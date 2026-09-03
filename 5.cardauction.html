@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>보물카드 경매 진행판</title>
+<style>
+:root{--pri:#2563eb;--bg:#ffffff;--fg:#111827;--bd:#d1d5db;--r:8px}
+*{box-sizing:border-box}
+body{margin:0;padding:14px;font-family:Pretendard,-apple-system,"Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--fg);font-size:16px}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;border-bottom:1px solid var(--bd);padding-bottom:10px;margin-bottom:14px}
+h1{font-size:20px;margin:0;font-weight:700}
+h1 span{font-size:14px;color:#6b7280;font-weight:400;margin-left:10px}
+button{font-family:inherit;font-size:15px;padding:8px 12px;border:1px solid var(--bd);background:#fff;color:var(--fg);border-radius:6px;cursor:pointer}
+button:hover{background:#f3f4f6}
+.btn-p{background:var(--pri);border-color:var(--pri);color:#fff;font-weight:700;font-size:20px;padding:14px 16px;width:100%;border-radius:var(--r)}
+.btn-p:hover{background:#1d4ed8}
+.grid{display:grid;grid-template-columns:minmax(340px,1fr) minmax(380px,1.1fr);gap:14px;align-items:start}
+.panel{border:1px solid var(--bd);border-radius:var(--r);padding:14px}
+.cardbig{border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;margin-bottom:12px}
+.cband{height:12px}
+.cinner{padding:12px 14px}
+.ctop{font-size:17px;font-weight:700}
+.cpts{font-size:56px;font-weight:700;line-height:1.1;margin:2px 0}
+.cpts em{font-size:18px;font-style:normal;font-weight:500;color:#6b7280;margin-left:6px}
+.cnote{font-size:14px;color:#6b7280}
+.brow{display:grid;grid-template-columns:1fr 44px 44px 74px 44px 44px 58px;gap:5px;align-items:center;padding:7px 0;border-top:1px solid #eceff3}
+.brow.off{opacity:.45}
+.bname{font-size:16px;font-weight:700}
+.bname span{display:block;font-size:12px;font-weight:400;color:#6b7280}
+.bval{text-align:right;font-size:28px;font-weight:700;font-variant-numeric:tabular-nums}
+.stp{padding:9px 0;width:100%;font-size:15px}
+.msg{font-size:15px;border:1px solid var(--bd);border-radius:6px;padding:10px 12px;margin-top:12px;background:#f9fafb;min-height:44px}
+.tgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tcard{border:1px solid var(--bd);border-radius:var(--r);padding:11px 12px}
+.tcard.lead{border-color:var(--pri);border-width:2px}
+.thead{display:flex;justify-content:space-between;align-items:baseline}
+.tname{font-size:17px;font-weight:700}
+.ttot{font-size:40px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}
+.tsub{font-size:13px;color:#6b7280;margin-top:2px}
+.dots{display:flex;gap:8px;margin-top:7px;font-size:13px;color:#374151}
+.dot{display:inline-flex;align-items:center;gap:4px}
+.sw{width:11px;height:11px;border-radius:2px;display:inline-block}
+.bon{display:inline-block;font-size:12px;font-weight:700;border:1px solid #15803d;color:#15803d;border-radius:4px;padding:1px 5px;margin-left:5px}
+.strip{display:grid;grid-template-columns:repeat(12,1fr);gap:5px;margin-top:14px}
+.chip{border:1px solid var(--bd);border-radius:6px;padding:5px 2px;text-align:center;font-size:12px;line-height:1.35}
+.chip b{display:block;font-size:16px}
+.chip.now{border-color:var(--pri);border-width:2px}
+.chip.done{background:#f3f4f6;color:#6b7280}
+.rrow{display:grid;grid-template-columns:26px 80px 1fr 70px;gap:10px;align-items:center;padding:8px 0;border-top:1px solid #eceff3;font-size:16px}
+.rbar{height:18px;background:var(--pri);border-radius:3px}
+.rnum{text-align:right;font-weight:700;font-variant-numeric:tabular-nums;font-size:20px}
+.foot{font-size:13px;color:#6b7280;margin-top:12px;line-height:1.7}
+table.rt{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}
+table.rt th,table.rt td{border-top:1px solid #eceff3;padding:5px;text-align:right}
+table.rt th:first-child,table.rt td:first-child{text-align:left}
+table.rt thead th{color:#6b7280;font-weight:600;border-top:0}
+@media print{button{display:none}}
+</style>
+</head>
+<body>
+<div class="bar">
+  <h1>보물카드 경매 진행판<span id="prog"></span></h1>
+  <div>
+    <button id="btnView">최종 결과</button>
+    <button id="btnUndo">되돌리기</button>
+    <button id="btnReset">처음부터</button>
+  </div>
+</div>
+<div class="grid">
+  <div class="panel" id="left"></div>
+  <div>
+    <div class="tgrid" id="teams"></div>
+    <div class="strip" id="strip"></div>
+    <div class="foot">예산 100점 · 같은 색 3장 모으면 보너스 25점 · 남은 예산은 그대로 점수 · 최고가 동점은 유찰</div>
+  </div>
+</div>
+<script>
+(function(){
+  var CARDS=[
+    {c:'red',p:18},{c:'blue',p:12},{c:'green',p:20},{c:'red',p:8},
+    {c:'blue',p:22},{c:'green',p:10},{c:'red',p:15},{c:'blue',p:6},
+    {c:'green',p:5},{c:'red',p:11},{c:'blue',p:16},{c:'green',p:14}
+  ];
+  var CO={red:{k:'빨강',h:'#b91c1c'},blue:{k:'파랑',h:'#1d4ed8'},green:{k:'초록',h:'#15803d'}};
+  var KEYS=['red','blue','green'];
+  var teams,idx,owner,msg,hist,view,resetArm;
+  function init(){
+    teams=[];
+    for(var i=1;i<=4;i++){teams.push({name:i+'조',budget:100,won:[],bid:0,pass:false});}
+    idx=0;owner=[];
+    for(var j=0;j<CARDS.length;j++){owner.push(null);}
+    msg='1번 카드부터 시작합니다. 각 조가 상의한 입찰가를 입력하세요.';
+    hist=[];view='play';resetArm=false;render();
+  }
+  function snap(){hist.push(JSON.stringify({t:teams,i:idx,o:owner,m:msg}));if(hist.length>40){hist.shift();}}
+  function undo(){if(hist.length===0){return;}var s=JSON.parse(hist.pop());teams=s.t;idx=s.i;owner=s.o;msg=s.m;view='play';render();}
+  function cnt(t,c){var n=0;for(var i=0;i<t.won.length;i++){if(CARDS[t.won[i]].c===c){n++;}}return n;}
+  function scoreOf(t){
+    var pts=0,i;
+    for(i=0;i<t.won.length;i++){pts+=CARDS[t.won[i]].p;}
+    var bonus=0;
+    for(i=0;i<KEYS.length;i++){if(cnt(t,KEYS[i])>=3){bonus+=25;}}
+    return {pts:pts,bonus:bonus,total:pts+bonus+t.budget};
+  }
+  function adj(i,d){
+    var t=teams[i];
+    if(t.pass){return;}
+    t.bid=t.bid+d;
+    if(t.bid<0){t.bid=0;}
+    if(t.bid>t.budget){t.bid=t.budget;}
+    render();
+  }
+  function award(){
+    if(idx>=CARDS.length){return;}
+    snap();
+    var mx=0,i;
+    for(i=0;i<teams.length;i++){if(!teams[i].pass&&teams[i].bid>mx){mx=teams[i].bid;}}
+    var w=[];
+    for(i=0;i<teams.length;i++){if(!teams[i].pass&&teams[i].bid===mx&&mx>0){w.push(i);}}
+    if(mx===0){
+      owner[idx]=-1;
+      msg=(idx+1)+'번 카드 — 입찰이 없어 유찰되었습니다.';
+    }else if(w.length>1){
+      var nm=[];
+      for(i=0;i<w.length;i++){nm.push(teams[w[i]].name);}
+      owner[idx]=-1;
+      msg=(idx+1)+'번 카드 — '+nm.join(', ')+'가 '+mx+'점 동점이므로 유찰되었습니다.';
+    }else{
+      var t=teams[w[0]];
+      t.budget=t.budget-mx;
+      t.won.push(idx);
+      owner[idx]=w[0];
+      msg=(idx+1)+'번 카드 — '+t.name+' 낙찰, '+mx+'점 지불 (카드 '+CARDS[idx].p+'점 · 잔여 예산 '+t.budget+'점)';
+    }
+    for(i=0;i<teams.length;i++){teams[i].bid=0;teams[i].pass=false;}
+    idx++;
+    if(idx>=CARDS.length){view='result';msg='12장 경매가 모두 끝났습니다. 최종 점수를 확인하세요.';}
+    render();
+  }
+  function renderLeft(){
+    var h='',i;
+    if(view==='result'||idx>=CARDS.length){
+      var arr=[];
+      for(i=0;i<teams.length;i++){arr.push({n:teams[i].name,s:scoreOf(teams[i]),b:teams[i].budget});}
+      arr.sort(function(a,b){return b.s.total-a.s.total;});
+      var top=arr[0].s.total;
+      if(top<1){top=1;}
+      h+='<div style="font-size:16px;font-weight:700;margin-bottom:4px">최종 순위</div>';
+      for(i=0;i<arr.length;i++){
+        var pct=Math.round(arr[i].s.total/top*100);
+        h+='<div class="rrow"><div>'+(i+1)+'</div><div style="font-weight:700">'+arr[i].n+'</div><div><div class="rbar" style="width:'+pct+'%"></div></div><div class="rnum">'+arr[i].s.total+'</div></div>';
+      }
+      h+='<table class="rt"><thead><tr><th>조</th><th>카드 점수</th><th>보너스</th><th>남은 예산</th><th>합계</th></tr></thead><tbody>';
+      for(i=0;i<arr.length;i++){
+        h+='<tr><td>'+arr[i].n+'</td><td>'+arr[i].s.pts+'</td><td>'+arr[i].s.bonus+'</td><td>'+arr[i].b+'</td><td style="font-weight:700">'+arr[i].s.total+'</td></tr>';
+      }
+      h+='</tbody></table><div class="msg">'+msg+'</div>';
+      document.getElementById('left').innerHTML=h;
+      return;
+    }
+    var c=CARDS[idx];
+    h+='<div class="cardbig"><div class="cband" style="background:'+CO[c.c].h+'"></div><div class="cinner">'+
+       '<div class="ctop" style="color:'+CO[c.c].h+'">'+(idx+1)+'번 카드 · '+CO[c.c].k+'</div>'+
+       '<div class="cpts">'+c.p+'<em>점</em></div>'+
+       '<div class="cnote">진행 '+(idx+1)+' / 12 · 남은 카드 '+(CARDS.length-idx-1)+'장</div></div></div>';
+    for(i=0;i<teams.length;i++){
+      var t=teams[i];
+      h+='<div class="brow'+(t.pass?' off':'')+'">'+
+         '<div class="bname">'+t.name+'<span>예산 '+t.budget+'점</span></div>'+
+         '<button class="stp" data-a="-5" data-i="'+i+'">-5</button>'+
+         '<button class="stp" data-a="-1" data-i="'+i+'">-1</button>'+
+         '<div class="bval">'+(t.pass?'포기':t.bid)+'</div>'+
+         '<button class="stp" data-a="1" data-i="'+i+'">+1</button>'+
+         '<button class="stp" data-a="5" data-i="'+i+'">+5</button>'+
+         '<button class="stp" data-a="p" data-i="'+i+'">'+(t.pass?'복귀':'포기')+'</button></div>';
+    }
+    h+='<div style="margin-top:12px"><button class="btn-p" id="btnAward">낙찰 처리 · 다음 카드</button></div>';
+    h+='<div class="msg">'+msg+'</div>';
+    document.getElementById('left').innerHTML=h;
+    var b=document.getElementById('btnAward');
+    if(b){b.addEventListener('click',award);}
+  }
+  function renderTeams(){
+    var best=-1,i;
+    for(i=0;i<teams.length;i++){
+      var v=scoreOf(teams[i]).total;
+      if(v>best){best=v;}
+    }
+    var h='';
+    for(i=0;i<teams.length;i++){
+      var t=teams[i],s=scoreOf(t),bon='',dots='';
+      for(var k=0;k<KEYS.length;k++){
+        if(cnt(t,KEYS[k])>=3){bon+='<span class="bon">'+CO[KEYS[k]].k+' +25</span>';}
+      }
+      for(var j=0;j<KEYS.length;j++){
+        dots+='<span class="dot"><span class="sw" style="background:'+CO[KEYS[j]].h+'"></span>'+cnt(t,KEYS[j])+'</span>';
+      }
+      h+='<div class="tcard'+(s.total===best?' lead':'')+'">'+
+         '<div class="thead"><span class="tname">'+t.name+bon+'</span><span class="ttot">'+s.total+'</span></div>'+
+         '<div class="tsub">카드 '+s.pts+' + 보너스 '+s.bonus+' + 예산 '+t.budget+'</div>'+
+         '<div class="dots">'+dots+'<span class="dot" style="color:#6b7280">보유 '+t.won.length+'장</span></div></div>';
+    }
+    document.getElementById('teams').innerHTML=h;
+  }
+  function renderStrip(){
+    var h='';
+    for(var i=0;i<CARDS.length;i++){
+      var cls='chip';
+      if(i===idx&&view==='play'){cls+=' now';}
+      if(owner[i]!==null){cls+=' done';}
+      var who='대기';
+      if(owner[i]===-1){who='유찰';}
+      else if(owner[i]!==null){who=teams[owner[i]].name;}
+      h+='<div class="'+cls+'"><span class="sw" style="background:'+CO[CARDS[i].c].h+'"></span><b>'+CARDS[i].p+'</b>'+who+'</div>';
+    }
+    document.getElementById('strip').innerHTML=h;
+    document.getElementById('prog').innerHTML=(idx>=CARDS.length?'경매 종료':'진행 '+(idx+1)+'/12');
+  }
+  function render(){
+    renderLeft();renderTeams();renderStrip();
+    document.getElementById('btnView').textContent=(view==='result'?'진행 화면':'최종 결과');
+    document.getElementById('btnReset').textContent=(resetArm?'한 번 더 누르면 초기화':'처음부터');
+  }
+  document.getElementById('left').addEventListener('click',function(e){
+    var b=e.target.closest('button.stp');
+    if(!b){return;}
+    var i=parseInt(b.getAttribute('data-i'),10);
+    var a=b.getAttribute('data-a');
+    if(a==='p'){teams[i].pass=!teams[i].pass;teams[i].bid=0;render();}
+    else{adj(i,parseInt(a,10));}
+  });
+  document.getElementById('btnUndo').addEventListener('click',undo);
+  document.getElementById('btnView').addEventListener('click',function(){
+    view=(view==='result'?'play':'result');
+    if(idx>=CARDS.length){view='result';}
+    render();
+  });
+  document.getElementById('btnReset').addEventListener('click',function(){
+    if(resetArm){init();}
+    else{resetArm=true;render();setTimeout(function(){resetArm=false;render();},4000);}
+  });
+  init();
+})();
+</script>
+</body>
+</html>

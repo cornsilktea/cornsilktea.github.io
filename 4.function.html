@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>로봇 코딩 미로 - 10단계</title>
+<style>
+:root{--bd:#d7dbe2;--fg:#1b2330;--sub:#5b6675;--pri:#2563eb;--bg:#f7f8fa;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);
+ font-family:Pretendard,-apple-system,"Segoe UI",sans-serif;}
+header{background:#fff;border-bottom:1px solid var(--bd);padding:10px 16px;}
+h1{font-size:18px;margin:0 0 8px;}
+#stagebar{display:flex;flex-wrap:wrap;gap:6px;}
+#stagebar button{width:40px;height:34px;border:1px solid var(--bd);background:#fff;
+ border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;color:var(--sub);}
+#stagebar button.on{background:var(--pri);border-color:var(--pri);color:#fff;}
+#stagebar button.clear{border-color:#16a34a;color:#16a34a;}
+#stagebar button.on.clear{background:#16a34a;border-color:#16a34a;color:#fff;}
+main{display:flex;gap:14px;padding:14px;align-items:flex-start;flex-wrap:wrap;}
+.panel{background:#fff;border:1px solid var(--bd);border-radius:8px;padding:12px;}
+#left{flex:1 1 420px;min-width:340px;}
+#right{flex:1 1 340px;min-width:300px;}
+#title{font-size:16px;font-weight:700;margin-bottom:4px;}
+#hint{font-size:13px;color:var(--sub);line-height:1.5;margin-bottom:10px;}
+canvas{display:block;background:#eef1f5;border-radius:6px;margin:0 auto;}
+#msg{margin-top:10px;font-size:14px;min-height:22px;line-height:1.5;font-weight:600;}
+.ok{color:#16a34a}.bad{color:#dc2626}.warn{color:#b45309}
+#counter{font-size:13px;color:var(--sub);margin-bottom:8px;}
+#counter b{color:var(--fg);font-size:15px;}
+.tabs{display:flex;gap:6px;margin-bottom:8px;}
+.tabs button{flex:1;padding:7px;border:1px solid var(--bd);background:#fff;border-radius:6px;
+ font-size:13px;font-weight:600;cursor:pointer;color:var(--sub);}
+.tabs button.on{background:#eef4ff;border-color:var(--pri);color:var(--pri);}
+.pal{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
+.pal button{padding:8px 11px;border:1px solid var(--bd);background:#fff;border-radius:6px;
+ font-size:13px;font-weight:600;cursor:pointer;}
+.pal button:hover{background:#f1f4f9;}
+.pal .go{border-color:#2563eb;color:#2563eb;}
+.pal .turn{border-color:#7c3aed;color:#7c3aed;}
+.pal .rep{border-color:#b45309;color:#b45309;}
+.pal .fn{border-color:#0d9488;color:#0d9488;}
+.pal input{width:52px;padding:6px;border:1px solid var(--bd);border-radius:6px;text-align:right;}
+#code,#fcode{border:1px solid var(--bd);border-radius:6px;padding:8px;min-height:120px;
+ max-height:300px;overflow:auto;background:#fbfcfd;}
+.list{padding-left:0;}
+.list.active{outline:2px dashed var(--pri);outline-offset:2px;border-radius:5px;min-height:22px;}
+.blk{border:1px solid var(--bd);border-radius:5px;padding:5px 8px;margin:3px 0;font-size:13px;
+ background:#fff;font-weight:600;}
+.b-M{border-left:4px solid #2563eb;}
+.b-L,.b-R{border-left:4px solid #7c3aed;}
+.b-CALL{border-left:4px solid #0d9488;}
+.b-REP{border-left:4px solid #b45309;padding:5px 6px;}
+.rep-head,.rep-foot{font-size:13px;font-weight:700;color:#b45309;}
+.rep-body{margin:4px 0 4px 14px;border-left:2px dotted #d9b382;padding-left:8px;min-height:20px;}
+.empty{color:#9aa3af;font-size:12px;font-weight:500;padding:4px;}
+#runbar{display:flex;gap:6px;margin-top:10px;align-items:center;flex-wrap:wrap;}
+#runbar button{padding:9px 14px;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;
+ border:1px solid var(--bd);background:#fff;}
+#runbar button#run{background:var(--pri);border-color:var(--pri);color:#fff;}
+#runbar select{padding:7px;border:1px solid var(--bd);border-radius:6px;}
+.note{font-size:12px;color:var(--sub);margin-top:8px;line-height:1.5;}
+</style>
+</head>
+<body>
+<header>
+  <h1>로봇 코딩 미로 - 10단계</h1>
+  <div id="stagebar"></div>
+</header>
+<main>
+  <section id="left" class="panel">
+    <div id="title"></div>
+    <div id="hint"></div>
+    <canvas id="cv" width="520" height="420"></canvas>
+    <div id="msg"></div>
+  </section>
+  <section id="right" class="panel">
+    <div id="counter"></div>
+    <div class="tabs" id="tabs">
+      <button id="tabMain" class="on">메인 프로그램</button>
+      <button id="tabFunc">나만의 블록</button>
+    </div>
+    <div class="pal">
+      <button class="go" data-t="M">앞으로 가기</button>
+      <button class="turn" data-t="L">왼쪽 돌기</button>
+      <button class="turn" data-t="R">오른쪽 돌기</button>
+      <input id="repN" type="number" min="2" max="20" value="3">
+      <button class="rep" data-t="REP">번 반복</button>
+      <button class="rep" id="endrep">반복 끝내기</button>
+      <button class="fn" id="callbtn" data-t="CALL">나만의 블록 넣기</button>
+    </div>
+    <div id="code"></div>
+    <div id="fwrap" style="margin-top:10px;">
+      <div style="font-size:13px;font-weight:700;color:#0d9488;margin-bottom:4px;">나만의 블록 만들기</div>
+      <div id="fcode"></div>
+    </div>
+    <div id="runbar">
+      <button id="run">실행하기</button>
+      <button id="undo">되돌리기</button>
+      <button id="clear">전체 지우기</button>
+      <select id="speed">
+        <option value="320">느리게</option>
+        <option value="170" selected>보통</option>
+        <option value="70">빠르게</option>
+      </select>
+    </div>
+    <div class="note">블록을 반복 안에 넣으려면 먼저 반복 블록을 만드세요. 새 블록은 점선으로 표시된 곳에 들어갑니다.</div>
+  </section>
+</main>
+<script>
+var STAGES = [{"name": "1단계 · 첫 걸음", "hint": "앞으로 가기 버튼만 눌러 도착 깃발까지 가 보세요.", "grid": ["#########", "#S.....G#", "#########"], "dir": "E", "limit": 8, "best": 6, "func": false}, {"name": "2단계 · 블록이 모자라요", "hint": "앞으로 15칸! 그런데 블록은 5개뿐입니다. 반복 블록을 써 보세요.", "grid": ["##################", "#S..............G#", "##################"], "dir": "E", "limit": 5, "best": 2, "func": false}, {"name": "3단계 · 모퉁이 돌기", "hint": "직진 구간마다 반복 블록으로 묶어 보세요.", "grid": ["##########", "#S.......#", "########.#", "########.#", "########.#", "########.#", "########G#", "##########"], "dir": "E", "limit": 7, "best": 5, "func": false}, {"name": "4단계 · 계단 오르기", "hint": "앞으로-왼쪽-앞으로-오른쪽. 이 네 개가 계속 되풀이됩니다.", "grid": ["########", "######G#", "#####..#", "####..##", "###..###", "##..####", "#S.#####", "########"], "dir": "E", "limit": 7, "best": 5, "func": false}, {"name": "5단계 · 반복 속의 반복", "hint": "반복 블록 안에 반복 블록을 넣을 수 있어요.", "grid": ["###############", "#############G#", "#############.#", "###########...#", "###########.###", "#########...###", "#########.#####", "#######...#####", "#######.#######", "#####...#######", "#####.#########", "###...#########", "###.###########", "#S..###########", "###############"], "dir": "E", "limit": 8, "best": 7, "func": false}, {"name": "6단계 · 별을 모두 모아라", "hint": "별을 하나도 빠짐없이 지나간 뒤 도착해야 성공입니다.", "grid": ["########", "#S.*...#", "#G####.#", "#.####*#", "#*####.#", "#.####.#", "#...*..#", "########"], "dir": "E", "limit": 7, "best": 6, "func": false}, {"name": "7단계 · 똑같은 동작에 이름 붙이기", "hint": "같은 계단 동작이 네 번 나오는데 사이 간격이 제각각입니다. 나만의 블록을 만들어 보세요.", "grid": ["#############", "###########G#", "#######.....#", "#####...#####", "##....#######", "#S.##########", "#############"], "dir": "E", "limit": 15, "best": 13, "func": true}, {"name": "8단계 · 블록 속의 블록", "hint": "나만의 블록 안에도 반복 블록을 넣을 수 있어요.", "grid": ["#############", "###########G#", "###########.#", "######......#", "######.######", "###....######", "###.#########", "#S..#########", "#############"], "dir": "E", "limit": 14, "best": 12, "func": true}, {"name": "9단계 · 밭갈이", "hint": "좌우로 왔다 갔다 하는 큰 규칙 하나가 숨어 있습니다.", "grid": ["########", "#S.....#", "######.#", "#....*.#", "#.######", "#......#", "######.#", "#.....*#", "#.######", "#.....*#", "######.#", "#......#", "#.######", "#G######", "########"], "dir": "E", "limit": 14, "best": 13, "func": false}, {"name": "10단계 · 마지막 관문", "hint": "반복 블록과 나만의 블록을 함께 써야 통과할 수 있습니다.", "grid": ["##############", "############G#", "############.#", "######*....*.#", "######.#######", "###*...#######", "###.##########", "#S..##########", "##############"], "dir": "E", "limit": 13, "best": 12, "func": true}];
+var DIRS={E:[0,1],S:[1,0],W:[0,-1],N:[-1,0]};
+var RIGHT={E:'S',S:'W',W:'N',N:'E'};
+var LEFT={E:'N',N:'W',W:'S',S:'E'};
+var LABEL={M:'앞으로 가기',L:'왼쪽 돌기',R:'오른쪽 돌기',CALL:'나만의 블록'};
+
+var idx=0, st=null, grid=[], startPos=null, goalPos=null, allStars=[];
+var robot={r:0,c:0,d:'E'}, got={}, running=false;
+var prog={main:[],func:[]}, target='main', cursor=[];
+var cv=document.getElementById('cv'), cx=cv.getContext('2d');
+
+function cleared(){
+  try{ return JSON.parse(localStorage.getItem('rmz10')||'{}'); }catch(e){ return {}; }
+}
+function markClear(i,used){
+  var c=cleared();
+  if(!c[i] || used<c[i]) c[i]=used;
+  localStorage.setItem('rmz10', JSON.stringify(c));
+}
+
+function buildBar(){
+  var bar=document.getElementById('stagebar'); bar.innerHTML='';
+  var c=cleared();
+  for(var i=0;i<STAGES.length;i++){
+    (function(i){
+      var b=document.createElement('button');
+      b.textContent=(i+1);
+      if(i===idx) b.className='on';
+      if(c[i]) b.className+=' clear';
+      b.onclick=function(){ load(i); };
+      bar.appendChild(b);
+    })(i);
+  }
+}
+
+function load(i){
+  idx=i; st=STAGES[i];
+  grid=st.grid.map(function(r){ return r.split(''); });
+  allStars=[];
+  for(var r=0;r<grid.length;r++){
+    for(var c=0;c<grid[r].length;c++){
+      if(grid[r][c]==='S') startPos={r:r,c:c};
+      if(grid[r][c]==='G') goalPos={r:r,c:c};
+      if(grid[r][c]==='*') allStars.push(r+','+c);
+    }
+  }
+  prog={main:[],func:[]}; target='main'; cursor=[];
+  document.getElementById('title').textContent=st.name;
+  document.getElementById('hint').textContent=st.hint;
+  document.getElementById('tabs').style.display = st.func?'flex':'none';
+  document.getElementById('fwrap').style.display = st.func?'block':'none';
+  document.getElementById('callbtn').style.display = st.func?'inline-block':'none';
+  setMsg('','');
+  resetRobot(); buildBar(); render();
+}
+
+function resetRobot(){
+  robot={r:startPos.r,c:startPos.c,d:st.dir}; got={};
+}
+function setMsg(t,cls){
+  var m=document.getElementById('msg'); m.textContent=t; m.className=cls||'';
+}
+
+/* ---------- 그리기 ---------- */
+function draw(){
+  var H=grid.length, W=grid[0].length;
+  var cell=Math.floor(Math.min(500/W, 400/H));
+  if(cell<18) cell=18;
+  cv.width=W*cell; cv.height=H*cell;
+  for(var r=0;r<H;r++){
+    for(var c=0;c<W;c++){
+      var ch=grid[r][c];
+      cx.fillStyle=(ch==='#')?'#9aa5b4':'#ffffff';
+      cx.fillRect(c*cell,r*cell,cell,cell);
+      cx.strokeStyle=(ch==='#')?'#8c97a6':'#e6eaf0';
+      cx.strokeRect(c*cell+0.5,r*cell+0.5,cell-1,cell-1);
+    }
+  }
+  cx.textAlign='center'; cx.textBaseline='middle';
+  for(var i=0;i<allStars.length;i++){
+    var p=allStars[i].split(','), sr=+p[0], sc=+p[1];
+    cx.fillStyle = got[allStars[i]] ? '#d6dbe3' : '#f59e0b';
+    cx.font='bold '+Math.floor(cell*0.62)+'px sans-serif';
+    cx.fillText('★', sc*cell+cell/2, sr*cell+cell/2+1);
+  }
+  cx.fillStyle='#16a34a';
+  cx.fillRect(goalPos.c*cell+cell*0.2, goalPos.r*cell+cell*0.2, cell*0.6, cell*0.6);
+  cx.fillStyle='#fff'; cx.font='bold '+Math.floor(cell*0.4)+'px sans-serif';
+  cx.fillText('G', goalPos.c*cell+cell/2, goalPos.r*cell+cell/2+1);
+  var x=robot.c*cell+cell/2, y=robot.r*cell+cell/2;
+  cx.fillStyle='#2563eb';
+  cx.beginPath();
+  cx.arc(x,y,cell*0.32,0,Math.PI*2);
+  cx.fill();
+  var d=DIRS[robot.d];
+  cx.fillStyle='#fbbf24';
+  cx.beginPath();
+  cx.arc(x+d[1]*cell*0.2, y+d[0]*cell*0.2, cell*0.11, 0, Math.PI*2);
+  cx.fill();
+}
+
+/* ---------- 블록 편집 ---------- */
+function root(){ return target==='main'?prog.main:prog.func; }
+function container(){
+  var a=root();
+  for(var i=0;i<cursor.length;i++){ a=a[cursor[i]].body; }
+  return a;
+}
+function countList(list){
+  var n=0;
+  for(var i=0;i<list.length;i++){
+    n++;
+    if(list[i].t==='REP') n+=countList(list[i].body);
+  }
+  return n;
+}
+function total(){ return countList(prog.main)+countList(prog.func); }
+
+function addBlock(t){
+  if(running) return;
+  if(t==='CALL' && target==='func'){
+    setMsg('나만의 블록 안에는 자기 자신을 넣을 수 없어요.','bad'); return;
+  }
+  if(total()>=st.limit){
+    setMsg('블록을 '+st.limit+'개까지만 쓸 수 있어요. 더 짧게 만들 방법이 있을까요?','warn');
+    return;
+  }
+  var c=container();
+  if(t==='REP'){
+    var n=parseInt(document.getElementById('repN').value,10);
+    if(!(n>=2)) n=2;
+    if(n>20) n=20;
+    c.push({t:'REP',n:n,body:[]});
+    cursor=cursor.concat([c.length-1]);
+  } else {
+    c.push({t:t});
+  }
+  setMsg('','');
+  render();
+}
+function endRep(){
+  if(cursor.length>0){ cursor=cursor.slice(0,cursor.length-1); render(); }
+}
+function undo(){
+  if(running) return;
+  var c=container();
+  if(c.length>0){ c.pop(); }
+  else if(cursor.length>0){
+    cursor=cursor.slice(0,cursor.length-1);
+    container().pop();
+  }
+  setMsg('','');
+  render();
+}
+function clearAll(){
+  if(running) return;
+  if(target==='main'){ prog.main=[]; } else { prog.func=[]; }
+  cursor=[]; setMsg('','');
+  render();
+}
+
+function renderList(list, path, wrap){
+  wrap.className='list';
+  var isHere = (path.join(',')===cursor.join(',')) &&
+               ((path.length===0 ? true : true));
+  if(isHere && wrap.dataset.target===target) wrap.className='list active';
+  if(list.length===0){
+    var e=document.createElement('div');
+    e.className='empty'; e.textContent='(블록을 추가해 보세요)';
+    wrap.appendChild(e);
+  }
+  for(var i=0;i<list.length;i++){
+    var n=list[i];
+    var el=document.createElement('div');
+    el.className='blk b-'+n.t;
+    if(n.t==='REP'){
+      var head=document.createElement('div');
+      head.className='rep-head'; head.textContent=n.n+'번 반복';
+      el.appendChild(head);
+      var body=document.createElement('div');
+      body.className='rep-body';
+      var inner=document.createElement('div');
+      inner.dataset.target=wrap.dataset.target;
+      renderList(n.body, path.concat([i]), inner);
+      body.appendChild(inner);
+      el.appendChild(body);
+      var foot=document.createElement('div');
+      foot.className='rep-foot'; foot.textContent='반복 끝';
+      el.appendChild(foot);
+    } else {
+      el.textContent=LABEL[n.t];
+    }
+    wrap.appendChild(el);
+  }
+}
+
+function render(){
+  draw();
+  document.getElementById('tabMain').className = (target==='main')?'on':'';
+  document.getElementById('tabFunc').className = (target==='func')?'on':'';
+  var codeEl=document.getElementById('code');
+  codeEl.innerHTML='';
+  var w1=document.createElement('div');
+  w1.dataset.target='main';
+  renderList(prog.main, [], w1);
+  codeEl.appendChild(w1);
+  if(st.func){
+    var fEl=document.getElementById('fcode');
+    fEl.innerHTML='';
+    var w2=document.createElement('div');
+    w2.dataset.target='func';
+    renderList(prog.func, [], w2);
+    fEl.appendChild(w2);
+  }
+  var used=total();
+  var starTxt = allStars.length? ' · 별 '+Object.keys(got).length+'/'+allStars.length : '';
+  document.getElementById('counter').innerHTML =
+    '사용한 블록 <b>'+used+'</b> / 최대 '+st.limit+'개'+starTxt;
+}
+
+/* ---------- 실행 ---------- */
+function expandList(list, out){
+  for(var i=0;i<list.length;i++){
+    if(out.length>4000) return;
+    var n=list[i];
+    if(n.t==='M'||n.t==='L'||n.t==='R'){ out.push(n.t); }
+    else if(n.t==='REP'){
+      for(var k=0;k<n.n;k++){ expandList(n.body,out); }
+    }
+    else if(n.t==='CALL'){ expandList(prog.func,out); }
+  }
+}
+
+function run(){
+  if(running) return;
+  if(prog.main.length===0){ setMsg('먼저 블록을 놓아 주세요.','warn'); return; }
+  var raw=[]; expandList(prog.main, raw);
+  var used=total();
+  resetRobot(); render();
+  running=true; setMsg('로봇이 움직입니다...','');
+  var i=0;
+  var speed=parseInt(document.getElementById('speed').value,10);
+  var timer=setInterval(function(){
+    if(i>=raw.length){
+      clearInterval(timer); running=false; finish(used); return;
+    }
+    var cmd=raw[i++];
+    if(cmd==='L'){ robot.d=LEFT[robot.d]; }
+    else if(cmd==='R'){ robot.d=RIGHT[robot.d]; }
+    else {
+      var d=DIRS[robot.d], nr=robot.r+d[0], nc=robot.c+d[1];
+      if(nr<0||nr>=grid.length||nc<0||nc>=grid[0].length||grid[nr][nc]==='#'){
+        clearInterval(timer); running=false;
+        render();
+        setMsg('벽에 부딪혔어요. 어느 명령에서 잘못됐는지 찾아볼까요?','bad');
+        return;
+      }
+      robot.r=nr; robot.c=nc;
+      var key=nr+','+nc;
+      if(allStars.indexOf(key)>=0) got[key]=true;
+    }
+    render();
+  }, speed);
+}
+
+function finish(used){
+  var atGoal = (robot.r===goalPos.r && robot.c===goalPos.c);
+  var allGot = (Object.keys(got).length===allStars.length);
+  if(atGoal && allGot){
+    markClear(idx, used); buildBar();
+    if(used>st.best){
+      setMsg('성공! 그런데 블록 '+st.best+'개로도 갈 수 있어요. 더 줄여 볼까요?','ok');
+    } else {
+      setMsg('완벽합니다! 최소 블록 '+st.best+'개로 통과했어요.','ok');
+    }
+  } else if(atGoal && !allGot){
+    setMsg('도착은 했지만 별을 다 모으지 못했어요. 별을 모두 지나가야 합니다.','bad');
+  } else {
+    setMsg('도착 깃발까지 가지 못했어요. 명령을 다시 살펴보세요.','bad');
+  }
+}
+
+/* ---------- 이벤트 ---------- */
+var pal=document.querySelectorAll('.pal button[data-t]');
+for(var i=0;i<pal.length;i++){
+  (function(b){
+    b.onclick=function(){ addBlock(b.dataset.t); };
+  })(pal[i]);
+}
+document.getElementById('endrep').onclick=endRep;
+document.getElementById('undo').onclick=undo;
+document.getElementById('clear').onclick=clearAll;
+document.getElementById('run').onclick=run;
+document.getElementById('tabMain').onclick=function(){ target='main'; cursor=[]; render(); };
+document.getElementById('tabFunc').onclick=function(){ target='func'; cursor=[]; render(); };
+load(0);
+</script>
+</body>
+</html>

@@ -1,0 +1,1190 @@
+<title>추상화 놀이터</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F2F4EE;
+    --surface:#FFFFFF;
+    --surface-alt:#E7ECE2;
+    --ink:#1E241D;
+    --ink-soft:#5B6459;
+    --line:#CBD3C3;
+    --accent:#2E5FA3;
+    --accent-ink:#1F3F73;
+    --accent-bg:#E1EAF6;
+    --core:#2E7D4F;
+    --core-bg:#E1F1E5;
+    --omit:#8A7F6A;
+    --omit-bg:#EFEAE0;
+    --presenter:#2E5FA3;
+    --presenter-bg:#E1EAF6;
+    --guesser:#8A4F82;
+    --guesser-bg:#F1E5EF;
+    --danger:#B3462C;
+    --shadow: 0 1px 0 rgba(30,36,29,.06), 0 8px 20px -12px rgba(30,36,29,.25);
+    --radius: 14px;
+    --font-display:'Gaegu','Noto Sans KR',sans-serif;
+    --font-body:'IBM Plex Sans KR','Apple SD Gothic Neo',sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#12160F;
+      --surface:#1A2016;
+      --surface-alt:#232B1D;
+      --ink:#EAEFE4;
+      --ink-soft:#AEB8A4;
+      --line:#39432F;
+      --accent:#7FAEEB;
+      --accent-ink:#A9C8F2;
+      --accent-bg:#1E2C40;
+      --core:#68CB90;
+      --core-bg:#1D3524;
+      --omit:#C2B79E;
+      --omit-bg:#2B2818;
+      --presenter:#7FAEEB;
+      --presenter-bg:#1E2C40;
+      --guesser:#CE96C7;
+      --guesser-bg:#332230;
+      --danger:#E58164;
+      --shadow: 0 1px 0 rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#12160F;
+    --surface:#1A2016;
+    --surface-alt:#232B1D;
+    --ink:#EAEFE4;
+    --ink-soft:#AEB8A4;
+    --line:#39432F;
+    --accent:#7FAEEB;
+    --accent-ink:#A9C8F2;
+    --accent-bg:#1E2C40;
+    --core:#68CB90;
+    --core-bg:#1D3524;
+    --omit:#C2B79E;
+    --omit-bg:#2B2818;
+    --presenter:#7FAEEB;
+    --presenter-bg:#1E2C40;
+    --guesser:#CE96C7;
+    --guesser-bg:#332230;
+    --danger:#E58164;
+    --shadow: 0 1px 0 rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.6);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--paper);
+    background-image:
+      radial-gradient(circle, var(--line) 1px, transparent 1.4px);
+    background-size: 26px 26px;
+    color:var(--ink);
+    font-family:var(--font-body);
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3{font-family:var(--font-display); text-wrap:balance; margin:0;}
+  p{margin:0;}
+  button{font-family:var(--font-body);}
+
+  .app{
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+  }
+
+  /* ---------- Topbar ---------- */
+  .topbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    padding:14px 28px;
+    background:var(--surface);
+    border-bottom:2px dashed var(--line);
+    flex-wrap:wrap;
+  }
+  .brand{
+    font-family:var(--font-display);
+    font-size:1.7rem;
+    font-weight:700;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .tabs{
+    display:flex;
+    gap:10px;
+  }
+  .tab-btn{
+    border:2px solid var(--line);
+    background:var(--surface);
+    color:var(--ink);
+    padding:10px 20px;
+    border-radius:999px;
+    font-size:1.05rem;
+    font-weight:600;
+    cursor:pointer;
+  }
+  .tab-btn.active{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:#fff;
+  }
+  .round-progress{
+    font-variant-numeric:tabular-nums;
+    font-weight:600;
+    color:var(--ink-soft);
+    background:var(--surface-alt);
+    padding:8px 16px;
+    border-radius:999px;
+    font-size:1rem;
+  }
+
+  main{
+    flex:1;
+    display:flex;
+    justify-content:center;
+    padding:28px 20px 48px;
+  }
+  .screen{
+    width:100%;
+    max-width:920px;
+    display:flex;
+    flex-direction:column;
+    gap:22px;
+  }
+  .card{
+    background:var(--surface);
+    border:2px dashed var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:28px;
+  }
+  .lede{
+    color:var(--ink-soft);
+    font-size:1.1rem;
+    line-height:1.6;
+  }
+  .stack{display:flex; flex-direction:column; gap:14px;}
+  .row{display:flex; gap:14px; flex-wrap:wrap; align-items:center;}
+  .row.center{justify-content:center;}
+  .row.between{justify-content:space-between;}
+
+  /* ---------- Buttons ---------- */
+  .btn{
+    appearance:none;
+    border:2px solid var(--accent);
+    background:var(--accent);
+    color:#fff;
+    font-size:1.15rem;
+    font-weight:600;
+    padding:16px 26px;
+    border-radius:12px;
+    cursor:pointer;
+    min-height:64px;
+    line-height:1.2;
+  }
+  .btn:hover{background:var(--accent-ink); border-color:var(--accent-ink);}
+  .btn:focus-visible{outline:3px solid var(--accent-ink); outline-offset:3px;}
+  .btn.ghost{
+    background:var(--surface);
+    color:var(--accent);
+  }
+  .btn.ghost:hover{background:var(--accent-bg);}
+  .btn.quiet{
+    background:var(--surface-alt);
+    border-color:var(--surface-alt);
+    color:var(--ink);
+  }
+  .btn.quiet:hover{background:var(--line);}
+  .btn.wide{width:100%;}
+  .btn:disabled{opacity:.45; cursor:not-allowed;}
+
+  /* ---------- Number picker (presenter / guesser) ---------- */
+  .pick-badge{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    background:var(--presenter-bg);
+    color:var(--presenter);
+    font-weight:700;
+    padding:8px 16px;
+    border-radius:999px;
+    font-size:1rem;
+  }
+  .num-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(64px,1fr));
+    gap:10px;
+  }
+  .num-btn{
+    min-height:58px;
+    border-radius:12px;
+    border:2px solid var(--line);
+    background:var(--surface-alt);
+    color:var(--ink);
+    font-size:1.15rem;
+    font-weight:700;
+    font-variant-numeric:tabular-nums;
+    cursor:pointer;
+  }
+  .num-btn:hover{background:var(--line);}
+  .num-btn.presenter-mode{border-color:var(--presenter); color:var(--presenter); background:var(--presenter-bg);}
+  .num-btn.presenter-mode:hover{filter:brightness(0.97);}
+  .num-btn.guesser-mode{border-color:var(--guesser); color:var(--guesser); background:var(--guesser-bg);}
+  .num-btn.guesser-mode:hover{filter:brightness(0.97);}
+  .num-btn.none-btn{
+    grid-column:1 / -1;
+    background:var(--surface);
+    border-color:var(--line);
+    color:var(--ink-soft);
+  }
+  .num-btn:disabled{opacity:.3; cursor:not-allowed; filter:none;}
+
+  /* ---------- Scoreboard tab ---------- */
+  .scoreboard-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(92px,1fr));
+    gap:12px;
+  }
+  .score-card{
+    background:var(--surface-alt);
+    border-radius:12px;
+    padding:14px 8px;
+    text-align:center;
+  }
+  .score-card .num{
+    font-size:.95rem;
+    font-weight:600;
+    color:var(--ink-soft);
+  }
+  .score-card .pts{
+    font-family:var(--font-display);
+    font-size:1.8rem;
+    font-weight:700;
+    color:var(--accent);
+    font-variant-numeric:tabular-nums;
+    line-height:1.3;
+  }
+
+  /* ---------- Intro screen ---------- */
+  .rules-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(220px,1fr));
+    gap:16px;
+  }
+  .rule-item{
+    background:var(--surface-alt);
+    border-radius:12px;
+    padding:16px 18px;
+    display:flex;
+    gap:12px;
+    align-items:flex-start;
+  }
+  .rule-num{
+    font-family:var(--font-display);
+    font-size:1.6rem;
+    font-weight:700;
+    color:var(--accent);
+    line-height:1;
+  }
+  .settings-row{
+    display:flex;
+    gap:24px;
+    flex-wrap:wrap;
+  }
+  .field{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .field label{font-size:.95rem; color:var(--ink-soft); font-weight:600;}
+  .field input{
+    font-family:var(--font-body);
+    font-size:1.1rem;
+    font-variant-numeric:tabular-nums;
+    padding:10px 14px;
+    border:2px solid var(--line);
+    border-radius:10px;
+    background:var(--surface);
+    color:var(--ink);
+    width:110px;
+  }
+
+  /* ---------- Peek screen ---------- */
+  .peek-tag{
+    display:inline-block;
+    background:var(--accent-bg);
+    color:var(--accent);
+    font-weight:700;
+    padding:6px 16px;
+    border-radius:999px;
+    font-size:.95rem;
+  }
+  .peek-warn{
+    background:var(--accent-bg);
+    color:var(--accent-ink);
+    border-radius:12px;
+    padding:16px 18px;
+    font-size:1.05rem;
+    line-height:1.6;
+  }
+  .peek-box{
+    position:fixed;
+    left:20px;
+    bottom:20px;
+    width:230px;
+    min-height:110px;
+    background:var(--surface);
+    border:2px dashed var(--accent);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:14px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    cursor:pointer;
+    -webkit-user-select:none;
+    user-select:none;
+    -webkit-touch-callout:none;
+    z-index:50;
+  }
+  .peek-box:active{ background:var(--accent-bg); }
+  .peek-box:focus-visible{ outline:3px solid var(--accent-ink); outline-offset:3px; }
+  .peek-box-face{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:8px;
+  }
+  .peek-box-locked{ color:var(--ink-soft); font-weight:600; font-size:.95rem; }
+  .peek-lock{ font-size:1.7rem; }
+  .peek-box .peek-tag{ font-size:.8rem; padding:4px 12px; margin:0; }
+  .peek-box .peek-word{
+    font-family:var(--font-display);
+    font-size:1.8rem;
+    font-weight:700;
+    line-height:1.15;
+  }
+
+  /* ---------- Draw screen ---------- */
+  .draw-toolbar{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:16px;
+  }
+  .timer{
+    font-variant-numeric:tabular-nums;
+    font-size:2.2rem;
+    font-weight:700;
+    color:var(--accent);
+  }
+  .timer.warn{color:var(--danger);}
+  .pips{display:flex; gap:8px;}
+  .pip{
+    width:22px; height:22px;
+    border-radius:50%;
+    border:2px solid var(--accent);
+    background:transparent;
+  }
+  .pip.used{background:var(--accent);}
+  .pip-label{font-size:.9rem; color:var(--ink-soft); margin-right:4px;}
+  .canvas-wrap{
+    position:relative;
+    border:2px dashed var(--line);
+    border-radius:var(--radius);
+    overflow:hidden;
+    background:var(--surface);
+    touch-action:none;
+  }
+  canvas{
+    display:block;
+    width:100%;
+    height:min(58vh, 520px);
+    touch-action:none;
+    cursor:crosshair;
+  }
+  .budget-banner{
+    position:absolute;
+    inset:auto 0 0 0;
+    background:var(--danger);
+    color:#fff;
+    text-align:center;
+    font-weight:600;
+    padding:10px;
+    transform:translateY(100%);
+    transition:transform .2s ease;
+  }
+  .budget-banner.show{transform:translateY(0);}
+
+  /* ---------- Reveal screen ---------- */
+  .reveal-word{
+    font-family:var(--font-display);
+    font-size:clamp(2.4rem, 6vw, 3.6rem);
+    font-weight:700;
+  }
+  .tag-groups{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+  }
+  @media (max-width:640px){ .tag-groups{grid-template-columns:1fr;} }
+  .tag-group h3{
+    font-family:var(--font-body);
+    font-size:1rem;
+    font-weight:700;
+    margin-bottom:10px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .dot{width:10px;height:10px;border-radius:50%;display:inline-block;}
+  .dot.core{background:var(--core);}
+  .dot.omit{background:var(--omit);}
+  .tag-list{display:flex; flex-wrap:wrap; gap:8px;}
+  .tag{
+    padding:8px 14px;
+    border-radius:999px;
+    font-size:1rem;
+    font-weight:600;
+  }
+  .tag.core{background:var(--core-bg); color:var(--core);}
+  .tag.omit{background:var(--omit-bg); color:var(--omit); text-decoration:line-through; text-decoration-thickness:1.5px;}
+  .discuss{
+    background:var(--accent-bg);
+    border-radius:12px;
+    padding:16px 18px;
+    color:var(--accent-ink);
+    font-size:1.05rem;
+    line-height:1.6;
+  }
+  .used-stat{color:var(--ink-soft); font-size:.98rem;}
+
+  /* ---------- Context screen ---------- */
+  .context-btns{display:flex; gap:14px; flex-wrap:wrap;}
+  .ctx-btn{
+    flex:1;
+    min-width:240px;
+    padding:18px 20px;
+    border-radius:12px;
+    border:2px solid var(--line);
+    background:var(--surface-alt);
+    color:var(--ink);
+    font-size:1.1rem;
+    font-weight:700;
+    cursor:pointer;
+    text-align:left;
+  }
+  .ctx-btn .sub{display:block; font-weight:400; font-size:.9rem; color:var(--ink-soft); margin-top:4px;}
+  .ctx-btn.active{background:var(--accent); border-color:var(--accent); color:#fff;}
+  .ctx-btn.active .sub{color:rgba(255,255,255,.85);}
+  .chip-grid{
+    display:flex;
+    flex-wrap:wrap;
+    gap:12px;
+  }
+  .chip{
+    padding:12px 18px;
+    border-radius:12px;
+    background:var(--surface-alt);
+    border:2px solid var(--surface-alt);
+    font-size:1.05rem;
+    font-weight:600;
+    color:var(--ink);
+    transition:background .15s, border-color .15s, color .15s, opacity .15s;
+  }
+  .chip.relevant{background:var(--core-bg); border-color:var(--core); color:var(--core);}
+  .chip.irrelevant{background:var(--omit-bg); border-color:var(--omit-bg); color:var(--omit); opacity:.7;}
+  .ctx-explain{
+    min-height:1.6em;
+    color:var(--ink-soft);
+    line-height:1.6;
+    font-size:1.02rem;
+  }
+  .note{
+    font-size:.95rem;
+    color:var(--ink-soft);
+    border-top:1px dashed var(--line);
+    padding-top:14px;
+  }
+
+  /* ---------- Wrap screen ---------- */
+  .definition{
+    font-size:1.3rem;
+    line-height:1.7;
+  }
+  .definition b{color:var(--accent);}
+  .example-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(240px,1fr));
+    gap:16px;
+  }
+  .example-card{
+    background:var(--surface-alt);
+    border-radius:12px;
+    padding:18px;
+  }
+  .example-card h3{
+    font-size:1.15rem;
+    margin-bottom:8px;
+    color:var(--accent);
+  }
+  .example-card p{color:var(--ink-soft); font-size:.98rem; line-height:1.6;}
+
+  [hidden]{display:none !important;}
+
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none !important; animation:none !important;}
+  }
+</style>
+
+<div class="app">
+  <header class="topbar">
+    <div class="brand">✏️ 추상화 놀이터</div>
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="game">게임</button>
+      <button class="tab-btn" data-tab="scores">점수판</button>
+      <button class="tab-btn" data-tab="context">심화모드</button>
+      <button class="tab-btn" data-tab="wrap">정리</button>
+    </nav>
+    <div class="round-progress" id="roundProgress">라운드 대기 중</div>
+  </header>
+
+  <main>
+    <!-- ===== GAME TAB (sub-screens) ===== -->
+    <div id="tab-game" class="screen">
+
+      <section id="screen-intro" class="stack">
+        <div class="card stack">
+          <h1>선을 몇 개까지만 그릴 수 있다면?</h1>
+          <p class="lede">한 사람이 제시어를 보고 정해진 개수의 선으로만 그림을 그리면, 나머지 친구들이 무엇인지 맞혀요. 다 그리고 나면 무엇을 남기고 무엇을 지웠는지 함께 이야기해 봅니다.</p>
+        </div>
+        <div class="card stack">
+          <h2 style="font-size:1.3rem;">진행 방법</h2>
+          <div class="rules-grid">
+            <div class="rule-item"><span class="rule-num">1</span><span>출제자 한 명이 제시어를 확인해요. (다른 친구들은 못 보게!)</span></div>
+            <div class="rule-item"><span class="rule-num">2</span><span>정해진 선 개수 안에서만 칠판에 그림을 그려요.</span></div>
+            <div class="rule-item"><span class="rule-num">3</span><span>출제자 번호, 정답자 번호를 순서대로 눌러요. 출제자는 2점, 맞힌 사람은 1점을 얻어요.</span></div>
+          </div>
+        </div>
+        <div class="card stack">
+          <h2 style="font-size:1.3rem;">라운드 설정</h2>
+          <div class="settings-row">
+            <div class="field">
+              <label for="setTime">라운드 시간(초)</label>
+              <input id="setTime" type="number" min="20" max="180" step="10" value="60">
+            </div>
+            <div class="field">
+              <label for="setStrokes">선 개수 제한</label>
+              <input id="setStrokes" type="number" min="2" max="12" step="1" value="5">
+            </div>
+          </div>
+          <div class="row">
+            <button class="btn wide" id="btnStart">게임 시작</button>
+          </div>
+          <p class="lede" id="introDoneMsg" hidden>모든 제시어를 다 사용했어요! 다시 시작하면 처음부터 섞어서 진행해요.</p>
+        </div>
+      </section>
+
+      <section id="screen-peek" class="stack" hidden>
+        <div class="card stack">
+          <h2 style="font-size:1.3rem;">출제자만 확인하세요</h2>
+          <p class="lede">다른 친구들은 화면에서 눈을 떼주세요. 출제자는 화면 왼쪽 아래 작은 확인 칸을 <b>손이나 책으로 가린 채</b> 길게 눌러야만 제시어가 보여요. 손을 떼면 바로 다시 가려집니다.</p>
+          <p class="peek-warn">📌 확인 칸이 화면 구석에 작게 있어요 — 몸으로 가리고 혼자만 볼 수 있게 확인해 주세요.</p>
+        </div>
+        <div class="row center">
+          <button class="btn quiet" id="btnSkipWord">다른 단어 뽑기</button>
+          <button class="btn" id="btnBeginDraw">확인했어요, 그리기 시작</button>
+        </div>
+
+        <div class="peek-box" id="peekBox" role="button" tabindex="0" aria-label="길게 눌러 제시어 확인하기">
+          <div class="peek-box-face" id="peekLocked">
+            <span class="peek-lock">🔒</span>
+            <span class="peek-box-locked">길게 눌러 확인</span>
+          </div>
+          <div class="peek-box-face" id="peekRevealed" hidden>
+            <span class="peek-tag" id="peekCat">카테고리</span>
+            <span class="peek-word" id="peekWord">단어</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="screen-draw" class="stack" hidden>
+        <div class="card stack">
+          <div class="draw-toolbar">
+            <div class="row" style="gap:20px;">
+              <div class="timer" id="timerDisplay">60</div>
+              <div class="row" style="gap:6px;">
+                <span class="pip-label">남은 선</span>
+                <div class="pips" id="pipsRow"></div>
+              </div>
+            </div>
+            <div class="row">
+              <button class="btn quiet" id="btnClearCanvas">다시 그리기</button>
+            </div>
+          </div>
+          <div class="canvas-wrap">
+            <canvas id="drawCanvas"></canvas>
+            <div class="budget-banner" id="budgetBanner">선을 다 썼어요! 이걸로 친구들이 맞힐 수 있을까요?</div>
+          </div>
+          <button class="btn wide" id="btnReveal">정답 공개하기</button>
+        </div>
+      </section>
+
+      <section id="screen-reveal" class="stack" hidden>
+        <div class="card stack">
+          <div class="row between">
+            <div>
+              <span class="peek-tag" id="revealCat">카테고리</span>
+              <div class="reveal-word" id="revealWord">단어</div>
+            </div>
+            <div class="used-stat" id="revealUsed">선 0개 사용</div>
+          </div>
+          <div class="tag-groups">
+            <div class="tag-group">
+              <h3><span class="dot core"></span>꼭 필요했던 핵심 특징</h3>
+              <div class="tag-list" id="coreTags"></div>
+            </div>
+            <div class="tag-group">
+              <h3><span class="dot omit"></span>생략해도 되는 특징</h3>
+              <div class="tag-list" id="omitTags"></div>
+            </div>
+          </div>
+          <div class="discuss">💬 함께 이야기해보기: 이 선으로도 사람들이 알아챌 수 있었던 이유는 무엇일까요? 어떤 특징을 남기고, 어떤 특징을 지웠나요?</div>
+        </div>
+        <div class="card stack">
+          <div class="row between">
+            <h2 style="font-size:1.1rem;" id="pickStepTitle">① 출제자 번호를 눌러주세요</h2>
+            <button class="btn quiet" id="btnPickBack" hidden>다시 선택</button>
+          </div>
+          <p class="lede" id="pickStepHint" style="font-size:.95rem;">번호를 다 누르면 점수가 반영되고 곧바로 다음 라운드로 넘어가요.</p>
+          <div class="num-grid" id="numGrid"></div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- ===== SCORES TAB ===== -->
+    <div id="tab-scores" class="screen" hidden>
+      <div class="card stack">
+        <h1 style="font-size:1.6rem;">점수판</h1>
+        <p class="lede">1번부터 27번까지 번호 순서예요. 출제자는 2점, 정답을 맞힌 사람은 1점씩 쌓여요.</p>
+        <div class="scoreboard-grid" id="scoreboardGrid"></div>
+      </div>
+    </div>
+
+    <!-- ===== CONTEXT TAB ===== -->
+    <div id="tab-context" class="screen" hidden>
+      <div class="card stack">
+        <h1 style="font-size:1.6rem;">같은 '학생', 하지만 다른 추상화</h1>
+        <p class="lede">같은 대상이라도 프로그램의 목적이 다르면, 필요한 정보(속성)도 달라져요. 아래 두 프로그램 중 하나를 눌러서 어떤 정보가 필요한지 살펴보세요.</p>
+        <div class="context-btns">
+          <button class="ctx-btn" data-ctx="a">성적 관리 프로그램<span class="sub">시험 점수와 출석을 관리해요</span></button>
+          <button class="ctx-btn" data-ctx="b">보건실 건강기록 프로그램<span class="sub">학생의 건강 정보를 관리해요</span></button>
+        </div>
+        <p class="ctx-explain" id="ctxExplain">두 버튼 중 하나를 눌러보세요.</p>
+        <div class="chip-grid" id="chipGrid"></div>
+        <p class="note">이름·학년·반처럼 '누구인지 확인하는 정보'는 목적과 상관없이 거의 항상 필요해요. 반대로 좋아하는 색깔·연예인·취미·전화번호는 두 프로그램 모두에 필요 없죠 — 목적이 무엇이든 원래부터 불필요한 정보도 있다는 뜻이에요.</p>
+      </div>
+    </div>
+
+    <!-- ===== WRAP TAB ===== -->
+    <div id="tab-wrap" class="screen" hidden>
+      <div class="card stack">
+        <h1 style="font-size:1.6rem;">오늘 배운 것: 추상화란?</h1>
+        <p class="definition">어떤 대상을 표현할 때, <b>목적에 맞는 핵심적인 특징만 남기고</b> 나머지는 과감히 <b>생략</b>하는 것 — 이것이 <b>추상화(Abstraction)</b>예요.</p>
+      </div>
+      <div class="example-grid">
+        <div class="example-card">
+          <h3>🖍️ 오늘의 그림 게임</h3>
+          <p>선 5개로 고양이를 그릴 때, 세모난 귀와 수염만 그려도 통했어요. 털 무늬나 눈동자 색 같은 세부사항은 몰라도 알아보는 데 문제없었죠.</p>
+        </div>
+        <div class="example-card">
+          <h3>🚇 지하철 노선도</h3>
+          <p>실제 거리, 건물, 도로 모양은 다 지우고 '어느 역이 어느 역과 연결되는지'만 남긴 지도예요. 그래도 길 찾는 데는 충분해요.</p>
+        </div>
+        <div class="example-card">
+          <h3>💻 프로그래밍</h3>
+          <p>'학생' 정보를 성적 프로그램에 담을 때는 이름·학년·반·점수만 남겨요. 함수도 마찬가지예요 — 사용하는 사람은 복잡한 내부 코드를 몰라도 '무엇을 넣으면 무엇이 나오는지'만 알면 충분하죠.</p>
+        </div>
+      </div>
+      <div class="card row between">
+        <p class="lede">추상화는 '적게 아는 것'이 아니라, <b style="color:var(--accent)">목적에 맞게 골라내는 능력</b>이에요.</p>
+        <button class="btn quiet" id="btnResetAll">전체 다시 시작</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- Word bank ----------
+  var WORDS = [
+    {word:'고양이', cat:'동물', core:['세모난 귀 두 개','긴 수염','동그란 얼굴'], omit:['털 무늬','눈동자 색','발톱 개수']},
+    {word:'강아지', cat:'동물', core:['늘어지거나 쫑긋한 귀','짧은 꼬리','네 다리'], omit:['털 색깔','품종별 생김새']},
+    {word:'나비', cat:'동물', core:['좌우 대칭 날개','가느다란 더듬이'], omit:['날개 무늬 색','정확한 날개 모양']},
+    {word:'물고기', cat:'동물', core:['유선형 몸통','지느러미','꼬리'], omit:['비늘 무늬','몸 색깔']},
+    {word:'자전거', cat:'사물', core:['바퀴 두 개','손잡이(핸들)','페달'], omit:['색깔','상표 로고','체인 무늬']},
+    {word:'우산', cat:'사물', core:['둥근 덮개','기다란 손잡이','살대'], omit:['천 무늬','색상']},
+    {word:'냉장고', cat:'사물', core:['네모난 상자','문','손잡이'], omit:['상표','색깔','안의 내용물']},
+    {word:'스마트폰', cat:'사물', core:['직사각형 몸체','화면','카메라'], omit:['상표 로고','버튼 위치']},
+    {word:'시계', cat:'사물', core:['원','숫자 또는 눈금','바늘'], omit:['테두리 장식','초침 유무']},
+    {word:'로켓', cat:'사물', core:['뾰족한 머리','원통 몸통','아래쪽 지느러미'], omit:['색깔','창문 개수']},
+    {word:'축구공', cat:'사물', core:['원','오각형·육각형 무늬'], omit:['무늬 정확한 개수','스티치 선']},
+    {word:'눈사람', cat:'자연', core:['둥근 덩어리 2~3개','단추 눈','당근 코'], omit:['모자 모양','팔(나뭇가지) 각도']},
+    {word:'나무', cat:'자연', core:['곧은 줄기','둥근 잎 뭉치'], omit:['잎 개수','가지 뻗은 모양']},
+    {word:'사과', cat:'자연', core:['원','꼭지','잎 하나'], omit:['색깔(빨강/초록)','광택']},
+    {word:'집', cat:'사물', core:['네모난 벽','세모난 지붕','문'], omit:['창문 개수','벽돌 무늬']},
+    {word:'비행기', cat:'사물', core:['긴 몸통','날개','꼬리날개'], omit:['창문 개수','항공사 로고']},
+    {word:'의사', cat:'직업', core:['청진기','흰 가운'], omit:['얼굴 생김새','키']},
+    {word:'축구선수', cat:'직업', core:['운동복(유니폼)','축구공','골대'], omit:['등번호','신발 브랜드']},
+    {word:'기린', cat:'동물', core:['긴 목','작은 뿔 두 개','긴 다리'], omit:['무늬 모양','색깔']},
+    {word:'코끼리', cat:'동물', core:['긴 코','큰 귀','굵은 다리'], omit:['피부 주름','상아 길이']},
+    {word:'거북이', cat:'동물', core:['둥근 등딱지','짧은 다리와 목'], omit:['등딱지 무늬','발톱 개수']},
+    {word:'뱀', cat:'동물', core:['길고 가느다란 몸','갈라진 혀'], omit:['비늘 무늬','몸 색깔']},
+    {word:'컵', cat:'사물', core:['원통 모양','손잡이'], omit:['무늬','재질']},
+    {word:'가위', cat:'사물', core:['두 개의 날','고리 손잡이 두 개'], omit:['색깔','크기']},
+    {word:'사다리', cat:'사물', core:['두 개의 긴 기둥','가로 발판 여러 개'], omit:['재질','발판 개수']},
+    {word:'기타', cat:'사물', core:['몸통(울림통)','긴 목','줄'], omit:['줄 개수','색깔·무늬']},
+    {word:'구름', cat:'자연', core:['뭉게뭉게한 둥근 덩어리'], omit:['정확한 모양','색(회색/흰색)']},
+    {word:'무지개', cat:'자연', core:['둥근 호 모양','여러 겹의 줄(색띠)'], omit:['정확한 색 순서','굵기']},
+    {word:'별', cat:'자연', core:['뾰족한 꼭짓점 5개'], omit:['크기','반짝이는 표현']},
+    {word:'요리사', cat:'직업', core:['높은 모자(콕모자)','앞치마'], omit:['얼굴 생김새','들고 있는 도구']}
+  ];
+
+  var CHIPS = [
+    {id:'name', label:'이름', a:true, b:true},
+    {id:'grade', label:'학년', a:true, b:true},
+    {id:'class', label:'반', a:true, b:true},
+    {id:'scores', label:'과목별 점수', a:true, b:false},
+    {id:'attend', label:'출석일수', a:true, b:false},
+    {id:'height', label:'키', a:false, b:true},
+    {id:'weight', label:'몸무게', a:false, b:true},
+    {id:'vision', label:'시력', a:false, b:true},
+    {id:'blood', label:'혈액형', a:false, b:true},
+    {id:'allergy', label:'알레르기 정보', a:false, b:true},
+    {id:'color', label:'좋아하는 색깔', a:false, b:false},
+    {id:'celeb', label:'좋아하는 연예인', a:false, b:false},
+    {id:'hobby', label:'취미', a:false, b:false},
+    {id:'phone', label:'휴대폰 번호', a:false, b:false}
+  ];
+  var CTX_EXPLAIN = {
+    a: "성적 관리 프로그램은 '누가, 몇 학년 몇 반이고, 어떤 과목에서 몇 점을 받았고, 며칠 출석했는지'만 알면 동작해요. 키나 혈액형은 몰라도 전혀 문제없죠.",
+    b: "보건실 건강기록 프로그램은 '누구의 키·몸무게·시력·혈액형·알레르기 정보'가 중요해요. 이 학생이 시험을 몇 점 받았는지는 알 필요가 없어요."
+  };
+
+  function shuffle(arr){
+    var a = arr.slice();
+    for (var i = a.length - 1; i > 0; i--){
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+
+  // ---------- State ----------
+  var STUDENT_COUNT = 27;
+  var state = {
+    scores: new Array(STUDENT_COUNT + 1).fill(0), // index 1..27 used, 0 unused
+    queue: shuffle(WORDS),
+    idx: 0,
+    roundTime: 60,
+    strokeMax: 5,
+    strokesUsed: 0,
+    timeLeft: 60,
+    timerHandle: null,
+    gameScreen: 'intro', // intro | peek | draw | reveal
+    pickStep: 'presenter', // presenter | guesser
+    presenterNum: null
+  };
+
+  // ---------- Element refs ----------
+  var el = {};
+  ['introDoneMsg','setTime','setStrokes','btnStart','roundProgress',
+   'peekCat','peekWord','btnSkipWord','btnBeginDraw','peekBox','peekLocked','peekRevealed',
+   'timerDisplay','pipsRow','btnClearCanvas','drawCanvas','budgetBanner','btnReveal',
+   'revealCat','revealWord','revealUsed','coreTags','omitTags',
+   'pickStepTitle','pickStepHint','numGrid','btnPickBack','scoreboardGrid',
+   'ctxExplain','chipGrid','btnResetAll'
+  ].forEach(function(id){ el[id] = document.getElementById(id); });
+
+  var screens = {
+    intro: document.getElementById('screen-intro'),
+    peek: document.getElementById('screen-peek'),
+    draw: document.getElementById('screen-draw'),
+    reveal: document.getElementById('screen-reveal')
+  };
+
+  var tabs = {
+    game: document.getElementById('tab-game'),
+    scores: document.getElementById('tab-scores'),
+    context: document.getElementById('tab-context'),
+    wrap: document.getElementById('tab-wrap')
+  };
+
+  // ---------- Tab navigation ----------
+  document.querySelectorAll('.tab-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      Object.keys(tabs).forEach(function(k){ tabs[k].hidden = (k !== btn.dataset.tab); });
+    });
+  });
+
+  function showGameScreen(name){
+    state.gameScreen = name;
+    Object.keys(screens).forEach(function(k){ screens[k].hidden = (k !== name); });
+  }
+
+  // ---------- Score ----------
+  function renderScoreboard(){
+    el.scoreboardGrid.innerHTML = '';
+    for (var n = 1; n <= STUDENT_COUNT; n++){
+      var card = document.createElement('div');
+      card.className = 'score-card';
+      card.innerHTML = '<div class="num">' + n + '번</div><div class="pts">' + state.scores[n] + '</div>';
+      el.scoreboardGrid.appendChild(card);
+    }
+  }
+
+  // ---------- Intro / start ----------
+  el.btnStart.addEventListener('click', function(){
+    state.roundTime = Math.max(20, Math.min(180, parseInt(el.setTime.value, 10) || 60));
+    state.strokeMax = Math.max(2, Math.min(12, parseInt(el.setStrokes.value, 10) || 5));
+    if (state.idx >= state.queue.length){
+      state.queue = shuffle(WORDS);
+      state.idx = 0;
+      el.introDoneMsg.hidden = true;
+    }
+    goToPeek();
+  });
+
+  function currentWord(){ return state.queue[state.idx]; }
+
+  function goToPeek(){
+    var w = currentWord();
+    if (!w){
+      state.queue = shuffle(WORDS);
+      state.idx = 0;
+      w = currentWord();
+    }
+    el.peekCat.textContent = w.cat;
+    el.peekWord.textContent = w.word;
+    hidePeekWord();
+    el.roundProgress.textContent = '라운드 ' + (state.idx + 1) + ' / ' + state.queue.length;
+    showGameScreen('peek');
+  }
+
+  // Peek box: word only shows while pressed/held, and only inside this small
+  // corner box — the presenter covers it with a hand or book while holding it.
+  function showPeekWord(){ el.peekLocked.hidden = true; el.peekRevealed.hidden = false; }
+  function hidePeekWord(){ el.peekLocked.hidden = false; el.peekRevealed.hidden = true; }
+
+  el.peekBox.addEventListener('pointerdown', function(e){ e.preventDefault(); showPeekWord(); });
+  ['pointerup','pointerleave','pointercancel'].forEach(function(ev){
+    el.peekBox.addEventListener(ev, hidePeekWord);
+  });
+  el.peekBox.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+  el.peekBox.addEventListener('keydown', function(e){
+    if (e.key === ' ' || e.key === 'Enter'){ e.preventDefault(); showPeekWord(); }
+  });
+  el.peekBox.addEventListener('keyup', function(e){
+    if (e.key === ' ' || e.key === 'Enter'){ hidePeekWord(); }
+  });
+
+  el.btnSkipWord.addEventListener('click', function(){
+    var w = state.queue.splice(state.idx, 1)[0];
+    state.queue.push(w);
+    if (state.idx >= state.queue.length) state.idx = 0;
+    goToPeek();
+  });
+
+  el.btnBeginDraw.addEventListener('click', function(){
+    startDrawRound();
+  });
+
+  // ---------- Canvas drawing ----------
+  var canvas = el.drawCanvas;
+  var ctx = canvas.getContext('2d');
+  var drawing = false;
+  var lastX = 0, lastY = 0;
+  var locked = false;
+
+  function resizeCanvas(){
+    var rect = canvas.getBoundingClientRect();
+    var dpr = window.devicePixelRatio || 1;
+    var prevW = canvas.width, prevH = canvas.height;
+    canvas.width = Math.max(1, Math.round(rect.width * dpr));
+    canvas.height = Math.max(1, Math.round(rect.height * dpr));
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawGrid();
+  }
+
+  function drawGrid(){
+    var w = canvas.width / (window.devicePixelRatio || 1);
+    var h = canvas.height / (window.devicePixelRatio || 1);
+    var cssBg = getComputedStyle(document.documentElement).getPropertyValue('--surface').trim();
+    var lineColor = getComputedStyle(document.documentElement).getPropertyValue('--line').trim();
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = cssBg || '#fff';
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = lineColor || '#ccc';
+    var gap = 28;
+    for (var y = gap; y < h; y += gap){
+      for (var x = gap; x < w; x += gap){
+        ctx.beginPath();
+        ctx.arc(x, y, 1.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  function getPos(e){
+    var rect = canvas.getBoundingClientRect();
+    var clientX = e.clientX, clientY = e.clientY;
+    if (e.touches && e.touches[0]){ clientX = e.touches[0].clientX; clientY = e.touches[0].clientY; }
+    return { x: clientX - rect.left, y: clientY - rect.top };
+  }
+
+  function inkColor(){
+    return getComputedStyle(document.documentElement).getPropertyValue('--ink').trim() || '#222';
+  }
+
+  canvas.addEventListener('pointerdown', function(e){
+    if (locked) { flashBudget(); return; }
+    drawing = true;
+    canvas.setPointerCapture(e.pointerId);
+    var p = getPos(e);
+    lastX = p.x; lastY = p.y;
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+  });
+
+  canvas.addEventListener('pointermove', function(e){
+    if (!drawing || locked) return;
+    var p = getPos(e);
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.lineWidth = 7;
+    ctx.strokeStyle = inkColor();
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    lastX = p.x; lastY = p.y;
+  });
+
+  function endStroke(e){
+    if (!drawing) return;
+    drawing = false;
+    state.strokesUsed++;
+    renderPips();
+    if (state.strokesUsed >= state.strokeMax){
+      locked = true;
+    }
+  }
+  canvas.addEventListener('pointerup', endStroke);
+  canvas.addEventListener('pointercancel', endStroke);
+  canvas.addEventListener('pointerleave', function(){ if (drawing) endStroke(); });
+
+  function flashBudget(){
+    el.budgetBanner.classList.add('show');
+    setTimeout(function(){ el.budgetBanner.classList.remove('show'); }, 1400);
+  }
+
+  function renderPips(){
+    el.pipsRow.innerHTML = '';
+    for (var i = 0; i < state.strokeMax; i++){
+      var pip = document.createElement('div');
+      pip.className = 'pip' + (i < state.strokesUsed ? ' used' : '');
+      el.pipsRow.appendChild(pip);
+    }
+  }
+
+  el.btnClearCanvas.addEventListener('click', function(){
+    state.strokesUsed = 0;
+    locked = false;
+    drawGrid();
+    renderPips();
+  });
+
+  window.addEventListener('resize', function(){
+    if (state.gameScreen === 'draw') resizeCanvas();
+  });
+
+  // ---------- Timer ----------
+  function startDrawRound(){
+    showGameScreen('draw');
+    state.strokesUsed = 0;
+    locked = false;
+    drawing = false;
+    state.timeLeft = state.roundTime;
+    renderPips();
+    resizeCanvas();
+    el.timerDisplay.textContent = state.timeLeft;
+    el.timerDisplay.classList.remove('warn');
+    clearInterval(state.timerHandle);
+    state.timerHandle = setInterval(function(){
+      state.timeLeft--;
+      el.timerDisplay.textContent = Math.max(0, state.timeLeft);
+      if (state.timeLeft <= 10) el.timerDisplay.classList.add('warn');
+      if (state.timeLeft <= 0){
+        clearInterval(state.timerHandle);
+      }
+    }, 1000);
+  }
+
+  el.btnReveal.addEventListener('click', function(){
+    clearInterval(state.timerHandle);
+    var w = currentWord();
+    el.revealCat.textContent = w.cat;
+    el.revealWord.textContent = w.word;
+    el.revealUsed.textContent = '선 ' + state.strokesUsed + '개 사용 (제한 ' + state.strokeMax + '개)';
+    el.coreTags.innerHTML = '';
+    w.core.forEach(function(t){
+      var s = document.createElement('span');
+      s.className = 'tag core';
+      s.textContent = t;
+      el.coreTags.appendChild(s);
+    });
+    el.omitTags.innerHTML = '';
+    w.omit.forEach(function(t){
+      var s = document.createElement('span');
+      s.className = 'tag omit';
+      s.textContent = t;
+      el.omitTags.appendChild(s);
+    });
+    showGameScreen('reveal');
+    startPickStep('presenter');
+  });
+
+  // ---------- Scoring / next round ----------
+  // Scoring a round (or marking it unsolved) immediately advances to the next round.
+  function goToNextRound(){
+    state.idx++;
+    if (state.idx >= state.queue.length){
+      el.introDoneMsg.hidden = false;
+      showGameScreen('intro');
+    } else {
+      goToPeek();
+    }
+  }
+
+  // Two-step number picker: ① 출제자 번호 → ② 정답자 번호(또는 '아무도 못 맞힘').
+  // 출제자는 2점, 정답자는 1점을 얻고 바로 다음 라운드로 넘어간다.
+  function startPickStep(mode){
+    state.pickStep = mode;
+    if (mode === 'presenter'){
+      state.presenterNum = null;
+      el.pickStepTitle.textContent = '① 출제자 번호를 눌러주세요';
+      el.pickStepHint.textContent = '그림을 그린 사람의 번호를 눌러주세요.';
+      el.btnPickBack.hidden = true;
+    } else {
+      el.pickStepTitle.textContent = '② 정답자 번호를 눌러주세요';
+      el.pickStepHint.textContent = '출제자: ' + state.presenterNum + '번 · 맞힌 사람이 없으면 "아무도 못 맞힘"을 눌러주세요.';
+      el.btnPickBack.hidden = false;
+    }
+    buildNumGrid(mode);
+  }
+
+  function buildNumGrid(mode){
+    el.numGrid.innerHTML = '';
+    for (var n = 1; n <= STUDENT_COUNT; n++){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'num-btn ' + (mode === 'presenter' ? 'presenter-mode' : 'guesser-mode');
+      b.textContent = n;
+      if (mode === 'guesser' && n === state.presenterNum){
+        b.disabled = true;
+      } else {
+        b.addEventListener('click', (function(num){
+          return function(){ onPickNumber(mode, num); };
+        })(n));
+      }
+      el.numGrid.appendChild(b);
+    }
+    if (mode === 'guesser'){
+      var none = document.createElement('button');
+      none.type = 'button';
+      none.className = 'num-btn none-btn';
+      none.textContent = '아무도 못 맞힘';
+      none.addEventListener('click', function(){ onPickNumber(mode, null); });
+      el.numGrid.appendChild(none);
+    }
+  }
+
+  function onPickNumber(mode, num){
+    if (mode === 'presenter'){
+      state.presenterNum = num;
+      startPickStep('guesser');
+    } else {
+      if (num !== null){
+        state.scores[state.presenterNum] += 2;
+        state.scores[num] += 1;
+        renderScoreboard();
+      }
+      goToNextRound();
+    }
+  }
+
+  el.btnPickBack.addEventListener('click', function(){ startPickStep('presenter'); });
+
+  // ---------- Context (bonus) tab ----------
+  var activeCtx = null;
+  function renderChips(){
+    el.chipGrid.innerHTML = '';
+    CHIPS.forEach(function(c){
+      var chip = document.createElement('div');
+      chip.className = 'chip';
+      chip.textContent = c.label;
+      if (activeCtx){
+        var relevant = c[activeCtx];
+        chip.classList.add(relevant ? 'relevant' : 'irrelevant');
+      }
+      el.chipGrid.appendChild(chip);
+    });
+  }
+  document.querySelectorAll('.ctx-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var ctx2 = btn.dataset.ctx;
+      if (activeCtx === ctx2){
+        activeCtx = null;
+        el.ctxExplain.textContent = '두 버튼 중 하나를 눌러보세요.';
+      } else {
+        activeCtx = ctx2;
+        el.ctxExplain.textContent = CTX_EXPLAIN[ctx2];
+      }
+      document.querySelectorAll('.ctx-btn').forEach(function(b){
+        b.classList.toggle('active', b.dataset.ctx === activeCtx);
+      });
+      renderChips();
+    });
+  });
+  renderChips();
+
+  // ---------- Reset all ----------
+  el.btnResetAll.addEventListener('click', function(){
+    state.scores = new Array(STUDENT_COUNT + 1).fill(0);
+    state.queue = shuffle(WORDS);
+    state.idx = 0;
+    state.presenterNum = null;
+    el.introDoneMsg.hidden = true;
+    el.roundProgress.textContent = '라운드 대기 중';
+    renderScoreboard();
+    showGameScreen('intro');
+    document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
+    document.querySelector('.tab-btn[data-tab="game"]').classList.add('active');
+    Object.keys(tabs).forEach(function(k){ tabs[k].hidden = (k !== 'game'); });
+  });
+
+  // ---------- Init ----------
+  renderScoreboard();
+  renderPips();
+  showGameScreen('intro');
+})();
+</script>
