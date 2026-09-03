@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<title>6x6 카드 슬라이딩 보드</title>
+<style>
+:root{
+  --wrks-viz-font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --wrks-viz-primary:#2563eb;
+  --wrks-viz-bg:#ffffff;
+  --wrks-viz-fg:#111827;
+  --wrks-viz-border:#d1d5db;
+  --wrks-viz-radius:8px;
+  --wrks-viz-space-1:4px;
+  --wrks-viz-space-2:8px;
+  --wrks-viz-space-3:12px;
+  --wrks-viz-space-4:16px;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0;padding:var(--wrks-viz-space-4);
+  background:var(--wrks-viz-bg);color:var(--wrks-viz-fg);
+  font-family:var(--wrks-viz-font-family);
+  -webkit-user-select:none;user-select:none;
+}
+.wrap{display:flex;gap:var(--wrks-viz-space-4);align-items:flex-start;flex-wrap:wrap;}
+.boardpane{flex:1 1 380px;max-width:520px;min-width:280px;}
+.board{position:relative;width:100%;border:1px solid var(--wrks-viz-border);border-radius:var(--wrks-viz-radius);background:#f9fafb;padding:8px;touch-action:none;}
+.card{position:absolute;border-radius:6px;background:var(--wrks-viz-primary);cursor:grab;}
+.card.red{background:#dc2626;}
+.card.movable{cursor:grab;}
+.card.locked{cursor:default;}
+.card.anim{transition:left .13s ease-out, top .13s ease-out;}
+.card.dragging{cursor:grabbing;z-index:5;}
+.panel{flex:0 0 216px;display:flex;flex-direction:column;gap:var(--wrks-viz-space-2);}
+.tile{border:1px solid var(--wrks-viz-border);border-radius:var(--wrks-viz-radius);padding:var(--wrks-viz-space-3);}
+.k{font-size:12px;color:#6b7280;margin-bottom:var(--wrks-viz-space-1);}
+.v{font-size:30px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.15;}
+.v.done{color:#15803d;}
+.s{font-size:12px;color:#6b7280;margin-top:var(--wrks-viz-space-1);}
+.goal{font-size:13px;line-height:1.5;}
+.legend{display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:6px;}
+.dot{width:10px;height:10px;border-radius:3px;display:inline-block;}
+.dot.red{background:#dc2626;}
+.dot.blue{background:var(--wrks-viz-primary);}
+button{
+  font-family:inherit;font-size:13px;padding:9px 12px;
+  border:1px solid var(--wrks-viz-border);border-radius:6px;
+  background:#fff;color:var(--wrks-viz-fg);cursor:pointer;
+}
+button:hover{background:#f3f4f6;}
+.help{font-size:12px;color:#6b7280;line-height:1.6;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="boardpane">
+    <div id="board" class="board"></div>
+  </div>
+  <aside class="panel">
+    <div class="tile">
+      <div class="k">경과 시간</div>
+      <div class="v" id="clock">00:00.0</div>
+      <div class="s" id="status">대기 중 · 첫 이동에서 시작</div>
+    </div>
+    <div class="tile">
+      <div class="k">이동 횟수</div>
+      <div class="v" id="moves">0</div>
+    </div>
+    <div class="tile">
+      <div class="k">목표</div>
+      <div class="goal">빨간 카드를 오른쪽 맨 아래 칸(6행 6열)으로 옮기기</div>
+      <div class="legend"><span class="dot red"></span>빨간 카드<span class="dot blue" style="margin-left:8px"></span>파란 카드</div>
+    </div>
+    <button id="reset" type="button">초기화</button>
+    <div class="help">빈 칸과 맞닿은 카드를 빈 칸 쪽으로 끌어서 옮깁니다. 짧게 누르기(탭)로도 이동합니다.</div>
+  </aside>
+</div>
+<script>
+(function(){
+  var ROWS=6, COLS=6, GAP=8, PAD=8;
+  var RED_ID=0, START_EMPTY=1, GOAL_SLOT=ROWS*COLS-1;
+
+  var board=document.getElementById('board');
+  var clockEl=document.getElementById('clock');
+  var movesEl=document.getElementById('moves');
+  var statusEl=document.getElementById('status');
+  var resetBtn=document.getElementById('reset');
+
+  var N=ROWS*COLS, CARDN=N-1;
+  var els=[], slotOf=[], empty=START_EMPTY;
+  var cell=56, step=64;
+  var moves=0, startAt=0, running=false, finished=false, elapsed=0, raf=0;
+
+  function build(){
+    board.innerHTML='';
+    els=[];slotOf=[];
+    for(var i=0;i<CARDN;i++){
+      var el=document.createElement('div');
+      el.className='card'+(i===RED_ID?' red':'');
+      el.addEventListener('pointerdown',onDown);
+      board.appendChild(el);
+      els.push(el);
+    }
+    resetState();
+  }
+
+  function resetState(){
+    empty=START_EMPTY;
+    for(var i=0;i<CARDN;i++){
+      slotOf[i]=(i<START_EMPTY)?i:i+1;
+    }
+    moves=0;movesEl.textContent='0';
+    running=false;finished=false;elapsed=0;startAt=0;
+    if(raf){cancelAnimationFrame(raf);raf=0;}
+    clockEl.textContent='00:00.0';
+    clockEl.classList.remove('done');
+    statusEl.textContent='대기 중 · 첫 이동에서 시작';
+    for(var j=0;j<CARDN;j++){
+      els[j].classList.remove('locked');
+    }
+    layout(false);
+  }
+
+  function measure(){
+    var inner=board.clientWidth-PAD*2;
+    cell=Math.max(24,(inner-GAP*(COLS-1))/COLS);
+    step=cell+GAP;
+    board.style.height=(PAD*2+cell*ROWS+GAP*(ROWS-1))+'px';
+  }
+
+  function xOf(slot){return PAD+(slot%COLS)*step;}
+  function yOf(slot){return PAD+Math.floor(slot/COLS)*step;}
+
+  function layout(animate){
+    measure();
+    for(var i=0;i<CARDN;i++){
+      var el=els[i];
+      el.classList.toggle('anim',!!animate);
+      el.style.width=cell+'px';
+      el.style.height=cell+'px';
+      el.style.left=xOf(slotOf[i])+'px';
+      el.style.top=yOf(slotOf[i])+'px';
+      el.style.transform='';
+    }
+  }
+
+  function dirToEmpty(slot){
+    var r=Math.floor(slot/COLS), c=slot%COLS;
+    var er=Math.floor(empty/COLS), ec=empty%COLS;
+    if(r===er&&ec===c-1){return {ax:'x',sign:-1};}
+    if(r===er&&ec===c+1){return {ax:'x',sign:1};}
+    if(c===ec&&er===r-1){return {ax:'y',sign:-1};}
+    if(c===ec&&er===r+1){return {ax:'y',sign:1};}
+    return null;
+  }
+
+  var drag=null;
+
+  function onDown(ev){
+    if(finished){return;}
+    var idx=els.indexOf(ev.currentTarget);
+    if(idx<0){return;}
+    var dir=dirToEmpty(slotOf[idx]);
+    if(!dir){return;}
+    ev.preventDefault();
+    var el=els[idx];
+    el.classList.remove('anim');
+    el.classList.add('dragging');
+    el.setPointerCapture(ev.pointerId);
+    drag={id:ev.pointerId,idx:idx,dir:dir,x0:ev.clientX,y0:ev.clientY,off:0,far:0,t0:Date.now()};
+    el.addEventListener('pointermove',onMove);
+    el.addEventListener('pointerup',onUp);
+    el.addEventListener('pointercancel',onUp);
+  }
+
+  function onMove(ev){
+    if(!drag||ev.pointerId!==drag.id){return;}
+    var dx=ev.clientX-drag.x0, dy=ev.clientY-drag.y0;
+    drag.far=Math.max(drag.far,Math.abs(dx),Math.abs(dy));
+    var raw=(drag.dir.ax==='x')?dx:dy;
+    var v=raw*drag.dir.sign;
+    if(v<0){v=0;}
+    if(v>step){v=step;}
+    drag.off=v;
+    var d=v*drag.dir.sign;
+    els[drag.idx].style.transform=(drag.dir.ax==='x')?('translateX('+d+'px)'):('translateY('+d+'px)');
+  }
+
+  function onUp(ev){
+    if(!drag||ev.pointerId!==drag.id){return;}
+    var el=els[drag.idx];
+    el.removeEventListener('pointermove',onMove);
+    el.removeEventListener('pointerup',onUp);
+    el.removeEventListener('pointercancel',onUp);
+    el.classList.remove('dragging');
+    var tap=(drag.far<6&&Date.now()-drag.t0<400);
+    var commit=(drag.off>=step*0.35)||tap;
+    var idx=drag.idx;
+    drag=null;
+    el.style.transform='';
+    el.classList.add('anim');
+    if(commit){applyMove(idx);}
+  }
+
+  function applyMove(idx){
+    var from=slotOf[idx];
+    slotOf[idx]=empty;
+    empty=from;
+    moves++;
+    movesEl.textContent=String(moves);
+    startTimer();
+    layout(true);
+    checkGoal();
+  }
+
+  function startTimer(){
+    if(running||finished){return;}
+    running=true;
+    startAt=Date.now();
+    statusEl.textContent='측정 중';
+    tick();
+  }
+
+  function tick(){
+    if(!running){return;}
+    elapsed=Date.now()-startAt;
+    clockEl.textContent=fmt(elapsed);
+    raf=requestAnimationFrame(tick);
+  }
+
+  function fmt(ms){
+    var t=Math.max(0,ms);
+    var m=Math.floor(t/60000);
+    var s=Math.floor(t%60000/1000);
+    var d=Math.floor(t%1000/100);
+    return (m<10?'0':'')+m+':'+(s<10?'0':'')+s+'.'+d;
+  }
+
+  function checkGoal(){
+    if(slotOf[RED_ID]!==GOAL_SLOT){return;}
+    finished=true;
+    if(running){
+      elapsed=Date.now()-startAt;
+      running=false;
+    }
+    if(raf){cancelAnimationFrame(raf);raf=0;}
+    clockEl.textContent=fmt(elapsed);
+    clockEl.classList.add('done');
+    statusEl.textContent='완료 · 기록 '+fmt(elapsed)+' / '+moves+'회';
+    for(var i=0;i<CARDN;i++){
+      els[i].classList.add('locked');
+    }
+  }
+
+  resetBtn.addEventListener('click',resetState);
+  window.addEventListener('resize',function(){layout(false);postH();});
+
+  function postH(){
+    try{
+      parent.postMessage({type:'wrks:viz:resize',height:document.documentElement.scrollHeight},'*');
+    }catch(e){}
+  }
+
+  build();
+  postH();
+  window.addEventListener('load',function(){layout(false);postH();});
+})();
+</script>
+</body>
+</html>
