@@ -70,6 +70,11 @@ button:hover{background:#f3f4f6;}
       <div class="v" id="moves">0</div>
     </div>
     <div class="tile">
+      <div class="k">역대 최고 기록</div>
+      <div class="v" id="best">-</div>
+      <div class="s" id="bestMoves"></div>
+    </div>
+    <div class="tile">
       <div class="k">목표</div>
       <div class="goal">빨간 카드를 오른쪽 맨 아래 칸(6행 6열)으로 옮기기</div>
       <div class="legend"><span class="dot red"></span>빨간 카드<span class="dot blue" style="margin-left:8px"></span>파란 카드</div>
@@ -88,11 +93,39 @@ button:hover{background:#f3f4f6;}
   var movesEl=document.getElementById('moves');
   var statusEl=document.getElementById('status');
   var resetBtn=document.getElementById('reset');
+  var bestEl=document.getElementById('best');
+  var bestMovesEl=document.getElementById('bestMoves');
+  var BEST_KEY='slidecard6x6_best_v1';
 
   var N=ROWS*COLS, CARDN=N-1;
   var els=[], slotOf=[], empty=START_EMPTY;
   var cell=56, step=64;
   var moves=0, startAt=0, running=false, finished=false, elapsed=0, raf=0;
+  var best=loadBest();
+
+  function loadBest(){
+    try{
+      var raw=localStorage.getItem(BEST_KEY);
+      if(!raw){return null;}
+      var v=JSON.parse(raw);
+      if(v&&typeof v.time==='number'&&typeof v.moves==='number'){return v;}
+    }catch(e){}
+    return null;
+  }
+
+  function saveBest(v){
+    try{localStorage.setItem(BEST_KEY,JSON.stringify(v));}catch(e){}
+  }
+
+  function renderBest(){
+    if(best){
+      bestEl.textContent=fmt(best.time);
+      bestMovesEl.textContent=best.moves+'회 이동';
+    }else{
+      bestEl.textContent='-';
+      bestMovesEl.textContent='아직 기록 없음';
+    }
+  }
 
   function build(){
     board.innerHTML='';
@@ -121,6 +154,7 @@ button:hover{background:#f3f4f6;}
     for(var j=0;j<CARDN;j++){
       els[j].classList.remove('locked');
     }
+    renderBest();
     layout(false);
   }
 
@@ -249,7 +283,13 @@ button:hover{background:#f3f4f6;}
     if(raf){cancelAnimationFrame(raf);raf=0;}
     clockEl.textContent=fmt(elapsed);
     clockEl.classList.add('done');
-    statusEl.textContent='완료 · 기록 '+fmt(elapsed)+' / '+moves+'회';
+    var isNewBest=!best||elapsed<best.time;
+    if(isNewBest){
+      best={time:elapsed,moves:moves};
+      saveBest(best);
+      renderBest();
+    }
+    statusEl.textContent=(isNewBest?'완료 · 신기록! ':'완료 · 기록 ')+fmt(elapsed)+' / '+moves+'회';
     for(var i=0;i<CARDN;i++){
       els[i].classList.add('locked');
     }
