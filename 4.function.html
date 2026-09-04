@@ -73,6 +73,7 @@ canvas{display:block;background:#eef1f5;border-radius:6px;margin:0 auto;}
   <section id="left" class="panel">
     <div id="title"></div>
     <div id="hint"></div>
+    <div id="record" class="note"></div>
     <canvas id="cv" width="520" height="420"></canvas>
     <div id="msg"></div>
   </section>
@@ -129,6 +130,14 @@ function markClear(i,used){
   if(!c[i] || used<c[i]) c[i]=used;
   localStorage.setItem('rmz10', JSON.stringify(c));
 }
+function renderRecord(){
+  var box=document.getElementById('record');
+  if(!box) return;
+  var mine=cleared()[idx];
+  box.textContent = mine
+    ? '역대 최고 기록: 블록 ' + mine + '개 (최소 ' + st.best + '개)'
+    : '역대 최고 기록: 아직 없음 (최소 ' + st.best + '개로 통과할 수 있어요)';
+}
 
 function buildBar(){
   var bar=document.getElementById('stagebar'); bar.innerHTML='';
@@ -163,6 +172,7 @@ function load(i){
   document.getElementById('fwrap').style.display = st.func?'block':'none';
   document.getElementById('callbtn').style.display = st.func?'inline-block':'none';
   setMsg('','');
+  renderRecord();
   resetRobot(); buildBar(); render();
 }
 
@@ -379,7 +389,7 @@ function finish(used){
   var atGoal = (robot.r===goalPos.r && robot.c===goalPos.c);
   var allGot = (Object.keys(got).length===allStars.length);
   if(atGoal && allGot){
-    markClear(idx, used); buildBar();
+    markClear(idx, used); buildBar(); renderRecord();
     if(used>st.best){
       setMsg('성공! 그런데 블록 '+st.best+'개로도 갈 수 있어요. 더 줄여 볼까요?','ok');
     } else {

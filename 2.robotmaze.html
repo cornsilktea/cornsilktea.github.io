@@ -76,6 +76,7 @@ h1{font-size:16px;margin:0 0 var(--wrks-viz-space-1);letter-spacing:-0.01em;}
 
 .panel{display:flex;flex-direction:column;gap:var(--wrks-viz-space-3);max-width:420px;}
 .metrics{display:grid;grid-template-columns:1fr 1fr;gap:var(--wrks-viz-space-2);}
+.m.wide{grid-column:1/-1;}
 .m{border:1px solid var(--wrks-viz-border);border-radius:var(--wrks-viz-radius);padding:var(--wrks-viz-space-3);background:var(--wrks-viz-bg);}
 .m .lab{font-size:12px;color:var(--muted);}
 .m .val{font-size:28px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-0.02em;margin-top:2px;}
@@ -120,6 +121,7 @@ h1{font-size:16px;margin:0 0 var(--wrks-viz-space-1);letter-spacing:-0.01em;}
     <div class="metrics">
       <div class="m"><div class="lab">시간</div><div class="val" id="mTime">0.0초</div></div>
       <div class="m"><div class="lab">명령 수</div><div class="val" id="mCmd">0</div></div>
+      <div class="m wide"><div class="lab">역대 최고 기록</div><div class="val" id="mBest">-</div><div class="lab" id="mBestSub">아직 기록 없음</div></div>
     </div>
 
     <div class="ctrls">
@@ -134,7 +136,7 @@ h1{font-size:16px;margin:0 0 var(--wrks-viz-space-1);letter-spacing:-0.01em;}
     </div>
 
     <div class="msg" id="msg">첫 명령을 누르면 시간이 시작됩니다.</div>
-    <div class="hint">키보드 <b>&#8592;</b> 좌회전 &nbsp; <b>&#8593;</b> 전진 &nbsp; <b>&#8594;</b> 우회전<br>다시 시도는 같은 미로, 초기화는 새 미로입니다.</div>
+    <div class="hint">키보드 <b>&#8592;</b> 또는 <b>A</b> 좌회전 &nbsp; <b>&#8593;</b> 또는 <b>W</b> 전진 &nbsp; <b>&#8594;</b> 또는 <b>D</b> 우회전<br><b>스페이스바</b>로 다시 시작할 수 있습니다. 다시 시도는 같은 미로, 초기화는 새 미로입니다.</div>
   </div>
 </div>
 
@@ -363,8 +365,51 @@ h1{font-size:16px;margin:0 0 var(--wrks-viz-space-1);letter-spacing:-0.01em;}
     bF:document.getElementById('bF'),
     bR:document.getElementById('bR'),
     retry:document.getElementById('bRetry'),
-    reset:document.getElementById('bReset')
+    reset:document.getElementById('bReset'),
+    best:document.getElementById('mBest'),
+    bestSub:document.getElementById('mBestSub')
   };
+
+  var BEST_KEY='robotmaze_best_v1';
+  var best=loadBest();
+
+  function loadBest(){
+    try{
+      var raw=localStorage.getItem(BEST_KEY);
+      if(!raw){
+        return null;
+      }
+      var v=JSON.parse(raw);
+      if(v&&typeof v.cmds==='number'&&typeof v.time==='number'){
+        return v;
+      }
+    }catch(e){}
+    return null;
+  }
+
+  function saveBest(v){
+    try{
+      localStorage.setItem(BEST_KEY,JSON.stringify(v));
+    }catch(e){}
+  }
+
+  function renderBest(){
+    if(best){
+      el.best.textContent='\uBA85\uB839 '+best.cmds+'\uAC1C';
+      el.bestSub.textContent=(best.time/1000).toFixed(1)+'\uCD08';
+    }else{
+      el.best.textContent='-';
+      el.bestSub.textContent='\uC544\uC9C1 \uAE30\uB85D \uC5C6\uC74C';
+    }
+  }
+
+  function recordWin(cmds,time){
+    if(!best || cmds<best.cmds || (cmds===best.cmds && time<best.time)){
+      best={cmds:cmds,time:time};
+      saveBest(best);
+    }
+    renderBest();
+  }
 
   var cells=[];
   (function buildCells(){
@@ -477,6 +522,7 @@ h1{font-size:16px;margin:0 0 var(--wrks-viz-space-1);letter-spacing:-0.01em;}
       st.c=nc;
       if(nr===GOAL.r && nc===GOAL.c){
         finish('win','\uB3C4\uCC29. \uBA85\uB839 '+st.cmds+'\uAC1C \u00B7 '+((Date.now()-st.t0)/1000).toFixed(1)+'\uCD08');
+        recordWin(st.cmds,Date.now()-st.t0);
         return;
       }
     }
@@ -525,15 +571,23 @@ h1{font-size:16px;margin:0 0 var(--wrks-viz-space-1);letter-spacing:-0.01em;}
   el.reset.addEventListener('click',newBoard);
 
   document.addEventListener('keydown',function(e){
-    if(e.key==='ArrowUp'){
+    var k=e.key.length===1 ? e.key.toLowerCase() : e.key;
+    if(k==='ArrowUp' || k==='w'){
       e.preventDefault();
       act('F');
-    }else if(e.key==='ArrowLeft'){
+    }else if(k==='ArrowLeft' || k==='a'){
       e.preventDefault();
       act('L');
-    }else if(e.key==='ArrowRight'){
+    }else if(k==='ArrowRight' || k==='d'){
       e.preventDefault();
       act('R');
+    }else if(k===' ' || k==='Spacebar'){
+      e.preventDefault();
+      if(st.fin==='win'){
+        newBoard();
+      }else{
+        softReset();
+      }
     }
   });
 
@@ -548,6 +602,7 @@ h1{font-size:16px;margin:0 0 var(--wrks-viz-space-1);letter-spacing:-0.01em;}
     board={grid:[[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0]],walls:0,runs4:0};
   }
   softReset();
+  renderBest();
   prefetch();
   post();
   window.addEventListener('resize',post);

@@ -1,11 +1,11 @@
 /* =====================================================================
-   게임 접근 가드
-   각 게임 HTML의 <head> 맨 앞에 아래 두 줄을 넣어 사용합니다.
+   수업 자료 접근 가드
+   각 수업 자료 HTML의 <head> 맨 앞에 아래 두 줄을 넣어 사용합니다.
 
      <script src="firebase-config.js"></script>
      <script src="access-guard.js" data-game="slidecard"></script>
 
-   data-game 값(slug)이 교사용 화면에 등록된 게임 이름과 같아야 합니다.
+   data-game 값(slug)이 교사용 화면에 등록된 자료 아이디와 같아야 합니다.
    ===================================================================== */
 (function () {
   "use strict";
@@ -22,7 +22,7 @@
   var POLL = (cfg.POLL_SECONDS || 5) * 1000;
 
   var locked = true;          /* 판정 전에는 무조건 잠금 */
-  var played = false;         /* 한 번이라도 게임이 열렸는지 */
+  var played = false;         /* 한 번이라도 자료가 열렸는지 */
   var overlay = null;
   var keepAlive = null;
 
@@ -95,7 +95,7 @@
     overlay = null;
   }
 
-  /* 잠긴 동안에는 키보드 입력이 게임에 닿지 않게 막습니다. */
+  /* 잠긴 동안에는 키보드 입력이 자료에 닿지 않게 막습니다. */
   ["keydown", "keypress", "keyup"].forEach(function (type) {
     window.addEventListener(type, function (e) {
       if (locked) { e.stopImmediatePropagation(); e.preventDefault(); }
@@ -106,7 +106,7 @@
   function check() {
     if (!cfg.isReady || !cfg.isReady()) {
       lock("🔧", "설정이 아직 끝나지 않았어요",
-           "firebase-config.js 에 주소와 키를 넣어야 게임을 열 수 있습니다.");
+           "firebase-config.js 에 주소와 키를 넣어야 수업 자료를 열 수 있습니다.");
       return;
     }
     fetch(cfg.dbPath("games/" + slug), { cache: "no-store" })
@@ -116,15 +116,15 @@
       })
       .then(function (game) {
         if (!game) {
-          lock("🔒", "아직 등록되지 않은 게임이에요",
-               "선생님 화면에서 이 게임을 등록하면 열립니다.");
+          lock("🔒", "아직 등록되지 않은 자료예요",
+               "선생님 화면에서 이 자료를 등록하면 열립니다.");
           return;
         }
         if (game.open === true) {
           unlock();
         } else if (played) {
           lock("✋", "선생님이 종료했어요",
-               "지금은 게임을 진행할 수 없어요. 다시 열리면 이어서 할 수 있어요.");
+               "지금은 계속할 수 없어요. 다시 열리면 이어서 할 수 있어요.");
         } else {
           lock("🔒", "선생님이 아직 열지 않았어요",
                "수업 시간에 선생님이 열어주면 바로 시작할 수 있어요.");

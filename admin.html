@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>수업 게임 제어판</title>
+<title>수업 자료 제어판</title>
 <style>
   * { box-sizing: border-box; }
   body {
@@ -98,7 +98,7 @@
 <body>
 <div class="wrap">
 
-  <h1>수업 게임 제어판</h1>
+  <h1>수업 자료 제어판</h1>
   <p class="sub">스위치를 켜면 학생이 바로 들어갈 수 있고, 끄면 즉시 막힙니다. 저장 버튼은 없습니다.</p>
 
   <!-- 로그인 -->
@@ -128,7 +128,7 @@
     <div id="list"></div>
 
     <div class="panel">
-      <h2>게임 추가</h2>
+      <h2>수업 자료 추가</h2>
       <div class="row">
         <div>
           <label for="newTitle">제목</label>
@@ -141,7 +141,7 @@
       </div>
       <div class="row" style="margin-top:8px">
         <div>
-          <label for="newSlug">게임 아이디(영문)</label>
+          <label for="newSlug">자료 아이디(영문)</label>
           <input id="newSlug" type="text" placeholder="예: newgame">
         </div>
         <div>
@@ -154,7 +154,7 @@
       </div>
       <p class="msg" id="addMsg"></p>
       <p class="hint">
-        게임 아이디는 게임 HTML 파일 안의 <code>data-game="..."</code> 값과 똑같이 적어야 합니다.
+        자료 아이디는 수업 자료 HTML 파일 안의 <code>data-game="..."</code> 값과 똑같이 적어야 합니다.
         영문 소문자·숫자·하이픈만 쓸 수 있습니다.
       </p>
     </div>
@@ -293,7 +293,7 @@ function renderSummary() {
   const on = games.filter((g) => g.open).length;
   $("dot").className = "dot" + (on === 0 ? "" : on === games.length ? " on" : " some");
   $("summaryText").textContent =
-    games.length === 0 ? "등록된 게임이 없습니다."
+    games.length === 0 ? "등록된 수업 자료가 없습니다."
     : on === 0 ? "전체 잠금 (" + games.length + "개 모두 닫힘)"
     : on === games.length ? "전체 열림 (" + on + "개)"
     : "일부 열림 (" + on + " / " + games.length + "개)";
@@ -466,9 +466,9 @@ $("addBtn").addEventListener("click", async () => {
   const slug = $("newSlug").value.trim().toLowerCase();
   const title = $("newTitle").value.trim();
   const url = $("newUrl").value.trim();
-  if (!slug || !title || !url) { say("addMsg", "제목·파일 이름·게임 아이디를 모두 채워 주세요."); return; }
-  if (!/^[a-z0-9-]+$/.test(slug)) { say("addMsg", "게임 아이디는 영문 소문자·숫자·하이픈만 됩니다."); return; }
-  if (games.some((g) => g.slug === slug)) { say("addMsg", "이미 있는 게임 아이디입니다."); return; }
+  if (!slug || !title || !url) { say("addMsg", "제목·파일 이름·자료 아이디를 모두 채워 주세요."); return; }
+  if (!/^[a-z0-9-]+$/.test(slug)) { say("addMsg", "자료 아이디는 영문 소문자·숫자·하이픈만 됩니다."); return; }
+  if (games.some((g) => g.slug === slug)) { say("addMsg", "이미 있는 자료 아이디입니다."); return; }
   try {
     await write("games/" + slug, { title, url, memo: $("newMemo").value.trim(), order: games.length, open: false });
     await load();

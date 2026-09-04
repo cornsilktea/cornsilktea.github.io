@@ -155,7 +155,7 @@ button:active { background: #eef2f7; }
     <ul>
       <li>발사대 위쪽을 드래그하면 손가락 방향으로, 아래쪽을 드래그하면 새총처럼 반대 방향으로 조준됩니다.</li>
       <li>손을 떼도 조준선은 유지되며, <b>발사</b> 버튼을 눌러야 공이 나갑니다.</li>
-      <li>◀ ▶ 버튼으로 2도씩 미세 조정할 수 있습니다.</li>
+      <li>◀ ▶ 버튼으로 1도씩 미세 조정할 수 있습니다.</li>
     </ul>
     <b>규칙</b>
     <ul>
@@ -654,13 +654,13 @@ button:active { background: #eef2f7; }
   });
   btnL.addEventListener("click", function () {
     if (state !== "aim") { return; }
-    aim = Math.max(-MAXA, aim - 2 * Math.PI / 180);
+    aim = Math.max(-MAXA, aim - 1 * Math.PI / 180);
     aimed = true;
     setMsg("각도 " + (aim * 180 / Math.PI).toFixed(0) + "°");
   });
   btnR.addEventListener("click", function () {
     if (state !== "aim") { return; }
-    aim = Math.min(MAXA, aim + 2 * Math.PI / 180);
+    aim = Math.min(MAXA, aim + 1 * Math.PI / 180);
     aimed = true;
     setMsg("각도 " + (aim * 180 / Math.PI).toFixed(0) + "°");
   });

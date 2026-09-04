@@ -245,7 +245,18 @@
 
   let cellSize, snake, dir, nextDir, food, score, best, tickMs, timer, running, started, paused;
 
-  const BEST_KEY_UNUSED = null; // no persistent storage available; best resets per session
+  const BEST_KEY = 'snake_best_v1';
+
+  function loadBest() {
+    try {
+      const v = parseInt(localStorage.getItem(BEST_KEY), 10);
+      return isNaN(v) ? 0 : v;
+    } catch (e) { return 0; }
+  }
+
+  function saveBest(v) {
+    try { localStorage.setItem(BEST_KEY, String(v)); } catch (e) {}
+  }
 
   function resizeCanvas() {
     const frame = canvas.parentElement;
@@ -288,13 +299,18 @@
   }
 
   function setDir(x, y) {
-    if (dir.x === -x && dir.y === -y) return; // 역방향 무시
-    nextDir = { x, y };
-    if (!started && running) {
+    if (!running) return;
+    if (!started) {
+      // 시작 화면: 어떤 방향키를 눌러도 바로 시작한다
       started = true;
       overlay.classList.add('hidden');
       startLoop();
+    } else if (paused) {
+      // 일시정지 화면: 어떤 방향키를 눌러도 다시 진행한다
+      togglePause();
     }
+    if (dir.x === -x && dir.y === -y) return; // 역방향 무시
+    nextDir = { x, y };
   }
 
   function startLoop() {
@@ -320,6 +336,7 @@
       scoreEl.textContent = score;
       if (score > best) {
         best = score;
+        saveBest(best);
         bestEl.textContent = best;
       }
       if (score % 5 === 0 && tickMs > 60) {
@@ -437,10 +454,10 @@
 
   restartBtn.addEventListener('click', restartGame);
 
-  best = 0;
+  best = loadBest();
   bestEl.textContent = best;
+  resetState();      // 뱀·먹이를 먼저 만들어야 draw() 가 그릴 수 있다
   resizeCanvas();
-  resetState();
 })();
 </script>
 </body>
