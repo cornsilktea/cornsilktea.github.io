@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<script charset="utf-8" src="firebase-config.js"></script>
+<script charset="utf-8" src="access-guard.js" data-game="privacyescape"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>개인정보 탈출 게임</title>
+<style>
+  :root{
+    --bg:#f5f7fb;
+    --card:#ffffff;
+    --ink:#1f2430;
+    --sub:#6b7280;
+    --line:#e1e6ef;
+    --danger:#e5484d;
+    --danger-soft:#fdecec;
+    --safe:#1a9b64;
+    --safe-soft:#e6f7ef;
+    --accent:#3b6ef6;
+    --accent-soft:#eaf0fe;
+    --radius:20px;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    -webkit-user-select:none;
+    user-select:none;
+  }
+  header{
+    padding:18px 28px 8px;
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  h1{font-size:1.6rem;margin:0;font-weight:800;letter-spacing:-0.02em;}
+  .desc{color:var(--sub);font-size:0.95rem;margin-top:2px;}
+  .status{display:flex;gap:14px;}
+  .pill{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:999px;
+    padding:8px 18px;
+    font-weight:700;
+    white-space:nowrap;
+  }
+  .pill.timer{color:var(--danger);}
+  .pill.progress{color:var(--accent);}
+
+  main{
+    flex:1;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    padding:10px 20px 30px;
+  }
+
+  #introScreen, #endScreen{
+    width:min(640px,95vw);
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:40px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:18px;
+    text-align:center;
+  }
+  #introScreen h2, #endScreen h2{margin:0;font-size:1.8rem;}
+  #introScreen p, #endScreen p{color:var(--sub);font-size:1.05rem;line-height:1.6;margin:0;}
+
+  #playScreen{
+    display:none;
+    width:min(700px,95vw);
+    flex-direction:column;
+    gap:16px;
+  }
+  .phone{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:28px;
+    padding:20px;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    box-shadow:0 10px 30px rgba(20,30,60,0.08);
+  }
+  .phone-topbar{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding-bottom:10px;
+    border-bottom:1px solid var(--line);
+  }
+  .avatar{
+    width:40px;height:40px;
+    border-radius:50%;
+    background:linear-gradient(135deg,#a6c1ff,#8fe3c0);
+    flex-shrink:0;
+  }
+  .handle{font-weight:800;}
+  .handle-sub{font-size:0.85rem;color:var(--sub);}
+
+  .items{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .item{
+    background:#fbfcfe;
+    border:2px solid var(--line);
+    border-radius:14px;
+    padding:14px 16px;
+    font-size:1.05rem;
+    font-weight:600;
+    line-height:1.5;
+    cursor:pointer;
+    transition:transform .08s ease, border-color .15s ease, background .15s ease, opacity .3s ease;
+  }
+  .item:active{transform:scale(.98);}
+  .item.removed{
+    border-color:var(--safe);
+    background:var(--safe-soft);
+    text-decoration:line-through;
+    opacity:.55;
+    cursor:default;
+    pointer-events:none;
+  }
+  .item.shake{
+    animation:shake .35s;
+    border-color:var(--danger);
+    background:var(--danger-soft);
+  }
+  @keyframes shake{
+    0%,100%{transform:translateX(0);}
+    25%{transform:translateX(-6px);}
+    75%{transform:translateX(6px);}
+  }
+
+  .toast{
+    text-align:center;
+    min-height:28px;
+    font-weight:700;
+    font-size:1rem;
+  }
+  .toast.ok{color:var(--safe);}
+  .toast.no{color:var(--danger);}
+
+  button.primary{
+    background:var(--accent);
+    color:#fff;
+    border:none;
+    border-radius:14px;
+    padding:16px 30px;
+    font-size:1.1rem;
+    font-weight:800;
+    cursor:pointer;
+  }
+  button.primary:active{transform:translateY(1px);}
+
+  .missed-list{
+    text-align:left;
+    background:#fbfcfe;
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:16px 18px;
+    width:100%;
+    font-size:0.95rem;
+    line-height:1.7;
+  }
+  .missed-list b{color:var(--danger);}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🔓 개인정보 탈출 게임</h1>
+    <div class="desc">가상 SNS 화면 속 위험한 개인정보를 모두 지우고 탈출하세요!</div>
+  </div>
+  <div class="status">
+    <div class="pill progress" id="progressPill">제거 0 / 6</div>
+    <div class="pill timer" id="timerPill">⏱ 60초</div>
+  </div>
+</header>
+
+<main>
+  <div id="introScreen">
+    <h2>🕵️ 미션 브리핑</h2>
+    <p>
+      아래 SNS 화면에는 12개의 글이 있어요. 이 중 <b>6개는 노출되면 위험한 개인정보</b>이고,
+      나머지 6개는 괜찮은 내용이에요.<br><br>
+      제한시간 60초 안에 <b>위험한 정보만</b> 골라 클릭해서 지워야 탈출할 수 있어요.
+      안전한 글을 잘못 클릭하면 시간이 5초 줄어드니 신중하게 골라보세요!
+    </p>
+    <button class="primary" id="startBtn">탈출 시작하기 →</button>
+  </div>
+
+  <div id="playScreen">
+    <div class="phone">
+      <div class="phone-topbar">
+        <div class="avatar"></div>
+        <div>
+          <div class="handle">별빛토끼</div>
+          <div class="handle-sub">공개 계정 · 팔로워 132명</div>
+        </div>
+      </div>
+      <div class="items" id="itemsBox"></div>
+    </div>
+    <div class="toast" id="toast"></div>
+  </div>
+
+  <div id="endScreen" style="display:none;">
+    <h2 id="endTitle"></h2>
+    <p id="endDesc"></p>
+    <div class="missed-list" id="missedList" style="display:none;"></div>
+    <button class="primary" id="retryBtn">다시 도전하기</button>
+  </div>
+</main>
+
+<script>
+const ITEMS = [
+  {text:"OO중학교 2학년 3반 김민준입니다!", risky:true, why:"학교·학년·반·이름이 함께 있으면 누군지 특정하기 쉬워져요."},
+  {text:"제 전화번호는 010-1234-5678이에요, 연락주세요!", risky:true, why:"전화번호는 모르는 사람에게 공개하면 위험해요."},
+  {text:"우리집은 행복빌라 302호예요~", risky:true, why:"집 주소가 공개되면 실제 위치가 노출돼요."},
+  {text:"제 생일은 2012년 3월 5일이에요!", risky:true, why:"생년월일은 각종 인증에 쓰이는 중요한 개인정보예요."},
+  {text:"오늘 학교 끝나고 강남동 어린이공원에서 놀아요!", risky:true, why:"실시간 위치와 일정을 알리면 낯선 사람이 찾아올 수 있어요."},
+  {text:"우리 엄마는 OO병원에서 간호사로 일하셔요", risky:true, why:"가족의 직장 정보도 나와 가족을 특정하는 단서가 될 수 있어요."},
+  {text:"제 취미는 그림 그리기예요! 🎨", risky:false, why:""},
+  {text:"오늘 급식 진짜 맛있었다ㅎㅎ", risky:false, why:""},
+  {text:"저는 고양이를 정말 좋아해요 🐱", risky:false, why:""},
+  {text:"요즘 좋아하는 노래 계속 듣는 중~ 🎧", risky:false, why:""},
+  {text:"닉네임 짓느라 30분 걸렸어요ㅋㅋ", risky:false, why:""},
+  {text:"주말에 진짜 재밌는 영화 봤어요! 다들 추천추천", risky:false, why:""},
+];
+
+const TIME_LIMIT = 60;
+let timeLeft = TIME_LIMIT;
+let timerId = null;
+let removedCount = 0;
+let removedTexts = new Set();
+const totalRisky = ITEMS.filter(i=>i.risky).length;
+
+const introScreen = document.getElementById('introScreen');
+const playScreen = document.getElementById('playScreen');
+const endScreen = document.getElementById('endScreen');
+const itemsBox = document.getElementById('itemsBox');
+const toast = document.getElementById('toast');
+const progressPill = document.getElementById('progressPill');
+const timerPill = document.getElementById('timerPill');
+
+function shuffle(arr){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+
+document.getElementById('startBtn').addEventListener('click', startGame);
+document.getElementById('retryBtn').addEventListener('click', ()=>{
+  endScreen.style.display = 'none';
+  introScreen.style.display = 'flex';
+});
+
+function startGame(){
+  introScreen.style.display = 'none';
+  playScreen.style.display = 'flex';
+  timeLeft = TIME_LIMIT;
+  removedCount = 0;
+  removedTexts = new Set();
+  progressPill.textContent = `제거 0 / ${totalRisky}`;
+  timerPill.textContent = `⏱ ${timeLeft}초`;
+  toast.textContent = '';
+  toast.className = 'toast';
+
+  itemsBox.innerHTML = '';
+  const order = shuffle(ITEMS);
+  order.forEach(item=>{
+    const el = document.createElement('div');
+    el.className = 'item';
+    el.textContent = item.text;
+    el.addEventListener('click', ()=> handleClick(el, item));
+    itemsBox.appendChild(el);
+  });
+
+  clearInterval(timerId);
+  timerId = setInterval(tick, 1000);
+}
+
+function tick(){
+  timeLeft -= 1;
+  if(timeLeft <= 0){
+    timeLeft = 0;
+    timerPill.textContent = `⏱ 0초`;
+    clearInterval(timerId);
+    endGame(false);
+    return;
+  }
+  timerPill.textContent = `⏱ ${timeLeft}초`;
+}
+
+function handleClick(el, item){
+  if(item.risky){
+    el.classList.add('removed');
+    removedCount += 1;
+    removedTexts.add(item.text);
+    progressPill.textContent = `제거 ${removedCount} / ${totalRisky}`;
+    toast.textContent = `✅ 제거 완료! ${item.why}`;
+    toast.className = 'toast ok';
+    if(removedCount >= totalRisky){
+      clearInterval(timerId);
+      endGame(true);
+    }
+  } else {
+    el.classList.remove('shake');
+    void el.offsetWidth;
+    el.classList.add('shake');
+    timeLeft = Math.max(0, timeLeft - 5);
+    timerPill.textContent = `⏱ ${timeLeft}초`;
+    toast.textContent = `❌ 이건 안전한 글이에요! 시간이 5초 줄었어요.`;
+    toast.className = 'toast no';
+    if(timeLeft <= 0){
+      clearInterval(timerId);
+      endGame(false);
+    }
+  }
+}
+
+function endGame(success){
+  playScreen.style.display = 'none';
+  endScreen.style.display = 'flex';
+  const endTitle = document.getElementById('endTitle');
+  const endDesc = document.getElementById('endDesc');
+  const missedList = document.getElementById('missedList');
+
+  if(success){
+    endTitle.textContent = `🎉 탈출 성공! (${timeLeft}초 남음)`;
+    endDesc.textContent = '위험한 개인정보를 모두 찾아 지웠어요! SNS에 글을 올릴 때는 항상 이렇게 확인하는 습관을 들여보세요.';
+    missedList.style.display = 'none';
+  } else {
+    endTitle.textContent = '⏰ 시간 종료! 탈출 실패';
+    const missedItems = ITEMS.filter(i=>i.risky && !removedTexts.has(i.text));
+    endDesc.textContent = `아직 위험한 정보가 화면에 남아있었어요. 아래에서 어떤 정보가 위험했는지 함께 확인해봐요.`;
+    missedList.style.display = 'block';
+    missedList.innerHTML = missedItems.map(i=>`<div><b>⚠ ${i.text}</b><br>${i.why}</div>`).join('<hr style="border:none;border-top:1px solid #e1e6ef;margin:10px 0;">');
+  }
+}
+</script>
+</body>
+</html>
