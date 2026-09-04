@@ -6,80 +6,104 @@
         "url": "1.slidecard.html",
         "memo": "",
         "order": 0,
-        "open": false,
-        "units": ["g1s2-1", "g2s2-3-1"]
+        "open": true,
+        "units": [
+          "g1s2-1",
+          "g2s2-3-1"
+        ]
       },
       "robotmaze": {
         "title": "미로 찾기",
         "url": "2.robotmaze.html",
         "memo": "",
         "order": 1,
-        "open": false,
-        "units": ["g1s2-1", "g2s2-3-1"]
+        "open": true,
+        "units": [
+          "g1s2-1",
+          "g2s2-3-1"
+        ]
       },
       "brickbreak": {
         "title": "벽돌깨기",
         "url": "3.brickbreak.html",
         "memo": "",
         "order": 2,
-        "open": false,
-        "units": ["g1s2-3", "g2s1-4-2"]
+        "open": true,
+        "units": [
+          "g1s2-3",
+          "g2s1-4-2"
+        ]
       },
       "function": {
         "title": "코딩 미로",
         "url": "4.function.html",
         "memo": "",
         "order": 3,
-        "open": false,
-        "units": ["g2s2-3-2"]
+        "open": true,
+        "units": [
+          "g2s2-3-2"
+        ]
       },
       "cardauction": {
         "title": "경매",
         "url": "5.cardauction.html",
         "memo": "",
         "order": 4,
-        "open": false,
-        "units": ["g2s2-2-2"]
+        "open": true,
+        "units": [
+          "g2s2-2-2"
+        ]
       },
       "snakegame": {
         "title": "스네이크",
         "url": "6.snakegame.html",
         "memo": "",
         "order": 5,
-        "open": false,
-        "units": ["g2s2-3-1"]
+        "open": true,
+        "units": [
+          "g2s2-3-1"
+        ]
       },
       "drawing": {
         "title": "추상화",
         "url": "7.drawing.html",
         "memo": "",
         "order": 6,
-        "open": false,
-        "units": ["g2s2-3-1"]
+        "open": true,
+        "units": [
+          "g2s2-3-1"
+        ]
       },
       "datasorting": {
-        "title": "데이터 분류",
+        "title": "자료 정렬하기",
         "url": "8.data-sorting-game.html",
         "memo": "",
         "order": 7,
-        "open": false,
-        "units": ["g1s2-2", "g2s2-2-1"]
+        "open": true,
+        "units": [
+          "g2s2-2-2"
+        ]
       },
       "graphreading": {
         "title": "그래프 읽기",
         "url": "9.graph-reading-game.html",
         "memo": "",
         "order": 8,
-        "open": false,
-        "units": ["g1s2-2", "g2s2-2-2"]
+        "open": true,
+        "units": [
+          "g2s2-2-1"
+        ]
       },
       "aiorhuman": {
-        "title": "AI일까 사람일까",
+        "title": "AI와 인간이 쓴 글 구분하기",
         "url": "10.ai-or-human-game.html",
         "memo": "",
         "order": 9,
-        "open": false,
-        "units": ["g1s2-1", "g2s1-4-1"]
+        "open": true,
+        "units": [
+          "g1s2-5",
+          "g2s1-4-1"
+        ]
       }
     }
   }

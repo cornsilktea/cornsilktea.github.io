@@ -1,0 +1,8 @@
+{
+  "rules": {
+    "portal": {
+      ".read": true,
+      ".write": "auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+    }
+  }
+}
