@@ -4,8 +4,8 @@
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="aiethicscourt"></script>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>AI 윤리 법정</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 윤리 법정 — 전자칠판</title>
 <style>
   :root{
     --bg:#f5f7fb;
@@ -16,11 +16,8 @@
     --wood:#8b5e34;
     --wood-soft:#f2e9df;
     --agree:#1a9b64;
-    --agree-soft:#e6f7ef;
     --cond:#c9860a;
-    --cond-soft:#fdf3e3;
     --disagree:#e5484d;
-    --disagree-soft:#fdecec;
     --radius:20px;
   }
   *{box-sizing:border-box;}
@@ -37,44 +34,46 @@
     user-select:none;
   }
   header{
-    padding:18px 28px 8px;
+    padding:14px 26px 6px;
     display:flex;
     justify-content:space-between;
     align-items:baseline;
     flex-wrap:wrap;
     gap:10px;
   }
-  h1{font-size:1.6rem;margin:0;font-weight:800;letter-spacing:-0.02em;}
-  .desc{color:var(--sub);font-size:0.95rem;margin-top:2px;}
-  .status{display:flex;gap:14px;}
+  h1{font-size:1.5rem;margin:0;font-weight:800;letter-spacing:-0.02em;}
+  .desc{color:var(--sub);font-size:0.92rem;margin-top:2px;}
+  .status{display:flex;gap:10px;flex-wrap:wrap;}
   .pill{
     background:var(--card);
     border:1px solid var(--line);
     border-radius:999px;
-    padding:8px 18px;
+    padding:7px 16px;
     font-weight:700;
     white-space:nowrap;
+    font-size:0.95rem;
   }
   .pill.count{color:var(--wood);}
+  .pill.link{color:var(--sub);}
+  .pill.link.bad{color:var(--disagree);border-color:#f4c7c9;}
 
   main{
     flex:1;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    padding:10px 20px 30px;
+    display:grid;
+    grid-template-columns:minmax(0,1fr) 300px;
+    gap:18px;
+    align-items:start;
+    padding:6px 26px 22px;
   }
 
-  #playScreen{
-    width:min(880px,95vw);
+  .panel{
     background:var(--card);
     border:1px solid var(--line);
     border-radius:var(--radius);
-    padding:30px 34px;
-    display:flex;
-    flex-direction:column;
-    gap:20px;
+    padding:24px 28px;
   }
+
+  #stage{display:flex;flex-direction:column;gap:18px;}
 
   .case-label{
     display:inline-flex;
@@ -89,132 +88,92 @@
     width:fit-content;
   }
   .case-text{
-    font-size:1.35rem;
+    font-size:clamp(1.3rem, 2.4vw, 2rem);
     font-weight:700;
-    line-height:1.55;
+    line-height:1.5;
   }
 
-  .verdicts{
-    display:grid;
-    grid-template-columns:1fr 1fr 1fr;
-    gap:14px;
+  /* ----- 저울 ----- */
+  .scale-wrap{
+    display:flex;
+    justify-content:center;
+    padding:4px 0 0;
   }
-  .verdict-btn{
-    background:#fbfcfe;
-    border:2px solid var(--line);
-    border-radius:16px;
-    padding:20px 14px;
-    font-size:1.15rem;
-    font-weight:800;
-    text-align:center;
-    cursor:pointer;
-    transition:border-color .12s ease, background .12s ease, transform .08s ease;
-  }
-  .verdict-btn:active{transform:scale(.97);}
-  .verdict-btn.picked{border-color:var(--wood);background:var(--wood-soft);}
+  svg.scale{width:min(560px,100%);height:auto;}
+  .beam{transition:transform .5s cubic-bezier(.34,1.3,.64,1);transform-origin:200px 40px;}
+  .pan-label{font-size:13px;font-weight:800;}
 
-  .result-area{
-    border-top:1px dashed var(--line);
-    padding-top:18px;
-    display:flex;
-    flex-direction:column;
-    gap:10px;
-  }
-  .result-title{
-    font-size:1rem;
-    font-weight:800;
-    color:var(--sub);
-  }
-  .bars{
-    display:flex;
-    flex-direction:column;
-    gap:10px;
-  }
+  /* ----- 막대 ----- */
+  .bars{display:flex;flex-direction:column;gap:12px;}
   .bar-row{
     display:grid;
-    grid-template-columns:110px 1fr 50px;
+    grid-template-columns:120px 1fr 92px;
     align-items:center;
-    gap:10px;
+    gap:12px;
   }
-  .bar-label{font-size:0.95rem;font-weight:700;}
-  .bar-track{
-    background:#f0f2f7;
-    border-radius:999px;
-    height:24px;
-    overflow:hidden;
-  }
-  .bar-fill{
-    height:100%;
-    border-radius:999px;
-    width:0%;
-    transition:width .35s ease;
-  }
+  .bar-label{font-size:1.05rem;font-weight:800;}
+  .bar-track{background:#f0f2f7;border-radius:999px;height:34px;overflow:hidden;}
+  .bar-fill{height:100%;border-radius:999px;width:0%;transition:width .4s ease;}
   .bar-fill.agree{background:var(--agree);}
   .bar-fill.cond{background:var(--cond);}
   .bar-fill.disagree{background:var(--disagree);}
-  .bar-count{font-size:0.95rem;font-weight:800;text-align:right;}
+  .bar-count{font-size:1.05rem;font-weight:800;text-align:right;}
+  .bar-count small{color:var(--sub);font-weight:700;font-size:0.85rem;}
 
+  /* ----- 참여 안내 ----- */
+  #joinPanel{display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;padding:20px;}
+  .join-title{font-size:0.92rem;font-weight:800;color:var(--sub);}
+  .join-code{
+    font-size:2.6rem;
+    font-weight:900;
+    letter-spacing:0.14em;
+    color:var(--wood);
+    line-height:1;
+  }
+  .qr-box{
+    width:190px;height:190px;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:8px;
+  }
+  .qr-box svg{display:block;width:100%;height:100%;shape-rendering:crispEdges;}
+  .join-url{font-size:0.8rem;color:var(--sub);word-break:break-all;line-height:1.4;}
+  .join-hint{font-size:0.85rem;color:var(--sub);line-height:1.5;}
+
+  /* ----- 버튼 ----- */
   .btnbar{
+    grid-column:1 / -1;
     display:flex;
     justify-content:space-between;
     gap:12px;
     flex-wrap:wrap;
   }
-  .left-btns, .right-btns{display:flex;gap:10px;}
+  .left-btns,.right-btns{display:flex;gap:10px;flex-wrap:wrap;}
   button.primary{
-    background:var(--wood);
-    color:#fff;
-    border:none;
-    border-radius:14px;
-    padding:14px 26px;
-    font-size:1.02rem;
-    font-weight:800;
-    cursor:pointer;
+    background:var(--wood);color:#fff;border:none;border-radius:14px;
+    padding:14px 28px;font-size:1.05rem;font-weight:800;cursor:pointer;
   }
   button.primary:active{transform:translateY(1px);}
   button.ghost{
-    background:var(--card);
-    color:var(--ink);
-    border:1px solid var(--line);
-    border-radius:14px;
-    padding:14px 22px;
-    font-size:1.02rem;
-    font-weight:700;
-    cursor:pointer;
+    background:var(--card);color:var(--ink);border:1px solid var(--line);
+    border-radius:14px;padding:14px 22px;font-size:1.02rem;font-weight:700;cursor:pointer;
   }
+  button:disabled{opacity:.45;cursor:default;}
 
-  #summaryScreen{
-    display:none;
-    width:min(920px,95vw);
-    background:var(--card);
-    border:1px solid var(--line);
-    border-radius:var(--radius);
-    padding:34px;
-    flex-direction:column;
-    gap:22px;
-  }
-  #summaryScreen h2{margin:0;font-size:1.7rem;}
-  .summary-case{
-    border:1px solid var(--line);
-    border-radius:16px;
-    padding:18px 20px;
-    display:flex;
-    flex-direction:column;
-    gap:10px;
-  }
-  .summary-case .case-text{font-size:1.05rem;}
-  .summary-list{
-    display:flex;
-    flex-direction:column;
-    gap:16px;
-    max-height:55vh;
-    overflow-y:auto;
-    padding-right:4px;
-  }
+  /* ----- 결과 모음 ----- */
+  #summaryScreen{display:none;grid-column:1 / -1;flex-direction:column;gap:20px;}
+  #summaryScreen h2{margin:0;font-size:1.6rem;}
+  .summary-list{display:flex;flex-direction:column;gap:14px;max-height:62vh;overflow-y:auto;padding-right:6px;}
+  .summary-case{border:1px solid var(--line);border-radius:16px;padding:16px 18px;display:flex;flex-direction:column;gap:10px;}
+  .summary-case .case-text{font-size:1.02rem;}
+  .summary-case .bar-row{grid-template-columns:100px 1fr 80px;}
+  .summary-case .bar-track{height:22px;}
+  .summary-case .bar-label,.summary-case .bar-count{font-size:0.92rem;}
 
-  @media (max-width:640px){
-    .verdicts{grid-template-columns:1fr;}
-    .bar-row{grid-template-columns:80px 1fr 40px;}
+  @media (max-width:900px){
+    main{grid-template-columns:1fr;}
+    .qr-box{width:160px;height:160px;}
   }
 </style>
 </head>
@@ -223,195 +182,324 @@
 <header>
   <div>
     <h1>⚖️ AI 윤리 법정</h1>
-    <div class="desc">사건을 읽고 판사가 되어 판결을 내려보세요. 정답은 없어요 — 우리 반의 생각을 함께 확인해봐요.</div>
+    <div class="desc">사건을 읽고 태블릿으로 판결해 주세요. 정답은 없어요 — 우리 반의 생각을 함께 확인해봐요.</div>
   </div>
   <div class="status">
     <div class="pill" id="progressPill">사건 1 / 6</div>
-    <div class="pill count" id="totalVotesPill">총 판결 0표</div>
+    <div class="pill count" id="votePill">판결 0표</div>
+    <div class="pill link" id="linkPill">연결 확인 중…</div>
   </div>
 </header>
 
 <main>
-  <div id="playScreen">
+  <section class="panel" id="stage">
     <div class="case-label" id="caseLabel">사건 1</div>
     <div class="case-text" id="caseText"></div>
 
-    <div class="verdicts" id="verdictsBox"></div>
-
-    <div class="result-area">
-      <div class="result-title">📊 우리 반 판결 분포 (실시간)</div>
-      <div class="bars" id="barsBox"></div>
+    <div class="scale-wrap">
+      <svg class="scale" viewBox="0 0 400 150" aria-hidden="true">
+        <rect x="196" y="40" width="8" height="86" rx="3" fill="#c8a37a"/>
+        <path d="M160 132 L240 132 L228 126 L172 126 Z" fill="#8b5e34"/>
+        <g class="beam" id="beam">
+          <rect x="60" y="36" width="280" height="9" rx="4.5" fill="#8b5e34"/>
+          <circle cx="200" cy="40.5" r="11" fill="#c8a37a" stroke="#8b5e34" stroke-width="3"/>
+          <line x1="70" y1="45" x2="70" y2="72" stroke="#8b5e34" stroke-width="3"/>
+          <path d="M40 72 L100 72 L88 100 L52 100 Z" fill="#e6f7ef" stroke="#1a9b64" stroke-width="3"/>
+          <text x="70" y="92" text-anchor="middle" class="pan-label" fill="#1a9b64">찬성</text>
+          <line x1="330" y1="45" x2="330" y2="72" stroke="#8b5e34" stroke-width="3"/>
+          <path d="M300 72 L360 72 L348 100 L312 100 Z" fill="#fdecec" stroke="#e5484d" stroke-width="3"/>
+          <text x="330" y="92" text-anchor="middle" class="pan-label" fill="#e5484d">반대</text>
+        </g>
+      </svg>
     </div>
 
-    <div class="btnbar">
-      <div class="left-btns">
-        <button class="ghost" id="resetBtn">이 사건 초기화</button>
-      </div>
-      <div class="right-btns">
-        <button class="ghost" id="prevBtn">← 이전 사건</button>
-        <button class="primary" id="nextBtn">다음 사건 →</button>
-      </div>
+    <div class="bars" id="barsBox"></div>
+  </section>
+
+  <aside class="panel" id="joinPanel">
+    <div class="join-title">📱 태블릿으로 참여하기</div>
+    <div class="qr-box" id="qrBox"><svg viewBox="0 0 37 37" role="img" aria-label="학생 투표 페이지 QR코드" class="segno"><path class="qrline" stroke="#1f2430" d="M2 2.5h7m1 0h2m8 0h3m2 0h1m2 0h7m-33 1h1m5 0h1m1 0h1m2 0h2m1 0h1m1 0h3m2 0h4m1 0h1m5 0h1m-33 1h1m1 0h3m1 0h1m5 0h4m2 0h1m1 0h1m2 0h1m2 0h1m1 0h3m1 0h1m-33 1h1m1 0h3m1 0h1m1 0h1m1 0h2m5 0h2m3 0h1m1 0h1m1 0h1m1 0h3m1 0h1m-33 1h1m1 0h3m1 0h1m6 0h1m2 0h1m2 0h1m1 0h2m1 0h1m1 0h1m1 0h3m1 0h1m-33 1h1m5 0h1m2 0h1m2 0h1m1 0h3m2 0h1m2 0h1m1 0h1m1 0h1m5 0h1m-33 1h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7m-25 1h2m1 0h2m2 0h4m3 0h1m-23 1h1m1 0h2m1 0h3m7 0h5m1 0h1m2 0h1m1 0h1m2 0h1m1 0h2m-32 1h2m2 0h1m1 0h4m2 0h2m1 0h2m1 0h3m1 0h1m2 0h2m1 0h2m1 0h1m-33 1h7m1 0h1m1 0h4m2 0h1m1 0h1m1 0h1m1 0h2m3 0h3m1 0h2m-32 1h5m10 0h1m3 0h1m2 0h3m1 0h1m1 0h1m1 0h2m-33 1h1m3 0h3m1 0h1m5 0h1m2 0h1m1 0h2m1 0h4m1 0h3m1 0h2m-33 1h4m5 0h2m1 0h3m2 0h1m1 0h1m1 0h2m1 0h1m2 0h1m1 0h1m1 0h1m-32 1h1m4 0h2m1 0h3m1 0h3m1 0h1m1 0h3m3 0h1m1 0h1m1 0h2m-30 1h1m2 0h2m3 0h1m1 0h2m2 0h2m2 0h4m3 0h2m2 0h2m-28 1h2m1 0h1m3 0h1m1 0h1m5 0h5m2 0h2m1 0h3m-31 1h1m6 0h1m1 0h1m2 0h2m1 0h1m1 0h1m4 0h5m1 0h2m1 0h2m-32 1h1m1 0h2m1 0h1m2 0h1m1 0h2m2 0h1m2 0h1m1 0h1m3 0h1m1 0h3m1 0h1m-31 1h1m4 0h1m1 0h1m1 0h2m3 0h4m2 0h1m4 0h2m1 0h1m2 0h1m-28 1h1m1 0h6m2 0h6m1 0h1m5 0h1m1 0h3m-32 1h3m1 0h1m3 0h1m2 0h2m1 0h2m1 0h1m1 0h2m1 0h3m1 0h1m5 0h1m-29 1h1m1 0h2m2 0h1m1 0h3m2 0h1m2 0h2m1 0h2m1 0h2m3 0h2m-32 1h1m1 0h1m3 0h1m1 0h1m4 0h1m5 0h1m2 0h1m2 0h3m2 0h2m-33 1h1m2 0h1m2 0h3m2 0h1m1 0h2m2 0h1m4 0h1m1 0h5m3 0h1m-25 1h2m1 0h1m1 0h3m1 0h3m2 0h1m1 0h1m3 0h2m1 0h1m-32 1h7m1 0h2m1 0h1m1 0h2m1 0h1m1 0h3m2 0h2m1 0h1m1 0h1m2 0h1m-32 1h1m5 0h1m1 0h1m1 0h2m1 0h2m3 0h1m1 0h2m1 0h2m3 0h4m-32 1h1m1 0h3m1 0h1m2 0h1m1 0h1m1 0h2m3 0h1m2 0h1m1 0h6m1 0h1m1 0h1m-33 1h1m1 0h3m1 0h1m1 0h3m4 0h1m4 0h1m1 0h3m2 0h1m1 0h2m1 0h1m-33 1h1m1 0h3m1 0h1m1 0h2m3 0h4m3 0h4m2 0h2m1 0h2m-31 1h1m5 0h1m2 0h3m1 0h2m1 0h3m5 0h1m1 0h3m3 0h1m-33 1h7m1 0h1m1 0h2m3 0h4m2 0h1m1 0h1m2 0h1m1 0h1m1 0h1"/></svg></div>
+    <div>
+      <div class="join-title">참여 코드</div>
+      <div class="join-code" id="codeText">----</div>
+    </div>
+    <div class="join-url" id="joinUrl"></div>
+    <div class="join-hint">QR을 찍으면 코드 입력 없이 바로 들어옵니다.</div>
+  </aside>
+
+  <div class="btnbar" id="btnbar">
+    <div class="left-btns">
+      <button class="ghost" id="newSessionBtn">새 세션 시작</button>
+      <button class="ghost" id="resetBtn">이 사건 판결 지우기</button>
+    </div>
+    <div class="right-btns">
+      <button class="ghost" id="prevBtn">← 이전 사건</button>
+      <button class="primary" id="nextBtn">다음 사건 →</button>
     </div>
   </div>
 
-  <div id="summaryScreen">
+  <section class="panel" id="summaryScreen">
     <h2>🏛️ 오늘의 판결 모음</h2>
     <div class="summary-list" id="summaryList"></div>
     <div class="btnbar">
       <button class="ghost" id="backBtn">← 사건으로 돌아가기</button>
-      <button class="primary" id="restartBtn">전체 초기화</button>
     </div>
-  </div>
+  </section>
 </main>
 
+<script charset="utf-8" src="court-cases.js"></script>
 <script>
-const VERDICT_OPTIONS = [
-  {key:'agree', label:'찬성'},
-  {key:'cond', label:'조건부 찬성'},
-  {key:'disagree', label:'반대'},
-];
+(function(){
+  "use strict";
 
-const CASES = [
-  { text: "학교에서 AI가 시험 중 부정행위를 자동으로 감지해 선생님께 알려주는 시스템을 도입하려고 합니다. 이 시스템 도입에 찬성하시나요?" },
-  { text: "한 회사가 채용 과정에서 지원자의 표정을 AI로 분석해 합격 여부를 결정하는 방식을 도입했습니다. 이 방식에 찬성하시나요?" },
-  { text: "우리 반 친구가 AI 챗봇에게 숙제를 대신 풀게 하고 그대로 제출했습니다. 이런 행동에 찬성하시나요?" },
-  { text: "공공장소의 CCTV가 AI 얼굴 인식으로 시민들의 위치를 실시간으로 추적하는 것에 찬성하시나요?" },
-  { text: "AI가 작곡한 노래를 사람이 직접 만든 것처럼 속여 음원 사이트에 올리는 것에 찬성하시나요?" },
-  { text: "AI 스피커가 우리 집 대화 내용을 항상 녹음해 두었다가, 나중에 다시 들려주는 기능을 넣는 것에 찬성하시나요?" },
-];
+  var CASES   = window.COURT_CASES || [];
+  var OPTIONS = window.COURT_OPTIONS || [];
+  var CFG     = window.PORTAL_CONFIG || {};
 
-let votes = CASES.map(()=> ({agree:0, cond:0, disagree:0}));
-let idx = 0;
+  /* 학생 태블릿이 접속할 주소 — 오른쪽 QR은 이 주소로 미리 만들어 둔 것입니다.
+     파일 이름이나 사이트 주소를 바꾸면 QR도 다시 만들어야 합니다(사용법.md 참고). */
+  var VOTE_URL = "https://cornsilktea.github.io/13.ai-ethics-court-vote.html";
 
-const caseLabel = document.getElementById('caseLabel');
-const caseText = document.getElementById('caseText');
-const verdictsBox = document.getElementById('verdictsBox');
-const barsBox = document.getElementById('barsBox');
-const progressPill = document.getElementById('progressPill');
-const totalVotesPill = document.getElementById('totalVotesPill');
-const playScreen = document.getElementById('playScreen');
-const summaryScreen = document.getElementById('summaryScreen');
+  /* 헷갈리기 쉬운 글자(0 O 1 I)는 빼고 코드를 만듭니다. */
+  var CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  var STORE_KEY  = "court_board_room_v1";
 
-function init(){
-  votes = CASES.map(()=> ({agree:0, cond:0, disagree:0}));
-  idx = 0;
-  render();
-}
+  var room = null;       /* 참여 코드 */
+  var idx = 0;           /* 지금 보여 주는 사건 번호(0부터) */
+  var data = {};         /* 서버에서 받아 온 이 세션 전체 */
+  var pollTimer = null;
+  var lastOk = 0;
 
-function render(){
-  const c = CASES[idx];
-  caseLabel.textContent = `사건 ${idx+1}`;
-  progressPill.textContent = `사건 ${idx+1} / ${CASES.length}`;
-  caseText.textContent = c.text;
+  var el = function(id){ return document.getElementById(id); };
+  var caseLabel = el('caseLabel'), caseText = el('caseText'), barsBox = el('barsBox');
+  var progressPill = el('progressPill'), votePill = el('votePill'), linkPill = el('linkPill');
+  var codeText = el('codeText'), joinUrl = el('joinUrl'), beam = el('beam');
+  var stage = el('stage'), joinPanel = el('joinPanel'), btnbar = el('btnbar');
+  var summaryScreen = el('summaryScreen'), summaryList = el('summaryList');
 
-  verdictsBox.innerHTML = '';
-  VERDICT_OPTIONS.forEach(opt=>{
-    const btn = document.createElement('div');
-    btn.className = 'verdict-btn';
-    btn.textContent = opt.label;
-    btn.addEventListener('click', ()=>{
-      votes[idx][opt.key] += 1;
-      btn.classList.add('picked');
-      setTimeout(()=>btn.classList.remove('picked'), 250);
-      renderBars();
+  function dbUrl(path){
+    return String(CFG.DB_URL || "").replace(/\/+$/, "") + "/" + path + ".json";
+  }
+  function ready(){
+    return !!(CFG.isReady && CFG.isReady());
+  }
+
+  function put(path, value){
+    return fetch(dbUrl(path), {
+      method: "PUT",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify(value)
     });
-    verdictsBox.appendChild(btn);
-  });
+  }
+  function del(path){
+    return fetch(dbUrl(path), { method:"DELETE" });
+  }
 
-  renderBars();
+  function makeCode(){
+    var s = "";
+    for (var i = 0; i < 4; i++){
+      s += CODE_CHARS.charAt(Math.floor(Math.random() * CODE_CHARS.length));
+    }
+    return s;
+  }
 
-  const nextBtn = document.getElementById('nextBtn');
-  nextBtn.textContent = idx === CASES.length - 1 ? '결과 보기 →' : '다음 사건 →';
+  /* ---------- 세션 ---------- */
 
-  const prevBtn = document.getElementById('prevBtn');
-  prevBtn.style.visibility = idx === 0 ? 'hidden' : 'visible';
-}
+  function startSession(){
+    if (!ready()){ setLink(false, "설정 파일 확인 필요"); return; }
+    room = makeCode();
+    idx = 0;
+    data = {};
+    try { localStorage.setItem(STORE_KEY, room); } catch(e){}
+    codeText.textContent = room;
 
-function renderBars(){
-  const v = votes[idx];
-  const total = v.agree + v.cond + v.disagree;
-  totalVotesPill.textContent = `총 판결 ${total}표`;
+    /* 방을 새로 만들고, 태블릿이 찾아올 수 있게 '지금 열린 방'으로 등록합니다. */
+    put("court/room/" + room, { state: { i: 0, t: Date.now() } })
+      .then(function(){ return put("court/now", { code: room, t: Date.now() }); })
+      .then(function(){ setLink(true); refresh(); })
+      .catch(function(){ setLink(false, "저장 실패"); });
 
-  barsBox.innerHTML = '';
-  VERDICT_OPTIONS.forEach(opt=>{
-    const count = v[opt.key];
-    const pct = total > 0 ? Math.round((count/total)*100) : 0;
-    const row = document.createElement('div');
-    row.className = 'bar-row';
-    row.innerHTML = `
-      <div class="bar-label">${opt.label}</div>
-      <div class="bar-track"><div class="bar-fill ${opt.key}" style="width:${pct}%"></div></div>
-      <div class="bar-count">${count}표</div>
-    `;
-    barsBox.appendChild(row);
-  });
-}
-
-document.getElementById('resetBtn').addEventListener('click', ()=>{
-  votes[idx] = {agree:0, cond:0, disagree:0};
-  renderBars();
-});
-
-document.getElementById('prevBtn').addEventListener('click', ()=>{
-  if(idx > 0){
-    idx -= 1;
     render();
   }
-});
 
-document.getElementById('nextBtn').addEventListener('click', ()=>{
-  if(idx < CASES.length - 1){
-    idx += 1;
+  function resumeSession(){
+    var saved = null;
+    try { saved = localStorage.getItem(STORE_KEY); } catch(e){}
+    if (saved && /^[A-Z0-9]{4}$/.test(saved)){
+      room = saved;
+      codeText.textContent = room;
+      /* 이 화면이 여전히 '지금 열린 방'인지 확인하고, 아니면 다시 등록합니다. */
+      fetch(dbUrl("court/now"), {cache:"no-store"})
+        .then(function(r){ return r.json(); })
+        .then(function(now){
+          if (!now || now.code !== room){ put("court/now", { code: room, t: Date.now() }); }
+        })
+        .catch(function(){});
+      refresh();
+      render();
+    } else {
+      startSession();
+    }
+  }
+
+  function pushState(){
+    if (!room) return;
+    put("court/room/" + room + "/state", { i: idx, t: Date.now() }).catch(function(){});
+  }
+
+  /* ---------- 서버에서 판결 받아오기 ---------- */
+
+  function refresh(){
+    if (!room || !ready()) return;
+    fetch(dbUrl("court/room/" + room), {cache:"no-store"})
+      .then(function(r){ return r.json(); })
+      .then(function(json){
+        data = json || {};
+        lastOk = Date.now();
+        setLink(true);
+        if (summaryScreen.style.display === "flex") renderSummary(); else renderBars();
+      })
+      .catch(function(){
+        if (Date.now() - lastOk > 6000) setLink(false, "연결 끊김");
+      });
+  }
+
+  function setLink(ok, msg){
+    linkPill.textContent = ok ? "연결됨" : ("⚠ " + (msg || "연결 확인 중…"));
+    linkPill.classList.toggle("bad", !ok);
+  }
+
+  function tally(caseIdx){
+    var out = { agree:0, cond:0, disagree:0, total:0 };
+    var votes = data && data.votes ? data.votes[caseIdx] : null;
+    if (!votes) return out;
+    Object.keys(votes).forEach(function(dev){
+      var v = votes[dev];
+      if (out.hasOwnProperty(v)){ out[v] += 1; out.total += 1; }
+    });
+    return out;
+  }
+
+  /* ---------- 화면 그리기 ---------- */
+
+  function render(){
+    var c = CASES[idx] || { text:"" };
+    caseLabel.textContent = "사건 " + (idx + 1);
+    progressPill.textContent = "사건 " + (idx + 1) + " / " + CASES.length;
+    caseText.textContent = c.text;
+    el('prevBtn').style.visibility = idx === 0 ? "hidden" : "visible";
+    el('nextBtn').textContent = idx === CASES.length - 1 ? "결과 보기 →" : "다음 사건 →";
+    renderBars();
+  }
+
+  function renderBars(){
+    var t = tally(idx);
+    votePill.textContent = "판결 " + t.total + "표";
+
+    barsBox.innerHTML = "";
+    OPTIONS.forEach(function(opt){
+      var count = t[opt.key];
+      var pct = t.total > 0 ? Math.round((count / t.total) * 100) : 0;
+      var row = document.createElement('div');
+      row.className = "bar-row";
+      row.innerHTML =
+        '<div class="bar-label">' + opt.label + '</div>' +
+        '<div class="bar-track"><div class="bar-fill ' + opt.key + '" style="width:' + pct + '%"></div></div>' +
+        '<div class="bar-count">' + count + '표 <small>' + pct + '%</small></div>';
+      barsBox.appendChild(row);
+    });
+
+    /* 저울 — 조건부 찬성은 양쪽에 반씩 얹습니다. */
+    var left = t.agree + t.cond * 0.5;
+    var right = t.disagree + t.cond * 0.5;
+    var angle = t.total > 0 ? ((right - left) / t.total) * 16 : 0;
+    beam.style.transform = "rotate(" + angle.toFixed(2) + "deg)";
+  }
+
+  function renderSummary(){
+    summaryList.innerHTML = "";
+    CASES.forEach(function(c, i){
+      var t = tally(i);
+      var bars = OPTIONS.map(function(opt){
+        var count = t[opt.key];
+        var pct = t.total > 0 ? Math.round((count / t.total) * 100) : 0;
+        return '<div class="bar-row">' +
+               '<div class="bar-label">' + opt.label + '</div>' +
+               '<div class="bar-track"><div class="bar-fill ' + opt.key + '" style="width:' + pct + '%"></div></div>' +
+               '<div class="bar-count">' + count + '표</div></div>';
+      }).join("");
+
+      var wrap = document.createElement('div');
+      wrap.className = "summary-case";
+      var label = document.createElement('div');
+      label.className = "case-label";
+      label.textContent = "사건 " + (i + 1) + " · 총 " + t.total + "표";
+      var text = document.createElement('div');
+      text.className = "case-text";
+      text.textContent = c.text;
+      var barsWrap = document.createElement('div');
+      barsWrap.className = "bars";
+      barsWrap.innerHTML = bars;
+      wrap.appendChild(label); wrap.appendChild(text); wrap.appendChild(barsWrap);
+      summaryList.appendChild(wrap);
+    });
+  }
+
+  function showSummary(){
+    stage.style.display = "none";
+    joinPanel.style.display = "none";
+    btnbar.style.display = "none";
+    summaryScreen.style.display = "flex";
+    renderSummary();
+  }
+  function hideSummary(){
+    summaryScreen.style.display = "none";
+    stage.style.display = "flex";
+    joinPanel.style.display = "flex";
+    btnbar.style.display = "flex";
     render();
+  }
+
+  /* ---------- 버튼 ---------- */
+
+  el('nextBtn').addEventListener('click', function(){
+    if (idx < CASES.length - 1){ idx += 1; pushState(); render(); }
+    else { showSummary(); }
+  });
+  el('prevBtn').addEventListener('click', function(){
+    if (idx > 0){ idx -= 1; pushState(); render(); }
+  });
+  el('backBtn').addEventListener('click', hideSummary);
+  el('resetBtn').addEventListener('click', function(){
+    if (!room) return;
+    if (!confirm("사건 " + (idx + 1) + "의 판결을 모두 지울까요?")) return;
+    del("court/room/" + room + "/votes/" + idx).then(function(){
+      if (data.votes) delete data.votes[idx];
+      renderBars();
+      refresh();
+    });
+  });
+  el('newSessionBtn').addEventListener('click', function(){
+    if (!confirm("새 참여 코드를 만들고 판결을 처음부터 다시 받을까요?\n(지금까지의 판결은 화면에서 사라집니다)")) return;
+    hideSummary();
+    startSession();
+  });
+
+  /* ---------- 시작 ---------- */
+
+  joinUrl.textContent = VOTE_URL.replace(/^https?:\/\//, "");
+  render();
+  if (!ready()){
+    setLink(false, "firebase-config.js 확인");
+    caseText.textContent = "설정 파일(firebase-config.js)의 주소를 읽지 못했습니다.";
   } else {
-    showSummary();
+    resumeSession();
+    pollTimer = setInterval(refresh, 1200);
+    document.addEventListener("visibilitychange", function(){
+      if (!document.hidden) refresh();
+    });
   }
-});
-
-function showSummary(){
-  playScreen.style.display = 'none';
-  summaryScreen.style.display = 'flex';
-
-  const list = document.getElementById('summaryList');
-  list.innerHTML = '';
-  CASES.forEach((c, i)=>{
-    const v = votes[i];
-    const total = v.agree + v.cond + v.disagree;
-    const wrap = document.createElement('div');
-    wrap.className = 'summary-case';
-
-    const barsHtml = VERDICT_OPTIONS.map(opt=>{
-      const count = v[opt.key];
-      const pct = total > 0 ? Math.round((count/total)*100) : 0;
-      return `
-        <div class="bar-row">
-          <div class="bar-label">${opt.label}</div>
-          <div class="bar-track"><div class="bar-fill ${opt.key}" style="width:${pct}%"></div></div>
-          <div class="bar-count">${count}표</div>
-        </div>`;
-    }).join('');
-
-    wrap.innerHTML = `
-      <div class="case-label">사건 ${i+1}</div>
-      <div class="case-text">${c.text}</div>
-      <div class="bars">${barsHtml}</div>
-    `;
-    list.appendChild(wrap);
-  });
-}
-
-document.getElementById('backBtn').addEventListener('click', ()=>{
-  summaryScreen.style.display = 'none';
-  playScreen.style.display = 'flex';
-});
-
-document.getElementById('restartBtn').addEventListener('click', ()=>{
-  summaryScreen.style.display = 'none';
-  playScreen.style.display = 'flex';
-  init();
-});
-
-init();
+})();
 </script>
 </body>
 </html>

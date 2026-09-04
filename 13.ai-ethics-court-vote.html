@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<script charset="utf-8" src="firebase-config.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>AI 윤리 법정 — 판결하기</title>
+<style>
+  :root{
+    --bg:#f5f7fb;
+    --card:#ffffff;
+    --ink:#1f2430;
+    --sub:#6b7280;
+    --line:#e1e6ef;
+    --wood:#8b5e34;
+    --wood-soft:#f2e9df;
+    --agree:#1a9b64;
+    --agree-soft:#e6f7ef;
+    --cond:#c9860a;
+    --cond-soft:#fdf3e3;
+    --disagree:#e5484d;
+    --disagree-soft:#fdecec;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    -webkit-user-select:none;
+    user-select:none;
+    -webkit-tap-highlight-color:transparent;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  header{
+    padding:16px 18px 8px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+  }
+  h1{font-size:1.1rem;margin:0;font-weight:800;}
+  .pill{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:999px;
+    padding:6px 13px;
+    font-weight:700;
+    font-size:0.82rem;
+    white-space:nowrap;
+    color:var(--sub);
+  }
+  .pill.bad{color:var(--disagree);border-color:#f4c7c9;}
+  .pill.code{color:var(--wood);letter-spacing:0.08em;}
+
+  main{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    padding:6px 16px 22px;
+  }
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:20px;
+    padding:20px;
+  }
+  .case-label{
+    display:inline-flex;
+    font-size:0.85rem;
+    font-weight:800;
+    color:var(--wood);
+    background:var(--wood-soft);
+    border-radius:999px;
+    padding:5px 14px;
+    width:fit-content;
+    margin-bottom:12px;
+  }
+  .case-text{font-size:1.18rem;font-weight:700;line-height:1.6;}
+
+  .verdicts{display:flex;flex-direction:column;gap:12px;}
+  .verdict-btn{
+    border:2px solid var(--line);
+    background:#fbfcfe;
+    border-radius:18px;
+    padding:22px 16px;
+    font-size:1.25rem;
+    font-weight:800;
+    text-align:center;
+    cursor:pointer;
+    transition:transform .08s ease, border-color .12s ease, background .12s ease;
+  }
+  .verdict-btn:active{transform:scale(.98);}
+  .verdict-btn.agree.on{border-color:var(--agree);background:var(--agree-soft);color:var(--agree);}
+  .verdict-btn.cond.on{border-color:var(--cond);background:var(--cond-soft);color:var(--cond);}
+  .verdict-btn.disagree.on{border-color:var(--disagree);background:var(--disagree-soft);color:var(--disagree);}
+
+  .note{
+    text-align:center;
+    font-size:0.95rem;
+    font-weight:700;
+    color:var(--sub);
+    line-height:1.5;
+    min-height:1.4em;
+  }
+  .note.done{color:var(--agree);}
+
+  /* 코드 입력 화면 */
+  #joinScreen{display:none;flex-direction:column;gap:14px;text-align:center;align-items:center;}
+  #joinScreen input{
+    font-size:2rem;
+    font-weight:900;
+    letter-spacing:0.2em;
+    text-align:center;
+    width:100%;
+    max-width:260px;
+    padding:14px;
+    border:2px solid var(--line);
+    border-radius:16px;
+    text-transform:uppercase;
+    font-family:inherit;
+  }
+  button.primary{
+    background:var(--wood);color:#fff;border:none;border-radius:16px;
+    padding:15px 30px;font-size:1.05rem;font-weight:800;cursor:pointer;font-family:inherit;
+  }
+  #waitScreen{display:none;text-align:center;color:var(--sub);font-weight:700;line-height:1.6;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚖️ AI 윤리 법정</h1>
+  <div style="display:flex;gap:6px;">
+    <div class="pill code" id="codePill">----</div>
+    <div class="pill" id="statusPill">접속 중…</div>
+  </div>
+</header>
+
+<main>
+  <!-- 참여 코드 직접 입력 -->
+  <section class="card" id="joinScreen">
+    <div style="font-weight:800;font-size:1.05rem;">전자칠판에 있는<br>참여 코드 4글자를 입력하세요</div>
+    <input id="codeInput" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD">
+    <button class="primary" id="joinBtn">들어가기</button>
+    <div class="note" id="joinNote"></div>
+  </section>
+
+  <!-- 사건 대기 -->
+  <section class="card" id="waitScreen">
+    선생님이 사건을 열면<br>여기에 바로 나타납니다.
+  </section>
+
+  <!-- 판결 -->
+  <section class="card" id="caseCard" style="display:none;">
+    <div class="case-label" id="caseLabel">사건 1</div>
+    <div class="case-text" id="caseText"></div>
+  </section>
+
+  <div class="verdicts" id="verdictsBox" style="display:none;"></div>
+  <div class="note" id="note"></div>
+</main>
+
+<script charset="utf-8" src="court-cases.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  var CASES   = window.COURT_CASES || [];
+  var OPTIONS = window.COURT_OPTIONS || [];
+  var CFG     = window.PORTAL_CONFIG || {};
+
+  var DEV_KEY  = "court_dev_v1";
+  var VOTE_KEY = "court_my_votes_v1";
+
+  var room = null;
+  var idx = -1;          /* 아직 사건을 못 받은 상태 */
+  var myVotes = {};      /* { "코드:사건번호": "agree" } */
+  var deviceId = null;
+  var tick = 0;
+  var lastOk = 0;
+  var fixedRoom = false; /* 주소에 코드가 들어 있으면 그 방만 봅니다 */
+
+  var el = function(id){ return document.getElementById(id); };
+  var codePill = el('codePill'), statusPill = el('statusPill'), note = el('note');
+  var joinScreen = el('joinScreen'), waitScreen = el('waitScreen');
+  var caseCard = el('caseCard'), caseLabel = el('caseLabel'), caseText = el('caseText');
+  var verdictsBox = el('verdictsBox');
+
+  /* ---------- 저장소 ---------- */
+
+  function load(key, fallback){
+    try {
+      var raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch(e){ return fallback; }
+  }
+  function save(key, value){
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch(e){}
+  }
+
+  deviceId = load(DEV_KEY, null);
+  if (!deviceId){
+    deviceId = "d" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    save(DEV_KEY, deviceId);
+  }
+  myVotes = load(VOTE_KEY, {}) || {};
+
+  /* ---------- 서버 ---------- */
+
+  function dbUrl(path){
+    return String(CFG.DB_URL || "").replace(/\/+$/, "") + "/" + path + ".json";
+  }
+  function ready(){ return !!(CFG.isReady && CFG.isReady()); }
+
+  function get(path){
+    return fetch(dbUrl(path), {cache:"no-store"}).then(function(r){ return r.json(); });
+  }
+
+  function setStatus(ok, msg){
+    statusPill.textContent = ok ? "연결됨" : ("⚠ " + msg);
+    statusPill.classList.toggle("bad", !ok);
+  }
+
+  /* ---------- 방 찾기 ---------- */
+
+  function askCode(msg){
+    joinScreen.style.display = "flex";
+    waitScreen.style.display = "none";
+    caseCard.style.display = "none";
+    verdictsBox.style.display = "none";
+    el('joinNote').textContent = msg || "";
+  }
+
+  function enterRoom(code){
+    room = code;
+    codePill.textContent = room;
+    joinScreen.style.display = "none";
+    idx = -1;
+    renderCase();
+    poll();
+  }
+
+  function findRoom(){
+    get("court/now").then(function(now){
+      setStatus(true);
+      lastOk = Date.now();
+      if (now && /^[A-Z0-9]{4}$/.test(now.code || "")){
+        if (now.code !== room) enterRoom(now.code);
+      } else {
+        askCode("지금 열린 수업이 없어요. 코드를 직접 넣어 주세요.");
+      }
+    }).catch(function(){
+      setStatus(false, "인터넷 확인");
+      askCode("연결이 안 돼요. 잠시 뒤 다시 시도해 주세요.");
+    });
+  }
+
+  /* ---------- 사건 따라가기 ---------- */
+
+  function poll(){
+    if (!room) return;
+    get("court/room/" + room + "/state").then(function(state){
+      lastOk = Date.now();
+      setStatus(true);
+      var next = (state && typeof state.i === "number") ? state.i : -1;
+      if (next !== idx){ idx = next; renderCase(); }
+    }).catch(function(){
+      if (Date.now() - lastOk > 6000) setStatus(false, "연결 끊김");
+    });
+  }
+
+  function renderCase(){
+    var c = CASES[idx];
+    if (!c){
+      waitScreen.style.display = "block";
+      caseCard.style.display = "none";
+      verdictsBox.style.display = "none";
+      note.textContent = "";
+      return;
+    }
+    waitScreen.style.display = "none";
+    caseCard.style.display = "block";
+    verdictsBox.style.display = "flex";
+
+    caseLabel.textContent = "사건 " + (idx + 1);
+    caseText.textContent = c.text;
+
+    var mine = myVotes[room + ":" + idx] || null;
+
+    verdictsBox.innerHTML = "";
+    OPTIONS.forEach(function(opt){
+      var btn = document.createElement('div');
+      btn.className = "verdict-btn " + opt.key + (mine === opt.key ? " on" : "");
+      btn.textContent = opt.label;
+      btn.addEventListener('click', function(){ vote(opt.key); });
+      verdictsBox.appendChild(btn);
+    });
+
+    note.textContent = mine ? "판결을 냈어요. 전자칠판을 봐 주세요." : "하나를 골라 주세요.";
+    note.classList.toggle("done", !!mine);
+  }
+
+  function vote(key){
+    if (!room || idx < 0) return;
+    var prev = myVotes[room + ":" + idx];
+    myVotes[room + ":" + idx] = key;
+    save(VOTE_KEY, myVotes);
+    renderCase();
+    note.textContent = "보내는 중…";
+    note.classList.remove("done");
+
+    fetch(dbUrl("court/room/" + room + "/votes/" + idx + "/" + deviceId), {
+      method: "PUT",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify(key)
+    }).then(function(res){
+      if (!res.ok) throw new Error("fail");
+      note.textContent = prev && prev !== key
+        ? "판결을 바꿨어요. 전자칠판을 봐 주세요."
+        : "판결을 냈어요. 전자칠판을 봐 주세요.";
+      note.classList.add("done");
+    }).catch(function(){
+      delete myVotes[room + ":" + idx];
+      save(VOTE_KEY, myVotes);
+      renderCase();
+      note.textContent = "보내지 못했어요. 한 번 더 눌러 주세요.";
+      note.classList.remove("done");
+    });
+  }
+
+  /* ---------- 코드 직접 입력 ---------- */
+
+  el('joinBtn').addEventListener('click', function(){
+    var code = (el('codeInput').value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (code.length !== 4){ el('joinNote').textContent = "4글자를 정확히 넣어 주세요."; return; }
+    fixedRoom = true;
+    enterRoom(code);
+  });
+  el('codeInput').addEventListener('keydown', function(e){
+    if (e.key === "Enter") el('joinBtn').click();
+  });
+
+  /* ---------- 시작 ---------- */
+
+  if (!ready()){
+    setStatus(false, "설정 확인");
+    askCode("설정 파일(firebase-config.js)을 읽지 못했어요.");
+    return;
+  }
+
+  var fromUrl = (location.search.match(/[?&]r=([A-Za-z0-9]{4})\b/) || [])[1];
+  if (fromUrl){
+    fixedRoom = true;
+    enterRoom(fromUrl.toUpperCase());
+  } else {
+    findRoom();
+  }
+
+  setInterval(function(){
+    tick += 1;
+    if (room) poll();
+    /* 선생님이 새 세션을 열면 따라갑니다(주소로 방을 지정한 경우는 그대로). */
+    if (!fixedRoom && tick % 4 === 0) findRoom();
+    if (!room && tick % 4 === 0) findRoom();
+  }, 1500);
+
+  document.addEventListener("visibilitychange", function(){
+    if (!document.hidden){ if (room) poll(); else findRoom(); }
+  });
+})();
+</script>
+</body>
+</html>

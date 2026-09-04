@@ -98,6 +98,30 @@
           "g2s2-2-2"
         ],
         "unitsSet": true
+      },
+      "privacyescape": {
+        "title": "개인정보 보호하기",
+        "url": "12.privacy-escape-game.html",
+        "memo": "",
+        "order": 11,
+        "open": true,
+        "units": [
+          "g1s2-5",
+          "g2s1-5-2"
+        ],
+        "unitsSet": true
+      },
+      "aiethicscourt": {
+        "title": "AI판사 체험하기",
+        "url": "13.ai-ethics-court.html",
+        "memo": "",
+        "order": 12,
+        "open": true,
+        "units": [
+          "g2s1-5-2",
+          "g1s2-5"
+        ],
+        "unitsSet": true
       }
     }
   }
