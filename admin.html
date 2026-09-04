@@ -87,6 +87,37 @@
   code { background: #f3f4f6; border-radius: 4px; padding: 1px 5px; font-size: 12px; }
   [hidden] { display: none !important; }
 
+  /* 단원 고르기 (구조도와 같은 폴더 탐색 방식) */
+  .picker {
+    border: 1px solid #d1d5db; border-radius: 10px;
+    padding: 12px; background: #fff; margin-top: 8px;
+  }
+  .picker-crumbs { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .picker-crumbs button { flex: none; }
+  .picker-crumb { font-size: 13px; color: #374151; word-break: keep-all; }
+  .picker-nodes {
+    display: grid; gap: 8px;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+  .picker-nodes button { min-height: 46px; width: 100%; }
+  .chk {
+    display: flex; align-items: center; gap: 8px; min-height: 46px;
+    padding: 8px 12px; font-size: 14px; cursor: pointer;
+    border: 1px solid #d1d5db; border-radius: 8px; background: #fff;
+  }
+  .chk:hover { border-color: #2563eb; background: #f8faff; }
+  .chk input { position: static; opacity: 1; width: 18px; height: 18px; flex: none; margin: 0; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 10px; font-size: 12px; color: #374151;
+    border: 1px solid #d1d5db; border-radius: 999px; background: #fff;
+  }
+  .chip button {
+    all: unset; cursor: pointer; color: #6b7280; font-size: 14px; line-height: 1;
+  }
+  .chips-none { font-size: 12px; color: #9ca3af; margin-top: 10px; }
+
   @media (max-width: 600px) {
     body { padding: 16px; }
     .panel { padding: 16px; }
@@ -125,6 +156,19 @@
       <p class="who" id="who"></p>
     </div>
 
+    <!-- 예전 오타 아이디가 남아 있을 때만 보입니다 -->
+    <div class="panel" id="fixPanel" hidden>
+      <h2>자료 아이디 정리</h2>
+      <p class="msg" id="fixMsg"></p>
+      <div class="actions">
+        <button id="fixBtn" type="button">아이디 바로잡기</button>
+      </div>
+      <p class="hint">
+        예전에 잘못 적힌 자료 아이디를 새 이름으로 옮기고, 예전 기록은 지웁니다.
+        자료의 제목·순서·단원·잠금 상태는 그대로 옮겨집니다.
+      </p>
+    </div>
+
     <div id="list"></div>
 
     <div class="panel">
@@ -149,6 +193,8 @@
           <input id="newMemo" type="text" placeholder="예: 3차시에 사용">
         </div>
       </div>
+      <label style="margin-top:12px">어느 단원에 넣을까요? (여러 곳을 함께 고를 수 있습니다)</label>
+      <div id="addPicker"></div>
       <div class="actions">
         <button id="addBtn" type="button">추가하기</button>
       </div>
@@ -158,11 +204,27 @@
         영문 소문자·숫자·하이픈만 쓸 수 있습니다.
       </p>
     </div>
+
+    <div class="panel">
+      <h2>백업 내려받기</h2>
+      <p class="hint" style="margin-top:0">
+        추가·수정한 내용은 누르는 즉시 저장되므로 커밋이 필요 없습니다.
+        아래 버튼은 지금 상태를 파일로 보관해 두고 싶을 때만 쓰세요.
+        내려받은 파일은 저장소의 <code>초기데이터.json</code> 을 덮어써 두면
+        나중에 데이터베이스를 새로 만들 때 그대로 되살릴 수 있습니다.
+      </p>
+      <div class="actions">
+        <button id="exportBtn" type="button">파일로 내려받기</button>
+        <button id="copyBtn" type="button">클립보드에 복사</button>
+      </div>
+      <p class="msg" id="exportMsg"></p>
+    </div>
   </div>
 
 </div>
 
 <script charset="utf-8" src="firebase-config.js"></script>
+<script charset="utf-8" src="data.js"></script>
 <script>
 /* 로그인 도구(구글 서버)를 못 불러오는 경우에 대비한 안내 */
 window.__portalBooted = false;
@@ -182,6 +244,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const cfg = window.PORTAL_CONFIG;
+const D = window.PORTAL_DATA;      /* 단원 구조는 data.js 한 곳에만 있습니다 */
 const $ = (id) => document.getElementById(id);
 
 let games = [];
@@ -258,15 +321,21 @@ async function load() {
     const data = await r.json();
     games = Object.keys(data || {}).map((slug) => {
       const g = data[slug] || {};
+      const n = D.normalize(slug, g);
+      /* slug 는 데이터베이스에 실제로 저장된 이름(고치기 전),
+         canonical 은 오타를 바로잡은 이름입니다. */
       return {
-        slug, title: g.title || slug, url: g.url || "", memo: g.memo || "",
-        open: g.open === true, order: typeof g.order === "number" ? g.order : 999
+        slug, canonical: n.slug,
+        title: g.title || slug, url: g.url || "", memo: g.memo || "",
+        open: g.open === true, order: typeof g.order === "number" ? g.order : 999,
+        units: n.units
       };
     });
     games.sort((a, b) => a.order - b.order || a.title.localeCompare(b.title, "ko"));
     const next = JSON.stringify(games);
     if (next !== snapshot) { snapshot = next; renderList(); }
     renderSummary();
+    renderFixPanel();
     if ($("mainMsg").textContent.indexOf("불러오지") !== -1) say("mainMsg", "");
   } catch (e) {
     say("mainMsg", "목록을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.");
@@ -306,6 +375,102 @@ function el(tag, cls, text) {
   return n;
 }
 
+/* ---------------- 단원 고르기 ----------------
+   목록 화면의 구조도와 똑같은 폴더 탐색 방식입니다.
+   최하위 단원은 체크박스라서 여러 단원을 한 번에 고를 수 있습니다. */
+function unitPicker(initial) {
+  const chosen = new Set(initial || []);
+  let sem = null, path = [];
+
+  const root = el("div", "picker");
+  const crumbs = el("div", "picker-crumbs");
+  const back = el("button", null, "← 뒤로");
+  back.type = "button";
+  const crumb = el("span", "picker-crumb");
+  crumbs.append(back, crumb);
+  const nodes = el("div", "picker-nodes");
+  const chips = el("div", "chips");
+  root.append(crumbs, nodes, chips);
+
+  function drawChips() {
+    chips.className = "chips";
+    chips.innerHTML = "";
+    if (chosen.size === 0) {
+      chips.className = "chips-none";
+      chips.textContent = "아직 고른 단원이 없습니다.";
+      return;
+    }
+    [...chosen].forEach((id) => {
+      const chip = el("span", "chip", D.unitLabel(id));
+      const x = el("button", null, "✕");
+      x.type = "button";
+      x.title = "빼기";
+      x.addEventListener("click", () => { chosen.delete(id); drawChips(); draw(); });
+      chip.appendChild(x);
+      chips.appendChild(chip);
+    });
+  }
+
+  function draw() {
+    nodes.innerHTML = "";
+
+    if (!sem) {
+      back.hidden = true;
+      crumb.textContent = "학년과 학기를 고르세요";
+      D.SEMESTERS.forEach((s) => {
+        const b = el("button", null, s.label);
+        b.type = "button";
+        b.addEventListener("click", () => { sem = s.id; path = []; draw(); });
+        nodes.appendChild(b);
+      });
+      return;
+    }
+
+    back.hidden = false;
+    crumb.textContent = [D.semesterById(sem).label].concat(path).join(" > ");
+
+    D.browse(sem, path).children.forEach((name) => {
+      const next = path.concat([name]);
+      const child = D.browse(sem, next);
+
+      /* 더 이상 하위 폴더가 없으면 체크박스, 있으면 폴더 버튼 */
+      if (child.terminal) {
+        const id = child.unit.id;
+        const label = el("label", "chk");
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = chosen.has(id);
+        cb.addEventListener("change", () => {
+          if (cb.checked) chosen.add(id); else chosen.delete(id);
+          drawChips();
+        });
+        label.append(cb, el("span", null, name));
+        nodes.appendChild(label);
+      } else {
+        const b = el("button", null, name);
+        b.type = "button";
+        b.addEventListener("click", () => { path = next; draw(); });
+        nodes.appendChild(b);
+      }
+    });
+  }
+
+  back.addEventListener("click", () => {
+    if (path.length > 0) path = path.slice(0, -1);
+    else sem = null;
+    draw();
+  });
+
+  drawChips();
+  draw();
+
+  return {
+    root,
+    get: () => [...chosen],
+    set: (ids) => { chosen.clear(); (ids || []).forEach((i) => chosen.add(i)); drawChips(); draw(); }
+  };
+}
+
 function field(labelText, value) {
   const box = document.createElement("div");
   const input = document.createElement("input");
@@ -330,6 +495,8 @@ function gameCard(g, i) {
   info.appendChild(el("p", "game-title", g.title));
   info.appendChild(el("p", "game-meta",
     g.url + "   ·   아이디: " + g.slug + (g.memo ? "   ·   " + g.memo : "")));
+  info.appendChild(el("p", "game-meta",
+    "단원: " + (D.unitsLabel(g.units) || "아직 정해지지 않음")));
   head.appendChild(info);
 
   const sw = el("label", "switch");
@@ -380,11 +547,13 @@ function gameCard(g, i) {
   const fTitle = field("제목", g.title), fUrl = field("파일 이름", g.url), fMemo = field("설명", g.memo);
   r1.append(fTitle.box, fUrl.box);
   r2.append(fMemo.box);
+  const picker = unitPicker(g.units);
+  const pickerLabel = el("label", null, "어느 단원에 넣을까요? (여러 곳을 함께 고를 수 있습니다)");
   const save = el("button", null, "저장");
   const cancel = el("button", null, "취소");
   const acts = el("div", "actions");
   acts.append(save, cancel);
-  form.append(r1, r2, acts);
+  form.append(r1, r2, pickerLabel, picker.root, acts);
   card.appendChild(form);
 
   edit.addEventListener("click", () => {
@@ -398,12 +567,13 @@ function gameCard(g, i) {
     edit.textContent = "수정";
     busy = false;
     fTitle.input.value = g.title; fUrl.input.value = g.url; fMemo.input.value = g.memo;
+    picker.set(g.units);
   });
   save.addEventListener("click", async () => {
     const title = fTitle.input.value.trim(), url = fUrl.input.value.trim();
     if (!title || !url) { say("mainMsg", "제목과 파일 이름은 비울 수 없습니다."); return; }
     try {
-      await write("games/" + g.slug, { title, url, memo: fMemo.input.value.trim() });
+      await write("games/" + g.slug, { title, url, memo: fMemo.input.value.trim(), units: picker.get(), unitsSet: true });
       busy = false;
       await load();
       say("mainMsg", "저장했습니다.");
@@ -437,6 +607,67 @@ async function bulk(open) {
   } catch (e) { say("mainMsg", e.message); }
 }
 
+/* ---------------- 예전 오타 아이디 정리 ----------------
+   data.js 의 LEGACY_SLUGS 에 적힌 예전 이름이 데이터베이스에 남아 있으면
+   새 이름으로 옮기고 예전 기록을 지웁니다. */
+function legacyGames() {
+  return games.filter((g) => g.slug !== g.canonical);
+}
+
+function renderFixPanel() {
+  const bad = legacyGames();
+  $("fixPanel").hidden = bad.length === 0;
+  if (bad.length === 0) return;
+  say("fixMsg", bad.map((g) =>
+    "'" + g.title + "' 의 아이디가 " + g.slug + " 로 되어 있습니다 → " + g.canonical
+  ).join("   ·   "));
+}
+
+async function fixLegacy() {
+  const bad = legacyGames();
+  if (bad.length === 0) return;
+  busy = true;
+  try {
+    for (const g of bad) {
+      if (games.some((o) => o.slug === g.canonical)) {
+        throw new Error("'" + g.canonical + "' 아이디가 이미 있어서 옮길 수 없습니다.");
+      }
+      await write("games/" + g.canonical, {
+        title: g.title,
+        url: D.fixUrl(g.url),
+        memo: g.memo,
+        order: g.order,
+        open: g.open,
+        units: g.units,
+        unitsSet: true
+      });
+      await write("games/" + g.slug, null);
+    }
+    busy = false;
+    await load();
+    say("fixMsg", "아이디를 바로잡았습니다.");
+  } catch (e) {
+    busy = false;
+    say("fixMsg", e.message);
+  }
+}
+
+/* ---------------- 백업 ---------------- */
+function backupText() {
+  const out = {};
+  games.forEach((g) => {
+    out[g.canonical] = {
+      title: g.title,
+      url: D.fixUrl(g.url),
+      memo: g.memo,
+      order: g.order,
+      open: g.open,
+      units: g.units
+    };
+  });
+  return JSON.stringify({ portal: { games: out } }, null, 2) + "\n";
+}
+
 /* ---------------- 시작 ---------------- */
 function showMain(user) {
   /* 이 기기의 목록 화면에 '제어판' 버튼을 보이게 한다 */
@@ -464,6 +695,31 @@ $("logout").addEventListener("click", async () => {
   showLogin("로그아웃했습니다.");
 });
 
+$("fixBtn").addEventListener("click", fixLegacy);
+
+$("exportBtn").addEventListener("click", () => {
+  const blob = new Blob([backupText()], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "초기데이터.json";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  say("exportMsg", "내려받았습니다.");
+});
+
+$("copyBtn").addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(backupText());
+    say("exportMsg", "복사했습니다.");
+  } catch (e) {
+    say("exportMsg", "복사가 막혔습니다. '파일로 내려받기'를 써 주세요.");
+  }
+});
+
+/* 새 자료를 추가할 때 쓰는 단원 고르기 */
+const addPicker = unitPicker([]);
+$("addPicker").appendChild(addPicker.root);
+
 $("addBtn").addEventListener("click", async () => {
   const slug = $("newSlug").value.trim().toLowerCase();
   const title = $("newTitle").value.trim();
@@ -472,9 +728,14 @@ $("addBtn").addEventListener("click", async () => {
   if (!/^[a-z0-9-]+$/.test(slug)) { say("addMsg", "자료 아이디는 영문 소문자·숫자·하이픈만 됩니다."); return; }
   if (games.some((g) => g.slug === slug)) { say("addMsg", "이미 있는 자료 아이디입니다."); return; }
   try {
-    await write("games/" + slug, { title, url, memo: $("newMemo").value.trim(), order: games.length, open: false });
+    await write("games/" + slug, {
+      title, url, memo: $("newMemo").value.trim(),
+      order: games.length, open: false,
+      units: addPicker.get(), unitsSet: true
+    });
     await load();
     $("newSlug").value = ""; $("newTitle").value = ""; $("newUrl").value = ""; $("newMemo").value = "";
+    addPicker.set([]);
     say("addMsg", "추가했습니다. 스위치를 켜면 학생이 들어올 수 있습니다.");
   } catch (e) { say("addMsg", e.message); }
 });

@@ -15,6 +15,11 @@
   var slug = script ? script.getAttribute("data-game") : null;
   if (!slug) return;
 
+  /* 자료 아이디를 바꾼 직후(예: drowing → drawing)에도 화면이 멈추지 않도록,
+     새 아이디로 못 찾으면 예전 아이디로 한 번 더 찾아봅니다.
+     제어판의 '자료 아이디 정리'를 누르면 이 줄은 더 이상 쓰이지 않습니다. */
+  var legacySlug = script ? script.getAttribute("data-game-legacy") : null;
+
   /* ---------- 목록으로 돌아가는 버튼 ----------
      학생 기기는 전체화면으로 열려 있어 브라우저 뒤로가기가 없습니다.
      그래서 모든 수업 자료 화면 왼쪽 위에 목록으로 가는 버튼을 띄웁니다. */
@@ -156,10 +161,18 @@
            "firebase-config.js 에 주소와 키를 넣어야 수업 자료를 열 수 있습니다.");
       return;
     }
-    fetch(cfg.dbPath("games/" + slug), { cache: "no-store" })
-      .then(function (r) {
-        if (!r.ok) throw new Error(r.status);
-        return r.json();
+    function read(id) {
+      return fetch(cfg.dbPath("games/" + id), { cache: "no-store" })
+        .then(function (r) {
+          if (!r.ok) throw new Error(r.status);
+          return r.json();
+        });
+    }
+
+    read(slug)
+      .then(function (game) {
+        if (!game && legacySlug) return read(legacySlug);
+        return game;
       })
       .then(function (game) {
         if (!game) {
