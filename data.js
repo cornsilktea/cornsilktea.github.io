@@ -58,7 +58,7 @@
     datasorting:  ["g1s2-2", "g2s2-2-1"],
     graphreading: ["g1s2-2", "g2s2-2-2"],
     aiorhuman:    ["g1s2-1", "g2s1-4-1"],
-    tablereading: ["g1s2-2", "g2s2-2-2"]
+    tablereading: ["g2s2-2-2"]
   };
 
   /* 예전 오타(drowing)를 쓰던 자료를 자동으로 바로잡기 위한 표입니다.

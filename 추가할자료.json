@@ -14,6 +14,6 @@
                     "units": ["g1s2-2", "g2s2-2-2"], "unitsSet": true },
   "aiorhuman":    { "title": "AI일까 사람일까", "url": "10.ai-or-human-game.html",  "memo": "", "order": 9, "open": false,
                     "units": ["g1s2-1", "g2s1-4-1"], "unitsSet": true },
-  "tablereading": { "title": "표 읽기",          "url": "11.table-reading-game.html","memo": "", "order": 10, "open": false,
-                    "units": ["g1s2-2", "g2s2-2-2"], "unitsSet": true }
+  "tablereading": { "title": "표 분석하기",      "url": "11.table-reading-game.html","memo": "", "order": 10, "open": false,
+                    "units": ["g2s2-2-2"], "unitsSet": true }
 }

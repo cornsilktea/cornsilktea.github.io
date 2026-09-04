@@ -6,63 +6,42 @@
         "url": "1.slidecard.html",
         "memo": "",
         "order": 0,
-        "open": true,
-        "units": [
-          "g1s2-1",
-          "g2s2-3-1"
-        ]
+        "open": true
       },
       "robotmaze": {
         "title": "미로 찾기",
         "url": "2.robotmaze.html",
         "memo": "",
         "order": 1,
-        "open": true,
-        "units": [
-          "g1s2-1",
-          "g2s2-3-1"
-        ]
+        "open": true
       },
       "brickbreak": {
         "title": "벽돌깨기",
         "url": "3.brickbreak.html",
         "memo": "",
         "order": 2,
-        "open": true,
-        "units": [
-          "g1s2-3",
-          "g2s1-4-2"
-        ]
+        "open": true
       },
       "function": {
         "title": "코딩 미로",
         "url": "4.function.html",
         "memo": "",
         "order": 3,
-        "open": true,
-        "units": [
-          "g2s2-3-2"
-        ]
+        "open": true
       },
       "cardauction": {
         "title": "경매",
         "url": "5.cardauction.html",
         "memo": "",
         "order": 4,
-        "open": true,
-        "units": [
-          "g2s2-2-2"
-        ]
+        "open": true
       },
       "snakegame": {
         "title": "스네이크",
         "url": "6.snakegame.html",
         "memo": "",
         "order": 5,
-        "open": true,
-        "units": [
-          "g2s2-3-1"
-        ]
+        "open": true
       },
       "drawing": {
         "title": "추상화",
@@ -72,7 +51,8 @@
         "open": true,
         "units": [
           "g2s2-3-1"
-        ]
+        ],
+        "unitsSet": true
       },
       "datasorting": {
         "title": "자료 정렬하기",
@@ -82,7 +62,8 @@
         "open": true,
         "units": [
           "g2s2-2-2"
-        ]
+        ],
+        "unitsSet": true
       },
       "graphreading": {
         "title": "그래프 읽기",
@@ -92,7 +73,8 @@
         "open": true,
         "units": [
           "g2s2-2-1"
-        ]
+        ],
+        "unitsSet": true
       },
       "aiorhuman": {
         "title": "AI와 인간이 쓴 글 구분하기",
@@ -103,18 +85,19 @@
         "units": [
           "g1s2-5",
           "g2s1-4-1"
-        ]
+        ],
+        "unitsSet": true
       },
       "tablereading": {
-        "title": "표 읽기",
+        "title": "표 분석하기",
         "url": "11.table-reading-game.html",
         "memo": "",
         "order": 10,
         "open": true,
         "units": [
-          "g1s2-2",
           "g2s2-2-2"
-        ]
+        ],
+        "unitsSet": true
       }
     }
   }
