@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<script charset="utf-8" src="firebase-config.js"></script>
+<script charset="utf-8" src="access-guard.js" data-game="graphreading"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>그래프 읽고 답 찾기</title>
+<style>
+  :root{
+    --bg:#f5f7fb;
+    --card:#ffffff;
+    --ink:#1f2430;
+    --sub:#6b7280;
+    --line:#e1e6ef;
+    --green:#1a9b64;
+    --green-soft:#e6f7ef;
+    --red:#e5484d;
+    --red-soft:#fdecec;
+    --bar:#3b6ef6;
+    --bar-soft:#c8d8fd;
+    --radius:18px;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    -webkit-user-select:none;
+    user-select:none;
+  }
+  header{
+    padding:18px 28px 8px;
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  h1{font-size:1.6rem;margin:0;font-weight:800;letter-spacing:-0.02em;}
+  .desc{color:var(--sub);font-size:0.95rem;margin-top:2px;}
+  .status{display:flex;gap:14px;}
+  .pill{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:999px;
+    padding:8px 18px;
+    font-weight:700;
+    white-space:nowrap;
+  }
+  .pill.score{color:var(--bar);}
+
+  main{
+    flex:1;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    padding:10px 20px 30px;
+  }
+
+  #playScreen{
+    width:min(880px,95vw);
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:24px;
+    padding:26px 30px 30px;
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+  .chart-title{
+    font-size:1.15rem;
+    font-weight:800;
+  }
+  .chart-box{
+    width:100%;
+    display:flex;
+    justify-content:center;
+  }
+  svg{max-width:100%;height:auto;}
+
+  .question{
+    font-size:1.3rem;
+    font-weight:800;
+    margin-top:4px;
+  }
+  .options{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+  }
+  .opt{
+    background:#fbfcfe;
+    border:2px solid var(--line);
+    border-radius:14px;
+    padding:16px 18px;
+    font-size:1.1rem;
+    font-weight:700;
+    cursor:pointer;
+    text-align:center;
+    transition:border-color .12s ease, background .12s ease, transform .08s ease;
+  }
+  .opt:active{transform:scale(.98);}
+  .opt.correct{border-color:var(--green);background:var(--green-soft);color:var(--green);}
+  .opt.wrong{border-color:var(--red);background:var(--red-soft);color:var(--red);}
+  .opt.disabled{cursor:default;}
+
+  #feedback{
+    min-height:30px;
+    font-size:1.05rem;
+    font-weight:700;
+  }
+  #feedback.ok{color:var(--green);}
+  #feedback.no{color:var(--red);}
+
+  .btnbar{display:flex;justify-content:flex-end;}
+  button.primary{
+    background:var(--bar);
+    color:#fff;
+    border:none;
+    border-radius:14px;
+    padding:15px 28px;
+    font-size:1.05rem;
+    font-weight:800;
+    cursor:pointer;
+    visibility:hidden;
+  }
+  button.primary.show{visibility:visible;}
+  button.primary:active{transform:translateY(1px);}
+
+  #endScreen{
+    display:none;
+    width:min(700px,95vw);
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:24px;
+    padding:40px;
+    flex-direction:column;
+    align-items:center;
+    gap:16px;
+    text-align:center;
+  }
+  #endScreen h2{margin:0;font-size:2rem;}
+  #endScreen .bigscore{font-size:3.2rem;font-weight:900;color:var(--bar);}
+  button.secondary{
+    background:var(--card);
+    color:var(--ink);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:16px 30px;
+    font-size:1.1rem;
+    font-weight:800;
+    cursor:pointer;
+  }
+
+  @media (max-width:600px){
+    .options{grid-template-columns:1fr;}
+    h1{font-size:1.3rem;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>📈 그래프 읽고 답 찾기</h1>
+    <div class="desc">그래프를 잘 살펴보고, 알맞은 답을 골라보세요.</div>
+  </div>
+  <div class="status">
+    <div class="pill" id="progressPill">1 / 6</div>
+    <div class="pill score" id="scorePill">점수 0</div>
+  </div>
+</header>
+
+<main>
+  <div id="playScreen">
+    <div class="chart-title" id="chartTitle"></div>
+    <div class="chart-box" id="chartBox"></div>
+    <div class="question" id="questionText"></div>
+    <div class="options" id="optionsBox"></div>
+    <div id="feedback"></div>
+    <div class="btnbar">
+      <button class="primary" id="nextBtn">다음 문제 →</button>
+    </div>
+  </div>
+
+  <div id="endScreen">
+    <h2>결과 발표! 📊</h2>
+    <div class="bigscore" id="finalScore">0 / 6</div>
+    <div id="finalComment" style="font-size:1.1rem;color:var(--sub);"></div>
+    <button class="secondary" id="retryBtn">다시 하기</button>
+  </div>
+</main>
+
+<script>
+const ROUNDS = [
+  {
+    type:'bar',
+    title:'우리 반 요일별 지각생 수',
+    labels:['월','화','수','목','금'],
+    values:[3,1,4,2,0],
+    unit:'명',
+    question:'지각생이 가장 많았던 요일은?',
+    options:['월요일','수요일','목요일','금요일'],
+    correct:'수요일',
+    explain:'수요일이 4명으로 가장 많아요.'
+  },
+  {
+    type:'line',
+    title:'월별 학교 도서관 대출 권수',
+    labels:['3월','4월','5월','6월','7월'],
+    values:[40,55,70,68,90],
+    unit:'권',
+    question:'대출 권수가 가장 많이 늘어난 구간은?',
+    options:['3월→4월','4월→5월','5월→6월','6월→7월'],
+    correct:'6월→7월',
+    explain:'6월(68권)에서 7월(90권)로 22권이 늘어 가장 크게 증가했어요.'
+  },
+  {
+    type:'bar',
+    title:'반별 봉사활동 참여 인원',
+    labels:['1반','2반','3반','4반'],
+    values:[12,18,9,15],
+    unit:'명',
+    question:'참여 인원이 가장 적은 반은?',
+    options:['1반','2반','3반','4반'],
+    correct:'3반',
+    explain:'3반이 9명으로 참여 인원이 가장 적어요.'
+  },
+  {
+    type:'line',
+    title:'점심시간 시간대별 급식실 혼잡도',
+    labels:['12:00','12:10','12:20','12:30','12:40'],
+    values:[20,80,95,60,15],
+    unit:'%',
+    question:'급식실이 가장 혼잡한 시간대는?',
+    options:['12:00','12:10','12:20','12:30'],
+    correct:'12:20',
+    explain:'12:20에 혼잡도 95%로 가장 높아요.'
+  },
+  {
+    type:'bar',
+    title:'좋아하는 계절 설문 결과',
+    labels:['봄','여름','가을','겨울'],
+    values:[6,9,10,5],
+    unit:'명',
+    question:'가장 인기 많은 계절은?',
+    options:['봄','여름','가을','겨울'],
+    correct:'가을',
+    explain:'가을이 10명으로 가장 많은 표를 받았어요.'
+  },
+  {
+    type:'line',
+    title:'상반기 월별 평균 기온',
+    labels:['1월','2월','3월','4월','5월','6월'],
+    values:[-2,1,7,13,18,23],
+    unit:'℃',
+    question:'평균 기온이 6℃ 이상 오른 구간은?',
+    options:['1월→2월','2월→3월','3월→4월','5월→6월'],
+    correct:'3월→4월',
+    explain:'3월(7℃)에서 4월(13℃)로 6℃가 올라 정답이에요.'
+  },
+];
+
+let order = [];
+let idx = 0;
+let score = 0;
+let answered = false;
+
+const chartTitle = document.getElementById('chartTitle');
+const chartBox = document.getElementById('chartBox');
+const questionText = document.getElementById('questionText');
+const optionsBox = document.getElementById('optionsBox');
+const feedback = document.getElementById('feedback');
+const nextBtn = document.getElementById('nextBtn');
+const progressPill = document.getElementById('progressPill');
+const scorePill = document.getElementById('scorePill');
+const playScreen = document.getElementById('playScreen');
+const endScreen = document.getElementById('endScreen');
+
+function shuffle(arr){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+
+function init(){
+  order = ROUNDS.map((_,i)=>i);
+  idx = 0;
+  score = 0;
+  playScreen.style.display = 'flex';
+  endScreen.style.display = 'none';
+  renderRound();
+}
+
+function renderRound(){
+  answered = false;
+  const r = ROUNDS[order[idx]];
+  progressPill.textContent = `${idx+1} / ${ROUNDS.length}`;
+  scorePill.textContent = `점수 ${score}`;
+  chartTitle.textContent = r.title;
+  questionText.textContent = r.question;
+  feedback.textContent = '';
+  feedback.className = '';
+  nextBtn.classList.remove('show');
+
+  chartBox.innerHTML = '';
+  chartBox.appendChild(r.type === 'bar' ? buildBarChart(r) : buildLineChart(r));
+
+  optionsBox.innerHTML = '';
+  const opts = shuffle(r.options);
+  opts.forEach(optText=>{
+    const btn = document.createElement('div');
+    btn.className = 'opt';
+    btn.textContent = optText;
+    btn.addEventListener('click', ()=> handleAnswer(btn, optText, r));
+    optionsBox.appendChild(btn);
+  });
+}
+
+function handleAnswer(btn, chosen, r){
+  if(answered) return;
+  answered = true;
+  const allOpts = optionsBox.querySelectorAll('.opt');
+  allOpts.forEach(o=>o.classList.add('disabled'));
+
+  if(chosen === r.correct){
+    btn.classList.add('correct');
+    score += 1;
+    feedback.textContent = `✅ 정답이에요! ${r.explain}`;
+    feedback.className = 'ok';
+  } else {
+    btn.classList.add('wrong');
+    allOpts.forEach(o=>{ if(o.textContent === r.correct) o.classList.add('correct'); });
+    feedback.textContent = `❌ 아쉬워요. ${r.explain}`;
+    feedback.className = 'no';
+  }
+  scorePill.textContent = `점수 ${score}`;
+  nextBtn.classList.add('show');
+}
+
+nextBtn.addEventListener('click', ()=>{
+  idx += 1;
+  if(idx >= order.length){
+    showEnd();
+  } else {
+    renderRound();
+  }
+});
+
+function showEnd(){
+  playScreen.style.display = 'none';
+  endScreen.style.display = 'flex';
+  document.getElementById('finalScore').textContent = `${score} / ${ROUNDS.length}`;
+  const ratio = score/ROUNDS.length;
+  let comment = '';
+  if(ratio === 1) comment = '완벽해요! 그래프를 정확하게 읽어내는군요.';
+  else if(ratio >= 0.66) comment = '잘했어요! 조금만 더 꼼꼼히 보면 만점도 가능해요.';
+  else comment = '그래프의 축과 눈금을 천천히 다시 살펴보는 연습을 해봐요.';
+  document.getElementById('finalComment').textContent = comment;
+}
+
+document.getElementById('retryBtn').addEventListener('click', init);
+
+// ---- Chart builders (SVG) ----
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const CHART_W = 720, CHART_H = 320;
+const PAD = {top:20, right:24, bottom:44, left:52};
+
+function el(tag, attrs){
+  const e = document.createElementNS(SVG_NS, tag);
+  for(const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+}
+
+function buildBarChart(r){
+  const svg = el('svg', {viewBox:`0 0 ${CHART_W} ${CHART_H}`, width: CHART_W, height: CHART_H});
+  const plotW = CHART_W - PAD.left - PAD.right;
+  const plotH = CHART_H - PAD.top - PAD.bottom;
+  const maxVal = Math.max(...r.values) * 1.2;
+  const n = r.values.length;
+  const gap = 24;
+  const barW = (plotW - gap*(n-1)) / n;
+
+  // axis line
+  svg.appendChild(el('line', {x1:PAD.left, y1:PAD.top, x2:PAD.left, y2:PAD.top+plotH, stroke:'#c7cede', 'stroke-width':2}));
+  svg.appendChild(el('line', {x1:PAD.left, y1:PAD.top+plotH, x2:PAD.left+plotW, y2:PAD.top+plotH, stroke:'#c7cede', 'stroke-width':2}));
+
+  r.values.forEach((v,i)=>{
+    const h = (v/maxVal) * plotH;
+    const x = PAD.left + i*(barW+gap);
+    const y = PAD.top + plotH - h;
+    svg.appendChild(el('rect', {x, y, width:barW, height:h, rx:8, fill:'#3b6ef6'}));
+    const valLabel = el('text', {x: x+barW/2, y: y-8, 'text-anchor':'middle', 'font-size':16, 'font-weight':800, fill:'#1f2430'});
+    valLabel.textContent = `${v}${r.unit}`;
+    svg.appendChild(valLabel);
+    const catLabel = el('text', {x: x+barW/2, y: PAD.top+plotH+26, 'text-anchor':'middle', 'font-size':15, fill:'#4b5563'});
+    catLabel.textContent = r.labels[i];
+    svg.appendChild(catLabel);
+  });
+
+  return svg;
+}
+
+function buildLineChart(r){
+  const svg = el('svg', {viewBox:`0 0 ${CHART_W} ${CHART_H}`, width: CHART_W, height: CHART_H});
+  const plotW = CHART_W - PAD.left - PAD.right;
+  const plotH = CHART_H - PAD.top - PAD.bottom;
+  const maxVal = Math.max(...r.values);
+  const minVal = Math.min(...r.values, 0);
+  const range = (maxVal - minVal) || 1;
+  const n = r.values.length;
+  const stepX = plotW / (n-1);
+
+  svg.appendChild(el('line', {x1:PAD.left, y1:PAD.top, x2:PAD.left, y2:PAD.top+plotH, stroke:'#c7cede', 'stroke-width':2}));
+  const zeroY = PAD.top + plotH - ((0-minVal)/range)*plotH;
+  svg.appendChild(el('line', {x1:PAD.left, y1:zeroY, x2:PAD.left+plotW, y2:zeroY, stroke:'#c7cede', 'stroke-width':2}));
+
+  const points = r.values.map((v,i)=>{
+    const x = PAD.left + i*stepX;
+    const y = PAD.top + plotH - ((v-minVal)/range)*plotH;
+    return [x,y];
+  });
+
+  const pathD = points.map((p,i)=> (i===0?'M':'L') + p[0] + ' ' + p[1]).join(' ');
+  svg.appendChild(el('path', {d:pathD, fill:'none', stroke:'#1a9b64', 'stroke-width':3, 'stroke-linecap':'round', 'stroke-linejoin':'round'}));
+
+  points.forEach(([x,y],i)=>{
+    svg.appendChild(el('circle', {cx:x, cy:y, r:6, fill:'#1a9b64'}));
+    const valLabel = el('text', {x, y:y-14, 'text-anchor':'middle', 'font-size':15, 'font-weight':800, fill:'#1f2430'});
+    valLabel.textContent = `${r.values[i]}${r.unit}`;
+    svg.appendChild(valLabel);
+    const catLabel = el('text', {x, y:PAD.top+plotH+26, 'text-anchor':'middle', 'font-size':14, fill:'#4b5563'});
+    catLabel.textContent = r.labels[i];
+    svg.appendChild(catLabel);
+  });
+
+  return svg;
+}
+
+init();
+</script>
+</body>
+</html>

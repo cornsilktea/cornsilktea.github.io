@@ -56,6 +56,30 @@
         "order": 6,
         "open": false,
         "units": ["g2s2-3-1"]
+      },
+      "datasorting": {
+        "title": "데이터 분류",
+        "url": "8.data-sorting-game.html",
+        "memo": "",
+        "order": 7,
+        "open": false,
+        "units": ["g1s2-2", "g2s2-2-1"]
+      },
+      "graphreading": {
+        "title": "그래프 읽기",
+        "url": "9.graph-reading-game.html",
+        "memo": "",
+        "order": 8,
+        "open": false,
+        "units": ["g1s2-2", "g2s2-2-2"]
+      },
+      "aiorhuman": {
+        "title": "AI일까 사람일까",
+        "url": "10.ai-or-human-game.html",
+        "memo": "",
+        "order": 9,
+        "open": false,
+        "units": ["g1s2-1", "g2s1-4-1"]
       }
     }
   }

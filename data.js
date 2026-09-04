@@ -48,13 +48,16 @@
 
   /* units 항목이 저장되기 전(예전 자료)에 쓰는 기본 배치 */
   var DEFAULT_UNITS = {
-    slidecard:   ["g1s2-1", "g2s2-3-1"],
-    robotmaze:   ["g1s2-1", "g2s2-3-1"],
-    brickbreak:  ["g1s2-3", "g2s1-4-2"],
-    "function":  ["g2s2-3-2"],
-    cardauction: ["g2s2-2-2"],
-    snakegame:   ["g2s2-3-1"],
-    drawing:     ["g2s2-3-1"]
+    slidecard:    ["g1s2-1", "g2s2-3-1"],
+    robotmaze:    ["g1s2-1", "g2s2-3-1"],
+    brickbreak:   ["g1s2-3", "g2s1-4-2"],
+    "function":   ["g2s2-3-2"],
+    cardauction:  ["g2s2-2-2"],
+    snakegame:    ["g2s2-3-1"],
+    drawing:      ["g2s2-3-1"],
+    datasorting:  ["g1s2-2", "g2s2-2-1"],
+    graphreading: ["g1s2-2", "g2s2-2-2"],
+    aiorhuman:    ["g1s2-1", "g2s1-4-1"]
   };
 
   /* 예전 오타(drowing)를 쓰던 자료를 자동으로 바로잡기 위한 표입니다.

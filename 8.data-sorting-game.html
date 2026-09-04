@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<script charset="utf-8" src="firebase-config.js"></script>
+<script charset="utf-8" src="access-guard.js" data-game="datasorting"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>데이터 분류 놀이터</title>
+<style>
+  :root{
+    --bg:#f5f7fb;
+    --card:#ffffff;
+    --ink:#1f2430;
+    --sub:#6b7280;
+    --line:#e1e6ef;
+    --blue:#3b6ef6;
+    --blue-soft:#eaf0fe;
+    --green:#1fae6a;
+    --green-soft:#e7f8ef;
+    --red:#e5484d;
+    --red-soft:#fdecec;
+    --amber:#c9860a;
+    --radius:18px;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    display:flex;
+    flex-direction:column;
+    min-height:100vh;
+    -webkit-user-select:none;
+    user-select:none;
+  }
+  header{
+    padding:18px 28px 10px;
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  h1{font-size:1.6rem;margin:0;font-weight:800;letter-spacing:-0.02em;}
+  .desc{color:var(--sub);font-size:0.95rem;margin-top:2px;}
+  .status{
+    display:flex;
+    gap:14px;
+    align-items:center;
+    font-size:1rem;
+  }
+  .pill{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:999px;
+    padding:8px 18px;
+    font-weight:700;
+    white-space:nowrap;
+  }
+  .pill.score{color:var(--blue);}
+  .pill.progress{color:var(--ink);}
+  main{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    padding:10px 24px 30px;
+    gap:24px;
+  }
+  #trayWrap{
+    width:min(1100px,94vw);
+    min-height:120px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:14px;
+    justify-content:center;
+    align-content:center;
+    padding:16px;
+  }
+  .card{
+    background:var(--card);
+    border:2px solid var(--line);
+    border-radius:16px;
+    padding:18px 22px;
+    font-size:1.25rem;
+    font-weight:700;
+    box-shadow:0 3px 0 rgba(0,0,0,0.04);
+    cursor:grab;
+    touch-action:none;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    min-width:150px;
+    justify-content:center;
+    transition:transform .12s ease, box-shadow .12s ease, opacity .2s ease;
+  }
+  .card .emoji{font-size:1.4rem;}
+  .card.dragging{
+    cursor:grabbing;
+    box-shadow:0 10px 24px rgba(0,0,0,0.18);
+    transform:scale(1.05);
+    z-index:50;
+  }
+  .card.placed-correct{
+    border-color:var(--green);
+    background:var(--green-soft);
+  }
+  .card.placed-wrong{
+    border-color:var(--red);
+    background:var(--red-soft);
+  }
+  .card.fading{opacity:0;transform:scale(.85);}
+
+  #bins{
+    width:min(1100px,94vw);
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:20px;
+  }
+  .bin{
+    background:var(--card);
+    border:3px dashed var(--line);
+    border-radius:var(--radius);
+    min-height:220px;
+    padding:18px;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    transition:border-color .15s ease, background .15s ease;
+  }
+  .bin.hover{border-color:var(--blue);background:var(--blue-soft);}
+  .bin-title{
+    font-size:1.2rem;
+    font-weight:800;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .bin-hint{font-size:0.9rem;color:var(--sub);margin-top:-6px;}
+  .bin-body{
+    flex:1;
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    align-content:flex-start;
+  }
+
+  #feedback{
+    min-height:34px;
+    font-size:1.15rem;
+    font-weight:700;
+  }
+  #feedback.ok{color:var(--green);}
+  #feedback.no{color:var(--red);}
+
+  .btnbar{
+    display:flex;
+    gap:12px;
+  }
+  button.primary{
+    background:var(--blue);
+    color:#fff;
+    border:none;
+    border-radius:14px;
+    padding:16px 30px;
+    font-size:1.1rem;
+    font-weight:800;
+    cursor:pointer;
+  }
+  button.primary:active{transform:translateY(1px);}
+  button.secondary{
+    background:var(--card);
+    color:var(--ink);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:16px 30px;
+    font-size:1.1rem;
+    font-weight:800;
+    cursor:pointer;
+  }
+
+  #endScreen{
+    display:none;
+    flex-direction:column;
+    align-items:center;
+    gap:18px;
+    text-align:center;
+  }
+  #endScreen h2{font-size:2rem;margin:0;}
+  #endScreen .bigscore{font-size:3.2rem;font-weight:900;color:var(--blue);}
+
+  .ghost-slot{
+    width:150px;height:56px;
+    border:2px dashed var(--line);
+    border-radius:14px;
+    opacity:.5;
+  }
+
+  @media (max-width:720px){
+    #bins{grid-template-columns:1fr;}
+    h1{font-size:1.3rem;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🗂️ 데이터 분류 놀이터</h1>
+    <div class="desc">카드를 손가락(또는 마우스)으로 끌어서 알맞은 바구니에 넣어보세요.</div>
+  </div>
+  <div class="status">
+    <div class="pill progress" id="progressPill">0 / 16</div>
+    <div class="pill score" id="scorePill">점수 0</div>
+  </div>
+</header>
+
+<main>
+  <div id="playScreen">
+    <div id="trayWrap"></div>
+
+    <div id="bins">
+      <div class="bin" data-type="structured" id="binStructured">
+        <div class="bin-title">📊 정형 데이터</div>
+        <div class="bin-hint">정해진 형식(표, 항목)으로 딱 떨어지게 정리되는 데이터</div>
+        <div class="bin-body"></div>
+      </div>
+      <div class="bin" data-type="unstructured" id="binUnstructured">
+        <div class="bin-title">🎨 비정형 데이터</div>
+        <div class="bin-hint">형식이 정해져 있지 않은, 자유로운 형태의 데이터</div>
+        <div class="bin-body"></div>
+      </div>
+    </div>
+
+    <div id="feedback"></div>
+  </div>
+
+  <div id="endScreen">
+    <h2>결과 발표! 🎉</h2>
+    <div class="bigscore" id="finalScore">0 / 16</div>
+    <div id="finalComment" style="font-size:1.1rem;color:var(--sub);"></div>
+    <div class="btnbar">
+      <button class="primary" id="retryBtn">다시 하기</button>
+    </div>
+  </div>
+</main>
+
+<script>
+const ITEMS = [
+  {label:"학번", emoji:"🔢", type:"structured"},
+  {label:"키(cm)", emoji:"📏", type:"structured"},
+  {label:"몸무게(kg)", emoji:"⚖️", type:"structured"},
+  {label:"시험 점수", emoji:"💯", type:"structured"},
+  {label:"전화번호", emoji:"📱", type:"structured"},
+  {label:"출석부", emoji:"📋", type:"structured"},
+  {label:"좌석 번호", emoji:"🪑", type:"structured"},
+  {label:"엑셀 성적표", emoji:"📈", type:"structured"},
+  {label:"일기", emoji:"📔", type:"unstructured"},
+  {label:"여행 사진", emoji:"🖼️", type:"unstructured"},
+  {label:"좋아하는 노래", emoji:"🎵", type:"unstructured"},
+  {label:"미술 작품", emoji:"🖌️", type:"unstructured"},
+  {label:"친구와의 대화 메시지", emoji:"💬", type:"unstructured"},
+  {label:"동영상", emoji:"🎬", type:"unstructured"},
+  {label:"손 편지", emoji:"✉️", type:"unstructured"},
+  {label:"음성 메모", emoji:"🎙️", type:"unstructured"},
+];
+
+let queue = [];
+let currentIndex = 0;
+let score = 0;
+let total = ITEMS.length;
+let activeCard = null;
+let activePointerId = null;
+let dragOffsetX = 0, dragOffsetY = 0;
+let activeItem = null;
+let nextSpawnIndex = 0;
+let resolvedCount = 0;
+
+const trayWrap = document.getElementById('trayWrap');
+const scorePill = document.getElementById('scorePill');
+const progressPill = document.getElementById('progressPill');
+const feedback = document.getElementById('feedback');
+const playScreen = document.getElementById('playScreen');
+const endScreen = document.getElementById('endScreen');
+const binStructured = document.getElementById('binStructured');
+const binUnstructured = document.getElementById('binUnstructured');
+
+function shuffle(arr){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+
+function init(){
+  queue = shuffle(ITEMS);
+  currentIndex = 0;
+  score = 0;
+  nextSpawnIndex = 0;
+  resolvedCount = 0;
+  updateStatus();
+  binStructured.querySelector('.bin-body').innerHTML = '';
+  binUnstructured.querySelector('.bin-body').innerHTML = '';
+  playScreen.style.display = 'flex';
+  playScreen.style.flexDirection = 'column';
+  playScreen.style.alignItems = 'center';
+  playScreen.style.gap = '24px';
+  endScreen.style.display = 'none';
+  feedback.textContent = '';
+  feedback.className = '';
+  spawnNextCards();
+}
+
+function updateStatus(){
+  progressPill.textContent = `${resolvedCount} / ${total}`;
+  scorePill.textContent = `점수 ${score}`;
+}
+
+// Show up to 4 cards at a time in the tray
+function spawnNextCards(){
+  trayWrap.innerHTML = '';
+  const batchEnd = Math.min(4, total);
+  for(let i=0;i<batchEnd;i++){
+    addCardToTray(queue[i]);
+  }
+  nextSpawnIndex = batchEnd;
+}
+
+function addCardToTray(item){
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = `<span class="emoji">${item.emoji}</span><span>${item.label}</span>`;
+  card.dataset.type = item.type;
+  attachDrag(card, item);
+  trayWrap.appendChild(card);
+}
+
+function attachDrag(card, item){
+  card.addEventListener('pointerdown', (e)=>{
+    if(activeCard) return;
+    e.preventDefault();
+    activeCard = card;
+    activeItem = item;
+    activePointerId = e.pointerId;
+    const rect = card.getBoundingClientRect();
+    dragOffsetX = e.clientX - rect.left;
+    dragOffsetY = e.clientY - rect.top;
+    card.classList.add('dragging');
+    card.style.position = 'fixed';
+    card.style.left = rect.left + 'px';
+    card.style.top = rect.top + 'px';
+    card.style.width = rect.width + 'px';
+    /* body 로 옮기면 브라우저가 포인터 캡처를 놓아 버립니다.
+       그래서 이어지는 움직임과 손 떼기는 window 에서 받습니다. */
+    document.body.appendChild(card);
+  });
+}
+
+/* 카드를 빠르게 끌다가 포인터가 카드 밖으로 나가도 놓치지 않도록,
+   드래그 도중의 이벤트는 카드가 아니라 window 에서 한 번만 받습니다. */
+window.addEventListener('pointermove', (e)=>{
+  if(!activeCard || e.pointerId !== activePointerId) return;
+  activeCard.style.left = (e.clientX - dragOffsetX) + 'px';
+  activeCard.style.top = (e.clientY - dragOffsetY) + 'px';
+  checkHover(e.clientX, e.clientY);
+});
+
+window.addEventListener('pointerup', (e)=>{
+  if(!activeCard || e.pointerId !== activePointerId) return;
+  const card = activeCard, item = activeItem;
+  activeCard = null;
+  activeItem = null;
+  activePointerId = null;
+  handleDrop(card, item, e.clientX, e.clientY);
+});
+
+window.addEventListener('pointercancel', (e)=>{
+  if(!activeCard || e.pointerId !== activePointerId) return;
+  const card = activeCard;
+  activeCard = null;
+  activeItem = null;
+  activePointerId = null;
+  binStructured.classList.remove('hover');
+  binUnstructured.classList.remove('hover');
+  resetCardPosition(card);
+});
+
+function checkHover(x,y){
+  [binStructured, binUnstructured].forEach(bin=>{
+    const r = bin.getBoundingClientRect();
+    const inside = x>=r.left && x<=r.right && y>=r.top && y<=r.bottom;
+    bin.classList.toggle('hover', inside);
+  });
+}
+
+function handleDrop(card, item, x, y){
+  binStructured.classList.remove('hover');
+  binUnstructured.classList.remove('hover');
+
+  let target = null;
+  [binStructured, binUnstructured].forEach(bin=>{
+    const r = bin.getBoundingClientRect();
+    if(x>=r.left && x<=r.right && y>=r.top && y<=r.bottom){
+      target = bin;
+    }
+  });
+
+  card.classList.remove('dragging');
+
+  if(!target){
+    // return to tray
+    resetCardPosition(card);
+    return;
+  }
+
+  const droppedType = target.dataset.type;
+  const correct = droppedType === item.type;
+
+  card.style.position = 'static';
+  card.style.left = '';
+  card.style.top = '';
+  card.style.width = '';
+  target.querySelector('.bin-body').appendChild(card);
+
+  if(correct){
+    card.classList.add('placed-correct');
+    score += 1;
+    showFeedback(true, `${item.label} 정답! ${item.type==='structured'?'정형':'비정형'} 데이터가 맞아요.`);
+  } else {
+    card.classList.add('placed-wrong');
+    showFeedback(false, `${item.label}은(는) 사실 ${item.type==='structured'?'정형':'비정형'} 데이터예요.`);
+  }
+
+  resolvedCount += 1;
+  updateStatus();
+
+  setTimeout(()=>{
+    card.classList.add('fading');
+    setTimeout(()=>{
+      card.remove();
+      fillTray();
+    }, 250);
+  }, 700);
+}
+
+function fillTray(){
+  if(nextSpawnIndex < total){
+    addCardToTray(queue[nextSpawnIndex]);
+    nextSpawnIndex += 1;
+  }
+  if(resolvedCount >= total){
+    setTimeout(showEnd, 400);
+  }
+}
+
+function resetCardPosition(card){
+  card.style.position = 'static';
+  card.style.left = '';
+  card.style.top = '';
+  card.style.width = '';
+  card.classList.remove('dragging');
+  trayWrap.appendChild(card);
+}
+
+function showFeedback(ok, text){
+  feedback.textContent = (ok ? '✅ ' : '❌ ') + text;
+  feedback.className = ok ? 'ok' : 'no';
+}
+
+function showEnd(){
+  playScreen.style.display = 'none';
+  endScreen.style.display = 'flex';
+  document.getElementById('finalScore').textContent = `${score} / ${total}`;
+  let comment = '';
+  const ratio = score/total;
+  if(ratio === 1) comment = '완벽해요! 정형·비정형 데이터를 정확히 구분하네요.';
+  else if(ratio >= 0.75) comment = '아주 잘했어요! 조금만 더 연습하면 완벽!';
+  else if(ratio >= 0.5) comment = '절반 이상 맞혔어요. 헷갈렸던 카드를 다시 떠올려볼까요?';
+  else comment = '정형 데이터는 "표로 정리하기 쉬운 것", 비정형은 "자유로운 형태"라는 점을 기억해보세요!';
+  document.getElementById('finalComment').textContent = comment;
+}
+
+document.getElementById('retryBtn').addEventListener('click', init);
+
+init();
+</script>
+</body>
+</html>
