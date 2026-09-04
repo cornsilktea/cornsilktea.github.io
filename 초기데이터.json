@@ -104,6 +104,17 @@
           "g1s2-5",
           "g2s1-4-1"
         ]
+      },
+      "tablereading": {
+        "title": "표 읽기",
+        "url": "11.table-reading-game.html",
+        "memo": "",
+        "order": 10,
+        "open": true,
+        "units": [
+          "g1s2-2",
+          "g2s2-2-2"
+        ]
       }
     }
   }
