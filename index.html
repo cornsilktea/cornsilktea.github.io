@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>정보 수업용 링크 모음</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#f5f6f8">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="수업 게임">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <style>
   * { box-sizing: border-box; }
   body {
@@ -132,6 +139,9 @@
   var games = [];
   var toastTimer = null;
   var snapshot = "";
+  /* 홈 화면 아이콘으로 연 경우(전체화면)에는 새 탭을 띄우지 않는다 */
+  var standalone = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches)
+                   || window.navigator.standalone === true;
 
   function setNotice(text) {
     if (text) { notice.textContent = text; notice.hidden = false; }
@@ -187,8 +197,10 @@
       card.className = g.open ? "card" : "card locked";
       if (g.open) {
         card.href = g.url;
-        card.target = "_blank";
-        card.rel = "noopener noreferrer";
+        if (!standalone) {
+          card.target = "_blank";
+          card.rel = "noopener noreferrer";
+        }
       } else {
         card.addEventListener("click", function () {
           showToast("🔒 " + g.title + " — 선생님이 아직 열지 않았어요.");
@@ -258,6 +270,13 @@
 
   load();
   setInterval(load, (cfg.POLL_SECONDS || 5) * 1000);
+
+  /* 홈 화면에 추가했을 때 앱처럼 열리게 하는 등록 (실패해도 사이트는 그대로 동작) */
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").catch(function () {});
+    });
+  }
 })();
 </script>
 
