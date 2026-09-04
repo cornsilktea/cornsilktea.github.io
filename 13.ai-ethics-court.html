@@ -335,6 +335,8 @@
           if (!now || now.code !== room){ put("court/now", { code: room, t: Date.now() }); }
         })
         .catch(function(){});
+      /* 새로고침해도 학생 화면이 같은 사건을 따라오도록 사건 번호를 다시 알려 줍니다. */
+      pushState();
       refresh();
       render();
     } else {
