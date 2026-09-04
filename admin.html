@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>수업 게임 제어판</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px;
+    font-family: Pretendard, -apple-system, "Segoe UI", "맑은 고딕", sans-serif;
+    background: #f5f6f8; color: #111827;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { font-size: 13px; color: #6b7280; margin: 0 0 16px; }
+
+  .panel {
+    background: #fff; border: 1px solid #d1d5db; border-radius: 12px;
+    padding: 20px; margin-bottom: 16px;
+  }
+  .panel h2 { font-size: 15px; margin: 0 0 12px; font-weight: 600; }
+
+  label { display: block; font-size: 13px; color: #6b7280; margin: 0 0 4px; }
+  input[type=text] {
+    width: 100%; padding: 9px 10px; font-size: 14px;
+    border: 1px solid #d1d5db; border-radius: 8px; background: #fff; color: #111827;
+  }
+  input:focus { outline: none; border-color: #2563eb; }
+
+  button {
+    padding: 9px 14px; font-size: 14px; font-family: inherit;
+    border: 1px solid #d1d5db; border-radius: 8px;
+    background: #fff; color: #111827; cursor: pointer;
+  }
+  button:hover { border-color: #2563eb; background: #f8faff; }
+  button:disabled { color: #9ca3af; background: #fafafa; cursor: default; border-color: #e5e7eb; }
+
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .row > * { flex: 1 1 160px; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .actions button { flex: 1 1 120px; }
+
+  .msg { font-size: 13px; color: #6b7280; margin: 10px 0 0; min-height: 18px; line-height: 1.6; }
+
+  .summary {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    font-size: 14px; color: #374151;
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: #d1d5db; flex: none; }
+  .dot.on { background: #16a34a; }
+  .dot.some { background: #d97706; }
+  .who { font-size: 13px; color: #6b7280; margin: 10px 0 0; word-break: break-all; }
+
+  .game {
+    border: 1px solid #d1d5db; border-radius: 10px;
+    padding: 14px; margin-bottom: 10px; background: #fff;
+  }
+  .game-head { display: flex; align-items: flex-start; gap: 12px; }
+  .game-info { flex: 1 1 auto; min-width: 0; }
+  .game-title { font-size: 16px; font-weight: 600; margin: 0; }
+  .game-meta { font-size: 13px; color: #6b7280; margin: 3px 0 0; word-break: break-all; }
+  .game-buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .game-buttons button { flex: 1 1 84px; }
+
+  .switch { flex: none; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+  .switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .track {
+    width: 50px; height: 30px; border-radius: 999px;
+    background: #e5e7eb; border: 1px solid #d1d5db; position: relative;
+    transition: background .15s;
+  }
+  .track::after {
+    content: ""; position: absolute; top: 3px; left: 3px;
+    width: 22px; height: 22px; border-radius: 50%; background: #fff;
+    border: 1px solid #d1d5db; transition: left .15s;
+  }
+  .switch input:checked + .track { background: #86efac; border-color: #4ade80; }
+  .switch input:checked + .track::after { left: 23px; }
+  .switch-text { font-size: 13px; color: #6b7280; width: 34px; }
+
+  .edit { margin-top: 12px; display: none; }
+  .edit.open { display: block; }
+  .edit .row { margin-bottom: 8px; }
+
+  .hint { font-size: 12px; color: #9ca3af; margin: 8px 0 0; line-height: 1.6; }
+  code { background: #f3f4f6; border-radius: 4px; padding: 1px 5px; font-size: 12px; }
+  [hidden] { display: none !important; }
+
+  @media (max-width: 600px) {
+    body { padding: 16px; }
+    .panel { padding: 16px; }
+    .game-head { flex-direction: column; }
+    .switch { align-self: flex-start; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>수업 게임 제어판</h1>
+  <p class="sub">스위치를 켜면 학생이 바로 들어갈 수 있고, 끄면 즉시 막힙니다. 저장 버튼은 없습니다.</p>
+
+  <!-- 로그인 -->
+  <div class="panel" id="loginPanel">
+    <h2>선생님 로그인</h2>
+    <p class="msg" id="loginMsg">준비 중…</p>
+    <div class="actions">
+      <button id="loginBtn" type="button" disabled>구글 계정으로 로그인</button>
+    </div>
+  </div>
+
+  <!-- 제어 -->
+  <div id="mainPanel" hidden>
+    <div class="panel">
+      <h2>지금 상태</h2>
+      <div class="summary"><span class="dot" id="dot"></span><span id="summaryText">불러오는 중…</span></div>
+      <div class="actions">
+        <button id="allOn" type="button">전체 켜기</button>
+        <button id="allOff" type="button">전체 끄기</button>
+        <button id="reload" type="button">새로고침</button>
+        <button id="logout" type="button">로그아웃</button>
+      </div>
+      <p class="msg" id="mainMsg"></p>
+      <p class="who" id="who"></p>
+    </div>
+
+    <div id="list"></div>
+
+    <div class="panel">
+      <h2>게임 추가</h2>
+      <div class="row">
+        <div>
+          <label for="newTitle">제목</label>
+          <input id="newTitle" type="text" placeholder="예: 스네이크">
+        </div>
+        <div>
+          <label for="newUrl">파일 이름</label>
+          <input id="newUrl" type="text" placeholder="예: 8.newgame.html">
+        </div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <div>
+          <label for="newSlug">게임 아이디(영문)</label>
+          <input id="newSlug" type="text" placeholder="예: newgame">
+        </div>
+        <div>
+          <label for="newMemo">설명(선택)</label>
+          <input id="newMemo" type="text" placeholder="예: 3차시에 사용">
+        </div>
+      </div>
+      <div class="actions">
+        <button id="addBtn" type="button">추가하기</button>
+      </div>
+      <p class="msg" id="addMsg"></p>
+      <p class="hint">
+        게임 아이디는 게임 HTML 파일 안의 <code>data-game="..."</code> 값과 똑같이 적어야 합니다.
+        영문 소문자·숫자·하이픈만 쓸 수 있습니다.
+      </p>
+    </div>
+  </div>
+
+</div>
+
+<script charset="utf-8" src="firebase-config.js"></script>
+<script>
+/* 로그인 도구(구글 서버)를 못 불러오는 경우에 대비한 안내 */
+window.__portalBooted = false;
+setTimeout(function () {
+  if (!window.__portalBooted) {
+    document.getElementById("loginMsg").textContent =
+      "로그인 도구를 불러오지 못했습니다. 인터넷 연결을 확인한 뒤 새로고침해 주세요.";
+  }
+}, 8000);
+</script>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import {
+  getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect,
+  getRedirectResult, onAuthStateChanged, signOut
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+const cfg = window.PORTAL_CONFIG;
+const $ = (id) => document.getElementById(id);
+
+let games = [];
+let busy = false;      /* 수정 중일 때 자동 새로고침 멈춤 */
+let snapshot = "";     /* 내용이 바뀔 때만 화면을 다시 그리기 위한 비교용 */
+let timer = null;
+let auth = null;
+
+const say = (id, text) => { $(id).textContent = text; };
+
+/* ---------------- 로그인 ---------------- */
+function startAuth() {
+  const app = initializeApp({
+    apiKey: cfg.API_KEY,
+    authDomain: cfg.AUTH_DOMAIN,
+    databaseURL: cfg.DB_URL
+  });
+  auth = getAuth(app);
+
+  getRedirectResult(auth).catch((e) => say("loginMsg", explainAuth(e)));
+
+  onAuthStateChanged(auth, (user) => {
+    if (user) showMain(user);
+    else showLogin("");
+  });
+
+  $("loginBtn").disabled = false;
+  say("loginMsg", "");
+}
+
+async function login() {
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: "select_account" });
+  say("loginMsg", "로그인 창을 여는 중…");
+  try {
+    await signInWithPopup(auth, provider);
+  } catch (e) {
+    const code = e && e.code ? e.code : "";
+    if (code === "auth/popup-blocked" || code === "auth/operation-not-supported-in-this-environment") {
+      say("loginMsg", "팝업이 막혀서 페이지를 이동해 로그인합니다…");
+      try { await signInWithRedirect(auth, provider); } catch (e2) { say("loginMsg", explainAuth(e2)); }
+    } else if (code === "auth/cancelled-popup-request" || code === "auth/popup-closed-by-user") {
+      say("loginMsg", "");
+    } else {
+      say("loginMsg", explainAuth(e));
+    }
+  }
+}
+
+function explainAuth(e) {
+  const code = (e && e.code) || "";
+  if (code === "auth/unauthorized-domain")
+    return "이 주소가 Firebase에 등록되어 있지 않습니다. Authentication → 설정 → 승인된 도메인에 cornsilktea.github.io 를 추가해 주세요.";
+  if (code === "auth/operation-not-allowed")
+    return "구글 로그인이 켜져 있지 않습니다. Authentication → Sign-in method 에서 Google 을 사용 설정해 주세요.";
+  if (code === "auth/network-request-failed")
+    return "인터넷 연결을 확인해 주세요.";
+  return "로그인에 실패했습니다" + (code ? " (" + code + ")" : "");
+}
+
+function explainDb(code) {
+  const s = String(code);
+  if (s === "Permission denied")
+    return "쓰기 권한이 없습니다. 아래에 보이는 내 UID를 데이터베이스 규칙에 넣었는지 확인해 주세요.";
+  return "문제가 생겼습니다 (" + s + ")";
+}
+
+/* ---------------- 데이터 ---------------- */
+async function load() {
+  if (busy) return;
+  try {
+    const r = await fetch(cfg.dbPath("games"), { cache: "no-store" });
+    if (!r.ok) throw new Error(r.status);
+    const data = await r.json();
+    games = Object.keys(data || {}).map((slug) => {
+      const g = data[slug] || {};
+      return {
+        slug, title: g.title || slug, url: g.url || "", memo: g.memo || "",
+        open: g.open === true, order: typeof g.order === "number" ? g.order : 999
+      };
+    });
+    games.sort((a, b) => a.order - b.order || a.title.localeCompare(b.title, "ko"));
+    const next = JSON.stringify(games);
+    if (next !== snapshot) { snapshot = next; renderList(); }
+    renderSummary();
+    if ($("mainMsg").textContent.indexOf("불러오지") !== -1) say("mainMsg", "");
+  } catch (e) {
+    say("mainMsg", "목록을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.");
+  }
+}
+
+async function write(path, value) {
+  if (!auth || !auth.currentUser) throw new Error("다시 로그인해 주세요.");
+  const idToken = await auth.currentUser.getIdToken();
+  const r = await fetch(cfg.dbPath(path) + "?auth=" + encodeURIComponent(idToken), {
+    method: value === null ? "DELETE" : "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: value === null ? undefined : JSON.stringify(value)
+  });
+  if (!r.ok) {
+    let detail = r.status;
+    try { const d = await r.json(); detail = d.error || detail; } catch (e) {}
+    throw new Error(explainDb(detail));
+  }
+}
+
+/* ---------------- 화면 ---------------- */
+function renderSummary() {
+  const on = games.filter((g) => g.open).length;
+  $("dot").className = "dot" + (on === 0 ? "" : on === games.length ? " on" : " some");
+  $("summaryText").textContent =
+    games.length === 0 ? "등록된 게임이 없습니다."
+    : on === 0 ? "전체 잠금 (" + games.length + "개 모두 닫힘)"
+    : on === games.length ? "전체 열림 (" + on + "개)"
+    : "일부 열림 (" + on + " / " + games.length + "개)";
+}
+
+function el(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+}
+
+function field(labelText, value) {
+  const box = document.createElement("div");
+  const input = document.createElement("input");
+  input.type = "text";
+  input.value = value || "";
+  box.appendChild(el("label", null, labelText));
+  box.appendChild(input);
+  return { box, input };
+}
+
+function renderList() {
+  const list = $("list");
+  list.innerHTML = "";
+  games.forEach((g, i) => list.appendChild(gameCard(g, i)));
+}
+
+function gameCard(g, i) {
+  const card = el("div", "game");
+
+  const head = el("div", "game-head");
+  const info = el("div", "game-info");
+  info.appendChild(el("p", "game-title", g.title));
+  info.appendChild(el("p", "game-meta",
+    g.url + "   ·   아이디: " + g.slug + (g.memo ? "   ·   " + g.memo : "")));
+  head.appendChild(info);
+
+  const sw = el("label", "switch");
+  const cb = document.createElement("input");
+  cb.type = "checkbox";
+  cb.checked = g.open;
+  const track = el("span", "track");
+  const stateText = el("span", "switch-text", g.open ? "열림" : "잠김");
+  cb.addEventListener("change", async () => {
+    const next = cb.checked;
+    cb.disabled = true;
+    try {
+      await write("games/" + g.slug, { open: next });
+      g.open = next;
+      snapshot = JSON.stringify(games);
+      stateText.textContent = next ? "열림" : "잠김";
+      renderSummary();
+      say("mainMsg", g.title + " → " + (next ? "열었습니다." : "닫았습니다."));
+    } catch (e) {
+      cb.checked = !next;
+      say("mainMsg", e.message);
+    }
+    cb.disabled = false;
+  });
+  sw.appendChild(cb); sw.appendChild(track); sw.appendChild(stateText);
+  head.appendChild(sw);
+  card.appendChild(head);
+
+  const buttons = el("div", "game-buttons");
+  const up = el("button", null, "▲ 위로");
+  const down = el("button", null, "▼ 아래로");
+  const edit = el("button", null, "수정");
+  const del = el("button", null, "삭제");
+  up.disabled = i === 0;
+  down.disabled = i === games.length - 1;
+  up.addEventListener("click", () => move(i, -1));
+  down.addEventListener("click", () => move(i, 1));
+  del.addEventListener("click", async () => {
+    if (!confirm("'" + g.title + "' 을(를) 목록에서 지울까요?\n(HTML 파일 자체는 지워지지 않습니다.)")) return;
+    try { await write("games/" + g.slug, null); await load(); }
+    catch (e) { say("mainMsg", e.message); }
+  });
+  buttons.append(up, down, edit, del);
+  card.appendChild(buttons);
+
+  const form = el("div", "edit");
+  const r1 = el("div", "row"), r2 = el("div", "row");
+  const fTitle = field("제목", g.title), fUrl = field("파일 이름", g.url), fMemo = field("설명", g.memo);
+  r1.append(fTitle.box, fUrl.box);
+  r2.append(fMemo.box);
+  const save = el("button", null, "저장");
+  const cancel = el("button", null, "취소");
+  const acts = el("div", "actions");
+  acts.append(save, cancel);
+  form.append(r1, r2, acts);
+  card.appendChild(form);
+
+  edit.addEventListener("click", () => {
+    const opening = !form.classList.contains("open");
+    form.classList.toggle("open", opening);
+    edit.textContent = opening ? "수정 닫기" : "수정";
+    busy = opening;
+  });
+  cancel.addEventListener("click", () => {
+    form.classList.remove("open");
+    edit.textContent = "수정";
+    busy = false;
+    fTitle.input.value = g.title; fUrl.input.value = g.url; fMemo.input.value = g.memo;
+  });
+  save.addEventListener("click", async () => {
+    const title = fTitle.input.value.trim(), url = fUrl.input.value.trim();
+    if (!title || !url) { say("mainMsg", "제목과 파일 이름은 비울 수 없습니다."); return; }
+    try {
+      await write("games/" + g.slug, { title, url, memo: fMemo.input.value.trim() });
+      busy = false;
+      await load();
+      say("mainMsg", "저장했습니다.");
+    } catch (e) { say("mainMsg", e.message); }
+  });
+
+  return card;
+}
+
+async function move(i, dir) {
+  const j = i + dir;
+  if (j < 0 || j >= games.length) return;
+  const a = games[i], b = games[j];
+  busy = true;
+  try {
+    await write("games/" + a.slug, { order: j });
+    await write("games/" + b.slug, { order: i });
+    busy = false;
+    await load();
+  } catch (e) { busy = false; say("mainMsg", e.message); }
+}
+
+async function bulk(open) {
+  if (games.length === 0) return;
+  const patch = {};
+  games.forEach((g) => { patch[g.slug + "/open"] = open; });
+  try {
+    await write("games", patch);
+    await load();
+    say("mainMsg", open ? "전체를 열었습니다." : "전체를 닫았습니다.");
+  } catch (e) { say("mainMsg", e.message); }
+}
+
+/* ---------------- 시작 ---------------- */
+function showMain(user) {
+  $("loginPanel").hidden = true;
+  $("mainPanel").hidden = false;
+  $("who").textContent = "로그인: " + (user.email || user.displayName || "") + "   ·   내 UID: " + user.uid;
+  load();
+  if (!timer) timer = setInterval(load, (cfg.POLL_SECONDS || 5) * 1000);
+}
+
+function showLogin(message) {
+  $("loginPanel").hidden = false;
+  $("mainPanel").hidden = true;
+  if (timer) { clearInterval(timer); timer = null; }
+  say("loginMsg", message || "");
+}
+
+$("loginBtn").addEventListener("click", login);
+$("allOn").addEventListener("click", () => bulk(true));
+$("allOff").addEventListener("click", () => bulk(false));
+$("reload").addEventListener("click", () => { busy = false; load(); });
+$("logout").addEventListener("click", async () => {
+  try { await signOut(auth); } catch (e) {}
+  showLogin("로그아웃했습니다.");
+});
+
+$("addBtn").addEventListener("click", async () => {
+  const slug = $("newSlug").value.trim().toLowerCase();
+  const title = $("newTitle").value.trim();
+  const url = $("newUrl").value.trim();
+  if (!slug || !title || !url) { say("addMsg", "제목·파일 이름·게임 아이디를 모두 채워 주세요."); return; }
+  if (!/^[a-z0-9-]+$/.test(slug)) { say("addMsg", "게임 아이디는 영문 소문자·숫자·하이픈만 됩니다."); return; }
+  if (games.some((g) => g.slug === slug)) { say("addMsg", "이미 있는 게임 아이디입니다."); return; }
+  try {
+    await write("games/" + slug, { title, url, memo: $("newMemo").value.trim(), order: games.length, open: false });
+    await load();
+    $("newSlug").value = ""; $("newTitle").value = ""; $("newUrl").value = ""; $("newMemo").value = "";
+    say("addMsg", "추가했습니다. 스위치를 켜면 학생이 들어올 수 있습니다.");
+  } catch (e) { say("addMsg", e.message); }
+});
+
+window.__portalBooted = true;
+if (!cfg.isAdminReady()) {
+  showLogin("설정이 아직 끝나지 않았어요. firebase-config.js 의 세 줄을 먼저 채워 주세요.");
+} else {
+  startAuth();
+}
+</script>
+</body>
+</html>

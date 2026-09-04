@@ -19,6 +19,13 @@
     border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;
   }
 
+  .notice {
+    max-width: 1400px; margin: 0 auto 16px;
+    padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px;
+    background: #fff; font-size: 13px; color: #6b7280;
+  }
+  .notice[hidden] { display: none; }
+
   .layout {
     max-width: 1600px; margin: 0 auto;
     display: flex; align-items: stretch; gap: 24px;
@@ -45,9 +52,21 @@
   }
   .title { font-size: 16px; font-weight: 600; margin: 0; }
   .memo { font-size: 13px; color: #6b7280; margin: 2px 0 0; }
-  .empty { background: #fafafa; border-style: dashed; color: #9ca3af; cursor: default; }
-  .empty:hover { border-color: #d1d5db; background: #fafafa; }
-  .empty .num { color: #9ca3af; background: #f3f4f6; }
+
+  .card.locked { background: #fafafa; color: #6b7280; cursor: pointer; }
+  .card.locked:hover { border-color: #d1d5db; background: #fafafa; }
+  .card.locked .num { color: #9ca3af; background: #f3f4f6; }
+  .card.locked .title { color: #6b7280; }
+  .lock {
+    display: inline-block; margin-top: 6px; padding: 3px 8px;
+    font-size: 12px; color: #6b7280;
+    background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 999px;
+  }
+  .empty {
+    grid-column: 1 / -1;
+    padding: 24px; text-align: center; font-size: 14px; color: #9ca3af;
+    background: #fafafa; border: 1px dashed #d1d5db; border-radius: 8px;
+  }
 
   .qr-panel {
     flex: 0 0 50%;
@@ -56,15 +75,24 @@
     padding: 24px; text-align: center;
   }
   .qr-panel img {
-    width: 100%; max-width: 560px; height: auto; display: block; margin: 0 auto;
+    width: 100%; max-width: 460px; height: auto;
+    border: 1px solid #e5e7eb; border-radius: 8px;
   }
-  .qr-panel p { font-size: 16px; color: #374151; margin: 14px 0 0; font-weight: 600; }
+  .qr-panel p { margin: 16px 0 0; font-size: 15px; color: #374151; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+    background: #fff; border: 1px solid #d1d5db; border-radius: 8px;
+    padding: 12px 16px; font-size: 14px; color: #111827;
+    box-shadow: 0 2px 8px rgba(0,0,0,.08);
+  }
+  .toast[hidden] { display: none; }
 
   @media (max-width: 900px) {
-    .layout { flex-direction: column; }
-    .grid, .qr-panel { flex: none; width: 100%; }
+    body { padding: 16px; }
+    .layout { flex-direction: column; gap: 16px; min-height: 0; }
+    .grid, .qr-panel { flex: 1 1 auto; }
     .qr-panel { position: static; }
-    .qr-panel img { max-width: 320px; }
   }
 </style>
 </head>
@@ -72,9 +100,11 @@
 
 <header>
   <h1>수업용 링크 모음</h1>
-  <p class="sub">항목을 클릭하면 새 탭에서 열립니다.</p>
+  <p class="sub">선생님이 연 게임만 열립니다. 잠긴 게임은 잠시 후 다시 확인해 보세요.</p>
   <input id="search" type="text" placeholder="제목·설명으로 검색">
 </header>
+
+<p class="notice" id="notice" hidden></p>
 
 <div class="layout">
   <div class="grid" id="grid"></div>
@@ -85,72 +115,150 @@
   </div>
 </div>
 
+<div class="toast" id="toast" hidden></div>
+
+<script charset="utf-8" src="firebase-config.js"></script>
 <script>
-/* ===================================================================
-   여기만 수정하세요.  형식:  { title: "제목", url: "주소", memo: "설명" }
-   비워둘 칸은  { title: "", url: "", memo: "" }  그대로 두면 됩니다.
-   =================================================================== */
-const LINKS = [
-  { title: "카드 옮기기",    url: "1.slidecard.html",  memo: "" },
-  { title: "미로 찾기",      url: "2.robotmaze.html",  memo: "" },
-  { title: "벽돌깨기",       url: "3.brickbreak.html",  memo: "" },
-  { title: "반복문과 함수",  url: "4.function.html", memo: "" },
-  { title: "경매",           url: "5.cardauction.html", memo: "" },
-  { title: "스네이크",  url: "6.snakegame.html",  memo: "" },
-  { title: "추상화",  url: "7.drowing.html",  memo: "" },
-  { title: "",  url: "",  memo: "" },
-  { title: "",  url: "",  memo: "" },
-  { title: "",  url: "",  memo: "" },
-  { title: "",  url: "",  memo: "" },
-  { title: "",  url: "",  memo: "" },
-  { title: "",  url: "",  memo: "" },
-  { title: "",  url: "",  memo: "" },
-  { title: "",  url: "",  memo: "" },
-  { title: "",  url: "",  memo: "" },
-  { title: "",  url: "",  memo: "" },
-  { title: "",  url: "",  memo: "" },
-  { title: "",  url: "",  memo: "" },
-  { title: "",  url: "",  memo: "" }
-];
-/* =================== 아래는 수정하지 않아도 됩니다 =================== */
+/* 게임 목록과 잠금 상태는 모두 선생님 화면(admin.html)에서 관리합니다.
+   이 파일은 고칠 필요가 없습니다. */
+(function () {
+  "use strict";
 
-const grid = document.getElementById("grid");
+  var cfg = window.PORTAL_CONFIG;
+  var grid = document.getElementById("grid");
+  var notice = document.getElementById("notice");
+  var toast = document.getElementById("toast");
+  var keyword = "";
+  var games = [];
+  var toastTimer = null;
+  var snapshot = "";
 
-function render(keyword) {
-  grid.innerHTML = "";
-  LINKS.forEach(function (item, i) {
-    const text = (item.title + " " + item.memo).toLowerCase();
-    if (keyword && text.indexOf(keyword) === -1) {
+  function setNotice(text) {
+    if (text) { notice.textContent = text; notice.hidden = false; }
+    else { notice.hidden = true; }
+  }
+
+  function showToast(text) {
+    toast.textContent = text;
+    toast.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toast.hidden = true; }, 2600);
+  }
+
+  function toList(data) {
+    var out = [];
+    Object.keys(data || {}).forEach(function (slug) {
+      var g = data[slug] || {};
+      if (!g.title || !g.url) return;
+      out.push({
+        slug: slug,
+        title: g.title,
+        url: g.url,
+        memo: g.memo || "",
+        open: g.open === true,
+        order: typeof g.order === "number" ? g.order : 999
+      });
+    });
+    out.sort(function (a, b) {
+      return a.order - b.order || a.title.localeCompare(b.title, "ko");
+    });
+    return out;
+  }
+
+  function render() {
+    grid.innerHTML = "";
+    var shown = games.filter(function (g) {
+      if (!keyword) return true;
+      return (g.title + " " + g.memo).toLowerCase().indexOf(keyword) !== -1;
+    });
+
+    if (shown.length === 0) {
+      var e = document.createElement("div");
+      e.className = "empty";
+      e.textContent = games.length === 0
+        ? "아직 등록된 게임이 없어요."
+        : "검색 결과가 없어요.";
+      grid.appendChild(e);
       return;
     }
-    const filled = item.url !== "" && item.title !== "";
-    const card = document.createElement(filled ? "a" : "div");
-    card.className = filled ? "card" : "card empty";
-    if (filled) {
-      card.href = item.url;
-      card.target = "_blank";
-      card.rel = "noopener noreferrer";
-    }
-    let inner = '<span class="num">' + (i + 1) + '</span><span>';
-    if (filled) {
-      inner += '<p class="title">' + item.title + '</p>';
-      if (item.memo !== "") {
-        inner += '<p class="memo">' + item.memo + '</p>';
+
+    shown.forEach(function (g, i) {
+      var card = document.createElement(g.open ? "a" : "div");
+      card.className = g.open ? "card" : "card locked";
+      if (g.open) {
+        card.href = g.url;
+        card.target = "_blank";
+        card.rel = "noopener noreferrer";
+      } else {
+        card.addEventListener("click", function () {
+          showToast("🔒 " + g.title + " — 선생님이 아직 열지 않았어요.");
+        });
       }
-    } else {
-      inner += '<p class="title">빈 칸</p><p class="memo">링크 추가 예정</p>';
+
+      var num = document.createElement("span");
+      num.className = "num";
+      num.textContent = String(i + 1);
+
+      var box = document.createElement("span");
+      var t = document.createElement("p");
+      t.className = "title";
+      t.textContent = g.title;
+      box.appendChild(t);
+      if (g.memo) {
+        var m = document.createElement("p");
+        m.className = "memo";
+        m.textContent = g.memo;
+        box.appendChild(m);
+      }
+      if (!g.open) {
+        var lockBadge = document.createElement("span");
+        lockBadge.className = "lock";
+        lockBadge.textContent = "🔒 선생님이 아직 열지 않았어요";
+        box.appendChild(lockBadge);
+      }
+
+      card.appendChild(num);
+      card.appendChild(box);
+      grid.appendChild(card);
+    });
+  }
+
+  function load() {
+    if (!cfg.isReady()) {
+      setNotice("설정이 아직 끝나지 않았어요. firebase-config.js 를 먼저 채워 주세요.");
+      games = [];
+      render();
+      return;
     }
-    inner += '</span>';
-    card.innerHTML = inner;
-    grid.appendChild(card);
+    fetch(cfg.dbPath("games"), { cache: "no-store" })
+      .then(function (r) {
+        if (!r.ok) throw new Error(r.status);
+        return r.json();
+      })
+      .then(function (data) {
+        setNotice("");
+        games = toList(data);
+        var next = JSON.stringify(games);
+        if (next !== snapshot) { snapshot = next; render(); }
+      })
+      .catch(function () {
+        setNotice("📡 연결을 확인하는 중이에요. 인터넷이 연결되면 자동으로 최신 상태가 됩니다.");
+        games = games.map(function (g) {
+          return { slug: g.slug, title: g.title, url: g.url, memo: g.memo, order: g.order, open: false };
+        });
+        var next = JSON.stringify(games);
+        if (next !== snapshot) { snapshot = next; render(); }
+      });
+  }
+
+  document.getElementById("search").addEventListener("input", function (e) {
+    keyword = e.target.value.trim().toLowerCase();
+    render();
   });
-}
 
-document.getElementById("search").addEventListener("input", function (e) {
-  render(e.target.value.trim().toLowerCase());
-});
-
-render("");
+  load();
+  setInterval(load, (cfg.POLL_SECONDS || 5) * 1000);
+})();
 </script>
 
 </body>
