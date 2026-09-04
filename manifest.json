@@ -1,6 +1,6 @@
 {
-  "name": "수업용 링크 모음",
-  "short_name": "수업 게임",
+  "name": "정보 수업",
+  "short_name": "정보 수업",
   "lang": "ko",
   "start_url": "./index.html",
   "scope": "./",
