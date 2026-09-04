@@ -439,6 +439,8 @@ async function bulk(open) {
 
 /* ---------------- 시작 ---------------- */
 function showMain(user) {
+  /* 이 기기의 목록 화면에 '제어판' 버튼을 보이게 한다 */
+  try { localStorage.setItem("portal_teacher", "1"); } catch (e) {}
   $("loginPanel").hidden = true;
   $("mainPanel").hidden = false;
   $("who").textContent = "로그인: " + (user.email || user.displayName || "") + "   ·   내 UID: " + user.uid;

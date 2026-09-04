@@ -19,7 +19,15 @@
     background: #f5f6f8; color: #111827;
   }
   header { max-width: 1400px; margin: 0 auto 16px; }
-  h1 { font-size: 22px; margin: 0 0 4px; }
+  .title-row { display: flex; align-items: center; gap: 10px; margin: 0 0 4px; }
+  h1 { font-size: 22px; margin: 0; }
+  .admin-link {
+    display: inline-flex; align-items: center; height: 30px; padding: 0 12px;
+    border: 1px solid #d1d5db; border-radius: 999px; background: #fff;
+    color: #111827; font-size: 13px; font-weight: 600; text-decoration: none;
+  }
+  .admin-link:hover { border-color: #2563eb; background: #f8faff; }
+  .admin-link[hidden] { display: none; }
   .sub { font-size: 13px; color: #6b7280; margin: 0 0 12px; }
   #search {
     width: 100%; max-width: 360px; padding: 8px 10px;
@@ -106,7 +114,10 @@
 <body>
 
 <header>
-  <h1>수업용 링크 모음</h1>
+  <div class="title-row">
+    <h1>수업용 링크 모음</h1>
+    <a class="admin-link" id="adminLink" href="admin.html" hidden>제어판</a>
+  </div>
   <p class="sub">선생님이 연 수업 자료만 열립니다. 잠긴 자료는 잠시 후 다시 확인해 보세요.</p>
   <input id="search" type="text" placeholder="제목·설명으로 검색">
 </header>
@@ -262,6 +273,14 @@
         if (next !== snapshot) { snapshot = next; render(); }
       });
   }
+
+  /* 선생님이 한 번이라도 제어판에 로그인한 기기에서만 '제어판' 버튼을 보여 줍니다.
+     학생 기기에는 나타나지 않습니다. */
+  try {
+    if (localStorage.getItem("portal_teacher") === "1") {
+      document.getElementById("adminLink").hidden = false;
+    }
+  } catch (e) {}
 
   document.getElementById("search").addEventListener("input", function (e) {
     keyword = e.target.value.trim().toLowerCase();
