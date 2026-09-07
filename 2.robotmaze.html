@@ -46,7 +46,7 @@
   --wall:#111827;
   --ok:#15803d;
   --bad:#b91c1c;
-  --cellsize:clamp(42px, 9vh, 84px);
+  --cellsize:64px;
 }
 *{box-sizing:border-box;}
 body{
@@ -56,26 +56,26 @@ body{
 }
 h1{font-size:16px;margin:0 0 var(--wrks-viz-space-1);letter-spacing:-0.01em;}
 .sub{font-size:12px;color:var(--muted);margin:0 0 var(--wrks-viz-space-3);}
-.wrap{display:grid;grid-template-columns:auto 1fr;gap:var(--wrks-viz-space-4);align-items:start;}
+.wrap{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:var(--wrks-viz-space-4);align-items:start;}
 @media (max-width:760px){.wrap{grid-template-columns:1fr;}}
 
-.boardbox{border:1px solid var(--wrks-viz-border);border-radius:var(--wrks-viz-radius);padding:var(--wrks-viz-space-3);background:var(--surface);}
-#board{display:grid;grid-template-columns:repeat(8,var(--cellsize));grid-template-rows:repeat(8,var(--cellsize));gap:3px;}
+.boardbox{display:inline-block;border:1px solid var(--wrks-viz-border);border-radius:var(--wrks-viz-radius);padding:var(--wrks-viz-space-3);background:var(--surface);}
+#board{display:grid;grid-template-columns:repeat(8,64px);grid-template-rows:repeat(8,64px);grid-gap:3px;gap:3px;font-size:64px;}
 .c{background:var(--cell);border:1px solid #e5e7eb;border-radius:4px;position:relative;display:flex;align-items:center;justify-content:center;}
 .c.wall{background:var(--wall);border-color:var(--wall);}
 .c.start{background:#e5e7eb;}
 .c.goal{background:#dbeafe;border-color:#93c5fd;}
-.tag{font-size:calc(var(--cellsize) * 0.22);color:var(--muted);letter-spacing:-0.03em;}
+.tag{font-size:0.22em;color:var(--muted);letter-spacing:-0.03em;}
 .c.goal .tag{color:#1d4ed8;}
-.robot{position:absolute;inset:-1px;border-radius:4px;background:var(--wrks-viz-primary);
-  color:#fff;display:flex;align-items:center;justify-content:center;font-size:calc(var(--cellsize) * 0.72);line-height:1;}
+.robot{position:absolute;top:-1px;right:-1px;bottom:-1px;left:-1px;border-radius:4px;background:var(--wrks-viz-primary);
+  color:#fff;display:flex;align-items:center;justify-content:center;font-size:0.72em;line-height:1;}
 .robot.win{background:var(--ok);}
 .robot.fail{background:var(--bad);}
 
 .stats{display:flex;gap:var(--wrks-viz-space-3);margin-top:var(--wrks-viz-space-3);font-size:12px;color:var(--muted);flex-wrap:wrap;}
 .stats b{color:var(--wrks-viz-fg);font-weight:600;font-variant-numeric:tabular-nums;}
 
-.panel{display:flex;flex-direction:column;gap:var(--wrks-viz-space-3);max-width:420px;}
+.panel{display:flex;flex-direction:column;gap:var(--wrks-viz-space-3);min-width:0;}
 .metrics{display:grid;grid-template-columns:1fr 1fr;gap:var(--wrks-viz-space-2);}
 .m.wide{grid-column:1/-1;}
 .m{border:1px solid var(--wrks-viz-border);border-radius:var(--wrks-viz-radius);padding:var(--wrks-viz-space-3);background:var(--wrks-viz-bg);}
@@ -102,7 +102,38 @@ h1{font-size:16px;margin:0 0 var(--wrks-viz-space-1);letter-spacing:-0.01em;}
 .msg.fail{border-color:var(--bad);color:var(--bad);}
 .hint{font-size:12px;color:var(--muted);border-top:1px solid var(--wrks-viz-border);padding-top:var(--wrks-viz-space-2);}
 .hint b{color:var(--wrks-viz-fg);font-weight:600;}
+
+/* ---------- 큰 화면(전자칠판) : 글자와 버튼도 화면에 맞춰 키운다 ---------- */
+@media (min-width:1500px){
+  body{font-size:17px;padding:24px;}
+  h1{font-size:26px;}
+  .sub{font-size:16px;}
+  .wrap{grid-template-columns:minmax(0,1fr) 520px;}
+  .stats{font-size:16px;}
+  .m .lab{font-size:15px;}
+  .m .val{font-size:38px;}
+  .btn{height:104px;font-size:19px;}
+  .btn .sym{font-size:28px;}
+  .sbtn{height:56px;font-size:17px;}
+  .msg{font-size:17px;min-height:60px;}
+  .hint{font-size:15px;}
+}
+@media (min-width:2400px){
+  body{font-size:22px;padding:32px;}
+  h1{font-size:36px;}
+  .sub{font-size:21px;}
+  .wrap{grid-template-columns:minmax(0,1fr) 760px;}
+  .stats{font-size:22px;}
+  .m .lab{font-size:20px;}
+  .m .val{font-size:54px;}
+  .btn{height:150px;font-size:26px;}
+  .btn .sym{font-size:40px;}
+  .sbtn{height:76px;font-size:23px;}
+  .msg{font-size:23px;min-height:80px;}
+  .hint{font-size:20px;}
+}
 </style>
+
 </head>
 <body>
 <h1>로봇 미로</h1>
@@ -111,7 +142,7 @@ h1{font-size:16px;margin:0 0 var(--wrks-viz-space-1);letter-spacing:-0.01em;}
 <div class="wrap">
   <div>
     <div class="boardbox"><div id="board"></div></div>
-    <div class="stats">
+    <div class="stats" id="stats">
       <span>벽 개수 <b id="sWalls">-</b></span>
       <span>4칸 구간 <b id="sRuns">-</b></span>
       <span>로봇 방향 <b id="sDir">북</b></span>
@@ -356,6 +387,7 @@ h1{font-size:16px;margin:0 0 var(--wrks-viz-space-1);letter-spacing:-0.01em;}
 
   var el={
     board:document.getElementById('board'),
+    stats:document.getElementById('stats'),
     time:document.getElementById('mTime'),
     cmd:document.getElementById('mCmd'),
     walls:document.getElementById('sWalls'),
@@ -424,7 +456,63 @@ h1{font-size:16px;margin:0 0 var(--wrks-viz-space-1);letter-spacing:-0.01em;}
     }
   })();
 
+  /* ---------- 화면 크기에 맞춰 미로 칸 크기를 다시 잰다 ----------
+     전자칠판처럼 화면이 아주 크거나 세로가 짧은 기기에서도 미로가 남는 공간을
+     모두 쓰도록, 가로와 세로를 함께 재서 칸 크기를 px 로 직접 넣습니다.
+     CSS 최신 문법(clamp 등)을 못 읽는 칠판 브라우저에서도 안전합니다. */
+  var GAP=3, MINCELL=28, MAXCELL=240;
+  var HASGRID=(function(){
+    var d=document.createElement('div');
+    return typeof d.style.gridTemplateColumns==='string';
+  })();
+
+  function fitBoard(){
+    var box=el.board.parentNode;          /* .boardbox */
+    var col=box.parentNode;               /* 왼쪽 열 */
+    var padX=24, bord=2;
+    if(window.getComputedStyle){
+      var cs=window.getComputedStyle(box);
+      padX=(parseFloat(cs.paddingLeft)||0)+(parseFloat(cs.paddingRight)||0);
+      bord=(parseFloat(cs.borderLeftWidth)||0)+(parseFloat(cs.borderRightWidth)||0);
+    }
+    var availW=col.clientWidth-padX-bord;
+    var vh=window.innerHeight||document.documentElement.clientHeight||600;
+    var top=el.board.getBoundingClientRect().top+(window.pageYOffset||document.documentElement.scrollTop||0);
+    var reserve=(el.stats?el.stats.offsetHeight:0)+48;
+    var availH=vh-top-reserve;
+    var byW=(availW-GAP*(N-1))/N;
+    var byH=(availH-GAP*(N-1))/N;
+    var size=Math.floor(Math.min(byW,byH));
+    if(!(size>MINCELL)){
+      size=MINCELL;
+    }
+    if(size>MAXCELL){
+      size=MAXCELL;
+    }
+    var full=size*N+GAP*(N-1);
+    el.board.style.width=full+'px';
+    el.board.style.fontSize=size+'px';
+    if(HASGRID){
+      var tmpl='repeat('+N+', '+size+'px)';
+      el.board.style.gridTemplateColumns=tmpl;
+      el.board.style.gridTemplateRows=tmpl;
+      return;
+    }
+    /* 아주 오래된 칠판 브라우저(그리드 미지원)에서는 칸을 직접 배치합니다. */
+    el.board.style.position='relative';
+    el.board.style.height=full+'px';
+    for(var i=0;i<cells.length;i++){
+      var cell=cells[i];
+      cell.style.position='absolute';
+      cell.style.width=size+'px';
+      cell.style.height=size+'px';
+      cell.style.left=((i%N)*(size+GAP))+'px';
+      cell.style.top=(Math.floor(i/N)*(size+GAP))+'px';
+    }
+  }
+
   function elapsed(){
+
     if(!st.started){
       return 0;
     }
@@ -602,11 +690,21 @@ h1{font-size:16px;margin:0 0 var(--wrks-viz-space-1);letter-spacing:-0.01em;}
   if(!board){
     board={grid:[[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0]],walls:0,runs4:0};
   }
+  fitBoard();
   softReset();
   renderBest();
   prefetch();
   post();
-  window.addEventListener('resize',post);
+  function refit(){
+    fitBoard();
+    post();
+  }
+  window.addEventListener('resize',refit);
+  window.addEventListener('orientationchange',refit);
+  if(document.readyState!=='complete'){
+    window.addEventListener('load',refit);
+  }
+  setTimeout(refit,300);
 })();
 </script>
 </body>
