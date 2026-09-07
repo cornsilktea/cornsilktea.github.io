@@ -156,6 +156,7 @@ button:active { background: #eef2f7; }
       <li>발사대 위쪽을 드래그하면 손가락 방향으로, 아래쪽을 드래그하면 새총처럼 반대 방향으로 조준됩니다.</li>
       <li>손을 떼도 조준선은 유지되며, <b>발사</b> 버튼을 눌러야 공이 나갑니다.</li>
       <li>◀ ▶ 버튼으로 1도씩 미세 조정할 수 있습니다.</li>
+      <li>키보드 ← → 는 한 번에 0.1도씩 더 미세하게 움직이고, 누르고 있으면 점점 빠르게 이동합니다. Shift와 함께 누르면 1도 단위입니다.</li>
     </ul>
     <b>규칙</b>
     <ul>
@@ -596,6 +597,7 @@ button:active { background: #eef2f7; }
     if (!prev) { prev = ts; }
     var dt = Math.min(0.033, (ts - prev) / 1000);
     prev = ts;
+    tickAim(dt);
     update(dt);
     draw();
     window.requestAnimationFrame(loop);
@@ -619,7 +621,7 @@ button:active { background: #eef2f7; }
     if (a < -MAXA) { a = -MAXA; }
     aim = a;
     aimed = true;
-    setMsg("각도 " + (aim * 180 / Math.PI).toFixed(0) + "° · 발사 버튼을 누르세요.");
+    setMsg("각도 " + fmtAim() + "° · 발사 버튼을 누르세요.");
   }
 
   var dragging = false;
@@ -652,25 +654,73 @@ button:active { background: #eef2f7; }
     }
     fire();
   });
-  btnL.addEventListener("click", function () {
+  function fmtAim() {
+    var d = aim * 180 / Math.PI;
+    return Math.abs(d - Math.round(d)) < 0.05 ? d.toFixed(0) : d.toFixed(1);
+  }
+
+  function adjustAim(deg) {
     if (state !== "aim") { return; }
-    aim = Math.max(-MAXA, aim - 1 * Math.PI / 180);
+    var a = aim + deg * Math.PI / 180;
+    if (a > MAXA) { a = MAXA; }
+    if (a < -MAXA) { a = -MAXA; }
+    aim = a;
     aimed = true;
-    setMsg("각도 " + (aim * 180 / Math.PI).toFixed(0) + "°");
-  });
-  btnR.addEventListener("click", function () {
-    if (state !== "aim") { return; }
-    aim = Math.min(MAXA, aim + 1 * Math.PI / 180);
-    aimed = true;
-    setMsg("각도 " + (aim * 180 / Math.PI).toFixed(0) + "°");
-  });
+    setMsg("각도 " + fmtAim() + "°");
+  }
+
+  btnL.addEventListener("click", function () { adjustAim(-1); });
+  btnR.addEventListener("click", function () { adjustAim(1); });
   btnRestart.addEventListener("click", function () { reset(); });
 
+  // 방향키: 한 번 누르면 0.1° 미세 조정, 계속 누르고 있으면 부드럽게 가속(3°/s → 20°/s).
+  // Shift와 함께 누르면 버튼과 같은 1° 단위(길게 누를 때도 4배 빠르게).
+  var KEY_STEP = 0.1;
+  var KEY_STEP_COARSE = 1;
+  var HOLD_DELAY = 0.28;
+  var HOLD_SLOW = 3;
+  var HOLD_FAST = 20;
+  var HOLD_RAMP = 0.8;
+  var heldDir = 0;
+  var heldTime = 0;
+  var heldShift = false;
+
+  function holdSpeed(t) {
+    var k = Math.min(1, t / HOLD_RAMP);
+    return HOLD_SLOW + (HOLD_FAST - HOLD_SLOW) * k;
+  }
+
+  function tickAim(dt) {
+    if (!heldDir) { return; }
+    if (state !== "aim") { heldDir = 0; return; }
+    var t0 = Math.max(0, heldTime - HOLD_DELAY);
+    heldTime += dt;
+    var t1 = heldTime - HOLD_DELAY;
+    if (t1 <= 0) { return; }
+    var deg = (holdSpeed(t0) + holdSpeed(t1)) / 2 * (t1 - t0);
+    if (heldShift) { deg *= 4; }
+    adjustAim(heldDir * deg);
+  }
+
   window.addEventListener("keydown", function (ev) {
-    if (ev.key === "ArrowLeft") { btnL.click(); }
-    if (ev.key === "ArrowRight") { btnR.click(); }
+    if (ev.key === "ArrowLeft" || ev.key === "ArrowRight") {
+      ev.preventDefault();
+      var dir = ev.key === "ArrowLeft" ? -1 : 1;
+      heldShift = !!ev.shiftKey;
+      if (ev.repeat) { return; }
+      heldDir = dir;
+      heldTime = 0;
+      adjustAim(dir * (ev.shiftKey ? KEY_STEP_COARSE : KEY_STEP));
+      return;
+    }
     if (ev.key === " " || ev.key === "Enter") { ev.preventDefault(); btnFire.click(); }
   });
+  window.addEventListener("keyup", function (ev) {
+    if (ev.key === "ArrowLeft" && heldDir === -1) { heldDir = 0; }
+    if (ev.key === "ArrowRight" && heldDir === 1) { heldDir = 0; }
+    if (ev.key === "Shift") { heldShift = false; }
+  });
+  window.addEventListener("blur", function () { heldDir = 0; });
 
   function postH() {
     var h = document.documentElement.scrollHeight;
