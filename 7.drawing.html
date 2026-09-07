@@ -92,7 +92,7 @@
   button{font-family:var(--font-body);}
 
   .app{
-    min-height:100vh;
+    min-height:100%;
     display:flex;
     flex-direction:column;
   }
@@ -538,6 +538,35 @@
     color:var(--accent);
   }
   .example-card p{color:var(--ink-soft); font-size:.98rem; line-height:1.6;}
+
+  /* ---------- 큰 화면(전자칠판) : 가로 공간을 써서 세로 스크롤을 없앤다 ---------- */
+  @media (min-width:1200px){
+    main{padding:18px 24px 24px;}
+    .screen{max-width:1400px; gap:16px;}
+    .card{padding:20px 24px;}
+    .stack{gap:11px;}
+    .topbar{padding:10px 24px;}
+
+    /* 시작 화면 : 소개는 가로 전체, 진행 방법과 라운드 설정은 나란히 */
+    #screen-intro{
+      display:grid;
+      grid-template-columns:1.4fr 1fr;
+      align-items:start;
+      gap:16px;
+    }
+    #screen-intro > .card:first-child{grid-column:1 / -1;}
+
+    /* 정답 공개 화면 : 공개 내용과 번호 누르기를 나란히 */
+    #screen-reveal{
+      display:grid;
+      grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+      align-items:start;
+      gap:16px;
+    }
+
+    /* 그리기 화면 : 캔버스가 남는 높이를 모두 차지하도록 */
+    canvas{height:clamp(280px, calc(100vh - 330px), 720px);}
+  }
 
   [hidden]{display:none !important;}
 
