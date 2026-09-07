@@ -661,16 +661,18 @@ h1{font-size:16px;margin:0 0 var(--wrks-viz-space-1);letter-spacing:-0.01em;}
 
   document.addEventListener('keydown',function(e){
     var k=e.key.length===1 ? e.key.toLowerCase() : e.key;
-    if(k==='ArrowUp' || k==='w'){
+    // 한글 IME가 켜져 있어도 WASD가 먹도록 물리 키(code)로도 판정한다
+    var c=e.code;
+    if(k==='ArrowUp' || k==='w' || c==='KeyW'){
       e.preventDefault();
       act('F');
-    }else if(k==='ArrowLeft' || k==='a'){
+    }else if(k==='ArrowLeft' || k==='a' || c==='KeyA'){
       e.preventDefault();
       act('L');
-    }else if(k==='ArrowRight' || k==='d'){
+    }else if(k==='ArrowRight' || k==='d' || c==='KeyD'){
       e.preventDefault();
       act('R');
-    }else if(k===' ' || k==='Spacebar'){
+    }else if(k===' ' || k==='Spacebar' || c==='Space'){
       e.preventDefault();
       if(st.fin==='win'){
         newBoard();

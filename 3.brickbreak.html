@@ -702,10 +702,20 @@ button:active { background: #eef2f7; }
     adjustAim(heldDir * deg);
   }
 
+  // 방향키와 WASD를 함께 지원한다. 한글 IME가 켜져 있어도 되도록 물리 키(code)로도 판정한다.
+  function keyDir(ev) {
+    if (ev.key === "ArrowLeft" || ev.code === "KeyA") { return -1; }
+    if (ev.key === "ArrowRight" || ev.code === "KeyD") { return 1; }
+    var k = (ev.key || "").toLowerCase();
+    if (k === "a") { return -1; }
+    if (k === "d") { return 1; }
+    return 0;
+  }
+
   window.addEventListener("keydown", function (ev) {
-    if (ev.key === "ArrowLeft" || ev.key === "ArrowRight") {
+    var dir = keyDir(ev);
+    if (dir) {
       ev.preventDefault();
-      var dir = ev.key === "ArrowLeft" ? -1 : 1;
       heldShift = !!ev.shiftKey;
       if (ev.repeat) { return; }
       heldDir = dir;
@@ -716,8 +726,8 @@ button:active { background: #eef2f7; }
     if (ev.key === " " || ev.key === "Enter") { ev.preventDefault(); btnFire.click(); }
   });
   window.addEventListener("keyup", function (ev) {
-    if (ev.key === "ArrowLeft" && heldDir === -1) { heldDir = 0; }
-    if (ev.key === "ArrowRight" && heldDir === 1) { heldDir = 0; }
+    var dir = keyDir(ev);
+    if (dir && dir === heldDir) { heldDir = 0; }
     if (ev.key === "Shift") { heldShift = false; }
   });
   window.addEventListener("blur", function () { heldDir = 0; });

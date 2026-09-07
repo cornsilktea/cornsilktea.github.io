@@ -29,12 +29,11 @@
     background: var(--bg);
     color: var(--ink);
     font-family: ui-monospace, "SF Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
-    height: 100%;
   }
 
   body {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
     min-height: 100vh;
     padding: 24px 16px;
@@ -42,7 +41,10 @@
 
   .wrap {
     width: 100%;
-    max-width: 480px;
+    /* 세로가 짧은 화면(전자칠판 등)에서는 화면 높이에 맞춰 줄어든다 */
+    max-width: min(480px, 68vh);
+    /* 공간이 남으면 가운데, 모자라면 위가 잘리지 않도록 */
+    margin: auto;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -420,15 +422,25 @@
     ArrowRight: [1, 0], d: [1, 0], D: [1, 0]
   };
 
+  // 한글 IME가 켜져 있으면 e.key가 'ㅈ' 등으로 오므로 물리 키(code)로도 판정한다
+  const CODE_DIRS = {
+    KeyW: [0, -1], KeyS: [0, 1], KeyA: [-1, 0], KeyD: [1, 0]
+  };
+
+  function dirFromKey(e) {
+    return ARROW_DIRS[e.key] || CODE_DIRS[e.code] || null;
+  }
+
   document.addEventListener('keydown', (e) => {
-    if (e.key in ARROW_DIRS) {
+    const dir = dirFromKey(e);
+    if (dir) {
       e.preventDefault();
       if (!running) {
         // 게임 오버 화면에서는 방향키 입력으로 바로 재시작
         restartGame();
         return;
       }
-      const [x, y] = ARROW_DIRS[e.key];
+      const [x, y] = dir;
       setDir(x, y);
       return;
     }
