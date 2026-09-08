@@ -19,5 +19,8 @@
   "privacyescape":{ "title": "개인정보 탈출",   "url": "12.privacy-escape-game.html","memo": "", "order": 11, "open": false,
                     "units": ["g2s1-5-2"], "unitsSet": true },
   "aiethicscourt":{ "title": "AI 윤리 법정",    "url": "13.ai-ethics-court.html",   "memo": "", "order": 12, "open": false,
-                    "units": ["g1s2-5", "g2s1-5-2"], "unitsSet": true }
+                    "units": ["g1s2-5", "g2s1-5-2"], "unitsSet": true },
+
+  "conditionrun": { "title": "조건문 러너",     "url": "14.conditional_statement_run.html", "memo": "", "order": 13, "open": false,
+                    "units": ["g2s2-3-2"], "unitsSet": true }
 }

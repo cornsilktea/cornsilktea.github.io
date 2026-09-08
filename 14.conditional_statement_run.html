@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<script charset="utf-8" src="firebase-config.js"></script>
+<script charset="utf-8" src="access-guard.js" data-game="conditionrun"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>조건문 러너 3D</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#123f42;
+    font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR",system-ui,-apple-system,sans-serif;
+    touch-action:none;overscroll-behavior:none;}
+  #scene{position:fixed;inset:0;width:100%;height:100%;display:block;}
+
+  /* ===== 상단 : 조건문 로그 + HUD ===== */
+  #topbar{position:fixed;top:0;left:0;right:0;z-index:20;
+    padding:calc(env(safe-area-inset-top,0px) + 8px) 8px 0;
+    display:flex;flex-direction:column;gap:6px;pointer-events:none;}
+  #logPanel{background:rgba(255,255,255,0.92);backdrop-filter:blur(4px);border:1px solid #d9dcdf;border-radius:8px;
+    padding:8px 10px;}
+  #logTitle{font-size:11px;color:#7a828a;letter-spacing:.02em;margin-bottom:5px;}
+  #logList{margin:0;padding:0;list-style:none;
+    font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+    font-size:12.5px;line-height:1.55;color:#1f2933;}
+  #logList li{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  #logList li.ok{color:#1f2933;}
+  #logList li.no{color:#b03a2e;}
+  #logList li.empty{color:#a5adb5;}
+  #hud{display:flex;gap:6px;flex-wrap:wrap;}
+  .chip{background:rgba(255,255,255,0.92);backdrop-filter:blur(4px);border:1px solid #d9dcdf;border-radius:6px;
+    padding:5px 9px;font-size:12px;color:#3d454d;}
+  .chip b{font-weight:700;color:#111827;font-variant-numeric:tabular-nums;}
+
+  /* ===== 하단 : 조작 버튼 ===== */
+  #controls{position:fixed;left:0;right:0;bottom:0;z-index:20;
+    padding:8px 8px calc(env(safe-area-inset-bottom,0px) + 8px);
+    display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+  #controls button{appearance:none;background:rgba(255,255,255,0.92);border:1px solid #d9dcdf;
+    border-radius:8px;padding:14px 0;font-size:15px;font-weight:600;color:#1f2933;
+    font-family:inherit;cursor:pointer;user-select:none;}
+  #controls button:active{background:#eef1f3;}
+
+  /* ===== 전체 화면 오버레이 ===== */
+  .screen{position:fixed;inset:0;z-index:40;background:rgba(16,44,47,.72);
+    display:flex;align-items:center;justify-content:center;padding:14px;overflow-y:auto;}
+  .card{background:#fff;border:1px solid #d9dcdf;border-radius:10px;
+    padding:20px;width:100%;max-width:440px;}
+  .card h1{margin:0 0 4px;font-size:21px;color:#111827;letter-spacing:-.01em;}
+  .card h2{margin:0 0 12px;font-size:19px;color:#111827;}
+  .card p{margin:0 0 14px;font-size:13.5px;line-height:1.65;color:#4b535b;}
+  .maptable{width:100%;border-collapse:collapse;margin-bottom:14px;font-size:13px;}
+  .maptable th,.maptable td{border:1px solid #e3e6e9;padding:8px 9px;text-align:left;color:#28303a;}
+  .maptable th{background:#f6f7f8;font-weight:600;color:#4b535b;font-size:12px;}
+  .sw{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:7px;
+    vertical-align:-1px;border:1px solid rgba(0,0,0,.14);}
+  .bigbtn{display:block;width:100%;appearance:none;background:#1f2933;color:#fff;
+    border:1px solid #1f2933;border-radius:8px;padding:15px 0;font-size:16px;font-weight:700;
+    font-family:inherit;cursor:pointer;}
+  .bigbtn:active{background:#333d47;}
+  
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
+  .stat{border:1px solid #e3e6e9;border-radius:8px;padding:10px 11px;}
+  .stat span{display:block;font-size:11.5px;color:#7a828a;margin-bottom:3px;}
+  .stat b{font-size:20px;color:#111827;font-weight:700;font-variant-numeric:tabular-nums;}
+  
+  #fullLog{max-height:190px;overflow-y:auto;border:1px solid #e3e6e9;border-radius:8px;
+    padding:9px 11px;margin-bottom:12px;
+    font-family:"SFMono-Regular",Consolas,Menlo,monospace;font-size:11.5px;line-height:1.6;
+    color:#28303a;-webkit-overflow-scrolling:touch;}
+  #fullLog div.no{color:#b03a2e;}
+  .hide{display:none !important;}
+  @media (max-height:620px){
+    #logList{font-size:11.5px;line-height:1.45;}
+    #controls button{padding:11px 0;font-size:14px;}
+    .card{padding:16px;}
+  }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<div id="topbar">
+  <div id="logPanel">
+    <div id="logTitle">조건문 실행 로그</div>
+    <ul id="logList"><li class="empty">// 장애물을 판정하면 여기에 기록됩니다</li></ul>
+  </div>
+  <div id="hud">
+    <div class="chip">스테이지 <b id="hStage">0</b> / 100</div>
+    <div class="chip">최고 기록 <b id="hBest">0</b></div>
+  </div>
+</div>
+
+<div id="controls">
+  <button id="bLeft" type="button">◀ 이동</button>
+  <button id="bJump" type="button">▲ 점프</button>
+  <button id="bSlide" type="button">▼ 숙이기</button>
+  <button id="bRight" type="button">이동 ▶</button>
+</div>
+
+<div class="screen" id="startScreen">
+  <div class="card">
+    <h1>조건문 러너 3D</h1>
+    <p>다가오는 <b>장애물의 종류가 조건</b>이고, 내가 누르는 <b>행동이 실행</b>입니다.
+       조건을 보고 알맞은 실행을 골라 <code>if(조건) 실행();</code> 구조를 익혀 봅시다.</p>
+    <table class="maptable">
+      <thead><tr><th>조건 (장애물)</th><th>실행 (행동)</th></tr></thead>
+      <tbody>
+        <tr><td><span class="sw" style="background:#a9743c"></span>바닥의 통나무</td><td>점프 (▲ / W / 스페이스)</td></tr>
+        <tr><td><span class="sw" style="background:#c2543f"></span>공중의 낮은 천장</td><td>숙이기 (▼ / S)</td></tr>
+        <tr><td><span class="sw" style="background:#5c7f8c"></span>차선을 막는 벽</td><td>차선 이동 (◀ ▶ / A D)</td></tr>
+      </tbody>
+    </table>
+    <p>총 <b>100개</b>의 장애물을 통과하면 완주입니다.<br>
+       조작은 화면 스와이프, 하단 버튼, 방향키(WASD) 모두 가능합니다.</p>
+    <button class="bigbtn" id="startBtn" type="button">시작하기 (Space)</button>
+  </div>
+</div>
+
+<div class="screen hide" id="resultScreen">
+  <div class="card">
+    <h2 id="rTitle">결과</h2>
+    <div class="stats">
+      <div class="stat"><span>도달 스테이지</span><b id="rStage">0</b></div>
+      <div class="stat"><span>최고 기록</span><b id="rBest">0</b></div>
+    </div>
+    <div id="fullLog"></div>
+    <button class="bigbtn" id="againBtn" type="button">다시 하기 (Space)</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  var LANES = [-3.2, 0, 3.2];
+  var TOTAL = 100;
+  var PLAYER_Z = -0.15;
+  var SPAWN_Z = -155;
+  var SEG_LEN = 20;
+  var SEG_COUNT = 12;
+
+  var TIERS = [
+    { speed:30.0, gap:30 },
+    { speed:36.6, gap:26 },
+    { speed:43.3, gap:23 },
+    { speed:50.0, gap:20 },
+    { speed:56.6, gap:18 },
+    { speed:63.3, gap:16 },
+    { speed:70.0, gap:14 }
+  ];
+  function tierOf(n){
+    if (n >= 69) return 6;
+    var t = Math.floor(n / 11.5);
+    if (t < 0) t = 0;
+    if (t > 6) t = 6;
+    return t;
+  }
+
+  var COND_NAME = { log:"통나무", ceil:"낮은천장", wall:"벽", wall2:"벽(2개)" };
+  var NEED_ACT  = { log:"점프",   ceil:"숙이기",   wall:"차선이동", wall2:"차선이동" };
+
+  var bestStage = parseInt(localStorage.getItem("runner_best_stage") || "0", 10);
+  function checkBestStage(current){
+    if (current > bestStage) {
+      bestStage = current;
+      localStorage.setItem("runner_best_stage", bestStage.toString());
+    }
+  }
+
+  var state = {
+    phase:"ready", speed:TIERS[0].speed, targetSpeed:TIERS[0].speed,
+    spawned:0, passed:0, correct:0, tier:0,
+    distSinceSpawn:0, logs:[], maxTier:0
+  };
+  var player = {
+    lane:1, x:0, y:0, jumping:false, sliding:false,
+    tAct:0, durAct:0, jumpH:2.45, animTime:0
+  };
+  
+  var isSlidePressed = false;
+
+  var $ = function(id){ return document.getElementById(id); };
+  var elLogList=$("logList"), elStage=$("hStage"), elBest=$("hBest"),
+      elStart=$("startScreen"), elResult=$("resultScreen"), elTop=$("topbar"),
+      elCtrl=$("controls");
+
+  var scene, camera, renderer, clock, roadSegs=[], obstacles=[], pool=[], playerObj;
+  var dirLight, mainSun, waterMesh;
+
+  function makeMat(hex, rough){
+    return new THREE.MeshStandardMaterial({ color:hex, roughness:(rough===undefined?0.95:rough), metalness:0.0, flatShading:true });
+  }
+
+  var MAT = {
+    road:       makeMat(0x8b8172),
+    curb:       makeMat(0x6a6153),
+    line:       makeMat(0x6f665a),
+    ground:     makeMat(0x407c49), // 지형 풀밭
+    grassTuft:  makeMat(0x57a660), // 풀 다발
+    flowerRed:  makeMat(0xe53e3e), // 꽃
+    flowerYel:  makeMat(0xeab308),
+    water:      makeMat(0x143f45, 0.4),
+    // 나무 관련 재질
+    treeTrunk:  makeMat(0x4a2e18),
+    treeLeaf1:  makeMat(0x1e5e3a),
+    treeLeaf2:  makeMat(0x277c4d),
+    treeLeaf3:  makeMat(0x329860),
+    // 기둥/가로등 관련 재질
+    pillarMetal:makeMat(0x334155, 0.2),
+    pillarDark: makeMat(0x1e293b, 0.1),
+    lampGlow:   new THREE.MeshBasicMaterial({ color:0xffea9f }),
+    // 장애물 재질
+    logBark:    makeMat(0x633d1f),
+    logCore:    makeMat(0xb5804c),
+    logRing:    makeMat(0x2d3748, 0.3),
+    leaf:       makeMat(0x2f855a),
+    metal:      makeMat(0x4a5568, 0.3),
+    warning:    makeMat(0xdd6b20),
+    signYellow: makeMat(0xd69e2e),
+    signBlack:  makeMat(0x1a202c),
+    wallBase:   makeMat(0x2d3748),
+    wallStripe: makeMat(0xe53e3e),
+    // 캐릭터 재질
+    skin:       makeMat(0xffd5b2),
+    hair:       makeMat(0x3d2314),
+    shirt:      makeMat(0x3b82f6),
+    pants:      makeMat(0x1e293b),
+    shoe:       makeMat(0xf8fafc),
+    eye:        makeMat(0x0f172a)
+  };
+
+  var GEO = {
+    road:   new THREE.BoxGeometry(10.4, 0.6, SEG_LEN),
+    curb:   new THREE.BoxGeometry(0.7, 0.9, SEG_LEN),
+    line:   new THREE.BoxGeometry(0.11, 0.06, SEG_LEN),
+    ground: new THREE.BoxGeometry(60, 0.55, SEG_LEN) // 양옆 끝까지 비지 않도록 폭을 60으로 크게 확장
+  };
+
+  /* ================= 주변 환경 오브젝트 생성 ================= */
+  function buildGrassTuft(){
+    var tg = new THREE.Group();
+    for(var i=0; i<3; i++){
+      var blade = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.5 + Math.random()*0.3, 4), MAT.grassTuft);
+      blade.position.set((Math.random()-0.5)*0.3, 0.25, (Math.random()-0.5)*0.3);
+      blade.rotation.z = (Math.random()-0.5)*0.3;
+      tg.add(blade);
+    }
+    return tg;
+  }
+
+  function buildFlower(isYellow){
+    var fg = new THREE.Group();
+    var stem = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.3, 4), MAT.grassTuft);
+    stem.position.y = 0.15; fg.add(stem);
+    var petal = new THREE.Mesh(new THREE.DodecahedronGeometry(0.12), isYellow ? MAT.flowerYel : MAT.flowerRed);
+    petal.position.y = 0.32; fg.add(petal);
+    return fg;
+  }
+
+  function buildDetailedTree(){
+    var tg = new THREE.Group();
+    var trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.55, 2.5, 8), MAT.treeTrunk);
+    trunk.position.y = 1.25; tg.add(trunk);
+    
+    var l1 = new THREE.Mesh(new THREE.ConeGeometry(2.2, 2.2, 7), MAT.treeLeaf1);
+    l1.position.y = 2.8; tg.add(l1);
+    var l2 = new THREE.Mesh(new THREE.ConeGeometry(1.7, 1.9, 7), MAT.treeLeaf2);
+    l2.position.y = 3.9; tg.add(l2);
+    var l3 = new THREE.Mesh(new THREE.ConeGeometry(1.2, 1.5, 7), MAT.treeLeaf3);
+    l3.position.y = 4.8; tg.add(l3);
+    return tg;
+  }
+
+  function buildDetailedPillar(){
+    var pg = new THREE.Group();
+    var base = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.6, 1.2), MAT.pillarDark);
+    base.position.y = 0.3; pg.add(base);
+    var body = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.38, 5.2, 8), MAT.pillarMetal);
+    body.position.y = 2.9; pg.add(body);
+    var cap = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.3, 1.4), MAT.pillarDark);
+    cap.position.y = 5.6; pg.add(cap);
+    var bulb = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.5, 1.0), MAT.lampGlow);
+    bulb.position.y = 5.25; pg.add(bulb);
+    return pg;
+  }
+
+  function initThree(){
+    var canvas = $("scene");
+    renderer = new THREE.WebGLRenderer({ canvas:canvas, antialias:true, powerPreference:"high-performance" });
+    renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xf1a983);
+    scene.fog = new THREE.Fog(0xf1a983, 40, 142);
+
+    camera = new THREE.PerspectiveCamera(62, 1, 0.1, 200);
+    camera.position.set(0, 5.0, 8.4);
+    camera.lookAt(0, 1.6, -12);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    dirLight = new THREE.DirectionalLight(0xffeedd, 0.9);
+    dirLight.position.set(12, 20, 6);
+    scene.add(dirLight);
+
+    var sunGeo = new THREE.SphereGeometry(12, 16, 16);
+    var sunMat = new THREE.MeshBasicMaterial({ color: 0xfff0dd });
+    mainSun = new THREE.Mesh(sunGeo, sunMat);
+    mainSun.position.set(-30, 20, -150);
+    scene.add(mainSun);
+
+    waterMesh = new THREE.Mesh(new THREE.PlaneGeometry(420, 520), MAT.water);
+    waterMesh.rotation.x = -Math.PI / 2;
+    waterMesh.position.set(0, -1.4, -160);
+    scene.add(waterMesh);
+
+    for (var i = 0; i < SEG_COUNT; i++) roadSegs.push(buildSegment(i));
+    playerObj = buildPlayer();
+    scene.add(playerObj);
+
+    clock = new THREE.Clock();
+    resize();
+    window.addEventListener("resize", resize);
+  }
+
+  function buildSegment(i){
+    var g = new THREE.Group();
+    var road = new THREE.Mesh(GEO.road, MAT.road); road.position.y = -0.3; g.add(road);
+    var cl = new THREE.Mesh(GEO.curb, MAT.curb); cl.position.set(-5.2, 0.05, 0); g.add(cl);
+    var cr = new THREE.Mesh(GEO.curb, MAT.curb); cr.position.set(5.2, 0.05, 0); g.add(cr);
+    var l1 = new THREE.Mesh(GEO.line, MAT.line); l1.position.set(-1.6, 0.02, 0); g.add(l1);
+    var l2 = new THREE.Mesh(GEO.line, MAT.line); l2.position.set(1.6, 0.02, 0); g.add(l2);
+
+    /* ===== 넓어진 양옆 풀밭 땅 메쉬 (화면 끝까지 꽉 채움) ===== */
+    var groundL = new THREE.Mesh(GEO.ground, MAT.ground);
+    groundL.position.set(-35.2, -0.32, 0); g.add(groundL);
+    var groundR = new THREE.Mesh(GEO.ground, MAT.ground);
+    groundR.position.set(35.2, -0.32, 0); g.add(groundR);
+
+    // 풀 다발 및 꽃을 넓어진 지형에 풍성하게 배치
+    for (var k = 0; k < 6; k++) {
+      var tuftL = buildGrassTuft();
+      tuftL.position.set(-6.5 - Math.random() * 18, 0, (Math.random() - 0.5) * SEG_LEN);
+      g.add(tuftL);
+      var tuftR = buildGrassTuft();
+      tuftR.position.set(6.5 + Math.random() * 18, 0, (Math.random() - 0.5) * SEG_LEN);
+      g.add(tuftR);
+    }
+    if (i % 2 === 0) {
+      var fl = buildFlower(i % 4 === 0);
+      fl.position.set(-7.5 - Math.random() * 10, 0, (Math.random() - 0.5) * 12);
+      g.add(fl);
+      var fr = buildFlower(i % 4 !== 0);
+      fr.position.set(7.5 + Math.random() * 10, 0, (Math.random() - 0.5) * 12);
+      g.add(fr);
+    }
+
+    // 가로등 및 나무 배치
+    if (i % 2 === 0) {
+      var p = buildDetailedPillar();
+      p.position.set(i % 4 === 0 ? -7.8 : 7.8, 0, -3);
+      g.add(p);
+    } else {
+      var t1 = buildDetailedTree(); t1.position.set(-9.2, 0, 2); g.add(t1);
+      var t2 = buildDetailedTree(); t2.position.set(9.2, 0, -6); t2.scale.set(0.85, 0.85, 0.85); g.add(t2);
+      // 넓어진 외부 땅에 추가 나무 배치
+      var t3 = buildDetailedTree(); t3.position.set(-18.5, 0, -4); t3.scale.set(1.1, 1.1, 1.1); g.add(t3);
+      var t4 = buildDetailedTree(); t4.position.set(17.5, 0, 3); t4.scale.set(0.9, 0.9, 0.9); g.add(t4);
+    }
+    g.position.z = 30 - i * SEG_LEN;
+    scene.add(g);
+    return g;
+  }
+
+  function buildPlayer(){
+    var root = new THREE.Group();
+    var headGroup = new THREE.Group(); headGroup.position.y = 1.75;
+    var head = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.55, 0.55), MAT.skin); headGroup.add(head);
+    var hair = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.22, 0.6), MAT.hair); hair.position.y = 0.22; headGroup.add(hair);
+    var eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 0.05), MAT.eye); eyeL.position.set(-0.14, 0.02, -0.28);
+    var eyeR = eyeL.clone(); eyeR.position.x = 0.14;
+    headGroup.add(eyeL); headGroup.add(eyeR); root.add(headGroup);
+
+    var bodyGroup = new THREE.Group(); bodyGroup.position.y = 1.05;
+    var torso = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.75, 0.4), MAT.shirt); bodyGroup.add(torso); root.add(bodyGroup);
+
+    function buildArm(){
+      var armGroup = new THREE.Group();
+      var sleeve = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.3, 0.22), MAT.shirt); sleeve.position.y = -0.15; armGroup.add(sleeve);
+      var hand = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.4, 0.2), MAT.skin); hand.position.y = -0.45; armGroup.add(hand);
+      return armGroup;
+    }
+    var armL = buildArm(); armL.position.set(-0.43, 1.35, 0); root.add(armL);
+    var armR = buildArm(); armR.position.set(0.43, 1.35, 0); root.add(armR);
+
+    function buildLeg(){
+      var legGroup = new THREE.Group();
+      var pant = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.5, 0.26), MAT.pants); pant.position.y = -0.25; legGroup.add(pant);
+      var shoe = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.2, 0.38), MAT.shoe); shoe.position.set(0, -0.55, -0.05); legGroup.add(shoe);
+      return legGroup;
+    }
+    var legL = buildLeg(); legL.position.set(-0.18, 0.7, 0); root.add(legL);
+    var legR = buildLeg(); legR.position.set(0.18, 0.7, 0); root.add(legR);
+
+    root.userData = { head: headGroup, body: bodyGroup, armL: armL, armR: armR, legL: legL, legR: legR };
+    root.position.set(0, 0, PLAYER_Z);
+    return root;
+  }
+
+  function buildObstacle(type){
+    var g = new THREE.Group();
+    if (type === "log") {
+      var logBody = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.52, 10.4, 12), MAT.logBark);
+      logBody.rotation.z = Math.PI / 2; logBody.position.y = 0.52; g.add(logBody);
+      var endA = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.46, 0.05, 12), MAT.logCore);
+      endA.rotation.z = Math.PI / 2; endA.position.set(-5.21, 0.52, 0); g.add(endA);
+      var endB = endA.clone(); endB.position.x = 5.21; g.add(endB);
+
+      for (var r = -4.2; r <= 4.2; r += 2.8) {
+        var ring = new THREE.Mesh(new THREE.TorusGeometry(0.54, 0.04, 6, 12), MAT.logRing);
+        ring.rotation.y = Math.PI / 2; ring.position.set(r, 0.52, 0); g.add(ring);
+      }
+      var leaf = new THREE.Mesh(new THREE.DodecahedronGeometry(0.4), MAT.leaf);
+      leaf.position.set(1.2, 0.95, 0.2); g.add(leaf);
+    } 
+    else if (type === "ceil") {
+      var bar = new THREE.Mesh(new THREE.BoxGeometry(10.4, 0.5, 0.6), MAT.metal);
+      bar.position.y = 2.6; g.add(bar);
+      var subBar = new THREE.Mesh(new THREE.BoxGeometry(10.4, 0.15, 0.15), MAT.metal);
+      subBar.position.y = 2.15; g.add(subBar);
+
+      var legL = new THREE.Mesh(new THREE.BoxGeometry(0.35, 2.6, 0.5), MAT.metal); legL.position.set(-4.95, 1.3, 0); g.add(legL);
+      var legR = legL.clone(); legR.position.x = 4.95; g.add(legR);
+
+      var sign = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.6, 0.1), MAT.signYellow);
+      sign.position.set(0, 2.6, 0.32); g.add(sign);
+      var signInner = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.4, 0.12), MAT.signBlack);
+      signInner.position.set(0, 2.6, 0.32); g.add(signInner);
+
+      var lightL = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.25, 8), MAT.warning);
+      lightL.position.set(-2.2, 2.9, 0); g.add(lightL);
+      var lightR = lightL.clone(); lightR.position.x = 2.2; g.add(lightR);
+    } 
+    else {
+      function makeSingleWall(){
+        var wg = new THREE.Group();
+        var mainW = new THREE.Mesh(new THREE.BoxGeometry(2.7, 2.8, 0.6), MAT.wallBase);
+        mainW.position.y = 1.4; wg.add(mainW);
+        var frame = new THREE.Mesh(new THREE.BoxGeometry(2.82, 2.92, 0.2), MAT.metal);
+        frame.position.y = 1.4; wg.add(frame);
+
+        for (var s = 0; s < 3; s++) {
+          var stripe = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.25, 0.65), MAT.wallStripe);
+          stripe.position.set(0, 0.7 + s * 0.7, 0); wg.add(stripe);
+        }
+        return wg;
+      }
+      var w1 = makeSingleWall(); g.add(w1);
+      var w2 = makeSingleWall(); g.add(w2);
+      g.userData.w1 = w1; g.userData.w2 = w2;
+    }
+    g.userData.type = type;
+    scene.add(g);
+    return g;
+  }
+
+  function takeFromPool(type){
+    for (var i = 0; i < pool.length; i++) {
+      if (pool[i].userData.type === type) {
+        var o = pool.splice(i, 1)[0];
+        o.visible = true;
+        return o;
+      }
+    }
+    return buildObstacle(type);
+  }
+
+  function pickType(){
+    var r = Math.random();
+    var t = (r < 0.34) ? "log" : ((r < 0.67) ? "ceil" : "wall");
+    var L = obstacles.length;
+    if (L >= 2) {
+      var a = obstacles[L-1].kindBase, b = obstacles[L-2].kindBase;
+      if (a === b && b === t) t = (t === "log") ? "ceil" : (t === "ceil" ? "wall" : "log");
+    }
+    return t;
+  }
+
+  function spawn(){
+    var base = pickType();
+    var passed = state.passed;
+    var type = base, blocked = [], safe = -1;
+
+    if (base === "wall") {
+      var pDouble = (passed >= 45) ? 0.8 : (passed >= 20 ? 0.6 : 0);
+      if (Math.random() < pDouble) {
+        type = "wall2";
+        safe = Math.floor(Math.random() * 3);
+        for (var i = 0; i < 3; i++) if (i !== safe) blocked.push(i);
+      } else {
+        blocked = [Math.floor(Math.random() * 3)];
+        type = "wall";
+      }
+    }
+
+    var g = takeFromPool(base === "wall" ? "wall" : base);
+    if (base === "wall") {
+      var w1 = g.userData.w1, w2 = g.userData.w2;
+      w1.position.x = LANES[blocked[0]];
+      if (blocked.length > 1) { w2.visible = true; w2.position.x = LANES[blocked[1]]; }
+      else { w2.visible = false; }
+    }
+    g.position.set(0, 0, SPAWN_Z);
+    obstacles.push({ mesh:g, type:type, kindBase:base, blocked:blocked, safe:safe, judged:false });
+    state.spawned++;
+  }
+
+  function recycle(rec){ rec.mesh.visible = false; pool.push(rec.mesh); }
+
+  function updateEnvironment(){
+    var progress = Math.min(1.0, Math.max(0.0, state.passed / TOTAL));
+    var skyColor = new THREE.Color();
+    var lightColor = new THREE.Color();
+
+    if (progress <= 0.4) {
+      var p = progress / 0.4;
+      skyColor.lerpColors(new THREE.Color(0xf1a983), new THREE.Color(0x60a5fa), p);
+      lightColor.lerpColors(new THREE.Color(0xffedd5), new THREE.Color(0xffffff), p);
+      mainSun.position.set(-30 + p * 30, 20 + p * 45, -150);
+    } else {
+      var p2 = (progress - 0.4) / 0.6;
+      skyColor.lerpColors(new THREE.Color(0x60a5fa), new THREE.Color(0xbc3908), p2);
+      lightColor.lerpColors(new THREE.Color(0xffffff), new THREE.Color(0xffaa77), p2);
+      mainSun.position.set(0 + p2 * 45, 65 - p2 * 55, -150);
+    }
+
+    scene.background = skyColor;
+    scene.fog.color = skyColor;
+    dirLight.color = lightColor;
+    waterMesh.material.color.copy(skyColor).multiplyScalar(0.6);
+  }
+
+  function act(kind){
+    if (state.phase !== "run") return;
+    if (kind === "left")  { if (player.lane > 0) player.lane--; return; }
+    if (kind === "right") { if (player.lane < 2) player.lane++; return; }
+
+    if (kind === "jump") {
+      player.jumping = true; player.sliding = false; player.tAct = 0;
+      player.durAct = Math.min(0.68, Math.max(0.17, 12.4 / state.speed));
+    } else if (kind === "slide") {
+      player.sliding = true; player.jumping = false; player.y = 0; player.tAct = 0;
+      player.durAct = Math.min(0.62, Math.max(0.16, 11.0 / state.speed));
+    }
+  }
+
+  document.addEventListener("keydown", function(e){
+    var k = e.key;
+    if ((state.phase === "ready" || state.phase === "over") && (k === " " || k === "Spacebar" || k === "Enter")) { 
+      startGame(); 
+      e.preventDefault(); 
+      return; 
+    }
+    if (k === "ArrowLeft" || k === "a" || k === "A") { act("left"); e.preventDefault(); }
+    else if (k === "ArrowRight" || k === "d" || k === "D") { act("right"); e.preventDefault(); }
+    else if (k === "ArrowUp" || k === "w" || k === "W" || k === " " || k === "Spacebar") { act("jump"); e.preventDefault(); }
+    else if (k === "ArrowDown" || k === "s" || k === "S") {
+      if (!isSlidePressed) { isSlidePressed = true; act("slide"); }
+      e.preventDefault(); 
+    }
+  }, { passive:false });
+
+  document.addEventListener("keyup", function(e){
+    var k = e.key;
+    if (k === "ArrowDown" || k === "s" || k === "S") { isSlidePressed = false; player.sliding = false; }
+  });
+
+  var sx = 0, sy = 0, swiping = false;
+  function pStart(x, y){ sx = x; sy = y; swiping = true; }
+  function pEnd(x, y){
+    if (!swiping) return; swiping = false;
+    var dx = x - sx, dy = y - sy, ax = Math.abs(dx), ay = Math.abs(dy);
+    if (ax < 22 && ay < 22) return;
+    if (ax > ay) act(dx > 0 ? "right" : "left");
+    else act(dy > 0 ? "slide" : "jump");
+  }
+  var cv = $("scene");
+  cv.addEventListener("touchstart", function(e){ var t=e.changedTouches[0]; pStart(t.clientX,t.clientY); e.preventDefault(); }, { passive:false });
+  cv.addEventListener("touchend", function(e){ var t=e.changedTouches[0]; pEnd(t.clientX,t.clientY); e.preventDefault(); }, { passive:false });
+  cv.addEventListener("touchmove", function(e){ e.preventDefault(); }, { passive:false });
+  cv.addEventListener("mousedown", function(e){ pStart(e.clientX, e.clientY); });
+  cv.addEventListener("mouseup", function(e){ pEnd(e.clientX, e.clientY); });
+
+  function bindBtn(id, kind){
+    var b = $(id);
+    if (kind === "slide") {
+      var startSlide = function(e){ isSlidePressed = true; act("slide"); e.preventDefault(); };
+      var endSlide = function(e){ isSlidePressed = false; player.sliding = false; e.preventDefault(); };
+      b.addEventListener("touchstart", startSlide, { passive:false });
+      b.addEventListener("touchend", endSlide, { passive:false });
+      b.addEventListener("mousedown", startSlide);
+      b.addEventListener("mouseup", endSlide);
+      b.addEventListener("mouseleave", endSlide);
+    } else {
+      b.addEventListener("touchstart", function(e){ act(kind); e.preventDefault(); }, { passive:false });
+      b.addEventListener("click", function(e){ act(kind); e.preventDefault(); });
+    }
+  }
+  bindBtn("bLeft","left"); bindBtn("bRight","right");
+  bindBtn("bJump","jump"); bindBtn("bSlide","slide");
+
+  function pushLog(text, ok){
+    state.logs.push({ text:text, ok:ok });
+    var items = state.logs.slice(-6), html = "";
+    for (var i = 0; i < items.length; i++) html += '<li class="' + (items[i].ok ? "ok" : "no") + '">' + esc(items[i].text) + "</li>";
+    elLogList.innerHTML = html;
+  }
+  function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+  function judge(rec){
+    rec.judged = true;
+    var cond = COND_NAME[rec.type], need = NEED_ACT[rec.type], ok;
+    if (rec.type === "log") ok = (player.jumping && player.y > 0.75);
+    else if (rec.type === "ceil") ok = player.sliding;
+    else ok = (rec.blocked.indexOf(player.lane) === -1);
+
+    var did = player.jumping ? "점프" : (player.sliding ? "숙이기" : "차선이동");
+    state.passed++;
+    checkBestStage(state.passed);
+    updateEnvironment();
+
+    var line = "if(장애물==" + cond + ") " + need + "() → ";
+    if (ok) { state.correct++; pushLog(line + "성공 ✅", true); } 
+    else { pushLog(line + "실패 ❌ // 실행:" + did, false); }
+    updateHUD();
+
+    if (!ok) { endGame(false); return; }
+    if (state.passed >= TOTAL) endGame(true);
+  }
+
+  function updateHUD(){
+    elStage.textContent = state.passed;
+    elBest.textContent = bestStage;
+  }
+
+  function update(dt){
+    if (state.phase !== "run") return;
+
+    var t = tierOf(state.passed);
+    state.tier = t;
+    state.targetSpeed = TIERS[t].speed;
+    state.speed += (state.targetSpeed - state.speed) * Math.min(1, dt * 3.0);
+
+    var move = state.speed * dt;
+
+    for (var i = 0; i < roadSegs.length; i++) {
+      var s = roadSegs[i];
+      s.position.z += move;
+      if (s.position.z > 40) s.position.z -= SEG_LEN * SEG_COUNT;
+    }
+
+    if (state.spawned < TOTAL) {
+      state.distSinceSpawn += move;
+      var gap = TIERS[tierOf(state.spawned)].gap;
+      if (state.spawned === 0 || state.distSinceSpawn >= gap) {
+        state.distSinceSpawn = 0;
+        spawn();
+      }
+    }
+
+    for (var j = obstacles.length - 1; j >= 0; j--) {
+      var rec = obstacles[j];
+      rec.mesh.position.z += move;
+      if (!rec.judged && rec.mesh.position.z >= PLAYER_Z) judge(rec);
+      if (rec.mesh.position.z > 26) { recycle(rec); obstacles.splice(j, 1); }
+    }
+
+    var tx = LANES[player.lane];
+    player.x += (tx - player.x) * Math.min(1, dt * 14);
+
+    if (player.jumping) {
+      player.tAct += dt;
+      var r = player.tAct / player.durAct;
+      if (r >= 1) { player.jumping = false; player.y = 0; }
+      else player.y = Math.sin(Math.PI * r) * player.jumpH;
+    } else if (player.sliding) {
+      player.tAct += dt;
+      if (player.tAct >= player.durAct) {
+        if (isSlidePressed) {
+          player.tAct = 0;
+          player.durAct = Math.min(0.62, Math.max(0.16, 11.0 / state.speed));
+        } else { player.sliding = false; }
+      }
+    }
+
+    player.animTime += dt * (state.speed * 0.45);
+    var runCycle = Math.sin(player.animTime);
+    var parts = playerObj.userData;
+
+    playerObj.position.x = player.x;
+    playerObj.position.y = player.y;
+    playerObj.rotation.z = (tx - player.x) * 0.09;
+
+    if (player.sliding) {
+      playerObj.rotation.x = 0.85; playerObj.position.y = 0.15;
+      parts.armL.rotation.x = -1.2; parts.armR.rotation.x = -1.2;
+      parts.legL.rotation.x = 1.1; parts.legR.rotation.x = 1.1;
+    } else if (player.jumping) {
+      playerObj.rotation.x = -0.15;
+      parts.armL.rotation.x = -0.9; parts.armR.rotation.x = 0.9;
+      parts.legL.rotation.x = 0.6; parts.legR.rotation.x = -0.6;
+    } else {
+      playerObj.rotation.x = 0;
+      playerObj.position.y = Math.abs(Math.sin(player.animTime * 2)) * 0.12;
+      parts.armL.rotation.x = runCycle * 0.95; parts.armR.rotation.x = -runCycle * 0.95;
+      parts.legL.rotation.x = -runCycle * 1.1; parts.legR.rotation.x = runCycle * 1.1;
+    }
+
+    camera.position.x += (player.x * 0.55 - camera.position.x) * Math.min(1, dt * 6);
+    camera.position.y = 5.0 + player.y * 0.28;
+    camera.lookAt(player.x * 0.6, 1.6 + player.y * 0.3, -12);
+  }
+
+  function loop(){
+    requestAnimationFrame(loop);
+    var dt = Math.min(0.05, clock.getDelta());
+    update(dt);
+    renderer.render(scene, camera);
+  }
+
+  function resize(){
+    var w = window.innerWidth, h = window.innerHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateMatrix();
+  }
+
+  function startGame(){
+    for (var j = obstacles.length - 1; j >= 0; j--) { recycle(obstacles[j]); }
+    obstacles.length = 0;
+
+    state.phase = "run";
+    state.speed = TIERS[0].speed;
+    state.targetSpeed = TIERS[0].speed;
+    state.spawned = 0; state.passed = 0; state.correct = 0;
+    state.tier = 0; state.maxTier = 0; state.distSinceSpawn = 0;
+    state.logs = [];
+
+    player.lane = 1; player.x = 0; player.y = 0;
+    player.jumping = false; player.sliding = false; player.animTime = 0;
+    isSlidePressed = false;
+
+    updateEnvironment();
+    elLogList.innerHTML = '<li class="empty">// 장애물을 판정하면 여기에 기록됩니다</li>';
+    elStart.classList.add("hide");
+    elResult.classList.add("hide");
+    elTop.style.display = "flex";
+    elCtrl.style.display = "grid";
+    updateHUD();
+    clock.getDelta();
+  }
+
+  function endGame(cleared){
+    state.phase = "over";
+    isSlidePressed = false;
+    checkBestStage(state.passed);
+
+    $("rTitle").textContent = cleared ? "완주했습니다" : "게임 종료";
+    $("rStage").textContent = state.passed + " / " + TOTAL;
+    $("rBest").textContent = bestStage + " / " + TOTAL;
+
+    var html = "";
+    for (var i = 0; i < state.logs.length; i++) {
+      html += '<div class="' + (state.logs[i].ok ? "ok" : "no") + '">' +
+              String(i + 1) + ". " + esc(state.logs[i].text) + "</div>";
+    }
+    if (!html) html = '<div class="ok">// 판정 기록이 없습니다</div>';
+    $("fullLog").innerHTML = html;
+    elResult.classList.remove("hide");
+  }
+
+  $("startBtn").addEventListener("click", startGame);
+  $("againBtn").addEventListener("click", startGame);
+
+  function boot(){
+    if (!window.THREE) {
+      document.body.innerHTML =
+        '<div class="screen"><div class="card"><h2>라이브러리를 불러오지 못했습니다</h2>' +
+        '<p>인터넷 연결을 확인한 뒤 페이지를 새로 고쳐 주세요.</p></div></div>';
+      return;
+    }
+    initThree();
+    elTop.style.display = "none";
+    elCtrl.style.display = "none";
+    loop();
+  }
+  boot();
+})();
+</script>
+</body>
+</html>

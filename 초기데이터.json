@@ -122,6 +122,17 @@
           "g1s2-5"
         ],
         "unitsSet": true
+      },
+      "conditionrun": {
+        "title": "조건문 러너",
+        "url": "14.conditional_statement_run.html",
+        "memo": "",
+        "order": 13,
+        "open": true,
+        "units": [
+          "g2s2-3-2"
+        ],
+        "unitsSet": true
       }
     }
   }
