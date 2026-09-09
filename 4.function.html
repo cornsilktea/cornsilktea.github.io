@@ -128,7 +128,7 @@ function cleared(){
 function markClear(i,used){
   var c=cleared();
   if(!c[i] || used<c[i]) c[i]=used;
-  localStorage.setItem('rmz10', JSON.stringify(c));
+  try{ localStorage.setItem('rmz10', JSON.stringify(c)); }catch(e){}
 }
 function renderRecord(){
   var box=document.getElementById('record');

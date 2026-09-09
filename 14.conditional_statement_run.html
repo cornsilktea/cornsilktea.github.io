@@ -161,11 +161,16 @@
   var COND_NAME = { log:"통나무", ceil:"낮은천장", wall:"벽", wall2:"벽(2개)" };
   var NEED_ACT  = { log:"점프",   ceil:"숙이기",   wall:"차선이동", wall2:"차선이동" };
 
-  var bestStage = parseInt(localStorage.getItem("runner_best_stage") || "0", 10);
+  /* 저장소가 차단된 환경(사생활 보호 모드, 일부 학교 태블릿)에서도
+     게임이 멈추지 않도록 localStorage 접근을 모두 감싼다. */
+  var bestStage = 0;
+  try { bestStage = parseInt(localStorage.getItem("runner_best_stage") || "0", 10) || 0; }
+  catch (e) { bestStage = 0; }
+
   function checkBestStage(current){
     if (current > bestStage) {
       bestStage = current;
-      localStorage.setItem("runner_best_stage", bestStage.toString());
+      try { localStorage.setItem("runner_best_stage", bestStage.toString()); } catch (e) {}
     }
   }
 
@@ -231,20 +236,49 @@
     eye:        makeMat(0x0f172a)
   };
 
+  /* ================= 기기 성능 등급 판정 =================
+     터치 기기(모바일/태블릿/전자칠판)는 GPU 픽셀 처리량이 낮으므로
+     픽셀 비율·안티에일리어싱·풀밭 장식 수를 자동으로 낮춘다. */
+  var IS_TOUCH = (navigator.maxTouchPoints || 0) > 0 || "ontouchstart" in window;
+  var CORES = navigator.hardwareConcurrency || 4;
+  var LOW_END = IS_TOUCH && (CORES <= 4 || window.innerWidth * window.innerHeight > 1600 * 900);
+  var QUALITY = {
+    pixelRatio: LOW_END ? 1 : (IS_TOUCH ? 1.35 : Math.min(2, window.devicePixelRatio || 1)),
+    antialias:  !IS_TOUCH,
+    tuftPerSide: LOW_END ? 2 : (IS_TOUCH ? 3 : 6),
+    blades:      LOW_END ? 2 : 3,
+    extraTrees:  !LOW_END,
+    flowers:     !LOW_END
+  };
+
   var GEO = {
     road:   new THREE.BoxGeometry(10.4, 0.6, SEG_LEN),
     curb:   new THREE.BoxGeometry(0.7, 0.9, SEG_LEN),
     line:   new THREE.BoxGeometry(0.11, 0.06, SEG_LEN),
-    ground: new THREE.BoxGeometry(60, 0.55, SEG_LEN) // 양옆 끝까지 비지 않도록 폭을 60으로 크게 확장
+    ground: new THREE.BoxGeometry(60, 0.55, SEG_LEN), // 양옆 끝까지 비지 않도록 폭을 60으로 크게 확장
+
+    // ↓ 아래는 모두 "한 번만 만들어 두고 계속 재사용"하는 공용 지오메트리
+    blade:      new THREE.ConeGeometry(0.15, 0.62, 4),
+    stem:       new THREE.CylinderGeometry(0.03, 0.03, 0.3, 4),
+    petal:      new THREE.DodecahedronGeometry(0.12),
+    treeTrunk:  new THREE.CylinderGeometry(0.35, 0.55, 2.5, 6),
+    treeL1:     new THREE.ConeGeometry(2.2, 2.2, 7),
+    treeL2:     new THREE.ConeGeometry(1.7, 1.9, 7),
+    treeL3:     new THREE.ConeGeometry(1.2, 1.5, 7),
+    pillarBase: new THREE.BoxGeometry(1.2, 0.6, 1.2),
+    pillarBody: new THREE.CylinderGeometry(0.28, 0.38, 5.2, 6),
+    pillarCap:  new THREE.BoxGeometry(1.4, 0.3, 1.4),
+    pillarBulb: new THREE.BoxGeometry(1.0, 0.5, 1.0)
   };
 
   /* ================= 주변 환경 오브젝트 생성 ================= */
   function buildGrassTuft(){
     var tg = new THREE.Group();
-    for(var i=0; i<3; i++){
-      var blade = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.5 + Math.random()*0.3, 4), MAT.grassTuft);
+    for(var i=0; i<QUALITY.blades; i++){
+      var blade = new THREE.Mesh(GEO.blade, MAT.grassTuft);
       blade.position.set((Math.random()-0.5)*0.3, 0.25, (Math.random()-0.5)*0.3);
       blade.rotation.z = (Math.random()-0.5)*0.3;
+      blade.scale.y = 0.8 + Math.random()*0.5;
       tg.add(blade);
     }
     return tg;
@@ -252,44 +286,44 @@
 
   function buildFlower(isYellow){
     var fg = new THREE.Group();
-    var stem = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.3, 4), MAT.grassTuft);
+    var stem = new THREE.Mesh(GEO.stem, MAT.grassTuft);
     stem.position.y = 0.15; fg.add(stem);
-    var petal = new THREE.Mesh(new THREE.DodecahedronGeometry(0.12), isYellow ? MAT.flowerYel : MAT.flowerRed);
+    var petal = new THREE.Mesh(GEO.petal, isYellow ? MAT.flowerYel : MAT.flowerRed);
     petal.position.y = 0.32; fg.add(petal);
     return fg;
   }
 
   function buildDetailedTree(){
     var tg = new THREE.Group();
-    var trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.55, 2.5, 8), MAT.treeTrunk);
+    var trunk = new THREE.Mesh(GEO.treeTrunk, MAT.treeTrunk);
     trunk.position.y = 1.25; tg.add(trunk);
-    
-    var l1 = new THREE.Mesh(new THREE.ConeGeometry(2.2, 2.2, 7), MAT.treeLeaf1);
+
+    var l1 = new THREE.Mesh(GEO.treeL1, MAT.treeLeaf1);
     l1.position.y = 2.8; tg.add(l1);
-    var l2 = new THREE.Mesh(new THREE.ConeGeometry(1.7, 1.9, 7), MAT.treeLeaf2);
+    var l2 = new THREE.Mesh(GEO.treeL2, MAT.treeLeaf2);
     l2.position.y = 3.9; tg.add(l2);
-    var l3 = new THREE.Mesh(new THREE.ConeGeometry(1.2, 1.5, 7), MAT.treeLeaf3);
+    var l3 = new THREE.Mesh(GEO.treeL3, MAT.treeLeaf3);
     l3.position.y = 4.8; tg.add(l3);
     return tg;
   }
 
   function buildDetailedPillar(){
     var pg = new THREE.Group();
-    var base = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.6, 1.2), MAT.pillarDark);
+    var base = new THREE.Mesh(GEO.pillarBase, MAT.pillarDark);
     base.position.y = 0.3; pg.add(base);
-    var body = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.38, 5.2, 8), MAT.pillarMetal);
+    var body = new THREE.Mesh(GEO.pillarBody, MAT.pillarMetal);
     body.position.y = 2.9; pg.add(body);
-    var cap = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.3, 1.4), MAT.pillarDark);
+    var cap = new THREE.Mesh(GEO.pillarCap, MAT.pillarDark);
     cap.position.y = 5.6; pg.add(cap);
-    var bulb = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.5, 1.0), MAT.lampGlow);
+    var bulb = new THREE.Mesh(GEO.pillarBulb, MAT.lampGlow);
     bulb.position.y = 5.25; pg.add(bulb);
     return pg;
   }
 
   function initThree(){
     var canvas = $("scene");
-    renderer = new THREE.WebGLRenderer({ canvas:canvas, antialias:true, powerPreference:"high-performance" });
-    renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    renderer = new THREE.WebGLRenderer({ canvas:canvas, antialias:QUALITY.antialias, powerPreference:"high-performance" });
+    renderer.setPixelRatio(Math.min(QUALITY.pixelRatio, window.devicePixelRatio || 1));
 
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0xf1a983);
@@ -319,6 +353,7 @@
     playerObj = buildPlayer();
     scene.add(playerObj);
 
+    curPR = renderer.getPixelRatio();
     clock = new THREE.Clock();
     resize();
     window.addEventListener("resize", resize);
@@ -339,7 +374,7 @@
     groundR.position.set(35.2, -0.32, 0); g.add(groundR);
 
     // 풀 다발 및 꽃을 넓어진 지형에 풍성하게 배치
-    for (var k = 0; k < 6; k++) {
+    for (var k = 0; k < QUALITY.tuftPerSide; k++) {
       var tuftL = buildGrassTuft();
       tuftL.position.set(-6.5 - Math.random() * 18, 0, (Math.random() - 0.5) * SEG_LEN);
       g.add(tuftL);
@@ -347,7 +382,7 @@
       tuftR.position.set(6.5 + Math.random() * 18, 0, (Math.random() - 0.5) * SEG_LEN);
       g.add(tuftR);
     }
-    if (i % 2 === 0) {
+    if (QUALITY.flowers && i % 2 === 0) {
       var fl = buildFlower(i % 4 === 0);
       fl.position.set(-7.5 - Math.random() * 10, 0, (Math.random() - 0.5) * 12);
       g.add(fl);
@@ -364,9 +399,11 @@
     } else {
       var t1 = buildDetailedTree(); t1.position.set(-9.2, 0, 2); g.add(t1);
       var t2 = buildDetailedTree(); t2.position.set(9.2, 0, -6); t2.scale.set(0.85, 0.85, 0.85); g.add(t2);
-      // 넓어진 외부 땅에 추가 나무 배치
-      var t3 = buildDetailedTree(); t3.position.set(-18.5, 0, -4); t3.scale.set(1.1, 1.1, 1.1); g.add(t3);
-      var t4 = buildDetailedTree(); t4.position.set(17.5, 0, 3); t4.scale.set(0.9, 0.9, 0.9); g.add(t4);
+      // 넓어진 외부 땅에 추가 나무 배치 (저사양 기기에서는 생략)
+      if (QUALITY.extraTrees) {
+        var t3 = buildDetailedTree(); t3.position.set(-18.5, 0, -4); t3.scale.set(1.1, 1.1, 1.1); g.add(t3);
+        var t4 = buildDetailedTree(); t4.position.set(17.5, 0, 3); t4.scale.set(0.9, 0.9, 0.9); g.add(t4);
+      }
     }
     g.position.z = 30 - i * SEG_LEN;
     scene.add(g);
@@ -518,26 +555,29 @@
 
   function recycle(rec){ rec.mesh.visible = false; pool.push(rec.mesh); }
 
+  // 색 객체를 미리 만들어 두고 재사용 (판정마다 새로 만들지 않는다)
+  var C_DAWN=new THREE.Color(0xf1a983), C_NOON=new THREE.Color(0x60a5fa), C_DUSK=new THREE.Color(0xbc3908),
+      C_L1=new THREE.Color(0xffedd5), C_L2=new THREE.Color(0xffffff), C_L3=new THREE.Color(0xffaa77),
+      skyColor=new THREE.Color(), lightColor=new THREE.Color();
+
   function updateEnvironment(){
     var progress = Math.min(1.0, Math.max(0.0, state.passed / TOTAL));
-    var skyColor = new THREE.Color();
-    var lightColor = new THREE.Color();
 
     if (progress <= 0.4) {
       var p = progress / 0.4;
-      skyColor.lerpColors(new THREE.Color(0xf1a983), new THREE.Color(0x60a5fa), p);
-      lightColor.lerpColors(new THREE.Color(0xffedd5), new THREE.Color(0xffffff), p);
+      skyColor.lerpColors(C_DAWN, C_NOON, p);
+      lightColor.lerpColors(C_L1, C_L2, p);
       mainSun.position.set(-30 + p * 30, 20 + p * 45, -150);
     } else {
       var p2 = (progress - 0.4) / 0.6;
-      skyColor.lerpColors(new THREE.Color(0x60a5fa), new THREE.Color(0xbc3908), p2);
-      lightColor.lerpColors(new THREE.Color(0xffffff), new THREE.Color(0xffaa77), p2);
+      skyColor.lerpColors(C_NOON, C_DUSK, p2);
+      lightColor.lerpColors(C_L2, C_L3, p2);
       mainSun.position.set(0 + p2 * 45, 65 - p2 * 55, -150);
     }
 
     scene.background = skyColor;
-    scene.fog.color = skyColor;
-    dirLight.color = lightColor;
+    scene.fog.color.copy(skyColor);
+    dirLight.color.copy(lightColor);
     waterMesh.material.color.copy(skyColor).multiplyScalar(0.6);
   }
 
@@ -722,18 +762,45 @@
     camera.lookAt(player.x * 0.6, 1.6 + player.y * 0.3, -12);
   }
 
+  /* 실제로 프레임이 밀리면 해상도를 한 단계씩 자동으로 낮춘다 */
+  var curPR = 0, slowFrames = 0;
+  function adaptQuality(dt){
+    if (dt > 0.028) slowFrames++; else if (slowFrames > 0) slowFrames--;
+    if (slowFrames > 45 && curPR > 0.75) {
+      curPR = Math.max(0.75, curPR - 0.25);
+      renderer.setPixelRatio(curPR);
+      resize();
+      slowFrames = 0;
+    }
+  }
+
   function loop(){
     requestAnimationFrame(loop);
     var dt = Math.min(0.05, clock.getDelta());
+    adaptQuality(dt);
     update(dt);
     renderer.render(scene, camera);
   }
 
+  /* 가로 화면 대응 : 세로 화각을 그대로 두면 가로 화각이 100도 가까이 벌어져
+     양옆이 심하게 늘어나 보인다. 가로 화각에 상한을 두어 살짝만 넓어지게 한다. */
+  var BASE_FOV = 62;      // 세로 기준 화각
+  var MAX_H_FOV = 84;     // 가로 화각 상한 (도)
+  var MIN_FOV = 46;       // 너무 확대되지 않도록 세로 화각 하한
+
   function resize(){
     var w = window.innerWidth, h = window.innerHeight;
+    var aspect = w / h;
     renderer.setSize(w, h, false);
-    camera.aspect = w / h;
-    camera.updateMatrix();
+    camera.aspect = aspect;
+
+    var fov = BASE_FOV;
+    var halfH = Math.tan(MAX_H_FOV * Math.PI / 360);          // 가로 반각의 tan
+    var limitFov = 2 * Math.atan(halfH / aspect) * 180 / Math.PI;
+    if (limitFov < fov) fov = Math.max(MIN_FOV, limitFov);
+
+    camera.fov = fov;
+    camera.updateProjectionMatrix();
   }
 
   function startGame(){

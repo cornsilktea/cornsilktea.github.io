@@ -1,4 +1,5 @@
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="drawing" data-game-legacy="drowing"></script>
 <title>추상화 놀이터</title>
@@ -949,63 +950,98 @@
   var lastX = 0, lastY = 0;
   var locked = false;
 
+  /* 태블릿·전자칠판은 DPR 이 3까지 올라가 캔버스 픽셀 수가 9배가 된다.
+     2 로 제한해도 눈으로는 차이가 없고 그리기 반응 속도는 크게 좋아진다. */
+  function dprOf(){ return Math.min(2, window.devicePixelRatio || 1); }
+
   function resizeCanvas(){
     var rect = canvas.getBoundingClientRect();
-    var dpr = window.devicePixelRatio || 1;
-    var prevW = canvas.width, prevH = canvas.height;
-    canvas.width = Math.max(1, Math.round(rect.width * dpr));
-    canvas.height = Math.max(1, Math.round(rect.height * dpr));
+    var dpr = dprOf();
+    var nw = Math.max(1, Math.round(rect.width * dpr));
+    var nh = Math.max(1, Math.round(rect.height * dpr));
+    // 크기가 그대로면 아무것도 하지 않는다 (모바일 주소창 여닫힘으로 그림이 지워지는 것 방지)
+    if (nw === canvas.width && nh === canvas.height) { canvasRect = rect; return; }
+    canvas.width = nw;
+    canvas.height = nh;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    canvasRect = rect;
     drawGrid();
   }
 
   function drawGrid(){
-    var w = canvas.width / (window.devicePixelRatio || 1);
-    var h = canvas.height / (window.devicePixelRatio || 1);
+    var dpr = dprOf();
+    var w = canvas.width / dpr;
+    var h = canvas.height / dpr;
     var cssBg = getComputedStyle(document.documentElement).getPropertyValue('--surface').trim();
     var lineColor = getComputedStyle(document.documentElement).getPropertyValue('--line').trim();
     ctx.clearRect(0, 0, w, h);
     ctx.fillStyle = cssBg || '#fff';
     ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = lineColor || '#ccc';
+    /* 점 격자는 작은 타일 하나를 만들어 패턴으로 한 번에 칠한다.
+       예전처럼 점마다 arc() 를 부르면 큰 화면(전자칠판)에서 수천 번 반복된다. */
     var gap = 28;
-    for (var y = gap; y < h; y += gap){
-      for (var x = gap; x < w; x += gap){
-        ctx.beginPath();
-        ctx.arc(x, y, 1.2, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
+    ctx.fillStyle = gridPattern(lineColor || '#ccc', gap, dpr);
+    ctx.fillRect(0, 0, w, h);
   }
 
+  var _patCache = null;
+  function gridPattern(color, gap, dpr){
+    if (_patCache && _patCache.color === color && _patCache.gap === gap && _patCache.dpr === dpr) {
+      return _patCache.pat;
+    }
+    var tile = document.createElement('canvas');
+    tile.width = tile.height = Math.round(gap * dpr);
+    var tc = tile.getContext('2d');
+    tc.setTransform(dpr, 0, 0, dpr, 0, 0);
+    tc.fillStyle = color;
+    tc.beginPath();
+    tc.arc(gap, gap, 1.2, 0, Math.PI * 2);   // 타일 모서리에 찍혀 이어붙으면 격자가 된다
+    tc.fill();
+    var pat = ctx.createPattern(tile, 'repeat');
+    _patCache = { color: color, gap: gap, dpr: dpr, pat: pat };
+    return pat;
+  }
+
+  /* 캔버스 위치는 그리는 중에 바뀌지 않으므로 획을 시작할 때 한 번만 구한다.
+     (매 pointermove 마다 getBoundingClientRect 를 부르면 레이아웃이 다시 계산되어 끊긴다) */
+  var canvasRect = null;
+  function refreshRect(){ canvasRect = canvas.getBoundingClientRect(); }
+
   function getPos(e){
-    var rect = canvas.getBoundingClientRect();
+    if (!canvasRect) refreshRect();
     var clientX = e.clientX, clientY = e.clientY;
     if (e.touches && e.touches[0]){ clientX = e.touches[0].clientX; clientY = e.touches[0].clientY; }
-    return { x: clientX - rect.left, y: clientY - rect.top };
+    return { x: clientX - canvasRect.left, y: clientY - canvasRect.top };
   }
 
   function inkColor(){
     return getComputedStyle(document.documentElement).getPropertyValue('--ink').trim() || '#222';
   }
 
+  var strokeInk = '#222';
+
   canvas.addEventListener('pointerdown', function(e){
     if (locked) { flashBudget(); return; }
     drawing = true;
     canvas.setPointerCapture(e.pointerId);
+    refreshRect();
+    strokeInk = inkColor();   // 색도 획 시작에 한 번만 읽는다
     var p = getPos(e);
     lastX = p.x; lastY = p.y;
-    ctx.beginPath();
-    ctx.moveTo(p.x, p.y);
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.lineWidth = 7;
   });
 
   canvas.addEventListener('pointermove', function(e){
     if (!drawing || locked) return;
     var p = getPos(e);
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    ctx.lineWidth = 7;
-    ctx.strokeStyle = inkColor();
+    /* 이전 점 → 현재 점 구간만 그린다.
+       예전처럼 path 를 계속 이어붙이면 stroke() 마다 획 전체를 다시 그리게 되어
+       선이 길어질수록 급격히 느려진다. */
+    ctx.strokeStyle = strokeInk;
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
     ctx.lineTo(p.x, p.y);
     ctx.stroke();
     lastX = p.x; lastY = p.y;
