@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<!--
+  17.alkkagi.html — 알까기 (단일 HTML 파일)
+
+  목적: 중학생이 쉬는시간·자투리 시간에 태블릿/스마트폰으로 가볍게 즐기는 오락용 알까기.
+  사용법: 이 파일을 브라우저로 열면 바로 실행됩니다. 외부 리소스·라이브러리 없음.
+    - AI 대전: 난이도 하/중/상 선택 → 학생이 흑(아래), AI가 백(위).
+    - 2인 대전: 같은 화면을 마주 보고 두 명이 번갈아 한 번씩 튕깁니다.
+  조작: ① 내 돌을 누르면 그 돌이 선택됩니다(어떤 돌로 때릴지 결정).
+        ② 누른 채로 반대 방향으로 드래그하면 세기 게이지가 차오릅니다(멀리 끌수록 강함).
+        ③ 손을 떼면 게이지만큼 튕겨 나갑니다.
+  규칙: 판 밖으로 나간 돌은 제거되고, 상대 돌을 모두 떨어뜨리면 승리합니다.
+        자기 돌을 떨어뜨려도 그대로 제거되니 세기 조절이 중요합니다.
+-->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>알까기</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: Pretendard, -apple-system, "Segoe UI", "맑은 고딕", sans-serif;
+    background: #f5f6f8; color: #111827;
+    overflow: hidden;
+  }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-height: 56px; padding: 12px 16px;
+    font-family: inherit; font-size: 17px; font-weight: 600;
+    text-align: center; word-break: keep-all; line-height: 1.3;
+    background: #fff; color: #111827;
+    border: 1px solid #d1d5db; border-radius: 10px; cursor: pointer;
+    transition: background .12s, border-color .12s;
+  }
+  .btn:hover { border-color: #2563eb; background: #f8faff; }
+  .btn:active { background: #eff6ff; }
+  .btn.small { min-height: 40px; padding: 8px 14px; font-size: 15px; }
+
+  .screen { display: none; height: 100%; }
+  .screen.on { display: flex; }
+
+  /* ── 시작 화면 ────────────────────────────── */
+  #startScreen {
+    flex-direction: column; align-items: center;
+    overflow-y: auto; padding: 24px 16px 32px;
+  }
+  .start-inner { width: 100%; max-width: 520px; margin: auto; }
+  h1 { font-size: 26px; margin: 0 0 6px; text-align: center; }
+  .sub { font-size: 15px; color: #6b7280; margin: 0 0 22px; text-align: center; line-height: 1.5; }
+  .card {
+    background: #fff; border: 1px solid #d1d5db; border-radius: 12px;
+    padding: 16px; margin: 0 0 14px;
+  }
+  .card h2 { font-size: 17px; margin: 0 0 4px; }
+  .card p { font-size: 14px; color: #6b7280; margin: 0 0 12px; line-height: 1.5; }
+  .row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .help { font-size: 14px; color: #6b7280; line-height: 1.7; margin: 0; padding-left: 18px; }
+
+  /* ── 게임 화면 ────────────────────────────── */
+  #gameScreen { flex-direction: column; }
+  #hud {
+    flex: 0 0 auto; display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; background: #fff; border-bottom: 1px solid #e5e7eb;
+  }
+  #turnDot {
+    width: 22px; height: 22px; border-radius: 50%;
+    border: 1px solid #9ca3af; background: #111827; flex: 0 0 auto;
+  }
+  #turnText { font-size: 16px; font-weight: 700; }
+  #countText { font-size: 14px; color: #6b7280; margin-left: auto; white-space: nowrap; }
+  #hud .btn.small { flex: 0 0 auto; }
+
+  #boardWrap {
+    flex: 1 1 auto; position: relative; display: flex;
+    align-items: center; justify-content: center; padding: 10px;
+    min-height: 0;
+  }
+  canvas { touch-action: none; display: block; border-radius: 12px; }
+
+  #hint {
+    flex: 0 0 auto; text-align: center; font-size: 14px; color: #6b7280;
+    padding: 8px 12px 14px; line-height: 1.5; min-height: 42px;
+  }
+
+  /* ── 결과 오버레이 ────────────────────────── */
+  #overlay {
+    position: fixed; inset: 0; display: none;
+    align-items: center; justify-content: center;
+    background: rgba(17,24,39,.55); padding: 20px;
+  }
+  #overlay.on { display: flex; }
+  .modal {
+    width: 100%; max-width: 340px; background: #fff;
+    border-radius: 14px; padding: 22px 18px; text-align: center;
+  }
+  .modal h2 { font-size: 22px; margin: 0 0 6px; }
+  .modal p { font-size: 15px; color: #6b7280; margin: 0 0 18px; }
+  .modal .btn + .btn { margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<!-- 시작 화면 -->
+<section id="startScreen" class="screen on">
+  <div class="start-inner">
+    <h1>알까기</h1>
+    <p class="sub">돌을 골라 누르고, 끌어당겨 세기를 정한 뒤 손을 떼세요.</p>
+
+    <div class="card">
+      <h2>AI 대전</h2>
+      <p>내가 흑(아래), AI가 백(위)입니다.</p>
+      <div class="row">
+        <button class="btn" data-mode="ai" data-level="1">하</button>
+        <button class="btn" data-mode="ai" data-level="2">중</button>
+        <button class="btn" data-mode="ai" data-level="3">상</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>2인 대전</h2>
+      <p>한 화면을 마주 보고 번갈아 한 번씩 튕깁니다.</p>
+      <button class="btn" data-mode="duo">2인 대전 시작</button>
+    </div>
+
+    <div class="card">
+      <h2>놀이 방법</h2>
+      <ul class="help">
+        <li>내 돌을 누르면 그 돌이 선택됩니다.</li>
+        <li>누른 채 <b>쏘고 싶은 방향의 반대쪽</b>으로 끌면 세기 게이지가 찹니다.</li>
+        <li>손을 떼면 게이지만큼 튕겨 나갑니다.</li>
+        <li>판 밖으로 나간 돌은 제거되고, 상대 돌을 모두 떨어뜨리면 이깁니다.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 게임 화면 -->
+<section id="gameScreen" class="screen">
+  <div id="hud">
+    <span id="turnDot"></span>
+    <span id="turnText">흑 차례</span>
+    <span id="countText">흑 8 : 백 8</span>
+    <button class="btn small" id="restartBtn">다시</button>
+    <button class="btn small" id="homeBtn">처음으로</button>
+  </div>
+  <div id="boardWrap"><canvas id="cv"></canvas></div>
+  <div id="hint">내 돌을 눌러 고르고, 반대쪽으로 끌었다 놓으세요.</div>
+</section>
+
+<!-- 결과 -->
+<div id="overlay">
+  <div class="modal">
+    <h2 id="resultTitle">흑 승리!</h2>
+    <p id="resultText">상대 돌을 모두 떨어뜨렸습니다.</p>
+    <button class="btn" id="againBtn">한 판 더</button>
+    <button class="btn" id="toStartBtn">처음으로</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* ══════════════════════════════════════════════════════
+   상수: 판과 돌은 600x600 논리 좌표에서 계산하고,
+   화면에는 캔버스 크기에 맞춰 비율만 바꿔 그린다.
+   ══════════════════════════════════════════════════════ */
+const W = 600, H = 600;      // 판 크기(논리)
+const R = 21;                // 돌 반지름
+const DT = 1 / 120;          // 물리 한 스텝(초)
+const DAMP = 0.984;          // 스텝마다 남는 속도(마찰)
+const REST = 0.82;           // 충돌 반발(부딪칠수록 힘이 줄어 연쇄가 과하지 않다)
+const STOP = 14;             // 이 속도 아래면 멈춘 것으로 본다(px/s)
+const MAX_DRAG = 190;        // 이만큼 끌면 게이지 100%
+const MIN_DRAG = 12;         // 이보다 짧으면 발사 취소
+const SPD_MIN = 200, SPD_MAX = 820;  // 게이지 0%/100%일 때 속도
+
+const BLACK = 0, WHITE = 1;  // 흑=아래(사람), 백=위
+const SIDE_NAME = ['흑', '백'];
+
+/* ── 상태 ── */
+let stones = [];             // {x,y,vx,vy,side,alive}
+let turn = BLACK;
+let phase = 'aim';           // 'aim' | 'anim' | 'over'
+let mode = 'duo';            // 'ai' | 'duo'
+let aiLevel = 2;
+let selected = null;         // 선택된 돌
+let dragging = false;
+let pointer = { x: 0, y: 0 };
+let puffs = [];              // 판 밖으로 나간 돌의 잔상
+let aiTimer = 0;
+
+/* ── 화면 요소 ── */
+const startScreen = document.getElementById('startScreen');
+const gameScreen  = document.getElementById('gameScreen');
+const overlay     = document.getElementById('overlay');
+const cv  = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const turnDot   = document.getElementById('turnDot');
+const turnText  = document.getElementById('turnText');
+const countText = document.getElementById('countText');
+const hintEl    = document.getElementById('hint');
+
+/* ══════════════════════════════════════════════════════
+   판 만들기
+   ══════════════════════════════════════════════════════ */
+function newGame() {
+  stones = [];
+  const xs = [90, 230, 370, 510];
+  for (const x of xs) {
+    stones.push(mkStone(x, H - 72,  BLACK));
+    stones.push(mkStone(x, H - 150, BLACK));
+    stones.push(mkStone(x, 72,      WHITE));
+    stones.push(mkStone(x, 150,     WHITE));
+  }
+  turn = BLACK;
+  phase = 'aim';
+  selected = null;
+  dragging = false;
+  puffs = [];
+  overlay.classList.remove('on');
+  updateHud();
+  setHint('내 돌을 눌러 고르고, 반대쪽으로 끌었다 놓으세요.');
+}
+function mkStone(x, y, side) {
+  return { x, y, vx: 0, vy: 0, side, alive: true };
+}
+
+/* ══════════════════════════════════════════════════════
+   물리: 한 스텝 진행(이동 → 마찰 → 충돌 → 판 밖 판정)
+   AI가 미리 굴려 볼 때도 같은 함수를 쓴다.
+   ══════════════════════════════════════════════════════ */
+function step(list, onDrop) {
+  for (const s of list) {
+    if (!s.alive) continue;
+    s.x += s.vx * DT;
+    s.y += s.vy * DT;
+    s.vx *= DAMP;
+    s.vy *= DAMP;
+    if (Math.hypot(s.vx, s.vy) < STOP) { s.vx = 0; s.vy = 0; }
+  }
+  // 돌끼리 충돌 (질량이 같은 탄성 충돌)
+  for (let i = 0; i < list.length; i++) {
+    const a = list[i];
+    if (!a.alive) continue;
+    for (let j = i + 1; j < list.length; j++) {
+      const b = list[j];
+      if (!b.alive) continue;
+      let dx = b.x - a.x, dy = b.y - a.y;
+      let d = Math.hypot(dx, dy);
+      if (d === 0) { dx = 0.01; dy = 0; d = 0.01; }
+      if (d >= R * 2) continue;
+      const nx = dx / d, ny = dy / d;
+      // 겹친 만큼 서로 밀어낸다
+      const push = (R * 2 - d) / 2;
+      a.x -= nx * push; a.y -= ny * push;
+      b.x += nx * push; b.y += ny * push;
+      // 법선 방향 속도 주고받기
+      const rel = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+      if (rel > 0) continue;
+      const imp = -(1 + REST) * rel / 2;
+      a.vx -= imp * nx; a.vy -= imp * ny;
+      b.vx += imp * nx; b.vy += imp * ny;
+    }
+  }
+  // 판 밖으로 중심이 나가면 떨어진 것
+  for (const s of list) {
+    if (!s.alive) continue;
+    if (s.x < 0 || s.x > W || s.y < 0 || s.y > H) {
+      s.alive = false;
+      if (onDrop) onDrop(s);
+    }
+  }
+}
+function allStopped(list) {
+  return list.every(s => !s.alive || (s.vx === 0 && s.vy === 0));
+}
+function countAlive(list, side) {
+  return list.reduce((n, s) => n + (s.alive && s.side === side ? 1 : 0), 0);
+}
+
+/* ══════════════════════════════════════════════════════
+   발사와 차례 넘기기
+   ══════════════════════════════════════════════════════ */
+function shoot(stone, angle, power) {
+  const spd = SPD_MIN + (SPD_MAX - SPD_MIN) * power;
+  stone.vx = Math.cos(angle) * spd;
+  stone.vy = Math.sin(angle) * spd;
+  phase = 'anim';
+  selected = null;
+  dragging = false;
+  setHint('');
+}
+
+function endTurn() {
+  const myLeft = countAlive(stones, turn);
+  const opLeft = countAlive(stones, 1 - turn);
+  if (opLeft === 0 || myLeft === 0) {
+    // 내 돌까지 다 떨어뜨려 둘 다 비면 상대 승
+    const winner = (opLeft === 0 && myLeft > 0) ? turn : 1 - turn;
+    finish(winner);
+    return;
+  }
+  turn = 1 - turn;
+  phase = 'aim';
+  updateHud();
+  if (mode === 'ai' && turn === WHITE) {
+    aiTimer = 0.6;
+    setHint('AI가 생각하는 중…');
+  } else {
+    setHint('내 돌을 눌러 고르고, 반대쪽으로 끌었다 놓으세요.');
+  }
+}
+
+function finish(winner) {
+  phase = 'over';
+  updateHud();
+  const title = document.getElementById('resultTitle');
+  const text  = document.getElementById('resultText');
+  if (mode === 'ai') {
+    title.textContent = winner === BLACK ? '이겼습니다!' : '졌습니다';
+    text.textContent = winner === BLACK
+      ? 'AI의 돌을 모두 떨어뜨렸습니다.'
+      : '내 돌이 모두 판을 벗어났습니다.';
+  } else {
+    title.textContent = SIDE_NAME[winner] + ' 승리!';
+    text.textContent = '상대 돌이 판에 남지 않았습니다.';
+  }
+  overlay.classList.add('on');
+}
+
+/* ══════════════════════════════════════════════════════
+   AI: 난이도에 따라 후보 수를 늘리고, 실제 물리로
+   미리 굴려 본 뒤 가장 점수가 높은 수를 고른다.
+   ══════════════════════════════════════════════════════ */
+function aiMove() {
+  const mine = stones.filter(s => s.alive && s.side === WHITE);
+  const foes = stones.filter(s => s.alive && s.side === BLACK);
+  if (!mine.length || !foes.length) return;
+
+  if (aiLevel === 1) {                       // 하: 대충 조준
+    const me = mine[(Math.random() * mine.length) | 0];
+    const foe = foes[(Math.random() * foes.length) | 0];
+    const ang = Math.atan2(foe.y - me.y, foe.x - me.x) + (Math.random() - 0.5) * 0.34;
+    shoot(me, ang, 0.45 + Math.random() * 0.5);
+    return;
+  }
+
+  const jitter = aiLevel === 2 ? 0.06 : 0;    // 중은 조준이 조금 흔들린다
+  const powers = aiLevel === 2 ? [0.55, 0.85] : [0.45, 0.7, 0.95];
+  const spread = aiLevel === 2 ? [0] : [-0.05, 0, 0.05];
+  let best = null;
+
+  for (const me of mine) {
+    const idx = stones.indexOf(me);
+    for (const foe of foes) {
+      const base = Math.atan2(foe.y - me.y, foe.x - me.x);
+      for (const off of spread) {
+        for (const p of powers) {
+          const ang = base + off;
+          const sc = simulate(idx, ang, p);
+          if (!best || sc > best.score) best = { score: sc, idx, ang, p };
+        }
+      }
+    }
+  }
+  if (!best) {
+    const me = mine[0], foe = foes[0];
+    shoot(me, Math.atan2(foe.y - me.y, foe.x - me.x), 0.7);
+    return;
+  }
+  shoot(stones[best.idx], best.ang + (Math.random() - 0.5) * jitter * 2, best.p);
+}
+
+// 후보 한 수를 복사본 위에서 끝까지 굴려 보고 점수를 낸다.
+function simulate(idx, angle, power) {
+  const list = stones.map(s => ({ x: s.x, y: s.y, vx: 0, vy: 0, side: s.side, alive: s.alive }));
+  const spd = SPD_MIN + (SPD_MAX - SPD_MIN) * power;
+  list[idx].vx = Math.cos(angle) * spd;
+  list[idx].vy = Math.sin(angle) * spd;
+  let guard = 1200;
+  while (guard-- > 0 && !allStopped(list)) step(list, null);
+
+  const foeLost = countAlive(stones, BLACK) - countAlive(list, BLACK);
+  const myLost  = countAlive(stones, WHITE) - countAlive(list, WHITE);
+  let score = foeLost * 100 - myLost * 130;
+  // 상대 돌을 가장자리로 밀어 두면 다음 수가 편하다
+  for (let i = 0; i < list.length; i++) {
+    if (!list[i].alive || list[i].side !== BLACK) continue;
+    score += (edgeDist(stones[i]) - edgeDist(list[i])) * 0.12;
+  }
+  return score;
+}
+function edgeDist(s) {
+  return Math.min(s.x, W - s.x, s.y, H - s.y);
+}
+
+/* ══════════════════════════════════════════════════════
+   입력: 내 돌을 누르면 선택, 끌면 게이지, 놓으면 발사
+   ══════════════════════════════════════════════════════ */
+function toBoard(ev) {
+  const r = cv.getBoundingClientRect();
+  return {
+    x: (ev.clientX - r.left) / r.width * W,
+    y: (ev.clientY - r.top) / r.height * H
+  };
+}
+function myTurnNow() {
+  if (phase !== 'aim') return false;
+  if (mode === 'ai' && turn === WHITE) return false;
+  return true;
+}
+function stoneAt(p) {
+  for (const s of stones) {
+    if (!s.alive || s.side !== turn) continue;
+    if (Math.hypot(s.x - p.x, s.y - p.y) <= R + 8) return s;
+  }
+  return null;
+}
+
+cv.addEventListener('pointerdown', e => {
+  if (!myTurnNow()) return;
+  cv.setPointerCapture(e.pointerId);
+  pointer = toBoard(e);
+  const hit = stoneAt(pointer);
+  if (hit) {                    // 돌을 눌러 고르고 바로 조준 시작
+    selected = hit;
+    dragging = true;
+  } else if (selected) {        // 이미 고른 돌이 있으면 빈 곳에서도 조준
+    dragging = true;
+  }
+});
+cv.addEventListener('pointermove', e => {
+  if (!dragging) return;
+  pointer = toBoard(e);
+});
+cv.addEventListener('pointerup', e => {
+  if (!dragging || !selected) { dragging = false; return; }
+  pointer = toBoard(e);
+  const dx = selected.x - pointer.x, dy = selected.y - pointer.y;
+  const dist = Math.hypot(dx, dy);
+  dragging = false;
+  if (dist < MIN_DRAG) {        // 너무 짧으면 고르기만 하고 끝
+    setHint('고른 돌을 반대쪽으로 끌어당겼다 놓으세요.');
+    return;
+  }
+  shoot(selected, Math.atan2(dy, dx), Math.min(dist, MAX_DRAG) / MAX_DRAG);
+});
+cv.addEventListener('pointercancel', () => { dragging = false; });
+
+/* ══════════════════════════════════════════════════════
+   그리기
+   ══════════════════════════════════════════════════════ */
+function resize() {
+  const wrap = document.getElementById('boardWrap');
+  const size = Math.max(200, Math.min(wrap.clientWidth, wrap.clientHeight) - 4);
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cv.style.width = size + 'px';
+  cv.style.height = size + 'px';
+  cv.width = Math.round(size * dpr);
+  cv.height = Math.round(size * dpr);
+}
+window.addEventListener('resize', resize);
+
+function draw() {
+  const scale = cv.width / W;
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+
+  // 판
+  const g = ctx.createLinearGradient(0, 0, W, H);
+  g.addColorStop(0, '#e3bd7e');
+  g.addColorStop(1, '#c9974f');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = 'rgba(120,80,30,.35)';
+  ctx.lineWidth = 1;
+  for (let i = 1; i < 10; i++) {
+    const t = i * W / 10;
+    ctx.beginPath(); ctx.moveTo(t, 12); ctx.lineTo(t, H - 12); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(12, t); ctx.lineTo(W - 12, t); ctx.stroke();
+  }
+  ctx.strokeStyle = 'rgba(90,60,20,.8)';
+  ctx.lineWidth = 4;
+  ctx.strokeRect(2, 2, W - 4, H - 4);
+
+  // 떨어진 돌 잔상
+  for (const f of puffs) {
+    ctx.globalAlpha = Math.max(0, f.life);
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, R * (1 + (1 - f.life) * 0.8), 0, Math.PI * 2);
+    ctx.strokeStyle = f.side === BLACK ? '#374151' : '#f3f4f6';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  // 조준선 + 세기 게이지
+  if (selected && dragging) drawAim();
+
+  // 돌
+  for (const s of stones) {
+    if (!s.alive) continue;
+    drawStone(s, s === selected);
+  }
+}
+
+function drawStone(s, sel) {
+  ctx.beginPath();
+  ctx.arc(s.x, s.y + 3, R, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(80,50,10,.25)';
+  ctx.fill();
+
+  const grd = ctx.createRadialGradient(s.x - R * .35, s.y - R * .4, R * .1, s.x, s.y, R);
+  if (s.side === BLACK) { grd.addColorStop(0, '#5b5b5b'); grd.addColorStop(1, '#0d0d0d'); }
+  else                  { grd.addColorStop(0, '#ffffff'); grd.addColorStop(1, '#cfcfcf'); }
+  ctx.beginPath();
+  ctx.arc(s.x, s.y, R, 0, Math.PI * 2);
+  ctx.fillStyle = grd;
+  ctx.fill();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = s.side === BLACK ? '#000' : '#9ca3af';
+  ctx.stroke();
+
+  if (sel) {
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, R + 6, 0, Math.PI * 2);
+    ctx.strokeStyle = '#2563eb';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  }
+}
+
+function drawAim() {
+  const dx = selected.x - pointer.x, dy = selected.y - pointer.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist < 1) return;
+  const power = Math.min(dist, MAX_DRAG) / MAX_DRAG;
+  const ang = Math.atan2(dy, dx);
+  const len = 40 + power * 150;
+  const col = gaugeColor(power);
+
+  // 끌고 있는 쪽(뒤로 당긴 만큼) 점선
+  ctx.save();
+  ctx.setLineDash([6, 6]);
+  ctx.strokeStyle = 'rgba(255,255,255,.8)';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(selected.x, selected.y);
+  ctx.lineTo(selected.x - Math.cos(ang) * Math.min(dist, MAX_DRAG),
+             selected.y - Math.sin(ang) * Math.min(dist, MAX_DRAG));
+  ctx.stroke();
+  ctx.restore();
+
+  // 날아갈 방향 화살표
+  const ex = selected.x + Math.cos(ang) * len;
+  const ey = selected.y + Math.sin(ang) * len;
+  ctx.strokeStyle = col;
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(selected.x, selected.y);
+  ctx.lineTo(ex, ey);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(ex, ey);
+  ctx.lineTo(ex - Math.cos(ang - .4) * 16, ey - Math.sin(ang - .4) * 16);
+  ctx.lineTo(ex - Math.cos(ang + .4) * 16, ey - Math.sin(ang + .4) * 16);
+  ctx.closePath();
+  ctx.fillStyle = col;
+  ctx.fill();
+
+  // 돌 둘레를 도는 세기 게이지
+  ctx.beginPath();
+  ctx.arc(selected.x, selected.y, R + 12, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * power);
+  ctx.strokeStyle = col;
+  ctx.lineWidth = 7;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+  ctx.lineCap = 'butt';
+
+  // 세기 퍼센트
+  ctx.font = 'bold 18px Pretendard, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = 'rgba(0,0,0,.5)';
+  ctx.fillStyle = '#fff';
+  const label = Math.round(power * 100) + '%';
+  const tx = selected.x, ty = selected.y - R - 32;
+  ctx.strokeText(label, tx, ty);
+  ctx.fillText(label, tx, ty);
+}
+function gaugeColor(p) {
+  if (p < 0.4) return '#22c55e';
+  if (p < 0.75) return '#eab308';
+  return '#ef4444';
+}
+
+/* ══════════════════════════════════════════════════════
+   진행 루프
+   ══════════════════════════════════════════════════════ */
+let last = 0, acc = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  if (!last) last = t;
+  const elapsed = Math.min((t - last) / 1000, 0.1);
+  last = t;
+  if (!gameScreen.classList.contains('on')) return;
+
+  if (phase === 'anim') {
+    acc += elapsed;
+    let guard = 600;
+    while (acc >= DT && guard-- > 0) {
+      step(stones, s => puffs.push({ x: s.x, y: s.y, side: s.side, life: 1 }));
+      acc -= DT;
+    }
+    if (allStopped(stones)) { acc = 0; updateHud(); endTurn(); }
+  } else if (phase === 'aim' && mode === 'ai' && turn === WHITE) {
+    aiTimer -= elapsed;
+    if (aiTimer <= 0) aiMove();
+  }
+
+  for (const f of puffs) f.life -= elapsed * 1.6;
+  puffs = puffs.filter(f => f.life > 0);
+  draw();
+}
+requestAnimationFrame(loop);
+
+/* ══════════════════════════════════════════════════════
+   화면 전환·표시
+   ══════════════════════════════════════════════════════ */
+function updateHud() {
+  const b = countAlive(stones, BLACK), w = countAlive(stones, WHITE);
+  countText.textContent = '흑 ' + b + ' : 백 ' + w;
+  turnDot.style.background = turn === BLACK ? '#111827' : '#ffffff';
+  if (phase === 'over') { turnText.textContent = '게임 끝'; return; }
+  if (mode === 'ai') turnText.textContent = (turn === BLACK ? '내 차례' : 'AI 차례');
+  else turnText.textContent = SIDE_NAME[turn] + ' 차례';
+}
+function setHint(t) { hintEl.textContent = t; }
+
+function showGame() {
+  startScreen.classList.remove('on');
+  gameScreen.classList.add('on');
+  resize();
+  newGame();
+}
+function showStart() {
+  overlay.classList.remove('on');
+  gameScreen.classList.remove('on');
+  startScreen.classList.add('on');
+}
+
+document.querySelectorAll('[data-mode]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    mode = btn.dataset.mode;
+    aiLevel = parseInt(btn.dataset.level || '2', 10);
+    showGame();
+  });
+});
+document.getElementById('restartBtn').addEventListener('click', newGame);
+document.getElementById('againBtn').addEventListener('click', newGame);
+document.getElementById('homeBtn').addEventListener('click', showStart);
+document.getElementById('toStartBtn').addEventListener('click', showStart);
+
+resize();
+</script>
+</body>
+</html>

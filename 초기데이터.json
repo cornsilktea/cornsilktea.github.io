@@ -153,6 +153,15 @@
         "open": true,
         "units": [],
         "unitsSet": true
+      },
+      "alkkagi": {
+        "title": "쉬는시간 알까기",
+        "url": "17.alkkagi.html",
+        "memo": "AI 대전(하·중·상) / 2인 대전",
+        "order": 16,
+        "open": true,
+        "units": [],
+        "unitsSet": true
       }
     }
   }
