@@ -192,6 +192,42 @@
     image-rendering:pixelated;
   }
 
+  /* ---------- 선생님 정답 확인 칸 (추상화 놀이터의 peek-box 와 동일) ---------- */
+  .peek-tag{
+    display:inline-block;
+    background:var(--accent-bg); color:var(--accent);
+    font-weight:700; padding:6px 16px; border-radius:999px; font-size:.95rem;
+  }
+  .peek-box{
+    position:fixed; right:20px; bottom:20px;
+    width:230px; min-height:110px;
+    background:var(--surface);
+    border:2px dashed var(--accent);
+    border-radius:var(--radius); box-shadow:var(--shadow);
+    padding:14px;
+    display:flex; align-items:center; justify-content:center; text-align:center;
+    cursor:pointer;
+    -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+    z-index:50;
+  }
+  .peek-box:active{ background:var(--accent-bg); }
+  .peek-box:focus-visible{ outline:3px solid var(--accent-ink); outline-offset:3px; }
+  .peek-box-face{ display:flex; flex-direction:column; align-items:center; gap:8px; }
+  .peek-box-locked{ color:var(--ink-soft); font-weight:600; font-size:.95rem; }
+  .peek-lock{ font-size:1.7rem; }
+  .peek-box .peek-tag{ font-size:.8rem; padding:4px 12px; margin:0; }
+  .peek-box .peek-word{
+    font-family:var(--font-display); font-size:2.5rem; font-weight:700; line-height:1.15;
+  }
+  /* 작은 화면에서는 확인 칸이 버튼을 가리지 않도록 줄이고, 아래쪽 여백을 둡니다. */
+  @media (max-width:900px){
+    .peek-box{ width:150px; min-height:84px; padding:10px; right:12px; bottom:12px; }
+    .peek-box .peek-word{ font-size:1.7rem; }
+    .peek-box-locked{ font-size:.82rem; }
+    .peek-lock{ font-size:1.3rem; }
+    main{ padding-bottom:130px; }
+  }
+
   /* ---------- 정답 공개 화면 ---------- */
   .reveal-word{
     font-family:var(--font-display);
@@ -268,6 +304,7 @@
             <div class="rule-item"><span class="rule-num">2</span><span>가장 먼저 정답을 외친 한 명이 그 단계의 점수를 가져가고 문제는 끝나요.</span></div>
             <div class="rule-item"><span class="rule-num">3</span><span>7단계까지 아무도 못 맞히면 정답을 공개하고 0점으로 다음 문제로 넘어가요.</span></div>
           </div>
+          <p class="lede" style="font-size:1rem;">🔒 선생님은 문제 화면 <b>왼쪽 아래 작은 칸</b>을 길게 누르고 있는 동안에만 정답을 볼 수 있어요. 손을 떼면 바로 가려집니다.</p>
           <div class="row">
             <button class="btn wide" id="btnStart">게임 시작</button>
           </div>
@@ -300,6 +337,18 @@
           <div class="row">
             <button class="btn" id="btnHit">정답 맞힘</button>
             <button class="btn quiet" id="btnNext">다음 단계 공개</button>
+          </div>
+        </div>
+
+        <!-- 선생님만 정답을 확인하는 칸: 누르고 있는 동안에만 보입니다. -->
+        <div class="peek-box" id="peekBox" role="button" tabindex="0" aria-label="길게 눌러 정답 확인하기">
+          <div class="peek-box-face" id="peekLocked">
+            <span class="peek-lock">🔒</span>
+            <span class="peek-box-locked">선생님용 · 길게 눌러 정답 확인</span>
+          </div>
+          <div class="peek-box-face" id="peekRevealed" hidden>
+            <span class="peek-tag">정답</span>
+            <span class="peek-word" id="peekWord">단어</span>
           </div>
         </div>
       </section>
@@ -879,9 +928,32 @@ function startQuestion() {
   current = { item: item, master: buildMaster(item) };
   stage = 0;
   qCount++;
+  $("peekWord").textContent = item.name;
+  hidePeek();
   paintStage();
   showScreen("play");
 }
+
+/* ---------- 선생님 정답 확인 칸 ----------
+   전자칠판에는 학생들도 함께 보고 있으므로, 정답은 화면 왼쪽 아래 작은 칸을
+   누르고 있는 동안에만 보입니다. 손을 떼면 곧바로 다시 가려집니다. */
+function showPeek() { $("peekLocked").hidden = true;  $("peekRevealed").hidden = false; }
+function hidePeek() { $("peekLocked").hidden = false; $("peekRevealed").hidden = true; }
+
+(function wirePeek() {
+  var box = $("peekBox");
+  box.addEventListener("pointerdown", function (e) { e.preventDefault(); showPeek(); });
+  ["pointerup", "pointerleave", "pointercancel"].forEach(function (ev) {
+    box.addEventListener(ev, hidePeek);
+  });
+  box.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+  box.addEventListener("keydown", function (e) {
+    if (e.key === " " || e.key === "Enter") { e.preventDefault(); showPeek(); }
+  });
+  box.addEventListener("keyup", function (e) {
+    if (e.key === " " || e.key === "Enter") { hidePeek(); }
+  });
+})();
 
 $("btnNext").addEventListener("click", function () {
   if (stage < STAGES.length - 1) {
