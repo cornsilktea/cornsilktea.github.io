@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>풍선 타워 디펜스 - 그리디 알고리즘</title>
+<style>
+  :root{
+    --bg:#f4f7fb;
+    --panel:#ffffff;
+    --line:#d7dfea;
+    --text:#22303f;
+    --sub:#5d6c7e;
+    --accent:#3a6ea5;
+    --good:#2e8b57;
+    --bad:#c8443c;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:linear-gradient(180deg,#f7fafd 0%,#eef3f9 100%);
+    color:var(--text);
+    font-family:"Malgun Gothic","맑은 고딕",AppleSDGothicNeo-Regular,"Apple SD Gothic Neo",sans-serif;
+    font-size:15px;
+    line-height:1.45;
+    min-height:100vh;
+  }
+  button{font-family:inherit;font-size:15px;cursor:pointer;}
+
+  .wrap{max-width:1360px;margin:0 auto;padding:10px;}
+
+  /* ===== 상단 상태바 ===== */
+  .topbar{
+    display:flex;flex-wrap:wrap;gap:8px;align-items:stretch;
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:8px;margin-bottom:10px;
+  }
+  .stat{
+    flex:1 1 110px;min-height:44px;
+    border:1px solid var(--line);border-radius:8px;background:#fbfdff;
+    padding:5px 8px;display:flex;flex-direction:column;justify-content:center;
+  }
+  .stat .k{font-size:12px;color:var(--sub);}
+  .stat .v{font-size:18px;font-weight:bold;}
+
+  /* ===== 본문 레이아웃 ===== */
+  .main{display:flex;gap:10px;align-items:flex-start;}
+  .left{flex:1 1 auto;min-width:0;}
+  .right{flex:0 0 320px;display:flex;flex-direction:column;gap:10px;}
+  @media (max-width:900px){
+    .main{flex-direction:column;}
+    .right{flex:1 1 auto;width:100%;}
+    /* 세로 화면: 맵이 화면을 다 차지하지 않도록 높이 제한 */
+    canvas{max-height:54vh;width:auto;max-width:100%;margin:0 auto;}
+  }
+  @media (max-width:640px){
+    .wrap{padding:8px;}
+    .topbar{padding:6px;gap:6px;margin-bottom:8px;}
+    .stat{flex:1 1 88px;padding:4px 6px;}
+    .stat .k{font-size:11px;}
+    .stat .v{font-size:16px;}
+  }
+
+  .board{
+    position:relative;background:var(--panel);border:1px solid var(--line);
+    border-radius:var(--radius);padding:6px;
+  }
+  canvas{display:block;width:100%;height:auto;border-radius:6px;touch-action:manipulation;}
+
+  .overlay-msg{
+    position:absolute;left:50%;top:14px;transform:translateX(-50%);
+    background:rgba(255,255,255,0.94);border:1px solid var(--line);
+    border-radius:8px;padding:6px 14px;font-weight:bold;font-size:15px;
+    pointer-events:none;
+  }
+
+  /* ===== 타워 패널 ===== */
+  .panel{
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:8px;
+  }
+  .panel h2{margin:0 0 6px;font-size:14px;color:var(--sub);font-weight:bold;}
+  .towers{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+  .tw{
+    text-align:left;border:1px solid var(--line);border-radius:8px;background:#fbfdff;
+    padding:6px 7px;min-height:76px;color:var(--text);display:block;
+  }
+  .tw .nm{font-size:14px;font-weight:bold;display:flex;align-items:center;gap:5px;}
+  .tw .dot{width:11px;height:11px;border-radius:3px;display:inline-block;flex:0 0 auto;}
+  .tw .cost{font-size:16px;font-weight:bold;margin-top:1px;}
+  .tw .sp{font-size:11px;color:var(--sub);line-height:1.3;}
+  .tw .eff{font-size:12px;font-weight:bold;color:var(--accent);}
+  .tw[disabled]{opacity:.42;cursor:not-allowed;}
+  .tw.sel{border-color:var(--accent);background:#eaf2fb;box-shadow:0 0 0 2px #cfe0f2 inset;}
+
+  /* ===== 로그 ===== */
+  #logBox{height:150px;overflow-y:auto;font-size:12.5px;line-height:1.5;}
+  .lg{padding:3px 5px;border-bottom:1px dashed #e6ecf3;color:var(--sub);}
+  .lg b{color:var(--text);}
+  .lg.build{background:#f3f9f4;}
+  .lg.save{background:#fdf7ee;}
+
+  .hint{font-size:12px;color:var(--sub);margin-top:6px;}
+
+  /* ===== 시작/결과 화면 ===== */
+  .screen{
+    position:fixed;inset:0;background:rgba(240,245,250,.96);
+    display:flex;align-items:center;justify-content:center;padding:14px;z-index:20;
+    overflow-y:auto;
+  }
+  .card{
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:18px;max-width:520px;width:100%;
+  }
+  .card h1{font-size:21px;margin:0 0 6px;}
+  .card h2{font-size:16px;margin:14px 0 6px;color:var(--sub);}
+  .card p{margin:6px 0;font-size:14px;color:var(--sub);}
+  .card ul{margin:6px 0;padding-left:18px;font-size:13.5px;color:var(--sub);}
+  .card li{margin:3px 0;}
+  input[type=number]{
+    font-size:18px;padding:10px;width:130px;border:1px solid var(--line);
+    border-radius:8px;font-family:inherit;
+  }
+  .btn{
+    min-height:46px;padding:10px 16px;border:1px solid var(--line);
+    background:#fbfdff;border-radius:9px;font-weight:bold;color:var(--text);
+  }
+  .btn:active{background:#eaf2fb;}
+  .btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+  .btnrow .btn{flex:1 1 140px;}
+  table.res{width:100%;border-collapse:collapse;font-size:14px;margin-top:6px;}
+  table.res td{border-bottom:1px solid #eef2f7;padding:7px 4px;}
+  table.res td:last-child{text-align:right;font-weight:bold;}
+  .fb{
+    margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:9px;
+    background:#fbfdff;font-size:14px;
+  }
+  .hidden{display:none !important;}
+</style>
+</head>
+<body>
+
+<!-- ================= 시작 화면 ================= -->
+<div class="screen" id="startScreen">
+  <div class="card">
+    <h1>풍선 타워 디펜스</h1>
+    <p>그리디 알고리즘(탐욕 알고리즘)과 자원 최적화를 체험하는 게임입니다. 20웨이브를 막아내세요.</p>
+    <h2>규칙</h2>
+    <ul>
+      <li>골드는 <b>웨이브가 시작될 때마다</b> 지급됩니다.</li>
+      <li>한 번 지은 타워는 <b>팔거나 옮길 수 없습니다.</b> (되돌릴 수 없는 선택)</li>
+      <li>타워마다 <b>효율(DPS ÷ 비용)</b>이 다릅니다. 지금 싼 타워를 여러 개 지을지, 모아서 상위 타워를 지을지 스스로 판단하세요.</li>
+      <li>보스 풍선은 <b>방어력</b>이 있어 한 발당 데미지에서 방어력만큼 빠집니다. 연사형 타워는 보스에게 매우 약합니다.</li>
+      <li>타워는 <b>최대 26개</b>까지만 지을 수 있습니다. 싼 타워로 칸을 다 채우면 나중에 강한 타워를 놓을 자리가 없습니다.</li>
+    </ul>
+    <h2>학번 입력 (1~27)</h2>
+    <input type="number" id="sid" min="1" max="27" placeholder="학번">
+    <div class="btnrow">
+      <button class="btn" id="startBtn">게임 시작</button>
+    </div>
+    <p id="startErr" style="color:var(--bad);"></p>
+  </div>
+</div>
+
+<!-- ================= 결과 화면 ================= -->
+<div class="screen hidden" id="endScreen">
+  <div class="card">
+    <h1 id="endTitle">결과</h1>
+    <table class="res" id="resTable"></table>
+    <div class="fb" id="feedback"></div>
+    <div class="btnrow">
+      <button class="btn" id="copyBtn">결과 복사하기</button>
+      <button class="btn" id="retryBtn">다시하기</button>
+    </div>
+    <p id="copyMsg"></p>
+  </div>
+</div>
+
+<!-- ================= 게임 화면 ================= -->
+<div class="wrap">
+  <div class="topbar">
+    <div class="stat"><span class="k">웨이브</span><span class="v" id="uiWave">0 / 20</span></div>
+    <div class="stat"><span class="k">목숨</span><span class="v" id="uiLife">15</span></div>
+    <div class="stat"><span class="k">골드</span><span class="v" id="uiGold">0</span></div>
+    <div class="stat"><span class="k">효율 점수</span><span class="v" id="uiScore">0</span></div>
+    <div class="stat"><span class="k">시간</span><span class="v" id="uiTime">0:00</span></div>
+  </div>
+
+  <div class="main">
+    <div class="left">
+      <div class="board">
+        <canvas id="cv"></canvas>
+        <div class="overlay-msg hidden" id="prepMsg"></div>
+      </div>
+      <div class="hint" id="hint">타워 버튼을 고른 뒤 초록 잔디를 누르면 사거리가 보이고, 한 번 더 누르면 설치됩니다. 설치된 타워를 누르면 사거리를 다시 볼 수 있습니다.</div>
+    </div>
+
+    <div class="right">
+      <div class="panel">
+        <h2>타워 구매 (효율 = DPS ÷ 비용) · <span id="uiTowerCount">0/26</span>칸</h2>
+        <div class="towers" id="towerList"></div>
+      </div>
+      <div class="panel">
+        <h2>선택 로그</h2>
+        <div id="logBox"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* =====================================================================
+   ★★★ CONFIG ★★★
+   여기 숫자를 조정하면 전체 플레이타임이 바뀐다.
+   - PREP_TIME  : 웨이브 준비시간(초). 20웨이브 총합에 그대로 더해진다.
+   - TRAVEL     : 풍선이 경로 전체를 지나는 데 걸리는 시간(초).
+                  숫자를 줄이면 웨이브가 빨리 끝나고 전체 플레이타임이 줄어든다.
+   - 타워 cd    : 공격주기(초). 표 기준값의 약 1/2.5로 줄여 템포를 빠르게 했고,
+                  데미지도 함께 줄여 DPS/효율 비율은 스펙표와 동일하게 유지했다.
+   - WAVES[].gold, groups[].n / hp / gap : 웨이브당 물량과 난이도.
+   목표: 준비 2초 + 전투 20초 내외 = 웨이브당 평균 25~28초, 20웨이브 ≈ 9~10분.
+   ===================================================================== */
+var CONFIG = {
+  PREP_TIME: 2.0,       // 웨이브 준비시간(초)
+  START_LIFE: 15,       // 시작 목숨
+  START_GOLD: 80,       // 시작 골드
+  MAX_TOWERS: 26,       // 저사양 기기 보호: 타워 상한
+  MAX_BALLOONS: 60,     // 동시 렌더링 풍선 상한(초과분은 대기)
+  MAX_EFFECTS: 70,      // 이펙트 상한
+  SAVE_LOG_GOLD: 100,   // 이 골드 이상 보유한 채 타워를 안 지으면 '저축 중' 기록
+
+  // 풍선이 경로 전체를 통과하는 시간(초) — 경로 길이와 무관하게 일정
+  TRAVEL: { red:19, blue:15.5, yellow:13, boss:24 }
+};
+
+/* ---- 타워 스펙 ----
+   dps = dmg / cd, eff = dps / cost  (스펙표와 동일)
+   화살 10/0.50, 대포 20/0.40, 레이저 50/0.63, 저격 33.3/0.28,
+   플라즈마 75/0.30, 레일건 120/0.30                                  */
+var TOWERS = [
+  { id:'arrow',  name:'화살타워',    tier:1, cost:20,  dmg:4,   cd:0.40, range:110, color:'#4a8f3c', desc:'기본, 저렴' },
+  { id:'cannon', name:'대포타워',    tier:1, cost:50,  dmg:16,  cd:0.80, range:100, color:'#8a6134', desc:'범위 피해', splash:46, splashRate:0.4 },
+  { id:'laser',  name:'레이저타워',  tier:2, cost:80,  dmg:6,   cd:0.12, range:120, color:'#d13b8f', desc:'초고속 연사 · 최고 효율' },
+  { id:'sniper', name:'저격타워',    tier:2, cost:120, dmg:40,  cd:1.20, range:195, color:'#2f6fae', desc:'긴 사거리 · 보스에 강함' },
+  { id:'plasma', name:'플라즈마타워',tier:3, cost:250, dmg:24,  cd:0.32, range:165, color:'#12a09a', desc:'고성능 · 넓은 사거리' },
+  { id:'rail',   name:'레일건타워',  tier:3, cost:400, dmg:120, cd:1.00, range:215, color:'#5b3fd0', desc:'최고 단일 데미지 · 보스용' }
+];
+TOWERS.forEach(function(t){ t.dps = t.dmg / t.cd; t.eff = t.dps / t.cost; });
+
+/* ---- 풍선 종류 ---- */
+var BTYPE = {
+  red:    { color:'#e2483c', r:12, name:'빨강' },
+  blue:   { color:'#3d7ff2', r:12, name:'파랑' },
+  yellow: { color:'#eeb81f', r:10, name:'노랑' },
+  boss:   { color:'#7b3fbf', r:27, name:'보스' }
+};
+
+/* ---- 웨이브 구성 ----
+   g(type, 개수, 개당 체력, 간격초, 시작지연초)
+   1~6 관대 / 7~14 중간 / 15~20 엄격                                   */
+function g(t,n,hp,gap,start){ return {t:t,n:n,hp:hp,gap:gap,start:start||0}; }
+var WAVES = [
+  /* --- 1~6 관대한 구간: 실수해도 목숨을 거의 잃지 않는다 --- */
+  /* 1 */ { gold:70,  groups:[ g('red',8,40,0.50) ] },
+  /* 2 */ { gold:70,  groups:[ g('red',10,45,0.45) ] },
+  /* 3 */ { gold:75,  groups:[ g('red',8,50,0.45), g('blue',4,65,0.50,4) ] },
+  /* 4 */ { gold:75,  groups:[ g('red',10,60,0.40), g('yellow',6,40,0.35,4.5) ] },
+  /* 5 */ { gold:85,  groups:[ g('red',8,65,0.40), g('blue',5,75,0.45,3.5) ], boss:{hp:650,armor:2,start:1} },
+  /* 6 */ { gold:90,  groups:[ g('red',10,75,0.38), g('yellow',8,50,0.30,4) ] },
+
+  /* --- 7~14 중간 구간: 골드가 빠듯하고 실수가 목숨으로 돌아온다 --- */
+  /* 7 */ { gold:90,  groups:[ g('red',10,90,0.35), g('blue',8,100,0.40,3.5) ] },
+  /* 8 */ { gold:90,  groups:[ g('red',12,95,0.33), g('yellow',10,65,0.28,4) ] },
+  /* 9 */ { gold:100, groups:[ g('blue',12,115,0.35), g('yellow',10,75,0.28,4.5) ] },
+  /*10 */ { gold:105, groups:[ g('red',8,105,0.35), g('blue',6,125,0.40,3) ], boss:{hp:1350,armor:3,start:1} },
+  /*11 */ { gold:115, groups:[ g('blue',12,145,0.32), g('yellow',12,90,0.26,4) ] },
+  /*12 */ { gold:120, groups:[ g('red',12,135,0.30), g('blue',8,160,0.35,4) ] },
+  /*13 */ { gold:130, groups:[ g('yellow',14,105,0.24), g('blue',10,180,0.32,3.5) ] },
+  /*14 */ { gold:135, groups:[ g('red',12,180,0.30), g('yellow',12,115,0.24,4) ] },
+
+  /* --- 15~20 엄격한 구간: 3티어 타워 없이는 버티기 어렵다 --- */
+  /*15 */ { gold:165, groups:[ g('blue',10,200,0.30), g('yellow',10,135,0.24,3.5) ], boss:{hp:2300,armor:5,start:1} },
+  /*16 */ { gold:180, groups:[ g('blue',14,210,0.28), g('yellow',12,160,0.22,4) ] },
+  /*17 */ { gold:195, groups:[ g('red',14,210,0.26), g('blue',10,230,0.30,4) ] },
+  /*18 */ { gold:210, groups:[ g('blue',12,250,0.27), g('yellow',16,170,0.20,3.5) ] },
+  /*19 */ { gold:225, groups:[ g('red',14,250,0.25), g('blue',10,275,0.28,4) ] },
+  /*20 */ { gold:240, groups:[ g('red',8,265,0.28), g('blue',8,275,0.30,3), g('yellow',8,190,0.20,6) ], boss:{hp:3700,armor:7,start:1} }
+];
+var TOTAL_WAVES = WAVES.length;
+
+/* =====================================================================
+   맵 / 경로
+   ===================================================================== */
+var LAND = {
+  w:960, h:640, road:18, cell:46,
+  pts:[[-40,60],[780,60],[780,195],[180,195],[180,330],[820,330],[820,465],[120,465],[120,595],[1000,595]]
+};
+var PORT = {
+  w:620, h:820, road:17, cell:44,
+  pts:[[60,-40],[60,130],[540,130],[540,270],[80,270],[80,410],[540,410],[540,550],[80,550],[80,680],[560,680],[560,870]]
+};
+var MAP = null;
+
+function buildPath(map){
+  var pts = map.pts, segs = [], total = 0;
+  for(var i=0;i<pts.length-1;i++){
+    var a=pts[i], b=pts[i+1];
+    var dx=b[0]-a[0], dy=b[1]-a[1];
+    var len=Math.sqrt(dx*dx+dy*dy);
+    segs.push({x:a[0],y:a[1],dx:dx/len,dy:dy/len,len:len,start:total});
+    total+=len;
+  }
+  map.segs=segs; map.total=total;
+}
+function posAt(d){
+  var s=MAP.segs;
+  for(var i=0;i<s.length;i++){
+    if(d <= s[i].start + s[i].len || i===s.length-1){
+      var k=d-s[i].start;
+      return {x:s[i].x+s[i].dx*k, y:s[i].y+s[i].dy*k};
+    }
+  }
+  return {x:0,y:0};
+}
+// 점에서 경로까지의 최단거리
+function distToPath(px,py){
+  var best=1e9, s=MAP.segs;
+  for(var i=0;i<s.length;i++){
+    var vx=px-s[i].x, vy=py-s[i].y;
+    var t=vx*s[i].dx+vy*s[i].dy;
+    if(t<0)t=0; else if(t>s[i].len)t=s[i].len;
+    var qx=s[i].x+s[i].dx*t-px, qy=s[i].y+s[i].dy*t-py;
+    var d=Math.sqrt(qx*qx+qy*qy);
+    if(d<best)best=d;
+  }
+  return best;
+}
+
+/* =====================================================================
+   게임 상태
+   ===================================================================== */
+var G = null;
+function newGame(sid){
+  return {
+    sid: sid,
+    life: CONFIG.START_LIFE,
+    gold: CONFIG.START_GOLD,
+    wave: 0,
+    state: 'prep',          // prep | battle | over
+    prepLeft: CONFIG.PREP_TIME,
+    towers: [],
+    balloons: [],
+    effects: [],
+    queue: [],              // 스폰 대기열 {time, type, hp, armor}
+    waveTime: 0,
+    startedAt: performance.now(),
+    elapsed: 0,
+    logs: [],
+    score: 0,               // 총 사용 효율 점수 = 구매한 DPS 합
+    goldSpent: 0,
+    tier3: 0,
+    builtThisWave: 0,
+    selected: null,         // 구매 선택된 타워 id
+    pending: null,          // 배치 미리보기 셀 {x,y,ok}
+    inspect: null,          // 클릭해서 사거리 확인 중인 타워
+    inspectT: 0,
+    cleared: false
+  };
+}
+
+/* =====================================================================
+   캔버스
+   ===================================================================== */
+var cv = document.getElementById('cv');
+var ctx = cv.getContext('2d', {alpha:false});
+var DPR = 1;
+
+function setupCanvas(){
+  var portrait = window.innerHeight > window.innerWidth * 1.05;
+  MAP = portrait ? PORT : LAND;
+  buildPath(MAP);
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  cv.width = Math.round(MAP.w * DPR);
+  cv.height = Math.round(MAP.h * DPR);
+  cv.style.aspectRatio = MAP.w + ' / ' + MAP.h;
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+setupCanvas();
+window.addEventListener('resize', function(){
+  var portrait = window.innerHeight > window.innerWidth * 1.05;
+  var want = portrait ? PORT : LAND;
+  if(want === MAP){                    // 방향 그대로면 해상도만 갱신
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    cv.width = Math.round(MAP.w*DPR); cv.height = Math.round(MAP.h*DPR);
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    return;
+  }
+  if(!G || G.state==='over'){ setupCanvas(); drawStatic(); }
+  // 플레이 중 방향 전환은 타워 좌표가 깨지므로 맵을 바꾸지 않는다.
+});
+
+/* 설치 가능한 셀인지 */
+function cellOf(x,y){
+  var c = MAP.cell;
+  var cx = Math.floor(x/c)*c + c/2;
+  var cy = Math.floor(y/c)*c + c/2;
+  return {x:cx, y:cy};
+}
+function cellValid(cx,cy){
+  if(cx < c_(0) || cy < c_(0) || cx > MAP.w-4 || cy > MAP.h-4) return false;
+  if(distToPath(cx,cy) < MAP.road + 15) return false;
+  for(var i=0;i<G.towers.length;i++){
+    if(Math.abs(G.towers[i].x-cx)<2 && Math.abs(G.towers[i].y-cy)<2) return false;
+  }
+  return true;
+}
+function c_(v){ return v + 4; }
+
+/* =====================================================================
+   로그
+   ===================================================================== */
+var logBox = document.getElementById('logBox');
+function addLog(text, kind){
+  G.logs.push({t:text, k:kind||''});
+  if(G.logs.length>60) G.logs.shift();
+  renderLog();
+}
+function renderLog(){
+  var arr = G.logs.slice(-6);
+  var h='';
+  for(var i=arr.length-1;i>=0;i--){
+    h += '<div class="lg '+arr[i].k+'">'+arr[i].t+'</div>';
+  }
+  logBox.innerHTML = h;
+}
+
+/* =====================================================================
+   타워 패널
+   ===================================================================== */
+var towerList = document.getElementById('towerList');
+function buildTowerPanel(){
+  var h='';
+  for(var i=0;i<TOWERS.length;i++){
+    var t=TOWERS[i];
+    h += '<button class="tw" data-id="'+t.id+'">'
+       +   '<span class="nm"><i class="dot" style="background:'+t.color+'"></i>'+t.name+'</span>'
+       +   '<span class="cost">'+t.cost+'G</span>'
+       +   '<div class="sp">'+t.tier+'티어 · 데미지 '+t.dmg+' · 주기 '+t.cd.toFixed(2)+'초<br>DPS '+t.dps.toFixed(1)+' · 사거리 '+t.range+'</div>'
+       +   '<div class="eff">효율 '+t.eff.toFixed(2)+'</div>'
+       + '</button>';
+  }
+  towerList.innerHTML = h;
+  Array.prototype.forEach.call(towerList.querySelectorAll('.tw'), function(b){
+    b.addEventListener('click', function(){
+      if(b.hasAttribute('disabled')) return;
+      var id=b.getAttribute('data-id');
+      G.selected = (G.selected===id) ? null : id;
+      G.pending = null; G.inspect = null;
+      updatePanel();
+    });
+  });
+}
+function updatePanel(){
+  Array.prototype.forEach.call(towerList.querySelectorAll('.tw'), function(b){
+    var t = towerById(b.getAttribute('data-id'));
+    var can = G.gold >= t.cost && G.towers.length < CONFIG.MAX_TOWERS;
+    if(can) b.removeAttribute('disabled'); else b.setAttribute('disabled','');
+    b.classList.toggle('sel', G.selected===t.id);
+  });
+}
+function towerById(id){
+  for(var i=0;i<TOWERS.length;i++) if(TOWERS[i].id===id) return TOWERS[i];
+  return null;
+}
+
+/* =====================================================================
+   입력 (마우스 / 터치)
+   ===================================================================== */
+function canvasPos(e){
+  var r = cv.getBoundingClientRect();
+  var cx = (e.clientX - r.left) / r.width * MAP.w;
+  var cy = (e.clientY - r.top) / r.height * MAP.h;
+  return {x:cx, y:cy};
+}
+cv.addEventListener('pointermove', function(e){
+  if(!G || G.state==='over') return;
+  if(e.pointerType !== 'mouse') return;
+  if(!G.selected){ G.pending=null; return; }
+  var p = canvasPos(e), c = cellOf(p.x,p.y);
+  G.pending = {x:c.x, y:c.y, ok:cellValid(c.x,c.y)};
+});
+cv.addEventListener('pointerleave', function(){ if(G) G.pending=null; });
+
+cv.addEventListener('pointerdown', function(e){
+  if(!G || G.state==='over') return;
+  e.preventDefault();
+  var p = canvasPos(e);
+
+  // 1) 설치된 타워를 눌렀으면 사거리 확인
+  for(var i=0;i<G.towers.length;i++){
+    var tw=G.towers[i];
+    if((tw.x-p.x)*(tw.x-p.x)+(tw.y-p.y)*(tw.y-p.y) < 22*22){
+      G.inspect = tw; G.inspectT = 2.2; G.pending=null;
+      return;
+    }
+  }
+  G.inspect = null;
+
+  if(!G.selected) return;
+  var c = cellOf(p.x,p.y);
+  var ok = cellValid(c.x,c.y);
+
+  // 2) 마우스는 곧바로 설치, 터치는 (미리보기 → 같은 칸 재터치) 설치
+  if(e.pointerType === 'mouse'){
+    if(ok) placeTower(c.x,c.y);
+    else { G.pending={x:c.x,y:c.y,ok:false}; }
+    return;
+  }
+  if(G.pending && Math.abs(G.pending.x-c.x)<2 && Math.abs(G.pending.y-c.y)<2 && G.pending.ok){
+    placeTower(c.x,c.y);
+    G.pending=null;
+  }else{
+    G.pending = {x:c.x, y:c.y, ok:ok};
+  }
+}, {passive:false});
+
+function placeTower(x,y){
+  var spec = towerById(G.selected);
+  if(!spec) return;
+  if(G.gold < spec.cost) return;
+  if(G.towers.length >= CONFIG.MAX_TOWERS) return;
+
+  G.gold -= spec.cost;
+  G.goldSpent += spec.cost;
+  G.score += spec.dps;
+  if(spec.tier===3) G.tier3++;
+  G.builtThisWave++;
+  G.towers.push({x:x, y:y, s:spec, cool:0, flash:0, angle:-Math.PI/2});
+
+  addLog('<b>Wave '+Math.max(1,G.wave)+'</b> | 골드 '+spec.cost+' 사용 → '+spec.name+' 건설 (효율 '+spec.eff.toFixed(2)+')','build');
+  if(G.gold < spec.cost) G.selected=null;
+  updateHUD(); updatePanel();
+}
+
+/* =====================================================================
+   웨이브 진행
+   ===================================================================== */
+function startWave(n){
+  G.wave = n;
+  var w = WAVES[n-1];
+  G.gold += w.gold;
+  G.builtThisWave = 0;
+  G.state = 'prep';
+  G.prepLeft = CONFIG.PREP_TIME;
+  G.waveTime = 0;
+
+  // 스폰 대기열 만들기
+  G.queue = [];
+  for(var i=0;i<w.groups.length;i++){
+    var gr=w.groups[i];
+    for(var k=0;k<gr.n;k++){
+      G.queue.push({time: gr.start + k*gr.gap, type:gr.t, hp:gr.hp, armor:0});
+    }
+  }
+  if(w.boss){
+    G.queue.push({time:w.boss.start, type:'boss', hp:w.boss.hp, armor:w.boss.armor});
+  }
+  G.queue.sort(function(a,b){ return a.time-b.time; });
+
+  var msg = 'Wave '+n+' / '+TOTAL_WAVES+' 준비  (+'+w.gold+'G'+(w.boss? ' · 보스 등장 방어력 '+w.boss.armor : '')+')';
+  showPrep(msg);
+  updateHUD(); updatePanel();
+}
+function endWave(){
+  // 저축 판정 로그
+  if(G.builtThisWave===0 && G.gold >= CONFIG.SAVE_LOG_GOLD){
+    addLog('<b>Wave '+G.wave+'</b> | 골드 '+G.gold+' 보유, 건설 보류 → 저축 중','save');
+  }
+  if(G.wave >= TOTAL_WAVES){ G.cleared = true; gameOver(true); return; }
+  startWave(G.wave+1);
+}
+
+var prepMsg = document.getElementById('prepMsg');
+function showPrep(t){ prepMsg.textContent=t; prepMsg.classList.remove('hidden'); }
+function hidePrep(){ prepMsg.classList.add('hidden'); }   // 사용이 끝난 안내는 화면에서 제거
+
+/* =====================================================================
+   전투 로직
+   ===================================================================== */
+function spawn(item){
+  var bt = BTYPE[item.type];
+  G.balloons.push({
+    type:item.type, d:0, hp:item.hp, max:item.hp,
+    armor:item.armor||0,
+    speed: MAP.total / CONFIG.TRAVEL[item.type],
+    r: bt.r, color: bt.color, x:0, y:0, hit:0
+  });
+}
+function addEffect(e){
+  if(G.effects.length >= CONFIG.MAX_EFFECTS) G.effects.shift();
+  G.effects.push(e);
+}
+
+function damage(b, amount){
+  var real = amount - b.armor;
+  if(real < 1) real = 1;
+  b.hp -= real;
+  b.hit = 0.12;
+}
+
+function update(dt){
+  G.elapsed = (performance.now() - G.startedAt)/1000;
+
+  if(G.state==='prep'){
+    G.prepLeft -= dt;
+    if(G.prepLeft<=0){ G.state='battle'; hidePrep(); }
+  }
+
+  if(G.state==='battle'){
+    G.waveTime += dt;
+    // 스폰
+    while(G.queue.length && G.queue[0].time <= G.waveTime && G.balloons.length < CONFIG.MAX_BALLOONS){
+      spawn(G.queue.shift());
+    }
+    // 풍선 이동
+    for(var i=G.balloons.length-1;i>=0;i--){
+      var b=G.balloons[i];
+      b.d += b.speed*dt;
+      if(b.hit>0) b.hit-=dt;
+      if(b.d >= MAP.total){
+        G.balloons.splice(i,1);
+        G.life--;
+        if(G.life<=0){ gameOver(false); return; }
+        continue;
+      }
+      var p=posAt(b.d); b.x=p.x; b.y=p.y;
+    }
+    // 타워 공격
+    for(var ti=0;ti<G.towers.length;ti++){
+      var tw=G.towers[ti];
+      tw.cool -= dt;
+      if(tw.flash>0) tw.flash -= dt;
+      if(tw.cool>0) continue;
+
+      var target=null, bestD=-1, rr=tw.s.range*tw.s.range;
+      for(var bi=0;bi<G.balloons.length;bi++){
+        var bb=G.balloons[bi];
+        var dx=bb.x-tw.x, dy=bb.y-tw.y;
+        if(dx*dx+dy*dy <= rr && bb.d>bestD){ bestD=bb.d; target=bb; }
+      }
+      if(!target) continue;
+
+      tw.cool = tw.s.cd;
+      tw.flash = Math.min(0.10, tw.s.cd*0.6);
+      tw.angle = Math.atan2(target.y-tw.y, target.x-tw.x);
+      damage(target, tw.s.dmg);
+
+      // 범위 피해(대포)
+      if(tw.s.splash){
+        var sr=tw.s.splash*tw.s.splash;
+        for(var si=0;si<G.balloons.length;si++){
+          var o=G.balloons[si];
+          if(o===target) continue;
+          var ox=o.x-target.x, oy=o.y-target.y;
+          if(ox*ox+oy*oy<=sr) damage(o, tw.s.dmg*tw.s.splashRate);
+        }
+        addEffect({k:'ring', x:target.x, y:target.y, r:tw.s.splash, t:0.22, life:0.22, c:tw.s.color});
+      }else{
+        addEffect({k:'beam', x:tw.x, y:tw.y, x2:target.x, y2:target.y,
+                   t:0.11, life:0.11, c:tw.s.color, w:(tw.s.id==='rail'?4:(tw.s.id==='sniper'?2.5:1.6))});
+      }
+    }
+    // 사망 처리
+    for(var di=G.balloons.length-1;di>=0;di--){
+      if(G.balloons[di].hp<=0){
+        var d=G.balloons[di];
+        addEffect({k:'pop', x:d.x, y:d.y, r:d.r, t:0.18, life:0.18, c:d.color});
+        G.balloons.splice(di,1);
+      }
+    }
+    // 웨이브 종료
+    if(G.queue.length===0 && G.balloons.length===0){ endWave(); }
+  }
+
+  // 이펙트
+  for(var ei=G.effects.length-1;ei>=0;ei--){
+    G.effects[ei].t -= dt;
+    if(G.effects[ei].t<=0) G.effects.splice(ei,1);
+  }
+  if(G.inspectT>0){ G.inspectT-=dt; if(G.inspectT<=0) G.inspect=null; }
+}
+
+/* =====================================================================
+   그리기
+   ===================================================================== */
+function drawMap(){
+  // 잔디
+  ctx.fillStyle='#dff0d3'; ctx.fillRect(0,0,MAP.w,MAP.h);
+  // 배치 가능 칸 힌트(옅은 점)
+  ctx.fillStyle='rgba(255,255,255,0.55)';
+  var c=MAP.cell;
+  for(var y=c/2; y<MAP.h; y+=c){
+    for(var x=c/2; x<MAP.w; x+=c){
+      if(distToPath(x,y) >= MAP.road+15){ ctx.fillRect(x-1.5,y-1.5,3,3); }
+    }
+  }
+  // 길(회색 포장도로)
+  ctx.lineCap='round'; ctx.lineJoin='round';
+  ctx.strokeStyle='#b9bfc6'; ctx.lineWidth=MAP.road*2+8;
+  strokePath();
+  ctx.strokeStyle='#8f979f'; ctx.lineWidth=MAP.road*2;
+  strokePath();
+  ctx.strokeStyle='rgba(255,255,255,0.75)'; ctx.lineWidth=3;
+  ctx.setLineDash([14,14]); strokePath(); ctx.setLineDash([]);
+}
+function strokePath(){
+  var p=MAP.pts;
+  ctx.beginPath(); ctx.moveTo(p[0][0],p[0][1]);
+  for(var i=1;i<p.length;i++) ctx.lineTo(p[i][0],p[i][1]);
+  ctx.stroke();
+}
+function drawTower(tw){
+  var s=tw.s;
+  ctx.fillStyle='rgba(0,0,0,0.10)';
+  ctx.beginPath(); ctx.arc(tw.x, tw.y+2, 15, 0, 6.2832); ctx.fill();
+  ctx.fillStyle='#ffffff';
+  ctx.beginPath(); ctx.arc(tw.x, tw.y, 14, 0, 6.2832); ctx.fill();
+  ctx.fillStyle=s.color;
+  ctx.beginPath(); ctx.arc(tw.x, tw.y, 11, 0, 6.2832); ctx.fill();
+  // 포신
+  ctx.strokeStyle=s.color; ctx.lineWidth = s.tier===3 ? 6 : 4;
+  ctx.beginPath(); ctx.moveTo(tw.x,tw.y);
+  ctx.lineTo(tw.x+Math.cos(tw.angle)*17, tw.y+Math.sin(tw.angle)*17); ctx.stroke();
+  // 티어 표시
+  ctx.fillStyle='#fff'; ctx.font='bold 10px sans-serif';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(String(s.tier), tw.x, tw.y);
+  if(tw.flash>0){
+    ctx.strokeStyle='rgba(255,255,255,0.9)'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(tw.x,tw.y,16,0,6.2832); ctx.stroke();
+  }
+}
+function drawBalloon(b){
+  var r=b.r;
+  ctx.fillStyle = b.hit>0 ? '#ffffff' : b.color;
+  ctx.beginPath(); ctx.ellipse(b.x, b.y, r*0.86, r, 0, 0, 6.2832); ctx.fill();
+  // 매듭
+  ctx.beginPath();
+  ctx.moveTo(b.x-r*0.22, b.y+r*0.92);
+  ctx.lineTo(b.x+r*0.22, b.y+r*0.92);
+  ctx.lineTo(b.x, b.y+r*1.28); ctx.closePath(); ctx.fill();
+  // 하이라이트
+  ctx.fillStyle='rgba(255,255,255,0.45)';
+  ctx.beginPath(); ctx.ellipse(b.x-r*0.30, b.y-r*0.34, r*0.20, r*0.28, -0.5, 0, 6.2832); ctx.fill();
+
+  if(b.type==='boss'){
+    ctx.fillStyle='#fff'; ctx.font='bold 13px sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('방'+b.armor, b.x, b.y);
+  }
+  if(b.hp < b.max){
+    var w = b.type==='boss' ? 54 : 22;
+    var ratio = Math.max(0, b.hp/b.max);
+    ctx.fillStyle='rgba(0,0,0,0.25)';
+    ctx.fillRect(b.x-w/2, b.y-r-9, w, 4);
+    ctx.fillStyle = ratio>0.5 ? '#3fa45b' : (ratio>0.22 ? '#e0a418' : '#d0453c');
+    ctx.fillRect(b.x-w/2, b.y-r-9, w*ratio, 4);
+  }
+}
+function drawEffects(){
+  for(var i=0;i<G.effects.length;i++){
+    var e=G.effects[i], a=e.t/e.life;
+    if(e.k==='beam'){
+      ctx.globalAlpha=a; ctx.strokeStyle=e.c; ctx.lineWidth=e.w;
+      ctx.beginPath(); ctx.moveTo(e.x,e.y); ctx.lineTo(e.x2,e.y2); ctx.stroke();
+    }else if(e.k==='ring'){
+      ctx.globalAlpha=a*0.7; ctx.strokeStyle=e.c; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.arc(e.x,e.y,e.r*(1.15-a*0.35),0,6.2832); ctx.stroke();
+    }else{
+      ctx.globalAlpha=a*0.8; ctx.strokeStyle=e.c; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(e.x,e.y,e.r*(1.9-a),0,6.2832); ctx.stroke();
+    }
+  }
+  ctx.globalAlpha=1;
+}
+function drawRange(x,y,range,ok){
+  ctx.fillStyle = ok ? 'rgba(58,110,165,0.16)' : 'rgba(200,68,60,0.16)';
+  ctx.strokeStyle = ok ? 'rgba(58,110,165,0.75)' : 'rgba(200,68,60,0.8)';
+  ctx.lineWidth=2;
+  ctx.beginPath(); ctx.arc(x,y,range,0,6.2832); ctx.fill(); ctx.stroke();
+}
+
+function draw(){
+  drawMap();
+
+  // 배치 미리보기 (사거리 반투명 원)
+  if(G.selected && G.pending){
+    var sp=towerById(G.selected);
+    drawRange(G.pending.x, G.pending.y, sp.range, G.pending.ok);
+    ctx.fillStyle = G.pending.ok ? 'rgba(58,110,165,0.55)' : 'rgba(200,68,60,0.55)';
+    var c=MAP.cell;
+    ctx.fillRect(G.pending.x-c/2+3, G.pending.y-c/2+3, c-6, c-6);
+  }
+  // 설치 타워 사거리 확인
+  if(G.inspect){ drawRange(G.inspect.x, G.inspect.y, G.inspect.s.range, true); }
+
+  for(var i=0;i<G.towers.length;i++) drawTower(G.towers[i]);
+  drawEffects();
+  for(var j=0;j<G.balloons.length;j++) drawBalloon(G.balloons[j]);
+}
+function drawStatic(){ if(G) draw(); else { drawMap(); } }
+
+/* =====================================================================
+   HUD
+   ===================================================================== */
+var uiWave=document.getElementById('uiWave'), uiLife=document.getElementById('uiLife'),
+    uiGold=document.getElementById('uiGold'), uiScore=document.getElementById('uiScore'),
+    uiTime=document.getElementById('uiTime');
+function fmtTime(s){
+  var m=Math.floor(s/60), r=Math.floor(s%60);
+  return m+':'+(r<10?'0':'')+r;
+}
+function updateHUD(){
+  uiWave.textContent = G.wave+' / '+TOTAL_WAVES;
+  uiLife.textContent = '♥ '+G.life;
+  uiGold.textContent = G.gold+'G';
+  uiScore.textContent = Math.round(G.score);
+  var tc = document.getElementById('uiTowerCount');
+  if(tc) tc.textContent = G.towers.length + '/' + CONFIG.MAX_TOWERS;
+}
+
+/* =====================================================================
+   루프
+   ===================================================================== */
+var last=0, running=false;
+function loop(ts){
+  if(!running) return;
+  var dt=(ts-last)/1000; last=ts;
+  if(dt>0.1) dt=0.1;                 // 탭 전환/저사양 대비
+  update(dt);
+  if(!running) return;
+  draw();
+  updateHUD();
+  uiTime.textContent = fmtTime(G.elapsed);
+  requestAnimationFrame(loop);
+}
+
+/* =====================================================================
+   시작 / 종료
+   ===================================================================== */
+var startScreen=document.getElementById('startScreen');
+var endScreen=document.getElementById('endScreen');
+
+document.getElementById('startBtn').addEventListener('click', function(){
+  var v=parseInt(document.getElementById('sid').value,10);
+  if(!(v>=1 && v<=27)){
+    document.getElementById('startErr').textContent='학번을 1~27 사이로 입력하세요.';
+    return;
+  }
+  document.getElementById('startErr').textContent='';
+  startScreen.classList.add('hidden');
+  begin(v);
+});
+document.getElementById('retryBtn').addEventListener('click', function(){
+  endScreen.classList.add('hidden');
+  startScreen.classList.remove('hidden');
+  document.getElementById('copyMsg').textContent='';
+});
+
+function begin(sid){
+  setupCanvas();
+  G = newGame(sid);
+  buildTowerPanel();
+  renderLog();
+  updateHUD(); updatePanel();
+  addLog('<b>게임 시작</b> | 시작 골드 '+CONFIG.START_GOLD+'G');
+  startWave(1);
+  running=true; last=performance.now();
+  requestAnimationFrame(loop);
+}
+
+var lastResult='';
+function gameOver(cleared){
+  running=false;
+  G.state='over';
+  hidePrep();
+  var t = G.elapsed;
+  var wavesDone = cleared ? TOTAL_WAVES : Math.max(0, G.wave-1);
+  var score = Math.round(G.score);
+  var effPerGold = G.goldSpent>0 ? (G.score/G.goldSpent) : 0;
+
+  document.getElementById('endTitle').textContent =
+    cleared ? '20웨이브 클리어!' : '게임 오버 (Wave '+G.wave+')';
+
+  var rows=[
+    ['학번', G.sid+'번'],
+    ['클리어한 웨이브', wavesDone+' / '+TOTAL_WAVES],
+    ['최종 목숨', Math.max(0,G.life)+' 개'],
+    ['총 사용 효율 점수', score+' (구매한 DPS 합계)'],
+    ['사용한 골드', G.goldSpent+'G'],
+    ['골드당 평균 효율', effPerGold.toFixed(2)],
+    ['저축 후 상위 타워(3티어) 건설', G.tier3+' 개'],
+    ['총 소요시간', fmtTime(t)]
+  ];
+  var h='';
+  for(var i=0;i<rows.length;i++) h+='<tr><td>'+rows[i][0]+'</td><td>'+rows[i][1]+'</td></tr>';
+  document.getElementById('resTable').innerHTML=h;
+
+  document.getElementById('feedback').innerHTML = makeFeedback(cleared, effPerGold);
+
+  lastResult = [G.sid, wavesDone, Math.max(0,G.life), score, G.tier3, fmtTime(t)].join(',');
+  endScreen.classList.remove('hidden');
+}
+
+/* 두 전략(즉시 소비형 vs 저축형)의 결과 차이를 한 줄 데이터 피드백으로 */
+function makeFeedback(cleared, effPerGold){
+  var e = effPerGold.toFixed(2);
+  var head = '골드당 평균 효율 <b>'+e+'</b>, 3티어 타워 <b>'+G.tier3+'개</b> → ';
+  if(G.tier3===0){
+    return head + '매 웨이브 <b>즉시 소비형(그리디)</b> 플레이입니다. 효율 수치는 높게 나오지만, 방어력이 있는 보스에게는 한 발당 데미지가 깎여 실제 피해가 거의 들어가지 않습니다. '
+      + (cleared ? '클리어했지만 후반에 목숨을 많이 잃었을 것입니다.' : '보스 웨이브에서 막힌 것이 그 증거입니다. 다음엔 골드를 모아 3티어를 지어 보세요.');
+  }
+  if(G.tier3>=1 && effPerGold>=0.42){
+    return head + '<b>효율과 저축을 함께 잡은 균형 전략</b>입니다. 평소엔 효율 좋은 레이저타워로 잔챙이를 처리하고, 보스용으로 상위 타워를 모아 지은 선택이 데이터로 드러납니다.'
+      + (cleared ? ' 20웨이브 클리어 성공!' : '');
+  }
+  return head + '<b>저축형</b> 플레이입니다. 골드당 평균 효율은 낮지만 한 발당 데미지가 커서 보스 구간에서 강합니다. '
+    + (cleared ? '저축 전략이 후반을 버티게 해 주었습니다.' : '다만 초반 물량 방어가 얇아 목숨을 잃었습니다. 효율 좋은 저가 타워도 함께 섞어 보세요.');
+}
+
+document.getElementById('copyBtn').addEventListener('click', function(){
+  var msg=document.getElementById('copyMsg');
+  function done(){ msg.textContent='복사되었습니다: '+lastResult; }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(lastResult).then(done, fallback);
+  }else fallback();
+  function fallback(){
+    var ta=document.createElement('textarea');
+    ta.value=lastResult; document.body.appendChild(ta);
+    ta.select();
+    try{ document.execCommand('copy'); done(); }
+    catch(err){ msg.textContent='복사 실패. 직접 적어주세요: '+lastResult; }
+    document.body.removeChild(ta);
+  }
+});
+
+// 시작 전 빈 맵 미리보기
+drawMap();
+</script>
+</body>
+</html>

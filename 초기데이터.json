@@ -162,6 +162,15 @@
         "open": true,
         "units": [],
         "unitsSet": true
+      },
+      "greedytd": {
+        "title": "풍선 타워 디펜스",
+        "url": "18.greedy-tower-defense.html",
+        "memo": "그리디 알고리즘 · 자원 최적화 / 20웨이브 개인전",
+        "order": 17,
+        "open": false,
+        "units": [],
+        "unitsSet": true
       }
     }
   }
