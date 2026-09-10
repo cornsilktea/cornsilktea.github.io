@@ -22,7 +22,7 @@
     --radius:18px;
   }
   *{box-sizing:border-box;}
-  html,body{height:100%;}
+  html{height:100%;}
   body{
     margin:0;
     font-family:-apple-system,BlinkMacSystemFont,"Malgun Gothic","Apple SD Gothic Neo",sans-serif;
@@ -59,7 +59,7 @@
     flex:1;
     display:flex;
     justify-content:center;
-    align-items:center;
+    align-items:flex-start;   /* 화면이 짧을 때 카드 위쪽이 잘리지 않도록 */
     padding:10px 20px 30px;
   }
 
@@ -258,12 +258,12 @@ const ROUNDS = [
     type:'line',
     title:'상반기 월별 평균 기온',
     labels:['1월','2월','3월','4월','5월','6월'],
-    values:[-2,1,7,13,18,23],
+    values:[-2,1,6,13,18,23],
     unit:'℃',
-    question:'평균 기온이 6℃ 이상 오른 구간은?',
+    question:'평균 기온이 가장 많이 오른 구간은?',
     options:['1월→2월','2월→3월','3월→4월','5월→6월'],
     correct:'3월→4월',
-    explain:'3월(7℃)에서 4월(13℃)로 6℃가 올라 정답이에요.'
+    explain:'3월(6℃)에서 4월(13℃)로 7℃가 올랐어요. 나머지 구간은 모두 5℃ 이하로 올랐습니다.'
   },
 ];
 
@@ -372,8 +372,8 @@ document.getElementById('retryBtn').addEventListener('click', init);
 
 // ---- Chart builders (SVG) ----
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const CHART_W = 720, CHART_H = 320;
-const PAD = {top:20, right:24, bottom:44, left:52};
+const CHART_W = 720, CHART_H = 340;
+const PAD = {top:36, right:34, bottom:46, left:56};   /* 위쪽 값 라벨이 잘리지 않도록 여백을 넉넉히 둡니다 */
 
 function el(tag, attrs){
   const e = document.createElementNS(SVG_NS, tag);

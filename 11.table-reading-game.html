@@ -22,7 +22,7 @@
     --radius:18px;
   }
   *{box-sizing:border-box;}
-  html,body{height:100%;}
+  html{height:100%;}
   body{
     margin:0;
     font-family:-apple-system,BlinkMacSystemFont,"Malgun Gothic","Apple SD Gothic Neo",sans-serif;
@@ -59,7 +59,7 @@
     flex:1;
     display:flex;
     justify-content:center;
-    align-items:center;
+    align-items:flex-start;   /* 화면이 짧을 때 카드 위쪽이 잘리지 않도록 */
     padding:10px 20px 30px;
   }
 
@@ -237,19 +237,19 @@ const ROUNDS = [
     explain:'수요일 비빔밥이 6점으로 가장 낮아요.'
   },
   {
-    title:'체육대회 반별 종목 순위 (1등이 가장 높은 점수)',
-    headers:['반','줄다리기','이어달리기','피구'],
+    title:'체육대회 반별 종목 등수 — 표의 숫자는 점수가 아니라 등수입니다 (1등이 가장 잘한 것)',
+    headers:['반','줄다리기(등수)','이어달리기(등수)','피구(등수)'],
     rowHeaderCol:0,
     rows:[
-      ['1반','2','4','3'],
-      ['2반','4','1','2'],
-      ['3반','1','3','4'],
-      ['4반','3','2','1'],
+      ['1반','2등','4등','3등'],
+      ['2반','4등','1등','2등'],
+      ['3반','1등','3등','4등'],
+      ['4반','3등','2등','1등'],
     ],
-    question:'피구에서 가장 높은 순위(1등)를 받은 반은?',
+    question:'피구에서 1등을 한 반은?',
     options:['1반','2반','3반','4반'],
     correct:'4반',
-    explain:'피구 열에서 4반이 1을 기록해 1등이에요.'
+    explain:'피구 열에서 4반이 1등이에요. 이 표의 숫자는 점수가 아니라 등수라서, 숫자가 작을수록 잘한 것입니다.'
   },
   {
     title:'학생별 과목 점수표',

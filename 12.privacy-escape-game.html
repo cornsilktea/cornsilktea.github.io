@@ -22,7 +22,7 @@
     --radius:20px;
   }
   *{box-sizing:border-box;}
-  html,body{height:100%;}
+  html{height:100%;}
   body{
     margin:0;
     font-family:-apple-system,BlinkMacSystemFont,"Malgun Gothic","Apple SD Gothic Neo",sans-serif;
@@ -60,7 +60,7 @@
     flex:1;
     display:flex;
     justify-content:center;
-    align-items:center;
+    align-items:flex-start;   /* 화면이 짧을 때 카드 위쪽이 잘리지 않도록 */
     padding:10px 20px 30px;
   }
 
@@ -81,7 +81,7 @@
 
   #playScreen{
     display:none;
-    width:min(700px,95vw);
+    width:min(1000px,95vw);
     flex-direction:column;
     gap:16px;
   }
@@ -111,10 +111,12 @@
   .handle{font-weight:800;}
   .handle-sub{font-size:0.85rem;color:var(--sub);}
 
+  /* 글이 16개로 늘어나서, 넓은 화면에서는 두 줄로 나눠 한눈에 보이게 합니다. */
   .items{
-    display:flex;
-    flex-direction:column;
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(300px, 1fr));
     gap:10px;
+    align-items:start;
   }
   .item{
     background:#fbfcfe;
@@ -189,8 +191,8 @@
     <div class="desc">가상 SNS 화면 속 위험한 개인정보를 모두 지우고 탈출하세요!</div>
   </div>
   <div class="status">
-    <div class="pill progress" id="progressPill">제거 0 / 6</div>
-    <div class="pill timer" id="timerPill">⏱ 60초</div>
+    <div class="pill progress" id="progressPill">제거 0 / 8</div>
+    <div class="pill timer" id="timerPill">⏱ 80초</div>
   </div>
 </header>
 
@@ -198,10 +200,11 @@
   <div id="introScreen">
     <h2>🕵️ 미션 브리핑</h2>
     <p>
-      아래 SNS 화면에는 12개의 글이 있어요. 이 중 <b>6개는 노출되면 위험한 개인정보</b>이고,
-      나머지 6개는 괜찮은 내용이에요.<br><br>
-      제한시간 60초 안에 <b>위험한 정보만</b> 골라 클릭해서 지워야 탈출할 수 있어요.
-      안전한 글을 잘못 클릭하면 시간이 5초 줄어드니 신중하게 골라보세요!
+      아래 SNS 화면에는 16개의 글이 있어요. 이 중 <b>8개는 노출되면 위험한 개인정보</b>이고,
+      나머지 8개는 괜찮은 내용이에요.<br><br>
+      제한시간 80초 안에 <b>위험한 정보만</b> 골라 클릭해서 지워야 탈출할 수 있어요.
+      안전한 글을 잘못 클릭하면 시간이 5초 줄어드니 신중하게 골라보세요!<br><br>
+      🔀 글은 <b>할 때마다 새로 뽑혀요.</b> 여러 번 도전해도 매번 다른 화면이 나옵니다.
     </p>
     <button class="primary" id="startBtn">탈출 시작하기 →</button>
   </div>
@@ -229,27 +232,70 @@
 </main>
 
 <script>
-const ITEMS = [
-  {text:"OO중학교 2학년 3반 김민준입니다!", risky:true, why:"학교·학년·반·이름이 함께 있으면 누군지 특정하기 쉬워져요."},
-  {text:"제 전화번호는 010-1234-5678이에요, 연락주세요!", risky:true, why:"전화번호는 모르는 사람에게 공개하면 위험해요."},
-  {text:"우리집은 행복빌라 302호예요~", risky:true, why:"집 주소가 공개되면 실제 위치가 노출돼요."},
-  {text:"제 생일은 2012년 3월 5일이에요!", risky:true, why:"생년월일은 각종 인증에 쓰이는 중요한 개인정보예요."},
-  {text:"오늘 학교 끝나고 강남동 어린이공원에서 놀아요!", risky:true, why:"실시간 위치와 일정을 알리면 낯선 사람이 찾아올 수 있어요."},
-  {text:"우리 엄마는 OO병원에서 간호사로 일하셔요", risky:true, why:"가족의 직장 정보도 나와 가족을 특정하는 단서가 될 수 있어요."},
-  {text:"제 취미는 그림 그리기예요! 🎨", risky:false, why:""},
-  {text:"오늘 급식 진짜 맛있었다ㅎㅎ", risky:false, why:""},
-  {text:"저는 고양이를 정말 좋아해요 🐱", risky:false, why:""},
-  {text:"요즘 좋아하는 노래 계속 듣는 중~ 🎧", risky:false, why:""},
-  {text:"닉네임 짓느라 30분 걸렸어요ㅋㅋ", risky:false, why:""},
-  {text:"주말에 진짜 재밌는 영화 봤어요! 다들 추천추천", risky:false, why:""},
+/* 위험한 글 모음 — 이 중에서 매번 PER_SIDE 개를 뽑아 씁니다. */
+const POOL_RISKY = [
+  {text:"OO중학교 2학년 3반 김민준입니다!", why:"학교·학년·반·이름이 함께 있으면 누군지 특정하기 쉬워져요."},
+  {text:"제 전화번호는 010-1234-5678이에요, 연락주세요!", why:"전화번호는 모르는 사람에게 공개하면 위험해요."},
+  {text:"우리집은 행복빌라 302호예요~", why:"집 주소가 공개되면 실제 위치가 노출돼요."},
+  {text:"제 생일은 2012년 3월 5일이에요!", why:"생년월일은 각종 인증에 쓰이는 중요한 개인정보예요."},
+  {text:"오늘 학교 끝나고 강남동 어린이공원에서 놀아요!", why:"실시간 위치와 일정을 알리면 낯선 사람이 찾아올 수 있어요."},
+  {text:"우리 엄마는 OO병원에서 간호사로 일하셔요", why:"가족의 직장 정보도 가족을 특정하는 단서가 될 수 있어요."},
+  {text:"새 학생증 나왔다! (사진 속에 이름·학번 그대로 보임)", why:"학생증 사진에는 이름·학교·학번이 다 들어 있어서 그대로 노출돼요."},
+  {text:"내 계정 비밀번호 쉬워요~ 우리집 강아지 이름 '초코'!", why:"비밀번호나 비밀번호 힌트를 알려주면 계정을 빼앗길 수 있어요."},
+  {text:"주민등록번호 뒷자리가 3으로 시작해요ㅋㅋ", why:"주민등록번호는 일부만 알려져도 신분 도용에 쓰일 수 있어요."},
+  {text:"우리 아빠 차 번호 12가 3456이에요, 멋있죠?", why:"차량 번호로 가족의 이동 경로나 거주지를 추적할 수 있어요."},
+  {text:"택배 왔다! (송장 사진 그대로 올림)", why:"택배 송장에는 이름·주소·전화번호가 모두 적혀 있어요."},
+  {text:"용돈 보내주실 분~ 계좌 123-456-789예요", why:"계좌번호 공개는 금융 사기의 표적이 되기 쉬워요."},
+  {text:"화요일 목요일 7시에 OO수학학원 다녀요", why:"정기적인 일정과 장소는 낯선 사람이 기다릴 수 있게 해줘요."},
+  {text:"이번 주 내내 가족여행! 집 아무도 없어요~", why:"집을 비운다는 정보는 빈집털이의 표적이 될 수 있어요."},
+  {text:"카톡 아이디 minjun0305이에요, 추가해주세요!", why:"메신저 아이디를 공개하면 모르는 사람의 연락에 그대로 노출돼요."},
+  {text:"교복 입고 찍은 사진! 명찰이랑 학교 마크 잘 나왔다", why:"교복·명찰·학교 마크로 어느 학교 누구인지 알아낼 수 있어요."},
+  {text:"우리 가족사진이에요~ 왼쪽부터 아빠 김OO, 동생 김OO", why:"가족의 얼굴과 실명이 함께 공개되면 가족 전체가 노출돼요."},
+  {text:"메일 주소 minjun2012@mail.com 으로 보내주세요", why:"이메일 주소는 스팸이나 피싱 메일의 통로가 될 수 있어요."},
+  {text:"저 지금 OO병원 입원했어요, 병실 705호", why:"건강 정보와 지금 있는 장소는 특히 민감한 개인정보예요."},
+  {text:"매일 4시에 OO아파트 앞 PC방에 있어요!", why:"자주 가는 장소와 시간을 알리면 누군가 찾아올 수 있어요."},
+  {text:"우리집 현관 비번 1234예요, 놀러오세요", why:"현관 비밀번호는 절대 온라인에 남기면 안 되는 정보예요."},
+  {text:"엄마 번호 010-9876-5432, 급하면 여기로!", why:"가족의 전화번호도 본인 것만큼 중요한 개인정보예요."},
+  {text:"저희 반 단톡방 참여코드 공유합니다~", why:"단체방 참여코드가 퍼지면 모르는 사람이 반 친구들 정보를 볼 수 있어요."},
+  {text:"학교에서 집까지 이 골목으로 가면 빨라요 (지도 캡처)", why:"등하교 경로가 알려지면 어디서 기다리면 되는지도 알려지는 셈이에요."},
 ];
 
-const TIME_LIMIT = 60;
+/* 올려도 괜찮은 글 모음 */
+const POOL_SAFE = [
+  {text:"제 취미는 그림 그리기예요! 🎨"},
+  {text:"오늘 급식 진짜 맛있었다ㅎㅎ"},
+  {text:"저는 고양이를 정말 좋아해요 🐱"},
+  {text:"요즘 좋아하는 노래 계속 듣는 중~ 🎧"},
+  {text:"닉네임 짓느라 30분 걸렸어요ㅋㅋ"},
+  {text:"주말에 진짜 재밌는 영화 봤어요! 다들 추천추천"},
+  {text:"오늘 하늘 진짜 예쁘다 ☁️"},
+  {text:"드디어 그림 한 장 완성! 3시간 걸렸어요"},
+  {text:"요즘 읽는 소설이 너무 재밌어요 📚"},
+  {text:"라면에 계란 넣는 타이밍이 제일 중요함"},
+  {text:"시험 끝!!! 오늘은 아무것도 안 할 거예요"},
+  {text:"겨울보다 가을이 훨씬 좋아요"},
+  {text:"게임 캐릭터 드디어 만렙 찍었다 🎮"},
+  {text:"좋아하는 색은 민트색이에요"},
+  {text:"이번 주 웹툰 전개 진짜 미쳤다..."},
+  {text:"아침에 일찍 일어나기 성공한 지 3일째!"},
+  {text:"체육시간에 달리기 1등 했어요 🏃"},
+  {text:"떡볶이는 역시 국물이 있어야 함"},
+  {text:"수학보다 과학이 더 재밌는 것 같아요"},
+  {text:"오늘 하루도 수고했어요, 다들 잘 자요 🌙"},
+  {text:"새로 산 필통이 마음에 쏙 들어요"},
+  {text:"비 오는 날 창밖 보는 거 좋아해요 ☔"},
+  {text:"방학까지 딱 30일 남았다!!"},
+  {text:"강아지 산책 시키고 왔어요 🐶"},
+];
+
+const PER_SIDE = 8;              /* 위험한 글 8개 + 안전한 글 8개 = 한 판에 16개 */
+const TIME_LIMIT = 80;
 let timeLeft = TIME_LIMIT;
 let timerId = null;
 let removedCount = 0;
 let removedTexts = new Set();
-const totalRisky = ITEMS.filter(i=>i.risky).length;
+let roundItems = [];             /* 이번 판에 뽑힌 16개 */
+const totalRisky = PER_SIDE;
 
 const introScreen = document.getElementById('introScreen');
 const playScreen = document.getElementById('playScreen');
@@ -286,8 +332,13 @@ function startGame(){
   toast.className = 'toast';
 
   itemsBox.innerHTML = '';
-  const order = shuffle(ITEMS);
-  order.forEach(item=>{
+
+  /* 매번 새로 뽑습니다. 위험한 글과 안전한 글의 개수는 항상 같습니다. */
+  const risky = shuffle(POOL_RISKY).slice(0, PER_SIDE).map(o=>({text:o.text, why:o.why, risky:true}));
+  const safe  = shuffle(POOL_SAFE ).slice(0, PER_SIDE).map(o=>({text:o.text, why:'', risky:false}));
+  roundItems = shuffle(risky.concat(safe));
+
+  roundItems.forEach(item=>{
     const el = document.createElement('div');
     el.className = 'item';
     el.textContent = item.text;
@@ -351,7 +402,7 @@ function endGame(success){
     missedList.style.display = 'none';
   } else {
     endTitle.textContent = '⏰ 시간 종료! 탈출 실패';
-    const missedItems = ITEMS.filter(i=>i.risky && !removedTexts.has(i.text));
+    const missedItems = roundItems.filter(i=>i.risky && !removedTexts.has(i.text));
     endDesc.textContent = `아직 위험한 정보가 화면에 남아있었어요. 아래에서 어떤 정보가 위험했는지 함께 확인해봐요.`;
     missedList.style.display = 'block';
     missedList.innerHTML = missedItems.map(i=>`<div><b>⚠ ${i.text}</b><br>${i.why}</div>`).join('<hr style="border:none;border-top:1px solid #e1e6ef;margin:10px 0;">');
