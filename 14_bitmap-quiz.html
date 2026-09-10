@@ -557,11 +557,11 @@ var BANK = [
         g.quadraticCurveTo(64, 80, 46, 62);
         g.quadraticCurveTo(27, 78, 10, 60);
         g.closePath(); g.fill();
-        rct(g, 61, 58, 7, 46);
+        rct(g, 61, 71, 7, 33);          /* 기둥은 캐노피가 끝나는 곳에서 시작 */
         g.lineWidth = 8; g.lineCap = "round";
         g.beginPath(); g.arc(75, 104, 11, Math.PI, 0, true); g.stroke();
       });
-      K(c); rct(c, 61, 58, 7, 46);
+      K(c); rct(c, 61, 71, 7, 33);
       K(c); arcln(c, 75, 104, 11, Math.PI, 0, 8, true);
       /* 패널을 나누는 살대 */
       K(c); ln(c, 64, 8, 46, 62, 3); ln(c, 64, 8, 82, 62, 3);
@@ -691,26 +691,6 @@ var BANK = [
       });
       K(c); ln(c, 30, 108, 60, 108, 5); ln(c, 74, 108, 104, 108, 5);
       W(c); arcln(c, 66, 58, 20, 3.6, 5.2, 4);
-  }},
-
-  { name: "달", draw: function (c) {
-      /* 큰 원에서 오른쪽 원을 잘라낸 초승달을 "하나의 도형"으로 만듭니다.
-         두 원이 만나는 점을 구해 바깥쪽 호와 안쪽 호를 이어 붙입니다. */
-      outlined(c, function (g) {
-        var ax = 52, ay = 64, ar = 48, bx = 96, by = 60, br = 50;
-        var dx = bx - ax, dy = by - ay, d = Math.sqrt(dx * dx + dy * dy);
-        var a = (ar * ar - br * br + d * d) / (2 * d);
-        var h = Math.sqrt(ar * ar - a * a);
-        var px = ax + a * dx / d, py = ay + a * dy / d;
-        var i1x = px - h * dy / d, i1y = py + h * dx / d;
-        var i2x = px + h * dy / d, i2y = py - h * dx / d;
-        g.beginPath();
-        g.arc(ax, ay, ar, Math.atan2(i1y - ay, i1x - ax), Math.atan2(i2y - ay, i2x - ax), false);
-        g.arc(bx, by, br, Math.atan2(i2y - by, i2x - bx), Math.atan2(i1y - by, i1x - bx), true);
-        g.closePath(); g.fill();
-      });
-      W(c); circ(c, 32, 54, 8); circ(c, 38, 84, 6); circ(c, 46, 40, 5);
-      K(c); circ(c, 112, 98, 7); circ(c, 118, 74, 5); circ(c, 98, 116, 4);
   }},
 
   { name: "눈사람", draw: function (c) {
@@ -1075,16 +1055,13 @@ var BANK = [
   { name: "망치", draw: function (c) {
       /* 노루발이 달린 장도리 */
       outlined(c, function (g) {
-        rr(g, 38, 12, 60, 32, 4);                                   /* 머리 */
+        rr(g, 20, 12, 78, 32, 4);                                   /* 머리 */
         poly(g, [[96, 8], [112, 14], [112, 42], [96, 48]]);         /* 때리는 면 */
-        poly(g, [[42, 12], [18, 8], [4, 24], [15, 31], [27, 18], [42, 22]]);  /* 노루발 */
-        rr(g, 56, 42, 16, 80, 6);                                   /* 자루 */
+        rr(g, 52, 42, 16, 80, 6);                                   /* 자루 */
       });
-      W(c); poly(c, [[7, 24], [21, 12], [25, 17], [13, 28]]);       /* 노루발 갈라진 틈 */
-      K(c); ln(c, 42, 12, 42, 44, 3);                               /* 노루발과 머리 경계 */
       K(c); ln(c, 96, 10, 96, 46, 3);                               /* 때리는 면 경계 */
-      K(c); ln(c, 56, 44, 72, 44, 3);                               /* 머리와 자루 경계 */
-      K(c); ln(c, 58, 94, 70, 94, 3); K(c); ln(c, 58, 106, 70, 106, 3);   /* 손잡이 그립 */
+      K(c); ln(c, 52, 44, 68, 44, 3);                               /* 머리와 자루 경계 */
+      K(c); ln(c, 54, 94, 66, 94, 3); K(c); ln(c, 54, 106, 66, 106, 3);   /* 손잡이 그립 */
   }},
 
   { name: "책", draw: function (c) {
