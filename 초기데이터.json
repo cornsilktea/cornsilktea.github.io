@@ -136,7 +136,7 @@
       },
       "bitmapquiz": {
         "title": "비트맵 퀴즈",
-        "url": "14_bitmap-quiz.html",
+        "url": "15.bitmap-quiz.html",
         "memo": "",
         "order": 14,
         "open": true,
@@ -147,7 +147,7 @@
       },
       "gomoku": {
         "title": "쉬는시간 오목",
-        "url": "15.gomoku.html",
+        "url": "16.gomoku.html",
         "memo": "AI 대전(하·중·상) / 2인 대전",
         "order": 15,
         "open": true,
