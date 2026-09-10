@@ -370,6 +370,30 @@
     return list;
   }
 
+  /* ---------- 저장소 목록(시드) 합치기 ----------
+     자료 목록의 원본은 Firebase 이지만, 저장소에 새 파일을 올리고
+     초기데이터.json 에 적어 두기만 해도 제어판 등록 전까지 목록에 보이게 합니다.
+     - 제어판에 등록된 자료는 언제나 Firebase 값이 우선입니다(잠금·순서 포함).
+     - 제어판에서 지운 자료는 removed 표시가 남아 다시 살아나지 않습니다. */
+  var seedGames = null;   /* 한 번만 읽어서 기억해 둡니다 */
+
+  function loadSeed() {
+    return fetch("초기데이터.json", { cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { seedGames = (j && j.portal && j.portal.games) || {}; })
+      .catch(function () { seedGames = {}; });
+  }
+
+  function mergeSeed(data) {
+    var merged = {}, db = data || {};
+    Object.keys(seedGames || {}).forEach(function (slug) {
+      if (db[slug]) return;                      /* 등록·삭제 이력이 있으면 손대지 않음 */
+      merged[slug] = seedGames[slug];
+    });
+    Object.keys(db).forEach(function (slug) { merged[slug] = db[slug]; });
+    return merged;
+  }
+
   function load() {
     if (!cfg.isReady()) {
       setNotice("설정이 아직 끝나지 않았어요. firebase-config.js 를 먼저 채워 주세요.");
@@ -384,7 +408,7 @@
       })
       .then(function (data) {
         setNotice("");
-        games = numbered(D.toList(data));
+        games = numbered(D.toList(mergeSeed(data)));
         var next = JSON.stringify(games);
         if (next !== snapshot) { snapshot = next; render(); }
       })
@@ -408,8 +432,11 @@
   try { saved = localStorage.getItem("portal_view"); } catch (e) {}
   setView(saved || "tree", false);
 
-  load();
-  setInterval(load, (cfg.POLL_SECONDS || 5) * 1000);
+  /* 시드를 먼저 읽고 목록을 불러옵니다(실패해도 Firebase 목록은 그대로 나옵니다) */
+  loadSeed().then(function () {
+    load();
+    setInterval(load, (cfg.POLL_SECONDS || 5) * 1000);
+  });
 
   /* 홈 화면에 추가했을 때 앱처럼 열리게 하는 등록 (실패해도 사이트는 그대로 동작) */
   if ("serviceWorker" in navigator) {

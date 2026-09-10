@@ -169,6 +169,20 @@
       </p>
     </div>
 
+    <!-- 저장소(초기데이터.json)에는 있는데 아직 등록되지 않은 자료가 있을 때만 보입니다 -->
+    <div class="panel" id="seedPanel" hidden>
+      <h2>저장소에 올라온 새 자료</h2>
+      <p class="msg" id="seedMsg"></p>
+      <div id="seedList"></div>
+      <div class="actions">
+        <button id="seedBtn" type="button">한 번에 등록하기</button>
+      </div>
+      <p class="hint">
+        저장소의 <code>초기데이터.json</code> 에는 있는데 아직 여기 등록되지 않은 자료입니다.
+        등록하지 않아도 학생 목록에는 이미 보이지만, 등록해야 잠금·순서·단원을 여기서 정할 수 있습니다.
+      </p>
+    </div>
+
     <div id="list"></div>
 
     <div class="panel">
@@ -248,6 +262,8 @@ const D = window.PORTAL_DATA;      /* 단원 구조는 data.js 한 곳에만 있
 const $ = (id) => document.getElementById(id);
 
 let games = [];
+let dbKeys = [];       /* 데이터베이스에 실제로 있는 자료 아이디(지운 표시까지 포함) */
+let seedGames = null;  /* 저장소 초기데이터.json 의 자료 목록 */
 let busy = false;      /* 수정 중일 때 자동 새로고침 멈춤 */
 let snapshot = "";     /* 내용이 바뀔 때만 화면을 다시 그리기 위한 비교용 */
 let timer = null;
@@ -319,7 +335,10 @@ async function load() {
     const r = await fetch(cfg.dbPath("games"), { cache: "no-store" });
     if (!r.ok) throw new Error(r.status);
     const data = await r.json();
-    games = Object.keys(data || {}).map((slug) => {
+    dbKeys = Object.keys(data || {});
+    /* removed 표시는 "제어판에서 지운 자료"라는 뜻이라 목록에 넣지 않습니다.
+       (이 표시가 있어야 저장소 시드에서 다시 살아나지 않습니다) */
+    games = dbKeys.filter((slug) => !(data[slug] && data[slug].removed === true)).map((slug) => {
       const g = data[slug] || {};
       const n = D.normalize(slug, g);
       /* slug 는 데이터베이스에 실제로 저장된 이름(고치기 전),
@@ -336,6 +355,7 @@ async function load() {
     if (next !== snapshot) { snapshot = next; renderList(); }
     renderSummary();
     renderFixPanel();
+    renderSeedPanel();
     if ($("mainMsg").textContent.indexOf("불러오지") !== -1) say("mainMsg", "");
   } catch (e) {
     say("mainMsg", "목록을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.");
@@ -536,8 +556,13 @@ function gameCard(g, i) {
   down.addEventListener("click", () => move(i, 1));
   del.addEventListener("click", async () => {
     if (!confirm("'" + g.title + "' 을(를) 목록에서 지울까요?\n(HTML 파일 자체는 지워지지 않습니다.)")) return;
-    try { await write("games/" + g.slug, null); await load(); }
-    catch (e) { say("mainMsg", e.message); }
+    try {
+      await write("games/" + g.slug, null);
+      /* 저장소 시드에 남아 있는 자료라면, 지웠다는 표시를 남겨야
+         학생 목록에서 다시 살아나지 않습니다. */
+      if (seedGames && seedGames[g.slug]) await write("games/" + g.slug, { removed: true });
+      await load();
+    } catch (e) { say("mainMsg", e.message); }
   });
   buttons.append(up, down, edit, del);
   card.appendChild(buttons);
@@ -652,6 +677,72 @@ async function fixLegacy() {
   }
 }
 
+/* ---------------- 저장소에 올라온 새 자료 ----------------
+   저장소의 초기데이터.json 과 데이터베이스를 견주어, 아직 등록되지 않은
+   자료를 찾아 한 번에 등록합니다. 학생 목록에는 이미 보이는 자료이므로
+   등록해도 학생 화면이 달라지지는 않고, 잠금·순서·단원을 제어판에서
+   다룰 수 있게 되는 것이 달라지는 점입니다. */
+async function loadSeed() {
+  try {
+    const r = await fetch("초기데이터.json", { cache: "no-store" });
+    seedGames = r.ok ? ((await r.json()).portal || {}).games || {} : {};
+  } catch (e) {
+    seedGames = {};
+  }
+}
+
+function seedOnlyGames() {
+  if (!seedGames) return [];
+  return Object.keys(seedGames)
+    .filter((slug) => dbKeys.indexOf(slug) === -1)
+    .map((slug) => Object.assign({ slug }, seedGames[slug]))
+    .filter((g) => g.title && g.url)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+}
+
+function renderSeedPanel() {
+  const list = seedOnlyGames();
+  $("seedPanel").hidden = list.length === 0;
+  if (list.length === 0) return;
+  say("seedMsg", "아직 등록되지 않은 자료가 " + list.length + "개 있습니다.");
+  const box = $("seedList");
+  box.innerHTML = "";
+  list.forEach((g) => {
+    const p = el("p", "hint",
+      "· " + g.title + " (" + g.url + ") — " + (g.open === true ? "열림" : "잠금") + " 상태로 등록됩니다");
+    p.style.margin = "2px 0";
+    box.appendChild(p);
+  });
+}
+
+async function registerSeedGames() {
+  const list = seedOnlyGames();
+  if (list.length === 0) return;
+  busy = true;
+  try {
+    const payload = {};
+    list.forEach((g) => {
+      payload[g.slug] = {
+        title: g.title,
+        url: D.fixUrl(g.url),
+        memo: g.memo || "",
+        order: typeof g.order === "number" ? g.order : 999,
+        open: g.open === true,
+        units: Array.isArray(g.units) ? g.units : [],
+        unitsSet: true,
+        removed: null            /* 예전에 지운 표시가 있으면 함께 지웁니다 */
+      };
+    });
+    await write("games", payload);
+    busy = false;
+    await load();
+    say("seedMsg", list.length + "개를 등록했습니다.");
+  } catch (e) {
+    busy = false;
+    say("seedMsg", e.message);
+  }
+}
+
 /* ---------------- 백업 ---------------- */
 function backupText() {
   const out = {};
@@ -675,8 +766,10 @@ function showMain(user) {
   $("loginPanel").hidden = true;
   $("mainPanel").hidden = false;
   $("who").textContent = "로그인: " + (user.email || user.displayName || "") + "   ·   내 UID: " + user.uid;
-  load();
-  if (!timer) timer = setInterval(load, (cfg.POLL_SECONDS || 5) * 1000);
+  loadSeed().then(() => {
+    load();
+    if (!timer) timer = setInterval(load, (cfg.POLL_SECONDS || 5) * 1000);
+  });
 }
 
 function showLogin(message) {
@@ -689,7 +782,8 @@ function showLogin(message) {
 $("loginBtn").addEventListener("click", login);
 $("allOn").addEventListener("click", () => bulk(true));
 $("allOff").addEventListener("click", () => bulk(false));
-$("reload").addEventListener("click", () => { busy = false; load(); });
+$("reload").addEventListener("click", () => { busy = false; loadSeed().then(load); });
+$("seedBtn").addEventListener("click", registerSeedGames);
 $("logout").addEventListener("click", async () => {
   try { await signOut(auth); } catch (e) {}
   showLogin("로그아웃했습니다.");

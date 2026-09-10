@@ -134,11 +134,22 @@
         ],
         "unitsSet": true
       },
+      "bitmapquiz": {
+        "title": "비트맵 퀴즈",
+        "url": "14_bitmap-quiz.html",
+        "memo": "",
+        "order": 14,
+        "open": true,
+        "units": [
+          "g2s2-2-1"
+        ],
+        "unitsSet": true
+      },
       "gomoku": {
         "title": "쉬는시간 오목",
         "url": "gomoku.html",
         "memo": "AI 대전(하·중·상) / 2인 대전",
-        "order": 14,
+        "order": 15,
         "open": true,
         "units": [],
         "unitsSet": true
