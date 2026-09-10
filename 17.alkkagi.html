@@ -238,11 +238,18 @@ const DT = 1 / 120;          // 물리 한 스텝(초)
 const DAMP = 0.984;          // 스텝마다 남는 속도(마찰)
 const REST = 0.82;           // 충돌 반발(부딪칠수록 힘이 줄어 연쇄가 과하지 않다)
 const STOP = 14;             // 이 속도 아래면 멈춘 것으로 본다(px/s)
-const MAX_DRAG = 180;        // 이만큼 끌면 게이지 100%
-const MIN_DRAG = 12;         // 이보다 짧으면 발사 취소
+const MAX_DRAG = 90;         // 이만큼 끌면 게이지 100%(짧게 끌어도 세게 나간다)
+// DEAD: 손가락이 살짝 흔들린 정도는 '고르기'로 본다.
+// 이만큼 끌기 전에는 게이지가 0이고, 손을 떼도 발사되지 않는다.
+const DEAD = 24;
 // 마찰 때문에 굴러가는 거리는 대략 속도/1.94 이다.
 // 100%(1400)면 약 720px — 아무것도 없는 판이면 한 변(600)을 지나 밖으로 나간다.
-const SPD_MIN = 300, SPD_MAX = 1400;
+const SPD_MIN = 200, SPD_MAX = 1400;
+
+/* 끈 거리 → 세기(0~1). DEAD 안쪽은 0이라 발사되지 않는다. */
+function aimPower(dist) {
+  return Math.max(0, Math.min(dist, MAX_DRAG) - DEAD) / (MAX_DRAG - DEAD);
+}
 
 const BLACK = 0, WHITE = 1;  // 흑=아래(사람), 백=위
 const SIDE_NAME = ['흑', '백'];
@@ -536,11 +543,12 @@ cv.addEventListener('pointerup', e => {
   const dx = selected.x - pointer.x, dy = selected.y - pointer.y;
   const dist = Math.hypot(dx, dy);
   dragging = false;
-  if (dist < MIN_DRAG) {        // 너무 짧으면 고르기만 하고 끝
-    setHint('고른 돌을 <b>반대쪽</b>으로 끌어당겼다 놓으세요.');
+  const power = aimPower(dist);
+  if (power <= 0) {             // 누르기만 했거나 살짝 흔들린 정도면 고르기만 한다
+    setHint('돌을 골랐어요. <b>반대쪽</b>으로 끌어당겼다 놓으면 발사!');
     return;
   }
-  shoot(selected, Math.atan2(dy, dx), Math.min(dist, MAX_DRAG) / MAX_DRAG);
+  shoot(selected, Math.atan2(dy, dx), power);
 });
 cv.addEventListener('pointercancel', () => { dragging = false; });
 
@@ -678,9 +686,9 @@ function drawAim() {
   const dx = selected.x - pointer.x, dy = selected.y - pointer.y;
   const dist = Math.hypot(dx, dy);
   if (dist < 1) return;
-  const power = Math.min(dist, MAX_DRAG) / MAX_DRAG;
+  const power = aimPower(dist);
   const ang = Math.atan2(dy, dx);
-  const col = gaugeColor(power);
+  const col = power > 0 ? gaugeColor(power) : 'rgba(255,255,255,.55)';
 
   // 날아갈 방향을 판 끝까지 알려 주는 옅은 점선
   ctx.save();
@@ -702,6 +710,17 @@ function drawAim() {
              selected.y - Math.sin(ang) * Math.min(dist, MAX_DRAG));
   ctx.stroke();
   ctx.restore();
+
+  // 아직 '고르기' 구간이면 화살표 대신 얼마나 더 끌어야 하는지만 보여 준다
+  if (power <= 0) {
+    ctx.beginPath();                       // 아직 0%인 빈 게이지
+    ctx.arc(selected.x, selected.y, R + 12, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(0,0,0,.22)';
+    ctx.lineWidth = 8;
+    ctx.stroke();
+    drawBadge('조금 더', 'rgba(255,255,255,.9)');
+    return;
+  }
 
   // 세기만큼 자라는 화살표
   const len = 44 + power * 200;
@@ -738,15 +757,19 @@ function drawAim() {
   ctx.stroke();
   ctx.lineCap = 'butt';
 
-  // 세기 퍼센트
-  const label = Math.round(power * 100) + '%';
+  drawBadge(Math.round(power * 100) + '%', col);
+}
+
+// 고른 돌 위에 뜨는 작은 알림표(세기 % 또는 안내말)
+function drawBadge(label, col) {
   const tx = selected.x, ty = selected.y - R - 34;
   ctx.font = 'bold 19px Pretendard, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
+  const w = Math.max(60, ctx.measureText(label).width + 24);
   ctx.beginPath();
-  if (ctx.roundRect) ctx.roundRect(tx - 30, ty - 15, 60, 30, 15);
-  else ctx.arc(tx, ty, 22, 0, Math.PI * 2);   // roundRect가 없는 옛 브라우저
+  if (ctx.roundRect) ctx.roundRect(tx - w / 2, ty - 15, w, 30, 15);
+  else ctx.arc(tx, ty, w / 2, 0, Math.PI * 2);   // roundRect가 없는 옛 브라우저
   ctx.fillStyle = 'rgba(17,24,39,.72)';
   ctx.fill();
   ctx.fillStyle = col;

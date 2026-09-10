@@ -334,6 +334,10 @@
       if (!keyword) return true;
       return (g.title + " " + g.memo).toLowerCase().indexOf(keyword) !== -1;
     });
+    /* 열려 있는 자료를 먼저, 잠긴 자료를 뒤에 (같은 무리 안에서는 원래 순서) */
+    var opened = shown.filter(function (g) { return g.open; });
+    var locked = shown.filter(function (g) { return !g.open; });
+    shown = opened.concat(locked);
     fillGrid(listGrid, shown, true, games.length === 0
       ? "아직 등록된 수업 자료가 없어요."
       : "검색 결과가 없어요.");
