@@ -81,6 +81,13 @@
     overflow: hidden;
   }
 
+  /* aspect-ratio 를 모르는 구형 전자칠판 대비.
+     정사각형 판이 납작해지지 않도록 예전 방식(padding)으로 높이를 만든다. */
+  @supports not (aspect-ratio: 1 / 1) {
+    .board-frame { height: 0; padding-top: 100%; }
+    .board-frame > canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+  }
+
   canvas {
     display: block;
     width: 100%;

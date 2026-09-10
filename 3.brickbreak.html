@@ -53,6 +53,11 @@ canvas {
   touch-action: none;
   cursor: crosshair;
 }
+/* aspect-ratio 를 모르는 구형 전자칠판 대비.
+   canvas 는 560x700 크기를 갖고 있어 height:auto 면 비율대로 늘어난다. */
+@supports not (aspect-ratio: 1 / 1) {
+  canvas { height: auto; }
+}
 .ctrl {
   display: grid;
   grid-template-columns: 56px 1fr 56px;
@@ -146,6 +151,41 @@ button:active { background: #eef2f7; }
     </ul>
   </div>
 </div>
+
+<script>
+/* 구형 전자칠판·태블릿 브라우저 대응
+   ctx.roundRect() 는 비교적 최근(2022년 무렵)에 추가된 기능이라
+   오래된 기기에는 없습니다. 없을 때만 같은 동작을 직접 만들어 넣습니다.
+   이게 없으면 벽돌을 그리다 오류가 나서 화면이 아예 그려지지 않습니다. */
+(function () {
+  if (typeof CanvasRenderingContext2D === "undefined") return;
+  var P = CanvasRenderingContext2D.prototype;
+  if (P.roundRect) return;
+  P.roundRect = function (x, y, w, h, r) {
+    if (typeof r === "undefined") { r = 0; }
+    if (r && r.length) { r = r[0]; }          // 배열로 넘어와도 첫 값만 사용
+    var max = Math.min(Math.abs(w), Math.abs(h)) / 2;
+    if (r > max) { r = max; }
+    if (r < 0) { r = 0; }
+    this.moveTo(x + r, y);
+    this.lineTo(x + w - r, y);
+    this.quadraticCurveTo(x + w, y, x + w, y + r);
+    this.lineTo(x + w, y + h - r);
+    this.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    this.lineTo(x + r, y + h);
+    this.quadraticCurveTo(x, y + h, x, y + h - r);
+    this.lineTo(x, y + r);
+    this.quadraticCurveTo(x, y, x + r, y);
+    this.closePath();
+    return this;
+  };
+})();
+
+/* Math.hypot 도 오래된 기기에는 없습니다. 공의 속도 계산에 쓰입니다. */
+if (!Math.hypot) {
+  Math.hypot = function (a, b) { return Math.sqrt(a * a + b * b); };
+}
+</script>
 
 <script>
 (function () {
@@ -573,13 +613,16 @@ button:active { background: #eef2f7; }
 
   var prev = 0;
   function loop(ts) {
+    /* 다음 프레임 예약을 맨 앞에서 한다.
+       예전처럼 맨 뒤에 두면 그리기 중 오류가 한 번만 나도
+       예약이 되지 않아 게임이 통째로 멈춰 버린다. */
+    window.requestAnimationFrame(loop);
     if (!prev) { prev = ts; }
     var dt = Math.min(0.033, (ts - prev) / 1000);
     prev = ts;
     tickAim(dt);
     update(dt);
     draw();
-    window.requestAnimationFrame(loop);
   }
 
   function toLocal(ev) {
