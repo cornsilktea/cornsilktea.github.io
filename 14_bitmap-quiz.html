@@ -1,0 +1,1027 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>비트맵 해상도 퀴즈</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* 디자인 언어는 '추상화 놀이터'(7.drawing.html) 와 동일하게 맞췄습니다. */
+  :root{
+    --paper:#F2F4EE;
+    --surface:#FFFFFF;
+    --surface-alt:#E7ECE2;
+    --ink:#1E241D;
+    --ink-soft:#5B6459;
+    --line:#CBD3C3;
+    --accent:#2E5FA3;
+    --accent-ink:#1F3F73;
+    --accent-bg:#E1EAF6;
+    --core:#2E7D4F;
+    --core-bg:#E1F1E5;
+    --omit:#8A7F6A;
+    --omit-bg:#EFEAE0;
+    --danger:#B3462C;
+    --shadow: 0 1px 0 rgba(30,36,29,.06), 0 8px 20px -12px rgba(30,36,29,.25);
+    --radius: 14px;
+    --font-display:'Gaegu','Noto Sans KR',sans-serif;
+    --font-body:'IBM Plex Sans KR','Apple SD Gothic Neo',sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#12160F;
+      --surface:#1A2016;
+      --surface-alt:#232B1D;
+      --ink:#EAEFE4;
+      --ink-soft:#AEB8A4;
+      --line:#39432F;
+      --accent:#7FAEEB;
+      --accent-ink:#A9C8F2;
+      --accent-bg:#1E2C40;
+      --core:#68CB90;
+      --core-bg:#1D3524;
+      --omit:#C2B79E;
+      --omit-bg:#2B2818;
+      --danger:#E58164;
+      --shadow: 0 1px 0 rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#12160F;
+    --surface:#1A2016;
+    --surface-alt:#232B1D;
+    --ink:#EAEFE4;
+    --ink-soft:#AEB8A4;
+    --line:#39432F;
+    --accent:#7FAEEB;
+    --accent-ink:#A9C8F2;
+    --accent-bg:#1E2C40;
+    --core:#68CB90;
+    --core-bg:#1D3524;
+    --omit:#C2B79E;
+    --omit-bg:#2B2818;
+    --danger:#E58164;
+    --shadow: 0 1px 0 rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.6);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--paper);
+    background-image: radial-gradient(circle, var(--line) 1px, transparent 1.4px);
+    background-size: 26px 26px;
+    color:var(--ink);
+    font-family:var(--font-body);
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3{font-family:var(--font-display); text-wrap:balance; margin:0;}
+  p{margin:0;}
+  button{font-family:var(--font-body);}
+
+  .app{min-height:100%; display:flex; flex-direction:column;}
+
+  /* ---------- Topbar ---------- */
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    gap:16px; padding:14px 28px;
+    background:var(--surface); border-bottom:2px dashed var(--line);
+    flex-wrap:wrap;
+  }
+  .brand{
+    font-family:var(--font-display); font-size:1.7rem; font-weight:700;
+    display:flex; align-items:center; gap:10px;
+  }
+  .tabs{display:flex; gap:10px;}
+  .tab-btn{
+    border:2px solid var(--line); background:var(--surface); color:var(--ink);
+    padding:10px 20px; border-radius:999px;
+    font-size:1.05rem; font-weight:600; cursor:pointer;
+  }
+  .tab-btn.active{background:var(--accent); border-color:var(--accent); color:#fff;}
+  .round-progress{
+    font-variant-numeric:tabular-nums; font-weight:600; color:var(--ink-soft);
+    background:var(--surface-alt); padding:8px 16px; border-radius:999px; font-size:1rem;
+  }
+
+  main{flex:1; display:flex; justify-content:center; padding:28px 20px 48px;}
+  .screen{width:100%; max-width:920px; display:flex; flex-direction:column; gap:22px;}
+  .card{
+    background:var(--surface); border:2px dashed var(--line);
+    border-radius:var(--radius); box-shadow:var(--shadow); padding:28px;
+  }
+  .lede{color:var(--ink-soft); font-size:1.1rem; line-height:1.6;}
+  .stack{display:flex; flex-direction:column; gap:14px;}
+  .row{display:flex; gap:14px; flex-wrap:wrap; align-items:center;}
+  .row.center{justify-content:center;}
+  .row.between{justify-content:space-between;}
+
+  /* ---------- Buttons ---------- */
+  .btn{
+    appearance:none; border:2px solid var(--accent); background:var(--accent);
+    color:#fff; font-size:1.15rem; font-weight:600;
+    padding:16px 26px; border-radius:12px; cursor:pointer;
+    min-height:64px; line-height:1.2;
+  }
+  .btn:hover{background:var(--accent-ink); border-color:var(--accent-ink);}
+  .btn:focus-visible{outline:3px solid var(--accent-ink); outline-offset:3px;}
+  .btn.ghost{background:var(--surface); color:var(--accent);}
+  .btn.ghost:hover{background:var(--accent-bg);}
+  .btn.quiet{background:var(--surface-alt); border-color:var(--surface-alt); color:var(--ink);}
+  .btn.quiet:hover{background:var(--line);}
+  .btn.wide{width:100%;}
+  .btn:disabled{opacity:.45; cursor:not-allowed;}
+
+  /* ---------- 번호 고르기 ---------- */
+  .num-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(64px,1fr)); gap:10px;}
+  .num-btn{
+    min-height:58px; border-radius:12px;
+    border:2px solid var(--line); background:var(--surface-alt); color:var(--ink);
+    font-size:1.15rem; font-weight:700; font-variant-numeric:tabular-nums; cursor:pointer;
+  }
+  .num-btn:hover{background:var(--line);}
+
+  /* ---------- 점수판 ---------- */
+  .scoreboard-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(92px,1fr)); gap:12px;}
+  .score-card{background:var(--surface-alt); border-radius:12px; padding:14px 8px; text-align:center;}
+  .score-card .num{font-size:.95rem; font-weight:600; color:var(--ink-soft);}
+  .score-card .pts{
+    font-family:var(--font-display); font-size:1.8rem; font-weight:700;
+    color:var(--accent); font-variant-numeric:tabular-nums; line-height:1.3;
+  }
+
+  /* ---------- 시작 화면 ---------- */
+  .rules-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(220px,1fr)); gap:16px;}
+  .rule-item{
+    background:var(--surface-alt); border-radius:12px; padding:16px 18px;
+    display:flex; gap:12px; align-items:flex-start;
+  }
+  .rule-num{font-family:var(--font-display); font-size:1.6rem; font-weight:700; color:var(--accent); line-height:1;}
+
+  table.steps{border-collapse:collapse; width:100%; font-variant-numeric:tabular-nums;}
+  table.steps th, table.steps td{
+    border-bottom:1px dashed var(--line); padding:10px 12px; text-align:center; font-size:1.02rem;
+  }
+  table.steps th{color:var(--ink-soft); font-weight:600; font-size:.95rem;}
+  table.steps td.pts{font-weight:700; color:var(--accent);}
+
+  /* ---------- 진행 화면 ---------- */
+  .stage-tag{
+    display:inline-flex; align-items:center; gap:8px;
+    background:var(--accent-bg); color:var(--accent); font-weight:700;
+    padding:8px 16px; border-radius:999px; font-size:1rem;
+  }
+  .stage-now{font-family:var(--font-display); font-size:2.2rem; font-weight:700; line-height:1;}
+  .pips{display:flex; gap:8px; flex-wrap:wrap;}
+  .pip{
+    width:38px; height:38px; border-radius:10px;
+    border:2px solid var(--line); background:var(--surface);
+    color:var(--ink-soft); font-size:.95rem; font-weight:700;
+    display:flex; align-items:center; justify-content:center;
+    font-variant-numeric:tabular-nums;
+  }
+  .pip.used{background:var(--accent); border-color:var(--accent); color:#fff;}
+  .bmp-wrap{
+    display:flex; justify-content:center;
+    border:2px dashed var(--line); border-radius:var(--radius);
+    background:var(--surface-alt); padding:14px;
+  }
+  canvas#bmp{
+    display:block;
+    width:min(62vh, 560px, 100%); height:auto; aspect-ratio:1 / 1;
+    background:#fff; border-radius:8px;
+    image-rendering:pixelated;
+  }
+
+  /* ---------- 정답 공개 화면 ---------- */
+  .reveal-word{
+    font-family:var(--font-display);
+    font-size:clamp(4rem, 13vw, 10rem);
+    font-weight:700; line-height:1.05; text-align:center;
+  }
+  .reveal-cap{color:var(--ink-soft); font-size:1.05rem; text-align:center;}
+  .result-note{
+    background:var(--core-bg); color:var(--core);
+    border-radius:12px; padding:16px 18px; font-size:1.08rem; font-weight:600; line-height:1.6;
+  }
+  .result-note.zero{background:var(--omit-bg); color:var(--omit);}
+
+  /* ---------- 정리 화면 ---------- */
+  .definition{font-size:1.3rem; line-height:1.7;}
+  .definition b{color:var(--accent);}
+  .example-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(240px,1fr)); gap:16px;}
+  .example-card{background:var(--surface-alt); border-radius:12px; padding:18px;}
+  .example-card h3{font-size:1.15rem; margin-bottom:8px; color:var(--accent);}
+  .example-card p{color:var(--ink-soft); font-size:.98rem; line-height:1.6;}
+  textarea#rankText{
+    width:100%; min-height:220px; padding:14px;
+    border:2px solid var(--line); border-radius:12px;
+    background:var(--surface-alt); color:var(--ink);
+    font-family:var(--font-body); font-size:1rem; line-height:1.7;
+    font-variant-numeric:tabular-nums; resize:vertical;
+  }
+
+  /* ---------- 큰 화면(전자칠판) ---------- */
+  @media (min-width:1200px){
+    main{padding:18px 24px 24px;}
+    .screen{max-width:1400px; gap:16px;}
+    .card{padding:20px 24px;}
+    .stack{gap:11px;}
+    .topbar{padding:10px 24px;}
+
+    #screen-intro{display:grid; grid-template-columns:1.4fr 1fr; align-items:start; gap:16px;}
+    #screen-intro > .card:first-child{grid-column:1 / -1;}
+
+    #screen-answer{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); align-items:start; gap:16px;}
+
+    canvas#bmp{width:min(calc(100vh - 300px), 620px);}
+  }
+
+  [hidden]{display:none !important;}
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important; animation:none !important;} }
+</style>
+
+<div class="app">
+  <header class="topbar">
+    <div class="brand">🔳 비트맵 해상도 퀴즈</div>
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="game">게임</button>
+      <button class="tab-btn" data-tab="scores">점수판</button>
+      <button class="tab-btn" data-tab="wrap">정리</button>
+    </nav>
+    <div class="round-progress" id="roundProgress">문제 대기 중</div>
+  </header>
+
+  <main>
+    <!-- ===== GAME TAB ===== -->
+    <div id="tab-game" class="screen">
+
+      <section id="screen-intro" class="stack">
+        <div class="card stack">
+          <h1>점 4개로 무엇인지 알 수 있을까?</h1>
+          <p class="lede">컴퓨터는 그림을 아주 작은 점(픽셀)들의 <b>0과 1</b>로 저장해요. 같은 그림이라도 점이 많아질수록 정보량(비트)이 커지고, 그만큼 더 또렷하고 정확해집니다. 흐릿한 그림을 먼저 알아볼수록 높은 점수를 받아요.</p>
+        </div>
+
+        <div class="card stack">
+          <h2 style="font-size:1.3rem;">진행 방법</h2>
+          <div class="rules-grid">
+            <div class="rule-item"><span class="rule-num">1</span><span>같은 그림을 2×2 부터 128×128 까지 7단계로 조금씩 또렷하게 공개해요.</span></div>
+            <div class="rule-item"><span class="rule-num">2</span><span>가장 먼저 정답을 외친 한 명이 그 단계의 점수를 가져가고 문제는 끝나요.</span></div>
+            <div class="rule-item"><span class="rule-num">3</span><span>7단계까지 아무도 못 맞히면 정답을 공개하고 0점으로 다음 문제로 넘어가요.</span></div>
+          </div>
+          <div class="row">
+            <button class="btn wide" id="btnStart">게임 시작</button>
+          </div>
+        </div>
+
+        <div class="card stack">
+          <h2 style="font-size:1.3rem;">단계별 정보량과 점수</h2>
+          <table class="steps">
+            <thead><tr><th>단계</th><th>그리드</th><th>픽셀 수 (정보량)</th><th>점수</th></tr></thead>
+            <tbody id="stepTable"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="screen-play" class="stack" hidden>
+        <div class="card stack">
+          <div class="row between">
+            <div class="row" style="gap:16px;">
+              <div class="stage-now" id="stageNow">1 / 7</div>
+              <span class="stage-tag" id="stageScore">이번 단계 5점</span>
+              <span class="lede" id="stageMeta" style="font-size:1rem;"></span>
+            </div>
+            <div class="pips" id="pips"></div>
+          </div>
+
+          <div class="bmp-wrap">
+            <canvas id="bmp" width="640" height="640"></canvas>
+          </div>
+
+          <div class="row">
+            <button class="btn" id="btnHit">정답 맞힘</button>
+            <button class="btn quiet" id="btnNext">다음 단계 공개</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="screen-answer" class="stack" hidden>
+        <div class="card stack">
+          <div class="reveal-word" id="revealWord">사과</div>
+          <p class="reveal-cap" id="revealCap"></p>
+        </div>
+
+        <div class="card stack">
+          <div id="pickArea">
+            <h2 style="font-size:1.2rem;">정답을 맞힌 학생의 번호를 눌러주세요</h2>
+            <p class="lede" style="font-size:.95rem; margin:8px 0 14px;">번호를 누르면 점수가 바로 반영돼요.</p>
+            <div class="num-grid" id="numGrid"></div>
+          </div>
+
+          <div id="afterArea" class="stack" hidden>
+            <div class="result-note" id="resultNote"></div>
+            <div class="row">
+              <button class="btn" id="btnNextQ">다음 문제</button>
+              <button class="btn quiet" id="btnGoScore">점수판 보기</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- ===== SCORES TAB ===== -->
+    <div id="tab-scores" class="screen" hidden>
+      <div class="card stack">
+        <h1 style="font-size:1.6rem;">점수판</h1>
+        <p class="lede">1번부터 27번까지 번호 순서예요. 흐릿한 단계에서 맞힐수록 점수가 높습니다. (5·4·4·4·3·3·3점)</p>
+        <div class="scoreboard-grid" id="scoreboardGrid"></div>
+      </div>
+    </div>
+
+    <!-- ===== WRAP TAB ===== -->
+    <div id="tab-wrap" class="screen" hidden>
+      <div class="card stack">
+        <h1 style="font-size:1.6rem;">오늘 배운 것: 정보량과 해상도</h1>
+        <p class="definition">같은 대상이라도 <b>표현에 쓰는 픽셀(비트)이 많아질수록</b> 더 정확하고 구체적인 정보가 됩니다. 해상도를 높인다는 것은 곧 <b>저장할 데이터의 양을 늘린다</b>는 뜻이에요.</p>
+      </div>
+
+      <div class="example-grid">
+        <div class="example-card">
+          <h3>🔲 정보가 적어도 알아본 이유</h3>
+          <p>사람은 전체 실루엣, 즉 큰 덩어리와 밝고 어두운 배치만으로도 대상을 추측할 수 있어요. 2×2 는 칸이 4개뿐이지만 "위가 밝고 아래가 어둡다" 같은 정보는 담깁니다.</p>
+        </div>
+        <div class="example-card">
+          <h3>📈 픽셀이 늘수록 정확해지는 이유</h3>
+          <p>칸이 2배 촘촘해질 때마다 픽셀 수는 4배로 늘어요(4 → 16 → 64 → … → 16,384). 칸이 많아지면 큰 덩어리에 묻혀 있던 작은 디테일까지 따로 기록할 수 있습니다.</p>
+        </div>
+        <div class="example-card">
+          <h3>💾 그래서 용량이 커진다</h3>
+          <p>사진을 고화질로 찍으면 파일이 커지는 것도 같은 이유예요. 더 많은 픽셀 = 더 많은 비트 = 더 정확한 표현이지만, 저장 공간도 그만큼 더 필요합니다.</p>
+        </div>
+      </div>
+
+      <div class="card stack">
+        <h2 style="font-size:1.3rem;">최종 순위</h2>
+        <textarea id="rankText" readonly></textarea>
+        <div class="row">
+          <button class="btn" id="btnCopy">순위 복사하기</button>
+          <button class="btn quiet" id="btnResetAll">전체 다시 시작</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+"use strict";
+
+/* =====================================================================
+   1. 규칙 상수
+   ===================================================================== */
+var STUDENTS = 27;
+var MASTER = 128;                                   // 마스터 비트맵 해상도
+var STAGES = [
+  { grid: 2,   bits: 4,     score: 5 },
+  { grid: 4,   bits: 16,    score: 4 },
+  { grid: 8,   bits: 64,    score: 4 },
+  { grid: 16,  bits: 256,   score: 4 },
+  { grid: 32,  bits: 1024,  score: 3 },
+  { grid: 64,  bits: 4096,  score: 3 },
+  { grid: 128, bits: 16384, score: 3 }
+];
+var POW = [2, 4, 6, 8, 10, 12, 14];
+
+/* =====================================================================
+   2. 그리기 도우미 (128×128 좌표계)
+   ===================================================================== */
+function K(c) { c.fillStyle = "#000"; c.strokeStyle = "#000"; }
+function G(c) { c.fillStyle = "#8a8a8a"; c.strokeStyle = "#8a8a8a"; }
+function W(c) { c.fillStyle = "#fff"; c.strokeStyle = "#fff"; }
+
+function circ(c, x, y, r) { c.beginPath(); c.arc(x, y, r, 0, 6.2832); c.fill(); }
+function ell(c, x, y, rx, ry, rot) { c.beginPath(); c.ellipse(x, y, rx, ry, rot || 0, 0, 6.2832); c.fill(); }
+function rct(c, x, y, w, h) { c.fillRect(x, y, w, h); }
+function rr(c, x, y, w, h, r) { c.beginPath(); c.roundRect(x, y, w, h, r); c.fill(); }
+function poly(c, pts) {
+  c.beginPath();
+  for (var i = 0; i < pts.length; i++) {
+    if (i === 0) c.moveTo(pts[i][0], pts[i][1]); else c.lineTo(pts[i][0], pts[i][1]);
+  }
+  c.closePath(); c.fill();
+}
+function ln(c, x1, y1, x2, y2, w) {
+  c.lineWidth = w || 4; c.lineCap = "round";
+  c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke();
+}
+function ringPath(c, x, y, r, w) {                 /* 테두리 원 */
+  c.lineWidth = w; c.beginPath(); c.arc(x, y, r, 0, 6.2832); c.stroke();
+}
+
+/* =====================================================================
+   3. 문제 은행 — 사물마다 "그림 그리는 함수" 하나
+      (128×128 오프스크린 캔버스에 도형 조합으로 그린 뒤 비트맵으로 변환)
+   ===================================================================== */
+var BANK = [
+  { name: "사과", draw: function (c) {
+      G(c); ell(c, 50, 78, 30, 34); ell(c, 78, 78, 30, 34);
+      K(c); ln(c, 64, 50, 66, 26, 5);
+      K(c); ell(c, 82, 30, 16, 8, -0.5);
+  }},
+  { name: "나무", draw: function (c) {
+      K(c); rct(c, 58, 74, 13, 42);
+      G(c); circ(c, 64, 52, 34); circ(c, 40, 64, 22); circ(c, 88, 64, 22);
+  }},
+  { name: "집", draw: function (c) {
+      K(c); poly(c, [[64, 16], [116, 58], [12, 58]]);
+      G(c); rct(c, 24, 58, 80, 56);
+      K(c); rct(c, 54, 80, 22, 34);            /* 문 */
+      K(c); rct(c, 30, 68, 16, 16);            /* 창문 */
+      K(c); rct(c, 88, 22, 12, 26);            /* 굴뚝 */
+  }},
+  { name: "우산", draw: function (c) {
+      G(c); c.beginPath(); c.arc(64, 62, 50, Math.PI, 0); c.fill();
+      W(c); circ(c, 30, 62, 12); circ(c, 64, 62, 12); circ(c, 98, 62, 12);
+      K(c); ln(c, 64, 62, 64, 104, 5);
+      K(c); c.lineWidth = 5; c.beginPath(); c.arc(76, 104, 12, Math.PI, 0, true); c.stroke();
+  }},
+  { name: "물고기", draw: function (c) {
+      G(c); ell(c, 58, 64, 40, 24);
+      K(c); poly(c, [[96, 64], [120, 44], [120, 84]]);
+      G(c); poly(c, [[56, 42], [72, 28], [76, 44]]);
+      K(c); circ(c, 34, 58, 5);
+  }},
+  { name: "나비", draw: function (c) {
+      G(c); ell(c, 40, 48, 24, 20, -0.4); ell(c, 88, 48, 24, 20, 0.4);
+      G(c); ell(c, 44, 86, 18, 16, 0.4); ell(c, 84, 86, 18, 16, -0.4);
+      K(c); ell(c, 64, 66, 6, 32);
+      K(c); ln(c, 64, 36, 50, 16, 3); ln(c, 64, 36, 78, 16, 3);
+  }},
+  { name: "안경", draw: function (c) {
+      G(c); circ(c, 34, 66, 27); circ(c, 94, 66, 27);
+      K(c); ringPath(c, 34, 66, 27, 10); ringPath(c, 94, 66, 27, 10);
+      K(c); ln(c, 60, 58, 68, 58, 10);
+      K(c); ln(c, 8, 58, 2, 38, 7); ln(c, 120, 58, 126, 38, 7);
+  }},
+  { name: "왕관", draw: function (c) {
+      G(c); poly(c, [[16, 96], [16, 40], [40, 66], [64, 30], [88, 66], [112, 40], [112, 96]]);
+      K(c); rct(c, 16, 96, 96, 14);
+      K(c); circ(c, 16, 36, 7); circ(c, 64, 24, 7); circ(c, 112, 36, 7);
+  }},
+  { name: "자동차", draw: function (c) {
+      G(c); rr(c, 34, 44, 62, 26, 8);
+      G(c); rr(c, 10, 66, 110, 28, 10);
+      K(c); circ(c, 36, 96, 14); circ(c, 94, 96, 14);
+      W(c); circ(c, 36, 96, 5); circ(c, 94, 96, 5);
+      K(c); rct(c, 44, 50, 18, 16); rct(c, 68, 50, 18, 16);
+  }},
+  { name: "비행기", draw: function (c) {
+      G(c); ell(c, 66, 62, 48, 12);
+      K(c); poly(c, [[64, 56], [86, 18], [96, 20], [82, 58]]);
+      K(c); poly(c, [[64, 68], [86, 106], [96, 104], [82, 66]]);
+      K(c); poly(c, [[16, 62], [30, 40], [38, 42], [32, 62]]);
+      W(c); circ(c, 96, 60, 4); circ(c, 84, 60, 4);
+  }},
+  { name: "로켓", draw: function (c) {
+      G(c); poly(c, [[64, 10], [86, 52], [86, 92], [42, 92], [42, 52]]);
+      K(c); poly(c, [[42, 66], [20, 104], [42, 96]]);
+      K(c); poly(c, [[86, 66], [108, 104], [86, 96]]);
+      K(c); circ(c, 64, 44, 11);
+      K(c); poly(c, [[52, 92], [76, 92], [64, 122]]);
+  }},
+  { name: "구름", draw: function (c) {
+      G(c); circ(c, 44, 68, 24); circ(c, 70, 58, 30); circ(c, 96, 72, 20);
+      G(c); rct(c, 44, 66, 52, 26);
+      K(c); rct(c, 24, 88, 84, 8);
+  }},
+  { name: "달", draw: function (c) {
+      G(c); circ(c, 58, 64, 48);
+      W(c); circ(c, 84, 52, 40);
+      K(c); circ(c, 106, 26, 6); circ(c, 116, 48, 4);
+  }},
+  { name: "눈사람", draw: function (c) {
+      G(c); circ(c, 64, 88, 30); circ(c, 64, 44, 21);
+      K(c); rct(c, 46, 22, 36, 8); rct(c, 54, 6, 20, 16);
+      K(c); circ(c, 57, 40, 3); circ(c, 71, 40, 3);
+      K(c); poly(c, [[64, 46], [82, 50], [64, 52]]);
+      K(c); circ(c, 64, 78, 4); circ(c, 64, 94, 4);
+      K(c); ln(c, 36, 84, 12, 66, 4); ln(c, 92, 84, 116, 66, 4);
+  }},
+  { name: "크리스마스트리", draw: function (c) {
+      G(c); poly(c, [[64, 8], [92, 46], [36, 46]]);
+      G(c); poly(c, [[64, 30], [102, 76], [26, 76]]);
+      G(c); poly(c, [[64, 58], [112, 104], [16, 104]]);
+      K(c); rct(c, 56, 104, 16, 16);
+      K(c); circ(c, 50, 70, 5); circ(c, 82, 66, 5); circ(c, 64, 96, 5); circ(c, 40, 96, 5); circ(c, 92, 96, 5);
+  }},
+  { name: "가위", draw: function (c) {
+      K(c); ln(c, 40, 20, 84, 78, 7); ln(c, 88, 20, 44, 78, 7);
+      K(c); ringPath(c, 38, 96, 16, 7); ringPath(c, 90, 96, 16, 7);
+  }},
+  { name: "신발", draw: function (c) {
+      G(c); poly(c, [[20, 46], [46, 46], [58, 66], [110, 78], [114, 96], [20, 96]]);
+      K(c); rct(c, 16, 96, 100, 14);
+      K(c); ln(c, 30, 52, 46, 52, 4); ln(c, 34, 62, 52, 62, 4); ln(c, 40, 72, 60, 72, 4);
+  }},
+  { name: "가방", draw: function (c) {
+      K(c); c.lineWidth = 8; c.beginPath(); c.arc(64, 46, 22, Math.PI, 0); c.stroke();
+      G(c); rr(c, 20, 46, 88, 62, 10);
+      K(c); rct(c, 20, 62, 88, 10);
+      K(c); rct(c, 56, 70, 16, 14);
+  }},
+  { name: "텀블러", draw: function (c) {
+      G(c); poly(c, [[42, 26], [86, 26], [80, 116], [48, 116]]);
+      K(c); rct(c, 40, 18, 48, 12);
+      K(c); rct(c, 42, 60, 42, 8);
+      K(c); rct(c, 58, 6, 12, 12);
+  }},
+  { name: "시계", draw: function (c) {
+      K(c); ringPath(c, 64, 68, 44, 8);
+      G(c); circ(c, 64, 68, 38);
+      K(c); ln(c, 64, 68, 64, 40, 6); ln(c, 64, 68, 88, 78, 5);
+      K(c); rct(c, 46, 10, 36, 12);
+      K(c); rct(c, 58, 22, 12, 8);
+  }},
+  { name: "열쇠", draw: function (c) {
+      K(c); ringPath(c, 36, 46, 22, 9);
+      K(c); ln(c, 52, 60, 108, 106, 9);
+      K(c); ln(c, 92, 78, 106, 68, 8); ln(c, 104, 90, 116, 80, 8);
+  }},
+  { name: "카메라", draw: function (c) {
+      K(c); rct(c, 46, 24, 34, 14);
+      G(c); rr(c, 10, 38, 108, 68, 10);
+      K(c); ringPath(c, 64, 72, 24, 8);
+      G(c); circ(c, 64, 72, 16);
+      K(c); circ(c, 100, 50, 6);
+  }},
+  { name: "아이스크림", draw: function (c) {
+      G(c); circ(c, 48, 40, 20); circ(c, 80, 40, 20); circ(c, 64, 26, 20);
+      G(c); rct(c, 28, 40, 72, 16);
+      K(c); poly(c, [[26, 56], [102, 56], [64, 124]]);
+      W(c); ln(c, 40, 66, 78, 106, 3); ln(c, 88, 66, 50, 106, 3);
+  }},
+  { name: "케이크", draw: function (c) {
+      K(c); ln(c, 44, 12, 44, 30, 4); ln(c, 64, 8, 64, 30, 4); ln(c, 84, 12, 84, 30, 4);
+      G(c); rr(c, 14, 34, 100, 26, 10);
+      K(c); rct(c, 14, 60, 100, 12);
+      G(c); rct(c, 14, 72, 100, 34);
+      K(c); rct(c, 8, 106, 112, 12);
+  }},
+  { name: "축구공", draw: function (c) {
+      G(c); circ(c, 64, 64, 46);
+      K(c); poly(c, [[64, 40], [86, 56], [78, 82], [50, 82], [42, 56]]);
+      K(c); poly(c, [[64, 18], [52, 34], [76, 34]]);
+      K(c); poly(c, [[22, 74], [38, 62], [42, 86]]);
+      K(c); poly(c, [[106, 74], [90, 62], [86, 86]]);
+      K(c); ringPath(c, 64, 64, 46, 5);
+  }},
+  { name: "기타", draw: function (c) {
+      G(c); circ(c, 60, 90, 30); circ(c, 60, 54, 21);
+      G(c); rct(c, 46, 54, 28, 34);
+      K(c); circ(c, 60, 72, 9);
+      K(c); rct(c, 54, 8, 12, 46);
+      K(c); rct(c, 46, 0, 28, 10);
+      K(c); ln(c, 60, 100, 60, 116, 3);
+  }},
+  { name: "우체통", draw: function (c) {
+      G(c); c.beginPath(); c.arc(60, 50, 38, Math.PI, 0); c.fill();
+      G(c); rct(c, 22, 50, 76, 42);
+      K(c); rct(c, 40, 38, 40, 10);
+      K(c); rct(c, 54, 92, 12, 28);
+      K(c); rct(c, 36, 118, 48, 10);
+      K(c); rct(c, 100, 24, 5, 28); rct(c, 104, 24, 16, 10);
+  }},
+  { name: "전구", draw: function (c) {
+      G(c); circ(c, 64, 46, 40);
+      G(c); rct(c, 42, 62, 44, 32);
+      K(c); rct(c, 42, 92, 44, 9); rct(c, 42, 105, 44, 9);
+      K(c); rct(c, 52, 118, 24, 8);
+      K(c); ln(c, 54, 38, 64, 62, 6); ln(c, 74, 38, 64, 62, 6);
+  }},
+  { name: "연필", draw: function (c) {
+      G(c); poly(c, [[24, 96], [40, 20], [64, 26], [48, 102]]);
+      K(c); poly(c, [[24, 96], [48, 102], [22, 118]]);
+      K(c); poly(c, [[22, 118], [30, 100], [40, 103]]);
+      K(c); poly(c, [[40, 20], [46, 6], [70, 12], [64, 26]]);
+  }},
+  { name: "버섯", draw: function (c) {
+      G(c); c.beginPath(); c.ellipse(64, 62, 50, 38, 0, Math.PI, 0); c.fill();
+      K(c); circ(c, 44, 44, 9); circ(c, 82, 50, 7); circ(c, 62, 30, 6);
+      G(c); rct(c, 48, 62, 32, 46);
+      K(c); rct(c, 42, 106, 44, 10);
+  }},
+  { name: "펭귄", draw: function (c) {
+      K(c); ell(c, 64, 66, 40, 50);
+      W(c); ell(c, 64, 76, 25, 36);
+      W(c); circ(c, 52, 36, 8); circ(c, 76, 36, 8);
+      K(c); circ(c, 53, 37, 4); circ(c, 75, 37, 4);
+      G(c); poly(c, [[54, 46], [74, 46], [64, 60]]);
+      G(c); poly(c, [[42, 112], [70, 112], [32, 124]]);
+      G(c); poly(c, [[86, 112], [58, 112], [96, 124]]);
+  }},
+  { name: "닻", draw: function (c) {
+      K(c); ringPath(c, 64, 26, 12, 7);
+      K(c); ln(c, 64, 38, 64, 108, 8);
+      K(c); ln(c, 34, 50, 94, 50, 7);
+      K(c); c.lineWidth = 8; c.beginPath(); c.arc(64, 76, 40, 0.35, Math.PI - 0.35); c.stroke();
+      K(c); poly(c, [[16, 92], [34, 92], [24, 112]]);
+      K(c); poly(c, [[112, 92], [94, 92], [104, 112]]);
+  }},
+  { name: "모래시계", draw: function (c) {
+      K(c); rct(c, 26, 12, 76, 12); rct(c, 26, 104, 76, 12);
+      G(c); poly(c, [[34, 24], [94, 24], [68, 64], [94, 104], [34, 104], [60, 64]]);
+      K(c); poly(c, [[38, 28], [90, 28], [64, 60]]);
+      K(c); poly(c, [[42, 100], [86, 100], [64, 76]]);
+  }},
+  { name: "신호등", draw: function (c) {
+      G(c); rr(c, 30, 4, 68, 96, 14);
+      K(c); circ(c, 64, 28, 17); circ(c, 64, 76, 17);
+      W(c); circ(c, 64, 52, 17);
+      K(c); rct(c, 54, 100, 20, 26);
+  }},
+  { name: "열기구", draw: function (c) {
+      G(c); ell(c, 64, 46, 36, 42);
+      K(c); ell(c, 48, 46, 8, 41); ell(c, 80, 46, 8, 41);
+      K(c); ln(c, 44, 76, 52, 98, 3); ln(c, 84, 76, 76, 98, 3);
+      K(c); rct(c, 50, 98, 28, 22);
+  }},
+  { name: "자전거", draw: function (c) {
+      K(c); ringPath(c, 30, 84, 26, 6); ringPath(c, 98, 84, 26, 6);
+      K(c); ln(c, 30, 84, 58, 84, 5); ln(c, 58, 84, 74, 46, 5);
+      K(c); ln(c, 74, 46, 98, 84, 5); ln(c, 58, 84, 74, 46, 5);
+      K(c); ln(c, 44, 46, 84, 46, 5);
+      K(c); ln(c, 44, 46, 30, 84, 5);
+      G(c); rct(c, 34, 38, 22, 8);
+      G(c); ln(c, 78, 38, 96, 38, 6);
+  }},
+  { name: "망치", draw: function (c) {
+      G(c); poly(c, [[26, 18], [92, 18], [92, 46], [26, 46]]);
+      K(c); poly(c, [[26, 18], [26, 46], [10, 40], [10, 24]]);
+      K(c); rct(c, 58, 46, 16, 70);
+  }},
+  { name: "책", draw: function (c) {
+      G(c); poly(c, [[12, 30], [60, 40], [60, 106], [12, 96]]);
+      G(c); poly(c, [[116, 30], [68, 40], [68, 106], [116, 96]]);
+      K(c); rct(c, 60, 38, 8, 70);
+      K(c); ln(c, 20, 50, 52, 56, 3); ln(c, 20, 64, 52, 70, 3);
+      K(c); ln(c, 76, 56, 108, 50, 3); ln(c, 76, 70, 108, 64, 3);
+  }},
+  { name: "고양이", draw: function (c) {
+      G(c); circ(c, 64, 70, 36);
+      G(c); poly(c, [[34, 46], [38, 12], [64, 38]]);
+      G(c); poly(c, [[94, 46], [90, 12], [64, 38]]);
+      K(c); circ(c, 50, 64, 5); circ(c, 78, 64, 5);
+      K(c); poly(c, [[58, 78], [70, 78], [64, 86]]);
+      K(c); ln(c, 22, 74, 4, 68, 3); ln(c, 22, 84, 4, 88, 3);
+      K(c); ln(c, 106, 74, 124, 68, 3); ln(c, 106, 84, 124, 88, 3);
+  }},
+  { name: "오리", draw: function (c) {
+      G(c); ell(c, 58, 86, 44, 26);
+      G(c); circ(c, 92, 44, 22);
+      K(c); poly(c, [[110, 40], [128, 46], [110, 54]]);
+      K(c); circ(c, 92, 38, 4);
+      K(c); ell(c, 52, 84, 22, 12, -0.2);
+      G(c); poly(c, [[14, 84], [30, 74], [26, 92]]);
+  }}
+];
+
+/* =====================================================================
+   4. 마스터 비트맵 만들기 (절차적 그림 → 128×128 명암 배열)
+   ===================================================================== */
+var off = document.createElement("canvas");
+off.width = MASTER; off.height = MASTER;
+var octx = off.getContext("2d", { willReadFrequently: true });
+
+function buildMaster(item) {
+  octx.setTransform(1, 0, 0, 1, 0, 0);
+  octx.fillStyle = "#fff";
+  octx.fillRect(0, 0, MASTER, MASTER);
+  octx.save();
+  item.draw(octx);
+  octx.restore();
+
+  var img = octx.getImageData(0, 0, MASTER, MASTER).data;
+  var out = new Float32Array(MASTER * MASTER);
+  for (var i = 0, p = 0; i < out.length; i++, p += 4) {
+    /* 밝기(0~1). 색을 쓰지 않으므로 R 값만 봐도 충분하지만 안전하게 평균. */
+    out[i] = (img[p] * 0.299 + img[p + 1] * 0.587 + img[p + 2] * 0.114) / 255;
+  }
+  return out;
+}
+
+/* 블록 평균 다운샘플링: 128×128 → n×n */
+function downsample(master, n) {
+  var block = MASTER / n;
+  var out = new Float32Array(n * n);
+  for (var gy = 0; gy < n; gy++) {
+    for (var gx = 0; gx < n; gx++) {
+      var sum = 0;
+      for (var y = 0; y < block; y++) {
+        var row = (gy * block + y) * MASTER + gx * block;
+        for (var x = 0; x < block; x++) sum += master[row + x];
+      }
+      out[gy * n + gx] = sum / (block * block);
+    }
+  }
+  return out;
+}
+
+/* 칸이 몇 개 없는 낮은 단계에서는 평균값이 서로 비슷해 화면이 통째로 하얗게
+   보일 수 있습니다. 그래서 각 단계의 밝기 범위를 0~1 로 펴 준 뒤 명암을 나눕니다. */
+function stretch(cells) {
+  var min = 1, max = 0, i;
+  for (i = 0; i < cells.length; i++) {
+    if (cells[i] < min) min = cells[i];
+    if (cells[i] > max) max = cells[i];
+  }
+  if (max - min < 0.005) return cells;            /* 정말 균일하면 그대로 */
+  var out = new Float32Array(cells.length);
+  for (i = 0; i < cells.length; i++) out[i] = (cells[i] - min) / (max - min);
+  return out;
+}
+
+/* 3단계 명암으로 양자화 */
+function shade(v) {
+  if (v < 0.27) return "#000000";      /* 검정과 회색의 중간 */
+  if (v < 0.77) return "#8a8a8a";      /* 회색과 흰색의 중간 */
+  return "#ffffff";
+}
+
+/* =====================================================================
+   5. 화면에 그리기 (칸마다 연한 회색 구분선)
+   ===================================================================== */
+var cv = document.getElementById("bmp");
+var cctx = cv.getContext("2d");
+var GRID_COLOR = "#c9d0c2";
+var GRID_MIN_CELL = 6;          /* 칸이 이보다 작아지면(128×128) 선을 그리지 않습니다 */
+
+function render(master, n) {
+  var cells = stretch(downsample(master, n));
+  var size = cv.width / n;
+  var gx, gy;
+
+  cctx.fillStyle = "#fff";
+  cctx.fillRect(0, 0, cv.width, cv.height);
+
+  for (gy = 0; gy < n; gy++) {
+    for (gx = 0; gx < n; gx++) {
+      cctx.fillStyle = shade(cells[gy * n + gx]);
+      cctx.fillRect(Math.round(gx * size), Math.round(gy * size),
+                    Math.ceil(size), Math.ceil(size));
+    }
+  }
+
+  if (size < GRID_MIN_CELL) return;
+
+  cctx.strokeStyle = GRID_COLOR;
+  cctx.lineWidth = 1;
+  cctx.beginPath();
+  for (gx = 0; gx <= n; gx++) {
+    var x = Math.min(Math.round(gx * size), cv.width - 0.5) + 0.5;
+    cctx.moveTo(x, 0); cctx.lineTo(x, cv.height);
+  }
+  for (gy = 0; gy <= n; gy++) {
+    var y = Math.min(Math.round(gy * size), cv.height - 0.5) + 0.5;
+    cctx.moveTo(0, y); cctx.lineTo(cv.width, y);
+  }
+  cctx.stroke();
+}
+
+/* =====================================================================
+   6. 게임 상태
+   ===================================================================== */
+var scores = new Array(STUDENTS).fill(0);
+var deck = [];
+var current = null;      /* { item, master } */
+var stage = 0;           /* 0-based */
+var qCount = 0;
+
+function shuffled() {
+  var a = BANK.map(function (_, i) { return i; });
+  for (var i = a.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var t = a[i]; a[i] = a[j]; a[j] = t;
+  }
+  return a;
+}
+
+function nextItem() {
+  if (deck.length === 0) deck = shuffled();
+  return BANK[deck.pop()];
+}
+
+/* =====================================================================
+   7. 탭 · 화면 전환
+   ===================================================================== */
+function $(id) { return document.getElementById(id); }
+
+var TABS = ["game", "scores", "wrap"];
+function showTab(name) {
+  TABS.forEach(function (t) { $("tab-" + t).hidden = (t !== name); });
+  document.querySelectorAll(".tab-btn").forEach(function (b) {
+    b.classList.toggle("active", b.dataset.tab === name);
+  });
+  if (name === "scores") paintScores();
+  if (name === "wrap") $("rankText").value = rankingText();
+  window.scrollTo(0, 0);
+}
+
+var SCREENS = ["intro", "play", "answer"];
+function showScreen(name) {
+  SCREENS.forEach(function (s) { $("screen-" + s).hidden = (s !== name); });
+  showTab("game");
+}
+
+document.querySelectorAll(".tab-btn").forEach(function (b) {
+  b.addEventListener("click", function () { showTab(b.dataset.tab); });
+});
+
+/* =====================================================================
+   8. 진행 로직
+   ===================================================================== */
+var SUP = { 0: "⁰", 1: "¹", 2: "²", 3: "³", 4: "⁴", 5: "⁵", 6: "⁶", 7: "⁷", 8: "⁸", 9: "⁹" };
+function supers(n) {
+  return String(n).split("").map(function (ch) { return SUP[ch]; }).join("");
+}
+
+function buildPips() {
+  var box = $("pips");
+  box.innerHTML = "";
+  for (var i = 0; i < STAGES.length; i++) {
+    var p = document.createElement("span");
+    p.className = "pip";
+    p.textContent = String(i + 1);
+    box.appendChild(p);
+  }
+}
+
+function paintStage() {
+  var st = STAGES[stage];
+  render(current.master, st.grid);
+
+  $("stageNow").textContent = (stage + 1) + " / 7";
+  $("stageScore").textContent = "이번 단계 " + st.score + "점";
+  $("stageMeta").textContent = st.grid + "×" + st.grid + " · 픽셀 " +
+                               st.bits.toLocaleString() + "개 (2" + supers(POW[stage]) + ")";
+  $("roundProgress").textContent = qCount + "번째 문제 · " + (stage + 1) + "/7단계";
+
+  var kids = $("pips").children;
+  for (var i = 0; i < kids.length; i++) {
+    kids[i].className = "pip" + (i <= stage ? " used" : "");
+  }
+
+  $("btnNext").textContent = (stage >= STAGES.length - 1)
+    ? "아무도 못 맞힘 (정답 공개)"
+    : "다음 단계 공개";
+}
+
+function startQuestion() {
+  var item = nextItem();
+  current = { item: item, master: buildMaster(item) };
+  stage = 0;
+  qCount++;
+  paintStage();
+  showScreen("play");
+}
+
+$("btnNext").addEventListener("click", function () {
+  if (stage < STAGES.length - 1) {
+    stage++;
+    paintStage();
+  } else {
+    openAnswer(false);
+  }
+});
+
+$("btnHit").addEventListener("click", function () { openAnswer(true); });
+
+/* ---------- 정답 공개 · 정답자 번호 선택 ---------- */
+function buildNumGrid() {
+  var grid = $("numGrid");
+  grid.innerHTML = "";
+  for (var i = 1; i <= STUDENTS; i++) {
+    (function (num) {
+      var b = document.createElement("button");
+      b.className = "num-btn";
+      b.type = "button";
+      b.textContent = String(num);
+      b.addEventListener("click", function () { award(num); });
+      grid.appendChild(b);
+    })(i);
+  }
+}
+
+function openAnswer(hit) {
+  var st = STAGES[stage];
+  $("revealWord").textContent = current.item.name;
+
+  if (hit) {
+    $("revealCap").textContent = (stage + 1) + "단계 · " + st.grid + "×" + st.grid +
+                                 " · 픽셀 " + st.bits.toLocaleString() + "개에서 맞혔어요 — " + st.score + "점";
+    $("pickArea").hidden = false;
+    $("afterArea").hidden = true;
+    $("roundProgress").textContent = qCount + "번째 문제 · 정답자 선택";
+  } else {
+    $("revealCap").textContent = "7단계까지 아무도 맞히지 못했어요 — 0점";
+    $("pickArea").hidden = true;
+    $("afterArea").hidden = false;
+    $("resultNote").className = "result-note zero";
+    $("resultNote").textContent = "이번 문제의 정답은 “" + current.item.name +
+                                  "” 였어요. 점수 변동 없이 다음 문제로 넘어갑니다.";
+    $("roundProgress").textContent = qCount + "번째 문제 · 정답 공개";
+  }
+  showScreen("answer");
+}
+
+function award(num) {
+  var st = STAGES[stage];
+  scores[num - 1] += st.score;
+  $("pickArea").hidden = true;
+  $("afterArea").hidden = false;
+  $("resultNote").className = "result-note";
+  $("resultNote").textContent = num + "번 학생에게 " + st.score + "점을 주었어요. (누적 " +
+                                scores[num - 1] + "점) · 정답: " + current.item.name;
+}
+
+$("btnNextQ").addEventListener("click", startQuestion);
+$("btnGoScore").addEventListener("click", function () { showTab("scores"); });
+
+/* ---------- 점수판 ---------- */
+function paintScores() {
+  var grid = $("scoreboardGrid");
+  grid.innerHTML = "";
+  for (var i = 0; i < STUDENTS; i++) {
+    var cell = document.createElement("div");
+    cell.className = "score-card";
+    var n = document.createElement("div"); n.className = "num"; n.textContent = (i + 1) + "번";
+    var s = document.createElement("div"); s.className = "pts"; s.textContent = scores[i];
+    cell.appendChild(n); cell.appendChild(s);
+    grid.appendChild(cell);
+  }
+}
+
+/* ---------- 정리 ---------- */
+function rankingText() {
+  var rows = scores.map(function (s, i) { return { num: i + 1, s: s }; });
+  rows.sort(function (a, b) { return b.s - a.s || a.num - b.num; });
+
+  var lines = ["비트맵 해상도 퀴즈 결과 (출제 " + qCount + "문제)", ""];
+  var rank = 0, prev = null, shown = 0;
+  rows.forEach(function (r) {
+    shown++;
+    if (r.s !== prev) { rank = shown; prev = r.s; }
+    lines.push(rank + "위  " + r.num + "번  " + r.s + "점");
+  });
+  return lines.join("\n");
+}
+
+$("btnCopy").addEventListener("click", function () {
+  var ta = $("rankText");
+  var btn = this;
+  function done() {
+    btn.textContent = "복사했어요";
+    setTimeout(function () { btn.textContent = "순위 복사하기"; }, 1800);
+  }
+  function fallback() {
+    ta.removeAttribute("readonly");
+    ta.select(); ta.setSelectionRange(0, ta.value.length);
+    try { document.execCommand("copy"); done(); }
+    catch (e) { btn.textContent = "직접 선택해 복사해 주세요"; }
+    ta.setAttribute("readonly", "readonly");
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(ta.value).then(done, fallback);
+  } else { fallback(); }
+});
+
+$("btnResetAll").addEventListener("click", function () {
+  scores = new Array(STUDENTS).fill(0);
+  deck = []; qCount = 0; current = null;
+  $("roundProgress").textContent = "문제 대기 중";
+  showScreen("intro");
+});
+
+/* =====================================================================
+   9. 시작 준비
+   ===================================================================== */
+(function initStepTable() {
+  var tb = $("stepTable");
+  STAGES.forEach(function (st, i) {
+    var tr = document.createElement("tr");
+    [ (i + 1) + "단계",
+      st.grid + "×" + st.grid,
+      st.bits.toLocaleString() + " (2" + supers(POW[i]) + ")",
+      st.score + "점"
+    ].forEach(function (txt, col) {
+      var td = document.createElement("td");
+      if (col === 3) td.className = "pts";
+      td.textContent = txt;
+      tr.appendChild(td);
+    });
+    tb.appendChild(tr);
+  });
+})();
+
+buildPips();
+buildNumGrid();
+$("btnStart").addEventListener("click", startQuestion);
+</script>
