@@ -133,6 +133,15 @@
           "g2s2-3-2"
         ],
         "unitsSet": true
+      },
+      "gomoku": {
+        "title": "쉬는시간 오목",
+        "url": "gomoku.html",
+        "memo": "AI 대전(하·중·상) / 2인 대전",
+        "order": 14,
+        "open": true,
+        "units": [],
+        "unitsSet": true
       }
     }
   }

@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<!--
+  gomoku.html — 쉬는시간 오목 게임 (15x15, 단일 HTML 파일)
+
+  목적: 중학생이 쉬는시간·자투리 시간에 태블릿/스마트폰으로 가볍게 즐기는 오락용 오목 게임.
+  사용법: 이 파일을 브라우저로 열면 바로 실행됩니다. 외부 리소스·라이브러리 없음.
+    - AI 대전: 난이도 하/중/상 선택 → 학생이 흑(선), AI가 백.
+    - 2인 대전: 같은 화면을 돌려가며 두 명이 번갈아 착수. '보드 회전'을 켜면
+      턴마다 보드가 180도 돌아 마주 앉아서도 편하게 볼 수 있습니다.
+  규칙: 가로/세로/대각선으로 5개를 먼저 이으면 승리. 렌주룰(금수)은 적용하지 않습니다.
+-->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>쉬는시간 오목</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: Pretendard, -apple-system, "Segoe UI", "맑은 고딕", sans-serif;
+    background: #f5f6f8; color: #111827;
+    overflow: hidden;
+  }
+
+  /* 버튼은 모두 같은 크기·같은 색으로 (위계 강조 대신 균일하게) */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-height: 56px; padding: 12px 16px;
+    font-family: inherit; font-size: 17px; font-weight: 600;
+    text-align: center; word-break: keep-all; line-height: 1.3;
+    background: #fff; color: #111827;
+    border: 1px solid #d1d5db; border-radius: 10px; cursor: pointer;
+    transition: background .12s, border-color .12s;
+  }
+  .btn:hover { border-color: #2563eb; background: #f8faff; }
+  .btn:active { background: #eff6ff; }
+  .btn[aria-pressed="true"] { border-color: #2563eb; background: #eff6ff; }
+  .btn:disabled { color: #9ca3af; background: #fafafa; border-color: #e5e7eb; cursor: default; }
+
+  .screen { display: none; height: 100%; }
+  .screen.on { display: flex; }
+
+  /* ── 시작 화면 ────────────────────────────── */
+  #startScreen {
+    flex-direction: column; align-items: center;
+    overflow-y: auto; padding: 24px 16px 32px;
+  }
+  .start-inner { width: 100%; max-width: 520px; margin: auto; }
+  h1 { font-size: 26px; margin: 0 0 6px; text-align: center; }
+  .sub { font-size: 15px; color: #6b7280; margin: 0 0 22px; text-align: center; line-height: 1.5; }
+  .card {
+    background: #fff; border: 1px solid #d1d5db; border-radius: 12px;
+    padding: 16px; margin: 0 0 14px;
+  }
+  .card h2 { font-size: 17px; margin: 0 0 4px; }
+  .card p { font-size: 14px; color: #6b7280; margin: 0 0 12px; line-height: 1.5; }
+  .row3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .names { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 8px; }
+  .names input {
+    width: 100%; min-height: 56px; padding: 10px 12px;
+    font-family: inherit; font-size: 17px; color: #111827;
+    background: #fff; border: 1px solid #d1d5db; border-radius: 10px;
+  }
+  .names input:focus { outline: none; border-color: #2563eb; }
+  .stack { display: grid; gap: 8px; }
+
+  /* ── 게임 화면 ────────────────────────────── */
+  #gameScreen { flex-direction: column; padding: 10px 10px 12px; gap: 8px; }
+  #statusBar {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    min-height: 58px; padding: 8px 12px;
+    background: #fff; border: 1px solid #d1d5db; border-radius: 10px;
+    font-size: 19px; font-weight: 700; text-align: center;
+    transition: transform .35s ease;
+  }
+  #statusDot {
+    width: 22px; height: 22px; border-radius: 50%; flex: 0 0 auto;
+    border: 1px solid #9ca3af; background: #111827;
+  }
+  #statusDot.white { background: #fff; }
+  #statusDot.hide { display: none; }
+  #statusText.win { color: #1d4ed8; }
+  #statusBar.flip { transform: rotate(180deg); }
+
+  #boardWrap {
+    flex: 1 1 auto; min-height: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #board {
+    display: block; touch-action: manipulation;
+    border-radius: 10px; border: 1px solid #d1d5db;
+    background: #f3e3c3;
+    transition: transform .35s ease;
+  }
+  #board.flip { transform: rotate(180deg); }
+
+  #sidePanel { display: flex; flex-direction: column; gap: 8px; }
+  #controls { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  #controls .btn { font-size: 15px; min-height: 52px; padding: 8px 6px; }
+  #controls .btn.hide { display: none; }
+
+  @media (max-width: 420px) {
+    #controls { grid-template-columns: repeat(2, 1fr); }
+    #statusBar { font-size: 17px; }
+  }
+  @media (min-width: 700px) and (orientation: landscape) {
+    #gameScreen { flex-direction: row-reverse; align-items: stretch; gap: 12px; }
+    #sidePanel { width: 240px; flex: 0 0 240px; justify-content: flex-start; }
+    #controls { grid-template-columns: 1fr; }
+  }
+
+  @keyframes pop { from { transform: scale(.94); } to { transform: scale(1); } }
+  .pop { animation: pop .22s ease-out; }
+</style>
+</head>
+<body>
+
+<!-- ===== 시작 화면 ===== -->
+<section id="startScreen" class="screen on">
+  <div class="start-inner">
+    <h1>쉬는시간 오목</h1>
+    <p class="sub">가로·세로·대각선으로 5개를 먼저 이으면 이깁니다.<br>금수(렌주룰) 없이 단순하게 즐기는 오목이에요.</p>
+
+    <div class="card">
+      <h2>AI 대전</h2>
+      <p>혼자서 AI와 겨룹니다. 학생이 흑돌로 먼저 둡니다.</p>
+      <div class="row3">
+        <button class="btn" data-ai="1">난이도 하</button>
+        <button class="btn" data-ai="2">난이도 중</button>
+        <button class="btn" data-ai="3">난이도 상</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>2인 대전</h2>
+      <p>한 태블릿을 돌려가며 두 명이 번갈아 둡니다. 이름은 비워 두면 흑돌·백돌로 표시됩니다.</p>
+      <div class="names">
+        <input id="p1Name" type="text" maxlength="6" placeholder="흑돌 이름">
+        <input id="p2Name" type="text" maxlength="6" placeholder="백돌 이름">
+      </div>
+      <div class="stack">
+        <button class="btn" id="rotateToggle" aria-pressed="true">보드 회전: 켜기</button>
+        <button class="btn" id="startPvp">2인 대전 시작</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>설정</h2>
+      <div class="stack">
+        <button class="btn" id="soundToggleStart" aria-pressed="true">효과음: 켜기</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 게임 화면 ===== -->
+<section id="gameScreen" class="screen">
+  <div id="boardWrap"><canvas id="board"></canvas></div>
+  <div id="sidePanel">
+    <div id="statusBar"><span id="statusDot"></span><span id="statusText"></span></div>
+    <div id="controls">
+      <button class="btn" id="btnUndo">한 수 무르기</button>
+      <button class="btn" id="btnReset">다시두기</button>
+      <button class="btn" id="btnHome">처음 화면</button>
+      <button class="btn" id="btnSound" aria-pressed="true">효과음 켜짐</button>
+    </div>
+  </div>
+</section>
+
+<script>
+"use strict";
+(function () {
+  /* ────────── 상수 ────────── */
+  var N = 15;
+  var EMPTY = 0, BLACK = 1, WHITE = 2;
+  var DIRS = [[0, 1], [1, 0], [1, 1], [1, -1]];
+
+  /* ────────── 상태 ────────── */
+  var board = new Uint8Array(N * N);
+  var history = [];        // {i, p}
+  var mode = "ai";         // "ai" | "pvp"
+  var aiLevel = 2;         // 1 하 / 2 중 / 3 상
+  var turn = BLACK;
+  var over = false;
+  var winLine = null;      // 승리한 5칸
+  var thinking = false;
+  var rotateOn = true;
+  var soundOn = true;
+  var names = { 1: "흑돌", 2: "백돌" };
+  var flipped = false;
+
+  /* ────────── DOM ────────── */
+  function $(id) { return document.getElementById(id); }
+  var startScreen = $("startScreen"), gameScreen = $("gameScreen");
+  var canvas = $("board"), ctx = canvas.getContext("2d");
+  var statusBar = $("statusBar"), statusText = $("statusText"), statusDot = $("statusDot");
+  var btnUndo = $("btnUndo"), btnReset = $("btnReset"), btnHome = $("btnHome"), btnSound = $("btnSound");
+
+  /* ────────── 효과음 (Web Audio, 외부 리소스 없음) ────────── */
+  var actx = null;
+  function audio() {
+    if (!soundOn) return null;
+    try {
+      if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === "suspended") actx.resume();
+      return actx;
+    } catch (e) { return null; }
+  }
+  function beep(freq, dur, type, vol) {
+    var a = audio(); if (!a) return;
+    var o = a.createOscillator(), g = a.createGain();
+    o.type = type || "triangle"; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, a.currentTime);
+    g.gain.exponentialRampToValueAtTime(vol || 0.16, a.currentTime + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + dur);
+    o.connect(g); g.connect(a.destination);
+    o.start(); o.stop(a.currentTime + dur + 0.03);
+  }
+  function soundPlace(p) { beep(p === BLACK ? 620 : 460, 0.09, "triangle", 0.16); }
+  function soundWin() {
+    [523, 659, 784, 1047].forEach(function (f, k) {
+      setTimeout(function () { beep(f, 0.22, "sine", 0.15); }, k * 110);
+    });
+  }
+  function soundNope() { beep(170, 0.07, "square", 0.07); }
+
+  /* ────────── 보드 그리기 ────────── */
+  var size = 400, cell = 26, pad = 13, dpr = 1;
+  var anim = null;   // 착수 애니메이션 {i, t0}
+  var winFx = null;  // 승리선 반짝임 {t0}
+  var rafId = 0;
+
+  function layout() {
+    var wrap = $("boardWrap");
+    var w = wrap.clientWidth, h = wrap.clientHeight;
+    var s = Math.floor(Math.min(w || 320, h || 320));
+    if (!s || s < 220) s = Math.max(240, Math.min(w || 300, 300));
+    s = Math.min(s, 760);
+    size = s; cell = size / N; pad = cell / 2;
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.style.width = size + "px";
+    canvas.style.height = size + "px";
+    canvas.width = Math.round(size * dpr);
+    canvas.height = Math.round(size * dpr);
+    render();
+  }
+
+  function xy(r, c) { return [pad + c * cell, pad + r * cell]; }
+
+  function drawStone(x, y, p, radius) {
+    var g = ctx.createRadialGradient(x - radius * 0.3, y - radius * 0.35, radius * 0.15, x, y, radius);
+    if (p === BLACK) {
+      g.addColorStop(0, "#6b7280"); g.addColorStop(0.55, "#1f2937"); g.addColorStop(1, "#030712");
+    } else {
+      g.addColorStop(0, "#ffffff"); g.addColorStop(0.6, "#f3f4f6"); g.addColorStop(1, "#cbd5e1");
+    }
+    ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fillStyle = g; ctx.fill();
+    ctx.lineWidth = Math.max(1, radius * 0.06);
+    ctx.strokeStyle = p === BLACK ? "rgba(0,0,0,.45)" : "rgba(120,130,145,.75)";
+    ctx.stroke();
+  }
+
+  function render(ts) {
+    var now = ts || (window.performance ? performance.now() : Date.now());
+    var animating = false;
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = "#f3e3c3";
+    ctx.fillRect(0, 0, size, size);
+
+    // 격자
+    ctx.strokeStyle = "#a9865a";
+    ctx.lineWidth = Math.max(0.7, size / 700);
+    ctx.beginPath();
+    for (var k = 0; k < N; k++) {
+      var a = pad + k * cell;
+      ctx.moveTo(pad, a); ctx.lineTo(size - pad, a);
+      ctx.moveTo(a, pad); ctx.lineTo(a, size - pad);
+    }
+    ctx.stroke();
+
+    // 화점
+    var stars = [3, 7, 11], sr = Math.max(2, cell * 0.11);
+    ctx.fillStyle = "#8a6a42";
+    for (var i = 0; i < 3; i++) {
+      for (var j = 0; j < 3; j++) {
+        var pt = xy(stars[i], stars[j]);
+        ctx.beginPath(); ctx.arc(pt[0], pt[1], sr, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+
+    // 돌
+    var base = cell * 0.43;
+    for (var idx = 0; idx < board.length; idx++) {
+      var p = board[idx]; if (!p) continue;
+      var pos = xy((idx / N) | 0, idx % N), rad = base;
+      if (anim && anim.i === idx) {
+        var t = Math.min(1, (now - anim.t0) / 170);
+        rad = base * (0.4 + 0.6 * (1 - Math.pow(1 - t, 3)));
+        if (t < 1) animating = true; else anim = null;
+      }
+      drawStone(pos[0], pos[1], p, rad);
+    }
+
+    // 마지막 착수 표시
+    if (history.length && !winLine) {
+      var last = history[history.length - 1];
+      var lp = xy((last.i / N) | 0, last.i % N);
+      ctx.beginPath();
+      ctx.arc(lp[0], lp[1], base * 0.3, 0, Math.PI * 2);
+      ctx.strokeStyle = last.p === BLACK ? "rgba(255,255,255,.85)" : "rgba(30,41,59,.75)";
+      ctx.lineWidth = Math.max(1.6, cell * 0.07);
+      ctx.stroke();
+    }
+
+    // 승리 연결선
+    if (winLine) {
+      var alpha = 0.9;
+      if (winFx) {
+        var wt = (now - winFx.t0) / 1000;
+        alpha = 0.55 + 0.45 * Math.abs(Math.sin(wt * 2.2));
+        if (wt < 5) animating = true; else winFx = null;
+      }
+      var s0 = xy(winLine[0][0], winLine[0][1]);
+      var s1 = xy(winLine[4][0], winLine[4][1]);
+      ctx.beginPath(); ctx.moveTo(s0[0], s0[1]); ctx.lineTo(s1[0], s1[1]);
+      ctx.strokeStyle = "rgba(220,38,38," + alpha.toFixed(3) + ")";
+      ctx.lineWidth = Math.max(3, cell * 0.16);
+      ctx.lineCap = "round";
+      ctx.stroke();
+    }
+
+    rafId = animating ? requestAnimationFrame(render) : 0;
+  }
+  function kick() { if (!rafId) rafId = requestAnimationFrame(render); }
+
+  /* ────────── 규칙: 5목 판정 ────────── */
+  function winAt(r, c, p) {
+    for (var d = 0; d < 4; d++) {
+      var dr = DIRS[d][0], dc = DIRS[d][1];
+      var back = 0, fwd = 0, k, rr, cc;
+      for (k = 1; k < 5; k++) {
+        rr = r + dr * k; cc = c + dc * k;
+        if (rr < 0 || rr >= N || cc < 0 || cc >= N || board[rr * N + cc] !== p) break;
+        fwd++;
+      }
+      for (k = 1; k < 5; k++) {
+        rr = r - dr * k; cc = c - dc * k;
+        if (rr < 0 || rr >= N || cc < 0 || cc >= N || board[rr * N + cc] !== p) break;
+        back++;
+      }
+      if (back + fwd + 1 >= 5) {
+        // 착수점을 포함하는 5칸을 고른다
+        var startOff = -Math.min(back, 4 - Math.min(fwd, 4));
+        if (startOff + 4 > fwd) startOff = fwd - 4;
+        var cells = [];
+        for (k = 0; k < 5; k++) cells.push([r + dr * (startOff + k), c + dc * (startOff + k)]);
+        return cells;
+      }
+    }
+    return null;
+  }
+
+  /* ────────── AI: 패턴 평가 ────────── */
+  // 한 방향 9칸을 문자열로 만든다. '1' 내 돌, '2' 상대 돌/벽, '0' 빈칸. 중앙(k=0)은 착수 가정.
+  function lineStr(r, c, dr, dc, p) {
+    var s = "", k, rr, cc, v;
+    for (k = -4; k <= 4; k++) {
+      if (k === 0) { s += "1"; continue; }
+      rr = r + dr * k; cc = c + dc * k;
+      if (rr < 0 || rr >= N || cc < 0 || cc >= N) { s += "2"; continue; }
+      v = board[rr * N + cc];
+      s += v === EMPTY ? "0" : (v === p ? "1" : "2");
+    }
+    return s;
+  }
+  var PATTERNS = [
+    [/11111/, 10000000],                                  // 5목
+    [/011110/, 500000],                                   // 열린 4
+    [/211110|011112|11011|10111|11101/, 60000],           // 4 (막힌 4 · 띈 4)
+    [/011100|001110|010110|011010/, 9000],                // 열린 3
+    [/211100|001112|211010|010112|210110|011012/, 900],   // 막힌 3
+    [/01100|00110|01010|010010/, 120],                    // 열린 2
+    [/1/, 12]
+  ];
+  function dirScore(s) {
+    for (var k = 0; k < PATTERNS.length; k++) if (PATTERNS[k][0].test(s)) return PATTERNS[k][1];
+    return 0;
+  }
+  function offense(r, c, p) {           // (r,c)에 p가 두었을 때의 공격 가치
+    var sum = 0, big = 0, sc;
+    for (var d = 0; d < 4; d++) {
+      sc = dirScore(lineStr(r, c, DIRS[d][0], DIRS[d][1], p));
+      sum += sc;
+      if (sc >= 9000) big++;
+    }
+    if (big >= 2) sum += 40000;         // 삼삼·사삼 등 복합 위협
+    return sum;
+  }
+  function moveScore(r, c, p) {         // 공격 + 상대 급소 차단
+    return offense(r, c, p) + 0.9 * offense(r, c, 3 - p);
+  }
+
+  function candidates() {               // 기존 돌 주변 2칸 이내의 빈칸
+    var out = [], seen = new Uint8Array(N * N), any = false, i, dr, dc;
+    for (i = 0; i < board.length; i++) {
+      if (!board[i]) continue;
+      any = true;
+      var r = (i / N) | 0, c = i % N;
+      for (dr = -2; dr <= 2; dr++) {
+        for (dc = -2; dc <= 2; dc++) {
+          var rr = r + dr, cc = c + dc;
+          if (rr < 0 || rr >= N || cc < 0 || cc >= N) continue;
+          var j = rr * N + cc;
+          if (board[j] || seen[j]) continue;
+          seen[j] = 1; out.push(j);
+        }
+      }
+    }
+    if (!any) out.push(7 * N + 7);
+    return out;
+  }
+  function ordered(p, limit) {
+    var cs = candidates(), arr = [], i, j;
+    for (i = 0; i < cs.length; i++) {
+      j = cs[i];
+      arr.push({ i: j, s: moveScore((j / N) | 0, j % N, p) });
+    }
+    arr.sort(function (a, b) { return b.s - a.s; });
+    return limit ? arr.slice(0, limit) : arr;
+  }
+
+  // 판 전체 평가: 모든 직선의 연속 5칸 창을 훑는다 (가볍고 빠름)
+  var LINES = (function () {
+    var L = [], r, c, k, line;
+    for (r = 0; r < N; r++) { line = []; for (c = 0; c < N; c++) line.push(r * N + c); L.push(line); }
+    for (c = 0; c < N; c++) { line = []; for (r = 0; r < N; r++) line.push(r * N + c); L.push(line); }
+    for (k = -(N - 5); k <= N - 5; k++) {
+      line = [];
+      for (r = 0; r < N; r++) { c = r + k; if (c >= 0 && c < N) line.push(r * N + c); }
+      if (line.length >= 5) L.push(line);
+      line = [];
+      for (r = 0; r < N; r++) { c = (N - 1) - r + k; if (c >= 0 && c < N) line.push(r * N + c); }
+      if (line.length >= 5) L.push(line);
+    }
+    return L;
+  })();
+  var W5 = [0, 1, 14, 180, 3200, 1000000];
+  function evalBoard(me) {
+    var them = 3 - me, score = 0, li, line, k, j, mine, theirs, v;
+    for (li = 0; li < LINES.length; li++) {
+      line = LINES[li];
+      for (k = 0; k + 4 < line.length; k++) {
+        mine = 0; theirs = 0;
+        for (j = 0; j < 5; j++) {
+          v = board[line[k + j]];
+          if (v === me) mine++; else if (v === them) theirs++;
+        }
+        if (mine && !theirs) score += W5[mine];
+        else if (theirs && !mine) score -= W5[theirs] * 1.15;
+      }
+    }
+    return score;
+  }
+
+  var nodes = 0, NODE_CAP = 45000;
+  function alphabeta(depth, alpha, beta, mover, me) {
+    var moves = ordered(mover, depth >= 3 ? 8 : 10), i, m, v, best;
+    if (!moves.length) return 0;
+    if (mover === me) {
+      best = -Infinity;
+      for (i = 0; i < moves.length; i++) {
+        m = moves[i]; board[m.i] = mover; nodes++;
+        if (winAt((m.i / N) | 0, m.i % N, mover)) v = 9e8 + depth * 1000;
+        else if (depth <= 1 || nodes > NODE_CAP) v = evalBoard(me);
+        else v = alphabeta(depth - 1, alpha, beta, 3 - mover, me);
+        board[m.i] = EMPTY;
+        if (v > best) best = v;
+        if (best > alpha) alpha = best;
+        if (alpha >= beta) break;
+      }
+      return best;
+    }
+    best = Infinity;
+    for (i = 0; i < moves.length; i++) {
+      m = moves[i]; board[m.i] = mover; nodes++;
+      if (winAt((m.i / N) | 0, m.i % N, mover)) v = -(9e8 + depth * 1000);
+      else if (depth <= 1 || nodes > NODE_CAP) v = evalBoard(me);
+      else v = alphabeta(depth - 1, alpha, beta, 3 - mover, me);
+      board[m.i] = EMPTY;
+      if (v < best) best = v;
+      if (best < beta) beta = best;
+      if (alpha >= beta) break;
+    }
+    return best;
+  }
+
+  function aiMove() {
+    var me = WHITE, you = BLACK, i, r, c, idx, w;
+    if (!history.length) return 7 * N + 7;
+
+    var cs = candidates();
+    // 1) 바로 이기는 자리 2) 상대의 5목을 막는 자리 — 난이도와 무관하게 우선
+    for (i = 0; i < cs.length; i++) {
+      idx = cs[i]; r = (idx / N) | 0; c = idx % N;
+      board[idx] = me; w = winAt(r, c, me); board[idx] = EMPTY;
+      if (w) return idx;
+    }
+    for (i = 0; i < cs.length; i++) {
+      idx = cs[i]; r = (idx / N) | 0; c = idx % N;
+      board[idx] = you; w = winAt(r, c, you); board[idx] = EMPTY;
+      if (w) return idx;
+    }
+
+    var top = ordered(me, 12);
+    if (!top.length) return cs[0];
+
+    // 하: 절반 정도만 최선의 수, 나머지는 상위권 중 아무 수 (일부러 헐렁하게)
+    if (aiLevel === 1) {
+      if (Math.random() < 0.5) return top[0].i;
+      var pool = top.slice(1, 7);
+      if (!pool.length) return top[0].i;
+      return pool[(Math.random() * pool.length) | 0].i;
+    }
+
+    var depth = aiLevel === 2 ? 2 : 4;
+    nodes = 0;
+    var bestV = -Infinity, bestMoves = [], v;
+    for (i = 0; i < top.length; i++) {
+      idx = top[i].i;
+      board[idx] = me;
+      if (winAt((idx / N) | 0, idx % N, me)) v = 9e9;
+      else v = alphabeta(depth - 1, -Infinity, Infinity, you, me);
+      board[idx] = EMPTY;
+      if (v > bestV + 1e-6) { bestV = v; bestMoves = [idx]; }
+      else if (v > bestV - 1e-6) bestMoves.push(idx);
+    }
+    if (!bestMoves.length) return top[0].i;
+    // 중: 동점 후보 중 무작위(대국마다 다른 흐름) / 상: 탐색 순서상 최선
+    if (aiLevel === 2) return bestMoves[(Math.random() * bestMoves.length) | 0];
+    return bestMoves[0];
+  }
+
+  /* ────────── 진행 ────────── */
+  function place(idx, p) {
+    board[idx] = p;
+    history.push({ i: idx, p: p });
+    anim = { i: idx, t0: window.performance ? performance.now() : Date.now() };
+    soundPlace(p);
+    var w = winAt((idx / N) | 0, idx % N, p);
+    if (w) {
+      winLine = w; over = true;
+      winFx = { t0: window.performance ? performance.now() : Date.now() };
+      soundWin();
+    } else if (history.length === N * N) {
+      over = true;
+    } else {
+      turn = 3 - p;
+    }
+    updateUI();
+    kick();
+    return !!w;
+  }
+
+  function humanPlay(idx) {
+    if (over || thinking) return;
+    if (board[idx]) { soundNope(); return; }          // 이미 돌이 있는 칸은 무시
+    if (mode === "ai" && turn !== BLACK) return;
+    var won = place(idx, turn);
+    if (mode === "ai" && !over && !won) {
+      thinking = true; updateUI();
+      setTimeout(function () {
+        var m = aiMove();
+        thinking = false;
+        if (m == null || board[m]) {                   // 안전망
+          m = -1;
+          for (var i = 0; i < board.length; i++) if (!board[i]) { m = i; break; }
+        }
+        if (m < 0) { over = true; updateUI(); return; }
+        place(m, WHITE);
+      }, 80);
+    }
+  }
+
+  function updateUI() {
+    statusDot.className = "";
+    statusText.className = "";
+
+    if (over) {
+      statusDot.className = "hide";
+      if (winLine) {
+        var w = history[history.length - 1].p;
+        statusText.textContent = mode === "ai"
+          ? (w === BLACK ? "축하합니다! 학생 승리 🎉" : "AI 승리! 다시 도전해 볼까요?")
+          : (names[w] + "님 승리 🎉");
+      } else {
+        statusText.textContent = "판이 모두 찼습니다 — 무승부";
+      }
+      statusText.className = "win";
+      btnUndo.classList.add("hide");                   // 끝난 뒤에는 대국 정리용 버튼만 남긴다
+    } else {
+      btnUndo.classList.remove("hide");
+      btnUndo.disabled = thinking || history.length === 0;
+      if (thinking) {
+        statusDot.className = "hide";
+        statusText.textContent = "AI가 생각 중…";
+      } else if (mode === "ai") {
+        statusDot.className = turn === WHITE ? "white" : "";
+        statusText.textContent = turn === BLACK ? "학생 차례입니다" : "AI 차례입니다";
+      } else {
+        statusDot.className = turn === WHITE ? "white" : "";
+        statusText.textContent = names[turn] + "님 차례입니다";
+      }
+    }
+    btnReset.disabled = thinking;
+
+    // 2인 대전: 백돌 차례에는 보드를 180도 돌려 마주 앉은 사람이 보기 편하게
+    var wantFlip = (mode === "pvp" && rotateOn && !over && turn === WHITE);
+    if (wantFlip !== flipped) {
+      flipped = wantFlip;
+      canvas.classList.toggle("flip", flipped);
+      statusBar.classList.toggle("flip", flipped);
+    }
+    statusBar.classList.remove("pop");
+    void statusBar.offsetWidth;
+    statusBar.classList.add("pop");
+  }
+
+  function resetBoard() {
+    board.fill(EMPTY);
+    history = []; over = false; winLine = null; winFx = null; anim = null;
+    thinking = false; turn = BLACK; flipped = false;
+    canvas.classList.remove("flip");
+    statusBar.classList.remove("flip");
+    updateUI();
+    render();
+  }
+
+  function startGame(newMode, level) {
+    mode = newMode;
+    if (level) aiLevel = level;
+    startScreen.classList.remove("on");
+    gameScreen.classList.add("on");
+    resetBoard();
+    requestAnimationFrame(layout);
+  }
+
+  /* ────────── 입력 ────────── */
+  function pick(ev) {
+    var rect = canvas.getBoundingClientRect();
+    if (!rect.width) return -1;
+    var cx = ev.clientX - rect.left, cy = ev.clientY - rect.top;
+    if (flipped) { cx = rect.width - cx; cy = rect.height - cy; }
+    var scale = size / rect.width;
+    cx *= scale; cy *= scale;
+    var c = Math.round((cx - pad) / cell), r = Math.round((cy - pad) / cell);
+    if (r < 0 || r >= N || c < 0 || c >= N) return -1;
+    var px = xy(r, c);
+    var dx = px[0] - cx, dy = px[1] - cy;
+    if (Math.sqrt(dx * dx + dy * dy) > cell * 0.62) return -1;   // 교차점에서 너무 먼 터치는 무시
+    return r * N + c;
+  }
+  canvas.addEventListener("pointerup", function (ev) {
+    if (over) return;                                            // 종료 후 보드 터치 비활성화
+    var idx = pick(ev);
+    if (idx >= 0) humanPlay(idx);
+  });
+  canvas.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+
+  btnReset.addEventListener("click", function () { if (!thinking) resetBoard(); });
+  btnHome.addEventListener("click", function () {
+    gameScreen.classList.remove("on");
+    startScreen.classList.add("on");
+  });
+  btnUndo.addEventListener("click", function () {
+    if (thinking || over || !history.length) return;
+    var back = (mode === "ai" && history.length >= 2) ? 2 : 1;
+    for (var k = 0; k < back; k++) {
+      var h = history.pop();
+      if (!h) break;
+      board[h.i] = EMPTY;
+      turn = h.p;
+    }
+    anim = null; winLine = null; winFx = null; over = false;
+    updateUI();
+    render();
+  });
+
+  function syncSound() {
+    btnSound.textContent = soundOn ? "효과음 켜짐" : "효과음 꺼짐";
+    btnSound.setAttribute("aria-pressed", soundOn ? "true" : "false");
+    var s = $("soundToggleStart");
+    s.textContent = "효과음: " + (soundOn ? "켜기" : "끄기");
+    s.setAttribute("aria-pressed", soundOn ? "true" : "false");
+  }
+  function toggleSound() {
+    soundOn = !soundOn;
+    syncSound();
+    if (soundOn) beep(700, 0.07);
+  }
+  btnSound.addEventListener("click", toggleSound);
+  $("soundToggleStart").addEventListener("click", toggleSound);
+
+  var rotBtn = $("rotateToggle");
+  rotBtn.addEventListener("click", function () {
+    rotateOn = !rotateOn;
+    rotBtn.textContent = "보드 회전: " + (rotateOn ? "켜기" : "끄기");
+    rotBtn.setAttribute("aria-pressed", rotateOn ? "true" : "false");
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll("[data-ai]"), function (b) {
+    b.addEventListener("click", function () {
+      startGame("ai", parseInt(b.getAttribute("data-ai"), 10));
+    });
+  });
+  $("startPvp").addEventListener("click", function () {
+    names[BLACK] = ($("p1Name").value || "").trim() || "흑돌";
+    names[WHITE] = ($("p2Name").value || "").trim() || "백돌";
+    startGame("pvp");
+  });
+
+  window.addEventListener("resize", layout);
+  window.addEventListener("orientationchange", function () { setTimeout(layout, 250); });
+
+  syncSound();
+  layout();
+})();
+</script>
+</body>
+</html>
