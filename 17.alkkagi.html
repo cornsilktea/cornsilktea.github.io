@@ -8,8 +8,8 @@
     - 2인 대전: 같은 화면을 마주 보고 두 명이 번갈아 한 번씩 튕깁니다.
   조작: ① 내 돌을 누르면 그 돌이 선택됩니다(어떤 돌로 때릴지 결정).
         ② 누른 채로 반대 방향으로 드래그하면 세기 게이지가 차오릅니다(멀리 끌수록 강함).
-        ③ 손을 떼면 게이지만큼 튕겨 나갑니다.
-  규칙: 판 밖으로 나간 돌은 제거되고, 상대 돌을 모두 떨어뜨리면 승리합니다.
+        ③ 손을 떼면 게이지만큼 튕겨 나갑니다. 100%면 판 한 변을 지나갈 만큼 강합니다.
+  규칙: 한 편에 돌 6개. 판 밖으로 나간 돌은 제거되고, 상대 돌을 모두 떨어뜨리면 승리합니다.
         자기 돌을 떨어뜨려도 그대로 제거되니 세기 조절이 중요합니다.
 -->
 <html lang="ko">
@@ -28,16 +28,16 @@
   }
 
   .btn {
-    display: inline-flex; align-items: center; justify-content: center;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
     min-height: 56px; padding: 12px 16px;
     font-family: inherit; font-size: 17px; font-weight: 600;
     text-align: center; word-break: keep-all; line-height: 1.3;
     background: #fff; color: #111827;
     border: 1px solid #d1d5db; border-radius: 10px; cursor: pointer;
-    transition: background .12s, border-color .12s;
+    transition: background .12s, border-color .12s, transform .08s;
   }
   .btn:hover { border-color: #2563eb; background: #f8faff; }
-  .btn:active { background: #eff6ff; }
+  .btn:active { background: #eff6ff; transform: translateY(1px); }
   .btn.small { min-height: 40px; padding: 8px 14px; font-size: 15px; }
 
   .screen { display: none; height: 100%; }
@@ -49,42 +49,94 @@
     overflow-y: auto; padding: 24px 16px 32px;
   }
   .start-inner { width: 100%; max-width: 520px; margin: auto; }
-  h1 { font-size: 26px; margin: 0 0 6px; text-align: center; }
+  .logo {
+    display: flex; justify-content: center; align-items: flex-end; gap: 10px;
+    margin: 0 0 10px;
+  }
+  .logo i {
+    display: block; width: 30px; height: 30px; border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(80,50,10,.35);
+  }
+  .logo i.b { background: radial-gradient(circle at 34% 30%, #5b5b5b, #0d0d0d); }
+  .logo i.w { background: radial-gradient(circle at 34% 30%, #fff, #cfcfcf); border: 1px solid #d1d5db; }
+  .logo i.s { width: 18px; height: 18px; opacity: .55; }
+  h1 { font-size: 28px; margin: 0 0 6px; text-align: center; letter-spacing: -.5px; }
   .sub { font-size: 15px; color: #6b7280; margin: 0 0 22px; text-align: center; line-height: 1.5; }
   .card {
-    background: #fff; border: 1px solid #d1d5db; border-radius: 12px;
+    background: #fff; border: 1px solid #e5e7eb; border-radius: 14px;
     padding: 16px; margin: 0 0 14px;
+    box-shadow: 0 1px 3px rgba(17,24,39,.06);
   }
   .card h2 { font-size: 17px; margin: 0 0 4px; }
   .card p { font-size: 14px; color: #6b7280; margin: 0 0 12px; line-height: 1.5; }
   .row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .help { font-size: 14px; color: #6b7280; line-height: 1.7; margin: 0; padding-left: 18px; }
+  .help { font-size: 14px; color: #4b5563; line-height: 1.8; margin: 0; padding-left: 20px; }
+  .help b { color: #111827; }
 
   /* ── 게임 화면 ────────────────────────────── */
   #gameScreen { flex-direction: column; }
   #hud {
-    flex: 0 0 auto; display: flex; align-items: center; gap: 10px;
-    padding: 10px 12px; background: #fff; border-bottom: 1px solid #e5e7eb;
+    flex: 0 0 auto; display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; background: #fff; border-bottom: 1px solid #e5e7eb;
   }
-  #turnDot {
-    width: 22px; height: 22px; border-radius: 50%;
-    border: 1px solid #9ca3af; background: #111827; flex: 0 0 auto;
+  .pchip {
+    flex: 0 1 auto; min-width: 0;
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 10px; border: 1px solid #e5e7eb; border-radius: 10px;
+    background: #fafafa; transition: border-color .15s, background .15s, box-shadow .15s;
   }
-  #turnText { font-size: 16px; font-weight: 700; }
-  #countText { font-size: 14px; color: #6b7280; margin-left: auto; white-space: nowrap; }
-  #hud .btn.small { flex: 0 0 auto; }
+  .pchip.active {
+    border-color: #2563eb; background: #eff6ff;
+    box-shadow: 0 0 0 2px rgba(37,99,235,.12);
+  }
+  .pname { font-size: 15px; font-weight: 700; white-space: nowrap; }
+  .pchip.active .pname { color: #1d4ed8; }
+  .dots { display: flex; gap: 4px; flex-wrap: wrap; }
+  .dots span {
+    width: 13px; height: 13px; border-radius: 50%; display: block;
+    transition: opacity .2s, transform .2s;
+  }
+  .dots span.b {
+    background: radial-gradient(circle at 34% 28%, #6a6a6a, #111827 70%);
+    box-shadow: 0 1px 2px rgba(0,0,0,.35);
+  }
+  .dots span.w {
+    background: radial-gradient(circle at 34% 28%, #fff, #d8d8d8 75%);
+    border: 1px solid #9ca3af; box-shadow: 0 1px 2px rgba(0,0,0,.2);
+  }
+  .dots span.gone {
+    background: none; border: 1px dashed #cbd5e1; box-shadow: none;
+    opacity: .5; transform: scale(.72);
+  }
+  .hud-actions { display: flex; gap: 6px; flex: 0 0 auto; margin-left: auto; }
 
   #boardWrap {
     flex: 1 1 auto; position: relative; display: flex;
     align-items: center; justify-content: center; padding: 10px;
     min-height: 0;
   }
-  canvas { touch-action: none; display: block; border-radius: 12px; }
+  canvas {
+    touch-action: none; display: block; border-radius: 14px;
+    box-shadow: 0 6px 18px rgba(80,50,10,.22);
+  }
+
+  /* 판 위에 잠깐 떴다 사라지는 안내 */
+  #toast {
+    position: absolute; left: 50%; top: 16%;
+    transform: translate(-50%, -50%) scale(.94);
+    padding: 10px 20px; border-radius: 999px;
+    background: rgba(17,24,39,.78); color: #fff;
+    font-size: 18px; font-weight: 700; white-space: nowrap;
+    opacity: 0; pointer-events: none;
+    transition: opacity .18s, transform .18s;
+  }
+  #toast.on { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 
   #hint {
     flex: 0 0 auto; text-align: center; font-size: 14px; color: #6b7280;
     padding: 8px 12px 14px; line-height: 1.5; min-height: 42px;
   }
+  #hint b { color: #2563eb; }
 
   /* ── 결과 오버레이 ────────────────────────── */
   #overlay {
@@ -95,8 +147,10 @@
   #overlay.on { display: flex; }
   .modal {
     width: 100%; max-width: 340px; background: #fff;
-    border-radius: 14px; padding: 22px 18px; text-align: center;
+    border-radius: 16px; padding: 24px 18px; text-align: center;
+    box-shadow: 0 12px 30px rgba(0,0,0,.25);
   }
+  .modal .crown { font-size: 34px; line-height: 1; margin-bottom: 8px; }
   .modal h2 { font-size: 22px; margin: 0 0 6px; }
   .modal p { font-size: 15px; color: #6b7280; margin: 0 0 18px; }
   .modal .btn + .btn { margin-top: 8px; }
@@ -107,6 +161,9 @@
 <!-- 시작 화면 -->
 <section id="startScreen" class="screen on">
   <div class="start-inner">
+    <div class="logo">
+      <i class="b s"></i><i class="b"></i><i class="w"></i><i class="w s"></i>
+    </div>
     <h1>알까기</h1>
     <p class="sub">돌을 골라 누르고, 끌어당겨 세기를 정한 뒤 손을 떼세요.</p>
 
@@ -129,9 +186,10 @@
     <div class="card">
       <h2>놀이 방법</h2>
       <ul class="help">
+        <li>한 편에 돌 <b>6개</b>로 시작합니다.</li>
         <li>내 돌을 누르면 그 돌이 선택됩니다.</li>
         <li>누른 채 <b>쏘고 싶은 방향의 반대쪽</b>으로 끌면 세기 게이지가 찹니다.</li>
-        <li>손을 떼면 게이지만큼 튕겨 나갑니다.</li>
+        <li>손을 떼면 게이지만큼 튕겨 나갑니다. <b>100%</b>면 판을 가로지릅니다.</li>
         <li>판 밖으로 나간 돌은 제거되고, 상대 돌을 모두 떨어뜨리면 이깁니다.</li>
       </ul>
     </div>
@@ -141,19 +199,24 @@
 <!-- 게임 화면 -->
 <section id="gameScreen" class="screen">
   <div id="hud">
-    <span id="turnDot"></span>
-    <span id="turnText">흑 차례</span>
-    <span id="countText">흑 8 : 백 8</span>
-    <button class="btn small" id="restartBtn">다시</button>
-    <button class="btn small" id="homeBtn">처음으로</button>
+    <div class="pchip" id="chipB"><span class="pname" id="nameB">흑</span><span class="dots" id="dotsB"></span></div>
+    <div class="pchip" id="chipW"><span class="pname" id="nameW">백</span><span class="dots" id="dotsW"></span></div>
+    <div class="hud-actions">
+      <button class="btn small" id="restartBtn">다시</button>
+      <button class="btn small" id="homeBtn">나가기</button>
+    </div>
   </div>
-  <div id="boardWrap"><canvas id="cv"></canvas></div>
+  <div id="boardWrap">
+    <canvas id="cv"></canvas>
+    <div id="toast"></div>
+  </div>
   <div id="hint">내 돌을 눌러 고르고, 반대쪽으로 끌었다 놓으세요.</div>
 </section>
 
 <!-- 결과 -->
 <div id="overlay">
   <div class="modal">
+    <div class="crown">🏆</div>
     <h2 id="resultTitle">흑 승리!</h2>
     <p id="resultText">상대 돌을 모두 떨어뜨렸습니다.</p>
     <button class="btn" id="againBtn">한 판 더</button>
@@ -170,13 +233,16 @@
    ══════════════════════════════════════════════════════ */
 const W = 600, H = 600;      // 판 크기(논리)
 const R = 21;                // 돌 반지름
+const PER_SIDE = 6;          // 한 편의 돌 개수
 const DT = 1 / 120;          // 물리 한 스텝(초)
 const DAMP = 0.984;          // 스텝마다 남는 속도(마찰)
 const REST = 0.82;           // 충돌 반발(부딪칠수록 힘이 줄어 연쇄가 과하지 않다)
 const STOP = 14;             // 이 속도 아래면 멈춘 것으로 본다(px/s)
-const MAX_DRAG = 190;        // 이만큼 끌면 게이지 100%
+const MAX_DRAG = 180;        // 이만큼 끌면 게이지 100%
 const MIN_DRAG = 12;         // 이보다 짧으면 발사 취소
-const SPD_MIN = 200, SPD_MAX = 820;  // 게이지 0%/100%일 때 속도
+// 마찰 때문에 굴러가는 거리는 대략 속도/1.94 이다.
+// 100%(1400)면 약 720px — 아무것도 없는 판이면 한 변(600)을 지나 밖으로 나간다.
+const SPD_MIN = 300, SPD_MAX = 1400;
 
 const BLACK = 0, WHITE = 1;  // 흑=아래(사람), 백=위
 const SIDE_NAME = ['흑', '백'];
@@ -192,6 +258,7 @@ let dragging = false;
 let pointer = { x: 0, y: 0 };
 let puffs = [];              // 판 밖으로 나간 돌의 잔상
 let aiTimer = 0;
+let clock = 0;               // 반짝임 등 연출용 시간
 
 /* ── 화면 요소 ── */
 const startScreen = document.getElementById('startScreen');
@@ -199,22 +266,26 @@ const gameScreen  = document.getElementById('gameScreen');
 const overlay     = document.getElementById('overlay');
 const cv  = document.getElementById('cv');
 const ctx = cv.getContext('2d');
-const turnDot   = document.getElementById('turnDot');
-const turnText  = document.getElementById('turnText');
-const countText = document.getElementById('countText');
-const hintEl    = document.getElementById('hint');
+const chip = [document.getElementById('chipB'), document.getElementById('chipW')];
+const nameEl = [document.getElementById('nameB'), document.getElementById('nameW')];
+const dotsEl = [document.getElementById('dotsB'), document.getElementById('dotsW')];
+const hintEl  = document.getElementById('hint');
+const toastEl = document.getElementById('toast');
 
 /* ══════════════════════════════════════════════════════
-   판 만들기
+   판 만들기 — 한 편에 6개(뒷줄 3, 앞줄 3)
    ══════════════════════════════════════════════════════ */
 function newGame() {
   stones = [];
-  const xs = [90, 230, 370, 510];
-  for (const x of xs) {
-    stones.push(mkStone(x, H - 72,  BLACK));
-    stones.push(mkStone(x, H - 150, BLACK));
-    stones.push(mkStone(x, 72,      WHITE));
-    stones.push(mkStone(x, 150,     WHITE));
+  const back  = [110, 300, 490];   // 가장자리 쪽 줄
+  const front = [205, 395, 300];   // 가운데 쪽 줄(엇갈리게 두어 길을 막지 않는다)
+  for (const x of back) {
+    stones.push(mkStone(x, 70,     WHITE));
+    stones.push(mkStone(x, H - 70, BLACK));
+  }
+  for (const x of front) {
+    stones.push(mkStone(x, 158,     WHITE));
+    stones.push(mkStone(x, H - 158, BLACK));
   }
   turn = BLACK;
   phase = 'aim';
@@ -222,8 +293,10 @@ function newGame() {
   dragging = false;
   puffs = [];
   overlay.classList.remove('on');
+  buildDots();
   updateHud();
   setHint('내 돌을 눌러 고르고, 반대쪽으로 끌었다 놓으세요.');
+  showToast(mode === 'ai' ? '내 차례' : '흑 차례', 900);
 }
 function mkStone(x, y, side) {
   return { x, y, vx: 0, vy: 0, side, alive: true };
@@ -285,10 +358,13 @@ function countAlive(list, side) {
 /* ══════════════════════════════════════════════════════
    발사와 차례 넘기기
    ══════════════════════════════════════════════════════ */
+let lostBefore = [0, 0];     // 이번 수로 몇 개가 떨어졌는지 세려고 기억해 둔다
+
 function shoot(stone, angle, power) {
   const spd = SPD_MIN + (SPD_MAX - SPD_MIN) * power;
   stone.vx = Math.cos(angle) * spd;
   stone.vy = Math.sin(angle) * spd;
+  lostBefore = [countAlive(stones, BLACK), countAlive(stones, WHITE)];
   phase = 'anim';
   selected = null;
   dragging = false;
@@ -298,20 +374,33 @@ function shoot(stone, angle, power) {
 function endTurn() {
   const myLeft = countAlive(stones, turn);
   const opLeft = countAlive(stones, 1 - turn);
+
+  // 이번 수의 결과를 판 위에 잠깐 알려 준다
+  const dropOp = lostBefore[1 - turn] - opLeft;
+  const dropMe = lostBefore[turn] - myLeft;
+  if (dropOp > 0 && dropMe > 0)      showToast('상대 ' + dropOp + '개, 내 돌 ' + dropMe + '개 아웃', 1100);
+  else if (dropOp > 0)               showToast(SIDE_NAME[1 - turn] + ' ' + dropOp + '개 아웃!', 1100);
+  else if (dropMe > 0)               showToast('앗, 내 돌 ' + dropMe + '개 아웃', 1100);
+
   if (opLeft === 0 || myLeft === 0) {
     // 내 돌까지 다 떨어뜨려 둘 다 비면 상대 승
     const winner = (opLeft === 0 && myLeft > 0) ? turn : 1 - turn;
-    finish(winner);
+    setTimeout(() => finish(winner), 700);
+    phase = 'over';
+    updateHud();
     return;
   }
   turn = 1 - turn;
   phase = 'aim';
   updateHud();
   if (mode === 'ai' && turn === WHITE) {
-    aiTimer = 0.6;
+    aiTimer = 0.7;
     setHint('AI가 생각하는 중…');
   } else {
     setHint('내 돌을 눌러 고르고, 반대쪽으로 끌었다 놓으세요.');
+    if (dropOp === 0 && dropMe === 0) {
+      showToast(mode === 'ai' ? '내 차례' : SIDE_NAME[turn] + ' 차례', 800);
+    }
   }
 }
 
@@ -320,15 +409,18 @@ function finish(winner) {
   updateHud();
   const title = document.getElementById('resultTitle');
   const text  = document.getElementById('resultText');
+  const left  = countAlive(stones, winner);
   if (mode === 'ai') {
     title.textContent = winner === BLACK ? '이겼습니다!' : '졌습니다';
     text.textContent = winner === BLACK
-      ? 'AI의 돌을 모두 떨어뜨렸습니다.'
+      ? '내 돌 ' + left + '개를 남기고 이겼습니다.'
       : '내 돌이 모두 판을 벗어났습니다.';
   } else {
     title.textContent = SIDE_NAME[winner] + ' 승리!';
-    text.textContent = '상대 돌이 판에 남지 않았습니다.';
+    text.textContent = SIDE_NAME[winner] + ' 돌 ' + left + '개가 판에 남았습니다.';
   }
+  document.querySelector('.modal .crown').textContent =
+    (mode === 'ai' && winner === WHITE) ? '🤖' : '🏆';
   overlay.classList.add('on');
 }
 
@@ -345,12 +437,12 @@ function aiMove() {
     const me = mine[(Math.random() * mine.length) | 0];
     const foe = foes[(Math.random() * foes.length) | 0];
     const ang = Math.atan2(foe.y - me.y, foe.x - me.x) + (Math.random() - 0.5) * 0.34;
-    shoot(me, ang, 0.45 + Math.random() * 0.5);
+    shoot(me, ang, 0.4 + Math.random() * 0.45);
     return;
   }
 
   const jitter = aiLevel === 2 ? 0.06 : 0;    // 중은 조준이 조금 흔들린다
-  const powers = aiLevel === 2 ? [0.55, 0.85] : [0.45, 0.7, 0.95];
+  const powers = aiLevel === 2 ? [0.5, 0.8] : [0.4, 0.65, 0.9];
   const spread = aiLevel === 2 ? [0] : [-0.05, 0, 0.05];
   let best = null;
 
@@ -416,19 +508,20 @@ function myTurnNow() {
 function stoneAt(p) {
   for (const s of stones) {
     if (!s.alive || s.side !== turn) continue;
-    if (Math.hypot(s.x - p.x, s.y - p.y) <= R + 8) return s;
+    if (Math.hypot(s.x - p.x, s.y - p.y) <= R + 10) return s;
   }
   return null;
 }
 
 cv.addEventListener('pointerdown', e => {
   if (!myTurnNow()) return;
-  cv.setPointerCapture(e.pointerId);
+  try { cv.setPointerCapture(e.pointerId); } catch (err) { /* 무시 */ }
   pointer = toBoard(e);
   const hit = stoneAt(pointer);
   if (hit) {                    // 돌을 눌러 고르고 바로 조준 시작
     selected = hit;
     dragging = true;
+    setHint('그대로 <b>반대쪽</b>으로 끌면 세기가 찹니다.');
   } else if (selected) {        // 이미 고른 돌이 있으면 빈 곳에서도 조준
     dragging = true;
   }
@@ -444,7 +537,7 @@ cv.addEventListener('pointerup', e => {
   const dist = Math.hypot(dx, dy);
   dragging = false;
   if (dist < MIN_DRAG) {        // 너무 짧으면 고르기만 하고 끝
-    setHint('고른 돌을 반대쪽으로 끌어당겼다 놓으세요.');
+    setHint('고른 돌을 <b>반대쪽</b>으로 끌어당겼다 놓으세요.');
     return;
   }
   shoot(selected, Math.atan2(dy, dx), Math.min(dist, MAX_DRAG) / MAX_DRAG);
@@ -469,61 +562,108 @@ function draw() {
   const scale = cv.width / W;
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
   ctx.clearRect(0, 0, W, H);
-
-  // 판
-  const g = ctx.createLinearGradient(0, 0, W, H);
-  g.addColorStop(0, '#e3bd7e');
-  g.addColorStop(1, '#c9974f');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, W, H);
-  ctx.strokeStyle = 'rgba(120,80,30,.35)';
-  ctx.lineWidth = 1;
-  for (let i = 1; i < 10; i++) {
-    const t = i * W / 10;
-    ctx.beginPath(); ctx.moveTo(t, 12); ctx.lineTo(t, H - 12); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(12, t); ctx.lineTo(W - 12, t); ctx.stroke();
-  }
-  ctx.strokeStyle = 'rgba(90,60,20,.8)';
-  ctx.lineWidth = 4;
-  ctx.strokeRect(2, 2, W - 4, H - 4);
+  drawBoard();
 
   // 떨어진 돌 잔상
   for (const f of puffs) {
     ctx.globalAlpha = Math.max(0, f.life);
     ctx.beginPath();
-    ctx.arc(f.x, f.y, R * (1 + (1 - f.life) * 0.8), 0, Math.PI * 2);
+    ctx.arc(f.x, f.y, R * (1 + (1 - f.life) * 0.9), 0, Math.PI * 2);
     ctx.strokeStyle = f.side === BLACK ? '#374151' : '#f3f4f6';
     ctx.lineWidth = 3;
     ctx.stroke();
     ctx.globalAlpha = 1;
   }
 
-  // 조준선 + 세기 게이지
   if (selected && dragging) drawAim();
 
-  // 돌
   for (const s of stones) {
     if (!s.alive) continue;
     drawStone(s, s === selected);
   }
+
+  // 내 차례에 고를 수 있는 돌을 은은하게 표시
+  if (myTurnNow() && !selected) {
+    const a = 0.25 + 0.2 * Math.sin(clock * 3.2);
+    ctx.strokeStyle = 'rgba(37,99,235,' + a.toFixed(3) + ')';
+    ctx.lineWidth = 3;
+    for (const s of stones) {
+      if (!s.alive || s.side !== turn) continue;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, R + 5, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+}
+
+function drawBoard() {
+  const g = ctx.createLinearGradient(0, 0, W, H);
+  g.addColorStop(0, '#e8c68c');
+  g.addColorStop(.5, '#d9ae6d');
+  g.addColorStop(1, '#c6944c');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+
+  // 나뭇결 느낌의 옅은 세로줄
+  ctx.strokeStyle = 'rgba(140,95,40,.10)';
+  ctx.lineWidth = 6;
+  for (let x = 18; x < W; x += 46) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.bezierCurveTo(x + 10, H * .3, x - 10, H * .7, x + 4, H);
+    ctx.stroke();
+  }
+
+  // 바둑판 선
+  ctx.strokeStyle = 'rgba(110,72,26,.32)';
+  ctx.lineWidth = 1;
+  for (let i = 1; i < 10; i++) {
+    const t = i * W / 10;
+    ctx.beginPath(); ctx.moveTo(t, 22); ctx.lineTo(t, H - 22); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(22, t); ctx.lineTo(W - 22, t); ctx.stroke();
+  }
+  // 화점
+  ctx.fillStyle = 'rgba(110,72,26,.45)';
+  for (const px of [180, 300, 420]) {
+    for (const py of [180, 300, 420]) {
+      ctx.beginPath(); ctx.arc(px, py, 3.5, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  // 진영 표시: 위는 백, 아래는 흑
+  ctx.fillStyle = 'rgba(255,255,255,.14)';
+  ctx.fillRect(0, 0, W, 26);
+  ctx.fillStyle = 'rgba(0,0,0,.10)';
+  ctx.fillRect(0, H - 26, W, 26);
+
+  // 가장자리(여기를 넘어가면 아웃)
+  ctx.strokeStyle = 'rgba(92,60,20,.85)';
+  ctx.lineWidth = 5;
+  ctx.strokeRect(2.5, 2.5, W - 5, H - 5);
 }
 
 function drawStone(s, sel) {
   ctx.beginPath();
-  ctx.arc(s.x, s.y + 3, R, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(80,50,10,.25)';
+  ctx.arc(s.x + 1, s.y + 4, R, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(80,50,10,.28)';
   ctx.fill();
 
-  const grd = ctx.createRadialGradient(s.x - R * .35, s.y - R * .4, R * .1, s.x, s.y, R);
-  if (s.side === BLACK) { grd.addColorStop(0, '#5b5b5b'); grd.addColorStop(1, '#0d0d0d'); }
-  else                  { grd.addColorStop(0, '#ffffff'); grd.addColorStop(1, '#cfcfcf'); }
+  const grd = ctx.createRadialGradient(s.x - R * .35, s.y - R * .42, R * .1, s.x, s.y, R);
+  if (s.side === BLACK) { grd.addColorStop(0, '#6a6a6a'); grd.addColorStop(.55, '#232323'); grd.addColorStop(1, '#080808'); }
+  else                  { grd.addColorStop(0, '#ffffff'); grd.addColorStop(.6, '#f2f2f2'); grd.addColorStop(1, '#c9c9c9'); }
   ctx.beginPath();
   ctx.arc(s.x, s.y, R, 0, Math.PI * 2);
   ctx.fillStyle = grd;
   ctx.fill();
   ctx.lineWidth = 1;
-  ctx.strokeStyle = s.side === BLACK ? '#000' : '#9ca3af';
+  ctx.strokeStyle = s.side === BLACK ? 'rgba(0,0,0,.9)' : 'rgba(140,140,140,.9)';
   ctx.stroke();
+
+  // 반짝임
+  ctx.beginPath();
+  ctx.ellipse(s.x - R * .3, s.y - R * .38, R * .26, R * .17, -0.6, 0, Math.PI * 2);
+  ctx.fillStyle = s.side === BLACK ? 'rgba(255,255,255,.30)' : 'rgba(255,255,255,.85)';
+  ctx.fill();
 
   if (sel) {
     ctx.beginPath();
@@ -540,13 +680,21 @@ function drawAim() {
   if (dist < 1) return;
   const power = Math.min(dist, MAX_DRAG) / MAX_DRAG;
   const ang = Math.atan2(dy, dx);
-  const len = 40 + power * 150;
   const col = gaugeColor(power);
 
-  // 끌고 있는 쪽(뒤로 당긴 만큼) 점선
+  // 날아갈 방향을 판 끝까지 알려 주는 옅은 점선
   ctx.save();
-  ctx.setLineDash([6, 6]);
-  ctx.strokeStyle = 'rgba(255,255,255,.8)';
+  ctx.setLineDash([3, 11]);
+  ctx.strokeStyle = 'rgba(255,255,255,.5)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(selected.x, selected.y);
+  ctx.lineTo(selected.x + Math.cos(ang) * 900, selected.y + Math.sin(ang) * 900);
+  ctx.stroke();
+
+  // 뒤로 당긴 만큼(고무줄) 점선
+  ctx.setLineDash([7, 7]);
+  ctx.strokeStyle = 'rgba(255,255,255,.85)';
   ctx.lineWidth = 3;
   ctx.beginPath();
   ctx.moveTo(selected.x, selected.y);
@@ -555,47 +703,58 @@ function drawAim() {
   ctx.stroke();
   ctx.restore();
 
-  // 날아갈 방향 화살표
+  // 세기만큼 자라는 화살표
+  const len = 44 + power * 200;
   const ex = selected.x + Math.cos(ang) * len;
   const ey = selected.y + Math.sin(ang) * len;
   ctx.strokeStyle = col;
-  ctx.lineWidth = 5;
+  ctx.lineWidth = 4 + power * 4;
+  ctx.lineCap = 'round';
   ctx.beginPath();
   ctx.moveTo(selected.x, selected.y);
   ctx.lineTo(ex, ey);
   ctx.stroke();
+  ctx.lineCap = 'butt';
+  const head = 14 + power * 8;
   ctx.beginPath();
-  ctx.moveTo(ex, ey);
-  ctx.lineTo(ex - Math.cos(ang - .4) * 16, ey - Math.sin(ang - .4) * 16);
-  ctx.lineTo(ex - Math.cos(ang + .4) * 16, ey - Math.sin(ang + .4) * 16);
+  ctx.moveTo(ex + Math.cos(ang) * head * .8, ey + Math.sin(ang) * head * .8);
+  ctx.lineTo(ex - Math.cos(ang - .5) * head, ey - Math.sin(ang - .5) * head);
+  ctx.lineTo(ex - Math.cos(ang + .5) * head, ey - Math.sin(ang + .5) * head);
   ctx.closePath();
   ctx.fillStyle = col;
   ctx.fill();
 
   // 돌 둘레를 도는 세기 게이지
   ctx.beginPath();
+  ctx.arc(selected.x, selected.y, R + 12, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(0,0,0,.22)';
+  ctx.lineWidth = 8;
+  ctx.stroke();
+  ctx.beginPath();
   ctx.arc(selected.x, selected.y, R + 12, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * power);
   ctx.strokeStyle = col;
-  ctx.lineWidth = 7;
+  ctx.lineWidth = 8;
   ctx.lineCap = 'round';
   ctx.stroke();
   ctx.lineCap = 'butt';
 
   // 세기 퍼센트
-  ctx.font = 'bold 18px Pretendard, sans-serif';
+  const label = Math.round(power * 100) + '%';
+  const tx = selected.x, ty = selected.y - R - 34;
+  ctx.font = 'bold 19px Pretendard, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.lineWidth = 4;
-  ctx.strokeStyle = 'rgba(0,0,0,.5)';
-  ctx.fillStyle = '#fff';
-  const label = Math.round(power * 100) + '%';
-  const tx = selected.x, ty = selected.y - R - 32;
-  ctx.strokeText(label, tx, ty);
-  ctx.fillText(label, tx, ty);
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(tx - 30, ty - 15, 60, 30, 15);
+  else ctx.arc(tx, ty, 22, 0, Math.PI * 2);   // roundRect가 없는 옛 브라우저
+  ctx.fillStyle = 'rgba(17,24,39,.72)';
+  ctx.fill();
+  ctx.fillStyle = col;
+  ctx.fillText(label, tx, ty + 1);
 }
 function gaugeColor(p) {
-  if (p < 0.4) return '#22c55e';
-  if (p < 0.75) return '#eab308';
+  if (p < 0.35) return '#22c55e';
+  if (p < 0.7) return '#eab308';
   return '#ef4444';
 }
 
@@ -609,6 +768,7 @@ function loop(t) {
   const elapsed = Math.min((t - last) / 1000, 0.1);
   last = t;
   if (!gameScreen.classList.contains('on')) return;
+  clock += elapsed;
 
   if (phase === 'anim') {
     acc += elapsed;
@@ -632,15 +792,34 @@ requestAnimationFrame(loop);
 /* ══════════════════════════════════════════════════════
    화면 전환·표시
    ══════════════════════════════════════════════════════ */
-function updateHud() {
-  const b = countAlive(stones, BLACK), w = countAlive(stones, WHITE);
-  countText.textContent = '흑 ' + b + ' : 백 ' + w;
-  turnDot.style.background = turn === BLACK ? '#111827' : '#ffffff';
-  if (phase === 'over') { turnText.textContent = '게임 끝'; return; }
-  if (mode === 'ai') turnText.textContent = (turn === BLACK ? '내 차례' : 'AI 차례');
-  else turnText.textContent = SIDE_NAME[turn] + ' 차례';
+function buildDots() {
+  for (const side of [BLACK, WHITE]) {
+    dotsEl[side].innerHTML = '';
+    for (let i = 0; i < PER_SIDE; i++) {
+      const d = document.createElement('span');
+      d.className = side === BLACK ? 'b' : 'w';
+      dotsEl[side].appendChild(d);
+    }
+  }
+  nameEl[BLACK].textContent = mode === 'ai' ? '나(흑)' : '흑';
+  nameEl[WHITE].textContent = mode === 'ai' ? 'AI(백)' : '백';
 }
-function setHint(t) { hintEl.textContent = t; }
+function updateHud() {
+  for (const side of [BLACK, WHITE]) {
+    const left = countAlive(stones, side);
+    const ds = dotsEl[side].children;
+    for (let i = 0; i < ds.length; i++) ds[i].classList.toggle('gone', i >= left);
+    chip[side].classList.toggle('active', phase !== 'over' && turn === side);
+  }
+}
+let toastTimer = 0;
+function showToast(text, ms) {
+  toastEl.textContent = text;
+  toastEl.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('on'), ms || 900);
+}
+function setHint(html) { hintEl.innerHTML = html; }
 
 function showGame() {
   startScreen.classList.remove('on');
