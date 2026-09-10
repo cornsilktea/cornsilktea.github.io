@@ -7,7 +7,9 @@
     - AI 대전: 난이도 하/중/상 선택 → 학생이 흑(선), AI가 백.
     - 2인 대전: 같은 화면을 돌려가며 두 명이 번갈아 착수. '보드 회전'을 켜면
       턴마다 보드가 180도 돌아 마주 앉아서도 편하게 볼 수 있습니다.
-  규칙: 가로/세로/대각선으로 5개를 먼저 이으면 승리. 렌주룰(금수)은 적용하지 않습니다.
+  규칙: 가로/세로/대각선으로 5개를 먼저 이으면 승리.
+        금수(33·44·장목)는 흑돌에만 적용하며 시작 화면에서 끌 수 있습니다.
+        금수 자리를 누르면 보드 위에 안내가 뜨고 착수는 무시됩니다.
 -->
 <html lang="ko">
 <head>
@@ -85,9 +87,21 @@
   #statusBar.flip { transform: rotate(180deg); }
 
   #boardWrap {
+    position: relative;
     flex: 1 1 auto; min-height: 0;
     display: flex; align-items: center; justify-content: center;
   }
+  /* 금수 안내 — 보드 위에 잠깐 떴다 사라집니다 */
+  #toast {
+    position: absolute; left: 50%; top: 12px; transform: translateX(-50%);
+    max-width: 92%; padding: 12px 16px;
+    background: #fff; border: 1px solid #fca5a5; border-radius: 10px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, .12);
+    color: #b91c1c; font-size: 16px; font-weight: 600;
+    line-height: 1.5; text-align: center; white-space: pre-line;
+    pointer-events: none; opacity: 0; transition: opacity .18s;
+  }
+  #toast.show { opacity: 1; }
   #board {
     display: block; touch-action: manipulation;
     border-radius: 10px; border: 1px solid #d1d5db;
@@ -97,12 +111,12 @@
   #board.flip { transform: rotate(180deg); }
 
   #sidePanel { display: flex; flex-direction: column; gap: 8px; }
-  #controls { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  #controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   #controls .btn { font-size: 15px; min-height: 52px; padding: 8px 6px; }
   #controls .btn.hide { display: none; }
 
   @media (max-width: 420px) {
-    #controls { grid-template-columns: repeat(2, 1fr); }
+    #controls .btn { font-size: 14px; }
     #statusBar { font-size: 17px; }
   }
   @media (min-width: 700px) and (orientation: landscape) {
@@ -121,7 +135,7 @@
 <section id="startScreen" class="screen on">
   <div class="start-inner">
     <h1>쉬는시간 오목</h1>
-    <p class="sub">가로·세로·대각선으로 5개를 먼저 이으면 이깁니다.<br>금수(렌주룰) 없이 단순하게 즐기는 오목이에요.</p>
+    <p class="sub">가로·세로·대각선으로 5개를 먼저 이으면 이깁니다.<br>흑돌은 33·44·장목 자리에 둘 수 없어요(금수).</p>
 
     <div class="card">
       <h2>AI 대전</h2>
@@ -148,7 +162,10 @@
 
     <div class="card">
       <h2>설정</h2>
+      <p>금수는 <b>흑돌에만</b> 적용됩니다. 33(쌍삼)·44(쌍사)·장목(6목) 자리에는 둘 수 없고,
+         그 자리를 누르면 안내가 뜹니다. 먼저 두는 흑돌이 너무 유리해지지 않게 하는 규칙이에요.</p>
       <div class="stack">
+        <button class="btn" id="renjuToggle" aria-pressed="true">금수 규칙: 켜기</button>
         <button class="btn" id="soundToggleStart" aria-pressed="true">효과음: 켜기</button>
       </div>
     </div>
@@ -157,11 +174,10 @@
 
 <!-- ===== 게임 화면 ===== -->
 <section id="gameScreen" class="screen">
-  <div id="boardWrap"><canvas id="board"></canvas></div>
+  <div id="boardWrap"><canvas id="board"></canvas><div id="toast"></div></div>
   <div id="sidePanel">
     <div id="statusBar"><span id="statusDot"></span><span id="statusText"></span></div>
     <div id="controls">
-      <button class="btn" id="btnUndo">한 수 무르기</button>
       <button class="btn" id="btnReset">다시두기</button>
       <button class="btn" id="btnHome">처음 화면</button>
       <button class="btn" id="btnSound" aria-pressed="true">효과음 켜짐</button>
@@ -188,6 +204,7 @@
   var thinking = false;
   var rotateOn = true;
   var soundOn = true;
+  var renjuOn = true;      // 금수(33·44·장목) 제한 — 흑돌에만 적용
   var names = { 1: "흑돌", 2: "백돌" };
   var flipped = false;
 
@@ -196,7 +213,19 @@
   var startScreen = $("startScreen"), gameScreen = $("gameScreen");
   var canvas = $("board"), ctx = canvas.getContext("2d");
   var statusBar = $("statusBar"), statusText = $("statusText"), statusDot = $("statusDot");
-  var btnUndo = $("btnUndo"), btnReset = $("btnReset"), btnHome = $("btnHome"), btnSound = $("btnSound");
+  var toastEl = $("toast"), toastTimer = null;
+  var btnReset = $("btnReset"), btnHome = $("btnHome"), btnSound = $("btnSound");
+
+  function showToast(text) {
+    toastEl.textContent = text;
+    toastEl.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove("show"); }, 2400);
+  }
+  function hideToast() {
+    clearTimeout(toastTimer);
+    toastEl.classList.remove("show");
+  }
 
   /* ────────── 효과음 (Web Audio, 외부 리소스 없음) ────────── */
   var actx = null;
@@ -250,6 +279,7 @@
   function xy(r, c) { return [pad + c * cell, pad + r * cell]; }
 
   function drawStone(x, y, p, radius) {
+    if (!(radius > 0.5)) radius = 0.5;      /* 반지름이 0 이하면 canvas 가 예외를 던집니다 */
     var g = ctx.createRadialGradient(x - radius * 0.3, y - radius * 0.35, radius * 0.15, x, y, radius);
     if (p === BLACK) {
       g.addColorStop(0, "#6b7280"); g.addColorStop(0.55, "#1f2937"); g.addColorStop(1, "#030712");
@@ -264,6 +294,11 @@
   }
 
   function render(ts) {
+    rafId = 0;                 /* 그리다 중간에 실패해도 다음 그리기가 막히지 않도록 먼저 비웁니다 */
+    try { draw(ts); } catch (e) { /* 한 프레임 못 그려도 게임은 계속됩니다 */ }
+  }
+
+  function draw(ts) {
     var now = ts || (window.performance ? performance.now() : Date.now());
     var animating = false;
 
@@ -298,7 +333,12 @@
       var p = board[idx]; if (!p) continue;
       var pos = xy((idx / N) | 0, idx % N), rad = base;
       if (anim && anim.i === idx) {
-        var t = Math.min(1, (now - anim.t0) / 170);
+        /* requestAnimationFrame 이 주는 시각은 '이번 프레임이 시작된 때'라서
+           돌을 놓으며 잰 시각보다 앞설 수 있습니다. 그대로 두면 진행률이 음수가 되어
+           반지름이 음수가 되고, canvas 가 예외를 던져 그리다 말게 됩니다. */
+        var t = (now - anim.t0) / 170;
+        if (!(t > 0)) t = 0;
+        if (t > 1) t = 1;
         rad = base * (0.4 + 0.6 * (1 - Math.pow(1 - t, 3)));
         if (t < 1) animating = true; else anim = null;
       }
@@ -333,7 +373,7 @@
       ctx.stroke();
     }
 
-    rafId = animating ? requestAnimationFrame(render) : 0;
+    if (animating) rafId = requestAnimationFrame(render);
   }
   function kick() { if (!rafId) rafId = requestAnimationFrame(render); }
 
@@ -361,6 +401,60 @@
         return cells;
       }
     }
+    return null;
+  }
+
+  /* ────────── 금수(렌주룰) 판정 — 흑돌에만 적용 ──────────
+     33(쌍삼)·44(쌍사)·장목(6목 이상)을 막습니다.
+     한 방향 9칸만 보고 판정하는 간단한 방식이라, 정식 렌주룰의 까다로운 예외
+     (금수 자리를 이용한 삼·사 판정 등)까지 가려내지는 않습니다.
+     아래 lineStr 은 '놓았다고 치고' 만든 문자열이라 가운데(4번 칸)가 늘 '1' 입니다. */
+  function runLen(s) {                       // 가운데를 지나는 연속 흑돌 길이
+    var n = 1, i;
+    for (i = 5; i < 9 && s.charAt(i) === "1"; i++) n++;
+    for (i = 3; i >= 0 && s.charAt(i) === "1"; i--) n++;
+    return n;
+  }
+  function fillAt(s, i) { return s.substring(0, i) + "1" + s.substring(i + 1); }
+
+  function makesFour(s) {                    // 빈칸 하나를 더 채우면 정확히 5목이 되는가
+    for (var i = 0; i < 9; i++) {
+      if (s.charAt(i) !== "0") continue;
+      if (runLen(fillAt(s, i)) === 5) return true;
+    }
+    return false;
+  }
+  function hasOpenFour(s) {                  // 가운데를 포함하는 열린 4가 있는가
+    var k = s.indexOf("011110");
+    while (k >= 0) {
+      if (k + 1 <= 4 && 4 <= k + 4) return true;
+      k = s.indexOf("011110", k + 1);
+    }
+    return false;
+  }
+  function makesOpenThree(s) {               // 빈칸 하나를 더 채우면 열린 4가 되는가(=활삼)
+    for (var i = 0; i < 9; i++) {
+      if (s.charAt(i) !== "0") continue;
+      if (hasOpenFour(fillAt(s, i))) return true;
+    }
+    return false;
+  }
+
+  /* 금수면 그 이름을, 둘 수 있으면 null 을 돌려줍니다 */
+  function forbiddenReason(r, c) {
+    var fours = 0, threes = 0, over = false, five = false, d, s, n;
+    for (d = 0; d < 4; d++) {
+      s = lineStr(r, c, DIRS[d][0], DIRS[d][1], BLACK);
+      n = runLen(s);
+      if (n >= 6) over = true;
+      else if (n === 5) five = true;
+      if (makesFour(s)) fours++;
+      if (makesOpenThree(s)) threes++;
+    }
+    if (five) return null;                   // 5목이 되는 수는 이기는 수라 금수보다 우선
+    if (over) return "장목(6목)";
+    if (fours >= 2) return "44(쌍사)";
+    if (threes >= 2) return "33(쌍삼)";
     return null;
   }
 
@@ -569,6 +663,16 @@
     if (over || thinking) return;
     if (board[idx]) { soundNope(); return; }          // 이미 돌이 있는 칸은 무시
     if (mode === "ai" && turn !== BLACK) return;
+
+    if (renjuOn && turn === BLACK) {                  // 금수는 흑돌에만
+      var bad = forbiddenReason((idx / N) | 0, idx % N);
+      if (bad) {
+        soundNope();
+        showToast(bad + " 자리예요.\n오목 규칙에 따라 흑돌은 여기에 둘 수 없어요.");
+        return;
+      }
+    }
+
     var won = place(idx, turn);
     if (mode === "ai" && !over && !won) {
       thinking = true; updateUI();
@@ -600,10 +704,7 @@
         statusText.textContent = "판이 모두 찼습니다 — 무승부";
       }
       statusText.className = "win";
-      btnUndo.classList.add("hide");                   // 끝난 뒤에는 대국 정리용 버튼만 남긴다
     } else {
-      btnUndo.classList.remove("hide");
-      btnUndo.disabled = thinking || history.length === 0;
       if (thinking) {
         statusDot.className = "hide";
         statusText.textContent = "AI가 생각 중…";
@@ -633,6 +734,7 @@
     board.fill(EMPTY);
     history = []; over = false; winLine = null; winFx = null; anim = null;
     thinking = false; turn = BLACK; flipped = false;
+    hideToast();
     canvas.classList.remove("flip");
     statusBar.classList.remove("flip");
     updateUI();
@@ -675,20 +777,6 @@
     gameScreen.classList.remove("on");
     startScreen.classList.add("on");
   });
-  btnUndo.addEventListener("click", function () {
-    if (thinking || over || !history.length) return;
-    var back = (mode === "ai" && history.length >= 2) ? 2 : 1;
-    for (var k = 0; k < back; k++) {
-      var h = history.pop();
-      if (!h) break;
-      board[h.i] = EMPTY;
-      turn = h.p;
-    }
-    anim = null; winLine = null; winFx = null; over = false;
-    updateUI();
-    render();
-  });
-
   function syncSound() {
     btnSound.textContent = soundOn ? "효과음 켜짐" : "효과음 꺼짐";
     btnSound.setAttribute("aria-pressed", soundOn ? "true" : "false");
@@ -703,6 +791,13 @@
   }
   btnSound.addEventListener("click", toggleSound);
   $("soundToggleStart").addEventListener("click", toggleSound);
+
+  var renjuBtn = $("renjuToggle");
+  renjuBtn.addEventListener("click", function () {
+    renjuOn = !renjuOn;
+    renjuBtn.textContent = "금수 규칙: " + (renjuOn ? "켜기" : "끄기");
+    renjuBtn.setAttribute("aria-pressed", renjuOn ? "true" : "false");
+  });
 
   var rotBtn = $("rotateToggle");
   rotBtn.addEventListener("click", function () {
@@ -724,6 +819,12 @@
 
   window.addEventListener("resize", layout);
   window.addEventListener("orientationchange", function () { setTimeout(layout, 250); });
+
+  /* 다른 앱에 갔다 돌아오면 화면 그리기가 멈춰 있거나 판이 비어 보일 수 있어
+     돌아온 순간 한 번 다시 그립니다. */
+  function redrawNow() { anim = null; render(); }
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) redrawNow(); });
+  window.addEventListener("pageshow", redrawNow);
 
   syncSound();
   layout();
