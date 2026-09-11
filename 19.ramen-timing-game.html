@@ -162,6 +162,15 @@
   .tray svg{width:110px;height:44px;flex:none}
   .tray .sub{flex:1}
 
+  /* ---------- 등급·금액 팝업 ---------- */
+  .pop{position:absolute;left:50%;top:38%;transform:translate(-50%,0);z-index:5;pointer-events:none;
+    background:#fff;border:2px solid var(--ok);color:var(--ok);border-radius:12px;padding:6px 12px;
+    font-weight:800;font-size:16px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.15);
+    animation:popup 1.6s ease-out forwards}
+  .pop.minus{border-color:var(--bad);color:var(--bad)}
+  @keyframes popup{0%{opacity:0;transform:translate(-50%,10px) scale(.8)}15%{opacity:1;transform:translate(-50%,0) scale(1)}
+    75%{opacity:1;transform:translate(-50%,-14px)}100%{opacity:0;transform:translate(-50%,-30px)}}
+
   /* ---------- 결과 ---------- */
   .result .big{font-size:26px;font-weight:700;margin:8px 0}
   .grades{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:10px 0}
@@ -260,11 +269,13 @@ const CONFIG = {
   TRAY_GOOD    : 1.5,    // 담기 신호 후 이 시간 안에 담으면 등급 유지 (넘기면 한 단계 하락)
   TRAY_BURN    : 4.0,    // 담기 신호 후 이 시간까지 안 담으면 탐
   FAST_BONUS   : 200,    // 빠르게 담았을 때 추가 금액(원)
+  BURN_PENALTY : 1000,   // 태워먹었을 때 깎이는 금액(원)
   BURNT_SHOW   : 1.5,    // 탐/순서 오류 표시가 남아 있는 시간
 
   PRICES : { best:1000, good:800, fair:600, poor:400, fail:0 }
 };
 const GRADE_ORDER = ["best","good","fair","poor"];
+const GRADE_NAME  = { best:"최상", good:"상", fair:"중", poor:"하" };
 
 /* ===================================================================== */
 const $ = id => document.getElementById(id);
@@ -403,8 +414,16 @@ class Pot {
       this.reset();
     }
   }
+  popup(text, minus){
+    const d = document.createElement("div");
+    d.className = "pop" + (minus ? " minus" : "");
+    d.textContent = text;
+    this.el.appendChild(d);
+    setTimeout(() => d.remove(), 1700);
+  }
   fail(msg, burnt){
     game.count("fail");
+    if (burnt) game.penalize(this);
     this.reset();
     this.state = burnt ? "burnt" : "error";
     this.failMsg = msg;
@@ -522,11 +541,18 @@ const game = {
 
   count(g){ this.grades[g]++; },
 
+  penalize(pot){
+    this.money -= CONFIG.BURN_PENALTY;
+    pot.popup(`타버림 -${fmt(CONFIG.BURN_PENALTY)}원`, true);
+    this.updateHud();
+  },
+
   serve(pot, grade, bonus){
     this.count(grade);
     this.money += CONFIG.PRICES[grade] + (bonus||0);
     this.served++;
     this.flyBowl(pot);
+    pot.popup(`${GRADE_NAME[grade]} +${fmt(CONFIG.PRICES[grade] + (bonus||0))}원`, false);
     this.updateHud();
   },
 
