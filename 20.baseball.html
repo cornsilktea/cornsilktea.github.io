@@ -171,7 +171,13 @@
     <svg class="field" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
       <defs>
         <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#3f92dd"/><stop offset="1" stop-color="#cfe6fa"/>
+          <stop offset="0" stop-color="#2f7fd0"/><stop offset=".45" stop-color="#63aae6"/><stop offset=".8" stop-color="#a9d3f3"/><stop offset="1" stop-color="#dcedf9"/>
+        </linearGradient>
+        <radialGradient id="sun" cx="78" cy="2" r="30" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#fff7d6" stop-opacity=".9"/><stop offset=".35" stop-color="#fff1c4" stop-opacity=".35"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+        </radialGradient>
+        <linearGradient id="cloud" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#dfe9f3"/>
         </linearGradient>
         <linearGradient id="grass" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stop-color="#4e9c46"/><stop offset="1" stop-color="#2f7c3a"/>
@@ -205,10 +211,20 @@
 
       <!-- 하늘·구름 -->
       <rect x="0" y="0" width="100" height="40" fill="url(#sky)"/>
-      <g fill="#fff" opacity=".9">
-        <ellipse cx="14" cy="7" rx="7" ry="2.2"/><ellipse cx="18" cy="5.6" rx="4" ry="2"/><ellipse cx="10" cy="6.4" rx="3.5" ry="1.6"/>
-        <ellipse cx="76" cy="5" rx="8" ry="2.4"/><ellipse cx="81" cy="3.6" rx="4.5" ry="2.2"/><ellipse cx="71" cy="4.4" rx="3.8" ry="1.7"/>
-        <ellipse cx="46" cy="9" rx="5" ry="1.5"/><ellipse cx="49" cy="8.2" rx="3" ry="1.3"/>
+      <rect x="0" y="0" width="100" height="40" fill="url(#sun)"/>
+      <!-- 옅은 상층운 -->
+      <g fill="#fff" opacity=".35">
+        <ellipse cx="30" cy="4" rx="16" ry=".9"/><ellipse cx="62" cy="7" rx="12" ry=".7"/><ellipse cx="88" cy="12" rx="9" ry=".6"/>
+      </g>
+      <!-- 뭉게구름: 아래는 살짝 그늘 -->
+      <g fill="url(#cloud)">
+        <ellipse cx="13" cy="8.5" rx="7.5" ry="2.4"/><ellipse cx="16.5" cy="6.4" rx="4.6" ry="2.6"/><ellipse cx="10" cy="7" rx="3.8" ry="2"/><ellipse cx="20" cy="8" rx="3.2" ry="1.6"/>
+        <ellipse cx="72" cy="6" rx="8.5" ry="2.6"/><ellipse cx="76.5" cy="4" rx="5" ry="2.8"/><ellipse cx="68" cy="4.8" rx="4" ry="2.1"/><ellipse cx="80" cy="5.6" rx="3.4" ry="1.7"/>
+        <ellipse cx="44" cy="12.5" rx="5.5" ry="1.5"/><ellipse cx="46.5" cy="11.4" rx="3.2" ry="1.5"/>
+        <ellipse cx="93" cy="15" rx="5" ry="1.3"/><ellipse cx="95" cy="14.1" rx="2.8" ry="1.3"/>
+      </g>
+      <g fill="#c9d8e6" opacity=".55">
+        <ellipse cx="13" cy="10.2" rx="7" ry=".8"/><ellipse cx="72" cy="8" rx="8" ry=".9"/><ellipse cx="44" cy="13.6" rx="5" ry=".5"/>
       </g>
       <!-- 조명탑 -->
       <g fill="#8f9aa6">
@@ -241,31 +257,6 @@
         <!-- 가운데 배터스 아이(타자 시야 보호용 짙은 녹색 벽) -->
         <path d="M41 18 L59 18 L59 34 L41 34 Z" fill="#1e472b"/>
         <path d="M41 18 L59 18 L59 19 L41 19 Z" fill="#2b5c3a"/>
-        <!-- 전광판: 틀 · 팀 이름 줄 · 이닝 칸 두 줄 · R H E -->
-        <rect x="43" y="19.8" width="14" height="8.6" rx=".5" fill="#0d141b" stroke="#3b4855" stroke-width=".25"/>
-        <rect x="43.7" y="20.5" width="12.6" height="7.2" rx=".3" fill="#141d27"/>
-        <rect x="43.7" y="20.5" width="12.6" height="1.5" fill="#1f2d3b"/>
-        <rect x="44.4" y="21" width="3.4" height=".55" rx=".2" fill="#dfe6ee"/>
-        <rect x="52.2" y="21" width="3.4" height=".55" rx=".2" fill="#dfe6ee"/>
-        <g fill="#0b1117">
-          <rect x="44.4" y="22.5" width="1.05" height=".95"/><rect x="45.65" y="22.5" width="1.05" height=".95"/><rect x="46.9" y="22.5" width="1.05" height=".95"/>
-          <rect x="48.15" y="22.5" width="1.05" height=".95"/><rect x="49.4" y="22.5" width="1.05" height=".95"/><rect x="50.65" y="22.5" width="1.05" height=".95"/>
-          <rect x="51.9" y="22.5" width="1.05" height=".95"/><rect x="53.15" y="22.5" width="1.05" height=".95"/><rect x="54.4" y="22.5" width="1.05" height=".95"/>
-          <rect x="44.4" y="23.7" width="1.05" height=".95"/><rect x="45.65" y="23.7" width="1.05" height=".95"/><rect x="46.9" y="23.7" width="1.05" height=".95"/>
-          <rect x="48.15" y="23.7" width="1.05" height=".95"/><rect x="49.4" y="23.7" width="1.05" height=".95"/><rect x="50.65" y="23.7" width="1.05" height=".95"/>
-          <rect x="51.9" y="23.7" width="1.05" height=".95"/><rect x="53.15" y="23.7" width="1.05" height=".95"/><rect x="54.4" y="23.7" width="1.05" height=".95"/>
-        </g>
-        <g fill="#f2c94c">
-          <rect x="44.75" y="22.7" width=".35" height=".55"/><rect x="46" y="22.7" width=".35" height=".55"/><rect x="47.25" y="22.7" width=".35" height=".55"/>
-          <rect x="44.75" y="23.9" width=".35" height=".55"/><rect x="46" y="23.9" width=".35" height=".55"/>
-        </g>
-        <rect x="43.7" y="25.1" width="12.6" height=".2" fill="#2a3946"/>
-        <g fill="#0b1117">
-          <rect x="44.6" y="25.7" width="2.6" height="1.6" rx=".2"/><rect x="48.7" y="25.7" width="2.6" height="1.6" rx=".2"/><rect x="52.8" y="25.7" width="2.6" height="1.6" rx=".2"/>
-        </g>
-        <g fill="#f2c94c">
-          <rect x="45.6" y="26.05" width=".6" height=".9"/><rect x="49.7" y="26.05" width=".6" height=".9"/><rect x="53.9" y="26.05" width=".6" height=".9"/>
-        </g>
         <!-- 계단 통로 -->
         <g fill="#2f3842" opacity=".8">
           <rect x="14" y="26" width="1" height="19"/><rect x="28" y="22" width="1" height="23"/>
@@ -274,6 +265,44 @@
       </g>
       <path d="M0 28 Q50 10 100 28" fill="none" stroke="#9aa5b1" stroke-width=".6"/>                <!-- 지붕 난간 -->
       <path d="M0 44.5 Q50 28.5 100 44.5 L100 45 Q50 29 0 45 Z" fill="#30404f"/>
+      <!-- 전광판: 지지대 두 개로 담장 위에 서 있고, 윗부분은 하늘에 걸침 -->
+      <g fill="#3a4552">
+        <rect x="43.6" y="23.5" width="1.3" height="8.5"/><rect x="55.1" y="23.5" width="1.3" height="8.5"/>
+        <rect x="43.6" y="27" width="12.8" height=".6"/>
+      </g>
+      <rect x="40.5" y="8" width="19" height="16" rx=".6" fill="#0d141b" stroke="#3b4855" stroke-width=".3"/>
+      <rect x="41.3" y="8.8" width="17.4" height="14.4" rx=".3" fill="#141d27"/>
+      <rect x="41.3" y="8.8" width="17.4" height="2.2" fill="#1f2d3b"/>
+      <rect x="42.2" y="9.55" width="4.6" height=".7" rx=".25" fill="#dfe6ee"/>
+      <rect x="53.2" y="9.55" width="4.6" height=".7" rx=".25" fill="#dfe6ee"/>
+      <g fill="#0b1117">
+        <rect x="42.2" y="11.8" width="1.5" height="1.4"/><rect x="43.95" y="11.8" width="1.5" height="1.4"/><rect x="45.7" y="11.8" width="1.5" height="1.4"/>
+        <rect x="47.45" y="11.8" width="1.5" height="1.4"/><rect x="49.2" y="11.8" width="1.5" height="1.4"/><rect x="50.95" y="11.8" width="1.5" height="1.4"/>
+        <rect x="52.7" y="11.8" width="1.5" height="1.4"/><rect x="54.45" y="11.8" width="1.5" height="1.4"/><rect x="56.2" y="11.8" width="1.5" height="1.4"/>
+        <rect x="42.2" y="13.6" width="1.5" height="1.4"/><rect x="43.95" y="13.6" width="1.5" height="1.4"/><rect x="45.7" y="13.6" width="1.5" height="1.4"/>
+        <rect x="47.45" y="13.6" width="1.5" height="1.4"/><rect x="49.2" y="13.6" width="1.5" height="1.4"/><rect x="50.95" y="13.6" width="1.5" height="1.4"/>
+        <rect x="52.7" y="13.6" width="1.5" height="1.4"/><rect x="54.45" y="13.6" width="1.5" height="1.4"/><rect x="56.2" y="13.6" width="1.5" height="1.4"/>
+      </g>
+      <g fill="#f2c94c">
+        <rect x="42.7" y="12.1" width=".5" height=".8"/><rect x="44.45" y="12.1" width=".5" height=".8"/><rect x="46.2" y="12.1" width=".5" height=".8"/><rect x="47.95" y="12.1" width=".5" height=".8"/>
+        <rect x="42.7" y="13.9" width=".5" height=".8"/><rect x="44.45" y="13.9" width=".5" height=".8"/><rect x="46.2" y="13.9" width=".5" height=".8"/>
+      </g>
+      <rect x="41.3" y="15.4" width="17.4" height=".25" fill="#2a3946"/>
+      <g fill="#0b1117">
+        <rect x="42.6" y="16.2" width="3.6" height="2.6" rx=".25"/><rect x="48.2" y="16.2" width="3.6" height="2.6" rx=".25"/><rect x="53.8" y="16.2" width="3.6" height="2.6" rx=".25"/>
+      </g>
+      <g fill="#f2c94c">
+        <rect x="44" y="16.7" width=".9" height="1.6"/><rect x="49.6" y="16.7" width=".9" height="1.6"/><rect x="55.2" y="16.7" width=".9" height="1.6"/>
+      </g>
+      <!-- 볼·스트라이크·아웃 불 / 시계 -->
+      <g>
+        <circle cx="42.9" cy="20.6" r=".45" fill="#3fbf6a"/><circle cx="44.1" cy="20.6" r=".45" fill="#3fbf6a"/><circle cx="45.3" cy="20.6" r=".45" fill="#22402c"/>
+        <circle cx="47.6" cy="20.6" r=".45" fill="#e04b3a"/><circle cx="48.8" cy="20.6" r=".45" fill="#4a2420"/>
+        <circle cx="51.1" cy="20.6" r=".45" fill="#e04b3a"/><circle cx="52.3" cy="20.6" r=".45" fill="#4a2420"/>
+        <rect x="53.6" y="19.9" width="4.2" height="1.4" rx=".2" fill="#0b1117"/>
+        <rect x="54.3" y="20.2" width=".5" height=".8" fill="#f2c94c"/><rect x="55" y="20.2" width=".5" height=".8" fill="#f2c94c"/>
+        <rect x="55.9" y="20.2" width=".5" height=".8" fill="#f2c94c"/><rect x="56.6" y="20.2" width=".5" height=".8" fill="#f2c94c"/>
+      </g>
 
 
       <!-- 외야 펜스: 좌우 폴을 잇는 둥근 담장 + 경고 트랙 -->
@@ -288,31 +317,27 @@
       <path d="M50 87 L88 63 Q50 36 12 63 Z" fill="url(#dirt)"/>
       <path d="M50 87 L88 63 Q50 36 12 63 Z" fill="none" stroke="#9c7245" stroke-width=".25" opacity=".5"/>
       <!-- 내야 잔디 (베이스라인 안쪽 다이아몬드) -->
-      <path d="M50 80.5 L70.5 64.4 L50 55.6 L29.5 64.4 Z" fill="url(#grass)" stroke="#3f8a3d" stroke-width="1" stroke-linejoin="round"/>
-      <path d="M50 80.5 L70.5 64.4 L50 55.6 L29.5 64.4 Z" fill="none" stroke="#2c6a30" stroke-width=".25" opacity=".5"/>
+      <path d="M50 80.5 L73 64.6 L50 55.6 L27 64.6 Z" fill="url(#grass)" stroke="#3f8a3d" stroke-width="1" stroke-linejoin="round"/>
+      <path d="M50 80.5 L73 64.6 L50 55.6 L27 64.6 Z" fill="none" stroke="#2c6a30" stroke-width=".25" opacity=".5"/>
       <!-- 베이스라인 (홈 ↔ 1루·3루 선은 파울선과 겹침) -->
       <!-- 마운드 -->
       <ellipse cx="50" cy="60.4" rx="6.2" ry="2.4" fill="url(#dirt)"/>
       <ellipse cx="50" cy="60.2" rx="6.2" ry="2.4" fill="none" stroke="#9c7245" stroke-width=".25" opacity=".6"/>
       <ellipse cx="50" cy="60" rx="4" ry="1.4" fill="#bb8c5c" opacity=".7"/>
       <rect x="49.2" y="59.3" width="1.6" height=".45" fill="#fff"/>
-      <!-- 베이스: 다이아몬드의 네 꼭짓점, 각 변이 베이스라인과 나란하게 -->
-      <polygon points="73.83,62.77 75.79,63.75 74.17,65.23 72.21,64.25" fill="#fff" stroke="#cfcfcf" stroke-width=".15"/>   <!-- 1루 -->
+      <!-- 베이스: 1루·3루는 파울선 위, 2루는 그 맞은편 꼭짓점. 각 변이 베이스라인과 나란하게 -->
+      <polygon points="77.43,62.77 79.39,63.75 77.77,65.23 75.81,64.25" fill="#fff" stroke="#cfcfcf" stroke-width=".15"/>   <!-- 1루 -->
       <polygon points="50,51.1 51.8,52 50,52.9 48.2,52" fill="#fff" stroke="#cfcfcf" stroke-width=".15"/>                    <!-- 2루 -->
-      <polygon points="26.17,62.77 24.21,63.75 25.83,65.23 27.79,64.25" fill="#fff" stroke="#cfcfcf" stroke-width=".15"/>   <!-- 3루 -->
-      <!-- 홈플레이트 주변 흙 (타자 박스·포수 박스를 넉넉히 감쌈) -->
+      <polygon points="22.57,62.77 20.61,63.75 22.23,65.23 24.19,64.25" fill="#fff" stroke="#cfcfcf" stroke-width=".15"/>   <!-- 3루 -->
+      <!-- 홈플레이트 주변 흙 (타자 박스를 넉넉히 감쌈) -->
       <ellipse cx="50" cy="86" rx="27" ry="12.5" fill="url(#dirt)"/>
       <ellipse cx="50" cy="86" rx="27" ry="12.5" fill="none" stroke="#9c7245" stroke-width=".25" opacity=".5"/>
-      <!-- 대기 타석 -->
-      <ellipse cx="80" cy="83" rx="3.2" ry="1.3" fill="url(#dirt)"/>
-      <ellipse cx="80" cy="83" rx="3.2" ry="1.3" fill="none" stroke="#fff" stroke-width=".3" opacity=".7"/>
-      <!-- 타자 박스(양쪽)·포수 박스 -->
+      <!-- 타자 박스(양쪽) -->
       <path d="M33 78 L46 78 L47 91 L31.5 91 Z" fill="none" stroke="#fff" stroke-width=".5" opacity=".85"/>
       <path d="M54 78 L67 78 L68.5 91 L53 91 Z" fill="none" stroke="#fff" stroke-width=".5" opacity=".85"/>
-      <path d="M43 91.8 L57 91.8 L58.5 96.5 L41.5 96.5 Z" fill="none" stroke="#fff" stroke-width=".5" opacity=".65"/>
       <!-- 파울선 (타자 박스 바깥부터 1루·3루를 지나 파울 폴까지; 박스 안과 홈플레이트 주변엔 그리지 않음) -->
-      <path d="M39.5 77.6 L0.5 46.5" stroke="#fff" stroke-width=".55" opacity=".92"/>
-      <path d="M60.5 77.6 L99.5 46.5" stroke="#fff" stroke-width=".55" opacity=".92"/>
+      <path d="M39.5 77.6 L1.6 47.4" stroke="#fff" stroke-width=".55" opacity=".92"/>
+      <path d="M60.5 77.6 L98.4 47.4" stroke="#fff" stroke-width=".55" opacity=".92"/>
       <!-- 홈플레이트 -->
       <path d="M47.8 82.8 L52.2 82.8 L52.2 84.4 L50 85.8 L47.8 84.4 Z" fill="#fff" stroke="#c9c9c9" stroke-width=".3"/>
     </svg>
