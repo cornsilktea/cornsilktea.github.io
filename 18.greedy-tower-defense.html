@@ -188,7 +188,7 @@
       <li>골드는 <b>풍선을 하나 터뜨릴 때마다</b> 조금씩 들어옵니다. 놓친 풍선의 골드는 받지 못합니다.</li>
       <li>한 번 지은 타워는 <b>팔거나 옮길 수 없습니다.</b> (되돌릴 수 없는 선택)</li>
       <li>타워마다 <b>효율(DPS ÷ 비용)</b>이 다릅니다. 지금 싼 타워를 여러 개 지을지, 모아서 상위 타워를 지을지 스스로 판단하세요.</li>
-      <li>보스 풍선은 <b>방어력</b>이 있어 한 발당 데미지에서 방어력만큼 빠집니다. <b>보스를 놓치면 즉시 게임 오버</b>됩니다! (타워는 사거리 안에 보스가 있으면 보스를 먼저 쏩니다)</li>
+      <li>보스 풍선은 <b>방어력</b>이 있어 한 발당 데미지에서 방어력만큼 빠집니다. 효율은 화살이 최고지만 칸은 40개뿐이라, 칸당 화력·범위 피해·한 발 데미지를 따져 골라야 합니다. <b>보스를 놓치면 즉시 게임 오버</b>됩니다! (타워는 사거리 안에 보스가 있으면 보스를 먼저 쏩니다)</li>
       <li>타워는 <b>최대 40개</b>까지만 지을 수 있습니다. 싼 타워로 칸을 다 채우면 나중에 강한 타워를 놓을 자리가 없습니다.</li>
       <li>웨이브는 <b>[시작] 버튼</b>을 눌러야 시작됩니다. 그 전에 타워를 배치하세요.</li>
     </ul>
@@ -270,14 +270,17 @@ var CONFIG = {
    - WAVES[].gold : 풍선을 다 잡았을 때 받는 총 골드(1마리마다 나누어 지급).
    - boss : 놓치면 즉시 패배. hp/armor 를 낮추면 쉬워진다.
    ===================================================================== */
-/* ---- 타워 스펙 : 효율 = DPS/비용. 레이저(0.63)가 최고 효율, 화살 0.57, 대포 0.45 ---- */
+/* ---- 타워 스펙 : 효율(DPS/비용)은 화살→레일건 순으로 내려간다.
+   대신 칸당 DPS는 올라가고(칸 제한 40개), 플라즈마는 범위 피해로 물량에,
+   레일건은 한 발 데미지로 방어력 보스에 강하다.
+   화살 0.57 > 대포 0.45 > 레이저 0.42 > 저격 0.28 > 플라즈마 0.25 > 레일건 0.23 ---- */
 var TOWERS = [
   { id:'arrow',  name:'화살타워',     tier:1, cost:20,  dmg:5,   cd:0.44, range:110, proj:'arrow',  pspd:1200, color:'#4f8f3a', dark:'#33682a', desc:'화살을 쏘는 목조 망루' },
   { id:'cannon', name:'대포타워',     tier:1, cost:50,  dmg:18,  cd:0.80, range:100, proj:'shell',  pspd:1200, color:'#8a6134', dark:'#5e3f1f', desc:'포탄이 터지며 주변에도 피해', splash:46, splashRate:0.4 },
-  { id:'laser',  name:'레이저타워',   tier:2, cost:80,  dmg:6,   cd:0.12, range:120, proj:null,     color:'#d4318c', dark:'#96185f', desc:'끊임없이 쏘는 광선 · 최고 효율' },
-  { id:'sniper', name:'저격타워',     tier:2, cost:120, dmg:40,  cd:1.20, range:195, proj:null,     color:'#2f6fae', dark:'#1c4c7d', desc:'초장거리 정밀 사격' },
-  { id:'plasma', name:'플라즈마타워', tier:3, cost:250, dmg:24,  cd:0.32, range:165, proj:'plasma', pspd:1200, color:'#12a09a', dark:'#0a6d69', desc:'에너지 구체를 연발' },
-  { id:'rail',   name:'레일건타워',   tier:3, cost:400, dmg:120, cd:1.00, range:215, proj:null,     color:'#6244d6', dark:'#3f2a9b', desc:'전자기 관통포 · 최고 단일 데미지' }
+  { id:'laser',  name:'레이저타워',   tier:2, cost:80,  dmg:4,   cd:0.12, range:120, proj:null,     color:'#d4318c', dark:'#96185f', desc:'끊임없이 쏘는 광선 · 칸당 화살 3배' },
+  { id:'sniper', name:'저격타워',     tier:2, cost:120, dmg:40,  cd:1.20, range:195, proj:null,     color:'#2f6fae', dark:'#1c4c7d', desc:'초장거리 · 한 발이 세서 방어력에 강함' },
+  { id:'plasma', name:'플라즈마타워', tier:3, cost:250, dmg:20,  cd:0.32, range:165, proj:'plasma', pspd:1200, color:'#12a09a', dark:'#0a6d69', desc:'구체가 터져 주변 60% 피해 · 물량에 최강', splash:60, splashRate:0.6 },
+  { id:'rail',   name:'레일건타워',   tier:3, cost:400, dmg:90,  cd:1.00, range:215, proj:null,     color:'#6244d6', dark:'#3f2a9b', desc:'최고 단일 데미지 · 보스 전용' }
 ];
 TOWERS.forEach(function(t){ t.dps=t.dmg/t.cd; t.eff=t.dps/t.cost; });
 
@@ -297,53 +300,53 @@ var WAVES = [
   /* 3 */ { gold:90,  groups:[ g('red',8,38,0.45), g('blue',4,50,0.50,3.5) ] },
   /* 4 */ { gold:95,  groups:[ g('red',10,46,0.40), g('yellow',6,32,0.35,4) ] },
   /* 5 */ { gold:105, groups:[ g('red',8,50,0.40), g('blue',5,60,0.45,3) ], boss:{hp:200,armor:8,start:1} },
-  /* 6 */ { gold:110, groups:[ g('red',10,60,0.38), g('yellow',8,40,0.30,3.5) ] },
+  /* 6 */ { gold:110, groups:[ g('red',10,48,0.38), g('yellow',8,32,0.30,3.5) ] },
 
   /* --- 7~14 중간 구간 --- */
-  /* 7 */ { gold:90,  groups:[ g('red',10,80,0.35), g('blue',8,90,0.40,3) ] },
-  /* 8 */ { gold:90,  groups:[ g('red',12,86,0.33), g('yellow',10,58,0.28,3.5) ] },
-  /* 9 */ { gold:100, groups:[ g('blue',12,104,0.35), g('yellow',10,68,0.28,4) ] },
-  /*10 */ { gold:105, groups:[ g('red',8,95,0.35), g('blue',6,112,0.40,2.5) ], boss:{hp:600,armor:2,start:1} },
-  /*11 */ { gold:115, groups:[ g('blue',12,118,0.32), g('yellow',12,72,0.26,3.5) ] },
-  /*12 */ { gold:120, groups:[ g('red',12,110,0.30), g('blue',8,130,0.35,3.5) ] },
-  /*13 */ { gold:130, groups:[ g('yellow',14,85,0.24), g('blue',10,146,0.32,3) ] },
-  /*14 */ { gold:135, groups:[ g('red',12,146,0.30), g('yellow',12,94,0.24,3.5) ] },
+  /* 7 */ { gold:90,  groups:[ g('red',10,64,0.35), g('blue',8,72,0.40,3) ] },
+  /* 8 */ { gold:90,  groups:[ g('red',12,69,0.33), g('yellow',10,46,0.28,3.5) ] },
+  /* 9 */ { gold:100, groups:[ g('blue',12,83,0.35), g('yellow',10,54,0.28,4) ] },
+  /*10 */ { gold:105, groups:[ g('red',8,76,0.35), g('blue',6,90,0.40,2.5) ], boss:{hp:480,armor:2,start:1} },
+  /*11 */ { gold:115, groups:[ g('blue',12,94,0.32), g('yellow',12,58,0.26,3.5) ] },
+  /*12 */ { gold:120, groups:[ g('red',12,88,0.30), g('blue',8,104,0.35,3.5) ] },
+  /*13 */ { gold:130, groups:[ g('yellow',14,68,0.24), g('blue',10,117,0.32,3) ] },
+  /*14 */ { gold:135, groups:[ g('red',12,117,0.30), g('yellow',12,75,0.24,3.5) ] },
 
   /* --- 15~20 엄격한 구간 : 3티어 없이는 버티기 어렵다 --- */
-  /*15 */ { gold:165, groups:[ g('blue',10,145,0.30), g('yellow',10,98,0.24,3) ], boss:{hp:1100,armor:3,start:1} },
-  /*16 */ { gold:180, groups:[ g('blue',14,152,0.28), g('yellow',12,115,0.22,3.5) ] },
-  /*17 */ { gold:195, groups:[ g('red',14,152,0.26), g('blue',10,166,0.30,3.5) ] },
-  /*18 */ { gold:210, groups:[ g('blue',12,180,0.27), g('yellow',16,122,0.20,3) ] },
-  /*19 */ { gold:225, groups:[ g('red',14,180,0.25), g('blue',10,198,0.28,3.5) ] },
-  /*20 */ { gold:240, groups:[ g('red',8,170,0.28), g('blue',8,176,0.30,2.5), g('yellow',8,120,0.20,5) ], boss:{hp:1400,armor:4,start:1} },
+  /*15 */ { gold:165, groups:[ g('blue',10,116,0.30), g('yellow',10,78,0.24,3) ], boss:{hp:880,armor:3,start:1} },
+  /*16 */ { gold:180, groups:[ g('blue',14,122,0.28), g('yellow',12,92,0.22,3.5) ] },
+  /*17 */ { gold:195, groups:[ g('red',14,122,0.26), g('blue',10,133,0.30,3.5) ] },
+  /*18 */ { gold:210, groups:[ g('blue',12,144,0.27), g('yellow',16,98,0.20,3) ] },
+  /*19 */ { gold:225, groups:[ g('red',14,144,0.25), g('blue',10,158,0.28,3.5) ] },
+  /*20 */ { gold:240, groups:[ g('red',8,136,0.28), g('blue',8,141,0.30,2.5), g('yellow',8,96,0.20,5) ], boss:{hp:1120,armor:4,start:1} },
 
   /* --- 21~25 : 20웨이브 클리어 실력이면 통과 --- */
-  /*21 */ { gold:255, groups:[ g('red',14,200,0.25), g('blue',12,215,0.28,3) ] },
-  /*22 */ { gold:270, groups:[ g('blue',14,225,0.26), g('yellow',18,150,0.18,3) ] },
-  /*23 */ { gold:285, groups:[ g('red',16,235,0.24), g('blue',12,250,0.27,3.5) ] },
-  /*24 */ { gold:300, groups:[ g('yellow',20,170,0.17), g('blue',12,270,0.26,3) ] },
-  /*25 */ { gold:330, groups:[ g('red',10,260,0.26), g('blue',10,280,0.28,2.5) ], boss:{hp:2600,armor:5,start:1} },
+  /*21 */ { gold:255, groups:[ g('red',14,150,0.25), g('blue',12,161,0.28,3) ] },
+  /*22 */ { gold:270, groups:[ g('blue',14,169,0.26), g('yellow',18,113,0.18,3) ] },
+  /*23 */ { gold:285, groups:[ g('red',16,176,0.24), g('blue',12,188,0.27,3.5) ] },
+  /*24 */ { gold:300, groups:[ g('yellow',20,128,0.17), g('blue',12,203,0.26,3) ] },
+  /*25 */ { gold:330, groups:[ g('red',10,195,0.26), g('blue',10,210,0.28,2.5) ], boss:{hp:1950,armor:5,start:1} },
 
   /* --- 26~30 : 어느 정도 효율(3티어 여러 개)이 있어야 통과 --- */
-  /*26 */ { gold:330, groups:[ g('blue',16,264,0.25), g('yellow',16,176,0.17,3) ] },
-  /*27 */ { gold:350, groups:[ g('red',16,282,0.23), g('blue',12,290,0.26,3) ] },
-  /*28 */ { gold:370, groups:[ g('yellow',22,198,0.16), g('blue',12,308,0.25,3) ] },
-  /*29 */ { gold:390, groups:[ g('red',16,317,0.22), g('blue',14,326,0.25,3) ] },
-  /*30 */ { gold:420, groups:[ g('red',10,308,0.25), g('blue',10,334,0.27,2.5), g('yellow',10,229,0.18,5) ], boss:{hp:3700,armor:6,start:1} },
+  /*26 */ { gold:330, groups:[ g('blue',16,198,0.25), g('yellow',16,132,0.17,3) ] },
+  /*27 */ { gold:350, groups:[ g('red',16,212,0.23), g('blue',12,218,0.26,3) ] },
+  /*28 */ { gold:370, groups:[ g('yellow',22,149,0.16), g('blue',12,231,0.25,3) ] },
+  /*29 */ { gold:390, groups:[ g('red',16,238,0.22), g('blue',14,245,0.25,3) ] },
+  /*30 */ { gold:420, groups:[ g('red',10,231,0.25), g('blue',10,251,0.27,2.5), g('yellow',10,172,0.18,5) ], boss:{hp:2775,armor:6,start:1} },
 
   /* --- 31~35 : 효율적인 플레이(칸당 DPS·배치)를 해야 통과 --- */
-  /*31 */ { gold:420, groups:[ g('blue',18,308,0.23), g('yellow',18,210,0.16,3) ] },
-  /*32 */ { gold:440, groups:[ g('red',18,330,0.21), g('blue',14,338,0.24,3) ] },
-  /*33 */ { gold:460, groups:[ g('yellow',24,233,0.15), g('blue',14,360,0.23,3) ] },
-  /*34 */ { gold:480, groups:[ g('red',18,375,0.20), g('blue',16,383,0.23,3) ] },
-  /*35 */ { gold:520, groups:[ g('red',12,360,0.24), g('blue',12,390,0.26,2.5), g('yellow',12,263,0.17,5) ], boss:{hp:4900,armor:8,start:1} },
+  /*31 */ { gold:420, groups:[ g('blue',18,216,0.23), g('yellow',18,147,0.16,3) ] },
+  /*32 */ { gold:440, groups:[ g('red',18,231,0.21), g('blue',14,237,0.24,3) ] },
+  /*33 */ { gold:460, groups:[ g('yellow',24,163,0.15), g('blue',14,252,0.23,3) ] },
+  /*34 */ { gold:480, groups:[ g('red',18,263,0.20), g('blue',16,268,0.23,3) ] },
+  /*35 */ { gold:520, groups:[ g('red',12,252,0.24), g('blue',12,273,0.26,2.5), g('yellow',12,184,0.17,5) ], boss:{hp:3430,armor:8,start:1} },
 
   /* --- 36~40 : 최고 효율의 플레이만 통과 --- */
-  /*36 */ { gold:520, groups:[ g('blue',20,293,0.22), g('yellow',20,198,0.15,3) ] },
-  /*37 */ { gold:540, groups:[ g('red',20,313,0.20), g('blue',16,324,0.22,3) ] },
-  /*38 */ { gold:560, groups:[ g('yellow',26,220,0.14), g('blue',16,345,0.22,3) ] },
-  /*39 */ { gold:580, groups:[ g('red',20,365,0.19), g('blue',18,376,0.21,3) ] },
-  /*40 */ { gold:650, groups:[ g('red',14,365,0.22), g('blue',14,386,0.24,2.5), g('yellow',14,261,0.16,5) ], boss:{hp:5200,armor:10,start:1} }
+  /*36 */ { gold:520, groups:[ g('blue',20,205,0.22), g('yellow',20,139,0.15,3) ] },
+  /*37 */ { gold:540, groups:[ g('red',20,219,0.20), g('blue',16,227,0.22,3) ] },
+  /*38 */ { gold:560, groups:[ g('yellow',26,154,0.14), g('blue',16,241,0.22,3) ] },
+  /*39 */ { gold:580, groups:[ g('red',20,255,0.19), g('blue',18,263,0.21,3) ] },
+  /*40 */ { gold:650, groups:[ g('red',14,255,0.22), g('blue',14,270,0.24,2.5), g('yellow',14,183,0.16,5) ], boss:{hp:3640,armor:10,start:1} }
 ];
 var TOTAL_WAVES = WAVES.length;
 
@@ -752,7 +755,7 @@ function buildTowerPanel(){
       +  '<canvas width="68" height="68" data-icon="'+t.id+'"></canvas>'
       +  '<span class="nm">'+t.name+'<span class="tier">T'+t.tier+'</span></span>'
       +  '<div class="cost">'+t.cost+' G</div>'
-      +  '<div class="sp">데미지 '+t.dmg+' · 주기 '+t.cd.toFixed(2)+'초<br>DPS '+t.dps.toFixed(1)+' · 사거리 '+t.range+'</div>'
+      +  '<div class="sp">데미지 '+t.dmg+(t.splash?' (범위 '+Math.round(t.splashRate*100)+'%)':'')+' · 주기 '+t.cd.toFixed(2)+'초<br>DPS '+t.dps.toFixed(1)+' · 사거리 '+t.range+'</div>'
       +  '<span class="eff">효율 '+t.eff.toFixed(2)+'</span>'
       +'</button>';
   });
@@ -936,7 +939,7 @@ function applyHit(spec, b, x, y){
       var dx=o.x-x, dy=o.y-y;
       if(dx*dx+dy*dy<=sr) hurt(o, spec.dmg*spec.splashRate);
     }
-    addEffect({k:'boom',x:x,y:y,r:spec.splash,t:0.26,life:0.26,c:'#ffb347'});
+    addEffect({k:'boom',x:x,y:y,r:spec.splash,t:0.26,life:0.26,c:(spec.id==='plasma'?'#5fe0d8':'#ffb347')});
   }
 }
 function killBalloon(i){
@@ -1042,7 +1045,7 @@ function update(dt){
       var ddx=pr.target.x-pr.x, ddy=pr.target.y-pr.y, dist=Math.sqrt(ddx*ddx+ddy*ddy);
       if(dist <= step+pr.target.r*0.6){
         applyHit(pr.spec, pr.target, pr.target.x, pr.target.y);
-        if(pr.kind==='plasma') addEffect({k:'boom',x:pr.target.x,y:pr.target.y,r:16,t:0.18,life:0.18,c:pr.spec.color});
+        // 플라즈마 폭발 이펙트는 applyHit의 splash 처리에서 그린다
         G.projs.splice(pi,1); continue;
       }
       pr.x+=Math.cos(pr.ang)*step; pr.y+=Math.sin(pr.ang)*step;
