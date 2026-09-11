@@ -1,5 +1,6 @@
+@import url("https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700;800&display=swap");
 /* =====================================================================
-   공통 테마 — 6.snakegame.html 의 색감·글꼴을 기준으로 함
+   공통 테마 — 색감은 6.snakegame.html 기준, 글꼴은 나눔고딕으로 고정
    각 페이지는 자기 :root 토큰을 아래 --sg-* 값으로 연결해서 쓴다.
    ===================================================================== */
 :root{
@@ -20,5 +21,5 @@
   --sg-ok:#2F7D4F;          /* 정답·성공 */
   --sg-warn:#A8731C;        /* 주의·기록 */
   --sg-radius:4px;
-  --sg-font:ui-monospace,"SF Mono","Menlo","Consolas","Liberation Mono",monospace;
+  --sg-font:"Nanum Gothic","NanumGothic","나눔고딕","Malgun Gothic","맑은 고딕",sans-serif;
 }

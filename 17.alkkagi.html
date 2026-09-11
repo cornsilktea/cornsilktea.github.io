@@ -766,7 +766,7 @@ function drawAim() {
 // 고른 돌 위에 뜨는 작은 알림표(세기 % 또는 안내말)
 function drawBadge(label, col) {
   const tx = selected.x, ty = selected.y - R - 34;
-  ctx.font = 'bold 19px Consolas, ui-monospace, monospace';
+  ctx.font = 'bold 19px "Nanum Gothic", "Malgun Gothic", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   const w = Math.max(60, ctx.measureText(label).width + 24);

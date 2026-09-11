@@ -86,7 +86,7 @@
       "text-decoration:none",
       "box-shadow:0 1px 3px rgba(0,0,0,0.08)",
       "-webkit-tap-highlight-color:transparent",
-      "font-family:ui-monospace,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace"
+      "font-family:'Nanum Gothic','Malgun Gothic','맑은 고딕',sans-serif"
     ].join(";");
     document.body.appendChild(home);
   }
@@ -127,7 +127,7 @@
       "align-items:center", "justify-content:center", "gap:14px",
       "background:#F4F6F1", "color:#1B2B20", "text-align:center",
       "padding:24px", "visibility:visible",
-      "font-family:ui-monospace,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace"
+      "font-family:'Nanum Gothic','Malgun Gothic','맑은 고딕',sans-serif"
     ].join(";");
     document.documentElement.appendChild(overlay);
     return overlay;

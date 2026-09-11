@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'self'; style-src 'self' 'unsafe-inline'; img-src data:; connect-src https://*.firebasedatabase.app https://*.firebaseio.com; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src https://*.firebasedatabase.app https://*.firebaseio.com; base-uri 'none'; form-action 'none'">
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="brickbreak"></script>
 <title>벽돌깨기 - 드래그 조준형 (터치 지원)</title>
@@ -557,7 +557,7 @@ if (!Math.hypot) {
           ctx.stroke();
         }
         ctx.fillStyle = "#ffffff";
-        ctx.font = "600 21px Consolas, ui-monospace, monospace";
+        ctx.font = "600 21px 'Nanum Gothic', 'Malgun Gothic', sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(String(e.hp), x + BW / 2, y + BH / 2 + 1);
@@ -568,7 +568,7 @@ if (!Math.hypot) {
         ctx.arc(x + BW / 2, y + BH / 2, 15, 0, Math.PI * 2);
         ctx.stroke();
         ctx.fillStyle = "#15803d";
-        ctx.font = "600 14px Consolas, ui-monospace, monospace";
+        ctx.font = "600 14px 'Nanum Gothic', 'Malgun Gothic', sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText("+1", x + BW / 2, y + BH / 2 + 1);
@@ -637,9 +637,9 @@ if (!Math.hypot) {
       ctx.stroke();
       ctx.fillStyle = "#1B2B20";
       ctx.textAlign = "center";
-      ctx.font = "600 30px Consolas, ui-monospace, monospace";
+      ctx.font = "600 30px 'Nanum Gothic', 'Malgun Gothic', sans-serif";
       ctx.fillText("게임 종료", LW / 2, LH / 2 - 16);
-      ctx.font = "18px Consolas, ui-monospace, monospace";
+      ctx.font = "18px 'Nanum Gothic', 'Malgun Gothic', sans-serif";
       ctx.fillText("도달 라운드 " + round + " / 최고 " + best, LW / 2, LH / 2 + 24);
     }
   }
