@@ -834,16 +834,14 @@ function canvasPos(e){
   var r=cv.getBoundingClientRect();
   return { x:(e.clientX-r.left)/r.width*MAP.w, y:(e.clientY-r.top)/r.height*MAP.h };
 }
-cv.addEventListener('pointermove', function(e){
-  if(!G || G.state==='over' || e.pointerType!=='mouse') return;
-  if(!G.selected){ G.pending=null; return; }
-  var p=canvasPos(e), c=cellOf(p.x,p.y);
-  G.pending={x:c.x,y:c.y,ok:isValidCell(c.x,c.y)};
-});
-cv.addEventListener('pointerleave', function(){ if(G) G.pending=null; });
-cv.addEventListener('pointerdown', function(e){
+/* 마우스가 벗어나면 미리보기를 지웁니다.
+   손가락·펜은 뗄 때마다 pointerleave 가 오므로(터치는 화면을 떠나는 셈)
+   여기서 지우면 '한 번 더 눌러 설치'가 절대 성립하지 않습니다 → 마우스만 처리 */
+function onLeave(e){
+  if(G && (!e || !e.pointerType || e.pointerType==='mouse')) G.pending=null;
+}
+function onDown(e, type){
   if(!G || G.state==='over') return;
-  e.preventDefault();
   var p=canvasPos(e);
   for(var i=0;i<G.towers.length;i++){
     var tw=G.towers[i];
@@ -854,16 +852,48 @@ cv.addEventListener('pointerdown', function(e){
   G.inspect=null;
   if(!G.selected) return;
   var c=cellOf(p.x,p.y), ok=isValidCell(c.x,c.y);
-  if(e.pointerType==='mouse'){
+  if(type==='mouse'){
     if(ok) placeTower(c.x,c.y); else G.pending={x:c.x,y:c.y,ok:false};
     return;
   }
+  /* 터치·펜: 첫 탭은 사거리 미리보기, 같은 칸을 한 번 더 탭하면 설치 */
   if(G.pending && G.pending.x===c.x && G.pending.y===c.y && G.pending.ok){
     placeTower(c.x,c.y); G.pending=null;
   }else{
     G.pending={x:c.x,y:c.y,ok:ok};
   }
-}, {passive:false});
+}
+function onMove(e){
+  if(!G || G.state==='over') return;
+  if(!G.selected){ G.pending=null; return; }
+  var p=canvasPos(e), c=cellOf(p.x,p.y);
+  G.pending={x:c.x,y:c.y,ok:isValidCell(c.x,c.y)};
+}
+
+if(window.PointerEvent){
+  cv.addEventListener('pointermove', function(e){ if(e.pointerType==='mouse') onMove(e); });
+  cv.addEventListener('pointerleave', onLeave);
+  cv.addEventListener('pointerdown', function(e){
+    e.preventDefault();
+    onDown(e, e.pointerType==='mouse' ? 'mouse' : 'touch');
+  }, {passive:false});
+}else{
+  /* 포인터 이벤트가 없는 구형 전자칠판·태블릿 브라우저: 터치/마우스 이벤트로 대신 처리 */
+  var lastTouch=0;
+  cv.addEventListener('touchstart', function(e){
+    lastTouch=Date.now();
+    if(e.touches.length!==1) return;
+    e.preventDefault();
+    onDown(e.touches[0], 'touch');
+  }, {passive:false});
+  cv.addEventListener('mousemove', function(e){ if(Date.now()-lastTouch>800) onMove(e); });
+  cv.addEventListener('mouseleave', function(){ onLeave(null); });
+  cv.addEventListener('mousedown', function(e){
+    if(Date.now()-lastTouch<800) return;      /* 터치 뒤에 따라오는 가짜 마우스 이벤트 무시 */
+    e.preventDefault();
+    onDown(e, 'mouse');
+  });
+}
 
 function placeTower(x,y){
   var s=towerById(G.selected);
