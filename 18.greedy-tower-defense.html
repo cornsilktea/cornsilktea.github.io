@@ -189,7 +189,7 @@
       <li>한 번 지은 타워는 <b>팔거나 옮길 수 없습니다.</b> (되돌릴 수 없는 선택)</li>
       <li>타워마다 <b>효율(DPS ÷ 비용)</b>이 다릅니다. 지금 싼 타워를 여러 개 지을지, 모아서 상위 타워를 지을지 스스로 판단하세요.</li>
       <li>보스 풍선은 <b>방어력</b>이 있어 한 발당 데미지에서 방어력만큼 빠집니다. 효율은 화살이 최고지만 칸은 40개뿐이라, 칸당 화력·범위 피해·한 발 데미지를 따져 골라야 합니다. <b>보스를 놓치면 즉시 게임 오버</b>됩니다! (타워는 사거리 안에 보스가 있으면 보스를 먼저 쏩니다)</li>
-      <li>타워는 <b>최대 40개</b>까지만 지을 수 있습니다. 싼 타워로 칸을 다 채우면 나중에 강한 타워를 놓을 자리가 없습니다.</li>
+      <li>타워를 놓을 수 있는 <b>돌판은 40개뿐</b>입니다. 싼 타워로 돌판을 다 채우면 나중에 강한 타워를 놓을 자리가 없습니다.</li>
       <li>웨이브는 <b>[시작] 버튼</b>을 눌러야 시작됩니다. 그 전에 타워를 배치하세요.</li>
     </ul>
     <div class="btnrow">
@@ -230,7 +230,7 @@
         <div class="msg" id="goMsg"></div>
         <button id="goBtn">▶ Wave 1 시작</button>
       </div>
-      <p class="hint">타워를 고르면 <b>설치 가능한 칸이 초록 격자</b>로 표시됩니다. 칸을 누르면 사거리가 보이고 한 번 더 누르면 설치됩니다. 설치된 타워를 누르면 사거리를 다시 확인할 수 있습니다.</p>
+      <p class="hint">타워는 <b>돌판(40개)</b> 위에만 놓을 수 있습니다. 타워를 고르면 빈 돌판이 초록으로 표시되고, 돌판을 누르면 사거리가 보이고 한 번 더 누르면 설치됩니다. 설치된 타워를 누르면 사거리를 다시 확인할 수 있습니다.</p>
     </div>
 
     <div class="right">
@@ -399,19 +399,27 @@ function distToPath(px,py){
   return best;
 }
 
-/* 설치 가능 칸 목록 */
+/* 설치 가능 칸 목록 : 길이 사거리 안에 가장 많이 들어오는 칸 상위 MAX_TOWERS개만 남긴다.
+   → 칸 수 = 타워 상한. "나쁜 자리"가 거의 없으므로 어떤 타워를 어느 칸에 두느냐가 승부. */
 var VALID = [];
 function computeValidCells(){
-  VALID=[];
-  var c=MAP.cell;
+  var c=MAP.cell, cand=[];
+  var samples=[]; for(var d=0; d<MAP.total; d+=20) samples.push(posAt(d));
   for(var y=c/2;y<MAP.h;y+=c){
     for(var x=c/2;x<MAP.w;x+=c){
       if(x-c/2<2 || y-c/2<2 || x+c/2>MAP.w-2 || y+c/2>MAP.h-2) continue;
       if(distToPath(x,y) < MAP.road+17) continue;
       if(inLake(x,y,16)) continue;
-      VALID.push({x:x,y:y});
+      var cov=0;
+      for(var i=0;i<samples.length;i++){
+        var dx=samples[i].x-x, dy=samples[i].y-y;
+        if(dx*dx+dy*dy < 140*140) cov++;
+      }
+      cand.push({x:x,y:y,cov:cov});
     }
   }
+  cand.sort(function(a,b){ return b.cov-a.cov; });
+  VALID = cand.slice(0, CONFIG.MAX_TOWERS).map(function(v){ return {x:v.x,y:v.y}; });
 }
 function isValidCell(cx,cy){
   for(var i=0;i<VALID.length;i++){
@@ -553,6 +561,18 @@ function renderBackground(){
   b.setLineDash([16,13]);
   stroke(3.2, '#f2c744');
   b.setLineDash([]);
+
+  /* 6.5) 설치 칸(돌판) — 항상 보이게 */
+  VALID.forEach(function(v){
+    var h=MAP.cell/2-5;
+    b.fillStyle='rgba(60,50,30,0.14)';
+    b.beginPath(); b.roundRect(v.x-h+2, v.y-h+3, h*2, h*2, 7); b.fill();
+    b.fillStyle='rgba(236,226,200,0.78)';
+    b.strokeStyle='rgba(150,130,90,0.7)'; b.lineWidth=1.5;
+    b.beginPath(); b.roundRect(v.x-h, v.y-h, h*2, h*2, 7); b.fill(); b.stroke();
+    b.strokeStyle='rgba(255,255,255,0.45)'; b.lineWidth=1;
+    b.beginPath(); b.roundRect(v.x-h+3, v.y-h+3, h*2-6, h*2-6, 5); b.stroke();
+  });
 
   /* 7) 시작(동굴) / 도착(집) */
   var p0=posAt(4), p1=posAt(MAP.total-22);
