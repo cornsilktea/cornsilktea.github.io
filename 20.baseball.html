@@ -83,9 +83,8 @@
   @keyframes markpop{0%{transform:scale(.3)}70%{transform:scale(1.2)}100%{transform:scale(1)}}
 
   /* 공 (실밥 2줄 — 회전이 보이도록) */
-  #ball{position:absolute;left:0;top:0;width:12px;height:12px;border-radius:50%;display:none;will-change:transform;z-index:2;
-    background:radial-gradient(circle at 35% 30%,#fff 0 38%,#e6e6e6 72%,#cfcfcf 100%);box-shadow:0 1px 2px rgba(0,0,0,.35);overflow:hidden}
-  #ball i{position:absolute;left:50%;top:50%;border:1.5px solid #c2453d;border-radius:50%;box-sizing:border-box;transform:translate(-50%,-50%);opacity:.9}
+  #ball{position:absolute;left:0;top:0;width:12px;height:12px;display:none;will-change:transform;z-index:2;overflow:visible;
+    filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.35))}
   #shadow{position:absolute;width:12px;height:5px;border-radius:50%;background:rgba(0,0,0,.28);display:none;z-index:1}
   /* 타격 순간 빛: 홈런 노랑, 135m 이상 주황 */
   #flash{position:absolute;left:0;top:0;width:40px;height:40px;border-radius:50%;display:none;z-index:1;pointer-events:none;
@@ -284,6 +283,7 @@
       <path d="M0 28 Q50 10 100 28" fill="none" stroke="#9aa5b1" stroke-width=".6"/>                <!-- 지붕 난간 -->
       <path d="M0 44.5 Q50 28.5 100 44.5 L100 45 Q50 29 0 45 Z" fill="#30404f"/>
       <!-- 전광판: 지지대 두 개로 담장 위에 서 있고, 윗부분은 하늘에 걸침 -->
+      <g transform="translate(0 4)">   <!-- 지지대 아랫부분은 담장(나중에 그림)에 가려짐 -->
       <g fill="#3a4552">
         <rect x="43.6" y="23.5" width="1.3" height="8.5"/><rect x="55.1" y="23.5" width="1.3" height="8.5"/>
         <rect x="43.6" y="27" width="12.8" height=".6"/>
@@ -320,6 +320,7 @@
         <rect x="53.6" y="19.9" width="4.2" height="1.4" rx=".2" fill="#0b1117"/>
         <rect x="54.3" y="20.2" width=".5" height=".8" fill="#f2c94c"/><rect x="55" y="20.2" width=".5" height=".8" fill="#f2c94c"/>
         <rect x="55.9" y="20.2" width=".5" height=".8" fill="#f2c94c"/><rect x="56.6" y="20.2" width=".5" height=".8" fill="#f2c94c"/>
+      </g>
       </g>
 
 
@@ -385,13 +386,13 @@
         <rect x="18" y="16" width="1.2" height="1.2" fill="#3b2a1e"/><rect x="21" y="16" width="1.2" height="1.2" fill="#3b2a1e"/>
       </symbol>
     </svg>
-    <svg class="fielder in" style="left:20%;top:64%" viewBox="0 0 40 64"><use href="#fielderShape"/></svg>   <!-- 3루수 -->
+    <svg class="fielder in" style="left:27%;top:63%" viewBox="0 0 40 64"><use href="#fielderShape"/></svg>   <!-- 3루수 (파울선 안쪽) -->
     <svg class="fielder in" style="left:37%;top:58%" viewBox="0 0 40 64"><use href="#fielderShape"/></svg>   <!-- 유격수 -->
     <svg class="fielder in" style="left:64%;top:58%" viewBox="0 0 40 64"><use href="#fielderShape"/></svg>   <!-- 2루수 -->
-    <svg class="fielder in" style="left:80%;top:64%" viewBox="0 0 40 64"><use href="#fielderShape"/></svg>   <!-- 1루수 -->
+    <svg class="fielder in" style="left:73%;top:63%" viewBox="0 0 40 64"><use href="#fielderShape"/></svg>   <!-- 1루수 (파울선 안쪽) -->
     <svg class="fielder out" style="left:17%;top:51%" viewBox="0 0 40 64"><use href="#fielderShape"/></svg>  <!-- 좌익수 -->
     <svg class="fielder out" style="left:83%;top:51%" viewBox="0 0 40 64"><use href="#fielderShape"/></svg>  <!-- 우익수 -->
-    <svg class="fielder out" style="left:57%;top:46.5%;width:3.2%;min-width:14px" viewBox="0 0 40 64"><use href="#fielderShape"/></svg>  <!-- 중견수 (담장 앞, 투수 뒤로 살짝 비켜) -->
+    <svg class="fielder out" style="left:54.5%;top:43.5%;width:3.2%;min-width:14px" viewBox="0 0 40 64"><use href="#fielderShape"/></svg>  <!-- 중견수 (투수의 1시 방향) -->
 
     <!-- 투수 자리 -->
     <div class="slot" id="pitcher">
@@ -404,7 +405,21 @@
     <!-- 스트라이크 존 -->
     <div id="zone"></div>
     <div id="shadow"></div>
-    <div id="ball"><i></i><i></i><i></i></div>
+    <svg id="ball" viewBox="0 0 100 100" aria-hidden="true">
+      <defs>
+        <radialGradient id="leather" cx="38%" cy="32%" r="70%">
+          <stop offset="0" stop-color="#ffffff"/><stop offset=".55" stop-color="#f3f3f1"/><stop offset=".85" stop-color="#d9d9d6"/><stop offset="1" stop-color="#bdbdb9"/>
+        </radialGradient>
+      </defs>
+      <circle cx="50" cy="50" r="48" fill="url(#leather)"/>
+      <!-- 실밥: 양쪽으로 휜 두 줄 + 가로지르는 바늘땀 -->
+      <g fill="none" stroke="#c8403a" stroke-linecap="round">
+        <path d="M31 6 C 9 30, 9 70, 31 94" stroke-width="3"/>
+        <path d="M69 6 C 91 30, 91 70, 69 94" stroke-width="3"/>
+        <path d="M31 6 C 9 30, 9 70, 31 94" stroke-width="9" stroke-dasharray="1.6 5.2" stroke-linecap="butt" opacity=".95"/>
+        <path d="M69 6 C 91 30, 91 70, 69 94" stroke-width="9" stroke-dasharray="1.6 5.2" stroke-linecap="butt" opacity=".95"/>
+      </g>
+    </svg>
     <div id="flash"></div>
     <div id="zoneMark"><span class="dot"></span><span class="lb" id="zoneMarkText"></span></div>
 
@@ -506,13 +521,13 @@ const CENTER_MS = 30;         // ±30ms 안이면 "정타"
 /* 구종 — kmh: 처음 구속, spin: 날아오는 동안 도는 바퀴 수(부호 = 방향),
    path: 0~1 → 직선 궤적에 더하는 화면 오프셋(%) (마지막 값은 도착점 계산에서 빼서 목표 지점에 맞춥니다) */
 const PITCHES = [
-  { name: "직구",     kmh: 140, w: 4, spin: -7, axis: "back",   // 백스핀
+  { name: "직구",     kmh: 140, w: 4, spin: -16, axis: "back",   // 백스핀
     path: t => ({ dx: 0, dy: -1.2 * Math.sin(Math.PI * t) }) },
-  { name: "커브",     kmh: 120, w: 2, spin: 5, axis: "back",    // 톱스핀(반대 방향)
+  { name: "커브",     kmh: 120, w: 2, spin: 12, axis: "back",    // 톱스핀(반대 방향)
     path: t => ({ dx: 3.5 * t * t, dy: -5 * Math.sin(Math.PI * t) + 8 * t * t * t }) },
-  { name: "슬라이더", kmh: 132, w: 2, spin: 9, axis: "side",    // 옆으로 도는 회전, 우완 → 우타자 바깥쪽으로 꺾임
+  { name: "슬라이더", kmh: 132, w: 2, spin: 18, axis: "side",    // 옆으로 도는 회전, 우완 → 우타자 바깥쪽으로 꺾임
     path: t => ({ dx: 9 * t * t * t, dy: 2 * t * t }) },
-  { name: "체인지업", kmh: 126, w: 2, spin: -3, axis: "back",  // 느린 백스핀, 팔 쪽(우타자 몸쪽)으로 살짝 흘러 들어감
+  { name: "체인지업", kmh: 126, w: 2, spin: -8, axis: "back",  // 느린 백스핀, 팔 쪽(우타자 몸쪽)으로 살짝 흘러 들어감
     path: t => ({ dx: -1.5 * t * t, dy: -1.2 * Math.sin(Math.PI * t) + 4 * t * t * t * t }) }
 ];
 // 구속(km/h) → 홈플레이트까지 걸리는 시간(ms). 140 km/h 가 900ms, 160 은 약 690ms, 120 은 약 1225ms
@@ -594,22 +609,11 @@ function hud(){
   $("hudScore").textContent = fmt(G.score);
   $("hudCombo").textContent = G.combo;
 }
-const SEAMS = ball.querySelectorAll("i");
-/* 공: 실밥 띠 3개가 회전축을 따라 구 표면을 도는 것처럼 보이게(위도선처럼 납작해졌다 넓어졌다) */
+/* 공 놓기: 화면 좌표(%)·지름(무대 높이 %)·회전각(도) */
 function placeBall(x, y, dia, rot, withShadow, shadowY, axis){
   const W = stage.clientWidth, H = stage.clientHeight, px = dia / 100 * H;
   ball.style.width = ball.style.height = px + "px";
-  ball.style.transform = `translate(${x/100*W - px/2}px, ${y/100*H - px/2}px)`;
-  const side = axis === "side";
-  SEAMS.forEach((el, k) => {
-    const a = (rot + k * 120) * Math.PI / 180, c = Math.cos(a), sn = Math.sin(a);
-    if (c < 0.06){ el.style.display = "none"; return; }           // 뒤쪽으로 넘어간 띠
-    el.style.display = "block";
-    const long = (c * 104) + "%", short = (c * 34 + 6) + "%", off = (50 + sn * 44) + "%";
-    el.style.width  = side ? short : long;  el.style.height = side ? long : short;
-    el.style.left   = side ? off : "50%";   el.style.top    = side ? "50%" : off;
-    el.style.borderWidth = Math.max(1, px * 0.07) + "px";
-  });
+  ball.style.transform = `translate(${x/100*W - px/2}px, ${y/100*H - px/2}px) rotate(${rot}deg)`;
   if (withShadow){
     shadow.style.display = "block";
     shadow.style.width = px + "px"; shadow.style.height = px * .4 + "px";
@@ -830,7 +834,7 @@ function flyHit(dist, delta, done){
     const gx = x0 + (x1 - x0) * t, gy = y0 + (y1 - y0) * t;         // 지면 위 위치
     const y = gy - H * Math.sin(Math.PI * t);
     const dia = BALL_MAX - (BALL_MAX - 1.2) * Math.pow(t, .7) * f;
-    placeBall(gx, y, dia, t * 720, true, gy, "back");
+    placeBall(gx, y, dia, t * 1440, true, gy, "back");
     if (t < 1) G.raf = requestAnimationFrame(step); else done();
   })(t0);
 }
@@ -843,7 +847,7 @@ function flyFoul(side, done){
   (function step(now){
     const t = Math.min(1, (now - t0) / dur);
     const gx = x0 + (x1 - x0) * t, gy = y0 + (y1 - y0) * t, y = gy - H * Math.sin(Math.PI * t);
-    placeBall(gx, y, BALL_MAX - (BALL_MAX - 1.4) * Math.pow(t, .8), t * 900, true, gy, "back");
+    placeBall(gx, y, BALL_MAX - (BALL_MAX - 1.4) * Math.pow(t, .8), t * 1600, true, gy, "back");
     if (t < 1) G.raf = requestAnimationFrame(step); else done();
   })(t0);
 }
