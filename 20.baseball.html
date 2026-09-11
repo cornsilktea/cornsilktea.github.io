@@ -59,7 +59,7 @@
   #pitcher{left:50%;bottom:39.5%;width:14%;height:24%;transform:translateX(-50%);min-width:56px;z-index:2}
   #pitcher .ph{font-size:13px}
   /* 우타자: 홈플레이트 왼쪽(3루 쪽) 타석 */
-  #batter{left:2%;bottom:9%;width:30%;height:50%;min-width:120px;max-width:260px;z-index:4}
+  #batter{left:1%;bottom:6%;width:34%;height:58%;min-width:120px;max-width:300px;z-index:4}
   #batter .ph{font-size:16px}
   .fielder{position:absolute;pointer-events:none;opacity:.95;transform:translate(-50%,-100%)}
   .fielder.in{width:4.2%;min-width:18px;max-width:30px}
@@ -318,14 +318,15 @@
       <li>타격에 성공할수록 다음 공의 구속이 빨라집니다 (120 → 최대 160 km/h).</li>
       <li>빠르게 치면 당겨치기(왼쪽), 늦게 치면 밀어치기(오른쪽)로 날아갑니다.</li>
       <li>홈런을 연속으로 치면 콤보 보너스가 붙습니다.</li>
-      <li>치지 않은 공은 스트라이크 존을 지나면 스트라이크, 벗어나면 볼입니다.</li>
+      <li>치지 않은 공은 존을 지나면 스트라이크, 벗어나면 볼 — 볼을 골라내면 +500점이고 투구 수도 줄지 않습니다.</li>
     </ul>
     <table class="tbl">
       <tr><th>타이밍</th><th>결과</th><th>점수</th></tr>
       <tr><td>정확</td><td>홈런</td><td>비거리에 비례 (가장 높음)</td></tr>
       <tr><td>조금 빠름·늦음</td><td>장타 · 외야안타 · 내야안타</td><td>비거리에 비례</td></tr>
       <tr><td>더 빠름·늦음</td><td>파울</td><td>0</td></tr>
-      <tr><td>훨씬 빠름·늦음 · 안 침</td><td>헛스윙 · 스트라이크 · 볼</td><td>0</td></tr>
+      <tr><td>훨씬 빠름·늦음 · 안 침</td><td>헛스윙 · 스트라이크</td><td>0</td></tr>
+      <tr><td>존 밖의 공을 안 침</td><td>볼</td><td>500 (투구 수 유지)</td></tr>
     </table>
     <div class="best-box" id="startBest"></div>
     <button class="btn" id="btnStart">시작하기</button>
@@ -344,7 +345,7 @@
       <div class="c"><span class="k">안타 (홈런 제외)</span><span class="v" id="endHit">0</span></div>
       <div class="c"><span class="k">파울</span><span class="v" id="endFoul">0</span></div>
       <div class="c"><span class="k">헛스윙 · 스트라이크</span><span class="v" id="endMiss">0</span></div>
-      <div class="c"><span class="k">볼 (안 침)</span><span class="v" id="endBall">0</span></div>
+      <div class="c"><span class="k">골라낸 볼</span><span class="v" id="endBall">0</span></div>
       <div class="c"><span class="k">최고 구속</span><span class="v" id="endSpeed">0</span></div>
     </div>
     <div class="best-box" id="endBest"></div>
@@ -365,11 +366,11 @@
    포수 뒤 위쪽에서 비스듬히 본 모습, 투수는 우완 투수가 정면(타자 쪽)을 향한 모습.
    ===================================================================== */
 const IMAGES = {
-  batterReady:   "",   // 타자 준비 자세 (우타)
-  batterSwing:   "",   // 타자 스윙 자세 (스윙 버튼을 누르면 전환)
-  pitcherIdle:   "",   // 투수 대기 (세트 포지션)
-  pitcherWindup: "",   // 투수 와인드업 (다리 들어 올림)
-  pitcherThrow:  ""    // 투수 투구 (팔이 앞으로 나와 공을 놓는 순간)
+  batterReady:   "img/batter-ready.png",   // 타자 준비 자세 (우타)
+  batterSwing:   "img/batter-swing.png",   // 타자 스윙 자세 (스윙 버튼을 누르면 전환)
+  pitcherIdle:   "img/pitcher-idle.png",   // 투수 대기 (세트 포지션)
+  pitcherWindup: "img/pitcher-windup.png",   // 투수 와인드업 (다리 들어 올림)
+  pitcherThrow:  "img/pitcher-throw.png"  // 투수 투구 (팔이 앞으로 나와 공을 놓는 순간)
 };
 
 /* ---------- 게임 규칙 상수 ---------- */
@@ -379,6 +380,7 @@ const SPEED_BONUS_MAX = 20;   // 최대 +20 km/h  → 표시 구속 120(커브 �
 // 타이밍 창 (ms, 정확한 순간 = 0, 좌우 대칭)
 const WIN = { hr: 40, xbh: 75, out: 105, inf: 130, foul: 210 };
 const GAUGE_RANGE = 260;      // 게이지 막대 양 끝 = ±260ms
+const BALL_BONUS = 500;       // 볼을 골라냈을 때 점수
 /* 구종 — kmh: 처음 구속, spin: 날아오는 동안 도는 바퀴 수(부호 = 방향),
    path: 0~1 → 직선 궤적에 더하는 화면 오프셋(%) (마지막 값은 도착점 계산에서 빼서 목표 지점에 맞춥니다) */
 const PITCHES = [
@@ -394,7 +396,7 @@ const PITCHES = [
 // 구속(km/h) → 홈플레이트까지 걸리는 시간(ms). 140 km/h 가 900ms, 160 은 약 690ms, 120 은 약 1225ms
 const flightMs = kmh => 900 * Math.pow(140 / kmh, 2);
 // 화면 좌표(%): 투수 손(우완 → 화면 왼쪽) → 스트라이크 존 가운데
-const REL = { x: 47.5, y: 43 };   // 우완 투수: 화면에서는 투수의 오른손이 왼쪽
+const REL = { x: 45.5, y: 38 };   // 우완 투수: 투구 그림에서 공을 쥔 오른손 위치(화면 왼쪽 위)
 const PLATE = { x: 50, y: 70 };
 const ZONE = { hw: 6, hh: 7 };            // 스트라이크 존 반너비·반높이(%)  (#zone 의 CSS 와 같은 값)
 const BALL_MIN = 1.3, BALL_MAX = 5.2;     // 공 지름 (무대 높이의 %)
@@ -459,7 +461,7 @@ const BEST = {
 const G = {
   pitchNo: 0, score: 0, combo: 0, maxCombo: 0, hr: 0, hits: 0, fouls: 0, misses: 0, balls: 0, maxDist: 0, maxKmh: 0,
   speedBonus: 0, phase: "idle",          // idle | windup | flight | result
-  cur: null, kmh: 0, end: null, t0: 0, flightTime: 0, swung: false, pitchAnim: false, raf: 0, timers: []
+  cur: null, kmh: 0, end: null, t0: 0, flightTime: 0, swung: false, pitchAnim: false, freePitch: false, raf: 0, timers: []
 };
 const stage = $("stage"), ball = $("ball"), shadow = $("shadow"), btnSwing = $("btnSwing");
 
@@ -511,7 +513,7 @@ function hideZoneMark(){ $("zoneMark").classList.remove("on"); $("zone").classLi
 function startGame(){
   clearAll();
   Object.assign(G, { pitchNo: 0, score: 0, combo: 0, maxCombo: 0, hr: 0, hits: 0, fouls: 0, misses: 0, balls: 0, maxDist: 0, maxKmh: 0,
-    speedBonus: 0, phase: "idle", cur: null, swung: false });
+    speedBonus: 0, phase: "idle", cur: null, swung: false, freePitch: false });
   $("hudSpeed").textContent = "-";
   setGauge(null, "이전 타격의 타이밍");
   hideCall(); hideZoneMark(); ball.style.display = "none"; shadow.style.display = "none";
@@ -542,7 +544,8 @@ function pickEnd(){
 
 function nextPitch(){
   if (G.pitchNo >= TOTAL_PITCHES){ endGame(); return; }
-  G.pitchNo++; hud();
+  if (G.freePitch) G.freePitch = false; else G.pitchNo++;   // 볼을 골라낸 다음 공은 같은 번호로
+  hud();
   G.cur = pickPitch();
   G.kmh = G.cur.kmh + G.speedBonus;
   G.maxKmh = Math.max(G.maxKmh, G.kmh);
@@ -627,7 +630,9 @@ function judge(delta){
     G.speedBonus = Math.min(SPEED_BONUS_MAX, G.speedBonus + SPEED_STEP);
     detail += `${dist}m ${dirText} · +${fmt(gained)}점`;
   } else if (grade === "파울"){ G.combo = 0; G.fouls++; detail += dirText + " 파울"; }
-  else if (grade === "볼"){ G.balls++; detail += "존을 벗어난 공 (콤보 유지)"; }   // 볼은 안 쳐도 손해 없음
+  else if (grade === "볼"){                     // 볼을 골라내면 +500점, 투구 수는 세지 않음(다음 공이 같은 번호)
+    G.balls++; gained = BALL_BONUS; G.freePitch = true;
+    detail += "볼 골라냄 · +" + gained + "점 · 투구 수 유지"; }
   else { G.combo = 0; G.misses++;
     detail += delta === null ? "치지 않고 흘려보냄" : (delta < 0 ? "너무 빠름" : "너무 늦음"); }
   G.score += gained; hud();
