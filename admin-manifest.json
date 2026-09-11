@@ -1,9 +1,10 @@
 {
+  "id": "./admin.html",
   "name": "수업 자료 제어판",
   "short_name": "제어판",
   "lang": "ko",
   "start_url": "./admin.html",
-  "scope": "./",
+  "scope": "./admin.html",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#F4F6F1",
