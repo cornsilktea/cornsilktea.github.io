@@ -491,9 +491,9 @@
       <div class="c"><span class="k">최고 구속</span><span class="v" id="endSpeed">0</span></div>
     </div>
     <div class="chart">
-      <div class="chart-k">이번 경기의 투구 위치</div>
+      <div class="chart-k">이번 경기의 투구 위치 (20구 · 골라낸 볼 제외)</div>
       <svg id="endChart" viewBox="0 0 220 230" aria-label="투구 위치"></svg>
-      <div class="legend"><span><i style="background:#D97B4F"></i>안 친 스트라이크</span><span><i style="background:#2F7D4F"></i>안 친 볼</span><span><i style="background:#B33951"></i>스윙(타격·헛스윙)</span></div>
+      <div class="legend"><span><i style="background:#D97B4F"></i>안 친 스트라이크</span><span><i style="background:#B33951"></i>스윙(타격·헛스윙)</span></div>
     </div>
     <div class="best-box" id="endBest"></div>
     <button class="btn" id="btnAgain">다시 시작하기</button>
@@ -656,7 +656,7 @@ function showZoneMark(kind){
   const h = e.dx < -ZONE.hw / 3 ? "몸쪽" : e.dx > ZONE.hw / 3 ? "바깥쪽" : "";   // 우타자: 왼쪽이 몸쪽
   const where = (v || h) ? [v, h].filter(Boolean).join(" ") : "한가운데";
   $("zoneMarkText").textContent = (kind === "hit" ? "타격 · " : kind === "miss" ? "헛스윙 · " : e.strike ? "스트라이크 · " : "볼 · ") + where;
-  G.log.push({ dx: e.dx, dy: e.dy, strike: e.strike, kind: kind || "take" });   // 결과 화면의 투구 위치 종합용
+  if (kind || e.strike) G.log.push({ dx: e.dx, dy: e.dy, strike: e.strike, kind: kind || "take" });   // 결과 화면 종합용 — 골라낸 볼은 투구 수에 안 들어가므로 제외
   mk.classList.add("on");
   $("zone").classList.toggle("strike", e.strike);
 }
@@ -874,7 +874,7 @@ function flyFoul(side, done){
 function drawEndChart(){
   const svg = $("endChart"), K = 10;                 // 무대 1% = 10px
   const cx = 110, cy = 112, zw = ZONE.hw * K, zh = ZONE.hh * K;
-  const col = p => p.kind === "take" ? (p.strike ? "#D97B4F" : "#2F7D4F") : "#B33951";
+  const col = p => p.kind === "take" ? "#D97B4F" : "#B33951";
   let h = `<rect x="${cx - zw}" y="${cy - zh}" width="${zw * 2}" height="${zh * 2}" fill="rgba(36,64,47,.08)" stroke="#24402F" stroke-width="1.5"/>`;
   for (let i = 1; i < 3; i++){
     h += `<line x1="${cx - zw + zw * 2 * i / 3}" y1="${cy - zh}" x2="${cx - zw + zw * 2 * i / 3}" y2="${cy + zh}" stroke="#24402F" stroke-opacity=".3"/>`;
