@@ -70,7 +70,8 @@
     display: grid; gap: 12px; margin: 0 0 12px;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   }
-  .nodes .btn { min-height: 60px; }
+  .nodes .btn { min-height: 60px; flex-direction: column; gap: 2px; }
+  .nodes .btn small { font-size: 12px; font-weight: 400; color: var(--sg-ink-soft); }
 
   /* 자료 카드 (구조도·리스트 공용) */
   .grid {
@@ -235,6 +236,21 @@
     return n;
   }
 
+  /* 구조도 폴더 버튼: "1학년 2학기 (인공지능과 미래사회)" 처럼 괄호가 있으면
+     괄호 안은 아랫줄에 작게 놓는다 (한 줄에서 어색하게 잘리지 않도록). */
+  function folderButton(label) {
+    var b = el("button", "btn");
+    b.type = "button";
+    var m = /^(.*?)\s*\((.+)\)\s*$/.exec(label);
+    if (m) {
+      b.appendChild(el("span", null, m[1]));
+      b.appendChild(el("small", null, m[2]));
+    } else {
+      b.textContent = label;
+    }
+    return b;
+  }
+
   /* ---------- 자료 카드 (구조도·리스트 공용) ---------- */
   function card(g, showUnits) {
     var node = document.createElement(g.open ? "a" : "div");
@@ -285,8 +301,7 @@
       treeBack.hidden = true;
       crumbText.textContent = "학년과 학기를 고르세요";
       D.SEMESTERS.forEach(function (s) {
-        var b = el("button", "btn", s.label);
-        b.type = "button";
+        var b = folderButton(s.label);
         b.addEventListener("click", function () {
           nav = { sem: s.id, path: [] };
           renderTree();
@@ -313,8 +328,7 @@
 
     /* 아니면 다음 단계 폴더를 보여 준다 */
     here.children.forEach(function (name) {
-      var b = el("button", "btn", name);
-      b.type = "button";
+      var b = folderButton(name);
       b.addEventListener("click", function () {
         nav.path = nav.path.concat([name]);
         renderTree();
