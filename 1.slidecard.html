@@ -32,7 +32,7 @@ body{
 .boardpane{flex:1 1 380px;max-width:520px;min-width:280px;}
 .board{position:relative;width:100%;border:2px solid var(--sg-line-strong);border-radius:var(--wrks-viz-radius);background:var(--sg-panel);padding:8px;touch-action:none;}
 .card{position:absolute;border-radius:var(--sg-radius);background:var(--wrks-viz-primary);cursor:grab;}
-.card.red{background:var(--sg-danger);}
+.card.red{background:#D97B4F;}
 .card.movable{cursor:grab;}
 .card.locked{cursor:default;}
 .card.anim{transition:left .13s ease-out, top .13s ease-out;}
@@ -46,7 +46,7 @@ body{
 .goal{font-size:13px;line-height:1.5;}
 .legend{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--sg-ink-mid);margin-top:6px;}
 .dot{width:10px;height:10px;border-radius:3px;display:inline-block;}
-.dot.red{background:var(--sg-danger);}
+.dot.red{background:#D97B4F;}
 .dot.blue{background:var(--wrks-viz-primary);}
 button{
   font-family:inherit;font-size:13px;padding:9px 12px;
@@ -79,8 +79,8 @@ button:hover{background:var(--sg-panel-alt);}
     </div>
     <div class="tile">
       <div class="k">목표</div>
-      <div class="goal">빨간 카드를 오른쪽 맨 아래 칸(6행 6열)으로 옮기기</div>
-      <div class="legend"><span class="dot red"></span>빨간 카드<span class="dot blue" style="margin-left:8px"></span>초록 카드</div>
+      <div class="goal">주황 카드를 오른쪽 맨 아래 칸(6행 6열)으로 옮기기</div>
+      <div class="legend"><span class="dot red"></span>주황 카드<span class="dot blue" style="margin-left:8px"></span>초록 카드</div>
     </div>
     <button id="reset" type="button">초기화</button>
     <div class="help">빈 칸과 맞닿은 카드를 빈 칸 쪽으로 끌어서 옮깁니다. 짧게 누르기(탭)로도 이동합니다.</div>
