@@ -79,6 +79,15 @@
   .switch input:checked + .track::after { left: 23px; }
   .switch-text { font-size: 13px; color: #6b7280; width: 34px; }
 
+  /* 빌드(공략 이미지) 버튼과 보기창 */
+  .guide-btn { flex: none; margin-left: 4px; padding: 6px 12px; font-size: 13px; }
+  .lightbox {
+    position: fixed; inset: 0; background: rgba(17,24,39,.82); z-index: 50;
+    display: flex; align-items: center; justify-content: center; padding: 20px; cursor: zoom-out;
+  }
+  .lightbox img { max-width: 100%; max-height: 92vh; border-radius: 10px; background: #fff; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
+  .lightbox p { position: absolute; top: 14px; left: 0; right: 0; text-align: center; color: #e5e7eb; font-size: 13px; margin: 0; }
+
   .edit { margin-top: 12px; display: none; }
   .edit.open { display: block; }
   .edit .row { margin-bottom: 8px; }
@@ -500,6 +509,20 @@ function field(labelText, value) {
   return { box, input };
 }
 
+/* 자료 파일 이름 → 공략 이미지. 새 공략을 만들면 여기에 한 줄 추가 */
+const GUIDE_IMAGES = {
+  "18.greedy-tower-defense.html": "18.greedy-tower-defense-build.png"
+};
+function showGuide(src, caption) {
+  const box = el("div", "lightbox");
+  const img = document.createElement("img");
+  img.src = src; img.alt = caption;
+  box.appendChild(el("p", null, caption));
+  box.appendChild(img);
+  box.addEventListener("click", () => box.remove());
+  document.body.appendChild(box);
+}
+
 function renderList() {
   const list = $("list");
   list.innerHTML = "";
@@ -542,6 +565,14 @@ function gameCard(g, i) {
   });
   sw.appendChild(cb); sw.appendChild(track); sw.appendChild(stateText);
   head.appendChild(sw);
+
+  /* 공략(빌드) 이미지가 있는 자료는 잠김 스위치 옆에 [빌드] 버튼 */
+  const guide = GUIDE_IMAGES[g.url];
+  if (guide) {
+    const gb = el("button", "guide-btn", "빌드");
+    gb.addEventListener("click", () => showGuide(guide, g.title + " — 최적 빌드 배치 (숫자 = 설치한 웨이브). 아무 곳이나 누르면 닫힘"));
+    head.appendChild(gb);
+  }
   card.appendChild(head);
 
   const buttons = el("div", "game-buttons");
