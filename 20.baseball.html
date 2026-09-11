@@ -81,7 +81,7 @@
     background:rgba(27,43,32,.75);border-radius:var(--radius);padding:1px 8px;text-align:center}
   #zoneMark.on{display:block}
   #zoneMark.ball .dot{background:rgba(47,125,79,.9)}     /* 안 친 볼: 녹색 */
-  #zoneMark.hit .dot{background:rgba(179,57,81,.9)}      /* 타격한 공: 빨강 (안 친 스트라이크는 주황) */
+  #zoneMark.hit .dot{background:rgba(179,57,81,.9)}      /* 스윙한 공(타격·헛스윙): 빨강 (안 친 스트라이크는 주황) */
   @keyframes markpop{0%{transform:scale(.3)}70%{transform:scale(1.2)}100%{transform:scale(1)}}
 
   /* 공 (실밥 2줄 — 회전이 보이도록) */
@@ -137,6 +137,11 @@
     border-radius:var(--radius);background:var(--tone);border:1px solid var(--tone-line);font-weight:700;font-size:16px}
   .btn:active{filter:brightness(.94)}
   .stats{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:10px}
+  .chart{margin-top:10px;background:var(--tone);border:1px solid var(--tone-line);border-radius:var(--radius);padding:8px 10px;text-align:center}
+  .chart-k{font-size:12px;color:var(--sub);margin-bottom:4px}
+  #endChart{width:100%;max-width:220px;height:auto;display:block;margin:0 auto}
+  .legend{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--sub);margin-top:4px}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:-1px}
   .stats .c{background:var(--tone);border:1px solid var(--tone-line);border-radius:var(--radius);padding:8px;text-align:center}
   .stats .k{display:block;font-size:12px;color:var(--sub)}
   .stats .v{display:block;font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
@@ -485,6 +490,11 @@
       <div class="c"><span class="k">골라낸 볼</span><span class="v" id="endBall">0</span></div>
       <div class="c"><span class="k">최고 구속</span><span class="v" id="endSpeed">0</span></div>
     </div>
+    <div class="chart">
+      <div class="chart-k">이번 경기의 투구 위치</div>
+      <svg id="endChart" viewBox="0 0 220 230" aria-label="투구 위치"></svg>
+      <div class="legend"><span><i style="background:#D97B4F"></i>안 친 스트라이크</span><span><i style="background:#2F7D4F"></i>안 친 볼</span><span><i style="background:#B33951"></i>스윙(타격·헛스윙)</span></div>
+    </div>
     <div class="best-box" id="endBest"></div>
     <button class="btn" id="btnAgain">다시 시작하기</button>
   </div>
@@ -598,7 +608,7 @@ const BEST = {
 
 /* ---------- 게임 상태 ---------- */
 const G = {
-  pitchNo: 0, score: 0, combo: 0, maxCombo: 0, hr: 0, hits: 0, fouls: 0, misses: 0, balls: 0, maxDist: 0, maxKmh: 0,
+  pitchNo: 0, score: 0, combo: 0, maxCombo: 0, hr: 0, hits: 0, fouls: 0, misses: 0, balls: 0, maxDist: 0, maxKmh: 0, log: [],
   speedBonus: 0, phase: "idle",          // idle | windup | flight | result
   cur: null, kmh: 0, end: null, t0: 0, flightTime: 0, swung: false, pitchAnim: false, freePitch: false, raf: 0, timers: []
 };
@@ -637,15 +647,16 @@ function setGauge(deltaMs, text){
   $("gaugeText").textContent = text;
 }
 /* 도착점 표시: 스트라이크 존의 어느 부분(또는 바깥)을 지났는지 */
-/* 도착점 표시: hit = 타격한 공(빨강), 아니면 스트라이크(주황)·볼(녹색) */
-function showZoneMark(hit){
-  const e = G.end, mk = $("zoneMark");
-  mk.classList.toggle("hit", !!hit); mk.classList.toggle("ball", !hit && !e.strike);
+/* 도착점 표시: kind "hit"(타격)·"miss"(헛스윙) = 빨강, 아니면 스트라이크(주황)·볼(녹색) */
+function showZoneMark(kind){
+  const e = G.end, mk = $("zoneMark"), hit = !!kind;
+  mk.classList.toggle("hit", hit); mk.classList.toggle("ball", !hit && !e.strike);
   mk.style.left = (PLATE.x + e.dx) + "%"; mk.style.top = (PLATE.y + e.dy) + "%";
   const v = e.dy < -ZONE.hh / 3 ? "높은" : e.dy > ZONE.hh / 3 ? "낮은" : "";
   const h = e.dx < -ZONE.hw / 3 ? "몸쪽" : e.dx > ZONE.hw / 3 ? "바깥쪽" : "";   // 우타자: 왼쪽이 몸쪽
   const where = (v || h) ? [v, h].filter(Boolean).join(" ") : "한가운데";
-  $("zoneMarkText").textContent = (hit ? "타격 · " : e.strike ? "스트라이크 · " : "볼 · ") + where;
+  $("zoneMarkText").textContent = (kind === "hit" ? "타격 · " : kind === "miss" ? "헛스윙 · " : e.strike ? "스트라이크 · " : "볼 · ") + where;
+  G.log.push({ dx: e.dx, dy: e.dy, strike: e.strike, kind: kind || "take" });   // 결과 화면의 투구 위치 종합용
   mk.classList.add("on");
   $("zone").classList.toggle("strike", e.strike);
 }
@@ -664,7 +675,7 @@ function showFlash(color){
 /* ---------- 게임 흐름 ---------- */
 function startGame(){
   clearAll();
-  Object.assign(G, { pitchNo: 0, score: 0, combo: 0, maxCombo: 0, hr: 0, hits: 0, fouls: 0, misses: 0, balls: 0, maxDist: 0, maxKmh: 0,
+  Object.assign(G, { pitchNo: 0, score: 0, combo: 0, maxCombo: 0, hr: 0, hits: 0, fouls: 0, misses: 0, balls: 0, maxDist: 0, maxKmh: 0, log: [],
     speedBonus: 0, phase: "idle", cur: null, swung: false, freePitch: false });
   $("hudSpeed").textContent = "-";
   setGauge(null, "이전 타격의 타이밍");
@@ -795,7 +806,7 @@ function judge(delta){
   }
 
   const bigGrade = grade === "홈런" ? "홈런!" : grade;
-  if (dist > 0 || grade === "파울"){ G.pitchAnim = false; cancelAnimationFrame(G.raf); showZoneMark(true); }   // 타격한 위치도 남김
+  if (dist > 0 || grade === "파울"){ G.pitchAnim = false; cancelAnimationFrame(G.raf); showZoneMark("hit"); }   // 타격한 위치도 남김
   if (dist > 0){
     const go = () => flyHit(dist, delta, () => { showCall(bigGrade, detail); later(afterResult, 1100); });
     if (grade === "홈런"){   // 홈런: 노란 빛, 135m 이상: 주황 빛 — 빛이 나는 동안에도 공은 맞은 자리에 보임
@@ -808,7 +819,7 @@ function judge(delta){
   else {
     // 헛스윙·스트라이크·볼: 공이 존을 지나는 것을 끝까지 보여 준 뒤 도착점 표시
     const wait = Math.max(0, G.flightTime - (performance.now() - G.t0));
-    later(() => { G.pitchAnim = false; cancelAnimationFrame(G.raf); ball.style.display = "none"; showZoneMark(); showCall(bigGrade, detail);
+    later(() => { G.pitchAnim = false; cancelAnimationFrame(G.raf); ball.style.display = "none"; showZoneMark(delta === null ? "" : "miss"); showCall(bigGrade, detail);
       later(afterResult, 1300); }, wait + 120);
   }
 }
@@ -859,6 +870,26 @@ function flyFoul(side, done){
   })(t0);
 }
 
+/* 결과 화면: 이번 경기의 모든 투구 도착점을 스트라이크 존 위에 모아 그림 */
+function drawEndChart(){
+  const svg = $("endChart"), K = 10;                 // 무대 1% = 10px
+  const cx = 110, cy = 112, zw = ZONE.hw * K, zh = ZONE.hh * K;
+  const col = p => p.kind === "take" ? (p.strike ? "#D97B4F" : "#2F7D4F") : "#B33951";
+  let h = `<rect x="${cx - zw}" y="${cy - zh}" width="${zw * 2}" height="${zh * 2}" fill="rgba(36,64,47,.08)" stroke="#24402F" stroke-width="1.5"/>`;
+  for (let i = 1; i < 3; i++){
+    h += `<line x1="${cx - zw + zw * 2 * i / 3}" y1="${cy - zh}" x2="${cx - zw + zw * 2 * i / 3}" y2="${cy + zh}" stroke="#24402F" stroke-opacity=".3"/>`;
+    h += `<line x1="${cx - zw}" y1="${cy - zh + zh * 2 * i / 3}" x2="${cx + zw}" y2="${cy - zh + zh * 2 * i / 3}" stroke="#24402F" stroke-opacity=".3"/>`;
+  }
+  h += `<path d="M${cx - 14} 212 L${cx + 14} 212 L${cx + 14} 220 L${cx} 226 L${cx - 14} 220 Z" fill="#fff" stroke="#8A978C"/>`;
+  h += `<text x="${cx - zw - 6}" y="${cy + 4}" font-size="10" text-anchor="end" fill="#5B6B5E">몸쪽</text><text x="${cx + zw + 6}" y="${cy + 4}" font-size="10" fill="#5B6B5E">바깥쪽</text>`;
+  G.log.forEach((p, i) => {
+    const x = cx + p.dx * K, y = cy + p.dy * K;
+    h += `<circle cx="${x}" cy="${y}" r="7" fill="${col(p)}" stroke="#fff" stroke-width="1.5"/>`;
+    h += `<text x="${x}" y="${y + 3}" font-size="8" font-weight="700" text-anchor="middle" fill="#fff">${i + 1}</text>`;
+  });
+  svg.innerHTML = h;
+}
+
 function endGame(){
   G.phase = "idle"; btnSwing.disabled = true;
   $("endScore").textContent = fmt(G.score) + "점";
@@ -869,6 +900,7 @@ function endGame(){
   const prev = BEST.get();
   const isNew = !prev || G.score > prev.score;
   if (isNew) BEST.set({ score: G.score, hr: G.hr, combo: G.maxCombo, dist: G.maxDist, date: BEST.today() });
+  drawEndChart();
   BEST.render($("endBest"), isNew);
   $("scrEnd").classList.add("on");
 }
@@ -879,8 +911,9 @@ btnSwing.addEventListener("keydown", e => { if (e.code === "Space" || e.code ===
 document.addEventListener("keydown", e => {
   if (e.repeat) return;
   if (e.code === "Space" || e.code === "Enter" || e.code === "KeyJ"){
-    if ($("scrStart").classList.contains("on") || $("scrEnd").classList.contains("on")) return;
-    e.preventDefault(); swing();
+    e.preventDefault();
+    if ($("scrStart").classList.contains("on") || $("scrEnd").classList.contains("on")){ if (e.code !== "KeyJ") startGame(); return; }   // 스페이스·엔터로 시작
+    swing();
   }
 });
 $("btnStart").addEventListener("click", e => { e.currentTarget.blur(); startGame(); });
