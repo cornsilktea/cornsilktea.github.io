@@ -59,7 +59,7 @@
   #pitcher{left:50%;bottom:39.5%;width:11%;height:17%;transform:translateX(-50%);min-width:40px;z-index:2}
   #pitcher .ph{font-size:13px}
   /* 우타자: 홈플레이트 왼쪽(3루 쪽) 타석 */
-  #batter{left:21%;bottom:12%;width:34%;height:41.5%;z-index:3}   /* 발이 왼쪽 타자 박스 안에, 무릎(그림 높이의 30%)~팔꿈치(62.5%)가 스트라이크 존과 맞도록 */
+  #batter{left:23%;bottom:12%;width:34%;height:41.5%;z-index:3}   /* 발이 왼쪽 타자 박스 안에, 무릎(그림 높이의 30%)~팔꿈치(62.5%)가 스트라이크 존과 맞도록 */
   #batter .ph{font-size:16px}
   .fielder{position:absolute;pointer-events:none;opacity:.95;transform:translate(-50%,-100%)}
   .fielder.in{width:5.2%;min-width:22px;max-width:36px}
@@ -88,7 +88,7 @@
   #ball i{position:absolute;left:50%;top:50%;border:1.5px solid #c2453d;border-radius:50%;box-sizing:border-box;transform:translate(-50%,-50%);opacity:.9}
   #shadow{position:absolute;width:12px;height:5px;border-radius:50%;background:rgba(0,0,0,.28);display:none;z-index:1}
   /* 타격 순간 빛: 홈런 노랑, 135m 이상 주황 */
-  #flash{position:absolute;left:0;top:0;width:40px;height:40px;border-radius:50%;display:none;z-index:4;pointer-events:none;
+  #flash{position:absolute;left:0;top:0;width:40px;height:40px;border-radius:50%;display:none;z-index:1;pointer-events:none;
     transform:translate(-50%,-50%);background:radial-gradient(circle,rgba(255,255,255,.95) 0 18%,var(--flash) 30%,rgba(255,255,255,0) 70%)}
   #flash.on{display:block;animation:flash .32s ease-out forwards}
   @keyframes flash{0%{transform:translate(-50%,-50%) scale(.3);opacity:1}70%{opacity:.9}100%{transform:translate(-50%,-50%) scale(1.6);opacity:0}}
@@ -310,9 +310,9 @@
       <path d="M33 78 L46 78 L47 91 L31.5 91 Z" fill="none" stroke="#fff" stroke-width=".5" opacity=".85"/>
       <path d="M54 78 L67 78 L68.5 91 L53 91 Z" fill="none" stroke="#fff" stroke-width=".5" opacity=".85"/>
       <path d="M43 91.8 L57 91.8 L58.5 96.5 L41.5 96.5 Z" fill="none" stroke="#fff" stroke-width=".5" opacity=".65"/>
-      <!-- 파울선 (홈플레이트 뒤 꼭짓점 → 1루·3루 → 파울 폴) -->
-      <path d="M50 86 L0.5 46.5" stroke="#fff" stroke-width=".55" opacity=".92"/>
-      <path d="M50 86 L99.5 46.5" stroke="#fff" stroke-width=".55" opacity=".92"/>
+      <!-- 파울선 (타자 박스 바깥부터 1루·3루를 지나 파울 폴까지; 박스 안과 홈플레이트 주변엔 그리지 않음) -->
+      <path d="M39.5 77.6 L0.5 46.5" stroke="#fff" stroke-width=".55" opacity=".92"/>
+      <path d="M60.5 77.6 L99.5 46.5" stroke="#fff" stroke-width=".55" opacity=".92"/>
       <!-- 홈플레이트 -->
       <path d="M47.8 82.8 L52.2 82.8 L52.2 84.4 L50 85.8 L47.8 84.4 Z" fill="#fff" stroke="#c9c9c9" stroke-width=".3"/>
     </svg>
@@ -747,7 +747,10 @@ function judge(delta){
   if (dist > 0 || grade === "파울"){ G.pitchAnim = false; cancelAnimationFrame(G.raf); }
   if (dist > 0){
     const go = () => flyHit(dist, delta, () => { showCall(bigGrade, detail); later(afterResult, 1100); });
-    if (grade === "홈런"){ showFlash(dist >= 135 ? "#ff8a2a" : "#ffd83a"); ball.style.display = "none"; later(go, 150); }   // 홈런: 노란 빛, 135m 이상: 주황 빛
+    if (grade === "홈런"){   // 홈런: 노란 빛, 135m 이상: 주황 빛 — 빛이 나는 동안에도 공은 맞은 자리에 보임
+      showFlash(dist >= 135 ? "#ff8a2a" : "#ffd83a");
+      placeBall(PLATE.x + G.end.dx, PLATE.y + G.end.dy, BALL_MAX, 0, false, 0, "back"); ball.style.display = "block";
+      later(go, 150); }
     else go();
   }
   else if (grade === "파울"){ flyFoul(side, () => { showCall(bigGrade, detail); later(afterResult, 1000); }); }
