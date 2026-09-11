@@ -142,8 +142,8 @@
       <h1>라면 끓이기 타이밍 게임</h1>
       <p class="sub">순차 처리 · 우선순위 판단 / 개인전</p>
       <ol class="steps">
-        <li><b>①</b> 면+스프 넣기</li>
-        <li><b>②</b> 물 붓기 → 물이 서서히 끓어오름</li>
+        <li><b>①</b> 물 붓기 → 물이 서서히 끓어오름 (물을 부어야 조리 시작)</li>
+        <li><b>②</b> 면+스프 넣기 (물을 부은 뒤라면 언제든 가능, 담기 전까지 꼭 넣기)</li>
         <li><b>③</b> 물이 끓기 시작하는 <u>그 순간</u>(테두리 반짝) 계란+파 넣기</li>
         <li><b>④</b> 바로 쟁반에 담기</li>
       </ol>
@@ -153,9 +153,7 @@
         <tr><th>등급</th><th>최상</th><th>상</th><th>중</th><th>하</th><th>실패</th></tr>
         <tr><td>가격</td><td id="p1"></td><td id="p2"></td><td id="p3"></td><td id="p4"></td><td>0원</td></tr>
       </table>
-      <p style="margin-top:14px"><label for="num">번호 (1~27)</label></p>
-      <input id="num" type="number" min="1" max="27" inputmode="numeric" placeholder="번호">
-      <p style="margin-top:10px"><button id="btnStart" class="btn wide">시작</button></p>
+            <p style="margin-top:10px"><button id="btnStart" class="btn wide">시작</button></p>
     </div>
   </section>
 
@@ -215,7 +213,6 @@ const CONFIG = {
   FAIR_TOL     : 3.0,    // 중  (그 밖은 '하': 안 끓었는데 넣음 / 너무 오래 끓임)
 
   OVERBOIL_BURN: 8.0,    // 끓기 시작 후 이 시간까지 계란+파 안 넣으면 탐
-  NEGLECT_BURN : 15.0,   // 면+스프만 넣고 물을 안 부은 채 방치하면 탐
   TRAY_GOOD    : 2.5,    // 토핑 후 이 시간 안에 담으면 등급 유지 (넘기면 한 단계 하락)
   TRAY_BURN    : 6.0,    // 토핑 후 이 시간까지 안 담으면 탐
   BURNT_SHOW   : 1.5,    // 탐/순서 오류 표시가 남아 있는 시간
@@ -270,12 +267,6 @@ function potSVG(i){
     <path d="M42 52 H158 L150 132 Q100 146 50 132 Z" fill="url(#steel${i})" stroke="#7d8790" stroke-width="2"/>
     <path class="inner" d="M48 58 H152 L146 128 Q100 138 54 128 Z" fill="#c9d0d6"/>
     <g clip-path="url(#clipInner${i})">
-      <!-- 생면 (뻣뻣한 직선) + 스프 -->
-      <g class="raw">
-        <path class="noodle" d="M62 95 H138"/><path class="noodle" d="M64 103 H136"/><path class="noodle" d="M62 111 H138"/>
-        <path class="noodle" d="M66 119 H134"/>
-        <rect x="88" y="78" width="24" height="14" rx="3" fill="#d95f43"/>
-      </g>
       <!-- 물 -->
       <rect class="water" x="40" y="70" width="120" height="70" fill="#8ec5f2" fill-opacity=".75"/>
       <!-- 익은 면 (구불구불) -->
@@ -319,7 +310,8 @@ class Pot {
     this.reset();
   }
   reset(){
-    this.state = "empty";     // empty → noodleAdded → waterAdded → boiling → ready(/late) → topped
+    this.state = "empty";     // empty → waterAdded → boiling → ready(/late) → topped
+    this.hasNoodle = false;   // 면+스프는 물을 부은 뒤 담기 전까지 아무 때나
     this.t0 = 0;              // 현재 단계 시작 시각
     this.boilAt = 0;          // 끓기 시작 시각
     this.topDelta = 0;        // 토핑 오차(초)
@@ -334,23 +326,25 @@ class Pot {
     const t = now();
     if (t < this.lockUntil) return;
     const st = this.state;
-    if (kind === "noodle"){
-      if (st !== "empty") return;
-      this.set("noodleAdded"); return;
-    }
     if (kind === "water"){
-      if (st !== "noodleAdded") return this.fail("순서 오류");
+      if (st !== "empty") return;
       this.set("waterAdded");
       this.boilAt = this.t0 + CONFIG.BOIL_MIN + Math.random()*(CONFIG.BOIL_MAX-CONFIG.BOIL_MIN);
       return;
     }
+    if (kind === "noodle"){
+      if (st === "empty") return this.fail("순서 오류 → 실패");   // 물보다 먼저 넣으면 실패
+      if (this.hasNoodle) return;
+      this.hasNoodle = true; return;
+    }
     if (kind === "top"){
-      if (!(st==="waterAdded"||st==="boiling"||st==="ready"||st==="late")) return this.fail("순서 오류");
+      if (!(st==="waterAdded"||st==="boiling"||st==="ready"||st==="late")) return this.fail("순서 오류 → 실패");
       this.topDelta = t - (this.boilAt + CONFIG.READY_WINDOW/2);
       this.set("topped"); return;
     }
     if (kind === "tray"){
-      if (st !== "topped") return this.fail("순서 오류");
+      if (st !== "topped") return this.fail("순서 오류 → 실패");
+      if (!this.hasNoodle) return this.fail("재료 누락 → 실패");
       const d = Math.abs(this.topDelta);
       let gi = d<=CONFIG.PERFECT_TOL?0 : d<=CONFIG.GOOD_TOL?1 : d<=CONFIG.FAIR_TOL?2 : 3;
       if (t - this.t0 > CONFIG.TRAY_GOOD) gi = Math.min(3, gi+1);   // 늦게 담으면 한 단계 하락
@@ -371,11 +365,7 @@ class Pot {
     const t = now(), st = this.state, el = this.el;
     let label = "", lvl = "0", prog = 0, cls = "";
 
-    if (st === "empty"){ label = "빈 냄비"; }
-    else if (st === "noodleAdded"){
-      const e = t - this.t0; prog = e/CONFIG.NEGLECT_BURN; label = "면·스프 넣음 → 물";
-      if (e >= CONFIG.NEGLECT_BURN) return this.fail("탐!", true);
-    }
+    if (st === "empty"){ label = "빈 냄비 · 물 붓기"; }
     else if (st==="waterAdded"||st==="boiling"||st==="ready"||st==="late"){
       const r = (t - this.t0)/(this.boilAt - this.t0);
       if (t < this.boilAt){
@@ -387,16 +377,16 @@ class Pot {
       } else {
         this.state = "late"; label = "너무 오래 끓는 중"; lvl = "4"; cls = "late";
         prog = 1 - (t - this.boilAt - CONFIG.READY_WINDOW)/(CONFIG.OVERBOIL_BURN - CONFIG.READY_WINDOW);
-        if (t >= this.boilAt + CONFIG.OVERBOIL_BURN) return this.fail("탐!", true);
+        if (t >= this.boilAt + CONFIG.OVERBOIL_BURN) return this.fail("타버림.. 실패", true);
       }
     }
     else if (st === "topped"){
       const e = t - this.t0; label = "쟁반에 담으세요"; lvl="3"; prog = 1 - e/CONFIG.TRAY_BURN;
       if (e > CONFIG.TRAY_GOOD) cls = "late";
-      if (e >= CONFIG.TRAY_BURN) return this.fail("탐!", true);
+      if (e >= CONFIG.TRAY_BURN) return this.fail("타버림.. 실패", true);
     }
     else if (st === "burnt" || st === "error"){
-      label = this.failMsg + " → 실패"; cls = st + " off";
+      label = this.failMsg; cls = st + " off";
       if (t >= this.lockUntil) this.reset();
     }
 
@@ -408,30 +398,27 @@ class Pot {
 
     /* 그림 요소 표시 */
     const s = this.state;
-    const hasNoodle = s !== "empty" && s !== "burnt" && s !== "error";
-    const hasWater = hasNoodle && s !== "noodleAdded";
-    this.q(".raw").style.display     = (s==="noodleAdded") ? "" : "none";
+    const hasWater = s !== "empty" && s !== "burnt" && s !== "error";
     this.q(".water").style.display   = hasWater ? "" : "none";
-    this.q(".cooked").style.display  = hasWater ? "" : "none";
+    this.q(".cooked").style.display  = (hasWater && this.hasNoodle) ? "" : "none";
     this.q(".topping").style.display = (s==="topped") ? "" : "none";
     this.q(".burn").setAttribute("fill-opacity", s==="burnt" ? "0.85" : "0");
     this.q(".water").setAttribute("fill", s==="late" ? "#e8c98a" : s==="topped" ? "#f1b06a" : "#8ec5f2");
 
-    /* 버튼: 지난 단계는 비활성(정리), 그 외는 눌러 볼 수 있음 → 순서 오류 학습 */
-    const stepIdx = {empty:0,noodleAdded:1,waterAdded:2,boiling:2,ready:2,late:2,topped:3}[s];
+    /* 버튼: 이미 한 일은 비활성(정리), 그 외는 눌러 볼 수 있음 → 순서 오류 학습 */
     const locked = (s==="burnt"||s==="error");
-    [["noodle",0],["water",1],["top",2],["tray",3]].forEach(([k,i])=>{
+    const done = { water: s!=="empty", noodle: this.hasNoodle, top: s==="topped", tray: false };
+    Object.keys(done).forEach(k => {
       const b = this.btn[k];
-      const done = stepIdx !== undefined && i < stepIdx;
-      b.disabled = locked || done;
-      b.classList.toggle("done", done);
+      b.disabled = locked || done[k];
+      b.classList.toggle("done", done[k]);
     });
   }
 }
 
 /* ---------- 게임 ---------- */
 const game = {
-  pots: [], num: 0, money: 0, served: 0, grades: {}, startAt: 0, endAt: 0, raf: 0, running: false, goalTime: null,
+  pots: [], money: 0, served: 0, grades: {}, startAt: 0, endAt: 0, raf: 0, running: false, goalTime: null,
 
   build(){
     const wrap = $("pots"); wrap.innerHTML = "";
@@ -445,21 +432,21 @@ const game = {
         <div class="prog"><i></i></div>
         ${potSVG(i)}
         <div class="btns">
-          <button class="btn" data-act="noodle">① 면·스프</button>
-          <button class="btn" data-act="water">② 물</button>
+          <button class="btn" data-act="water">① 물</button>
+          <button class="btn" data-act="noodle">② 면·스프</button>
           <button class="btn" data-act="top">③ 계란·파</button>
           <button class="btn" data-act="tray">④ 쟁반</button>
         </div>`;
       wrap.appendChild(el);
       const pot = new Pot(i, el);
       el.querySelectorAll("[data-act]").forEach(b => b.addEventListener("click", () => pot.act(b.dataset.act)));
-      el.querySelector(".scene").addEventListener("click", () => { if (pot.state==="empty") pot.act("noodle"); });
+      el.querySelector(".scene").addEventListener("click", () => { if (pot.state==="empty") pot.act("water"); });
       this.pots.push(pot);
     }
   },
 
-  start(num){
-    this.num = num; this.money = 0; this.served = 0;
+  start(){
+    this.money = 0; this.served = 0;
     this.grades = {best:0,good:0,fair:0,poor:0,fail:0}; this.goalTime = null;
     $("trayBowls").innerHTML = ""; this.updateHud();
     this.build();
@@ -527,14 +514,14 @@ const game = {
     this.running = false; cancelAnimationFrame(this.raf);
     document.querySelectorAll(".fly").forEach(e=>e.remove());
     const g = this.grades;
-    $("endTitle").textContent = `${this.num}번 최종 결과`;
+    $("endTitle").textContent = "최종 결과";
     $("endMoney").textContent = `누적 금액: ${fmt(this.money)}원`;
     $("endLine").textContent = this.goalTime !== null
       ? `목표 ${fmt(CONFIG.GOAL_MONEY)}원 달성 · 걸린 시간 ${this.goalTime.toFixed(1)}초`
       : `제한시간 ${CONFIG.GAME_SECONDS}초 종료`;
     $("gBest").textContent = g.best; $("gGood").textContent = g.good; $("gFair").textContent = g.fair;
     $("gPoor").textContent = g.poor; $("gFail").textContent = g.fail;
-    $("endSummary").textContent = `${this.num}번 최종 결과 - 누적 금액: ${fmt(this.money)}원, 완성 ${this.served}그릇 (최상 ${g.best} / 상 ${g.good} / 중 ${g.fair} / 하 ${g.poor} / 실패 ${g.fail})`;
+    $("endSummary").textContent = `최종 결과 - 누적 금액: ${fmt(this.money)}원, 완성 ${this.served}그릇 (최상 ${g.best} / 상 ${g.good} / 중 ${g.fair} / 하 ${g.poor} / 실패 ${g.fail})`;
     show("scrEnd");
   }
 };
@@ -555,12 +542,7 @@ function show(id){
   window.scrollTo(0,0);
 }
 
-$("btnStart").addEventListener("click", () => {
-  const n = parseInt($("num").value, 10);
-  if (!(n >= 1 && n <= 27)){ $("num").focus(); return; }
-  game.start(n);
-});
-$("num").addEventListener("keydown", e => { if (e.key === "Enter") $("btnStart").click(); });
+$("btnStart").addEventListener("click", () => game.start());
 $("btnAgain").addEventListener("click", () => show("scrStart"));
 </script>
 </body>
