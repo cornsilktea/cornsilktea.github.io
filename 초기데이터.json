@@ -1,187 +1,193 @@
 {
   "portal": {
     "games": {
-      "slidecard": {
-        "title": "카드 옮기기",
-        "url": "1.slidecard.html",
-        "memo": "",
-        "order": 0,
-        "open": true
-      },
-      "robotmaze": {
-        "title": "미로 찾기",
-        "url": "2.robotmaze.html",
-        "memo": "",
-        "order": 1,
-        "open": true
-      },
-      "brickbreak": {
-        "title": "벽돌깨기",
-        "url": "3.brickbreak.html",
-        "memo": "",
-        "order": 2,
-        "open": true
-      },
-      "function": {
-        "title": "코딩 미로",
-        "url": "4.function.html",
-        "memo": "",
-        "order": 3,
-        "open": true
-      },
-      "cardauction": {
-        "title": "경매",
-        "url": "5.cardauction.html",
-        "memo": "",
-        "order": 4,
-        "open": true
-      },
-      "snakegame": {
-        "title": "스네이크",
-        "url": "6.snakegame.html",
-        "memo": "",
-        "order": 5,
-        "open": true
-      },
-      "drawing": {
-        "title": "추상화",
-        "url": "7.drawing.html",
-        "memo": "",
-        "order": 6,
-        "open": true,
-        "units": [
-          "g2s2-3-1"
-        ],
-        "unitsSet": true
-      },
-      "datasorting": {
-        "title": "자료 정렬하기",
-        "url": "8.data-sorting-game.html",
-        "memo": "",
-        "order": 7,
-        "open": true,
-        "units": [
-          "g2s2-2-2"
-        ],
-        "unitsSet": true
-      },
-      "graphreading": {
-        "title": "그래프 읽기",
-        "url": "9.graph-reading-game.html",
-        "memo": "",
-        "order": 8,
-        "open": true,
-        "units": [
-          "g2s2-2-1"
-        ],
-        "unitsSet": true
-      },
-      "aiorhuman": {
-        "title": "AI와 인간이 쓴 글 구분하기",
-        "url": "10.ai-or-human-game.html",
-        "memo": "",
-        "order": 9,
-        "open": true,
-        "units": [
-          "g1s2-5",
-          "g2s1-4-1"
-        ],
-        "unitsSet": true
-      },
-      "tablereading": {
-        "title": "표 분석하기",
-        "url": "11.table-reading-game.html",
-        "memo": "",
-        "order": 10,
-        "open": true,
-        "units": [
-          "g2s2-2-2"
-        ],
-        "unitsSet": true
-      },
-      "privacyescape": {
-        "title": "개인정보 보호하기",
-        "url": "12.privacy-escape-game.html",
-        "memo": "",
-        "order": 11,
-        "open": true,
-        "units": [
-          "g1s2-5",
-          "g2s1-5-2"
-        ],
-        "unitsSet": true
-      },
       "aiethicscourt": {
-        "title": "AI판사 체험하기",
-        "url": "13.ai-ethics-court.html",
         "memo": "",
-        "order": 12,
         "open": true,
+        "order": 12,
+        "title": "AI판사 체험하기",
         "units": [
           "g2s1-5-2",
           "g1s2-5"
         ],
-        "unitsSet": true
+        "unitsSet": true,
+        "url": "13.ai-ethics-court.html"
       },
-      "conditionrun": {
-        "title": "조건문 러너",
-        "url": "14.conditional_statement_run.html",
+      "aiorhuman": {
         "memo": "",
-        "order": 13,
         "open": true,
+        "order": 10,
+        "title": "AI와 인간이 쓴 글 구분하기",
         "units": [
-          "g2s2-3-2"
+          "g1s2-5",
+          "g2s1-4-1"
         ],
-        "unitsSet": true
+        "unitsSet": true,
+        "url": "10.ai-or-human-game.html"
+      },
+      "alkkagi": {
+        "memo": "AI 대전(하·중·상) / 2인 대전",
+        "open": true,
+        "order": 16,
+        "title": "AI와 알까기",
+        "units": [
+          "g2s1-4-2"
+        ],
+        "unitsSet": true,
+        "url": "17.alkkagi.html"
       },
       "bitmapquiz": {
-        "title": "비트맵 퀴즈",
-        "url": "15.bitmap-quiz.html",
         "memo": "",
-        "order": 14,
         "open": true,
+        "order": 14,
+        "title": "비트맵 퀴즈",
         "units": [
           "g2s2-2-1"
         ],
-        "unitsSet": true
+        "unitsSet": true,
+        "url": "15.bitmap-quiz.html"
       },
-      "gomoku": {
-        "title": "쉬는시간 오목",
-        "url": "16.gomoku.html",
-        "memo": "AI 대전(하·중·상) / 2인 대전",
-        "order": 15,
+      "brickbreak": {
+        "memo": "",
         "open": true,
-        "units": [],
-        "unitsSet": true
+        "order": 2,
+        "title": "벽돌깨기",
+        "url": "3.brickbreak.html"
       },
-      "alkkagi": {
-        "title": "쉬는시간 알까기",
-        "url": "17.alkkagi.html",
-        "memo": "AI 대전(하·중·상) / 2인 대전",
-        "order": 16,
+      "cardauction": {
+        "memo": "",
         "open": true,
-        "units": [],
-        "unitsSet": true
+        "order": 4,
+        "title": "경매",
+        "url": "5.cardauction.html"
       },
-      "greedytd": {
-        "title": "풍선 타워 디펜스",
-        "url": "18.greedy-tower-defense.html",
-        "memo": "그리디 알고리즘 · 자원 최적화 / 20웨이브 개인전",
-        "order": 17,
-        "open": false,
-        "units": [],
-        "unitsSet": true
+      "conditionrun": {
+        "memo": "",
+        "open": true,
+        "order": 13,
+        "title": "조건문 러너",
+        "units": [
+          "g2s2-3-2"
+        ],
+        "unitsSet": true,
+        "url": "14.conditional_statement_run.html"
       },
-      "ramentiming": {
-        "title": "라면 끓이기 타이밍 게임",
-        "url": "19.ramen-timing-game.html",
-        "memo": "순차 처리 · 우선순위 판단 / 120초 개인전",
-        "order": 18,
-        "open": false,
+      "datasorting": {
+        "memo": "",
+        "open": true,
+        "order": 7,
+        "title": "자료 정렬하기",
+        "units": [
+          "g2s2-2-2"
+        ],
+        "unitsSet": true,
+        "url": "8.data-sorting-game.html"
+      },
+      "drawing": {
+        "memo": "",
+        "open": true,
+        "order": 6,
+        "title": "추상화",
         "units": [
           "g2s2-3-1"
         ],
-        "unitsSet": true
+        "unitsSet": true,
+        "url": "7.drawing.html"
+      },
+      "function": {
+        "memo": "",
+        "open": true,
+        "order": 3,
+        "title": "코딩 미로",
+        "url": "4.function.html"
+      },
+      "gomoku": {
+        "memo": "AI 대전(하·중·상) / 2인 대전",
+        "open": true,
+        "order": 15,
+        "title": "AI와 오목대전",
+        "units": [
+          "g1s2-3"
+        ],
+        "unitsSet": true,
+        "url": "16.gomoku.html"
+      },
+      "graphreading": {
+        "memo": "",
+        "open": true,
+        "order": 8,
+        "title": "그래프 읽기",
+        "units": [
+          "g2s2-2-1"
+        ],
+        "unitsSet": true,
+        "url": "9.graph-reading-game.html"
+      },
+      "greedytd": {
+        "memo": "그리디 알고리즘 · 자원 최적화 / 40웨이브 개인전",
+        "open": true,
+        "order": 17,
+        "title": "풍선 디펜스",
+        "units": [
+          "g2s2-3-1"
+        ],
+        "unitsSet": true,
+        "url": "18.greedy-tower-defense.html"
+      },
+      "privacyescape": {
+        "memo": "",
+        "open": true,
+        "order": 11,
+        "title": "개인정보 보호하기",
+        "units": [
+          "g1s2-5",
+          "g2s1-5-2"
+        ],
+        "unitsSet": true,
+        "url": "12.privacy-escape-game.html"
+      },
+      "ramentiming": {
+        "memo": "순차 처리 · 우선순위 판단 / 60초 개인전",
+        "open": true,
+        "order": 18,
+        "title": "라면 끓이기",
+        "units": [
+          "g2s2-3-1"
+        ],
+        "unitsSet": true,
+        "url": "19.ramen-timing-game.html"
+      },
+      "robotmaze": {
+        "memo": "",
+        "open": true,
+        "order": 1,
+        "title": "미로 찾기",
+        "url": "2.robotmaze.html"
+      },
+      "slidecard": {
+        "memo": "",
+        "open": true,
+        "order": 0,
+        "title": "카드 옮기기",
+        "url": "1.slidecard.html"
+      },
+      "snakegame": {
+        "memo": "",
+        "open": true,
+        "order": 5,
+        "title": "스네이크",
+        "url": "6.snakegame.html"
+      },
+      "tablereading": {
+        "memo": "",
+        "open": true,
+        "order": 9,
+        "title": "표 분석하기",
+        "units": [
+          "g2s2-2-2"
+        ],
+        "unitsSet": true,
+        "url": "11.table-reading-game.html"
       }
     }
   }

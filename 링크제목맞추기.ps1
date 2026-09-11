@@ -22,7 +22,9 @@ $siteUrl  = "https://cornsilktea.github.io/"
 $image    = $siteUrl + "icon-512.png"
 
 $data  = Get-Content -Raw -Encoding utf8 (Join-Path $root "초기데이터.json") | ConvertFrom-Json
-$games = $data.portal.games.PSObject.Properties
+# 초기데이터.json 은 { "portal": { "games": … } } 꼴이지만, curl 로 portal.json 을 그대로 받으면
+# { "games": … } 꼴이 됩니다. 둘 다 읽습니다.
+$games = $(if ($data.portal) { $data.portal.games } else { $data.games }).PSObject.Properties
 
 function Esc([string]$s) {
   return $s.Replace("&", "&amp;").Replace('"', "&quot;").Replace("<", "&lt;").Replace(">", "&gt;")
