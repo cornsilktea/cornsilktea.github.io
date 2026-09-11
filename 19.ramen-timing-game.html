@@ -92,10 +92,35 @@
   .grade-table th{background:var(--tone);font-weight:600}
 
   /* ---------- 상단 상태 바 ---------- */
-  .hud{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px}
+  .hud{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
+  @media (max-width:479px){.hud{grid-template-columns:1fr 1fr}}
   .hud .card{padding:8px 10px;text-align:center}
   .hud .k{font-size:12px;color:var(--sub)}
   .hud .v{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+  .hud .card.best{background:linear-gradient(180deg,#fff8e3,#fff);border-color:#f1d98a}
+  .hud .card.best .k{color:#9a6b12}
+  .hud .card.best .v{color:#8a5a00}
+  .hud .card.best.beat{box-shadow:0 0 0 2px var(--ready)}
+  .hud .card.best.beat .v::after{content:" ✨";font-size:14px}
+
+  /* ---------- 최고 기록 ---------- */
+  .best-box{display:flex;align-items:center;gap:12px;margin-top:12px;padding:10px 12px;border-radius:12px;
+    background:linear-gradient(90deg,#fff8e3,#fffdf7);border:1px solid #f1d98a}
+  .best-box .bi{width:40px;height:40px;flex:none;border-radius:12px;display:flex;align-items:center;justify-content:center;
+    font-size:20px;background:#fff;border:1px solid #f1d98a}
+  .best-box .bt{flex:1;min-width:0}
+  .best-box .bk{display:block;font-size:12px;font-weight:700;color:#9a6b12}
+  .best-box .bv{display:block;font-size:18px;font-weight:800;color:#4a3600;font-variant-numeric:tabular-nums}
+  .best-box .bd{display:block;font-size:12px;color:var(--sub)}
+  .best-box.empty{background:var(--tone);border-color:var(--tone-line)}
+  .best-box.empty .bi{border-color:var(--tone-line)}
+  .best-box.empty .bk{color:var(--sub)}
+  .best-box.empty .bv{font-size:14px;font-weight:600;color:var(--sub)}
+  .best-box.new{background:linear-gradient(90deg,#ffefbf,#fff8e3);border-color:#e9c45a;animation:bestpop .5s ease-out}
+  .best-box.new .bi{background:var(--ready);border-color:#e9c45a}
+  .newtag{display:inline-block;font-size:10.5px;font-weight:800;color:#fff;background:#e0932b;
+    border-radius:999px;padding:1px 8px;margin-left:6px;vertical-align:1px}
+  @keyframes bestpop{0%{transform:scale(.96);opacity:.4}60%{transform:scale(1.02)}100%{transform:scale(1);opacity:1}}
 
   /* ---------- 냄비 4개 ---------- */
   .pots{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
@@ -207,7 +232,8 @@
         <tr><th>등급</th><th>최상</th><th>상</th><th>중</th><th>하</th><th>순서 실수</th><th>타버림</th></tr>
         <tr><td>가격</td><td id="p1"></td><td id="p2"></td><td id="p3"></td><td id="p4"></td><td id="p5"></td><td id="p6"></td></tr>
       </table>
-            <p style="margin-top:10px"><button id="btnStart" class="btn wide">시작</button></p>
+      <div class="best-box empty" id="startBest"></div>
+      <p style="margin-top:10px"><button id="btnStart" class="btn wide">시작</button></p>
     </div>
   </section>
 
@@ -217,6 +243,7 @@
       <div class="card"><div class="k">남은 시간</div><div class="v" id="hudTime">0</div></div>
       <div class="card"><div class="k">누적 금액</div><div class="v" id="hudMoney">0원</div></div>
       <div class="card"><div class="k">완성</div><div class="v" id="hudCount">0그릇</div></div>
+      <div class="card best" id="hudBestCard"><div class="k">최고 기록</div><div class="v" id="hudBest">-</div></div>
     </div>
     <div class="pots" id="pots"></div>
     <div class="card tray">
@@ -235,6 +262,7 @@
       <h1 id="endTitle">최종 결과</h1>
       <div class="big" id="endMoney"></div>
       <p id="endLine"></p>
+      <div class="best-box" id="endBest"></div>
       <div class="grades">
         <div><div class="k">최상</div><div class="v" id="gBest">0</div></div>
         <div><div class="k">상</div><div class="v" id="gGood">0</div></div>
@@ -589,6 +617,9 @@ const game = {
     $("hudMoney").textContent = fmt(this.money) + "원";
     $("hudCount").textContent = this.served + "그릇";
     $("trayTxt").textContent = `쟁반: 완성 ${this.served}그릇`;
+    const b = BEST.get();
+    $("hudBest").textContent = b ? fmt(b.money) + "원" : "-";
+    $("hudBestCard").classList.toggle("beat", !!b && this.money > b.money);
   },
 
   /* 완성 그릇이 냄비에서 쟁반으로 이동 */
@@ -626,6 +657,20 @@ const game = {
     $("gBest").textContent = g.best; $("gGood").textContent = g.good; $("gFair").textContent = g.fair;
     $("gPoor").textContent = g.poor; $("gMis").textContent = g.mistake; $("gFail").textContent = g.fail;
     $("endSummary").textContent = `최종 결과 - 누적 금액: ${fmt(this.money)}원, 완성 ${this.served}그릇 (최상 ${g.best} / 상 ${g.good} / 중 ${g.fair} / 하 ${g.poor} / 순서 실수 ${g.mistake} / 타버림 ${g.fail})`;
+
+    /* 최고 기록 갱신 여부 */
+    const prev = BEST.get(), box = $("endBest");
+    const cur  = { money:this.money, served:this.served, best:g.best, date:BEST.today() };
+    if (!prev || cur.money > prev.money){
+      BEST.set(cur);
+      box.className = "best-box new";
+      box.innerHTML = BEST.html("🎉", `최고 기록 갱신!<span class="newtag">NEW</span>`, fmt(cur.money)+"원",
+        prev ? `이전 기록: ${fmt(prev.money)}원 (완성 ${prev.served}그릇)` : "이 기기의 첫 기록입니다.");
+    } else {
+      box.className = "best-box";
+      box.innerHTML = BEST.html("🏅", "이 기기의 최고 기록", fmt(prev.money)+"원", BEST.detail(prev));
+    }
+    BEST.renderStart();
     show("scrEnd");
   }
 };
@@ -645,6 +690,37 @@ function show(id){
   document.querySelectorAll(".screen").forEach(s => s.classList.toggle("on", s.id === id));
   window.scrollTo(0,0);
 }
+
+/* ---------- 최고 기록 (이 기기의 localStorage 에 저장) ---------- */
+const BEST = {
+  KEY: "ramen_best_v1",
+  get(){
+    try {
+      const b = JSON.parse(localStorage.getItem(this.KEY) || "null");
+      return (b && typeof b.money === "number") ? b : null;
+    } catch (e) { return null; }
+  },
+  set(b){ try { localStorage.setItem(this.KEY, JSON.stringify(b)); } catch (e) {} },
+  today(){
+    const d = new Date(), m = d.getMonth()+1, day = d.getDate();
+    return `${d.getFullYear()}.${m<10?"0":""}${m}.${day<10?"0":""}${day}`;
+  },
+  detail(b){ return `완성 ${b.served}그릇 · 최상 ${b.best}개` + (b.date ? ` · ${b.date}` : ""); },
+  html(icon, k, v, d){
+    return `<span class="bi">${icon}</span><span class="bt"><span class="bk">${k}</span><span class="bv">${v}</span><span class="bd">${d}</span></span>`;
+  },
+  renderStart(){
+    const b = this.get(), box = $("startBest");
+    if (!b){
+      box.className = "best-box empty";
+      box.innerHTML = this.html("🏅", "이 기기의 최고 기록", "아직 기록이 없습니다", "게임이 끝나면 기록이 자동으로 저장됩니다.");
+    } else {
+      box.className = "best-box";
+      box.innerHTML = this.html("🏅", "이 기기의 최고 기록", fmt(b.money)+"원", this.detail(b));
+    }
+  }
+};
+BEST.renderStart();
 
 $("btnStart").addEventListener("click", () => game.start());
 $("btnAgain").addEventListener("click", () => show("scrStart"));

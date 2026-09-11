@@ -161,6 +161,33 @@
   .msg{font-size:12.5px;color:var(--sub);margin:8px 0 0;min-height:18px;}
   .hidden{display:none !important;}
 
+  /* ---------- 최고 기록 ---------- */
+  .stat.best .ic{background:#fff7e0;}
+  .stat.best .v{color:#b3720a;}
+  .bestbox{
+    display:flex;align-items:center;gap:11px;margin-top:14px;padding:11px 13px;border-radius:12px;
+    background:linear-gradient(90deg,#fff7e0,#fffdf6);border:1px solid #f2dfa6;
+  }
+  .bestbox .bi{
+    width:36px;height:36px;flex:0 0 36px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+    font-size:18px;background:#fff;box-shadow:inset 0 0 0 1px #f2dfa6;
+  }
+  .bestbox .bt{min-width:0;flex:1;}
+  .bestbox .bk{font-size:11px;color:#9a6b12;font-weight:800;letter-spacing:.03em;display:block;line-height:1.3;}
+  .bestbox .bv{font-size:16px;font-weight:800;display:block;line-height:1.3;letter-spacing:-.01em;}
+  .bestbox .bd{font-size:12px;color:var(--sub);display:block;line-height:1.4;}
+  .bestbox.empty{background:var(--line2);border-color:var(--line);}
+  .bestbox.empty .bi{box-shadow:inset 0 0 0 1px var(--line);}
+  .bestbox.empty .bk{color:var(--sub);}
+  .bestbox.empty .bv{color:var(--sub);font-weight:600;font-size:14px;}
+  .bestbox.new{background:linear-gradient(90deg,#fff1c2,#fff9e6);border-color:#e9c45a;animation:bestpop .5s ease-out;}
+  .bestbox.new .bi{background:#ffe08a;box-shadow:none;}
+  .newtag{
+    display:inline-block;font-size:10.5px;font-weight:800;color:#fff;background:#e0932b;
+    border-radius:999px;padding:2px 8px;margin-left:6px;vertical-align:1px;letter-spacing:.03em;
+  }
+  @keyframes bestpop{0%{transform:scale(.96);opacity:.4}60%{transform:scale(1.02)}100%{transform:scale(1);opacity:1}}
+
   /* ---------- 반응형 ---------- */
   @media (max-width:940px){
     .main{flex-direction:column;}
@@ -194,6 +221,7 @@
       <li>타워를 놓을 수 있는 <b>돌판은 40개뿐</b>입니다. 싼 타워로 돌판을 다 채우면 나중에 강한 타워를 놓을 자리가 없습니다.</li>
       <li>웨이브는 <b>[시작] 버튼</b>을 눌러야 시작됩니다. 그 전에 타워를 배치하세요.</li>
     </ul>
+    <div class="bestbox empty" id="startBest"></div>
     <div class="btnrow">
       <button class="btn pri" id="startBtn">게임 시작</button>
     </div>
@@ -205,7 +233,8 @@
   <div class="card">
     <h1 id="endTitle">결과</h1>
     <p class="lead" id="endLead"></p>
-    <table class="res" id="resTable"></table>
+    <div class="bestbox" id="endBest"></div>
+    <table class="res" id="resTable" style="margin-top:14px"></table>
     <div class="fb" id="feedback"></div>
     <div class="btnrow">
       <button class="btn" id="copyBtn">결과 복사하기</button>
@@ -223,6 +252,7 @@
     <div class="stat gold"><span class="ic">🪙</span><span class="tx"><span class="k">골드</span><span class="v" id="uiGold">0</span></span></div>
     <div class="stat"><span class="ic">📊</span><span class="tx"><span class="k">효율 점수</span><span class="v" id="uiScore">0</span></span></div>
     <div class="stat"><span class="ic">⏱️</span><span class="tx"><span class="k">시간</span><span class="v" id="uiTime">0:00</span></span></div>
+    <div class="stat best"><span class="ic">🏅</span><span class="tx"><span class="k">최고 기록</span><span class="v" id="uiBest">-</span></span></div>
   </div>
 
   <div class="main">
@@ -1296,7 +1326,8 @@ function draw(){
    ===================================================================== */
 var uiWave=document.getElementById('uiWave'), uiLife=document.getElementById('uiLife'),
     uiGold=document.getElementById('uiGold'), uiScore=document.getElementById('uiScore'),
-    uiTime=document.getElementById('uiTime'), uiTC=document.getElementById('uiTowerCount');
+    uiTime=document.getElementById('uiTime'), uiTC=document.getElementById('uiTowerCount'),
+    uiBest=document.getElementById('uiBest');
 function fmtTime(s){ var m=Math.floor(s/60), r=Math.floor(s%60); return m+':'+(r<10?'0':'')+r; }
 function updateHUD(){
   uiWave.textContent=G.wave+' / '+TOTAL_WAVES;
@@ -1315,6 +1346,51 @@ function loop(ts){
   draw();
   uiTime.textContent=fmtTime(G.elapsed);
   requestAnimationFrame(loop);
+}
+
+/* =====================================================================
+   최고 기록 (이 기기의 localStorage 에 저장)
+   ===================================================================== */
+var BEST_KEY='greedytd_best_v1';
+function loadBest(){
+  try{
+    var raw=window.localStorage.getItem(BEST_KEY);
+    if(!raw) return null;
+    var b=JSON.parse(raw);
+    return (b && typeof b.waves==='number') ? b : null;
+  }catch(e){ return null; }
+}
+function saveBest(b){
+  try{ window.localStorage.setItem(BEST_KEY, JSON.stringify(b)); }catch(e){}
+}
+/* 더 좋은 기록인가: 클리어 웨이브 > 남은 목숨 > 짧은 시간 순으로 비교 */
+function isBetter(a, b){
+  if(!b) return true;
+  if(a.waves!==b.waves) return a.waves>b.waves;
+  if(a.life!==b.life) return a.life>b.life;
+  return a.elapsed<b.elapsed;
+}
+function bestLabel(b){ return b.cleared ? '40웨이브 클리어' : 'Wave '+b.waves+' 클리어'; }
+function bestDetail(b){
+  return '목숨 '+b.life+'개 · 효율 점수 '+b.score+' · '+fmtTime(b.elapsed)+(b.date? ' · '+b.date : '');
+}
+function bestBoxHTML(icon, k, v, d){
+  return '<span class="bi">'+icon+'</span><span class="bt"><span class="bk">'+k+'</span><span class="bv">'+v+'</span><span class="bd">'+d+'</span></span>';
+}
+function renderStartBest(){
+  var b=loadBest(), box=document.getElementById('startBest');
+  if(!b){
+    box.className='bestbox empty';
+    box.innerHTML=bestBoxHTML('🏅','이 기기의 최고 기록','아직 기록이 없습니다','게임이 끝나면 기록이 자동으로 저장됩니다.');
+  }else{
+    box.className='bestbox';
+    box.innerHTML=bestBoxHTML(b.cleared?'🏆':'🏅','이 기기의 최고 기록',bestLabel(b),bestDetail(b));
+  }
+  uiBest.textContent = b ? (b.cleared? '클리어' : 'Wave '+b.waves) : '-';
+}
+function todayStr(){
+  var d=new Date(), m=d.getMonth()+1, day=d.getDate();
+  return d.getFullYear()+'.'+(m<10?'0':'')+m+'.'+(day<10?'0':'')+day;
 }
 
 /* =====================================================================
@@ -1368,6 +1444,20 @@ function gameOver(cleared){
   document.getElementById('feedback').innerHTML = makeFeedback(cleared, effPerGold);
 
   lastResult=[wavesDone, Math.max(0,G.life), score, G.tier3, fmtTime(G.elapsed)].join(',');
+
+  /* 최고 기록 갱신 여부 */
+  var cur={waves:wavesDone, life:Math.max(0,G.life), score:score, elapsed:Math.round(G.elapsed), cleared:!!cleared, date:todayStr()};
+  var prev=loadBest(), box=document.getElementById('endBest');
+  if(isBetter(cur, prev)){
+    saveBest(cur);
+    box.className='bestbox new';
+    box.innerHTML=bestBoxHTML('🎉','최고 기록 갱신!<span class="newtag">NEW</span>',bestLabel(cur),
+      prev ? '이전 기록: '+bestLabel(prev)+' (목숨 '+prev.life+'개 · '+fmtTime(prev.elapsed)+')' : '이 기기의 첫 기록입니다.');
+  }else{
+    box.className='bestbox';
+    box.innerHTML=bestBoxHTML(prev.cleared?'🏆':'🏅','이 기기의 최고 기록',bestLabel(prev),bestDetail(prev));
+  }
+  renderStartBest();
   endScreen.classList.remove('hidden');
 }
 function makeFeedback(cleared, e){
@@ -1397,6 +1487,7 @@ document.getElementById('copyBtn').addEventListener('click', function(){
   }else fallback();
 });
 
+renderStartBest();
 draw();
 </script>
 </body>
