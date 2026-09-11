@@ -7,13 +7,15 @@
 
    data-game 값(slug)이 교사용 화면에 등록된 자료 아이디와 같아야 합니다.
    이 두 줄만 넣으면 잠금 확인과 '목록으로' 버튼이 함께 붙습니다.
+
+   잠금 없이 '목록으로' 버튼만 필요한 화면(예: 투표 화면)은
+   data-game 없이 access-guard.js 한 줄만 넣으면 됩니다.
    ===================================================================== */
 (function () {
   "use strict";
 
   var script = document.currentScript;
   var slug = script ? script.getAttribute("data-game") : null;
-  if (!slug) return;
 
   /* 자료 아이디를 바꾼 직후(예: drowing → drawing)에도 화면이 멈추지 않도록,
      새 아이디로 못 찾으면 예전 아이디로 한 번 더 찾아봅니다.
@@ -65,6 +67,9 @@
   } else {
     addHomeButton();
   }
+
+  /* data-game 이 없으면 잠금 확인은 하지 않고 버튼만 붙입니다. */
+  if (!slug) return;
 
   /* 인터넷 주소로 열었을 때만 잠금을 검사합니다.
      (내 컴퓨터에서 파일을 직접 열어보는 file:// 미리보기는 그대로 실행) */
