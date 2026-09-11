@@ -214,6 +214,14 @@
                "선생님 화면에서 이 자료를 등록하면 열립니다.");
           return;
         }
+        /* 탭 제목과 브라우저 공유 제목은 제어판에서 적은 제목을 따릅니다.
+           (카카오톡 등 링크 미리보기는 파일 안의 <title>을 읽으므로
+            링크제목맞추기.ps1 로 따로 맞춥니다.) */
+        if (game.title && document.title !== game.title) {
+          document.title = game.title;
+          var og = document.querySelector("meta[property=\"og:title\"]");
+          if (og) og.setAttribute("content", game.title);
+        }
         if (game.open === true) {
           unlock();
         } else if (played) {
