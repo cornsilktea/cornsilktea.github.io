@@ -1,0 +1,24 @@
+/* =====================================================================
+   공통 테마 — 6.snakegame.html 의 색감·글꼴을 기준으로 함
+   각 페이지는 자기 :root 토큰을 아래 --sg-* 값으로 연결해서 쓴다.
+   ===================================================================== */
+:root{
+  --sg-bg:#F4F6F1;          /* 페이지 배경(아주 연한 녹색) */
+  --sg-panel:#FFFFFF;       /* 카드·패널 */
+  --sg-panel-alt:#EAF0E6;   /* 눌린 버튼·보조 영역 */
+  --sg-line:#E4E8DE;        /* 연한 구분선 */
+  --sg-line-mid:#C9D2C3;    /* 카드 테두리 */
+  --sg-line-strong:#24402F; /* 버튼·판 테두리 */
+  --sg-ink:#1B2B20;         /* 본문 글자 */
+  --sg-ink-mid:#3B4B40;     /* 본문보다 조금 옅은 글자 */
+  --sg-ink-soft:#5B6B5E;    /* 보조 글자 */
+  --sg-ink-faint:#8A978C;   /* 비활성·자리표시 */
+  --sg-primary:#24402F;     /* 주 동작(짙은 녹색) */
+  --sg-primary-ink:#FFFFFF;
+  --sg-primary-soft:#DCE6D6;/* 선택·강조 배경 */
+  --sg-danger:#B33951;      /* 경고·틀림 */
+  --sg-ok:#2F7D4F;          /* 정답·성공 */
+  --sg-warn:#A8731C;        /* 주의·기록 */
+  --sg-radius:4px;
+  --sg-font:ui-monospace,"SF Mono","Menlo","Consolas","Liberation Mono",monospace;
+}

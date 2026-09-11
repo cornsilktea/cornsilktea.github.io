@@ -1,4 +1,5 @@
 <meta charset="utf-8">
+<link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="drawing" data-game-legacy="drowing"></script>
@@ -8,28 +9,28 @@
 <link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --paper:#F2F4EE;
+    --paper:var(--sg-bg);
     --surface:#FFFFFF;
-    --surface-alt:#E7ECE2;
-    --ink:#1E241D;
-    --ink-soft:#5B6459;
-    --line:#CBD3C3;
-    --accent:#2E5FA3;
-    --accent-ink:#1F3F73;
-    --accent-bg:#E1EAF6;
+    --surface-alt:var(--sg-panel-alt);
+    --ink:var(--sg-ink);
+    --ink-soft:var(--sg-ink-soft);
+    --line:var(--sg-line-mid);
+    --accent:var(--sg-primary);
+    --accent-ink:var(--sg-primary);
+    --accent-bg:var(--sg-primary-soft);
     --core:#2E7D4F;
     --core-bg:#E1F1E5;
     --omit:#8A7F6A;
     --omit-bg:#EFEAE0;
-    --presenter:#2E5FA3;
-    --presenter-bg:#E1EAF6;
+    --presenter:var(--sg-primary);
+    --presenter-bg:var(--sg-primary-soft);
     --guesser:#8A4F82;
     --guesser-bg:#F1E5EF;
-    --danger:#B3462C;
+    --danger:var(--sg-danger);
     --shadow: 0 1px 0 rgba(30,36,29,.06), 0 8px 20px -12px rgba(30,36,29,.25);
-    --radius: 14px;
-    --font-display:'Gaegu','Noto Sans KR',sans-serif;
-    --font-body:'IBM Plex Sans KR','Apple SD Gothic Neo',sans-serif;
+    --radius:var(--sg-radius);
+    --font-display:var(--sg-font);
+    --font-body:var(--sg-font);
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
@@ -126,7 +127,7 @@
     background:var(--surface);
     color:var(--ink);
     padding:10px 20px;
-    border-radius:999px;
+    border-radius:var(--radius);
     font-size:1.05rem;
     font-weight:600;
     cursor:pointer;
@@ -142,7 +143,7 @@
     color:var(--ink-soft);
     background:var(--surface-alt);
     padding:8px 16px;
-    border-radius:999px;
+    border-radius:var(--radius);
     font-size:1rem;
   }
 
@@ -185,7 +186,7 @@
     font-size:1.15rem;
     font-weight:600;
     padding:16px 26px;
-    border-radius:12px;
+    border-radius:var(--radius);
     cursor:pointer;
     min-height:64px;
     line-height:1.2;
@@ -215,7 +216,7 @@
     color:var(--presenter);
     font-weight:700;
     padding:8px 16px;
-    border-radius:999px;
+    border-radius:var(--radius);
     font-size:1rem;
   }
   .num-grid{
@@ -225,7 +226,7 @@
   }
   .num-btn{
     min-height:58px;
-    border-radius:12px;
+    border-radius:var(--radius);
     border:2px solid var(--line);
     background:var(--surface-alt);
     color:var(--ink);
@@ -255,7 +256,7 @@
   }
   .score-card{
     background:var(--surface-alt);
-    border-radius:12px;
+    border-radius:var(--radius);
     padding:14px 8px;
     text-align:center;
   }
@@ -281,7 +282,7 @@
   }
   .rule-item{
     background:var(--surface-alt);
-    border-radius:12px;
+    border-radius:var(--radius);
     padding:16px 18px;
     display:flex;
     gap:12px;
@@ -311,7 +312,7 @@
     font-variant-numeric:tabular-nums;
     padding:10px 14px;
     border:2px solid var(--line);
-    border-radius:10px;
+    border-radius:var(--radius);
     background:var(--surface);
     color:var(--ink);
     width:110px;
@@ -324,13 +325,13 @@
     color:var(--accent);
     font-weight:700;
     padding:6px 16px;
-    border-radius:999px;
+    border-radius:var(--radius);
     font-size:.95rem;
   }
   .peek-warn{
     background:var(--accent-bg);
     color:var(--accent-ink);
-    border-radius:12px;
+    border-radius:var(--radius);
     padding:16px 18px;
     font-size:1.05rem;
     line-height:1.6;
@@ -454,7 +455,7 @@
   .tag-list{display:flex; flex-wrap:wrap; gap:8px;}
   .tag{
     padding:8px 14px;
-    border-radius:999px;
+    border-radius:var(--radius);
     font-size:1rem;
     font-weight:600;
   }
@@ -462,7 +463,7 @@
   .tag.omit{background:var(--omit-bg); color:var(--omit); text-decoration:line-through; text-decoration-thickness:1.5px;}
   .discuss{
     background:var(--accent-bg);
-    border-radius:12px;
+    border-radius:var(--radius);
     padding:16px 18px;
     color:var(--accent-ink);
     font-size:1.05rem;
@@ -476,7 +477,7 @@
     flex:1;
     min-width:240px;
     padding:18px 20px;
-    border-radius:12px;
+    border-radius:var(--radius);
     border:2px solid var(--line);
     background:var(--surface-alt);
     color:var(--ink);
@@ -495,7 +496,7 @@
   }
   .chip{
     padding:12px 18px;
-    border-radius:12px;
+    border-radius:var(--radius);
     background:var(--surface-alt);
     border:2px solid var(--surface-alt);
     font-size:1.05rem;
@@ -531,7 +532,7 @@
   }
   .example-card{
     background:var(--surface-alt);
-    border-radius:12px;
+    border-radius:var(--radius);
     padding:18px;
   }
   .example-card h3{

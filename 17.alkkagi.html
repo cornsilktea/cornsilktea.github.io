@@ -17,6 +17,7 @@
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="alkkagi"></script>
 <meta charset="UTF-8">
+<link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>알까기</title>
 <style>
@@ -24,8 +25,8 @@
   html, body { height: 100%; }
   body {
     margin: 0;
-    font-family: Pretendard, -apple-system, "Segoe UI", "맑은 고딕", sans-serif;
-    background: #f5f6f8; color: #111827;
+    font-family:var(--sg-font);
+    background: var(--sg-bg); color: var(--sg-ink);
     overflow: hidden;
   }
 
@@ -34,12 +35,12 @@
     min-height: 56px; padding: 12px 16px;
     font-family: inherit; font-size: 17px; font-weight: 600;
     text-align: center; word-break: keep-all; line-height: 1.3;
-    background: #fff; color: #111827;
-    border: 1px solid #d1d5db; border-radius: 10px; cursor: pointer;
+    background: #fff; color: var(--sg-ink);
+    border: 1.5px solid var(--sg-line-strong); border-radius:var(--sg-radius); cursor: pointer;
     transition: background .12s, border-color .12s, transform .08s;
   }
-  .btn:hover { border-color: #2563eb; background: #f8faff; }
-  .btn:active { background: #eff6ff; transform: translateY(1px); }
+  .btn:hover { border-color: var(--sg-primary); background: var(--sg-panel-alt); }
+  .btn:active { background: var(--sg-primary-soft); transform: translateY(1px); }
   .btn.small { min-height: 40px; padding: 8px 14px; font-size: 15px; }
 
   .screen { display: none; height: 100%; }
@@ -60,54 +61,54 @@
     box-shadow: 0 2px 4px rgba(80,50,10,.35);
   }
   .logo i.b { background: radial-gradient(circle at 34% 30%, #5b5b5b, #0d0d0d); }
-  .logo i.w { background: radial-gradient(circle at 34% 30%, #fff, #cfcfcf); border: 1px solid #d1d5db; }
+  .logo i.w { background: radial-gradient(circle at 34% 30%, #fff, #cfcfcf); border: 1px solid var(--sg-line-mid); }
   .logo i.s { width: 18px; height: 18px; opacity: .55; }
   h1 { font-size: 28px; margin: 0 0 6px; text-align: center; letter-spacing: -.5px; }
-  .sub { font-size: 15px; color: #6b7280; margin: 0 0 22px; text-align: center; line-height: 1.5; }
+  .sub { font-size: 15px; color: var(--sg-ink-soft); margin: 0 0 22px; text-align: center; line-height: 1.5; }
   .card {
-    background: #fff; border: 1px solid #e5e7eb; border-radius: 14px;
+    background: #fff; border: 1px solid var(--sg-line); border-radius:var(--sg-radius);
     padding: 16px; margin: 0 0 14px;
     box-shadow: 0 1px 3px rgba(17,24,39,.06);
   }
   .card h2 { font-size: 17px; margin: 0 0 4px; }
-  .card p { font-size: 14px; color: #6b7280; margin: 0 0 12px; line-height: 1.5; }
+  .card p { font-size: 14px; color: var(--sg-ink-soft); margin: 0 0 12px; line-height: 1.5; }
   .row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .help { font-size: 14px; color: #4b5563; line-height: 1.8; margin: 0; padding-left: 20px; }
-  .help b { color: #111827; }
+  .help { font-size: 14px; color: var(--sg-ink-mid); line-height: 1.8; margin: 0; padding-left: 20px; }
+  .help b { color: var(--sg-ink); }
 
   /* ── 게임 화면 ────────────────────────────── */
   #gameScreen { flex-direction: column; }
   #hud {
     flex: 0 0 auto; display: flex; align-items: center; gap: 8px;
-    padding: 8px 10px; background: #fff; border-bottom: 1px solid #e5e7eb;
+    padding: 8px 10px; background: #fff; border-bottom: 1px solid var(--sg-line);
   }
   .pchip {
     flex: 0 1 auto; min-width: 0;
     display: flex; align-items: center; gap: 8px;
-    padding: 7px 10px; border: 1px solid #e5e7eb; border-radius: 10px;
-    background: #fafafa; transition: border-color .15s, background .15s, box-shadow .15s;
+    padding: 7px 10px; border: 1px solid var(--sg-line); border-radius:var(--sg-radius);
+    background: var(--sg-panel-alt); transition: border-color .15s, background .15s, box-shadow .15s;
   }
   .pchip.active {
-    border-color: #2563eb; background: #eff6ff;
+    border-color: var(--sg-primary); background: var(--sg-primary-soft);
     box-shadow: 0 0 0 2px rgba(37,99,235,.12);
   }
   .pname { font-size: 15px; font-weight: 700; white-space: nowrap; }
-  .pchip.active .pname { color: #1d4ed8; }
+  .pchip.active .pname { color: var(--sg-primary); }
   .dots { display: flex; gap: 4px; flex-wrap: wrap; }
   .dots span {
     width: 13px; height: 13px; border-radius: 50%; display: block;
     transition: opacity .2s, transform .2s;
   }
   .dots span.b {
-    background: radial-gradient(circle at 34% 28%, #6a6a6a, #111827 70%);
+    background: radial-gradient(circle at 34% 28%, #6a6a6a, var(--sg-ink) 70%);
     box-shadow: 0 1px 2px rgba(0,0,0,.35);
   }
   .dots span.w {
     background: radial-gradient(circle at 34% 28%, #fff, #d8d8d8 75%);
-    border: 1px solid #9ca3af; box-shadow: 0 1px 2px rgba(0,0,0,.2);
+    border: 1px solid var(--sg-ink-faint); box-shadow: 0 1px 2px rgba(0,0,0,.2);
   }
   .dots span.gone {
-    background: none; border: 1px dashed #cbd5e1; box-shadow: none;
+    background: none; border: 1px dashed var(--sg-line); box-shadow: none;
     opacity: .5; transform: scale(.72);
   }
   .hud-actions { display: flex; gap: 6px; flex: 0 0 auto; margin-left: auto; }
@@ -118,15 +119,15 @@
     min-height: 0;
   }
   canvas {
-    touch-action: none; display: block; border-radius: 14px;
-    box-shadow: 0 6px 18px rgba(80,50,10,.22);
+    touch-action: none; display: block; border-radius:var(--sg-radius);
+    border: 2px solid var(--sg-line-strong); box-shadow: 0 6px 18px rgba(27,43,32,.12);
   }
 
   /* 판 위에 잠깐 떴다 사라지는 안내 */
   #toast {
     position: absolute; left: 50%; top: 16%;
     transform: translate(-50%, -50%) scale(.94);
-    padding: 10px 20px; border-radius: 999px;
+    padding: 10px 20px; border-radius:var(--sg-radius);
     background: rgba(17,24,39,.78); color: #fff;
     font-size: 18px; font-weight: 700; white-space: nowrap;
     opacity: 0; pointer-events: none;
@@ -135,10 +136,10 @@
   #toast.on { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 
   #hint {
-    flex: 0 0 auto; text-align: center; font-size: 14px; color: #6b7280;
+    flex: 0 0 auto; text-align: center; font-size: 14px; color: var(--sg-ink-soft);
     padding: 8px 12px 14px; line-height: 1.5; min-height: 42px;
   }
-  #hint b { color: #2563eb; }
+  #hint b { color: var(--sg-primary); }
 
   /* ── 결과 오버레이 ────────────────────────── */
   #overlay {
@@ -149,12 +150,12 @@
   #overlay.on { display: flex; }
   .modal {
     width: 100%; max-width: 340px; background: #fff;
-    border-radius: 16px; padding: 24px 18px; text-align: center;
+    border-radius:var(--sg-radius); padding: 24px 18px; text-align: center;
     box-shadow: 0 12px 30px rgba(0,0,0,.25);
   }
   .modal .crown { font-size: 34px; line-height: 1; margin-bottom: 8px; }
   .modal h2 { font-size: 22px; margin: 0 0 6px; }
-  .modal p { font-size: 15px; color: #6b7280; margin: 0 0 18px; }
+  .modal p { font-size: 15px; color: var(--sg-ink-soft); margin: 0 0 18px; }
   .modal .btn + .btn { margin-top: 8px; }
 </style>
 </head>
@@ -579,7 +580,7 @@ function draw() {
     ctx.globalAlpha = Math.max(0, f.life);
     ctx.beginPath();
     ctx.arc(f.x, f.y, R * (1 + (1 - f.life) * 0.9), 0, Math.PI * 2);
-    ctx.strokeStyle = f.side === BLACK ? '#374151' : '#f3f4f6';
+    ctx.strokeStyle = f.side === BLACK ? '#3B4B40' : '#EAF0E6';
     ctx.lineWidth = 3;
     ctx.stroke();
     ctx.globalAlpha = 1;
@@ -595,7 +596,7 @@ function draw() {
   // 내 차례에 고를 수 있는 돌을 은은하게 표시
   if (myTurnNow() && !selected) {
     const a = 0.25 + 0.2 * Math.sin(clock * 3.2);
-    ctx.strokeStyle = 'rgba(37,99,235,' + a.toFixed(3) + ')';
+    ctx.strokeStyle = 'rgba(36,64,47,' + a.toFixed(3) + ')';
     ctx.lineWidth = 3;
     for (const s of stones) {
       if (!s.alive || s.side !== turn) continue;
@@ -608,14 +609,14 @@ function draw() {
 
 function drawBoard() {
   const g = ctx.createLinearGradient(0, 0, W, H);
-  g.addColorStop(0, '#e8c68c');
-  g.addColorStop(.5, '#d9ae6d');
-  g.addColorStop(1, '#c6944c');
+  g.addColorStop(0, '#FFFFFF');
+  g.addColorStop(.5, '#FAFBF8');
+  g.addColorStop(1, '#F4F6F1');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, H);
 
   // 나뭇결 느낌의 옅은 세로줄
-  ctx.strokeStyle = 'rgba(140,95,40,.10)';
+  ctx.strokeStyle = 'rgba(36,64,47,.04)';
   ctx.lineWidth = 6;
   for (let x = 18; x < W; x += 46) {
     ctx.beginPath();
@@ -625,7 +626,7 @@ function drawBoard() {
   }
 
   // 바둑판 선
-  ctx.strokeStyle = 'rgba(110,72,26,.32)';
+  ctx.strokeStyle = 'rgba(36,64,47,.38)';
   ctx.lineWidth = 1;
   for (let i = 1; i < 10; i++) {
     const t = i * W / 10;
@@ -633,7 +634,7 @@ function drawBoard() {
     ctx.beginPath(); ctx.moveTo(22, t); ctx.lineTo(W - 22, t); ctx.stroke();
   }
   // 화점
-  ctx.fillStyle = 'rgba(110,72,26,.45)';
+  ctx.fillStyle = 'rgba(36,64,47,.55)';
   for (const px of [180, 300, 420]) {
     for (const py of [180, 300, 420]) {
       ctx.beginPath(); ctx.arc(px, py, 3.5, 0, Math.PI * 2); ctx.fill();
@@ -647,7 +648,7 @@ function drawBoard() {
   ctx.fillRect(0, H - 26, W, 26);
 
   // 가장자리(여기를 넘어가면 아웃)
-  ctx.strokeStyle = 'rgba(92,60,20,.85)';
+  ctx.strokeStyle = 'rgba(36,64,47,.9)';
   ctx.lineWidth = 5;
   ctx.strokeRect(2.5, 2.5, W - 5, H - 5);
 }
@@ -655,12 +656,12 @@ function drawBoard() {
 function drawStone(s, sel) {
   ctx.beginPath();
   ctx.arc(s.x + 1, s.y + 4, R, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(80,50,10,.28)';
+  ctx.fillStyle = 'rgba(27,43,32,.22)';
   ctx.fill();
 
   const grd = ctx.createRadialGradient(s.x - R * .35, s.y - R * .42, R * .1, s.x, s.y, R);
   if (s.side === BLACK) { grd.addColorStop(0, '#6a6a6a'); grd.addColorStop(.55, '#232323'); grd.addColorStop(1, '#080808'); }
-  else                  { grd.addColorStop(0, '#ffffff'); grd.addColorStop(.6, '#f2f2f2'); grd.addColorStop(1, '#c9c9c9'); }
+  else                  { grd.addColorStop(0, '#ffffff'); grd.addColorStop(.6, '#EAF0E6'); grd.addColorStop(1, '#c9c9c9'); }
   ctx.beginPath();
   ctx.arc(s.x, s.y, R, 0, Math.PI * 2);
   ctx.fillStyle = grd;
@@ -678,7 +679,7 @@ function drawStone(s, sel) {
   if (sel) {
     ctx.beginPath();
     ctx.arc(s.x, s.y, R + 6, 0, Math.PI * 2);
-    ctx.strokeStyle = '#2563eb';
+    ctx.strokeStyle = '#24402F';
     ctx.lineWidth = 3;
     ctx.stroke();
   }
@@ -765,22 +766,22 @@ function drawAim() {
 // 고른 돌 위에 뜨는 작은 알림표(세기 % 또는 안내말)
 function drawBadge(label, col) {
   const tx = selected.x, ty = selected.y - R - 34;
-  ctx.font = 'bold 19px Pretendard, sans-serif';
+  ctx.font = 'bold 19px Consolas, ui-monospace, monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   const w = Math.max(60, ctx.measureText(label).width + 24);
   ctx.beginPath();
   if (ctx.roundRect) ctx.roundRect(tx - w / 2, ty - 15, w, 30, 15);
   else ctx.arc(tx, ty, w / 2, 0, Math.PI * 2);   // roundRect가 없는 옛 브라우저
-  ctx.fillStyle = 'rgba(17,24,39,.72)';
+  ctx.fillStyle = 'rgba(27,43,32,.72)';
   ctx.fill();
   ctx.fillStyle = col;
   ctx.fillText(label, tx, ty + 1);
 }
 function gaugeColor(p) {
-  if (p < 0.35) return '#22c55e';
-  if (p < 0.7) return '#eab308';
-  return '#ef4444';
+  if (p < 0.35) return '#2F7D4F';
+  if (p < 0.7) return '#A8731C';
+  return '#B33951';
 }
 
 /* ══════════════════════════════════════════════════════

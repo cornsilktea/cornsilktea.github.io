@@ -2,19 +2,20 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
+<link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'self'; style-src 'unsafe-inline'; img-src data:; connect-src https://*.firebasedatabase.app https://*.firebaseio.com; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'self'; style-src 'self' 'unsafe-inline'; img-src data:; connect-src https://*.firebasedatabase.app https://*.firebaseio.com; base-uri 'none'; form-action 'none'">
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="brickbreak"></script>
 <title>벽돌깨기 - 드래그 조준형 (터치 지원)</title>
 <style>
 :root {
-  --wrks-viz-font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --wrks-viz-primary: #2563eb;
-  --wrks-viz-bg: #ffffff;
-  --wrks-viz-fg: #111827;
-  --wrks-viz-border: #d1d5db;
-  --wrks-viz-radius: 8px;
+  --wrks-viz-font-family:var(--sg-font);
+  --wrks-viz-primary: var(--sg-primary);
+  --wrks-viz-bg: var(--sg-bg);
+  --wrks-viz-fg: var(--sg-ink);
+  --wrks-viz-border: var(--sg-line-mid);
+  --wrks-viz-radius:var(--sg-radius);
   --wrks-viz-space-1: 4px;
   --wrks-viz-space-2: 8px;
   --wrks-viz-space-3: 12px;
@@ -48,6 +49,7 @@ body { padding: var(--wrks-viz-space-3); }
   .sub { grid-area: sub; }
 }
 .hud {
+  background: var(--sg-panel);
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   border: 1px solid var(--wrks-viz-border);
@@ -57,15 +59,15 @@ body { padding: var(--wrks-viz-space-3); }
 }
 .hud div { padding: 6px 10px; border-left: 1px solid var(--wrks-viz-border); }
 .hud div:first-child { border-left: 0; }
-.hud .lb { font-size: 11px; color: #6b7280; letter-spacing: .02em; }
+.hud .lb { font-size: 11px; color: var(--sg-ink-soft); letter-spacing: .02em; }
 .hud .vl { font-size: 22px; font-variant-numeric: tabular-nums; line-height: 1.25; }
 canvas {
   display: block;
   width: 100%;
   aspect-ratio: 560 / 700;
-  border: 1px solid var(--wrks-viz-border);
+  border: 2px solid var(--sg-line-strong);
   border-radius: var(--wrks-viz-radius);
-  background: #f8fafc;
+  background: var(--sg-panel);
   touch-action: none;
   cursor: crosshair;
 }
@@ -85,15 +87,15 @@ button {
   font-size: 15px;
   color: var(--wrks-viz-fg);
   background: #ffffff;
-  border: 1px solid var(--wrks-viz-border);
-  border-radius: 6px;
+  border: 1.5px solid var(--sg-line-strong);
+  border-radius:var(--sg-radius);
   padding: 12px 8px;
   cursor: pointer;
   touch-action: manipulation;
   -webkit-user-select: none;
   user-select: none;
 }
-button:active { background: #eef2f7; }
+button:active { background: var(--sg-panel-alt); }
 #fire {
   background: var(--wrks-viz-primary);
   border-color: var(--wrks-viz-primary);
@@ -103,9 +105,9 @@ button:active { background: #eef2f7; }
   letter-spacing: .06em;
 }
 #fire:disabled {
-  background: #e5e7eb;
+  background: var(--sg-line);
   border-color: var(--wrks-viz-border);
-  color: #9ca3af;
+  color: var(--sg-ink-faint);
   cursor: default;
 }
 /* 발사 버튼에서 충분히 떨어뜨려 실수로 누르지 않게 합니다.
@@ -115,18 +117,19 @@ button:active { background: #eef2f7; }
 .note {
   margin-top: var(--wrks-viz-space-3);
   border: 1px solid var(--wrks-viz-border);
+  background: var(--sg-panel);
   border-radius: var(--wrks-viz-radius);
   padding: 10px var(--wrks-viz-space-3);
   font-size: 12.5px;
   line-height: 1.65;
-  color: #374151;
+  color: var(--sg-ink-mid);
 }
 .note b { font-weight: 600; color: var(--wrks-viz-fg); }
 .note ul { margin: 4px 0 0; padding-left: 17px; }
 #msg {
   margin-top: var(--wrks-viz-space-2);
   font-size: 13px;
-  color: #6b7280;
+  color: var(--sg-ink-soft);
   min-height: 18px;
 }
 </style>
@@ -521,13 +524,13 @@ if (!Math.hypot) {
   function brickColor(hp) {
     var t = Math.min(1, hp / Math.max(4, round));
     var l = 68 - t * 34;
-    return "hsl(217, 62%, " + l.toFixed(0) + "%)";
+    return "hsl(144, 30%, " + l.toFixed(0) + "%)";
   }
 
   function draw() {
     ctx.clearRect(0, 0, LW, LH);
 
-    ctx.strokeStyle = "#e5e7eb";
+    ctx.strokeStyle = "#E4E8DE";
     ctx.lineWidth = 2;
     ctx.strokeRect(MARGIN - 2, TOPWALL, LW - (MARGIN - 2) * 2, LAUNCHY - TOPWALL);
 
@@ -554,7 +557,7 @@ if (!Math.hypot) {
           ctx.stroke();
         }
         ctx.fillStyle = "#ffffff";
-        ctx.font = "600 21px Pretendard, sans-serif";
+        ctx.font = "600 21px Consolas, ui-monospace, monospace";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(String(e.hp), x + BW / 2, y + BH / 2 + 1);
@@ -565,7 +568,7 @@ if (!Math.hypot) {
         ctx.arc(x + BW / 2, y + BH / 2, 15, 0, Math.PI * 2);
         ctx.stroke();
         ctx.fillStyle = "#15803d";
-        ctx.font = "600 14px Pretendard, sans-serif";
+        ctx.font = "600 14px Consolas, ui-monospace, monospace";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText("+1", x + BW / 2, y + BH / 2 + 1);
@@ -573,13 +576,13 @@ if (!Math.hypot) {
     }
 
     if (state === "aim") {
-      ctx.fillStyle = "#9ca3af";
+      ctx.fillStyle = "#8A978C";
       ctx.beginPath();
       ctx.arc(nextX, LAUNCHY, R, 0, Math.PI * 2);
       ctx.fill();
       if (aimed) {
         var pts = predict();
-        // 예상 경로는 파란 점선 하나로만 표시합니다.
+        // 예상 경로는 점선 하나로만 표시합니다.
         for (var p = 1; p < pts.length; p++) {
           var prior = pts[p - 1];
           var now = pts[p];
@@ -592,7 +595,7 @@ if (!Math.hypot) {
           ctx.stroke();
           if (now.kind === "wall") {
             ctx.setLineDash([]);
-            ctx.fillStyle = "#2563eb";
+            ctx.fillStyle = "#24402F";
             ctx.beginPath();
             ctx.arc(now.x, now.y, 4.5, 0, Math.PI * 2);
             ctx.fill();
@@ -600,13 +603,13 @@ if (!Math.hypot) {
         }
         ctx.setLineDash([]);
         var last = pts[pts.length - 1];
-        ctx.strokeStyle = "#2563eb";
+        ctx.strokeStyle = "#24402F";
         ctx.lineWidth = 2.5;
         ctx.beginPath();
         ctx.arc(last.x, last.y, 10, 0, Math.PI * 2);
         ctx.stroke();
       }
-      ctx.fillStyle = "#2563eb";
+      ctx.fillStyle = "#24402F";
       ctx.beginPath();
       ctx.arc(launchX, LAUNCHY, R + 2, 0, Math.PI * 2);
       ctx.fill();
@@ -615,7 +618,7 @@ if (!Math.hypot) {
     for (var k = 0; k < balls.length; k++) {
       var b = balls[k];
       if (!b.alive || b.delay > 0) { continue; }
-      ctx.fillStyle = "#1d4ed8";
+      ctx.fillStyle = "#24402F";
       ctx.beginPath();
       ctx.arc(b.x, b.y, R, 0, Math.PI * 2);
       ctx.fill();
@@ -624,7 +627,7 @@ if (!Math.hypot) {
     if (state === "over") {
       ctx.fillStyle = "rgba(255,255,255,0.9)";
       ctx.fillRect(0, LH / 2 - 66, LW, 132);
-      ctx.strokeStyle = "#d1d5db";
+      ctx.strokeStyle = "#C9D2C3";
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(0, LH / 2 - 66);
@@ -632,11 +635,11 @@ if (!Math.hypot) {
       ctx.moveTo(0, LH / 2 + 66);
       ctx.lineTo(LW, LH / 2 + 66);
       ctx.stroke();
-      ctx.fillStyle = "#111827";
+      ctx.fillStyle = "#1B2B20";
       ctx.textAlign = "center";
-      ctx.font = "600 30px Pretendard, sans-serif";
+      ctx.font = "600 30px Consolas, ui-monospace, monospace";
       ctx.fillText("게임 종료", LW / 2, LH / 2 - 16);
-      ctx.font = "18px Pretendard, sans-serif";
+      ctx.font = "18px Consolas, ui-monospace, monospace";
       ctx.fillText("도달 라운드 " + round + " / 최고 " + best, LW / 2, LH / 2 + 24);
     }
   }

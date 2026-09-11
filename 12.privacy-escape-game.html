@@ -4,28 +4,29 @@
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="privacyescape"></script>
 <meta charset="UTF-8">
+<link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>개인정보 탈출 게임</title>
 <style>
   :root{
-    --bg:#f5f7fb;
+    --bg:var(--sg-bg);
     --card:#ffffff;
-    --ink:#1f2430;
-    --sub:#6b7280;
-    --line:#e1e6ef;
-    --danger:#e5484d;
-    --danger-soft:#fdecec;
-    --safe:#1a9b64;
-    --safe-soft:#e6f7ef;
-    --accent:#3b6ef6;
-    --accent-soft:#eaf0fe;
-    --radius:20px;
+    --ink:var(--sg-ink);
+    --sub:var(--sg-ink-soft);
+    --line:var(--sg-line-mid);
+    --danger:var(--sg-danger);
+    --danger-soft:#F6E3E7;
+    --safe:var(--sg-ok);
+    --safe-soft:#E1F1E5;
+    --accent:var(--sg-primary);
+    --accent-soft:var(--sg-primary-soft);
+    --radius:var(--sg-radius);
   }
   *{box-sizing:border-box;}
   html{height:100%;}
   body{
     margin:0;
-    font-family:-apple-system,BlinkMacSystemFont,"Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+    font-family:var(--sg-font);
     background:var(--bg);
     color:var(--ink);
     min-height:100vh;
@@ -48,7 +49,7 @@
   .pill{
     background:var(--card);
     border:1px solid var(--line);
-    border-radius:999px;
+    border-radius:var(--sg-radius);
     padding:8px 18px;
     font-weight:700;
     white-space:nowrap;
@@ -105,7 +106,7 @@
   .avatar{
     width:40px;height:40px;
     border-radius:50%;
-    background:linear-gradient(135deg,#a6c1ff,#8fe3c0);
+    background:linear-gradient(135deg,var(--sg-primary-soft),#B9CBB0);
     flex-shrink:0;
   }
   .handle{font-weight:800;}
@@ -119,9 +120,9 @@
     align-items:start;
   }
   .item{
-    background:#fbfcfe;
-    border:2px solid var(--line);
-    border-radius:14px;
+    background:var(--sg-panel);
+    border:2px solid var(--sg-line-strong);
+    border-radius:var(--sg-radius);
     padding:14px 16px;
     font-size:1.05rem;
     font-weight:600;
@@ -162,7 +163,7 @@
     background:var(--accent);
     color:#fff;
     border:none;
-    border-radius:14px;
+    border-radius:var(--sg-radius);
     padding:16px 30px;
     font-size:1.1rem;
     font-weight:800;
@@ -172,9 +173,9 @@
 
   .missed-list{
     text-align:left;
-    background:#fbfcfe;
+    background:var(--sg-panel);
     border:1px solid var(--line);
-    border-radius:14px;
+    border-radius:var(--sg-radius);
     padding:16px 18px;
     width:100%;
     font-size:0.95rem;
@@ -405,7 +406,7 @@ function endGame(success){
     const missedItems = roundItems.filter(i=>i.risky && !removedTexts.has(i.text));
     endDesc.textContent = `아직 위험한 정보가 화면에 남아있었어요. 아래에서 어떤 정보가 위험했는지 함께 확인해봐요.`;
     missedList.style.display = 'block';
-    missedList.innerHTML = missedItems.map(i=>`<div><b>⚠ ${i.text}</b><br>${i.why}</div>`).join('<hr style="border:none;border-top:1px solid #e1e6ef;margin:10px 0;">');
+    missedList.innerHTML = missedItems.map(i=>`<div><b>⚠ ${i.text}</b><br>${i.why}</div>`).join('<hr style="border:none;border-top:1px solid #E4E8DE;margin:10px 0;">');
   }
 }
 </script>

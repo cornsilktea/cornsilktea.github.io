@@ -16,6 +16,7 @@
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="gomoku"></script>
 <meta charset="UTF-8">
+<link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>오목</title>
 <style>
@@ -23,8 +24,8 @@
   html, body { height: 100%; }
   body {
     margin: 0;
-    font-family: Pretendard, -apple-system, "Segoe UI", "맑은 고딕", sans-serif;
-    background: #f5f6f8; color: #111827;
+    font-family:var(--sg-font);
+    background: var(--sg-bg); color: var(--sg-ink);
     overflow: hidden;
   }
 
@@ -34,14 +35,14 @@
     min-height: 56px; padding: 12px 16px;
     font-family: inherit; font-size: 17px; font-weight: 600;
     text-align: center; word-break: keep-all; line-height: 1.3;
-    background: #fff; color: #111827;
-    border: 1px solid #d1d5db; border-radius: 10px; cursor: pointer;
+    background: #fff; color: var(--sg-ink);
+    border: 1.5px solid var(--sg-line-strong); border-radius:var(--sg-radius); cursor: pointer;
     transition: background .12s, border-color .12s;
   }
-  .btn:hover { border-color: #2563eb; background: #f8faff; }
-  .btn:active { background: #eff6ff; }
-  .btn[aria-pressed="true"] { border-color: #2563eb; background: #eff6ff; }
-  .btn:disabled { color: #9ca3af; background: #fafafa; border-color: #e5e7eb; cursor: default; }
+  .btn:hover { border-color: var(--sg-primary); background: var(--sg-panel-alt); }
+  .btn:active { background: var(--sg-primary-soft); }
+  .btn[aria-pressed="true"] { border-color: var(--sg-primary); background: var(--sg-primary-soft); }
+  .btn:disabled { color: var(--sg-ink-faint); background: var(--sg-panel-alt); border-color: var(--sg-line); cursor: default; }
 
   .screen { display: none; height: 100%; }
   .screen.on { display: flex; }
@@ -53,21 +54,21 @@
   }
   .start-inner { width: 100%; max-width: 520px; margin: auto; }
   h1 { font-size: 26px; margin: 0 0 6px; text-align: center; }
-  .sub { font-size: 15px; color: #6b7280; margin: 0 0 22px; text-align: center; line-height: 1.5; }
+  .sub { font-size: 15px; color: var(--sg-ink-soft); margin: 0 0 22px; text-align: center; line-height: 1.5; }
   .card {
-    background: #fff; border: 1px solid #d1d5db; border-radius: 12px;
+    background: #fff; border: 1px solid var(--sg-line-mid); border-radius:var(--sg-radius);
     padding: 16px; margin: 0 0 14px;
   }
   .card h2 { font-size: 17px; margin: 0 0 4px; }
-  .card p { font-size: 14px; color: #6b7280; margin: 0 0 12px; line-height: 1.5; }
+  .card p { font-size: 14px; color: var(--sg-ink-soft); margin: 0 0 12px; line-height: 1.5; }
   .row3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .names { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 8px; }
   .names input {
     width: 100%; min-height: 56px; padding: 10px 12px;
-    font-family: inherit; font-size: 17px; color: #111827;
-    background: #fff; border: 1px solid #d1d5db; border-radius: 10px;
+    font-family: inherit; font-size: 17px; color: var(--sg-ink);
+    background: #fff; border: 1px solid var(--sg-line-mid); border-radius:var(--sg-radius);
   }
-  .names input:focus { outline: none; border-color: #2563eb; }
+  .names input:focus { outline: none; border-color: var(--sg-primary); }
   .stack { display: grid; gap: 8px; }
 
   /* ── 게임 화면 ────────────────────────────── */
@@ -75,17 +76,17 @@
   #statusBar {
     display: flex; align-items: center; justify-content: center; gap: 10px;
     min-height: 58px; padding: 8px 12px;
-    background: #fff; border: 1px solid #d1d5db; border-radius: 10px;
+    background: #fff; border: 1px solid var(--sg-line-mid); border-radius:var(--sg-radius);
     font-size: 19px; font-weight: 700; text-align: center;
     transition: transform .35s ease;
   }
   #statusDot {
     width: 22px; height: 22px; border-radius: 50%; flex: 0 0 auto;
-    border: 1px solid #9ca3af; background: #111827;
+    border: 1px solid var(--sg-ink-faint); background: var(--sg-ink);
   }
   #statusDot.white { background: #fff; }
   #statusDot.hide { display: none; }
-  #statusText.win { color: #1d4ed8; }
+  #statusText.win { color: var(--sg-primary); }
   #statusBar.flip { transform: rotate(180deg); }
 
   #boardWrap {
@@ -97,17 +98,17 @@
   #toast {
     position: absolute; left: 50%; top: 12px; transform: translateX(-50%);
     max-width: 92%; padding: 12px 16px;
-    background: #fff; border: 1px solid #fca5a5; border-radius: 10px;
+    background: #fff; border: 1px solid var(--sg-danger); border-radius:var(--sg-radius);
     box-shadow: 0 6px 20px rgba(0, 0, 0, .12);
-    color: #b91c1c; font-size: 16px; font-weight: 600;
+    color: var(--sg-danger); font-size: 16px; font-weight: 600;
     line-height: 1.5; text-align: center; white-space: pre-line;
     pointer-events: none; opacity: 0; transition: opacity .18s;
   }
   #toast.show { opacity: 1; }
   #board {
     display: block; touch-action: manipulation;
-    border-radius: 10px; border: 1px solid #d1d5db;
-    background: #f3e3c3;
+    border-radius:var(--sg-radius); border: 2px solid var(--sg-line-strong);
+    background: #fff;
     transition: transform .35s ease;
   }
   #board.flip { transform: rotate(180deg); }
@@ -284,14 +285,14 @@
     if (!(radius > 0.5)) radius = 0.5;      /* 반지름이 0 이하면 canvas 가 예외를 던집니다 */
     var g = ctx.createRadialGradient(x - radius * 0.3, y - radius * 0.35, radius * 0.15, x, y, radius);
     if (p === BLACK) {
-      g.addColorStop(0, "#6b7280"); g.addColorStop(0.55, "#1f2937"); g.addColorStop(1, "#030712");
+      g.addColorStop(0, "#5B6B5E"); g.addColorStop(0.55, "#1B2B20"); g.addColorStop(1, "#1B2B20");
     } else {
-      g.addColorStop(0, "#ffffff"); g.addColorStop(0.6, "#f3f4f6"); g.addColorStop(1, "#cbd5e1");
+      g.addColorStop(0, "#ffffff"); g.addColorStop(0.6, "#EAF0E6"); g.addColorStop(1, "#E4E8DE");
     }
     ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2);
     ctx.fillStyle = g; ctx.fill();
     ctx.lineWidth = Math.max(1, radius * 0.06);
-    ctx.strokeStyle = p === BLACK ? "rgba(0,0,0,.45)" : "rgba(120,130,145,.75)";
+    ctx.strokeStyle = p === BLACK ? "rgba(0,0,0,.45)" : "rgba(91,107,94,.75)";
     ctx.stroke();
   }
 
@@ -305,11 +306,11 @@
     var animating = false;
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = "#f3e3c3";
+    ctx.fillStyle = "#FFFFFF";
     ctx.fillRect(0, 0, size, size);
 
     // 격자
-    ctx.strokeStyle = "#a9865a";
+    ctx.strokeStyle = "#5B6B5E";
     ctx.lineWidth = Math.max(0.7, size / 700);
     ctx.beginPath();
     for (var k = 0; k < N; k++) {
@@ -321,7 +322,7 @@
 
     // 화점
     var stars = [3, 7, 11], sr = Math.max(2, cell * 0.11);
-    ctx.fillStyle = "#8a6a42";
+    ctx.fillStyle = "#24402F";
     for (var i = 0; i < 3; i++) {
       for (var j = 0; j < 3; j++) {
         var pt = xy(stars[i], stars[j]);
@@ -369,7 +370,7 @@
       var s0 = xy(winLine[0][0], winLine[0][1]);
       var s1 = xy(winLine[4][0], winLine[4][1]);
       ctx.beginPath(); ctx.moveTo(s0[0], s0[1]); ctx.lineTo(s1[0], s1[1]);
-      ctx.strokeStyle = "rgba(220,38,38," + alpha.toFixed(3) + ")";
+      ctx.strokeStyle = "rgba(179,57,81," + alpha.toFixed(3) + ")";
       ctx.lineWidth = Math.max(3, cell * 0.16);
       ctx.lineCap = "round";
       ctx.stroke();

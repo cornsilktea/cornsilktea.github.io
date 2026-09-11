@@ -4,59 +4,60 @@
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="cardauction"></script>
 <meta charset="utf-8">
+<link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>보물카드 경매 진행판</title>
 <style>
-:root{--pri:#2563eb;--bg:#ffffff;--fg:#111827;--bd:#d1d5db;--r:8px}
+:root{--pri:var(--sg-primary);--bg:var(--sg-bg);--fg:var(--sg-ink);--bd:var(--sg-line-mid);--r:var(--sg-radius)}
 *{box-sizing:border-box}
-body{margin:0;padding:14px;font-family:Pretendard,-apple-system,"Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--fg);font-size:16px}
+body{margin:0;padding:14px;font-family:var(--sg-font);background:var(--bg);color:var(--fg);font-size:16px}
 .bar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;border-bottom:1px solid var(--bd);padding-bottom:10px;margin-bottom:14px}
 h1{font-size:20px;margin:0;font-weight:700}
-h1 span{font-size:14px;color:#6b7280;font-weight:400;margin-left:10px}
-button{font-family:inherit;font-size:15px;padding:8px 12px;border:1px solid var(--bd);background:#fff;color:var(--fg);border-radius:6px;cursor:pointer}
-button:hover{background:#f3f4f6}
+h1 span{font-size:14px;color:var(--sg-ink-soft);font-weight:400;margin-left:10px}
+button{font-family:inherit;font-size:15px;padding:8px 12px;border:1.5px solid var(--sg-line-strong);background:#fff;color:var(--fg);border-radius:var(--sg-radius);cursor:pointer}
+button:hover{background:var(--sg-panel-alt)}
 .btn-p{background:var(--pri);border-color:var(--pri);color:#fff;font-weight:700;font-size:20px;padding:14px 16px;width:100%;border-radius:var(--r)}
-.btn-p:hover{background:#1d4ed8}
+.btn-p:hover{background:var(--sg-primary)}
 .grid{display:grid;grid-template-columns:minmax(340px,1fr) minmax(380px,1.1fr);gap:14px;align-items:start}
-.panel{border:1px solid var(--bd);border-radius:var(--r);padding:14px}
-.cardbig{border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;margin-bottom:12px}
+.panel{background:var(--sg-panel);border:1px solid var(--bd);border-radius:var(--r);padding:14px}
+.cardbig{background:var(--sg-panel);border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;margin-bottom:12px}
 .cband{height:12px}
 .cinner{padding:12px 14px}
 .ctop{font-size:17px;font-weight:700}
 .cpts{font-size:56px;font-weight:700;line-height:1.1;margin:2px 0}
-.cpts em{font-size:18px;font-style:normal;font-weight:500;color:#6b7280;margin-left:6px}
-.cnote{font-size:14px;color:#6b7280}
-.brow{display:grid;grid-template-columns:1fr 44px 44px 74px 44px 44px 58px;gap:5px;align-items:center;padding:7px 0;border-top:1px solid #eceff3}
+.cpts em{font-size:18px;font-style:normal;font-weight:500;color:var(--sg-ink-soft);margin-left:6px}
+.cnote{font-size:14px;color:var(--sg-ink-soft)}
+.brow{display:grid;grid-template-columns:1fr 44px 44px 74px 44px 44px 58px;gap:5px;align-items:center;padding:7px 0;border-top:1px solid var(--sg-line)}
 .brow.off{opacity:.45}
 .bname{font-size:16px;font-weight:700}
-.bname span{display:block;font-size:12px;font-weight:400;color:#6b7280}
+.bname span{display:block;font-size:12px;font-weight:400;color:var(--sg-ink-soft)}
 .bval{text-align:right;font-size:28px;font-weight:700;font-variant-numeric:tabular-nums}
 .stp{padding:9px 0;width:100%;font-size:15px}
-.msg{font-size:15px;border:1px solid var(--bd);border-radius:6px;padding:10px 12px;margin-top:12px;background:#f9fafb;min-height:44px}
+.msg{font-size:15px;border:1px solid var(--bd);border-radius:var(--sg-radius);padding:10px 12px;margin-top:12px;background:var(--sg-panel-alt);min-height:44px}
 .tgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.tcard{border:1px solid var(--bd);border-radius:var(--r);padding:11px 12px}
+.tcard{background:var(--sg-panel);border:1px solid var(--bd);border-radius:var(--r);padding:11px 12px}
 .tcard.lead{border-color:var(--pri);border-width:2px}
 .thead{display:flex;justify-content:space-between;align-items:baseline}
 .tname{font-size:17px;font-weight:700}
 .ttot{font-size:40px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}
-.tsub{font-size:13px;color:#6b7280;margin-top:2px}
-.dots{display:flex;gap:8px;margin-top:7px;font-size:13px;color:#374151}
+.tsub{font-size:13px;color:var(--sg-ink-soft);margin-top:2px}
+.dots{display:flex;gap:8px;margin-top:7px;font-size:13px;color:var(--sg-ink-mid)}
 .dot{display:inline-flex;align-items:center;gap:4px}
 .sw{width:11px;height:11px;border-radius:2px;display:inline-block}
-.bon{display:inline-block;font-size:12px;font-weight:700;border:1px solid #15803d;color:#15803d;border-radius:4px;padding:1px 5px;margin-left:5px}
+.bon{display:inline-block;font-size:12px;font-weight:700;border:1px solid var(--sg-ok);color:var(--sg-ok);border-radius:4px;padding:1px 5px;margin-left:5px}
 .strip{display:grid;grid-template-columns:repeat(12,1fr);gap:5px;margin-top:14px}
-.chip{border:1px solid var(--bd);border-radius:6px;padding:5px 2px;text-align:center;font-size:12px;line-height:1.35}
+.chip{background:var(--sg-panel);border:1px solid var(--bd);border-radius:var(--sg-radius);padding:5px 2px;text-align:center;font-size:12px;line-height:1.35}
 .chip b{display:block;font-size:16px}
 .chip.now{border-color:var(--pri);border-width:2px}
-.chip.done{background:#f3f4f6;color:#6b7280}
-.rrow{display:grid;grid-template-columns:26px 80px 1fr 70px;gap:10px;align-items:center;padding:8px 0;border-top:1px solid #eceff3;font-size:16px}
+.chip.done{background:var(--sg-panel-alt);color:var(--sg-ink-soft)}
+.rrow{display:grid;grid-template-columns:26px 80px 1fr 70px;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--sg-line);font-size:16px}
 .rbar{height:18px;background:var(--pri);border-radius:3px}
 .rnum{text-align:right;font-weight:700;font-variant-numeric:tabular-nums;font-size:20px}
-.foot{font-size:13px;color:#6b7280;margin-top:12px;line-height:1.7}
+.foot{font-size:13px;color:var(--sg-ink-soft);margin-top:12px;line-height:1.7}
 table.rt{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}
-table.rt th,table.rt td{border-top:1px solid #eceff3;padding:5px;text-align:right}
+table.rt th,table.rt td{border-top:1px solid var(--sg-line);padding:5px;text-align:right}
 table.rt th:first-child,table.rt td:first-child{text-align:left}
-table.rt thead th{color:#6b7280;font-weight:600;border-top:0}
+table.rt thead th{color:var(--sg-ink-soft);font-weight:600;border-top:0}
 @media print{button{display:none}}
 </style>
 </head>
@@ -84,7 +85,7 @@ table.rt thead th{color:#6b7280;font-weight:600;border-top:0}
     {c:'blue',p:22},{c:'green',p:10},{c:'red',p:15},{c:'blue',p:6},
     {c:'green',p:5},{c:'red',p:11},{c:'blue',p:16},{c:'green',p:14}
   ];
-  var CO={red:{k:'빨강',h:'#b91c1c'},blue:{k:'파랑',h:'#1d4ed8'},green:{k:'초록',h:'#15803d'}};
+  var CO={red:{k:'빨강',h:'#B33951'},blue:{k:'파랑',h:'#2E5FA3'},green:{k:'초록',h:'#2F7D4F'}};
   var KEYS=['red','blue','green'];
   var teams,idx,owner,msg,hist,view,resetArm;
   function init(){
@@ -201,7 +202,7 @@ table.rt thead th{color:#6b7280;font-weight:600;border-top:0}
       h+='<div class="tcard'+(s.total===best?' lead':'')+'">'+
          '<div class="thead"><span class="tname">'+t.name+bon+'</span><span class="ttot">'+s.total+'</span></div>'+
          '<div class="tsub">카드 '+s.pts+' + 보너스 '+s.bonus+' + 예산 '+t.budget+'</div>'+
-         '<div class="dots">'+dots+'<span class="dot" style="color:#6b7280">보유 '+t.won.length+'장</span></div></div>';
+         '<div class="dots">'+dots+'<span class="dot" style="color:#5B6B5E">보유 '+t.won.length+'장</span></div></div>';
     }
     document.getElementById('teams').innerHTML=h;
   }

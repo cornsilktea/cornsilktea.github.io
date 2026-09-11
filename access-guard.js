@@ -77,16 +77,16 @@
       "height:32px",
       "padding:0 12px",
       "background:#ffffff",
-      "border:1px solid #d1d5db",
-      "border-radius:999px",
-      "color:#111827",
+      "border:1.5px solid #24402F",
+      "border-radius:4px",
+      "color:#1B2B20",
       "font-size:13px",
       "font-weight:600",
       "line-height:1",
       "text-decoration:none",
       "box-shadow:0 1px 3px rgba(0,0,0,0.08)",
       "-webkit-tap-highlight-color:transparent",
-      "font-family:Pretendard,-apple-system,'Segoe UI','\uB9D1\uC740 \uACE0\uB515',sans-serif"
+      "font-family:ui-monospace,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace"
     ].join(";");
     document.body.appendChild(home);
   }
@@ -125,9 +125,9 @@
       "position:fixed", "inset:0", "z-index:2147483647",
       "display:flex", "flex-direction:column",
       "align-items:center", "justify-content:center", "gap:14px",
-      "background:#f5f6f8", "color:#111827", "text-align:center",
+      "background:#F4F6F1", "color:#1B2B20", "text-align:center",
       "padding:24px", "visibility:visible",
-      "font-family:Pretendard,-apple-system,'Segoe UI','맑은 고딕',sans-serif"
+      "font-family:ui-monospace,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace"
     ].join(";");
     document.documentElement.appendChild(overlay);
     return overlay;
@@ -137,17 +137,17 @@
     var el = makeOverlay();
     el.innerHTML = "";
     var box = document.createElement("div");
-    box.style.cssText = "background:#fff;border:1px solid #d1d5db;border-radius:12px;" +
+    box.style.cssText = "background:#fff;border:1px solid #C9D2C3;border-radius:4px;" +
       "padding:28px 24px;max-width:360px;width:100%";
     box.appendChild(txt("div", icon, "font-size:40px;line-height:1;margin-bottom:12px"));
     box.appendChild(txt("p", title, "font-size:18px;font-weight:600;margin:0 0 6px"));
-    box.appendChild(txt("p", desc, "font-size:14px;color:#6b7280;margin:0;line-height:1.6"));
+    box.appendChild(txt("p", desc, "font-size:14px;color:#5B6B5E;margin:0;line-height:1.6"));
     if (showHome) {
       var a = document.createElement("a");
       a.href = "index.html";
       a.textContent = "목록으로 돌아가기";
-      a.style.cssText = "display:block;margin-top:18px;padding:10px 14px;border:1px solid #d1d5db;" +
-        "border-radius:8px;text-decoration:none;color:#111827;font-size:14px;background:#fff";
+      a.style.cssText = "display:block;margin-top:18px;padding:10px 14px;border:1.5px solid #24402F;" +
+        "border-radius:4px;text-decoration:none;color:#1B2B20;font-size:14px;background:#fff";
       box.appendChild(a);
     }
     el.appendChild(box);

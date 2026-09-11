@@ -4,27 +4,28 @@
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="aiethicscourt"></script>
 <meta charset="UTF-8">
+<link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AI판사 체험하기 — 전자칠판</title>
 <style>
   :root{
-    --bg:#f5f7fb;
+    --bg:var(--sg-bg);
     --card:#ffffff;
-    --ink:#1f2430;
-    --sub:#6b7280;
-    --line:#e1e6ef;
-    --wood:#8b5e34;
-    --wood-soft:#f2e9df;
-    --agree:#1a9b64;
-    --cond:#c9860a;
-    --disagree:#e5484d;
-    --radius:20px;
+    --ink:var(--sg-ink);
+    --sub:var(--sg-ink-soft);
+    --line:var(--sg-line-mid);
+    --wood:var(--sg-primary);
+    --wood-soft:var(--sg-primary-soft);
+    --agree:var(--sg-ok);
+    --cond:var(--sg-warn);
+    --disagree:var(--sg-danger);
+    --radius:var(--sg-radius);
   }
   *{box-sizing:border-box;}
   html,body{height:100%;}
   body{
     margin:0;
-    font-family:-apple-system,BlinkMacSystemFont,"Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+    font-family:var(--sg-font);
     background:var(--bg);
     color:var(--ink);
     min-height:100vh;
@@ -47,7 +48,7 @@
   .pill{
     background:var(--card);
     border:1px solid var(--line);
-    border-radius:999px;
+    border-radius:var(--sg-radius);
     padding:7px 16px;
     font-weight:700;
     white-space:nowrap;
@@ -55,7 +56,7 @@
   }
   .pill.count{color:var(--wood);}
   .pill.link{color:var(--sub);}
-  .pill.link.bad{color:var(--disagree);border-color:#f4c7c9;}
+  .pill.link.bad{color:var(--disagree);border-color:#E8C3CB;}
 
   main{
     flex:1;
@@ -83,7 +84,7 @@
     font-weight:800;
     color:var(--wood);
     background:var(--wood-soft);
-    border-radius:999px;
+    border-radius:var(--sg-radius);
     padding:6px 16px;
     width:fit-content;
   }
@@ -112,8 +113,8 @@
     gap:12px;
   }
   .bar-label{font-size:1.05rem;font-weight:800;}
-  .bar-track{background:#f0f2f7;border-radius:999px;height:34px;overflow:hidden;}
-  .bar-fill{height:100%;border-radius:999px;width:0%;transition:width .4s ease;}
+  .bar-track{background:var(--sg-panel-alt);border-radius:var(--sg-radius);height:34px;overflow:hidden;}
+  .bar-fill{height:100%;border-radius:var(--sg-radius);width:0%;transition:width .4s ease;}
   .bar-fill.agree{background:var(--agree);}
   .bar-fill.cond{background:var(--cond);}
   .bar-fill.disagree{background:var(--disagree);}
@@ -134,7 +135,7 @@
     width:190px;height:190px;
     background:#fff;
     border:1px solid var(--line);
-    border-radius:14px;
+    border-radius:var(--sg-radius);
     padding:8px;
   }
   .qr-box svg{display:block;width:100%;height:100%;shape-rendering:crispEdges;}
@@ -151,13 +152,13 @@
   }
   .left-btns,.right-btns{display:flex;gap:10px;flex-wrap:wrap;}
   button.primary{
-    background:var(--wood);color:#fff;border:none;border-radius:14px;
+    background:var(--wood);color:#fff;border:none;border-radius:var(--sg-radius);
     padding:14px 28px;font-size:1.05rem;font-weight:800;cursor:pointer;
   }
   button.primary:active{transform:translateY(1px);}
   button.ghost{
-    background:var(--card);color:var(--ink);border:1px solid var(--line);
-    border-radius:14px;padding:14px 22px;font-size:1.02rem;font-weight:700;cursor:pointer;
+    background:var(--card);color:var(--ink);border:1.5px solid var(--sg-line-strong);
+    border-radius:var(--sg-radius);padding:14px 22px;font-size:1.02rem;font-weight:700;cursor:pointer;
   }
   button:disabled{opacity:.45;cursor:default;}
 
@@ -165,7 +166,7 @@
   #summaryScreen{display:none;grid-column:1 / -1;flex-direction:column;gap:20px;}
   #summaryScreen h2{margin:0;font-size:1.6rem;}
   .summary-list{display:flex;flex-direction:column;gap:14px;max-height:62vh;overflow-y:auto;padding-right:6px;}
-  .summary-case{border:1px solid var(--line);border-radius:16px;padding:16px 18px;display:flex;flex-direction:column;gap:10px;}
+  .summary-case{border:1px solid var(--line);border-radius:var(--sg-radius);padding:16px 18px;display:flex;flex-direction:column;gap:10px;}
   .summary-case .case-text{font-size:1.02rem;}
   .summary-case .bar-row{grid-template-columns:100px 1fr 80px;}
   .summary-case .bar-track{height:22px;}
@@ -218,7 +219,7 @@
 
   <aside class="panel" id="joinPanel">
     <div class="join-title">📱 태블릿으로 참여하기</div>
-    <div class="qr-box" id="qrBox"><svg viewBox="0 0 37 37" role="img" aria-label="학생 투표 페이지 QR코드" class="segno"><path class="qrline" stroke="#1f2430" d="M2 2.5h7m1 0h2m8 0h3m2 0h1m2 0h7m-33 1h1m5 0h1m1 0h1m2 0h2m1 0h1m1 0h3m2 0h4m1 0h1m5 0h1m-33 1h1m1 0h3m1 0h1m5 0h4m2 0h1m1 0h1m2 0h1m2 0h1m1 0h3m1 0h1m-33 1h1m1 0h3m1 0h1m1 0h1m1 0h2m5 0h2m3 0h1m1 0h1m1 0h1m1 0h3m1 0h1m-33 1h1m1 0h3m1 0h1m6 0h1m2 0h1m2 0h1m1 0h2m1 0h1m1 0h1m1 0h3m1 0h1m-33 1h1m5 0h1m2 0h1m2 0h1m1 0h3m2 0h1m2 0h1m1 0h1m1 0h1m5 0h1m-33 1h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7m-25 1h2m1 0h2m2 0h4m3 0h1m-23 1h1m1 0h2m1 0h3m7 0h5m1 0h1m2 0h1m1 0h1m2 0h1m1 0h2m-32 1h2m2 0h1m1 0h4m2 0h2m1 0h2m1 0h3m1 0h1m2 0h2m1 0h2m1 0h1m-33 1h7m1 0h1m1 0h4m2 0h1m1 0h1m1 0h1m1 0h2m3 0h3m1 0h2m-32 1h5m10 0h1m3 0h1m2 0h3m1 0h1m1 0h1m1 0h2m-33 1h1m3 0h3m1 0h1m5 0h1m2 0h1m1 0h2m1 0h4m1 0h3m1 0h2m-33 1h4m5 0h2m1 0h3m2 0h1m1 0h1m1 0h2m1 0h1m2 0h1m1 0h1m1 0h1m-32 1h1m4 0h2m1 0h3m1 0h3m1 0h1m1 0h3m3 0h1m1 0h1m1 0h2m-30 1h1m2 0h2m3 0h1m1 0h2m2 0h2m2 0h4m3 0h2m2 0h2m-28 1h2m1 0h1m3 0h1m1 0h1m5 0h5m2 0h2m1 0h3m-31 1h1m6 0h1m1 0h1m2 0h2m1 0h1m1 0h1m4 0h5m1 0h2m1 0h2m-32 1h1m1 0h2m1 0h1m2 0h1m1 0h2m2 0h1m2 0h1m1 0h1m3 0h1m1 0h3m1 0h1m-31 1h1m4 0h1m1 0h1m1 0h2m3 0h4m2 0h1m4 0h2m1 0h1m2 0h1m-28 1h1m1 0h6m2 0h6m1 0h1m5 0h1m1 0h3m-32 1h3m1 0h1m3 0h1m2 0h2m1 0h2m1 0h1m1 0h2m1 0h3m1 0h1m5 0h1m-29 1h1m1 0h2m2 0h1m1 0h3m2 0h1m2 0h2m1 0h2m1 0h2m3 0h2m-32 1h1m1 0h1m3 0h1m1 0h1m4 0h1m5 0h1m2 0h1m2 0h3m2 0h2m-33 1h1m2 0h1m2 0h3m2 0h1m1 0h2m2 0h1m4 0h1m1 0h5m3 0h1m-25 1h2m1 0h1m1 0h3m1 0h3m2 0h1m1 0h1m3 0h2m1 0h1m-32 1h7m1 0h2m1 0h1m1 0h2m1 0h1m1 0h3m2 0h2m1 0h1m1 0h1m2 0h1m-32 1h1m5 0h1m1 0h1m1 0h2m1 0h2m3 0h1m1 0h2m1 0h2m3 0h4m-32 1h1m1 0h3m1 0h1m2 0h1m1 0h1m1 0h2m3 0h1m2 0h1m1 0h6m1 0h1m1 0h1m-33 1h1m1 0h3m1 0h1m1 0h3m4 0h1m4 0h1m1 0h3m2 0h1m1 0h2m1 0h1m-33 1h1m1 0h3m1 0h1m1 0h2m3 0h4m3 0h4m2 0h2m1 0h2m-31 1h1m5 0h1m2 0h3m1 0h2m1 0h3m5 0h1m1 0h3m3 0h1m-33 1h7m1 0h1m1 0h2m3 0h4m2 0h1m1 0h1m2 0h1m1 0h1m1 0h1"/></svg></div>
+    <div class="qr-box" id="qrBox"><svg viewBox="0 0 37 37" role="img" aria-label="학생 투표 페이지 QR코드" class="segno"><path class="qrline" stroke="var(--sg-ink)" d="M2 2.5h7m1 0h2m8 0h3m2 0h1m2 0h7m-33 1h1m5 0h1m1 0h1m2 0h2m1 0h1m1 0h3m2 0h4m1 0h1m5 0h1m-33 1h1m1 0h3m1 0h1m5 0h4m2 0h1m1 0h1m2 0h1m2 0h1m1 0h3m1 0h1m-33 1h1m1 0h3m1 0h1m1 0h1m1 0h2m5 0h2m3 0h1m1 0h1m1 0h1m1 0h3m1 0h1m-33 1h1m1 0h3m1 0h1m6 0h1m2 0h1m2 0h1m1 0h2m1 0h1m1 0h1m1 0h3m1 0h1m-33 1h1m5 0h1m2 0h1m2 0h1m1 0h3m2 0h1m2 0h1m1 0h1m1 0h1m5 0h1m-33 1h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7m-25 1h2m1 0h2m2 0h4m3 0h1m-23 1h1m1 0h2m1 0h3m7 0h5m1 0h1m2 0h1m1 0h1m2 0h1m1 0h2m-32 1h2m2 0h1m1 0h4m2 0h2m1 0h2m1 0h3m1 0h1m2 0h2m1 0h2m1 0h1m-33 1h7m1 0h1m1 0h4m2 0h1m1 0h1m1 0h1m1 0h2m3 0h3m1 0h2m-32 1h5m10 0h1m3 0h1m2 0h3m1 0h1m1 0h1m1 0h2m-33 1h1m3 0h3m1 0h1m5 0h1m2 0h1m1 0h2m1 0h4m1 0h3m1 0h2m-33 1h4m5 0h2m1 0h3m2 0h1m1 0h1m1 0h2m1 0h1m2 0h1m1 0h1m1 0h1m-32 1h1m4 0h2m1 0h3m1 0h3m1 0h1m1 0h3m3 0h1m1 0h1m1 0h2m-30 1h1m2 0h2m3 0h1m1 0h2m2 0h2m2 0h4m3 0h2m2 0h2m-28 1h2m1 0h1m3 0h1m1 0h1m5 0h5m2 0h2m1 0h3m-31 1h1m6 0h1m1 0h1m2 0h2m1 0h1m1 0h1m4 0h5m1 0h2m1 0h2m-32 1h1m1 0h2m1 0h1m2 0h1m1 0h2m2 0h1m2 0h1m1 0h1m3 0h1m1 0h3m1 0h1m-31 1h1m4 0h1m1 0h1m1 0h2m3 0h4m2 0h1m4 0h2m1 0h1m2 0h1m-28 1h1m1 0h6m2 0h6m1 0h1m5 0h1m1 0h3m-32 1h3m1 0h1m3 0h1m2 0h2m1 0h2m1 0h1m1 0h2m1 0h3m1 0h1m5 0h1m-29 1h1m1 0h2m2 0h1m1 0h3m2 0h1m2 0h2m1 0h2m1 0h2m3 0h2m-32 1h1m1 0h1m3 0h1m1 0h1m4 0h1m5 0h1m2 0h1m2 0h3m2 0h2m-33 1h1m2 0h1m2 0h3m2 0h1m1 0h2m2 0h1m4 0h1m1 0h5m3 0h1m-25 1h2m1 0h1m1 0h3m1 0h3m2 0h1m1 0h1m3 0h2m1 0h1m-32 1h7m1 0h2m1 0h1m1 0h2m1 0h1m1 0h3m2 0h2m1 0h1m1 0h1m2 0h1m-32 1h1m5 0h1m1 0h1m1 0h2m1 0h2m3 0h1m1 0h2m1 0h2m3 0h4m-32 1h1m1 0h3m1 0h1m2 0h1m1 0h1m1 0h2m3 0h1m2 0h1m1 0h6m1 0h1m1 0h1m-33 1h1m1 0h3m1 0h1m1 0h3m4 0h1m4 0h1m1 0h3m2 0h1m1 0h2m1 0h1m-33 1h1m1 0h3m1 0h1m1 0h2m3 0h4m3 0h4m2 0h2m1 0h2m-31 1h1m5 0h1m2 0h3m1 0h2m1 0h3m5 0h1m1 0h3m3 0h1m-33 1h7m1 0h1m1 0h2m3 0h4m2 0h1m1 0h1m2 0h1m1 0h1m1 0h1"/></svg></div>
     <div>
       <div class="join-title">참여 코드</div>
       <div class="join-code" id="codeText">----</div>

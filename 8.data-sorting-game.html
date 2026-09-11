@@ -4,29 +4,30 @@
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="datasorting"></script>
 <meta charset="UTF-8">
+<link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>데이터 분류 놀이터</title>
 <style>
   :root{
-    --bg:#f5f7fb;
+    --bg:var(--sg-bg);
     --card:#ffffff;
-    --ink:#1f2430;
-    --sub:#6b7280;
-    --line:#e1e6ef;
-    --blue:#3b6ef6;
-    --blue-soft:#eaf0fe;
-    --green:#1fae6a;
-    --green-soft:#e7f8ef;
-    --red:#e5484d;
-    --red-soft:#fdecec;
-    --amber:#c9860a;
-    --radius:18px;
+    --ink:var(--sg-ink);
+    --sub:var(--sg-ink-soft);
+    --line:var(--sg-line-mid);
+    --blue:var(--sg-primary);
+    --blue-soft:var(--sg-primary-soft);
+    --green:var(--sg-ok);
+    --green-soft:#E1F1E5;
+    --red:var(--sg-danger);
+    --red-soft:#F6E3E7;
+    --amber:var(--sg-warn);
+    --radius:var(--sg-radius);
   }
   *{box-sizing:border-box;}
   html,body{height:100%;}
   body{
     margin:0;
-    font-family:-apple-system,BlinkMacSystemFont,"Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+    font-family:var(--sg-font);
     background:var(--bg);
     color:var(--ink);
     display:flex;
@@ -54,7 +55,7 @@
   .pill{
     background:var(--card);
     border:1px solid var(--line);
-    border-radius:999px;
+    border-radius:var(--sg-radius);
     padding:8px 18px;
     font-weight:700;
     white-space:nowrap;
@@ -82,8 +83,8 @@
   }
   .card{
     background:var(--card);
-    border:2px solid var(--line);
-    border-radius:16px;
+    border:2px solid var(--sg-line-strong);
+    border-radius:var(--sg-radius);
     padding:18px 22px;
     font-size:1.25rem;
     font-weight:700;
@@ -122,7 +123,7 @@
   }
   .bin{
     background:var(--card);
-    border:3px dashed var(--line);
+    border:3px dashed var(--sg-line-mid);
     border-radius:var(--radius);
     min-height:220px;
     padding:18px;
@@ -164,7 +165,7 @@
     background:var(--blue);
     color:#fff;
     border:none;
-    border-radius:14px;
+    border-radius:var(--sg-radius);
     padding:16px 30px;
     font-size:1.1rem;
     font-weight:800;
@@ -174,8 +175,8 @@
   button.secondary{
     background:var(--card);
     color:var(--ink);
-    border:1px solid var(--line);
-    border-radius:14px;
+    border:1.5px solid var(--sg-line-strong);
+    border-radius:var(--sg-radius);
     padding:16px 30px;
     font-size:1.1rem;
     font-weight:800;
@@ -195,7 +196,7 @@
   .ghost-slot{
     width:150px;height:56px;
     border:2px dashed var(--line);
-    border-radius:14px;
+    border-radius:var(--sg-radius);
     opacity:.5;
   }
 

@@ -4,28 +4,29 @@
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="graphreading"></script>
 <meta charset="UTF-8">
+<link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>그래프 읽고 답 찾기</title>
 <style>
   :root{
-    --bg:#f5f7fb;
+    --bg:var(--sg-bg);
     --card:#ffffff;
-    --ink:#1f2430;
-    --sub:#6b7280;
-    --line:#e1e6ef;
-    --green:#1a9b64;
-    --green-soft:#e6f7ef;
-    --red:#e5484d;
-    --red-soft:#fdecec;
-    --bar:#3b6ef6;
-    --bar-soft:#c8d8fd;
-    --radius:18px;
+    --ink:var(--sg-ink);
+    --sub:var(--sg-ink-soft);
+    --line:var(--sg-line-mid);
+    --green:var(--sg-ok);
+    --green-soft:#E1F1E5;
+    --red:var(--sg-danger);
+    --red-soft:#F6E3E7;
+    --bar:var(--sg-primary);
+    --bar-soft:var(--sg-primary-soft);
+    --radius:var(--sg-radius);
   }
   *{box-sizing:border-box;}
   html{height:100%;}
   body{
     margin:0;
-    font-family:-apple-system,BlinkMacSystemFont,"Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+    font-family:var(--sg-font);
     background:var(--bg);
     color:var(--ink);
     min-height:100vh;
@@ -48,7 +49,7 @@
   .pill{
     background:var(--card);
     border:1px solid var(--line);
-    border-radius:999px;
+    border-radius:var(--sg-radius);
     padding:8px 18px;
     font-weight:700;
     white-space:nowrap;
@@ -67,7 +68,7 @@
     width:min(880px,95vw);
     background:var(--card);
     border:1px solid var(--line);
-    border-radius:24px;
+    border-radius:var(--sg-radius);
     padding:26px 30px 30px;
     display:flex;
     flex-direction:column;
@@ -95,9 +96,9 @@
     gap:14px;
   }
   .opt{
-    background:#fbfcfe;
-    border:2px solid var(--line);
-    border-radius:14px;
+    background:var(--sg-panel);
+    border:2px solid var(--sg-line-strong);
+    border-radius:var(--sg-radius);
     padding:16px 18px;
     font-size:1.1rem;
     font-weight:700;
@@ -123,7 +124,7 @@
     background:var(--bar);
     color:#fff;
     border:none;
-    border-radius:14px;
+    border-radius:var(--sg-radius);
     padding:15px 28px;
     font-size:1.05rem;
     font-weight:800;
@@ -138,7 +139,7 @@
     width:min(700px,95vw);
     background:var(--card);
     border:1px solid var(--line);
-    border-radius:24px;
+    border-radius:var(--sg-radius);
     padding:40px;
     flex-direction:column;
     align-items:center;
@@ -150,8 +151,8 @@
   button.secondary{
     background:var(--card);
     color:var(--ink);
-    border:1px solid var(--line);
-    border-radius:14px;
+    border:1.5px solid var(--sg-line-strong);
+    border-radius:var(--sg-radius);
     padding:16px 30px;
     font-size:1.1rem;
     font-weight:800;
@@ -391,18 +392,18 @@ function buildBarChart(r){
   const barW = (plotW - gap*(n-1)) / n;
 
   // axis line
-  svg.appendChild(el('line', {x1:PAD.left, y1:PAD.top, x2:PAD.left, y2:PAD.top+plotH, stroke:'#c7cede', 'stroke-width':2}));
-  svg.appendChild(el('line', {x1:PAD.left, y1:PAD.top+plotH, x2:PAD.left+plotW, y2:PAD.top+plotH, stroke:'#c7cede', 'stroke-width':2}));
+  svg.appendChild(el('line', {x1:PAD.left, y1:PAD.top, x2:PAD.left, y2:PAD.top+plotH, stroke:'#C9D2C3', 'stroke-width':2}));
+  svg.appendChild(el('line', {x1:PAD.left, y1:PAD.top+plotH, x2:PAD.left+plotW, y2:PAD.top+plotH, stroke:'#C9D2C3', 'stroke-width':2}));
 
   r.values.forEach((v,i)=>{
     const h = (v/maxVal) * plotH;
     const x = PAD.left + i*(barW+gap);
     const y = PAD.top + plotH - h;
-    svg.appendChild(el('rect', {x, y, width:barW, height:h, rx:8, fill:'#3b6ef6'}));
-    const valLabel = el('text', {x: x+barW/2, y: y-8, 'text-anchor':'middle', 'font-size':16, 'font-weight':800, fill:'#1f2430'});
+    svg.appendChild(el('rect', {x, y, width:barW, height:h, rx:8, fill:'#24402F'}));
+    const valLabel = el('text', {x: x+barW/2, y: y-8, 'text-anchor':'middle', 'font-size':16, 'font-weight':800, fill:'#1B2B20'});
     valLabel.textContent = `${v}${r.unit}`;
     svg.appendChild(valLabel);
-    const catLabel = el('text', {x: x+barW/2, y: PAD.top+plotH+26, 'text-anchor':'middle', 'font-size':15, fill:'#4b5563'});
+    const catLabel = el('text', {x: x+barW/2, y: PAD.top+plotH+26, 'text-anchor':'middle', 'font-size':15, fill:'#3B4B40'});
     catLabel.textContent = r.labels[i];
     svg.appendChild(catLabel);
   });
@@ -420,9 +421,9 @@ function buildLineChart(r){
   const n = r.values.length;
   const stepX = plotW / (n-1);
 
-  svg.appendChild(el('line', {x1:PAD.left, y1:PAD.top, x2:PAD.left, y2:PAD.top+plotH, stroke:'#c7cede', 'stroke-width':2}));
+  svg.appendChild(el('line', {x1:PAD.left, y1:PAD.top, x2:PAD.left, y2:PAD.top+plotH, stroke:'#C9D2C3', 'stroke-width':2}));
   const zeroY = PAD.top + plotH - ((0-minVal)/range)*plotH;
-  svg.appendChild(el('line', {x1:PAD.left, y1:zeroY, x2:PAD.left+plotW, y2:zeroY, stroke:'#c7cede', 'stroke-width':2}));
+  svg.appendChild(el('line', {x1:PAD.left, y1:zeroY, x2:PAD.left+plotW, y2:zeroY, stroke:'#C9D2C3', 'stroke-width':2}));
 
   const points = r.values.map((v,i)=>{
     const x = PAD.left + i*stepX;
@@ -435,10 +436,10 @@ function buildLineChart(r){
 
   points.forEach(([x,y],i)=>{
     svg.appendChild(el('circle', {cx:x, cy:y, r:6, fill:'#1a9b64'}));
-    const valLabel = el('text', {x, y:y-14, 'text-anchor':'middle', 'font-size':15, 'font-weight':800, fill:'#1f2430'});
+    const valLabel = el('text', {x, y:y-14, 'text-anchor':'middle', 'font-size':15, 'font-weight':800, fill:'#1B2B20'});
     valLabel.textContent = `${r.values[i]}${r.unit}`;
     svg.appendChild(valLabel);
-    const catLabel = el('text', {x, y:PAD.top+plotH+26, 'text-anchor':'middle', 'font-size':14, fill:'#4b5563'});
+    const catLabel = el('text', {x, y:PAD.top+plotH+26, 'text-anchor':'middle', 'font-size':14, fill:'#3B4B40'});
     catLabel.textContent = r.labels[i];
     svg.appendChild(catLabel);
   });

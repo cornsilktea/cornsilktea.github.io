@@ -2,82 +2,83 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
+<link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>수업 자료 제어판</title>
 <style>
   * { box-sizing: border-box; }
   body {
     margin: 0; padding: 24px;
-    font-family: Pretendard, -apple-system, "Segoe UI", "맑은 고딕", sans-serif;
-    background: #f5f6f8; color: #111827;
+    font-family:var(--sg-font);
+    background: var(--sg-bg); color: var(--sg-ink);
   }
   .wrap { max-width: 880px; margin: 0 auto; }
   h1 { font-size: 22px; margin: 0 0 4px; }
-  .sub { font-size: 13px; color: #6b7280; margin: 0 0 16px; }
+  .sub { font-size: 13px; color: var(--sg-ink-soft); margin: 0 0 16px; }
 
   .panel {
-    background: #fff; border: 1px solid #d1d5db; border-radius: 12px;
+    background: #fff; border: 1px solid var(--sg-line-mid); border-radius:var(--sg-radius);
     padding: 20px; margin-bottom: 16px;
   }
   .panel h2 { font-size: 15px; margin: 0 0 12px; font-weight: 600; }
 
-  label { display: block; font-size: 13px; color: #6b7280; margin: 0 0 4px; }
+  label { display: block; font-size: 13px; color: var(--sg-ink-soft); margin: 0 0 4px; }
   input[type=text] {
     width: 100%; padding: 9px 10px; font-size: 14px;
-    border: 1px solid #d1d5db; border-radius: 8px; background: #fff; color: #111827;
+    border: 1px solid var(--sg-line-mid); border-radius:var(--sg-radius); background: #fff; color: var(--sg-ink);
   }
-  input:focus { outline: none; border-color: #2563eb; }
+  input:focus { outline: none; border-color: var(--sg-primary); }
 
   button {
     padding: 9px 14px; font-size: 14px; font-family: inherit;
-    border: 1px solid #d1d5db; border-radius: 8px;
-    background: #fff; color: #111827; cursor: pointer;
+    border: 1.5px solid var(--sg-line-strong); border-radius:var(--sg-radius);
+    background: #fff; color: var(--sg-ink); cursor: pointer;
   }
-  button:hover { border-color: #2563eb; background: #f8faff; }
-  button:disabled { color: #9ca3af; background: #fafafa; cursor: default; border-color: #e5e7eb; }
+  button:hover { border-color: var(--sg-primary); background: var(--sg-panel-alt); }
+  button:disabled { color: var(--sg-ink-faint); background: var(--sg-panel-alt); cursor: default; border-color: var(--sg-line); }
 
   .row { display: flex; gap: 8px; flex-wrap: wrap; }
   .row > * { flex: 1 1 160px; }
   .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
   .actions button { flex: 1 1 120px; }
 
-  .msg { font-size: 13px; color: #6b7280; margin: 10px 0 0; min-height: 18px; line-height: 1.6; }
+  .msg { font-size: 13px; color: var(--sg-ink-soft); margin: 10px 0 0; min-height: 18px; line-height: 1.6; }
 
   .summary {
     display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-    font-size: 14px; color: #374151;
+    font-size: 14px; color: var(--sg-ink-mid);
   }
-  .dot { width: 10px; height: 10px; border-radius: 50%; background: #d1d5db; flex: none; }
-  .dot.on { background: #16a34a; }
-  .dot.some { background: #d97706; }
-  .who { font-size: 13px; color: #6b7280; margin: 10px 0 0; word-break: break-all; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--sg-line-mid); flex: none; }
+  .dot.on { background: var(--sg-ok); }
+  .dot.some { background: var(--sg-warn); }
+  .who { font-size: 13px; color: var(--sg-ink-soft); margin: 10px 0 0; word-break: break-all; }
 
   .game {
-    border: 1px solid #d1d5db; border-radius: 10px;
+    border: 1px solid var(--sg-line-mid); border-radius:var(--sg-radius);
     padding: 14px; margin-bottom: 10px; background: #fff;
   }
   .game-head { display: flex; align-items: flex-start; gap: 12px; }
   .game-info { flex: 1 1 auto; min-width: 0; }
   .game-title { font-size: 16px; font-weight: 600; margin: 0; }
-  .game-meta { font-size: 13px; color: #6b7280; margin: 3px 0 0; word-break: break-all; }
+  .game-meta { font-size: 13px; color: var(--sg-ink-soft); margin: 3px 0 0; word-break: break-all; }
   .game-buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
   .game-buttons button { flex: 1 1 84px; }
 
   .switch { flex: none; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
   .switch input { position: absolute; opacity: 0; width: 0; height: 0; }
   .track {
-    width: 50px; height: 30px; border-radius: 999px;
-    background: #e5e7eb; border: 1px solid #d1d5db; position: relative;
+    width: 50px; height: 30px; border-radius:var(--sg-radius);
+    background: var(--sg-line); border: 1px solid var(--sg-line-mid); position: relative;
     transition: background .15s;
   }
   .track::after {
     content: ""; position: absolute; top: 3px; left: 3px;
-    width: 22px; height: 22px; border-radius: 50%; background: #fff;
-    border: 1px solid #d1d5db; transition: left .15s;
+    width: 22px; height: 22px; border-radius: 3px; background: #fff;
+    border: 1px solid var(--sg-line-mid); transition: left .15s;
   }
-  .switch input:checked + .track { background: #86efac; border-color: #4ade80; }
+  .switch input:checked + .track { background: var(--sg-primary); border-color: var(--sg-primary); }
   .switch input:checked + .track::after { left: 23px; }
-  .switch-text { font-size: 13px; color: #6b7280; width: 34px; }
+  .switch-text { font-size: 13px; color: var(--sg-ink-soft); width: 34px; }
 
   /* 빌드(공략 이미지) 버튼과 보기창 */
   .guide-btn { flex: none; margin-right: 4px; padding: 6px 12px; font-size: 13px; }
@@ -85,25 +86,25 @@
     position: fixed; inset: 0; background: rgba(17,24,39,.82); z-index: 50;
     display: flex; align-items: center; justify-content: center; padding: 20px; cursor: zoom-out;
   }
-  .lightbox img { max-width: 100%; max-height: 92vh; border-radius: 10px; background: #fff; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
-  .lightbox p { position: absolute; top: 14px; left: 0; right: 0; text-align: center; color: #e5e7eb; font-size: 13px; margin: 0; }
+  .lightbox img { max-width: 100%; max-height: 92vh; border-radius:var(--sg-radius); background: #fff; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
+  .lightbox p { position: absolute; top: 14px; left: 0; right: 0; text-align: center; color: var(--sg-line); font-size: 13px; margin: 0; }
 
   .edit { margin-top: 12px; display: none; }
   .edit.open { display: block; }
   .edit .row { margin-bottom: 8px; }
 
-  .hint { font-size: 12px; color: #9ca3af; margin: 8px 0 0; line-height: 1.6; }
-  code { background: #f3f4f6; border-radius: 4px; padding: 1px 5px; font-size: 12px; }
+  .hint { font-size: 12px; color: var(--sg-ink-faint); margin: 8px 0 0; line-height: 1.6; }
+  code { background: var(--sg-panel-alt); border-radius: 4px; padding: 1px 5px; font-size: 12px; }
   [hidden] { display: none !important; }
 
   /* 단원 고르기 (구조도와 같은 폴더 탐색 방식) */
   .picker {
-    border: 1px solid #d1d5db; border-radius: 10px;
+    border: 1px solid var(--sg-line-mid); border-radius:var(--sg-radius);
     padding: 12px; background: #fff; margin-top: 8px;
   }
   .picker-crumbs { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
   .picker-crumbs button { flex: none; }
-  .picker-crumb { font-size: 13px; color: #374151; word-break: keep-all; }
+  .picker-crumb { font-size: 13px; color: var(--sg-ink-mid); word-break: keep-all; }
   .picker-nodes {
     display: grid; gap: 8px;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -112,20 +113,20 @@
   .chk {
     display: flex; align-items: center; gap: 8px; min-height: 46px;
     padding: 8px 12px; font-size: 14px; cursor: pointer;
-    border: 1px solid #d1d5db; border-radius: 8px; background: #fff;
+    border: 1px solid var(--sg-line-mid); border-radius:var(--sg-radius); background: #fff;
   }
-  .chk:hover { border-color: #2563eb; background: #f8faff; }
+  .chk:hover { border-color: var(--sg-primary); background: var(--sg-panel-alt); }
   .chk input { position: static; opacity: 1; width: 18px; height: 18px; flex: none; margin: 0; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
   .chip {
     display: inline-flex; align-items: center; gap: 6px;
-    padding: 5px 10px; font-size: 12px; color: #374151;
-    border: 1px solid #d1d5db; border-radius: 999px; background: #fff;
+    padding: 5px 10px; font-size: 12px; color: var(--sg-ink-mid);
+    border: 1px solid var(--sg-line-mid); border-radius:var(--sg-radius); background: #fff;
   }
   .chip button {
-    all: unset; cursor: pointer; color: #6b7280; font-size: 14px; line-height: 1;
+    all: unset; cursor: pointer; color: var(--sg-ink-soft); font-size: 14px; line-height: 1;
   }
-  .chips-none { font-size: 12px; color: #9ca3af; margin-top: 10px; }
+  .chips-none { font-size: 12px; color: var(--sg-ink-faint); margin-top: 10px; }
 
   @media (max-width: 600px) {
     body { padding: 16px; }

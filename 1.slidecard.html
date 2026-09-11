@@ -2,19 +2,20 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
+<link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'self'; style-src 'unsafe-inline'; img-src data:; connect-src https://*.firebasedatabase.app https://*.firebaseio.com; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'self'; style-src 'self' 'unsafe-inline'; img-src data:; connect-src https://*.firebasedatabase.app https://*.firebaseio.com; base-uri 'none'; form-action 'none'">
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="slidecard"></script>
 <title>6x6 카드 슬라이딩 보드</title>
 <style>
 :root{
-  --wrks-viz-font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --wrks-viz-primary:#2563eb;
-  --wrks-viz-bg:#ffffff;
-  --wrks-viz-fg:#111827;
-  --wrks-viz-border:#d1d5db;
-  --wrks-viz-radius:8px;
+  --wrks-viz-font-family:var(--sg-font);
+  --wrks-viz-primary:var(--sg-primary);
+  --wrks-viz-bg:var(--sg-bg);
+  --wrks-viz-fg:var(--sg-ink);
+  --wrks-viz-border:var(--sg-line-mid);
+  --wrks-viz-radius:var(--sg-radius);
   --wrks-viz-space-1:4px;
   --wrks-viz-space-2:8px;
   --wrks-viz-space-3:12px;
@@ -29,31 +30,31 @@ body{
 }
 .wrap{display:flex;gap:var(--wrks-viz-space-4);align-items:flex-start;flex-wrap:wrap;}
 .boardpane{flex:1 1 380px;max-width:520px;min-width:280px;}
-.board{position:relative;width:100%;border:1px solid var(--wrks-viz-border);border-radius:var(--wrks-viz-radius);background:#f9fafb;padding:8px;touch-action:none;}
-.card{position:absolute;border-radius:6px;background:var(--wrks-viz-primary);cursor:grab;}
-.card.red{background:#dc2626;}
+.board{position:relative;width:100%;border:2px solid var(--sg-line-strong);border-radius:var(--wrks-viz-radius);background:var(--sg-panel);padding:8px;touch-action:none;}
+.card{position:absolute;border-radius:var(--sg-radius);background:var(--wrks-viz-primary);cursor:grab;}
+.card.red{background:var(--sg-danger);}
 .card.movable{cursor:grab;}
 .card.locked{cursor:default;}
 .card.anim{transition:left .13s ease-out, top .13s ease-out;}
 .card.dragging{cursor:grabbing;z-index:5;}
 .panel{flex:0 0 216px;display:flex;flex-direction:column;gap:var(--wrks-viz-space-2);}
-.tile{border:1px solid var(--wrks-viz-border);border-radius:var(--wrks-viz-radius);padding:var(--wrks-viz-space-3);}
-.k{font-size:12px;color:#6b7280;margin-bottom:var(--wrks-viz-space-1);}
+.tile{background:var(--sg-panel);border:1px solid var(--wrks-viz-border);border-radius:var(--wrks-viz-radius);padding:var(--wrks-viz-space-3);}
+.k{font-size:12px;color:var(--sg-ink-soft);margin-bottom:var(--wrks-viz-space-1);}
 .v{font-size:30px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.15;}
-.v.done{color:#15803d;}
-.s{font-size:12px;color:#6b7280;margin-top:var(--wrks-viz-space-1);}
+.v.done{color:var(--sg-ok);}
+.s{font-size:12px;color:var(--sg-ink-soft);margin-top:var(--wrks-viz-space-1);}
 .goal{font-size:13px;line-height:1.5;}
-.legend{display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:6px;}
+.legend{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--sg-ink-mid);margin-top:6px;}
 .dot{width:10px;height:10px;border-radius:3px;display:inline-block;}
-.dot.red{background:#dc2626;}
+.dot.red{background:var(--sg-danger);}
 .dot.blue{background:var(--wrks-viz-primary);}
 button{
   font-family:inherit;font-size:13px;padding:9px 12px;
-  border:1px solid var(--wrks-viz-border);border-radius:6px;
+  border:1.5px solid var(--sg-line-strong);border-radius:var(--sg-radius);
   background:#fff;color:var(--wrks-viz-fg);cursor:pointer;
 }
-button:hover{background:#f3f4f6;}
-.help{font-size:12px;color:#6b7280;line-height:1.6;}
+button:hover{background:var(--sg-panel-alt);}
+.help{font-size:12px;color:var(--sg-ink-soft);line-height:1.6;}
 </style>
 </head>
 <body>
@@ -79,7 +80,7 @@ button:hover{background:#f3f4f6;}
     <div class="tile">
       <div class="k">목표</div>
       <div class="goal">빨간 카드를 오른쪽 맨 아래 칸(6행 6열)으로 옮기기</div>
-      <div class="legend"><span class="dot red"></span>빨간 카드<span class="dot blue" style="margin-left:8px"></span>파란 카드</div>
+      <div class="legend"><span class="dot red"></span>빨간 카드<span class="dot blue" style="margin-left:8px"></span>초록 카드</div>
     </div>
     <button id="reset" type="button">초기화</button>
     <div class="help">빈 칸과 맞닿은 카드를 빈 칸 쪽으로 끌어서 옮깁니다. 짧게 누르기(탭)로도 이동합니다.</div>

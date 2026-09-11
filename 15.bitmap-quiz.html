@@ -1,6 +1,7 @@
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="bitmapquiz"></script>
 <meta charset="utf-8">
+<link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>비트맵 해상도 퀴즈</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -9,24 +10,24 @@
 <style>
   /* 디자인 언어는 '추상화 놀이터'(7.drawing.html) 와 동일하게 맞췄습니다. */
   :root{
-    --paper:#F2F4EE;
+    --paper:var(--sg-bg);
     --surface:#FFFFFF;
-    --surface-alt:#E7ECE2;
-    --ink:#1E241D;
-    --ink-soft:#5B6459;
-    --line:#CBD3C3;
-    --accent:#2E5FA3;
-    --accent-ink:#1F3F73;
-    --accent-bg:#E1EAF6;
+    --surface-alt:var(--sg-panel-alt);
+    --ink:var(--sg-ink);
+    --ink-soft:var(--sg-ink-soft);
+    --line:var(--sg-line-mid);
+    --accent:var(--sg-primary);
+    --accent-ink:var(--sg-primary);
+    --accent-bg:var(--sg-primary-soft);
     --core:#2E7D4F;
     --core-bg:#E1F1E5;
     --omit:#8A7F6A;
     --omit-bg:#EFEAE0;
-    --danger:#B3462C;
+    --danger:var(--sg-danger);
     --shadow: 0 1px 0 rgba(30,36,29,.06), 0 8px 20px -12px rgba(30,36,29,.25);
-    --radius: 14px;
-    --font-display:'Gaegu','Noto Sans KR',sans-serif;
-    --font-body:'IBM Plex Sans KR','Apple SD Gothic Neo',sans-serif;
+    --radius:var(--sg-radius);
+    --font-display:var(--sg-font);
+    --font-body:var(--sg-font);
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
@@ -96,13 +97,13 @@
   .tabs{display:flex; gap:10px;}
   .tab-btn{
     border:2px solid var(--line); background:var(--surface); color:var(--ink);
-    padding:10px 20px; border-radius:999px;
+    padding:10px 20px; border-radius:var(--radius);
     font-size:1.05rem; font-weight:600; cursor:pointer;
   }
   .tab-btn.active{background:var(--accent); border-color:var(--accent); color:#fff;}
   .round-progress{
     font-variant-numeric:tabular-nums; font-weight:600; color:var(--ink-soft);
-    background:var(--surface-alt); padding:8px 16px; border-radius:999px; font-size:1rem;
+    background:var(--surface-alt); padding:8px 16px; border-radius:var(--radius); font-size:1rem;
   }
 
   main{flex:1; display:flex; justify-content:center; padding:28px 20px 48px;}
@@ -121,7 +122,7 @@
   .btn{
     appearance:none; border:2px solid var(--accent); background:var(--accent);
     color:#fff; font-size:1.15rem; font-weight:600;
-    padding:16px 26px; border-radius:12px; cursor:pointer;
+    padding:16px 26px; border-radius:var(--radius); cursor:pointer;
     min-height:64px; line-height:1.2;
   }
   .btn:hover{background:var(--accent-ink); border-color:var(--accent-ink);}
@@ -136,7 +137,7 @@
   /* ---------- 번호 고르기 ---------- */
   .num-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(64px,1fr)); gap:10px;}
   .num-btn{
-    min-height:58px; border-radius:12px;
+    min-height:58px; border-radius:var(--radius);
     border:2px solid var(--line); background:var(--surface-alt); color:var(--ink);
     font-size:1.15rem; font-weight:700; font-variant-numeric:tabular-nums; cursor:pointer;
   }
@@ -144,7 +145,7 @@
 
   /* ---------- 점수판 ---------- */
   .scoreboard-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(92px,1fr)); gap:12px;}
-  .score-card{background:var(--surface-alt); border-radius:12px; padding:14px 8px; text-align:center;}
+  .score-card{background:var(--surface-alt); border-radius:var(--radius); padding:14px 8px; text-align:center;}
   .score-card .num{font-size:.95rem; font-weight:600; color:var(--ink-soft);}
   .score-card .pts{
     font-family:var(--font-display); font-size:1.8rem; font-weight:700;
@@ -154,7 +155,7 @@
   /* ---------- 시작 화면 ---------- */
   .rules-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(220px,1fr)); gap:16px;}
   .rule-item{
-    background:var(--surface-alt); border-radius:12px; padding:16px 18px;
+    background:var(--surface-alt); border-radius:var(--radius); padding:16px 18px;
     display:flex; gap:12px; align-items:flex-start;
   }
   .rule-num{font-family:var(--font-display); font-size:1.6rem; font-weight:700; color:var(--accent); line-height:1;}
@@ -170,12 +171,12 @@
   .stage-tag{
     display:inline-flex; align-items:center; gap:8px;
     background:var(--accent-bg); color:var(--accent); font-weight:700;
-    padding:8px 16px; border-radius:999px; font-size:1rem;
+    padding:8px 16px; border-radius:var(--radius); font-size:1rem;
   }
   .stage-now{font-family:var(--font-display); font-size:2.2rem; font-weight:700; line-height:1;}
   .pips{display:flex; gap:8px; flex-wrap:wrap;}
   .pip{
-    width:38px; height:38px; border-radius:10px;
+    width:38px; height:38px; border-radius:var(--radius);
     border:2px solid var(--line); background:var(--surface);
     color:var(--ink-soft); font-size:.95rem; font-weight:700;
     display:flex; align-items:center; justify-content:center;
@@ -190,7 +191,7 @@
   canvas#bmp{
     display:block;
     width:min(62vh, 560px, 100%); height:auto; aspect-ratio:1 / 1;
-    background:#fff; border-radius:8px;
+    background:#fff; border-radius:var(--radius);
     image-rendering:pixelated;
   }
 
@@ -198,7 +199,7 @@
   .peek-tag{
     display:inline-block;
     background:var(--accent-bg); color:var(--accent);
-    font-weight:700; padding:6px 16px; border-radius:999px; font-size:.95rem;
+    font-weight:700; padding:6px 16px; border-radius:var(--radius); font-size:.95rem;
   }
   .peek-box{
     position:fixed; right:20px; bottom:20px;
@@ -239,7 +240,7 @@
   .reveal-cap{color:var(--ink-soft); font-size:1.05rem; text-align:center;}
   .result-note{
     background:var(--core-bg); color:var(--core);
-    border-radius:12px; padding:16px 18px; font-size:1.08rem; font-weight:600; line-height:1.6;
+    border-radius:var(--radius); padding:16px 18px; font-size:1.08rem; font-weight:600; line-height:1.6;
   }
   .result-note.zero{background:var(--omit-bg); color:var(--omit);}
 
@@ -247,12 +248,12 @@
   .definition{font-size:1.3rem; line-height:1.7;}
   .definition b{color:var(--accent);}
   .example-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(240px,1fr)); gap:16px;}
-  .example-card{background:var(--surface-alt); border-radius:12px; padding:18px;}
+  .example-card{background:var(--surface-alt); border-radius:var(--radius); padding:18px;}
   .example-card h3{font-size:1.15rem; margin-bottom:8px; color:var(--accent);}
   .example-card p{color:var(--ink-soft); font-size:.98rem; line-height:1.6;}
   textarea#rankText{
     width:100%; min-height:220px; padding:14px;
-    border:2px solid var(--line); border-radius:12px;
+    border:2px solid var(--line); border-radius:var(--radius);
     background:var(--surface-alt); color:var(--ink);
     font-family:var(--font-body); font-size:1rem; line-height:1.7;
     font-variant-numeric:tabular-nums; resize:vertical;
