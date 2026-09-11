@@ -213,11 +213,6 @@ button:active { background: var(--sg-panel-alt); }
     return this;
   };
 })();
-
-/* Math.hypot 도 오래된 기기에는 없습니다. 공의 속도 계산에 쓰입니다. */
-if (!Math.hypot) {
-  Math.hypot = function (a, b) { return Math.sqrt(a * a + b * b); };
-}
 </script>
 
 <script>
@@ -263,6 +258,61 @@ if (!Math.hypot) {
   var turnTime = 0;
   var best = 1;
 
+  /* ---- 저사양 기기(구형 태블릿·전자칠판) 프레임드랍 대책 ----
+     예전에는 매 프레임마다 벽돌 전부를 다시 그리고, 조준 중에는 예측선을 매번 다시 계산하고,
+     공 하나하나가 서브스텝마다 벽돌 전부와 충돌 검사를 했습니다. 이 셋이 프레임드랍의 원인이라
+     - cells 가 바뀔 때마다 cellsVer 를 올리고, 이를 기준으로 벽돌 그림·예측선을 캐시하며
+     - grid 로 공 근처 칸만 검사합니다(칸당 벽돌 하나이므로 격자 조회로 충분).
+     - 조준 상태에서는 화면이 바뀔 때(needDraw)만 그립니다. */
+  var GRID_ROWS = ROWS_MAX + 2;             // 게임 종료 시 r === ROWS_MAX 까지 올 수 있어 여유를 둠
+  var grid = new Array(GRID_ROWS * COLS);
+  var cellsVer = 0;
+  var needDraw = true;
+
+  function markCells() {
+    cellsVer += 1;
+    needDraw = true;
+    for (var g = 0; g < grid.length; g++) { grid[g] = null; }
+    for (var i = 0; i < cells.length; i++) {
+      var e = cells[i];
+      if (e.r >= 0 && e.r < GRID_ROWS) { grid[e.r * COLS + e.c] = e; }
+    }
+  }
+
+  function removeCell(e) {
+    var i = cells.indexOf(e);
+    if (i >= 0) { cells.splice(i, 1); }
+    markCells();
+  }
+
+  // 공(x, y, 반지름 R)이 걸칠 수 있는 칸만 훑어 처음 만나는 벽돌을 돌려줍니다.
+  // 벽돌은 칸 안쪽으로 GAP/2 만큼 들어가 있어 이웃 칸까지(최대 2×2) 보면 충분합니다.
+  function brickNear(x, y) {
+    var c0 = Math.floor((x - R - MARGIN) / CELLW), c1 = Math.floor((x + R - MARGIN) / CELLW);
+    var r0 = Math.floor((y - R - TOP) / ROWH), r1 = Math.floor((y + R - TOP) / ROWH);
+    if (c0 < 0) { c0 = 0; }
+    if (c1 > COLS - 1) { c1 = COLS - 1; }
+    if (r0 < 0) { r0 = 0; }
+    if (r1 > GRID_ROWS - 1) { r1 = GRID_ROWS - 1; }
+    for (var r = r0; r <= r1; r++) {
+      for (var c = c0; c <= c1; c++) {
+        var e = grid[r * COLS + c];
+        if (e && e.type === "brick" && circleHitsBrick(x, y, e)) { return e; }
+      }
+    }
+    return null;
+  }
+
+  // +1 공 아이템은 칸 중심에서 R+14 안에 들어와야 먹히는데, 그 거리면 공 중심이 그 칸 안에 있습니다.
+  function itemAt(x, y) {
+    var c = Math.floor((x - MARGIN) / CELLW), r = Math.floor((y - TOP) / ROWH);
+    if (c < 0 || c >= COLS || r < 0 || r >= GRID_ROWS) { return null; }
+    var e = grid[r * COLS + c];
+    if (!e || e.type !== "item") { return null; }
+    var ddx = x - (bx(e) + BW / 2), ddy = y - (by(e) + BH / 2);
+    return (ddx * ddx + ddy * ddy < (R + 14) * (R + 14)) ? e : null;
+  }
+
   try {
     var saved = window.localStorage.getItem("brk_best");
     if (saved) { best = parseInt(saved, 10) || 1; }
@@ -296,6 +346,7 @@ if (!Math.hypot) {
     for (var k = 0; k < n; k++) {
       cells.push({ c: pool[k], r: 0, type: "brick", hp: hp });
     }
+    markCells();   // descend() 뒤에는 항상 newRow() 가 오므로 여기서 한 번만 갱신
   }
 
   function descend() {
@@ -314,6 +365,7 @@ if (!Math.hypot) {
     aimed = false;
     state = "aim";
     turnTime = 0;
+    needDraw = true;
     for (var i = 0; i < 3; i++) {
       descend();
       newRow(1);
@@ -343,14 +395,6 @@ if (!Math.hypot) {
     return (dx * dx + dy * dy) <= R * R;
   }
 
-  function anyBrickAt(x, y) {
-    for (var i = 0; i < cells.length; i++) {
-      if (cells[i].type !== "brick") { continue; }
-      if (circleHitsBrick(x, y, cells[i])) { return true; }
-    }
-    return false;
-  }
-
   function predict() {
     // 벽 반사만 계산하고, 블록에 처음 닿는 지점에서 경로를 끝냅니다.
     var pts = [{ x: launchX, y: LAUNCHY, kind: "start" }];
@@ -375,14 +419,7 @@ if (!Math.hypot) {
         pts.push({ x: x, y: y, kind: kind });
         continue;
       }
-      var hit = null;
-      for (var i = 0; i < cells.length; i++) {
-        if (cells[i].type === "brick" && circleHitsBrick(x, y, cells[i])) {
-          hit = cells[i];
-          break;
-        }
-      }
-      if (hit) {
+      if (brickNear(x, y)) {
         // 첫 블록 충돌 지점에서 예측을 끝냅니다.
         break;
       }
@@ -390,6 +427,15 @@ if (!Math.hypot) {
     }
     pts.push({ x: x, y: y, kind: "end" });
     return pts;
+  }
+
+  // 각도·발사 위치·벽돌 배치가 그대로면 지난 프레임의 예측선을 다시 씁니다.
+  var predPts = null, predAim = NaN, predX = NaN, predVer = -1;
+  function predictCached() {
+    if (predPts && predAim === aim && predX === launchX && predVer === cellsVer) { return predPts; }
+    predPts = predict();
+    predAim = aim; predX = launchX; predVer = cellsVer;
+    return predPts;
   }
 
   function speedOf() {
@@ -417,11 +463,13 @@ if (!Math.hypot) {
     turnTime = 0;
     state = "run";
     aimed = false;
+    needDraw = true;
     setMsg("발사 중입니다.");
     syncHud();
   }
 
   function endTurn() {
+    needDraw = true;
     launchX = (firstLanded >= 0) ? firstLanded : launchX;
     nextX = launchX;
     round += 1;
@@ -453,50 +501,44 @@ if (!Math.hypot) {
       }
       return;
     }
-    for (var i = 0; i < cells.length; i++) {
-      var e = cells[i];
-      if (e.type === "item") {
-        var ix = bx(e) + BW / 2, iy = by(e) + BH / 2;
-        var ddx = b.x - ix, ddy = b.y - iy;
-        if (ddx * ddx + ddy * ddy < (R + 14) * (R + 14)) {
-          if (ballCount < 60) { ballCount += 1; }
-          cells.splice(i, 1);
-          syncHud();
-          return;
-        }
-        continue;
-      }
-      if (!circleHitsBrick(b.x, b.y, e)) { continue; }
-      b.free = false;   // 예측선은 첫 벽돌 충돌에서 끝나므로 이후부터 보정 적용
-      var cx = bx(e) + BW / 2, cy = by(e) + BH / 2;
-      var ox = (BW / 2 + R) - Math.abs(b.x - cx);
-      var oy = (BH / 2 + R) - Math.abs(b.y - cy);
-      if (ox < oy) {
-        b.vx = -b.vx;
-        b.x += (b.x < cx) ? -ox : ox;
-      } else {
-        b.vy = -b.vy;
-        b.y += (b.y < cy) ? -oy : oy;
-      }
-      e.hp -= 1;
-      if (e.hp <= 0) { cells.splice(i, 1); }
+    var item = itemAt(b.x, b.y);
+    if (item) {
+      if (ballCount < 60) { ballCount += 1; }
+      removeCell(item);
+      syncHud();
       return;
     }
+    var e = brickNear(b.x, b.y);
+    if (!e) { return; }
+    b.free = false;   // 예측선은 첫 벽돌 충돌에서 끝나므로 이후부터 보정 적용
+    var cx = bx(e) + BW / 2, cy = by(e) + BH / 2;
+    var ox = (BW / 2 + R) - Math.abs(b.x - cx);
+    var oy = (BH / 2 + R) - Math.abs(b.y - cy);
+    if (ox < oy) {
+      b.vx = -b.vx;
+      b.x += (b.x < cx) ? -ox : ox;
+    } else {
+      b.vy = -b.vy;
+      b.y += (b.y < cy) ? -oy : oy;
+    }
+    e.hp -= 1;
+    if (e.hp <= 0) { removeCell(e); } else { cellsVer += 1; }   // 내구도 숫자가 바뀌었으니 벽돌 그림만 갱신(격자는 그대로)
   }
 
   function update(dt) {
     if (state !== "run") { return; }
     turnTime += dt;
+    // 긴 턴을 줄이기 위한 단계형 가속: 7초·12초·18초 이후 각각 가속합니다.
+    var timeBoost = turnTime > 18 ? 1.90 : (turnTime > 12 ? 1.55 : (turnTime > 7 ? 1.25 : 1));
+    var targetSpeed = speedOf() * timeBoost;
     var live = 0;
     for (var i = 0; i < balls.length; i++) {
       var b = balls[i];
       if (!b.alive) { continue; }
       live += 1;
       if (b.delay > 0) { b.delay -= dt; continue; }
-      // 긴 턴을 줄이기 위한 단계형 가속: 7초·12초·18초 이후 각각 가속합니다.
-      var timeBoost = turnTime > 18 ? 1.90 : (turnTime > 12 ? 1.55 : (turnTime > 7 ? 1.25 : 1));
-      var targetSpeed = speedOf() * timeBoost;
-      var currentSpeed = Math.hypot(b.vx, b.vy);
+      // Math.hypot 은 구형 기기에서 매우 느려 sqrt 로 직접 계산합니다(서브스텝마다 호출되는 자리).
+      var currentSpeed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
       if (currentSpeed > 0 && Math.abs(currentSpeed - targetSpeed) > 1) {
         b.vx = b.vx / currentSpeed * targetSpeed;
         b.vy = b.vy / currentSpeed * targetSpeed;
@@ -510,7 +552,7 @@ if (!Math.hypot) {
       var guard = 0;
       while (move > 0 && b.alive && guard < 140) {
         guard += 1;
-        var sp = Math.hypot(b.vx, b.vy);
+        var sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
         if (sp < 1) { break; }
         var st = Math.min(move, 4 / sp);
         b.x += b.vx * st;
@@ -519,7 +561,7 @@ if (!Math.hypot) {
         move -= st;
       }
       if (b.alive && !b.free && turnTime <= 25) {
-        var s2 = Math.hypot(b.vx, b.vy);
+        var s2 = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
         if (Math.abs(b.vy) < s2 * MINVY) {
           var sgn = (b.vy < 0) ? -1 : 1;
           b.vy = sgn * s2 * MINVY;
@@ -536,53 +578,73 @@ if (!Math.hypot) {
     return "hsl(144, 30%, " + l.toFixed(0) + "%)";
   }
 
-  function draw() {
-    ctx.clearRect(0, 0, LW, LH);
+  /* 벽돌 층(테두리·경고선·벽돌·+1 아이템)은 따로 만든 캔버스에 그려 두고,
+     cells 가 바뀌었을 때(cellsVer)만 다시 그립니다. 매 프레임에는 drawImage 한 번이면 됩니다.
+     글자(fillText)와 둥근 사각형 수십 개를 매 프레임 그리던 것이 저사양 기기 프레임드랍의 가장 큰 원인이었습니다. */
+  var layer = document.createElement("canvas");
+  layer.width = LW; layer.height = LH;
+  var lctx = layer.getContext("2d");
+  var layerVer = -1;
 
-    ctx.strokeStyle = "#E4E8DE";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(MARGIN - 2, TOPWALL, LW - (MARGIN - 2) * 2, LAUNCHY - TOPWALL);
+  function drawLayer() {
+    lctx.clearRect(0, 0, LW, LH);
 
-    ctx.setLineDash([7, 7]);
-    ctx.strokeStyle = "#dc2626";
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(MARGIN, DEADLINE);
-    ctx.lineTo(LW - MARGIN, DEADLINE);
-    ctx.stroke();
-    ctx.setLineDash([]);
+    lctx.strokeStyle = "#E4E8DE";
+    lctx.lineWidth = 2;
+    lctx.strokeRect(MARGIN - 2, TOPWALL, LW - (MARGIN - 2) * 2, LAUNCHY - TOPWALL);
 
-    for (var i = 0; i < cells.length; i++) {
-      var e = cells[i];
-      var x = bx(e), y = by(e);
-      if (e.type === "brick") {
-        ctx.fillStyle = brickColor(e.hp);
-        ctx.beginPath();
-        ctx.roundRect(x, y, BW, BH, 5);
-        ctx.fill();
-        if (e.r === ROWS_MAX - 1) {
-          ctx.strokeStyle = "#dc2626";
-          ctx.lineWidth = 2;
-          ctx.stroke();
-        }
-        ctx.fillStyle = "#ffffff";
-        ctx.font = "600 21px 'Nanum Gothic', 'Malgun Gothic', sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(String(e.hp), x + BW / 2, y + BH / 2 + 1);
-      } else {
-        ctx.strokeStyle = "#15803d";
-        ctx.lineWidth = 2.5;
-        ctx.beginPath();
-        ctx.arc(x + BW / 2, y + BH / 2, 15, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.fillStyle = "#15803d";
-        ctx.font = "600 14px 'Nanum Gothic', 'Malgun Gothic', sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText("+1", x + BW / 2, y + BH / 2 + 1);
+    lctx.setLineDash([7, 7]);
+    lctx.strokeStyle = "#dc2626";
+    lctx.lineWidth = 1.5;
+    lctx.beginPath();
+    lctx.moveTo(MARGIN, DEADLINE);
+    lctx.lineTo(LW - MARGIN, DEADLINE);
+    lctx.stroke();
+    lctx.setLineDash([]);
+
+    lctx.textAlign = "center";
+    lctx.textBaseline = "middle";
+
+    // 벽돌: 글꼴 설정(ctx.font)은 비싸므로 종류별로 한 번만 합니다.
+    lctx.font = "600 21px 'Nanum Gothic', 'Malgun Gothic', sans-serif";
+    var i, e, x, y;
+    for (i = 0; i < cells.length; i++) {
+      e = cells[i];
+      if (e.type !== "brick") { continue; }
+      x = bx(e); y = by(e);
+      lctx.fillStyle = brickColor(e.hp);
+      lctx.beginPath();
+      lctx.roundRect(x, y, BW, BH, 5);
+      lctx.fill();
+      if (e.r === ROWS_MAX - 1) {
+        lctx.strokeStyle = "#dc2626";
+        lctx.lineWidth = 2;
+        lctx.stroke();
       }
+      lctx.fillStyle = "#ffffff";
+      lctx.fillText(String(e.hp), x + BW / 2, y + BH / 2 + 1);
     }
+
+    // +1 공 아이템
+    lctx.font = "600 14px 'Nanum Gothic', 'Malgun Gothic', sans-serif";
+    lctx.strokeStyle = "#15803d";
+    lctx.fillStyle = "#15803d";
+    lctx.lineWidth = 2.5;
+    for (i = 0; i < cells.length; i++) {
+      e = cells[i];
+      if (e.type !== "item") { continue; }
+      x = bx(e) + BW / 2; y = by(e) + BH / 2;
+      lctx.beginPath();
+      lctx.arc(x, y, 15, 0, Math.PI * 2);
+      lctx.stroke();
+      lctx.fillText("+1", x, y + 1);
+    }
+  }
+
+  function draw() {
+    if (layerVer !== cellsVer) { drawLayer(); layerVer = cellsVer; }
+    ctx.clearRect(0, 0, LW, LH);
+    ctx.drawImage(layer, 0, 0);
 
     if (state === "aim") {
       ctx.fillStyle = "#8A978C";
@@ -590,27 +652,25 @@ if (!Math.hypot) {
       ctx.arc(nextX, LAUNCHY, R, 0, Math.PI * 2);
       ctx.fill();
       if (aimed) {
-        var pts = predict();
+        var pts = predictCached();
         // 예상 경로는 점선 하나로만 표시합니다.
-        for (var p = 1; p < pts.length; p++) {
-          var prior = pts[p - 1];
-          var now = pts[p];
-          ctx.setLineDash([9, 9]);
-          ctx.strokeStyle = "rgba(37, 99, 235, 0.75)";
-          ctx.lineWidth = 3;
-          ctx.beginPath();
-          ctx.moveTo(prior.x, prior.y);
-          ctx.lineTo(now.x, now.y);
-          ctx.stroke();
-          if (now.kind === "wall") {
-            ctx.setLineDash([]);
-            ctx.fillStyle = "#24402F";
-            ctx.beginPath();
-            ctx.arc(now.x, now.y, 4.5, 0, Math.PI * 2);
-            ctx.fill();
-          }
-        }
+        ctx.setLineDash([9, 9]);
+        ctx.strokeStyle = "rgba(37, 99, 235, 0.75)";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (var p = 1; p < pts.length; p++) { ctx.lineTo(pts[p].x, pts[p].y); }
+        ctx.stroke();
         ctx.setLineDash([]);
+        // 벽에 닿는 지점 표시
+        ctx.fillStyle = "#24402F";
+        ctx.beginPath();
+        for (var q = 1; q < pts.length; q++) {
+          if (pts[q].kind !== "wall") { continue; }
+          ctx.moveTo(pts[q].x + 4.5, pts[q].y);
+          ctx.arc(pts[q].x, pts[q].y, 4.5, 0, Math.PI * 2);
+        }
+        ctx.fill();
         var last = pts[pts.length - 1];
         ctx.strokeStyle = "#24402F";
         ctx.lineWidth = 2.5;
@@ -624,14 +684,16 @@ if (!Math.hypot) {
       ctx.fill();
     }
 
+    // 공은 한 경로에 모아 fill 한 번으로 그립니다(공 60개면 호출 60번 → 1번).
+    ctx.fillStyle = "#24402F";
+    ctx.beginPath();
     for (var k = 0; k < balls.length; k++) {
       var b = balls[k];
       if (!b.alive || b.delay > 0) { continue; }
-      ctx.fillStyle = "#24402F";
-      ctx.beginPath();
+      ctx.moveTo(b.x + R, b.y);
       ctx.arc(b.x, b.y, R, 0, Math.PI * 2);
-      ctx.fill();
     }
+    ctx.fill();
 
     if (state === "over") {
       ctx.fillStyle = "rgba(255,255,255,0.9)";
@@ -646,6 +708,7 @@ if (!Math.hypot) {
       ctx.stroke();
       ctx.fillStyle = "#1B2B20";
       ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
       ctx.font = "600 30px 'Nanum Gothic', 'Malgun Gothic', sans-serif";
       ctx.fillText("게임 종료", LW / 2, LH / 2 - 16);
       ctx.font = "18px 'Nanum Gothic', 'Malgun Gothic', sans-serif";
@@ -664,7 +727,11 @@ if (!Math.hypot) {
     prev = ts;
     tickAim(dt);
     update(dt);
-    draw();
+    // 공이 움직이는 동안은 매 프레임, 그 외(조준·종료)에는 화면이 바뀌었을 때만 그립니다.
+    if (state === "run" || needDraw) {
+      needDraw = false;
+      draw();
+    }
   }
 
   function toLocal(ev) {
@@ -685,6 +752,7 @@ if (!Math.hypot) {
     if (a < -MAXA) { a = -MAXA; }
     aim = a;
     aimed = true;
+    needDraw = true;
     setMsg("각도 " + fmtAim() + "° · 발사 버튼을 누르세요.");
   }
 
@@ -730,6 +798,7 @@ if (!Math.hypot) {
     if (a < -MAXA) { a = -MAXA; }
     aim = a;
     aimed = true;
+    needDraw = true;
     setMsg("각도 " + fmtAim() + "°");
   }
 
@@ -834,6 +903,11 @@ if (!Math.hypot) {
     window.parent.postMessage({ type: "wrks:viz:resize", height: h }, "*");
   }
   window.addEventListener("resize", postH);
+
+  // 벽돌 층은 캐시되므로, 나눔고딕 웹 글꼴이 뒤늦게 로드되면 한 번 다시 그려 글꼴을 맞춥니다.
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(function () { layerVer = -1; needDraw = true; });
+  }
 
   reset();
   window.requestAnimationFrame(loop);
