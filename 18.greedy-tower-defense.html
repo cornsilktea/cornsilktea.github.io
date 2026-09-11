@@ -139,13 +139,17 @@
   .hint{font-size:12px;color:var(--sub);margin-top:9px;line-height:1.5;}
 
   /* ---------- 오버레이 화면 ---------- */
+  /* 카드가 화면보다 길면(휴대폰) align-items:center 는 위쪽을 잘라 스크롤로도 못 보게 하므로
+     margin:auto 로 가운데 맞춤 — 작으면 가운데, 크면 위에서부터 스크롤.
+     위 여백은 접근 가드의 '← 목록으로' 버튼, 아래 여백은 저작권 표시에 버튼이 가려지지 않게 둡니다. */
   .screen{
     position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(232,239,247,.94);backdrop-filter:blur(3px);
-    display:flex;align-items:center;justify-content:center;padding:16px;z-index:30;overflow-y:auto;
+    display:flex;padding:calc(52px + env(safe-area-inset-top, 0px)) 16px calc(40px + env(safe-area-inset-bottom, 0px));
+    z-index:30;overflow-y:auto;-webkit-overflow-scrolling:touch;
   }
   .card{
     background:var(--panel);border:1px solid var(--line);border-radius:var(--sg-radius);
-    padding:22px;max-width:540px;width:100%;box-shadow:0 10px 40px rgba(31,45,61,.14);
+    padding:22px;max-width:540px;width:100%;margin:auto;flex:0 0 auto;box-shadow:0 10px 40px rgba(31,45,61,.14);
   }
   .card h1{font-size:23px;margin:0 0 4px;letter-spacing:-.02em;}
   .card .lead{font-size:14px;color:var(--sub);margin:0 0 4px;}
@@ -1207,7 +1211,7 @@ function drawBalloon(b){
 
   // 중앙 숫자 : 남은 체력(=터뜨리려면 더 줘야 하는 데미지)
   var hpTxt=String(Math.ceil(b.hp));
-  ctx.font='800 '+(b.type==='boss'?16:(hpTxt.length>2?10:11.5))+'px 'Nanum Gothic', 'Malgun Gothic', sans-serif';
+  ctx.font='800 '+(b.type==='boss'?16:(hpTxt.length>2?10:11.5))+'px "Nanum Gothic", "Malgun Gothic", sans-serif';
   ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.lineWidth=3; ctx.lineJoin='round'; ctx.strokeStyle='rgba(0,0,0,0.55)';
   ctx.strokeText(hpTxt, 0, 1);
@@ -1218,7 +1222,7 @@ function drawBalloon(b){
     ctx.beginPath();
     ctx.moveTo(-13,-r+3); ctx.lineTo(-9,-r-8); ctx.lineTo(-4.5,-r); ctx.lineTo(0,-r-11);
     ctx.lineTo(4.5,-r); ctx.lineTo(9,-r-8); ctx.lineTo(13,-r+3); ctx.closePath(); ctx.fill();
-    ctx.font='800 11px 'Nanum Gothic', 'Malgun Gothic', sans-serif';           // 방어력 배지
+    ctx.font='800 11px "Nanum Gothic", "Malgun Gothic", sans-serif';           // 방어력 배지
     ctx.fillStyle='rgba(0,0,0,0.5)'; roundRect(-19,r*0.35,38,15,7); ctx.fill();
     ctx.fillStyle='#ffe9a8'; ctx.fillText('방어 '+b.armor, 0, r*0.35+8);
   }
@@ -1291,7 +1295,7 @@ function drawEffects(){
       ctx.beginPath(); ctx.arc(e.x,e.y,30*(1.4-a),0,6.2832); ctx.stroke();
     }else if(e.k==='text'){
       ctx.globalAlpha=Math.min(1,a*1.6);
-      ctx.font='800 14px 'Nanum Gothic', 'Malgun Gothic', sans-serif';
+      ctx.font='800 14px "Nanum Gothic", "Malgun Gothic", sans-serif';
       ctx.fillStyle='rgba(255,255,255,0.9)';
       ctx.fillText(e.s, e.x, e.y-(1-a)*16+1);
       ctx.fillStyle=e.c;
@@ -1326,7 +1330,7 @@ function draw(){
     ctx.fillStyle='rgba(31,45,61,0.72)';
     var bw=Math.min(MAP.w*0.62,330), bh=34;
     roundRect(MAP.w/2-bw/2, 12, bw, bh, 10); ctx.fill();
-    ctx.fillStyle='#fff'; ctx.font='800 15px 'Nanum Gothic', 'Malgun Gothic', sans-serif';
+    ctx.fillStyle='#fff'; ctx.font='800 15px "Nanum Gothic", "Malgun Gothic", sans-serif';
     ctx.fillText('Wave '+G.wave+' 대기 중 — [시작] 버튼을 누르세요', MAP.w/2, 12+bh/2+1);
   }
 }
