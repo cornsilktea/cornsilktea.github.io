@@ -182,14 +182,14 @@
 <div class="screen" id="startScreen">
   <div class="card">
     <h1>🎈 풍선 타워 디펜스</h1>
-    <p class="lead">그리디 알고리즘(탐욕 알고리즘)과 자원 최적화를 체험하는 게임입니다. 20웨이브를 막아내세요.</p>
+    <p class="lead">그리디 알고리즘(탐욕 알고리즘)과 자원 최적화를 체험하는 게임입니다. 40웨이브를 막아내세요. 20웨이브까지는 기본, 그 뒤부터는 효율이 승부를 가릅니다.</p>
     <h2>규칙</h2>
     <ul class="rules">
       <li>골드는 <b>풍선을 하나 터뜨릴 때마다</b> 조금씩 들어옵니다. 놓친 풍선의 골드는 받지 못합니다.</li>
       <li>한 번 지은 타워는 <b>팔거나 옮길 수 없습니다.</b> (되돌릴 수 없는 선택)</li>
       <li>타워마다 <b>효율(DPS ÷ 비용)</b>이 다릅니다. 지금 싼 타워를 여러 개 지을지, 모아서 상위 타워를 지을지 스스로 판단하세요.</li>
       <li>보스 풍선은 <b>방어력</b>이 있어 한 발당 데미지에서 방어력만큼 빠집니다. <b>보스를 놓치면 즉시 게임 오버</b>됩니다! (타워는 사거리 안에 보스가 있으면 보스를 먼저 쏩니다)</li>
-      <li>타워는 <b>최대 26개</b>까지만 지을 수 있습니다. 싼 타워로 칸을 다 채우면 나중에 강한 타워를 놓을 자리가 없습니다.</li>
+      <li>타워는 <b>최대 40개</b>까지만 지을 수 있습니다. 싼 타워로 칸을 다 채우면 나중에 강한 타워를 놓을 자리가 없습니다.</li>
       <li>웨이브는 <b>[시작] 버튼</b>을 눌러야 시작됩니다. 그 전에 타워를 배치하세요.</li>
     </ul>
     <div class="btnrow">
@@ -216,7 +216,7 @@
 <!-- ================= 게임 화면 ================= -->
 <div class="wrap">
   <div class="topbar">
-    <div class="stat"><span class="ic">🌊</span><span class="tx"><span class="k">웨이브</span><span class="v" id="uiWave">1 / 20</span></span></div>
+    <div class="stat"><span class="ic">🌊</span><span class="tx"><span class="k">웨이브</span><span class="v" id="uiWave">1 / 40</span></span></div>
     <div class="stat life"><span class="ic">❤️</span><span class="tx"><span class="k">목숨</span><span class="v" id="uiLife">15</span></span></div>
     <div class="stat gold"><span class="ic">🪙</span><span class="tx"><span class="k">골드</span><span class="v" id="uiGold">0</span></span></div>
     <div class="stat"><span class="ic">📊</span><span class="tx"><span class="k">효율 점수</span><span class="v" id="uiScore">0</span></span></div>
@@ -235,7 +235,7 @@
 
     <div class="right">
       <div class="panel">
-        <div class="ph"><h2>타워 구매</h2><span class="sub">효율 = DPS ÷ 비용 · <span id="uiTowerCount">0/26</span>칸</span></div>
+        <div class="ph"><h2>타워 구매</h2><span class="sub">효율 = DPS ÷ 비용 · <span id="uiTowerCount">0/40</span>칸</span></div>
         <div class="towers" id="towerList"></div>
       </div>
       <div class="panel">
@@ -252,7 +252,7 @@
 var CONFIG = {
   START_LIFE: 15,
   START_GOLD: 120,
-  MAX_TOWERS: 26,
+  MAX_TOWERS: 40,
   MAX_BALLOONS: 60,
   MAX_PROJ: 120,
   MAX_EFFECTS: 80,
@@ -291,12 +291,15 @@ var BTYPE = {
 /* ---- 웨이브 구성 ---- */
 function g(t,n,hp,gap,start){ return {t:t,n:n,hp:hp,gap:gap,start:start||0}; }
 var WAVES = [
+  /* --- 1~6 관대한 구간 --- */
   /* 1 */ { gold:80,  groups:[ g('red',8,30,0.50) ] },
   /* 2 */ { gold:85,  groups:[ g('red',10,34,0.45) ] },
   /* 3 */ { gold:90,  groups:[ g('red',8,38,0.45), g('blue',4,50,0.50,3.5) ] },
   /* 4 */ { gold:95,  groups:[ g('red',10,46,0.40), g('yellow',6,32,0.35,4) ] },
   /* 5 */ { gold:105, groups:[ g('red',8,50,0.40), g('blue',5,60,0.45,3) ], boss:{hp:300,armor:1,start:1} },
   /* 6 */ { gold:110, groups:[ g('red',10,60,0.38), g('yellow',8,40,0.30,3.5) ] },
+
+  /* --- 7~14 중간 구간 --- */
   /* 7 */ { gold:90,  groups:[ g('red',10,80,0.35), g('blue',8,90,0.40,3) ] },
   /* 8 */ { gold:90,  groups:[ g('red',12,86,0.33), g('yellow',10,58,0.28,3.5) ] },
   /* 9 */ { gold:100, groups:[ g('blue',12,104,0.35), g('yellow',10,68,0.28,4) ] },
@@ -305,12 +308,42 @@ var WAVES = [
   /*12 */ { gold:120, groups:[ g('red',12,110,0.30), g('blue',8,130,0.35,3.5) ] },
   /*13 */ { gold:130, groups:[ g('yellow',14,85,0.24), g('blue',10,146,0.32,3) ] },
   /*14 */ { gold:135, groups:[ g('red',12,146,0.30), g('yellow',12,94,0.24,3.5) ] },
+
+  /* --- 15~20 엄격한 구간 : 3티어 없이는 버티기 어렵다 --- */
   /*15 */ { gold:165, groups:[ g('blue',10,145,0.30), g('yellow',10,98,0.24,3) ], boss:{hp:1100,armor:3,start:1} },
   /*16 */ { gold:180, groups:[ g('blue',14,152,0.28), g('yellow',12,115,0.22,3.5) ] },
   /*17 */ { gold:195, groups:[ g('red',14,152,0.26), g('blue',10,166,0.30,3.5) ] },
   /*18 */ { gold:210, groups:[ g('blue',12,180,0.27), g('yellow',16,122,0.20,3) ] },
   /*19 */ { gold:225, groups:[ g('red',14,180,0.25), g('blue',10,198,0.28,3.5) ] },
-  /*20 */ { gold:240, groups:[ g('red',8,170,0.28), g('blue',8,176,0.30,2.5), g('yellow',8,120,0.20,5) ], boss:{hp:1400,armor:4,start:1} }
+  /*20 */ { gold:240, groups:[ g('red',8,170,0.28), g('blue',8,176,0.30,2.5), g('yellow',8,120,0.20,5) ], boss:{hp:1400,armor:4,start:1} },
+
+  /* --- 21~25 : 20웨이브 클리어 실력이면 통과 --- */
+  /*21 */ { gold:255, groups:[ g('red',14,200,0.25), g('blue',12,215,0.28,3) ] },
+  /*22 */ { gold:270, groups:[ g('blue',14,225,0.26), g('yellow',18,150,0.18,3) ] },
+  /*23 */ { gold:285, groups:[ g('red',16,235,0.24), g('blue',12,250,0.27,3.5) ] },
+  /*24 */ { gold:300, groups:[ g('yellow',20,170,0.17), g('blue',12,270,0.26,3) ] },
+  /*25 */ { gold:330, groups:[ g('red',10,260,0.26), g('blue',10,280,0.28,2.5) ], boss:{hp:2600,armor:5,start:1} },
+
+  /* --- 26~30 : 어느 정도 효율(3티어 여러 개)이 있어야 통과 --- */
+  /*26 */ { gold:330, groups:[ g('blue',16,264,0.25), g('yellow',16,176,0.17,3) ] },
+  /*27 */ { gold:350, groups:[ g('red',16,282,0.23), g('blue',12,290,0.26,3) ] },
+  /*28 */ { gold:370, groups:[ g('yellow',22,198,0.16), g('blue',12,308,0.25,3) ] },
+  /*29 */ { gold:390, groups:[ g('red',16,317,0.22), g('blue',14,326,0.25,3) ] },
+  /*30 */ { gold:420, groups:[ g('red',10,308,0.25), g('blue',10,334,0.27,2.5), g('yellow',10,229,0.18,5) ], boss:{hp:3700,armor:6,start:1} },
+
+  /* --- 31~35 : 효율적인 플레이(칸당 DPS·배치)를 해야 통과 --- */
+  /*31 */ { gold:420, groups:[ g('blue',18,308,0.23), g('yellow',18,210,0.16,3) ] },
+  /*32 */ { gold:440, groups:[ g('red',18,330,0.21), g('blue',14,338,0.24,3) ] },
+  /*33 */ { gold:460, groups:[ g('yellow',24,233,0.15), g('blue',14,360,0.23,3) ] },
+  /*34 */ { gold:480, groups:[ g('red',18,375,0.20), g('blue',16,383,0.23,3) ] },
+  /*35 */ { gold:520, groups:[ g('red',12,360,0.24), g('blue',12,390,0.26,2.5), g('yellow',12,263,0.17,5) ], boss:{hp:4900,armor:8,start:1} },
+
+  /* --- 36~40 : 최고 효율의 플레이만 통과 --- */
+  /*36 */ { gold:520, groups:[ g('blue',20,325,0.22), g('yellow',20,220,0.15,3) ] },
+  /*37 */ { gold:540, groups:[ g('red',20,348,0.20), g('blue',16,360,0.22,3) ] },
+  /*38 */ { gold:560, groups:[ g('yellow',26,244,0.14), g('blue',16,383,0.22,3) ] },
+  /*39 */ { gold:580, groups:[ g('red',20,406,0.19), g('blue',18,418,0.21,3) ] },
+  /*40 */ { gold:650, groups:[ g('red',14,406,0.22), g('blue',14,429,0.24,2.5), g('yellow',14,290,0.16,5) ], boss:{hp:5800,armor:10,start:1} }
 ];
 var TOTAL_WAVES = WAVES.length;
 
@@ -1260,7 +1293,7 @@ function gameOver(cleared){
   var score=Math.round(G.score);
   var effPerGold = G.goldSpent>0 ? G.score/G.goldSpent : 0;
 
-  document.getElementById('endTitle').textContent = cleared? '🏆 20웨이브 클리어!' : '💥 게임 오버 (Wave '+G.wave+')';
+  document.getElementById('endTitle').textContent = cleared? '🏆 40웨이브 클리어!' : '💥 게임 오버 (Wave '+G.wave+')';
   document.getElementById('endLead').textContent = cleared
     ? '끝까지 방어에 성공했습니다.'
     : (G.bossEscaped ? '보스 풍선을 놓쳐 즉시 게임이 종료되었습니다!' : '목숨이 모두 떨어졌습니다.');
@@ -1290,7 +1323,7 @@ function makeFeedback(cleared, e){
   }
   if(e>=0.42){
     return head+'<b>효율과 저축을 함께 잡은 균형 전략</b>입니다. 평소엔 효율 좋은 타워로 잔챙이를 처리하고 보스용으로 상위 타워를 모아 지은 선택이 데이터로 드러납니다.'
-      +(cleared? ' 20웨이브 클리어 성공!' : '');
+      +(cleared? ' 40웨이브 클리어 성공!' : '');
   }
   return head+'<b>저축형</b> 플레이입니다. 골드당 평균 효율은 낮지만 한 발당 데미지가 커서 보스 구간에 강합니다. '
     +(cleared? '저축 전략이 후반을 버티게 해 주었습니다.' : '다만 초반 물량 방어가 얇아 목숨을 잃었습니다. 효율 좋은 저가 타워도 함께 섞어 보세요.');
