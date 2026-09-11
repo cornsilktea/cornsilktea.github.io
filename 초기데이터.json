@@ -36,6 +36,15 @@
         "unitsSet": true,
         "url": "17.alkkagi.html"
       },
+      "baseball": {
+        "memo": "타이밍 판정 · 구종별 궤적 / 20구 개인전",
+        "open": true,
+        "order": 19,
+        "title": "야구 타격",
+        "units": [],
+        "unitsSet": false,
+        "url": "20.baseball.html"
+      },
       "bitmapquiz": {
         "memo": "",
         "open": true,

@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<script charset="utf-8" src="firebase-config.js"></script>
+<script charset="utf-8" src="access-guard.js" data-game="baseball"></script>
+<meta charset="utf-8">
+<link rel="stylesheet" href="theme.css">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
+<title>야구 타격</title>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="정보 수업용 링크 모음">
+<meta property="og:title" content="야구 타격">
+<meta property="og:description" content="타이밍 판정 · 구종별 궤적 / 20구 개인전">
+<meta property="og:url" content="https://cornsilktea.github.io/20.baseball.html">
+<meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
+<meta name="twitter:card" content="summary">
+<!-- 링크 미리보기 끝 -->
+<style>
+  :root{
+    --bg:var(--sg-bg);
+    --panel:var(--sg-panel);
+    --line:var(--sg-line-mid);
+    --text:var(--sg-ink);
+    --sub:var(--sg-ink-soft);
+    --tone:var(--sg-panel-alt);
+    --tone-line:var(--sg-line-mid);
+    --primary:var(--sg-primary);
+    --accent:#D97B4F;         /* 보색: 강조 한 곳에만 */
+    --radius:var(--sg-radius);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:var(--sg-font);font-size:16px;line-height:1.45;overscroll-behavior:none}
+  button{font:inherit;color:inherit;cursor:pointer;border:none;background:none;padding:0;user-select:none}
+  button:disabled{cursor:default}
+  .wrap{max-width:960px;margin:0 auto;padding:8px 10px 34px}
+
+  /* ---------- 상단 스코어보드 (모든 칸 동일 크기·색) ---------- */
+  .hud{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:8px}
+  .hud .c{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:6px 4px;text-align:center;min-width:0}
+  .hud .k{display:block;font-size:11px;color:var(--sub);white-space:nowrap}
+  .hud .v{display:block;font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  @media (max-width:479px){.hud .v{font-size:15px}.hud .k{font-size:10px}}
+
+  /* ---------- 경기장 무대 ---------- */
+  .stage{position:relative;width:100%;height:clamp(380px,calc(100vh - 250px),640px);
+    border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:#8fc5ec;user-select:none}
+  .stage svg.field{position:absolute;inset:0;width:100%;height:100%;display:block}
+
+  /* 캐릭터 자리 — 이미지가 있으면 <img>, 없으면 임시 도형 */
+  .slot{position:absolute;pointer-events:none}
+  .slot img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;object-position:bottom center;display:none}
+  .slot.has-img img.cur{display:block}
+  .slot .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:2px;
+    border:2px dashed rgba(27,43,32,.55);border-radius:6px;background:rgba(255,255,255,.35);color:#1B2B20;font-weight:700;text-align:center}
+  .slot.has-img .ph{display:none}
+  .slot .ph small{font-weight:400;font-size:11px;color:#3B4B40}
+  #pitcher{left:50%;top:19%;width:13%;height:22%;transform:translateX(-50%);min-width:56px}
+  #pitcher .ph{font-size:13px}
+  #batter{right:2%;bottom:16%;width:30%;height:46%;min-width:120px;max-width:260px}
+  #batter .ph{font-size:16px}
+  .fielder{position:absolute;width:5%;min-width:22px;max-width:34px;pointer-events:none;opacity:.95}
+
+  /* 공 */
+  #ball{position:absolute;left:0;top:0;width:12px;height:12px;border-radius:50%;background:#fff;
+    border:1px solid #b9b9b9;box-shadow:0 1px 2px rgba(0,0,0,.35);display:none;will-change:transform;
+    background-image:radial-gradient(circle at 35% 30%,#fff 0 40%,#e8e8e8 70%);z-index:3}
+  #ball::after{content:"";position:absolute;inset:18% 30%;border-radius:50%;border:1px solid transparent;border-left-color:#c2453d;border-right-color:#c2453d;opacity:.8}
+  #shadow{position:absolute;width:12px;height:5px;border-radius:50%;background:rgba(0,0,0,.28);display:none;z-index:2}
+
+  /* 판정 문구 */
+  #call{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;
+    opacity:0;transition:opacity .15s;z-index:5}
+  #call.on{opacity:1}
+  #call .g{display:inline-block;font-size:clamp(22px,5vw,36px);font-weight:800;color:#fff;
+    background:rgba(27,43,32,.78);border-radius:var(--radius);padding:4px 16px;line-height:1.3}
+  #call .d{display:block;margin-top:4px;font-size:clamp(12px,2.6vw,15px);font-weight:700;color:#fff;
+    background:rgba(27,43,32,.6);border-radius:var(--radius);padding:2px 10px}
+
+  /* 타이밍 게이지 (홈플레이트 아래) */
+  .gauge{position:absolute;left:50%;bottom:3%;transform:translateX(-50%);width:62%;max-width:420px;z-index:4}
+  .gauge .bar{position:relative;height:14px;border-radius:7px;border:1px solid rgba(255,255,255,.7);box-shadow:0 1px 3px rgba(0,0,0,.35);
+    background:linear-gradient(90deg,#c8453f 0%,#e8892b 22%,#f2c94c 36%,#2f8f5b 44%,#2f8f5b 56%,#f2c94c 64%,#e8892b 78%,#c8453f 100%)}
+  .gauge .mid{position:absolute;left:50%;top:-3px;bottom:-3px;width:2px;background:rgba(255,255,255,.85);transform:translateX(-50%)}
+  .gauge .mk{position:absolute;top:-6px;width:6px;height:26px;border-radius:3px;background:#1B2B20;border:2px solid #fff;
+    transform:translateX(-50%);left:50%;display:none;box-shadow:0 1px 3px rgba(0,0,0,.4);transition:left .2s}
+  .gauge .mk.on{display:block}
+  .gauge .lb{display:flex;justify-content:space-between;font-size:11px;font-weight:700;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6);margin-top:3px}
+  .gauge .lb b{font-weight:800}
+  #gaugeText{text-align:center;flex:1}
+
+  /* 스윙 버튼 */
+  .swing{display:flex;align-items:center;justify-content:center;width:100%;height:clamp(64px,12vh,96px);margin-top:8px;
+    border-radius:var(--radius);background:var(--panel);border:1px solid var(--line);font-size:clamp(22px,5vw,30px);font-weight:800;letter-spacing:4px}
+  .swing:active:not(:disabled){background:var(--tone)}
+  .swing:disabled{opacity:.45}
+
+  /* ---------- 시작·결과 화면 ---------- */
+  .overlay{position:fixed;inset:0;z-index:20;background:rgba(27,43,32,.55);display:none;overflow:auto;padding:56px 12px 40px}
+  .overlay.on{display:flex}
+  .card{margin:auto;width:100%;max-width:520px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px}
+  h1{font-size:22px;margin:0 0 6px}
+  h2{font-size:18px;margin:0 0 6px}
+  p{margin:6px 0}
+  .sub{color:var(--sub);font-size:14px}
+  .steps{display:grid;gap:6px;margin:10px 0;padding:0;list-style:none}
+  .steps li{background:var(--tone);border:1px solid var(--tone-line);border-radius:var(--radius);padding:8px 10px;font-size:14px}
+  .tbl{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+  .tbl td,.tbl th{border:1px solid var(--line);padding:5px 6px;text-align:center}
+  .tbl th{background:var(--tone);font-weight:600}
+  .btn{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 16px;width:100%;margin-top:12px;
+    border-radius:var(--radius);background:var(--tone);border:1px solid var(--tone-line);font-weight:700;font-size:16px}
+  .btn:active{filter:brightness(.94)}
+  .stats{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:10px}
+  .stats .c{background:var(--tone);border:1px solid var(--tone-line);border-radius:var(--radius);padding:8px;text-align:center}
+  .stats .k{display:block;font-size:12px;color:var(--sub)}
+  .stats .v{display:block;font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
+  .total{margin-top:10px;background:var(--tone);border:1px solid var(--tone-line);border-radius:var(--radius);padding:10px;text-align:center}
+  .total .k{display:block;font-size:13px;color:var(--sub)}
+  .total .v{display:block;font-size:32px;font-weight:800;font-variant-numeric:tabular-nums}
+  .best-box{display:flex;align-items:center;gap:12px;margin-top:12px;padding:10px 12px;border-radius:var(--radius);
+    background:var(--tone);border:1px solid var(--tone-line)}
+  .best-box .bi{width:40px;height:40px;flex:none;border-radius:var(--radius);display:flex;align-items:center;justify-content:center;
+    font-size:20px;background:var(--panel);border:1px solid var(--tone-line)}
+  .best-box .bt{flex:1;min-width:0}
+  .best-box .bk{display:block;font-size:12px;font-weight:700;color:var(--sub)}
+  .best-box .bv{display:block;font-size:18px;font-weight:800;font-variant-numeric:tabular-nums}
+  .best-box .bd{display:block;font-size:12px;color:var(--sub)}
+  .best-box.new{border-color:var(--accent)}
+  .newtag{display:inline-block;font-size:10.5px;font-weight:800;color:#fff;background:var(--accent);
+    border-radius:999px;padding:1px 8px;margin-left:6px;vertical-align:1px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <!-- 스코어보드 -->
+  <div class="hud">
+    <div class="c"><span class="k">투구</span><span class="v" id="hudPitch">0 / 20</span></div>
+    <div class="c"><span class="k">구속 km/h</span><span class="v" id="hudSpeed">-</span></div>
+    <div class="c"><span class="k">점수</span><span class="v" id="hudScore">0</span></div>
+    <div class="c"><span class="k">연속 홈런</span><span class="v" id="hudCombo">0</span></div>
+    <div class="c"><span class="k">최고 기록</span><span class="v" id="hudBest">-</span></div>
+  </div>
+
+  <!-- 경기장 -->
+  <div class="stage" id="stage">
+    <svg class="field" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+      <defs>
+        <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#5aa5e6"/><stop offset="1" stop-color="#c9e6fb"/>
+        </linearGradient>
+        <linearGradient id="grass" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#4f9a45"/><stop offset="1" stop-color="#2f7d3a"/>
+        </linearGradient>
+        <linearGradient id="dirt" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#c9a069"/><stop offset="1" stop-color="#b3865a"/>
+        </linearGradient>
+        <linearGradient id="stand" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#8a95a3"/><stop offset="1" stop-color="#5f6a78"/>
+        </linearGradient>
+        <pattern id="crowd" width="2" height="1.6" patternUnits="userSpaceOnUse">
+          <circle cx=".5" cy=".5" r=".45" fill="#d97b4f" opacity=".55"/>
+          <circle cx="1.5" cy="1.1" r=".45" fill="#e6d3a3" opacity=".55"/>
+        </pattern>
+      </defs>
+      <!-- 하늘 -->
+      <rect x="0" y="0" width="100" height="40" fill="url(#sky)"/>
+      <!-- 구름 -->
+      <g fill="#fff" opacity=".85">
+        <ellipse cx="14" cy="9" rx="7" ry="2.2"/><ellipse cx="18" cy="7.6" rx="4" ry="2"/>
+        <ellipse cx="72" cy="6" rx="8" ry="2.4"/><ellipse cx="77" cy="4.6" rx="4.5" ry="2.2"/>
+        <ellipse cx="40" cy="13" rx="5" ry="1.6"/>
+      </g>
+      <!-- 원경 건물 -->
+      <g fill="#7c8aa0">
+        <rect x="3" y="20" width="6" height="9"/><rect x="10" y="16" width="4" height="13"/><rect x="15" y="22" width="7" height="7"/>
+        <rect x="78" y="18" width="5" height="11"/><rect x="84" y="21" width="8" height="8"/><rect x="93" y="15" width="4" height="14"/>
+      </g>
+      <g fill="#dfe6ee" opacity=".7">
+        <rect x="4" y="22" width="1" height="1"/><rect x="6" y="22" width="1" height="1"/><rect x="11" y="18" width="1" height="1"/>
+        <rect x="79" y="20" width="1" height="1"/><rect x="81" y="20" width="1" height="1"/><rect x="94" y="17" width="1" height="1"/>
+      </g>
+      <!-- 관중석 -->
+      <path d="M0 29 L100 29 L100 40 L0 40 Z" fill="url(#stand)"/>
+      <rect x="0" y="30" width="100" height="7" fill="url(#crowd)"/>
+      <rect x="0" y="37" width="100" height="3" fill="#3e4a58"/>
+      <!-- 외야 펜스 -->
+      <rect x="0" y="39" width="100" height="1.4" fill="#2b5f8c"/>
+      <!-- 잔디 -->
+      <rect x="0" y="40" width="100" height="60" fill="url(#grass)"/>
+      <!-- 잔디 줄무늬 -->
+      <g fill="#ffffff" opacity=".06">
+        <path d="M0 46 L100 46 L100 52 L0 52 Z"/><path d="M0 58 L100 58 L100 66 L0 66 Z"/><path d="M0 74 L100 74 L100 84 L0 84 Z"/>
+      </g>
+      <!-- 파울선 -->
+      <path d="M46 84 L4 40" stroke="#fff" stroke-width=".7" opacity=".85"/>
+      <path d="M46 84 L96 40" stroke="#fff" stroke-width=".7" opacity=".85"/>
+      <!-- 내야 흙 (원근) -->
+      <path d="M46 84 C 20 76, 18 52, 50 44 C 82 52, 76 76, 46 84 Z" fill="url(#dirt)" opacity=".95"/>
+      <path d="M46 78 C 28 72, 28 56, 50 50 C 72 56, 66 72, 46 78 Z" fill="url(#grass)"/>
+      <!-- 1루·3루 베이스 -->
+      <rect x="28.5" y="59" width="2.6" height="1.5" fill="#fff" transform="skewX(-10)"/>
+      <rect x="76" y="59" width="2.6" height="1.5" fill="#fff" transform="skewX(10)"/>
+      <!-- 마운드 -->
+      <ellipse cx="50" cy="42.5" rx="9" ry="2.6" fill="url(#dirt)"/>
+      <rect x="49" y="41.4" width="2" height=".5" fill="#fff"/>
+      <!-- 타석 흙 -->
+      <ellipse cx="46" cy="83" rx="17" ry="7" fill="url(#dirt)"/>
+      <!-- 타자 박스 -->
+      <path d="M50 78 L58 78 L59 88 L51 88 Z" fill="none" stroke="#fff" stroke-width=".5" opacity=".7"/>
+      <path d="M33 78 L41 78 L40 88 L32 88 Z" fill="none" stroke="#fff" stroke-width=".5" opacity=".7"/>
+      <!-- 홈플레이트 -->
+      <path d="M43.5 81 L48.5 81 L48.5 83 L46 85 L43.5 83 Z" fill="#fff" stroke="#c9c9c9" stroke-width=".3"/>
+    </svg>
+
+    <!-- 대기 중인 야수 (간단한 도형) -->
+    <svg class="fielder" style="left:20%;top:40%" viewBox="0 0 20 30" aria-hidden="true">
+      <circle cx="10" cy="6" r="4" fill="#e9c9a6"/><rect x="5" y="10" width="10" height="11" rx="3" fill="#f4f6f1"/>
+      <rect x="5" y="20" width="4" height="9" fill="#24402F"/><rect x="11" y="20" width="4" height="9" fill="#24402F"/><rect x="6" y="2" width="8" height="2.5" rx="1" fill="#24402F"/>
+    </svg>
+    <svg class="fielder" style="left:76%;top:40%" viewBox="0 0 20 30" aria-hidden="true">
+      <circle cx="10" cy="6" r="4" fill="#e9c9a6"/><rect x="5" y="10" width="10" height="11" rx="3" fill="#f4f6f1"/>
+      <rect x="5" y="20" width="4" height="9" fill="#24402F"/><rect x="11" y="20" width="4" height="9" fill="#24402F"/><rect x="6" y="2" width="8" height="2.5" rx="1" fill="#24402F"/>
+    </svg>
+
+    <!-- 투수 자리 -->
+    <div class="slot" id="pitcher">
+      <img id="imgPitcherIdle" alt="">
+      <img id="imgPitcherWindup" alt="">
+      <img id="imgPitcherThrow" alt="">
+      <div class="ph">투수<small id="pitcherState">대기</small></div>
+    </div>
+
+    <div id="shadow"></div>
+    <div id="ball"></div>
+
+    <!-- 타자 자리 -->
+    <div class="slot" id="batter">
+      <img id="imgBatterReady" alt="">
+      <img id="imgBatterSwing" alt="">
+      <div class="ph">타자<small id="batterState">준비 자세</small></div>
+    </div>
+
+    <!-- 판정 문구 -->
+    <div id="call"><span class="g" id="callGrade"></span><span class="d" id="callDetail"></span></div>
+
+    <!-- 타이밍 게이지 -->
+    <div class="gauge">
+      <div class="bar"><span class="mid"></span><span class="mk" id="gaugeMark"></span></div>
+      <div class="lb"><span>빠름</span><span id="gaugeText">이전 타격의 타이밍</span><span>늦음</span></div>
+    </div>
+  </div>
+
+  <button class="swing" id="btnSwing" disabled>스윙</button>
+</div>
+
+<!-- 시작 화면 -->
+<div class="overlay on" id="scrStart">
+  <div class="card">
+    <h1>야구 타격</h1>
+    <p class="sub">투수가 20개의 공을 던집니다. 공이 홈플레이트에 들어오는 순간 <b>스윙</b> 버튼(또는 스페이스 키)을 눌러 타이밍을 맞추세요.</p>
+    <ul class="steps">
+      <li>구종은 직구·커브·슬라이더·체인지업 — 궤적과 속도가 다릅니다.</li>
+      <li>타격에 성공할수록 다음 공의 구속이 빨라집니다.</li>
+      <li>빠르게 치면 당겨치기(왼쪽), 늦게 치면 밀어치기(오른쪽)로 날아갑니다.</li>
+      <li>홈런을 연속으로 치면 콤보 보너스가 붙습니다.</li>
+    </ul>
+    <table class="tbl">
+      <tr><th>타이밍</th><th>결과</th><th>점수</th></tr>
+      <tr><td>정확</td><td>홈런</td><td>비거리에 비례 (가장 높음)</td></tr>
+      <tr><td>조금 빠름·늦음</td><td>장타 · 외야안타 · 내야안타</td><td>비거리에 비례</td></tr>
+      <tr><td>더 빠름·늦음</td><td>파울</td><td>0</td></tr>
+      <tr><td>훨씬 빠름·늦음 · 안 침</td><td>헛스윙</td><td>0</td></tr>
+    </table>
+    <div class="best-box" id="startBest"></div>
+    <button class="btn" id="btnStart">시작하기</button>
+  </div>
+</div>
+
+<!-- 결과 화면 -->
+<div class="overlay" id="scrEnd">
+  <div class="card">
+    <h2>경기 종료</h2>
+    <div class="total"><span class="k">총점</span><span class="v" id="endScore">0</span></div>
+    <div class="stats">
+      <div class="c"><span class="k">홈런</span><span class="v" id="endHr">0</span></div>
+      <div class="c"><span class="k">최다 연속 홈런</span><span class="v" id="endCombo">0</span></div>
+      <div class="c"><span class="k">최고 비거리</span><span class="v" id="endDist">0 m</span></div>
+      <div class="c"><span class="k">안타 (홈런 제외)</span><span class="v" id="endHit">0</span></div>
+      <div class="c"><span class="k">파울</span><span class="v" id="endFoul">0</span></div>
+      <div class="c"><span class="k">헛스윙</span><span class="v" id="endMiss">0</span></div>
+    </div>
+    <div class="best-box" id="endBest"></div>
+    <button class="btn" id="btnAgain">다시 시작하기</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* =====================================================================
+   캐릭터 이미지 파일 — 나중에 만든 PNG 경로를 여기에만 적으면 됩니다.
+   비워 두면("") 임시 도형(점선 상자 + 라벨)이 대신 보입니다.
+   예: batterReady: "img/batter-ready.png"
+   ===================================================================== */
+const IMAGES = {
+  batterReady:   "",   // 타자 준비 자세
+  batterSwing:   "",   // 타자 스윙 자세 (스윙 버튼을 누르면 전환)
+  pitcherIdle:   "",   // 투수 대기
+  pitcherWindup: "",   // 투수 와인드업
+  pitcherThrow:  ""    // 투수 투구(공을 놓는 순간)
+};
+
+/* ---------- 게임 규칙 상수 ---------- */
+const TOTAL_PITCHES = 20;
+const SPEED_STEP = 0.05;      // 타격 성공(안타 이상)마다 구속이 5% 씩 증가
+const SPEED_MAX  = 1.8;       // 최대 배율
+// 타이밍 창 (ms, 정확한 순간 = 0, 좌우 대칭)
+const WIN = { hr: 40, xbh: 75, out: 105, inf: 130, foul: 210 };
+const GAUGE_RANGE = 260;      // 게이지 막대 양 끝 = ±260ms
+// 구종 — 표시 구속(km/h), 홈플레이트까지 걸리는 기본 시간(ms), 궤적 함수(0~1 → 화면 오프셋 %)
+const PITCHES = [
+  { name: "직구",     kmh: 145, time: 900,  w: 4,
+    path: t => ({ dx: 0, dy: -1.2 * Math.sin(Math.PI * t) }) },
+  { name: "커브",     kmh: 115, time: 1150, w: 2,
+    path: t => ({ dx: 3.5 * t * t, dy: -5 * Math.sin(Math.PI * t) + 7 * t * t * t }) },
+  { name: "슬라이더", kmh: 132, time: 1000, w: 2,
+    path: t => ({ dx: -9 * t * t * t, dy: 2 * t * t }) },
+  { name: "체인지업", kmh: 124, time: 1050, w: 2,
+    path: t => ({ dx: 0, dy: -1.2 * Math.sin(Math.PI * t) + 3.5 * t * t * t * t }) }
+];
+// 화면 좌표(%): 투수 손 → 홈플레이트 위 스트라이크존
+const REL = { x: 52, y: 34 };
+const PLATE = { x: 46, y: 74 };
+const BALL_MIN = 1.4, BALL_MAX = 5.2;   // 공 지름 (무대 높이의 %)
+
+const $ = id => document.getElementById(id);
+const fmt = n => n.toLocaleString("ko-KR");
+
+/* ---------- 이미지 자리 채우기 ---------- */
+function applyImages(){
+  const map = [
+    ["imgBatterReady", IMAGES.batterReady, "batter"], ["imgBatterSwing", IMAGES.batterSwing, "batter"],
+    ["imgPitcherIdle", IMAGES.pitcherIdle, "pitcher"], ["imgPitcherWindup", IMAGES.pitcherWindup, "pitcher"],
+    ["imgPitcherThrow", IMAGES.pitcherThrow, "pitcher"]
+  ];
+  const has = { batter: false, pitcher: false };
+  map.forEach(([id, src, slot]) => { if (src){ $(id).src = src; has[slot] = true; } });
+  $("batter").classList.toggle("has-img", has.batter);
+  $("pitcher").classList.toggle("has-img", has.pitcher);
+}
+function setBatter(pose){            // "ready" | "swing"
+  const useSwing = pose === "swing" && !!IMAGES.batterSwing;   // 스윙 이미지가 없으면 준비 이미지를 그대로
+  $("imgBatterSwing").classList.toggle("cur", useSwing);
+  $("imgBatterReady").classList.toggle("cur", !useSwing);
+  $("batterState").textContent = pose === "swing" ? "스윙 자세" : "준비 자세";
+}
+function setPitcher(pose){           // "idle" | "windup" | "throw"
+  const pick = { idle: "imgPitcherIdle", windup: "imgPitcherWindup", throw: "imgPitcherThrow" };
+  const label = { idle: "대기", windup: "와인드업", throw: "투구" };
+  // 해당 단계 이미지가 없으면 앞 단계 이미지로 대신 보여 줍니다.
+  const order = ["idle", "windup", "throw"];
+  let use = pose;
+  while (use && !IMAGES["pitcher" + use[0].toUpperCase() + use.slice(1)]) use = order[order.indexOf(use) - 1];
+  order.forEach(p => $(pick[p]).classList.toggle("cur", p === use));
+  $("pitcherState").textContent = label[pose];
+}
+
+/* ---------- 최고 기록 (이 기기의 localStorage) ---------- */
+const BEST = {
+  KEY: "baseball_best_v1",
+  get(){
+    try { const b = JSON.parse(localStorage.getItem(this.KEY) || "null");
+      return (b && typeof b.score === "number") ? b : null; } catch (e) { return null; }
+  },
+  set(b){ try { localStorage.setItem(this.KEY, JSON.stringify(b)); } catch (e) {} },
+  today(){ const d = new Date(), m = d.getMonth()+1, day = d.getDate();
+    return `${d.getFullYear()}.${m<10?"0":""}${m}.${day<10?"0":""}${day}`; },
+  detail(b){ return `홈런 ${b.hr}개 · 연속 ${b.combo} · ${b.dist}m` + (b.date ? ` · ${b.date}` : ""); },
+  html(k, v, d){ return `<span class="bi">🏅</span><span class="bt"><span class="bk">${k}</span><span class="bv">${v}</span><span class="bd">${d}</span></span>`; },
+  render(box, isNew){
+    const b = this.get();
+    box.className = "best-box" + (isNew ? " new" : "");
+    box.innerHTML = b
+      ? this.html("이 기기의 최고 기록" + (isNew ? '<span class="newtag">NEW</span>' : ""), fmt(b.score) + "점", this.detail(b))
+      : this.html("이 기기의 최고 기록", "아직 기록이 없습니다", "게임이 끝나면 기록이 자동으로 저장됩니다.");
+    $("hudBest").textContent = b ? fmt(b.score) : "-";
+  }
+};
+
+/* ---------- 게임 상태 ---------- */
+const G = {
+  pitchNo: 0, score: 0, combo: 0, maxCombo: 0, hr: 0, hits: 0, fouls: 0, misses: 0, maxDist: 0,
+  speedMult: 1, phase: "idle",           // idle | windup | flight | result
+  cur: null, t0: 0, flightTime: 0, swung: false, raf: 0, timers: []
+};
+const stage = $("stage"), ball = $("ball"), shadow = $("shadow"), btnSwing = $("btnSwing");
+
+function later(fn, ms){ const id = setTimeout(fn, ms); G.timers.push(id); return id; }
+function clearAll(){ G.timers.forEach(clearTimeout); G.timers = []; cancelAnimationFrame(G.raf); }
+function hud(){
+  $("hudPitch").textContent = `${G.pitchNo} / ${TOTAL_PITCHES}`;
+  $("hudScore").textContent = fmt(G.score);
+  $("hudCombo").textContent = G.combo;
+}
+function placeBall(x, y, dia, withShadow, shadowY){
+  const W = stage.clientWidth, H = stage.clientHeight, px = dia / 100 * H;
+  ball.style.width = ball.style.height = px + "px";
+  ball.style.transform = `translate(${x/100*W - px/2}px, ${y/100*H - px/2}px)`;
+  if (withShadow){
+    shadow.style.display = "block";
+    shadow.style.width = px + "px"; shadow.style.height = px * .4 + "px";
+    shadow.style.transform = `translate(${x/100*W - px/2}px, ${shadowY/100*H - px*.2}px)`;
+  } else shadow.style.display = "none";
+}
+function showCall(grade, detail){
+  $("callGrade").textContent = grade; $("callDetail").textContent = detail;
+  $("call").classList.add("on");
+}
+function hideCall(){ $("call").classList.remove("on"); }
+function setGauge(deltaMs, text){
+  const mk = $("gaugeMark");
+  if (deltaMs === null){ mk.classList.remove("on"); }
+  else {
+    const c = Math.max(-1, Math.min(1, deltaMs / GAUGE_RANGE));
+    mk.style.left = (50 + c * 50) + "%"; mk.classList.add("on");
+  }
+  $("gaugeText").textContent = text;
+}
+
+/* ---------- 게임 흐름 ---------- */
+function startGame(){
+  clearAll();
+  Object.assign(G, { pitchNo: 0, score: 0, combo: 0, maxCombo: 0, hr: 0, hits: 0, fouls: 0, misses: 0, maxDist: 0,
+    speedMult: 1, phase: "idle", cur: null, swung: false });
+  $("hudSpeed").textContent = "-";
+  setGauge(null, "이전 타격의 타이밍");
+  hideCall(); ball.style.display = "none"; shadow.style.display = "none";
+  setBatter("ready"); setPitcher("idle");
+  $("scrStart").classList.remove("on"); $("scrEnd").classList.remove("on");
+  hud();
+  later(nextPitch, 900);
+}
+
+function pickPitch(){
+  const total = PITCHES.reduce((s, p) => s + p.w, 0);
+  let r = Math.random() * total;
+  for (const p of PITCHES){ r -= p.w; if (r < 0) return p; }
+  return PITCHES[0];
+}
+
+function nextPitch(){
+  if (G.pitchNo >= TOTAL_PITCHES){ endGame(); return; }
+  G.pitchNo++; hud();
+  G.cur = pickPitch();
+  G.flightTime = G.cur.time / G.speedMult;
+  G.swung = false;
+  G.phase = "windup";
+  setPitcher("windup");
+  $("hudSpeed").textContent = String(Math.round(G.cur.kmh * G.speedMult));
+  // 와인드업 길이를 조금씩 다르게 해서 리듬만으로 맞추기 어렵게
+  later(release, 650 + Math.random() * 350);
+}
+
+function release(){
+  G.phase = "flight";
+  setPitcher("throw");
+  G.t0 = performance.now();
+  btnSwing.disabled = false;
+  ball.style.display = "block";
+  later(() => setPitcher("idle"), 350);
+  // 공을 치지 않고 흘려보내면 스트라이크
+  later(() => { if (G.phase === "flight" && !G.swung) judge(null); }, G.flightTime + WIN.foul + 40);
+  G.raf = requestAnimationFrame(flyPitch);
+}
+
+function flyPitch(now){
+  if (G.phase !== "flight") return;
+  const t = Math.min(1.25, (now - G.t0) / G.flightTime);
+  // 원근감: 다가올수록 화면에서 빨라 보이도록
+  const s = Math.pow(Math.min(t, 1), 1.55);
+  const off = G.cur.path(Math.min(t, 1));
+  let x = REL.x + (PLATE.x - REL.x) * s + off.dx * s;
+  let y = REL.y + (PLATE.y - REL.y) * s + off.dy;
+  let dia = BALL_MIN + (BALL_MAX - BALL_MIN) * s;
+  if (t > 1){ // 홈플레이트를 지나 포수 쪽으로 사라짐
+    y += (t - 1) * 60; dia += (t - 1) * 6;
+  }
+  placeBall(x, y, dia, false);
+  if (t >= 1.25){ ball.style.display = "none"; return; }
+  G.raf = requestAnimationFrame(flyPitch);
+}
+
+function swing(){
+  if (G.phase !== "flight" || G.swung) return;
+  G.swung = true;
+  btnSwing.disabled = true;
+  setBatter("swing");
+  later(() => setBatter("ready"), 380);
+  judge(performance.now() - (G.t0 + G.flightTime));
+}
+
+/* 타이밍 판정: delta(ms) < 0 빠름(당겨치기·왼쪽), > 0 늦음(밀어치기·오른쪽), null = 스윙 안 함 */
+function judge(delta){
+  G.phase = "result";
+  btnSwing.disabled = true;
+  cancelAnimationFrame(G.raf);
+  const a = delta === null ? Infinity : Math.abs(delta);
+  let grade, dist = 0, gained = 0, side = delta === null ? 0 : Math.sign(delta);
+  const ease = (lo, hi, dLo, dHi) => Math.round(dHi - (dHi - dLo) * (a - lo) / (hi - lo));
+  if (a <= WIN.hr)        { grade = "홈런";     dist = ease(0, WIN.hr, 120, 140); }
+  else if (a <= WIN.xbh)  { grade = "장타";     dist = ease(WIN.hr, WIN.xbh, 95, 119); }
+  else if (a <= WIN.out)  { grade = "외야안타"; dist = ease(WIN.xbh, WIN.out, 65, 94); }
+  else if (a <= WIN.inf)  { grade = "내야안타"; dist = ease(WIN.out, WIN.inf, 30, 64); }
+  else if (a <= WIN.foul) { grade = "파울"; }
+  else                    { grade = "헛스윙"; }
+
+  const dirText = delta === null ? "" : (delta < 0 ? "당겨치기" : "밀어치기");
+  let detail = G.cur.name + " · ";
+  if (grade === "홈런" || grade === "장타" || grade === "외야안타" || grade === "내야안타"){
+    // 비거리에 비례(제곱)해서 점수 — 멀리 갈수록 훨씬 높음
+    gained = Math.round(Math.pow(dist / 10, 2) * 10);
+    if (grade === "홈런"){
+      G.combo++; G.hr++;
+      if (G.combo >= 2){ const mult = 1 + 0.25 * (G.combo - 1); gained = Math.round(gained * mult);
+        detail += `${G.combo}연속 홈런 ×${mult.toFixed(2).replace(/\.?0+$/, "")} · `; }
+    } else { G.combo = 0; G.hits++; }
+    G.maxCombo = Math.max(G.maxCombo, G.combo);
+    G.maxDist = Math.max(G.maxDist, dist);
+    G.speedMult = Math.min(SPEED_MAX, G.speedMult + SPEED_STEP);
+    detail += `${dist}m ${dirText} · +${fmt(gained)}점`;
+  } else {
+    G.combo = 0;
+    if (grade === "파울"){ G.fouls++; detail += dirText + " 파울"; }
+    else { G.misses++; detail += delta === null ? "스트라이크 (안 침)" : (delta < 0 ? "너무 빠름" : "너무 늦음"); }
+  }
+  G.score += gained; hud();
+
+  // 게이지 갱신 (다음 타격 결과가 나올 때까지 유지)
+  if (delta === null) setGauge(GAUGE_RANGE, "스윙하지 않음");
+  else {
+    const ms = Math.round(Math.abs(delta));
+    setGauge(delta, ms <= 5 ? "정확!" : `${ms}ms ${delta < 0 ? "빠름" : "늦음"}`);
+  }
+
+  const bigGrade = grade === "홈런" ? "홈런!" : grade;
+  if (dist > 0){ flyHit(dist, delta, () => { showCall(bigGrade, detail); later(afterResult, 1100); }); }
+  else if (grade === "파울"){ flyFoul(side, () => { showCall(bigGrade, detail); later(afterResult, 1000); }); }
+  else { later(() => { ball.style.display = "none"; showCall(bigGrade, detail); later(afterResult, 1100); }, delta === null ? 0 : 150); }
+}
+
+function afterResult(){
+  hideCall(); ball.style.display = "none"; shadow.style.display = "none";
+  later(nextPitch, 500);
+}
+
+/* 타구 애니메이션: 비거리·방향에 따라 외야로 날아감 */
+function flyHit(dist, delta, done){
+  const f = dist / 140;
+  const a = Math.max(-1, Math.min(1, delta / WIN.inf));          // 빠름 → 왼쪽(음수), 늦음 → 오른쪽(양수)
+  const x0 = PLATE.x, y0 = PLATE.y;
+  const x1 = x0 + a * 42 * (0.35 + 0.65 * f), y1 = y0 - 44 * f;    // 착지점(원근: 위로 갈수록 멀리)
+  const H = 4 + 28 * f;                                              // 포물선 높이
+  const dur = 800 + 700 * f, t0 = performance.now();
+  ball.style.display = "block";
+  (function step(now){
+    const t = Math.min(1, (now - t0) / dur);
+    const gx = x0 + (x1 - x0) * t, gy = y0 + (y1 - y0) * t;         // 지면 위 위치
+    const y = gy - H * Math.sin(Math.PI * t);
+    const dia = BALL_MAX - (BALL_MAX - 1.2) * Math.pow(t, .7) * f;
+    placeBall(gx, y, dia, true, gy);
+    if (t < 1) G.raf = requestAnimationFrame(step); else done();
+  })(t0);
+}
+function flyFoul(side, done){
+  const x0 = PLATE.x, y0 = PLATE.y, x1 = x0 + side * 60, y1 = y0 - 14, dur = 650, t0 = performance.now();
+  ball.style.display = "block";
+  (function step(now){
+    const t = Math.min(1, (now - t0) / dur);
+    const gx = x0 + (x1 - x0) * t, gy = y0 + (y1 - y0) * t, y = gy - 16 * Math.sin(Math.PI * t);
+    placeBall(gx, y, BALL_MAX - 2 * t, true, gy);
+    if (t < 1) G.raf = requestAnimationFrame(step); else done();
+  })(t0);
+}
+
+function endGame(){
+  G.phase = "idle"; btnSwing.disabled = true;
+  $("endScore").textContent = fmt(G.score) + "점";
+  $("endHr").textContent = G.hr + "개"; $("endCombo").textContent = G.maxCombo;
+  $("endDist").textContent = G.maxDist + " m"; $("endHit").textContent = G.hits + "개";
+  $("endFoul").textContent = G.fouls + "개"; $("endMiss").textContent = G.misses + "개";
+  const prev = BEST.get();
+  const isNew = !prev || G.score > prev.score;
+  if (isNew) BEST.set({ score: G.score, hr: G.hr, combo: G.maxCombo, dist: G.maxDist, date: BEST.today() });
+  BEST.render($("endBest"), isNew);
+  $("scrEnd").classList.add("on");
+}
+
+/* ---------- 입력 ---------- */
+btnSwing.addEventListener("pointerdown", e => { e.preventDefault(); swing(); });
+btnSwing.addEventListener("keydown", e => { if (e.code === "Space" || e.code === "Enter") e.preventDefault(); });
+document.addEventListener("keydown", e => {
+  if (e.repeat) return;
+  if (e.code === "Space" || e.code === "Enter" || e.code === "KeyJ"){
+    if ($("scrStart").classList.contains("on") || $("scrEnd").classList.contains("on")) return;
+    e.preventDefault(); swing();
+  }
+});
+$("btnStart").addEventListener("click", startGame);
+$("btnAgain").addEventListener("click", startGame);
+
+applyImages();
+setBatter("ready"); setPitcher("idle");
+BEST.render($("startBest"), false);
+</script>
+</body>
+</html>
