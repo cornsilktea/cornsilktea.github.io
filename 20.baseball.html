@@ -806,7 +806,7 @@ function judge(delta){
   if (dist > 0){
     const go = () => flyHit(dist, delta, () => { showCall(bigGrade, detail); later(afterResult, 1100); });
     if (grade === "홈런"){   // 빛이 나는 동안에도 공은 맞은 자리에 보임
-      if (dist >= 135) showFlash("#ff3b2a", 3); else showFlash("#ff9a2a", 2);   // 홈런: 주황 빛(반지름 2배), 135m 이상: 빨간 빛(3배)
+      if (dist >= 135) showFlash("#ff3b2a", 9); else showFlash("#ff9a2a", 4);   // 홈런: 주황 빛(기본의 4배), 135m 이상: 빨간 빛(9배)
       placeBall(PLATE.x + G.end.dx, PLATE.y + G.end.dy, BALL_MAX, 0, false, 0, "back"); ball.style.display = "block";
       later(go, 150); }
     else go();
