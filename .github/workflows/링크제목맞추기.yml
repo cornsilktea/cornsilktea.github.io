@@ -1,0 +1,54 @@
+# 링크 미리보기 제목을 제어판 내용대로 자동으로 맞추는 로봇
+#
+# 카카오톡 등 링크 미리보기는 파일 안에 적힌 <title>·og: 태그를 읽습니다.
+# 그래서 제어판(Firebase)에서 제목·설명을 바꿔도 파일을 고쳐 올려야 미리보기가 따라옵니다.
+# 이 워크플로가 1시간마다 제어판 내용을 받아 링크제목맞추기.ps1 을 돌리고,
+# 바뀐 것이 있으면 스스로 커밋·푸시합니다. 선생님은 아무것도 하지 않아도 됩니다.
+#
+# 바로 돌리고 싶으면: GitHub 저장소 → Actions 탭 → "링크 제목 맞추기" → Run workflow
+name: 링크 제목 맞추기
+
+on:
+  schedule:
+    - cron: "0 * * * *"     # 매시 정각(UTC 기준, 한국 시간으로도 매시 정각). 바쁜 시간엔 몇 분 늦을 수 있음
+  workflow_dispatch:        # Actions 탭에서 손으로도 실행 가능
+
+permissions:
+  contents: write           # 이 저장소에 커밋·푸시할 권한 (GitHub 가 주는 임시 토큰, 따로 만들 것 없음)
+
+concurrency:
+  group: sync-titles
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 저장소 받기
+        uses: actions/checkout@v4
+
+      - name: 제어판(Firebase) 내용을 초기데이터.json 으로 받기
+        shell: pwsh
+        run: |
+          $db = "https://cornsilktea-default-rtdb.asia-southeast1.firebasedatabase.app"
+          $portal = Invoke-RestMethod "$db/portal.json"
+          if (-not $portal.games) { throw "제어판 내용을 받지 못했습니다." }
+          $json = [ordered]@{ portal = $portal } | ConvertTo-Json -Depth 20
+          [IO.File]::WriteAllText("$PWD/초기데이터.json", $json, [Text.UTF8Encoding]::new($false))
+
+      - name: 자료 파일의 <title>·og: 태그 맞추기
+        shell: pwsh
+        run: ./링크제목맞추기.ps1
+
+      - name: 바뀐 것이 있으면 커밋·푸시
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "바뀐 것이 없습니다."
+            exit 0
+          fi
+          git diff --cached --stat
+          git commit -m "링크 미리보기 제목을 제어판 내용으로 자동 맞춤"
+          git push
