@@ -295,18 +295,18 @@ var BTYPE = {
 function g(t,n,hp,gap,start){ return {t:t,n:n,hp:hp,gap:gap,start:start||0}; }
 var WAVES = [
   /* --- 1~6 관대한 구간 --- */
-  /* 1 */ { gold:80,  groups:[ g('red',8,30,0.50) ] },
-  /* 2 */ { gold:85,  groups:[ g('red',10,34,0.45) ] },
-  /* 3 */ { gold:90,  groups:[ g('red',8,38,0.45), g('blue',4,50,0.50,3.5) ] },
-  /* 4 */ { gold:95,  groups:[ g('red',10,46,0.40), g('yellow',6,32,0.35,4) ] },
-  /* 5 */ { gold:105, groups:[ g('red',8,50,0.40), g('blue',5,60,0.45,3) ], boss:{hp:200,armor:8,start:1} },
-  /* 6 */ { gold:110, groups:[ g('red',10,48,0.38), g('yellow',8,32,0.30,3.5) ] },
+  /* 1 */ { gold:80,  groups:[ g('red',8,26,0.50) ] },
+  /* 2 */ { gold:85,  groups:[ g('red',10,29,0.45) ] },
+  /* 3 */ { gold:90,  groups:[ g('red',8,32,0.45), g('blue',4,43,0.50,3.5) ] },
+  /* 4 */ { gold:95,  groups:[ g('red',10,39,0.40), g('yellow',6,27,0.35,4) ] },
+  /* 5 */ { gold:105, groups:[ g('red',8,43,0.40), g('blue',5,51,0.45,3) ], boss:{hp:200,armor:10,start:1} },
+  /* 6 */ { gold:110, groups:[ g('red',10,41,0.38), g('yellow',8,27,0.30,3.5) ] },
 
   /* --- 7~14 중간 구간 --- */
-  /* 7 */ { gold:90,  groups:[ g('red',10,64,0.35), g('blue',8,72,0.40,3) ] },
-  /* 8 */ { gold:90,  groups:[ g('red',12,69,0.33), g('yellow',10,46,0.28,3.5) ] },
-  /* 9 */ { gold:100, groups:[ g('blue',12,83,0.35), g('yellow',10,54,0.28,4) ] },
-  /*10 */ { gold:105, groups:[ g('red',8,76,0.35), g('blue',6,90,0.40,2.5) ], boss:{hp:480,armor:2,start:1} },
+  /* 7 */ { gold:90,  groups:[ g('red',10,54,0.35), g('blue',8,61,0.40,3) ] },
+  /* 8 */ { gold:90,  groups:[ g('red',12,59,0.33), g('yellow',10,39,0.28,3.5) ] },
+  /* 9 */ { gold:100, groups:[ g('blue',12,71,0.35), g('yellow',10,46,0.28,4) ] },
+  /*10 */ { gold:105, groups:[ g('red',8,65,0.35), g('blue',6,77,0.40,2.5) ], boss:{hp:408,armor:2,start:1} },
   /*11 */ { gold:115, groups:[ g('blue',12,94,0.32), g('yellow',12,58,0.26,3.5) ] },
   /*12 */ { gold:120, groups:[ g('red',12,88,0.30), g('blue',8,104,0.35,3.5) ] },
   /*13 */ { gold:130, groups:[ g('yellow',14,68,0.24), g('blue',10,117,0.32,3) ] },
