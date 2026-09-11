@@ -59,7 +59,7 @@
   #pitcher{left:50%;bottom:39.5%;width:11%;height:17%;transform:translateX(-50%);min-width:40px;z-index:2}
   #pitcher .ph{font-size:13px}
   /* 우타자: 홈플레이트 왼쪽(3루 쪽) 타석 */
-  #batter{left:25%;bottom:12%;width:34%;height:41.5%;z-index:2}   /* 발이 왼쪽 타자 박스 안에, 무릎(그림 높이의 30%)~팔꿈치(62.5%)가 스트라이크 존과 맞도록 */
+  #batter{left:25%;bottom:12%;width:34%;height:41.5%;z-index:3}   /* 발이 왼쪽 타자 박스 안에, 무릎(그림 높이의 30%)~팔꿈치(62.5%)가 스트라이크 존과 맞도록 */
   #batter .ph{font-size:16px}
   .fielder{position:absolute;pointer-events:none;opacity:.95;transform:translate(-50%,-100%)}
   .fielder.in{width:5.2%;min-width:22px;max-width:36px}
@@ -83,12 +83,12 @@
   @keyframes markpop{0%{transform:scale(.3)}70%{transform:scale(1.2)}100%{transform:scale(1)}}
 
   /* 공 (실밥 2줄 — 회전이 보이도록) */
-  #ball{position:absolute;left:0;top:0;width:12px;height:12px;border-radius:50%;display:none;will-change:transform;z-index:3;
+  #ball{position:absolute;left:0;top:0;width:12px;height:12px;border-radius:50%;display:none;will-change:transform;z-index:2;
     background:radial-gradient(circle at 35% 30%,#fff 0 38%,#e6e6e6 72%,#cfcfcf 100%);box-shadow:0 1px 2px rgba(0,0,0,.35);overflow:hidden}
   #ball::before,#ball::after{content:"";position:absolute;width:100%;height:100%;border-radius:50%;border:2px solid transparent;box-sizing:border-box}
   #ball::before{left:-45%;top:0;border-right-color:#c2453d}
   #ball::after{left:45%;top:0;border-left-color:#c2453d}
-  #shadow{position:absolute;width:12px;height:5px;border-radius:50%;background:rgba(0,0,0,.28);display:none;z-index:2}
+  #shadow{position:absolute;width:12px;height:5px;border-radius:50%;background:rgba(0,0,0,.28);display:none;z-index:1}
 
   /* 판정 문구 */
   #call{position:absolute;left:50%;top:54%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;
@@ -219,30 +219,6 @@
         <rect x="79.2" y="5.9" width="1.2" height=".9"/><rect x="81" y="5.9" width="1.2" height=".9"/><rect x="82.8" y="5.9" width="1.2" height=".9"/>
       </g>
 
-      <!-- 외야 관중석: 펜스를 따라 둥글게, 2층 -->
-      <g clip-path="url(#standClip)">
-        <path d="M0 28 Q50 10 100 28 L100 45 Q50 29 0 45 Z" fill="url(#standUp)"/>
-        <path d="M0 29.5 Q50 11.5 100 29.5 L100 36.5 Q50 18.5 0 36.5 Z" fill="url(#crowd)"/>       <!-- 위층 관중 -->
-        <path d="M0 36.5 Q50 18.5 100 36.5 L100 38 Q50 20 0 38 Z" fill="#2f3842"/>                 <!-- 층 사이 통로 -->
-        <path d="M0 38 Q50 20 100 38 L100 45 Q50 29 0 45 Z" fill="url(#standLow)"/>
-        <path d="M0 39 Q50 21 100 39 L100 44 Q50 28 0 44 Z" fill="url(#crowd2)"/>                 <!-- 아래층 관중 -->
-        <!-- 가운데 배터스 아이(타자 시야 보호용 짙은 녹색 벽) -->
-        <path d="M42 22 L58 22 L58 34 L42 34 Z" fill="#1f4a2c"/>
-        <path d="M42 22 L58 22 L58 23 L42 23 Z" fill="#2c5e3a"/>
-        <!-- 전광판 -->
-        <rect x="44" y="24" width="12" height="7" rx=".4" fill="#101820"/>
-        <rect x="45" y="25" width="10" height="1.4" fill="#2b3a48"/>
-        <rect x="45.6" y="27.2" width="2" height="1" fill="#f2c94c"/><rect x="48.4" y="27.2" width="2" height="1" fill="#f2c94c"/>
-        <rect x="51.2" y="27.2" width="2" height="1" fill="#f2c94c"/><rect x="45.6" y="29" width="8.8" height=".8" fill="#4a6b8a"/>
-        <!-- 계단 통로 -->
-        <g fill="#2f3842" opacity=".8">
-          <rect x="14" y="26" width="1" height="19"/><rect x="28" y="22" width="1" height="23"/>
-          <rect x="71" y="22" width="1" height="23"/><rect x="85" y="26" width="1" height="19"/>
-        </g>
-      </g>
-      <path d="M0 28 Q50 10 100 28" fill="none" stroke="#9aa5b1" stroke-width=".6"/>                <!-- 지붕 난간 -->
-      <path d="M0 44.5 Q50 28.5 100 44.5 L100 45 Q50 29 0 45 Z" fill="#30404f"/>
-
       <!-- 잔디 (외야 줄무늬는 홈플레이트를 중심으로 한 동심 호) -->
       <rect x="0" y="36" width="100" height="64" fill="url(#grass)"/>
       <g clip-path="url(#grassClip)" fill="#ffffff" opacity=".07">
@@ -252,6 +228,50 @@
       <g clip-path="url(#grassClip)" fill="#000000" opacity=".06">
         <ellipse cx="50" cy="86" rx="69" ry="43.5"/><ellipse cx="50" cy="86" rx="55.5" ry="35"/><ellipse cx="50" cy="86" rx="43" ry="27"/>
       </g>
+      <!-- 외야 관중석: 펜스를 따라 둥글게, 2층 -->
+      <g clip-path="url(#standClip)">
+        <path d="M0 28 Q50 10 100 28 L100 45 Q50 29 0 45 Z" fill="url(#standUp)"/>
+        <path d="M0 29.5 Q50 11.5 100 29.5 L100 36.5 Q50 18.5 0 36.5 Z" fill="url(#crowd)"/>       <!-- 위층 관중 -->
+        <path d="M0 36.5 Q50 18.5 100 36.5 L100 38 Q50 20 0 38 Z" fill="#2f3842"/>                 <!-- 층 사이 통로 -->
+        <path d="M0 38 Q50 20 100 38 L100 45 Q50 29 0 45 Z" fill="url(#standLow)"/>
+        <path d="M0 39 Q50 21 100 39 L100 44 Q50 28 0 44 Z" fill="url(#crowd2)"/>                 <!-- 아래층 관중 -->
+        <!-- 가운데 배터스 아이(타자 시야 보호용 짙은 녹색 벽) -->
+        <path d="M41 18 L59 18 L59 34 L41 34 Z" fill="#1e472b"/>
+        <path d="M41 18 L59 18 L59 19 L41 19 Z" fill="#2b5c3a"/>
+        <!-- 전광판: 틀 · 팀 이름 줄 · 이닝 칸 두 줄 · R H E -->
+        <rect x="43" y="19.8" width="14" height="8.6" rx=".5" fill="#0d141b" stroke="#3b4855" stroke-width=".25"/>
+        <rect x="43.7" y="20.5" width="12.6" height="7.2" rx=".3" fill="#141d27"/>
+        <rect x="43.7" y="20.5" width="12.6" height="1.5" fill="#1f2d3b"/>
+        <rect x="44.4" y="21" width="3.4" height=".55" rx=".2" fill="#dfe6ee"/>
+        <rect x="52.2" y="21" width="3.4" height=".55" rx=".2" fill="#dfe6ee"/>
+        <g fill="#0b1117">
+          <rect x="44.4" y="22.5" width="1.05" height=".95"/><rect x="45.65" y="22.5" width="1.05" height=".95"/><rect x="46.9" y="22.5" width="1.05" height=".95"/>
+          <rect x="48.15" y="22.5" width="1.05" height=".95"/><rect x="49.4" y="22.5" width="1.05" height=".95"/><rect x="50.65" y="22.5" width="1.05" height=".95"/>
+          <rect x="51.9" y="22.5" width="1.05" height=".95"/><rect x="53.15" y="22.5" width="1.05" height=".95"/><rect x="54.4" y="22.5" width="1.05" height=".95"/>
+          <rect x="44.4" y="23.7" width="1.05" height=".95"/><rect x="45.65" y="23.7" width="1.05" height=".95"/><rect x="46.9" y="23.7" width="1.05" height=".95"/>
+          <rect x="48.15" y="23.7" width="1.05" height=".95"/><rect x="49.4" y="23.7" width="1.05" height=".95"/><rect x="50.65" y="23.7" width="1.05" height=".95"/>
+          <rect x="51.9" y="23.7" width="1.05" height=".95"/><rect x="53.15" y="23.7" width="1.05" height=".95"/><rect x="54.4" y="23.7" width="1.05" height=".95"/>
+        </g>
+        <g fill="#f2c94c">
+          <rect x="44.75" y="22.7" width=".35" height=".55"/><rect x="46" y="22.7" width=".35" height=".55"/><rect x="47.25" y="22.7" width=".35" height=".55"/>
+          <rect x="44.75" y="23.9" width=".35" height=".55"/><rect x="46" y="23.9" width=".35" height=".55"/>
+        </g>
+        <rect x="43.7" y="25.1" width="12.6" height=".2" fill="#2a3946"/>
+        <g fill="#0b1117">
+          <rect x="44.6" y="25.7" width="2.6" height="1.6" rx=".2"/><rect x="48.7" y="25.7" width="2.6" height="1.6" rx=".2"/><rect x="52.8" y="25.7" width="2.6" height="1.6" rx=".2"/>
+        </g>
+        <g fill="#f2c94c">
+          <rect x="45.6" y="26.05" width=".6" height=".9"/><rect x="49.7" y="26.05" width=".6" height=".9"/><rect x="53.9" y="26.05" width=".6" height=".9"/>
+        </g>
+        <!-- 계단 통로 -->
+        <g fill="#2f3842" opacity=".8">
+          <rect x="14" y="26" width="1" height="19"/><rect x="28" y="22" width="1" height="23"/>
+          <rect x="71" y="22" width="1" height="23"/><rect x="85" y="26" width="1" height="19"/>
+        </g>
+      </g>
+      <path d="M0 28 Q50 10 100 28" fill="none" stroke="#9aa5b1" stroke-width=".6"/>                <!-- 지붕 난간 -->
+      <path d="M0 44.5 Q50 28.5 100 44.5 L100 45 Q50 29 0 45 Z" fill="#30404f"/>
+
 
       <!-- 외야 펜스: 좌우 폴을 잇는 둥근 담장 + 경고 트랙 -->
       <path d="M0 47.5 Q50 31.5 100 47.5 L100 50.5 Q50 34.5 0 50.5 Z" fill="url(#dirt)" opacity=".9"/>   <!-- 경고 트랙 -->
@@ -285,15 +305,15 @@
       <polygon points="50,51.1 51.8,52 50,52.9 48.2,52" fill="#fff" stroke="#cfcfcf" stroke-width=".15"/>                    <!-- 2루 -->
       <polygon points="26.17,62.77 24.21,63.75 25.83,65.23 27.79,64.25" fill="#fff" stroke="#cfcfcf" stroke-width=".15"/>   <!-- 3루 -->
       <!-- 홈플레이트 주변 흙 (타자 박스·포수 박스를 넉넉히 감쌈) -->
-      <ellipse cx="50" cy="86" rx="20" ry="9.5" fill="url(#dirt)"/>
-      <ellipse cx="50" cy="86" rx="20" ry="9.5" fill="none" stroke="#9c7245" stroke-width=".25" opacity=".5"/>
+      <ellipse cx="50" cy="86" rx="27" ry="12.5" fill="url(#dirt)"/>
+      <ellipse cx="50" cy="86" rx="27" ry="12.5" fill="none" stroke="#9c7245" stroke-width=".25" opacity=".5"/>
       <!-- 대기 타석 -->
       <ellipse cx="80" cy="83" rx="3.2" ry="1.3" fill="url(#dirt)"/>
       <ellipse cx="80" cy="83" rx="3.2" ry="1.3" fill="none" stroke="#fff" stroke-width=".3" opacity=".7"/>
       <!-- 타자 박스(양쪽)·포수 박스 -->
-      <path d="M38.5 80.5 L46 80.5 L46.5 89 L37.5 89 Z" fill="none" stroke="#fff" stroke-width=".5" opacity=".85"/>
-      <path d="M54 80.5 L61.5 80.5 L62.5 89 L53.5 89 Z" fill="none" stroke="#fff" stroke-width=".5" opacity=".85"/>
-      <path d="M44 89.8 L56 89.8 L57 94 L43 94 Z" fill="none" stroke="#fff" stroke-width=".5" opacity=".65"/>
+      <path d="M33 78 L46 78 L47 91 L31.5 91 Z" fill="none" stroke="#fff" stroke-width=".5" opacity=".85"/>
+      <path d="M54 78 L67 78 L68.5 91 L53 91 Z" fill="none" stroke="#fff" stroke-width=".5" opacity=".85"/>
+      <path d="M43 91.8 L57 91.8 L58.5 96.5 L41.5 96.5 Z" fill="none" stroke="#fff" stroke-width=".5" opacity=".65"/>
       <!-- 홈플레이트 -->
       <path d="M47.8 82.8 L52.2 82.8 L52.2 84.4 L50 85.8 L47.8 84.4 Z" fill="#fff" stroke="#c9c9c9" stroke-width=".3"/>
     </svg>
