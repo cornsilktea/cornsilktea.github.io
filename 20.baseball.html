@@ -722,7 +722,7 @@ function release(){
 
 function flyPitch(now){
   if (!G.pitchAnim) return;
-  const t = Math.min(1.25, (now - G.t0) / G.flightTime);
+  const t = (now - G.t0) / G.flightTime;
   const tc = Math.min(t, 1);
   // 원근감: 다가올수록 화면에서 빨라 보이도록
   const s = Math.pow(tc, 1.55);
@@ -731,11 +731,8 @@ function flyPitch(now){
   let x = PLATE.x * s + REL.x * (1 - s) + off.dx + (G.end.dx - fin.dx) * s;
   let y = PLATE.y * s + REL.y * (1 - s) + off.dy + (G.end.dy - fin.dy) * s;
   let dia = BALL_MIN + (BALL_MAX - BALL_MIN) * s;
-  if (t > 1){ // 홈플레이트를 지나 포수 미트 쪽으로 사라짐
-    y += (t - 1) * 60; dia += (t - 1) * 6;
-  }
+  if (t >= 1){ ball.style.display = "none"; G.pitchAnim = false; return; }   // 존 위치를 지나면 사라짐(포수 미트)
   placeBall(x, y, dia, G.cur.spin * 360 * t, false, 0, G.cur.axis);
-  if (t >= 1.25){ ball.style.display = "none"; G.pitchAnim = false; return; }
   G.raf = requestAnimationFrame(flyPitch);
 }
 
@@ -816,23 +813,29 @@ function afterResult(){
   later(nextPitch, 500);
 }
 
-/* 타구 애니메이션: 비거리·방향에 따라 외야로 날아감 (홈런은 담장 너머 관중석까지) */
+/* 타구 애니메이션: 비거리·타이밍에 무작위를 더해 방향과 궤적(땅볼·라이너·뜬공)이 다양하게 */
 function flyHit(dist, delta, done){
   const f = dist / 140;
-  const a = Math.max(-1, Math.min(1, delta / WIN.inf));          // 빠름 → 왼쪽(음수), 늦음 → 오른쪽(양수)
+  const jitter = (Math.random() - 0.5) * 0.6;                       // 같은 타이밍이라도 방향이 조금씩 다름
+  const a = Math.max(-1, Math.min(1, delta / WIN.inf * 0.85 + jitter));   // 빠름 → 왼쪽(음수), 늦음 → 오른쪽(양수)
   const x0 = PLATE.x + G.end.dx, y0 = PLATE.y + G.end.dy;
-  const x1 = PLATE.x + a * 44 * (0.35 + 0.65 * f);
+  const x1 = PLATE.x + a * 46 * (0.3 + 0.7 * f);
   // 착지점: 홈런(120m 이상)만 담장을 넘고, 그보다 짧으면 담장 앞 잔디에 떨어짐 (119m = 담장 바로 앞)
   const fy = fenceY(x1);
   const y1 = dist >= 120 ? fy - 5 - (dist - 120) * 0.5
                          : PLATE.y - (PLATE.y - (fy + 3)) * (dist / 120);
-  const H = 4 + 28 * f;                                              // 포물선 높이
-  const dur = 800 + 700 * f, t0 = performance.now();
+  // 궤적 종류
+  let kind, H, dur;
+  if (dist < 65){ kind = "ground"; H = 1.5 + Math.random() * 2;   dur = 650 + 350 * f; }                       // 땅볼: 낮게 튀며 굴러감
+  else if (dist < 120 && Math.random() < 0.45){ kind = "liner"; H = 5 + 7 * f; dur = 650 + 450 * f; }           // 라이너: 낮고 빠르게
+  else { kind = "fly"; H = 14 + 30 * f + Math.random() * 8; dur = 900 + 800 * f; }                               // 뜬공: 높이 떠서
+  const t0 = performance.now();
   ball.style.display = "block";
   (function step(now){
     const t = Math.min(1, (now - t0) / dur);
     const gx = x0 + (x1 - x0) * t, gy = y0 + (y1 - y0) * t;         // 지면 위 위치
-    const y = gy - H * Math.sin(Math.PI * t);
+    const lift = kind === "ground" ? Math.abs(Math.sin(Math.PI * 3 * t)) * (1 - t) : Math.sin(Math.PI * t);
+    const y = gy - H * lift;
     const dia = BALL_MAX - (BALL_MAX - 1.2) * Math.pow(t, .7) * f;
     placeBall(gx, y, dia, t * 1440, true, gy, "back");
     if (t < 1) G.raf = requestAnimationFrame(step); else done();
