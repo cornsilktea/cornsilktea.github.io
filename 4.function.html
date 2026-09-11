@@ -203,7 +203,7 @@ function draw(){
   for(var i=0;i<allStars.length;i++){
     var p=allStars[i].split(','), sr=+p[0], sc=+p[1];
     cx.fillStyle = got[allStars[i]] ? '#C9D2C3' : '#f59e0b';
-    cx.font='bold '+Math.floor(cell*0.62)+'px sans-serif';
+    cx.font='bold '+Math.floor(cell*0.62)+'px 'Nanum Gothic', 'Malgun Gothic', sans-serif';
     cx.fillText('★', sc*cell+cell/2, sr*cell+cell/2+1);
   }
   cx.fillStyle='#2F7D4F';
