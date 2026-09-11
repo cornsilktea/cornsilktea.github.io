@@ -62,8 +62,8 @@
   #batter{left:1%;bottom:6%;width:34%;height:58%;min-width:120px;max-width:300px;z-index:4}
   #batter .ph{font-size:16px}
   .fielder{position:absolute;pointer-events:none;opacity:.95;transform:translate(-50%,-100%)}
-  .fielder.in{width:4.2%;min-width:18px;max-width:30px}
-  .fielder.out{width:3.2%;min-width:14px;max-width:22px;opacity:.85}
+  .fielder.in{width:5.2%;min-width:22px;max-width:36px}
+  .fielder.out{width:4%;min-width:17px;max-width:28px;opacity:.9}
 
   /* 스트라이크 존 (홈플레이트 위 공간) */
   #zone{position:absolute;left:44%;top:63%;width:12%;height:14%;border:1.5px solid rgba(255,255,255,.55);border-radius:2px;
@@ -168,111 +168,167 @@
     <svg class="field" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
       <defs>
         <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#4f9de3"/><stop offset="1" stop-color="#cfe8fb"/>
+          <stop offset="0" stop-color="#3f92dd"/><stop offset="1" stop-color="#cfe6fa"/>
         </linearGradient>
         <linearGradient id="grass" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#4c9a44"/><stop offset="1" stop-color="#2e7a39"/>
+          <stop offset="0" stop-color="#4e9c46"/><stop offset="1" stop-color="#2f7c3a"/>
         </linearGradient>
         <linearGradient id="dirt" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#c79a63"/><stop offset="1" stop-color="#ad7f52"/>
+          <stop offset="0" stop-color="#c99c64"/><stop offset="1" stop-color="#b08154"/>
         </linearGradient>
         <linearGradient id="wall" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#2f6f9e"/><stop offset="1" stop-color="#1f4f74"/>
+          <stop offset="0" stop-color="#2c6a99"/><stop offset="1" stop-color="#1c4a6e"/>
         </linearGradient>
-        <linearGradient id="stand" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#8d98a6"/><stop offset="1" stop-color="#5c6674"/>
+        <linearGradient id="standUp" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#6d7986"/><stop offset="1" stop-color="#4f5a67"/>
         </linearGradient>
-        <pattern id="crowd" width="1.6" height="1.3" patternUnits="userSpaceOnUse">
-          <circle cx=".4" cy=".4" r=".36" fill="#d97b4f" opacity=".5"/>
-          <circle cx="1.2" cy="1" r=".36" fill="#efe1bd" opacity=".55"/>
+        <linearGradient id="standLow" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#5b6673"/><stop offset="1" stop-color="#3f4954"/>
+        </linearGradient>
+        <!-- 관중: 여러 색 점을 엇갈리게 -->
+        <pattern id="crowd" width="2.4" height="1.5" patternUnits="userSpaceOnUse">
+          <circle cx=".5" cy=".45" r=".34" fill="#e8c9a4"/><circle cx=".5" cy=".95" r=".38" fill="#d97b4f"/>
+          <circle cx="1.3" cy=".35" r=".34" fill="#f0dcc0"/><circle cx="1.3" cy=".85" r=".38" fill="#f2f2ea"/>
+          <circle cx="2.05" cy=".5" r=".34" fill="#e8c9a4"/><circle cx="2.05" cy="1.0" r=".38" fill="#5c8f6a"/>
+        </pattern>
+        <pattern id="crowd2" width="2.2" height="1.4" patternUnits="userSpaceOnUse">
+          <circle cx=".4" cy=".4" r=".3" fill="#e8c9a4"/><circle cx=".4" cy=".85" r=".34" fill="#3d6b9b"/>
+          <circle cx="1.2" cy=".3" r=".3" fill="#f0dcc0"/><circle cx="1.2" cy=".75" r=".34" fill="#d97b4f"/>
+          <circle cx="1.9" cy=".45" r=".3" fill="#e8c9a4"/><circle cx="1.9" cy=".9" r=".34" fill="#eeeee6"/>
         </pattern>
         <clipPath id="grassClip"><rect x="0" y="36" width="100" height="64"/></clipPath>
+        <clipPath id="standClip"><path d="M0 28 Q50 10 100 28 L100 45 Q50 29 0 45 Z"/></clipPath>
       </defs>
 
       <!-- 하늘·구름 -->
       <rect x="0" y="0" width="100" height="40" fill="url(#sky)"/>
-      <g fill="#fff" opacity=".85">
-        <ellipse cx="14" cy="8" rx="7" ry="2.2"/><ellipse cx="18" cy="6.6" rx="4" ry="2"/>
-        <ellipse cx="74" cy="6" rx="8" ry="2.4"/><ellipse cx="79" cy="4.6" rx="4.5" ry="2.2"/>
-        <ellipse cx="44" cy="12" rx="5" ry="1.6"/>
+      <g fill="#fff" opacity=".9">
+        <ellipse cx="14" cy="7" rx="7" ry="2.2"/><ellipse cx="18" cy="5.6" rx="4" ry="2"/><ellipse cx="10" cy="6.4" rx="3.5" ry="1.6"/>
+        <ellipse cx="76" cy="5" rx="8" ry="2.4"/><ellipse cx="81" cy="3.6" rx="4.5" ry="2.2"/><ellipse cx="71" cy="4.4" rx="3.8" ry="1.7"/>
+        <ellipse cx="46" cy="9" rx="5" ry="1.5"/><ellipse cx="49" cy="8.2" rx="3" ry="1.3"/>
       </g>
-      <!-- 원경 건물 -->
-      <g fill="#7c8aa0">
-        <rect x="3" y="20" width="6" height="12"/><rect x="10" y="15" width="4" height="17"/><rect x="15" y="22" width="7" height="10"/>
-        <rect x="78" y="17" width="5" height="15"/><rect x="84" y="21" width="8" height="11"/><rect x="93" y="14" width="4" height="18"/>
-        <rect x="46" y="18" width="8" height="10"/>
+      <!-- 조명탑 -->
+      <g fill="#8f9aa6">
+        <rect x="17.4" y="6" width="1.2" height="16"/><rect x="14.6" y="4" width="6.8" height="3.2" rx=".4" fill="#5f6a76"/>
+        <rect x="81.4" y="6" width="1.2" height="16"/><rect x="78.6" y="4" width="6.8" height="3.2" rx=".4" fill="#5f6a76"/>
       </g>
-      <g fill="#dfe6ee" opacity=".7">
-        <rect x="4" y="22" width="1" height="1"/><rect x="6" y="22" width="1" height="1"/><rect x="11" y="18" width="1" height="1"/>
-        <rect x="79" y="20" width="1" height="1"/><rect x="81" y="20" width="1" height="1"/><rect x="94" y="17" width="1" height="1"/>
-        <rect x="48" y="20" width="1" height="1"/><rect x="51" y="20" width="1" height="1"/>
+      <g fill="#fff8d6" opacity=".9">
+        <rect x="15.2" y="4.6" width="1.2" height=".9"/><rect x="17" y="4.6" width="1.2" height=".9"/><rect x="18.8" y="4.6" width="1.2" height=".9"/>
+        <rect x="15.2" y="5.9" width="1.2" height=".9"/><rect x="17" y="5.9" width="1.2" height=".9"/><rect x="18.8" y="5.9" width="1.2" height=".9"/>
+        <rect x="79.2" y="4.6" width="1.2" height=".9"/><rect x="81" y="4.6" width="1.2" height=".9"/><rect x="82.8" y="4.6" width="1.2" height=".9"/>
+        <rect x="79.2" y="5.9" width="1.2" height=".9"/><rect x="81" y="5.9" width="1.2" height=".9"/><rect x="82.8" y="5.9" width="1.2" height=".9"/>
       </g>
 
-      <!-- 외야 관중석: 펜스를 따라 둥글게 -->
-      <path d="M0 36 Q50 20 100 36 L100 46 Q50 30 0 46 Z" fill="url(#stand)"/>
-      <path d="M0 37.5 Q50 21.5 100 37.5 L100 44.5 Q50 28.5 0 44.5 Z" fill="url(#crowd)"/>
-      <path d="M0 44.5 Q50 28.5 100 44.5 L100 46 Q50 30 0 46 Z" fill="#3e4a58"/>
+      <!-- 외야 관중석: 펜스를 따라 둥글게, 2층 -->
+      <g clip-path="url(#standClip)">
+        <path d="M0 28 Q50 10 100 28 L100 45 Q50 29 0 45 Z" fill="url(#standUp)"/>
+        <path d="M0 29.5 Q50 11.5 100 29.5 L100 36.5 Q50 18.5 0 36.5 Z" fill="url(#crowd)"/>       <!-- 위층 관중 -->
+        <path d="M0 36.5 Q50 18.5 100 36.5 L100 38 Q50 20 0 38 Z" fill="#2f3842"/>                 <!-- 층 사이 통로 -->
+        <path d="M0 38 Q50 20 100 38 L100 45 Q50 29 0 45 Z" fill="url(#standLow)"/>
+        <path d="M0 39 Q50 21 100 39 L100 44 Q50 28 0 44 Z" fill="url(#crowd2)"/>                 <!-- 아래층 관중 -->
+        <!-- 가운데 배터스 아이(타자 시야 보호용 짙은 녹색 벽) -->
+        <path d="M42 22 L58 22 L58 34 L42 34 Z" fill="#1f4a2c"/>
+        <path d="M42 22 L58 22 L58 23 L42 23 Z" fill="#2c5e3a"/>
+        <!-- 전광판 -->
+        <rect x="44" y="24" width="12" height="7" rx=".4" fill="#101820"/>
+        <rect x="45" y="25" width="10" height="1.4" fill="#2b3a48"/>
+        <rect x="45.6" y="27.2" width="2" height="1" fill="#f2c94c"/><rect x="48.4" y="27.2" width="2" height="1" fill="#f2c94c"/>
+        <rect x="51.2" y="27.2" width="2" height="1" fill="#f2c94c"/><rect x="45.6" y="29" width="8.8" height=".8" fill="#4a6b8a"/>
+        <!-- 계단 통로 -->
+        <g fill="#2f3842" opacity=".8">
+          <rect x="14" y="26" width="1" height="19"/><rect x="28" y="22" width="1" height="23"/>
+          <rect x="71" y="22" width="1" height="23"/><rect x="85" y="26" width="1" height="19"/>
+        </g>
+      </g>
+      <path d="M0 28 Q50 10 100 28" fill="none" stroke="#9aa5b1" stroke-width=".6"/>                <!-- 지붕 난간 -->
+      <path d="M0 44.5 Q50 28.5 100 44.5 L100 45 Q50 29 0 45 Z" fill="#30404f"/>
 
       <!-- 잔디 (외야 줄무늬는 홈플레이트를 중심으로 한 동심 호) -->
       <rect x="0" y="36" width="100" height="64" fill="url(#grass)"/>
-      <g clip-path="url(#grassClip)" fill="#ffffff" opacity=".06">
-        <ellipse cx="50" cy="86" rx="72" ry="46"/><ellipse cx="50" cy="86" rx="60" ry="38"/>
-        <ellipse cx="50" cy="86" rx="48" ry="30"/><ellipse cx="50" cy="86" rx="38" ry="24"/>
+      <g clip-path="url(#grassClip)" fill="#ffffff" opacity=".07">
+        <ellipse cx="50" cy="86" rx="76" ry="48"/><ellipse cx="50" cy="86" rx="62" ry="39"/>
+        <ellipse cx="50" cy="86" rx="49" ry="31"/><ellipse cx="50" cy="86" rx="37" ry="23"/>
       </g>
-      <g clip-path="url(#grassClip)" fill="#000000" opacity=".05">
-        <ellipse cx="50" cy="86" rx="66" ry="42"/><ellipse cx="50" cy="86" rx="54" ry="34"/><ellipse cx="50" cy="86" rx="43" ry="27"/>
+      <g clip-path="url(#grassClip)" fill="#000000" opacity=".06">
+        <ellipse cx="50" cy="86" rx="69" ry="43.5"/><ellipse cx="50" cy="86" rx="55.5" ry="35"/><ellipse cx="50" cy="86" rx="43" ry="27"/>
       </g>
 
       <!-- 외야 펜스: 좌우 폴을 잇는 둥근 담장 + 경고 트랙 -->
-      <path d="M0 47.5 Q50 31.5 100 47.5 L100 50 Q50 34 0 50 Z" fill="url(#dirt)" opacity=".9"/>   <!-- 경고 트랙 -->
-      <path d="M0 45 Q50 29 100 45 L100 47.5 Q50 31.5 0 47.5 Z" fill="url(#wall)"/>                <!-- 담장 -->
-      <path d="M0 45 Q50 29 100 45" fill="none" stroke="#f2c94c" stroke-width=".5"/>               <!-- 담장 위 노란 선 -->
+      <path d="M0 47.5 Q50 31.5 100 47.5 L100 50.5 Q50 34.5 0 50.5 Z" fill="url(#dirt)" opacity=".9"/>   <!-- 경고 트랙 -->
+      <path d="M0 45 Q50 29 100 45 L100 47.5 Q50 31.5 0 47.5 Z" fill="url(#wall)"/>                  <!-- 담장 -->
+      <g stroke="#173d5c" stroke-width=".25" opacity=".6">                                            <!-- 담장 패널 이음새 -->
+        <path d="M10 43.6 L10 46.2"/><path d="M20 41.7 L20 44.3"/><path d="M30 40.2 L30 42.8"/><path d="M40 39.3 L40 41.9"/>
+        <path d="M50 37 L50 39.6"/><path d="M60 39.3 L60 41.9"/><path d="M70 40.2 L70 42.8"/><path d="M80 41.7 L80 44.3"/><path d="M90 43.6 L90 46.2"/>
+      </g>
+      <path d="M0 45 Q50 29 100 45" fill="none" stroke="#f2c94c" stroke-width=".5"/>                 <!-- 담장 위 노란 선 -->
       <!-- 파울 폴 -->
-      <rect x=".6" y="30" width=".8" height="17" fill="#f2c94c"/>
-      <rect x="98.6" y="30" width=".8" height="17" fill="#f2c94c"/>
+      <rect x=".6" y="24" width=".8" height="23" fill="#f2c94c"/><rect x="1.4" y="24" width="1.6" height="9" fill="#f2c94c" opacity=".85"/>
+      <rect x="98.6" y="24" width=".8" height="23" fill="#f2c94c"/><rect x="97" y="24" width="1.6" height="9" fill="#f2c94c" opacity=".85"/>
 
-      <!-- 내야 흙(스킨) : 1·3루 바깥까지, 2루 뒤로 둥글게 -->
-      <path d="M50 87 L87 63.5 Q50 37 13 63.5 Z" fill="url(#dirt)"/>
-      <!-- 내야 잔디 (다이아몬드) -->
-      <path d="M50 79.5 L72.5 64.8 L50 55.2 L27.5 64.8 Z" fill="url(#grass)" stroke="#3f8a3d" stroke-width="1.2" stroke-linejoin="round"/>
       <!-- 파울선 (홈 → 파울 폴) -->
       <path d="M50 86 L0.5 46.5" stroke="#fff" stroke-width=".55" opacity=".9"/>
       <path d="M50 86 L99.5 46.5" stroke="#fff" stroke-width=".55" opacity=".9"/>
+      <!-- 내야 흙(스킨): 1·3루 바깥까지, 2루 뒤로 둥글게 -->
+      <path d="M50 87 L88 63 Q50 36 12 63 Z" fill="url(#dirt)"/>
+      <path d="M50 87 L88 63 Q50 36 12 63 Z" fill="none" stroke="#9c7245" stroke-width=".25" opacity=".5"/>
+      <!-- 내야 잔디 (베이스라인 안쪽 다이아몬드) -->
+      <path d="M50 80.5 L70.5 64.4 L50 55.6 L29.5 64.4 Z" fill="url(#grass)" stroke="#3f8a3d" stroke-width="1" stroke-linejoin="round"/>
+      <path d="M50 80.5 L70.5 64.4 L50 55.6 L29.5 64.4 Z" fill="none" stroke="#2c6a30" stroke-width=".25" opacity=".5"/>
+      <!-- 베이스라인 (홈 ↔ 1루·3루 선은 파울선과 겹침) -->
       <!-- 마운드 -->
-      <ellipse cx="50" cy="60.2" rx="6" ry="2.3" fill="url(#dirt)"/>
-      <ellipse cx="50" cy="60" rx="4.2" ry="1.5" fill="#b78859" opacity=".7"/>
+      <ellipse cx="50" cy="60.4" rx="6.2" ry="2.4" fill="url(#dirt)"/>
+      <ellipse cx="50" cy="60.2" rx="6.2" ry="2.4" fill="none" stroke="#9c7245" stroke-width=".25" opacity=".6"/>
+      <ellipse cx="50" cy="60" rx="4" ry="1.4" fill="#bb8c5c" opacity=".7"/>
       <rect x="49.2" y="59.3" width="1.6" height=".45" fill="#fff"/>
-      <!-- 베이스 -->
-      <rect x="48.8" y="52.6" width="2.4" height="1.2" fill="#fff"/>
-      <polygon points="74.6,64.1 77.4,64.1 77.8,65.5 75,65.5" fill="#fff"/>
-      <polygon points="22.6,64.1 25.4,64.1 25,65.5 22.2,65.5" fill="#fff"/>
-      <!-- 홈플레이트 주변 흙 -->
-      <ellipse cx="50" cy="85" rx="13" ry="5.5" fill="url(#dirt)"/>
+      <!-- 베이스: 다이아몬드의 네 꼭짓점, 각 변이 베이스라인과 나란하게 -->
+      <polygon points="73.83,62.77 75.79,63.75 74.17,65.23 72.21,64.25" fill="#fff" stroke="#cfcfcf" stroke-width=".15"/>   <!-- 1루 -->
+      <polygon points="50,51.1 51.8,52 50,52.9 48.2,52" fill="#fff" stroke="#cfcfcf" stroke-width=".15"/>                    <!-- 2루 -->
+      <polygon points="26.17,62.77 24.21,63.75 25.83,65.23 27.79,64.25" fill="#fff" stroke="#cfcfcf" stroke-width=".15"/>   <!-- 3루 -->
+      <!-- 홈플레이트 주변 흙 (타자 박스·포수 박스를 넉넉히 감쌈) -->
+      <ellipse cx="50" cy="86" rx="20" ry="9.5" fill="url(#dirt)"/>
+      <ellipse cx="50" cy="86" rx="20" ry="9.5" fill="none" stroke="#9c7245" stroke-width=".25" opacity=".5"/>
+      <!-- 대기 타석 -->
+      <ellipse cx="80" cy="83" rx="3.2" ry="1.3" fill="url(#dirt)"/>
+      <ellipse cx="80" cy="83" rx="3.2" ry="1.3" fill="none" stroke="#fff" stroke-width=".3" opacity=".7"/>
       <!-- 타자 박스(양쪽)·포수 박스 -->
-      <path d="M38.5 80.5 L46 80.5 L46.5 89 L37.5 89 Z" fill="none" stroke="#fff" stroke-width=".5" opacity=".8"/>
-      <path d="M54 80.5 L61.5 80.5 L62.5 89 L53.5 89 Z" fill="none" stroke="#fff" stroke-width=".5" opacity=".8"/>
-      <path d="M44 89.8 L56 89.8 L57 94 L43 94 Z" fill="none" stroke="#fff" stroke-width=".5" opacity=".6"/>
+      <path d="M38.5 80.5 L46 80.5 L46.5 89 L37.5 89 Z" fill="none" stroke="#fff" stroke-width=".5" opacity=".85"/>
+      <path d="M54 80.5 L61.5 80.5 L62.5 89 L53.5 89 Z" fill="none" stroke="#fff" stroke-width=".5" opacity=".85"/>
+      <path d="M44 89.8 L56 89.8 L57 94 L43 94 Z" fill="none" stroke="#fff" stroke-width=".5" opacity=".65"/>
       <!-- 홈플레이트 -->
       <path d="M47.8 82.8 L52.2 82.8 L52.2 84.4 L50 85.8 L47.8 84.4 Z" fill="#fff" stroke="#c9c9c9" stroke-width=".3"/>
     </svg>
 
-    <!-- 야수 (간단한 도형): 유격수·2루수·좌익수·우익수 -->
-    <svg class="fielder in" style="left:35%;top:59%" viewBox="0 0 20 30" aria-hidden="true">
-      <circle cx="10" cy="6" r="4" fill="#e9c9a6"/><rect x="5" y="10" width="10" height="11" rx="3" fill="#f4f6f1"/>
-      <rect x="5" y="20" width="4" height="9" fill="#24402F"/><rect x="11" y="20" width="4" height="9" fill="#24402F"/><rect x="6" y="2" width="8" height="2.5" rx="1" fill="#24402F"/>
+    <!-- 야수 (공통 도형 하나를 여러 자리에 재사용): 3루수·유격수·2루수·1루수·좌익수·우익수 -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+      <symbol id="fielderShape" viewBox="0 0 40 64">
+        <ellipse cx="20" cy="61" rx="11" ry="2.4" fill="rgba(0,0,0,.25)"/>
+        <!-- 다리·양말·신발 -->
+        <path d="M13 38 L18 38 L17.5 52 L12.5 52 Z" fill="#f4f6f1"/><path d="M22 38 L27 38 L27.5 52 L22.5 52 Z" fill="#f4f6f1"/>
+        <rect x="12.5" y="50" width="5" height="8" fill="#24402F"/><rect x="22.5" y="50" width="5" height="8" fill="#24402F"/>
+        <rect x="12.5" y="52" width="5" height="1" fill="#fff"/><rect x="22.5" y="52" width="5" height="1" fill="#fff"/>
+        <path d="M11 57.5 L18 57.5 L18.5 60.5 L10 60.5 Z" fill="#1b2b20"/><path d="M22 57.5 L29 57.5 L30 60.5 L21.5 60.5 Z" fill="#1b2b20"/>
+        <!-- 몸통(유니폼) -->
+        <path d="M12 22 Q20 19 28 22 L29 40 L11 40 Z" fill="#f4f6f1"/>
+        <path d="M19.4 22 L20.6 22 L20.6 40 L19.4 40 Z" fill="#24402F" opacity=".8"/>
+        <rect x="11" y="37" width="18" height="2" fill="#24402F"/>
+        <!-- 팔: 왼쪽은 글러브, 오른쪽은 맨손 -->
+        <path d="M12 23 L7 34 L10.5 35.5 L15 26 Z" fill="#f4f6f1"/><path d="M28 23 L33 34 L29.5 35.5 L25 26 Z" fill="#f4f6f1"/>
+        <path d="M9 29 L7 34 L10.5 35.5 L12 31 Z" fill="#24402F"/><path d="M31 29 L33 34 L29.5 35.5 L28 31 Z" fill="#24402F"/>
+        <ellipse cx="8" cy="37.5" rx="4" ry="4.4" fill="#8a5a2b"/><ellipse cx="8" cy="36" rx="3" ry="2.4" fill="#a86f38"/>
+        <circle cx="31.5" cy="37" r="2.2" fill="#e9c9a6"/>
+        <!-- 머리·모자 -->
+        <circle cx="20" cy="14" r="6" fill="#e9c9a6"/>
+        <path d="M14 13.5 Q20 5 26 13.5 Z" fill="#24402F"/>
+        <path d="M13.5 13.5 L28.5 13.5 L28.5 15 L13.5 15 Z" fill="#1b2f22"/>
+        <rect x="18" y="16" width="1.2" height="1.2" fill="#3b2a1e"/><rect x="21" y="16" width="1.2" height="1.2" fill="#3b2a1e"/>
+      </symbol>
     </svg>
-    <svg class="fielder in" style="left:65%;top:59%" viewBox="0 0 20 30" aria-hidden="true">
-      <circle cx="10" cy="6" r="4" fill="#e9c9a6"/><rect x="5" y="10" width="10" height="11" rx="3" fill="#f4f6f1"/>
-      <rect x="5" y="20" width="4" height="9" fill="#24402F"/><rect x="11" y="20" width="4" height="9" fill="#24402F"/><rect x="6" y="2" width="8" height="2.5" rx="1" fill="#24402F"/>
-    </svg>
-    <svg class="fielder out" style="left:20%;top:52%" viewBox="0 0 20 30" aria-hidden="true">
-      <circle cx="10" cy="6" r="4" fill="#e9c9a6"/><rect x="5" y="10" width="10" height="11" rx="3" fill="#f4f6f1"/>
-      <rect x="5" y="20" width="4" height="9" fill="#24402F"/><rect x="11" y="20" width="4" height="9" fill="#24402F"/><rect x="6" y="2" width="8" height="2.5" rx="1" fill="#24402F"/>
-    </svg>
-    <svg class="fielder out" style="left:80%;top:52%" viewBox="0 0 20 30" aria-hidden="true">
-      <circle cx="10" cy="6" r="4" fill="#e9c9a6"/><rect x="5" y="10" width="10" height="11" rx="3" fill="#f4f6f1"/>
-      <rect x="5" y="20" width="4" height="9" fill="#24402F"/><rect x="11" y="20" width="4" height="9" fill="#24402F"/><rect x="6" y="2" width="8" height="2.5" rx="1" fill="#24402F"/>
-    </svg>
+    <svg class="fielder in" style="left:20%;top:64%" viewBox="0 0 40 64"><use href="#fielderShape"/></svg>   <!-- 3루수 -->
+    <svg class="fielder in" style="left:37%;top:58%" viewBox="0 0 40 64"><use href="#fielderShape"/></svg>   <!-- 유격수 -->
+    <svg class="fielder in" style="left:64%;top:58%" viewBox="0 0 40 64"><use href="#fielderShape"/></svg>   <!-- 2루수 -->
+    <svg class="fielder in" style="left:80%;top:64%" viewBox="0 0 40 64"><use href="#fielderShape"/></svg>   <!-- 1루수 -->
+    <svg class="fielder out" style="left:17%;top:51%" viewBox="0 0 40 64"><use href="#fielderShape"/></svg>  <!-- 좌익수 -->
+    <svg class="fielder out" style="left:83%;top:51%" viewBox="0 0 40 64"><use href="#fielderShape"/></svg>  <!-- 우익수 -->
 
     <!-- 투수 자리 -->
     <div class="slot" id="pitcher">
@@ -553,9 +609,9 @@ function nextPitch(){
   G.end = pickEnd();
   G.swung = false;
   G.phase = "windup";
+  $("hudSpeed").textContent = "-";
   hideZoneMark();
   setPitcher("windup");
-  $("hudSpeed").textContent = String(G.kmh);
   // 와인드업 길이를 조금씩 다르게 해서 리듬만으로 맞추기 어렵게
   later(release, 650 + Math.random() * 350);
 }
@@ -567,6 +623,7 @@ function release(){
   btnSwing.disabled = false;
   ball.style.display = "block";
   later(() => setPitcher("idle"), 350);
+  later(() => { $("hudSpeed").textContent = String(G.kmh); }, G.flightTime);   // 구속은 공이 홈플레이트에 닿은 뒤에 표시
   // 공을 치지 않고 흘려보내면 스트라이크 또는 볼
   later(() => { if (G.phase === "flight" && !G.swung) judge(null); }, G.flightTime + WIN.foul + 40);
   G.raf = requestAnimationFrame(flyPitch);
