@@ -91,10 +91,42 @@
     document.body.appendChild(home);
   }
 
+  /* ---------- 저작권 표시 ----------
+     모든 수업 자료 화면 오른쪽 아래에 작게 붙습니다.
+     (목록·제어판 화면은 이 파일을 쓰지 않으므로 index.html·admin.html 에 같은 표시가 따로 있습니다.) */
+  function addCopyright() {
+    if (document.querySelector("[data-guard-copyright]")) return;
+    var c = document.createElement("a");
+    c.setAttribute("data-guard-copyright", "1");
+    c.href = "https://creativecommons.org/licenses/by-nc-sa/4.0/deed.ko";
+    c.target = "_blank";
+    c.rel = "license noopener";
+    c.title = "저작자를 밝히고, 비영리로, 같은 조건이면 자유롭게 쓸 수 있어요";
+    c.textContent = "© 2026 cornsilktea · CC BY-NC-SA 4.0";
+    c.style.cssText = [
+      "position:fixed",
+      "right:8px",
+      "bottom:calc(4px + env(safe-area-inset-bottom, 0px))",
+      "z-index:2147483000",
+      "padding:2px 8px",
+      "border-radius:4px",
+      "background:rgba(244,246,241,0.85)",
+      "color:#5B6B5E",
+      "font-size:11px",
+      "line-height:1.4",
+      "text-decoration:none",
+      "white-space:nowrap",
+      "-webkit-tap-highlight-color:transparent",
+      "font-family:'Nanum Gothic','Malgun Gothic','맑은 고딕',sans-serif"
+    ].join(";");
+    document.body.appendChild(c);
+  }
+
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", addHomeButton);
+    document.addEventListener("DOMContentLoaded", function () { addHomeButton(); addCopyright(); });
   } else {
     addHomeButton();
+    addCopyright();
   }
 
   /* data-game 이 없으면 잠금 확인은 하지 않고 버튼만 붙입니다. */

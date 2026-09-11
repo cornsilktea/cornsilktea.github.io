@@ -142,6 +142,11 @@
     .game-head { flex-direction: column; }
     .switch { align-self: flex-start; }
   }
+  .copyright {
+    position: fixed; right: 8px; bottom: calc(4px + env(safe-area-inset-bottom, 0px)); z-index: 1000;
+    padding: 2px 8px; border-radius: var(--sg-radius); background: rgba(244,246,241,0.85);
+    color: var(--sg-ink-soft); font-size: 11px; line-height: 1.4; text-decoration: none; white-space: nowrap;
+  }
 </style>
 </head>
 <body>
@@ -915,5 +920,9 @@ if ("serviceWorker" in navigator) {
   });
 }
 </script>
+
+<!-- 저작권 표시: 수업 자료 화면에는 access-guard.js 가 같은 표시를 붙입니다. -->
+<a class="copyright" href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.ko" target="_blank" rel="license noopener"
+   title="저작자를 밝히고, 비영리로, 같은 조건이면 자유롭게 쓸 수 있어요">© 2026 cornsilktea · CC BY-NC-SA 4.0</a>
 </body>
 </html>
