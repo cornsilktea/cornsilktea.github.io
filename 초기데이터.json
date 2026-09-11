@@ -171,6 +171,17 @@
         "open": false,
         "units": [],
         "unitsSet": true
+      },
+      "ramentiming": {
+        "title": "라면 끓이기 타이밍 게임",
+        "url": "19.ramen-timing-game.html",
+        "memo": "순차 처리 · 우선순위 판단 / 120초 개인전",
+        "order": 18,
+        "open": false,
+        "units": [
+          "g2s2-3-1"
+        ],
+        "unitsSet": true
       }
     }
   }

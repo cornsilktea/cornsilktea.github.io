@@ -61,7 +61,8 @@
     tablereading: ["g2s2-2-2"],
     privacyescape:["g2s1-5-2"],
     aiethicscourt:["g1s2-5", "g2s1-5-2"],
-    conditionrun: ["g2s2-3-2"]
+    conditionrun: ["g2s2-3-2"],
+    ramentiming:  ["g2s2-3-1"]
   };
 
   /* 예전 오타(drowing)를 쓰던 자료를 자동으로 바로잡기 위한 표입니다.
