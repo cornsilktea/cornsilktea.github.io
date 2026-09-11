@@ -59,7 +59,7 @@
   #pitcher{left:50%;bottom:39.5%;width:11%;height:17%;transform:translateX(-50%);min-width:40px;z-index:2}
   #pitcher .ph{font-size:13px}
   /* 우타자: 홈플레이트 왼쪽(3루 쪽) 타석 */
-  #batter{left:25%;bottom:12%;width:34%;height:41.5%;z-index:3}   /* 발이 왼쪽 타자 박스 안에, 무릎(그림 높이의 30%)~팔꿈치(62.5%)가 스트라이크 존과 맞도록 */
+  #batter{left:21%;bottom:12%;width:34%;height:41.5%;z-index:3}   /* 발이 왼쪽 타자 박스 안에, 무릎(그림 높이의 30%)~팔꿈치(62.5%)가 스트라이크 존과 맞도록 */
   #batter .ph{font-size:16px}
   .fielder{position:absolute;pointer-events:none;opacity:.95;transform:translate(-50%,-100%)}
   .fielder.in{width:5.2%;min-width:22px;max-width:36px}
@@ -89,6 +89,11 @@
   #ball::before{left:-45%;top:0;border-right-color:#c2453d}
   #ball::after{left:45%;top:0;border-left-color:#c2453d}
   #shadow{position:absolute;width:12px;height:5px;border-radius:50%;background:rgba(0,0,0,.28);display:none;z-index:1}
+  /* 타격 순간 빛: 홈런 노랑, 135m 이상 주황 */
+  #flash{position:absolute;left:0;top:0;width:40px;height:40px;border-radius:50%;display:none;z-index:4;pointer-events:none;
+    transform:translate(-50%,-50%);background:radial-gradient(circle,rgba(255,255,255,.95) 0 18%,var(--flash) 30%,rgba(255,255,255,0) 70%)}
+  #flash.on{display:block;animation:flash .32s ease-out forwards}
+  @keyframes flash{0%{transform:translate(-50%,-50%) scale(.3);opacity:1}70%{opacity:.9}100%{transform:translate(-50%,-50%) scale(1.6);opacity:0}}
 
   /* 판정 문구 */
   #call{position:absolute;left:50%;top:54%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;
@@ -362,6 +367,7 @@
     <div id="zone"></div>
     <div id="shadow"></div>
     <div id="ball"></div>
+    <div id="flash"></div>
     <div id="zoneMark"><span class="dot"></span><span class="lb" id="zoneMarkText"></span></div>
 
     <!-- 타자 자리 (우타석) -->
@@ -584,6 +590,16 @@ function showZoneMark(){
   $("zone").classList.toggle("strike", e.strike);
 }
 function hideZoneMark(){ $("zoneMark").classList.remove("on"); $("zone").classList.remove("strike"); }
+/* 타격 순간 공 위치에 잠깐 빛나는 효과 */
+function showFlash(color){
+  const W = stage.clientWidth, H = stage.clientHeight, fl = $("flash");
+  const px = BALL_MAX / 100 * H * 2.2;
+  fl.style.width = fl.style.height = px + "px";
+  fl.style.left = (PLATE.x + G.end.dx) / 100 * W + "px"; fl.style.top = (PLATE.y + G.end.dy) / 100 * H + "px";
+  fl.style.setProperty("--flash", color);
+  fl.classList.remove("on"); void fl.offsetWidth; fl.classList.add("on");
+  later(() => fl.classList.remove("on"), 340);
+}
 
 /* ---------- 게임 흐름 ---------- */
 function startGame(){
@@ -592,7 +608,7 @@ function startGame(){
     speedBonus: 0, phase: "idle", cur: null, swung: false, freePitch: false });
   $("hudSpeed").textContent = "-";
   setGauge(null, "이전 타격의 타이밍");
-  hideCall(); hideZoneMark(); ball.style.display = "none"; shadow.style.display = "none";
+  hideCall(); hideZoneMark(); ball.style.display = "none"; shadow.style.display = "none"; $("flash").classList.remove("on");
   setBatter("ready"); setPitcher("idle");
   $("scrStart").classList.remove("on"); $("scrEnd").classList.remove("on");
   hud();
@@ -610,11 +626,10 @@ function pickEnd(){
   const rnd = (a, b) => a + Math.random() * (b - a);
   if (Math.random() < 0.7)
     return { dx: rnd(-ZONE.hw + 1, ZONE.hw - 1), dy: rnd(-ZONE.hh + 1, ZONE.hh - 1), strike: true };
-  const side = Math.floor(Math.random() * 4);   // 0 위 1 아래 2 몸쪽 3 바깥쪽
+  const side = Math.floor(Math.random() * 3);   // 0 위 1 아래 2 바깥쪽 (타자 몸에 맞을 만한 몸쪽 볼은 던지지 않음)
   const out = rnd(1.5, 4.5);
   if (side === 0) return { dx: rnd(-ZONE.hw, ZONE.hw), dy: -ZONE.hh - out, strike: false };
   if (side === 1) return { dx: rnd(-ZONE.hw, ZONE.hw), dy:  ZONE.hh + out, strike: false };
-  if (side === 2) return { dx: -ZONE.hw - out, dy: rnd(-ZONE.hh, ZONE.hh), strike: false };
   return { dx: ZONE.hw + out, dy: rnd(-ZONE.hh, ZONE.hh), strike: false };
 }
 
@@ -723,7 +738,11 @@ function judge(delta){
 
   const bigGrade = grade === "홈런" ? "홈런!" : grade;
   if (dist > 0 || grade === "파울"){ G.pitchAnim = false; cancelAnimationFrame(G.raf); }
-  if (dist > 0){ flyHit(dist, delta, () => { showCall(bigGrade, detail); later(afterResult, 1100); }); }
+  if (dist > 0){
+    const go = () => flyHit(dist, delta, () => { showCall(bigGrade, detail); later(afterResult, 1100); });
+    if (grade === "홈런"){ showFlash(dist >= 135 ? "#ff8a2a" : "#ffd83a"); ball.style.display = "none"; later(go, 150); }   // 홈런: 노란 빛, 135m 이상: 주황 빛
+    else go();
+  }
   else if (grade === "파울"){ flyFoul(side, () => { showCall(bigGrade, detail); later(afterResult, 1000); }); }
   else {
     // 헛스윙·스트라이크·볼: 공이 존을 지나는 것을 끝까지 보여 준 뒤 도착점 표시
