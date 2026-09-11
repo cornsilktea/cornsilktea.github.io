@@ -57,8 +57,6 @@
   .hud .card{padding:8px 10px;text-align:center}
   .hud .k{font-size:12px;color:var(--sub)}
   .hud .v{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
-  .goalbar{height:6px;background:var(--tone);border-radius:6px;overflow:hidden;margin-top:4px}
-  .goalbar i{display:block;height:100%;width:0;background:var(--ok);transition:width .3s}
 
   /* ---------- 냄비 4개 ---------- */
   .pots{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
@@ -145,10 +143,10 @@
         <li><b>①</b> 물 붓기 → 물이 서서히 끓어오름 (물을 부어야 조리 시작)</li>
         <li><b>②</b> 면+스프 넣기 (물을 부은 뒤라면 언제든 가능, 담기 전까지 꼭 넣기)</li>
         <li><b>③</b> 물이 끓기 시작하는 <u>그 순간</u>(테두리 반짝) 계란+파 넣기</li>
-        <li><b>④</b> 바로 쟁반에 담기</li>
+        <li><b>④</b> 잠시 익히는 동안 기다렸다가, 신호(테두리 반짝)가 오면 <u>바로</u> 쟁반에 담기 (빠를수록 보너스)</li>
       </ol>
       <p class="sub">순서를 건너뛰거나 뒤바꾸면 그 냄비는 실패. 오래 방치하면 탄다.
-        냄비 4개를 동시에 관리하며 <b id="goalTxt"></b>원을 <b id="secTxt"></b>초 안에 채우는 것이 목표.</p>
+        냄비 4개를 동시에 관리하며 <b id="secTxt"></b>초 안에 최대한 많은 돈을 버는 것이 목표.</p>
       <table class="grade-table">
         <tr><th>등급</th><th>최상</th><th>상</th><th>중</th><th>하</th><th>실패</th></tr>
         <tr><td>가격</td><td id="p1"></td><td id="p2"></td><td id="p3"></td><td id="p4"></td><td>0원</td></tr>
@@ -161,7 +159,7 @@
   <section id="scrGame" class="screen">
     <div class="hud">
       <div class="card"><div class="k">남은 시간</div><div class="v" id="hudTime">0</div></div>
-      <div class="card"><div class="k">누적 금액</div><div class="v" id="hudMoney">0원</div><div class="goalbar"><i id="goalFill"></i></div></div>
+      <div class="card"><div class="k">누적 금액</div><div class="v" id="hudMoney">0원</div></div>
       <div class="card"><div class="k">완성</div><div class="v" id="hudCount">0그릇</div></div>
     </div>
     <div class="pots" id="pots"></div>
@@ -200,11 +198,10 @@
    ===================================================================== */
 const CONFIG = {
   GAME_SECONDS : 120,    // 제한시간
-  GOAL_MONEY   : 10000,  // 목표 금액 (도달하면 즉시 종료·달성 시간 표시)
   POT_COUNT    : 4,      // 냄비 개수
 
-  BOIL_MIN     : 4.0,    // 물 부은 뒤 끓기까지 최소 시간
-  BOIL_MAX     : 6.0,    // 물 부은 뒤 끓기까지 최대 시간 (냄비마다 랜덤)
+  BOIL_MIN     : 3.0,    // 물 부은 뒤 끓기까지 최소 시간
+  BOIL_MAX     : 9.0,    // 물 부은 뒤 끓기까지 최대 시간 (냄비마다 랜덤, 폭이 클수록 예측 어려움)
   READY_WINDOW : 1.5,    // "지금 넣으세요!" 신호가 켜져 있는 시간
 
   /* 등급 판정: 신호 구간의 한가운데를 0초로 두고 |오차| 로 판정 */
@@ -213,8 +210,12 @@ const CONFIG = {
   FAIR_TOL     : 3.0,    // 중  (그 밖은 '하': 안 끓었는데 넣음 / 너무 오래 끓임)
 
   OVERBOIL_BURN: 8.0,    // 끓기 시작 후 이 시간까지 계란+파 안 넣으면 탐
-  TRAY_GOOD    : 2.5,    // 토핑 후 이 시간 안에 담으면 등급 유지 (넘기면 한 단계 하락)
-  TRAY_BURN    : 6.0,    // 토핑 후 이 시간까지 안 담으면 탐
+  SIMMER_MIN   : 2.0,    // 계란+파 넣은 뒤 익히는 대기시간 최소
+  SIMMER_MAX   : 5.0,    // 계란+파 넣은 뒤 익히는 대기시간 최대 (냄비마다 랜덤)
+  TRAY_FAST    : 1.0,    // 담기 신호 후 이 시간 안에 담으면 보너스
+  TRAY_GOOD    : 2.5,    // 담기 신호 후 이 시간 안에 담으면 등급 유지 (넘기면 한 단계 하락)
+  TRAY_BURN    : 6.0,    // 담기 신호 후 이 시간까지 안 담으면 탐
+  FAST_BONUS   : 200,    // 빠르게 담았을 때 추가 금액(원)
   BURNT_SHOW   : 1.5,    // 탐/순서 오류 표시가 남아 있는 시간
 
   PRICES : { best:1000, good:800, fair:600, poor:400, fail:0 }
@@ -226,7 +227,6 @@ const $ = id => document.getElementById(id);
 const fmt = n => n.toLocaleString("ko-KR");
 const now = () => performance.now()/1000;
 
-$("goalTxt").textContent = fmt(CONFIG.GOAL_MONEY);
 $("secTxt").textContent  = CONFIG.GAME_SECONDS;
 $("p1").textContent = fmt(CONFIG.PRICES.best)+"원";
 $("p2").textContent = fmt(CONFIG.PRICES.good)+"원";
@@ -314,6 +314,7 @@ class Pot {
     this.hasNoodle = false;   // 면+스프는 물을 부은 뒤 담기 전까지 아무 때나
     this.t0 = 0;              // 현재 단계 시작 시각
     this.boilAt = 0;          // 끓기 시작 시각
+    this.simmerAt = 0;        // 담기 신호 시각 (토핑 후 대기 끝)
     this.topDelta = 0;        // 토핑 오차(초)
     this.lockUntil = 0;       // 실패 표시 중 잠금
     this.failMsg = "";
@@ -340,15 +341,21 @@ class Pot {
     if (kind === "top"){
       if (!(st==="waterAdded"||st==="boiling"||st==="ready"||st==="late")) return this.fail("순서 오류 → 실패");
       this.topDelta = t - (this.boilAt + CONFIG.READY_WINDOW/2);
-      this.set("topped"); return;
+      this.set("topped");
+      this.simmerAt = this.t0 + CONFIG.SIMMER_MIN + Math.random()*(CONFIG.SIMMER_MAX-CONFIG.SIMMER_MIN);
+      return;
     }
     if (kind === "tray"){
       if (st !== "topped") return this.fail("순서 오류 → 실패");
       if (!this.hasNoodle) return this.fail("재료 누락 → 실패");
       const d = Math.abs(this.topDelta);
       let gi = d<=CONFIG.PERFECT_TOL?0 : d<=CONFIG.GOOD_TOL?1 : d<=CONFIG.FAIR_TOL?2 : 3;
-      if (t - this.t0 > CONFIG.TRAY_GOOD) gi = Math.min(3, gi+1);   // 늦게 담으면 한 단계 하락
-      game.serve(this, GRADE_ORDER[gi]);
+      const ds = t - this.simmerAt;            // 담기 신호 기준 시간
+      let bonus = 0;
+      if (ds < 0) gi = Math.min(3, gi+1);          // 덜 익은 채 담음 → 한 단계 하락
+      else if (ds <= CONFIG.TRAY_FAST) bonus = CONFIG.FAST_BONUS;   // 신호 직후 → 보너스
+      else if (ds > CONFIG.TRAY_GOOD) gi = Math.min(3, gi+1);        // 늦게 담음 → 한 단계 하락
+      game.serve(this, GRADE_ORDER[gi], bonus);
       this.reset();
     }
   }
@@ -381,9 +388,14 @@ class Pot {
       }
     }
     else if (st === "topped"){
-      const e = t - this.t0; label = "쟁반에 담으세요"; lvl="3"; prog = 1 - e/CONFIG.TRAY_BURN;
-      if (e > CONFIG.TRAY_GOOD) cls = "late";
-      if (e >= CONFIG.TRAY_BURN) return this.fail("타버림.. 실패", true);
+      lvl="3";
+      if (t < this.simmerAt){
+        label = "익히는 중…"; prog = (t - this.t0)/(this.simmerAt - this.t0);
+      } else {
+        const e = t - this.simmerAt; label = "지금 쟁반에 담으세요!"; prog = 1 - e/CONFIG.TRAY_BURN;
+        cls = e > CONFIG.TRAY_GOOD ? "late" : "ready";
+      }
+      if (t >= this.simmerAt + CONFIG.TRAY_BURN) return this.fail("타버림.. 실패", true);
     }
     else if (st === "burnt" || st === "error"){
       label = this.failMsg; cls = st + " off";
@@ -418,7 +430,7 @@ class Pot {
 
 /* ---------- 게임 ---------- */
 const game = {
-  pots: [], money: 0, served: 0, grades: {}, startAt: 0, endAt: 0, raf: 0, running: false, goalTime: null,
+  pots: [], money: 0, served: 0, grades: {}, startAt: 0, endAt: 0, raf: 0, running: false,
 
   build(){
     const wrap = $("pots"); wrap.innerHTML = "";
@@ -447,7 +459,7 @@ const game = {
 
   start(){
     this.money = 0; this.served = 0;
-    this.grades = {best:0,good:0,fair:0,poor:0,fail:0}; this.goalTime = null;
+    this.grades = {best:0,good:0,fair:0,poor:0,fail:0};
     $("trayBowls").innerHTML = ""; this.updateHud();
     this.build();
     this.startAt = now(); this.endAt = this.startAt + CONFIG.GAME_SECONDS;
@@ -466,23 +478,18 @@ const game = {
 
   count(g){ this.grades[g]++; },
 
-  serve(pot, grade){
+  serve(pot, grade, bonus){
     this.count(grade);
-    this.money += CONFIG.PRICES[grade];
+    this.money += CONFIG.PRICES[grade] + (bonus||0);
     this.served++;
     this.flyBowl(pot);
     this.updateHud();
-    if (this.money >= CONFIG.GOAL_MONEY && this.goalTime === null){
-      this.goalTime = now() - this.startAt;
-      this.finish();
-    }
   },
 
   updateHud(){
     $("hudMoney").textContent = fmt(this.money) + "원";
     $("hudCount").textContent = this.served + "그릇";
-    $("goalFill").style.width = Math.min(100, this.money/CONFIG.GOAL_MONEY*100) + "%";
-    $("trayTxt").textContent = `쟁반: 완성 ${this.served}그릇 / 목표 ${fmt(CONFIG.GOAL_MONEY)}원`;
+    $("trayTxt").textContent = `쟁반: 완성 ${this.served}그릇`;
   },
 
   /* 완성 그릇이 냄비에서 쟁반으로 이동 */
@@ -516,9 +523,7 @@ const game = {
     const g = this.grades;
     $("endTitle").textContent = "최종 결과";
     $("endMoney").textContent = `누적 금액: ${fmt(this.money)}원`;
-    $("endLine").textContent = this.goalTime !== null
-      ? `목표 ${fmt(CONFIG.GOAL_MONEY)}원 달성 · 걸린 시간 ${this.goalTime.toFixed(1)}초`
-      : `제한시간 ${CONFIG.GAME_SECONDS}초 종료`;
+    $("endLine").textContent = `제한시간 ${CONFIG.GAME_SECONDS}초 종료`;
     $("gBest").textContent = g.best; $("gGood").textContent = g.good; $("gFair").textContent = g.fair;
     $("gPoor").textContent = g.poor; $("gFail").textContent = g.fail;
     $("endSummary").textContent = `최종 결과 - 누적 금액: ${fmt(this.money)}원, 완성 ${this.served}그릇 (최상 ${g.best} / 상 ${g.good} / 중 ${g.fair} / 하 ${g.poor} / 실패 ${g.fail})`;
