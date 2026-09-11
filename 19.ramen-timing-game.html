@@ -109,6 +109,8 @@
   .pot.ready .label{background:var(--ready);color:#4a3600}
   .pot.burnt .label,.pot.error .label{background:#333;color:#fff}
   .pot.late .label{background:#f2d7b6}
+  .pot.prep .label{background:#dfe4ea;color:var(--sub)}
+  .pot.prep .scene{cursor:default;opacity:.6}
   .prog{height:5px;background:var(--tone);border-radius:5px;overflow:hidden}
   .prog i{display:block;height:100%;width:0;background:var(--focus)}
   .pot.ready .prog i{background:var(--ready)}
@@ -252,7 +254,7 @@
    교사 조정용 상수 (단위: 초 / 원)
    ===================================================================== */
 const CONFIG = {
-  GAME_SECONDS : 120,    // 제한시간
+  GAME_SECONDS : 60,     // 제한시간
   POT_COUNT    : 4,      // 냄비 개수
 
   BOIL_MIN     : 3.0,    // 물 부은 뒤 끓기까지 최소 시간
@@ -273,6 +275,8 @@ const CONFIG = {
   FAST_BONUS   : 200,    // 빠르게 담았을 때 추가 금액(원)
   BURN_PENALTY : 1000,   // 태워먹었을 때 깎이는 금액(원)
   BURNT_SHOW   : 1.5,    // 탐/순서 오류 표시가 남아 있는 시간
+  PREP_MIN     : 2.0,    // 쟁반에 담은 뒤 새 냄비가 준비되기까지 최소 시간 (그동안 클릭 불가)
+  PREP_MAX     : 4.0,    // 쟁반에 담은 뒤 새 냄비가 준비되기까지 최대 시간
 
   /* 실수가 있을수록 확 줄어드는 가격. mistake = 순서를 어기거나 재료를 빠뜨렸지만 완성한 경우 */
   PRICES : { best:1000, good:700, fair:500, poor:300, mistake:200, fail:0 }
@@ -427,6 +431,9 @@ class Pot {
       }
       game.serve(this, grade, bonus);
       this.reset();
+      this.state = "prep";                        // 새 냄비 준비 시간 → 바로 다시 시작 못 함
+      this.t0 = t;
+      this.lockUntil = t + CONFIG.PREP_MIN + Math.random()*(CONFIG.PREP_MAX-CONFIG.PREP_MIN);
     }
   }
   popup(text, minus){
@@ -479,6 +486,11 @@ class Pot {
       label = this.failMsg; cls = st + " off";
       if (t >= this.lockUntil) this.reset();
     }
+    else if (st === "prep"){
+      label = "냄비 준비 중…"; cls = "prep off";
+      prog = (t - this.t0)/(this.lockUntil - this.t0);
+      if (t >= this.lockUntil) this.reset();
+    }
 
     /* 클래스·라벨·진행 바 */
     el.className = "pot " + cls;
@@ -490,7 +502,7 @@ class Pot {
 
     /* 그림 요소 표시 */
     const s = this.state;
-    const hasWater = s !== "empty" && s !== "burnt" && s !== "error";
+    const hasWater = s !== "empty" && s !== "burnt" && s !== "error" && s !== "prep";
     this.q(".water").style.display   = hasWater ? "" : "none";
     this.q(".cooked").style.display  = (hasWater && this.hasNoodle) ? "" : "none";
     this.q(".topping").style.display = (s==="topped") ? "" : "none";
@@ -498,7 +510,7 @@ class Pot {
     this.q(".water").setAttribute("fill", s==="late" ? "#e8c98a" : s==="topped" ? "#f1b06a" : "#8ec5f2");
 
     /* 버튼: 이미 한 일은 비활성(정리), 그 외는 눌러 볼 수 있음 → 순서 오류 학습 */
-    const locked = (s==="burnt"||s==="error");
+    const locked = (s==="burnt"||s==="error"||s==="prep");
     const done = { water: s!=="empty", noodle: this.hasNoodle, top: s==="topped", tray: false };
     Object.keys(done).forEach(k => {
       const b = this.btn[k];
