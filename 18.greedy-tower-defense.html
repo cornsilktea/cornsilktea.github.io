@@ -296,7 +296,7 @@ var WAVES = [
   /* 2 */ { gold:85,  groups:[ g('red',10,34,0.45) ] },
   /* 3 */ { gold:90,  groups:[ g('red',8,38,0.45), g('blue',4,50,0.50,3.5) ] },
   /* 4 */ { gold:95,  groups:[ g('red',10,46,0.40), g('yellow',6,32,0.35,4) ] },
-  /* 5 */ { gold:105, groups:[ g('red',8,50,0.40), g('blue',5,60,0.45,3) ], boss:{hp:300,armor:1,start:1} },
+  /* 5 */ { gold:105, groups:[ g('red',8,50,0.40), g('blue',5,60,0.45,3) ], boss:{hp:240,armor:5,start:1} },
   /* 6 */ { gold:110, groups:[ g('red',10,60,0.38), g('yellow',8,40,0.30,3.5) ] },
 
   /* --- 7~14 중간 구간 --- */
@@ -881,7 +881,7 @@ function prepareWave(n){
   goBtn.textContent='▶ Wave '+n+' 시작';
   goBtn.removeAttribute('disabled');
   goMsg.innerHTML='<b>Wave '+n+'</b> · 풍선 '+units+'마리'+(w.boss? ' + 보스(방어력 '+w.boss.armor+')':'')
-    +' · 모두 잡으면 <b>'+w.gold+'G</b>' + (w.boss?' · 보스를 놓치면 즉시 패배합니다!':'')
+    +' · 모두 잡으면 <b>'+w.gold+'G</b>' + (w.boss?' · 보스를 놓치면 즉시 패배! 한 발 데미지에서 방어력만큼 빠지니 한 발이 센 타워가 필요합니다':'')
     +'<br>타워를 배치한 뒤 시작하세요.';
   updateHUD(); updatePanel();
 }
