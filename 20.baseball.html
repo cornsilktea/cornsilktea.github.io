@@ -287,7 +287,7 @@
       <path d="M0 28 Q50 10 100 28" fill="none" stroke="#9aa5b1" stroke-width=".6"/>                <!-- 지붕 난간 -->
       <path d="M0 44.5 Q50 28.5 100 44.5 L100 45 Q50 29 0 45 Z" fill="#30404f"/>
       <!-- 가운데 배터스 아이(타자 시야 보호용 짙은 녹색 벽): 담장 가운데까지 내려와 담장에 겹침 -->
-      <path d="M40.5 18 L59.5 18 L59.5 42 L40.5 42 Z" fill="#1e472b"/>
+      <path d="M40.5 18 L59.5 18 L59.5 40 L40.5 40 Z" fill="#1e472b"/>
       <path d="M40.5 18 L59.5 18 L59.5 19 L40.5 19 Z" fill="#2b5c3a"/>
       <!-- 전광판: 아래는 배터스 아이 초록 벽이 담장까지 받치고(담장 뒤 층), 윗부분은 하늘에 걸침 -->
       <g transform="translate(0 4)">   <!-- 지지대 아랫부분은 담장(나중에 그림)에 가려짐 -->
@@ -328,7 +328,7 @@
 
 
       <!-- 외야 펜스: 좌우 폴을 잇는 둥근 담장 + 경고 트랙 -->
-      <path d="M0 47.5 Q50 31.5 100 47.5 L100 50.5 Q50 34.5 0 50.5 Z" fill="url(#dirt)" opacity=".9"/>   <!-- 경고 트랙 -->
+      <path d="M0 47.5 Q50 31.5 100 47.5 L100 50.5 Q50 34.5 0 50.5 Z" fill="url(#dirt)"/>   <!-- 경고 트랙 -->
       <path d="M0 45 Q50 29 100 45 L100 47.5 Q50 31.5 0 47.5 Z" fill="url(#wall)"/>                  <!-- 담장 -->
       <path d="M0 45 Q50 29 100 45" fill="none" stroke="#f2c94c" stroke-width=".5"/>                 <!-- 담장 위 노란 선 -->
       <!-- 파울 폴 -->
@@ -462,7 +462,7 @@
       <tr><th>타이밍</th><th>결과</th><th>점수</th></tr>
       <tr><td>정확</td><td>홈런</td><td>비거리에 비례 (가장 높음)</td></tr>
       <tr><td>조금 빠름·늦음</td><td>장타 · 외야안타 · 내야안타</td><td>비거리에 비례</td></tr>
-      <tr><td>더 빠름·늦음</td><td>파울</td><td>0</td></tr>
+      <tr><td>더 빠름·늦음</td><td>파울</td><td>0 (투구 수 유지)</td></tr>
       <tr><td>훨씬 빠름·늦음 · 안 침</td><td>헛스윙 · 스트라이크</td><td>0</td></tr>
       <tr><td>존 밖의 공을 안 침</td><td>볼</td><td>500 (투구 수 유지)</td></tr>
     </table>
@@ -487,7 +487,7 @@
       <div class="c"><span class="k">최고 구속</span><span class="v" id="endSpeed">0</span></div>
     </div>
     <div class="chart">
-      <div class="chart-k">이번 경기의 투구 위치 (20구 · 골라낸 볼 제외)</div>
+      <div class="chart-k">이번 경기의 투구 위치 (투구 수에 든 20구 · 볼·파울 제외)</div>
       <svg id="endChart" viewBox="0 0 220 230" aria-label="투구 위치"></svg>
       <div class="legend"><span><i style="background:#D97B4F"></i>안 친 스트라이크</span><span><i style="background:#B33951"></i>스윙(타격·헛스윙)</span></div>
     </div>
@@ -644,7 +644,7 @@ function setGauge(deltaMs, text){
 }
 /* 도착점 표시: 스트라이크 존의 어느 부분(또는 바깥)을 지났는지 */
 /* 도착점 표시: kind "hit"(타격)·"miss"(헛스윙) = 빨강, 아니면 스트라이크(주황)·볼(녹색) */
-function showZoneMark(kind){
+function showZoneMark(kind, count){
   const e = G.end, mk = $("zoneMark"), hit = !!kind;
   mk.classList.toggle("hit", hit); mk.classList.toggle("ball", !hit && !e.strike);
   mk.style.left = (PLATE.x + e.dx) + "%"; mk.style.top = (PLATE.y + e.dy) + "%";
@@ -652,7 +652,7 @@ function showZoneMark(kind){
   const h = e.dx < -ZONE.hw / 3 ? "몸쪽" : e.dx > ZONE.hw / 3 ? "바깥쪽" : "";   // 우타자: 왼쪽이 몸쪽
   const where = (v || h) ? [v, h].filter(Boolean).join(" ") : "한가운데";
   $("zoneMarkText").textContent = (kind === "hit" ? "타격 · " : kind === "miss" ? "헛스윙 · " : e.strike ? "스트라이크 · " : "볼 · ") + where;
-  if (kind || e.strike) G.log.push({ dx: e.dx, dy: e.dy, strike: e.strike, kind: kind || "take" });   // 결과 화면 종합용 — 골라낸 볼은 투구 수에 안 들어가므로 제외
+  if (count !== false && (kind || e.strike)) G.log.push({ dx: e.dx, dy: e.dy, strike: e.strike, kind: kind || "take" });   // 결과 화면 종합용 — 골라낸 볼은 투구 수에 안 들어가므로 제외
   mk.classList.add("on");
   $("zone").classList.toggle("strike", e.strike);
 }
@@ -786,7 +786,7 @@ function judge(delta){
     G.maxDist = Math.max(G.maxDist, dist);
     G.speedBonus = Math.min(SPEED_BONUS_MAX, G.speedBonus + SPEED_STEP);
     detail += `${dist}m ${dirText} · +${fmt(gained)}점`;
-  } else if (grade === "파울"){ G.combo = 0; G.fouls++; detail += dirText + " 파울"; }
+  } else if (grade === "파울"){ G.combo = 0; G.fouls++; G.freePitch = true; detail += dirText + " 파울 · 투구 수 유지"; }   // 파울도 투구 수에 안 셈
   else if (grade === "볼"){                     // 볼을 골라내면 +500점, 투구 수는 세지 않음(다음 공이 같은 번호)
     G.balls++; gained = BALL_BONUS; G.freePitch = true;
     detail += "볼 골라냄 · +" + gained + "점 · 투구 수 유지"; }
@@ -802,7 +802,7 @@ function judge(delta){
   }
 
   const bigGrade = grade === "홈런" ? "홈런!" : grade;
-  if (dist > 0 || grade === "파울"){ G.pitchAnim = false; cancelAnimationFrame(G.raf); showZoneMark("hit"); }   // 타격한 위치도 남김
+  if (dist > 0 || grade === "파울"){ G.pitchAnim = false; cancelAnimationFrame(G.raf); showZoneMark("hit", grade !== "파울"); }   // 타격한 위치도 남김(파울은 투구 수에 안 들어가 차트에서 제외)
   if (dist > 0){
     const go = () => flyHit(dist, delta, () => { showCall(bigGrade, detail); later(afterResult, 1100); });
     if (grade === "홈런"){   // 빛이 나는 동안에도 공은 맞은 자리에 보임
