@@ -5,6 +5,13 @@
 <link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>수업 자료 제어판</title>
+<link rel="manifest" href="admin-manifest.json">
+<meta name="theme-color" content="#F4F6F1">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="제어판">
+<link rel="icon" href="admin-icon-192.png">
+<link rel="apple-touch-icon" href="admin-icon-192.png">
 <style>
   * { box-sizing: border-box; }
   body {
@@ -898,6 +905,13 @@ if (!cfg.isAdminReady()) {
   showLogin("설정이 아직 끝나지 않았어요. firebase-config.js 의 세 줄을 먼저 채워 주세요.");
 } else {
   startAuth();
+}
+
+/* 홈 화면에 추가했을 때 앱처럼 열리게 하는 등록 (실패해도 제어판은 그대로 동작) */
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", function () {
+    navigator.serviceWorker.register("sw.js").catch(function () {});
+  });
 }
 </script>
 </body>
