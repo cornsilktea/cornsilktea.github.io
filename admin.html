@@ -80,7 +80,7 @@
   .switch-text { font-size: 13px; color: #6b7280; width: 34px; }
 
   /* 빌드(공략 이미지) 버튼과 보기창 */
-  .guide-btn { flex: none; margin-left: 4px; padding: 6px 12px; font-size: 13px; }
+  .guide-btn { flex: none; margin-right: 4px; padding: 6px 12px; font-size: 13px; }
   .lightbox {
     position: fixed; inset: 0; background: rgba(17,24,39,.82); z-index: 50;
     display: flex; align-items: center; justify-content: center; padding: 20px; cursor: zoom-out;
@@ -564,15 +564,16 @@ function gameCard(g, i) {
     cb.disabled = false;
   });
   sw.appendChild(cb); sw.appendChild(track); sw.appendChild(stateText);
-  head.appendChild(sw);
 
-  /* 공략(빌드) 이미지가 있는 자료는 잠김 스위치 옆에 [빌드] 버튼 */
+  /* 공략(빌드) 이미지가 있는 자료는 잠김 스위치 왼쪽에 [빌드] 버튼
+     (스위치는 다른 자료와 같은 오른쪽 끝 자리에 그대로 둠) */
   const guide = GUIDE_IMAGES[g.url];
   if (guide) {
     const gb = el("button", "guide-btn", "빌드");
     gb.addEventListener("click", () => showGuide(guide, g.title + " — 최적 빌드 배치 (숫자 = 설치한 웨이브). 아무 곳이나 누르면 닫힘"));
     head.appendChild(gb);
   }
+  head.appendChild(sw);
   card.appendChild(head);
 
   const buttons = el("div", "game-buttons");
