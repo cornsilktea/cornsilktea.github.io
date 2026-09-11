@@ -75,11 +75,13 @@
   #zone.strike{box-shadow:0 0 0 2px rgba(255,255,255,.7)}
   /* 도착점 표시 (헛스윙·안 침) */
   #zoneMark{position:absolute;left:0;top:0;display:none;z-index:6;pointer-events:none;transform:translate(-50%,-50%)}
-  #zoneMark .dot{display:block;width:18px;height:18px;border-radius:50%;border:3px solid #fff;background:rgba(217,123,79,.85);
+  #zoneMark .dot{display:block;width:18px;height:18px;border-radius:50%;border:3px solid #fff;background:rgba(217,123,79,.9);
     box-shadow:0 0 0 2px rgba(0,0,0,.35);margin:0 auto;animation:markpop .25s ease-out}
   #zoneMark .lb{display:block;margin-top:3px;white-space:nowrap;font-size:12px;font-weight:800;color:#fff;
     background:rgba(27,43,32,.75);border-radius:var(--radius);padding:1px 8px;text-align:center}
   #zoneMark.on{display:block}
+  #zoneMark.ball .dot{background:rgba(47,125,79,.9)}     /* 안 친 볼: 녹색 */
+  #zoneMark.hit .dot{background:rgba(179,57,81,.9)}      /* 타격한 공: 빨강 (안 친 스트라이크는 주황) */
   @keyframes markpop{0%{transform:scale(.3)}70%{transform:scale(1.2)}100%{transform:scale(1)}}
 
   /* 공 (실밥 2줄 — 회전이 보이도록) */
@@ -635,13 +637,15 @@ function setGauge(deltaMs, text){
   $("gaugeText").textContent = text;
 }
 /* 도착점 표시: 스트라이크 존의 어느 부분(또는 바깥)을 지났는지 */
-function showZoneMark(){
+/* 도착점 표시: hit = 타격한 공(빨강), 아니면 스트라이크(주황)·볼(녹색) */
+function showZoneMark(hit){
   const e = G.end, mk = $("zoneMark");
+  mk.classList.toggle("hit", !!hit); mk.classList.toggle("ball", !hit && !e.strike);
   mk.style.left = (PLATE.x + e.dx) + "%"; mk.style.top = (PLATE.y + e.dy) + "%";
   const v = e.dy < -ZONE.hh / 3 ? "높은" : e.dy > ZONE.hh / 3 ? "낮은" : "";
   const h = e.dx < -ZONE.hw / 3 ? "몸쪽" : e.dx > ZONE.hw / 3 ? "바깥쪽" : "";   // 우타자: 왼쪽이 몸쪽
   const where = (v || h) ? [v, h].filter(Boolean).join(" ") : "한가운데";
-  $("zoneMarkText").textContent = (e.strike ? "스트라이크 · " : "볼 · ") + where;
+  $("zoneMarkText").textContent = (hit ? "타격 · " : e.strike ? "스트라이크 · " : "볼 · ") + where;
   mk.classList.add("on");
   $("zone").classList.toggle("strike", e.strike);
 }
@@ -791,7 +795,7 @@ function judge(delta){
   }
 
   const bigGrade = grade === "홈런" ? "홈런!" : grade;
-  if (dist > 0 || grade === "파울"){ G.pitchAnim = false; cancelAnimationFrame(G.raf); }
+  if (dist > 0 || grade === "파울"){ G.pitchAnim = false; cancelAnimationFrame(G.raf); showZoneMark(true); }   // 타격한 위치도 남김
   if (dist > 0){
     const go = () => flyHit(dist, delta, () => { showCall(bigGrade, detail); later(afterResult, 1100); });
     if (grade === "홈런"){   // 홈런: 노란 빛, 135m 이상: 주황 빛 — 빛이 나는 동안에도 공은 맞은 자리에 보임
