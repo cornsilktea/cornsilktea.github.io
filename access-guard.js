@@ -14,6 +14,35 @@
 (function () {
   "use strict";
 
+  /* ---------- 구형 전자칠판·태블릿 브라우저 대응 ----------
+     이 파일은 모든 수업 자료의 <head> 맨 앞에서 실행되므로,
+     오래된 브라우저에 없는 기능을 여기서 한 번만 채워 넣습니다.
+
+     ctx.roundRect() 는 2022년 무렵(Chrome 99)에 추가된 기능이라
+     구형 기기에는 없습니다. 없으면 캔버스를 그리다 오류가 나서
+     화면이 검게(또는 비어) 나옵니다. 없을 때만 같은 동작을 만들어 넣습니다. */
+  if (typeof CanvasRenderingContext2D !== "undefined" &&
+      !CanvasRenderingContext2D.prototype.roundRect) {
+    CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+      if (typeof r === "undefined") { r = 0; }
+      if (r && r.length) { r = r[0]; }          /* 배열로 넘어와도 첫 값만 사용 */
+      if (typeof r === "object") { r = r.x || 0; }
+      var max = Math.min(Math.abs(w), Math.abs(h)) / 2;
+      if (r > max) { r = max; }
+      if (r < 0) { r = 0; }
+      this.moveTo(x + r, y);
+      this.lineTo(x + w - r, y);
+      this.quadraticCurveTo(x + w, y, x + w, y + r);
+      this.lineTo(x + w, y + h - r);
+      this.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      this.lineTo(x + r, y + h);
+      this.quadraticCurveTo(x, y + h, x, y + h - r);
+      this.lineTo(x, y + r);
+      this.quadraticCurveTo(x, y, x + r, y);
+      this.closePath();
+    };
+  }
+
   var script = document.currentScript;
   var slug = script ? script.getAttribute("data-game") : null;
 
