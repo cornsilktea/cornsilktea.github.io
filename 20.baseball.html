@@ -91,7 +91,7 @@
   #shadow{position:absolute;width:12px;height:5px;border-radius:50%;background:rgba(0,0,0,.28);display:none;z-index:2}
 
   /* 판정 문구 */
-  #call{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;
+  #call{position:absolute;left:50%;top:54%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;
     opacity:0;transition:opacity .15s;z-index:5}
   #call.on{opacity:1}
   #call .g{display:inline-block;font-size:clamp(22px,5vw,36px);font-weight:800;color:#fff;
@@ -362,7 +362,7 @@
    권장 규격: 배경 투명 PNG, 세로가 긴 비율(타자 약 3:5, 투수 약 3:5),
    인물의 발이 그림 맨 아래에 닿게(자리의 아래 가운데에 맞춰 놓입니다).
    타자는 우타자(홈플레이트 왼쪽 타석, 투수 쪽을 향해 오른쪽으로 서 있음)를
-   포수 뒤 위쪽에서 비스듬히 본 모습, 투수는 정면(타자 쪽)을 향한 모습.
+   포수 뒤 위쪽에서 비스듬히 본 모습, 투수는 우완 투수가 정면(타자 쪽)을 향한 모습.
    ===================================================================== */
 const IMAGES = {
   batterReady:   "",   // 타자 준비 자세 (우타)
@@ -386,18 +386,20 @@ const PITCHES = [
     path: t => ({ dx: 0, dy: -1.2 * Math.sin(Math.PI * t) }) },
   { name: "커브",     kmh: 120, w: 2, spin: 5,
     path: t => ({ dx: 3.5 * t * t, dy: -5 * Math.sin(Math.PI * t) + 8 * t * t * t }) },
-  { name: "슬라이더", kmh: 132, w: 2, spin: 9,
-    path: t => ({ dx: -9 * t * t * t, dy: 2 * t * t }) },
-  { name: "체인지업", kmh: 126, w: 2, spin: -3,
-    path: t => ({ dx: 0, dy: -1.2 * Math.sin(Math.PI * t) + 4 * t * t * t * t }) }
+  { name: "슬라이더", kmh: 132, w: 2, spin: 9,                    // 우완 → 우타자 바깥쪽으로 꺾임
+    path: t => ({ dx: 9 * t * t * t, dy: 2 * t * t }) },
+  { name: "체인지업", kmh: 126, w: 2, spin: -3,                  // 팔 쪽(우타자 몸쪽)으로 살짝 흘러 들어감
+    path: t => ({ dx: -1.5 * t * t, dy: -1.2 * Math.sin(Math.PI * t) + 4 * t * t * t * t }) }
 ];
 // 구속(km/h) → 홈플레이트까지 걸리는 시간(ms). 140 km/h 가 900ms, 160 은 약 690ms, 120 은 약 1225ms
 const flightMs = kmh => 900 * Math.pow(140 / kmh, 2);
-// 화면 좌표(%): 투수 손 → 스트라이크 존 가운데
-const REL = { x: 52, y: 43 };
+// 화면 좌표(%): 투수 손(우완 → 화면 왼쪽) → 스트라이크 존 가운데
+const REL = { x: 47.5, y: 43 };   // 우완 투수: 화면에서는 투수의 오른손이 왼쪽
 const PLATE = { x: 50, y: 70 };
 const ZONE = { hw: 6, hh: 7 };            // 스트라이크 존 반너비·반높이(%)  (#zone 의 CSS 와 같은 값)
 const BALL_MIN = 1.3, BALL_MAX = 5.2;     // 공 지름 (무대 높이의 %)
+// 외야 담장 윗선의 화면 y(%) — SVG 의 "M0 45 Q50 29 100 45" 와 같은 곡선 (가운데 37, 양 끝 45)
+const fenceY = x => { const u = Math.max(0, Math.min(1, x / 100)); return (1-u)*(1-u)*45 + 2*u*(1-u)*29 + u*u*45; };
 
 const $ = id => document.getElementById(id);
 const fmt = n => n.toLocaleString("ko-KR");
@@ -658,7 +660,11 @@ function flyHit(dist, delta, done){
   const f = dist / 140;
   const a = Math.max(-1, Math.min(1, delta / WIN.inf));          // 빠름 → 왼쪽(음수), 늦음 → 오른쪽(양수)
   const x0 = PLATE.x + G.end.dx, y0 = PLATE.y + G.end.dy;
-  const x1 = PLATE.x + a * 44 * (0.35 + 0.65 * f), y1 = PLATE.y - 46 * f;   // 착지점(원근: 위로 갈수록 멀리)
+  const x1 = PLATE.x + a * 44 * (0.35 + 0.65 * f);
+  // 착지점: 홈런(120m 이상)만 담장을 넘고, 그보다 짧으면 담장 앞 잔디에 떨어짐 (119m = 담장 바로 앞)
+  const fy = fenceY(x1);
+  const y1 = dist >= 120 ? fy - 5 - (dist - 120) * 0.5
+                         : PLATE.y - (PLATE.y - (fy + 3)) * (dist / 120);
   const H = 4 + 28 * f;                                              // 포물선 높이
   const dur = 800 + 700 * f, t0 = performance.now();
   ball.style.display = "block";
