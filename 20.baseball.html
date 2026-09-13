@@ -410,11 +410,8 @@
     <svg class="fielder out" style="left:83%;top:51%" viewBox="0 0 40 64"><use href="#fielderShape"/></svg>  <!-- 우익수 -->
     <svg class="fielder out" style="left:54.5%;top:43.5%;width:3.2%;min-width:14px" viewBox="0 0 40 64"><use href="#fielderShape"/></svg>  <!-- 중견수 (투수의 1시 방향) -->
 
-    <!-- 투수 자리 -->
+    <!-- 투수 자리 (동작별 <img> 는 applyImages 가 IMAGES 대로 만들어 넣음) -->
     <div class="slot" id="pitcher">
-      <img id="imgPitcherIdle" alt="">
-      <img id="imgPitcherWindup" alt="">
-      <img id="imgPitcherThrow" alt="">
       <div class="ph">투수<small id="pitcherState">대기</small></div>
     </div>
 
@@ -435,8 +432,6 @@
 
     <!-- 타자 자리 (우타석) -->
     <div class="slot" id="batter">
-      <img id="imgBatterReady" alt="">
-      <img id="imgBatterSwing" alt="">
       <div class="ph">타자 (우타)<small id="batterState">준비 자세</small></div>
     </div>
 
@@ -507,22 +502,36 @@
 <script>
 "use strict";
 /* =====================================================================
-   캐릭터 이미지 파일 — 나중에 만든 PNG 경로를 여기에만 적으면 됩니다.
-   비워 두면("") 임시 도형(점선 상자 + 라벨)이 대신 보입니다.
-   예: batterReady: "img/batter-ready.png"
+   캐릭터 이미지 파일 — 동작 순서대로 적습니다. 경로를 비워 두면("") 그 동작은
+   바로 앞 동작 그림으로 대신하고, 한 장도 없으면 임시 도형(점선 상자 + 라벨)이 보입니다.
 
-   권장 규격: 배경 투명 PNG, 세로가 긴 비율(타자 약 3:5, 투수 약 3:5),
-   인물의 발이 그림 맨 아래에 닿게(자리의 아래 가운데에 맞춰 놓입니다).
+   규격: 배경 투명 PNG. 한 인물의 모든 동작은 같은 크기의 캔버스에 같은 축척으로,
+   발이 그림 맨 아래(가운데)에 닿게 놓아야 동작이 바뀌어도 인물이 튀지 않습니다.
+   (현재 투수 4장 352×508, 타자 6장 312×432 — 한 장의 동작표에서 잘라 냄)
    타자는 우타자(홈플레이트 왼쪽 타석, 투수 쪽을 향해 오른쪽으로 서 있음)를
    포수 뒤 위쪽에서 비스듬히 본 모습, 투수는 우완 투수가 정면(타자 쪽)을 향한 모습.
+   투구 그림(throw)에서 공을 쥔 손의 위치는 아래 REL 과 맞춰야 공이 손에서 출발합니다.
    ===================================================================== */
 const IMAGES = {
-  batterReady:   "img/batter-ready.png",   // 타자 준비 자세 (우타)
-  batterSwing:   "img/batter-swing.png",   // 타자 스윙 자세 (스윙 버튼을 누르면 전환)
-  pitcherIdle:   "img/pitcher-idle.png",   // 투수 대기 (세트 포지션)
-  pitcherWindup: "img/pitcher-windup.png",   // 투수 와인드업 (다리 들어 올림)
-  pitcherThrow:  "img/pitcher-throw.png"  // 투수 투구 (팔이 앞으로 나와 공을 놓는 순간)
+  pitcher: [                                        // 투수: 대기 → 와인드업 → 투구 → 팔로스루
+    ["idle",   "img/pitcher-idle.png",   "대기"],       // 세트 포지션 (공을 글러브에 넣고 타자를 봄)
+    ["windup", "img/pitcher-windup.png", "와인드업"],   // 앞다리를 들어 올림 (공을 놓을 때까지 유지)
+    ["throw",  "img/pitcher-throw.png",  "투구"],       // 공을 놓는 순간 (공은 오른손 = 화면 왼쪽 위)
+    ["follow", "img/pitcher-follow.png", "팔로스루"]    // 던진 뒤 앞으로 숙임
+  ],
+  batter: [                                         // 타자: 준비 → 타격 준비 → 스윙 4단계
+    ["ready",  "img/batter-ready.png",  "준비 자세"],   // 타석에서 기다림
+    ["load",   "img/batter-load.png",   "타격 준비"],   // 투수가 발을 내딛을 때 방망이를 뒤로 당김
+    ["swing1", "img/batter-swing1.png", "스윙 시작"],   // 방망이가 나오기 시작
+    ["swing2", "img/batter-swing2.png", "타격"],        // 방망이가 홈플레이트 위를 지남
+    ["swing3", "img/batter-swing3.png", "팔로스루"],    // 방망이가 몸을 지나 돌아감
+    ["swing4", "img/batter-swing4.png", "스윙 마무리"]  // 끝까지 돌린 자세 (타구를 지켜봄)
+  ]
 };
+// 스윙 버튼을 누른 뒤 각 동작이 보이는 시각(ms) — 누른 순간이 타격 판정 시각이므로 타격 그림이 곧바로 따라옴
+const SWING_SEQ = [["swing1", 0], ["swing2", 60], ["swing3", 170], ["swing4", 320]];
+const LOAD_BEFORE_RELEASE = 260;     // 타자가 방망이를 뒤로 당기는 시점: 투수가 공을 놓기 몇 ms 전
+const FOLLOW_AFTER_RELEASE = 160;    // 투구 그림에서 팔로스루 그림으로 넘어가는 시점
 
 /* ---------- 게임 규칙 상수 ---------- */
 const TOTAL_PITCHES = 20;
@@ -560,7 +569,7 @@ const SPIN_STEP_MAX = 0.17;
 // 구속(km/h) → 홈플레이트까지 걸리는 시간(ms). 140 km/h 가 900ms, 160 은 약 690ms, 120 은 약 1225ms
 const flightMs = kmh => 900 * Math.pow(140 / kmh, 2);
 // 화면 좌표(%): 투수 손(우완 → 화면 왼쪽) → 스트라이크 존 가운데
-const REL = { x: 46.8, y: 44.5 };   // 우완 투수: 투구 그림에서 공을 쥔 오른손 위치(화면 왼쪽 위)
+const REL = { x: 48.1, y: 45.6 };   // 우완 투수: 투구 그림(pitcher-throw.png 의 (92,62)/352×508)에서 공을 쥔 오른손 위치(화면 왼쪽 위)
 const PLATE = { x: 50, y: 68.75 };
 // 땅의 화면 y(%): 투수판(마운드 위 투수의 발)과 홈플레이트 — 공 그림자는 이 선 위에 놓임
 const GROUND = { mound: 60.5, plate: 84.3 };
@@ -578,39 +587,33 @@ const $ = id => document.getElementById(id);
 const fmt = n => n.toLocaleString("ko-KR");
 
 /* ---------- 이미지 자리 채우기 ---------- */
+const POSE_IMG = { pitcher: {}, batter: {} };   // 동작 이름 → <img> (그림이 없는 동작은 빠짐)
 function applyImages(){
-  const map = [
-    ["imgBatterReady", IMAGES.batterReady, "batter"], ["imgBatterSwing", IMAGES.batterSwing, "batter"],
-    ["imgPitcherIdle", IMAGES.pitcherIdle, "pitcher"], ["imgPitcherWindup", IMAGES.pitcherWindup, "pitcher"],
-    ["imgPitcherThrow", IMAGES.pitcherThrow, "pitcher"]
-  ];
-  const has = { batter: false, pitcher: false };
-  map.forEach(([id, src, slot]) => {
-    if (!src) return;
-    const img = $(id);
-    img.decoding = "sync";                                   // Safari: 표시 순간 비동기 디코딩으로 빈 칸이 되는 것 방지
-    img.src = src; has[slot] = true;
-    if (img.decode) img.decode().catch(() => {});            // 미리 디코딩해 두기 (실패해도 무시)
-  });
-  $("batter").classList.toggle("has-img", has.batter);
-  $("pitcher").classList.toggle("has-img", has.pitcher);
+  for (const slot of ["pitcher", "batter"]){
+    const box = $(slot), ph = box.querySelector(".ph");
+    IMAGES[slot].forEach(([pose, src]) => {
+      if (!src) return;
+      const img = document.createElement("img");
+      img.alt = ""; img.decoding = "sync";                     // Safari: 표시 순간 비동기 디코딩으로 빈 칸이 되는 것 방지
+      img.src = src;
+      if (img.decode) img.decode().catch(() => {});            // 미리 디코딩해 두기 (실패해도 무시)
+      box.insertBefore(img, ph);
+      POSE_IMG[slot][pose] = img;
+    });
+    box.classList.toggle("has-img", Object.keys(POSE_IMG[slot]).length > 0);
+  }
 }
-function setBatter(pose){            // "ready" | "swing"
-  const useSwing = pose === "swing" && !!IMAGES.batterSwing;   // 스윙 이미지가 없으면 준비 이미지를 그대로
-  $("imgBatterSwing").classList.toggle("cur", useSwing);
-  $("imgBatterReady").classList.toggle("cur", !useSwing);
-  $("batterState").textContent = pose === "swing" ? "스윙 자세" : "준비 자세";
+// 동작 바꾸기: 그 동작의 그림이 없으면 순서상 바로 앞의 있는 그림으로 대신
+function setPose(slot, pose){
+  const list = IMAGES[slot], imgs = POSE_IMG[slot];
+  let i = list.findIndex(p => p[0] === pose);
+  while (i > 0 && !imgs[list[i][0]]) i--;
+  const use = list[i][0];
+  for (const p in imgs) imgs[p].classList.toggle("cur", p === use);
+  $(slot + "State").textContent = list.find(p => p[0] === pose)[2];
 }
-function setPitcher(pose){           // "idle" | "windup" | "throw"
-  const pick = { idle: "imgPitcherIdle", windup: "imgPitcherWindup", throw: "imgPitcherThrow" };
-  const label = { idle: "대기", windup: "와인드업", throw: "투구" };
-  // 해당 단계 이미지가 없으면 앞 단계 이미지로 대신 보여 줍니다.
-  const order = ["idle", "windup", "throw"];
-  let use = pose;
-  while (use && !IMAGES["pitcher" + use[0].toUpperCase() + use.slice(1)]) use = order[order.indexOf(use) - 1];
-  order.forEach(p => $(pick[p]).classList.toggle("cur", p === use));
-  $("pitcherState").textContent = label[pose];
-}
+const setBatter = pose => setPose("batter", pose);
+const setPitcher = pose => setPose("pitcher", pose);
 
 /* ---------- 최고 기록 (이 기기의 localStorage) ---------- */
 const BEST = {
@@ -802,9 +805,11 @@ function nextPitch(){
   G.phase = "windup";
   $("hudSpeed").textContent = "-";
   hideZoneMark();
-  setPitcher("windup");
+  setBatter("ready"); setPitcher("windup");
   // 와인드업 길이를 조금씩 다르게 해서 리듬만으로 맞추기 어렵게
-  later(release, 650 + Math.random() * 350);
+  const windup = 650 + Math.random() * 350;
+  later(() => setBatter("load"), windup - LOAD_BEFORE_RELEASE);   // 투구 직전에 타자가 방망이를 당김
+  later(release, windup);
 }
 
 function release(){
@@ -813,7 +818,8 @@ function release(){
   G.t0 = performance.now(); G.spinAng = 0;
   btnSwing.disabled = false;
   ball.style.visibility = "visible";
-  later(() => setPitcher("idle"), 350);
+  later(() => setPitcher("follow"), FOLLOW_AFTER_RELEASE);
+  later(() => setPitcher("idle"), G.flightTime + 300);      // 공이 홈플레이트를 지난 뒤 세트 포지션으로
   later(() => { $("hudSpeed").textContent = String(G.kmh); }, G.flightTime);   // 구속은 공이 홈플레이트에 닿은 뒤에 표시
   // 공을 치지 않고 흘려보내면 스트라이크 또는 볼
   later(() => { if (G.phase === "flight" && !G.swung) judge(null); }, G.flightTime + WIN.foul + 40);
@@ -841,8 +847,7 @@ function swing(){
   if (G.phase !== "flight" || G.swung) return;
   G.swung = true;
   btnSwing.disabled = true;
-  setBatter("swing");
-  later(() => setBatter("ready"), 380);
+  SWING_SEQ.forEach(([pose, ms]) => ms ? later(() => setBatter(pose), ms) : setBatter(pose));   // 끝 자세는 다음 공까지 유지(타구를 지켜봄)
   judge(performance.now() - (G.t0 + G.flightTime));
 }
 
@@ -907,6 +912,7 @@ function judge(delta){
     // 헛스윙·스트라이크·볼: 공이 존을 지나는 것을 끝까지 보여 준 뒤 도착점 표시
     const wait = Math.max(0, G.flightTime - (performance.now() - G.t0));
     later(() => { G.pitchAnim = false; cancelAnimationFrame(G.raf); ball.style.visibility = "hidden"; shadow.style.display = "none"; showZoneMark(delta === null ? "" : "miss"); settle();
+      if (delta === null) setBatter("ready");   // 치지 않고 흘려보낸 공: 공이 지나가면 방망이를 내림
       later(afterResult, 1300); }, wait + 120);
   }
 }
