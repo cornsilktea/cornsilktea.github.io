@@ -458,7 +458,7 @@
       <li>구종은 직구·커브·슬라이더·체인지업 — 궤적과 속도가 다릅니다.</li>
       <li>타격에 성공할수록 다음 공의 구속이 빨라집니다 (120 → 최대 160 km/h).</li>
       <li>빠르게 치면 당겨치기(왼쪽), 늦게 치면 밀어치기(오른쪽)로 날아갑니다.</li>
-      <li>홈런을 연속으로 치면 콤보 보너스가 붙습니다.</li>
+      <li>홈런을 연속으로 치면 콤보 보너스가 붙습니다. 사이에 볼·파울이 끼어도 콤보는 이어집니다.</li>
       <li>치지 않은 공은 존을 지나면 스트라이크, 벗어나면 볼 — 볼을 골라내면 +500점이고 투구 수도 줄지 않습니다.</li>
     </ul>
     <table class="tbl">
@@ -881,8 +881,8 @@ function judge(delta){
     G.maxDist = Math.max(G.maxDist, dist);
     G.speedBonus = Math.min(SPEED_BONUS_MAX, G.speedBonus + SPEED_STEP);
     detail += `${dist}m ${dirText} · +${fmt(gained)}점`;
-  } else if (grade === "파울"){ G.combo = 0; G.fouls++; G.freePitch = true; detail += dirText + " 파울 · 투구 수 유지"; }   // 파울도 투구 수에 안 셈
-  else if (grade === "볼"){                     // 볼을 골라내면 +500점, 투구 수는 세지 않음(다음 공이 같은 번호)
+  } else if (grade === "파울"){ G.fouls++; G.freePitch = true; detail += dirText + " 파울 · 투구 수 유지"; }   // 파울도 투구 수에 안 셈. 연속 홈런은 끊기지 않음
+  else if (grade === "볼"){                     // 볼을 골라내면 +500점, 투구 수는 세지 않음(다음 공이 같은 번호). 연속 홈런은 끊기지 않음
     G.balls++; gained = BALL_BONUS; G.freePitch = true;
     detail += "볼 골라냄 · +" + gained + "점 · 투구 수 유지"; }
   else { G.combo = 0; G.misses++;
