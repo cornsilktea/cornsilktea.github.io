@@ -45,6 +45,15 @@
         "unitsSet": false,
         "url": "20.baseball.html"
       },
+      "hanokroofrun": {
+        "memo": "점프·와이어 타이밍 / 6단계 연속 코스 개인전",
+        "open": true,
+        "order": 21,
+        "title": "한옥 지붕 와이어 러너",
+        "units": [],
+        "unitsSet": false,
+        "url": "22.hanokroofrun.html"
+      },
       "bitmapquiz": {
         "memo": "",
         "open": true,
