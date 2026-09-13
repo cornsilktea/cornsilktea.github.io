@@ -187,6 +187,15 @@
         "title": "스네이크",
         "url": "6.snakegame.html"
       },
+      "timeguess": {
+        "memo": "시간 감각 워밍업 / 1회 개인전",
+        "open": true,
+        "order": 20,
+        "title": "5초 타이머 맞히기",
+        "units": [],
+        "unitsSet": false,
+        "url": "21.timeguess.html"
+      },
       "tablereading": {
         "memo": "",
         "open": true,
