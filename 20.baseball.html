@@ -43,15 +43,22 @@
   .hud .v{display:block;font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   @media (max-width:479px){.hud .v{font-size:15px}.hud .k{font-size:10px}}
 
-  /* ---------- 경기장 무대 ---------- */
-  .stage{position:relative;width:100%;height:clamp(380px,calc(100vh - 250px),640px);
-    border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:#8fc5ec;user-select:none}
+  /* ---------- 경기장 무대 ----------
+     무대(.stage)는 항상 3:2 비율(모든 인물·존이 가로·세로 % 로 놓여 있어 비율이 바뀌면 찌그러짐).
+     틀(.arena)이 무대보다 좁으면(세로 휴대전화) 가운데만 보이고 양옆(외야수·파울 폴)은 잘려 나감. */
+  .arena{--h:min(clamp(300px,calc(100vh - 250px),640px),calc(100vw - 20px));
+    position:relative;width:min(100%,calc(var(--h) * 1.5));height:var(--h);margin:0 auto;
+    border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:#8fc5ec}
+  .stage{position:absolute;top:0;left:50%;height:100%;width:calc(var(--h) * 1.5);transform:translateX(-50%);user-select:none}
   .stage svg.field{position:absolute;inset:0;width:100%;height:100%;display:block}
 
   /* 캐릭터 자리 — 이미지가 있으면 <img>, 없으면 임시 도형 */
   .slot{position:absolute;pointer-events:none}
-  .slot img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;object-position:bottom center;display:none}
-  .slot.has-img img.cur{display:block}
+  /* 그림 바꿔 끼우기는 display 가 아니라 opacity 로 — Safari(iPad)는 처음 표시되는 이미지를 비동기로 디코딩해서
+     display:none→block 순간 빈 칸이 됨. 항상 그려 두고 투명도만 바꾸면 미리 디코딩되어 사라지지 않음 */
+  .slot img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;object-position:bottom center;display:none;opacity:0}
+  .slot.has-img img{display:block}
+  .slot.has-img img.cur{opacity:1}
   .slot .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:2px;
     border:2px dashed rgba(27,43,32,.55);border-radius:6px;background:rgba(255,255,255,.35);color:#1B2B20;font-weight:700;text-align:center}
   .slot.has-img .ph{display:none}
@@ -85,9 +92,10 @@
   @keyframes markpop{0%{transform:scale(.3)}70%{transform:scale(1.2)}100%{transform:scale(1)}}
 
   /* 공 (실밥 2줄 — 회전이 보이도록) */
-  #ball{position:absolute;left:0;top:0;width:12px;height:12px;display:none;will-change:transform;z-index:2;overflow:visible;
-    filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.35))}
-  #shadow{position:absolute;width:12px;height:5px;border-radius:50%;background:rgba(0,0,0,.28);display:none;z-index:1}
+  /* 숨길 때 display:none 이 아니라 visibility — WebKit 은 display:none 인 SVG 를 다시 보여도 그라데이션을 못 그리는 경우가 있음.
+     CSS filter(drop-shadow) 도 Safari 에서 SVG 가 통째로 안 그려지는 원인이라 뺌 (테두리 그림자는 SVG 안 stroke 로 대신) */
+  #ball{position:absolute;left:0;top:0;width:12px;height:12px;visibility:hidden;will-change:transform;z-index:2;overflow:visible}
+  #shadow{position:absolute;left:0;top:0;width:12px;height:5px;border-radius:50%;background:#000;opacity:.3;display:none;z-index:1;will-change:transform}
   /* 타격 순간 빛: 홈런 주황, 135m 이상 빨강 */
   #flash{position:absolute;left:0;top:0;width:40px;height:40px;border-radius:50%;display:none;z-index:1;pointer-events:none;
     transform:translate(-50%,-50%);background:radial-gradient(circle,rgba(255,255,255,.95) 0 18%,var(--flash) 30%,rgba(255,255,255,0) 70%)}
@@ -104,7 +112,7 @@
     background:rgba(27,43,32,.6);border-radius:var(--radius);padding:2px 10px}
 
   /* 타이밍 게이지 (홈플레이트 아래) */
-  .gauge{position:absolute;left:50%;bottom:2.5%;transform:translateX(-50%);width:62%;max-width:420px;z-index:5}
+  .gauge{position:absolute;left:50%;bottom:2.5%;transform:translateX(-50%);width:min(62%,420px,calc(100vw - 60px));z-index:5}   /* 무대가 틀보다 넓어도 화면 안에 */
   .gauge .bar{position:relative;height:14px;border-radius:7px;border:1px solid rgba(255,255,255,.7);box-shadow:0 1px 3px rgba(0,0,0,.35);
     background:linear-gradient(90deg,#c8453f 0%,#e8892b 22%,#f2c94c 36%,#2f8f5b 44%,#2f8f5b 56%,#f2c94c 64%,#e8892b 78%,#c8453f 100%)}
   .gauge .mid{position:absolute;left:50%;top:-3px;bottom:-3px;width:2px;background:rgba(255,255,255,.85);transform:translateX(-50%)}
@@ -172,7 +180,8 @@
     <div class="c"><span class="k">최고 기록</span><span class="v" id="hudBest">-</span></div>
   </div>
 
-  <!-- 경기장 (포수 뒤 위쪽에서 투수를 바라보는 구도, 좌우 대칭) -->
+  <!-- 경기장 (포수 뒤 위쪽에서 투수를 바라보는 구도, 좌우 대칭) — .arena 는 보이는 틀, .stage 는 3:2 고정 무대 -->
+  <div class="arena">
   <div class="stage" id="stage">
     <svg class="field" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
       <defs>
@@ -211,6 +220,10 @@
           <circle cx="1.2" cy=".3" r=".3" fill="#f0dcc0"/><circle cx="1.2" cy=".75" r=".34" fill="#d97b4f"/>
           <circle cx="1.9" cy=".45" r=".3" fill="#e8c9a4"/><circle cx="1.9" cy=".9" r=".34" fill="#eeeee6"/>
         </pattern>
+        <!-- 공(#ball)의 가죽 그라데이션 — 공 SVG 는 숨겨진 채 시작하므로 여기(항상 보이는 SVG)에 둠 -->
+        <radialGradient id="leather" cx="38%" cy="32%" r="70%">
+          <stop offset="0" stop-color="#ffffff"/><stop offset=".55" stop-color="#f3f3f1"/><stop offset=".85" stop-color="#d9d9d6"/><stop offset="1" stop-color="#bdbdb9"/>
+        </radialGradient>
         <clipPath id="grassClip"><rect x="0" y="36" width="100" height="64"/></clipPath>
         <clipPath id="standClip"><path d="M0 28 Q50 10 100 28 L100 45 Q50 29 0 45 Z"/></clipPath>
       </defs>
@@ -409,12 +422,8 @@
     <div id="zone"></div>
     <div id="shadow"></div>
     <svg id="ball" viewBox="0 0 100 100" aria-hidden="true">
-      <defs>
-        <radialGradient id="leather" cx="38%" cy="32%" r="70%">
-          <stop offset="0" stop-color="#ffffff"/><stop offset=".55" stop-color="#f3f3f1"/><stop offset=".85" stop-color="#d9d9d6"/><stop offset="1" stop-color="#bdbdb9"/>
-        </radialGradient>
-      </defs>
-      <circle cx="50" cy="50" r="48" fill="url(#leather)"/>
+      <!-- 가죽 그라데이션(#leather)은 항상 보이는 경기장 SVG 의 defs 에 있음 (숨겨진 SVG 안에 두면 Safari 가 못 그림) -->
+      <circle cx="50" cy="50" r="48" fill="url(#leather)" stroke="rgba(0,0,0,.28)" stroke-width="3"/>
       <!-- 실밥: 양쪽으로 휜 두 줄 + 가로지르는 바늘땀 -->
       <g fill="none" stroke="#c8403a" stroke-linecap="round">
         <path d="M31 6 C 9 30, 9 70, 31 94" stroke-width="3"/>
@@ -441,6 +450,7 @@
       <div class="bar"><span class="mid"></span><span class="mk" id="gaugeMark"></span></div>
       <div class="lb"><span>빠름</span><span id="gaugeText">이전 타격의 타이밍</span><span>늦음</span></div>
     </div>
+  </div>
   </div>
 
   <button class="swing" id="btnSwing" disabled>스윙</button>
@@ -543,6 +553,8 @@ const flightMs = kmh => 900 * Math.pow(140 / kmh, 2);
 // 화면 좌표(%): 투수 손(우완 → 화면 왼쪽) → 스트라이크 존 가운데
 const REL = { x: 46.8, y: 44.5 };   // 우완 투수: 투구 그림에서 공을 쥔 오른손 위치(화면 왼쪽 위)
 const PLATE = { x: 50, y: 68.75 };
+// 땅의 화면 y(%): 투수판(마운드 위 투수의 발)과 홈플레이트 — 공 그림자는 이 선 위에 놓임
+const GROUND = { mound: 60.5, plate: 84.3 };
 const ZONE = { hw: 3.75, hh: 6.75 };      // 스트라이크 존 반너비·반높이(%) — 세로로 긴 모양, #zone 의 CSS 와 같은 값
 const BALL_MIN = 1.1, BALL_MAX = 3.8;     // 공 지름 (무대 높이의 %)
 // 외야 담장 윗선의 화면 y(%) — SVG 의 "M0 45 Q50 29 100 45" 와 같은 곡선 (가운데 37, 양 끝 45)
@@ -559,7 +571,13 @@ function applyImages(){
     ["imgPitcherThrow", IMAGES.pitcherThrow, "pitcher"]
   ];
   const has = { batter: false, pitcher: false };
-  map.forEach(([id, src, slot]) => { if (src){ $(id).src = src; has[slot] = true; } });
+  map.forEach(([id, src, slot]) => {
+    if (!src) return;
+    const img = $(id);
+    img.decoding = "sync";                                   // Safari: 표시 순간 비동기 디코딩으로 빈 칸이 되는 것 방지
+    img.src = src; has[slot] = true;
+    if (img.decode) img.decode().catch(() => {});            // 미리 디코딩해 두기 (실패해도 무시)
+  });
   $("batter").classList.toggle("has-img", has.batter);
   $("pitcher").classList.toggle("has-img", has.pitcher);
 }
@@ -617,15 +635,19 @@ function hud(){
   $("hudScore").textContent = fmt(G.score);
   $("hudCombo").textContent = G.combo;
 }
-/* 공 놓기: 화면 좌표(%)·지름(무대 높이 %)·회전각(도) */
+/* 공 놓기: 화면 좌표(%)·지름(무대 높이 %)·회전각(도). shadowY = 공 바로 아래 땅의 화면 y(%) —
+   공이 땅에서 높이 떠 있을수록 그림자는 넓고 옅어짐 */
 function placeBall(x, y, dia, rot, withShadow, shadowY, axis){
   const W = stage.clientWidth, H = stage.clientHeight, px = dia / 100 * H;
   ball.style.width = ball.style.height = px + "px";
   ball.style.transform = `translate(${x/100*W - px/2}px, ${y/100*H - px/2}px) rotate(${rot}deg)`;
   if (withShadow){
+    const h = Math.max(0, shadowY - y);                       // 땅에서의 높이(무대 높이 %)
+    const sw = px * (1 + h / 40), sh = px * .4 * (1 + h / 80);
     shadow.style.display = "block";
-    shadow.style.width = px + "px"; shadow.style.height = px * .4 + "px";
-    shadow.style.transform = `translate(${x/100*W - px/2}px, ${shadowY/100*H - px*.2}px)`;
+    shadow.style.opacity = Math.max(.1, .32 - h * .006);
+    shadow.style.width = sw + "px"; shadow.style.height = sh + "px";
+    shadow.style.transform = `translate(${x/100*W - sw/2}px, ${shadowY/100*H - sh/2}px)`;
   } else shadow.style.display = "none";
 }
 function showCall(grade, detail){
@@ -675,7 +697,7 @@ function startGame(){
     speedBonus: 0, phase: "idle", cur: null, swung: false, freePitch: false });
   $("hudSpeed").textContent = "-";
   setGauge(null, "이전 타격의 타이밍");
-  hideCall(); hideZoneMark(); ball.style.display = "none"; shadow.style.display = "none"; $("flash").classList.remove("on");
+  hideCall(); hideZoneMark(); ball.style.visibility = "hidden"; shadow.style.display = "none"; $("flash").classList.remove("on");
   setBatter("ready"); setPitcher("idle");
   $("scrStart").classList.remove("on"); $("scrEnd").classList.remove("on");
   hud();
@@ -701,8 +723,9 @@ function pickEnd(){
 }
 
 function nextPitch(){
-  if (G.pitchNo >= TOTAL_PITCHES){ endGame(); return; }
-  if (G.freePitch) G.freePitch = false; else G.pitchNo++;   // 볼을 골라낸 다음 공은 같은 번호로
+  // 볼·파울 다음 공은 타격 기회를 쓰지 않으므로(같은 번호) 20구째라도 경기를 끝내지 않음
+  if (!G.freePitch && G.pitchNo >= TOTAL_PITCHES){ endGame(); return; }
+  if (G.freePitch) G.freePitch = false; else G.pitchNo++;   // 볼·파울 다음 공은 같은 번호로
   hud();
   G.cur = pickPitch();
   G.kmh = G.cur.kmh + G.speedBonus;
@@ -723,7 +746,7 @@ function release(){
   setPitcher("throw");
   G.t0 = performance.now();
   btnSwing.disabled = false;
-  ball.style.display = "block";
+  ball.style.visibility = "visible";
   later(() => setPitcher("idle"), 350);
   later(() => { $("hudSpeed").textContent = String(G.kmh); }, G.flightTime);   // 구속은 공이 홈플레이트에 닿은 뒤에 표시
   // 공을 치지 않고 흘려보내면 스트라이크 또는 볼
@@ -742,8 +765,9 @@ function flyPitch(now){
   let x = PLATE.x * s + REL.x * (1 - s) + off.dx + (G.end.dx - fin.dx) * s;
   let y = PLATE.y * s + REL.y * (1 - s) + off.dy + (G.end.dy - fin.dy) * s;
   let dia = BALL_MIN + (BALL_MAX - BALL_MIN) * s;
-  if (t >= 1){ ball.style.display = "none"; G.pitchAnim = false; return; }   // 존 위치를 지나면 사라짐(포수 미트)
-  placeBall(x, y, dia, G.cur.spin * 360 * t, false, 0, G.cur.axis);
+  if (t >= 1){ ball.style.visibility = "hidden"; shadow.style.display = "none"; G.pitchAnim = false; return; }   // 존 위치를 지나면 사라짐(포수 미트)
+  // 그림자: 투수판에서 홈플레이트까지 땅 위를 따라옴 (공과 같은 원근 진행률)
+  placeBall(x, y, dia, G.cur.spin * 360 * t, true, GROUND.mound + (GROUND.plate - GROUND.mound) * s, G.cur.axis);
   G.raf = requestAnimationFrame(flyPitch);
 }
 
@@ -807,7 +831,7 @@ function judge(delta){
     const go = () => flyHit(dist, delta, () => { showCall(bigGrade, detail); later(afterResult, 1100); });
     if (grade === "홈런"){   // 빛이 나는 동안에도 공은 맞은 자리에 보임
       if (dist >= 135) showFlash("#ff3b2a", 9); else showFlash("#ff9a2a", 4);   // 홈런: 주황 빛(기본의 4배), 135m 이상: 빨간 빛(9배)
-      placeBall(PLATE.x + G.end.dx, PLATE.y + G.end.dy, BALL_MAX, 0, false, 0, "back"); ball.style.display = "block";
+      placeBall(PLATE.x + G.end.dx, PLATE.y + G.end.dy, BALL_MAX, 0, true, GROUND.plate, "back"); ball.style.visibility = "visible";
       later(go, 150); }
     else go();
   }
@@ -815,12 +839,12 @@ function judge(delta){
   else {
     // 헛스윙·스트라이크·볼: 공이 존을 지나는 것을 끝까지 보여 준 뒤 도착점 표시
     const wait = Math.max(0, G.flightTime - (performance.now() - G.t0));
-    later(() => { G.pitchAnim = false; cancelAnimationFrame(G.raf); ball.style.display = "none"; showZoneMark(delta === null ? "" : "miss"); showCall(bigGrade, detail);
+    later(() => { G.pitchAnim = false; cancelAnimationFrame(G.raf); ball.style.visibility = "hidden"; shadow.style.display = "none"; showZoneMark(delta === null ? "" : "miss"); showCall(bigGrade, detail);
       later(afterResult, 1300); }, wait + 120);
   }
 }
 function afterResult(){
-  hideCall(); ball.style.display = "none"; shadow.style.display = "none";
+  hideCall(); ball.style.visibility = "hidden"; shadow.style.display = "none";
   later(nextPitch, 500);
 }
 
@@ -841,12 +865,13 @@ function flyHit(dist, delta, done){
   else if (dist < 120 && Math.random() < 0.45){ kind = "liner"; H = 5 + 7 * f; dur = 650 + 450 * f; }           // 라이너: 낮고 빠르게
   else { kind = "fly"; H = 14 + 30 * f + Math.random() * 8; dur = 900 + 800 * f; }                               // 뜬공: 높이 떠서
   const t0 = performance.now();
-  ball.style.display = "block";
+  const g0 = GROUND.plate, h0 = g0 - y0;                            // 맞는 순간 공은 홈플레이트 땅에서 h0 만큼 떠 있음
+  ball.style.visibility = "visible";
   (function step(now){
     const t = Math.min(1, (now - t0) / dur);
-    const gx = x0 + (x1 - x0) * t, gy = y0 + (y1 - y0) * t;         // 지면 위 위치
+    const gx = x0 + (x1 - x0) * t, gy = g0 + (y1 - g0) * t;         // 지면 위 위치(그림자 자리): 홈플레이트 → 착지점
     const lift = kind === "ground" ? Math.abs(Math.sin(Math.PI * 3 * t)) * (1 - t) : Math.sin(Math.PI * t);
-    const y = gy - H * lift;
+    const y = gy - h0 * (1 - t) - H * lift;                          // 처음 높이는 점점 줄고, 궤적 높이가 더해짐
     const dia = BALL_MAX - (BALL_MAX - 1.2) * Math.pow(t, .7) * f;
     placeBall(gx, y, dia, t * 1440, true, gy, "back");
     if (t < 1) G.raf = requestAnimationFrame(step); else done();
@@ -857,10 +882,11 @@ function flyFoul(side, done){
   const x0 = PLATE.x + G.end.dx, y0 = PLATE.y + G.end.dy;
   const x1 = 50 + side * (40 + Math.random() * 8), y1 = 60 + Math.random() * 8;
   const H = 18 + Math.random() * 8, dur = 950, t0 = performance.now();
-  ball.style.display = "block";
+  const g0 = GROUND.plate, h0 = g0 - y0;
+  ball.style.visibility = "visible";
   (function step(now){
     const t = Math.min(1, (now - t0) / dur);
-    const gx = x0 + (x1 - x0) * t, gy = y0 + (y1 - y0) * t, y = gy - H * Math.sin(Math.PI * t);
+    const gx = x0 + (x1 - x0) * t, gy = g0 + (y1 - g0) * t, y = gy - h0 * (1 - t) - H * Math.sin(Math.PI * t);
     placeBall(gx, y, BALL_MAX - (BALL_MAX - 1.4) * Math.pow(t, .8), t * 1600, true, gy, "back");
     if (t < 1) G.raf = requestAnimationFrame(step); else done();
   })(t0);
