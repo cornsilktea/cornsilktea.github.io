@@ -424,12 +424,10 @@
     <svg id="ball" viewBox="0 0 100 100" aria-hidden="true">
       <!-- 가죽 그라데이션(#leather)은 항상 보이는 경기장 SVG 의 defs 에 있음 (숨겨진 SVG 안에 두면 Safari 가 못 그림) -->
       <circle cx="50" cy="50" r="48" fill="url(#leather)" stroke="rgba(0,0,0,.28)" stroke-width="3"/>
-      <!-- 실밥: 양쪽으로 휜 두 줄 + 가로지르는 바늘땀 -->
+      <!-- 실밥: 3차원 곡선을 회전축 기준으로 돌려 앞쪽 반구만 매 프레임 그림 (drawSeams) -->
       <g fill="none" stroke="#c8403a" stroke-linecap="round">
-        <path d="M31 6 C 9 30, 9 70, 31 94" stroke-width="3"/>
-        <path d="M69 6 C 91 30, 91 70, 69 94" stroke-width="3"/>
-        <path d="M31 6 C 9 30, 9 70, 31 94" stroke-width="9" stroke-dasharray="1.6 5.2" stroke-linecap="butt" opacity=".95"/>
-        <path d="M69 6 C 91 30, 91 70, 69 94" stroke-width="9" stroke-dasharray="1.6 5.2" stroke-linecap="butt" opacity=".95"/>
+        <path id="seam" d="" stroke-width="3"/>
+        <path id="stitch" d="" stroke-width="2" opacity=".95"/>
       </g>
     </svg>
     <div id="flash"></div>
@@ -536,18 +534,29 @@ const GAUGE_RANGE = 260;      // 게이지 막대 양 끝 = ±260ms
 const BALL_BONUS = 500;       // 볼을 골라냈을 때 점수
 const BALL_HIT_PENALTY = 1.6;  // 볼을 쳤을 때 타이밍 오차 배율(존 안의 공보다 정확해야 함)
 const CENTER_MS = 30;         // ±30ms 안이면 "정타"
-/* 구종 — kmh: 처음 구속, spin: 날아오는 동안 도는 바퀴 수(부호 = 방향),
+/* 구종 — kmh: 처음 구속, spin: 날아오는 동안 도는 바퀴 수,
+   axis: 회전축 [x, y, z] (포수 시점: x 오른쪽, y 위, z 포수 쪽. 오른손 법칙 — 엄지가 축, 손가락이 도는 방향).
+   공이 포수 쪽(+z)으로 날아올 때 마그누스 힘은 축 × 진행방향 이므로
+     -x 축 = 백스핀(앞면이 위로 흐름·떠오름), +x 축 = 톱스핀(앞면이 아래로·떨어짐),
+     +y 축 = 앞면이 오른쪽으로 흐름(글러브 쪽으로 꺾임), +z 축 = 자이로(총알 회전, 포수가 보면 반시계 — 휘지 않음).
+   실제 우완 투수(포수 시점):
+     직구   순수 백스핀에 가깝고 축이 살짝 기울어 팔 쪽(왼쪽)으로 흐름 (회전 효율 85~90%)
+     커브   톱스핀(12-6) + 글러브 쪽으로 약간 쓸림
+     슬라이더 자이로 성분이 커서 회전축이 공 앞면 오른쪽 위를 뚫고 나옴 → 타자에게 그 자리에 실밥이 뭉친 "빨간 점"이 보임
+     체인지업 직구보다 느린 백스핀, 축이 더 기울어(약 2시) 팔 쪽으로 흘러 들어감
    path: 0~1 → 직선 궤적에 더하는 화면 오프셋(%) (마지막 값은 도착점 계산에서 빼서 목표 지점에 맞춥니다) */
 const PITCHES = [
-  { name: "직구",     kmh: 140, w: 4, spin: -16, axis: "back",   // 백스핀
+  { name: "직구",     kmh: 140, w: 4, spin: 16, axis: [-1, -0.25, 0],
     path: t => ({ dx: 0, dy: -1.2 * Math.sin(Math.PI * t) }) },
-  { name: "커브",     kmh: 120, w: 2, spin: 12, axis: "back",    // 톱스핀(반대 방향)
+  { name: "커브",     kmh: 120, w: 2, spin: 14, axis: [1, 0.3, 0.15],
     path: t => ({ dx: 3.5 * t * t, dy: -5 * Math.sin(Math.PI * t) + 8 * t * t * t }) },
-  { name: "슬라이더", kmh: 132, w: 2, spin: 18, axis: "side",    // 옆으로 도는 회전, 우완 → 우타자 바깥쪽으로 꺾임
+  { name: "슬라이더", kmh: 132, w: 2, spin: 18, axis: [0.35, 0.45, 0.85],
     path: t => ({ dx: 9 * t * t * t, dy: 2 * t * t }) },
-  { name: "체인지업", kmh: 126, w: 2, spin: -8, axis: "back",  // 느린 백스핀, 팔 쪽(우타자 몸쪽)으로 살짝 흘러 들어감
+  { name: "체인지업", kmh: 126, w: 2, spin: 8, axis: [-0.8, -0.55, 0.3],
     path: t => ({ dx: -1.5 * t * t, dy: -1.2 * Math.sin(Math.PI * t) + 4 * t * t * t * t }) }
 ];
+// 한 프레임에 도는 최대 바퀴 수 — 실밥 무늬는 반 바퀴마다 같은 모양이라 한 프레임에 이보다 많이 돌면 거꾸로 도는 것처럼 보임(마차 바퀴 효과)
+const SPIN_STEP_MAX = 0.17;
 // 구속(km/h) → 홈플레이트까지 걸리는 시간(ms). 140 km/h 가 900ms, 160 은 약 690ms, 120 은 약 1225ms
 const flightMs = kmh => 900 * Math.pow(140 / kmh, 2);
 // 화면 좌표(%): 투수 손(우완 → 화면 왼쪽) → 스트라이크 존 가운데
@@ -557,6 +566,11 @@ const PLATE = { x: 50, y: 68.75 };
 const GROUND = { mound: 60.5, plate: 84.3 };
 const ZONE = { hw: 3.75, hh: 6.75 };      // 스트라이크 존 반너비·반높이(%) — 세로로 긴 모양, #zone 의 CSS 와 같은 값
 const BALL_MIN = 1.1, BALL_MAX = 3.8;     // 공 지름 (무대 높이의 %)
+// 타구 회전: 직구와 같은 백스핀. 멀어지는 공(진행 방향 -z)의 백스핀 축은 진행방향 × 위 = +x 쪽 (포수가 보면 뒷면이 아래로 흐름)
+const BACKSPIN_AWAY = [1, 0, 0];
+const HIT_SPIN = 5;                       // 타구가 날아가는 동안 도는 바퀴 수
+// 옆으로 side(-1~1)만큼 치우쳐 멀어지는 타구의 백스핀 축 (진행방향 (side·0.6, 0, -1) × 위)
+const hitAxis = side => [1, 0, side * 0.6];
 // 외야 담장 윗선의 화면 y(%) — SVG 의 "M0 45 Q50 29 100 45" 와 같은 곡선 (가운데 37, 양 끝 45)
 const fenceY = x => { const u = Math.max(0, Math.min(1, x / 100)); return (1-u)*(1-u)*45 + 2*u*(1-u)*29 + u*u*45; };
 
@@ -624,7 +638,7 @@ const BEST = {
 const G = {
   pitchNo: 0, score: 0, combo: 0, maxCombo: 0, hr: 0, hits: 0, fouls: 0, misses: 0, balls: 0, maxDist: 0, maxKmh: 0, log: [],
   speedBonus: 0, phase: "idle",          // idle | windup | flight | result
-  cur: null, kmh: 0, end: null, t0: 0, flightTime: 0, swung: false, pitchAnim: false, freePitch: false, raf: 0, timers: []
+  cur: null, kmh: 0, end: null, t0: 0, flightTime: 0, swung: false, pitchAnim: false, freePitch: false, raf: 0, timers: [], spinAng: 0
 };
 const stage = $("stage"), ball = $("ball"), shadow = $("shadow"), btnSwing = $("btnSwing");
 
@@ -635,12 +649,64 @@ function hud(){
   $("hudScore").textContent = fmt(G.score);
   $("hudCombo").textContent = G.combo;
 }
-/* 공 놓기: 화면 좌표(%)·지름(무대 높이 %)·회전각(도). shadowY = 공 바로 아래 땅의 화면 y(%) —
+/* ---------- 공 실밥(3차원) ----------
+   실밥을 단위 구 위의 닫힌 곡선으로 두고, 매 프레임 회전축을 중심으로 돌린 뒤 앞쪽 반구(z ≥ 0)만 그림.
+   곡선의 z 축을 회전축에 맞춰 두면 한 바퀴에 실밥 네 가닥이 지나가는 포심 방향이 됨. */
+const SEAM_N = 240;
+const SEAM = [];                                   // 실밥 곡선 표본점 (Thompson 의 야구공 실밥: 극각이 두 극 근처를 번갈아 오감, t = 0 ~ 4π)
+for (let i = 0; i < SEAM_N; i++){
+  const t = i / SEAM_N * 4 * Math.PI, a = .4;
+  const th = Math.PI / 2 - (Math.PI / 2 - a) * Math.cos(t), ph = t / 2 + a * Math.sin(2 * t);
+  SEAM.push([Math.sin(th) * Math.cos(ph), Math.sin(th) * Math.sin(ph), Math.cos(th)]);
+}
+const STITCH = [];                                 // 바늘땀: 실밥과 직각(구 표면에 접함)인 짧은 선의 양 끝
+for (let i = 0; i < SEAM_N; i += 5){
+  const p = SEAM[i], q = SEAM[(i + 1) % SEAM_N];
+  const tx = q[0] - p[0], ty = q[1] - p[1], tz = q[2] - p[2];                  // 접선
+  let nx = ty * p[2] - tz * p[1], ny = tz * p[0] - tx * p[2], nz = tx * p[1] - ty * p[0];   // 접선 × 반지름
+  const l = Math.hypot(nx, ny, nz) || 1, w = .09; nx *= w / l; ny *= w / l; nz *= w / l;
+  STITCH.push([[p[0] - nx, p[1] - ny, p[2] - nz], [p[0] + nx, p[1] + ny, p[2] + nz]]);
+}
+// 로드리게스 회전: 단위 축 k 를 중심으로 각 th 만큼
+function rotator(k, th){
+  const c = Math.cos(th), s = Math.sin(th), [kx, ky, kz] = k;
+  return v => { const d = (kx * v[0] + ky * v[1] + kz * v[2]) * (1 - c);
+    return [v[0] * c + (ky * v[2] - kz * v[1]) * s + kx * d,
+            v[1] * c + (kz * v[0] - kx * v[2]) * s + ky * d,
+            v[2] * c + (kx * v[1] - ky * v[0]) * s + kz * d]; };
+}
+let seamBase = { axis: null, seam: SEAM, stitch: STITCH };
+function drawSeams(axis, turns){
+  const al = Math.hypot(axis[0], axis[1], axis[2]) || 1, k = [axis[0] / al, axis[1] / al, axis[2] / al];
+  if (seamBase.axis !== axis){                     // 축이 바뀌면 곡선의 z 축을 회전축에 맞춰 놓은 표본을 한 번만 계산
+    let bk = [-k[1], k[0], 0], bl = Math.hypot(bk[0], bk[1]);   // z × k
+    const base = bl < 1e-6 ? (v => v) : rotator([bk[0] / bl, bk[1] / bl, 0], Math.acos(Math.max(-1, Math.min(1, k[2]))));
+    seamBase = { axis, seam: SEAM.map(base), stitch: STITCH.map(([a, b]) => [base(a), base(b)]) };
+  }
+  const rot = rotator(k, turns * 2 * Math.PI);
+  const P = v => (50 + 47 * v[0]).toFixed(1) + " " + (50 - 47 * v[1]).toFixed(1);
+  let d = "", pen = false;
+  for (let i = 0; i <= SEAM_N; i++){
+    const v = rot(seamBase.seam[i % SEAM_N]);
+    if (v[2] >= 0){ d += (pen ? "L" : "M") + P(v); pen = true; } else pen = false;
+  }
+  let st = "";
+  for (const [a, b] of seamBase.stitch){ const A = rot(a), B = rot(b); if (A[2] > .03 && B[2] > .03) st += "M" + P(A) + "L" + P(B); }
+  $("seam").setAttribute("d", d); $("stitch").setAttribute("d", st);
+}
+// 회전각(바퀴): 목표값을 따라가되 한 프레임에 SPIN_STEP_MAX 이상은 돌지 않음 (reset = 새 비행 시작)
+function spinTo(target, reset){
+  if (reset) G.spinAng = target;
+  else G.spinAng += Math.max(-SPIN_STEP_MAX, Math.min(SPIN_STEP_MAX, target - G.spinAng));
+  return G.spinAng;
+}
+/* 공 놓기: 화면 좌표(%)·지름(무대 높이 %)·회전(바퀴)·회전축. shadowY = 공 바로 아래 땅의 화면 y(%) —
    공이 땅에서 높이 떠 있을수록 그림자는 넓고 옅어짐 */
-function placeBall(x, y, dia, rot, withShadow, shadowY, axis){
+function placeBall(x, y, dia, turns, withShadow, shadowY, axis){
   const W = stage.clientWidth, H = stage.clientHeight, px = dia / 100 * H;
   ball.style.width = ball.style.height = px + "px";
-  ball.style.transform = `translate(${x/100*W - px/2}px, ${y/100*H - px/2}px) rotate(${rot}deg)`;
+  ball.style.transform = `translate(${x/100*W - px/2}px, ${y/100*H - px/2}px)`;
+  drawSeams(axis || BACKSPIN_AWAY, turns);
   if (withShadow){
     const h = Math.max(0, shadowY - y);                       // 땅에서의 높이(무대 높이 %)
     const sw = px * (1 + h / 40), sh = px * .4 * (1 + h / 80);
@@ -744,7 +810,7 @@ function nextPitch(){
 function release(){
   G.phase = "flight"; G.pitchAnim = true;
   setPitcher("throw");
-  G.t0 = performance.now();
+  G.t0 = performance.now(); G.spinAng = 0;
   btnSwing.disabled = false;
   ball.style.visibility = "visible";
   later(() => setPitcher("idle"), 350);
@@ -767,7 +833,7 @@ function flyPitch(now){
   let dia = BALL_MIN + (BALL_MAX - BALL_MIN) * s;
   if (t >= 1){ ball.style.visibility = "hidden"; shadow.style.display = "none"; G.pitchAnim = false; return; }   // 존 위치를 지나면 사라짐(포수 미트)
   // 그림자: 투수판에서 홈플레이트까지 땅 위를 따라옴 (공과 같은 원근 진행률)
-  placeBall(x, y, dia, G.cur.spin * 360 * t, true, GROUND.mound + (GROUND.plate - GROUND.mound) * s, G.cur.axis);
+  placeBall(x, y, dia, spinTo(G.cur.spin * t), true, GROUND.mound + (GROUND.plate - GROUND.mound) * s, G.cur.axis);
   G.raf = requestAnimationFrame(flyPitch);
 }
 
@@ -816,7 +882,9 @@ function judge(delta){
     detail += "볼 골라냄 · +" + gained + "점 · 투구 수 유지"; }
   else { G.combo = 0; G.misses++;
     detail += delta === null ? "치지 않고 흘려보냄" : (delta < 0 ? "너무 빠름" : "너무 늦음"); }
-  G.score += gained; hud();
+  const bigGrade = grade === "홈런" ? "홈런!" : (grade === "외야안타" || grade === "내야안타") ? "안타" : grade;   // 내야·외야안타는 크게는 "안타"로
+  // 점수·스코어보드는 타구가 땅에 닿아 판정 문구(획득 점수)가 뜬 뒤에 올림
+  const settle = () => { showCall(bigGrade, detail); G.score += gained; hud(); };
 
   // 게이지 갱신 (다음 타격 결과가 나올 때까지 유지)
   if (delta === null) setGauge(GAUGE_RANGE, "스윙하지 않음");
@@ -825,21 +893,20 @@ function judge(delta){
     setGauge(delta, ms <= 5 ? "정확!" : `${ms}ms ${delta < 0 ? "빠름" : "늦음"}`);
   }
 
-  const bigGrade = grade === "홈런" ? "홈런!" : grade;
   if (dist > 0 || grade === "파울"){ G.pitchAnim = false; cancelAnimationFrame(G.raf); showZoneMark("hit", grade !== "파울"); }   // 타격한 위치도 남김(파울은 투구 수에 안 들어가 차트에서 제외)
   if (dist > 0){
-    const go = () => flyHit(dist, delta, () => { showCall(bigGrade, detail); later(afterResult, 1100); });
+    const go = () => flyHit(dist, delta, () => { settle(); later(afterResult, 1100); });
     if (grade === "홈런"){   // 빛이 나는 동안에도 공은 맞은 자리에 보임
       if (dist >= 135) showFlash("#ff3b2a", 9); else showFlash("#ff9a2a", 4);   // 홈런: 주황 빛(기본의 4배), 135m 이상: 빨간 빛(9배)
-      placeBall(PLATE.x + G.end.dx, PLATE.y + G.end.dy, BALL_MAX, 0, true, GROUND.plate, "back"); ball.style.visibility = "visible";
+      placeBall(PLATE.x + G.end.dx, PLATE.y + G.end.dy, BALL_MAX, 0, true, GROUND.plate, BACKSPIN_AWAY); ball.style.visibility = "visible";
       later(go, 150); }
     else go();
   }
-  else if (grade === "파울"){ flyFoul(side, () => { showCall(bigGrade, detail); later(afterResult, 1000); }); }
+  else if (grade === "파울"){ flyFoul(side, () => { settle(); later(afterResult, 1000); }); }
   else {
     // 헛스윙·스트라이크·볼: 공이 존을 지나는 것을 끝까지 보여 준 뒤 도착점 표시
     const wait = Math.max(0, G.flightTime - (performance.now() - G.t0));
-    later(() => { G.pitchAnim = false; cancelAnimationFrame(G.raf); ball.style.visibility = "hidden"; shadow.style.display = "none"; showZoneMark(delta === null ? "" : "miss"); showCall(bigGrade, detail);
+    later(() => { G.pitchAnim = false; cancelAnimationFrame(G.raf); ball.style.visibility = "hidden"; shadow.style.display = "none"; showZoneMark(delta === null ? "" : "miss"); settle();
       later(afterResult, 1300); }, wait + 120);
   }
 }
@@ -864,16 +931,16 @@ function flyHit(dist, delta, done){
   if (dist < 65){ kind = "ground"; H = 1.5 + Math.random() * 2;   dur = 650 + 350 * f; }                       // 땅볼: 낮게 튀며 굴러감
   else if (dist < 120 && Math.random() < 0.45){ kind = "liner"; H = 5 + 7 * f; dur = 650 + 450 * f; }           // 라이너: 낮고 빠르게
   else { kind = "fly"; H = 14 + 30 * f + Math.random() * 8; dur = 900 + 800 * f; }                               // 뜬공: 높이 떠서
-  const t0 = performance.now();
+  const t0 = performance.now(), axis = hitAxis(a);                  // 타구는 직구와 같은 백스핀으로 날아감
   const g0 = GROUND.plate, h0 = g0 - y0;                            // 맞는 순간 공은 홈플레이트 땅에서 h0 만큼 떠 있음
-  ball.style.visibility = "visible";
+  ball.style.visibility = "visible"; G.spinAng = 0;
   (function step(now){
     const t = Math.min(1, (now - t0) / dur);
     const gx = x0 + (x1 - x0) * t, gy = g0 + (y1 - g0) * t;         // 지면 위 위치(그림자 자리): 홈플레이트 → 착지점
     const lift = kind === "ground" ? Math.abs(Math.sin(Math.PI * 3 * t)) * (1 - t) : Math.sin(Math.PI * t);
     const y = gy - h0 * (1 - t) - H * lift;                          // 처음 높이는 점점 줄고, 궤적 높이가 더해짐
     const dia = BALL_MAX - (BALL_MAX - 1.2) * Math.pow(t, .7) * f;
-    placeBall(gx, y, dia, t * 1440, true, gy, "back");
+    placeBall(gx, y, dia, spinTo(HIT_SPIN * t), true, gy, axis);
     if (t < 1) G.raf = requestAnimationFrame(step); else done();
   })(t0);
 }
@@ -881,13 +948,13 @@ function flyFoul(side, done){
   // 파울선 바깥(1루·3루 쪽 관중석 방향)으로 높이 떠서 날아가며 멀어질수록 작아짐
   const x0 = PLATE.x + G.end.dx, y0 = PLATE.y + G.end.dy;
   const x1 = 50 + side * (40 + Math.random() * 8), y1 = 60 + Math.random() * 8;
-  const H = 18 + Math.random() * 8, dur = 950, t0 = performance.now();
+  const H = 18 + Math.random() * 8, dur = 950, t0 = performance.now(), axis = hitAxis(side);
   const g0 = GROUND.plate, h0 = g0 - y0;
-  ball.style.visibility = "visible";
+  ball.style.visibility = "visible"; G.spinAng = 0;
   (function step(now){
     const t = Math.min(1, (now - t0) / dur);
     const gx = x0 + (x1 - x0) * t, gy = g0 + (y1 - g0) * t, y = gy - h0 * (1 - t) - H * Math.sin(Math.PI * t);
-    placeBall(gx, y, BALL_MAX - (BALL_MAX - 1.4) * Math.pow(t, .8), t * 1600, true, gy, "back");
+    placeBall(gx, y, BALL_MAX - (BALL_MAX - 1.4) * Math.pow(t, .8), spinTo(HIT_SPIN * t), true, gy, axis);
     if (t < 1) G.raf = requestAnimationFrame(step); else done();
   })(t0);
 }
