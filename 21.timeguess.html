@@ -30,7 +30,19 @@
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
     font-family:var(--sg-font);font-size:16px;line-height:1.45;overscroll-behavior:none}
-  body{min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px 16px 40px}
+  body{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;align-items:center;padding:24px 16px 40px;
+    transition:background-color .3s}
+  /* 측정 중에는 화면 전체가 옅은 녹색으로 바뀌고 천천히 숨 쉬듯 밝아졌다 어두워집니다. */
+  body.running{background:var(--sg-primary-soft);animation:breathe 2s ease-in-out infinite}
+  @keyframes breathe{0%,100%{background-color:var(--sg-primary-soft)}50%{background-color:var(--tone)}}
+
+  /* 상단 최고 기록: 5초에 가장 가까웠던 시도 */
+  .best{width:100%;max-width:560px;padding:12px 16px;text-align:center;
+    font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;word-break:keep-all;
+    background:var(--panel);border:2px solid var(--line);border-radius:var(--radius)}
+  .best span{font-weight:400;color:var(--sub)}
+
+  .main{flex:1;width:100%;display:flex;align-items:center;justify-content:center}
 
   /* 화면은 하나씩만 보입니다. 세 화면(시작·측정 중·결과)이 같은 자리에 번갈아 나옵니다. */
   .screen{display:none;width:100%;max-width:560px;text-align:center}
@@ -67,11 +79,16 @@
     .btn{min-height:100px;font-size:32px}
     .lead{font-size:18px}
     .result p{font-size:28px}
+    .best{font-size:17px}
   }
 </style>
 </head>
 <body>
 
+<!-- 상단 최고 기록 (5초에 가장 가까운 시도) -->
+<div class="best" id="best">최고 기록 <span>아직 없음</span></div>
+
+<div class="main">
 <!-- 1) 시작 화면 -->
 <section class="screen on" id="scrStart">
   <p class="lead">시작을 누르고, 딱 5초가 됐다고 생각될 때 종료를 누르세요.</p>
@@ -92,6 +109,7 @@
   </div>
   <button class="btn" id="btnAgain" type="button">다시하기</button>
 </section>
+</div>
 
 <script>
 (function () {
@@ -108,10 +126,41 @@
   var btnAgain  = document.getElementById("btnAgain");
   var txtTime   = document.getElementById("txtTime");
   var txtDiff   = document.getElementById("txtDiff");
+  var bestEl    = document.getElementById("best");
+
+  /* ---------- 최고 기록 ----------
+     5초와의 차이(절댓값)가 가장 작은 시도. 같은 기기에서는 새로고침해도 남습니다. */
+  var BEST_KEY = "timeguess_best";
+  var best = null;                    /* {sec, diff} */
+  try {
+    var saved = JSON.parse(localStorage.getItem(BEST_KEY));
+    if (saved && typeof saved.sec === "number") best = saved;
+  } catch (e) {}
+
+  function renderBest() {
+    bestEl.innerHTML = "";
+    bestEl.appendChild(document.createTextNode("최고 기록 "));
+    var s = document.createElement("span");
+    if (!best) {
+      s.textContent = "아직 없음";
+    } else {
+      s.textContent = best.sec.toFixed(2) + "초 (" +
+        (best.diff === 0 ? "정확히 5초" : "5초와 " + Math.abs(best.diff).toFixed(2) + "초 차이") + ")";
+    }
+    bestEl.appendChild(s);
+  }
+
+  function updateBest(sec, diff) {
+    if (best && Math.abs(best.diff) <= Math.abs(diff)) return;
+    best = { sec: sec, diff: diff };
+    try { localStorage.setItem(BEST_KEY, JSON.stringify(best)); } catch (e) {}
+    renderBest();
+  }
 
   function show(scr) {
     [scrStart, scrRun, scrResult].forEach(function (s) { s.classList.remove("on"); });
     scr.classList.add("on");
+    document.body.classList.toggle("running", scr === scrRun);
   }
 
   function start() {
@@ -128,6 +177,7 @@
        "3.82초" 와 "1.18초 빨랐어요" 가 서로 어긋나지 않습니다. */
     var sec  = Math.round(ms / 10) / 100;
     var diff = Math.round((sec - TARGET) * 100) / 100;
+    updateBest(sec, diff);
 
     txtTime.textContent = sec.toFixed(2) + "초";
     if (diff === 0) {
@@ -162,6 +212,7 @@
   bind(btnStart, start);
   bind(btnStop, stop);
   bind(btnAgain, again);
+  renderBest();
 })();
 </script>
 </body>
