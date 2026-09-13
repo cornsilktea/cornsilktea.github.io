@@ -74,6 +74,9 @@
   .result{display:flex;flex-direction:column;gap:12px;width:100%}
   .result p{margin:0;font-size:36px;font-weight:700;line-height:1.35;word-break:keep-all;
     font-variant-numeric:tabular-nums}
+  /* 부호 붙은 차이: 느리면(+) 빨강, 빠르면(−) 파랑, 정확하면 기본색 */
+  .result p.late{color:var(--sg-danger)}
+  .result p.early{color:#2F5FA8}
 
   @media (max-width:479px){
     .btn{min-height:100px;font-size:32px}
@@ -106,6 +109,7 @@
   <div class="result" aria-live="polite">
     <p id="txtTime"></p>
     <p id="txtDiff"></p>
+    <p id="txtSigned"></p>
   </div>
   <button class="btn" id="btnAgain" type="button">다시하기</button>
 </section>
@@ -126,6 +130,7 @@
   var btnAgain  = document.getElementById("btnAgain");
   var txtTime   = document.getElementById("txtTime");
   var txtDiff   = document.getElementById("txtDiff");
+  var txtSigned = document.getElementById("txtSigned");
   var bestEl    = document.getElementById("best");
 
   /* ---------- 최고 기록 ----------
@@ -180,12 +185,18 @@
     updateBest(sec, diff);
 
     txtTime.textContent = sec.toFixed(2) + "초";
+    txtSigned.className = "";
     if (diff === 0) {
       txtDiff.textContent = "정확히 맞혔어요!";
+      txtSigned.textContent = "±0.00초";
     } else if (diff < 0) {
       txtDiff.textContent = TARGET + "초보다 " + Math.abs(diff).toFixed(2) + "초 빨랐어요";
+      txtSigned.textContent = "- " + Math.abs(diff).toFixed(2) + "초";
+      txtSigned.className = "early";
     } else {
       txtDiff.textContent = TARGET + "초보다 " + diff.toFixed(2) + "초 느렸어요";
+      txtSigned.textContent = "+ " + diff.toFixed(2) + "초";
+      txtSigned.className = "late";
     }
     btnAgain.focus({ preventScroll: true });
   }
