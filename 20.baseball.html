@@ -68,7 +68,7 @@
   /* 우타자: 홈플레이트 왼쪽(3루 쪽) 타석 */
   #batter{left:23%;bottom:12%;width:34%;height:41.5%;z-index:3}   /* 발이 왼쪽 타자 박스 안에, 무릎(그림 높이의 30%)~팔꿈치(62.5%)가 스트라이크 존과 맞도록 */
   #batter .ph{font-size:16px}
-  .fielder{position:absolute;pointer-events:none;opacity:.95;transform:translate(-50%,-100%)}
+  .fielder{position:absolute;pointer-events:none;opacity:.95;transform:translate(-50%,-100%);height:auto;filter:drop-shadow(0 1px 1px rgba(0,0,0,.35))}
   .fielder.in{width:5.2%;min-width:22px;max-width:36px}
   .fielder.out{width:4%;min-width:17px;max-width:28px;opacity:.9}
 
@@ -377,38 +377,14 @@
       <path d="M47.8 82.8 L52.2 82.8 L52.2 84.4 L50 85.8 L47.8 84.4 Z" fill="#fff" stroke="#c9c9c9" stroke-width=".3"/>
     </svg>
 
-    <!-- 야수 (공통 도형 하나를 여러 자리에 재사용): 3루수·유격수·2루수·1루수·좌익수·우익수 -->
-    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-      <symbol id="fielderShape" viewBox="0 0 40 64">
-        <ellipse cx="20" cy="61" rx="11" ry="2.4" fill="rgba(0,0,0,.25)"/>
-        <!-- 다리·양말·신발 -->
-        <path d="M13 38 L18 38 L17.5 52 L12.5 52 Z" fill="#f4f6f1"/><path d="M22 38 L27 38 L27.5 52 L22.5 52 Z" fill="#f4f6f1"/>
-        <rect x="12.5" y="50" width="5" height="8" fill="#24402F"/><rect x="22.5" y="50" width="5" height="8" fill="#24402F"/>
-        <rect x="12.5" y="52" width="5" height="1" fill="#fff"/><rect x="22.5" y="52" width="5" height="1" fill="#fff"/>
-        <path d="M11 57.5 L18 57.5 L18.5 60.5 L10 60.5 Z" fill="#1b2b20"/><path d="M22 57.5 L29 57.5 L30 60.5 L21.5 60.5 Z" fill="#1b2b20"/>
-        <!-- 몸통(유니폼) -->
-        <path d="M12 22 Q20 19 28 22 L29 40 L11 40 Z" fill="#f4f6f1"/>
-        <path d="M19.4 22 L20.6 22 L20.6 40 L19.4 40 Z" fill="#24402F" opacity=".8"/>
-        <rect x="11" y="37" width="18" height="2" fill="#24402F"/>
-        <!-- 팔: 왼쪽은 글러브, 오른쪽은 맨손 -->
-        <path d="M12 23 L7 34 L10.5 35.5 L15 26 Z" fill="#f4f6f1"/><path d="M28 23 L33 34 L29.5 35.5 L25 26 Z" fill="#f4f6f1"/>
-        <path d="M9 29 L7 34 L10.5 35.5 L12 31 Z" fill="#24402F"/><path d="M31 29 L33 34 L29.5 35.5 L28 31 Z" fill="#24402F"/>
-        <ellipse cx="8" cy="37.5" rx="4" ry="4.4" fill="#8a5a2b"/><ellipse cx="8" cy="36" rx="3" ry="2.4" fill="#a86f38"/>
-        <circle cx="31.5" cy="37" r="2.2" fill="#e9c9a6"/>
-        <!-- 머리·모자 -->
-        <circle cx="20" cy="14" r="6" fill="#e9c9a6"/>
-        <path d="M14 13.5 Q20 5 26 13.5 Z" fill="#24402F"/>
-        <path d="M13.5 13.5 L28.5 13.5 L28.5 15 L13.5 15 Z" fill="#1b2f22"/>
-        <rect x="18" y="16" width="1.2" height="1.2" fill="#3b2a1e"/><rect x="21" y="16" width="1.2" height="1.2" fill="#3b2a1e"/>
-      </symbol>
-    </svg>
-    <svg class="fielder in" style="left:27%;top:63%" viewBox="0 0 40 64"><use href="#fielderShape"/></svg>   <!-- 3루수 (파울선 안쪽) -->
-    <svg class="fielder in" style="left:37%;top:58%" viewBox="0 0 40 64"><use href="#fielderShape"/></svg>   <!-- 유격수 -->
-    <svg class="fielder in" style="left:64%;top:58%" viewBox="0 0 40 64"><use href="#fielderShape"/></svg>   <!-- 2루수 -->
-    <svg class="fielder in" style="left:73%;top:63%" viewBox="0 0 40 64"><use href="#fielderShape"/></svg>   <!-- 1루수 (파울선 안쪽) -->
-    <svg class="fielder out" style="left:17%;top:51%" viewBox="0 0 40 64"><use href="#fielderShape"/></svg>  <!-- 좌익수 -->
-    <svg class="fielder out" style="left:83%;top:51%" viewBox="0 0 40 64"><use href="#fielderShape"/></svg>  <!-- 우익수 -->
-    <svg class="fielder out" style="left:54.5%;top:43.5%;width:3.2%;min-width:14px" viewBox="0 0 40 64"><use href="#fielderShape"/></svg>  <!-- 중견수 (투수의 1시 방향) -->
+    <!-- 야수 그림 (img/fielder-*.png, 배경 투명). 2루수·유격수 자리는 그림을 서로 바꿔 씀 (몸이 향하는 방향이 자리와 맞도록) -->
+    <img class="fielder in"  style="left:27%;top:63%"     src="img/fielder-3b.png" alt="">   <!-- 3루수 (파울선 안쪽) -->
+    <img class="fielder in"  style="left:37%;top:58%"     src="img/fielder-2b.png" alt="">   <!-- 유격수 자리 (2루수 그림) -->
+    <img class="fielder in"  style="left:64%;top:58%"     src="img/fielder-ss.png" alt="">   <!-- 2루수 자리 (유격수 그림) -->
+    <img class="fielder in"  style="left:73%;top:63%"     src="img/fielder-1b.png" alt="">   <!-- 1루수 (파울선 안쪽) -->
+    <img class="fielder out" style="left:17%;top:51%"     src="img/fielder-lf.png" alt="">   <!-- 좌익수 -->
+    <img class="fielder out" style="left:83%;top:51%"     src="img/fielder-rf.png" alt="">   <!-- 우익수 -->
+    <img class="fielder out" style="left:54.5%;top:43.5%;width:3.2%;min-width:14px" src="img/fielder-cf.png" alt="">   <!-- 중견수 (투수의 1시 방향) -->
 
     <!-- 투수 자리 (동작별 <img> 는 applyImages 가 IMAGES 대로 만들어 넣음) -->
     <div class="slot" id="pitcher">
