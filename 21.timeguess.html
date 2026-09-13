@@ -41,6 +41,7 @@
     font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;word-break:keep-all;
     background:var(--panel);border:2px solid var(--line);border-radius:var(--radius)}
   .best span{font-weight:400;color:var(--sub)}
+  .best span.late,.best span.early{font-weight:700}
 
   .main{flex:1;width:100%;display:flex;align-items:center;justify-content:center}
 
@@ -75,8 +76,8 @@
   .result p{margin:0;font-size:36px;font-weight:700;line-height:1.35;word-break:keep-all;
     font-variant-numeric:tabular-nums}
   /* 부호 붙은 차이: 느리면(+) 빨강, 빠르면(−) 파랑, 정확하면 기본색 */
-  .result p.late{color:var(--sg-danger)}
-  .result p.early{color:#2F5FA8}
+  .late{color:var(--sg-danger) !important}
+  .early{color:#2F5FA8 !important}
 
   @media (max-width:479px){
     .btn{min-height:100px;font-size:32px}
@@ -142,17 +143,30 @@
     if (saved && typeof saved.sec === "number") best = saved;
   } catch (e) {}
 
+  /* 부호 붙은 차이 문구와 색 클래스: 느리면 "+ 0.1234초"(빨강), 빠르면 "- 0.1234초"(파랑) */
+  function signed(diff) {
+    if (diff === 0) return { text: "±0.0000초", cls: "" };
+    if (diff < 0)   return { text: "- " + Math.abs(diff).toFixed(4) + "초", cls: "early" };
+    return               { text: "+ " + diff.toFixed(4) + "초", cls: "late" };
+  }
+
   function renderBest() {
     bestEl.innerHTML = "";
     bestEl.appendChild(document.createTextNode("최고 기록 "));
     var s = document.createElement("span");
     if (!best) {
       s.textContent = "아직 없음";
-    } else {
-      s.textContent = best.sec.toFixed(2) + "초 (" +
-        (best.diff === 0 ? "정확히 5초" : "5초와 " + Math.abs(best.diff).toFixed(2) + "초 차이") + ")";
+      bestEl.appendChild(s);
+      return;
     }
+    s.textContent = best.sec.toFixed(4) + "초 (";
+    var d = signed(best.diff);
+    var em = document.createElement("span");
+    em.textContent = d.text;
+    em.className = d.cls;
     bestEl.appendChild(s);
+    bestEl.appendChild(em);
+    bestEl.appendChild(document.createTextNode(")"));
   }
 
   function updateBest(sec, diff) {
@@ -178,26 +192,23 @@
     var ms = performance.now() - startAt;
     show(scrResult);
 
-    /* 표시할 소수 둘째 자리 값으로 먼저 반올림한 뒤 차이를 구해야
-       "3.82초" 와 "1.18초 빨랐어요" 가 서로 어긋나지 않습니다. */
-    var sec  = Math.round(ms / 10) / 100;
-    var diff = Math.round((sec - TARGET) * 100) / 100;
+    /* 표시할 소수 넷째 자리 값으로 먼저 반올림한 뒤 차이를 구해야
+       "3.8213초" 와 "1.1787초 빨랐어요" 가 서로 어긋나지 않습니다. */
+    var sec  = Math.round(ms * 10) / 10000;
+    var diff = Math.round((sec - TARGET) * 10000) / 10000;
     updateBest(sec, diff);
 
-    txtTime.textContent = sec.toFixed(2) + "초";
-    txtSigned.className = "";
+    txtTime.textContent = sec.toFixed(4) + "초";
     if (diff === 0) {
       txtDiff.textContent = "정확히 맞혔어요!";
-      txtSigned.textContent = "±0.00초";
     } else if (diff < 0) {
-      txtDiff.textContent = TARGET + "초보다 " + Math.abs(diff).toFixed(2) + "초 빨랐어요";
-      txtSigned.textContent = "- " + Math.abs(diff).toFixed(2) + "초";
-      txtSigned.className = "early";
+      txtDiff.textContent = TARGET + "초보다 " + Math.abs(diff).toFixed(4) + "초 빨랐어요";
     } else {
-      txtDiff.textContent = TARGET + "초보다 " + diff.toFixed(2) + "초 느렸어요";
-      txtSigned.textContent = "+ " + diff.toFixed(2) + "초";
-      txtSigned.className = "late";
+      txtDiff.textContent = TARGET + "초보다 " + diff.toFixed(4) + "초 느렸어요";
     }
+    var d = signed(diff);
+    txtSigned.textContent = d.text;
+    txtSigned.className = d.cls;
     btnAgain.focus({ preventScroll: true });
   }
 
