@@ -597,18 +597,22 @@ function drawMinimap() {
   mctx.clearRect(0, 0, w, h);
   const x0 = 14, x1 = w - 30, wx0 = -600, wx1 = stage.goalX;
   const mx = (wx) => x0 + (wx - wx0) / (wx1 - wx0) * (x1 - x0);
-  mctx.strokeStyle = '#c3c9e8'; mctx.lineWidth = 2; mctx.beginPath(); mctx.moveTo(x0, h / 2); mctx.lineTo(x1, h / 2); mctx.stroke();
-  mctx.strokeStyle = '#1b2350'; mctx.lineWidth = Math.max(4, h * 0.28); mctx.lineCap = 'butt';
-  for (const r of stage.roofs) { mctx.beginPath(); mctx.moveTo(mx(r.x0), h / 2); mctx.lineTo(mx(Math.min(r.x1, wx1)), h / 2); mctx.stroke(); }
-  mctx.fillStyle = '#5a67b8';
-  for (const p of stage.pagodas) { const px = mx(p.x); mctx.beginPath(); mctx.moveTo(px - 4, h * 0.3); mctx.lineTo(px + 4, h * 0.3); mctx.lineTo(px, h * 0.05); mctx.fill(); }
-  // 스테이지 경계
-  mctx.fillStyle = '#1b2350'; mctx.font = 'bold ' + Math.round(h * 0.45) + 'px sans-serif'; mctx.textAlign = 'left'; mctx.textBaseline = 'top';
-  stage.stageStarts.forEach((sxx, i) => { const px = mx(sxx); mctx.fillRect(px - 1, h * 0.15, 2, h * 0.7); mctx.fillText(String(i + 1), px + 4, h * 0.05); });
+  // 진행선 (지나온 구간은 진하게)
+  mctx.lineCap = 'round';
+  mctx.strokeStyle = '#c3c9e8'; mctx.lineWidth = Math.max(4, h * 0.22); mctx.beginPath(); mctx.moveTo(x0, h / 2); mctx.lineTo(x1, h / 2); mctx.stroke();
+  const cx = mx(Math.max(wx0, Math.min(wx1, cat.x)));
+  mctx.strokeStyle = '#1b2350'; mctx.beginPath(); mctx.moveTo(x0, h / 2); mctx.lineTo(cx, h / 2); mctx.stroke();
+  // 스테이지 시작점
+  mctx.font = 'bold ' + Math.round(h * 0.5) + 'px sans-serif'; mctx.textAlign = 'center'; mctx.textBaseline = 'middle';
+  stage.stageStarts.forEach((sxx, i) => {
+    const px = mx(sxx);
+    mctx.fillStyle = '#f4f6ff'; mctx.beginPath(); mctx.arc(px, h / 2, h * 0.36, 0, Math.PI * 2); mctx.fill();
+    mctx.strokeStyle = '#1b2350'; mctx.lineWidth = 2; mctx.stroke();
+    mctx.fillStyle = '#1b2350'; mctx.fillText(String(i + 1), px, h / 2 + 1);
+  });
   // G
   mctx.fillStyle = '#1b2350'; mctx.font = 'bold ' + Math.round(h * 0.7) + 'px sans-serif'; mctx.textAlign = 'center'; mctx.textBaseline = 'middle'; mctx.fillText('G', x1 + 14, h / 2);
   // 고양이 위치
-  const cx = mx(Math.max(wx0, Math.min(wx1, cat.x)));
   mctx.fillStyle = '#f5a623'; mctx.beginPath(); mctx.arc(cx, h / 2, h * 0.32, 0, Math.PI * 2); mctx.fill();
   mctx.strokeStyle = '#1b2350'; mctx.lineWidth = 2; mctx.stroke();
 }
