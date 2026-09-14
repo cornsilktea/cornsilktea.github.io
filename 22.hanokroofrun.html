@@ -92,10 +92,7 @@ const PIVOT_Y = -330;      // 탑 꼭대기(와이어 걸리는 지점) 높이 (
 const PAGODA_H = 640, PAGODA_W = 194;
 const ROOF_H = 100;
 const CAT_H = 110;
-const FLIP_AFTER = 0.3;    // 매달린 뒤 공중제비 시작까지의 시간(초)
-const SWING_G = GRAVITY * 2.4;  // 스윙 전용 가상 중력 (클수록 빠르게 돎)
-const SWING_PUMP = 3.0;         // 앞으로 도는 동안 더해지는 각가속도
-const SWING_MIN_OM = 2.2;       // 걸리는 순간 최소 각속도
+const FLIP_AFTER = 0.45;   // 매달린 뒤 공중제비 시작까지의 시간(초)
 
 // 각 스테이지 구간 길이(px) — 6단계가 하나의 코스로 이어짐
 const STAGE_PARAMS = [null,
@@ -327,7 +324,7 @@ function attach() {
   cat.th = Math.atan2(dx, dy);
   const tx = Math.cos(cat.th), ty = -Math.sin(cat.th);
   cat.om = (cat.vx * tx + cat.vy * ty) / cat.L;
-  if (cat.om < SWING_MIN_OM) cat.om = SWING_MIN_OM;
+  if (cat.om < 1.2) cat.om = 1.2;
   cat.state = 'swing'; cat.hangT = 0; cat.holdT = 0;
   beep(1200, 0.1, 'triangle', 0.05);
 }
@@ -373,14 +370,13 @@ function update(dt) {
   } else if (c.state === 'swing') {
     c.hangT += dt;
     if (c.hangT > FLIP_AFTER && !c.flipping) { c.flipping = true; c.flipT = 0; }
-    // 스윙은 실제 중력보다 강한 가상 중력으로 빠르게 돌게 함
-    const alpha = -(SWING_G / c.L) * Math.sin(c.th) + (c.om > 0 ? SWING_PUMP : 0);
+    const alpha = -(GRAVITY / c.L) * Math.sin(c.th) + (c.om > 0 ? 1.4 : 0);
     c.om += alpha * dt; c.th += c.om * dt;
     const hx = c.pivot.x + c.L * Math.sin(c.th), hy = c.pivot.y + c.L * Math.cos(c.th);
     c.x = hx - 10; c.y = hy + CAT_H * 0.95;
     const tx = Math.cos(c.th), ty = -Math.sin(c.th);
     c.vx = c.L * c.om * tx; c.vy = c.L * c.om * ty;
-    if ((c.th > 0.25 && c.om <= 0) || c.hangT > 2.2) detach();
+    if ((c.th > 0.25 && c.om <= 0) || c.hangT > 3) detach();
     // 매달린 채 지붕에 닿으면 착지
     if (c.state === 'swing') {
       const r = roofUnder(c.x, 0);
