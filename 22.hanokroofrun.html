@@ -533,22 +533,29 @@ const sy = (wy) => groundY + wy * S;
 function drawImg(im, x, y, w, h) { if (im && im.complete && im.naturalWidth) ctx.drawImage(im, x, y, w, h); }
 function mod(a, b) { return ((a % b) + b) % b; }
 
+// 먼 배경 한 장. flip 이면 좌우 반전해서 그린다.
+function drawFarTile(im, px, py, fw, fh, flip) {
+  if (!flip) { ctx.drawImage(im, px, py, fw + 1, fh); return; }
+  ctx.save(); ctx.translate(px + fw, py); ctx.scale(-1, 1); ctx.drawImage(im, -1, 0, fw + 1, fh); ctx.restore();
+}
 function drawRoofSeg(r) {
   const im = IMG.roof; if (!im.complete) return;
   const k = ROOF_H / im.naturalHeight;          // 이미지→월드 배율
-  const capL = 74, capR = im.naturalWidth - 937, mid0 = 74, midW = 937 - 74;
+  // 기와 한 장 간격은 그림에서 68.5px. 84~906 구간이 정확히 12장이라 여기서 끊어 반복하면 이음새가 안 생긴다.
+  const capL = 84, capR = im.naturalWidth - 906, mid0 = 84, midW = 906 - 84;
+  const width = r.x1 - r.x0, capsW = (capL + capR) * k, tileW = midW * k;
+  const n = Math.max(0, Math.round((width - capsW) / tileW));   // 통째로 들어가는 기와 묶음 수
+  const hs = width / (capsW + n * tileW);                       // 남는 폭은 가로로 살짝 늘리거나 줄여서 맞춤(기와가 잘리지 않게)
   const x0 = sx(r.x0), x1 = sx(r.x1), y = sy(0), h = ROOF_H * S;
-  const capLw = capL * k * S, capRw = capR * k * S, midWw = midW * k * S;
+  const capLw = capL * k * hs * S, capRw = capR * k * hs * S, midWw = tileW * hs * S;
   // 건물 몸체
   const g = ctx.createLinearGradient(0, y + h * 0.8, 0, ch);
   g.addColorStop(0, '#111741'); g.addColorStop(1, '#070a1e');
   ctx.fillStyle = g; ctx.fillRect(x0 + 12 * S, y + h * 0.8, (x1 - x0) - 24 * S, ch - y);
-  // 기와
-  ctx.save(); ctx.beginPath(); ctx.rect(x0 + capLw - 1, y - 1, (x1 - x0) - capLw - capRw + 2, h + 2); ctx.clip();
-  for (let px = x0 + capLw; px < x1 - capRw; px += midWw) ctx.drawImage(im, mid0, 0, midW, im.naturalHeight, px, y, midWw + 1, h);
-  ctx.restore();
-  ctx.drawImage(im, 0, 0, capL, im.naturalHeight, x0, y, capLw, h);
-  ctx.drawImage(im, 937, 0, capR, im.naturalHeight, x1 - capRw, y, capRw, h);
+  // 기와: 왼쪽 끝 + 기와 묶음 n개 + 오른쪽 끝 (모두 같은 위상에서 이어 붙임)
+  for (let i = 0; i < n; i++) ctx.drawImage(im, mid0, 0, midW, im.naturalHeight, x0 + capLw + i * midWw, y, midWw + 0.6, h);
+  ctx.drawImage(im, 0, 0, capL, im.naturalHeight, x0, y, capLw + 0.6, h);
+  ctx.drawImage(im, 906, 0, capR, im.naturalHeight, x0 + capLw + n * midWw, y, capRw, h);
 }
 
 // 지금 상태에 맞는 스프라이트 키
@@ -610,8 +617,9 @@ function draw() {
 
   // 원경 (산)
   { const im = IMG.far; const fh = groundY + 90 * S, fw = fh * im.naturalWidth / im.naturalHeight;
-    const off = mod(-camX * 0.08 * S, fw);
-    for (let px = off - fw; px < cw; px += fw) ctx.drawImage(im, px, groundY + 90 * S - fh, fw + 1, fh); }
+    // 그림의 양끝이 이어지지 않으므로 한 장 걸러 좌우를 뒤집어 붙인다(거울 반복) → 이음새 없음
+    const off = mod(-camX * 0.08 * S, fw * 2);
+    let i = 0; for (let px = off - fw * 2; px < cw; px += fw, i++) drawFarTile(im, px, groundY + 90 * S - fh, fw, fh, i % 2 === 1); }
   // 달
   { const im = IMG.moon; const ms = 150 * S; const span = cw + ms * 2;
     const mx = mod(MOON_X * S - camX * 0.04 * S, span) - ms; const my = groundY * 0.10;
@@ -665,7 +673,7 @@ function draw() {
 }
 function drawSkyOnly() {
   const im = IMG.far; const fh = ch * 0.75, fw = fh * im.naturalWidth / im.naturalHeight;
-  for (let px = 0; px < cw; px += fw) ctx.drawImage(im, px, ch * 0.75 - fh, fw + 1, fh);
+  let i = 0; for (let px = 0; px < cw; px += fw, i++) drawFarTile(im, px, ch * 0.75 - fh, fw, fh, i % 2 === 1);
   ctx.drawImage(IMG.moon, cw * 0.72, ch * 0.06, 150 * S, 150 * S);
 }
 function drawMinimap() {
