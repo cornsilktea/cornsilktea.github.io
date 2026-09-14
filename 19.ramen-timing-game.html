@@ -146,17 +146,15 @@
   .scene{width:100%;aspect-ratio:200/190;display:block;cursor:pointer;position:relative;overflow:visible}
   .scene img,.scene .layer{position:absolute;display:block;object-fit:contain;pointer-events:none;user-select:none;-webkit-user-drag:none}
   .scene .potimg{left:6%;top:9%;width:88%;height:82%}
-  /* 물·면·탐은 냄비 테두리보다 작은 안쪽 바닥 타원에 맞춰, 냄비 속에 담긴 것처럼 보이게 한다 */
-  .scene .inner{left:24.9%;top:28.4%;width:44.2%;height:23.6%;border-radius:50%;overflow:hidden}
-  .scene .inner img{left:0;top:0;width:100%;height:100%;object-fit:fill;transform:scale(1.18)}  /* 그림 자체의 그릇 가장자리는 타원 밖으로 밀어내 잘라낸다 */
-  .scene .inner::after{content:"";position:absolute;inset:0;border-radius:50%;
-    box-shadow:inset 0 6px 8px rgba(40,30,20,.45),inset 0 -2px 4px rgba(255,255,255,.3),inset 0 0 3px rgba(40,30,20,.35)}
-  .scene .water .tint{position:absolute;inset:0;background:var(--tint,transparent);mix-blend-mode:multiply;transition:background .4s}
-  .scene .topping{left:31%;top:30%;width:34%;height:21%;overflow:visible}
-  .scene .topping::after{display:none}
-  .scene .topping img{transform:none}
+  /* 물·면·토핑·탐은 내용물까지 그려진 냄비 통짜 그림(pot-water / pot-water-noodle / pot-water-full / pot-burnt)으로
+     빈 냄비 위에 덮어 씌운다. 512 캔버스 안의 냄비가 빈 냄비 그림보다 크게 그려져 있어 상자를 따로 잡아 크기를 맞춘다 */
+  .scene .state{left:19.75%;top:19.5%;width:60.5%;height:63.7%}
+  .scene .topping,.scene .burn{top:20.6%}   /* 아랫줄 두 장은 원본 시트에서 9px 위에 그려져 있어 보정 */
   .scene .burn{opacity:0;transition:opacity .6s}
-  .scene .rimglow{left:23.5%;top:27%;width:47%;height:26.5%;border-radius:50%;opacity:0;pointer-events:none}
+  /* 너무 오래 끓을 때 국물 색이 탁해지는 오버레이 (냄비 입구 타원에만) */
+  .scene .tint{left:29.4%;top:34.8%;width:43.6%;height:17.2%;border-radius:50%;
+    background:var(--tint,transparent);mix-blend-mode:multiply;transition:background .4s}
+  .scene .rimglow{left:28.4%;top:33.8%;width:45.6%;height:19.2%;border-radius:50%;opacity:0;pointer-events:none}
   .btns{display:grid;grid-template-columns:1fr 1fr;gap:6px}
   .btns .btn{min-height:44px;padding:0 4px;font-size:13px}
   .btns .btn.done{opacity:.25;text-decoration:line-through}
@@ -346,7 +344,7 @@ function potSVG(i){
   let bubbles = "";
   for (let k=0;k<14;k++){
     const cx = 62 + (k*37)%76, cy = 118 - (k*13)%18, r = 2 + (k%3);
-    const d = r*2.6, left = (cx-d/2)/2, top = (cy-35-d/2)/1.9;
+    const d = r*2.6, left = (cx-d/2)/2, top = (cy-22-d/2)/1.9;
     bubbles += `<img class="bub" src="${IMG}bubble.png" alt="" width="159" height="159" style="left:${left}%;top:${top}%;width:${d/2}%;height:${d/1.9}%">`;
   }
   return `
@@ -355,18 +353,16 @@ function potSVG(i){
     <img class="flame f1" src="${IMG}flame.png" alt="" width="500" height="500">
     <img class="flame f2" src="${IMG}flame.png" alt="" width="500" height="500">
     <img class="flame f3" src="${IMG}flame.png" alt="" width="500" height="500">
-    <!-- 냄비 본체 -->
+    <!-- 빈 냄비 -->
     <img class="potimg" src="${IMG}pot-empty.png" alt="" width="500" height="500">
-    <!-- 물 + 상태별 색 오버레이 -->
-    <div class="layer inner water"><img src="${IMG}water.png" alt="" width="578" height="432"><div class="tint"></div></div>
-    <!-- 익은 면 -->
-    <div class="layer inner cooked"><img src="${IMG}noodles.png" alt="" width="578" height="432"></div>
+    <!-- 물 / 물+면 / 물+면+토핑 / 탄 냄비 — 상태에 맞는 통짜 그림을 위에 덮는다 -->
+    <img class="state water" src="${IMG}pot-water.png" alt="" width="512" height="512">
+    <img class="state cooked" src="${IMG}pot-water-noodle.png" alt="" width="512" height="512">
+    <div class="layer tint"></div>
     <!-- 기포 -->
     <div class="layer bubs" style="inset:0">${bubbles}</div>
-    <!-- 계란 + 파 -->
-    <div class="layer inner topping"><img src="${IMG}topping.png" alt="" width="500" height="500" style="object-fit:contain"></div>
-    <!-- 탐 -->
-    <div class="layer inner burn"><img src="${IMG}burnt-overlay.png" alt="" width="578" height="432"></div>
+    <img class="state topping" src="${IMG}pot-water-full.png" alt="" width="512" height="512">
+    <img class="state burn" src="${IMG}pot-burnt.png" alt="" width="512" height="512">
     <!-- 테두리 반짝 -->
     <div class="layer rimglow"></div>
     <!-- 김 / 연기 -->
@@ -520,8 +516,8 @@ class Pot {
     this.q(".cooked").style.display  = (hasWater && this.hasNoodle) ? "" : "none";
     this.q(".topping").style.display = (s==="topped") ? "" : "none";
     this.q(".burn").style.opacity = s==="burnt" ? "0.85" : "0";
-    /* 물 이미지는 fill 이 없으므로 위에 얹은 .tint 오버레이(multiply)의 색만 상태별로 바꾼다 */
-    this.q(".water").style.setProperty("--tint", s==="late" ? "#e8c98a" : s==="topped" ? "#f1b06a" : "transparent");
+    /* 물 색 변화: 토핑 뒤 국물 색은 pot-water-full 그림에 이미 있으므로, 너무 오래 끓을 때만 .tint 오버레이(multiply)로 탁하게 한다 */
+    this.q(".tint").style.setProperty("--tint", s==="late" ? "#e8c98a" : "transparent");
 
     /* 버튼: 이미 한 일은 비활성(정리), 그 외는 눌러 볼 수 있음 → 순서 오류 학습 */
     const locked = (s==="burnt"||s==="error"||s==="prep");
