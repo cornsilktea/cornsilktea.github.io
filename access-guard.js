@@ -43,6 +43,37 @@
     };
   }
 
+  /* ---------- 태블릿·휴대폰 길게 누르기 대응 ----------
+     손가락으로 꾹 누르면 기기가 '글자 복사·선택' 동작으로 받아들여
+     복사 풍선이 뜨거나 화면이 파랗게 선택됩니다. 모든 수업 자료에서
+     이를 막습니다. 글자를 직접 입력하는 칸(input·textarea 등)은 예외입니다. */
+  var touchStyle = document.createElement("style");
+  touchStyle.textContent =
+    "html,body{-webkit-touch-callout:none;-webkit-user-select:none;-moz-user-select:none;user-select:none;" +
+    "-webkit-tap-highlight-color:transparent;}" +
+    "input,textarea,select,[contenteditable],[contenteditable] *{-webkit-user-select:text;-moz-user-select:text;user-select:text;}" +
+    "img,canvas,svg{-webkit-user-drag:none;}";
+  (document.head || document.documentElement).appendChild(touchStyle);
+
+  var lastPointerTouch = false;
+  window.addEventListener("pointerdown", function (e) {
+    lastPointerTouch = (e.pointerType === "touch" || e.pointerType === "pen");
+  }, true);
+  window.addEventListener("touchstart", function () { lastPointerTouch = true; }, { capture: true, passive: true });
+  /* 손가락·펜으로 길게 눌러 뜨는 메뉴만 막고, 마우스 오른쪽 클릭은 그대로 둡니다. */
+  window.addEventListener("contextmenu", function (e) {
+    if (!lastPointerTouch) return;
+    var t = e.target;
+    if (t && t.closest && t.closest("input,textarea,[contenteditable]")) return;
+    e.preventDefault();
+  }, true);
+  window.addEventListener("selectstart", function (e) {
+    if (!lastPointerTouch) return;
+    var t = e.target;
+    if (t && t.closest && t.closest("input,textarea,[contenteditable]")) return;
+    e.preventDefault();
+  }, true);
+
   var script = document.currentScript;
   var slug = script ? script.getAttribute("data-game") : null;
 
