@@ -286,6 +286,47 @@
     MAT.obVine   = spriteMat("obstacle_vine");
     MAT.obWall   = spriteMat("obstacle_wall");
     MAT.player   = new THREE.MeshBasicMaterial({ map:makeTexture("player_sprites"), transparent:true, alphaTest:0.5, side:THREE.DoubleSide });
+    MAT.shadow   = new THREE.MeshBasicMaterial({ map:makeShadowTexture(), color:0x000000, transparent:true, opacity:0.4,
+                     depthWrite:false, fog:true });
+  }
+
+  /* ================= 그림자 : 바닥에 눕힌 부드러운 타원 한 장 =================
+     빌보드 일러스트는 조명을 받지 않으므로 실제 그림자 맵 대신 반투명 방사형 그라데이션을
+     바닥에 깔아 "땅에 서 있다"는 느낌을 준다. 저사양 태블릿에서도 메쉬 한 장 값만 든다. */
+  function makeShadowTexture(){
+    var c = document.createElement("canvas"); c.width = c.height = 128;
+    // 캔버스는 흰색으로 알파만 그리고 색은 재질 color(검정)가 입힌다.
+    // 검정으로 그리면 프리멀티플라이드 알파 업로드 과정에서 알파가 사라져 보이지 않는다.
+    var x = c.getContext("2d"), g = x.createRadialGradient(64, 64, 6, 64, 64, 64);
+    g.addColorStop(0, "rgba(255,255,255,1)"); g.addColorStop(0.55, "rgba(255,255,255,0.55)"); g.addColorStop(1, "rgba(255,255,255,0)");
+    x.fillStyle = g; x.fillRect(0, 0, 128, 128);
+    var t = new THREE.CanvasTexture(c);
+    t.minFilter = THREE.LinearFilter;
+    return t;
+  }
+  var SHADOW_Y = 0.07;         // 차선 흰 줄(윗면 0.05)보다 살짝 위에 깔아 겹침 깜빡임 방지
+  var shadows = [];            // 해 위치에 따라 살짝 옮길 그림자 목록 {mesh, x, z, h}
+  var shadowDir = 0;           // 그림자가 늘어지는 방향(해 반대편) 배율, updateEnvironment 에서 갱신
+  var SHADOW_MATS = [];        // 해 높이에 따라 진하기를 함께 조절할 재질 목록 (baseOpacity 보관)
+  function makeShadow(w, d, opacity){
+    var mat = MAT.shadow.clone();
+    mat.userData.baseOpacity = (opacity === undefined) ? 0.4 : opacity;
+    SHADOW_MATS.push(mat);
+    var m = new THREE.Mesh(GEO.shadow, mat);
+    m.rotation.x = -Math.PI / 2;
+    m.scale.set(w, d, 1);
+    m.position.y = SHADOW_Y;
+    m.renderOrder = 1;
+    return m;
+  }
+  /* 세그먼트에 붙는 배경 그림자 : 빌보드는 카메라 쪽으로 돌기 때문에 자식으로 넣지 않고
+     세그먼트 그룹에 직접 놓는다. h 는 물체 높이(그림자 늘어짐 폭 계산용). */
+  function addGroundShadow(seg, x, z, w, d, h, opacity){
+    var m = makeShadow(w, d, opacity);
+    m.position.x = x; m.position.z = z;
+    seg.add(m);
+    shadows.push({ mesh:m, x:x, z:z, h:h });
+    return m;
   }
 
   /* 13장 텍스처를 모두 미리 읽어 둔 뒤 콜백 실행 (첫 화면에서 텍스처가 늦게 뜨는 현상 방지) */
@@ -319,7 +360,10 @@
     ground: new THREE.BoxGeometry(60, 0.55, SEG_LEN), // 양옆 끝까지 비지 않도록 폭을 60으로 크게 확장
 
     // 빌보드 스프라이트 공용 평면 (1×1, 바닥이 원점에 오도록 위로 0.5 이동) — scale 로 크기 조절
-    sprite: new THREE.PlaneGeometry(1, 1).translate(0, 0.5, 0)
+    sprite: new THREE.PlaneGeometry(1, 1).translate(0, 0.5, 0),
+
+    // 바닥 그림자 공용 평면 (1×1, 중심 원점) — rotation.x=-90° 로 눕히고 scale 로 타원 크기 조절
+    shadow: new THREE.PlaneGeometry(1, 1)
   };
 
   /* ================= 주변 환경 오브젝트 생성 (세로형 빌보드 스프라이트) =================
@@ -446,18 +490,23 @@
       g.add(fr);
     }
 
-    // 가로등 및 나무 배치
+    // 가로등 및 나무 배치 (각각 발밑에 타원 그림자를 세그먼트에 함께 깐다)
     if (i % 2 === 0) {
       var p = registerBillboard(buildDetailedPillar(), g);
       p.position.set(i % 4 === 0 ? -7.8 : 7.8, 0, -3);
       g.add(p);
+      addGroundShadow(g, p.position.x, -3, 1.6, 1.0, 6.0, 0.34);
     } else {
       var t1 = registerBillboard(buildDetailedTree(), g); t1.position.set(-9.2, 0, 2); g.add(t1);
+      addGroundShadow(g, -9.2, 2, 4.2, 2.0, 6.6, 0.36);
       var t2 = registerBillboard(buildDetailedTree(), g); t2.position.set(9.2, 0, -6); t2.scale.set(0.85, 0.85, 0.85); g.add(t2);
+      addGroundShadow(g, 9.2, -6, 3.6, 1.7, 5.6, 0.36);
       // 넓어진 외부 땅에 추가 나무 배치 (저사양 기기에서는 생략)
       if (QUALITY.extraTrees) {
         var t3 = registerBillboard(buildDetailedTree(), g); t3.position.set(-18.5, 0, -4); t3.scale.set(1.1, 1.1, 1.1); g.add(t3);
+        addGroundShadow(g, -18.5, -4, 4.6, 2.2, 7.3, 0.34);
         var t4 = registerBillboard(buildDetailedTree(), g); t4.position.set(17.5, 0, 3); t4.scale.set(0.9, 0.9, 0.9); g.add(t4);
+        addGroundShadow(g, 17.5, 3, 3.8, 1.8, 5.9, 0.34);
       }
     }
     g.position.z = 30 - i * SEG_LEN;
@@ -471,7 +520,11 @@
     var geo = new THREE.PlaneGeometry(1, 1).translate(0, 0.5, 0);   // 발이 원점
     var mesh = new THREE.Mesh(geo, MAT.player);
     root.add(mesh);
-    root.userData = { mesh:mesh, uv:geo.attributes.uv, curFrame:null };
+    // 발밑 그림자는 root 의 자식이 아니라 씬에 따로 둔다 (점프해도 바닥에 남아 높이를 읽게 함)
+    var sh = makeShadow(1.8, 1.0, 0.46);
+    sh.position.z = PLAYER_Z;
+    scene.add(sh);
+    root.userData = { mesh:mesh, uv:geo.attributes.uv, curFrame:null, shadow:sh };
     root.position.set(0, 0, PLAYER_Z);
     setPlayerFrame(root, SPRITE.run[0]);
     return root;
@@ -496,21 +549,32 @@
      위치(x,y,z)·스폰 타이밍·판정 z값은 기존과 동일하며 그리는 방식만 바뀐다. */
   function buildObstacle(type){
     var g = new THREE.Group();
+    g.userData.shadows = [];   // {mesh, h} — spawn 때 해 방향으로 살짝 옮긴다
+    var sh;
     if (type === "log") {
       // 768×512, 통나무 몸통이 이미지 폭의 86%·아랫면이 높이의 76% 지점 → 바닥에 닿도록 배치
       var log = makeBillboard(MAT.obLog, 11.5, 5.75);
       log.position.y = -5.75 * 0.238 + 0.05;
       g.add(log);
+      sh = makeShadow(10.4, 2.6, 0.4);                     // 통나무 몸통 아래 길쭉한 그림자
+      g.add(sh); g.userData.shadows.push({ mesh:sh, h:1.9 });
     }
     else if (type === "ceil") {
       // 768×512, 덩굴 로프 중심이 이미지 높이의 49% 지점 → 로프가 y≈2.5(기존 봉 높이)에 오도록
       var vine = makeBillboard(MAT.obVine, 11.2, 7.47);
       vine.position.y = 2.5 - 7.47 * 0.512;
       g.add(vine);
+      sh = makeShadow(10.0, 1.4, 0.16);                    // 공중 장애물 : 옅고 가는 그림자로 "떠 있음" 표시
+      g.add(sh); g.userData.shadows.push({ mesh:sh, h:3.0 });
     }
     else {
       // 609×640 벽 이미지, wall / wall2 모두 같은 이미지 재사용
-      function makeSingleWall(){ return makeBillboard(MAT.obWall, 2.95, 3.1); }
+      function makeSingleWall(){
+        var w = makeBillboard(MAT.obWall, 2.95, 3.1);
+        var ws = makeShadow(3.3, 1.6, 0.4);                // 벽 그룹의 자식이라 차선(x)·표시 여부를 함께 따른다
+        w.add(ws); g.userData.shadows.push({ mesh:ws, h:3.1 });
+        return w;
+      }
       var w1 = makeSingleWall(); g.add(w1);
       var w2 = makeSingleWall(); g.add(w2);
       g.userData.w1 = w1; g.userData.w2 = w2;
@@ -567,6 +631,8 @@
       else { w2.visible = false; }
     }
     g.position.set(0, 0, SPAWN_Z);
+    var shs = g.userData.shadows;
+    for (var s = 0; s < shs.length; s++) shs[s].mesh.position.x = shadowDir * shs[s].h * 0.22;
     obstacles.push({ mesh:g, type:type, kindBase:base, blocked:blocked, safe:safe, judged:false });
     state.spawned++;
   }
@@ -602,6 +668,16 @@
     tintColor.copy(C_WHITE).lerp(skyColor, 0.22);
     for (var i = 0; i < TINT_MATS.length; i++) TINT_MATS[i].color.copy(tintColor);
     MAT.sky.color.copy(C_WHITE).lerp(skyColor, 0.3);
+
+    /* 그림자 : 해 반대편으로 살짝 늘어지고(새벽엔 오른쪽, 노을엔 왼쪽), 해가 높을수록 진해진다 */
+    var sunH = Math.max(0, Math.min(1, (mainSun.position.y - 10) / 55));
+    shadowDir = Math.max(-0.7, Math.min(0.7, -mainSun.position.x / mainSun.position.y));
+    var strength = 0.72 + 0.28 * sunH;
+    for (var s = 0; s < SHADOW_MATS.length; s++) SHADOW_MATS[s].opacity = SHADOW_MATS[s].userData.baseOpacity * strength;
+    for (var k = 0; k < shadows.length; k++) {
+      var sh = shadows[k];
+      sh.mesh.position.x = sh.x + shadowDir * sh.h * 0.22;
+    }
   }
 
   function act(kind){
@@ -777,6 +853,13 @@
       playerObj.position.y = Math.abs(Math.sin(player.animTime * 2)) * 0.12;
     }
     setPlayerFrame(playerObj, frameSet[fi]);
+
+    /* 발밑 그림자 : 바닥에 남아 있으면서 높이 오를수록 작고 옅어지고, 숙이면 넓적해진다 */
+    var sh = playerObj.userData.shadow, hr = Math.min(1, player.y / player.jumpH);
+    var shrink = 1 - hr * 0.45;
+    sh.position.x = player.x + shadowDir * (0.35 + hr * 0.9);   // 뛰어오르면 해 반대편으로 더 밀린다
+    sh.scale.set((player.sliding ? 2.5 : 1.8) * shrink, (player.sliding ? 1.2 : 1.0) * shrink, 1);
+    sh.material.opacity = sh.material.userData.baseOpacity * (1 - hr * 0.55) * (0.72 + 0.28 * Math.max(0, Math.min(1, (mainSun.position.y - 10) / 55)));
 
     camera.position.x += (player.x * 0.55 - camera.position.x) * Math.min(1, dt * 6);
     camera.position.y = 5.0 + player.y * 0.28;
