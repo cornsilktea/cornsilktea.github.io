@@ -11,10 +11,12 @@
   html, body { width: 100%; height: 100%; overflow: hidden; background: #0a0d2b; font-family: "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif; color: #f4f6ff; }
   #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
   /* 위쪽 46px 는 access-guard.js 가 붙이는 '← 목록으로' 버튼 자리 */
-  #hud { position: fixed; top: 0; left: 0; right: 0; padding: calc(46px + env(safe-area-inset-top, 0px)) 10px 0; display: none; flex-direction: column; gap: 6px; pointer-events: none; z-index: 5; }
-  #hud .row { display: flex; gap: 6px; flex-wrap: wrap; }
-  .chip { flex: 1 1 0; min-width: 0; background: rgba(244, 246, 255, 0.92); color: #1b2350; border-radius: 10px; padding: 6px 8px; font-size: clamp(14px, 2.4vw, 26px); font-weight: 700; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
-  #minimap { width: 100%; height: clamp(22px, 3.2vw, 36px); background: rgba(244, 246, 255, 0.92); border-radius: 10px; display: block; }
+  /* 한 줄 HUD: 왼쪽 1/3 = 스테이지·점수, 오른쪽 2/3 = 현재 위치(미니맵) */
+  #hud { position: fixed; top: 0; left: 0; right: 0; padding: calc(46px + env(safe-area-inset-top, 0px)) 10px 0; display: none; flex-direction: row; align-items: stretch; gap: 6px; pointer-events: none; z-index: 5; }
+  .chip { flex: 1 1 0; min-width: 0; height: clamp(26px, 3.6vw, 40px); display: flex; align-items: center; justify-content: center; background: rgba(244, 246, 255, 0.92); color: #1b2350; border-radius: 10px; padding: 0 8px; font-size: clamp(13px, 2.2vw, 24px); font-weight: 700; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
+  #minimap { flex: 2 1 0; min-width: 0; height: clamp(26px, 3.6vw, 40px); background: rgba(244, 246, 255, 0.92); border-radius: 10px; display: block; }
+  /* 고양이 전용 레이어: HUD 보다 위에 그려서 높이 점프해도 가려지지 않게 */
+  #catLayer { position: fixed; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; z-index: 6; }
   #overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(6, 8, 30, 0.72); z-index: 10; padding: 12px; overflow: auto; }
   #overlay.hidden { display: none; }
   .panel { width: min(96vw, 720px); background: rgba(244, 246, 255, 0.95); color: #1b2350; border-radius: 18px; padding: clamp(16px, 3vw, 30px); text-align: center; }
@@ -38,14 +40,10 @@
 <body>
 <canvas id="game"></canvas>
 <div id="hud">
-  <div class="row">
-    <div class="chip" id="chipStage">스테이지 1</div>
-    <div class="chip" id="chipScore">점수 0</div>
-    <div class="chip" id="chipGold">금화 0/0</div>
-    <div class="chip" id="chipBest">최고 0</div>
-  </div>
+  <div class="chip" id="chipStage">스테이지 1 · 점수 0</div>
   <canvas id="minimap"></canvas>
 </div>
+<canvas id="catLayer"></canvas>
 <div id="overlay"><div class="panel" id="panel"></div></div>
 
 <script>
@@ -284,7 +282,9 @@ const mctx = mini.getContext('2d');
 const hud = document.getElementById('hud');
 const overlay = document.getElementById('overlay');
 const panel = document.getElementById('panel');
-const chipStage = document.getElementById('chipStage'), chipScore = document.getElementById('chipScore'), chipGold = document.getElementById('chipGold'), chipBest = document.getElementById('chipBest');
+const chipStage = document.getElementById('chipStage');
+const catLayer = document.getElementById('catLayer');
+const octx = catLayer.getContext('2d');
 
 let cw = 0, ch = 0, dpr = 1, S = 1, groundY = 0, viewW = 0;
 function resize() {
@@ -292,6 +292,8 @@ function resize() {
   cw = Math.max(1, window.innerWidth); ch = Math.max(1, window.innerHeight);
   canvas.width = Math.round(cw * dpr); canvas.height = Math.round(ch * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  catLayer.width = canvas.width; catLayer.height = canvas.height;
+  octx.setTransform(dpr, 0, 0, dpr, 0, 0);
   S = Math.min(cw / 700, ch / 620);
   groundY = ch * (cw > ch ? 0.7 : 0.66);
   viewW = cw / S;
@@ -333,10 +335,7 @@ function startGame(which) {
 }
 
 function updateHud() {
-  chipStage.textContent = '스테이지 ' + curStage;
-  chipScore.textContent = '점수 ' + score;
-  chipGold.textContent = '금화 ' + goldGot + '/' + stage.goldTotal;
-  chipBest.textContent = '최고 ' + Math.max(best, score);
+  chipStage.textContent = '스테이지 ' + curStage + ' · 점수 ' + score;
 }
 
 // ───────── 조작 ─────────
@@ -597,32 +596,34 @@ function ropeStart() {
   if (!a) return { x: sx(cat.x + 20), y: sy(cat.y - CAT_H * 0.6) };
   return { x: r.x + r.w * a[0], y: r.y + r.h * a[1] };
 }
+// 고양이·밧줄은 HUD 위에 있는 catLayer(octx)에 그린다 → 높이 점프해도 정보 바에 가려지지 않음
 function drawCat() {
   const c = cat;
   const r = catRect(); if (!r) return;
   const { im, x, y, w, h } = r;
-  ctx.save();
-  if (c.dead) { ctx.translate(x + w / 2, y + h / 2); ctx.rotate(resultTimer * 4); ctx.translate(-(x + w / 2), -(y + h / 2)); }
-  ctx.drawImage(im, x, y, w, h);
-  ctx.restore();
+  octx.save();
+  if (c.dead) { octx.translate(x + w / 2, y + h / 2); octx.rotate(resultTimer * 4); octx.translate(-(x + w / 2), -(y + h / 2)); }
+  octx.drawImage(im, x, y, w, h);
+  octx.restore();
 }
 function drawRope() {
   const c = cat;
   if (c.state === 'swing' && c.pivot) {
     const { x: hx, y: hy } = ropeStart();
-    ctx.strokeStyle = '#e8ecff'; ctx.lineWidth = Math.max(2, 3 * S); ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(sx(c.pivot.x), sy(c.pivot.y)); ctx.stroke();
+    octx.strokeStyle = '#e8ecff'; octx.lineWidth = Math.max(2, 3 * S); octx.lineCap = 'round';
+    octx.beginPath(); octx.moveTo(hx, hy); octx.lineTo(sx(c.pivot.x), sy(c.pivot.y)); octx.stroke();
   } else if (c.state === 'throw') {
     const { x: hx, y: hy } = ropeStart();
     let tx, ty, t;
     if (c.pivot) { t = Math.min(1, c.throwT / 0.12); tx = sx(c.pivot.x); ty = sy(c.pivot.y); }
     else { t = Math.min(1, c.throwT / 0.25); const d = 260 * S; tx = hx + d * 0.72; ty = hy - d * 0.7; }
-    ctx.strokeStyle = c.pivot ? '#e8ecff' : 'rgba(232,236,255,' + (1 - t * 0.8) + ')'; ctx.lineWidth = Math.max(2, 3 * S); ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx + (tx - hx) * t, hy + (ty - hy) * t); ctx.stroke();
+    octx.strokeStyle = c.pivot ? '#e8ecff' : 'rgba(232,236,255,' + (1 - t * 0.8) + ')'; octx.lineWidth = Math.max(2, 3 * S); octx.lineCap = 'round';
+    octx.beginPath(); octx.moveTo(hx, hy); octx.lineTo(hx + (tx - hx) * t, hy + (ty - hy) * t); octx.stroke();
   }
 }
 
 function draw() {
+  octx.clearRect(0, 0, cw, ch);
   // 하늘
   const g = ctx.createLinearGradient(0, 0, 0, ch);
   g.addColorStop(0, '#080b24'); g.addColorStop(0.45, '#161d4d'); g.addColorStop(0.75, '#2a3470'); g.addColorStop(1, '#0a0d2b');
@@ -645,19 +646,17 @@ function draw() {
     const span = cw + w * 2; const px = mod(cl.x * S - camX * cl.f * S, span) - w;
     ctx.globalAlpha = cl.alpha; ctx.drawImage(im, px, groundY * cl.yF, w, h); ctx.globalAlpha = 1;
   }
+  // 석상 + 최고 기록 (배경 왼쪽에 항상 고정 표시)
+  { const im = IMG.stone; const h = 150 * S, w = h * im.naturalWidth / im.naturalHeight; const x = 18 * S, y = sy(4) - h;
+    ctx.drawImage(im, x, y, w, h);
+    ctx.font = 'bold ' + Math.round(22 * S) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#f4f6ff';
+    ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 6;
+    ctx.fillText('최고 기록', x + w / 2, y - 34 * S); ctx.fillText(Math.max(best, score) + '점', x + w / 2, y - 8 * S); ctx.shadowBlur = 0; }
   // 탑
   { const im = IMG.pagoda; const h = PAGODA_H * S, w = PAGODA_W * S;
     for (const p of stage.pagodas) { const x = sx(p.x); if (x < -w || x > cw + w) continue; ctx.drawImage(im, x - w / 2, sy(PIVOT_Y) - 10 * S, w, h); } }
   // 지붕
   for (const r of stage.roofs) { if (sx(r.x1) < -50 || sx(r.x0) > cw + 50) continue; drawRoofSeg(r); }
-  // 석상 + 최고 기록
-  { const im = IMG.stone; const h = 150 * S, w = h * im.naturalWidth / im.naturalHeight; const x = sx(-190) - w / 2, y = sy(4) - h;
-    if (x > -w && x < cw + w) {
-      ctx.drawImage(im, x, y, w, h);
-      ctx.font = 'bold ' + Math.round(22 * S) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#f4f6ff';
-      ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 6;
-      ctx.fillText('최고 기록', x + w / 2, y - 34 * S); ctx.fillText(best + '점', x + w / 2, y - 8 * S); ctx.shadowBlur = 0;
-    } }
   // 목표 G
   { const gx = sx(stage.goalX); if (gx > -80 && gx < cw + 80) {
       ctx.strokeStyle = '#f4f6ff'; ctx.lineWidth = 4 * S; ctx.beginPath(); ctx.moveTo(gx, sy(0)); ctx.lineTo(gx, sy(-190)); ctx.stroke();
