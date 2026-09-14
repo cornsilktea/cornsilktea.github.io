@@ -116,8 +116,8 @@
   #toast.show { opacity: 1; }
   #board {
     display: block; touch-action: manipulation;
-    border-radius:var(--sg-radius); border: 2px solid var(--sg-line-strong);
-    background: #fff;
+    border-radius:var(--sg-radius); border: 2px solid #7A5A2A;
+    background: #E1B96F;
     transition: transform .35s ease;
   }
   #board.flip { transform: rotate(180deg); }
@@ -315,11 +315,23 @@
     var animating = false;
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = "#FFFFFF";
+    // 바둑판 나무색(비자나무 톤)
+    var bg = ctx.createLinearGradient(0, 0, size, size);
+    bg.addColorStop(0, "#E9C57E"); bg.addColorStop(0.5, "#E1B96F"); bg.addColorStop(1, "#D9AE62");
+    ctx.fillStyle = bg;
     ctx.fillRect(0, 0, size, size);
+    // 옅은 나뭇결
+    ctx.strokeStyle = "rgba(120,80,20,.06)";
+    ctx.lineWidth = Math.max(3, size / 110);
+    for (var gx = size * 0.03; gx < size; gx += size * 0.075) {
+      ctx.beginPath();
+      ctx.moveTo(gx, 0);
+      ctx.bezierCurveTo(gx + size * 0.02, size * .3, gx - size * 0.02, size * .7, gx + size * 0.01, size);
+      ctx.stroke();
+    }
 
     // 격자
-    ctx.strokeStyle = "#5B6B5E";
+    ctx.strokeStyle = "#5A3E1B";
     ctx.lineWidth = Math.max(0.7, size / 700);
     ctx.beginPath();
     for (var k = 0; k < N; k++) {
@@ -331,7 +343,7 @@
 
     // 화점
     var stars = [3, 7, 11], sr = Math.max(2, cell * 0.11);
-    ctx.fillStyle = "#24402F";
+    ctx.fillStyle = "#3E2A10";
     for (var i = 0; i < 3; i++) {
       for (var j = 0; j < 3; j++) {
         var pt = xy(stars[i], stars[j]);
