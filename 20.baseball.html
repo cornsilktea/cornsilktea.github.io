@@ -325,7 +325,7 @@ const IMAGES = {
   ]
 };
 // 스윙 버튼을 누른 뒤 각 동작이 보이는 시각(ms) — 누른 순간이 타격 판정 시각이므로 타격 그림이 곧바로 따라옴
-const SWING_SEQ = [["swing1", 0], ["swing2", 30], ["swing3", 80], ["swing4", 150]];   // 빠르게 휘두름 (총 150ms)
+const SWING_SEQ = [["swing1", 0], ["swing2", 20], ["swing3", 45], ["swing4", 80]];   // 빠르게 휘두름 (총 80ms)
 const FOLLOW_AFTER_RELEASE = 160;    // 투구 그림에서 팔로스루 그림으로 넘어가는 시점
 
 /* ---------- 게임 규칙 상수 ---------- */
@@ -570,7 +570,7 @@ function showFlash(color, scale){
   const W = stage.clientWidth, H = stage.clientHeight, fl = $("flash");
   const px = BALL_MAX / 100 * H * 2.2 * (scale || 1);
   fl.style.width = fl.style.height = px + "px";
-  fl.style.left = (PLATE.x + G.end.dx) / 100 * W + "px"; fl.style.top = (PLATE.y + G.end.dy) / 100 * H + "px";
+  fl.style.left = G.ballNow.x / 100 * W + "px"; fl.style.top = G.ballNow.y / 100 * H + "px";   // 맞는 순간의 공 자리
   fl.style.setProperty("--flash", color);
   fl.classList.remove("on"); void fl.offsetWidth; fl.classList.add("on");
   later(() => fl.classList.remove("on"), 340);
@@ -656,6 +656,7 @@ function flyPitch(now){
   let x = PLATE.x * s + REL.x * (1 - s) + off.dx + (G.end.dx - fin.dx) * s;
   let y = PLATE.y * s + REL.y * (1 - s) + off.dy + (G.end.dy - fin.dy) * s;
   let dia = BALL_MIN + (BALL_MAX - BALL_MIN) * s;
+  G.ballNow = { x, y, dia };   // 스윙 순간의 공 위치·크기 — 타구는 여기서, 이 크기로 출발
   // 그림자: 투수판에서 홈플레이트까지 땅 위를 따라옴 (공과 같은 원근 진행률)
   placeBall(x, y, dia, spinTo(G.cur.spin * tc, G.cur.step), true, GROUND.mound + (GROUND.plate - GROUND.mound) * s, G.cur.axis);
   // 마지막 프레임은 정확히 도착점(존 판정 위치)에 그린 뒤 다음 프레임에 사라짐(포수 미트) — 존에 걸친 정도가 판정과 같게 보이도록
@@ -726,7 +727,7 @@ function judge(delta){
     const go = () => flyHit(dist, delta, () => { settle(); later(afterResult, 1100); });
     if (grade === "홈런"){   // 빛이 나는 동안에도 공은 맞은 자리에 보임
       if (dist >= OUT_OF_PARK) showFlash("#00FF00", 18); else if (dist >= 135) showFlash("#ff3b2a", 9); else showFlash("#ff9a2a", 4);   // 홈런: 주황 빛(기본의 4배), 135m 이상: 빨간 빛(9배)
-      placeBall(PLATE.x + G.end.dx, PLATE.y + G.end.dy, BALL_MAX, 0, true, GROUND.plate, BACKSPIN_AWAY); ball.style.visibility = "visible";
+      placeBall(G.ballNow.x, G.ballNow.y, G.ballNow.dia, 0, true, GROUND.plate, BACKSPIN_AWAY); ball.style.visibility = "visible";
       later(go, 150); }
     else go();
   }
@@ -749,7 +750,7 @@ function flyHit(dist, delta, done){
   const f = dist / 140;
   const jitter = (Math.random() - 0.5) * 0.6;                       // 같은 타이밍이라도 방향이 조금씩 다름
   const a = Math.max(-1, Math.min(1, delta / WIN.inf * 0.85 + jitter));   // 빠름 → 왼쪽(음수), 늦음 → 오른쪽(양수)
-  const x0 = PLATE.x + G.end.dx, y0 = PLATE.y + G.end.dy;
+  const { x: x0, y: y0, dia: d0 } = G.ballNow;                      // 배트에 맞기 직전의 자리·크기에서 출발
   // 파울선이 화면에 없으므로 페어 타구는 화면 안(약 12~88%)에 떨어지게 좌우 폭을 잡음
   let x1 = PLATE.x + a * 38 * (0.3 + 0.7 * f);
   const rnd = (lo, hi) => lo + Math.random() * (hi - lo);
@@ -784,7 +785,7 @@ function flyHit(dist, delta, done){
     const gx = x0 + (x1 - x0) * t + bend * Math.sin(Math.PI * t), gy = g0 + (y1 - g0) * t;   // 지면 위 위치(그림자 자리): 홈플레이트 → 착지점 (bend 는 옆으로 휘는 양)
     const lift = kind === "ground" ? Math.abs(Math.sin(Math.PI * 3 * t)) * (1 - t) : Math.sin(Math.PI * t);
     const y = gy - h0 * (1 - t) - H * lift;                          // 처음 높이는 점점 줄고, 궤적 높이가 더해짐
-    const dia = BALL_MAX * (1 - Math.min(1, dist * t / MAX_DIST) / 3);   // 홈에서 멀어질수록 작게 — 가장 멀리(150m) 갔을 때 반지름이 2/3
+    const dia = d0 * (1 - Math.min(1, dist * t / MAX_DIST) / 3);   // 맞기 직전 크기에서 홈에서 멀어질수록 작게 — 가장 멀리(150m) 갔을 때 반지름이 2/3
     // 장외: 담장을 넘은 뒤에는 그림자를 지우고, 마지막 15% 동안 옅어지며 관중석 뒤로 사라짐
     placeBall(gx, y, dia, spinTo(HIT_SPIN * t), !(outOfPark && t > 0.55), gy, axis);
     ball.style.opacity = outOfPark && t > 0.85 ? String(Math.max(0, (1 - t) / 0.15)) : "";
@@ -793,7 +794,7 @@ function flyHit(dist, delta, done){
 }
 function flyFoul(side, done){
   // 파울선이 화면에 없으므로 1루·3루 쪽으로 높이 떠서 화면 밖(양옆)으로 나감
-  const x0 = PLATE.x + G.end.dx, y0 = PLATE.y + G.end.dy;
+  const { x: x0, y: y0, dia: d0 } = G.ballNow;
   const x1 = 50 + side * (62 + Math.random() * 8), y1 = 64 + Math.random() * 10;
   const H = 18 + Math.random() * 8, dur = 950, t0 = performance.now(), axis = hitAxis(side);
   const g0 = GROUND.plate, h0 = g0 - y0;
@@ -801,7 +802,7 @@ function flyFoul(side, done){
   (function step(now){
     const t = Math.min(1, (now - t0) / dur);
     const gx = x0 + (x1 - x0) * t, gy = g0 + (y1 - g0) * t, y = gy - h0 * (1 - t) - H * Math.sin(Math.PI * t);
-    placeBall(gx, y, BALL_MAX * (1 - 0.12 * t), spinTo(HIT_SPIN * t), true, gy, axis);   // 파울(약 50m)도 멀어지는 만큼만 작아짐
+    placeBall(gx, y, d0 * (1 - 0.12 * t), spinTo(HIT_SPIN * t), true, gy, axis);   // 파울(약 50m)도 멀어지는 만큼만 작아짐
     if (t < 1) G.raf = requestAnimationFrame(step); else done();
   })(t0);
 }
