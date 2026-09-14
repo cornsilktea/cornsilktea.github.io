@@ -122,10 +122,11 @@ const STAGE_PARAMS = [null,
   { speed: 430, len: 17500 },
 ];
 // 낭떠러지 판정 여유(px): 조금 늦게 뛰거나 조금 못 미쳐도 살려 준다
-const EDGE_TOL = 30;       // 지붕 끝을 이만큼 지나도 아직 달리는 중 (원래 18)
+const EDGE_TOL = 22;       // 지붕 끝을 이만큼 지나도 아직 달리는 중 (원래 18)
 const COYOTE_T = 0.18;     // 떨어지기 시작한 뒤에도 점프가 되는 시간(초, 원래 0.1)
 const LAND_TOL = 34;       // 지붕 끝에 이만큼 못 미쳐도 착지 (원래 22)
-const LAND_Y = 40;         // 지붕 윗면보다 이만큼 아래까지는 착지로 인정 (원래 28)
+const LAND_Y = 40;         // 점프한 뒤 지붕 윗면보다 이만큼 아래까지는 착지로 인정 (원래 28)
+const LAND_Y_FALL = 12;    // 점프 없이 걸어서 떨어질 때는 이만큼만 — 걷기만으로 틈을 건너지 못하게
 const SILVER_PT = 5, GOLD_PT = 20;
 
 // ───────── 이미지 로딩 ─────────
@@ -444,7 +445,7 @@ function update(dt) {
       if (c.vy > 0 && c.y >= 0) {
         const r = roofUnder(c.x, LAND_TOL);
         if (r) {
-          if (prevY <= 0 || c.y < LAND_Y) land();
+          if (prevY <= 0 || c.y < (c.state === 'fall' ? LAND_Y_FALL : LAND_Y)) land();
           else { // 지붕 옆면에 충돌 → 추락
             c.vx = 0; c.x = Math.min(c.x, r.x0 - 24);
           }
