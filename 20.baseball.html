@@ -194,13 +194,13 @@
     </svg>
 
     <!-- 야수 그림 (img/fielder-*.png, 배경 투명). 내야수는 내야 흙 띠(y≈52~58%), 외야수는 담장 앞 외야 잔디(y≈48~52%) 위. 2루수·유격수 자리는 그림을 서로 바꿔 씀 (몸이 향하는 방향이 자리와 맞도록) -->
-    <img class="fielder in"  style="left:24%;top:57%"     src="img/fielder-3b.png" alt="">   <!-- 3루수 (파울선 안쪽) -->
-    <img class="fielder in"  style="left:39%;top:54.5%"     src="img/fielder-2b.png" alt="">   <!-- 유격수 자리 (2루수 그림) -->
-    <img class="fielder in"  style="left:61%;top:54.5%"     src="img/fielder-ss.png" alt="">   <!-- 2루수 자리 (유격수 그림) -->
-    <img class="fielder in"  style="left:76%;top:57%"     src="img/fielder-1b.png" alt="">   <!-- 1루수 (파울선 안쪽) -->
-    <img class="fielder out" style="left:15%;top:51%"     src="img/fielder-lf.png" alt="">   <!-- 좌익수 -->
-    <img class="fielder out" style="left:85%;top:51%"     src="img/fielder-rf.png" alt="">   <!-- 우익수 -->
-    <img class="fielder out" style="left:56%;top:50.5%" src="img/fielder-cf.png" alt="">   <!-- 중견수 (투수의 1시 방향) -->
+    <img class="fielder in"  style="left:24%;top:62%"     src="img/fielder-3b.png" alt="">   <!-- 3루수 (파울선 안쪽) -->
+    <img class="fielder in"  style="left:39%;top:61%"     src="img/fielder-2b.png" alt="">   <!-- 유격수 자리 (2루수 그림) -->
+    <img class="fielder in"  style="left:61%;top:61%"     src="img/fielder-ss.png" alt="">   <!-- 2루수 자리 (유격수 그림) -->
+    <img class="fielder in"  style="left:76%;top:62%"     src="img/fielder-1b.png" alt="">   <!-- 1루수 (파울선 안쪽) -->
+    <img class="fielder out" style="left:15%;top:47%"     src="img/fielder-lf.png" alt="">   <!-- 좌익수 -->
+    <img class="fielder out" style="left:85%;top:47%"     src="img/fielder-rf.png" alt="">   <!-- 우익수 -->
+    <img class="fielder out" style="left:56%;top:46%" src="img/fielder-cf.png" alt="">   <!-- 중견수 (투수의 1시 방향) -->
 
     <!-- 투수 자리 (동작별 <img> 는 applyImages 가 IMAGES 대로 만들어 넣음) -->
     <div class="slot" id="pitcher">
@@ -362,11 +362,11 @@ const SPIN_STEP_MAX = 0.17;
 // 구속(km/h) → 홈플레이트까지 걸리는 시간(ms). 140 km/h 가 900ms, 160 은 약 690ms, 120 은 약 1225ms
 const flightMs = kmh => 900 * Math.pow(140 / kmh, 2);
 // 화면 좌표(%): 투수 손(우완 → 화면 왼쪽) → 스트라이크 존 가운데
-const REL = { x: 48.7, y: 43.5 };   // 우완 투수: 투구 그림(pitcher-throw.png 의 (92,62)/352×508)에서 공을 쥔 오른손 위치 — #pitcher(bottom 46%·높이 12% → 그림 폭 5.54%, x 47.23~52.77) 기준으로 계산
+const REL = { x: 48.7, y: 46.8 };   // 공이 투수 손에서 나오는 위치   // 우완 투수: 투구 그림(pitcher-throw.png 의 (92,62)/352×508)에서 공을 쥔 오른손 위치 — #pitcher(bottom 46%·높이 12% → 그림 폭 5.54%, x 47.23~52.77) 기준으로 계산
 const PLATE = { x: 50, y: 71.75 };       // 스트라이크 존 가운데 = 타자 무릎(81.9%)과 팔꿈치(61.6%)의 중간
 // 땅의 화면 y(%): 투수판(마운드 위 투수의 발)과 홈플레이트 — 공 그림자는 이 선 위에 놓임
-const GROUND = { mound: 54, plate: 89.5 };
-const ZONE = { hw: 5.2, hh: 10.15 };     // 좌우는 홈플레이트 폭(10.4%), 위아래는 타자 무릎~팔꿈치      // 스트라이크 존 반너비·반높이(%) — 세로로 긴 모양, #zone 의 CSS 와 같은 값
+const GROUND = { mound: 57, plate: 89.5 };
+const ZONE = { hw: 5.5, hh: 11 };     // 좌우는 홈플레이트 폭(10.4%), 위아래는 타자 무릎~팔꿈치      // 스트라이크 존 반너비·반높이(%) — 세로로 긴 모양, #zone 의 CSS 와 같은 값
 const BALL_MIN = 1.1, BALL_MAX = 3.8;     // 공 지름 (무대 높이의 %)
 // 타구 회전: 직구와 같은 백스핀. 멀어지는 공(진행 방향 -z)의 백스핀 축은 진행방향 × 위 = +x 쪽 (포수가 보면 뒷면이 아래로 흐름)
 const BACKSPIN_AWAY = [1, 0, 0];
@@ -699,7 +699,7 @@ function judge(delta){
   if (dist > 0){
     const go = () => flyHit(dist, delta, () => { settle(); later(afterResult, 1100); });
     if (grade === "홈런"){   // 빛이 나는 동안에도 공은 맞은 자리에 보임
-      if (dist >= 135) showFlash("#ff3b2a", 9); else showFlash("#ff9a2a", 4);   // 홈런: 주황 빛(기본의 4배), 135m 이상: 빨간 빛(9배)
+      if (dist >= OUT_OF_PARK) showFlash("#00FF00", 18); else if (dist >= 135) showFlash("#ff3b2a", 9); else showFlash("#ff9a2a", 4);   // 홈런: 주황 빛(기본의 4배), 135m 이상: 빨간 빛(9배)
       placeBall(PLATE.x + G.end.dx, PLATE.y + G.end.dy, BALL_MAX, 0, true, GROUND.plate, BACKSPIN_AWAY); ball.style.visibility = "visible";
       later(go, 150); }
     else go();
@@ -738,9 +738,9 @@ function flyHit(dist, delta, done){
   if (lane === "pull" || lane === "push"){
     // 당겨친·밀어친 홈런 궤적 세 가지 중 하나 (좌우는 서로 거울상)
     const sgn = lane === "pull" ? -1 : 1, v = Math.random();
-    if (v < 0.4){        kind = "fly";   x1 = 50 + sgn * rnd(28, 36); H = rnd(24, 32); dur = 1450; }                  // 높이 뜬 큰 타구: 좌·우측 관중석 깊숙이
-    else if (v < 0.75){  kind = "liner"; x1 = 50 + sgn * rnd(24, 32); H = rnd(9, 12);  dur = 1100; }                  // 총알 같은 라이너: 담장을 아슬아슬하게 넘김
-    else {               kind = "fly";   x1 = 50 + sgn * rnd(30, 37); H = rnd(18, 24); dur = 1350; bend = sgn * rnd(6, 10); }   // 파울 폴 쪽으로 휘어 들어가는 타구
+    if (v < 0.4){        kind = "fly";   x1 = 50 + sgn * rnd(28, 36); H = rnd(32, 42); dur = 1450; }                  // 높이 뜬 큰 타구: 좌·우측 관중석 깊숙이
+    else if (v < 0.75){  kind = "liner"; x1 = 50 + sgn * rnd(24, 32); H = rnd(15, 20);  dur = 1100; }                  // 총알 같은 라이너: 담장을 아슬아슬하게 넘김
+    else {               kind = "fly";   x1 = 50 + sgn * rnd(30, 37); H = rnd(26, 34); dur = 1350; bend = sgn * rnd(6, 10); }   // 파울 폴 쪽으로 휘어 들어가는 타구
   }
   // 착지점: 홈런(120m 이상)만 담장의 노란 선을 넘어 관중석(y 30~41%)에 떨어지고, 라이너 홈런은 담장 바로 뒤 앞줄에,
   // 그보다 짧으면 담장 앞 잔디에 떨어짐 (119m = 담장 바로 앞). 장외(145m 이상)는 관중석 위쪽까지 날아가 그 뒤로 사라짐
