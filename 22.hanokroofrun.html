@@ -541,18 +541,18 @@ function drawFarTile(im, px, py, fw, fh, flip) {
 function drawRoofSeg(r) {
   const im = IMG.roof; if (!im.complete) return;
   const k = ROOF_H / im.naturalHeight;          // 이미지→월드 배율
-  // 기와 한 장 간격은 그림에서 68.5px. 84~906 구간이 정확히 12장이라 여기서 끊어 반복하면 이음새가 안 생긴다.
-  const capL = 84, capR = im.naturalWidth - 906, mid0 = 84, midW = 906 - 84;
+  // 기와 한 장 간격은 그림에서 68.5px(84~906 구간에 12장). 한 장 단위로 이어 붙여 어떤 폭이든 기와가 잘리지 않게 한다.
+  const capL = 84, capR = im.naturalWidth - 906, mid0 = 84, midW = (906 - 84) / 12;
   const width = r.x1 - r.x0, capsW = (capL + capR) * k, tileW = midW * k;
-  const n = Math.max(0, Math.round((width - capsW) / tileW));   // 통째로 들어가는 기와 묶음 수
-  const hs = width / (capsW + n * tileW);                       // 남는 폭은 가로로 살짝 늘리거나 줄여서 맞춤(기와가 잘리지 않게)
+  const n = Math.max(0, Math.round((width - capsW) / tileW));   // 통째로 들어가는 기와 장수
+  const hs = width / (capsW + n * tileW);                       // 남는 폭(최대 반 장)은 가로로 살짝 늘리거나 줄여서 맞춤
   const x0 = sx(r.x0), x1 = sx(r.x1), y = sy(0), h = ROOF_H * S;
   const capLw = capL * k * hs * S, capRw = capR * k * hs * S, midWw = tileW * hs * S;
   // 건물 몸체
   const g = ctx.createLinearGradient(0, y + h * 0.8, 0, ch);
   g.addColorStop(0, '#111741'); g.addColorStop(1, '#070a1e');
   ctx.fillStyle = g; ctx.fillRect(x0 + 12 * S, y + h * 0.8, (x1 - x0) - 24 * S, ch - y);
-  // 기와: 왼쪽 끝 + 기와 묶음 n개 + 오른쪽 끝 (모두 같은 위상에서 이어 붙임)
+  // 기와: 왼쪽 끝 + 기와 n장 + 오른쪽 끝 (모두 같은 위상에서 이어 붙임)
   for (let i = 0; i < n; i++) ctx.drawImage(im, mid0, 0, midW, im.naturalHeight, x0 + capLw + i * midWw, y, midWw + 0.6, h);
   ctx.drawImage(im, 0, 0, capL, im.naturalHeight, x0, y, capLw + 0.6, h);
   ctx.drawImage(im, 906, 0, capR, im.naturalHeight, x0 + capLw + n * midWw, y, capRw, h);
