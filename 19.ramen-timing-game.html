@@ -146,12 +146,16 @@
   .scene{width:100%;aspect-ratio:200/190;display:block;cursor:pointer;position:relative;overflow:visible}
   .scene img,.scene .layer{position:absolute;display:block;object-fit:contain;pointer-events:none;user-select:none;-webkit-user-drag:none}
   .scene .potimg{left:6%;top:9%;width:88%;height:82%}
-  .scene .inner{left:23.5%;top:22%;width:53%;height:23%;border-radius:50%;overflow:hidden}
+  /* 물·면·탐은 냄비 테두리보다 작은 안쪽 바닥 타원에 맞춰, 냄비 속에 담긴 것처럼 보이게 한다 */
+  .scene .inner{left:27%;top:37.5%;width:42%;height:14.5%;border-radius:50%;overflow:hidden}
   .scene .inner img{left:0;top:0;width:100%;height:100%;object-fit:fill}
+  .scene .inner::after{content:"";position:absolute;inset:0;border-radius:50%;
+    box-shadow:inset 0 5px 7px rgba(40,30,20,.35),inset 0 -2px 3px rgba(255,255,255,.35)}
   .scene .water .tint{position:absolute;inset:0;background:var(--tint,transparent);mix-blend-mode:multiply;transition:background .4s}
-  .scene .topping{top:20%;height:27%}
+  .scene .topping{left:30%;top:33%;width:36%;height:22%;overflow:visible}
+  .scene .topping::after{display:none}
   .scene .burn{opacity:0;transition:opacity .6s}
-  .scene .rimglow{left:22%;top:20.5%;width:56%;height:26%;border-radius:50%;opacity:0;pointer-events:none}
+  .scene .rimglow{left:24%;top:26.5%;width:48.5%;height:26%;border-radius:50%;opacity:0;pointer-events:none}
   .btns{display:grid;grid-template-columns:1fr 1fr;gap:6px}
   .btns .btn{min-height:44px;padding:0 4px;font-size:13px}
   .btns .btn.done{opacity:.25;text-decoration:line-through}
@@ -173,8 +177,8 @@
   @keyframes rise{0%{transform:translateY(0) scale(.5);opacity:0}20%{opacity:.9}100%{transform:translateY(-58px) scale(1.1);opacity:0}}
 
   /* ---------- 김 / 연기 ---------- */
-  .steam{opacity:0;transform-origin:center;width:16%;height:20%;top:8%}
-  .steam.s1{left:32%}.steam.s2{left:44%;top:6%;width:18%}.steam.s3{left:56%}
+  .steam{opacity:0;transform-origin:center;width:16%;height:20%;top:22%}
+  .steam.s1{left:32%}.steam.s2{left:44%;top:20%;width:18%}.steam.s3{left:56%}
   .pot.ready .steam,.pot.late .steam,.pot.burnt .steam{animation:steam 1.4s ease-out infinite}
   .steam.s2{animation-delay:.45s !important}.steam.s3{animation-delay:.9s !important}
   @keyframes steam{0%{transform:translateY(0) scale(.6);opacity:0}30%{opacity:.7}100%{transform:translateY(-48px) scale(1.5);opacity:0}}
@@ -341,7 +345,7 @@ function potSVG(i){
   let bubbles = "";
   for (let k=0;k<14;k++){
     const cx = 62 + (k*37)%76, cy = 118 - (k*13)%18, r = 2 + (k%3);
-    const d = r*2.6, left = (cx-d/2)/2, top = (cy-50-d/2)/1.9;
+    const d = r*2.6, left = (cx-d/2)/2, top = (cy-20-d/2)/1.9;
     bubbles += `<img class="bub" src="${IMG}bubble.png" alt="" width="159" height="159" style="left:${left}%;top:${top}%;width:${d/2}%;height:${d/1.9}%">`;
   }
   return `
