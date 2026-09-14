@@ -110,7 +110,7 @@ const CAT_H = 110;
 const CAT_SINK = 20;       // 지붕 그림 위쪽 여백(12px) + 기와 두께만큼 고양이를 내려 그려 지붕에 붙어 보이게 (그리기 전용, 물리는 그대로)
 const FLIP_AFTER = 0.45;   // 매달린 뒤 공중제비 시작까지의 시간(초)
 
-// 각 스테이지 구간 길이(px) — 6단계가 하나의 코스로 이어짐
+// 각 스테이지 구간 길이(px) — 8단계가 하나의 코스로 이어짐
 const STAGE_PARAMS = [null,
   { speed: 280, len: 6500 },
   { speed: 300, len: 8000 },
@@ -118,7 +118,14 @@ const STAGE_PARAMS = [null,
   { speed: 340, len: 11000 },
   { speed: 360, len: 12500 },
   { speed: 390, len: 14500 },
+  { speed: 410, len: 16000 },
+  { speed: 430, len: 17500 },
 ];
+// 낭떠러지 판정 여유(px): 조금 늦게 뛰거나 조금 못 미쳐도 살려 준다
+const EDGE_TOL = 30;       // 지붕 끝을 이만큼 지나도 아직 달리는 중 (원래 18)
+const COYOTE_T = 0.18;     // 떨어지기 시작한 뒤에도 점프가 되는 시간(초, 원래 0.1)
+const LAND_TOL = 34;       // 지붕 끝에 이만큼 못 미쳐도 착지 (원래 22)
+const LAND_Y = 40;         // 지붕 윗면보다 이만큼 아래까지는 착지로 인정 (원래 28)
 const SILVER_PT = 5, GOLD_PT = 20;
 
 // ───────── 이미지 로딩 ─────────
@@ -204,7 +211,7 @@ function buildCourse() {
 
   // 시작 지붕 (석상 + 출발)
   addRoof(1100);
-  for (let n = 1; n <= 6; n++) {
+  for (let n = 1; n <= 8; n++) {
   const P = STAGE_PARAMS[n];
   const stageEnd = x + P.len;
   stageStarts.push(x);
@@ -228,10 +235,20 @@ function buildCourse() {
       const roof = addRoof(R(260, 400)); silverRow(roof.x0, roof.x1);
       const q = rnd();
       if (q < 0.25) smallGap(R(180, 220)); else if (q < 0.45) pagodaGap(R(800, 900), 2); else if (q < 0.7) threeCell(); else pagodaGap(R(1500, 1900), 4 + (rnd() < 0.5 ? 1 : 0));
-    } else {
+    } else if (n === 6) {
       const roof = addRoof(R(240, 380)); silverRow(roof.x0, roof.x1);
       const q = rnd();
       if (q < 0.2) smallGap(R(190, 230)); else if (q < 0.35) pagodaGap(R(480, 520), 1); else if (q < 0.5) threeCell(); else if (q < 0.7) pagodaGap(R(1500, 1900), 4 + Math.floor(rnd() * 2), 70); else pagodaGap(R(1900, 2300), 5 + Math.floor(rnd() * 2), 70);
+    } else if (n === 7) {
+      // 7단계: 지붕이 더 짧고, 탑 간격이 들쭉날쭉한 긴 와이어 구간 + 미끼 섬
+      const roof = addRoof(R(220, 340)); silverRow(roof.x0, roof.x1);
+      const q = rnd();
+      if (q < 0.15) smallGap(R(200, 240)); else if (q < 0.3) pagodaGap(R(500, 540), 1, 40); else if (q < 0.45) threeCell(); else if (q < 0.6) bait(); else if (q < 0.8) pagodaGap(R(1700, 2100), 5 + Math.floor(rnd() * 2), 80); else pagodaGap(R(2200, 2600), 6 + Math.floor(rnd() * 2), 60);
+    } else {
+      // 8단계: 가장 빠르고, 짧은 지붕 사이를 6~8개 탑으로 잇는 구간이 주를 이룸. 한 번 쉬어 가는 작은 틈은 드물다
+      const roof = addRoof(R(200, 320)); silverRow(roof.x0, roof.x1);
+      const q = rnd();
+      if (q < 0.1) smallGap(R(210, 250)); else if (q < 0.25) pagodaGap(R(520, 560), 1, 60); else if (q < 0.4) bait(); else if (q < 0.55) threeCell(); else if (q < 0.8) pagodaGap(R(2000, 2400), 6 + Math.floor(rnd() * 2), 70); else pagodaGap(R(2600, 3000), 7 + Math.floor(rnd() * 2), 60);
     }
   }
   // 스테이지 경계: 안전한 긴 지붕으로 연결
@@ -397,7 +414,7 @@ function update(dt) {
     resultTimer += dt; if (resultTimer > 0.9) showResult(false);
   } else if (c.state === 'run') {
     c.vx = sp; c.x += sp * dt; c.y = 0;
-    if (!roofUnder(c.x, 18)) { c.state = 'fall'; c.vy = 0; c.coyote = 0.1; }
+    if (!roofUnder(c.x, EDGE_TOL)) { c.state = 'fall'; c.vy = 0; c.coyote = COYOTE_T; }
   } else if (c.state === 'swing') {
     c.hangT += dt;
     if (c.hangT > FLIP_AFTER && !c.flipping) { c.flipping = true; c.flipT = 0; }
@@ -411,8 +428,8 @@ function update(dt) {
     // 매달린 채 지붕에 닿으면 착지
     if (c.state === 'swing') {
       const r = roofUnder(c.x, 0);
-      if (r && c.y >= 0 && c.y < 40 && c.vy >= 0) { land(); }
-      else if (r && c.y >= 40) { detach(); c.vx = 0; c.x = r.x0 - 24; } // 건물 옆면에 부딪힘
+      if (r && c.y >= 0 && c.y < LAND_Y + 15 && c.vy >= 0) { land(); }
+      else if (r && c.y >= LAND_Y + 15) { detach(); c.vx = 0; c.x = r.x0 - 24; } // 건물 옆면에 부딪힘
     }
   } else { // jump / fall / throw
     if (c.state === 'throw') {
@@ -425,9 +442,9 @@ function update(dt) {
     if (c.state !== 'swing') {
       c.vy += GRAVITY * dt; c.y += c.vy * dt; c.x += c.vx * dt;
       if (c.vy > 0 && c.y >= 0) {
-        const r = roofUnder(c.x, 22);
+        const r = roofUnder(c.x, LAND_TOL);
         if (r) {
-          if (prevY <= 0 || c.y < 28) land();
+          if (prevY <= 0 || c.y < LAND_Y) land();
           else { // 지붕 옆면에 충돌 → 추락
             c.vx = 0; c.x = Math.min(c.x, r.x0 - 24);
           }
@@ -490,7 +507,7 @@ function showMenu() {
   mode = 'menu'; hud.style.display = 'none';
   panel.innerHTML = `
     <h1>한옥 지붕 와이어 러너</h1>
-    <p>고양이가 한옥 지붕 위를 달립니다. 지붕 사이 낭떠러지를 점프와 와이어로 건너 6단계가 이어진 코스의 목표 지점(G)까지 가세요.</p>
+    <p>고양이가 한옥 지붕 위를 달립니다. 지붕 사이 낭떠러지를 점프와 와이어로 건너 8단계가 이어진 코스의 목표 지점(G)까지 가세요.</p>
     <div class="score-line">최고 기록 ${best}점</div>
     <p>고양이를 골라 시작하세요</p>
     <div class="btn-row cat-row">
