@@ -335,6 +335,7 @@ const GAUGE_RANGE = 260;      // 게이지 막대 양 끝 = ±260ms
 const BALL_BONUS = 500;       // 볼을 골라냈을 때 점수
 const BALL_HIT_PENALTY = 1.6;  // 볼을 쳤을 때 타이밍 오차 배율(존 안의 공보다 정확해야 함)
 const CENTER_MS = 30;         // ±30ms 안이면 "정타"
+const PULL_SHIFT_MS = 35;     // 몸쪽·바깥쪽 끝의 공은 정확 타이밍이 이만큼(ms) 빨라지거나 늦어짐 (당겨치기·밀어치기 홈런)
 /* 구종 — kmh: 처음 구속, spin: 날아오는 동안 도는 바퀴 수,
    axis: 회전축 [x, y, z] (포수 시점: x 오른쪽, y 위, z 포수 쪽. 오른손 법칙 — 엄지가 축, 손가락이 도는 방향).
    공이 포수 쪽(+z)으로 날아올 때 마그누스 힘은 축 × 진행방향 이므로
@@ -650,7 +651,9 @@ function judge(delta){
   G.phase = "result";
   btnSwing.disabled = true;
   // 존을 벗어난 공(볼)을 치면 정확히 맞추기 어려워 오차를 1.6배로 계산
-  const a = delta === null ? Infinity : Math.abs(delta) * (G.end.strike ? 1 : BALL_HIT_PENALTY);
+  // 몸쪽 공(dx<0)은 조금 일찍(당겨치기), 바깥쪽 공(dx>0)은 조금 늦게(밀어치기) 쳐야 정확히 맞음 — 정확 타이밍이 dx 에 비례해 최대 ±PULL_SHIFT_MS 만큼 옮겨짐
+  const sweet = Math.max(-1, Math.min(1, G.end.dx / ZONE.hw)) * PULL_SHIFT_MS;
+  const a = delta === null ? Infinity : Math.abs(delta - sweet) * (G.end.strike ? 1 : BALL_HIT_PENALTY);
   let grade, dist = 0, gained = 0, side = delta === null ? 0 : Math.sign(delta);
   const ease = (lo, hi, dLo, dHi) => Math.round(dHi - (dHi - dLo) * (a - lo) / (hi - lo));
   if (a <= WIN.hr)        { grade = "홈런";     dist = ease(0, WIN.hr, 120, 150); }   // 정확할수록 멀리, 145m 이상은 장외
@@ -711,7 +714,7 @@ function judge(delta){
   }
 }
 function afterResult(){
-  hideCall(); ball.style.visibility = "hidden"; shadow.style.display = "none";
+  hideCall(); ball.style.visibility = "hidden"; ball.style.opacity = ""; shadow.style.display = "none";   // 장외 홈런으로 옅어진 공을 되돌림
   later(nextPitch, 500);
 }
 
@@ -722,25 +725,36 @@ function flyHit(dist, delta, done){
   const a = Math.max(-1, Math.min(1, delta / WIN.inf * 0.85 + jitter));   // 빠름 → 왼쪽(음수), 늦음 → 오른쪽(양수)
   const x0 = PLATE.x + G.end.dx, y0 = PLATE.y + G.end.dy;
   // 파울선이 화면에 없으므로 페어 타구는 화면 안(약 12~88%)에 떨어지게 좌우 폭을 잡음
-  const x1 = PLATE.x + a * 38 * (0.3 + 0.7 * f);
-  // 착지점: 홈런(120m 이상)만 담장의 노란 선을 넘고, 그보다 짧으면 담장 앞 잔디에 떨어짐 (119m = 담장 바로 앞).
-  // 장외(145m 이상)는 관중석 위쪽까지 날아가 그 뒤로 사라짐
-  const fy = fenceY(x1), outOfPark = dist >= OUT_OF_PARK;
-  const y1 = outOfPark ? 22 - (dist - OUT_OF_PARK) * 0.8
-           : dist >= 120 ? fy - 4 - (dist - 120) * 0.5
-                         : PLATE.y - (PLATE.y - WALL_BOTTOM) * (dist / 120);
+  let x1 = PLATE.x + a * 38 * (0.3 + 0.7 * f);
+  const rnd = (lo, hi) => lo + Math.random() * (hi - lo);
+  const outOfPark = dist >= OUT_OF_PARK, isHR = dist >= 120;
+  // 홈런의 방향: 빨리 쳐서 당겼으면 좌익수 뒤(왼쪽) 담장, 늦게 쳐서 밀었으면 우익수 뒤(오른쪽) 담장, 정타는 가운데
+  const lane = !isHR ? "" : delta < -CENTER_MS ? "pull" : delta > CENTER_MS ? "push" : "center";
   // 궤적 종류
-  let kind, H, dur;
+  let kind, H, dur, bend = 0, y1;
   if (dist < 65){ kind = "ground"; H = 1.5 + Math.random() * 2;   dur = 650 + 350 * f; }                       // 땅볼: 낮게 튀며 굴러감
   else if (dist < 120 && Math.random() < 0.45){ kind = "liner"; H = 5 + 7 * f; dur = 650 + 450 * f; }           // 라이너: 낮고 빠르게
   else { kind = "fly"; H = 14 + 30 * f + Math.random() * 8; dur = 900 + 800 * f; }                               // 뜬공: 높이 떠서
-  if (outOfPark){ H = 30 + Math.random() * 6; dur = 1700; }                                                        // 장외: 크게 떠서 관중석 너머로
+  if (lane === "pull" || lane === "push"){
+    // 당겨친·밀어친 홈런 궤적 세 가지 중 하나 (좌우는 서로 거울상)
+    const sgn = lane === "pull" ? -1 : 1, v = Math.random();
+    if (v < 0.4){        kind = "fly";   x1 = 50 + sgn * rnd(28, 36); H = rnd(24, 32); dur = 1450; }                  // 높이 뜬 큰 타구: 좌·우측 관중석 깊숙이
+    else if (v < 0.75){  kind = "liner"; x1 = 50 + sgn * rnd(24, 32); H = rnd(9, 12);  dur = 1100; }                  // 총알 같은 라이너: 담장을 아슬아슬하게 넘김
+    else {               kind = "fly";   x1 = 50 + sgn * rnd(30, 37); H = rnd(18, 24); dur = 1350; bend = sgn * rnd(6, 10); }   // 파울 폴 쪽으로 휘어 들어가는 타구
+  }
+  // 착지점: 홈런(120m 이상)만 담장의 노란 선을 넘어 관중석(y 30~41%)에 떨어지고, 라이너 홈런은 담장 바로 뒤 앞줄에,
+  // 그보다 짧으면 담장 앞 잔디에 떨어짐 (119m = 담장 바로 앞). 장외(145m 이상)는 관중석 위쪽까지 날아가 그 뒤로 사라짐
+  const fy = fenceY(x1);
+  y1 = outOfPark ? 22 - (dist - OUT_OF_PARK) * 0.8
+     : isHR ? (kind === "liner" ? fy - rnd(1.5, 3.5) : fy - 2 - (dist - 120) * 0.4)
+            : PLATE.y - (PLATE.y - WALL_BOTTOM) * (dist / 120);
+  if (outOfPark){ kind = "fly"; H = 30 + Math.random() * 6; dur = 1700; }                                          // 장외: 크게 떠서 관중석 너머로
   const t0 = performance.now(), axis = hitAxis(a);                  // 타구는 직구와 같은 백스핀으로 날아감
   const g0 = GROUND.plate, h0 = g0 - y0;                            // 맞는 순간 공은 홈플레이트 땅에서 h0 만큼 떠 있음
-  ball.style.visibility = "visible"; G.spinAng = 0;
+  ball.style.visibility = "visible"; ball.style.opacity = ""; G.spinAng = 0;
   (function step(now){
     const t = Math.min(1, (now - t0) / dur);
-    const gx = x0 + (x1 - x0) * t, gy = g0 + (y1 - g0) * t;         // 지면 위 위치(그림자 자리): 홈플레이트 → 착지점
+    const gx = x0 + (x1 - x0) * t + bend * Math.sin(Math.PI * t), gy = g0 + (y1 - g0) * t;   // 지면 위 위치(그림자 자리): 홈플레이트 → 착지점 (bend 는 옆으로 휘는 양)
     const lift = kind === "ground" ? Math.abs(Math.sin(Math.PI * 3 * t)) * (1 - t) : Math.sin(Math.PI * t);
     const y = gy - h0 * (1 - t) - H * lift;                          // 처음 높이는 점점 줄고, 궤적 높이가 더해짐
     const dia = BALL_MAX - (BALL_MAX - 1.2) * Math.pow(t, .7) * Math.min(1, f);
