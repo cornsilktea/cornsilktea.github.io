@@ -145,22 +145,22 @@
   /* 냄비 장면: 200×190 좌표계를 %로 옮긴 이미지 레이어 스택 (아래→위: 불꽃·냄비·물·면·기포·토핑·탐·김) */
   .scene{width:100%;aspect-ratio:200/190;display:block;cursor:pointer;position:relative;overflow:visible}
   .scene img,.scene .layer{position:absolute;display:block;object-fit:contain;pointer-events:none;user-select:none;-webkit-user-drag:none}
-  .scene .potimg{left:6%;top:9%;width:88%;height:82%}   /* 빈 냄비(그림 각도가 달라 상자를 따로 잡음) */
-  /* 물·면·토핑·탐은 내용물까지 그려진 냄비 통짜 그림(pot-water / pot-water-noodle / pot-water-full / pot-burnt)으로
-     빈 냄비 위에 덮어 씌운다. 512 캔버스 안의 냄비가 빈 냄비 그림보다 크게 그려져 있어 상자를 따로 잡아 크기를 맞춘다 */
-  .scene .state{left:19.75%;top:19.5%;width:60.5%;height:63.7%;display:none}   /* 한 번에 한 장만 보인다(JS 가 고른다) */
-  .scene .state.row2{top:20.6%}   /* 시트 아랫줄 그림은 9px 위에 그려져 있어 보정 */
+  /* 냄비 그림 9장은 모두 같은 512 캔버스·같은 구도라 한 상자를 공유한다. 장면 폭에 거의 꽉 차게 잡아
+     카드가 작은 기기에서도 냄비가 작아 보이지 않게 하고, 모든 위치는 % 라 기기 크기와 무관하게 같은 비율을 유지한다 */
+  .scene .state{left:4%;top:12%;width:92%;height:96.8%;display:none}   /* 한 번에 한 장만 보인다(JS 가 고른다) */
+  .scene .state.row2{top:13.7%}   /* 시트 아랫줄 그림은 9px 위에 그려져 있어 보정 */
   /* 너무 오래 끓을 때 국물 색이 탁해지는 오버레이 (냄비 입구 타원에만) */
-  .scene .tint{left:29.4%;top:34.8%;width:43.6%;height:17.2%;border-radius:50%;
+  .scene .tint{left:18.7%;top:35.2%;width:66.3%;height:26.1%;border-radius:50%;
     background:var(--tint,transparent);mix-blend-mode:multiply;transition:background .4s}
-  .scene .rimglow{left:28.4%;top:33.8%;width:45.6%;height:19.2%;border-radius:50%;opacity:0;pointer-events:none}
+  .scene .rimglow{left:17.7%;top:34.2%;width:68.3%;height:28.1%;border-radius:50%;opacity:0;pointer-events:none}
   .btns{display:grid;grid-template-columns:1fr 1fr;gap:6px}
   .btns .btn{min-height:44px;padding:0 4px;font-size:13px}
   .btns .btn.done{opacity:.25;text-decoration:line-through}
 
   /* ---------- 불꽃 ---------- */
-  .flame{width:26%;height:30%;bottom:9%;transform-origin:50% 100%;animation:flick .35s ease-in-out infinite alternate}
-  .flame.f1{left:26%}.flame.f2{left:37%;height:36%;animation-duration:.42s;animation-delay:.1s}.flame.f3{left:48%;animation-duration:.3s;animation-delay:.2s}
+  /* 냄비 그림이 장면을 거의 다 덮으므로 불꽃은 냄비 앞(z-index)에서 받침 고리 높이에 낮게 깐다 */
+  .flame{width:24%;height:22%;bottom:-3%;z-index:2;transform-origin:50% 100%;animation:flick .35s ease-in-out infinite alternate}
+  .flame.f1{left:26%}.flame.f2{left:38%;height:26%;animation-duration:.42s;animation-delay:.1s}.flame.f3{left:50%;animation-duration:.3s;animation-delay:.2s}
   @keyframes flick{from{transform:scaleY(.85) skewX(-4deg)}to{transform:scaleY(1.12) skewX(4deg)}}
   .pot.off .flame{opacity:0;transition:opacity .3s}
 
@@ -175,8 +175,8 @@
   @keyframes rise{0%{transform:translateY(0) scale(.5);opacity:0}20%{opacity:.9}100%{transform:translateY(-58px) scale(1.1);opacity:0}}
 
   /* ---------- 김 / 연기 ---------- */
-  .steam{opacity:0;transform-origin:center;width:16%;height:20%;top:18%}
-  .steam.s1{left:32%}.steam.s2{left:44%;top:16%;width:18%}.steam.s3{left:56%}
+  .steam{opacity:0;transform-origin:center;width:20%;height:24%;top:14%}
+  .steam.s1{left:26%}.steam.s2{left:40%;top:11%;width:22%}.steam.s3{left:56%}
   .pot.ready .steam,.pot.late .steam,.pot.burnt .steam{animation:steam 1.4s ease-out infinite}
   .steam.s2{animation-delay:.45s !important}.steam.s3{animation-delay:.9s !important}
   @keyframes steam{0%{transform:translateY(0) scale(.6);opacity:0}30%{opacity:.7}100%{transform:translateY(-48px) scale(1.5);opacity:0}}
@@ -184,7 +184,7 @@
 
   /* ---------- 테두리 반짝 ---------- */
   .pot.ready .rimglow{opacity:1;box-shadow:0 0 0 3px var(--ready),0 0 14px 4px var(--ready);animation:glow .35s ease-in-out infinite alternate}
-  .pot.ready .potimg,.pot.ready .state{filter:drop-shadow(0 0 6px var(--ready))}
+  .pot.ready .state{filter:drop-shadow(0 0 6px var(--ready))}
   @keyframes glow{from{opacity:.5}to{opacity:1}}
   .pot.ready{box-shadow:0 0 0 3px var(--ready)}
   .pot.error{box-shadow:0 0 0 3px var(--bad)}
@@ -343,8 +343,9 @@ function potSVG(i){
   let bubbles = "";
   for (let k=0;k<14;k++){
     const cx = 62 + (k*37)%76, cy = 118 - (k*13)%18, r = 2 + (k%3);
-    const d = r*2.6, left = (cx-d/2)/2, top = (cy-22-d/2)/1.9;
-    bubbles += `<img class="bub" src="${IMG}bubble.png" alt="" width="159" height="159" style="left:${left}%;top:${top}%;width:${d/2}%;height:${d/1.9}%">`;
+    /* 냄비 그림이 장면 폭의 92% 라 x 는 중심(100) 기준 1.52배로 벌리고, y 는 물 표면 높이로 내린다 */
+    const d = r*3.6, left = 50 + (cx-100)*0.76 - d/2, top = (cy-5)/1.9 - d/2;
+    bubbles += `<img class="bub" src="${IMG}bubble.png" alt="" width="159" height="159" style="left:${left}%;top:${top}%;width:${d}%;height:${d*1.05}%">`;
   }
   return `
   <div class="scene" aria-hidden="true">
@@ -353,7 +354,7 @@ function potSVG(i){
     <img class="flame f2" src="${IMG}flame.png" alt="" width="500" height="500">
     <img class="flame f3" src="${IMG}flame.png" alt="" width="500" height="500">
     <!-- 냄비 그림: 상태·재료 조합에 맞는 한 장만 보인다 (data-pic 로 고름). 겹치지 않고 통째로 바뀐다 -->
-    <img class="potimg" data-pic="empty" src="${IMG}pot-empty.png" alt="" width="500" height="500">
+    <img class="state" data-pic="empty" src="${IMG}pot-empty.png" alt="" width="512" height="512">
     <img class="state water" data-pic="water" src="${IMG}pot-water.png" alt="" width="512" height="512">
     <img class="state cooked" data-pic="water-noodle" src="${IMG}pot-water-noodle.png" alt="" width="512" height="512">
     <img class="state topping row2" data-pic="water-full" src="${IMG}pot-water-full.png" alt="" width="512" height="512">
