@@ -84,7 +84,8 @@
     z-index:1;pointer-events:none;transition:box-shadow .15s}
   #zone.strike{box-shadow:0 0 0 2px rgba(255,255,255,.7)}
   /* 도착점 표시 (헛스윙·안 침) */
-  #zoneMark{position:absolute;left:0;top:0;display:none;z-index:6;pointer-events:none;transform:translate(-50%,-50%)}
+  /* 점(18px)의 한가운데가 도착점(공 중심)에 오도록 점 반지름만큼만 올림 — 전엔 글자까지 합친 높이의 절반을 올려 점이 실제보다 위에 찍혔음 */
+  #zoneMark{position:absolute;left:0;top:0;display:none;z-index:6;pointer-events:none;transform:translate(-50%,-9px)}
   #zoneMark .dot{display:block;width:18px;height:18px;border-radius:50%;border:3px solid #fff;background:rgba(217,123,79,.9);
     box-shadow:0 0 0 2px rgba(0,0,0,.35);margin:0 auto;animation:markpop .25s ease-out}
   #zoneMark .lb{display:block;margin-top:3px;white-space:nowrap;font-size:12px;font-weight:800;color:#fff;
@@ -387,7 +388,7 @@ const hitAxis = side => [1, 0, side * 0.6];
 const fenceY = x => 43;   // 배경 그림의 노란 선(홈런 라인), 곡률이 화면에 안 보여 평평하게
 const WALL_BOTTOM = 47.5;       // 담장 아래 끝(외야 잔디가 시작되는 y)
 const OUT_OF_PARK = 145;        // 이 비거리부터 장외 홈런 (외야 관중석 뒤로 사라짐)
-const MAX_DIST = 150;           // 가장 긴 비거리 — 타구 공 크기는 홈에서 이만큼 멀어졌을 때 반지름 2/3
+const MAX_DIST = 150;           // 가장 긴 비거리 — 타구 공 크기는 홈에서 이만큼 멀어졌을 때 반지름 1/4
 // 홈런이 아닌 타구가 떨어지는 땅의 y(%) ← 비거리(m). 배경 그림 기준: 내야 잔디·흙 y 56~72, 주루 흙 띠 y 50~54, 외야 잔디 47.5~50
 // (40m 미만은 내야 안, 60m 전후는 외야수 앞, 100m 전후는 담장 근처, 119m = 담장 바로 앞)
 const LAND = [[15, 74], [40, 56], [52, 52.5], [75, 49.6], [88, 49.0], [119, WALL_BOTTOM]];
@@ -554,6 +555,7 @@ function setGauge(deltaMs, text){
 /* 도착점 표시: kind "hit"(타격)·"miss"(헛스윙) = 빨강, 아니면 스트라이크(주황)·볼(녹색) */
 function showZoneMark(kind, count){
   const e = G.end, mk = $("zoneMark"), hit = !!kind;
+  e.strike = isStrike(e.dx, e.dy);   // 표시·판정 모두 "공 중심이 존 안" 한 가지 기준
   mk.classList.toggle("hit", hit); mk.classList.toggle("ball", !hit && !e.strike);
   mk.style.left = (PLATE.x + e.dx) + "%"; mk.style.top = (PLATE.y + e.dy) + "%";
   const v = e.dy < -ZONE.hh / 3 ? "높은" : e.dy > ZONE.hh / 3 ? "낮은" : "";
@@ -785,7 +787,7 @@ function flyHit(dist, delta, done){
     const gx = x0 + (x1 - x0) * t + bend * Math.sin(Math.PI * t), gy = g0 + (y1 - g0) * t;   // 지면 위 위치(그림자 자리): 홈플레이트 → 착지점 (bend 는 옆으로 휘는 양)
     const lift = kind === "ground" ? Math.abs(Math.sin(Math.PI * 3 * t)) * (1 - t) : Math.sin(Math.PI * t);
     const y = gy - h0 * (1 - t) - H * lift;                          // 처음 높이는 점점 줄고, 궤적 높이가 더해짐
-    const dia = d0 * (1 - Math.min(1, dist * t / MAX_DIST) / 3);   // 맞기 직전 크기에서 홈에서 멀어질수록 작게 — 가장 멀리(150m) 갔을 때 반지름이 2/3
+    const dia = d0 * (1 - Math.min(1, dist * t / MAX_DIST) * 0.75);   // 맞기 직전 크기에서 홈에서 멀어질수록 작게 — 가장 멀리(150m) 갔을 때 반지름이 1/4
     // 장외: 담장을 넘은 뒤에는 그림자를 지우고, 마지막 15% 동안 옅어지며 관중석 뒤로 사라짐
     placeBall(gx, y, dia, spinTo(HIT_SPIN * t), !(outOfPark && t > 0.55), gy, axis);
     ball.style.opacity = outOfPark && t > 0.85 ? String(Math.max(0, (1 - t) / 0.15)) : "";
@@ -802,7 +804,7 @@ function flyFoul(side, done){
   (function step(now){
     const t = Math.min(1, (now - t0) / dur);
     const gx = x0 + (x1 - x0) * t, gy = g0 + (y1 - g0) * t, y = gy - h0 * (1 - t) - H * Math.sin(Math.PI * t);
-    placeBall(gx, y, d0 * (1 - 0.12 * t), spinTo(HIT_SPIN * t), true, gy, axis);   // 파울(약 50m)도 멀어지는 만큼만 작아짐
+    placeBall(gx, y, d0 * (1 - 0.25 * t), spinTo(HIT_SPIN * t), true, gy, axis);   // 파울(약 50m)도 멀어지는 만큼만 작아짐
     if (t < 1) G.raf = requestAnimationFrame(step); else done();
   })(t0);
 }
