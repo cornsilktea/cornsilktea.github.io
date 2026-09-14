@@ -304,7 +304,7 @@
 
    규격: 배경 투명 PNG. 한 인물의 모든 동작은 같은 크기의 캔버스에 같은 축척으로,
    발이 그림 맨 아래(가운데)에 닿게 놓아야 동작이 바뀌어도 인물이 튀지 않습니다.
-   (현재 투수 4장 352×508, 타자 6장 500×520 — 낱장 그림 6장을 뒷발 가운데가 (100,512)에 오도록 한 캔버스에 맞춰 넣음)
+   (현재 투수 4장 352×508, 타자 5장 500×520 — 낱장 그림을 뒷발 가운데가 (100,512)에 오도록 한 캔버스에 맞춰 넣음)
    타자는 우타자(홈플레이트 왼쪽 타석, 투수 쪽을 향해 오른쪽으로 서 있음)를
    포수 뒤 위쪽에서 비스듬히 본 모습, 투수는 우완 투수가 정면(타자 쪽)을 향한 모습.
    투구 그림(throw)에서 공을 쥔 손의 위치는 아래 REL 과 맞춰야 공이 손에서 출발합니다.
@@ -316,9 +316,8 @@ const IMAGES = {
     ["throw",  "img/pitcher-throw.png",  "투구"],       // 공을 놓는 순간 (공은 오른손 = 화면 왼쪽 위)
     ["follow", "img/pitcher-follow.png", "팔로스루"]    // 던진 뒤 앞으로 숙임
   ],
-  batter: [                                         // 타자: 준비 → 타격 준비 → 스윙 4단계
+  batter: [                                         // 타자: 준비 → 스윙 4단계
     ["ready",  "img/batter-ready.png",  "준비 자세"],   // 타석에서 기다림
-    ["load",   "img/batter-load.png",   "타격 준비"],   // 투수가 발을 내딛을 때 방망이를 뒤로 당김
     ["swing1", "img/batter-swing1.png", "스윙 시작"],   // 방망이가 나오기 시작
     ["swing2", "img/batter-swing2.png", "타격"],        // 방망이가 홈플레이트 위를 지남
     ["swing3", "img/batter-swing3.png", "팔로스루"],    // 방망이가 몸을 지나 돌아감
@@ -326,8 +325,7 @@ const IMAGES = {
   ]
 };
 // 스윙 버튼을 누른 뒤 각 동작이 보이는 시각(ms) — 누른 순간이 타격 판정 시각이므로 타격 그림이 곧바로 따라옴
-const SWING_SEQ = [["swing1", 0], ["swing2", 60], ["swing3", 170], ["swing4", 320]];
-const LOAD_BEFORE_RELEASE = 260;     // 타자가 방망이를 뒤로 당기는 시점: 투수가 공을 놓기 몇 ms 전
+const SWING_SEQ = [["swing1", 0], ["swing2", 30], ["swing3", 80], ["swing4", 150]];   // 빠르게 휘두름 (총 150ms)
 const FOLLOW_AFTER_RELEASE = 160;    // 투구 그림에서 팔로스루 그림으로 넘어가는 시점
 
 /* ---------- 게임 규칙 상수 ---------- */
@@ -630,7 +628,6 @@ function nextPitch(){
   setBatter("ready"); setPitcher("windup");
   // 와인드업 길이를 조금씩 다르게 해서 리듬만으로 맞추기 어렵게
   const windup = 650 + Math.random() * 350;
-  later(() => setBatter("load"), windup - LOAD_BEFORE_RELEASE);   // 투구 직전에 타자가 방망이를 당김
   later(release, windup);
 }
 
