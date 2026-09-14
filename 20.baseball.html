@@ -66,14 +66,17 @@
   #pitcher{left:50%;bottom:46%;width:8%;height:12%;transform:translateX(-50%);min-width:40px;z-index:2}
   #pitcher .ph{font-size:13px}
   /* 우타자: 홈플레이트 왼쪽(3루 쪽) 타석 */
-  #batter{left:8%;bottom:2%;width:40%;height:52%;z-index:3}   /* 그림(312×432)은 높이에 맞춰 폭 25% 로 그려져 슬롯 가운데(15.5~40.5%)에 옴. 앞발(그림 폭 85%)이 왼쪽 타자 박스 안쪽 선(x≈40%)에서 반 발 뒤(≈37%)에, 무릎(그림 높이 69%)~팔꿈치(30%)가 스트라이크 존과 맞도록 */
+  /* 그림 6장은 모두 500×520 캔버스, 뒷발 가운데가 (100,512)에 오도록 맞춰 놓음(compose). 슬롯 비율(40%×1.5 : 62.4%)이 그림 비율과 같아 그림이 슬롯을 꽉 채움.
+     뒷발이 x=19+8=27%, 앞발 끝(준비 자세 +125px)이 왼쪽 타자 박스 안쪽 선(x≈42%)에서 반 발 뒤(≈37%). 발끝 y≈97%.
+     준비 자세의 팔꿈치(그림 y 207)·무릎(y 388) → 무대 60.4%·82.2% = 스트라이크 존 위·아래 (#zone, PLATE.y, ZONE.hh 와 같이 맞춤) */
+  #batter{left:19%;bottom:2%;width:40%;height:62.4%;z-index:3}
   #batter .ph{font-size:16px}
   .fielder{position:absolute;pointer-events:none;opacity:.95;transform:translate(-50%,-100%);height:auto;filter:drop-shadow(0 1px 1px rgba(0,0,0,.35))}
-  .fielder.in{width:3.6%;min-width:14px;max-width:26px}
+  .fielder.in{width:3.1%;min-width:12px;max-width:22px}   /* 주루 흙 띠(y≈52%)는 투수판(54%)보다 조금 멀어 투수보다 작게 */
   .fielder.out{width:2.2%;min-width:9px;max-width:16px;opacity:.9}
 
   /* 스트라이크 존 (홈플레이트 위 공간) */
-  #zone{position:absolute;left:44.8%;top:61.6%;width:10.4%;height:20.3%;border:1.5px solid rgba(255,255,255,.55);border-radius:2px;
+  #zone{position:absolute;left:44.5%;top:60.4%;width:11%;height:21.8%;border:1.5px solid rgba(255,255,255,.55);border-radius:2px;
     background:
       linear-gradient(90deg,transparent calc(33.3% - .5px),rgba(255,255,255,.28) calc(33.3% - .5px) calc(33.3% + .5px),transparent calc(33.3% + .5px) calc(66.6% - .5px),rgba(255,255,255,.28) calc(66.6% - .5px) calc(66.6% + .5px),transparent calc(66.6% + .5px)),
       linear-gradient(180deg,transparent calc(33.3% - .5px),rgba(255,255,255,.28) calc(33.3% - .5px) calc(33.3% + .5px),transparent calc(33.3% + .5px) calc(66.6% - .5px),rgba(255,255,255,.28) calc(66.6% - .5px) calc(66.6% + .5px),transparent calc(66.6% + .5px)),
@@ -193,11 +196,13 @@
       </defs>
     </svg>
 
-    <!-- 야수 그림 (img/fielder-*.png, 배경 투명). 내야수는 내야 흙 띠(y≈52~58%), 외야수는 담장 앞 외야 잔디(y≈48~52%) 위. 2루수·유격수 자리는 그림을 서로 바꿔 씀 (몸이 향하는 방향이 자리와 맞도록) -->
-    <img class="fielder in"  style="left:24%;top:58.5%"     src="img/fielder-3b.png" alt="">   <!-- 3루수 (파울선 안쪽) -->
-    <img class="fielder in"  style="left:39%;top:56.5%"     src="img/fielder-2b.png" alt="">   <!-- 유격수 자리 (2루수 그림) -->
-    <img class="fielder in"  style="left:61%;top:56.5%"     src="img/fielder-ss.png" alt="">   <!-- 2루수 자리 (유격수 그림) -->
-    <img class="fielder in"  style="left:76%;top:58.5%"     src="img/fielder-1b.png" alt="">   <!-- 1루수 (파울선 안쪽) -->
+    <!-- 야수 그림 (img/fielder-*.png, 배경 투명). top 은 발 위치(translate -100%).
+         내야수는 1루→2루→3루 주루 흙 띠(배경 그림에서 x=24%: y 50.9~53.9, x=39%: 50.2~52.3 — 픽셀로 잰 값)의 한가운데를 밟고 섬.
+         외야수는 담장 앞 외야 잔디(y≈48~52%) 위. 2루수·유격수 자리는 그림을 서로 바꿔 씀 (몸이 향하는 방향이 자리와 맞도록) -->
+    <img class="fielder in"  style="left:24%;top:52.4%"     src="img/fielder-3b.png" alt="">   <!-- 3루수 (3루 쪽 흙 띠 가운데) -->
+    <img class="fielder in"  style="left:39%;top:51.3%"     src="img/fielder-2b.png" alt="">   <!-- 유격수 자리 (2루수 그림) -->
+    <img class="fielder in"  style="left:61%;top:51.3%"     src="img/fielder-ss.png" alt="">   <!-- 2루수 자리 (유격수 그림) -->
+    <img class="fielder in"  style="left:76%;top:52.4%"     src="img/fielder-1b.png" alt="">   <!-- 1루수 (1루 쪽 흙 띠 가운데) -->
     <img class="fielder out" style="left:15%;top:49%"     src="img/fielder-lf.png" alt="">   <!-- 좌익수 -->
     <img class="fielder out" style="left:85%;top:49%"     src="img/fielder-rf.png" alt="">   <!-- 우익수 -->
     <img class="fielder out" style="left:56%;top:48%" src="img/fielder-cf.png" alt="">   <!-- 중견수 (투수의 1시 방향) -->
@@ -299,7 +304,7 @@
 
    규격: 배경 투명 PNG. 한 인물의 모든 동작은 같은 크기의 캔버스에 같은 축척으로,
    발이 그림 맨 아래(가운데)에 닿게 놓아야 동작이 바뀌어도 인물이 튀지 않습니다.
-   (현재 투수 4장 352×508, 타자 6장 312×432 — 한 장의 동작표에서 잘라 냄)
+   (현재 투수 4장 352×508, 타자 6장 500×520 — 낱장 그림 6장을 뒷발 가운데가 (100,512)에 오도록 한 캔버스에 맞춰 넣음)
    타자는 우타자(홈플레이트 왼쪽 타석, 투수 쪽을 향해 오른쪽으로 서 있음)를
    포수 뒤 위쪽에서 비스듬히 본 모습, 투수는 우완 투수가 정면(타자 쪽)을 향한 모습.
    투구 그림(throw)에서 공을 쥔 손의 위치는 아래 REL 과 맞춰야 공이 손에서 출발합니다.
@@ -362,12 +367,19 @@ const SPIN_STEP_MAX = 0.17;
 // 구속(km/h) → 홈플레이트까지 걸리는 시간(ms). 140 km/h 가 900ms, 160 은 약 690ms, 120 은 약 1225ms
 const flightMs = kmh => 900 * Math.pow(140 / kmh, 2);
 // 화면 좌표(%): 투수 손(우완 → 화면 왼쪽) → 스트라이크 존 가운데
-const REL = { x: 48.7, y: 47.8 };   // 공이 투수 손에서 나오는 위치   // 우완 투수: 투구 그림(pitcher-throw.png 의 (92,62)/352×508)에서 공을 쥔 오른손 위치 — #pitcher(bottom 46%·높이 12% → 그림 폭 5.54%, x 47.23~52.77) 기준으로 계산
-const PLATE = { x: 50, y: 71.75 };       // 스트라이크 존 가운데 = 타자 무릎(81.9%)과 팔꿈치(61.6%)의 중간
+// 공이 투수 손에서 나오는 위치 = 투구 그림(pitcher-throw.png)에서 손이 가장 높이 올라간 지점의 공 (92,62)/352×508.
+// #pitcher 는 bottom 46%·높이 12% → 그림 폭 5.54%(x 47.23~52.77), 위 42% → x = 47.23 + 92/352×5.54 = 48.7, y = 42 + 62/508×12 = 43.5
+const REL = { x: 48.7, y: 43.5 };
+const PLATE = { x: 50, y: 71.3 };       // 스트라이크 존 가운데 = 타자 무릎(82.2%)과 팔꿈치(60.4%)의 중간 (#batter 주석 참고)
 // 땅의 화면 y(%): 투수판(마운드 위 투수의 발)과 홈플레이트 — 공 그림자는 이 선 위에 놓임
 const GROUND = { mound: 57, plate: 89.5 };
-const ZONE = { hw: 5.5, hh: 11 };     // 좌우는 홈플레이트 폭(10.4%), 위아래는 타자 무릎~팔꿈치      // 스트라이크 존 반너비·반높이(%) — 세로로 긴 모양, #zone 의 CSS 와 같은 값
+const ZONE = { hw: 5.5, hh: 10.9 };   // 스트라이크 존 반너비·반높이(%) — 좌우는 홈플레이트 폭(11%), 위아래는 타자 무릎~팔꿈치(21.8%). #zone 의 CSS 와 같은 값
 const BALL_MIN = 1.1, BALL_MAX = 3.8;     // 공 지름 (무대 높이의 %)
+// 스트라이크 = 홈플레이트를 지날 때 공이 존에 절반 이상 걸침 = 공의 중심이 존 안(경계 포함).
+// 도착점을 뽑을 때 스트라이크는 경계에서 EDGE_IN 만큼 안쪽까지(공이 반만 걸친 아슬아슬한 스트라이크도 나옴),
+// 볼은 EDGE_OUT 만큼 바깥부터(반 넘게 걸친 공이 볼로 판정되는 일이 없게) 뽑음. 단위 %
+const EDGE_IN = 0.4, EDGE_OUT = 1.0;
+const isStrike = (dx, dy) => Math.abs(dx) <= ZONE.hw && Math.abs(dy) <= ZONE.hh;
 // 타구 회전: 직구와 같은 백스핀. 멀어지는 공(진행 방향 -z)의 백스핀 축은 진행방향 × 위 = +x 쪽 (포수가 보면 뒷면이 아래로 흐름)
 const BACKSPIN_AWAY = [1, 0, 0];
 const HIT_SPIN = 5;                       // 타구가 날아가는 동안 도는 바퀴 수
@@ -377,6 +389,18 @@ const hitAxis = side => [1, 0, side * 0.6];
 const fenceY = x => 43;   // 배경 그림의 노란 선(홈런 라인), 곡률이 화면에 안 보여 평평하게
 const WALL_BOTTOM = 47.5;       // 담장 아래 끝(외야 잔디가 시작되는 y)
 const OUT_OF_PARK = 145;        // 이 비거리부터 장외 홈런 (외야 관중석 뒤로 사라짐)
+const MAX_DIST = 150;           // 가장 긴 비거리 — 타구 공 크기는 홈에서 이만큼 멀어졌을 때 반지름 2/3
+// 홈런이 아닌 타구가 떨어지는 땅의 y(%) ← 비거리(m). 배경 그림 기준: 내야 잔디·흙 y 56~72, 주루 흙 띠 y 50~54, 외야 잔디 47.5~50
+// (40m 미만은 내야 안, 60m 전후는 외야수 앞, 100m 전후는 담장 근처, 119m = 담장 바로 앞)
+const LAND = [[15, 74], [40, 56], [52, 52.5], [75, 49.6], [88, 49.0], [119, WALL_BOTTOM]];
+function landY(d){
+  if (d <= LAND[0][0]) return LAND[0][1];
+  for (let i = 1; i < LAND.length; i++){
+    const [d0, y0] = LAND[i - 1], [d1, y1] = LAND[i];
+    if (d <= d1) return y0 + (y1 - y0) * (d - d0) / (d1 - d0);
+  }
+  return WALL_BOTTOM;
+}
 
 const $ = id => document.getElementById(id);
 const fmt = n => n.toLocaleString("ko-KR");
@@ -574,16 +598,19 @@ function pickPitch(){
   for (const p of PITCHES){ r -= p.w; if (r < 0) return p; }
   return PITCHES[0];
 }
-/* 도착점 정하기: 70% 는 존 안(스트라이크), 30% 는 존 밖(볼) */
+/* 도착점 정하기: 70% 는 존 안(스트라이크), 30% 는 존 밖(볼). strike 는 도착점 좌표로 판정(isStrike) */
 function pickEnd(){
   const rnd = (a, b) => a + Math.random() * (b - a);
-  if (Math.random() < 0.7)
-    return { dx: rnd(-ZONE.hw + 1, ZONE.hw - 1), dy: rnd(-ZONE.hh + 1, ZONE.hh - 1), strike: true };
-  const side = Math.floor(Math.random() * 3);   // 0 위 1 아래 2 바깥쪽 (타자 몸에 맞을 만한 몸쪽 볼은 던지지 않음)
-  const out = rnd(1.5, 4.5);
-  if (side === 0) return { dx: rnd(-ZONE.hw, ZONE.hw), dy: -ZONE.hh - out, strike: false };
-  if (side === 1) return { dx: rnd(-ZONE.hw, ZONE.hw), dy:  ZONE.hh + out, strike: false };
-  return { dx: ZONE.hw + out, dy: rnd(-ZONE.hh, ZONE.hh), strike: false };
+  let dx, dy;
+  if (Math.random() < 0.7){ dx = rnd(-ZONE.hw + EDGE_IN, ZONE.hw - EDGE_IN); dy = rnd(-ZONE.hh + EDGE_IN, ZONE.hh - EDGE_IN); }
+  else {
+    const side = Math.floor(Math.random() * 3);   // 0 위 1 아래 2 바깥쪽 (타자 몸에 맞을 만한 몸쪽 볼은 던지지 않음)
+    const out = rnd(EDGE_OUT, 4.5);
+    if (side === 0){ dx = rnd(-ZONE.hw, ZONE.hw); dy = -ZONE.hh - out; }
+    else if (side === 1){ dx = rnd(-ZONE.hw, ZONE.hw); dy = ZONE.hh + out; }
+    else { dx = ZONE.hw + out; dy = rnd(-ZONE.hh, ZONE.hh); }
+  }
+  return { dx, dy, strike: isStrike(dx, dy) };
 }
 
 function nextPitch(){
@@ -632,9 +659,10 @@ function flyPitch(now){
   let x = PLATE.x * s + REL.x * (1 - s) + off.dx + (G.end.dx - fin.dx) * s;
   let y = PLATE.y * s + REL.y * (1 - s) + off.dy + (G.end.dy - fin.dy) * s;
   let dia = BALL_MIN + (BALL_MAX - BALL_MIN) * s;
-  if (t >= 1){ ball.style.visibility = "hidden"; shadow.style.display = "none"; G.pitchAnim = false; return; }   // 존 위치를 지나면 사라짐(포수 미트)
   // 그림자: 투수판에서 홈플레이트까지 땅 위를 따라옴 (공과 같은 원근 진행률)
-  placeBall(x, y, dia, spinTo(G.cur.spin * t, G.cur.step), true, GROUND.mound + (GROUND.plate - GROUND.mound) * s, G.cur.axis);
+  placeBall(x, y, dia, spinTo(G.cur.spin * tc, G.cur.step), true, GROUND.mound + (GROUND.plate - GROUND.mound) * s, G.cur.axis);
+  // 마지막 프레임은 정확히 도착점(존 판정 위치)에 그린 뒤 다음 프레임에 사라짐(포수 미트) — 존에 걸친 정도가 판정과 같게 보이도록
+  if (t >= 1){ G.pitchAnim = false; requestAnimationFrame(() => { if (G.phase === "flight"){ ball.style.visibility = "hidden"; shadow.style.display = "none"; } }); return; }   // 이미 쳤으면(result) 타구 쪽에서 공을 다룸
   G.raf = requestAnimationFrame(flyPitch);
 }
 
@@ -656,10 +684,11 @@ function judge(delta){
   const a = delta === null ? Infinity : Math.abs(delta - sweet) * (G.end.strike ? 1 : BALL_HIT_PENALTY);
   let grade, dist = 0, gained = 0, side = delta === null ? 0 : Math.sign(delta);
   const ease = (lo, hi, dLo, dHi) => Math.round(dHi - (dHi - dLo) * (a - lo) / (hi - lo));
+  // 비거리는 떨어지는 자리와 맞춤(landY): 내야 안은 40m 미만, 외야수 앞은 60m 전후, 담장 근처는 100m 전후, 담장 너머는 120m 이상
   if (a <= WIN.hr)        { grade = "홈런";     dist = ease(0, WIN.hr, 120, 150); }   // 정확할수록 멀리, 145m 이상은 장외
-  else if (a <= WIN.xbh)  { grade = "장타";     dist = ease(WIN.hr, WIN.xbh, 95, 119); }
-  else if (a <= WIN.out)  { grade = "외야안타"; dist = ease(WIN.xbh, WIN.out, 65, 94); }
-  else if (a <= WIN.inf)  { grade = "내야안타"; dist = ease(WIN.out, WIN.inf, 30, 64); }
+  else if (a <= WIN.xbh)  { grade = "장타";     dist = ease(WIN.hr, WIN.xbh, 88, 112); }    // 담장 근처
+  else if (a <= WIN.out)  { grade = "외야안타"; dist = ease(WIN.xbh, WIN.out, 52, 72); }    // 외야수 앞 잔디
+  else if (a <= WIN.inf)  { grade = "내야안타"; dist = ease(WIN.out, WIN.inf, 18, 39); }    // 내야 안
   else if (a <= WIN.foul) { grade = "파울"; }
   else if (delta === null){ grade = G.end.strike ? "스트라이크" : "볼"; }
   else                    { grade = "헛스윙"; }
@@ -732,22 +761,23 @@ function flyHit(dist, delta, done){
   const lane = !isHR ? "" : delta < -CENTER_MS ? "pull" : delta > CENTER_MS ? "push" : "center";
   // 궤적 종류
   let kind, H, dur, bend = 0, y1;
-  if (dist < 65){ kind = "ground"; H = 1.5 + Math.random() * 2;   dur = 650 + 350 * f; }                       // 땅볼: 낮게 튀며 굴러감
-  else if (dist < 120 && Math.random() < 0.45){ kind = "liner"; H = 5 + 7 * f; dur = 650 + 450 * f; }           // 라이너: 낮고 빠르게
-  else { kind = "fly"; H = 14 + 30 * f + Math.random() * 8; dur = 900 + 800 * f; }                               // 뜬공: 높이 떠서
+  if (dist < 40){ kind = Math.random() < 0.7 ? "ground" : "liner"; H = kind === "ground" ? 1.5 + Math.random() * 2 : 4 + Math.random() * 3; dur = 650 + 350 * f; }   // 내야: 땅볼(낮게 튀며 굴러감) 또는 낮은 라이너
+  else if (dist < 120 && Math.random() < 0.45){ kind = "liner"; H = 6 + 8 * f; dur = 650 + 450 * f; }           // 라이너: 낮고 빠르게
+  else if (dist < 120){ kind = "fly"; H = 14 + 30 * f + Math.random() * 8; dur = 900 + 800 * f; }                // 뜬공: 높이 떠서
+  else { kind = "fly"; H = 32 + 16 * f + Math.random() * 8; dur = 900 + 800 * f; }                               // 가운데 홈런: 짧은 홈런도 발사각이 충분히 높게 (120m 에서 H≈46)
   if (lane === "pull" || lane === "push"){
     // 당겨친·밀어친 홈런 궤적 세 가지 중 하나 (좌우는 서로 거울상)
     const sgn = lane === "pull" ? -1 : 1, v = Math.random();
-    if (v < 0.4){        kind = "fly";   x1 = 50 + sgn * rnd(28, 36); H = rnd(32, 42); dur = 1450; }                  // 높이 뜬 큰 타구: 좌·우측 관중석 깊숙이
-    else if (v < 0.75){  kind = "liner"; x1 = 50 + sgn * rnd(24, 32); H = rnd(15, 20);  dur = 1100; }                  // 총알 같은 라이너: 담장을 아슬아슬하게 넘김
-    else {               kind = "fly";   x1 = 50 + sgn * rnd(30, 37); H = rnd(26, 34); dur = 1350; bend = sgn * rnd(6, 10); }   // 파울 폴 쪽으로 휘어 들어가는 타구
+    if (v < 0.45){       kind = "fly";   x1 = 50 + sgn * rnd(28, 36); H = rnd(34, 44); dur = 1450; }                  // 높이 뜬 큰 타구: 좌·우측 관중석 깊숙이
+    else if (v < 0.7){   kind = "liner"; x1 = 50 + sgn * rnd(24, 32); H = rnd(24, 30);  dur = 1150; }                  // 빠른 라이너: 담장을 넘기되 발사각은 낮지 않게
+    else {               kind = "fly";   x1 = 50 + sgn * rnd(30, 37); H = rnd(30, 38); dur = 1350; bend = sgn * rnd(6, 10); }   // 파울 폴 쪽으로 휘어 들어가는 타구
   }
   // 착지점: 홈런(120m 이상)만 담장의 노란 선을 넘어 관중석(y 30~41%)에 떨어지고, 라이너 홈런은 담장 바로 뒤 앞줄에,
-  // 그보다 짧으면 담장 앞 잔디에 떨어짐 (119m = 담장 바로 앞). 장외(145m 이상)는 관중석 위쪽까지 날아가 그 뒤로 사라짐
+  // 그보다 짧으면 비거리에 맞는 자리(landY)에 떨어짐. 장외(145m 이상)는 관중석 위쪽까지 날아가 그 뒤로 사라짐
   const fy = fenceY(x1);
   y1 = outOfPark ? 22 - (dist - OUT_OF_PARK) * 0.8
      : isHR ? (kind === "liner" ? fy - rnd(1.5, 3.5) : fy - 2 - (dist - 120) * 0.4)
-            : PLATE.y - (PLATE.y - WALL_BOTTOM) * (dist / 120);
+            : landY(dist);
   if (outOfPark){ kind = "fly"; H = 30 + Math.random() * 6; dur = 1700; }                                          // 장외: 크게 떠서 관중석 너머로
   const t0 = performance.now(), axis = hitAxis(a);                  // 타구는 직구와 같은 백스핀으로 날아감
   const g0 = GROUND.plate, h0 = g0 - y0;                            // 맞는 순간 공은 홈플레이트 땅에서 h0 만큼 떠 있음
@@ -757,7 +787,7 @@ function flyHit(dist, delta, done){
     const gx = x0 + (x1 - x0) * t + bend * Math.sin(Math.PI * t), gy = g0 + (y1 - g0) * t;   // 지면 위 위치(그림자 자리): 홈플레이트 → 착지점 (bend 는 옆으로 휘는 양)
     const lift = kind === "ground" ? Math.abs(Math.sin(Math.PI * 3 * t)) * (1 - t) : Math.sin(Math.PI * t);
     const y = gy - h0 * (1 - t) - H * lift;                          // 처음 높이는 점점 줄고, 궤적 높이가 더해짐
-    const dia = BALL_MAX - (BALL_MAX - 1.2) * Math.pow(t, .7) * Math.min(1, f);
+    const dia = BALL_MAX * (1 - Math.min(1, dist * t / MAX_DIST) / 3);   // 홈에서 멀어질수록 작게 — 가장 멀리(150m) 갔을 때 반지름이 2/3
     // 장외: 담장을 넘은 뒤에는 그림자를 지우고, 마지막 15% 동안 옅어지며 관중석 뒤로 사라짐
     placeBall(gx, y, dia, spinTo(HIT_SPIN * t), !(outOfPark && t > 0.55), gy, axis);
     ball.style.opacity = outOfPark && t > 0.85 ? String(Math.max(0, (1 - t) / 0.15)) : "";
@@ -774,7 +804,7 @@ function flyFoul(side, done){
   (function step(now){
     const t = Math.min(1, (now - t0) / dur);
     const gx = x0 + (x1 - x0) * t, gy = g0 + (y1 - g0) * t, y = gy - h0 * (1 - t) - H * Math.sin(Math.PI * t);
-    placeBall(gx, y, BALL_MAX - (BALL_MAX - 1.4) * Math.pow(t, .8), spinTo(HIT_SPIN * t), true, gy, axis);
+    placeBall(gx, y, BALL_MAX * (1 - 0.12 * t), spinTo(HIT_SPIN * t), true, gy, axis);   // 파울(약 50m)도 멀어지는 만큼만 작아짐
     if (t < 1) G.raf = requestAnimationFrame(step); else done();
   })(t0);
 }
