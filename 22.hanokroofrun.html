@@ -131,7 +131,11 @@ let imagesReady = false;
 const IMG_BLACK = {};
 Object.keys(IMG_SRC_BLACK).forEach(k => { const im = new Image(); im.src = IMG_SRC_BLACK[k]; IMG_BLACK[k] = im; });
 // 고양이 스킨: yellow(기본 이미지) | black(검은 고양이). 두 스킨 모두 노란 고양이와 같은 이름(run1~7·flip1~4·run·jump·throw·swing)을 쓴다.
-const SKINS = { yellow: { imgs: IMG, runFrames: 7 }, black: { imgs: IMG_BLACK, runFrames: 7 } };
+// anchors: 와이어가 시작되는 지점(스프라이트 안 비율 u,v — 0~1). throw 는 와이어 총 총구, swing/flip 은 그림 속 와이어 끝.
+const SKINS = {
+  yellow: { imgs: IMG, runFrames: 7, anchors: { throw: [0.97, 0.32], swing: [0.76, 0.02], flip1: [0.74, 0.02], flip2: [0.97, 0.02], flip3: [0.76, 0.02], flip4: [0.82, 0.02] } },
+  black:  { imgs: IMG_BLACK, runFrames: 7, anchors: { throw: [0.97, 0.32], swing: [0.94, 0.02], flip1: [0.94, 0.02], flip2: [0.94, 0.02], flip3: [0.59, 0.02], flip4: [0.93, 0.02] } },
+};
 let skin = 'yellow';
 
 // ───────── 저장 ─────────
@@ -529,19 +533,34 @@ function drawRoofSeg(r) {
   ctx.drawImage(im, 937, 0, capR, im.naturalHeight, x1 - capRw, y, capRw, h);
 }
 
+// 지금 상태에 맞는 스프라이트 키
+function catKey() {
+  const c = cat;
+  if (c.flipping && (c.state === 'swing' || c.state === 'jump' || c.state === 'fall')) return 'flip' + (1 + Math.floor(c.flipT / 0.09) % 4);
+  if (c.state === 'jump' || c.state === 'fall') return 'jump';
+  if (c.state === 'throw') return 'throw';
+  if (c.state === 'swing') return 'swing';
+  if (mode === 'ready') return 'run';
+  return 'run' + (1 + Math.floor(c.bob * (speed / 26)) % SKINS[skin].runFrames); // 달리기 프레임 순환 (속도에 비례)
+}
+// 스프라이트가 화면에 그려지는 사각형 (와이어 시작점 계산에도 씀)
+function catRect() {
+  const key = catKey();
+  const im = SKINS[skin].imgs[key]; if (!im || !im.complete || !im.naturalWidth) return null;
+  const h = CAT_H * S, w = h * im.naturalWidth / im.naturalHeight;
+  return { key, im, x: sx(cat.x) - w / 2, y: sy(cat.y + CAT_SINK) - h, w, h };
+}
+// 와이어 시작점(화면 좌표): 스킨별 anchors 비율 → 실제 그려진 사각형 위의 점
+function ropeStart() {
+  const r = catRect();
+  const a = r && SKINS[skin].anchors[r.key];
+  if (!a) return { x: sx(cat.x + 20), y: sy(cat.y - CAT_H * 0.6) };
+  return { x: r.x + r.w * a[0], y: r.y + r.h * a[1] };
+}
 function drawCat() {
   const c = cat;
-  let key = 'run1';
-  if (c.flipping && (c.state === 'swing' || c.state === 'jump' || c.state === 'fall')) key = 'flip' + (1 + Math.floor(c.flipT / 0.09) % 4);
-  else if (c.state === 'jump' || c.state === 'fall') key = 'jump';
-  else if (c.state === 'throw') key = 'throw';
-  else if (c.state === 'swing') key = 'swing';
-  else if (mode === 'ready') key = 'run';
-  else key = 'run' + (1 + Math.floor(c.bob * (speed / 26)) % SKINS[skin].runFrames); // 달리기 프레임 순환 (속도에 비례)
-  const im = SKINS[skin].imgs[key]; if (!im || !im.complete || !im.naturalWidth) return;
-  const h = CAT_H * S, w = h * im.naturalWidth / im.naturalHeight;
-  const bob = 0;
-  const x = sx(c.x) - w / 2, y = sy(c.y + CAT_SINK) - h - bob;
+  const r = catRect(); if (!r) return;
+  const { im, x, y, w, h } = r;
   ctx.save();
   if (c.dead) { ctx.translate(x + w / 2, y + h / 2); ctx.rotate(resultTimer * 4); ctx.translate(-(x + w / 2), -(y + h / 2)); }
   ctx.drawImage(im, x, y, w, h);
@@ -550,11 +569,11 @@ function drawCat() {
 function drawRope() {
   const c = cat;
   if (c.state === 'swing' && c.pivot) {
-    const hx = sx(c.x + 10), hy = sy(c.y - CAT_H * 0.95);
+    const { x: hx, y: hy } = ropeStart();
     ctx.strokeStyle = '#e8ecff'; ctx.lineWidth = Math.max(2, 3 * S); ctx.lineCap = 'round';
     ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(sx(c.pivot.x), sy(c.pivot.y)); ctx.stroke();
   } else if (c.state === 'throw') {
-    const hx = sx(c.x + 30), hy = sy(c.y - CAT_H * 0.6);
+    const { x: hx, y: hy } = ropeStart();
     let tx, ty, t;
     if (c.pivot) { t = Math.min(1, c.throwT / 0.12); tx = sx(c.pivot.x); ty = sy(c.pivot.y); }
     else { t = Math.min(1, c.throwT / 0.25); const d = 260 * S; tx = hx + d * 0.72; ty = hy - d * 0.7; }
