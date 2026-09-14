@@ -45,40 +45,31 @@
   .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
   .sub{color:var(--sub);font-size:14px}
 
-  /* ---------- 라면가게 배경 (CSS 도형만) ---------- */
+  /* ---------- 라면가게 배경 (img/ramen/ 수채화 이미지) ---------- */
   .shop{position:fixed;top:0;left:0;right:0;bottom:0;z-index:-1;overflow:hidden;pointer-events:none;
-    background:
-      /* 벽 타일 격자 */
-      linear-gradient(rgba(0,0,0,.035) 1px,transparent 1px) 0 0/100% 44px,
-      linear-gradient(90deg,rgba(0,0,0,.035) 1px,transparent 1px) 0 0/44px 100%,
-      linear-gradient(#f8efe0,#f1e3ca)}
+    background:url(img/ramen/wall-tile.jpg) 0 0/440px 440px repeat #f6ecd9}
   /* 나무 카운터(아래) */
   .shop::before{content:"";position:absolute;left:0;right:0;bottom:0;height:34vh;
-    background:
-      repeating-linear-gradient(90deg,rgba(0,0,0,0) 0 120px,rgba(60,30,10,.10) 120px 122px),
-      repeating-linear-gradient(0deg,rgba(255,255,255,.05) 0 3px,rgba(0,0,0,.03) 3px 6px),
-      linear-gradient(#b8824e,#9a6a3c);
+    background:url(img/ramen/counter-tile.jpg) 0 0/auto 100% repeat-x #b8824e;
     border-top:8px solid #8a5a30;box-shadow:0 -6px 14px rgba(0,0,0,.12)}
   /* 선반 + 그릇·병 */
   .shop::after{content:"";position:absolute;left:0;right:0;top:78px;height:14px;
     background:linear-gradient(#a97445,#8b5b30);box-shadow:0 4px 8px rgba(0,0,0,.15)}
-  .shelf{position:absolute;left:0;right:0;top:30px;height:48px;display:flex;justify-content:space-evenly;align-items:flex-end;padding:0 4vw}
-  .shelf i{display:block;flex:none}
-  .shelf .bowl{width:40px;height:20px;border-radius:0 0 20px 20px;background:linear-gradient(#f7f1e6,#d8ccb5);border-top:4px solid #c0392b}
-  .shelf .bowl.b{border-top-color:#2c6fb3}
-  .shelf .jar{width:22px;height:38px;border-radius:5px 5px 4px 4px;background:linear-gradient(90deg,#c14c3a,#e0664f 50%,#b8432f);border-top:6px solid #333}
-  .shelf .jar.y{background:linear-gradient(90deg,#c99a2b,#e8b93e 50%,#b98a20)}
-  .shelf .stack{width:34px;height:30px;background:repeating-linear-gradient(0deg,#f1c76a 0 8px,#e4b24a 8px 10px);border-radius:4px}
-  /* 노렌(천 간판) */
-  .noren{position:absolute;top:0;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:1}
-  .noren b{display:flex;align-items:flex-start;justify-content:center;width:52px;height:64px;padding-top:6px;
-    background:linear-gradient(#b93a2f,#a32d24);color:#fff;font-size:22px;font-weight:800;letter-spacing:2px;
-    border-radius:0 0 4px 4px;box-shadow:0 3px 6px rgba(0,0,0,.2)}
-  .noren::before{content:"";position:absolute;left:-14px;right:-14px;top:-6px;height:6px;background:#5b3a1e;border-radius:3px}
+  .shelf{position:absolute;left:0;right:0;top:20px;height:58px;display:flex;justify-content:space-evenly;align-items:flex-end;padding:0 4vw}
+  .shelf i{display:block;flex:none;background:center bottom/contain no-repeat;filter:drop-shadow(0 2px 2px rgba(0,0,0,.18))}
+  .shelf .bowl{width:38px;height:34px;background-image:url(img/ramen/bowl-stack.png)}
+  .shelf .bowl.b{filter:hue-rotate(190deg) saturate(.6) drop-shadow(0 2px 2px rgba(0,0,0,.18))}
+  .shelf .jar{width:28px;height:42px;background-image:url(img/ramen/jar-red.png)}
+  .shelf .jar.y{background-image:url(img/ramen/jar-yellow.png)}
+  .shelf .stack{width:44px;height:44px;background-image:url(img/ramen/bowl-stack.png)}
+  /* 노렌(천 간판) — 이미지에 막대가 포함되어 있어 CSS 막대는 제거 */
+  .noren{position:absolute;top:0;left:50%;transform:translateX(-50%);display:flex;gap:2px;z-index:1}
+  .noren b{display:flex;align-items:flex-start;justify-content:center;width:54px;height:72px;padding-top:16px;
+    background:url(img/ramen/noren.png) center top/100% 100% no-repeat;color:#fff;font-size:22px;font-weight:800;letter-spacing:2px;
+    filter:drop-shadow(0 3px 4px rgba(0,0,0,.2))}
   /* 등불 */
-  .lamp{position:absolute;top:4px;width:34px;height:46px;border-radius:14px;
-    background:radial-gradient(circle at 50% 40%,#ffd77a,#e8892b 70%,#c8611c);box-shadow:0 0 18px rgba(255,180,60,.55);opacity:.9}
-  .lamp::before{content:"";position:absolute;left:12px;top:-8px;width:10px;height:8px;background:#5b3a1e}
+  .lamp{position:absolute;top:-6px;width:44px;height:66px;
+    background:url(img/ramen/lantern.png) center top/contain no-repeat;filter:drop-shadow(0 0 12px rgba(255,180,60,.75))}
   .lamp.l{left:10vw}.lamp.r{right:10vw}
   @media (max-width:719px){.shelf .jar,.shelf .stack{display:none}.lamp{display:none}}
   .wrap{position:relative;z-index:1;padding-top:100px}
@@ -151,20 +142,28 @@
   .pot.ready .prog i{background:var(--ready)}
   .pot.late .prog i{background:#c7772e}
 
-  .scene{width:100%;aspect-ratio:200/190;display:block;cursor:pointer}
+  /* 냄비 장면: 200×190 좌표계를 %로 옮긴 이미지 레이어 스택 (아래→위: 불꽃·냄비·물·면·기포·토핑·탐·김) */
+  .scene{width:100%;aspect-ratio:200/190;display:block;cursor:pointer;position:relative;overflow:visible}
+  .scene img,.scene .layer{position:absolute;display:block;object-fit:contain;pointer-events:none;user-select:none;-webkit-user-drag:none}
+  .scene .potimg{left:6%;top:9%;width:88%;height:82%}
+  .scene .inner{left:23.5%;top:22%;width:53%;height:23%;border-radius:50%;overflow:hidden}
+  .scene .inner img{left:0;top:0;width:100%;height:100%;object-fit:fill}
+  .scene .water .tint{position:absolute;inset:0;background:var(--tint,transparent);mix-blend-mode:multiply;transition:background .4s}
+  .scene .topping{top:20%;height:27%}
+  .scene .burn{opacity:0;transition:opacity .6s}
+  .scene .rimglow{left:22%;top:20.5%;width:56%;height:26%;border-radius:50%;opacity:0;pointer-events:none}
   .btns{display:grid;grid-template-columns:1fr 1fr;gap:6px}
   .btns .btn{min-height:44px;padding:0 4px;font-size:13px}
   .btns .btn.done{opacity:.25;text-decoration:line-through}
 
   /* ---------- 불꽃 ---------- */
-  .flame{transform-box:fill-box;transform-origin:50% 100%;animation:flick .35s ease-in-out infinite alternate}
-  .flame.f2{animation-duration:.42s;animation-delay:.1s}
-  .flame.f3{animation-duration:.3s;animation-delay:.2s}
+  .flame{width:26%;height:30%;bottom:9%;transform-origin:50% 100%;animation:flick .35s ease-in-out infinite alternate}
+  .flame.f1{left:26%}.flame.f2{left:37%;height:36%;animation-duration:.42s;animation-delay:.1s}.flame.f3{left:48%;animation-duration:.3s;animation-delay:.2s}
   @keyframes flick{from{transform:scaleY(.85) skewX(-4deg)}to{transform:scaleY(1.12) skewX(4deg)}}
   .pot.off .flame{opacity:0;transition:opacity .3s}
 
   /* ---------- 물·기포 ---------- */
-  .bub{opacity:0;transform-box:fill-box;transform-origin:center}
+  .bub{opacity:0;transform-origin:center}
   .pot[data-lvl="1"] .bub:nth-child(-n+3),
   .pot[data-lvl="2"] .bub:nth-child(-n+6),
   .pot[data-lvl="3"] .bub:nth-child(-n+10),
@@ -174,30 +173,29 @@
   @keyframes rise{0%{transform:translateY(0) scale(.5);opacity:0}20%{opacity:.9}100%{transform:translateY(-58px) scale(1.1);opacity:0}}
 
   /* ---------- 김 / 연기 ---------- */
-  .steam{opacity:0;transform-box:fill-box;transform-origin:center;fill:#fff}
+  .steam{opacity:0;transform-origin:center;width:16%;height:20%;top:8%}
+  .steam.s1{left:32%}.steam.s2{left:44%;top:6%;width:18%}.steam.s3{left:56%}
   .pot.ready .steam,.pot.late .steam,.pot.burnt .steam{animation:steam 1.4s ease-out infinite}
   .steam.s2{animation-delay:.45s !important}.steam.s3{animation-delay:.9s !important}
   @keyframes steam{0%{transform:translateY(0) scale(.6);opacity:0}30%{opacity:.7}100%{transform:translateY(-48px) scale(1.5);opacity:0}}
-  .pot.burnt .steam{fill:#3a3a3a}
+  .pot.burnt .steam{filter:brightness(.25)}
 
   /* ---------- 테두리 반짝 ---------- */
-  .rim{transition:stroke .2s}
-  .pot.ready .rim{stroke:var(--ready);stroke-width:5;animation:glow .35s ease-in-out infinite alternate}
-  @keyframes glow{from{stroke-opacity:.5}to{stroke-opacity:1}}
+  .pot.ready .rimglow{opacity:1;box-shadow:0 0 0 3px var(--ready),0 0 14px 4px var(--ready);animation:glow .35s ease-in-out infinite alternate}
+  .pot.ready .potimg{filter:drop-shadow(0 0 6px var(--ready))}
+  @keyframes glow{from{opacity:.5}to{opacity:1}}
   .pot.ready{box-shadow:0 0 0 3px var(--ready)}
   .pot.error{box-shadow:0 0 0 3px var(--bad)}
-
-  /* ---------- 면·계란·파 ---------- */
-  .noodle{fill:none;stroke:#f3d77a;stroke-width:3;stroke-linecap:round}
-  .egg-w{fill:#fff;stroke:#e6e6e6}
-  .egg-y{fill:#f4b400}
-  .scal{fill:#4caf50}
 
   /* ---------- 완성 그릇 날아가기 ---------- */
   .fly{position:fixed;width:70px;height:70px;z-index:50;pointer-events:none;
     transition:transform .7s cubic-bezier(.4,.1,.3,1),opacity .7s}
+  .fly img{width:100%;height:100%;object-fit:contain;display:block}
   .tray{display:flex;align-items:center;gap:10px;margin-top:10px}
-  .tray svg{width:110px;height:44px;flex:none}
+  .tray .trayimg{position:relative;width:110px;height:60px;flex:none}
+  .tray .trayimg>img{position:absolute;left:0;bottom:0;width:100%;height:100%;object-fit:contain;display:block}
+  .tray #trayBowls{position:absolute;left:12px;right:12px;top:6px;height:30px;display:flex;align-items:flex-end}
+  .tray #trayBowls img{width:22px;height:22px;object-fit:contain;flex:none;margin-right:-8px;filter:drop-shadow(0 1px 1px rgba(0,0,0,.25))}
   .tray .sub{flex:1}
 
   /* ---------- 등급·금액 팝업 ---------- */
@@ -257,11 +255,10 @@
     </div>
     <div class="pots" id="pots"></div>
     <div class="card tray">
-      <svg viewBox="0 0 110 44" aria-hidden="true">
-        <rect x="4" y="30" width="102" height="10" rx="4" fill="#c9a074"/>
-        <rect x="10" y="26" width="90" height="6" rx="3" fill="#e2c39a"/>
-        <g id="trayBowls"></g>
-      </svg>
+      <div class="trayimg" aria-hidden="true">
+        <img src="img/ramen/tray.png" alt="" width="669" height="373">
+        <div id="trayBowls"></div>
+      </div>
       <div class="sub" id="trayTxt">쟁반: 완성 0그릇</div>
     </div>
   </section>
@@ -337,68 +334,41 @@ $("p6").textContent = "-"+fmt(CONFIG.BURN_PENALTY)+"원";
 $("pMis").textContent = fmt(CONFIG.PRICES.mistake);
 $("pBurn").textContent = fmt(CONFIG.BURN_PENALTY);
 
-/* ---------- 냄비 SVG (이미지 없이 도형만) ---------- */
+/* ---------- 냄비 장면 (img/ramen/ 이미지 레이어) ---------- */
+const IMG = "img/ramen/";
 function potSVG(i){
+  /* 기포 좌표는 원래 SVG(200×190) 계산식을 그대로 쓰고 %로 환산. 냄비 그림이 위에서 본 각도라 cy 만 물 타원 높이로 내린다 */
   let bubbles = "";
   for (let k=0;k<14;k++){
     const cx = 62 + (k*37)%76, cy = 118 - (k*13)%18, r = 2 + (k%3);
-    bubbles += `<circle class="bub" cx="${cx}" cy="${cy}" r="${r}" fill="#fff" fill-opacity=".85"/>`;
+    const d = r*2.6, left = (cx-d/2)/2, top = (cy-50-d/2)/1.9;
+    bubbles += `<img class="bub" src="${IMG}bubble.png" alt="" width="159" height="159" style="left:${left}%;top:${top}%;width:${d/2}%;height:${d/1.9}%">`;
   }
   return `
-  <svg class="scene" viewBox="0 0 200 190" aria-hidden="true">
-    <defs>
-      <clipPath id="clipInner${i}"><path d="M48 58 H152 L146 128 Q100 138 54 128 Z"/></clipPath>
-      <linearGradient id="fire${i}" x1="0" y1="1" x2="0" y2="0">
-        <stop offset="0" stop-color="#e53935"/><stop offset=".55" stop-color="#ff8f00"/><stop offset="1" stop-color="#ffd54f"/>
-      </linearGradient>
-      <linearGradient id="steel${i}" x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0" stop-color="#9aa4ad"/><stop offset=".5" stop-color="#e0e5ea"/><stop offset="1" stop-color="#9aa4ad"/>
-      </linearGradient>
-    </defs>
-    <!-- 김 / 연기 -->
-    <g>
-      <ellipse class="steam"    cx="80"  cy="45" rx="12" ry="8"/>
-      <ellipse class="steam s2" cx="100" cy="42" rx="14" ry="9"/>
-      <ellipse class="steam s3" cx="122" cy="45" rx="12" ry="8"/>
-    </g>
+  <div class="scene" aria-hidden="true">
     <!-- 불꽃 -->
-    <g>
-      <path class="flame f1" d="M72 178 Q70 160 82 148 Q84 162 90 165 Q92 155 96 150 Q104 168 92 178 Z" fill="url(#fire${i})"/>
-      <path class="flame f2" d="M92 180 Q88 158 100 142 Q104 160 110 162 Q112 150 116 146 Q126 168 112 180 Z" fill="url(#fire${i})"/>
-      <path class="flame f3" d="M112 178 Q110 162 120 150 Q122 162 128 164 Q130 156 134 152 Q140 170 128 178 Z" fill="url(#fire${i})"/>
-    </g>
-    <!-- 냄비 본체 (둥근 사다리꼴) -->
-    <path d="M42 52 H158 L150 132 Q100 146 50 132 Z" fill="url(#steel${i})" stroke="#7d8790" stroke-width="2"/>
-    <path class="inner" d="M48 58 H152 L146 128 Q100 138 54 128 Z" fill="#c9d0d6"/>
-    <g clip-path="url(#clipInner${i})">
-      <!-- 물 -->
-      <rect class="water" x="40" y="70" width="120" height="70" fill="#8ec5f2" fill-opacity=".75"/>
-      <!-- 익은 면 (구불구불) -->
-      <g class="cooked">
-        <path class="noodle" d="M60 96 q8-8 16 0 t16 0 t16 0 t16 0 t16 0"/>
-        <path class="noodle" d="M58 106 q8 8 16 0 t16 0 t16 0 t16 0 t16 0"/>
-        <path class="noodle" d="M62 116 q8-8 16 0 t16 0 t16 0 t16 0"/>
-        <path class="noodle" d="M70 88 q8 6 16 0 t16 0 t16 0 t16 0"/>
-      </g>
-      <!-- 기포 -->
-      <g class="bubs">${bubbles}</g>
-      <!-- 계란 + 파 -->
-      <g class="topping">
-        <ellipse class="egg-w" cx="100" cy="92" rx="22" ry="14"/>
-        <circle class="egg-y" cx="100" cy="92" r="8"/>
-        <circle class="scal" cx="70" cy="84" r="3"/><ellipse class="scal" cx="132" cy="86" rx="4" ry="2.5"/>
-        <circle class="scal" cx="78" cy="104" r="2.5"/><ellipse class="scal" cx="126" cy="106" rx="3.5" ry="2.2"/>
-        <circle class="scal" cx="112" cy="112" r="2.5"/><circle class="scal" cx="88" cy="112" r="2.2"/>
-      </g>
-      <!-- 탐 -->
-      <rect class="burn" x="40" y="50" width="120" height="100" fill="#111" fill-opacity="0" style="transition:fill-opacity .6s"/>
-    </g>
-    <!-- 테두리 -->
-    <path class="rim" d="M36 50 H164 L162 58 H38 Z" fill="#b8c0c7" stroke="#7d8790" stroke-width="2"/>
-    <!-- 손잡이 -->
-    <rect x="14" y="50" width="26" height="8" rx="4" fill="#4a4f55"/>
-    <rect x="160" y="50" width="26" height="8" rx="4" fill="#4a4f55"/>
-  </svg>`;
+    <img class="flame f1" src="${IMG}flame.png" alt="" width="500" height="500">
+    <img class="flame f2" src="${IMG}flame.png" alt="" width="500" height="500">
+    <img class="flame f3" src="${IMG}flame.png" alt="" width="500" height="500">
+    <!-- 냄비 본체 -->
+    <img class="potimg" src="${IMG}pot-empty.png" alt="" width="500" height="500">
+    <!-- 물 + 상태별 색 오버레이 -->
+    <div class="layer inner water"><img src="${IMG}water.png" alt="" width="578" height="432"><div class="tint"></div></div>
+    <!-- 익은 면 -->
+    <div class="layer inner cooked"><img src="${IMG}noodles.png" alt="" width="578" height="432"></div>
+    <!-- 기포 -->
+    <div class="layer bubs" style="inset:0">${bubbles}</div>
+    <!-- 계란 + 파 -->
+    <div class="layer inner topping"><img src="${IMG}topping.png" alt="" width="500" height="500" style="object-fit:contain"></div>
+    <!-- 탐 -->
+    <div class="layer inner burn"><img src="${IMG}burnt-overlay.png" alt="" width="578" height="432"></div>
+    <!-- 테두리 반짝 -->
+    <div class="layer rimglow"></div>
+    <!-- 김 / 연기 -->
+    <img class="steam s1" src="${IMG}steam.png" alt="" width="242" height="340">
+    <img class="steam s2" src="${IMG}steam.png" alt="" width="242" height="340">
+    <img class="steam s3" src="${IMG}steam.png" alt="" width="242" height="340">
+  </div>`;
 }
 
 /* ---------- 냄비 상태 기계 ---------- */
@@ -544,8 +514,9 @@ class Pot {
     this.q(".water").style.display   = hasWater ? "" : "none";
     this.q(".cooked").style.display  = (hasWater && this.hasNoodle) ? "" : "none";
     this.q(".topping").style.display = (s==="topped") ? "" : "none";
-    this.q(".burn").setAttribute("fill-opacity", s==="burnt" ? "0.85" : "0");
-    this.q(".water").setAttribute("fill", s==="late" ? "#e8c98a" : s==="topped" ? "#f1b06a" : "#8ec5f2");
+    this.q(".burn").style.opacity = s==="burnt" ? "0.85" : "0";
+    /* 물 이미지는 fill 이 없으므로 위에 얹은 .tint 오버레이(multiply)의 색만 상태별로 바꾼다 */
+    this.q(".water").style.setProperty("--tint", s==="late" ? "#e8c98a" : s==="topped" ? "#f1b06a" : "transparent");
 
     /* 버튼: 이미 한 일은 비활성(정리), 그 외는 눌러 볼 수 있음 → 순서 오류 학습 */
     const locked = (s==="burnt"||s==="error"||s==="prep");
@@ -635,7 +606,7 @@ const game = {
   /* 완성 그릇이 냄비에서 쟁반으로 이동 */
   flyBowl(pot){
     const from = pot.svg.getBoundingClientRect();
-    const to = document.querySelector(".tray svg").getBoundingClientRect();
+    const to = document.querySelector(".tray .trayimg").getBoundingClientRect();
     const d = document.createElement("div");
     d.className = "fly";
     d.innerHTML = bowlSVG();
@@ -652,7 +623,7 @@ const game = {
     const g = $("trayBowls"); const n = Math.min(this.served, 8);
     g.innerHTML = "";
     for (let i=0;i<n;i++){
-      g.insertAdjacentHTML("beforeend", `<ellipse cx="${18+i*11}" cy="22" rx="8" ry="4.5" fill="#f5efe4" stroke="#b9ad9a"/><ellipse cx="${18+i*11}" cy="21" rx="5" ry="2.2" fill="#f0a15a"/>`);
+      g.insertAdjacentHTML("beforeend", `<img src="${IMG}bowl-finished.png" alt="" width="500" height="500">`);
     }
   },
 
@@ -686,14 +657,7 @@ const game = {
 };
 
 function bowlSVG(){
-  return `<svg viewBox="0 0 70 70">
-    <ellipse cx="35" cy="40" rx="30" ry="18" fill="#f5efe4" stroke="#b9ad9a" stroke-width="2"/>
-    <ellipse cx="35" cy="38" rx="24" ry="12" fill="#f0a15a"/>
-    <path d="M16 38 q6-6 12 0 t12 0 t12 0 t6 0" fill="none" stroke="#f3d77a" stroke-width="2.5" stroke-linecap="round"/>
-    <path d="M18 43 q6 6 12 0 t12 0 t12 0" fill="none" stroke="#f3d77a" stroke-width="2.5" stroke-linecap="round"/>
-    <ellipse cx="35" cy="36" rx="10" ry="6" fill="#fff"/><circle cx="35" cy="36" r="3.5" fill="#f4b400"/>
-    <circle cx="20" cy="34" r="2" fill="#4caf50"/><circle cx="50" cy="35" r="2" fill="#4caf50"/><circle cx="46" cy="44" r="1.8" fill="#4caf50"/>
-  </svg>`;
+  return `<img src="${IMG}bowl-finished.png" alt="" width="500" height="500">`;
 }
 
 function show(id){
