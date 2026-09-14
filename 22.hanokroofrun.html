@@ -112,7 +112,6 @@ const FLIP_AFTER = 0.45;   // 매달린 뒤 공중제비 시작까지의 시간(
 
 // 각 스테이지 구간 길이(px) — 8단계가 하나의 코스로 이어짐
 const STAGE_PARAMS = [null,
-  { speed: 280, len: 6500 },
   { speed: 300, len: 8000 },
   { speed: 320, len: 9500 },
   { speed: 340, len: 11000 },
@@ -120,6 +119,7 @@ const STAGE_PARAMS = [null,
   { speed: 390, len: 14500 },
   { speed: 410, len: 16000 },
   { speed: 430, len: 17500 },
+  { speed: 450, len: 19000 },
 ];
 // 낭떠러지 판정 여유(px): 조금 늦게 뛰거나 조금 못 미쳐도 살려 준다
 const EDGE_TOL = 22;       // 지붕 끝을 이만큼 지나도 아직 달리는 중 (원래 18)
@@ -202,6 +202,10 @@ function buildCourse() {
   const threeCell = () => {
     for (let i = 0; i < 3; i++) { const gw = 200; coin(x + gw / 2, -150, true); x += gw; addRoof(170); }
   };
+  // 8단계용: 세 칸 점프인데 틈이 넓고(230) 발판이 좁다(150)
+  const threeCellHard = () => {
+    for (let i = 0; i < 3; i++) { const gw = 230; coin(x + gw / 2, -150, true); x += gw; addRoof(150); }
+  };
   const bait = () => {
     const gx = x, w = 640;
     // 작은 섬 위 금화 (정확한 점프에만 착지 가능), 안전 루트 = 탑 와이어
@@ -219,37 +223,39 @@ function buildCourse() {
   while (x < stageEnd) {
     const r = rnd();
     if (n === 1) {
-      const roof = addRoof(R(320, 520)); silverRow(roof.x0, roof.x1); if (r < 0.35) goldOverRoof(roof);
-      smallGap(R(110, 170));
-    } else if (n === 2) {
       const roof = addRoof(R(300, 480)); silverRow(roof.x0, roof.x1); if (r < 0.2) goldOverRoof(roof);
       if (rnd() < 0.5) smallGap(R(130, 190)); else pagodaGap(R(400, 470), 1);
-    } else if (n === 3) {
+    } else if (n === 2) {
       const roof = addRoof(R(280, 440)); silverRow(roof.x0, roof.x1); if (r < 0.15) goldOverRoof(roof);
       const q = rnd();
       if (q < 0.4) smallGap(R(150, 200)); else if (q < 0.7) pagodaGap(R(440, 500), 1); else pagodaGap(R(780, 880), 2);
-    } else if (n === 4) {
+    } else if (n === 3) {
       const roof = addRoof(R(260, 420)); silverRow(roof.x0, roof.x1);
       const q = rnd();
       if (q < 0.3) smallGap(R(170, 220)); else if (q < 0.5) pagodaGap(R(800, 900), 2); else if (q < 0.75) pagodaGap(R(1050, 1150), 3); else bait();
-    } else if (n === 5) {
+    } else if (n === 4) {
       const roof = addRoof(R(260, 400)); silverRow(roof.x0, roof.x1);
       const q = rnd();
       if (q < 0.25) smallGap(R(180, 220)); else if (q < 0.45) pagodaGap(R(800, 900), 2); else if (q < 0.7) threeCell(); else pagodaGap(R(1500, 1900), 4 + (rnd() < 0.5 ? 1 : 0));
-    } else if (n === 6) {
+    } else if (n === 5) {
       const roof = addRoof(R(240, 380)); silverRow(roof.x0, roof.x1);
       const q = rnd();
       if (q < 0.2) smallGap(R(190, 230)); else if (q < 0.35) pagodaGap(R(480, 520), 1); else if (q < 0.5) threeCell(); else if (q < 0.7) pagodaGap(R(1500, 1900), 4 + Math.floor(rnd() * 2), 70); else pagodaGap(R(1900, 2300), 5 + Math.floor(rnd() * 2), 70);
-    } else if (n === 7) {
-      // 7단계: 지붕이 더 짧고, 탑 간격이 들쭉날쭉한 긴 와이어 구간 + 미끼 섬
+    } else if (n === 6) {
+      // 6단계: 지붕이 더 짧고, 탑 간격이 들쭉날쭉한 긴 와이어 구간 + 미끼 섬
       const roof = addRoof(R(220, 340)); silverRow(roof.x0, roof.x1);
       const q = rnd();
       if (q < 0.15) smallGap(R(200, 240)); else if (q < 0.3) pagodaGap(R(500, 540), 1, 40); else if (q < 0.45) threeCell(); else if (q < 0.6) bait(); else if (q < 0.8) pagodaGap(R(1700, 2100), 5 + Math.floor(rnd() * 2), 80); else pagodaGap(R(2200, 2600), 6 + Math.floor(rnd() * 2), 60);
-    } else {
-      // 8단계: 가장 빠르고, 짧은 지붕 사이를 6~8개 탑으로 잇는 구간이 주를 이룸. 한 번 쉬어 가는 작은 틈은 드물다
+    } else if (n === 7) {
+      // 7단계: 짧은 지붕 사이를 6~8개 탑으로 잇는 구간이 주를 이룸. 한 번 쉬어 가는 작은 틈은 드물다
       const roof = addRoof(R(200, 320)); silverRow(roof.x0, roof.x1);
       const q = rnd();
       if (q < 0.1) smallGap(R(210, 250)); else if (q < 0.25) pagodaGap(R(520, 560), 1, 60); else if (q < 0.4) bait(); else if (q < 0.55) threeCell(); else if (q < 0.8) pagodaGap(R(2000, 2400), 6 + Math.floor(rnd() * 2), 70); else pagodaGap(R(2600, 3000), 7 + Math.floor(rnd() * 2), 60);
+    } else {
+      // 8단계(최종): 가장 빠르고 지붕이 가장 짧다. 탑 8~10개짜리 초장거리 와이어, 미끼 섬 연속, 좁은 세 칸 점프가 번갈아 나온다
+      const roof = addRoof(R(190, 300)); silverRow(roof.x0, roof.x1);
+      const q = rnd();
+      if (q < 0.08) smallGap(R(230, 270)); else if (q < 0.2) pagodaGap(R(540, 580), 1, 70); else if (q < 0.35) { bait(); const mid = addRoof(R(200, 260)); silverRow(mid.x0, mid.x1); bait(); } else if (q < 0.5) threeCellHard(); else if (q < 0.75) pagodaGap(R(2400, 2800), 7 + Math.floor(rnd() * 2), 70); else pagodaGap(R(3000, 3400), 8 + Math.floor(rnd() * 2), 60);
     }
   }
   // 스테이지 경계: 안전한 긴 지붕으로 연결
@@ -430,7 +436,7 @@ function update(dt) {
     if (c.state === 'swing') {
       const r = roofUnder(c.x, 0);
       if (r && c.y >= 0 && c.y < LAND_Y + 15 && c.vy >= 0) { land(); }
-      else if (r && c.y >= LAND_Y + 15) { detach(); c.vx = 0; c.x = r.x0 - 24; } // 건물 옆면에 부딪힘
+      else if (r && c.y >= LAND_Y + 15) { detach(); c.vx = 0; c.vy = Math.max(c.vy, 0); c.x = r.x0 - 24; } // 건물 옆면에 부딪힘 → 위로 튀지 않고 미끄러져 떨어짐
     }
   } else { // jump / fall / throw
     if (c.state === 'throw') {
@@ -446,8 +452,8 @@ function update(dt) {
         const r = roofUnder(c.x, LAND_TOL);
         if (r) {
           if (prevY <= 0 || c.y < (c.state === 'fall' ? LAND_Y_FALL : LAND_Y)) land();
-          else { // 지붕 옆면에 충돌 → 추락
-            c.vx = 0; c.x = Math.min(c.x, r.x0 - 24);
+          else { // 지붕 옆면에 충돌 → 추락 (위로 튀어 올라 착지하지 못하게 상승 속도 제거)
+            c.vx = 0; c.vy = Math.max(c.vy, 0); c.x = Math.min(c.x, r.x0 - 24);
           }
         }
       }
@@ -541,8 +547,8 @@ function drawFarTile(im, px, py, fw, fh, flip) {
 function drawRoofSeg(r) {
   const im = IMG.roof; if (!im.complete) return;
   const k = ROOF_H / im.naturalHeight;          // 이미지→월드 배율
-  // 기와 한 장 간격은 그림에서 68.5px(84~906 구간에 12장). 한 장 단위로 이어 붙여 어떤 폭이든 기와가 잘리지 않게 한다.
-  const capL = 84, capR = im.naturalWidth - 906, mid0 = 84, midW = (906 - 84) / 12;
+  // 기와 한 장 간격은 그림에서 정확히 68px(자기상관으로 측정). 84px 에서 시작해 12장 뒤(900px)에서 오른쪽 처마로 넘어가야 위상이 맞는다.
+  const capL = 84, capR = im.naturalWidth - 900, mid0 = 84, midW = 68;
   const width = r.x1 - r.x0, capsW = (capL + capR) * k, tileW = midW * k;
   const n = Math.max(0, Math.round((width - capsW) / tileW));   // 통째로 들어가는 기와 장수
   const hs = width / (capsW + n * tileW);                       // 남는 폭(최대 반 장)은 가로로 살짝 늘리거나 줄여서 맞춤
@@ -555,7 +561,7 @@ function drawRoofSeg(r) {
   // 기와: 왼쪽 끝 + 기와 n장 + 오른쪽 끝 (모두 같은 위상에서 이어 붙임)
   for (let i = 0; i < n; i++) ctx.drawImage(im, mid0, 0, midW, im.naturalHeight, x0 + capLw + i * midWw, y, midWw + 0.6, h);
   ctx.drawImage(im, 0, 0, capL, im.naturalHeight, x0, y, capLw + 0.6, h);
-  ctx.drawImage(im, 906, 0, capR, im.naturalHeight, x0 + capLw + n * midWw, y, capRw, h);
+  ctx.drawImage(im, 900, 0, capR, im.naturalHeight, x0 + capLw + n * midWw, y, capRw, h);
 }
 
 // 지금 상태에 맞는 스프라이트 키
