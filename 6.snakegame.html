@@ -3,6 +3,7 @@
 <head>
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="snakegame"></script>
+<script charset="utf-8" src="world-record.js"></script>
 <meta charset="UTF-8">
 <link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -145,6 +146,8 @@
     font-size: 11px;
   }
 
+  .stat.world { align-items: flex-end; text-align: right; }
+
   .stat .value {
     font-size: 16px;
     font-weight: 700;
@@ -230,6 +233,10 @@
         <span class="label">BEST</span>
         <span class="value" id="best">0</span>
       </div>
+      <div class="stat world">
+        <span class="label">WORLD BEST</span>
+        <span class="value" id="world">-</span>
+      </div>
     </div>
 
     <div class="controls">
@@ -256,6 +263,7 @@
   const ctx = canvas.getContext('2d');
   const scoreEl = document.getElementById('score');
   const bestEl = document.getElementById('best');
+  const worldEl = document.getElementById('world');
   const speedLabel = document.getElementById('speedLabel');
   const overlay = document.getElementById('overlay');
   const overlayMsg = document.getElementById('overlayMsg');
@@ -265,6 +273,15 @@
   let cellSize, snake, dir, nextDir, food, score, best, tickMs, timer, running, started, paused;
 
   const BEST_KEY = 'snake_best_v1';
+
+  /* 세계 신기록 (모든 학생 공통, Firebase): 점수 · 이름 */
+  const WR = window.WorldRecord ? WorldRecord('snakegame') : null;
+  function renderWorld() {
+    if (WR && WR.rec) worldEl.textContent = WR.value() + ' · ' + WR.name();
+    else worldEl.textContent = (WR && !WR.loaded) ? '…' : '-';
+  }
+  if (WR) { WR.onChange(renderWorld); WR.load(); }
+  renderWorld();
 
   function loadBest() {
     try {
@@ -376,6 +393,7 @@
     clearInterval(timer);
     overlayMsg.innerHTML = '게임 오버<br>점수 ' + score + '점';
     overlay.classList.remove('hidden');
+    if (WR) WR.prompt(score);
   }
 
   function togglePause() {

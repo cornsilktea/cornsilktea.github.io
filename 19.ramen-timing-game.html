@@ -3,6 +3,7 @@
 <head>
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="ramentiming"></script>
+<script charset="utf-8" src="world-record.js"></script>
 <meta charset="utf-8">
 <link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
@@ -122,6 +123,13 @@
   .newtag{display:inline-block;font-size:10.5px;font-weight:800;color:#fff;background:#e0932b;
     border-radius:999px;padding:1px 8px;margin-left:6px;vertical-align:1px}
   @keyframes bestpop{0%{transform:scale(.96);opacity:.4}60%{transform:scale(1.02)}100%{transform:scale(1);opacity:1}}
+  .best-row{display:flex;gap:8px;margin-top:12px}
+  .best-row .best-box{flex:1 1 0;min-width:0;margin-top:0}
+  .best-row .bv{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .best-box.world{background:linear-gradient(90deg,#e8f3ea,#f7fbf7);border-color:#b9d6bf}
+  .best-box.world .bi{border-color:#b9d6bf}
+  .best-box.world .bk{color:#2F7D4F}
+  @media (max-width:480px){.best-row{flex-direction:column}}
 
   /* ---------- 냄비 4개 ---------- */
   .pots{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
@@ -242,7 +250,10 @@
         <tr><th>등급</th><th>최상</th><th>상</th><th>중</th><th>하</th><th>순서 실수</th><th>타버림</th></tr>
         <tr><td>가격</td><td id="p1"></td><td id="p2"></td><td id="p3"></td><td id="p4"></td><td id="p5"></td><td id="p6"></td></tr>
       </table>
-      <div class="best-box empty" id="startBest"></div>
+      <div class="best-row">
+        <div class="best-box empty" id="startBest"></div>
+        <div class="best-box world empty" id="startWorld"></div>
+      </div>
       <p style="margin-top:10px"><button id="btnStart" class="btn wide">시작</button></p>
     </div>
   </section>
@@ -663,10 +674,11 @@ const game = {
         prev ? `이전 기록: ${fmt(prev.money)}원 (완성 ${prev.served}그릇)` : "이 기기의 첫 기록입니다.");
     } else {
       box.className = "best-box";
-      box.innerHTML = BEST.html("🏅", "이 기기의 최고 기록", fmt(prev.money)+"원", BEST.detail(prev));
+      box.innerHTML = BEST.html("🏅", "개인 최고 기록", fmt(prev.money)+"원", BEST.detail(prev));
     }
     BEST.renderStart();
     show("scrEnd");
+    if (WR) WR.prompt(this.money);
   }
 };
 
@@ -701,14 +713,29 @@ const BEST = {
     const b = this.get(), box = $("startBest");
     if (!b){
       box.className = "best-box empty";
-      box.innerHTML = this.html("🏅", "이 기기의 최고 기록", "아직 기록이 없습니다", "게임이 끝나면 기록이 자동으로 저장됩니다.");
+      box.innerHTML = this.html("🏅", "개인 최고 기록", "아직 기록이 없습니다", "게임이 끝나면 기록이 자동으로 저장됩니다.");
     } else {
       box.className = "best-box";
-      box.innerHTML = this.html("🏅", "이 기기의 최고 기록", fmt(b.money)+"원", this.detail(b));
+      box.innerHTML = this.html("🏅", "개인 최고 기록", fmt(b.money)+"원", this.detail(b));
     }
   }
 };
 BEST.renderStart();
+
+/* ---------- 세계 신기록 (모든 학생 공통, Firebase) ---------- */
+const WR = window.WorldRecord ? WorldRecord("ramentiming", { format: v => fmt(v) + "원" }) : null;
+function renderWorld(){
+  const box = $("startWorld");
+  if (WR && WR.rec){
+    box.className = "best-box world";
+    box.innerHTML = BEST.html("🏆", "세계 신기록", WR.text(), WR.escapeHtml(WR.name()));
+  } else {
+    box.className = "best-box world empty";
+    box.innerHTML = BEST.html("🏆", "세계 신기록", (WR && !WR.loaded) ? "불러오는 중…" : "아직 기록이 없습니다", "첫 기록에 도전해 보세요.");
+  }
+}
+if (WR) { WR.onChange(renderWorld); WR.load(); }
+renderWorld();
 
 $("btnStart").addEventListener("click", () => game.start());
 $("btnAgain").addEventListener("click", () => show("scrStart"));

@@ -7,6 +7,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src https://*.firebasedatabase.app https://*.firebaseio.com; base-uri 'none'; form-action 'none'">
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="slidecard"></script>
+<script charset="utf-8" src="world-record.js"></script>
 <!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
 <title>카드 옮기기</title>
 <meta property="og:type" content="website">
@@ -63,7 +64,6 @@ button{
   background:#fff;color:var(--wrks-viz-fg);cursor:pointer;
 }
 button:hover{background:var(--sg-panel-alt);}
-.help{font-size:12px;color:var(--sg-ink-soft);line-height:1.6;}
 </style>
 </head>
 <body>
@@ -74,7 +74,7 @@ button:hover{background:var(--sg-panel-alt);}
   <aside class="panel">
     <div class="tile">
       <div class="k">경과 시간</div>
-      <div class="v" id="clock">00:00.0</div>
+      <div class="v" id="clock">00:00.00</div>
       <div class="s" id="status">대기 중 · 첫 이동에서 시작</div>
     </div>
     <div class="tile">
@@ -82,17 +82,21 @@ button:hover{background:var(--sg-panel-alt);}
       <div class="v" id="moves">0</div>
     </div>
     <div class="tile">
-      <div class="k">역대 최고 기록</div>
+      <div class="k">개인 최고 기록</div>
       <div class="v" id="best">-</div>
       <div class="s" id="bestMoves"></div>
     </div>
+    <div class="tile">
+      <div class="k">세계 신기록</div>
+      <div class="v" id="world">-</div>
+      <div class="s" id="worldName"></div>
+    </div>
+    <button id="reset" type="button">초기화</button>
     <div class="tile">
       <div class="k">목표</div>
       <div class="goal">주황 카드를 오른쪽 맨 아래 칸(6행 6열)으로 옮기기</div>
       <div class="legend"><span class="dot red"></span>주황 카드<span class="dot blue" style="margin-left:8px"></span>초록 카드</div>
     </div>
-    <button id="reset" type="button">초기화</button>
-    <div class="help">빈 칸과 맞닿은 카드를 빈 칸 쪽으로 끌어서 옮깁니다. 짧게 누르기(탭)로도 이동합니다.</div>
   </aside>
 </div>
 <script>
@@ -114,6 +118,16 @@ button:hover{background:var(--sg-panel-alt);}
   var cell=56, step=64;
   var moves=0, startAt=0, running=false, finished=false, elapsed=0, raf=0;
   var best=loadBest();
+
+  /* 세계 신기록 (모든 학생 공통, Firebase). 시간은 작을수록 좋으므로 lower:true */
+  var worldEl=document.getElementById('world');
+  var worldNameEl=document.getElementById('worldName');
+  var WR=window.WorldRecord?WorldRecord('slidecard',{lower:true,format:fmt}):null;
+  function renderWorld(){
+    if(WR&&WR.rec){worldEl.textContent=WR.text();worldNameEl.textContent=WR.name();}
+    else{worldEl.textContent='-';worldNameEl.textContent=(WR&&!WR.loaded)?'불러오는 중…':'아직 기록 없음';}
+  }
+  if(WR){WR.onChange(renderWorld);WR.load();}
 
   function loadBest(){
     try{
@@ -160,13 +174,14 @@ button:hover{background:var(--sg-panel-alt);}
     moves=0;movesEl.textContent='0';
     running=false;finished=false;elapsed=0;startAt=0;
     if(raf){cancelAnimationFrame(raf);raf=0;}
-    clockEl.textContent='00:00.0';
+    clockEl.textContent='00:00.00';
     clockEl.classList.remove('done');
     statusEl.textContent='대기 중 · 첫 이동에서 시작';
     for(var j=0;j<CARDN;j++){
       els[j].classList.remove('locked');
     }
     renderBest();
+    renderWorld();
     layout(false);
   }
 
@@ -281,8 +296,8 @@ button:hover{background:var(--sg-panel-alt);}
     var t=Math.max(0,ms);
     var m=Math.floor(t/60000);
     var s=Math.floor(t%60000/1000);
-    var d=Math.floor(t%1000/100);
-    return (m<10?'0':'')+m+':'+(s<10?'0':'')+s+'.'+d;
+    var d=Math.floor(t%1000/10);
+    return (m<10?'0':'')+m+':'+(s<10?'0':'')+s+'.'+(d<10?'0':'')+d;
   }
 
   function checkGoal(){
@@ -302,6 +317,7 @@ button:hover{background:var(--sg-panel-alt);}
       renderBest();
     }
     statusEl.textContent=(isNewBest?'완료 · 신기록! ':'완료 · 기록 ')+fmt(elapsed)+' / '+moves+'회';
+    if(WR){WR.prompt(elapsed);}
     for(var i=0;i<CARDN;i++){
       els[i].classList.add('locked');
     }

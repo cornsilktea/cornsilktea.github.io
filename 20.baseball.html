@@ -3,6 +3,7 @@
 <head>
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="baseball"></script>
+<script charset="utf-8" src="world-record.js"></script>
 <meta charset="utf-8">
 <link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
@@ -169,6 +170,11 @@
   .best-box .bv{display:block;font-size:18px;font-weight:800;font-variant-numeric:tabular-nums}
   .best-box .bd{display:block;font-size:12px;color:var(--sub)}
   .best-box.new{border-color:var(--accent)}
+  .best-row{display:flex;gap:8px;margin-top:12px}
+  .best-row .best-box{flex:1 1 0;min-width:0;margin-top:0}
+  .best-row .bv,.best-row .bd{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .best-box.world .bk{color:var(--accent)}
+  @media (max-width:480px){.best-row{flex-direction:column}}
   .newtag{display:inline-block;font-size:10.5px;font-weight:800;color:#fff;background:var(--accent);
     border-radius:999px;padding:1px 8px;margin-left:6px;vertical-align:1px}
 </style>
@@ -267,7 +273,10 @@
       <tr><td>훨씬 빠름·늦음 · 안 침</td><td>헛스윙 · 스트라이크</td><td>0</td></tr>
       <tr><td>존 밖의 공을 안 침</td><td>볼</td><td>500 (투구 수 유지)</td></tr>
     </table>
-    <div class="best-box" id="startBest"></div>
+    <div class="best-row">
+      <div class="best-box" id="startBest"></div>
+      <div class="best-box world" id="startWorld"></div>
+    </div>
     <button class="btn" id="btnStart">시작하기</button>
   </div>
 </div>
@@ -443,17 +452,28 @@ const BEST = {
   set(b){ try { localStorage.setItem(this.KEY, JSON.stringify(b)); } catch (e) {} },
   today(){ const d = new Date(), m = d.getMonth()+1, day = d.getDate();
     return `${d.getFullYear()}.${m<10?"0":""}${m}.${day<10?"0":""}${day}`; },
-  detail(b){ return `홈런 ${b.hr}개 · 연속 ${b.combo} · ${b.dist}m` + (b.date ? ` · ${b.date}` : ""); },
-  html(k, v, d){ return `<span class="bi">🏅</span><span class="bt"><span class="bk">${k}</span><span class="bv">${v}</span><span class="bd">${d}</span></span>`; },
+  html(k, v, d, icon){ return `<span class="bi">${icon || "🏅"}</span><span class="bt"><span class="bk">${k}</span><span class="bv">${v}</span><span class="bd">${d}</span></span>`; },
+  /* 점수만 표시한다(홈런·연속·비거리·날짜는 저장만 하고 보여 주지 않음) */
   render(box, isNew){
     const b = this.get();
     box.className = "best-box" + (isNew ? " new" : "");
     box.innerHTML = b
-      ? this.html("이 기기의 최고 기록" + (isNew ? '<span class="newtag">NEW</span>' : ""), fmt(b.score) + "점", this.detail(b))
-      : this.html("이 기기의 최고 기록", "아직 기록이 없습니다", "게임이 끝나면 기록이 자동으로 저장됩니다.");
+      ? this.html("개인 최고 기록" + (isNew ? '<span class="newtag">NEW</span>' : ""), fmt(b.score) + "점", isNew ? "기록 갱신!" : "이 기기에 저장된 기록")
+      : this.html("개인 최고 기록", "기록 없음", "게임이 끝나면 기록이 자동으로 저장됩니다.");
     $("hudBest").textContent = b ? fmt(b.score) : "-";
   }
 };
+
+/* ---------- 세계 신기록 (모든 학생 공통, Firebase) ---------- */
+const WR = window.WorldRecord ? WorldRecord("baseball", { format: v => fmt(v) + "점" }) : null;
+function renderWorld(){
+  const box = $("startWorld");
+  box.className = "best-box world";
+  box.innerHTML = (WR && WR.rec)
+    ? BEST.html("세계 신기록", WR.text(), WR.escapeHtml(WR.name()), "🏆")
+    : BEST.html("세계 신기록", (WR && !WR.loaded) ? "불러오는 중…" : "기록 없음", "첫 기록에 도전해 보세요.", "🏆");
+}
+if (WR) { WR.onChange(renderWorld); WR.load(); }
 
 /* ---------- 게임 상태 ---------- */
 const G = {
@@ -845,6 +865,7 @@ function endGame(){
   drawEndChart();
   BEST.render($("endBest"), isNew);
   $("scrEnd").classList.add("on");
+  if (WR) WR.prompt(G.score);
 }
 
 /* ---------- 입력 ---------- */
@@ -864,6 +885,7 @@ $("btnAgain").addEventListener("click", e => { e.currentTarget.blur(); startGame
 applyImages();
 setBatter("ready"); setPitcher("idle");
 BEST.render($("startBest"), false);
+renderWorld();
 </script>
 </body>
 </html>

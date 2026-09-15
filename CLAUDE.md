@@ -33,6 +33,11 @@
 - 방향키를 쓰는 프로그램은 **WASD 도 함께** 받는다. 방향키는 `e.key`, WASD 는 한글 IME 대비 `e.code`(KeyW…)로 판정.
 - 개인전(1인) 게임은 **최고 기록**을 `localStorage`(`<게임>_best_v1`, try/catch)에 저장하고
   시작 카드·HUD·결과 화면(갱신 시 `NEW`) 세 곳에 표시한다. 패턴은 18·19번 참고.
+- 개인전 게임은 **세계 신기록**(Firebase `records/<게임>/all`, 모든 학생 공통)도 함께 둔다.
+  `world-record.js` 를 `access-guard.js` 다음 줄에 넣고 `WorldRecord("<게임>", {lower, format})` 로 만든다
+  (시간처럼 작을수록 좋은 기록은 `lower:true`). 게임 종료 시 `WR.prompt(값)` 을 부르면 신기록일 때만
+  이름 입력 창이 뜬다. 화면 표기는 "개인 최고 기록" / "세계 신기록"(이름 포함). 게임 이름은 규칙상
+  소문자 영문만(`^[a-z]+$`). 개인 기기의 localStorage 최고 기록은 그대로 유지한다. 패턴은 1·19·20번 참고.
 
 ## 환경
 

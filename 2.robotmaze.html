@@ -7,6 +7,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src https://*.firebasedatabase.app https://*.firebaseio.com; base-uri 'none'; form-action 'none'">
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="robotmaze"></script>
+<script charset="utf-8" src="world-record.js"></script>
 <!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
 <title>미로 찾기</title>
 <meta property="og:type" content="website">
@@ -140,9 +141,10 @@ h1{font-size:16px;margin:0 0 var(--wrks-viz-space-1);letter-spacing:-0.01em;}
 
   <div class="panel">
     <div class="metrics">
-      <div class="m"><div class="lab">시간</div><div class="val" id="mTime">0.0초</div></div>
+      <div class="m"><div class="lab">시간</div><div class="val" id="mTime">0.00초</div></div>
       <div class="m"><div class="lab">명령 수</div><div class="val" id="mCmd">0</div></div>
-      <div class="m wide"><div class="lab">역대 최고 기록</div><div class="val" id="mBest">-</div><div class="lab" id="mBestSub">아직 기록 없음</div></div>
+      <div class="m wide"><div class="lab">개인 최고 기록</div><div class="val" id="mBest">-</div><div class="lab" id="mBestSub">아직 기록 없음</div></div>
+      <div class="m wide"><div class="lab">세계 신기록</div><div class="val" id="mWorld">-</div><div class="lab" id="mWorldSub">불러오는 중…</div></div>
     </div>
 
     <div class="ctrls">
@@ -418,7 +420,7 @@ h1{font-size:16px;margin:0 0 var(--wrks-viz-space-1);letter-spacing:-0.01em;}
   function renderBest(){
     if(best){
       el.best.textContent='\uBA85\uB839 '+best.cmds+'\uAC1C';
-      el.bestSub.textContent=(best.time/1000).toFixed(1)+'\uCD08';
+      el.bestSub.textContent=(best.time/1000).toFixed(2)+'\uCD08';
     }else{
       el.best.textContent='-';
       el.bestSub.textContent='\uC544\uC9C1 \uAE30\uB85D \uC5C6\uC74C';
@@ -431,7 +433,19 @@ h1{font-size:16px;margin:0 0 var(--wrks-viz-space-1);letter-spacing:-0.01em;}
       saveBest(best);
     }
     renderBest();
+    if(WR){WR.prompt(time);}
   }
+
+  /* 세계 신기록 (모든 학생 공통, Firebase). 도착까지 걸린 시간(ms), 작을수록 좋으므로 lower:true */
+  var worldEl=document.getElementById('mWorld');
+  var worldSubEl=document.getElementById('mWorldSub');
+  var WR=window.WorldRecord?WorldRecord('robotmaze',{lower:true,format:function(ms){return (ms/1000).toFixed(2)+'초';}}):null;
+  function renderWorld(){
+    if(WR&&WR.rec){worldEl.textContent=WR.text();worldSubEl.textContent=WR.name();}
+    else{worldEl.textContent='-';worldSubEl.textContent=(WR&&!WR.loaded)?'불러오는 중…':'아직 기록 없음';}
+  }
+  if(WR){WR.onChange(renderWorld);WR.load();}
+  renderWorld();
 
   var cells=[];
   (function buildCells(){
@@ -509,7 +523,7 @@ h1{font-size:16px;margin:0 0 var(--wrks-viz-space-1);letter-spacing:-0.01em;}
   }
 
   function tick(){
-    el.time.textContent=(elapsed()/1000).toFixed(1)+'\uCD08';
+    el.time.textContent=(elapsed()/1000).toFixed(2)+'\uCD08';
   }
 
   function render(){
@@ -576,7 +590,7 @@ h1{font-size:16px;margin:0 0 var(--wrks-viz-space-1);letter-spacing:-0.01em;}
     if(!st.started){
       st.started=true;
       st.t0=Date.now();
-      timerId=setInterval(tick,100);
+      timerId=setInterval(tick,50);
     }
     st.cmds++;
     if(kind==='L'){
@@ -587,19 +601,19 @@ h1{font-size:16px;margin:0 0 var(--wrks-viz-space-1);letter-spacing:-0.01em;}
       var nr=st.r+DIRS[st.d][0];
       var nc=st.c+DIRS[st.d][1];
       if(!inb(nr,nc)){
-        finish('fail','\uC2E4\uD328. \uD310 \uBC16\uC73C\uB85C \uB098\uAC14\uC2B5\uB2C8\uB2E4. \uBA85\uB839 '+st.cmds+'\uAC1C \u00B7 '+(elapsed()/1000).toFixed(1)+'\uCD08');
+        finish('fail','\uC2E4\uD328. \uD310 \uBC16\uC73C\uB85C \uB098\uAC14\uC2B5\uB2C8\uB2E4. \uBA85\uB839 '+st.cmds+'\uAC1C \u00B7 '+(elapsed()/1000).toFixed(2)+'\uCD08');
         return;
       }
       if(board.grid[nr][nc]===1){
         st.r=nr;
         st.c=nc;
-        finish('fail','\uC2E4\uD328. \uBCBD\uC5D0 \uBD80\uB52A\uD614\uC2B5\uB2C8\uB2E4. \uBA85\uB839 '+st.cmds+'\uAC1C \u00B7 '+(elapsed()/1000).toFixed(1)+'\uCD08');
+        finish('fail','\uC2E4\uD328. \uBCBD\uC5D0 \uBD80\uB52A\uD614\uC2B5\uB2C8\uB2E4. \uBA85\uB839 '+st.cmds+'\uAC1C \u00B7 '+(elapsed()/1000).toFixed(2)+'\uCD08');
         return;
       }
       st.r=nr;
       st.c=nc;
       if(nr===GOAL.r && nc===GOAL.c){
-        finish('win','\uB3C4\uCC29. \uBA85\uB839 '+st.cmds+'\uAC1C \u00B7 '+((Date.now()-st.t0)/1000).toFixed(1)+'\uCD08');
+        finish('win','\uB3C4\uCC29. \uBA85\uB839 '+st.cmds+'\uAC1C \u00B7 '+((Date.now()-st.t0)/1000).toFixed(2)+'\uCD08');
         recordWin(st.cmds,Date.now()-st.t0);
         return;
       }
@@ -612,7 +626,7 @@ h1{font-size:16px;margin:0 0 var(--wrks-viz-space-1);letter-spacing:-0.01em;}
     st={r:START.r,c:START.c,d:0,cmds:0,started:false,t0:0,tEnd:0,fin:null};
     el.msg.className='msg';
     el.msg.textContent='\uCCAB \uBA85\uB839\uC744 \uB204\uB974\uBA74 \uC2DC\uAC04\uC774 \uC2DC\uC791\uB429\uB2C8\uB2E4.';
-    el.time.textContent='0.0\uCD08';
+    el.time.textContent='0.00\uCD08';
     render();
   }
 

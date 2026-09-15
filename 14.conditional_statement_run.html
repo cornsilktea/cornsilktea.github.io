@@ -3,6 +3,7 @@
 <head>
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="conditionrun"></script>
+<script charset="utf-8" src="world-record.js"></script>
 <meta charset="utf-8">
 <link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -69,10 +70,11 @@
     font-family:inherit;cursor:pointer;}
   .bigbtn:active{background:#333d47;}
   
-  .stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
-  .stat{border:1px solid #e3e6e9;border-radius:8px;padding:10px 11px;}
-  .stat span{display:block;font-size:11.5px;color:#7a828a;margin-bottom:3px;}
-  .stat b{font-size:20px;color:#111827;font-weight:700;font-variant-numeric:tabular-nums;}
+  .stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:12px;}
+  .stat{border:1px solid #e3e6e9;border-radius:8px;padding:7px 8px;min-width:0;}
+  .stat span{display:block;font-size:11px;color:#7a828a;margin-bottom:2px;white-space:nowrap;}
+  .stat b{font-size:16px;color:#111827;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .stat em{display:block;font-style:normal;font-size:12px;color:#3d454d;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   
   #fullLog{max-height:190px;overflow-y:auto;border:1px solid #e3e6e9;border-radius:8px;
     padding:9px 11px;margin-bottom:12px;
@@ -98,6 +100,7 @@
   <div id="hud">
     <div class="chip">스테이지 <b id="hStage">0</b> / 100</div>
     <div class="chip">최고 기록 <b id="hBest">0</b></div>
+    <div class="chip">세계 신기록 <b id="hWorld">-</b></div>
   </div>
 </div>
 
@@ -133,6 +136,7 @@
     <div class="stats">
       <div class="stat"><span>도달 스테이지</span><b id="rStage">0</b></div>
       <div class="stat"><span>최고 기록</span><b id="rBest">0</b></div>
+      <div class="stat"><span>세계 신기록</span><b id="rWorld">-</b><em id="rWorldName"></em></div>
     </div>
     <div id="fullLog"></div>
     <button class="bigbtn" id="againBtn" type="button">다시 하기 (Space)</button>
@@ -183,6 +187,16 @@
       try { localStorage.setItem("runner_best_stage", bestStage.toString()); } catch (e) {}
     }
   }
+
+  /* 세계 신기록 (모든 학생 공통, Firebase): 도달 스테이지 · 이름 */
+  var WR = window.WorldRecord ? WorldRecord("conditionrun") : null;
+  function renderWorld(){
+    var has = WR && WR.rec;
+    $("hWorld").textContent = has ? WR.value() + " " + WR.name() : "-";
+    $("rWorld").textContent = has ? WR.value() + " / " + TOTAL : "-";
+    $("rWorldName").textContent = has ? WR.name() : ((WR && !WR.loaded) ? "불러오는 중…" : "기록 없음");
+  }
+  if (WR) { WR.onChange(renderWorld); WR.load(); }
 
   var state = {
     phase:"ready", speed:TIERS[0].speed, targetSpeed:TIERS[0].speed,
@@ -837,6 +851,7 @@
   }
 
   function updateHUD(){
+    renderWorld();
     elStage.textContent = state.passed;
     elBest.textContent = bestStage;
   }
@@ -1060,6 +1075,8 @@
     $("rTitle").textContent = cleared ? "완주했습니다" : "게임 종료";
     $("rStage").textContent = state.passed + " / " + TOTAL;
     $("rBest").textContent = bestStage + " / " + TOTAL;
+    renderWorld();
+    if (WR) WR.prompt(state.passed);
 
     var html = "";
     for (var i = 0; i < state.logs.length; i++) {

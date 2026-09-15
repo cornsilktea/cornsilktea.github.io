@@ -7,6 +7,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src https://*.firebasedatabase.app https://*.firebaseio.com; base-uri 'none'; form-action 'none'">
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="brickbreak"></script>
+<script charset="utf-8" src="world-record.js"></script>
 <!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
 <title>벽돌깨기</title>
 <meta property="og:type" content="website">
@@ -134,6 +135,8 @@ button:active { background: var(--sg-panel-alt); }
   color: var(--sg-ink-mid);
 }
 .note b { font-weight: 600; color: var(--wrks-viz-fg); }
+.note .world { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--wrks-viz-border); font-size: 13px; }
+.note .world em { font-style: normal; font-weight: 700; color: var(--sg-warn); font-size: 16px; }
 .note ul { margin: 4px 0 0; padding-left: 17px; }
 #msg {
   margin-top: var(--wrks-viz-space-2);
@@ -163,6 +166,7 @@ button:active { background: var(--sg-panel-alt); }
  </div>
 
   <div class="note">
+    <div class="world"><b>🏆 세계 신기록</b><span id="worldLine">불러오는 중…</span></div>
     <b>조작</b>
     <ul>
       <li>발사대 위쪽을 드래그하면 손가락 방향으로, 아래쪽을 드래그하면 새총처럼 반대 방향으로 조준됩니다.</li>
@@ -322,6 +326,16 @@ button:active { background: var(--sg-panel-alt); }
     try { window.localStorage.setItem("brk_best", String(best)); } catch (e) {}
   }
 
+  /* 세계 신기록 (모든 학생 공통, Firebase): 도달 라운드 */
+  var worldLine = document.getElementById("worldLine");
+  var WR = window.WorldRecord ? WorldRecord("brickbreak", { format: function (v) { return "라운드 " + v; } }) : null;
+  function renderWorld() {
+    if (WR && WR.rec) { worldLine.innerHTML = "<em>" + WR.text() + "</em> " + WR.escapeHtml(WR.name()); }
+    else { worldLine.textContent = (WR && !WR.loaded) ? "불러오는 중…" : "아직 기록 없음 — 첫 기록에 도전!"; }
+  }
+  if (WR) { WR.onChange(renderWorld); WR.load(); }
+  renderWorld();
+
   // 한 줄에 채우는 벽돌 수(7칸 중). 값을 키우면 어려워지고 줄이면 쉬워집니다.
   function fillCount(rowNumber) {
     if (rowNumber <= 5) { return 4; }
@@ -479,6 +493,7 @@ button:active { background: var(--sg-panel-alt); }
     for (var i = 0; i < cells.length; i++) {
       if (cells[i].type === "brick" && cells[i].r >= ROWS_MAX) {
         state = "over";
+        if (WR) { WR.prompt(round); }
         setMsg("벽돌이 경고선에 닿았습니다. 다시 시작을 눌러 주세요.");
         syncHud();
         return;

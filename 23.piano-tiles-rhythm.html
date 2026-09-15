@@ -145,9 +145,9 @@
       <div class="sub" id="rBest"></div>
     </div>
     <div class="hall" id="hall">
-      <div class="k" id="hallLine">역대 최고 기록을 불러오는 중…</div>
+      <div class="k" id="hallLine">세계 신기록을 불러오는 중…</div>
       <div class="hall-form" id="hallForm" style="display:none">
-        <div class="hall-title">🏆 역대 최고 기록 달성! 이름을 남기세요</div>
+        <div class="hall-title">🏆 세계 신기록 달성! 이름을 남기세요</div>
         <div class="row">
           <input type="text" id="hallName" maxlength="20" placeholder="이름 (20자 이내)" autocomplete="off">
           <button type="button" class="btn primary" id="hallSubmit" style="flex:0 0 96px">등록</button>
@@ -713,7 +713,7 @@ function finish(){
   showScreen("result");
 }
 $("retryBtn").addEventListener("click", startGame);
-/* ============ 역대 최고 기록 (Firebase Realtime Database, 모든 학생 공통) ============ */
+/* ============ 세계 신기록 (Firebase Realtime Database, 모든 학생 공통) ============ */
 const Hall = {
   data: {},          // 곡 id → { score, name, at }
   loaded: false,
@@ -740,8 +740,8 @@ const Hall = {
 };
 function hallText(id){
   const r = Hall.get(id);
-  if (!Hall.loaded) return Hall.url("") ? "역대 최고 기록을 불러오지 못했습니다" : "";
-  return r ? "역대 최고 <em>" + r.score + "</em>점 · " + escapeHtml(r.name) : "역대 최고 기록 없음 — 첫 기록에 도전!";
+  if (!Hall.loaded) return Hall.url("") ? "세계 신기록을 불러오지 못했습니다" : "";
+  return r ? "세계 신기록 <em>" + r.score + "</em>점 · " + escapeHtml(r.name) : "세계 신기록 없음 — 첫 기록에 도전!";
 }
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch])); }
 function showHall(){

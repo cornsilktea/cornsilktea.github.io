@@ -172,7 +172,7 @@ function loadBest() { try { return parseInt(localStorage.getItem(SAVE_KEY)) || 0
 function saveBest(v) { try { localStorage.setItem(SAVE_KEY, String(v)); } catch (e) {} }
 let best = loadBest();
 
-// ───────── 역대 최고 기록 (Firebase Realtime Database, 모든 학생 공통) ─────────
+// ───────── 세계 신기록 (Firebase Realtime Database, 모든 학생 공통) ─────────
 // 경로 records/hanokroofrun/all → { score, name, at }. 규칙(데이터베이스규칙.json)이 기존보다 높은 점수만 받는다.
 const Hall = {
   rec: null, loaded: false,
@@ -198,9 +198,9 @@ const Hall = {
 };
 function escapeHtml(t) { return String(t).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch])); }
 function hallText() {
-  if (!Hall.loaded) return Hall.url() ? '역대 최고 기록을 불러오지 못했습니다' : '';
+  if (!Hall.loaded) return Hall.url() ? '세계 신기록을 불러오지 못했습니다' : '';
   const r = Hall.rec;
-  return r ? '🏆 역대 최고 <em>' + r.score + '</em>점 · ' + escapeHtml(r.name) : '🏆 역대 최고 기록 없음 — 첫 기록에 도전!';
+  return r ? '🏆 세계 신기록 <em>' + r.score + '</em>점 · ' + escapeHtml(r.name) : '🏆 세계 신기록 없음 — 첫 기록에 도전!';
 }
 
 // ───────── 사운드 (간단 비프) ─────────
@@ -557,7 +557,7 @@ function showResult(cleared) {
     <p>내 최고 기록 ${best}점</p>
     <div class="hall" id="hallLine">${hallText()}</div>
     <div class="hall-form" id="hallForm" style="display:${Hall.beats(score) ? '' : 'none'}">
-      <div>🏆 역대 최고 기록 달성! 이름을 남기세요</div>
+      <div>🏆 세계 신기록 달성! 이름을 남기세요</div>
       <div class="row">
         <input type="text" id="hallName" maxlength="20" placeholder="이름 (20자 이내)" autocomplete="off">
         <button class="btn" id="hallSubmit">등록</button>
@@ -571,7 +571,7 @@ function showResult(cleared) {
   overlay.classList.remove('hidden');
   document.getElementById('btnRetry').onclick = () => startGame();
   document.getElementById('btnMenu').onclick = showMenu;
-  // 역대 최고 기록 등록 (규칙이 더 높은 점수만 받으므로, 그 사이 누가 앞질렀으면 401 로 거부된다)
+  // 세계 신기록 등록 (규칙이 더 높은 점수만 받으므로, 그 사이 누가 앞질렀으면 401 로 거부된다)
   const nameEl = document.getElementById('hallName'), submitEl = document.getElementById('hallSubmit');
   const lineEl = document.getElementById('hallLine'), formEl = document.getElementById('hallForm'), msgEl = document.getElementById('hallMsg');
   const thisScore = score;
