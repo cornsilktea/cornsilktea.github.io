@@ -201,7 +201,7 @@ const CONFIG = {
     hard: {
       label: "어려움",
       songs: [
-        { id: "canon",    title: "캐논 변주곡", bpm: 116, song: "HARD_SONG_1", fallDurationMs: 1300 },
+        { id: "canon",    title: "캐논 변주곡", bpm: 88,  song: "HARD_SONG_1", fallDurationMs: 1400 },
         { id: "heukgeon", title: "흑건",         bpm: 80,  song: "HARD_SONG_2", fallDurationMs: 1200, missScore: 30 },
         { id: "moonlight", title: "월광 소나타 1악장", bpm: 108, song: "HARD_SONG_3", fallDurationMs: 1600 }
       ]
@@ -274,28 +274,22 @@ const TURK_BR = seq(`C#5 D5 E5 F#5 E5 D5 C#5 B4 A4 B4 C#5 D5 E5:1.5 R
                      F#5 E5 D5 C#5 B4 C#5 D5 B4 C#5 B4 A4 G#4 A4:1.5 R`);
 const MEDIUM_SONG_2 = cat(TURK_P1, TURK_P2, TURK_P1, TURK_P2, TURK_BR, TURK_BR, TURK_P1, TURK_P2, TURK_P1, TURK_P2, seq(`A4:2`));
 
-// 어려움 ① 캐논 변주곡 (116bpm) — 파헬벨 원곡 제1바이올린을 기본으로 한 변주 12순환, 약 101초
-// 코드 진행 D–A–Bm–F#m–G–D–G–A, 코드당 2박(원곡 4분음표 = 여기 2박). 한 순환 = 16박.
-const CANON_V1 = seq(`F#5:2 E5:2 D5:2 C#5:2 B4:2 A4:2 B4:2 C#5:2`);                     // 원곡 3~4마디 (2분음표)
-const CANON_V2 = seq(`D5:2 C#5:2 B4:2 A4:2 G4:2 F#4:2 G4:2 E4:2`);                       // 원곡 5~6마디
-const CANON_V3 = seq(`D5 F#5 A5 G5 F#5 D5 F#5 E5  D5 B4 D5 A4 G4 B4 A4 G4
-                      F#4 D4 E4 C#5 D5 F#5 A5 A4  B4 G4 A4 F#4 D4 D5 D5 C#5`, 1);        // 원곡 7~10마디 (4분음표)
-const CANON_V4 = seq(`D5 C#5 D5 D4 C#4 A4 E4 F#4  D4 D5 C#5 B4 C#5 F#4 A4 B4
-                      G4 F#4 E4 G4 F#4 E4 D4 C#5  B4 A4 G4 F#4 E4 G4 F#4 E4
-                      D4 E4 F#4 G4 A4 E4 A4 G4  F#4 B4 A4 G4 A4 G4 F#4 E4
-                      D4 B3 B4 C#5 D5 C#5 B4 A4  G4 F#4 E4 B4 A4 B4 A4 G4`);            // 원곡 11~14마디 (가장 유명한 8분음표 런)
-const CANON_DOT = seq(`F#5:1.5 F#5:0.5 F#5 G5 F#5 E5  D5:1.5 D5:0.5 D5 E5 D5 C#5
-                       B4:1.5 B4:0.5 B4 C#5 B4 A4  G4:1.5 G4:0.5 G4 A4 B4 C#5`);         // 점 리듬 하행 변주
-const CANON_SCALE = seq(`D5 E5 F#5 G5  A5 G5 F#5 E5  B4 C#5 D5 E5  F#5 E5 D5 C#5
-                         G4 A4 B4 C#5  D5 C#5 B4 A4  G4 A4 B4 C#5  D5 C#5 B4 A4`);       // 음계 변주
-const CANON_ARP = seq(`D5 F#5 A5 F#5  C#5 E5 A5 E5  B4 D5 F#5 D5  A4 C#5 F#5 C#5
-                       B4 D5 G5 D5  A4 D5 F#5 D5  B4 D5 G5 D5  C#5 E5 A5 E5`);            // 분산화음 변주
-const CANON_CLX1 = seq(`F#5 E5 D5 E5  F#5 E5 D5 C#5  D5 C#5 B4 C#5  D5 C#5 B4 A4
-                        B4 A4 G4 A4  B4 A4 G4 F#4  G4 A4 B4 C#5  D5 C#5 B4 C#5`);         // 절정 ① 순차 하행
-const CANON_CLX2 = seq(`A5 G5 F#5 E5  E5 D5 C#5 B4  D5 C#5 B4 A4  C#5 A4 F#4 A4
-                        B4 A4 G4 F#4  A4 G4 F#4 E4  G4 A4 B4 D5  E5 F#5 G5 A5`);          // 절정 ② 하행 음계 → 상행
-const HARD_SONG_1 = cat(CANON_V1, CANON_V2, CANON_V3, CANON_V4, CANON_DOT, CANON_SCALE, CANON_ARP,
-                        CANON_CLX1, CANON_CLX2, CANON_V4.slice(0, 32), seq(`D5:4`));
+// 어려움 ① 캐논 변주곡 (88bpm) — 파헬벨 캐논 피아노 편곡(W. Wallace, C장조 → D장조로 올림, github.com/piotr-yuxuan/pachelbel-canone)
+// 을 그대로 옮김. 코드 진행 D–A–Bm–F#m–G–D–G–A, 코드당 2박(편곡의 2분음표). 16분음표 단위(seqU 4).
+// 도입은 왼손 8분음표 아르페지오만, 이후엔 오른손 선율을 우선하고 오른손이 쉬는 8분음표 자리는 왼손(한 옥타브 올림)으로 채움.
+// 편곡 22순환 중 반복되는 순환은 하나만 남겨 9순환 + 맺음, 약 101초.
+const HARD_SONG_1 = seqU(`
+  D4:2 A4:2 D5:2 F#5:2 A3:2 E4:2 A4:2 C#5:2 B3:2 F#4:2 B4:2 D5:2 F#3:2 C#4:2 F#4:2 A4:2 G3:2 D4:2 G4:2 B4:2 D3:2 A3:2 D4:2 F#4:2 G3:2 D4:2 G4:2 B4:2 A3:2 E4:2 A4:2 C#5:2
+  F#5:2 A4:2 D5:2 F#5:2 E5:2 E4:2 A4:2 C#5:2 D5:2 F#4:2 B4:2 D5:2 C#5:2 C#4:2 F#4:2 A4:2 B4:2 D4:2 G4:2 B4:2 A4:2 A3:2 D4:2 F#4:2 B4:2 D4:2 G4:2 B4:2 C#5:2 E4:2 A4:2 C#5:2
+  D5:2 A4:2 F#5:2 F#5:2 A5:2 E4:2 G5:2 C#5:2 F#5:2 F#4:2 D5:2 D5:2 F#5:2 C#4:2 E5:2 A4:2 D5:2 D4:2 B4:2 B4:2 D5:2 A3:2 F#5:2 F#4:2 G5:2 D4:2 B5:2 B4:2 A5:2 E4:2 G5:2 C#5:2
+  D5:2 C#5:2 D5:2 F#5:2 A4:2 E4:2 C#5:2 C#5:2 D5:2 F#4:2 F#5:2 D5:2 A5:2 C#4:2 A5:2 B5:2 G5:2 F#5:2 E5:2 G5:2 F#5:2 E5:2 D5:2 C#5:2 B4:2 A4:2 G4:2 D5:2 D5:2 E4:2 C#5:2 C#5:2
+  A5:2 F#5 G5 A5:2 F#5 G5 A5 A4 B4 C#5 D5 E5 F#5 G5 F#5:2 D5 E5 F#5:2 F#4 G4 A4 B4 A4 G4 A4 F#4 G4 A4 G4:2 B4 A4 G4:2 F#4 E4 F#4 E4 D4 E4 F#4 G4 A4 B4 G4:2 B4 A4 B4:2 C#5 D5 A4 B4 C#5 D5 E5 F#5 G5 A5
+  F#5:2 D5 E5 F#5:2 E5 D5 E5 C#5 D5 E5 F#5 E5 D5 C#5 D5:2 B4 C#5 D5:2 F#4 G4 A4 B4 A4 G4 A4 D5 C#5 D5 B4:2 D5 C#5 B4:2 A4 G4 A4 G4 F#4 G4 A4 B4 C#5 D5 B4:2 D5 C#5 D5:2 C#5 B4 C#5 D5 E5 D5 C#5 D5 B4 C#5
+  D5:2 F#5:2 G5:2 F#5:2 E5:2 E4:2 F#5:2 E5:2 D5:2 F#4:2 D4:2 B4:2 A4:2 C#4:2 G4:2 A4:2 B4:2 D4:2 C#5:2 B4:2 A4:2 A3:2 G4:2 A4:2 B4:2 D4:2 A4:2 B4:2 C#5:2 E4:2 D5:2 E5:2
+  D5:2 D5 E5 F#5:2 D5:2 C#5:2 C#5 D5 E5:2 C#5:2 B4:2 D5 E5 F#5:2 D5:2 F#5:2 F#5 E5 D5:2 C#5:2 B4:2 B4 A4 B4:2 C#5:2 D5:2 F#5 E5 D5:2 F#5:2 G5:2 D5 C#5 B4:2 B4:2 A4:2 A4 G4 A4:2 C#5:2
+  F#5:2 A4:2 F#6:2 F#5:2 E6:2 E4:2 E5:2 C#5:2 D5:2 F#4:2 D6:2 D5:2 C#6:2 C#4:2 C#5:2 A4:2 B4:2 D4:2 B5:2 B4:2 A5:2 A3:2 A4:2 F#4:2 B4:2 D4:2 G5:2 B4:2 E5:2 E4:2 A4:2 F#5:2
+  F#5:16
+`, 4);
 
 // 어려움 ② 흑건 (80bpm, 2/4) — 쇼팽 Op.10 No.5 오른손을 초판(슐레징거) 악보에서 그대로 옮김.
 // 원곡은 셋잇단 16분음표(한 박에 6개)라 seqU(문자열, 한 박을 나누는 수) 로 적는다(숫자 = 단위 개수, 생략하면 1개).
