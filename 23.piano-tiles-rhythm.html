@@ -88,8 +88,6 @@
   .stats .k{ font-size:12px; color:var(--ink-soft); }
   .stats .v{ font-size:22px; font-weight:700; }
   .stats .v.p{ color:var(--ok); } .stats .v.g{ color:var(--warn); } .stats .v.m{ color:var(--danger); }
-  textarea#copyBox{ width:100%; height:64px; font:inherit; font-size:13px; padding:8px; border:1px solid var(--line-mid); border-radius:var(--radius); margin-top:8px; display:none; }
-  .msg{ font-size:13px; text-align:center; color:var(--ok); min-height:18px; margin-top:6px; }
 </style>
 </head>
 <body>
@@ -147,12 +145,9 @@
       <b>PERFECT</b>는 ±50ms, <b>GOOD</b>은 ±120ms 오차까지 인정한 결과입니다.
       실제 프로그램도 이렇게 '허용 오차'를 정해서 이벤트를 판정합니다.
     </div>
-    <button class="btn primary" id="copyBtn">결과 복사</button>
-    <textarea id="copyBox" readonly></textarea>
-    <div class="msg" id="copyMsg"></div>
     <div class="spacer"></div>
     <div class="row" style="margin-top:10px">
-      <button class="btn" id="retryBtn">다시하기</button>
+      <button class="btn" id="retryBtn">다시하기 (스페이스 · D F J K)</button>
       <button class="btn" id="homeBtn">처음으로</button>
     </div>
   </section>
@@ -164,6 +159,8 @@ const CONFIG = {
   lanes: 4,
   hitWindowPerfectMs: 50,
   hitWindowGoodMs: 120,
+  hitWindowMissMs: 250,    // 이 안에 타일이 있으면 그 타일을 MISS 로 처리, 없으면 빈 MISS
+  penaltyMiss: 500,        // MISS 감점 (점수는 0 아래로 내려가지 않음)
   scorePerfect: 300,
   scoreGood: 100,
   comboMultiplierThresholds: [ {combo: 10, mult: 1.2}, {combo: 20, mult: 1.5} ],
@@ -511,16 +508,22 @@ function hitLane(lane){
     if (n.judged || n.lane !== lane) continue;
     const d = Math.abs(inputMs - n.targetMs);
     if (d < bestDiff) { bestDiff = d; best = n; }
-    if (n.targetMs - inputMs > CONFIG.hitWindowGoodMs) break;   // 이후 노트는 더 멀다
+    if (n.targetMs - inputMs > CONFIG.hitWindowMissMs) break;   // 이후 노트는 더 멀다
   }
-  if (!best || bestDiff > CONFIG.hitWindowGoodMs) return;
-  judge(best, bestDiff <= CONFIG.hitWindowPerfectMs ? "PERFECT" : "GOOD", inputMs);
+  if (best && bestDiff <= CONFIG.hitWindowGoodMs) {
+    judge(best, bestDiff <= CONFIG.hitWindowPerfectMs ? "PERFECT" : "GOOD", inputMs);
+  } else if (best && bestDiff <= CONFIG.hitWindowMissMs) {
+    judge(best, "MISS", inputMs);                 // 너무 이르거나 늦은 입력: 그 타일을 MISS 로 소비
+  } else {
+    judge({ lane, pitch: null }, "MISS", inputMs); // 타일 없는 곳을 두드림(연타 방지): 빈 MISS
+  }
 }
 function judge(n, grade, atMs){
   n.judged = grade; n.hitAt = atMs;
   S.judged++;
   if (grade === "MISS") {
     S.m++; S.combo = 0;
+    S.score = Math.max(0, S.score - CONFIG.penaltyMiss);
     Sound.playThud();
   } else {
     S.combo++; S.maxCombo = Math.max(S.maxCombo, S.combo);
@@ -616,7 +619,11 @@ document.querySelectorAll("#lanes .lane").forEach(el => {
 window.addEventListener("keydown", e => {
   if (e.repeat) return;
   const i = CONFIG.laneKeys.indexOf(e.code);
-  if (i >= 0 && S.running) { e.preventDefault(); hitLane(i); }
+  if (S.running) {
+    if (i >= 0) { e.preventDefault(); hitLane(i); }
+  } else if ($("result").classList.contains("on") && (i >= 0 || e.code === "Space")) {
+    e.preventDefault(); startGame();               // 결과 화면: D/F/J/K·스페이스 → 다시하기
+  }
 });
 $("exitBtn").addEventListener("click", () => { if (S.running) finish(); });
 
@@ -636,30 +643,8 @@ function finish(){
   $("rAcc").textContent = accuracy() + "%";
   $("rCombo").textContent = S.maxCombo;
   $("rP").textContent = S.p; $("rG").textContent = S.g; $("rM").textContent = S.m;
-  $("copyBox").style.display = "none"; $("copyMsg").textContent = "";
   showScreen("result");
 }
-function resultText(){
-  return "난이도: " + CONFIG.difficulties[S.diff].label + " | 곡: " + S.song.title +
-    " | 점수: " + S.score + " | 정확도: " + accuracy() + "%" +
-    " | PERFECT " + S.p + " GOOD " + S.g + " MISS " + S.m + " | 최고콤보 " + S.maxCombo;
-}
-function copyFallback(text){
-  const box = $("copyBox");
-  box.style.display = "block"; box.value = text;
-  box.focus(); box.select(); box.setSelectionRange(0, text.length);
-  let ok = false;
-  try { ok = document.execCommand("copy"); } catch (e) {}
-  $("copyMsg").textContent = ok ? "복사했습니다. 선생님께 제출하세요." : "자동 복사가 안 되는 기기입니다. 위 글을 길게 눌러 복사하세요.";
-}
-$("copyBtn").addEventListener("click", () => {
-  const text = resultText();
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text)
-      .then(() => { $("copyMsg").textContent = "복사했습니다. 선생님께 제출하세요."; })
-      .catch(() => copyFallback(text));
-  } else copyFallback(text);
-});
 $("retryBtn").addEventListener("click", startGame);
 $("homeBtn").addEventListener("click", () => {
   S.diff = null; S.songIdx = null;
