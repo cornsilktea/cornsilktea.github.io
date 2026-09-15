@@ -201,7 +201,7 @@ const CONFIG = {
     hard: {
       label: "어려움",
       songs: [
-        { id: "canon",    title: "캐논 변주곡", bpm: 88,  song: "HARD_SONG_1", fallDurationMs: 1400 },
+        { id: "canon",    title: "캐논 변주곡", bpm: 100, song: "HARD_SONG_1", fallDurationMs: 1400 },
         { id: "heukgeon", title: "흑건",         bpm: 80,  song: "HARD_SONG_2", fallDurationMs: 1200, missScore: 30 },
         { id: "moonlight", title: "월광 소나타 1악장", bpm: 108, song: "HARD_SONG_3", fallDurationMs: 1600 }
       ]
@@ -274,16 +274,18 @@ const TURK_BR = seq(`C#5 D5 E5 F#5 E5 D5 C#5 B4 A4 B4 C#5 D5 E5:1.5 R
                      F#5 E5 D5 C#5 B4 C#5 D5 B4 C#5 B4 A4 G#4 A4:1.5 R`);
 const MEDIUM_SONG_2 = cat(TURK_P1, TURK_P2, TURK_P1, TURK_P2, TURK_BR, TURK_BR, TURK_P1, TURK_P2, TURK_P1, TURK_P2, seq(`A4:2`));
 
-// 어려움 ① 캐논 변주곡 (88bpm) — 파헬벨 캐논 피아노 편곡(W. Wallace, C장조 → D장조로 올림, github.com/piotr-yuxuan/pachelbel-canone)
+// 어려움 ① 캐논 변주곡 (100bpm) — 파헬벨 캐논 피아노 편곡(W. Wallace, C장조 → D장조로 올림, github.com/piotr-yuxuan/pachelbel-canone)
 // 을 그대로 옮김. 코드 진행 D–A–Bm–F#m–G–D–G–A, 코드당 2박(편곡의 2분음표). 16분음표 단위(seqU 4).
 // 도입은 왼손 8분음표 아르페지오만, 이후엔 오른손 선율을 우선하고 오른손이 쉬는 8분음표 자리는 왼손(한 옥타브 올림)으로 채움.
-// 편곡 22순환 중 반복되는 순환은 하나만 남겨 9순환 + 맺음, 약 101초.
+// 편곡 22순환 중 반복 순환은 하나만 남기되 16분음표 런 두 순환은 원곡처럼 두 번씩 → 11순환 + 맺음, 약 108초.
 const HARD_SONG_1 = seqU(`
   D4:2 A4:2 D5:2 F#5:2 A3:2 E4:2 A4:2 C#5:2 B3:2 F#4:2 B4:2 D5:2 F#3:2 C#4:2 F#4:2 A4:2 G3:2 D4:2 G4:2 B4:2 D3:2 A3:2 D4:2 F#4:2 G3:2 D4:2 G4:2 B4:2 A3:2 E4:2 A4:2 C#5:2
   F#5:2 A4:2 D5:2 F#5:2 E5:2 E4:2 A4:2 C#5:2 D5:2 F#4:2 B4:2 D5:2 C#5:2 C#4:2 F#4:2 A4:2 B4:2 D4:2 G4:2 B4:2 A4:2 A3:2 D4:2 F#4:2 B4:2 D4:2 G4:2 B4:2 C#5:2 E4:2 A4:2 C#5:2
   D5:2 A4:2 F#5:2 F#5:2 A5:2 E4:2 G5:2 C#5:2 F#5:2 F#4:2 D5:2 D5:2 F#5:2 C#4:2 E5:2 A4:2 D5:2 D4:2 B4:2 B4:2 D5:2 A3:2 F#5:2 F#4:2 G5:2 D4:2 B5:2 B4:2 A5:2 E4:2 G5:2 C#5:2
   D5:2 C#5:2 D5:2 F#5:2 A4:2 E4:2 C#5:2 C#5:2 D5:2 F#4:2 F#5:2 D5:2 A5:2 C#4:2 A5:2 B5:2 G5:2 F#5:2 E5:2 G5:2 F#5:2 E5:2 D5:2 C#5:2 B4:2 A4:2 G4:2 D5:2 D5:2 E4:2 C#5:2 C#5:2
   A5:2 F#5 G5 A5:2 F#5 G5 A5 A4 B4 C#5 D5 E5 F#5 G5 F#5:2 D5 E5 F#5:2 F#4 G4 A4 B4 A4 G4 A4 F#4 G4 A4 G4:2 B4 A4 G4:2 F#4 E4 F#4 E4 D4 E4 F#4 G4 A4 B4 G4:2 B4 A4 B4:2 C#5 D5 A4 B4 C#5 D5 E5 F#5 G5 A5
+  A5:2 F#5 G5 A5:2 F#5 G5 A5 A4 B4 C#5 D5 E5 F#5 G5 F#5:2 D5 E5 F#5:2 F#4 G4 A4 B4 A4 G4 A4 F#4 G4 A4 G4:2 B4 A4 G4:2 F#4 E4 F#4 E4 D4 E4 F#4 G4 A4 B4 G4:2 B4 A4 B4:2 C#5 D5 A4 B4 C#5 D5 E5 F#5 G5 A5
+  F#5:2 D5 E5 F#5:2 E5 D5 E5 C#5 D5 E5 F#5 E5 D5 C#5 D5:2 B4 C#5 D5:2 F#4 G4 A4 B4 A4 G4 A4 D5 C#5 D5 B4:2 D5 C#5 B4:2 A4 G4 A4 G4 F#4 G4 A4 B4 C#5 D5 B4:2 D5 C#5 D5:2 C#5 B4 C#5 D5 E5 D5 C#5 D5 B4 C#5
   F#5:2 D5 E5 F#5:2 E5 D5 E5 C#5 D5 E5 F#5 E5 D5 C#5 D5:2 B4 C#5 D5:2 F#4 G4 A4 B4 A4 G4 A4 D5 C#5 D5 B4:2 D5 C#5 B4:2 A4 G4 A4 G4 F#4 G4 A4 B4 C#5 D5 B4:2 D5 C#5 D5:2 C#5 B4 C#5 D5 E5 D5 C#5 D5 B4 C#5
   D5:2 F#5:2 G5:2 F#5:2 E5:2 E4:2 F#5:2 E5:2 D5:2 F#4:2 D4:2 B4:2 A4:2 C#4:2 G4:2 A4:2 B4:2 D4:2 C#5:2 B4:2 A4:2 A3:2 G4:2 A4:2 B4:2 D4:2 A4:2 B4:2 C#5:2 E4:2 D5:2 E5:2
   D5:2 D5 E5 F#5:2 D5:2 C#5:2 C#5 D5 E5:2 C#5:2 B4:2 D5 E5 F#5:2 D5:2 F#5:2 F#5 E5 D5:2 C#5:2 B4:2 B4 A4 B4:2 C#5:2 D5:2 F#5 E5 D5:2 F#5:2 G5:2 D5 C#5 B4:2 B4:2 A4:2 A4 G4 A4:2 C#5:2
