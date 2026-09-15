@@ -44,6 +44,13 @@
   .cat-btn img { display: block; height: clamp(64px, 12vw, 120px); margin: 0 auto 4px; object-fit: contain; }
   .help { background: rgba(27, 35, 80, 0.08); border-radius: 12px; padding: 10px 12px; margin-top: 8px; text-align: left; }
   .help p { margin: 3px 0; }
+  .hall { font-size: clamp(14px, 2.2vw, 20px); margin: 4px 0 8px; }
+  .hall em { font-style: normal; font-weight: 800; }
+  .hall-form { background: rgba(27, 35, 80, 0.08); border-radius: 12px; padding: 10px 12px; margin: 8px 0 4px; font-size: clamp(14px, 2.2vw, 20px); font-weight: 700; }
+  .hall-form .row { display: flex; gap: 8px; margin-top: 8px; }
+  .hall-form input[type=text] { flex: 1; min-width: 0; height: 44px; font: inherit; font-size: 16px; padding: 0 12px; border: 2px solid #1b2350; border-radius: 10px; background: #fff; color: #1b2350; }
+  .hall-form .btn { flex: 0 0 96px; width: auto; padding: 0 8px; font-size: 16px; }
+  .hall-msg { font-size: 13px; font-weight: 600; min-height: 18px; margin-top: 6px; opacity: 0.85; }
 </style>
 </head>
 <body>
@@ -164,6 +171,37 @@ const SAVE_KEY = 'hanokroofrun_best_v2';
 function loadBest() { try { return parseInt(localStorage.getItem(SAVE_KEY)) || 0; } catch (e) { return 0; } }
 function saveBest(v) { try { localStorage.setItem(SAVE_KEY, String(v)); } catch (e) {} }
 let best = loadBest();
+
+// ───────── 역대 최고 기록 (Firebase Realtime Database, 모든 학생 공통) ─────────
+// 경로 records/hanokroofrun/all → { score, name, at }. 규칙(데이터베이스규칙.json)이 기존보다 높은 점수만 받는다.
+const Hall = {
+  rec: null, loaded: false,
+  url() {
+    const cfg = window.PORTAL_CONFIG;
+    if (!cfg || !cfg.isReady || !cfg.isReady()) return null;
+    return cfg.DB_URL.replace(/\/+$/, '') + '/records/hanokroofrun/all.json';
+  },
+  load() {
+    const u = this.url(); if (!u) return Promise.resolve();
+    return fetch(u, { cache: 'no-store' })
+      .then(r => { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
+      .then(j => { this.rec = (j && typeof j.score === 'number') ? j : null; this.loaded = true; })
+      .catch(() => {});
+  },
+  submit(score, name) {
+    const u = this.url(); if (!u) return Promise.reject(new Error('no-db'));
+    const rec = { score, name, at: Date.now() };
+    return fetch(u, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rec) })
+      .then(r => { if (!r.ok) throw new Error(String(r.status)); this.rec = rec; return rec; });
+  },
+  beats(score) { return this.loaded && score > 0 && (!this.rec || score > this.rec.score); },
+};
+function escapeHtml(t) { return String(t).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch])); }
+function hallText() {
+  if (!Hall.loaded) return Hall.url() ? '역대 최고 기록을 불러오지 못했습니다' : '';
+  const r = Hall.rec;
+  return r ? '🏆 역대 최고 <em>' + r.score + '</em>점 · ' + escapeHtml(r.name) : '🏆 역대 최고 기록 없음 — 첫 기록에 도전!';
+}
 
 // ───────── 사운드 (간단 비프) ─────────
 let actx = null;
@@ -403,6 +441,7 @@ function detach() {
 }
 
 window.addEventListener('keydown', (e) => {
+  if (e.target && e.target.tagName === 'INPUT') return;   // 이름 입력 중에는 스페이스바로 재시작하지 않음
   if (e.code === 'Space' || e.code === 'ArrowUp') {
     e.preventDefault();
     if (e.repeat) return;
@@ -410,7 +449,7 @@ window.addEventListener('keydown', (e) => {
     press();
   }
 });
-window.addEventListener('keyup', (e) => { if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); release(); } });
+window.addEventListener('keyup', (e) => { if (e.target && e.target.tagName === 'INPUT') return; if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); release(); } });
 canvas.addEventListener('pointerdown', (e) => { e.preventDefault(); press(); });
 window.addEventListener('pointerup', () => release());
 window.addEventListener('pointercancel', () => release());
@@ -515,7 +554,16 @@ function showResult(cleared) {
     <h2>${cleared ? '코스 완주!' : '추락!'}</h2>
     <div class="score-line">점수 ${score}</div>
     <p>스테이지 ${curStage}까지 진행 · 금화 ${goldGot} / ${stage.goldTotal}${isNew ? ' · 신기록!' : ''}</p>
-    <p>최고 기록 ${best}점</p>
+    <p>내 최고 기록 ${best}점</p>
+    <div class="hall" id="hallLine">${hallText()}</div>
+    <div class="hall-form" id="hallForm" style="display:${Hall.beats(score) ? '' : 'none'}">
+      <div>🏆 역대 최고 기록 달성! 이름을 남기세요</div>
+      <div class="row">
+        <input type="text" id="hallName" maxlength="20" placeholder="이름 (20자 이내)" autocomplete="off">
+        <button class="btn" id="hallSubmit">등록</button>
+      </div>
+      <div class="hall-msg" id="hallMsg"></div>
+    </div>
     <div class="btn-row">
       <button class="btn" id="btnRetry">다시 도전<small>스페이스바</small></button>
       <button class="btn" id="btnMenu">처음으로</button>
@@ -523,13 +571,33 @@ function showResult(cleared) {
   overlay.classList.remove('hidden');
   document.getElementById('btnRetry').onclick = () => startGame();
   document.getElementById('btnMenu').onclick = showMenu;
+  // 역대 최고 기록 등록 (규칙이 더 높은 점수만 받으므로, 그 사이 누가 앞질렀으면 401 로 거부된다)
+  const nameEl = document.getElementById('hallName'), submitEl = document.getElementById('hallSubmit');
+  const lineEl = document.getElementById('hallLine'), formEl = document.getElementById('hallForm'), msgEl = document.getElementById('hallMsg');
+  const thisScore = score;
+  submitEl.onclick = () => {
+    const name = nameEl.value.trim();
+    if (!name) { msgEl.textContent = '이름을 입력하세요.'; nameEl.focus(); return; }
+    submitEl.disabled = true; msgEl.textContent = '등록 중…';
+    Hall.submit(thisScore, name)
+      .then(() => { formEl.style.display = 'none'; lineEl.innerHTML = hallText() + ' (등록 완료)'; })
+      .catch(err => {
+        if (err.message === '401' || err.message === '400') {
+          msgEl.textContent = '그 사이 더 높은 기록이 등록되었습니다.';
+          Hall.load().then(() => { lineEl.innerHTML = hallText(); formEl.style.display = 'none'; });
+        } else { msgEl.textContent = '네트워크 오류로 등록하지 못했습니다. 다시 눌러 보세요.'; submitEl.disabled = false; }
+      });
+  };
+  nameEl.onkeydown = (e) => { if (e.key === 'Enter') submitEl.click(); };
+  if (Hall.beats(score)) setTimeout(() => nameEl.focus(), 50);
 }
 function showMenu() {
   mode = 'menu'; hud.style.display = 'none';
   panel.innerHTML = `
     <h1>고양이 달리기</h1>
     <p>고양이가 한옥 지붕 위를 달립니다. 지붕 사이 낭떠러지를 점프와 와이어로 건너 8단계가 이어진 코스의 목표 지점(G)까지 가세요.</p>
-    <div class="score-line">최고 기록 ${best}점</div>
+    <div class="score-line">내 최고 기록 ${best}점</div>
+    <div class="hall">${hallText()}</div>
     <p>고양이를 골라 시작하세요</p>
     <div class="btn-row cat-row">
       <button class="btn cat-btn" id="btnBlack"><img src="${IMG_SRC_BLACK.run}" alt="">검은 고양이</button>
@@ -545,6 +613,8 @@ function showMenu() {
   overlay.classList.remove('hidden');
   document.getElementById('btnBlack').onclick = () => startGame('black');
   document.getElementById('btnYellow').onclick = () => startGame('yellow');
+  // 다른 학생이 올린 기록 반영 (처음 열 때·처음으로 돌아올 때마다 새로 읽음)
+  Hall.load().then(() => { const el = panel.querySelector('.hall'); if (mode === 'menu' && el) el.innerHTML = hallText(); });
 }
 
 // ───────── 그리기 ─────────
