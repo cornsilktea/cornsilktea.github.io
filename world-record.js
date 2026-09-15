@@ -139,11 +139,12 @@
       submit: function (v, name, grade, cls) {
         var u = api.url();
         if (!u) return Promise.reject(new Error("no-db"));
-        var rec = { score: lower ? LOWER_BASE - v : v, name: name, grade: grade, cls: cls, at: Date.now() };
+        /* at 은 서버 시각(.sv) — 학생 기기의 시계가 틀려도 규칙의 시각 검사에 걸리지 않게 */
+        var rec = { score: lower ? LOWER_BASE - v : v, name: name, grade: grade, cls: cls, at: { ".sv": "timestamp" } };
         return fetch(u, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(rec) })
           .then(function (r) {
             if (!r.ok) throw new Error(String(r.status));
-            api.rec = rec; emit(); return rec;
+            rec.at = Date.now(); api.rec = rec; emit(); return rec;
           });
       },
 
