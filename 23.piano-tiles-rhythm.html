@@ -3,6 +3,7 @@
 <head>
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="pianotiles"></script>
+<script charset="utf-8" src="world-record.js"></script>
 <meta charset="utf-8">
 <link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
@@ -86,13 +87,10 @@
   .hall{ background:var(--panel); border:1px solid var(--line-mid); border-radius:var(--radius); padding:8px 10px; margin:8px 0 2px; }
   .hall .k{ font-size:13px; color:var(--ink-mid); text-align:center; }
   .hall .k em{ font-style:normal; color:var(--warn); font-weight:700; }
-  .hall-form{ margin-top:8px; }
-  .hall-title{ font-size:14px; font-weight:700; text-align:center; color:var(--accent); margin-bottom:8px; }
-  .hall-form input[type=text]{ flex:1; min-width:0; height:44px; font:inherit; font-size:16px; padding:0 12px; border:1px solid var(--line-strong); border-radius:var(--radius); background:var(--panel); color:var(--ink); }
-  .hall-form input[type=text]:focus{ outline:2px solid var(--primary-soft); }
-  .hall-msg{ font-size:13px; text-align:center; color:var(--ink-soft); min-height:18px; margin-top:6px; }
+  .hall .k small{ display:block; font-size:12px; color:var(--ink-soft); margin-top:2px; }
   .song .h{ font-size:12px; color:var(--ink-soft); display:block; }
   .song .h em{ font-style:normal; color:var(--accent); font-weight:700; }
+  .song .h small{ display:block; font-size:11px; }
   .stats{ display:grid; grid-template-columns:repeat(2,1fr); gap:6px; margin:10px 0; }
   .stats .cell{ background:var(--panel); border:1px solid var(--line-mid); border-radius:var(--radius); padding:8px; text-align:center; }
   .stats .k{ font-size:12px; color:var(--ink-soft); }
@@ -146,14 +144,6 @@
     </div>
     <div class="hall" id="hall">
       <div class="k" id="hallLine">세계 신기록을 불러오는 중…</div>
-      <div class="hall-form" id="hallForm" style="display:none">
-        <div class="hall-title">🏆 세계 신기록 달성! 이름을 남기세요</div>
-        <div class="row">
-          <input type="text" id="hallName" maxlength="20" placeholder="이름 (20자 이내)" autocomplete="off">
-          <button type="button" class="btn primary" id="hallSubmit" style="flex:0 0 96px">등록</button>
-        </div>
-        <div class="hall-msg" id="hallMsg"></div>
-      </div>
     </div>
     <div class="stats">
       <div class="cell"><div class="k">정확도</div><div class="v" id="rAcc">0%</div></div>
@@ -741,30 +731,25 @@ const Hall = {
 function hallText(id){
   const r = Hall.get(id);
   if (!Hall.loaded) return Hall.url("") ? "세계 신기록을 불러오지 못했습니다" : "";
-  return r ? "세계 신기록 <em>" + r.score + "</em>점 · " + escapeHtml(r.name) : "세계 신기록 없음 — 첫 기록에 도전!";
+  return r ? "세계 신기록 <em>" + r.score + "</em>점<small>" + escapeHtml(whoOf(r)) + "</small>" : "세계 신기록 없음 — 첫 기록에 도전!";
 }
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch])); }
+function whoOf(r){ return (r.grade ? r.grade + "학년 " : "") + (r.cls ? r.cls + "반 " : "") + r.name; }
+/* 결과 화면: 곡별 세계 신기록 표시. 넘었으면 world-record.js 의 공용 입력 창(학년·반·이름)을 띄운다.
+   곡별 기록은 Hall 이 한 번에 읽어 두므로, 입력 창용 WorldRecord 에는 그 값을 넘겨 준다. */
 function showHall(){
-  const cfg = S.song, r = Hall.get(cfg.id);
-  const beat = Hall.loaded && S.score > 0 && (!r || S.score > r.score);
+  const cfg = S.song;
   $("hallLine").innerHTML = hallText(cfg.id);
-  $("hallForm").style.display = beat ? "" : "none";
-  $("hallMsg").textContent = ""; $("hallName").value = ""; $("hallSubmit").disabled = false;
+  if (!window.WorldRecord || !Hall.loaded) return;
+  const wr = WorldRecord("pianotiles", { key: cfg.id, format: v => v + "점" });
+  wr.rec = Hall.get(cfg.id); wr.loaded = true;
+  const songId = cfg.id;
+  if (!wr.beats(S.score)) return;
+  wr.prompt(S.score).then(rec => {
+    if (rec) Hall.data[songId] = rec; else Hall.load();
+    $("hallLine").innerHTML = hallText(songId) + (rec ? " (등록 완료)" : "");
+  });
 }
-$("hallSubmit").addEventListener("click", () => {
-  const name = $("hallName").value.trim();
-  if (!name) { $("hallMsg").textContent = "이름을 입력하세요."; $("hallName").focus(); return; }
-  $("hallSubmit").disabled = true; $("hallMsg").textContent = "등록 중…";
-  Hall.submit(S.song.id, S.score, name)
-    .then(() => { $("hallForm").style.display = "none"; $("hallLine").innerHTML = hallText(S.song.id) + " (등록 완료)"; })
-    .catch(err => {
-      if (err.message === "401" || err.message === "400") {
-        $("hallMsg").textContent = "그 사이 더 높은 기록이 등록되었습니다.";
-        Hall.load().then(() => { $("hallLine").innerHTML = hallText(S.song.id); $("hallForm").style.display = "none"; });
-      } else { $("hallMsg").textContent = "네트워크 오류로 등록하지 못했습니다. 다시 눌러 보세요."; $("hallSubmit").disabled = false; }
-    });
-});
-$("hallName").addEventListener("keydown", e => { if (e.key === "Enter") $("hallSubmit").click(); });
 
 $("homeBtn").addEventListener("click", () => {
   S.diff = null; S.songIdx = null;

@@ -42,6 +42,8 @@
   .chip{background:rgba(255,255,255,0.92);backdrop-filter:blur(4px);border:1px solid #d9dcdf;border-radius:6px;
     padding:5px 9px;font-size:12px;color:#3d454d;}
   .chip b{font-weight:700;color:#111827;font-variant-numeric:tabular-nums;}
+  .chip small{display:block;font-size:10.5px;color:#5b6670;line-height:1.2;margin-top:1px;}
+  .chip small:empty{display:none;}
 
   /* ===== 하단 : 조작 버튼 ===== */
   #controls{position:fixed;left:0;right:0;bottom:0;z-index:20;
@@ -100,7 +102,7 @@
   <div id="hud">
     <div class="chip">스테이지 <b id="hStage">0</b> / 100</div>
     <div class="chip">최고 기록 <b id="hBest">0</b></div>
-    <div class="chip">세계 신기록 <b id="hWorld">-</b></div>
+    <div class="chip">세계 신기록 <b id="hWorld">-</b><small id="hWorldWho"></small></div>
   </div>
 </div>
 
@@ -192,9 +194,10 @@
   var WR = window.WorldRecord ? WorldRecord("conditionrun") : null;
   function renderWorld(){
     var has = WR && WR.rec;
-    $("hWorld").textContent = has ? WR.value() + " " + WR.name() : "-";
+    $("hWorld").textContent = has ? WR.value() : "-";
+    $("hWorldWho").textContent = has ? WR.who() : "";
     $("rWorld").textContent = has ? WR.value() + " / " + TOTAL : "-";
-    $("rWorldName").textContent = has ? WR.name() : ((WR && !WR.loaded) ? "불러오는 중…" : "기록 없음");
+    $("rWorldName").textContent = has ? WR.who() : ((WR && !WR.loaded) ? "불러오는 중…" : "기록 없음");
   }
   if (WR) { WR.onChange(renderWorld); WR.load(); }
 

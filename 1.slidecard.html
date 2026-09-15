@@ -124,7 +124,7 @@ button:hover{background:var(--sg-panel-alt);}
   var worldNameEl=document.getElementById('worldName');
   var WR=window.WorldRecord?WorldRecord('slidecard',{lower:true,format:fmt}):null;
   function renderWorld(){
-    if(WR&&WR.rec){worldEl.textContent=WR.text();worldNameEl.textContent=WR.name();}
+    if(WR&&WR.rec){worldEl.textContent=WR.text();worldNameEl.textContent=WR.who();}
     else{worldEl.textContent='-';worldNameEl.textContent=(WR&&!WR.loaded)?'불러오는 중…':'아직 기록 없음';}
   }
   if(WR){WR.onChange(renderWorld);WR.load();}

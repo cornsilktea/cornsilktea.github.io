@@ -147,6 +147,7 @@
   }
 
   .stat.world { align-items: flex-end; text-align: right; }
+  .stat .who { font-size: 10px; color: var(--ink-soft); white-space: nowrap; }
 
   .stat .value {
     font-size: 16px;
@@ -236,6 +237,7 @@
       <div class="stat world">
         <span class="label">WORLD BEST</span>
         <span class="value" id="world">-</span>
+        <span class="who" id="worldWho"></span>
       </div>
     </div>
 
@@ -264,6 +266,7 @@
   const scoreEl = document.getElementById('score');
   const bestEl = document.getElementById('best');
   const worldEl = document.getElementById('world');
+  const worldWhoEl = document.getElementById('worldWho');
   const speedLabel = document.getElementById('speedLabel');
   const overlay = document.getElementById('overlay');
   const overlayMsg = document.getElementById('overlayMsg');
@@ -277,8 +280,8 @@
   /* 세계 신기록 (모든 학생 공통, Firebase): 점수 · 이름 */
   const WR = window.WorldRecord ? WorldRecord('snakegame') : null;
   function renderWorld() {
-    if (WR && WR.rec) worldEl.textContent = WR.value() + ' · ' + WR.name();
-    else worldEl.textContent = (WR && !WR.loaded) ? '…' : '-';
+    if (WR && WR.rec) { worldEl.textContent = WR.value(); worldWhoEl.textContent = WR.who(); }
+    else { worldEl.textContent = (WR && !WR.loaded) ? '…' : '-'; worldWhoEl.textContent = ''; }
   }
   if (WR) { WR.onChange(renderWorld); WR.load(); }
   renderWorld();

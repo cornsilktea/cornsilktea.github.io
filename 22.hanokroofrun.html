@@ -3,6 +3,7 @@
 <head>
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="hanokroofrun"></script>
+<script charset="utf-8" src="world-record.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
@@ -46,11 +47,7 @@
   .help p { margin: 3px 0; }
   .hall { font-size: clamp(14px, 2.2vw, 20px); margin: 4px 0 8px; }
   .hall em { font-style: normal; font-weight: 800; }
-  .hall-form { background: rgba(27, 35, 80, 0.08); border-radius: 12px; padding: 10px 12px; margin: 8px 0 4px; font-size: clamp(14px, 2.2vw, 20px); font-weight: 700; }
-  .hall-form .row { display: flex; gap: 8px; margin-top: 8px; }
-  .hall-form input[type=text] { flex: 1; min-width: 0; height: 44px; font: inherit; font-size: 16px; padding: 0 12px; border: 2px solid #1b2350; border-radius: 10px; background: #fff; color: #1b2350; }
-  .hall-form .btn { flex: 0 0 96px; width: auto; padding: 0 8px; font-size: 16px; }
-  .hall-msg { font-size: 13px; font-weight: 600; min-height: 18px; margin-top: 6px; opacity: 0.85; }
+  .hall small { display: block; font-size: 0.8em; font-weight: 600; opacity: 0.85; margin-top: 2px; }
 </style>
 </head>
 <body>
@@ -173,34 +170,14 @@ function saveBest(v) { try { localStorage.setItem(SAVE_KEY, String(v)); } catch 
 let best = loadBest();
 
 // ───────── 세계 신기록 (Firebase Realtime Database, 모든 학생 공통) ─────────
-// 경로 records/hanokroofrun/all → { score, name, at }. 규칙(데이터베이스규칙.json)이 기존보다 높은 점수만 받는다.
-const Hall = {
-  rec: null, loaded: false,
-  url() {
-    const cfg = window.PORTAL_CONFIG;
-    if (!cfg || !cfg.isReady || !cfg.isReady()) return null;
-    return cfg.DB_URL.replace(/\/+$/, '') + '/records/hanokroofrun/all.json';
-  },
-  load() {
-    const u = this.url(); if (!u) return Promise.resolve();
-    return fetch(u, { cache: 'no-store' })
-      .then(r => { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
-      .then(j => { this.rec = (j && typeof j.score === 'number') ? j : null; this.loaded = true; })
-      .catch(() => {});
-  },
-  submit(score, name) {
-    const u = this.url(); if (!u) return Promise.reject(new Error('no-db'));
-    const rec = { score, name, at: Date.now() };
-    return fetch(u, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rec) })
-      .then(r => { if (!r.ok) throw new Error(String(r.status)); this.rec = rec; return rec; });
-  },
-  beats(score) { return this.loaded && score > 0 && (!this.rec || score > this.rec.score); },
-};
-function escapeHtml(t) { return String(t).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch])); }
+// world-record.js 공용 도우미. 경로 records/hanokroofrun/all → { score, name, grade, cls, at }
+const Hall = window.WorldRecord ? WorldRecord('hanokroofrun', { format: v => v + '점' }) : null;
 function hallText() {
+  if (!Hall) return '';
   if (!Hall.loaded) return Hall.url() ? '세계 신기록을 불러오지 못했습니다' : '';
   const r = Hall.rec;
-  return r ? '🏆 세계 신기록 <em>' + r.score + '</em>점 · ' + escapeHtml(r.name) : '🏆 세계 신기록 없음 — 첫 기록에 도전!';
+  return r ? '🏆 세계 신기록 <em>' + r.score + '</em>점<small>' + Hall.escapeHtml(Hall.who()) + '</small>'
+           : '🏆 세계 신기록 없음 — 첫 기록에 도전!';
 }
 
 // ───────── 사운드 (간단 비프) ─────────
@@ -556,14 +533,6 @@ function showResult(cleared) {
     <p>스테이지 ${curStage}까지 진행 · 금화 ${goldGot} / ${stage.goldTotal}${isNew ? ' · 신기록!' : ''}</p>
     <p>내 최고 기록 ${best}점</p>
     <div class="hall" id="hallLine">${hallText()}</div>
-    <div class="hall-form" id="hallForm" style="display:${Hall.beats(score) ? '' : 'none'}">
-      <div>🏆 세계 신기록 달성! 이름을 남기세요</div>
-      <div class="row">
-        <input type="text" id="hallName" maxlength="20" placeholder="이름 (20자 이내)" autocomplete="off">
-        <button class="btn" id="hallSubmit">등록</button>
-      </div>
-      <div class="hall-msg" id="hallMsg"></div>
-    </div>
     <div class="btn-row">
       <button class="btn" id="btnRetry">다시 도전<small>스페이스바</small></button>
       <button class="btn" id="btnMenu">처음으로</button>
@@ -571,25 +540,8 @@ function showResult(cleared) {
   overlay.classList.remove('hidden');
   document.getElementById('btnRetry').onclick = () => startGame();
   document.getElementById('btnMenu').onclick = showMenu;
-  // 세계 신기록 등록 (규칙이 더 높은 점수만 받으므로, 그 사이 누가 앞질렀으면 401 로 거부된다)
-  const nameEl = document.getElementById('hallName'), submitEl = document.getElementById('hallSubmit');
-  const lineEl = document.getElementById('hallLine'), formEl = document.getElementById('hallForm'), msgEl = document.getElementById('hallMsg');
-  const thisScore = score;
-  submitEl.onclick = () => {
-    const name = nameEl.value.trim();
-    if (!name) { msgEl.textContent = '이름을 입력하세요.'; nameEl.focus(); return; }
-    submitEl.disabled = true; msgEl.textContent = '등록 중…';
-    Hall.submit(thisScore, name)
-      .then(() => { formEl.style.display = 'none'; lineEl.innerHTML = hallText() + ' (등록 완료)'; })
-      .catch(err => {
-        if (err.message === '401' || err.message === '400') {
-          msgEl.textContent = '그 사이 더 높은 기록이 등록되었습니다.';
-          Hall.load().then(() => { lineEl.innerHTML = hallText(); formEl.style.display = 'none'; });
-        } else { msgEl.textContent = '네트워크 오류로 등록하지 못했습니다. 다시 눌러 보세요.'; submitEl.disabled = false; }
-      });
-  };
-  nameEl.onkeydown = (e) => { if (e.key === 'Enter') submitEl.click(); };
-  if (Hall.beats(score)) setTimeout(() => nameEl.focus(), 50);
+  // 세계 신기록이면 학년·반·이름 입력 창(공용) — 등록되거나 그 사이 누가 앞지르면 닫힘
+  if (Hall) Hall.prompt(score).then(rec => { const el = document.getElementById('hallLine'); if (el) el.innerHTML = hallText() + (rec ? ' (등록 완료)' : ''); });
 }
 function showMenu() {
   mode = 'menu'; hud.style.display = 'none';
@@ -614,7 +566,7 @@ function showMenu() {
   document.getElementById('btnBlack').onclick = () => startGame('black');
   document.getElementById('btnYellow').onclick = () => startGame('yellow');
   // 다른 학생이 올린 기록 반영 (처음 열 때·처음으로 돌아올 때마다 새로 읽음)
-  Hall.load().then(() => { const el = panel.querySelector('.hall'); if (mode === 'menu' && el) el.innerHTML = hallText(); });
+  if (Hall) Hall.load().then(() => { const el = panel.querySelector('.hall'); if (mode === 'menu' && el) el.innerHTML = hallText(); });
 }
 
 // ───────── 그리기 ─────────

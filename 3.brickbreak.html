@@ -135,7 +135,8 @@ button:active { background: var(--sg-panel-alt); }
   color: var(--sg-ink-mid);
 }
 .note b { font-weight: 600; color: var(--wrks-viz-fg); }
-.note .world { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--wrks-viz-border); font-size: 13px; }
+.note .world { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--wrks-viz-border); font-size: 13px; line-height: 1.4; }
+.note .world small { display: block; font-size: 11.5px; color: var(--sg-ink-soft); }
 .note .world em { font-style: normal; font-weight: 700; color: var(--sg-warn); font-size: 16px; }
 .note ul { margin: 4px 0 0; padding-left: 17px; }
 #msg {
@@ -330,7 +331,7 @@ button:active { background: var(--sg-panel-alt); }
   var worldLine = document.getElementById("worldLine");
   var WR = window.WorldRecord ? WorldRecord("brickbreak", { format: function (v) { return "라운드 " + v; } }) : null;
   function renderWorld() {
-    if (WR && WR.rec) { worldLine.innerHTML = "<em>" + WR.text() + "</em> " + WR.escapeHtml(WR.name()); }
+    if (WR && WR.rec) { worldLine.innerHTML = "<em>" + WR.text() + "</em><small>" + WR.escapeHtml(WR.who()) + "</small>"; }
     else { worldLine.textContent = (WR && !WR.loaded) ? "불러오는 중…" : "아직 기록 없음 — 첫 기록에 도전!"; }
   }
   if (WR) { WR.onChange(renderWorld); WR.load(); }

@@ -441,7 +441,7 @@ h1{font-size:16px;margin:0 0 var(--wrks-viz-space-1);letter-spacing:-0.01em;}
   var worldSubEl=document.getElementById('mWorldSub');
   var WR=window.WorldRecord?WorldRecord('robotmaze',{lower:true,format:function(ms){return (ms/1000).toFixed(2)+'초';}}):null;
   function renderWorld(){
-    if(WR&&WR.rec){worldEl.textContent=WR.text();worldSubEl.textContent=WR.name();}
+    if(WR&&WR.rec){worldEl.textContent=WR.text();worldSubEl.textContent=WR.who();}
     else{worldEl.textContent='-';worldSubEl.textContent=(WR&&!WR.loaded)?'불러오는 중…':'아직 기록 없음';}
   }
   if(WR){WR.onChange(renderWorld);WR.load();}

@@ -470,7 +470,7 @@ function renderWorld(){
   const box = $("startWorld");
   box.className = "best-box world";
   box.innerHTML = (WR && WR.rec)
-    ? BEST.html("세계 신기록", WR.text(), WR.escapeHtml(WR.name()), "🏆")
+    ? BEST.html("세계 신기록", WR.text(), WR.escapeHtml(WR.who()), "🏆")
     : BEST.html("세계 신기록", (WR && !WR.loaded) ? "불러오는 중…" : "기록 없음", "첫 기록에 도전해 보세요.", "🏆");
 }
 if (WR) { WR.onChange(renderWorld); WR.load(); }
