@@ -12,7 +12,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
 <meta property="og:title" content="피아노 타일 리듬">
-<meta property="og:description" content="타이밍·이벤트 입력 판정(±50ms/±120ms) / 쉬움 3곡·보통 2곡·어려움 2곡 개인전">
+<meta property="og:description" content="타이밍·이벤트 입력 판정(±50ms/±120ms) / 쉬움 3곡·보통 3곡·어려움 3곡 개인전">
 <meta property="og:url" content="https://cornsilktea.github.io/23.piano-tiles-rhythm.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
@@ -179,7 +179,8 @@ const CONFIG = {
   laneKeys: ["KeyD", "KeyF", "KeyJ", "KeyK"],
   laneKeyLabels: ["D", "F", "J", "K"],
   leadInMs: 1500,          // 첫 타일이 생성되기 전 준비 시간
-  noteDurationMs: 1400,    // 합성음 길이(기본파 기준, 저음일수록 길어짐)
+  noteDecaySec: 0.55,      // 합성음 지수 감쇠 시정수(초, 저음일수록 길어짐 — 여운 길이)
+  missScore: null,         // 곡별 missScore 가 있으면 MISS 때 감점 대신 그 점수를 더함(흑건처럼 빠른 곡 구제용)
   difficulties: {
     easy: {
       label: "쉬움",
@@ -193,14 +194,16 @@ const CONFIG = {
       label: "보통",
       songs: [
         { id: "furelise", title: "엘리제를 위하여", bpm: 120, song: "MEDIUM_SONG_1", fallDurationMs: 1800 },
-        { id: "turkish",  title: "터키 행진곡",     bpm: 160, song: "MEDIUM_SONG_2", fallDurationMs: 1700 }
+        { id: "turkish",  title: "터키 행진곡",     bpm: 160, song: "MEDIUM_SONG_2", fallDurationMs: 1700 },
+        { id: "bach",     title: "바흐 프렐류드 C장조", bpm: 76, song: "MEDIUM_SONG_3", fallDurationMs: 1700 }
       ]
     },
     hard: {
       label: "어려움",
       songs: [
         { id: "canon",    title: "캐논 변주곡", bpm: 116, song: "HARD_SONG_1", fallDurationMs: 1300 },
-        { id: "heukgeon", title: "흑건",         bpm: 80,  song: "HARD_SONG_2", fallDurationMs: 1200 }
+        { id: "heukgeon", title: "흑건",         bpm: 80,  song: "HARD_SONG_2", fallDurationMs: 1200, missScore: 30 },
+        { id: "moonlight", title: "월광 소나타 1악장", bpm: 108, song: "HARD_SONG_3", fallDurationMs: 1600 }
       ]
     }
   }
@@ -295,16 +298,16 @@ const HARD_SONG_1 = cat(CANON_V1, CANON_V2, CANON_V3, CANON_V4, CANON_DOT, CANON
                         CANON_CLX1, CANON_CLX2, CANON_V4.slice(0, 32), seq(`D5:4`));
 
 // 어려움 ② 흑건 (80bpm, 2/4) — 쇼팽 Op.10 No.5 오른손을 초판(슐레징거) 악보에서 그대로 옮김.
-// 원곡은 셋잇단 16분음표(한 박에 6개)라 seqT 로 적는다(숫자 = 셋잇단 16분음표 개수, 생략하면 1개).
+// 원곡은 셋잇단 16분음표(한 박에 6개)라 seqU(문자열, 한 박을 나누는 수) 로 적는다(숫자 = 단위 개수, 생략하면 1개).
 // 원곡 빠르기 116 → 80 으로 늦춤. 1~32마디(A + B 전반) + 49~85마디(재현 + 코다), 약 104초.
 // 오른손 성부가 둘로 갈라지는 마디(4·12·52·66~68·71~72)는 위 성부의 16분음표를 쓴다(아래 성부만 읽으면 긴 음 하나로 뚝 끊김).
-function seqT(str){
+function seqU(str, div){
   return str.trim().split(/\s+/).map(tok => {
     const [p, n] = tok.split(":");
-    return { pitch: p === "R" ? null : p, beats: (n !== undefined ? parseFloat(n) : 1) / 6 };
+    return { pitch: p === "R" ? null : p, beats: (n !== undefined ? parseFloat(n) : 1) / div };
   });
 }
-const HARD_SONG_2 = seqT(`
+const HARD_SONG_2 = seqU(`
   F#6 A#6 C#6 F#6 D#6 F#6 C#6 F#6 A#5 C#6 F#5 A#5
   F#5 A#5 C#5 F#5 D#5 F#5 C#5 F#5 A#4 C#5 F#4 A#4
   C#4 C#5 G#4 C#5 G#4 G#5 G#4 G#5 D#5 G#5 D#5 D#6
@@ -374,8 +377,92 @@ const HARD_SONG_2 = seqT(`
   F#6 R F#6 D#6 C#6 A#5 G#5 F#5 D#5 C#5 A#4 G#4
   F#4:3 R:3 A#6:6
   F#3:24
-`);
-const SONG_DATA = { EASY_SONG_1, EASY_SONG_2, EASY_SONG_3, MEDIUM_SONG_1, MEDIUM_SONG_2, HARD_SONG_1, HARD_SONG_2 };
+`, 6);
+
+// 보통 ③ 바흐 평균율 1권 프렐류드 C장조 BWV 846 (76bpm) — humdrum-tools/bach-wtc 악보 35마디 전부, 16분음표 단위, 약 110초.
+// 세 성부가 겹치는 자리는 가장 높은 음 하나만(C E G C E G C E 패턴). 저음 C2 는 한 옥타브 올림.
+const MEDIUM_SONG_3 = seqU(`
+  C4 E4 G4 C5 E5 G4 C5 E5 C4 E4 G4 C5 E5 G4 C5 E5
+  C4 D4 A4 D5 F5 A4 D5 F5 C4 D4 A4 D5 F5 A4 D5 F5
+  B3 D4 G4 D5 F5 G4 D5 F5 B3 D4 G4 D5 F5 G4 D5 F5
+  C4 E4 G4 C5 E5 G4 C5 E5 C4 E4 G4 C5 E5 G4 C5 E5
+  C4 E4 A4 E5 A5 A4 E5 A5 C4 E4 A4 E5 A5 A4 E5 A5
+  C4 D4 F#4 A4 D5 F#4 A4 D5 C4 D4 F#4 A4 D5 F#4 A4 D5
+  B3 D4 G4 D5 G5 G4 D5 G5 B3 D4 G4 D5 G5 G4 D5 G5
+  B3 C4 E4 G4 C5 E4 G4 C5 B3 C4 E4 G4 C5 E4 G4 C5
+  A3 C4 E4 G4 C5 E4 G4 C5 A3 C4 E4 G4 C5 E4 G4 C5
+  D3 A3 D4 F#4 C5 D4 F#4 C5 D3 A3 D4 F#4 C5 D4 F#4 C5
+  G3 B3 D4 G4 B4 D4 G4 B4 G3 B3 D4 G4 B4 D4 G4 B4
+  G3 A#3 E4 G4 C#5 E4 G4 C#5 G3 A#3 E4 G4 C#5 E4 G4 C#5
+  F3 A3 D4 A4 D5 D4 A4 D5 F3 A3 D4 A4 D5 D4 A4 D5
+  F3 G#3 D4 F4 B4 D4 F4 B4 F3 G#3 D4 F4 B4 D4 F4 B4
+  E3 G3 C4 G4 C5 C4 G4 C5 E3 G3 C4 G4 C5 C4 G4 C5
+  E3 F3 A3 C4 F4 A3 C4 F4 E3 F3 A3 C4 F4 A3 C4 F4
+  D3 F3 A3 C4 F4 A3 C4 F4 D3 F3 A3 C4 F4 A3 C4 F4
+  G3 D3 G3 B3 F4 G3 B3 F4 G3 D3 G3 B3 F4 G3 B3 F4
+  C3 E3 G3 C4 E4 G3 C4 E4 C3 E3 G3 C4 E4 G3 C4 E4
+  C3 G3 A#3 C4 E4 A#3 C4 E4 C3 G3 A#3 C4 E4 A#3 C4 E4
+  F3 F3 A3 C4 E4 A3 C4 E4 F3 F3 A3 C4 E4 A3 C4 E4
+  F#3 C3 A3 C4 D#4 A3 C4 D#4 F#3 C3 A3 C4 D#4 A3 C4 D#4
+  G#3 F3 B3 C4 D4 B3 C4 D4 G#3 F3 B3 C4 D4 B3 C4 D4
+  G3 F3 G3 B3 D4 G3 B3 D4 G3 F3 G3 B3 D4 G3 B3 D4
+  G3 E3 G3 C4 E4 G3 C4 E4 G3 E3 G3 C4 E4 G3 C4 E4
+  G3 D3 G3 C4 F4 G3 C4 F4 G3 D3 G3 C4 F4 G3 C4 F4
+  G3 D3 G3 B3 F4 G3 B3 F4 G3 D3 G3 B3 F4 G3 B3 F4
+  G3 D#3 A3 C4 F#4 A3 C4 F#4 G3 D#3 A3 C4 F#4 A3 C4 F#4
+  G3 E3 G3 C4 G4 G3 C4 G4 G3 E3 G3 C4 G4 G3 C4 G4
+  G3 D3 G3 C4 F4 G3 C4 F4 G3 D3 G3 C4 F4 G3 C4 F4
+  G3 D3 G3 B3 F4 G3 B3 F4 G3 D3 G3 B3 F4 G3 B3 F4
+  C3 C3 G3 A#3 E4 G3 A#3 E4 C3 C3 G3 A#3 E4 G3 A#3 E4
+  C3 C3 F3 A3 C4 F4 C4 A3 C4 A3 F3 A3 F3 D3 F3 D3
+  C3 B3 G4 B4 D5 F5 D5 B4 D5 B4 G4 B4 D4 F4 E4 D4
+  C5:4
+`, 4);
+
+// 어려움 ③ 베토벤 월광 소나타 1악장 (2분음표 54 = 4분음표 108) — craigsapp/beethoven-piano-sonatas 악보에서
+// 1~28마디 + 60~69마디(코다), 셋잇단 8분음표 단위, 약 84초. 두 손 음 중 같은 시각엔 가장 높은 음(선율이 있으면 선율).
+// 선율의 붙점 16분음표는 셋잇단 격자에 맞춰 붙였다. 저음 옥타브는 C3 아래를 한 옥타브 올림.
+const HARD_SONG_3 = seqU(`
+  G#3 C#4 E4 G#3 C#4 E4 G#3 C#4 E4 G#3 C#4 E4
+  G#3 C#4 E4 G#3 C#4 E4 G#3 C#4 E4 G#3 C#4 E4
+  A3 C#4 E4 A3 C#4 E4 A3 D4 F#4 A3 D4 F#4
+  G#3 C4 F#4 G#3 C#4 E4 G#3 C#4 D#4 F#3 C4 D#4
+  E3 G#3 C#4 G#3 C#4 E4 G#3 C#4 E4 G#4 C#4 G#4
+  G#4 D#4 F#4 G#3 D#4 F#4 G#3 D#4 F#4 G#4 D#4 G#4
+  G#4 C#4 E4 G#3 C#4 E4 A4 C#4 F#4 A3 C#4 F#4
+  G#4 B3 E4 G#3 B3 E4 F#4 B3 D#4 B4 B3 D#4
+  E4 B3 E4 G#3 B3 E4 G#3 B3 E4 G#3 B3 E4
+  G3 B3 E4 G3 B3 E4 G3 B3 E4 G4 B3 G4
+  G4 B3 F4 G3 B3 F4 G3 B3 F4 G4 B3 G4
+  G4 C4 E4 G3 C4 E4 G3 C#4 E4 F#4 C#4 E4
+  F#4 B3 D4 F#3 B3 D4 G4 B3 C#4 E4 B3 C#4
+  F#4 B3 D4 F#3 B3 D4 F#4 A#3 C#4 F#3 A#3 C#4
+  B3 D4 F#4 B3 D4 F#4 B3 D#4 F#4 B4 D#4 F#4
+  C5 E4 G4 B3 E4 G4 B3 E4 G4 A#4 E4 G4
+  B4 D#4 F#4 B3 D#4 F#4 B3 D#4 F#4 B4 D#4 F#4
+  C5 E4 G4 B3 E4 G4 B3 E4 G4 A#4 E4 G4
+  B4 D#4 F#4 B3 D#4 F#4 B4 D4 F4 B3 D4 F4
+  B4 C#4 G#4 B3 C#4 G#4 A4 C#4 F#4 A3 C#4 F#4
+  G4 B3 D4 G3 B3 D4 F#4 A3 D#4 F#3 A3 D#4
+  C#4 F#3 A3 C#3 F#3 A3 C#4 F#3 G#3 C#4 F3 G#3
+  F#3 A3 C#4 A3 C#4 F#4 C#4 F#4 A4 C#5 F#4 C#5
+  C#5 G#4 B4 C#4 G#4 B4 C#4 G#4 B4 C#5 G#4 C#5
+  C#5 F#4 A4 C#4 F#4 A4 C5 F#4 A4 C#5 F#4 A4
+  D#5 F#4 G#4 D#4 F#4 G#4 D#4 F#4 G#4 D#5 F#4 G#4
+  E5 G#4 C#5 E4 G#4 C#5 D#5 F#4 A4 C#5 E4 A#4
+  C5 C4 D#4 G#4 C4 D#4 A4 C4 D#4 F#4 C4 D#4:4
+  C#4 G#3 C#4 G#3 C#4 E4 G#3 C#4 E4 G#3 C#4 E4
+  G#3 D#4 F#4 G#3 D#4 F#4 G#3 D#4 F#4 G#3 D#4 F#4
+  G#3 E4 C#4 G#4 E4 C#5 G#4 E5 C#5 G#5 E5 C#5
+  C5 D#5 A4 C5 F#4 A4 D#4 F#4 A3 C4 G#3 F#3
+  C#4 E4 C#4 G#4 E4 C#5 G#4 E5 C#5 G#5 E5 C#5
+  C5 D#5 A4 C5 F#4 A4 D#4 F#4 A3 C4 G#3 F#3
+  C#4 G#3 C#4 E4 C#4 G#3 C#3 E3 G#3 C#4 G#3 E3
+  G#3 C#3 E3 G#3 E3 C#3 G#3 C#3 G#3 E3 G#3 E3
+  C#3:6 C#4:6
+  C#4:4
+`, 3);
+const SONG_DATA = { EASY_SONG_1, EASY_SONG_2, EASY_SONG_3, MEDIUM_SONG_1, MEDIUM_SONG_2, MEDIUM_SONG_3, HARD_SONG_1, HARD_SONG_2, HARD_SONG_3 };
 
 /* ============ 최고 기록 (이 기기의 localStorage, 곡별) ============ */
 const Best = {
@@ -397,45 +484,46 @@ const Sound = {
   },
   // 현재 시각(ms). 오디오 타임라인을 기준으로 하고, 없으면 performance.now()
   nowMs(){ return this.ctx ? this.ctx.currentTime * 1000 : performance.now(); },
-  // 피아노 음 합성: 배음 5개(위로 갈수록 작고 빨리 사라짐) + 살짝 어긋난 기본파(울림) +
-  // 시간이 지나며 닫히는 저역 필터(타건 직후 밝고 곧 부드러워짐) + 짧은 해머 잡음
+  // 피아노 음 합성 (playPianoNote): 기본파 삼각파 + 2·3·4배음(사인, 2·4배음은 ±4센트 디튠) + 살짝 어긋난 유니즌 현
+  // + 15ms 화이트노이즈 해머 타격(1.5kHz 하이패스). 엔벨로프는 3ms 선형 어택 뒤 setTargetAtTime 지수 감쇠(저음일수록 길게),
+  // 저역통과 필터 컷오프를 밝게 열었다가 감쇠와 함께 서서히 닫아 시간이 갈수록 어두워지는 피아노 특성을 흉내 낸다.
   playNote(freq, vol, when){
     const c = this.ctx; if (!c) return null;
     const t = (when !== undefined) ? when : c.currentTime;
     const v = vol || 0.5;
-    const body = Math.pow(220 / freq, 0.35);                  // 낮은 음일수록 길게 울림
-    const dur = CONFIG.noteDurationMs / 1000 * body;
+    const body = Math.pow(220 / freq, 0.35);                          // 낮은 음일수록 길게 울림
+    const tau = Math.min(0.9, Math.max(0.3, CONFIG.noteDecaySec * body)); // 지수 감쇠 시정수
+    const end = t + tau * 6 + 0.05;                                   // 약 -52dB 지점에서 노드 정리
     const master = c.createGain();
-    master.gain.setValueAtTime(v, t);
-    master.gain.setValueAtTime(v, t + dur * 0.7);
-    master.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    master.gain.setValueAtTime(0.0001, t);
+    master.gain.linearRampToValueAtTime(v, t + 0.003);                // 어택 3ms
+    master.gain.setTargetAtTime(0.0001, t + 0.003, tau);              // 지수 감쇠(여운)
     const lp = c.createBiquadFilter();
     lp.type = "lowpass"; lp.Q.value = 0.7;
-    lp.frequency.setValueAtTime(Math.min(12000, freq * 10), t);
-    lp.frequency.exponentialRampToValueAtTime(Math.min(12000, freq * 2.5), t + 0.35);
+    lp.frequency.setValueAtTime(Math.min(12000, Math.max(5000, freq * 8)), t);
+    lp.frequency.setTargetAtTime(Math.max(1500, freq * 2.5), t + 0.01, tau * 0.8);
     master.connect(lp); lp.connect(c.destination);
-    const parts = [[1, 1.0, 1.0], [2, 0.45, 0.55], [3, 0.22, 0.35], [4, 0.10, 0.25], [5, 0.05, 0.18]]; // [배음, 세기, 길이비율]
-    const end = t + dur + 0.05;
+    const parts = [[1, 1.0, 0, "triangle", 1.0], [2, 0.25, 4, "sine", 0.6], [3, 0.12, 0, "sine", 0.45], [4, 0.06, -4, "sine", 0.35]]; // [배음, 세기, 디튠(센트), 파형, 감쇠비]
     parts.forEach(p => {
-      const o = c.createOscillator(); o.type = "sine"; o.frequency.value = freq * p[0];
+      const o = c.createOscillator(); o.type = p[3]; o.frequency.value = freq * p[0];
+      if (p[2]) o.detune.value = p[2];
       const g = c.createGain();
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(p[1], t + 0.006);                       // 빠른 어택
-      g.gain.exponentialRampToValueAtTime(p[1] * 0.25, t + 0.10 + 0.15 * p[2]);   // 초기 감쇠
-      g.gain.exponentialRampToValueAtTime(0.0001, t + Math.max(0.15, dur * p[2])); // 잔향
+      g.gain.setValueAtTime(p[1], t);
+      g.gain.setTargetAtTime(0.0001, t + 0.02, tau * p[4]);           // 높은 배음일수록 먼저 사라짐
       o.connect(g); g.connect(master); o.start(t); o.stop(end);
     });
-    const od = c.createOscillator(); od.type = "sine"; od.frequency.value = freq * 1.0025; // 살짝 어긋난 현
+    const od = c.createOscillator(); od.type = "sine"; od.frequency.value = freq * 1.0025; // 살짝 어긋난 유니즌 현(울림)
     const gd = c.createGain();
-    gd.gain.setValueAtTime(0.0001, t);
-    gd.gain.exponentialRampToValueAtTime(0.35, t + 0.008);
-    gd.gain.exponentialRampToValueAtTime(0.0001, t + Math.max(0.2, dur * 0.8));
+    gd.gain.setValueAtTime(0.3, t);
+    gd.gain.setTargetAtTime(0.0001, t + 0.02, tau * 0.8);
     od.connect(gd); gd.connect(master); od.start(t); od.stop(end);
-    const hammer = c.createOscillator(); hammer.type = "triangle"; hammer.frequency.value = freq * 6.3; // 해머 타격감
-    const gh = c.createGain();
-    gh.gain.setValueAtTime(0.12, t);
-    gh.gain.exponentialRampToValueAtTime(0.0001, t + 0.03);
-    hammer.connect(gh); gh.connect(master); hammer.start(t); hammer.stop(t + 0.05);
+    // 해머 타격: 15ms 화이트노이즈 → 1.5kHz 하이패스
+    const n = Math.floor(c.sampleRate * 0.015);
+    const buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * 0.05 * (1 - i / n);
+    const ns = c.createBufferSource(); ns.buffer = buf;
+    const hp = c.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 1500;
+    ns.connect(hp); hp.connect(master); ns.start(t); ns.stop(t + 0.02);
     return master;
   },
   /* 미리 듣기: 곡을 1초 앞까지만 미리 예약하며 재생(노드 수 절약). 다시 부르면 기존 재생은 멈춤 */
@@ -661,7 +749,8 @@ function judge(n, grade, atMs){
   S.judged++;
   if (grade === "MISS") {
     S.m++; S.combo = 0;
-    S.score = Math.max(0, S.score - CONFIG.penaltyMiss);
+    const ms = (S.song && S.song.missScore != null) ? S.song.missScore : CONFIG.missScore;
+    S.score = Math.max(0, S.score + (ms != null ? ms : -CONFIG.penaltyMiss));   // 곡별 missScore 가 있으면 감점 대신 소량 가산
     Sound.playThud();
   } else {
     S.combo++; S.maxCombo = Math.max(S.maxCombo, S.combo);
