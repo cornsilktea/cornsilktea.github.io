@@ -168,7 +168,7 @@
   if (location.protocol !== "http:" && location.protocol !== "https:") return;
 
   var cfg = window.PORTAL_CONFIG || {};
-  var POLL = (cfg.POLL_SECONDS || 5) * 1000;
+  var POLL = (cfg.POLL_SECONDS || 10) * 1000;
 
   var locked = true;          /* 판정 전에는 무조건 잠금 */
   var played = false;         /* 한 번이라도 자료가 열렸는지 */

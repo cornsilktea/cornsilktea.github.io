@@ -18,8 +18,8 @@ window.PORTAL_CONFIG = {
   API_KEY:     "AIzaSyBr4X1mAHNeZVUzxfnp4ZAdOo2JXfR7-k8",
   AUTH_DOMAIN: "cornsilktea.firebaseapp.com",
 
-  /* 잠금 상태를 다시 확인하는 주기(초). 5~10 사이를 권합니다. */
-  POLL_SECONDS: 5
+  /* 잠금 상태를 다시 확인하는 주기(초). 10을 권합니다(무료 한도 여유). */
+  POLL_SECONDS: 10
 };
 
 /* 학생 화면과 게임에서 쓰는 값 (DB 주소만 있으면 됩니다) */

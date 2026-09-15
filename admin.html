@@ -746,7 +746,7 @@ function seedOnlyGames() {
 }
 
 /* 미등록 목록이 바뀔 때만 다시 그립니다.
-   (5초마다 새로 그리면 단원을 고르던 것이 지워지기 때문입니다) */
+   (10초마다 새로 그리면 단원을 고르던 것이 지워지기 때문입니다) */
 let seedSnapshot = "";
 
 function renderSeedPanel() {
@@ -841,7 +841,7 @@ function showMain(user) {
   $("who").textContent = "로그인: " + (user.email || user.displayName || "") + "   ·   내 UID: " + user.uid;
   loadSeed().then(() => {
     load();
-    if (!timer) timer = setInterval(load, (cfg.POLL_SECONDS || 5) * 1000);
+    if (!timer) timer = setInterval(load, (cfg.POLL_SECONDS || 10) * 1000);
   });
 }
 
