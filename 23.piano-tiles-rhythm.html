@@ -12,7 +12,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
 <meta property="og:title" content="피아노 타일 리듬">
-<meta property="og:description" content="타이밍·이벤트 입력 판정(±50ms/±120ms) / 쉬움 3곡·보통 3곡·어려움 3곡 개인전">
+<meta property="og:description" content="타이밍·이벤트 입력 판정(±50ms/±120ms) / 쉬움 3곡·보통 3곡·어려움 2곡·매우 어려움 1곡 개인전">
 <meta property="og:url" content="https://cornsilktea.github.io/23.piano-tiles-rhythm.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
@@ -51,6 +51,7 @@
   label.field{ display:block; font-size:13px; color:var(--ink-soft); margin:10px 0 4px; }
   .row{ display:flex; gap:8px; }
   .row > *{ flex:1; }
+  .diffgrid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   .btn{ height:44px; font:inherit; font-size:16px; font-weight:700; border:1px solid var(--line-strong); border-radius:var(--radius); background:var(--panel); color:var(--ink); cursor:pointer; padding:0 12px; }
   .btn.sel{ background:var(--primary); color:var(--primary-ink); }
   .btn.primary{ background:var(--primary); color:var(--primary-ink); }
@@ -109,7 +110,7 @@
       컴퓨터 프로그램이 '이벤트가 발생한 시각'을 어떻게 처리하는지 직접 느껴보세요.
     </div>
     <label class="field">난이도</label>
-    <div class="row" id="diffRow"></div>
+    <div class="diffgrid" id="diffRow"></div>
     <label class="field" id="songLabel" style="display:none">곡 선택</label>
     <div class="songs" id="songRow"></div>
     <div class="hint" id="keyHint">PC: D · F · J · K 키 / 모바일: 레인 터치</div>
@@ -202,8 +203,13 @@ const CONFIG = {
       label: "어려움",
       songs: [
         { id: "canon",    title: "캐논 변주곡", bpm: 100, song: "HARD_SONG_1", fallDurationMs: 1400 },
-        { id: "heukgeon", title: "흑건",         bpm: 80,  song: "HARD_SONG_2", fallDurationMs: 1200, missScore: 30 },
         { id: "moonlight", title: "월광 소나타 1악장", bpm: 108, song: "HARD_SONG_3", fallDurationMs: 1600 }
+      ]
+    },
+    veryhard: {
+      label: "매우 어려움",
+      songs: [
+        { id: "heukgeon", title: "흑건",         bpm: 80,  song: "HARD_SONG_2", fallDurationMs: 1200, missScore: 30 }
       ]
     }
   }
@@ -293,7 +299,7 @@ const HARD_SONG_1 = seqU(`
   F#5:16
 `, 4);
 
-// 어려움 ② 흑건 (80bpm, 2/4) — 쇼팽 Op.10 No.5 오른손을 초판(슐레징거) 악보에서 그대로 옮김.
+// 매우 어려움 흑건 (80bpm, 2/4) — 쇼팽 Op.10 No.5 오른손을 초판(슐레징거) 악보에서 그대로 옮김.
 // 원곡은 셋잇단 16분음표(한 박에 6개)라 seqU(문자열, 한 박을 나누는 수) 로 적는다(숫자 = 단위 개수, 생략하면 1개).
 // 원곡 빠르기 116 → 80 으로 늦춤. 1~32마디(A + B 전반) + 49~85마디(재현 + 코다), 약 104초.
 // 오른손 성부가 둘로 갈라지는 마디(4·12·52·66~68·71~72)는 위 성부의 16분음표를 쓴다(아래 성부만 읽으면 긴 음 하나로 뚝 끊김).
@@ -415,7 +421,7 @@ const MEDIUM_SONG_3 = seqU(`
   C5:4
 `, 4);
 
-// 어려움 ③ 베토벤 월광 소나타 1악장 (2분음표 54 = 4분음표 108) — craigsapp/beethoven-piano-sonatas 악보에서
+// 어려움 ② 베토벤 월광 소나타 1악장 (2분음표 54 = 4분음표 108) — craigsapp/beethoven-piano-sonatas 악보에서
 // 1~28마디 + 60~69마디(코다), 셋잇단 8분음표 단위, 약 84초. 두 손 음 중 같은 시각엔 가장 높은 음(선율이 있으면 선율).
 // 선율의 붙점 16분음표는 셋잇단 격자에 맞춰 붙였다. 저음 옥타브는 C3 아래를 한 옥타브 올림.
 const HARD_SONG_3 = seqU(`
