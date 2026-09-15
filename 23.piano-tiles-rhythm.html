@@ -180,7 +180,7 @@ const CONFIG = {
   laneKeyLabels: ["D", "F", "J", "K"],
   leadInMs: 1500,          // 첫 타일이 생성되기 전 준비 시간
   noteDecaySec: 0.55,      // 합성음 지수 감쇠 시정수(초, 저음일수록 길어짐 — 여운 길이)
-  missScore: null,         // 곡별 missScore 가 있으면 MISS 때 감점 대신 그 점수를 더함(흑건처럼 빠른 곡 구제용)
+  missScore: null,         // 곡별 missScore 가 있으면 MISS 때 감점 대신 그 점수를 더함(흑건처럼 빠른 곡 구제용). 타일 없는 헛탭(phantom)에는 적용 안 됨
   difficulties: {
     easy: {
       label: "쉬움",
@@ -737,15 +737,17 @@ function hitLane(lane){
   } else if (best && bestDiff <= CONFIG.hitWindowMissMs) {
     judge(best, "MISS", inputMs);                 // 너무 이르거나 늦은 입력: 그 타일을 MISS 로 소비
   } else {
-    judge({ lane, pitch: null }, "MISS", inputMs); // 타일 없는 곳을 두드림(연타 방지): 빈 MISS
+    judge({ lane, pitch: null }, "MISS", inputMs, true); // 타일 없는 곳을 두드림(막치기 방지): 구제 점수 없는 빈 MISS
   }
 }
-function judge(n, grade, atMs){
+function judge(n, grade, atMs, phantom){
   n.judged = grade; n.hitAt = atMs;
   S.judged++;
   if (grade === "MISS") {
     S.m++; S.combo = 0;
-    const ms = (S.song && S.song.missScore != null) ? S.song.missScore : CONFIG.missScore;
+    // 곡별 missScore 는 "타일은 있었지만 박자가 어긋난" 미스만 구제한다.
+    // 타일이 아예 없는 곳을 두드린 헛탭(phantom)까지 구제하면 막치기가 정타보다 유리해진다.
+    const ms = (!phantom && S.song && S.song.missScore != null) ? S.song.missScore : CONFIG.missScore;
     S.score = Math.max(0, S.score + (ms != null ? ms : -CONFIG.penaltyMiss));   // 곡별 missScore 가 있으면 감점 대신 소량 가산
     Sound.playThud();
   } else {
