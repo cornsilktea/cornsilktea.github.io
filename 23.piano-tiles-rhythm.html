@@ -631,6 +631,12 @@ function songLengthSec(s){
   const beatMs = 60000 / s.bpm;
   return Math.round(SONG_DATA[s.song].reduce((a, n) => a + n.beats, 0) * beatMs / 1000);
 }
+function tilesPerTenSec(s){
+  const len = songLengthSec(s);
+  if (!len) return 0;
+  const tiles = SONG_DATA[s.song].filter(n => n.pitch).length;
+  return Math.round(tiles / len * 10 * 10) / 10;
+}
 function renderSongs(){
   const row = $("songRow"); row.innerHTML = "";
   $("songLabel").style.display = S.diff ? "" : "none";
@@ -641,7 +647,7 @@ function renderSongs(){
     card.setAttribute("role", "button");
     const best = Best.get(s.id);
     const len = songLengthSec(s);
-    card.innerHTML = '<span class="t"></span><span class="b">' + Math.floor(len / 60) + '분 ' + (len % 60) + '초 · ' +
+    card.innerHTML = '<span class="t"></span><span class="b">' + Math.floor(len / 60) + '분 ' + (len % 60) + '초 · 10초당 ' + tilesPerTenSec(s) + '개 · ' +
       (best ? '내 최고 <em>' + best.score + '</em>점' : '내 기록 없음') + '</span>' +
       '<span class="h">' + hallText(s.id) + '</span>' +
       '<button type="button" class="listen">▶ 미리 듣기</button>';
