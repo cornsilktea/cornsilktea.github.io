@@ -12,7 +12,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
 <meta property="og:title" content="피아노 타일 리듬">
-<meta property="og:description" content="타이밍·이벤트 입력 판정(±50ms/±120ms) / 난이도별 2곡 개인전">
+<meta property="og:description" content="타이밍·이벤트 입력 판정(±50ms/±120ms) / 쉬움 3곡·보통 2곡·어려움 2곡 개인전">
 <meta property="og:url" content="https://cornsilktea.github.io/23.piano-tiles-rhythm.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
@@ -185,33 +185,35 @@ const CONFIG = {
       label: "쉬움",
       songs: [
         { id: "twinkle", title: "반짝반짝 작은 별", bpm: 90,  song: "EASY_SONG_1", fallDurationMs: 2200 },
-        { id: "ode",     title: "환희의 송가",       bpm: 100, song: "EASY_SONG_2", fallDurationMs: 2000 }
+        { id: "ode",     title: "환희의 송가",       bpm: 100, song: "EASY_SONG_2", fallDurationMs: 2000 },
+        { id: "cuckoo",  title: "뻐꾹 왈츠",         bpm: 120, song: "EASY_SONG_3", fallDurationMs: 2000 }
       ]
     },
     medium: {
       label: "보통",
       songs: [
         { id: "furelise", title: "엘리제를 위하여", bpm: 120, song: "MEDIUM_SONG_1", fallDurationMs: 1800 },
-        { id: "canon",    title: "캐논 변주곡",     bpm: 100, song: "MEDIUM_SONG_2", fallDurationMs: 1900 }
+        { id: "turkish",  title: "터키 행진곡",     bpm: 160, song: "MEDIUM_SONG_2", fallDurationMs: 1700 }
       ]
     },
     hard: {
       label: "어려움",
       songs: [
-        { id: "turkish",  title: "터키 행진곡", bpm: 160, song: "HARD_SONG_1", fallDurationMs: 1400 },
-        { id: "heukgeon", title: "흑건",       bpm: 116, song: "HARD_SONG_2", fallDurationMs: 1200 }
+        { id: "canon",    title: "캐논 변주곡", bpm: 116, song: "HARD_SONG_1", fallDurationMs: 1300 },
+        { id: "heukgeon", title: "흑건",         bpm: 80,  song: "HARD_SONG_2", fallDurationMs: 1200 }
       ]
     }
   }
 };
 
-const NOTE_FREQ = {
-  "B3": 246.94,
-  "C4": 261.63, "C#4": 277.18, "D4": 293.66, "D#4": 311.13, "E4": 329.63, "F4": 349.23,
-  "F#4": 369.99, "G4": 392.00, "G#4": 415.30, "A4": 440.00, "A#4": 466.16, "B4": 493.88,
-  "C5": 523.25, "C#5": 554.37, "D5": 587.33, "D#5": 622.25, "E5": 659.25,
-  "F5": 698.46, "F#5": 739.99, "G5": 783.99, "G#5": 830.61, "A5": 880.00, "A#5": 932.33
-};
+// 음이름 → 주파수. C3~B7 를 모두 만들어 둔다(흑건이 F#3~D#7 까지 씀). 순서는 낮은 음부터.
+const NOTE_FREQ = {};
+(function(){
+  const names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+  for (let midi = 48; midi <= 107; midi++) {            // C3(48) ~ B7(107)
+    NOTE_FREQ[names[midi % 12] + (Math.floor(midi / 12) - 1)] = Math.round(440 * Math.pow(2, (midi - 69) / 12) * 100) / 100;
+  }
+})();
 const PITCH_ORDER = Object.keys(NOTE_FREQ);
 
 /* ============ 곡 데이터 (퍼블릭 도메인 선율, 게임용 간소화·확장) ============ */
@@ -241,59 +243,138 @@ const ODE_A2 = seq(`E4:1 E4:1 F4:1 G4:1 G4:1 F4:1 E4:1 D4:1 C4:1 C4:1 D4:1 E4:1 
 const ODE_B = seq(`D4:1 D4:1 E4:1 C4:1 D4:1 E4:0.5 F4:0.5 E4:1 C4:1 D4:1 E4:0.5 F4:0.5 E4:1 D4:1 C4:1 D4:1 G4:2`);
 const EASY_SONG_2 = rep(cat(ODE_A, ODE_A2, ODE_B, ODE_A2), 2);
 
+// 쉬움 ③ 뻐꾹 왈츠 (요나손, 원곡 3/8 → 한 박 = 8분음표, 120bpm) — A(18마디) + B(8마디) + A + 맺음, 약 72초
+const CUCKOO_A = seq(`
+  G4:2 E5:1   C5:2 E5:1   G5 F5 G5 E5 D5:1
+  C5:1 R:1 E5:1   C5:1 R:1 E5:1   C5:1 R:1 E5:1   G5 G5 E5 C5 D5 E5   C5:1 R:1 E5:1
+  C5:1 R:1 E5:1   C5:1 R:1 E5:1   G5 F5 D5 C5 D5:1
+  C5:1 R:1 E5:1   C5:1 R:1 E5:1   C5:1 R:1 E5:1   G5 G5 E5 C5 D5 E5
+  D5:1 R:1 E5:1   C5:1 R:1 E5:1   C5:1 R:1 E5:1`);
+const CUCKOO_B = seq(`
+  G5 F5 D5 C5 D5:1   E5:1 R:1 G5:1   E5:1 R:1 G5:1   E5:1 R:1 G5:1
+  A5 G5 F5 E5 D5:1   D5:1 R:1 F5:1   D5:1 R:1 F5:1   D5:1 R:1 F5:1`);
+const CUCKOO_END = seq(`G5 F5 E5 D5 C5:1   E5:1 C5:2   E5:1 C5:2   C5:3`);
+const EASY_SONG_3 = cat(CUCKOO_A, CUCKOO_B, CUCKOO_A, CUCKOO_END);
+
 // 보통 ① 엘리제를 위하여 (120bpm) — A부 반복 + B부, 약 66초
 const ELISE_A = seq(`E5 D#5 E5 D#5 E5 B4 D5 C5 A4:1 R C4 E4 A4 B4:1 R E4 G#4 B4 C5:1 R E4`);
 const ELISE_B = seq(`E5 D#5 E5 D#5 E5 B4 D5 C5 A4:1 R C4 E4 A4 B4:1 R E4 C5 B4 A4:1`);
 const ELISE_C = seq(`R B4 C5 D5 E5:1.5 G4 F5 E5 D5:1.5 F4 E5 D5 C5:1.5 E4 D5 C5 B4:1 R E4 E5 R E5 E5:1 D#5 E5 D#5 E5 D#5 E5 D#5`);
 const MEDIUM_SONG_1 = cat(ELISE_A, ELISE_B, ELISE_A, ELISE_B, ELISE_C, ELISE_A, ELISE_B, ELISE_A, ELISE_B, ELISE_A, ELISE_B, seq(`A4:2`));
 
-// 보통 ② 캐논 변주곡 (100bpm) — D–A–Bm–F#m–G–D–G–A 진행(코드당 2박) 위의 유명 선율 변주, 약 68초
-const CANON_V1 = seq(`F#5:2 E5:2 D5:2 C#5:2 B4:2 A4:2 B4:2 C#5:2`);           // 첫 성부 (2분음표)
-const CANON_V2 = seq(`D5:2 C#5:2 B4:2 A4:2 G4:2 F#4:2 G4:2 E4:2`);             // 두 번째 성부
-const CANON_V3 = seq(`D4 F#4 A4 G4  F#4 D4 F#4 E4  D4 B3 D4 A4  G4 B4 A4 G4
-                      F#4 D4 E4 C#5  D5 F#5 A5 A4  B4 G4 A4 F#4  D4 D5 D5 C#5`);  // 가장 유명한 8분음표 선율
-const CANON_V4 = seq(`D5 A4 F#4 A4  C#5 A4 E4 A4  D5 B4 F#4 B4  C#5 A4 F#4 A4
-                      B4 G4 D4 G4  A4 F#4 D4 F#4  B4 G4 D4 G4  C#5 A4 E4 A4`);   // 분산화음 변주
-const CANON_V5 = seq(`F#5:1 D5:1 E5:1 C#5:1 D5:1 B4:1 C#5:1 A4:1 B4:1 G4:1 A4:1 F#4:1 B4:1 G4:1 C#5:1 A4:1`); // 4분음표 변주
-const MEDIUM_SONG_2 = cat(CANON_V1, CANON_V2, CANON_V3, CANON_V4, CANON_V5, CANON_V3, CANON_V1, seq(`D5:2`));
-
-// 어려움 ① 터키 행진곡 (160bpm) — A단조 주제 + A장조 브리지, 약 61초
+// 보통 ② 터키 행진곡 (160bpm) — A단조 주제 + A장조 브리지, 약 61초
 const TURK_P1 = seq(`B4 A4 G#4 A4 C5:1.5 R  D5 C5 B4 C5 E5:1.5 R
                      F5 E5 D#5 E5 B4 A4 G#4 A4 B4 A4 G#4 A4 C5:1.5 R`);
 const TURK_P2 = seq(`A4 B4 C5 B4 A4 G#4 A4 B4 C5:1.5 R
                      A4 B4 C5 B4 A4 G#4 A4 B4 C5 D5 E5 D5 C5 B4 A4:1 R:2`);
 const TURK_BR = seq(`C#5 D5 E5 F#5 E5 D5 C#5 B4 A4 B4 C#5 D5 E5:1.5 R
                      F#5 E5 D5 C#5 B4 C#5 D5 B4 C#5 B4 A4 G#4 A4:1.5 R`);
-const HARD_SONG_1 = cat(TURK_P1, TURK_P2, TURK_P1, TURK_P2, TURK_BR, TURK_BR, TURK_P1, TURK_P2, TURK_P1, TURK_P2, seq(`A4:2`));
+const MEDIUM_SONG_2 = cat(TURK_P1, TURK_P2, TURK_P1, TURK_P2, TURK_BR, TURK_BR, TURK_P1, TURK_P2, TURK_P1, TURK_P2, seq(`A4:2`));
 
-// 어려움 ② 흑건 (116bpm, 2/4) — 쇼팽 Op.10 No.5 오른손 선율을 검은건반(Gb Ab Bb Db Eb = F# G# A# C# D#)으로
-// 게임용 간소화. 한 마디 = 16분음표 8개(2박). 도입 주제(A) → 물결 구간(B) → 상행·하행 런(C) 순으로 구성, 약 61초
-const HK_A = seq(`
-  F#5 C#5 A#4 F#4  C#5 A#4 F#4 C#4
-  F#4 A#4 C#5 F#5  A#5 F#5 C#5 A#4
-  G#5 D#5 A#4 G#4  D#5 A#4 G#4 D#4
-  G#4 A#4 C#5 D#5  F#5 D#5 C#5 A#4
-  F#5 C#5 A#4 F#4  C#5 A#4 F#4 C#4
-  F#4 A#4 C#5 F#5  A#5 F#5 C#5 A#4
-  G#5 D#5 A#4 G#4  D#5 A#4 G#4 D#4
-  F#4 A#4 C#5 F#5  F#5:1`, 0.25);
-const HK_B = seq(`
-  C#5 D#5 F#5 D#5  C#5 A#4 G#4 F#4
-  G#4 A#4 C#5 A#4  G#4 F#4 D#4 C#4
-  C#4 D#4 F#4 G#4  A#4 C#5 D#5 F#5
-  G#5 F#5 D#5 C#5  A#4 G#4 F#4 D#4
-  C#5 D#5 F#5 D#5  C#5 A#4 G#4 F#4
-  G#4 A#4 C#5 A#4  G#4 F#4 D#4 C#4
-  C#4 D#4 F#4 G#4  A#4 C#5 D#5 F#5
-  A#5 G#5 F#5 D#5  C#5 A#4 F#4:0.5`, 0.25);
-const HK_C = seq(`
-  F#4 G#4 A#4 C#5  D#5 F#5 G#5 A#5
-  G#5 F#5 D#5 C#5  A#4 G#4 F#4 D#4
-  C#4 D#4 F#4 G#4  A#4 C#5 D#5 F#5
-  F#5 D#5 C#5 A#4  G#4 F#4 D#4 C#4`, 0.25);
-const HK_CODA = seq(`F#4 A#4 C#5 F#5 A#5 F#5 C#5 A#4 F#4:0.25 F#5:2`, 0.25);
-const HARD_SONG_2 = cat(HK_A, HK_B, HK_A, HK_C, HK_B, HK_A, HK_C, HK_A, HK_CODA);
-const SONG_DATA = { EASY_SONG_1, EASY_SONG_2, MEDIUM_SONG_1, MEDIUM_SONG_2, HARD_SONG_1, HARD_SONG_2 };
+// 어려움 ① 캐논 변주곡 (116bpm) — 파헬벨 원곡 제1바이올린을 기본으로 한 변주 12순환, 약 101초
+// 코드 진행 D–A–Bm–F#m–G–D–G–A, 코드당 2박(원곡 4분음표 = 여기 2박). 한 순환 = 16박.
+const CANON_V1 = seq(`F#5:2 E5:2 D5:2 C#5:2 B4:2 A4:2 B4:2 C#5:2`);                     // 원곡 3~4마디 (2분음표)
+const CANON_V2 = seq(`D5:2 C#5:2 B4:2 A4:2 G4:2 F#4:2 G4:2 E4:2`);                       // 원곡 5~6마디
+const CANON_V3 = seq(`D5 F#5 A5 G5 F#5 D5 F#5 E5  D5 B4 D5 A4 G4 B4 A4 G4
+                      F#4 D4 E4 C#5 D5 F#5 A5 A4  B4 G4 A4 F#4 D4 D5 D5 C#5`, 1);        // 원곡 7~10마디 (4분음표)
+const CANON_V4 = seq(`D5 C#5 D5 D4 C#4 A4 E4 F#4  D4 D5 C#5 B4 C#5 F#4 A4 B4
+                      G4 F#4 E4 G4 F#4 E4 D4 C#5  B4 A4 G4 F#4 E4 G4 F#4 E4
+                      D4 E4 F#4 G4 A4 E4 A4 G4  F#4 B4 A4 G4 A4 G4 F#4 E4
+                      D4 B3 B4 C#5 D5 C#5 B4 A4  G4 F#4 E4 B4 A4 B4 A4 G4`);            // 원곡 11~14마디 (가장 유명한 8분음표 런)
+const CANON_DOT = seq(`F#5:1.5 F#5:0.5 F#5 G5 F#5 E5  D5:1.5 D5:0.5 D5 E5 D5 C#5
+                       B4:1.5 B4:0.5 B4 C#5 B4 A4  G4:1.5 G4:0.5 G4 A4 B4 C#5`);         // 점 리듬 하행 변주
+const CANON_SCALE = seq(`D5 E5 F#5 G5  A5 G5 F#5 E5  B4 C#5 D5 E5  F#5 E5 D5 C#5
+                         G4 A4 B4 C#5  D5 C#5 B4 A4  G4 A4 B4 C#5  D5 C#5 B4 A4`);       // 음계 변주
+const CANON_ARP = seq(`D5 F#5 A5 F#5  C#5 E5 A5 E5  B4 D5 F#5 D5  A4 C#5 F#5 C#5
+                       B4 D5 G5 D5  A4 D5 F#5 D5  B4 D5 G5 D5  C#5 E5 A5 E5`);            // 분산화음 변주
+const CANON_CLX1 = seq(`F#5 E5 D5 E5  F#5 E5 D5 C#5  D5 C#5 B4 C#5  D5 C#5 B4 A4
+                        B4 A4 G4 A4  B4 A4 G4 F#4  G4 A4 B4 C#5  D5 C#5 B4 C#5`);         // 절정 ① 순차 하행
+const CANON_CLX2 = seq(`A5 G5 F#5 E5  E5 D5 C#5 B4  D5 C#5 B4 A4  C#5 A4 F#4 A4
+                        B4 A4 G4 F#4  A4 G4 F#4 E4  G4 A4 B4 D5  E5 F#5 G5 A5`);          // 절정 ② 하행 음계 → 상행
+const HARD_SONG_1 = cat(CANON_V1, CANON_V2, CANON_V3, CANON_V4, CANON_DOT, CANON_SCALE, CANON_ARP,
+                        CANON_CLX1, CANON_CLX2, CANON_V4.slice(0, 32), seq(`D5:4`));
+
+// 어려움 ② 흑건 (80bpm, 2/4) — 쇼팽 Op.10 No.5 오른손을 초판(슐레징거) 악보에서 그대로 옮김.
+// 원곡은 셋잇단 16분음표(한 박에 6개)라 seqT 로 적는다(숫자 = 셋잇단 16분음표 개수, 생략하면 1개).
+// 원곡 빠르기 116 → 80 으로 늦춤. 1~32마디(A + B 전반) + 49~85마디(재현 + 코다), 약 104초.
+function seqT(str){
+  return str.trim().split(/\s+/).map(tok => {
+    const [p, n] = tok.split(":");
+    return { pitch: p === "R" ? null : p, beats: (n !== undefined ? parseFloat(n) : 1) / 6 };
+  });
+}
+const HARD_SONG_2 = seqT(`
+  F#6 A#6 C#6 F#6 D#6 F#6 C#6 F#6 A#5 C#6 F#5 A#5
+  F#5 A#5 C#5 F#5 D#5 F#5 C#5 F#5 A#4 C#5 F#4 A#4
+  C#4 C#5 G#4 C#5 G#4 G#5 G#4 G#5 D#5 G#5 D#5 D#6
+  C#4:9 R:3
+  F#6 A#6 C#6 F#6 D#6 F#6 C#6 F#6 A#5 C#6 F#5 A#5
+  F#5 A#5 C#5 F#5 D#5 F#5 C#5 F#5 A#4 C#5 F#4 A#4
+  D#4 D#5 G#4 D#5 G#4 G#5 D#5 G#5 D#5 D#6 G#5 G#6
+  A#5 A#6 A#5 A#6 A#5 A#6 A#5 A#6 A#5 A#6 A#5 A#6
+  F#6 A#6 C#6 F#6 D#6 F#6 C#6 F#6 A#5 C#6 F#5 A#5
+  F#5 A#5 C#5 F#5 D#5 F#5 C#5 F#5 A#4 C#5 F#4 A#4
+  C#4 C#5 G#4 C#5 G#4 G#5 G#4 G#5 D#5 G#5 D#5 D#6
+  C#4:9 R:3
+  F#6 A#6 C#6 F#6 D#6 F#6 C#6 F#6 A#5 C#6 F#5 A#5
+  F#5 A#5 C#5 F#5 D#5 F#5 C#5 F#5 A#4 C#5 F#4 A#4
+  D#4 D#5 G#4 D#5 G#4 G#5 D#5 G#5 D#5 D#6 G#5 D#6
+  D#5 D#6 G#5 D#6 C#5 C#6 G#5 C#6 G#5 G#6 C#6 C#7
+  G#6 A#6 G#6 D#6 D#7 D#6 C#6 D#6 C#6 G#5 G#6 G#5
+  G#5 A#5 G#5 D#5 D#6 D#5 C#5 D#5 C#5 G#4:3
+  G#4 D#5 G#5 A#5 G#5 D#5 C#5 G#5 C#6 D#6 C#6 A#5
+  G#5 D#6 G#6 A#6 G#6 D#6 C#6 G#6 C#7 D#7 C#7 A#6
+  G#6 A#6 G#6 D#6 D#7 D#6 C#6 D#6 C#6 G#5 G#6 G#5
+  G#5 A#5 G#5 D#5 D#6 D#5 C#5 D#5 C#5 G#4:3
+  G#4 G#5 F#5 G#5 F#5 G#5 F#6 G#5 F#5 G#5 F#5 G#5
+  G#4 G#5 F#5 G#5 F#5 G#5 D#6 G#5 F#5 G#5 F#5 G#5
+  A#4 A#5 F#5 A#5 F#5 A#5 F#6 A#5 F#5 A#5 F#5 A#5
+  A#4 A#5 F#5 A#5 F#5 A#5 F#6 A#5 F#5 A#5 F#5 A#5
+  A#5 F#5 A#6 A#5 F#5 G#6 A#5 F#5 F#6 A#5 F#5 R
+  C#6 A#5 F#5 A#6 A#5 F#5 G#6 A#5 F#5 F#6 A#5 F#5
+  C#5 C#6 A#5 C#6 C#6 C#7 A#6 C#7 C#6 C#6 A#5 C#6
+  C#5 C#6 A#5 C#6 C#6 C#7 A#6 C#7 C#6 C#6 A#5 C#6
+  C#5 C#6 A#5 C#6 A#5 C#7 G#6 C#7 C#6 C#6 G#5 C#6
+  C#5 C#6 F#5 C#6 C#5 C#5 F#4 C#5 C#4 C#4 F#3 C#4
+  F#6 A#6 C#6 F#6 D#6 F#6 C#6 F#6 A#5 C#6 F#5 A#5
+  F#5 A#5 C#5 F#5 D#5 F#5 C#5 F#5 A#4 C#5 F#4 A#4
+  C#4 C#5 G#4 C#5 G#4 G#5 G#4 G#5 D#5 G#5 D#5 D#6
+  C#4:9 R:3
+  F#6 A#6 C#6 F#6 D#6 F#6 C#6 F#6 A#5 C#6 F#5 A#5
+  F#5 A#5 C#5 F#5 D#5 F#5 C#5 F#5 A#4 C#5 F#4 A#4
+  D#4 D#5 G#4 D#5 G#4 G#5 A#4 A#5 A#4 A#5 A#4 A#5
+  D#5 D#6 G#5 D#6 G#5 G#6 A#5 A#6 A#5 A#6 A#5 A#6
+  A#5 A#6 D#6 A#6 G#5 G#6 G#5 G#6 C#6 G#6 F#5 F#6
+  C#5 C#6 G#5 C#6 G#5 G#6 F#5 F#6 C#6 F#6 C#6 C#7
+  A#5 A#6 D#6 A#6 G#5 G#6 G#5 G#6 C#6 G#6 F#5 F#6
+  C#5 C#6 G#5 C#6 G#5 G#6 A#5 F#6 C#6 F#6 C#6 C#7
+  A#5 A#6 D#6 A#6 G#5 G#6 A#5 A#6 D#6 A#6 G#5 G#6
+  A#5 A#6 D#6 A#6 G#5 G#6 A#5 A#6 D#6 A#6 G#5 G#6
+  A#6 G#5 G#6 C#6 A#6 G#5 G#6 C#6 A#6 G#5 G#6 R
+  C#6 A#6 G#5 G#6 C#6 A#6 G#5 G#6 C#6 A#6 G#5 G#6
+  D#7 C#7 A#6 G#6 F#6 D#6 C#6 A#5 G#5 F#5 D#5 C#5
+  B3:12
+  F#3:12
+  F#3:12
+  C#5 F#5 G#5 A#5 G#5 F#5 C#5 G#5 C#6 D#6 C#6 G#5
+  F#5 C#6 F#6 G#6 F#6 D#6 C#6 G#6 C#7 D#7 C#7 G#6
+  F#3:12
+  F#3:12
+  C#5 F#5 G#5 A#5 G#5 F#5 C#5 G#5 C#6 D#6 C#6 G#5
+  F#5 C#6 F#6 G#6 F#6 C#6 G#5 C#6 G#6 A#6 G#6 C#6
+  A#6 C#6 G#6 A#5 G#6 C#6 F#6 A#5 D#6 G#5 C#6 C#5
+  A#5 C#5 G#5 A#4 G#5 C#5 F#5 A#4 D#5 G#4 C#5 C#4
+  A#4 C#4 G#4 A#3 G#4 C#4 F#4 A#3 D#4 G#3 C#4 C#4
+  A#3 F#3 D#4 C#4 C#4 G#3 A#3 F#3 D#4 C#4 C#4 G#3
+  A#3:3 C#4 G#3 F#3 D#4 C#4 A#3 A#4 D#4 C#4
+  C#5 G#4 F#4 F#5 C#5 A#4 A#5 D#5 C#5 C#6 G#5 F#5
+  F#6 C#6 A#5 A#6 D#6 C#6 F#6 C#6 A#5 A#6 D#6 C#6
+  F#6 C#6 A#5 A#6 D#6 C#6 F#6 C#6 A#5 A#6 D#6 C#6
+  F#6 R F#6 D#6 C#6 A#5 G#5 F#5 D#5 C#5 A#4 G#4
+  F#4:3 R:3 A#6:6
+  F#3:24 R
+`);
+const SONG_DATA = { EASY_SONG_1, EASY_SONG_2, EASY_SONG_3, MEDIUM_SONG_1, MEDIUM_SONG_2, HARD_SONG_1, HARD_SONG_2 };
 
 /* ============ 최고 기록 (이 기기의 localStorage, 곡별) ============ */
 const Best = {

@@ -217,7 +217,7 @@
         "url": "11.table-reading-game.html"
       },
       "pianotiles": {
-        "memo": "타이밍·이벤트 입력 판정(±50ms/±120ms) / 난이도별 2곡 개인전",
+        "memo": "타이밍·이벤트 입력 판정(±50ms/±120ms) / 쉬움 3곡·보통 2곡·어려움 2곡 개인전",
         "open": false,
         "order": 22.0,
         "title": "피아노 타일 리듬",
