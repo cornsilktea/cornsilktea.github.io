@@ -215,6 +215,15 @@
         ],
         "unitsSet": true,
         "url": "11.table-reading-game.html"
+      },
+      "pianotiles": {
+        "memo": "타이밍·이벤트 입력 판정(±50ms/±120ms) / 난이도별 2곡 개인전",
+        "open": false,
+        "order": 22.0,
+        "title": "피아노 타일 리듬",
+        "units": [],
+        "unitsSet": false,
+        "url": "23.piano-tiles-rhythm.html"
       }
     }
   }

@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<script charset="utf-8" src="firebase-config.js"></script>
+<script charset="utf-8" src="access-guard.js" data-game="pianotiles"></script>
+<meta charset="utf-8">
+<link rel="stylesheet" href="theme.css">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
+<title>피아노 타일 리듬</title>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="정보 수업용 링크 모음">
+<meta property="og:title" content="피아노 타일 리듬">
+<meta property="og:description" content="타이밍·이벤트 입력 판정(±50ms/±120ms) / 난이도별 2곡 개인전">
+<meta property="og:url" content="https://cornsilktea.github.io/23.piano-tiles-rhythm.html">
+<meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
+<meta name="twitter:card" content="summary">
+<!-- 링크 미리보기 끝 -->
+<style>
+  :root{
+    --bg:var(--sg-bg);
+    --panel:var(--sg-panel);
+    --panel-alt:var(--sg-panel-alt);
+    --line:var(--sg-line);
+    --line-mid:var(--sg-line-mid);
+    --line-strong:var(--sg-line-strong);
+    --ink:var(--sg-ink);
+    --ink-mid:var(--sg-ink-mid);
+    --ink-soft:var(--sg-ink-soft);
+    --ink-faint:var(--sg-ink-faint);
+    --primary:var(--sg-primary);
+    --primary-ink:var(--sg-primary-ink);
+    --primary-soft:var(--sg-primary-soft);
+    --danger:var(--sg-danger);
+    --ok:var(--sg-ok);
+    --warn:var(--sg-warn);
+    --accent:#D97B4F;
+    --radius:var(--sg-radius);
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; background:var(--bg); color:var(--ink); font-family:var(--sg-font); }
+  body{ overscroll-behavior:none; touch-action:manipulation; }
+  #app{ max-width:520px; margin:0 auto; min-height:100%; padding:46px 12px 12px; display:flex; flex-direction:column; }
+  .screen{ display:none; flex:1; flex-direction:column; }
+  .screen.on{ display:flex; }
+
+  h1{ font-size:24px; margin:0 0 6px; text-align:center; }
+  .concept{ background:var(--panel); border:1px solid var(--line-mid); border-radius:var(--radius); padding:10px 12px; font-size:14px; line-height:1.55; color:var(--ink-mid); margin:8px 0 14px; }
+  .concept b{ color:var(--ink); }
+  label.field{ display:block; font-size:13px; color:var(--ink-soft); margin:10px 0 4px; }
+  input[type=text]{ width:100%; height:44px; font:inherit; font-size:16px; padding:0 12px; border:1px solid var(--line-strong); border-radius:var(--radius); background:var(--panel); color:var(--ink); }
+  input[type=text]:focus{ outline:2px solid var(--primary-soft); }
+  .row{ display:flex; gap:8px; }
+  .row > *{ flex:1; }
+  .btn{ height:44px; font:inherit; font-size:16px; font-weight:700; border:1px solid var(--line-strong); border-radius:var(--radius); background:var(--panel); color:var(--ink); cursor:pointer; padding:0 12px; }
+  .btn.sel{ background:var(--primary); color:var(--primary-ink); }
+  .btn.primary{ background:var(--primary); color:var(--primary-ink); }
+  .btn:disabled{ background:var(--panel-alt); color:var(--ink-faint); border-color:var(--line-mid); cursor:default; }
+  .songs{ display:flex; gap:8px; margin-top:8px; }
+  .song{ flex:1; border:1px solid var(--line-mid); border-radius:var(--radius); background:var(--panel); padding:12px 10px; cursor:pointer; text-align:left; font:inherit; color:var(--ink); min-height:72px; }
+  .song.sel{ border-color:var(--primary); background:var(--primary-soft); }
+  .song .t{ font-size:16px; font-weight:700; display:block; }
+  .song .b{ font-size:12px; color:var(--ink-soft); display:block; margin-top:6px; }
+  .song .b em{ font-style:normal; color:var(--warn); font-weight:700; }
+  .hint{ font-size:12px; color:var(--ink-faint); text-align:center; margin-top:6px; }
+  .spacer{ flex:1; }
+
+  /* 게임 화면 */
+  #game{ height:calc(100dvh - 58px); min-height:420px; }
+  .hud{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin-bottom:8px; }
+  .hud .cell{ background:var(--panel); border:1px solid var(--line-mid); border-radius:var(--radius); padding:6px 4px; text-align:center; }
+  .hud .k{ font-size:11px; color:var(--ink-soft); }
+  .hud .v{ font-size:24px; font-weight:700; line-height:1.15; font-variant-numeric:tabular-nums; }
+  .hud .v.small{ font-size:13px; color:var(--warn); font-weight:700; }
+  #track{ position:relative; flex:1; border:1px solid var(--line-strong); border-radius:var(--radius); overflow:hidden; background:var(--panel); }
+  #cv{ position:absolute; inset:0; width:100%; height:100%; display:block; }
+  #lanes{ position:absolute; inset:0; display:flex; }
+  #lanes .lane{ flex:1; touch-action:none; -webkit-tap-highlight-color:transparent; }
+  #exitBtn{ margin-top:8px; height:36px; font-size:13px; }
+
+  /* 결과 */
+  .result-score{ text-align:center; margin:10px 0 4px; }
+  .result-score .big{ font-size:44px; font-weight:700; font-variant-numeric:tabular-nums; }
+  .result-score .sub{ font-size:14px; color:var(--ink-soft); }
+  .newtag{ display:inline-block; background:var(--accent); color:#fff; font-size:12px; font-weight:700; padding:2px 7px; border-radius:var(--radius); margin-left:6px; vertical-align:middle; }
+  .stats{ display:grid; grid-template-columns:repeat(2,1fr); gap:6px; margin:10px 0; }
+  .stats .cell{ background:var(--panel); border:1px solid var(--line-mid); border-radius:var(--radius); padding:8px; text-align:center; }
+  .stats .k{ font-size:12px; color:var(--ink-soft); }
+  .stats .v{ font-size:22px; font-weight:700; }
+  .stats .v.p{ color:var(--ok); } .stats .v.g{ color:var(--warn); } .stats .v.m{ color:var(--danger); }
+  textarea#copyBox{ width:100%; height:64px; font:inherit; font-size:13px; padding:8px; border:1px solid var(--line-mid); border-radius:var(--radius); margin-top:8px; display:none; }
+  .msg{ font-size:13px; text-align:center; color:var(--ok); min-height:18px; margin-top:6px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- 시작 화면 -->
+  <section id="start" class="screen on">
+    <h1>피아노 타일 리듬</h1>
+    <div class="concept">
+      이 게임은 <b>정해진 순간</b>과 <b>여러분의 입력 순간</b>이 얼마나 가까운지를 판정합니다.
+      컴퓨터 프로그램이 '이벤트가 발생한 시각'을 어떻게 처리하는지 직접 느껴보세요.
+    </div>
+    <label class="field" for="nameIn">이름 또는 학번</label>
+    <input type="text" id="nameIn" maxlength="20" placeholder="예) 10315 홍길동" autocomplete="off">
+    <label class="field">난이도</label>
+    <div class="row" id="diffRow"></div>
+    <label class="field" id="songLabel" style="display:none">곡 선택</label>
+    <div class="songs" id="songRow"></div>
+    <div class="hint" id="keyHint">PC: D · F · J · K 키 / 모바일: 레인 터치</div>
+    <div class="spacer"></div>
+    <button class="btn primary" id="startBtn" disabled style="margin-top:14px">시작하기</button>
+  </section>
+
+  <!-- 게임 화면 -->
+  <section id="game" class="screen">
+    <div class="hud">
+      <div class="cell"><div class="k">점수</div><div class="v" id="hScore">0</div><div class="v small" id="hBest">최고 —</div></div>
+      <div class="cell"><div class="k">콤보</div><div class="v" id="hCombo">0</div><div class="v small" id="hMult">×1.0</div></div>
+      <div class="cell"><div class="k">정확도</div><div class="v" id="hAcc">100%</div><div class="v small" id="hSong">&nbsp;</div></div>
+    </div>
+    <div id="track">
+      <canvas id="cv"></canvas>
+      <div id="lanes">
+        <div class="lane" data-lane="0"></div><div class="lane" data-lane="1"></div>
+        <div class="lane" data-lane="2"></div><div class="lane" data-lane="3"></div>
+      </div>
+    </div>
+    <button class="btn" id="exitBtn">그만두기</button>
+  </section>
+
+  <!-- 결과 화면 -->
+  <section id="result" class="screen">
+    <h1>결과</h1>
+    <div class="result-score">
+      <div class="sub" id="rSong"></div>
+      <div class="big"><span id="rScore">0</span><span class="newtag" id="rNew" style="display:none">NEW</span></div>
+      <div class="sub" id="rBest"></div>
+    </div>
+    <div class="stats">
+      <div class="cell"><div class="k">정확도</div><div class="v" id="rAcc">0%</div></div>
+      <div class="cell"><div class="k">최고 콤보</div><div class="v" id="rCombo">0</div></div>
+      <div class="cell"><div class="k">PERFECT (±50ms)</div><div class="v p" id="rP">0</div></div>
+      <div class="cell"><div class="k">GOOD (±120ms)</div><div class="v g" id="rG">0</div></div>
+      <div class="cell" style="grid-column:1/-1"><div class="k">MISS</div><div class="v m" id="rM">0</div></div>
+    </div>
+    <div class="concept">
+      <b>PERFECT</b>는 ±50ms, <b>GOOD</b>은 ±120ms 오차까지 인정한 결과입니다.
+      실제 프로그램도 이렇게 '허용 오차'를 정해서 이벤트를 판정합니다.
+    </div>
+    <button class="btn primary" id="copyBtn">결과 복사</button>
+    <textarea id="copyBox" readonly></textarea>
+    <div class="msg" id="copyMsg"></div>
+    <div class="spacer"></div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn" id="retryBtn">다시하기</button>
+      <button class="btn" id="homeBtn">처음으로</button>
+    </div>
+  </section>
+</div>
+
+<script>
+/* ============ 설정 (튜닝 값은 전부 여기) ============ */
+const CONFIG = {
+  lanes: 4,
+  hitWindowPerfectMs: 50,
+  hitWindowGoodMs: 120,
+  scorePerfect: 300,
+  scoreGood: 100,
+  comboMultiplierThresholds: [ {combo: 10, mult: 1.2}, {combo: 20, mult: 1.5} ],
+  laneColors: ["#FFD3B6", "#DCEDC1", "#A8E6CE", "#FFAAA6"],
+  laneKeys: ["KeyD", "KeyF", "KeyJ", "KeyK"],
+  laneKeyLabels: ["D", "F", "J", "K"],
+  leadInMs: 1500,          // 첫 타일이 생성되기 전 준비 시간
+  noteDurationMs: 260,     // 합성음 길이
+  difficulties: {
+    easy: {
+      label: "쉬움",
+      songs: [
+        { id: "twinkle", title: "반짝반짝 작은 별", bpm: 90,  song: "EASY_SONG_1", fallDurationMs: 2200 },
+        { id: "ode",     title: "환희의 송가",       bpm: 100, song: "EASY_SONG_2", fallDurationMs: 2000 }
+      ]
+    },
+    medium: {
+      label: "보통",
+      songs: [
+        { id: "furelise", title: "엘리제를 위하여", bpm: 120, song: "MEDIUM_SONG_1", fallDurationMs: 1800 },
+        { id: "canon",    title: "캐논 변주곡",     bpm: 100, song: "MEDIUM_SONG_2", fallDurationMs: 1900 }
+      ]
+    },
+    hard: {
+      label: "어려움",
+      songs: [
+        { id: "turkish",  title: "터키 행진곡", bpm: 160, song: "HARD_SONG_1", fallDurationMs: 1400 },
+        { id: "heukgeon", title: "흑건",       bpm: 160, song: "HARD_SONG_2", fallDurationMs: 1100 }
+      ]
+    }
+  }
+};
+
+const NOTE_FREQ = {
+  "C4": 261.63, "C#4": 277.18, "D4": 293.66, "D#4": 311.13, "E4": 329.63, "F4": 349.23,
+  "F#4": 369.99, "G4": 392.00, "G#4": 415.30, "A4": 440.00, "A#4": 466.16, "B4": 493.88,
+  "C5": 523.25, "C#5": 554.37, "D5": 587.33, "D#5": 622.25, "E5": 659.25,
+  "F5": 698.46
+};
+const PITCH_ORDER = Object.keys(NOTE_FREQ);
+
+/* ============ 곡 데이터 (퍼블릭 도메인 선율, 게임용 간소화) ============ */
+const EASY_SONG_1 = [
+  {pitch:"C4",beats:1},{pitch:"C4",beats:1},{pitch:"G4",beats:1},{pitch:"G4",beats:1},
+  {pitch:"A4",beats:1},{pitch:"A4",beats:1},{pitch:"G4",beats:2},
+  {pitch:"F4",beats:1},{pitch:"F4",beats:1},{pitch:"E4",beats:1},{pitch:"E4",beats:1},
+  {pitch:"D4",beats:1},{pitch:"D4",beats:1},{pitch:"C4",beats:2},
+  {pitch:"G4",beats:1},{pitch:"G4",beats:1},{pitch:"F4",beats:1},{pitch:"F4",beats:1},
+  {pitch:"E4",beats:1},{pitch:"E4",beats:1},{pitch:"D4",beats:2},
+  {pitch:"G4",beats:1},{pitch:"G4",beats:1},{pitch:"F4",beats:1},{pitch:"F4",beats:1},
+  {pitch:"E4",beats:1},{pitch:"E4",beats:1},{pitch:"D4",beats:2},
+  {pitch:"C4",beats:1},{pitch:"C4",beats:1},{pitch:"G4",beats:1},{pitch:"G4",beats:1},
+  {pitch:"A4",beats:1},{pitch:"A4",beats:1},{pitch:"G4",beats:2},
+  {pitch:"F4",beats:1},{pitch:"F4",beats:1},{pitch:"E4",beats:1},{pitch:"E4",beats:1},
+  {pitch:"D4",beats:1},{pitch:"D4",beats:1},{pitch:"C4",beats:2}
+];
+const EASY_SONG_2 = [
+  {pitch:"E4",beats:1},{pitch:"E4",beats:1},{pitch:"F4",beats:1},{pitch:"G4",beats:1},
+  {pitch:"G4",beats:1},{pitch:"F4",beats:1},{pitch:"E4",beats:1},{pitch:"D4",beats:1},
+  {pitch:"C4",beats:1},{pitch:"C4",beats:1},{pitch:"D4",beats:1},{pitch:"E4",beats:1},
+  {pitch:"E4",beats:1.5},{pitch:"D4",beats:0.5},{pitch:"D4",beats:2},
+
+  {pitch:"E4",beats:1},{pitch:"E4",beats:1},{pitch:"F4",beats:1},{pitch:"G4",beats:1},
+  {pitch:"G4",beats:1},{pitch:"F4",beats:1},{pitch:"E4",beats:1},{pitch:"D4",beats:1},
+  {pitch:"C4",beats:1},{pitch:"C4",beats:1},{pitch:"D4",beats:1},{pitch:"E4",beats:1},
+  {pitch:"D4",beats:1.5},{pitch:"C4",beats:0.5},{pitch:"C4",beats:2},
+
+  {pitch:"D4",beats:1},{pitch:"D4",beats:1},{pitch:"E4",beats:1},{pitch:"C4",beats:1},
+  {pitch:"D4",beats:1},{pitch:"E4",beats:0.5},{pitch:"F4",beats:0.5},{pitch:"E4",beats:1},{pitch:"C4",beats:1},
+  {pitch:"D4",beats:1},{pitch:"E4",beats:0.5},{pitch:"F4",beats:0.5},{pitch:"E4",beats:1},{pitch:"D4",beats:1},
+  {pitch:"C4",beats:1},{pitch:"D4",beats:1},{pitch:"G4",beats:2},
+
+  {pitch:"E4",beats:1},{pitch:"E4",beats:1},{pitch:"F4",beats:1},{pitch:"G4",beats:1},
+  {pitch:"G4",beats:1},{pitch:"F4",beats:1},{pitch:"E4",beats:1},{pitch:"D4",beats:1},
+  {pitch:"C4",beats:1},{pitch:"C4",beats:1},{pitch:"D4",beats:1},{pitch:"E4",beats:1},
+  {pitch:"D4",beats:1.5},{pitch:"C4",beats:0.5},{pitch:"C4",beats:2}
+];
+const MEDIUM_SONG_1 = [
+  {pitch:"E5",beats:0.5},{pitch:"D#5",beats:0.5},{pitch:"E5",beats:0.5},{pitch:"D#5",beats:0.5},
+  {pitch:"E5",beats:0.5},{pitch:"B4",beats:0.5},{pitch:"D5",beats:0.5},{pitch:"C5",beats:0.5},
+  {pitch:"A4",beats:1},{pitch:null,beats:0.5},{pitch:"C4",beats:0.5},{pitch:"E4",beats:0.5},
+  {pitch:"A4",beats:0.5},{pitch:"B4",beats:0.5},{pitch:null,beats:0.5},{pitch:"E4",beats:0.5},
+  {pitch:"G#4",beats:0.5},{pitch:"B4",beats:0.5},{pitch:"C5",beats:1},{pitch:null,beats:0.5},
+  {pitch:"E5",beats:0.5},{pitch:"D#5",beats:0.5},{pitch:"E5",beats:0.5},{pitch:"D#5",beats:0.5},
+  {pitch:"E5",beats:0.5},{pitch:"B4",beats:0.5},{pitch:"D5",beats:0.5},{pitch:"C5",beats:0.5},
+  {pitch:"A4",beats:1},{pitch:null,beats:0.5},{pitch:"C4",beats:0.5},{pitch:"E4",beats:0.5},
+  {pitch:"A4",beats:0.5},{pitch:"B4",beats:0.5},{pitch:null,beats:0.5},{pitch:"D5",beats:0.5},
+  {pitch:"C5",beats:0.5},{pitch:"B4",beats:1}
+];
+const CANON_BAR = [
+  {pitch:"D4",beats:1},{pitch:"A4",beats:1},{pitch:"B4",beats:1},{pitch:"F#4",beats:1},
+  {pitch:"G4",beats:1},{pitch:"D4",beats:1},{pitch:"G4",beats:1},{pitch:"A4",beats:1}
+];
+const MEDIUM_SONG_2 = [];
+for (let r = 0; r < 8; r++) CANON_BAR.forEach(n => MEDIUM_SONG_2.push({pitch:n.pitch, beats:n.beats}));
+MEDIUM_SONG_2[MEDIUM_SONG_2.length - 1].beats = 2;
+const HARD_SONG_1 = [
+  {pitch:"B4",beats:0.5},{pitch:"C5",beats:0.5},{pitch:"D5",beats:0.5},{pitch:"E5",beats:0.5},
+  {pitch:"F5",beats:0.5},{pitch:"E5",beats:0.5},{pitch:"D5",beats:0.5},{pitch:"C5",beats:0.5},
+  {pitch:"B4",beats:0.5},{pitch:"A4",beats:0.5},{pitch:"G#4",beats:0.5},{pitch:"A4",beats:0.5},
+  {pitch:"B4",beats:0.5},{pitch:"C5",beats:0.5},{pitch:"D5",beats:0.5},{pitch:"E5",beats:0.5},
+  {pitch:"F5",beats:0.5},{pitch:"E5",beats:0.5},{pitch:"D5",beats:0.5},{pitch:"C5",beats:0.5},
+  {pitch:"B4",beats:0.5},{pitch:"A4",beats:0.5},{pitch:"G#4",beats:0.5},{pitch:"A4",beats:0.5},
+  {pitch:"B4",beats:0.5},{pitch:"C5",beats:0.5},{pitch:"D5",beats:0.5},{pitch:"E5",beats:0.5},
+  {pitch:"F5",beats:0.5},{pitch:"E5",beats:0.5},{pitch:"D5",beats:0.5},{pitch:"C5",beats:0.5}
+];
+const HARD_SONG_2 = [
+  {pitch:"C#4",beats:0.25},{pitch:"D#4",beats:0.25},{pitch:"F#4",beats:0.25},{pitch:"G#4",beats:0.25},
+  {pitch:"A#4",beats:0.25},{pitch:"C#5",beats:0.25},{pitch:"A#4",beats:0.25},{pitch:"G#4",beats:0.25},
+  {pitch:"F#4",beats:0.25},{pitch:"D#4",beats:0.25},
+
+  {pitch:"C#4",beats:0.25},{pitch:"D#4",beats:0.25},{pitch:"F#4",beats:0.25},{pitch:"G#4",beats:0.25},
+  {pitch:"A#4",beats:0.25},{pitch:"C#5",beats:0.25},{pitch:"D#5",beats:0.25},{pitch:"C#5",beats:0.25},
+  {pitch:"A#4",beats:0.25},{pitch:"G#4",beats:0.25},
+
+  {pitch:"F#4",beats:0.25},{pitch:"D#4",beats:0.25},{pitch:"C#4",beats:0.25},{pitch:"D#4",beats:0.25},
+  {pitch:"F#4",beats:0.25},{pitch:"G#4",beats:0.25},{pitch:"A#4",beats:0.25},{pitch:"C#5",beats:0.25},
+  {pitch:"A#4",beats:0.25},{pitch:"G#4",beats:0.25},
+
+  {pitch:"F#4",beats:0.25},{pitch:"D#4",beats:0.25},{pitch:"C#4",beats:0.25},{pitch:"D#4",beats:0.25},
+  {pitch:"F#4",beats:0.25},{pitch:"A#4",beats:0.25},{pitch:"G#4",beats:0.25},{pitch:"F#4",beats:0.25},
+  {pitch:"D#4",beats:0.25},{pitch:"C#4",beats:1}
+];
+const SONG_DATA = { EASY_SONG_1, EASY_SONG_2, MEDIUM_SONG_1, MEDIUM_SONG_2, HARD_SONG_1, HARD_SONG_2 };
+
+/* ============ 최고 기록 (이 기기의 localStorage, 곡별) ============ */
+const Best = {
+  KEY: "pianotiles_best_v1",
+  all(){ try { return JSON.parse(localStorage.getItem(this.KEY) || "{}") || {}; } catch (e) { return {}; } },
+  get(id){ const b = this.all()[id]; return (b && typeof b.score === "number") ? b : null; },
+  set(id, rec){ try { const a = this.all(); a[id] = rec; localStorage.setItem(this.KEY, JSON.stringify(a)); } catch (e) {} }
+};
+
+/* ============ 사운드 합성 (Web Audio, 외부 파일 없음) ============ */
+const Sound = {
+  ctx: null,
+  ensure(){
+    if (!this.ctx) {
+      try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { this.ctx = null; }
+    }
+    if (this.ctx && this.ctx.state === "suspended") this.ctx.resume();
+    return this.ctx;
+  },
+  // 현재 시각(ms). 오디오 타임라인을 기준으로 하고, 없으면 performance.now()
+  nowMs(){ return this.ctx ? this.ctx.currentTime * 1000 : performance.now(); },
+  // 피아노 비슷한 음: 기본파(triangle) + 옥타브 위 sine 약하게, ADSR 엔벨로프
+  playNote(freq, vol){
+    const c = this.ctx; if (!c) return;
+    const t = c.currentTime, dur = CONFIG.noteDurationMs / 1000;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol || 0.5, t + 0.008);           // attack 8ms
+    g.gain.exponentialRampToValueAtTime((vol || 0.5) * 0.35, t + 0.12);   // decay
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.25);          // release
+    g.connect(c.destination);
+    const o1 = c.createOscillator(); o1.type = "triangle"; o1.frequency.value = freq;
+    const o2 = c.createOscillator(); o2.type = "sine"; o2.frequency.value = freq * 2;
+    const g2 = c.createGain(); g2.gain.value = 0.25;
+    o1.connect(g); o2.connect(g2); g2.connect(g);
+    o1.start(t); o2.start(t);
+    o1.stop(t + dur + 0.3); o2.stop(t + dur + 0.3);
+  },
+  // MISS: 아주 약한 둔탁한 클릭음
+  playThud(){
+    const c = this.ctx; if (!c) return;
+    const t = c.currentTime;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.12, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+    g.connect(c.destination);
+    const o = c.createOscillator(); o.type = "square"; o.frequency.value = 90;
+    o.connect(g); o.start(t); o.stop(t + 0.07);
+  }
+};
+
+/* ============ 노트 → 레인 배정 (같은 레인 연속 금지, 음높이 순) ============ */
+function assignLanes(notes){
+  const pitches = notes.filter(n => n.pitch).map(n => PITCH_ORDER.indexOf(n.pitch));
+  const lo = Math.min.apply(null, pitches), hi = Math.max.apply(null, pitches);
+  let prev = -1, prevPitch = null;
+  return notes.map(n => {
+    if (!n.pitch) return -1;
+    const p = PITCH_ORDER.indexOf(n.pitch);
+    // 낮은 음은 왼쪽, 높은 음은 오른쪽 레인을 우선
+    let want = hi === lo ? 1 : Math.min(CONFIG.lanes - 1, Math.floor((p - lo) / (hi - lo + 0.0001) * CONFIG.lanes));
+    if (want === prev) {
+      // 이전과 같으면 음 진행 방향(올라가면 오른쪽, 내려가면 왼쪽)으로 한 칸 옮김
+      const dir = (prevPitch !== null && p < prevPitch) ? -1 : 1;
+      want = want + dir;
+      if (want < 0 || want >= CONFIG.lanes) want = prev - dir;
+    }
+    prev = want; prevPitch = p;
+    return want;
+  });
+}
+
+/* ============ 상태 ============ */
+const $ = id => document.getElementById(id);
+const S = {
+  name: "", diff: null, songIdx: null,
+  song: null, notes: [], startMs: 0, endMs: 0, running: false, raf: 0,
+  score: 0, combo: 0, maxCombo: 0, p: 0, g: 0, m: 0, judged: 0,
+  popups: [], flash: [0,0,0,0]
+};
+
+function comboMult(combo){
+  let m = 1;
+  CONFIG.comboMultiplierThresholds.forEach(t => { if (combo >= t.combo) m = Math.max(m, t.mult); });
+  return m;
+}
+
+/* ============ 시작 화면 ============ */
+function showScreen(id){
+  document.querySelectorAll(".screen").forEach(s => s.classList.toggle("on", s.id === id));
+}
+function buildStart(){
+  const row = $("diffRow"); row.innerHTML = "";
+  Object.keys(CONFIG.difficulties).forEach(key => {
+    const b = document.createElement("button");
+    b.className = "btn"; b.textContent = CONFIG.difficulties[key].label; b.dataset.diff = key;
+    b.addEventListener("click", () => selectDiff(key));
+    row.appendChild(b);
+  });
+  $("nameIn").addEventListener("input", updateStartBtn);
+  $("startBtn").addEventListener("click", startGame);
+}
+function selectDiff(key){
+  if (S.diff !== key) S.songIdx = null;        // 난이도 바꾸면 곡 선택 초기화
+  S.diff = key;
+  document.querySelectorAll("#diffRow .btn").forEach(b => b.classList.toggle("sel", b.dataset.diff === key));
+  renderSongs();
+  updateStartBtn();
+}
+function renderSongs(){
+  const row = $("songRow"); row.innerHTML = "";
+  $("songLabel").style.display = S.diff ? "" : "none";
+  if (!S.diff) return;
+  CONFIG.difficulties[S.diff].songs.forEach((s, i) => {
+    const b = document.createElement("button");
+    b.className = "song" + (S.songIdx === i ? " sel" : "");
+    const best = Best.get(s.id);
+    b.innerHTML = '<span class="t"></span><span class="b">' + (best ? '최고 <em>' + best.score + '</em>점' : '기록 없음') + '</span>';
+    b.querySelector(".t").textContent = s.title;
+    b.addEventListener("click", () => { S.songIdx = i; renderSongs(); updateStartBtn(); });
+    row.appendChild(b);
+  });
+}
+function updateStartBtn(){
+  S.name = $("nameIn").value.trim();
+  $("startBtn").disabled = !(S.name && S.diff && S.songIdx !== null);
+}
+
+/* ============ 게임 ============ */
+const cv = $("cv"), ctx = cv.getContext("2d");
+let W = 0, H = 0, hitY = 0, padH = 0, dpr = 1;
+function resize(){
+  const r = $("track").getBoundingClientRect();
+  dpr = Math.min(2, window.devicePixelRatio || 1);
+  W = r.width; H = r.height;
+  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  padH = Math.max(64, Math.min(96, H * 0.16));   // 아래 탭 버튼 띠
+  hitY = H - padH;                                // 히트 라인
+}
+window.addEventListener("resize", () => { if (S.running) resize(); });
+
+function startGame(){
+  const cfg = CONFIG.difficulties[S.diff].songs[S.songIdx];
+  Sound.ensure();
+  S.song = cfg;
+  const beatMs = 60000 / cfg.bpm, data = SONG_DATA[cfg.song];
+  const lanes = assignLanes(data);
+  S.notes = [];
+  let acc = 0;
+  data.forEach((n, i) => {
+    if (n.pitch) S.notes.push({ lane: lanes[i], pitch: n.pitch, offset: acc, judged: null, hitAt: 0 });
+    acc += n.beats * beatMs;
+  });
+  S.score = 0; S.combo = 0; S.maxCombo = 0; S.p = S.g = S.m = S.judged = 0;
+  S.popups = []; S.flash = [0,0,0,0];
+  showScreen("game");
+  resize();
+  const best = Best.get(cfg.id);
+  $("hBest").textContent = best ? "최고 " + best.score : "최고 —";
+  $("hSong").textContent = cfg.title;
+  updateHud();
+  // 시작 시각: 지금 + 준비 시간 + 낙하 시간. targetMs 는 모두 오디오 타임라인 기준
+  S.startMs = Sound.nowMs() + CONFIG.leadInMs + cfg.fallDurationMs;
+  S.notes.forEach(n => n.targetMs = S.startMs + n.offset);
+  S.endMs = S.notes[S.notes.length - 1].targetMs + 1200;
+  S.running = true;
+  cancelAnimationFrame(S.raf);
+  S.raf = requestAnimationFrame(loop);
+}
+
+function updateHud(){
+  $("hScore").textContent = S.score;
+  $("hCombo").textContent = S.combo;
+  $("hMult").textContent = "×" + comboMult(S.combo).toFixed(1);
+  $("hAcc").textContent = accuracy() + "%";
+}
+function accuracy(){
+  return S.judged ? Math.round((S.p + S.g) / S.judged * 100) : 100;
+}
+
+/* 입력 → 판정. 허용 오차 안에 그 레인 노트가 없으면 아무 일도 없음(오탭 무시) */
+function hitLane(lane){
+  if (!S.running) return;
+  const inputMs = Sound.nowMs();
+  S.flash[lane] = inputMs;
+  let best = null, bestDiff = Infinity;
+  for (const n of S.notes) {
+    if (n.judged || n.lane !== lane) continue;
+    const d = Math.abs(inputMs - n.targetMs);
+    if (d < bestDiff) { bestDiff = d; best = n; }
+    if (n.targetMs - inputMs > CONFIG.hitWindowGoodMs) break;   // 이후 노트는 더 멀다
+  }
+  if (!best || bestDiff > CONFIG.hitWindowGoodMs) return;
+  judge(best, bestDiff <= CONFIG.hitWindowPerfectMs ? "PERFECT" : "GOOD", inputMs);
+}
+function judge(n, grade, atMs){
+  n.judged = grade; n.hitAt = atMs;
+  S.judged++;
+  if (grade === "MISS") {
+    S.m++; S.combo = 0;
+    Sound.playThud();
+  } else {
+    S.combo++; S.maxCombo = Math.max(S.maxCombo, S.combo);
+    const base = grade === "PERFECT" ? CONFIG.scorePerfect : CONFIG.scoreGood;
+    S.score += Math.round(base * comboMult(S.combo));
+    if (grade === "PERFECT") S.p++; else S.g++;
+    Sound.playNote(NOTE_FREQ[n.pitch], 0.5);
+  }
+  S.popups.push({ lane: n.lane, grade, at: atMs });
+  updateHud();
+}
+
+function loop(){
+  if (!S.running) return;
+  const now = Sound.nowMs();
+  // 히트 라인을 판정 없이 지나간 노트 → 자동 MISS
+  for (const n of S.notes) {
+    if (!n.judged && now - n.targetMs > CONFIG.hitWindowGoodMs) judge(n, "MISS", now);
+  }
+  draw(now);
+  if (now >= S.endMs) { finish(); return; }
+  S.raf = requestAnimationFrame(loop);
+}
+
+function draw(now){
+  const cfg = S.song, laneW = W / CONFIG.lanes, fall = cfg.fallDurationMs;
+  ctx.clearRect(0, 0, W, H);
+  // 레인 배경
+  for (let i = 0; i < CONFIG.lanes; i++) {
+    ctx.fillStyle = i % 2 ? "#FFFFFF" : "#F8FAF6";
+    ctx.fillRect(i * laneW, 0, laneW, hitY);
+    ctx.fillStyle = CONFIG.laneColors[i];
+    ctx.fillRect(i * laneW, hitY, laneW, padH);
+    const f = now - S.flash[i];
+    if (f >= 0 && f < 120) {
+      ctx.fillStyle = "rgba(27,43,32," + (0.25 * (1 - f / 120)) + ")";
+      ctx.fillRect(i * laneW, hitY, laneW, padH);
+    }
+    ctx.strokeStyle = "#E4E8DE"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(i * laneW + 0.5, 0); ctx.lineTo(i * laneW + 0.5, H); ctx.stroke();
+    ctx.fillStyle = "#3B4B40"; ctx.font = "700 18px \"Nanum Gothic\", \"Malgun Gothic\", sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(CONFIG.laneKeyLabels[i], (i + 0.5) * laneW, hitY + padH / 2);
+  }
+  // 히트 라인
+  ctx.strokeStyle = "#24402F"; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(0, hitY); ctx.lineTo(W, hitY); ctx.stroke();
+
+  // 타일. 위치 = 남은 시간 비율로 계산 (속도 하드코딩 없음: 거리 hitY / 시간 fall)
+  const tileH = Math.max(28, Math.min(56, hitY * 0.09));
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, hitY); ctx.clip();   // 타일은 히트 라인 위 영역에만
+  for (const n of S.notes) {
+    const remain = n.targetMs - now;
+    if (remain > fall) break;
+    if (n.judged && n.judged !== "MISS") continue;         // 맞춘 타일은 사라짐
+    if (n.judged === "MISS" && now - n.hitAt > 250) continue;
+    const y = hitY - (remain / fall) * hitY;              // 히트 라인 도달 시 y == hitY
+    const x = n.lane * laneW + 4, w = laneW - 8;
+    ctx.fillStyle = n.judged === "MISS" ? "#C9D2C3" : CONFIG.laneColors[n.lane];
+    ctx.strokeStyle = n.judged === "MISS" ? "#B33951" : "#24402F";
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.rect(x, y - tileH, w, tileH); ctx.fill(); ctx.stroke();
+  }
+  ctx.restore();
+  // 준비 안내
+  if (now < S.startMs - fall) {
+    const sec = Math.ceil((S.startMs - now) / 1000);
+    ctx.fillStyle = "#1B2B20"; ctx.font = "700 40px \"Nanum Gothic\", \"Malgun Gothic\", sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(String(sec), W / 2, hitY * 0.45);
+    ctx.font = "15px \"Nanum Gothic\", \"Malgun Gothic\", sans-serif"; ctx.fillStyle = "#5B6B5E";
+    ctx.fillText("타일이 선에 닿는 순간 탭!", W / 2, hitY * 0.45 + 34);
+  }
+  // 판정 팝업 (히트 라인 근처, 페이드아웃)
+  S.popups = S.popups.filter(p => now - p.at < 600);
+  for (const p of S.popups) {
+    const a = 1 - (now - p.at) / 600;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = p.grade === "PERFECT" ? "#2F7D4F" : p.grade === "GOOD" ? "#A8731C" : "#B33951";
+    ctx.font = "700 " + (p.grade === "PERFECT" ? 20 : 17) + "px \"Nanum Gothic\", \"Malgun Gothic\", sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+    ctx.fillText(p.grade, (p.lane + 0.5) * laneW, hitY - 14 - (1 - a) * 24);
+    ctx.globalAlpha = 1;
+  }
+}
+
+/* 입력: 포인터(터치·마우스) + 키보드 */
+document.querySelectorAll("#lanes .lane").forEach(el => {
+  const lane = +el.dataset.lane;
+  el.addEventListener("pointerdown", e => { e.preventDefault(); hitLane(lane); });
+  el.addEventListener("touchstart", e => { e.preventDefault(); }, { passive: false });
+});
+window.addEventListener("keydown", e => {
+  if (e.repeat) return;
+  const i = CONFIG.laneKeys.indexOf(e.code);
+  if (i >= 0 && S.running) { e.preventDefault(); hitLane(i); }
+});
+$("exitBtn").addEventListener("click", () => { if (S.running) finish(); });
+
+/* ============ 결과 ============ */
+function finish(){
+  S.running = false;
+  cancelAnimationFrame(S.raf);
+  const now = Sound.nowMs();
+  S.notes.forEach(n => { if (!n.judged) judge(n, "MISS", now); });   // 중도 종료 시 남은 노트는 MISS
+  const cfg = S.song, prev = Best.get(cfg.id);
+  const isNew = !prev || S.score > prev.score;
+  if (isNew) Best.set(cfg.id, { score: S.score, acc: accuracy(), name: S.name, at: Date.now() });
+  $("rSong").textContent = CONFIG.difficulties[S.diff].label + " · " + cfg.title + " · " + S.name;
+  $("rScore").textContent = S.score;
+  $("rNew").style.display = isNew ? "" : "none";
+  $("rBest").textContent = "이 기기 최고 기록 " + (isNew ? S.score : prev.score) + "점";
+  $("rAcc").textContent = accuracy() + "%";
+  $("rCombo").textContent = S.maxCombo;
+  $("rP").textContent = S.p; $("rG").textContent = S.g; $("rM").textContent = S.m;
+  $("copyBox").style.display = "none"; $("copyMsg").textContent = "";
+  showScreen("result");
+}
+function resultText(){
+  return "이름: " + S.name + " | 난이도: " + CONFIG.difficulties[S.diff].label + " | 곡: " + S.song.title +
+    " | 점수: " + S.score + " | 정확도: " + accuracy() + "%" +
+    " | PERFECT " + S.p + " GOOD " + S.g + " MISS " + S.m + " | 최고콤보 " + S.maxCombo;
+}
+function copyFallback(text){
+  const box = $("copyBox");
+  box.style.display = "block"; box.value = text;
+  box.focus(); box.select(); box.setSelectionRange(0, text.length);
+  let ok = false;
+  try { ok = document.execCommand("copy"); } catch (e) {}
+  $("copyMsg").textContent = ok ? "복사했습니다. 선생님께 제출하세요." : "자동 복사가 안 되는 기기입니다. 위 글을 길게 눌러 복사하세요.";
+}
+$("copyBtn").addEventListener("click", () => {
+  const text = resultText();
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text)
+      .then(() => { $("copyMsg").textContent = "복사했습니다. 선생님께 제출하세요."; })
+      .catch(() => copyFallback(text));
+  } else copyFallback(text);
+});
+$("retryBtn").addEventListener("click", startGame);
+$("homeBtn").addEventListener("click", () => {
+  S.diff = null; S.songIdx = null;
+  document.querySelectorAll("#diffRow .btn").forEach(b => b.classList.remove("sel"));
+  renderSongs(); updateStartBtn();
+  showScreen("start");
+});
+
+buildStart();
+</script>
+</body>
+</html>
