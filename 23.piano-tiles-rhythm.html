@@ -297,6 +297,7 @@ const HARD_SONG_1 = cat(CANON_V1, CANON_V2, CANON_V3, CANON_V4, CANON_DOT, CANON
 // 어려움 ② 흑건 (80bpm, 2/4) — 쇼팽 Op.10 No.5 오른손을 초판(슐레징거) 악보에서 그대로 옮김.
 // 원곡은 셋잇단 16분음표(한 박에 6개)라 seqT 로 적는다(숫자 = 셋잇단 16분음표 개수, 생략하면 1개).
 // 원곡 빠르기 116 → 80 으로 늦춤. 1~32마디(A + B 전반) + 49~85마디(재현 + 코다), 약 104초.
+// 오른손 성부가 둘로 갈라지는 마디(4·12·52·66~68·71~72)는 위 성부의 16분음표를 쓴다(아래 성부만 읽으면 긴 음 하나로 뚝 끊김).
 function seqT(str){
   return str.trim().split(/\s+/).map(tok => {
     const [p, n] = tok.split(":");
@@ -307,7 +308,7 @@ const HARD_SONG_2 = seqT(`
   F#6 A#6 C#6 F#6 D#6 F#6 C#6 F#6 A#5 C#6 F#5 A#5
   F#5 A#5 C#5 F#5 D#5 F#5 C#5 F#5 A#4 C#5 F#4 A#4
   C#4 C#5 G#4 C#5 G#4 G#5 G#4 G#5 D#5 G#5 D#5 D#6
-  C#4:9 R:3
+  D#5 D#6 G#5 D#6 G#5 G#6 G#5 G#6 C#6 G#6 C#6 C#7
   F#6 A#6 C#6 F#6 D#6 F#6 C#6 F#6 A#5 C#6 F#5 A#5
   F#5 A#5 C#5 F#5 D#5 F#5 C#5 F#5 A#4 C#5 F#4 A#4
   D#4 D#5 G#4 D#5 G#4 G#5 D#5 G#5 D#5 D#6 G#5 G#6
@@ -315,7 +316,7 @@ const HARD_SONG_2 = seqT(`
   F#6 A#6 C#6 F#6 D#6 F#6 C#6 F#6 A#5 C#6 F#5 A#5
   F#5 A#5 C#5 F#5 D#5 F#5 C#5 F#5 A#4 C#5 F#4 A#4
   C#4 C#5 G#4 C#5 G#4 G#5 G#4 G#5 D#5 G#5 D#5 D#6
-  C#4:9 R:3
+  D#5 D#6 G#5 D#6 G#5 G#6 G#5 G#6 D#6 G#6 C#6 C#7
   F#6 A#6 C#6 F#6 D#6 F#6 C#6 F#6 A#5 C#6 F#5 A#5
   F#5 A#5 C#5 F#5 D#5 F#5 C#5 F#5 A#4 C#5 F#4 A#4
   D#4 D#5 G#4 D#5 G#4 G#5 D#5 G#5 D#5 D#6 G#5 D#6
@@ -339,7 +340,7 @@ const HARD_SONG_2 = seqT(`
   F#6 A#6 C#6 F#6 D#6 F#6 C#6 F#6 A#5 C#6 F#5 A#5
   F#5 A#5 C#5 F#5 D#5 F#5 C#5 F#5 A#4 C#5 F#4 A#4
   C#4 C#5 G#4 C#5 G#4 G#5 G#4 G#5 D#5 G#5 D#5 D#6
-  C#4:9 R:3
+  D#5 D#6 G#5 D#6 G#5 G#6 G#5 G#6 D#6 G#6 C#6 C#7
   F#6 A#6 C#6 F#6 D#6 F#6 C#6 F#6 A#5 C#6 F#5 A#5
   F#5 A#5 C#5 F#5 D#5 F#5 C#5 F#5 A#4 C#5 F#4 A#4
   D#4 D#5 G#4 D#5 G#4 G#5 A#4 A#5 A#4 A#5 A#4 A#5
@@ -353,13 +354,13 @@ const HARD_SONG_2 = seqT(`
   A#6 G#5 G#6 C#6 A#6 G#5 G#6 C#6 A#6 G#5 G#6 R
   C#6 A#6 G#5 G#6 C#6 A#6 G#5 G#6 C#6 A#6 G#5 G#6
   D#7 C#7 A#6 G#6 F#6 D#6 C#6 A#5 G#5 F#5 D#5 C#5
-  B3:12
-  F#3:12
-  F#3:12
+  G#4:6 A#4:4.5 G#4:1.5
+  F#4:3 R:3 G#6 A#6 G#6 C#6 C#7 C#6
+  C#6 D#6 C#6 F#5 F#6 F#5 G#5 A#5 G#5 C#5:3
   C#5 F#5 G#5 A#5 G#5 F#5 C#5 G#5 C#6 D#6 C#6 G#5
   F#5 C#6 F#6 G#6 F#6 D#6 C#6 G#6 C#7 D#7 C#7 G#6
-  F#3:12
-  F#3:12
+  F#6 G#6 F#6 C#6 C#7 C#6 C#6 D#6 C#6 G#5 G#6 G#5
+  G#5 A#5 G#5 F#5 F#6 F#5 C#5:6
   C#5 F#5 G#5 A#5 G#5 F#5 C#5 G#5 C#6 D#6 C#6 G#5
   F#5 C#6 F#6 G#6 F#6 C#6 G#5 C#6 G#6 A#6 G#6 C#6
   A#6 C#6 G#6 A#5 G#6 C#6 F#6 A#5 D#6 G#5 C#6 C#5
@@ -372,7 +373,7 @@ const HARD_SONG_2 = seqT(`
   F#6 C#6 A#5 A#6 D#6 C#6 F#6 C#6 A#5 A#6 D#6 C#6
   F#6 R F#6 D#6 C#6 A#5 G#5 F#5 D#5 C#5 A#4 G#4
   F#4:3 R:3 A#6:6
-  F#3:24 R
+  F#3:24
 `);
 const SONG_DATA = { EASY_SONG_1, EASY_SONG_2, EASY_SONG_3, MEDIUM_SONG_1, MEDIUM_SONG_2, HARD_SONG_1, HARD_SONG_2 };
 
