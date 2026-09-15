@@ -10,6 +10,15 @@
       "room": {
         "$room": { ".write": "$room.matches(/^[A-Z0-9]{4}$/)" }
       }
+    },
+    "records": {
+      ".read": true,
+      "pianotiles": {
+        "$song": {
+          ".write": "$song.matches(/^[a-z]+$/) && (!data.exists() || newData.child('score').val() > data.child('score').val())",
+          ".validate": "newData.hasChildren(['score', 'name', 'at']) && newData.child('score').isNumber() && newData.child('score').val() >= 0 && newData.child('name').isString() && newData.child('name').val().length >= 1 && newData.child('name').val().length <= 20 && newData.child('at').isNumber()"
+        }
+      }
     }
   }
 }
