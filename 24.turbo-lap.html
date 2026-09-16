@@ -187,7 +187,13 @@
       <button type="button" class="btn" id="btnRetry">다시 하기</button>
       <button type="button" class="btn sub" id="btnMenu">처음 화면</button>
     </div>
-    <div class="hint">스페이스바: 다시 하기</div>
+    <div class="sect">👻 다음 판 고스트</div>
+    <div class="ghosts">
+      <button type="button" class="ghostbtn on" data-ghost="none">없음<small>&nbsp;</small></button>
+      <button type="button" class="ghostbtn" data-ghost="mine">나의 최고 기록<small>기록 없음</small></button>
+      <button type="button" class="ghostbtn" data-ghost="world">세계신기록<small>확인 중…</small></button>
+    </div>
+    <div class="hint" id="ghostUpNote">스페이스바: 다시 하기</div>
   </div>
 </div>
 
@@ -280,21 +286,31 @@ function fetchWorldGhost(k) {
     worldGhost.tried[k] = true; renderGhostButtons(); return worldGhost[k];
   }).catch(() => { worldGhost.tried[k] = true; renderGhostButtons(); return null; });
 }
-function uploadWorldGhost(k, rec, data) {         // 세계 신기록을 등록한 직후에만 부른다 (규칙이 score 일치를 요구)
-  const u = ghostUrl(k); if (!u) return Promise.resolve();
+function uploadWorldGhost(k, rec, data, retry) {  // 세계 신기록을 등록한 직후에만 부른다 (규칙이 score 일치를 요구)
+  const u = ghostUrl(k), note = $("ghostUpNote"); if (!u) return Promise.resolve();
+  note.textContent = "세계신기록 고스트 저장 중…";
   return fetch(u, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ score: rec.score, name: rec.name, data }) })
-    .then(r => { if (r.ok) { worldGhost[k] = { score: rec.score, name: rec.name, data }; renderGhostButtons(); } })
-    .catch(() => {});
+    .then(r => {
+      if (r.ok) { worldGhost[k] = { score: rec.score, name: rec.name, data }; worldGhost.tried[k] = true; renderGhostButtons(); note.textContent = "세계신기록 고스트 저장 완료 · 스페이스바: 다시 하기"; return; }
+      return r.text().then(t => { throw new Error(r.status + " " + t); });
+    })
+    .catch(err => {
+      console.warn("[turbolap] 세계신기록 고스트 저장 실패:", err.message);
+      if (!retry) return uploadWorldGhost(k, rec, data, true);
+      note.textContent = "세계신기록 고스트 저장 실패 (" + err.message.slice(0, 60) + ")";
+    });
 }
 /* 세계 신기록 고스트가 현재 기록과 같은 주행인지 (기록이 바뀌었는데 고스트가 옛것이면 안 쓴다) */
 function worldGhostValid(k) { const g = worldGhost[k], WR = WRS[k]; return !!(g && WR && WR.rec && g.score === WR.rec.score); }
 function renderGhostButtons() {
-  const k = pendingDiff, mine = loadMyGhost(k), wv = worldGhostValid(k);
-  const bm = $("ghostMine"), bw = $("ghostWorld");
-  bm.disabled = !mine; bm.querySelector("small").textContent = mine ? fmtTime(mine.ms) : "기록 없음";
-  bw.disabled = !wv; bw.querySelector("small").textContent = wv ? fmtTime(WRS[k].value()) + " " + WRS[k].name() : (worldGhost.tried[k] ? "고스트 없음" : "확인 중…");
+  const k = (state === "menu") ? pendingDiff : diff, mine = loadMyGhost(k), wv = worldGhostValid(k);
   if ((ghostPick === "mine" && !mine) || (ghostPick === "world" && !wv)) ghostPick = "none";
-  document.querySelectorAll(".ghostbtn").forEach(b => b.classList.toggle("on", b.getAttribute("data-ghost") === ghostPick));
+  document.querySelectorAll(".ghostbtn").forEach(b => {
+    const g = b.getAttribute("data-ghost"), sm = b.querySelector("small");
+    if (g === "mine") { b.disabled = !mine; sm.textContent = mine ? fmtTime(mine.ms) : "기록 없음"; }
+    else if (g === "world") { b.disabled = !wv; sm.textContent = wv ? fmtTime(WRS[k].value()) + " " + WRS[k].name() : (worldGhost.tried[k] ? "고스트 없음" : "확인 중…"); }
+    b.classList.toggle("on", g === ghostPick);
+  });
 }
 function makeGhostCar() {
   const g = makeCar(0xDDE6EE);
@@ -769,7 +785,7 @@ function finish() {
   $("finalMsg").textContent = (wrBeat ? "🏆 세계 신기록입니다!" : (isBest ? "개인 신기록입니다!" : "완주를 축하합니다!")) + ghostNote;
   setTimeout(() => {
     if (state !== "done") return;
-    showCard("done"); renderRecords();
+    showCard("done"); renderRecords(); $("ghostUpNote").textContent = "스페이스바: 다시 하기"; renderGhostButtons(); if (!worldGhost.tried[k] || !worldGhostValid(k)) fetchWorldGhost(k);
     if (wrBeat) WR.prompt(finalMs, TRACKS[k].name + " 세계 신기록 달성!").then(rec => { renderRecords(); if (rec) uploadWorldGhost(k, rec, ghostData); });
   }, 1300);
 }
