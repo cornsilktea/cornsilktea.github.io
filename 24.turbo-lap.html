@@ -89,7 +89,9 @@
   .cars { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 14px 0 12px; }
   .carbtn { font: inherit; font-weight: 800; font-size: 15px; padding: 10px 4px 8px; border-radius: 12px; border: 3px solid var(--sg-line-strong); background: #fff; color: var(--sg-ink); cursor: pointer; box-shadow: 0 4px 0 var(--sg-ink); }
   .carbtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--sg-ink); }
-  .carbtn i { display: block; height: 34px; margin: 0 8px 8px; border-radius: 17px 17px 8px 8px; border: 2px solid var(--sg-ink); }
+  .carbtn canvas { display: block; width: 100%; height: 66px; margin-bottom: 4px; }
+  .wipe { font-size: 12px; color: var(--sg-ink-faint); margin-top: 8px; }
+  .wipe button { font: inherit; font-size: 12px; color: var(--sg-ink-soft); background: none; border: none; text-decoration: underline; cursor: pointer; }
   .carbtn.on { outline: 3px solid #D97B4F; outline-offset: 2px; }
   .ghosts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 4px 0 8px; }
   .ghostbtn { font: inherit; font-weight: 800; font-size: 14px; padding: 8px 4px; border-radius: 10px; border: 2px solid var(--sg-line-mid); background: var(--sg-panel-alt); color: var(--sg-ink); cursor: pointer; }
@@ -153,15 +155,16 @@
       <button type="button" class="btn hard" id="btnHard">어려움<small>좁은 도로 · 헤어핀 · 언덕 2개</small></button>
     </div>
     <div class="hint">트랙을 벗어나면 느려지고, 울타리에 부딪히면 크게 감속합니다.</div>
+    <div class="wipe"><button type="button" id="btnWipe">이 기기의 나의 최고 기록·고스트 지우기</button></div>
   </div>
 
   <div class="card" id="cardCar" style="display:none">
     <div class="logo" style="font-size:36px">차량 선택<small id="carCourse">쉬움 코스</small></div>
     <div class="cars">
-      <button type="button" class="carbtn" data-car="black"><i style="background:#2A2E35"></i>검정</button>
-      <button type="button" class="carbtn" data-car="yellow"><i style="background:#FFC23D"></i>노랑</button>
-      <button type="button" class="carbtn" data-car="blue"><i style="background:#3D8BFF"></i>파랑</button>
-      <button type="button" class="carbtn" data-car="red"><i style="background:#FF5A4E"></i>빨강</button>
+      <button type="button" class="carbtn" data-car="black"><canvas width="220" height="132"></canvas>검정</button>
+      <button type="button" class="carbtn" data-car="yellow"><canvas width="220" height="132"></canvas>노랑</button>
+      <button type="button" class="carbtn" data-car="blue"><canvas width="220" height="132"></canvas>파랑</button>
+      <button type="button" class="carbtn" data-car="red"><canvas width="220" height="132"></canvas>빨강</button>
     </div>
     <div class="sect">👻 고스트 고르기 <span style="font-weight:700">— 지난 주행이 반투명 차로 같이 달립니다</span></div>
     <div class="ghosts">
@@ -685,6 +688,24 @@ function makeCar(color) {
   return g;
 }
 let car = makeCar(CARS[carKey].color); scene.add(car);
+/* 차량 선택 카드의 회전 미리보기: 버튼마다 작은 렌더러·장면 */
+const carPreviews = [];
+document.querySelectorAll(".carbtn").forEach(b => {
+  const key = b.getAttribute("data-car"), cv = b.querySelector("canvas");
+  try {
+    const r = new THREE.WebGLRenderer({ canvas: cv, alpha: true, antialias: true }); r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); r.setSize(220, 132, false);
+    const sc = new THREE.Scene();
+    sc.add(new THREE.HemisphereLight(0xE6F4FF, 0x8FB37A, 1.0));
+    const dl = new THREE.DirectionalLight(0xFFFFFF, 0.7); dl.position.set(3, 6, 4); sc.add(dl);
+    const cam = new THREE.PerspectiveCamera(28, 220 / 132, 0.1, 50); cam.position.set(0, 3.4, 9); cam.lookAt(0, 0.55, 0);
+    const m = makeCar(CARS[key].color); m.scale.setScalar(1); m.rotation.y = 0.6; sc.add(m);
+    carPreviews.push({ r, sc, cam, m });
+  } catch (e) { cv.style.display = "none"; }
+});
+function renderCarPreviews(dt) {
+  if (state !== "menu" || cardCar.style.display === "none") return;
+  carPreviews.forEach(p => { p.m.rotation.y += dt * 1.1; p.r.render(p.sc, p.cam); });
+}
 
 /* ═══════════════════ 게임 상태 ═══════════════════ */
 const P = { x: 0, z: 0, y: 0, h: 0, v: 0, ci: 0, prevCi: 0, lap: 0, expected: 0, off: false, wallT: 0, steerVis: 0 };
@@ -950,6 +971,7 @@ function tick(now) {
 
   updateCar(dt);
   updateCamera(dt);
+  renderCarPreviews(dt);
   engineUpdate(Math.min(1, Math.abs(P.v) / CFG.maxSpeed), state === "race" || state === "countdown");
 
   if (state !== "menu") {
@@ -1003,6 +1025,12 @@ document.querySelectorAll(".carbtn").forEach(b => b.onclick = e => {
   document.querySelectorAll(".carbtn").forEach(x => x.classList.toggle("on", x === b));
 });
 $("btnGo").onclick = e => { e.currentTarget.blur(); startRace(pendingDiff); };
+$("btnWipe").onclick = e => {
+  e.currentTarget.blur();
+  if (!confirm("이 기기에 저장된 나의 최고 기록과 고스트를 모두 지울까요? (세계 신기록에는 영향이 없습니다)")) return;
+  ["easy", "hard"].forEach(k => { try { localStorage.removeItem(bestKey(k)); localStorage.removeItem(ghostKey(k)); } catch (err) {} best[k] = 0; });
+  renderRecords(); alert("지웠습니다.");
+};
 $("btnRetry").onclick = e => { e.currentTarget.blur(); startRace(); };
 $("btnMenu").onclick = e => { e.currentTarget.blur(); showMenu(); };
 $("btnReset").onclick = e => { e.currentTarget.blur(); startRace(); };
