@@ -476,7 +476,6 @@ function makeRoadTex() {
     c.fillStyle = "#6E7280"; c.fillRect(0, 0, w, h);
     c.fillStyle = "#7A7E8C";
     for (let i = 0; i < 60; i++) c.fillRect(rnd(0, w), rnd(0, h), 3, 3);
-    c.fillStyle = "#FFE066"; c.fillRect(w / 2 - 5, 0, 10, h * .5);     // 가운데 점선
   }, [1, 1]);
 }
 const texCurb = imgTex("img/turbo/curb.png", 1, 1, false, drawCurb, 256, 128); texCurb.rotation = Math.PI / 2; texCurb.center.set(0.5, 0.5);   // 띠 방향(가로)을 도로 진행 방향(v)으로
