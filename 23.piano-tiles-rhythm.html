@@ -188,7 +188,10 @@ const CONFIG = {
       songs: [
         { id: "twinkle", title: "반짝반짝 작은 별", bpm: 90,  song: "EASY_SONG_1", fallDurationMs: 2200 },
         { id: "ode",     title: "환희의 송가",       bpm: 100, song: "EASY_SONG_2", fallDurationMs: 2000 },
-        { id: "cuckoo",  title: "뻐꾹 왈츠",         bpm: 120, song: "EASY_SONG_3", fallDurationMs: 2000 }
+        { id: "cuckoo",  title: "뻐꾹 왈츠",         bpm: 120, song: "EASY_SONG_3", fallDurationMs: 2000 },
+        { id: "lith",     title: "리스 항구", bpm: 130, song: "LITH_SONG", fallDurationMs: 1700 },
+        { id: "terran",   title: "스타크래프트 - 테란", bpm: 140, song: "TERRAN_SONG", fallDurationMs: 1900 },
+        { id: "countryroads", title: "테이크 미 홈, 컨트리 로드", bpm: 84, song: "COUNTRYROADS_SONG", fallDurationMs: 2200 }
       ]
     },
     medium: {
@@ -197,15 +200,14 @@ const CONFIG = {
         { id: "furelise", title: "엘리제를 위하여", bpm: 120, song: "MEDIUM_SONG_1", fallDurationMs: 1800 },
         { id: "turkish",  title: "터키 행진곡",     bpm: 160, song: "MEDIUM_SONG_2", fallDurationMs: 1700 },
         { id: "bach",     title: "바흐 프렐류드 C장조", bpm: 76, song: "MEDIUM_SONG_3", fallDurationMs: 1700 },
-        { id: "lith",     title: "리스 항구", bpm: 130, song: "LITH_SONG", fallDurationMs: 1700 }
+        { id: "kerning",  title: "커닝시티", bpm: 135, song: "KERNING_SONG", fallDurationMs: 1500 }
       ]
     },
     hard: {
       label: "어려움",
       songs: [
         { id: "canon",    title: "캐논 변주곡", bpm: 100, song: "HARD_SONG_1", fallDurationMs: 1400 },
-        { id: "moonlight", title: "월광 소나타 1악장", bpm: 108, song: "HARD_SONG_3", fallDurationMs: 1600 },
-        { id: "kerning",  title: "커닝시티", bpm: 135, song: "KERNING_SONG", fallDurationMs: 1500 }
+        { id: "moonlight", title: "월광 소나타 1악장", bpm: 108, song: "HARD_SONG_3", fallDurationMs: 1600 }
       ]
     },
     veryhard: {
@@ -542,7 +544,53 @@ const KERNING_SONG = seq(`
   A#5:0.5 R:2 B5:0.5 R:0.5 B5:0.5 R:2
 `);
 
-const SONG_DATA = { EASY_SONG_1, EASY_SONG_2, EASY_SONG_3, MEDIUM_SONG_1, MEDIUM_SONG_2, MEDIUM_SONG_3, HARD_SONG_1, HARD_SONG_2, HARD_SONG_3, LITH_SONG, KERNING_SONG };
+// 쉬움 ④ 스타크래프트 - 테란 (Blizzard, "Terran Theme 1", 1998, 140bpm) — SID 칩튠 리메이크가 아니라 원곡을 그대로 옮긴
+// 채보를 썼다. vgmusic.com 에 올라온 M4ST3R 채보 MIDI(vgmusic.com/music/computer/microsoft/windows/Terran1.mid, 포맷1,
+// 11트랙, division=960)를 직접 파싱(PowerShell 바이트 파서)했다. 이 곡은 한 트랙이 처음부터 끝까지 선율을 맡는 구조가
+// 아니라 구간마다 리드 악기가 바뀐다(디스토션 기타 리프 → 브라스 응답구 → 하프시코드풍 아르페지오 → 기타 메인 훅
+// → 리드 신스 전환구 → 스트링 아르페지오) — 각 구간에서 그 순간 선율을 맡은 트랙을 골라 이어 붙이고, 화음이 겹치는
+// 자리는 가장 높은 음만 남겼다(트랙별 선택 근거는 GM 프로그램 번호와 각 트랙의 음역·리듬 패턴을 비교해 판단한
+// 교차 확인 재구성이며, 공식 악보 대조는 아니다 — 뻐꾹 왈츠 항목과 같은 한계). 기타 인트로 리프가 들어오는 지점
+// (틱 76320)부터 정확히 66초(사용자 지정 컷) 분량만 사용, 낮은 인트로 리프(G2·A2)는 게임 음역(C3~B7)에 맞춰
+// 한 옥타브 올렸다.
+const TERRAN_SONG = seq(`
+  G3:0.25 G3:0.25 G3:0.5 A3:0.5 A3:1 R:5.5 G3:0.25 G3:0.25 G3:0.5 A3:0.5
+  A3:1 R:5.5 G3:0.25 G3:0.25 G3:0.5 A3:0.5 A3:1 R:5.5 G3:0.25 G3:0.25
+  G3:0.5 A3:0.5 A3:1 C5:0.5 B4:0.5 A4:1 A4:1.5 A4:1 A4:1.5 R:1
+  B4:0.5 C#5:0.5 D5:0.5 C#5:0.5 B4:1 C#5:1.5 C#5:1 E4:1.5 R:1 B4:0.5
+  C#5:0.5 D5:0.5 C#5:0.5 B4:1 B4:1.5 G#4:1 B4:1.5 R:1 B4:0.5 C#5:0.5
+  D5:0.5 C#5:0.5 B4:1 C#5:1.5 C#5:1 E5:1.5 R:1 B4:0.5 C#5:0.5 D5:0.5
+  C#5:0.5 B4:1 B4:1.5 G#4:1 F#4:1.5 G#3:0.5 A3:0.5 G#3:0.5 E4:2.5 G#3:0.5
+  A3:0.5 G#3:0.5 B3:2.5 G#3:0.5 A3:0.5 G#3:0.5 B3:2.5 C4:0.5 G3:0.5 C4:0.5
+  C4:2.5 B3:0.5 G3:0.5 B3:0.5 G4:2.5 A3:0.5 F#3:0.5 A3:0.5 F#4:2.5 C4:0.5
+  G3:0.5 C4:0.5 G4:2.5 B3:0.5 F#3:0.5 B3:0.5 F#4:2.5 E5:6 B5:0.75 A5:0.25
+  B5:0.75 D6:0.25 B5:3.5 A5:0.25 B5:0.25 C6:3.5 E5:0.5 G5:3.5 F#5:0.25 E5:0.25
+  D5:4 E5:3.5 D5:0.25 C5:0.25 B4:4 E5:9.5 F#7:0.5 G7:1 E7:0.5 G7:1
+  G7:0.5 E7:0.5 E7:0.5 F#7:0.5 F#7:0.5 G7:0.5 G7:0.5 A7:1 B3:1 A3:1
+  B3:0.5 D#4:1.5 C#4:1 D#4:1 C#4:1 A3:1 B3:0.5
+`);
+
+// 쉬움 ⑤ 존 덴버 - Take Me Home, Country Roads (1971, 84bpm) — 사용자가 제공한 MIDI
+// "MIDI_John Denver_Take Me Home Country Roads.mid"(포맷1, 11트랙, division=192)를 PowerShell 바이트 파서로 직접
+// 해석했다. 트랙 중 이름이 그대로 "Melody" 인 트랙(9번, 단선율)을 선율로 채택, 규칙대로 동시음이 겹치면 가장 높은
+// 음만 남기는 처리도 적용해 두었다(실제로는 겹침이 거의 없었다). 1절 + 후렴이 끝나는 지점(약 53초, 사용자 지정
+// 컷)에 가장 가까운 자연스러운 구절 경계로 끊었다 — 정확히는 도입부 4음 모티프("Almost heaven…")가 한 번 더
+// 반복되며 끝나는 지점, 53.4초.
+const COUNTRYROADS_SONG = seq(`
+  A3:0.25 R:0.25 A3:0.5 R:0.25 B3:0.75 A3:2.25 R:0.25 B3:0.5 A3:0.5 B3:0.5
+  D4:2.25 R:0.5 E4:0.5 R:0.25 E4:0.5 F#4:0.75 R:0.25 E4:1.25 B3:0.25 R:0.25
+  B3:0.5 R:0.25 A3:0.5 B3:0.5 A3:0.5 D4:0.5 R:0.25 D4:3.25 R:1 A3:0.25
+  R:0.25 A3:0.5 B3:1 A3:1.5 B3:0.5 D4:0.25 R:0.25 D4:0.5 E4:0.5 F#4:2
+  R:0.25 E4:0.5 R:0.25 E4:0.5 R:0.25 E4:0.5 R:0.25 E4:0.5 F#4:0.75 E4:1.25
+  B3:0.5 D4:0.25 R:0.25 D4:0.5 E4:0.25 D4:1 R:0.25 D4:0.5 E4:0.25 F#4:3
+  R:0.25 E4:0.5 D4:0.25 E4:3 R:0.25 F#4:0.5 R:0.25 E4:0.25 D4:3 R:0.25
+  F#4:0.5 A4:0.25 B4:3 R:0.25 B4:0.5 R:0.25 F#4:0.25 A4:0.75 F#4:2.5 E4:0.5
+  R:0.25 D4:0.25 E4:0.75 F#4:2.5 E4:0.5 R:0.25 D4:0.25 R:0.25 D4:3 R:0.25
+  D4:0.5 E4:0.25 R:0.25 D4:4.25 R:1 A3:0.25 R:0.25 A3:0.5 R:0.25 B3:1
+  A3:1.5
+`);
+
+const SONG_DATA = { EASY_SONG_1, EASY_SONG_2, EASY_SONG_3, MEDIUM_SONG_1, MEDIUM_SONG_2, MEDIUM_SONG_3, HARD_SONG_1, HARD_SONG_2, HARD_SONG_3, LITH_SONG, KERNING_SONG, TERRAN_SONG, COUNTRYROADS_SONG };
 
 /* ============ 최고 기록 (이 기기의 localStorage, 곡별) ============ */
 const Best = {
