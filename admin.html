@@ -255,6 +255,21 @@
       </div>
       <p class="msg" id="exportMsg"></p>
     </div>
+
+    <!-- 세계 신기록 관리: records/<게임>/<항목> 을 읽어 보여 주고, 선생님 계정으로 고치거나 지웁니다.
+         (학생은 규칙상 더 높은 점수만 쓸 수 있고, 선생님 UID 는 규칙에서 예외) -->
+    <div class="panel" id="recPanel">
+      <h2>세계 신기록 관리</h2>
+      <p class="hint" style="margin-top:0">
+        게임마다 모든 학생이 공유하는 세계 신기록입니다. 의심스러운 기록은 <b>지우기</b>(다음 판부터 첫 기록으로 다시 받음),
+        저장 단위가 바뀐 기록은 <b>고치기</b>로 값을 바꿉니다. 값은 각 게임의 저장 단위(초·밀리초·점 등)로 넣습니다.
+      </p>
+      <div class="actions" style="margin-top:0">
+        <button id="recReload" type="button">신기록 새로고침</button>
+      </div>
+      <p class="msg" id="recMsg"></p>
+      <div id="recList"></div>
+    </div>
   </div>
 
 </div>
@@ -397,6 +412,173 @@ async function write(path, value) {
     try { const d = await r.json(); detail = d.error || detail; } catch (e) {}
     throw new Error(explainDb(detail));
   }
+}
+
+/* ---------------- 세계 신기록 ----------------
+   records/<게임>/<항목> = { score, name, grade, cls, at }.
+   작을수록 좋은 기록(lower)은 world-record.js 와 같이 score = 10억 - 값 으로 저장돼 있습니다.
+   아래 표는 게임별 저장 단위와 표시 방법(각 게임 파일의 WorldRecord(...) format 과 맞춤). */
+const REC_BASE = 1000000000;
+const REC_GAMES = {
+  slidecard:    { title: "카드 옮기기",         lower: true, unit: "밀리초(ms)", fmt: (v) => clock(v) },
+  robotmaze:    { title: "미로 찾기",           lower: true, unit: "밀리초(ms)", fmt: (v) => (v / 1000).toFixed(2) + "초" },
+  brickbreak:   { title: "벽돌깨기",            unit: "라운드", fmt: (v) => "라운드 " + v },
+  snakegame:    { title: "스네이크",            unit: "점", fmt: (v) => v + "점" },
+  conditionrun: { title: "조건문 러너",         unit: "점", fmt: (v) => v + "점" },
+  ramentiming:  { title: "라면 끓이기",         unit: "원", fmt: (v) => v.toLocaleString("ko-KR") + "원" },
+  baseball:     { title: "야구 타격",           unit: "점", fmt: (v) => v.toLocaleString("ko-KR") + "점" },
+  hanokroofrun: { title: "한옥 지붕 와이어 러너", unit: "점", fmt: (v) => v + "점" },
+  pianotiles:   { title: "피아노 타일 리듬",    unit: "점", fmt: (v) => v + "점", keyed: "곡" },
+  timeguess:    { title: "5초 타이머 맞히기",   lower: true, unit: "백만분의 1초 (0.000001초)", fmt: (v) => "오차 " + (v / 1000000).toFixed(6) + "초" },
+  turbolap:     { title: "터보 랩",             lower: true, unit: "밀리초(ms)", fmt: (v) => clock(v), keyed: "난이도" }
+};
+function clock(ms) {
+  ms = Math.max(0, Math.round(ms));
+  const m = Math.floor(ms / 60000), s = Math.floor(ms % 60000 / 1000), c = Math.floor(ms % 1000 / 10);
+  return m + ":" + String(s).padStart(2, "0") + "." + String(c).padStart(2, "0");
+}
+let records = [];   /* [{game, key, rec}] */
+
+function recordUrl(game, key) {
+  return cfg.DB_URL.replace(/\/+$/, "") + "/records/" + game + "/" + key + ".json";
+}
+
+/* 선생님 계정으로 기록을 통째로 쓰거나(PUT) 지웁니다(DELETE). 규칙에서 선생님 UID 는 "더 높은 점수만" 검사에서 예외. */
+async function writeRecord(game, key, value) {
+  if (!auth || !auth.currentUser) throw new Error("다시 로그인해 주세요.");
+  const idToken = await auth.currentUser.getIdToken();
+  const r = await fetch(recordUrl(game, key) + "?auth=" + encodeURIComponent(idToken), {
+    method: value === null ? "DELETE" : "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: value === null ? undefined : JSON.stringify(value)
+  });
+  if (!r.ok) {
+    let detail = r.status;
+    try { const d = await r.json(); detail = d.error || detail; } catch (e) {}
+    if (detail === "Permission denied" || detail === 401) {
+      throw new Error("권한이 없습니다. 데이터베이스규칙.json 을 Firebase 콘솔 → 규칙 탭에 다시 게시했는지 확인해 주세요.");
+    }
+    throw new Error(explainDb(detail));
+  }
+}
+
+async function loadRecords() {
+  try {
+    const r = await fetch(cfg.DB_URL.replace(/\/+$/, "") + "/records.json", { cache: "no-store" });
+    if (!r.ok) throw new Error(r.status);
+    const data = (await r.json()) || {};
+    records = [];
+    Object.keys(data).sort().forEach((game) => {
+      Object.keys(data[game] || {}).sort().forEach((key) => {
+        const rec = data[game][key];
+        if (rec && typeof rec.score === "number") records.push({ game, key, rec });
+      });
+    });
+    renderRecords();
+    say("recMsg", "");
+  } catch (e) {
+    say("recMsg", "세계 신기록을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.");
+  }
+}
+
+function recValue(game, score) {
+  const m = REC_GAMES[game];
+  return m && m.lower ? REC_BASE - score : score;
+}
+function recText(game, score) {
+  const m = REC_GAMES[game];
+  const v = recValue(game, score);
+  return m ? m.fmt(v) : String(v);
+}
+function recWho(rec) {
+  const p = [];
+  if (rec.grade) p.push(rec.grade + "학년");
+  if (rec.cls) p.push(rec.cls + "반");
+  p.push(rec.name || "");
+  return p.join(" ");
+}
+
+function renderRecords() {
+  const box = $("recList");
+  box.innerHTML = "";
+  if (records.length === 0) { box.appendChild(el("p", "hint", "등록된 세계 신기록이 없습니다.")); return; }
+  records.forEach((r) => box.appendChild(recCard(r)));
+}
+
+function recCard(r) {
+  const m = REC_GAMES[r.game];
+  const card = el("div", "game");
+  const head = el("div", "game-head");
+  const info = el("div", "game-info");
+  const label = (m ? m.title : r.game) + (m && m.keyed ? " · " + m.keyed + " " + r.key : (r.key === "all" ? "" : " · " + r.key));
+  info.appendChild(el("p", "game-title", label));
+  info.appendChild(el("p", "game-meta", recText(r.game, r.rec.score) + "   ·   " + recWho(r.rec)));
+  info.appendChild(el("p", "game-meta",
+    "records/" + r.game + "/" + r.key + "   ·   저장값 " + r.rec.score +
+    (r.rec.at ? "   ·   " + new Date(r.rec.at).toLocaleString("ko-KR") : "")));
+  head.appendChild(info);
+  card.appendChild(head);
+
+  const buttons = el("div", "game-buttons");
+  const editBtn = el("button", "", "고치기");
+  const delBtn = el("button", "", "지우기");
+  editBtn.type = "button"; delBtn.type = "button";
+  buttons.appendChild(editBtn);
+  buttons.appendChild(delBtn);
+  card.appendChild(buttons);
+
+  /* 고치기: 값(게임 단위)·이름·학년·반. 등록 시각(at)은 그대로 둡니다. */
+  const edit = el("div", "edit");
+  const fVal = field("값 (" + (m ? m.unit : "저장값") + ")", String(recValue(r.game, r.rec.score)));
+  const fName = field("이름", r.rec.name || "");
+  const fGrade = field("학년 (1~2, 비우면 없음)", r.rec.grade ? String(r.rec.grade) : "");
+  const fCls = field("반 (1~5, 비우면 없음)", r.rec.cls ? String(r.rec.cls) : "");
+  const row1 = el("div", "row"); row1.appendChild(fVal.box); row1.appendChild(fName.box);
+  const row2 = el("div", "row"); row2.appendChild(fGrade.box); row2.appendChild(fCls.box);
+  edit.appendChild(row1); edit.appendChild(row2);
+  const act = el("div", "actions");
+  const saveBtn = el("button", "", "저장"); saveBtn.type = "button";
+  const cancelBtn = el("button", "", "취소"); cancelBtn.type = "button";
+  act.appendChild(saveBtn); act.appendChild(cancelBtn);
+  edit.appendChild(act);
+  const msg = el("p", "msg", "");
+  edit.appendChild(msg);
+  card.appendChild(edit);
+
+  editBtn.addEventListener("click", () => { edit.classList.toggle("open"); msg.textContent = ""; });
+  cancelBtn.addEventListener("click", () => edit.classList.remove("open"));
+
+  saveBtn.addEventListener("click", async () => {
+    const v = Number(fVal.input.value.trim());
+    const name = fName.input.value.trim();
+    const grade = fGrade.input.value.trim() === "" ? 0 : Number(fGrade.input.value.trim());
+    const cls = fCls.input.value.trim() === "" ? 0 : Number(fCls.input.value.trim());
+    if (!isFinite(v) || v < 0 || fVal.input.value.trim() === "") { msg.textContent = "값은 0 이상의 숫자여야 합니다."; return; }
+    if (!name || name.length > 20) { msg.textContent = "이름은 1~20자여야 합니다."; return; }
+    if (grade && grade !== 1 && grade !== 2) { msg.textContent = "학년은 1 또는 2 입니다."; return; }
+    if (cls && !(cls >= 1 && cls <= 5 && Number.isInteger(cls))) { msg.textContent = "반은 1~5 입니다."; return; }
+    const rec = { score: m && m.lower ? REC_BASE - v : v, name, at: r.rec.at || { ".sv": "timestamp" } };
+    if (grade) rec.grade = grade;
+    if (cls) rec.cls = cls;
+    saveBtn.disabled = true; msg.textContent = "저장 중…";
+    try {
+      await writeRecord(r.game, r.key, rec);
+      await loadRecords();
+      say("recMsg", label + " 기록을 " + recText(r.game, rec.score) + " (" + recWho(rec) + ") 으로 고쳤습니다.");
+    } catch (e) { msg.textContent = e.message; saveBtn.disabled = false; }
+  });
+
+  delBtn.addEventListener("click", async () => {
+    if (!confirm(label + " 세계 신기록(" + recText(r.game, r.rec.score) + ", " + recWho(r.rec) + ")을 지울까요?\n다음 판부터 첫 기록으로 다시 받습니다.")) return;
+    delBtn.disabled = true;
+    try {
+      await writeRecord(r.game, r.key, null);
+      await loadRecords();
+      say("recMsg", label + " 기록을 지웠습니다.");
+    } catch (e) { say("recMsg", e.message); delBtn.disabled = false; }
+  });
+
+  return card;
 }
 
 /* ---------------- 화면 ---------------- */
@@ -841,6 +1023,7 @@ function showMain(user) {
   $("who").textContent = "로그인: " + (user.email || user.displayName || "") + "   ·   내 UID: " + user.uid;
   loadSeed().then(() => {
     load();
+    loadRecords();
     if (!timer) timer = setInterval(load, (cfg.POLL_SECONDS || 10) * 1000);
   });
 }
@@ -862,6 +1045,7 @@ $("logout").addEventListener("click", async () => {
 });
 
 $("fixBtn").addEventListener("click", fixLegacy);
+$("recReload").addEventListener("click", loadRecords);
 
 $("exportBtn").addEventListener("click", () => {
   const blob = new Blob([backupText()], { type: "application/json" });
