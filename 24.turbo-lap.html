@@ -236,13 +236,15 @@ const CFG = {
   kmh: 4                 // 표시용 속도 배율
 };
 /* 난이도별 트랙 — points: 제어점 [x, y(높이), z] (닫힌 곡선), width: 도로 폭
-   세계 신기록 경로 records/turbolap/<key>, 개인 기록 localStorage turbolap_best_<key>_v1 */
+   세계 신기록 경로 records/turbolap/<key>, 개인 기록 localStorage turbolap_best_<key>_v1
+   ※ 코너 반지름은 width/2 + shoulder(4.5) 보다 커야 한다. 더 급하면 안쪽 난간이 도로 안으로 꼬여 들어와
+     차가 난간을 통과한다. 제어점을 고친 뒤 콘솔의 "[turbolap] … minR" 값(쉬움 ≥ 11.5, 어려움 ≥ 10)을 확인할 것. */
 const TRACKS = {
   easy: {
     key: "easy", name: "쉬움", width: 14, trees: 90,
     points: [
       [-60, 0, 80], [40, 0, 80], [110, 0, 55], [125, 0, -15], [90, 5, -65],
-      [25, 9, -95], [-40, 5, -70], [-95, 0, -85], [-135, 0, -25], [-105, 0, 35], [-125, 0, 72]
+      [25, 9, -95], [-40, 5, -70], [-95, 0, -85], [-140, 0, -35], [-125, 0, 15], [-135, 0, 55], [-105, 0, 85]
     ]
   },
   hard: {
@@ -250,7 +252,7 @@ const TRACKS = {
     points: [
       [-90, 0, 95], [20, 0, 95], [80, 0, 80], [110, 0, 40], [85, 0, 10], [45, 0, 25], [20, 0, -5],
       [50, 4, -40], [100, 9, -70], [120, 3, -115], [60, 0, -135], [0, 4, -110], [-50, 10, -130],
-      [-105, 5, -100], [-140, 0, -50], [-95, 0, -20], [-135, 0, 30], [-125, 0, 80]
+      [-105, 5, -100], [-140, 0, -70], [-135, 0, -40], [-95, 0, -20], [-100, 0, 5], [-135, 0, 35], [-125, 0, 80]
     ]
   }
 };
@@ -579,14 +581,23 @@ function buildTrack(def) {
   {
     const railMat = lambert(0xFFFFFF), postMat = lambert(0xF23B3B);
     const off = W / 2 + SH;
+    /* 급한 코너 안쪽에서는 offset 점이 다른 샘플의 중심선에 더 가까워진다(= 난간이 도로 안으로 꼬여 들어옴).
+       물리는 "중심선까지 거리" 로만 판정하므로 그런 점은 난간·기둥에서 빼서 물리 경계와 그림을 맞춘다. */
+    let folded = 0;
+    const railOk = (i, sg) => {
+      const e = edgeAt(i, off * sg, 0);
+      for (let j = 0; j < N; j += 2) { const dx = S[j].p.x - e.x, dz = S[j].p.z - e.z; if (dx * dx + dz * dz < (off - 0.3) * (off - 0.3)) { folded++; return false; } }
+      return true;
+    };
     [1, -1].forEach(sg => {
       const pts = [];
-      for (let i = 0; i < N; i += 4) pts.push(edgeAt(i, off * sg, 1.0));
+      for (let i = 0; i < N; i += 4) if (railOk(i, sg)) pts.push(edgeAt(i, off * sg, 1.0));
       const c = new THREE.CatmullRomCurve3(pts, true);
       G.add(new THREE.Mesh(new THREE.TubeGeometry(c, N / 2, 0.22, 6, true), railMat));
       const postGeo = new THREE.CylinderGeometry(0.3, 0.3, 1.4, 6);
-      for (let i = 0; i < N; i += CFG.postEvery) { const m = new THREE.Mesh(postGeo, postMat); m.position.copy(edgeAt(i, off * sg, 0.7)); G.add(m); }
+      for (let i = 0; i < N; i += CFG.postEvery) { if (!railOk(i, sg)) continue; const m = new THREE.Mesh(postGeo, postMat); m.position.copy(edgeAt(i, off * sg, 0.7)); G.add(m); }
     });
+    if (folded) console.warn("[turbolap] " + def.key + ": 난간이 꼬이는 코너가 있습니다(" + folded + "점 제외). 제어점을 완만하게 고치세요.");
     /* 깃대 (양쪽 번갈아) — 카메라 가까이 지나가는 키 큰 물체가 속도감을 살린다 */
     const poleGeo = new THREE.CylinderGeometry(0.12, 0.12, 7, 5), poleMat = lambert(0xF4F4F4);
     const flagGeo = new THREE.BufferGeometry();
@@ -627,7 +638,9 @@ function buildTrack(def) {
     const ox = 150 - (minX + maxX) / 2 * sc, oz = 150 - (minZ + maxZ) / 2 * sc;
     MM = { sc, mx: x => ox + x * sc, mz: z => oz + z * sc };
   }
-  console.log("[turbolap] " + def.key + " track length", TRACK_LEN.toFixed(1), "/ min 3-lap time at max speed", (3 * TRACK_LEN / CFG.maxSpeed).toFixed(1), "s");
+  let minR = Infinity;                                                // 가장 급한 코너의 반지름 (난간 offset 보다 커야 함)
+  for (let i = 0; i < N; i++) { const a = S[(i + N - 2) % N].t, b = S[(i + 2) % N].t; const ang = Math.acos(Math.max(-1, Math.min(1, a.x * b.x + a.z * b.z))); minR = Math.min(minR, SEG * 4 / Math.max(ang, 1e-6)); }
+  console.log("[turbolap] " + def.key + " track length", TRACK_LEN.toFixed(1), "/ min 3-lap time at max speed", (3 * TRACK_LEN / CFG.maxSpeed).toFixed(1), "s / minR", minR.toFixed(1), "(rail offset " + (W / 2 + SH) + ")");
 }
 
 /* ── 자동차 ── */
