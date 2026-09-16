@@ -162,11 +162,11 @@
     if (saved && typeof saved.sec === "number") best = saved;
   } catch (e) {}
 
-  /* 부호 붙은 차이 문구와 색 클래스: 느리면 "+ 0.1234초"(빨강), 빠르면 "- 0.1234초"(파랑) */
+  /* 부호 붙은 차이 문구와 색 클래스: 느리면 "+ 0.123456초"(빨강), 빠르면 "- 0.123456초"(파랑) */
   function signed(diff) {
-    if (diff === 0) return { text: "±0.0000초", cls: "" };
-    if (diff < 0)   return { text: "- " + Math.abs(diff).toFixed(4) + "초", cls: "early" };
-    return               { text: "+ " + diff.toFixed(4) + "초", cls: "late" };
+    if (diff === 0) return { text: "±0.000000초", cls: "" };
+    if (diff < 0)   return { text: "- " + Math.abs(diff).toFixed(6) + "초", cls: "early" };
+    return               { text: "+ " + diff.toFixed(6) + "초", cls: "late" };
   }
 
   function renderBest(isNew) {
@@ -177,7 +177,7 @@
       bestVal.appendChild(s);
       return;
     }
-    s.textContent = best.sec.toFixed(4) + "초 (";
+    s.textContent = best.sec.toFixed(6) + "초 (";
     var d = signed(best.diff);
     var em = document.createElement("span");
     em.textContent = d.text;
@@ -201,9 +201,9 @@
   }
 
   /* ---------- 세계 신기록 (모든 학생 공통, Firebase) ----------
-     5초와의 차이(절댓값)를 0.0001초 단위 정수로 저장. 작을수록 좋은 기록(lower:true) */
+     5초와의 차이(절댓값)를 0.000001초 단위 정수로 저장. 작을수록 좋은 기록(lower:true) */
   var WR = window.WorldRecord
-    ? WorldRecord("timeguess", { lower: true, format: function (v) { return "오차 " + (v / 10000).toFixed(4) + "초"; } })
+    ? WorldRecord("timeguess", { lower: true, format: function (v) { return "오차 " + (v / 1000000).toFixed(6) + "초"; } })
     : null;
 
   function renderWorld() {
@@ -236,25 +236,25 @@
     var ms = performance.now() - startAt;
     show(scrResult);
 
-    /* 표시할 소수 넷째 자리 값으로 먼저 반올림한 뒤 차이를 구해야
-       "3.8213초" 와 "1.1787초 빨랐어요" 가 서로 어긋나지 않습니다. */
-    var sec  = Math.round(ms * 10) / 10000;
-    var diff = Math.round((sec - TARGET) * 10000) / 10000;
+    /* 표시할 소수 여섯째 자리 값으로 먼저 반올림한 뒤 차이를 구해야
+       "3.821345초" 와 "1.178655초 빨랐어요" 가 서로 어긋나지 않습니다. */
+    var sec  = Math.round(ms * 1000) / 1000000;
+    var diff = Math.round((sec - TARGET) * 1000000) / 1000000;
     updateBest(sec, diff);
 
-    txtTime.textContent = sec.toFixed(4) + "초";
+    txtTime.textContent = sec.toFixed(6) + "초";
     if (diff === 0) {
       txtDiff.textContent = "정확히 맞혔어요!";
     } else if (diff < 0) {
-      txtDiff.textContent = TARGET + "초보다 " + Math.abs(diff).toFixed(4) + "초 빨랐어요";
+      txtDiff.textContent = TARGET + "초보다 " + Math.abs(diff).toFixed(6) + "초 빨랐어요";
     } else {
-      txtDiff.textContent = TARGET + "초보다 " + diff.toFixed(4) + "초 느렸어요";
+      txtDiff.textContent = TARGET + "초보다 " + diff.toFixed(6) + "초 느렸어요";
     }
     var d = signed(diff);
     txtSigned.textContent = d.text;
     txtSigned.className = d.cls;
     btnAgain.focus({ preventScroll: true });
-    if (WR) WR.prompt(Math.round(Math.abs(diff) * 10000));   /* 세계 신기록이면 학년·반·이름 입력 창 */
+    if (WR) WR.prompt(Math.round(Math.abs(diff) * 1000000));   /* 세계 신기록이면 학년·반·이름 입력 창 */
   }
 
   function again() {
