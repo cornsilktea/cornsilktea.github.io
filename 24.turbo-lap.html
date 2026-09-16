@@ -197,6 +197,9 @@ const CFG = {
   offroadMax: 15,        // 오프로드 최고 속도
   offroadDrag: 2.4,      // 오프로드 감속 (초당 비율)
   wallKeep: 0.3,         // 울타리 충돌 시 남는 속도 비율
+  gravity: 40,           // 경사 가속도(오르막에서 느려지고 내리막에서 빨라짐, 아케이드용으로 과장)
+  cornerDrag: 0.25,      // 코너에서 조향량×속도에 비례해 잃는 속도 (직선보다 코너가 느리게)
+  downhillMax: 1.2,      // 내리막에서 허용하는 최고 속도 배율
   shoulder: 4.5,         // 도로 밖 갓길 폭 (여기까지 나가면 울타리)
   /* 속도감 연출 (물리·기록에는 영향 없음) */
   carScale: 0.8,         // 차를 작게 → 같은 속도라도 풍경이 더 빨리 지나가 보임
@@ -694,21 +697,31 @@ function updateCar(dt) {
   const thr = racing ? ((keys.up ? 1 : 0) - (keys.down ? 1 : 0)) : 0;
   const str = racing ? ((keys.left ? 1 : 0) - (keys.right ? 1 : 0)) : 0;
   const maxV = P.off ? CFG.offroadMax : CFG.maxSpeed;
+  const fx0 = -Math.sin(P.h), fz0 = -Math.cos(P.h);
+  /* 진행 방향의 경사: 도로 앞뒤 샘플의 높이차 × (차 방향·도로 방향 일치도) */
+  const sA = S[(P.ci + 5) % N], sB = S[(P.ci + N - 5) % N], s0 = S[P.ci];
+  const slope = Math.atan2(sA.p.y - sB.p.y, SEG * 10) * (fx0 * s0.t.x + fz0 * s0.t.z);   // +: 오르막
 
-  /* 가속·브레이크·후진 */
-  if (thr > 0) P.v += CFG.accel * dt;
+  /* 가속·브레이크·후진 — 엔진 힘에서 공기저항(속도² 비례, 평지 최고속도에서 균형)·경사·코너 손실을 뺀다 */
+  const ratio0 = Math.abs(P.v) / CFG.maxSpeed;
+  if (thr > 0) P.v += CFG.accel * (1 - ratio0 * ratio0) * dt;
   else if (thr < 0) { if (P.v > 0.5) P.v -= CFG.brake * dt; else P.v -= CFG.accel * 0.6 * dt; }
   else P.v -= P.v * CFG.coastDrag * dt;
+  P.v -= CFG.gravity * Math.sin(slope) * dt;                                   // 오르막 감속·내리막 가속
+  if (thr <= 0 && P.v > 0) P.v -= CFG.accel * ratio0 * ratio0 * dt;             // 가속 안 할 때도 공기저항은 받음
   if (state === "done") P.v -= P.v * 1.5 * dt;
   if (P.off) { P.v -= P.v * CFG.offroadDrag * dt; }
-  if (P.v > maxV) P.v = Math.max(maxV, P.v - 40 * dt);
+  const capV = maxV * (slope < 0 ? CFG.downhillMax : 1);
+  if (P.v > capV) P.v = Math.max(capV, P.v - 40 * dt);
   if (P.v < -CFG.reverseMax) P.v = -CFG.reverseMax;
   if (Math.abs(P.v) < 0.02 && thr === 0) P.v = 0;
 
   /* 조향 (속도에 비례, 고속에서는 둔하게) */
   const ratio = Math.abs(P.v) / CFG.maxSpeed;
   const gain = Math.min(1, ratio / CFG.steerFullAt) * (1 - (1 - CFG.steerHighSpeed) * ratio);
-  P.h += str * CFG.steerRate * gain * dt * (P.v >= 0 ? 1 : -1);
+  const turn = str * CFG.steerRate * gain;
+  P.h += turn * dt * (P.v >= 0 ? 1 : -1);
+  P.v -= CFG.cornerDrag * Math.abs(turn) * P.v * dt;                            // 코너를 돌수록 속도를 잃는다
   P.steerVis += (str * 0.45 - P.steerVis) * Math.min(1, dt * 10);
 
   /* 이동 */
@@ -750,9 +763,7 @@ function updateCar(dt) {
   car.position.set(P.x, P.y, P.z);
   car.rotation.y = P.h;
   const i1 = (P.ci + 5) % N, i0 = (P.ci + N - 5) % N;
-  const slope = Math.atan2(S[i1].p.y - S[i0].p.y, SEG * 10);
-  const c = fx * s.t.x + fz * s.t.z;
-  car.rotation.x = slope * c;
+  car.rotation.x = Math.atan2(S[i1].p.y - S[i0].p.y, SEG * 10) * (fx * s.t.x + fz * s.t.z);
   car.rotation.z = -str * Math.min(1, ratio) * 0.06;
   car.userData.wheels.forEach(w => { w.g.rotation.x += P.v * dt / 0.48; if (w.front) w.g.rotation.y = P.steerVis; });
 }
