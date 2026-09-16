@@ -764,7 +764,7 @@ function hitLane(lane){
     judge({ lane, pitch: null }, "MISS", inputMs, true); // 타일 없는 곳을 두드림(막치기 방지): 구제 점수 없는 빈 MISS
   }
 }
-function judge(n, grade, atMs, phantom){
+function judge(n, grade, atMs, phantom, silent){
   n.judged = grade; n.hitAt = atMs;
   S.judged++;
   if (grade === "MISS") {
@@ -773,7 +773,7 @@ function judge(n, grade, atMs, phantom){
     // 타일이 아예 없는 곳을 두드린 헛탭(phantom)까지 구제하면 막치기가 정타보다 유리해진다.
     const ms = (!phantom && S.song && S.song.missScore != null) ? S.song.missScore : CONFIG.missScore;
     S.score = Math.max(0, S.score + (ms != null ? ms : -CONFIG.penaltyMiss));   // 곡별 missScore 가 있으면 감점 대신 소량 가산
-    Sound.playThud();
+    if (!silent) Sound.playThud();
   } else {
     S.combo++; S.maxCombo = Math.max(S.maxCombo, S.combo);
     const base = grade === "PERFECT" ? CONFIG.scorePerfect : CONFIG.scoreGood;
@@ -881,7 +881,7 @@ function finish(){
   S.running = false;
   cancelAnimationFrame(S.raf);
   const now = Sound.nowMs();
-  S.notes.forEach(n => { if (!n.judged) judge(n, "MISS", now); });   // 중도 종료 시 남은 노트는 MISS
+  S.notes.forEach(n => { if (!n.judged) judge(n, "MISS", now, false, true); });   // 중도 종료 시 남은 노트는 MISS(소리 없이 — 한꺼번에 울리면 겹쳐서 "퍽" 소리가 남)
   const cfg = S.song, prev = Best.get(cfg.id);
   const isNew = !prev || S.score > prev.score;
   if (isNew) Best.set(cfg.id, { score: S.score, acc: accuracy(), at: Date.now() });
