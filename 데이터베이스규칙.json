@@ -11,6 +11,19 @@
         "$room": { ".write": "$room.matches(/^[A-Z0-9]{4}$/)" }
       }
     },
+    "ghosts": {
+      ".read": true,
+      "$game": {
+        "$key": {
+          ".write": "$game.matches(/^[a-z]+$/) && $key.matches(/^[a-z]+$/) && newData.child('score').val() === root.child('records').child($game).child($key).child('score').val()",
+          ".validate": "newData.hasChildren(['score', 'name', 'data'])",
+          "score": { ".validate": "newData.isNumber()" },
+          "name": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20" },
+          "data": { ".validate": "newData.isString() && newData.val().length <= 120000" },
+          "$other": { ".validate": false }
+        }
+      }
+    },
     "records": {
       ".read": true,
       "$game": {

@@ -91,6 +91,13 @@
   .carbtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--sg-ink); }
   .carbtn i { display: block; height: 34px; margin: 0 8px 8px; border-radius: 17px 17px 8px 8px; border: 2px solid var(--sg-ink); }
   .carbtn.on { outline: 3px solid #D97B4F; outline-offset: 2px; }
+  .ghosts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 4px 0 8px; }
+  .ghostbtn { font: inherit; font-weight: 800; font-size: 14px; padding: 8px 4px; border-radius: 10px; border: 2px solid var(--sg-line-mid); background: var(--sg-panel-alt); color: var(--sg-ink); cursor: pointer; }
+  .ghostbtn small { display: block; font-size: 11px; font-weight: 700; color: var(--sg-ink-soft); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ghostbtn.on { background: #fff; border-color: #D97B4F; outline: 2px solid #D97B4F; }
+  .ghostbtn:disabled { opacity: .45; cursor: default; }
+  .sect { font-size: 13px; font-weight: 800; color: var(--sg-ink-soft); text-align: left; margin: 10px 0 4px; }
+  #hudGhost { position: fixed; left: 50%; transform: translateX(-50%); top: 118px; z-index: 5; display: none; pointer-events: none; font-size: 12px; padding: 3px 10px; }
   @media (max-width: 520px) { .cars { grid-template-columns: repeat(2, 1fr); } }
   .final { font-size: clamp(40px, 9vw, 58px); font-weight: 800; font-variant-numeric: tabular-nums; color: var(--sg-primary); line-height: 1.1; }
   .diffTag { display: inline-block; padding: 2px 12px; border-radius: 8px; background: var(--sg-panel-alt); border: 2px solid var(--sg-line-mid); font-size: 14px; font-weight: 800; margin-bottom: 6px; }
@@ -117,6 +124,7 @@
     <button type="button" id="btnRecover">🚗 트랙 복귀 (T)</button>
   </div>
 </div>
+<div class="hud-box" id="hudGhost"></div>
 <div class="hud-box" id="speed"><span class="lab">속도</span><b id="speedVal">0</b> km/h</div>
 <canvas id="minimap" width="300" height="300"></canvas>
 <canvas id="fx"></canvas>
@@ -155,7 +163,13 @@
       <button type="button" class="carbtn" data-car="blue"><i style="background:#3D8BFF"></i>파랑</button>
       <button type="button" class="carbtn" data-car="red"><i style="background:#FF5A4E"></i>빨강</button>
     </div>
-    <div class="hint">차량을 고르면 바로 출발합니다.</div>
+    <div class="sect">👻 고스트 고르기 <span style="font-weight:700">— 지난 주행이 반투명 차로 같이 달립니다</span></div>
+    <div class="ghosts">
+      <button type="button" class="ghostbtn on" data-ghost="none">없음<small>&nbsp;</small></button>
+      <button type="button" class="ghostbtn" data-ghost="mine" id="ghostMine">나의 최고 기록<small>기록 없음</small></button>
+      <button type="button" class="ghostbtn" data-ghost="world" id="ghostWorld">세계신기록<small>확인 중…</small></button>
+    </div>
+    <div class="hint">고스트를 고른 뒤 차량을 누르면 바로 출발합니다.</div>
     <div class="btns" style="margin-top:12px"><button type="button" class="btn sub" id="btnCarBack">← 코스 다시 고르기</button></div>
   </div>
 
@@ -186,7 +200,7 @@
 const CFG = {
   laps: 3,               // 완주 바퀴 수
   countdown: 3,          // 출발 카운트다운(초)
-  maxSpeed: 44,          // 최고 속도 (단위/초)
+  maxSpeed: 44,          // 최고 속도 (단위/초). 표시 km/h = ×4 → 평지 직선 약 170
   accel: 20,             // 가속도
   brake: 42,             // 브레이크 감속도
   reverseMax: 12,        // 후진 최고 속도
@@ -198,8 +212,8 @@ const CFG = {
   offroadDrag: 2.4,      // 오프로드 감속 (초당 비율)
   wallKeep: 0.3,         // 울타리 충돌 시 남는 속도 비율
   gravity: 40,           // 경사 가속도(오르막에서 느려지고 내리막에서 빨라짐, 아케이드용으로 과장)
-  cornerDrag: 0.25,      // 코너에서 조향량×속도에 비례해 잃는 속도 (직선보다 코너가 느리게)
-  downhillMax: 1.2,      // 내리막에서 허용하는 최고 속도 배율
+  cornerDrag: 0.12,      // 코너에서 조향량×속도에 비례해 잃는 속도 (직선보다 코너가 느리게)
+  downhillMax: 1.1,      // 내리막에서 허용하는 최고 속도 배율 (약 190km/h)
   shoulder: 4.5,         // 도로 밖 갓길 폭 (여기까지 나가면 울타리)
   /* 속도감 연출 (물리·기록에는 영향 없음) */
   carScale: 0.8,         // 차를 작게 → 같은 속도라도 풍경이 더 빨리 지나가 보임
@@ -246,6 +260,73 @@ function lapKey(k) { return "turbolap_bestlap_" + k + "_v1"; }
 function loadBestLap(k) { try { const v = parseInt(localStorage.getItem(lapKey(k)), 10); return v > 0 ? v : 0; } catch (e) { return 0; } }
 function saveBestLap(k, v) { try { localStorage.setItem(lapKey(k), String(v)); } catch (e) {} }
 const bestLap = { easy: loadBestLap("easy"), hard: loadBestLap("hard") };
+/* ═══════════════════ 고스트 (지난 주행을 반투명 차로 재생) ═══════════════════
+   기록 형식: [[t(ms), x, y, z, 방향, 기울기], …] 를 0.1초마다 → 3바퀴 약 15~35KB
+   나의 최고 기록 고스트: localStorage turbolap_ghost_<key>_v1 = {"ms":…, "data":"[…]"}
+   세계 신기록 고스트:   Firebase ghosts/turbolap/<key> = { score, name, data } (규칙: score 가 현재 세계 신기록과 같아야 씀) */
+const GHOST_STEP = 100;
+let ghostPick = "none"; try { if (/^(none|mine|world)$/.test(localStorage.getItem("turbolap_ghostpick_v1") || "")) ghostPick = localStorage.getItem("turbolap_ghostpick_v1"); } catch (e) {}
+const worldGhost = { easy: null, hard: null, tried: { easy: false, hard: false } };   // 내려받은 세계 신기록 고스트
+let ghostPlay = null, ghostCar = null, ghostIdx = 0, ghostLabel = "";               // 이번 경기에 재생 중인 고스트
+let recData = [], recLast = -Infinity;                                              // 이번 경기 녹화
+function ghostKey(k) { return "turbolap_ghost_" + k + "_v1"; }
+function loadMyGhost(k) { try { const j = JSON.parse(localStorage.getItem(ghostKey(k)) || "null"); return (j && j.ms > 0 && typeof j.data === "string") ? j : null; } catch (e) { return null; } }
+function saveMyGhost(k, ms, data) { try { localStorage.setItem(ghostKey(k), JSON.stringify({ ms, data })); } catch (e) {} }
+function ghostUrl(k) { const cfg = window.PORTAL_CONFIG; return (cfg && cfg.isReady && cfg.isReady()) ? cfg.DB_URL.replace(/\/+$/, "") + "/ghosts/turbolap/" + k + ".json" : null; }
+function fetchWorldGhost(k) {
+  const u = ghostUrl(k); if (!u) return Promise.resolve(null);
+  return fetch(u, { cache: "no-store" }).then(r => r.ok ? r.json() : null).then(j => {
+    worldGhost[k] = (j && typeof j.score === "number" && typeof j.data === "string") ? j : null;
+    worldGhost.tried[k] = true; renderGhostButtons(); return worldGhost[k];
+  }).catch(() => { worldGhost.tried[k] = true; renderGhostButtons(); return null; });
+}
+function uploadWorldGhost(k, rec, data) {         // 세계 신기록을 등록한 직후에만 부른다 (규칙이 score 일치를 요구)
+  const u = ghostUrl(k); if (!u) return Promise.resolve();
+  return fetch(u, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ score: rec.score, name: rec.name, data }) })
+    .then(r => { if (r.ok) { worldGhost[k] = { score: rec.score, name: rec.name, data }; renderGhostButtons(); } })
+    .catch(() => {});
+}
+/* 세계 신기록 고스트가 현재 기록과 같은 주행인지 (기록이 바뀌었는데 고스트가 옛것이면 안 쓴다) */
+function worldGhostValid(k) { const g = worldGhost[k], WR = WRS[k]; return !!(g && WR && WR.rec && g.score === WR.rec.score); }
+function renderGhostButtons() {
+  const k = pendingDiff, mine = loadMyGhost(k), wv = worldGhostValid(k);
+  const bm = $("ghostMine"), bw = $("ghostWorld");
+  bm.disabled = !mine; bm.querySelector("small").textContent = mine ? fmtTime(mine.ms) : "기록 없음";
+  bw.disabled = !wv; bw.querySelector("small").textContent = wv ? fmtTime(WRS[k].value()) + " " + WRS[k].name() : (worldGhost.tried[k] ? "고스트 없음" : "확인 중…");
+  if ((ghostPick === "mine" && !mine) || (ghostPick === "world" && !wv)) ghostPick = "none";
+  document.querySelectorAll(".ghostbtn").forEach(b => b.classList.toggle("on", b.getAttribute("data-ghost") === ghostPick));
+}
+function makeGhostCar() {
+  const g = makeCar(0xDDE6EE);
+  g.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.4; o.material.depthWrite = false; } });
+  return g;
+}
+function setupGhost() {                           // 출발 때: 고른 고스트를 풀어 차를 세워 둔다
+  if (ghostCar) { scene.remove(ghostCar); ghostCar = null; }
+  ghostPlay = null; ghostLabel = ""; ghostIdx = 0;
+  let src = null;
+  if (ghostPick === "mine") { const m = loadMyGhost(diff); if (m) { src = m.data; ghostLabel = "나의 최고 기록 " + fmtTime(m.ms); } }
+  else if (ghostPick === "world" && worldGhostValid(diff)) { src = worldGhost[diff].data; ghostLabel = "세계신기록 " + fmtTime(WRS[diff].value()); }
+  if (!src) return;
+  try { const arr = JSON.parse(src); if (Array.isArray(arr) && arr.length > 1) ghostPlay = arr; } catch (e) {}
+  if (!ghostPlay) { ghostLabel = ""; return; }
+  ghostCar = makeGhostCar(); scene.add(ghostCar); placeGhost(0);
+}
+function placeGhost(t) {
+  const a = ghostPlay; if (!a || !ghostCar) return;
+  while (ghostIdx < a.length - 2 && a[ghostIdx + 1][0] <= t) ghostIdx++;
+  while (ghostIdx > 0 && a[ghostIdx][0] > t) ghostIdx--;
+  const p = a[ghostIdx], q = a[Math.min(a.length - 1, ghostIdx + 1)];
+  const f = (q[0] > p[0]) ? Math.max(0, Math.min(1, (t - p[0]) / (q[0] - p[0]))) : 0;
+  let dh = q[4] - p[4]; while (dh > Math.PI) dh -= 2 * Math.PI; while (dh < -Math.PI) dh += 2 * Math.PI;
+  ghostCar.position.set(p[1] + (q[1] - p[1]) * f, p[2] + (q[2] - p[2]) * f, p[3] + (q[3] - p[3]) * f);
+  ghostCar.rotation.y = p[4] + dh * f; ghostCar.rotation.x = p[5] + (q[5] - p[5]) * f;
+}
+function recordSample(t) {                        // 0.1초마다 한 점, t === Infinity 면 마지막 점(완주 순간)
+  if (t === Infinity) t = elapsed; else if (t - recLast < GHOST_STEP) return;
+  recLast = t;
+  recData.push([Math.round(t), +P.x.toFixed(2), +P.y.toFixed(2), +P.z.toFixed(2), +P.h.toFixed(3), +car.rotation.x.toFixed(3)]);
+}
 function fmtTime(ms) {
   ms = Math.max(0, Math.round(ms));
   const m = Math.floor(ms / 60000), s = Math.floor(ms % 60000 / 1000), c = Math.floor(ms % 1000 / 10);
@@ -631,6 +712,7 @@ function pickCourse(k) {                  // 코스 고른 뒤 차량 색 고르
   pendingDiff = k; $("carCourse").textContent = TRACKS[k].name + " 코스";
   document.querySelectorAll(".carbtn").forEach(b => b.classList.toggle("on", b.getAttribute("data-car") === carKey));
   showCard("car");
+  renderGhostButtons(); if (!worldGhost.tried[k] || !worldGhostValid(k)) fetchWorldGhost(k);
 }
 function setHud(on) { hud.style.display = on ? "flex" : "none"; speedBox.style.display = on ? "block" : "none"; mini.style.display = on ? "block" : "none"; }
 function showLapToast(done, lt, isNew) {     // done = 방금 끝낸 바퀴 수, lt = 그 랩타임
@@ -646,6 +728,8 @@ function startRace(which) {
   if (which && which !== diff) { diff = which; buildTrack(TRACKS[diff]); }
   scene.remove(car); car = makeCar(CARS[carKey].color); scene.add(car);
   resetCar(); P.lap = 0; P.expected = 0; lapTimes = []; lapStartMs = 0; lapNewInRace = false; renderHudBest();
+  recData = []; recLast = -Infinity; setupGhost();
+  $("hudGhost").style.display = ghostLabel ? "block" : "none"; $("hudGhost").textContent = "👻 " + ghostLabel;
   state = "countdown"; cdTime = 0; cdShown = -1; goTimer = 0; elapsed = 0; finalMs = 0; shake = 0;
   showCard(null); setHud(true); countBox.style.display = "flex"; lapToast.className = "";
   hudLap.textContent = "1 / " + CFG.laps; hudTime.firstChild.nodeValue = fmtTime(0); hudOff.textContent = "";
@@ -670,16 +754,23 @@ function finish() {
   $("lapList").innerHTML = lapTimes.map((t, i) => "랩" + (i + 1) + " " + fmtTime(t)).join(" · ") +
     "<br>최고 랩타임 <b>" + fmtTime(bestLap[k]) + "</b>" + (lapNewInRace ? '<span class="new">NEW</span>' : "");
   $("doneDiff").textContent = TRACKS[k].name;
+  recordSample(Infinity);
+  const ghostData = JSON.stringify(recData);
   const isBest = best[k] === 0 || finalMs < best[k];
-  if (isBest) { best[k] = finalMs; saveBest(k, finalMs); }
+  if (isBest) { best[k] = finalMs; saveBest(k, finalMs); saveMyGhost(k, finalMs, ghostData); }
+  let ghostNote = "";
+  if (ghostPlay && ghostLabel) {
+    const gt = ghostPlay[ghostPlay.length - 1][0], d = finalMs - gt;
+    ghostNote = "  ·  👻 " + ghostLabel + " 보다 " + (d <= 0 ? (-d / 1000).toFixed(2) + "초 빠름" : (d / 1000).toFixed(2) + "초 느림");
+  }
   renderRecords();
   $("bestDoneNew").innerHTML = isBest ? '<span class="new">NEW</span> 개인 신기록 갱신!' : "";
   const wrBeat = WR && WR.beats(finalMs);
-  $("finalMsg").textContent = wrBeat ? "🏆 세계 신기록입니다!" : (isBest ? "개인 신기록입니다!" : "완주를 축하합니다!");
+  $("finalMsg").textContent = (wrBeat ? "🏆 세계 신기록입니다!" : (isBest ? "개인 신기록입니다!" : "완주를 축하합니다!")) + ghostNote;
   setTimeout(() => {
     if (state !== "done") return;
     showCard("done"); renderRecords();
-    if (wrBeat) WR.prompt(finalMs, TRACKS[k].name + " 세계 신기록 달성!").then(() => renderRecords());
+    if (wrBeat) WR.prompt(finalMs, TRACKS[k].name + " 세계 신기록 달성!").then(rec => { renderRecords(); if (rec) uploadWorldGhost(k, rec, ghostData); });
   }, 1300);
 }
 
@@ -829,7 +920,7 @@ function drawMinimap() {
 let last = performance.now();
 function frame(now) { requestAnimationFrame(frame); tick(now); }
 function tick(now) {
-  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
 
   if (state === "countdown") {
     cdTime += dt;
@@ -842,6 +933,7 @@ function tick(now) {
   }
   if (state === "race") {
     elapsed = performance.now() - t0;
+    recordSample(elapsed); placeGhost(elapsed);
     if (goTimer > 0) { goTimer -= dt; if (goTimer <= 0) countBox.style.display = "none"; }
   }
   if (state === "done") doneTimer += dt;
@@ -886,6 +978,11 @@ window.addEventListener("blur", () => { keys.up = keys.down = keys.left = keys.r
 $("btnEasy").onclick = e => { e.currentTarget.blur(); pickCourse("easy"); };
 $("btnHard").onclick = e => { e.currentTarget.blur(); pickCourse("hard"); };
 $("btnCarBack").onclick = e => { e.currentTarget.blur(); showCard("start"); };
+document.querySelectorAll(".ghostbtn").forEach(b => b.onclick = e => {
+  e.currentTarget.blur(); ghostPick = b.getAttribute("data-ghost");
+  try { localStorage.setItem("turbolap_ghostpick_v1", ghostPick); } catch (err) {}
+  renderGhostButtons();
+});
 document.querySelectorAll(".carbtn").forEach(b => b.onclick = e => {
   e.currentTarget.blur(); carKey = b.getAttribute("data-car");
   try { localStorage.setItem("turbolap_car_v1", carKey); } catch (err) {}
@@ -897,7 +994,7 @@ $("btnReset").onclick = e => { e.currentTarget.blur(); startRace(); };
 $("btnRecover").onclick = e => { e.currentTarget.blur(); recover(); };
 
 /* 콘솔 디버그용 */
-window.TL = { keys, P, CFG, camera, scene, tick, get S() { return S; }, setTrack: k => { diff = k; buildTrack(TRACKS[k]); resetCar(); } };
+window.TL = { keys, P, CFG, camera, scene, renderer, tick, get S() { return S; }, setTrack: k => { diff = k; buildTrack(TRACKS[k]); resetCar(); } };
 buildTrack(TRACKS[diff]); resetCar(); updateCar(0); showMenu();
 ["easy", "hard"].forEach(k => { const WR = WRS[k]; if (WR) { WR.onChange(renderRecords); WR.load().then(() => { wrTried[k] = true; renderRecords(); }); } });
 requestAnimationFrame(frame);
