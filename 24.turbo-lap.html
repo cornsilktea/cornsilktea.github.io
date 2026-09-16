@@ -319,13 +319,52 @@ function canvasTex(w, h, draw, repeat) {
   return t;
 }
 function rnd(a, b) { return a + Math.random() * (b - a); }
-/* 잔디·연석·하늘은 img/turbo/ 의 그림을 쓴다 */
-function imgTex(src, rx, ry, mirror) {
-  const t = new THREE.TextureLoader().load(src);
+/* 잔디·연석·하늘은 img/turbo/ 의 그림을 쓴다.
+   그림이 아직 안 왔거나(느린 학교 망) 못 불러오면 three 는 그 면을 새까맣게 그리므로,
+   먼저 캔버스로 그린 대체 무늬를 쓰고 그림이 도착하면 같은 텍스처 객체의 image 만 바꿔 끼운다. */
+function imgTex(src, rx, ry, mirror, fallbackDraw, fw, fh) {
+  const t = canvasTex(fw || 256, fh || 256, fallbackDraw);
   t.wrapS = t.wrapT = mirror ? THREE.MirroredRepeatWrapping : THREE.RepeatWrapping; t.repeat.set(rx, ry); t.anisotropy = 8;
+  const img = new Image();
+  img.onload = function () { t.image = img; t.needsUpdate = true; };
+  img.onerror = function () { console.warn("[turbolap] 그림을 못 불러와 캔버스 무늬로 대신함:", src); };
+  img.src = src;
   return t;
 }
-const texGrass = imgTex("img/turbo/grass.png", 45, 45);
+function drawGrass(c, w, h) {                  // 대체 잔디 무늬
+  c.fillStyle = "#78C539"; c.fillRect(0, 0, w, h);
+  c.lineWidth = 3; c.lineJoin = "round";
+  for (let i = 0; i < 7; i++) {
+    const x = rnd(0, w), y = rnd(0, h), r = rnd(14, 26);
+    c.beginPath();
+    for (let k = 0; k < 7; k++) { const a = k / 7 * Math.PI * 2; c.arc(x + Math.cos(a) * r * .6, y + Math.sin(a) * r * .35, r * .45, 0, Math.PI * 2); }
+    c.fillStyle = "#3EA23F"; c.strokeStyle = "#1F5F2A"; c.fill(); c.stroke();
+  }
+  for (let i = 0; i < 40; i++) {
+    const x = rnd(0, w), y = rnd(0, h);
+    c.strokeStyle = "#1F5F2A"; c.lineWidth = 4; c.lineCap = "round";
+    [[-6, -9], [0, -12], [6, -9]].forEach(d => { c.beginPath(); c.moveTo(x, y); c.lineTo(x + d[0], y + d[1]); c.stroke(); });
+    c.strokeStyle = "#2F8F3A"; c.lineWidth = 2;
+    [[-6, -9], [0, -12], [6, -9]].forEach(d => { c.beginPath(); c.moveTo(x, y); c.lineTo(x + d[0], y + d[1]); c.stroke(); });
+  }
+  for (let i = 0; i < 9; i++) {
+    const x = rnd(0, w), y = rnd(0, h), yellow = Math.random() < .5;
+    c.fillStyle = yellow ? "#FFD84A" : "#FFFFFF";
+    for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI * 2; c.beginPath(); c.arc(x + Math.cos(a) * 4, y + Math.sin(a) * 4, 3, 0, Math.PI * 2); c.fill(); }
+    c.fillStyle = yellow ? "#F08A2A" : "#FFC23D"; c.beginPath(); c.arc(x, y, 2.5, 0, Math.PI * 2); c.fill();
+  }
+}
+function drawCurb(c, w, h) {                   // 대체 연석: 왼쪽 빨강, 오른쪽 흰색 (그림과 같은 배치)
+  c.fillStyle = "#1B2B20"; c.fillRect(0, 0, w, h);
+  c.fillStyle = "#F23B3B"; c.fillRect(3, 4, w / 2 - 6, h - 8);
+  c.fillStyle = "#FFFFFF"; c.fillRect(w / 2 + 3, 4, w / 2 - 6, h - 8);
+}
+function drawSky(c, w, h) {                    // 대체 하늘: 위 진한 파랑 → 지평선 연한 파랑
+  const g = c.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, "#4FB1FD"); g.addColorStop(1, "#B8EAFD");
+  c.fillStyle = g; c.fillRect(0, 0, w, h);
+}
+const texGrass = imgTex("img/turbo/grass.jpg", 45, 45, false, drawGrass, 256, 256);
 function makeRoadTex() {
   return canvasTex(256, 256, (c, w, h) => {
     c.fillStyle = "#6E7280"; c.fillRect(0, 0, w, h);
@@ -334,7 +373,7 @@ function makeRoadTex() {
     c.fillStyle = "#FFE066"; c.fillRect(w / 2 - 5, 0, 10, h * .5);     // 가운데 점선
   }, [1, 1]);
 }
-const texCurb = imgTex("img/turbo/curb.png", 1, 1); texCurb.rotation = Math.PI / 2; texCurb.center.set(0.5, 0.5);   // 띠 방향(가로)을 도로 진행 방향(v)으로
+const texCurb = imgTex("img/turbo/curb.png", 1, 1, false, drawCurb, 256, 128); texCurb.rotation = Math.PI / 2; texCurb.center.set(0.5, 0.5);   // 띠 방향(가로)을 도로 진행 방향(v)으로
 const texChecker = canvasTex(128, 128, (c, w, h) => {
   const n = 8, s = w / n;
   for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { c.fillStyle = (x + y) % 2 ? "#1B2B20" : "#FFFFFF"; c.fillRect(x * s, y * s, s, s); }
@@ -355,7 +394,7 @@ function lambert(color, extra) { return new THREE.MeshLambertMaterial(Object.ass
 
 /* 하늘: img/turbo/sky.png 를 반구 돔 안쪽에 통째로(가로 4번 거울 반복) — 한 그림이라 색이 끊기지 않는다 */
 {
-  const sky = imgTex("img/turbo/sky.png", 4, 1, true); sky.wrapT = THREE.ClampToEdgeWrapping;
+  const sky = imgTex("img/turbo/sky.jpg", 4, 1, true, drawSky, 64, 512); sky.wrapT = THREE.ClampToEdgeWrapping;
   const dome = new THREE.Mesh(new THREE.SphereGeometry(900, 48, 16, 0, Math.PI * 2, 0, Math.PI / 2 + 0.05),
     new THREE.MeshBasicMaterial({ map: sky, side: THREE.BackSide, fog: false }));
   scene.add(dome);
