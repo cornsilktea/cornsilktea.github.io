@@ -260,15 +260,21 @@
          (학생은 규칙상 더 높은 점수만 쓸 수 있고, 선생님 UID 는 규칙에서 예외) -->
     <div class="panel" id="recPanel">
       <h2>세계 신기록 관리</h2>
-      <p class="hint" style="margin-top:0">
-        게임마다 모든 학생이 공유하는 세계 신기록입니다. 의심스러운 기록은 <b>지우기</b>(다음 판부터 첫 기록으로 다시 받음),
-        저장 단위가 바뀐 기록은 <b>고치기</b>로 값을 바꿉니다. 값은 각 게임의 저장 단위(초·밀리초·점 등)로 넣습니다.
-      </p>
       <div class="actions" style="margin-top:0">
-        <button id="recReload" type="button">신기록 새로고침</button>
+        <button id="recToggle" type="button" aria-expanded="false">펼치기</button>
       </div>
-      <p class="msg" id="recMsg"></p>
-      <div id="recList"></div>
+      <!-- 평소에는 접어 두고, 펼치기를 눌렀을 때만 목록을 불러옵니다 -->
+      <div id="recBody" hidden>
+        <p class="hint">
+          게임마다 모든 학생이 공유하는 세계 신기록입니다. 의심스러운 기록은 <b>지우기</b>(다음 판부터 첫 기록으로 다시 받음),
+          저장 단위가 바뀐 기록은 <b>고치기</b>로 값을 바꿉니다. 값은 각 게임의 저장 단위(초·밀리초·점 등)로 넣습니다.
+        </p>
+        <div class="actions">
+          <button id="recReload" type="button">신기록 새로고침</button>
+        </div>
+        <p class="msg" id="recMsg"></p>
+        <div id="recList"></div>
+      </div>
     </div>
   </div>
 
@@ -1023,7 +1029,6 @@ function showMain(user) {
   $("who").textContent = "로그인: " + (user.email || user.displayName || "") + "   ·   내 UID: " + user.uid;
   loadSeed().then(() => {
     load();
-    loadRecords();
     if (!timer) timer = setInterval(load, (cfg.POLL_SECONDS || 10) * 1000);
   });
 }
@@ -1046,6 +1051,14 @@ $("logout").addEventListener("click", async () => {
 
 $("fixBtn").addEventListener("click", fixLegacy);
 $("recReload").addEventListener("click", loadRecords);
+/* 세계 신기록 칸은 접어 두었다가 펼치기를 누르면 그때 불러옵니다 */
+$("recToggle").addEventListener("click", () => {
+  const open = $("recBody").hidden;
+  $("recBody").hidden = !open;
+  $("recToggle").textContent = open ? "접기" : "펼치기";
+  $("recToggle").setAttribute("aria-expanded", open ? "true" : "false");
+  if (open && records.length === 0) loadRecords();
+});
 
 $("exportBtn").addEventListener("click", () => {
   const blob = new Blob([backupText()], { type: "application/json" });
