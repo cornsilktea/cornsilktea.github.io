@@ -30,6 +30,9 @@
   보색이 필요하면 `#D97B4F` 만 쓴다. 캔버스 안에서는 CSS 변수가 안 먹으니 hex 값 그대로.
   예외: 14(어두운 청록)·19(라면가게 크림) 배경과 게임 안 그림은 색을 건드리지 않음.
 - 칠판(전자칠판) 형식 퀴즈는 `7.drawing.html` 형식을 따르고 `theme.css` 를 링크하지 않는다(15번도 같은 형식).
+- 손가락으로 **꾹 누르는(길게 누르는) 조작**은 `<canvas>` 에 `touch-action:none` 을 주면 `access-guard.js` 가
+  아이폰 돋보기(확대 창)·복사 풍선을 알아서 막는다. 캔버스가 아닌 요소(div 버튼 등)를 길게 누르는 조작은
+  23번처럼 그 요소에 `touchstart` → `preventDefault()`(`{passive:false}`) 를 직접 붙인다(click 은 안 생기니 pointerdown 으로 처리).
 - 방향키를 쓰는 프로그램은 **WASD 도 함께** 받는다. 방향키는 `e.key`, WASD 는 한글 IME 대비 `e.code`(KeyW…)로 판정.
 - 개인전(1인) 게임은 **최고 기록**을 `localStorage`(`<게임>_best_v1`, try/catch)에 저장하고
   시작 카드·HUD·결과 화면(갱신 시 `NEW`) 세 곳에 표시한다. 패턴은 18·19번 참고.

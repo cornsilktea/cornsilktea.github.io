@@ -52,14 +52,27 @@
     "html,body{-webkit-touch-callout:none;-webkit-user-select:none;-moz-user-select:none;user-select:none;" +
     "-webkit-tap-highlight-color:transparent;}" +
     "input,textarea,select,[contenteditable],[contenteditable] *{-webkit-user-select:text;-moz-user-select:text;user-select:text;}" +
-    "img,canvas,svg{-webkit-user-drag:none;}";
+    "img,canvas,svg{-webkit-user-drag:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;}";
   (document.head || document.documentElement).appendChild(touchStyle);
 
+  /* 아이폰(iOS 17 이후 사파리)은 user-select:none 을 줘도 캔버스를 꾹 누르면
+     글자 선택용 '돋보기(확대 창)'를 띄웁니다. pointerdown 의 preventDefault 로는
+     안 막히고, touchstart 에서 preventDefault 를 해야만 막힙니다.
+     단 touchstart 를 막으면 그 자리의 click 이 안 생기므로, 게임이 직접 손가락을
+     다루겠다고 선언한(touch-action:none) <canvas> 에서만 막습니다. */
   var lastPointerTouch = false;
   window.addEventListener("pointerdown", function (e) {
     lastPointerTouch = (e.pointerType === "touch" || e.pointerType === "pen");
   }, true);
-  window.addEventListener("touchstart", function () { lastPointerTouch = true; }, { capture: true, passive: true });
+  window.addEventListener("touchstart", function (e) {
+    lastPointerTouch = true;
+    var t = e.target;
+    if (!t || !t.tagName || t.tagName.toLowerCase() !== "canvas") return;
+    if (!e.cancelable) return;
+    var ta = "";
+    try { ta = getComputedStyle(t).touchAction || ""; } catch (err) { ta = ""; }
+    if (ta === "none") e.preventDefault();
+  }, { capture: true, passive: false });
   /* 손가락·펜으로 길게 눌러 뜨는 메뉴만 막고, 마우스 오른쪽 클릭은 그대로 둡니다. */
   window.addEventListener("contextmenu", function (e) {
     if (!lastPointerTouch) return;
