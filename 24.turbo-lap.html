@@ -152,8 +152,8 @@
       <p><b>W / ↑</b> 가속<br><b>S / ↓</b> 브레이크·후진<br><b>A D / ← →</b> 조향<br><b>R</b> 처음부터 다시</p>
     </div>
     <div class="btns">
-      <button type="button" class="btn" id="btnEasy">쉬움<small>넓은 도로 · 언덕 1개</small></button>
-      <button type="button" class="btn hard" id="btnHard">어려움<small>좁은 도로 · 헤어핀 · 언덕 2개</small></button>
+      <button type="button" class="btn" id="btnEasy">쉬움<small></small></button>
+      <button type="button" class="btn hard" id="btnHard">어려움<small></small></button>
     </div>
     <div class="hint">트랙을 벗어나면 느려지고, 울타리에 부딪히면 크게 감속합니다.</div>
     <div class="wipe"><button type="button" id="btnWipe">이 기기의 나의 최고 기록·고스트 지우기</button></div>
@@ -281,7 +281,7 @@ let ghostPlay = null, ghostCar = null, ghostIdx = 0, ghostLabel = "";           
 let recData = [], recLast = -Infinity;                                              // 이번 경기 녹화
 function ghostKey(k) { return "turbolap_ghost_" + k + "_v1"; }
 function loadMyGhost(k) { try { const j = JSON.parse(localStorage.getItem(ghostKey(k)) || "null"); return (j && j.ms > 0 && typeof j.data === "string") ? j : null; } catch (e) { return null; } }
-function saveMyGhost(k, ms, data) { try { localStorage.setItem(ghostKey(k), JSON.stringify({ ms, data })); } catch (e) {} }
+function saveMyGhost(k, ms, data) { try { localStorage.setItem(ghostKey(k), JSON.stringify({ ms, data, car: carKey })); } catch (e) {} }
 function ghostUrl(k) { const cfg = window.PORTAL_CONFIG; return (cfg && cfg.isReady && cfg.isReady()) ? cfg.DB_URL.replace(/\/+$/, "") + "/ghosts/turbolap/" + k + ".json" : null; }
 function fetchWorldGhost(k) {
   const u = ghostUrl(k); if (!u) return Promise.resolve(null);
@@ -293,9 +293,9 @@ function fetchWorldGhost(k) {
 function uploadWorldGhost(k, rec, data, retry) {  // 세계 신기록을 등록한 직후에만 부른다 (규칙이 score 일치를 요구)
   const u = ghostUrl(k), note = $("ghostUpNote"); if (!u) return Promise.resolve();
   note.textContent = "세계신기록 고스트 저장 중…";
-  return fetch(u, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ score: rec.score, name: rec.name, data }) })
+  return fetch(u, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(retry ? { score: rec.score, name: rec.name, data } : { score: rec.score, name: rec.name, data, car: carKey }) })   // 재시도 땐 car 없이(옛 규칙 대비)
     .then(r => {
-      if (r.ok) { worldGhost[k] = { score: rec.score, name: rec.name, data }; worldGhost.tried[k] = true; renderGhostButtons(); note.textContent = "세계신기록 고스트 저장 완료 · 스페이스바: 다시 하기"; return; }
+      if (r.ok) { worldGhost[k] = { score: rec.score, name: rec.name, data, car: carKey }; worldGhost.tried[k] = true; renderGhostButtons(); note.textContent = "세계신기록 고스트 저장 완료 · 스페이스바: 다시 하기"; return; }
       return r.text().then(t => { throw new Error(r.status + " " + t); });
     })
     .catch(err => {
@@ -316,21 +316,22 @@ function renderGhostButtons() {
     b.classList.toggle("on", g === ghostPick);
   });
 }
-function makeGhostCar() {
-  const g = makeCar(0xDDE6EE, CARS[carKey].model);
+function makeGhostCar(ck) {                      // 고스트를 세울 당시의 차(모델·색)를 반투명으로
+  const c = CARS[ck] || CARS[carKey];
+  const g = makeCar(c.color, c.model);
   g.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.4; o.material.depthWrite = false; } });
   return g;
 }
 function setupGhost() {                           // 출발 때: 고른 고스트를 풀어 차를 세워 둔다
   if (ghostCar) { scene.remove(ghostCar); ghostCar = null; }
   ghostPlay = null; ghostLabel = ""; ghostIdx = 0;
-  let src = null;
-  if (ghostPick === "mine") { const m = loadMyGhost(diff); if (m) { src = m.data; ghostLabel = "나의 최고 기록 " + fmtTime(m.ms); } }
-  else if (ghostPick === "world" && worldGhostValid(diff)) { src = worldGhost[diff].data; ghostLabel = "세계신기록 " + fmtTime(WRS[diff].value()); }
+  let src = null, gcar = carKey;
+  if (ghostPick === "mine") { const m = loadMyGhost(diff); if (m) { src = m.data; gcar = m.car || carKey; ghostLabel = "나의 최고 기록 " + fmtTime(m.ms); } }
+  else if (ghostPick === "world" && worldGhostValid(diff)) { const wg = worldGhost[diff]; src = wg.data; gcar = wg.car || carKey; ghostLabel = "세계신기록 " + fmtTime(WRS[diff].value()) + (CARS[wg.car] ? " · " + CARS[wg.car].desc : ""); }
   if (!src) return;
   try { const arr = JSON.parse(src); if (Array.isArray(arr) && arr.length > 1) ghostPlay = arr; } catch (e) {}
   if (!ghostPlay) { ghostLabel = ""; return; }
-  ghostCar = makeGhostCar(); scene.add(ghostCar); placeGhost(0);
+  ghostCar = makeGhostCar(gcar); scene.add(ghostCar); placeGhost(0);
 }
 function placeGhost(t) {
   const a = ghostPlay; if (!a || !ghostCar) return;
@@ -782,12 +783,13 @@ function makeCar(color, modelKey) {
   const spokeGeo = new THREE.BoxGeometry(tw + 0.04, R * 1.2, R * 0.16);
   const wheels = [];
   [[BW / 2 - 0.12, -D.wheelZ], [-(BW / 2 - 0.12), -D.wheelZ], [BW / 2 - 0.12, D.wheelZ], [-(BW / 2 - 0.12), D.wheelZ]].forEach(([x, z], k) => {
-    const w = new THREE.Group(); w.position.set(x, R, z);
+    const pivot = new THREE.Group(); pivot.position.set(x, R, z);     // 조향(y축)
+    const w = new THREE.Group(); pivot.add(w);                          // 굴림(x축) — 피벗 안에 두어야 조향각이 흔들리지 않는다
     w.add(new THREE.Mesh(tireGeo, M.dark));
     const rim = new THREE.Mesh(rimGeo, M.dark); rim.scale.setScalar(0.98); w.add(rim);
     for (let i = 0; i < 5; i++) { const s = new THREE.Mesh(spokeGeo, M.rim); s.rotation.x = i * Math.PI / 5; w.add(s); }
     const hub = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.18, R * 0.18, tw + 0.06, 10).rotateZ(Math.PI / 2), M.chrome); w.add(hub);
-    g.add(w); wheels.push({ g: w, front: k < 2 });
+    g.add(pivot); wheels.push({ g: pivot, spin: w, front: k < 2 });
   });
   const shadow = new THREE.Mesh(new THREE.CircleGeometry(1, 16), new THREE.MeshBasicMaterial({ color: 0x1B2B20, transparent: true, opacity: 0.22 }));
   shadow.rotation.x = -Math.PI / 2; shadow.scale.set(BW * 0.7, 2.7, 1); shadow.position.y = 0.12; g.add(shadow);
@@ -996,7 +998,7 @@ function updateCar(dt) {
   const i1 = (P.ci + 5) % N, i0 = (P.ci + N - 5) % N;
   car.rotation.x = Math.atan2(S[i1].p.y - S[i0].p.y, SEG * 10) * (fx * s.t.x + fz * s.t.z);
   car.rotation.z = -str * Math.min(1, ratio) * 0.06;
-  car.userData.wheels.forEach(w => { w.g.rotation.x += P.v * dt / car.userData.wheelR; if (w.front) w.g.rotation.y = P.steerVis; });
+  car.userData.wheels.forEach(w => { w.spin.rotation.x += P.v * dt / car.userData.wheelR; if (w.front) w.g.rotation.y = P.steerVis; });
 }
 
 /* ═══════════════════ 카메라 ═══════════════════ */
