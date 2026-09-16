@@ -191,6 +191,7 @@ const CONFIG = {
         { id: "cuckoo",  title: "뻐꾹 왈츠",         bpm: 120, song: "EASY_SONG_3", fallDurationMs: 2000 },
         { id: "lith",     title: "리스 항구", bpm: 130, song: "LITH_SONG", fallDurationMs: 1700 },
         { id: "terran",   title: "StarCraft - Terran", bpm: 140, song: "TERRAN_SONG", fallDurationMs: 1900 },
+        { id: "terran2",  title: "테란-2", bpm: 135, song: "TERRAN2_SONG", fallDurationMs: 1750 },
         { id: "countryroads", title: "Take Me Home, Country Roads", bpm: 84, song: "COUNTRYROADS_SONG", fallDurationMs: 2200 }
       ]
     },
@@ -597,7 +598,43 @@ const COUNTRYROADS_SONG = seq(`
   A3:1.5
 `);
 
-const SONG_DATA = { EASY_SONG_1, EASY_SONG_2, EASY_SONG_3, MEDIUM_SONG_1, MEDIUM_SONG_2, MEDIUM_SONG_3, HARD_SONG_1, HARD_SONG_2, HARD_SONG_3, LITH_SONG, KERNING_SONG, TERRAN_SONG, COUNTRYROADS_SONG };
+// 쉬움 ⑥ 스타크래프트 - 테란 (같은 곡의 두 번째 채보, Blizzard "Terran Theme 1", 135bpm) — 사용자가 제공한 두 번째
+// MIDI "Game MIDI_- Arranged -_Starcraft (PC/DOS, 1997)_Terran 1.mid"(포맷1, 7트랙, division=120)를 PowerShell
+// 바이트 파서로 새로 파싱했다(위 TERRAN_SONG 과는 완전히 다른 사람의 편곡). 메타 이벤트(카피라이트·텍스트)가
+// EUC-KR(CP949)로 들어 있어 [System.Text.Encoding]::GetEncoding(949) 로 디코딩했고, "Copyright ⓒ 1999 by
+// 권용달(niliri)"와 "베틀넷 niliri(1승6패)" 문구로 편곡자가 니릴리(권용달)임을 확인했다. 7개 트랙(드럼·멜로디·
+// 전자기타·화음·베이스·그냥 넣은 악기 등) 중 트랙 2가 트랙명부터 "멜로디"로 명시돼 있고(GM 프로그램 61=
+// 브라스 섹션) 실제로 처음부터 끝까지 완전한 단선율(다른 음과 겹치는 구간이 전혀 없어 화음 정리가 필요
+// 없었다)이라 이견 없이 채택했다. 곡 전체가 71박(135bpm 기준 33.78초) 길이의 짧은 루프이고 드럼 인트로
+// 5박 뒤 멜로디가 시작되는 tick 600부터 반복 재생되도록 만들어진 시퀀서 파일이라, 멜로디 시작 지점부터
+// 정확히 66초(=148.5박, 기존 TERRAN_SONG과 같은 컷 길이)가 될 때까지 루프를 이어 붙이고(약 두 바퀴 반)
+// 마지막 음만 필요한 길이로 잘랐다. 개인 팬이 만든 간이 시퀀싱이라 공식 악보 대조는 아니며 원곡보다
+// 단순화돼 있을 수 있다(뻐꾹 왈츠 항목과 같은 한계). 기존 TERRAN_SONG(M4ST3R 채보)은 그대로 두고, 어느 쪽이
+// 실제 게임 테마에 더 가까운지 비교해 볼 수 있도록 별도 곡으로 나란히 추가한다.
+const TERRAN2_SONG = seq(`
+  A4:0.25 R:0.25 B4:0.25 R:0.25 C5:0.25 R:0.25 B4:0.25 R:0.25 A4:0.25 R:0.75
+  B4:0.5 R:1 B4:1 G4:1.5 R:1 A4:0.25 R:0.25 B4:0.25 R:0.25 C5:0.25
+  R:0.25 B4:0.25 R:0.25 A4:0.25 R:0.75 D#4:1.5 D4:1 C4:1.5 R:1 A4:0.25
+  R:0.25 B4:0.25 R:0.25 C5:0.25 R:0.25 B4:0.25 R:0.25 A4:0.25 R:0.75 B4:0.5
+  R:1 B4:1 D5:1.5 R:1 A4:0.25 R:0.25 B4:0.25 R:0.25 C5:0.25 R:0.25
+  B4:0.25 R:0.25 A4:0.25 R:0.75 A4:4 R:1 B4:0.5 C#5:0.5 D5:0.5 C#5:0.5
+  B4:0.5 R:0.5 C#5:0.5 R:1 C#5:1 A4:1 R:1.5 B4:0.5 C#5:0.5 D5:0.5
+  C#5:0.5 B4:0.5 R:0.5 B4:4 R:1 B4:0.5 C#5:0.5 D5:0.5 C#5:0.5 B4:0.5
+  R:0.5 C#5:0.5 R:1 C#5:1 E5:1.5 R:1 B4:0.5 C#5:0.5 D5:0.5 C#5:0.5
+  B4:0.5 R:0.5 B4:12 A4:0.25 R:0.25 B4:0.25 R:0.25 C5:0.25 R:0.25 B4:0.25
+  R:0.25 A4:0.25 R:0.75 B4:0.5 R:1 B4:1 G4:1.5 R:1 A4:0.25 R:0.25
+  B4:0.25 R:0.25 C5:0.25 R:0.25 B4:0.25 R:0.25 A4:0.25 R:0.75 D#4:1.5 D4:1
+  C4:1.5 R:1 A4:0.25 R:0.25 B4:0.25 R:0.25 C5:0.25 R:0.25 B4:0.25 R:0.25
+  A4:0.25 R:0.75 B4:0.5 R:1 B4:1 D5:1.5 R:1 A4:0.25 R:0.25 B4:0.25
+  R:0.25 C5:0.25 R:0.25 B4:0.25 R:0.25 A4:0.25 R:0.75 A4:4 R:1 B4:0.5
+  C#5:0.5 D5:0.5 C#5:0.5 B4:0.5 R:0.5 C#5:0.5 R:1 C#5:1 A4:1 R:1.5
+  B4:0.5 C#5:0.5 D5:0.5 C#5:0.5 B4:0.5 R:0.5 B4:4 R:1 B4:0.5 C#5:0.5
+  D5:0.5 C#5:0.5 B4:0.5 R:0.5 C#5:0.5 R:1 C#5:1 E5:1.5 R:1 B4:0.5
+  C#5:0.5 D5:0.5 C#5:0.5 B4:0.5 R:0.5 B4:12 A4:0.25 R:0.25 B4:0.25 R:0.25
+  C5:0.25 R:0.25 B4:0.25 R:0.25 A4:0.25 R:0.75 B4:0.5 R:1 B4:1 G4:1
+`);
+
+const SONG_DATA = { EASY_SONG_1, EASY_SONG_2, EASY_SONG_3, MEDIUM_SONG_1, MEDIUM_SONG_2, MEDIUM_SONG_3, HARD_SONG_1, HARD_SONG_2, HARD_SONG_3, LITH_SONG, KERNING_SONG, TERRAN_SONG, TERRAN2_SONG, COUNTRYROADS_SONG };
 
 /* ============ 최고 기록 (이 기기의 localStorage, 곡별) ============ */
 const Best = {
