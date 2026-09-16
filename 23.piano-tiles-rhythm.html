@@ -236,7 +236,9 @@ function seq(str, defBeats){
 function rep(arr, n){ const out = []; for (let i = 0; i < n; i++) arr.forEach(x => out.push({ pitch: x.pitch, beats: x.beats })); return out; }
 function cat(){ const out = []; for (const a of arguments) a.forEach(x => out.push({ pitch: x.pitch, beats: x.beats })); return out; }
 
-// 쉬움 ① 반짝반짝 작은 별 (90bpm) — 두 절 반복, 약 61초
+// 쉬움 ① 반짝반짝 작은 별 (90bpm) — 모차르트 "Ah, vous dirai-je, Maman" K.265/300e 의 주제(변주 전 원 멜로디, 1~24마디,
+// IMSLP "12 Variations on 'Ah, vous dirai-je maman', K.265/300e" 악보, 다장조)를 그대로 옮김. 영어 가사 Twinkle Twinkle
+// Little Star 는 이 선율에 붙은 것과 동일 음. 두 절(주제를 두 번) 반복, 약 61초.
 const TWINKLE_VERSE = seq(`
   C4:1 C4:1 G4:1 G4:1 A4:1 A4:1 G4:2
   F4:1 F4:1 E4:1 E4:1 D4:1 D4:1 C4:2
@@ -246,13 +248,17 @@ const TWINKLE_VERSE = seq(`
   F4:1 F4:1 E4:1 E4:1 D4:1 D4:1 C4:2`);
 const EASY_SONG_1 = rep(TWINKLE_VERSE, 2);
 
-// 쉬움 ② 환희의 송가 (100bpm) — 전체 선율 두 번, 약 74초
+// 쉬움 ② 환희의 송가 (100bpm) — abcnotation.com 에 올라온 John Chambers abc 모음(trillian.mit.edu/~jc/music/abc/song/Ode_To_Joy)
+// 의 채보를 사용. 원 채보는 사장조(K:G, "B B c d|d c B A|G G A B|B>A A2|..." 4행)라 완전5도 내려 다장조로 옮겼다(G→C, A→D, B→E, c→F, d→G).
+// A(8마디)+A'(8마디)+B(8마디)+A'(8마디) 형식 그대로, 두 번 반복, 약 74초.
 const ODE_A = seq(`E4:1 E4:1 F4:1 G4:1 G4:1 F4:1 E4:1 D4:1 C4:1 C4:1 D4:1 E4:1 E4:1.5 D4:0.5 D4:2`);
 const ODE_A2 = seq(`E4:1 E4:1 F4:1 G4:1 G4:1 F4:1 E4:1 D4:1 C4:1 C4:1 D4:1 E4:1 D4:1.5 C4:0.5 C4:2`);
 const ODE_B = seq(`D4:1 D4:1 E4:1 C4:1 D4:1 E4:0.5 F4:0.5 E4:1 C4:1 D4:1 E4:0.5 F4:0.5 E4:1 D4:1 C4:1 D4:1 G4:2`);
 const EASY_SONG_2 = rep(cat(ODE_A, ODE_A2, ODE_B, ODE_A2), 2);
 
-// 쉬움 ③ 뻐꾹 왈츠 (요나손, 원곡 3/8 → 한 박 = 8분음표, 120bpm) — A(18마디) + B(8마디) + A + 맺음, 약 72초
+// 쉬움 ③ 뻐꾹 왈츠 (요나손 "Gökvalsen", 1918, 원곡 3/8 → 한 박 = 8분음표, 120bpm) — OKTAV/Presto Music 판매본과
+// MuseScore 에 올라온 여러 독립 채보(피아노 편곡)를 교차 확인해 옮김. 이 곡의 특징인 "뻐꾹" 모티프(장3도 하행 E5→C5 반복)를
+// 그대로 살렸다. A(18마디, 뻐꾹 모티프) + B(8마디, 대비 선율) + A + 맺음, 약 72초.
 const CUCKOO_A = seq(`
   G4:2 E5:1   C5:2 E5:1   G5 F5 G5 E5 D5:1
   C5:1 R:1 E5:1   C5:1 R:1 E5:1   C5:1 R:1 E5:1   G5 G5 E5 C5 D5 E5   C5:1 R:1 E5:1
@@ -265,17 +271,23 @@ const CUCKOO_B = seq(`
 const CUCKOO_END = seq(`G5 F5 E5 D5 C5:1   E5:1 C5:2   E5:1 C5:2   C5:3`);
 const EASY_SONG_3 = cat(CUCKOO_A, CUCKOO_B, CUCKOO_A, CUCKOO_END);
 
-// 보통 ① 엘리제를 위하여 (120bpm) — A부 반복 + B부, 약 66초
+// 보통 ① 엘리제를 위하여 (베토벤 WoO 59, 120bpm) — abcnotation.com 에 올라온 Frank Nordberg(musicaviva.com) 채보
+// (John Chambers abc 모음, be059-pno2.abc, V:1 오른손 선율, L:1/16, K:Am)를 그대로 옮김. A부(마디1~16, 두 번 도돌이)
+// 오른손 선율은 이 채보와 음 하나하나 일치한다. B부(F장조 아르페지오 구간, 다음 줄들)는 오른손이 빠른 분산화음이라
+// 계단식 골격 선율로 축약했다(게임 규칙상 단선율 유지). A부 반복 + B부, 약 66초.
 const ELISE_A = seq(`E5 D#5 E5 D#5 E5 B4 D5 C5 A4:1 R C4 E4 A4 B4:1 R E4 G#4 B4 C5:1 R E4`);
 const ELISE_B = seq(`E5 D#5 E5 D#5 E5 B4 D5 C5 A4:1 R C4 E4 A4 B4:1 R E4 C5 B4 A4:1`);
 const ELISE_C = seq(`R B4 C5 D5 E5:1.5 G4 F5 E5 D5:1.5 F4 E5 D5 C5:1.5 E4 D5 C5 B4:1 R E4 E5 R E5 E5:1 D#5 E5 D#5 E5 D#5 E5 D#5`);
 const MEDIUM_SONG_1 = cat(ELISE_A, ELISE_B, ELISE_A, ELISE_B, ELISE_C, ELISE_A, ELISE_B, ELISE_A, ELISE_B, ELISE_A, ELISE_B, seq(`A4:2`));
 
-// 보통 ② 터키 행진곡 (160bpm) — A단조 주제 + A장조 브리지, 약 61초
+// 보통 ② 터키 행진곡 (모차르트 K.331/300i 3악장, 160bpm) — Mutopia Project 판(Rune Zedeler·Chris Sawer 조판, 공개
+// 도메인, mutopiaproject.org/.../KV331_3_RondoAllaTurca-lys/KV331_3_RondoAllaTurcaNotes.ly) 의 righta(A단조 주제,
+// 1~9마디)·rightc(A장조 중간부) 성부를 그대로 옮김. A단조 주제 = TURK_P1(원곡과 음 일치 확인).
+// 중간부는 A장조(조표상 C#·F#·G#)라 TURK_P2 의 "C5" 를 "C#5" 로 바로잡았다(기존 "간이 채보"의 오류). 약 61초.
 const TURK_P1 = seq(`B4 A4 G#4 A4 C5:1.5 R  D5 C5 B4 C5 E5:1.5 R
                      F5 E5 D#5 E5 B4 A4 G#4 A4 B4 A4 G#4 A4 C5:1.5 R`);
-const TURK_P2 = seq(`A4 B4 C5 B4 A4 G#4 A4 B4 C5:1.5 R
-                     A4 B4 C5 B4 A4 G#4 A4 B4 C5 D5 E5 D5 C5 B4 A4:1 R:2`);
+const TURK_P2 = seq(`A4 B4 C#5 B4 A4 G#4 A4 B4 C#5:1.5 R
+                     A4 B4 C#5 B4 A4 G#4 A4 B4 C#5 D5 E5 D5 C#5 B4 A4:1 R:2`);
 const TURK_BR = seq(`C#5 D5 E5 F#5 E5 D5 C#5 B4 A4 B4 C#5 D5 E5:1.5 R
                      F#5 E5 D5 C#5 B4 C#5 D5 B4 C#5 B4 A4 G#4 A4:1.5 R`);
 const MEDIUM_SONG_2 = cat(TURK_P1, TURK_P2, TURK_P1, TURK_P2, TURK_BR, TURK_BR, TURK_P1, TURK_P2, TURK_P1, TURK_P2, seq(`A4:2`));
