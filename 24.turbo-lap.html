@@ -118,7 +118,7 @@
 <div id="hud">
   <div class="hud-box"><span class="lab">바퀴</span><span id="hudLap">1 / 3</span></div>
   <div class="hud-box" id="hudTime">0:00.00<span class="off" id="hudOff"></span></div>
-  <div class="hud-box"><span class="lab">최고 랩타임</span><span id="hudBest">—</span></div>
+  <div class="hud-box"><span class="lab">이번 경기 최고 랩</span><span id="hudBest">—</span></div>
   <div id="hudBtns">
     <button type="button" id="btnReset">↻ 처음부터 (R)</button>
     <button type="button" id="btnRecover">🚗 트랙 복귀 (T)</button>
@@ -137,8 +137,8 @@
     <table class="rtab">
       <thead><tr><th>난이도</th><th>나의 최고 기록</th><th>🏆 세계신기록</th></tr></thead>
       <tbody>
-        <tr><td>쉬움</td><td><em id="bestEasy">—</em><small id="lapEasy"></small></td><td><em id="wrEasy">—</em><small id="wrWhoEasy"></small></td></tr>
-        <tr><td>어려움</td><td><em id="bestHard">—</em><small id="lapHard"></small></td><td><em id="wrHard">—</em><small id="wrWhoHard"></small></td></tr>
+        <tr><td>쉬움</td><td><em id="bestEasy">—</em></td><td><em id="wrEasy">—</em><small id="wrWhoEasy"></small></td></tr>
+        <tr><td>어려움</td><td><em id="bestHard">—</em></td><td><em id="wrHard">—</em><small id="wrWhoHard"></small></td></tr>
       </tbody>
     </table>
     <div class="keys">
@@ -169,8 +169,8 @@
       <button type="button" class="ghostbtn" data-ghost="mine" id="ghostMine">나의 최고 기록<small>기록 없음</small></button>
       <button type="button" class="ghostbtn" data-ghost="world" id="ghostWorld">세계신기록<small>확인 중…</small></button>
     </div>
-    <div class="hint">고스트를 고른 뒤 차량을 누르면 바로 출발합니다.</div>
-    <div class="btns" style="margin-top:12px"><button type="button" class="btn sub" id="btnCarBack">← 코스 다시 고르기</button></div>
+    <div class="btns" style="margin-top:12px"><button type="button" class="btn sub" id="btnCarBack">← 코스 다시 고르기</button><button type="button" class="btn" id="btnGo">시작하기</button></div>
+    <div class="hint">스페이스바: 시작하기</div>
   </div>
 
   <div class="card" id="cardDone" style="display:none">
@@ -261,11 +261,6 @@ function bestKey(k) { return "turbolap_best_" + k + "_v1"; }
 function loadBest(k) { try { const v = parseInt(localStorage.getItem(bestKey(k)), 10); return v > 0 ? v : 0; } catch (e) { return 0; } }
 function saveBest(k, v) { try { localStorage.setItem(bestKey(k), String(v)); } catch (e) {} }
 const best = { easy: loadBest("easy"), hard: loadBest("hard") };
-/* 최고 랩타임(난이도별, 이 기기) */
-function lapKey(k) { return "turbolap_bestlap_" + k + "_v1"; }
-function loadBestLap(k) { try { const v = parseInt(localStorage.getItem(lapKey(k)), 10); return v > 0 ? v : 0; } catch (e) { return 0; } }
-function saveBestLap(k, v) { try { localStorage.setItem(lapKey(k), String(v)); } catch (e) {} }
-const bestLap = { easy: loadBestLap("easy"), hard: loadBestLap("hard") };
 /* ═══════════════════ 고스트 (지난 주행을 반투명 차로 재생) ═══════════════════
    기록 형식: [[t(ms), x, y, z, 방향, 기울기], …] 를 0.1초마다 → 3바퀴 약 15~35KB
    나의 최고 기록 고스트: localStorage turbolap_ghost_<key>_v1 = {"ms":…, "data":"[…]"}
@@ -364,7 +359,6 @@ function renderRecords() {
   ["easy", "hard"].forEach(k => {
     const cap = k === "easy" ? "Easy" : "Hard", w = wrInfo(k);
     setVal($("best" + cap), best[k] > 0 ? fmtTime(best[k]) : "아직 없음", !(best[k] > 0), "");
-    $("lap" + cap).textContent = bestLap[k] > 0 ? "최고 랩 " + fmtTime(bestLap[k]) : "";
     setVal($("wr" + cap), w.val, w.none, ""); $("wrWho" + cap).textContent = w.who;
   });
   const k = diff, w = wrInfo(k);
@@ -702,13 +696,13 @@ const hudLap = $("hudLap"), hudTime = $("hudTime"), hudOff = $("hudOff"), speedB
 const countBox = $("count"), countNum = $("countNum"), mini = $("minimap"), mctx = mini.getContext("2d");
 const lapToast = $("lapToast"), lapToastMain = $("lapToastMain"), lapToastSub = $("lapToastSub"), hudBest = $("hudBest");
 const fx = $("fx"), fctx = fx.getContext("2d");
-let lapTimes = [], lapStartMs = 0, lapNewInRace = false;   // 이번 경기의 랩타임들
-function renderHudBest() { hudBest.innerHTML = bestLap[diff] > 0 ? fmtTime(bestLap[diff]) + (lapNewInRace ? '<span class="new">NEW</span>' : "") : "—"; }
+let lapTimes = [], lapStartMs = 0, raceBest = 0;   // 이번 경기의 랩타임들 · 이번 경기 최고 랩 (경기마다 0부터)
+function renderHudBest() { hudBest.textContent = raceBest > 0 ? fmtTime(raceBest) : "—"; }
 /* 랩 하나 끝남: 랩타임 기록, 최고 랩 갱신 여부 반환 */
 function closeLap() {
   const lt = Math.round(elapsed - lapStartMs); lapStartMs = elapsed; lapTimes.push(lt);
-  const isNew = bestLap[diff] === 0 || lt < bestLap[diff];
-  if (isNew) { bestLap[diff] = lt; saveBestLap(diff, lt); lapNewInRace = true; }
+  const isNew = raceBest === 0 || lt < raceBest;
+  if (isNew) raceBest = lt;
   renderHudBest(); return isNew;
 }
 
@@ -734,7 +728,7 @@ function setHud(on) { hud.style.display = on ? "flex" : "none"; speedBox.style.d
 function showLapToast(done, lt, isNew) {     // done = 방금 끝낸 바퀴 수, lt = 그 랩타임
   const left = CFG.laps - done;
   lapToastMain.textContent = done + "바퀴 완료! " + fmtTime(lt);
-  lapToastSub.textContent = (left === 1 ? "마지막 바퀴!" : "남은 " + left + "바퀴") + "  ·  최고 랩 " + fmtTime(bestLap[diff]) + (isNew ? " NEW" : "");
+  lapToastSub.textContent = (left === 1 ? "마지막 바퀴!" : "남은 " + left + "바퀴") + "  ·  이번 경기 최고 랩 " + fmtTime(raceBest) + (isNew && lapTimes.length > 1 ? " NEW" : "");
   lapToast.className = ""; void lapToast.offsetWidth;   // 애니메이션 다시 시작
   lapToast.className = "show";
 }
@@ -743,7 +737,7 @@ function startRace(which) {
   audioInit();
   if (which && which !== diff) { diff = which; buildTrack(TRACKS[diff]); }
   scene.remove(car); car = makeCar(CARS[carKey].color); scene.add(car);
-  resetCar(); P.lap = 0; P.expected = 0; lapTimes = []; lapStartMs = 0; lapNewInRace = false; renderHudBest();
+  resetCar(); P.lap = 0; P.expected = 0; lapTimes = []; lapStartMs = 0; raceBest = 0; renderHudBest();
   recData = []; recLast = -Infinity; setupGhost();
   $("hudGhost").style.display = ghostLabel ? "block" : "none"; $("hudGhost").textContent = "👻 " + ghostLabel;
   state = "countdown"; cdTime = 0; cdShown = -1; goTimer = 0; elapsed = 0; finalMs = 0; shake = 0;
@@ -768,7 +762,7 @@ function finish() {
   const k = diff, WR = WRS[k];
   $("finalTime").textContent = fmtTime(finalMs);
   $("lapList").innerHTML = lapTimes.map((t, i) => "랩" + (i + 1) + " " + fmtTime(t)).join(" · ") +
-    "<br>최고 랩타임 <b>" + fmtTime(bestLap[k]) + "</b>" + (lapNewInRace ? '<span class="new">NEW</span>' : "");
+    "<br>이번 경기 최고 랩타임 <b>" + fmtTime(raceBest) + "</b>";
   $("doneDiff").textContent = TRACKS[k].name;
   recordSample(Infinity);
   const ghostData = JSON.stringify(recData);
@@ -986,7 +980,11 @@ function onKey(e, down) {
   if (!down) return;
   if (e.code === "KeyR" && state !== "menu") startRace();
   else if (e.code === "KeyT") recover();
-  else if (e.code === "Space") { e.preventDefault(); if (state === "done") startRace(); }   // 스페이스바 = 다시 하기
+  else if (e.code === "Space") {                                              // 스페이스바 = 시작하기(차량 선택 카드) / 다시 하기(완주 카드)
+    e.preventDefault();
+    if (state === "done") startRace();
+    else if (state === "menu" && cardCar.style.display !== "none") startRace(pendingDiff);
+  }
 }
 window.addEventListener("keydown", e => onKey(e, true));
 window.addEventListener("keyup", e => onKey(e, false));
@@ -1002,8 +1000,9 @@ document.querySelectorAll(".ghostbtn").forEach(b => b.onclick = e => {
 document.querySelectorAll(".carbtn").forEach(b => b.onclick = e => {
   e.currentTarget.blur(); carKey = b.getAttribute("data-car");
   try { localStorage.setItem("turbolap_car_v1", carKey); } catch (err) {}
-  startRace(pendingDiff);
+  document.querySelectorAll(".carbtn").forEach(x => x.classList.toggle("on", x === b));
 });
+$("btnGo").onclick = e => { e.currentTarget.blur(); startRace(pendingDiff); };
 $("btnRetry").onclick = e => { e.currentTarget.blur(); startRace(); };
 $("btnMenu").onclick = e => { e.currentTarget.blur(); showMenu(); };
 $("btnReset").onclick = e => { e.currentTarget.blur(); startRace(); };
