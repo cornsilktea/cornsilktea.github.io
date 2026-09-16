@@ -563,8 +563,15 @@ function makeCar(color) {
   const lamp = lambert(0xFFF6C8, { emissive: 0xFFE9A0 }), tail = lambert(0xFF3B3B, { emissive: 0xB01818 });
   [0.62, -0.62].forEach(x => { const m = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.12, 0.12), lamp); m.position.set(x, 0.72, -2.42); g.add(m); });
   const bar = new THREE.Mesh(new THREE.BoxGeometry(BW - 0.3, 0.1, 0.1), tail); bar.position.set(0, 0.9, 2.44); g.add(bar);
-  /* 뒤 스포일러 립, 사이드미러, 앞 그릴 */
-  const lip = new THREE.Mesh(new THREE.BoxGeometry(BW - 0.4, 0.06, 0.35), dark); lip.position.set(0, 1.04, 2.2); g.add(lip);
+  /* 리어윙(차체색): 날개 + 양끝 엔드플레이트, 어두운 기둥 두 개 */
+  const wingGeo = new THREE.BoxGeometry(BW - 0.15, 0.08, 0.5);
+  const wing = new THREE.Mesh(wingGeo, bodyMat); wing.position.set(0, 1.42, 2.15); wing.rotation.x = -0.18; g.add(wing);
+  const wingOl = new THREE.Mesh(wingGeo, outline); wingOl.position.copy(wing.position); wingOl.rotation.copy(wing.rotation); wingOl.scale.set(1.02, 1.4, 1.08); g.add(wingOl);
+  [1, -1].forEach(sg => {
+    const ep = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.26, 0.55), bodyMat); ep.position.set(sg * (BW / 2 - 0.1), 1.42, 2.15); ep.rotation.x = -0.18; g.add(ep);
+    const py = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.4, 0.16), dark); py.position.set(sg * 0.6, 1.18, 2.2); g.add(py);
+  });
+  /* 사이드미러, 앞 그릴 */
   [1, -1].forEach(sg => { const m = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.12, 0.18), bodyMat); m.position.set(sg * (BW / 2 + 0.1), 1.0, -0.75); g.add(m); });
   const grille = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.18, 0.1), dark); grille.position.set(0, 0.5, -2.47); g.add(grille);
   /* 바퀴 */
