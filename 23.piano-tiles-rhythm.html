@@ -817,6 +817,9 @@ function resize(){
   hitY = H - padH;                                // 히트 라인
 }
 window.addEventListener("resize", () => { if (S.running) resize(); });
+// 목록으로 이동 등으로 화면을 벗어나도(뒤로가기 캐시 등으로 페이지가 바로 사라지지 않는 경우 대비) 미리 듣기는 끈다.
+document.addEventListener("visibilitychange", () => { if (document.hidden) Sound.stopPreview(); });
+window.addEventListener("pagehide", () => { Sound.stopPreview(); });
 
 function startGame(){
   const cfg = CONFIG.difficulties[S.diff].songs[S.songIdx];
