@@ -34,6 +34,11 @@
   #hudBtns button:active { transform: translateY(2px); box-shadow: none; }
   #speed { position: fixed; left: 12px; bottom: 12px; z-index: 5; display: none; pointer-events: none; }
   #speed b { font-size: 30px; }
+  #fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 4; }
+  #hudBest { font-size: 18px; }
+  #hudBest .lab { white-space: nowrap; }
+  .laps { font-size: 13px; color: var(--sg-ink-mid); margin: 4px 0 2px; font-variant-numeric: tabular-nums; }
+  .laps b { color: var(--sg-primary); }
   #minimap { position: fixed; right: 12px; bottom: 12px; width: 150px; height: 150px; background: rgba(255,255,255,.85); border: 2px solid var(--sg-line-strong); border-radius: 10px; z-index: 5; display: none; pointer-events: none; }
 
   /* ── 바퀴 통과 안내 (화면 위쪽 가운데) ── */
@@ -100,6 +105,7 @@
 <div id="hud">
   <div class="hud-box"><span class="lab">바퀴</span><span id="hudLap">1 / 3</span></div>
   <div class="hud-box" id="hudTime">0:00.00<span class="off" id="hudOff"></span></div>
+  <div class="hud-box"><span class="lab">최고 랩타임</span><span id="hudBest">—</span></div>
   <div id="hudBtns">
     <button type="button" id="btnReset">↻ 처음부터 (R)</button>
     <button type="button" id="btnRecover">🚗 트랙 복귀 (T)</button>
@@ -107,6 +113,7 @@
 </div>
 <div class="hud-box" id="speed"><span class="lab">속도</span><b id="speedVal">0</b> km/h</div>
 <canvas id="minimap" width="300" height="300"></canvas>
+<canvas id="fx"></canvas>
 <div id="lapToast"><b id="lapToastMain"></b><span id="lapToastSub"></span></div>
 <div id="count"><span id="countNum">3</span></div>
 
@@ -116,8 +123,8 @@
     <table class="rtab">
       <thead><tr><th>난이도</th><th>나의 최고 기록</th><th>🏆 세계신기록</th></tr></thead>
       <tbody>
-        <tr><td>쉬움</td><td><em id="bestEasy">—</em></td><td><em id="wrEasy">—</em><small id="wrWhoEasy"></small></td></tr>
-        <tr><td>어려움</td><td><em id="bestHard">—</em></td><td><em id="wrHard">—</em><small id="wrWhoHard"></small></td></tr>
+        <tr><td>쉬움</td><td><em id="bestEasy">—</em><small id="lapEasy"></small></td><td><em id="wrEasy">—</em><small id="wrWhoEasy"></small></td></tr>
+        <tr><td>어려움</td><td><em id="bestHard">—</em><small id="lapHard"></small></td><td><em id="wrHard">—</em><small id="wrWhoHard"></small></td></tr>
       </tbody>
     </table>
     <div class="keys">
@@ -139,6 +146,7 @@
     <div class="diffTag" id="doneDiff">쉬움</div>
     <div class="final" id="finalTime">0:00.00</div>
     <div class="msg" id="finalMsg"></div>
+    <div class="laps" id="lapList"></div>
     <div class="rec">
       <div><div class="lab">나의 최고 기록</div><div class="val" id="bestDone">—</div><div class="who" id="bestDoneNew"></div></div>
       <div><div class="lab">🏆 세계신기록</div><div class="val" id="wrDone">—</div><div class="who" id="wrWhoDone"></div></div>
@@ -171,7 +179,13 @@ const CFG = {
   offroadDrag: 2.4,      // 오프로드 감속 (초당 비율)
   wallKeep: 0.3,         // 울타리 충돌 시 남는 속도 비율
   shoulder: 4.5,         // 도로 밖 갓길 폭 (여기까지 나가면 울타리)
-  camBack: 13, camUp: 6, camLerp: 6,
+  /* 속도감 연출 (물리·기록에는 영향 없음) */
+  carScale: 0.8,         // 차를 작게 → 같은 속도라도 풍경이 더 빨리 지나가 보임
+  camBack: 8.5, camUp: 3.9, camLerp: 7,
+  fovBase: 66, fovBoost: 16,   // 시야각: 정지 66° → 최고 속도 82°
+  speedLinesFrom: 0.45,  // 이 비율 속도부터 화면 가장자리 속도선
+  postEvery: 6,          // 울타리 기둥 간격(샘플)
+  flagEvery: 36,         // 트랙 옆 깃대 간격(샘플)
   samples: 800,          // 트랙 곡선 샘플 수
   kmh: 4                 // 표시용 속도 배율
 };
@@ -203,6 +217,11 @@ function bestKey(k) { return "turbolap_best_" + k + "_v1"; }
 function loadBest(k) { try { const v = parseInt(localStorage.getItem(bestKey(k)), 10); return v > 0 ? v : 0; } catch (e) { return 0; } }
 function saveBest(k, v) { try { localStorage.setItem(bestKey(k), String(v)); } catch (e) {} }
 const best = { easy: loadBest("easy"), hard: loadBest("hard") };
+/* 최고 랩타임(난이도별, 이 기기) */
+function lapKey(k) { return "turbolap_bestlap_" + k + "_v1"; }
+function loadBestLap(k) { try { const v = parseInt(localStorage.getItem(lapKey(k)), 10); return v > 0 ? v : 0; } catch (e) { return 0; } }
+function saveBestLap(k, v) { try { localStorage.setItem(lapKey(k), String(v)); } catch (e) {} }
+const bestLap = { easy: loadBestLap("easy"), hard: loadBestLap("hard") };
 function fmtTime(ms) {
   ms = Math.max(0, Math.round(ms));
   const m = Math.floor(ms / 60000), s = Math.floor(ms % 60000 / 1000), c = Math.floor(ms % 1000 / 10);
@@ -224,6 +243,7 @@ function renderRecords() {
   ["easy", "hard"].forEach(k => {
     const cap = k === "easy" ? "Easy" : "Hard", w = wrInfo(k);
     setVal($("best" + cap), best[k] > 0 ? fmtTime(best[k]) : "아직 없음", !(best[k] > 0), "");
+    $("lap" + cap).textContent = bestLap[k] > 0 ? "최고 랩 " + fmtTime(bestLap[k]) : "";
     setVal($("wr" + cap), w.val, w.none, ""); $("wrWho" + cap).textContent = w.who;
   });
   const k = diff, w = wrInfo(k);
@@ -262,7 +282,7 @@ function engineStart() {
 }
 function engineUpdate(ratio, on) {
   if (!AUD.eng) return;
-  const t = AUD.ctx.currentTime, fr = 55 + ratio * 170;
+  const t = AUD.ctx.currentTime, fr = 60 + ratio * 260;
   AUD.eng.o.frequency.setTargetAtTime(fr, t, 0.06);
   AUD.eng.o2.frequency.setTargetAtTime(fr / 2, t, 0.06);
   AUD.eng.g.gain.setTargetAtTime(on ? 0.03 + ratio * 0.03 : 0, t, 0.1);
@@ -420,7 +440,7 @@ function buildTrack(def) {
   ribbon(G, i => [edgeAt(i, W / 2 + SH + 1, -0.02), edgeAt(i, -(W / 2 + SH + 1), -0.02)], 1, grassMat);           // 갓길(언덕 높이 따라감)
   ribbon(G, i => { const h = S[i].p.y, k = W / 2 + SH + 1; return [edgeAt(i, k + 3 + h * 2.2, -h - 0.04), edgeAt(i, k, -0.03)]; }, 1, grassMat);      // 왼쪽 비탈
   ribbon(G, i => { const h = S[i].p.y, k = W / 2 + SH + 1; return [edgeAt(i, -k, -0.03), edgeAt(i, -(k + 3 + h * 2.2), -h - 0.04)]; }, 1, grassMat);  // 오른쪽 비탈
-  const roadRep = Math.round(TRACK_LEN / 8), texRoad = makeRoadTex(); texRoad.repeat.set(1, roadRep);
+  const roadRep = Math.round(TRACK_LEN / 5), texRoad = makeRoadTex(); texRoad.repeat.set(1, roadRep);
   ribbon(G, i => [edgeAt(i, W / 2, 0.05), edgeAt(i, -W / 2, 0.05)], roadRep, lambert(0xFFFFFF, { map: texRoad }));   // 도로
   const curbMat = lambert(0xFFFFFF, { map: texCurb }), curbRep = Math.round(TRACK_LEN / 3);
   ribbon(G, i => [edgeAt(i, W / 2 + 1.3, 0.09), edgeAt(i, W / 2, 0.09)], curbRep, curbMat);
@@ -447,8 +467,20 @@ function buildTrack(def) {
       const c = new THREE.CatmullRomCurve3(pts, true);
       G.add(new THREE.Mesh(new THREE.TubeGeometry(c, N / 2, 0.22, 6, true), railMat));
       const postGeo = new THREE.CylinderGeometry(0.3, 0.3, 1.4, 6);
-      for (let i = 0; i < N; i += 10) { const m = new THREE.Mesh(postGeo, postMat); m.position.copy(edgeAt(i, off * sg, 0.7)); G.add(m); }
+      for (let i = 0; i < N; i += CFG.postEvery) { const m = new THREE.Mesh(postGeo, postMat); m.position.copy(edgeAt(i, off * sg, 0.7)); G.add(m); }
     });
+    /* 깃대 (양쪽 번갈아) — 카메라 가까이 지나가는 키 큰 물체가 속도감을 살린다 */
+    const poleGeo = new THREE.CylinderGeometry(0.12, 0.12, 7, 5), poleMat = lambert(0xF4F4F4);
+    const flagGeo = new THREE.BufferGeometry();
+    flagGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array([0, 0, 0, 2.2, -0.5, 0, 0, -1.1, 0]), 3));
+    flagGeo.computeVertexNormals();
+    const flagMats = [0xFF5A4E, 0x3D8BFF, 0xFFC23D, 0x4FD66A].map(c => lambert(c, { side: THREE.DoubleSide }));
+    for (let i = 18, k = 0; i < N; i += CFG.flagEvery, k++) {
+      const sg = k % 2 ? 1 : -1, base = edgeAt(i, (off + 1.4) * sg, 0);
+      const pole = new THREE.Mesh(poleGeo, poleMat); pole.position.set(base.x, base.y + 3.5, base.z); G.add(pole);
+      const flag = new THREE.Mesh(flagGeo, flagMats[k % flagMats.length]); flag.position.set(base.x, base.y + 6.9, base.z);
+      flag.rotation.y = Math.atan2(S[i].t.x, S[i].t.z); G.add(flag);
+    }
   }
   /* 나무 */
   {
@@ -513,6 +545,7 @@ function makeCar(color) {
   const shadow = new THREE.Mesh(new THREE.CircleGeometry(1, 16), new THREE.MeshBasicMaterial({ color: 0x1B2B20, transparent: true, opacity: 0.22 }));
   shadow.rotation.x = -Math.PI / 2; shadow.scale.set(1.5, 2.6, 1); shadow.position.y = 0.16; g.add(shadow);
   g.rotation.order = "YXZ";
+  g.scale.setScalar(CFG.carScale);
   g.userData.wheels = wheels;
   return g;
 }
@@ -526,7 +559,17 @@ const keys = { up: false, down: false, left: false, right: false };
 const hud = $("hud"), overlay = $("overlay"), cardStart = $("cardStart"), cardDone = $("cardDone");
 const hudLap = $("hudLap"), hudTime = $("hudTime"), hudOff = $("hudOff"), speedBox = $("speed"), speedVal = $("speedVal");
 const countBox = $("count"), countNum = $("countNum"), mini = $("minimap"), mctx = mini.getContext("2d");
-const lapToast = $("lapToast"), lapToastMain = $("lapToastMain"), lapToastSub = $("lapToastSub");
+const lapToast = $("lapToast"), lapToastMain = $("lapToastMain"), lapToastSub = $("lapToastSub"), hudBest = $("hudBest");
+const fx = $("fx"), fctx = fx.getContext("2d");
+let lapTimes = [], lapStartMs = 0, lapNewInRace = false;   // 이번 경기의 랩타임들
+function renderHudBest() { hudBest.innerHTML = bestLap[diff] > 0 ? fmtTime(bestLap[diff]) + (lapNewInRace ? '<span class="new">NEW</span>' : "") : "—"; }
+/* 랩 하나 끝남: 랩타임 기록, 최고 랩 갱신 여부 반환 */
+function closeLap() {
+  const lt = Math.round(elapsed - lapStartMs); lapStartMs = elapsed; lapTimes.push(lt);
+  const isNew = bestLap[diff] === 0 || lt < bestLap[diff];
+  if (isNew) { bestLap[diff] = lt; saveBestLap(diff, lt); lapNewInRace = true; }
+  renderHudBest(); return isNew;
+}
 
 function placeAt(i) {
   const s = S[i % N];
@@ -540,10 +583,10 @@ function showCard(which) {
   cardDone.style.display = which === "done" ? "" : "none";
 }
 function setHud(on) { hud.style.display = on ? "flex" : "none"; speedBox.style.display = on ? "block" : "none"; mini.style.display = on ? "block" : "none"; }
-function showLapToast(done) {                 // done = 방금 끝낸 바퀴 수
+function showLapToast(done, lt, isNew) {     // done = 방금 끝낸 바퀴 수, lt = 그 랩타임
   const left = CFG.laps - done;
-  lapToastMain.textContent = done + "바퀴 완료!";
-  lapToastSub.textContent = left === 1 ? "마지막 바퀴!" : "남은 " + left + "바퀴";
+  lapToastMain.textContent = done + "바퀴 완료! " + fmtTime(lt);
+  lapToastSub.textContent = (left === 1 ? "마지막 바퀴!" : "남은 " + left + "바퀴") + "  ·  최고 랩 " + fmtTime(bestLap[diff]) + (isNew ? " NEW" : "");
   lapToast.className = ""; void lapToast.offsetWidth;   // 애니메이션 다시 시작
   lapToast.className = "show";
 }
@@ -552,7 +595,7 @@ function startRace(which) {
   audioInit();
   if (which && which !== diff) { diff = which; buildTrack(TRACKS[diff]); }
   scene.remove(car); car = makeCar(CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)]); scene.add(car);
-  resetCar(); P.lap = 0; P.expected = 0;
+  resetCar(); P.lap = 0; P.expected = 0; lapTimes = []; lapStartMs = 0; lapNewInRace = false; renderHudBest();
   state = "countdown"; cdTime = 0; cdShown = -1; goTimer = 0; elapsed = 0; finalMs = 0; shake = 0;
   showCard(null); setHud(true); countBox.style.display = "flex"; lapToast.className = "";
   hudLap.textContent = "1 / " + CFG.laps; hudTime.firstChild.nodeValue = fmtTime(0); hudOff.textContent = "";
@@ -564,7 +607,7 @@ function recover() {                      // 가장 가까운 트랙 지점으�
   placeAt(P.ci); P.off = false; shake = 0;
 }
 function showMenu() {
-  state = "menu"; setHud(false); countBox.style.display = "none"; lapToast.className = ""; showCard("start");
+  state = "menu"; setHud(false); fctx.clearRect(0, 0, fx.width, fx.height); countBox.style.display = "none"; lapToast.className = ""; showCard("start");
   engineUpdate(0, false); renderRecords();
   ["easy", "hard"].forEach(k => { if (WRS[k]) WRS[k].load(); });
 }
@@ -574,6 +617,8 @@ function finish() {
   [523, 659, 784, 1047].forEach((f, i) => beep(f, 0.35, "triangle", 0.1, i * 0.13));
   const k = diff, WR = WRS[k];
   $("finalTime").textContent = fmtTime(finalMs);
+  $("lapList").innerHTML = lapTimes.map((t, i) => "랩" + (i + 1) + " " + fmtTime(t)).join(" · ") +
+    "<br>최고 랩타임 <b>" + fmtTime(bestLap[k]) + "</b>" + (lapNewInRace ? '<span class="new">NEW</span>' : "");
   $("doneDiff").textContent = TRACKS[k].name;
   const isBest = best[k] === 0 || finalMs < best[k];
   if (isBest) { best[k] = finalMs; saveBest(k, finalMs); }
@@ -648,8 +693,9 @@ function updateCar(dt) {
     if (P.expected < 4 && sec === P.expected % 4 && (P.expected > 0 || fwdCross)) P.expected++;
     if (fwdCross && P.expected >= 4) {
       P.lap++; P.expected = 1;
+      const isNew = closeLap();
       if (P.lap >= CFG.laps) finish();
-      else { showLapToast(P.lap); beep(880, 0.12, "square", 0.08); beep(1175, 0.2, "square", 0.08, 0.12); }
+      else { showLapToast(P.lap, lapTimes[lapTimes.length - 1], isNew); beep(880, 0.12, "square", 0.08); beep(1175, 0.2, "square", 0.08, 0.12); }
     } else if (backCross) P.expected = 0;
   }
 
@@ -668,7 +714,7 @@ function updateCar(dt) {
 const camTarget = new THREE.Vector3(), camLook = new THREE.Vector3();
 function snapCamera() {
   const fx = -Math.sin(P.h), fz = -Math.cos(P.h);
-  camera.position.set(P.x - fx * CFG.camBack, P.y + CFG.camUp, P.z - fz * CFG.camBack);
+  camera.position.set(P.x - fx * CFG.camBack, P.y + CFG.camUp, P.z - fz * CFG.camBack); camera.fov = CFG.fovBase; camera.updateProjectionMatrix();
 }
 function updateCamera(dt) {
   if (state === "menu") {
@@ -678,16 +724,33 @@ function updateCamera(dt) {
     return;
   }
   const fx = -Math.sin(P.h), fz = -Math.cos(P.h);
-  const back = CFG.camBack + Math.abs(P.v) / CFG.maxSpeed * 3;
-  camTarget.set(P.x - fx * back, P.y + CFG.camUp, P.z - fz * back);
+  const r = Math.min(1, Math.abs(P.v) / CFG.maxSpeed);
+  const back = CFG.camBack - r * 0.8, up = CFG.camUp - r * 0.8;      // 빠를수록 낮고 바짝 붙어서
+  camTarget.set(P.x - fx * back, P.y + up, P.z - fz * back);
   camera.position.lerp(camTarget, 1 - Math.exp(-CFG.camLerp * dt));
   if (shake > 0) { shake -= dt; camera.position.x += rnd(-0.3, 0.3) * shake * 3; camera.position.y += rnd(-0.3, 0.3) * shake * 3; }
-  camLook.set(P.x + fx * 4, P.y + 1.4, P.z + fz * 4);
+  if (r > 0.85 && state === "race") { const j = (r - 0.85) * 0.5; camera.position.x += rnd(-j, j); camera.position.y += rnd(-j, j); }   // 고속 진동
+  camLook.set(P.x + fx * (4 + r * 8), P.y + 1.2, P.z + fz * (4 + r * 8));
   camera.lookAt(camLook);
-  camera.fov = 62 + Math.abs(P.v) / CFG.maxSpeed * 10; camera.updateProjectionMatrix();
+  camera.fov = CFG.fovBase + r * r * CFG.fovBoost; camera.updateProjectionMatrix();
 }
 
 /* ═══════════════════ 미니맵 ═══════════════════ */
+/* 속도선: 빠를수록 화면 가장자리에서 가운데로 흰 줄이 흐른다 */
+function drawSpeedLines(ratio) {
+  const w = fx.width, h = fx.height;
+  fctx.clearRect(0, 0, w, h);
+  const a = (ratio - CFG.speedLinesFrom) / (1 - CFG.speedLinesFrom);
+  if (a <= 0 || state === "done") return;
+  const cx = w / 2, cy = h * 0.45, n = 26;
+  fctx.strokeStyle = "rgba(255,255,255," + (0.55 * a).toFixed(2) + ")"; fctx.lineCap = "round";
+  for (let i = 0; i < n; i++) {
+    const ang = (i / n) * Math.PI * 2 + Math.sin(i * 7.3) * 0.1, len = (0.18 + Math.random() * 0.22) * a;
+    const R = Math.hypot(w, h) * 0.5, r0 = R * (1 - len), r1 = R * 1.05;
+    fctx.lineWidth = 1.5 + Math.random() * 2.5;
+    fctx.beginPath(); fctx.moveTo(cx + Math.cos(ang) * r0, cy + Math.sin(ang) * r0); fctx.lineTo(cx + Math.cos(ang) * r1, cy + Math.sin(ang) * r1); fctx.stroke();
+  }
+}
 function drawMinimap() {
   mctx.clearRect(0, 0, 300, 300);
   mctx.lineCap = mctx.lineJoin = "round";
@@ -706,8 +769,8 @@ function drawMinimap() {
 
 /* ═══════════════════ 메인 루프 ═══════════════════ */
 let last = performance.now();
-function frame(now) {
-  requestAnimationFrame(frame);
+function frame(now) { requestAnimationFrame(frame); tick(now); }
+function tick(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   clouds.forEach(c => { c.position.x += c.userData.vx * dt; if (c.position.x > 460) c.position.x = -460; });
 
@@ -716,7 +779,7 @@ function frame(now) {
     const n = Math.ceil(CFG.countdown - cdTime);
     if (n !== cdShown && n > 0) { cdShown = n; countNum.textContent = n; countNum.className = ""; beep(440, 0.15, "square", 0.1); }
     if (cdTime >= CFG.countdown) {
-      state = "race"; t0 = performance.now(); goTimer = 0.9;
+      state = "race"; t0 = performance.now(); goTimer = 0.9; lapStartMs = 0;
       countNum.textContent = "GO!"; countNum.className = "go"; beep(880, 0.45, "square", 0.12);
     }
   }
@@ -736,12 +799,14 @@ function frame(now) {
     hudOff.textContent = P.off ? "오프로드 — 감속 중" : "";
     speedVal.textContent = Math.round(Math.abs(P.v) * CFG.kmh);
     drawMinimap();
+    drawSpeedLines(Math.abs(P.v) / CFG.maxSpeed);
   }
   renderer.render(scene, camera);
 }
 function resize() {
   const w = window.innerWidth, h = window.innerHeight;
   renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
+  fx.width = w; fx.height = h;
 }
 window.addEventListener("resize", resize); resize();
 
@@ -768,7 +833,7 @@ $("btnReset").onclick = e => { e.currentTarget.blur(); startRace(); };
 $("btnRecover").onclick = e => { e.currentTarget.blur(); recover(); };
 
 /* 콘솔 디버그용 */
-window.TL = { keys, P, CFG, camera, scene, get S() { return S; }, setTrack: k => { diff = k; buildTrack(TRACKS[k]); resetCar(); } };
+window.TL = { keys, P, CFG, camera, scene, tick, get S() { return S; }, setTrack: k => { diff = k; buildTrack(TRACKS[k]); resetCar(); } };
 buildTrack(TRACKS[diff]); resetCar(); updateCar(0); showMenu();
 ["easy", "hard"].forEach(k => { const WR = WRS[k]; if (WR) { WR.onChange(renderRecords); WR.load().then(() => { wrTried[k] = true; renderRecords(); }); } });
 requestAnimationFrame(frame);
