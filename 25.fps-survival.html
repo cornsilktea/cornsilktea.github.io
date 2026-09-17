@@ -64,6 +64,7 @@
   .pop.head { color: #D97B4F; font-size: 32px; }
   .pop.kill { color: #F2D06B; font-size: 36px; }
   .pop.heal { color: #FF6B7A; font-size: 30px; }
+  .pop.warn { color: #B33951; font-size: 24px; }
   @keyframes pop { 0% { opacity: 0; transform: translate(-50%,-50%) scale(1.5); } 15% { opacity: 1; transform: translate(-50%,-70%) scale(1); } 100% { opacity: 0; transform: translate(-50%,-160%); } }
 
   /* ── 시작 / 게임오버 카드 ── */
@@ -120,17 +121,17 @@
   <div class="hud-box"><span class="lab">처치</span><span id="hudScore">0</span></div>
   <div class="hud-box"><span class="lab">생존 시간</span><span id="hudTime">0:00</span></div>
 </div>
-<div class="hud hud-box" id="hudAmmo"><span class="lab">탄약</span><span id="ammoNum">50/50</span></div>
+<div class="hud hud-box" id="hudAmmo"><span class="lab" id="ammoLab">소총 탄약</span><span id="ammoNum">50/50</span></div>
 <div class="hud hud-box" id="hudBest"><span class="lab">개인 최고 기록</span><span id="hudBestVal">—</span><span class="lab" style="margin-top:4px">🏆 세계 신기록</span><span id="hudWrVal">—</span><span class="who" id="hudWrWho"></span></div>
 
 <div id="overlay">
   <div class="card" id="cardStart">
     <div class="logo">FPS 서바이벌<small>적을 처치하고 최대한 오래 살아남아라</small></div>
-    <div class="desc">세 방향에서 권총병이 몰려옵니다. 장애물 뒤에 숨어 싸우고, <b>탄약 캡슐</b>로 재장전, <b>빨간 물약</b>으로 체력 +50.<br>적 총알은 느려서 옆으로 움직이면 피할 수 있어요. 머리 1발, 몸통 2발. 체력이 0이 되면 끝. <b>처치 수</b>가 높을수록, 같으면 <b>생존 시간</b>이 길수록 좋은 기록입니다.</div>
+    <div class="desc">세 방향에서 권총병이 몰려옵니다. 장애물 뒤에 숨어 싸우고, <b>탄약 캡슐</b>로 재장전, <b>빨간 물약</b>으로 체력 +50.<br>적 총알은 느려서 옆으로 움직이면 피할 수 있어요. 소총은 머리 1발·몸통 2발, 탄약이 떨어지면 <b>권총</b>(머리 50%·몸통 30%)으로 버티다 탄약 캡슐을 주우면 다시 소총. 체력이 0이 되면 끝. <b>처치 수</b>가 높을수록, 같으면 <b>생존 시간</b>이 길수록 좋은 기록입니다.</div>
     <div class="warn" id="warnTouch">⌨️ 이 게임은 키보드가 필요합니다. 노트북·PC 또는 키보드를 연결한 전자칠판에서 실행하세요.</div>
     <div class="keys">
       <div><b>← → ↑ ↓</b><span>시점 회전</span></div>
-      <div><b>W A S D</b><span>이동</span></div>
+      <div><b>W A S D</b><span>이동 · <b style="font-size:14px">Q</b> 뒤돌기</span></div>
       <div><b>SPACE</b><span>발사 (누르고 있으면 연사)</span></div>
     </div>
     <div class="rec">
@@ -198,7 +199,9 @@ const PLAYER_CONFIG = {
   yawSpeed: 75, pitchSpeed: 55, pitchLimit: 60,   // 도/초, 도 — 시점 회전 감도
   turnRampSec: 0.35,                              // 키를 누른 뒤 최고 회전 속도까지 걸리는 시간(처음엔 40%에서 시작 → 미세 조준)
   radius: 0.45, eyeHeight: 1.6,
-  headDamage: 100, bodyDamage: 50,                // 적 체력(100) 기준 % — 머리 1발, 몸통 2발
+  headDamage: 100, bodyDamage: 50,                // 소총: 적 체력(100) 기준 % — 머리 1발, 몸통 2발
+  pistol: { headDamage: 50, bodyDamage: 30, fireRate: 3 },   // 소총 탄약이 떨어지면 자동으로 드는 권총(탄약 무제한, 연사 3발/초)
+  flipSec: 0.15,                                  // Q 뒤돌기(180°)에 걸리는 시간
 };
 const ITEM_CONFIG = {
   pickupDist: 1.5,
@@ -281,6 +284,7 @@ function noise(dur, vol, cutoff) {
 const SFX = {
   shoot()   { noise(0.12, 0.35, 3000); tone(160, 0.08, "square", 0.12, 0, 60); },
   empty()   { tone(1100, 0.04, "square", 0.05); tone(700, 0.04, "square", 0.05, 0.05); },
+  pistol()  { noise(0.07, 0.25, 4500); tone(260, 0.05, "square", 0.1, 0, 90); },
   enemyShot(){ noise(0.08, 0.12, 1500); tone(120, 0.06, "square", 0.05); },
   hurt()    { tone(220, 0.25, "sawtooth", 0.12, 0, 70); },
   hitmark() { tone(900, 0.05, "sine", 0.08); },
@@ -434,6 +438,33 @@ const gun = new THREE.Group();
   gun.userData.flash = flash;
   gun.position.set(0.32, -0.28, -0.5);
   camera.add(gun);
+}
+/* 권총 (탄약 0 일 때) — 슬라이드·프레임·손잡이·방아쇠울·가늠쇠 */
+const pistolG = new THREE.Group();
+{
+  const dark = MS({ color: 0x2A3230, roughness: 0.45, metalness: 0.6 }), poly = MS({ color: 0x3C4744, roughness: 0.8 });
+  const add = (geo, mat, x, y, z, rx) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); if (rx) m.rotation.x = rx; m.castShadow = true; pistolG.add(m); return m; };
+  add(new THREE.BoxGeometry(0.075, 0.075, 0.34), dark, 0, 0.04, -0.12);                   // 슬라이드
+  for (let i = 0; i < 5; i++) add(new THREE.BoxGeometry(0.08, 0.05, 0.012), METAL, 0, 0.045, 0.0 + i * 0.016);   // 슬라이드 홈
+  add(new THREE.BoxGeometry(0.07, 0.05, 0.3), poly, 0, -0.01, -0.1);                     // 프레임
+  add(new THREE.CylinderGeometry(0.014, 0.014, 0.06, 10), METAL, 0, 0.045, -0.31, Math.PI / 2);   // 총구
+  add(new THREE.BoxGeometry(0.014, 0.03, 0.014), dark, 0, 0.09, -0.27);                  // 가늠쇠
+  add(new THREE.BoxGeometry(0.05, 0.03, 0.02), dark, 0, 0.09, 0.03);                     // 가늠자
+  const grip = add(new THREE.BoxGeometry(0.07, 0.2, 0.09), poly, 0, -0.13, 0.04); grip.rotation.x = -0.25;   // 손잡이
+  add(new THREE.BoxGeometry(0.02, 0.05, 0.08), dark, 0, -0.06, -0.06);                   // 방아쇠울
+  const flash = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), new THREE.MeshBasicMaterial({ color: 0xFFE28A })); flash.position.set(0, 0.045, -0.37); flash.scale.set(1, 1, 1.6); flash.visible = false; pistolG.add(flash);
+  pistolG.userData.flash = flash;
+  pistolG.position.set(0.26, -0.3, -0.42); pistolG.visible = false;
+  camera.add(pistolG);
+}
+const WEAPONS = {
+  rifle:  { g: gun,     base: [0.32, -0.28, -0.5],  rate: () => PLAYER_CONFIG.fireRate,        head: () => PLAYER_CONFIG.headDamage,        body: () => PLAYER_CONFIG.bodyDamage },
+  pistol: { g: pistolG, base: [0.26, -0.3, -0.42],  rate: () => PLAYER_CONFIG.pistol.fireRate, head: () => PLAYER_CONFIG.pistol.headDamage, body: () => PLAYER_CONFIG.pistol.bodyDamage },
+};
+function setWeapon(name) {
+  P.weapon = name;
+  gun.visible = name === "rifle"; pistolG.visible = name === "pistol";
+  P.swap = 1;   // 꺼내는 동작(아래에서 올라옴)
 }
 const sparkGeo = new THREE.SphereGeometry(0.08, 6, 6), sparkMat = new THREE.MeshBasicMaterial({ color: 0xFFE28A, transparent: true });
 const tracerMat = new THREE.LineBasicMaterial({ color: 0xFFD07A });
@@ -659,7 +690,7 @@ function updateItems(dt) {
     it.g.rotation.y += dt * 2.5; it.g.position.y = 1 + Math.sin(it.t * 3) * 0.15;
     if (state === "play" && Math.hypot(it.g.position.x - P.x, it.g.position.z - P.z) < ITEM_CONFIG.pickupDist) {
       scene.remove(it.g); items.splice(i, 1);
-      if (it.kind === "ammo") { P.ammo = ITEM_CONFIG.ammo.refill; SFX.ammo(); popup("탄약 +" + ITEM_CONFIG.ammo.refill, ""); }
+      if (it.kind === "ammo") { P.ammo = ITEM_CONFIG.ammo.refill; SFX.ammo(); popup("탄약 +" + ITEM_CONFIG.ammo.refill, ""); if (P.weapon !== "rifle") setWeapon("rifle"); }
       else { const before = P.hp; P.hp = Math.min(PLAYER_CONFIG.hp, P.hp + ITEM_CONFIG.heal.amount); SFX.heal(); popup("체력 +" + (P.hp - before), "heal"); }
       renderHud();
     }
@@ -667,7 +698,7 @@ function updateItems(dt) {
 }
 
 /* ═══════════════════ 플레이어 · 게임 상태 ═══════════════════ */
-const P = { x: 0, z: 0, yaw: 0, pitch: 0, hp: 100, ammo: 30, fireT: 0, recoil: 0 };
+const P = { x: 0, z: 0, yaw: 0, pitch: 0, hp: 100, ammo: 50, fireT: 0, recoil: 0, weapon: "rifle", swap: 0, flip: 0 };
 let state = "menu";          // menu | play | over
 let elapsed = 0, score = 0, lastT = 0;
 let spawnTimers = [], itemT = { ammo: 0, heal: 0 }, overAt = 0, spaceFresh = true;
@@ -681,7 +712,7 @@ function resetGame() {
   corpses.forEach(c => scene.remove(c.g)); corpses.length = 0;
   transient.forEach(t => scene.remove(t.obj)); transient.length = 0;
   P.x = PLAYER_START.x; P.z = PLAYER_START.z; P.yaw = PLAYER_START.yaw; P.pitch = 0;
-  P.hp = PLAYER_CONFIG.hp; P.ammo = PLAYER_CONFIG.ammo; P.fireT = 0; P.recoil = 0;
+  P.hp = PLAYER_CONFIG.hp; P.ammo = PLAYER_CONFIG.ammo; P.fireT = 0; P.recoil = 0; P.flip = 0; setWeapon("rifle"); P.swap = 0;
   elapsed = 0; score = 0; STAT.shots = STAT.hits = STAT.heads = 0;
   spawnTimers = SPAWNS.map((s, i) => DIFFICULTY_CONFIG.initialSpawnIntervalSec * (0.5 + i * 0.35));   // 세 곳이 동시에 쏟아지지 않게 어긋나게
   itemT.ammo = ITEM_CONFIG.ammo.intervalSec; itemT.heal = ITEM_CONFIG.heal.intervalSec * 0.5;   // 탄약·물약이 번갈아 나오게 반 주기 어긋남
@@ -751,8 +782,10 @@ function gameOver() {
 function renderHud() {
   $("hpNum").textContent = P.hp;
   const f = $("hpFill"); f.style.width = P.hp + "%"; f.classList.toggle("low", P.hp <= 30);
-  $("ammoNum").textContent = P.ammo + "/" + PLAYER_CONFIG.ammo;
-  $("hudAmmo").classList.toggle("empty", P.ammo <= 0);
+  const pistol = P.weapon === "pistol";
+  $("ammoLab").textContent = pistol ? "권총 (탄약 없음)" : "소총 탄약";
+  $("ammoNum").textContent = pistol ? "∞" : P.ammo + "/" + PLAYER_CONFIG.ammo;
+  $("hudAmmo").classList.toggle("empty", pistol);
   $("hudScore").textContent = score; $("hudTime").textContent = fmtTime(elapsed);
 }
 function popup(text, cls) {
@@ -764,15 +797,16 @@ function hitmark() { const h = $("hitmark"); h.classList.remove("show"); void h.
 
 /* ───────── 사격 (히트스캔) ───────── */
 function shoot() {
-  if (P.ammo <= 0) { SFX.empty(); return; }
-  P.ammo--; P.recoil = 1; SFX.shoot();
-  gun.userData.flash.visible = true; setTimeout(() => { gun.userData.flash.visible = false; }, 45);
+  const W = WEAPONS[P.weapon], wg = W.g;
+  if (P.weapon === "rifle") { P.ammo--; SFX.shoot(); } else SFX.pistol();
+  P.recoil = 1;
+  wg.userData.flash.visible = true; setTimeout(() => { wg.userData.flash.visible = false; }, 45);
   scene.updateMatrixWorld();
   ray.setFromCamera({ x: 0, y: 0 }, camera); ray.far = 200;
   const hits = ray.intersectObjects(obstacleMeshes.concat(enemyParts), false);
   STAT.shots++;
   /* 예광탄: 총구 → 맞은 지점(없으면 60유닛 앞)까지 굵은 빛줄기, 0.18초 동안 옅어지며 사라짐 */
-  const muzzle = new THREE.Vector3(); gun.userData.flash.getWorldPosition(muzzle);
+  const muzzle = new THREE.Vector3(); wg.userData.flash.getWorldPosition(muzzle);
   const end = hits.length ? hits[0].point.clone() : ray.ray.at(60, new THREE.Vector3());
   const len = muzzle.distanceTo(end);
   const tracer = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.045, len, 6), playerTracerMat.clone());
@@ -783,7 +817,7 @@ function shoot() {
     const spark = new THREE.Mesh(sparkGeo, sparkMat.clone()); spark.position.copy(h.point); spark.scale.setScalar(2.2); addTransient(spark, 160, true);
     const ud = h.object.userData;
     if (ud && ud.enemy) {
-      const e = ud.enemy, head = ud.part === "head", dmg = head ? PLAYER_CONFIG.headDamage : PLAYER_CONFIG.bodyDamage;
+      const e = ud.enemy, head = ud.part === "head", dmg = head ? W.head() : W.body();
       STAT.hits++; if (head) STAT.heads++;
       e.hp -= dmg; hitmark(); popup("-" + dmg + "%", head ? "head" : "");
       enemyFlash(e, true); e.flashT = 0.08;
@@ -794,6 +828,7 @@ function shoot() {
       } else SFX.hitmark();
     }
   }
+  if (P.weapon === "rifle" && P.ammo <= 0) { setWeapon("pistol"); SFX.empty(); popup("탄약 소진 → 권총", "warn"); }
   renderHud();
 }
 
@@ -810,6 +845,8 @@ function update(dt) {
   if (keys.ArrowLeft) P.yaw += yawR; if (keys.ArrowRight) P.yaw -= yawR;
   if (keys.ArrowUp) P.pitch += pitchR; if (keys.ArrowDown) P.pitch -= pitchR;
   P.pitch = clamp(P.pitch, -lim, lim);
+  /* Q 뒤돌기: 남은 각도(P.flip)를 flipSec 동안 빠르게 돌림 */
+  if (P.flip > 0) { const s = Math.min(P.flip, dt * Math.PI / PC.flipSec); P.yaw += s; P.flip -= s; }
   /* 이동 (카메라 기준, 한글 IME 대비 e.code) */
   const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw), rx = Math.cos(P.yaw), rz = -Math.sin(P.yaw);
   let mx = 0, mz = 0;
@@ -819,13 +856,15 @@ function update(dt) {
   if (ml > 0) slide(P, mx / ml * PC.moveSpeed * dt, mz / ml * PC.moveSpeed * dt, PC.radius);
   /* 사격 (스페이스 연사) */
   P.fireT -= dt;
-  if (keys.Space && P.fireT <= 0) { P.fireT = 1 / PC.fireRate; shoot(); }
-  P.recoil = Math.max(0, P.recoil - dt * 8);
+  if (keys.Space && P.fireT <= 0 && P.swap <= 0) { P.fireT = 1 / WEAPONS[P.weapon].rate(); shoot(); }
+  P.recoil = Math.max(0, P.recoil - dt * (P.weapon === "pistol" ? 5 : 8));
+  P.swap = Math.max(0, P.swap - dt * 4);   // 무기 꺼내는 동작 0.25초
   /* 카메라·총 */
   camera.position.set(P.x, PC.eyeHeight, P.z);
   camera.rotation.set(P.pitch, P.yaw, 0);
   const bob = ml > 0 ? Math.sin(elapsed * 10) * 0.012 : 0;
-  gun.position.set(0.32, -0.28 + bob, -0.5 + P.recoil * 0.08); gun.rotation.x = P.recoil * 0.12;
+  const W = WEAPONS[P.weapon], kick = P.weapon === "pistol" ? 0.05 : 0.08;
+  W.g.position.set(W.base[0], W.base[1] + bob - P.swap * 0.35, W.base[2] + P.recoil * kick); W.g.rotation.x = P.recoil * (P.weapon === "pistol" ? 0.25 : 0.12) - P.swap * 0.6;
   /* 스폰 */
   const stepN = Math.floor(elapsed / C.spawnIntervalDecreaseEverySec);
   const interval = Math.max(C.minSpawnIntervalSec, C.initialSpawnIntervalSec - stepN * C.spawnIntervalDecreasePerStep);
@@ -886,6 +925,7 @@ window.addEventListener("keydown", e => {
     /* 게임오버: 새로 누른 스페이스만(사격하다 죽었을 때 눌린 채로 바로 재시작되지 않게) */
     if (state === "over") { if (!e.repeat && spaceFresh && performance.now() - overAt > 900 && !document.querySelector(".wr-back")) startGame(); return; }
   }
+  if (e.code === "KeyQ" && state === "play" && !e.repeat && P.flip <= 0) P.flip = Math.PI;   // 뒤돌기
   keys[e.code] = true;
 });
 window.addEventListener("keyup", e => { keys[e.code] = false; if (e.code === "Space") spaceFresh = true; });
