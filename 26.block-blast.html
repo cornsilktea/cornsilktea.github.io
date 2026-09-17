@@ -40,7 +40,7 @@
 
   /* ---------- 배경(세계 여행 테마) — 항상 연하게, 그리드 위에 깔림 ---------- */
   #bg{position:fixed;inset:-20px;z-index:0;pointer-events:none;background-size:cover;background-position:center;
-    opacity:.28;filter:blur(3px);transition:opacity .6s,background-image .6s}
+    opacity:.38;filter:blur(2px);transition:opacity .6s,background-image .6s}
   .wrap{z-index:1}
 
   /* ---------- 상단 고정 영역 (모든 칸 동일 크기·색) ---------- */
@@ -88,7 +88,8 @@
   .dragp{display:grid;gap:2px}
 
   /* 보드 아래 정보 줄 */
-  .info{display:flex;justify-content:space-between;gap:8px;margin-top:8px;font-size:13px;color:var(--sub);flex-wrap:wrap}
+  .info{display:flex;justify-content:space-between;gap:8px;margin-top:8px;font-size:13px;color:var(--sub);flex-wrap:wrap;
+    background:rgba(255,255,255,.7);border-radius:var(--radius);padding:4px 8px}
   .info b{color:var(--text)}
 
   /* 점수 팝업 */
@@ -266,15 +267,15 @@ const CONFIG = {
   COLORS: ["#24402F", "#2F7D4F", "#A8731C", "#D97B4F", "#5B6B5E", "#B33951"],
   /* 세계 여행 테마 — 퍼펙트 클리어마다 다음으로. image 에 그림 주소를 넣으면 그라데이션 대신 쓰인다(나중에 첨부 예정) */
   THEMES: [
-    { name: "프랑스 파리 — 에펠탑",            image: "", grad: "linear-gradient(160deg,#c9d6e8,#f1e3d3)" },
-    { name: "이집트 기자 — 피라미드와 스핑크스", image: "", grad: "linear-gradient(160deg,#f3dfb0,#d7a96b)" },
-    { name: "미국 뉴욕 — 자유의 여신상",        image: "", grad: "linear-gradient(160deg,#bfe0d6,#9fb8c9)" },
-    { name: "중국 — 만리장성",                 image: "", grad: "linear-gradient(160deg,#c8d3b8,#8f9c7d)" },
-    { name: "인도 아그라 — 타지마할",           image: "", grad: "linear-gradient(160deg,#f6e6ea,#d9c6d2)" },
-    { name: "호주 시드니 — 오페라하우스",       image: "", grad: "linear-gradient(160deg,#bcdff5,#f5f0e6)" },
-    { name: "일본 — 후지산과 벚꽃",             image: "", grad: "linear-gradient(160deg,#f7d9e3,#c9d8ea)" },
-    { name: "이탈리아 로마 — 콜로세움",         image: "", grad: "linear-gradient(160deg,#e8d8bf,#b9a58a)" },
-    { name: "서울 — 경복궁",                   image: "", grad: "linear-gradient(160deg,#e4ecd9,#c9b9a3)" }
+    { name: "프랑스 파리 — 에펠탑",            image: "img/blockblast/paris.jpg",   grad: "linear-gradient(160deg,#c9d6e8,#f1e3d3)" },
+    { name: "이집트 기자 — 피라미드와 스핑크스", image: "img/blockblast/egypt.jpg",   grad: "linear-gradient(160deg,#f3dfb0,#d7a96b)" },
+    { name: "미국 뉴욕 — 자유의 여신상",        image: "img/blockblast/newyork.jpg", grad: "linear-gradient(160deg,#bfe0d6,#9fb8c9)" },
+    { name: "중국 — 만리장성",                 image: "img/blockblast/china.jpg",   grad: "linear-gradient(160deg,#c8d3b8,#8f9c7d)" },
+    { name: "인도 아그라 — 타지마할",           image: "img/blockblast/india.jpg",   grad: "linear-gradient(160deg,#f6e6ea,#d9c6d2)" },
+    { name: "호주 시드니 — 오페라하우스",       image: "img/blockblast/sydney.jpg",  grad: "linear-gradient(160deg,#bcdff5,#f5f0e6)" },
+    { name: "일본 — 후지산과 벚꽃",             image: "img/blockblast/japan.jpg",   grad: "linear-gradient(160deg,#f7d9e3,#c9d8ea)" },
+    { name: "이탈리아 로마 — 콜로세움",         image: "img/blockblast/rome.jpg",    grad: "linear-gradient(160deg,#e8d8bf,#b9a58a)" },
+    { name: "서울 — 경복궁",                   image: "img/blockblast/seoul.jpg",   grad: "linear-gradient(160deg,#e4ecd9,#c9b9a3)" }
   ]
 };
 
@@ -425,6 +426,11 @@ function applyTheme(){
   const t = CONFIG.THEMES[G.theme];
   $("bg").style.backgroundImage = t.image ? `url("${t.image}")` : t.grad;
   renderHud();
+}
+/* 퍼펙트 클리어 순간 배경이 바로 바뀌도록 모든 테마 그림을 미리 받아 둔다 */
+function preloadThemes(){
+  if (preloadThemes.done) return; preloadThemes.done = true;
+  CONFIG.THEMES.forEach(t => { if (t.image) { const im = new Image(); im.src = t.image; } });
 }
 
 /* 배치 불가 블록 흐리게 — 남은 블록 각각을 전수 검사 */
@@ -580,7 +586,7 @@ window.addEventListener("resize", () => { if (G.playing) renderTray(); });
 /* ---------- 시작·종료 ---------- */
 function start(){
   G.board = newBoard(); G.tray = []; G.score = 0; G.maxLines = 0; G.totalLines = 0; G.pieces = 0; G.perfects = 0; G.theme = 0;
-  G.playing = true;
+  G.playing = true; preloadThemes();
   $("scrStart").classList.remove("on"); $("scrEnd").classList.remove("on");
   applyTheme(); renderBoard(); refillTray(); renderHud();
   if (markDead()) { G.playing = false; setTimeout(gameOver, CONFIG.GAMEOVER_DELAY); }
