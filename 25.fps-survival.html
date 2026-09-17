@@ -180,7 +180,8 @@ const DIFFICULTY_CONFIG = {
 };
 const PLAYER_CONFIG = {
   hp: 100, ammo: 30, moveSpeed: 6, fireRate: 6,   // 발/초
-  yawSpeed: 120, pitchSpeed: 90, pitchLimit: 60,  // 도/초, 도
+  yawSpeed: 75, pitchSpeed: 55, pitchLimit: 60,   // 도/초, 도 — 시점 회전 감도
+  turnRampSec: 0.35,                              // 키를 누른 뒤 최고 회전 속도까지 걸리는 시간(처음엔 40%에서 시작 → 미세 조준)
   radius: 0.45, eyeHeight: 1.6,
   headDamage: 70, bodyDamage: 30,                 // 적 체력(100) 기준 %
 };
@@ -274,46 +275,142 @@ const SFX = {
 const canvas = $("gl");
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputEncoding = THREE.sRGBEncoding;
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xDDE3E8);
+scene.background = new THREE.Color(0xD6DEE6);
+scene.fog = new THREE.Fog(0xD6DEE6, 45, 90);
 const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 200);
 camera.rotation.order = "YXZ";
 scene.add(camera);
-scene.add(new THREE.HemisphereLight(0xFFFFFF, 0x8A978C, 0.9));
-const sun = new THREE.DirectionalLight(0xFFFFFF, 0.6); sun.position.set(20, 40, 10); scene.add(sun);
+scene.add(new THREE.HemisphereLight(0xFFFFFF, 0x8A978C, 0.75));
+const sun = new THREE.DirectionalLight(0xFFF4E0, 0.9); sun.position.set(18, 30, 12); scene.add(sun);
+sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -30, right: 30, top: 22, bottom: -22, near: 1, far: 80 }); sun.shadow.bias = -0.0008;
 
-const M = (c, extra) => new THREE.MeshLambertMaterial(Object.assign({ color: c }, extra || {}));
+/* ── 캔버스로 만드는 텍스처 (외부 그림 파일 없음) ── */
+function canvasTex(w, h, draw, repeat) {
+  const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+  draw(cv.getContext("2d"), w, h);
+  const t = new THREE.CanvasTexture(cv);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; if (repeat) t.repeat.set(repeat[0], repeat[1]);
+  t.anisotropy = 4; t.encoding = THREE.sRGBEncoding;
+  return t;
+}
+function speckle(ctx, w, h, n, alpha) { for (let i = 0; i < n; i++) { ctx.fillStyle = `rgba(${Math.random() < 0.5 ? "0,0,0" : "255,255,255"},${alpha})`; ctx.fillRect(Math.random() * w, Math.random() * h, rnd(1, 3), rnd(1, 3)); } }
+const TEX = {
+  /* 콘크리트 바닥: 큰 타일 + 이음새 + 얼룩 */
+  floor: canvasTex(256, 256, (c, w, h) => {
+    c.fillStyle = "#B4B9B1"; c.fillRect(0, 0, w, h); speckle(c, w, h, 900, 0.06);
+    c.strokeStyle = "rgba(60,70,60,.35)"; c.lineWidth = 3; c.strokeRect(1.5, 1.5, w - 3, h - 3);
+    c.strokeStyle = "rgba(255,255,255,.18)"; c.lineWidth = 1; c.strokeRect(5, 5, w - 10, h - 10);
+    for (let i = 0; i < 6; i++) { c.strokeStyle = "rgba(60,70,60,.25)"; c.beginPath(); let x = rnd(0, w), y = rnd(0, h); c.moveTo(x, y); for (let k = 0; k < 4; k++) { x += rnd(-30, 30); y += rnd(-30, 30); c.lineTo(x, y); } c.stroke(); }
+  }, [ARENA.hx, ARENA.hz]),
+  /* 금속 벽 패널: 패널 분할선 + 리벳 */
+  wall: canvasTex(256, 256, (c, w, h) => {
+    c.fillStyle = "#A9B4BE"; c.fillRect(0, 0, w, h); speckle(c, w, h, 400, 0.05);
+    c.strokeStyle = "rgba(40,55,70,.45)"; c.lineWidth = 4; c.strokeRect(2, 2, w - 4, h - 4);
+    c.strokeStyle = "rgba(255,255,255,.25)"; c.lineWidth = 2; c.strokeRect(8, 8, w - 16, h - 16);
+    c.fillStyle = "rgba(40,55,70,.6)"; [[18, 18], [w - 18, 18], [18, h - 18], [w - 18, h - 18]].forEach(p => { c.beginPath(); c.arc(p[0], p[1], 4, 0, 7); c.fill(); });
+    c.fillStyle = "rgba(255,255,255,.5)"; [[16, 16], [w - 20, 16], [16, h - 20], [w - 20, h - 20]].forEach(p => { c.beginPath(); c.arc(p[0], p[1], 1.5, 0, 7); c.fill(); });
+  }),
+  /* 나무 상자: 판자 + 금속 테두리 */
+  crate: canvasTex(256, 256, (c, w, h) => {
+    c.fillStyle = "#8C7350"; c.fillRect(0, 0, w, h);
+    for (let y = 0; y < h; y += 32) { c.fillStyle = y % 64 ? "#96795A" : "#846A48"; c.fillRect(0, y, w, 30); c.strokeStyle = "rgba(60,40,20,.35)"; for (let i = 0; i < 6; i++) { c.beginPath(); c.moveTo(rnd(0, w), y + rnd(2, 28)); c.lineTo(rnd(0, w), y + rnd(2, 28)); c.stroke(); } }
+    c.fillStyle = "#4C5550"; c.fillRect(0, 0, w, 14); c.fillRect(0, h - 14, w, 14); c.fillRect(0, 0, 14, h); c.fillRect(w - 14, 0, 14, h);
+    c.strokeStyle = "#4C5550"; c.lineWidth = 10; c.beginPath(); c.moveTo(0, 0); c.lineTo(w, h); c.moveTo(w, 0); c.lineTo(0, h); c.stroke();
+    c.fillStyle = "#C9CFC8"; [[7, 7], [w - 7, 7], [7, h - 7], [w - 7, h - 7], [w / 2, h / 2]].forEach(p => { c.beginPath(); c.arc(p[0], p[1], 3, 0, 7); c.fill(); });
+  }),
+  /* 기둥: 주황 안전 띠 + 콘크리트 */
+  pillar: canvasTex(128, 256, (c, w, h) => {
+    c.fillStyle = "#C9C4B8"; c.fillRect(0, 0, w, h); speckle(c, w, h, 300, 0.07);
+    c.fillStyle = "#D97B4F"; c.fillRect(0, 20, w, 36); c.fillRect(0, h - 56, w, 36);
+    c.fillStyle = "#1B2B20"; for (let x = -40; x < w + 40; x += 40) { c.beginPath(); c.moveTo(x, 20); c.lineTo(x + 16, 20); c.lineTo(x + 36, 56); c.lineTo(x + 20, 56); c.fill(); c.beginPath(); c.moveTo(x, h - 56); c.lineTo(x + 16, h - 56); c.lineTo(x + 36, h - 20); c.lineTo(x + 20, h - 20); c.fill(); }
+  }, [3, 1]),
+  /* 낮은 방벽: 콘크리트 + 노랑·검정 사선 */
+  barrier: canvasTex(256, 64, (c, w, h) => {
+    c.fillStyle = "#9AA39C"; c.fillRect(0, 0, w, h); speckle(c, w, h, 200, 0.07);
+    c.fillStyle = "#E2B93B"; c.fillRect(0, h - 22, w, 22);
+    c.fillStyle = "#1B2B20"; for (let x = -30; x < w + 30; x += 40) { c.beginPath(); c.moveTo(x, h - 22); c.lineTo(x + 18, h - 22); c.lineTo(x + 40, h); c.lineTo(x + 22, h); c.fill(); }
+  }, [3, 1]),
+};
+const M  = (c, extra) => new THREE.MeshLambertMaterial(Object.assign({ color: c }, extra || {}));
+const MS = (opts) => new THREE.MeshStandardMaterial(Object.assign({ roughness: 0.85, metalness: 0.05 }, opts));
+const METAL = MS({ color: 0x3A4441, roughness: 0.45, metalness: 0.6 });
+const edgeMat = new THREE.LineBasicMaterial({ color: 0x1B2B20, transparent: true, opacity: 0.5 });
+function outline(mesh) { mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry, 20), edgeMat)); return mesh; }
+function solid(mesh, cast) { mesh.castShadow = cast !== false; mesh.receiveShadow = true; return mesh; }
+
 const obstacleMeshes = [];   // 시야·총알 차단 (박스·기둥·낮은 벽·외벽)
 {
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(ARENA.hx * 2, ARENA.hz * 2), M(0xB8BDB5));
-  floor.rotation.x = -Math.PI / 2; scene.add(floor);
-  /* 바닥 격자선 — 거리감 */
-  const grid = new THREE.GridHelper(50, 25, 0x9AA39C, 0xA9B1AA); grid.position.y = 0.01; grid.scale.z = 30 / 50; scene.add(grid);
-  const wallM = M(0xAAB4BE, { side: THREE.DoubleSide });
-  const mkWall = (w, x, z, ry) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, ARENA.wallH), wallM); m.position.set(x, ARENA.wallH / 2, z); m.rotation.y = ry; scene.add(m); obstacleMeshes.push(m); };
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(ARENA.hx * 2, ARENA.hz * 2), MS({ map: TEX.floor }));
+  floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+  const wallM = MS({ map: TEX.wall, side: THREE.DoubleSide });
+  const mkWall = (w, x, z, ry) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, ARENA.wallH), wallM.clone()); m.material.map = TEX.wall.clone(); m.material.map.needsUpdate = true; m.material.map.repeat.set(w / 4, 1);
+    m.position.set(x, ARENA.wallH / 2, z); m.rotation.y = ry; m.receiveShadow = true; scene.add(m); obstacleMeshes.push(m);
+  };
   mkWall(ARENA.hx * 2, 0, -ARENA.hz, 0); mkWall(ARENA.hx * 2, 0, ARENA.hz, Math.PI);
   mkWall(ARENA.hz * 2, -ARENA.hx, 0, Math.PI / 2); mkWall(ARENA.hz * 2, ARENA.hx, 0, -Math.PI / 2);
-  /* 벽 위 테두리 */
-  const rimM = M(0x24402F);
+  /* 벽 위 테두리 + 벽 아래 굽도리 */
+  const rimM = MS({ color: 0x24402F });
   [[ARENA.hx * 2 + 0.4, 0.4, 0, -ARENA.hz], [ARENA.hx * 2 + 0.4, 0.4, 0, ARENA.hz], [0.4, ARENA.hz * 2 + 0.4, -ARENA.hx, 0], [0.4, ARENA.hz * 2 + 0.4, ARENA.hx, 0]]
-    .forEach(r => { const m = new THREE.Mesh(new THREE.BoxGeometry(r[0], 0.2, r[1]), rimM); m.position.set(r[2], ARENA.wallH, r[3]); scene.add(m); });
-  BOXES.forEach(b => { const m = new THREE.Mesh(new THREE.BoxGeometry(b.w, b.h, b.d), M(0x6B7F6E)); m.position.set(b.x, b.h / 2, b.z); scene.add(m); obstacleMeshes.push(m); });
-  CYLS.forEach(c => { const m = new THREE.Mesh(new THREE.CylinderGeometry(c.r, c.r, c.h, 24), M(0xD97B4F)); m.position.set(c.x, c.h / 2, c.z); scene.add(m); obstacleMeshes.push(m); });
-  LOWS.forEach(l => { const m = new THREE.Mesh(new THREE.BoxGeometry(l.w, l.h, l.d), M(0x8C9A8E)); m.position.set(l.x, l.h / 2, l.z); scene.add(m); obstacleMeshes.push(m); });
-  /* 스폰 지점 표시(바닥 원) */
-  SPAWNS.forEach(s => { const m = new THREE.Mesh(new THREE.CircleGeometry(2, 24), M(0xB33951, { transparent: true, opacity: 0.35 })); m.rotation.x = -Math.PI / 2; m.position.set(s.x, 0.02, s.z); scene.add(m); });
+    .forEach(r => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(r[0], 0.25, r[1]), rimM); m.position.set(r[2], ARENA.wallH, r[3]); scene.add(m);
+      const b = new THREE.Mesh(new THREE.BoxGeometry(r[0], 0.3, r[1]), rimM); b.position.set(r[2], 0.15, r[3]); scene.add(b);
+    });
+  /* 큰 상자: 나무 크레이트 + 윤곽선 */
+  const crateM = MS({ map: TEX.crate });
+  BOXES.forEach(b => {
+    const m = solid(outline(new THREE.Mesh(new THREE.BoxGeometry(b.w, b.h, b.d), crateM))); m.position.set(b.x, b.h / 2, b.z); scene.add(m); obstacleMeshes.push(m);
+    /* 위에 작은 상자 하나 얹어 실루엣 변화 */
+    const s = solid(outline(new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.2, 1.4), crateM))); s.position.set(b.x + (b.x > 0 ? -0.9 : 0.9), b.h + 0.6, b.z + 0.7); s.rotation.y = 0.35; scene.add(s); obstacleMeshes.push(s);
+  });
+  /* 기둥: 콘크리트 + 안전 띠 + 받침 */
+  const pillarM = MS({ map: TEX.pillar });
+  CYLS.forEach(c => {
+    const m = solid(new THREE.Mesh(new THREE.CylinderGeometry(c.r, c.r, c.h, 28), pillarM)); m.position.set(c.x, c.h / 2, c.z); scene.add(m); obstacleMeshes.push(m);
+    const base = solid(new THREE.Mesh(new THREE.CylinderGeometry(c.r + 0.35, c.r + 0.45, 0.3, 28), MS({ color: 0x6E7A72 }))); base.position.set(c.x, 0.15, c.z); scene.add(base);
+    const cap = solid(new THREE.Mesh(new THREE.CylinderGeometry(c.r + 0.25, c.r, 0.3, 28), MS({ color: 0x6E7A72 }))); cap.position.set(c.x, c.h - 0.15, c.z); scene.add(cap);
+  });
+  /* 낮은 방벽: 저지 방벽 형태(위가 좁음) */
+  const barrierM = MS({ map: TEX.barrier });
+  LOWS.forEach(l => {
+    const g = new THREE.CylinderGeometry(l.d * 0.35, l.d * 0.5, l.h, 4, 1); g.rotateY(Math.PI / 4); g.scale(l.w / l.d, 1, 1);   // 사각뿔대
+    const m = solid(new THREE.Mesh(g, barrierM)); m.position.set(l.x, l.h / 2, l.z); scene.add(m); obstacleMeshes.push(m);
+    const top = solid(new THREE.Mesh(new THREE.BoxGeometry(l.w * 0.98, 0.12, l.d * 0.5), MS({ color: 0x5B6B5E }))); top.position.set(l.x, l.h, l.z); scene.add(top);
+  });
+  /* 스폰 지점 표시(바닥 원 + 경고 링) */
+  SPAWNS.forEach(s => {
+    const m = new THREE.Mesh(new THREE.CircleGeometry(2, 32), M(0xB33951, { transparent: true, opacity: 0.25 })); m.rotation.x = -Math.PI / 2; m.position.set(s.x, 0.02, s.z); scene.add(m);
+    const r = new THREE.Mesh(new THREE.RingGeometry(1.8, 2.1, 32), M(0xB33951, { transparent: true, opacity: 0.7 })); r.rotation.x = -Math.PI / 2; r.position.set(s.x, 0.03, s.z); scene.add(r);
+  });
 }
-/* 1인칭 소총 (카메라 자식) */
+/* 1인칭 소총 (카메라 자식) — 카빈 스타일: 리시버·레일·핸드가드·총열·소염기·가늠쇠·탄창·그립·개머리판 */
 const gun = new THREE.Group();
 {
-  const dark = M(0x2E3A33), wood = M(0x7A5A3A);
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.14, 0.55), dark); body.position.set(0, 0, -0.1);
-  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.5, 10), dark); barrel.rotation.x = Math.PI / 2; barrel.position.set(0, 0.03, -0.55);
-  const stock = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.12, 0.3), wood); stock.position.set(0, -0.03, 0.3);
-  const grip = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.16, 0.08), wood); grip.position.set(0, -0.13, 0.02);
-  const mag = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.2, 0.1), dark); mag.position.set(0, -0.15, -0.15);
-  gun.add(body, barrel, stock, grip, mag);
-  const flash = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), new THREE.MeshBasicMaterial({ color: 0xFFE28A })); flash.position.set(0, 0.03, -0.82); flash.visible = false; gun.add(flash);
+  const dark = MS({ color: 0x2A3230, roughness: 0.5, metalness: 0.5 }), poly = MS({ color: 0x3C4744, roughness: 0.8 }), tan = MS({ color: 0x8A7A5C, roughness: 0.9 });
+  const add = (geo, mat, x, y, z, rx, ry, rz) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); if (rx) m.rotation.x = rx; if (ry) m.rotation.y = ry; if (rz) m.rotation.z = rz; m.castShadow = true; gun.add(m); return m; };
+  add(new THREE.BoxGeometry(0.11, 0.13, 0.5), dark, 0, 0, -0.05);                          // 리시버
+  add(new THREE.BoxGeometry(0.06, 0.03, 0.62), dark, 0, 0.08, -0.15);                       // 윗 레일
+  for (let i = 0; i < 9; i++) add(new THREE.BoxGeometry(0.065, 0.012, 0.03), METAL, 0, 0.095, -0.42 + i * 0.06);   // 레일 홈
+  add(new THREE.BoxGeometry(0.09, 0.1, 0.4), poly, 0, -0.005, -0.5);                        // 핸드가드
+  for (let i = 0; i < 5; i++) { add(new THREE.BoxGeometry(0.1, 0.02, 0.03), dark, 0, -0.03, -0.36 - i * 0.07); }  // 핸드가드 슬롯
+  add(new THREE.CylinderGeometry(0.022, 0.022, 0.42, 12), METAL, 0, 0.02, -0.85, Math.PI / 2);   // 총열
+  add(new THREE.CylinderGeometry(0.032, 0.028, 0.09, 12), dark, 0, 0.02, -1.06, Math.PI / 2);    // 소염기
+  add(new THREE.BoxGeometry(0.02, 0.07, 0.02), dark, 0, 0.12, -0.6);                        // 가늠쇠
+  add(new THREE.BoxGeometry(0.04, 0.04, 0.02), dark, 0, 0.115, -0.1);                       // 가늠자
+  add(new THREE.BoxGeometry(0.008, 0.008, 0.008), MS({ color: 0xFF5A4E, emissive: 0xFF5A4E, emissiveIntensity: 0.8 }), 0, 0.14, -0.1);   // 가늠자 점
+  add(new THREE.BoxGeometry(0.08, 0.26, 0.11), tan, 0, -0.17, -0.12, 0.25);                 // 탄창(앞으로 기울임)
+  add(new THREE.BoxGeometry(0.07, 0.02, 0.1), dark, 0, -0.3, -0.15, 0.25);                  // 탄창 바닥판
+  add(new THREE.BoxGeometry(0.07, 0.18, 0.07), poly, 0, -0.14, 0.12, -0.3);                 // 권총 손잡이
+  add(new THREE.BoxGeometry(0.02, 0.06, 0.1), dark, 0, -0.08, 0.02);                        // 방아쇠울
+  add(new THREE.CylinderGeometry(0.035, 0.035, 0.24, 12), dark, 0, 0.0, 0.3, Math.PI / 2);  // 완충 튜브
+  add(new THREE.BoxGeometry(0.09, 0.14, 0.14), poly, 0, -0.02, 0.44);                       // 개머리판
+  add(new THREE.BoxGeometry(0.1, 0.16, 0.03), MS({ color: 0x1B2B20 }), 0, -0.02, 0.52);      // 개머리판 고무
+  add(new THREE.BoxGeometry(0.04, 0.04, 0.06), dark, -0.075, 0.02, 0.05);                   // 장전 손잡이
+  const flash = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 8), new THREE.MeshBasicMaterial({ color: 0xFFE28A })); flash.position.set(0, 0.02, -1.12); flash.scale.set(1, 1, 1.8); flash.visible = false; gun.add(flash);
   gun.userData.flash = flash;
   gun.position.set(0.32, -0.28, -0.5);
   camera.add(gun);
@@ -343,22 +440,48 @@ function slide(p, dx, dz, r) {
 /* ═══════════════════ 적 (권총병) ═══════════════════ */
 const enemies = [];
 const enemyParts = [];   // 레이캐스트 대상(머리·몸통 메시)
-/* 키 2.25: 다리 0~0.7, 몸통 0.6~1.7, 머리 1.65~2.25 (겹치게 — 눈높이 1.6 에서 쏜 총알이 목 사이로 빠지지 않게) */
-const geoHead = new THREE.SphereGeometry(0.3, 12, 10), geoBody = new THREE.CylinderGeometry(0.32, 0.36, 1.1, 12), geoLeg = new THREE.BoxGeometry(0.18, 0.7, 0.18), geoGun = new THREE.BoxGeometry(0.06, 0.1, 0.3);
+/* 키 2.25: 다리 0~0.75, 몸통 0.65~1.7, 머리 1.65~2.25 (겹치게 — 눈높이 1.6 에서 쏜 총알이 목 사이로 빠지지 않게)
+   히트박스: 머리 = 얼굴 구 + 헬멧, 몸통 = 나머지 전부. 판정용 메시는 모두 enemyParts 에 등록. */
+const EG = {
+  face: new THREE.SphereGeometry(0.27, 14, 12), helmet: new THREE.SphereGeometry(0.32, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), brim: new THREE.CylinderGeometry(0.36, 0.36, 0.05, 16),
+  torso: new THREE.BoxGeometry(0.62, 0.7, 0.36), vest: new THREE.BoxGeometry(0.66, 0.5, 0.42), belt: new THREE.BoxGeometry(0.6, 0.1, 0.38), hip: new THREE.BoxGeometry(0.56, 0.3, 0.34),
+  shoulder: new THREE.SphereGeometry(0.13, 10, 8), upperArm: new THREE.BoxGeometry(0.16, 0.4, 0.16), foreArm: new THREE.BoxGeometry(0.14, 0.38, 0.14), hand: new THREE.BoxGeometry(0.12, 0.12, 0.14),
+  thigh: new THREE.BoxGeometry(0.2, 0.42, 0.2), shin: new THREE.BoxGeometry(0.17, 0.4, 0.17), boot: new THREE.BoxGeometry(0.19, 0.12, 0.28),
+  pistol: new THREE.BoxGeometry(0.05, 0.12, 0.26), pistolGrip: new THREE.BoxGeometry(0.05, 0.12, 0.06), pouch: new THREE.BoxGeometry(0.12, 0.14, 0.08), goggles: new THREE.BoxGeometry(0.4, 0.09, 0.1),
+};
 function makeEnemy(x, z) {
   const g = new THREE.Group();
-  const bodyMat = M(0xB33951), headMat = M(0xE8C9A8), legMat = M(0x3B4B40);
-  const body = new THREE.Mesh(geoBody, bodyMat); body.position.y = 1.15;
-  const head = new THREE.Mesh(geoHead, headMat); head.position.y = 1.95;
-  const legL = new THREE.Mesh(geoLeg, legMat); legL.position.set(-0.14, 0.35, 0);
-  const legR = new THREE.Mesh(geoLeg, legMat); legR.position.set(0.14, 0.35, 0);
-  const pistol = new THREE.Mesh(geoGun, M(0x2E3A33)); pistol.position.set(0.3, 1.25, -0.35);
-  g.add(body, head, legL, legR, pistol);
+  const uniform = MS({ color: 0xB33951 }), skin = MS({ color: 0xE8C9A8 }), dark = MS({ color: 0x2E3A33 }), vestM = MS({ color: 0x4A3F3A }), bootM = MS({ color: 0x1B2B20 });
+  const mk = (geo, mat, x, y, z, parent) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; (parent || g).add(m); return m; };
+  const bodyParts = [], headParts = [];
+  /* 몸통·조끼·허리 */
+  bodyParts.push(mk(EG.torso, uniform, 0, 1.35, 0), mk(EG.vest, vestM, 0, 1.4, 0), mk(EG.belt, dark, 0, 0.98, 0), mk(EG.hip, uniform, 0, 0.83, 0));
+  mk(EG.pouch, dark, -0.18, 1.25, 0.24); mk(EG.pouch, dark, 0.18, 1.25, 0.24); mk(EG.pouch, dark, 0, 1.0, -0.22);
+  /* 머리: 얼굴 + 헬멧 + 챙 + 고글 */
+  const face = mk(EG.face, skin, 0, 1.95, 0);
+  const helmet = mk(EG.helmet, vestM, 0, 1.97, 0);
+  const brim = mk(EG.brim, vestM, 0, 1.97, 0);
+  const goggles = mk(EG.goggles, dark, 0, 1.98, 0.22);
+  headParts.push(face, helmet, brim, goggles);
+  /* 팔: 어깨 피벗 그룹 (오른팔은 권총을 앞으로 뻗음, +Z 가 정면) */
+  const armPivot = (side) => { const p = new THREE.Group(); p.position.set(side * 0.4, 1.62, 0); g.add(p); mk(EG.shoulder, uniform, 0, 0, 0, p); return p; };
+  const armR = armPivot(1), armL = armPivot(-1);
+  const upR = mk(EG.upperArm, uniform, 0, -0.22, 0, armR), foreR = mk(EG.foreArm, uniform, 0, -0.6, 0, armR), handR = mk(EG.hand, skin, 0, -0.85, 0, armR);
+  const pistol = mk(EG.pistol, dark, 0, -0.9, 0.12, armR); mk(EG.pistolGrip, dark, 0, -0.98, 0.02, armR);
+  armR.rotation.x = -Math.PI / 2 + 0.1;                         // 앞으로 뻗음
+  const upL = mk(EG.upperArm, uniform, 0, -0.22, 0, armL), foreL = mk(EG.foreArm, uniform, 0, -0.6, 0, armL), handL = mk(EG.hand, skin, 0, -0.85, 0, armL);
+  armL.rotation.x = -Math.PI / 2 + 0.45; armL.rotation.y = 0.35;  // 왼손은 권총을 받침
+  bodyParts.push(upR, foreR, handR, upL, foreL, handL);
+  /* 다리: 엉덩이 피벗 그룹 (걷기 애니메이션) */
+  const legPivot = (side) => { const p = new THREE.Group(); p.position.set(side * 0.16, 0.72, 0); g.add(p); return p; };
+  const legR = legPivot(1), legL = legPivot(-1);
+  [legR, legL].forEach(p => bodyParts.push(mk(EG.thigh, uniform, 0, -0.2, 0, p), mk(EG.shin, uniform, 0, -0.55, 0, p), mk(EG.boot, bootM, 0, -0.72, 0.04, p)));
   g.position.set(x, 0, z);
-  const e = { g, hp: 100, fire: rnd(0.8, DIFFICULTY_CONFIG.enemyFireCooldownSec), strafe: Math.random() < 0.5 ? 1 : -1, strafeT: rnd(1.5, 3), flashT: 0, bodyMat, headMat, pistol, spawnIdx: 0 };
-  [body, legL, legR].forEach(m => { m.userData = { enemy: e, part: "body" }; enemyParts.push(m); });
-  head.userData = { enemy: e, part: "head" }; enemyParts.push(head);
-  e.parts = [body, head, legL, legR];
+  const e = { g, hp: 100, fire: rnd(0.8, DIFFICULTY_CONFIG.enemyFireCooldownSec), strafe: Math.random() < 0.5 ? 1 : -1, strafeT: rnd(1.5, 3), flashT: 0,
+              mats: [uniform, skin, vestM], baseCols: [0xB33951, 0xE8C9A8, 0x4A3F3A], pistol, legR, legL, armR, walk: Math.random() * 6, spawnIdx: 0 };
+  bodyParts.forEach(m => { m.userData = { enemy: e, part: "body" }; enemyParts.push(m); });
+  headParts.forEach(m => { m.userData = { enemy: e, part: "head" }; enemyParts.push(m); });
+  e.parts = bodyParts.concat(headParts);
   scene.add(g); enemies.push(e);
   return e;
 }
@@ -367,6 +490,7 @@ function removeEnemy(e) {
   enemies.splice(enemies.indexOf(e), 1);
   e.parts.forEach(m => { const i = enemyParts.indexOf(m); if (i >= 0) enemyParts.splice(i, 1); });
 }
+function enemyFlash(e, on) { e.mats.forEach((m, i) => m.color.set(on ? 0xFFFFFF : e.baseCols[i])); }
 const ray = new THREE.Raycaster();
 const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3();
 function enemyCanSee(e) {
@@ -388,8 +512,12 @@ function updateEnemy(e, dt) {
   const step = C.enemyMoveSpeed * dt;
   if (slide(p, mx * step, mz * step, 0.4)) { e.strafe = -e.strafe; e.strafeT = rnd(1, 2); }   // 막히면 반대쪽으로
   e.g.rotation.y = Math.atan2(nx, nz);   // 플레이어를 바라봄 (+Z 가 정면)
+  /* 걷기: 다리 앞뒤 흔들기 + 몸 살짝 들썩 */
+  e.walk += dt * 9; const sw = Math.sin(e.walk) * 0.55;
+  e.legR.rotation.x = sw; e.legL.rotation.x = -sw; e.g.position.y = Math.abs(Math.cos(e.walk)) * 0.04;
+  e.armR.rotation.x = -Math.PI / 2 + 0.1 - Math.atan2(PLAYER_CONFIG.eyeHeight - 1.5, dist) * 0.8;   // 권총을 플레이어 높이로
   /* 피격 표시 복구 */
-  if (e.flashT > 0) { e.flashT -= dt; if (e.flashT <= 0) { e.bodyMat.color.set(0xB33951); e.headMat.color.set(0xE8C9A8); } }
+  if (e.flashT > 0) { e.flashT -= dt; if (e.flashT <= 0) enemyFlash(e, false); }
   /* 사격 */
   e.fire -= dt;
   if (e.fire <= 0 && dist <= C.enemyFireRange && enemyCanSee(e)) {
@@ -525,7 +653,7 @@ function shoot() {
     if (ud && ud.enemy) {
       const e = ud.enemy, head = ud.part === "head", dmg = head ? PLAYER_CONFIG.headDamage : PLAYER_CONFIG.bodyDamage;
       e.hp -= dmg; hitmark(); popup("-" + dmg + "%", head ? "head" : "");
-      e.bodyMat.color.set(0xFFFFFF); e.headMat.color.set(0xFFFFFF); e.flashT = 0.08;
+      enemyFlash(e, true); e.flashT = 0.08;
       if (e.hp <= 0) {
         removeEnemy(e); score++; spawnTimers[e.spawnIdx] += DIFFICULTY_CONFIG.enemySpawnCooldownSec;
         head ? SFX.killHead() : SFX.killBody();
@@ -541,7 +669,11 @@ function update(dt) {
   const C = DIFFICULTY_CONFIG, PC = PLAYER_CONFIG;
   elapsed += dt;
   /* 시점 */
-  const yawR = PC.yawSpeed * Math.PI / 180 * dt, pitchR = PC.pitchSpeed * Math.PI / 180 * dt, lim = PC.pitchLimit * Math.PI / 180;
+  /* 회전 램프: 키를 누른 직후엔 40% 속도, turnRampSec 뒤 100% (짧게 톡톡 누르면 미세 조준) */
+  const turning = keys.ArrowLeft || keys.ArrowRight || keys.ArrowUp || keys.ArrowDown;
+  P.turnT = turning ? Math.min(PC.turnRampSec, (P.turnT || 0) + dt) : 0;
+  const ramp = 0.4 + 0.6 * (P.turnT / PC.turnRampSec);
+  const yawR = PC.yawSpeed * Math.PI / 180 * dt * ramp, pitchR = PC.pitchSpeed * Math.PI / 180 * dt * ramp, lim = PC.pitchLimit * Math.PI / 180;
   if (keys.ArrowLeft) P.yaw += yawR; if (keys.ArrowRight) P.yaw -= yawR;
   if (keys.ArrowUp) P.pitch += pitchR; if (keys.ArrowDown) P.pitch -= pitchR;
   P.pitch = clamp(P.pitch, -lim, lim);
