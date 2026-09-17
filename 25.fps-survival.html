@@ -120,7 +120,7 @@
   <div class="hud-box"><span class="lab">처치</span><span id="hudScore">0</span></div>
   <div class="hud-box"><span class="lab">생존 시간</span><span id="hudTime">0:00</span></div>
 </div>
-<div class="hud hud-box" id="hudAmmo"><span class="lab">탄약</span><span id="ammoNum">30/30</span></div>
+<div class="hud hud-box" id="hudAmmo"><span class="lab">탄약</span><span id="ammoNum">50/50</span></div>
 <div class="hud hud-box" id="hudBest"><span class="lab">개인 최고 기록</span><span id="hudBestVal">—</span><span class="lab" style="margin-top:4px">🏆 세계 신기록</span><span id="hudWrVal">—</span><span class="who" id="hudWrWho"></span></div>
 
 <div id="overlay">
@@ -175,13 +175,14 @@
 
 /* ───────── 난이도 · 밸런스 설정 (선생님이 값만 바꿔 조정) ───────── */
 const DIFFICULTY_CONFIG = {
-  initialSpawnIntervalSec: 4.0,          // 스폰 지점당 최초 스폰 간격(초)
-  spawnIntervalDecreasePerStep: 0.3,     // 단계마다 줄어드는 간격
-  spawnIntervalDecreaseEverySec: 30,     // 몇 초마다 한 단계
-  minSpawnIntervalSec: 1.2,              // 스폰 간격 하한
+  /* 5분 이상 버티기 어렵게: 3분이면 동시 최대 12명·스폰 간격 0.8초에 도달 */
+  initialSpawnIntervalSec: 3.0,          // 스폰 지점당 최초 스폰 간격(초)
+  spawnIntervalDecreasePerStep: 0.4,     // 단계마다 줄어드는 간격
+  spawnIntervalDecreaseEverySec: 15,     // 몇 초마다 한 단계
+  minSpawnIntervalSec: 0.8,              // 스폰 간격 하한
   initialMaxConcurrentEnemies: 3,        // 처음 동시 최대 적 수
-  maxConcurrentEnemiesIncreaseEvery: 60, // 몇 초마다 동시 최대 +1
-  maxConcurrentEnemiesCap: 9,            // 동시 최대 상한
+  maxConcurrentEnemiesIncreaseEvery: 20, // 몇 초마다 동시 최대 +1
+  maxConcurrentEnemiesCap: 12,           // 동시 최대 상한
   enemyHitChance: 0.7,                   // 적 권총 명중률 (0~1)
   enemyFireCooldownSec: 1.8,             // 적 발사 주기(초)
   enemyFireRange: 20,                    // 적 사거리(유닛)
@@ -193,7 +194,7 @@ const DIFFICULTY_CONFIG = {
   enemySpawnCooldownSec: 2.0,            // 처치된 적의 스폰 지점 추가 쿨다운
 };
 const PLAYER_CONFIG = {
-  hp: 100, ammo: 30, moveSpeed: 6, fireRate: 6,   // 발/초
+  hp: 100, ammo: 50, moveSpeed: 6, fireRate: 6,   // 발/초
   yawSpeed: 75, pitchSpeed: 55, pitchLimit: 60,   // 도/초, 도 — 시점 회전 감도
   turnRampSec: 0.35,                              // 키를 누른 뒤 최고 회전 속도까지 걸리는 시간(처음엔 40%에서 시작 → 미세 조준)
   radius: 0.45, eyeHeight: 1.6,
@@ -201,7 +202,7 @@ const PLAYER_CONFIG = {
 };
 const ITEM_CONFIG = {
   pickupDist: 1.5,
-  ammo: { intervalSec: 30, maxItems: 4, initialCount: 1, refill: 30 },   // 탄약 캡슐
+  ammo: { intervalSec: 30, maxItems: 4, initialCount: 1, refill: 50 },   // 탄약 캡슐
   heal: { intervalSec: 30, maxItems: 3, initialCount: 0, amount: 50 },   // 체력 물약 (+50, 최대 100)
 };
 
@@ -505,7 +506,7 @@ function makeEnemy(x, z) {
   const legPivot = (side) => { const p = new THREE.Group(); p.position.set(side * 0.16, 0.72, 0); g.add(p); return p; };
   const legR = legPivot(1), legL = legPivot(-1);
   [legR, legL].forEach(p => bodyParts.push(mk(EG.thigh, uniform, 0, -0.2, 0, p), mk(EG.shin, uniform, 0, -0.55, 0, p), mk(EG.boot, bootM, 0, -0.72, 0.04, p)));
-  g.position.set(x, 0, z);
+  g.position.set(x, 0, z); g.rotation.order = "YXZ";   // 넘어질 때(rotation.x) 바라보는 방향 기준으로 넘어지게
   const e = { g, hp: 100, fire: rnd(0.8, DIFFICULTY_CONFIG.enemyFireCooldownSec), strafe: Math.random() < 0.5 ? 1 : -1, strafeT: rnd(1.5, 3), flashT: 0,
               mats: [uniform, skin, vestM], baseCols: [0xB33951, 0xE8C9A8, 0x4A3F3A], pistol, legR, legL, armR, walk: Math.random() * 6, spawnIdx: 0 };
   bodyParts.forEach(m => { m.userData = { enemy: e, part: "body" }; enemyParts.push(m); });
@@ -520,6 +521,29 @@ function removeEnemy(e) {
   e.parts.forEach(m => { const i = enemyParts.indexOf(m); if (i >= 0) enemyParts.splice(i, 1); });
 }
 function enemyFlash(e, on) { e.mats.forEach((m, i) => m.color.set(on ? 0xFFFFFF : e.baseCols[i])); }
+
+/* ── 처치 연출: 판정·AI 에서 빼고(removeEnemy) 모델만 남겨 뒤로 넘어졌다가 바닥으로 가라앉음 ── */
+const corpses = [];   // { g, t, head }
+function killEnemy(e, head) {
+  removeEnemy(e); enemyFlash(e, false);
+  e.armR.rotation.x = -0.3; e.legR.rotation.x = e.legL.rotation.x = 0;   // 팔 내리고 다리 펴기
+  scene.add(e.g); corpses.push({ g: e.g, t: 0, head, yaw0: e.g.rotation.y, spin: rnd(-0.6, 0.6) });
+}
+function updateCorpses(dt) {
+  for (let i = corpses.length - 1; i >= 0; i--) {
+    const c = corpses[i]; c.t += dt; const g = c.g;
+    if (c.t < 0.55) {                                       // 0~0.55초: 뒤로(플레이어 반대쪽) 넘어짐 — 발이 축, 헤드샷이면 더 세게
+      const k = c.t / 0.55, ease = 1 - (1 - k) * (1 - k) * (1 - k);
+      g.rotation.x = -Math.PI / 2 * ease * (c.head ? 1.0 : 0.97); g.rotation.y = c.yaw0 + c.spin * ease;
+      g.position.y = c.head ? Math.sin(k * Math.PI) * 0.35 : 0;    // 헤드샷은 살짝 튕겨 오름
+    } else if (c.t < 0.7) {                                  // 바닥에 닿아 살짝 튕김
+      const k = (c.t - 0.55) / 0.15; g.rotation.x = -Math.PI / 2 + Math.sin(k * Math.PI) * 0.12; g.position.y = 0;
+    } else if (c.t > 1.6) {                                  // 1.6초 뒤 바닥으로 가라앉아 사라짐
+      g.position.y = -(c.t - 1.6) * 1.2;
+      if (c.t > 2.4) { scene.remove(g); corpses.splice(i, 1); }
+    }
+  }
+}
 const ray = new THREE.Raycaster();
 const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3();
 function enemyCanSee(e) {
@@ -654,6 +678,7 @@ function resetGame() {
   enemies.slice().forEach(removeEnemy);
   items.slice().forEach(it => scene.remove(it.g)); items.length = 0;
   bullets.forEach(b => scene.remove(b.g)); bullets.length = 0;
+  corpses.forEach(c => scene.remove(c.g)); corpses.length = 0;
   transient.forEach(t => scene.remove(t.obj)); transient.length = 0;
   P.x = PLAYER_START.x; P.z = PLAYER_START.z; P.yaw = PLAYER_START.yaw; P.pitch = 0;
   P.hp = PLAYER_CONFIG.hp; P.ammo = PLAYER_CONFIG.ammo; P.fireT = 0; P.recoil = 0;
@@ -763,7 +788,7 @@ function shoot() {
       e.hp -= dmg; hitmark(); popup("-" + dmg + "%", head ? "head" : "");
       enemyFlash(e, true); e.flashT = 0.08;
       if (e.hp <= 0) {
-        removeEnemy(e); score++; spawnTimers[e.spawnIdx] += DIFFICULTY_CONFIG.enemySpawnCooldownSec;
+        killEnemy(e, head); score++; spawnTimers[e.spawnIdx] += DIFFICULTY_CONFIG.enemySpawnCooldownSec;
         head ? SFX.killHead() : SFX.killBody();
         setTimeout(() => popup("+1", "kill"), 120);
       } else SFX.hitmark();
@@ -821,7 +846,7 @@ function update(dt) {
     if (itemT[k] <= 0) { itemT[k] = ITEM_CONFIG[k].intervalSec; if (items.filter(it => it.kind === k).length < ITEM_CONFIG[k].maxItems) makeItem(k); }
   });
   updateItems(dt);
-  updateBullets(dt);
+  updateBullets(dt); updateCorpses(dt);
   if (Math.floor(elapsed) !== Math.floor(elapsed - dt)) renderHud();
 }
 function loop(now) {
@@ -833,7 +858,7 @@ function loop(now) {
     /* 죽은 뒤에도 적은 계속 움직여 보여 준다 */
     const dt = Math.min(0.05, (now - lastT) / 1000);
     enemies.forEach(e => { e.fire = 99; updateEnemy(e, dt); });
-    updateItems(dt); updateBullets(dt);
+    updateItems(dt); updateBullets(dt); updateCorpses(dt);
   } else {
     /* 메뉴: 아레나를 천천히 둘러보는 카메라 */
     const t = now / 1000;
