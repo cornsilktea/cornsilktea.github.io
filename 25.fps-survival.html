@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<script charset="utf-8" src="firebase-config.js"></script>
+<script charset="utf-8" src="access-guard.js" data-game="fpssurvival"></script>
+<script charset="utf-8" src="world-record.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
+<title>FPS 서바이벌</title>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="정보 수업용 링크 모음">
+<meta property="og:title" content="FPS 서바이벌">
+<meta property="og:description" content="1인칭 3D 서바이벌 슈팅 / 처치 수·생존 시간 개인전 (방향키 시점·WASD 이동·스페이스 발사)">
+<meta property="og:url" content="https://cornsilktea.github.io/25.fps-survival.html">
+<meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
+<meta name="twitter:card" content="summary">
+<!-- 링크 미리보기 끝 -->
+<link rel="stylesheet" href="theme.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #DDE3E8; font-family: var(--sg-font); color: var(--sg-ink); }
+  canvas#gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+  /* ── HUD (위쪽 46px 는 access-guard.js 의 '← 목록으로' 버튼 자리) ── */
+  .hud { position: fixed; z-index: 5; pointer-events: none; display: none; }
+  .hud-box { background: rgba(255,255,255,.92); border: 2px solid var(--sg-line-strong); border-radius: 10px; padding: 6px 12px; font-weight: 800; font-variant-numeric: tabular-nums; box-shadow: 0 3px 0 rgba(27,43,32,.25); }
+  .hud-box .lab { font-size: 11px; color: var(--sg-ink-soft); font-weight: 700; display: block; }
+  #hudHp { top: 52px; left: 10px; width: 230px; }
+  #hpBar { height: 16px; border: 2px solid var(--sg-line-strong); border-radius: 6px; background: #fff; overflow: hidden; margin-top: 3px; }
+  #hpFill { height: 100%; width: 100%; background: var(--sg-ok); transition: width .12s; }
+  #hpFill.low { background: var(--sg-danger); }
+  #hpNum { font-size: 20px; float: right; }
+  #hudTop { top: 52px; left: 50%; transform: translateX(-50%); text-align: center; display: none; gap: 10px; }
+  #hudTop .hud-box { min-width: 110px; font-size: 24px; }
+  #hudAmmo { right: 12px; bottom: 12px; font-size: 34px; text-align: right; }
+  #hudAmmo.empty { color: var(--sg-danger); border-color: var(--sg-danger); animation: blink .5s steps(2) infinite; }
+  #hudAmmo.empty .lab { color: var(--sg-danger); }
+  @keyframes blink { 50% { opacity: .55; } }
+  #hudBest { left: 12px; bottom: 12px; font-size: 15px; }
+  #hudBest .who { display: block; font-size: 11px; color: var(--sg-ink-soft); font-weight: 700; }
+
+  /* 크로스헤어 · 히트마커 */
+  #cross { position: fixed; left: 50%; top: 50%; width: 28px; height: 28px; transform: translate(-50%,-50%); z-index: 5; pointer-events: none; display: none; }
+  #cross::before, #cross::after { content: ""; position: absolute; background: #fff; box-shadow: 0 0 0 1px var(--sg-ink); }
+  #cross::before { left: 12px; top: 0; width: 4px; height: 28px; }
+  #cross::after { top: 12px; left: 0; width: 28px; height: 4px; }
+  #hitmark { position: fixed; left: 50%; top: 50%; width: 44px; height: 44px; transform: translate(-50%,-50%) rotate(45deg); z-index: 5; pointer-events: none; opacity: 0; }
+  #hitmark span { position: absolute; width: 4px; height: 12px; background: #D97B4F; box-shadow: 0 0 0 1px var(--sg-ink); }
+  #hitmark span:nth-child(1) { left: 20px; top: 0; } #hitmark span:nth-child(2) { left: 20px; bottom: 0; }
+  #hitmark span:nth-child(3) { left: 0; top: 16px; transform: rotate(90deg); } #hitmark span:nth-child(4) { right: 0; top: 16px; transform: rotate(90deg); }
+  #hitmark.show { animation: hm .18s ease-out; }
+  @keyframes hm { 0% { opacity: 1; transform: translate(-50%,-50%) rotate(45deg) scale(1.5); } 100% { opacity: 0; transform: translate(-50%,-50%) rotate(45deg) scale(1); } }
+
+  /* 피격 붉은 플래시 */
+  #dmg { position: fixed; inset: 0; z-index: 4; pointer-events: none; opacity: 0; box-shadow: inset 0 0 120px 40px rgba(179,57,81,.75); }
+  #dmg.show { animation: dmg .45s ease-out; }
+  @keyframes dmg { 0% { opacity: 1; } 100% { opacity: 0; } }
+
+  /* 팝업 (-70% / -30% / +1) */
+  #pops { position: fixed; inset: 0; z-index: 6; pointer-events: none; overflow: hidden; }
+  .pop { position: absolute; left: 50%; top: 50%; font-size: 26px; font-weight: 800; color: #fff; -webkit-text-stroke: 1.5px var(--sg-ink); text-shadow: 0 3px 0 rgba(27,43,32,.35); animation: pop 1s ease-out forwards; white-space: nowrap; }
+  .pop.head { color: #D97B4F; font-size: 32px; }
+  .pop.kill { color: #F2D06B; font-size: 36px; }
+  @keyframes pop { 0% { opacity: 0; transform: translate(-50%,-50%) scale(1.5); } 15% { opacity: 1; transform: translate(-50%,-70%) scale(1); } 100% { opacity: 0; transform: translate(-50%,-160%); } }
+
+  /* ── 시작 / 게임오버 카드 ── */
+  #overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 56px 12px 12px; z-index: 7; overflow-y: auto; background: rgba(27,43,32,.25); }
+  .card { width: min(500px, 100%); background: var(--sg-panel); border: 3px solid var(--sg-line-strong); border-radius: 14px; padding: 22px 22px 18px; box-shadow: 0 10px 0 rgba(27,43,32,.3), 0 20px 40px rgba(0,0,0,.2); text-align: center; }
+  .logo { font-size: clamp(38px, 8vw, 58px); font-weight: 800; line-height: 1.05; color: #D97B4F; -webkit-text-stroke: 2px var(--sg-ink); text-shadow: 4px 5px 0 var(--sg-ink); letter-spacing: -1px; margin-bottom: 4px; }
+  .logo small { display: block; font-size: 15px; -webkit-text-stroke: 0; text-shadow: none; color: var(--sg-ink-soft); letter-spacing: 0; margin-top: 8px; font-weight: 700; }
+  .desc { font-size: 14px; color: var(--sg-ink-mid); line-height: 1.6; margin: 10px 0 4px; }
+  .rec { display: flex; gap: 10px; margin: 14px 0 12px; }
+  .rec > div { flex: 1 1 0; min-width: 0; background: var(--sg-panel-alt); border: 2px solid var(--sg-line-mid); border-radius: 10px; padding: 8px 6px; }
+  .rec .lab { font-size: 12px; font-weight: 700; color: var(--sg-ink-soft); }
+  .rec .val { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; margin-top: 2px; color: var(--sg-primary); }
+  .rec .val.none { font-size: 14px; color: var(--sg-ink-faint); font-weight: 700; }
+  .rec .who { font-size: 12px; color: var(--sg-ink-soft); min-height: 15px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .new { display: inline-block; margin-left: 5px; padding: 1px 6px; font-size: 11px; border-radius: 6px; background: #D97B4F; color: #fff; vertical-align: middle; -webkit-text-stroke: 0; text-shadow: none; }
+  .keys { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin: 8px 0 14px; }
+  .keys > div { background: var(--sg-panel-alt); border: 2px solid var(--sg-line-mid); border-radius: 10px; padding: 8px 4px; }
+  .keys b { display: block; font-size: 18px; margin-bottom: 2px; }
+  .keys span { font-size: 12px; color: var(--sg-ink-soft); font-weight: 700; }
+  .warn { background: #FBE9EC; border: 2px solid var(--sg-danger); color: var(--sg-danger); border-radius: 10px; padding: 8px 10px; font-size: 14px; font-weight: 800; margin: 8px 0; display: none; }
+  .btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 6px; }
+  .btn { display: inline-block; font: inherit; font-weight: 800; font-size: 20px; padding: 13px 34px; border-radius: 12px; border: 3px solid var(--sg-line-strong); background: var(--sg-primary); color: var(--sg-primary-ink); cursor: pointer; box-shadow: 0 5px 0 var(--sg-ink); }
+  .btn:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--sg-ink); }
+  .btn.sub { background: #fff; color: var(--sg-ink); font-size: 16px; padding: 10px 20px; }
+  .hint { font-size: 12px; color: var(--sg-ink-faint); margin-top: 12px; }
+  .final { display: flex; gap: 10px; justify-content: center; margin: 8px 0; }
+  .final > div { flex: 1 1 0; }
+  .final .lab { font-size: 13px; color: var(--sg-ink-soft); font-weight: 700; }
+  .final .num { font-size: clamp(36px, 8vw, 52px); font-weight: 800; font-variant-numeric: tabular-nums; color: var(--sg-primary); line-height: 1.1; }
+  .msg { font-size: 16px; font-weight: 800; color: #D97B4F; min-height: 20px; margin: 4px 0 2px; }
+  .wipe { font-size: 12px; color: var(--sg-ink-faint); margin-top: 8px; }
+  .wipe button { font: inherit; font-size: 12px; color: var(--sg-ink-soft); background: none; border: none; text-decoration: underline; cursor: pointer; }
+  @media (max-width: 520px) {
+    #hudHp { width: 160px; } #hudTop .hud-box { min-width: 80px; font-size: 18px; } #hudAmmo { font-size: 26px; }
+    #hudBest { display: none !important; }
+    .btn { font-size: 18px; padding: 11px 22px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="dmg"></div>
+<div id="cross"></div>
+<div id="hitmark"><span></span><span></span><span></span><span></span></div>
+<div id="pops"></div>
+
+<div class="hud hud-box" id="hudHp"><span class="lab">체력 <span id="hpNum">100</span></span><div id="hpBar"><div id="hpFill"></div></div></div>
+<div class="hud" id="hudTop">
+  <div class="hud-box"><span class="lab">처치</span><span id="hudScore">0</span></div>
+  <div class="hud-box"><span class="lab">생존 시간</span><span id="hudTime">0:00</span></div>
+</div>
+<div class="hud hud-box" id="hudAmmo"><span class="lab">탄약</span><span id="ammoNum">30/30</span></div>
+<div class="hud hud-box" id="hudBest"><span class="lab">개인 최고 기록</span><span id="hudBestVal">—</span><span class="lab" style="margin-top:4px">🏆 세계 신기록</span><span id="hudWrVal">—</span><span class="who" id="hudWrWho"></span></div>
+
+<div id="overlay">
+  <div class="card" id="cardStart">
+    <div class="logo">FPS 서바이벌<small>적을 처치하고 최대한 오래 살아남아라</small></div>
+    <div class="desc">세 방향에서 권총병이 몰려옵니다. 장애물 뒤에 숨어 싸우고, <b>탄약 캡슐</b>을 주워 재장전하세요.<br>체력이 0이 되면 끝. <b>처치 수</b>가 높을수록, 같으면 <b>생존 시간</b>이 길수록 좋은 기록입니다.</div>
+    <div class="warn" id="warnTouch">⌨️ 이 게임은 키보드가 필요합니다. 노트북·PC 또는 키보드를 연결한 전자칠판에서 실행하세요.</div>
+    <div class="keys">
+      <div><b>← → ↑ ↓</b><span>시점 회전</span></div>
+      <div><b>W A S D</b><span>이동</span></div>
+      <div><b>SPACE</b><span>발사 (누르고 있으면 연사)</span></div>
+    </div>
+    <div class="rec">
+      <div><div class="lab">개인 최고 기록</div><div class="val" id="bestStart">—</div><div class="who" id="bestStartDate"></div></div>
+      <div><div class="lab">🏆 세계 신기록</div><div class="val" id="wrStart">—</div><div class="who" id="wrWhoStart"></div></div>
+    </div>
+    <div class="btns"><button type="button" class="btn" id="btnStart">시작하기</button></div>
+    <div class="hint">스페이스바: 시작하기</div>
+    <div class="wipe"><button type="button" id="btnWipe">이 기기의 나의 최고 기록 지우기</button></div>
+  </div>
+
+  <div class="card" id="cardOver" style="display:none">
+    <div class="logo" style="font-size:40px">💀 게임 오버</div>
+    <div class="final">
+      <div><div class="lab">처치</div><div class="num" id="finalScore">0</div></div>
+      <div><div class="lab">생존 시간</div><div class="num" id="finalTime">0:00</div></div>
+    </div>
+    <div class="msg" id="finalMsg"></div>
+    <div class="rec">
+      <div><div class="lab">개인 최고 기록</div><div class="val" id="bestOver">—</div><div class="who" id="bestOverNew"></div></div>
+      <div><div class="lab">🏆 세계 신기록</div><div class="val" id="wrOver">—</div><div class="who" id="wrWhoOver"></div></div>
+    </div>
+    <div class="btns"><button type="button" class="btn" id="btnRetry">다시하기</button></div>
+    <div class="hint">스페이스바: 다시하기</div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+"use strict";
+/* ═══════════════════════════════════════════════════════════════════
+   FPS 서바이벌 — 1인칭 3D 서바이벌 슈팅 (쉬는시간용, 개인전)
+   기록: 처치 수 우선, 같으면 생존 시간.  저장값 = 처치 × 10000 + 생존초(최대 9999)
+     · 개인 최고: localStorage fpssurvival_best_v1 = {score, time, date}
+     · 세계 신기록: Firebase records/fpssurvival/all (world-record.js)
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ───────── 난이도 · 밸런스 설정 (선생님이 값만 바꿔 조정) ───────── */
+const DIFFICULTY_CONFIG = {
+  initialSpawnIntervalSec: 4.0,          // 스폰 지점당 최초 스폰 간격(초)
+  spawnIntervalDecreasePerStep: 0.3,     // 단계마다 줄어드는 간격
+  spawnIntervalDecreaseEverySec: 30,     // 몇 초마다 한 단계
+  minSpawnIntervalSec: 1.2,              // 스폰 간격 하한
+  initialMaxConcurrentEnemies: 3,        // 처음 동시 최대 적 수
+  maxConcurrentEnemiesIncreaseEvery: 60, // 몇 초마다 동시 최대 +1
+  maxConcurrentEnemiesCap: 9,            // 동시 최대 상한
+  enemyHitChance: 0.7,                   // 적 권총 명중률 (0~1)
+  enemyFireCooldownSec: 1.8,             // 적 발사 주기(초)
+  enemyFireRange: 20,                    // 적 사거리(유닛)
+  enemyDamage: 10,                       // 적 1발 데미지
+  enemyMoveSpeed: 3.5,                   // 적 이동 속도(유닛/초)
+  enemyKeepMin: 8, enemyKeepMax: 15,     // 적이 유지하려는 거리
+  enemySpawnCooldownSec: 2.0,            // 처치된 적의 스폰 지점 추가 쿨다운
+};
+const PLAYER_CONFIG = {
+  hp: 100, ammo: 30, moveSpeed: 6, fireRate: 6,   // 발/초
+  yawSpeed: 120, pitchSpeed: 90, pitchLimit: 60,  // 도/초, 도
+  radius: 0.45, eyeHeight: 1.6,
+  headDamage: 70, bodyDamage: 30,                 // 적 체력(100) 기준 %
+};
+const AMMO_CONFIG = { intervalSec: 15, maxItems: 4, initialCount: 1, pickupDist: 1.5, refill: 30 };
+
+/* ───────── 맵 (고정 배치 — 공정한 기록 경쟁을 위해 매판 동일) ───────── */
+const ARENA = { hx: 25, hz: 15, wallH: 4 };
+const PLAYER_START = { x: -24, z: 0, yaw: -Math.PI / 2 };   // 시야 +X
+const SPAWNS = [ { x: 24, z: 0 }, { x: 0, z: -14 }, { x: 0, z: 14 } ];
+const BOXES = [ [-10, -8], [-10, 8], [12, 0], [18, -10], [18, 10] ].map(p => ({ x: p[0], z: p[1], w: 4, h: 3, d: 4 }));
+const CYLS  = [ [0, -10], [0, 10], [-15, -5], [-15, 5] ].map(p => ({ x: p[0], z: p[1], r: 1.2, h: 4 }));
+const LOWS  = [ [5, -5], [5, 5] ].map(p => ({ x: p[0], z: p[1], w: 6, h: 1, d: 1 }));   // 이동만 차단(눈높이 1.6 아래)
+
+const $ = id => document.getElementById(id);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const rnd = (a, b) => a + Math.random() * (b - a);
+function fmtTime(s) { s = Math.max(0, Math.floor(s)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }
+function packScore(kills, sec) { return kills * 10000 + Math.min(9999, Math.floor(sec)); }
+function fmtPacked(v) { return Math.floor(v / 10000) + "명 · " + fmtTime(v % 10000); }
+
+/* ═══════════════════ 기록 ═══════════════════ */
+const BEST_KEY = "fpssurvival_best_v1";
+function loadBest() { try { const j = JSON.parse(localStorage.getItem(BEST_KEY) || "null"); return (j && j.score >= 0 && j.time >= 0) ? j : null; } catch (e) { return null; } }
+function saveBest(b) { try { localStorage.setItem(BEST_KEY, JSON.stringify(b)); } catch (e) {} }
+let best = loadBest();
+const WR = window.WorldRecord ? WorldRecord("fpssurvival", { format: fmtPacked }) : null;
+let wrTried = false;
+function wrInfo() {
+  if (!WR) return { val: "—", who: "", none: true };
+  if (WR.loaded && WR.rec) return { val: WR.text(), who: WR.who(), none: false };
+  if (WR.loaded) return { val: "아직 없음", who: "", none: true };
+  return { val: !WR.url() ? "오프라인" : (wrTried ? "불러오지 못함" : "불러오는 중…"), who: "", none: true };
+}
+function setVal(el, text, none) { el.textContent = text; el.classList.toggle("none", !!none); }
+function renderRecords() {
+  const w = wrInfo();
+  const bTxt = best ? best.score + "명 · " + fmtTime(best.time) : "아직 없음";
+  setVal($("bestStart"), bTxt, !best); $("bestStartDate").textContent = best ? best.date : "";
+  setVal($("bestOver"), bTxt, !best);
+  setVal($("wrStart"), w.val, w.none); $("wrWhoStart").textContent = w.who;
+  setVal($("wrOver"), w.val, w.none); $("wrWhoOver").textContent = w.who;
+  $("hudBestVal").textContent = bTxt; $("hudWrVal").textContent = w.val; $("hudWrWho").textContent = w.who;
+}
+if (WR) { WR.onChange(renderRecords); WR.load().then(() => { wrTried = true; renderRecords(); }); }
+
+/* ═══════════════════ 소리 (Web Audio, 외부 파일 없음) ═══════════════════ */
+const AUD = { ctx: null, noise: null };
+function audioInit() {
+  try {
+    if (!AUD.ctx) {
+      AUD.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const n = AUD.ctx.sampleRate * 0.5, buf = AUD.ctx.createBuffer(1, n, AUD.ctx.sampleRate), d = buf.getChannelData(0);
+      for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+      AUD.noise = buf;
+    }
+    if (AUD.ctx.state === "suspended") AUD.ctx.resume();
+  } catch (e) {}
+}
+function tone(freq, dur, type, vol, when, slideTo) {
+  if (!AUD.ctx) return;
+  try {
+    const c = AUD.ctx, t = c.currentTime + (when || 0), o = c.createOscillator(), g = c.createGain();
+    o.type = type || "square"; o.frequency.setValueAtTime(freq, t);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+    g.gain.setValueAtTime(vol || 0.08, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + dur);
+  } catch (e) {}
+}
+function noise(dur, vol, cutoff) {
+  if (!AUD.ctx) return;
+  try {
+    const c = AUD.ctx, t = c.currentTime, s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+    s.buffer = AUD.noise; f.type = "lowpass"; f.frequency.value = cutoff || 2500;
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(f); f.connect(g); g.connect(c.destination); s.start(t); s.stop(t + dur);
+  } catch (e) {}
+}
+const SFX = {
+  shoot()   { noise(0.12, 0.35, 3000); tone(160, 0.08, "square", 0.12, 0, 60); },
+  empty()   { tone(1100, 0.04, "square", 0.05); tone(700, 0.04, "square", 0.05, 0.05); },
+  enemyShot(){ noise(0.08, 0.12, 1500); tone(120, 0.06, "square", 0.05); },
+  hurt()    { tone(220, 0.25, "sawtooth", 0.12, 0, 70); },
+  hitmark() { tone(900, 0.05, "sine", 0.08); },
+  killBody(){ tone(440, 0.1, "square", 0.08); tone(660, 0.14, "square", 0.08, 0.09); },
+  killHead(){ tone(660, 0.08, "square", 0.08); tone(990, 0.08, "square", 0.08, 0.08); tone(1320, 0.18, "square", 0.08, 0.16); },
+  ammo()    { [523, 659, 784].forEach((f, i) => tone(f, 0.12, "triangle", 0.1, i * 0.07)); },
+  over()    { tone(400, 1.0, "sawtooth", 0.12, 0, 90); tone(200, 1.0, "square", 0.06, 0.1, 45); },
+};
+
+/* ═══════════════════ 3D 씬 ═══════════════════ */
+const canvas = $("gl");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xDDE3E8);
+const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 200);
+camera.rotation.order = "YXZ";
+scene.add(camera);
+scene.add(new THREE.HemisphereLight(0xFFFFFF, 0x8A978C, 0.9));
+const sun = new THREE.DirectionalLight(0xFFFFFF, 0.6); sun.position.set(20, 40, 10); scene.add(sun);
+
+const M = (c, extra) => new THREE.MeshLambertMaterial(Object.assign({ color: c }, extra || {}));
+const obstacleMeshes = [];   // 시야·총알 차단 (박스·기둥·낮은 벽·외벽)
+{
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(ARENA.hx * 2, ARENA.hz * 2), M(0xB8BDB5));
+  floor.rotation.x = -Math.PI / 2; scene.add(floor);
+  /* 바닥 격자선 — 거리감 */
+  const grid = new THREE.GridHelper(50, 25, 0x9AA39C, 0xA9B1AA); grid.position.y = 0.01; grid.scale.z = 30 / 50; scene.add(grid);
+  const wallM = M(0xAAB4BE, { side: THREE.DoubleSide });
+  const mkWall = (w, x, z, ry) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, ARENA.wallH), wallM); m.position.set(x, ARENA.wallH / 2, z); m.rotation.y = ry; scene.add(m); obstacleMeshes.push(m); };
+  mkWall(ARENA.hx * 2, 0, -ARENA.hz, 0); mkWall(ARENA.hx * 2, 0, ARENA.hz, Math.PI);
+  mkWall(ARENA.hz * 2, -ARENA.hx, 0, Math.PI / 2); mkWall(ARENA.hz * 2, ARENA.hx, 0, -Math.PI / 2);
+  /* 벽 위 테두리 */
+  const rimM = M(0x24402F);
+  [[ARENA.hx * 2 + 0.4, 0.4, 0, -ARENA.hz], [ARENA.hx * 2 + 0.4, 0.4, 0, ARENA.hz], [0.4, ARENA.hz * 2 + 0.4, -ARENA.hx, 0], [0.4, ARENA.hz * 2 + 0.4, ARENA.hx, 0]]
+    .forEach(r => { const m = new THREE.Mesh(new THREE.BoxGeometry(r[0], 0.2, r[1]), rimM); m.position.set(r[2], ARENA.wallH, r[3]); scene.add(m); });
+  BOXES.forEach(b => { const m = new THREE.Mesh(new THREE.BoxGeometry(b.w, b.h, b.d), M(0x6B7F6E)); m.position.set(b.x, b.h / 2, b.z); scene.add(m); obstacleMeshes.push(m); });
+  CYLS.forEach(c => { const m = new THREE.Mesh(new THREE.CylinderGeometry(c.r, c.r, c.h, 24), M(0xD97B4F)); m.position.set(c.x, c.h / 2, c.z); scene.add(m); obstacleMeshes.push(m); });
+  LOWS.forEach(l => { const m = new THREE.Mesh(new THREE.BoxGeometry(l.w, l.h, l.d), M(0x8C9A8E)); m.position.set(l.x, l.h / 2, l.z); scene.add(m); obstacleMeshes.push(m); });
+  /* 스폰 지점 표시(바닥 원) */
+  SPAWNS.forEach(s => { const m = new THREE.Mesh(new THREE.CircleGeometry(2, 24), M(0xB33951, { transparent: true, opacity: 0.35 })); m.rotation.x = -Math.PI / 2; m.position.set(s.x, 0.02, s.z); scene.add(m); });
+}
+/* 1인칭 소총 (카메라 자식) */
+const gun = new THREE.Group();
+{
+  const dark = M(0x2E3A33), wood = M(0x7A5A3A);
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.14, 0.55), dark); body.position.set(0, 0, -0.1);
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.5, 10), dark); barrel.rotation.x = Math.PI / 2; barrel.position.set(0, 0.03, -0.55);
+  const stock = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.12, 0.3), wood); stock.position.set(0, -0.03, 0.3);
+  const grip = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.16, 0.08), wood); grip.position.set(0, -0.13, 0.02);
+  const mag = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.2, 0.1), dark); mag.position.set(0, -0.15, -0.15);
+  gun.add(body, barrel, stock, grip, mag);
+  const flash = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), new THREE.MeshBasicMaterial({ color: 0xFFE28A })); flash.position.set(0, 0.03, -0.82); flash.visible = false; gun.add(flash);
+  gun.userData.flash = flash;
+  gun.position.set(0.32, -0.28, -0.5);
+  camera.add(gun);
+}
+const sparkGeo = new THREE.SphereGeometry(0.08, 6, 6), sparkMat = new THREE.MeshBasicMaterial({ color: 0xFFE28A });
+const tracerMat = new THREE.LineBasicMaterial({ color: 0xFFD07A });
+const transient = [];   // { obj, until }
+function addTransient(obj, ms) { scene.add(obj); transient.push({ obj, until: performance.now() + ms }); }
+function pruneTransient(now) { for (let i = transient.length - 1; i >= 0; i--) if (transient[i].until <= now) { scene.remove(transient[i].obj); transient.splice(i, 1); } }
+
+/* ═══════════════════ 충돌 (원 vs 사각·원, XZ 평면) ═══════════════════ */
+function blocked(x, z, r) {
+  if (Math.abs(x) > ARENA.hx - r || Math.abs(z) > ARENA.hz - r) return true;
+  for (const b of BOXES) if (Math.abs(x - b.x) < b.w / 2 + r && Math.abs(z - b.z) < b.d / 2 + r) return true;
+  for (const l of LOWS)  if (Math.abs(x - l.x) < l.w / 2 + r && Math.abs(z - l.z) < l.d / 2 + r) return true;
+  for (const c of CYLS)  { const dx = x - c.x, dz = z - c.z; if (dx * dx + dz * dz < (c.r + r) * (c.r + r)) return true; }
+  return false;
+}
+/* 축별로 나눠 미끄러지듯 이동. 반환: 막힌 축이 있었는지 */
+function slide(p, dx, dz, r) {
+  let hit = false;
+  if (!blocked(p.x + dx, p.z, r)) p.x += dx; else hit = true;
+  if (!blocked(p.x, p.z + dz, r)) p.z += dz; else hit = true;
+  return hit;
+}
+
+/* ═══════════════════ 적 (권총병) ═══════════════════ */
+const enemies = [];
+const enemyParts = [];   // 레이캐스트 대상(머리·몸통 메시)
+/* 키 2.25: 다리 0~0.7, 몸통 0.6~1.7, 머리 1.65~2.25 (겹치게 — 눈높이 1.6 에서 쏜 총알이 목 사이로 빠지지 않게) */
+const geoHead = new THREE.SphereGeometry(0.3, 12, 10), geoBody = new THREE.CylinderGeometry(0.32, 0.36, 1.1, 12), geoLeg = new THREE.BoxGeometry(0.18, 0.7, 0.18), geoGun = new THREE.BoxGeometry(0.06, 0.1, 0.3);
+function makeEnemy(x, z) {
+  const g = new THREE.Group();
+  const bodyMat = M(0xB33951), headMat = M(0xE8C9A8), legMat = M(0x3B4B40);
+  const body = new THREE.Mesh(geoBody, bodyMat); body.position.y = 1.15;
+  const head = new THREE.Mesh(geoHead, headMat); head.position.y = 1.95;
+  const legL = new THREE.Mesh(geoLeg, legMat); legL.position.set(-0.14, 0.35, 0);
+  const legR = new THREE.Mesh(geoLeg, legMat); legR.position.set(0.14, 0.35, 0);
+  const pistol = new THREE.Mesh(geoGun, M(0x2E3A33)); pistol.position.set(0.3, 1.25, -0.35);
+  g.add(body, head, legL, legR, pistol);
+  g.position.set(x, 0, z);
+  const e = { g, hp: 100, fire: rnd(0.8, DIFFICULTY_CONFIG.enemyFireCooldownSec), strafe: Math.random() < 0.5 ? 1 : -1, strafeT: rnd(1.5, 3), flashT: 0, bodyMat, headMat, pistol, spawnIdx: 0 };
+  [body, legL, legR].forEach(m => { m.userData = { enemy: e, part: "body" }; enemyParts.push(m); });
+  head.userData = { enemy: e, part: "head" }; enemyParts.push(head);
+  e.parts = [body, head, legL, legR];
+  scene.add(g); enemies.push(e);
+  return e;
+}
+function removeEnemy(e) {
+  scene.remove(e.g);
+  enemies.splice(enemies.indexOf(e), 1);
+  e.parts.forEach(m => { const i = enemyParts.indexOf(m); if (i >= 0) enemyParts.splice(i, 1); });
+}
+const ray = new THREE.Raycaster();
+const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3();
+function enemyCanSee(e) {
+  _v1.set(e.g.position.x, 1.5, e.g.position.z);
+  _v2.set(P.x, PLAYER_CONFIG.eyeHeight, P.z).sub(_v1);
+  const dist = _v2.length();
+  ray.set(_v1, _v2.normalize()); ray.far = dist;
+  return ray.intersectObjects(obstacleMeshes, false).length === 0;
+}
+function updateEnemy(e, dt) {
+  const C = DIFFICULTY_CONFIG, p = e.g.position;
+  const dx = P.x - p.x, dz = P.z - p.z, dist = Math.hypot(dx, dz) || 0.001, nx = dx / dist, nz = dz / dist;
+  /* 스티어링: 거리 유지 + 측면 이동(정면 돌진 금지) */
+  let radial = 0;
+  if (dist > C.enemyKeepMax) radial = 1; else if (dist < C.enemyKeepMin) radial = -1;
+  e.strafeT -= dt; if (e.strafeT <= 0) { e.strafe = -e.strafe; e.strafeT = rnd(1.5, 3); }
+  let mx = nx * radial + (-nz) * e.strafe * 0.9, mz = nz * radial + nx * e.strafe * 0.9;
+  const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml;
+  const step = C.enemyMoveSpeed * dt;
+  if (slide(p, mx * step, mz * step, 0.4)) { e.strafe = -e.strafe; e.strafeT = rnd(1, 2); }   // 막히면 반대쪽으로
+  e.g.rotation.y = Math.atan2(nx, nz);   // 플레이어를 바라봄 (+Z 가 정면)
+  /* 피격 표시 복구 */
+  if (e.flashT > 0) { e.flashT -= dt; if (e.flashT <= 0) { e.bodyMat.color.set(0xB33951); e.headMat.color.set(0xE8C9A8); } }
+  /* 사격 */
+  e.fire -= dt;
+  if (e.fire <= 0 && dist <= C.enemyFireRange && enemyCanSee(e)) {
+    e.fire = C.enemyFireCooldownSec;
+    const hit = Math.random() < C.enemyHitChance;
+    SFX.enemyShot();
+    /* 예광: 총구 → 플레이어(빗나가면 옆으로) */
+    const from = new THREE.Vector3(); e.pistol.getWorldPosition(from);
+    const to = new THREE.Vector3(P.x, PLAYER_CONFIG.eyeHeight - 0.2, P.z);
+    if (!hit) to.add(new THREE.Vector3(rnd(-1.2, 1.2), rnd(-0.6, 0.8), rnd(-1.2, 1.2)));
+    addTransient(new THREE.Line(new THREE.BufferGeometry().setFromPoints([from, to]), tracerMat), 90);
+    if (hit) damagePlayer(C.enemyDamage);
+  }
+}
+
+/* ═══════════════════ 탄약 아이템 ═══════════════════ */
+const items = [];
+const itemMat = new THREE.MeshLambertMaterial({ color: 0xF2C94C, emissive: 0xA8731C, emissiveIntensity: 0.6 });
+function makeItem() {
+  let x, z, ok = false;
+  for (let i = 0; i < 30 && !ok; i++) {
+    x = rnd(-ARENA.hx + 2, ARENA.hx - 2); z = rnd(-ARENA.hz + 2, ARENA.hz - 2);
+    ok = !blocked(x, z, 1.0) && Math.hypot(x - P.x, z - P.z) > 4 && items.every(it => Math.hypot(x - it.g.position.x, z - it.g.position.z) > 4);
+  }
+  if (!ok) return;
+  const g = new THREE.Group();
+  const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.5, 12), itemMat);
+  const top = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 8), itemMat); top.position.y = 0.25;
+  const bot = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 8), itemMat); bot.position.y = -0.25;
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.04, 8, 24), new THREE.MeshBasicMaterial({ color: 0xF2C94C })); ring.rotation.x = Math.PI / 2;
+  g.add(cyl, top, bot, ring);
+  g.rotation.z = Math.PI / 6; g.position.set(x, 1, z);
+  scene.add(g); items.push({ g, t: Math.random() * 6 });
+}
+function updateItems(dt) {
+  for (let i = items.length - 1; i >= 0; i--) {
+    const it = items[i]; it.t += dt;
+    it.g.rotation.y += dt * 2.5; it.g.position.y = 1 + Math.sin(it.t * 3) * 0.15;
+    if (Math.hypot(it.g.position.x - P.x, it.g.position.z - P.z) < AMMO_CONFIG.pickupDist) {
+      scene.remove(it.g); items.splice(i, 1);
+      P.ammo = AMMO_CONFIG.refill; SFX.ammo(); popup("탄약 +" + AMMO_CONFIG.refill, "");
+      renderHud();
+    }
+  }
+}
+
+/* ═══════════════════ 플레이어 · 게임 상태 ═══════════════════ */
+const P = { x: 0, z: 0, yaw: 0, pitch: 0, hp: 100, ammo: 30, fireT: 0, recoil: 0 };
+let state = "menu";          // menu | play | over
+let elapsed = 0, score = 0, lastT = 0;
+let spawnTimers = [], ammoT = 0, overAt = 0, spaceFresh = true;
+const keys = {};
+
+function resetGame() {
+  enemies.slice().forEach(removeEnemy);
+  items.slice().forEach(it => scene.remove(it.g)); items.length = 0;
+  transient.forEach(t => scene.remove(t.obj)); transient.length = 0;
+  P.x = PLAYER_START.x; P.z = PLAYER_START.z; P.yaw = PLAYER_START.yaw; P.pitch = 0;
+  P.hp = PLAYER_CONFIG.hp; P.ammo = PLAYER_CONFIG.ammo; P.fireT = 0; P.recoil = 0;
+  elapsed = 0; score = 0;
+  spawnTimers = SPAWNS.map((s, i) => DIFFICULTY_CONFIG.initialSpawnIntervalSec * (0.5 + i * 0.35));   // 세 곳이 동시에 쏟아지지 않게 어긋나게
+  ammoT = AMMO_CONFIG.intervalSec;
+  for (let i = 0; i < AMMO_CONFIG.initialCount; i++) makeItem();
+  renderHud();
+}
+function startGame() {
+  audioInit();
+  resetGame();
+  state = "play"; lastT = performance.now();
+  $("overlay").style.display = "none";
+  ["hudHp", "hudAmmo", "hudBest"].forEach(id => $(id).style.display = "block");
+  $("hudTop").style.display = "flex"; $("cross").style.display = "block";
+}
+function showCard(which) {
+  $("overlay").style.display = "flex";
+  $("cardStart").style.display = which === "start" ? "block" : "none";
+  $("cardOver").style.display = which === "over" ? "block" : "none";
+  ["hudHp", "hudAmmo", "hudBest", "hudTop"].forEach(id => $(id).style.display = "none");
+  $("cross").style.display = "none";
+}
+function damagePlayer(n) {
+  if (state !== "play") return;
+  P.hp = Math.max(0, P.hp - n);
+  SFX.hurt();
+  const d = $("dmg"); d.classList.remove("show"); void d.offsetWidth; d.classList.add("show");
+  renderHud();
+  if (P.hp <= 0) gameOver();
+}
+function gameOver() {
+  state = "over"; overAt = performance.now(); spaceFresh = false;
+  SFX.over();
+  const kills = score, sec = Math.floor(elapsed), packed = packScore(kills, sec);
+  $("finalScore").textContent = kills; $("finalTime").textContent = fmtTime(sec);
+  const prevPacked = best ? packScore(best.score, best.time) : -1;
+  const newBest = packed > prevPacked;
+  if (newBest) { best = { score: kills, time: sec, date: new Date().toLocaleDateString("ko-KR") }; saveBest(best); }
+  const wrBeat = WR && WR.beats(packed);
+  $("finalMsg").textContent = wrBeat ? "🏆 세계 신기록!" : newBest ? "🎉 개인 최고 기록 경신!" : (kills === 0 ? "장애물 뒤에 숨어서 싸워 보세요!" : "");
+  $("bestOverNew").innerHTML = newBest ? '<span class="new">NEW</span>' : "";
+  setTimeout(() => {
+    if (state !== "over") return;
+    showCard("over"); renderRecords();
+    if (wrBeat) WR.prompt(packed).then(() => renderRecords());
+  }, 900);
+}
+
+/* ───────── HUD ───────── */
+function renderHud() {
+  $("hpNum").textContent = P.hp;
+  const f = $("hpFill"); f.style.width = P.hp + "%"; f.classList.toggle("low", P.hp <= 30);
+  $("ammoNum").textContent = P.ammo + "/" + PLAYER_CONFIG.ammo;
+  $("hudAmmo").classList.toggle("empty", P.ammo <= 0);
+  $("hudScore").textContent = score; $("hudTime").textContent = fmtTime(elapsed);
+}
+function popup(text, cls) {
+  const el = document.createElement("div"); el.className = "pop " + cls; el.textContent = text;
+  el.style.marginLeft = rnd(20, 70) + "px"; el.style.marginTop = rnd(-40, 10) + "px";
+  $("pops").appendChild(el); setTimeout(() => el.remove(), 1000);
+}
+function hitmark() { const h = $("hitmark"); h.classList.remove("show"); void h.offsetWidth; h.classList.add("show"); }
+
+/* ───────── 사격 (히트스캔) ───────── */
+function shoot() {
+  if (P.ammo <= 0) { SFX.empty(); return; }
+  P.ammo--; P.recoil = 1; SFX.shoot();
+  gun.userData.flash.visible = true; setTimeout(() => { gun.userData.flash.visible = false; }, 45);
+  scene.updateMatrixWorld();
+  ray.setFromCamera({ x: 0, y: 0 }, camera); ray.far = 200;
+  const hits = ray.intersectObjects(obstacleMeshes.concat(enemyParts), false);
+  if (hits.length) {
+    const h = hits[0], spark = new THREE.Mesh(sparkGeo, sparkMat); spark.position.copy(h.point); addTransient(spark, 70);
+    const ud = h.object.userData;
+    if (ud && ud.enemy) {
+      const e = ud.enemy, head = ud.part === "head", dmg = head ? PLAYER_CONFIG.headDamage : PLAYER_CONFIG.bodyDamage;
+      e.hp -= dmg; hitmark(); popup("-" + dmg + "%", head ? "head" : "");
+      e.bodyMat.color.set(0xFFFFFF); e.headMat.color.set(0xFFFFFF); e.flashT = 0.08;
+      if (e.hp <= 0) {
+        removeEnemy(e); score++; spawnTimers[e.spawnIdx] += DIFFICULTY_CONFIG.enemySpawnCooldownSec;
+        head ? SFX.killHead() : SFX.killBody();
+        setTimeout(() => popup("+1", "kill"), 120);
+      } else SFX.hitmark();
+    }
+  }
+  renderHud();
+}
+
+/* ───────── 매 프레임 ───────── */
+function update(dt) {
+  const C = DIFFICULTY_CONFIG, PC = PLAYER_CONFIG;
+  elapsed += dt;
+  /* 시점 */
+  const yawR = PC.yawSpeed * Math.PI / 180 * dt, pitchR = PC.pitchSpeed * Math.PI / 180 * dt, lim = PC.pitchLimit * Math.PI / 180;
+  if (keys.ArrowLeft) P.yaw += yawR; if (keys.ArrowRight) P.yaw -= yawR;
+  if (keys.ArrowUp) P.pitch += pitchR; if (keys.ArrowDown) P.pitch -= pitchR;
+  P.pitch = clamp(P.pitch, -lim, lim);
+  /* 이동 (카메라 기준, 한글 IME 대비 e.code) */
+  const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw), rx = Math.cos(P.yaw), rz = -Math.sin(P.yaw);
+  let mx = 0, mz = 0;
+  if (keys.KeyW) { mx += fx; mz += fz; } if (keys.KeyS) { mx -= fx; mz -= fz; }
+  if (keys.KeyD) { mx += rx; mz += rz; } if (keys.KeyA) { mx -= rx; mz -= rz; }
+  const ml = Math.hypot(mx, mz);
+  if (ml > 0) slide(P, mx / ml * PC.moveSpeed * dt, mz / ml * PC.moveSpeed * dt, PC.radius);
+  /* 사격 (스페이스 연사) */
+  P.fireT -= dt;
+  if (keys.Space && P.fireT <= 0) { P.fireT = 1 / PC.fireRate; shoot(); }
+  P.recoil = Math.max(0, P.recoil - dt * 8);
+  /* 카메라·총 */
+  camera.position.set(P.x, PC.eyeHeight, P.z);
+  camera.rotation.set(P.pitch, P.yaw, 0);
+  const bob = ml > 0 ? Math.sin(elapsed * 10) * 0.012 : 0;
+  gun.position.set(0.32, -0.28 + bob, -0.5 + P.recoil * 0.08); gun.rotation.x = P.recoil * 0.12;
+  /* 스폰 */
+  const stepN = Math.floor(elapsed / C.spawnIntervalDecreaseEverySec);
+  const interval = Math.max(C.minSpawnIntervalSec, C.initialSpawnIntervalSec - stepN * C.spawnIntervalDecreasePerStep);
+  const maxN = Math.min(C.maxConcurrentEnemiesCap, C.initialMaxConcurrentEnemies + Math.floor(elapsed / C.maxConcurrentEnemiesIncreaseEvery));
+  SPAWNS.forEach((s, i) => {
+    spawnTimers[i] -= dt;
+    if (spawnTimers[i] <= 0 && enemies.length < maxN) {
+      let x, z, tries = 0;
+      do { x = s.x + rnd(-2, 2); z = s.z + rnd(-2, 2); } while (blocked(x, z, 0.5) && ++tries < 10);
+      if (tries < 10) makeEnemy(x, z).spawnIdx = i;
+      spawnTimers[i] = interval;
+    }
+  });
+  enemies.slice().forEach(e => updateEnemy(e, dt));
+  /* 탄약 아이템 */
+  ammoT -= dt;
+  if (ammoT <= 0) { ammoT = AMMO_CONFIG.intervalSec; if (items.length < AMMO_CONFIG.maxItems) makeItem(); }
+  updateItems(dt);
+  if (Math.floor(elapsed) !== Math.floor(elapsed - dt)) renderHud();
+}
+function loop(now) {
+  requestAnimationFrame(loop);
+  if (state === "play") {
+    const dt = Math.min(0.05, (now - lastT) / 1000);
+    update(dt);
+  } else if (state === "over") {
+    /* 죽은 뒤에도 적은 계속 움직여 보여 준다 */
+    const dt = Math.min(0.05, (now - lastT) / 1000);
+    enemies.forEach(e => { e.fire = 99; updateEnemy(e, dt); });
+    updateItems(dt);
+  } else {
+    /* 메뉴: 아레나를 천천히 둘러보는 카메라 */
+    const t = now / 1000;
+    camera.position.set(Math.sin(t * 0.12) * 16, 9, Math.cos(t * 0.12) * 9);
+    camera.lookAt(0, 0.5, 0);
+  }
+  lastT = now;
+  pruneTransient(now);
+  renderer.render(scene, camera);
+}
+function resize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  if (!w || !h) return;   // 숨겨진 창(0×0)에서는 종횡비가 NaN 이 되어 조준 레이가 깨진다
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+window.addEventListener("resize", resize); resize();
+
+/* ───────── 입력 ───────── */
+window.addEventListener("keydown", e => {
+  if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
+  if (/^(Arrow(Up|Down|Left|Right)|Space)$/.test(e.code)) e.preventDefault();
+  audioInit();
+  if (e.code === "Space") {
+    if (state === "menu" && !e.repeat) { startGame(); return; }
+    /* 게임오버: 새로 누른 스페이스만(사격하다 죽었을 때 눌린 채로 바로 재시작되지 않게) */
+    if (state === "over") { if (!e.repeat && spaceFresh && performance.now() - overAt > 900 && !document.querySelector(".wr-back")) startGame(); return; }
+  }
+  keys[e.code] = true;
+});
+window.addEventListener("keyup", e => { keys[e.code] = false; if (e.code === "Space") spaceFresh = true; });
+window.addEventListener("blur", () => { for (const k in keys) keys[k] = false; });
+$("btnStart").onclick = e => { e.currentTarget.blur(); startGame(); };
+$("btnRetry").onclick = e => { e.currentTarget.blur(); startGame(); };
+$("btnWipe").onclick = e => {
+  e.currentTarget.blur();
+  if (!confirm("이 기기에 저장된 나의 최고 기록을 지울까요? (세계 신기록에는 영향이 없습니다)")) return;
+  try { localStorage.removeItem(BEST_KEY); } catch (err) {}
+  best = null; renderRecords(); alert("지웠습니다.");
+};
+/* 터치 기기로 추정되면 안내 */
+function checkTouch() { try { $("warnTouch").style.display = (!window.matchMedia("(pointer: fine)").matches || window.innerWidth < 700) ? "block" : "none"; } catch (e) {} }
+window.addEventListener("resize", checkTouch); checkTouch();
+
+renderRecords();
+showCard("start");
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

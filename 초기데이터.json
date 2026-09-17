@@ -233,6 +233,15 @@
         "units": [],
         "unitsSet": false,
         "url": "24.turbo-lap.html"
+      },
+      "fpssurvival": {
+        "memo": "1인칭 3D 서바이벌 슈팅 / 처치 수·생존 시간 개인전 (방향키 시점·WASD 이동·스페이스 발사)",
+        "open": true,
+        "order": 24,
+        "title": "FPS 서바이벌",
+        "units": [],
+        "unitsSet": false,
+        "url": "25.fps-survival.html"
       }
     }
   }
