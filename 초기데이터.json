@@ -242,6 +242,15 @@
         "units": [],
         "unitsSet": false,
         "url": "25.fps-survival.html"
+      },
+      "blockblast": {
+        "memo": "8×8 보드 블록 퍼즐 / 줄 동시 제거 10×n² 점수(탐욕 vs 전체 최적화) · 2차원 배열 · 개인전",
+        "open": true,
+        "order": 25,
+        "title": "블록 블라스트",
+        "units": [],
+        "unitsSet": false,
+        "url": "26.block-blast.html"
       }
     }
   }

@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<script charset="utf-8" src="firebase-config.js"></script>
+<script charset="utf-8" src="access-guard.js" data-game="blockblast"></script>
+<script charset="utf-8" src="world-record.js"></script>
+<meta charset="utf-8">
+<link rel="stylesheet" href="theme.css">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
+<title>블록 블라스트</title>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="정보 수업용 링크 모음">
+<meta property="og:title" content="블록 블라스트">
+<meta property="og:description" content="8×8 보드 블록 퍼즐 / 줄 동시 제거 10×n² 점수(탐욕 vs 전체 최적화) · 2차원 배열 · 개인전">
+<meta property="og:url" content="https://cornsilktea.github.io/26.block-blast.html">
+<meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
+<meta name="twitter:card" content="summary">
+<!-- 링크 미리보기 끝 -->
+<style>
+  :root{
+    --bg:var(--sg-bg);
+    --panel:var(--sg-panel);
+    --line:var(--sg-line-mid);
+    --text:var(--sg-ink);
+    --sub:var(--sg-ink-soft);
+    --tone:var(--sg-panel-alt);
+    --tone-line:var(--sg-line-mid);
+    --primary:var(--sg-primary);
+    --accent:#D97B4F;         /* 보색: 강조 한 곳에만 */
+    --radius:var(--sg-radius);
+    --cell:40px;              /* 보드 한 칸 크기 — 스크립트가 실제 크기로 갱신 */
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:var(--sg-font);font-size:16px;line-height:1.45;overscroll-behavior:none;height:100%}
+  body{overflow-x:hidden}
+  button{font:inherit;color:inherit;cursor:pointer;border:none;background:none;padding:0;user-select:none}
+  .wrap{position:relative;max-width:960px;margin:0 auto;padding:8px 10px 24px}
+
+  /* ---------- 배경(세계 여행 테마) — 항상 연하게, 그리드 위에 깔림 ---------- */
+  #bg{position:fixed;inset:-20px;z-index:0;pointer-events:none;background-size:cover;background-position:center;
+    opacity:.28;filter:blur(3px);transition:opacity .6s,background-image .6s}
+  .wrap{z-index:1}
+
+  /* ---------- 상단 고정 영역 (모든 칸 동일 크기·색) ---------- */
+  .hud{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px}
+  .hud .c{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:6px 4px;text-align:center;min-width:0}
+  .hud .k{display:block;font-size:11px;color:var(--sub);white-space:nowrap}
+  .hud .v{display:block;font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hud .w{display:block;font-size:11px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:16px}
+  @media (max-width:479px){.hud .v{font-size:16px}.hud .k{font-size:10px}}
+
+  /* ---------- 보드 + 트레이 ----------
+     데스크톱: 보드 왼쪽·트레이 오른쪽 세로 한 줄 / 휴대전화(세로): 보드 위·트레이 아래 가로 한 줄 */
+  .play{--size:min(calc(100vw - 20px),calc(100vh - 300px),560px);
+    display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start;justify-content:center}
+  #board{width:var(--size);height:var(--size);display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);gap:2px;
+    padding:4px;background:var(--panel);border:2px solid var(--sg-line-strong);border-radius:var(--radius);
+    touch-action:none;user-select:none;-webkit-user-select:none}
+  #board .cell{position:relative;border-radius:3px;background:var(--tone);border:1px solid var(--line)}
+  #board .cell.on{border-color:transparent}
+  #board .cell.ghost-ok{background:rgba(47,125,79,.45)!important;border-color:rgba(47,125,79,.6)}
+  #board .cell.ghost-bad{background:rgba(179,57,81,.4)!important;border-color:rgba(179,57,81,.6)}
+  #board .cell.will{box-shadow:inset 0 0 0 2px rgba(255,255,255,.75);filter:brightness(1.18)}
+  #board .cell.pop::after{content:"";position:absolute;inset:0;border-radius:3px;background:#fff;animation:pop .32s ease-out forwards}
+  @keyframes pop{0%{opacity:.95;transform:scale(1)}100%{opacity:0;transform:scale(1.35)}}
+
+  .tray{display:grid;grid-template-rows:repeat(3,1fr);gap:8px;align-self:stretch;min-width:150px;width:min(190px,28vw)}
+  .slot{position:relative;display:flex;align-items:center;justify-content:center;background:var(--panel);border:1px solid var(--line);
+    border-radius:var(--radius);min-height:110px;touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab;transition:opacity .2s,filter .2s}
+  .slot.empty{cursor:default;background:transparent;border-style:dashed}
+  .slot.dead{filter:grayscale(1);opacity:.35}                 /* 지금 놓을 곳이 없는 블록 — 제약 조건 검사 결과를 눈으로 보여 줌 */
+  .slot.dragging .mini{opacity:.25}
+  .mini{display:grid;gap:2px;pointer-events:none}
+  .mini i,.dragp i{display:block;border-radius:3px}
+  .mini i.x,.dragp i.x{background:transparent}
+  @media (max-width:640px){
+    .play{--size:min(calc(100vw - 20px),calc(100vh - 330px));grid-template-columns:1fr}
+    #board{margin:0 auto}
+    .tray{grid-template-rows:none;grid-template-columns:repeat(3,1fr);width:var(--size);margin:0 auto;min-width:0}
+    .slot{min-height:92px}
+  }
+
+  /* 드래그 중 손가락·마우스를 따라다니는 블록 */
+  #drag{position:fixed;left:0;top:0;z-index:30;pointer-events:none;display:none;filter:drop-shadow(0 6px 10px rgba(0,0,0,.28))}
+  #drag.on{display:block}
+  .dragp{display:grid;gap:2px}
+
+  /* 보드 아래 정보 줄 */
+  .info{display:flex;justify-content:space-between;gap:8px;margin-top:8px;font-size:13px;color:var(--sub);flex-wrap:wrap}
+  .info b{color:var(--text)}
+
+  /* 점수 팝업 */
+  .fx{position:fixed;left:0;top:0;z-index:25;pointer-events:none;font-weight:800;color:var(--accent);
+    text-shadow:0 1px 0 #fff,0 0 8px rgba(255,255,255,.9);transform:translate(-50%,-50%);animation:fxup 1s ease-out forwards;white-space:nowrap}
+  @keyframes fxup{0%{opacity:0;transform:translate(-50%,-30%) scale(.6)}20%{opacity:1;transform:translate(-50%,-50%) scale(1.1)}100%{opacity:0;transform:translate(-50%,-160%) scale(1)}}
+  #flash{position:fixed;inset:0;z-index:24;background:#fff;opacity:0;pointer-events:none}
+  #flash.on{animation:flash .7s ease-out}
+  @keyframes flash{0%{opacity:.9}100%{opacity:0}}
+  #confetti{position:fixed;inset:0;z-index:26;pointer-events:none;display:none}
+  #toast{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:27;pointer-events:none;opacity:0;
+    background:rgba(27,43,32,.85);color:#fff;font-size:clamp(18px,4vw,28px);font-weight:800;padding:12px 22px;border-radius:var(--radius);
+    text-align:center;line-height:1.4;transition:opacity .25s;max-width:90vw}
+  #toast.on{opacity:1}
+
+  /* ---------- 시작·결과 화면 ---------- */
+  .overlay{position:fixed;inset:0;z-index:20;background:rgba(27,43,32,.55);display:none;overflow:auto;padding:56px 12px 40px}
+  .overlay.on{display:flex}
+  .card{margin:auto;width:100%;max-width:520px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px}
+  h1{font-size:22px;margin:0 0 6px}
+  h2{font-size:20px;margin:0 0 10px}
+  .card p{margin:6px 0;font-size:14px;color:var(--sub)}
+  .tbl{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+  .tbl th,.tbl td{border:1px solid var(--line);padding:5px 6px;text-align:center}
+  .tbl th{background:var(--tone);font-weight:700}
+  .btn{display:block;width:100%;height:56px;margin-top:14px;border-radius:var(--radius);background:var(--primary);color:var(--sg-primary-ink);
+    font-size:20px;font-weight:800;letter-spacing:2px}
+  .btn:active{opacity:.85}
+  .hint{font-size:12px;color:var(--sub);text-align:center;margin-top:8px}
+  .total{margin-top:10px;background:var(--tone);border:1px solid var(--tone-line);border-radius:var(--radius);padding:10px;text-align:center}
+  .total .k{display:block;font-size:13px;color:var(--sub)}
+  .total .v{display:block;font-size:34px;font-weight:800;font-variant-numeric:tabular-nums}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+  .stats .c{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:8px;text-align:center}
+  .stats .k{display:block;font-size:12px;color:var(--sub)}
+  .stats .v{display:block;font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
+  .best-box{display:flex;align-items:center;gap:12px;margin-top:12px;padding:10px 12px;border-radius:var(--radius);
+    background:var(--tone);border:1px solid var(--tone-line)}
+  .best-box .bi{width:40px;height:40px;flex:none;border-radius:var(--radius);display:flex;align-items:center;justify-content:center;
+    font-size:20px;background:var(--panel);border:1px solid var(--tone-line)}
+  .best-box .bt{flex:1;min-width:0}
+  .best-box .bk{display:block;font-size:12px;font-weight:700;color:var(--sub)}
+  .best-box .bv{display:block;font-size:18px;font-weight:800;font-variant-numeric:tabular-nums}
+  .best-box .bd{display:block;font-size:12px;color:var(--sub)}
+  .best-box.new{border-color:var(--accent)}
+  .best-row{display:flex;gap:8px;margin-top:12px}
+  .best-row .best-box{flex:1 1 0;min-width:0;margin-top:0}
+  .best-row .bv,.best-row .bd{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .best-box.world .bk{color:var(--accent)}
+  @media (max-width:480px){.best-row{flex-direction:column}}
+  .newtag{display:inline-block;font-size:10.5px;font-weight:800;color:#fff;background:var(--accent);
+    border-radius:999px;padding:1px 8px;margin-left:6px;vertical-align:1px}
+  .lesson{margin-top:10px;padding:8px 10px;border-left:3px solid var(--accent);background:var(--tone);font-size:13px;color:var(--text)}
+</style>
+</head>
+<body>
+<div id="bg"></div>
+<div class="wrap">
+  <div class="hud">
+    <div class="c"><span class="k">점수</span><span class="v" id="hudScore">0</span><span class="w" id="hudLines">최대 동시 제거 0줄</span></div>
+    <div class="c"><span class="k">개인 최고 기록</span><span class="v" id="hudBest">-</span><span class="w">이 기기</span></div>
+    <div class="c"><span class="k">🏆 세계 신기록</span><span class="v" id="hudWorld">…</span><span class="w" id="hudWho"></span></div>
+  </div>
+
+  <div class="play">
+    <div>
+      <div id="board" aria-label="8×8 보드"></div>
+      <div class="info"><span id="infoTheme"></span><span>놓기 <b id="infoCells">+칸 수</b> · 줄 제거 <b>10×n²</b> · 퍼펙트 <b>+<span id="infoPerfect">100</span></b></span></div>
+    </div>
+    <div class="tray" id="tray">
+      <div class="slot empty" data-i="0"></div>
+      <div class="slot empty" data-i="1"></div>
+      <div class="slot empty" data-i="2"></div>
+    </div>
+  </div>
+</div>
+
+<div id="drag"></div>
+<div id="flash"></div>
+<canvas id="confetti"></canvas>
+<div id="toast"></div>
+
+<!-- 시작 화면 -->
+<div class="overlay on" id="scrStart">
+  <div class="card">
+    <h1>🧩 블록 블라스트</h1>
+    <p>블록을 끌어 8×8 보드에 놓고, 가로·세로 줄을 가득 채워 지웁니다. 남은 블록 중 하나라도 놓을 곳이 없으면 게임이 끝납니다.</p>
+    <table class="tbl">
+      <tr><th>동작</th><th>점수</th></tr>
+      <tr><td>블록 놓기</td><td>칸 수 × 1점</td></tr>
+      <tr><td>n줄 동시 제거</td><td>10 × n² (1줄 10 · 2줄 40 · 3줄 90 · 4줄 160)</td></tr>
+      <tr><td>퍼펙트 클리어(보드 비움)</td><td>+100 · 다음 여행지로 ✈️</td></tr>
+    </table>
+    <div class="lesson">💡 1줄씩 바로 지우는 것(탐욕적 선택)보다, 배치를 조절해 2~3줄을 한 번에 지우면 점수가 제곱으로 커집니다.</div>
+    <div class="best-row">
+      <div class="best-box" id="startBest"></div>
+      <div class="best-box world" id="startWorld"></div>
+    </div>
+    <button class="btn" id="btnStart">시작하기</button>
+    <div class="hint">스페이스바로도 시작할 수 있습니다</div>
+  </div>
+</div>
+
+<!-- 결과 화면 -->
+<div class="overlay" id="scrEnd">
+  <div class="card">
+    <h2>게임 종료</h2>
+    <div class="total"><span class="k">최종 점수</span><span class="v" id="endScore">0</span></div>
+    <div class="stats">
+      <div class="c"><span class="k">동시에 가장 많이 지운 줄</span><span class="v" id="endLines">0줄</span></div>
+      <div class="c"><span class="k">놓은 블록 수</span><span class="v" id="endPieces">0</span></div>
+      <div class="c"><span class="k">지운 줄 합계</span><span class="v" id="endTotalLines">0</span></div>
+      <div class="c"><span class="k">퍼펙트 클리어</span><span class="v" id="endPerfect">0회</span></div>
+    </div>
+    <div class="lesson" id="endLesson"></div>
+    <div class="best-row">
+      <div class="best-box" id="endBest"></div>
+      <div class="best-box world" id="endWorld"></div>
+    </div>
+    <button class="btn" id="btnAgain">다시하기</button>
+    <div class="hint">스페이스바로도 다시 시작할 수 있습니다</div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* =====================================================================
+   설정 — 밸런스 관련 수치는 모두 여기서 조정한다
+   ===================================================================== */
+const CONFIG = {
+  BOARD: 8,                 // 보드 한 변의 칸 수
+  TRAY: 3,                  // 한 세트의 블록 개수
+  CELL_POINT: 1,            // 블록을 놓을 때 칸(셀) 하나당 점수 ("블록당 1점" 을 칸 수로 해석)
+  LINE_SCORE: n => 10 * n * n,   // n줄 동시 제거 점수 (제곱 증가 — 탐욕 vs 전체 최적화 교훈의 핵심)
+  PERFECT_CLEAR_BONUS: 100, // 보드를 완전히 비웠을 때 보너스
+  GAMEOVER_DELAY: 700,      // 놓을 곳 없는 블록이 흐려진 뒤 결과 화면까지(ms)
+  /* 블록 모양 30종 — [행, 열] 오프셋(좌상단 0,0). 회전 없이 각 모양이 개별 항목 */
+  BLOCK_SHAPES: [
+    [[0,0]],
+    [[0,0],[0,1]],
+    [[0,0],[1,0]],
+    [[0,0],[0,1],[0,2]],
+    [[0,0],[1,0],[2,0]],
+    [[0,0],[0,1],[0,2],[0,3]],
+    [[0,0],[1,0],[2,0],[3,0]],
+    [[0,0],[0,1],[0,2],[0,3],[0,4]],
+    [[0,0],[1,0],[2,0],[3,0],[4,0]],
+    [[0,0],[0,1],[1,0],[1,1]],
+    [[0,0],[0,1],[0,2],[1,0],[1,1],[1,2],[2,0],[2,1],[2,2]],
+    [[0,0],[0,1],[0,2],[1,0],[1,1],[1,2]],
+    [[0,0],[0,1],[1,0],[1,1],[2,0],[2,1]],
+    [[0,0],[1,0],[1,1]],
+    [[0,0],[0,1],[1,0]],
+    [[0,0],[0,1],[1,1]],
+    [[0,1],[1,0],[1,1]],
+    [[0,0],[0,1],[0,2],[1,1]],
+    [[1,0],[1,1],[1,2],[0,1]],
+    [[0,0],[1,0],[2,0],[1,1]],
+    [[0,1],[1,0],[1,1],[2,1]],
+    [[0,1],[0,2],[1,0],[1,1]],
+    [[0,0],[0,1],[1,1],[1,2]],
+    [[0,0],[1,0],[2,0],[2,1]],
+    [[0,1],[1,1],[2,0],[2,1]],
+    [[0,1],[1,0],[1,1],[1,2],[2,1]],
+    [[0,0],[0,2],[1,0],[1,1],[1,2]],
+    [[0,0],[1,0],[1,1],[2,1],[2,2]],
+    [[0,0],[0,1],[1,0],[1,1],[2,0]],
+    [[0,0],[0,1],[1,1],[1,2],[2,2]]
+  ],
+  /* 랜덤 생성 조정 — 지금은 순수 랜덤. 초반 게임오버가 잦으면 여기서 손본다.
+     WEIGHTS: 모양별 가중치 배열(길이 30, null 이면 균등) / FILTER: (shape, board) => true/false 로 후보 제외 */
+  WEIGHTS: null,
+  FILTER: null,
+  /* 블록 색 — 캔버스가 아니어도 hex 로 고정(theme.css 톤) */
+  COLORS: ["#24402F", "#2F7D4F", "#A8731C", "#D97B4F", "#5B6B5E", "#B33951"],
+  /* 세계 여행 테마 — 퍼펙트 클리어마다 다음으로. image 에 그림 주소를 넣으면 그라데이션 대신 쓰인다(나중에 첨부 예정) */
+  THEMES: [
+    { name: "프랑스 파리 — 에펠탑",            image: "", grad: "linear-gradient(160deg,#c9d6e8,#f1e3d3)" },
+    { name: "이집트 기자 — 피라미드와 스핑크스", image: "", grad: "linear-gradient(160deg,#f3dfb0,#d7a96b)" },
+    { name: "미국 뉴욕 — 자유의 여신상",        image: "", grad: "linear-gradient(160deg,#bfe0d6,#9fb8c9)" },
+    { name: "중국 — 만리장성",                 image: "", grad: "linear-gradient(160deg,#c8d3b8,#8f9c7d)" },
+    { name: "인도 아그라 — 타지마할",           image: "", grad: "linear-gradient(160deg,#f6e6ea,#d9c6d2)" },
+    { name: "호주 시드니 — 오페라하우스",       image: "", grad: "linear-gradient(160deg,#bcdff5,#f5f0e6)" },
+    { name: "일본 — 후지산과 벚꽃",             image: "", grad: "linear-gradient(160deg,#f7d9e3,#c9d8ea)" },
+    { name: "이탈리아 로마 — 콜로세움",         image: "", grad: "linear-gradient(160deg,#e8d8bf,#b9a58a)" },
+    { name: "서울 — 경복궁",                   image: "", grad: "linear-gradient(160deg,#e4ecd9,#c9b9a3)" }
+  ]
+};
+
+const $ = id => document.getElementById(id);
+const fmt = n => n.toLocaleString("ko-KR");
+const N = CONFIG.BOARD;
+
+/* ---------- 소리 (Web Audio 합성음 — 외부 파일 없음) ---------- */
+const SND = {
+  ctx: null,
+  init(){ if (!this.ctx) { try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+    if (this.ctx && this.ctx.state === "suspended") this.ctx.resume(); },
+  tone(f, t0, dur, type, vol){
+    if (!this.ctx) return;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type || "sine"; o.frequency.value = f;
+    g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(vol || 0.2, t0 + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g).connect(this.ctx.destination); o.start(t0); o.stop(t0 + dur + 0.02);
+  },
+  place(){ if (this.ctx) this.tone(330, this.ctx.currentTime, 0.08, "triangle", 0.15); },
+  clear(n){ if (!this.ctx) return; const t = this.ctx.currentTime;
+    for (let i = 0; i < Math.min(n, 4) + 1; i++) this.tone(440 * Math.pow(1.25, i), t + i * 0.07, 0.18, "square", 0.08); },
+  perfect(){ if (!this.ctx) return; const t = this.ctx.currentTime;
+    [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => this.tone(f, t + i * 0.11, 0.25, "triangle", 0.18)); },
+  over(){ if (!this.ctx) return; const t = this.ctx.currentTime;
+    [392, 330, 262].forEach((f, i) => this.tone(f, t + i * 0.18, 0.3, "sawtooth", 0.1)); }
+};
+
+/* ---------- 최고 기록 (이 기기의 localStorage) ---------- */
+const BEST = {
+  KEY: "blockblast_best_v1",
+  get(){
+    try { const b = JSON.parse(localStorage.getItem(this.KEY) || "null");
+      return (b && typeof b.score === "number") ? b : null; } catch (e) { return null; }
+  },
+  set(b){ try { localStorage.setItem(this.KEY, JSON.stringify(b)); } catch (e) {} },
+  html(k, v, d, icon){ return `<span class="bi">${icon || "🏅"}</span><span class="bt"><span class="bk">${k}</span><span class="bv">${v}</span><span class="bd">${d}</span></span>`; },
+  render(box, isNew){
+    const b = this.get();
+    box.className = "best-box" + (isNew ? " new" : "");
+    box.innerHTML = b
+      ? this.html("개인 최고 기록" + (isNew ? '<span class="newtag">NEW</span>' : ""), fmt(b.score) + "점", isNew ? "기록 갱신!" : "이 기기에 저장된 기록")
+      : this.html("개인 최고 기록", "기록 없음", "게임이 끝나면 기록이 자동으로 저장됩니다.");
+    $("hudBest").textContent = b ? fmt(b.score) : "-";
+  }
+};
+
+/* ---------- 세계 신기록 (모든 학생 공통, Firebase — world-record.js) ---------- */
+const WR = window.WorldRecord ? WorldRecord("blockblast", { format: v => fmt(v) + "점" }) : null;
+function renderWorld(){
+  ["startWorld", "endWorld"].forEach(id => {
+    const box = $(id);
+    box.className = "best-box world";
+    box.innerHTML = (WR && WR.rec)
+      ? BEST.html("세계 신기록", WR.text(), WR.escapeHtml(WR.who()), "🏆")
+      : BEST.html("세계 신기록", (WR && !WR.loaded) ? "불러오는 중…" : "기록 없음", "첫 기록에 도전해 보세요.", "🏆");
+  });
+  $("hudWorld").textContent = (WR && WR.rec) ? WR.text() : (WR && !WR.loaded) ? "…" : "-";
+  $("hudWho").textContent = (WR && WR.rec) ? WR.who() : (WR && !WR.loaded ? "불러오는 중" : "기록 없음");
+}
+if (WR) { WR.onChange(renderWorld); WR.load(); }
+renderWorld();
+
+/* ---------- 게임 상태 ---------- */
+const G = {
+  board: [],        // 2차원 배열 board[r][c] = 0(빈칸) 또는 색 인덱스+1
+  tray: [],         // [{shape, color, dead} | null] × 3
+  score: 0, maxLines: 0, totalLines: 0, pieces: 0, perfects: 0, theme: 0,
+  playing: false
+};
+
+function newBoard(){ return Array.from({ length: N }, () => new Array(N).fill(0)); }
+
+/* 모양을 (r,c) 에 놓을 수 있는가 — 보드 밖·겹침이면 false */
+function canPlaceAt(board, shape, r, c){
+  for (const [dr, dc] of shape) {
+    const rr = r + dr, cc = c + dc;
+    if (rr < 0 || cc < 0 || rr >= N || cc >= N || board[rr][cc]) return false;
+  }
+  return true;
+}
+/* 어딘가에 놓을 자리가 하나라도 있는가 — 모든 (행,열)을 순서대로 대입(전수 검사) */
+function canPlaceAnywhere(board, shape){
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (canPlaceAt(board, shape, r, c)) return true;
+  return false;
+}
+function shapeSize(shape){
+  let h = 0, w = 0;
+  for (const [r, c] of shape) { h = Math.max(h, r + 1); w = Math.max(w, c + 1); }
+  return { h, w };
+}
+
+/* 랜덤 블록 — WEIGHTS/FILTER 가 없으면 순수 랜덤 */
+function randomPiece(){
+  let idx = CONFIG.BLOCK_SHAPES.map((s, i) => i);
+  if (CONFIG.FILTER) idx = idx.filter(i => CONFIG.FILTER(CONFIG.BLOCK_SHAPES[i], G.board));
+  if (idx.length === 0) idx = CONFIG.BLOCK_SHAPES.map((s, i) => i);
+  let pick;
+  if (CONFIG.WEIGHTS) {
+    const tot = idx.reduce((a, i) => a + (CONFIG.WEIGHTS[i] || 0), 0);
+    let x = Math.random() * tot; pick = idx[idx.length - 1];
+    for (const i of idx) { x -= CONFIG.WEIGHTS[i] || 0; if (x <= 0) { pick = i; break; } }
+  } else pick = idx[Math.floor(Math.random() * idx.length)];
+  return { shape: CONFIG.BLOCK_SHAPES[pick], color: Math.floor(Math.random() * CONFIG.COLORS.length) + 1, dead: false };
+}
+function refillTray(){ for (let i = 0; i < CONFIG.TRAY; i++) G.tray[i] = randomPiece(); }
+
+/* ---------- 그리기 ---------- */
+const boardEl = $("board"), cells = [];
+for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+  const d = document.createElement("div"); d.className = "cell"; d.dataset.r = r; d.dataset.c = c;
+  boardEl.appendChild(d); cells.push(d);
+}
+function cellSize(){ return cells[0].getBoundingClientRect().width; }
+function cellGap(){ return cells[1].getBoundingClientRect().left - cells[0].getBoundingClientRect().right; }
+
+function renderBoard(){
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+    const el = cells[r * N + c], v = G.board[r][c];
+    el.className = "cell" + (v ? " on" : "");
+    el.style.background = v ? CONFIG.COLORS[v - 1] : "";
+  }
+}
+function miniHtml(piece, cls, cell){
+  const { h, w } = shapeSize(piece.shape);
+  const on = new Set(piece.shape.map(([r, c]) => r * 10 + c));
+  let s = `<div class="${cls}" style="grid-template-columns:repeat(${w},${cell}px);grid-template-rows:repeat(${h},${cell}px)">`;
+  for (let r = 0; r < h; r++) for (let c = 0; c < w; c++)
+    s += on.has(r * 10 + c) ? `<i style="background:${CONFIG.COLORS[piece.color - 1]}"></i>` : '<i class="x"></i>';
+  return s + "</div>";
+}
+function renderTray(){
+  const slots = $("tray").children;
+  const cs = Math.max(12, Math.min(22, Math.floor((slots[0].getBoundingClientRect().width - 20) / 5)));
+  for (let i = 0; i < CONFIG.TRAY; i++) {
+    const p = G.tray[i], el = slots[i];
+    el.className = "slot" + (p ? (p.dead ? " dead" : "") : " empty");
+    el.innerHTML = p ? miniHtml(p, "mini", cs) : "";
+  }
+}
+function renderHud(){
+  $("hudScore").textContent = fmt(G.score);
+  $("hudLines").textContent = "최대 동시 제거 " + G.maxLines + "줄";
+  $("infoTheme").textContent = "🌍 " + (G.theme + 1) + "/" + CONFIG.THEMES.length + " " + CONFIG.THEMES[G.theme].name;
+}
+function applyTheme(){
+  const t = CONFIG.THEMES[G.theme];
+  $("bg").style.backgroundImage = t.image ? `url("${t.image}")` : t.grad;
+  renderHud();
+}
+
+/* 배치 불가 블록 흐리게 — 남은 블록 각각을 전수 검사 */
+function markDead(){
+  let anyDead = false;
+  for (const p of G.tray) if (p) { p.dead = !canPlaceAnywhere(G.board, p.shape); if (p.dead) anyDead = true; }
+  renderTray();
+  return anyDead;
+}
+
+/* ---------- 이펙트 ---------- */
+function popText(text, x, y, size){
+  const d = document.createElement("div"); d.className = "fx"; d.textContent = text;
+  d.style.left = x + "px"; d.style.top = y + "px"; d.style.fontSize = (size || 28) + "px";
+  document.body.appendChild(d); setTimeout(() => d.remove(), 1000);
+}
+function toast(msg, ms){
+  const t = $("toast"); t.textContent = msg; t.classList.add("on");
+  clearTimeout(toast.tm); toast.tm = setTimeout(() => t.classList.remove("on"), ms || 1600);
+}
+function confetti(){
+  const cv = $("confetti"), ctx = cv.getContext("2d");
+  cv.width = innerWidth; cv.height = innerHeight; cv.style.display = "block";
+  const ps = Array.from({ length: 140 }, () => ({
+    x: Math.random() * cv.width, y: -20 - Math.random() * cv.height * .4, vx: (Math.random() - .5) * 3, vy: 2 + Math.random() * 4,
+    s: 6 + Math.random() * 8, a: Math.random() * Math.PI, va: (Math.random() - .5) * .3, col: CONFIG.COLORS[Math.floor(Math.random() * CONFIG.COLORS.length)]
+  }));
+  const t0 = performance.now();
+  (function step(t){
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    for (const p of ps) { p.x += p.vx; p.y += p.vy; p.a += p.va;
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.a); ctx.fillStyle = p.col; ctx.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2); ctx.restore(); }
+    if (t - t0 < 1800) requestAnimationFrame(step); else cv.style.display = "none";
+  })(t0);
+}
+
+/* ---------- 블록 놓기 → 줄 제거 → 퍼펙트 → 새 세트 → 게임오버 검사 ---------- */
+function place(i, r, c){
+  const p = G.tray[i];
+  if (!p || !canPlaceAt(G.board, p.shape, r, c)) return false;
+  for (const [dr, dc] of p.shape) G.board[r + dr][c + dc] = p.color;
+  G.tray[i] = null; G.pieces++;
+  let gained = p.shape.length * CONFIG.CELL_POINT;
+  SND.place();
+
+  /* 가득 찬 가로·세로 줄 찾기 */
+  const rows = [], cols = [];
+  for (let k = 0; k < N; k++) {
+    if (G.board[k].every(v => v)) rows.push(k);
+    if (G.board.every(row => row[k])) cols.push(k);
+  }
+  const n = rows.length + cols.length;
+  const rect = boardEl.getBoundingClientRect(), cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+  if (n > 0) {
+    const cleared = new Set();
+    rows.forEach(k => { for (let x = 0; x < N; x++) cleared.add(k * N + x); });
+    cols.forEach(k => { for (let x = 0; x < N; x++) cleared.add(x * N + k); });
+    cleared.forEach(idx => { G.board[Math.floor(idx / N)][idx % N] = 0; });
+    const ls = CONFIG.LINE_SCORE(n); gained += ls;
+    G.totalLines += n; G.maxLines = Math.max(G.maxLines, n);
+    SND.clear(n);
+    renderBoard();
+    cleared.forEach(idx => { cells[idx].classList.add("pop"); cells[idx].style.background = CONFIG.COLORS[p.color - 1]; });
+    setTimeout(() => cleared.forEach(idx => { cells[idx].classList.remove("pop"); renderBoard(); }), 340);
+    popText(`${n}줄 +${ls}`, cx, cy, n >= 2 ? 40 : 30);
+  } else renderBoard();
+
+  /* 퍼펙트 클리어 — 64칸 전부 빈칸 */
+  if (G.board.every(row => row.every(v => !v))) {
+    gained += CONFIG.PERFECT_CLEAR_BONUS; G.perfects++;
+    G.theme = (G.theme + 1) % CONFIG.THEMES.length; applyTheme();
+    $("flash").classList.remove("on"); void $("flash").offsetWidth; $("flash").classList.add("on");
+    confetti(); SND.perfect();
+    toast(`퍼펙트 클리어! +${CONFIG.PERFECT_CLEAR_BONUS}\n다음 여행지로 이동합니다 ✈️\n${CONFIG.THEMES[G.theme].name}`, 2400);
+  }
+  G.score += gained;
+  if (n === 0) popText("+" + gained, cx, rect.top + 24, 22);
+  renderHud();
+
+  if (G.tray.every(x => !x)) refillTray();
+  if (markDead()) { G.playing = false; setTimeout(gameOver, CONFIG.GAMEOVER_DELAY); }
+  return true;
+}
+
+/* ---------- 드래그 (마우스·터치 공통, Pointer Events) ---------- */
+const dragEl = $("drag");
+const D = { on: false, i: -1, pid: null, w: 0, h: 0, lift: 0, ghost: [] };
+const trayEl = $("tray");
+/* 길게 누를 때 아이폰 돋보기·복사 풍선 방지 (캔버스가 아니라 직접 막음) */
+trayEl.addEventListener("touchstart", e => e.preventDefault(), { passive: false });
+boardEl.addEventListener("touchstart", e => e.preventDefault(), { passive: false });
+trayEl.addEventListener("contextmenu", e => e.preventDefault());
+
+trayEl.addEventListener("pointerdown", e => {
+  if (!G.playing || D.on) return;
+  const slot = e.target.closest(".slot"); if (!slot) return;
+  const i = +slot.dataset.i, p = G.tray[i]; if (!p || p.dead) return;
+  SND.init();
+  const cs = cellSize(), gap = cellGap(), { h, w } = shapeSize(p.shape);
+  D.on = true; D.i = i; D.pid = e.pointerId;
+  D.w = w * cs + (w - 1) * gap; D.h = h * cs + (h - 1) * gap;
+  D.lift = e.pointerType === "touch" ? Math.max(60, cs * 1.6) : 0;   /* 손가락에 가리지 않게 위로 띄움 */
+  dragEl.innerHTML = miniHtml(p, "dragp", cs);
+  dragEl.firstChild.style.gap = gap + "px";
+  dragEl.classList.add("on"); slot.classList.add("dragging");
+  try { slot.setPointerCapture(e.pointerId); } catch (x) {}
+  moveDrag(e);
+});
+function dragPos(e){ return { x: e.clientX - D.w / 2, y: e.clientY - D.h / 2 - D.lift }; }
+/* 드래그 블록의 좌상단 → 보드 칸 좌표(반올림) */
+function targetCell(pos){
+  const rect = cells[0].getBoundingClientRect(), step = cellSize() + cellGap();
+  return { r: Math.round((pos.y - rect.top) / step), c: Math.round((pos.x - rect.left) / step) };
+}
+function clearGhost(){
+  for (const el of D.ghost) { el.classList.remove("ghost-ok", "ghost-bad", "will"); if (!el.classList.contains("on")) el.style.background = ""; }
+  D.ghost = [];
+}
+function moveDrag(e){
+  const pos = dragPos(e);
+  dragEl.style.transform = `translate(${pos.x}px,${pos.y}px)`;
+  clearGhost();
+  const p = G.tray[D.i], { r, c } = targetCell(pos);
+  const ok = canPlaceAt(G.board, p.shape, r, c);
+  for (const [dr, dc] of p.shape) {
+    const rr = r + dr, cc = c + dc;
+    if (rr < 0 || cc < 0 || rr >= N || cc >= N) continue;
+    const el = cells[rr * N + cc]; el.classList.add(ok ? "ghost-ok" : "ghost-bad"); D.ghost.push(el);
+  }
+  if (ok) {   /* 놓으면 지워질 줄 미리 밝게 */
+    const tmp = G.board.map(row => row.slice());
+    for (const [dr, dc] of p.shape) tmp[r + dr][c + dc] = 1;
+    for (let k = 0; k < N; k++) {
+      if (tmp[k].every(v => v)) for (let x = 0; x < N; x++) { cells[k * N + x].classList.add("will"); D.ghost.push(cells[k * N + x]); }
+      if (tmp.every(row => row[k])) for (let x = 0; x < N; x++) { cells[x * N + k].classList.add("will"); D.ghost.push(cells[x * N + k]); }
+    }
+  }
+}
+function endDrag(e, drop){
+  if (!D.on || (e && e.pointerId !== D.pid)) return;
+  const pos = dragPos(e), { r, c } = targetCell(pos);
+  clearGhost(); dragEl.classList.remove("on");
+  trayEl.children[D.i].classList.remove("dragging");
+  const i = D.i; D.on = false; D.i = -1;
+  if (drop && G.playing) place(i, r, c);
+  renderTray();
+}
+window.addEventListener("pointermove", e => { if (D.on && e.pointerId === D.pid) moveDrag(e); });
+window.addEventListener("pointerup", e => endDrag(e, true));
+window.addEventListener("pointercancel", e => endDrag(e, false));
+window.addEventListener("resize", () => { if (G.playing) renderTray(); });
+
+/* ---------- 시작·종료 ---------- */
+function start(){
+  G.board = newBoard(); G.tray = []; G.score = 0; G.maxLines = 0; G.totalLines = 0; G.pieces = 0; G.perfects = 0; G.theme = 0;
+  G.playing = true;
+  $("scrStart").classList.remove("on"); $("scrEnd").classList.remove("on");
+  applyTheme(); renderBoard(); refillTray(); renderHud();
+  if (markDead()) { G.playing = false; setTimeout(gameOver, CONFIG.GAMEOVER_DELAY); }
+}
+function gameOver(){
+  G.playing = false; SND.over();
+  $("endScore").textContent = fmt(G.score);
+  $("endLines").textContent = G.maxLines + "줄";
+  $("endPieces").textContent = fmt(G.pieces);
+  $("endTotalLines").textContent = fmt(G.totalLines);
+  $("endPerfect").textContent = G.perfects + "회";
+  $("endLesson").textContent = G.maxLines >= 2
+    ? `한 번에 ${G.maxLines}줄을 지워 ${fmt(CONFIG.LINE_SCORE(G.maxLines))}점을 얻었습니다. 1줄씩 ${G.maxLines}번 지우면 ${fmt(10 * G.maxLines)}점뿐 — 당장의 선택보다 전체 배치가 중요합니다.`
+    : "이번 판은 한 번에 1줄씩만 지웠습니다. 배치를 조절해 2줄 이상을 동시에 지우면 점수가 제곱으로 커집니다(2줄 40 · 3줄 90).";
+  const b = BEST.get(), isNew = !b || G.score > b.score;
+  if (isNew && G.score > 0) BEST.set({ score: G.score, maxLines: G.maxLines, at: Date.now() });
+  BEST.render($("endBest"), isNew && G.score > 0);
+  BEST.render($("startBest"), false);
+  renderWorld();
+  $("scrEnd").classList.add("on");
+  if (WR) WR.prompt(G.score).then(rec => { if (rec) toast("🏆 세계 신기록 등록!", 2000); });
+}
+$("btnStart").onclick = () => { SND.init(); start(); };
+$("btnAgain").onclick = () => { SND.init(); start(); };
+document.addEventListener("keydown", e => {
+  if (e.code === "Space" && !G.playing && !D.on && ($("scrStart").classList.contains("on") || $("scrEnd").classList.contains("on"))) {
+    e.preventDefault(); SND.init(); start();
+  }
+});
+
+$("infoPerfect").textContent = CONFIG.PERFECT_CLEAR_BONUS;
+$("infoCells").textContent = "+칸 수×" + CONFIG.CELL_POINT;
+BEST.render($("startBest"), false);
+G.board = newBoard();
+applyTheme(); renderBoard(); renderTray();
+</script>
+</body>
+</html>
