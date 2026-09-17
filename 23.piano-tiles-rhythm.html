@@ -108,6 +108,7 @@
     <h1>피아노 타일 리듬</h1>
     <div class="concept">
       이 게임은 <b>정해진 순간</b>과 <b>여러분의 입력 순간</b>이 얼마나 가까운지를 판정합니다.
+      내려오는 타일이 아래 <b>버튼과 완전히 겹치는 순간</b>이 '정해진 순간'(PERFECT)입니다.
       컴퓨터 프로그램이 '이벤트가 발생한 시각'을 어떻게 처리하는지 직접 느껴보세요.
     </div>
     <label class="field">난이도</label>
@@ -156,7 +157,7 @@
       <div class="cell" style="grid-column:1/-1"><div class="k">MISS</div><div class="v m" id="rM">0</div></div>
     </div>
     <div class="concept">
-      <b>PERFECT</b>는 ±50ms, <b>GOOD</b>은 ±120ms 오차까지 인정한 결과입니다.
+      타일이 버튼과 <b>완전히 겹치는 순간</b>을 기준으로 <b>PERFECT</b>는 ±50ms, <b>GOOD</b>은 ±120ms 오차까지 인정한 결과입니다.
       실제 프로그램도 이렇게 '허용 오차'를 정해서 이벤트를 판정합니다.
     </div>
     <div class="spacer"></div>
@@ -870,8 +871,8 @@ function resize(){
   W = r.width; H = r.height;
   cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  padH = Math.max(64, Math.min(96, H * 0.16));   // 아래 탭 버튼 띠
-  hitY = H - padH;                                // 히트 라인
+  padH = Math.max(44, Math.min(72, H * 0.12));   // 아래 탭 버튼 높이 = 타일 높이 (타일이 버튼과 완전히 겹치는 순간이 PERFECT)
+  hitY = H - padH;                                // 버튼 윗변(히트 라인)
 }
 window.addEventListener("resize", () => { if (S.running) resize(); });
 // 목록으로 이동 등으로 화면을 벗어나도(뒤로가기 캐시 등으로 페이지가 바로 사라지지 않는 경우 대비) 미리 듣기는 끈다.
@@ -973,44 +974,55 @@ function loop(){
 
 function draw(now){
   const cfg = S.song, laneW = W / CONFIG.lanes, fall = cfg.fallDurationMs;
+  const tileH = padH, tileX = i => i * laneW + 4, tileW = laneW - 8;   // 버튼과 타일은 같은 크기·같은 자리
   ctx.clearRect(0, 0, W, H);
-  // 레인 배경
+  // 레인 배경 + 버튼(타일과 같은 크기)
   for (let i = 0; i < CONFIG.lanes; i++) {
     ctx.fillStyle = i % 2 ? "#FFFFFF" : "#F8FAF6";
-    ctx.fillRect(i * laneW, 0, laneW, hitY);
+    ctx.fillRect(i * laneW, 0, laneW, H);
     ctx.fillStyle = CONFIG.laneColors[i];
-    ctx.fillRect(i * laneW, hitY, laneW, padH);
+    ctx.fillRect(tileX(i), hitY, tileW, padH);
     const f = now - S.flash[i];
     if (f >= 0 && f < 120) {
       ctx.fillStyle = "rgba(27,43,32," + (0.25 * (1 - f / 120)) + ")";
-      ctx.fillRect(i * laneW, hitY, laneW, padH);
+      ctx.fillRect(tileX(i), hitY, tileW, padH);
     }
     ctx.strokeStyle = "#E4E8DE"; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(i * laneW + 0.5, 0); ctx.lineTo(i * laneW + 0.5, H); ctx.stroke();
+    ctx.strokeStyle = "#24402F"; ctx.lineWidth = 2;
+    ctx.strokeRect(tileX(i), hitY, tileW, padH);
+  }
+  // 히트 라인(버튼 윗변)
+  ctx.strokeStyle = "#24402F"; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(0, hitY); ctx.lineTo(W, hitY); ctx.stroke();
+
+  // 타일. 위치 = 남은 시간 비율로 계산 (속도 하드코딩 없음: 거리 H / 시간 fall)
+  // 타일 아랫변이 화면 맨 아래(H)에 닿는 순간 == 버튼과 완전히 겹치는 순간 == targetMs
+  // 버튼 위를 지나는 부분은 반투명으로 그려 얼마나 겹쳤는지 보이게 한다
+  const drawTiles = (clipY0, clipY1, alpha) => {
+    ctx.save(); ctx.beginPath(); ctx.rect(0, clipY0, W, clipY1 - clipY0); ctx.clip(); ctx.globalAlpha = alpha;
+    for (const n of S.notes) {
+      const remain = n.targetMs - now;
+      if (remain > fall) break;
+      if (n.judged && n.judged !== "MISS") continue;         // 맞춘 타일은 사라짐
+      if (n.judged === "MISS" && now - n.hitAt > 250) continue;
+      const y = H - (remain / fall) * H;                    // 타일 아랫변. 버튼과 완전히 겹칠 때 y == H
+      if (y - tileH > clipY1 || y < clipY0) continue;
+      ctx.fillStyle = n.judged === "MISS" ? "#C9D2C3" : CONFIG.laneColors[n.lane];
+      ctx.strokeStyle = n.judged === "MISS" ? "#B33951" : "#24402F";
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.rect(tileX(n.lane), y - tileH, tileW, tileH); ctx.fill(); ctx.stroke();
+    }
+    ctx.restore();
+  };
+  drawTiles(0, hitY, 1);          // 버튼 위쪽: 불투명
+  drawTiles(hitY, H, 0.45);       // 버튼 구간: 반투명 테두리로 통과
+  // 키 이름(버튼 안, 타일 위에)
+  for (let i = 0; i < CONFIG.lanes; i++) {
     ctx.fillStyle = "#3B4B40"; ctx.font = "700 18px \"Nanum Gothic\", \"Malgun Gothic\", sans-serif";
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.fillText(CONFIG.laneKeyLabels[i], (i + 0.5) * laneW, hitY + padH / 2);
   }
-  // 히트 라인
-  ctx.strokeStyle = "#24402F"; ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.moveTo(0, hitY); ctx.lineTo(W, hitY); ctx.stroke();
-
-  // 타일. 위치 = 남은 시간 비율로 계산 (속도 하드코딩 없음: 거리 hitY / 시간 fall)
-  const tileH = Math.max(28, Math.min(56, hitY * 0.09));
-  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, hitY); ctx.clip();   // 타일은 히트 라인 위 영역에만
-  for (const n of S.notes) {
-    const remain = n.targetMs - now;
-    if (remain > fall) break;
-    if (n.judged && n.judged !== "MISS") continue;         // 맞춘 타일은 사라짐
-    if (n.judged === "MISS" && now - n.hitAt > 250) continue;
-    const y = hitY - (remain / fall) * hitY;              // 히트 라인 도달 시 y == hitY
-    const x = n.lane * laneW + 4, w = laneW - 8;
-    ctx.fillStyle = n.judged === "MISS" ? "#C9D2C3" : CONFIG.laneColors[n.lane];
-    ctx.strokeStyle = n.judged === "MISS" ? "#B33951" : "#24402F";
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.rect(x, y - tileH, w, tileH); ctx.fill(); ctx.stroke();
-  }
-  ctx.restore();
   // 준비 안내
   if (now < S.startMs - fall) {
     const sec = Math.ceil((S.startMs - now) / 1000);
@@ -1018,7 +1030,7 @@ function draw(now){
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.fillText(String(sec), W / 2, hitY * 0.45);
     ctx.font = "15px \"Nanum Gothic\", \"Malgun Gothic\", sans-serif"; ctx.fillStyle = "#5B6B5E";
-    ctx.fillText("타일이 선에 닿는 순간 탭!", W / 2, hitY * 0.45 + 34);
+    ctx.fillText("타일이 버튼과 완전히 겹치는 순간 탭!", W / 2, hitY * 0.45 + 34);
   }
   // 판정 팝업 (히트 라인 근처, 페이드아웃)
   S.popups = S.popups.filter(p => now - p.at < 600);
