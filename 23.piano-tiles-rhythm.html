@@ -193,7 +193,6 @@ const CONFIG = {
         { id: "ode",     title: "환희의 송가",       bpm: 100, song: "EASY_SONG_2", fallDurationMs: 2000 },
         { id: "cuckoo",  title: "뻐꾹 왈츠",         bpm: 120, song: "EASY_SONG_3", fallDurationMs: 2000 },
         { id: "lith",     title: "리스 항구", bpm: 130, song: "LITH_SONG", fallDurationMs: 1700 },
-        { id: "terran",   title: "StarCraft - Terran", bpm: 135, song: "TERRAN_SONG", fallDurationMs: 1750 },
         { id: "countryroads", title: "Take Me Home, Country Roads", bpm: 84, song: "COUNTRYROADS_SONG", fallDurationMs: 2200 }
       ]
     },
@@ -202,7 +201,8 @@ const CONFIG = {
       songs: [
         { id: "furelise", title: "엘리제를 위하여", bpm: 120, song: "MEDIUM_SONG_1", fallDurationMs: 1800 },
         { id: "turkish",  title: "터키 행진곡",     bpm: 160, song: "MEDIUM_SONG_2", fallDurationMs: 1700 },
-        { id: "kerning",  title: "커닝시티", bpm: 135, song: "KERNING_SONG", fallDurationMs: 1500 }
+        { id: "kerning",  title: "커닝시티", bpm: 135, song: "KERNING_SONG", fallDurationMs: 1500 },
+        { id: "terran",   title: "StarCraft - Terran", bpm: 135, song: "TERRAN_SONG", fallDurationMs: 1600 }
       ]
     },
     hard: {
@@ -568,43 +568,33 @@ const COUNTRYROADS_SONG = seq(`
   A3:0.5 B3:0.75 A3:1.25 R:1 B3:0.5 A3:0.25 B3:0.75 D4:1.5
 `);
 
-// 쉬움 ⑤ 스타크래프트 - 테란 (Blizzard "Terran Theme 1", 1997/98, 135bpm) — 사용자가 제공한
+// 보통 ④ 스타크래프트 - 테란 (Blizzard "Terran Theme 1", 1997/98, 135bpm) — 사용자가 제공한
 // MIDI "Game MIDI_- Arranged -_Starcraft (PC/DOS, 1997)_Terran 1.mid"(포맷1, 7트랙, division=120)를 PowerShell
-// 바이트 파서로 파싱했다. 메타 이벤트(카피라이트·텍스트)가 EUC-KR(CP949)로 들어 있어
-// [System.Text.Encoding]::GetEncoding(949) 로 디코딩했고, "Copyright ⓒ 1999 by 권용달(niliri)"와 "베틀넷
-// niliri(1승6패)" 문구로 편곡자가 니릴리(권용달)임을 확인했다. 7개 트랙(드럼·멜로디·전자기타·화음·베이스·
-// 그냥 넣은 악기 등) 중 트랙 2가 트랙명부터 "멜로디"로 명시돼 있고(GM 프로그램 61=브라스 섹션) 실제로 처음부터
-// 끝까지 완전한 단선율(다른 음과 겹치는 구간이 전혀 없어 화음 정리가 필요 없었다)이라 이견 없이 채택했다.
-// 원래 vgmusic.com M4ST3R 채보(다른 사람의 편곡, 11트랙 MIDI)로 만든 TERRAN_SONG 을 별도 곡(테란-2)으로 나란히
-// 두었었으나, 사용자가 청음 비교 후 이쪽(니릴리 편곡) 손을 들어줘 M4ST3R 채보를 완전히 삭제하고 이 채보를
-// 유일한 테란 곡으로 승격했다. 곡 전체가 76박 길이이고(드럼 인트로 5박 + 멜로디 71박), 멜로디 트랙 노트온이
-// 정확히 58개뿐이라(원본 이벤트 수 재확인, 전부 0.25박 격자에 정렬돼 있어 더 잘게 쪼갤 음도 없음) 이전 채보가
-// 이미 무손실이었음을 재검증했다. 멜로디 시작 지점(tick 600)부터 정확히 66초(=148.5박, 두 바퀴 + 6.5박)가
-// 될 때까지 71박 루프를 이어 붙이고 마지막 음만 필요한 길이로 잘랐다(밀도 18.8/10초, 쉬움 등급 ≤20 이내).
-// 개인 팬이 만든 간이 시퀀싱이라 공식 악보 대조는 아니며 원곡보다 단순화돼 있을 수 있다(뻐꾹 왈츠 항목과
-// 같은 한계).
-const TERRAN_SONG = seq(`
-  A4:0.25 R:0.25 B4:0.25 R:0.25 C5:0.25 R:0.25 B4:0.25 R:0.25 A4:0.25 R:0.75
-  B4:0.5 R:1 B4:1 G4:1.5 R:1 A4:0.25 R:0.25 B4:0.25 R:0.25 C5:0.25
-  R:0.25 B4:0.25 R:0.25 A4:0.25 R:0.75 D#4:1.5 D4:1 C4:1.5 R:1 A4:0.25
-  R:0.25 B4:0.25 R:0.25 C5:0.25 R:0.25 B4:0.25 R:0.25 A4:0.25 R:0.75 B4:0.5
-  R:1 B4:1 D5:1.5 R:1 A4:0.25 R:0.25 B4:0.25 R:0.25 C5:0.25 R:0.25
-  B4:0.25 R:0.25 A4:0.25 R:0.75 A4:4 R:1 B4:0.5 C#5:0.5 D5:0.5 C#5:0.5
-  B4:0.5 R:0.5 C#5:0.5 R:1 C#5:1 A4:1 R:1.5 B4:0.5 C#5:0.5 D5:0.5
-  C#5:0.5 B4:0.5 R:0.5 B4:4 R:1 B4:0.5 C#5:0.5 D5:0.5 C#5:0.5 B4:0.5
-  R:0.5 C#5:0.5 R:1 C#5:1 E5:1.5 R:1 B4:0.5 C#5:0.5 D5:0.5 C#5:0.5
-  B4:0.5 R:0.5 B4:12 A4:0.25 R:0.25 B4:0.25 R:0.25 C5:0.25 R:0.25 B4:0.25
-  R:0.25 A4:0.25 R:0.75 B4:0.5 R:1 B4:1 G4:1.5 R:1 A4:0.25 R:0.25
-  B4:0.25 R:0.25 C5:0.25 R:0.25 B4:0.25 R:0.25 A4:0.25 R:0.75 D#4:1.5 D4:1
-  C4:1.5 R:1 A4:0.25 R:0.25 B4:0.25 R:0.25 C5:0.25 R:0.25 B4:0.25 R:0.25
-  A4:0.25 R:0.75 B4:0.5 R:1 B4:1 D5:1.5 R:1 A4:0.25 R:0.25 B4:0.25
-  R:0.25 C5:0.25 R:0.25 B4:0.25 R:0.25 A4:0.25 R:0.75 A4:4 R:1 B4:0.5
-  C#5:0.5 D5:0.5 C#5:0.5 B4:0.5 R:0.5 C#5:0.5 R:1 C#5:1 A4:1 R:1.5
-  B4:0.5 C#5:0.5 D5:0.5 C#5:0.5 B4:0.5 R:0.5 B4:4 R:1 B4:0.5 C#5:0.5
-  D5:0.5 C#5:0.5 B4:0.5 R:0.5 C#5:0.5 R:1 C#5:1 E5:1.5 R:1 B4:0.5
-  C#5:0.5 D5:0.5 C#5:0.5 B4:0.5 R:0.5 B4:12 A4:0.25 R:0.25 B4:0.25 R:0.25
-  C5:0.25 R:0.25 B4:0.25 R:0.25 A4:0.25 R:0.75 B4:0.5 R:1 B4:1 G4:1
-`);
+// 바이트 파서로 파싱했다. 메타 이벤트가 EUC-KR(CP949)이라 GetEncoding(949) 로 디코딩, "Copyright ⓒ 1999 by 권용달(niliri)"
+// 문구로 편곡자가 니릴리(권용달)임을 확인. 7개 트랙 중 트랙 2 "멜로디"(GM 61 브라스 섹션)가 처음부터 끝까지 완전한 단선율이라
+// 채택했다(71박 루프에 노트온 58개, 전부 0.25박 격자). 원래 vgmusic.com M4ST3R 채보로 만든 판은 사용자가 청음 비교 후 삭제.
+// 처음엔 멜로디 58음만 두 바퀴 + 6.5박(66초, 밀도 18.8/10초, 쉬움)이었으나 "훨씬 음이 많고 웅장하게" 요청으로
+// 멜로디 음의 위치·높이는 그대로 둔 채 쉼표·롱톤 자리를 채웠다(MIDI 파일이 남아 있지 않아 다른 트랙을 다시 파싱하지는 못했고
+// 원곡의 베이스 페달·파워코드 느낌을 손으로 편곡):
+//  · A부(Am) 기타 리프 뒤 빈 8분음표에 A3 페달, 응답 구절의 쉼표에 A3·E3·E4 갤럽 베이스, 반음 하강(D#-D-C)은 저음 옥타브로 받침,
+//    A4 롱톤은 A3→E5 Am 아르페지오로 상승.
+//  · B부(Bm) 리프 뒤 B3 페달, C#5·A4 구절에 F#3·B3·A3 베이스, B4 롱톤은 Bm 아르페지오(B3→F#5), 마지막 12박 롱톤은
+//    B3→B5 까지 올라갔다 내려오는 아르페지오 피날레.
+//  16분음표는 원 리프처럼 8분음표 간격(222ms)을 유지해 연타가 111ms 로 좁아지는 자리는 없다. 한 바퀴 121음(원래 58음),
+//  두 바퀴 + 6.5박 = 253타일, 66초, 밀도 38.3/10초 — 쉬움(≤20)을 넘어 보통 등급으로 옮겼다.
+const TERRAN_RIFF_A = seq(`A4:0.25 R:0.25 B4:0.25 R:0.25 C5:0.25 R:0.25 B4:0.25 R:0.25 A4:0.25 R:0.25 A3:0.5`);
+const TERRAN_RIFF_B = seq(`B4:0.5 C#5:0.5 D5:0.5 C#5:0.5 B4:0.5 B3:0.5`);
+const TERRAN_LOOP = cat(
+  TERRAN_RIFF_A, seq(`B4:0.5 A3:0.5 E4:0.5 B4:1 G4:1.5 A3:0.5 E3:0.5`),
+  TERRAN_RIFF_A, seq(`D#4:1 D#3:0.5 D4:0.5 D3:0.5 C4:1 C3:0.5 E3:0.5 G3:0.5`),
+  TERRAN_RIFF_A, seq(`B4:0.5 A3:0.5 E4:0.5 B4:1 D5:1 A3:0.5 C4:0.5 E4:0.5`),
+  TERRAN_RIFF_A, seq(`A4:1 E4:0.5 A3:0.5 C4:0.5 E4:0.5 A4:0.5 C5:0.5 E5:1`),
+  TERRAN_RIFF_B, seq(`C#5:0.5 F#3:0.5 B3:0.5 C#5:1 A4:1 A3:0.5 E4:0.5 A4:0.5`),
+  TERRAN_RIFF_B, seq(`B4:1 F#4:0.5 B3:0.5 D4:0.5 F#4:0.5 B4:0.5 D5:0.5 F#5:1`),
+  TERRAN_RIFF_B, seq(`C#5:0.5 F#3:0.5 B3:0.5 C#5:1 E5:1 E4:0.5 G#4:0.5 B4:0.5`),
+  TERRAN_RIFF_B, seq(`B4:2 F#4:0.5 B3:0.5 D4:0.5 F#4:0.5 B4:0.5 D5:0.5 F#5:0.5 B5:1 F#5:0.5 D5:0.5 B4:0.5 F#4:0.5 D4:0.5 B3:0.5 F#3:0.5 B3:0.5 B4:1.5`)
+);
+const TERRAN_SONG = cat(rep(TERRAN_LOOP, 2), TERRAN_RIFF_A, seq(`B4:0.5 A3:0.5 E4:0.5 B4:1 G4:1`));
 
 // 어려움 ④ 신해철(N.EX.T) - 그대에게 (1988, 원곡 135→160bpm) — 사용자가 제공한 MIDI "그대에게.mid"(포맷1, 18트랙,
 // division=120, 트랙명 BRASS·BASS·MELODY·DISTOTION GT·BELLS·SFX·BRASS2 …)를 PowerShell 바이트 파서로 파싱했다.
