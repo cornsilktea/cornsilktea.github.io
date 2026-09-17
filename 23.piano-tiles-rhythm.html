@@ -1037,10 +1037,10 @@ function draw(now){
   }
 }
 
-/* 입력: 터치 + 포인터(마우스·펜) + 키보드
-   전자칠판 일부는 손가락 터치에 pointerdown 을 안 보내거나(touch 이벤트만 보냄)
-   pointerType 을 비워 보내므로, 손가락은 touchstart 로 직접 받고 pointerdown 은
-   마우스·펜만 처리한다. 좌표로 레인을 계산해 두 손가락 동시 입력도 각각 판정한다. */
+/* 입력: 레인에 오는 모든 종류의 누름(pointerdown·touchstart·mousedown·click)을 다 받는다.
+   전자칠판 내장 브라우저는 손가락 터치를 pointer 로만, touch 로만, 혹은 흉내 mouse/click 으로만
+   전달하는 등 기기마다 달라서 한 종류만 믿을 수 없다. 같은 손가락이 여러 이벤트로 겹쳐 오면
+   레인별 시각으로 걸러 한 번만 판정한다. 좌표로 레인을 계산해 두 손가락 동시 입력도 각각 판정한다. */
 const lanesEl = $("lanes");
 function laneAtX(x){
   const r = lanesEl.getBoundingClientRect();
@@ -1048,25 +1048,37 @@ function laneAtX(x){
   const i = Math.floor((x - r.left) / r.width * CONFIG.lanes);
   return i < 0 || i >= CONFIG.lanes ? -1 : i;
 }
-let lastPointerHitAt = 0;
+const laneLastHit = [0, 0, 0, 0];
+function hitLaneOnce(lane, src){
+  if (lane < 0) return;
+  const now = performance.now();
+  const gap = src === "click" ? 400 : 100;     // click 은 손을 뗀 뒤 오므로 앞선 판정과 더 넓게 겹친다
+  if (now - laneLastHit[lane] < gap) return;
+  laneLastHit[lane] = now;
+  hitLane(lane);
+}
 lanesEl.addEventListener("touchstart", e => {
   e.preventDefault();
-  if (performance.now() - lastPointerHitAt < 120) return;   // pointerType 없는 pointerdown 이 이미 처리한 터치
-  for (const t of e.changedTouches) { const i = laneAtX(t.clientX); if (i >= 0) hitLane(i); }
+  for (const t of e.changedTouches) hitLaneOnce(laneAtX(t.clientX), "touch");
 }, { passive: false });
-lanesEl.addEventListener("pointerdown", e => {
-  e.preventDefault();
-  if (e.pointerType === "touch") return;                     // 손가락은 touchstart 가 처리
-  lastPointerHitAt = performance.now();
-  const i = laneAtX(e.clientX); if (i >= 0) hitLane(i);
-});
-if (!window.PointerEvent) {                                  // 포인터 이벤트가 없는 옛 브라우저: 마우스 직접 처리
-  lanesEl.addEventListener("mousedown", e => {
-    e.preventDefault();
-    if (performance.now() - lastPointerHitAt < 400) return;   // 터치 뒤에 따라오는 흉내 마우스 이벤트 무시
-    const i = laneAtX(e.clientX); if (i >= 0) hitLane(i);
+lanesEl.addEventListener("pointerdown", e => { e.preventDefault(); hitLaneOnce(laneAtX(e.clientX), "pointer"); });
+lanesEl.addEventListener("mousedown",   e => { e.preventDefault(); hitLaneOnce(laneAtX(e.clientX), "mouse"); });
+lanesEl.addEventListener("click",       e => { e.preventDefault(); hitLaneOnce(laneAtX(e.clientX), "click"); });
+/* 진단: 주소 뒤에 ?debug 를 붙이면 레인에 도착하는 이벤트를 화면 왼쪽 아래에 보여 준다 (전자칠판 확인용) */
+if (/[?&]debug/.test(location.search)) {
+  const box = document.createElement("div");
+  box.style.cssText = "position:fixed;left:8px;bottom:8px;z-index:99999;background:rgba(0,0,0,.75);color:#fff;font:12px/1.4 monospace;padding:6px 8px;border-radius:6px;max-width:60vw;pointer-events:none;white-space:pre";
+  box.textContent = "PointerEvent:" + !!window.PointerEvent + " TouchEvent:" + ("ontouchstart" in window) + " maxTouch:" + navigator.maxTouchPoints + "\n";
+  document.body.appendChild(box);
+  const lines = [];
+  ["pointerdown", "touchstart", "mousedown", "click"].forEach(type => {
+    lanesEl.addEventListener(type, e => {
+      const x = e.clientX != null ? e.clientX : (e.changedTouches && e.changedTouches[0] ? e.changedTouches[0].clientX : NaN);
+      lines.push(type + (e.pointerType != null ? "(" + (e.pointerType || "빈값") + ")" : "") + " lane " + laneAtX(x));
+      if (lines.length > 6) lines.shift();
+      box.textContent = box.textContent.split("\n")[0] + "\n" + lines.join("\n");
+    }, true);
   });
-  lanesEl.addEventListener("touchstart", () => { lastPointerHitAt = performance.now(); }, { passive: true });
 }
 window.addEventListener("keydown", e => {
   if (e.repeat || (e.target && e.target.tagName === "INPUT")) return;
