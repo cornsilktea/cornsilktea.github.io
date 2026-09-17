@@ -94,6 +94,11 @@
   .final .lab { font-size: 13px; color: var(--sg-ink-soft); font-weight: 700; }
   .final .num { font-size: clamp(36px, 8vw, 52px); font-weight: 800; font-variant-numeric: tabular-nums; color: var(--sg-primary); line-height: 1.1; }
   .msg { font-size: 16px; font-weight: 800; color: #D97B4F; min-height: 20px; margin: 4px 0 2px; }
+  .stats { display: flex; gap: 8px; margin: 6px 0 0; }
+  .stats > div { flex: 1 1 0; min-width: 0; border: 2px solid var(--sg-line); border-radius: 10px; padding: 6px 4px; }
+  .stats .lab { font-size: 12px; font-weight: 700; color: var(--sg-ink-soft); }
+  .stats .val { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--sg-ink); }
+  .stats .sub { font-size: 11px; color: var(--sg-ink-faint); font-variant-numeric: tabular-nums; min-height: 13px; }
   .wipe { font-size: 12px; color: var(--sg-ink-faint); margin-top: 8px; }
   .wipe button { font: inherit; font-size: 12px; color: var(--sg-ink-soft); background: none; border: none; text-decoration: underline; cursor: pointer; }
   @media (max-width: 520px) {
@@ -144,6 +149,11 @@
       <div><div class="lab">생존 시간</div><div class="num" id="finalTime">0:00</div></div>
     </div>
     <div class="msg" id="finalMsg"></div>
+    <div class="stats">
+      <div><div class="lab">발사</div><div class="val" id="statShots">0발</div><div class="sub">&nbsp;</div></div>
+      <div><div class="lab">명중률</div><div class="val" id="statAcc">—</div><div class="sub" id="statAccSub"></div></div>
+      <div><div class="lab">헤드샷 비율</div><div class="val" id="statHead">—</div><div class="sub" id="statHeadSub"></div></div>
+    </div>
     <div class="rec">
       <div><div class="lab">개인 최고 기록</div><div class="val" id="bestOver">—</div><div class="who" id="bestOverNew"></div></div>
       <div><div class="lab">🏆 세계 신기록</div><div class="val" id="wrOver">—</div><div class="who" id="wrWhoOver"></div></div>
@@ -176,7 +186,7 @@ const DIFFICULTY_CONFIG = {
   enemyFireCooldownSec: 1.8,             // 적 발사 주기(초)
   enemyFireRange: 20,                    // 적 사거리(유닛)
   enemyDamage: 10,                       // 적 1발 데미지
-  enemyBulletSpeed: 14,                  // 적 총알 속도(유닛/초) — 느려서 옆으로 움직이면 피할 수 있음
+  enemyBulletSpeed: 18,                  // 적 총알 속도(유닛/초) — 옆으로 움직이면 피할 수 있는 정도(14 는 너무 쉬웠음)
   enemyBulletSpread: 0.9,                // 빗나가는 탄의 조준 오차(유닛, 좌우·상하)
   enemyMoveSpeed: 3.5,                   // 적 이동 속도(유닛/초)
   enemyKeepMin: 8, enemyKeepMax: 15,     // 적이 유지하려는 거리
@@ -424,11 +434,21 @@ const gun = new THREE.Group();
   gun.position.set(0.32, -0.28, -0.5);
   camera.add(gun);
 }
-const sparkGeo = new THREE.SphereGeometry(0.08, 6, 6), sparkMat = new THREE.MeshBasicMaterial({ color: 0xFFE28A });
+const sparkGeo = new THREE.SphereGeometry(0.08, 6, 6), sparkMat = new THREE.MeshBasicMaterial({ color: 0xFFE28A, transparent: true });
 const tracerMat = new THREE.LineBasicMaterial({ color: 0xFFD07A });
 const transient = [];   // { obj, until }
-function addTransient(obj, ms) { scene.add(obj); transient.push({ obj, until: performance.now() + ms }); }
-function pruneTransient(now) { for (let i = transient.length - 1; i >= 0; i--) if (transient[i].until <= now) { scene.remove(transient[i].obj); transient.splice(i, 1); } }
+const playerTracerMat = new THREE.MeshBasicMaterial({ color: 0xFFE9A8, transparent: true, opacity: 0.95 });
+/* fade: 남은 시간에 따라 투명해지며 사라짐(재질을 clone 해서 넘길 것). 끝나면 geometry·material 정리 */
+function addTransient(obj, ms, fade) { scene.add(obj); transient.push({ obj, until: performance.now() + ms, ms, fade: !!fade }); }
+function pruneTransient(now) {
+  for (let i = transient.length - 1; i >= 0; i--) {
+    const t = transient[i];
+    if (t.until <= now) {
+      scene.remove(t.obj); transient.splice(i, 1);
+      if (t.fade) { if (t.obj.geometry !== sparkGeo) t.obj.geometry.dispose(); t.obj.material.dispose(); }
+    } else if (t.fade) t.obj.material.opacity = Math.max(0, (t.until - now) / t.ms);
+  }
+}
 
 /* ═══════════════════ 충돌 (원 vs 사각·원, XZ 평면) ═══════════════════ */
 function blocked(x, z, r) {
@@ -627,6 +647,7 @@ const P = { x: 0, z: 0, yaw: 0, pitch: 0, hp: 100, ammo: 30, fireT: 0, recoil: 0
 let state = "menu";          // menu | play | over
 let elapsed = 0, score = 0, lastT = 0;
 let spawnTimers = [], itemT = { ammo: 0, heal: 0 }, overAt = 0, spaceFresh = true;
+const STAT = { shots: 0, hits: 0, heads: 0 };   // 이번 판 발사·명중·헤드샷 수
 const keys = {};
 
 function resetGame() {
@@ -636,7 +657,7 @@ function resetGame() {
   transient.forEach(t => scene.remove(t.obj)); transient.length = 0;
   P.x = PLAYER_START.x; P.z = PLAYER_START.z; P.yaw = PLAYER_START.yaw; P.pitch = 0;
   P.hp = PLAYER_CONFIG.hp; P.ammo = PLAYER_CONFIG.ammo; P.fireT = 0; P.recoil = 0;
-  elapsed = 0; score = 0;
+  elapsed = 0; score = 0; STAT.shots = STAT.hits = STAT.heads = 0;
   spawnTimers = SPAWNS.map((s, i) => DIFFICULTY_CONFIG.initialSpawnIntervalSec * (0.5 + i * 0.35));   // 세 곳이 동시에 쏟아지지 않게 어긋나게
   itemT.ammo = ITEM_CONFIG.ammo.intervalSec; itemT.heal = ITEM_CONFIG.heal.intervalSec * 0.5;   // 탄약·물약이 번갈아 나오게 반 주기 어긋남
   for (let i = 0; i < ITEM_CONFIG.ammo.initialCount; i++) makeItem("ammo");
@@ -689,6 +710,10 @@ function gameOver() {
   if (newBest) { best = { score: kills, time: sec, date: new Date().toLocaleDateString("ko-KR") }; saveBest(best); }
   const wrBeat = WR && WR.beats(packed);
   $("finalMsg").textContent = wrBeat ? "🏆 세계 신기록!" : newBest ? "🎉 개인 최고 기록 경신!" : (kills === 0 ? "장애물 뒤에 숨어서 싸워 보세요!" : "");
+  const pct = (a, b) => b > 0 ? Math.round(a / b * 100) + "%" : "—";
+  $("statShots").textContent = STAT.shots + "발";
+  $("statAcc").textContent = pct(STAT.hits, STAT.shots); $("statAccSub").textContent = STAT.hits + " / " + STAT.shots;
+  $("statHead").textContent = pct(STAT.heads, STAT.hits); $("statHeadSub").textContent = STAT.heads + " / " + STAT.hits;
   $("bestOverNew").innerHTML = newBest ? '<span class="new">NEW</span>' : "";
   setTimeout(() => {
     if (state !== "over") return;
@@ -720,11 +745,21 @@ function shoot() {
   scene.updateMatrixWorld();
   ray.setFromCamera({ x: 0, y: 0 }, camera); ray.far = 200;
   const hits = ray.intersectObjects(obstacleMeshes.concat(enemyParts), false);
+  STAT.shots++;
+  /* 예광탄: 총구 → 맞은 지점(없으면 60유닛 앞)까지 굵은 빛줄기, 0.18초 동안 옅어지며 사라짐 */
+  const muzzle = new THREE.Vector3(); gun.userData.flash.getWorldPosition(muzzle);
+  const end = hits.length ? hits[0].point.clone() : ray.ray.at(60, new THREE.Vector3());
+  const len = muzzle.distanceTo(end);
+  const tracer = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.045, len, 6), playerTracerMat.clone());
+  tracer.geometry.translate(0, len / 2, 0); tracer.geometry.rotateX(Math.PI / 2);   // 원기둥 축을 +Z 로 → lookAt 으로 정렬
+  tracer.position.copy(muzzle); tracer.lookAt(end); addTransient(tracer, 180, true);
   if (hits.length) {
-    const h = hits[0], spark = new THREE.Mesh(sparkGeo, sparkMat); spark.position.copy(h.point); addTransient(spark, 70);
+    const h = hits[0];
+    const spark = new THREE.Mesh(sparkGeo, sparkMat.clone()); spark.position.copy(h.point); spark.scale.setScalar(2.2); addTransient(spark, 160, true);
     const ud = h.object.userData;
     if (ud && ud.enemy) {
       const e = ud.enemy, head = ud.part === "head", dmg = head ? PLAYER_CONFIG.headDamage : PLAYER_CONFIG.bodyDamage;
+      STAT.hits++; if (head) STAT.heads++;
       e.hp -= dmg; hitmark(); popup("-" + dmg + "%", head ? "head" : "");
       enemyFlash(e, true); e.flashT = 0.08;
       if (e.hp <= 0) {
