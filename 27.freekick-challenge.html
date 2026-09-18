@@ -34,7 +34,7 @@
   #pips span.done { background: var(--sg-ok); border-color: var(--sg-ok); color: #fff; }
   #pips span.open { border-color: var(--sg-primary); color: var(--sg-primary); }
   #pips span.cur { background: #D97B4F; border-color: #D97B4F; color: #fff; }
-  #hudAim { top: 52px; left: 10px; pointer-events: none; font-size: 15px; }
+  #hudAim { top: 52px; left: 10px; pointer-events: none; font-size: 15px; max-width: 300px; }
   #hudAim b { color: var(--sg-primary); }
   #hudBest { top: 52px; right: 10px; pointer-events: none; font-size: 14px; text-align: right; }
   #hudBest .who { display: block; font-size: 11px; color: var(--sg-ink-soft); font-weight: 700; }
@@ -210,6 +210,7 @@ for (let n = 1; n <= 10; n++) {
     gkSigma:   [1.7, 0.6, 0.55][tier],     // 골키퍼 예측 오차(표준편차, m) — 클수록 쉬움
     gkWrong:   [0.30, 0.10, 0.03][tier],   // 골키퍼가 아예 반대쪽으로 가는 확률
     gkReact:   [0.32, 0.16, 0.14][tier],   // 골키퍼 반응 지연(초)
+    cornerSave: [0, 0.25, 0.35][tier],     // (6단계부터) 위 구석으로 정확히 온 공을 골키퍼가 막아낼 확률 — 나머지는 손이 닿지 않게 짧게 뛴다
     wallDelay: [0.35, 0.18, 0.08][tier],   // 수비수 점프 타이밍이 늦어지는 최대치(초)
   });
 }
@@ -228,8 +229,9 @@ const PHYS = {
 const GOAL = { hw: 3.66, h: 2.44, post: 0.06, depth: 1.8 };
 const AIM = { range: 15, speed: 5.5, accel: 2.4, accelT: 0.6, previewPower: 0.5 };   // 조준 범위(골라인 x, m — 커브 보정을 위해 골대보다 훨씬 넓게) · 이동 속도(m/s) · 길게 누르면 accelT초에 걸쳐 accel배까지 빨라짐 · 누르기 전 궤적 미리보기 파워
 const DEF = { w: 0.5, h: 1.83, gap: 0.58, jumpH: 0.4, jumpDur: 0.6 };
-const TOP_CORNER = { x: 2.5, y: 1.7 };   // 6단계부터 골키퍼가 못 막는 유일한 곳: 골라인에서 |x| ≥ 2.5m 이고 높이 ≥ 1.7m (골대 폭 ±3.66, 높이 2.44)
-const GK = { diveSpeed: 5.2, shuffle: 3.2, reach: 0.45, arm: 1.0, maxX: 3.2, armDrop: [0.95, 0.85, 0.6], slowCatch: 9 };   // shuffle: 다이빙 전 잔발 이동 속도(m/s) · slowCatch: 이보다 느린 공(m/s)은 몸 가까이 오면 그냥 잡는다
+const TOP_CORNER = { x: 2.2, y: 1.5 };   // 6단계부터 골키퍼가 못 막는 유일한 곳: 골라인에서 |x| ≥ 2.2m 이고 높이 ≥ 1.5m (골대 폭 ±3.66, 높이 2.44)
+function inTopCorner(x, y) { return Math.abs(x) >= TOP_CORNER.x && Math.abs(x) < GOAL.hw && y >= TOP_CORNER.y && y < GOAL.h; }
+const GK = { diveSpeed: 5.2, shuffle: 3.2, reach: 0.45, arm: 1.0, maxX: 3.2, armDrop: [0.95, 1.05, 0.9], slowCatch: 9 };   // shuffle: 다이빙 전 잔발 이동 속도(m/s) · slowCatch: 이보다 느린 공(m/s)은 몸 가까이 오면 그냥 잡는다
 
 const $ = id => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -515,7 +517,7 @@ const B = { p: new THREE.Vector3(), v: new THREE.Vector3(), rpm: 0, curve: 0, t:
 const K = { swing: -1 };       // 키커 킥 동작 진행 시간(초). -1 = 안 함. 오른발(legs[1])로만 찬다
 /* 골키퍼. phase: ready(대기) → wait(반응 지연) → shuffle(공을 보며 잔발로 이동, 예측 오차가 점점 줄어듦) → dive(방향을 정하고 몸을 날림) → land(착지) → recover(공이 아직 살아 있으면 일어나서 다시 따라감)
    keeperEst(): 지금 시점의 예상 도착 x. 공이 골대에 가까워질수록 오차(err)가 줄어들어 느린 공·이상한 공은 결국 따라잡는다 */
-const G = { x: 0, y: 0, baseX: 0, dir: 0, footX: 0, phase: "ready", tStart: 0, commitAt: 0, arrive: 0, goalX: 0, goalY: 0, err: 0, errY: 0, diveFrom: 0, targetX: 0, targetY: 0, lean: 0, high: false, armAng: 0.9, armLen: 0.6, step: 0, landT: 0, sure: false };
+const G = { x: 0, y: 0, baseX: 0, dir: 0, footX: 0, phase: "ready", tStart: 0, commitAt: 0, arrive: 0, goalX: 0, goalY: 0, err: 0, errY: 0, diveFrom: 0, targetX: 0, targetY: 0, lean: 0, high: false, armAng: 0.9, armLen: 0.6, step: 0, landT: 0, sure: false, miss: false };
 let shotStat = { kmh: 0, rpm: 0 };
 
 function ballHome() { return new THREE.Vector3(0, PHYS.ballR, stage.dist); }
@@ -528,7 +530,7 @@ function placeScene() {
   kicker.userData.legs.forEach(l => l.rotation.x = 0); kicker.userData.knees.forEach(k => k.rotation.x = 0); kicker.userData.arms.forEach(a => a.rotation.set(0, 0, 0)); kicker.userData.torso.rotation.x = 0;
   keeper.position.set(0, 0, 0.6); keeper.rotation.set(0, Math.PI, 0);
   keeperPose("ready");
-  G.x = 0; G.y = 0; G.phase = "ready"; G.lean = 0; G.dir = 0; G.footX = 0;
+  G.x = 0; G.y = 0; G.phase = "ready"; G.lean = 0; G.dir = 0; G.footX = 0; G.sure = G.miss = false;
   /* 수비벽: 골 중심에서 살짝 치우쳐 한쪽을 막고, 골키퍼가 반대쪽을 맡는 느낌 */
   /* 수비벽은 실제처럼 '가까운 골대 기둥 쪽'을 막는다: 벽 바깥쪽 끝이 공→기둥 선보다 조금 밖에 오도록 맞추고, 골키퍼는 열린 쪽으로 한 발 옮긴다 */
   const wz = home.z - stage.wallDist, n = stage.defenders, side = Math.random() < 0.5 ? -1 : 1;
@@ -558,7 +560,9 @@ function updateAimVisual() {
   trajMat.color.setHex(KICKS[kickType].color); trajMark.material.color.setHex(KICKS[kickType].color);
   trajMark.position.copy(tp.end);
   $("aimVal").textContent = (aimX >= 0 ? "+" : "") + aimX.toFixed(1); $("loftVal").textContent = tp.goal ? tp.goal.y.toFixed(1) : "—";
-  $("trajNote").textContent = state === "charge" ? "파워 " + Math.round(pw * 100) + "% 기준" : "파워 " + Math.round(AIM.previewPower * 100) + "% 기준 (누르면 실시간)";
+  const corner = stage.strict && tp.goal && inTopCorner(tp.goal.x, tp.goal.y);   // 6단계부터: 예상 도착점이 위 구석이면 초록으로 알려 준다
+  if (corner) { trajMat.color.setHex(0x5FD37A); trajMark.material.color.setHex(0x5FD37A); }
+  $("trajNote").textContent = (corner ? "✅ 위 구석! · " : stage.strict ? "🎯 위 구석만 골 · " : "") + (state === "charge" ? "파워 " + Math.round(pw * 100) + "% 기준" : "파워 " + Math.round(AIM.previewPower * 100) + "% 기준 (누르면 실시간)");
 }
 
 /* ═══════════════════ 공 물리 (실제 비행과 예측에 같은 적분기를 씀) ═══════════════════ */
@@ -645,8 +649,10 @@ function shoot() {
   if (scale >= 0.99 && Math.random() < stage.gkWrong) err = -Math.sign(gt.x - G.baseX || 1) * rnd(3, 5);   // 반대쪽을 읽음 (다가오면서 고치지만 늦는다)
   G.err = err * scale; G.errY = gauss() * stage.gkSigma * 0.35 * Math.max(scale, 0.15);
   /* 6단계부터: 골대 위 양쪽 구석(TOP_CORNER)이 아니면 골키퍼가 정확히 읽고 반드시 막는다(sure). 위 구석은 평소대로 예측 오차 + 멀리 날수록 손이 낮아짐 */
-  G.sure = stage.strict && !(Math.abs(gt.x) >= TOP_CORNER.x && gt.y >= TOP_CORNER.y);
+  G.sure = stage.strict && !inTopCorner(gt.x, gt.y);
   if (G.sure) { G.err = 0; G.errY = 0; }
+  G.miss = stage.strict && !G.sure && Math.random() >= stage.cornerSave;   // 위 구석 공: cornerSave 확률로만 막고, 아니면 일부러 짧고 낮게 뛰어 공이 손 위로 지나간다
+  if (G.miss) { G.err = -Math.sign(gt.x - G.baseX || 1) * rnd(1.2, 2.0); G.errY = -rnd(0.4, 0.8); }
   G.tStart = stage.gkReact + rnd(0, 0.08); G.arrive = Math.max(G.tStart + 0.2, gt.t);
   G.commitAt = Math.max(G.tStart + 0.02, G.arrive - clamp(gt.t * 0.45, 0.35, 0.6));   // 도착 0.35~0.6초 전에 방향을 정하고 몸을 날린다
   G.phase = "wait"; G.lean = 0; G.high = false; G.dir = 0;
@@ -691,7 +697,7 @@ function updateFlight(dt) {
       const dist = Math.min(segDist(B.p.x, B.p.y, gx, gy, hx, hy), segDist(B.p.x, B.p.y, fx, fy, gx, gy), segDist(B.p.x, B.p.y, gx, gy, tx, ty));
       const slow = B.v.length() < GK.slowCatch && G.phase !== "dive" && Math.abs(B.p.x - gx) < 0.9 && B.p.y < 2.1;   // 느린 공은 서서 그냥 잡는다
       const sure = G.sure && (G.phase === "dive" || G.phase === "land") && Math.hypot(B.p.x - G.targetX, B.p.y - G.targetY) < 1.0;   // 6단계부터 위 구석이 아닌 공은 정확히 도착점으로 손을 뻗어 막는다
-      if (dist < GK.reach + PHYS.ballR || slow || sure) {
+      if (!G.miss && (dist < GK.reach + PHYS.ballR || slow || sure)) {
         B.gkChecked = true;
         B.v.z = Math.abs(B.v.z) * 0.3; B.v.x = (B.p.x - gx) * 3 + rnd(-1, 1); B.v.y = Math.max(1.5, B.v.y * 0.3); B.rpm *= 0.3;
         finishShot("save", "골키퍼 선방!");
