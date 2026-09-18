@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<script charset="utf-8" src="firebase-config.js"></script>
+<script charset="utf-8" src="access-guard.js" data-game="freekick"></script>
+<script charset="utf-8" src="world-record.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
+<title>프리킥 챌린지</title>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="정보 수업용 링크 모음">
+<meta property="og:title" content="프리킥 챌린지">
+<meta property="og:description" content="3D 축구 프리킥 10단계 / 조준·킥 종류·파워로 수비벽과 골키퍼를 뚫는 개인전 (방향키·WASD 조준, 1·2·3 킥, 스페이스 파워)">
+<meta property="og:url" content="https://cornsilktea.github.io/27.freekick-challenge.html">
+<meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
+<meta name="twitter:card" content="summary">
+<!-- 링크 미리보기 끝 -->
+<link rel="stylesheet" href="theme.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #DDE3E8; font-family: var(--sg-font); color: var(--sg-ink); }
+  canvas#gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+  /* ── HUD (위쪽 46px 는 access-guard.js 의 '← 목록으로' 버튼 자리) ── */
+  .hud { position: fixed; z-index: 5; display: none; }
+  .hud-box { background: rgba(255,255,255,.92); border: 2px solid var(--sg-line-strong); border-radius: 10px; padding: 6px 12px; font-weight: 800; font-variant-numeric: tabular-nums; box-shadow: 0 3px 0 rgba(27,43,32,.25); }
+  .hud-box .lab { font-size: 11px; color: var(--sg-ink-soft); font-weight: 700; display: block; }
+  #hudTop { top: 52px; left: 50%; transform: translateX(-50%); text-align: center; pointer-events: none; }
+  #hudTop .hud-box { display: inline-block; font-size: 18px; }
+  #hudTop .stage { font-size: 22px; color: var(--sg-primary); }
+  #pips { display: flex; gap: 4px; justify-content: center; margin-top: 5px; }
+  #pips span { width: 18px; height: 18px; border-radius: 5px; border: 2px solid var(--sg-line-mid); background: #fff; font-size: 10px; line-height: 14px; color: var(--sg-ink-faint); font-weight: 800; }
+  #pips span.done { background: var(--sg-ok); border-color: var(--sg-ok); color: #fff; }
+  #pips span.open { border-color: var(--sg-primary); color: var(--sg-primary); }
+  #pips span.cur { background: #D97B4F; border-color: #D97B4F; color: #fff; }
+  #hudAim { top: 52px; left: 10px; pointer-events: none; font-size: 15px; }
+  #hudAim b { color: var(--sg-primary); }
+  #hudBest { top: 52px; right: 10px; pointer-events: none; font-size: 14px; text-align: right; }
+  #hudBest .who { display: block; font-size: 11px; color: var(--sg-ink-soft); font-weight: 700; }
+
+  /* ── 아래 조작판: 조준 · 킥 종류 · 높이 · 파워 게이지 ── */
+  #panel { left: 0; right: 0; bottom: 0; padding: 8px 10px 10px; display: none; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
+  #panel > * { pointer-events: auto; }
+  #powerWrap { width: min(560px, 100%); background: rgba(255,255,255,.92); border: 2px solid var(--sg-line-strong); border-radius: 10px; padding: 6px 10px 8px; box-shadow: 0 3px 0 rgba(27,43,32,.25); }
+  #powerWrap .lab { display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; color: var(--sg-ink-soft); margin-bottom: 4px; }
+  #powerWrap .lab b { color: var(--sg-ink); font-size: 14px; }
+  #powerBar { height: 22px; border: 2px solid var(--sg-line-strong); border-radius: 6px; background: #fff; overflow: hidden; position: relative; }
+  #powerFill { height: 100%; width: 0; background: linear-gradient(90deg, var(--sg-ok), var(--sg-warn) 60%, #D97B4F); }
+  #powerBar .tick { position: absolute; top: 0; bottom: 0; width: 2px; background: rgba(27,43,32,.25); }
+  .row { display: flex; gap: 8px; align-items: stretch; justify-content: center; flex-wrap: wrap; width: min(700px, 100%); }
+  .kick { flex: 1 1 150px; min-width: 0; font: inherit; font-weight: 800; font-size: 16px; padding: 8px 6px; border-radius: 10px; border: 3px solid var(--sg-line-mid); background: rgba(255,255,255,.95); color: var(--sg-ink); cursor: pointer; box-shadow: 0 3px 0 rgba(27,43,32,.25); text-align: center; line-height: 1.25; }
+  .kick small { display: block; font-size: 11px; color: var(--sg-ink-soft); font-weight: 700; }
+  .kick .key { display: inline-block; font-size: 11px; background: var(--sg-ink); color: #fff; border-radius: 4px; padding: 0 5px; margin-right: 4px; vertical-align: 1px; }
+  .kick.on { border-color: #D97B4F; background: #FDEFE6; box-shadow: 0 3px 0 #D97B4F, 0 0 0 3px rgba(217,123,79,.25); }
+  .pad { display: flex; gap: 6px; }
+  .pad button { font: inherit; font-weight: 800; font-size: 20px; width: 54px; height: 46px; border-radius: 10px; border: 3px solid var(--sg-line-strong); background: rgba(255,255,255,.95); color: var(--sg-ink); cursor: pointer; box-shadow: 0 3px 0 rgba(27,43,32,.25); touch-action: none; user-select: none; }
+  .pad button:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(27,43,32,.25); }
+  .pad .lab { align-self: center; font-size: 12px; font-weight: 700; color: var(--sg-ink-soft); padding: 0 2px; }
+  #btnKick { font: inherit; font-weight: 800; font-size: 18px; padding: 0 22px; height: 46px; border-radius: 10px; border: 3px solid var(--sg-line-strong); background: var(--sg-primary); color: #fff; cursor: pointer; box-shadow: 0 4px 0 var(--sg-ink); touch-action: none; user-select: none; }
+  #btnKick:active, #btnKick.hold { transform: translateY(3px); box-shadow: 0 1px 0 var(--sg-ink); background: #D97B4F; }
+
+  /* 결과 팝업 글자 */
+  #pops { position: fixed; inset: 0; z-index: 6; pointer-events: none; overflow: hidden; }
+  .pop { position: absolute; left: 50%; top: 42%; font-size: clamp(34px, 7vw, 64px); font-weight: 800; color: #fff; -webkit-text-stroke: 2px var(--sg-ink); text-shadow: 0 5px 0 rgba(27,43,32,.4); animation: pop 1.3s ease-out forwards; white-space: nowrap; }
+  .pop.goal { color: #F2D06B; }
+  .pop.fail { color: #FF6B7A; }
+  @keyframes pop { 0% { opacity: 0; transform: translate(-50%,-50%) scale(1.6); } 15% { opacity: 1; transform: translate(-50%,-50%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%,-90%); } }
+
+  /* ── 카드 (시작 · 결과) ── */
+  #overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 56px 12px 12px; z-index: 7; overflow-y: auto; background: rgba(27,43,32,.25); }
+  .card { width: min(560px, 100%); background: var(--sg-panel); border: 3px solid var(--sg-line-strong); border-radius: 14px; padding: 22px 22px 18px; box-shadow: 0 10px 0 rgba(27,43,32,.3), 0 20px 40px rgba(0,0,0,.2); text-align: center; }
+  .logo { font-size: clamp(38px, 8vw, 58px); font-weight: 800; line-height: 1.05; color: #D97B4F; -webkit-text-stroke: 2px var(--sg-ink); text-shadow: 4px 5px 0 var(--sg-ink); letter-spacing: -1px; margin-bottom: 4px; }
+  .logo small { display: block; font-size: 15px; -webkit-text-stroke: 0; text-shadow: none; color: var(--sg-ink-soft); letter-spacing: 0; margin-top: 8px; font-weight: 700; }
+  .desc { font-size: 14px; color: var(--sg-ink-mid); line-height: 1.6; margin: 10px 0 4px; }
+  .keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 8px 0 12px; }
+  .keys > div { background: var(--sg-panel-alt); border: 2px solid var(--sg-line-mid); border-radius: 10px; padding: 8px 2px; }
+  .keys b { display: block; font-size: 16px; margin-bottom: 2px; }
+  .keys span { font-size: 11px; color: var(--sg-ink-soft); font-weight: 700; }
+  .stages { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 6px 0 12px; }
+  .stages button { font: inherit; font-weight: 800; font-size: 20px; height: 56px; border-radius: 10px; border: 3px solid var(--sg-line-strong); background: var(--sg-primary); color: #fff; cursor: pointer; box-shadow: 0 4px 0 var(--sg-ink); position: relative; }
+  .stages button small { display: block; font-size: 10px; font-weight: 700; opacity: .85; }
+  .stages button:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--sg-ink); }
+  .stages button.done { background: var(--sg-ok); }
+  .stages button.lock { background: var(--sg-panel-alt); color: var(--sg-ink-faint); border-color: var(--sg-line-mid); box-shadow: 0 4px 0 var(--sg-line-mid); cursor: default; }
+  .stages button.lock:active { transform: none; box-shadow: 0 4px 0 var(--sg-line-mid); }
+  .stages button.next { background: #D97B4F; }
+  .rec { display: flex; gap: 10px; margin: 10px 0 12px; }
+  .rec > div { flex: 1 1 0; min-width: 0; background: var(--sg-panel-alt); border: 2px solid var(--sg-line-mid); border-radius: 10px; padding: 8px 6px; }
+  .rec .lab { font-size: 12px; font-weight: 700; color: var(--sg-ink-soft); }
+  .rec .val { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; margin-top: 2px; color: var(--sg-primary); }
+  .rec .val.none { font-size: 14px; color: var(--sg-ink-faint); font-weight: 700; }
+  .rec .who { font-size: 12px; color: var(--sg-ink-soft); min-height: 15px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .new { display: inline-block; margin-left: 5px; padding: 1px 6px; font-size: 11px; border-radius: 6px; background: #D97B4F; color: #fff; vertical-align: middle; -webkit-text-stroke: 0; text-shadow: none; }
+  .btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 6px; }
+  .btn { display: inline-block; font: inherit; font-weight: 800; font-size: 20px; padding: 13px 30px; border-radius: 12px; border: 3px solid var(--sg-line-strong); background: var(--sg-primary); color: var(--sg-primary-ink); cursor: pointer; box-shadow: 0 5px 0 var(--sg-ink); }
+  .btn:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--sg-ink); }
+  .btn.sub { background: #fff; color: var(--sg-ink); font-size: 16px; padding: 10px 20px; }
+  .btn.hot { background: #D97B4F; }
+  .hint { font-size: 12px; color: var(--sg-ink-faint); margin-top: 12px; }
+  .final { display: flex; gap: 10px; justify-content: center; margin: 8px 0; }
+  .final > div { flex: 1 1 0; }
+  .final .lab { font-size: 13px; color: var(--sg-ink-soft); font-weight: 700; }
+  .final .num { font-size: clamp(32px, 7vw, 46px); font-weight: 800; font-variant-numeric: tabular-nums; color: var(--sg-primary); line-height: 1.1; }
+  .final .num small { font-size: 15px; color: var(--sg-ink-soft); }
+  .msg { font-size: 17px; font-weight: 800; color: #D97B4F; min-height: 22px; margin: 4px 0 2px; }
+  .reason { font-size: 15px; color: var(--sg-ink-mid); font-weight: 700; margin: 4px 0 8px; line-height: 1.5; }
+  .wipe { font-size: 12px; color: var(--sg-ink-faint); margin-top: 8px; }
+  .wipe button { font: inherit; font-size: 12px; color: var(--sg-ink-soft); background: none; border: none; text-decoration: underline; cursor: pointer; }
+  @media (max-width: 640px) {
+    #hudBest { display: none !important; }
+    #hudAim { font-size: 12px; padding: 4px 8px; top: 100px; }
+    #powerWrap .lab .mid { display: none; }
+    #hudTop .hud-box { font-size: 14px; padding: 4px 8px; } #hudTop .stage { font-size: 17px; }
+    #pips span { width: 14px; height: 14px; font-size: 8px; line-height: 10px; }
+    .kick { font-size: 13px; padding: 6px 4px; flex-basis: 100px; } .kick small { font-size: 10px; }
+    .pad button { width: 46px; height: 42px; font-size: 18px; } #btnKick { height: 42px; padding: 0 14px; font-size: 15px; }
+    .btn { font-size: 18px; padding: 11px 22px; }
+    .keys { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="pops"></div>
+
+<div class="hud" id="hudTop">
+  <div class="hud-box"><span class="stage" id="hudStage">1단계</span> <span id="hudStageInfo"></span><div id="pips"></div></div>
+</div>
+<div class="hud hud-box" id="hudAim"><span class="lab">조준</span>좌우 <b id="aimVal">0.0</b> m · 높이 <b id="loftVal">16</b>°</div>
+<div class="hud hud-box" id="hudBest"><span class="lab">개인 최고 기록</span><span id="hudBestVal">—</span><span class="lab" style="margin-top:4px">🏆 세계 신기록</span><span id="hudWrVal">—</span><span class="who" id="hudWrWho"></span></div>
+
+<div class="hud" id="panel">
+  <div id="powerWrap">
+    <div class="lab"><span>파워 <b id="powerPct">0%</b></span><span class="mid">스페이스·클릭 <b>누르고 있기</b> → 떼면 발사</span><span><b id="powerSec">0.0</b> / 5초</span></div>
+    <div id="powerBar"><div id="powerFill"></div><div class="tick" style="left:20%"></div><div class="tick" style="left:40%"></div><div class="tick" style="left:60%"></div><div class="tick" style="left:80%"></div></div>
+  </div>
+  <div class="row" id="kickRow">
+    <button type="button" class="kick" data-kick="in"><span class="key">1</span>인프런트 킥<small>우→좌 감아차기 · 회전 많음</small></button>
+    <button type="button" class="kick" data-kick="out"><span class="key">2</span>아웃프런트 킥<small>좌→우 바깥 커브</small></button>
+    <button type="button" class="kick" data-kick="step"><span class="key">3</span>인스텝 슛<small>회전 적음 · 가장 빠른 직선</small></button>
+  </div>
+  <div class="row">
+    <div class="pad"><span class="lab">조준</span><button type="button" data-hold="aimL">◀</button><button type="button" data-hold="aimR">▶</button></div>
+    <div class="pad"><span class="lab">높이</span><button type="button" data-hold="loftU">▲</button><button type="button" data-hold="loftD">▼</button></div>
+    <button type="button" id="btnKick">⚽ 차기 (누르고 있기)</button>
+  </div>
+</div>
+
+<div id="overlay">
+  <div class="card" id="cardStart">
+    <div class="logo">프리킥 챌린지<small>수비벽과 골키퍼를 뚫고 10단계를 정복하라</small></div>
+    <div class="desc">조준(좌우·높이)과 <b>킥 종류</b>, 누르고 있는 시간만큼 차는 <b>파워</b>로 골을 노립니다. 파워가 강할수록 빠르고 회전(rpm)이 많아져 <b>더 크게 휘어집니다</b>. 수비벽은 공이 올 때 점프하고, 골키퍼는 슛을 보고 도착 지점을 예측해 몸을 날립니다(단계가 오를수록 정확). 클리어하면 다음 단계가 열립니다.</div>
+    <div class="keys">
+      <div><b>← →</b><span>조준 좌우 (A·D)</span></div>
+      <div><b>↑ ↓</b><span>공 높이 (W·S)</span></div>
+      <div><b>1 2 3</b><span>킥 종류</span></div>
+      <div><b>SPACE</b><span>누르고 있으면 파워 ↑</span></div>
+    </div>
+    <div class="stages" id="stageGrid"></div>
+    <div class="rec">
+      <div><div class="lab">개인 최고 기록</div><div class="val" id="bestStart">—</div><div class="who" id="bestStartDate"></div></div>
+      <div><div class="lab">🏆 세계 신기록</div><div class="val" id="wrStart">—</div><div class="who" id="wrWhoStart"></div></div>
+    </div>
+    <div class="btns"><button type="button" class="btn" id="btnStart">시작하기</button></div>
+    <div class="hint">스페이스바: 열려 있는 가장 높은 단계 시작</div>
+    <div class="wipe"><button type="button" id="btnWipe">이 기기의 진행 상황·최고 기록 지우기</button></div>
+  </div>
+
+  <div class="card" id="cardOver" style="display:none">
+    <div class="logo" style="font-size:40px" id="overTitle">⚽ 골인!</div>
+    <div class="reason" id="overReason"></div>
+    <div class="final" id="overStats">
+      <div><div class="lab">슛 속도</div><div class="num" id="statSpeed">0<small> km/h</small></div></div>
+      <div><div class="lab">회전수</div><div class="num" id="statRpm">0<small> rpm</small></div></div>
+    </div>
+    <div class="msg" id="finalMsg"></div>
+    <div class="rec">
+      <div><div class="lab">개인 최고 기록</div><div class="val" id="bestOver">—</div><div class="who" id="bestOverNew"></div></div>
+      <div><div class="lab">🏆 세계 신기록</div><div class="val" id="wrOver">—</div><div class="who" id="wrWhoOver"></div></div>
+    </div>
+    <div class="btns">
+      <button type="button" class="btn hot" id="btnNext" style="display:none">다음 단계 ▶</button>
+      <button type="button" class="btn" id="btnRetry">다시 도전</button>
+      <button type="button" class="btn sub" id="btnMenu">단계 선택</button>
+    </div>
+    <div class="hint" id="overHint">스페이스바: 다시 도전</div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+"use strict";
+/* ═══════════════════════════════════════════════════════════════════
+   프리킥 챌린지 — Three.js 3D 프리킥 (쉬는시간용, 개인전, 10단계 순차 언락)
+   좌표: 골 중심이 원점, 골라인이 x축, 공은 +z 쪽(D m)에서 -z 방향으로 찬다. y 는 높이.
+   기록: 클리어한 최고 단계 우선, 같으면 골인 슛 최고 속도.  저장값 = 단계 × 1000 + 속도(km/h, ≤999)
+     · 진행·개인 최고: localStorage freekick_progress_v1 / freekick_best_v1
+     · 세계 신기록: Firebase records/freekick/all (world-record.js)
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ───────── 단계 · 밸런스 설정 (선생님이 값만 바꿔 조정) ───────── */
+const STAGES = [];
+for (let n = 1; n <= 10; n++) {
+  const tier = n <= 3 ? 0 : n <= 7 ? 1 : 2;
+  STAGES.push({
+    n, tier,
+    dist:      [5, 10, 15][tier],          // 공 ~ 골라인 거리(m)
+    defenders: [2, 4, 5][tier],            // 수비벽 인원
+    wallDist:  [2.6, 4.6, 6.2][tier],      // 공 ~ 수비벽 거리(m)
+    gkSigma:   [0.8, 0.55, 0.3][tier],     // 골키퍼 예측 오차(표준편차, m) — 클수록 쉬움
+    gkWrong:   [0.25, 0.10, 0.03][tier],   // 골키퍼가 아예 반대쪽으로 가는 확률
+    gkReact:   [0.30, 0.20, 0.12][tier],   // 골키퍼 반응 지연(초)
+    wallDelay: [0.35, 0.18, 0.08][tier],   // 수비수 점프 타이밍이 늦어지는 최대치(초)
+  });
+}
+const KICKS = {
+  in:   { name: "인프런트 킥", curve: -1, speedMin: 14, speedMax: 29, rpmMin: 150, rpmMax: 900, loft: 16 },   // 우→좌(화면 기준) 감아차기
+  out:  { name: "아웃프런트 킥", curve: +1, speedMin: 14, speedMax: 28, rpmMin: 150, rpmMax: 800, loft: 16 },  // 좌→우 바깥 커브
+  step: { name: "인스텝 슛", curve: 0, speedMin: 17, speedMax: 34, rpmMin: 40, rpmMax: 160, loft: 10 },      // 직선, 최고 속도
+};
+const PHYS = {
+  g: 9.8, drag: 0.10, ballR: 0.11,
+  magnus: 0.020,        // 횡가속도 = magnus × 회전(rps) × 속도  (마그누스 효과 근사)
+  dip: 0.06,            // 추가 낙하가속도 = dip × 회전(rps) × 속도 (톱스핀 — 회전 많은 공이 뚝 떨어짐)
+  maxCharge: 5,         // 파워 최대 입력 시간(초)
+};
+const GOAL = { hw: 3.66, h: 2.44, post: 0.06, depth: 1.8 };
+const AIM = { range: 6.0, speed: 3.8, loftMin: 5, loftMax: 32, loftSpeed: 16 };   // 조준 범위(골라인 x, m) · 이동 속도(m/s) · 높이(°)
+const DEF = { w: 0.5, h: 1.75, gap: 0.62, jumpH: 0.4, jumpDur: 0.6 };
+const GK = { diveSpeed: 6.0, reach: 0.42, arm: 0.95, maxX: 3.2 };
+
+const $ = id => document.getElementById(id);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const rnd = (a, b) => a + Math.random() * (b - a);
+function gauss() { let u = 0, v = 0; while (u === 0) u = Math.random(); while (v === 0) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+function packScore(stage, kmh) { return stage * 1000 + clamp(Math.round(kmh), 0, 999); }
+function fmtPacked(v) { const s = Math.floor(v / 1000), k = v % 1000; return s >= 10 ? "전부 클리어 · " + k + " km/h" : s + "단계 · " + k + " km/h"; }
+
+/* ═══════════════════ 기록 · 진행 ═══════════════════ */
+const PROG_KEY = "freekick_progress_v1", BEST_KEY = "freekick_best_v1";
+function loadJSON(k) { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch (e) { return null; } }
+function saveJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+let prog = loadJSON(PROG_KEY); if (!prog || !(prog.cleared >= 0)) prog = { cleared: 0 };
+let best = loadJSON(BEST_KEY); if (best && !(best.stage >= 1 && best.speed >= 0)) best = null;
+const WR = window.WorldRecord ? WorldRecord("freekick", { format: fmtPacked }) : null;
+let wrTried = false;
+function wrInfo() {
+  if (!WR) return { val: "—", who: "", none: true };
+  if (WR.loaded && WR.rec) return { val: WR.text(), who: WR.who(), none: false };
+  if (WR.loaded) return { val: "아직 없음", who: "", none: true };
+  return { val: !WR.url() ? "오프라인" : (wrTried ? "불러오지 못함" : "불러오는 중…"), who: "", none: true };
+}
+function setVal(el, text, none) { el.textContent = text; el.classList.toggle("none", !!none); }
+function renderRecords() {
+  const w = wrInfo();
+  const bTxt = best ? fmtPacked(packScore(best.stage, best.speed)) : "아직 없음";
+  setVal($("bestStart"), bTxt, !best); $("bestStartDate").textContent = best ? best.date : "";
+  setVal($("bestOver"), bTxt, !best);
+  setVal($("wrStart"), w.val, w.none); $("wrWhoStart").textContent = w.who;
+  setVal($("wrOver"), w.val, w.none); $("wrWhoOver").textContent = w.who;
+  $("hudBestVal").textContent = bTxt; $("hudWrVal").textContent = w.val; $("hudWrWho").textContent = w.who;
+}
+if (WR) { WR.onChange(renderRecords); WR.load().then(() => { wrTried = true; renderRecords(); }); }
+
+/* ═══════════════════ 소리 (Web Audio, 외부 파일 없음) ═══════════════════ */
+const AUD = { ctx: null, noise: null };
+function audioInit() {
+  try {
+    if (!AUD.ctx) {
+      AUD.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const n = AUD.ctx.sampleRate * 1.5, buf = AUD.ctx.createBuffer(1, n, AUD.ctx.sampleRate), d = buf.getChannelData(0);
+      for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+      AUD.noise = buf;
+    }
+    if (AUD.ctx.state === "suspended") AUD.ctx.resume();
+  } catch (e) {}
+}
+function tone(freq, dur, type, vol, when, slideTo) {
+  if (!AUD.ctx) return;
+  try {
+    const c = AUD.ctx, t = c.currentTime + (when || 0), o = c.createOscillator(), g = c.createGain();
+    o.type = type || "square"; o.frequency.setValueAtTime(freq, t);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+    g.gain.setValueAtTime(vol || 0.08, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + dur);
+  } catch (e) {}
+}
+function noise(dur, vol, cutoff, when, attack) {
+  if (!AUD.ctx) return;
+  try {
+    const c = AUD.ctx, t = c.currentTime + (when || 0), s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+    s.buffer = AUD.noise; s.loop = true; f.type = "lowpass"; f.frequency.value = cutoff || 2500;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + (attack || 0.01)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(f); f.connect(g); g.connect(c.destination); s.start(t); s.stop(t + dur);
+  } catch (e) {}
+}
+const SFX = {
+  tick(p)  { tone(300 + p * 500, 0.05, "square", 0.04); },
+  kick(p)  { noise(0.12, 0.35, 1200); tone(90, 0.12, "sine", 0.3, 0, 40); noise(0.5 + p * 0.5, 0.08, 3000, 0.05, 0.1); },
+  goal()   { [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.35, "square", 0.09, i * 0.09)); noise(2.2, 0.22, 1800, 0.1, 0.4); },
+  save()   { noise(0.15, 0.3, 900); tone(150, 0.2, "sawtooth", 0.1, 0, 60); },
+  wall()   { noise(0.1, 0.3, 700); tone(110, 0.15, "square", 0.12, 0, 50); },
+  post()   { tone(1400, 0.5, "sine", 0.15, 0, 1300); tone(2100, 0.3, "sine", 0.06); },
+  miss()   { tone(260, 0.3, "sawtooth", 0.08, 0, 120); noise(0.6, 0.05, 600, 0.05, 0.2); },
+  clear()  { [392, 523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.25, "triangle", 0.1, 0.3 + i * 0.07)); },
+  select() { tone(700, 0.05, "square", 0.05); },
+};
+
+/* ═══════════════════ 3D 씬 ═══════════════════ */
+const canvas = $("gl");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputEncoding = THREE.sRGBEncoding;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xCFE3F2);
+scene.fog = new THREE.Fog(0xCFE3F2, 60, 140);
+const camera = new THREE.PerspectiveCamera(58, 1, 0.1, 300);
+scene.add(camera);
+scene.add(new THREE.AmbientLight(0xFFFFFF, 0.55));
+scene.add(new THREE.HemisphereLight(0xE8F4FF, 0x5F8A4A, 0.35));
+const sun = new THREE.DirectionalLight(0xFFF4E0, 0.95); sun.position.set(-14, 26, 10); scene.add(sun);
+sun.castShadow = true; sun.shadow.mapSize.set(1536, 1536);
+Object.assign(sun.shadow.camera, { left: -22, right: 22, top: 26, bottom: -14, near: 1, far: 80 }); sun.shadow.bias = -0.0006;
+
+function canvasTex(w, h, draw, repeat) {
+  const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+  draw(cv.getContext("2d"), w, h);
+  const t = new THREE.CanvasTexture(cv);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; if (repeat) t.repeat.set(repeat[0], repeat[1]);
+  t.anisotropy = 4; t.encoding = THREE.sRGBEncoding;
+  return t;
+}
+/* 잔디: 밝기가 번갈아 바뀌는 줄무늬 + 잔털 */
+const grassTex = canvasTex(256, 256, (c, w, h) => {
+  c.fillStyle = "#4E9A3C"; c.fillRect(0, 0, w, h);
+  c.fillStyle = "#58A845"; c.fillRect(0, 0, w, h / 2);
+  for (let i = 0; i < 1400; i++) { c.fillStyle = Math.random() < 0.5 ? "rgba(0,40,0,.10)" : "rgba(200,255,160,.10)"; c.fillRect(Math.random() * w, Math.random() * h, 1, rnd(2, 5)); }
+}, [20, 20]);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(160, 160), new THREE.MeshStandardMaterial({ map: grassTex, roughness: 1 }));
+ground.rotation.x = -Math.PI / 2; ground.position.y = 0; ground.receiveShadow = true; scene.add(ground);
+grassTex.repeat.set(16, 32);
+
+/* 라인(골라인 · 페널티 박스 · 골 에어리어) */
+const lineMat = new THREE.MeshBasicMaterial({ color: 0xF6F8F2 });
+function line(x1, z1, x2, z2, w) {
+  const len = Math.hypot(x2 - x1, z2 - z1);
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(len, w || 0.12), lineMat);
+  m.rotation.x = -Math.PI / 2; m.rotation.z = -Math.atan2(z2 - z1, x2 - x1);
+  m.position.set((x1 + x2) / 2, 0.012, (z1 + z2) / 2); scene.add(m);
+}
+line(-34, 0, 34, 0); line(-20.16, 0, -20.16, 16.5); line(20.16, 0, 20.16, 16.5); line(-20.16, 16.5, 20.16, 16.5);
+line(-9.16, 0, -9.16, 5.5); line(9.16, 0, 9.16, 5.5); line(-9.16, 5.5, 9.16, 5.5);
+line(-34, 0, -34, 52); line(34, 0, 34, 52); line(-34, 52, 34, 52);
+(function () { const m = new THREE.Mesh(new THREE.RingGeometry(0.16, 0.24, 20), lineMat); m.rotation.x = -Math.PI / 2; m.position.set(0, 0.012, 11); scene.add(m); })();
+
+/* 골대: 포스트·크로스바(흰 원기둥) + 그물(격자 텍스처 반투명 평면) */
+const netTex = canvasTex(64, 64, (c, w, h) => { c.clearRect(0, 0, w, h); c.strokeStyle = "rgba(255,255,255,.85)"; c.lineWidth = 2; c.beginPath(); for (let i = 0; i <= 64; i += 8) { c.moveTo(i, 0); c.lineTo(i, h); c.moveTo(0, i); c.lineTo(w, i); } c.stroke(); });
+const postMat = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 0.4 });
+const netMat = new THREE.MeshBasicMaterial({ map: netTex, transparent: true, opacity: 0.75, side: THREE.DoubleSide, depthWrite: false });
+(function buildGoal() {
+  const r = GOAL.post, g = new THREE.Group();
+  const cyl = (len) => new THREE.CylinderGeometry(r, r, len, 12);
+  [-1, 1].forEach(s => { const p = new THREE.Mesh(cyl(GOAL.h), postMat); p.position.set(s * GOAL.hw, GOAL.h / 2, 0); p.castShadow = true; g.add(p); });
+  const bar = new THREE.Mesh(cyl(GOAL.hw * 2 + r * 2), postMat); bar.rotation.z = Math.PI / 2; bar.position.set(0, GOAL.h, 0); bar.castShadow = true; g.add(bar);
+  [-1, 1].forEach(s => { const b = new THREE.Mesh(cyl(GOAL.depth), postMat); b.rotation.x = Math.PI / 2; b.position.set(s * GOAL.hw, 0.04, -GOAL.depth / 2); g.add(b); });
+  const backBar = new THREE.Mesh(cyl(GOAL.hw * 2), postMat); backBar.rotation.z = Math.PI / 2; backBar.position.set(0, GOAL.h * 0.62, -GOAL.depth); g.add(backBar);
+  const back = new THREE.Mesh(new THREE.PlaneGeometry(GOAL.hw * 2, GOAL.h * 0.62), netMat); back.position.set(0, GOAL.h * 0.31, -GOAL.depth); g.add(back);
+  const topN = new THREE.Mesh(new THREE.PlaneGeometry(GOAL.hw * 2, Math.hypot(GOAL.depth, GOAL.h * 0.38)), netMat);
+  topN.position.set(0, GOAL.h - GOAL.h * 0.19, -GOAL.depth / 2); topN.rotation.x = Math.atan2(GOAL.depth, GOAL.h * 0.38); g.add(topN);
+  [-1, 1].forEach(s => {
+    const sh = new THREE.Shape(); sh.moveTo(0, 0); sh.lineTo(0, GOAL.h); sh.lineTo(-GOAL.depth * 0.25, GOAL.h * 0.62 + 0.3); sh.lineTo(-GOAL.depth, GOAL.h * 0.62); sh.lineTo(-GOAL.depth, 0); sh.closePath();
+    const side = new THREE.Mesh(new THREE.ShapeGeometry(sh), netMat); side.rotation.y = -Math.PI / 2; side.position.x = s * GOAL.hw; g.add(side);
+  });
+  scene.add(g);
+})();
+
+/* 관중석(단순 계단 상자) — 골 뒤쪽·양옆 */
+(function stands() {
+  const m1 = new THREE.MeshStandardMaterial({ color: 0x8A97A8, roughness: 0.9 }), m2 = new THREE.MeshStandardMaterial({ color: 0x6F7D8E, roughness: 0.9 });
+  for (let i = 0; i < 6; i++) { const b = new THREE.Mesh(new THREE.BoxGeometry(110, 1.4, 3), i % 2 ? m1 : m2); b.position.set(0, 0.7 + i * 1.2, -14 - i * 3); scene.add(b); }
+  for (let i = 0; i < 5; i++) [-1, 1].forEach(s => { const b = new THREE.Mesh(new THREE.BoxGeometry(3, 1.4, 90), i % 2 ? m1 : m2); b.position.set(s * (44 + i * 3), 0.7 + i * 1.2, 20); scene.add(b); });
+  const crowd = canvasTex(256, 32, (c, w, h) => { c.fillStyle = "#5C6672"; c.fillRect(0, 0, w, h); for (let i = 0; i < 70; i++) { c.fillStyle = `hsl(${Math.random() * 360},22%,${38 + Math.random() * 22}%)`; c.fillRect(Math.random() * w, 4 + Math.random() * (h - 12), 6, 8); } }, [10, 1]);
+  const cm = new THREE.MeshBasicMaterial({ map: crowd });
+  for (let i = 0; i < 6; i++) { const p = new THREE.Mesh(new THREE.PlaneGeometry(110, 1.3), cm); p.position.set(0, 1.5 + i * 1.2, -12.45 - i * 3); scene.add(p); }
+  /* 광고판 */
+  const ad = canvasTex(512, 64, (c, w, h) => { c.fillStyle = "#24402F"; c.fillRect(0, 0, w, h); c.fillStyle = "#F4F6F1"; c.font = "bold 34px 'Nanum Gothic', 'Malgun Gothic', sans-serif"; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText("정보 수업 프리킥 챌린지   ★   FREE KICK CHALLENGE", w / 2, h / 2); }, [4, 1]);
+  const board = new THREE.Mesh(new THREE.PlaneGeometry(110, 1.0), new THREE.MeshBasicMaterial({ map: ad })); board.position.set(0, 0.5, -11.9); scene.add(board);
+})();
+
+/* ── 사람: 상자·캡슐 조합 로우폴리 ── */
+function makePerson(shirt, shorts, skin) {
+  const g = new THREE.Group();
+  const mS = new THREE.MeshStandardMaterial({ color: shirt, roughness: 0.8 }), mP = new THREE.MeshStandardMaterial({ color: shorts, roughness: 0.8 }), mK = new THREE.MeshStandardMaterial({ color: skin || 0xE8B892, roughness: 0.7 });
+  const add = (geo, mat, x, y, z, parent) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; (parent || g).add(m); return m; };
+  const torso = add(new THREE.BoxGeometry(0.46, 0.6, 0.26), mS, 0, 1.15, 0);
+  add(new THREE.SphereGeometry(0.14, 12, 10), mK, 0, 1.62, 0);
+  add(new THREE.CylinderGeometry(0.05, 0.05, 0.12, 8), mK, 0, 1.48, 0);
+  const legs = [], arms = [];
+  [-1, 1].forEach(s => {
+    const hip = new THREE.Group(); hip.position.set(s * 0.12, 0.85, 0); g.add(hip);
+    add(new THREE.BoxGeometry(0.17, 0.28, 0.2), mP, 0, -0.12, 0, hip);
+    add(new THREE.CylinderGeometry(0.07, 0.065, 0.55, 8), mK, 0, -0.55, 0, hip);
+    add(new THREE.BoxGeometry(0.15, 0.09, 0.26), new THREE.MeshStandardMaterial({ color: 0x1B2B20 }), 0, -0.82, 0.04, hip);
+    legs.push(hip);
+    const sh = new THREE.Group(); sh.position.set(s * 0.3, 1.4, 0); g.add(sh);
+    add(new THREE.CylinderGeometry(0.06, 0.055, 0.56, 8), mS, 0, -0.26, 0, sh);
+    add(new THREE.SphereGeometry(0.06, 8, 8), mK, 0, -0.56, 0, sh);
+    arms.push(sh);
+  });
+  g.userData = { legs, arms, torso };
+  return g;
+}
+const kicker = makePerson(0x2F6BD9, 0xFFFFFF); scene.add(kicker);
+const keeper = makePerson(0xF2B233, 0x1B2B20); scene.add(keeper);
+const defenders = [];
+for (let i = 0; i < 5; i++) { const d = makePerson(0x4A4F55, 0x2B2F33); d.visible = false; scene.add(d); defenders.push({ g: d, x: 0, jumpAt: -1, hit: false }); }
+
+/* ── 축구공: 오각형 흑백 패턴을 캔버스로 그려 CanvasTexture 로 ── */
+const ballTex = canvasTex(256, 128, (c, w, h) => {
+  c.fillStyle = "#FFFFFF"; c.fillRect(0, 0, w, h);
+  c.fillStyle = "#1B2B20";
+  const pent = (cx, cy, r) => { c.beginPath(); for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + i * Math.PI * 2 / 5; c.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); } c.closePath(); c.fill(); };
+  for (let row = 0; row < 3; row++) for (let col = 0; col < 4; col++) pent(col * 64 + (row % 2 ? 32 : 0), 22 + row * 42, 15);
+  c.strokeStyle = "rgba(0,0,0,.18)"; c.lineWidth = 2; c.beginPath(); for (let i = 0; i < 4; i++) { c.moveTo(i * 64 + 32, 0); c.lineTo(i * 64, h); } c.stroke();
+});
+const ball = new THREE.Mesh(new THREE.SphereGeometry(PHYS.ballR, 18, 14), new THREE.MeshStandardMaterial({ map: ballTex, roughness: 0.55 }));
+ball.castShadow = true; scene.add(ball);
+const ballShadow = new THREE.Mesh(new THREE.CircleGeometry(PHYS.ballR * 1.2, 16), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.25 }));
+ballShadow.rotation.x = -Math.PI / 2; ballShadow.position.y = 0.015; scene.add(ballShadow);
+
+/* ── 조준 표시: 바닥 점선 + 도착 표시 + 높이 화살표 ── */
+const aimLineMat = new THREE.LineDashedMaterial({ color: 0xFFFFFF, dashSize: 0.35, gapSize: 0.22, linewidth: 1 });
+let aimLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), aimLineMat); scene.add(aimLine);
+const aimMark = new THREE.Mesh(new THREE.RingGeometry(0.22, 0.34, 24), new THREE.MeshBasicMaterial({ color: 0xD97B4F, side: THREE.DoubleSide }));
+aimMark.rotation.x = -Math.PI / 2; aimMark.position.y = 0.02; scene.add(aimMark);
+const aimArrow = new THREE.Group();
+(function () { const m = new THREE.MeshBasicMaterial({ color: 0xD97B4F });
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.1, 8), m); shaft.rotation.x = Math.PI / 2; shaft.position.z = -0.55; aimArrow.add(shaft);
+  const head = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.22, 10), m); head.rotation.x = -Math.PI / 2; head.position.z = -1.2; aimArrow.add(head); })();
+scene.add(aimArrow);
+
+/* ═══════════════════ 게임 상태 ═══════════════════ */
+let state = "menu";            // menu | aim | charge | flight | result
+let stage = STAGES[0];
+let aimX = 0, loft = 16, kickType = "in";
+let power = 0, chargeAt = 0, lastT = 0, spaceFresh = true;
+let wallX = 0;                 // 수비벽 중심 x
+const keys = {};
+const hold = { aimL: false, aimR: false, loftU: false, loftD: false };
+const B = { p: new THREE.Vector3(), v: new THREE.Vector3(), rpm: 0, curve: 0, t: 0, active: false, result: null, resultAt: 0, inNet: false, wallChecked: false, gkChecked: false, spinAxis: new THREE.Vector3(1, 0, 0) };
+const K = { swing: -1 };       // 키커 킥 동작 진행 시간(초). -1 = 안 함
+const G = { x: 0, y: 0, dir: 0, targetX: 0, targetY: 0, tStart: 0, arrive: 0, diving: false, t: 0, armAng: 0.9, armLen: 0.6 };
+let shotStat = { kmh: 0, rpm: 0 };
+
+function ballHome() { return new THREE.Vector3(0, PHYS.ballR, stage.dist); }
+function placeScene() {
+  const home = ballHome();
+  B.p.copy(home); B.v.set(0, 0, 0); B.active = false; B.result = null; B.inNet = false; B.wallChecked = B.gkChecked = false;
+  ball.position.copy(B.p); ball.rotation.set(0, 0, 0);
+  kicker.position.set(0.75, 0, home.z + 1.25); kicker.rotation.y = Math.PI + 0.4; K.swing = -1;
+  kicker.userData.legs.forEach(l => l.rotation.x = 0); kicker.userData.arms.forEach(a => a.rotation.set(0, 0, 0));
+  keeper.position.set(0, 0, 0.6); keeper.rotation.set(0, Math.PI, 0); keeper.userData.arms.forEach((a, i) => a.rotation.set(0, 0, i ? 1.1 : -1.1));
+  keeper.userData.legs.forEach(l => l.rotation.x = 0);
+  G.x = 0; G.y = 0; G.diving = false; G.t = 0;
+  /* 수비벽: 골 중심에서 살짝 치우쳐 한쪽을 막고, 골키퍼가 반대쪽을 맡는 느낌 */
+  wallX = rnd(-1.1, 1.1);
+  const wz = home.z - stage.wallDist, n = stage.defenders;
+  defenders.forEach((d, i) => {
+    d.g.visible = i < n; d.jumpAt = -1; d.hit = false; d.g.position.y = 0;
+    if (i < n) { d.x = wallX + (i - (n - 1) / 2) * DEF.gap; d.g.position.set(d.x, 0, wz); d.g.rotation.y = 0; d.g.userData.arms.forEach(a => a.rotation.set(0, 0, 0)); d.z = wz; }
+  });
+  camera.position.set(-1.5, 3.1, home.z + 4.3);
+  updateAimVisual();
+}
+function updateAimVisual() {
+  const home = ballHome();
+  const show = state === "aim" || state === "charge";
+  aimLine.visible = aimMark.visible = aimArrow.visible = show;
+  if (!show) return;
+  const pts = [new THREE.Vector3(home.x, 0.03, home.z), new THREE.Vector3(aimX, 0.03, 0)];
+  aimLine.geometry.dispose(); aimLine.geometry = new THREE.BufferGeometry().setFromPoints(pts); aimLine.computeLineDistances();
+  aimMark.position.set(aimX, 0.02, 0);
+  aimArrow.position.set(home.x, PHYS.ballR + 0.05, home.z);
+  const yaw = Math.atan2(aimX - home.x, -(0 - home.z));   // -z 가 정면
+  aimArrow.rotation.set(0, 0, 0); aimArrow.rotateY(-yaw); aimArrow.rotateX(loft * Math.PI / 180);
+  $("aimVal").textContent = (aimX >= 0 ? "+" : "") + aimX.toFixed(1); $("loftVal").textContent = Math.round(loft);
+}
+
+/* ═══════════════════ 공 물리 (실제 비행과 예측에 같은 적분기를 씀) ═══════════════════ */
+function stepBall(p, v, rpm, curve, dt) {
+  const sp = v.length(), rps = rpm / 60;
+  const ax = PHYS.magnus * rps * sp * curve - v.x * PHYS.drag;
+  const ay = -(PHYS.g + PHYS.dip * rps * sp) - v.y * PHYS.drag;
+  const az = -v.z * PHYS.drag;
+  v.x += ax * dt; v.y += ay * dt; v.z += az * dt;
+  p.x += v.x * dt; p.y += v.y * dt; p.z += v.z * dt;
+  let bounced = false;
+  if (p.y < PHYS.ballR) { p.y = PHYS.ballR; if (v.y < 0) { v.y = -v.y * 0.5; v.x *= 0.85; v.z *= 0.85; bounced = true; } }
+  return bounced;
+}
+function launchVelocity(kt, pw) {
+  const k = KICKS[kt], home = ballHome();
+  const speed = k.speedMin + (k.speedMax - k.speedMin) * pw;
+  const rpm = k.rpmMin + (k.rpmMax - k.rpmMin) * pw;
+  const dir = new THREE.Vector3(aimX - home.x, 0, -home.z).normalize();
+  const el = loft * Math.PI / 180;
+  const v = new THREE.Vector3(dir.x * Math.cos(el), Math.sin(el), dir.z * Math.cos(el)).multiplyScalar(speed);
+  return { v, rpm, speed, curve: k.curve };
+}
+/* 예측: 골라인(z=0)과 수비벽 z 를 지나는 시각·위치 (수비수·골키퍼 판단용) */
+function predict(v0, rpm, curve, wallZ) {
+  const p = ballHome(), v = v0.clone(); let t = 0; const dt = 1 / 240; let wall = null, goal = null;
+  for (let i = 0; i < 240 * 4; i++) {
+    const pz = p.z; stepBall(p, v, rpm, curve, dt); t += dt;
+    if (!wall && pz > wallZ && p.z <= wallZ) wall = { x: p.x, y: p.y, t };
+    if (!goal && pz > 0 && p.z <= 0) { goal = { x: p.x, y: p.y, t }; break; }
+    if (p.z > stage.dist + 1 || Math.abs(p.x) > 15) break;
+  }
+  return { wall, goal };
+}
+
+/* ═══════════════════ 슛 ═══════════════════ */
+function shoot() {
+  const pw = clamp(power, 0.02, 1);
+  const L = launchVelocity(kickType, pw);
+  B.v.copy(L.v); B.rpm = L.rpm; B.curve = L.curve; B.t = 0; B.active = true; B.result = null; B.inNet = false; B.wallChecked = B.gkChecked = false;
+  B.spinAxis.set(0, 1, 0).cross(B.v).normalize();
+  shotStat = { kmh: Math.round(L.speed * 3.6), rpm: Math.round(L.rpm) };
+  state = "flight"; updateAimVisual(); SFX.kick(pw);
+  const wz = ballHome().z - stage.wallDist;
+  const pr = predict(B.v, B.rpm, B.curve, wz);
+  /* 수비수: 공이 자기 근처로 온다고 보이면 점프 (예측 시각 - 점프 정점까지 걸리는 시간 + 반응 지연) */
+  defenders.forEach(d => {
+    if (!d.g.visible) return;
+    const wx = pr.wall ? pr.wall.x : aimX * (1 - wz / stage.dist);
+    const wt = pr.wall ? pr.wall.t : stage.wallDist / Math.max(1, B.v.length());
+    if (Math.abs(wx - d.x) < 1.3) d.jumpAt = Math.max(0.02, wt - DEF.jumpDur * 0.5 + rnd(-0.05, stage.wallDelay));
+  });
+  /* 골키퍼: 예상 도착점 + 단계별 오차 */
+  const gt = pr.goal || { x: aimX, y: 1.0, t: stage.dist / Math.max(1, B.v.length()) };
+  let tx = gt.x + gauss() * stage.gkSigma, ty = gt.y + gauss() * stage.gkSigma * 0.6;
+  if (Math.random() < stage.gkWrong) tx = -tx - rnd(0.5, 1.5) * Math.sign(tx || 1);
+  G.targetX = clamp(tx, -GK.maxX, GK.maxX); G.targetY = clamp(ty, 0.3, 2.2);
+  G.tStart = stage.gkReact + rnd(0, 0.08); G.arrive = Math.max(G.tStart + 0.15, gt.t); G.diving = true; G.t = 0; G.dir = Math.sign(G.targetX || 1);
+}
+function finishShot(result, reason) {
+  if (B.result) return;
+  B.result = result; B.reason = reason; B.resultAt = B.t;
+  const goal = result === "goal";
+  popText(goal ? "⚽ 골인!" : reason, goal ? "goal" : "fail");
+  if (goal) { SFX.goal(); onGoal(); }
+  else if (result === "save") SFX.save(); else if (result === "wall") SFX.wall(); else if (result === "post") SFX.post(); else SFX.miss();
+}
+function popText(text, cls) { const d = document.createElement("div"); d.className = "pop " + cls; d.textContent = text; $("pops").appendChild(d); setTimeout(() => d.remove(), 1400); }
+
+/* ── 비행 갱신 ── */
+function updateFlight(dt) {
+  const home = ballHome(), wz = home.z - stage.wallDist;
+  const sub = 4, h = dt / sub;
+  for (let i = 0; i < sub; i++) {
+    const prev = B.p.clone();
+    const bounced = stepBall(B.p, B.v, B.rpm, B.curve, h); B.t += h;
+    if (bounced) B.rpm *= 0.6;
+    if (B.result) continue;
+    /* 수비벽 */
+    if (!B.wallChecked && prev.z > wz + 0.2 && B.p.z <= wz + 0.2) {
+      B.wallChecked = true;
+      for (const d of defenders) {
+        if (!d.g.visible) continue;
+        const top = DEF.h + d.g.position.y;
+        if (Math.abs(B.p.x - d.x) < DEF.w / 2 + PHYS.ballR && B.p.y < top + PHYS.ballR) {
+          d.hit = true; B.v.z = Math.min(6, Math.abs(B.v.z) * 0.25); B.v.y = Math.abs(B.v.y) * 0.4 + 2; B.v.x += rnd(-1.5, 1.5); B.rpm *= 0.3;
+          finishShot("wall", "수비벽에 막힘!"); break;
+        }
+      }
+    }
+    /* 골키퍼: 몸통~손끝 선분과의 거리 */
+    if (!B.gkChecked && G.diving && B.p.z < 1.3 && B.p.z > -0.4) {
+      const gx = G.x, gy = 1.0 + G.y, hx = gx + G.dir * G.armLen * Math.cos(G.armAng), hy = gy + G.armLen * Math.sin(G.armAng);
+      const dist = segDist(B.p.x, B.p.y, gx, gy, hx, hy);
+      if (dist < GK.reach + PHYS.ballR) {
+        B.gkChecked = true;
+        B.v.z = Math.abs(B.v.z) * 0.3; B.v.x = (B.p.x - gx) * 3 + rnd(-1, 1); B.v.y = Math.max(1.5, B.v.y * 0.3); B.rpm *= 0.3;
+        finishShot("save", "골키퍼 선방!");
+      }
+    }
+    /* 골라인 통과 */
+    if (prev.z > 0 && B.p.z <= 0) {
+      const f = prev.z / (prev.z - B.p.z), x = prev.x + (B.p.x - prev.x) * f, y = prev.y + (B.p.y - prev.y) * f;
+      const inside = Math.abs(x) < GOAL.hw && y < GOAL.h;
+      const nearPost = Math.abs(Math.abs(x) - GOAL.hw) < GOAL.post + PHYS.ballR && y < GOAL.h + GOAL.post;
+      const nearBar = Math.abs(y - GOAL.h) < GOAL.post + PHYS.ballR && Math.abs(x) < GOAL.hw + GOAL.post;
+      if (nearPost || nearBar) {
+        B.p.z = 0.05; B.v.z = Math.abs(B.v.z) * 0.45; if (nearBar) B.v.y = -Math.abs(B.v.y) * 0.5; else B.v.x = (x > 0 ? -1 : 1) * Math.abs(B.v.x) * 0.5 - (x > 0 ? 2 : -2);
+        B.rpm *= 0.3; finishShot("post", nearBar ? "크로스바 맞음!" : "골대 맞음!");
+      } else if (inside) { B.inNet = true; finishShot("goal", ""); }
+      else finishShot("miss", "빗나감!");
+    }
+  }
+  /* 그물 안: 세게 감속해서 그물 뒤에서 멈춤 */
+  if (B.inNet) {
+    const k = Math.max(0, 1 - 6 * dt); B.v.multiplyScalar(k);
+    if (B.p.z < -GOAL.depth + 0.15) { B.p.z = -GOAL.depth + 0.15; B.v.z = Math.abs(B.v.z) * 0.2; }
+    if (Math.abs(B.p.x) > GOAL.hw - 0.15) { B.p.x = Math.sign(B.p.x) * (GOAL.hw - 0.15); B.v.x *= -0.2; }
+    if (B.p.y > GOAL.h - 0.15 && B.p.z < 0) { B.p.y = GOAL.h - 0.15; B.v.y = -Math.abs(B.v.y) * 0.2; }
+  }
+  if (!B.result && (B.t > 4.5 || Math.abs(B.p.x) > 14 || B.p.z < -3 || B.p.z > home.z + 3)) finishShot("miss", "빗나감!");
+  /* 공 굴림 회전 */
+  const sp = B.v.length();
+  if (sp > 0.05) { B.spinAxis.set(0, 1, 0).cross(B.v).normalize(); ball.rotateOnWorldAxis(B.spinAxis, sp / PHYS.ballR * dt * 0.35); if (B.curve) ball.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), -B.curve * B.rpm / 60 * 2 * Math.PI * dt * 0.5); }
+  ball.position.copy(B.p);
+  if (B.result && B.t - B.resultAt > (B.result === "goal" ? 1.6 : 1.3)) showResult();
+}
+function segDist(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
+  const t = l2 > 0 ? clamp(((px - ax) * dx + (py - ay) * dy) / l2, 0, 1) : 0;
+  return Math.hypot(px - (ax + dx * t), py - (ay + dy * t));
+}
+
+/* ── 사람 애니메이션 ── */
+function updateActors(dt) {
+  /* 키커: 킥 동작 */
+  if (K.swing >= 0) {
+    K.swing += dt; const s = K.swing;
+    const leg = kicker.userData.legs[1], other = kicker.userData.legs[0];
+    const ph = s < 0.12 ? -s / 0.12 : s < 0.3 ? -1 + (s - 0.12) / 0.18 * 2.2 : 1.2 - (s - 0.3) * 2.5;
+    leg.rotation.x = -ph * 0.9; other.rotation.x = ph * 0.2;
+    kicker.userData.arms[0].rotation.z = -0.9 * Math.max(0, ph); kicker.userData.arms[1].rotation.z = 0.5 * Math.max(0, ph);
+    kicker.userData.torso.rotation.x = ph * 0.1;
+    if (s > 0.75) { K.swing = -1; leg.rotation.x = other.rotation.x = 0; }
+  } else if (state === "charge") {
+    const t = performance.now() / 1000;
+    kicker.userData.legs[1].rotation.x = -0.15 - power * 0.35 + Math.sin(t * 8) * 0.03;   // 뒤로 준비 자세
+  }
+  /* 수비수: 점프 */
+  defenders.forEach(d => {
+    if (!d.g.visible) return;
+    if (d.jumpAt >= 0 && B.t >= d.jumpAt) {
+      const u = (B.t - d.jumpAt) / DEF.jumpDur;
+      d.g.position.y = u < 1 ? Math.sin(u * Math.PI) * DEF.jumpH : 0;
+      d.g.userData.arms.forEach((a, i) => a.rotation.z = u < 1 ? (i ? 2.6 : -2.6) : 0);
+      if (u >= 1) { d.jumpAt = -1; d.g.userData.arms.forEach(a => a.rotation.z = 0); }
+    } else if (state === "flight" || state === "result") { /* 슛 중 기본 자세 */ }
+    else { const t = performance.now() / 1000 + d.x; d.g.position.y = 0; d.g.userData.arms.forEach((a, i) => a.rotation.z = (i ? 0.25 : -0.25) + Math.sin(t * 2) * 0.03); }
+    if (d.hit && d.g.rotation.x > -0.5) d.g.rotation.x -= dt * 2;   // 맞으면 살짝 뒤로 젖힘
+  });
+  /* 골키퍼 */
+  if (G.diving) {
+    const t = B.t;
+    if (t >= G.tStart) {
+      const span = Math.max(0.15, G.arrive - G.tStart), u = clamp((t - G.tStart) / span, 0, 1);
+      const maxReach = GK.diveSpeed * span;
+      const tgt = clamp(G.targetX, -maxReach, maxReach);
+      G.x = tgt * u;
+      const high = G.targetY > 1.3;
+      G.y = high ? u * (G.targetY - 1.0) * 0.6 : -u * 0.35;   // 위로 뛰거나 낮게 몸을 던짐
+      const lean = Math.abs(tgt) > 0.5 ? clamp(Math.abs(tgt) / 2.2, 0, 1) * u : 0;
+      keeper.position.set(G.x, G.y + (lean * 0.15), 0.6);
+      keeper.rotation.z = G.dir * lean * 1.35;
+      G.armAng = high ? 1.2 : (lean > 0.3 ? 0.15 : 0.9); G.armLen = GK.arm;
+      keeper.userData.arms.forEach((a, i) => { a.rotation.z = (i ? 1 : -1) * (2.9 - (high ? 0 : lean * 0.8)); });
+      if (t > G.arrive + 0.8 && !B.result) { /* 놓쳤으면 서 있음 */ }
+    } else { G.armAng = 0.9; G.armLen = GK.arm * 0.6; const t2 = performance.now() / 1000; keeper.position.x = Math.sin(t2 * 2) * 0.05; }
+  } else { G.armAng = 0.9; G.armLen = GK.arm * 0.6; const t2 = performance.now() / 1000; keeper.position.x = Math.sin(t2 * 2) * 0.08; keeper.position.y = Math.abs(Math.sin(t2 * 6)) * 0.03; }
+}
+
+/* ═══════════════════ 흐름 ═══════════════════ */
+function showCard(which) {
+  $("overlay").style.display = "flex";
+  $("cardStart").style.display = which === "start" ? "block" : "none";
+  $("cardOver").style.display = which === "over" ? "block" : "none";
+  ["hudTop", "hudAim", "hudBest"].forEach(id => $(id).style.display = "none"); $("panel").style.display = "none";
+  updateAimVisual();
+}
+function renderStageGrid() {
+  const grid = $("stageGrid"); grid.innerHTML = "";
+  STAGES.forEach(s => {
+    const b = document.createElement("button"); b.type = "button";
+    const cleared = s.n <= prog.cleared, open = s.n <= prog.cleared + 1;
+    b.className = cleared ? "done" : open ? "next" : "lock";
+    b.innerHTML = s.n + "<small>" + (cleared ? "클리어" : open ? "도전!" : "🔒 " + s.dist + "m") + "</small>";
+    b.title = s.dist + "m · 수비 " + s.defenders + "명";
+    if (open) b.onclick = e => { e.currentTarget.blur(); startStage(s.n); };
+    grid.appendChild(b);
+  });
+}
+function renderPips() {
+  const p = $("pips"); p.innerHTML = "";
+  STAGES.forEach(s => { const sp = document.createElement("span"); sp.textContent = s.n; sp.className = s.n === stage.n ? "cur" : s.n <= prog.cleared ? "done" : s.n <= prog.cleared + 1 ? "open" : ""; p.appendChild(sp); });
+}
+function startStage(n) {
+  audioInit();
+  stage = STAGES[clamp(n, 1, 10) - 1];
+  state = "aim"; power = 0; lastT = performance.now();
+  aimX = clamp(aimX, -AIM.range, AIM.range); loft = KICKS[kickType].loft;
+  placeScene();
+  $("overlay").style.display = "none";
+  ["hudTop", "hudAim", "hudBest"].forEach(id => $(id).style.display = "block"); $("panel").style.display = "flex";
+  $("hudStage").textContent = stage.n + "단계"; $("hudStageInfo").textContent = stage.dist + "m · 수비 " + stage.defenders + "명";
+  renderPips(); renderKickButtons(); renderPower(); updateAimVisual();
+}
+function retry() { startStage(stage.n); }
+function onGoal() {
+  if (stage.n > prog.cleared) { prog.cleared = stage.n; saveJSON(PROG_KEY, prog); SFX.clear(); }
+}
+function showResult() {
+  state = "result"; spaceFresh = false; overAt = performance.now();
+  const goal = B.result === "goal";
+  $("overTitle").textContent = goal ? (stage.n === 10 ? "🏆 전부 클리어!" : "⚽ 골인!") : "❌ 실패";
+  $("overReason").textContent = goal ? (stage.n + "단계 클리어! " + (stage.n < 10 ? (stage.n + 1) + "단계가 열렸습니다." : "10단계까지 모두 정복했습니다!")) : B.reason + "  같은 단계에 다시 도전하세요.";
+  $("overStats").style.display = "flex";
+  $("statSpeed").innerHTML = shotStat.kmh + "<small> km/h</small>"; $("statRpm").innerHTML = shotStat.rpm + "<small> rpm</small>";
+  let newBest = false, wrBeat = false;
+  if (goal) {
+    const packed = packScore(stage.n, shotStat.kmh), prevPacked = best ? packScore(best.stage, best.speed) : -1;
+    newBest = packed > prevPacked;
+    if (newBest) { best = { stage: stage.n, speed: shotStat.kmh, date: new Date().toLocaleDateString("ko-KR") }; saveJSON(BEST_KEY, best); }
+    wrBeat = !!(WR && WR.beats(packed));
+    $("finalMsg").textContent = wrBeat ? "🏆 세계 신기록!" : newBest ? "🎉 개인 최고 기록 경신!" : "";
+    if (wrBeat) setTimeout(() => WR.prompt(packed).then(() => renderRecords()), 50);
+  } else $("finalMsg").textContent = "";
+  $("bestOverNew").innerHTML = newBest ? '<span class="new">NEW</span>' : "";
+  const hasNext = goal && stage.n < 10;
+  $("btnNext").style.display = hasNext ? "inline-block" : "none";
+  $("btnRetry").textContent = goal ? "이 단계 다시" : "다시 도전";
+  $("btnRetry").classList.toggle("hot", !goal);
+  $("overHint").textContent = "스페이스바: " + (hasNext ? "다음 단계" : goal ? "단계 선택" : "다시 도전");
+  renderRecords(); renderStageGrid(); showCard("over");
+}
+let overAt = 0;
+function resultSpace() {
+  if (document.querySelector(".wr-back")) return;
+  const goal = B.result === "goal";
+  if (goal && stage.n < 10) startStage(stage.n + 1); else if (goal) { state = "menu"; placeScene(); renderStageGrid(); showCard("start"); } else retry();
+}
+
+/* ── 조작 ── */
+function renderKickButtons() { document.querySelectorAll(".kick").forEach(b => b.classList.toggle("on", b.dataset.kick === kickType)); }
+function setKick(k) { if (!KICKS[k] || kickType === k) return; kickType = k; if (state === "aim" || state === "charge") { loft = KICKS[k].loft; updateAimVisual(); } renderKickButtons(); SFX.select(); }
+function renderPower() {
+  const sec = power * PHYS.maxCharge;
+  $("powerFill").style.width = (power * 100).toFixed(1) + "%"; $("powerPct").textContent = Math.round(power * 100) + "%"; $("powerSec").textContent = sec.toFixed(1);
+}
+function chargeStart() {
+  if (state !== "aim") return;
+  audioInit(); state = "charge"; chargeAt = performance.now(); power = 0; $("btnKick").classList.add("hold"); renderPower();
+}
+function chargeEnd() {
+  if (state !== "charge") return;
+  $("btnKick").classList.remove("hold");
+  K.swing = 0; state = "kicking"; updateAimVisual();
+  setTimeout(() => { if (state === "kicking") shoot(); }, 110);   // 다리가 공에 닿는 순간 발사
+}
+let tickAcc = 0;
+function updateInput(dt) {
+  if (state !== "aim" && state !== "charge") return;
+  const L = keys.ArrowLeft || keys.KeyA || hold.aimL, R = keys.ArrowRight || keys.KeyD || hold.aimR;
+  const U = keys.ArrowUp || keys.KeyW || hold.loftU, D = keys.ArrowDown || keys.KeyS || hold.loftD;
+  let changed = false;
+  if (L !== R) { aimX = clamp(aimX + (R ? 1 : -1) * AIM.speed * dt, -AIM.range, AIM.range); changed = true; }
+  if (U !== D) { loft = clamp(loft + (U ? 1 : -1) * AIM.loftSpeed * dt, AIM.loftMin, AIM.loftMax); changed = true; }
+  if (changed) updateAimVisual();
+  if (state === "charge") {
+    const prev = power;
+    power = clamp((performance.now() - chargeAt) / 1000 / PHYS.maxCharge, 0, 1); renderPower();
+    tickAcc += dt; if (tickAcc > 0.22) { tickAcc = 0; SFX.tick(power); }
+    if (power >= 1 && prev < 1) chargeEnd();   // 5초 도달 → 자동 발사
+  }
+}
+
+/* ═══════════════════ 루프 ═══════════════════ */
+function updateCamera(dt) {
+  const home = ballHome();
+  let lx = aimX * 0.25, ly = 0.45 + (home.z - 5) * 0.05 - (window.innerWidth < window.innerHeight ? 0.7 : 0), lz = home.z * 0.15;   // 세로 화면은 아래 조작판에 공이 가리지 않게 시선을 낮춤
+  if (state === "flight" || state === "result") { lx = clamp(B.p.x, -4, 4) * 0.45; ly = 0.9 + B.p.y * 0.25; lz = Math.min(home.z * 0.15, B.p.z * 0.3); }
+  camera.userData.look = camera.userData.look || new THREE.Vector3(lx, ly, lz);
+  if (!B.result) camera.userData.look.lerp(new THREE.Vector3(lx, ly, lz), Math.min(1, dt * 6));   // 결과가 난 뒤엔 시선 고정
+  camera.lookAt(camera.userData.look);
+}
+function loop(now) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
+  if (state === "menu") {
+    const t = now / 1000;
+    camera.position.set(Math.sin(t * 0.15) * 12, 5, 10 + Math.cos(t * 0.15) * 4);
+    camera.lookAt(0, 1, 0);
+    updateActors(dt);
+  } else {
+    updateInput(dt);
+    if (state === "flight" || state === "result") { if (state === "flight") updateFlight(dt); }
+    updateActors(dt); updateCamera(dt);
+  }
+  ballShadow.position.set(ball.position.x, 0.015, ball.position.z);
+  const sc = clamp(1 - (ball.position.y - PHYS.ballR) * 0.15, 0.4, 1); ballShadow.scale.set(sc, sc, 1); ballShadow.material.opacity = 0.25 * sc;
+  renderer.render(scene, camera);
+}
+function resize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  if (!w || !h) return;
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.fov = w < h ? 74 : 58; camera.updateProjectionMatrix();   // 세로 화면은 시야각을 넓혀 골대가 다 보이게
+}
+window.addEventListener("resize", resize); resize();
+
+/* ───────── 입력 ───────── */
+window.addEventListener("keydown", e => {
+  if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
+  if (/^(Arrow(Up|Down|Left|Right)|Space)$/.test(e.code)) e.preventDefault();
+  audioInit();
+  if (e.code === "Space") {
+    if (e.repeat) return;
+    if (state === "menu") { startStage(prog.cleared + 1); return; }
+    if (state === "result") { if (spaceFresh && performance.now() - overAt > 500) resultSpace(); return; }
+    if (state === "aim") chargeStart();
+    return;
+  }
+  if (/^Digit[123]$/.test(e.code) || /^Numpad[123]$/.test(e.code)) setKick(["in", "out", "step"][+e.key - 1] || kickType);
+  keys[e.code] = true;
+});
+window.addEventListener("keyup", e => { keys[e.code] = false; if (e.code === "Space") { spaceFresh = true; chargeEnd(); } });
+window.addEventListener("blur", () => { for (const k in keys) keys[k] = false; for (const k in hold) hold[k] = false; chargeEnd(); });
+/* 마우스·터치: 화면(캔버스)이나 '차기' 버튼을 누르고 있으면 파워, 떼면 발사 */
+function bindHold(el, down, up) {
+  el.addEventListener("pointerdown", e => { e.preventDefault(); try { el.setPointerCapture(e.pointerId); } catch (err) {} down(); });
+  ["pointerup", "pointercancel"].forEach(ev => el.addEventListener(ev, e => { e.preventDefault(); up(); }));
+  el.addEventListener("touchstart", e => e.preventDefault(), { passive: false });
+  el.addEventListener("contextmenu", e => e.preventDefault());
+}
+bindHold(canvas, chargeStart, chargeEnd);
+bindHold($("btnKick"), chargeStart, chargeEnd);
+document.querySelectorAll("[data-hold]").forEach(b => bindHold(b, () => { audioInit(); hold[b.dataset.hold] = true; }, () => { hold[b.dataset.hold] = false; }));
+document.querySelectorAll(".kick").forEach(b => b.addEventListener("click", e => { e.currentTarget.blur(); audioInit(); setKick(b.dataset.kick); }));
+$("btnStart").onclick = e => { e.currentTarget.blur(); startStage(prog.cleared + 1); };
+$("btnRetry").onclick = e => { e.currentTarget.blur(); retry(); };
+$("btnNext").onclick = e => { e.currentTarget.blur(); startStage(stage.n + 1); };
+$("btnMenu").onclick = e => { e.currentTarget.blur(); state = "menu"; placeScene(); renderStageGrid(); showCard("start"); };
+$("btnWipe").onclick = e => {
+  e.currentTarget.blur();
+  if (!confirm("이 기기에 저장된 진행 상황과 나의 최고 기록을 지울까요? (세계 신기록에는 영향이 없습니다)")) return;
+  try { localStorage.removeItem(PROG_KEY); localStorage.removeItem(BEST_KEY); } catch (err) {}
+  prog = { cleared: 0 }; best = null; renderRecords(); renderStageGrid(); alert("지웠습니다.");
+};
+
+stage = STAGES[0]; placeScene();
+renderRecords(); renderStageGrid(); renderKickButtons();
+showCard("start");
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

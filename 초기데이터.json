@@ -251,6 +251,15 @@
         "units": [],
         "unitsSet": false,
         "url": "26.block-blast.html"
+      },
+      "freekick": {
+        "memo": "3D 축구 프리킥 10단계 / 조준·킥 종류·파워로 수비벽과 골키퍼를 뚫는 개인전 (방향키·WASD 조준, 1·2·3 킥, 스페이스 파워)",
+        "open": true,
+        "order": 26,
+        "title": "프리킥 챌린지",
+        "units": [],
+        "unitsSet": false,
+        "url": "27.freekick-challenge.html"
       }
     }
   }
