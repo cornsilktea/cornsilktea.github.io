@@ -127,12 +127,12 @@
 <div class="hud" id="hudTop">
   <div class="hud-box"><span class="stage" id="hudStage">1단계</span> <span id="hudStageInfo"></span><div id="pips"></div></div>
 </div>
-<div class="hud hud-box" id="hudAim"><span class="lab">조준</span>좌우 <b id="aimVal">0.0</b> m · 높이 <b id="loftVal">16</b>°</div>
+<div class="hud hud-box" id="hudAim"><span class="lab">조준 · 예상 궤적</span>좌우 <b id="aimVal">0.0</b> m · 골라인 높이 <b id="loftVal">0.0</b> m<span class="lab" id="trajNote">파워 50% 기준</span></div>
 <div class="hud hud-box" id="hudBest"><span class="lab">개인 최고 기록</span><span id="hudBestVal">—</span><span class="lab" style="margin-top:4px">🏆 세계 신기록</span><span id="hudWrVal">—</span><span class="who" id="hudWrWho"></span></div>
 
 <div class="hud" id="panel">
   <div id="powerWrap">
-    <div class="lab"><span>파워 <b id="powerPct">0%</b></span><span class="mid">스페이스·클릭 <b>누르고 있기</b> → 떼면 발사</span><span><b id="powerSec">0.0</b> / 5초</span></div>
+    <div class="lab"><span>파워 <b id="powerPct">0%</b></span><span class="mid">약하고 낮게 ← <b>누르고 있기</b> → 세고 높게</span><span><b id="powerSec">0.0</b> / 2초</span></div>
     <div id="powerBar"><div id="powerFill"></div><div class="tick" style="left:20%"></div><div class="tick" style="left:40%"></div><div class="tick" style="left:60%"></div><div class="tick" style="left:80%"></div></div>
   </div>
   <div class="row" id="kickRow">
@@ -142,7 +142,6 @@
   </div>
   <div class="row">
     <div class="pad"><span class="lab">조준</span><button type="button" data-hold="aimL">◀</button><button type="button" data-hold="aimR">▶</button></div>
-    <div class="pad"><span class="lab">높이</span><button type="button" data-hold="loftU">▲</button><button type="button" data-hold="loftD">▼</button></div>
     <button type="button" id="btnKick">⚽ 차기 (누르고 있기)</button>
   </div>
 </div>
@@ -150,10 +149,10 @@
 <div id="overlay">
   <div class="card" id="cardStart">
     <div class="logo">프리킥 챌린지<small>수비벽과 골키퍼를 뚫고 10단계를 정복하라</small></div>
-    <div class="desc">조준(좌우·높이)과 <b>킥 종류</b>, 누르고 있는 시간만큼 차는 <b>파워</b>로 골을 노립니다. 파워가 강할수록 빠르고 회전(rpm)이 많아져 <b>더 크게 휘어집니다</b>. 수비벽은 공이 올 때 점프하고, 골키퍼는 슛을 보고 도착 지점을 예측해 몸을 날립니다(단계가 오를수록 정확). 클리어하면 다음 단계가 열립니다.</div>
+    <div class="desc">좌우 <b>조준</b>과 <b>킥 종류</b>, 누르고 있는 시간(최대 2초)만큼 차는 <b>파워</b>로 골을 노립니다. 파워는 <b>세기와 높이를 함께</b> 정합니다(짧게 누르면 낮고 약하게, 길게 누르면 높고 세게). 파워가 강할수록 회전(rpm)이 많아져 <b>더 크게 휘어지고</b>, 화면의 점선이 <b>예상 궤적</b>을 보여 줍니다. 킥은 항상 오른발. 수비벽은 공이 올 때 점프하고, 골키퍼는 슛을 보고 도착 지점을 예측해 몸을 날립니다(단계가 오를수록 정확). 클리어하면 다음 단계가 열립니다.</div>
     <div class="keys">
       <div><b>← →</b><span>조준 좌우 (A·D)</span></div>
-      <div><b>↑ ↓</b><span>공 높이 (W·S)</span></div>
+      <div><b>점선</b><span>킥 종류별 예상 궤적</span></div>
       <div><b>1 2 3</b><span>킥 종류</span></div>
       <div><b>SPACE</b><span>누르고 있으면 파워 ↑</span></div>
     </div>
@@ -210,25 +209,25 @@ for (let n = 1; n <= 10; n++) {
     wallDist:  9.15,                       // 공 ~ 수비벽 거리(m) — 규칙상 9.15m(10야드)
     gkSigma:   [1.3, 0.6, 0.55][tier],     // 골키퍼 예측 오차(표준편차, m) — 클수록 쉬움
     gkWrong:   [0.25, 0.10, 0.03][tier],   // 골키퍼가 아예 반대쪽으로 가는 확률
-    gkReact:   [0.40, 0.20, 0.14][tier],   // 골키퍼 반응 지연(초)
+    gkReact:   [0.40, 0.16, 0.14][tier],   // 골키퍼 반응 지연(초)
     wallDelay: [0.35, 0.18, 0.08][tier],   // 수비수 점프 타이밍이 늦어지는 최대치(초)
   });
 }
 const KICKS = {
-  in:   { name: "인프런트 킥", curve: -1, speedMin: 14, speedMax: 29, rpmMin: 150, rpmMax: 900, loft: 16 },   // 우→좌(화면 기준) 감아차기
-  out:  { name: "아웃프런트 킥", curve: +1, speedMin: 14, speedMax: 28, rpmMin: 150, rpmMax: 800, loft: 16 },  // 좌→우 바깥 커브
-  step: { name: "인스텝 슛", curve: 0, speedMin: 17, speedMax: 34, rpmMin: 40, rpmMax: 160, loft: 10 },      // 직선, 최고 속도
+  in:   { name: "인프런트 킥", curve: -1, speedMin: 14, speedMax: 29, rpmMin: 200, rpmMax: 1000, loftMin: 6, loftMax: 28, color: 0xD97B4F },   // 우→좌(화면 기준) 감아차기
+  out:  { name: "아웃프런트 킥", curve: +1, speedMin: 14, speedMax: 28, rpmMin: 200, rpmMax: 900, loftMin: 6, loftMax: 28, color: 0x5FA8FF },  // 좌→우 바깥 커브
+  step: { name: "인스텝 슛", curve: 0, speedMin: 17, speedMax: 34, rpmMin: 40, rpmMax: 160, loftMin: 3, loftMax: 14, color: 0xFFFFFF },      // 직선, 최고 속도
 };
 const PHYS = {
   g: 9.8, drag: 0.10, ballR: 0.11,
-  magnus: 0.020,        // 횡가속도 = magnus × 회전(rps) × 속도  (마그누스 효과 근사)
+  magnus: 0.045,        // 횡가속도 = magnus × 회전(rps) × 속도  (마그누스 효과 근사)
   dip: 0.06,            // 추가 낙하가속도 = dip × 회전(rps) × 속도 (톱스핀 — 회전 많은 공이 뚝 떨어짐)
-  maxCharge: 5,         // 파워 최대 입력 시간(초)
+  maxCharge: 2,         // 파워 최대 입력 시간(초). 파워 = 세기 + 높이(킥 종류별 loftMin~loftMax)
 };
 const GOAL = { hw: 3.66, h: 2.44, post: 0.06, depth: 1.8 };
-const AIM = { range: 7.5, speed: 3.8, loftMin: 5, loftMax: 32, loftSpeed: 16 };   // 조준 범위(골라인 x, m) · 이동 속도(m/s) · 높이(°)
+const AIM = { range: 7.5, speed: 3.8, previewPower: 0.5 };   // 조준 범위(골라인 x, m) · 이동 속도(m/s) · 누르기 전 궤적 미리보기 파워
 const DEF = { w: 0.5, h: 1.83, gap: 0.58, jumpH: 0.4, jumpDur: 0.6 };
-const GK = { diveSpeed: 5.2, reach: 0.45, arm: 1.0, maxX: 3.2 };
+const GK = { diveSpeed: 5.2, reach: 0.45, arm: 1.0, maxX: 3.2, armDrop: [0.95, 0.7, 0.45] };
 
 const $ = id => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -492,27 +491,25 @@ ball.castShadow = true; scene.add(ball);
 const ballShadow = new THREE.Mesh(new THREE.CircleGeometry(PHYS.ballR * 1.2, 16), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.25 }));
 ballShadow.rotation.x = -Math.PI / 2; ballShadow.position.y = 0.015; scene.add(ballShadow);
 
-/* ── 조준 표시: 바닥 점선 + 도착 표시 + 높이 화살표 ── */
+/* ── 조준 표시: 바닥 점선 + 도착 표시 + 예상 궤적(킥 종류 색) ── */
 const aimLineMat = new THREE.LineDashedMaterial({ color: 0xFFFFFF, dashSize: 0.35, gapSize: 0.22, linewidth: 1 });
 let aimLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), aimLineMat); scene.add(aimLine);
 const aimMark = new THREE.Mesh(new THREE.RingGeometry(0.22, 0.34, 24), new THREE.MeshBasicMaterial({ color: 0xD97B4F, side: THREE.DoubleSide }));
 aimMark.rotation.x = -Math.PI / 2; aimMark.position.y = 0.02; scene.add(aimMark);
-const aimArrow = new THREE.Group();
-(function () { const m = new THREE.MeshBasicMaterial({ color: 0xD97B4F });
-  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.1, 8), m); shaft.rotation.x = Math.PI / 2; shaft.position.z = -0.55; aimArrow.add(shaft);
-  const head = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.22, 10), m); head.rotation.x = -Math.PI / 2; head.position.z = -1.2; aimArrow.add(head); })();
-scene.add(aimArrow);
+const trajMat = new THREE.MeshBasicMaterial({ color: 0xD97B4F, transparent: true, opacity: 0.85, depthWrite: false });
+const trajLine = new THREE.Mesh(new THREE.BufferGeometry(), trajMat); scene.add(trajLine);   // 궤적은 가는 관(tube)으로 — WebGL 선은 굵기가 안 먹음
+const trajMark = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 10), new THREE.MeshBasicMaterial({ color: 0xD97B4F, transparent: true, opacity: 0.8 })); scene.add(trajMark);
 
 /* ═══════════════════ 게임 상태 ═══════════════════ */
 let state = "menu";            // menu | aim | charge | flight | result
 let stage = STAGES[0];
-let aimX = 0, loft = 16, kickType = "in";
+let aimX = 0, kickType = "in";
 let power = 0, chargeAt = 0, lastT = 0, spaceFresh = true;
 let wallX = 0;                 // 수비벽 중심 x
 const keys = {};
-const hold = { aimL: false, aimR: false, loftU: false, loftD: false };
+const hold = { aimL: false, aimR: false };
 const B = { p: new THREE.Vector3(), v: new THREE.Vector3(), rpm: 0, curve: 0, t: 0, active: false, result: null, resultAt: 0, inNet: false, wallChecked: false, gkChecked: false, spinAxis: new THREE.Vector3(1, 0, 0) };
-const K = { swing: -1 };       // 키커 킥 동작 진행 시간(초). -1 = 안 함
+const K = { swing: -1 };       // 키커 킥 동작 진행 시간(초). -1 = 안 함. 오른발(legs[1])로만 찬다
 const G = { x: 0, y: 0, baseX: 0, dir: 0, targetX: 0, targetY: 0, tStart: 0, arrive: 0, diving: false, t: 0, armAng: 0.9, armLen: 0.6 };
 let shotStat = { kmh: 0, rpm: 0 };
 
@@ -521,7 +518,8 @@ function placeScene() {
   const home = ballHome();
   B.p.copy(home); B.v.set(0, 0, 0); B.active = false; B.result = null; B.inNet = false; B.wallChecked = B.gkChecked = false;
   ball.position.copy(B.p); ball.rotation.set(0, 0, 0);
-  kicker.position.set(0.5, 0, home.z + 0.85); kicker.rotation.y = Math.PI + 0.35; K.swing = -1;
+  /* 항상 오른발: 오른발(몸 기준 +x)이 공 앞에 오도록 왼쪽 뒤에 비스듬히 선다 */
+  kicker.position.set(home.x + 0.28, 0, home.z + 0.62); kicker.rotation.y = Math.PI + 0.4; K.swing = -1;
   kicker.userData.legs.forEach(l => l.rotation.x = 0); kicker.userData.knees.forEach(k => k.rotation.x = 0); kicker.userData.arms.forEach(a => a.rotation.set(0, 0, 0)); kicker.userData.torso.rotation.x = 0;
   keeper.position.set(0, 0, 0.6); keeper.rotation.set(0, Math.PI, 0);
   keeperPose("ready");
@@ -543,15 +541,19 @@ function placeScene() {
 function updateAimVisual() {
   const home = ballHome();
   const show = state === "aim" || state === "charge";
-  aimLine.visible = aimMark.visible = aimArrow.visible = show;
+  aimLine.visible = aimMark.visible = trajLine.visible = trajMark.visible = show;
   if (!show) return;
   const pts = [new THREE.Vector3(home.x, 0.03, home.z), new THREE.Vector3(aimX, 0.03, 0)];
   aimLine.geometry.dispose(); aimLine.geometry = new THREE.BufferGeometry().setFromPoints(pts); aimLine.computeLineDistances();
   aimMark.position.set(aimX, 0.02, 0);
-  aimArrow.position.set(home.x, PHYS.ballR + 0.05, home.z);
-  const yaw = Math.atan2(aimX - home.x, -(0 - home.z));   // -z 가 정면
-  aimArrow.rotation.set(0, 0, 0); aimArrow.rotateY(-yaw); aimArrow.rotateX(loft * Math.PI / 180);
-  $("aimVal").textContent = (aimX >= 0 ? "+" : "") + aimX.toFixed(1); $("loftVal").textContent = Math.round(loft);
+  /* 예상 궤적: 누르는 동안은 지금 파워, 누르기 전엔 미리보기 파워 기준 (수비수·골키퍼는 계산에 넣지 않은 "대략적" 궤적) */
+  const pw = state === "charge" ? clamp(power, 0.02, 1) : AIM.previewPower;
+  const L = launchVelocity(kickType, pw), tp = trajectory(L.v, L.rpm, L.curve);
+  trajLine.geometry.dispose(); trajLine.geometry = tp.pts.length > 2 ? new THREE.TubeGeometry(new THREE.CatmullRomCurve3(tp.pts), Math.min(96, tp.pts.length * 2), 0.06, 6, false) : new THREE.BufferGeometry();
+  trajMat.color.setHex(KICKS[kickType].color); trajMark.material.color.setHex(KICKS[kickType].color);
+  trajMark.position.copy(tp.end);
+  $("aimVal").textContent = (aimX >= 0 ? "+" : "") + aimX.toFixed(1); $("loftVal").textContent = tp.goal ? tp.goal.y.toFixed(1) : "—";
+  $("trajNote").textContent = state === "charge" ? "파워 " + Math.round(pw * 100) + "% 기준" : "파워 " + Math.round(AIM.previewPower * 100) + "% 기준 (누르면 실시간)";
 }
 
 /* ═══════════════════ 공 물리 (실제 비행과 예측에 같은 적분기를 씀) ═══════════════════ */
@@ -566,12 +568,24 @@ function stepBall(p, v, rpm, curve, dt) {
   if (p.y < PHYS.ballR) { p.y = PHYS.ballR; if (v.y < 0) { v.y = -v.y * 0.5; v.x *= 0.85; v.z *= 0.85; bounced = true; } }
   return bounced;
 }
+function loftFor(kt, pw) { const k = KICKS[kt]; return k.loftMin + (k.loftMax - k.loftMin) * pw; }   // 파워가 높이를 함께 정한다
+/* 예상 궤적 점 목록 (골라인을 지나거나 땅에 두 번 닿으면 끝) */
+function trajectory(v0, rpm, curve) {
+  const p = ballHome(), v = v0.clone(), pts = [p.clone()]; let t = 0, goal = null, bounces = 0; const dt = 1 / 120;
+  for (let i = 0; i < 120 * 3; i++) {
+    const pz = p.z; if (stepBall(p, v, rpm, curve, dt)) bounces++; t += dt;
+    if (i % 2 === 0) pts.push(p.clone());
+    if (!goal && pz > 0 && p.z <= 0) { goal = { x: p.x, y: p.y, t }; pts.push(p.clone()); break; }
+    if (bounces >= 2 || p.z < -1 || Math.abs(p.x) > 12) break;
+  }
+  return { pts, end: pts[pts.length - 1], goal };
+}
 function launchVelocity(kt, pw) {
   const k = KICKS[kt], home = ballHome();
   const speed = k.speedMin + (k.speedMax - k.speedMin) * pw;
   const rpm = k.rpmMin + (k.rpmMax - k.rpmMin) * pw;
   const dir = new THREE.Vector3(aimX - home.x, 0, -home.z).normalize();
-  const el = loft * Math.PI / 180;
+  const el = loftFor(kt, pw) * Math.PI / 180;
   const v = new THREE.Vector3(dir.x * Math.cos(el), Math.sin(el), dir.z * Math.cos(el)).multiplyScalar(speed);
   return { v, rpm, speed, curve: k.curve };
 }
@@ -763,7 +777,7 @@ function updateActors(dt) {
       G.y = high ? u * (G.targetY - 1.0) * 0.6 * (1 - lean * 0.7) : -u * (G.targetY < 0.7 ? 0.62 : 0.35);   // 위로 뛰거나 낮게 몸을 던짐 (멀리 날수록 높이 못 뜀, 낮은 공은 바닥까지 눕는다)
       keeper.position.set(G.x, G.y + (lean * 0.15), 0.6);
       keeper.rotation.z = G.dir * lean * 1.35;
-      G.armAng = high ? 1.2 - 0.95 * lean : (lean > 0.3 ? 0.15 : 0.9); G.armLen = GK.arm;   // 멀리 몸을 날릴수록 손이 낮아져 위쪽 구석은 못 막는다
+      G.armAng = high ? 1.2 - GK.armDrop[stage.tier] * lean : (lean > 0.3 ? 0.15 : 0.9); G.armLen = GK.arm;   // 멀리 몸을 날릴수록 손이 낮아져 위쪽 구석은 못 막는다(단계가 오를수록 덜 낮아짐)
       keeperPose("dive", G.dir, lean, high);
     } else { G.armAng = 0.9; G.armLen = GK.arm * 0.6; const t2 = performance.now() / 1000; keeper.position.x = G.baseX + Math.sin(t2 * 2) * 0.05; }
   } else { G.armAng = 0.9; G.armLen = GK.arm * 0.6; const t2 = performance.now() / 1000; keeper.position.x = G.baseX + Math.sin(t2 * 2) * 0.08; keeper.position.y = Math.abs(Math.sin(t2 * 6)) * 0.03; }
@@ -796,7 +810,7 @@ function startStage(n) {
   audioInit();
   stage = STAGES[clamp(n, 1, 10) - 1];
   state = "aim"; power = 0; lastT = performance.now();
-  aimX = clamp(aimX, -AIM.range, AIM.range); loft = KICKS[kickType].loft;
+  aimX = clamp(aimX, -AIM.range, AIM.range);
   placeScene();
   $("overlay").style.display = "none";
   ["hudTop", "hudAim", "hudBest"].forEach(id => $(id).style.display = "block"); $("panel").style.display = "flex";
@@ -840,7 +854,7 @@ function resultSpace() {
 
 /* ── 조작 ── */
 function renderKickButtons() { document.querySelectorAll(".kick").forEach(b => b.classList.toggle("on", b.dataset.kick === kickType)); }
-function setKick(k) { if (!KICKS[k] || kickType === k) return; kickType = k; if (state === "aim" || state === "charge") { loft = KICKS[k].loft; updateAimVisual(); } renderKickButtons(); SFX.select(); }
+function setKick(k) { if (!KICKS[k] || kickType === k) return; kickType = k; if (state === "aim" || state === "charge") updateAimVisual(); renderKickButtons(); SFX.select(); }
 function renderPower() {
   const sec = power * PHYS.maxCharge;
   $("powerFill").style.width = (power * 100).toFixed(1) + "%"; $("powerPct").textContent = Math.round(power * 100) + "%"; $("powerSec").textContent = sec.toFixed(1);
@@ -859,16 +873,14 @@ let tickAcc = 0;
 function updateInput(dt) {
   if (state !== "aim" && state !== "charge") return;
   const L = keys.ArrowLeft || keys.KeyA || hold.aimL, R = keys.ArrowRight || keys.KeyD || hold.aimR;
-  const U = keys.ArrowUp || keys.KeyW || hold.loftU, D = keys.ArrowDown || keys.KeyS || hold.loftD;
   let changed = false;
   if (L !== R) { aimX = clamp(aimX + (R ? 1 : -1) * AIM.speed * dt, -AIM.range, AIM.range); changed = true; }
-  if (U !== D) { loft = clamp(loft + (U ? 1 : -1) * AIM.loftSpeed * dt, AIM.loftMin, AIM.loftMax); changed = true; }
   if (changed) updateAimVisual();
   if (state === "charge") {
     const prev = power;
-    power = clamp((performance.now() - chargeAt) / 1000 / PHYS.maxCharge, 0, 1); renderPower();
+    power = clamp((performance.now() - chargeAt) / 1000 / PHYS.maxCharge, 0, 1); renderPower(); updateAimVisual();   // 누르는 동안 궤적을 실시간으로
     tickAcc += dt; if (tickAcc > 0.22) { tickAcc = 0; SFX.tick(power); }
-    if (power >= 1 && prev < 1) chargeEnd();   // 5초 도달 → 자동 발사
+    if (power >= 1 && prev < 1) chargeEnd();   // 최대 시간 도달 → 자동 발사
   }
 }
 
