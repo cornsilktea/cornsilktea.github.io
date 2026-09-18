@@ -398,6 +398,7 @@ const netMat = new THREE.MeshBasicMaterial({ map: netTex, transparent: true, opa
    ② 없으면(로드 실패) 코드로 만든 계단식 관중석을 보여 준다. 그림 생성용 프롬프트는 저장소의 27.freekick-stadium-prompt.md 참고. */
 const STADIUM_IMG = "27.freekick-stadium.jpg";
 const STADIUM_GRASS = 0.14;   // 그림 맨 아래에서 잔디가 차지하는 비율(0~1) — 이 부분은 땅 밑으로 숨긴다
+const STADIUM_R = 45, STADIUM_ARC = 120, STADIUM_BEHIND = 14;   // 곡면 반지름(m)·그림이 덮는 각도(°)·골라인 뒤 거리(m). 반지름이 작을수록 관중석이 낮아져 지붕·하늘까지 보인다
 const standsGroup = new THREE.Group(); scene.add(standsGroup);
 (function stands() {
   const m1 = new THREE.MeshStandardMaterial({ color: 0x8A97A8, roughness: 0.9 }), m2 = new THREE.MeshStandardMaterial({ color: 0x6F7D8E, roughness: 0.9 });
@@ -424,14 +425,15 @@ const standsGroup = new THREE.Group(); scene.add(standsGroup);
   try {
     new THREE.TextureLoader().load(STADIUM_IMG, tex => {
       tex.encoding = THREE.sRGBEncoding; tex.wrapS = THREE.ClampToEdgeWrapping;
-      /* 반지름 90m 반원통이 골 뒤쪽(-z)을 감싼다. 안쪽에서 보므로 BackSide, 좌우가 뒤집히지 않게 repeat.x = -1 */
+      /* 골 뒤쪽(-z)을 감싸는 곡면(원통의 일부). 안쪽에서 보므로 BackSide, 좌우가 뒤집히지 않게 repeat.x = -1 */
       tex.repeat.x = -1; tex.offset.x = 1;
-      /* 원통 높이는 그림 비율에 맞춰 정한다(둘레 π·90 m ÷ 가로세로비) — 그림이 찌그러지지 않게.
+      /* 크기: 그림을 STADIUM_ARC(120°) 호에 붙이고 높이는 그림 비율에 맞춘다(호 길이 ÷ 가로세로비) — 그림이 찌그러지지 않게.
+         호의 한가운데가 골라인 뒤 STADIUM_BEHIND m 에 오고, 반지름은 낮은 카메라에서도 지붕까지 보이도록 작게(관중석 높이 ≈ 38 m).
          그림 아래쪽 잔디 부분(STADIUM_GRASS 비율)은 땅(y=0) 밑으로 내려 관중석 바닥이 잔디와 이어지게 한다 */
-      const R = 90, im = tex.image, H = Math.PI * R / ((im && im.width && im.height) ? im.width / im.height : 4);
-      const geo = new THREE.CylinderGeometry(R, R, H, 48, 1, true, Math.PI / 2, Math.PI);
+      const R = STADIUM_R, arc = STADIUM_ARC * Math.PI / 180, im = tex.image, H = arc * R / ((im && im.width && im.height) ? im.width / im.height : 4);
+      const geo = new THREE.CylinderGeometry(R, R, H, 48, 1, true, Math.PI - arc / 2, arc);
       const wall = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide, fog: false }));
-      wall.position.set(0, H / 2 - H * STADIUM_GRASS, 30); scene.add(wall);
+      wall.position.set(0, H / 2 - H * STADIUM_GRASS, R - STADIUM_BEHIND); scene.add(wall);
       standsGroup.visible = false;
     }, undefined, () => {});
   } catch (e) {}
@@ -583,7 +585,7 @@ function placeScene() {
     d.g.visible = i < n; d.jumpAt = -1; d.hit = false; d.g.position.y = 0;
     if (i < n) { d.x = wallX + (i - (n - 1) / 2) * DEF.gap; d.g.position.set(wc.x + F.r.x * d.x, 0, wc.z + F.r.y * d.x); d.g.rotation.set(0, faceBall, 0); wallPose(d.g, 0); }
   });
-  camera.position.copy(home).setY(4.8).add(rotXZ(-2.4, 6.8));   // 공 뒤 왼쪽, 조금 높은 곳 — 공과 도움닫기하는 키커가 화면 아래에 들어오도록
+  camera.position.copy(home).setY(4.0).add(rotXZ(2.4, 6.0));   // 공 뒤 오른쪽(키커가 왼쪽 뒤에 서므로 공을 가리지 않게), 조금 높은 곳
   updateAimVisual();
 }
 function updateAimVisual() {
@@ -1067,7 +1069,7 @@ function updateInput(dt) {
 /* ═══════════════════ 루프 ═══════════════════ */
 function updateCamera(dt) {
   const home = ballHome();
-  let lx = home.x * 0.45 + F.r.x * aimX * 0.2, ly = -0.7 - (window.innerWidth < window.innerHeight ? 0.3 : 0), lz = home.z * 0.45 + F.r.y * aimX * 0.2;   // 시선: 공→골 선의 55% 지점 + 조준 쪽으로 조금. 낮춰서 공·키커가 보이게, 세로 화면은 아래 조작판에 공이 가리지 않게 더 낮춤
+  let lx = home.x * 0.45 + F.r.x * aimX * 0.2, ly = 0.5 - (window.innerWidth < window.innerHeight ? 0.3 : 0), lz = home.z * 0.45 + F.r.y * aimX * 0.2;   // 시선: 공→골 선의 55% 지점 + 조준 쪽으로 조금. 공이 화면 아래에 들어오면서 골 뒤 관중석·지붕이 보이는 높이. 세로 화면은 아래 조작판에 공이 가리지 않게 조금 낮춤
   if (state === "flight" || state === "result") { lx = clamp(B.p.x, -4, 4) * 0.45; ly = 0.9 + B.p.y * 0.25; lz = Math.min(home.z * 0.15, B.p.z * 0.3); }
   camera.userData.look = camera.userData.look || new THREE.Vector3(lx, ly, lz);
   if (!B.result) camera.userData.look.lerp(new THREE.Vector3(lx, ly, lz), Math.min(1, dt * 6));   // 결과가 난 뒤엔 시선 고정
