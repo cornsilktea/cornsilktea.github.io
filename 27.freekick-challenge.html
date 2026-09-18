@@ -214,14 +214,15 @@ for (let n = 1; n <= 10; n++) {
   });
 }
 const KICKS = {
-  in:   { name: "인프런트 킥", curve: -1, speedMin: 14, speedMax: 29, rpmMin: 200, rpmMax: 1000, loftMin: 6, loftMax: 28, color: 0xD97B4F },   // 우→좌(화면 기준) 감아차기
-  out:  { name: "아웃프런트 킥", curve: +1, speedMin: 14, speedMax: 28, rpmMin: 200, rpmMax: 900, loftMin: 6, loftMax: 28, color: 0x5FA8FF },  // 좌→우 바깥 커브
+  in:   { name: "인프런트 킥", curve: -1, speedMin: 14, speedMax: 32, rpmMin: 200, rpmMax: 1000, loftMin: 6, loftMax: 28, color: 0xD97B4F },   // 우→좌(화면 기준) 감아차기
+  out:  { name: "아웃프런트 킥", curve: +1, speedMin: 14, speedMax: 31, rpmMin: 200, rpmMax: 900, loftMin: 6, loftMax: 28, color: 0x5FA8FF },  // 좌→우 바깥 커브
   step: { name: "인스텝 슛", curve: 0, speedMin: 17, speedMax: 34, rpmMin: 40, rpmMax: 160, loftMin: 3, loftMax: 14, color: 0xFFFFFF },      // 직선, 최고 속도
 };
 const PHYS = {
   g: 9.8, drag: 0.10, ballR: 0.11,
   magnus: 0.045,        // 횡가속도 = magnus × 회전(rps) × 속도  (마그누스 효과 근사)
-  dip: 0.06,            // 추가 낙하가속도 = dip × 회전(rps) × 속도 (톱스핀 — 회전 많은 공이 뚝 떨어짐)
+  dip: 0.025,           // 추가 낙하가속도 = dip × 회전(rps) × 속도 (톱스핀 — 회전 많은 공이 뚝 떨어짐)
+  topY: 2.2,            // 게이지를 다 채운 슛이 골라인에서 닿는 높이(m) — 단계 거리마다 loftMax 를 자동으로 맞춘다(solveLofts). 크로스바 2.44
   maxCharge: 2,         // 파워 최대 입력 시간(초). 파워 = 세기 + 높이(킥 종류별 loftMin~loftMax)
 };
 const GOAL = { hw: 3.66, h: 2.44, post: 0.06, depth: 1.8 };
@@ -571,7 +572,19 @@ function stepBall(p, v, rpm, curve, dt) {
   if (p.y < PHYS.ballR) { p.y = PHYS.ballR; if (v.y < 0) { v.y = -v.y * 0.5; v.x *= 0.85; v.z *= 0.85; bounced = true; } }
   return bounced;
 }
-function loftFor(kt, pw) { const k = KICKS[kt]; return k.loftMin + (k.loftMax - k.loftMin) * pw; }   // 파워가 높이를 함께 정한다
+function loftFor(kt, pw) { const k = KICKS[kt]; return k.loftMin + ((k.loftTop || k.loftMax) - k.loftMin) * pw; }   // 파워가 높이를 함께 정한다 (loftTop = 이 단계에서 풀파워가 topY 높이에 닿는 각도)
+/* 단계 거리마다 풀파워 슛이 골라인 PHYS.topY 높이에 오도록 킥 종류별 loftTop 을 구한다 (정면 조준, 파워 1) */
+function solveLofts() {
+  const savedAim = aimX; aimX = 0;
+  for (const kt in KICKS) {
+    const k = KICKS[kt]; let lo = k.loftMin, found = k.loftMax;
+    const yAt = el => { k.loftTop = el; const L = launchVelocity(kt, 1); const pr = predict(L.v, L.rpm, L.curve, stage.dist - stage.wallDist); return pr.goal ? pr.goal.y : -1; };   // 골라인까지 못 오면(땅에 구름) 낮은 것으로 본다
+    for (let el = k.loftMin + 1; el <= 45; el += 1) { if (yAt(el) >= PHYS.topY) { found = el; break; } lo = el; }   // 낮은 각도부터 올라가며 처음 topY 를 넘는 구간을 찾고
+    let hi = found; for (let i = 0; i < 12; i++) { const mid = (lo + hi) / 2; if (yAt(mid) >= PHYS.topY) hi = mid; else lo = mid; }   // 이분법으로 정밀화
+    k.loftTop = hi;
+  }
+  aimX = savedAim;
+}
 /* 예상 궤적 점 목록 (골라인을 지나거나 땅에 두 번 닿으면 끝) */
 function trajectory(v0, rpm, curve) {
   const p = ballHome(), v = v0.clone(), pts = [p.clone()]; let t = 0, goal = null, bounces = 0; const dt = 1 / 120;
@@ -876,7 +889,7 @@ function renderPips() {
 }
 function startStage(n) {
   audioInit();
-  stage = STAGES[clamp(n, 1, 10) - 1];
+  stage = STAGES[clamp(n, 1, 10) - 1]; solveLofts();
   state = "aim"; power = 0; lastT = performance.now();
   aimX = clamp(aimX, -AIM.range, AIM.range);
   placeScene();
