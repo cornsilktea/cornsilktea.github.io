@@ -11,7 +11,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
 <meta property="og:title" content="터보 랩">
-<meta property="og:description" content="3D 카툰 레이싱 / 쉬움·어려움 트랙 3바퀴 완주 시간 개인전 (WASD·방향키)">
+<meta property="og:description" content="3D 카툰 레이싱 / 쉬움·보통 3바퀴, 어려움 2바퀴 완주 시간 개인전 (WASD·방향키)">
 <meta property="og:url" content="https://cornsilktea.github.io/24.turbo-lap.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
@@ -84,6 +84,7 @@
   .btn { display: inline-block; font: inherit; font-weight: 800; font-size: 20px; padding: 13px 30px; border-radius: 12px; border: 3px solid var(--sg-line-strong); background: var(--sg-primary); color: var(--sg-primary-ink); cursor: pointer; box-shadow: 0 5px 0 var(--sg-ink); }
   .btn:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--sg-ink); }
   .btn small { display: block; font-size: 12px; font-weight: 700; opacity: .85; margin-top: 2px; }
+  .btn.mid { background: var(--sg-panel-alt); color: var(--sg-ink); }
   .btn.hard { background: #D97B4F; }
   .btn.sub { background: #fff; color: var(--sg-ink); font-size: 16px; padding: 10px 20px; }
   .cars { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 14px 0 12px; }
@@ -136,12 +137,13 @@
 
 <div id="overlay">
   <div class="card" id="cardStart">
-    <div class="logo">TURBO LAP<small>터보 랩 — 3바퀴 최단 시간 도전</small></div>
+    <div class="logo">TURBO LAP<small>터보 랩 — 완주 최단 시간 도전 (쉬움·보통 3바퀴, 어려움 2바퀴)</small></div>
     <table class="rtab">
       <thead><tr><th>난이도</th><th>나의 최고 기록</th><th>🏆 세계신기록</th></tr></thead>
       <tbody>
         <tr><td>쉬움</td><td><em id="bestEasy">—</em></td><td><em id="wrEasy">—</em><small id="wrWhoEasy"></small></td></tr>
-        <tr><td>어려움</td><td><em id="bestHard">—</em></td><td><em id="wrHard">—</em><small id="wrWhoHard"></small></td></tr>
+        <tr><td>보통</td><td><em id="bestHard">—</em></td><td><em id="wrHard">—</em><small id="wrWhoHard"></small></td></tr>
+        <tr><td>어려움 <small style="font-weight:400">2바퀴</small></td><td><em id="bestExpert">—</em></td><td><em id="wrExpert">—</em><small id="wrWhoExpert"></small></td></tr>
       </tbody>
     </table>
     <div class="keys">
@@ -153,7 +155,8 @@
     </div>
     <div class="btns">
       <button type="button" class="btn" id="btnEasy">쉬움</button>
-      <button type="button" class="btn hard" id="btnHard">어려움</button>
+      <button type="button" class="btn mid" id="btnHard">보통</button>
+      <button type="button" class="btn hard" id="btnExpert">어려움</button>
     </div>
     <div class="hint">트랙을 벗어나면 느려지고, 울타리에 부딪히면 크게 감속합니다.</div>
     <div class="wipe"><button type="button" id="btnWipe">이 기기의 나의 최고 기록·고스트 지우기</button></div>
@@ -208,7 +211,7 @@
 
 /* ═══════════════════ 밸런스 설정 (여기 숫자만 바꾸면 됨) ═══════════════════ */
 const CFG = {
-  laps: 3,               // 완주 바퀴 수
+  laps: 3,               // 완주 바퀴 수 (트랙에 laps 가 없을 때 기본값)
   countdown: 3,          // 출발 카운트다운(초)
   maxSpeed: 44,          // 최고 속도 (단위/초). 표시 km/h = ×4 → 평지 직선 약 170
   accel: 20,             // 가속도
@@ -235,27 +238,45 @@ const CFG = {
   samples: 800,          // 트랙 곡선 샘플 수
   kmh: 4                 // 표시용 속도 배율
 };
-/* 난이도별 트랙 — points: 제어점 [x, y(높이), z] (닫힌 곡선), width: 도로 폭
+/* 난이도별 트랙 — points: 제어점 [x, y(높이), z] (닫힌 곡선), width: 도로 폭, laps: 완주 바퀴 수
    세계 신기록 경로 records/turbolap/<key>, 개인 기록 localStorage turbolap_best_<key>_v1
+   ※ key 는 기록 경로라서 바꾸면 그동안의 기록이 끊긴다. 예전 "어려움" 트랙이 "보통" 이 되었지만 key 는 hard 그대로,
+     새 "어려움" 트랙은 key expert.
    ※ 코너 반지름은 width/2 + shoulder(4.5) 보다 커야 한다. 더 급하면 안쪽 난간이 도로 안으로 꼬여 들어와
-     차가 난간을 통과한다. 제어점을 고친 뒤 콘솔의 "[turbolap] … minR" 값(쉬움 ≥ 11.5, 어려움 ≥ 10)을 확인할 것. */
+     차가 난간을 통과한다. 제어점을 고친 뒤 콘솔의 "[turbolap] … minR" 값(쉬움 ≥ 11.5, 보통 ≥ 10, 어려움 ≥ 10.5)을 확인할 것. */
 const TRACKS = {
   easy: {
-    key: "easy", name: "쉬움", width: 14, trees: 90,
+    key: "easy", name: "쉬움", width: 14, trees: 90, laps: 3,
     points: [
       [-60, 0, 80], [40, 0, 80], [110, 0, 55], [125, 0, -15], [90, 5, -65],
       [25, 9, -95], [-40, 5, -70], [-95, 0, -85], [-140, 0, -35], [-125, 0, 15], [-135, 0, 55], [-105, 0, 85]
     ]
   },
   hard: {
-    key: "hard", name: "어려움", width: 11, trees: 110,
+    key: "hard", name: "보통", width: 11, trees: 110, laps: 3,
     points: [
       [-90, 0, 95], [20, 0, 95], [80, 0, 80], [110, 0, 40], [85, 0, 10], [45, 0, 25], [20, 0, -5],
       [50, 4, -40], [100, 9, -70], [120, 3, -115], [60, 0, -135], [0, 4, -110], [-50, 10, -130],
       [-105, 5, -100], [-140, 0, -70], [-135, 0, -40], [-95, 0, -20], [-100, 0, 5], [-135, 0, 35], [-125, 0, 80]
     ]
+  },
+  /* 어려움: 약 2배 긴 트랙을 2바퀴. 출발 직선(370m) → 오른쪽 큰 원호(반지름 약 95, 속도를 안 줄여도 돎)
+     → 시케인·헤어핀(감속) → 언덕을 넘어 아래쪽 내리막 직선 → S자 시케인(감속) → 왼쪽 큰 원호 → 출발선 */
+  expert: {
+    key: "expert", name: "어려움", width: 12, trees: 150, laps: 2,
+    points: [
+      [-110, 0, 150], [-30, 0, 150], [50, 0, 150], [130, 0, 150], [180, 0, 146],                    // 출발 직선(출발선 다음 290m)
+      [233, 0, 127], [266, 0, 69], [255, 0, 3], [203, 0, -40], [150, 0, -45],                       // 오른쪽 큰 원호
+      [95, 0, -30], [60, 0, -60], [45, 0, -95], [75, 2, -115], [115, 4, -105],                       // 시케인 → 헤어핀(감속)
+      [160, 8, -135], [150, 11, -180], [100, 11, -200], [40, 8, -200], [-20, 4, -195], [-80, 0, -185],  // 언덕 → 내리막 직선
+      [-125, 0, -165], [-165, 0, -190], [-205, 0, -160],                                            // S자 시케인(감속)
+      [-245, 0, -100], [-262, 0, -25], [-258, 0, 50], [-235, 0, 115], [-190, 0, 150]                 // 왼쪽 큰 원호 → 출발선
+    ]
   }
 };
+const DIFFS = Object.keys(TRACKS);                // ["easy", "hard", "expert"] — 기록·버튼·표 모두 이 순서
+function capKey(k) { return k[0].toUpperCase() + k.slice(1); }   // 요소 id 접미사: bestEasy · wrHard · wrWhoExpert …
+let LAPS = CFG.laps;                              // 현재 트랙의 완주 바퀴 수 (buildTrack 에서 설정)
 const CARS = {
   black:  { name: "검정", color: 0x2A2E35, model: "cayenne" },
   yellow: { name: "노랑", color: 0xFFC23D, model: "aventador" },
@@ -271,14 +292,14 @@ const $ = id => document.getElementById(id);
 function bestKey(k) { return "turbolap_best_" + k + "_v1"; }
 function loadBest(k) { try { const v = parseInt(localStorage.getItem(bestKey(k)), 10); return v > 0 ? v : 0; } catch (e) { return 0; } }
 function saveBest(k, v) { try { localStorage.setItem(bestKey(k), String(v)); } catch (e) {} }
-const best = { easy: loadBest("easy"), hard: loadBest("hard") };
+const best = {}; DIFFS.forEach(k => { best[k] = loadBest(k); });
 /* ═══════════════════ 고스트 (지난 주행을 반투명 차로 재생) ═══════════════════
    기록 형식: [[t(ms), x, y, z, 방향, 기울기], …] 를 0.1초마다 → 3바퀴 약 15~35KB
    나의 최고 기록 고스트: localStorage turbolap_ghost_<key>_v1 = {"ms":…, "data":"[…]"}
    세계 신기록 고스트:   Firebase ghosts/turbolap/<key> = { score, name, data } (규칙: score 가 현재 세계 신기록과 같아야 씀) */
 const GHOST_STEP = 100;
 let ghostPick = "none"; try { if (/^(none|mine|world)$/.test(localStorage.getItem("turbolap_ghostpick_v1") || "")) ghostPick = localStorage.getItem("turbolap_ghostpick_v1"); } catch (e) {}
-const worldGhost = { easy: null, hard: null, tried: { easy: false, hard: false } };   // 내려받은 세계 신기록 고스트
+const worldGhost = { tried: {} }; DIFFS.forEach(k => { worldGhost[k] = null; worldGhost.tried[k] = false; });   // 내려받은 세계 신기록 고스트
 let ghostPlay = null, ghostCar = null, ghostIdx = 0, ghostLabel = "", ghostShort = "";               // 이번 경기에 재생 중인 고스트
 let recData = [], recLast = -Infinity;                                              // 이번 경기 녹화
 function ghostKey(k) { return "turbolap_ghost_" + k + "_v1"; }
@@ -355,10 +376,10 @@ function fmtTime(ms) {
   const m = Math.floor(ms / 60000), s = Math.floor(ms % 60000 / 1000), c = Math.floor(ms % 1000 / 10);
   return m + ":" + String(s).padStart(2, "0") + "." + String(c).padStart(2, "0");
 }
-/* 세계 신기록 — records/turbolap/easy · hard, 시간(ms)은 작을수록 좋으므로 lower:true */
+/* 세계 신기록 — records/turbolap/easy · hard · expert, 시간(ms)은 작을수록 좋으므로 lower:true */
 const WRS = {};
-["easy", "hard"].forEach(k => { WRS[k] = window.WorldRecord ? WorldRecord("turbolap", { key: k, lower: true, format: fmtTime }) : null; });
-const wrTried = { easy: false, hard: false };
+DIFFS.forEach(k => { WRS[k] = window.WorldRecord ? WorldRecord("turbolap", { key: k, lower: true, format: fmtTime }) : null; });
+const wrTried = {};
 function wrInfo(k) {
   const WR = WRS[k];
   if (!WR) return { val: "—", who: "", none: true };
@@ -368,8 +389,8 @@ function wrInfo(k) {
 }
 function setVal(el, text, none, cls) { el.textContent = text; el.className = cls + (none ? " none" : ""); }
 function renderRecords() {
-  ["easy", "hard"].forEach(k => {
-    const cap = k === "easy" ? "Easy" : "Hard", w = wrInfo(k);
+  DIFFS.forEach(k => {
+    const cap = capKey(k), w = wrInfo(k);
     setVal($("best" + cap), best[k] > 0 ? fmtTime(best[k]) : "아직 없음", !(best[k] > 0), "");
     setVal($("wr" + cap), w.val, w.none, ""); $("wrWho" + cap).textContent = w.who;
   });
@@ -547,7 +568,7 @@ function buildTrack(def) {
   const G = trackGroup = new THREE.Group(); scene.add(G);
   W = def.width;
   const curve = new THREE.CatmullRomCurve3(def.points.map(p => new THREE.Vector3(p[0], p[1], p[2])), true, "catmullrom", 0.5);
-  N = CFG.samples; TRACK_LEN = curve.getLength(); SEG = TRACK_LEN / N;
+  N = CFG.samples; TRACK_LEN = curve.getLength(); SEG = TRACK_LEN / N; LAPS = def.laps || CFG.laps;
   S = [];  // { p: 위치, t: 접선(xz 정규화), n: 왼쪽 법선(xz) }
   for (let i = 0; i < N; i++) {
     const u = i / N, p = curve.getPointAt(u), tg = curve.getTangentAt(u);
@@ -610,7 +631,10 @@ function buildTrack(def) {
       flag.rotation.y = Math.atan2(S[i].t.x, S[i].t.z); G.add(flag);
     }
   }
-  /* 나무 */
+  /* 트랙 범위 (나무 배치·미니맵에 씀) */
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  S.forEach(s => { minX = Math.min(minX, s.p.x); maxX = Math.max(maxX, s.p.x); minZ = Math.min(minZ, s.p.z); maxZ = Math.max(maxZ, s.p.z); });
+  /* 나무 — 트랙 범위보다 사방 100 넓게 */
   {
     const trunk = new THREE.CylinderGeometry(0.4, 0.55, 2.2, 6), leaf1 = new THREE.ConeGeometry(2.6, 4.2, 7), leaf2 = new THREE.ConeGeometry(1.9, 3.4, 7);
     const trunkMat = lambert(0x8B5A2B);
@@ -618,7 +642,7 @@ function buildTrack(def) {
     let placed = 0, tries = 0;
     while (placed < def.trees && tries < 3000) {
       tries++;
-      const x = rnd(-240, 240), z = rnd(-220, 220);
+      const x = rnd(minX - 100, maxX + 100), z = rnd(minZ - 100, maxZ + 100);
       let ok = true;
       for (let i = 0; i < N; i += 3) { const s = S[i]; const dx = s.p.x - x, dz = s.p.z - z; if (dx * dx + dz * dz < 24 * 24) { ok = false; break; } }
       if (!ok) continue;
@@ -631,15 +655,13 @@ function buildTrack(def) {
   }
   /* 미니맵 좌표 변환 */
   {
-    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-    S.forEach(s => { minX = Math.min(minX, s.p.x); maxX = Math.max(maxX, s.p.x); minZ = Math.min(minZ, s.p.z); maxZ = Math.max(maxZ, s.p.z); });
     const pad = 22, sc = Math.min((300 - pad * 2) / (maxX - minX), (300 - pad * 2) / (maxZ - minZ));
     const ox = 150 - (minX + maxX) / 2 * sc, oz = 150 - (minZ + maxZ) / 2 * sc;
     MM = { sc, mx: x => ox + x * sc, mz: z => oz + z * sc };
   }
   let minR = Infinity;                                                // 가장 급한 코너의 반지름 (난간 offset 보다 커야 함)
   for (let i = 0; i < N; i++) { const a = S[(i + N - 2) % N].t, b = S[(i + 2) % N].t; const ang = Math.acos(Math.max(-1, Math.min(1, a.x * b.x + a.z * b.z))); minR = Math.min(minR, SEG * 4 / Math.max(ang, 1e-6)); }
-  console.log("[turbolap] " + def.key + " track length", TRACK_LEN.toFixed(1), "/ min 3-lap time at max speed", (3 * TRACK_LEN / CFG.maxSpeed).toFixed(1), "s / minR", minR.toFixed(1), "(rail offset " + (W / 2 + SH) + ")");
+  console.log("[turbolap] " + def.key + " track length", TRACK_LEN.toFixed(1), "/ laps", LAPS, "/ min time at max speed", (LAPS * TRACK_LEN / CFG.maxSpeed).toFixed(1), "s / minR", minR.toFixed(1), "(rail offset " + (W / 2 + SH) + ")");
 }
 
 /* ── 자동차 ── */
@@ -870,7 +892,7 @@ function pickCourse(k) {                  // 코스 고른 뒤 차량 색 고르
 }
 function setHud(on) { hud.style.display = on ? "flex" : "none"; speedBox.style.display = on ? "block" : "none"; mini.style.display = on ? "block" : "none"; }
 function showLapToast(done, lt, isNew) {     // done = 방금 끝낸 바퀴 수, lt = 그 랩타임
-  const left = CFG.laps - done;
+  const left = LAPS - done;
   lapToastMain.textContent = done + "바퀴 완료! " + fmtTime(lt);
   lapToastSub.textContent = (left === 1 ? "마지막 바퀴!" : "남은 " + left + "바퀴") + "  ·  이번 경기 최고 랩 " + fmtTime(raceBest) + (isNew && lapTimes.length > 1 ? " NEW" : "");
   lapToast.className = ""; void lapToast.offsetWidth;   // 애니메이션 다시 시작
@@ -886,7 +908,7 @@ function startRace(which) {
   $("hudGhost").style.display = ghostLabel ? "block" : "none"; $("hudGhost").textContent = "👻 " + ghostLabel;
   state = "countdown"; cdTime = 0; cdShown = -1; goTimer = 0; elapsed = 0; finalMs = 0; shake = 0;
   showCard(null); setHud(true); countBox.style.display = "flex"; lapToast.className = "";
-  hudLap.textContent = "1 / " + CFG.laps; hudTime.firstChild.nodeValue = fmtTime(0); hudOff.textContent = "";
+  hudLap.textContent = "1 / " + LAPS; hudTime.firstChild.nodeValue = fmtTime(0); hudOff.textContent = "";
   engineStart();
   snapCamera();
 }
@@ -897,7 +919,7 @@ function recover() {                      // 가장 가까운 트랙 지점으�
 function showMenu() {
   state = "menu"; setHud(false); fctx.clearRect(0, 0, fx.width, fx.height); countBox.style.display = "none"; lapToast.className = ""; showCard("start");
   engineUpdate(0, false); renderRecords();
-  ["easy", "hard"].forEach(k => { if (WRS[k]) WRS[k].load(); });
+  DIFFS.forEach(k => { if (WRS[k]) WRS[k].load(); });
 }
 function finish() {
   state = "done"; finalMs = Math.round(elapsed); doneTimer = 0;
@@ -999,7 +1021,7 @@ function updateCar(dt) {
     if (fwdCross && P.expected >= 4) {
       P.lap++; P.expected = 1;
       const isNew = closeLap();
-      if (P.lap >= CFG.laps) finish();
+      if (P.lap >= LAPS) finish();
       else { showLapToast(P.lap, lapTimes[lapTimes.length - 1], isNew); beep(880, 0.12, "square", 0.08); beep(1175, 0.2, "square", 0.08, 0.12); }
     } else if (backCross) P.expected = 0;
   }
@@ -1099,7 +1121,7 @@ function tick(now) {
 
   if (state !== "menu") {
     hudTime.firstChild.nodeValue = fmtTime(state === "done" ? finalMs : elapsed);
-    hudLap.textContent = Math.min(CFG.laps, P.lap + 1) + " / " + CFG.laps;
+    hudLap.textContent = Math.min(LAPS, P.lap + 1) + " / " + LAPS;
     hudOff.textContent = P.off ? "오프로드 — 감속 중" : "";
     speedVal.textContent = Math.round(Math.abs(P.v) * CFG.kmh);
     drawMinimap();
@@ -1136,6 +1158,7 @@ window.addEventListener("keyup", e => onKey(e, false));
 window.addEventListener("blur", () => { keys.up = keys.down = keys.left = keys.right = false; });
 $("btnEasy").onclick = e => { e.currentTarget.blur(); pickCourse("easy"); };
 $("btnHard").onclick = e => { e.currentTarget.blur(); pickCourse("hard"); };
+$("btnExpert").onclick = e => { e.currentTarget.blur(); pickCourse("expert"); };
 $("btnCarBack").onclick = e => { e.currentTarget.blur(); showCard("start"); };
 document.querySelectorAll(".ghostbtn").forEach(b => b.onclick = e => {
   e.currentTarget.blur(); ghostPick = b.getAttribute("data-ghost");
@@ -1151,7 +1174,7 @@ $("btnGo").onclick = e => { e.currentTarget.blur(); startRace(pendingDiff); };
 $("btnWipe").onclick = e => {
   e.currentTarget.blur();
   if (!confirm("이 기기에 저장된 나의 최고 기록과 고스트를 모두 지울까요? (세계 신기록에는 영향이 없습니다)")) return;
-  ["easy", "hard"].forEach(k => { try { localStorage.removeItem(bestKey(k)); localStorage.removeItem(ghostKey(k)); } catch (err) {} best[k] = 0; });
+  DIFFS.forEach(k => { try { localStorage.removeItem(bestKey(k)); localStorage.removeItem(ghostKey(k)); } catch (err) {} best[k] = 0; });
   renderRecords(); alert("지웠습니다.");
 };
 $("btnRetry").onclick = e => { e.currentTarget.blur(); startRace(); };
@@ -1162,7 +1185,7 @@ $("btnRecover").onclick = e => { e.currentTarget.blur(); recover(); };
 /* 콘솔 디버그용 */
 window.TL = { keys, P, CFG, camera, scene, renderer, tick, makeCar, CARS, get S() { return S; }, setTrack: k => { diff = k; buildTrack(TRACKS[k]); resetCar(); } };
 buildTrack(TRACKS[diff]); resetCar(); updateCar(0); showMenu();
-["easy", "hard"].forEach(k => { const WR = WRS[k]; if (WR) { WR.onChange(renderRecords); WR.load().then(() => { wrTried[k] = true; renderRecords(); }); } });
+DIFFS.forEach(k => { const WR = WRS[k]; if (WR) { WR.onChange(renderRecords); WR.load().then(() => { wrTried[k] = true; renderRecords(); }); } });
 requestAnimationFrame(frame);
 })();
 </script>
