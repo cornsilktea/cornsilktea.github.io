@@ -110,6 +110,7 @@
   .class-grid button[aria-pressed="true"] { border-color: var(--sg-primary); background: var(--sg-primary-soft); }
   .class-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
   .class-head h2 { margin: 0; }
+  .class-tools { display: flex; align-items: center; gap: 14px; flex: none; }
   @media (max-width: 600px) {
     .class-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   }
@@ -209,7 +210,12 @@
     <div class="panel" id="classPanel" hidden>
       <div class="class-head">
         <h2 id="classTitle"></h2>
-        <button id="classClose" type="button">닫기</button>
+        <div class="class-tools">
+          <label class="switch" title="이 반의 자료를 모두 켜거나 끕니다">
+            <input type="checkbox" id="classAll"><span class="track"></span><span class="switch-text" style="width:auto">모두 켜기</span>
+          </label>
+          <button id="classClose" type="button">닫기</button>
+        </div>
       </div>
       <p class="msg" id="classMsg"></p>
       <div id="list"></div>
@@ -262,6 +268,25 @@
         </div>
         <p class="msg" id="recMsg"></p>
         <div id="recList"></div>
+      </div>
+    </div>
+
+    <!-- 학급 신기록 관리: 위 '반 고르기'에서 누른 반의 기록(records/<게임>/<항목>cls<학년><반>)만 보여 줍니다 -->
+    <div class="panel" id="crecPanel">
+      <h2 id="crecTitle">학급 신기록 관리</h2>
+      <div class="actions" style="margin-top:0">
+        <button id="crecToggle" type="button" aria-expanded="false">펼치기</button>
+      </div>
+      <div id="crecBody" hidden>
+        <p class="hint">
+          위 <b>반 고르기</b>에서 누른 반의 신기록만 나옵니다. 반별 링크(?c=)로 들어온 학생이 세운 기록이며,
+          세계 신기록과 똑같이 <b>고치기</b>·<b>지우기</b>를 할 수 있습니다.
+        </p>
+        <div class="actions">
+          <button id="crecReload" type="button">신기록 새로고침</button>
+        </div>
+        <p class="msg" id="crecMsg"></p>
+        <div id="crecList"></div>
       </div>
     </div>
 
@@ -562,26 +587,47 @@ function recWho(rec) {
   return p.join(" ");
 }
 
+/* 반 신기록 key 의 꼬리: "cls" + 학년 글자 + 반 글자 (world-record.js 와 같은 규칙) */
+function classSuffix(cid) {
+  const c = D.classById(cid);
+  return "cls" + "ab".charAt(c.grade - 1) + "abcde".charAt(c.cls - 1);
+}
+function isClassKey(key) { return /cls[ab][a-e]$/.test(key); }
+
+/* 세계 신기록 관리: 반 기록이 아닌 것만 */
 function renderRecords() {
-  const box = $("recList");
+  renderRecordList($("recList"), records.filter((r) => !isClassKey(r.key)), "recMsg", "등록된 세계 신기록이 없습니다.");
+  renderClassRecords();
+}
+
+/* 학급 신기록 관리: 위에서 고른 반(current)의 기록만 */
+function renderClassRecords() {
+  const box = $("crecList");
+  $("crecTitle").textContent = "학급 신기록 관리" + (current ? " — " + D.classById(current).label : "");
+  if (!current) { box.innerHTML = ""; box.appendChild(el("p", "hint", "위 '반 고르기'에서 반을 먼저 누르세요.")); return; }
+  const suffix = classSuffix(current);
+  renderRecordList(box, records.filter((r) => r.key.endsWith(suffix)), "crecMsg",
+    D.classById(current).label + "에 등록된 신기록이 없습니다.");
+}
+
+function renderRecordList(box, list, msgId, emptyText) {
   box.innerHTML = "";
-  if (records.length === 0) { box.appendChild(el("p", "hint", "등록된 세계 신기록이 없습니다.")); return; }
+  if (list.length === 0) { box.appendChild(el("p", "hint", emptyText)); return; }
   /* 곡별·난이도별로 항목이 여러 개인 게임(피아노 타일·터보 랩)은 게임 하나로 묶어 접어 둡니다 */
   const groups = new Map();
-  records.forEach((r) => {
+  list.forEach((r) => {
     if (!groups.has(r.game)) groups.set(r.game, []);
     groups.get(r.game).push(r);
   });
   groups.forEach((list, game) => {
     const m = REC_GAMES[game];
-    if (list.length < 2) { list.forEach((r) => box.appendChild(recCard(r))); return; }
-    /* 세계 기록을 맨 앞에, 그다음 반별 */
-    list.sort((a, b) => (a.key.indexOf("cls") === -1 ? 0 : 1) - (b.key.indexOf("cls") === -1 ? 0 : 1) || a.key.localeCompare(b.key));
+    if (list.length < 2) { list.forEach((r) => box.appendChild(recCard(r, msgId))); return; }
+    list.sort((a, b) => a.key.localeCompare(b.key));
     const wrap = el("div", "game");
     const head = el("div", "game-head");
     const info = el("div", "game-info");
     info.appendChild(el("p", "game-title", m ? m.title : game));
-    info.appendChild(el("p", "game-meta", "기록 " + list.length + "개(세계·반별) · records/" + game + "/…"));
+    info.appendChild(el("p", "game-meta", (m && m.keyed ? m.keyed + " " : "기록 ") + list.length + "개 · records/" + game + "/…"));
     head.appendChild(info);
     wrap.appendChild(head);
     const buttons = el("div", "game-buttons");
@@ -591,7 +637,7 @@ function renderRecords() {
     buttons.appendChild(toggle);
     wrap.appendChild(buttons);
     const body = el("div", "edit");
-    list.forEach((r) => body.appendChild(recCard(r)));
+    list.forEach((r) => body.appendChild(recCard(r, msgId)));
     wrap.appendChild(body);
     toggle.addEventListener("click", () => {
       const open = body.classList.toggle("open");
@@ -602,7 +648,8 @@ function renderRecords() {
   });
 }
 
-function recCard(r) {
+function recCard(r, msgId) {
+  msgId = msgId || "recMsg";
   const m = REC_GAMES[r.game];
   const card = el("div", "game");
   const head = el("div", "game-head");
@@ -661,7 +708,7 @@ function recCard(r) {
     try {
       await writeRecord(r.game, r.key, rec);
       await loadRecords();
-      say("recMsg", label + " 기록을 " + recText(r.game, rec.score) + " (" + recWho(rec) + ") 으로 고쳤습니다.");
+      say(msgId, label + " 기록을 " + recText(r.game, rec.score) + " (" + recWho(rec) + ") 으로 고쳤습니다.");
     } catch (e) { msg.textContent = e.message; saveBtn.disabled = false; }
   });
 
@@ -671,8 +718,8 @@ function recCard(r) {
     try {
       await writeRecord(r.game, r.key, null);
       await loadRecords();
-      say("recMsg", label + " 기록을 지웠습니다.");
-    } catch (e) { say("recMsg", e.message); delBtn.disabled = false; }
+      say(msgId, label + " 기록을 지웠습니다.");
+    } catch (e) { say(msgId, e.message); delBtn.disabled = false; }
   });
 
   return card;
@@ -723,9 +770,18 @@ function selectClass(cid) {
   if (cid) {
     $("classTitle").textContent = D.classById(cid).label + " 자료 스위치";
     renderList();
+    syncClassAll();
     $("classPanel").scrollIntoView({ behavior: "smooth", block: "start" });
   }
   renderClassGrid();
+  renderClassRecords();
+  if (cid && !$("crecBody").hidden && records.length === 0) loadRecords();
+}
+
+/* 모두 켜기 토글: 이 반의 등록된 자료가 전부 열려 있을 때만 켜진 모양 */
+function syncClassAll() {
+  const cb = $("classAll");
+  cb.checked = !!current && games.length > 0 && games.every((g) => isOpen(current, g.slug));
 }
 
 function el(tag, cls, text) {
@@ -860,6 +916,7 @@ function renderList() {
   list.innerHTML = "";
   if (!current) return;
   games.forEach((g, i) => list.appendChild(gameCard(g, i)));
+  syncClassAll();
 }
 
 /* 고른 반(current)의 자료 카드. 스위치는 classes/<반>/<자료> 를 바꿉니다. */
@@ -895,6 +952,7 @@ function gameCard(g, i) {
       stateText.textContent = next ? "열림" : "잠김";
       renderSummary();
       renderClassGrid();
+      syncClassAll();
       say("classMsg", label + " · " + g.title + " → " + (next ? "열었습니다." : "닫았습니다."));
     } catch (e) {
       cb.checked = !next;
@@ -1203,6 +1261,34 @@ function showLogin(message) {
 $("loginBtn").addEventListener("click", login);
 $("allOff").addEventListener("click", allOff);
 $("classClose").addEventListener("click", () => selectClass(null));
+/* 모두 켜기: 이 반의 자료를 한 번에 켜거나 끕니다 */
+$("classAll").addEventListener("change", async () => {
+  const cb = $("classAll"), cid = current, next = cb.checked;
+  if (!cid || games.length === 0) { cb.checked = false; return; }
+  const patch = {};
+  games.forEach((g) => { patch[g.slug] = next; });
+  cb.disabled = true;
+  try {
+    await write("classes/" + cid, patch);
+    classes[cid] = Object.assign(classes[cid] || {}, patch);
+    snapshot = JSON.stringify([games, classes]);
+    renderList(); renderSummary(); renderClassGrid();
+    say("classMsg", D.classById(cid).label + " 자료를 모두 " + (next ? "열었습니다." : "닫았습니다."));
+  } catch (e) {
+    cb.checked = !next;
+    say("classMsg", e.message);
+  }
+  cb.disabled = false;
+});
+$("crecReload").addEventListener("click", loadRecords);
+$("crecToggle").addEventListener("click", () => {
+  const open = $("crecBody").hidden;
+  $("crecBody").hidden = !open;
+  $("crecToggle").textContent = open ? "접기" : "펼치기";
+  $("crecToggle").setAttribute("aria-expanded", open ? "true" : "false");
+  renderClassRecords();
+  if (open && current && records.length === 0) loadRecords();
+});
 $("reload").addEventListener("click", () => { busy = false; seedSnapshot = ""; loadSeed().then(load); });
 $("logout").addEventListener("click", async () => {
   try { await signOut(auth); } catch (e) {}
