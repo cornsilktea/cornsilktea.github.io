@@ -851,7 +851,8 @@ function field(labelText, value) {
 
 /* 자료 파일 이름 → 공략 이미지. 새 공략을 만들면 여기에 한 줄 추가 */
 const GUIDE_IMAGES = {
-  "18.greedy-tower-defense.html": "18.greedy-tower-defense-build.png"
+  "18.greedy-tower-defense.html": { src: "18.greedy-tower-defense-build.png", caption: "최적 빌드 배치 (숫자 = 설치한 웨이브)" },
+  "4.function.html": { src: "4.function-build.png", caption: "10단계 최소 블록 답안" }
 };
 function showGuide(src, caption) {
   const box = el("div", "lightbox");
@@ -919,7 +920,7 @@ function gameCard(g, i) {
   const guide = GUIDE_IMAGES[g.url];
   if (guide) {
     const gb = el("button", "guide-btn", "빌드");
-    gb.addEventListener("click", () => showGuide(guide, g.title + " — 최적 빌드 배치 (숫자 = 설치한 웨이브). 아무 곳이나 누르면 닫힘"));
+    gb.addEventListener("click", () => showGuide(guide.src, g.title + " — " + guide.caption + ". 아무 곳이나 누르면 닫힘"));
     head.appendChild(gb);
   }
   head.appendChild(sw);
