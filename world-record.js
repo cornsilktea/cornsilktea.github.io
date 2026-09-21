@@ -14,6 +14,8 @@
      WR.prompt(v) → 넘으면 학년·반·이름 입력 창을 띄우고 등록. Promise<등록된 기록 또는 null>
                     (등록하거나, 그 사이 누가 앞질러 거부될 때까지 닫히지 않는다)
      WR.onChange(fn) → 불러오거나 등록해 기록이 바뀔 때마다 fn 호출
+     · 세계 신기록으로 등록하면 입력 창에서 고른 학년·반의 반 신기록도 함께 등록한다(반 링크 없이 들어왔어도).
+       그때 WR.cls / WR.klass 가 그 반으로 채워지므로 결과 화면에 반 신기록을 보여 줄 수 있다.
 
    옵션: lower(작을수록 좋음), format(값→문자열), key(기본 "all" — 곡별 기록처럼 여러 개면 지정)
    경로는 records/<게임>/<key> . 규칙(데이터베이스규칙.json)은 기존보다 큰 score 만 받으므로
@@ -257,9 +259,24 @@
             var job;
             if (isWorld) {
               job = world.submit(v, name, grade, cls_).then(function (rec) {
-                /* 세계 신기록이면 우리 반 신기록이기도 하다(반 링크로 들어왔을 때) */
-                if (cls && cls.beats(v)) return cls.submit(v, name, grade, cls_).then(function () { return rec; }, function () { return rec; });
-                return rec;
+                /* 세계 신기록이면 그 반의 신기록이기도 하다. 반 링크로 들어왔고 고른 학년·반이 같으면 그 묶음에,
+                   아니면(반 링크 없이 들어왔거나 다른 반을 골랐으면) 고른 학년·반의 경로를 새로 읽어서 등록한다 */
+                var picked = { grade: grade, cls: cls_ };
+                var target = (cls && pc.grade === grade && pc.cls === cls_) ? cls : Store(game, classKey(key, picked), lower, format);
+                var ready = target === cls ? Promise.resolve() : target.load();
+                return ready
+                  .then(function () {
+                    /* 못 읽었으면(loaded=false) 일단 써 본다 — 규칙이 더 낮은 점수는 거부한다 */
+                    if (!target.loaded || target.beats(v)) return target.submit(v, name, grade, cls_);
+                  })
+                  .then(function () {
+                    if (target !== cls) {   /* 게임이 결과 화면에 그 반 신기록을 보여 줄 수 있게 붙여 둔다 */
+                      target.who = function () { return target.rec ? target.rec.name : ""; };
+                      api.cls = cls = target;
+                      api.klass = { id: grade + "-" + cls_, grade: grade, cls: cls_, label: grade + "학년 " + cls_ + "반" };
+                    }
+                    return rec;
+                  }, function () { return rec; });
               });
             } else {
               job = cls.submit(v, name, grade, cls_).then(function () { return null; });

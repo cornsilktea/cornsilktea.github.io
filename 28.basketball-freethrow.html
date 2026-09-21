@@ -36,7 +36,7 @@
   /* 현재 점수·통과 점수: 오른쪽 위, 굵은 주황 글자(피버 점수 모양 재활용) */
   #hudScore { top: 52px; right: 12px; text-align: right; }
   #hudScore .num { font-size: clamp(40px, 9vw, 84px); font-weight: 800; color: #D97B4F; -webkit-text-stroke: 2px var(--sg-ink); text-shadow: 0 5px 0 rgba(27,43,32,.35); line-height: 1; font-variant-numeric: tabular-nums; }
-  #hudScore .pass { display: inline-block; margin-top: 6px; font-size: clamp(13px, 2.4vw, 18px); font-weight: 800; color: #fff; background: var(--sg-primary); border: 2px solid var(--sg-ink); border-radius: 8px; padding: 2px 10px; box-shadow: 0 3px 0 var(--sg-ink); }
+  #hudScore .pass { display: inline-block; margin-top: 6px; font-size: clamp(20px, 4.5vw, 42px); font-weight: 800; color: #fff; background: var(--sg-primary); border: 2px solid var(--sg-ink); border-radius: 8px; padding: 2px 10px; box-shadow: 0 3px 0 var(--sg-ink); }
   #hudScore .fev { display: none; margin-top: 6px; font-size: clamp(14px, 2.6vw, 20px); font-weight: 800; color: #fff; -webkit-text-stroke: 1px var(--sg-ink); }
   body.fever #hudScore .fev { display: block; animation: pulse .6s ease-in-out infinite alternate; }
   body.fever #hudScore .num { animation: pulse .6s ease-in-out infinite alternate; }
@@ -237,7 +237,7 @@ function renderRecords() {
   if (c) {
     setVal($("crStart"), c.val, c.none); $("crWhoStart").textContent = c.who;
     setVal($("crOver"), c.val, c.none); $("crWhoOver").textContent = c.who;
-    document.querySelectorAll(".clsCol").forEach(el => { el.hidden = false; });
+    document.querySelectorAll(".clsCol").forEach(el => { el.hidden = false; el.querySelector(".lab").textContent = "🏫 " + (WR.klass ? WR.klass.label : "우리 반") + " 신기록"; });
   }
 }
 if (WR) { WR.onChange(renderRecords); WR.load().then(() => { wrTried = true; renderRecords(); }); }
@@ -523,8 +523,8 @@ function draw() {
   if (G.fever) drawFeverGlow(W, H);
 
   const balls = (G.ball ? [G.ball] : []).concat(G.ghosts);
-  /* 림보다 높이 있으면서 골대 뒤로 간 공만 골대보다 먼저(뒤에) 그린다. 림 아래로 내려온 공은 받침대 그림에 가려지지 않게 앞에 그린다 */
-  const behind = x => x.z > HOOP_Z - 0.1 && x.y > CFG.RIM_Y - 0.05;
+  /* 백보드 면을 넘어간(위나 옆으로 지나간) 공만 골대보다 먼저(뒤에) 그린다. 림 앞·위·네트 안의 공은 골대 그림에 가려지지 않게 앞에 그린다 */
+  const behind = x => x.z > BOARD_Z - CFG.BALL_R * 0.5 && x.y > CFG.RIM_Y - 0.05;   // 백보드 면을 넘어간 공만 뒤
   balls.filter(behind).forEach(drawBall);
   drawHoop(L);
   if (G.state === "play" || G.state === "ending" || G.state === "between") drawClock(L);
