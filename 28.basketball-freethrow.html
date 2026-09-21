@@ -120,7 +120,7 @@
 <div id="fever"><span class="tag">🔥 FEVER TIME ×2</span><div class="num" id="feverScore">0</div></div>
 
 <div class="hud" id="powerWrap">
-  <div class="lab"><span>파워 <b id="powerPct">0%</b></span><span>▲ 표시가 적당한 세기</span></div>
+  <div class="lab"><span>파워 <b id="powerPct">0%</b></span><span id="sweetLab">▲ 표시가 적당한 세기</span></div>
   <div id="powerBar"><div id="powerFill"></div><div id="sweet"></div></div>
 </div>
 <div class="hud" id="tip">공을 골대 쪽으로 드래그해서 던지세요</div>
@@ -181,16 +181,16 @@ const CFG = {
   CLEAN: 3, BANK: 2,      // 클린 슛 · 뱅크 슛 점수
   HOOP_MOVE_FROM: 2,      // 이 라운드부터 골대가 좌우로 움직인다
   HOOP_AMP: 1.0,          // 골대 좌우 이동 폭(m, 한쪽)
-  HOOP_SPEED: [0, 0.6, 0.8, 1.0, 1.25],  // 라운드별 이동 속도(rad/s) — 마지막 항목 이후는 HOOP_SPEED_STEP 씩 증가
-  HOOP_SPEED_STEP: 0.2, HOOP_SPEED_MAX: 2.4,
+  HOOP_SPEED: [0, 0.7, 1.0, 1.3, 1.6],   // 라운드별 이동 속도(rad/s) — 마지막 항목 이후는 HOOP_SPEED_STEP 씩 증가
+  HOOP_SPEED_STEP: 0.3, HOOP_SPEED_MAX: 3.0,
   DIST: 3.2,              // 공 ~ 림 중심 거리(m) (실제 자유투선 4.225m 보다 가깝게)
-  RIM_Y: 3.05, HOOP_SCALE: 1.35, BALL_R: 0.12, HAND_Y: 1.2,   // HOOP_SCALE: 골대(림·백보드) 크기 배율 — 1 이 실제 규격(림 지름 45cm)
+  RIM_Y: 3.05, HOOP_SCALE: 1.35, BALL_R: 0.14, BALL_DRAW: 2.3, HAND_Y: 1.2,   // HOOP_SCALE: 골대(림·백보드) 크기 배율 — 1 이 실제 규격(림 지름 45cm)
   ELEV: 64,               // 발사 각도(도) — 고정. 드래그 길이는 세기만 정한다 (낮추면 공이 얕게 들어와 앞 림에 잘 걸린다)
   SPEED_MIN: 6.9, SPEED_MAX: 8.1,   // 드래그 최소·최대 세기(m/s) — 범위가 좁을수록 세기 조절이 쉽다 (적정 세기는 중간보다 약간 위)
   DRAG_LEN: 0.30,         // 최대 세기가 되는 드래그 길이 (화면 높이 비율)
   LAT_GAIN: 0.9,          // 드래그 좌우 기울기 → 좌우 속도 비율
-  ASSIST: 0.8,            // 조준 보정(0 없음 ~ 1 무조건 정중앙). 림 근처 오차를 이 비율만큼 줄여 준다
-  SHOW_SWEET: true,       // 파워 게이지에 적당한 세기 표시
+  ASSIST: 0.6,            // 조준 보정(0 없음 ~ 1 무조건 정중앙). 림 근처 오차를 이 비율만큼 줄여 준다
+  SHOW_SWEET: false,      // 파워 게이지에 적당한 세기 표시
   GRAVITY: 9.81,
 };
 function passOf(r) { const P = CFG.PASS; return r <= P.length ? P[r - 1] : P[P.length - 1] + CFG.PASS_STEP * (r - P.length); }
@@ -304,7 +304,7 @@ function sweetSpeed() {   // 클린 슛이 되는 세기의 한가운데(포물�
 }
 const SWEET_P = (sweetSpeed() - CFG.SPEED_MIN) / (CFG.SPEED_MAX - CFG.SPEED_MIN);
 $("sweet").style.left = "calc(" + (SWEET_P * 100).toFixed(1) + "% - 1px)";
-$("sweet").style.display = CFG.SHOW_SWEET ? "block" : "none";
+$("sweet").style.display = $("sweetLab").style.display = CFG.SHOW_SWEET ? "" : "none";
 
 function canShoot() { return G.state === "play" && !G.ball; }
 
@@ -412,7 +412,7 @@ function stepBall(b, dt) {
   /* 림 통과 판정: 림 높이를 내려오면서 지나고 중심이 링 안쪽이면 골 */
   if (!b.scored && py >= CFG.RIM_Y && b.y < CFG.RIM_Y && b.vy < 0) {
     const d = Math.hypot(b.x - hx, b.z - HOOP_Z);
-    if (d < R - r * 0.5) { b.scored = true; b.vx *= 0.3; b.vz *= 0.3; b.vy *= 0.6; judge(b); return; }
+    if (d < R - r * 0.8) { b.scored = true; b.vx *= 0.3; b.vz *= 0.3; b.vy *= 0.6; judge(b); return; }
   }
   /* 백보드 */
   if (b.z + r > BOARD_Z && b.vz > 0 && Math.abs(b.x - hx) < BOARD_HW + r && b.y > BOARD_Y0 - r && b.y < BOARD_Y1 + r) {
@@ -571,7 +571,7 @@ function drawBallAt(x, y, z, alpha) {
   /* 공 */
   ctx.translate(p.x, p.y); ctx.rotate(G.spin);
   if (IMG.ball) {
-    const d = r * 2.08;   // 그림 여백만큼 조금 크게
+    const d = r * (CFG.BALL_DRAW || 2.08);   // 그림 여백 + 보기 좋게 조금 크게(물리 크기는 BALL_R)
     ctx.drawImage(IMG.ball, -d / 2, -d / 2, d, d);
   } else {
     ctx.fillStyle = "#E58A3E"; ctx.strokeStyle = "#1B2B20"; ctx.lineWidth = Math.max(1.5, r * 0.07);
