@@ -11,7 +11,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
 <meta property="og:title" content="농구 자유투 챌린지">
-<meta property="og:description" content="드래그로 던지는 농구 자유투 라운드제 개인전 / 40초 라운드·마지막 15초 피버 2배·3라운드부터 움직이는 골대 / 클린 슛 3점·뱅크 슛 2점 누적 점수로 통과 기준 넘기기">
+<meta property="og:description" content="드래그로 던지는 농구 자유투 라운드제 개인전 / 40초 라운드·마지막 15초 피버 2배·2라운드부터 움직이는 골대 / 클린 슛 3점·뱅크 슛 2점 누적 점수로 통과 기준 넘기기">
 <meta property="og:url" content="https://cornsilktea.github.io/28.basketball-freethrow.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
@@ -128,7 +128,7 @@
 <div id="overlay">
   <div class="card" id="cardStart">
     <div class="logo">🏀 자유투 챌린지<small>40초 라운드 · 누적 점수로 통과 기준을 넘겨라</small></div>
-    <div class="desc">화면을 <b>드래그</b>해서 공을 던집니다. 드래그 <b>방향</b>이 슛 방향, <b>길이</b>가 세기입니다. 림·백보드를 안 건드리고 들어가면 <b>클린 슛 3점</b>, 맞고 들어가면 <b>뱅크 슛 2점</b>. 라운드마다 40초가 주어지고, 끝날 때 누적 점수가 <b>통과 기준</b>에 못 미치면 탈락합니다. 마지막 <b>15초는 피버 타임(2배)</b>, <b>3라운드부터는 골대가 움직입니다.</b></div>
+    <div class="desc">화면을 <b>드래그</b>해서 공을 던집니다. 드래그 <b>방향</b>이 슛 방향, <b>길이</b>가 세기입니다. 림·백보드를 안 건드리고 들어가면 <b>클린 슛 3점</b>, 맞고 들어가면 <b>뱅크 슛 2점</b>. 라운드마다 40초가 주어지고, 끝날 때 누적 점수가 <b>통과 기준</b>에 못 미치면 탈락합니다. 마지막 <b>15초는 피버 타임(2배)</b>, <b>2라운드부터는 골대가 움직입니다.</b></div>
     <div class="keys">
       <div><b>↕ 드래그</b><span>길이 = 세기</span></div>
       <div><b>↔ 드래그</b><span>방향 = 좌우 조준</span></div>
@@ -179,9 +179,9 @@ const CFG = {
   PASS_STEP: 100,
   CLEAR_SCORE: 500,       // 누적 점수가 여기에 닿으면 바로 클리어 창
   CLEAN: 3, BANK: 2,      // 클린 슛 · 뱅크 슛 점수
-  HOOP_MOVE_FROM: 3,      // 이 라운드부터 골대가 좌우로 움직인다
+  HOOP_MOVE_FROM: 2,      // 이 라운드부터 골대가 좌우로 움직인다
   HOOP_AMP: 1.0,          // 골대 좌우 이동 폭(m, 한쪽)
-  HOOP_SPEED: [0, 0, 0.6, 0.8, 1.0, 1.25],  // 라운드별 이동 속도(rad/s) — 마지막 항목 이후는 HOOP_SPEED_STEP 씩 증가
+  HOOP_SPEED: [0, 0.6, 0.8, 1.0, 1.25],  // 라운드별 이동 속도(rad/s) — 마지막 항목 이후는 HOOP_SPEED_STEP 씩 증가
   HOOP_SPEED_STEP: 0.2, HOOP_SPEED_MAX: 2.4,
   DIST: 3.2,              // 공 ~ 림 중심 거리(m) (실제 자유투선 4.225m 보다 가깝게)
   RIM_Y: 3.05, HOOP_SCALE: 1.35, BALL_R: 0.12, HAND_Y: 1.2,   // HOOP_SCALE: 골대(림·백보드) 크기 배율 — 1 이 실제 규격(림 지름 45cm)
@@ -275,9 +275,9 @@ function resize() {
   V.W = window.innerWidth; V.H = window.innerHeight;
   canvas.width = Math.round(V.W * V.dpr); canvas.height = Math.round(V.H * V.dpr);
   ctx.setTransform(V.dpr, 0, 0, V.dpr, 0, 0);
-  V.f = Math.min(0.9 * V.H, 1.45 * V.W);   // 초점 거리(px) — 공은 화면 72% 높이, 림은 그 위에 오도록
+  V.f = Math.min(0.9 * V.H, 1.45 * V.W);   // 초점 거리(px) — 공은 화면 76% 높이, 림은 그 위에 오도록
   V.cx = V.W / 2;
-  V.hy = 0.72 * V.H - (V.camY - CFG.HAND_Y) * V.f / (0 - V.camZ);   // 지평선(카메라 눈높이) 화면 y
+  V.hy = 0.76 * V.H - (V.camY - CFG.HAND_Y) * V.f / (0 - V.camZ);   // 지평선(카메라 눈높이) 화면 y
 }
 window.addEventListener("resize", resize);
 resize();
@@ -502,14 +502,15 @@ const IMG = {};
 });
 /* 골대 그림(28.hoop.png 768×512)에서 잰 위치: 림 타원 중심·지름, 받침대 아래쪽 */
 /* 골대 그림(28.hoop.png 768×512)에서 잰 위치: 림 타원 중심·지름, 받침대를 잘라 낼 높이(파란 받침대 아랫부분은 버린다) */
-const HOOP_IMG = { rimX: 384, rimY: 142, rimW: 112, cutY: 400 };
-const COURT_END = 0.43;   // 배경 그림에서 코트 엔드라인(바닥 시작) 높이 비율 — 골대 받침대 아래를 여기에 맞춘다
+const HOOP_IMG = { rimX: 384, rimY: 142, rimW: 112, baseTop: 300, baseBottom: 496 };   // baseTop~baseBottom: 파란 받침대(이 부분만 세로로 늘려 바닥까지 잇는다)
+const COURT_END = 0.465;  // 배경 그림에서 코트 아웃라인(파란 구역 위 흰 선) 높이 비율 — 골대 받침대 아래를 여기에 맞춘다
+const STAND_Z = 2.0;      // 받침대가 서는 바닥 지점(아웃라인)은 백보드보다 이만큼 뒤(m) — 키우면 받침대가 짧아지고 코트가 더 보인다
 
 /* 골대 그림 배치: 림 지름을 물리 림에 맞추고, 잘라 낸 받침대 아래가 코트 엔드라인에 닿게 */
 function hoopLayout() {
   const rimP = proj(G.hoopX, CFG.RIM_Y, HOOP_Z);
   const k = (2 * CFG.RIM_R * rimP.s) / HOOP_IMG.rimW;   // 그림 1px 당 화면 px
-  return { k, x0: rimP.x - HOOP_IMG.rimX * k, y0: rimP.y - HOOP_IMG.rimY * k, endY: rimP.y + (HOOP_IMG.cutY - HOOP_IMG.rimY) * k, rimP };
+  return { k, x0: rimP.x - HOOP_IMG.rimX * k, y0: rimP.y - HOOP_IMG.rimY * k, endY: proj(G.hoopX, 0, BOARD_Z + STAND_Z).y, rimP };
 }
 function draw() {
   const W = V.W, H = V.H, L = hoopLayout();
@@ -536,8 +537,11 @@ function drawHoop(L) {
   if (IMG.hoop) {
     const im = IMG.hoop, k = L.k;
     ctx.fillStyle = "rgba(27,43,32,.2)";
-    ctx.beginPath(); ctx.ellipse(rimP.x, L.endY, 110 * k, 14 * k, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.drawImage(im, 0, 0, im.naturalWidth, HOOP_IMG.cutY, L.x0, L.y0, im.naturalWidth * k, HOOP_IMG.cutY * k);
+    ctx.beginPath(); ctx.ellipse(rimP.x, L.endY, 120 * k, 16 * k, 0, 0, Math.PI * 2); ctx.fill();
+    /* 백보드·림·기둥은 그대로, 파란 받침대는 세로로 늘려 아웃라인(L.endY)까지 잇는다 */
+    const bt = HOOP_IMG.baseTop, bb = HOOP_IMG.baseBottom, topY = L.y0 + bt * k;
+    ctx.drawImage(im, 0, bt, im.naturalWidth, bb - bt, L.x0, topY - 1, im.naturalWidth * k, Math.max(bb - bt, (L.endY - topY) / k) * k + 1);
+    ctx.drawImage(im, 0, 0, im.naturalWidth, bt, L.x0, L.y0, im.naturalWidth * k, bt * k);
     return;
   }
   /* 그림이 없을 때의 도형 골대 */
