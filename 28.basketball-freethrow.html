@@ -175,20 +175,20 @@ const CFG = {
   ROUND_SEC: 40,          // 라운드 시간(초)
   FEVER_SEC: 15,          // 라운드 마지막 피버 타임(초)
   FEVER_MULT: 2,          // 피버 타임 점수 배율
-  PASS: [60, 120, 180, 240, 300, 360],    // 라운드별 누적 통과 기준 (마지막 항목 이후는 PASS_STEP 씩 증가). 전부 클린 슛이면 라운드당 약 90점
-  PASS_STEP: 70,
+  PASS: [30, 40, 50, 60, 70, 80],         // 라운드별 누적 통과 기준 (마지막 항목 이후는 PASS_STEP 씩 증가). 40초에 슛 20개쯤 던진다
+  PASS_STEP: 10,
   CLEAN: 3, BANK: 2,      // 클린 슛 · 뱅크 슛 점수
   HOOP_MOVE_FROM: 3,      // 이 라운드부터 골대가 좌우로 움직인다
   HOOP_AMP: 1.0,          // 골대 좌우 이동 폭(m, 한쪽)
   HOOP_SPEED: [0, 0, 0.6, 0.8, 1.0, 1.25],  // 라운드별 이동 속도(rad/s) — 마지막 항목 이후는 HOOP_SPEED_STEP 씩 증가
   HOOP_SPEED_STEP: 0.2, HOOP_SPEED_MAX: 2.4,
-  DIST: 4.2,              // 공 ~ 림 중심 거리(m) (자유투선 4.225m)
+  DIST: 3.2,              // 공 ~ 림 중심 거리(m) (실제 자유투선 4.225m 보다 가깝게)
   RIM_Y: 3.05, RIM_R: 0.225, BALL_R: 0.12, HAND_Y: 1.2,
   ELEV: 64,               // 발사 각도(도) — 고정. 드래그 길이는 세기만 정한다 (낮추면 공이 얕게 들어와 앞 림에 잘 걸린다)
-  SPEED_MIN: 7.0, SPEED_MAX: 9.0,   // 드래그 최소·최대 세기(m/s) — 범위가 좁을수록 세기 조절이 쉽다
-  DRAG_LEN: 0.34,         // 최대 세기가 되는 드래그 길이 (화면 높이 비율)
+  SPEED_MIN: 6.9, SPEED_MAX: 8.1,   // 드래그 최소·최대 세기(m/s) — 범위가 좁을수록 세기 조절이 쉽다 (적정 세기는 중간보다 약간 위)
+  DRAG_LEN: 0.30,         // 최대 세기가 되는 드래그 길이 (화면 높이 비율)
   LAT_GAIN: 0.9,          // 드래그 좌우 기울기 → 좌우 속도 비율
-  ASSIST: 0.75,           // 조준 보정(0 없음 ~ 1 무조건 정중앙). 림 근처 오차를 이 비율만큼 줄여 준다
+  ASSIST: 0.8,            // 조준 보정(0 없음 ~ 1 무조건 정중앙). 림 근처 오차를 이 비율만큼 줄여 준다
   SHOW_SWEET: true,       // 파워 게이지에 적당한 세기 표시
   GRAVITY: 9.81,
 };
@@ -294,10 +294,10 @@ const G = {
   drag: null,        // { x0, y0, x, y }
   shots: 0, made: 0,
 };
-const HOOP_Z = CFG.DIST, BOARD_Z = CFG.DIST + CFG.RIM_R + 0.15, BOARD_HW = 0.9, BOARD_Y0 = 2.9, BOARD_Y1 = 3.95;
+const HOOP_Z = CFG.DIST, BOARD_Z = CFG.DIST + CFG.RIM_R + 0.1, BOARD_HW = 0.62, BOARD_Y0 = 2.9, BOARD_Y1 = 3.55;   // 백보드 크기는 28.hoop.png 그림에 맞춤
 
-function sweetSpeed() {   // 정지한 림 중심에 정확히 떨어지는 세기(포물선 공식)
-  const th = CFG.ELEV * Math.PI / 180, D = CFG.DIST, h = CFG.RIM_Y - CFG.HAND_Y;
+function sweetSpeed() {   // 클린 슛이 되는 세기의 한가운데(포물선 공식). 앞 림을 넘겨야 하므로 림 중심보다 조금 뒤를 겨냥한다
+  const th = CFG.ELEV * Math.PI / 180, D = CFG.DIST + 0.25, h = CFG.RIM_Y - CFG.HAND_Y;
   return Math.sqrt(CFG.GRAVITY * D * D / (2 * Math.cos(th) * Math.cos(th) * (D * Math.tan(th) - h)));
 }
 const SWEET_P = (sweetSpeed() - CFG.SPEED_MIN) / (CFG.SPEED_MAX - CFG.SPEED_MIN);
@@ -489,28 +489,27 @@ function update(dt) {
 }
 
 /* ═══════════════════ 그리기 ═══════════════════ */
+/* 그림 파일 (28.court.jpg 배경 · 28.hoop.png 골대 · 28.ball.png 공). 아직 안 읽혔으면 간단한 도형으로 그린다 */
+const IMG = {};
+[["court", "28.court.jpg"], ["hoop", "28.hoop.png"], ["ball", "28.ball.png"]].forEach(([k, src]) => {
+  const im = new Image(); im.onload = () => { IMG[k] = im; }; im.src = src;
+});
+/* 골대 그림(28.hoop.png 768×512)에서 잰 위치: 림 타원 중심·지름, 받침대 아래쪽 */
+const HOOP_IMG = { rimX: 384, rimY: 142, rimW: 112, baseY: 496, baseHW: 85 };
+const COURT_FLOOR = 0.415;   // 배경 그림에서 바닥(코트)이 시작되는 높이 비율 — 지평선을 여기에 맞춘다
+
 function draw() {
-  const W = V.W, H = V.H;
-  ctx.fillStyle = G.fever ? "#FBEFE7" : "#F4F6F1";
-  ctx.fillRect(0, 0, W, H);
-  /* 바닥(코트) */
-  const hy = V.hy;
-  const grad = ctx.createLinearGradient(0, hy, 0, H);
-  grad.addColorStop(0, "#DDCBAF"); grad.addColorStop(1, "#EADCC3");
-  ctx.fillStyle = grad; ctx.fillRect(0, hy, W, H - hy);
-  ctx.strokeStyle = "rgba(27,43,32,.18)"; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(0, hy); ctx.lineTo(W, hy); ctx.stroke();
-  /* 자유투 레인(사다리꼴) + 자유투선 */
-  const lw = 2.45, z0 = -0.6, z1 = BOARD_Z + 0.3;
-  const a = proj(-lw, 0, z0), b = proj(lw, 0, z0), c = proj(lw, 0, z1), d = proj(-lw, 0, z1);
-  ctx.fillStyle = "rgba(217,123,79,.16)";
-  ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(c.x, c.y); ctx.lineTo(d.x, d.y); ctx.closePath(); ctx.fill();
-  ctx.strokeStyle = "rgba(255,255,255,.9)"; ctx.lineWidth = 2; ctx.stroke();
-  const l1 = proj(-lw, 0, 0), l2 = proj(lw, 0, 0);
-  ctx.beginPath(); ctx.moveTo(l1.x, l1.y); ctx.lineTo(l2.x, l2.y); ctx.stroke();
-  /* 자유투 원 */
-  const cc = proj(0, 0, 0);
-  ctx.beginPath(); ctx.ellipse(cc.x, cc.y, 1.8 * cc.s, 1.8 * cc.s * 0.25, 0, 0, Math.PI * 2); ctx.stroke();
+  const W = V.W, H = V.H, hy = V.hy;
+  if (IMG.court) {
+    const im = IMG.court, iw = im.naturalWidth, ih = im.naturalHeight;
+    /* 바닥선을 지평선(hy)에 맞추고 화면을 다 덮도록 키운다 */
+    const s = Math.max(W / iw, hy / (COURT_FLOOR * ih), (H - hy) / ((1 - COURT_FLOOR) * ih));
+    ctx.drawImage(im, (W - iw * s) / 2, hy - COURT_FLOOR * ih * s, iw * s, ih * s);
+  } else {
+    ctx.fillStyle = "#F4F6F1"; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "#DDCBAF"; ctx.fillRect(0, hy, W, H - hy);
+  }
+  if (G.fever) { ctx.fillStyle = "rgba(217,123,79,.14)"; ctx.fillRect(0, 0, W, H); }
 
   const balls = (G.ball ? [G.ball] : []).concat(G.ghosts);
   balls.filter(x => x.z > HOOP_Z - 0.1).forEach(drawBall);   // 골대 뒤(또는 네트 안)의 공은 골대보다 먼저
@@ -520,53 +519,57 @@ function draw() {
   if (G.drag) drawDrag();
 }
 function drawHoop() {
-  const hx = G.hoopX, R = CFG.RIM_R;
-  /* 기둥(백보드 뒤) */
-  const p0 = proj(hx, 0, BOARD_Z + 0.4), p1 = proj(hx, BOARD_Y0 + 0.3, BOARD_Z + 0.4);
-  ctx.strokeStyle = "#B4BDB5"; ctx.lineWidth = Math.max(2, 0.06 * p0.s); ctx.lineCap = "round";
-  ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
-  /* 백보드 */
+  const hx = G.hoopX, R = CFG.RIM_R, rimP = proj(hx, CFG.RIM_Y, HOOP_Z), floorP = proj(hx, 0, BOARD_Z + 1.2);   // 받침대 바닥은 조금 뒤쪽에(기둥이 너무 길지 않게)
+  if (IMG.hoop) {
+    const im = IMG.hoop, k = (2 * R * rimP.s) / HOOP_IMG.rimW;   // 그림 1px 당 화면 px (림 지름을 물리 림에 맞춤)
+    const x0 = rimP.x - HOOP_IMG.rimX * k, y0 = rimP.y - HOOP_IMG.rimY * k;
+    /* 받침대는 그림보다 바닥이 훨씬 아래에 있으므로, 받침대 아래 띠를 바닥까지 늘려 기둥처럼 잇는다 */
+    const baseBottom = y0 + HOOP_IMG.baseY * k;
+    if (floorP.y > baseBottom + 1) {
+      ctx.drawImage(im, HOOP_IMG.rimX - HOOP_IMG.baseHW, HOOP_IMG.baseY - 14, HOOP_IMG.baseHW * 2, 10,
+                    rimP.x - HOOP_IMG.baseHW * k, baseBottom - 2, HOOP_IMG.baseHW * 2 * k, floorP.y - baseBottom + 2);
+    }
+    ctx.fillStyle = "rgba(27,43,32,.18)";
+    ctx.beginPath(); ctx.ellipse(floorP.x, floorP.y, HOOP_IMG.baseHW * k * 1.25, HOOP_IMG.baseHW * k * 0.35, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.drawImage(im, x0, y0, im.naturalWidth * k, im.naturalHeight * k);
+    return;
+  }
+  /* 그림이 없을 때의 도형 골대 */
   const bl = proj(hx - BOARD_HW, BOARD_Y0, BOARD_Z), br = proj(hx + BOARD_HW, BOARD_Y1, BOARD_Z);
+  ctx.strokeStyle = "#B4BDB5"; ctx.lineWidth = Math.max(2, 0.06 * floorP.s); ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(floorP.x, floorP.y); ctx.lineTo(floorP.x, bl.y); ctx.stroke();
   ctx.fillStyle = "rgba(255,255,255,.95)"; ctx.strokeStyle = "#3B4B40"; ctx.lineWidth = 3;
   ctx.beginPath(); ctx.rect(bl.x, br.y, br.x - bl.x, bl.y - br.y); ctx.fill(); ctx.stroke();
-  const s = bl.s, sqW = 0.59 * s, sqH = 0.45 * s, rimP = proj(hx, CFG.RIM_Y, HOOP_Z);
-  ctx.strokeStyle = "#D97B4F"; ctx.lineWidth = 3;
-  ctx.strokeRect(bl.x + (br.x - bl.x) / 2 - sqW / 2, bl.y - sqH - 0.15 * s, sqW, sqH);
-  /* 림 */
   const rx = R * rimP.s, ry = rx * 0.27;
   ctx.strokeStyle = "#D97B4F"; ctx.lineWidth = Math.max(3, 0.035 * rimP.s);
   ctx.beginPath(); ctx.ellipse(rimP.x, rimP.y, rx, ry, 0, 0, Math.PI * 2); ctx.stroke();
-  /* 네트 */
   const nb = proj(hx, CFG.RIM_Y - 0.42, HOOP_Z), nrx = rx * 0.55, nry = nrx * 0.27;
   ctx.strokeStyle = "rgba(90,105,95,.75)"; ctx.lineWidth = 1.5;
   for (let i = 0; i < 10; i++) {
-    const t = i / 10 * Math.PI * 2, t2 = t + 0.32;
+    const t = i / 10 * Math.PI * 2;
     ctx.beginPath(); ctx.moveTo(rimP.x + Math.cos(t) * rx, rimP.y + Math.sin(t) * ry);
-    ctx.lineTo(nb.x + Math.cos(t2) * nrx, nb.y + Math.sin(t2) * nry); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(rimP.x + Math.cos(t) * rx, rimP.y + Math.sin(t) * ry);
-    ctx.lineTo(nb.x + Math.cos(t - 0.32) * nrx, nb.y + Math.sin(t - 0.32) * nry); ctx.stroke();
+    ctx.lineTo(nb.x + Math.cos(t + 0.32) * nrx, nb.y + Math.sin(t + 0.32) * nry); ctx.stroke();
   }
   ctx.beginPath(); ctx.ellipse(nb.x, nb.y, nrx, nry, 0, 0, Math.PI * 2); ctx.stroke();
-  const nm = proj(hx, CFG.RIM_Y - 0.2, HOOP_Z);
-  ctx.beginPath(); ctx.ellipse(nm.x, nm.y, rx * 0.78, rx * 0.78 * 0.27, 0, 0, Math.PI * 2); ctx.stroke();
 }
 function drawBallAt(x, y, z, alpha) {
   const p = proj(x, y, z), sh = proj(x, 0, z), r = CFG.BALL_R * p.s;
   ctx.save(); ctx.globalAlpha = alpha;
   /* 그림자 */
-  ctx.fillStyle = "rgba(27,43,32,.22)";
+  ctx.fillStyle = "rgba(27,43,32,.25)";
   ctx.beginPath(); ctx.ellipse(sh.x, sh.y, r * 0.9, r * 0.3, 0, 0, Math.PI * 2); ctx.fill();
   /* 공 */
   ctx.translate(p.x, p.y); ctx.rotate(G.spin);
-  ctx.fillStyle = "#E58A3E"; ctx.strokeStyle = "#1B2B20"; ctx.lineWidth = Math.max(1.5, r * 0.07);
-  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-  ctx.save(); ctx.beginPath(); ctx.arc(0, 0, r - ctx.lineWidth / 2, 0, Math.PI * 2); ctx.clip();
-  ctx.lineWidth = Math.max(1.2, r * 0.06);
-  ctx.beginPath(); ctx.moveTo(-r, 0); ctx.lineTo(r, 0); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(0, -r); ctx.lineTo(0, r); ctx.stroke();
-  ctx.beginPath(); ctx.arc(-r * 1.15, 0, r * 0.95, -1.1, 1.1); ctx.stroke();
-  ctx.beginPath(); ctx.arc(r * 1.15, 0, r * 0.95, Math.PI - 1.1, Math.PI + 1.1); ctx.stroke();
-  ctx.restore(); ctx.restore();
+  if (IMG.ball) {
+    const d = r * 2.08;   // 그림 여백만큼 조금 크게
+    ctx.drawImage(IMG.ball, -d / 2, -d / 2, d, d);
+  } else {
+    ctx.fillStyle = "#E58A3E"; ctx.strokeStyle = "#1B2B20"; ctx.lineWidth = Math.max(1.5, r * 0.07);
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-r, 0); ctx.lineTo(r, 0); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, -r); ctx.lineTo(0, r); ctx.stroke();
+  }
+  ctx.restore();
 }
 function drawBall(b) { drawBallAt(b.x, b.y, b.z, b.done ? Math.max(0, 1 - (b.age - 0.6) / 1.4) : 1); }
 function drawReadyBall() { drawBallAt(0, CFG.HAND_Y, 0, 1); }
