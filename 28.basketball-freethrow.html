@@ -37,10 +37,6 @@
   @keyframes blink { 50% { opacity: .35; } }
 
   /* 피버 타임 표시 (누적 점수를 크게) */
-  #fever { position: fixed; z-index: 4; left: 0; right: 0; top: 140px; text-align: center; pointer-events: none; display: none; }
-  body.fever #fever { display: block; }
-  #fever .tag { display: inline-block; font-size: clamp(18px, 4vw, 30px); font-weight: 800; color: #fff; background: #D97B4F; border: 3px solid var(--sg-ink); border-radius: 12px; padding: 4px 18px; box-shadow: 0 4px 0 var(--sg-ink); animation: pulse .7s ease-in-out infinite alternate; }
-  #fever .num { font-size: clamp(48px, 12vw, 96px); font-weight: 800; color: #D97B4F; -webkit-text-stroke: 2px var(--sg-ink); text-shadow: 0 5px 0 rgba(27,43,32,.35); line-height: 1.1; font-variant-numeric: tabular-nums; }
   @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.08); } }
 
   /* 파워 게이지 (드래그하는 동안만) */
@@ -100,7 +96,6 @@
   @media (max-width: 640px) {
     .hud-box { padding: 4px 8px; min-width: 0; flex: 1 1 0; }
     .hud-box .lab { font-size: 10px; }
-    #fever { top: 120px; }
     .btn { font-size: 18px; padding: 11px 24px; }
     .desc { font-size: 13px; }
   }
@@ -117,7 +112,6 @@
   <div class="hud-box" id="hudScore"><span class="lab">누적 점수</span><span class="big" id="hudScoreVal">0</span><span class="lab" id="hudBest">최고 —</span></div>
   <div class="hud-box" id="hudTime"><span class="lab">남은 시간</span><span class="big" id="hudTimeVal">40</span><span class="lab" id="hudFeverLab">피버까지 25초</span></div>
 </div>
-<div id="fever"><span class="tag">🔥 FEVER TIME ×2</span><div class="num" id="feverScore">0</div></div>
 
 <div class="hud" id="powerWrap">
   <div class="lab"><span>파워 <b id="powerPct">0%</b></span><span id="sweetLab">▲ 표시가 적당한 세기</span></div>
@@ -371,7 +365,7 @@ function popText(txt, cls) {
 function updateHud() {
   $("hudRoundVal").textContent = G.round;
   $("hudPass").textContent = "통과 " + passOf(G.round) + "점";
-  $("hudScoreVal").textContent = G.score; $("feverScore").textContent = G.score + "점";
+  $("hudScoreVal").textContent = G.score;
   const tl = Math.max(0, Math.ceil(G.timeLeft));
   $("hudTimeVal").textContent = tl;
   $("hudFeverLab").textContent = G.fever ? "🔥 피버 ×" + CFG.FEVER_MULT : "피버까지 " + Math.max(0, Math.ceil(G.timeLeft - CFG.FEVER_SEC)) + "초";
@@ -398,7 +392,7 @@ function shoot(dx, dy) {   // dx: 오른쪽 +, dy: 위쪽 + (px)
       if (Math.abs(ex) < 0.6) b.vx += CFG.ASSIST * ex / t;
     }
   }
-  G.ball = b; G.shots++;
+  G.ball = b; G.shots++; G.ghosts = [];   // 앞 슛의 공은 새 슛을 던질 때 치운다
   SFX.throw();
 }
 function hoopXAt(t) { const w = hoopSpeedOf(G.round); return w ? CFG.HOOP_AMP * Math.sin(G.hoopPhase + w * t) : 0; }
@@ -474,7 +468,7 @@ function update(dt) {
     if (G.state === "play") {
       G.timeLeft -= dt;
       if (!G.fever && G.timeLeft <= CFG.FEVER_SEC) {
-        G.fever = true; document.body.classList.add("fever"); SFX.fever();
+        G.fever = true; G.feverAt = G.t; document.body.classList.add("fever"); SFX.fever();
         showBanner("🔥 FEVER TIME!", "지금부터 점수 " + CFG.FEVER_MULT + "배", 1300);
       }
       if (G.timeLeft <= 0) {
@@ -489,7 +483,7 @@ function update(dt) {
     if (G.ball) stepBall(G.ball, h);
     G.ghosts.forEach(b => stepBall(b, h));
   }
-  G.ghosts = G.ghosts.filter(b => b.age < 2.2);
+  G.ghosts = G.ghosts.filter(b => b.age < 12 && Math.abs(b.x) < 6);   // 새 슛 전까지 남겨 둔다(너무 오래되거나 옆으로 멀리 간 공만 정리)
   const spd = G.ball ? Math.hypot(G.ball.vx, G.ball.vy, G.ball.vz) : 0;
   G.spin += (G.ball ? spd * 1.6 : 0) * dt;
 }
@@ -523,14 +517,40 @@ function draw() {
     ctx.fillStyle = "#F4F6F1"; ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = "#DDCBAF"; ctx.fillRect(0, L.endY, W, H - L.endY);
   }
-  if (G.fever) { ctx.fillStyle = "rgba(217,123,79,.14)"; ctx.fillRect(0, 0, W, H); }
+  if (G.fever) drawFeverGlow(W, H);
 
   const balls = (G.ball ? [G.ball] : []).concat(G.ghosts);
-  balls.filter(x => x.z > HOOP_Z - 0.1).forEach(drawBall);   // 골대 뒤(또는 네트 안)의 공은 골대보다 먼저
+  /* 림보다 높이 있으면서 골대 뒤로 간 공만 골대보다 먼저(뒤에) 그린다. 림 아래로 내려온 공은 받침대 그림에 가려지지 않게 앞에 그린다 */
+  const behind = x => x.z > HOOP_Z - 0.1 && x.y > CFG.RIM_Y - 0.05;
+  balls.filter(behind).forEach(drawBall);
   drawHoop(L);
-  balls.filter(x => x.z <= HOOP_Z - 0.1).forEach(drawBall);
+  if (G.fever && G.t - G.feverAt > 1.4) drawFeverScore(L);   // 진입 배너가 사라진 뒤부터
+  balls.filter(x => !behind(x)).forEach(drawBall);
   if (canShoot()) drawReadyBall();
   if (G.drag) drawDrag();
+}
+/* 피버 타임: 처음 배너 한 번 뒤로는 주황 불빛(화면 가장자리 맥동)으로만 표현 */
+function drawFeverGlow(W, H) {
+  const p = 0.5 + 0.5 * Math.sin(G.t * 6);   // 0~1 맥동
+  ctx.fillStyle = "rgba(217,123,79," + (0.08 + 0.06 * p).toFixed(3) + ")"; ctx.fillRect(0, 0, W, H);
+  const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);
+  g.addColorStop(0, "rgba(217,123,79,0)"); g.addColorStop(1, "rgba(217,123,79," + (0.35 + 0.25 * p).toFixed(3) + ")");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+}
+/* 피버 타임 동안 누적 점수를 골 망 아래에 크게 */
+function drawFeverScore(L) {
+  const size = Math.max(36, Math.min(96, V.W * 0.12));
+  const y = L.y0 + 262 * L.k + size * 0.9;   // 그림에서 네트 아래(262px)보다 조금 아래
+  ctx.save();
+  ctx.font = "800 " + size + 'px "Nanum Gothic", "Malgun Gothic", sans-serif';
+  ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+  ctx.lineJoin = "round"; ctx.lineWidth = size * 0.12; ctx.strokeStyle = "#1B2B20";
+  ctx.strokeText(G.score + "점", L.rimP.x, y);
+  ctx.fillStyle = "#D97B4F"; ctx.fillText(G.score + "점", L.rimP.x, y);
+  ctx.font = "800 " + Math.round(size * 0.32) + 'px "Nanum Gothic", "Malgun Gothic", sans-serif';
+  ctx.lineWidth = size * 0.05; ctx.strokeText("🔥 ×" + CFG.FEVER_MULT, L.rimP.x, y + size * 0.42);
+  ctx.fillStyle = "#FFFFFF"; ctx.fillText("🔥 ×" + CFG.FEVER_MULT, L.rimP.x, y + size * 0.42);
+  ctx.restore();
 }
 function drawHoop(L) {
   const hx = G.hoopX, R = CFG.RIM_R, rimP = L.rimP;
@@ -581,7 +601,7 @@ function drawBallAt(x, y, z, alpha) {
   }
   ctx.restore();
 }
-function drawBall(b) { drawBallAt(b.x, b.y, b.z, b.done ? Math.max(0, 1 - (b.age - 0.6) / 1.4) : 1); }
+function drawBall(b) { drawBallAt(b.x, b.y, b.z, 1); }   // 판정이 끝난 공도 다음 슛을 던질 때까지 그대로 보인다
 function drawReadyBall() { drawBallAt(0, CFG.HAND_Y, 0, 1); }
 function drawDrag() {
   const d = G.drag, dx = d.x - d.x0, dy = d.y0 - d.y;
