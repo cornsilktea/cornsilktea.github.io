@@ -290,54 +290,6 @@
       </div>
     </div>
 
-    <div class="panel">
-      <h2>백업 내려받기</h2>
-      <p class="hint" style="margin-top:0">
-        추가·수정한 내용은 누르는 즉시 저장되므로 커밋이 필요 없습니다.
-        아래 버튼은 지금 상태를 파일로 보관해 두고 싶을 때만 쓰세요.
-        내려받은 파일은 저장소의 <code>초기데이터.json</code> 을 덮어써 두면
-        나중에 데이터베이스를 새로 만들 때 그대로 되살릴 수 있습니다(반별 잠금 상태도 함께 들어갑니다).
-      </p>
-      <div class="actions">
-        <button id="exportBtn" type="button">파일로 내려받기</button>
-        <button id="copyBtn" type="button">클립보드에 복사</button>
-      </div>
-      <p class="msg" id="exportMsg"></p>
-    </div>
-
-    <div class="panel">
-      <h2>수업 자료 추가</h2>
-      <div class="row">
-        <div>
-          <label for="newTitle">제목</label>
-          <input id="newTitle" type="text" placeholder="예: 스네이크">
-        </div>
-        <div>
-          <label for="newUrl">파일 이름</label>
-          <input id="newUrl" type="text" placeholder="예: 8.newgame.html">
-        </div>
-      </div>
-      <div class="row" style="margin-top:8px">
-        <div>
-          <label for="newSlug">자료 아이디(영문)</label>
-          <input id="newSlug" type="text" placeholder="예: newgame">
-        </div>
-        <div>
-          <label for="newMemo">설명(선택)</label>
-          <input id="newMemo" type="text" placeholder="예: 3차시에 사용">
-        </div>
-      </div>
-      <label style="margin-top:12px">어느 단원에 넣을까요? (여러 곳을 함께 고를 수 있습니다)</label>
-      <div id="addPicker"></div>
-      <div class="actions">
-        <button id="addBtn" type="button">추가하기</button>
-      </div>
-      <p class="msg" id="addMsg"></p>
-      <p class="hint">
-        자료 아이디는 수업 자료 HTML 파일 안의 <code>data-game="..."</code> 값과 똑같이 적어야 합니다.
-        영문 소문자·숫자·하이픈만 쓸 수 있습니다. 추가한 자료는 모든 반에서 잠긴 상태로 시작합니다.
-      </p>
-    </div>
   </div>
 
 </div>
@@ -1215,29 +1167,6 @@ function seedCard(g) {
   return card;
 }
 
-/* ---------------- 백업 ---------------- */
-function backupText() {
-  const out = {};
-  games.forEach((g) => {
-    out[g.canonical] = {
-      title: g.title,
-      url: D.fixUrl(g.url),
-      memo: g.memo,
-      order: g.order,
-      /* open 은 예전 형식과의 호환용: 어느 반에서든 열려 있으면 true */
-      open: D.CLASSES.some((c) => isOpen(c.id, g.slug)),
-      units: g.units
-    };
-  });
-  /* 반별 잠금 상태(classes)도 함께 담아 되살릴 수 있게 합니다 */
-  const cls = {};
-  D.CLASSES.forEach((c) => {
-    cls[c.id] = {};
-    games.forEach((g) => { cls[c.id][g.canonical] = isOpen(c.id, g.slug); });
-  });
-  return JSON.stringify({ portal: { games: out, classes: cls } }, null, 2) + "\n";
-}
-
 /* ---------------- 시작 ---------------- */
 function showMain(user) {
   /* 이 기기의 목록 화면에 '제어판' 버튼을 보이게 한다 */
@@ -1304,49 +1233,6 @@ $("recToggle").addEventListener("click", () => {
   $("recToggle").textContent = open ? "접기" : "펼치기";
   $("recToggle").setAttribute("aria-expanded", open ? "true" : "false");
   if (open && records.length === 0) loadRecords();
-});
-
-$("exportBtn").addEventListener("click", () => {
-  const blob = new Blob([backupText()], { type: "application/json" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = "초기데이터.json";
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  say("exportMsg", "내려받았습니다.");
-});
-
-$("copyBtn").addEventListener("click", async () => {
-  try {
-    await navigator.clipboard.writeText(backupText());
-    say("exportMsg", "복사했습니다.");
-  } catch (e) {
-    say("exportMsg", "복사가 막혔습니다. '파일로 내려받기'를 써 주세요.");
-  }
-});
-
-/* 새 자료를 추가할 때 쓰는 단원 고르기 */
-const addPicker = unitPicker([]);
-$("addPicker").appendChild(addPicker.root);
-
-$("addBtn").addEventListener("click", async () => {
-  const slug = $("newSlug").value.trim().toLowerCase();
-  const title = $("newTitle").value.trim();
-  const url = $("newUrl").value.trim();
-  if (!slug || !title || !url) { say("addMsg", "제목·파일 이름·자료 아이디를 모두 채워 주세요."); return; }
-  if (!/^[a-z0-9-]+$/.test(slug)) { say("addMsg", "자료 아이디는 영문 소문자·숫자·하이픈만 됩니다."); return; }
-  if (games.some((g) => g.slug === slug)) { say("addMsg", "이미 있는 자료 아이디입니다."); return; }
-  try {
-    await write("games/" + slug, {
-      title, url, memo: $("newMemo").value.trim(),
-      order: games.length,
-      units: addPicker.get(), unitsSet: true
-    });
-    await load();
-    $("newSlug").value = ""; $("newTitle").value = ""; $("newUrl").value = ""; $("newMemo").value = "";
-    addPicker.set([]);
-    say("addMsg", "추가했습니다. 스위치를 켜면 학생이 들어올 수 있습니다.");
-  } catch (e) { say("addMsg", e.message); }
 });
 
 window.__portalBooted = true;
