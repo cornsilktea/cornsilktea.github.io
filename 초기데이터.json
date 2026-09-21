@@ -260,6 +260,15 @@
         "units": [],
         "unitsSet": false,
         "url": "27.freekick-challenge.html"
+      },
+      "basketball": {
+        "memo": "드래그로 던지는 농구 자유투 라운드제 개인전 / 40초 라운드·마지막 15초 피버 2배·3라운드부터 움직이는 골대 / 클린 슛 3점·뱅크 슛 2점 누적 점수로 통과 기준 넘기기",
+        "open": true,
+        "order": 27,
+        "title": "농구 자유투 챌린지",
+        "units": [],
+        "unitsSet": false,
+        "url": "28.basketball-freethrow.html"
       }
     }
   }

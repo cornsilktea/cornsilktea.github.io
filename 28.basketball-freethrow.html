@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<script charset="utf-8" src="firebase-config.js"></script>
+<script charset="utf-8" src="access-guard.js" data-game="basketball"></script>
+<script charset="utf-8" src="world-record.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
+<title>농구 자유투 챌린지</title>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="정보 수업용 링크 모음">
+<meta property="og:title" content="농구 자유투 챌린지">
+<meta property="og:description" content="드래그로 던지는 농구 자유투 라운드제 개인전 / 40초 라운드·마지막 15초 피버 2배·3라운드부터 움직이는 골대 / 클린 슛 3점·뱅크 슛 2점 누적 점수로 통과 기준 넘기기">
+<meta property="og:url" content="https://cornsilktea.github.io/28.basketball-freethrow.html">
+<meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
+<meta name="twitter:card" content="summary">
+<!-- 링크 미리보기 끝 -->
+<link rel="stylesheet" href="theme.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--sg-bg); font-family: var(--sg-font); color: var(--sg-ink); }
+  canvas#gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+  /* ── HUD (위쪽 46px 는 access-guard.js 의 '← 목록으로' 버튼 자리) ── */
+  .hud { position: fixed; z-index: 5; display: none; pointer-events: none; }
+  .hud-box { background: rgba(255,255,255,.92); border: 2px solid var(--sg-line-strong); border-radius: 10px; padding: 6px 12px; font-weight: 800; font-variant-numeric: tabular-nums; box-shadow: 0 3px 0 rgba(27,43,32,.25); text-align: center; min-width: 96px; }
+  .hud-box .lab { font-size: 12px; color: var(--sg-ink-soft); font-weight: 700; display: block; }
+  .hud-box .big { font-size: clamp(22px, 4vw, 34px); line-height: 1.15; color: var(--sg-primary); }
+  #hudTop { top: 52px; left: 0; right: 0; display: none; justify-content: center; gap: 8px; padding: 0 10px; flex-wrap: wrap; }
+  #hudTop.on { display: flex; }
+  #hudRound .big { color: var(--sg-ink); }
+  #hudTime .big { color: var(--sg-ink); }
+  body.fever .hud-box { border-color: #D97B4F; box-shadow: 0 3px 0 #D97B4F; }
+  body.fever #hudTime .big, body.fever #hudScore .big { color: #D97B4F; }
+  body.fever #hudTime .big { animation: blink .5s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: .35; } }
+
+  /* 피버 타임 표시 (누적 점수를 크게) */
+  #fever { position: fixed; z-index: 4; left: 0; right: 0; top: 140px; text-align: center; pointer-events: none; display: none; }
+  body.fever #fever { display: block; }
+  #fever .tag { display: inline-block; font-size: clamp(18px, 4vw, 30px); font-weight: 800; color: #fff; background: #D97B4F; border: 3px solid var(--sg-ink); border-radius: 12px; padding: 4px 18px; box-shadow: 0 4px 0 var(--sg-ink); animation: pulse .7s ease-in-out infinite alternate; }
+  #fever .num { font-size: clamp(48px, 12vw, 96px); font-weight: 800; color: #D97B4F; -webkit-text-stroke: 2px var(--sg-ink); text-shadow: 0 5px 0 rgba(27,43,32,.35); line-height: 1.1; font-variant-numeric: tabular-nums; }
+  @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.08); } }
+
+  /* 파워 게이지 (드래그하는 동안만) */
+  #powerWrap { left: 50%; bottom: 14px; transform: translateX(-50%); width: min(420px, calc(100% - 24px)); background: rgba(255,255,255,.92); border: 2px solid var(--sg-line-strong); border-radius: 10px; padding: 5px 10px 7px; box-shadow: 0 3px 0 rgba(27,43,32,.25); }
+  #powerWrap .lab { display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; color: var(--sg-ink-soft); margin-bottom: 3px; }
+  #powerWrap .lab b { color: var(--sg-ink); font-size: 15px; }
+  #powerBar { height: 18px; border: 2px solid var(--sg-line-strong); border-radius: 6px; background: #fff; overflow: hidden; position: relative; }
+  #powerFill { height: 100%; width: 0; background: linear-gradient(90deg, var(--sg-ok), var(--sg-warn) 60%, #D97B4F); }
+  #sweet { position: absolute; top: 0; bottom: 0; width: 3px; background: var(--sg-ink); }
+
+  /* 안내 문구 (공 아래) */
+  #tip { left: 0; right: 0; bottom: 14px; text-align: center; font-size: 14px; font-weight: 700; color: var(--sg-ink-soft); }
+
+  /* 라운드 배너 · 득점 팝업 */
+  #banner { position: fixed; z-index: 6; left: 0; right: 0; top: 40%; text-align: center; pointer-events: none; display: none; }
+  #banner .t { display: inline-block; font-size: clamp(30px, 7vw, 60px); font-weight: 800; color: #fff; -webkit-text-stroke: 2px var(--sg-ink); text-shadow: 0 5px 0 rgba(27,43,32,.4); }
+  #banner .s { display: block; font-size: clamp(15px, 3vw, 22px); font-weight: 800; color: var(--sg-primary); margin-top: 6px; }
+  #pops { position: fixed; inset: 0; z-index: 6; pointer-events: none; overflow: hidden; }
+  .pop { position: absolute; left: 50%; top: 30%; font-size: clamp(30px, 6vw, 56px); font-weight: 800; color: #fff; -webkit-text-stroke: 2px var(--sg-ink); text-shadow: 0 5px 0 rgba(27,43,32,.4); animation: pop 1.1s ease-out forwards; white-space: nowrap; }
+  .pop.clean { color: #F2D06B; }
+  .pop.bank { color: #9FD8B0; }
+  .pop.miss { color: #FF6B7A; font-size: clamp(22px, 4.5vw, 40px); }
+  @keyframes pop { 0% { opacity: 0; transform: translate(-50%,-50%) scale(1.6); } 15% { opacity: 1; transform: translate(-50%,-50%) scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%,-100%); } }
+
+  /* ── 카드 (시작 · 결과) ── */
+  #overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 56px 12px 12px; z-index: 7; overflow-y: auto; background: rgba(27,43,32,.25); }
+  .card { width: min(520px, 100%); background: var(--sg-panel); border: 3px solid var(--sg-line-strong); border-radius: 14px; padding: 22px 22px 18px; box-shadow: 0 10px 0 rgba(27,43,32,.3), 0 20px 40px rgba(0,0,0,.2); text-align: center; }
+  .logo { font-size: clamp(36px, 8vw, 54px); font-weight: 800; line-height: 1.05; color: #D97B4F; -webkit-text-stroke: 2px var(--sg-ink); text-shadow: 4px 5px 0 var(--sg-ink); letter-spacing: -1px; margin-bottom: 4px; }
+  .logo small { display: block; font-size: 15px; -webkit-text-stroke: 0; text-shadow: none; color: var(--sg-ink-soft); letter-spacing: 0; margin-top: 8px; font-weight: 700; }
+  .desc { font-size: 14px; color: var(--sg-ink-mid); line-height: 1.6; margin: 10px 0 4px; }
+  .keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 8px 0 12px; }
+  .keys > div { background: var(--sg-panel-alt); border: 2px solid var(--sg-line-mid); border-radius: 10px; padding: 8px 4px; }
+  .keys b { display: block; font-size: 16px; margin-bottom: 2px; }
+  .keys span { font-size: 11px; color: var(--sg-ink-soft); font-weight: 700; }
+  .rec { display: flex; gap: 10px; margin: 10px 0 12px; }
+  .rec > div { flex: 1 1 0; min-width: 0; background: var(--sg-panel-alt); border: 2px solid var(--sg-line-mid); border-radius: 10px; padding: 8px 6px; }
+  .rec .lab { font-size: 12px; font-weight: 700; color: var(--sg-ink-soft); }
+  .rec .val { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; margin-top: 2px; color: var(--sg-primary); }
+  .rec .val.none { font-size: 14px; color: var(--sg-ink-faint); font-weight: 700; }
+  .rec .who { font-size: 12px; color: var(--sg-ink-soft); min-height: 15px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .new { display: inline-block; margin-left: 5px; padding: 1px 6px; font-size: 11px; border-radius: 6px; background: #D97B4F; color: #fff; vertical-align: middle; -webkit-text-stroke: 0; text-shadow: none; }
+  .btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 6px; }
+  .btn { display: inline-block; font: inherit; font-weight: 800; font-size: 20px; padding: 13px 34px; border-radius: 12px; border: 3px solid var(--sg-line-strong); background: var(--sg-primary); color: var(--sg-primary-ink); cursor: pointer; box-shadow: 0 5px 0 var(--sg-ink); }
+  .btn:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--sg-ink); }
+  .btn.hot { background: #D97B4F; }
+  .hint { font-size: 12px; color: var(--sg-ink-faint); margin-top: 12px; }
+  .final { display: flex; gap: 10px; justify-content: center; margin: 8px 0; }
+  .final > div { flex: 1 1 0; }
+  .final .lab { font-size: 13px; color: var(--sg-ink-soft); font-weight: 700; }
+  .final .num { font-size: clamp(34px, 8vw, 52px); font-weight: 800; font-variant-numeric: tabular-nums; color: var(--sg-primary); line-height: 1.1; }
+  .final .num small { font-size: 15px; color: var(--sg-ink-soft); }
+  .msg { font-size: 18px; font-weight: 800; color: #D97B4F; min-height: 24px; margin: 4px 0 2px; }
+  .msg.wr { font-size: 22px; animation: pulse .6s ease-in-out infinite alternate; }
+  .reason { font-size: 14px; color: var(--sg-ink-mid); font-weight: 700; margin: 4px 0 8px; line-height: 1.5; }
+  .wipe { font-size: 12px; color: var(--sg-ink-faint); margin-top: 8px; }
+  .wipe button { font: inherit; font-size: 12px; color: var(--sg-ink-soft); background: none; border: none; text-decoration: underline; cursor: pointer; }
+  @media (max-width: 640px) {
+    .hud-box { padding: 4px 8px; min-width: 0; flex: 1 1 0; }
+    .hud-box .lab { font-size: 10px; }
+    #fever { top: 120px; }
+    .btn { font-size: 18px; padding: 11px 24px; }
+    .desc { font-size: 13px; }
+  }
+  [hidden]{display:none !important;}
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="pops"></div>
+<div id="banner"><span class="t" id="bannerT"></span><span class="s" id="bannerS"></span></div>
+
+<div class="hud" id="hudTop">
+  <div class="hud-box" id="hudRound"><span class="lab">라운드</span><span class="big" id="hudRoundVal">1</span><span class="lab" id="hudPass">통과 100점</span></div>
+  <div class="hud-box" id="hudScore"><span class="lab">누적 점수</span><span class="big" id="hudScoreVal">0</span><span class="lab" id="hudBest">최고 —</span></div>
+  <div class="hud-box" id="hudTime"><span class="lab">남은 시간</span><span class="big" id="hudTimeVal">40</span><span class="lab" id="hudFeverLab">피버까지 25초</span></div>
+</div>
+<div id="fever"><span class="tag">🔥 FEVER TIME ×2</span><div class="num" id="feverScore">0</div></div>
+
+<div class="hud" id="powerWrap">
+  <div class="lab"><span>파워 <b id="powerPct">0%</b></span><span>▲ 표시가 적당한 세기</span></div>
+  <div id="powerBar"><div id="powerFill"></div><div id="sweet"></div></div>
+</div>
+<div class="hud" id="tip">공을 골대 쪽으로 드래그해서 던지세요</div>
+
+<div id="overlay">
+  <div class="card" id="cardStart">
+    <div class="logo">🏀 자유투 챌린지<small>40초 라운드 · 누적 점수로 통과 기준을 넘겨라</small></div>
+    <div class="desc">화면을 <b>드래그</b>해서 공을 던집니다. 드래그 <b>방향</b>이 슛 방향, <b>길이</b>가 세기입니다. 림·백보드를 안 건드리고 들어가면 <b>클린 슛 3점</b>, 맞고 들어가면 <b>뱅크 슛 2점</b>. 라운드마다 40초가 주어지고, 끝날 때 누적 점수가 <b>통과 기준</b>에 못 미치면 탈락합니다. 마지막 <b>15초는 피버 타임(2배)</b>, <b>3라운드부터는 골대가 움직입니다.</b></div>
+    <div class="keys">
+      <div><b>↕ 드래그</b><span>길이 = 세기</span></div>
+      <div><b>↔ 드래그</b><span>방향 = 좌우 조준</span></div>
+      <div><b>🔥 15초</b><span>피버 타임 2배</span></div>
+    </div>
+    <div class="rec">
+      <div><div class="lab">개인 최고 기록</div><div class="val" id="bestStart">—</div><div class="who" id="bestStartDate"></div></div>
+      <div><div class="lab">🏆 세계 신기록</div><div class="val" id="wrStart">—</div><div class="who" id="wrWhoStart"></div></div>
+      <div class="clsCol" hidden><div class="lab">🏫 우리 반 신기록</div><div class="val" id="crStart">—</div><div class="who" id="crWhoStart"></div></div>
+    </div>
+    <div class="btns"><button type="button" class="btn" id="btnStart">시작하기</button></div>
+    <div class="hint">스페이스바로도 시작할 수 있습니다</div>
+    <div class="wipe"><button type="button" id="btnWipe">이 기기의 최고 기록 지우기</button></div>
+  </div>
+
+  <div class="card" id="cardOver" style="display:none">
+    <div class="logo" style="font-size:38px">탈락!</div>
+    <div class="reason" id="overReason"></div>
+    <div class="final">
+      <div><div class="lab">최종 누적 점수</div><div class="num" id="finalScore">0<small> 점</small></div></div>
+      <div><div class="lab">도달 라운드</div><div class="num" id="finalRound">1<small> 라운드</small></div></div>
+    </div>
+    <div class="msg" id="finalMsg"></div>
+    <div class="rec">
+      <div><div class="lab">개인 최고 기록</div><div class="val" id="bestOver">—</div><div class="who" id="bestOverNew"></div></div>
+      <div><div class="lab">🏆 세계 신기록</div><div class="val" id="wrOver">—</div><div class="who" id="wrWhoOver"></div></div>
+      <div class="clsCol" hidden><div class="lab">🏫 우리 반 신기록</div><div class="val" id="crOver">—</div><div class="who" id="crWhoOver"></div></div>
+    </div>
+    <div class="btns"><button type="button" class="btn hot" id="btnRetry">다시하기</button></div>
+    <div class="hint">스페이스바: 다시하기</div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ═══════════════════════════════════════════════════════════════════
+   농구 자유투 챌린지 — Canvas 2D 유사 3D (쉬는시간용, 개인전, 라운드제 누적 점수)
+   좌표(m): 공이 서는 곳이 원점, 골대 쪽이 +z, 위가 +y, 오른쪽이 +x. 카메라는 공 뒤(−z)·눈높이.
+   기록: 최종 누적 점수. 개인 최고: localStorage basketball_best_v1 / 세계 신기록: Firebase records/basketball/all
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ───────── 밸런스 설정 (선생님이 값만 바꿔 조정) ───────── */
+const CFG = {
+  ROUND_SEC: 40,          // 라운드 시간(초)
+  FEVER_SEC: 15,          // 라운드 마지막 피버 타임(초)
+  FEVER_MULT: 2,          // 피버 타임 점수 배율
+  PASS: [60, 120, 180, 240, 300, 360],    // 라운드별 누적 통과 기준 (마지막 항목 이후는 PASS_STEP 씩 증가). 전부 클린 슛이면 라운드당 약 90점
+  PASS_STEP: 70,
+  CLEAN: 3, BANK: 2,      // 클린 슛 · 뱅크 슛 점수
+  HOOP_MOVE_FROM: 3,      // 이 라운드부터 골대가 좌우로 움직인다
+  HOOP_AMP: 1.0,          // 골대 좌우 이동 폭(m, 한쪽)
+  HOOP_SPEED: [0, 0, 0.6, 0.8, 1.0, 1.25],  // 라운드별 이동 속도(rad/s) — 마지막 항목 이후는 HOOP_SPEED_STEP 씩 증가
+  HOOP_SPEED_STEP: 0.2, HOOP_SPEED_MAX: 2.4,
+  DIST: 4.2,              // 공 ~ 림 중심 거리(m) (자유투선 4.225m)
+  RIM_Y: 3.05, RIM_R: 0.225, BALL_R: 0.12, HAND_Y: 1.2,
+  ELEV: 64,               // 발사 각도(도) — 고정. 드래그 길이는 세기만 정한다 (낮추면 공이 얕게 들어와 앞 림에 잘 걸린다)
+  SPEED_MIN: 7.0, SPEED_MAX: 9.0,   // 드래그 최소·최대 세기(m/s) — 범위가 좁을수록 세기 조절이 쉽다
+  DRAG_LEN: 0.34,         // 최대 세기가 되는 드래그 길이 (화면 높이 비율)
+  LAT_GAIN: 0.9,          // 드래그 좌우 기울기 → 좌우 속도 비율
+  ASSIST: 0.75,           // 조준 보정(0 없음 ~ 1 무조건 정중앙). 림 근처 오차를 이 비율만큼 줄여 준다
+  SHOW_SWEET: true,       // 파워 게이지에 적당한 세기 표시
+  GRAVITY: 9.81,
+};
+function passOf(r) { const P = CFG.PASS; return r <= P.length ? P[r - 1] : P[P.length - 1] + CFG.PASS_STEP * (r - P.length); }
+function hoopSpeedOf(r) {
+  if (r < CFG.HOOP_MOVE_FROM) return 0;
+  const S = CFG.HOOP_SPEED;
+  return Math.min(CFG.HOOP_SPEED_MAX, r <= S.length ? S[r - 1] : S[S.length - 1] + CFG.HOOP_SPEED_STEP * (r - S.length));
+}
+
+const $ = id => document.getElementById(id);
+const canvas = $("gl"), ctx = canvas.getContext("2d");
+
+/* ═══════════════════ 기록 (개인 최고 · 세계 신기록 · 우리 반 신기록) ═══════════════════ */
+const BEST_KEY = "basketball_best_v1";
+function loadJSON(k) { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch (e) { return null; } }
+function saveJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+let best = loadJSON(BEST_KEY); if (best && !(best.score >= 0)) best = null;
+const fmtScore = v => v + "점";
+const WR = window.WorldRecord ? WorldRecord("basketball", { format: fmtScore }) : null;
+let wrTried = false;
+function wrInfo() {
+  if (!WR) return { val: "—", who: "", none: true };
+  if (WR.loaded && WR.rec) return { val: WR.text(), who: WR.who(), none: false };
+  if (WR.loaded) return { val: "아직 없음", who: "", none: true };
+  return { val: !WR.url() ? "오프라인" : (wrTried ? "불러오지 못함" : "불러오는 중…"), who: "", none: true };
+}
+function crInfo() {
+  const C = WR && WR.cls;
+  if (!C) return null;
+  if (C.loaded && C.rec) return { val: C.text(), who: C.who(), none: false };
+  if (C.loaded) return { val: "아직 없음", who: "", none: true };
+  return { val: wrTried ? "불러오지 못함" : "불러오는 중…", who: "", none: true };
+}
+function setVal(el, text, none) { el.textContent = text; el.classList.toggle("none", !!none); }
+function renderRecords() {
+  const w = wrInfo();
+  const bTxt = best ? fmtScore(best.score) : "아직 없음";
+  setVal($("bestStart"), bTxt, !best); $("bestStartDate").textContent = best ? best.round + "라운드 · " + best.date : "";
+  setVal($("bestOver"), bTxt, !best);
+  setVal($("wrStart"), w.val, w.none); $("wrWhoStart").textContent = w.who;
+  setVal($("wrOver"), w.val, w.none); $("wrWhoOver").textContent = w.who;
+  $("hudBest").textContent = "최고 " + (best ? best.score : "—");
+  const c = crInfo();
+  if (c) {
+    setVal($("crStart"), c.val, c.none); $("crWhoStart").textContent = c.who;
+    setVal($("crOver"), c.val, c.none); $("crWhoOver").textContent = c.who;
+    document.querySelectorAll(".clsCol").forEach(el => { el.hidden = false; });
+  }
+}
+if (WR) { WR.onChange(renderRecords); WR.load().then(() => { wrTried = true; renderRecords(); }); }
+renderRecords();
+
+/* ═══════════════════ 소리 (Web Audio, 외부 파일 없음) ═══════════════════ */
+const AUD = { ctx: null };
+function audioInit() { try { if (!AUD.ctx) AUD.ctx = new (window.AudioContext || window.webkitAudioContext)(); if (AUD.ctx.state === "suspended") AUD.ctx.resume(); } catch (e) {} }
+function tone(freq, dur, type, vol, slide) {
+  if (!AUD.ctx) return;
+  try {
+    const t = AUD.ctx.currentTime, o = AUD.ctx.createOscillator(), g = AUD.ctx.createGain();
+    o.type = type || "sine"; o.frequency.setValueAtTime(freq, t);
+    if (slide) o.frequency.exponentialRampToValueAtTime(slide, t + dur);
+    g.gain.setValueAtTime(vol || .15, t); g.gain.exponentialRampToValueAtTime(.001, t + dur);
+    o.connect(g); g.connect(AUD.ctx.destination); o.start(t); o.stop(t + dur);
+  } catch (e) {}
+}
+const SFX = {
+  throw() { tone(300, .12, "triangle", .08, 500); },
+  rim() { tone(900, .08, "square", .06, 500); },
+  board() { tone(180, .1, "square", .1, 120); },
+  clean() { tone(660, .12, "sine", .15); setTimeout(() => tone(880, .18, "sine", .15), 90); setTimeout(() => tone(1320, .25, "sine", .15), 180); },
+  bank() { tone(520, .12, "sine", .15); setTimeout(() => tone(780, .2, "sine", .15), 100); },
+  miss() { tone(220, .25, "sawtooth", .06, 120); },
+  fever() { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone(f, .2, "square", .08), i * 80)); },
+  pass() { [523, 659, 784, 1047, 1319].forEach((f, i) => setTimeout(() => tone(f, .25, "sine", .14), i * 110)); },
+  over() { [440, 370, 311, 262].forEach((f, i) => setTimeout(() => tone(f, .3, "triangle", .12), i * 160)); },
+};
+
+/* ═══════════════════ 화면 · 투영 ═══════════════════ */
+const V = { W: 0, H: 0, dpr: 1, f: 0, cx: 0, hy: 0, camY: 1.5, camZ: -1.5 };
+function resize() {
+  V.dpr = Math.min(2, window.devicePixelRatio || 1);
+  V.W = window.innerWidth; V.H = window.innerHeight;
+  canvas.width = Math.round(V.W * V.dpr); canvas.height = Math.round(V.H * V.dpr);
+  ctx.setTransform(V.dpr, 0, 0, V.dpr, 0, 0);
+  V.f = Math.min(0.78 * V.H, 1.3 * V.W);   // 초점 거리(px) — 공은 화면 72% 높이, 림은 그 위에 오도록
+  V.cx = V.W / 2;
+  V.hy = 0.72 * V.H - (V.camY - CFG.HAND_Y) * V.f / (0 - V.camZ);   // 지평선(카메라 눈높이) 화면 y
+}
+window.addEventListener("resize", resize);
+resize();
+/* 월드 (x,y,z) → 화면. s 는 그 깊이에서 1m 가 몇 px 인지 */
+function proj(x, y, z) { const s = V.f / (z - V.camZ); return { x: V.cx + x * s, y: V.hy - (y - V.camY) * s, s }; }
+
+/* ═══════════════════ 게임 상태 ═══════════════════ */
+const G = {
+  state: "idle",     // idle · play · ending(시간 끝, 공 판정 대기) · between(라운드 통과 연출) · over
+  round: 1, score: 0, timeLeft: CFG.ROUND_SEC, fever: false, t: 0,
+  hoopX: 0, hoopPhase: 0,
+  ball: null,        // 날아가는 공 (하나만)
+  ghosts: [],        // 판정이 끝난 뒤 남아서 떨어지는 공
+  spin: 0,
+  drag: null,        // { x0, y0, x, y }
+  shots: 0, made: 0,
+};
+const HOOP_Z = CFG.DIST, BOARD_Z = CFG.DIST + CFG.RIM_R + 0.15, BOARD_HW = 0.9, BOARD_Y0 = 2.9, BOARD_Y1 = 3.95;
+
+function sweetSpeed() {   // 정지한 림 중심에 정확히 떨어지는 세기(포물선 공식)
+  const th = CFG.ELEV * Math.PI / 180, D = CFG.DIST, h = CFG.RIM_Y - CFG.HAND_Y;
+  return Math.sqrt(CFG.GRAVITY * D * D / (2 * Math.cos(th) * Math.cos(th) * (D * Math.tan(th) - h)));
+}
+const SWEET_P = (sweetSpeed() - CFG.SPEED_MIN) / (CFG.SPEED_MAX - CFG.SPEED_MIN);
+$("sweet").style.left = "calc(" + (SWEET_P * 100).toFixed(1) + "% - 1px)";
+$("sweet").style.display = CFG.SHOW_SWEET ? "block" : "none";
+
+function canShoot() { return G.state === "play" && !G.ball; }
+
+function startGame() {
+  audioInit();
+  G.round = 1; G.score = 0; G.ball = null; G.ghosts = []; G.drag = null; G.shots = 0; G.made = 0; G.hoopX = 0; G.hoopPhase = 0;
+  $("overlay").style.display = "none";
+  $("hudTop").classList.add("on"); $("tip").style.display = "block";
+  startRound();
+}
+function startRound() {
+  G.timeLeft = CFG.ROUND_SEC; G.fever = false; G.t = 0; document.body.classList.remove("fever");
+  G.state = "play";
+  updateHud();
+  const moving = hoopSpeedOf(G.round) > 0;
+  showBanner("ROUND " + G.round, "통과 기준 누적 " + passOf(G.round) + "점" + (moving ? (G.round === CFG.HOOP_MOVE_FROM ? " · 골대가 움직입니다!" : " · 골대 더 빨라짐") : ""), 1500);
+}
+function endRound() {
+  G.state = "between";
+  if (G.score >= passOf(G.round)) {
+    SFX.pass();
+    showBanner("ROUND " + G.round + " 통과!", "누적 " + G.score + "점 ≥ " + passOf(G.round) + "점", 1600);
+    setTimeout(() => { G.round++; G.ghosts = []; startRound(); }, 1700);
+  } else {
+    gameOver();
+  }
+}
+function gameOver() {
+  G.state = "over"; document.body.classList.remove("fever"); G.drag = null; hidePower();
+  SFX.over();
+  $("hudTop").classList.remove("on"); $("tip").style.display = "none";
+  const score = G.score, round = G.round;
+  $("overReason").textContent = round + "라운드 종료 시 누적 " + score + "점 < 통과 기준 " + passOf(round) + "점 (성공 " + G.made + " / " + G.shots + "슛)";
+  $("finalScore").innerHTML = score + "<small> 점</small>";
+  $("finalRound").innerHTML = round + "<small> 라운드</small>";
+  let newBest = false, wrBeat = false, crBeat = false;
+  if (score > 0) {
+    newBest = !best || score > best.score;
+    if (newBest) { best = { score, round, date: new Date().toLocaleDateString("ko-KR") }; saveJSON(BEST_KEY, best); }
+    wrBeat = !!(WR && WR.beats(score));
+    crBeat = !!(WR && WR.beatsClass(score));   /* 우리 반 신기록(반별 링크일 때만) */
+  }
+  const m = $("finalMsg");
+  m.textContent = wrBeat ? "🏆 세계 신기록 달성! 🎉" : crBeat ? "🏫 우리 반 신기록!" : newBest ? "🎉 개인 최고 기록 경신!" : "";
+  m.classList.toggle("wr", wrBeat);
+  $("bestOverNew").innerHTML = (best ? best.round + "라운드 " : "") + (newBest ? '<span class="new">NEW</span>' : "");
+  renderRecords();
+  $("cardStart").style.display = "none"; $("cardOver").style.display = "block"; $("overlay").style.display = "flex";
+  if (wrBeat || crBeat) setTimeout(() => WR.prompt(score).then(() => renderRecords()), 400);
+}
+
+let bannerTimer = 0;
+function showBanner(t, s, ms) {
+  $("bannerT").textContent = t; $("bannerS").textContent = s; $("banner").style.display = "block";
+  clearTimeout(bannerTimer); bannerTimer = setTimeout(() => { $("banner").style.display = "none"; }, ms);
+}
+function popText(txt, cls) {
+  const el = document.createElement("div"); el.className = "pop " + cls; el.textContent = txt;
+  $("pops").appendChild(el); setTimeout(() => el.remove(), 1200);
+}
+function updateHud() {
+  $("hudRoundVal").textContent = G.round;
+  $("hudPass").textContent = "통과 " + passOf(G.round) + "점";
+  $("hudScoreVal").textContent = G.score; $("feverScore").textContent = G.score + "점";
+  const tl = Math.max(0, Math.ceil(G.timeLeft));
+  $("hudTimeVal").textContent = tl;
+  $("hudFeverLab").textContent = G.fever ? "🔥 피버 ×" + CFG.FEVER_MULT : "피버까지 " + Math.max(0, Math.ceil(G.timeLeft - CFG.FEVER_SEC)) + "초";
+}
+
+/* ═══════════════════ 슛 · 물리 ═══════════════════ */
+function shoot(dx, dy) {   // dx: 오른쪽 +, dy: 위쪽 + (px)
+  const len = Math.hypot(dx, dy);
+  const power = Math.min(1, len / (CFG.DRAG_LEN * V.H));
+  const v = CFG.SPEED_MIN + power * (CFG.SPEED_MAX - CFG.SPEED_MIN);
+  const th = CFG.ELEV * Math.PI / 180;
+  const vz = v * Math.cos(th), vy = v * Math.sin(th);
+  let vx = vz * (dx / Math.max(1, dy)) * CFG.LAT_GAIN;
+  vx = Math.max(-3, Math.min(3, vx));
+  const b = { x: 0, y: CFG.HAND_Y, z: 0, vx, vy, vz, touched: false, scored: false, done: false, fever: G.fever, age: 0 };
+  /* 조준 보정: 림 높이로 내려올 때의 위치를 미리 계산해 오차를 ASSIST 비율만큼 줄인다 */
+  if (CFG.ASSIST > 0) {
+    const g = CFG.GRAVITY, dh = CFG.RIM_Y - b.y, disc = vy * vy - 2 * g * dh;
+    if (disc > 0) {
+      const t = (vy + Math.sqrt(disc)) / g;
+      const hx = hoopXAt(G.t + t);
+      const ex = hx - (b.x + b.vx * t), ez = HOOP_Z - b.vz * t;
+      if (Math.abs(ez) < 0.6) b.vz += CFG.ASSIST * ez / t;
+      if (Math.abs(ex) < 0.6) b.vx += CFG.ASSIST * ex / t;
+    }
+  }
+  G.ball = b; G.shots++;
+  SFX.throw();
+}
+function hoopXAt(t) { const w = hoopSpeedOf(G.round); return w ? CFG.HOOP_AMP * Math.sin(G.hoopPhase + w * t) : 0; }
+
+function stepBall(b, dt) {
+  const g = CFG.GRAVITY, R = CFG.RIM_R, r = CFG.BALL_R, hx = G.hoopX;
+  const py = b.y;
+  b.vy -= g * dt;
+  b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
+  b.age += dt;
+  /* 림 통과 판정: 림 높이를 내려오면서 지나고 중심이 링 안쪽이면 골 */
+  if (!b.scored && py >= CFG.RIM_Y && b.y < CFG.RIM_Y && b.vy < 0) {
+    const d = Math.hypot(b.x - hx, b.z - HOOP_Z);
+    if (d < R - r * 0.5) { b.scored = true; b.vx *= 0.3; b.vz *= 0.3; b.vy *= 0.6; judge(b); return; }
+  }
+  /* 백보드 */
+  if (b.z + r > BOARD_Z && b.vz > 0 && Math.abs(b.x - hx) < BOARD_HW + r && b.y > BOARD_Y0 - r && b.y < BOARD_Y1 + r) {
+    b.z = BOARD_Z - r; b.vz = -b.vz * 0.55; b.vx *= 0.8; if (!b.touched) SFX.board(); b.touched = true;
+  }
+  /* 림(링) 충돌 — 링에서 가장 가까운 점과의 거리로 */
+  if (!b.scored || b.y > CFG.RIM_Y - 0.3) {
+    const dx = b.x - hx, dz = b.z - HOOP_Z, rad = Math.hypot(dx, dz) || 1e-6;
+    const nx = dx / rad * (rad - R), ny = b.y - CFG.RIM_Y, nz = dz / rad * (rad - R);
+    const d = Math.hypot(nx, ny, nz);
+    if (d < r && d > 1e-6) {
+      const ux = nx / d, uy = ny / d, uz = nz / d;
+      const vn = b.vx * ux + b.vy * uy + b.vz * uz;
+      if (vn < 0) {
+        const e = 0.55;
+        b.vx -= (1 + e) * vn * ux; b.vy -= (1 + e) * vn * uy; b.vz -= (1 + e) * vn * uz;
+        b.vx *= 0.9; b.vz *= 0.9;
+        if (!b.touched) SFX.rim(); b.touched = true;
+      }
+      const push = r - d + 0.002; b.x += ux * push; b.y += uy * push; b.z += uz * push;
+    }
+  }
+  /* 노골 판정: 림보다 충분히 아래로 내려가며 떨어지는 중이면 더는 들어갈 수 없다 */
+  if (!b.done && !b.scored && b.vy < 0 && b.y < CFG.RIM_Y - 0.45) judge(b);
+  if (!b.done && !b.scored && b.z > BOARD_Z + 1.5) judge(b);
+  /* 바닥 */
+  if (b.y < r) { b.y = r; b.vy = -b.vy * 0.5; b.vx *= 0.8; b.vz *= 0.8; }
+}
+function judge(b) {
+  if (b.done) return;
+  b.done = true;
+  const fever = b.fever || G.fever, mult = fever ? CFG.FEVER_MULT : 1;
+  if (b.scored) {
+    const base = b.touched ? CFG.BANK : CFG.CLEAN, pts = base * mult;
+    G.score += pts; G.made++;
+    popText("+" + pts + (b.touched ? " 뱅크 슛" : " 클린 슛!") + (fever ? " 🔥" : ""), b.touched ? "bank" : "clean");
+    b.touched ? SFX.bank() : SFX.clean();
+  } else {
+    popText("노골", "miss"); SFX.miss();
+  }
+  updateHud();
+  G.ghosts.push(b); if (G.ghosts.length > 3) G.ghosts.shift();
+  G.ball = null;
+  if (G.state === "ending") endRound();
+}
+
+/* ═══════════════════ 진행 ═══════════════════ */
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  update(dt); draw();
+  requestAnimationFrame(frame);
+}
+function update(dt) {
+  if (G.state === "play" || G.state === "ending") {
+    G.t += dt;
+    G.hoopX = hoopXAt(G.t);
+    if (G.state === "play") {
+      G.timeLeft -= dt;
+      if (!G.fever && G.timeLeft <= CFG.FEVER_SEC) {
+        G.fever = true; document.body.classList.add("fever"); SFX.fever();
+        showBanner("🔥 FEVER TIME!", "지금부터 점수 " + CFG.FEVER_MULT + "배", 1300);
+      }
+      if (G.timeLeft <= 0) {
+        G.timeLeft = 0; G.state = "ending"; G.drag = null; hidePower();
+        if (!G.ball) endRound();
+      }
+      updateHud();
+    }
+  }
+  const sub = 4, h = dt / sub;
+  for (let i = 0; i < sub; i++) {
+    if (G.ball) stepBall(G.ball, h);
+    G.ghosts.forEach(b => stepBall(b, h));
+  }
+  G.ghosts = G.ghosts.filter(b => b.age < 2.2);
+  const spd = G.ball ? Math.hypot(G.ball.vx, G.ball.vy, G.ball.vz) : 0;
+  G.spin += (G.ball ? spd * 1.6 : 0) * dt;
+}
+
+/* ═══════════════════ 그리기 ═══════════════════ */
+function draw() {
+  const W = V.W, H = V.H;
+  ctx.fillStyle = G.fever ? "#FBEFE7" : "#F4F6F1";
+  ctx.fillRect(0, 0, W, H);
+  /* 바닥(코트) */
+  const hy = V.hy;
+  const grad = ctx.createLinearGradient(0, hy, 0, H);
+  grad.addColorStop(0, "#DDCBAF"); grad.addColorStop(1, "#EADCC3");
+  ctx.fillStyle = grad; ctx.fillRect(0, hy, W, H - hy);
+  ctx.strokeStyle = "rgba(27,43,32,.18)"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, hy); ctx.lineTo(W, hy); ctx.stroke();
+  /* 자유투 레인(사다리꼴) + 자유투선 */
+  const lw = 2.45, z0 = -0.6, z1 = BOARD_Z + 0.3;
+  const a = proj(-lw, 0, z0), b = proj(lw, 0, z0), c = proj(lw, 0, z1), d = proj(-lw, 0, z1);
+  ctx.fillStyle = "rgba(217,123,79,.16)";
+  ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(c.x, c.y); ctx.lineTo(d.x, d.y); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,.9)"; ctx.lineWidth = 2; ctx.stroke();
+  const l1 = proj(-lw, 0, 0), l2 = proj(lw, 0, 0);
+  ctx.beginPath(); ctx.moveTo(l1.x, l1.y); ctx.lineTo(l2.x, l2.y); ctx.stroke();
+  /* 자유투 원 */
+  const cc = proj(0, 0, 0);
+  ctx.beginPath(); ctx.ellipse(cc.x, cc.y, 1.8 * cc.s, 1.8 * cc.s * 0.25, 0, 0, Math.PI * 2); ctx.stroke();
+
+  const balls = (G.ball ? [G.ball] : []).concat(G.ghosts);
+  balls.filter(x => x.z > HOOP_Z - 0.1).forEach(drawBall);   // 골대 뒤(또는 네트 안)의 공은 골대보다 먼저
+  drawHoop();
+  balls.filter(x => x.z <= HOOP_Z - 0.1).forEach(drawBall);
+  if (canShoot()) drawReadyBall();
+  if (G.drag) drawDrag();
+}
+function drawHoop() {
+  const hx = G.hoopX, R = CFG.RIM_R;
+  /* 기둥(백보드 뒤) */
+  const p0 = proj(hx, 0, BOARD_Z + 0.4), p1 = proj(hx, BOARD_Y0 + 0.3, BOARD_Z + 0.4);
+  ctx.strokeStyle = "#B4BDB5"; ctx.lineWidth = Math.max(2, 0.06 * p0.s); ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
+  /* 백보드 */
+  const bl = proj(hx - BOARD_HW, BOARD_Y0, BOARD_Z), br = proj(hx + BOARD_HW, BOARD_Y1, BOARD_Z);
+  ctx.fillStyle = "rgba(255,255,255,.95)"; ctx.strokeStyle = "#3B4B40"; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.rect(bl.x, br.y, br.x - bl.x, bl.y - br.y); ctx.fill(); ctx.stroke();
+  const s = bl.s, sqW = 0.59 * s, sqH = 0.45 * s, rimP = proj(hx, CFG.RIM_Y, HOOP_Z);
+  ctx.strokeStyle = "#D97B4F"; ctx.lineWidth = 3;
+  ctx.strokeRect(bl.x + (br.x - bl.x) / 2 - sqW / 2, bl.y - sqH - 0.15 * s, sqW, sqH);
+  /* 림 */
+  const rx = R * rimP.s, ry = rx * 0.27;
+  ctx.strokeStyle = "#D97B4F"; ctx.lineWidth = Math.max(3, 0.035 * rimP.s);
+  ctx.beginPath(); ctx.ellipse(rimP.x, rimP.y, rx, ry, 0, 0, Math.PI * 2); ctx.stroke();
+  /* 네트 */
+  const nb = proj(hx, CFG.RIM_Y - 0.42, HOOP_Z), nrx = rx * 0.55, nry = nrx * 0.27;
+  ctx.strokeStyle = "rgba(90,105,95,.75)"; ctx.lineWidth = 1.5;
+  for (let i = 0; i < 10; i++) {
+    const t = i / 10 * Math.PI * 2, t2 = t + 0.32;
+    ctx.beginPath(); ctx.moveTo(rimP.x + Math.cos(t) * rx, rimP.y + Math.sin(t) * ry);
+    ctx.lineTo(nb.x + Math.cos(t2) * nrx, nb.y + Math.sin(t2) * nry); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(rimP.x + Math.cos(t) * rx, rimP.y + Math.sin(t) * ry);
+    ctx.lineTo(nb.x + Math.cos(t - 0.32) * nrx, nb.y + Math.sin(t - 0.32) * nry); ctx.stroke();
+  }
+  ctx.beginPath(); ctx.ellipse(nb.x, nb.y, nrx, nry, 0, 0, Math.PI * 2); ctx.stroke();
+  const nm = proj(hx, CFG.RIM_Y - 0.2, HOOP_Z);
+  ctx.beginPath(); ctx.ellipse(nm.x, nm.y, rx * 0.78, rx * 0.78 * 0.27, 0, 0, Math.PI * 2); ctx.stroke();
+}
+function drawBallAt(x, y, z, alpha) {
+  const p = proj(x, y, z), sh = proj(x, 0, z), r = CFG.BALL_R * p.s;
+  ctx.save(); ctx.globalAlpha = alpha;
+  /* 그림자 */
+  ctx.fillStyle = "rgba(27,43,32,.22)";
+  ctx.beginPath(); ctx.ellipse(sh.x, sh.y, r * 0.9, r * 0.3, 0, 0, Math.PI * 2); ctx.fill();
+  /* 공 */
+  ctx.translate(p.x, p.y); ctx.rotate(G.spin);
+  ctx.fillStyle = "#E58A3E"; ctx.strokeStyle = "#1B2B20"; ctx.lineWidth = Math.max(1.5, r * 0.07);
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.save(); ctx.beginPath(); ctx.arc(0, 0, r - ctx.lineWidth / 2, 0, Math.PI * 2); ctx.clip();
+  ctx.lineWidth = Math.max(1.2, r * 0.06);
+  ctx.beginPath(); ctx.moveTo(-r, 0); ctx.lineTo(r, 0); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, -r); ctx.lineTo(0, r); ctx.stroke();
+  ctx.beginPath(); ctx.arc(-r * 1.15, 0, r * 0.95, -1.1, 1.1); ctx.stroke();
+  ctx.beginPath(); ctx.arc(r * 1.15, 0, r * 0.95, Math.PI - 1.1, Math.PI + 1.1); ctx.stroke();
+  ctx.restore(); ctx.restore();
+}
+function drawBall(b) { drawBallAt(b.x, b.y, b.z, b.done ? Math.max(0, 1 - (b.age - 0.6) / 1.4) : 1); }
+function drawReadyBall() { drawBallAt(0, CFG.HAND_Y, 0, 1); }
+function drawDrag() {
+  const d = G.drag, dx = d.x - d.x0, dy = d.y0 - d.y;
+  if (dy <= 0) return;
+  const p = proj(0, CFG.HAND_Y, 0), len = Math.hypot(dx, dy), power = Math.min(1, len / (CFG.DRAG_LEN * V.H));
+  const ang = Math.atan2(dx, dy), L = 40 + power * 140;
+  const ex = p.x + Math.sin(ang) * L, ey = p.y - Math.cos(ang) * L;
+  ctx.save(); ctx.setLineDash([8, 8]); ctx.strokeStyle = "#24402F"; ctx.lineWidth = 4; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(ex, ey); ctx.stroke();
+  ctx.setLineDash([]); ctx.fillStyle = "#24402F";
+  ctx.translate(ex, ey); ctx.rotate(ang);
+  ctx.beginPath(); ctx.moveTo(0, -14); ctx.lineTo(10, 4); ctx.lineTo(-10, 4); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+/* ═══════════════════ 입력 (드래그 슛 · 마우스/터치 공통) ═══════════════════ */
+function showPower(power) {
+  $("powerWrap").style.display = "block"; $("tip").style.display = "none";
+  $("powerFill").style.width = (power * 100).toFixed(0) + "%"; $("powerPct").textContent = (power * 100).toFixed(0) + "%";
+}
+function hidePower() { $("powerWrap").style.display = "none"; if (G.state === "play") $("tip").style.display = "block"; }
+canvas.addEventListener("pointerdown", e => {
+  if (!canShoot()) return;
+  audioInit();
+  G.drag = { x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, id: e.pointerId };
+  try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+  e.preventDefault();
+});
+canvas.addEventListener("pointermove", e => {
+  if (!G.drag || e.pointerId !== G.drag.id) return;
+  G.drag.x = e.clientX; G.drag.y = e.clientY;
+  const dy = G.drag.y0 - G.drag.y, dx = G.drag.x - G.drag.x0;
+  if (dy > 0) showPower(Math.min(1, Math.hypot(dx, dy) / (CFG.DRAG_LEN * V.H))); else hidePower();
+});
+function endDrag(e) {
+  if (!G.drag || e.pointerId !== G.drag.id) return;
+  const dx = e.clientX - G.drag.x0, dy = G.drag.y0 - e.clientY;
+  G.drag = null; hidePower();
+  if (dy < 24 || !canShoot()) return;   // 너무 짧거나 아래로 끌면 취소
+  shoot(dx, dy);
+}
+canvas.addEventListener("pointerup", endDrag);
+canvas.addEventListener("pointercancel", e => { if (G.drag && e.pointerId === G.drag.id) { G.drag = null; hidePower(); } });
+
+$("btnStart").addEventListener("click", startGame);
+$("btnRetry").addEventListener("click", startGame);
+$("btnWipe").addEventListener("click", () => { if (confirm("이 기기에 저장된 개인 최고 기록을 지울까요?")) { best = null; try { localStorage.removeItem(BEST_KEY); } catch (e) {} renderRecords(); } });
+window.addEventListener("keydown", e => {
+  if (e.code === "Space" && (G.state === "idle" || G.state === "over") && !e.repeat) { e.preventDefault(); startGame(); }
+});
+
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
