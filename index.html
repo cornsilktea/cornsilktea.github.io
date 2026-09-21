@@ -131,7 +131,6 @@
     border: 1px solid var(--sg-line); border-radius:var(--sg-radius);
   }
   .qr-panel p { margin: 16px 0 0; font-size: 15px; color: var(--sg-ink-mid); }
-  .qr-panel .qr-url { font-size: 13px; color: var(--sg-ink-soft); word-break: break-all; }
   .qr-panel .qr-change { margin-top: 18px; }
 
   /* 첫 화면: 학년·반 고르기 (전자칠판에서 선생님이 누릅니다) */
@@ -216,7 +215,6 @@
   <div class="qr-panel">
     <canvas id="qrCanvas" width="460" height="460"></canvas>
     <p>디벗 카메라로 QR 코드를 촬영하세요</p>
-    <p class="qr-url" id="qrUrl"></p>
     <p class="qr-change"><a class="btn" id="changeClass" href="index.html">다른 반 고르기</a></p>
   </div>
 </div>
@@ -319,16 +317,14 @@
   document.getElementById("layout").hidden = false;
   document.getElementById("viewtabs").hidden = false;
   document.getElementById("pageSub").hidden = true;      /* 반 화면에서는 제목만 남깁니다 */
-  document.title = klass.label + " · " + document.title;
 
   /* 반별 QR: 학생이 이 QR 을 찍으면 학년·반이 정해진 목록으로 들어옵니다 */
   (function drawQr() {
     var url = location.origin + classHref(klass.id);
-    document.getElementById("qrUrl").textContent = url;
     try {
       window.QR.draw(document.getElementById("qrCanvas"), url, { size: 460, margin: 3, dark: "#1B2B20" });
     } catch (e) {
-      document.getElementById("qrUrl").textContent = "QR 을 그리지 못했어요. 주소로 들어와 주세요: " + url;
+      showToast("QR 을 그리지 못했어요. 화면을 새로고침해 주세요.");
     }
   })();
 
