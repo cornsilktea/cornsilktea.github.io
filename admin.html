@@ -1186,9 +1186,7 @@ function showLogin(message) {
 }
 
 $("loginBtn").addEventListener("click", login);
-$("allOff").addEventListener("click", () => {
-  if (confirm("10개 반의 수업 자료를 모두 닫을까요?")) allOff();
-});
+$("allOff").addEventListener("click", allOff);
 $("classClose").addEventListener("click", () => selectClass(null));
 $("reload").addEventListener("click", () => { busy = false; seedSnapshot = ""; loadSeed().then(load); });
 $("logout").addEventListener("click", async () => {
