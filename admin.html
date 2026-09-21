@@ -97,6 +97,23 @@
   .lightbox img { max-width: 100%; max-height: 92vh; border-radius:var(--sg-radius); background: #fff; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
   .lightbox p { position: absolute; top: 14px; left: 0; right: 0; text-align: center; color: var(--sg-line); font-size: 13px; margin: 0; }
 
+  /* 반 고르기 */
+  .class-grade { font-size: 13px; color: var(--sg-ink-soft); margin: 0 0 6px; }
+  .class-grade + .class-grid { margin-bottom: 14px; }
+  .class-grid { display: grid; gap: 8px; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .class-grid button {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    min-height: 64px; padding: 8px 4px; font-weight: 600;
+  }
+  .class-grid button small { font-size: 12px; font-weight: 400; color: var(--sg-ink-soft); }
+  .class-grid button.on small { color: var(--sg-ok); }
+  .class-grid button[aria-pressed="true"] { border-color: var(--sg-primary); background: var(--sg-primary-soft); }
+  .class-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+  .class-head h2 { margin: 0; }
+  @media (max-width: 600px) {
+    .class-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+
   .edit { margin-top: 12px; display: none; }
   .edit.open { display: block; }
   .edit .row { margin-bottom: 8px; }
@@ -153,7 +170,7 @@
 <div class="wrap">
 
   <h1>수업 자료 제어판</h1>
-  <p class="sub">스위치를 켜면 학생이 바로 들어갈 수 있고, 끄면 즉시 막힙니다. 저장 버튼은 없습니다.</p>
+  <p class="sub">반을 고른 뒤 스위치를 켜면 그 반 학생만 바로 들어갈 수 있고, 끄면 즉시 막힙니다. 저장 버튼은 없습니다.</p>
 
   <!-- 로그인 -->
   <div class="panel" id="loginPanel">
@@ -170,13 +187,35 @@
       <h2>지금 상태</h2>
       <div class="summary"><span class="dot" id="dot"></span><span id="summaryText">불러오는 중…</span></div>
       <div class="actions">
-        <button id="allOn" type="button">전체 켜기</button>
-        <button id="allOff" type="button">전체 끄기</button>
+        <button id="allOff" type="button">전체 끄기 (10개 반 모두)</button>
         <button id="reload" type="button">새로고침</button>
         <button id="logout" type="button">로그아웃</button>
       </div>
       <p class="msg" id="mainMsg"></p>
       <p class="who" id="who"></p>
+    </div>
+
+    <!-- 반 고르기: 반을 누르면 아래에 그 반의 자료 스위치 목록이 열립니다 -->
+    <div class="panel">
+      <h2>반 고르기</h2>
+      <p class="class-grade">1학년</p>
+      <div class="class-grid" id="classGrid1"></div>
+      <p class="class-grade">2학년</p>
+      <div class="class-grid" id="classGrid2"></div>
+      <p class="hint">반마다 링크가 다릅니다(목록 화면에서 반을 고르면 그 반의 QR 이 나옵니다). 스위치도 반마다 따로 켜고 끕니다.</p>
+    </div>
+
+    <!-- 고른 반의 자료 스위치 목록 -->
+    <div class="panel" id="classPanel" hidden>
+      <div class="class-head">
+        <h2 id="classTitle"></h2>
+        <button id="classClose" type="button">닫기</button>
+      </div>
+      <p class="msg" id="classMsg"></p>
+      <div id="list"></div>
+      <p class="hint">
+        스위치는 <b>이 반</b>에만 적용됩니다. ▲▼ 순서·수정·삭제는 자료 자체를 바꾸는 것이라 모든 반에 함께 적용됩니다.
+      </p>
     </div>
 
     <!-- 예전 오타 아이디가 남아 있을 때만 보입니다 -->
@@ -201,11 +240,45 @@
         저장소에 파일은 올라왔지만 아직 등록되지 않은 자료입니다.
         <b>등록하기 전에는 학생 목록에 나오지 않습니다.</b>
         단원을 고르고 등록하면 그때부터 학생 목록에 나타나고,
-        잠금·순서도 아래 목록에서 정할 수 있게 됩니다.
+        잠금·순서도 반 목록에서 정할 수 있게 됩니다.
       </p>
     </div>
 
-    <div id="list"></div>
+    <!-- 세계 신기록 관리: records/<게임>/<항목> 을 읽어 보여 주고, 선생님 계정으로 고치거나 지웁니다.
+         (학생은 규칙상 더 높은 점수만 쓸 수 있고, 선생님 UID 는 규칙에서 예외) -->
+    <div class="panel" id="recPanel">
+      <h2>세계 신기록 관리</h2>
+      <div class="actions" style="margin-top:0">
+        <button id="recToggle" type="button" aria-expanded="false">펼치기</button>
+      </div>
+      <!-- 평소에는 접어 두고, 펼치기를 눌렀을 때만 목록을 불러옵니다 -->
+      <div id="recBody" hidden>
+        <p class="hint">
+          게임마다 모든 학생이 공유하는 세계 신기록입니다. 의심스러운 기록은 <b>지우기</b>(다음 판부터 첫 기록으로 다시 받음),
+          저장 단위가 바뀐 기록은 <b>고치기</b>로 값을 바꿉니다. 값은 각 게임의 저장 단위(초·밀리초·점 등)로 넣습니다.
+        </p>
+        <div class="actions">
+          <button id="recReload" type="button">신기록 새로고침</button>
+        </div>
+        <p class="msg" id="recMsg"></p>
+        <div id="recList"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>백업 내려받기</h2>
+      <p class="hint" style="margin-top:0">
+        추가·수정한 내용은 누르는 즉시 저장되므로 커밋이 필요 없습니다.
+        아래 버튼은 지금 상태를 파일로 보관해 두고 싶을 때만 쓰세요.
+        내려받은 파일은 저장소의 <code>초기데이터.json</code> 을 덮어써 두면
+        나중에 데이터베이스를 새로 만들 때 그대로 되살릴 수 있습니다(반별 잠금 상태도 함께 들어갑니다).
+      </p>
+      <div class="actions">
+        <button id="exportBtn" type="button">파일로 내려받기</button>
+        <button id="copyBtn" type="button">클립보드에 복사</button>
+      </div>
+      <p class="msg" id="exportMsg"></p>
+    </div>
 
     <div class="panel">
       <h2>수업 자료 추가</h2>
@@ -237,44 +310,8 @@
       <p class="msg" id="addMsg"></p>
       <p class="hint">
         자료 아이디는 수업 자료 HTML 파일 안의 <code>data-game="..."</code> 값과 똑같이 적어야 합니다.
-        영문 소문자·숫자·하이픈만 쓸 수 있습니다.
+        영문 소문자·숫자·하이픈만 쓸 수 있습니다. 추가한 자료는 모든 반에서 잠긴 상태로 시작합니다.
       </p>
-    </div>
-
-    <div class="panel">
-      <h2>백업 내려받기</h2>
-      <p class="hint" style="margin-top:0">
-        추가·수정한 내용은 누르는 즉시 저장되므로 커밋이 필요 없습니다.
-        아래 버튼은 지금 상태를 파일로 보관해 두고 싶을 때만 쓰세요.
-        내려받은 파일은 저장소의 <code>초기데이터.json</code> 을 덮어써 두면
-        나중에 데이터베이스를 새로 만들 때 그대로 되살릴 수 있습니다.
-      </p>
-      <div class="actions">
-        <button id="exportBtn" type="button">파일로 내려받기</button>
-        <button id="copyBtn" type="button">클립보드에 복사</button>
-      </div>
-      <p class="msg" id="exportMsg"></p>
-    </div>
-
-    <!-- 세계 신기록 관리: records/<게임>/<항목> 을 읽어 보여 주고, 선생님 계정으로 고치거나 지웁니다.
-         (학생은 규칙상 더 높은 점수만 쓸 수 있고, 선생님 UID 는 규칙에서 예외) -->
-    <div class="panel" id="recPanel">
-      <h2>세계 신기록 관리</h2>
-      <div class="actions" style="margin-top:0">
-        <button id="recToggle" type="button" aria-expanded="false">펼치기</button>
-      </div>
-      <!-- 평소에는 접어 두고, 펼치기를 눌렀을 때만 목록을 불러옵니다 -->
-      <div id="recBody" hidden>
-        <p class="hint">
-          게임마다 모든 학생이 공유하는 세계 신기록입니다. 의심스러운 기록은 <b>지우기</b>(다음 판부터 첫 기록으로 다시 받음),
-          저장 단위가 바뀐 기록은 <b>고치기</b>로 값을 바꿉니다. 값은 각 게임의 저장 단위(초·밀리초·점 등)로 넣습니다.
-        </p>
-        <div class="actions">
-          <button id="recReload" type="button">신기록 새로고침</button>
-        </div>
-        <p class="msg" id="recMsg"></p>
-        <div id="recList"></div>
-      </div>
     </div>
   </div>
 
@@ -305,6 +342,8 @@ const D = window.PORTAL_DATA;      /* 단원 구조는 data.js 한 곳에만 있
 const $ = (id) => document.getElementById(id);
 
 let games = [];
+let classes = {};      /* 반별 잠금: classes[반 아이디][자료 아이디] = true/false (portal/classes) */
+let current = null;    /* 지금 펼쳐 둔 반 아이디("1-1" …), 없으면 null */
 let dbKeys = [];       /* 데이터베이스에 실제로 있는 자료 아이디(지운 표시까지 포함) */
 let seedGames = null;  /* 저장소 초기데이터.json 의 자료 목록 */
 let busy = false;      /* 수정 중일 때 자동 새로고침 멈춤 */
@@ -375,9 +414,14 @@ function explainDb(code) {
 async function load() {
   if (busy) return;
   try {
-    const r = await fetch(cfg.dbPath("games"), { cache: "no-store" });
+    const [r, rc] = await Promise.all([
+      fetch(cfg.dbPath("games"), { cache: "no-store" }),
+      fetch(cfg.dbPath("classes"), { cache: "no-store" })
+    ]);
     if (!r.ok) throw new Error(r.status);
+    if (!rc.ok) throw new Error(rc.status);
     const data = await r.json();
+    classes = (await rc.json()) || {};
     dbKeys = Object.keys(data || {});
     /* removed 표시는 "제어판에서 지운 자료"라는 뜻이라 목록에 넣지 않습니다.
        (이 표시가 있어야 저장소 시드에서 다시 살아나지 않습니다) */
@@ -389,14 +433,15 @@ async function load() {
       return {
         slug, canonical: n.slug,
         title: g.title || slug, url: g.url || "", memo: g.memo || "",
-        open: g.open === true, order: typeof g.order === "number" ? g.order : 999,
+        order: typeof g.order === "number" ? g.order : 999,
         units: n.units
       };
     });
     games.sort((a, b) => a.order - b.order || a.title.localeCompare(b.title, "ko"));
-    const next = JSON.stringify(games);
+    const next = JSON.stringify([games, classes]);
     if (next !== snapshot) { snapshot = next; renderList(); }
     renderSummary();
+    renderClassGrid();
     renderFixPanel();
     renderSeedPanel();
     if ($("mainMsg").textContent.indexOf("불러오지") !== -1) say("mainMsg", "");
@@ -619,14 +664,53 @@ function recCard(r) {
 }
 
 /* ---------------- 화면 ---------------- */
+/* 반에서 열려 있는 자료(등록된 자료만 셈) */
+function isOpen(cid, slug) {
+  return !!(classes[cid] && classes[cid][slug] === true);
+}
+function openCount(cid) {
+  return games.filter((g) => isOpen(cid, g.slug)).length;
+}
+
 function renderSummary() {
-  const on = games.filter((g) => g.open).length;
-  $("dot").className = "dot" + (on === 0 ? "" : on === games.length ? " on" : " some");
+  const opened = D.CLASSES.filter((c) => openCount(c.id) > 0);
+  $("dot").className = "dot" + (opened.length === 0 ? "" : " some");
   $("summaryText").textContent =
     games.length === 0 ? "등록된 수업 자료가 없습니다."
-    : on === 0 ? "전체 잠금 (" + games.length + "개 모두 닫힘)"
-    : on === games.length ? "전체 열림 (" + on + "개)"
-    : "일부 열림 (" + on + " / " + games.length + "개)";
+    : opened.length === 0 ? "전체 잠금 (10개 반 모두 닫힘)"
+    : "열린 반: " + opened.map((c) => c.label + " " + openCount(c.id) + "개").join(" · ");
+}
+
+/* ---------------- 반 고르기 ---------------- */
+function renderClassGrid() {
+  D.CLASSES.forEach((c) => {
+    let b = document.getElementById("cls-" + c.id);
+    if (!b) {
+      b = el("button", null);
+      b.type = "button";
+      b.id = "cls-" + c.id;
+      b.append(el("span", null, c.label), el("small", null, ""));
+      b.addEventListener("click", () => selectClass(current === c.id ? null : c.id));
+      $("classGrid" + c.grade).appendChild(b);
+    }
+    const n = openCount(c.id);
+    b.querySelector("small").textContent = n > 0 ? n + "개 열림" : "잠금";
+    b.classList.toggle("on", n > 0);
+    b.setAttribute("aria-pressed", current === c.id ? "true" : "false");
+  });
+}
+
+function selectClass(cid) {
+  current = cid;
+  busy = false;
+  $("classPanel").hidden = !cid;
+  say("classMsg", "");
+  if (cid) {
+    $("classTitle").textContent = D.classById(cid).label + " 자료 스위치";
+    renderList();
+    $("classPanel").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  renderClassGrid();
 }
 
 function el(tag, cls, text) {
@@ -759,10 +843,15 @@ function showGuide(src, caption) {
 function renderList() {
   const list = $("list");
   list.innerHTML = "";
+  if (!current) return;
   games.forEach((g, i) => list.appendChild(gameCard(g, i)));
 }
 
+/* 고른 반(current)의 자료 카드. 스위치는 classes/<반>/<자료> 를 바꿉니다. */
 function gameCard(g, i) {
+  const cid = current;
+  const label = D.classById(cid).label;
+  const open = isOpen(cid, g.slug);
   const card = el("div", "game");
 
   const head = el("div", "game-head");
@@ -777,22 +866,24 @@ function gameCard(g, i) {
   const sw = el("label", "switch");
   const cb = document.createElement("input");
   cb.type = "checkbox";
-  cb.checked = g.open;
+  cb.checked = open;
   const track = el("span", "track");
-  const stateText = el("span", "switch-text", g.open ? "열림" : "잠김");
+  const stateText = el("span", "switch-text", open ? "열림" : "잠김");
   cb.addEventListener("change", async () => {
     const next = cb.checked;
     cb.disabled = true;
     try {
-      await write("games/" + g.slug, { open: next });
-      g.open = next;
-      snapshot = JSON.stringify(games);
+      await write("classes/" + cid, { [g.slug]: next });
+      if (!classes[cid]) classes[cid] = {};
+      classes[cid][g.slug] = next;
+      snapshot = JSON.stringify([games, classes]);
       stateText.textContent = next ? "열림" : "잠김";
       renderSummary();
-      say("mainMsg", g.title + " → " + (next ? "열었습니다." : "닫았습니다."));
+      renderClassGrid();
+      say("classMsg", label + " · " + g.title + " → " + (next ? "열었습니다." : "닫았습니다."));
     } catch (e) {
       cb.checked = !next;
-      say("mainMsg", e.message);
+      say("classMsg", e.message);
     }
     cb.disabled = false;
   });
@@ -825,8 +916,9 @@ function gameCard(g, i) {
       /* 저장소 시드에 남아 있는 자료라면, 지웠다는 표시를 남겨야
          학생 목록에서 다시 살아나지 않습니다. */
       if (seedGames && seedGames[g.slug]) await write("games/" + g.slug, { removed: true });
+      await write("classes", classPatch(g.slug, null));   /* 반별 잠금 값도 함께 지움 */
       await load();
-    } catch (e) { say("mainMsg", e.message); }
+    } catch (e) { say("classMsg", e.message); }
   });
   buttons.append(up, down, edit, del);
   card.appendChild(buttons);
@@ -860,13 +952,13 @@ function gameCard(g, i) {
   });
   save.addEventListener("click", async () => {
     const title = fTitle.input.value.trim(), url = fUrl.input.value.trim();
-    if (!title || !url) { say("mainMsg", "제목과 파일 이름은 비울 수 없습니다."); return; }
+    if (!title || !url) { say("classMsg", "제목과 파일 이름은 비울 수 없습니다."); return; }
     try {
       await write("games/" + g.slug, { title, url, memo: fMemo.input.value.trim(), units: picker.get(), unitsSet: true });
       busy = false;
       await load();
-      say("mainMsg", "저장했습니다.");
-    } catch (e) { say("mainMsg", e.message); }
+      say("classMsg", "저장했습니다.");
+    } catch (e) { say("classMsg", e.message); }
   });
 
   return card;
@@ -882,17 +974,25 @@ async function move(i, dir) {
     await write("games/" + b.slug, { order: i });
     busy = false;
     await load();
-  } catch (e) { busy = false; say("mainMsg", e.message); }
+  } catch (e) { busy = false; say("classMsg", e.message); }
 }
 
-async function bulk(open) {
+/* 자료 하나의 값을 10개 반 모두에 한 번에 쓰기 위한 묶음(classes 에 PATCH). null 이면 지움 */
+function classPatch(slug, value) {
+  const patch = {};
+  D.CLASSES.forEach((c) => { patch[c.id + "/" + slug] = value; });
+  return patch;
+}
+
+/* 전체 끄기: 10개 반의 모든 자료를 한 번에 닫습니다 */
+async function allOff() {
   if (games.length === 0) return;
   const patch = {};
-  games.forEach((g) => { patch[g.slug + "/open"] = open; });
+  D.CLASSES.forEach((c) => { games.forEach((g) => { patch[c.id + "/" + g.slug] = false; }); });
   try {
-    await write("games", patch);
+    await write("classes", patch);
     await load();
-    say("mainMsg", open ? "전체를 열었습니다." : "전체를 닫았습니다.");
+    say("mainMsg", "10개 반의 자료를 모두 닫았습니다.");
   } catch (e) { say("mainMsg", e.message); }
 }
 
@@ -926,11 +1026,17 @@ async function fixLegacy() {
         url: D.fixUrl(g.url),
         memo: g.memo,
         order: g.order,
-        open: g.open,
         units: g.units,
         unitsSet: true
       });
       await write("games/" + g.slug, null);
+      /* 반별 잠금 값도 새 아이디로 옮깁니다 */
+      const moved = {};
+      D.CLASSES.forEach((c) => {
+        moved[c.id + "/" + g.canonical] = isOpen(c.id, g.slug);
+        moved[c.id + "/" + g.slug] = null;
+      });
+      await write("classes", moved);
     }
     busy = false;
     await load();
@@ -991,7 +1097,7 @@ function seedCard(g) {
   info.appendChild(el("p", "game-meta",
     g.url + "   ·   아이디: " + g.slug + (g.memo ? "   ·   " + g.memo : "")));
   info.appendChild(el("p", "game-meta",
-    "등록하면 " + (g.open === true ? "열린" : "잠긴") + " 상태로 학생 목록에 나타납니다"));
+    "등록하면 모든 반에서 " + (g.open === true ? "열린" : "잠긴") + " 상태로 학생 목록에 나타납니다"));
   head.appendChild(info);
   card.appendChild(head);
 
@@ -1017,11 +1123,12 @@ function seedCard(g) {
         url: D.fixUrl(g.url),
         memo: g.memo || "",
         order: typeof g.order === "number" ? g.order : 999,
-        open: g.open === true,
         units: units,
         unitsSet: true,
         removed: null            /* 예전에 지운 표시가 있으면 함께 지웁니다 */
       });
+      /* 초기데이터.json 의 open 값을 10개 반 모두의 시작 상태로 씁니다(오락용은 true) */
+      await write("classes", classPatch(g.slug, g.open === true));
       busy = false;
       await load();
       say("seedMsg", "'" + g.title + "' 을(를) 등록했습니다. 이제 학생 목록에 나옵니다.");
@@ -1044,11 +1151,18 @@ function backupText() {
       url: D.fixUrl(g.url),
       memo: g.memo,
       order: g.order,
-      open: g.open,
+      /* open 은 예전 형식과의 호환용: 어느 반에서든 열려 있으면 true */
+      open: D.CLASSES.some((c) => isOpen(c.id, g.slug)),
       units: g.units
     };
   });
-  return JSON.stringify({ portal: { games: out } }, null, 2) + "\n";
+  /* 반별 잠금 상태(classes)도 함께 담아 되살릴 수 있게 합니다 */
+  const cls = {};
+  D.CLASSES.forEach((c) => {
+    cls[c.id] = {};
+    games.forEach((g) => { cls[c.id][g.canonical] = isOpen(c.id, g.slug); });
+  });
+  return JSON.stringify({ portal: { games: out, classes: cls } }, null, 2) + "\n";
 }
 
 /* ---------------- 시작 ---------------- */
@@ -1072,8 +1186,10 @@ function showLogin(message) {
 }
 
 $("loginBtn").addEventListener("click", login);
-$("allOn").addEventListener("click", () => bulk(true));
-$("allOff").addEventListener("click", () => bulk(false));
+$("allOff").addEventListener("click", () => {
+  if (confirm("10개 반의 수업 자료를 모두 닫을까요?")) allOff();
+});
+$("classClose").addEventListener("click", () => selectClass(null));
 $("reload").addEventListener("click", () => { busy = false; seedSnapshot = ""; loadSeed().then(load); });
 $("logout").addEventListener("click", async () => {
   try { await signOut(auth); } catch (e) {}
@@ -1124,7 +1240,7 @@ $("addBtn").addEventListener("click", async () => {
   try {
     await write("games/" + slug, {
       title, url, memo: $("newMemo").value.trim(),
-      order: games.length, open: false,
+      order: games.length,
       units: addPicker.get(), unitsSet: true
     });
     await load();

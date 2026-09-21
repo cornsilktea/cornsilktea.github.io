@@ -14,6 +14,11 @@
    - 가드가 왼쪽 위에 `← 목록으로` 버튼(높이 32px, top 8px)을 붙이므로 화면 위쪽에
      고정(fixed) HUD 가 있으면 46px 아래로 내린다.
    - 잠금 없이 버튼만 필요한 화면(예: 투표 화면)은 `data-game` 없이 `access-guard.js` 한 줄만.
+   - **링크는 반마다 다르다.** 목록은 `index.html?c=1-1`, 자료는 `6.snakegame.html?c=1-1` 처럼 `?c=<학년>-<반>` 이
+     붙고, 잠금은 Firebase `portal/classes/<반>/<자료>` 를 본다(`games/<자료>/open` 은 더 이상 안 씀).
+     가드가 `window.PORTAL_CLASS`(`{id,grade,cls,label}` 또는 null)를 만들어 주므로 학년·반이 필요한 게임은 이걸 읽는다.
+     자료 안에서 다른 자료로 링크할 때는 `location.search` 를 그대로 붙여 반이 유지되게 한다.
+     학급 목록(1·2학년 각 5반)은 `data.js` 의 `CLASSES` 한 곳에만 있다.
    - 파일에 `Content-Security-Policy` 가 있으면 `connect-src` 에 Firebase 주소를 허용한다(사용법.md 3절).
 2. **파일 이름은 `<번호>.<영문이름>.html`**, 번호는 저장소 최대 번호 + 1 (`ls` 로 확인). 구분자는 점.
 3. **`초기데이터.json` 의 `portal.games` 에 항목 추가**(title·url·memo·order·open·units·unitsSet).

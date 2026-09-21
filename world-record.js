@@ -186,6 +186,14 @@
           }
           wirePick(picks[0], function (n) { grade = n; });
           wirePick(picks[1], function (n) { cls = n; });
+          /* 반별 링크(?c=1-1)로 들어왔으면 학년·반을 미리 골라 둔다(access-guard.js 가 읽어 둠) */
+          var pc = window.PORTAL_CLASS;
+          if (pc && pc.grade && pc.cls) {
+            var gb = picks[0].querySelector('button[data-v="' + pc.grade + '"]');
+            var cb = picks[1].querySelector('button[data-v="' + pc.cls + '"]');
+            if (gb) gb.click();
+            if (cb) cb.click();
+          }
           function close(result) { back.remove(); resolve(result); }
           function stop(e) { e.stopPropagation(); }
           /* 게임의 전역 키 입력(스페이스·방향키)이 입력창을 가로채지 않도록 */

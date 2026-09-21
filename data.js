@@ -16,6 +16,24 @@
 (function () {
   "use strict";
 
+  /* 학급 (목록 화면의 첫 화면·제어판의 반 버튼·자료 링크의 ?c= 값)
+     반마다 링크가 다르고(index.html?c=1-1), 잠금도 반마다 따로 둡니다
+     (Firebase portal/classes/<반>/<자료> = true/false). */
+  var CLASSES = [];
+  [1, 2].forEach(function (grade) {
+    [1, 2, 3, 4, 5].forEach(function (cls) {
+      CLASSES.push({ id: grade + "-" + cls, grade: grade, cls: cls, label: grade + "학년 " + cls + "반" });
+    });
+  });
+  var classIndex = {};
+  CLASSES.forEach(function (c) { classIndex[c.id] = c; });
+  function classById(id) { return classIndex[id] || null; }
+  /* 주소의 ?c=1-1 을 읽어 학급을 돌려줍니다(없거나 틀리면 null) */
+  function classFromSearch(search) {
+    var m = /[?&]c=([12]-[1-5])(?:&|$)/.exec(search || "");
+    return m ? classById(m[1]) : null;
+  }
+
   /* 학년·학기 (구조도의 첫 화면) */
   var SEMESTERS = [
     { id: "g1s1", grade: 1, semester: 1, short: "1학년 1학기", label: "1학년 1학기 (정보)" },
@@ -168,6 +186,9 @@
   }
 
   window.PORTAL_DATA = {
+    CLASSES: CLASSES,
+    classById: classById,
+    classFromSearch: classFromSearch,
     SEMESTERS: SEMESTERS,
     UNITS: UNITS,
     DEFAULT_UNITS: DEFAULT_UNITS,

@@ -95,6 +95,20 @@
      제어판의 '자료 아이디 정리'를 누르면 이 줄은 더 이상 쓰이지 않습니다. */
   var legacySlug = script ? script.getAttribute("data-game-legacy") : null;
 
+  /* ---------- 학급 ----------
+     반마다 링크가 다릅니다: 목록은 index.html?c=1-1, 자료는 6.snakegame.html?c=1-1.
+     잠금도 반마다 따로 두므로(제어판 → 반 버튼), 주소의 ?c= 값이 어느 반인지 알려 줍니다.
+     게임에서도 window.PORTAL_CLASS 로 읽을 수 있습니다({ id:"1-1", grade:1, cls:1, label:"1학년 1반" } 또는 null). */
+  var classMatch = /[?&]c=([12])-([1-5])(?:&|$)/.exec(location.search);
+  var klass = classMatch ? {
+    id: classMatch[1] + "-" + classMatch[2],
+    grade: parseInt(classMatch[1], 10),
+    cls: parseInt(classMatch[2], 10),
+    label: classMatch[1] + "학년 " + classMatch[2] + "반"      /* 1학년 1반 */
+  } : null;
+  window.PORTAL_CLASS = klass;
+  var homeHref = klass ? "index.html?c=" + klass.id : "index.html";
+
   /* ---------- 목록으로 돌아가는 버튼 ----------
      학생 기기는 전체화면으로 열려 있어 브라우저 뒤로가기가 없습니다.
      그래서 모든 수업 자료 화면 왼쪽 위에 목록으로 가는 버튼을 띄웁니다. */
@@ -109,7 +123,7 @@
 
     var home = document.createElement("a");
     home.setAttribute("data-guard-home", "1");
-    home.href = "index.html";
+    home.href = homeHref;
     home.textContent = "\u2190 \uBAA9\uB85D\uC73C\uB85C";   /* ← 목록으로 */
     home.style.cssText = [
       "position:fixed",
@@ -220,7 +234,7 @@
     box.appendChild(txt("p", desc, "font-size:14px;color:#5B6B5E;margin:0;line-height:1.6"));
     if (showHome) {
       var a = document.createElement("a");
-      a.href = "index.html";
+      a.href = homeHref;
       a.textContent = "목록으로 돌아가기";
       a.style.cssText = "display:block;margin-top:18px;padding:10px 14px;border:1.5px solid #24402F;" +
         "border-radius:4px;text-decoration:none;color:#1B2B20;font-size:14px;background:#fff";
@@ -264,49 +278,71 @@
     }, true);
   });
 
-  /* ---------- 상태 확인 ---------- */
+  /* ---------- 상태 확인 ----------
+     잠금은 반마다 따로입니다: portal/classes/<반>/<자료> 가 true 일 때만 열립니다.
+     자료 정보(games/<자료>)는 제목을 맞추고 등록 여부를 확인하는 데만 쓰므로 처음 한 번만 읽습니다. */
+  var gameId = null;          /* 실제로 등록된 자료 아이디(예전 아이디로 찾았으면 그 이름) */
+
   function check() {
     if (!cfg.isReady || !cfg.isReady()) {
       lock("🔧", "설정이 아직 끝나지 않았어요",
            "firebase-config.js 에 주소와 키를 넣어야 수업 자료를 열 수 있습니다.");
       return;
     }
-    function read(id) {
-      return fetch(cfg.dbPath("games/" + id), { cache: "no-store" })
+    if (!klass) {
+      lock("🏫", "학년·반이 정해지지 않았어요",
+           "전자칠판의 QR 코드를 찍거나, 목록 화면에서 우리 반을 고른 뒤 들어와 주세요.");
+      return;
+    }
+    function read(path) {
+      return fetch(cfg.dbPath(path), { cache: "no-store" })
         .then(function (r) {
           if (!r.ok) throw new Error(r.status);
           return r.json();
         });
     }
 
-    read(slug)
-      .then(function (game) {
-        if (!game && legacySlug) return read(legacySlug);
-        return game;
-      })
-      .then(function (game) {
-        if (!game) {
+    var meta = gameId
+      ? Promise.resolve(gameId)
+      : read("games/" + slug)
+          .then(function (game) {
+            if (game) return { id: slug, game: game };
+            if (!legacySlug) return null;
+            return read("games/" + legacySlug).then(function (g2) { return g2 ? { id: legacySlug, game: g2 } : null; });
+          })
+          .then(function (found) {
+            if (!found) return null;
+            var game = found.game;
+            /* 탭 제목과 브라우저 공유 제목은 제어판에서 적은 제목을 따릅니다.
+               (카카오톡 등 링크 미리보기는 파일 안의 <title>을 읽으므로
+                링크제목맞추기.ps1 로 따로 맞춥니다.) */
+            if (game.title && document.title !== game.title) {
+              document.title = game.title;
+              var og = document.querySelector("meta[property=\"og:title\"]");
+              if (og) og.setAttribute("content", game.title);
+            }
+            gameId = found.id;
+            return gameId;
+          });
+
+    meta
+      .then(function (id) {
+        if (!id) {
           lock("🔒", "아직 등록되지 않은 자료예요",
                "선생님 화면에서 이 자료를 등록하면 열립니다.");
-          return;
+          return null;
         }
-        /* 탭 제목과 브라우저 공유 제목은 제어판에서 적은 제목을 따릅니다.
-           (카카오톡 등 링크 미리보기는 파일 안의 <title>을 읽으므로
-            링크제목맞추기.ps1 로 따로 맞춥니다.) */
-        if (game.title && document.title !== game.title) {
-          document.title = game.title;
-          var og = document.querySelector("meta[property=\"og:title\"]");
-          if (og) og.setAttribute("content", game.title);
-        }
-        if (game.open === true) {
-          unlock();
-        } else if (played) {
-          lock("✋", "선생님이 종료했어요",
-               "지금은 계속할 수 없어요. 다시 열리면 이어서 할 수 있어요.");
-        } else {
-          lock("🔒", "선생님이 아직 열지 않았어요",
-               "수업 시간에 선생님이 열어주면 바로 시작할 수 있어요.");
-        }
+        return read("classes/" + klass.id + "/" + id).then(function (open) {
+          if (open === true) {
+            unlock();
+          } else if (played) {
+            lock("✋", "선생님이 종료했어요",
+                 "지금은 계속할 수 없어요. 다시 열리면 이어서 할 수 있어요.");
+          } else {
+            lock("🔒", klass.label + "은 아직 열리지 않았어요",
+                 "수업 시간에 선생님이 열어주면 바로 시작할 수 있어요.");
+          }
+        });
       })
       .catch(function () {
         lock("📡", "연결을 확인하는 중이에요",
