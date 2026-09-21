@@ -223,6 +223,7 @@
   .grades div{background:var(--tone);border:1px solid var(--tone-line);border-radius:10px;padding:8px 4px;text-align:center}
   .grades .k{font-size:12px;color:var(--sub)}
   .grades .v{font-size:20px;font-weight:700}
+  [hidden]{display:none !important;}
 </style>
 </head>
 <body>
@@ -253,6 +254,7 @@
       <div class="best-row">
         <div class="best-box empty" id="startBest"></div>
         <div class="best-box world empty" id="startWorld"></div>
+        <div class="best-box world empty" id="startCls" hidden></div>
       </div>
       <p style="margin-top:10px"><button id="btnStart" class="btn wide">시작</button></p>
     </div>
@@ -732,6 +734,15 @@ function renderWorld(){
   } else {
     box.className = "best-box world empty";
     box.innerHTML = BEST.html("🏆", "세계 신기록", (WR && !WR.loaded) ? "불러오는 중…" : "아직 기록이 없습니다", "첫 기록에 도전해 보세요.");
+  }
+  /* 반별 링크로 들어왔을 때만 우리 반 신기록 칸을 보인다 */
+  const C = WR && WR.cls, cbox = $("startCls");
+  if (C){
+    cbox.hidden = false;
+    cbox.className = "best-box world" + (C.rec ? "" : " empty");
+    cbox.innerHTML = C.rec
+      ? BEST.html("🏫", "우리 반 신기록", C.text(), WR.escapeHtml(C.who()))
+      : BEST.html("🏫", "우리 반 신기록", C.loaded ? "아직 기록이 없습니다" : "불러오는 중…", "첫 기록에 도전해 보세요.");
   }
 }
 if (WR) { WR.onChange(renderWorld); WR.load(); }

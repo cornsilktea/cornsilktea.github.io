@@ -1316,10 +1316,19 @@ const Hall = {
       .then(r => { if (!r.ok) throw new Error(String(r.status)); this.data[id] = rec; return rec; });
   }
 };
+/* 반 신기록의 키(world-record.js 와 같은 규칙: <곡>cls<학년글자><반글자>). 반별 링크가 아니면 null */
+function clsKeyOf(id){
+  const pc = window.PORTAL_CLASS;
+  return pc ? id + "cls" + "ab".charAt(pc.grade - 1) + "abcde".charAt(pc.cls - 1) : null;
+}
 function hallText(id){
   const r = Hall.get(id);
   if (!Hall.loaded) return Hall.url("") ? "세계 신기록을 불러오지 못했습니다" : "";
-  return r ? "세계 신기록 <em>" + r.score + "</em>점<small>" + escapeHtml(whoOf(r)) + "</small>" : "세계 신기록 없음 — 첫 기록에 도전!";
+  const world = r ? "세계 신기록 <em>" + r.score + "</em>점<small>" + escapeHtml(whoOf(r)) + "</small>" : "세계 신기록 없음 — 첫 기록에 도전!";
+  const ck = clsKeyOf(id);
+  if (!ck) return world;
+  const c = Hall.get(ck);
+  return world + "<br>" + (c ? "우리 반 신기록 <em>" + c.score + "</em>점<small>" + escapeHtml(c.name) + "</small>" : "우리 반 신기록 없음 — 첫 기록에 도전!");
 }
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch])); }
 function whoOf(r){ return (r.grade ? r.grade + "학년 " : "") + (r.cls ? r.cls + "반 " : "") + r.name; }
@@ -1331,11 +1340,13 @@ function showHall(){
   if (!window.WorldRecord || !Hall.loaded) return;
   const wr = WorldRecord("pianotiles", { key: cfg.id, format: v => v + "점" });
   wr.rec = Hall.get(cfg.id); wr.loaded = true;
+  if (wr.cls) { wr.cls.rec = Hall.get(wr.clsKey); wr.cls.loaded = true; }   /* 우리 반 신기록도 Hall 에서 */
   const songId = cfg.id;
-  if (!wr.beats(S.score)) return;
+  if (!wr.beats(S.score) && !wr.beatsClass(S.score)) return;
+  const clsBefore = wr.cls ? wr.cls.rec : null;
   wr.prompt(S.score).then(rec => {
-    if (rec) Hall.data[songId] = rec; else Hall.load();
-    $("hallLine").innerHTML = hallText(songId) + (rec ? " (등록 완료)" : "");
+    const done = !!rec || (wr.cls && wr.cls.rec !== clsBefore);
+    Hall.load().then(() => { $("hallLine").innerHTML = hallText(songId) + (done ? " (등록 완료)" : ""); });
   });
 }
 

@@ -122,6 +122,7 @@ h1{font-size:16px;margin:0 0 var(--wrks-viz-space-1);letter-spacing:-0.01em;}
   .msg{font-size:23px;min-height:80px;}
   .hint{font-size:20px;}
 }
+  [hidden]{display:none !important;}
 </style>
 
 </head>
@@ -145,6 +146,7 @@ h1{font-size:16px;margin:0 0 var(--wrks-viz-space-1);letter-spacing:-0.01em;}
       <div class="m"><div class="lab">명령 수</div><div class="val" id="mCmd">0</div></div>
       <div class="m wide"><div class="lab">개인 최고 기록</div><div class="val" id="mBest">-</div><div class="lab" id="mBestSub">아직 기록 없음</div></div>
       <div class="m wide"><div class="lab">세계 신기록</div><div class="val" id="mWorld">-</div><div class="lab" id="mWorldSub">불러오는 중…</div></div>
+      <div class="m wide" id="mCls" hidden><div class="lab">우리 반 신기록</div><div class="val" id="mClsVal">-</div><div class="lab" id="mClsSub">불러오는 중…</div></div>
     </div>
 
     <div class="ctrls">
@@ -443,6 +445,11 @@ h1{font-size:16px;margin:0 0 var(--wrks-viz-space-1);letter-spacing:-0.01em;}
   function renderWorld(){
     if(WR&&WR.rec){worldEl.textContent=WR.text();worldSubEl.textContent=WR.who();}
     else{worldEl.textContent='-';worldSubEl.textContent=(WR&&!WR.loaded)?'불러오는 중…':'아직 기록 없음';}
+    /* 반별 링크로 들어왔을 때만 우리 반 신기록 칸을 보인다 */
+    var C=WR&&WR.cls;
+    if(C){document.getElementById('mCls').hidden=false;
+      document.getElementById('mClsVal').textContent=C.rec?C.text():'-';
+      document.getElementById('mClsSub').textContent=C.rec?C.who():(C.loaded?'아직 기록 없음':'불러오는 중…');}
   }
   if(WR){WR.onChange(renderWorld);WR.load();}
   renderWorld();

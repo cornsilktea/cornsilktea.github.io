@@ -107,6 +107,7 @@
     #hudBest { display: none !important; }
     .btn { font-size: 18px; padding: 11px 22px; }
   }
+  [hidden]{display:none !important;}
 </style>
 </head>
 <body>
@@ -137,6 +138,7 @@
     <div class="rec">
       <div><div class="lab">개인 최고 기록</div><div class="val" id="bestStart">—</div><div class="who" id="bestStartDate"></div></div>
       <div><div class="lab">🏆 세계 신기록</div><div class="val" id="wrStart">—</div><div class="who" id="wrWhoStart"></div></div>
+      <div class="clsCol" hidden><div class="lab">🏫 우리 반 신기록</div><div class="val" id="crStart">—</div><div class="who" id="crWhoStart"></div></div>
     </div>
     <div class="btns"><button type="button" class="btn" id="btnStart">시작하기</button></div>
     <div class="hint">스페이스바: 시작하기</div>
@@ -158,6 +160,7 @@
     <div class="rec">
       <div><div class="lab">개인 최고 기록</div><div class="val" id="bestOver">—</div><div class="who" id="bestOverNew"></div></div>
       <div><div class="lab">🏆 세계 신기록</div><div class="val" id="wrOver">—</div><div class="who" id="wrWhoOver"></div></div>
+      <div class="clsCol" hidden><div class="lab">🏫 우리 반 신기록</div><div class="val" id="crOver">—</div><div class="who" id="crWhoOver"></div></div>
     </div>
     <div class="btns"><button type="button" class="btn" id="btnRetry">다시하기</button></div>
     <div class="hint">스페이스바: 다시하기</div>
@@ -237,6 +240,14 @@ function wrInfo() {
   if (WR.loaded) return { val: "아직 없음", who: "", none: true };
   return { val: !WR.url() ? "오프라인" : (wrTried ? "불러오지 못함" : "불러오는 중…"), who: "", none: true };
 }
+/* 우리 반 신기록(반별 링크로 들어왔을 때만; WR.cls) */
+function crInfo() {
+  const C = WR && WR.cls;
+  if (!C) return null;
+  if (C.loaded && C.rec) return { val: C.text(), who: C.who(), none: false };
+  if (C.loaded) return { val: "아직 없음", who: "", none: true };
+  return { val: wrTried ? "불러오지 못함" : "불러오는 중…", who: "", none: true };
+}
 function setVal(el, text, none) { el.textContent = text; el.classList.toggle("none", !!none); }
 function renderRecords() {
   const w = wrInfo();
@@ -246,6 +257,12 @@ function renderRecords() {
   setVal($("wrStart"), w.val, w.none); $("wrWhoStart").textContent = w.who;
   setVal($("wrOver"), w.val, w.none); $("wrWhoOver").textContent = w.who;
   $("hudBestVal").textContent = bTxt; $("hudWrVal").textContent = w.val; $("hudWrWho").textContent = w.who;
+  const c = crInfo();
+  if (c) {
+    setVal($("crStart"), c.val, c.none); $("crWhoStart").textContent = c.who;
+    setVal($("crOver"), c.val, c.none); $("crWhoOver").textContent = c.who;
+    document.querySelectorAll(".clsCol").forEach(el => { el.hidden = false; });
+  }
 }
 if (WR) { WR.onChange(renderRecords); WR.load().then(() => { wrTried = true; renderRecords(); }); }
 
@@ -765,7 +782,8 @@ function gameOver() {
   const newBest = packed > prevPacked;
   if (newBest) { best = { score: kills, time: sec, date: new Date().toLocaleDateString("ko-KR") }; saveBest(best); }
   const wrBeat = WR && WR.beats(packed);
-  $("finalMsg").textContent = wrBeat ? "🏆 세계 신기록!" : newBest ? "🎉 개인 최고 기록 경신!" : (kills === 0 ? "장애물 뒤에 숨어서 싸워 보세요!" : "");
+  const crBeat = WR && WR.beatsClass(packed);   /* 우리 반 신기록(반별 링크일 때만) */
+  $("finalMsg").textContent = wrBeat ? "🏆 세계 신기록!" : crBeat ? "🏫 우리 반 신기록!" : newBest ? "🎉 개인 최고 기록 경신!" : (kills === 0 ? "장애물 뒤에 숨어서 싸워 보세요!" : "");
   const pct = (a, b) => b > 0 ? Math.round(a / b * 100) + "%" : "—";
   $("statShots").textContent = STAT.shots + "발";
   $("statAcc").textContent = pct(STAT.hits, STAT.shots); $("statAccSub").textContent = STAT.hits + " / " + STAT.shots;
@@ -774,7 +792,7 @@ function gameOver() {
   setTimeout(() => {
     if (state !== "over") return;
     showCard("over"); renderRecords();
-    if (wrBeat) WR.prompt(packed).then(() => renderRecords());
+    if (wrBeat || crBeat) WR.prompt(packed).then(() => renderRecords());
   }, 900);
 }
 

@@ -64,6 +64,7 @@ button{
   background:#fff;color:var(--wrks-viz-fg);cursor:pointer;
 }
 button:hover{background:var(--sg-panel-alt);}
+  [hidden]{display:none !important;}
 </style>
 </head>
 <body>
@@ -90,6 +91,11 @@ button:hover{background:var(--sg-panel-alt);}
       <div class="k">세계 신기록</div>
       <div class="v" id="world">-</div>
       <div class="s" id="worldName"></div>
+    </div>
+    <div class="tile" id="clsTile" hidden>
+      <div class="k">우리 반 신기록</div>
+      <div class="v" id="clsVal">-</div>
+      <div class="s" id="clsName"></div>
     </div>
     <button id="reset" type="button">초기화</button>
     <div class="tile">
@@ -126,6 +132,11 @@ button:hover{background:var(--sg-panel-alt);}
   function renderWorld(){
     if(WR&&WR.rec){worldEl.textContent=WR.text();worldNameEl.textContent=WR.who();}
     else{worldEl.textContent='-';worldNameEl.textContent=(WR&&!WR.loaded)?'불러오는 중…':'아직 기록 없음';}
+    /* 반별 링크로 들어왔을 때만 우리 반 신기록 칸을 보인다 */
+    var C=WR&&WR.cls;
+    if(C){document.getElementById('clsTile').hidden=false;
+      if(C.rec){document.getElementById('clsVal').textContent=C.text();document.getElementById('clsName').textContent=C.who();}
+      else{document.getElementById('clsVal').textContent='-';document.getElementById('clsName').textContent=C.loaded?'아직 기록 없음':'불러오는 중…';}}
   }
   if(WR){WR.onChange(renderWorld);WR.load();}
 

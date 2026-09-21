@@ -177,6 +177,7 @@
   @media (max-width:480px){.best-row{flex-direction:column}}
   .newtag{display:inline-block;font-size:10.5px;font-weight:800;color:#fff;background:var(--accent);
     border-radius:999px;padding:1px 8px;margin-left:6px;vertical-align:1px}
+  [hidden]{display:none !important;}
 </style>
 </head>
 <body>
@@ -276,6 +277,7 @@
     <div class="best-row">
       <div class="best-box" id="startBest"></div>
       <div class="best-box world" id="startWorld"></div>
+      <div class="best-box world" id="startCls" hidden></div>
     </div>
     <button class="btn" id="btnStart">시작하기</button>
   </div>
@@ -472,6 +474,15 @@ function renderWorld(){
   box.innerHTML = (WR && WR.rec)
     ? BEST.html("세계 신기록", WR.text(), WR.escapeHtml(WR.who()), "🏆")
     : BEST.html("세계 신기록", (WR && !WR.loaded) ? "불러오는 중…" : "기록 없음", "첫 기록에 도전해 보세요.", "🏆");
+  /* 반별 링크로 들어왔을 때만 우리 반 신기록 칸을 보인다 */
+  const C = WR && WR.cls, cbox = $("startCls");
+  if (C){
+    cbox.hidden = false;
+    cbox.className = "best-box world";
+    cbox.innerHTML = C.rec
+      ? BEST.html("우리 반 신기록", C.text(), WR.escapeHtml(C.who()), "🏫")
+      : BEST.html("우리 반 신기록", C.loaded ? "기록 없음" : "불러오는 중…", "첫 기록에 도전해 보세요.", "🏫");
+  }
 }
 if (WR) { WR.onChange(renderWorld); WR.load(); }
 

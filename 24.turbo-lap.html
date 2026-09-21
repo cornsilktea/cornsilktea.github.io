@@ -116,6 +116,7 @@
     .btn { font-size: 18px; padding: 11px 22px; }
     .rtab small { max-width: 100px; }
   }
+  [hidden]{display:none !important;}
 </style>
 </head>
 <body>
@@ -139,11 +140,11 @@
   <div class="card" id="cardStart">
     <div class="logo">TURBO LAP<small>터보 랩 — 완주 최단 시간 도전 (쉬움·보통 3바퀴, 어려움 2바퀴)</small></div>
     <table class="rtab">
-      <thead><tr><th>난이도</th><th>나의 최고 기록</th><th>🏆 세계신기록</th></tr></thead>
+      <thead><tr><th>난이도</th><th>나의 최고 기록</th><th>🏆 세계신기록</th><th class="clsCol" hidden>🏫 우리 반</th></tr></thead>
       <tbody>
-        <tr><td>쉬움</td><td><em id="bestEasy">—</em></td><td><em id="wrEasy">—</em><small id="wrWhoEasy"></small></td></tr>
-        <tr><td>보통</td><td><em id="bestHard">—</em></td><td><em id="wrHard">—</em><small id="wrWhoHard"></small></td></tr>
-        <tr><td>어려움 <small style="font-weight:400">2바퀴</small></td><td><em id="bestExpert">—</em></td><td><em id="wrExpert">—</em><small id="wrWhoExpert"></small></td></tr>
+        <tr><td>쉬움</td><td><em id="bestEasy">—</em></td><td><em id="wrEasy">—</em><small id="wrWhoEasy"></small></td><td class="clsCol" hidden><em id="crEasy">—</em><small id="crWhoEasy"></small></td></tr>
+        <tr><td>보통</td><td><em id="bestHard">—</em></td><td><em id="wrHard">—</em><small id="wrWhoHard"></small></td><td class="clsCol" hidden><em id="crHard">—</em><small id="crWhoHard"></small></td></tr>
+        <tr><td>어려움 <small style="font-weight:400">2바퀴</small></td><td><em id="bestExpert">—</em></td><td><em id="wrExpert">—</em><small id="wrWhoExpert"></small></td><td class="clsCol" hidden><em id="crExpert">—</em><small id="crWhoExpert"></small></td></tr>
       </tbody>
     </table>
     <div class="keys">
@@ -189,6 +190,7 @@
     <div class="rec">
       <div><div class="lab">나의 최고 기록</div><div class="val" id="bestDone">—</div><div class="who" id="bestDoneNew"></div></div>
       <div><div class="lab">🏆 세계신기록</div><div class="val" id="wrDone">—</div><div class="who" id="wrWhoDone"></div></div>
+      <div class="clsCol" hidden><div class="lab">🏫 우리 반 신기록</div><div class="val" id="crDone">—</div><div class="who" id="crWhoDone"></div></div>
     </div>
     <div class="btns">
       <button type="button" class="btn" id="btnRetry">다시 하기</button>
@@ -387,16 +389,28 @@ function wrInfo(k) {
   if (WR.loaded) return { val: "아직 없음", who: "", none: true };
   return { val: !WR.url() ? "오프라인" : (wrTried[k] ? "불러오지 못함" : "불러오는 중…"), who: "", none: true };
 }
+/* 우리 반 신기록(반별 링크로 들어왔을 때만; WR.cls) */
+function crInfo(k) {
+  const C = WRS[k] && WRS[k].cls;
+  if (!C) return null;
+  if (C.loaded && C.rec) return { val: C.text(), who: C.who(), none: false };
+  if (C.loaded) return { val: "아직 없음", who: "", none: true };
+  return { val: wrTried[k] ? "불러오지 못함" : "불러오는 중…", who: "", none: true };
+}
 function setVal(el, text, none, cls) { el.textContent = text; el.className = cls + (none ? " none" : ""); }
 function renderRecords() {
   DIFFS.forEach(k => {
     const cap = capKey(k), w = wrInfo(k);
     setVal($("best" + cap), best[k] > 0 ? fmtTime(best[k]) : "아직 없음", !(best[k] > 0), "");
     setVal($("wr" + cap), w.val, w.none, ""); $("wrWho" + cap).textContent = w.who;
+    const c = crInfo(k);
+    if (c) { setVal($("cr" + cap), c.val, c.none, ""); $("crWho" + cap).textContent = c.who; }
   });
-  const k = diff, w = wrInfo(k);
+  const k = diff, w = wrInfo(k), c = crInfo(k);
   setVal($("bestDone"), best[k] > 0 ? fmtTime(best[k]) : "아직 없음", !(best[k] > 0), "val");
   setVal($("wrDone"), w.val, w.none, "val"); $("wrWhoDone").textContent = w.who;
+  if (c) { setVal($("crDone"), c.val, c.none, "val"); $("crWhoDone").textContent = c.who; }
+  if (c) document.querySelectorAll(".clsCol").forEach(el => { el.hidden = false; });
 }
 
 /* ═══════════════════ 소리 (Web Audio, 외부 파일 없음) ═══════════════════ */
@@ -948,11 +962,12 @@ function finish() {
   renderRecords();
   $("bestDoneNew").innerHTML = isBest ? '<span class="new">NEW</span> 개인 신기록 갱신!' : "";
   const wrBeat = WR && WR.beats(finalMs);
-  $("finalMsg").textContent = (wrBeat ? "🏆 세계 신기록입니다!" : (isBest ? "개인 신기록입니다!" : "완주를 축하합니다!")) + ghostNote;
+  const crBeat = WR && WR.beatsClass(finalMs);   /* 우리 반 신기록(반별 링크일 때만) */
+  $("finalMsg").textContent = (wrBeat ? "🏆 세계 신기록입니다!" : crBeat ? "🏫 우리 반 신기록입니다!" : (isBest ? "개인 신기록입니다!" : "완주를 축하합니다!")) + ghostNote;
   setTimeout(() => {
     if (state !== "done") return;
     showCard("done"); renderRecords(); $("ghostUpNote").textContent = "스페이스바: 다시 하기"; renderGhostButtons(); if (!worldGhost.tried[k] || !worldGhostValid(k)) fetchWorldGhost(k);
-    if (wrBeat) WR.prompt(finalMs, TRACKS[k].name + " 세계 신기록 달성!").then(rec => { renderRecords(); if (rec) uploadWorldGhost(k, rec, ghostData); });
+    if (wrBeat || crBeat) WR.prompt(finalMs, TRACKS[k].name + " 세계 신기록 달성!").then(rec => { renderRecords(); if (rec) uploadWorldGhost(k, rec, ghostData); });
   }, 1300);
 }
 

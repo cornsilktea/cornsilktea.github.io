@@ -211,8 +211,14 @@ function hallText() {
   if (!Hall) return '';
   if (!Hall.loaded) return Hall.url() ? '세계 신기록을 불러오지 못했습니다' : '';
   const r = Hall.rec;
-  return r ? '🏆 세계 신기록 <em>' + r.score + '</em>점<small>' + Hall.escapeHtml(Hall.who()) + '</small>'
-           : '🏆 세계 신기록 없음 — 첫 기록에 도전!';
+  const world = r ? '🏆 세계 신기록 <em>' + r.score + '</em>점<small>' + Hall.escapeHtml(Hall.who()) + '</small>'
+                  : '🏆 세계 신기록 없음 — 첫 기록에 도전!';
+  /* 반별 링크로 들어왔을 때만 우리 반 신기록 줄을 덧붙인다 */
+  const C = Hall.cls;
+  if (!C) return world;
+  const cr = C.rec;
+  return world + '<br>' + (cr ? '🏫 우리 반 신기록 <em>' + cr.score + '</em>점<small>' + Hall.escapeHtml(C.who()) + '</small>'
+                               : '🏫 우리 반 신기록 없음 — 첫 기록에 도전!');
 }
 
 // ───────── 사운드 (간단 비프) ─────────

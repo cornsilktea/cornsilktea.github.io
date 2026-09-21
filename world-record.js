@@ -81,6 +81,67 @@
     }).join("") + "</div>";
   }
 
+  /* 기록 하나(records/<게임>/<key>)를 읽고 쓰는 묶음. 세계 신기록과 반 신기록이 같은 모양이다. */
+  function Store(game, key, lower, format) {
+    var s = {
+      rec: null,
+      loaded: false,
+      url: function () {
+        var cfg = window.PORTAL_CONFIG;
+        if (!cfg || !cfg.isReady || !cfg.isReady()) return null;
+        return cfg.DB_URL.replace(/\/+$/, "") + "/records/" + game + "/" + key + ".json";
+      },
+      /* 저장된 score → 표시용 값 */
+      value: function () {
+        if (!s.rec) return null;
+        return lower ? LOWER_BASE - s.rec.score : s.rec.score;
+      },
+      name: function () { return s.rec ? s.rec.name : ""; },
+      who: function () { return whoOf(s.rec); },
+      /* 표시용 문자열 (형식은 opts.format) */
+      text: function () {
+        var v = s.value();
+        return v === null ? "" : format(v);
+      },
+      load: function () {
+        var u = s.url();
+        if (!u) return Promise.resolve(null);
+        return fetch(u, { cache: "no-store" })
+          .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
+          .then(function (j) {
+            s.rec = (j && typeof j.score === "number") ? j : null;
+            s.loaded = true;
+            return s.rec;
+          })
+          .catch(function () { return null; });
+      },
+      beats: function (v) {
+        if (!s.loaded || typeof v !== "number" || !isFinite(v)) return false;
+        if (!s.rec) return v > 0;
+        return lower ? v < LOWER_BASE - s.rec.score : v > s.rec.score;
+      },
+      /* 규칙이 "기존보다 큰 score 만" 받으므로, 그 사이 누가 앞질렀으면 401 로 거부된다 */
+      submit: function (v, name, grade, cls) {
+        var u = s.url();
+        if (!u) return Promise.reject(new Error("no-db"));
+        /* at 은 서버 시각(.sv) — 학생 기기의 시계가 틀려도 규칙의 시각 검사에 걸리지 않게 */
+        var rec = { score: lower ? LOWER_BASE - v : v, name: name, grade: grade, cls: cls, at: { ".sv": "timestamp" } };
+        return fetch(u, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(rec) })
+          .then(function (r) {
+            if (!r.ok) throw new Error(String(r.status));
+            rec.at = Date.now(); s.rec = rec; return rec;
+          });
+      }
+    };
+    return s;
+  }
+
+  /* 반 신기록의 key: <key>cls<학년글자><반글자> — 규칙이 소문자 영문만 받으므로 숫자 대신 글자
+     (1학년→a, 2학년→b / 1반→a … 5반→e). 예: records/snakegame/allclsaa = 1학년 1반 */
+  function classKey(key, pc) {
+    return key + "cls" + "ab".charAt(pc.grade - 1) + "abcde".charAt(pc.cls - 1);
+  }
+
   function WorldRecord(game, opts) {
     opts = opts || {};
     var lower = !!opts.lower;
@@ -88,82 +149,70 @@
     var format = opts.format || function (v) { return String(v); };  // 표시용 값 → 문자열
     var listeners = [];
 
+    /* 반별 링크(?c=1-1)로 들어왔으면 그 반의 신기록도 함께 둔다(access-guard.js 가 window.PORTAL_CLASS 를 만든다) */
+    var pc = window.PORTAL_CLASS || null;
+    var world = Store(game, key, lower, format);
+    var cls = pc ? Store(game, classKey(key, pc), lower, format) : null;
+    if (cls) cls.who = function () { return cls.rec ? cls.rec.name : ""; };   /* 반 안에서는 이름만 */
+
     var api = {
       game: game,
-      rec: null,
-      loaded: false,
       lower: lower,
+      /* 반 신기록 묶음(반 링크가 아니면 null): cls.rec · cls.loaded · cls.value() · cls.text() · cls.who() · cls.beats(v) */
+      cls: cls,
+      klass: pc,
+      get rec() { return world.rec; },
+      set rec(v) { world.rec = v; },
+      get loaded() { return world.loaded; },
+      set loaded(v) { world.loaded = v; },
+      clsKey: cls ? classKey(key, pc) : null,
 
-      url: function () {
-        var cfg = window.PORTAL_CONFIG;
-        if (!cfg || !cfg.isReady || !cfg.isReady()) return null;
-        return cfg.DB_URL.replace(/\/+$/, "") + "/records/" + game + "/" + key + ".json";
-      },
-
-      /* 저장된 score → 표시용 값 */
-      value: function () {
-        if (!api.rec) return null;
-        return lower ? LOWER_BASE - api.rec.score : api.rec.score;
-      },
-      name: function () { return api.rec ? api.rec.name : ""; },
-      who: function () { return whoOf(api.rec); },
-      /* 표시용 문자열 (형식은 opts.format) */
-      text: function () {
-        var v = api.value();
-        return v === null ? "" : format(v);
-      },
+      url: world.url,
+      value: world.value,
+      name: world.name,
+      who: world.who,
+      text: world.text,
       escapeHtml: escapeHtml,
       whoOf: whoOf,
 
+      /* 세계 신기록과 반 신기록을 함께 불러온다. 돌려주는 값은 세계 신기록 */
       load: function () {
-        var u = api.url();
-        if (!u) return Promise.resolve(null);
-        return fetch(u, { cache: "no-store" })
-          .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
-          .then(function (j) {
-            api.rec = (j && typeof j.score === "number") ? j : null;
-            api.loaded = true;
-            emit();
-            return api.rec;
-          })
-          .catch(function () { return null; });
+        return Promise.all([world.load(), cls ? cls.load() : null]).then(function (r) {
+          emit();
+          return r[0];
+        });
       },
 
-      beats: function (v) {
-        if (!api.loaded || typeof v !== "number" || !isFinite(v)) return false;
-        if (!api.rec) return v > 0;
-        return lower ? v < LOWER_BASE - api.rec.score : v > api.rec.score;
-      },
+      beats: world.beats,
+      beatsClass: function (v) { return !!(cls && cls.beats(v)); },
 
-      /* 규칙이 "기존보다 큰 score 만" 받으므로, 그 사이 누가 앞질렀으면 401 로 거부된다 */
-      submit: function (v, name, grade, cls) {
-        var u = api.url();
-        if (!u) return Promise.reject(new Error("no-db"));
-        /* at 은 서버 시각(.sv) — 학생 기기의 시계가 틀려도 규칙의 시각 검사에 걸리지 않게 */
-        var rec = { score: lower ? LOWER_BASE - v : v, name: name, grade: grade, cls: cls, at: { ".sv": "timestamp" } };
-        return fetch(u, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(rec) })
-          .then(function (r) {
-            if (!r.ok) throw new Error(String(r.status));
-            rec.at = Date.now(); api.rec = rec; emit(); return rec;
-          });
+      submit: function (v, name, grade, cls_) {
+        return world.submit(v, name, grade, cls_).then(function (rec) { emit(); return rec; });
       },
 
       onChange: function (fn) { listeners.push(fn); },
 
-      /* 세계 신기록을 넘었으면 학년·반·이름 입력 창을 띄운다.
-         셋을 다 채워 등록하기 전에는 닫히지 않는다(그 사이 누가 앞질러 거부되면 자동으로 닫힘). */
+      /* 세계 신기록을 넘었으면 학년·반·이름 입력 창을, 우리 반 신기록만 넘었으면 이름 입력 창을 띄운다.
+         다 채워 등록하기 전에는 닫히지 않는다(그 사이 누가 앞질러 거부되면 자동으로 닫힘).
+         돌려주는 값은 세계 신기록으로 등록된 기록(반 신기록만 등록했거나 아니면 null). */
       prompt: function (v, title) {
-        if (!api.beats(v)) return Promise.resolve(null);
+        var isWorld = api.beats(v);
+        var isClass = api.beatsClass(v);
+        if (!isWorld && !isClass) return Promise.resolve(null);
         ensureStyle();
         return new Promise(function (resolve) {
           var back = document.createElement("div");
           back.className = "wr-back";
           back.innerHTML =
             '<div class="wr-box" role="dialog" aria-modal="true">' +
-              "<h3>🏆 " + escapeHtml(title || "세계 신기록 달성!") + "</h3>" +
+              (isWorld
+                ? "<h3>🏆 " + escapeHtml(title || "세계 신기록 달성!") + "</h3>"
+                : "<h3>🏫 " + escapeHtml(pc.label + " 신기록 달성!") + "</h3>") +
               '<div class="wr-val">기록 <b>' + escapeHtml(format(v)) + "</b></div>" +
-              '<div class="wr-lab">학년</div>' + pickRow(GRADES, "학년") +
-              '<div class="wr-lab">반</div>' + pickRow(CLASSES, "반") +
+              (isWorld
+                ? '<div class="wr-lab">학년</div>' + pickRow(GRADES, "학년") +
+                  '<div class="wr-lab">반</div>' + pickRow(CLASSES, "반")
+                : '<div class="wr-lab">' + escapeHtml(pc.label) + "</div>") +
               '<div class="wr-lab">이름</div>' +
               '<div class="wr-row">' +
                 '<input type="text" maxlength="20" placeholder="이름 (20자 이내)" autocomplete="off">' +
@@ -175,7 +224,7 @@
           document.body.appendChild(back);
           var picks = back.querySelectorAll(".wr-pick");
           var input = back.querySelector("input"), ok = back.querySelector(".wr-ok"), msg = back.querySelector(".wr-msg");
-          var grade = 0, cls = 0;
+          var grade = pc ? pc.grade : 0, cls_ = pc ? pc.cls : 0;
           function wirePick(row, setter) {
             row.addEventListener("click", function (e) {
               var b = e.target.closest("button"); if (!b) return;
@@ -184,15 +233,16 @@
               msg.textContent = "";
             });
           }
-          wirePick(picks[0], function (n) { grade = n; });
-          wirePick(picks[1], function (n) { cls = n; });
-          /* 반별 링크(?c=1-1)로 들어왔으면 학년·반을 미리 골라 둔다(access-guard.js 가 읽어 둠) */
-          var pc = window.PORTAL_CLASS;
-          if (pc && pc.grade && pc.cls) {
-            var gb = picks[0].querySelector('button[data-v="' + pc.grade + '"]');
-            var cb = picks[1].querySelector('button[data-v="' + pc.cls + '"]');
-            if (gb) gb.click();
-            if (cb) cb.click();
+          if (isWorld) {
+            wirePick(picks[0], function (n) { grade = n; });
+            wirePick(picks[1], function (n) { cls_ = n; });
+            /* 반별 링크로 들어왔으면 학년·반을 미리 골라 둔다 */
+            if (pc) {
+              var gb = picks[0].querySelector('button[data-v="' + pc.grade + '"]');
+              var cb = picks[1].querySelector('button[data-v="' + pc.cls + '"]');
+              if (gb) gb.classList.add("on");
+              if (cb) cb.classList.add("on");
+            }
           }
           function close(result) { back.remove(); resolve(result); }
           function stop(e) { e.stopPropagation(); }
@@ -201,11 +251,21 @@
           ok.onclick = function () {
             var name = input.value.trim();
             if (!grade) { msg.textContent = "학년을 선택하세요."; return; }
-            if (!cls) { msg.textContent = "반을 선택하세요."; return; }
+            if (!cls_) { msg.textContent = "반을 선택하세요."; return; }
             if (!name) { msg.textContent = "이름을 입력하세요."; input.focus(); return; }
             ok.disabled = true; msg.textContent = "등록 중…";
-            api.submit(v, name, grade, cls)
-              .then(function (rec) { close(rec); })
+            var job;
+            if (isWorld) {
+              job = world.submit(v, name, grade, cls_).then(function (rec) {
+                /* 세계 신기록이면 우리 반 신기록이기도 하다(반 링크로 들어왔을 때) */
+                if (cls && cls.beats(v)) return cls.submit(v, name, grade, cls_).then(function () { return rec; }, function () { return rec; });
+                return rec;
+              });
+            } else {
+              job = cls.submit(v, name, grade, cls_).then(function () { return null; });
+            }
+            job
+              .then(function (rec) { emit(); close(rec); })
               .catch(function (err) {
                 if (err.message === "401" || err.message === "400") {
                   msg.textContent = "그 사이 더 높은 기록이 등록되었습니다.";

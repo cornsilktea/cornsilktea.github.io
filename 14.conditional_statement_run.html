@@ -89,6 +89,7 @@
     #controls button{padding:11px 0;font-size:14px;}
     .card{padding:16px;}
   }
+  [hidden]{display:none !important;}
 </style>
 </head>
 <body>
@@ -103,6 +104,7 @@
     <div class="chip">스테이지 <b id="hStage">0</b> / 100</div>
     <div class="chip">최고 기록 <b id="hBest">0</b></div>
     <div class="chip">세계 신기록 <b id="hWorld">-</b><small id="hWorldWho"></small></div>
+    <div class="chip" id="hClsChip" hidden>우리 반 신기록 <b id="hCls">-</b><small id="hClsWho"></small></div>
   </div>
 </div>
 
@@ -139,6 +141,7 @@
       <div class="stat"><span>도달 스테이지</span><b id="rStage">0</b></div>
       <div class="stat"><span>최고 기록</span><b id="rBest">0</b></div>
       <div class="stat"><span>세계 신기록</span><b id="rWorld">-</b><em id="rWorldName"></em></div>
+      <div class="stat" id="rClsStat" hidden><span>우리 반 신기록</span><b id="rCls">-</b><em id="rClsName"></em></div>
     </div>
     <div id="fullLog"></div>
     <button class="bigbtn" id="againBtn" type="button">다시 하기 (Space)</button>
@@ -198,6 +201,16 @@
     $("hWorldWho").textContent = has ? WR.who() : "";
     $("rWorld").textContent = has ? WR.value() + " / " + TOTAL : "-";
     $("rWorldName").textContent = has ? WR.who() : ((WR && !WR.loaded) ? "불러오는 중…" : "기록 없음");
+    /* 반별 링크로 들어왔을 때만 우리 반 신기록 칸을 보인다 */
+    var C = WR && WR.cls;
+    if (C) {
+      var hasC = !!C.rec;
+      $("hClsChip").hidden = false; $("rClsStat").hidden = false;
+      $("hCls").textContent = hasC ? C.value() : "-";
+      $("hClsWho").textContent = hasC ? C.who() : "";
+      $("rCls").textContent = hasC ? C.value() + " / " + TOTAL : "-";
+      $("rClsName").textContent = hasC ? C.who() : (C.loaded ? "기록 없음" : "불러오는 중…");
+    }
   }
   if (WR) { WR.onChange(renderWorld); WR.load(); }
 

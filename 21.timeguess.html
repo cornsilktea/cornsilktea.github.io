@@ -91,6 +91,7 @@
     .result p{font-size:28px}
     .best .val{font-size:17px}
   }
+  [hidden]{display:none !important;}
 </style>
 </head>
 <body>
@@ -106,6 +107,11 @@
     <div class="lab">🏆 세계 신기록</div>
     <div class="val" id="worldVal"><span>불러오는 중…</span></div>
     <div class="who" id="worldWho"></div>
+  </div>
+  <div class="best" id="clsBox" hidden>
+    <div class="lab">🏫 우리 반 신기록</div>
+    <div class="val" id="clsVal"><span>불러오는 중…</span></div>
+    <div class="who" id="clsWho"></div>
   </div>
 </div>
 
@@ -207,6 +213,7 @@
     : null;
 
   function renderWorld() {
+    renderClass();
     if (WR && WR.rec) {
       worldVal.textContent = WR.text();
       worldWho.textContent = WR.who();
@@ -217,6 +224,20 @@
     s.textContent = (WR && !WR.loaded) ? "불러오는 중…" : "아직 없음";
     worldVal.appendChild(s);
     worldWho.textContent = "";
+  }
+  /* 반별 링크로 들어왔을 때만 우리 반 신기록 칸을 보인다(기록 칸이 세 개가 되므로 한 줄에 셋) */
+  function renderClass() {
+    var C = WR && WR.cls;
+    if (!C) return;
+    var box = document.getElementById("clsBox"), val = document.getElementById("clsVal"), who = document.getElementById("clsWho");
+    box.hidden = false;
+    box.parentNode.style.gridTemplateColumns = "1fr 1fr 1fr";
+    if (C.rec) { val.textContent = C.text(); who.textContent = C.who(); return; }
+    val.innerHTML = "";
+    var s = document.createElement("span");
+    s.textContent = C.loaded ? "아직 없음" : "불러오는 중…";
+    val.appendChild(s);
+    who.textContent = "";
   }
   if (WR) { WR.onChange(renderWorld); WR.load(); }
 

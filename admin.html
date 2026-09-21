@@ -481,8 +481,21 @@ const REC_GAMES = {
   hanokroofrun: { title: "한옥 지붕 와이어 러너", unit: "점", fmt: (v) => v + "점" },
   pianotiles:   { title: "피아노 타일 리듬",    unit: "점", fmt: (v) => v + "점", keyed: "곡" },
   timeguess:    { title: "5초 타이머 맞히기",   lower: true, unit: "백만분의 1초 (0.000001초)", fmt: (v) => "오차 " + (v / 1000000).toFixed(6) + "초" },
-  turbolap:     { title: "터보 랩",             lower: true, unit: "밀리초(ms)", fmt: (v) => clock(v), keyed: "난이도" }
+  turbolap:     { title: "터보 랩",             lower: true, unit: "밀리초(ms)", fmt: (v) => clock(v), keyed: "난이도" },
+  fpssurvival:  { title: "FPS 서바이벌",        unit: "처치×10000+초", fmt: (v) => Math.floor(v / 10000) + "명 · " + clock((v % 10000) * 1000) },
+  blockblast:   { title: "블록 블라스트",        unit: "점", fmt: (v) => v.toLocaleString("ko-KR") + "점" },
+  freekick:     { title: "프리킥 챌린지",        unit: "단계×1000+km/h", fmt: (v) => Math.floor(v / 1000) + "단계 · " + (v % 1000) + " km/h" }
 };
+
+/* 항목(key) 이름 풀이. 반 신기록은 <key>cls<학년글자><반글자> (world-record.js 와 같은 규칙) */
+function keyLabel(game, key) {
+  const m = REC_GAMES[game];
+  const cm = /^([a-z]+)cls([ab])([a-e])$/.exec(key);
+  const base = cm ? cm[1] : key;
+  const cls = cm ? ("ab".indexOf(cm[2]) + 1) + "학년 " + ("abcde".indexOf(cm[3]) + 1) + "반" : "세계";
+  const sub = (m && m.keyed) ? m.keyed + " " + base : (base === "all" ? "" : base);
+  return (sub ? sub + " · " : "") + cls;
+}
 function clock(ms) {
   ms = Math.max(0, Math.round(ms));
   const m = Math.floor(ms / 60000), s = Math.floor(ms % 60000 / 1000), c = Math.floor(ms % 1000 / 10);
@@ -561,12 +574,14 @@ function renderRecords() {
   });
   groups.forEach((list, game) => {
     const m = REC_GAMES[game];
-    if (!(m && m.keyed) || list.length < 2) { list.forEach((r) => box.appendChild(recCard(r))); return; }
+    if (list.length < 2) { list.forEach((r) => box.appendChild(recCard(r))); return; }
+    /* 세계 기록을 맨 앞에, 그다음 반별 */
+    list.sort((a, b) => (a.key.indexOf("cls") === -1 ? 0 : 1) - (b.key.indexOf("cls") === -1 ? 0 : 1) || a.key.localeCompare(b.key));
     const wrap = el("div", "game");
     const head = el("div", "game-head");
     const info = el("div", "game-info");
-    info.appendChild(el("p", "game-title", m.title));
-    info.appendChild(el("p", "game-meta", m.keyed + " " + list.length + "개 · records/" + game + "/…"));
+    info.appendChild(el("p", "game-title", m ? m.title : game));
+    info.appendChild(el("p", "game-meta", "기록 " + list.length + "개(세계·반별) · records/" + game + "/…"));
     head.appendChild(info);
     wrap.appendChild(head);
     const buttons = el("div", "game-buttons");
@@ -592,7 +607,7 @@ function recCard(r) {
   const card = el("div", "game");
   const head = el("div", "game-head");
   const info = el("div", "game-info");
-  const label = (m ? m.title : r.game) + (m && m.keyed ? " · " + m.keyed + " " + r.key : (r.key === "all" ? "" : " · " + r.key));
+  const label = (m ? m.title : r.game) + " · " + keyLabel(r.game, r.key);
   info.appendChild(el("p", "game-title", label));
   info.appendChild(el("p", "game-meta", recText(r.game, r.rec.score) + "   ·   " + recWho(r.rec)));
   info.appendChild(el("p", "game-meta",

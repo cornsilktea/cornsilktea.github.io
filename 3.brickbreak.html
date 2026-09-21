@@ -145,6 +145,7 @@ button:active { background: var(--sg-panel-alt); }
   color: var(--sg-ink-soft);
   min-height: 18px;
 }
+  [hidden]{display:none !important;}
 </style>
 </head>
 <body>
@@ -168,6 +169,7 @@ button:active { background: var(--sg-panel-alt); }
 
   <div class="note">
     <div class="world"><b>🏆 세계 신기록</b><span id="worldLine">불러오는 중…</span></div>
+    <div class="world" id="clsBox" hidden><b>🏫 우리 반 신기록</b><span id="clsLine">불러오는 중…</span></div>
     <b>조작</b>
     <ul>
       <li>발사대 위쪽을 드래그하면 손가락 방향으로, 아래쪽을 드래그하면 새총처럼 반대 방향으로 조준됩니다.</li>
@@ -333,6 +335,13 @@ button:active { background: var(--sg-panel-alt); }
   function renderWorld() {
     if (WR && WR.rec) { worldLine.innerHTML = "<em>" + WR.text() + "</em><small>" + WR.escapeHtml(WR.who()) + "</small>"; }
     else { worldLine.textContent = (WR && !WR.loaded) ? "불러오는 중…" : "아직 기록 없음 — 첫 기록에 도전!"; }
+    /* 반별 링크로 들어왔을 때만 우리 반 신기록 줄을 보인다 */
+    var C = WR && WR.cls, clsLine = document.getElementById("clsLine");
+    if (C) {
+      document.getElementById("clsBox").hidden = false;
+      if (C.rec) { clsLine.innerHTML = "<em>" + C.text() + "</em><small>" + WR.escapeHtml(C.who()) + "</small>"; }
+      else { clsLine.textContent = C.loaded ? "아직 기록 없음 — 첫 기록에 도전!" : "불러오는 중…"; }
+    }
   }
   if (WR) { WR.onChange(renderWorld); WR.load(); }
   renderWorld();
