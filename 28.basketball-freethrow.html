@@ -184,7 +184,7 @@ const CFG = {
   HOOP_SPEED: [0, 0.7, 1.0, 1.3, 1.6],   // 라운드별 이동 속도(rad/s) — 마지막 항목 이후는 HOOP_SPEED_STEP 씩 증가
   HOOP_SPEED_STEP: 0.3, HOOP_SPEED_MAX: 3.0,
   DIST: 3.2,              // 공 ~ 림 중심 거리(m) (실제 자유투선 4.225m 보다 가깝게)
-  RIM_Y: 3.05, HOOP_SCALE: 1.35, BALL_R: 0.14, BALL_DRAW: 2.3, HAND_Y: 1.2,   // HOOP_SCALE: 골대(림·백보드) 크기 배율 — 1 이 실제 규격(림 지름 45cm)
+  RIM_Y: 3.05, HOOP_SCALE: 1.35, BALL_R: 0.14, BALL_DRAW: 2.1, HAND_Y: 1.2,   // HOOP_SCALE: 골대(림·백보드) 크기 배율 — 1 이 실제 규격(림 지름 45cm)
   ELEV: 64,               // 발사 각도(도) — 고정. 드래그 길이는 세기만 정한다 (낮추면 공이 얕게 들어와 앞 림에 잘 걸린다)
   SPEED_MIN: 6.9, SPEED_MAX: 8.1,   // 드래그 최소·최대 세기(m/s) — 범위가 좁을수록 세기 조절이 쉽다 (적정 세기는 중간보다 약간 위)
   DRAG_LEN: 0.30,         // 최대 세기가 되는 드래그 길이 (화면 높이 비율)
@@ -307,6 +307,8 @@ $("sweet").style.left = "calc(" + (SWEET_P * 100).toFixed(1) + "% - 1px)";
 $("sweet").style.display = $("sweetLab").style.display = CFG.SHOW_SWEET ? "" : "none";
 
 function canShoot() { return G.state === "play" && !G.ball; }
+/* 놓는 순간의 판정: 버저 전에 끌기 시작했으면 버저 뒤에 놓아도 슛이 나간다(버저비터) */
+function canRelease() { return (G.state === "play" || G.state === "ending") && !G.ball; }
 
 function startGame() {
   audioInit();
@@ -409,7 +411,7 @@ function stepBall(b, dt) {
   /* 림 통과 판정: 림 높이를 내려오면서 지나고 중심이 링 안쪽이면 골 */
   if (!b.scored && py >= CFG.RIM_Y && b.y < CFG.RIM_Y && b.vy < 0) {
     const d = Math.hypot(b.x - hx, b.z - HOOP_Z);
-    if (d < R - r * 0.8) { b.scored = true; b.vx *= 0.3; b.vz *= 0.3; b.vy *= 0.6; judge(b); return; }
+    if (d < R - r) { b.scored = true;   /* 공 전체가 링 안쪽을 지나야 골 */ b.vx *= 0.3; b.vz *= 0.3; b.vy *= 0.6; judge(b); return; }
   }
   /* 백보드 */
   if (b.z + r > BOARD_Z && b.vz > 0 && Math.abs(b.x - hx) < BOARD_HW + r && b.y > BOARD_Y0 - r && b.y < BOARD_Y1 + r) {
@@ -475,10 +477,15 @@ function update(dt) {
         showBanner("🔥 FEVER TIME!", "지금부터 점수 " + CFG.FEVER_MULT + "배", 1300);
       }
       if (G.timeLeft <= 0) {
-        G.timeLeft = 0; G.state = "ending"; G.drag = null; hidePower();
-        if (!G.ball) endRound();
+        /* 버저비터: 시간이 끝나도 날아가는 공이 있으면 그 판정까지, 끌고 있던 손가락이 있으면 놓을 때까지(최대 1.5초) 라운드 종료를 미룬다 */
+        G.timeLeft = 0; G.state = "ending"; G.endingAt = G.t;
+        if (!G.ball && !G.drag) endRound();
       }
       updateHud();
+    }
+    if (G.state === "ending" && G.drag && G.t - G.endingAt > 1.5) {   // 버저 뒤 1.5초 안에 안 놓으면 취소
+      G.drag = null; hidePower();
+      if (!G.ball) endRound();
     }
   }
   const sub = 4, h = dt / sub;
@@ -499,7 +506,7 @@ const IMG = {};
 });
 /* 골대 그림(28.hoop.png 768×512)에서 잰 위치: 림 타원 중심·지름, 받침대 아래쪽 */
 /* 골대 그림(28.hoop.png 768×512)에서 잰 위치: 림 타원 중심·지름, 받침대를 잘라 낼 높이(파란 받침대 아랫부분은 버린다) */
-const HOOP_IMG = { rimX: 384, rimY: 142, rimW: 112, baseTop: 300, baseBottom: 496 };   // baseTop~baseBottom: 파란 받침대(이 부분만 세로로 늘려 바닥까지 잇는다)
+const HOOP_IMG = { rimX: 384, rimY: 142, rimW: 112, baseTop: 300, baseBottom: 496, net: { x: 318, y: 116, w: 132, h: 150 } };   // net: 림+네트 영역(골인한 공 위에 반투명으로 다시 그린다)   // baseTop~baseBottom: 파란 받침대(이 부분만 세로로 늘려 바닥까지 잇는다)
 const COURT_END = 0.465;  // 배경 그림에서 코트 아웃라인(파란 구역 위 흰 선) 높이 비율 — 골대 받침대 아래를 여기에 맞춘다
 const STAND_Z = 2.0;      // 받침대가 서는 바닥 지점(아웃라인)은 백보드보다 이만큼 뒤(m) — 키우면 받침대가 짧아지고 코트가 더 보인다
 
@@ -529,6 +536,8 @@ function draw() {
   drawHoop(L);
   if (G.state === "play" || G.state === "ending" || G.state === "between") drawClock(L);
   balls.filter(x => !behind(x)).forEach(drawBall);
+  /* 골인해서 네트 안을 지나는 공은 림·네트 그림을 반투명으로 한 번 더 덮어 "안쪽으로 들어간" 느낌을 준다 */
+  if (IMG.hoop && balls.some(inNet)) drawNetOver(L);
   if (canShoot()) drawReadyBall();
   if (G.drag) drawDrag();
 }
@@ -554,6 +563,15 @@ function drawClock(L) {
   ctx.fillStyle = G.fever ? (blink ? "#FFB347" : "#D97B4F") : (tl <= 5 ? "#FF5A3C" : "#7CFF9A");
   ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = h * 0.3;
   ctx.fillText(text, L.rimP.x, y + h / 2 + h * 0.03);
+  ctx.restore();
+}
+function inNet(b) {
+  return b.scored && b.y < CFG.RIM_Y + 0.05 && b.y > CFG.RIM_Y - 0.75 && Math.hypot(b.x - G.hoopX, b.z - HOOP_Z) < CFG.RIM_R;
+}
+function drawNetOver(L) {
+  const n = HOOP_IMG.net, k = L.k;
+  ctx.save(); ctx.globalAlpha = 0.7;
+  ctx.drawImage(IMG.hoop, n.x, n.y, n.w, n.h, L.x0 + n.x * k, L.y0 + n.y * k, n.w * k, n.h * k);
   ctx.restore();
 }
 function drawHoop(L) {
@@ -644,11 +662,11 @@ function endDrag(e) {
   if (!G.drag || e.pointerId !== G.drag.id) return;
   const dx = e.clientX - G.drag.x0, dy = G.drag.y0 - e.clientY;
   G.drag = null; hidePower();
-  if (dy < 24 || !canShoot()) return;   // 너무 짧거나 아래로 끌면 취소
+  if (dy < 24 || !canRelease()) { if (G.state === "ending" && !G.ball) endRound(); return; }   // 너무 짧거나 아래로 끌면 취소
   shoot(dx, dy);
 }
 canvas.addEventListener("pointerup", endDrag);
-canvas.addEventListener("pointercancel", e => { if (G.drag && e.pointerId === G.drag.id) { G.drag = null; hidePower(); } });
+canvas.addEventListener("pointercancel", e => { if (G.drag && e.pointerId === G.drag.id) { G.drag = null; hidePower(); if (G.state === "ending" && !G.ball) endRound(); } });
 
 $("btnStart").addEventListener("click", startGame);
 $("btnRetry").addEventListener("click", startGame);
