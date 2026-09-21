@@ -131,7 +131,6 @@
     border: 1px solid var(--sg-line); border-radius:var(--sg-radius);
   }
   .qr-panel p { margin: 16px 0 0; font-size: 15px; color: var(--sg-ink-mid); }
-  .qr-panel .qr-class { font-size: 26px; font-weight: 700; color: var(--sg-ink); margin: 0 0 14px; }
   .qr-panel .qr-url { font-size: 13px; color: var(--sg-ink-soft); word-break: break-all; }
   .qr-panel .qr-change { margin-top: 18px; }
 
@@ -215,7 +214,6 @@
 
   <!-- 반별 QR: 이 반의 주소(index.html?c=1-1)를 그립니다. 학생은 이 QR 로만 들어옵니다. -->
   <div class="qr-panel">
-    <p class="qr-class" id="qrClass"></p>
     <canvas id="qrCanvas" width="460" height="460"></canvas>
     <p>디벗 카메라로 QR 코드를 촬영하세요</p>
     <p class="qr-url" id="qrUrl"></p>
@@ -320,15 +318,12 @@
   /* ---------- 반이 정해진 화면 ---------- */
   document.getElementById("layout").hidden = false;
   document.getElementById("viewtabs").hidden = false;
-  document.getElementById("pageTitle").textContent = klass.label + " 수업용 링크";
-  document.getElementById("pageSub").textContent =
-    "선생님이 " + klass.label + "에 연 수업 자료만 열립니다. 잠긴 자료는 잠시 후 다시 확인해 보세요.";
+  document.getElementById("pageSub").hidden = true;      /* 반 화면에서는 제목만 남깁니다 */
   document.title = klass.label + " · " + document.title;
 
   /* 반별 QR: 학생이 이 QR 을 찍으면 학년·반이 정해진 목록으로 들어옵니다 */
   (function drawQr() {
     var url = location.origin + classHref(klass.id);
-    document.getElementById("qrClass").textContent = klass.label;
     document.getElementById("qrUrl").textContent = url;
     try {
       window.QR.draw(document.getElementById("qrCanvas"), url, { size: 460, margin: 3, dark: "#1B2B20" });
