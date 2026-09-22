@@ -179,9 +179,11 @@ const CONFIG = {
   drawBackM: 0.38,            // 장전 때 오늬가 축을 따라 뒤(카메라 쪽)로 끌려오는 거리 → 앞 절반쯤만 화면에 남는다
   launchAngleDeg: 20,         // 발사 각도(위로)
   gravity: 9.81,
-  minForeshorten: 0.5,        // 화살이 시선과 거의 나란해도 그림 길이를 (길이×초점/거리) 의 이 비율 아래로 줄이지 않는다
-  stuckScale: 0.085,          // 과녁에 꽂힌 화살 그림 높이(화면 높이 비율)
-  stuckSinkRatio: 0.38,       // 꽂힌 화살은 앞쪽 이 비율만큼 과녁에 박혀 안 보인다(깃 쪽만 보임)
+  /* 날아가는 화살의 세로 단축(arrowScreen 참고). 투영된 세로 비율 r(=오늬가 촉 아래로 떨어진 화면 거리 ÷ 화살 길이의 화면 크기)이
+     tailLiftFull 이면 그대로, tailLiftFrom(닿을 때쯤의 실제 값, 음수 = 뒤집힘) 이면 tailLiftMin 으로 — 그 사이는 비례.
+     꼬리가 촉 쪽으로 살짝 올라오는 느낌만 주고 뒤집히진 않게 한다 */
+  tailLiftFull: 0.75, tailLiftFrom: -0.3, tailLiftMin: 0.4,
+  stuckSinkRatio: 0.25,       // 꽂힌 화살은 앞쪽 이 비율만큼 과녁에 박혀 안 보인다(깃 쪽만 보임). 닿을 때 이미 단축돼 짧으므로 크게 두지 않음
   targetRingScores: [10, 8, 6, 4, 2, 1],   // 중심→바깥 점수 (그림의 빨강·크림·초록·크림·초록·테두리 6단계와 맞춤)
   targetRingEdges: [0.2, 0.39, 0.58, 0.77, 0.94, 1.0],   // 각 띠의 바깥 경계(과녁 반지름 비율)
   targetRadiusH: 0.11,        // 과녁 반지름(화면 높이 비율, 세로 화면에서는 너비 기준으로 제한)
@@ -329,7 +331,7 @@ const G = {
   arrow: null,       // 날아가는 화살 { c, v, L, judged, life, stopped }
   fading: null,      // 빗나간 화살(사라지는 중) — 같은 모양
   nextSpawnT: 0,     // 다음 과녁이 나올 시각(G.t)
-  targets: [],       // 화면에 있는 과녁들 { x(과녁 중심의 지금 화면 x), stuck: [ {x,y(과녁 그림 px), t0, lean} ] }
+  targets: [],       // 화면에 있는 과녁들 { x(과녁 중심의 지금 화면 x), stuck: [ {x,y(꽂힌 자리, 과녁 그림 px), t0, dx,dy(촉→오늬 화면 벡터), w(깃 폭) — 모두 과녁 그림 px} ] }
   scroll: 0,         // 배경 스크롤 누적(px, 과녁 속도 기준)
   worldSpeed: 0,     // 현재 과녁 속도(px/s)
   hits: 0,
@@ -502,9 +504,10 @@ function judge(a, tipAt) {
   const ix = c ? TARGET_IMG.cx + (sp.x - c.x) / V.tk : -1, iy = c ? TARGET_IMG.cy + (sp.y - c.y) / V.tk : -1;
   const inTree = !!(c && tipAt) && score === 0 && Math.abs(ix - TARGET_IMG.cx) < 95 && iy > 60 && iy < TARGET_IMG.h - 20;
   if (score > 0 || inTree) {
-    /* 꽂힌 화살: 과녁 그림 px 좌표로 기억해 두고 과녁과 함께 흐른다. 도착 방향으로 살짝 기울고, 꽂히는 순간 떨린다 */
-    const dir = arrowDir(a), lean = Math.atan2(dir.x, -dir.y * 0.4 + 1) * 0.6 + (Math.random() - 0.5) * 0.14;
-    tg.stuck.push({ x: ix, y: iy, t0: G.t, lean });
+    /* 꽂힌 화살: 과녁 그림 px 좌표로 기억해 두고 과녁과 함께 흐른다. 닿는 순간 화면에 보이던 모양(촉→오늬 벡터·깃 폭)을
+       그대로 과녁 그림 px 단위로 저장해, 날아오던 자세 그대로 박히고(꼬리가 살짝 위) 꽂히는 순간만 떨린다 */
+    const dir = arrowDir(a), L = a.L, sc = arrowScreen(tipAt, { x: tipAt.x - dir.x * L, y: tipAt.y - dir.y * L, z: tipAt.z - dir.z * L });
+    tg.stuck.push({ x: ix, y: iy, t0: G.t, dx: sc.dx / V.tk, dy: sc.dy / V.tk, w: sc.w / V.tk });
     G.arrow = null;
   }
   if (score > 0) {
@@ -580,30 +583,32 @@ function drawOneTarget(tg) {
   tg.stuck.forEach(st => drawStuckArrow(st.x * k, st.y * k, st));
   ctx.restore();
 }
-/* 꽂힌 화살: 앞쪽(stuckSinkRatio)은 과녁에 박혀 안 보이고 깃 쪽만 우리 쪽으로 튀어나와 보인다.
-   꽂힌 자리에 작은 구멍, 도착 방향대로 살짝 기울고, 꽂히는 순간 0.5초쯤 떨린다 */
+/* 꽂힌 화살: 닿는 순간 저장해 둔 화면 모양(촉→오늬 벡터 dx,dy · 깃 폭 w, 과녁 그림 px)을 그대로 그린다.
+   앞쪽(stuckSinkRatio)은 과녁에 박혀 안 보이고 깃 쪽만 우리 쪽으로 튀어나와 보인다. 꽂힌 자리에 작은 구멍, 꽂히는 순간 0.5초쯤 떨린다 */
 function drawStuckArrow(x, y, st) {
-  const age = G.t - st.t0, wob = Math.sin(age * 42) * 0.16 * Math.exp(-age * 5);
-  const hFull = CONFIG.stuckScale * V.H, sink = CONFIG.stuckSinkRatio;
-  const hVis = hFull * (1 - sink), w = hFull * ARROW_IMG.w / ARROW_IMG.h;
-  ctx.save(); ctx.translate(x, y); ctx.rotate(st.lean + wob);
-  ctx.fillStyle = "rgba(40,25,10,.55)"; ctx.beginPath(); ctx.ellipse(0, 0, w * 0.07, w * 0.045, 0, 0, Math.PI * 2); ctx.fill();   // 구멍
-  if (IMG.arrow) {
-    const im = IMG.arrow, sy = ARROW_IMG.tipY + sink * (ARROW_IMG.h - ARROW_IMG.tipY);   // 그림에서 보이는 부분의 시작(위) y
-    ctx.drawImage(im, 0, sy, ARROW_IMG.w, ARROW_IMG.h - sy, -w * ARROW_IMG.tipX / ARROW_IMG.w, 0, w, hVis);
-  } else {
-    ctx.strokeStyle = "#B8863B"; ctx.lineWidth = Math.max(2, w * 0.08); ctx.lineCap = "round";
-    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, hVis); ctx.stroke();
-    ctx.fillStyle = "#F0DFC0"; ctx.beginPath(); ctx.moveTo(0, hVis * 0.45); ctx.lineTo(-w * 0.45, hVis); ctx.lineTo(0, hVis * 0.92); ctx.lineTo(w * 0.45, hVis); ctx.closePath(); ctx.fill();
-  }
-  ctx.restore();
+  const age = G.t - st.t0, wob = Math.sin(age * 42) * 0.16 * Math.exp(-age * 5), k = V.tk;
+  const w = st.w * k;
+  ctx.fillStyle = "rgba(40,25,10,.55)"; ctx.beginPath(); ctx.ellipse(x, y, w * 0.07, w * 0.045, 0, 0, Math.PI * 2); ctx.fill();   // 구멍
+  drawArrowVec(x, y, st.dx * k, st.dy * k, w, 1, CONFIG.stuckSinkRatio, wob);
 }
-/* 촉 끝이 (tx,ty) 에 오고, 거기서 밑동 쪽으로 h px 뻗도록(폭 w, 화면 아래 방향에서 rot 만큼 회전) 화살 그림을 그린다 */
-function drawArrowImg(tx, ty, h, w, rot, alpha) {
+/* 촉 끝이 (tx,ty) 에 오고 오늬가 거기서 화면 벡터 (dx,dy) 만큼 떨어져 보이도록 화살 그림을 그린다(폭 w).
+   sink: 앞쪽 이 비율만큼은 과녁에 박혀 그리지 않음. wob: 추가 회전(떨림) */
+function drawArrowVec(tx, ty, dx, dy, w, alpha, sink, wob) {
+  drawArrowImg(tx, ty, Math.hypot(dx, dy), w, Math.atan2(-dx, dy) + (wob || 0), alpha, sink || 0);   // 그림은 아래(0,1)로 뻗으므로 (dx,dy) 방향을 보게 회전
+}
+/* 촉 끝이 (tx,ty) 에 오고, 거기서 밑동 쪽으로 h px 뻗도록(폭 w, 화면 아래 방향에서 rot 만큼 회전) 화살 그림을 그린다.
+   sink: 앞쪽 이 비율은 그리지 않음 */
+function drawArrowImg(tx, ty, h, w, rot, alpha, sink) {
   const H = h / (1 - ARROW_IMG.tipY / ARROW_IMG.h);   // 그림 위 여백(촉 위)을 포함한 전체 그림 높이
+  const y0 = h * sink;   // 촉에서 이만큼은 박혀서 안 보임
   ctx.save(); ctx.globalAlpha = alpha; ctx.translate(tx, ty); ctx.rotate(rot);
-  if (IMG.arrow) ctx.drawImage(IMG.arrow, -w * ARROW_IMG.tipX / ARROW_IMG.w, -H * ARROW_IMG.tipY / ARROW_IMG.h, w, H);
-  else {   // 그림이 없을 때의 도형 화살
+  if (IMG.arrow) {
+    if (sink > 0) {
+      const sy = ARROW_IMG.tipY + sink * (ARROW_IMG.h - ARROW_IMG.tipY);   // 그림에서 보이는 부분의 시작(위) y
+      ctx.drawImage(IMG.arrow, 0, sy, ARROW_IMG.w, ARROW_IMG.h - sy, -w * ARROW_IMG.tipX / ARROW_IMG.w, 0, w, h - y0);
+    } else ctx.drawImage(IMG.arrow, -w * ARROW_IMG.tipX / ARROW_IMG.w, -H * ARROW_IMG.tipY / ARROW_IMG.h, w, H);
+  } else {   // 그림이 없을 때의 도형 화살 (박힌 부분은 잘라냄)
+    if (sink > 0) { ctx.beginPath(); ctx.rect(-w, 0, w * 2, h); ctx.clip(); ctx.translate(0, -y0); }
     ctx.strokeStyle = "#B8863B"; ctx.lineWidth = Math.max(2, w * 0.08); ctx.lineCap = "round";
     ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, h); ctx.stroke();
     ctx.fillStyle = "#8A97A5"; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-w * 0.06, h * 0.08); ctx.lineTo(w * 0.06, h * 0.08); ctx.closePath(); ctx.fill();
@@ -611,19 +616,22 @@ function drawArrowImg(tx, ty, h, w, rot, alpha) {
   }
   ctx.restore();
 }
-/* 월드의 화살(촉 tip · 오늬 nock, m)을 투영해 그린다. 길이는 두 끝의 화면 거리(원근·단축 포함), 폭은 깃 쪽 깊이의 원근.
-   화살이 시선과 거의 나란히 멀어질 때 원근 때문에(오늬가 눈높이 위에서는 더 가까워 더 높이 찍힘) 투영된 꼬리가 촉 위로
-   올라가 버려, 그대로 그리면 날아가는 도중 꼬리가 갑자기 위로 뒤집혔다. 그래서 세로 성분은 아래(꼬리가 촉보다 아래)로만 두고
-   최소 길이(minForeshorten) 이상을 보장하며, 좌우 기울기만 투영 그대로 쓴다 → 발사부터 도착까지 꼬리가 아래를 향한 채 매끄럽게 줄어든다 */
+/* 월드의 화살(촉 tip · 오늬 nock, m)이 화면에서 어떻게 보이는지: 촉 위치 tp, 촉→오늬 화면 벡터 (dx,dy), 깃 폭 w(깃 쪽 깊이의 원근).
+   좌우(dx)는 투영 그대로. 세로는 투영값을 그대로 쓰면 날아가며 고개를 숙일 때(중력) 원근 때문에 오늬가 촉과 겹쳤다가
+   위로 넘어가 버려(납작해졌다 뒤집힘) 어색하다. 그래서 "화살 길이(L×초점/거리) 대비 세로 비율" r 을 그대로 쓰지 않고
+   [tailLiftFrom, tailLiftFull] 구간을 [tailLiftMin, tailLiftFull] 로 눌러 담는다 — 발사 직후엔 투영과 같고, 날아가며
+   꼬리가 촉 쪽으로 살짝 올라오되(짧아지되) 촉 위로는 넘어가지 않고, 닿을 때가 가장 짧다. 그 자세 그대로 과녁에 박힌다 */
+function arrowScreen(tip, nock) {
+  const tp = proj(tip.x, tip.y, tip.z), np = proj(nock.x, nock.y, nock.z);
+  const zc = (tip.z + nock.z) / 2, zw = nock.z + 0.25 * (tip.z - nock.z), full = CONFIG.arrowLengthM * V.f / zc;
+  const C = CONFIG, r = (np.y - tp.y) / full;
+  const rd = C.tailLiftMin + Math.max(0, r - C.tailLiftFrom) * (C.tailLiftFull - C.tailLiftMin) / (C.tailLiftFull - C.tailLiftFrom);
+  return { tp, dx: np.x - tp.x, dy: rd * full, w: C.arrowWidthM * V.f / zw };
+}
 function drawArrow3D(tip, nock, alpha) {
   if (tip.z <= 0.05 || nock.z <= 0.05) return;
-  const tp = proj(tip.x, tip.y, tip.z), np = proj(nock.x, nock.y, nock.z);
-  const zc = (tip.z + nock.z) / 2, zw = nock.z + 0.25 * (tip.z - nock.z);
-  const dx = np.x - tp.x, dy = Math.max(np.y - tp.y, CONFIG.minForeshorten * CONFIG.arrowLengthM * V.f / zc);
-  const h = Math.hypot(dx, dy);
-  const w = CONFIG.arrowWidthM * V.f / zw;
-  const rot = Math.atan2(-dx, dy);   // 그림은 아래(0,1)로 뻗으므로 (dx,dy) 방향을 보게 회전
-  drawArrowImg(tp.x, tp.y, h, w, rot, alpha);
+  const s = arrowScreen(tip, nock);
+  drawArrowVec(s.tp.x, s.tp.y, s.dx, s.dy, s.w, alpha, 0, 0);
 }
 function drawHeldArrow(p) {   // 대기·장전 중: 축을 따라 뒤로 끌려와 장전되면 앞 절반만 보인다
   const a = heldArrow(p), wob = p >= 1 ? Math.sin(G.t * 40) * 0.004 : 0;   // 장전 상태면 살짝 떨림
