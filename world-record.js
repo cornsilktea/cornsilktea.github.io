@@ -33,9 +33,9 @@
   var CLASSES = [1, 2, 3, 4, 5];
 
   var CSS =
-    ".wr-back{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;" +
+    ".wr-back{position:fixed;top:0; right:0; bottom:0; left:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;" +
       "background:rgba(27,43,32,.55);padding:16px;font-family:'Nanum Gothic','NanumGothic','나눔고딕','Malgun Gothic','맑은 고딕',sans-serif;}" +
-    ".wr-box{background:#FFFFFF;color:#1B2B20;border:2px solid #24402F;border-radius:8px;padding:18px 20px;width:min(380px,100%);" +
+    ".wr-box{background:#FFFFFF;color:#1B2B20;border:2px solid #24402F;border-radius:8px;padding:18px 20px;width:100%; max-width:380px;" +
       "box-shadow:0 12px 32px rgba(0,0,0,.25);box-sizing:border-box;max-height:100%;overflow-y:auto;}" +
     ".wr-box h3{margin:0 0 6px;font-size:18px;font-weight:800;text-align:center;}" +
     ".wr-box .wr-val{text-align:center;font-size:15px;color:#3B4B40;margin-bottom:12px;}" +

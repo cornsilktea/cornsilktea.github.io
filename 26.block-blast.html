@@ -39,7 +39,7 @@
   .wrap{position:relative;max-width:960px;margin:0 auto;padding:8px 10px 24px}
 
   /* ---------- 배경(세계 여행 테마) — 항상 연하게, 그리드 위에 깔림 ---------- */
-  #bg{position:fixed;inset:-20px;z-index:0;pointer-events:none;background-size:cover;background-position:center;
+  #bg{position:fixed;top:-20px; right:-20px; bottom:-20px; left:-20px;z-index:0;pointer-events:none;background-size:cover;background-position:center;
     opacity:.38;filter:blur(2px);transition:opacity .6s,background-image .6s}
   .wrap{z-index:1}
 
@@ -63,10 +63,10 @@
   #board .cell.ghost-ok{background:rgba(47,125,79,.45)!important;border-color:rgba(47,125,79,.6)}
   #board .cell.ghost-bad{background:rgba(179,57,81,.4)!important;border-color:rgba(179,57,81,.6)}
   #board .cell.will{box-shadow:inset 0 0 0 2px rgba(255,255,255,.75);filter:brightness(1.18)}
-  #board .cell.pop::after{content:"";position:absolute;inset:0;border-radius:3px;background:#fff;animation:pop .32s ease-out forwards}
+  #board .cell.pop::after{content:"";position:absolute;top:0; right:0; bottom:0; left:0;border-radius:3px;background:#fff;animation:pop .32s ease-out forwards}
   @keyframes pop{0%{opacity:.95;transform:scale(1)}100%{opacity:0;transform:scale(1.35)}}
 
-  .tray{display:grid;grid-template-rows:repeat(3,1fr);gap:8px;align-self:stretch;min-width:150px;width:min(190px,28vw)}
+  .tray{display:grid;grid-template-rows:repeat(3,1fr);gap:8px;align-self:stretch;min-width:150px;width:28vw;max-width:190px}
   .slot{position:relative;display:flex;align-items:center;justify-content:center;background:var(--panel);border:1px solid var(--line);
     border-radius:var(--radius);min-height:110px;touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab;transition:opacity .2s,filter .2s}
   .slot.empty{cursor:default;background:transparent;border-style:dashed}
@@ -96,7 +96,7 @@
   .fx{position:fixed;left:0;top:0;z-index:25;pointer-events:none;font-weight:800;color:var(--accent);
     text-shadow:0 1px 0 #fff,0 0 8px rgba(255,255,255,.9);transform:translate(-50%,-50%);animation:fxup 1s ease-out forwards;white-space:nowrap}
   @keyframes fxup{0%{opacity:0;transform:translate(-50%,-30%) scale(.6)}20%{opacity:1;transform:translate(-50%,-50%) scale(1.1)}100%{opacity:0;transform:translate(-50%,-160%) scale(1)}}
-  #flash{position:fixed;inset:0;z-index:24;background:#fff;opacity:0;pointer-events:none}
+  #flash{position:fixed;top:0; right:0; bottom:0; left:0;z-index:24;background:#fff;opacity:0;pointer-events:none}
   #flash.on{animation:flash .7s ease-out}
   @keyframes flash{0%{opacity:.9}100%{opacity:0}}
   /* 줄 제거 이펙트 — 줄 수(n)에 따라 흔들림·번쩍임이 커진다 */
@@ -111,14 +111,14 @@
   @keyframes shake2{0%,100%{transform:none}15%{transform:translate(5px,-3px) rotate(.4deg)}30%{transform:translate(-5px,3px) rotate(-.4deg)}45%{transform:translate(4px,4px)}60%{transform:translate(-4px,-3px)}80%{transform:translate(2px,1px)}}
   @keyframes shake3{0%,100%{transform:none}10%{transform:translate(9px,-6px) rotate(.8deg) scale(1.02)}25%{transform:translate(-9px,6px) rotate(-.8deg) scale(1.02)}40%{transform:translate(7px,7px) scale(1.01)}55%{transform:translate(-7px,-5px)}70%{transform:translate(4px,3px)}85%{transform:translate(-2px,-2px)}}
   .fx.big{color:#D97B4F;text-shadow:0 2px 0 #fff,0 0 14px rgba(255,255,255,1),0 0 28px rgba(217,123,79,.6);letter-spacing:1px}
-  #confetti{position:fixed;inset:0;z-index:26;pointer-events:none;display:none}
+  #confetti{position:fixed;top:0; right:0; bottom:0; left:0;z-index:26;pointer-events:none;display:none}
   #toast{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:27;pointer-events:none;opacity:0;
-    background:rgba(27,43,32,.85);color:#fff;font-size:clamp(18px,4vw,28px);font-weight:800;padding:12px 22px;border-radius:var(--radius);
+    background:rgba(27,43,32,.85);color:#fff;font-size:28px; font-size:clamp(18px, 4vw, 28px);font-weight:800;padding:12px 22px;border-radius:var(--radius);
     text-align:center;line-height:1.4;transition:opacity .25s;max-width:90vw}
   #toast.on{opacity:1}
 
   /* ---------- 시작·결과 화면 ---------- */
-  .overlay{position:fixed;inset:0;z-index:20;background:rgba(27,43,32,.55);display:none;overflow:auto;padding:56px 12px 40px}
+  .overlay{position:fixed;top:0; right:0; bottom:0; left:0;z-index:20;background:rgba(27,43,32,.55);display:none;overflow:auto;padding:56px 12px 40px}
   .overlay.on{display:flex}
   .card{margin:auto;width:100%;max-width:520px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px}
   h1{font-size:22px;margin:0 0 6px}
@@ -661,7 +661,16 @@ function endDrag(e, drop){
 window.addEventListener("pointermove", e => { if (D.on && e.pointerId === D.pid) moveDrag(e); });
 window.addEventListener("pointerup", e => endDrag(e, true));
 window.addEventListener("pointercancel", e => endDrag(e, false));
-window.addEventListener("resize", () => { if (G.playing) renderTray(); });
+/* 보드 크기(--size)는 CSS min() 과 같은 식으로 스크립트가 직접 넣음 — 전자칠판처럼 min()/clamp() 를 모르는 옛 브라우저에서
+   보드가 0px 로 찌그러지는 것을 막음(CSS 의 min() 값은 스크립트가 돌기 전 첫 화면용) */
+const playEl = document.querySelector(".play");
+function fitBoard(){
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const size = vw <= 640 ? Math.min(vw - 20, vh - 330) : Math.min(vw - 20, vh - 300, 560);
+  playEl.style.setProperty("--size", Math.max(200, Math.floor(size)) + "px");
+}
+fitBoard();
+window.addEventListener("resize", () => { fitBoard(); if (G.playing) renderTray(); });
 
 /* ---------- 시작·종료 ---------- */
 function start(){

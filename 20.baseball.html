@@ -48,19 +48,19 @@
      무대(.stage)는 항상 3:2 비율(모든 인물·존이 가로·세로 % 로 놓여 있어 비율이 바뀌면 찌그러짐).
      틀(.arena)이 무대보다 좁으면(세로 휴대전화) 가운데만 보이고 양옆(외야수·파울 폴)은 잘려 나감. */
   .arena{--h:min(clamp(300px,calc(100vh - 250px),640px),calc(100vw - 20px));
-    position:relative;width:min(100%,calc(var(--h) * 1.5));height:var(--h);margin:0 auto;
+    position:relative;width:calc(var(--h) * 1.5);max-width:100%;height:var(--h);margin:0 auto;
     border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:#8fc5ec}
   .stage{position:absolute;top:0;left:50%;height:100%;width:calc(var(--h) * 1.5);transform:translateX(-50%);user-select:none}
-  .stage img.field{position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:fill}
+  .stage img.field{position:absolute;top:0; right:0; bottom:0; left:0;width:100%;height:100%;display:block;object-fit:fill}
 
   /* 캐릭터 자리 — 이미지가 있으면 <img>, 없으면 임시 도형 */
   .slot{position:absolute;pointer-events:none}
   /* 그림 바꿔 끼우기는 display 가 아니라 opacity 로 — Safari(iPad)는 처음 표시되는 이미지를 비동기로 디코딩해서
      display:none→block 순간 빈 칸이 됨. 항상 그려 두고 투명도만 바꾸면 미리 디코딩되어 사라지지 않음 */
-  .slot img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;object-position:bottom center;display:none;opacity:0}
+  .slot img{position:absolute;top:0; right:0; bottom:0; left:0;width:100%;height:100%;object-fit:contain;object-position:bottom center;display:none;opacity:0}
   .slot.has-img img{display:block}
   .slot.has-img img.cur{opacity:1}
-  .slot .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:2px;
+  .slot .ph{position:absolute;top:0; right:0; bottom:0; left:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:2px;
     border:2px dashed rgba(27,43,32,.55);border-radius:6px;background:rgba(255,255,255,.35);color:#1B2B20;font-weight:700;text-align:center}
   .slot.has-img .ph{display:none}
   .slot .ph small{font-weight:400;font-size:11px;color:#3B4B40}
@@ -111,13 +111,13 @@
   #call{position:absolute;left:50%;top:54%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;
     opacity:0;transition:opacity .15s;z-index:5}
   #call.on{opacity:1}
-  #call .g{display:inline-block;font-size:clamp(22px,5vw,36px);font-weight:800;color:#fff;
+  #call .g{display:inline-block;font-size:36px; font-size:clamp(22px, 5vw, 36px);font-weight:800;color:#fff;
     background:rgba(27,43,32,.78);border-radius:var(--radius);padding:4px 16px;line-height:1.3}
-  #call .d{display:block;margin-top:4px;font-size:clamp(12px,2.6vw,15px);font-weight:700;color:#fff;
+  #call .d{display:block;margin-top:4px;font-size:15px; font-size:clamp(12px, 2.6vw, 15px);font-weight:700;color:#fff;
     background:rgba(27,43,32,.6);border-radius:var(--radius);padding:2px 10px}
 
   /* 타이밍 게이지 (홈플레이트 아래) */
-  .gauge{position:absolute;left:50%;bottom:2.5%;transform:translateX(-50%);width:min(62%,420px,calc(100vw - 60px));z-index:5}   /* 무대가 틀보다 넓어도 화면 안에 */
+  .gauge{position:absolute;left:50%;bottom:2.5%;transform:translateX(-50%);width:62%;max-width:420px;width:min(62%,420px,calc(100vw - 60px));z-index:5}   /* 무대가 틀보다 넓어도 화면 안에 */
   .gauge .bar{position:relative;height:14px;border-radius:7px;border:1px solid rgba(255,255,255,.7);box-shadow:0 1px 3px rgba(0,0,0,.35);
     background:linear-gradient(90deg,#c8453f 0%,#e8892b 22%,#f2c94c 36%,#2f8f5b 44%,#2f8f5b 56%,#f2c94c 64%,#e8892b 78%,#c8453f 100%)}
   .gauge .mid{position:absolute;left:50%;top:-3px;bottom:-3px;width:2px;background:rgba(255,255,255,.85);transform:translateX(-50%)}
@@ -128,13 +128,13 @@
   #gaugeText{text-align:center;flex:1}
 
   /* 스윙 버튼 */
-  .swing{display:flex;align-items:center;justify-content:center;width:100%;height:clamp(64px,12vh,96px);margin-top:8px;
-    border-radius:var(--radius);background:var(--panel);border:1px solid var(--line);font-size:clamp(22px,5vw,30px);font-weight:800;letter-spacing:4px}
+  .swing{display:flex;align-items:center;justify-content:center;width:100%;height:96px; height:clamp(64px, 12vh, 96px);margin-top:8px;
+    border-radius:var(--radius);background:var(--panel);border:1px solid var(--line);font-size:30px; font-size:clamp(22px, 5vw, 30px);font-weight:800;letter-spacing:4px}
   .swing:active:not(:disabled){background:var(--tone)}
   .swing:disabled{opacity:.45}
 
   /* ---------- 시작·결과 화면 ---------- */
-  .overlay{position:fixed;inset:0;z-index:20;background:rgba(27,43,32,.55);display:none;overflow:auto;padding:56px 12px 40px}
+  .overlay{position:fixed;top:0; right:0; bottom:0; left:0;z-index:20;background:rgba(27,43,32,.55);display:none;overflow:auto;padding:56px 12px 40px}
   .overlay.on{display:flex}
   .card{margin:auto;width:100%;max-width:520px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px}
   h1{font-size:22px;margin:0 0 6px}
@@ -892,6 +892,17 @@ document.addEventListener("keydown", e => {
 });
 $("btnStart").addEventListener("click", e => { e.currentTarget.blur(); startGame(); });
 $("btnAgain").addEventListener("click", e => { e.currentTarget.blur(); startGame(); });
+
+/* 무대 높이(--h)는 CSS 의 min(clamp(...)) 과 같은 식으로 스크립트가 직접 넣음 — 전자칠판처럼 min()/clamp() 를 모르는
+   옛 브라우저에서 무대가 0px 로 사라지는 것을 막음(CSS 값은 스크립트가 돌기 전 첫 화면용) */
+const arenaEl = document.querySelector(".arena");
+function fitArena(){
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const h = Math.min(Math.max(300, Math.min(vh - 250, 640)), vw - 20);
+  arenaEl.style.setProperty("--h", Math.floor(h) + "px");
+}
+fitArena();
+window.addEventListener("resize", fitArena);
 
 applyImages();
 setBatter("ready"); setPitcher("idle");

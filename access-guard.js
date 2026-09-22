@@ -217,7 +217,7 @@
     overlay = document.createElement("div");
     overlay.setAttribute("data-guard", "1");
     overlay.style.cssText = [
-      "position:fixed", "inset:0", "z-index:2147483647",
+      "position:fixed", "top:0; right:0; bottom:0; left:0", "z-index:2147483647",
       "display:flex", "flex-direction:column",
       "align-items:center", "justify-content:center", "gap:14px",
       "background:#F4F6F1", "color:#1B2B20", "text-align:center",
