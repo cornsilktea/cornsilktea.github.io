@@ -11,7 +11,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
 <meta property="og:title" content="파워 애로우 챌린지">
-<meta property="og:description" content="꾹 눌러 파워를 모았다가 놓아 화살을 쏘는 1인칭 타이밍 양궁 개인전 / 흘러가는 나무 과녁 6라운드·라운드당 5발 / 라운드 합계가 통과 기준 아래면 탈락, 총점으로 기록">
+<meta property="og:description" content="누르면 장전, 놓으면 발사하는 1인칭 타이밍 양궁 개인전 / 흘러가는 나무 과녁 6라운드·라운드당 5발, 라운드마다 과녁이 빨라짐 / 라운드 합계가 통과 기준 아래면 탈락, 총점으로 기록">
 <meta property="og:url" content="https://cornsilktea.github.io/29.power-arrow.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
@@ -38,14 +38,8 @@
   #hudScore .num { font-size: clamp(40px, 9vw, 84px); font-weight: 800; color: #D97B4F; -webkit-text-stroke: 2px var(--sg-ink); text-shadow: 0 5px 0 rgba(27,43,32,.35); line-height: 1; font-variant-numeric: tabular-nums; }
   #hudScore .pass { display: inline-block; margin-top: 6px; font-size: clamp(18px, 4vw, 36px); font-weight: 800; color: #fff; background: var(--sg-primary); border: 2px solid var(--sg-ink); border-radius: 8px; padding: 2px 10px; box-shadow: 0 3px 0 var(--sg-ink); font-variant-numeric: tabular-nums; }
 
-  /* 파워 게이지: 화면 아래 가운데, 항상 보임 */
-  #powerWrap { left: 50%; bottom: 14px; transform: translateX(-50%); width: min(460px, calc(100% - 24px)); background: rgba(255,255,255,.92); border: 2px solid var(--sg-line-strong); border-radius: 10px; padding: 5px 10px 8px; box-shadow: 0 3px 0 rgba(27,43,32,.25); }
-  #powerWrap .lab { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: var(--sg-ink-soft); margin-bottom: 4px; }
-  #powerWrap .lab b { color: var(--sg-ink); font-size: 17px; }
-  #powerBar { height: 24px; border: 2px solid var(--sg-line-strong); border-radius: 6px; background: #fff; overflow: hidden; position: relative; }
-  #powerFill { height: 100%; width: 0; background: linear-gradient(90deg, var(--sg-ok), var(--sg-warn) 60%, #D97B4F); }
-  #powerFill.full { animation: blink .35s ease-in-out infinite alternate; }
-  @keyframes blink { to { opacity: .55; } }
+  /* 조작 안내(화면 아래 가운데) */
+  #tip { left: 0; right: 0; bottom: 18px; text-align: center; font-size: 15px; font-weight: 800; color: #fff; -webkit-text-stroke: 1px var(--sg-ink); text-shadow: 0 2px 0 rgba(27,43,32,.4); }
 
   /* 라운드 배너 · 득점 팝업 */
   #banner { position: fixed; z-index: 6; left: 0; right: 0; top: 60%; text-align: center; pointer-events: none; display: none; }
@@ -93,7 +87,7 @@
   @media (max-width: 640px) {
     .hud-box { padding: 4px 8px; min-width: 0; }
     #hudArrows { left: 96px; }
-    #powerWrap { bottom: 64px; }   /* 왼쪽 아래 개인 최고 기록과 겹치지 않게 */
+    #tip { bottom: 70px; font-size: 13px; }   /* 왼쪽 아래 개인 최고 기록과 겹치지 않게 */
     .hud-box .lab { font-size: 10px; }
     .btn { font-size: 18px; padding: 11px 24px; }
     .desc { font-size: 13px; }
@@ -111,17 +105,14 @@
 <div class="hud" id="hudScore"><div class="num" id="hudScoreVal">0점</div><div class="pass" id="hudPass">이번 라운드 0 / 통과 20점</div></div>
 <div class="hud hud-box" id="hudBest"><span class="lab">개인 최고 기록</span><span class="big" id="hudBestVal">—</span></div>
 
-<div class="hud" id="powerWrap">
-  <div class="lab"><span>파워 <b id="powerPct">0%</b></span><span id="powerTip">꾹 눌렀다가 놓으면 발사</span></div>
-  <div id="powerBar"><div id="powerFill"></div></div>
-</div>
+<div class="hud" id="tip">화면을 누르면 장전 · 놓으면 발사</div>
 
 <div id="overlay">
   <div class="card" id="cardStart">
     <div class="logo">🏹 파워 애로우 챌린지<small>흘러가는 과녁을 타이밍 맞춰 맞혀라 · 6라운드 × 5발</small></div>
-    <div class="desc">화면(또는 <b>스페이스바</b>)을 <b>꾹 누르면</b> 파워가 차고, <b>놓으면</b> 화살이 날아갑니다. 파워가 약하면 과녁 아래로 떨어지고 너무 세면 위로 지나갑니다. 과녁은 계속 왼쪽으로 흘러가니 <b>도착할 때 과녁이 가운데에 오도록</b> 미리 쏘세요. 가운데 <b>10점</b>, 바깥으로 갈수록 점수가 낮아지고 빗나가면 0점. 라운드 5발 합계가 <b>통과 기준</b>보다 낮으면 탈락합니다.</div>
+    <div class="desc">화면(또는 <b>스페이스바</b>)을 <b>누르면 장전</b>되고, <b>놓으면</b> 화살이 날아갑니다. 과녁은 계속 왼쪽으로 흘러가고 화살이 닿기까지 시간이 걸리니 <b>도착할 때 과녁이 가운데에 오도록</b> 조금 미리 놓으세요. 가운데 <b>10점</b>, 바깥으로 갈수록 점수가 낮아지고 빗나가면 0점. 라운드가 오를수록 과녁이 빨라지고, 라운드 5발 합계가 <b>통과 기준</b>보다 낮으면 탈락합니다.</div>
     <div class="keys">
-      <div><b>꾹 누르기</b><span>파워 충전</span></div>
+      <div><b>누르기</b><span>장전</span></div>
       <div><b>놓기</b><span>발사</span></div>
       <div><b>🎯 10점</b><span>정중앙 명중</span></div>
     </div>
@@ -157,11 +148,11 @@
 "use strict";
 /* ═══════════════════════════════════════════════════════════════════
    파워 애로우 챌린지 — Canvas 2D 1인칭 타이밍 양궁 (쉬는시간용, 개인전, 라운드제)
-   화면에는 활·사람 없이 화살 하나만 아래 가운데에 놓인다. 꾹 누르면 화살이 제 축을 따라 화면 앞(카메라 쪽)으로
-   끌려 내려와 완충 때는 앞 절반만 보이고(파워 충전), 놓으면 화면 안쪽으로 날아간다.
-   배경 3겹 패럴랙스 + 나뭇가지에 매달려 흔들리는 과녁이 왼쪽으로 흐른다.
+   화면에는 활·사람 없이 화살 하나만 아래 가운데에 놓인다. 누르면 화살이 제 축을 따라 화면 앞(카메라 쪽)으로
+   끌려 내려와 앞 절반만 보이고(장전), 놓으면 화면 안쪽으로 날아간다. 파워 게이지는 없다 — 초속은 늘 과녁 중심 높이에 닿는 값.
+   배경 3겹 패럴랙스 + 나무에 매달린 과녁이 배경과 함께 왼쪽으로 흐른다(흔들림 없음).
    좌표(m): 카메라가 원점, 앞이 +z, 위가 +y, 오른쪽이 +x. 화살은 실제 포물선(중력)으로 날고 속도 방향으로 기운다.
-   그릴 때는 촉·오늬를 각각 투영해 원근·단축(짧아 보임)을 그대로 쓴다. 파워 → 초속(도착 높이), 놓는 순간(타이밍) → 좌우.
+   그릴 때는 촉·오늬를 각각 투영해 원근·단축(짧아 보임)을 그대로 쓴다. 놓는 순간(타이밍)이 좌우 오차를 정한다.
    기록: 총점(모든 화살 점수 합). 개인 최고: localStorage powerarrow_best_v1 / 세계 신기록: Firebase records/powerarrow/all
    ═══════════════════════════════════════════════════════════════════ */
 
@@ -169,13 +160,11 @@
 const CONFIG = {
   arrowsPerRound: 5,
   passThresholds: [20, 23, 26, 30, 35, 40],          // 라운드별 통과 기준(해당 라운드 5발 합). 배열 길이 = 라운드 수
-  targetSpeedByRound: [1.0, 1.15, 1.3, 1.5, 1.75, 2.0],   // 라운드별 과녁 이동·흔들림 속도 배율 (모자라면 마지막 값 사용)
+  targetSpeedByRound: [1.0, 1.15, 1.3, 1.5, 1.75, 2.0],   // 라운드별 과녁 이동 속도 배율 (모자라면 마지막 값 사용)
   targetBaseSpeedW: 0.20,     // 과녁 기본 속도 (초당 화면 너비 비율)
   targetGapW: 0.45,           // 과녁이 왼쪽으로 사라진 뒤 오른쪽에서 다시 나올 때까지의 간격(화면 너비 비율)
-  chargeMaxTimeMs: 1200,      // 파워 게이지 완충까지 걸리는 시간 (100% 뒤에는 계속 눌러도 100% 유지)
-  idealPower: 0.72,           // 과녁 정중앙 높이에 닿는 파워 (더 약하면 아래로, 더 세면 위로)
-  speedLowK: 0.7, speedHighK: 3.2,   // 파워 0% / 100% 의 초속 = 정중앙 초속 × (1 − idealPower×speedLowK) / (1 + (1−idealPower)×speedHighK)
-  assistX: 0.45, assistY: 0.2,   // 조준 보정(0 없음 ~ 1 무조건 정중앙). 과녁 근처(반지름 1.6배 안)에서만 오차를 이 비율만큼 줄인다
+  loadTimeMs: 120,            // 누른 뒤 화살이 뒤로 끌려오는(장전 모션) 시간
+  assistX: 0.45,              // 조준 보정(0 없음 ~ 1 무조건 정중앙). 과녁 근처(반지름 1.6배 안)에서만 좌우 오차를 이 비율만큼 줄인다
   /* 3D 장면 (m) — 카메라 눈높이·초점거리로 화면 크기가 정해진다 */
   camHeightM: 1.5,            // 카메라(눈) 높이
   horizonH: 0.38,             // 지평선(눈높이)의 화면 y (화면 높이 비율)
@@ -183,17 +172,16 @@ const CONFIG = {
   targetRadiusM: 0.6,         // 과녁 실제 반지름 → 화면 크기(targetRadiusH)와 합쳐 과녁까지 거리가 정해진다
   arrowLengthM: 0.8, arrowWidthM: 0.42,   // 화살 길이 · 깃 너비(그림 폭)
   handM: { y: 1.0, z: 0.9 },  // 대기 상태 오늬(밑동) 위치 (x=0)
-  drawBackM: 0.38,            // 완충 때 오늬가 축을 따라 뒤(카메라 쪽)로 끌려오는 거리 → 앞 절반쯤만 화면에 남는다
+  drawBackM: 0.38,            // 장전 때 오늬가 축을 따라 뒤(카메라 쪽)로 끌려오는 거리 → 앞 절반쯤만 화면에 남는다
   launchAngleDeg: 20,         // 발사 각도(위로)
   gravity: 9.81,
   minForeshorten: 0.5,        // 화살이 시선과 거의 나란해도 그림 길이를 (길이×초점/거리) 의 이 비율 아래로 줄이지 않는다
-  stuckScale: 0.08,           // 과녁에 꽂힌 화살 그림 높이(화면 높이 비율)
-  targetRingScores: [10, 8, 6, 5, 3, 2, 1],   // 중심→바깥 점수 (그림의 빨강·크림·초록 띠 7단계와 맞춤)
-  targetRingEdges: [0.19, 0.33, 0.47, 0.61, 0.75, 0.88, 1.0],   // 각 띠의 바깥 경계(과녁 반지름 비율)
+  stuckScale: 0.085,          // 과녁에 꽂힌 화살 그림 높이(화면 높이 비율)
+  stuckSinkRatio: 0.38,       // 꽂힌 화살은 앞쪽 이 비율만큼 과녁에 박혀 안 보인다(깃 쪽만 보임)
+  targetRingScores: [10, 8, 6, 4, 2, 1],   // 중심→바깥 점수 (그림의 빨강·크림·초록·크림·초록·테두리 6단계와 맞춤)
+  targetRingEdges: [0.2, 0.39, 0.58, 0.77, 0.94, 1.0],   // 각 띠의 바깥 경계(과녁 반지름 비율)
   targetRadiusH: 0.11,        // 과녁 반지름(화면 높이 비율, 세로 화면에서는 너비 기준으로 제한)
   targetCenterY: 0.42,        // 과녁 중심 높이(화면 높이 비율)
-  swingAmplitudePx: 40,       // 과녁 흔들림 진폭(과녁 중심이 좌우로 움직이는 px, 1080p 기준으로 화면에 맞춰 조정)
-  swingPeriodSec: 2.0,        // 과녁 흔들림 주기(초) — 라운드 배율만큼 빨라짐
 };
 function thresholdOf(r) { const P = CONFIG.passThresholds; return P[Math.min(r, P.length) - 1]; }
 function speedMulOf(r) { const S = CONFIG.targetSpeedByRound; return S[Math.min(r, S.length) - 1]; }
@@ -267,21 +255,8 @@ function noise(dur, vol, from, to) {   // 바람 소리(화살 날아가는 소�
   } catch (e) {}
 }
 const SFX = {
-  chargeStart() {   // 누르는 동안 올라가는 삐- 소리 (놓으면 끝)
-    if (!AUD.ctx) return;
-    try {
-      const c = AUD.ctx, t = c.currentTime, o = c.createOscillator(), g = c.createGain();
-      o.type = "triangle"; o.frequency.setValueAtTime(160, t); o.frequency.linearRampToValueAtTime(420, t + CONFIG.chargeMaxTimeMs / 1000);
-      g.gain.setValueAtTime(.05, t); o.connect(g); g.connect(c.destination); o.start(t);
-      AUD.charge = { o, g };
-    } catch (e) {}
-  },
-  chargeStop() {
-    const ch = AUD.charge; AUD.charge = null;
-    if (!ch || !AUD.ctx) return;
-    try { const t = AUD.ctx.currentTime; ch.g.gain.setValueAtTime(ch.g.gain.value, t); ch.g.gain.exponentialRampToValueAtTime(.001, t + .06); ch.o.stop(t + .07); } catch (e) {}
-  },
-  shoot(p) { tone(260 + p * 140, .1, "square", .07, 120); noise(.35 + p * .3, .12, 1200, 300); },
+  load() { noise(.12, .05, 400, 900); tone(220, .1, "triangle", .05, 300); },   // 장전(활시위 당기는 소리)
+  shoot() { tone(360, .1, "square", .07, 120); noise(.55, .12, 1200, 300); },
   hit(score) { tone(120, .12, "square", .14, 70); if (score >= 8) { setTimeout(() => tone(880, .12, "sine", .13), 60); setTimeout(() => tone(1320, .22, "sine", .13), 150); } else setTimeout(() => tone(600, .15, "sine", .1), 60); },
   miss() { noise(.4, .06, 600, 150); tone(220, .3, "sawtooth", .05, 110); },
   pass() { [523, 659, 784, 1047, 1319].forEach((f, i) => setTimeout(() => tone(f, .25, "sine", .14), i * 110)); },
@@ -296,8 +271,8 @@ const IMG = {};
 });
 /* 화살 그림(480×809): 촉 끝이 (240,55), 오늬(밑동)는 맨 아래 */
 const ARROW_IMG = { w: 480, h: 809, tipX: 240, tipY: 55 };
-/* 과녁 그림(640×1067): 과녁 중심 (386,753)·반지름 178, 밧줄이 가지에 묶인 점(회전축) (386,310) */
-const TARGET_IMG = { w: 640, h: 1067, cx: 386, cy: 753, r: 178, px: 386, py: 310 };
+/* 과녁 그림(640×960, 나무에 매달린 과녁): 과녁 중심 (333,554)·반지름 156 */
+const TARGET_IMG = { w: 640, h: 960, cx: 333, cy: 554, r: 156 };
 
 /* 중경·근경은 불투명 그림이라 위쪽을 투명하게 깎아(알파 그라데이션) 뒤의 겹이 비치게 한다 */
 const LAYER = { mid: null, near: null };
@@ -314,7 +289,7 @@ function fadedLayer(k, from, to) {   // from~to: 그림 높이 비율. from 위�
 }
 
 /* ═══════════════════ 화면 ═══════════════════ */
-const V = { W: 0, H: 0, dpr: 1, cx: 0, R: 0, tk: 0, swingAmp: 0, f: 0, hy: 0, camY: 1.5, Zt: 5 };
+const V = { W: 0, H: 0, dpr: 1, cx: 0, R: 0, tk: 0, f: 0, hy: 0, camY: 1.5, Zt: 5 };
 function resize() {
   V.dpr = Math.min(2, window.devicePixelRatio || 1);
   V.W = window.innerWidth; V.H = window.innerHeight;
@@ -323,7 +298,6 @@ function resize() {
   V.cx = V.W / 2;
   V.R = Math.min(CONFIG.targetRadiusH * V.H, 0.17 * V.W);   // 과녁 반지름(px)
   V.tk = V.R / TARGET_IMG.r;                                // 과녁 그림 1px 당 화면 px
-  V.swingAmp = CONFIG.swingAmplitudePx * V.H / 1080;
   V.f = Math.min(CONFIG.focalH * V.H, 1.45 * V.W);          // 초점거리(px): 그 거리(m)에서 1m 가 f/z px
   V.hy = CONFIG.horizonH * V.H;                              // 지평선(눈높이) 화면 y
   V.camY = CONFIG.camHeightM;
@@ -336,7 +310,7 @@ function proj(x, y, z) { const s = V.f / z; return { x: V.cx + x * s, y: V.hy - 
 /* 화면 (sx,sy) 를 깊이 z 에 놓았을 때의 월드 x,y */
 function unproj(sx, sy, z) { return { x: (sx - V.cx) * z / V.f, y: V.camY - (sy - V.hy) * z / V.f }; }
 const DIR = (() => { const a = CONFIG.launchAngleDeg * Math.PI / 180; return { x: 0, y: Math.sin(a), z: Math.cos(a) }; })();   // 발사 방향(단위)
-/* 들고 있는 화살의 오늬(밑동)·촉 위치. p: 파워 0~1 — 축을 따라 뒤로 drawBackM×p 만큼 끌려온다 */
+/* 들고 있는 화살의 오늬(밑동)·촉 위치. p: 장전 진행 0~1 — 축을 따라 뒤로 drawBackM×p 만큼 끌려온다 */
 function heldArrow(p) {
   const L = CONFIG.arrowLengthM, back = CONFIG.drawBackM * p;
   const nock = { x: 0, y: CONFIG.handM.y - DIR.y * back, z: CONFIG.handM.z - DIR.z * back };
@@ -347,31 +321,22 @@ function heldArrow(p) {
 const G = {
   state: "idle",     // idle · play · between(라운드 통과 연출) · over
   round: 1, score: 0, roundScore: 0, shot: 0, t: 0,
-  charge: null,      // { t0 } 누르는 중
-  arrow: null,       // 날아가는 화살 { x0,y0,s0, xe,ye, T, t, power, arc, done }
-  fading: null,      // 빗나간 화살(사라지는 중) { x, y, s, life }
-  target: null,      // { x(중심 x, 화면 px), spawnT, stuck: [] }
+  charge: null,      // { t0 } 누르는 중(장전)
+  arrow: null,       // 날아가는 화살 { c, v, L, judged, life, stopped }
+  fading: null,      // 빗나간 화살(사라지는 중) — 같은 모양
+  target: null,      // { x(과녁 중심의 지금 화면 x), stuck: [ {x,y(과녁 그림 px), t0, lean} ] }
   scroll: 0,         // 배경 스크롤 누적(px, 과녁 속도 기준)
   worldSpeed: 0,     // 현재 과녁 속도(px/s)
   hits: 0,
 };
 function targetSpeed() { return CONFIG.targetBaseSpeedW * V.W * speedMulOf(G.round); }
-function swingAngle(t) {   // 밧줄 묶인 점을 축으로 흔들리는 각(rad). 진폭은 과녁 중심이 swingAmp 만큼 움직이도록
-  const arm = (TARGET_IMG.cy - TARGET_IMG.py) * V.tk;
-  const period = CONFIG.swingPeriodSec / speedMulOf(G.round);
-  return (V.swingAmp / arm) * Math.sin(2 * Math.PI * t / period);
+/* 과녁 중심의 화면 좌표 — 배경과 같은 속도로 왼쪽으로만 흐른다. tg.x 는 지금(G.t) 위치, t 가 미래면 지금 속도로 예측 */
+function targetCenterAt(tg, t) {
+  return { x: tg.x - G.worldSpeed * (t - G.t), y: CONFIG.targetCenterY * V.H };
 }
-/* 과녁 중심의 화면 좌표(흔들림 포함). tg.x 는 회전축(가지에 묶인 점)의 x */
-function targetCenterAt(tg, t, ang) {
-  if (ang === undefined) ang = swingAngle(t);
-  const arm = (TARGET_IMG.cy - TARGET_IMG.py) * V.tk, py = pivotY();
-  const x = (tg.x - G.worldSpeed * (t - tg.spawnT)) + Math.sin(ang) * arm;
-  return { x, y: py + Math.cos(ang) * arm, ang };
-}
-function pivotY() { return CONFIG.targetCenterY * V.H - (TARGET_IMG.cy - TARGET_IMG.py) * V.tk; }
 function spawnTarget(fromX) {
   const halfW = TARGET_IMG.w * V.tk / 2;
-  G.target = { x: fromX !== undefined ? fromX : V.W + halfW + 20, spawnT: G.t, stuck: [] };
+  G.target = { x: fromX !== undefined ? fromX : V.W + halfW + 20, stuck: [] };
 }
 
 function startGame() {
@@ -384,7 +349,7 @@ function startGame() {
 }
 function startRound() {
   G.roundScore = 0; G.shot = 0; G.state = "play"; G.worldSpeed = targetSpeed();
-  updateHud(); showPower(0);
+  updateHud();
   showBanner("ROUND " + G.round, "5발 합계 " + thresholdOf(G.round) + "점 이상이면 통과" + (G.round > 1 ? " · 과녁이 더 빨라집니다" : ""), 1600);
 }
 function endRound() {
@@ -399,7 +364,7 @@ function endRound() {
   }
 }
 function gameOver(cleared) {
-  G.state = "over"; G.charge = null; SFX.chargeStop(); G.arrow = null;
+  G.state = "over"; G.charge = null; G.arrow = null;
   cleared ? SFX.clear() : SFX.over();
   document.body.classList.remove("playing");
   const score = G.score, round = G.round;
@@ -443,20 +408,21 @@ function updateHud() {
   $("hudScoreVal").textContent = G.score + "점";
 }
 
-/* ═══════════════════ 충전 · 발사 · 판정 ═══════════════════ */
+/* ═══════════════════ 장전 · 발사 · 판정 ═══════════════════ */
 function canCharge() { return G.state === "play" && !G.charge && !G.arrow && G.shot < CONFIG.arrowsPerRound; }
-function chargePower() { return G.charge ? Math.min(1, (performance.now() - G.charge.t0) / CONFIG.chargeMaxTimeMs) : 0; }
+/* 장전 진행 0~1 (누른 뒤 loadTimeMs 동안 화살이 뒤로 끌려온다) */
+function chargePower() { return G.charge ? Math.min(1, (performance.now() - G.charge.t0) / CONFIG.loadTimeMs) : 0; }
 function beginCharge() {
   if (!canCharge()) return;
   audioInit();
   G.charge = { t0: performance.now() };
-  SFX.chargeStart();
+  SFX.load();
 }
-function cancelCharge() { G.charge = null; SFX.chargeStop(); showPower(0); }
+function cancelCharge() { G.charge = null; }
 function release() {
   if (!G.charge) return;
   const p = chargePower();
-  G.charge = null; SFX.chargeStop();
+  G.charge = null;
   shoot(p);
 }
 /* 화살 중심 c0 에서 초속 vel 로 쏘면 촉이 언제(T)·어디서 과녁 깊이(Zt)를 지나는지 (stepArrow 와 같은 모델의 폐형식 + 이분법).
@@ -479,28 +445,23 @@ function idealSpeed(held, Yt) {
   for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2; if (flightAt(c0, { x: 0, y: DIR.y * m, z: DIR.z * m }, L).tip.y < Yt) lo = m; else hi = m; }
   return (lo + hi) / 2;
 }
-function speedOf(p, vStar) {
-  const q = CONFIG.idealPower;
-  return vStar * (p < q ? 1 - (q - p) * CONFIG.speedLowK : 1 + (p - q) * CONFIG.speedHighK);
-}
-/* 발사: 지금 끌려 내려온 자리에서 발사 방향으로 초속을 주고 중력에 맡긴다 */
+/* 발사: 지금 끌려 내려온 자리에서 과녁 중심 높이에 닿는 초속으로 쏘고 중력에 맡긴다 (좌우는 놓는 타이밍이 정한다) */
 function shoot(p) {
   const L = CONFIG.arrowLengthM, held = heldArrow(p);
   const c0 = { x: 0, y: (held.nock.y + held.tip.y) / 2, z: (held.nock.z + held.tip.z) / 2 };
-  const tw = unproj(V.cx, CONFIG.targetCenterY * V.H, V.Zt);   // 과녁 기본 위치의 월드 좌표
-  const v = speedOf(p, idealSpeed(held, tw.y));
+  const tw = unproj(V.cx, CONFIG.targetCenterY * V.H, V.Zt);   // 과녁 중심의 월드 좌표
+  const v = idealSpeed(held, tw.y);
   const vel = { x: 0, y: DIR.y * v, z: DIR.z * v };
-  /* 조준 보정: 도착 시점의 과녁 위치를 미리 계산해 근처면 오차를 조금 줄인다 */
+  /* 조준 보정: 도착 시점의 과녁 위치를 미리 계산해 근처면 좌우 오차를 조금 줄인다 */
   const tg = G.target, fl = flightAt(c0, vel, L);
   if (tg && fl.T > 0) {
     const c = targetCenterAt(tg, G.t + fl.T), cw = unproj(c.x, c.y, V.Zt), lim = 1.6 * CONFIG.targetRadiusM;
     if (Math.abs(cw.x - fl.tip.x) < lim) vel.x += CONFIG.assistX * (cw.x - fl.tip.x) / fl.T;
-    if (Math.abs(cw.y - fl.tip.y) < lim) vel.y += CONFIG.assistY * (cw.y - fl.tip.y) / fl.T;
   }
   G.arrow = { c: c0, v: vel, L, judged: false, life: 0, stopped: false };
   G.shot++; G.fading = null;
-  updateHud(); showPower(0);
-  SFX.shoot(p);
+  updateHud();
+  SFX.shoot();
 }
 function arrowDir(a) { const n = Math.hypot(a.v.x, a.v.y, a.v.z) || 1; return { x: a.v.x / n, y: a.v.y / n, z: a.v.z / n }; }
 function arrowTip(a) { const d = arrowDir(a), h = a.L / 2; return { x: a.c.x + d.x * h, y: a.c.y + d.y * h, z: a.c.z + d.z * h }; }
@@ -526,15 +487,22 @@ function judge(a, tipAt) {
   const d = (c && tipAt) ? Math.hypot(sp.x - c.x, sp.y - c.y) / V.R : 9;
   let score = 0;
   if (d <= 1) { const E = CONFIG.targetRingEdges; for (let i = 0; i < E.length; i++) if (d <= E[i]) { score = CONFIG.targetRingScores[i]; break; } }
+  /* 과녁 판 밖이라도 나무 줄기(과녁 그림 가운데 세로 띠)에 맞으면 0점으로 꽂힌다 */
+  const ix = c ? TARGET_IMG.cx + (sp.x - c.x) / V.tk : -1, iy = c ? TARGET_IMG.cy + (sp.y - c.y) / V.tk : -1;
+  const inTree = !!(c && tipAt) && score === 0 && Math.abs(ix - TARGET_IMG.cx) < 95 && iy > 60 && iy < TARGET_IMG.h - 20;
+  if (score > 0 || inTree) {
+    /* 꽂힌 화살: 과녁 그림 px 좌표로 기억해 두고 과녁과 함께 흐른다. 도착 방향으로 살짝 기울고, 꽂히는 순간 떨린다 */
+    const dir = arrowDir(a), lean = Math.atan2(dir.x, -dir.y * 0.4 + 1) * 0.6 + (Math.random() - 0.5) * 0.14;
+    tg.stuck.push({ x: ix, y: iy, t0: G.t, lean });
+    G.arrow = null;
+  }
   if (score > 0) {
-    /* 과녁에 꽂힌 화살: 과녁 회전 전 좌표계(과녁 그림 px)로 기억해 두고 과녁과 함께 그린다 */
-    const ang = c.ang, dx = sp.x - c.x, dy = sp.y - c.y;
-    const lx = (Math.cos(-ang) * dx - Math.sin(-ang) * dy) / V.tk, ly = (Math.sin(-ang) * dx + Math.cos(-ang) * dy) / V.tk;
-    tg.stuck.push({ x: TARGET_IMG.cx + lx, y: TARGET_IMG.cy + ly });
     G.hits++; G.score += score; G.roundScore += score;
     SFX.hit(score);
     popText("+" + score, score >= 10 ? "ten" : "", sp.x, sp.y - V.R * 0.6);
-    G.arrow = null;
+  } else if (inTree) {
+    SFX.hit(0);
+    popText("빗나감", "miss", sp.x, sp.y - V.R * 0.6);
   } else {
     SFX.miss();
     a.life = 0.7; G.fading = a; G.arrow = null;   // 빗나간 화살은 그대로 날아가며(또는 땅에 꽂힌 채) 사라진다
@@ -549,12 +517,13 @@ let last = 0;
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000 || 0) * (CONFIG.timeScale === undefined ? 1 : CONFIG.timeScale); last = now;   // timeScale: 콘솔에서 CONFIG.timeScale=0.2 로 슬로모션 확인용(0 이면 정지)
   if (G.state === "play" || G.state === "between") {
+    G.worldSpeed = targetSpeed();   // 화면 크기·라운드가 바뀌어도 매 프레임 다시 계산
     G.t += dt; G.scroll += G.worldSpeed * dt;
     const tg = G.target, halfW = TARGET_IMG.w * V.tk / 2;
-    if (tg && tg.x - G.worldSpeed * (G.t - tg.spawnT) < -halfW - 10) spawnTarget(V.W + halfW + CONFIG.targetGapW * V.W);
+    if (tg) tg.x -= G.worldSpeed * dt;
+    if (tg && tg.x < -halfW - 10) spawnTarget(V.W + halfW + CONFIG.targetGapW * V.W);
     if (G.arrow) stepArrow(G.arrow, dt);
     if (G.fading) { const f = G.fading; stepArrow(f, dt); f.life -= dt; if (f.life <= 0) G.fading = null; }
-    if (G.charge) showPower(chargePower());
   }
   draw();
   requestAnimationFrame(frame);
@@ -583,18 +552,35 @@ function drawForeground() {
 }
 function drawTarget() {
   const tg = G.target; if (!tg) return;
-  const ang = swingAngle(G.t), px = tg.x - G.worldSpeed * (G.t - tg.spawnT), py = pivotY(), k = V.tk;
-  ctx.save(); ctx.translate(px, py); ctx.rotate(ang);
-  if (IMG.target) ctx.drawImage(IMG.target, -TARGET_IMG.px * k, -TARGET_IMG.py * k, TARGET_IMG.w * k, TARGET_IMG.h * k);
+  const c = targetCenterAt(tg, G.t), k = V.tk;
+  ctx.save(); ctx.translate(c.x - TARGET_IMG.cx * k, c.y - TARGET_IMG.cy * k);   // 과녁 그림의 왼쪽 위가 원점
+  if (IMG.target) ctx.drawImage(IMG.target, 0, 0, TARGET_IMG.w * k, TARGET_IMG.h * k);
   else {   // 그림이 없을 때의 도형 과녁
-    const cx = (TARGET_IMG.cx - TARGET_IMG.px) * k, cy = (TARGET_IMG.cy - TARGET_IMG.py) * k;
-    ctx.strokeStyle = "#8B5A2B"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(cx, cy - V.R); ctx.stroke();
-    const cols = ["#C8A46A", "#6FA35A", "#F2E6C8", "#6FA35A", "#F2E6C8", "#6FA35A", "#F2E6C8", "#E24C3A"];
+    const cx = TARGET_IMG.cx * k, cy = TARGET_IMG.cy * k;
+    ctx.fillStyle = "#8B5A2B"; ctx.fillRect(cx - 40 * k, 0, 80 * k, TARGET_IMG.h * k);
+    const cols = ["#C8A46A", "#6FA35A", "#F2E6C8", "#6FA35A", "#F2E6C8", "#E24C3A"];
     const E = CONFIG.targetRingEdges;
     for (let i = E.length - 1; i >= 0; i--) { ctx.fillStyle = cols[cols.length - 1 - i]; ctx.beginPath(); ctx.arc(cx, cy, V.R * E[i], 0, Math.PI * 2); ctx.fill(); }
   }
-  /* 꽂힌 화살(작게, 과녁과 함께 흔들림) */
-  if (IMG.arrow) tg.stuck.forEach(st => { const h = CONFIG.stuckScale * V.H; drawArrowImg((st.x - TARGET_IMG.px) * k, (st.y - TARGET_IMG.py) * k, h, h * ARROW_IMG.w / ARROW_IMG.h, 0, 1); });
+  tg.stuck.forEach(st => drawStuckArrow(st.x * k, st.y * k, st));
+  ctx.restore();
+}
+/* 꽂힌 화살: 앞쪽(stuckSinkRatio)은 과녁에 박혀 안 보이고 깃 쪽만 우리 쪽으로 튀어나와 보인다.
+   꽂힌 자리에 작은 구멍, 도착 방향대로 살짝 기울고, 꽂히는 순간 0.5초쯤 떨린다 */
+function drawStuckArrow(x, y, st) {
+  const age = G.t - st.t0, wob = Math.sin(age * 42) * 0.16 * Math.exp(-age * 5);
+  const hFull = CONFIG.stuckScale * V.H, sink = CONFIG.stuckSinkRatio;
+  const hVis = hFull * (1 - sink), w = hFull * ARROW_IMG.w / ARROW_IMG.h;
+  ctx.save(); ctx.translate(x, y); ctx.rotate(st.lean + wob);
+  ctx.fillStyle = "rgba(40,25,10,.55)"; ctx.beginPath(); ctx.ellipse(0, 0, w * 0.07, w * 0.045, 0, 0, Math.PI * 2); ctx.fill();   // 구멍
+  if (IMG.arrow) {
+    const im = IMG.arrow, sy = ARROW_IMG.tipY + sink * (ARROW_IMG.h - ARROW_IMG.tipY);   // 그림에서 보이는 부분의 시작(위) y
+    ctx.drawImage(im, 0, sy, ARROW_IMG.w, ARROW_IMG.h - sy, -w * ARROW_IMG.tipX / ARROW_IMG.w, 0, w, hVis);
+  } else {
+    ctx.strokeStyle = "#B8863B"; ctx.lineWidth = Math.max(2, w * 0.08); ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, hVis); ctx.stroke();
+    ctx.fillStyle = "#F0DFC0"; ctx.beginPath(); ctx.moveTo(0, hVis * 0.45); ctx.lineTo(-w * 0.45, hVis); ctx.lineTo(0, hVis * 0.92); ctx.lineTo(w * 0.45, hVis); ctx.closePath(); ctx.fill();
+  }
   ctx.restore();
 }
 /* 촉 끝이 (tx,ty) 에 오고, 거기서 밑동 쪽으로 h px 뻗도록(폭 w, 화면 아래 방향에서 rot 만큼 회전) 화살 그림을 그린다 */
@@ -621,8 +607,8 @@ function drawArrow3D(tip, nock, alpha) {
   const rot = seen > 3 ? Math.atan2(dy, dx) - Math.PI / 2 : 0;   // 그림은 아래로 뻗으므로 (0,1) 기준 각
   drawArrowImg(tp.x, tp.y, h, w, rot, alpha);
 }
-function drawHeldArrow(p) {   // 대기·충전 중: 축을 따라 뒤로 끌려와 완충이면 앞 절반만 보인다
-  const a = heldArrow(p), wob = p >= 1 ? Math.sin(G.t * 40) * 0.004 : 0;   // 완충이면 살짝 떨림
+function drawHeldArrow(p) {   // 대기·장전 중: 축을 따라 뒤로 끌려와 장전되면 앞 절반만 보인다
+  const a = heldArrow(p), wob = p >= 1 ? Math.sin(G.t * 40) * 0.004 : 0;   // 장전 상태면 살짝 떨림
   drawArrow3D({ x: a.tip.x + wob, y: a.tip.y, z: a.tip.z }, { x: a.nock.x + wob, y: a.nock.y, z: a.nock.z }, 1);
 }
 function drawFlying(a, alpha) { drawArrow3D(arrowTip(a), arrowNock(a), alpha); }
@@ -642,13 +628,7 @@ function draw() {
   } else drawHeldArrow(0);
 }
 
-/* ═══════════════════ 입력 (꾹 누르기 → 놓기 · 마우스/터치/스페이스 공통) ═══════════════════ */
-function showPower(p) {
-  const pct = Math.round(p * 100);
-  $("powerFill").style.width = pct + "%"; $("powerPct").textContent = pct + "%";
-  $("powerFill").classList.toggle("full", p >= 1);
-  $("powerTip").textContent = G.charge ? (p >= 1 ? "MAX! 놓으면 발사" : "놓으면 발사") : "꾹 눌렀다가 놓으면 발사";
-}
+/* ═══════════════════ 입력 (누르면 장전 → 놓으면 발사 · 마우스/터치/스페이스 공통) ═══════════════════ */
 let pointerId = null;
 canvas.addEventListener("pointerdown", e => {
   if (pointerId !== null) return;
