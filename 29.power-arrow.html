@@ -157,9 +157,11 @@
 "use strict";
 /* ═══════════════════════════════════════════════════════════════════
    파워 애로우 챌린지 — Canvas 2D 1인칭 타이밍 양궁 (쉬는시간용, 개인전, 라운드제)
-   화면에는 활·사람 없이 화살 하나만 아래 가운데에 놓인다. 꾹 누르면 화살이 커지며 다가오고(파워 충전),
-   놓으면 화면 안쪽으로 작아지며 날아간다. 배경 3겹 패럴랙스 + 나뭇가지에 매달려 흔들리는 과녁이 왼쪽으로 흐른다.
-   비행은 "스케일(원근) + 화면 x/y 보간(중력 포물선)"으로 표현. 파워가 도착 높이를, 놓는 순간(타이밍)이 좌우를 정한다.
+   화면에는 활·사람 없이 화살 하나만 아래 가운데에 놓인다. 꾹 누르면 화살이 제 축을 따라 화면 앞(카메라 쪽)으로
+   끌려 내려와 완충 때는 앞 절반만 보이고(파워 충전), 놓으면 화면 안쪽으로 날아간다.
+   배경 3겹 패럴랙스 + 나뭇가지에 매달려 흔들리는 과녁이 왼쪽으로 흐른다.
+   좌표(m): 카메라가 원점, 앞이 +z, 위가 +y, 오른쪽이 +x. 화살은 실제 포물선(중력)으로 날고 속도 방향으로 기운다.
+   그릴 때는 촉·오늬를 각각 투영해 원근·단축(짧아 보임)을 그대로 쓴다. 파워 → 초속(도착 높이), 놓는 순간(타이밍) → 좌우.
    기록: 총점(모든 화살 점수 합). 개인 최고: localStorage powerarrow_best_v1 / 세계 신기록: Firebase records/powerarrow/all
    ═══════════════════════════════════════════════════════════════════ */
 
@@ -172,14 +174,20 @@ const CONFIG = {
   targetGapW: 0.45,           // 과녁이 왼쪽으로 사라진 뒤 오른쪽에서 다시 나올 때까지의 간격(화면 너비 비율)
   chargeMaxTimeMs: 1200,      // 파워 게이지 완충까지 걸리는 시간 (100% 뒤에는 계속 눌러도 100% 유지)
   idealPower: 0.72,           // 과녁 정중앙 높이에 닿는 파워 (더 약하면 아래로, 더 세면 위로)
-  powerSpreadH: 0.75,         // 파워 1.0 차이가 만드는 도착 높이 차이(화면 높이 비율). 작을수록 관대
+  speedLowK: 0.7, speedHighK: 3.2,   // 파워 0% / 100% 의 초속 = 정중앙 초속 × (1 − idealPower×speedLowK) / (1 + (1−idealPower)×speedHighK)
   assistX: 0.45, assistY: 0.2,   // 조준 보정(0 없음 ~ 1 무조건 정중앙). 과녁 근처(반지름 1.6배 안)에서만 오차를 이 비율만큼 줄인다
-  arrowRestScale: 0.5,        // 대기 상태 화살 스케일 (화살 그림 높이 = 스케일 × 기준 길이)
-  arrowChargedScale: 0.75,    // 100% 충전 시 화살 스케일(더 커 보임 = 더 가까워 보임)
-  arrowFlightMinScale: 0.08,  // 화살이 과녁에 도달했을 때(가장 멀어졌을 때) 스케일
-  arrowFlightSlowMs: 900,     // 파워 0% 일 때 비행 소요 시간
-  arrowFlightFastMs: 350,     // 파워 100% 일 때 비행 소요 시간 (세게 쏠수록 빨리 도달)
-  arcHeightH: 0.16,           // 비행 중 y축 포물선 정점 높이(화면 높이 비율, 파워에 비례해 0.4~1배)
+  /* 3D 장면 (m) — 카메라 눈높이·초점거리로 화면 크기가 정해진다 */
+  camHeightM: 1.5,            // 카메라(눈) 높이
+  horizonH: 0.38,             // 지평선(눈높이)의 화면 y (화면 높이 비율)
+  focalH: 0.9,                // 초점거리 = min(focalH×화면높이, 1.45×화면너비) px
+  targetRadiusM: 0.6,         // 과녁 실제 반지름 → 화면 크기(targetRadiusH)와 합쳐 과녁까지 거리가 정해진다
+  arrowLengthM: 0.8, arrowWidthM: 0.42,   // 화살 길이 · 깃 너비(그림 폭)
+  handM: { y: 1.0, z: 0.9 },  // 대기 상태 오늬(밑동) 위치 (x=0)
+  drawBackM: 0.38,            // 완충 때 오늬가 축을 따라 뒤(카메라 쪽)로 끌려오는 거리 → 앞 절반쯤만 화면에 남는다
+  launchAngleDeg: 20,         // 발사 각도(위로)
+  gravity: 9.81,
+  minForeshorten: 0.5,        // 화살이 시선과 거의 나란해도 그림 길이를 (길이×초점/거리) 의 이 비율 아래로 줄이지 않는다
+  stuckScale: 0.08,           // 과녁에 꽂힌 화살 그림 높이(화면 높이 비율)
   targetRingScores: [10, 8, 6, 5, 3, 2, 1],   // 중심→바깥 점수 (그림의 빨강·크림·초록 띠 7단계와 맞춤)
   targetRingEdges: [0.19, 0.33, 0.47, 0.61, 0.75, 0.88, 1.0],   // 각 띠의 바깥 경계(과녁 반지름 비율)
   targetRadiusH: 0.11,        // 과녁 반지름(화면 높이 비율, 세로 화면에서는 너비 기준으로 제한)
@@ -306,7 +314,7 @@ function fadedLayer(k, from, to) {   // from~to: 그림 높이 비율. from 위�
 }
 
 /* ═══════════════════ 화면 ═══════════════════ */
-const V = { W: 0, H: 0, dpr: 1, cx: 0, R: 0, tk: 0, arrowBase: 0, nockY: 0, swingAmp: 0 };
+const V = { W: 0, H: 0, dpr: 1, cx: 0, R: 0, tk: 0, swingAmp: 0, f: 0, hy: 0, camY: 1.5, Zt: 5 };
 function resize() {
   V.dpr = Math.min(2, window.devicePixelRatio || 1);
   V.W = window.innerWidth; V.H = window.innerHeight;
@@ -315,12 +323,25 @@ function resize() {
   V.cx = V.W / 2;
   V.R = Math.min(CONFIG.targetRadiusH * V.H, 0.17 * V.W);   // 과녁 반지름(px)
   V.tk = V.R / TARGET_IMG.r;                                // 과녁 그림 1px 당 화면 px
-  V.arrowBase = Math.min(V.H, 1.6 * V.W);                   // 화살 스케일 1.0 일 때 그림 높이
-  V.nockY = V.H - (V.W <= 640 ? 134 : 86);                   // 화살 밑동이 놓이는 높이(파워 게이지 바로 위)
   V.swingAmp = CONFIG.swingAmplitudePx * V.H / 1080;
+  V.f = Math.min(CONFIG.focalH * V.H, 1.45 * V.W);          // 초점거리(px): 그 거리(m)에서 1m 가 f/z px
+  V.hy = CONFIG.horizonH * V.H;                              // 지평선(눈높이) 화면 y
+  V.camY = CONFIG.camHeightM;
+  V.Zt = V.f * CONFIG.targetRadiusM / V.R;                   // 과녁까지 거리(m) — 화면 크기가 targetRadiusH 가 되도록
 }
 window.addEventListener("resize", resize);
 resize();
+/* 월드 (x,y,z) → 화면. s 는 그 깊이에서 1m 가 몇 px 인지 */
+function proj(x, y, z) { const s = V.f / z; return { x: V.cx + x * s, y: V.hy - (y - V.camY) * s, s }; }
+/* 화면 (sx,sy) 를 깊이 z 에 놓았을 때의 월드 x,y */
+function unproj(sx, sy, z) { return { x: (sx - V.cx) * z / V.f, y: V.camY - (sy - V.hy) * z / V.f }; }
+const DIR = (() => { const a = CONFIG.launchAngleDeg * Math.PI / 180; return { x: 0, y: Math.sin(a), z: Math.cos(a) }; })();   // 발사 방향(단위)
+/* 들고 있는 화살의 오늬(밑동)·촉 위치. p: 파워 0~1 — 축을 따라 뒤로 drawBackM×p 만큼 끌려온다 */
+function heldArrow(p) {
+  const L = CONFIG.arrowLengthM, back = CONFIG.drawBackM * p;
+  const nock = { x: 0, y: CONFIG.handM.y - DIR.y * back, z: CONFIG.handM.z - DIR.z * back };
+  return { nock, tip: { x: 0, y: nock.y + DIR.y * L, z: nock.z + DIR.z * L } };
+}
 
 /* ═══════════════════ 게임 상태 ═══════════════════ */
 const G = {
@@ -438,53 +459,87 @@ function release() {
   G.charge = null; SFX.chargeStop();
   shoot(p);
 }
-/* 비행 시간 · 화살 촉의 시작/도착 위치를 정해 화살을 띄운다 */
+/* 화살 중심 c0 에서 초속 vel 로 쏘면 촉이 언제(T)·어디서 과녁 깊이(Zt)를 지나는지 (stepArrow 와 같은 모델의 폐형식 + 이분법).
+   화살은 속도 방향으로 기우므로 촉 = 중심 + 방향×L/2 — 날면서 고개를 숙여 촉이 포물선보다 조금 낮게 닿는다 */
+function flightAt(c0, vel, L) {
+  const g = CONFIG.gravity;
+  const at = t => {
+    const vy = vel.y - g * t, n = Math.hypot(vel.x, vy, vel.z) || 1, h = L / 2;
+    return { x: c0.x + vel.x * t + vel.x / n * h, y: c0.y + vel.y * t - g * t * t / 2 + vy / n * h, z: c0.z + vel.z * t + vel.z / n * h };
+  };
+  let lo = 0, hi = (V.Zt - c0.z) / Math.max(0.1, vel.z) + 1;
+  for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2; if (at(m).z < V.Zt) lo = m; else hi = m; }
+  const T = (lo + hi) / 2, tip = at(T);
+  return { T, tip };
+}
+/* 정중앙(과녁 중심 높이 Yt)에 닿는 초속 — 초속이 클수록 높이 닿으므로 이분법 */
+function idealSpeed(held, Yt) {
+  const L = CONFIG.arrowLengthM, c0 = { x: 0, y: (held.nock.y + held.tip.y) / 2, z: (held.nock.z + held.tip.z) / 2 };
+  let lo = 2, hi = 40;
+  for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2; if (flightAt(c0, { x: 0, y: DIR.y * m, z: DIR.z * m }, L).tip.y < Yt) lo = m; else hi = m; }
+  return (lo + hi) / 2;
+}
+function speedOf(p, vStar) {
+  const q = CONFIG.idealPower;
+  return vStar * (p < q ? 1 - (q - p) * CONFIG.speedLowK : 1 + (p - q) * CONFIG.speedHighK);
+}
+/* 발사: 지금 끌려 내려온 자리에서 발사 방향으로 초속을 주고 중력에 맡긴다 */
 function shoot(p) {
-  const s0 = CONFIG.arrowChargedScale, len0 = s0 * V.arrowBase;
-  const x0 = V.cx, y0 = V.nockY - len0 * (1 - ARROW_IMG.tipY / ARROW_IMG.h);   // 발사 순간 촉 위치
-  const T = (CONFIG.arrowFlightSlowMs + p * (CONFIG.arrowFlightFastMs - CONFIG.arrowFlightSlowMs)) / 1000;
-  const cy0 = CONFIG.targetCenterY * V.H;
-  let xe = V.cx, ye = cy0 + (CONFIG.idealPower - p) * CONFIG.powerSpreadH * V.H;   // 파워가 도착 높이를 정한다
+  const L = CONFIG.arrowLengthM, held = heldArrow(p);
+  const c0 = { x: 0, y: (held.nock.y + held.tip.y) / 2, z: (held.nock.z + held.tip.z) / 2 };
+  const tw = unproj(V.cx, CONFIG.targetCenterY * V.H, V.Zt);   // 과녁 기본 위치의 월드 좌표
+  const v = speedOf(p, idealSpeed(held, tw.y));
+  const vel = { x: 0, y: DIR.y * v, z: DIR.z * v };
   /* 조준 보정: 도착 시점의 과녁 위치를 미리 계산해 근처면 오차를 조금 줄인다 */
-  const tg = G.target;
-  if (tg) {
-    const c = targetCenterAt(tg, G.t + T), lim = 1.6 * V.R;
-    if (Math.abs(c.x - xe) < lim) xe += CONFIG.assistX * (c.x - xe);
-    if (Math.abs(c.y - ye) < lim) ye += CONFIG.assistY * (c.y - ye);
+  const tg = G.target, fl = flightAt(c0, vel, L);
+  if (tg && fl.T > 0) {
+    const c = targetCenterAt(tg, G.t + fl.T), cw = unproj(c.x, c.y, V.Zt), lim = 1.6 * CONFIG.targetRadiusM;
+    if (Math.abs(cw.x - fl.tip.x) < lim) vel.x += CONFIG.assistX * (cw.x - fl.tip.x) / fl.T;
+    if (Math.abs(cw.y - fl.tip.y) < lim) vel.y += CONFIG.assistY * (cw.y - fl.tip.y) / fl.T;
   }
-  G.arrow = { x0, y0, s0, xe, ye, T, t: 0, power: p, arc: CONFIG.arcHeightH * V.H * (0.4 + 0.6 * p), done: false };
+  G.arrow = { c: c0, v: vel, L, judged: false, life: 0, stopped: false };
   G.shot++; G.fading = null;
   updateHud(); showPower(0);
   SFX.shoot(p);
 }
-/* 비행 중 화살 촉의 화면 위치·스케일 (u: 0~1 진행률) */
-function arrowPose(a, u) {
-  const e = 1 - Math.pow(1 - u, 2);                                   // 앞에서 빠르고 뒤로 갈수록 느려짐(감속 곡선)
-  const s = 1 / (1 / a.s0 + e * (1 / CONFIG.arrowFlightMinScale - 1 / a.s0));   // 원근: 스케일은 1/거리
-  const x = a.x0 + (a.xe - a.x0) * e;
-  const y = a.y0 + (a.ye - a.y0) * e - a.arc * 4 * u * (1 - u);       // 살짝 솟았다가 떨어지는 포물선
-  return { x, y, s };
+function arrowDir(a) { const n = Math.hypot(a.v.x, a.v.y, a.v.z) || 1; return { x: a.v.x / n, y: a.v.y / n, z: a.v.z / n }; }
+function arrowTip(a) { const d = arrowDir(a), h = a.L / 2; return { x: a.c.x + d.x * h, y: a.c.y + d.y * h, z: a.c.z + d.z * h }; }
+function arrowNock(a) { const d = arrowDir(a), h = a.L / 2; return { x: a.c.x - d.x * h, y: a.c.y - d.y * h, z: a.c.z - d.z * h }; }
+/* 한 프레임 물리. 촉이 과녁 깊이(Zt)를 지나는 순간 판정, 땅(y=0)에 닿으면 멈춤 */
+function stepArrow(a, dt) {
+  if (a.stopped) return;
+  const before = arrowTip(a);
+  a.v.y -= CONFIG.gravity * dt;
+  a.c.x += a.v.x * dt; a.c.y += a.v.y * dt; a.c.z += a.v.z * dt;
+  const tip = arrowTip(a);
+  if (!a.judged && before.z < V.Zt && tip.z >= V.Zt) {
+    const k = (V.Zt - before.z) / (tip.z - before.z);   // 정확히 Zt 를 지나는 지점으로 보간
+    judge(a, { x: before.x + (tip.x - before.x) * k, y: before.y + (tip.y - before.y) * k, z: V.Zt });
+  } else if (!a.judged && tip.y <= 0) {   // 과녁 앞 땅에 꽂힘
+    a.stopped = true; judge(a, null);
+  } else if (a.judged && tip.y <= 0) a.stopped = true;
 }
-function judge(a) {
-  a.done = true;
+function judge(a, tipAt) {
+  a.judged = true;
   const tg = G.target, c = tg ? targetCenterAt(tg, G.t) : null;
-  const d = c ? Math.hypot(a.xe - c.x, a.ye - c.y) / V.R : 9;
+  const sp = tipAt ? proj(tipAt.x, tipAt.y, V.Zt) : proj(arrowTip(a).x, 0, arrowTip(a).z);   // 판정 지점의 화면 좌표
+  const d = (c && tipAt) ? Math.hypot(sp.x - c.x, sp.y - c.y) / V.R : 9;
   let score = 0;
   if (d <= 1) { const E = CONFIG.targetRingEdges; for (let i = 0; i < E.length; i++) if (d <= E[i]) { score = CONFIG.targetRingScores[i]; break; } }
   if (score > 0) {
     /* 과녁에 꽂힌 화살: 과녁 회전 전 좌표계(과녁 그림 px)로 기억해 두고 과녁과 함께 그린다 */
-    const ang = c.ang, dx = a.xe - c.x, dy = a.ye - c.y;
+    const ang = c.ang, dx = sp.x - c.x, dy = sp.y - c.y;
     const lx = (Math.cos(-ang) * dx - Math.sin(-ang) * dy) / V.tk, ly = (Math.sin(-ang) * dx + Math.cos(-ang) * dy) / V.tk;
     tg.stuck.push({ x: TARGET_IMG.cx + lx, y: TARGET_IMG.cy + ly });
     G.hits++; G.score += score; G.roundScore += score;
     SFX.hit(score);
-    popText("+" + score, score >= 10 ? "ten" : "", a.xe, a.ye - V.R * 0.6);
+    popText("+" + score, score >= 10 ? "ten" : "", sp.x, sp.y - V.R * 0.6);
+    G.arrow = null;
   } else {
     SFX.miss();
-    G.fading = { x: a.xe, y: a.ye, s: CONFIG.arrowFlightMinScale, life: 0.5 };
-    popText("빗나감", "miss", a.xe, Math.min(a.ye, V.H - 120));
+    a.life = 0.7; G.fading = a; G.arrow = null;   // 빗나간 화살은 그대로 날아가며(또는 땅에 꽂힌 채) 사라진다
+    popText("빗나감", "miss", Math.max(60, Math.min(V.W - 60, sp.x)), Math.max(120, Math.min(sp.y, V.H - 120)));
   }
-  G.arrow = null;
   updateHud();
   if (G.shot >= CONFIG.arrowsPerRound) setTimeout(() => { if (G.state === "play") endRound(); }, 1000);
 }
@@ -492,13 +547,13 @@ function judge(a) {
 /* ═══════════════════ 진행 ═══════════════════ */
 let last = 0;
 function frame(now) {
-  const dt = Math.min(0.05, (now - last) / 1000 || 0); last = now;
+  const dt = Math.min(0.05, (now - last) / 1000 || 0) * (CONFIG.timeScale === undefined ? 1 : CONFIG.timeScale); last = now;   // timeScale: 콘솔에서 CONFIG.timeScale=0.2 로 슬로모션 확인용(0 이면 정지)
   if (G.state === "play" || G.state === "between") {
     G.t += dt; G.scroll += G.worldSpeed * dt;
     const tg = G.target, halfW = TARGET_IMG.w * V.tk / 2;
     if (tg && tg.x - G.worldSpeed * (G.t - tg.spawnT) < -halfW - 10) spawnTarget(V.W + halfW + CONFIG.targetGapW * V.W);
-    if (G.arrow) { const a = G.arrow; a.t += dt; if (a.t >= a.T) judge(a); }
-    if (G.fading) { G.fading.life -= dt; if (G.fading.life <= 0) G.fading = null; }
+    if (G.arrow) stepArrow(G.arrow, dt);
+    if (G.fading) { const f = G.fading; stepArrow(f, dt); f.life -= dt; if (f.life <= 0) G.fading = null; }
     if (G.charge) showPower(chargePower());
   }
   draw();
@@ -539,38 +594,52 @@ function drawTarget() {
     for (let i = E.length - 1; i >= 0; i--) { ctx.fillStyle = cols[cols.length - 1 - i]; ctx.beginPath(); ctx.arc(cx, cy, V.R * E[i], 0, Math.PI * 2); ctx.fill(); }
   }
   /* 꽂힌 화살(작게, 과녁과 함께 흔들림) */
-  if (IMG.arrow) tg.stuck.forEach(st => drawArrowImg((st.x - TARGET_IMG.px) * k, (st.y - TARGET_IMG.py) * k, CONFIG.arrowFlightMinScale, 1));
+  if (IMG.arrow) tg.stuck.forEach(st => { const h = CONFIG.stuckScale * V.H; drawArrowImg((st.x - TARGET_IMG.px) * k, (st.y - TARGET_IMG.py) * k, h, h * ARROW_IMG.w / ARROW_IMG.h, 0, 1); });
   ctx.restore();
 }
-/* 촉 끝이 (tx,ty) 에 오도록 화살 그림을 그린다 */
-function drawArrowImg(tx, ty, s, alpha) {
-  const h = s * V.arrowBase, w = h * ARROW_IMG.w / ARROW_IMG.h;
-  ctx.save(); ctx.globalAlpha = alpha;
-  if (IMG.arrow) ctx.drawImage(IMG.arrow, tx - w * ARROW_IMG.tipX / ARROW_IMG.w, ty - h * ARROW_IMG.tipY / ARROW_IMG.h, w, h);
+/* 촉 끝이 (tx,ty) 에 오고, 거기서 밑동 쪽으로 h px 뻗도록(폭 w, 화면 아래 방향에서 rot 만큼 회전) 화살 그림을 그린다 */
+function drawArrowImg(tx, ty, h, w, rot, alpha) {
+  const H = h / (1 - ARROW_IMG.tipY / ARROW_IMG.h);   // 그림 위 여백(촉 위)을 포함한 전체 그림 높이
+  ctx.save(); ctx.globalAlpha = alpha; ctx.translate(tx, ty); ctx.rotate(rot);
+  if (IMG.arrow) ctx.drawImage(IMG.arrow, -w * ARROW_IMG.tipX / ARROW_IMG.w, -H * ARROW_IMG.tipY / ARROW_IMG.h, w, H);
   else {   // 그림이 없을 때의 도형 화살
     ctx.strokeStyle = "#B8863B"; ctx.lineWidth = Math.max(2, w * 0.08); ctx.lineCap = "round";
-    ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx, ty + h * 0.93); ctx.stroke();
-    ctx.fillStyle = "#8A97A5"; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx - w * 0.06, ty + h * 0.08); ctx.lineTo(tx + w * 0.06, ty + h * 0.08); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = "#F0DFC0"; ctx.beginPath(); ctx.moveTo(tx, ty + h * 0.62); ctx.lineTo(tx - w * 0.45, ty + h * 0.95); ctx.lineTo(tx, ty + h * 0.9); ctx.lineTo(tx + w * 0.45, ty + h * 0.95); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, h); ctx.stroke();
+    ctx.fillStyle = "#8A97A5"; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-w * 0.06, h * 0.08); ctx.lineTo(w * 0.06, h * 0.08); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#F0DFC0"; ctx.beginPath(); ctx.moveTo(0, h * 0.65); ctx.lineTo(-w * 0.45, h); ctx.lineTo(0, h * 0.95); ctx.lineTo(w * 0.45, h); ctx.closePath(); ctx.fill();
   }
   ctx.restore();
 }
-function drawHeldArrow() {   // 대기·충전 중: 밑동을 아래 가운데에 두고 파워만큼 커진다
-  const p = chargePower(), s = CONFIG.arrowRestScale + (CONFIG.arrowChargedScale - CONFIG.arrowRestScale) * p;
-  const h = s * V.arrowBase, ty = V.nockY - h * (1 - ARROW_IMG.tipY / ARROW_IMG.h);
-  const wob = p >= 1 ? Math.sin(G.t * 40) * 2 : 0;   // 완충이면 살짝 떨림
-  drawArrowImg(V.cx + wob, ty, s, 1);
+/* 월드의 화살(촉 tip · 오늬 nock, m)을 투영해 그린다. 길이는 두 끝의 화면 거리(원근·단축 포함), 폭은 깃 쪽 깊이의 원근 */
+function drawArrow3D(tip, nock, alpha) {
+  if (tip.z <= 0.05 || nock.z <= 0.05) return;
+  const tp = proj(tip.x, tip.y, tip.z), np = proj(nock.x, nock.y, nock.z);
+  const zc = (tip.z + nock.z) / 2, zw = nock.z + 0.25 * (tip.z - nock.z);
+  const dx = np.x - tp.x, dy = np.y - tp.y, seen = Math.hypot(dx, dy);
+  const h = Math.max(seen, CONFIG.minForeshorten * CONFIG.arrowLengthM * V.f / zc);
+  const w = CONFIG.arrowWidthM * V.f / zw;
+  const rot = seen > 3 ? Math.atan2(dy, dx) - Math.PI / 2 : 0;   // 그림은 아래로 뻗으므로 (0,1) 기준 각
+  drawArrowImg(tp.x, tp.y, h, w, rot, alpha);
 }
+function drawHeldArrow(p) {   // 대기·충전 중: 축을 따라 뒤로 끌려와 완충이면 앞 절반만 보인다
+  const a = heldArrow(p), wob = p >= 1 ? Math.sin(G.t * 40) * 0.004 : 0;   // 완충이면 살짝 떨림
+  drawArrow3D({ x: a.tip.x + wob, y: a.tip.y, z: a.tip.z }, { x: a.nock.x + wob, y: a.nock.y, z: a.nock.z }, 1);
+}
+function drawFlying(a, alpha) { drawArrow3D(arrowTip(a), arrowNock(a), alpha); }
 function draw() {
   ctx.clearRect(0, 0, V.W, V.H);
   drawBackground();
+  const inPlay = G.state === "play" || G.state === "between";
+  /* 과녁보다 멀리 간(빗나가 지나친) 화살은 과녁·덤불 뒤에 그린다 */
+  const far = inPlay && G.fading && G.fading.c.z > V.Zt;
+  if (far) drawFlying(G.fading, Math.max(0, Math.min(1, G.fading.life / 0.4)));
   drawTarget();
   drawForeground();
-  if (G.state === "play" || G.state === "between") {
-    if (G.fading) drawArrowImg(G.fading.x, G.fading.y, G.fading.s, Math.max(0, G.fading.life / 0.5));
-    if (G.arrow) { const a = G.arrow, q = arrowPose(a, Math.min(1, a.t / a.T)); drawArrowImg(q.x, q.y, q.s, 1); }
-    else if (G.state === "play" && G.shot < CONFIG.arrowsPerRound) drawHeldArrow();
-  } else drawArrowImg(V.cx, V.nockY - CONFIG.arrowRestScale * V.arrowBase * (1 - ARROW_IMG.tipY / ARROW_IMG.h), CONFIG.arrowRestScale, 1);
+  if (inPlay) {
+    if (G.fading && !far) drawFlying(G.fading, Math.max(0, Math.min(1, G.fading.life / 0.4)));
+    if (G.arrow) drawFlying(G.arrow, 1);
+    else if (G.state === "play" && G.shot < CONFIG.arrowsPerRound) drawHeldArrow(chargePower());
+  } else drawHeldArrow(0);
 }
 
 /* ═══════════════════ 입력 (꾹 누르기 → 놓기 · 마우스/터치/스페이스 공통) ═══════════════════ */
