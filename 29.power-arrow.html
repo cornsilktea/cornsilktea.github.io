@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<script charset="utf-8" src="firebase-config.js"></script>
+<script charset="utf-8" src="access-guard.js" data-game="powerarrow"></script>
+<script charset="utf-8" src="world-record.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
+<title>파워 애로우 챌린지</title>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="정보 수업용 링크 모음">
+<meta property="og:title" content="파워 애로우 챌린지">
+<meta property="og:description" content="꾹 눌러 파워를 모았다가 놓아 화살을 쏘는 1인칭 타이밍 양궁 개인전 / 흘러가는 나무 과녁 6라운드·라운드당 5발 / 라운드 합계가 통과 기준 아래면 탈락, 총점으로 기록">
+<meta property="og:url" content="https://cornsilktea.github.io/29.power-arrow.html">
+<meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
+<meta name="twitter:card" content="summary">
+<!-- 링크 미리보기 끝 -->
+<link rel="stylesheet" href="theme.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--sg-bg); font-family: var(--sg-font); color: var(--sg-ink); }
+  canvas#gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+  /* ── HUD (위쪽 46px 는 access-guard.js 의 '← 목록으로' 버튼 자리) ── */
+  .hud { position: fixed; z-index: 5; display: none; pointer-events: none; }
+  body.playing .hud { display: block; }
+  .hud-box { background: rgba(255,255,255,.92); border: 2px solid var(--sg-line-strong); border-radius: 10px; padding: 6px 12px; font-weight: 800; font-variant-numeric: tabular-nums; box-shadow: 0 3px 0 rgba(27,43,32,.25); text-align: center; min-width: 96px; }
+  .hud-box .lab { font-size: 12px; color: var(--sg-ink-soft); font-weight: 700; display: block; }
+  .hud-box .big { font-size: clamp(22px, 4vw, 34px); line-height: 1.15; color: var(--sg-ink); }
+  #hudRound { top: 52px; left: 10px; }
+  #hudArrows { top: 52px; left: 118px; min-width: 0; }
+  #hudArrows .big { letter-spacing: 2px; }
+  #hudBest { bottom: 14px; left: 10px; min-width: 0; }
+  #hudBest .big { font-size: 20px; }
+  /* 오른쪽 위: 총점(크게) · 이번 라운드 점수/통과 기준 */
+  #hudScore { top: 52px; right: 12px; text-align: right; }
+  #hudScore .num { font-size: clamp(40px, 9vw, 84px); font-weight: 800; color: #D97B4F; -webkit-text-stroke: 2px var(--sg-ink); text-shadow: 0 5px 0 rgba(27,43,32,.35); line-height: 1; font-variant-numeric: tabular-nums; }
+  #hudScore .pass { display: inline-block; margin-top: 6px; font-size: clamp(18px, 4vw, 36px); font-weight: 800; color: #fff; background: var(--sg-primary); border: 2px solid var(--sg-ink); border-radius: 8px; padding: 2px 10px; box-shadow: 0 3px 0 var(--sg-ink); font-variant-numeric: tabular-nums; }
+
+  /* 파워 게이지: 화면 아래 가운데, 항상 보임 */
+  #powerWrap { left: 50%; bottom: 14px; transform: translateX(-50%); width: min(460px, calc(100% - 24px)); background: rgba(255,255,255,.92); border: 2px solid var(--sg-line-strong); border-radius: 10px; padding: 5px 10px 8px; box-shadow: 0 3px 0 rgba(27,43,32,.25); }
+  #powerWrap .lab { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: var(--sg-ink-soft); margin-bottom: 4px; }
+  #powerWrap .lab b { color: var(--sg-ink); font-size: 17px; }
+  #powerBar { height: 24px; border: 2px solid var(--sg-line-strong); border-radius: 6px; background: #fff; overflow: hidden; position: relative; }
+  #powerFill { height: 100%; width: 0; background: linear-gradient(90deg, var(--sg-ok), var(--sg-warn) 60%, #D97B4F); }
+  #powerFill.full { animation: blink .35s ease-in-out infinite alternate; }
+  @keyframes blink { to { opacity: .55; } }
+
+  /* 라운드 배너 · 득점 팝업 */
+  #banner { position: fixed; z-index: 6; left: 0; right: 0; top: 60%; text-align: center; pointer-events: none; display: none; }
+  #banner .t { display: inline-block; font-size: clamp(30px, 7vw, 60px); font-weight: 800; color: #fff; -webkit-text-stroke: 2px var(--sg-ink); text-shadow: 0 5px 0 rgba(27,43,32,.4); }
+  #banner .s { display: inline-block; font-size: clamp(15px, 3vw, 22px); font-weight: 800; color: var(--sg-ink); background: rgba(255,255,255,.92); border: 2px solid var(--sg-line-strong); border-radius: 8px; padding: 3px 12px; margin-top: 8px; }
+  #pops { position: fixed; inset: 0; z-index: 6; pointer-events: none; overflow: hidden; }
+  .pop { position: absolute; left: 50%; top: 50%; font-size: clamp(34px, 7vw, 64px); font-weight: 800; color: #F2D06B; -webkit-text-stroke: 2px var(--sg-ink); text-shadow: 0 5px 0 rgba(27,43,32,.4); animation: pop 1.1s ease-out forwards; white-space: nowrap; }
+  .pop.ten { color: #FF6B7A; }
+  .pop.miss { color: #fff; font-size: clamp(24px, 5vw, 44px); }
+  @keyframes pop { 0% { opacity: 0; transform: translate(-50%,-50%) scale(1.6); } 15% { opacity: 1; transform: translate(-50%,-50%) scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%,-100%); } }
+
+  /* ── 카드 (시작 · 결과) ── */
+  #overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 56px 12px 12px; z-index: 7; overflow-y: auto; background: rgba(27,43,32,.25); }
+  .card { width: min(520px, 100%); background: var(--sg-panel); border: 3px solid var(--sg-line-strong); border-radius: 14px; padding: 22px 22px 18px; box-shadow: 0 10px 0 rgba(27,43,32,.3), 0 20px 40px rgba(0,0,0,.2); text-align: center; }
+  .logo { font-size: clamp(30px, 7vw, 46px); font-weight: 800; line-height: 1.05; color: #D97B4F; -webkit-text-stroke: 2px var(--sg-ink); text-shadow: 4px 5px 0 var(--sg-ink); letter-spacing: -1px; margin-bottom: 4px; }
+  .logo small { display: block; font-size: 15px; -webkit-text-stroke: 0; text-shadow: none; color: var(--sg-ink-soft); letter-spacing: 0; margin-top: 8px; font-weight: 700; }
+  .desc { font-size: 14px; color: var(--sg-ink-mid); line-height: 1.6; margin: 10px 0 4px; }
+  .keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 8px 0 12px; }
+  .keys > div { background: var(--sg-panel-alt); border: 2px solid var(--sg-line-mid); border-radius: 10px; padding: 8px 4px; }
+  .keys b { display: block; font-size: 16px; margin-bottom: 2px; }
+  .keys span { font-size: 11px; color: var(--sg-ink-soft); font-weight: 700; }
+  .rec { display: flex; gap: 10px; margin: 10px 0 12px; }
+  .rec > div { flex: 1 1 0; min-width: 0; background: var(--sg-panel-alt); border: 2px solid var(--sg-line-mid); border-radius: 10px; padding: 8px 6px; }
+  .rec .lab { font-size: 12px; font-weight: 700; color: var(--sg-ink-soft); }
+  .rec .val { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; margin-top: 2px; color: var(--sg-primary); }
+  .rec .val.none { font-size: 14px; color: var(--sg-ink-faint); font-weight: 700; }
+  .rec .who { font-size: 12px; color: var(--sg-ink-soft); min-height: 15px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .new { display: inline-block; margin-left: 5px; padding: 1px 6px; font-size: 11px; border-radius: 6px; background: #D97B4F; color: #fff; vertical-align: middle; -webkit-text-stroke: 0; text-shadow: none; }
+  .btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 6px; }
+  .btn { display: inline-block; font: inherit; font-weight: 800; font-size: 20px; padding: 13px 34px; border-radius: 12px; border: 3px solid var(--sg-line-strong); background: var(--sg-primary); color: var(--sg-primary-ink); cursor: pointer; box-shadow: 0 5px 0 var(--sg-ink); }
+  .btn:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--sg-ink); }
+  .btn.hot { background: #D97B4F; }
+  .hint { font-size: 12px; color: var(--sg-ink-faint); margin-top: 12px; }
+  .final { display: flex; gap: 10px; justify-content: center; margin: 8px 0; }
+  .final > div { flex: 1 1 0; }
+  .final .lab { font-size: 13px; color: var(--sg-ink-soft); font-weight: 700; }
+  .final .num { font-size: clamp(34px, 8vw, 52px); font-weight: 800; font-variant-numeric: tabular-nums; color: var(--sg-primary); line-height: 1.1; }
+  .final .num small { font-size: 15px; color: var(--sg-ink-soft); }
+  .msg { font-size: 18px; font-weight: 800; color: #D97B4F; min-height: 24px; margin: 4px 0 2px; }
+  @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.08); } }
+  .msg.wr { font-size: 22px; animation: pulse .6s ease-in-out infinite alternate; }
+  .reason { font-size: 14px; color: var(--sg-ink-mid); font-weight: 700; margin: 4px 0 8px; line-height: 1.5; }
+  .wipe { font-size: 12px; color: var(--sg-ink-faint); margin-top: 8px; }
+  .wipe button { font: inherit; font-size: 12px; color: var(--sg-ink-soft); background: none; border: none; text-decoration: underline; cursor: pointer; }
+  @media (max-width: 640px) {
+    .hud-box { padding: 4px 8px; min-width: 0; }
+    #hudArrows { left: 96px; }
+    #powerWrap { bottom: 64px; }   /* 왼쪽 아래 개인 최고 기록과 겹치지 않게 */
+    .hud-box .lab { font-size: 10px; }
+    .btn { font-size: 18px; padding: 11px 24px; }
+    .desc { font-size: 13px; }
+  }
+  [hidden]{display:none !important;}
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="pops"></div>
+<div id="banner"><span class="t" id="bannerT"></span><span class="s" id="bannerS"></span></div>
+
+<div class="hud hud-box" id="hudRound"><span class="lab">라운드</span><span class="big" id="hudRoundVal">1</span></div>
+<div class="hud hud-box" id="hudArrows"><span class="lab">남은 화살</span><span class="big" id="hudArrowsVal">●●●●●</span></div>
+<div class="hud" id="hudScore"><div class="num" id="hudScoreVal">0점</div><div class="pass" id="hudPass">이번 라운드 0 / 통과 20점</div></div>
+<div class="hud hud-box" id="hudBest"><span class="lab">개인 최고 기록</span><span class="big" id="hudBestVal">—</span></div>
+
+<div class="hud" id="powerWrap">
+  <div class="lab"><span>파워 <b id="powerPct">0%</b></span><span id="powerTip">꾹 눌렀다가 놓으면 발사</span></div>
+  <div id="powerBar"><div id="powerFill"></div></div>
+</div>
+
+<div id="overlay">
+  <div class="card" id="cardStart">
+    <div class="logo">🏹 파워 애로우 챌린지<small>흘러가는 과녁을 타이밍 맞춰 맞혀라 · 6라운드 × 5발</small></div>
+    <div class="desc">화면(또는 <b>스페이스바</b>)을 <b>꾹 누르면</b> 파워가 차고, <b>놓으면</b> 화살이 날아갑니다. 파워가 약하면 과녁 아래로 떨어지고 너무 세면 위로 지나갑니다. 과녁은 계속 왼쪽으로 흘러가니 <b>도착할 때 과녁이 가운데에 오도록</b> 미리 쏘세요. 가운데 <b>10점</b>, 바깥으로 갈수록 점수가 낮아지고 빗나가면 0점. 라운드 5발 합계가 <b>통과 기준</b>보다 낮으면 탈락합니다.</div>
+    <div class="keys">
+      <div><b>꾹 누르기</b><span>파워 충전</span></div>
+      <div><b>놓기</b><span>발사</span></div>
+      <div><b>🎯 10점</b><span>정중앙 명중</span></div>
+    </div>
+    <div class="rec">
+      <div><div class="lab">개인 최고 기록</div><div class="val" id="bestStart">—</div><div class="who" id="bestStartDate"></div></div>
+      <div><div class="lab">🏆 세계 신기록</div><div class="val" id="wrStart">—</div><div class="who" id="wrWhoStart"></div></div>
+      <div class="clsCol" hidden><div class="lab">🏫 우리 반 신기록</div><div class="val" id="crStart">—</div><div class="who" id="crWhoStart"></div></div>
+    </div>
+    <div class="btns"><button type="button" class="btn" id="btnStart">시작하기</button></div>
+    <div class="hint">스페이스바로도 시작할 수 있습니다</div>
+    <div class="wipe"><button type="button" id="btnWipe">이 기기의 최고 기록 지우기</button></div>
+  </div>
+
+  <div class="card" id="cardOver" style="display:none">
+    <div class="logo" style="font-size:38px" id="overTitle">탈락!</div>
+    <div class="reason" id="overReason"></div>
+    <div class="final">
+      <div><div class="lab">최종 점수</div><div class="num" id="finalScore">0<small> 점</small></div></div>
+      <div><div class="lab">도달 라운드</div><div class="num" id="finalRound">1<small> 라운드</small></div></div>
+    </div>
+    <div class="msg" id="finalMsg"></div>
+    <div class="rec">
+      <div><div class="lab">개인 최고 기록</div><div class="val" id="bestOver">—</div><div class="who" id="bestOverNew"></div></div>
+      <div><div class="lab">🏆 세계 신기록</div><div class="val" id="wrOver">—</div><div class="who" id="wrWhoOver"></div></div>
+      <div class="clsCol" hidden><div class="lab">🏫 우리 반 신기록</div><div class="val" id="crOver">—</div><div class="who" id="crWhoOver"></div></div>
+    </div>
+    <div class="btns"><button type="button" class="btn hot" id="btnRetry">다시하기</button></div>
+    <div class="hint">스페이스바: 다시하기</div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ═══════════════════════════════════════════════════════════════════
+   파워 애로우 챌린지 — Canvas 2D 1인칭 타이밍 양궁 (쉬는시간용, 개인전, 라운드제)
+   화면에는 활·사람 없이 화살 하나만 아래 가운데에 놓인다. 꾹 누르면 화살이 커지며 다가오고(파워 충전),
+   놓으면 화면 안쪽으로 작아지며 날아간다. 배경 3겹 패럴랙스 + 나뭇가지에 매달려 흔들리는 과녁이 왼쪽으로 흐른다.
+   비행은 "스케일(원근) + 화면 x/y 보간(중력 포물선)"으로 표현. 파워가 도착 높이를, 놓는 순간(타이밍)이 좌우를 정한다.
+   기록: 총점(모든 화살 점수 합). 개인 최고: localStorage powerarrow_best_v1 / 세계 신기록: Firebase records/powerarrow/all
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ───────── 밸런스 설정 (선생님이 값만 바꿔 조정) ───────── */
+const CONFIG = {
+  arrowsPerRound: 5,
+  passThresholds: [20, 23, 26, 30, 35, 40],          // 라운드별 통과 기준(해당 라운드 5발 합). 배열 길이 = 라운드 수
+  targetSpeedByRound: [1.0, 1.15, 1.3, 1.5, 1.75, 2.0],   // 라운드별 과녁 이동·흔들림 속도 배율 (모자라면 마지막 값 사용)
+  targetBaseSpeedW: 0.20,     // 과녁 기본 속도 (초당 화면 너비 비율)
+  targetGapW: 0.45,           // 과녁이 왼쪽으로 사라진 뒤 오른쪽에서 다시 나올 때까지의 간격(화면 너비 비율)
+  chargeMaxTimeMs: 1200,      // 파워 게이지 완충까지 걸리는 시간 (100% 뒤에는 계속 눌러도 100% 유지)
+  idealPower: 0.72,           // 과녁 정중앙 높이에 닿는 파워 (더 약하면 아래로, 더 세면 위로)
+  powerSpreadH: 0.75,         // 파워 1.0 차이가 만드는 도착 높이 차이(화면 높이 비율). 작을수록 관대
+  assistX: 0.45, assistY: 0.2,   // 조준 보정(0 없음 ~ 1 무조건 정중앙). 과녁 근처(반지름 1.6배 안)에서만 오차를 이 비율만큼 줄인다
+  arrowRestScale: 0.5,        // 대기 상태 화살 스케일 (화살 그림 높이 = 스케일 × 기준 길이)
+  arrowChargedScale: 0.75,    // 100% 충전 시 화살 스케일(더 커 보임 = 더 가까워 보임)
+  arrowFlightMinScale: 0.08,  // 화살이 과녁에 도달했을 때(가장 멀어졌을 때) 스케일
+  arrowFlightSlowMs: 900,     // 파워 0% 일 때 비행 소요 시간
+  arrowFlightFastMs: 350,     // 파워 100% 일 때 비행 소요 시간 (세게 쏠수록 빨리 도달)
+  arcHeightH: 0.16,           // 비행 중 y축 포물선 정점 높이(화면 높이 비율, 파워에 비례해 0.4~1배)
+  targetRingScores: [10, 8, 6, 5, 3, 2, 1],   // 중심→바깥 점수 (그림의 빨강·크림·초록 띠 7단계와 맞춤)
+  targetRingEdges: [0.19, 0.33, 0.47, 0.61, 0.75, 0.88, 1.0],   // 각 띠의 바깥 경계(과녁 반지름 비율)
+  targetRadiusH: 0.11,        // 과녁 반지름(화면 높이 비율, 세로 화면에서는 너비 기준으로 제한)
+  targetCenterY: 0.42,        // 과녁 중심 높이(화면 높이 비율)
+  swingAmplitudePx: 40,       // 과녁 흔들림 진폭(과녁 중심이 좌우로 움직이는 px, 1080p 기준으로 화면에 맞춰 조정)
+  swingPeriodSec: 2.0,        // 과녁 흔들림 주기(초) — 라운드 배율만큼 빨라짐
+};
+function thresholdOf(r) { const P = CONFIG.passThresholds; return P[Math.min(r, P.length) - 1]; }
+function speedMulOf(r) { const S = CONFIG.targetSpeedByRound; return S[Math.min(r, S.length) - 1]; }
+const TOTAL_ROUNDS = CONFIG.passThresholds.length;
+
+const $ = id => document.getElementById(id);
+const canvas = $("gl"), ctx = canvas.getContext("2d");
+
+/* ═══════════════════ 기록 (개인 최고 · 세계 신기록 · 우리 반 신기록) ═══════════════════ */
+const BEST_KEY = "powerarrow_best_v1";
+function loadJSON(k) { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch (e) { return null; } }
+function saveJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+let best = loadJSON(BEST_KEY); if (best && !(best.score >= 0)) best = null;
+const fmtScore = v => v + "점";
+const WR = window.WorldRecord ? WorldRecord("powerarrow", { format: fmtScore }) : null;
+let wrTried = false;
+function wrInfo() {
+  if (!WR) return { val: "—", who: "", none: true };
+  if (WR.loaded && WR.rec) return { val: WR.text(), who: WR.who(), none: false };
+  if (WR.loaded) return { val: "아직 없음", who: "", none: true };
+  return { val: !WR.url() ? "오프라인" : (wrTried ? "불러오지 못함" : "불러오는 중…"), who: "", none: true };
+}
+function crInfo() {
+  const C = WR && WR.cls;
+  if (!C) return null;
+  if (C.loaded && C.rec) return { val: C.text(), who: C.who(), none: false };
+  if (C.loaded) return { val: "아직 없음", who: "", none: true };
+  return { val: wrTried ? "불러오지 못함" : "불러오는 중…", who: "", none: true };
+}
+function setVal(el, text, none) { el.textContent = text; el.classList.toggle("none", !!none); }
+function renderRecords() {
+  const w = wrInfo();
+  const bTxt = best ? fmtScore(best.score) : "아직 없음";
+  setVal($("bestStart"), bTxt, !best); $("bestStartDate").textContent = best ? best.round + "라운드 · " + best.date : "";
+  setVal($("bestOver"), bTxt, !best);
+  setVal($("wrStart"), w.val, w.none); $("wrWhoStart").textContent = w.who;
+  setVal($("wrOver"), w.val, w.none); $("wrWhoOver").textContent = w.who;
+  $("hudBestVal").textContent = best ? best.score + "점" : "—";
+  const c = crInfo();
+  if (c) {
+    setVal($("crStart"), c.val, c.none); $("crWhoStart").textContent = c.who;
+    setVal($("crOver"), c.val, c.none); $("crWhoOver").textContent = c.who;
+    document.querySelectorAll(".clsCol").forEach(el => { el.hidden = false; el.querySelector(".lab").textContent = "🏫 " + (WR.klass ? WR.klass.label : "우리 반") + " 신기록"; });
+  }
+}
+if (WR) { WR.onChange(renderRecords); WR.load().then(() => { wrTried = true; renderRecords(); }); }
+renderRecords();
+
+/* ═══════════════════ 소리 (Web Audio, 외부 파일 없음) ═══════════════════ */
+const AUD = { ctx: null, charge: null };
+function audioInit() { try { if (!AUD.ctx) AUD.ctx = new (window.AudioContext || window.webkitAudioContext)(); if (AUD.ctx.state === "suspended") AUD.ctx.resume(); } catch (e) {} }
+function tone(freq, dur, type, vol, slide) {
+  if (!AUD.ctx) return;
+  try {
+    const t = AUD.ctx.currentTime, o = AUD.ctx.createOscillator(), g = AUD.ctx.createGain();
+    o.type = type || "sine"; o.frequency.setValueAtTime(freq, t);
+    if (slide) o.frequency.exponentialRampToValueAtTime(slide, t + dur);
+    g.gain.setValueAtTime(vol || .15, t); g.gain.exponentialRampToValueAtTime(.001, t + dur);
+    o.connect(g); g.connect(AUD.ctx.destination); o.start(t); o.stop(t + dur);
+  } catch (e) {}
+}
+function noise(dur, vol, from, to) {   // 바람 소리(화살 날아가는 소리)
+  if (!AUD.ctx) return;
+  try {
+    const c = AUD.ctx, n = Math.floor(c.sampleRate * dur), buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    const s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain(), t = c.currentTime;
+    s.buffer = buf; f.type = "bandpass"; f.Q.value = 1.2; f.frequency.setValueAtTime(from, t); f.frequency.exponentialRampToValueAtTime(to, t + dur);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + dur);
+    s.connect(f); f.connect(g); g.connect(c.destination); s.start(t); s.stop(t + dur);
+  } catch (e) {}
+}
+const SFX = {
+  chargeStart() {   // 누르는 동안 올라가는 삐- 소리 (놓으면 끝)
+    if (!AUD.ctx) return;
+    try {
+      const c = AUD.ctx, t = c.currentTime, o = c.createOscillator(), g = c.createGain();
+      o.type = "triangle"; o.frequency.setValueAtTime(160, t); o.frequency.linearRampToValueAtTime(420, t + CONFIG.chargeMaxTimeMs / 1000);
+      g.gain.setValueAtTime(.05, t); o.connect(g); g.connect(c.destination); o.start(t);
+      AUD.charge = { o, g };
+    } catch (e) {}
+  },
+  chargeStop() {
+    const ch = AUD.charge; AUD.charge = null;
+    if (!ch || !AUD.ctx) return;
+    try { const t = AUD.ctx.currentTime; ch.g.gain.setValueAtTime(ch.g.gain.value, t); ch.g.gain.exponentialRampToValueAtTime(.001, t + .06); ch.o.stop(t + .07); } catch (e) {}
+  },
+  shoot(p) { tone(260 + p * 140, .1, "square", .07, 120); noise(.35 + p * .3, .12, 1200, 300); },
+  hit(score) { tone(120, .12, "square", .14, 70); if (score >= 8) { setTimeout(() => tone(880, .12, "sine", .13), 60); setTimeout(() => tone(1320, .22, "sine", .13), 150); } else setTimeout(() => tone(600, .15, "sine", .1), 60); },
+  miss() { noise(.4, .06, 600, 150); tone(220, .3, "sawtooth", .05, 110); },
+  pass() { [523, 659, 784, 1047, 1319].forEach((f, i) => setTimeout(() => tone(f, .25, "sine", .14), i * 110)); },
+  clear() { [523, 659, 784, 1047, 784, 1047, 1319, 1568].forEach((f, i) => setTimeout(() => tone(f, .28, "sine", .14), i * 120)); },
+  over() { [440, 370, 311, 262].forEach((f, i) => setTimeout(() => tone(f, .3, "triangle", .12), i * 160)); },
+};
+
+/* ═══════════════════ 그림 ═══════════════════ */
+const IMG = {};
+[["far", "29.bg-far.jpg"], ["mid", "29.bg-mid.jpg"], ["near", "29.bg-near.jpg"], ["arrow", "29.arrow.png"], ["target", "29.target.png"]].forEach(([k, src]) => {
+  const im = new Image(); im.onload = () => { IMG[k] = im; if (k === "mid" || k === "near") LAYER[k] = null; }; im.src = src;
+});
+/* 화살 그림(480×809): 촉 끝이 (240,55), 오늬(밑동)는 맨 아래 */
+const ARROW_IMG = { w: 480, h: 809, tipX: 240, tipY: 55 };
+/* 과녁 그림(640×1067): 과녁 중심 (386,753)·반지름 178, 밧줄이 가지에 묶인 점(회전축) (386,310) */
+const TARGET_IMG = { w: 640, h: 1067, cx: 386, cy: 753, r: 178, px: 386, py: 310 };
+
+/* 중경·근경은 불투명 그림이라 위쪽을 투명하게 깎아(알파 그라데이션) 뒤의 겹이 비치게 한다 */
+const LAYER = { mid: null, near: null };
+function fadedLayer(k, from, to) {   // from~to: 그림 높이 비율. from 위는 투명, to 아래는 불투명
+  if (LAYER[k]) return LAYER[k];
+  const im = IMG[k]; if (!im) return null;
+  const c = document.createElement("canvas"); c.width = im.naturalWidth; c.height = im.naturalHeight;
+  const g = c.getContext("2d"); g.drawImage(im, 0, 0);
+  g.globalCompositeOperation = "destination-in";
+  const gr = g.createLinearGradient(0, from * c.height, 0, to * c.height);
+  gr.addColorStop(0, "rgba(0,0,0,0)"); gr.addColorStop(1, "rgba(0,0,0,1)");
+  g.fillStyle = gr; g.fillRect(0, 0, c.width, c.height);
+  return (LAYER[k] = c);
+}
+
+/* ═══════════════════ 화면 ═══════════════════ */
+const V = { W: 0, H: 0, dpr: 1, cx: 0, R: 0, tk: 0, arrowBase: 0, nockY: 0, swingAmp: 0 };
+function resize() {
+  V.dpr = Math.min(2, window.devicePixelRatio || 1);
+  V.W = window.innerWidth; V.H = window.innerHeight;
+  canvas.width = Math.round(V.W * V.dpr); canvas.height = Math.round(V.H * V.dpr);
+  ctx.setTransform(V.dpr, 0, 0, V.dpr, 0, 0);
+  V.cx = V.W / 2;
+  V.R = Math.min(CONFIG.targetRadiusH * V.H, 0.17 * V.W);   // 과녁 반지름(px)
+  V.tk = V.R / TARGET_IMG.r;                                // 과녁 그림 1px 당 화면 px
+  V.arrowBase = Math.min(V.H, 1.6 * V.W);                   // 화살 스케일 1.0 일 때 그림 높이
+  V.nockY = V.H - (V.W <= 640 ? 134 : 86);                   // 화살 밑동이 놓이는 높이(파워 게이지 바로 위)
+  V.swingAmp = CONFIG.swingAmplitudePx * V.H / 1080;
+}
+window.addEventListener("resize", resize);
+resize();
+
+/* ═══════════════════ 게임 상태 ═══════════════════ */
+const G = {
+  state: "idle",     // idle · play · between(라운드 통과 연출) · over
+  round: 1, score: 0, roundScore: 0, shot: 0, t: 0,
+  charge: null,      // { t0 } 누르는 중
+  arrow: null,       // 날아가는 화살 { x0,y0,s0, xe,ye, T, t, power, arc, done }
+  fading: null,      // 빗나간 화살(사라지는 중) { x, y, s, life }
+  target: null,      // { x(중심 x, 화면 px), spawnT, stuck: [] }
+  scroll: 0,         // 배경 스크롤 누적(px, 과녁 속도 기준)
+  worldSpeed: 0,     // 현재 과녁 속도(px/s)
+  hits: 0,
+};
+function targetSpeed() { return CONFIG.targetBaseSpeedW * V.W * speedMulOf(G.round); }
+function swingAngle(t) {   // 밧줄 묶인 점을 축으로 흔들리는 각(rad). 진폭은 과녁 중심이 swingAmp 만큼 움직이도록
+  const arm = (TARGET_IMG.cy - TARGET_IMG.py) * V.tk;
+  const period = CONFIG.swingPeriodSec / speedMulOf(G.round);
+  return (V.swingAmp / arm) * Math.sin(2 * Math.PI * t / period);
+}
+/* 과녁 중심의 화면 좌표(흔들림 포함). tg.x 는 회전축(가지에 묶인 점)의 x */
+function targetCenterAt(tg, t, ang) {
+  if (ang === undefined) ang = swingAngle(t);
+  const arm = (TARGET_IMG.cy - TARGET_IMG.py) * V.tk, py = pivotY();
+  const x = (tg.x - G.worldSpeed * (t - tg.spawnT)) + Math.sin(ang) * arm;
+  return { x, y: py + Math.cos(ang) * arm, ang };
+}
+function pivotY() { return CONFIG.targetCenterY * V.H - (TARGET_IMG.cy - TARGET_IMG.py) * V.tk; }
+function spawnTarget(fromX) {
+  const halfW = TARGET_IMG.w * V.tk / 2;
+  G.target = { x: fromX !== undefined ? fromX : V.W + halfW + 20, spawnT: G.t, stuck: [] };
+}
+
+function startGame() {
+  audioInit();
+  G.round = 1; G.score = 0; G.roundScore = 0; G.shot = 0; G.hits = 0; G.charge = null; G.arrow = null; G.fading = null; G.t = 0; G.scroll = 0;
+  $("overlay").style.display = "none";
+  document.body.classList.add("playing");
+  spawnTarget();
+  startRound();
+}
+function startRound() {
+  G.roundScore = 0; G.shot = 0; G.state = "play"; G.worldSpeed = targetSpeed();
+  updateHud(); showPower(0);
+  showBanner("ROUND " + G.round, "5발 합계 " + thresholdOf(G.round) + "점 이상이면 통과" + (G.round > 1 ? " · 과녁이 더 빨라집니다" : ""), 1600);
+}
+function endRound() {
+  G.state = "between";
+  if (G.roundScore >= thresholdOf(G.round)) {
+    if (G.round >= TOTAL_ROUNDS) { gameOver(true); return; }
+    SFX.pass();
+    showBanner("ROUND " + G.round + " 통과!", "이번 라운드 " + G.roundScore + "점 ≥ " + thresholdOf(G.round) + "점", 1600);
+    setTimeout(() => { G.round++; startRound(); }, 1700);
+  } else {
+    gameOver(false);
+  }
+}
+function gameOver(cleared) {
+  G.state = "over"; G.charge = null; SFX.chargeStop(); G.arrow = null;
+  cleared ? SFX.clear() : SFX.over();
+  document.body.classList.remove("playing");
+  const score = G.score, round = G.round;
+  $("overTitle").textContent = cleared ? "🏆 클리어!" : "탈락!";
+  $("overReason").textContent = cleared
+    ? TOTAL_ROUNDS + "라운드를 모두 통과했습니다! (명중 " + G.hits + " / " + TOTAL_ROUNDS * CONFIG.arrowsPerRound + "발)"
+    : round + "라운드 합계 " + G.roundScore + "점 < 통과 기준 " + thresholdOf(round) + "점 (명중 " + G.hits + " / " + ((round - 1) * CONFIG.arrowsPerRound + G.shot) + "발)";
+  $("finalScore").innerHTML = score + "<small> 점</small>";
+  $("finalRound").innerHTML = round + "<small> 라운드</small>";
+  let newBest = false, wrBeat = false, crBeat = false;
+  if (score > 0) {
+    newBest = !best || score > best.score;
+    if (newBest) { best = { score, round, date: new Date().toLocaleDateString("ko-KR") }; saveJSON(BEST_KEY, best); }
+    wrBeat = !!(WR && WR.beats(score));
+    crBeat = !!(WR && WR.beatsClass(score));   /* 우리 반 신기록(반별 링크일 때만) */
+  }
+  const m = $("finalMsg");
+  m.textContent = wrBeat ? "🏆 세계 신기록 달성! 🎉" : crBeat ? "🏫 우리 반 신기록!" : newBest ? "🎉 개인 최고 기록 경신!" : "";
+  m.classList.toggle("wr", wrBeat);
+  $("bestOverNew").innerHTML = (best ? best.round + "라운드 " : "") + (newBest ? '<span class="new">NEW</span>' : "");
+  renderRecords();
+  $("cardStart").style.display = "none"; $("cardOver").style.display = "block"; $("overlay").style.display = "flex";
+  if (wrBeat || crBeat) setTimeout(() => WR.prompt(score).then(() => renderRecords()), 400);
+}
+
+let bannerTimer = 0;
+function showBanner(t, s, ms) {
+  $("bannerT").textContent = t; $("bannerS").textContent = s; $("banner").style.display = "block";
+  clearTimeout(bannerTimer); bannerTimer = setTimeout(() => { $("banner").style.display = "none"; }, ms);
+}
+function popText(txt, cls, x, y) {
+  const el = document.createElement("div"); el.className = "pop " + cls; el.textContent = txt;
+  if (x !== undefined) { el.style.left = x + "px"; el.style.top = y + "px"; }
+  $("pops").appendChild(el); setTimeout(() => el.remove(), 1200);
+}
+function updateHud() {
+  $("hudRoundVal").textContent = G.round + " / " + TOTAL_ROUNDS;
+  const n = CONFIG.arrowsPerRound, left = n - G.shot;
+  $("hudArrowsVal").textContent = "●".repeat(left) + "○".repeat(n - left);
+  $("hudPass").textContent = "이번 라운드 " + G.roundScore + " / 통과 " + thresholdOf(G.round) + "점";
+  $("hudScoreVal").textContent = G.score + "점";
+}
+
+/* ═══════════════════ 충전 · 발사 · 판정 ═══════════════════ */
+function canCharge() { return G.state === "play" && !G.charge && !G.arrow && G.shot < CONFIG.arrowsPerRound; }
+function chargePower() { return G.charge ? Math.min(1, (performance.now() - G.charge.t0) / CONFIG.chargeMaxTimeMs) : 0; }
+function beginCharge() {
+  if (!canCharge()) return;
+  audioInit();
+  G.charge = { t0: performance.now() };
+  SFX.chargeStart();
+}
+function cancelCharge() { G.charge = null; SFX.chargeStop(); showPower(0); }
+function release() {
+  if (!G.charge) return;
+  const p = chargePower();
+  G.charge = null; SFX.chargeStop();
+  shoot(p);
+}
+/* 비행 시간 · 화살 촉의 시작/도착 위치를 정해 화살을 띄운다 */
+function shoot(p) {
+  const s0 = CONFIG.arrowChargedScale, len0 = s0 * V.arrowBase;
+  const x0 = V.cx, y0 = V.nockY - len0 * (1 - ARROW_IMG.tipY / ARROW_IMG.h);   // 발사 순간 촉 위치
+  const T = (CONFIG.arrowFlightSlowMs + p * (CONFIG.arrowFlightFastMs - CONFIG.arrowFlightSlowMs)) / 1000;
+  const cy0 = CONFIG.targetCenterY * V.H;
+  let xe = V.cx, ye = cy0 + (CONFIG.idealPower - p) * CONFIG.powerSpreadH * V.H;   // 파워가 도착 높이를 정한다
+  /* 조준 보정: 도착 시점의 과녁 위치를 미리 계산해 근처면 오차를 조금 줄인다 */
+  const tg = G.target;
+  if (tg) {
+    const c = targetCenterAt(tg, G.t + T), lim = 1.6 * V.R;
+    if (Math.abs(c.x - xe) < lim) xe += CONFIG.assistX * (c.x - xe);
+    if (Math.abs(c.y - ye) < lim) ye += CONFIG.assistY * (c.y - ye);
+  }
+  G.arrow = { x0, y0, s0, xe, ye, T, t: 0, power: p, arc: CONFIG.arcHeightH * V.H * (0.4 + 0.6 * p), done: false };
+  G.shot++; G.fading = null;
+  updateHud(); showPower(0);
+  SFX.shoot(p);
+}
+/* 비행 중 화살 촉의 화면 위치·스케일 (u: 0~1 진행률) */
+function arrowPose(a, u) {
+  const e = 1 - Math.pow(1 - u, 2);                                   // 앞에서 빠르고 뒤로 갈수록 느려짐(감속 곡선)
+  const s = 1 / (1 / a.s0 + e * (1 / CONFIG.arrowFlightMinScale - 1 / a.s0));   // 원근: 스케일은 1/거리
+  const x = a.x0 + (a.xe - a.x0) * e;
+  const y = a.y0 + (a.ye - a.y0) * e - a.arc * 4 * u * (1 - u);       // 살짝 솟았다가 떨어지는 포물선
+  return { x, y, s };
+}
+function judge(a) {
+  a.done = true;
+  const tg = G.target, c = tg ? targetCenterAt(tg, G.t) : null;
+  const d = c ? Math.hypot(a.xe - c.x, a.ye - c.y) / V.R : 9;
+  let score = 0;
+  if (d <= 1) { const E = CONFIG.targetRingEdges; for (let i = 0; i < E.length; i++) if (d <= E[i]) { score = CONFIG.targetRingScores[i]; break; } }
+  if (score > 0) {
+    /* 과녁에 꽂힌 화살: 과녁 회전 전 좌표계(과녁 그림 px)로 기억해 두고 과녁과 함께 그린다 */
+    const ang = c.ang, dx = a.xe - c.x, dy = a.ye - c.y;
+    const lx = (Math.cos(-ang) * dx - Math.sin(-ang) * dy) / V.tk, ly = (Math.sin(-ang) * dx + Math.cos(-ang) * dy) / V.tk;
+    tg.stuck.push({ x: TARGET_IMG.cx + lx, y: TARGET_IMG.cy + ly });
+    G.hits++; G.score += score; G.roundScore += score;
+    SFX.hit(score);
+    popText("+" + score, score >= 10 ? "ten" : "", a.xe, a.ye - V.R * 0.6);
+  } else {
+    SFX.miss();
+    G.fading = { x: a.xe, y: a.ye, s: CONFIG.arrowFlightMinScale, life: 0.5 };
+    popText("빗나감", "miss", a.xe, Math.min(a.ye, V.H - 120));
+  }
+  G.arrow = null;
+  updateHud();
+  if (G.shot >= CONFIG.arrowsPerRound) setTimeout(() => { if (G.state === "play") endRound(); }, 1000);
+}
+
+/* ═══════════════════ 진행 ═══════════════════ */
+let last = 0;
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000 || 0); last = now;
+  if (G.state === "play" || G.state === "between") {
+    G.t += dt; G.scroll += G.worldSpeed * dt;
+    const tg = G.target, halfW = TARGET_IMG.w * V.tk / 2;
+    if (tg && tg.x - G.worldSpeed * (G.t - tg.spawnT) < -halfW - 10) spawnTarget(V.W + halfW + CONFIG.targetGapW * V.W);
+    if (G.arrow) { const a = G.arrow; a.t += dt; if (a.t >= a.T) judge(a); }
+    if (G.fading) { G.fading.life -= dt; if (G.fading.life <= 0) G.fading = null; }
+    if (G.charge) showPower(chargePower());
+  }
+  draw();
+  requestAnimationFrame(frame);
+}
+
+/* ═══════════════════ 그리기 ═══════════════════ */
+function drawLayer(src, iw, ih, speedMul) {   // 화면을 덮게 키우고 가로로 이어 붙인다(홀수 번째는 좌우 뒤집어 이음새를 감춤)
+  const k = Math.max(V.W / iw, V.H / ih), tw = iw * k, th = ih * k, y = V.H - th;
+  const off = (G.scroll * speedMul) % (tw * 2);
+  for (let i = -1; i <= Math.ceil(V.W / tw) + 1; i++) {
+    const x = i * tw - off;   // off 가 타일 두 장 너비로 되감기므로 i 의 홀짝이 곧 뒤집기 여부
+    if (x + tw < 0 || x > V.W) continue;
+    if (((i % 2) + 2) % 2 === 1) { ctx.save(); ctx.translate(x + tw, y); ctx.scale(-1, 1); ctx.drawImage(src, 0, 0, tw, th); ctx.restore(); }
+    else ctx.drawImage(src, x, y, tw, th);
+  }
+}
+function drawBackground() {
+  if (IMG.far) drawLayer(IMG.far, IMG.far.naturalWidth, IMG.far.naturalHeight, 0.12);
+  else { ctx.fillStyle = "#DCE9C8"; ctx.fillRect(0, 0, V.W, V.H); }
+  const mid = fadedLayer("mid", 0, 0.46);
+  if (mid) drawLayer(mid, mid.width, mid.height, 0.45);
+}
+function drawForeground() {
+  const near = fadedLayer("near", 0.58, 0.8);
+  if (near) drawLayer(near, near.width, near.height, 1.25);
+}
+function drawTarget() {
+  const tg = G.target; if (!tg) return;
+  const ang = swingAngle(G.t), px = tg.x - G.worldSpeed * (G.t - tg.spawnT), py = pivotY(), k = V.tk;
+  ctx.save(); ctx.translate(px, py); ctx.rotate(ang);
+  if (IMG.target) ctx.drawImage(IMG.target, -TARGET_IMG.px * k, -TARGET_IMG.py * k, TARGET_IMG.w * k, TARGET_IMG.h * k);
+  else {   // 그림이 없을 때의 도형 과녁
+    const cx = (TARGET_IMG.cx - TARGET_IMG.px) * k, cy = (TARGET_IMG.cy - TARGET_IMG.py) * k;
+    ctx.strokeStyle = "#8B5A2B"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(cx, cy - V.R); ctx.stroke();
+    const cols = ["#C8A46A", "#6FA35A", "#F2E6C8", "#6FA35A", "#F2E6C8", "#6FA35A", "#F2E6C8", "#E24C3A"];
+    const E = CONFIG.targetRingEdges;
+    for (let i = E.length - 1; i >= 0; i--) { ctx.fillStyle = cols[cols.length - 1 - i]; ctx.beginPath(); ctx.arc(cx, cy, V.R * E[i], 0, Math.PI * 2); ctx.fill(); }
+  }
+  /* 꽂힌 화살(작게, 과녁과 함께 흔들림) */
+  if (IMG.arrow) tg.stuck.forEach(st => drawArrowImg((st.x - TARGET_IMG.px) * k, (st.y - TARGET_IMG.py) * k, CONFIG.arrowFlightMinScale, 1));
+  ctx.restore();
+}
+/* 촉 끝이 (tx,ty) 에 오도록 화살 그림을 그린다 */
+function drawArrowImg(tx, ty, s, alpha) {
+  const h = s * V.arrowBase, w = h * ARROW_IMG.w / ARROW_IMG.h;
+  ctx.save(); ctx.globalAlpha = alpha;
+  if (IMG.arrow) ctx.drawImage(IMG.arrow, tx - w * ARROW_IMG.tipX / ARROW_IMG.w, ty - h * ARROW_IMG.tipY / ARROW_IMG.h, w, h);
+  else {   // 그림이 없을 때의 도형 화살
+    ctx.strokeStyle = "#B8863B"; ctx.lineWidth = Math.max(2, w * 0.08); ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx, ty + h * 0.93); ctx.stroke();
+    ctx.fillStyle = "#8A97A5"; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx - w * 0.06, ty + h * 0.08); ctx.lineTo(tx + w * 0.06, ty + h * 0.08); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#F0DFC0"; ctx.beginPath(); ctx.moveTo(tx, ty + h * 0.62); ctx.lineTo(tx - w * 0.45, ty + h * 0.95); ctx.lineTo(tx, ty + h * 0.9); ctx.lineTo(tx + w * 0.45, ty + h * 0.95); ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+}
+function drawHeldArrow() {   // 대기·충전 중: 밑동을 아래 가운데에 두고 파워만큼 커진다
+  const p = chargePower(), s = CONFIG.arrowRestScale + (CONFIG.arrowChargedScale - CONFIG.arrowRestScale) * p;
+  const h = s * V.arrowBase, ty = V.nockY - h * (1 - ARROW_IMG.tipY / ARROW_IMG.h);
+  const wob = p >= 1 ? Math.sin(G.t * 40) * 2 : 0;   // 완충이면 살짝 떨림
+  drawArrowImg(V.cx + wob, ty, s, 1);
+}
+function draw() {
+  ctx.clearRect(0, 0, V.W, V.H);
+  drawBackground();
+  drawTarget();
+  drawForeground();
+  if (G.state === "play" || G.state === "between") {
+    if (G.fading) drawArrowImg(G.fading.x, G.fading.y, G.fading.s, Math.max(0, G.fading.life / 0.5));
+    if (G.arrow) { const a = G.arrow, q = arrowPose(a, Math.min(1, a.t / a.T)); drawArrowImg(q.x, q.y, q.s, 1); }
+    else if (G.state === "play" && G.shot < CONFIG.arrowsPerRound) drawHeldArrow();
+  } else drawArrowImg(V.cx, V.nockY - CONFIG.arrowRestScale * V.arrowBase * (1 - ARROW_IMG.tipY / ARROW_IMG.h), CONFIG.arrowRestScale, 1);
+}
+
+/* ═══════════════════ 입력 (꾹 누르기 → 놓기 · 마우스/터치/스페이스 공통) ═══════════════════ */
+function showPower(p) {
+  const pct = Math.round(p * 100);
+  $("powerFill").style.width = pct + "%"; $("powerPct").textContent = pct + "%";
+  $("powerFill").classList.toggle("full", p >= 1);
+  $("powerTip").textContent = G.charge ? (p >= 1 ? "MAX! 놓으면 발사" : "놓으면 발사") : "꾹 눌렀다가 놓으면 발사";
+}
+let pointerId = null;
+canvas.addEventListener("pointerdown", e => {
+  if (pointerId !== null) return;
+  pointerId = e.pointerId;
+  try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+  beginCharge();
+  e.preventDefault();
+});
+function pointerEnd(e) {
+  if (e.pointerId !== pointerId) return;
+  pointerId = null;
+  release();
+}
+canvas.addEventListener("pointerup", pointerEnd);
+canvas.addEventListener("pointercancel", pointerEnd);
+let spaceHeld = false;
+window.addEventListener("keydown", e => {
+  if (e.code !== "Space") return;
+  e.preventDefault();
+  if (e.repeat) return;
+  if (G.state === "idle" || G.state === "over") { startGame(); return; }
+  spaceHeld = true; beginCharge();
+});
+window.addEventListener("keyup", e => {
+  if (e.code !== "Space" || !spaceHeld) return;
+  spaceHeld = false; release();
+});
+window.addEventListener("blur", () => { spaceHeld = false; pointerId = null; if (G.charge) cancelCharge(); });
+
+$("btnStart").addEventListener("click", startGame);
+$("btnRetry").addEventListener("click", startGame);
+$("btnWipe").addEventListener("click", () => { if (confirm("이 기기에 저장된 개인 최고 기록을 지울까요?")) { best = null; try { localStorage.removeItem(BEST_KEY); } catch (e) {} renderRecords(); } });
+
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
