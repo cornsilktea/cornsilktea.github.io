@@ -1316,10 +1316,10 @@ const Hall = {
       .then(r => { if (!r.ok) throw new Error(String(r.status)); this.data[id] = rec; return rec; });
   }
 };
-/* 반 신기록의 키(world-record.js 와 같은 규칙: <곡>cls<학년글자><반글자>). 반별 링크가 아니면 null */
+/* 반 신기록의 키(world-record.js 와 같은 규칙: <곡>cls<학년글자><반글자>). 반별 링크가 아니거나 배포용 링크면 null */
 function clsKeyOf(id){
   const pc = window.PORTAL_CLASS;
-  return pc ? id + "cls" + "ab".charAt(pc.grade - 1) + "abcde".charAt(pc.cls - 1) : null;
+  return pc && !pc.test ? id + "cls" + "ab".charAt(pc.grade - 1) + "abcde".charAt(pc.cls - 1) : null;
 }
 function hallText(id){
   const r = Hall.get(id);

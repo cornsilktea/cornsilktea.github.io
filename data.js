@@ -25,12 +25,18 @@
       CLASSES.push({ id: grade + "-" + cls, grade: grade, cls: cls, label: grade + "학년 " + cls + "반" });
     });
   });
+  /* 배포용(테스트) 링크: index.html?c=test
+     선생님·지인에게 미리 보여 줄 때 쓰는 열한 번째 "반"입니다. 제어판에서 다른 반처럼 잠금을
+     켜고 끌 수 있지만, 학생용 첫 화면(반 고르기)에는 나오지 않고 세계·반 신기록도 등록하지 않습니다.
+     CLASSES 에는 넣지 않으므로(학생 화면이 CLASSES 를 그림) 모든 반이 필요한 곳은 ALL_CLASSES 를 씁니다. */
+  var TEST_CLASS = { id: "test", grade: 0, cls: 0, label: "배포용", test: true };
+  var ALL_CLASSES = CLASSES.concat([TEST_CLASS]);
   var classIndex = {};
-  CLASSES.forEach(function (c) { classIndex[c.id] = c; });
+  ALL_CLASSES.forEach(function (c) { classIndex[c.id] = c; });
   function classById(id) { return classIndex[id] || null; }
-  /* 주소의 ?c=1-1 을 읽어 학급을 돌려줍니다(없거나 틀리면 null) */
+  /* 주소의 ?c=1-1 (또는 ?c=test) 을 읽어 학급을 돌려줍니다(없거나 틀리면 null) */
   function classFromSearch(search) {
-    var m = /[?&]c=([12]-[1-5])(?:&|$)/.exec(search || "");
+    var m = /[?&]c=([12]-[1-5]|test)(?:&|$)/.exec(search || "");
     return m ? classById(m[1]) : null;
   }
 
@@ -187,6 +193,8 @@
 
   window.PORTAL_DATA = {
     CLASSES: CLASSES,
+    TEST_CLASS: TEST_CLASS,
+    ALL_CLASSES: ALL_CLASSES,
     classById: classById,
     classFromSearch: classFromSearch,
     SEMESTERS: SEMESTERS,

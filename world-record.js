@@ -16,6 +16,8 @@
      WR.onChange(fn) → 불러오거나 등록해 기록이 바뀔 때마다 fn 호출
      · 세계 신기록으로 등록하면 입력 창에서 고른 학년·반의 반 신기록도 함께 등록한다(반 링크 없이 들어왔어도).
        그때 WR.cls / WR.klass 가 그 반으로 채워지므로 결과 화면에 반 신기록을 보여 줄 수 있다.
+     · 배포용 링크(?c=test)로 들어오면 WR.noRecord 가 true: 기록은 보여 주지만 beats/beatsClass 는 항상 false,
+       prompt 는 창을 띄우지 않고 null 을 돌려주므로 세계·반 신기록이 등록되지 않는다(WR.cls 도 null).
 
    옵션: lower(작을수록 좋음), format(값→문자열), key(기본 "all" — 곡별 기록처럼 여러 개면 지정)
    경로는 records/<게임>/<key> . 규칙(데이터베이스규칙.json)은 기존보다 큰 score 만 받으므로
@@ -153,6 +155,10 @@
 
     /* 반별 링크(?c=1-1)로 들어왔으면 그 반의 신기록도 함께 둔다(access-guard.js 가 window.PORTAL_CLASS 를 만든다) */
     var pc = window.PORTAL_CLASS || null;
+    /* 배포용 링크(?c=test, access-guard.js 가 test:true 를 붙임)로 들어왔으면 기록은 보여 주되
+       세계·반 신기록은 등록하지 않는다(beats·beatsClass 는 false, prompt 는 바로 null, submit 은 거부). */
+    var noRecord = !!(pc && pc.test);
+    if (noRecord) pc = null;
     var world = Store(game, key, lower, format);
     var cls = pc ? Store(game, classKey(key, pc), lower, format) : null;
     if (cls) cls.who = function () { return cls.rec ? cls.rec.name : ""; };   /* 반 안에서는 이름만 */
@@ -185,10 +191,12 @@
         });
       },
 
-      beats: world.beats,
-      beatsClass: function (v) { return !!(cls && cls.beats(v)); },
+      noRecord: noRecord,
+      beats: function (v) { return !noRecord && world.beats(v); },
+      beatsClass: function (v) { return !noRecord && !!(cls && cls.beats(v)); },
 
       submit: function (v, name, grade, cls_) {
+        if (noRecord) return Promise.reject(new Error("test-link"));
         return world.submit(v, name, grade, cls_).then(function (rec) { emit(); return rec; });
       },
 

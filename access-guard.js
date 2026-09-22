@@ -98,14 +98,19 @@
   /* ---------- 학급 ----------
      반마다 링크가 다릅니다: 목록은 index.html?c=1-1, 자료는 6.snakegame.html?c=1-1.
      잠금도 반마다 따로 두므로(제어판 → 반 버튼), 주소의 ?c= 값이 어느 반인지 알려 줍니다.
-     게임에서도 window.PORTAL_CLASS 로 읽을 수 있습니다({ id:"1-1", grade:1, cls:1, label:"1학년 1반" } 또는 null). */
+     게임에서도 window.PORTAL_CLASS 로 읽을 수 있습니다({ id:"1-1", grade:1, cls:1, label:"1학년 1반" } 또는 null).
+     배포용 링크(?c=test)는 선생님·지인 테스트용 열한 번째 반입니다: 잠금은 portal/classes/test 를 보고,
+     PORTAL_CLASS 는 { id:"test", grade:0, cls:0, label:"배포용", test:true } 가 되며
+     세계·반 신기록은 등록하지 않습니다(world-record.js 가 test 를 보고 막음). */
   var classMatch = /[?&]c=([12])-([1-5])(?:&|$)/.exec(location.search);
   var klass = classMatch ? {
     id: classMatch[1] + "-" + classMatch[2],
     grade: parseInt(classMatch[1], 10),
     cls: parseInt(classMatch[2], 10),
     label: classMatch[1] + "학년 " + classMatch[2] + "반"      /* 1학년 1반 */
-  } : null;
+  } : (/[?&]c=test(?:&|$)/.test(location.search)
+    ? { id: "test", grade: 0, cls: 0, label: "배포용", test: true }
+    : null);
   window.PORTAL_CLASS = klass;
   var homeHref = klass ? "index.html?c=" + klass.id : "index.html";
 

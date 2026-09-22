@@ -108,6 +108,9 @@
   .class-grid button small { font-size: 12px; font-weight: 400; color: var(--sg-ink-soft); }
   .class-grid button.on small { color: var(--sg-ok); }
   .class-grid button[aria-pressed="true"] { border-color: var(--sg-primary); background: var(--sg-primary-soft); }
+  /* 배포용 줄: 배포용 버튼 + 오른쪽에 링크 복사 버튼(반 버튼과 같은 크기, 나머지 칸은 비움) */
+  .class-grid-test #copyTestLink { order: 1; }
+  .class-grid-test #cls-test { order: 0; }
   .class-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
   .class-head h2 { margin: 0; }
   .class-tools { display: flex; align-items: center; gap: 14px; flex: none; }
@@ -203,7 +206,14 @@
       <div class="class-grid" id="classGrid1"></div>
       <p class="class-grade">2학년</p>
       <div class="class-grid" id="classGrid2"></div>
-      <p class="hint">반마다 링크가 다릅니다(목록 화면에서 반을 고르면 그 반의 QR 이 나옵니다). 스위치도 반마다 따로 켜고 끕니다.</p>
+      <!-- 배포용: 선생님·지인 테스트용 링크(index.html?c=test). 학생 첫 화면에는 안 나오고 신기록도 등록되지 않습니다 -->
+      <p class="class-grade">배포용 (선생님·지인 테스트용 — 학생 화면에는 나오지 않음)</p>
+      <div class="class-grid class-grid-test" id="classGridTest">
+        <button id="copyTestLink" type="button" title="배포용 목록 링크를 클립보드에 복사합니다">배포용 링크 복사</button>
+      </div>
+      <p class="msg" id="pickMsg"></p>
+      <p class="hint">반마다 링크가 다릅니다(목록 화면에서 반을 고르면 그 반의 QR 이 나옵니다). 스위치도 반마다 따로 켜고 끕니다.
+        배포용 링크로 들어온 사람은 세계·반 신기록을 등록할 수 없습니다.</p>
     </div>
 
     <!-- 고른 반의 자료 스위치 목록 -->
@@ -557,6 +567,7 @@ function renderClassRecords() {
   const box = $("crecList");
   $("crecTitle").textContent = "학급 신기록 관리" + (current ? " — " + D.classById(current).label : "");
   if (!current) { box.innerHTML = ""; box.appendChild(el("p", "hint", "위 '반 고르기'에서 반을 먼저 누르세요.")); return; }
+  if (D.classById(current).test) { box.innerHTML = ""; box.appendChild(el("p", "hint", "배포용 링크로 들어온 사람은 신기록을 등록하지 않으므로 기록이 없습니다.")); return; }
   const suffix = classSuffix(current);
   renderRecordList(box, records.filter((r) => r.key.endsWith(suffix)), "crecMsg",
     D.classById(current).label + "에 등록된 신기록이 없습니다.");
@@ -687,17 +698,17 @@ function openCount(cid) {
 }
 
 function renderSummary() {
-  const opened = D.CLASSES.filter((c) => openCount(c.id) > 0);
+  const opened = D.ALL_CLASSES.filter((c) => openCount(c.id) > 0);
   $("dot").className = "dot" + (opened.length === 0 ? "" : " some");
   $("summaryText").textContent =
     games.length === 0 ? "등록된 수업 자료가 없습니다."
-    : opened.length === 0 ? "전체 잠금 (10개 반 모두 닫힘)"
+    : opened.length === 0 ? "전체 잠금 (10개 반·배포용 모두 닫힘)"
     : "열린 반: " + opened.map((c) => c.label + " " + openCount(c.id) + "개").join(" · ");
 }
 
 /* ---------------- 반 고르기 ---------------- */
 function renderClassGrid() {
-  D.CLASSES.forEach((c) => {
+  D.ALL_CLASSES.forEach((c) => {
     let b = document.getElementById("cls-" + c.id);
     if (!b) {
       b = el("button", null);
@@ -705,7 +716,8 @@ function renderClassGrid() {
       b.id = "cls-" + c.id;
       b.append(el("span", null, c.label), el("small", null, ""));
       b.addEventListener("click", () => selectClass(current === c.id ? null : c.id));
-      $("classGrid" + c.grade).appendChild(b);
+      /* 배포용은 2학년 아랫줄(링크 복사 버튼 왼쪽)에 */
+      $(c.test ? "classGridTest" : "classGrid" + c.grade).appendChild(b);
     }
     const n = openCount(c.id);
     b.querySelector("small").textContent = n > 0 ? n + "개 열림" : "잠금";
@@ -1003,22 +1015,22 @@ async function move(i, dir) {
   } catch (e) { busy = false; say("classMsg", e.message); }
 }
 
-/* 자료 하나의 값을 10개 반 모두에 한 번에 쓰기 위한 묶음(classes 에 PATCH). null 이면 지움 */
+/* 자료 하나의 값을 10개 반·배포용 모두에 한 번에 쓰기 위한 묶음(classes 에 PATCH). null 이면 지움 */
 function classPatch(slug, value) {
   const patch = {};
-  D.CLASSES.forEach((c) => { patch[c.id + "/" + slug] = value; });
+  D.ALL_CLASSES.forEach((c) => { patch[c.id + "/" + slug] = value; });
   return patch;
 }
 
-/* 전체 끄기: 10개 반의 모든 자료를 한 번에 닫습니다 */
+/* 전체 끄기: 10개 반·배포용의 모든 자료를 한 번에 닫습니다 */
 async function allOff() {
   if (games.length === 0) return;
   const patch = {};
-  D.CLASSES.forEach((c) => { games.forEach((g) => { patch[c.id + "/" + g.slug] = false; }); });
+  D.ALL_CLASSES.forEach((c) => { games.forEach((g) => { patch[c.id + "/" + g.slug] = false; }); });
   try {
     await write("classes", patch);
     await load();
-    say("mainMsg", "10개 반의 자료를 모두 닫았습니다.");
+    say("mainMsg", "10개 반·배포용의 자료를 모두 닫았습니다.");
   } catch (e) { say("mainMsg", e.message); }
 }
 
@@ -1058,7 +1070,7 @@ async function fixLegacy() {
       await write("games/" + g.slug, null);
       /* 반별 잠금 값도 새 아이디로 옮깁니다 */
       const moved = {};
-      D.CLASSES.forEach((c) => {
+      D.ALL_CLASSES.forEach((c) => {
         moved[c.id + "/" + g.canonical] = isOpen(c.id, g.slug);
         moved[c.id + "/" + g.slug] = null;
       });
@@ -1191,6 +1203,29 @@ function showLogin(message) {
 $("loginBtn").addEventListener("click", login);
 $("allOff").addEventListener("click", allOff);
 $("classClose").addEventListener("click", () => selectClass(null));
+
+/* 배포용 링크 복사: 이 제어판이 있는 자리의 index.html?c=test 를 클립보드에 넣습니다 */
+function testLink() {
+  return location.origin + location.pathname.replace(/[^/]*$/, "") + "index.html?c=" + D.TEST_CLASS.id;
+}
+async function copyText(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); return true; }
+  } catch (e) {}
+  /* 예전 브라우저·http 용 대체 방법 */
+  const ta = document.createElement("textarea");
+  ta.value = text; ta.setAttribute("readonly", ""); ta.style.cssText = "position:fixed;top:-1000px;opacity:0";
+  document.body.appendChild(ta); ta.select();
+  let ok = false;
+  try { ok = document.execCommand("copy"); } catch (e) {}
+  ta.remove();
+  return ok;
+}
+$("copyTestLink").addEventListener("click", async () => {
+  const link = testLink();
+  const ok = await copyText(link);
+  say("pickMsg", ok ? "배포용 링크를 복사했습니다: " + link : "복사하지 못했습니다. 직접 복사하세요: " + link);
+});
 /* 모두 켜기: 이 반의 자료를 한 번에 켜거나 끕니다 */
 $("classAll").addEventListener("change", async () => {
   const cb = $("classAll"), cid = current, next = cb.checked;
