@@ -1135,7 +1135,7 @@ function seedCard(g) {
   info.appendChild(el("p", "game-meta",
     g.url + "   ·   아이디: " + g.slug + (g.memo ? "   ·   " + g.memo : "")));
   info.appendChild(el("p", "game-meta",
-    "등록하면 모든 반에서 " + (g.open === true ? "열린" : "잠긴") + " 상태로 학생 목록에 나타납니다"));
+    "등록하면 모든 반에서 잠긴 상태로 학생 목록에 나타납니다 (열기는 반별 열기·잠그기에서)"));
   head.appendChild(info);
   card.appendChild(head);
 
@@ -1165,8 +1165,9 @@ function seedCard(g) {
         unitsSet: true,
         removed: null            /* 예전에 지운 표시가 있으면 함께 지웁니다 */
       });
-      /* 초기데이터.json 의 open 값을 10개 반 모두의 시작 상태로 씁니다(오락용은 true) */
-      await write("classes", classPatch(g.slug, g.open === true));
+      /* 새 자료는 초기데이터.json 의 open 값과 상관없이 10개 반·배포용 모두 잠긴 채로 시작합니다.
+         (열기는 반별 열기·잠그기에서 선생님이 직접) */
+      await write("classes", classPatch(g.slug, false));
       busy = false;
       await load();
       say("seedMsg", "'" + g.title + "' 을(를) 등록했습니다. 이제 학생 목록에 나옵니다.");

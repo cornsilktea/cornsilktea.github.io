@@ -12,7 +12,8 @@
      WR.who()     → "1학년 3반 홍길동" (학년·반이 없으면 이름만)
      WR.beats(v)  → v 가 세계 신기록을 넘는지
      WR.prompt(v) → 넘으면 학년·반·이름 입력 창을 띄우고 등록. Promise<등록된 기록 또는 null>
-                    (등록하거나, 그 사이 누가 앞질러 거부될 때까지 닫히지 않는다)
+                    (창을 띄우기 전에 세계·반 신기록을 다시 읽어 그 사이 누가 앞질렀으면 창을 띄우지 않고,
+                     띄운 뒤에는 등록하거나 등록이 거부될 때까지 닫히지 않는다)
      WR.onChange(fn) → 불러오거나 등록해 기록이 바뀔 때마다 fn 호출
      · 세계 신기록으로 등록하면 입력 창에서 고른 학년·반의 반 신기록도 함께 등록한다(반 링크 없이 들어왔어도).
        그때 WR.cls / WR.klass 가 그 반으로 채워지므로 결과 화면에 반 신기록을 보여 줄 수 있다.
@@ -206,9 +207,22 @@
          다 채워 등록하기 전에는 닫히지 않는다(그 사이 누가 앞질러 거부되면 자동으로 닫힘).
          돌려주는 값은 세계 신기록으로 등록된 기록(반 신기록만 등록했거나 아니면 null). */
       prompt: function (v, title) {
-        var isWorld = api.beats(v);
-        var isClass = api.beatsClass(v);
-        if (!isWorld && !isClass) return Promise.resolve(null);
+        if (noRecord) return Promise.resolve(null);
+        /* 기기에 들고 있던 기록은 게임을 시작할 때 읽은 값이라, 그 사이 다른 학생이 더 높은 기록을 냈을 수 있다.
+           창을 띄우기 전에 세계·반 신기록을 다시 읽어(onChange 도 다시 불림) 진짜 신기록일 때만 창을 띄운다.
+           다시 읽기에 실패하면(오프라인 등) 들고 있던 값으로 판정하고, 등록 때 규칙(401)이 한 번 더 거른다. */
+        var quick = !api.beats(v) && !api.beatsClass(v);
+        if (quick && world.loaded && (!cls || cls.loaded)) return Promise.resolve(null);
+        return api.load().then(function () {
+          var isWorld = api.beats(v);
+          var isClass = api.beatsClass(v);
+          if (!isWorld && !isClass) return null;
+          return openDialog(v, title, isWorld, isClass);
+        });
+      }
+    };
+
+    function openDialog(v, title, isWorld, isClass) {
         ensureStyle();
         return new Promise(function (resolve) {
           var back = document.createElement("div");
@@ -303,8 +317,7 @@
           };
           input.addEventListener("keydown", function (e) { if (e.key === "Enter") ok.click(); });
         });
-      }
-    };
+    }
 
     function emit() { listeners.forEach(function (fn) { try { fn(api); } catch (e) {} }); }
     return api;

@@ -249,8 +249,10 @@
         냄비 4개를 동시에 관리하며 <b id="secTxt"></b>초 안에 최대한 많은 돈을 버는 것이 목표.</p>
       <table class="grade-table">
         <tr><th>등급</th><th>최상</th><th>상</th><th>중</th><th>하</th><th>순서 실수</th><th>타버림</th></tr>
+        <tr><td>계란+파 타이밍</td><td id="t1"></td><td id="t2"></td><td id="t3"></td><td id="t4"></td><td>순서·재료 틀림</td><td>방치</td></tr>
         <tr><td>가격</td><td id="p1"></td><td id="p2"></td><td id="p3"></td><td id="p4"></td><td id="p5"></td><td id="p6"></td></tr>
       </table>
+      <p class="sub" id="bonusTxt" style="margin-top:6px"></p>
       <div class="best-row">
         <div class="best-box empty" id="startBest"></div>
         <div class="best-box world empty" id="startWorld"></div>
@@ -348,6 +350,15 @@ $("p5").textContent = fmt(CONFIG.PRICES.mistake)+"원";
 $("p6").textContent = "-"+fmt(CONFIG.BURN_PENALTY)+"원";
 $("pMis").textContent = fmt(CONFIG.PRICES.mistake);
 $("pBurn").textContent = fmt(CONFIG.BURN_PENALTY);
+/* 타이밍 열: 신호 한가운데 기준 |오차| 로 판정하므로, 신호(READY_WINDOW)가 켜진 동안 = ±READY_WINDOW/2 */
+$("t1").textContent = "±" + CONFIG.PERFECT_TOL + "초";
+$("t2").textContent = "±" + CONFIG.GOOD_TOL + "초";
+$("t3").textContent = "±" + CONFIG.FAIR_TOL + "초";
+$("t4").textContent = "그 밖";
+$("bonusTxt").innerHTML =
+  `※ 담기 신호 후 <b>${CONFIG.TRAY_FAST}초</b> 안에 담으면 <b>+${fmt(CONFIG.FAST_BONUS)}원</b> 보너스(순서 실수는 제외). ` +
+  `신호 전에 담거나 <b>${CONFIG.TRAY_GOOD}초</b>를 넘겨 담으면 등급이 한 단계 내려간다. ` +
+  `타이밍 오차는 "지금 넣으세요!" 신호(${CONFIG.READY_WINDOW}초)의 한가운데 기준이라, 신호가 켜진 동안 넣으면 최상.`;
 
 /* ---------- 냄비 장면 (img/ramen/ 이미지 레이어) ---------- */
 const IMG = "img/ramen/";

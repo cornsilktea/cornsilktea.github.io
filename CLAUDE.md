@@ -22,7 +22,8 @@
    - 파일에 `Content-Security-Policy` 가 있으면 `connect-src` 에 Firebase 주소를 허용한다(사용법.md 3절).
 2. **파일 이름은 `<번호>.<영문이름>.html`**, 번호는 저장소 최대 번호 + 1 (`ls` 로 확인). 구분자는 점.
 3. **`초기데이터.json` 의 `portal.games` 에 항목 추가**(title·url·memo·order·open·units·unitsSet).
-   수업 자료면 `open:false`, 오락용이면 `true`. 단원을 모르면 `units: []`.
+   `open` 은 참고용일 뿐이다 — 제어판에서 등록하면 **어떤 자료든 모든 반에서 잠긴 채로** 시작하고
+   선생님이 반별로 연다. 단원을 모르면 `units: []`.
 4. `pwsh ./링크제목맞추기.ps1` 실행 → 파일의 `<title>`·og: 태그를 제어판 제목으로 채움. `<title>` 은 손으로 고치지 않는다.
 5. **커밋·푸시까지** 한다. 학생 노출 여부만 선생님이 제어판(admin.html)에서 정한다.
 6. 인라인 스크립트를 고친 뒤에는 파싱 검사(브라우저에서 `<script>` 블록마다 `new Function(src)`)를 한다.
