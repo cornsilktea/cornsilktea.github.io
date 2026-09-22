@@ -162,16 +162,16 @@ const CONFIG = {
   passThresholds: [30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 50],   // 라운드별 통과 기준(해당 라운드 5발 합, 2점씩 올라 50점에서 멈춤). 배열 길이 = 라운드 수
   targetSpeedByRound: [1.0, 1.15, 1.3, 1.5, 1.75, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0, 3.2],   // 라운드별 과녁 이동 속도 배율 (모자라면 마지막 값 사용)
   targetBaseSpeedW: 0.20,     // 과녁 기본 속도 (초당 화면 너비 비율)
-  targetGapSec: 1.0,          // 과녁이 왼쪽으로 사라진 뒤 오른쪽에서 다시 나올 때까지의 시간(초) — 속도와 무관하게 모든 라운드 같은 간격
+  targetIntervalSec: 2.5,     // 과녁이 화면 가운데를 지나는 시간 간격(초) — 속도와 무관. 느린 라운드는 나무가 두 그루 같이 보인다
   loadTimeMs: 120,            // 누른 뒤 화살이 뒤로 끌려오는(장전 모션) 시간
   assistX: 0.45,              // 조준 보정(0 없음 ~ 1 무조건 정중앙). 과녁 근처(반지름 1.6배 안)에서만 좌우 오차를 이 비율만큼 줄인다
   /* 3D 장면 (m) — 카메라 눈높이·초점거리로 화면 크기가 정해진다 */
   camHeightM: 1.5,            // 카메라(눈) 높이
-  horizonH: 0.38,             // 지평선(눈높이)의 화면 y (화면 높이 비율)
+  horizonH: 0.46,             // 지평선(눈높이)의 화면 y (화면 높이 비율)
   focalH: 0.9,                // 초점거리 = min(focalH×화면높이, 1.45×화면너비) px
   targetRadiusM: 0.6,         // 과녁 실제 반지름 → 화면 크기(targetRadiusH)와 합쳐 과녁까지 거리가 정해진다
   arrowLengthM: 0.8, arrowWidthM: 0.42,   // 화살 길이 · 깃 너비(그림 폭)
-  handM: { y: 1.0, z: 0.9 },  // 대기 상태 오늬(밑동) 위치 (x=0)
+  handM: { y: 1.06, z: 0.9 },  // 대기 상태 오늬(밑동) 위치 (x=0)
   drawBackM: 0.38,            // 장전 때 오늬가 축을 따라 뒤(카메라 쪽)로 끌려오는 거리 → 앞 절반쯤만 화면에 남는다
   launchAngleDeg: 20,         // 발사 각도(위로)
   gravity: 9.81,
@@ -181,7 +181,7 @@ const CONFIG = {
   targetRingScores: [10, 8, 6, 4, 2, 1],   // 중심→바깥 점수 (그림의 빨강·크림·초록·크림·초록·테두리 6단계와 맞춤)
   targetRingEdges: [0.2, 0.39, 0.58, 0.77, 0.94, 1.0],   // 각 띠의 바깥 경계(과녁 반지름 비율)
   targetRadiusH: 0.11,        // 과녁 반지름(화면 높이 비율, 세로 화면에서는 너비 기준으로 제한)
-  targetCenterY: 0.42,        // 과녁 중심 높이(화면 높이 비율)
+  targetCenterY: 0.53,        // 과녁 중심 높이(화면 높이 비율) — 나무 뿌리가 앞쪽 덤불(화면 80% 아래) 속에 묻히는 높이
 };
 function thresholdOf(r) { const P = CONFIG.passThresholds; return P[Math.min(r, P.length) - 1]; }
 function speedMulOf(r) { const S = CONFIG.targetSpeedByRound; return S[Math.min(r, S.length) - 1]; }
@@ -324,7 +324,8 @@ const G = {
   charge: null,      // { t0 } 누르는 중(장전)
   arrow: null,       // 날아가는 화살 { c, v, L, judged, life, stopped }
   fading: null,      // 빗나간 화살(사라지는 중) — 같은 모양
-  target: null,      // { x(과녁 중심의 지금 화면 x), stuck: [ {x,y(과녁 그림 px), t0, lean} ] }
+  nextSpawnT: 0,     // 다음 과녁이 나올 시각(G.t)
+  targets: [],       // 화면에 있는 과녁들 { x(과녁 중심의 지금 화면 x), stuck: [ {x,y(과녁 그림 px), t0, lean} ] }
   scroll: 0,         // 배경 스크롤 누적(px, 과녁 속도 기준)
   worldSpeed: 0,     // 현재 과녁 속도(px/s)
   hits: 0,
@@ -336,7 +337,13 @@ function targetCenterAt(tg, t) {
 }
 function spawnTarget(fromX) {
   const halfW = TARGET_IMG.w * V.tk / 2;
-  G.target = { x: fromX !== undefined ? fromX : V.W + halfW + 20, stuck: [] };
+  G.targets.push({ x: fromX !== undefined ? fromX : V.W + halfW + 20, stuck: [] });
+}
+/* 시각 t 에 화면 x 와 가장 가까운 과녁 (판정·조준 보정용) */
+function nearestTarget(x, t) {
+  let best = null, bd = Infinity;
+  G.targets.forEach(tg => { const d = Math.abs(targetCenterAt(tg, t).x - x); if (d < bd) { bd = d; best = tg; } });
+  return best;
 }
 
 function startGame() {
@@ -344,7 +351,7 @@ function startGame() {
   G.round = 1; G.score = 0; G.roundScore = 0; G.shot = 0; G.hits = 0; G.charge = null; G.arrow = null; G.fading = null; G.t = 0; G.scroll = 0;
   $("overlay").style.display = "none";
   document.body.classList.add("playing");
-  spawnTarget();
+  G.targets = []; spawnTarget(); G.nextSpawnT = CONFIG.targetIntervalSec;
   startRound();
 }
 function startRound() {
@@ -453,7 +460,7 @@ function shoot(p) {
   const v = idealSpeed(held, tw.y);
   const vel = { x: 0, y: DIR.y * v, z: DIR.z * v };
   /* 조준 보정: 도착 시점의 과녁 위치를 미리 계산해 근처면 좌우 오차를 조금 줄인다 */
-  const tg = G.target, fl = flightAt(c0, vel, L);
+  const fl = flightAt(c0, vel, L), tg = nearestTarget(V.cx, G.t + fl.T);
   if (tg && fl.T > 0) {
     const c = targetCenterAt(tg, G.t + fl.T), cw = unproj(c.x, c.y, V.Zt), lim = 1.6 * CONFIG.targetRadiusM;
     if (Math.abs(cw.x - fl.tip.x) < lim) vel.x += CONFIG.assistX * (cw.x - fl.tip.x) / fl.T;
@@ -482,7 +489,7 @@ function stepArrow(a, dt) {
 }
 function judge(a, tipAt) {
   a.judged = true;
-  const tg = G.target, c = tg ? targetCenterAt(tg, G.t) : null;
+  const tg = nearestTarget(V.cx, G.t), c = tg ? targetCenterAt(tg, G.t) : null;
   const sp = tipAt ? proj(tipAt.x, tipAt.y, V.Zt) : proj(arrowTip(a).x, 0, arrowTip(a).z);   // 판정 지점의 화면 좌표
   const d = (c && tipAt) ? Math.hypot(sp.x - c.x, sp.y - c.y) / V.R : 9;
   let score = 0;
@@ -519,9 +526,11 @@ function frame(now) {
   if (G.state === "play" || G.state === "between") {
     G.worldSpeed = targetSpeed();   // 화면 크기·라운드가 바뀌어도 매 프레임 다시 계산
     G.t += dt; G.scroll += G.worldSpeed * dt;
-    const tg = G.target, halfW = TARGET_IMG.w * V.tk / 2;
-    if (tg) tg.x -= G.worldSpeed * dt;
-    if (tg && tg.x < -halfW - 10) spawnTarget(V.W + halfW + CONFIG.targetGapSec * G.worldSpeed);
+    const halfW = TARGET_IMG.w * V.tk / 2;
+    G.targets.forEach(tg => { tg.x -= G.worldSpeed * dt; });
+    G.targets = G.targets.filter(tg => tg.x > -halfW - 10);
+    /* 과녁은 interval 초마다 오른쪽 끝에서 하나씩 나온다 → 가운데를 지나는 간격도 interval 초 (속도와 무관) */
+    if (G.t >= G.nextSpawnT) { spawnTarget(); G.nextSpawnT += CONFIG.targetIntervalSec; }
     if (G.arrow) stepArrow(G.arrow, dt);
     if (G.fading) { const f = G.fading; stepArrow(f, dt); f.life -= dt; if (f.life <= 0) G.fading = null; }
   }
@@ -551,7 +560,9 @@ function drawForeground() {
   if (near) drawLayer(near, near.width, near.height, 1.25);
 }
 function drawTarget() {
-  const tg = G.target; if (!tg) return;
+  G.targets.forEach(drawOneTarget);
+}
+function drawOneTarget(tg) {
   const c = targetCenterAt(tg, G.t), k = V.tk;
   ctx.save(); ctx.translate(c.x - TARGET_IMG.cx * k, c.y - TARGET_IMG.cy * k);   // 과녁 그림의 왼쪽 위가 원점
   if (IMG.target) ctx.drawImage(IMG.target, 0, 0, TARGET_IMG.w * k, TARGET_IMG.h * k);
