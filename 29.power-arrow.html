@@ -11,7 +11,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
 <meta property="og:title" content="파워 애로우 챌린지">
-<meta property="og:description" content="누르면 장전, 놓으면 발사하는 1인칭 타이밍 양궁 개인전 / 흘러가는 나무 과녁 6라운드·라운드당 5발, 라운드마다 과녁이 빨라짐 / 라운드 합계가 통과 기준 아래면 탈락, 총점으로 기록">
+<meta property="og:description" content="누르면 장전, 놓으면 발사하는 1인칭 타이밍 양궁 개인전 / 흘러가는 나무 과녁 12라운드·라운드당 5발, 라운드마다 과녁이 빨라짐 / 라운드 합계가 통과 기준 아래면 탈락, 총점으로 기록">
 <meta property="og:url" content="https://cornsilktea.github.io/29.power-arrow.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
@@ -109,7 +109,7 @@
 
 <div id="overlay">
   <div class="card" id="cardStart">
-    <div class="logo">🏹 파워 애로우 챌린지<small>흘러가는 과녁을 타이밍 맞춰 맞혀라 · 6라운드 × 5발</small></div>
+    <div class="logo">🏹 파워 애로우 챌린지<small>흘러가는 과녁을 타이밍 맞춰 맞혀라 · 12라운드 × 5발</small></div>
     <div class="desc">화면(또는 <b>스페이스바</b>)을 <b>누르면 장전</b>되고, <b>놓으면</b> 화살이 날아갑니다. 과녁은 계속 왼쪽으로 흘러가고 화살이 닿기까지 시간이 걸리니 <b>도착할 때 과녁이 가운데에 오도록</b> 조금 미리 놓으세요. 가운데 <b>10점</b>, 바깥으로 갈수록 점수가 낮아지고 빗나가면 0점. 라운드가 오를수록 과녁이 빨라지고, 라운드 5발 합계가 <b>통과 기준</b>보다 낮으면 탈락합니다.</div>
     <div class="keys">
       <div><b>누르기</b><span>장전</span></div>
@@ -159,10 +159,10 @@
 /* ───────── 밸런스 설정 (선생님이 값만 바꿔 조정) ───────── */
 const CONFIG = {
   arrowsPerRound: 5,
-  passThresholds: [20, 23, 26, 30, 35, 40],          // 라운드별 통과 기준(해당 라운드 5발 합). 배열 길이 = 라운드 수
-  targetSpeedByRound: [1.0, 1.15, 1.3, 1.5, 1.75, 2.0],   // 라운드별 과녁 이동 속도 배율 (모자라면 마지막 값 사용)
+  passThresholds: [30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 50],   // 라운드별 통과 기준(해당 라운드 5발 합, 2점씩 올라 50점에서 멈춤). 배열 길이 = 라운드 수
+  targetSpeedByRound: [1.0, 1.15, 1.3, 1.5, 1.75, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0, 3.2],   // 라운드별 과녁 이동 속도 배율 (모자라면 마지막 값 사용)
   targetBaseSpeedW: 0.20,     // 과녁 기본 속도 (초당 화면 너비 비율)
-  targetGapW: 0.45,           // 과녁이 왼쪽으로 사라진 뒤 오른쪽에서 다시 나올 때까지의 간격(화면 너비 비율)
+  targetGapSec: 1.0,          // 과녁이 왼쪽으로 사라진 뒤 오른쪽에서 다시 나올 때까지의 시간(초) — 속도와 무관하게 모든 라운드 같은 간격
   loadTimeMs: 120,            // 누른 뒤 화살이 뒤로 끌려오는(장전 모션) 시간
   assistX: 0.45,              // 조준 보정(0 없음 ~ 1 무조건 정중앙). 과녁 근처(반지름 1.6배 안)에서만 좌우 오차를 이 비율만큼 줄인다
   /* 3D 장면 (m) — 카메라 눈높이·초점거리로 화면 크기가 정해진다 */
@@ -521,7 +521,7 @@ function frame(now) {
     G.t += dt; G.scroll += G.worldSpeed * dt;
     const tg = G.target, halfW = TARGET_IMG.w * V.tk / 2;
     if (tg) tg.x -= G.worldSpeed * dt;
-    if (tg && tg.x < -halfW - 10) spawnTarget(V.W + halfW + CONFIG.targetGapW * V.W);
+    if (tg && tg.x < -halfW - 10) spawnTarget(V.W + halfW + CONFIG.targetGapSec * G.worldSpeed);
     if (G.arrow) stepArrow(G.arrow, dt);
     if (G.fading) { const f = G.fading; stepArrow(f, dt); f.life -= dt; if (f.life <= 0) G.fading = null; }
   }
