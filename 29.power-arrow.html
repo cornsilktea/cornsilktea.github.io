@@ -28,8 +28,10 @@
   .hud-box { background: rgba(255,255,255,.92); border: 2px solid var(--sg-line-strong); border-radius: 10px; padding: 6px 12px; font-weight: 800; font-variant-numeric: tabular-nums; box-shadow: 0 3px 0 rgba(27,43,32,.25); text-align: center; min-width: 96px; }
   .hud-box .lab { font-size: 12px; color: var(--sg-ink-soft); font-weight: 700; display: block; }
   .hud-box .big { font-size: 34px; font-size: clamp(22px, 4vw, 34px); line-height: 1.15; color: var(--sg-ink); }
-  #hudRound { top: 52px; left: 10px; }
-  #hudArrows { top: 52px; left: 118px; min-width: 0; }
+  /* 왼쪽 위: 라운드 · 남은 화살 — 고정 left 값 대신 flex 로 나란히 놓아 "12 / 12" 처럼 길어져도 겹치지 않는다 */
+  #hudLeft { top: 52px; left: 10px; display: none; gap: 8px; align-items: flex-start; }
+  body.playing #hudLeft { display: flex; }
+  #hudArrows { min-width: 0; }
   #hudArrows .big { letter-spacing: 2px; }
   #hudBest { bottom: 14px; left: 10px; min-width: 0; }
   #hudBest .big { font-size: 20px; }
@@ -86,7 +88,7 @@
   .wipe button { font: inherit; font-size: 12px; color: var(--sg-ink-soft); background: none; border: none; text-decoration: underline; cursor: pointer; }
   @media (max-width: 640px) {
     .hud-box { padding: 4px 8px; min-width: 0; }
-    #hudArrows { left: 96px; }
+    #hudLeft { gap: 6px; }
     #tip { bottom: 70px; font-size: 13px; }   /* 왼쪽 아래 개인 최고 기록과 겹치지 않게 */
     .hud-box .lab { font-size: 10px; }
     .btn { font-size: 18px; padding: 11px 24px; }
@@ -100,8 +102,10 @@
 <div id="pops"></div>
 <div id="banner"><span class="t" id="bannerT"></span><span class="s" id="bannerS"></span></div>
 
-<div class="hud hud-box" id="hudRound"><span class="lab">라운드</span><span class="big" id="hudRoundVal">1</span></div>
-<div class="hud hud-box" id="hudArrows"><span class="lab">남은 화살</span><span class="big" id="hudArrowsVal">●●●●●</span></div>
+<div class="hud" id="hudLeft">
+  <div class="hud-box" id="hudRound"><span class="lab">라운드</span><span class="big" id="hudRoundVal">1</span></div>
+  <div class="hud-box" id="hudArrows"><span class="lab">남은 화살</span><span class="big" id="hudArrowsVal">●●●●●</span></div>
+</div>
 <div class="hud" id="hudScore"><div class="num" id="hudScoreVal">0점</div><div class="pass" id="hudPass">이번 라운드 0 / 통과 20점</div></div>
 <div class="hud hud-box" id="hudBest"><span class="lab">개인 최고 기록</span><span class="big" id="hudBestVal">—</span></div>
 
@@ -607,15 +611,18 @@ function drawArrowImg(tx, ty, h, w, rot, alpha) {
   }
   ctx.restore();
 }
-/* 월드의 화살(촉 tip · 오늬 nock, m)을 투영해 그린다. 길이는 두 끝의 화면 거리(원근·단축 포함), 폭은 깃 쪽 깊이의 원근 */
+/* 월드의 화살(촉 tip · 오늬 nock, m)을 투영해 그린다. 길이는 두 끝의 화면 거리(원근·단축 포함), 폭은 깃 쪽 깊이의 원근.
+   화살이 시선과 거의 나란히 멀어질 때 원근 때문에(오늬가 눈높이 위에서는 더 가까워 더 높이 찍힘) 투영된 꼬리가 촉 위로
+   올라가 버려, 그대로 그리면 날아가는 도중 꼬리가 갑자기 위로 뒤집혔다. 그래서 세로 성분은 아래(꼬리가 촉보다 아래)로만 두고
+   최소 길이(minForeshorten) 이상을 보장하며, 좌우 기울기만 투영 그대로 쓴다 → 발사부터 도착까지 꼬리가 아래를 향한 채 매끄럽게 줄어든다 */
 function drawArrow3D(tip, nock, alpha) {
   if (tip.z <= 0.05 || nock.z <= 0.05) return;
   const tp = proj(tip.x, tip.y, tip.z), np = proj(nock.x, nock.y, nock.z);
   const zc = (tip.z + nock.z) / 2, zw = nock.z + 0.25 * (tip.z - nock.z);
-  const dx = np.x - tp.x, dy = np.y - tp.y, seen = Math.hypot(dx, dy);
-  const h = Math.max(seen, CONFIG.minForeshorten * CONFIG.arrowLengthM * V.f / zc);
+  const dx = np.x - tp.x, dy = Math.max(np.y - tp.y, CONFIG.minForeshorten * CONFIG.arrowLengthM * V.f / zc);
+  const h = Math.hypot(dx, dy);
   const w = CONFIG.arrowWidthM * V.f / zw;
-  const rot = seen > 3 ? Math.atan2(dy, dx) - Math.PI / 2 : 0;   // 그림은 아래로 뻗으므로 (0,1) 기준 각
+  const rot = Math.atan2(-dx, dy);   // 그림은 아래(0,1)로 뻗으므로 (dx,dy) 방향을 보게 회전
   drawArrowImg(tp.x, tp.y, h, w, rot, alpha);
 }
 function drawHeldArrow(p) {   // 대기·장전 중: 축을 따라 뒤로 끌려와 장전되면 앞 절반만 보인다
