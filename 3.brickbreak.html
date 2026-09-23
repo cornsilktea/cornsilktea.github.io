@@ -8,7 +8,6 @@
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="brickbreak"></script>
 <script charset="utf-8" src="world-record.js"></script>
-<!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
 <title>벽돌깨기</title>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
@@ -17,32 +16,18 @@
 <meta property="og:url" content="https://cornsilktea.github.io/3.brickbreak.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
-<!-- 링크 미리보기 끝 -->
 <style>
-:root {
-  --wrks-viz-font-family:var(--sg-font);
-  --wrks-viz-primary: var(--sg-primary);
-  --wrks-viz-bg: var(--sg-bg);
-  --wrks-viz-fg: var(--sg-ink);
-  --wrks-viz-border: var(--sg-line-mid);
-  --wrks-viz-radius:var(--sg-radius);
-  --wrks-viz-space-1: 4px;
-  --wrks-viz-space-2: 8px;
-  --wrks-viz-space-3: 12px;
-  --wrks-viz-space-4: 16px;
-}
 * { box-sizing: border-box; }
 html, body {
   margin: 0;
   padding: 0;
-  background: var(--wrks-viz-bg);
-  color: var(--wrks-viz-fg);
-  font-family: var(--wrks-viz-font-family);
+  background: var(--sg-bg);
+  color: var(--sg-ink);
+  font-family: var(--sg-font);
   -webkit-text-size-adjust: 100%;
 }
-body { padding: var(--wrks-viz-space-3); }
+body { padding: 12px; }
 .wrap { max-width: 400px; margin: 0 auto; }
-/* 화면이 넓으면 조작 설명을 오른쪽 열로 보내고, '다시 시작' 은 게임판 아래에 둡니다. */
 @media (min-width: 860px) {
   .wrap {
     max-width: 760px;
@@ -51,7 +36,7 @@ body { padding: var(--wrks-viz-space-3); }
     grid-template-areas:
       "main note"
       "sub  note";
-    column-gap: var(--wrks-viz-space-4);
+    column-gap: 16px;
     align-items: start;
   }
   .main { grid-area: main; }
@@ -62,12 +47,12 @@ body { padding: var(--wrks-viz-space-3); }
   background: var(--sg-panel);
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  border: 1px solid var(--wrks-viz-border);
-  border-radius: var(--wrks-viz-radius);
+  border: 1px solid var(--sg-line-mid);
+  border-radius: var(--sg-radius);
   overflow: hidden;
-  margin-bottom: var(--wrks-viz-space-2);
+  margin-bottom: 8px;
 }
-.hud div { padding: 6px 10px; border-left: 1px solid var(--wrks-viz-border); }
+.hud div { padding: 6px 10px; border-left: 1px solid var(--sg-line-mid); }
 .hud div:first-child { border-left: 0; }
 .hud .lb { font-size: 11px; color: var(--sg-ink-soft); letter-spacing: .02em; }
 .hud .vl { font-size: 22px; font-variant-numeric: tabular-nums; line-height: 1.25; }
@@ -76,26 +61,24 @@ canvas {
   width: 100%;
   aspect-ratio: 560 / 700;
   border: 2px solid var(--sg-line-strong);
-  border-radius: var(--wrks-viz-radius);
+  border-radius: var(--sg-radius);
   background: var(--sg-panel);
   touch-action: none;
   cursor: crosshair;
 }
-/* aspect-ratio 를 모르는 구형 전자칠판 대비.
-   canvas 는 560x700 크기를 갖고 있어 height:auto 면 비율대로 늘어난다. */
 @supports not (aspect-ratio: 1 / 1) {
   canvas { height: auto; }
 }
 .ctrl {
   display: grid;
   grid-template-columns: 56px 1fr 56px;
-  gap: var(--wrks-viz-space-2);
-  margin-top: var(--wrks-viz-space-2);
+  gap: 8px;
+  margin-top: 8px;
 }
 button {
   font-family: inherit;
   font-size: 15px;
-  color: var(--wrks-viz-fg);
+  color: var(--sg-ink);
   background: #ffffff;
   border: 1.5px solid var(--sg-line-strong);
   border-radius:var(--sg-radius);
@@ -107,8 +90,8 @@ button {
 }
 button:active { background: var(--sg-panel-alt); }
 #fire {
-  background: var(--wrks-viz-primary);
-  border-color: var(--wrks-viz-primary);
+  background: var(--sg-primary);
+  border-color: var(--sg-primary);
   color: #ffffff;
   font-size: 17px;
   font-weight: 600;
@@ -116,36 +99,34 @@ button:active { background: var(--sg-panel-alt); }
 }
 #fire:disabled {
   background: var(--sg-line);
-  border-color: var(--wrks-viz-border);
+  border-color: var(--sg-line-mid);
   color: var(--sg-ink-faint);
   cursor: default;
 }
-/* 발사 버튼에서 충분히 떨어뜨려 실수로 누르지 않게 합니다.
-   좁은 화면에서는 조작 설명보다도 아래(맨 끝), 넓은 화면에서는 게임판 열 맨 아래에 놓입니다. */
-.sub { display: flex; gap: var(--wrks-viz-space-2); margin-top: 40px; }
+.sub { display: flex; gap: 8px; margin-top: 40px; }
 .sub button { flex: 1; font-size: 13px; padding: 9px 8px; }
 .note {
-  margin-top: var(--wrks-viz-space-3);
-  border: 1px solid var(--wrks-viz-border);
+  margin-top: 12px;
+  border: 1px solid var(--sg-line-mid);
   background: var(--sg-panel);
-  border-radius: var(--wrks-viz-radius);
-  padding: 10px var(--wrks-viz-space-3);
+  border-radius: var(--sg-radius);
+  padding: 10px 12px;
   font-size: 12.5px;
   line-height: 1.65;
   color: var(--sg-ink-mid);
 }
-.note b { font-weight: 600; color: var(--wrks-viz-fg); }
-.note .world { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--wrks-viz-border); font-size: 13px; line-height: 1.4; }
+.note b { font-weight: 600; color: var(--sg-ink); }
+.note .world { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--sg-line-mid); font-size: 13px; line-height: 1.4; }
 .note .world small { display: block; font-size: 11.5px; color: var(--sg-ink-soft); }
 .note .world em { font-style: normal; font-weight: 700; color: var(--sg-warn); font-size: 16px; }
 .note ul { margin: 4px 0 0; padding-left: 17px; }
 #msg {
-  margin-top: var(--wrks-viz-space-2);
+  margin-top: 8px;
   font-size: 13px;
   color: var(--sg-ink-soft);
   min-height: 18px;
 }
-  [hidden]{display:none !important;}
+[hidden]{display:none !important;}
 </style>
 </head>
 <body>
@@ -186,41 +167,10 @@ button:active { background: var(--sg-panel-alt); }
     </ul>
   </div>
 
-  <!-- 발사 버튼과 붙어 있으면 실수로 누르는 일이 생겨 맨 아래로 내렸습니다. -->
   <div class="sub">
     <button id="restart">다시 시작</button>
   </div>
 </div>
-
-<script>
-/* 구형 전자칠판·태블릿 브라우저 대응
-   ctx.roundRect() 는 비교적 최근(2022년 무렵)에 추가된 기능이라
-   오래된 기기에는 없습니다. 없을 때만 같은 동작을 직접 만들어 넣습니다.
-   이게 없으면 벽돌을 그리다 오류가 나서 화면이 아예 그려지지 않습니다. */
-(function () {
-  if (typeof CanvasRenderingContext2D === "undefined") return;
-  var P = CanvasRenderingContext2D.prototype;
-  if (P.roundRect) return;
-  P.roundRect = function (x, y, w, h, r) {
-    if (typeof r === "undefined") { r = 0; }
-    if (r && r.length) { r = r[0]; }          // 배열로 넘어와도 첫 값만 사용
-    var max = Math.min(Math.abs(w), Math.abs(h)) / 2;
-    if (r > max) { r = max; }
-    if (r < 0) { r = 0; }
-    this.moveTo(x + r, y);
-    this.lineTo(x + w - r, y);
-    this.quadraticCurveTo(x + w, y, x + w, y + r);
-    this.lineTo(x + w, y + h - r);
-    this.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-    this.lineTo(x + r, y + h);
-    this.quadraticCurveTo(x, y + h, x, y + h - r);
-    this.lineTo(x, y + r);
-    this.quadraticCurveTo(x, y, x + r, y);
-    this.closePath();
-    return this;
-  };
-})();
-</script>
 
 <script>
 (function () {
@@ -235,9 +185,6 @@ button:active { background: var(--sg-panel-alt); }
   var LAUNCHY = 668;
   var R = 7;
   var MAXA = 85 * Math.PI / 180;
-  // 거의 수평으로 오래 왕복하는 걸 막는 최소 세로 속도 비율(전체 속도 대비).
-  // cos 85° ≈ 0.087 이라 85° 발사는 이 값에 걸리므로, 예측선이 그려지는 구간(벽 반사 6번 또는
-  // 첫 벽돌 충돌까지)은 보정을 미루고 그 뒤부터 적용합니다. 예측선과 실제 궤적이 어긋나지 않게 하려는 것입니다.
   var MINVY = 0.16;
   var FREE_WALL_HITS = 6;
 
@@ -257,7 +204,6 @@ button:active { background: var(--sg-panel-alt); }
   var round = 1;
   var ballCount = 1;
   var launchX = LW / 2;
-  var nextX = LW / 2;
   var firstLanded = -1;
   var aim = 0;
   var aimed = false;
@@ -265,13 +211,7 @@ button:active { background: var(--sg-panel-alt); }
   var turnTime = 0;
   var best = 1;
 
-  /* ---- 저사양 기기(구형 태블릿·전자칠판) 프레임드랍 대책 ----
-     예전에는 매 프레임마다 벽돌 전부를 다시 그리고, 조준 중에는 예측선을 매번 다시 계산하고,
-     공 하나하나가 서브스텝마다 벽돌 전부와 충돌 검사를 했습니다. 이 셋이 프레임드랍의 원인이라
-     - cells 가 바뀔 때마다 cellsVer 를 올리고, 이를 기준으로 벽돌 그림·예측선을 캐시하며
-     - grid 로 공 근처 칸만 검사합니다(칸당 벽돌 하나이므로 격자 조회로 충분).
-     - 조준 상태에서는 화면이 바뀔 때(needDraw)만 그립니다. */
-  var GRID_ROWS = ROWS_MAX + 2;             // 게임 종료 시 r === ROWS_MAX 까지 올 수 있어 여유를 둠
+  var GRID_ROWS = ROWS_MAX + 2;
   var grid = new Array(GRID_ROWS * COLS);
   var cellsVer = 0;
   var needDraw = true;
@@ -292,8 +232,6 @@ button:active { background: var(--sg-panel-alt); }
     markCells();
   }
 
-  // 공(x, y, 반지름 R)이 걸칠 수 있는 칸만 훑어 처음 만나는 벽돌을 돌려줍니다.
-  // 벽돌은 칸 안쪽으로 GAP/2 만큼 들어가 있어 이웃 칸까지(최대 2×2) 보면 충분합니다.
   function brickNear(x, y) {
     var c0 = Math.floor((x - R - MARGIN) / CELLW), c1 = Math.floor((x + R - MARGIN) / CELLW);
     var r0 = Math.floor((y - R - TOP) / ROWH), r1 = Math.floor((y + R - TOP) / ROWH);
@@ -310,7 +248,6 @@ button:active { background: var(--sg-panel-alt); }
     return null;
   }
 
-  // +1 공 아이템은 칸 중심에서 R+14 안에 들어와야 먹히는데, 그 거리면 공 중심이 그 칸 안에 있습니다.
   function itemAt(x, y) {
     var c = Math.floor((x - MARGIN) / CELLW), r = Math.floor((y - TOP) / ROWH);
     if (c < 0 || c >= COLS || r < 0 || r >= GRID_ROWS) { return null; }
@@ -329,24 +266,26 @@ button:active { background: var(--sg-panel-alt); }
     try { window.localStorage.setItem("brk_best", String(best)); } catch (e) {}
   }
 
-  /* 세계 신기록 (모든 학생 공통, Firebase): 도달 라운드 */
   var worldLine = document.getElementById("worldLine");
+  var classBox = document.getElementById("clsBox");
+  var classLine = document.getElementById("clsLine");
   var WR = window.WorldRecord ? WorldRecord("brickbreak", { format: function (v) { return "라운드 " + v; } }) : null;
+  function recordHtml(record) {
+    return "<em>" + record.text() + "</em><small>" + WR.escapeHtml(record.who()) + "</small>";
+  }
   function renderWorld() {
-    if (WR && WR.rec) { worldLine.innerHTML = "<em>" + WR.text() + "</em><small>" + WR.escapeHtml(WR.who()) + "</small>"; }
+    if (WR && WR.rec) { worldLine.innerHTML = recordHtml(WR); }
     else { worldLine.textContent = (WR && !WR.loaded) ? "불러오는 중…" : "아직 기록 없음 — 첫 기록에 도전!"; }
-    /* 반별 링크로 들어왔을 때만 우리 반 신기록 줄을 보인다 */
-    var C = WR && WR.cls, clsLine = document.getElementById("clsLine");
-    if (C) {
-      document.getElementById("clsBox").hidden = false;
-      if (C.rec) { clsLine.innerHTML = "<em>" + C.text() + "</em><small>" + WR.escapeHtml(C.who()) + "</small>"; }
-      else { clsLine.textContent = C.loaded ? "아직 기록 없음 — 첫 기록에 도전!" : "불러오는 중…"; }
+    var classRecord = WR && WR.cls;
+    if (classRecord) {
+      classBox.hidden = false;
+      if (classRecord.rec) { classLine.innerHTML = recordHtml(classRecord); }
+      else { classLine.textContent = classRecord.loaded ? "아직 기록 없음 — 첫 기록에 도전!" : "불러오는 중…"; }
     }
   }
   if (WR) { WR.onChange(renderWorld); WR.load(); }
   renderWorld();
 
-  // 한 줄에 채우는 벽돌 수(7칸 중). 값을 키우면 어려워지고 줄이면 쉬워집니다.
   function fillCount(rowNumber) {
     if (rowNumber <= 5) { return 4; }
     if (rowNumber <= 12) { return 4 + Math.floor(Math.random() * 2); }
@@ -355,7 +294,6 @@ button:active { background: var(--sg-panel-alt); }
 
   function newRow(rowNumber) {
     var hp = rowNumber + Math.floor(rowNumber / 3);
-    // 1~4라운드는 매 줄, 이후에는 두 줄마다 +1 공을 한 칸 배치합니다.
     var hasItem = rowNumber <= 4 || rowNumber % 2 === 0;
     var pool = [];
     for (var c = 0; c < COLS; c++) { pool.push(c); }
@@ -370,7 +308,7 @@ button:active { background: var(--sg-panel-alt); }
     for (var k = 0; k < n; k++) {
       cells.push({ c: pool[k], r: 0, type: "brick", hp: hp });
     }
-    markCells();   // descend() 뒤에는 항상 newRow() 가 오므로 여기서 한 번만 갱신
+    markCells();
   }
 
   function descend() {
@@ -384,7 +322,6 @@ button:active { background: var(--sg-panel-alt); }
     round = 1;
     ballCount = 1;
     launchX = LW / 2;
-    nextX = LW / 2;
     aim = 0;
     aimed = false;
     state = "aim";
@@ -420,7 +357,6 @@ button:active { background: var(--sg-panel-alt); }
   }
 
   function predict() {
-    // 벽 반사만 계산하고, 블록에 처음 닿는 지점에서 경로를 끝냅니다.
     var pts = [{ x: launchX, y: LAUNCHY, kind: "start" }];
     var x = launchX, y = LAUNCHY;
     var dx = Math.sin(aim), dy = -Math.cos(aim);
@@ -444,7 +380,6 @@ button:active { background: var(--sg-panel-alt); }
         continue;
       }
       if (brickNear(x, y)) {
-        // 첫 블록 충돌 지점에서 예측을 끝냅니다.
         break;
       }
       if (y > LAUNCHY) { break; }
@@ -453,7 +388,6 @@ button:active { background: var(--sg-panel-alt); }
     return pts;
   }
 
-  // 각도·발사 위치·벽돌 배치가 그대로면 지난 프레임의 예측선을 다시 씁니다.
   var predPts = null, predAim = NaN, predX = NaN, predVer = -1;
   function predictCached() {
     if (predPts && predAim === aim && predX === launchX && predVer === cellsVer) { return predPts; }
@@ -479,8 +413,8 @@ button:active { background: var(--sg-panel-alt); }
         vy: dy * sp,
         delay: i * 0.032,
         alive: true,
-        wallHits: 0,     // 옆·위 벽 반사 횟수
-        free: true       // true 인 동안은 수평 방지 보정을 걸지 않음(예측선 구간)
+        wallHits: 0,
+        free: true
       });
     }
     firstLanded = -1;
@@ -494,8 +428,7 @@ button:active { background: var(--sg-panel-alt); }
 
   function endTurn() {
     needDraw = true;
-    launchX = (firstLanded >= 0) ? firstLanded : launchX;
-    nextX = launchX;
+    if (firstLanded >= 0) { launchX = firstLanded; }
     round += 1;
     descend();
     newRow(round);
@@ -535,7 +468,7 @@ button:active { background: var(--sg-panel-alt); }
     }
     var e = brickNear(b.x, b.y);
     if (!e) { return; }
-    b.free = false;   // 예측선은 첫 벽돌 충돌에서 끝나므로 이후부터 보정 적용
+    b.free = false;
     var cx = bx(e) + BW / 2, cy = by(e) + BH / 2;
     var ox = (BW / 2 + R) - Math.abs(b.x - cx);
     var oy = (BH / 2 + R) - Math.abs(b.y - cy);
@@ -547,13 +480,12 @@ button:active { background: var(--sg-panel-alt); }
       b.y += (b.y < cy) ? -oy : oy;
     }
     e.hp -= 1;
-    if (e.hp <= 0) { removeCell(e); } else { cellsVer += 1; }   // 내구도 숫자가 바뀌었으니 벽돌 그림만 갱신(격자는 그대로)
+    if (e.hp <= 0) { removeCell(e); } else { cellsVer += 1; }
   }
 
   function update(dt) {
     if (state !== "run") { return; }
     turnTime += dt;
-    // 긴 턴을 줄이기 위한 단계형 가속: 7초·12초·18초 이후 각각 가속합니다.
     var timeBoost = turnTime > 18 ? 1.90 : (turnTime > 12 ? 1.55 : (turnTime > 7 ? 1.25 : 1));
     var targetSpeed = speedOf() * timeBoost;
     var live = 0;
@@ -562,13 +494,11 @@ button:active { background: var(--sg-panel-alt); }
       if (!b.alive) { continue; }
       live += 1;
       if (b.delay > 0) { b.delay -= dt; continue; }
-      // Math.hypot 은 구형 기기에서 매우 느려 sqrt 로 직접 계산합니다(서브스텝마다 호출되는 자리).
       var currentSpeed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
       if (currentSpeed > 0 && Math.abs(currentSpeed - targetSpeed) > 1) {
         b.vx = b.vx / currentSpeed * targetSpeed;
         b.vy = b.vy / currentSpeed * targetSpeed;
       }
-      // 25초 뒤에는 남은 공을 빠르게 아래로 회수합니다.
       if (turnTime > 25) {
         b.vx *= 0.96;
         b.vy += 2200 * dt;
@@ -603,9 +533,6 @@ button:active { background: var(--sg-panel-alt); }
     return "hsl(144, 30%, " + l.toFixed(0) + "%)";
   }
 
-  /* 벽돌 층(테두리·경고선·벽돌·+1 아이템)은 따로 만든 캔버스에 그려 두고,
-     cells 가 바뀌었을 때(cellsVer)만 다시 그립니다. 매 프레임에는 drawImage 한 번이면 됩니다.
-     글자(fillText)와 둥근 사각형 수십 개를 매 프레임 그리던 것이 저사양 기기 프레임드랍의 가장 큰 원인이었습니다. */
   var layer = document.createElement("canvas");
   layer.width = LW; layer.height = LH;
   var lctx = layer.getContext("2d");
@@ -630,7 +557,6 @@ button:active { background: var(--sg-panel-alt); }
     lctx.textAlign = "center";
     lctx.textBaseline = "middle";
 
-    // 벽돌: 글꼴 설정(ctx.font)은 비싸므로 종류별로 한 번만 합니다.
     lctx.font = "600 21px 'Nanum Gothic', 'Malgun Gothic', sans-serif";
     var i, e, x, y;
     for (i = 0; i < cells.length; i++) {
@@ -650,7 +576,6 @@ button:active { background: var(--sg-panel-alt); }
       lctx.fillText(String(e.hp), x + BW / 2, y + BH / 2 + 1);
     }
 
-    // +1 공 아이템
     lctx.font = "600 14px 'Nanum Gothic', 'Malgun Gothic', sans-serif";
     lctx.strokeStyle = "#15803d";
     lctx.fillStyle = "#15803d";
@@ -672,13 +597,8 @@ button:active { background: var(--sg-panel-alt); }
     ctx.drawImage(layer, 0, 0);
 
     if (state === "aim") {
-      ctx.fillStyle = "#8A978C";
-      ctx.beginPath();
-      ctx.arc(nextX, LAUNCHY, R, 0, Math.PI * 2);
-      ctx.fill();
       if (aimed) {
         var pts = predictCached();
-        // 예상 경로는 점선 하나로만 표시합니다.
         ctx.setLineDash([9, 9]);
         ctx.strokeStyle = "rgba(37, 99, 235, 0.75)";
         ctx.lineWidth = 3;
@@ -687,7 +607,6 @@ button:active { background: var(--sg-panel-alt); }
         for (var p = 1; p < pts.length; p++) { ctx.lineTo(pts[p].x, pts[p].y); }
         ctx.stroke();
         ctx.setLineDash([]);
-        // 벽에 닿는 지점 표시
         ctx.fillStyle = "#24402F";
         ctx.beginPath();
         for (var q = 1; q < pts.length; q++) {
@@ -709,7 +628,6 @@ button:active { background: var(--sg-panel-alt); }
       ctx.fill();
     }
 
-    // 공은 한 경로에 모아 fill 한 번으로 그립니다(공 60개면 호출 60번 → 1번).
     ctx.fillStyle = "#24402F";
     ctx.beginPath();
     for (var k = 0; k < balls.length; k++) {
@@ -743,16 +661,12 @@ button:active { background: var(--sg-panel-alt); }
 
   var prev = 0;
   function loop(ts) {
-    /* 다음 프레임 예약을 맨 앞에서 한다.
-       예전처럼 맨 뒤에 두면 그리기 중 오류가 한 번만 나도
-       예약이 되지 않아 게임이 통째로 멈춰 버린다. */
     window.requestAnimationFrame(loop);
     if (!prev) { prev = ts; }
     var dt = Math.min(0.033, (ts - prev) / 1000);
     prev = ts;
     tickAim(dt);
     update(dt);
-    // 공이 움직이는 동안은 매 프레임, 그 외(조준·종료)에는 화면이 바뀌었을 때만 그립니다.
     if (state === "run" || needDraw) {
       needDraw = false;
       draw();
@@ -772,13 +686,14 @@ button:active { background: var(--sg-panel-alt); }
     var dy = p.y - LAUNCHY;
     if (dy > 0) { dx = -dx; dy = -dy; }
     if (dy > -1) { dy = -1; }
-    var a = Math.atan2(dx, -dy);
-    if (a > MAXA) { a = MAXA; }
-    if (a < -MAXA) { a = -MAXA; }
-    aim = a;
+    setAim(Math.atan2(dx, -dy));
+    setMsg("각도 " + fmtAim() + "° · 발사 버튼을 누르세요.");
+  }
+
+  function setAim(a) {
+    aim = Math.max(-MAXA, Math.min(MAXA, a));
     aimed = true;
     needDraw = true;
-    setMsg("각도 " + fmtAim() + "° · 발사 버튼을 누르세요.");
   }
 
   var dragging = false;
@@ -818,19 +733,12 @@ button:active { background: var(--sg-panel-alt); }
 
   function adjustAim(deg) {
     if (state !== "aim") { return; }
-    var a = aim + deg * Math.PI / 180;
-    if (a > MAXA) { a = MAXA; }
-    if (a < -MAXA) { a = -MAXA; }
-    aim = a;
-    aimed = true;
-    needDraw = true;
+    setAim(aim + deg * Math.PI / 180);
     setMsg("각도 " + fmtAim() + "°");
   }
 
   btnRestart.addEventListener("click", function () { reset(); });
 
-  // 방향키·◀ ▶ 버튼: 한 번 누르면 0.1° 미세 조정, 계속 누르고 있으면 부드럽게 가속(3°/s → 20°/s).
-  // 키보드에서 Shift와 함께 누르면 1° 단위(길게 누를 때도 4배 빠르게).
   var KEY_STEP = 0.1;
   var KEY_STEP_COARSE = 1;
   var HOLD_DELAY = 0.28;
@@ -868,8 +776,6 @@ button:active { background: var(--sg-panel-alt); }
     if (heldDir === dir) { heldDir = 0; }
   }
 
-  // ◀ ▶ 버튼도 키보드와 같은 방식: 탭하면 0.1°, 누르고 있으면 가속.
-  // click 대신 pointerdown/up 을 쓰므로 손을 뗄 때 한 번 더 움직이지 않습니다.
   function bindHoldButton(btn, dir) {
     var stop = function () { endHold(dir); };
     if ("PointerEvent" in window) {
@@ -883,7 +789,6 @@ button:active { background: var(--sg-panel-alt); }
       btn.addEventListener("pointercancel", stop);
       btn.addEventListener("lostpointercapture", stop);
     } else {
-      // 포인터 이벤트가 없는 구형 기기용 터치/마우스 대체 처리
       btn.addEventListener("touchstart", function (ev) { ev.preventDefault(); startHold(dir, false); }, false);
       btn.addEventListener("touchend", stop);
       btn.addEventListener("touchcancel", stop);
@@ -895,7 +800,6 @@ button:active { background: var(--sg-panel-alt); }
   bindHoldButton(btnL, -1);
   bindHoldButton(btnR, 1);
 
-  // 방향키와 WASD를 함께 지원한다. 한글 IME가 켜져 있어도 되도록 물리 키(code)로도 판정한다.
   function keyDir(ev) {
     if (ev.key === "ArrowLeft" || ev.code === "KeyA") { return -1; }
     if (ev.key === "ArrowRight" || ev.code === "KeyD") { return 1; }
@@ -923,21 +827,12 @@ button:active { background: var(--sg-panel-alt); }
   });
   window.addEventListener("blur", function () { heldDir = 0; });
 
-  function postH() {
-    var h = document.documentElement.scrollHeight;
-    window.parent.postMessage({ type: "wrks:viz:resize", height: h }, "*");
-  }
-  window.addEventListener("resize", postH);
-
-  // 벽돌 층은 캐시되므로, 나눔고딕 웹 글꼴이 뒤늦게 로드되면 한 번 다시 그려 글꼴을 맞춥니다.
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(function () { layerVer = -1; needDraw = true; });
   }
 
   reset();
   window.requestAnimationFrame(loop);
-  postH();
-  window.setTimeout(postH, 200);
 })();
 </script>
 </body>
