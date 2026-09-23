@@ -5,7 +5,6 @@
 <script charset="utf-8" src="access-guard.js" data-game="teambattle"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
 <title>3v3 팀 배틀 아레나</title>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
@@ -14,9 +13,7 @@
 <meta property="og:url" content="https://cornsilktea.github.io/30.team-battle-arena.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
-<!-- 링크 미리보기 끝 -->
 <link rel="stylesheet" href="theme.css">
-<!-- Firebase 실시간 DB (8.x: 옛 전자칠판 브라우저에서도 돌아가는 버전) -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <style>
@@ -26,7 +23,6 @@
   button { font-family: inherit; cursor: pointer; }
   :root { --blue: #2F6FD6; --blue-soft: #E3ECFB; --red: #D6453D; --red-soft: #FBE5E3; }
 
-  /* ── 로비 화면들 (위쪽 46px 는 '← 목록으로' 버튼 자리) ── */
   .screen { position: fixed; top: 0; right: 0; bottom: 0; left: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 54px 16px 24px; }
   .wrap { width: 100%; max-width: 760px; margin: 0 auto; }
   .card { background: var(--sg-panel); border: 1px solid var(--sg-line-mid); border-radius: 8px; padding: 22px 20px; margin-bottom: 14px; }
@@ -71,7 +67,6 @@
   .slot.mine { box-shadow: inset 0 0 0 2px var(--sg-primary); }
   .slot .host { font-size: 14px; }
   .team h3 { display: flex; align-items: center; gap: 8px; }
-  /* 이동하기: 팀 색, 옮길 수 없으면 회색 */
   .team .join { height: 30px; padding: 0 10px; border-radius: 6px; border: 2px solid; font-size: 14px; font-weight: 800; color: #fff; }
   .team.blue .join { background: var(--blue); border-color: var(--blue); }
   .team.red .join { background: var(--red); border-color: var(--red); }
@@ -84,7 +79,6 @@
   .specList { font-weight: 700; color: var(--sg-ink-mid); }
   .specList .none { color: var(--sg-ink-faint); font-weight: 400; }
 
-  /* ── 관전 화면: 왼쪽 블루팀, 오른쪽 레드팀 상태판 ── */
   .specPanel { position: absolute; top: 50px; bottom: 28px; width: 300px; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
   #specCode { position: absolute; left: 12px; bottom: 6px; font-size: 13px; font-weight: 800; color: rgba(255,255,255,.8); pointer-events: none; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
   .spTime {background: rgba(255,255,255,.95); border-radius: 10px; padding: 6px 10px; text-align: center; border: 3px solid var(--sg-line-mid); }
@@ -127,7 +121,6 @@
     .spTime b { font-size: 26px; }
     .spTime small { font-size: 12px; }
   }
-  /* 캐릭터 카드: 고른 카드를 한 번 더 누르면 뒤집혀 뒷면(능력치 표·궁극기 설명)이 보임 */
   .charCard { flex: 1 1 0; min-width: 0; padding: 0; border: 0; background: transparent; text-align: center; perspective: 900px; color: inherit; }
   .cardIn { position: relative; height: 285px; transition: transform .45s ease; transform-style: preserve-3d; }
   .charCard.flip .cardIn { transform: rotateY(180deg); }
@@ -153,10 +146,8 @@
   .startHint { text-align: center; font-size: 15px; font-weight: 700; color: var(--sg-ink-soft); margin-top: 8px; min-height: 20px; }
   .secTitle { font-size: 17px; font-weight: 800; margin-bottom: 10px; }
 
-  /* ── 게임 화면 ── */
   #scrGame { position: fixed; top: 0; right: 0; bottom: 0; left: 0; background: #2A2F2B; }
   #cv { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block; touch-action: none; }
-  /* 위쪽 가운데: 블루 피해 | 시계·생존 수 | 레드 피해 — 화면 맨 위에 붙임 */
   #hudTop { position: absolute; top: 0; left: 50%; transform: translateX(-50%); display: flex; align-items: stretch; pointer-events: none; white-space: nowrap;
             background: rgba(255,255,255,.94); border: 1px solid var(--sg-line-mid); border-top: 0; border-radius: 0 0 10px 10px; padding: 2px 4px 4px; }
   .hdSide { display: flex; flex-direction: column; justify-content: center; padding: 0 10px; text-align: center; font-size: 12px; font-weight: 800; line-height: 1.15; min-width: 64px; }
@@ -200,7 +191,6 @@
   .endBtns button { flex: 1 1 0; height: 56px; font-size: 19px; font-weight: 800; border-radius: 8px; border: 2px solid var(--sg-line-strong); background: #fff; color: var(--sg-ink); }
   .endBtns .primary { background: var(--sg-primary); color: #fff; }
 
-  /* ── 닉네임 창 ── */
   .modal { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 50; background: rgba(27,43,32,.55); display: flex; align-items: center; justify-content: center; padding: 16px; }
   .modalBox { background: #fff; border: 2px solid var(--sg-line-strong); border-radius: 10px; padding: 22px 20px; width: 100%; max-width: 400px; }
   .modalBox h3 { font-size: 22px; font-weight: 800; text-align: center; margin-bottom: 14px; }
@@ -234,7 +224,6 @@
 </head>
 <body>
 
-<!-- 시작 화면 -->
 <div id="scrStart" class="screen">
   <div class="wrap">
     <div class="card">
@@ -258,7 +247,6 @@
   </div>
 </div>
 
-<!-- 로비 -->
 <div id="scrLobby" class="screen" hidden>
   <div class="wrap">
     <div class="card">
@@ -293,7 +281,6 @@
   </div>
 </div>
 
-<!-- 게임 -->
 <div id="scrGame" hidden>
   <canvas id="cv"></canvas>
   <div id="hudTop">
@@ -318,7 +305,6 @@
   </div>
 </div>
 
-<!-- 닉네임 입력 -->
 <div id="nickModal" class="modal" hidden>
   <div class="modalBox">
     <h3>닉네임을 입력해주세요</h3>
@@ -335,23 +321,18 @@
 (function () {
   "use strict";
 
-  /* =====================================================================
-     설정 — 밸런스 조정은 여기 숫자만 고치면 됩니다.
-     ===================================================================== */
-  var TANK_ENABLED = true;           // false 로 두면 탱커 선택을 막고 AI 봇3 도 사격수로 대체
-  var KEY = 70;                      // 캐릭터 "키"(월드 px, 머리~발). 사거리는 이 값의 배수로 정함
-  var MW = 900, MH = 1350;           // 맵 크기(월드 좌표). 블루팀 = 위쪽(y 작음), 레드팀 = 아래쪽
-  var BOUND = { l: 48, r: 852, t: 38, b: 1312 };   // 배경 그림의 돌담 안쪽
-  var BODY_R = 24;                   // 캐릭터 몸 반지름(피격·충돌)
-  var MATCH_MS = 60000;              // 1분
-  var COUNT_MS = 3000;               // 시작 카운트다운
+  var TANK_ENABLED = true;
+  var KEY = 70;
+  var MW = 900, MH = 1350;
+  var BOUND = { l: 48, r: 852, t: 38, b: 1312 };
+  var BODY_R = 24;
+  var MATCH_MS = 60000;
+  var COUNT_MS = 3000;
   var GAUGE_MAX = 10;
-  var TEAM_MAX = 3, SPEC_MAX = 2;    // 팀당 인원, 관전자 최대 인원
-  var ATK_POSE_MS = 150;             // 기본 공격 포즈 유지 시간
-  var NET_MS = 143;                  // 위치 전송 간격(초당 약 7회) — 줄이면 부드럽지만 데이터베이스 사용량이 늘어남
+  var TEAM_MAX = 3, SPEC_MAX = 2;
+  var ATK_POSE_MS = 150;
+  var NET_MS = 143;
   var CHARS = {
-    /* shots·gap: 한 번 공격에 여러 발(gap ms 간격). perHit: 명중 1회당 궁극기 게이지 */
-    /* speed: 이동속도(초당 월드 px), ultSpeed: 궁극기 지속 중 이동속도 */
     marksman: { name: "사격수", hp: 100, speed: 250, cd: 400, dmg: 10, range: KEY * 6, pSpeed: 950, pr: 6, shots: 2, gap: 70, perHit: 1, ultName: "난사" },
     healer:   { name: "힐러", hp: 150, speed: 250, cd: 500, dmg: 11, range: KEY * 4, pSpeed: 700, pr: 9, perHit: 2, ultName: "회복" },
     tank:     { name: "탱커", hp: 350, speed: 220, ultSpeed: 300, cd: 1000, dmg: 30, range: KEY * 1 + 50, arc: Math.PI * 0.7, perHit: 2, ultName: "방어태세" },
@@ -361,13 +342,12 @@
   var ULT = { mkCount: 20, mkGap: 55, mkDmg: 18, mkSpeed: 1150, mkRange: KEY * 8, mkPr: 8,
               hlPct: 0.10, hlDur: 3000, hlSelf: 2, hlPoseMs: 1000, tkDur: 5000, tkDef: 0.5,
               asSmokeMs: 400, asDur: 10000 };
-  var STEALTH_ALPHA = 0.4;           // 풀숲·은신 중인 아군이 보이는 투명도
-  var BOT_VIEW = 600;                // AI 시야
-  var BOT_REACT_MS = 550;            // AI 가 적을 발견하고 첫 공격까지 걸리는 시간
-  var BOT_AIM_ERR = 0.16;            // AI 조준 오차(라디안, ±9° 정도) — 키우면 쉬워짐
-  var SPAWN_X = [250, 450, 650];     // 자기 팀 기준 왼쪽·가운데·오른쪽 (블루는 좌우가 뒤집혀 보이므로 900-x)
+  var STEALTH_ALPHA = 0.4;
+  var BOT_VIEW = 600;
+  var BOT_REACT_MS = 550;
+  var BOT_AIM_ERR = 0.16;
+  var SPAWN_X = [250, 450, 650];
   var SPAWN_Y = { blue: 118, red: MH - 118 };
-  /* 장애물·풀숲은 맵 가운데를 기준으로 점대칭 → 두 팀이 똑같은 지형을 봄 */
   var OBST = [
     { k: "rock", circle: true, x: 450, y: 675, r: 50 },
     { k: "rock", circle: true, x: 682, y: 430, r: 42 },
@@ -381,35 +361,30 @@
   ];
   var FONT = '"Nanum Gothic", "Malgun Gothic", sans-serif';
 
-  /* 스프라이트: [화면 높이(월드 px), 그림이 원래 오른쪽을 보고 있는지] — 뒷모습은 모두 오른쪽 위를 봄 */
   var SPR = {
     marksman: { pre: "mk",
       back:  { idle: [88, true], atk: [92, true], ult: [104, true] },
       front: { idle: [88, true], atk: [90, false], ult: [104, false] } },
     healer: { pre: "hl",
       back:  { idle: [84, true], walk: [84, true], atk: [90, true], ult: [112, true] },
-      front: { idle: [69, false], walk: [68, false], atk: [77, false], ult: [100, true] } },   // 앞모습 그림은 몸이 크게 그려져 있어 뒷모습 크기에 맞춤
-    /* 탱커: 뒷모습 대기·걷기는 망치를 왼쪽 어깨에 멤, 공격은 뒷모습 한 벌뿐(앞모습 공격은 대기 그림 + 휘두르기 효과). 궁극기는 포즈 대신 오라 */
+      front: { idle: [69, false], walk: [68, false], atk: [77, false], ult: [100, true] } },
     tank: { pre: "tk",
       back:  { idle: [100, false], walk: [100, false], atk: [108, true] },
       front: { idle: [100, true], walk: [100, true] } },
-    /* 암살자: 궁극기 그림은 연기 회오리까지 포함이라 조금 큼 */
     assassin: { pre: "as",
       back:  { idle: [88, true], walk: [88, true], atk: [92, true], ult: [104, true] },
-      front: { idle: [88, false], walk: [90, false], atk: [90, false], ult: [104, true] } }   // 앞모습 대기·걷기는 스카프가 오른쪽으로 날림 = 왼쪽을 향함
+      front: { idle: [88, false], walk: [90, false], atk: [90, false], ult: [104, true] } }
   };
-  /* 투사체가 나오는 곳(총구·지팡이 보석·손끝): 원래 그림 안의 위치(가로·세로 비율 0~1). 공격(사격수 궁극기는 궁극기) 그림 기준 */
   var TIP = {
     "mk-blue-back-atk": [0.85, 0.10], "mk-red-back-atk": [0.89, 0.10], "mk-blue-front-atk": [0.39, 0.80], "mk-red-front-atk": [0.37, 0.76],
     "mk-blue-back-ult": [0.85, 0.10], "mk-red-back-ult": [0.91, 0.10], "mk-blue-front-ult": [0.52, 0.70], "mk-red-front-ult": [0.42, 0.80],
     "hl-blue-back-atk": [0.68, 0.25], "hl-red-back-atk": [0.74, 0.25], "hl-blue-front-atk": [0.27, 0.33], "hl-red-front-atk": [0.31, 0.31],
     "as-blue-back-atk": [0.81, 0.19], "as-red-back-atk": [0.82, 0.20], "as-blue-front-atk": [0.05, 0.53], "as-red-front-atk": [0.06, 0.52]
   };
-  var TIP_BLEND = 110;               // 무기 끝에서 나와 이만큼(px) 날아가는 동안 실제 탄도에 합쳐짐(판정은 탄도 기준)
-  var FACE_BY_MOVE = true;           // 걸을 때는 이동 방향으로 앞·뒷모습(위로 가면 뒷모습, 아래로 오면 앞모습)
-  var BULLET_NATIVE = Math.atan2(-128, 99);   // 궁극기 총알 그림이 원래 향하는 각도(오른쪽 위)
+  var TIP_BLEND = 110;
+  var FACE_BY_MOVE = true;
+  var BULLET_NATIVE = Math.atan2(-128, 99);
 
-  /* ---------- 공용 도구 ---------- */
   var $ = function (id) { return document.getElementById(id); };
   function hyp(x, y) { return Math.sqrt(x * x + y * y); }
   function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
@@ -422,7 +397,6 @@
   function setText(el, t) { if (el._t !== t) { el._t = t; el.textContent = t; } }
   function setHtml(el, t) { if (el._h !== t) { el._h = t; el.innerHTML = t; } }
 
-  /* ---------- 그림 ---------- */
   var IMG = {};
   (function loadImages() {
     var names = ["rock", "wall", "bush", "aura", "smoke", "ult-bullet-blue", "ult-bullet-red", "shuriken-blue", "shuriken-red"];
@@ -439,7 +413,6 @@
   })();
   function ready(im) { return im && im.complete && im.naturalWidth > 0; }
 
-  /* ---------- 효과음 (Web Audio) ---------- */
   var AC = null;
   function audio() {
     if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
@@ -474,7 +447,6 @@
     else if (k === "lose") { [392, 330, 262].forEach(function (f, i) { setTimeout(function () { tone(f, 0.25, "triangle", 0.08); }, i * 160); }); }
   }
 
-  /* ---------- 닉네임 (기기별 1회 설정, 영구 재사용) ---------- */
   var nick = "";
   try { nick = localStorage.getItem("tba_nickname") || ""; } catch (e) { nick = ""; }
   var nickRequired = false;
@@ -502,7 +474,6 @@
   $("btnNickEdit").onclick = function () { openNick(false); };
   $("btnNickEdit2").onclick = function () { openNick(false); };
 
-  /* ---------- Firebase ---------- */
   var CONF = window.PORTAL_CONFIG || {};
   var db = null;
   try {
@@ -517,10 +488,9 @@
   var ROOT = "teambattle/rooms";
   var myId = "p" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 
-  /* ---------- 방 상태 ---------- */
-  var room = null;      // { code, ref, mode, status, host, startAt, winner, endedAt, final }
-  var P = {};           // players (DB 그대로)
-  var subs = [];        // 떼어낼 리스너 목록
+  var room = null;
+  var P = {};
+  var subs = [];
   var leaving = false;
 
   function sub(ref, ev, fn) { ref.on(ev, fn); subs.push([ref, ev, fn]); }
@@ -536,7 +506,6 @@
              joinedAt: joinedAt, lastUpdate: joinedAt };
   }
 
-  /* 오래된 방 정리: 사람 없는 방, 끝난 지 5분 넘은 방, 6시간 넘은 방 */
   function sweep() {
     return db.ref(ROOT).once("value").then(function (s) {
       var all = s.val() || {}, t = now(), u = {};
@@ -559,11 +528,10 @@
       var code = String(10000 + Math.floor(Math.random() * 90000));
       var t = now();
       var me = newPlayer("blue", t); me.isHost = true;
-      /* 기본은 3v3 플레이 — 로비의 방식 버튼으로 전환 */
       var obj = { mode: "pvp", status: "lobby", hostPlayerId: myId, createdAt: t, winner: null, players: {} };
       obj.players[myId] = me;
       db.ref(ROOT + "/" + code).transaction(function (cur) {
-        if (cur !== null) return;        // 이미 있는 코드 → 취소하고 다른 번호
+        if (cur !== null) return;
         return obj;
       }).then(function (res) {
         if (res.committed) { $("btnCreate").disabled = false; enterRoom(code); }
@@ -583,7 +551,6 @@
       $("btnJoin").disabled = false;
       var r = s.val();
       if (!r || !r.players || !humans(r.players).length) { startMsg("그런 방이 없어요. 코드를 확인해 주세요."); return; }
-      /* 로비면 자리가 남은 팀(인원이 적은 쪽)으로, 게임 중이거나 팀이 꽉 찼으면 관전자로 */
       var cnt = function (tm) { return keys(r.players).filter(function (id) { return r.players[id] && r.players[id].team === tm; }).length; };
       var team = null;
       if (r.status === "lobby") {
@@ -641,7 +608,6 @@
     showScreen("lobby");
   }
 
-  /* 다음 방장: 블루팀 → 레드팀 → 관전자 순, 같은 팀 안에서는 먼저 들어온 사람 */
   var HOST_ORDER = { blue: 0, red: 1, spec: 2 };
   function nextHost(ps) {
     var join = byJoin(ps);
@@ -651,7 +617,6 @@
       return ta !== tb ? ta - tb : join(a, b);
     })[0];
   }
-  /* 방장이 나가면(연결이 끊겨도) 다음 순번이 이어받는다 */
   function checkHost() {
     if (!room || !room.hostLoaded || !P[myId]) return;
     if (room.host && P[room.host] && !P[room.host].isAI) return;
@@ -671,8 +636,8 @@
       return r.ref.child("players").once("value");
     }).then(function (s) {
       var ps = s.val() || {}, hs = humans(ps);
-      if (!hs.length) return r.ref.remove();                   // 아무도 없으면 방 삭제
-      return r.ref.child("hostPlayerId").once("value").then(function (h) {   // 내가 방장이었다면 다음 순번에게 넘겨주기
+      if (!hs.length) return r.ref.remove();
+      return r.ref.child("hostPlayerId").once("value").then(function (h) {
         var hid = h.val(), nx = nextHost(ps);
         if (!hid || !ps[hid] || ps[hid].isAI) { var u = { hostPlayerId: nx }; u["players/" + nx + "/isHost"] = true; return r.ref.update(u); }
       });
@@ -686,7 +651,6 @@
   function resetLocal() { P = {}; R = {}; PR = {}; MELEE = {}; FX = []; G = null; ME = null; BOTS = {}; joy.id = null; aim.id = null; }
   window.addEventListener("pagehide", function () { if (room) { try { room.ref.child("players/" + myId).remove(); } catch (e) {} } });
 
-  /* ---------- 화면 전환 ---------- */
   var screenNow = "start";
   function showScreen(k) {
     screenNow = k;
@@ -694,44 +658,39 @@
     if (k === "game") resize();
   }
 
-  /* ---------- 로비 ---------- */
   var lobbyQueued = false;
   function playersChanged() {
     if (lobbyQueued) return; lobbyQueued = true;
     setTimeout(function () { lobbyQueued = false; renderLobby(); }, 0);
   }
 
-  /* 자리: 블루·레드 3명씩, 관전자 2명. 중립 없음 */
   function capOf(team) { return team === "spec" ? SPEC_MAX : TEAM_MAX; }
   function countIn(ps, team, except) { return keys(ps).filter(function (id) { return id !== except && ps[id] && ps[id].team === team; }).length; }
   function canMoveTo(team) {
     var me = P[myId];
     if (!room || room.status !== "lobby" || !me || me.team === team) return false;
-    if (team === "red" && room.mode === "ai") return false;          // AI 대전의 레드팀은 AI 자리
+    if (team === "red" && room.mode === "ai") return false;
     return countIn(P, team, myId) < capOf(team);
   }
   function pickTeam(team) {
     if (!canMoveTo(team)) return;
     room.ref.child("players").transaction(function (ps) {
       if (!ps || !ps[myId]) return ps;
-      if (countIn(ps, team, myId) >= capOf(team)) return;              // 그새 꽉 참 → 취소
+      if (countIn(ps, team, myId) >= capOf(team)) return;
       ps[myId].team = team; return ps;
     }).then(function (res) { if (!res.committed) flashHint("자리가 다 찼어요. 자리가 나면 다시 눌러 주세요."); });
   }
   var hintUntil = 0, hintText = "";
   function flashHint(t) { hintText = t; hintUntil = Date.now() + 2500; renderLobby(); setTimeout(renderLobby, 2600); }
 
-  /* 게임 방식 — 새 방식은 여기에 한 줄 추가하면 로비의 방식 버튼(AI 대전 오른쪽)에 붙음 */
   var MODES = [
     { id: "pvp", name: "3v3 플레이" },
     { id: "ai", name: "AI 대전" }
   ];
   function modeName(id) { for (var i = 0; i < MODES.length; i++) if (MODES[i].id === id) return MODES[i].name; return "모드 선택 중"; }
-  /* 방장만, 로비에서 언제든 바꿀 수 있음 */
   function setMode(mode) {
     if (!isHost() || room.status !== "lobby" || room.mode === mode) return;
     var u = { mode: mode };
-    /* 전에 있던 AI 봇은 치우고, AI 대전으로 가면 레드팀 학생은 블루팀 빈자리 → 관전자 자리 순으로 옮김 */
     var nb = countIn(P, "blue"), ns = countIn(P, "spec"), moved = true;
     keys(P).sort(byJoin(P)).forEach(function (id) {
       var p = P[id]; if (!p) return;
@@ -744,7 +703,6 @@
     });
     if (!moved) { flashHint("AI 대전은 블루팀 " + TEAM_MAX + "명 + 관전자 " + SPEC_MAX + "명까지예요. 레드팀 인원을 줄인 뒤 바꿔 주세요."); return; }
     if (mode === "ai") {
-      /* AI: 사격수·탱커 고정 + 힐러·암살자 중 하나 무작위. 이름은 직업명만(로비에선 🤖 표시) */
       var chars = ["marksman", Math.random() < 0.5 ? "healer" : "assassin", TANK_ENABLED ? "tank" : "marksman"];
       var t = now();
       chars.forEach(function (c, i) {
@@ -761,9 +719,7 @@
     return "img/teambattle/" + SPR[c].pre + "-" + tm + "-front-idle.png";
   }
 
-  /* 캐릭터 카드 — 앞면: 그림 + 이름 / 뒷면: 능력치 표 + 궁극기 설명.
-     숫자는 모두 CHARS·ULT 에서 가져오므로 밸런스를 고치면 카드도 저절로 바뀜 */
-  var flipped = null;                              // 뒤집혀 있는 캐릭터
+  var flipped = null;
   function num(v) { return String(Math.round(v * 10) / 10); }
   function ultDesc(k) {
     if (k === "marksman") return "짧은 시간 내에 " + num(ULT.mkDmg) + "의 데미지를 주는 " + ULT.mkCount + "발의 총알을 발사합니다.";
@@ -772,7 +728,6 @@
     if (k === "assassin") return num(ULT.asDur / 1000) + "초간 이동속도가 " + CHARS.assassin.ultSpeed + "으로 빨라지고 은신 상태가 됩니다. 다음 공격을 하면 은신이 해제됩니다.";
     return "";
   }
-  /* 능력치 표: HP · 공격당 데미지(여러 발이면 * n) · 초당 공격 횟수 · 이동속도(궁극기 중) · 사거리 · 궁극기 */
   function statTable(c) {
     var dmg = num(c.dmg) + (c.shots > 1 ? " * " + c.shots : "");
     return '<table class="st"><tr><th>HP</th><td>' + c.hp + "</td></tr><tr><th>공격</th><td>" + dmg + "</td></tr>" +
@@ -799,7 +754,6 @@
     var me = P[myId]; if (!me) return;
     var mode = room.mode;
     setText($("lobbyMode"), modeName(mode));
-    /* 방식 바꾸기 버튼: 방장만 누를 수 있고, 지금 방식이 칠해져 있음 */
     setHtml($("modeBtns"), MODES.map(function (m) {
       return '<button type="button" class="mini modeBtn' + (m.id === mode ? " on" : "") + '" data-mode="' + m.id + '"' + (isHost() ? "" : " disabled") + ">" + m.name + "</button>";
     }).join(""));
@@ -820,7 +774,6 @@
     setHtml($("listRed"), list("red"));
     var nb = teamIds("blue").length, nr = teamIds("red").length;
     var imSpec = me.team === "spec";
-    /* 이동하기: 내가 없는 팀 옆에만(관전자면 두 팀 모두). 옮길 수 없으면 회색 */
     show($("btnJoinBlue"), me.team !== "blue"); $("btnJoinBlue").disabled = !canMoveTo("blue");
     show($("btnJoinRed"), me.team !== "red");   $("btnJoinRed").disabled = !canMoveTo("red");
     var specs = teamIds("spec");
@@ -829,10 +782,8 @@
     show($("btnSpec"), !imSpec); $("btnSpec").disabled = !canMoveTo("spec");
     show($("charCardBox"), !imSpec);
 
-    /* 캐릭터 선택 */
     setHtml($("chars"), cardsHtml(me));
 
-    /* 시작 버튼 */
     var host = isHost(), ok = false, hint = "";
     if (!mode) hint = "게임 방식을 먼저 골라 주세요.";
     else if (mode === "pvp") {
@@ -854,10 +805,10 @@
     var c = b.getAttribute("data-c");
     if (c === "tank" && !TANK_ENABLED) return;
     var me = P[myId]; if (!me) return;
-    if (me.characterType === c) {                 // 이미 고른 카드를 한 번 더 → 뒤집어 자세한 설명
+    if (me.characterType === c) {
       flipped = flipped === c ? null : c;
       b.classList.toggle("flip", flipped === c);
-      $("chars")._h = cardsHtml(me);              // 화면은 그대로 두고(뒤집히는 애니메이션 유지) 기억만 맞춤
+      $("chars")._h = cardsHtml(me);
       return;
     }
     flipped = null;
@@ -879,7 +830,6 @@
   $("joinCode").onkeydown = function (e) { if (e.key === "Enter") joinRoom(); };
   $("btnStart").onclick = startGame;
 
-  /* 게임 시작(호스트): 팀별 입장 순서대로 슬롯 1~3 확정 + 스폰 위치 */
   function spawnOf(team, slot) {
     var x = SPAWN_X[slot - 1];
     return { x: team === "blue" ? MW - x : x, y: SPAWN_Y[team], angle: team === "blue" ? Math.PI / 2 : -Math.PI / 2 };
@@ -893,7 +843,7 @@
         var p = P[id], c = CHARS[p.characterType] ? p.characterType : "marksman";
         if (c === "tank" && !TANK_ENABLED) c = "marksman";
         var sp = spawnOf(team, i + 1), base = "players/" + id + "/";
-        if (p.isAI && (c === "healer" || c === "assassin")) {        // AI 세 번째 자리는 판마다 힐러·암살자 중 무작위
+        if (p.isAI && (c === "healer" || c === "assassin")) {
           c = Math.random() < 0.5 ? "healer" : "assassin"; u[base + "nickname"] = CHARS[c].name;
         }
         u[base + "slot"] = i + 1; u[base + "characterType"] = c;
@@ -907,17 +857,14 @@
     room.ref.update(u);
   }
 
-  /* =====================================================================
-     게임 진행
-     ===================================================================== */
-  var G = null;        // 현재 판 { startAt, endSent, playingSent, ... }
-  var ME = null;       // 내 캐릭터(로컬이 주인)
-  var BOTS = {};       // 호스트가 계산하는 AI 봇
-  var R = {};          // 다른 사람 캐릭터(보간된 화면 위치)
-  var PR = {};         // 투사체
-  var MELEE = {};      // 탱커 근접 판정
-  var FX = [];         // 화면 효과(떠오르는 숫자·불꽃)
-  var handled = {};    // 이미 처리한 hits/effects/melee 키
+  var G = null;
+  var ME = null;
+  var BOTS = {};
+  var R = {};
+  var PR = {};
+  var MELEE = {};
+  var FX = [];
+  var handled = {};
 
   function makeEnt(id, d) {
     var c = CHARS[d.characterType] ? d.characterType : "marksman";
@@ -930,7 +877,7 @@
   }
   function initGame() {
     G = { startAt: room.startAt, endSent: false, playingSent: false, lastNet: 0, sent: {}, finalSent: false, beeped: -1 };
-    ME = isSpec() ? null : makeEnt(myId, P[myId]);    // 관전자는 캐릭터 없음
+    ME = isSpec() ? null : makeEnt(myId, P[myId]);
     BOTS = {}; R = {}; FX = []; handled = {};
     lastHp = {};
     show($("endOv"), false);
@@ -939,7 +886,6 @@
   function participants() {
     return keys(P).filter(function (id) { var d = P[id]; return d && d.slot && (d.team === "blue" || d.team === "red"); });
   }
-  /* 화면·판정에 쓰는 캐릭터: 나 = ME, 호스트의 봇 = BOTS, 나머지 = 보간된 R */
   function ent(id) {
     if (id === myId) return ME;
     if (BOTS[id]) return BOTS[id];
@@ -950,7 +896,7 @@
     participants().forEach(function (id) {
       if (id === myId) return;
       var d = P[id];
-      if (d.isAI && host) {                 // 봇 연산 이어받기(호스트가 바뀌었을 때도)
+      if (d.isAI && host) {
         if (!BOTS[id]) { BOTS[id] = makeEnt(id, d); BOTS[id].bot = { seed: Math.random() * 10, seenAt: 0, target: null, stuck: 0, detour: 0, detourDir: 1 }; delete R[id]; }
         return;
       }
@@ -958,7 +904,7 @@
       if (!r) { r = R[id] = makeEnt(id, d); }
       var k = Math.min(1, dt * 12);
       var tx = +d.x || 0, ty = +d.y || 0;
-      if (d.mv && hyp(tx - r.x, ty - r.y) > 3) { r.moveAng = Math.atan2(ty - r.y, tx - r.x); r.moveAt = now(); }   // 걷는 방향(앞·뒷모습용)
+      if (d.mv && hyp(tx - r.x, ty - r.y) > 3) { r.moveAng = Math.atan2(ty - r.y, tx - r.x); r.moveAt = now(); }
       if (hyp(tx - r.x, ty - r.y) > 250) { r.x = tx; r.y = ty; } else { r.x += (tx - r.x) * k; r.y += (ty - r.y) * k; }
       r.angle = lerpAng(r.angle, +d.angle || 0, Math.min(1, dt * 15));
       r.team = d.team; r.char = CHARS[d.characterType] ? d.characterType : "marksman"; r.maxHp = CHARS[r.char].hp;
@@ -966,22 +912,18 @@
       r.mv = !!d.mv; r.atkAt = +d.atkAt || 0; r.ultUntil = +d.ultUntil || 0; r.buffUntil = +d.buffUntil || 0; r.nickname = d.nickname; r.isAI = !!d.isAI;
       r.regenUntil = +d.regenUntil || 0; r.skillUntil = +d.skillUntil || 0; r.skillDur = +d.skillDur || 0;
       var su = +d.stealthUntil || 0;
-      if (su > r.stealthUntil && su > now()) smoke(r.x, r.y);   // 다른 사람이 은신 궁극기를 씀 → 연막
+      if (su > r.stealthUntil && su > now()) smoke(r.x, r.y);
       r.stealthUntil = su;
     });
   }
 
-  /* ---------- 지형 ---------- */
   function inBush(x, y) {
     for (var i = 0; i < BUSH.length; i++) if (hyp(x - BUSH[i].x, y - BUSH[i].y) < BUSH[i].r * 0.85) return true;
     return false;
   }
-  /* 암살자 은신: 연막(0.4초)이 끝난 뒤부터 stealthUntil 까지 */
   function stealthed(E, t) { t = t || now(); return E.stealthUntil > t && t >= E.stealthUntil - ULT.asDur; }
-  /* 궁극기 지속 중(힐러 회복·탱커 방어태세·암살자 은신): 게이지가 분홍색으로 남은 시간만큼 표시되고, 끝나야 다시 참 */
   function skillActive(E, t) { return E.skillUntil > (t || now()); }
   function skillLeft(E, t) { return E.skillDur ? clamp((E.skillUntil - t) / E.skillDur, 0, 1) : 0; }
-  /* 상대 팀에게 안 보이는가 — 풀숲과 은신이 같은 규칙을 씀 */
   function hiddenFrom(E, t) { return inBush(E.x, E.y) || stealthed(E, t); }
   function resolve(E) {
     for (var pass = 0; pass < 2; pass++) {
@@ -994,7 +936,7 @@
           var cx = clamp(E.x, o.x - o.w / 2, o.x + o.w / 2), cy = clamp(E.y, o.y - o.h / 2, o.y + o.h / 2);
           var ex = E.x - cx, ey = E.y - cy, dd = hyp(ex, ey);
           if (dd < BODY_R) {
-            if (dd < 0.01) {   // 중심이 벽 안: 가장 가까운 면으로
+            if (dd < 0.01) {
               var l = E.x - (o.x - o.w / 2), rr = (o.x + o.w / 2) - E.x, t = E.y - (o.y - o.h / 2), b = (o.y + o.h / 2) - E.y;
               var mn = Math.min(l, rr, t, b);
               if (mn === l) E.x = o.x - o.w / 2 - BODY_R; else if (mn === rr) E.x = o.x + o.w / 2 + BODY_R;
@@ -1009,8 +951,8 @@
   }
   function speedOf(E) {
     var t = now(), c = CHARS[E.char];
-    if (E.char === "tank" && E.buffUntil > t) return c.ultSpeed;              // 방어태세
-    if (E.char === "assassin" && E.stealthUntil > t) return c.ultSpeed;       // 은신
+    if (E.char === "tank" && E.buffUntil > t) return c.ultSpeed;
+    if (E.char === "assassin" && E.stealthUntil > t) return c.ultSpeed;
     return c.speed;
   }
   function moveEnt(E, vx, vy, dt) {
@@ -1019,7 +961,6 @@
     E.x += vx * sp * dt; E.y += vy * sp * dt;
     resolve(E);
   }
-  /* 광선이 장애물·담에 닿는 거리 */
   function rayCircle(x, y, dx, dy, cx, cy, r) {
     var fx = x - cx, fy = y - cy, b = fx * dx + fy * dy, c = fx * fx + fy * fy - r * r;
     if (c < 0) return 0;
@@ -1058,7 +999,6 @@
     return rayObst(ax, ay, (bx - ax) / d, (by - ay) / d, 4) >= d;
   }
 
-  /* ---------- 투사체 ---------- */
   function addProj(id, d) {
     if (!d) return;
     var sp = hyp(d.vx, d.vy) || 1, dx = d.vx / sp, dy = d.vy / sp;
@@ -1078,12 +1018,11 @@
               pr:skill ? ULT.mkPr : c.pr, range: skill ? ULT.mkRange : c.range, createdAt: now() };
     var ref = room.ref.child("projectiles").push(d);
     setTimeout(function () { ref.remove(); }, d.range / sp * 1000 + 700);
-    if (skill || !E.volley || E.volley.left === c.shots) E.atkAt = now();   // 연발은 첫 발 때만 → 공격 그림이 끊기지 않고 이어짐
+    if (skill || !E.volley || E.volley.left === c.shots) E.atkAt = now();
     if (hear(E)) sfx(E.char === "healer" ? "orb" : (E.char === "assassin" ? "star" : "shoot"));
   }
   function hear(E) { return ME && hyp(E.x - ME.x, E.y - ME.y) < 700; }
 
-  /* 나(와 호스트면 봇)에게 닿은 투사체만 판정 — 클라이언트 신뢰 방식 */
   function localTargets() {
     var list = [];
     if (ME && ME.alive) list.push(ME);
@@ -1113,8 +1052,6 @@
     room.ref.child("projectiles/" + id).remove();
     spark(T.x, T.y, d.team === "blue" ? "#5FA2FF" : "#FF6A5F");
   }
-  /* 화면에서만: 투사체가 (내가 판정하지 않는) 다른 캐릭터에 닿으면 바로 사라진 것처럼 보이게.
-     실제 명중 판정·삭제는 맞은 사람 쪽에서 하므로, 그 소식이 도착하기 전까지 몸을 뚫고 지나가 보이던 것을 막는다. */
   function projVisualHit(p, t) {
     if (p.dead || p.gone) return;
     var d = p.d, e = clamp(t - d.createdAt, 0, p.life), pe = p.ve === undefined ? 0 : p.ve;
@@ -1132,9 +1069,9 @@
     }
   }
   function damage(T, amount, owner, basic) {
-    if (T.char === "tank" && T.buffUntil > now()) amount = Math.round(amount * ULT.tkDef);     // 탱커 궁극기: 받는 피해 감소
+    if (T.char === "tank" && T.buffUntil > now()) amount = Math.round(amount * ULT.tkDef);
     var dm = Math.min(amount, T.hp);
-    T.hp -= dm; if (!skillActive(T)) T.gauge = Math.min(GAUGE_MAX, T.gauge + 1);   // 궁극기 지속 중엔 게이지 안 참
+    T.hp -= dm; if (!skillActive(T)) T.gauge = Math.min(GAUGE_MAX, T.gauge + 1);
     if (T.hp <= 0) { T.hp = 0; T.alive = false; T.burst = null; T.volley = null; T.regenUntil = 0; T.skillUntil = 0; if (T === ME) { sfx("down"); aim.id = null; joy.id = null; } }
     else if (T === ME) sfx("hit");
     pushHit({ owner: owner, target: T.id, dmg: dm, basic: basic });
@@ -1142,7 +1079,6 @@
   }
   function pushHit(h) { h.createdAt = now(); room.ref.child("hits").push(h); }
 
-  /* 내가(또는 내 봇이) 맞힌 기록 → 누적 피해·게이지 +2 */
   function onHit(s) {
     var h = s.val(); if (!h || !G || handled[s.key]) return;
     var owner = h.owner === myId ? ME : (isHost() ? BOTS[h.owner] : null);
@@ -1150,13 +1086,12 @@
     handled[s.key] = 1;
     if (h.createdAt >= G.startAt - 1000) {
       if (h.dmg) owner.dmg += h.dmg;
-      if (h.basic && !skillActive(owner)) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + (CHARS[owner.char].perHit || 2));   // 사격수·암살자는 1발당 +1
+      if (h.basic && !skillActive(owner)) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + (CHARS[owner.char].perHit || 2));
       if (owner === ME && h.dmg) sfx("confirm");
       G.forceNet = true;
     }
     s.ref.remove();
   }
-  /* 힐러 궁극기: 같은 팀 전체가 몇 초에 걸쳐 회복(힐러 자신은 2배) */
   function onEffect(s) {
     var e = s.val(); if (!e || !G || handled[s.key]) return;
     handled[s.key] = 1;
@@ -1171,7 +1106,6 @@
       G.forceNet = true;
     }
   }
-  /* 탱커 근접: 부채꼴 판정 원을 짧게 브로드캐스트 */
   function onMelee(key, d) {
     if (!d) return;
     MELEE[key] = { d: d, at: Date.now() };
@@ -1195,16 +1129,15 @@
     if (hear(E)) sfx("swing");
   }
 
-  /* ---------- 공격·궁극기 ---------- */
   function canAct() { return G && room.status === "playing" && now() >= room.startAt && ME && ME.alive; }
   function fireBasic(E, ang) {
     var c = CHARS[E.char];
     E.cdUntil = now() + c.cd; E.angle = ang;
-    if (E.char === "assassin" && E.stealthUntil > now()) {     // 은신 중 첫 공격 → 은신(과 이속 증가) 해제
+    if (E.char === "assassin" && E.stealthUntil > now()) {
       E.stealthUntil = E.skillUntil = now(); G.forceNet = true;
     }
     if (E.char === "tank") swing(E, ang);
-    else if (c.shots > 1) { E.volley = { left: c.shots, next: now(), ang: ang }; stepVolley(E); }   // 사격수 2연발 · 암살자 표창 3연발
+    else if (c.shots > 1) { E.volley = { left: c.shots, next: now(), ang: ang }; stepVolley(E); }
     else spawnProj(E, ang, false);
   }
   function stepVolley(E) {
@@ -1217,7 +1150,7 @@
   }
   function tryFire(E, ang) {
     if (now() >= E.cdUntil) { fireBasic(E, ang); E.pending = null; }
-    else E.pending = { ang: ang, until: now() + 350 };     // 쿨다운이 곧 끝나면 그때 발사
+    else E.pending = { ang: ang, until: now() + 350 };
   }
   function useUlt(E, ang) {
     if (E.gauge < GAUGE_MAX || !E.alive) return;
@@ -1235,12 +1168,12 @@
       E.buffUntil = t + ULT.tkDur;
       E.skillDur = ULT.tkDur;
     } else if (E.char === "assassin") {
-      E.ultUntil = t + ULT.asSmokeMs;                        // 사라지는 포즈 + 연막 → 끝나면 은신 시작
+      E.ultUntil = t + ULT.asSmokeMs;
       E.stealthUntil = t + ULT.asSmokeMs + ULT.asDur;
       E.skillDur = ULT.asSmokeMs + ULT.asDur;
       smoke(E.x, E.y);
     }
-    if (E.skillDur && E.char !== "marksman") E.skillUntil = t + E.skillDur;   // 지속시간 동안 게이지가 분홍색으로 줄어듦
+    if (E.skillDur && E.char !== "marksman") E.skillUntil = t + E.skillDur;
     if (hear(E)) sfx("ult");
     G.forceNet = true;
   }
@@ -1258,10 +1191,8 @@
       if (E.burst && E.burst.left <= 0) E.burst = null;
     }
     if (E.volley) stepVolley(E);
-    if (E.regenUntil > t) E.hp = Math.min(E.maxHp, E.hp + E.maxHp * E.regenRate * dt);   // 힐러 궁극기 회복
+    if (E.regenUntil > t) E.hp = Math.min(E.maxHp, E.hp + E.maxHp * E.regenRate * dt);
   }
-  /* 클릭(드래그 없이 톡) = 거리와 상관없이 가장 가까운 보이는 적 자동 조준.
-     장애물에 가리지 않은 적을 먼저 고르고, 모두 가려져 있으면 그냥 가장 가까운 적. 풀숲 속 적은 제외(안 보이므로) */
   function autoAimAngle(E) {
     var best = null, bd = Infinity, open = null, od = Infinity;
     participants().forEach(function (id) {
@@ -1275,7 +1206,6 @@
     return t ? Math.atan2(t.y - E.y, t.x - E.x) : E.angle;
   }
 
-  /* ---------- AI 봇 (호스트가 계산) ---------- */
   function stepBot(B, dt) {
     if (!B.alive) { B.mv = false; return; }
     var t = now(), c = CHARS[B.char], k = B.bot;
@@ -1288,18 +1218,16 @@
     enemies.forEach(function (o) {
       var d = hyp(o.x - B.x, o.y - B.y);
       if (d > BOT_VIEW) return;
-      if (hiddenFrom(o, t) && d > 110) return;       // 풀숲·은신 속은 아주 가까이 오기 전엔 못 봄
+      if (hiddenFrom(o, t) && d > 110) return;
       if (d < td) { td = d; target = o; }
     });
     if (target !== k.target) { k.target = target; k.seenAt = t; }
-    /* 힐러: 싸울 적이 없으면 가장 다친 아군 곁으로 */
     var healT = null;
     if (B.char === "healer" && !target) {
       var low = 0.9;
       allies.forEach(function (a) { var ratio = a.hp / a.maxHp; if (ratio < low) { low = ratio; healT = a; } });
     }
 
-    /* 이동 */
     var mx = 0, my = 0;
     if (target) {
       var dx = target.x - B.x, dy = target.y - B.y, d = hyp(dx, dy) || 1, ux = dx / d, uy = dy / d;
@@ -1307,7 +1235,7 @@
       var los = losClear(B.x, B.y, target.x, target.y);
       if (!los || d > want + 40) { mx += ux; my += uy; }
       else if (d < want - 90) { mx -= ux * 0.8; my -= uy * 0.8; }
-      var s = Math.sin(t / 900 + k.seed) * 0.7;           // 좌우로 흔들며 피하기
+      var s = Math.sin(t / 900 + k.seed) * 0.7;
       mx += -uy * s; my += ux * s;
     } else if (healT) {
       var hx = healT.x - B.x, hy = healT.y - B.y, hd = hyp(hx, hy) || 1;
@@ -1328,7 +1256,6 @@
       if (B.mv) { B.moveAng = Math.atan2(B.y - oy, B.x - ox); B.moveAt = t; }
     } else B.mv = false;
 
-    /* 조준·공격 */
     var aimAt = target;
     if (aimAt) B.angle = Math.atan2(aimAt.y - B.y, aimAt.x - B.x);
     else if (B.mv) B.angle = Math.atan2(my, mx);
@@ -1343,9 +1270,6 @@
     }
   }
 
-  /* ---------- 네트워크 쓰기 (초당 약 7회, 바뀐 값만) ----------
-     데이터베이스 사용량(다운로드)을 줄이려고 지난번에 보낸 값과 같은 항목은 빼고 보낸다.
-     G.sent 에 마지막으로 보낸 값을 기억(판이 새로 시작하면 비워서 처음엔 전부 보냄) */
   function entFields(u, E) {
     var b = "players/" + E.id + "/", sent = G.sent;
     function put(k, v) { if (sent[b + k] !== v) { sent[b + k] = v; u[b + k] = v; } }
@@ -1366,7 +1290,6 @@
     if (keys(u).length) room.ref.update(u);
   }
 
-  /* ---------- 승패 (호스트가 판정해 기록) ---------- */
   function teamTotals() {
     var s = { blue: 0, red: 0, blueAlive: 0, redAlive: 0, blueN: 0, redN: 0 };
     participants().forEach(function (id) {
@@ -1403,14 +1326,14 @@
       keys(MELEE).forEach(function (id) { if (t - MELEE[id].d.createdAt > 3000) u["meleeHits/" + id] = null; });
       if (keys(u).length) room.ref.update(u);
     }
-    if (room.status === "ended" && room.endedAt && t - room.endedAt > 300000) room.ref.remove();   // 끝나고 5분 뒤 방 삭제
+    if (room.status === "ended" && room.endedAt && t - room.endedAt > 300000) room.ref.remove();
   }
   function onEnded() {
     if (!G) return;
     G.forceNet = true;
     try { netWrite(true); } catch (e) {}
     setTimeout(function () {
-      var mine = ME ? ME.team : null;   // 관전자는 승패 소리 없음
+      var mine = ME ? ME.team : null;
       if (mine && room && room.winner && room.winner !== "draw") sfx(room.winner === mine ? "win" : "lose");
     }, 200);
   }
@@ -1420,8 +1343,6 @@
                       projectiles: null, meleeHits: null, hits: null, effects: null });
   }
   $("btnAgain").onclick = restart;
-  /* 키보드(컴퓨터): WASD·방향키 이동, J 기본 공격, K 궁극기 — 조준 없이 가장 가까운 적 자동 조준.
-     WASD 는 한글 입력 상태에서도 되도록 e.code 로 판정 */
   var KEY_ON = { up: false, down: false, left: false, right: false, atk: false };
   var KEY_MAP = { KeyW: "up", KeyS: "down", KeyA: "left", KeyD: "right", KeyJ: "atk",
                   ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right" };
@@ -1436,18 +1357,14 @@
     }
   });
   window.addEventListener("keyup", function (e) { var k = keyName(e); if (k) KEY_ON[k] = false; });
-  window.addEventListener("blur", function () { for (var k in KEY_ON) KEY_ON[k] = false; });   // 창을 벗어나면 누른 키 풀기
+  window.addEventListener("blur", function () { for (var k in KEY_ON) KEY_ON[k] = false; });
 
-  /* =====================================================================
-     입력: 왼쪽 아래 = 고정 이동 조이스틱, 오른쪽 아래 = 공격·궁극기 버튼
-     ===================================================================== */
   var cv = $("cv"), ctx = cv.getContext("2d");
   var joy = { id: null, ox: 0, oy: 0, x: 0, y: 0 };
   var aim = { id: null, btn: null, ox: 0, oy: 0, dx: 0, dy: 0, drag: false };
   var JOY_R = 60, DRAG_MIN = 14;
   function flip() { return ME && ME.team === "blue"; }
   function screenToWorldAngle(a) { return flip() ? a + Math.PI : a; }
-  /* 조이스틱 중심은 왼쪽 아래에 고정(공격 버튼과 같은 높이) */
   function joyBase() {
     var small = W <= 560;
     JOY_R = small ? 54 : 64;
@@ -1458,7 +1375,7 @@
     audio();
     if (!canAct() || joy.id !== null) return;
     var jb = joyBase();
-    if (hyp(e.clientX - jb.x, e.clientY - jb.y) > JOY_R * 2.5) return;   // 조이스틱 근처를 눌렀을 때만
+    if (hyp(e.clientX - jb.x, e.clientY - jb.y) > JOY_R * 2.5) return;
     joy.id = e.pointerId; joy.ox = jb.x; joy.oy = jb.y; joy.x = e.clientX; joy.y = e.clientY;
     try { cv.setPointerCapture(e.pointerId); } catch (er) {}
     e.preventDefault();
@@ -1473,7 +1390,7 @@
       if (!canAct() || aim.id !== null) return;
       if (which === "ult") {
         if (ME.gauge < GAUGE_MAX || ME.burst) return;
-        if (ME.char !== "marksman") {   // 힐러·탱커: 방향 없는 즉시 발동형 — 탭하면 바로 발동, 가장 가까운 적 쪽을 바라봄
+        if (ME.char !== "marksman") {
           var ua = autoAimAngle(ME); ME.angle = ua; useUlt(ME, ua); return;
         }
       }
@@ -1501,7 +1418,6 @@
   bindAimButton($("btnAtk"), "atk");
   bindAimButton($("btnUlt"), "ult");
 
-  /* ---------- 화면 크기 ---------- */
   var W = 0, H = 0, DPR = 1;
   function resize() {
     DPR = Math.min(2, window.devicePixelRatio || 1);
@@ -1511,20 +1427,15 @@
   window.addEventListener("resize", resize);
   resize();
 
-  /* ---------- 효과 ---------- */
   var lastHp = {};
   function spark(x, y, color) { FX.push({ k: "spark", x: x, y: y, c: color, t: Date.now(), life: 260 }); }
   function smoke(x, y) { FX.push({ k: "smoke", x: x, y: y, t: Date.now(), life: ULT.asSmokeMs + 150 }); }
   function floatText(x, y, text, color) { FX.push({ k: "txt", x: x, y: y, s: text, c: color, t: Date.now(), life: 800 }); }
 
-  /* =====================================================================
-     그리기
-     ===================================================================== */
   var S = 1, camX = 0, camY = 0;
-  function V(x, y) { return flip() ? { x: MW - x, y: MH - y } : { x: x, y: y }; }   // 월드 → 내 화면 방향(블루는 180° 회전)
+  function V(x, y) { return flip() ? { x: MW - x, y: MH - y } : { x: x, y: y }; }
   function viewAngle(a) { return flip() ? a + Math.PI : a; }
 
-  /* 공격 그림 유지 시간: 망치는 조금 더 길게, 연발(사격수 2발·암살자 3발)은 마지막 발까지 */
   function atkPoseMs(k) {
     var c = CHARS[k];
     return ATK_POSE_MS * (k === "tank" ? 2 : 1) + (c.shots > 1 ? (c.shots - 1) * c.gap : 0);
@@ -1534,7 +1445,6 @@
     if (E.ultUntil > t && E.char !== "tank") pose = "ult";
     else if (t >= E.atkAt && t - E.atkAt < atkPoseMs(E.char)) pose = "atk";
     else if (E.mv && E.alive) { walking = true; pose = Math.floor(t / 200) % 2 ? "walk" : "idle"; }
-    /* 공격·궁극기·조준 중엔 조준 방향, 그 밖엔 마지막 이동 방향(화면에서 위로 가면 뒷모습, 아래로 오면 앞모습) */
     var useMove = FACE_BY_MOVE && pose !== "atk" && pose !== "ult" && E.moveAng != null && E.moveAt > E.atkAt &&
                   !(E === ME && aim.id !== null && aim.drag);
     var va = viewAngle(useMove ? E.moveAng : E.angle);
@@ -1543,21 +1453,18 @@
 
     ctx.save();
     ctx.globalAlpha = alpha;
-    /* 발밑 그림자 + 팀 색 고리 */
     ctx.fillStyle = "rgba(0,0,0,.22)";
     ctx.beginPath(); ctx.ellipse(p.x, p.y + 22, 22, 8, 0, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = E.team === "blue" ? "#2F6FD6" : "#D6453D"; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.ellipse(p.x, p.y + 22, 24, 9, 0, 0, Math.PI * 2); ctx.stroke();
     if (E === ME) { ctx.strokeStyle = "#FFFFFF"; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(p.x, p.y + 22, 29, 12, 0, 0, Math.PI * 2); ctx.stroke(); }
 
-    /* 탱커 궁극기 오라(캐릭터 바로 아래 레이어) */
     if (E.buffUntil > t && ready(IMG.aura)) {
       var ah = E.char === "tank" ? 130 : 110, aw = ah * IMG.aura.naturalWidth / IMG.aura.naturalHeight;
       ctx.globalAlpha = alpha * (0.75 + 0.25 * Math.sin(t / 120));
       ctx.drawImage(IMG.aura, p.x - aw / 2, p.y - 6 - ah / 2, aw, ah);
       ctx.globalAlpha = alpha;
     }
-    /* 힐러 궁극기 회복 중: 발밑 초록 빛 */
     if (E.regenUntil > t && E.alive) {
       ctx.globalAlpha = alpha * (0.55 + 0.25 * Math.sin(t / 110));
       ctx.fillStyle = "rgba(90,220,120,.45)"; ctx.strokeStyle = "#5ADC78"; ctx.lineWidth = 3;
@@ -1567,7 +1474,7 @@
 
     var spec = SPR[E.char], side = back ? "back" : "front";
     var key = pose, entry = spec[side][pose];
-    if (!entry) { entry = spec[side].idle; key = "idle"; if (pose === "walk") bob = 3; }   // 없는 포즈(사격수 걷기·탱커 앞모습 공격)는 대기 그림으로, 걷기면 통통 튀게
+    if (!entry) { entry = spec[side].idle; key = "idle"; if (pose === "walk") bob = 3; }
     var im = IMG[spec.pre + "-" + E.team + "-" + side + "-" + key];
     if (ready(im)) {
       var h = entry[0], w = h * im.naturalWidth / im.naturalHeight;
@@ -1595,15 +1502,14 @@
     ctx.fillStyle = "rgba(0,0,0,.55)"; ctx.fillRect(x0 - 1, top - 1, bw + 2, bh + 2);
     ctx.fillStyle = ally ? "#3BB273" : "#E0474C";
     ctx.fillRect(x0, top, bw * clamp(E.hp / E.maxHp, 0, 1), bh);
-    if (ally) {                     // 궁극기 게이지는 아군에게만
+    if (ally) {
       var gy = top + bh + 2, full = E.gauge >= GAUGE_MAX, t = now(), act = skillActive(E, t);
       ctx.fillStyle = "rgba(0,0,0,.5)"; ctx.fillRect(x0 - 1, gy - 1, bw + 2, 6);
-      ctx.fillStyle = act ? "#F06BB5" : (full ? "#E53935" : "#F2C230");      // 궁극기 지속 중 = 분홍, 남은 시간만큼
+      ctx.fillStyle = act ? "#F06BB5" : (full ? "#E53935" : "#F2C230");
       ctx.fillRect(x0, gy, bw * (act ? skillLeft(E, t) : clamp(E.gauge / GAUGE_MAX, 0, 1)), 4);
     }
     ctx.restore();
   }
-  /* 쏜 사람이 그 방향을 볼 때 그려지는 공격 그림에서 무기 끝의 위치 → 실제 출발점과의 차이(내 화면 좌표) */
   function tipOffset(p) {
     var d = p.d, c = d.ownerCharacterType, spec = SPR[c]; if (!spec) return null;
     var va = viewAngle(Math.atan2(p.dy, p.dx)), side = Math.sin(va) < 0 ? "back" : "front", right = Math.cos(va) >= 0;
@@ -1611,7 +1517,7 @@
     var name = spec.pre + "-" + d.team + "-" + side + "-" + pose, uv = TIP[name], im = IMG[name];
     if (!entry || !uv || !ready(im)) return null;
     var h = entry[0], w = h * im.naturalWidth / im.naturalHeight, mir = right !== entry[1] ? -1 : 1;
-    var cx = d.x - p.dx * 20, cy = d.y - p.dy * 20;           // 쏜 사람 위치(spawnProj 에서 20 앞에서 출발)
+    var cx = d.x - p.dx * 20, cy = d.y - p.dy * 20;
     var body = V(cx, cy), start = V(d.x, d.y);
     return { x: body.x + (uv[0] - 0.5) * w * mir - start.x, y: body.y + 26 - h / 2 + (uv[1] - 0.5) * h - start.y };
   }
@@ -1623,7 +1529,7 @@
     }
     var pos = projAt(p, e), v = V(pos.x, pos.y), a = viewAngle(Math.atan2(p.dy, p.dx));
     if (p.tipOff === undefined) p.tipOff = tipOffset(p);
-    if (p.tipOff) {                                    // 무기 끝에서 출발해 TIP_BLEND 안에 실제 탄도로 합류
+    if (p.tipOff) {
       var kk = 1 - clamp(p.sp * e / 1000 / TIP_BLEND, 0, 1);
       v = { x: v.x + p.tipOff.x * kk, y: v.y + p.tipOff.y * kk };
     }
@@ -1634,11 +1540,11 @@
       if (ready(im)) {
         var h = 46, w = h * im.naturalWidth / im.naturalHeight;
         ctx.rotate(a - BULLET_NATIVE);
-        ctx.drawImage(im, -w * 0.72, -h * 0.28, w, h);   // 그림의 앞머리(오른쪽 위)가 실제 위치에 오도록
+        ctx.drawImage(im, -w * 0.72, -h * 0.28, w, h);
       } else { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI * 2); ctx.fill(); }
     } else if (p.d.ownerCharacterType === "assassin") {
       var st = IMG["shuriken-" + (blue ? "blue" : "red")];
-      ctx.rotate(a);                                   // 날아가는 방향으로
+      ctx.rotate(a);
       if (ready(st)) { var sw = 34, sh = sw * st.naturalHeight / st.naturalWidth; ctx.drawImage(st, -sw / 2, -sh / 2, sw, sh); }
       else { ctx.fillStyle = "#C9CED6"; ctx.beginPath(); ctx.arc(0, 0, 7, 0, Math.PI * 2); ctx.fill(); }
     } else if (p.d.ownerCharacterType === "healer") {
@@ -1698,7 +1604,7 @@
     ctx.restore();
   }
   function drawJoystick() {
-    if (!ME || !ME.alive || !room || room.status === "ended") return;   // 살아 있는 동안 항상 제자리에 표시
+    if (!ME || !ME.alive || !room || room.status === "ended") return;
     var jb = joyBase(), on = joy.id !== null, dx = 0, dy = 0;
     if (on) {
       dx = joy.x - jb.x; dy = joy.y - jb.y; var d = hyp(dx, dy);
@@ -1719,17 +1625,15 @@
     ctx.fillStyle = "#2A2F2B"; ctx.fillRect(0, 0, W, H);
     var spec = !me;
     if (spec) {
-      /* 관전: 맵 전체를 양옆 상태판 사이에 위아래 꽉 차게 (블루팀이 위, 레드팀이 아래). 시계·점수는 양옆 상태판에 */
       var pw = specPanelW() + 20, top = 0, bottom = 0;
       S = Math.max(0.1, Math.min((W - pw * 2) / MW, (H - top - bottom) / MH));
       camX = -((W - MW * S) / 2) / S;
       camY = -(top + (H - top - bottom - MH * S) / 2) / S;
     } else {
-      /* 카메라: 내 캐릭터가 화면 아래쪽 가운데보다 살짝 위(66%)에 오도록 */
       S = Math.max(0.5, Math.min(H / 860, W / 560));
       var visW = W / S, visH = H / S;
       var focus = me;
-      if (!me.alive) {      // 쓰러지면 살아 있는 팀원을 비춤
+      if (!me.alive) {
         participants().forEach(function (id) { var o = ent(id); if (o && o.alive && o.team === me.team && focus === me) focus = o; });
       }
       var fv = V(focus.x, focus.y);
@@ -1738,7 +1642,6 @@
     }
     ctx.setTransform(DPR * S, 0, 0, DPR * S, -camX * S * DPR, -camY * S * DPR);
 
-    /* 배경 (블루팀 화면은 180° 돌려 자기 진영이 아래) */
     if (ready(IMG.bg)) {
       ctx.save(); ctx.translate(MW / 2, MH / 2); if (flip()) ctx.rotate(Math.PI);
       ctx.drawImage(IMG.bg, -MW / 2, -MH / 2, MW, MH); ctx.restore();
@@ -1747,16 +1650,14 @@
     BUSH.forEach(drawBush);
     keys(MELEE).forEach(function (k) { drawMelee(MELEE[k]); });
 
-    /* 캐릭터 + 장애물을 화면 y 순서로 */
     var items = [];
     OBST.forEach(function (o) { items.push({ y: V(o.x, o.y).y, o: o }); });
     var list = [];
     participants().forEach(function (id) {
       var E = ent(id); if (!E) return;
-      var ally = spec || E.team === me.team, hid = hiddenFrom(E, t);   // 관전자는 모두를 아군처럼(게이지까지) 봄
-      if (!ally && hid) { lastHp[id] = E.hp; return; }            // 풀숲·은신 중인 적은 아예 안 그림
+      var ally = spec || E.team === me.team, hid = hiddenFrom(E, t);
+      if (!ally && hid) { lastHp[id] = E.hp; return; }
       var alpha = !E.alive ? 0.35 : (E === me ? 1 : (hid ? (spec ? 0.55 : STEALTH_ALPHA) : 1));
-      /* 체력 변화 → 떠오르는 숫자 */
       if (lastHp[id] !== undefined && Math.abs(E.hp - lastHp[id]) >= 1) {
         var d = Math.round(E.hp - lastHp[id]);
         if (d < 0) { floatText(E.x, E.y, String(d), "#FF4B3E"); E.flashUntil = Date.now() + 90; }
@@ -1772,7 +1673,6 @@
     list.forEach(function (it) { if (it.e.alive) drawBars(it.e, it.alpha, it.ally); });
     drawAimGuide();
 
-    /* 효과 */
     var nowMs = Date.now();
     FX = FX.filter(function (f) { return nowMs - f.t < f.life; });
     FX.forEach(function (f) {
@@ -1781,7 +1681,7 @@
       if (f.k === "spark") {
         ctx.strokeStyle = f.c; ctx.lineWidth = 3;
         ctx.beginPath(); ctx.arc(v.x, v.y, 8 + k * 22, 0, Math.PI * 2); ctx.stroke();
-      } else if (f.k === "smoke") {                    // 연막: 뭉게뭉게 커졌다가 사라짐
+      } else if (f.k === "smoke") {
         var sm = IMG.smoke, sz = 70 + 90 * Math.sin(Math.min(1, k * 1.4) * Math.PI / 2);
         ctx.globalAlpha = k < 0.6 ? 0.95 : 0.95 * (1 - (k - 0.6) / 0.4);
         ctx.translate(v.x, v.y - 20); ctx.rotate(k * 0.6);
@@ -1799,8 +1699,7 @@
     drawJoystick();
   }
 
-  /* ---------- 관전 상태판 ---------- */
-  function specPanelW() { return W > 900 ? 300 : 150; }     // CSS .specPanel 너비와 같게
+  function specPanelW() { return W > 900 ? 300 : 150; }
   function specPanel(team, s) {
     var ids = participants().filter(function (id) { return P[id].team === team; })
       .sort(function (a, b) { return (P[a].slot || 0) - (P[b].slot || 0); });
@@ -1822,7 +1721,6 @@
     return h;
   }
 
-  /* ---------- HUD ---------- */
   function fmtTime(ms) { ms = Math.max(0, ms); var s = Math.ceil(ms / 1000); return Math.floor(s / 60) + ":" + (s % 60 < 10 ? "0" : "") + (s % 60); }
   function updateHud(t) {
     var st = room.status;
@@ -1834,7 +1732,6 @@
     setHtml($("hudCount"), '<span class="b">🔵 ' + s.blueAlive + '</span> vs <span class="r">🔴 ' + s.redAlive + "</span>");
     setText($("hudDmgB"), String(Math.round(s.blue))); setText($("hudDmgR"), String(Math.round(s.red)));
     var spec = !ME;
-    /* 관전: 가운데 위 시계를 없애고 왼쪽(시계·생존)·오른쪽(누적 피해) 상태판으로 나눔 → 맵이 위아래로 꽉 참 */
     show($("hudTop"), !spec); show($("specL"), spec); show($("specR"), spec); show($("specCode"), spec);
     if (spec) setText($("specCode"), "방 코드 " + room.code);
     if (spec) {
@@ -1855,7 +1752,6 @@
       setHtml($("btnUlt").lastChild, act ? CHARS[ME.char].ultName + "<br>" + Math.ceil((ME.skillUntil - t) / 1000) + "초"
                                          : (full ? "궁극기!" : "궁극기<br>" + Math.floor(ME.gauge) + "/10"));
     }
-    /* 카운트다운 */
     var cd = room.startAt - t;
     var counting = (st === "countdown" || st === "playing") && cd > -700;
     show($("countOv"), counting);
@@ -1865,7 +1761,6 @@
       var beepKey = cd > 0 ? Math.ceil(cd / 1000) : 0;
       if (G.beeped !== beepKey) { G.beeped = beepKey; sfx(beepKey > 0 ? "beep" : "go"); }
     }
-    /* 종료 */
     if (st === "ended") {
       var w = room.winner, f = room.final || {};
       show($("endOv"), true);
@@ -1877,7 +1772,6 @@
     } else show($("endOv"), false);
   }
 
-  /* ---------- 메인 루프 ---------- */
   var lastFrame = Date.now();
   function loop() {
     requestAnimationFrame(loop);
@@ -1900,14 +1794,14 @@
             var dx = joy.x - joy.ox, dy = joy.y - joy.oy, d = hyp(dx, dy);
             var m = d < 8 ? 0 : Math.min(1, d / JOY_R);
             vx = d ? dx / d * m : 0; vy = d ? dy / d * m : 0;
-          } else { var kd = hyp(kx, ky); vx = kx / kd; vy = ky / kd; }   // 키보드: 화면 기준 위·아래·왼쪽·오른쪽
+          } else { var kd = hyp(kx, ky); vx = kx / kd; vy = ky / kd; }
           if (flip()) { vx = -vx; vy = -vy; }
           var ox = ME.x, oy = ME.y;
           moveEnt(ME, vx, vy, dt);
           ME.mv = hyp(ME.x - ox, ME.y - oy) > 0.2;
           if (ME.mv) { ME.moveAng = Math.atan2(ME.y - oy, ME.x - ox); ME.moveAt = now(); }
         } else ME.mv = false;
-        if (KEY_ON.atk && t >= ME.cdUntil && !ME.volley) fireBasic(ME, autoAimAngle(ME));   // J 를 누르고 있으면 쿨다운마다 자동 조준 발사
+        if (KEY_ON.atk && t >= ME.cdUntil && !ME.volley) fireBasic(ME, autoAimAngle(ME));
         stepCombat(ME, dt);
       } else if (ME) ME.mv = false;
       if (isHost()) keys(BOTS).forEach(function (id) { var B = BOTS[id]; stepBot(B, dt); if (B.alive) stepCombat(B, dt); });
@@ -1919,7 +1813,6 @@
     updateHud(t);
   }
 
-  /* ---------- 시작 ---------- */
   refreshNick();
   if (!db) startMsg("온라인 연결을 준비하지 못했어요. 인터넷 연결을 확인해 주세요.");
   if (!nick) openNick(true);
