@@ -185,7 +185,6 @@
   #deadMsg { position: absolute; left: 50%; bottom: 30%; transform: translateX(-50%); background: rgba(27,43,32,.82); color: #fff; font-size: 20px; font-weight: 800; padding: 10px 20px; border-radius: 8px; pointer-events: none; white-space: nowrap; }
   #countOv { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; pointer-events: none; }
   #countNum { font-size: 150px; font-weight: 800; color: #fff; text-shadow: 0 4px 18px rgba(0,0,0,.55); line-height: 1; }
-  #countSub { font-size: 22px; font-weight: 800; color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,.6); margin-top: 10px; }
   #endOv { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; align-items: center; justify-content: center; padding: 16px; }
   #endOv.blue { background: rgba(47,111,214,.62); }
   #endOv.red { background: rgba(214,69,61,.62); }
@@ -253,7 +252,7 @@
       <div id="startMsg" class="msg"></div>
     </div>
     <div class="card note">
-      <b>조작</b> — 왼쪽 아래를 누르고 끌면 이동, 오른쪽 아래 <b>공격</b> 버튼을 누른 채 끌어 방향을 정하고 떼면 발사(그냥 톡 누르면 가까운 적을 자동 조준).
+      <b>조작</b> — 왼쪽 아래를 누르고 끌면 이동, 오른쪽 아래 <b>공격</b> 버튼을 누른 채 끌어 방향을 정하고 떼면 발사(그냥 톡 누르면 가까운 적을 자동 조준). 컴퓨터에서는 <b>WASD</b>(방향키)로 이동, <b>J</b> 기본 공격, <b>K</b> 궁극기(자동 조준).
       <b>궁극기</b>는 게이지가 10 모이면(명중 +2 · 사격수·암살자는 1발당 +1, 피격 +1) 빨갛게 빛나고, 궁극기를 쓰면 지속시간 동안 분홍색으로 줄어듭니다. 풀숲에 들어가면 상대 팀에게 보이지 않아요.
     </div>
   </div>
@@ -309,7 +308,7 @@
   <div id="btnUlt" class="actBtn"><div class="fill"></div><span>궁극기</span></div>
   <div id="btnAtk" class="actBtn"><div class="cd"></div><span>공격</span></div>
   <div id="deadMsg" hidden>쓰러졌습니다 — 팀원을 응원하세요!</div>
-  <div id="countOv" hidden><div id="countNum">3</div><div id="countSub"></div></div>
+  <div id="countOv" hidden><div id="countNum">3</div></div>
   <div id="endOv" hidden>
     <div class="endBox">
       <div id="endTitle"></div>
@@ -1421,9 +1420,23 @@
                       projectiles: null, meleeHits: null, hits: null, effects: null });
   }
   $("btnAgain").onclick = restart;
+  /* 키보드(컴퓨터): WASD·방향키 이동, J 기본 공격, K 궁극기 — 조준 없이 가장 가까운 적 자동 조준.
+     WASD 는 한글 입력 상태에서도 되도록 e.code 로 판정 */
+  var KEY_ON = { up: false, down: false, left: false, right: false, atk: false };
+  var KEY_MAP = { KeyW: "up", KeyS: "down", KeyA: "left", KeyD: "right", KeyJ: "atk",
+                  ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right" };
+  function keyName(e) { return KEY_MAP[e.code] || KEY_MAP[e.key] || null; }
   window.addEventListener("keydown", function (e) {
-    if ((e.code === "Space" || e.key === " ") && room && room.status === "ended" && screenNow === "game") { e.preventDefault(); restart(); }
+    if ((e.code === "Space" || e.key === " ") && room && room.status === "ended" && screenNow === "game") { e.preventDefault(); restart(); return; }
+    if (screenNow !== "game" || (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName))) return;
+    var k = keyName(e);
+    if (k) { KEY_ON[k] = true; e.preventDefault(); audio(); return; }
+    if (e.code === "KeyK" && !e.repeat && canAct() && ME.gauge >= GAUGE_MAX && !ME.burst) {
+      e.preventDefault(); var ua = autoAimAngle(ME); ME.angle = ua; useUlt(ME, ua);
+    }
   });
+  window.addEventListener("keyup", function (e) { var k = keyName(e); if (k) KEY_ON[k] = false; });
+  window.addEventListener("blur", function () { for (var k in KEY_ON) KEY_ON[k] = false; });   // 창을 벗어나면 누른 키 풀기
 
   /* =====================================================================
      입력: 왼쪽 아래 = 고정 이동 조이스틱, 오른쪽 아래 = 공격·궁극기 버튼
@@ -1849,7 +1862,6 @@
     if (counting) {
       var n = cd > 0 ? String(Math.ceil(cd / 1000)) : "시작!";
       setText($("countNum"), n);
-      setText($("countSub"), ME ? "나는 " + (ME.team === "blue" ? "블루팀" : "레드팀") + " " + CHARS[ME.char].name : "📺 관전 중");
       var beepKey = cd > 0 ? Math.ceil(cd / 1000) : 0;
       if (G.beeped !== beepKey) { G.beeped = beepKey; sfx(beepKey > 0 ? "beep" : "go"); }
     }
@@ -1881,16 +1893,21 @@
     var active = st === "playing" && t >= room.startAt;
     if (active) {
       if (ME && ME.alive) {
-        if (joy.id !== null) {
-          var dx = joy.x - joy.ox, dy = joy.y - joy.oy, d = hyp(dx, dy);
-          var m = d < 8 ? 0 : Math.min(1, d / JOY_R);
-          var vx = d ? dx / d * m : 0, vy = d ? dy / d * m : 0;
+        var kx = (KEY_ON.right ? 1 : 0) - (KEY_ON.left ? 1 : 0), ky = (KEY_ON.down ? 1 : 0) - (KEY_ON.up ? 1 : 0);
+        if (joy.id !== null || kx || ky) {
+          var vx, vy;
+          if (joy.id !== null) {
+            var dx = joy.x - joy.ox, dy = joy.y - joy.oy, d = hyp(dx, dy);
+            var m = d < 8 ? 0 : Math.min(1, d / JOY_R);
+            vx = d ? dx / d * m : 0; vy = d ? dy / d * m : 0;
+          } else { var kd = hyp(kx, ky); vx = kx / kd; vy = ky / kd; }   // 키보드: 화면 기준 위·아래·왼쪽·오른쪽
           if (flip()) { vx = -vx; vy = -vy; }
           var ox = ME.x, oy = ME.y;
           moveEnt(ME, vx, vy, dt);
           ME.mv = hyp(ME.x - ox, ME.y - oy) > 0.2;
           if (ME.mv) { ME.moveAng = Math.atan2(ME.y - oy, ME.x - ox); ME.moveAt = now(); }
         } else ME.mv = false;
+        if (KEY_ON.atk && t >= ME.cdUntil && !ME.volley) fireBasic(ME, autoAimAngle(ME));   // J 를 누르고 있으면 쿨다운마다 자동 조준 발사
         stepCombat(ME, dt);
       } else if (ME) ME.mv = false;
       if (isHost()) keys(BOTS).forEach(function (id) { var B = BOTS[id]; stepBot(B, dt); if (B.alive) stepCombat(B, dt); });
