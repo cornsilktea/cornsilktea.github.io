@@ -7,7 +7,6 @@
 <meta charset="utf-8">
 <link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
 <title>라면 끓이기</title>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
@@ -16,15 +15,14 @@
 <meta property="og:url" content="https://cornsilktea.github.io/19.ramen-timing-game.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
-<!-- 링크 미리보기 끝 -->
 <style>
   :root{
-    --bg:#f6ecd9;          /* 라면가게 벽(크림색) */
+    --bg:#f6ecd9;
     --panel:rgba(255,255,255,.93);
     --line:#e3d5bd;
     --text:#1f2d3d;
     --sub:#63748a;
-    --tone:#eef2f7;        /* 버튼·카드 공용 톤 (위계 없이 동일) */
+    --tone:#eef2f7;
     --tone-line:#cfd8e3;
     --focus:#3b74b8;
     --ok:#2f8f5b;
@@ -46,14 +44,11 @@
   .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
   .sub{color:var(--sub);font-size:14px}
 
-  /* ---------- 라면가게 배경 (img/ramen/ 수채화 이미지) ---------- */
   .shop{position:fixed;top:0;left:0;right:0;bottom:0;z-index:-1;overflow:hidden;pointer-events:none;
     background:url(img/ramen/wall-tile.jpg) 0 0/440px 440px repeat #f6ecd9}
-  /* 나무 카운터(아래) */
   .shop::before{content:"";position:absolute;left:0;right:0;bottom:0;height:34vh;
     background:url(img/ramen/counter-tile.jpg) 0 0/auto 100% repeat-x #b8824e;
     border-top:8px solid #8a5a30;box-shadow:0 -6px 14px rgba(0,0,0,.12)}
-  /* 선반 + 그릇·병 */
   .shop::after{content:"";position:absolute;left:0;right:0;top:78px;height:14px;
     background:linear-gradient(#a97445,#8b5b30);box-shadow:0 4px 8px rgba(0,0,0,.15)}
   .shelf{position:absolute;left:0;right:0;top:20px;height:58px;display:flex;justify-content:space-evenly;align-items:flex-end;padding:0 4vw}
@@ -63,12 +58,10 @@
   .shelf .jar{width:28px;height:42px;background-image:url(img/ramen/jar-red.png)}
   .shelf .jar.y{background-image:url(img/ramen/jar-yellow.png)}
   .shelf .stack{width:44px;height:44px;background-image:url(img/ramen/bowl-stack.png)}
-  /* 노렌(천 간판) — 이미지에 막대가 포함되어 있어 CSS 막대는 제거 */
   .noren{position:absolute;top:0;left:50%;transform:translateX(-50%);display:flex;gap:2px;z-index:1}
   .noren b{display:flex;align-items:flex-start;justify-content:center;width:54px;height:72px;padding-top:16px;
     background:url(img/ramen/noren.png) center top/100% 100% no-repeat;color:#fff;font-size:22px;font-weight:800;letter-spacing:2px;
     filter:drop-shadow(0 3px 4px rgba(0,0,0,.2))}
-  /* 등불 */
   .lamp{position:absolute;top:-6px;width:44px;height:66px;
     background:url(img/ramen/lantern.png) center top/contain no-repeat;filter:drop-shadow(0 0 12px rgba(255,180,60,.75))}
   .lamp.l{left:10vw}.lamp.r{right:10vw}
@@ -76,7 +69,6 @@
   .wrap{position:relative;z-index:1;padding-top:100px}
   @media (max-width:719px){.wrap{padding-top:72px}.shelf{display:none}.shop::after{display:none}.noren b{width:44px;height:58px;font-size:20px}}
 
-  /* ---------- 공용 버튼 ---------- */
   .btn{display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:0 16px;
     border-radius:12px;background:var(--tone);border:1px solid var(--tone-line);font-weight:600;font-size:15px}
   .btn:active:not(:disabled){filter:brightness(.94)}
@@ -85,7 +77,6 @@
   input[type=number]{font:inherit;font-size:20px;width:100%;padding:10px 12px;border:1px solid var(--tone-line);
     border-radius:12px;text-align:center;background:#fff;color:var(--text)}
 
-  /* ---------- 시작 화면 ---------- */
   .steps{display:grid;gap:6px;margin:10px 0;padding:0;list-style:none}
   .steps li{background:var(--tone);border:1px solid var(--tone-line);border-radius:10px;padding:8px 10px;font-size:14px}
   .steps li b{display:inline-block;min-width:22px;color:var(--focus)}
@@ -93,7 +84,6 @@
   .grade-table td,.grade-table th{border:1px solid var(--line);padding:5px 6px;text-align:center}
   .grade-table th{background:var(--tone);font-weight:600}
 
-  /* ---------- 상단 상태 바 ---------- */
   .hud{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
   @media (max-width:479px){.hud{grid-template-columns:1fr 1fr}}
   .hud .card{padding:8px 10px;text-align:center}
@@ -105,7 +95,6 @@
   .hud .card.best.beat{box-shadow:0 0 0 2px var(--ready)}
   .hud .card.best.beat .v::after{content:" ✨";font-size:14px}
 
-  /* ---------- 최고 기록 ---------- */
   .best-box{display:flex;align-items:center;gap:12px;margin-top:12px;padding:10px 12px;border-radius:12px;
     background:linear-gradient(90deg,#fff8e3,#fffdf7);border:1px solid #f1d98a}
   .best-box .bi{width:40px;height:40px;flex:none;border-radius:12px;display:flex;align-items:center;justify-content:center;
@@ -131,7 +120,6 @@
   .best-box.world .bk{color:#2F7D4F}
   @media (max-width:480px){.best-row{flex-direction:column}}
 
-  /* ---------- 냄비 4개 ---------- */
   .pots{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
   @media (min-width:720px){.pots{grid-template-columns:repeat(4,1fr)}}
   .pot{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:8px 8px 10px;
@@ -150,14 +138,10 @@
   .pot.ready .prog i{background:var(--ready)}
   .pot.late .prog i{background:#c7772e}
 
-  /* 냄비 장면: 200×190 좌표계를 %로 옮긴 이미지 레이어 스택 (아래→위: 불꽃·냄비·물·면·기포·토핑·탐·김) */
   .scene{width:100%;aspect-ratio:200/190;display:block;cursor:pointer;position:relative;overflow:visible}
   .scene img,.scene .layer{position:absolute;display:block;object-fit:contain;pointer-events:none;user-select:none;-webkit-user-drag:none}
-  /* 냄비 그림 9장은 모두 같은 512 캔버스·같은 구도라 한 상자를 공유한다. 장면 폭에 거의 꽉 차게 잡아
-     카드가 작은 기기에서도 냄비가 작아 보이지 않게 하고, 모든 위치는 % 라 기기 크기와 무관하게 같은 비율을 유지한다 */
-  .scene .state{left:4%;top:12%;width:92%;height:96.8%;display:none}   /* 한 번에 한 장만 보인다(JS 가 고른다) */
-  .scene .state.row2{top:13.7%}   /* 시트 아랫줄 그림은 9px 위에 그려져 있어 보정 */
-  /* 너무 오래 끓을 때 국물 색이 탁해지는 오버레이 (냄비 입구 타원에만) */
+  .scene .state{left:4%;top:12%;width:92%;height:96.8%;display:none}
+  .scene .state.row2{top:13.7%}
   .scene .tint{left:18.7%;top:35.2%;width:66.3%;height:26.1%;border-radius:50%;
     background:var(--tint,transparent);mix-blend-mode:multiply;transition:background .4s}
   .scene .rimglow{left:17.7%;top:34.2%;width:68.3%;height:28.1%;border-radius:50%;opacity:0;pointer-events:none}
@@ -165,14 +149,11 @@
   .btns .btn{min-height:44px;padding:0 4px;font-size:13px}
   .btns .btn.done{opacity:.25;text-decoration:line-through}
 
-  /* ---------- 불꽃 ---------- */
-  /* 냄비 그림이 장면을 거의 다 덮으므로 불꽃은 냄비 앞(z-index)에서 받침 고리 높이에 낮게 깐다 */
   .flame{width:24%;height:22%;bottom:-3%;z-index:2;transform-origin:50% 100%;animation:flick .35s ease-in-out infinite alternate}
   .flame.f1{left:26%}.flame.f2{left:38%;height:26%;animation-duration:.42s;animation-delay:.1s}.flame.f3{left:50%;animation-duration:.3s;animation-delay:.2s}
   @keyframes flick{from{transform:scaleY(.85) skewX(-4deg)}to{transform:scaleY(1.12) skewX(4deg)}}
   .pot.off .flame{opacity:0;transition:opacity .3s}
 
-  /* ---------- 물·기포 ---------- */
   .bub{opacity:0;transform-origin:center}
   .pot[data-lvl="1"] .bub:nth-child(-n+3),
   .pot[data-lvl="2"] .bub:nth-child(-n+6),
@@ -182,7 +163,6 @@
   .bub:nth-child(2n){animation-delay:.3s}.bub:nth-child(3n){animation-delay:.7s}.bub:nth-child(5n){animation-delay:1s}
   @keyframes rise{0%{transform:translateY(0) scale(.5);opacity:0}20%{opacity:.9}100%{transform:translateY(-58px) scale(1.1);opacity:0}}
 
-  /* ---------- 김 / 연기 ---------- */
   .steam{opacity:0;transform-origin:center;width:20%;height:24%;top:14%}
   .steam.s1{left:26%}.steam.s2{left:40%;top:11%;width:22%}.steam.s3{left:56%}
   .pot.ready .steam,.pot.late .steam,.pot.burnt .steam{animation:steam 1.4s ease-out infinite}
@@ -190,14 +170,12 @@
   @keyframes steam{0%{transform:translateY(0) scale(.6);opacity:0}30%{opacity:.7}100%{transform:translateY(-48px) scale(1.5);opacity:0}}
   .pot.burnt .steam{filter:brightness(.25)}
 
-  /* ---------- 테두리 반짝 ---------- */
   .pot.ready .rimglow{opacity:1;box-shadow:0 0 0 3px var(--ready),0 0 14px 4px var(--ready);animation:glow .35s ease-in-out infinite alternate}
   .pot.ready .state{filter:drop-shadow(0 0 6px var(--ready))}
   @keyframes glow{from{opacity:.5}to{opacity:1}}
   .pot.ready{box-shadow:0 0 0 3px var(--ready)}
   .pot.error{box-shadow:0 0 0 3px var(--bad)}
 
-  /* ---------- 완성 그릇 날아가기 ---------- */
   .fly{position:fixed;width:70px;height:70px;z-index:50;pointer-events:none;
     transition:transform .7s cubic-bezier(.4,.1,.3,1),opacity .7s}
   .fly img{width:100%;height:100%;object-fit:contain;display:block}
@@ -208,7 +186,6 @@
   .tray #trayBowls img{width:22px;height:22px;object-fit:contain;flex:none;margin-right:-8px;filter:drop-shadow(0 1px 1px rgba(0,0,0,.25))}
   .tray .sub{flex:1}
 
-  /* ---------- 등급·금액 팝업 ---------- */
   .pop{position:absolute;left:50%;top:38%;transform:translate(-50%,0);z-index:5;pointer-events:none;
     background:#fff;border:2px solid var(--ok);color:var(--ok);border-radius:12px;padding:6px 12px;
     font-weight:800;font-size:16px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.15);
@@ -217,7 +194,6 @@
   @keyframes popup{0%{opacity:0;transform:translate(-50%,10px) scale(.8)}15%{opacity:1;transform:translate(-50%,0) scale(1)}
     75%{opacity:1;transform:translate(-50%,-14px)}100%{opacity:0;transform:translate(-50%,-30px)}}
 
-  /* ---------- 결과 ---------- */
   .result .big{font-size:26px;font-weight:700;margin:8px 0}
   .grades{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin:10px 0}
   .grades div{background:var(--tone);border:1px solid var(--tone-line);border-radius:10px;padding:8px 4px;text-align:center}
@@ -234,7 +210,6 @@
 </div>
 <div class="wrap">
 
-  <!-- ===== 시작 화면 ===== -->
   <section id="scrStart" class="screen on">
     <div class="card">
       <h1>라면 끓이기 타이밍 게임</h1>
@@ -262,7 +237,6 @@
     </div>
   </section>
 
-  <!-- ===== 게임 화면 ===== -->
   <section id="scrGame" class="screen">
     <div class="hud">
       <div class="card"><div class="k">남은 시간</div><div class="v" id="hudTime">0</div></div>
@@ -280,7 +254,6 @@
     </div>
   </section>
 
-  <!-- ===== 결과 화면 ===== -->
   <section id="scrEnd" class="screen">
     <div class="card result">
       <h1 id="endTitle">최종 결과</h1>
@@ -302,44 +275,39 @@
 </div>
 
 <script>
-/* =====================================================================
-   교사 조정용 상수 (단위: 초 / 원)
-   ===================================================================== */
 const CONFIG = {
-  GAME_SECONDS : 60,     // 제한시간
-  POT_COUNT    : 4,      // 냄비 개수
+  GAME_SECONDS : 60,
+  POT_COUNT    : 4,
 
-  BOIL_MIN     : 3.0,    // 물 부은 뒤 끓기까지 최소 시간
-  BOIL_MAX     : 9.0,    // 물 부은 뒤 끓기까지 최대 시간 (냄비마다 랜덤, 폭이 클수록 예측 어려움)
-  READY_WINDOW : 1.5,    // "지금 넣으세요!" 신호가 켜져 있는 시간
+  BOIL_MIN     : 3.0,
+  BOIL_MAX     : 9.0,
+  READY_WINDOW : 1.5,
 
-  /* 등급 판정: 신호 구간의 한가운데를 0초로 두고 |오차| 로 판정 */
-  PERFECT_TOL  : 0.75,   // 최상 (READY_WINDOW/2 로 두면 신호 켜진 동안 누르면 최상)
-  GOOD_TOL     : 1.5,    // 상
-  FAIR_TOL     : 3.0,    // 중  (그 밖은 '하': 안 끓었는데 넣음 / 너무 오래 끓임)
+  PERFECT_TOL  : 0.75,
+  GOOD_TOL     : 1.5,
+  FAIR_TOL     : 3.0,
 
-  OVERBOIL_BURN: 8.0,    // 끓기 시작 후 이 시간까지 계란+파 안 넣으면 탐
-  SIMMER_MIN   : 2.0,    // 계란+파 넣은 뒤 익히는 대기시간 최소
-  SIMMER_MAX   : 5.0,    // 계란+파 넣은 뒤 익히는 대기시간 최대 (냄비마다 랜덤)
-  TRAY_FAST    : 0.8,    // 담기 신호 후 이 시간 안에 담으면 보너스
-  TRAY_GOOD    : 1.5,    // 담기 신호 후 이 시간 안에 담으면 등급 유지 (넘기면 한 단계 하락)
-  TRAY_BURN    : 4.0,    // 담기 신호 후 이 시간까지 안 담으면 탐
-  FAST_BONUS   : 200,    // 빠르게 담았을 때 추가 금액(원)
-  BURN_PENALTY : 1000,   // 태워먹었을 때 깎이는 금액(원)
-  BURNT_SHOW   : 1.5,    // 탐/순서 오류 표시가 남아 있는 시간
-  PREP_MIN     : 2.0,    // 쟁반에 담은 뒤 새 냄비가 준비되기까지 최소 시간 (그동안 클릭 불가)
-  PREP_MAX     : 4.0,    // 쟁반에 담은 뒤 새 냄비가 준비되기까지 최대 시간
+  OVERBOIL_BURN: 8.0,
+  SIMMER_MIN   : 2.0,
+  SIMMER_MAX   : 5.0,
+  TRAY_FAST    : 0.8,
+  TRAY_GOOD    : 1.5,
+  TRAY_BURN    : 4.0,
+  FAST_BONUS   : 200,
+  BURN_PENALTY : 1000,
+  BURNT_SHOW   : 1.5,
+  PREP_MIN     : 2.0,
+  PREP_MAX     : 4.0,
 
-  /* 실수가 있을수록 확 줄어드는 가격. mistake = 순서를 어기거나 재료를 빠뜨렸지만 완성한 경우 */
   PRICES : { best:1000, good:700, fair:500, poor:300, mistake:200, fail:0 }
 };
 const GRADE_ORDER = ["best","good","fair","poor"];
 const GRADE_NAME  = { best:"최상", good:"상", fair:"중", poor:"하", mistake:"순서 실수" };
 
-/* ===================================================================== */
 const $ = id => document.getElementById(id);
 const fmt = n => n.toLocaleString("ko-KR");
 const now = () => performance.now()/1000;
+const hudTimeEl = $("hudTime");
 
 $("secTxt").textContent  = CONFIG.GAME_SECONDS;
 $("p1").textContent = fmt(CONFIG.PRICES.best)+"원";
@@ -350,7 +318,6 @@ $("p5").textContent = fmt(CONFIG.PRICES.mistake)+"원";
 $("p6").textContent = "-"+fmt(CONFIG.BURN_PENALTY)+"원";
 $("pMis").textContent = fmt(CONFIG.PRICES.mistake);
 $("pBurn").textContent = fmt(CONFIG.BURN_PENALTY);
-/* 타이밍 열: 신호 한가운데 기준 |오차| 로 판정하므로, 신호(READY_WINDOW)가 켜진 동안 = ±READY_WINDOW/2 */
 $("t1").textContent = "±" + CONFIG.PERFECT_TOL + "초";
 $("t2").textContent = "±" + CONFIG.GOOD_TOL + "초";
 $("t3").textContent = "±" + CONFIG.FAIR_TOL + "초";
@@ -360,52 +327,43 @@ $("bonusTxt").innerHTML =
   `신호 전에 담거나 <b>${CONFIG.TRAY_GOOD}초</b>를 넘겨 담으면 등급이 한 단계 내려간다. ` +
   `타이밍 오차는 "지금 넣으세요!" 신호(${CONFIG.READY_WINDOW}초)의 한가운데 기준이라, 신호가 켜진 동안 넣으면 최상.`;
 
-/* ---------- 냄비 장면 (img/ramen/ 이미지 레이어) ---------- */
 const IMG = "img/ramen/";
-function potSVG(i){
-  /* 기포 좌표는 원래 SVG(200×190) 계산식을 그대로 쓰고 %로 환산. 냄비 그림이 위에서 본 각도라 cy 만 물 타원 높이로 내린다 */
+function potScene(){
   let bubbles = "";
   for (let k=0;k<14;k++){
     const cx = 62 + (k*37)%76, cy = 118 - (k*13)%18, r = 2 + (k%3);
-    /* 냄비 그림이 장면 폭의 92% 라 x 는 중심(100) 기준 1.52배로 벌리고, y 는 물 표면 높이로 내린다 */
     const d = r*3.6, left = 50 + (cx-100)*0.76 - d/2, top = (cy-5)/1.9 - d/2;
     bubbles += `<img class="bub" src="${IMG}bubble.png" alt="" width="159" height="159" style="left:${left}%;top:${top}%;width:${d}%;height:${d*1.05}%">`;
   }
   return `
   <div class="scene" aria-hidden="true">
-    <!-- 불꽃 -->
     <img class="flame f1" src="${IMG}flame.png" alt="" width="500" height="500">
     <img class="flame f2" src="${IMG}flame.png" alt="" width="500" height="500">
     <img class="flame f3" src="${IMG}flame.png" alt="" width="500" height="500">
-    <!-- 냄비 그림: 상태·재료 조합에 맞는 한 장만 보인다 (data-pic 로 고름). 겹치지 않고 통째로 바뀐다 -->
     <img class="state" data-pic="empty" src="${IMG}pot-empty.png" alt="" width="512" height="512">
     <img class="state water" data-pic="water" src="${IMG}pot-water.png" alt="" width="512" height="512">
     <img class="state cooked" data-pic="water-noodle" src="${IMG}pot-water-noodle.png" alt="" width="512" height="512">
     <img class="state topping row2" data-pic="water-full" src="${IMG}pot-water-full.png" alt="" width="512" height="512">
     <img class="state burn row2" data-pic="burnt" src="${IMG}pot-burnt.png" alt="" width="512" height="512">
-    <!-- 순서 실수 조합 -->
     <img class="state" data-pic="dry-noodle" src="${IMG}pot-dry-noodle.png" alt="" width="512" height="512">
     <img class="state" data-pic="dry-egg" src="${IMG}pot-dry-egg.png" alt="" width="512" height="512">
     <img class="state row2" data-pic="dry-noodle-egg" src="${IMG}pot-dry-noodle-egg.png" alt="" width="512" height="512">
     <img class="state row2" data-pic="water-egg" src="${IMG}pot-water-egg.png" alt="" width="512" height="512">
     <div class="layer tint"></div>
-    <!-- 기포 -->
     <div class="layer bubs" style="inset:0">${bubbles}</div>
-    <!-- 테두리 반짝 -->
     <div class="layer rimglow"></div>
-    <!-- 김 / 연기 -->
     <img class="steam s1" src="${IMG}steam.png" alt="" width="242" height="340">
     <img class="steam s2" src="${IMG}steam.png" alt="" width="242" height="340">
     <img class="steam s3" src="${IMG}steam.png" alt="" width="242" height="340">
   </div>`;
 }
 
-/* ---------- 냄비 상태 기계 ---------- */
 class Pot {
   constructor(idx, el){
     this.idx = idx; this.el = el;
     this.svg = el.querySelector(".scene");
-    this.q = s => this.svg.querySelector(s);
+    this.tint = this.svg.querySelector(".tint");
+    this.pics = Array.from(this.svg.querySelectorAll("[data-pic]"));
     this.label = el.querySelector(".label");
     this.warn = el.querySelector(".warn");
     this.progFill = el.querySelector(".prog i");
@@ -414,20 +372,19 @@ class Pot {
     this.reset();
   }
   reset(){
-    this.state = "empty";     // empty → waterAdded → boiling → ready(/late) → topped
-    this.hasNoodle = false;   // 면+스프는 물을 부은 뒤 담기 전까지 아무 때나
-    this.mistake = false;     // 순서를 어김/재료 누락 → 완성은 되지만 실수 가격
-    this.t0 = 0;              // 현재 단계 시작 시각
-    this.boilAt = 0;          // 끓기 시작 시각
-    this.simmerAt = 0;        // 담기 신호 시각 (토핑 후 대기 끝)
-    this.topDelta = 0;        // 토핑 오차(초)
-    this.lockUntil = 0;       // 실패 표시 중 잠금
+    this.state = "empty";
+    this.hasNoodle = false;
+    this.mistake = false;
+    this.t0 = 0;
+    this.boilAt = 0;
+    this.simmerAt = 0;
+    this.topDelta = 0;
+    this.lockUntil = 0;
     this.failMsg = "";
-    this.lastLabel = ""; this.lastLvl = "-1";
+    this.lastLabel = ""; this.lastLvl = "-1"; this.lastClass = null; this.lastTint = null;
   }
   set(state){ this.state = state; this.t0 = now(); }
 
-  /* 버튼 입력: 정상 순서인지 검사, 아니면 순서 오류(실패) */
   act(kind){
     const t = now();
     if (t < this.lockUntil) return;
@@ -440,35 +397,35 @@ class Pot {
     }
     if (kind === "noodle"){
       if (this.hasNoodle) return;
-      if (st === "empty") this.mistake = true;   // 물보다 먼저 → 순서 실수 (완성은 가능)
+      if (st === "empty") this.mistake = true;
       this.hasNoodle = true; return;
     }
     if (kind === "top"){
       if (st === "topped") return;
-      if (st === "empty") this.mistake = true;   // 물 없이 토핑 → 순서 실수 (물 부은 것으로 치고 진행)
+      if (st === "empty") this.mistake = true;
       this.topDelta = st === "empty" ? Infinity : t - (this.boilAt + CONFIG.READY_WINDOW/2);
       this.set("topped");
       this.simmerAt = this.t0 + CONFIG.SIMMER_MIN + Math.random()*(CONFIG.SIMMER_MAX-CONFIG.SIMMER_MIN);
       return;
     }
     if (kind === "tray"){
-      if (st === "empty") return;                 // 빈 냄비는 담을 게 없음
-      if (st !== "topped" || !this.hasNoodle) this.mistake = true;   // 토핑 전 담기 / 면 누락 → 순서 실수
+      if (st === "empty") return;
+      if (st !== "topped" || !this.hasNoodle) this.mistake = true;
       let grade, bonus = 0;
       if (this.mistake){
-        grade = "mistake";                        // 실수가 하나라도 있으면 보너스 없이 실수 가격
+        grade = "mistake";
       } else {
         const d = Math.abs(this.topDelta);
         let gi = d<=CONFIG.PERFECT_TOL?0 : d<=CONFIG.GOOD_TOL?1 : d<=CONFIG.FAIR_TOL?2 : 3;
-        const ds = t - this.simmerAt;            // 담기 신호 기준 시간
-        if (ds < 0) gi = Math.min(3, gi+1);          // 덜 익은 채 담음 → 한 단계 하락
-        else if (ds <= CONFIG.TRAY_FAST) bonus = CONFIG.FAST_BONUS;   // 신호 직후 → 보너스
-        else if (ds > CONFIG.TRAY_GOOD) gi = Math.min(3, gi+1);        // 늦게 담음 → 한 단계 하락
+        const ds = t - this.simmerAt;
+        if (ds < 0) gi = Math.min(3, gi+1);
+        else if (ds <= CONFIG.TRAY_FAST) bonus = CONFIG.FAST_BONUS;
+        else if (ds > CONFIG.TRAY_GOOD) gi = Math.min(3, gi+1);
         grade = GRADE_ORDER[gi];
       }
       game.serve(this, grade, bonus);
       this.reset();
-      this.state = "prep";                        // 새 냄비 준비 시간 → 바로 다시 시작 못 함
+      this.state = "prep";
       this.t0 = t;
       this.lockUntil = t + CONFIG.PREP_MIN + Math.random()*(CONFIG.PREP_MAX-CONFIG.PREP_MIN);
     }
@@ -489,7 +446,6 @@ class Pot {
     this.lockUntil = now() + CONFIG.BURNT_SHOW;
   }
 
-  /* 매 프레임: 시간 경과에 따른 상태 전이 + 시각 갱신 */
   update(){
     const t = now(), st = this.state, el = this.el;
     let label = "", lvl = "0", prog = 0, cls = "";
@@ -529,18 +485,16 @@ class Pot {
       if (t >= this.lockUntil) this.reset();
     }
 
-    /* 클래스·라벨·진행 바 */
-    el.className = "pot " + cls;
+    const className = "pot " + cls;
+    if (className !== this.lastClass){ el.className = className; this.lastClass = className; }
     if (lvl !== this.lastLvl){ el.dataset.lvl = lvl; this.lastLvl = lvl; }
     if (label !== this.lastLabel){ this.label.textContent = label; this.lastLabel = label; }
     const warn = this.mistake ? "⚠ 순서 실수" : "";
     if (this.warn.textContent !== warn) this.warn.textContent = warn;
     this.progFill.style.width = Math.max(0,Math.min(1,prog))*100 + "%";
 
-    /* 그림 요소 표시 */
     const s = this.state;
     const hasWater = s !== "empty" && s !== "burnt" && s !== "error" && s !== "prep";
-    /* 냄비 그림 한 장 고르기. 물 없이 계란·파를 넣은 경우는 act() 가 topDelta 를 Infinity 로 두므로 그걸로 구분한다 */
     const dryTop = s === "topped" && this.topDelta === Infinity;
     let pic;
     if (s === "burnt") pic = "burnt";
@@ -550,13 +504,12 @@ class Pot {
     else if (s === "empty" && this.hasNoodle) pic = "dry-noodle";
     else pic = "empty";
     if (pic !== this.lastPic){
-      this.svg.querySelectorAll("[data-pic]").forEach(im => im.style.display = im.dataset.pic === pic ? "block" : "none");
+      this.pics.forEach(im => im.style.display = im.dataset.pic === pic ? "block" : "none");
       this.lastPic = pic;
     }
-    /* 물 색 변화: 토핑 뒤 국물 색은 pot-water-full 그림에 이미 있으므로, 너무 오래 끓을 때만 .tint 오버레이(multiply)로 탁하게 한다 */
-    this.q(".tint").style.setProperty("--tint", s==="late" ? "#e8c98a" : "transparent");
+    const tint = s==="late" ? "#e8c98a" : "transparent";
+    if (tint !== this.lastTint){ this.tint.style.setProperty("--tint", tint); this.lastTint = tint; }
 
-    /* 버튼: 이미 한 일은 비활성(정리), 그 외는 눌러 볼 수 있음 → 순서 오류 학습 */
     const locked = (s==="burnt"||s==="error"||s==="prep");
     const done = { water: s!=="empty", noodle: this.hasNoodle, top: s==="topped", tray: false };
     Object.keys(done).forEach(k => {
@@ -567,9 +520,8 @@ class Pot {
   }
 }
 
-/* ---------- 게임 ---------- */
 const game = {
-  pots: [], money: 0, served: 0, grades: {}, startAt: 0, endAt: 0, raf: 0, running: false,
+  pots: [], money: 0, served: 0, grades: {}, startAt: 0, endAt: 0, raf: 0, running: false, best: null, shownTime: "",
 
   build(){
     const wrap = $("pots"); wrap.innerHTML = "";
@@ -581,7 +533,7 @@ const game = {
         <div class="pot-head"><span>냄비 ${i+1}</span><span class="warn"></span></div>
         <span class="label"></span>
         <div class="prog"><i></i></div>
-        ${potSVG(i)}
+        ${potScene()}
         <div class="btns">
           <button class="btn" data-act="water">① 물</button>
           <button class="btn" data-act="noodle">② 면·스프</button>
@@ -599,6 +551,7 @@ const game = {
   start(){
     this.money = 0; this.served = 0;
     this.grades = {best:0,good:0,fair:0,poor:0,mistake:0,fail:0};
+    this.best = BEST.get(); this.shownTime = "";
     $("trayBowls").innerHTML = ""; this.updateHud();
     this.build();
     this.startAt = now(); this.endAt = this.startAt + CONFIG.GAME_SECONDS;
@@ -610,7 +563,8 @@ const game = {
 
   tick(){
     const left = Math.max(0, this.endAt - now());
-    $("hudTime").textContent = Math.ceil(left) + "초";
+    const timeText = Math.ceil(left) + "초";
+    if (timeText !== this.shownTime){ hudTimeEl.textContent = timeText; this.shownTime = timeText; }
     this.pots.forEach(p => p.update());
     if (left <= 0) this.finish();
   },
@@ -636,18 +590,17 @@ const game = {
     $("hudMoney").textContent = fmt(this.money) + "원";
     $("hudCount").textContent = this.served + "그릇";
     $("trayTxt").textContent = `쟁반: 완성 ${this.served}그릇`;
-    const b = BEST.get();
+    const b = this.best;
     $("hudBest").textContent = b ? fmt(b.money) + "원" : "-";
     $("hudBestCard").classList.toggle("beat", !!b && this.money > b.money);
   },
 
-  /* 완성 그릇이 냄비에서 쟁반으로 이동 */
   flyBowl(pot){
     const from = pot.svg.getBoundingClientRect();
     const to = document.querySelector(".tray .trayimg").getBoundingClientRect();
     const d = document.createElement("div");
     d.className = "fly";
-    d.innerHTML = bowlSVG();
+    d.innerHTML = bowlImg();
     d.style.left = (from.left + from.width/2 - 35) + "px";
     d.style.top  = (from.top + from.height/2 - 35) + "px";
     document.body.appendChild(d);
@@ -659,10 +612,7 @@ const game = {
   },
   addTrayBowl(){
     const g = $("trayBowls"); const n = Math.min(this.served, 8);
-    g.innerHTML = "";
-    for (let i=0;i<n;i++){
-      g.insertAdjacentHTML("beforeend", `<img src="${IMG}bowl-finished.png" alt="" width="500" height="500">`);
-    }
+    g.innerHTML = bowlImg().repeat(n);
   },
 
   finish(){
@@ -677,7 +627,6 @@ const game = {
     $("gPoor").textContent = g.poor; $("gMis").textContent = g.mistake; $("gFail").textContent = g.fail;
     $("endSummary").textContent = `최종 결과 - 누적 금액: ${fmt(this.money)}원, 완성 ${this.served}그릇 (최상 ${g.best} / 상 ${g.good} / 중 ${g.fair} / 하 ${g.poor} / 순서 실수 ${g.mistake} / 타버림 ${g.fail})`;
 
-    /* 최고 기록 갱신 여부 */
     const prev = BEST.get(), box = $("endBest");
     const cur  = { money:this.money, served:this.served, best:g.best, date:BEST.today() };
     if (!prev || cur.money > prev.money){
@@ -695,7 +644,7 @@ const game = {
   }
 };
 
-function bowlSVG(){
+function bowlImg(){
   return `<img src="${IMG}bowl-finished.png" alt="" width="500" height="500">`;
 }
 
@@ -704,7 +653,6 @@ function show(id){
   window.scrollTo(0,0);
 }
 
-/* ---------- 최고 기록 (이 기기의 localStorage 에 저장) ---------- */
 const BEST = {
   KEY: "ramen_best_v1",
   get(){
@@ -735,7 +683,6 @@ const BEST = {
 };
 BEST.renderStart();
 
-/* ---------- 세계 신기록 (모든 학생 공통, Firebase) ---------- */
 const WR = window.WorldRecord ? WorldRecord("ramentiming", { format: v => fmt(v) + "원" }) : null;
 function renderWorld(){
   const box = $("startWorld");
@@ -746,7 +693,6 @@ function renderWorld(){
     box.className = "best-box world empty";
     box.innerHTML = BEST.html("🏆", "세계 신기록", (WR && !WR.loaded) ? "불러오는 중…" : "아직 기록이 없습니다", "첫 기록에 도전해 보세요.");
   }
-  /* 반별 링크로 들어왔을 때만 우리 반 신기록 칸을 보인다 */
   const C = WR && WR.cls, cbox = $("startCls");
   if (C){
     cbox.hidden = false;
