@@ -1,17 +1,4 @@
 <!DOCTYPE html>
-<!--
-  17.alkkagi.html — 알까기 (단일 HTML 파일)
-
-  목적: 중학생이 쉬는시간·자투리 시간에 태블릿/스마트폰으로 가볍게 즐기는 오락용 알까기.
-  사용법: 이 파일을 브라우저로 열면 바로 실행됩니다. 외부 리소스·라이브러리 없음.
-    - AI 대전: 난이도 하/중/상 선택 → 학생이 흑(아래), AI가 백(위).
-    - 2인 대전: 같은 화면을 마주 보고 두 명이 번갈아 한 번씩 튕깁니다.
-  조작: ① 내 돌을 누르면 그 돌이 선택됩니다(어떤 돌로 때릴지 결정).
-        ② 누른 채로 반대 방향으로 드래그하면 세기 게이지가 차오릅니다(멀리 끌수록 강함).
-        ③ 손을 떼면 게이지만큼 튕겨 나갑니다. 100%면 판 한 변을 지나갈 만큼 강합니다.
-  규칙: 한 편에 돌 6개. 판 밖으로 나간 돌은 제거되고, 상대 돌을 모두 떨어뜨리면 승리합니다.
-        자기 돌을 떨어뜨려도 그대로 제거되니 세기 조절이 중요합니다.
--->
 <html lang="ko">
 <head>
 <script charset="utf-8" src="firebase-config.js"></script>
@@ -19,7 +6,6 @@
 <meta charset="UTF-8">
 <link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
 <title>AI와 알까기</title>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
@@ -28,7 +14,6 @@
 <meta property="og:url" content="https://cornsilktea.github.io/17.alkkagi.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
-<!-- 링크 미리보기 끝 -->
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -55,7 +40,6 @@
   .screen { display: none; height: 100%; }
   .screen.on { display: flex; }
 
-  /* ── 시작 화면 ────────────────────────────── */
   #startScreen {
     flex-direction: column; align-items: center;
     overflow-y: auto; padding: 24px 16px 32px;
@@ -85,7 +69,6 @@
   .help { font-size: 14px; color: var(--sg-ink-mid); line-height: 1.8; margin: 0; padding-left: 20px; }
   .help b { color: var(--sg-ink); }
 
-  /* ── 게임 화면 ────────────────────────────── */
   #gameScreen { flex-direction: column; }
   #hud {
     flex: 0 0 auto; display: flex; align-items: center; gap: 8px;
@@ -132,7 +115,6 @@
     border: 2px solid var(--sg-line-strong); box-shadow: 0 6px 18px rgba(27,43,32,.12);
   }
 
-  /* 판 위에 잠깐 떴다 사라지는 안내 */
   #toast {
     position: absolute; left: 50%; top: 16%;
     transform: translate(-50%, -50%) scale(.94);
@@ -150,7 +132,6 @@
   }
   #hint b { color: var(--sg-primary); }
 
-  /* ── 결과 오버레이 ────────────────────────── */
   #overlay {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0; display: none;
     align-items: center; justify-content: center;
@@ -170,7 +151,6 @@
 </head>
 <body>
 
-<!-- 시작 화면 -->
 <section id="startScreen" class="screen on">
   <div class="start-inner">
     <div class="logo">
@@ -208,7 +188,6 @@
   </div>
 </section>
 
-<!-- 게임 화면 -->
 <section id="gameScreen" class="screen">
   <div id="hud">
     <div class="pchip" id="chipB"><span class="pname" id="nameB">흑</span><span class="dots" id="dotsB"></span></div>
@@ -225,7 +204,6 @@
   <div id="hint">내 돌을 눌러 고르고, 반대쪽으로 끌었다 놓으세요.</div>
 </section>
 
-<!-- 결과 -->
 <div id="overlay">
   <div class="modal">
     <div class="crown">🏆</div>
@@ -239,47 +217,36 @@
 <script>
 'use strict';
 
-/* ══════════════════════════════════════════════════════
-   상수: 판과 돌은 600x600 논리 좌표에서 계산하고,
-   화면에는 캔버스 크기에 맞춰 비율만 바꿔 그린다.
-   ══════════════════════════════════════════════════════ */
-const W = 600, H = 600;      // 판 크기(논리)
-const R = 21;                // 돌 반지름
-const PER_SIDE = 6;          // 한 편의 돌 개수
-const DT = 1 / 120;          // 물리 한 스텝(초)
-const DAMP = 0.984;          // 스텝마다 남는 속도(마찰)
-const REST = 0.82;           // 충돌 반발(부딪칠수록 힘이 줄어 연쇄가 과하지 않다)
-const STOP = 14;             // 이 속도 아래면 멈춘 것으로 본다(px/s)
-const MAX_DRAG = 90;         // 이만큼 끌면 게이지 100%(짧게 끌어도 세게 나간다)
-// DEAD: 손가락이 살짝 흔들린 정도는 '고르기'로 본다.
-// 이만큼 끌기 전에는 게이지가 0이고, 손을 떼도 발사되지 않는다.
+const W = 600, H = 600;
+const R = 21;
+const PER_SIDE = 6;
+const DT = 1 / 120;
+const DAMP = 0.984;
+const REST = 0.82;
+const STOP = 14;
+const MAX_DRAG = 90;
 const DEAD = 24;
-// 마찰 때문에 굴러가는 거리는 대략 속도/1.94 이다.
-// 100%(1400)면 약 720px — 아무것도 없는 판이면 한 변(600)을 지나 밖으로 나간다.
 const SPD_MIN = 200, SPD_MAX = 1400;
 
-/* 끈 거리 → 세기(0~1). DEAD 안쪽은 0이라 발사되지 않는다. */
 function aimPower(dist) {
   return Math.max(0, Math.min(dist, MAX_DRAG) - DEAD) / (MAX_DRAG - DEAD);
 }
 
-const BLACK = 0, WHITE = 1;  // 흑=아래(사람), 백=위
+const BLACK = 0, WHITE = 1;
 const SIDE_NAME = ['흑', '백'];
 
-/* ── 상태 ── */
-let stones = [];             // {x,y,vx,vy,side,alive}
+let stones = [];
 let turn = BLACK;
-let phase = 'aim';           // 'aim' | 'anim' | 'over'
-let mode = 'duo';            // 'ai' | 'duo'
+let phase = 'aim';
+let mode = 'duo';
 let aiLevel = 2;
-let selected = null;         // 선택된 돌
+let selected = null;
 let dragging = false;
 let pointer = { x: 0, y: 0 };
-let puffs = [];              // 판 밖으로 나간 돌의 잔상
+let puffs = [];
 let aiTimer = 0;
-let clock = 0;               // 반짝임 등 연출용 시간
+let clock = 0;
 
-/* ── 화면 요소 ── */
 const startScreen = document.getElementById('startScreen');
 const gameScreen  = document.getElementById('gameScreen');
 const overlay     = document.getElementById('overlay');
@@ -290,14 +257,15 @@ const nameEl = [document.getElementById('nameB'), document.getElementById('nameW
 const dotsEl = [document.getElementById('dotsB'), document.getElementById('dotsW')];
 const hintEl  = document.getElementById('hint');
 const toastEl = document.getElementById('toast');
+const boardWrap = document.getElementById('boardWrap');
+const resultTitleEl = document.getElementById('resultTitle');
+const resultTextEl = document.getElementById('resultText');
+const crownEl = document.querySelector('.modal .crown');
 
-/* ══════════════════════════════════════════════════════
-   판 만들기 — 한 편에 6개(뒷줄 3, 앞줄 3)
-   ══════════════════════════════════════════════════════ */
 function newGame() {
   stones = [];
-  const back  = [110, 300, 490];   // 가장자리 쪽 줄
-  const front = [205, 395, 300];   // 가운데 쪽 줄(엇갈리게 두어 길을 막지 않는다)
+  const back  = [110, 300, 490];
+  const front = [205, 395, 300];
   for (const x of back) {
     stones.push(mkStone(x, 70,     WHITE));
     stones.push(mkStone(x, H - 70, BLACK));
@@ -321,10 +289,6 @@ function mkStone(x, y, side) {
   return { x, y, vx: 0, vy: 0, side, alive: true };
 }
 
-/* ══════════════════════════════════════════════════════
-   물리: 한 스텝 진행(이동 → 마찰 → 충돌 → 판 밖 판정)
-   AI가 미리 굴려 볼 때도 같은 함수를 쓴다.
-   ══════════════════════════════════════════════════════ */
 function step(list, onDrop) {
   for (const s of list) {
     if (!s.alive) continue;
@@ -334,7 +298,6 @@ function step(list, onDrop) {
     s.vy *= DAMP;
     if (Math.hypot(s.vx, s.vy) < STOP) { s.vx = 0; s.vy = 0; }
   }
-  // 돌끼리 충돌 (질량이 같은 탄성 충돌)
   for (let i = 0; i < list.length; i++) {
     const a = list[i];
     if (!a.alive) continue;
@@ -346,11 +309,9 @@ function step(list, onDrop) {
       if (d === 0) { dx = 0.01; dy = 0; d = 0.01; }
       if (d >= R * 2) continue;
       const nx = dx / d, ny = dy / d;
-      // 겹친 만큼 서로 밀어낸다
       const push = (R * 2 - d) / 2;
       a.x -= nx * push; a.y -= ny * push;
       b.x += nx * push; b.y += ny * push;
-      // 법선 방향 속도 주고받기
       const rel = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
       if (rel > 0) continue;
       const imp = -(1 + REST) * rel / 2;
@@ -358,7 +319,6 @@ function step(list, onDrop) {
       b.vx += imp * nx; b.vy += imp * ny;
     }
   }
-  // 판 밖으로 중심이 나가면 떨어진 것
   for (const s of list) {
     if (!s.alive) continue;
     if (s.x < 0 || s.x > W || s.y < 0 || s.y > H) {
@@ -374,10 +334,7 @@ function countAlive(list, side) {
   return list.reduce((n, s) => n + (s.alive && s.side === side ? 1 : 0), 0);
 }
 
-/* ══════════════════════════════════════════════════════
-   발사와 차례 넘기기
-   ══════════════════════════════════════════════════════ */
-let lostBefore = [0, 0];     // 이번 수로 몇 개가 떨어졌는지 세려고 기억해 둔다
+let lostBefore = [0, 0];
 
 function shoot(stone, angle, power) {
   const spd = SPD_MIN + (SPD_MAX - SPD_MIN) * power;
@@ -394,7 +351,6 @@ function endTurn() {
   const myLeft = countAlive(stones, turn);
   const opLeft = countAlive(stones, 1 - turn);
 
-  // 이번 수의 결과를 판 위에 잠깐 알려 준다
   const dropOp = lostBefore[1 - turn] - opLeft;
   const dropMe = lostBefore[turn] - myLeft;
   if (dropOp > 0 && dropMe > 0)      showToast('상대 ' + dropOp + '개, 내 돌 ' + dropMe + '개 아웃', 1100);
@@ -402,7 +358,6 @@ function endTurn() {
   else if (dropMe > 0)               showToast('앗, 내 돌 ' + dropMe + '개 아웃', 1100);
 
   if (opLeft === 0 || myLeft === 0) {
-    // 내 돌까지 다 떨어뜨려 둘 다 비면 상대 승
     const winner = (opLeft === 0 && myLeft > 0) ? turn : 1 - turn;
     setTimeout(() => finish(winner), 700);
     phase = 'over';
@@ -426,8 +381,8 @@ function endTurn() {
 function finish(winner) {
   phase = 'over';
   updateHud();
-  const title = document.getElementById('resultTitle');
-  const text  = document.getElementById('resultText');
+  const title = resultTitleEl;
+  const text  = resultTextEl;
   const left  = countAlive(stones, winner);
   if (mode === 'ai') {
     title.textContent = winner === BLACK ? '이겼습니다!' : '졌습니다';
@@ -438,21 +393,17 @@ function finish(winner) {
     title.textContent = SIDE_NAME[winner] + ' 승리!';
     text.textContent = SIDE_NAME[winner] + ' 돌 ' + left + '개가 판에 남았습니다.';
   }
-  document.querySelector('.modal .crown').textContent =
+  crownEl.textContent =
     (mode === 'ai' && winner === WHITE) ? '🤖' : '🏆';
   overlay.classList.add('on');
 }
 
-/* ══════════════════════════════════════════════════════
-   AI: 난이도에 따라 후보 수를 늘리고, 실제 물리로
-   미리 굴려 본 뒤 가장 점수가 높은 수를 고른다.
-   ══════════════════════════════════════════════════════ */
 function aiMove() {
   const mine = stones.filter(s => s.alive && s.side === WHITE);
   const foes = stones.filter(s => s.alive && s.side === BLACK);
   if (!mine.length || !foes.length) return;
 
-  if (aiLevel === 1) {                       // 하: 대충 조준
+  if (aiLevel === 1) {
     const me = mine[(Math.random() * mine.length) | 0];
     const foe = foes[(Math.random() * foes.length) | 0];
     const ang = Math.atan2(foe.y - me.y, foe.x - me.x) + (Math.random() - 0.5) * 0.34;
@@ -460,7 +411,7 @@ function aiMove() {
     return;
   }
 
-  const jitter = aiLevel === 2 ? 0.06 : 0;    // 중은 조준이 조금 흔들린다
+  const jitter = aiLevel === 2 ? 0.06 : 0;
   const powers = aiLevel === 2 ? [0.5, 0.8] : [0.4, 0.65, 0.9];
   const spread = aiLevel === 2 ? [0] : [-0.05, 0, 0.05];
   let best = null;
@@ -486,7 +437,6 @@ function aiMove() {
   shoot(stones[best.idx], best.ang + (Math.random() - 0.5) * jitter * 2, best.p);
 }
 
-// 후보 한 수를 복사본 위에서 끝까지 굴려 보고 점수를 낸다.
 function simulate(idx, angle, power) {
   const list = stones.map(s => ({ x: s.x, y: s.y, vx: 0, vy: 0, side: s.side, alive: s.alive }));
   const spd = SPD_MIN + (SPD_MAX - SPD_MIN) * power;
@@ -498,7 +448,6 @@ function simulate(idx, angle, power) {
   const foeLost = countAlive(stones, BLACK) - countAlive(list, BLACK);
   const myLost  = countAlive(stones, WHITE) - countAlive(list, WHITE);
   let score = foeLost * 100 - myLost * 130;
-  // 상대 돌을 가장자리로 밀어 두면 다음 수가 편하다
   for (let i = 0; i < list.length; i++) {
     if (!list[i].alive || list[i].side !== BLACK) continue;
     score += (edgeDist(stones[i]) - edgeDist(list[i])) * 0.12;
@@ -509,9 +458,6 @@ function edgeDist(s) {
   return Math.min(s.x, W - s.x, s.y, H - s.y);
 }
 
-/* ══════════════════════════════════════════════════════
-   입력: 내 돌을 누르면 선택, 끌면 게이지, 놓으면 발사
-   ══════════════════════════════════════════════════════ */
 function toBoard(ev) {
   const r = cv.getBoundingClientRect();
   return {
@@ -534,14 +480,14 @@ function stoneAt(p) {
 
 cv.addEventListener('pointerdown', e => {
   if (!myTurnNow()) return;
-  try { cv.setPointerCapture(e.pointerId); } catch (err) { /* 무시 */ }
+  try { cv.setPointerCapture(e.pointerId); } catch (err) { }
   pointer = toBoard(e);
   const hit = stoneAt(pointer);
-  if (hit) {                    // 돌을 눌러 고르고 바로 조준 시작
+  if (hit) {
     selected = hit;
     dragging = true;
     setHint('그대로 <b>반대쪽</b>으로 끌면 세기가 찹니다.');
-  } else if (selected) {        // 이미 고른 돌이 있으면 빈 곳에서도 조준
+  } else if (selected) {
     dragging = true;
   }
 });
@@ -556,7 +502,7 @@ cv.addEventListener('pointerup', e => {
   const dist = Math.hypot(dx, dy);
   dragging = false;
   const power = aimPower(dist);
-  if (power <= 0) {             // 누르기만 했거나 살짝 흔들린 정도면 고르기만 한다
+  if (power <= 0) {
     setHint('돌을 골랐어요. <b>반대쪽</b>으로 끌어당겼다 놓으면 발사!');
     return;
   }
@@ -564,12 +510,8 @@ cv.addEventListener('pointerup', e => {
 });
 cv.addEventListener('pointercancel', () => { dragging = false; });
 
-/* ══════════════════════════════════════════════════════
-   그리기
-   ══════════════════════════════════════════════════════ */
 function resize() {
-  const wrap = document.getElementById('boardWrap');
-  const size = Math.max(200, Math.min(wrap.clientWidth, wrap.clientHeight) - 4);
+  const size = Math.max(200, Math.min(boardWrap.clientWidth, boardWrap.clientHeight) - 4);
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   cv.style.width = size + 'px';
   cv.style.height = size + 'px';
@@ -584,7 +526,6 @@ function draw() {
   ctx.clearRect(0, 0, W, H);
   drawBoard();
 
-  // 떨어진 돌 잔상
   for (const f of puffs) {
     ctx.globalAlpha = Math.max(0, f.life);
     ctx.beginPath();
@@ -602,7 +543,6 @@ function draw() {
     drawStone(s, s === selected);
   }
 
-  // 내 차례에 고를 수 있는 돌을 은은하게 표시
   if (myTurnNow() && !selected) {
     const a = 0.25 + 0.2 * Math.sin(clock * 3.2);
     ctx.strokeStyle = 'rgba(36,64,47,' + a.toFixed(3) + ')';
@@ -616,51 +556,62 @@ function draw() {
   }
 }
 
+let boardCache = null;
 function drawBoard() {
-  const g = ctx.createLinearGradient(0, 0, W, H);
-  // 바둑판 나무색(비자나무 톤)
+  if (!boardCache || boardCache.width !== cv.width || boardCache.height !== cv.height) {
+    boardCache = document.createElement('canvas');
+    boardCache.width = cv.width;
+    boardCache.height = cv.height;
+    const bctx = boardCache.getContext('2d');
+    const scale = cv.width / W;
+    bctx.setTransform(scale, 0, 0, scale, 0, 0);
+    paintBoard(bctx);
+  }
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(boardCache, 0, 0);
+  ctx.restore();
+}
+
+function paintBoard(c) {
+  const g = c.createLinearGradient(0, 0, W, H);
   g.addColorStop(0, '#E9C57E');
   g.addColorStop(.5, '#E1B96F');
   g.addColorStop(1, '#D9AE62');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, W, H);
+  c.fillStyle = g;
+  c.fillRect(0, 0, W, H);
 
-  // 나뭇결 느낌의 옅은 세로줄
-  ctx.strokeStyle = 'rgba(120,80,20,.07)';
-  ctx.lineWidth = 6;
+  c.strokeStyle = 'rgba(120,80,20,.07)';
+  c.lineWidth = 6;
   for (let x = 18; x < W; x += 46) {
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.bezierCurveTo(x + 10, H * .3, x - 10, H * .7, x + 4, H);
-    ctx.stroke();
+    c.beginPath();
+    c.moveTo(x, 0);
+    c.bezierCurveTo(x + 10, H * .3, x - 10, H * .7, x + 4, H);
+    c.stroke();
   }
 
-  // 바둑판 선
-  ctx.strokeStyle = 'rgba(90,62,27,.75)';
-  ctx.lineWidth = 1;
+  c.strokeStyle = 'rgba(90,62,27,.75)';
+  c.lineWidth = 1;
   for (let i = 1; i < 10; i++) {
     const t = i * W / 10;
-    ctx.beginPath(); ctx.moveTo(t, 22); ctx.lineTo(t, H - 22); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(22, t); ctx.lineTo(W - 22, t); ctx.stroke();
+    c.beginPath(); c.moveTo(t, 22); c.lineTo(t, H - 22); c.stroke();
+    c.beginPath(); c.moveTo(22, t); c.lineTo(W - 22, t); c.stroke();
   }
-  // 화점
-  ctx.fillStyle = '#3E2A10';
+  c.fillStyle = '#3E2A10';
   for (const px of [180, 300, 420]) {
     for (const py of [180, 300, 420]) {
-      ctx.beginPath(); ctx.arc(px, py, 3.5, 0, Math.PI * 2); ctx.fill();
+      c.beginPath(); c.arc(px, py, 3.5, 0, Math.PI * 2); c.fill();
     }
   }
 
-  // 진영 표시: 위는 백, 아래는 흑
-  ctx.fillStyle = 'rgba(255,255,255,.14)';
-  ctx.fillRect(0, 0, W, 26);
-  ctx.fillStyle = 'rgba(0,0,0,.10)';
-  ctx.fillRect(0, H - 26, W, 26);
+  c.fillStyle = 'rgba(255,255,255,.14)';
+  c.fillRect(0, 0, W, 26);
+  c.fillStyle = 'rgba(0,0,0,.10)';
+  c.fillRect(0, H - 26, W, 26);
 
-  // 가장자리(여기를 넘어가면 아웃)
-  ctx.strokeStyle = '#5A3E1B';
-  ctx.lineWidth = 5;
-  ctx.strokeRect(2.5, 2.5, W - 5, H - 5);
+  c.strokeStyle = '#5A3E1B';
+  c.lineWidth = 5;
+  c.strokeRect(2.5, 2.5, W - 5, H - 5);
 }
 
 function drawStone(s, sel) {
@@ -680,7 +631,6 @@ function drawStone(s, sel) {
   ctx.strokeStyle = s.side === BLACK ? 'rgba(0,0,0,.9)' : 'rgba(140,140,140,.9)';
   ctx.stroke();
 
-  // 반짝임
   ctx.beginPath();
   ctx.ellipse(s.x - R * .3, s.y - R * .38, R * .26, R * .17, -0.6, 0, Math.PI * 2);
   ctx.fillStyle = s.side === BLACK ? 'rgba(255,255,255,.30)' : 'rgba(255,255,255,.85)';
@@ -703,7 +653,6 @@ function drawAim() {
   const ang = Math.atan2(dy, dx);
   const col = power > 0 ? gaugeColor(power) : 'rgba(255,255,255,.55)';
 
-  // 날아갈 방향을 판 끝까지 알려 주는 옅은 점선
   ctx.save();
   ctx.setLineDash([3, 11]);
   ctx.strokeStyle = 'rgba(255,255,255,.5)';
@@ -713,7 +662,6 @@ function drawAim() {
   ctx.lineTo(selected.x + Math.cos(ang) * 900, selected.y + Math.sin(ang) * 900);
   ctx.stroke();
 
-  // 뒤로 당긴 만큼(고무줄) 점선
   ctx.setLineDash([7, 7]);
   ctx.strokeStyle = 'rgba(255,255,255,.85)';
   ctx.lineWidth = 3;
@@ -724,18 +672,12 @@ function drawAim() {
   ctx.stroke();
   ctx.restore();
 
-  // 아직 '고르기' 구간이면 화살표 대신 얼마나 더 끌어야 하는지만 보여 준다
   if (power <= 0) {
-    ctx.beginPath();                       // 아직 0%인 빈 게이지
-    ctx.arc(selected.x, selected.y, R + 12, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(0,0,0,.22)';
-    ctx.lineWidth = 8;
-    ctx.stroke();
+    drawGaugeTrack();
     drawBadge('조금 더', 'rgba(255,255,255,.9)');
     return;
   }
 
-  // 세기만큼 자라는 화살표
   const len = 44 + power * 200;
   const ex = selected.x + Math.cos(ang) * len;
   const ey = selected.y + Math.sin(ang) * len;
@@ -756,12 +698,7 @@ function drawAim() {
   ctx.fillStyle = col;
   ctx.fill();
 
-  // 돌 둘레를 도는 세기 게이지
-  ctx.beginPath();
-  ctx.arc(selected.x, selected.y, R + 12, 0, Math.PI * 2);
-  ctx.strokeStyle = 'rgba(0,0,0,.22)';
-  ctx.lineWidth = 8;
-  ctx.stroke();
+  drawGaugeTrack();
   ctx.beginPath();
   ctx.arc(selected.x, selected.y, R + 12, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * power);
   ctx.strokeStyle = col;
@@ -773,7 +710,14 @@ function drawAim() {
   drawBadge(Math.round(power * 100) + '%', col);
 }
 
-// 고른 돌 위에 뜨는 작은 알림표(세기 % 또는 안내말)
+function drawGaugeTrack() {
+  ctx.beginPath();
+  ctx.arc(selected.x, selected.y, R + 12, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(0,0,0,.22)';
+  ctx.lineWidth = 8;
+  ctx.stroke();
+}
+
 function drawBadge(label, col) {
   const tx = selected.x, ty = selected.y - R - 34;
   ctx.font = 'bold 19px "Nanum Gothic", "Malgun Gothic", sans-serif';
@@ -782,7 +726,7 @@ function drawBadge(label, col) {
   const w = Math.max(60, ctx.measureText(label).width + 24);
   ctx.beginPath();
   if (ctx.roundRect) ctx.roundRect(tx - w / 2, ty - 15, w, 30, 15);
-  else ctx.arc(tx, ty, w / 2, 0, Math.PI * 2);   // roundRect가 없는 옛 브라우저
+  else ctx.arc(tx, ty, w / 2, 0, Math.PI * 2);
   ctx.fillStyle = 'rgba(27,43,32,.72)';
   ctx.fill();
   ctx.fillStyle = col;
@@ -794,9 +738,6 @@ function gaugeColor(p) {
   return '#B33951';
 }
 
-/* ══════════════════════════════════════════════════════
-   진행 루프
-   ══════════════════════════════════════════════════════ */
 let last = 0, acc = 0;
 function loop(t) {
   requestAnimationFrame(loop);
@@ -825,9 +766,6 @@ function loop(t) {
 }
 requestAnimationFrame(loop);
 
-/* ══════════════════════════════════════════════════════
-   화면 전환·표시
-   ══════════════════════════════════════════════════════ */
 function buildDots() {
   for (const side of [BLACK, WHITE]) {
     dotsEl[side].innerHTML = '';
