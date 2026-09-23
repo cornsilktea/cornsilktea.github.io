@@ -1,16 +1,4 @@
 <!DOCTYPE html>
-<!--
-  16.gomoku.html — 오목 게임 (15x15, 단일 HTML 파일)
-
-  목적: 중학생이 쉬는시간·자투리 시간에 태블릿/스마트폰으로 가볍게 즐기는 오락용 오목 게임.
-  사용법: 이 파일을 브라우저로 열면 바로 실행됩니다. 외부 리소스·라이브러리 없음.
-    - AI 대전: 난이도 하/중/상 선택 → 학생이 흑(선), AI가 백.
-    - 2인 대전: 같은 화면을 돌려가며 두 명이 번갈아 착수. '보드 회전'을 켜면
-      턴마다 보드가 180도 돌아 마주 앉아서도 편하게 볼 수 있습니다.
-  규칙: 가로/세로/대각선으로 5개를 먼저 이으면 승리.
-        금수(33·44·장목)는 흑돌에만 적용하며 시작 화면에서 끌 수 있습니다.
-        금수 자리를 누르면 보드 위에 안내가 뜨고 착수는 무시됩니다.
--->
 <html lang="ko">
 <head>
 <script charset="utf-8" src="firebase-config.js"></script>
@@ -18,7 +6,6 @@
 <meta charset="UTF-8">
 <link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
 <title>AI와 오목대전</title>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
@@ -27,7 +14,6 @@
 <meta property="og:url" content="https://cornsilktea.github.io/16.gomoku.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
-<!-- 링크 미리보기 끝 -->
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -38,7 +24,6 @@
     overflow: hidden;
   }
 
-  /* 버튼은 모두 같은 크기·같은 색으로 (위계 강조 대신 균일하게) */
   .btn {
     display: inline-flex; align-items: center; justify-content: center;
     min-height: 56px; padding: 12px 16px;
@@ -56,7 +41,6 @@
   .screen { display: none; height: 100%; }
   .screen.on { display: flex; }
 
-  /* ── 시작 화면 ────────────────────────────── */
   #startScreen {
     flex-direction: column; align-items: center;
     overflow-y: auto; padding: 24px 16px 32px;
@@ -80,7 +64,6 @@
   .names input:focus { outline: none; border-color: var(--sg-primary); }
   .stack { display: grid; gap: 8px; }
 
-  /* ── 게임 화면 ────────────────────────────── */
   #gameScreen { flex-direction: column; padding: 10px 10px 12px; gap: 8px; }
   #statusBar {
     display: flex; align-items: center; justify-content: center; gap: 10px;
@@ -103,7 +86,6 @@
     flex: 1 1 auto; min-height: 0;
     display: flex; align-items: center; justify-content: center;
   }
-  /* 금수 안내 — 보드 위에 잠깐 떴다 사라집니다 */
   #toast {
     position: absolute; left: 50%; top: 12px; transform: translateX(-50%);
     max-width: 92%; padding: 12px 16px;
@@ -143,7 +125,6 @@
 </head>
 <body>
 
-<!-- ===== 시작 화면 ===== -->
 <section id="startScreen" class="screen on">
   <div class="start-inner">
     <h1>오목</h1>
@@ -184,7 +165,6 @@
   </div>
 </section>
 
-<!-- ===== 게임 화면 ===== -->
 <section id="gameScreen" class="screen">
   <div id="boardWrap"><canvas id="board"></canvas><div id="toast"></div></div>
   <div id="sidePanel">
@@ -200,33 +180,33 @@
 <script>
 "use strict";
 (function () {
-  /* ────────── 상수 ────────── */
   var N = 15;
   var EMPTY = 0, BLACK = 1, WHITE = 2;
   var DIRS = [[0, 1], [1, 0], [1, 1], [1, -1]];
 
-  /* ────────── 상태 ────────── */
   var board = new Uint8Array(N * N);
-  var history = [];        // {i, p}
-  var mode = "ai";         // "ai" | "pvp"
-  var aiLevel = 2;         // 1 하 / 2 중 / 3 상
+  var history = [];
+  var mode = "ai";
+  var aiLevel = 2;
   var turn = BLACK;
   var over = false;
-  var winLine = null;      // 승리한 5칸
+  var winLine = null;
   var thinking = false;
   var rotateOn = true;
   var soundOn = true;
-  var renjuOn = true;      // 금수(33·44·장목) 제한 — 흑돌에만 적용
+  var renjuOn = true;
   var names = { 1: "흑돌", 2: "백돌" };
   var flipped = false;
 
-  /* ────────── DOM ────────── */
   function $(id) { return document.getElementById(id); }
   var startScreen = $("startScreen"), gameScreen = $("gameScreen");
   var canvas = $("board"), ctx = canvas.getContext("2d");
   var statusBar = $("statusBar"), statusText = $("statusText"), statusDot = $("statusDot");
   var toastEl = $("toast"), toastTimer = null;
   var btnReset = $("btnReset"), btnHome = $("btnHome"), btnSound = $("btnSound");
+  var boardWrap = $("boardWrap"), soundToggleStart = $("soundToggleStart");
+
+  function now() { return window.performance ? performance.now() : Date.now(); }
 
   function showToast(text) {
     toastEl.textContent = text;
@@ -239,7 +219,6 @@
     toastEl.classList.remove("show");
   }
 
-  /* ────────── 효과음 (Web Audio, 외부 리소스 없음) ────────── */
   var actx = null;
   function audio() {
     if (!soundOn) return null;
@@ -267,15 +246,13 @@
   }
   function soundNope() { beep(170, 0.07, "square", 0.07); }
 
-  /* ────────── 보드 그리기 ────────── */
   var size = 400, cell = 26, pad = 13, dpr = 1;
-  var anim = null;   // 착수 애니메이션 {i, t0}
-  var winFx = null;  // 승리선 반짝임 {t0}
+  var anim = null;
+  var winFx = null;
   var rafId = 0;
 
   function layout() {
-    var wrap = $("boardWrap");
-    var w = wrap.clientWidth, h = wrap.clientHeight;
+    var w = boardWrap.clientWidth, h = boardWrap.clientHeight;
     var s = Math.floor(Math.min(w || 320, h || 320));
     if (!s || s < 220) s = Math.max(240, Math.min(w || 300, 300));
     s = Math.min(s, 760);
@@ -291,7 +268,7 @@
   function xy(r, c) { return [pad + c * cell, pad + r * cell]; }
 
   function drawStone(x, y, p, radius) {
-    if (!(radius > 0.5)) radius = 0.5;      /* 반지름이 0 이하면 canvas 가 예외를 던집니다 */
+    if (!(radius > 0.5)) radius = 0.5;
     var g = ctx.createRadialGradient(x - radius * 0.3, y - radius * 0.35, radius * 0.15, x, y, radius);
     if (p === BLACK) {
       g.addColorStop(0, "#5B6B5E"); g.addColorStop(0.55, "#1B2B20"); g.addColorStop(1, "#1B2B20");
@@ -306,21 +283,19 @@
   }
 
   function render(ts) {
-    rafId = 0;                 /* 그리다 중간에 실패해도 다음 그리기가 막히지 않도록 먼저 비웁니다 */
-    try { draw(ts); } catch (e) { /* 한 프레임 못 그려도 게임은 계속됩니다 */ }
+    rafId = 0;
+    try { draw(ts); } catch (e) { }
   }
 
   function draw(ts) {
-    var now = ts || (window.performance ? performance.now() : Date.now());
+    var frameTime = ts || now();
     var animating = false;
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    // 바둑판 나무색(비자나무 톤)
     var bg = ctx.createLinearGradient(0, 0, size, size);
     bg.addColorStop(0, "#E9C57E"); bg.addColorStop(0.5, "#E1B96F"); bg.addColorStop(1, "#D9AE62");
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, size, size);
-    // 옅은 나뭇결
     ctx.strokeStyle = "rgba(120,80,20,.06)";
     ctx.lineWidth = Math.max(3, size / 110);
     for (var gx = size * 0.03; gx < size; gx += size * 0.075) {
@@ -330,7 +305,6 @@
       ctx.stroke();
     }
 
-    // 격자
     ctx.strokeStyle = "#5A3E1B";
     ctx.lineWidth = Math.max(0.7, size / 700);
     ctx.beginPath();
@@ -341,7 +315,6 @@
     }
     ctx.stroke();
 
-    // 화점
     var stars = [3, 7, 11], sr = Math.max(2, cell * 0.11);
     ctx.fillStyle = "#3E2A10";
     for (var i = 0; i < 3; i++) {
@@ -351,16 +324,12 @@
       }
     }
 
-    // 돌
     var base = cell * 0.43;
     for (var idx = 0; idx < board.length; idx++) {
       var p = board[idx]; if (!p) continue;
       var pos = xy((idx / N) | 0, idx % N), rad = base;
       if (anim && anim.i === idx) {
-        /* requestAnimationFrame 이 주는 시각은 '이번 프레임이 시작된 때'라서
-           돌을 놓으며 잰 시각보다 앞설 수 있습니다. 그대로 두면 진행률이 음수가 되어
-           반지름이 음수가 되고, canvas 가 예외를 던져 그리다 말게 됩니다. */
-        var t = (now - anim.t0) / 170;
+        var t = (frameTime - anim.t0) / 170;
         if (!(t > 0)) t = 0;
         if (t > 1) t = 1;
         rad = base * (0.4 + 0.6 * (1 - Math.pow(1 - t, 3)));
@@ -369,7 +338,6 @@
       drawStone(pos[0], pos[1], p, rad);
     }
 
-    // 마지막 착수 표시
     if (history.length && !winLine) {
       var last = history[history.length - 1];
       var lp = xy((last.i / N) | 0, last.i % N);
@@ -380,11 +348,10 @@
       ctx.stroke();
     }
 
-    // 승리 연결선
     if (winLine) {
       var alpha = 0.9;
       if (winFx) {
-        var wt = (now - winFx.t0) / 1000;
+        var wt = (frameTime - winFx.t0) / 1000;
         alpha = 0.55 + 0.45 * Math.abs(Math.sin(wt * 2.2));
         if (wt < 5) animating = true; else winFx = null;
       }
@@ -401,7 +368,6 @@
   }
   function kick() { if (!rafId) rafId = requestAnimationFrame(render); }
 
-  /* ────────── 규칙: 5목 판정 ────────── */
   function winAt(r, c, p) {
     for (var d = 0; d < 4; d++) {
       var dr = DIRS[d][0], dc = DIRS[d][1];
@@ -417,7 +383,6 @@
         back++;
       }
       if (back + fwd + 1 >= 5) {
-        // 착수점을 포함하는 5칸을 고른다
         var startOff = -Math.min(back, 4 - Math.min(fwd, 4));
         if (startOff + 4 > fwd) startOff = fwd - 4;
         var cells = [];
@@ -428,12 +393,7 @@
     return null;
   }
 
-  /* ────────── 금수(렌주룰) 판정 — 흑돌에만 적용 ──────────
-     33(쌍삼)·44(쌍사)·장목(6목 이상)을 막습니다.
-     한 방향 9칸만 보고 판정하는 간단한 방식이라, 정식 렌주룰의 까다로운 예외
-     (금수 자리를 이용한 삼·사 판정 등)까지 가려내지는 않습니다.
-     아래 lineStr 은 '놓았다고 치고' 만든 문자열이라 가운데(4번 칸)가 늘 '1' 입니다. */
-  function runLen(s) {                       // 가운데를 지나는 연속 흑돌 길이
+  function runLen(s) {
     var n = 1, i;
     for (i = 5; i < 9 && s.charAt(i) === "1"; i++) n++;
     for (i = 3; i >= 0 && s.charAt(i) === "1"; i--) n++;
@@ -441,14 +401,14 @@
   }
   function fillAt(s, i) { return s.substring(0, i) + "1" + s.substring(i + 1); }
 
-  function makesFour(s) {                    // 빈칸 하나를 더 채우면 정확히 5목이 되는가
+  function makesFour(s) {
     for (var i = 0; i < 9; i++) {
       if (s.charAt(i) !== "0") continue;
       if (runLen(fillAt(s, i)) === 5) return true;
     }
     return false;
   }
-  function hasOpenFour(s) {                  // 가운데를 포함하는 열린 4가 있는가
+  function hasOpenFour(s) {
     var k = s.indexOf("011110");
     while (k >= 0) {
       if (k + 1 <= 4 && 4 <= k + 4) return true;
@@ -456,7 +416,7 @@
     }
     return false;
   }
-  function makesOpenThree(s) {               // 빈칸 하나를 더 채우면 열린 4가 되는가(=활삼)
+  function makesOpenThree(s) {
     for (var i = 0; i < 9; i++) {
       if (s.charAt(i) !== "0") continue;
       if (hasOpenFour(fillAt(s, i))) return true;
@@ -464,26 +424,23 @@
     return false;
   }
 
-  /* 금수면 그 이름을, 둘 수 있으면 null 을 돌려줍니다 */
   function forbiddenReason(r, c) {
-    var fours = 0, threes = 0, over = false, five = false, d, s, n;
+    var fours = 0, threes = 0, overline = false, five = false, d, s, n;
     for (d = 0; d < 4; d++) {
       s = lineStr(r, c, DIRS[d][0], DIRS[d][1], BLACK);
       n = runLen(s);
-      if (n >= 6) over = true;
+      if (n >= 6) overline = true;
       else if (n === 5) five = true;
       if (makesFour(s)) fours++;
       if (makesOpenThree(s)) threes++;
     }
-    if (five) return null;                   // 5목이 되는 수는 이기는 수라 금수보다 우선
-    if (over) return "장목(6목)";
+    if (five) return null;
+    if (overline) return "장목(6목)";
     if (fours >= 2) return "44(쌍사)";
     if (threes >= 2) return "33(쌍삼)";
     return null;
   }
 
-  /* ────────── AI: 패턴 평가 ────────── */
-  // 한 방향 9칸을 문자열로 만든다. '1' 내 돌, '2' 상대 돌/벽, '0' 빈칸. 중앙(k=0)은 착수 가정.
   function lineStr(r, c, dr, dc, p) {
     var s = "", k, rr, cc, v;
     for (k = -4; k <= 4; k++) {
@@ -496,33 +453,33 @@
     return s;
   }
   var PATTERNS = [
-    [/11111/, 10000000],                                  // 5목
-    [/011110/, 500000],                                   // 열린 4
-    [/211110|011112|11011|10111|11101/, 60000],           // 4 (막힌 4 · 띈 4)
-    [/011100|001110|010110|011010/, 9000],                // 열린 3
-    [/211100|001112|211010|010112|210110|011012/, 900],   // 막힌 3
-    [/01100|00110|01010|010010/, 120],                    // 열린 2
+    [/11111/, 10000000],
+    [/011110/, 500000],
+    [/211110|011112|11011|10111|11101/, 60000],
+    [/011100|001110|010110|011010/, 9000],
+    [/211100|001112|211010|010112|210110|011012/, 900],
+    [/01100|00110|01010|010010/, 120],
     [/1/, 12]
   ];
   function dirScore(s) {
     for (var k = 0; k < PATTERNS.length; k++) if (PATTERNS[k][0].test(s)) return PATTERNS[k][1];
     return 0;
   }
-  function offense(r, c, p) {           // (r,c)에 p가 두었을 때의 공격 가치
+  function offense(r, c, p) {
     var sum = 0, big = 0, sc;
     for (var d = 0; d < 4; d++) {
       sc = dirScore(lineStr(r, c, DIRS[d][0], DIRS[d][1], p));
       sum += sc;
       if (sc >= 9000) big++;
     }
-    if (big >= 2) sum += 40000;         // 삼삼·사삼 등 복합 위협
+    if (big >= 2) sum += 40000;
     return sum;
   }
-  function moveScore(r, c, p) {         // 공격 + 상대 급소 차단
+  function moveScore(r, c, p) {
     return offense(r, c, p) + 0.9 * offense(r, c, 3 - p);
   }
 
-  function candidates() {               // 기존 돌 주변 2칸 이내의 빈칸
+  function candidates() {
     var out = [], seen = new Uint8Array(N * N), any = false, i, dr, dc;
     for (i = 0; i < board.length; i++) {
       if (!board[i]) continue;
@@ -551,7 +508,6 @@
     return limit ? arr.slice(0, limit) : arr;
   }
 
-  // 판 전체 평가: 모든 직선의 연속 5칸 창을 훑는다 (가볍고 빠름)
   var LINES = (function () {
     var L = [], r, c, k, line;
     for (r = 0; r < N; r++) { line = []; for (c = 0; c < N; c++) line.push(r * N + c); L.push(line); }
@@ -616,27 +572,29 @@
     return best;
   }
 
+  function winningMove(cs, p) {
+    for (var i = 0; i < cs.length; i++) {
+      var idx = cs[i];
+      board[idx] = p;
+      var w = winAt((idx / N) | 0, idx % N, p);
+      board[idx] = EMPTY;
+      if (w) return idx;
+    }
+    return -1;
+  }
+
   function aiMove() {
-    var me = WHITE, you = BLACK, i, r, c, idx, w;
+    var me = WHITE, you = BLACK, i, idx;
     if (!history.length) return 7 * N + 7;
 
     var cs = candidates();
-    // 1) 바로 이기는 자리 2) 상대의 5목을 막는 자리 — 난이도와 무관하게 우선
-    for (i = 0; i < cs.length; i++) {
-      idx = cs[i]; r = (idx / N) | 0; c = idx % N;
-      board[idx] = me; w = winAt(r, c, me); board[idx] = EMPTY;
-      if (w) return idx;
-    }
-    for (i = 0; i < cs.length; i++) {
-      idx = cs[i]; r = (idx / N) | 0; c = idx % N;
-      board[idx] = you; w = winAt(r, c, you); board[idx] = EMPTY;
-      if (w) return idx;
-    }
+    var decisive = winningMove(cs, me);
+    if (decisive < 0) decisive = winningMove(cs, you);
+    if (decisive >= 0) return decisive;
 
     var top = ordered(me, 12);
     if (!top.length) return cs[0];
 
-    // 하: 절반 정도만 최선의 수, 나머지는 상위권 중 아무 수 (일부러 헐렁하게)
     if (aiLevel === 1) {
       if (Math.random() < 0.5) return top[0].i;
       var pool = top.slice(1, 7);
@@ -657,21 +615,19 @@
       else if (v > bestV - 1e-6) bestMoves.push(idx);
     }
     if (!bestMoves.length) return top[0].i;
-    // 중: 동점 후보 중 무작위(대국마다 다른 흐름) / 상: 탐색 순서상 최선
     if (aiLevel === 2) return bestMoves[(Math.random() * bestMoves.length) | 0];
     return bestMoves[0];
   }
 
-  /* ────────── 진행 ────────── */
   function place(idx, p) {
     board[idx] = p;
     history.push({ i: idx, p: p });
-    anim = { i: idx, t0: window.performance ? performance.now() : Date.now() };
+    anim = { i: idx, t0: now() };
     soundPlace(p);
     var w = winAt((idx / N) | 0, idx % N, p);
     if (w) {
       winLine = w; over = true;
-      winFx = { t0: window.performance ? performance.now() : Date.now() };
+      winFx = { t0: now() };
       soundWin();
     } else if (history.length === N * N) {
       over = true;
@@ -685,10 +641,10 @@
 
   function humanPlay(idx) {
     if (over || thinking) return;
-    if (board[idx]) { soundNope(); return; }          // 이미 돌이 있는 칸은 무시
+    if (board[idx]) { soundNope(); return; }
     if (mode === "ai" && turn !== BLACK) return;
 
-    if (renjuOn && turn === BLACK) {                  // 금수는 흑돌에만
+    if (renjuOn && turn === BLACK) {
       var bad = forbiddenReason((idx / N) | 0, idx % N);
       if (bad) {
         soundNope();
@@ -703,7 +659,7 @@
       setTimeout(function () {
         var m = aiMove();
         thinking = false;
-        if (m == null || board[m]) {                   // 안전망
+        if (m == null || board[m]) {
           m = -1;
           for (var i = 0; i < board.length; i++) if (!board[i]) { m = i; break; }
         }
@@ -742,7 +698,6 @@
     }
     btnReset.disabled = thinking;
 
-    // 2인 대전: 백돌 차례에는 보드를 180도 돌려 마주 앉은 사람이 보기 편하게
     var wantFlip = (mode === "pvp" && rotateOn && !over && turn === WHITE);
     if (wantFlip !== flipped) {
       flipped = wantFlip;
@@ -774,7 +729,6 @@
     requestAnimationFrame(layout);
   }
 
-  /* ────────── 입력 ────────── */
   function pick(ev) {
     var rect = canvas.getBoundingClientRect();
     if (!rect.width) return -1;
@@ -786,11 +740,11 @@
     if (r < 0 || r >= N || c < 0 || c >= N) return -1;
     var px = xy(r, c);
     var dx = px[0] - cx, dy = px[1] - cy;
-    if (Math.sqrt(dx * dx + dy * dy) > cell * 0.62) return -1;   // 교차점에서 너무 먼 터치는 무시
+    if (Math.sqrt(dx * dx + dy * dy) > cell * 0.62) return -1;
     return r * N + c;
   }
   canvas.addEventListener("pointerup", function (ev) {
-    if (over) return;                                            // 종료 후 보드 터치 비활성화
+    if (over) return;
     var idx = pick(ev);
     if (idx >= 0) humanPlay(idx);
   });
@@ -801,12 +755,14 @@
     gameScreen.classList.remove("on");
     startScreen.classList.add("on");
   });
+  function setToggleLabel(btn, label, on) {
+    btn.textContent = label + ": " + (on ? "켜기" : "끄기");
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+  }
   function syncSound() {
     btnSound.textContent = soundOn ? "효과음 켜짐" : "효과음 꺼짐";
     btnSound.setAttribute("aria-pressed", soundOn ? "true" : "false");
-    var s = $("soundToggleStart");
-    s.textContent = "효과음: " + (soundOn ? "켜기" : "끄기");
-    s.setAttribute("aria-pressed", soundOn ? "true" : "false");
+    setToggleLabel(soundToggleStart, "효과음", soundOn);
   }
   function toggleSound() {
     soundOn = !soundOn;
@@ -814,20 +770,18 @@
     if (soundOn) beep(700, 0.07);
   }
   btnSound.addEventListener("click", toggleSound);
-  $("soundToggleStart").addEventListener("click", toggleSound);
+  soundToggleStart.addEventListener("click", toggleSound);
 
   var renjuBtn = $("renjuToggle");
   renjuBtn.addEventListener("click", function () {
     renjuOn = !renjuOn;
-    renjuBtn.textContent = "금수 규칙: " + (renjuOn ? "켜기" : "끄기");
-    renjuBtn.setAttribute("aria-pressed", renjuOn ? "true" : "false");
+    setToggleLabel(renjuBtn, "금수 규칙", renjuOn);
   });
 
   var rotBtn = $("rotateToggle");
   rotBtn.addEventListener("click", function () {
     rotateOn = !rotateOn;
-    rotBtn.textContent = "보드 회전: " + (rotateOn ? "켜기" : "끄기");
-    rotBtn.setAttribute("aria-pressed", rotateOn ? "true" : "false");
+    setToggleLabel(rotBtn, "보드 회전", rotateOn);
   });
 
   Array.prototype.forEach.call(document.querySelectorAll("[data-ai]"), function (b) {
@@ -844,8 +798,6 @@
   window.addEventListener("resize", layout);
   window.addEventListener("orientationchange", function () { setTimeout(layout, 250); });
 
-  /* 다른 앱에 갔다 돌아오면 화면 그리기가 멈춰 있거나 판이 비어 보일 수 있어
-     돌아온 순간 한 번 다시 그립니다. */
   function redrawNow() { anim = null; render(); }
   document.addEventListener("visibilitychange", function () { if (!document.hidden) redrawNow(); });
   window.addEventListener("pageshow", redrawNow);
