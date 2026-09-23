@@ -6,7 +6,6 @@
 <meta charset="UTF-8">
 <link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
 <title>자료 정렬하기</title>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
@@ -15,7 +14,6 @@
 <meta property="og:url" content="https://cornsilktea.github.io/8.data-sorting-game.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
-<!-- 링크 미리보기 끝 -->
 <style>
   :root{
     --bg:var(--sg-bg);
@@ -29,7 +27,6 @@
     --green-soft:#E1F1E5;
     --red:var(--sg-danger);
     --red-soft:#F6E3E7;
-    --amber:var(--sg-warn);
     --radius:var(--sg-radius);
   }
   *{box-sizing:border-box;}
@@ -181,16 +178,7 @@
     cursor:pointer;
   }
   button.primary:active{transform:translateY(1px);}
-  button.secondary{
-    background:var(--card);
-    color:var(--ink);
-    border:1.5px solid var(--sg-line-strong);
-    border-radius:var(--sg-radius);
-    padding:16px 30px;
-    font-size:1.1rem;
-    font-weight:800;
-    cursor:pointer;
-  }
+
 
   #endScreen{
     display:none;
@@ -202,12 +190,6 @@
   #endScreen h2{font-size:2rem;margin:0;}
   #endScreen .bigscore{font-size:3.2rem;font-weight:900;color:var(--blue);}
 
-  .ghost-slot{
-    width:150px;height:56px;
-    border:2px dashed var(--line);
-    border-radius:var(--sg-radius);
-    opacity:.5;
-  }
 
   @media (max-width:720px){
     #bins{grid-template-columns:1fr;}
@@ -277,11 +259,11 @@ const ITEMS = [
   {label:"손 편지", emoji:"✉️", type:"unstructured"},
   {label:"음성 메모", emoji:"🎙️", type:"unstructured"},
 ];
+const TOTAL = ITEMS.length;
+const TRAY_SIZE = 4;
 
 let queue = [];
-let currentIndex = 0;
 let score = 0;
-let total = ITEMS.length;
 let activeCard = null;
 let activePointerId = null;
 let dragOffsetX = 0, dragOffsetY = 0;
@@ -295,8 +277,8 @@ const progressPill = document.getElementById('progressPill');
 const feedback = document.getElementById('feedback');
 const playScreen = document.getElementById('playScreen');
 const endScreen = document.getElementById('endScreen');
-const binStructured = document.getElementById('binStructured');
-const binUnstructured = document.getElementById('binUnstructured');
+const bins = [document.getElementById('binStructured'), document.getElementById('binUnstructured')];
+const binBodies = bins.map(bin => bin.querySelector('.bin-body'));
 
 function shuffle(arr){
   const a = arr.slice();
@@ -307,15 +289,16 @@ function shuffle(arr){
   return a;
 }
 
+function typeName(type){
+  return type==='structured' ? '정형' : '비정형';
+}
+
 function init(){
   queue = shuffle(ITEMS);
-  currentIndex = 0;
   score = 0;
-  nextSpawnIndex = 0;
   resolvedCount = 0;
   updateStatus();
-  binStructured.querySelector('.bin-body').innerHTML = '';
-  binUnstructured.querySelector('.bin-body').innerHTML = '';
+  binBodies.forEach(body => { body.innerHTML = ''; });
   playScreen.style.display = 'flex';
   playScreen.style.flexDirection = 'column';
   playScreen.style.alignItems = 'center';
@@ -323,22 +306,20 @@ function init(){
   endScreen.style.display = 'none';
   feedback.textContent = '';
   feedback.className = '';
-  spawnNextCards();
+  spawnFirstCards();
 }
 
 function updateStatus(){
-  progressPill.textContent = `${resolvedCount} / ${total}`;
+  progressPill.textContent = `${resolvedCount} / ${TOTAL}`;
   scorePill.textContent = `점수 ${score}`;
 }
 
-// Show up to 4 cards at a time in the tray
-function spawnNextCards(){
+function spawnFirstCards(){
   trayWrap.innerHTML = '';
-  const batchEnd = Math.min(4, total);
-  for(let i=0;i<batchEnd;i++){
+  nextSpawnIndex = Math.min(TRAY_SIZE, TOTAL);
+  for(let i=0;i<nextSpawnIndex;i++){
     addCardToTray(queue[i]);
   }
-  nextSpawnIndex = batchEnd;
 }
 
 function addCardToTray(item){
@@ -346,104 +327,93 @@ function addCardToTray(item){
   card.className = 'card';
   card.innerHTML = `<span class="emoji">${item.emoji}</span><span>${item.label}</span>`;
   card.dataset.type = item.type;
-  attachDrag(card, item);
+  card.addEventListener('pointerdown', (e)=>startDrag(e, card, item));
   trayWrap.appendChild(card);
 }
 
-function attachDrag(card, item){
-  card.addEventListener('pointerdown', (e)=>{
-    if(activeCard) return;
-    e.preventDefault();
-    activeCard = card;
-    activeItem = item;
-    activePointerId = e.pointerId;
-    const rect = card.getBoundingClientRect();
-    dragOffsetX = e.clientX - rect.left;
-    dragOffsetY = e.clientY - rect.top;
-    card.classList.add('dragging');
-    card.style.position = 'fixed';
-    card.style.left = rect.left + 'px';
-    card.style.top = rect.top + 'px';
-    card.style.width = rect.width + 'px';
-    /* body 로 옮기면 브라우저가 포인터 캡처를 놓아 버립니다.
-       그래서 이어지는 움직임과 손 떼기는 window 에서 받습니다. */
-    document.body.appendChild(card);
-  });
+function startDrag(e, card, item){
+  if(activeCard) return;
+  e.preventDefault();
+  activeCard = card;
+  activeItem = item;
+  activePointerId = e.pointerId;
+  const rect = card.getBoundingClientRect();
+  dragOffsetX = e.clientX - rect.left;
+  dragOffsetY = e.clientY - rect.top;
+  card.classList.add('dragging');
+  card.style.position = 'fixed';
+  card.style.left = rect.left + 'px';
+  card.style.top = rect.top + 'px';
+  card.style.width = rect.width + 'px';
+  document.body.appendChild(card);
 }
 
-/* 카드를 빠르게 끌다가 포인터가 카드 밖으로 나가도 놓치지 않도록,
-   드래그 도중의 이벤트는 카드가 아니라 window 에서 한 번만 받습니다. */
+function releaseDrag(e){
+  if(!activeCard || e.pointerId !== activePointerId) return null;
+  const released = {card: activeCard, item: activeItem};
+  activeCard = null;
+  activeItem = null;
+  activePointerId = null;
+  return released;
+}
+
 window.addEventListener('pointermove', (e)=>{
   if(!activeCard || e.pointerId !== activePointerId) return;
   activeCard.style.left = (e.clientX - dragOffsetX) + 'px';
   activeCard.style.top = (e.clientY - dragOffsetY) + 'px';
-  checkHover(e.clientX, e.clientY);
+  bins.forEach(bin => bin.classList.toggle('hover', isInside(bin, e.clientX, e.clientY)));
 });
 
 window.addEventListener('pointerup', (e)=>{
-  if(!activeCard || e.pointerId !== activePointerId) return;
-  const card = activeCard, item = activeItem;
-  activeCard = null;
-  activeItem = null;
-  activePointerId = null;
-  handleDrop(card, item, e.clientX, e.clientY);
+  const released = releaseDrag(e);
+  if(released) handleDrop(released.card, released.item, e.clientX, e.clientY);
 });
 
 window.addEventListener('pointercancel', (e)=>{
-  if(!activeCard || e.pointerId !== activePointerId) return;
-  const card = activeCard;
-  activeCard = null;
-  activeItem = null;
-  activePointerId = null;
-  binStructured.classList.remove('hover');
-  binUnstructured.classList.remove('hover');
-  resetCardPosition(card);
+  const released = releaseDrag(e);
+  if(!released) return;
+  clearHover();
+  returnToTray(released.card);
 });
 
-function checkHover(x,y){
-  [binStructured, binUnstructured].forEach(bin=>{
-    const r = bin.getBoundingClientRect();
-    const inside = x>=r.left && x<=r.right && y>=r.top && y<=r.bottom;
-    bin.classList.toggle('hover', inside);
-  });
+function isInside(el, x, y){
+  const r = el.getBoundingClientRect();
+  return x>=r.left && x<=r.right && y>=r.top && y<=r.bottom;
 }
 
-function handleDrop(card, item, x, y){
-  binStructured.classList.remove('hover');
-  binUnstructured.classList.remove('hover');
+function clearHover(){
+  bins.forEach(bin => bin.classList.remove('hover'));
+}
 
-  let target = null;
-  [binStructured, binUnstructured].forEach(bin=>{
-    const r = bin.getBoundingClientRect();
-    if(x>=r.left && x<=r.right && y>=r.top && y<=r.bottom){
-      target = bin;
-    }
-  });
-
-  card.classList.remove('dragging');
-
-  if(!target){
-    // return to tray
-    resetCardPosition(card);
-    return;
-  }
-
-  const droppedType = target.dataset.type;
-  const correct = droppedType === item.type;
-
+function clearDragStyle(card){
   card.style.position = 'static';
   card.style.left = '';
   card.style.top = '';
   card.style.width = '';
-  target.querySelector('.bin-body').appendChild(card);
+  card.classList.remove('dragging');
+}
+
+function handleDrop(card, item, x, y){
+  clearHover();
+  let targetIndex = -1;
+  bins.forEach((bin, i)=>{ if(isInside(bin, x, y)) targetIndex = i; });
+
+  if(targetIndex < 0){
+    returnToTray(card);
+    return;
+  }
+
+  const correct = bins[targetIndex].dataset.type === item.type;
+  clearDragStyle(card);
+  binBodies[targetIndex].appendChild(card);
 
   if(correct){
     card.classList.add('placed-correct');
     score += 1;
-    showFeedback(true, `${item.label} 정답! ${item.type==='structured'?'정형':'비정형'} 데이터가 맞아요.`);
+    showFeedback(true, `${item.label} 정답! ${typeName(item.type)} 데이터가 맞아요.`);
   } else {
     card.classList.add('placed-wrong');
-    showFeedback(false, `${item.label}은(는) 사실 ${item.type==='structured'?'정형':'비정형'} 데이터예요.`);
+    showFeedback(false, `${item.label}은(는) 사실 ${typeName(item.type)} 데이터예요.`);
   }
 
   resolvedCount += 1;
@@ -459,21 +429,17 @@ function handleDrop(card, item, x, y){
 }
 
 function fillTray(){
-  if(nextSpawnIndex < total){
+  if(nextSpawnIndex < TOTAL){
     addCardToTray(queue[nextSpawnIndex]);
     nextSpawnIndex += 1;
   }
-  if(resolvedCount >= total){
+  if(resolvedCount >= TOTAL){
     setTimeout(showEnd, 400);
   }
 }
 
-function resetCardPosition(card){
-  card.style.position = 'static';
-  card.style.left = '';
-  card.style.top = '';
-  card.style.width = '';
-  card.classList.remove('dragging');
+function returnToTray(card){
+  clearDragStyle(card);
   trayWrap.appendChild(card);
 }
 
@@ -482,17 +448,18 @@ function showFeedback(ok, text){
   feedback.className = ok ? 'ok' : 'no';
 }
 
+function endComment(ratio){
+  if(ratio === 1) return '완벽해요! 정형·비정형 데이터를 정확히 구분하네요.';
+  if(ratio >= 0.75) return '아주 잘했어요! 조금만 더 연습하면 완벽!';
+  if(ratio >= 0.5) return '절반 이상 맞혔어요. 헷갈렸던 카드를 다시 떠올려볼까요?';
+  return '정형 데이터는 "표로 정리하기 쉬운 것", 비정형은 "자유로운 형태"라는 점을 기억해보세요!';
+}
+
 function showEnd(){
   playScreen.style.display = 'none';
   endScreen.style.display = 'flex';
-  document.getElementById('finalScore').textContent = `${score} / ${total}`;
-  let comment = '';
-  const ratio = score/total;
-  if(ratio === 1) comment = '완벽해요! 정형·비정형 데이터를 정확히 구분하네요.';
-  else if(ratio >= 0.75) comment = '아주 잘했어요! 조금만 더 연습하면 완벽!';
-  else if(ratio >= 0.5) comment = '절반 이상 맞혔어요. 헷갈렸던 카드를 다시 떠올려볼까요?';
-  else comment = '정형 데이터는 "표로 정리하기 쉬운 것", 비정형은 "자유로운 형태"라는 점을 기억해보세요!';
-  document.getElementById('finalComment').textContent = comment;
+  document.getElementById('finalScore').textContent = `${score} / ${TOTAL}`;
+  document.getElementById('finalComment').textContent = endComment(score/TOTAL);
 }
 
 document.getElementById('retryBtn').addEventListener('click', init);
