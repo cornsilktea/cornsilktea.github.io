@@ -10,7 +10,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
 <meta property="og:title" content="터보 랩">
-<meta property="og:description" content="3D 실사 레이싱 / 홍콩(쉬움)·서울(어려움) 2바퀴, 싱가포르(보통) 3바퀴 완주 시간 개인전 (WASD·방향키)">
+<meta property="og:description" content="3D 실사 레이싱 / 홍콩·서울 2바퀴, 싱가포르 3바퀴 완주 시간 개인전 (WASD·방향키)">
 <meta property="og:url" content="https://cornsilktea.github.io/24.turbo-lap.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
@@ -98,7 +98,7 @@
   #hudGhost { position: fixed; left: 50%; transform: translateX(-50%); top: 118px; z-index: 5; display: none; pointer-events: none; font-size: 12px; padding: 3px 10px; }
   @media (max-width: 520px) { .cars { grid-template-columns: repeat(2, 1fr); } }
   .final { font-size: clamp(40px, 9vw, 58px); font-weight: 800; font-variant-numeric: tabular-nums; color: var(--sg-primary); line-height: 1.1; }
-  .diffTag { display: inline-block; padding: 2px 12px; border-radius: 8px; background: var(--sg-panel-alt); border: 2px solid var(--sg-line-mid); font-size: 14px; font-weight: 800; margin-bottom: 6px; }
+  .courseTag { display: inline-block; padding: 2px 12px; border-radius: 8px; background: var(--sg-panel-alt); border: 2px solid var(--sg-line-mid); font-size: 14px; font-weight: 800; margin-bottom: 6px; }
   .msg { font-size: 16px; font-weight: 800; color: #D97B4F; min-height: 20px; margin: 6px 0 2px; }
   .hint { font-size: 12px; color: var(--sg-ink-faint); margin-top: 12px; }
   @media (max-width: 520px) {
@@ -138,9 +138,9 @@
     <table class="rtab">
       <thead><tr><th>코스</th><th>나의 최고 기록</th><th>🏆 세계신기록</th><th class="clsCol" hidden>🏫 우리 반</th></tr></thead>
       <tbody>
-        <tr><td>홍콩<small style="font-weight:400">쉬움 · 2바퀴</small></td><td><em id="bestEasy">—</em></td><td><em id="wrEasy">—</em><small id="wrWhoEasy"></small></td><td class="clsCol" hidden><em id="crEasy">—</em><small id="crWhoEasy"></small></td></tr>
-        <tr><td>싱가포르<small style="font-weight:400">보통 · 3바퀴</small></td><td><em id="bestHard">—</em></td><td><em id="wrHard">—</em><small id="wrWhoHard"></small></td><td class="clsCol" hidden><em id="crHard">—</em><small id="crWhoHard"></small></td></tr>
-        <tr><td>서울<small style="font-weight:400">어려움 · 2바퀴</small></td><td><em id="bestExpert">—</em></td><td><em id="wrExpert">—</em><small id="wrWhoExpert"></small></td><td class="clsCol" hidden><em id="crExpert">—</em><small id="crWhoExpert"></small></td></tr>
+        <tr><td>홍콩<small style="font-weight:400">2바퀴</small></td><td><em id="bestHongkong">—</em></td><td><em id="wrHongkong">—</em><small id="wrWhoHongkong"></small></td><td class="clsCol" hidden><em id="crHongkong">—</em><small id="crWhoHongkong"></small></td></tr>
+        <tr><td>싱가포르<small style="font-weight:400">3바퀴</small></td><td><em id="bestSingapore">—</em></td><td><em id="wrSingapore">—</em><small id="wrWhoSingapore"></small></td><td class="clsCol" hidden><em id="crSingapore">—</em><small id="crWhoSingapore"></small></td></tr>
+        <tr><td>서울<small style="font-weight:400">2바퀴</small></td><td><em id="bestSeoul">—</em></td><td><em id="wrSeoul">—</em><small id="wrWhoSeoul"></small></td><td class="clsCol" hidden><em id="crSeoul">—</em><small id="crWhoSeoul"></small></td></tr>
       </tbody>
     </table>
     <div class="keys">
@@ -151,9 +151,9 @@
       <p><b>W / ↑</b> 가속<br><b>S / ↓</b> 브레이크·후진<br><b>A D / ← →</b> 조향<br><b>R</b> 처음부터 다시</p>
     </div>
     <div class="btns">
-      <button type="button" class="btn" id="btnEasy">홍콩<small>쉬움</small></button>
-      <button type="button" class="btn mid" id="btnHard">싱가포르<small>보통</small></button>
-      <button type="button" class="btn hard" id="btnExpert">서울<small>어려움</small></button>
+      <button type="button" class="btn" id="btnHongkong">홍콩<small>2바퀴</small></button>
+      <button type="button" class="btn mid" id="btnSingapore">싱가포르<small>3바퀴</small></button>
+      <button type="button" class="btn hard" id="btnSeoul">서울<small>2바퀴</small></button>
     </div>
     <div class="hint">트랙을 벗어나면 느려지고, 울타리에 부딪히면 크게 감속합니다.</div>
     <div class="wipe"><button type="button" id="btnWipe">이 기기의 나의 최고 기록·고스트 지우기</button></div>
@@ -181,7 +181,7 @@
 
   <div class="card" id="cardDone" style="display:none">
     <div class="logo" style="font-size:38px">🏁 완주!</div>
-    <div class="diffTag" id="doneDiff">쉬움</div>
+    <div class="courseTag" id="doneCourse">홍콩</div>
     <div class="final" id="finalTime">0:00.00</div>
     <div class="msg" id="finalMsg"></div>
     <div class="laps" id="lapList"></div>
@@ -211,11 +211,15 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { RGBELoader } from "three/addons/loaders/RGBELoader.js";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 (function () {
 "use strict";
 
 const CREDITS_HTML = "저작권 · 자동차 모델 “Car Concept” © Eric Chadwick (CC BY 4.0, Khronos glTF Sample Assets)<br>" +
-  "하늘 HDRI Greg Zaal·Jarod Guest, 아스팔트·나무껍질 Dimitrios Savva, 나뭇잎 Rob Tuytel (Poly Haven, CC0) · 잔디 Lennart Demes (ambientCG, CC0)";
+  "하늘 HDRI Greg Zaal·Jarod Guest, 아스팔트·나무껍질 Dimitrios Savva, 나뭇잎 Rob Tuytel (Poly Haven, CC0) · 잔디 Lennart Demes, 건물 외벽·보도블록·콘크리트·벽돌 사진 (ambientCG, CC0)";
 document.querySelectorAll(".creditText").forEach(el => { el.innerHTML = CREDITS_HTML; });
 
 const CFG = {
@@ -247,26 +251,29 @@ const CFG = {
   kmh: 4
 };
 const TRACKS = {
-  easy: {
-    key: "easy", recKey: "hongkong", name: "홍콩", width: 14, laps: 2, theme: "hongkong", samples: 900,
+  hongkong: {
+    key: "hongkong", recKey: "hkcircuit", name: "홍콩", width: 11, laps: 2, theme: "hongkong", samples: 1300,
     points: [
-      [150, 0, 188], [70, 0, 192], [-10, 0, 190], [-62, 0, 200], [-88, 0, 235], [-94, 0, 290], [-102, 0, 340], [-135, 0, 365],
-      [-185, 0, 360], [-222, 0, 325], [-232, 0, 270], [-234, 0, 215], [-235, 3, 150], [-236, 9, 100], [-236, 12, 40], [-236, 12, -40],
-      [-236, 9, -100], [-235, 3, -150], [-228, 0, -190], [-195, 0, -212], [-120, 0, -218], [-30, 0, -215], [60, 0, -212], [140, 0, -208],
-      [185, 0, -200], [212, 0, -180], [222, 3, -150], [224, 9, -100], [225, 12, -40], [225, 12, 40], [224, 9, 100], [222, 3, 150],
-      [210, 0, 178], [190, 0, 187]
+      [60, 0, 196], [20, 0, 192], [-25, 0, 196], [-62, 0, 212], [-78, 0, 250], [-70, 0, 290], [-88, 0, 325], [-125, 0, 345],
+      [-160, 0, 338], [-172, 0, 305], [-150, 0, 280], [-120, 0, 262], [-125, 0, 235], [-160, 0, 224], [-205, 0, 230], [-228, 0, 205],
+      [-234, 1, 170], [-235, 4, 135], [-236, 9, 100], [-236, 12, 40], [-236, 12, -40], [-236, 9, -100], [-234, 4, -135], [-230, 1, -170],
+      [-225, 2, -205], [-218, 8, -245], [-212, 17, -285], [-214, 26, -325], [-222, 35, -362], [-212, 45, -400], [-185, 53, -428],
+      [-140, 59, -442], [-80, 62, -448], [-20, 62, -450], [40, 61, -448], [85, 59, -440],
+      [104, 55, -418], [98, 47, -388], [90, 36, -350], [82, 24, -310], [78, 13, -275], [85, 5, -248], [105, 1, -228], [150, 0, -214],
+      [195, 0, -202], [217, 1, -178], [222, 4, -135], [224, 9, -100], [225, 12, -40], [225, 12, 40], [224, 9, 100], [222, 4, 135],
+      [216, 1, 168], [208, 0, 212], [180, 0, 248], [135, 0, 255], [105, 0, 230], [85, 0, 205]
     ]
   },
-  hard: {
-    key: "hard", name: "싱가포르", width: 11, trees: 110, laps: 3, theme: "singapore",
+  singapore: {
+    key: "singapore", recKey: "hard", name: "싱가포르", width: 11, trees: 110, laps: 3, theme: "singapore",
     points: [
       [-90, 0, 95], [20, 0, 95], [80, 0, 80], [110, 0, 40], [85, 0, 10], [45, 0, 25], [20, 0, -5],
       [50, 4, -40], [100, 9, -70], [120, 3, -115], [60, 0, -135], [0, 4, -110], [-50, 10, -130],
       [-105, 5, -100], [-140, 0, -70], [-135, 0, -40], [-95, 0, -20], [-100, 0, 5], [-135, 0, 35], [-125, 0, 80]
     ]
   },
-  expert: {
-    key: "expert", recKey: "seoulcity", name: "서울", width: 12, laps: 2, theme: "seoul", samples: 1000,
+  seoul: {
+    key: "seoul", recKey: "seoulcity", name: "서울", width: 12, laps: 2, theme: "seoul", samples: 1000,
     points: [
       [-230, 0, -30], [-120, 0, -30], [-30, 0, -32], [0, 0, -8], [40, 0, 8], [80, 0, -8], [110, 0, -32],
       [170, 0, -40], [240, 0, -42], [300, 0, -28], [340, 0, 10], [356, 2, 55], [360, 9, 95], [361, 12, 150],
@@ -276,7 +283,7 @@ const TRACKS = {
     ]
   }
 };
-const DIFFS = Object.keys(TRACKS);
+const COURSES = Object.keys(TRACKS);
 function capKey(k) { return k[0].toUpperCase() + k.slice(1); }
 let LAPS = CFG.laps;
 const CARS = {
@@ -286,7 +293,7 @@ const CARS = {
   red:    { name: "빨강", color: 0xFF5A4E, model: "p911" }
 };
 let carKey = "blue"; try { if (CARS[localStorage.getItem("turbolap_car_v1")]) carKey = localStorage.getItem("turbolap_car_v1"); } catch (e) {}
-let pendingDiff = "easy"; try { if (TRACKS[localStorage.getItem("turbolap_course_v1")]) pendingDiff = localStorage.getItem("turbolap_course_v1"); } catch (e) {}
+let pendingCourse = "hongkong"; try { if (TRACKS[localStorage.getItem("turbolap_course_v1")]) pendingCourse = localStorage.getItem("turbolap_course_v1"); } catch (e) {}
 
 const $ = id => document.getElementById(id);
 
@@ -294,10 +301,10 @@ function recKey(k) { return TRACKS[k].recKey || k; }
 function bestKey(k) { return "turbolap_best_" + recKey(k) + "_v1"; }
 function loadBest(k) { try { const v = parseInt(localStorage.getItem(bestKey(k)), 10); return v > 0 ? v : 0; } catch (e) { return 0; } }
 function saveBest(k, v) { try { localStorage.setItem(bestKey(k), String(v)); } catch (e) {} }
-const best = {}; DIFFS.forEach(k => { best[k] = loadBest(k); });
+const best = {}; COURSES.forEach(k => { best[k] = loadBest(k); });
 const GHOST_STEP = 100;
 let ghostPick = "none"; try { if (/^(none|mine|world)$/.test(localStorage.getItem("turbolap_ghostpick_v1") || "")) ghostPick = localStorage.getItem("turbolap_ghostpick_v1"); } catch (e) {}
-const worldGhost = { tried: {} }; DIFFS.forEach(k => { worldGhost[k] = null; worldGhost.tried[k] = false; });
+const worldGhost = { tried: {} }; COURSES.forEach(k => { worldGhost[k] = null; worldGhost.tried[k] = false; });
 let ghostPlay = null, ghostCar = null, ghostCarKey = null, ghostIdx = 0, ghostLabel = "", ghostShort = "";
 let recData = [], recLast = -Infinity;
 function ghostKey(k) { return "turbolap_ghost_" + recKey(k) + "_v1"; }
@@ -327,7 +334,7 @@ function uploadWorldGhost(k, rec, data, retry) {
 }
 function worldGhostValid(k) { const g = worldGhost[k], WR = WRS[k]; return !!(g && WR && WR.rec && g.score === WR.rec.score); }
 function renderGhostButtons() {
-  const k = (state === "menu") ? pendingDiff : diff, mine = loadMyGhost(k), wv = worldGhostValid(k);
+  const k = (state === "menu") ? pendingCourse : course, mine = loadMyGhost(k), wv = worldGhostValid(k);
   if ((ghostPick === "mine" && !mine) || (ghostPick === "world" && !wv)) ghostPick = "none";
   document.querySelectorAll(".ghostbtn").forEach(b => {
     const g = b.getAttribute("data-ghost"), sm = b.querySelector("small");
@@ -352,8 +359,8 @@ function setupGhost() {
   if (ghostCar) { scene.remove(ghostCar); ghostCar = null; }
   ghostPlay = null; ghostLabel = ""; ghostShort = ""; ghostIdx = 0;
   let src = null, gcar = carKey;
-  if (ghostPick === "mine") { const m = loadMyGhost(diff); if (m) { src = m.data; gcar = m.car || carKey; ghostShort = "나의 최고 기록"; ghostLabel = ghostShort + " " + fmtTime(m.ms); } }
-  else if (ghostPick === "world" && worldGhostValid(diff)) { const wg = worldGhost[diff]; src = wg.data; gcar = wg.car || carKey; ghostShort = "세계신기록"; ghostLabel = ghostShort + " " + fmtTime(WRS[diff].value()); }
+  if (ghostPick === "mine") { const m = loadMyGhost(course); if (m) { src = m.data; gcar = m.car || carKey; ghostShort = "나의 최고 기록"; ghostLabel = ghostShort + " " + fmtTime(m.ms); } }
+  else if (ghostPick === "world" && worldGhostValid(course)) { const wg = worldGhost[course]; src = wg.data; gcar = wg.car || carKey; ghostShort = "세계신기록"; ghostLabel = ghostShort + " " + fmtTime(WRS[course].value()); }
   if (!src) return;
   try { const arr = JSON.parse(src); if (Array.isArray(arr) && arr.length > 1) ghostPlay = arr; } catch (e) {}
   if (!ghostPlay) { ghostLabel = ""; return; }
@@ -380,7 +387,7 @@ function fmtTime(ms) {
   return m + ":" + String(s).padStart(2, "0") + "." + String(c).padStart(2, "0");
 }
 const WRS = {};
-DIFFS.forEach(k => { WRS[k] = window.WorldRecord ? WorldRecord("turbolap", { key: recKey(k), lower: true, format: fmtTime }) : null; });
+COURSES.forEach(k => { WRS[k] = window.WorldRecord ? WorldRecord("turbolap", { key: recKey(k), lower: true, format: fmtTime }) : null; });
 const wrTried = {};
 function wrInfo(k) {
   const WR = WRS[k];
@@ -398,14 +405,14 @@ function crInfo(k) {
 }
 function setVal(el, text, none, cls) { el.textContent = text; el.className = cls + (none ? " none" : ""); }
 function renderRecords() {
-  DIFFS.forEach(k => {
+  COURSES.forEach(k => {
     const cap = capKey(k), w = wrInfo(k);
     setVal($("best" + cap), best[k] > 0 ? fmtTime(best[k]) : "아직 없음", !(best[k] > 0), "");
     setVal($("wr" + cap), w.val, w.none, ""); $("wrWho" + cap).textContent = w.who;
     const c = crInfo(k);
     if (c) { setVal($("cr" + cap), c.val, c.none, ""); $("crWho" + cap).textContent = c.who; }
   });
-  const k = diff, w = wrInfo(k), c = crInfo(k);
+  const k = course, w = wrInfo(k), c = crInfo(k);
   setVal($("bestDone"), best[k] > 0 ? fmtTime(best[k]) : "아직 없음", !(best[k] > 0), "val");
   setVal($("wrDone"), w.val, w.none, "val"); $("wrWhoDone").textContent = w.who;
   if (c) { setVal($("crDone"), c.val, c.none, "val"); $("crWhoDone").textContent = c.who; }
@@ -465,7 +472,7 @@ const HQ_MANAGER = new THREE.LoadingManager(
   url => { HQ_LOAD.failed.push(String(url).split("/").pop()); renderLoadGate(); });
 function renderLoadGate() {
   const ok = HQ_LOAD.ready && !!SUPERCAR.tpl;
-  ["btnEasy", "btnHard", "btnExpert"].forEach(id => { $(id).disabled = !ok; });
+  ["btnHongkong", "btnSingapore", "btnSeoul"].forEach(id => { $(id).disabled = !ok; });
   const note = $("loadNote");
   if (!HQ_LOAD.ready) note.textContent = "그래픽 자료 불러오는 중… " + HQ_LOAD.loaded + " / " + (HQ_LOAD.total || "?") + (HQ_LOAD.slow ? " — 인터넷이 느리면 조금 더 기다려 주세요" : "");
   else if (!SUPERCAR.tpl) note.textContent = "자동차 모델을 불러오지 못했습니다. 새로 고침(F5) 해 주세요.";
@@ -493,14 +500,51 @@ const HQM = {};
 const WORLD = {};
 const ATMOSPHERE = {
   seoul: { near: 350, far: 3300, camFar: 4200, paved: true },
-  hongkong: { near: 320, far: 3000, camFar: 4200, paved: true },
+  hongkong: { near: 260, far: 2600, camFar: 4200, paved: true, night: true },
   singapore: { near: 330, far: 2700, camFar: 3600, paved: false }
 };
+const NIGHT = { on: false, sky: null, fog: new THREE.Color(0x1A2238), composer: null, bloom: null, headlight: null };
+function nightSkyTexture() {
+  const t = canvasTex(2048, 1024, (c, w, h) => {
+    const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, "#02040C"); g.addColorStop(0.36, "#08112A"); g.addColorStop(0.49, "#2A2F52"); g.addColorStop(0.53, "#4A3A4E"); g.addColorStop(0.6, "#10131E"); g.addColorStop(1, "#05060A");
+    c.fillStyle = g; c.fillRect(0, 0, w, h);
+    for (let i = 0; i < 900; i++) { const y = Math.pow(Math.random(), 1.6) * h * 0.46, a = rnd(0.15, 0.8); c.fillStyle = "rgba(255,255,255," + a.toFixed(2) + ")"; c.fillRect(rnd(0, w), y, 1, 1); }
+    const m = c.createRadialGradient(w * 0.62, h * 0.2, 2, w * 0.62, h * 0.2, 26); m.addColorStop(0, "#FFFBEA"); m.addColorStop(0.45, "#FFF3C8"); m.addColorStop(1, "rgba(255,243,200,0)");
+    c.fillStyle = m; c.beginPath(); c.arc(w * 0.62, h * 0.2, 26, 0, Math.PI * 2); c.fill();
+  });
+  t.mapping = THREE.EquirectangularReflectionMapping; t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+function setupNight() {
+  const size = new THREE.Vector2(); renderer.getSize(size);
+  const target = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: 4 });
+  NIGHT.composer = new EffectComposer(renderer, target);
+  NIGHT.composer.addPass(new RenderPass(scene, camera));
+  NIGHT.bloom = new UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.55, 0.4, 0.92);
+  NIGHT.composer.addPass(NIGHT.bloom);
+  NIGHT.composer.addPass(new OutputPass());
+  NIGHT.composer.setPixelRatio(renderer.getPixelRatio()); NIGHT.composer.setSize(size.x, size.y);
+  NIGHT.headlight = new THREE.SpotLight(0xFFF1DC, 90, 90, 0.42, 0.55, 1.1);
+  NIGHT.headlight.visible = false; scene.add(NIGHT.headlight); scene.add(NIGHT.headlight.target);
+}
+function setNight(on) {
+  NIGHT.on = on;
+  if (on && !NIGHT.composer) setupNight();
+  if (on && !NIGHT.sky) NIGHT.sky = nightSkyTexture();
+  scene.background = on ? NIGHT.sky : (WORLD.daySky || scene.background);
+  scene.fog.color.copy(on ? NIGHT.fog : (WORLD.dayFog || scene.fog.color));
+  WORLD.hemi.color.setHex(on ? 0x6479B0 : 0xD8E8FF); WORLD.hemi.groundColor.setHex(on ? 0x2A2630 : 0x55703F); WORLD.hemi.intensity = on ? 0.55 : 0.45;
+  sun.color.setHex(on ? 0x9DB2FF : 0xFFF2DF); sun.intensity = on ? 0.45 : 3.0;
+  scene.environmentIntensity = on ? 0.12 : 0.9;
+  renderer.toneMappingExposure = on ? 0.9 : HQ_EXPOSURE;
+  if (NIGHT.headlight) NIGHT.headlight.visible = on;
+}
 function applyAtmosphere(def) {
   const a = ATMOSPHERE[def.theme] || { near: 280, far: 1600, camFar: 1700, paved: false };
   scene.fog.near = a.near; scene.fog.far = a.far; camera.far = a.camFar;
   WORLD.ground.visible = !a.paved;
   camera.updateProjectionMatrix();
+  setNight(!!a.night);
 }
 
 function worldUvMaterial(params, tile, macro) {
@@ -515,8 +559,9 @@ function worldUvMaterial(params, tile, macro) {
   m.customProgramCacheKey = () => "worldUv" + tile + (macro ? "M" : "");
   return m;
 }
-function hqTex(name, srgb, fallbackColor) {
-  const t = new THREE.TextureLoader(HQ_MANAGER).load(HQ_DIR + name, undefined, undefined, () => {
+const REAL_DIR = "img/turbo/real/";
+function hqTex(name, srgb, fallbackColor, dir) {
+  const t = new THREE.TextureLoader(HQ_MANAGER).load((dir || HQ_DIR) + name, undefined, undefined, () => {
     console.warn("[turbolap] 고화질 텍스처를 못 불러옴:", name);
     const cv = document.createElement("canvas"); cv.width = cv.height = 2;
     const c = cv.getContext("2d"); c.fillStyle = fallbackColor || "#8080FF"; c.fillRect(0, 0, 2, 2);
@@ -553,6 +598,11 @@ function initMaterialsHQ() {
   leafMap.repeat.set(3, 3); leafNormal.repeat.set(3, 3);
   HQM.leaves = new THREE.MeshStandardMaterial({ map: leafMap, normalMap: leafNormal, roughness: 0.88 });
   HQM.palmLeaves = HQM.leaves.clone(); HQM.palmLeaves.side = THREE.DoubleSide;
+  const real = (n, srgb) => hqTex(n, srgb, srgb ? "#707070" : "#8080FF", REAL_DIR);
+  HQM.real = {};
+  ["facade_glass", "facade_mirror", "facade_office", "facade_concrete", "night_blinds", "night_dense", "night_grid", "night_brown", "paving", "plaza", "concrete_light", "concrete", "brick", "stone_block"].forEach(k => { HQM.real[k] = real(k + "_color.jpg", true); });
+  ["facade_office", "facade_concrete", "paving", "plaza", "concrete_light", "concrete", "brick", "stone_block"].forEach(k => { HQM.real[k + "N"] = real(k + "_normal.jpg", false); });
+  ["night_blinds", "night_dense", "night_grid", "night_brown"].forEach(k => { HQM.real[k + "E"] = real(k + "_emit.jpg", true); });
 }
 function brightestDirection(tex) {
   const { data, width, height } = tex.image, half = data instanceof Uint16Array;
@@ -579,7 +629,7 @@ function setupWorld() {
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   scene.background = new THREE.Color(0xA9C6E2);
   scene.fog = new THREE.Fog(0xC9D9E8, 280, 1600);
-  scene.add(new THREE.HemisphereLight(0xD8E8FF, 0x55703F, 0.45));
+  WORLD.hemi = new THREE.HemisphereLight(0xD8E8FF, 0x55703F, 0.45); scene.add(WORLD.hemi);
   sun = new THREE.DirectionalLight(0xFFF2DF, 3.0);
   sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
   Object.assign(sun.shadow.camera, { left: -SUN_BOX, right: SUN_BOX, top: SUN_BOX, bottom: -SUN_BOX, near: 1, far: 320 });
@@ -591,12 +641,13 @@ function setupWorld() {
   new RGBELoader(HQ_MANAGER).load(HQ_DIR + "sky_1k.hdr", hdr => {
     hdr.mapping = THREE.EquirectangularReflectionMapping;
     SUN_DIR.copy(brightestDirection(hdr));
-    HQENV.hdr = hdr; scene.environment = envFromHdr(renderer, hdr); scene.environmentIntensity = 0.9;
+    HQENV.hdr = hdr; scene.environment = envFromHdr(renderer, hdr); scene.environmentIntensity = NIGHT.on ? 0.12 : 0.9;
     HQENV.ready.forEach(f => f(hdr)); HQENV.ready = [];
   }, undefined, err => console.warn("[turbolap] 하늘 HDRI를 못 불러옴:", err));
   new THREE.TextureLoader(HQ_MANAGER).load(HQ_DIR + "sky.jpg", t => {
     t.mapping = THREE.EquirectangularReflectionMapping; t.colorSpace = THREE.SRGBColorSpace;
-    scene.background = t; scene.fog.color.copy(horizonColor(t.image));
+    WORLD.daySky = t; WORLD.dayFog = horizonColor(t.image);
+    if (!NIGHT.on) { scene.background = t; scene.fog.color.copy(WORLD.dayFog); }
   }, undefined, () => console.warn("[turbolap] 하늘 배경을 못 불러옴"));
 }
 const SUN_BOX = 36, SUN_TEXEL = SUN_BOX * 2 / 2048;
@@ -612,7 +663,7 @@ function followSun() {
 setupWorld();
 
 
-let diff = pendingDiff;
+let course = pendingCourse;
 let S = [], N = CFG.samples, W = 14, SEG = 1, TRACK_LEN = 1, MM = null;
 const SH = CFG.shoulder;
 let trackGroup = null;
@@ -918,11 +969,12 @@ function facadeMaterial(p, tileU, roofHex, tileV) {
       "\tvec4 facadeW = facadeM * vec4(position, 1.0);\n\tvec3 facadeN = normalize(mat3(facadeM) * normal);\n\tvFacadeRoof = abs(facadeN.y);\n" +
       "\tvec2 facadeT = normalize(vec2(-facadeN.z, facadeN.x) + vec2(1e-5, 0.0));\n" +
       "\tvMapUv = vec2(dot(facadeW.xz, facadeT) / " + tileU.toFixed(2) + ", facadeW.y / " + tv.toFixed(2) + ");\n" +
-      "#ifdef USE_NORMALMAP\n\tvNormalMapUv = vMapUv;\n#endif");
+      "#ifdef USE_NORMALMAP\n\tvNormalMapUv = vMapUv;\n#endif\n#ifdef USE_EMISSIVEMAP\n\tvEmissiveMapUv = vMapUv;\n#endif");
     sh.fragmentShader = "uniform vec3 facadeRoof;\nvarying float vFacadeRoof;\n" + sh.fragmentShader.replace("#include <map_fragment>",
-      "#include <map_fragment>\n\tif (vFacadeRoof > 0.5) diffuseColor.rgb = facadeRoof;");
+      "#include <map_fragment>\n\tif (vFacadeRoof > 0.5) diffuseColor.rgb = facadeRoof;").replace("#include <emissivemap_fragment>",
+      "#include <emissivemap_fragment>\n\tif (vFacadeRoof > 0.5) totalEmissiveRadiance *= 0.0;");
   };
-  m.customProgramCacheKey = () => "facade" + tileU + "_" + tv + "_" + roofHex;
+  m.customProgramCacheKey = () => "facade" + tileU + "_" + tv + "_" + roofHex + (p.emissiveMap ? "E" : "");
   return m;
 }
 function scaleBoxUv(geo, w, h, d, cellU, cellV) {
@@ -930,24 +982,7 @@ function scaleBoxUv(geo, w, h, d, cellU, cellV) {
   for (let f = 0; f < 6; f++) for (let k = 0; k < 4; k++) { const i = f * 4 + k; uv.setXY(i, uv.getX(i) * dims[f][0] / cellU, uv.getY(i) * dims[f][1] / cellV); }
   return geo;
 }
-function stoneCell(x, y, size) {
-  const rows = 4, bh = size / rows, r = Math.floor(y / bh), bw = size / 3, xx = ((x + (r % 2) * bw / 2) % size + size) % size, k = Math.floor(xx / bw);
-  return { id: r * 3 + k, e: Math.min(xx - k * bw, (k + 1) * bw - xx, y - r * bh, (r + 1) * bh - y) };
-}
 const SEOUL_DRAW = {
-  glass(c, w, h) {
-    const g = c.createLinearGradient(0, 0, w, h); g.addColorStop(0, "#4E7189"); g.addColorStop(1, "#8FAEC2"); c.fillStyle = g; c.fillRect(0, 0, w, h);
-    for (let i = 0; i < 64; i++) { c.fillStyle = "rgba(255,255,255," + rnd(0, 0.16).toFixed(2) + ")"; c.fillRect((i % 8) * w / 8, Math.floor(i / 8) * h / 8, w / 8, h / 8); }
-    c.fillStyle = "#D9E0E5"; for (let i = 0; i < 8; i++) { c.fillRect(i * w / 8, 0, 2, h); c.fillRect(0, i * h / 8, w, i % 2 ? 2 : 4); }
-  },
-  office(c, w, h) {
-    c.fillStyle = "#CDC7BC"; c.fillRect(0, 0, w, h);
-    for (let f = 0; f < 4; f++) for (let b = 0; b < 4; b++) {
-      c.fillStyle = Math.random() < 0.18 ? "#7890A8" : "#2F4155"; c.fillRect(b * w / 4 + 7, f * h / 4 + 10, w / 4 - 14, h / 4 - 20);
-      c.fillStyle = "rgba(255,255,255,0.18)"; c.fillRect(b * w / 4 + 7, f * h / 4 + 10, w / 4 - 14, 3);
-    }
-    c.fillStyle = "#B7B0A4"; for (let f = 0; f < 4; f++) c.fillRect(0, f * h / 4, w, 3);
-  },
   apartment(c, w, h) {
     c.fillStyle = "#EEECE6"; c.fillRect(0, 0, w, h);
     const fh = h / 5;
@@ -969,20 +1004,6 @@ const SEOUL_DRAW = {
       c.fillStyle = "#FFFFFF"; c.font = "bold " + Math.round(h * 0.18) + "px \"Nanum Gothic\", \"Malgun Gothic\", sans-serif"; c.textAlign = "center"; c.textBaseline = "middle";
       c.fillText(names[pick], x + sw / 2, 4 + h * 0.13);
     }
-  },
-  pavers(c, w, h) {
-    c.fillStyle = "#8E8A82"; c.fillRect(0, 0, w, h);
-    const n = 8, s = w / n;
-    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const v = Math.round(rnd(168, 196)); c.fillStyle = "rgb(" + v + "," + (v - 3) + "," + (v - 9) + ")"; c.fillRect(x * s + 1.5, y * s + 1.5, s - 3, s - 3); }
-  },
-  stone(c, w, h) {
-    const img = c.createImageData(w, h);
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-      const cell = stoneCell(x, y, w), o = (y * w + x) * 4;
-      let v = cell.e < 2 ? 128 : 170 + hash3(cell.id, 3, 7) * 34 + (hash3(x, y, 1) - 0.5) * 18;
-      img.data[o] = v; img.data[o + 1] = v - 5; img.data[o + 2] = v - 16; img.data[o + 3] = 255;
-    }
-    c.putImageData(img, 0, 0);
   },
   tiles(c, w, h) {
     for (let x = 0; x < w; x++) {
@@ -1071,28 +1092,27 @@ function waterNormalTexture() {
 function makeSeoulMaterials() {
   if (SEOUL_M) return SEOUL_M;
   const std = p => new THREE.MeshStandardMaterial(p), T = {};
-  ["glass", "office", "apartment", "pavers", "tiles", "rafters", "lattice", "gable", "door", "gold", "windowBand", "lotte"].forEach(k => { T[k] = seoulTex(256, 256, SEOUL_DRAW[k]); });
+  ["apartment", "tiles", "rafters", "lattice", "gable", "door", "gold", "windowBand", "lotte"].forEach(k => { T[k] = seoulTex(256, 256, SEOUL_DRAW[k]); });
   T.shop = seoulTex(512, 144, SEOUL_DRAW.shop);
-  T.stone = seoulTex(256, 256, SEOUL_DRAW.stone);
-  T.stoneN = heightNormalTex(256, 256, (x, y) => { const e = stoneCell(x, y, 256).e; return e < 2 ? 0 : Math.min(1, (e - 2) / 5) + hash3(x, y, 5) * 0.06; }, 2.2);
   T.tilesN = heightNormalTex(128, 128, (x, y) => Math.pow(Math.sin(Math.PI * (x % 16) / 16), 0.7) - (y % 32 < 3 ? 0.4 : 0), 1.8);
-  T.pavN = heightNormalTex(128, 128, (x, y) => (x % 16 < 1.5 || y % 16 < 1.5) ? 0 : 1, 0.8);
   T.dancheong = seoulTex(256, 64, SEOUL_DRAW.dancheong);
   T.bracket = seoulTex(256, 64, SEOUL_DRAW.bracket);
   T.diagrid = seoulTex(128, 128, SEOUL_DRAW.diagrid, true);
   T.mast = seoulTex(8, 64, SEOUL_DRAW.mast); T.mast.repeat.set(1, 9);
   T.windowBand.repeat.set(12, 1);
   SEOUL_M = {
-    glass: facadeMaterial({ map: T.glass, metalness: 0.6, roughness: 0.14 }, 16, 0x5E6266),
-    office: facadeMaterial({ map: T.office, roughness: 0.72 }, 14, 0x6A6A68),
+    glass: facadeMaterial({ map: HQM.real.facade_glass, metalness: 0.5, roughness: 0.16 }, 24, 0x5E6266),
+    office: facadeMaterial({ map: HQM.real.facade_office, normalMap: HQM.real.facade_officeN, roughness: 0.8 }, 18, 0x6A6A68),
+    concreteFacade: facadeMaterial({ map: HQM.real.facade_concrete, normalMap: HQM.real.facade_concreteN, roughness: 0.75 }, 13, 0x707070),
     apartment: facadeMaterial({ map: T.apartment, roughness: 0.85 }, 14, 0x7A7C80),
     shop: facadeMaterial({ map: T.shop, roughness: 0.45, metalness: 0.1 }, 16, 0x55585C, 4.6),
-    stone: facadeMaterial({ map: T.stone, normalMap: T.stoneN, roughness: 0.92 }, 3.6, 0xB5AD9F),
+    stone: facadeMaterial({ map: HQM.real.stone_block, normalMap: HQM.real.stone_blockN, color: 0xE6DED0, roughness: 0.92 }, 3.2, 0xB5AD9F),
     stoneLight: std({ color: 0xD9D3C5, roughness: 0.85 }),
-    sidewalk: worldUvMaterial({ map: T.pavers, normalMap: T.pavN, roughness: 0.9 }, 2.4, false),
+    sidewalk: worldUvMaterial({ map: HQM.real.paving, normalMap: HQM.real.pavingN, roughness: 0.9 }, 3, false),
+    plaza: worldUvMaterial({ map: HQM.real.plaza, normalMap: HQM.real.plazaN, roughness: 0.85 }, 4, false),
     pavement: worldUvMaterial({ map: HQM.asphalt.map, normalMap: HQM.asphalt.normalMap, roughness: 0.95, color: new THREE.Color(1.5, 1.5, 1.5) }, 5, false),
     concrete: std({ color: 0xB9B6AE, roughness: 0.85, side: THREE.DoubleSide }),
-    barrier: std({ color: 0xD6D3CB, roughness: 0.8, side: THREE.DoubleSide }),
+    barrier: std({ map: HQM.real.concrete_light, normalMap: HQM.real.concrete_lightN, roughness: 0.85, side: THREE.DoubleSide }),
     deck: std({ color: 0x8E8C85, roughness: 0.9, side: THREE.DoubleSide }),
     steel: std({ color: 0x9AA3AC, metalness: 0.6, roughness: 0.4 }),
     arch: std({ color: 0xC4552F, metalness: 0.35, roughness: 0.38 }),
@@ -1397,9 +1417,8 @@ function buildStreetDetails(G, M, centerLine) {
   if (centerLine) [[0.12, 0.3], [-0.12, -0.3]].forEach(([a, b]) => { ribbon(G, band(a, b, 0.064, 0.064), 1, M.yellow).receiveShadow = true; });
   const lampGeo = mergeGeometries([
     new THREE.CylinderGeometry(0.13, 0.18, 9, 8).translate(0, 4.5, 0),
-    new THREE.BoxGeometry(2.6, 0.18, 0.18).translate(-1.3, 8.9, 0),
-    new THREE.BoxGeometry(0.9, 0.22, 0.45).translate(-2.4, 8.8, 0)
-  ]);
+    new THREE.BoxGeometry(2.6, 0.18, 0.18).translate(-1.3, 8.9, 0)
+  ].concat(M.lampHead ? [] : [new THREE.BoxGeometry(0.9, 0.22, 0.45).translate(-2.4, 8.8, 0)]));
   const off = W / 2 + SH + 1.2, spots = [];
   for (let i = 6; i < N; i += 16) [1, -1].forEach(sg => {
     const e = edgeAt(i, off * sg, 0);
@@ -1409,6 +1428,14 @@ function buildStreetDetails(G, M, centerLine) {
   const lamps = new THREE.InstancedMesh(lampGeo, M.lamp, spots.length), mtx = new THREE.Matrix4(), q = new THREE.Quaternion(), one = new THREE.Vector3(1, 1, 1);
   spots.forEach(([e, a], k) => { q.setFromAxisAngle(WORLD_UP, a); lamps.setMatrixAt(k, mtx.compose(e, q, one)); });
   lamps.castShadow = true; lamps.frustumCulled = false; G.add(lamps);
+  if (!M.lampHead) return;
+  const heads = new THREE.InstancedMesh(new THREE.BoxGeometry(1.1, 0.3, 0.55).translate(-2.4, 8.78, 0), M.lampHead, spots.length);
+  const pools = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), M.lightPool, spots.length), v = new THREE.Vector3(), sc = new THREE.Vector3(15, 1, 15);
+  spots.forEach(([e, a], k) => {
+    q.setFromAxisAngle(WORLD_UP, a); heads.setMatrixAt(k, mtx.compose(e, q, one));
+    v.set(-5, 0.09, 0).applyQuaternion(q).add(e); pools.setMatrixAt(k, mtx.compose(v, q, sc));
+  });
+  heads.frustumCulled = false; pools.frustumCulled = false; pools.renderOrder = 1; G.add(heads); G.add(pools);
 }
 function streetTreeSpots(keepOut) {
   const spots = [], off = W / 2 + SH + 3.4, step = Math.max(1, Math.round(18 / SEG)), tints = [0x86A83E, 0x98B346, 0x7C9F3A];
@@ -1432,7 +1459,7 @@ function parkTreeSpots() {
   return spots;
 }
 function buildCity(G, M) {
-  const sets = { glass: [], office: [], apartment: [], shop: [] }, placed = [];
+  const sets = { glass: [], office: [], concreteFacade: [], apartment: [], shop: [] }, placed = [];
   const offBase = W / 2 + SH + 6;
   [1, -1].forEach(sg => {
     let i = 0;
@@ -1448,7 +1475,7 @@ function buildCity(G, M) {
       if (placed.some(p => Math.hypot(p[0] - x, p[1] - z) < p[2] + rad)) continue;
       placed.push([x, z, rad]);
       const h = Math.random() < 0.18 ? rnd(90, 170) : rnd(22, 70);
-      sets[Math.random() < (z > SEOUL.river.z1 ? 0.6 : 0.45) ? "glass" : "office"].push([x, z, len, h, depth, rot]);
+      sets[Math.random() < (z > SEOUL.river.z1 ? 0.6 : 0.45) ? "glass" : Math.random() < 0.5 ? "office" : "concreteFacade"].push([x, z, len, h, depth, rot]);
       sets.shop.push([x, z, len + 0.3, 4.6, depth + 0.3, rot]);
     }
   });
@@ -1460,7 +1487,7 @@ function buildCity(G, M) {
     if (placed.some(p => Math.hypot(p[0] - bx, p[1] - bz) < p[2] + rad)) continue;
     placed.push([bx, bz, rad]);
     if (apt) sets.apartment.push([bx, bz, w, rnd(40, 75), d, 0]);
-    else sets[Math.random() < 0.5 ? "glass" : "office"].push([bx, bz, w, Math.random() < 0.14 ? rnd(110, 210) : rnd(25, 95), d, rnd(-0.1, 0.1)]);
+    else sets[Math.random() < 0.5 ? "glass" : Math.random() < 0.5 ? "office" : "concreteFacade"].push([bx, bz, w, Math.random() < 0.14 ? rnd(110, 210) : rnd(25, 95), d, rnd(-0.1, 0.1)]);
   }
   const box = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), mtx = new THREE.Matrix4(), q = new THREE.Quaternion(), tint = new THREE.Color();
   Object.keys(sets).forEach(k => {
@@ -1574,7 +1601,7 @@ function nearestSampleInRange(a, b, z) {
   for (let i = a; i <= b; i++) { const d = Math.abs(S[i % N].p.z - z); if (d < bd) { bd = d; bi = i % N; } }
   return bi;
 }
-function groupAt(G, x, z, rot) { const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = rot || 0; G.add(g); return g; }
+function groupAt(G, x, z, rot) { const g = new THREE.Group(); g.position.set(x, G.userData.groundAt ? G.userData.groundAt(x, z) : 0, z); g.rotation.y = rot || 0; G.add(g); return g; }
 function buildFerrisWheel(G, M, o) {
   const g = groupAt(G, o.x, o.z, o.rot), rim = new THREE.Group(), R = o.r, rods = [], legs = [];
   rim.position.y = o.hub; g.add(rim);
@@ -1603,9 +1630,9 @@ function buildFerrisWheel(G, M, o) {
 const HK = {
   harbour: { z0: -80, z1: 80, water: -2.2 },
   hills: [
-    { x: 40, z: -880, r: 590, h: 470, pow: 1.5, seed: 2.2 },
-    { x: -720, z: -960, r: 540, h: 380, pow: 1.3, seed: 4.1 },
-    { x: 800, z: -980, r: 560, h: 400, pow: 1.35, seed: 5.3 },
+    { x: 20, z: -960, r: 560, h: 480, pow: 1.5, seed: 2.2 },
+    { x: -720, z: -1000, r: 540, h: 380, pow: 1.3, seed: 4.1 },
+    { x: 800, z: -1020, r: 560, h: 400, pow: 1.35, seed: 5.3 },
     { x: -1500, z: -820, r: 480, h: 220, pow: 1.0, seed: 6.7 },
     { x: 1550, z: -840, r: 480, h: 240, pow: 1.0, seed: 7.9 },
     { x: -700, z: 1350, r: 520, h: 250, pow: 1.0, seed: 1.1, rocky: true },
@@ -1623,7 +1650,9 @@ const HK = {
   hkcec: { x: 125, z: -125 },
   boc: { x: -40, z: -290 },
   hsbc: { x: -130, z: -285 },
-  cheungKong: { x: -215, z: -310 },
+  cheungKong: { x: -120, z: -360 },
+  midLevels: { z0: -235, z1: -470, z2: -640, z3: -730, h: 64, x0: -460, x1: -380, x2: 300, x3: 380 },
+  viewCorridor: { x0: 5, x1: 160, z0: -470, z1: -95 },
   center: { x: -300, z: -265 },
   centralPlaza: { x: 165, z: -290 },
   hopewell: { x: 260, z: -350 },
@@ -1633,47 +1662,12 @@ const HK = {
   peninsula: { x: 15, z: 245 },
   icc: { x: -340, z: 150 },
   reserve: [[-150, -138, 44], [-90, -150, 26], [-120, -178, 42], [-30, -140, 32], [8, -78, 22], [40, -125, 34], [125, -125, 72], [-40, -290, 48], [-130, -285, 40],
-    [-215, -310, 36], [-300, -265, 34], [165, -290, 44], [260, -350, 24], [30, 105, 12], [150, 120, 60], [75, 125, 32], [-40, 128, 28], [15, 245, 40], [8, 78, 22],
+    [-120, -360, 36], [-300, -265, 34], [165, -290, 44], [260, -350, 24], [30, 105, 12], [150, 120, 60], [75, 125, 32], [-40, 128, 28], [15, 245, 40], [8, 78, 22],
     [-340, 150, 46], [-350, 215, 72], [-450, 250, 36], [-470, 170, 36]]
 };
 let HK_M = null;
 const HK_FONT = n => "bold " + n + "px \"Malgun Gothic\", \"Microsoft JhengHei\", \"Nanum Gothic\", sans-serif";
 const HK_DRAW = {
-  resi(c, w, h) {
-    c.fillStyle = "#EEEAE2"; c.fillRect(0, 0, w, h);
-    const fh = h / 4, bw = w / 4, laundry = ["#D9534F", "#5BC0DE", "#F0AD4E", "#FFFFFF", "#5CB85C", "#9B59B6"];
-    for (let f = 0; f < 4; f++) for (let b = 0; b < 4; b++) {
-      const x = b * bw, y = f * fh;
-      c.fillStyle = "#D6D0C4"; c.fillRect(x + 5, y + 9, bw - 10, fh * 0.6);
-      const g = c.createLinearGradient(0, y + 12, 0, y + 12 + fh * 0.52); g.addColorStop(0, "#667D8F"); g.addColorStop(1, "#2C3A47");
-      c.fillStyle = g; c.fillRect(x + 8, y + 12, bw - 16, fh * 0.52);
-      c.fillStyle = "#E6E2DA"; c.fillRect(x + bw / 2 - 1.5, y + 12, 3, fh * 0.52);
-      if (Math.random() < 0.3) { c.fillStyle = "rgba(255,255,255,0.22)"; c.fillRect(x + 8, y + 12, bw - 16, 4); }
-      if (Math.random() < 0.55) {
-        const ax = x + (Math.random() < 0.5 ? 6 : bw - 26);
-        c.fillStyle = "#D8D8D4"; c.fillRect(ax, y + fh * 0.72, 20, 11);
-        c.fillStyle = "#9A9A96"; for (let k = 0; k < 5; k++) c.fillRect(ax + 2 + k * 4, y + fh * 0.72 + 2, 2, 7);
-      }
-      if (Math.random() < 0.3) {
-        c.strokeStyle = "#8A8A86"; c.lineWidth = 1; c.beginPath(); c.moveTo(x + 6, y + fh * 0.7); c.lineTo(x + bw - 6, y + fh * 0.7); c.stroke();
-        for (let k = 0; k < 4; k++) { c.fillStyle = laundry[(Math.random() * laundry.length) | 0]; c.fillRect(x + 9 + k * 11, y + fh * 0.7, 7, 8 + Math.random() * 5); }
-      }
-    }
-    c.fillStyle = "rgba(0,0,0,0.1)"; for (let f = 0; f < 4; f++) c.fillRect(0, f * fh + fh - 3, w, 3);
-    c.fillStyle = "rgba(90,80,70,0.2)"; c.fillRect(w / 2 - 1, 0, 2, h);
-  },
-  monster(c, w, h) {
-    ["#E7C6C0", "#C7D6E4", "#EADBA9", "#CFE2CC"].forEach((col, b) => { c.fillStyle = col; c.fillRect(b * w / 4, 0, w / 4, h); });
-    const rows = 8, cw = w / 8, rh = h / rows, bits = ["#C0392B", "#2980B9", "#F1C40F", "#FFFFFF", "#27AE60"];
-    for (let r = 0; r < rows; r++) for (let k = 0; k < 8; k++) {
-      const x = k * cw, y = r * rh;
-      c.fillStyle = "#39434C"; c.fillRect(x + 4, y + 5, cw - 8, rh * 0.5);
-      c.fillStyle = "rgba(255,255,255,0.5)"; c.fillRect(x + cw / 2 - 0.5, y + 5, 1, rh * 0.5);
-      if (Math.random() < 0.6) { c.fillStyle = "#D8D8D4"; c.fillRect(x + 5, y + rh * 0.66, cw - 12, 7); }
-      if (Math.random() < 0.35) { c.fillStyle = bits[(Math.random() * bits.length) | 0]; c.fillRect(x + 4 + Math.random() * 16, y + rh * 0.6, 5, 7); }
-    }
-    c.fillStyle = "rgba(0,0,0,0.14)"; for (let r = 0; r < rows; r++) c.fillRect(0, r * rh + rh - 2, w, 2);
-  },
   shop(c, w, h) {
     const names = ["茶餐廳", "金行", "藥房", "麵家", "士多", "電器", "鐘錶", "餅店"], cols = ["#C0392B", "#C99A12", "#1E8449", "#B03A2E", "#1F618D", "#7D3C98", "#117A65", "#AF601A"];
     for (let k = 0; k < 8; k++) {
@@ -1764,12 +1758,6 @@ const HK_DRAW = {
       }
     }
   },
-  brick(c, w, h) {
-    c.fillStyle = "#CFC6B5"; c.fillRect(0, 0, w, h);
-    for (let y = 0, r = 0; y < h; y += 16, r++) for (let x = -(r % 2) * 20; x < w; x += 40) {
-      const v = rnd(-14, 14); c.fillStyle = "rgb(" + Math.round(178 + v) + "," + Math.round(86 + v * 0.6) + "," + Math.round(58 + v * 0.4) + ")"; c.fillRect(x + 2, y + 2, 36, 12);
-    }
-  },
   clock(c, w, h) {
     c.fillStyle = "#E9E1CF"; c.fillRect(0, 0, w, h);
     c.fillStyle = "#FBFAF5"; c.beginPath(); c.arc(w / 2, h / 2, w * 0.44, 0, Math.PI * 2); c.fill(); c.strokeStyle = "#2B2B2B"; c.lineWidth = 7; c.stroke();
@@ -1801,43 +1789,120 @@ const HK_DRAW = {
     c.fillStyle = "#4B1A12"; for (let y = 0; y < h; y += 32) c.fillRect(0, y, w, 4);
   }
 };
+const HK_WARM = ["#FFD9A0", "#FFE7C0", "#FFC98A", "#FFF3DE"], HK_COOL = ["#DDEBFF", "#FFFFFF", "#CFE3FF", "#EAF4FF"];
+function litColor(palette) { const c = new THREE.Color(palette[(Math.random() * palette.length) | 0]).multiplyScalar(rnd(0.45, 1)); return "#" + c.getHexString(); }
+function litCells(c, cols, rows, w, h, rect, p, palette, rowP) {
+  c.fillStyle = "#000"; c.fillRect(0, 0, w, h);
+  for (let r = 0; r < rows; r++) {
+    const rowOn = rowP === undefined || Math.random() < rowP;
+    for (let k = 0; k < cols; k++) {
+      if (!rowOn || Math.random() > p) continue;
+      const [x, y, rw, rh] = rect(k * w / cols, r * h / rows, w / cols, h / rows);
+      c.fillStyle = litColor(palette); c.fillRect(x, y, rw, rh);
+    }
+  }
+}
+const HK_LIT = {
+  ifc(c, w, h) { litCells(c, 16, 8, w, h, (x, y, cw, ch) => [x + 3, y + 2, cw - 3, ch - 4], 0.9, HK_COOL, 0.75); c.fillStyle = "#9FB8D8"; for (let x = 0; x < w; x += 16) c.fillRect(x, 0, 2, h); },
+  grid(c, w, h) { litCells(c, 16, 16, w, h, (x, y, cw, ch) => [x + 2, y + 2, cw - 3, ch - 3], 0.55, HK_COOL.concat(HK_WARM), 0.8); },
+  hsbc(c, w, h) { litCells(c, 8, 16, w, h, (x, y, cw, ch) => [x + 3, y + 5, cw - 5, ch - 7], 0.8, HK_COOL, 0.7); },
+  jardine(c, w, h) {
+    c.fillStyle = "#000"; c.fillRect(0, 0, w, h);
+    for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) if (Math.random() < 0.65) { c.fillStyle = litColor(HK_WARM); c.beginPath(); c.arc(x * 64 + 32, y * 64 + 32, 18, 0, Math.PI * 2); c.fill(); }
+  },
+  colonial(c, w, h) {
+    c.fillStyle = "#000"; c.fillRect(0, 0, w, h);
+    const fh = h / 3, bw = w / 3;
+    for (let f = 0; f < 3; f++) for (let b = 0; b < 3; b++) {
+      if (Math.random() > 0.8) continue;
+      const x = b * bw + bw * 0.3, y = f * fh + fh * 0.22, ww = bw * 0.4, wh = fh * 0.55;
+      c.fillStyle = litColor(HK_WARM); c.beginPath(); c.moveTo(x, y + wh); c.lineTo(x, y + ww / 2); c.arc(x + ww / 2, y + ww / 2, ww / 2, Math.PI, 0); c.lineTo(x + ww, y + wh); c.fill();
+    }
+    c.fillStyle = "#6A5A3A"; for (let f = 0; f < 3; f++) c.fillRect(0, f * fh + fh - 8, w, 8);
+  },
+  boc(c, w, h) {
+    litCells(c, 16, 16, w, h, (x, y, cw, ch) => [x + 2, y + 2, cw - 3, ch - 3], 0.4, HK_COOL, 0.6);
+    c.strokeStyle = "#FFFFFF"; c.lineWidth = 12; c.strokeRect(0, 0, w, h);
+    c.lineWidth = 8; c.beginPath(); c.moveTo(0, 0); c.lineTo(w, h); c.moveTo(w, 0); c.lineTo(0, h); c.stroke();
+  },
+  cplaza(c, w, h) { c.fillStyle = "#000"; c.fillRect(0, 0, w, h); for (let y = 0; y < h; y += 32) { c.fillStyle = "#FFFFFF"; c.fillRect(0, y, w, 7); } },
+  ferryWin(c, w, h) { c.fillStyle = "#000"; c.fillRect(0, 0, w, h); for (let k = 0; k < 4; k++) { c.fillStyle = litColor(HK_WARM); c.fillRect(k * 64 + 8, 29, 48, 52); } },
+  clock(c, w, h) { c.fillStyle = "#000"; c.fillRect(0, 0, w, h); c.fillStyle = "#FFF6DA"; c.beginPath(); c.arc(w / 2, h / 2, w * 0.43, 0, Math.PI * 2); c.fill(); },
+  shop(c, w, h) {
+    const cols = ["#FF4A3D", "#FFC21A", "#2EE07A", "#FF5A4A", "#3DA0FF", "#C06CFF", "#2EE0C0", "#FF9A3D"], names = ["茶餐廳", "金行", "藥房", "麵家", "士多", "電器", "鐘錶", "餅店"];
+    c.fillStyle = "#000"; c.fillRect(0, 0, w, h);
+    for (let k = 0; k < 8; k++) {
+      const x = k * w / 8, sw = w / 8;
+      c.fillStyle = litColor(HK_WARM); c.fillRect(x + 4, h * 0.36, sw - 8, h * 0.6);
+      c.fillStyle = cols[k]; c.fillRect(x + 2, 4, sw - 4, h * 0.28);
+      c.fillStyle = "#FFFFFF"; c.font = HK_FONT(Math.round(h * 0.2)); c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(names[k], x + sw / 2, 4 + h * 0.14);
+    }
+  },
+  pool(c, w, h) {
+    const g = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2); g.addColorStop(0, "rgba(255,255,255,1)"); g.addColorStop(0.45, "rgba(255,255,255,0.45)"); g.addColorStop(1, "rgba(255,255,255,0)");
+    c.fillStyle = g; c.fillRect(0, 0, w, h);
+  },
+  streak(c, w, h) {
+    for (let y = 0; y < h; y++) {
+      const a = Math.pow(1 - y / h, 1.6);
+      const g = c.createLinearGradient(0, 0, w, 0); g.addColorStop(0, "rgba(255,255,255,0)"); g.addColorStop(0.5, "rgba(255,255,255," + a.toFixed(3) + ")"); g.addColorStop(1, "rgba(255,255,255,0)");
+      c.fillStyle = g; c.fillRect(0, y, w, 1);
+    }
+    for (let y = 0; y < h; y += 3) { c.fillStyle = "rgba(0,0,0," + rnd(0, 0.7).toFixed(2) + ")"; c.fillRect(0, y, w, 1 + (Math.random() * 2 | 0)); }
+  }
+};
 function makeHKMaterials() {
   if (HK_M) return HK_M;
-  const std = p => new THREE.MeshStandardMaterial(p), T = {};
-  ["resi", "monster", "ifc", "boc", "hsbc", "truss", "jardine", "grid", "cplaza", "colonial", "brick", "clock", "pinkTile", "domeTile", "ferryWin", "sail"].forEach(k => { T[k] = seoulTex(256, 256, HK_DRAW[k]); });
+  const std = p => new THREE.MeshStandardMaterial(p), T = {}, L = {}, S0 = makeSeoulMaterials();
+  ["ifc", "grid", "hsbc", "jardine", "colonial", "boc", "cplaza", "ferryWin", "clock"].forEach(k => { L[k] = seoulTex(256, 256, HK_LIT[k]); });
+  L.shop = seoulTex(1024, 144, HK_LIT.shop);
+  L.cplaza.repeat.set(0.1, 1 / 12);
+  const pool = seoulTex(128, 128, HK_LIT.pool), streak = seoulTex(64, 256, HK_LIT.streak);
+  const nightPhoto = k => ({ map: HQM.real[k], emissiveMap: HQM.real[k + "E"], emissive: 0xFFFFFF, emissiveIntensity: 0.85, roughness: 0.8 });
+  const lit = (p, map, k) => Object.assign(p, { emissiveMap: map, emissive: 0xFFFFFF, emissiveIntensity: (k || 1) * 0.55 });
+  ["ifc", "boc", "hsbc", "truss", "jardine", "grid", "cplaza", "colonial", "clock", "pinkTile", "domeTile", "ferryWin", "sail"].forEach(k => { T[k] = seoulTex(256, 256, HK_DRAW[k]); });
   T.shop = seoulTex(1024, 144, HK_DRAW.shop);
   T.neon = seoulTex(1024, 512, HK_DRAW.neon);
   T.jardineN = heightNormalTex(128, 128, (x, y) => { const d = Math.hypot((x % 32) - 16, (y % 32) - 16); return d < 10 ? 0 : d < 12 ? 1 : 0.55; }, 2.4);
   T.cplaza.repeat.set(0.1, 1 / 12); T.pinkTile.repeat.set(1 / 6, 1 / 6); T.domeTile.repeat.set(14, 5); T.sail.repeat.set(0.1, 0.1);
   const bandMat = hex => std({ color: hex, emissive: hex, emissiveIntensity: 0.9, roughness: 0.4 });
-  HK_M = Object.assign({}, makeSeoulMaterials(), {
-    resi: facadeMaterial({ map: T.resi, roughness: 0.82 }, 12, 0x8A8A86),
-    monster: facadeMaterial({ map: T.monster, roughness: 0.85 }, 12, 0x77736C, 24),
-    hkShop: facadeMaterial({ map: T.shop, roughness: 0.5, metalness: 0.1 }, 30, 0x55585C, 5),
-    ifc: std({ map: T.ifc, metalness: 0.7, roughness: 0.16 }),
-    icc: std({ map: T.ifc, color: 0x9DB2C6, metalness: 0.75, roughness: 0.12 }),
-    boc: std({ map: T.boc, metalness: 0.6, roughness: 0.15 }),
-    hsbc: facadeMaterial({ map: T.hsbc, metalness: 0.5, roughness: 0.3 }, 16, 0x6A6E72),
-    truss: std({ map: T.truss, metalness: 0.6, roughness: 0.4 }),
-    jardine: facadeMaterial({ map: T.jardine, normalMap: T.jardineN, metalness: 0.6, roughness: 0.3 }, 12, 0x8C9096),
-    grid: facadeMaterial({ map: T.grid, metalness: 0.6, roughness: 0.2 }, 10, 0x4A5058),
-    cplaza: std({ map: T.cplaza, metalness: 0.8, roughness: 0.2 }),
-    colonial: facadeMaterial({ map: T.colonial, roughness: 0.8 }, 10, 0x4E6B55),
-    brick: facadeMaterial({ map: T.brick, roughness: 0.9 }, 4, 0xB0B0A8),
-    clock: std({ map: T.clock, roughness: 0.5 }),
+  HK_M = Object.assign({}, S0, {
+    resi: facadeMaterial(nightPhoto("night_dense"), 40, 0x3A3A3C),
+    monster: facadeMaterial(nightPhoto("night_brown"), 55, 0x3A3836),
+    glass: facadeMaterial(nightPhoto("night_blinds"), 34, 0x2E3238),
+    office: facadeMaterial(nightPhoto("night_grid"), 48, 0x34343A),
+    hkShop: facadeMaterial(lit({ map: T.shop, roughness: 0.5, metalness: 0.1 }, L.shop, 0.9), 30, 0x55585C, 5),
+    ifc: std(lit({ map: T.ifc, metalness: 0.7, roughness: 0.16 }, L.ifc, 0.65)),
+    icc: std(lit({ map: T.ifc, color: 0x9DB2C6, metalness: 0.75, roughness: 0.12 }, L.ifc, 0.65)),
+    boc: std(lit({ map: T.boc, metalness: 0.6, roughness: 0.15 }, L.boc, 1.6)),
+    hsbc: facadeMaterial(lit({ map: T.hsbc, metalness: 0.5, roughness: 0.3 }, L.hsbc), 16, 0x6A6E72),
+    truss: std({ map: T.truss, metalness: 0.6, roughness: 0.4, emissive: 0x405060, emissiveIntensity: 0.6 }),
+    jardine: facadeMaterial(lit({ map: T.jardine, normalMap: T.jardineN, metalness: 0.6, roughness: 0.3 }, L.jardine), 12, 0x8C9096),
+    grid: facadeMaterial(lit({ map: T.grid, metalness: 0.6, roughness: 0.2 }, L.grid), 10, 0x4A5058),
+    cplaza: std(lit({ map: T.cplaza, metalness: 0.8, roughness: 0.2 }, L.cplaza, 1.6)),
+    colonial: facadeMaterial(lit({ map: T.colonial, roughness: 0.8 }, L.colonial), 10, 0x4E6B55),
+    brick: facadeMaterial({ map: HQM.real.brick, normalMap: HQM.real.brickN, roughness: 0.9, emissive: 0x6A3420, emissiveIntensity: 0.55 }, 3, 0xB0B0A8),
+    clock: std(lit({ map: T.clock, roughness: 0.5 }, L.clock, 1.3)),
+    lampHead: std({ color: 0xFFF1D0, emissive: 0xFFD9A0, emissiveIntensity: 3 }),
+    lightPool: new THREE.MeshBasicMaterial({ map: pool, color: 0x5E4630, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }),
+    streak: [0xFFB347, 0xE8F0FF, 0x4FE3FF, 0xFF4FD8, 0x8CFF6A].map(c => new THREE.MeshBasicMaterial({ map: streak, color: c, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false })),
+    bridgeLit: std({ color: 0xC9D2DC, roughness: 0.6, emissive: 0x7F9CC0, emissiveIntensity: 0.55 }),
+    cable: std({ color: 0xE8EEF4, metalness: 0.5, roughness: 0.4, emissive: 0xFFFFFF, emissiveIntensity: 1.3 }),
+    peakLit: std({ color: 0xF0EEE9, roughness: 0.45, emissive: 0xFFF0D0, emissiveIntensity: 0.7 }),
+    beam: [0xFFFFFF, 0x7FE8FF, 0xB07CFF, 0x7CFF9E].map(c => new THREE.MeshBasicMaterial({ color: c, vertexColors: true, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })),
     pinkTile: std({ map: T.pinkTile, roughness: 0.7 }),
     domeTile: std({ map: T.domeTile, roughness: 0.6 }),
     roofMetal: std({ color: 0xD4D8DC, metalness: 0.7, roughness: 0.35, side: THREE.DoubleSide }),
     copper: std({ color: 0x6FA38C, metalness: 0.5, roughness: 0.5 }),
     ferryGreen: std({ color: 0x1E6B3C, roughness: 0.6 }),
     white: std({ color: 0xF2F2EE, roughness: 0.5 }),
-    ferryWin: std({ map: T.ferryWin, roughness: 0.5 }),
+    ferryWin: std(lit({ map: T.ferryWin, roughness: 0.5 }, L.ferryWin)),
     wood: std({ color: 0x5A3A22, roughness: 0.8 }),
-    sail: std({ map: T.sail, roughness: 0.9, side: THREE.DoubleSide }),
-    neon: std({ map: T.neon, emissiveMap: T.neon, emissive: 0xFFFFFF, emissiveIntensity: 0.9, roughness: 0.45 }),
-    wheel: std({ color: 0xF0F2F3, metalness: 0.5, roughness: 0.3 }),
-    capsule: std({ color: 0xBFE3F2, transparent: true, opacity: 0.6, metalness: 0.3, roughness: 0.05 }),
-    bands: [0xFF3B3B, 0xFF9F1C, 0xFFE14D, 0x3DDC84, 0x3DA5FF].map(bandMat)
+    sail: std({ map: T.sail, roughness: 0.9, side: THREE.DoubleSide, emissive: 0x6A1A10, emissiveIntensity: 0.8 }),
+    neon: std({ map: T.neon, emissiveMap: T.neon, emissive: 0xFFFFFF, emissiveIntensity: 1.5, roughness: 0.45 }),
+    wheel: std({ color: 0xF0F2F3, metalness: 0.5, roughness: 0.3, emissive: 0xBFE0FF, emissiveIntensity: 1.2 }),
+    capsule: std({ color: 0xBFE3F2, transparent: true, opacity: 0.8, metalness: 0.3, roughness: 0.05, emissive: 0xFF6FD8, emissiveIntensity: 1.4 }),
+    bands: [0xFF3B3B, 0xFF9F1C, 0xFFE14D, 0x3DDC84, 0x3DA5FF].map(c => Object.assign(bandMat(c), { emissiveIntensity: 2.2 }))
   });
   return HK_M;
 }
@@ -1846,12 +1911,55 @@ function hkKeepOut(x, z, pad) {
   if (z > R.z0 - 22 - pad && z < R.z1 + 22 + pad) return true;
   return HK.reserve.some(([rx, rz, rr]) => Math.hypot(x - rx, z - rz) < rr + pad);
 }
-function hkBase(x, z) { let y = 0; HK.hills.forEach(o => { y = Math.max(y, hillHeightAt(o, x, z)); }); return y; }
+let HK_HILLS = HK.hills;
+function midLevelsHeight(x, z) {
+  const m = HK.midLevels, s = THREE.MathUtils.smoothstep;
+  return m.h * s(-z, -m.z0, -m.z1) * (1 - s(-z, -m.z2, -m.z3)) * s(x, m.x0, m.x1) * (1 - s(x, m.x2, m.x3));
+}
+function hkBase(x, z) { let y = midLevelsHeight(x, z); HK_HILLS.forEach(o => { y = Math.max(y, hillHeightAt(o, x, z)); }); return y; }
+function hkLandmarkBase(x, z) { return Math.min(...[[0, 0], [22, 22], [-22, 22], [22, -22], [-22, -22]].map(([a, b]) => hkBase(x + a, z + b))); }
+function fitHillsToTrack(hills) {
+  const side = W / 2 + SH + 8;
+  return hills.map(src => {
+    const o = Object.assign({}, src);
+    for (let k = 0; k < 50; k++) {
+      let hit = false;
+      for (let i = 0; i < N && !hit; i += 3) {
+        const s = S[i];
+        for (const off of [0, side, -side]) if (hillHeightAt(o, s.p.x + s.n.x * off, s.p.z + s.n.z * off) > s.p.y - 0.5) { hit = true; break; }
+      }
+      if (!hit) break;
+      o.r *= 0.94;
+    }
+    return o;
+  });
+}
+function buildHKTerrain(G, M) {
+  const m = HK.midLevels, x0 = m.x0, x1 = m.x3, z0 = m.z3, z1 = -195, step = 6, isl = S.filter(s => s.p.z < -185);
+  const edge = W / 2 + SH + 2, blend = 26;
+  const terrainAt = (x, z) => {
+    let h = midLevelsHeight(x, z), bd = Infinity, ty = 0;
+    for (const s of isl) { const d = (s.p.x - x) ** 2 + (s.p.z - z) ** 2; if (d < bd) { bd = d; ty = s.p.y; } }
+    bd = Math.sqrt(bd);
+    if (bd < edge + blend) h = THREE.MathUtils.lerp(ty - 0.3, h, THREE.MathUtils.smoothstep(bd, edge, edge + blend));
+    return h;
+  };
+  const g = new THREE.PlaneGeometry(x1 - x0, z1 - z0, Math.round((x1 - x0) / step), Math.round((z1 - z0) / step)).rotateX(-Math.PI / 2);
+  const p = g.attributes.position, col = [], green = new THREE.Color(0x2E5231), tmp = new THREE.Color(), cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+  for (let i = 0; i < p.count; i++) {
+    const h = terrainAt(p.getX(i) + cx, p.getZ(i) + cz);
+    p.setY(i, h > 0.4 ? h - 0.06 : -0.3);
+    tmp.copy(green).offsetHSL(0, 0, (hash3(i, 1, 2) - 0.5) * 0.06); col.push(tmp.r, tmp.g, tmp.b);
+  }
+  g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3)); g.computeVertexNormals();
+  const mesh = new THREE.Mesh(g, M.hill); mesh.position.set(cx, 0, cz); mesh.receiveShadow = true; G.add(mesh);
+  return terrainAt;
+}
 function buildHKGround(G, M) {
   const R = HK.harbour, X = 4500;
   flatPlane(G, M.pavement, -X, X, -3600, R.z0 - 20, -0.05);
-  flatPlane(G, M.sidewalk, -X, X, R.z0 - 20, R.z0, -0.04);
-  flatPlane(G, M.sidewalk, -X, X, R.z1, R.z1 + 20, -0.04);
+  flatPlane(G, M.plaza, -X, X, R.z0 - 20, R.z0, -0.04);
+  flatPlane(G, M.plaza, -X, X, R.z1, R.z1 + 20, -0.04);
   flatPlane(G, M.pavement, -X, X, R.z1 + 20, 3600, -0.05);
   flatPlane(G, M.water, -X, X, R.z0, R.z1, R.water);
   CITY_WATER.push(M.water);
@@ -1860,14 +1968,14 @@ function buildHKGround(G, M) {
     const sg = k ? 1 : -1;
     [0.55, 1.05].forEach(y => seoulMesh(G, new THREE.BoxGeometry(2 * X, 0.1, 0.1), M.steel, 0, y, z + sg * 0.8));
   });
-  HK.hills.forEach(o => seoulMesh(G, hillGeometry(o, !!o.rocky), M.hill, o.x, 0, o.z));
+  HK_HILLS.forEach(o => seoulMesh(G, hillGeometry(o, !!o.rocky), M.hill, o.x, 0, o.z));
 }
 function suspensionBridge(G, M, a, b, off) {
   const R = HK.harbour, lat = off + 2, iT = [R.z0 + 14, R.z1 - 14].map(z => nearestSampleInRange(a, b, z)), topY = S[iT[0]].p.y + 62, rods = [];
   iT.forEach(i => {
     const s = S[i], yaw = Math.atan2(s.t.x, s.t.z), hLeg = topY - R.water + 1;
-    [1, -1].forEach(sg => { const e = edgeAt(i, sg * lat, 0); seoulMesh(G, new THREE.BoxGeometry(3.6, hLeg, 3.6), M.concrete, e.x, R.water - 1 + hLeg / 2, e.z).rotation.y = yaw; });
-    [s.p.y - 3.6, s.p.y + 22, s.p.y + 42, topY - 1.2].forEach(y => { seoulMesh(G, new THREE.BoxGeometry(2 * lat + 3.6, 2.6, 3), M.concrete, s.p.x, y, s.p.z).rotation.y = yaw; });
+    [1, -1].forEach(sg => { const e = edgeAt(i, sg * lat, 0); seoulMesh(G, new THREE.BoxGeometry(3.6, hLeg, 3.6), M.bridgeLit, e.x, R.water - 1 + hLeg / 2, e.z).rotation.y = yaw; });
+    [s.p.y - 3.6, s.p.y + 22, s.p.y + 42, topY - 1.2].forEach(y => { seoulMesh(G, new THREE.BoxGeometry(2 * lat + 3.6, 2.6, 3), M.bridgeLit, s.p.x, y, s.p.z).rotation.y = yaw; });
   });
   const zc = (S[iT[0]].p.z + S[iT[1]].p.z) / 2, half = Math.abs(S[iT[1]].p.z - S[iT[0]].p.z) / 2, anchorD = 58, deckMid = S[nearestSampleInRange(a, b, zc)].p.y;
   const cableY = i => { const s = S[i], dz = Math.abs(s.p.z - zc); if (dz <= half) return deckMid + 4 + (topY - deckMid - 4) * (dz / half) ** 2; return topY + (s.p.y + 1.5 - topY) * Math.min(1, (dz - half) / anchorD); };
@@ -1880,24 +1988,24 @@ function suspensionBridge(G, M, a, b, off) {
       if ((i - a) % 3 === 0 && cy - S[k].p.y > 1.6) rods.push([new THREE.Vector3(e.x, S[k].p.y + 0.8, e.z), new THREE.Vector3(e.x, cy, e.z)]);
     }
     if (pts.length < 4) return;
-    seoulMesh(G, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), pts.length * 2, 0.55, 8), M.steel, 0, 0, 0);
+    seoulMesh(G, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), pts.length * 2, 0.55, 8), M.cable, 0, 0, 0);
     [pts[0], pts[pts.length - 1]].forEach(p => seoulMesh(G, new THREE.BoxGeometry(6, 4, 6), M.concrete, p.x, p.y - 1.2, p.z));
   });
-  rodsMesh(G, M.steel, rods, 0.09, 4);
+  rodsMesh(G, M.cable, rods, 0.09, 4);
 }
 function cableStayedBridge(G, M, a, b, off) {
   const R = HK.harbour, iP = nearestSampleInRange(a, b, (R.z0 + R.z1) / 2), s = S[iP], lat = off + 2.4, top = s.p.y + 78, rods = [];
   [1, -1].forEach(sg => {
     const e = edgeAt(iP, sg * lat, 0), h = top - R.water;
-    seoulMesh(G, new THREE.CylinderGeometry(1.5, 3.2, h * 0.72, 24), M.concrete, e.x, R.water + h * 0.36, e.z);
-    seoulMesh(G, new THREE.CylinderGeometry(0.8, 1.5, h * 0.28, 24), M.steel, e.x, R.water + h * 0.86, e.z);
+    seoulMesh(G, new THREE.CylinderGeometry(1.5, 3.2, h * 0.72, 24), M.bridgeLit, e.x, R.water + h * 0.36, e.z);
+    seoulMesh(G, new THREE.CylinderGeometry(0.8, 1.5, h * 0.28, 24), M.cable, e.x, R.water + h * 0.86, e.z);
     for (let k = 0; k < 12; k++) [1, -1].forEach(dir => {
       const i = nearestSampleInRange(a, b, s.p.z + dir * (14 + k * 7.5)), d = edgeAt(i, sg * (off + 0.6), 0);
       rods.push([new THREE.Vector3(d.x, S[i].p.y + 0.6, d.z), new THREE.Vector3(e.x, s.p.y + 36 + k * 3.2, e.z)]);
     });
   });
   seoulMesh(G, new THREE.BoxGeometry(2 * lat + 4, 2.6, 4), M.concrete, s.p.x, s.p.y - 3.6, s.p.z).rotation.y = Math.atan2(s.t.x, s.t.z);
-  rodsMesh(G, M.steel, rods, 0.12, 5);
+  rodsMesh(G, M.cable, rods, 0.12, 5);
 }
 function buildHKBridges(G, M) {
   const R = HK.harbour, off = W / 2 + SH + 1.5;
@@ -2027,9 +2135,9 @@ function buildICC(G, M, o) {
   [[-450, 250], [-470, 170]].forEach(([x, z]) => seoulMesh(G, new THREE.BoxGeometry(30, 262, 54).translate(0, 131, 0), M.glass, x, 0, z));
 }
 function buildPeakTower(G, M) {
-  const p = HK.hills[0], y0 = p.h - 6;
+  const p = HK_HILLS[0], y0 = p.h - 6;
   const pts = [[5, 0], [5, 12], [9, 13], [18, 16], [27, 21], [29, 24], [26, 24.6], [14, 20.5], [0.1, 20]].map(([r, y]) => new THREE.Vector2(r, y));
-  seoulMesh(G, new THREE.LatheGeometry(pts, 48), M.towerWhite, p.x, y0, p.z).scale.set(1, 1, 0.62);
+  seoulMesh(G, new THREE.LatheGeometry(pts, 48), M.peakLit, p.x, y0, p.z).scale.set(1, 1, 0.62);
   seoulMesh(G, new THREE.BoxGeometry(40, 14, 26).translate(0, 7, 0), M.glass, p.x + 45, y0 - 4, p.z + 20);
 }
 function buildFerryPiers(G, M) {
@@ -2113,7 +2221,8 @@ function buildHKCity(G, M) {
       const kowloon = s.p.z > 0, depth = rnd(14, 22), off = offBase + depth / 2, rot = Math.atan2(-s.t.z, s.t.x), c = Math.cos(rot), sn = Math.sin(rot);
       const x = s.p.x + s.n.x * off * sg, z = s.p.z + s.n.z * off * sg, hw = len / 2, hd = depth / 2;
       const corners = [[hw, hd], [hw, -hd], [-hw, hd], [-hw, -hd]].map(([a, b]) => [x + a * c + b * sn, z - a * sn + b * c]);
-      if (corners.some(([cx, cz]) => nearTrackXZ(cx, cz, offBase - 1.5) || hkKeepOut(cx, cz, 0))) continue;
+      const vc = HK.viewCorridor;
+      if (corners.some(([cx, cz]) => nearTrackXZ(cx, cz, offBase - 1.5) || hkKeepOut(cx, cz, 0) || (cx > vc.x0 && cx < vc.x1 && cz > vc.z0 && cz < vc.z1))) continue;
       const rad = Math.hypot(hw, hd) * 0.8;
       if (placed.some(p => Math.hypot(p[0] - x, p[1] - z) < p[2] + rad)) continue;
       placed.push([x, z, rad]);
@@ -2137,7 +2246,8 @@ function buildHKCity(G, M) {
     if (placed.some(p => Math.hypot(p[0] - x, p[1] - z) < p[2] + rad)) continue;
     const base = hkBase(x, z); if (base > (kowloon ? 45 : 150)) continue;
     const slope = base > 4, core = !kowloon && z > -520 && Math.abs(x) < 700;
-    const h = kowloon ? (Math.random() < 0.16 ? rnd(95, 170) : rnd(32, 90)) : slope ? rnd(55, 135) : core ? (Math.random() < 0.3 ? rnd(160, 250) : rnd(70, 150)) : rnd(50, 130);
+    const vc = HK.viewCorridor, inView = x > vc.x0 && x < vc.x1 && z > vc.z0 && z < vc.z1;
+    const h = inView ? rnd(14, 30) : kowloon ? (Math.random() < 0.16 ? rnd(95, 170) : rnd(32, 90)) : slope ? rnd(45, 115) : core ? (Math.random() < 0.3 ? rnd(160, 250) : rnd(70, 150)) : rnd(50, 130);
     const kind = pick(kowloon ? [["resi", 0.58], ["monster", 0.14], ["office", 0.18], ["glass", 0.1]] : slope ? [["resi", 0.8], ["glass", 0.2]] : core ? [["glass", 0.5], ["office", 0.3], ["resi", 0.2]] : [["resi", 0.55], ["office", 0.25], ["glass", 0.2]]);
     const y0 = slope ? base - 4 : 0, hh = h + (slope ? 4 : 0), rot = rnd(-0.08, 0.08);
     push(kind, x, y0, z, w, hh, d, rot);
@@ -2170,7 +2280,7 @@ function hkTreeSpots() {
       spots.push({ x, z, sc: rnd(0.6, 0.85), rot: rnd(0, 6.28), kind: 1, tint: green[spots.length % 3] });
     }
   });
-  HK.hills.forEach(o => {
+  HK_HILLS.forEach(o => {
     const limit = o.z < 0 ? 150 : 45;
     for (let k = 0; k < 70; k++) {
       const th = rnd(0, Math.PI * 2), q = hillPoint(o, th, rnd(0.08, 0.85));
@@ -2178,14 +2288,65 @@ function hkTreeSpots() {
       spots.push({ x: o.x + q[0], y: q[1] - 0.5, z: o.z + q[2], sc: rnd(1.6, 2.4), rot: rnd(0, 6.28), kind: 1, tint: green[k % 3] });
     }
   });
-  return spots.concat(streetTreeSpots(hkKeepOut).filter(s => s.z < 0));
+  return spots;
+}
+function hillsideTreeSpots(terrainAt) {
+  const spots = [], green = [0x3F7A2E, 0x4A8634, 0x376C29], side = W / 2 + SH + 3;
+  for (let i = 0; i < N; i += 4) {
+    const s = S[i]; if (s.p.y < 3 || s.p.z > -200) continue;
+    [1, -1].forEach(sg => {
+      if (Math.random() < 0.3) return;
+      const off = side + rnd(0, 12), x = s.p.x + s.n.x * off * sg, z = s.p.z + s.n.z * off * sg;
+      if (nearTrackXZ(x, z, side - 1) || hkKeepOut(x, z, 2)) return;
+      spots.push({ x, y: terrainAt(x, z) - 0.4, z, sc: rnd(0.8, 1.2), rot: rnd(0, 6.28), kind: 1, tint: green[i % 3] });
+    });
+  }
+  return spots;
+}
+function buildSkyBeams(G, M) {
+  const geo = new THREE.CylinderGeometry(0.8, 11, 520, 20, 8, true).translate(0, 260, 0), col = [], p = geo.attributes.position;
+  for (let i = 0; i < p.count; i++) { const k = Math.pow(1 - p.getY(i) / 520, 1.8); col.push(k, k, k); }
+  geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+  const at = (o, dy) => [o.x, G.userData.groundAt(o.x, o.z) + dy, o.z];
+  [at(HK.ifc2, 352), at(HK.boc, 318), at(HK.centralPlaza, 330), at(HK.center, 282), [HK.icc.x, 412, HK.icc.z], at(HK.cheungKong, 262)].forEach(([x, y, z], k) => {
+    const yaw = new THREE.Group(); yaw.position.set(x, y, z); G.add(yaw);
+    [0, Math.PI].forEach((ph, j) => {
+      const beam = new THREE.Mesh(geo, M.beam[(k + j) % M.beam.length]); beam.renderOrder = 3; yaw.add(beam);
+      CITY_ANIM.push(t => { beam.rotation.set(0, ph, 0.42 + 0.22 * Math.sin(t * 0.45 + k * 1.7 + ph)); });
+    });
+    CITY_ANIM.push(t => { yaw.rotation.y = t * (0.18 + k * 0.03) + k; });
+  });
+}
+function buildHarbourGlow(G, M) {
+  const R = HK.harbour, lists = M.streak.map(() => []), weights = [0.34, 0.3, 0.14, 0.12, 0.1];
+  const pick = () => { let r = Math.random(); for (let k = 0; k < weights.length; k++) { r -= weights[k]; if (r < 0) return k; } return 0; };
+  [[R.z0, 0], [R.z1, Math.PI]].forEach(([shore, rot]) => {
+    for (let x = -1300; x <= 1300; x += rnd(6, 18)) {
+      const len = rnd(20, 62) * (Math.abs(x) < 400 ? 1.2 : 0.8), wid = rnd(1.2, 3.2), dir = rot ? -1 : 1;
+      lists[pick()].push([x, shore + dir * len / 2, len, wid, rot]);
+    }
+  });
+  [[HK.ifc2.x, R.z0, 0, 1], [HK.boc.x, R.z0, 0, 1], [HK.centralPlaza.x, R.z0, 0, 3], [HK.wheel.x, R.z0, 0, 3], [HK.icc.x, R.z1, Math.PI, 2], [HK.cultural.x, R.z1, Math.PI, 0]].forEach(([x, shore, rot, k]) => {
+    const len = 95, dir = rot ? -1 : 1; lists[k].push([x, shore + dir * len / 2, len, 12, rot]);
+  });
+  const geo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), mtx = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), sc = new THREE.Vector3();
+  lists.forEach((list, k) => {
+    if (!list.length) return;
+    const mesh = new THREE.InstancedMesh(geo, M.streak[k], list.length);
+    list.forEach(([x, z, len, wid, rot], i) => { q.setFromAxisAngle(WORLD_UP, rot); mesh.setMatrixAt(i, mtx.compose(v.set(x, R.water + 0.06, z), q, sc.set(wid, 1, len))); });
+    mesh.frustumCulled = false; mesh.renderOrder = 2; G.add(mesh);
+    CITY_ANIM.push(t => { M.streak[k].opacity = 0.32 + 0.1 * Math.sin(t * 1.9 + k * 2.1); });
+  });
 }
 function buildHongKong(G) {
   const M = makeHKMaterials();
+  HK_HILLS = fitHillsToTrack(HK.hills);
+  G.userData.groundAt = hkLandmarkBase;
   buildRoadSurface(G);
   buildRiverRoadside(G, M, HK.harbour, true);
   buildStreetDetails(G, M, false);
   buildHKGround(G, M);
+  const terrainAt = buildHKTerrain(G, M);
   buildHKBridges(G, M);
   buildIFC(G, M, HK.ifc2); buildIFC(G, M, HK.ifc1);
   seoulMesh(G, new THREE.BoxGeometry(80, 16, 24).translate(0, 8, 0), M.glass, -120, 0, -178);
@@ -2207,7 +2368,10 @@ function buildHongKong(G) {
   buildPeakTower(G, M);
   buildHarbourBoats(G, M);
   buildHKCity(G, M);
-  buildTreesHQ(G, hkTreeSpots());
+  buildSkyBeams(G, M);
+  buildHarbourGlow(G, M);
+  CITY_ANIM.push(t => { M.cplaza.emissive.setHSL((t * 0.04) % 1, 0.8, 0.55); });
+  buildTreesHQ(G, hkTreeSpots().concat(hillsideTreeSpots(terrainAt)));
 }
 
 const SG = {
@@ -2231,12 +2395,6 @@ const SG_DRAW = {
     for (let y = 0; y < h; y += 16) for (let x = 0; x < w; x += 32) { c.fillStyle = "rgba(255,255,255," + rnd(0, 0.14).toFixed(2) + ")"; c.fillRect(x, y, 32, 16); }
     c.fillStyle = "#DDE3E7"; for (let x = 0; x < w; x += 32) c.fillRect(x, 0, 2, h);
     c.fillStyle = "#F0F2F3"; for (let y = 0; y < h; y += 64) c.fillRect(0, y, w, 6);
-  },
-  sgGlass(c, w, h) {
-    const g = c.createLinearGradient(0, 0, w, h); g.addColorStop(0, "#5F8E9C"); g.addColorStop(1, "#A6C9D2"); c.fillStyle = g; c.fillRect(0, 0, w, h);
-    for (let y = 0; y < h; y += 32) for (let x = 0; x < w; x += 32) { c.fillStyle = "rgba(255,255,255," + rnd(0, 0.18).toFixed(2) + ")"; c.fillRect(x, y, 32, 32); }
-    c.fillStyle = "#F2F5F6"; for (let x = 0; x < w; x += 32) c.fillRect(x, 0, 3, h);
-    c.fillStyle = "rgba(255,255,255,0.35)"; for (let y = 0; y < h; y += 32) c.fillRect(0, y, w, 2);
   },
   hdb(c, w, h) {
     c.fillStyle = "#F4F1EA"; c.fillRect(0, 0, w, h);
@@ -2290,7 +2448,7 @@ const SG_DRAW = {
 function makeSGMaterials() {
   if (SG_M) return SG_M;
   const std = p => new THREE.MeshStandardMaterial(p), T = {};
-  ["mbs", "sgGlass", "hdb", "supertree", "petal", "flower", "domeGlass", "canopy"].forEach(k => { T[k] = seoulTex(256, 256, SG_DRAW[k]); });
+  ["mbs", "hdb", "supertree", "petal", "flower", "domeGlass", "canopy"].forEach(k => { T[k] = seoulTex(256, 256, SG_DRAW[k]); });
   T.scale = seoulTex(128, 128, SG_DRAW.scale); T.scale.repeat.set(6, 3);
   T.flag = seoulTex(256, 128, SG_DRAW.flag);
   T.domeGlass.repeat.set(10, 4); T.canopy.repeat.set(4, 4); T.supertree.repeat.set(3, 2); T.petal.repeat.set(1, 0.5);
@@ -2298,7 +2456,7 @@ function makeSGMaterials() {
   const water = n => std({ color: 0x2E6070, roughness: 0.05, metalness: 0.25, normalMap: n, normalScale: new THREE.Vector2(0.35, 0.35) });
   SG_M = Object.assign({}, makeSeoulMaterials(), {
     mbs: std({ map: T.mbs, metalness: 0.55, roughness: 0.18 }),
-    sgGlass: facadeMaterial({ map: T.sgGlass, metalness: 0.6, roughness: 0.14 }, 12, 0x6A7075),
+    sgGlass: facadeMaterial({ map: HQM.real.facade_mirror, color: 0xCFE8EC, metalness: 0.6, roughness: 0.12 }, 16, 0x6A7075),
     hdb: facadeMaterial({ map: T.hdb, roughness: 0.85 }, 14, 0x8C8C88, 12),
     skypark: std({ color: 0xE9ECEE, metalness: 0.4, roughness: 0.4 }),
     pool: std({ color: 0x3FB6E0, roughness: 0.05, metalness: 0.1, emissive: 0x0E4A66, emissiveIntensity: 0.4 }),
@@ -2726,12 +2884,12 @@ function showCard(which) {
 }
 function showCourse(k) {
   if (ghostCar) { scene.remove(ghostCar); ghostCar = null; }
-  diff = k; buildTrack(TRACKS[k]); resetCar(); updateCar(0);
+  course = k; buildTrack(TRACKS[k]); resetCar(); updateCar(0);
 }
 function pickCourse(k) {
-  pendingDiff = k; $("carCourse").textContent = TRACKS[k].name + " 코스";
+  pendingCourse = k; $("carCourse").textContent = TRACKS[k].name + " 코스";
   try { localStorage.setItem("turbolap_course_v1", k); } catch (e) {}
-  if (k !== diff) showCourse(k);
+  if (k !== course) showCourse(k);
   document.querySelectorAll(".carbtn").forEach(b => b.classList.toggle("on", b.getAttribute("data-car") === carKey));
   showCard("car");
   renderGhostButtons(); if (!worldGhost.tried[k] || !worldGhostValid(k)) fetchWorldGhost(k);
@@ -2747,7 +2905,7 @@ function showLapToast(done, lt, isNew) {
 
 function startRace(which) {
   audioInit();
-  if (which && which !== diff) { diff = which; buildTrack(TRACKS[diff]); }
+  if (which && which !== course) { course = which; buildTrack(TRACKS[course]); }
   scene.remove(car); car = makeCar(CARS[carKey].color, CARS[carKey].model); scene.add(car);
   resetCar(); P.lap = 0; P.expected = 0; lapTimes = []; lapStartMs = 0; raceBest = 0; renderHudBest();
   recData = []; recLast = -Infinity; setupGhost();
@@ -2763,7 +2921,7 @@ function recover() {
   placeAt(P.ci); P.off = false; shake = 0;
 }
 function loadRecords() {
-  DIFFS.forEach(k => { const WR = WRS[k]; if (WR) WR.load().then(() => { wrTried[k] = true; renderRecords(); }); });
+  COURSES.forEach(k => { const WR = WRS[k]; if (WR) WR.load().then(() => { wrTried[k] = true; renderRecords(); }); });
 }
 function showMenu() {
   state = "menu"; setHud(false); fctx.clearRect(0, 0, fx.width, fx.height); countBox.style.display = "none"; lapToast.className = ""; showCard("start");
@@ -2774,11 +2932,11 @@ function finish() {
   state = "done"; finalMs = Math.round(elapsed); doneTimer = 0;
   engineUpdate(0, false);
   [523, 659, 784, 1047].forEach((f, i) => beep(f, 0.35, "triangle", 0.1, i * 0.13));
-  const k = diff, WR = WRS[k];
+  const k = course, WR = WRS[k];
   $("finalTime").textContent = fmtTime(finalMs);
   $("lapList").innerHTML = lapTimes.map((t, i) => "랩" + (i + 1) + " " + fmtTime(t)).join(" · ") +
     "<br>이번 경기 최고 랩타임 <b>" + fmtTime(raceBest) + "</b>";
-  $("doneDiff").textContent = TRACKS[k].name;
+  $("doneCourse").textContent = TRACKS[k].name;
   recordSample(Infinity);
   const ghostData = JSON.stringify(recData);
   const isBest = best[k] === 0 || finalMs < best[k];
@@ -2973,11 +3131,16 @@ function tick(now) {
   followSun();
   CITY_WATER.forEach(m => { m.normalMap.offset.x += dt * 0.012; m.normalMap.offset.y += dt * 0.005; });
   CITY_ANIM.forEach(f => f(now / 1000));
-  renderer.render(scene, camera);
+  if (NIGHT.on) {
+    const hl = NIGHT.headlight, hx = -Math.sin(P.h), hz = -Math.cos(P.h);
+    hl.position.set(P.x + hx * 1.5, P.y + 1.6, P.z + hz * 1.5); hl.target.position.set(P.x + hx * 30, P.y - 0.5, P.z + hz * 30); hl.target.updateMatrixWorld();
+    NIGHT.composer.render(dt);
+  } else renderer.render(scene, camera);
 }
 function resize() {
   const w = window.innerWidth, h = window.innerHeight;
   renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
+  if (NIGHT.composer) { NIGHT.composer.setPixelRatio(renderer.getPixelRatio()); NIGHT.composer.setSize(w, h); }
   fx.width = w; fx.height = h;
 }
 window.addEventListener("resize", resize); resize();
@@ -2995,15 +3158,15 @@ function onKey(e, down) {
   else if (e.code === "Space") {
     e.preventDefault();
     if (state === "done") startRace();
-    else if (state === "menu" && cardCar.style.display !== "none") startRace(pendingDiff);
+    else if (state === "menu" && cardCar.style.display !== "none") startRace(pendingCourse);
   }
 }
 window.addEventListener("keydown", e => onKey(e, true));
 window.addEventListener("keyup", e => onKey(e, false));
 window.addEventListener("blur", () => { keys.up = keys.down = keys.left = keys.right = false; });
-$("btnEasy").onclick = e => { e.currentTarget.blur(); pickCourse("easy"); };
-$("btnHard").onclick = e => { e.currentTarget.blur(); pickCourse("hard"); };
-$("btnExpert").onclick = e => { e.currentTarget.blur(); pickCourse("expert"); };
+$("btnHongkong").onclick = e => { e.currentTarget.blur(); pickCourse("hongkong"); };
+$("btnSingapore").onclick = e => { e.currentTarget.blur(); pickCourse("singapore"); };
+$("btnSeoul").onclick = e => { e.currentTarget.blur(); pickCourse("seoul"); };
 $("btnCarBack").onclick = e => { e.currentTarget.blur(); showCard("start"); };
 document.querySelectorAll(".ghostbtn").forEach(b => b.onclick = e => {
   e.currentTarget.blur(); ghostPick = b.getAttribute("data-ghost");
@@ -3015,11 +3178,11 @@ document.querySelectorAll(".carbtn").forEach(b => b.onclick = e => {
   try { localStorage.setItem("turbolap_car_v1", carKey); } catch (err) {}
   document.querySelectorAll(".carbtn").forEach(x => x.classList.toggle("on", x === b));
 });
-$("btnGo").onclick = e => { e.currentTarget.blur(); startRace(pendingDiff); };
+$("btnGo").onclick = e => { e.currentTarget.blur(); startRace(pendingCourse); };
 $("btnWipe").onclick = e => {
   e.currentTarget.blur();
   if (!confirm("이 기기에 저장된 나의 최고 기록과 고스트를 모두 지울까요? (세계 신기록에는 영향이 없습니다)")) return;
-  DIFFS.forEach(k => { try { localStorage.removeItem(bestKey(k)); localStorage.removeItem(ghostKey(k)); } catch (err) {} best[k] = 0; });
+  COURSES.forEach(k => { try { localStorage.removeItem(bestKey(k)); localStorage.removeItem(ghostKey(k)); } catch (err) {} best[k] = 0; });
   renderRecords(); alert("지웠습니다.");
 };
 $("btnRetry").onclick = e => { e.currentTarget.blur(); startRace(); };
@@ -3027,9 +3190,9 @@ $("btnMenu").onclick = e => { e.currentTarget.blur(); showMenu(); };
 $("btnReset").onclick = e => { e.currentTarget.blur(); startRace(); };
 $("btnRecover").onclick = e => { e.currentTarget.blur(); recover(); };
 
-window.TL = { keys, P, CFG, camera, scene, renderer, tick, makeCar, CARS, get S() { return S; }, setTrack: k => { diff = k; buildTrack(TRACKS[k]); resetCar(); } };
-DIFFS.forEach(k => { if (WRS[k]) WRS[k].onChange(renderRecords); });
-buildTrack(TRACKS[diff]); resetCar(); updateCar(0); showMenu();
+window.TL = { keys, P, CFG, camera, scene, renderer, tick, makeCar, CARS, get S() { return S; }, setTrack: k => { course = k; buildTrack(TRACKS[k]); resetCar(); } };
+COURSES.forEach(k => { if (WRS[k]) WRS[k].onChange(renderRecords); });
+buildTrack(TRACKS[course]); resetCar(); updateCar(0); showMenu();
 requestAnimationFrame(frame);
 })();
 </script>
