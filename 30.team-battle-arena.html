@@ -77,6 +77,46 @@
   .neutral b { color: #D97B4F; }
 
   .chars { display: flex; gap: 10px; }
+  .specBox { margin-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border-radius: 8px; border: 2px solid var(--sg-line-mid); background: var(--sg-panel-alt); font-size: 16px; }
+  .specHead { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; min-width: 0; }
+  .specList { font-weight: 700; color: var(--sg-ink-mid); }
+  .specList .none { color: var(--sg-ink-faint); font-weight: 400; }
+
+  /* ── 관전 화면: 왼쪽 블루팀, 오른쪽 레드팀 상태판 ── */
+  .specPanel { position: absolute; top: 92px; bottom: 12px; width: 300px; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+  .specPanel.blue { left: 12px; }
+  .specPanel.red { right: 12px; }
+  .spHead { border-radius: 10px; padding: 10px 14px; color: #fff; font-size: 24px; font-weight: 800; line-height: 1.3; }
+  .specPanel.blue .spHead { background: var(--blue); }
+  .specPanel.red .spHead { background: var(--red); }
+  .spHead small { display: block; font-size: 16px; font-weight: 700; opacity: .95; }
+  .spCard { display: flex; gap: 10px; align-items: center; background: rgba(255,255,255,.95); border-radius: 10px; padding: 8px 10px; border: 3px solid transparent; }
+  .specPanel.blue .spCard { border-color: rgba(47,111,214,.55); }
+  .specPanel.red .spCard { border-color: rgba(214,69,61,.55); }
+  .spCard.dead { opacity: .45; filter: grayscale(1); }
+  .spCard img { width: 58px; height: 64px; object-fit: contain; flex: 0 0 auto; }
+  .spInfo { flex: 1 1 auto; min-width: 0; }
+  .spName { font-size: 20px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
+  .spName small { font-size: 14px; color: var(--sg-ink-soft); font-weight: 700; margin-left: 4px; }
+  .spBar { position: relative; height: 20px; border-radius: 5px; background: #D9DED6; overflow: hidden; margin-top: 4px; }
+  .spBar i { position: absolute; left: 0; top: 0; bottom: 0; }
+  .spBar.hp i { background: #3BB273; }
+  .spBar.hp.low i { background: #E0474C; }
+  .spBar.ult i { background: #F2C230; }
+  .spBar.ult.full i { background: #E53935; }
+  .spBar span { position: relative; display: block; text-align: center; font-size: 14px; font-weight: 800; line-height: 20px; color: #1B2B20; }
+  .spBar.ult.full span { color: #fff; }
+  @media (max-width: 900px) {
+    .specPanel { width: 150px; gap: 6px; }
+    .spHead { font-size: 16px; padding: 6px 8px; }
+    .spHead small { font-size: 12px; }
+    .spCard { padding: 5px 6px; gap: 4px; }
+    .spCard img { display: none; }
+    .spName { font-size: 14px; }
+    .spName small { display: none; }
+    .spBar { height: 15px; }
+    .spBar span { font-size: 11px; line-height: 15px; }
+  }
   .charCard { flex: 1 1 0; min-width: 0; border: 3px solid var(--sg-line-mid); border-radius: 10px; background: var(--sg-panel); padding: 10px 6px; text-align: center; position: relative; }
   .charCard img { display: block; height: 110px; max-width: 100%; margin: 0 auto 6px; object-fit: contain; }
   .charCard .nm { font-size: 20px; font-weight: 800; }
@@ -156,6 +196,7 @@
     #hudTimer { font-size: 24px; }
     #hudDmg { top: 92px; }
     #hudTL { top: 92px; }
+    .specPanel { top: 124px; }
   }
 </style>
 </head>
@@ -212,6 +253,11 @@
       </div>
       <div id="neutralBox" class="neutral" hidden></div>
       <button id="btnTeamChange" class="mini" type="button" style="margin-top:12px;" hidden>🔄 팀 변경</button>
+      <div class="specBox">
+        <div class="specHead"><b>📺 관전자</b><span id="listSpec" class="specList"></span></div>
+        <button id="btnSpec" class="mini" type="button">📺 관전자로 보기</button>
+      </div>
+      <div class="note" style="margin-top:6px;">전자칠판은 관전자로 두면 맵 전체와 양 팀 체력·궁극기를 한눈에 볼 수 있어요. 관전자는 게임에 참여하지 않고, 게임 중에도 방 코드로 관전자 입장이 됩니다.</div>
     </div>
 
     <div id="charCardBox" class="card">
@@ -233,6 +279,8 @@
   <div id="hudTop"><div id="hudTimer">3:00</div><div id="hudCount"></div></div>
   <button id="btnLeaveGame" type="button">방 나가기</button>
   <div id="hudDmg"></div>
+  <div id="specL" class="specPanel blue" hidden></div>
+  <div id="specR" class="specPanel red" hidden></div>
   <div id="ctlHint">← 여기를 누르고 끌어서 이동</div>
   <div id="btnUlt" class="actBtn"><div class="fill"></div><span>궁극기</span></div>
   <div id="btnAtk" class="actBtn"><div class="cd"></div><span>공격</span></div>
@@ -495,13 +543,15 @@
       $("btnJoin").disabled = false;
       var r = s.val();
       if (!r || !r.players || !humans(r.players).length) { startMsg("그런 방이 없어요. 코드를 확인해 주세요."); return; }
-      if (r.status !== "lobby") { startMsg("이미 게임이 진행 중인 방이에요."); return; }
-      var hs = humans(r.players);
-      if (r.mode === "ai") {
+      /* 게임 중이거나 자리가 없으면 관전자로 입장 */
+      var hs = humans(r.players).filter(function (id) { return r.players[id].team !== "spec"; });
+      var team = r.mode === "ai" ? "blue" : "neutral";
+      if (r.status !== "lobby") team = "spec";
+      else if (r.mode === "ai") {
         var blue = hs.filter(function (id) { return r.players[id].team === "blue"; });
-        if (blue.length >= 3) { startMsg("방이 가득 찼습니다."); return; }
-      } else if (hs.length >= 6) { startMsg("방이 가득 찼습니다."); return; }
-      var me = newPlayer(r.mode === "ai" ? "blue" : "neutral", now());
+        if (blue.length >= 3) team = "spec";
+      } else if (hs.length >= 6) team = "spec";
+      var me = newPlayer(team, now());
       ref.child("players/" + myId).set(me).then(function () { enterRoom(code); })
         .catch(function () { startMsg("입장하지 못했어요."); });
     }).catch(function () { $("btnJoin").disabled = false; startMsg("방을 불러오지 못했어요."); });
@@ -675,10 +725,15 @@
     show($("neutralBox"), neutral.length > 0);
     setHtml($("neutralBox"), "<b>중립 대기 중</b> — " + neutral.map(function (id) { return esc(P[id].nickname) + (id === myId ? "(나)" : ""); }).join(", "));
     var pvp = mode === "pvp";
-    var imNeutral = me.team === "neutral";
-    show($("btnJoinBlue"), pvp && imNeutral); show($("btnJoinRed"), pvp && imNeutral);
+    var imNeutral = me.team === "neutral", imSpec = me.team === "spec";
+    show($("btnJoinBlue"), (pvp && (imNeutral || imSpec)) || (mode === "ai" && imSpec));
+    show($("btnJoinRed"), pvp && (imNeutral || imSpec));
     $("btnJoinBlue").disabled = nb >= 3; $("btnJoinRed").disabled = nr >= 3;
-    show($("btnTeamChange"), pvp && !imNeutral);
+    show($("btnTeamChange"), pvp && !imNeutral && !imSpec);
+    var specs = teamIds("spec");
+    setHtml($("listSpec"), specs.length ? specs.map(function (id) { return (room.host === id ? "👑" : "") + esc(P[id].nickname) + (id === myId ? "(나)" : ""); }).join(", ") : '<span class="none">없음</span>');
+    show($("btnSpec"), !imSpec);
+    show($("charCardBox"), !imSpec);
 
     /* 캐릭터 선택 */
     var cards = "";
@@ -717,6 +772,7 @@
   $("btnJoinBlue").onclick = function () { pickTeam("blue"); };
   $("btnJoinRed").onclick = function () { pickTeam("red"); };
   $("btnTeamChange").onclick = function () { if (room && room.status === "lobby") room.ref.child("players/" + myId + "/team").set("neutral"); };
+  $("btnSpec").onclick = function () { if (room && room.status === "lobby") room.ref.child("players/" + myId + "/team").set("spec"); };
   $("btnModePvp").onclick = function () { setMode("pvp"); };
   $("btnModeAi").onclick = function () { setMode("ai"); };
   $("btnLeaveLobby").onclick = leaveRoom;
@@ -774,11 +830,12 @@
   }
   function initGame() {
     G = { startAt: room.startAt, endSent: false, playingSent: false, lastNet: 0, finalSent: false, beeped: -1 };
-    ME = makeEnt(myId, P[myId]);
+    ME = isSpec() ? null : makeEnt(myId, P[myId]);    // 관전자는 캐릭터 없음
     BOTS = {}; R = {}; FX = []; handled = {};
     lastHp = {};
     show($("endOv"), false);
   }
+  function isSpec() { return !!P[myId] && P[myId].team === "spec"; }
   function participants() {
     return keys(P).filter(function (id) { var d = P[id]; return d && d.slot && (d.team === "blue" || d.team === "red"); });
   }
@@ -1150,7 +1207,7 @@
     if (!force && !G.forceNet && t - G.lastNet < NET_MS) return;
     G.lastNet = t; G.forceNet = false;
     var u = {};
-    if (P[myId]) entFields(u, ME);
+    if (ME && P[myId]) entFields(u, ME);
     if (isHost()) keys(BOTS).forEach(function (id) { if (P[id]) entFields(u, BOTS[id]); });
     if (keys(u).length) room.ref.update(u);
   }
@@ -1199,8 +1256,8 @@
     G.forceNet = true;
     try { netWrite(true); } catch (e) {}
     setTimeout(function () {
-      var mine = P[myId] && P[myId].team;
-      if (room && room.winner && room.winner !== "draw") sfx(room.winner === mine ? "win" : "lose");
+      var mine = ME ? ME.team : null;   // 관전자는 승패 소리 없음
+      if (mine && room && room.winner && room.winner !== "draw") sfx(room.winner === mine ? "win" : "lose");
     }, 200);
   }
   function restart() {
@@ -1443,17 +1500,25 @@
     var me = ME;
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.fillStyle = "#2A2F2B"; ctx.fillRect(0, 0, W, H);
-    if (!me) return;
-    /* 카메라: 내 캐릭터가 화면 아래쪽 가운데보다 살짝 위(66%)에 오도록 */
-    S = Math.max(0.5, Math.min(H / 860, W / 560));
-    var visW = W / S, visH = H / S;
-    var focus = me;
-    if (!me.alive) {      // 쓰러지면 살아 있는 팀원을 비춤
-      participants().forEach(function (id) { var o = ent(id); if (o && o.alive && o.team === me.team && focus === me) focus = o; });
+    var spec = !me;
+    if (spec) {
+      /* 관전: 맵 전체를 양옆 상태판 사이에 꽉 차게 (블루팀이 위, 레드팀이 아래) */
+      var pw = specPanelW() + 24, top = 80, bottom = 8;
+      S = Math.max(0.1, Math.min((W - pw * 2) / MW, (H - top - bottom) / MH));
+      camX = -((W - MW * S) / 2) / S;
+      camY = -(top + (H - top - bottom - MH * S) / 2) / S;
+    } else {
+      /* 카메라: 내 캐릭터가 화면 아래쪽 가운데보다 살짝 위(66%)에 오도록 */
+      S = Math.max(0.5, Math.min(H / 860, W / 560));
+      var visW = W / S, visH = H / S;
+      var focus = me;
+      if (!me.alive) {      // 쓰러지면 살아 있는 팀원을 비춤
+        participants().forEach(function (id) { var o = ent(id); if (o && o.alive && o.team === me.team && focus === me) focus = o; });
+      }
+      var fv = V(focus.x, focus.y);
+      camX = visW >= MW ? (MW - visW) / 2 : clamp(fv.x - visW / 2, -20, MW - visW + 20);
+      camY = clamp(fv.y - visH * 0.66, -40, Math.max(-40, MH - visH + 40));
     }
-    var fv = V(focus.x, focus.y);
-    camX = visW >= MW ? (MW - visW) / 2 : clamp(fv.x - visW / 2, -20, MW - visW + 20);
-    camY = clamp(fv.y - visH * 0.66, -40, Math.max(-40, MH - visH + 40));
     ctx.setTransform(DPR * S, 0, 0, DPR * S, -camX * S * DPR, -camY * S * DPR);
 
     /* 배경 (블루팀 화면은 180° 돌려 자기 진영이 아래) */
@@ -1471,9 +1536,9 @@
     var list = [];
     participants().forEach(function (id) {
       var E = ent(id); if (!E) return;
-      var ally = E.team === me.team, hid = inBush(E.x, E.y);
+      var ally = spec || E.team === me.team, hid = inBush(E.x, E.y);   // 관전자는 모두를 아군처럼(게이지까지) 봄
       if (!ally && hid) { lastHp[id] = E.hp; return; }            // 풀숲 속 적은 아예 안 그림
-      var alpha = !E.alive ? 0.35 : (E === me ? 1 : (ally && hid ? 0.4 : 1));
+      var alpha = !E.alive ? 0.35 : (E === me ? 1 : (hid ? (spec ? 0.55 : 0.4) : 1));
       /* 체력 변화 → 떠오르는 숫자 */
       if (lastHp[id] !== undefined && Math.abs(E.hp - lastHp[id]) >= 1) {
         var d = Math.round(E.hp - lastHp[id]);
@@ -1511,6 +1576,27 @@
     drawJoystick();
   }
 
+  /* ---------- 관전 상태판 ---------- */
+  function specPanelW() { return W > 900 ? 300 : 150; }     // CSS .specPanel 너비와 같게
+  function specPanel(team, s) {
+    var ids = participants().filter(function (id) { return P[id].team === team; })
+      .sort(function (a, b) { return (P[a].slot || 0) - (P[b].slot || 0); });
+    var h = '<div class="spHead">' + (team === "blue" ? "블루팀" : "레드팀") + " · 생존 " + s[team + "Alive"] + "/" + s[team + "N"] +
+            "<small>누적 피해 " + Math.round(s[team]) + "</small></div>";
+    ids.forEach(function (id) {
+      var E = ent(id); if (!E) return;
+      var hp = Math.max(0, Math.round(E.hp)), ratio = clamp(E.hp / E.maxHp, 0, 1);
+      var g = Math.min(GAUGE_MAX, Math.floor(E.gauge)), full = g >= GAUGE_MAX;
+      h += '<div class="spCard' + (E.alive ? "" : " dead") + '"><img alt="" src="' + charImgSrc(E.char, team) + '">' +
+        '<div class="spInfo"><div class="spName">' + (E.isAI ? "🤖 " : "") + esc(E.nickname) + "<small>" + CHARS[E.char].name + "</small></div>" +
+        '<div class="spBar hp' + (ratio < 0.3 ? " low" : "") + '"><i style="width:' + Math.round(ratio * 100) + '%"></i><span>' +
+          (E.alive ? "HP " + hp + " / " + E.maxHp : "쓰러짐") + "</span></div>" +
+        '<div class="spBar ult' + (full ? " full" : "") + '"><i style="width:' + g * 10 + '%"></i><span>' +
+          (full ? "궁극기 준비 완료!" : "궁극기 " + g + " / " + GAUGE_MAX) + "</span></div></div></div>";
+    });
+    return h;
+  }
+
   /* ---------- HUD ---------- */
   function fmtTime(ms) { ms = Math.max(0, ms); var s = Math.ceil(ms / 1000); return Math.floor(s / 60) + ":" + (s % 60 < 10 ? "0" : "") + (s % 60); }
   function updateHud(t) {
@@ -1524,6 +1610,9 @@
     var s = teamTotals();
     setHtml($("hudCount"), '<span class="b">🔵 ' + s.blueAlive + '</span> vs <span class="r">🔴 ' + s.redAlive + "</span>");
     setHtml($("hudDmg"), '누적 피해<br><span class="b">블루 ' + Math.round(s.blue) + '</span> · <span class="r">레드 ' + Math.round(s.red) + "</span>");
+    var spec = !ME;
+    show($("hudDmg"), !spec); show($("specL"), spec); show($("specR"), spec);
+    if (spec) { setHtml($("specL"), specPanel("blue", s)); setHtml($("specR"), specPanel("red", s)); }
 
     var alive = ME && ME.alive, playing = st === "playing" && t >= room.startAt;
     show($("btnAtk"), alive && st !== "ended"); show($("btnUlt"), alive && st !== "ended");
@@ -1544,7 +1633,7 @@
     if (counting) {
       var n = cd > 0 ? String(Math.ceil(cd / 1000)) : "시작!";
       setText($("countNum"), n);
-      setText($("countSub"), ME ? "나는 " + (ME.team === "blue" ? "블루팀" : "레드팀") + " " + CHARS[ME.char].name : "");
+      setText($("countSub"), ME ? "나는 " + (ME.team === "blue" ? "블루팀" : "레드팀") + " " + CHARS[ME.char].name : "📺 관전 중");
       var beepKey = cd > 0 ? Math.ceil(cd / 1000) : 0;
       if (G.beeped !== beepKey) { G.beeped = beepKey; sfx(beepKey > 0 ? "beep" : "go"); }
     }
@@ -1570,14 +1659,14 @@
     if (!room || screenNow !== "game") return;
     var st = room.status;
     if ((st === "countdown" || st === "playing" || st === "ended") && room.startAt && (!G || G.startAt !== room.startAt)) {
-      if (P[myId] && P[myId].slot) initGame(); else return;
+      if (P[myId] && (P[myId].slot || isSpec())) initGame(); else return;
     }
-    if (!G || !ME) return;
+    if (!G) return;
     var t = now();
     syncRemote(dt);
     var active = st === "playing" && t >= room.startAt;
     if (active) {
-      if (ME.alive) {
+      if (ME && ME.alive) {
         if (joy.id !== null) {
           var dx = joy.x - joy.ox, dy = joy.y - joy.oy, d = hyp(dx, dy);
           var m = d < 8 ? 0 : Math.min(1, d / JOY_R);
@@ -1588,7 +1677,7 @@
           ME.mv = hyp(ME.x - ox, ME.y - oy) > 0.2;
         } else ME.mv = false;
         stepCombat(ME, dt);
-      } else ME.mv = false;
+      } else if (ME) ME.mv = false;
       if (isHost()) keys(BOTS).forEach(function (id) { var B = BOTS[id]; stepBot(B, dt); if (B.alive) stepCombat(B, dt); });
       checkProjectiles(t);
     }
