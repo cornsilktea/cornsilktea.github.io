@@ -7,7 +7,6 @@
 <meta charset="utf-8">
 <link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
 <title>피아노 타일 리듬</title>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
@@ -16,7 +15,6 @@
 <meta property="og:url" content="https://cornsilktea.github.io/23.piano-tiles-rhythm.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
-<!-- 링크 미리보기 끝 -->
 <style>
   :root{
     --bg:var(--sg-bg);
@@ -67,7 +65,6 @@
   .hint{ font-size:12px; color:var(--ink-faint); text-align:center; margin-top:6px; }
   .spacer{ flex:1; }
 
-  /* 게임 화면 */
   #game{ height:calc(100vh - 58px); height:calc(100dvh - 58px); min-height:420px; }
   .gameTitle{ text-align:center; font-size:13px; font-weight:700; color:var(--ink-soft); margin-bottom:6px; }
   .hud{ display:grid; grid-template-columns:1fr 1fr 1fr auto; gap:6px; margin-bottom:8px; align-items:stretch; }
@@ -77,12 +74,10 @@
   .hud .v.small{ font-size:12px; color:var(--warn); font-weight:700; }
   #track{ position:relative; flex:1; border:1px solid var(--line-strong); border-radius:var(--radius); overflow:hidden; background:var(--panel); }
   #cv{ position:absolute; top:0; left:0; width:100%; height:100%; display:block; }
-  /* inset:0 은 크롬 87 미만(전자칠판 내장 브라우저 등)에서 무시돼 레인 크기가 0 이 되어 터치가 안 잡혔다. top/left+width/height 로 명시 */
   #lanes{ position:absolute; top:0; left:0; width:100%; height:100%; display:flex; }
   #lanes .lane{ flex:1; touch-action:none; -webkit-tap-highlight-color:transparent; }
   #exitBtn{ height:auto; font-size:13px; padding:0 10px; white-space:nowrap; }
 
-  /* 결과 */
   .result-score{ text-align:center; margin:10px 0 4px; }
   .result-score .big{ font-size:44px; font-weight:700; font-variant-numeric:tabular-nums; }
   .result-score .sub{ font-size:14px; color:var(--ink-soft); }
@@ -104,7 +99,6 @@
 <body>
 <div id="app">
 
-  <!-- 시작 화면 -->
   <section id="start" class="screen on">
     <h1>피아노 타일 리듬</h1>
     <div class="concept">
@@ -121,7 +115,6 @@
     <button class="btn primary" id="startBtn" disabled style="margin-top:14px">시작하기</button>
   </section>
 
-  <!-- 게임 화면 -->
   <section id="game" class="screen">
     <div class="gameTitle" id="gameTitle">&nbsp;</div>
     <div class="hud">
@@ -139,7 +132,6 @@
     </div>
   </section>
 
-  <!-- 결과 화면 -->
   <section id="result" class="screen">
     <h1>결과</h1>
     <div class="result-score">
@@ -170,22 +162,21 @@
 </div>
 
 <script>
-/* ============ 설정 (튜닝 값은 전부 여기) ============ */
 const CONFIG = {
   lanes: 4,
   hitWindowPerfectMs: 50,
   hitWindowGoodMs: 120,
-  hitWindowMissMs: 250,    // 이 안에 타일이 있으면 그 타일을 MISS 로 처리, 없으면 빈 MISS
-  penaltyMiss: 500,        // MISS 감점 (점수는 0 아래로 내려가지 않음)
+  hitWindowMissMs: 250,
+  penaltyMiss: 500,
   scorePerfect: 300,
   scoreGood: 100,
   comboMultiplierThresholds: [ {combo: 10, mult: 1.2}, {combo: 20, mult: 1.5} ],
   laneColors: ["#FFD3B6", "#DCEDC1", "#A8E6CE", "#FFAAA6"],
   laneKeys: ["KeyD", "KeyF", "KeyJ", "KeyK"],
   laneKeyLabels: ["D", "F", "J", "K"],
-  leadInMs: 1500,          // 첫 타일이 생성되기 전 준비 시간
-  noteDecaySec: 0.55,      // 합성음 지수 감쇠 시정수(초, 저음일수록 길어짐 — 여운 길이)
-  missScore: null,         // 곡별 missScore 가 있으면 MISS 때 감점 대신 그 점수를 더함(흑건처럼 빠른 곡 구제용). 타일 없는 헛탭(phantom)에는 적용 안 됨
+  leadInMs: 1500,
+  noteDecaySec: 0.55,
+  missScore: null,
   difficulties: {
     easy: {
       label: "쉬움",
@@ -229,19 +220,15 @@ const CONFIG = {
   }
 };
 
-// 음이름 → 주파수. C3~B7 를 모두 만들어 둔다(흑건이 F#3~D#7 까지 씀). 순서는 낮은 음부터.
 const NOTE_FREQ = {};
 (function(){
   const names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-  for (let midi = 48; midi <= 107; midi++) {            // C3(48) ~ B7(107)
+  for (let midi = 48; midi <= 107; midi++) {
     NOTE_FREQ[names[midi % 12] + (Math.floor(midi / 12) - 1)] = Math.round(440 * Math.pow(2, (midi - 69) / 12) * 100) / 100;
   }
 })();
 const PITCH_ORDER = Object.keys(NOTE_FREQ);
 
-/* ============ 곡 데이터 (퍼블릭 도메인 선율, 게임용 간소화·확장) ============ */
-// 표기: "음이름:박자" 문자열을 공백으로 나눠 씀. "R:0.5" 는 쉼표. 박자를 생략하면 0.5(8분음표).
-// 세 번째 칸 "음이름:박자:0.4" 는 소리 크기 배율(반주 음을 멜로디보다 작게 — 전전전세 리프). 없으면 1.
 function seq(str, defBeats){
   return str.trim().split(/\s+/).map(tok => {
     const [p, b, v] = tok.split(":");
@@ -251,9 +238,6 @@ function seq(str, defBeats){
 function rep(arr, n){ const out = []; for (let i = 0; i < n; i++) arr.forEach(x => out.push({ pitch: x.pitch, beats: x.beats, vol: x.vol })); return out; }
 function cat(){ const out = []; for (const a of arguments) a.forEach(x => out.push({ pitch: x.pitch, beats: x.beats, vol: x.vol })); return out; }
 
-// 쉬움 ① 반짝반짝 작은 별 (90bpm) — 모차르트 "Ah, vous dirai-je, Maman" K.265/300e 의 주제(변주 전 원 멜로디, 1~24마디,
-// IMSLP "12 Variations on 'Ah, vous dirai-je maman', K.265/300e" 악보, 다장조)를 그대로 옮김. 영어 가사 Twinkle Twinkle
-// Little Star 는 이 선율에 붙은 것과 동일 음. 두 절(주제를 두 번) 반복, 약 61초.
 const TWINKLE_VERSE = seq(`
   C4:1 C4:1 G4:1 G4:1 A4:1 A4:1 G4:2
   F4:1 F4:1 E4:1 E4:1 D4:1 D4:1 C4:2
@@ -263,17 +247,11 @@ const TWINKLE_VERSE = seq(`
   F4:1 F4:1 E4:1 E4:1 D4:1 D4:1 C4:2`);
 const EASY_SONG_1 = rep(TWINKLE_VERSE, 2);
 
-// 쉬움 ② 환희의 송가 (100bpm) — abcnotation.com 에 올라온 John Chambers abc 모음(trillian.mit.edu/~jc/music/abc/song/Ode_To_Joy)
-// 의 채보를 사용. 원 채보는 사장조(K:G, "B B c d|d c B A|G G A B|B>A A2|..." 4행)라 완전5도 내려 다장조로 옮겼다(G→C, A→D, B→E, c→F, d→G).
-// A(8마디)+A'(8마디)+B(8마디)+A'(8마디) 형식 그대로, 두 번 반복, 약 74초.
 const ODE_A = seq(`E4:1 E4:1 F4:1 G4:1 G4:1 F4:1 E4:1 D4:1 C4:1 C4:1 D4:1 E4:1 E4:1.5 D4:0.5 D4:2`);
 const ODE_A2 = seq(`E4:1 E4:1 F4:1 G4:1 G4:1 F4:1 E4:1 D4:1 C4:1 C4:1 D4:1 E4:1 D4:1.5 C4:0.5 C4:2`);
 const ODE_B = seq(`D4:1 D4:1 E4:1 C4:1 D4:1 E4:0.5 F4:0.5 E4:1 C4:1 D4:1 E4:0.5 F4:0.5 E4:1 D4:1 C4:1 D4:1 G4:2`);
 const EASY_SONG_2 = rep(cat(ODE_A, ODE_A2, ODE_B, ODE_A2), 2);
 
-// 쉬움 ③ 뻐꾹 왈츠 (요나손 "Gökvalsen", 1918, 원곡 3/8 → 한 박 = 8분음표, 120bpm) — OKTAV/Presto Music 판매본과
-// MuseScore 에 올라온 여러 독립 채보(피아노 편곡)를 교차 확인해 옮김. 이 곡의 특징인 "뻐꾹" 모티프(장3도 하행 E5→C5 반복)를
-// 그대로 살렸다. A(18마디, 뻐꾹 모티프) + B(8마디, 대비 선율) + A + 맺음, 약 72초.
 const CUCKOO_A = seq(`
   G4:2 E5:1   C5:2 E5:1   G5 F5 G5 E5 D5:1
   C5:1 R:1 E5:1   C5:1 R:1 E5:1   C5:1 R:1 E5:1   G5 G5 E5 C5 D5 E5   C5:1 R:1 E5:1
@@ -286,19 +264,11 @@ const CUCKOO_B = seq(`
 const CUCKOO_END = seq(`G5 F5 E5 D5 C5:1   E5:1 C5:2   E5:1 C5:2   C5:3`);
 const EASY_SONG_3 = cat(CUCKOO_A, CUCKOO_B, CUCKOO_A, CUCKOO_END);
 
-// 보통 ① 엘리제를 위하여 (베토벤 WoO 59, 120bpm) — abcnotation.com 에 올라온 Frank Nordberg(musicaviva.com) 채보
-// (John Chambers abc 모음, be059-pno2.abc, V:1 오른손 선율, L:1/16, K:Am)를 그대로 옮김. A부(마디1~16, 두 번 도돌이)
-// 오른손 선율은 이 채보와 음 하나하나 일치한다. B부(F장조 아르페지오 구간, 다음 줄들)는 오른손이 빠른 분산화음이라
-// 계단식 골격 선율로 축약했다(게임 규칙상 단선율 유지). A부 반복 + B부, 약 66초.
 const ELISE_A = seq(`E5 D#5 E5 D#5 E5 B4 D5 C5 A4:1 R C4 E4 A4 B4:1 R E4 G#4 B4 C5:1 R E4`);
 const ELISE_B = seq(`E5 D#5 E5 D#5 E5 B4 D5 C5 A4:1 R C4 E4 A4 B4:1 R E4 C5 B4 A4:1`);
 const ELISE_C = seq(`R B4 C5 D5 E5:1.5 G4 F5 E5 D5:1.5 F4 E5 D5 C5:1.5 E4 D5 C5 B4:1 R E4 E5 R E5 E5:1 D#5 E5 D#5 E5 D#5 E5 D#5`);
 const MEDIUM_SONG_1 = cat(ELISE_A, ELISE_B, ELISE_A, ELISE_B, ELISE_C, ELISE_A, ELISE_B, ELISE_A, ELISE_B, ELISE_A, ELISE_B, seq(`A4:2`));
 
-// 보통 ② 터키 행진곡 (모차르트 K.331/300i 3악장, 160bpm) — Mutopia Project 판(Rune Zedeler·Chris Sawer 조판, 공개
-// 도메인, mutopiaproject.org/.../KV331_3_RondoAllaTurca-lys/KV331_3_RondoAllaTurcaNotes.ly) 의 righta(A단조 주제,
-// 1~9마디)·rightc(A장조 중간부) 성부를 그대로 옮김. A단조 주제 = TURK_P1(원곡과 음 일치 확인).
-// 중간부는 A장조(조표상 C#·F#·G#)라 TURK_P2 의 "C5" 를 "C#5" 로 바로잡았다(기존 "간이 채보"의 오류). 약 61초.
 const TURK_P1 = seq(`B4 A4 G#4 A4 C5:1.5 R  D5 C5 B4 C5 E5:1.5 R
                      F5 E5 D#5 E5 B4 A4 G#4 A4 B4 A4 G#4 A4 C5:1.5 R`);
 const TURK_P2 = seq(`A4 B4 C#5 B4 A4 G#4 A4 B4 C#5:1.5 R
@@ -307,10 +277,6 @@ const TURK_BR = seq(`C#5 D5 E5 F#5 E5 D5 C#5 B4 A4 B4 C#5 D5 E5:1.5 R
                      F#5 E5 D5 C#5 B4 C#5 D5 B4 C#5 B4 A4 G#4 A4:1.5 R`);
 const MEDIUM_SONG_2 = cat(TURK_P1, TURK_P2, TURK_P1, TURK_P2, TURK_BR, TURK_BR, TURK_P1, TURK_P2, TURK_P1, TURK_P2, seq(`A4:2`));
 
-// 어려움 ① 캐논 변주곡 (100bpm) — 파헬벨 캐논 피아노 편곡(W. Wallace, C장조 → D장조로 올림, github.com/piotr-yuxuan/pachelbel-canone)
-// 을 그대로 옮김. 코드 진행 D–A–Bm–F#m–G–D–G–A, 코드당 2박(편곡의 2분음표). 16분음표 단위(seqU 4).
-// 도입은 왼손 8분음표 아르페지오만, 이후엔 오른손 선율을 우선하고 오른손이 쉬는 8분음표 자리는 왼손(한 옥타브 올림)으로 채움.
-// 편곡 22순환 중 반복 순환은 하나만 남기되 16분음표 런 두 순환은 원곡처럼 두 번씩 → 11순환 + 맺음, 약 108초.
 const HARD_SONG_1 = seqU(`
   D4:2 A4:2 D5:2 F#5:2 A3:2 E4:2 A4:2 C#5:2 B3:2 F#4:2 B4:2 D5:2 F#3:2 C#4:2 F#4:2 A4:2 G3:2 D4:2 G4:2 B4:2 D3:2 A3:2 D4:2 F#4:2 G3:2 D4:2 G4:2 B4:2 A3:2 E4:2 A4:2 C#5:2
   F#5:2 A4:2 D5:2 F#5:2 E5:2 E4:2 A4:2 C#5:2 D5:2 F#4:2 B4:2 D5:2 C#5:2 C#4:2 F#4:2 A4:2 B4:2 D4:2 G4:2 B4:2 A4:2 A3:2 D4:2 F#4:2 B4:2 D4:2 G4:2 B4:2 C#5:2 E4:2 A4:2 C#5:2
@@ -326,10 +292,6 @@ const HARD_SONG_1 = seqU(`
   F#5:16
 `, 4);
 
-// 매우 어려움 흑건 (80bpm, 2/4) — 쇼팽 Op.10 No.5 오른손을 초판(슐레징거) 악보에서 그대로 옮김.
-// 원곡은 셋잇단 16분음표(한 박에 6개)라 seqU(문자열, 한 박을 나누는 수) 로 적는다(숫자 = 단위 개수, 생략하면 1개).
-// 원곡 빠르기 116 → 80 으로 늦춤. 1~32마디(A + B 전반) + 49~85마디(재현 + 코다), 약 104초.
-// 오른손 성부가 둘로 갈라지는 마디(4·12·52·66~68·71~72)는 위 성부의 16분음표를 쓴다(아래 성부만 읽으면 긴 음 하나로 뚝 끊김).
 function seqU(str, div){
   return str.trim().split(/\s+/).map(tok => {
     const [p, n] = tok.split(":");
@@ -408,8 +370,6 @@ const HARD_SONG_2 = seqU(`
   F#3:24
 `, 6);
 
-// 보통 ③ 바흐 평균율 1권 프렐류드 C장조 BWV 846 (76bpm) — humdrum-tools/bach-wtc 악보 35마디 전부, 16분음표 단위, 약 110초.
-// 세 성부가 겹치는 자리는 가장 높은 음 하나만(C E G C E G C E 패턴). 저음 C2 는 한 옥타브 올림.
 const MEDIUM_SONG_3 = seqU(`
   C4 E4 G4 C5 E5 G4 C5 E5 C4 E4 G4 C5 E5 G4 C5 E5
   C4 D4 A4 D5 F5 A4 D5 F5 C4 D4 A4 D5 F5 A4 D5 F5
@@ -448,9 +408,6 @@ const MEDIUM_SONG_3 = seqU(`
   C5:4
 `, 4);
 
-// 어려움 ② 베토벤 월광 소나타 1악장 (2분음표 54 = 4분음표 108) — craigsapp/beethoven-piano-sonatas 악보에서
-// 1~28마디 + 60~69마디(코다), 셋잇단 8분음표 단위, 약 84초. 두 손 음 중 같은 시각엔 가장 높은 음(선율이 있으면 선율).
-// 선율의 붙점 16분음표는 셋잇단 격자에 맞춰 붙였다. 저음 옥타브는 C3 아래를 한 옥타브 올림.
 const HARD_SONG_3 = seqU(`
   G#3 C#4 E4 G#3 C#4 E4 G#3 C#4 E4 G#3 C#4 E4
   G#3 C#4 E4 G#3 C#4 E4 G#3 C#4 E4 G#3 C#4 E4
@@ -491,11 +448,6 @@ const HARD_SONG_3 = seqU(`
   C#3:6 C#4:6
   C#4:4
 `, 3);
-// 보통 ④ 리스 항구 (메이플스토리 "Lith Harbor", 130bpm) — vgmusic.com 에 올라온 Paul Soh 채보 MIDI(포맷1, 25트랙,
-// 헤더에 "Maple Story: Memories of Victoria" 라 적혀 있음, division=120)를 직접 파싱(PowerShell로 MThd/MTrk 바이트를
-// 읽어 델타타임·노트온오프·템포 메타이벤트를 해석)해 옮겼다. "Acoustic Grand Piano" 트랙(선율+반주 겸용)에서
-// 동시에 울리는 음 중 가장 높은 음만 남기는 방식(바흐 프렐류드와 같은 규칙)으로 단선율화했다. 곡 전체(약 4분)
-// 중 피아노가 주제를 연주하는 첫 구간(틱 3840~23040, 160박)만 사용. 원곡 템포 130bpm 그대로, 약 74초.
 const LITH_SONG = seq(`
   D5:0.5 A4:0.5 E5:0.5 F#5:1.5 G5:0.5 A5:3 E5:1 F#5:1 G4:0.5 A4:0.5
   D5:1 R:0.5 E5:0.5 G5:2 F#5:1 E5:1 D5:1 R:0.5 F#4:0.5 R:1
@@ -514,11 +466,6 @@ const LITH_SONG = seq(`
   A4:1.5 B4:0.5 C#5:1
 `);
 
-// 어려움 ③ 커닝시티 (메이플스토리 "Kerning City", 135bpm) — vgmusic.com Paul Soh 채보 MIDI(포맷1, 9트랙, division=120)를
-// 위와 같은 방식(PowerShell 바이트 파서)으로 직접 해석했다. "Hammond Organ" 트랙이 리드 선율을 맡고 "Rock Organ" 트랙이
-// 거의 같은 리듬으로 3도 아래를 따라가는(하모니) 구성이라 Hammond Organ 쪽을 선율로 채택, 동시음은 가장 높은 음만 남겼다.
-// 주제가 네 번 순환하는 구간(틱 11880~34200, 193.75박)만 사용 — 곡 앞부분(기타·전자베이스 인트로)과 뒷부분 반복은 제외.
-// 당김음이 많은 16분음표 리프가 특징이라 어려움 난이도로 분류. 원곡 템포 135bpm 그대로, 약 86초.
 const KERNING_SONG = seq(`
   B5:0.5 R:0.75 F#5:0.25 A5:0.5 R:0.25 B5:0.5 R:1 A5:0.5 R:0.75 G#5:0.5
   R:0.5 F#5:0.5 R:1 D5:1 R:0.5 E5:0.5 F#5:0.25 G#5:0.5 D5:0.25 R:0.5
@@ -555,14 +502,6 @@ const KERNING_SONG = seq(`
   A#5:0.5 R:2 B5:0.5 R:0.5 B5:0.5 R:2
 `);
 
-// 쉬움 ④ 존 덴버 - Take Me Home, Country Roads (1971, 84bpm) — 사용자가 제공한 MIDI
-// "MIDI_John Denver_Take Me Home Country Roads.mid"(포맷1, 11트랙, division=192)를 PowerShell 바이트 파서로 직접
-// 해석했다. 트랙 중 이름이 그대로 "Melody" 인 트랙(9번, 단선율)을 선율로 채택, 규칙대로 동시음이 겹치면 가장 높은
-// 음만 남기는 처리도 적용해 두었다(실제로는 겹침이 거의 없었다). 이전 채보(69음, 밀도 12.9/10초)가 raw MIDI를
-// 0.25박(16분음표) 격자에 맞추며 짧은 음 몇 개를 이웃 음에 합쳐 넣은 것을 재확인해(원본 노트온 이벤트 수와
-// 대조) 다시 파싱, 구간 내 실제 73개 음을 모두 살렸다(밀도 14.0/10초, 여전히 쉬움 등급 ≤20 이내). 1절 + 후렴이
-// 끝나는 지점(약 53초, 사용자 지정 컷) 중 자연스러운 구절 경계(다음 소절 픽업음 직전, D4 롱톤이 끝나는 지점)
-// 에서 끊었다, 52.1초.
 const COUNTRYROADS_SONG = seq(`
   A3:0.25 R:0.25 A3:0.5 B3:0.75 A3:2.25 B3:0.5 A3:0.25 B3:0.5 D4:2.25 R:0.5
   E4:0.5 E4:0.5 F#4:0.75 E4:1 B3:0.25 B3:0.5 A3:0.5 B3:0.5 A3:0.5 D4:0.5
@@ -575,21 +514,6 @@ const COUNTRYROADS_SONG = seq(`
   A3:0.5 B3:0.75 A3:1.25 R:1 B3:0.5 A3:0.25 B3:0.75 D4:1.5
 `);
 
-// 보통 ④ 스타크래프트 - 테란 (Blizzard "Terran Theme 1", 1997/98, 135bpm) — 사용자가 제공한
-// MIDI "Game MIDI_- Arranged -_Starcraft (PC/DOS, 1997)_Terran 1.mid"(포맷1, 7트랙, division=120, 76박 단일 패스)를 PowerShell
-// 바이트 파서로 파싱했다(메타 텍스트는 EUC-KR(949), "Copyright ⓒ 1999 by 권용달(niliri)" — 편곡 니릴리). 트랙: 1 드럼(249음),
-// 2 멜로디(브라스 61, 58음, 완전 단선율), 3 전자기타(파워코드 195음), 4 화음(86음), 5 베이스(135음, 거의 8분음표 페달),
-// 6 "그냥 넣은 악기"(현악 48, 55음). 원래 vgmusic.com M4ST3R 채보로 만든 판은 사용자가 청음 비교 후 삭제했고, 그 뒤 멜로디
-// 58음만 두 바퀴(66초, 밀도 18.8) → 손편곡 아르페지오(121음/바퀴)를 거쳐, "이 MIDI 바탕으로 풍성하게" 요청으로
-// 드럼을 뺀 5트랙을 한 줄로 합쳤다: 같은 시각(0.25박 격자)에 여러 트랙이 겹치면 멜로디 > 현악 > 화음 > 기타 > 베이스 순으로
-// 하나, 화음은 가장 높은 음(파워코드는 옥타브 루트), C3 아래(베이스 A1, 기타 E2 갤럽)는 C3 이상이 될 때까지 옥타브 올림.
-// 멜로디는 전부 살리고, 다른 트랙 음은 앞 음과 0.25박(111ms) 미만이거나 다음 멜로디 음까지 0.5박 미만이면 버렸다
-// (기타 E3·F#3 갤럽 16분음표 쌍만 111ms, 나머지는 8분음표 222ms). 화음 트랙은 현악과 최고음이 같아 결과에 0음.
-// 한 패스 138음(멜로디 58 + 베이스 39 + 기타 22 + 현악 19), 기타·베이스 픽업 1.5박부터 시작.
-// 곡 구조: 픽업(1.5박) + 본편(69.5박, 마지막 B4 롱톤 위에 F·E·D 코드 하강 뒤 63박째 E 코드 롱톤)이 71박 루프.
-// 처음엔 두 바퀴(143.5박, 63.8초, 276타일)였으나 2026-09-18 사용자 지정으로 한 바퀴만: 픽업+본편+끝 롱톤(원곡 그대로 8박·현악 E6)
-// = 72.5박, 32.2초, 138타일, 밀도 43/10초 — 보통 등급. 같은 날 멜로디가 앞에 들리도록 MIDI 멜로디 트랙(58음)과 시각·음높이가 일치하는
-// 음만 1.0 으로 두고 나머지 반주 80음(베이스·기타·현악)은 소리 배율 0.3.
 const TERRAN_SONG = seq(`
   E3:0.25:0.3 E3:0.25:0.3 A4:0.5:0.3 A3:0.5:0.3 A4:0.5 B4:0.5 C5:0.5 B4:0.5 A4:0.5 A3:0.5:0.3 B4:0.5 B3:0.5:0.3 B3:0.5:0.3 B4:0.5
   G4:0.5:0.3 G4:0.5 G3:0.5:0.3 E3:0.25:0.3 E3:0.25:0.3 A4:0.5:0.3 A3:0.5:0.3 A4:0.5 B4:0.5 C5:0.5 B4:0.5 A4:0.5 A3:0.5:0.3 D#4:0.5
@@ -603,17 +527,6 @@ const TERRAN_SONG = seq(`
   C#5:0.5 B4:0.5 B3:0.5:0.3 B4:0.5 F3:0.5:0.3 F3:0.5:0.3 B4:0.5:0.3 E3:0.5:0.3 A4:0.5:0.3 D3:0.5:0.3 D3:0.5:0.3 E6:8:0.3
 `);
 
-// 어려움 ④ 신해철(N.EX.T) - 그대에게 (1988, 원곡 135→160bpm) — 사용자가 제공한 MIDI "그대에게.mid"(포맷1, 18트랙,
-// division=120, 트랙명 BRASS·BASS·MELODY·DISTOTION GT·BELLS·SFX·BRASS2 …)를 PowerShell 바이트 파서로 파싱했다.
-// 템포가 인트로 135bpm → 본편 160bpm 으로 바뀌므로 템포 맵으로 초 단위 시각을 구한 뒤 게임 bpm 160 기준 박으로
-// 환산했다(인트로 브라스 리프의 셋잇단 8분음표가 0.395박으로 나오는 이유). 사용자 지정으로 인트로 + 1절 + 후렴까지만
-// (보컬 MELODY 트랙 122번째 음, 106.6초에서 기타 솔로 직전 26초 공백이 시작되는 지점)에서 끊고 마지막 음은 6박 롱톤.
-// "타일이 최대한 많게" 요청에 따라 구간마다 들리는 주선율을 합쳤다: 보컬 MELODY(122음, 원본 122음 전부 — 우선순위 최상,
-// 90ms 안에서도 버리지 않음) > 기타 > 인트로·간주 브라스 리프(BRASS 197음) > 후렴 브라스 스탭(BRASS2 59음).
-// 같은 시각 화음은 가장 높은 음, 보컬이 아닌 음은 앞 음과 140ms 안에 겹치면 버렸다(160bpm 16분음표 94ms 연타만 걸러지고
-// 인트로 셋잇단 148ms 는 남음). 총 392타일, 106.6초, 밀도 최대 56/10초(후렴) — 어려움 등급.
-// 2026-09-18: 반주를 낮춰 달라는 요청. MIDI 의 MELODY 트랙(보컬 122음)과 시각·음높이가 일치하는 음은 1.0, 그 밖의 음은 소리 배율
-// 0.3 — 단, 앞뒤 2초 안에 보컬 음이 없는 구간(인트로·간주 브라스 리프 153음)은 그 구간의 주선율이라 1.0 그대로. 결과 117음이 0.3.
 const TOYOU_SONG = seq(`
   C4:0.395 G3:0.395 C4:0.395 D4:0.395 C4:0.395 D4:0.395 G4:1.778 C5:0.593 C5:0.395 G4:0.395 C5:0.395 D5:0.395 C5:0.395 D5:0.395
   G5:11.852 C4:0.395 G3:0.395 C4:0.395 D4:0.395 C4:0.395 D4:0.395 G4:1.185 F4:1.185 E4:0.395 D4:0.395 C4:0.395 D4:0.79 E4:0.395
@@ -644,23 +557,7 @@ const TOYOU_SONG = seq(`
   D4:0.5:0.3 C6:0.5:0.3 E4:0.5:0.3 C6:0.5:0.3 E5:0.5:0.3 F5:0.5 F6:0.5:0.3 E5:0.5 A5:0.5:0.3 C5:0.5 F4:0.25:0.3 D5:0.5 C6:0.25:0.3 E5:0.5
   F5:0.5 F6:0.5:0.3 E5:0.5 A5:0.25:0.3 G5:0.75 F4:0.25:0.3 F5:0.5 C6:0.5:0.3 E5:0.5 E5:0.75 C5:0.5:0.3 D5:0.5 G6:0.25:0.3 D5:6
 `);
-// ---- 2026-09-17 추가: 사용자가 제공한 MIDI 4곡(전전전세·happyday·만찬가·anti.mid). 네 파일 모두 같은 구조(포맷1, division=480,
-// 템포 120bpm 고정, 트랙0 보컬(ch0 단선율 + ch1 코드 패드), 트랙1 피아노 오른손(ch2), 트랙2 피아노 왼손(ch2))라 PowerShell
-// 바이트 파서로 같은 규칙으로 옮겼다. 멜로디는 보컬 ch0 음을 전부(길이 0인 중복 음만 제거, 같은 시각 화음은 직전 음에 가장
-// 가까운 음) 살리고, "풍성하게" 요청에 따라 피아노 양손 음을 같은 시각이면 가장 높은 음 하나로 합쳐 사이사이에 넣었다.
-// 반주 음은 앞 음과의 간격·다음 멜로디 음까지의 간격이 곡의 8분음표(전전전세 167ms, 나머지 250ms) 이상일 때만 두고,
-// C3 아래 왼손 음은 C3 이상이 될 때까지 옥타브 올렸다. 코드 패드(ch1)와 전전전세 트랙1 ch3(긴 페달음)는 쓰지 않았다.
-// 네 곡 모두 사용자 지정으로 "1절 + 후렴"까지만: 보컬 구절(쉼 0.5초 이상으로 나눔)의 선율이 다시 반복되는 지점(2절 시작)을
-// 찾아 그 직전 후렴의 마지막 보컬 음에서 끊고, 마지막 음은 4박 롱톤(반주도 그 음 뒤로는 뺐다).
 
-// 어려움 ⑤ RADWIMPS - 전전전세 (前前前世, 2016 "너의 이름은.", 180bpm) — 파일은 120bpm 이지만 음표가 160틱(셋잇단) 격자라
-// 게임 bpm 180 으로 잡아 8분음표 = 0.5박. 원 파일 구조: 피아노 인트로(B-C#-F# 리프 0.5초짜리 64회, 32초) → A(32~63초) → 간주
-// 18초 → A'(81~148초, A 두 번 더) → 간주 18초 → B(166~203초) → 후렴(204~237초, F#5 롱톤) → 38초 간주 → 2절.
-// 사용자 지정으로 인트로는 보컬 직전 리프 16회(8초, 처음 4회에서 4배로 늘림), A절은 한 번만, 간주는 B 직전 2초만 남겼다: 원 파일 틱
-// [23520,61920)(인트로 16회 + A + 마디 끝까지) 뒤에 [157920,227520)(간주 2초 + B + 후렴)을 이어 붙임(두 이음매 모두 마디 안 같은 박 위치라
-// 박자가 이어진다). 보컬 231음 전부 + 피아노 358음, 총 589타일, 114초, 밀도 평균 52·최대 61/10초 — 어려움 등급.
-// 리프가 멜로디와 같은 음역(B4~F#5)이라 멜로디가 묻힌다는 지적에 따라 피아노(반주) 음은 소리 배율 0.3(세 번째 칸)으로 낮췄다
-// (Happy Day·만찬가·Antifreeze 는 같은 요청으로 반주 0.4배).
 const ZENZENZENSE_SONG = seq(`
   B4:0.5:0.3 C#5:0.5:0.3 F#5:0.5:0.3 B4:0.5:0.3 C#5:0.5:0.3 F#5:0.5:0.3 B4:0.5:0.3 C#5:0.5:0.3 F#5:0.5:0.3 B4:0.5:0.3 C#5:0.5:0.3 F#5:0.5:0.3 B4:0.5:0.3 C#5:0.5:0.3
   F#5:0.5:0.3 B4:0.5:0.3 C#5:0.5:0.3 F#5:0.5:0.3 B4:0.5:0.3 C#5:0.5:0.3 F#5:0.5:0.3 B4:0.5:0.3 C#5:0.5:0.3 F#5:0.5:0.3 B4:0.5:0.3 C#5:0.5:0.3 F#5:0.5:0.3 B4:0.5:0.3
@@ -707,8 +604,6 @@ const ZENZENZENSE_SONG = seq(`
   B4:0.5:0.3 C#5:0.5:0.3 F#5:0.5:0.3 B4:0.5:0.3 C#5:0.5:0.3 F#5:0.5:0.3 B4:0.5:0.3 C#5:0.5:0.3 F#5:4:0.3
 `);
 
-// 보통 ⑤ Happy Day (120bpm) — 구조: 1절 A(16~30초) → B(31~47초) → 후렴(48~65초) → 2절(66초~, 1절 선율 반복). 후렴 끝 65초
-// (62400틱)에서 끊어 보컬 141음 전부 + 피아노 97음, 총 238타일, 66초, 밀도 평균 36·최대 40/10초 — 보통 등급.
 const HAPPYDAY_SONG = seq(`
   G4:0.25:0.4 R:0.25 B4:1:0.4 D5:0.5:0.4 C5:1:0.4 D5:0.5:0.4 C4:0.5:0.4 D5:0.5:0.4 A4:0.5:0.4 G4:0.5:0.4 B4:0.5:0.4 B4:1:0.4 B4:0.5:0.4 A4:0.5:0.4
   G4:0.5:0.4 G4:0.5:0.4 G4:0.5:0.4 E5:0.5:0.4 D5:1:0.4 G4:0.5:0.4 C4:0.5:0.4 G4:0.5:0.4 G4:0.5:0.4 A4:0.5:0.4 B4:0.5:0.4 B4:1:0.4 A4:0.5:0.4 D4:0.5:0.4
@@ -730,8 +625,6 @@ const HAPPYDAY_SONG = seq(`
   G4:0.5 A4:0.5:0.4 G4:0.5 A4:0.5 G4:0.5 G4:4
 `);
 
-// 어려움 ⑥ 만찬가 (120bpm) — 보컬이 16분음표 위주. 구조: 1절(8~31초) → 후렴(32~55초) → 2절(64초~, 1절 선율 반복). 후렴 끝 55.5초
-// (53280틱)에서 끊어 보컬 226음 전부 + 피아노 41음, 총 267타일, 57초, 밀도 평균 47·최대 65/10초 — 어려움 등급.
 const MANCHANGA_SONG = seq(`
   D#4:0.5:0.4 D#3:1:0.4 D#4:1:0.4 D#3:0.5:0.4 G#3:0.5:0.4 D#3:0.5:0.4 G4:0.5:0.4 A#3:1:0.4 G#4:1:0.4 G#3:0.5:0.4 D#4:0.5:0.4 G#3:0.5:0.4 D#4:0.5:0.4 D#3:1:0.4
   D#4:1:0.4 D#3:0.5:0.4 G#3:0.5:0.4 D#3:0.5:0.4 G4:0.5:0.4 A#3:1:0.4 G#4:1:0.4 G#3:0.5:0.4 D#4:0.5:0.4 G#3:0.5:0.4 D#4:0.25 D#4:0.25 D#4:0.25 D#4:0.25
@@ -755,9 +648,6 @@ const MANCHANGA_SONG = seq(`
   F4:0.5 D#4:0.5 D#5:0.5:0.4 G#4:0.5 G4:0.5 C5:0.5:0.4 G#4:4
 `);
 
-// 보통 ⑥ 검정치마 - Antifreeze (2011, 120bpm) — 길이 0 중복 음 44개 제거, 화음 6곳은 직전 음에 가까운 음. 구조: 1절 A(17~45초)
-// → A'(49~77초) → 후렴(81~113초) → 후렴 반복(117~149초) → 브리지 → 2절. 첫 후렴 끝 113초(108480틱)에서 끊어 보컬 214음 전부
-// + 피아노 172음, 총 386타일, 114초, 밀도 평균 34·최대 38/10초 — 보통 등급.
 const ANTIFREEZE_SONG = seq(`
   F#4:0.5:0.4 F#3:0.5:0.4 F#5:0.5:0.4 F5:1:0.4 C#5:0.5:0.4 F#3:0.5:0.4 D#5:0.5:0.4 C#3:0.5:0.4 A#4:0.5:0.4 B3:0.5:0.4 C#5:1:0.4 G#4:0.5:0.4 B3:0.5:0.4 C#3:0.5:0.4
   A#4:1:0.4 F#3:0.5:0.4 A#4:1:0.4 F#3:0.5:0.4 A#4:0.5:0.4 F#3:0.5:0.4 F#4:1:0.4 E3:0.5:0.4 F#4:1:0.4 E3:0.5:0.4 F#4:1:0.4 F#4:0.5:0.4 F#3:0.5:0.4 F#5:0.5:0.4
@@ -789,13 +679,6 @@ const ANTIFREEZE_SONG = seq(`
   F#5:0.5 A#4:0.5 A#4:0.5 A#4:0.5 G#4:0.5 F#4:0.5 A#4:0.5 F#4:4
 `);
 
-// 보통 ⑦ one love (원곡 65bpm) — 2026-09-18 사용자가 제공한 MIDI "one.mid"(포맷1, division=480, 트랙0 Soprano(ch0 보컬 단선율
-// + ch1 코드 패드), 트랙1·2 Piano(ch2 양손))를 위 4곡과 같은 규칙으로 옮겼다. 구조: 1절 A(3.8~35초) → 후렴(36~53.5초) → 6초 간주
-// → 2절(59.5초~, 1절 뒤쪽 선율 반복) → 브리지(84초~) → 반음 올린 후렴(102초~). 첫 후렴 마지막 보컬 음(52.1초, 50040틱)에서 끊고
-// 4박 롱톤. 보컬 168음 전부(길이 0·화음 없음) + 피아노 71음(같은 시각이면 가장 높은 음, C3 아래는 옥타브 올림) — 피아노가
-// 멜로디와 같은 박에 화음을 치는 곡이라 8분음표 간격 규칙으로는 37음뿐이어서 이 곡만 앞뒤 간격 16분음표(120틱, 125ms) 이상으로
-// 낮췄다(보컬 자체가 16분음표 격자). 반주 음은 사용자 지정으로 소리 배율 0.3. 파일은 120bpm 이지만 원곡보다 빨라 사용자 지정으로 게임 bpm 65
-// (박 길이만 바뀌고 음 순서·박 수는 그대로). 총 239타일, 100초, 밀도 평균 24·최대 30/10초 — 보통 등급.
 const ONELOVE_SONG = seq(`
   D4:1:0.3 D4:1:0.3 D4:1:0.3 D4:0.5:0.3 D3:0.5:0.3 D4:1:0.3 D4:1:0.3 D4:1.5:0.3 F#4:0.25 F#4:0.25 G4:0.264583 D4:0.735417:0.3 D4:1:0.3 D4:1:0.3
   D4:0.5:0.3 A4:0.25 B4:0.25 C5:0.5 B4:0.5 B4:0.5 A4:0.25 G4:0.25 G4:1:0.3 D4:0.5:0.3 B4:0.25 D5:0.25 D5:0.5 C5:0.5
@@ -819,7 +702,6 @@ const ONELOVE_SONG = seq(`
 
 const SONG_DATA = { EASY_SONG_1, EASY_SONG_2, EASY_SONG_3, MEDIUM_SONG_1, MEDIUM_SONG_2, MEDIUM_SONG_3, HARD_SONG_1, HARD_SONG_2, HARD_SONG_3, LITH_SONG, KERNING_SONG, TERRAN_SONG, COUNTRYROADS_SONG, TOYOU_SONG, ZENZENZENSE_SONG, HAPPYDAY_SONG, MANCHANGA_SONG, ANTIFREEZE_SONG, ONELOVE_SONG };
 
-/* ============ 최고 기록 (이 기기의 localStorage, 곡별) ============ */
 const Best = {
   KEY: "pianotiles_best_v1",
   all(){ try { return JSON.parse(localStorage.getItem(this.KEY) || "{}") || {}; } catch (e) { return {}; } },
@@ -827,7 +709,6 @@ const Best = {
   set(id, rec){ try { const a = this.all(); a[id] = rec; localStorage.setItem(this.KEY, JSON.stringify(a)); } catch (e) {} }
 };
 
-/* ============ 사운드 합성 (Web Audio, 외부 파일 없음) ============ */
 const Sound = {
   ctx: null,
   ensure(){
@@ -837,42 +718,37 @@ const Sound = {
     if (this.ctx && this.ctx.state === "suspended") this.ctx.resume();
     return this.ctx;
   },
-  // 현재 시각(ms). 오디오 타임라인을 기준으로 하고, 없으면 performance.now()
   nowMs(){ return this.ctx ? this.ctx.currentTime * 1000 : performance.now(); },
-  // 피아노 음 합성 (playPianoNote): 기본파 삼각파 + 2·3·4배음(사인, 2·4배음은 ±4센트 디튠) + 살짝 어긋난 유니즌 현
-  // + 15ms 화이트노이즈 해머 타격(1.5kHz 하이패스). 엔벨로프는 3ms 선형 어택 뒤 setTargetAtTime 지수 감쇠(저음일수록 길게),
-  // 저역통과 필터 컷오프를 밝게 열었다가 감쇠와 함께 서서히 닫아 시간이 갈수록 어두워지는 피아노 특성을 흉내 낸다.
   playNote(freq, vol, when){
     const c = this.ctx; if (!c) return null;
     const t = (when !== undefined) ? when : c.currentTime;
     const v = vol || 0.5;
-    const body = Math.pow(220 / freq, 0.35);                          // 낮은 음일수록 길게 울림
-    const tau = Math.min(0.9, Math.max(0.3, CONFIG.noteDecaySec * body)); // 지수 감쇠 시정수
-    const end = t + tau * 6 + 0.05;                                   // 약 -52dB 지점에서 노드 정리
+    const body = Math.pow(220 / freq, 0.35);
+    const tau = Math.min(0.9, Math.max(0.3, CONFIG.noteDecaySec * body));
+    const end = t + tau * 6 + 0.05;
     const master = c.createGain();
     master.gain.setValueAtTime(0.0001, t);
-    master.gain.linearRampToValueAtTime(v, t + 0.003);                // 어택 3ms
-    master.gain.setTargetAtTime(0.0001, t + 0.003, tau);              // 지수 감쇠(여운)
+    master.gain.linearRampToValueAtTime(v, t + 0.003);
+    master.gain.setTargetAtTime(0.0001, t + 0.003, tau);
     const lp = c.createBiquadFilter();
     lp.type = "lowpass"; lp.Q.value = 0.7;
     lp.frequency.setValueAtTime(Math.min(12000, Math.max(5000, freq * 8)), t);
     lp.frequency.setTargetAtTime(Math.max(1500, freq * 2.5), t + 0.01, tau * 0.8);
     master.connect(lp); lp.connect(c.destination);
-    const parts = [[1, 1.0, 0, "triangle", 1.0], [2, 0.25, 4, "sine", 0.6], [3, 0.12, 0, "sine", 0.45], [4, 0.06, -4, "sine", 0.35]]; // [배음, 세기, 디튠(센트), 파형, 감쇠비]
+    const parts = [[1, 1.0, 0, "triangle", 1.0], [2, 0.25, 4, "sine", 0.6], [3, 0.12, 0, "sine", 0.45], [4, 0.06, -4, "sine", 0.35]];
     parts.forEach(p => {
       const o = c.createOscillator(); o.type = p[3]; o.frequency.value = freq * p[0];
       if (p[2]) o.detune.value = p[2];
       const g = c.createGain();
       g.gain.setValueAtTime(p[1], t);
-      g.gain.setTargetAtTime(0.0001, t + 0.02, tau * p[4]);           // 높은 배음일수록 먼저 사라짐
+      g.gain.setTargetAtTime(0.0001, t + 0.02, tau * p[4]);
       o.connect(g); g.connect(master); o.start(t); o.stop(end);
     });
-    const od = c.createOscillator(); od.type = "sine"; od.frequency.value = freq * 1.0025; // 살짝 어긋난 유니즌 현(울림)
+    const od = c.createOscillator(); od.type = "sine"; od.frequency.value = freq * 1.0025;
     const gd = c.createGain();
     gd.gain.setValueAtTime(0.3, t);
     gd.gain.setTargetAtTime(0.0001, t + 0.02, tau * 0.8);
     od.connect(gd); gd.connect(master); od.start(t); od.stop(end);
-    // 해머 타격: 15ms 화이트노이즈 → 1.5kHz 하이패스
     const n = Math.floor(c.sampleRate * 0.015);
     const buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
     for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * 0.05 * (1 - i / n);
@@ -881,7 +757,6 @@ const Sound = {
     ns.connect(hp); hp.connect(master); ns.start(t); ns.stop(t + 0.02);
     return master;
   },
-  /* 미리 듣기: 곡을 1초 앞까지만 미리 예약하며 재생(노드 수 절약). 다시 부르면 기존 재생은 멈춤 */
   preview: null,
   playSong(id, data, bpm, onEnd){
     this.stopPreview();
@@ -910,7 +785,6 @@ const Sound = {
     this.preview = null;
     if (p.onEnd) p.onEnd();
   },
-  // MISS: 아주 약한 둔탁한 클릭음
   playThud(){
     const c = this.ctx; if (!c) return;
     const t = c.currentTime;
@@ -923,7 +797,6 @@ const Sound = {
   }
 };
 
-/* ============ 노트 → 레인 배정 (같은 레인 연속 금지, 음높이 순) ============ */
 function assignLanes(notes){
   const pitches = notes.filter(n => n.pitch).map(n => PITCH_ORDER.indexOf(n.pitch));
   const lo = Math.min.apply(null, pitches), hi = Math.max.apply(null, pitches);
@@ -931,10 +804,8 @@ function assignLanes(notes){
   return notes.map(n => {
     if (!n.pitch) return -1;
     const p = PITCH_ORDER.indexOf(n.pitch);
-    // 낮은 음은 왼쪽, 높은 음은 오른쪽 레인을 우선
     let want = hi === lo ? 1 : Math.min(CONFIG.lanes - 1, Math.floor((p - lo) / (hi - lo + 0.0001) * CONFIG.lanes));
     if (want === prev) {
-      // 이전과 같으면 음 진행 방향(올라가면 오른쪽, 내려가면 왼쪽)으로 한 칸 옮김
       const dir = (prevPitch !== null && p < prevPitch) ? -1 : 1;
       want = want + dir;
       if (want < 0 || want >= CONFIG.lanes) want = prev - dir;
@@ -944,14 +815,16 @@ function assignLanes(notes){
   });
 }
 
-/* ============ 상태 ============ */
 const $ = id => document.getElementById(id);
 const S = {
   diff: null, songIdx: null,
   song: null, notes: [], startMs: 0, endMs: 0, running: false, raf: 0,
   score: 0, combo: 0, maxCombo: 0, p: 0, g: 0, m: 0, judged: 0,
-  popups: [], flash: [0,0,0,0]
+  popups: [], flash: [0,0,0,0],
+  missCursor: 0, drawCursor: 0
 };
+const hudEls = { score: $("hScore"), combo: $("hCombo"), mult: $("hMult"), acc: $("hAcc") };
+const TILE_FONT = "\"Nanum Gothic\", \"Malgun Gothic\", sans-serif";
 
 function comboMult(combo){
   let m = 1;
@@ -959,7 +832,6 @@ function comboMult(combo){
   return m;
 }
 
-/* ============ 시작 화면 ============ */
 function showScreen(id){
   document.querySelectorAll(".screen").forEach(s => s.classList.toggle("on", s.id === id));
 }
@@ -974,7 +846,7 @@ function buildStart(){
   $("startBtn").addEventListener("click", startGame);
 }
 function selectDiff(key){
-  if (S.diff !== key) { S.songIdx = null; Sound.stopPreview(); }   // 난이도 바꾸면 곡 선택·미리 듣기 초기화
+  if (S.diff !== key) { S.songIdx = null; Sound.stopPreview(); }
   S.diff = key;
   document.querySelectorAll("#diffRow .btn").forEach(b => b.classList.toggle("sel", b.dataset.diff === key));
   renderSongs();
@@ -1018,7 +890,6 @@ function renderSongs(){
   });
   syncListenBtns();
 }
-/* 미리 듣기 버튼 표시를 실제 재생 상태와 맞춤 (카드 다시 그려도 유지) */
 function syncListenBtns(){
   const cur = Sound.preview ? Sound.preview.id : null;
   document.querySelectorAll(".listen").forEach(b => {
@@ -1031,7 +902,6 @@ function updateStartBtn(){
   $("startBtn").disabled = !(S.diff && S.songIdx !== null);
 }
 
-/* ============ 게임 ============ */
 const cv = $("cv"), ctx = cv.getContext("2d");
 let W = 0, H = 0, hitY = 0, padH = 0, dpr = 1;
 function resize(){
@@ -1040,11 +910,10 @@ function resize(){
   W = r.width; H = r.height;
   cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  padH = Math.max(44, Math.min(72, H * 0.12));   // 아래 탭 버튼 높이 = 타일 높이 (타일이 버튼과 완전히 겹치는 순간이 PERFECT)
-  hitY = H - padH;                                // 버튼 윗변(히트 라인)
+  padH = Math.max(44, Math.min(72, H * 0.12));
+  hitY = H - padH;
 }
 window.addEventListener("resize", () => { if (S.running) resize(); });
-// 목록으로 이동 등으로 화면을 벗어나도(뒤로가기 캐시 등으로 페이지가 바로 사라지지 않는 경우 대비) 미리 듣기는 끈다.
 document.addEventListener("visibilitychange", () => { if (document.hidden) Sound.stopPreview(); });
 window.addEventListener("pagehide", () => { Sound.stopPreview(); });
 
@@ -1062,14 +931,13 @@ function startGame(){
     acc += n.beats * beatMs;
   });
   S.score = 0; S.combo = 0; S.maxCombo = 0; S.p = S.g = S.m = S.judged = 0;
-  S.popups = []; S.flash = [0,0,0,0];
+  S.popups = []; S.flash = [0,0,0,0]; S.missCursor = 0; S.drawCursor = 0;
   showScreen("game");
   resize();
   const best = Best.get(cfg.id);
   $("hBest").textContent = best ? "최고 " + best.score : "최고 —";
   $("gameTitle").textContent = CONFIG.difficulties[S.diff].label + " · " + cfg.title;
   updateHud();
-  // 시작 시각: 지금 + 준비 시간 + 낙하 시간. targetMs 는 모두 오디오 타임라인 기준
   S.startMs = Sound.nowMs() + CONFIG.leadInMs + cfg.fallDurationMs;
   S.notes.forEach(n => n.targetMs = S.startMs + n.offset);
   S.endMs = S.notes[S.notes.length - 1].targetMs + 1200;
@@ -1079,16 +947,15 @@ function startGame(){
 }
 
 function updateHud(){
-  $("hScore").textContent = S.score;
-  $("hCombo").textContent = S.combo;
-  $("hMult").textContent = "×" + comboMult(S.combo).toFixed(1);
-  $("hAcc").textContent = accuracy() + "%";
+  hudEls.score.textContent = S.score;
+  hudEls.combo.textContent = S.combo;
+  hudEls.mult.textContent = "×" + comboMult(S.combo).toFixed(1);
+  hudEls.acc.textContent = accuracy() + "%";
 }
 function accuracy(){
   return S.judged ? Math.round((S.p + S.g) / S.judged * 100) : 100;
 }
 
-/* 입력 → 판정. 허용 오차 안에 그 레인 노트가 없으면 아무 일도 없음(오탭 무시) */
 function hitLane(lane){
   if (!S.running) return;
   const inputMs = Sound.nowMs();
@@ -1098,14 +965,14 @@ function hitLane(lane){
     if (n.judged || n.lane !== lane) continue;
     const d = Math.abs(inputMs - n.targetMs);
     if (d < bestDiff) { bestDiff = d; best = n; }
-    if (n.targetMs - inputMs > CONFIG.hitWindowMissMs) break;   // 이후 노트는 더 멀다
+    if (n.targetMs - inputMs > CONFIG.hitWindowMissMs) break;
   }
   if (best && bestDiff <= CONFIG.hitWindowGoodMs) {
     judge(best, bestDiff <= CONFIG.hitWindowPerfectMs ? "PERFECT" : "GOOD", inputMs);
   } else if (best && bestDiff <= CONFIG.hitWindowMissMs) {
-    judge(best, "MISS", inputMs);                 // 너무 이르거나 늦은 입력: 그 타일을 MISS 로 소비
+    judge(best, "MISS", inputMs);
   } else {
-    judge({ lane, pitch: null }, "MISS", inputMs, true); // 타일 없는 곳을 두드림(막치기 방지): 구제 점수 없는 빈 MISS
+    judge({ lane, pitch: null }, "MISS", inputMs, true);
   }
 }
 function judge(n, grade, atMs, phantom, silent){
@@ -1113,10 +980,8 @@ function judge(n, grade, atMs, phantom, silent){
   S.judged++;
   if (grade === "MISS") {
     S.m++; S.combo = 0;
-    // 곡별 missScore 는 "타일은 있었지만 박자가 어긋난" 미스만 구제한다.
-    // 타일이 아예 없는 곳을 두드린 헛탭(phantom)까지 구제하면 막치기가 정타보다 유리해진다.
     const ms = (!phantom && S.song && S.song.missScore != null) ? S.song.missScore : CONFIG.missScore;
-    S.score = Math.max(0, S.score + (ms != null ? ms : -CONFIG.penaltyMiss));   // 곡별 missScore 가 있으면 감점 대신 소량 가산
+    S.score = Math.max(0, S.score + (ms != null ? ms : -CONFIG.penaltyMiss));
     if (!silent) Sound.playThud();
   } else {
     S.combo++; S.maxCombo = Math.max(S.maxCombo, S.combo);
@@ -1132,10 +997,11 @@ function judge(n, grade, atMs, phantom, silent){
 function loop(){
   if (!S.running) return;
   const now = Sound.nowMs();
-  // 히트 라인을 판정 없이 지나간 노트 → 자동 MISS
-  for (const n of S.notes) {
-    if (!n.judged && now - n.targetMs > CONFIG.hitWindowGoodMs) judge(n, "MISS", now);
+  let i = S.missCursor;
+  for (; i < S.notes.length && now - S.notes[i].targetMs > CONFIG.hitWindowGoodMs; i++) {
+    if (!S.notes[i].judged) judge(S.notes[i], "MISS", now);
   }
+  S.missCursor = i;
   draw(now);
   if (now >= S.endMs) { finish(); return; }
   S.raf = requestAnimationFrame(loop);
@@ -1143,9 +1009,8 @@ function loop(){
 
 function draw(now){
   const cfg = S.song, laneW = W / CONFIG.lanes, fall = cfg.fallDurationMs;
-  const tileH = padH, tileX = i => i * laneW + 4, tileW = laneW - 8;   // 버튼과 타일은 같은 크기·같은 자리
+  const tileH = padH, tileX = i => i * laneW + 4, tileW = laneW - 8;
   ctx.clearRect(0, 0, W, H);
-  // 레인 배경 + 버튼(타일과 같은 크기)
   for (let i = 0; i < CONFIG.lanes; i++) {
     ctx.fillStyle = i % 2 ? "#FFFFFF" : "#F8FAF6";
     ctx.fillRect(i * laneW, 0, laneW, H);
@@ -1161,21 +1026,20 @@ function draw(now){
     ctx.strokeStyle = "#24402F"; ctx.lineWidth = 2;
     ctx.strokeRect(tileX(i), hitY, tileW, padH);
   }
-  // 히트 라인(버튼 윗변)
   ctx.strokeStyle = "#24402F"; ctx.lineWidth = 3;
   ctx.beginPath(); ctx.moveTo(0, hitY); ctx.lineTo(W, hitY); ctx.stroke();
 
-  // 타일. 위치 = 남은 시간 비율로 계산 (속도 하드코딩 없음: 거리 H / 시간 fall)
-  // 타일 아랫변이 화면 맨 아래(H)에 닿는 순간 == 버튼과 완전히 겹치는 순간 == targetMs
-  // 버튼 위를 지나는 부분은 반투명으로 그려 얼마나 겹쳤는지 보이게 한다
+  const goneBelowMs = -fall * tileH / H;
+  while (S.drawCursor < S.notes.length && S.notes[S.drawCursor].targetMs - now < goneBelowMs) S.drawCursor++;
   const drawTiles = (clipY0, clipY1, alpha) => {
     ctx.save(); ctx.beginPath(); ctx.rect(0, clipY0, W, clipY1 - clipY0); ctx.clip(); ctx.globalAlpha = alpha;
-    for (const n of S.notes) {
+    for (let k = S.drawCursor; k < S.notes.length; k++) {
+      const n = S.notes[k];
       const remain = n.targetMs - now;
       if (remain > fall) break;
-      if (n.judged && n.judged !== "MISS") continue;         // 맞춘 타일은 사라짐
+      if (n.judged && n.judged !== "MISS") continue;
       if (n.judged === "MISS" && now - n.hitAt > 250) continue;
-      const y = H - (remain / fall) * H;                    // 타일 아랫변. 버튼과 완전히 겹칠 때 y == H
+      const y = H - (remain / fall) * H;
       if (y - tileH > clipY1 || y < clipY0) continue;
       ctx.fillStyle = n.judged === "MISS" ? "#C9D2C3" : CONFIG.laneColors[n.lane];
       ctx.strokeStyle = n.judged === "MISS" ? "#B33951" : "#24402F";
@@ -1184,40 +1048,33 @@ function draw(now){
     }
     ctx.restore();
   };
-  drawTiles(0, hitY, 1);          // 버튼 위쪽: 불투명
-  drawTiles(hitY, H, 0.45);       // 버튼 구간: 반투명 테두리로 통과
-  // 키 이름(버튼 안, 타일 위에)
+  drawTiles(0, hitY, 1);
+  drawTiles(hitY, H, 0.45);
+  ctx.fillStyle = "#3B4B40"; ctx.font = "700 18px " + TILE_FONT;
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
   for (let i = 0; i < CONFIG.lanes; i++) {
-    ctx.fillStyle = "#3B4B40"; ctx.font = "700 18px \"Nanum Gothic\", \"Malgun Gothic\", sans-serif";
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.fillText(CONFIG.laneKeyLabels[i], (i + 0.5) * laneW, hitY + padH / 2);
   }
-  // 준비 안내
   if (now < S.startMs - fall) {
     const sec = Math.ceil((S.startMs - now) / 1000);
-    ctx.fillStyle = "#1B2B20"; ctx.font = "700 40px \"Nanum Gothic\", \"Malgun Gothic\", sans-serif";
+    ctx.fillStyle = "#1B2B20"; ctx.font = "700 40px " + TILE_FONT;
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.fillText(String(sec), W / 2, hitY * 0.45);
-    ctx.font = "15px \"Nanum Gothic\", \"Malgun Gothic\", sans-serif"; ctx.fillStyle = "#5B6B5E";
+    ctx.font = "15px " + TILE_FONT; ctx.fillStyle = "#5B6B5E";
     ctx.fillText("타일이 버튼과 완전히 겹치는 순간 탭!", W / 2, hitY * 0.45 + 34);
   }
-  // 판정 팝업 (히트 라인 근처, 페이드아웃)
   S.popups = S.popups.filter(p => now - p.at < 600);
   for (const p of S.popups) {
     const a = 1 - (now - p.at) / 600;
     ctx.globalAlpha = a;
     ctx.fillStyle = p.grade === "PERFECT" ? "#2F7D4F" : p.grade === "GOOD" ? "#A8731C" : "#B33951";
-    ctx.font = "700 " + (p.grade === "PERFECT" ? 20 : 17) + "px \"Nanum Gothic\", \"Malgun Gothic\", sans-serif";
+    ctx.font = "700 " + (p.grade === "PERFECT" ? 20 : 17) + "px " + TILE_FONT;
     ctx.textAlign = "center"; ctx.textBaseline = "bottom";
     ctx.fillText(p.grade, (p.lane + 0.5) * laneW, hitY - 14 - (1 - a) * 24);
     ctx.globalAlpha = 1;
   }
 }
 
-/* 입력: 레인에 오는 모든 종류의 누름(pointerdown·touchstart·mousedown·click)을 다 받는다.
-   전자칠판 내장 브라우저는 손가락 터치를 pointer 로만, touch 로만, 혹은 흉내 mouse/click 으로만
-   전달하는 등 기기마다 달라서 한 종류만 믿을 수 없다. 같은 손가락이 여러 이벤트로 겹쳐 오면
-   레인별 시각으로 걸러 한 번만 판정한다. 좌표로 레인을 계산해 두 손가락 동시 입력도 각각 판정한다. */
 const lanesEl = $("lanes");
 function laneAtX(x){
   const r = lanesEl.getBoundingClientRect();
@@ -1229,7 +1086,7 @@ const laneLastHit = [0, 0, 0, 0];
 function hitLaneOnce(lane, src){
   if (lane < 0) return;
   const now = performance.now();
-  const gap = src === "click" ? 400 : 100;     // click 은 손을 뗀 뒤 오므로 앞선 판정과 더 넓게 겹친다
+  const gap = src === "click" ? 400 : 100;
   if (now - laneLastHit[lane] < gap) return;
   laneLastHit[lane] = now;
   hitLane(lane);
@@ -1241,7 +1098,6 @@ lanesEl.addEventListener("touchstart", e => {
 lanesEl.addEventListener("pointerdown", e => { e.preventDefault(); hitLaneOnce(laneAtX(e.clientX), "pointer"); });
 lanesEl.addEventListener("mousedown",   e => { e.preventDefault(); hitLaneOnce(laneAtX(e.clientX), "mouse"); });
 lanesEl.addEventListener("click",       e => { e.preventDefault(); hitLaneOnce(laneAtX(e.clientX), "click"); });
-/* 진단: 주소 뒤에 ?debug 를 붙이면 레인에 도착하는 이벤트를 화면 왼쪽 아래에 보여 준다 (전자칠판 확인용) */
 if (/[?&]debug/.test(location.search)) {
   const box = document.createElement("div");
   box.style.cssText = "position:fixed;left:8px;bottom:8px;z-index:99999;background:rgba(0,0,0,.75);color:#fff;font:12px/1.4 monospace;padding:6px 8px;border-radius:6px;max-width:60vw;pointer-events:none;white-space:pre";
@@ -1255,7 +1111,7 @@ if (/[?&]debug/.test(location.search)) {
       const x = e.clientX != null ? e.clientX : (e.changedTouches && e.changedTouches[0] ? e.changedTouches[0].clientX : NaN);
       lines.push(type + (e.pointerType != null ? "(" + (e.pointerType || "빈값") + ")" : "") + " lane " + laneAtX(x));
       if (lines.length > 6) lines.shift();
-      const r2 = lanesEl.getBoundingClientRect();   // 게임 화면이 열린 뒤의 실제 레인 크기
+      const r2 = lanesEl.getBoundingClientRect();
       box.textContent = box.textContent.split("\n")[0] + "\nlanes " + Math.round(r2.width) + "x" + Math.round(r2.height) + " / " + (navigator.userAgent.match(/Chrome\/\d+|Safari\/\d+|Firefox\/\d+/) || [""])[0] + "\n" + lines.join("\n");
     }, true);
   });
@@ -1266,17 +1122,16 @@ window.addEventListener("keydown", e => {
   if (S.running) {
     if (i >= 0) { e.preventDefault(); hitLane(i); }
   } else if ($("result").classList.contains("on") && (i >= 0 || e.code === "Space")) {
-    e.preventDefault(); startGame();               // 결과 화면: D/F/J/K·스페이스 → 다시하기
+    e.preventDefault(); startGame();
   }
 });
 $("exitBtn").addEventListener("click", () => { if (S.running) finish(); });
 
-/* ============ 결과 ============ */
 function finish(){
   S.running = false;
   cancelAnimationFrame(S.raf);
   const now = Sound.nowMs();
-  S.notes.forEach(n => { if (!n.judged) judge(n, "MISS", now, false, true); });   // 중도 종료 시 남은 노트는 MISS(소리 없이 — 한꺼번에 울리면 겹쳐서 "퍽" 소리가 남)
+  S.notes.forEach(n => { if (!n.judged) judge(n, "MISS", now, false, true); });
   const cfg = S.song, prev = Best.get(cfg.id);
   const isNew = !prev || S.score > prev.score;
   if (isNew) Best.set(cfg.id, { score: S.score, acc: accuracy(), at: Date.now() });
@@ -1291,9 +1146,8 @@ function finish(){
   showScreen("result");
 }
 $("retryBtn").addEventListener("click", startGame);
-/* ============ 세계 신기록 (Firebase Realtime Database, 모든 학생 공통) ============ */
 const Hall = {
-  data: {},          // 곡 id → { score, name, at }
+  data: {},
   loaded: false,
   url(path){
     const cfg = window.PORTAL_CONFIG;
@@ -1307,16 +1161,8 @@ const Hall = {
       .then(j => { this.data = j || {}; this.loaded = true; })
       .catch(() => {});
   },
-  get(id){ const r = this.data[id]; return (r && typeof r.score === "number") ? r : null; },
-  // 규칙(데이터베이스규칙.json)이 "기존보다 높은 점수만" 허용하므로, 그 사이 누가 앞질렀으면 거부(401)된다
-  submit(id, score, name){
-    const u = this.url(id); if (!u) return Promise.reject(new Error("no-db"));
-    const rec = { score, name, at: Date.now() };
-    return fetch(u, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(rec) })
-      .then(r => { if (!r.ok) throw new Error(String(r.status)); this.data[id] = rec; return rec; });
-  }
+  get(id){ const r = this.data[id]; return (r && typeof r.score === "number") ? r : null; }
 };
-/* 반 신기록의 키(world-record.js 와 같은 규칙: <곡>cls<학년글자><반글자>). 반별 링크가 아니거나 배포용 링크면 null */
 function clsKeyOf(id){
   const pc = window.PORTAL_CLASS;
   return pc && !pc.test ? id + "cls" + "ab".charAt(pc.grade - 1) + "abcde".charAt(pc.cls - 1) : null;
@@ -1332,15 +1178,13 @@ function hallText(id){
 }
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch])); }
 function whoOf(r){ return (r.grade ? r.grade + "학년 " : "") + (r.cls ? r.cls + "반 " : "") + r.name; }
-/* 결과 화면: 곡별 세계 신기록 표시. 넘었으면 world-record.js 의 공용 입력 창(학년·반·이름)을 띄운다.
-   곡별 기록은 Hall 이 한 번에 읽어 두므로, 입력 창용 WorldRecord 에는 그 값을 넘겨 준다. */
 function showHall(){
   const cfg = S.song;
   $("hallLine").innerHTML = hallText(cfg.id);
   if (!window.WorldRecord || !Hall.loaded) return;
   const wr = WorldRecord("pianotiles", { key: cfg.id, format: v => v + "점" });
   wr.rec = Hall.get(cfg.id); wr.loaded = true;
-  if (wr.cls) { wr.cls.rec = Hall.get(wr.clsKey); wr.cls.loaded = true; }   /* 우리 반 신기록도 Hall 에서 */
+  if (wr.cls) { wr.cls.rec = Hall.get(wr.clsKey); wr.cls.loaded = true; }
   const songId = cfg.id;
   if (!wr.beats(S.score) && !wr.beatsClass(S.score)) return;
   const clsBefore = wr.cls ? wr.cls.rec : null;
@@ -1354,7 +1198,7 @@ $("homeBtn").addEventListener("click", () => {
   S.diff = null; S.songIdx = null;
   document.querySelectorAll("#diffRow .btn").forEach(b => b.classList.remove("sel"));
   renderSongs(); updateStartBtn();
-  Hall.load().then(renderSongs);   // 다른 학생이 올린 기록 반영
+  Hall.load().then(renderSongs);
   showScreen("start");
 });
 
