@@ -32,6 +32,10 @@
 
 ## 디자인·조작 규칙
 
+- **게임 파일(번호.html, court-cases.js)에는 주석을 달지 않고 변수·함수 이름으로 설명한다.** 공용 모듈(access-guard.js·world-record.js·firebase-config.js·data.js·sw.js·theme.css)과
+  index.html·admin.html 은 "왜 이렇게 했는지" 주석을 유지한다. 그림은 HTML에 base64로 넣지 말고 `img/<게임>/` 파일로 둔다.
+  폴링·요청 빈도(네트워크 동작)는 선생님께 먼저 묻고 바꾼다.
+
 - **색감은 `theme.css` 의 `--sg-*` 토큰(스네이크 톤), 글꼴은 나눔고딕(`var(--sg-font)`)으로 고정.**
   보색이 필요하면 `#D97B4F` 만 쓴다. 캔버스 안에서는 CSS 변수가 안 먹으니 hex 값 그대로.
   예외: 14(어두운 청록)·19(라면가게 크림) 배경과 게임 안 그림은 색을 건드리지 않음.
