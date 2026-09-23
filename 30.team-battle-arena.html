@@ -1052,16 +1052,19 @@
     }
     if (E.buffUntil > t && E.char === "tank") E.hp = Math.min(E.maxHp, E.hp + E.maxHp * ULT.tkRegen * dt);
   }
-  /* 톡 누르기 = 가장 가까운(보이는) 적 자동 조준 */
+  /* 클릭(드래그 없이 톡) = 거리와 상관없이 가장 가까운 보이는 적 자동 조준.
+     장애물에 가리지 않은 적을 먼저 고르고, 모두 가려져 있으면 그냥 가장 가까운 적. 풀숲 속 적은 제외(안 보이므로) */
   function autoAimAngle(E) {
-    var best = null, bd = Infinity, rng = (E.char === "tank" ? CHARS.tank.range + 60 : CHARS[E.char].range) * 1.1;
+    var best = null, bd = Infinity, open = null, od = Infinity;
     participants().forEach(function (id) {
       var o = ent(id); if (!o || !o.alive || o.team === E.team) return;
       if (inBush(o.x, o.y)) return;
       var d = hyp(o.x - E.x, o.y - E.y);
-      if (d < bd && d <= rng) { bd = d; best = o; }
+      if (d < bd) { bd = d; best = o; }
+      if (d < od && losClear(E.x, E.y, o.x, o.y)) { od = d; open = o; }
     });
-    return best ? Math.atan2(best.y - E.y, best.x - E.x) : E.angle;
+    var t = open || best;
+    return t ? Math.atan2(t.y - E.y, t.x - E.x) : E.angle;
   }
 
   /* ---------- AI 봇 (호스트가 계산) ---------- */
@@ -1238,7 +1241,9 @@
       if (!canAct() || aim.id !== null) return;
       if (which === "ult") {
         if (ME.gauge < GAUGE_MAX || ME.burst) return;
-        if (ME.char !== "marksman") { useUlt(ME, ME.angle); return; }   // 힐러·탱커: 탭하면 즉시 발동
+        if (ME.char !== "marksman") {   // 힐러·탱커: 방향 없는 즉시 발동형 — 탭하면 바로 발동, 가장 가까운 적 쪽을 바라봄
+          var ua = autoAimAngle(ME); ME.angle = ua; useUlt(ME, ua); return;
+        }
       }
       aim.id = e.pointerId; aim.btn = which; aim.ox = e.clientX; aim.oy = e.clientY; aim.dx = 0; aim.dy = 0; aim.drag = false;
       try { el.setPointerCapture(e.pointerId); } catch (er) {}
