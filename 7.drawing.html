@@ -2,7 +2,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="drawing" data-game-legacy="drowing"></script>
-<!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
 <title>추상화</title>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
@@ -11,7 +10,6 @@
 <meta property="og:url" content="https://cornsilktea.github.io/7.drawing.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
-<!-- 링크 미리보기 끝 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -41,7 +39,7 @@
     --font-body:'IBM Plex Sans KR','Apple SD Gothic Neo',sans-serif;
   }
   @media (prefers-color-scheme: dark){
-    :root:not([data-theme="light"]){
+    :root{
       --paper:#12160F;
       --surface:#1A2016;
       --surface-alt:#232B1D;
@@ -62,27 +60,6 @@
       --danger:#E58164;
       --shadow: 0 1px 0 rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.6);
     }
-  }
-  :root[data-theme="dark"]{
-    --paper:#12160F;
-    --surface:#1A2016;
-    --surface-alt:#232B1D;
-    --ink:#EAEFE4;
-    --ink-soft:#AEB8A4;
-    --line:#39432F;
-    --accent:#7FAEEB;
-    --accent-ink:#A9C8F2;
-    --accent-bg:#1E2C40;
-    --core:#68CB90;
-    --core-bg:#1D3524;
-    --omit:#C2B79E;
-    --omit-bg:#2B2818;
-    --presenter:#7FAEEB;
-    --presenter-bg:#1E2C40;
-    --guesser:#CE96C7;
-    --guesser-bg:#332230;
-    --danger:#E58164;
-    --shadow: 0 1px 0 rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.6);
   }
 
   *{box-sizing:border-box;}
@@ -107,7 +84,6 @@
     flex-direction:column;
   }
 
-  /* ---------- Topbar ---------- */
   .topbar{
     display:flex;
     align-items:center;
@@ -185,7 +161,6 @@
   .row.center{justify-content:center;}
   .row.between{justify-content:space-between;}
 
-  /* ---------- Buttons ---------- */
   .btn{
     appearance:none;
     border:2px solid var(--accent);
@@ -201,11 +176,6 @@
   }
   .btn:hover{background:var(--accent-ink); border-color:var(--accent-ink);}
   .btn:focus-visible{outline:3px solid var(--accent-ink); outline-offset:3px;}
-  .btn.ghost{
-    background:var(--surface);
-    color:var(--accent);
-  }
-  .btn.ghost:hover{background:var(--accent-bg);}
   .btn.quiet{
     background:var(--surface-alt);
     border-color:var(--surface-alt);
@@ -215,7 +185,6 @@
   .btn.wide{width:100%;}
   .btn:disabled{opacity:.45; cursor:not-allowed;}
 
-  /* ---------- Number picker (presenter / guesser) ---------- */
   .pick-badge{
     display:inline-flex;
     align-items:center;
@@ -256,7 +225,6 @@
   }
   .num-btn:disabled{opacity:.3; cursor:not-allowed; filter:none;}
 
-  /* ---------- Scoreboard tab ---------- */
   .scoreboard-grid{
     display:grid;
     grid-template-columns:repeat(auto-fill, minmax(92px,1fr));
@@ -282,7 +250,6 @@
     line-height:1.3;
   }
 
-  /* ---------- Intro screen ---------- */
   .rules-grid{
     display:grid;
     grid-template-columns:repeat(auto-fit, minmax(220px,1fr));
@@ -326,7 +293,6 @@
     width:110px;
   }
 
-  /* ---------- Peek screen ---------- */
   .peek-tag{
     display:inline-block;
     background:var(--accent-bg);
@@ -383,7 +349,6 @@
     line-height:1.15;
   }
 
-  /* ---------- Draw screen ---------- */
   .draw-toolbar{
     display:flex;
     justify-content:space-between;
@@ -435,7 +400,6 @@
   }
   .budget-banner.show{transform:translateY(0);}
 
-  /* ---------- Reveal screen ---------- */
   .reveal-word{
     font-family:var(--font-display);
     font-size:clamp(4rem, 12vw, 8rem);
@@ -479,7 +443,6 @@
   }
   .used-stat{color:var(--ink-soft); font-size:.98rem;}
 
-  /* ---------- Context screen ---------- */
   .context-btns{display:flex; gap:14px; flex-wrap:wrap;}
   .ctx-btn{
     flex:1;
@@ -527,7 +490,6 @@
     padding-top:14px;
   }
 
-  /* ---------- Wrap screen ---------- */
   .definition{
     font-size:1.3rem;
     line-height:1.7;
@@ -550,7 +512,6 @@
   }
   .example-card p{color:var(--ink-soft); font-size:.98rem; line-height:1.6;}
 
-  /* ---------- 큰 화면(전자칠판) : 가로 공간을 써서 세로 스크롤을 없앤다 ---------- */
   @media (min-width:1200px){
     main{padding:18px 24px 24px;}
     .screen{max-width:1400px; gap:16px;}
@@ -558,7 +519,6 @@
     .stack{gap:11px;}
     .topbar{padding:10px 24px;}
 
-    /* 시작 화면 : 소개는 가로 전체, 진행 방법과 라운드 설정은 나란히 */
     #screen-intro{
       display:grid;
       grid-template-columns:1.4fr 1fr;
@@ -567,7 +527,6 @@
     }
     #screen-intro > .card:first-child{grid-column:1 / -1;}
 
-    /* 정답 공개 화면 : 공개 내용과 번호 누르기를 나란히 */
     #screen-reveal{
       display:grid;
       grid-template-columns:minmax(0,1fr) minmax(0,1fr);
@@ -575,7 +534,6 @@
       gap:16px;
     }
 
-    /* 그리기 화면 : 캔버스가 남는 높이를 모두 차지하도록 */
     canvas{height:clamp(280px, calc(100vh - 330px), 720px);}
   }
 
@@ -599,7 +557,6 @@
   </header>
 
   <main>
-    <!-- ===== GAME TAB (sub-screens) ===== -->
     <div id="tab-game" class="screen">
 
       <section id="screen-intro" class="stack">
@@ -712,7 +669,6 @@
 
     </div>
 
-    <!-- ===== SCORES TAB ===== -->
     <div id="tab-scores" class="screen" hidden>
       <div class="card stack">
         <h1 style="font-size:1.6rem;">점수판</h1>
@@ -721,7 +677,6 @@
       </div>
     </div>
 
-    <!-- ===== CONTEXT TAB ===== -->
     <div id="tab-context" class="screen" hidden>
       <div class="card stack">
         <h1 style="font-size:1.6rem;">같은 '학생', 하지만 다른 추상화</h1>
@@ -736,7 +691,6 @@
       </div>
     </div>
 
-    <!-- ===== WRAP TAB ===== -->
     <div id="tab-wrap" class="screen" hidden>
       <div class="card stack">
         <h1 style="font-size:1.6rem;">오늘 배운 것: 추상화란?</h1>
@@ -768,7 +722,6 @@
 (function(){
   "use strict";
 
-  // ---------- Word bank ----------
   var WORDS = [
     {word:'고양이', cat:'동물', core:['세모난 귀 두 개','긴 수염','동그란 얼굴'], omit:['털 무늬','눈동자 색','발톱 개수']},
     {word:'강아지', cat:'동물', core:['늘어지거나 쫑긋한 귀','짧은 꼬리','네 다리'], omit:['털 색깔','품종별 생김새']},
@@ -832,10 +785,9 @@
     return a;
   }
 
-  // ---------- State ----------
   var STUDENT_COUNT = 27;
   var state = {
-    scores: new Array(STUDENT_COUNT + 1).fill(0), // index 1..27 used, 0 unused
+    scores: new Array(STUDENT_COUNT + 1).fill(0),
     queue: shuffle(WORDS),
     idx: 0,
     roundTime: 60,
@@ -843,12 +795,11 @@
     strokesUsed: 0,
     timeLeft: 60,
     timerHandle: null,
-    gameScreen: 'intro', // intro | peek | draw | reveal
-    pickStep: 'presenter', // presenter | guesser
+    gameScreen: 'intro',
+    pickStep: 'presenter',
     presenterNum: null
   };
 
-  // ---------- Element refs ----------
   var el = {};
   ['introDoneMsg','setTime','setStrokes','btnStart','roundProgress',
    'peekCat','peekWord','btnSkipWord','btnBeginDraw','peekBox','peekLocked','peekRevealed',
@@ -872,13 +823,13 @@
     wrap: document.getElementById('tab-wrap')
   };
 
-  // ---------- Tab navigation ----------
-  document.querySelectorAll('.tab-btn').forEach(function(btn){
-    btn.addEventListener('click', function(){
-      document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
-      btn.classList.add('active');
-      Object.keys(tabs).forEach(function(k){ tabs[k].hidden = (k !== btn.dataset.tab); });
-    });
+  var tabButtons = document.querySelectorAll('.tab-btn');
+  function selectTab(name){
+    Array.prototype.forEach.call(tabButtons, function(b){ b.classList.toggle('active', b.dataset.tab === name); });
+    Object.keys(tabs).forEach(function(k){ tabs[k].hidden = (k !== name); });
+  }
+  Array.prototype.forEach.call(tabButtons, function(btn){
+    btn.addEventListener('click', function(){ selectTab(btn.dataset.tab); });
   });
 
   function showGameScreen(name){
@@ -886,7 +837,6 @@
     Object.keys(screens).forEach(function(k){ screens[k].hidden = (k !== name); });
   }
 
-  // ---------- Score ----------
   function renderScoreboard(){
     el.scoreboardGrid.innerHTML = '';
     for (var n = 1; n <= STUDENT_COUNT; n++){
@@ -897,7 +847,6 @@
     }
   }
 
-  // ---------- Intro / start ----------
   el.btnStart.addEventListener('click', function(){
     state.roundTime = Math.max(20, Math.min(180, parseInt(el.setTime.value, 10) || 60));
     state.strokeMax = Math.max(2, Math.min(12, parseInt(el.setStrokes.value, 10) || 5));
@@ -925,8 +874,6 @@
     showGameScreen('peek');
   }
 
-  // Peek box: word only shows while pressed/held, and only inside this small
-  // corner box — the presenter covers it with a hand or book while holding it.
   function showPeekWord(){ el.peekLocked.hidden = true; el.peekRevealed.hidden = false; }
   function hidePeekWord(){ el.peekLocked.hidden = false; el.peekRevealed.hidden = true; }
 
@@ -949,19 +896,16 @@
     goToPeek();
   });
 
-  el.btnBeginDraw.addEventListener('click', function(){
-    startDrawRound();
-  });
+  el.btnBeginDraw.addEventListener('click', startDrawRound);
 
-  // ---------- Canvas drawing ----------
+
   var canvas = el.drawCanvas;
   var ctx = canvas.getContext('2d');
   var drawing = false;
   var lastX = 0, lastY = 0;
   var locked = false;
+  var canvasRect = null;
 
-  /* 태블릿·전자칠판은 DPR 이 3까지 올라가 캔버스 픽셀 수가 9배가 된다.
-     2 로 제한해도 눈으로는 차이가 없고 그리기 반응 속도는 크게 좋아진다. */
   function dprOf(){ return Math.min(2, window.devicePixelRatio || 1); }
 
   function resizeCanvas(){
@@ -969,7 +913,6 @@
     var dpr = dprOf();
     var nw = Math.max(1, Math.round(rect.width * dpr));
     var nh = Math.max(1, Math.round(rect.height * dpr));
-    // 크기가 그대로면 아무것도 하지 않는다 (모바일 주소창 여닫힘으로 그림이 지워지는 것 방지)
     if (nw === canvas.width && nh === canvas.height) { canvasRect = rect; return; }
     canvas.width = nw;
     canvas.height = nh;
@@ -987,8 +930,6 @@
     ctx.clearRect(0, 0, w, h);
     ctx.fillStyle = cssBg || '#fff';
     ctx.fillRect(0, 0, w, h);
-    /* 점 격자는 작은 타일 하나를 만들어 패턴으로 한 번에 칠한다.
-       예전처럼 점마다 arc() 를 부르면 큰 화면(전자칠판)에서 수천 번 반복된다. */
     var gap = 28;
     ctx.fillStyle = gridPattern(lineColor || '#ccc', gap, dpr);
     ctx.fillRect(0, 0, w, h);
@@ -1005,16 +946,13 @@
     tc.setTransform(dpr, 0, 0, dpr, 0, 0);
     tc.fillStyle = color;
     tc.beginPath();
-    tc.arc(gap, gap, 1.2, 0, Math.PI * 2);   // 타일 모서리에 찍혀 이어붙으면 격자가 된다
+    tc.arc(gap, gap, 1.2, 0, Math.PI * 2);
     tc.fill();
     var pat = ctx.createPattern(tile, 'repeat');
     _patCache = { color: color, gap: gap, dpr: dpr, pat: pat };
     return pat;
   }
 
-  /* 캔버스 위치는 그리는 중에 바뀌지 않으므로 획을 시작할 때 한 번만 구한다.
-     (매 pointermove 마다 getBoundingClientRect 를 부르면 레이아웃이 다시 계산되어 끊긴다) */
-  var canvasRect = null;
   function refreshRect(){ canvasRect = canvas.getBoundingClientRect(); }
 
   function getPos(e){
@@ -1035,7 +973,7 @@
     drawing = true;
     canvas.setPointerCapture(e.pointerId);
     refreshRect();
-    strokeInk = inkColor();   // 색도 획 시작에 한 번만 읽는다
+    strokeInk = inkColor();
     var p = getPos(e);
     lastX = p.x; lastY = p.y;
     ctx.lineJoin = 'round';
@@ -1046,9 +984,6 @@
   canvas.addEventListener('pointermove', function(e){
     if (!drawing || locked) return;
     var p = getPos(e);
-    /* 이전 점 → 현재 점 구간만 그린다.
-       예전처럼 path 를 계속 이어붙이면 stroke() 마다 획 전체를 다시 그리게 되어
-       선이 길어질수록 급격히 느려진다. */
     ctx.strokeStyle = strokeInk;
     ctx.beginPath();
     ctx.moveTo(lastX, lastY);
@@ -1057,7 +992,7 @@
     lastX = p.x; lastY = p.y;
   });
 
-  function endStroke(e){
+  function endStroke(){
     if (!drawing) return;
     drawing = false;
     state.strokesUsed++;
@@ -1070,9 +1005,11 @@
   canvas.addEventListener('pointercancel', endStroke);
   canvas.addEventListener('pointerleave', function(){ if (drawing) endStroke(); });
 
+  var budgetBannerTimer = null;
   function flashBudget(){
     el.budgetBanner.classList.add('show');
-    setTimeout(function(){ el.budgetBanner.classList.remove('show'); }, 1400);
+    clearTimeout(budgetBannerTimer);
+    budgetBannerTimer = setTimeout(function(){ el.budgetBanner.classList.remove('show'); }, 1400);
   }
 
   function renderPips(){
@@ -1095,7 +1032,6 @@
     if (state.gameScreen === 'draw') resizeCanvas();
   });
 
-  // ---------- Timer ----------
   function startDrawRound(){
     showGameScreen('draw');
     state.strokesUsed = 0;
@@ -1123,26 +1059,22 @@
     el.revealCat.textContent = w.cat;
     el.revealWord.textContent = w.word;
     el.revealUsed.textContent = '선 ' + state.strokesUsed + '개 사용 (제한 ' + state.strokeMax + '개)';
-    el.coreTags.innerHTML = '';
-    w.core.forEach(function(t){
-      var s = document.createElement('span');
-      s.className = 'tag core';
-      s.textContent = t;
-      el.coreTags.appendChild(s);
-    });
-    el.omitTags.innerHTML = '';
-    w.omit.forEach(function(t){
-      var s = document.createElement('span');
-      s.className = 'tag omit';
-      s.textContent = t;
-      el.omitTags.appendChild(s);
-    });
+    renderTags(el.coreTags, w.core, 'core');
+    renderTags(el.omitTags, w.omit, 'omit');
     showGameScreen('reveal');
     startPickStep('presenter');
   });
 
-  // ---------- Scoring / next round ----------
-  // Scoring a round (or marking it unsolved) immediately advances to the next round.
+  function renderTags(host, labels, kind){
+    host.innerHTML = '';
+    labels.forEach(function(t){
+      var s = document.createElement('span');
+      s.className = 'tag ' + kind;
+      s.textContent = t;
+      host.appendChild(s);
+    });
+  }
+
   function goToNextRound(){
     state.idx++;
     if (state.idx >= state.queue.length){
@@ -1153,8 +1085,6 @@
     }
   }
 
-  // Two-step number picker: ① 출제자 번호 → ② 정답자 번호(또는 '아무도 못 맞힘').
-  // 출제자는 2점, 정답자는 1점을 얻고 바로 다음 라운드로 넘어간다.
   function startPickStep(mode){
     state.pickStep = mode;
     if (mode === 'presenter'){
@@ -1212,7 +1142,6 @@
 
   el.btnPickBack.addEventListener('click', function(){ startPickStep('presenter'); });
 
-  // ---------- Context (bonus) tab ----------
   var activeCtx = null;
   function renderChips(){
     el.chipGrid.innerHTML = '';
@@ -1227,17 +1156,18 @@
       el.chipGrid.appendChild(chip);
     });
   }
-  document.querySelectorAll('.ctx-btn').forEach(function(btn){
+  var contextButtons = document.querySelectorAll('.ctx-btn');
+  Array.prototype.forEach.call(contextButtons, function(btn){
     btn.addEventListener('click', function(){
-      var ctx2 = btn.dataset.ctx;
-      if (activeCtx === ctx2){
+      var picked = btn.dataset.ctx;
+      if (activeCtx === picked){
         activeCtx = null;
         el.ctxExplain.textContent = '두 버튼 중 하나를 눌러보세요.';
       } else {
-        activeCtx = ctx2;
-        el.ctxExplain.textContent = CTX_EXPLAIN[ctx2];
+        activeCtx = picked;
+        el.ctxExplain.textContent = CTX_EXPLAIN[picked];
       }
-      document.querySelectorAll('.ctx-btn').forEach(function(b){
+      Array.prototype.forEach.call(contextButtons, function(b){
         b.classList.toggle('active', b.dataset.ctx === activeCtx);
       });
       renderChips();
@@ -1245,7 +1175,6 @@
   });
   renderChips();
 
-  // ---------- Reset all ----------
   el.btnResetAll.addEventListener('click', function(){
     state.scores = new Array(STUDENT_COUNT + 1).fill(0);
     state.queue = shuffle(WORDS);
@@ -1255,12 +1184,9 @@
     el.roundProgress.textContent = '라운드 대기 중';
     renderScoreboard();
     showGameScreen('intro');
-    document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
-    document.querySelector('.tab-btn[data-tab="game"]').classList.add('active');
-    Object.keys(tabs).forEach(function(k){ tabs[k].hidden = (k !== 'game'); });
+    selectTab('game');
   });
 
-  // ---------- Init ----------
   renderScoreboard();
   renderPips();
   showGameScreen('intro');
