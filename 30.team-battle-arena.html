@@ -1066,7 +1066,7 @@
     var d = p.d; p.dead = true;
     damage(T, d.dmg, d.owner, !d.isSkill);
     room.ref.child("projectiles/" + id).remove();
-    spark(T.x, T.y, d.team === "blue" ? "#5FA2FF" : "#FF6A5F");
+    if (!ME || ME.team === T.team || visibleTo(T, ME)) spark(T.x, T.y, d.team === "blue" ? "#5FA2FF" : "#FF6A5F");
   }
   function projVisualHit(p, t) {
     if (p.dead || p.gone) return;
