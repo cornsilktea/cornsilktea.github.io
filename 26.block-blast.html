@@ -7,7 +7,6 @@
 <meta charset="utf-8">
 <link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
 <title>블록 블라스트</title>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
@@ -16,7 +15,6 @@
 <meta property="og:url" content="https://cornsilktea.github.io/26.block-blast.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
-<!-- 링크 미리보기 끝 -->
 <style>
   :root{
     --bg:var(--sg-bg);
@@ -27,9 +25,9 @@
     --tone:var(--sg-panel-alt);
     --tone-line:var(--sg-line-mid);
     --primary:var(--sg-primary);
-    --accent:#D97B4F;         /* 보색: 강조 한 곳에만 */
+    --accent:#D97B4F;
     --radius:var(--sg-radius);
-    --cell:40px;              /* 보드 한 칸 크기 — 스크립트가 실제 크기로 갱신 */
+    --cell:40px;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
@@ -38,12 +36,10 @@
   button{font:inherit;color:inherit;cursor:pointer;border:none;background:none;padding:0;user-select:none}
   .wrap{position:relative;max-width:960px;margin:0 auto;padding:8px 10px 24px}
 
-  /* ---------- 배경(세계 여행 테마) — 항상 연하게, 그리드 위에 깔림 ---------- */
   #bg{position:fixed;top:-20px; right:-20px; bottom:-20px; left:-20px;z-index:0;pointer-events:none;background-size:cover;background-position:center;
     opacity:.38;filter:blur(2px);transition:opacity .6s,background-image .6s}
   .wrap{z-index:1}
 
-  /* ---------- 상단 고정 영역 (모든 칸 동일 크기·색) ---------- */
   .hud{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px}
   .hud .c{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:6px 4px;text-align:center;min-width:0}
   .hud .k{display:block;font-size:11px;color:var(--sub);white-space:nowrap}
@@ -51,8 +47,6 @@
   .hud .w{display:block;font-size:11px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:16px}
   @media (max-width:479px){.hud .v{font-size:16px}.hud .k{font-size:10px}}
 
-  /* ---------- 보드 + 트레이 ----------
-     데스크톱: 보드 왼쪽·트레이 오른쪽 세로 한 줄 / 휴대전화(세로): 보드 위·트레이 아래 가로 한 줄 */
   .play{--size:min(calc(100vw - 20px),calc(100vh - 300px),560px);
     display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start;justify-content:center}
   #board{width:var(--size);height:var(--size);display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);gap:2px;
@@ -70,7 +64,7 @@
   .slot{position:relative;display:flex;align-items:center;justify-content:center;background:var(--panel);border:1px solid var(--line);
     border-radius:var(--radius);min-height:110px;touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab;transition:opacity .2s,filter .2s}
   .slot.empty{cursor:default;background:transparent;border-style:dashed}
-  .slot.dead{filter:grayscale(1);opacity:.35}                 /* 지금 놓을 곳이 없는 블록 — 제약 조건 검사 결과를 눈으로 보여 줌 */
+  .slot.dead{filter:grayscale(1);opacity:.35}
   .slot.dragging .mini{opacity:.25}
   .mini{display:grid;gap:2px;pointer-events:none}
   .mini i,.dragp i{display:block;border-radius:3px}
@@ -82,24 +76,20 @@
     .slot{min-height:92px}
   }
 
-  /* 드래그 중 손가락·마우스를 따라다니는 블록 */
   #drag{position:fixed;left:0;top:0;z-index:30;pointer-events:none;display:none;filter:drop-shadow(0 6px 10px rgba(0,0,0,.28))}
   #drag.on{display:block}
   .dragp{display:grid;gap:2px}
 
-  /* 보드 아래 정보 줄 */
   .info{display:flex;justify-content:space-between;gap:8px;margin-top:8px;font-size:13px;color:var(--sub);flex-wrap:wrap;
     background:rgba(255,255,255,.7);border-radius:var(--radius);padding:4px 8px}
   .info b{color:var(--text)}
 
-  /* 점수 팝업 */
   .fx{position:fixed;left:0;top:0;z-index:25;pointer-events:none;font-weight:800;color:var(--accent);
     text-shadow:0 1px 0 #fff,0 0 8px rgba(255,255,255,.9);transform:translate(-50%,-50%);animation:fxup 1s ease-out forwards;white-space:nowrap}
   @keyframes fxup{0%{opacity:0;transform:translate(-50%,-30%) scale(.6)}20%{opacity:1;transform:translate(-50%,-50%) scale(1.1)}100%{opacity:0;transform:translate(-50%,-160%) scale(1)}}
   #flash{position:fixed;top:0; right:0; bottom:0; left:0;z-index:24;background:#fff;opacity:0;pointer-events:none}
   #flash.on{animation:flash .7s ease-out}
   @keyframes flash{0%{opacity:.9}100%{opacity:0}}
-  /* 줄 제거 이펙트 — 줄 수(n)에 따라 흔들림·번쩍임이 커진다 */
   #flash.lv2{animation:flashSoft .45s ease-out}
   #flash.lv3{animation:flashMid .6s ease-out}
   @keyframes flashSoft{0%{opacity:.35}100%{opacity:0}}
@@ -117,7 +107,6 @@
     text-align:center;line-height:1.4;transition:opacity .25s;max-width:90vw}
   #toast.on{opacity:1}
 
-  /* ---------- 시작·결과 화면 ---------- */
   .overlay{position:fixed;top:0; right:0; bottom:0; left:0;z-index:20;background:rgba(27,43,32,.55);display:none;overflow:auto;padding:56px 12px 40px}
   .overlay.on{display:flex}
   .card{margin:auto;width:100%;max-width:520px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px}
@@ -185,7 +174,6 @@
 <canvas id="confetti"></canvas>
 <div id="toast"></div>
 
-<!-- 시작 화면 -->
 <div class="overlay on" id="scrStart">
   <div class="card">
     <h1>🧩 블록 블라스트</h1>
@@ -207,7 +195,6 @@
   </div>
 </div>
 
-<!-- 결과 화면 -->
 <div class="overlay" id="scrEnd">
   <div class="card">
     <h2>게임 종료</h2>
@@ -231,18 +218,13 @@
 
 <script>
 "use strict";
-/* =====================================================================
-   설정 — 밸런스 관련 수치는 모두 여기서 조정한다
-   ===================================================================== */
 const CONFIG = {
-  BOARD: 8,                 // 보드 한 변의 칸 수
-  TRAY: 3,                  // 한 세트의 블록 개수
-  CELL_POINT: 1,            // 블록을 놓을 때 칸(셀) 하나당 점수 ("블록당 1점" 을 칸 수로 해석)
-  LINE_SCORE: n => 10 * n * n,   // n줄 동시 제거 점수 (제곱 증가 — 탐욕 vs 전체 최적화 교훈의 핵심)
-  PERFECT_CLEAR_BONUS: 100, // 보드를 완전히 비웠을 때 보너스
-  GAMEOVER_DELAY: 700,      // 놓을 곳 없는 블록이 흐려진 뒤 결과 화면까지(ms)
-  /* 블록 모양 37종 — 실제 블록 블라스트에 나오는 것만. [행, 열] 오프셋(좌상단 0,0). 회전 없이 각 모양이 개별 항목 */
-  /* 직선 1~5 칸 */
+  BOARD: 8,
+  TRAY: 3,
+  CELL_POINT: 1,
+  LINE_SCORE: n => 10 * n * n,
+  PERFECT_CLEAR_BONUS: 100,
+  GAMEOVER_DELAY: 700,
   BLOCK_SHAPES: [
     [[0,0]],
     [[0,0],[0,1]],
@@ -253,27 +235,22 @@ const CONFIG = {
     [[0,0],[1,0],[2,0],[3,0]],
     [[0,0],[0,1],[0,2],[0,3],[0,4]],
     [[0,0],[1,0],[2,0],[3,0],[4,0]],
-    /* 사각형 */
     [[0,0],[0,1],[1,0],[1,1]],
     [[0,0],[0,1],[0,2],[1,0],[1,1],[1,2],[2,0],[2,1],[2,2]],
     [[0,0],[0,1],[0,2],[1,0],[1,1],[1,2]],
     [[0,0],[0,1],[1,0],[1,1],[2,0],[2,1]],
-    /* 작은 ㄱ (3칸) 4방향 */
     [[0,0],[1,0],[1,1]],
     [[0,0],[0,1],[1,0]],
     [[0,0],[0,1],[1,1]],
     [[0,1],[1,0],[1,1]],
-    /* T 4방향 */
     [[0,0],[0,1],[0,2],[1,1]],
     [[1,0],[1,1],[1,2],[0,1]],
     [[0,0],[1,0],[2,0],[1,1]],
     [[0,1],[1,0],[1,1],[2,1]],
-    /* S·Z 가로·세로 */
     [[0,1],[0,2],[1,0],[1,1]],
     [[0,0],[0,1],[1,1],[1,2]],
     [[0,0],[1,0],[1,1],[2,1]],
     [[0,1],[1,0],[1,1],[2,0]],
-    /* L·J (4칸) 8방향 */
     [[0,0],[1,0],[2,0],[2,1]],
     [[0,1],[1,1],[2,1],[2,0]],
     [[0,0],[0,1],[1,0],[2,0]],
@@ -282,19 +259,12 @@ const CONFIG = {
     [[0,0],[0,1],[0,2],[1,2]],
     [[0,0],[1,0],[1,1],[1,2]],
     [[0,2],[1,0],[1,1],[1,2]],
-    /* 큰 ㄱ (3×3 모서리, 5칸) 4방향 */
     [[0,0],[1,0],[2,0],[2,1],[2,2]],
     [[0,0],[0,1],[0,2],[1,0],[2,0]],
     [[0,0],[0,1],[0,2],[1,2],[2,2]],
     [[0,2],[1,2],[2,0],[2,1],[2,2]]
   ],
-  /* 랜덤 생성 조정 — 지금은 순수 랜덤. 초반 게임오버가 잦으면 여기서 손본다.
-     WEIGHTS: 모양별 가중치 배열(길이 37, null 이면 균등) / FILTER: (shape, board) => true/false 로 후보 제외 */
-  WEIGHTS: null,
-  FILTER: null,
-  /* 블록 색 — 캔버스가 아니어도 hex 로 고정(theme.css 톤) */
   COLORS: ["#24402F", "#2F7D4F", "#A8731C", "#D97B4F", "#5B6B5E", "#B33951"],
-  /* 세계 여행 테마 — 퍼펙트 클리어마다 다음으로. image 에 그림 주소를 넣으면 그라데이션 대신 쓰인다(나중에 첨부 예정) */
   THEMES: [
     { name: "프랑스 파리 — 에펠탑",            image: "img/blockblast/paris.jpg",   grad: "linear-gradient(160deg,#c9d6e8,#f1e3d3)" },
     { name: "이집트 기자 — 피라미드와 스핑크스", image: "img/blockblast/egypt.jpg",   grad: "linear-gradient(160deg,#f3dfb0,#d7a96b)" },
@@ -312,7 +282,6 @@ const $ = id => document.getElementById(id);
 const fmt = n => n.toLocaleString("ko-KR");
 const N = CONFIG.BOARD;
 
-/* ---------- 소리 (Web Audio 합성음 — 외부 파일 없음) ---------- */
 const SND = {
   ctx: null,
   init(){ if (!this.ctx) { try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
@@ -334,7 +303,6 @@ const SND = {
     [392, 330, 262].forEach((f, i) => this.tone(f, t + i * 0.18, 0.3, "sawtooth", 0.1)); }
 };
 
-/* ---------- 최고 기록 (이 기기의 localStorage) ---------- */
 const BEST = {
   KEY: "blockblast_best_v1",
   get(){
@@ -353,7 +321,6 @@ const BEST = {
   }
 };
 
-/* ---------- 세계 신기록 (모든 학생 공통, Firebase — world-record.js) ---------- */
 const WR = window.WorldRecord ? WorldRecord("blockblast", { format: v => fmt(v) + "점" }) : null;
 function renderWorld(){
   ["startWorld", "endWorld"].forEach(id => {
@@ -365,7 +332,6 @@ function renderWorld(){
   });
   $("hudWorld").textContent = (WR && WR.rec) ? WR.text() : (WR && !WR.loaded) ? "…" : "-";
   $("hudWho").textContent = (WR && WR.rec) ? WR.who() : (WR && !WR.loaded ? "불러오는 중" : "기록 없음");
-  /* 반별 링크로 들어왔을 때만 우리 반 신기록 칸을 보인다(시작·결과 카드) */
   const C = WR && WR.cls;
   if (C) ["startCls", "endCls"].forEach(id => {
     const box = $(id);
@@ -379,17 +345,15 @@ function renderWorld(){
 if (WR) { WR.onChange(renderWorld); WR.load(); }
 renderWorld();
 
-/* ---------- 게임 상태 ---------- */
 const G = {
-  board: [],        // 2차원 배열 board[r][c] = 0(빈칸) 또는 색 인덱스+1
-  tray: [],         // [{shape, color, dead} | null] × 3
+  board: [],
+  tray: [],
   score: 0, maxLines: 0, totalLines: 0, pieces: 0, perfects: 0, theme: 0,
   playing: false
 };
 
 function newBoard(){ return Array.from({ length: N }, () => new Array(N).fill(0)); }
 
-/* 모양을 (r,c) 에 놓을 수 있는가 — 보드 밖·겹침이면 false */
 function canPlaceAt(board, shape, r, c){
   for (const [dr, dc] of shape) {
     const rr = r + dr, cc = c + dc;
@@ -397,7 +361,6 @@ function canPlaceAt(board, shape, r, c){
   }
   return true;
 }
-/* 어딘가에 놓을 자리가 하나라도 있는가 — 모든 (행,열)을 순서대로 대입(전수 검사) */
 function canPlaceAnywhere(board, shape){
   for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (canPlaceAt(board, shape, r, c)) return true;
   return false;
@@ -408,22 +371,13 @@ function shapeSize(shape){
   return { h, w };
 }
 
-/* 랜덤 블록 — WEIGHTS/FILTER 가 없으면 순수 랜덤 */
 function randomPiece(){
-  let idx = CONFIG.BLOCK_SHAPES.map((s, i) => i);
-  if (CONFIG.FILTER) idx = idx.filter(i => CONFIG.FILTER(CONFIG.BLOCK_SHAPES[i], G.board));
-  if (idx.length === 0) idx = CONFIG.BLOCK_SHAPES.map((s, i) => i);
-  let pick;
-  if (CONFIG.WEIGHTS) {
-    const tot = idx.reduce((a, i) => a + (CONFIG.WEIGHTS[i] || 0), 0);
-    let x = Math.random() * tot; pick = idx[idx.length - 1];
-    for (const i of idx) { x -= CONFIG.WEIGHTS[i] || 0; if (x <= 0) { pick = i; break; } }
-  } else pick = idx[Math.floor(Math.random() * idx.length)];
-  return { shape: CONFIG.BLOCK_SHAPES[pick], color: Math.floor(Math.random() * CONFIG.COLORS.length) + 1, dead: false };
+  const shapes = CONFIG.BLOCK_SHAPES;
+  const shape = shapes[Math.floor(Math.random() * shapes.length)];
+  return { shape, color: Math.floor(Math.random() * CONFIG.COLORS.length) + 1, dead: false };
 }
 function refillTray(){ for (let i = 0; i < CONFIG.TRAY; i++) G.tray[i] = randomPiece(); }
 
-/* ---------- 그리기 ---------- */
 const boardEl = $("board"), cells = [];
 for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
   const d = document.createElement("div"); d.className = "cell"; d.dataset.r = r; d.dataset.c = c;
@@ -466,13 +420,11 @@ function applyTheme(){
   $("bg").style.backgroundImage = t.image ? `url("${t.image}")` : t.grad;
   renderHud();
 }
-/* 퍼펙트 클리어 순간 배경이 바로 바뀌도록 모든 테마 그림을 미리 받아 둔다 */
 function preloadThemes(){
   if (preloadThemes.done) return; preloadThemes.done = true;
   CONFIG.THEMES.forEach(t => { if (t.image) { const im = new Image(); im.src = t.image; } });
 }
 
-/* 배치 불가 블록 흐리게 — 남은 블록 각각을 전수 검사 */
 function markDead(){
   let anyDead = false;
   for (const p of G.tray) if (p) { p.dead = !canPlaceAnywhere(G.board, p.shape); if (p.dead) anyDead = true; }
@@ -480,7 +432,6 @@ function markDead(){
   return anyDead;
 }
 
-/* ---------- 이펙트 ---------- */
 function popText(text, x, y, size, big){
   const d = document.createElement("div"); d.className = "fx" + (big ? " big" : ""); d.textContent = text;
   d.style.left = x + "px"; d.style.top = y + "px"; d.style.fontSize = (size || 28) + "px";
@@ -490,7 +441,6 @@ function toast(msg, ms){
   const t = $("toast"); t.textContent = msg; t.classList.add("on");
   clearTimeout(toast.tm); toast.tm = setTimeout(() => t.classList.remove("on"), ms || 1600);
 }
-/* 파티클 — 색종이(퍼펙트)와 줄 제거 폭발이 한 캔버스·한 루프를 같이 쓴다 */
 const FX = {
   ps: [], running: false, cv: null, ctx: null,
   ensure(){ if (!this.cv) { this.cv = $("confetti"); this.ctx = this.cv.getContext("2d"); }
@@ -526,7 +476,6 @@ function confetti(){
     col: CONFIG.COLORS[Math.floor(Math.random() * CONFIG.COLORS.length)]
   });
 }
-/* 줄 제거 폭발 — n(동시 제거 줄 수)이 클수록 칸당 파편 수·속도·크기, 충격파 개수, 흔들림, 번쩍임이 모두 커진다 */
 function lineBlast(clearedIdx, n, color){
   const lv = Math.min(n, 3), per = 3 + n * 3, sp = 2.5 + n * 1.6;
   const rect = boardEl.getBoundingClientRect(), cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
@@ -545,7 +494,6 @@ function lineBlast(clearedIdx, n, color){
   if (n >= 2) { const f = $("flash"); f.className = ""; void f.offsetWidth; f.classList.add(n >= 3 ? "lv3" : "lv2"); }
 }
 
-/* ---------- 블록 놓기 → 줄 제거 → 퍼펙트 → 새 세트 → 게임오버 검사 ---------- */
 function place(i, r, c){
   const p = G.tray[i];
   if (!p || !canPlaceAt(G.board, p.shape, r, c)) return false;
@@ -554,7 +502,6 @@ function place(i, r, c){
   let gained = p.shape.length * CONFIG.CELL_POINT;
   SND.place();
 
-  /* 가득 찬 가로·세로 줄 찾기 */
   const rows = [], cols = [];
   for (let k = 0; k < N; k++) {
     if (G.board[k].every(v => v)) rows.push(k);
@@ -572,17 +519,16 @@ function place(i, r, c){
     SND.clear(n);
     renderBoard();
     cleared.forEach(idx => { cells[idx].classList.add("pop"); cells[idx].style.background = CONFIG.COLORS[p.color - 1]; });
-    setTimeout(() => cleared.forEach(idx => { cells[idx].classList.remove("pop"); renderBoard(); }), 340);
+    setTimeout(() => { cleared.forEach(idx => cells[idx].classList.remove("pop")); renderBoard(); }, 340);
     lineBlast([...cleared], n, CONFIG.COLORS[p.color - 1]);
     const label = n >= 4 ? "굉장해!! " : n === 3 ? "대단해! " : n === 2 ? "좋아! " : "";
     popText(`${label}${n}줄 +${ls}`, cx, cy, Math.min(30 + n * 10, 72), n >= 2);
   } else renderBoard();
 
-  /* 퍼펙트 클리어 — 64칸 전부 빈칸 */
   if (G.board.every(row => row.every(v => !v))) {
     gained += CONFIG.PERFECT_CLEAR_BONUS; G.perfects++;
     G.theme = (G.theme + 1) % CONFIG.THEMES.length; applyTheme();
-    $("flash").className = ""; void $("flash").offsetWidth; $("flash").classList.add("on");
+    const flashEl = $("flash"); flashEl.className = ""; void flashEl.offsetWidth; flashEl.classList.add("on");
     confetti(); SND.perfect();
     toast(`퍼펙트 클리어! +${CONFIG.PERFECT_CLEAR_BONUS}\n다음 여행지로 이동합니다 ✈️\n${CONFIG.THEMES[G.theme].name}`, 2400);
   }
@@ -595,11 +541,9 @@ function place(i, r, c){
   return true;
 }
 
-/* ---------- 드래그 (마우스·터치 공통, Pointer Events) ---------- */
 const dragEl = $("drag");
 const D = { on: false, i: -1, pid: null, w: 0, h: 0, lift: 0, ghost: [] };
 const trayEl = $("tray");
-/* 길게 누를 때 아이폰 돋보기·복사 풍선 방지 (캔버스가 아니라 직접 막음) */
 trayEl.addEventListener("touchstart", e => e.preventDefault(), { passive: false });
 boardEl.addEventListener("touchstart", e => e.preventDefault(), { passive: false });
 trayEl.addEventListener("contextmenu", e => e.preventDefault());
@@ -612,7 +556,7 @@ trayEl.addEventListener("pointerdown", e => {
   const cs = cellSize(), gap = cellGap(), { h, w } = shapeSize(p.shape);
   D.on = true; D.i = i; D.pid = e.pointerId;
   D.w = w * cs + (w - 1) * gap; D.h = h * cs + (h - 1) * gap;
-  D.lift = e.pointerType === "touch" ? Math.max(60, cs * 1.6) : 0;   /* 손가락에 가리지 않게 위로 띄움 */
+  D.lift = e.pointerType === "touch" ? Math.max(60, cs * 1.6) : 0;
   dragEl.innerHTML = miniHtml(p, "dragp", cs);
   dragEl.firstChild.style.gap = gap + "px";
   dragEl.classList.add("on"); slot.classList.add("dragging");
@@ -620,7 +564,6 @@ trayEl.addEventListener("pointerdown", e => {
   moveDrag(e);
 });
 function dragPos(e){ return { x: e.clientX - D.w / 2, y: e.clientY - D.h / 2 - D.lift }; }
-/* 드래그 블록의 좌상단 → 보드 칸 좌표(반올림) */
 function targetCell(pos){
   const rect = cells[0].getBoundingClientRect(), step = cellSize() + cellGap();
   return { r: Math.round((pos.y - rect.top) / step), c: Math.round((pos.x - rect.left) / step) };
@@ -640,7 +583,7 @@ function moveDrag(e){
     if (rr < 0 || cc < 0 || rr >= N || cc >= N) continue;
     const el = cells[rr * N + cc]; el.classList.add(ok ? "ghost-ok" : "ghost-bad"); D.ghost.push(el);
   }
-  if (ok) {   /* 놓으면 지워질 줄 미리 밝게 */
+  if (ok) {
     const tmp = G.board.map(row => row.slice());
     for (const [dr, dc] of p.shape) tmp[r + dr][c + dc] = 1;
     for (let k = 0; k < N; k++) {
@@ -661,8 +604,6 @@ function endDrag(e, drop){
 window.addEventListener("pointermove", e => { if (D.on && e.pointerId === D.pid) moveDrag(e); });
 window.addEventListener("pointerup", e => endDrag(e, true));
 window.addEventListener("pointercancel", e => endDrag(e, false));
-/* 보드 크기(--size)는 CSS min() 과 같은 식으로 스크립트가 직접 넣음 — 전자칠판처럼 min()/clamp() 를 모르는 옛 브라우저에서
-   보드가 0px 로 찌그러지는 것을 막음(CSS 의 min() 값은 스크립트가 돌기 전 첫 화면용) */
 const playEl = document.querySelector(".play");
 function fitBoard(){
   const vw = window.innerWidth, vh = window.innerHeight;
@@ -672,7 +613,6 @@ function fitBoard(){
 fitBoard();
 window.addEventListener("resize", () => { fitBoard(); if (G.playing) renderTray(); });
 
-/* ---------- 시작·종료 ---------- */
 function start(){
   G.board = newBoard(); G.tray = []; G.score = 0; G.maxLines = 0; G.totalLines = 0; G.pieces = 0; G.perfects = 0; G.theme = 0;
   G.playing = true; preloadThemes();
