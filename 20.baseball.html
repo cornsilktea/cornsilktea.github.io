@@ -33,7 +33,7 @@
     font-family:var(--sg-font);font-size:16px;line-height:1.45;overscroll-behavior:none}
   button{font:inherit;color:inherit;cursor:pointer;border:none;background:none;padding:0;user-select:none}
   button:disabled{cursor:default}
-  .wrap{max-width:960px;margin:0 auto;padding:8px 10px 34px}
+  .wrap{max-width:1400px;margin:0 auto;padding:8px 10px 12px}
 
   .hud{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:8px}
   .hud .c{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:6px 4px;text-align:center;min-width:0}
@@ -41,7 +41,7 @@
   .hud .v{display:block;font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   @media (max-width:479px){.hud .v{font-size:15px}.hud .k{font-size:10px}}
 
-  .arena{--h:min(clamp(300px,calc(100vh - 250px),640px),calc(100vw - 20px));
+  .arena{--h:min(clamp(300px,calc(100vh - 130px),900px),calc(100vw - 20px));touch-action:none;cursor:pointer;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
     position:relative;width:calc(var(--h) * 1.5);max-width:100%;height:var(--h);margin:0 auto;
     border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:#8fc5ec}
   .stage{position:absolute;top:0;left:50%;height:100%;width:calc(var(--h) * 1.5);transform:translateX(-50%);user-select:none}
@@ -105,10 +105,6 @@
   .gauge .lb{display:flex;justify-content:space-between;font-size:11px;font-weight:700;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6);margin-top:3px}
   #gaugeText{text-align:center;flex:1}
 
-  .swing{display:flex;align-items:center;justify-content:center;width:100%;height:96px; height:clamp(64px, 12vh, 96px);margin-top:8px;
-    border-radius:var(--radius);background:var(--panel);border:1px solid var(--line);font-size:30px; font-size:clamp(22px, 5vw, 30px);font-weight:800;letter-spacing:4px}
-  .swing:active:not(:disabled){background:var(--tone)}
-  .swing:disabled{opacity:.45}
 
   .overlay{position:fixed;top:0; right:0; bottom:0; left:0;z-index:20;background:rgba(27,43,32,.55);display:none;overflow:auto;padding:56px 12px 40px}
   .overlay.on{display:flex}
@@ -213,14 +209,13 @@
     </div>
   </div>
   </div>
-
-  <button class="swing" id="btnSwing" disabled>스윙</button>
+
 </div>
 
 <div class="overlay on" id="scrStart">
   <div class="card">
     <h1>야구 타격</h1>
-    <p class="sub">투수가 20개의 공을 던집니다. 공이 스트라이크 존에 들어오는 순간 <b>스윙</b> 버튼(또는 스페이스 키)을 눌러 타이밍을 맞추세요.</p>
+    <p class="sub">투수가 20개의 공을 던집니다. 공이 스트라이크 존에 들어오는 순간 야구장 화면 아무 곳이나 <b>터치</b>(또는 스페이스 키)해서 타이밍을 맞추세요.</p>
     <ul class="steps">
       <li>구종은 직구·커브·슬라이더·체인지업 — 궤적과 속도가 다릅니다.</li>
       <li>타격에 성공할수록 다음 공의 구속이 빨라집니다 (120 → 최대 160 km/h).</li>
@@ -407,7 +402,7 @@ const G = {
   speedBonus: 0, phase: "idle",
   cur: null, kmh: 0, end: null, t0: 0, flightTime: 0, swung: false, pitchAnim: false, freePitch: false, raf: 0, timers: [], spinAng: 0
 };
-const stage = $("stage"), ball = $("ball"), shadow = $("shadow"), btnSwing = $("btnSwing");
+const stage = $("stage"), ball = $("ball"), shadow = $("shadow");
 const seamPath = $("seam"), stitchPath = $("stitch");
 const callEl = $("call"), callGradeEl = $("callGrade"), callDetailEl = $("callDetail");
 const gaugeMarkEl = $("gaugeMark"), gaugeTextEl = $("gaugeText");
@@ -575,7 +570,6 @@ function release(){
   G.phase = "flight"; G.pitchAnim = true;
   setPitcher("throw");
   G.t0 = performance.now(); G.spinAng = 0;
-  btnSwing.disabled = false;
   ball.style.visibility = "visible";
   later(() => setPitcher("follow"), FOLLOW_AFTER_RELEASE);
   later(() => setPitcher("idle"), G.flightTime + 300);
@@ -602,14 +596,12 @@ function flyPitch(now){
 function swing(){
   if (G.phase !== "flight" || G.swung) return;
   G.swung = true;
-  btnSwing.disabled = true;
   SWING_SEQ.forEach(([pose, ms]) => ms ? later(() => setBatter(pose), ms) : setBatter(pose));
   judge(performance.now() - (G.t0 + G.flightTime));
 }
 
 function judge(delta){
   G.phase = "result";
-  btnSwing.disabled = true;
   const sweet = Math.max(-1, Math.min(1, G.end.dx / ZONE.hw)) * PULL_SHIFT_MS;
   const a = delta === null ? Infinity : Math.abs(delta - sweet) * (G.end.strike ? 1 : BALL_HIT_PENALTY);
   let grade, dist = 0, gained = 0, side = delta === null ? 0 : Math.sign(delta);
@@ -747,7 +739,7 @@ function drawEndChart(){
 }
 
 function endGame(){
-  G.phase = "idle"; btnSwing.disabled = true;
+  G.phase = "idle";
   $("endScore").textContent = fmt(G.score) + "점";
   $("endHr").textContent = G.hr + "개"; $("endCombo").textContent = G.maxCombo;
   $("endDist").textContent = G.maxDist + " m"; $("endHit").textContent = G.hits + "개";
@@ -762,8 +754,6 @@ function endGame(){
   if (WR) WR.prompt(G.score);
 }
 
-btnSwing.addEventListener("pointerdown", e => { e.preventDefault(); swing(); });
-btnSwing.addEventListener("keydown", e => { if (e.code === "Space" || e.code === "Enter") e.preventDefault(); });
 document.addEventListener("keydown", e => {
   if (e.repeat) return;
   if (e.code === "Space" || e.code === "Enter" || e.code === "KeyJ"){
@@ -778,9 +768,11 @@ $("btnAgain").addEventListener("click", e => { e.currentTarget.blur(); startGame
 const arenaEl = document.querySelector(".arena");
 function fitArena(){
   const vw = window.innerWidth, vh = window.innerHeight;
-  const h = Math.min(Math.max(300, Math.min(vh - 250, 640)), vw - 20);
+  const h = Math.min(Math.max(300, Math.min(vh - 130, 900)), vw - 20);
   arenaEl.style.setProperty("--h", Math.floor(h) + "px");
 }
+arenaEl.addEventListener("pointerdown", e => { e.preventDefault(); swing(); });
+arenaEl.addEventListener("touchstart", e => e.preventDefault(), { passive: false });
 fitArena();
 window.addEventListener("resize", fitArena);
 
