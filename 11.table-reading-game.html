@@ -6,7 +6,6 @@
 <meta charset="UTF-8">
 <link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
 <title>표 분석하기</title>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
@@ -15,7 +14,6 @@
 <meta property="og:url" content="https://cornsilktea.github.io/11.table-reading-game.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
-<!-- 링크 미리보기 끝 -->
 <style>
   :root{
     --bg:var(--sg-bg);
@@ -28,8 +26,6 @@
     --red:var(--sg-danger);
     --red-soft:#F6E3E7;
     --amber:var(--sg-warn);
-    --amber-soft:#F3EBD9;
-    --radius:var(--sg-radius);
   }
   *{box-sizing:border-box;}
   html{height:100%;}
@@ -69,7 +65,7 @@
     flex:1;
     display:flex;
     justify-content:center;
-    align-items:flex-start;   /* 화면이 짧을 때 카드 위쪽이 잘리지 않도록 */
+    align-items:flex-start;
     padding:10px 20px 30px;
   }
 
@@ -323,7 +319,6 @@ const ROUNDS = [
   },
 ];
 
-let order = [];
 let idx = 0;
 let score = 0;
 let answered = false;
@@ -349,7 +344,6 @@ function shuffle(arr){
 }
 
 function init(){
-  order = ROUNDS.map((_,i)=>i);
   idx = 0;
   score = 0;
   playScreen.style.display = 'flex';
@@ -359,7 +353,7 @@ function init(){
 
 function renderRound(){
   answered = false;
-  const r = ROUNDS[order[idx]];
+  const r = ROUNDS[idx];
   progressPill.textContent = `${idx+1} / ${ROUNDS.length}`;
   scorePill.textContent = `점수 ${score}`;
   tableTitle.textContent = r.title;
@@ -372,8 +366,7 @@ function renderRound(){
   tableBox.appendChild(buildTable(r));
 
   optionsBox.innerHTML = '';
-  const opts = shuffle(r.options);
-  opts.forEach(optText=>{
+  shuffle(r.options).forEach(optText=>{
     const btn = document.createElement('div');
     btn.className = 'opt';
     btn.textContent = optText;
@@ -405,7 +398,7 @@ function handleAnswer(btn, chosen, r){
 
 nextBtn.addEventListener('click', ()=>{
   idx += 1;
-  if(idx >= order.length){
+  if(idx >= ROUNDS.length){
     showEnd();
   } else {
     renderRound();
@@ -416,39 +409,38 @@ function showEnd(){
   playScreen.style.display = 'none';
   endScreen.style.display = 'flex';
   document.getElementById('finalScore').textContent = `${score} / ${ROUNDS.length}`;
-  const ratio = score/ROUNDS.length;
-  let comment = '';
-  if(ratio === 1) comment = '완벽해요! 표에서 원하는 값을 정확히 찾아내는군요.';
-  else if(ratio >= 0.66) comment = '잘했어요! 행과 열을 침착하게 따라가면 만점도 가능해요.';
-  else comment = '표는 행(가로)과 열(세로)이 만나는 칸을 찾는 게 핵심이에요. 다시 천천히 짚어볼까요?';
-  document.getElementById('finalComment').textContent = comment;
+  document.getElementById('finalComment').textContent = endComment(score/ROUNDS.length);
+}
+
+function endComment(ratio){
+  if(ratio === 1) return '완벽해요! 표에서 원하는 값을 정확히 찾아내는군요.';
+  if(ratio >= 0.66) return '잘했어요! 행과 열을 침착하게 따라가면 만점도 가능해요.';
+  return '표는 행(가로)과 열(세로)이 만나는 칸을 찾는 게 핵심이에요. 다시 천천히 짚어볼까요?';
 }
 
 document.getElementById('retryBtn').addEventListener('click', init);
+
+function buildRow(cells, tagFor){
+  const tr = document.createElement('tr');
+  cells.forEach((cell, colIdx)=>{
+    const cellEl = document.createElement(tagFor(colIdx));
+    cellEl.textContent = cell;
+    tr.appendChild(cellEl);
+  });
+  return tr;
+}
 
 function buildTable(r){
   const table = document.createElement('table');
   table.className = 'data';
 
   const thead = document.createElement('thead');
-  const headRow = document.createElement('tr');
-  r.headers.forEach(h=>{
-    const th = document.createElement('th');
-    th.textContent = h;
-    headRow.appendChild(th);
-  });
-  thead.appendChild(headRow);
+  thead.appendChild(buildRow(r.headers, ()=>'th'));
   table.appendChild(thead);
 
   const tbody = document.createElement('tbody');
   r.rows.forEach(row=>{
-    const tr = document.createElement('tr');
-    row.forEach((cell, colIdx)=>{
-      const cellEl = document.createElement(colIdx === r.rowHeaderCol ? 'th' : 'td');
-      cellEl.textContent = cell;
-      tr.appendChild(cellEl);
-    });
-    tbody.appendChild(tr);
+    tbody.appendChild(buildRow(row, colIdx => colIdx === r.rowHeaderCol ? 'th' : 'td'));
   });
   table.appendChild(tbody);
 
