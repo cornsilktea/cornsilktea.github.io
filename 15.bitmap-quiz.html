@@ -2,7 +2,6 @@
 <script charset="utf-8" src="access-guard.js" data-game="bitmapquiz"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
 <title>비트맵 퀴즈</title>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
@@ -11,12 +10,10 @@
 <meta property="og:url" content="https://cornsilktea.github.io/15.bitmap-quiz.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
-<!-- 링크 미리보기 끝 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  /* 디자인 언어는 '추상화 놀이터'(7.drawing.html) 와 동일하게 맞췄습니다. */
   :root{
     --paper:#F2F4EE;
     --surface:#FFFFFF;
@@ -38,7 +35,7 @@
     --font-body:'IBM Plex Sans KR','Apple SD Gothic Neo',sans-serif;
   }
   @media (prefers-color-scheme: dark){
-    :root:not([data-theme="light"]){
+    :root{
       --paper:#12160F;
       --surface:#1A2016;
       --surface-alt:#232B1D;
@@ -55,23 +52,6 @@
       --danger:#E58164;
       --shadow: 0 1px 0 rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.6);
     }
-  }
-  :root[data-theme="dark"]{
-    --paper:#12160F;
-    --surface:#1A2016;
-    --surface-alt:#232B1D;
-    --ink:#EAEFE4;
-    --ink-soft:#AEB8A4;
-    --line:#39432F;
-    --accent:#7FAEEB;
-    --accent-ink:#A9C8F2;
-    --accent-bg:#1E2C40;
-    --core:#68CB90;
-    --core-bg:#1D3524;
-    --omit:#C2B79E;
-    --omit-bg:#2B2818;
-    --danger:#E58164;
-    --shadow: 0 1px 0 rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.6);
   }
 
   *{box-sizing:border-box;}
@@ -91,7 +71,6 @@
 
   .app{min-height:100%; display:flex; flex-direction:column;}
 
-  /* ---------- Topbar ---------- */
   .topbar{
     display:flex; align-items:center; justify-content:space-between;
     gap:16px; padding:14px 28px;
@@ -123,10 +102,8 @@
   .lede{color:var(--ink-soft); font-size:1.1rem; line-height:1.6;}
   .stack{display:flex; flex-direction:column; gap:14px;}
   .row{display:flex; gap:14px; flex-wrap:wrap; align-items:center;}
-  .row.center{justify-content:center;}
   .row.between{justify-content:space-between;}
 
-  /* ---------- Buttons ---------- */
   .btn{
     appearance:none; border:2px solid var(--accent); background:var(--accent);
     color:#fff; font-size:1.15rem; font-weight:600;
@@ -135,14 +112,11 @@
   }
   .btn:hover{background:var(--accent-ink); border-color:var(--accent-ink);}
   .btn:focus-visible{outline:3px solid var(--accent-ink); outline-offset:3px;}
-  .btn.ghost{background:var(--surface); color:var(--accent);}
-  .btn.ghost:hover{background:var(--accent-bg);}
   .btn.quiet{background:var(--surface-alt); border-color:var(--surface-alt); color:var(--ink);}
   .btn.quiet:hover{background:var(--line);}
   .btn.wide{width:100%;}
   .btn:disabled{opacity:.45; cursor:not-allowed;}
 
-  /* ---------- 번호 고르기 ---------- */
   .num-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(64px,1fr)); gap:10px;}
   .num-btn{
     min-height:58px; border-radius:12px;
@@ -151,7 +125,6 @@
   }
   .num-btn:hover{background:var(--line);}
 
-  /* ---------- 점수판 ---------- */
   .scoreboard-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(92px,1fr)); gap:12px;}
   .score-card{background:var(--surface-alt); border-radius:12px; padding:14px 8px; text-align:center;}
   .score-card .num{font-size:.95rem; font-weight:600; color:var(--ink-soft);}
@@ -160,7 +133,6 @@
     color:var(--accent); font-variant-numeric:tabular-nums; line-height:1.3;
   }
 
-  /* ---------- 시작 화면 ---------- */
   .rules-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(220px,1fr)); gap:16px;}
   .rule-item{
     background:var(--surface-alt); border-radius:12px; padding:16px 18px;
@@ -175,7 +147,6 @@
   table.steps th{color:var(--ink-soft); font-weight:600; font-size:.95rem;}
   table.steps td.pts{font-weight:700; color:var(--accent);}
 
-  /* ---------- 진행 화면 ---------- */
   .stage-tag{
     display:inline-flex; align-items:center; gap:8px;
     background:var(--accent-bg); color:var(--accent); font-weight:700;
@@ -203,7 +174,6 @@
     image-rendering:pixelated;
   }
 
-  /* ---------- 선생님 정답 확인 칸 (추상화 놀이터의 peek-box 와 동일) ---------- */
   .peek-tag{
     display:inline-block;
     background:var(--accent-bg); color:var(--accent);
@@ -230,7 +200,6 @@
   .peek-box .peek-word{
     font-family:var(--font-display); font-size:2.5rem; font-weight:700; line-height:1.15;
   }
-  /* 작은 화면에서는 확인 칸이 버튼을 가리지 않도록 줄이고, 아래쪽 여백을 둡니다. */
   @media (max-width:900px){
     .peek-box{ width:150px; min-height:84px; padding:10px; right:12px; bottom:12px; }
     .peek-box .peek-word{ font-size:1.7rem; }
@@ -239,7 +208,6 @@
     main{ padding-bottom:130px; }
   }
 
-  /* ---------- 정답 공개 화면 ---------- */
   .reveal-word{
     font-family:var(--font-display);
     font-size:clamp(4rem, 13vw, 10rem);
@@ -252,7 +220,6 @@
   }
   .result-note.zero{background:var(--omit-bg); color:var(--omit);}
 
-  /* ---------- 정리 화면 ---------- */
   .definition{font-size:1.3rem; line-height:1.7;}
   .definition b{color:var(--accent);}
   .example-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(240px,1fr)); gap:16px;}
@@ -267,7 +234,6 @@
     font-variant-numeric:tabular-nums; resize:vertical;
   }
 
-  /* ---------- 큰 화면(전자칠판) ---------- */
   @media (min-width:1200px){
     main{padding:18px 24px 24px;}
     .screen{max-width:1400px; gap:16px;}
@@ -299,7 +265,6 @@
   </header>
 
   <main>
-    <!-- ===== GAME TAB ===== -->
     <div id="tab-game" class="screen">
 
       <section id="screen-intro" class="stack">
@@ -351,7 +316,6 @@
           </div>
         </div>
 
-        <!-- 선생님만 정답을 확인하는 칸: 누르고 있는 동안에만 보입니다. -->
         <div class="peek-box" id="peekBox" role="button" tabindex="0" aria-label="길게 눌러 정답 확인하기">
           <div class="peek-box-face" id="peekLocked">
             <span class="peek-lock">🔒</span>
@@ -389,7 +353,6 @@
 
     </div>
 
-    <!-- ===== SCORES TAB ===== -->
     <div id="tab-scores" class="screen" hidden>
       <div class="card stack">
         <h1 style="font-size:1.6rem;">점수판</h1>
@@ -398,7 +361,6 @@
       </div>
     </div>
 
-    <!-- ===== WRAP TAB ===== -->
     <div id="tab-wrap" class="screen" hidden>
       <div class="card stack">
         <h1 style="font-size:1.6rem;">오늘 배운 것: 정보량과 해상도</h1>
@@ -435,11 +397,8 @@
 <script>
 "use strict";
 
-/* =====================================================================
-   1. 규칙 상수
-   ===================================================================== */
 var STUDENTS = 27;
-var MASTER = 128;                                   // 마스터 비트맵 해상도
+var MASTER = 128;
 var STAGES = [
   { grid: 2,   bits: 4,     score: 5 },
   { grid: 4,   bits: 16,    score: 4 },
@@ -451,14 +410,6 @@ var STAGES = [
 ];
 var POW = [2, 4, 6, 8, 10, 12, 14];
 
-/* =====================================================================
-   2. 그리기 도우미 (128×128 좌표계)
-
-   사물마다 "덩어리(실루엣)"를 먼저 그리고 그 위에 세부를 얹습니다.
-   outlined() 는 덩어리를 8방향으로 조금씩 옮겨 검게 찍은 뒤 그 위에 회색을
-   덮어, 여러 도형이 합쳐진 모양의 바깥쪽에만 검은 윤곽선을 만듭니다.
-   윤곽선이 있으면 해상도가 낮아져도 실루엣이 또렷하게 남습니다.
-   ===================================================================== */
 var BK = "#000", GY = "#8a8a8a", WH = "#fff";
 
 function K(c) { c.fillStyle = BK; c.strokeStyle = BK; }
@@ -487,7 +438,6 @@ function arcln(c, x, y, r, a0, a1, w, ccw) {
   c.lineWidth = w; c.lineCap = "round";
   c.beginPath(); c.arc(x, y, r, a0, a1, !!ccw); c.stroke();
 }
-/* 자유 곡선: [x,y, cx1,cy1,cx2,cy2,x,y, ...] 형태의 베지어 묶음 */
 function curve(c, start, segs) {
   c.beginPath();
   c.moveTo(start[0], start[1]);
@@ -498,7 +448,6 @@ function curve(c, start, segs) {
   c.closePath(); c.fill();
 }
 
-/* 덩어리 + 바깥 윤곽선 */
 var OUTLINE = 3;
 function outlined(c, body, fillColor) {
   var i, t;
@@ -518,9 +467,6 @@ function outlined(c, body, fillColor) {
   c.restore();
 }
 
-/* =====================================================================
-   3. 문제 은행 — 사물마다 "그림 그리는 함수" 하나
-   ===================================================================== */
 var BANK = [
   { name: "사과", draw: function (c) {
       outlined(c, function (g) {
@@ -561,20 +507,18 @@ var BANK = [
 
   { name: "우산", draw: function (c) {
       outlined(c, function (g) {
-        /* 반원 지붕 + 아래쪽 물결 모양 단을 하나의 도형으로 */
         g.beginPath();
         g.arc(64, 60, 54, Math.PI, 0);
         g.quadraticCurveTo(101, 78, 82, 62);
         g.quadraticCurveTo(64, 80, 46, 62);
         g.quadraticCurveTo(27, 78, 10, 60);
         g.closePath(); g.fill();
-        rct(g, 61, 71, 7, 33);          /* 기둥은 캐노피가 끝나는 곳에서 시작 */
+        rct(g, 61, 71, 7, 33);
         g.lineWidth = 8; g.lineCap = "round";
         g.beginPath(); g.arc(75, 104, 11, Math.PI, 0, true); g.stroke();
       });
       K(c); rct(c, 61, 71, 7, 33);
       K(c); arcln(c, 75, 104, 11, Math.PI, 0, 8, true);
-      /* 패널을 나누는 살대 */
       K(c); ln(c, 64, 8, 46, 62, 3); ln(c, 64, 8, 82, 62, 3);
       K(c); ln(c, 64, 8, 12, 58, 3); ln(c, 64, 8, 116, 58, 3);
       K(c); c.lineWidth = 3; c.beginPath();
@@ -653,12 +597,11 @@ var BANK = [
   }},
 
   { name: "비행기", draw: function (c) {
-      /* 위에서 내려다본 여객기 (기수는 위쪽) */
       outlined(c, function (g) {
-        poly(g, [[52, 54], [8, 82], [8, 94], [52, 76]]);          /* 왼쪽 주날개 */
-        poly(g, [[76, 54], [120, 82], [120, 94], [76, 76]]);      /* 오른쪽 주날개 */
-        poly(g, [[55, 98], [30, 112], [30, 120], [57, 110]]);     /* 왼쪽 꼬리날개 */
-        poly(g, [[73, 98], [98, 112], [98, 120], [71, 110]]);     /* 오른쪽 꼬리날개 */
+        poly(g, [[52, 54], [8, 82], [8, 94], [52, 76]]);
+        poly(g, [[76, 54], [120, 82], [120, 94], [76, 76]]);
+        poly(g, [[55, 98], [30, 112], [30, 120], [57, 110]]);
+        poly(g, [[73, 98], [98, 112], [98, 120], [71, 110]]);
         curve(g, [64, 4], [
           [74, 20, 78, 38, 78, 60],
           [78, 88, 74, 106, 71, 118],
@@ -667,11 +610,11 @@ var BANK = [
           [50, 38, 54, 20, 64, 4]
         ]);
       });
-      K(c); poly(c, [[56, 22], [72, 22], [76, 34], [52, 34]]);     /* 조종석 창 */
+      K(c); poly(c, [[56, 22], [72, 22], [76, 34], [52, 34]]);
       W(c); circ(c, 58, 52, 4); circ(c, 70, 52, 4);
       W(c); circ(c, 58, 66, 4); circ(c, 70, 66, 4);
       W(c); circ(c, 58, 80, 4); circ(c, 70, 80, 4);
-      K(c); rr(c, 24, 84, 16, 12, 4); K(c); rr(c, 88, 84, 16, 12, 4);   /* 엔진 */
+      K(c); rr(c, 24, 84, 16, 12, 4); K(c); rr(c, 88, 84, 16, 12, 4);
       K(c); ln(c, 50, 60, 78, 60, 3);
   }},
 
@@ -860,7 +803,6 @@ var BANK = [
 
   { name: "축구공", draw: function (c) {
       outlined(c, function (g) { circ(g, 64, 64, 48); }, WH);
-      /* 가운데 오각형 하나와 가장자리 오각형 다섯 개 — 공 밖으로 나가는 부분은 잘라냅니다. */
       function pent(g, cx, cy, r, rot) {
         var pts = [], i, a;
         for (i = 0; i < 5; i++) {
@@ -898,20 +840,19 @@ var BANK = [
   }},
 
   { name: "우체통", draw: function (c) {
-      /* 길가에 서 있는 기둥형 우체통 */
       outlined(c, function (g) {
-        g.beginPath(); g.arc(64, 32, 30, Math.PI, 0); g.fill();   /* 둥근 지붕 */
-        rct(g, 34, 32, 60, 76);                                    /* 몸통 */
-        rr(g, 24, 22, 80, 12, 5);                                  /* 지붕 챙 */
-        rr(g, 34, 104, 60, 12, 4);                                 /* 받침 */
-        rct(g, 44, 114, 14, 12); rct(g, 70, 114, 14, 12);          /* 다리 */
+        g.beginPath(); g.arc(64, 32, 30, Math.PI, 0); g.fill();
+        rct(g, 34, 32, 60, 76);
+        rr(g, 24, 22, 80, 12, 5);
+        rr(g, 34, 104, 60, 12, 4);
+        rct(g, 44, 114, 14, 12); rct(g, 70, 114, 14, 12);
       });
       K(c); rr(c, 24, 22, 80, 12, 5);
-      K(c); rr(c, 42, 42, 44, 11, 4);                              /* 편지 투입구 */
+      K(c); rr(c, 42, 42, 44, 11, 4);
       W(c); rr(c, 45, 45, 38, 5, 2);
-      K(c); rr(c, 44, 64, 40, 32, 4);                              /* 수거문 */
+      K(c); rr(c, 44, 64, 40, 32, 4);
       G(c); rr(c, 47, 67, 34, 26, 3);
-      K(c); circ(c, 76, 80, 4);                                    /* 손잡이 */
+      K(c); circ(c, 76, 80, 4);
       K(c); rr(c, 34, 104, 60, 12, 4);
       K(c); rct(c, 44, 114, 14, 12); K(c); rct(c, 70, 114, 14, 12);
   }},
@@ -934,13 +875,13 @@ var BANK = [
 
   { name: "연필", draw: function (c) {
       outlined(c, function (g) {
-        rct(g, 30, 50, 64, 28);          /* 몸통 */
-        poly(g, [[30, 50], [30, 78], [4, 64]]);   /* 깎인 나무 */
-        rct(g, 94, 50, 12, 28);          /* 금속 띠 */
-        rr(g, 106, 50, 18, 28, 4);       /* 지우개 */
+        rct(g, 30, 50, 64, 28);
+        poly(g, [[30, 50], [30, 78], [4, 64]]);
+        rct(g, 94, 50, 12, 28);
+        rr(g, 106, 50, 18, 28, 4);
       });
-      K(c); poly(c, [[16, 57], [16, 71], [4, 64]]);            /* 흑연 심 */
-      K(c); rct(c, 94, 50, 12, 28);                            /* 금속 띠 */
+      K(c); poly(c, [[16, 57], [16, 71], [4, 64]]);
+      K(c); rct(c, 94, 50, 12, 28);
       W(c); ln(c, 97, 50, 97, 78, 2); W(c); ln(c, 103, 50, 103, 78, 2);
       K(c); ln(c, 30, 58, 94, 58, 3); K(c); ln(c, 30, 70, 94, 70, 3);
       K(c); ln(c, 30, 50, 30, 78, 3);
@@ -949,16 +890,16 @@ var BANK = [
 
   { name: "버섯", draw: function (c) {
       outlined(c, function (g) {
-        poly(g, [[55, 60], [73, 60], [78, 108], [50, 108]]);        /* 아래로 살짝 벌어지는 대 */
-        rr(g, 46, 104, 36, 12, 6);                                  /* 밑동 */
-        g.beginPath(); g.ellipse(64, 62, 52, 44, 0, Math.PI, 0); g.fill();   /* 갓 */
-        rr(g, 14, 58, 100, 10, 5);                                  /* 갓 아랫단 */
+        poly(g, [[55, 60], [73, 60], [78, 108], [50, 108]]);
+        rr(g, 46, 104, 36, 12, 6);
+        g.beginPath(); g.ellipse(64, 62, 52, 44, 0, Math.PI, 0); g.fill();
+        rr(g, 14, 58, 100, 10, 5);
       });
-      K(c); rr(c, 14, 58, 100, 10, 5);                              /* 갓과 대의 경계 */
+      K(c); rr(c, 14, 58, 100, 10, 5);
       W(c); circ(c, 40, 38, 12); circ(c, 88, 42, 10); circ(c, 64, 24, 9);
       W(c); circ(c, 60, 48, 6);
-      K(c); rr(c, 46, 104, 36, 12, 6);                              /* 밑동은 진하게 */
-      K(c); ln(c, 60, 70, 60, 100, 3);                              /* 대의 주름 */
+      K(c); rr(c, 46, 104, 36, 12, 6);
+      K(c); ln(c, 60, 70, 60, 100, 3);
   }},
 
   { name: "펭귄", draw: function (c) {
@@ -1013,7 +954,6 @@ var BANK = [
       });
       K(c); rct(c, 58, 104, 12, 20);
       K(c); rr(c, 44, 118, 40, 8, 3);
-      /* 등 세 개: 흰 바탕에 검은 테, 켜진 아래쪽(초록) 등만 검게 채웁니다. */
       [26, 55, 84].forEach(function (cy, i) {
         W(c); circ(c, 64, cy, 15);
         K(c);
@@ -1064,15 +1004,14 @@ var BANK = [
   }},
 
   { name: "망치", draw: function (c) {
-      /* 노루발이 달린 장도리 */
       outlined(c, function (g) {
-        rr(g, 20, 12, 78, 32, 4);                                   /* 머리 */
-        poly(g, [[96, 8], [112, 14], [112, 42], [96, 48]]);         /* 때리는 면 */
-        rr(g, 52, 42, 16, 80, 6);                                   /* 자루 */
+        rr(g, 20, 12, 78, 32, 4);
+        poly(g, [[96, 8], [112, 14], [112, 42], [96, 48]]);
+        rr(g, 52, 42, 16, 80, 6);
       });
-      K(c); ln(c, 96, 10, 96, 46, 3);                               /* 때리는 면 경계 */
-      K(c); ln(c, 52, 44, 68, 44, 3);                               /* 머리와 자루 경계 */
-      K(c); ln(c, 54, 94, 66, 94, 3); K(c); ln(c, 54, 106, 66, 106, 3);   /* 손잡이 그립 */
+      K(c); ln(c, 96, 10, 96, 46, 3);
+      K(c); ln(c, 52, 44, 68, 44, 3);
+      K(c); ln(c, 54, 94, 66, 94, 3); K(c); ln(c, 54, 106, 66, 106, 3);
   }},
 
   { name: "책", draw: function (c) {
@@ -1094,37 +1033,35 @@ var BANK = [
       K(c); rct(c, 58, 32, 12, 74);
       K(c); ln(c, 20, 44, 50, 48, 3); ln(c, 20, 58, 50, 62, 3); ln(c, 20, 72, 50, 76, 3);
       K(c); ln(c, 78, 48, 108, 44, 3); ln(c, 78, 62, 108, 58, 3); ln(c, 78, 76, 108, 72, 3);
-      G(c); rct(c, 10, 96, 108, 0);
   }},
 
   { name: "고양이", draw: function (c) {
-      /* 앉아 있는 고양이 — 몸은 아래로 넓어지고 꼬리는 오른쪽으로 감깁니다. */
       outlined(c, function (g) {
         g.lineWidth = 10; g.lineCap = "round";
         g.beginPath();
         g.moveTo(78, 116);
         g.bezierCurveTo(106, 118, 112, 96, 98, 84);
-        g.stroke();                                              /* 꼬리 */
+        g.stroke();
         curve(g, [40, 74], [
           [32, 90, 28, 106, 30, 118],
           [82, 118, 82, 118, 82, 118],
           [84, 106, 80, 90, 72, 74],
           [40, 74, 40, 74, 40, 74]
-        ]);                                                       /* 몸 */
-        g.beginPath(); g.ellipse(56, 54, 33, 29, 0, 0, 6.2832); g.fill();   /* 머리 */
-        poly(g, [[30, 36], [26, 8], [52, 28]]);                   /* 귀 */
+        ]);
+        g.beginPath(); g.ellipse(56, 54, 33, 29, 0, 0, 6.2832); g.fill();
+        poly(g, [[30, 36], [26, 8], [52, 28]]);
         poly(g, [[82, 36], [86, 8], [60, 28]]);
       });
-      K(c); poly(c, [[33, 32], [31, 16], [46, 28]]);              /* 귀 안쪽 */
+      K(c); poly(c, [[33, 32], [31, 16], [46, 28]]);
       K(c); poly(c, [[79, 32], [81, 16], [66, 28]]);
-      K(c); ell(c, 44, 52, 5, 7); ell(c, 68, 52, 5, 7);           /* 눈 */
+      K(c); ell(c, 44, 52, 5, 7); ell(c, 68, 52, 5, 7);
       W(c); circ(c, 42, 49, 2); circ(c, 66, 49, 2);
-      K(c); poly(c, [[51, 62], [61, 62], [56, 68]]);              /* 코 */
+      K(c); poly(c, [[51, 62], [61, 62], [56, 68]]);
       K(c); ln(c, 56, 68, 56, 71, 3);
       K(c); arcln(c, 49, 71, 7, 0, Math.PI, 3); arcln(c, 63, 71, 7, 0, Math.PI, 3);
-      K(c); ln(c, 24, 54, 4, 48, 3); ln(c, 24, 62, 4, 66, 3);     /* 수염 */
+      K(c); ln(c, 24, 54, 4, 48, 3); ln(c, 24, 62, 4, 66, 3);
       K(c); ln(c, 88, 54, 108, 48, 3); ln(c, 88, 62, 108, 66, 3);
-      K(c); arcln(c, 44, 118, 9, Math.PI, 0, 3);                  /* 앞발 */
+      K(c); arcln(c, 44, 118, 9, Math.PI, 0, 3);
       K(c); arcln(c, 66, 118, 9, Math.PI, 0, 3);
   }},
 
@@ -1145,9 +1082,6 @@ var BANK = [
   }}
 ];
 
-/* =====================================================================
-   4. 마스터 비트맵 만들기 (절차적 그림 → 128×128 명암 배열)
-   ===================================================================== */
 var off = document.createElement("canvas");
 off.width = MASTER; off.height = MASTER;
 var octx = off.getContext("2d", { willReadFrequently: true });
@@ -1163,13 +1097,11 @@ function buildMaster(item) {
   var img = octx.getImageData(0, 0, MASTER, MASTER).data;
   var out = new Float32Array(MASTER * MASTER);
   for (var i = 0, p = 0; i < out.length; i++, p += 4) {
-    /* 밝기(0~1). 색을 쓰지 않으므로 R 값만 봐도 충분하지만 안전하게 평균. */
     out[i] = (img[p] * 0.299 + img[p + 1] * 0.587 + img[p + 2] * 0.114) / 255;
   }
   return out;
 }
 
-/* 블록 평균 다운샘플링: 128×128 → n×n */
 function downsample(master, n) {
   var block = MASTER / n;
   var out = new Float32Array(n * n);
@@ -1186,34 +1118,28 @@ function downsample(master, n) {
   return out;
 }
 
-/* 칸이 몇 개 없는 낮은 단계에서는 평균값이 서로 비슷해 화면이 통째로 하얗게
-   보일 수 있습니다. 그래서 각 단계의 밝기 범위를 0~1 로 펴 준 뒤 명암을 나눕니다. */
 function stretch(cells) {
   var min = 1, max = 0, i;
   for (i = 0; i < cells.length; i++) {
     if (cells[i] < min) min = cells[i];
     if (cells[i] > max) max = cells[i];
   }
-  if (max - min < 0.005) return cells;            /* 정말 균일하면 그대로 */
+  if (max - min < 0.005) return cells;
   var out = new Float32Array(cells.length);
   for (i = 0; i < cells.length; i++) out[i] = (cells[i] - min) / (max - min);
   return out;
 }
 
-/* 3단계 명암으로 양자화 */
 function shade(v) {
-  if (v < 0.27) return "#000000";      /* 검정과 회색의 중간 */
-  if (v < 0.77) return "#8a8a8a";      /* 회색과 흰색의 중간 */
+  if (v < 0.27) return "#000000";
+  if (v < 0.77) return "#8a8a8a";
   return "#ffffff";
 }
 
-/* =====================================================================
-   5. 화면에 그리기 (칸마다 연한 회색 구분선)
-   ===================================================================== */
 var cv = document.getElementById("bmp");
 var cctx = cv.getContext("2d");
 var GRID_COLOR = "#c9d0c2";
-var GRID_MIN_CELL = 6;          /* 칸이 이보다 작아지면(128×128) 선을 그리지 않습니다 */
+var GRID_MIN_CELL = 6;
 
 function render(master, n) {
   var cells = stretch(downsample(master, n));
@@ -1247,13 +1173,10 @@ function render(master, n) {
   cctx.stroke();
 }
 
-/* =====================================================================
-   6. 게임 상태
-   ===================================================================== */
 var scores = new Array(STUDENTS).fill(0);
 var deck = [];
-var current = null;      /* { item, master } */
-var stage = 0;           /* 0-based */
+var current = null;
+var stage = 0;
 var qCount = 0;
 
 function shuffled() {
@@ -1270,9 +1193,6 @@ function nextItem() {
   return BANK[deck.pop()];
 }
 
-/* =====================================================================
-   7. 탭 · 화면 전환
-   ===================================================================== */
 function $(id) { return document.getElementById(id); }
 
 var TABS = ["game", "scores", "wrap"];
@@ -1296,9 +1216,6 @@ document.querySelectorAll(".tab-btn").forEach(function (b) {
   b.addEventListener("click", function () { showTab(b.dataset.tab); });
 });
 
-/* =====================================================================
-   8. 진행 로직
-   ===================================================================== */
 var SUP = { 0: "⁰", 1: "¹", 2: "²", 3: "³", 4: "⁴", 5: "⁵", 6: "⁶", 7: "⁷", 8: "⁸", 9: "⁹" };
 function supers(n) {
   return String(n).split("").map(function (ch) { return SUP[ch]; }).join("");
@@ -1346,11 +1263,9 @@ function startQuestion() {
   showScreen("play");
 }
 
-/* ---------- 선생님 정답 확인 칸 ----------
-   전자칠판에는 학생들도 함께 보고 있으므로, 정답은 화면 오른쪽 아래 작은 칸을
-   누르고 있는 동안에만 보입니다. 손을 떼면 곧바로 다시 가려집니다. */
-function showPeek() { $("peekLocked").hidden = true;  $("peekRevealed").hidden = false; }
-function hidePeek() { $("peekLocked").hidden = false; $("peekRevealed").hidden = true; }
+function setPeekVisible(visible) { $("peekLocked").hidden = visible; $("peekRevealed").hidden = !visible; }
+function showPeek() { setPeekVisible(true); }
+function hidePeek() { setPeekVisible(false); }
 
 (function wirePeek() {
   var box = $("peekBox");
@@ -1378,7 +1293,6 @@ $("btnNext").addEventListener("click", function () {
 
 $("btnHit").addEventListener("click", function () { openAnswer(true); });
 
-/* ---------- 정답 공개 · 정답자 번호 선택 ---------- */
 function buildNumGrid() {
   var grid = $("numGrid");
   grid.innerHTML = "";
@@ -1406,30 +1320,30 @@ function openAnswer(hit) {
     $("roundProgress").textContent = qCount + "번째 문제 · 정답자 선택";
   } else {
     $("revealCap").textContent = "7단계까지 아무도 맞히지 못했어요 — 0점";
-    $("pickArea").hidden = true;
-    $("afterArea").hidden = false;
-    $("resultNote").className = "result-note zero";
-    $("resultNote").textContent = "이번 문제의 정답은 “" + current.item.name +
-                                  "” 였어요. 점수 변동 없이 다음 문제로 넘어갑니다.";
+    showResultNote("result-note zero", "이번 문제의 정답은 “" + current.item.name +
+                                  "” 였어요. 점수 변동 없이 다음 문제로 넘어갑니다.");
     $("roundProgress").textContent = qCount + "번째 문제 · 정답 공개";
   }
   showScreen("answer");
 }
 
+function showResultNote(className, text) {
+  $("pickArea").hidden = true;
+  $("afterArea").hidden = false;
+  $("resultNote").className = className;
+  $("resultNote").textContent = text;
+}
+
 function award(num) {
   var st = STAGES[stage];
   scores[num - 1] += st.score;
-  $("pickArea").hidden = true;
-  $("afterArea").hidden = false;
-  $("resultNote").className = "result-note";
-  $("resultNote").textContent = num + "번 학생에게 " + st.score + "점을 주었어요. (누적 " +
-                                scores[num - 1] + "점) · 정답: " + current.item.name;
+  showResultNote("result-note", num + "번 학생에게 " + st.score + "점을 주었어요. (누적 " +
+                                scores[num - 1] + "점) · 정답: " + current.item.name);
 }
 
 $("btnNextQ").addEventListener("click", startQuestion);
 $("btnGoScore").addEventListener("click", function () { showTab("scores"); });
 
-/* ---------- 점수판 ---------- */
 function paintScores() {
   var grid = $("scoreboardGrid");
   grid.innerHTML = "";
@@ -1443,7 +1357,6 @@ function paintScores() {
   }
 }
 
-/* ---------- 정리 ---------- */
 function rankingText() {
   var rows = scores.map(function (s, i) { return { num: i + 1, s: s }; });
   rows.sort(function (a, b) { return b.s - a.s || a.num - b.num; });
@@ -1484,9 +1397,6 @@ $("btnResetAll").addEventListener("click", function () {
   showScreen("intro");
 });
 
-/* =====================================================================
-   9. 시작 준비
-   ===================================================================== */
 (function initStepTable() {
   var tb = $("stepTable");
   STAGES.forEach(function (st, i) {
