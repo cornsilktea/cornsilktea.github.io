@@ -637,12 +637,21 @@
     showScreen("lobby");
   }
 
-  /* 호스트가 사라지면 가장 먼저 들어온 사람이 이어받는다 */
+  /* 다음 방장: 블루팀 → 레드팀 → 관전자 순, 같은 팀 안에서는 먼저 들어온 사람 */
+  var HOST_ORDER = { blue: 0, red: 1, spec: 2 };
+  function nextHost(ps) {
+    var join = byJoin(ps);
+    return humans(ps).sort(function (a, b) {
+      var ta = HOST_ORDER[ps[a].team], tb = HOST_ORDER[ps[b].team];
+      ta = ta == null ? 3 : ta; tb = tb == null ? 3 : tb;
+      return ta !== tb ? ta - tb : join(a, b);
+    })[0];
+  }
+  /* 방장이 나가면(연결이 끊겨도) 다음 순번이 이어받는다 */
   function checkHost() {
     if (!room || !room.hostLoaded || !P[myId]) return;
     if (room.host && P[room.host] && !P[room.host].isAI) return;
-    var hs = humans(P).sort(byJoin(P));
-    if (hs[0] === myId) {
+    if (nextHost(P) === myId) {
       var u = { hostPlayerId: myId }; u["players/" + myId + "/isHost"] = true;
       room.host = myId; room.ref.update(u);
     }
@@ -659,10 +668,9 @@
     }).then(function (s) {
       var ps = s.val() || {}, hs = humans(ps);
       if (!hs.length) return r.ref.remove();                   // 아무도 없으면 방 삭제
-      hs.sort(byJoin(ps));
-      return r.ref.child("hostPlayerId").once("value").then(function (h) {   // 내가 호스트였다면 넘겨주기
-        var hid = h.val();
-        if (!hid || !ps[hid] || ps[hid].isAI) { var u = { hostPlayerId: hs[0] }; u["players/" + hs[0] + "/isHost"] = true; return r.ref.update(u); }
+      return r.ref.child("hostPlayerId").once("value").then(function (h) {   // 내가 방장이었다면 다음 순번에게 넘겨주기
+        var hid = h.val(), nx = nextHost(ps);
+        if (!hid || !ps[hid] || ps[hid].isAI) { var u = { hostPlayerId: nx }; u["players/" + nx + "/isHost"] = true; return r.ref.update(u); }
       });
     }).catch(function () {});
     room = null; resetLocal(); showScreen("start"); startMsg("");
