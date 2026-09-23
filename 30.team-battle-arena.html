@@ -389,7 +389,7 @@
       front: { idle: [88, true], atk: [90, false], ult: [104, false] } },
     healer: { pre: "hl",
       back:  { idle: [84, true], walk: [84, true], atk: [90, true], ult: [112, true] },
-      front: { idle: [90, false], walk: [88, false], atk: [90, false], ult: [112, true] } },
+      front: { idle: [69, false], walk: [68, false], atk: [77, false], ult: [100, true] } },   // 앞모습 그림은 몸이 크게 그려져 있어 뒷모습 크기에 맞춤
     /* 탱커: 뒷모습 대기·걷기는 망치를 왼쪽 어깨에 멤, 공격은 뒷모습 한 벌뿐(앞모습 공격은 대기 그림 + 휘두르기 효과). 궁극기는 포즈 대신 오라 */
     tank: { pre: "tk",
       back:  { idle: [100, false], walk: [100, false], atk: [108, true] },
@@ -397,7 +397,7 @@
     /* 암살자: 궁극기 그림은 연기 회오리까지 포함이라 조금 큼 */
     assassin: { pre: "as",
       back:  { idle: [88, true], walk: [88, true], atk: [92, true], ult: [104, true] },
-      front: { idle: [88, true], walk: [90, true], atk: [90, false], ult: [104, true] } }
+      front: { idle: [88, false], walk: [90, false], atk: [90, false], ult: [104, true] } }   // 앞모습 대기·걷기는 스카프가 오른쪽으로 날림 = 왼쪽을 향함
   };
   /* 투사체가 나오는 곳(총구·지팡이 보석·손끝): 원래 그림 안의 위치(가로·세로 비율 0~1). 공격(사격수 궁극기는 궁극기) 그림 기준 */
   var TIP = {
@@ -1079,7 +1079,7 @@
               pr:skill ? ULT.mkPr : c.pr, range: skill ? ULT.mkRange : c.range, createdAt: now() };
     var ref = room.ref.child("projectiles").push(d);
     setTimeout(function () { ref.remove(); }, d.range / sp * 1000 + 700);
-    E.atkAt = now();
+    if (skill || !E.volley || E.volley.left === c.shots) E.atkAt = now();   // 연발은 첫 발 때만 → 공격 그림이 끊기지 않고 이어짐
     if (hear(E)) sfx(E.char === "healer" ? "orb" : (E.char === "assassin" ? "star" : "shoot"));
   }
   function hear(E) { return ME && hyp(E.x - ME.x, E.y - ME.y) < 700; }
@@ -1511,10 +1511,15 @@
   function V(x, y) { return flip() ? { x: MW - x, y: MH - y } : { x: x, y: y }; }   // 월드 → 내 화면 방향(블루는 180° 회전)
   function viewAngle(a) { return flip() ? a + Math.PI : a; }
 
+  /* 공격 그림 유지 시간: 망치는 조금 더 길게, 연발(사격수 2발·암살자 3발)은 마지막 발까지 */
+  function atkPoseMs(k) {
+    var c = CHARS[k];
+    return ATK_POSE_MS * (k === "tank" ? 2 : 1) + (c.shots > 1 ? (c.shots - 1) * c.gap : 0);
+  }
   function drawSprite(E, alpha, t) {
     var p = V(E.x, E.y), pose = "idle", walking = false;
     if (E.ultUntil > t && E.char !== "tank") pose = "ult";
-    else if (t >= E.atkAt && t - E.atkAt < ATK_POSE_MS * (E.char === "tank" ? 2 : 1)) pose = "atk";   // 망치는 조금 더 길게
+    else if (t >= E.atkAt && t - E.atkAt < atkPoseMs(E.char)) pose = "atk";
     else if (E.mv && E.alive) { walking = true; pose = Math.floor(t / 200) % 2 ? "walk" : "idle"; }
     /* 공격·궁극기·조준 중엔 조준 방향, 그 밖엔 마지막 이동 방향(화면에서 위로 가면 뒷모습, 아래로 오면 앞모습) */
     var useMove = FACE_BY_MOVE && pose !== "atk" && pose !== "ult" && E.moveAng != null && E.moveAt > E.atkAt &&
