@@ -76,6 +76,7 @@
   .btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
   .btn { display: inline-block; font: inherit; font-weight: 800; font-size: 20px; padding: 13px 30px; border-radius: 12px; border: 3px solid var(--sg-line-strong); background: var(--sg-primary); color: var(--sg-primary-ink); cursor: pointer; box-shadow: 0 5px 0 var(--sg-ink); }
   .btn:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--sg-ink); }
+  .btn:disabled { opacity: .45; cursor: wait; transform: none; box-shadow: 0 5px 0 var(--sg-ink); }
   .btn small { display: block; font-size: 12px; font-weight: 700; opacity: .85; margin-top: 2px; }
   .btn.mid { background: var(--sg-panel-alt); color: var(--sg-ink); }
   .btn.hard { background: #D97B4F; }
@@ -539,6 +540,20 @@ const texChecker = canvasTex(128, 128, (c, w, h) => {
 THREE.ColorManagement.enabled = HQ;
 const LEGACY_LIGHT = Math.PI;
 const HQ_DIR = "img/turbo/hq/";
+const HQ_LOAD = { ready: !HQ, loaded: 0, total: 0, failed: [], slow: false };
+const HQ_MANAGER = new THREE.LoadingManager(
+  () => { HQ_LOAD.ready = true; renderLoadGate(); },
+  (url, loaded, total) => { HQ_LOAD.loaded = loaded; HQ_LOAD.total = total; renderLoadGate(); },
+  url => { HQ_LOAD.failed.push(String(url).split("/").pop()); renderLoadGate(); });
+function renderLoadGate() {
+  if (!HQ) return;
+  ["btnEasy", "btnHard", "btnExpert"].forEach(id => { $(id).disabled = !HQ_LOAD.ready; });
+  const note = $("loadNote");
+  if (!HQ_LOAD.ready) note.textContent = "고화질 자료 불러오는 중… " + HQ_LOAD.loaded + " / " + (HQ_LOAD.total || "?") + (HQ_LOAD.slow ? " — 오래 걸리면 저화질을 골라 주세요" : "");
+  else if (HQ_LOAD.failed.length) note.textContent = "고화질 자료 일부를 불러오지 못했습니다(" + HQ_LOAD.failed.join(", ") + "). 화면이 어두우면 저화질을 골라 주세요.";
+  else note.textContent = "";
+}
+if (HQ) { renderLoadGate(); setTimeout(() => { HQ_LOAD.slow = true; renderLoadGate(); }, 15000); }
 const HQ_EXPOSURE = 0.95;
 const SHARED_TEX = new Set([texCurb, texChecker]);
 function makeRenderer(opts) {
@@ -584,8 +599,13 @@ function worldUvMaterial(params, tile, macro) {
   m.customProgramCacheKey = () => "worldUv" + tile + (macro ? "M" : "");
   return m;
 }
-function hqTex(name, srgb) {
-  const t = new THREE.TextureLoader().load(HQ_DIR + name, undefined, undefined, () => console.warn("[turbolap] 고화질 텍스처를 못 불러옴:", name));
+function hqTex(name, srgb, fallbackColor) {
+  const t = new THREE.TextureLoader(HQ_MANAGER).load(HQ_DIR + name, undefined, undefined, () => {
+    console.warn("[turbolap] 고화질 텍스처를 못 불러옴:", name);
+    const cv = document.createElement("canvas"); cv.width = cv.height = 2;
+    const c = cv.getContext("2d"); c.fillStyle = fallbackColor || "#8080FF"; c.fillRect(0, 0, 2, 2);
+    t.image = cv; t.needsUpdate = true;
+  });
   t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
   SHARED_TEX.add(t);
@@ -594,8 +614,8 @@ function hqTex(name, srgb) {
 function srgbCanvasTex(w, h, draw, repeat) { const t = canvasTex(w, h, draw, repeat); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; SHARED_TEX.add(t); return t; }
 function initMaterialsHQ() {
   const asphaltNormal = hqTex("asphalt_normal.jpg");
-  HQM.grass = worldUvMaterial({ map: hqTex("grass_color.jpg", true), normalMap: hqTex("grass_normal.jpg"), roughness: 0.95, color: 0xE8F0DC }, 3.4, true);
-  HQM.asphalt = worldUvMaterial({ map: hqTex("asphalt_color.jpg", true), normalMap: asphaltNormal, roughnessMap: hqTex("asphalt_rough.jpg"), roughness: 1, color: new THREE.Color(2.1, 2.1, 2.15) }, 4.5, false);
+  HQM.grass = worldUvMaterial({ map: hqTex("grass_color.jpg", true, "#5E8C3A"), normalMap: hqTex("grass_normal.jpg"), roughness: 0.95, color: 0xE8F0DC }, 3.4, true);
+  HQM.asphalt = worldUvMaterial({ map: hqTex("asphalt_color.jpg", true, "#2E3034"), normalMap: asphaltNormal, roughnessMap: hqTex("asphalt_rough.jpg", false, "#E6E6E6"), roughness: 1, color: new THREE.Color(2.1, 2.1, 2.15) }, 4.5, false);
   HQM.line = new THREE.MeshStandardMaterial({ color: 0xEDEDE8, roughness: 0.7 });
   const curbTex = srgbCanvasTex(64, 128, (c, w, h) => {
     c.fillStyle = "#C3241E"; c.fillRect(0, 0, w, h / 2);
@@ -612,8 +632,8 @@ function initMaterialsHQ() {
   HQM.post = new THREE.MeshStandardMaterial({ color: 0x80878F, metalness: 0.7, roughness: 0.42 });
   HQM.pole = new THREE.MeshStandardMaterial({ color: 0xE6E6E6, metalness: 0.4, roughness: 0.35 });
   HQM.flags = [0xD8322A, 0x2F6FD8, 0xF2B632, 0x3FAE55].map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.8, side: THREE.DoubleSide }));
-  HQM.bark = new THREE.MeshStandardMaterial({ map: hqTex("bark_color.jpg", true), normalMap: hqTex("bark_normal.jpg"), roughness: 0.95 });
-  const leafMap = hqTex("leaves_color.jpg", true), leafNormal = hqTex("leaves_normal.jpg");
+  HQM.bark = new THREE.MeshStandardMaterial({ map: hqTex("bark_color.jpg", true, "#5A4636"), normalMap: hqTex("bark_normal.jpg"), roughness: 0.95 });
+  const leafMap = hqTex("leaves_color.jpg", true, "#8FA060"), leafNormal = hqTex("leaves_normal.jpg");
   leafMap.repeat.set(3, 3); leafNormal.repeat.set(3, 3);
   HQM.leaves = new THREE.MeshStandardMaterial({ map: leafMap, normalMap: leafNormal, roughness: 0.88 });
 }
@@ -651,13 +671,13 @@ function setupWorldHQ() {
   initMaterialsHQ();
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(5000, 5000), HQM.grass);
   ground.rotation.x = -Math.PI / 2; ground.position.y = -0.05; ground.receiveShadow = true; scene.add(ground);
-  new RGBELoader().load(HQ_DIR + "sky_1k.hdr", hdr => {
+  new RGBELoader(HQ_MANAGER).load(HQ_DIR + "sky_1k.hdr", hdr => {
     hdr.mapping = THREE.EquirectangularReflectionMapping;
     SUN_DIR.copy(brightestDirection(hdr));
     HQENV.hdr = hdr; scene.environment = envFromHdr(renderer, hdr); scene.environmentIntensity = 0.9;
     HQENV.ready.forEach(f => f(hdr)); HQENV.ready = [];
   }, undefined, err => console.warn("[turbolap] 하늘 HDRI를 못 불러옴:", err));
-  new THREE.TextureLoader().load(HQ_DIR + "sky.jpg", t => {
+  new THREE.TextureLoader(HQ_MANAGER).load(HQ_DIR + "sky.jpg", t => {
     t.mapping = THREE.EquirectangularReflectionMapping; t.colorSpace = THREE.SRGBColorSpace;
     scene.background = t; scene.fog.color.copy(horizonColor(t.image));
   }, undefined, () => console.warn("[turbolap] 하늘 배경을 못 불러옴"));
@@ -1228,11 +1248,10 @@ function refreshCars() {
   carPreviews.forEach(buildPreviewCar);
 }
 if (HQ) {
-  $("loadNote").textContent = "고화질 자동차 불러오는 중…";
-  new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load("img/turbo/supercar.glb", gltf => {
-    try { SUPERCAR.tpl = prepareSupercar(gltf.scene); refreshCars(); $("loadNote").textContent = ""; }
-    catch (e) { SUPERCAR.tpl = null; $("loadNote").textContent = "고화질 자동차를 준비하지 못해 기본 차로 달립니다."; console.warn("[turbolap] 슈퍼카 모델 준비 실패:", e); }
-  }, undefined, err => { $("loadNote").textContent = "고화질 자동차를 불러오지 못해 기본 차로 달립니다."; console.warn("[turbolap] 슈퍼카 모델을 못 불러옴:", err); });
+  new GLTFLoader(HQ_MANAGER).setMeshoptDecoder(MeshoptDecoder).load("img/turbo/supercar.glb", gltf => {
+    try { SUPERCAR.tpl = prepareSupercar(gltf.scene); refreshCars(); }
+    catch (e) { SUPERCAR.tpl = null; HQ_LOAD.failed.push("supercar.glb"); renderLoadGate(); console.warn("[turbolap] 슈퍼카 모델 준비 실패:", e); }
+  }, undefined, err => console.warn("[turbolap] 슈퍼카 모델을 못 불러옴:", err));
 }
 
 const P = { x: 0, z: 0, y: 0, h: 0, v: 0, ci: 0, prevCi: 0, lap: 0, expected: 0, off: false, wallT: 0, steerVis: 0, rollVis: 0 };
