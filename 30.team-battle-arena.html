@@ -110,6 +110,7 @@
   .spBar.ult.full i { background: #E53935; }
   .spBar span { position: relative; display: block; text-align: center; font-size: 14px; font-weight: 800; line-height: 20px; color: #1B2B20; }
   .spBar.ult.full span { color: #fff; }
+  .spBar.ult.act i { background: #F06BB5; }
   @media (max-width: 900px) {
     .specPanel { width: 150px; gap: 6px; }
     .spHead { font-size: 16px; padding: 6px 8px; }
@@ -126,7 +127,10 @@
   .charCard { flex: 1 1 0; min-width: 0; border: 3px solid var(--sg-line-mid); border-radius: 10px; background: var(--sg-panel); padding: 10px 6px; text-align: center; position: relative; }
   .charCard img { display: block; height: 110px; max-width: 100%; margin: 0 auto 6px; object-fit: contain; }
   .charCard .nm { font-size: 20px; font-weight: 800; }
-  .charCard .st { font-size: 12px; color: var(--sg-ink-soft); line-height: 1.5; margin-top: 4px; }
+  .charCard .st { width: 100%; margin-top: 6px; border-collapse: collapse; font-size: 13px; line-height: 1.35; }
+  .charCard .st th, .charCard .st td { padding: 2px 4px; border-top: 1px solid var(--sg-line); }
+  .charCard .st th { text-align: left; font-weight: 700; color: var(--sg-ink-soft); white-space: nowrap; }
+  .charCard .st td { text-align: right; font-weight: 800; color: var(--sg-ink); }
   .charCard.on { border-color: #D97B4F; background: #FFF6F0; box-shadow: 0 0 0 3px rgba(217,123,79,.25); }
   .charCard:disabled { opacity: .5; cursor: default; }
   .charCard .soon { position: absolute; top: 8px; right: 8px; font-size: 12px; font-weight: 800; background: var(--sg-ink-faint); color: #fff; border-radius: 4px; padding: 2px 6px; }
@@ -160,6 +164,8 @@
   #btnUlt .fill { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(242,194,48,.75); pointer-events: none; }
   #btnUlt.ready { background: rgba(229,57,53,.9); border-color: #FFE08A; animation: glow 0.9s ease-in-out infinite alternate; }
   #btnUlt.ready .fill { background: rgba(229,57,53,0); }
+  #btnUlt.act { border-color: #F9B8DA; }
+  #btnUlt.act .fill { background: rgba(240,107,181,.85); }
   @keyframes glow { from { box-shadow: 0 0 6px 2px rgba(255,120,80,.6); } to { box-shadow: 0 0 22px 8px rgba(255,90,60,.95); } }
   #ctlHint { position: absolute; left: 16px; bottom: 186px; font-size: 13px; font-weight: 700; color: rgba(255,255,255,.85); pointer-events: none; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
   #deadMsg { position: absolute; left: 50%; bottom: 30%; transform: translateX(-50%); background: rgba(27,43,32,.82); color: #fff; font-size: 20px; font-weight: 800; padding: 10px 20px; border-radius: 8px; pointer-events: none; white-space: nowrap; }
@@ -233,7 +239,7 @@
     </div>
     <div class="card note">
       <b>조작</b> — 왼쪽 아래를 누르고 끌면 이동, 오른쪽 아래 <b>공격</b> 버튼을 누른 채 끌어 방향을 정하고 떼면 발사(그냥 톡 누르면 가까운 적을 자동 조준).
-      <b>궁극기</b>는 게이지가 10 모이면(명중 +2 · 암살자는 표창 1개당 +1, 피격 +1) 빨갛게 빛납니다. 풀숲에 들어가면 상대 팀에게 보이지 않아요.
+      <b>궁극기</b>는 게이지가 10 모이면(명중 +2 · 사격수·암살자는 1발당 +1, 피격 +1) 빨갛게 빛나고, 궁극기를 쓰면 지속시간 동안 분홍색으로 줄어듭니다. 풀숲에 들어가면 상대 팀에게 보이지 않아요.
     </div>
   </div>
 </div>
@@ -342,14 +348,11 @@
   var ATK_POSE_MS = 150;             // 기본 공격 포즈 유지 시간
   var NET_MS = 100;                  // 위치 전송 간격(초당 10회)
   var CHARS = {
-    marksman: { name: "사격수", hp: 100, speed: 200, cd: 400, dmg: 12, range: KEY * 6, pSpeed: 950, pr: 6,
-                info: "HP 100 · 연사 · 사거리 키×6<br>궁극기: 20발 난사(발당 18)" },
-    healer:   { name: "힐러", hp: 150, speed: 200, cd: 500, dmg: 11, range: KEY * 4, pSpeed: 700, pr: 9,
-                info: "HP 150 · 사거리 키×4 · 적 11 피해<br>궁극기: 4초간 아군 초당 10% 회복(나는 20%)" },
-    tank:     { name: "탱커", hp: 350, speed: 160, cd: 1000, dmg: 30, range: KEY * 1 + 50, arc: Math.PI * 0.7,   // 이동속도 = 사격수·힐러(200)의 80%
-                info: "HP 350 · 조금 느림 · 망치 근접<br>궁극기: 5초간 받는 피해 50% 감소 + 이속 50%" },
-    assassin: { name: "암살자", hp: 90, speed: 220, cd: 600, dmg: 20, range: 250, pSpeed: 900, pr: 8, shots: 3, gap: 80,
-                info: "HP 90 · 가장 빠름 · 표창 3연발(개당 20)<br>궁극기: 10초간 은신 + 이속 40%(공격하면 풀림)" }
+    /* shots·gap: 한 번 공격에 여러 발(gap ms 간격). perHit: 명중 1회당 궁극기 게이지 */
+    marksman: { name: "사격수", hp: 100, speed: 200, cd: 400, dmg: 8.4, range: KEY * 6, pSpeed: 950, pr: 6, shots: 2, gap: 70, perHit: 1, ultName: "난사" },
+    healer:   { name: "힐러", hp: 150, speed: 200, cd: 500, dmg: 11, range: KEY * 4, pSpeed: 700, pr: 9, perHit: 2, ultName: "회복" },
+    tank:     { name: "탱커", hp: 350, speed: 160, cd: 1000, dmg: 30, range: KEY * 1 + 50, arc: Math.PI * 0.7, perHit: 2, ultName: "방어태세" },   // 이동속도 = 사격수·힐러(200)의 80%
+    assassin: { name: "암살자", hp: 90, speed: 220, cd: 600, dmg: 20, range: 250, pSpeed: 900, pr: 8, shots: 3, gap: 80, perHit: 1, ultName: "은신" }
   };
   var CHAR_LIST = ["marksman", "healer", "tank", "assassin"];
   var ULT = { mkCount: 20, mkGap: 55, mkDmg: 18, mkSpeed: 1150, mkRange: KEY * 8, mkPr: 8,
@@ -722,6 +725,12 @@
     return "img/teambattle/" + SPR[c].pre + "-" + tm + "-front-idle.png";
   }
 
+  /* 캐릭터 카드 능력치 표: HP · 공격당 데미지(여러 발이면 * n) · 사거리 · 궁극기 */
+  function statTable(c) {
+    var dmg = c.dmg + (c.shots > 1 ? " * " + c.shots : "");
+    return '<table class="st"><tr><th>HP</th><td>' + c.hp + "</td></tr><tr><th>공격</th><td>" + dmg + "</td></tr>" +
+           "<tr><th>사거리</th><td>" + Math.round(c.range) + "</td></tr><tr><th>궁극기</th><td>" + c.ultName + "</td></tr></table>";
+  }
   function renderLobby() {
     if (!room || screenNow !== "lobby") return;
     var me = P[myId]; if (!me) return;
@@ -765,7 +774,7 @@
       var off = c === "tank" && !TANK_ENABLED;
       cards += '<button type="button" class="charCard' + (me.characterType === c ? " on" : "") + '" data-c="' + c + '"' + (off ? " disabled" : "") + ">" +
         (off ? '<span class="soon">준비 중</span><div class="tankPh">🛡️</div>' : '<img alt="" src="' + charImgSrc(c, me.team) + '">') +
-        '<div class="nm">' + CHARS[c].name + '</div><div class="st">' + CHARS[c].info + "</div></button>";
+        '<div class="nm">' + CHARS[c].name + "</div>" + statTable(CHARS[c]) + "</button>";
     });
     setHtml($("chars"), cards);
 
@@ -825,7 +834,7 @@
         u[base + "slot"] = i + 1; u[base + "characterType"] = c;
         u[base + "x"] = sp.x; u[base + "y"] = sp.y; u[base + "angle"] = r1(sp.angle);
         u[base + "hp"] = CHARS[c].hp; u[base + "alive"] = true; u[base + "skillGauge"] = 0; u[base + "damageDealt"] = 0;
-        u[base + "mv"] = false; u[base + "atkAt"] = 0; u[base + "ultUntil"] = 0; u[base + "buffUntil"] = 0; u[base + "stealthUntil"] = 0; u[base + "regenUntil"] = 0;
+        u[base + "mv"] = false; u[base + "atkAt"] = 0; u[base + "ultUntil"] = 0; u[base + "buffUntil"] = 0; u[base + "stealthUntil"] = 0; u[base + "regenUntil"] = 0; u[base + "skillUntil"] = 0; u[base + "skillDur"] = 0;
       });
     });
     u.status = "countdown"; u.startAt = now() + COUNT_MS; u.winner = null; u.final = null; u.endedAt = null;
@@ -851,6 +860,7 @@
              x: +d.x || 0, y: +d.y || 0, angle: +d.angle || 0, hp: d.hp == null ? CHARS[c].hp : +d.hp, maxHp: CHARS[c].hp,
              alive: d.alive !== false, gauge: +d.skillGauge || 0, dmg: +d.damageDealt || 0,
              cdUntil: 0, atkAt: 0, ultUntil: 0, buffUntil: 0, stealthUntil: +d.stealthUntil || 0, regenUntil: 0, regenRate: 0,
+             skillUntil: +d.skillUntil || 0, skillDur: +d.skillDur || 0,
              burst: null, volley: null, mv: false, pending: null };
   }
   function initGame() {
@@ -888,7 +898,7 @@
       r.team = d.team; r.char = CHARS[d.characterType] ? d.characterType : "marksman"; r.maxHp = CHARS[r.char].hp;
       r.hp = +d.hp; r.alive = d.alive !== false; r.gauge = +d.skillGauge || 0; r.dmg = +d.damageDealt || 0;
       r.mv = !!d.mv; r.atkAt = +d.atkAt || 0; r.ultUntil = +d.ultUntil || 0; r.buffUntil = +d.buffUntil || 0; r.nickname = d.nickname; r.isAI = !!d.isAI;
-      r.regenUntil = +d.regenUntil || 0;
+      r.regenUntil = +d.regenUntil || 0; r.skillUntil = +d.skillUntil || 0; r.skillDur = +d.skillDur || 0;
       var su = +d.stealthUntil || 0;
       if (su > r.stealthUntil && su > now()) smoke(r.x, r.y);   // 다른 사람이 은신 궁극기를 씀 → 연막
       r.stealthUntil = su;
@@ -902,6 +912,9 @@
   }
   /* 암살자 은신: 연막(0.4초)이 끝난 뒤부터 stealthUntil 까지 */
   function stealthed(E, t) { t = t || now(); return E.stealthUntil > t && t >= E.stealthUntil - ULT.asDur; }
+  /* 궁극기 지속 중(힐러 회복·탱커 방어태세·암살자 은신): 게이지가 분홍색으로 남은 시간만큼 표시되고, 끝나야 다시 참 */
+  function skillActive(E, t) { return E.skillUntil > (t || now()); }
+  function skillLeft(E, t) { return E.skillDur ? clamp((E.skillUntil - t) / E.skillDur, 0, 1) : 0; }
   /* 상대 팀에게 안 보이는가 — 풀숲과 은신이 같은 규칙을 씀 */
   function hiddenFrom(E, t) { return inBush(E.x, E.y) || stealthed(E, t); }
   function resolve(E) {
@@ -1055,8 +1068,8 @@
   function damage(T, amount, owner, basic) {
     if (T.char === "tank" && T.buffUntil > now()) amount = Math.round(amount * ULT.tkDef);     // 탱커 궁극기: 받는 피해 감소
     var dm = Math.min(amount, T.hp);
-    T.hp -= dm; T.gauge = Math.min(GAUGE_MAX, T.gauge + 1);
-    if (T.hp <= 0) { T.hp = 0; T.alive = false; T.burst = null; T.volley = null; T.regenUntil = 0; if (T === ME) { sfx("down"); aim.id = null; joy.id = null; } }
+    T.hp -= dm; if (!skillActive(T)) T.gauge = Math.min(GAUGE_MAX, T.gauge + 1);   // 궁극기 지속 중엔 게이지 안 참
+    if (T.hp <= 0) { T.hp = 0; T.alive = false; T.burst = null; T.volley = null; T.regenUntil = 0; T.skillUntil = 0; if (T === ME) { sfx("down"); aim.id = null; joy.id = null; } }
     else if (T === ME) sfx("hit");
     pushHit({ owner: owner, target: T.id, dmg: dm, basic: basic });
     if (T === ME || T.bot) G.forceNet = true;
@@ -1071,7 +1084,7 @@
     handled[s.key] = 1;
     if (h.createdAt >= G.startAt - 1000) {
       if (h.dmg) owner.dmg += h.dmg;
-      if (h.basic) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + (owner.char === "assassin" ? 1 : 2));   // 암살자는 표창 1개당 +1
+      if (h.basic && !skillActive(owner)) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + (CHARS[owner.char].perHit || 2));   // 사격수·암살자는 1발당 +1
       if (owner === ME && h.dmg) sfx("confirm");
       G.forceNet = true;
     }
@@ -1121,14 +1134,15 @@
   function fireBasic(E, ang) {
     var c = CHARS[E.char];
     E.cdUntil = now() + c.cd; E.angle = ang;
+    if (E.char === "assassin" && E.stealthUntil > now()) {     // 은신 중 첫 공격 → 은신(과 이속 증가) 해제
+      E.stealthUntil = E.skillUntil = now(); G.forceNet = true;
+    }
     if (E.char === "tank") swing(E, ang);
-    else if (E.char === "assassin") {
-      if (E.stealthUntil > now()) { E.stealthUntil = now(); G.forceNet = true; }   // 은신 중 첫 공격 → 은신(과 이속 증가) 해제
-      E.volley = { left: c.shots, next: now(), ang: ang }; stepVolley(E); }   // 표창 3연발
+    else if (c.shots > 1) { E.volley = { left: c.shots, next: now(), ang: ang }; stepVolley(E); }   // 사격수 2연발 · 암살자 표창 3연발
     else spawnProj(E, ang, false);
   }
   function stepVolley(E) {
-    var t = now(), c = CHARS.assassin;
+    var t = now(), c = CHARS[E.char];
     while (E.volley && E.volley.left > 0 && t >= E.volley.next) {
       spawnProj(E, E.volley.ang, false);
       E.volley.left--; E.volley.next += c.gap;
@@ -1150,13 +1164,17 @@
       E.ultUntil = t + ULT.hlPoseMs;
       var ref = room.ref.child("effects").push({ type: "healAll", team: E.team, owner: E.id, pct: ULT.hlPct, dur: ULT.hlDur, createdAt: t });
       setTimeout(function () { ref.remove(); }, ULT.hlDur);
+      E.skillDur = ULT.hlDur;
     } else if (E.char === "tank") {
       E.buffUntil = t + ULT.tkDur;
+      E.skillDur = ULT.tkDur;
     } else if (E.char === "assassin") {
       E.ultUntil = t + ULT.asSmokeMs;                        // 사라지는 포즈 + 연막 → 끝나면 은신 시작
       E.stealthUntil = t + ULT.asSmokeMs + ULT.asDur;
+      E.skillDur = ULT.asSmokeMs + ULT.asDur;
       smoke(E.x, E.y);
     }
+    if (E.skillDur && E.char !== "marksman") E.skillUntil = t + E.skillDur;   // 지속시간 동안 게이지가 분홍색으로 줄어듦
     if (hear(E)) sfx("ult");
     G.forceNet = true;
   }
@@ -1264,7 +1282,8 @@
     u[b + "x"] = r1(E.x); u[b + "y"] = r1(E.y); u[b + "angle"] = Math.round(E.angle * 100) / 100;
     u[b + "hp"] = Math.round(E.hp * 10) / 10; u[b + "alive"] = E.alive; u[b + "skillGauge"] = E.gauge; u[b + "damageDealt"] = E.dmg;
     u[b + "mv"] = !!E.mv; u[b + "atkAt"] = E.atkAt; u[b + "ultUntil"] = E.ultUntil; u[b + "buffUntil"] = E.buffUntil;
-    u[b + "stealthUntil"] = E.stealthUntil; u[b + "regenUntil"] = E.regenUntil; u[b + "lastUpdate"] = now();
+    u[b + "stealthUntil"] = E.stealthUntil; u[b + "regenUntil"] = E.regenUntil;
+    u[b + "skillUntil"] = E.skillUntil; u[b + "skillDur"] = E.skillDur; u[b + "lastUpdate"] = now();
   }
   function netWrite(force) {
     var t = Date.now();
@@ -1484,10 +1503,10 @@
     ctx.fillStyle = ally ? "#3BB273" : "#E0474C";
     ctx.fillRect(x0, top, bw * clamp(E.hp / E.maxHp, 0, 1), bh);
     if (ally) {                     // 궁극기 게이지는 아군에게만
-      var gy = top + bh + 2, full = E.gauge >= GAUGE_MAX;
+      var gy = top + bh + 2, full = E.gauge >= GAUGE_MAX, t = now(), act = skillActive(E, t);
       ctx.fillStyle = "rgba(0,0,0,.5)"; ctx.fillRect(x0 - 1, gy - 1, bw + 2, 6);
-      ctx.fillStyle = full ? "#E53935" : "#F2C230";
-      ctx.fillRect(x0, gy, bw * clamp(E.gauge / GAUGE_MAX, 0, 1), 4);
+      ctx.fillStyle = act ? "#F06BB5" : (full ? "#E53935" : "#F2C230");      // 궁극기 지속 중 = 분홍, 남은 시간만큼
+      ctx.fillRect(x0, gy, bw * (act ? skillLeft(E, t) : clamp(E.gauge / GAUGE_MAX, 0, 1)), 4);
     }
     ctx.restore();
   }
@@ -1680,13 +1699,15 @@
     ids.forEach(function (id) {
       var E = ent(id); if (!E) return;
       var hp = Math.max(0, Math.round(E.hp)), ratio = clamp(E.hp / E.maxHp, 0, 1);
-      var g = Math.min(GAUGE_MAX, Math.floor(E.gauge)), full = g >= GAUGE_MAX;
+      var g = Math.min(GAUGE_MAX, Math.floor(E.gauge)), full = g >= GAUGE_MAX, tn = now(), act = E.alive && skillActive(E, tn);
       h += '<div class="spCard' + (E.alive ? "" : " dead") + '"><img alt="" src="' + charImgSrc(E.char, team) + '">' +
         '<div class="spInfo"><div class="spName">' + (E.isAI ? "🤖 " : "") + esc(E.nickname) + "<small>" + CHARS[E.char].name + "</small></div>" +
         '<div class="spBar hp' + (ratio < 0.3 ? " low" : "") + '"><i style="width:' + Math.round(ratio * 100) + '%"></i><span>' +
           (E.alive ? "HP " + hp + " / " + E.maxHp : "쓰러짐") + "</span></div>" +
-        '<div class="spBar ult' + (full ? " full" : "") + '"><i style="width:' + g * 10 + '%"></i><span>' +
-          (full ? "궁극기 준비 완료!" : "궁극기 " + g + " / " + GAUGE_MAX) + "</span></div></div></div>";
+        (act ? '<div class="spBar ult act"><i style="width:' + Math.round(skillLeft(E, tn) * 100) + '%"></i><span>' +
+                 CHARS[E.char].ultName + " " + Math.ceil((E.skillUntil - tn) / 1000) + "초</span></div>"
+             : '<div class="spBar ult' + (full ? " full" : "") + '"><i style="width:' + g * 10 + '%"></i><span>' +
+                 (full ? "궁극기 준비 완료!" : "궁극기 " + g + " / " + GAUGE_MAX) + "</span></div>") + "</div></div>";
     });
     return h;
   }
@@ -1718,10 +1739,11 @@
     if (ME) {
       var cdLeft = Math.max(0, ME.cdUntil - t) / CHARS[ME.char].cd;
       $("btnAtk").firstChild.style.height = Math.round(cdLeft * 100) + "%";
-      var full = ME.gauge >= GAUGE_MAX;
-      $("btnUlt").className = "actBtn" + (full && !ME.burst ? " ready" : "");
-      $("btnUlt").firstChild.style.height = Math.round(clamp(ME.gauge / GAUGE_MAX, 0, 1) * 100) + "%";
-      setHtml($("btnUlt").lastChild, full ? "궁극기!" : "궁극기<br>" + Math.floor(ME.gauge) + "/10");
+      var full = ME.gauge >= GAUGE_MAX, act = skillActive(ME, t);
+      $("btnUlt").className = "actBtn" + (act ? " act" : (full && !ME.burst ? " ready" : ""));
+      $("btnUlt").firstChild.style.height = Math.round((act ? skillLeft(ME, t) : clamp(ME.gauge / GAUGE_MAX, 0, 1)) * 100) + "%";
+      setHtml($("btnUlt").lastChild, act ? CHARS[ME.char].ultName + "<br>" + Math.ceil((ME.skillUntil - t) / 1000) + "초"
+                                         : (full ? "궁극기!" : "궁극기<br>" + Math.floor(ME.gauge) + "/10"));
     }
     /* 카운트다운 */
     var cd = room.startAt - t;
