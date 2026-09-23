@@ -4,6 +4,12 @@
       ".read": true,
       ".write": "auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
     },
+    "teambattle": {
+      ".read": true,
+      "rooms": {
+        "$room": { ".write": "$room.matches(/^[0-9]{5}$/)" }
+      }
+    },
     "court": {
       ".read": true,
       "now": { ".write": true },
