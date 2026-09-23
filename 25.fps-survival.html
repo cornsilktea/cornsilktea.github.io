@@ -228,7 +228,7 @@
       <div><div class="lab">블루팀</div><div class="num" id="finBlue" style="color:#2F6FD6">0</div></div>
       <div><div class="lab">레드팀</div><div class="num" id="finRed" style="color:#D6453D">0</div></div>
     </div>
-    <table class="board"><thead><tr><th>팀</th><th>닉네임</th><th>처치</th><th>쓰러짐</th></tr></thead><tbody id="boardBody"></tbody></table>
+    <table class="board"><thead><tr><th>팀</th><th>닉네임</th><th>처치</th><th>쓰러짐</th><th>입힌 피해</th></tr></thead><tbody id="boardBody"></tbody></table>
     <div class="stats" id="teamStats">
       <div><div class="lab">발사</div><div class="val" id="tStatShots">0발</div></div>
       <div><div class="lab">명중률</div><div class="val" id="tStatAcc">—</div></div>
@@ -1017,7 +1017,7 @@ const T = {
   db: null, ref: null, code: "", myId: "p" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4),
   nick: "", serverOffset: 0, players: {}, status: null, host: null, hostLoaded: false, startAt: 0, botFill: true, itemWave: 0,
   subs: [], botSubs: [], leaving: false, screen: "", spec: false, match: null, me: null,
-  ents: {}, bots: {}, raw: {}, kills: {}, items: {}, bullets: [], sent: {}, lastNet: 0, forceNet: false, statusSent: "",
+  ents: {}, bots: {}, raw: {}, kills: {}, dmg: {}, items: {}, bullets: [], sent: {}, lastNet: 0, forceNet: false, statusSent: "",
   lobbyQueued: false, textCache: {}, net: { up: 0, down: 0, t: 0 },
 };
 try { T.nick = localStorage.getItem(NICK_KEY) || ""; } catch (e) {}
@@ -1144,7 +1144,7 @@ async function joinRoom() {
 }
 function enterRoom(code) {
   T.leaving = false; T.code = code; T.ref = T.db.ref(TEAM.root + "/" + code);
-  T.players = {}; T.status = "lobby"; T.host = null; T.hostLoaded = false; T.raw = {}; T.kills = {};
+  T.players = {}; T.status = "lobby"; T.host = null; T.hostLoaded = false; T.raw = {}; T.kills = {}; T.dmg = {};
   resetMatchLocal(); clearTeamItems();
   const ref = T.ref;
   ref.child("players/" + T.myId).onDisconnect().remove();
@@ -1172,6 +1172,11 @@ function enterRoom(code) {
   const iRef = ref.child("items");
   sub(iRef, "child_added", s => onItemAdded(s.key, s.val()));
   sub(iRef, "child_removed", s => onItemRemoved(s.key));
+  const dRef = ref.child("dmg");
+  const onDmg = s => { T.dmg[s.key] = s.val(); if (T.screen === "over") renderBoard(); };
+  sub(dRef, "child_added", onDmg);
+  sub(dRef, "child_changed", onDmg);
+  sub(dRef, "child_removed", s => { delete T.dmg[s.key]; });
   sub(ref.child("hits/" + T.myId), "child_added", s => { onHit(T.myId, s.val()); s.ref.remove(); });
   $("lobbyCode").textContent = code;
   teamScreen("lobby");
@@ -1203,7 +1208,7 @@ function leaveRoom() {
       if (!hid || hid === me || !ps[hid] || ps[hid].isAI) return ref.update({ hostPlayerId: nextHost(ps) });
     });
   }).catch(() => {});
-  T.ref = null; T.players = {}; T.raw = {}; T.kills = {};
+  T.ref = null; T.players = {}; T.raw = {}; T.kills = {}; T.dmg = {};
   resetMatchLocal(); clearTeamItems();
 }
 function exitRoom(msg) {
@@ -1211,7 +1216,7 @@ function exitRoom(msg) {
     T.leaving = true; unsub(T.subs); unsub(T.botSubs);
     try { T.ref.child("players/" + T.myId).onDisconnect().cancel(); T.ref.child("st/" + T.myId).onDisconnect().cancel(); } catch (e) {}
   }
-  T.ref = null; T.players = {}; T.raw = {}; T.kills = {};
+  T.ref = null; T.players = {}; T.raw = {}; T.kills = {}; T.dmg = {};
   resetMatchLocal(); clearTeamItems();
   teamScreen("start"); teamStartMsg(msg);
 }
@@ -1267,7 +1272,7 @@ function hostStart() {
   if (!isHost() || T.status !== "lobby") return;
   if (teamIds("blue").length < 1 || teamIds("red").length < 1) return;
   const t = tnow();
-  const u = { status: "countdown", startAt: t + TEAM.countMs, endedAt: null, st: null, hits: null, kills: null, items: null, itemWave: 0 };
+  const u = { status: "countdown", startAt: t + TEAM.countMs, endedAt: null, st: null, hits: null, kills: null, items: null, dmg: null, itemWave: 0 };
   if (T.botFill) ["blue", "red"].forEach(team => {
     for (let i = teamIds(team).length; i < TEAM.max; i++) u["players/bot" + team + i] = { nickname: "AI " + TEAM_NAME[team] + (i + 1), team, isAI: true, joinedAt: t + i + 1 };
   });
@@ -1275,7 +1280,7 @@ function hostStart() {
 }
 function hostBackToLobby() {
   if (!isHost()) return;
-  const u = { status: "lobby", st: null, hits: null, kills: null, items: null, itemWave: 0, startAt: null, endedAt: null };
+  const u = { status: "lobby", st: null, hits: null, kills: null, items: null, dmg: null, itemWave: 0, startAt: null, endedAt: null };
   okeys(T.players).forEach(id => { if (T.players[id] && T.players[id].isAI) u["players/" + id] = null; });
   T.ref.update(u);
 }
@@ -1299,7 +1304,7 @@ function startMatchLocal() {
   resetMatchLocal();
   const me = T.players[T.myId];
   T.spec = !me || me.team === "spec";
-  T.match = { shownEnd: false, lastCount: -1, startedFor: T.startAt, feed: [] };
+  T.match = { shownEnd: false, lastCount: -1, startedFor: T.startAt, feed: [], dmgTaken: {}, dmgSent: false };
   STAT.shots = STAT.hits = STAT.heads = 0;
   if (!T.spec) {
     T.me = { team: me.team, slot: Math.max(0, teamIds(me.team).indexOf(T.myId)), alive: true, protectUntil: 0, deadUntil: 0, shots: 0, moving: false };
@@ -1474,12 +1479,14 @@ function onHit(target, h) {
   if (target === T.myId) {
     const me = T.me;
     if (!me || !me.alive || tnow() < me.protectUntil) return;
+    recordDamageTaken(T.myId, h.by, Math.min(d, P.hp));
     P.hp = Math.max(0, P.hp - d); SFX.hurt(); showHitDir(+h.x, +h.z); renderHud(); T.forceNet = true;
     if (P.hp <= 0) meDie(h.by, !!h.h);
     return;
   }
   const b = T.bots[target];
   if (!b || !b.alive || tnow() < b.protectUntil) return;
+  recordDamageTaken(target, h.by, Math.min(d, b.hp));
   b.hp = Math.max(0, b.hp - d);
   const ent = T.ents[target]; if (ent && ent.s) { enemyFlash(ent.s, true); ent.s.flashT = 0.08; }
   if (b.hp <= 0) { b.alive = false; b.deadUntil = tnow() + TEAM.respawnMs; pushKill(h.by, target, b.team, !!h.h); }
@@ -1692,21 +1699,40 @@ function renderTeamHud(t) {
     if (T.match.lastCount !== 0) { T.match.lastCount = 0; tone(990, 0.3, "square", 0.08); }
   } else cd.hidden = true;
 }
+function damageDealtBy(id) {
+  let n = 0;
+  for (const victim in T.dmg) { const row = T.dmg[victim]; if (row && row[id]) n += +row[id] || 0; }
+  return n;
+}
+function renderBoard() {
+  const rows = [];
+  ["blue", "red"].forEach(team => teamIds(team).forEach(id => {
+    let k = 0, d = 0;
+    for (const key in T.kills) { const v = T.kills[key]; if (!killCounts(v)) continue; if (v.k === id) k++; if (v.v === id) d++; }
+    rows.push('<tr class="' + (id === T.myId ? "mine" : "") + '"><td><span class="dot" style="background:' + TEAM_CSS[team] + '"></span></td><td>' + escHtml(T.players[id].nickname) + "</td><td>" + k + "</td><td>" + d + "</td><td>" + damageDealtBy(id) + "</td></tr>");
+  }));
+  $("boardBody").innerHTML = rows.join("");
+}
+function recordDamageTaken(victim, by, applied) {
+  if (!T.match || !by || applied <= 0) return;
+  const row = T.match.dmgTaken[victim] || (T.match.dmgTaken[victim] = {});
+  row[by] = (row[by] || 0) + applied;
+}
+function sendDamageTaken() {
+  if (!T.match || T.match.dmgSent || !T.ref) return;
+  T.match.dmgSent = true;
+  for (const victim in T.match.dmgTaken) if (okeys(T.match.dmgTaken[victim]).length) T.ref.child("dmg/" + victim).set(T.match.dmgTaken[victim]);
+}
 function showTeamResult() {
   if (!T.match || T.match.shownEnd) return;
+  sendDamageTaken();
   T.match.shownEnd = true;
   const b = teamScore("blue"), r = teamScore("red"), my = T.me ? T.me.team : null;
   const winner = b === r ? null : (b > r ? "blue" : "red");
   const title = winner ? (my ? (my === winner ? "🏆 승리! " : "😢 패배 — ") : "🏆 ") + TEAM_NAME[winner] + "팀 승리" : "🤝 무승부";
   $("teamResult").textContent = title;
   $("finBlue").textContent = b; $("finRed").textContent = r;
-  const rows = [];
-  ["blue", "red"].forEach(team => teamIds(team).forEach(id => {
-    let k = 0, d = 0;
-    for (const key in T.kills) { const v = T.kills[key]; if (!killCounts(v)) continue; if (v.k === id) k++; if (v.v === id) d++; }
-    rows.push('<tr class="' + (id === T.myId ? "mine" : "") + '"><td><span class="dot" style="background:' + TEAM_CSS[team] + '"></span></td><td>' + escHtml(T.players[id].nickname) + "</td><td>" + k + "</td><td>" + d + "</td></tr>");
-  }));
-  $("boardBody").innerHTML = rows.join("");
+  renderBoard();
   $("teamStats").hidden = !T.me;
   const pct = (a, n) => n > 0 ? Math.round(a / n * 100) + "%" : "—";
   $("tStatShots").textContent = STAT.shots + "발"; $("tStatAcc").textContent = pct(STAT.hits, STAT.shots); $("tStatHead").textContent = pct(STAT.heads, STAT.hits);
@@ -1736,6 +1762,7 @@ function teamFrame(nowMs, dt) {
   updateTeamItems(dt);
   netTick();
   renderTeamHud(t);
+  if (phase === "end") sendDamageTaken();
   if (phase === "end" && t >= endAt + 800) showTeamResult();
   if (netDebug && nowMs - T.net.t > 5000) {
     const sec = (nowMs - T.net.t) / 1000;
