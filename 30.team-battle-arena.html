@@ -353,11 +353,17 @@
     { k: "rock", circle: true, x: 682, y: 430, r: 42 },
     { k: "rock", circle: true, x: 218, y: 920, r: 42 },
     { k: "wall", x: 250, y: 470, w: 190, h: 44 },
-    { k: "wall", x: 650, y: 880, w: 190, h: 44 }
+    { k: "wall", x: 650, y: 880, w: 190, h: 44 },
+    { k: "rock", circle: true, x: 130, y: 300, r: 36 },
+    { k: "rock", circle: true, x: 770, y: 1050, r: 36 },
+    { k: "wall", x: 640, y: 600, w: 150, h: 40 },
+    { k: "wall", x: 260, y: 750, w: 150, h: 40 }
   ];
   var BUSH = [
     { x: 110, y: 675, r: 72 }, { x: 790, y: 675, r: 72 },
-    { x: 440, y: 322, r: 70 }, { x: 460, y: 1028, r: 70 }
+    { x: 440, y: 322, r: 70 }, { x: 460, y: 1028, r: 70 },
+    { x: 450, y: 500, r: 55 }, { x: 450, y: 850, r: 55 },
+    { x: 770, y: 350, r: 60 }, { x: 130, y: 1000, r: 60 }
   ];
   var FONT = '"Nanum Gothic", "Malgun Gothic", sans-serif';
 
@@ -1206,6 +1212,18 @@
     return t ? Math.atan2(t.y - E.y, t.x - E.x) : E.angle;
   }
 
+  function pickWanderPoint(B, t) {
+    var k = B.bot, spot;
+    if (Math.random() < 0.5) {
+      var b = BUSH[Math.floor(Math.random() * BUSH.length)];
+      spot = { x: b.x, y: b.y };
+    } else {
+      spot = { x: BOUND.l + 60 + Math.random() * (BOUND.r - BOUND.l - 120), y: BOUND.t + 180 + Math.random() * (BOUND.b - BOUND.t - 360) };
+    }
+    resolve(spot);
+    k.wx = spot.x; k.wy = spot.y; k.wanderUntil = t + 4000 + Math.random() * 3000;
+  }
+
   function stepBot(B, dt) {
     if (!B.alive) { B.mv = false; return; }
     var t = now(), c = CHARS[B.char], k = B.bot;
@@ -1241,9 +1259,9 @@
       var hx = healT.x - B.x, hy = healT.y - B.y, hd = hyp(hx, hy) || 1;
       if (hd > 260) { mx = hx / hd; my = hy / hd; }
     } else {
-      var cx = MW / 2 + Math.sin(k.seed * 3) * 140, cy = MH / 2 + (B.team === "red" ? 170 : -170);
-      var ddx = cx - B.x, ddy = cy - B.y, dd = hyp(ddx, ddy);
-      if (dd > 50) { mx = ddx / dd * 0.55; my = ddy / dd * 0.55; }
+      if (!k.wanderUntil || t > k.wanderUntil || hyp(k.wx - B.x, k.wy - B.y) < 50) pickWanderPoint(B, t);
+      var ddx = k.wx - B.x, ddy = k.wy - B.y, dd = hyp(ddx, ddy) || 1;
+      mx = ddx / dd * 0.7; my = ddy / dd * 0.7;
     }
     if (k.detour > t) { var rx = -my * k.detourDir, ry = mx * k.detourDir; mx = rx; my = ry; }
     var ox = B.x, oy = B.y, want2 = hyp(mx, my);
@@ -1657,7 +1675,7 @@
       var E = ent(id); if (!E) return;
       var ally = spec || E.team === me.team, hid = hiddenFrom(E, t);
       if (!ally && hid) { lastHp[id] = E.hp; return; }
-      var alpha = !E.alive ? 0.35 : (E === me ? 1 : (hid ? (spec ? 0.55 : STEALTH_ALPHA) : 1));
+      var alpha = !E.alive ? 0.35 : (E === me ? (stealthed(E, t) ? STEALTH_ALPHA : 1) : (hid ? (spec ? 0.55 : STEALTH_ALPHA) : 1));
       if (lastHp[id] !== undefined && Math.abs(E.hp - lastHp[id]) >= 1) {
         var d = Math.round(E.hp - lastHp[id]);
         if (d < 0) { floatText(E.x, E.y, String(d), "#FF4B3E"); E.flashUntil = Date.now() + 90; }
