@@ -6,7 +6,6 @@
 <meta charset="UTF-8">
 <link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
 <title>그래프 읽기</title>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
@@ -15,7 +14,6 @@
 <meta property="og:url" content="https://cornsilktea.github.io/9.graph-reading-game.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
-<!-- 링크 미리보기 끝 -->
 <style>
   :root{
     --bg:var(--sg-bg);
@@ -28,8 +26,6 @@
     --red:var(--sg-danger);
     --red-soft:#F6E3E7;
     --bar:var(--sg-primary);
-    --bar-soft:var(--sg-primary-soft);
-    --radius:var(--sg-radius);
   }
   *{box-sizing:border-box;}
   html{height:100%;}
@@ -69,7 +65,7 @@
     flex:1;
     display:flex;
     justify-content:center;
-    align-items:flex-start;   /* 화면이 짧을 때 카드 위쪽이 잘리지 않도록 */
+    align-items:flex-start;
     padding:10px 20px 30px;
   }
 
@@ -277,7 +273,6 @@ const ROUNDS = [
   },
 ];
 
-let order = [];
 let idx = 0;
 let score = 0;
 let answered = false;
@@ -303,7 +298,6 @@ function shuffle(arr){
 }
 
 function init(){
-  order = ROUNDS.map((_,i)=>i);
   idx = 0;
   score = 0;
   playScreen.style.display = 'flex';
@@ -313,7 +307,7 @@ function init(){
 
 function renderRound(){
   answered = false;
-  const r = ROUNDS[order[idx]];
+  const r = ROUNDS[idx];
   progressPill.textContent = `${idx+1} / ${ROUNDS.length}`;
   scorePill.textContent = `점수 ${score}`;
   chartTitle.textContent = r.title;
@@ -326,8 +320,7 @@ function renderRound(){
   chartBox.appendChild(r.type === 'bar' ? buildBarChart(r) : buildLineChart(r));
 
   optionsBox.innerHTML = '';
-  const opts = shuffle(r.options);
-  opts.forEach(optText=>{
+  shuffle(r.options).forEach(optText=>{
     const btn = document.createElement('div');
     btn.className = 'opt';
     btn.textContent = optText;
@@ -359,7 +352,7 @@ function handleAnswer(btn, chosen, r){
 
 nextBtn.addEventListener('click', ()=>{
   idx += 1;
-  if(idx >= order.length){
+  if(idx >= ROUNDS.length){
     showEnd();
   } else {
     renderRound();
@@ -370,20 +363,23 @@ function showEnd(){
   playScreen.style.display = 'none';
   endScreen.style.display = 'flex';
   document.getElementById('finalScore').textContent = `${score} / ${ROUNDS.length}`;
-  const ratio = score/ROUNDS.length;
-  let comment = '';
-  if(ratio === 1) comment = '완벽해요! 그래프를 정확하게 읽어내는군요.';
-  else if(ratio >= 0.66) comment = '잘했어요! 조금만 더 꼼꼼히 보면 만점도 가능해요.';
-  else comment = '그래프의 축과 눈금을 천천히 다시 살펴보는 연습을 해봐요.';
-  document.getElementById('finalComment').textContent = comment;
+  document.getElementById('finalComment').textContent = endComment(score/ROUNDS.length);
+}
+
+function endComment(ratio){
+  if(ratio === 1) return '완벽해요! 그래프를 정확하게 읽어내는군요.';
+  if(ratio >= 0.66) return '잘했어요! 조금만 더 꼼꼼히 보면 만점도 가능해요.';
+  return '그래프의 축과 눈금을 천천히 다시 살펴보는 연습을 해봐요.';
 }
 
 document.getElementById('retryBtn').addEventListener('click', init);
 
-// ---- Chart builders (SVG) ----
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const CHART_W = 720, CHART_H = 340;
-const PAD = {top:36, right:34, bottom:46, left:56};   /* 위쪽 값 라벨이 잘리지 않도록 여백을 넉넉히 둡니다 */
+const PAD = {top:36, right:34, bottom:46, left:56};
+const PLOT_W = CHART_W - PAD.left - PAD.right;
+const PLOT_H = CHART_H - PAD.top - PAD.bottom;
+const AXIS_STYLE = {stroke:'#C9D2C3', 'stroke-width':2};
 
 function el(tag, attrs){
   const e = document.createElementNS(SVG_NS, tag);
@@ -391,48 +387,56 @@ function el(tag, attrs){
   return e;
 }
 
-function buildBarChart(r){
+function textEl(content, attrs){
+  const t = el('text', Object.assign({'text-anchor':'middle'}, attrs));
+  t.textContent = content;
+  return t;
+}
+
+function axisLine(x1, y1, x2, y2){
+  return el('line', Object.assign({x1, y1, x2, y2}, AXIS_STYLE));
+}
+
+function chartSvg(){
   const svg = el('svg', {viewBox:`0 0 ${CHART_W} ${CHART_H}`, width: CHART_W, height: CHART_H});
-  const plotW = CHART_W - PAD.left - PAD.right;
-  const plotH = CHART_H - PAD.top - PAD.bottom;
+  svg.appendChild(axisLine(PAD.left, PAD.top, PAD.left, PAD.top+PLOT_H));
+  return svg;
+}
+
+function buildBarChart(r){
+  const svg = chartSvg();
+  const plotW = PLOT_W, plotH = PLOT_H;
   const maxVal = Math.max(...r.values) * 1.2;
   const n = r.values.length;
   const gap = 24;
   const barW = (plotW - gap*(n-1)) / n;
 
-  // axis line
-  svg.appendChild(el('line', {x1:PAD.left, y1:PAD.top, x2:PAD.left, y2:PAD.top+plotH, stroke:'#C9D2C3', 'stroke-width':2}));
-  svg.appendChild(el('line', {x1:PAD.left, y1:PAD.top+plotH, x2:PAD.left+plotW, y2:PAD.top+plotH, stroke:'#C9D2C3', 'stroke-width':2}));
+  svg.appendChild(axisLine(PAD.left, PAD.top+plotH, PAD.left+plotW, PAD.top+plotH));
+
 
   r.values.forEach((v,i)=>{
     const h = (v/maxVal) * plotH;
     const x = PAD.left + i*(barW+gap);
     const y = PAD.top + plotH - h;
     svg.appendChild(el('rect', {x, y, width:barW, height:h, rx:8, fill:'#24402F'}));
-    const valLabel = el('text', {x: x+barW/2, y: y-8, 'text-anchor':'middle', 'font-size':16, 'font-weight':800, fill:'#1B2B20'});
-    valLabel.textContent = `${v}${r.unit}`;
-    svg.appendChild(valLabel);
-    const catLabel = el('text', {x: x+barW/2, y: PAD.top+plotH+26, 'text-anchor':'middle', 'font-size':15, fill:'#3B4B40'});
-    catLabel.textContent = r.labels[i];
-    svg.appendChild(catLabel);
+    svg.appendChild(textEl(`${v}${r.unit}`, {x: x+barW/2, y: y-8, 'font-size':16, 'font-weight':800, fill:'#1B2B20'}));
+    svg.appendChild(textEl(r.labels[i], {x: x+barW/2, y: PAD.top+plotH+26, 'font-size':15, fill:'#3B4B40'}));
   });
 
   return svg;
 }
 
 function buildLineChart(r){
-  const svg = el('svg', {viewBox:`0 0 ${CHART_W} ${CHART_H}`, width: CHART_W, height: CHART_H});
-  const plotW = CHART_W - PAD.left - PAD.right;
-  const plotH = CHART_H - PAD.top - PAD.bottom;
+  const svg = chartSvg();
+  const plotW = PLOT_W, plotH = PLOT_H;
   const maxVal = Math.max(...r.values);
   const minVal = Math.min(...r.values, 0);
   const range = (maxVal - minVal) || 1;
   const n = r.values.length;
   const stepX = plotW / (n-1);
 
-  svg.appendChild(el('line', {x1:PAD.left, y1:PAD.top, x2:PAD.left, y2:PAD.top+plotH, stroke:'#C9D2C3', 'stroke-width':2}));
   const zeroY = PAD.top + plotH - ((0-minVal)/range)*plotH;
-  svg.appendChild(el('line', {x1:PAD.left, y1:zeroY, x2:PAD.left+plotW, y2:zeroY, stroke:'#C9D2C3', 'stroke-width':2}));
+  svg.appendChild(axisLine(PAD.left, zeroY, PAD.left+plotW, zeroY));
 
   const points = r.values.map((v,i)=>{
     const x = PAD.left + i*stepX;
@@ -445,12 +449,8 @@ function buildLineChart(r){
 
   points.forEach(([x,y],i)=>{
     svg.appendChild(el('circle', {cx:x, cy:y, r:6, fill:'#1a9b64'}));
-    const valLabel = el('text', {x, y:y-14, 'text-anchor':'middle', 'font-size':15, 'font-weight':800, fill:'#1B2B20'});
-    valLabel.textContent = `${r.values[i]}${r.unit}`;
-    svg.appendChild(valLabel);
-    const catLabel = el('text', {x, y:PAD.top+plotH+26, 'text-anchor':'middle', 'font-size':14, fill:'#3B4B40'});
-    catLabel.textContent = r.labels[i];
-    svg.appendChild(catLabel);
+    svg.appendChild(textEl(`${r.values[i]}${r.unit}`, {x, y:y-14, 'font-size':15, 'font-weight':800, fill:'#1B2B20'}));
+    svg.appendChild(textEl(r.labels[i], {x, y:PAD.top+plotH+26, 'font-size':14, fill:'#3B4B40'}));
   });
 
   return svg;
