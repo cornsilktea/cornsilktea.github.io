@@ -6,7 +6,6 @@
 <meta charset="UTF-8">
 <link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
 <title>AI와 인간이 쓴 글 구분하기</title>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
@@ -15,7 +14,6 @@
 <meta property="og:url" content="https://cornsilktea.github.io/10.ai-or-human-game.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
-<!-- 링크 미리보기 끝 -->
 <style>
   :root{
     --bg:var(--sg-bg);
@@ -279,7 +277,7 @@ const PASSAGES = [
   }
 ];
 
-let order = [];
+let queue = [];
 let idx = 0;
 let score = 0;
 let answered = false;
@@ -304,7 +302,7 @@ function shuffle(arr){
 }
 
 function init(){
-  order = shuffle(PASSAGES.map((_,i)=>i));
+  queue = shuffle(PASSAGES);
   idx = 0;
   score = 0;
   playScreen.style.display = 'flex';
@@ -314,13 +312,12 @@ function init(){
 
 function renderRound(){
   answered = false;
-  const p = PASSAGES[order[idx]];
+  const p = queue[idx];
   progressPill.textContent = `${idx+1} / ${PASSAGES.length}`;
   scorePill.textContent = `점수 ${score}`;
   passageBox.textContent = p.text;
   passageBox.className = 'passage';
   explainBox.className = '';
-  explainBox.classList.remove('show');
   explainBox.textContent = '';
   nextBtn.classList.remove('show');
   btnHuman.classList.remove('correct','wrong','disabled');
@@ -330,7 +327,8 @@ function renderRound(){
 function handleChoice(chosen){
   if(answered) return;
   answered = true;
-  const p = PASSAGES[order[idx]];
+  const p = queue[idx];
+  const author = p.origin === 'human' ? '사람' : 'AI';
   btnHuman.classList.add('disabled');
   btnAI.classList.add('disabled');
 
@@ -340,12 +338,12 @@ function handleChoice(chosen){
   if(chosen === p.origin){
     chosenBtn.classList.add('correct');
     score += 1;
-    explainBox.textContent = `✅ 정답! ${p.origin === 'human' ? '사람' : 'AI'}이(가) 쓴 글이에요. ${p.explain}`;
+    explainBox.textContent = `✅ 정답! ${author}이(가) 쓴 글이에요. ${p.explain}`;
     explainBox.className = 'show ok';
   } else {
     chosenBtn.classList.add('wrong');
     correctBtn.classList.add('correct');
-    explainBox.textContent = `❌ 사실 이 글은 ${p.origin === 'human' ? '사람' : 'AI'}이(가) 쓴 글이에요. ${p.explain}`;
+    explainBox.textContent = `❌ 사실 이 글은 ${author}이(가) 쓴 글이에요. ${p.explain}`;
     explainBox.className = 'show no';
   }
 
@@ -359,7 +357,7 @@ btnAI.addEventListener('click', ()=>handleChoice('ai'));
 
 nextBtn.addEventListener('click', ()=>{
   idx += 1;
-  if(idx >= order.length){
+  if(idx >= queue.length){
     showEnd();
   } else {
     renderRound();
@@ -370,12 +368,13 @@ function showEnd(){
   playScreen.style.display = 'none';
   endScreen.style.display = 'flex';
   document.getElementById('finalScore').textContent = `${score} / ${PASSAGES.length}`;
-  const ratio = score/PASSAGES.length;
-  let comment = '';
-  if(ratio >= 0.8) comment = '글의 특징을 예리하게 잘 찾아냈어요!';
-  else if(ratio >= 0.5) comment = '절반 이상 맞혔어요. 구체적인 경험이 담겼는지 살펴보는 게 힌트가 돼요.';
-  else comment = 'AI도 사람처럼 자연스럽게 쓸 수 있다는 걸 직접 느껴봤네요. 그게 바로 이 게임의 핵심이에요!';
-  document.getElementById('finalComment').textContent = comment;
+  document.getElementById('finalComment').textContent = endComment(score/PASSAGES.length);
+}
+
+function endComment(ratio){
+  if(ratio >= 0.8) return '글의 특징을 예리하게 잘 찾아냈어요!';
+  if(ratio >= 0.5) return '절반 이상 맞혔어요. 구체적인 경험이 담겼는지 살펴보는 게 힌트가 돼요.';
+  return 'AI도 사람처럼 자연스럽게 쓸 수 있다는 걸 직접 느껴봤네요. 그게 바로 이 게임의 핵심이에요!';
 }
 
 document.getElementById('retryBtn').addEventListener('click', init);
