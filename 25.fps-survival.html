@@ -10,7 +10,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
 <meta property="og:title" content="FPS 서바이벌">
-<meta property="og:description" content="1인칭 3D 서바이벌 슈팅 / 처치 수·생존 시간 개인전 (방향키 시점·WASD 이동·스페이스 발사)">
+<meta property="og:description" content="1인칭 3D 서바이벌 슈팅 / AI 대전(처치 수·생존 시간 개인전) + 팀 대전(최대 2대2·1분 킬 대결·관전) (방향키 시점·WASD 이동·스페이스 발사)">
 <meta property="og:url" content="https://cornsilktea.github.io/25.fps-survival.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
@@ -99,6 +99,48 @@
     #hudBest { display: none !important; }
     .btn { font-size: 18px; padding: 11px 22px; }
   }
+  .btn.alt { background: #D97B4F; }
+  .card.wide { width: min(620px, 100%); }
+  .field { display: flex; align-items: center; gap: 10px; justify-content: center; margin: 14px 0 10px; font-weight: 800; }
+  .field input, .joinRow input { font: inherit; font-size: 18px; font-weight: 800; padding: 9px 12px; border: 2px solid var(--sg-line-strong); border-radius: 10px; width: 170px; text-align: center; background: #fff; color: var(--sg-ink); }
+  .joinRow { display: flex; gap: 8px; justify-content: center; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+  .joinRow .btn.sub { padding: 10px 18px; }
+  .codeLine { font-size: 15px; font-weight: 700; color: var(--sg-ink-soft); margin-bottom: 10px; }
+  .codeLine b { font-size: 34px; color: var(--sg-ink); letter-spacing: 4px; margin-left: 8px; font-variant-numeric: tabular-nums; }
+  .teams { display: flex; gap: 10px; margin: 6px 0 10px; }
+  .team { flex: 1 1 0; min-width: 0; border: 3px solid; border-radius: 12px; padding: 10px; }
+  .team.blue { border-color: #2F6FD6; background: #E3ECFB; }
+  .team.red { border-color: #D6453D; background: #FBE5E3; }
+  .team h3 { font-size: 20px; font-weight: 800; margin-bottom: 8px; }
+  .team.blue h3 { color: #2F6FD6; } .team.red h3 { color: #D6453D; }
+  .slot { height: 40px; display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 6px; border-radius: 8px; background: rgba(255,255,255,.9); font-weight: 800; font-size: 16px; white-space: nowrap; overflow: hidden; }
+  .slot.empty { color: var(--sg-ink-faint); background: rgba(255,255,255,.5); font-weight: 700; font-size: 14px; }
+  .slot.mine { box-shadow: inset 0 0 0 2px var(--sg-ink); }
+  .slot .me { font-size: 11px; background: var(--sg-ink); color: #fff; border-radius: 6px; padding: 1px 5px; }
+  .team .btn.sub { width: 100%; padding: 8px 10px; font-size: 15px; }
+  .team.blue .btn.sub { background: #2F6FD6; color: #fff; } .team.red .btn.sub { background: #D6453D; color: #fff; }
+  .specRow { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 8px 12px; border: 2px solid var(--sg-line-mid); border-radius: 10px; background: var(--sg-panel-alt); font-weight: 800; text-align: left; }
+  .specRow .btn.sub { padding: 7px 14px; font-size: 14px; }
+  .specRow .none { color: var(--sg-ink-faint); font-weight: 700; }
+  .botRow { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 10px 0 2px; font-weight: 800; font-size: 15px; }
+  .botRow input { width: 20px; height: 20px; }
+  .btn:disabled { opacity: .45; cursor: default; transform: none; box-shadow: 0 5px 0 var(--sg-ink); }
+  .board { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 15px; }
+  .board th { font-size: 12px; color: var(--sg-ink-soft); font-weight: 700; padding: 4px; border-bottom: 2px solid var(--sg-line-mid); }
+  .board td { padding: 6px 4px; font-weight: 800; border-bottom: 1px solid var(--sg-line); font-variant-numeric: tabular-nums; }
+  .board tr.mine td { background: var(--sg-primary-soft); }
+  .dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: middle; }
+  #hudTeam { top: 52px; left: 50%; transform: translateX(-50%); display: none; gap: 8px; text-align: center; }
+  #hudTeam .hud-box { min-width: 90px; font-size: 26px; }
+  #hudTeam .tb.blue { color: #2F6FD6; border-color: #2F6FD6; } #hudTeam .tb.red { color: #D6453D; border-color: #D6453D; }
+  #killFeed { position: fixed; top: 52px; right: 12px; z-index: 5; pointer-events: none; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
+  .kf { background: rgba(255,255,255,.92); border: 2px solid var(--sg-line-strong); border-radius: 8px; padding: 3px 10px; font-size: 14px; font-weight: 800; white-space: nowrap; }
+  #teamMsg { position: fixed; left: 50%; bottom: 28%; transform: translateX(-50%); z-index: 6; pointer-events: none; background: rgba(27,43,32,.85); color: #fff; font-size: 22px; font-weight: 800; padding: 12px 22px; border-radius: 12px; white-space: nowrap; }
+  #protBadge { position: fixed; left: 50%; top: calc(50% + 34px); transform: translateX(-50%); z-index: 5; pointer-events: none; background: rgba(47,125,79,.9); color: #fff; font-size: 15px; font-weight: 800; padding: 4px 12px; border-radius: 10px; white-space: nowrap; }
+  #countBig { position: fixed; inset: 0; z-index: 6; pointer-events: none; display: flex; align-items: center; justify-content: center; font-size: 120px; font-weight: 800; color: #fff; -webkit-text-stroke: 3px var(--sg-ink); text-shadow: 0 6px 0 rgba(27,43,32,.35); }
+  #specCv { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 4; background: #DDE3E8; }
+  #btnGameLeave { position: fixed; left: 12px; bottom: 12px; z-index: 6; font: inherit; font-size: 14px; font-weight: 800; padding: 6px 14px; border-radius: 10px; border: 2px solid var(--sg-line-strong); background: rgba(255,255,255,.92); color: var(--sg-ink); cursor: pointer; }
+  @media (max-width: 520px) { .teams { flex-direction: column; } #hudTeam .hud-box { min-width: 64px; font-size: 20px; } #countBig { font-size: 90px; } }
   [hidden]{display:none !important;}
 </style>
 </head>
@@ -132,8 +174,8 @@
       <div><div class="lab">🏆 세계 신기록</div><div class="val" id="wrStart">—</div><div class="who" id="wrWhoStart"></div></div>
       <div class="clsCol" hidden><div class="lab">🏫 우리 반 신기록</div><div class="val" id="crStart">—</div><div class="who" id="crWhoStart"></div></div>
     </div>
-    <div class="btns"><button type="button" class="btn" id="btnStart">시작하기</button></div>
-    <div class="hint">스페이스바: 시작하기</div>
+    <div class="btns"><button type="button" class="btn" id="btnStart">AI 대전 (솔로)</button><button type="button" class="btn alt" id="btnTeam">팀 대전 (2대2)</button></div>
+    <div class="hint">스페이스바: AI 대전 시작 · 팀 대전은 친구와 방 코드로 함께해요</div>
     <div class="wipe"><button type="button" id="btnWipe">이 기기의 나의 최고 기록 지우기</button></div>
   </div>
 
@@ -157,7 +199,57 @@
     <div class="btns"><button type="button" class="btn" id="btnRetry">다시하기</button></div>
     <div class="hint">스페이스바: 다시하기</div>
   </div>
+
+  <div class="card" id="cardTeamStart" style="display:none">
+    <div class="logo" style="font-size:44px">팀 대전<small>블루 vs 레드 · 최대 2대2 · 1분 동안 처치 수 대결</small></div>
+    <div class="desc">상대를 처치하면 우리 팀 <b>+1점</b>. 쓰러지면 <b>3초 뒤</b> 우리 팀 시작 위치에서 부활하고, 부활 후 <b>3초 동안은 피해를 받지 않아요</b>. 무기·탄약·물약 규칙은 AI 대전과 같아요. 관전자는 경기장을 위에서 내려다봐요.</div>
+    <div class="field"><label for="nickInput">닉네임</label><input id="nickInput" maxlength="6" placeholder="최대 6글자" autocomplete="off"></div>
+    <div class="btns"><button type="button" class="btn" id="btnCreate">방 만들기</button></div>
+    <div class="joinRow"><input id="joinCode" inputmode="numeric" maxlength="5" placeholder="방 코드 5자리" autocomplete="off"><button type="button" class="btn sub" id="btnJoin">입장</button></div>
+    <div class="msg" id="teamStartMsg"></div>
+    <div class="btns"><button type="button" class="btn sub" id="btnTeamBack">← AI 대전으로</button></div>
+  </div>
+
+  <div class="card wide" id="cardLobby" style="display:none">
+    <div class="codeLine">방 코드<b id="lobbyCode">00000</b></div>
+    <div class="teams">
+      <div class="team blue"><h3>블루팀</h3><div id="listBlue"></div><button type="button" class="btn sub" id="btnJoinBlue">블루팀으로</button></div>
+      <div class="team red"><h3>레드팀</h3><div id="listRed"></div><button type="button" class="btn sub" id="btnJoinRed">레드팀으로</button></div>
+    </div>
+    <div class="specRow"><span>👀 관전자 <span id="listSpec"></span></span><button type="button" class="btn sub" id="btnJoinSpec">관전하기</button></div>
+    <label class="botRow"><input type="checkbox" id="botFill">빈자리는 AI로 채우기</label>
+    <div class="msg" id="lobbyHint"></div>
+    <div class="btns"><button type="button" class="btn" id="btnTeamStart">시작하기</button><button type="button" class="btn sub" id="btnLobbyLeave">나가기</button></div>
+  </div>
+
+  <div class="card wide" id="cardTeamOver" style="display:none">
+    <div class="logo" style="font-size:40px" id="teamResult">무승부</div>
+    <div class="final">
+      <div><div class="lab">블루팀</div><div class="num" id="finBlue" style="color:#2F6FD6">0</div></div>
+      <div><div class="lab">레드팀</div><div class="num" id="finRed" style="color:#D6453D">0</div></div>
+    </div>
+    <table class="board"><thead><tr><th>팀</th><th>닉네임</th><th>처치</th><th>쓰러짐</th></tr></thead><tbody id="boardBody"></tbody></table>
+    <div class="stats" id="teamStats">
+      <div><div class="lab">발사</div><div class="val" id="tStatShots">0발</div></div>
+      <div><div class="lab">명중률</div><div class="val" id="tStatAcc">—</div></div>
+      <div><div class="lab">헤드샷 비율</div><div class="val" id="tStatHead">—</div></div>
+    </div>
+    <div class="msg" id="teamOverHint"></div>
+    <div class="btns"><button type="button" class="btn" id="btnBackLobby">로비로 돌아가기</button><button type="button" class="btn sub" id="btnOverLeave">나가기</button></div>
+  </div>
 </div>
+
+<div class="hud" id="hudTeam">
+  <div class="hud-box tb blue"><span class="lab">블루</span><span id="tsBlue">0</span></div>
+  <div class="hud-box"><span class="lab">남은 시간</span><span id="tsTime">1:00</span></div>
+  <div class="hud-box tb red"><span class="lab">레드</span><span id="tsRed">0</span></div>
+</div>
+<div id="killFeed" hidden></div>
+<div id="teamMsg" hidden></div>
+<div id="protBadge" hidden></div>
+<div id="countBig" hidden></div>
+<canvas id="specCv" hidden></canvas>
+<button type="button" id="btnGameLeave" hidden>나가기</button>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -199,9 +291,26 @@ const ITEM_CONFIG = {
 const ARENA = { hx: 25, hz: 15, wallH: 4 };
 const PLAYER_START = { x: -24, z: 0, yaw: -Math.PI / 2 };
 const SPAWNS = [ { x: 24, z: 0 }, { x: 0, z: -14 }, { x: 0, z: 14 } ];
-const BOXES = [ [-10, -8], [-10, 8], [12, 0], [18, -10], [18, 10] ].map(p => ({ x: p[0], z: p[1], w: 4, h: 3, d: 4 }));
-const CYLS  = [ [0, -10], [0, 10], [-15, -5], [-15, 5] ].map(p => ({ x: p[0], z: p[1], r: 1.2, h: 4 }));
-const LOWS  = [ [5, -5], [5, 5] ].map(p => ({ x: p[0], z: p[1], w: 6, h: 1, d: 1 }));
+const boxAt = p => ({ x: p[0], z: p[1], w: 4, h: 3, d: 4 });
+const cylAt = p => ({ x: p[0], z: p[1], r: 1.2, h: 4 });
+const lowAt = p => ({ x: p[0], z: p[1], w: 6, h: 1, d: 1 });
+const SOLO_MAP = {
+  boxes: [ [-10, -8], [-10, 8], [12, 0], [18, -10], [18, 10] ].map(boxAt),
+  cyls:  [ [0, -10], [0, 10], [-15, -5], [-15, 5] ].map(cylAt),
+  lows:  [ [5, -5], [5, 5] ].map(lowAt),
+  pads:  SPAWNS.map(s => ({ x: s.x, z: s.z, color: 0xB33951 })),
+};
+const TEAM_COLOR = { blue: 0x2F6FD6, red: 0xD6453D };
+const TEAM_CSS = { blue: "#2F6FD6", red: "#D6453D" };
+const TEAM_SPAWNS = { blue: [ { x: -22, z: -3 }, { x: -22, z: 3 } ], red: [ { x: 22, z: -3 }, { x: 22, z: 3 } ] };
+const TEAM_YAW = { blue: -Math.PI / 2, red: Math.PI / 2 };
+const TEAM_MAP = {
+  boxes: [ [-12, -8], [-12, 8], [12, -8], [12, 8], [0, 0] ].map(boxAt),
+  cyls:  [ [0, -10], [0, 10], [-17, -6], [-17, 6], [17, -6], [17, 6] ].map(cylAt),
+  lows:  [ [-6, -5], [-6, 5], [6, -5], [6, 5] ].map(lowAt),
+  pads:  ["blue", "red"].flatMap(t => TEAM_SPAWNS[t].map(s => ({ x: s.x, z: s.z, color: TEAM_COLOR[t] }))),
+};
+let BOXES = SOLO_MAP.boxes, CYLS = SOLO_MAP.cyls, LOWS = SOLO_MAP.lows;
 
 const $ = id => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -356,14 +465,14 @@ const edgeMat = new THREE.LineBasicMaterial({ color: 0x1B2B20, transparent: true
 function outline(mesh) { mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry, 20), edgeMat)); return mesh; }
 function solid(mesh, cast) { mesh.castShadow = cast !== false; mesh.receiveShadow = true; return mesh; }
 
-const obstacleMeshes = [];
+const wallMeshes = [];
 {
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(ARENA.hx * 2, ARENA.hz * 2), MS({ map: TEX.floor }));
   floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
   const wallM = MS({ map: TEX.wall, side: THREE.DoubleSide });
   const mkWall = (w, x, z, ry) => {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(w, ARENA.wallH), wallM.clone()); m.material.map = TEX.wall.clone(); m.material.map.needsUpdate = true; m.material.map.repeat.set(w / 4, 1);
-    m.position.set(x, ARENA.wallH / 2, z); m.rotation.y = ry; m.receiveShadow = true; scene.add(m); obstacleMeshes.push(m);
+    m.position.set(x, ARENA.wallH / 2, z); m.rotation.y = ry; m.receiveShadow = true; scene.add(m); wallMeshes.push(m);
   };
   mkWall(ARENA.hx * 2, 0, -ARENA.hz, 0); mkWall(ARENA.hx * 2, 0, ARENA.hz, Math.PI);
   mkWall(ARENA.hz * 2, -ARENA.hx, 0, Math.PI / 2); mkWall(ARENA.hz * 2, ARENA.hx, 0, -Math.PI / 2);
@@ -373,28 +482,41 @@ const obstacleMeshes = [];
       const m = new THREE.Mesh(new THREE.BoxGeometry(r[0], 0.25, r[1]), rimM); m.position.set(r[2], ARENA.wallH, r[3]); scene.add(m);
       const b = new THREE.Mesh(new THREE.BoxGeometry(r[0], 0.3, r[1]), rimM); b.position.set(r[2], 0.15, r[3]); scene.add(b);
     });
-  const crateM = MS({ map: TEX.crate });
-  BOXES.forEach(b => {
-    const m = solid(outline(new THREE.Mesh(new THREE.BoxGeometry(b.w, b.h, b.d), crateM))); m.position.set(b.x, b.h / 2, b.z); scene.add(m); obstacleMeshes.push(m);
-    const s = solid(outline(new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.2, 1.4), crateM))); s.position.set(b.x + (b.x > 0 ? -0.9 : 0.9), b.h + 0.6, b.z + 0.7); s.rotation.y = 0.35; scene.add(s); obstacleMeshes.push(s);
-  });
-  const pillarM = MS({ map: TEX.pillar });
-  CYLS.forEach(c => {
-    const m = solid(new THREE.Mesh(new THREE.CylinderGeometry(c.r, c.r, c.h, 28), pillarM)); m.position.set(c.x, c.h / 2, c.z); scene.add(m); obstacleMeshes.push(m);
-    const base = solid(new THREE.Mesh(new THREE.CylinderGeometry(c.r + 0.35, c.r + 0.45, 0.3, 28), MS({ color: 0x6E7A72 }))); base.position.set(c.x, 0.15, c.z); scene.add(base);
-    const cap = solid(new THREE.Mesh(new THREE.CylinderGeometry(c.r + 0.25, c.r, 0.3, 28), MS({ color: 0x6E7A72 }))); cap.position.set(c.x, c.h - 0.15, c.z); scene.add(cap);
-  });
-  const barrierM = MS({ map: TEX.barrier });
-  LOWS.forEach(l => {
-    const g = new THREE.CylinderGeometry(l.d * 0.35, l.d * 0.5, l.h, 4, 1); g.rotateY(Math.PI / 4); g.scale(l.w / l.d, 1, 1);
-    const m = solid(new THREE.Mesh(g, barrierM)); m.position.set(l.x, l.h / 2, l.z); scene.add(m); obstacleMeshes.push(m);
-    const top = solid(new THREE.Mesh(new THREE.BoxGeometry(l.w * 0.98, 0.12, l.d * 0.5), MS({ color: 0x5B6B5E }))); top.position.set(l.x, l.h, l.z); scene.add(top);
-  });
-  SPAWNS.forEach(s => {
-    const m = new THREE.Mesh(new THREE.CircleGeometry(2, 32), M(0xB33951, { transparent: true, opacity: 0.25 })); m.rotation.x = -Math.PI / 2; m.position.set(s.x, 0.02, s.z); scene.add(m);
-    const r = new THREE.Mesh(new THREE.RingGeometry(1.8, 2.1, 32), M(0xB33951, { transparent: true, opacity: 0.7 })); r.rotation.x = -Math.PI / 2; r.position.set(s.x, 0.03, s.z); scene.add(r);
-  });
 }
+const crateM = MS({ map: TEX.crate }), pillarM = MS({ map: TEX.pillar }), barrierM = MS({ map: TEX.barrier }), pillarRimM = MS({ color: 0x6E7A72 }), barrierTopM = MS({ color: 0x5B6B5E });
+function buildMap(map) {
+  const group = new THREE.Group(), meshes = [];
+  const put = (m, blocks) => { group.add(m); if (blocks) meshes.push(m); return m; };
+  map.boxes.forEach(b => {
+    const m = solid(outline(new THREE.Mesh(new THREE.BoxGeometry(b.w, b.h, b.d), crateM))); m.position.set(b.x, b.h / 2, b.z); put(m, true);
+    const s = solid(outline(new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.2, 1.4), crateM))); s.position.set(b.x + (b.x > 0 ? -0.9 : 0.9), b.h + 0.6, b.z + 0.7); s.rotation.y = 0.35; put(s, true);
+  });
+  map.cyls.forEach(c => {
+    const m = solid(new THREE.Mesh(new THREE.CylinderGeometry(c.r, c.r, c.h, 28), pillarM)); m.position.set(c.x, c.h / 2, c.z); put(m, true);
+    const base = solid(new THREE.Mesh(new THREE.CylinderGeometry(c.r + 0.35, c.r + 0.45, 0.3, 28), pillarRimM)); base.position.set(c.x, 0.15, c.z); put(base);
+    const cap = solid(new THREE.Mesh(new THREE.CylinderGeometry(c.r + 0.25, c.r, 0.3, 28), pillarRimM)); cap.position.set(c.x, c.h - 0.15, c.z); put(cap);
+  });
+  map.lows.forEach(l => {
+    const g = new THREE.CylinderGeometry(l.d * 0.35, l.d * 0.5, l.h, 4, 1); g.rotateY(Math.PI / 4); g.scale(l.w / l.d, 1, 1);
+    const m = solid(new THREE.Mesh(g, barrierM)); m.position.set(l.x, l.h / 2, l.z); put(m, true);
+    const top = solid(new THREE.Mesh(new THREE.BoxGeometry(l.w * 0.98, 0.12, l.d * 0.5), barrierTopM)); top.position.set(l.x, l.h, l.z); put(top);
+  });
+  map.pads.forEach(s => {
+    const m = new THREE.Mesh(new THREE.CircleGeometry(2, 32), M(s.color, { transparent: true, opacity: 0.25 })); m.rotation.x = -Math.PI / 2; m.position.set(s.x, 0.02, s.z); put(m);
+    const r = new THREE.Mesh(new THREE.RingGeometry(1.8, 2.1, 32), M(s.color, { transparent: true, opacity: 0.7 })); r.rotation.x = -Math.PI / 2; r.position.set(s.x, 0.03, s.z); put(r);
+  });
+  scene.add(group);
+  return { group, meshes, map };
+}
+const MAPS = { solo: buildMap(SOLO_MAP), team: buildMap(TEAM_MAP) };
+let obstacleMeshes = [];
+function useMap(name) {
+  const m = MAPS[name];
+  MAPS.solo.group.visible = name === "solo"; MAPS.team.group.visible = name === "team";
+  BOXES = m.map.boxes; CYLS = m.map.cyls; LOWS = m.map.lows;
+  obstacleMeshes = wallMeshes.concat(m.meshes);
+}
+useMap("solo");
 const gun = new THREE.Group();
 {
   const dark = MS({ color: 0x2A3230, roughness: 0.5, metalness: 0.5 }), poly = MS({ color: 0x3C4744, roughness: 0.8 }), tan = MS({ color: 0x8A7A5C, roughness: 0.9 });
@@ -487,8 +609,14 @@ const EG = {
   pistol: new THREE.BoxGeometry(0.05, 0.12, 0.26), pistolGrip: new THREE.BoxGeometry(0.05, 0.12, 0.06), pouch: new THREE.BoxGeometry(0.12, 0.14, 0.08), goggles: new THREE.BoxGeometry(0.4, 0.09, 0.1),
 };
 function makeEnemy(x, z) {
+  const e = makeSoldier(x, z, 0xB33951);
+  e.parts.forEach(m => enemyParts.push(m));
+  scene.add(e.g); enemies.push(e);
+  return e;
+}
+function makeSoldier(x, z, color) {
   const g = new THREE.Group();
-  const uniform = MS({ color: 0xB33951 }), skin = MS({ color: 0xE8C9A8 }), dark = MS({ color: 0x2E3A33 }), vestM = MS({ color: 0x4A3F3A }), bootM = MS({ color: 0x1B2B20 });
+  const uniform = MS({ color }), skin = MS({ color: 0xE8C9A8 }), dark = MS({ color: 0x2E3A33 }), vestM = MS({ color: 0x4A3F3A }), bootM = MS({ color: 0x1B2B20 });
   const mk = (geo, mat, x, y, z, parent) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; (parent || g).add(m); return m; };
   const bodyParts = [], headParts = [];
   bodyParts.push(mk(EG.torso, uniform, 0, 1.35, 0), mk(EG.vest, vestM, 0, 1.4, 0), mk(EG.belt, dark, 0, 0.98, 0), mk(EG.hip, uniform, 0, 0.83, 0));
@@ -511,11 +639,10 @@ function makeEnemy(x, z) {
   [legR, legL].forEach(p => bodyParts.push(mk(EG.thigh, uniform, 0, -0.2, 0, p), mk(EG.shin, uniform, 0, -0.55, 0, p), mk(EG.boot, bootM, 0, -0.72, 0.04, p)));
   g.position.set(x, 0, z); g.rotation.order = "YXZ";
   const e = { g, hp: 100, fire: rnd(0.8, DIFFICULTY_CONFIG.enemyFireCooldownSec), strafe: Math.random() < 0.5 ? 1 : -1, strafeT: rnd(1.5, 3), flashT: 0,
-              mats: [uniform, skin, vestM], allMats: [uniform, skin, dark, vestM, bootM], baseCols: [0xB33951, 0xE8C9A8, 0x4A3F3A], pistol, legR, legL, armR, walk: Math.random() * 6, spawnIdx: 0 };
-  bodyParts.forEach(m => { m.userData = { enemy: e, part: "body" }; enemyParts.push(m); });
-  headParts.forEach(m => { m.userData = { enemy: e, part: "head" }; enemyParts.push(m); });
+              mats: [uniform, skin, vestM], allMats: [uniform, skin, dark, vestM, bootM], baseCols: [color, 0xE8C9A8, 0x4A3F3A], pistol, legR, legL, armR, walk: Math.random() * 6, spawnIdx: 0 };
+  bodyParts.forEach(m => { m.userData = { enemy: e, part: "body" }; });
+  headParts.forEach(m => { m.userData = { enemy: e, part: "head" }; });
   e.parts = bodyParts.concat(headParts);
-  scene.add(g); enemies.push(e);
   return e;
 }
 function removeEnemy(e) {
@@ -637,6 +764,11 @@ function makeItem(kind) {
     ok = !blocked(x, z, 1.0) && Math.hypot(x - P.x, z - P.z) > 4 && items.every(it => Math.hypot(x - it.g.position.x, z - it.g.position.z) > 4);
   }
   if (!ok) return;
+  const g = itemMesh(kind);
+  g.position.set(x, 1, z);
+  scene.add(g); items.push({ g, t: Math.random() * 6, kind });
+}
+function itemMesh(kind) {
   const g = new THREE.Group();
   if (kind === "ammo") {
     const cyl = new THREE.Mesh(ITEM_GEO.ammoBody, ammoMat);
@@ -654,8 +786,7 @@ function makeItem(kind) {
     const ring = new THREE.Mesh(ITEM_GEO.ring, ITEM_MAT.healRing); ring.rotation.x = Math.PI / 2; ring.position.y = -0.35;
     g.add(bottle, liquid, neck, cork, c1, c2, ring);
   }
-  g.position.set(x, 1, z);
-  scene.add(g); items.push({ g, t: Math.random() * 6, kind });
+  return g;
 }
 function updateItems(dt) {
   for (let i = items.length - 1; i >= 0; i--) {
@@ -677,12 +808,15 @@ let spawnTimers = [], itemT = { ammo: 0, heal: 0 }, overAt = 0, spaceFresh = tru
 const STAT = { shots: 0, hits: 0, heads: 0 };
 const keys = {};
 
-function resetGame() {
+function clearSoloWorld() {
   enemies.slice().forEach(e => { removeEnemy(e); disposeMaterials(e.allMats); });
   items.slice().forEach(it => scene.remove(it.g)); items.length = 0;
   bullets.forEach(b => scene.remove(b.g)); bullets.length = 0;
   corpses.forEach(c => { scene.remove(c.g); disposeMaterials(c.mats); }); corpses.length = 0;
   transient.forEach(t => scene.remove(t.obj)); transient.length = 0;
+}
+function resetGame() {
+  clearSoloWorld();
   P.x = PLAYER_START.x; P.z = PLAYER_START.z; P.yaw = PLAYER_START.yaw; P.pitch = 0;
   P.hp = PLAYER_CONFIG.hp; P.ammo = PLAYER_CONFIG.ammo; P.fireT = 0; P.recoil = 0; P.flip = 0; setWeapon("rifle"); P.swap = 0;
   elapsed = 0; score = 0; STAT.shots = STAT.hits = STAT.heads = 0;
@@ -702,15 +836,20 @@ function startGame() {
 }
 function showCard(which) {
   $("overlay").style.display = "flex";
-  $("cardStart").style.display = which === "start" ? "block" : "none";
-  $("cardOver").style.display = which === "over" ? "block" : "none";
-  ["hudHp", "hudAmmo", "hudBest", "hudTop"].forEach(id => $(id).style.display = "none");
+  const cardId = { start: "cardStart", over: "cardOver" }[which] || which;
+  document.querySelectorAll("#overlay > .card").forEach(c => { c.style.display = c.id === cardId ? "block" : "none"; });
+  ["hudHp", "hudAmmo", "hudBest", "hudTop", "hudTeam"].forEach(id => $(id).style.display = "none");
   $("cross").style.display = "none";
 }
 function damagePlayer(n, fromX, fromZ) {
   if (state !== "play") return;
   P.hp = Math.max(0, P.hp - n);
   SFX.hurt();
+  showHitDir(fromX, fromZ);
+  renderHud();
+  if (P.hp <= 0) gameOver();
+}
+function showHitDir(fromX, fromZ) {
   let deg = 180;
   if (typeof fromX === "number") {
     const dx = fromX - P.x, dz = fromZ - P.z;
@@ -724,8 +863,6 @@ function damagePlayer(n, fromX, fromZ) {
   d.style.transform = "translate(-50%,-50%) rotate(" + deg.toFixed(1) + "deg)";
   d.style.background = "radial-gradient(ellipse " + bw + "px " + bh + "px at 50% calc(50% - " + (edge + bh * 0.15) + "px), rgba(179,57,81,.9), rgba(179,57,81,.5) 45%, rgba(179,57,81,0) 100%)";
   $("dmg").appendChild(d); setTimeout(() => d.remove(), 800);
-  renderHud();
-  if (P.hp <= 0) gameOver();
 }
 function gameOver() {
   state = "over"; overAt = performance.now(); spaceFresh = false;
@@ -769,14 +906,14 @@ function popup(text, cls) {
 }
 function hitmark() { const h = $("hitmark"); h.classList.remove("show"); void h.offsetWidth; h.classList.add("show"); }
 
-function shoot() {
+function fireWeapon(targetParts) {
   const W = WEAPONS[P.weapon], wg = W.g;
   if (P.weapon === "rifle") { P.ammo--; SFX.shoot(); } else SFX.pistol();
   P.recoil = 1;
   wg.userData.flash.visible = true; setTimeout(() => { wg.userData.flash.visible = false; }, 45);
   scene.updateMatrixWorld();
   ray.setFromCamera({ x: 0, y: 0 }, camera); ray.far = 200;
-  const hits = ray.intersectObjects(obstacleMeshes.concat(enemyParts), false);
+  const hits = ray.intersectObjects(obstacleMeshes.concat(targetParts), false);
   STAT.shots++;
   const muzzle = new THREE.Vector3(); wg.userData.flash.getWorldPosition(muzzle);
   const end = hits.length ? hits[0].point.clone() : ray.ray.at(60, new THREE.Vector3());
@@ -784,9 +921,17 @@ function shoot() {
   const tracer = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.045, len, 6), playerTracerMat.clone());
   tracer.geometry.translate(0, len / 2, 0); tracer.geometry.rotateX(Math.PI / 2);
   tracer.position.copy(muzzle); tracer.lookAt(end); addTransient(tracer, 180, true);
-  if (hits.length) {
-    const h = hits[0];
-    const spark = new THREE.Mesh(sparkGeo, sparkMat.clone()); spark.position.copy(h.point); spark.scale.setScalar(2.2); addTransient(spark, 160, true);
+  if (!hits.length) return null;
+  const spark = new THREE.Mesh(sparkGeo, sparkMat.clone()); spark.position.copy(hits[0].point); spark.scale.setScalar(2.2); addTransient(spark, 160, true);
+  return hits[0];
+}
+function afterShot() {
+  if (P.weapon === "rifle" && P.ammo <= 0) { setWeapon("pistol"); SFX.empty(); popup("탄약 소진 → 권총", "warn"); }
+  renderHud();
+}
+function shoot() {
+  const W = WEAPONS[P.weapon], h = fireWeapon(enemyParts);
+  if (h) {
     const ud = h.object.userData;
     if (ud && ud.enemy) {
       const e = ud.enemy, head = ud.part === "head", dmg = head ? W.head() : W.body();
@@ -800,13 +945,11 @@ function shoot() {
       } else SFX.hitmark();
     }
   }
-  if (P.weapon === "rifle" && P.ammo <= 0) { setWeapon("pistol"); SFX.empty(); popup("탄약 소진 → 권총", "warn"); }
-  renderHud();
+  afterShot();
 }
 
-function update(dt) {
-  const C = DIFFICULTY_CONFIG, PC = PLAYER_CONFIG;
-  elapsed += dt;
+function controlPlayer(dt, t, fire) {
+  const PC = PLAYER_CONFIG;
   const turning = keys.ArrowLeft || keys.ArrowRight || keys.ArrowUp || keys.ArrowDown;
   P.turnT = turning ? Math.min(PC.turnRampSec, (P.turnT || 0) + dt) : 0;
   const ramp = 0.4 + 0.6 * (P.turnT / PC.turnRampSec);
@@ -822,14 +965,20 @@ function update(dt) {
   const ml = Math.hypot(mx, mz);
   if (ml > 0) slide(P, mx / ml * PC.moveSpeed * dt, mz / ml * PC.moveSpeed * dt, PC.radius);
   P.fireT -= dt;
-  if (keys.Space && P.fireT <= 0 && P.swap <= 0) { P.fireT = 1 / WEAPONS[P.weapon].rate(); shoot(); }
+  if (keys.Space && P.fireT <= 0 && P.swap <= 0) { P.fireT = 1 / WEAPONS[P.weapon].rate(); fire(); }
   P.recoil = Math.max(0, P.recoil - dt * (P.weapon === "pistol" ? 5 : 8));
   P.swap = Math.max(0, P.swap - dt * 4);
   camera.position.set(P.x, PC.eyeHeight, P.z);
   camera.rotation.set(P.pitch, P.yaw, 0);
-  const bob = ml > 0 ? Math.sin(elapsed * 10) * 0.012 : 0;
+  const bob = ml > 0 ? Math.sin(t * 10) * 0.012 : 0;
   const W = WEAPONS[P.weapon], kick = P.weapon === "pistol" ? 0.05 : 0.08;
   W.g.position.set(W.base[0], W.base[1] + bob - P.swap * 0.35, W.base[2] + P.recoil * kick); W.g.rotation.x = P.recoil * (P.weapon === "pistol" ? 0.25 : 0.12) - P.swap * 0.6;
+  return ml > 0;
+}
+function update(dt) {
+  const C = DIFFICULTY_CONFIG;
+  elapsed += dt;
+  controlPlayer(dt, elapsed, shoot);
   const stepN = Math.floor(elapsed / C.spawnIntervalDecreaseEverySec);
   const interval = Math.max(C.minSpawnIntervalSec, C.initialSpawnIntervalSec - stepN * C.spawnIntervalDecreasePerStep);
   const maxN = Math.min(C.maxConcurrentEnemiesCap, C.initialMaxConcurrentEnemies + Math.floor(elapsed / C.maxConcurrentEnemiesIncreaseEvery));
@@ -851,8 +1000,865 @@ function update(dt) {
   updateBullets(dt); updateCorpses(dt);
   if (Math.floor(elapsed) !== Math.floor(elapsed - dt)) renderHud();
 }
+const TEAM = { max: 2, specMax: 2, netMs: 143, matchMs: 60000, countMs: 3000, respawnMs: 3000, protectMs: 3000, lerpMs: 160, root: "fpsbattle/rooms" };
+const FIREBASE_SDK = ["https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js", "https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"];
+const NICK_KEY = "fpsbattle_nick";
+const TEAM_NAME = { blue: "블루", red: "레드" };
+const TEAM_ITEM_PAIRS = [ [[-17, 0], [17, 0]], [[-8, -12], [8, -12]], [[-8, 12], [8, 12]], [[0, -5], [0, 5]] ];
+const TEAM_ITEM_WAVES = (() => {
+  const w = [], sec = TEAM.matchMs / 1000, A = ITEM_CONFIG.ammo, H = ITEM_CONFIG.heal;
+  for (let i = 0; i < A.initialCount; i++) w.push({ at: 0, k: "ammo" });
+  for (let s = A.intervalSec; s < sec; s += A.intervalSec) w.push({ at: s, k: "ammo" });
+  for (let s = H.intervalSec * 0.5; s < sec; s += H.intervalSec) w.push({ at: s, k: "heal" });
+  return w.sort((a, b) => a.at - b.at);
+})();
+const netDebug = /netdebug/.test(location.hash);
+const T = {
+  db: null, ref: null, code: "", myId: "p" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4),
+  nick: "", serverOffset: 0, players: {}, status: null, host: null, hostLoaded: false, startAt: 0, botFill: true, itemWave: 0,
+  subs: [], botSubs: [], leaving: false, screen: "", spec: false, match: null, me: null,
+  ents: {}, bots: {}, raw: {}, kills: {}, items: {}, bullets: [], sent: {}, lastNet: 0, forceNet: false, statusSent: "",
+  lobbyQueued: false, textCache: {}, net: { up: 0, down: 0, t: 0 },
+};
+try { T.nick = localStorage.getItem(NICK_KEY) || ""; } catch (e) {}
+const tnow = () => Date.now() + T.serverOffset;
+const okeys = o => o ? Object.keys(o) : [];
+const byJoin = ps => (a, b) => ((ps[a] && ps[a].joinedAt) || 0) - ((ps[b] && ps[b].joinedAt) || 0);
+const humanIds = ps => okeys(ps).filter(id => ps[id] && !ps[id].isAI);
+const escHtml = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const angDiff = (a, b) => { let d = a - b; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; };
+function setText(el, t) { if (T.textCache[el.id] !== t) { T.textCache[el.id] = t; el.textContent = t; } }
+function teamIds(team, ps) { ps = ps || T.players; return okeys(ps).filter(id => ps[id] && ps[id].team === team).sort(byJoin(ps)); }
+function nickOf(id) { const p = T.players[id]; return p ? p.nickname : "?"; }
+function isHost() { return !!T.ref && T.host === T.myId; }
+function sub(ref, ev, fn, list) { ref.on(ev, fn); (list || T.subs).push([ref, ev, fn]); }
+function unsub(list) { list.forEach(s => { try { s[0].off(s[1], s[2]); } catch (e) {} }); list.length = 0; }
+
+function loadScript(src) {
+  return new Promise((ok, fail) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = fail; document.head.appendChild(s); });
+}
+let dbReady = null;
+function connectDb() {
+  if (!dbReady) dbReady = (async () => {
+    const CONF = window.PORTAL_CONFIG;
+    if (!CONF || !CONF.isReady || !CONF.isReady()) throw new Error("config");
+    if (!window.firebase) { await loadScript(FIREBASE_SDK[0]); await loadScript(FIREBASE_SDK[1]); }
+    if (!firebase.apps.length) firebase.initializeApp({ apiKey: CONF.API_KEY, authDomain: CONF.AUTH_DOMAIN, databaseURL: CONF.DB_URL.replace(/\/+$/, "") });
+    T.db = firebase.database();
+    T.db.ref(".info/serverTimeOffset").on("value", s => { T.serverOffset = s.val() || 0; });
+    return T.db;
+  })().catch(err => { dbReady = null; throw err; });
+  return dbReady;
+}
+
+function enterTeamMode() {
+  audioInit();
+  clearSoloWorld();
+  state = "team"; useMap("team");
+  for (const k in keys) keys[k] = false;
+  $("nickInput").value = T.nick;
+  teamStartMsg("");
+  teamScreen("start");
+}
+function exitTeamMode() {
+  if (T.ref) leaveRoom();
+  resetMatchLocal(); clearTeamItems();
+  teamScreen("start");
+  useMap("solo"); setWeapon("rifle"); P.swap = 0;
+  state = "menu";
+  showCard("start"); renderRecords();
+}
+function teamScreen(name) {
+  T.screen = name;
+  for (const k in keys) keys[k] = false;
+  const cards = { start: "cardTeamStart", lobby: "cardLobby", over: "cardTeamOver" };
+  if (cards[name]) showCard(cards[name]); else $("overlay").style.display = "none";
+  const inGame = name === "game", playing = inGame && !T.spec;
+  ["hudHp", "hudAmmo"].forEach(id => $(id).style.display = playing ? "block" : "none");
+  $("hudTeam").style.display = playing ? "flex" : "none";
+  $("cross").style.display = playing ? "block" : "none";
+  $("specCv").hidden = !(inGame && T.spec);
+  $("killFeed").hidden = !playing;
+  $("btnGameLeave").hidden = !inGame;
+  if (!inGame) { $("teamMsg").hidden = true; $("protBadge").hidden = true; $("countBig").hidden = true; }
+  gun.visible = playing && P.weapon === "rifle"; pistolG.visible = playing && P.weapon === "pistol";
+  if (name === "lobby") renderLobby();
+}
+function teamStartMsg(t) { $("teamStartMsg").textContent = t || ""; }
+function saveNickFromInput() {
+  const v = $("nickInput").value.replace(/\s+/g, " ").trim().slice(0, 6);
+  if (!v) return false;
+  T.nick = v;
+  try { localStorage.setItem(NICK_KEY, v); } catch (e) {}
+  return true;
+}
+function newPlayer(team, t) { return { nickname: T.nick, team, isAI: false, joinedAt: t }; }
+
+function sweepRooms() {
+  return T.db.ref(TEAM.root).once("value").then(s => {
+    const all = s.val() || {}, t = tnow(), u = {};
+    okeys(all).forEach(code => {
+      const r = all[code] || {}, age = t - (r.createdAt || 0);
+      if ((!humanIds(r.players || {}).length && age > 60000) || (r.status === "ended" && t - (r.endedAt || 0) > 300000) || age > 6 * 3600000) u[code] = null;
+    });
+    if (okeys(u).length) return T.db.ref(TEAM.root).update(u);
+  }).catch(() => {});
+}
+async function createRoom() {
+  if (!saveNickFromInput()) { teamStartMsg("닉네임을 먼저 입력해 주세요."); return; }
+  $("btnCreate").disabled = true; teamStartMsg("연결하는 중…");
+  try {
+    await connectDb();
+    await sweepRooms();
+    for (let n = 0; n < 8; n++) {
+      const code = String(10000 + Math.floor(Math.random() * 90000)), t = tnow();
+      const obj = { status: "lobby", hostPlayerId: T.myId, createdAt: t, botFill: true, players: { [T.myId]: newPlayer("blue", t) } };
+      const res = await T.db.ref(TEAM.root + "/" + code).transaction(cur => cur === null ? obj : undefined);
+      if (res.committed) { teamStartMsg(""); enterRoom(code); return; }
+    }
+    teamStartMsg("방을 만들지 못했어요. 다시 눌러 주세요.");
+  } catch (e) { teamStartMsg("온라인 연결을 할 수 없어요. (인터넷·데이터베이스 규칙 확인)"); }
+  finally { $("btnCreate").disabled = false; }
+}
+async function joinRoom() {
+  if (!saveNickFromInput()) { teamStartMsg("닉네임을 먼저 입력해 주세요."); return; }
+  const code = $("joinCode").value.replace(/\D/g, "");
+  if (code.length !== 5) { teamStartMsg("방 코드 5자리를 입력해 주세요."); return; }
+  $("btnJoin").disabled = true; teamStartMsg("연결하는 중…");
+  try {
+    await connectDb();
+    const ref = T.db.ref(TEAM.root + "/" + code);
+    const st = (await ref.child("status").once("value")).val();
+    const ps = (await ref.child("players").once("value")).val() || {};
+    if (!st || !humanIds(ps).length) { teamStartMsg("그런 방이 없어요. 코드를 확인해 주세요."); return; }
+    const cnt = tm => humanIds(ps).filter(id => ps[id].team === tm).length;
+    let team = null;
+    if (st === "lobby") { const nb = cnt("blue"), nr = cnt("red"); if (nb < TEAM.max || nr < TEAM.max) team = nr < nb ? "red" : "blue"; }
+    if (!team && cnt("spec") < TEAM.specMax) team = "spec";
+    if (!team) { teamStartMsg(st === "lobby" ? "방이 가득 찼어요." : "경기 중이고 관전자 자리(" + TEAM.specMax + "명)도 찼어요."); return; }
+    await ref.child("players/" + T.myId).set(newPlayer(team, tnow()));
+    teamStartMsg("");
+    enterRoom(code);
+  } catch (e) { teamStartMsg("입장하지 못했어요. (인터넷 확인)"); }
+  finally { $("btnJoin").disabled = false; }
+}
+function enterRoom(code) {
+  T.leaving = false; T.code = code; T.ref = T.db.ref(TEAM.root + "/" + code);
+  T.players = {}; T.status = "lobby"; T.host = null; T.hostLoaded = false; T.raw = {}; T.kills = {};
+  resetMatchLocal(); clearTeamItems();
+  const ref = T.ref;
+  ref.child("players/" + T.myId).onDisconnect().remove();
+  ref.child("st/" + T.myId).onDisconnect().remove();
+  const pref = ref.child("players");
+  sub(pref, "child_added", s => { T.players[s.key] = s.val(); playersChanged(); });
+  sub(pref, "child_changed", s => { T.players[s.key] = s.val(); playersChanged(); });
+  sub(pref, "child_removed", s => {
+    delete T.players[s.key]; removeEnt(s.key); delete T.bots[s.key];
+    if (s.key === T.myId && !T.leaving) { exitRoom("방에서 나가졌어요."); return; }
+    checkHost(); playersChanged();
+  });
+  sub(ref.child("hostPlayerId"), "value", s => { T.host = s.val(); T.hostLoaded = true; checkHost(); if (isHost() && T.match) adoptBots(); playersChanged(); });
+  sub(ref.child("botFill"), "value", s => { T.botFill = s.val() !== false; playersChanged(); });
+  sub(ref.child("startAt"), "value", s => { T.startAt = s.val() || 0; });
+  sub(ref.child("itemWave"), "value", s => { T.itemWave = Math.max(T.itemWave, s.val() || 0); });
+  sub(ref.child("status"), "value", s => onStatus(s.val()));
+  const stRef = ref.child("st");
+  sub(stRef, "child_added", s => onRemoteState(s.key, s.val()));
+  sub(stRef, "child_changed", s => onRemoteState(s.key, s.val()));
+  sub(stRef, "child_removed", s => { delete T.raw[s.key]; });
+  const kRef = ref.child("kills");
+  sub(kRef, "child_added", s => onKill(s.key, s.val()));
+  sub(kRef, "child_removed", s => { delete T.kills[s.key]; });
+  const iRef = ref.child("items");
+  sub(iRef, "child_added", s => onItemAdded(s.key, s.val()));
+  sub(iRef, "child_removed", s => onItemRemoved(s.key));
+  sub(ref.child("hits/" + T.myId), "child_added", s => { onHit(T.myId, s.val()); s.ref.remove(); });
+  $("lobbyCode").textContent = code;
+  teamScreen("lobby");
+}
+const HOST_ORDER = { blue: 0, red: 1, spec: 2 };
+function nextHost(ps) {
+  const join = byJoin(ps);
+  return humanIds(ps).sort((a, b) => {
+    const ta = HOST_ORDER[ps[a].team] == null ? 3 : HOST_ORDER[ps[a].team], tb = HOST_ORDER[ps[b].team] == null ? 3 : HOST_ORDER[ps[b].team];
+    return ta !== tb ? ta - tb : join(a, b);
+  })[0];
+}
+function checkHost() {
+  if (!T.ref || !T.hostLoaded || !T.players[T.myId]) return;
+  if (T.host && T.players[T.host] && !T.players[T.host].isAI) return;
+  if (nextHost(T.players) === T.myId) { T.host = T.myId; T.ref.update({ hostPlayerId: T.myId }); if (T.match) adoptBots(); }
+}
+function leaveRoom() {
+  if (!T.ref) return;
+  const ref = T.ref, me = T.myId;
+  T.leaving = true; unsub(T.subs); unsub(T.botSubs);
+  try { ref.child("players/" + me).onDisconnect().cancel(); ref.child("st/" + me).onDisconnect().cancel(); } catch (e) {}
+  ref.child("st/" + me).remove().catch(() => {});
+  ref.child("players/" + me).remove().then(() => ref.child("players").once("value")).then(s => {
+    const ps = s.val() || {};
+    if (!humanIds(ps).length) return ref.remove();
+    return ref.child("hostPlayerId").once("value").then(h => {
+      const hid = h.val();
+      if (!hid || hid === me || !ps[hid] || ps[hid].isAI) return ref.update({ hostPlayerId: nextHost(ps) });
+    });
+  }).catch(() => {});
+  T.ref = null; T.players = {}; T.raw = {}; T.kills = {};
+  resetMatchLocal(); clearTeamItems();
+}
+function exitRoom(msg) {
+  if (T.ref) {
+    T.leaving = true; unsub(T.subs); unsub(T.botSubs);
+    try { T.ref.child("players/" + T.myId).onDisconnect().cancel(); T.ref.child("st/" + T.myId).onDisconnect().cancel(); } catch (e) {}
+  }
+  T.ref = null; T.players = {}; T.raw = {}; T.kills = {};
+  resetMatchLocal(); clearTeamItems();
+  teamScreen("start"); teamStartMsg(msg);
+}
+window.addEventListener("pagehide", () => { if (T.ref) { try { T.ref.child("players/" + T.myId).remove(); T.ref.child("st/" + T.myId).remove(); } catch (e) {} } });
+
+function playersChanged() {
+  if (T.lobbyQueued) return;
+  T.lobbyQueued = true;
+  setTimeout(() => { T.lobbyQueued = false; renderLobby(); }, 0);
+}
+function canMoveTo(team) {
+  const me = T.players[T.myId];
+  if (!T.ref || T.status !== "lobby" || !me || me.team === team) return false;
+  return teamIds(team).filter(id => id !== T.myId).length < (team === "spec" ? TEAM.specMax : TEAM.max);
+}
+function pickTeam(team) {
+  if (!canMoveTo(team)) return;
+  const cap = team === "spec" ? TEAM.specMax : TEAM.max;
+  T.ref.child("players").transaction(ps => {
+    if (!ps || !ps[T.myId]) return ps;
+    if (okeys(ps).filter(id => id !== T.myId && ps[id] && ps[id].team === team).length >= cap) return;
+    ps[T.myId].team = team; return ps;
+  }).then(res => { if (!res.committed) $("lobbyHint").textContent = "자리가 다 찼어요."; });
+}
+function renderLobby() {
+  if (T.screen !== "lobby" || !T.ref) return;
+  const me = T.players[T.myId]; if (!me) return;
+  const list = team => {
+    const ids = teamIds(team); let h = "";
+    for (let i = 0; i < TEAM.max; i++) {
+      const id = ids[i];
+      if (!id) { h += '<div class="slot empty">' + (T.botFill ? "🤖 AI가 들어가요" : "빈 자리") + "</div>"; continue; }
+      h += '<div class="slot' + (id === T.myId ? " mine" : "") + '">' + (T.host === id ? "👑 " : "") + escHtml(T.players[id].nickname) + (id === T.myId ? ' <span class="me">나</span>' : "") + "</div>";
+    }
+    return h;
+  };
+  $("listBlue").innerHTML = list("blue"); $("listRed").innerHTML = list("red");
+  const specs = teamIds("spec");
+  $("listSpec").innerHTML = (specs.length ? specs.map(id => (T.host === id ? "👑" : "") + escHtml(T.players[id].nickname) + (id === T.myId ? "(나)" : "")).join(", ") : '<span class="none">없음</span>') + " (" + specs.length + "/" + TEAM.specMax + ")";
+  $("btnJoinBlue").hidden = me.team === "blue"; $("btnJoinBlue").disabled = !canMoveTo("blue");
+  $("btnJoinRed").hidden = me.team === "red"; $("btnJoinRed").disabled = !canMoveTo("red");
+  $("btnJoinSpec").hidden = me.team === "spec"; $("btnJoinSpec").disabled = !canMoveTo("spec");
+  const host = isHost(), nb = teamIds("blue").length, nr = teamIds("red").length;
+  $("botFill").checked = T.botFill; $("botFill").disabled = !host;
+  let hint = "", ok = false;
+  if (nb < 1 || nr < 1) hint = "양 팀에 1명 이상 있어야 시작할 수 있어요.";
+  else { ok = true; hint = "블루 " + nb + "명 vs 레드 " + nr + "명" + (T.botFill && (nb < TEAM.max || nr < TEAM.max) ? " · 빈자리는 AI" : ""); }
+  if (!host) hint = (ok ? "방장이 시작하기를 기다리는 중… " : "") + hint;
+  $("lobbyHint").textContent = hint;
+  $("btnTeamStart").hidden = !host; $("btnTeamStart").disabled = !ok;
+}
+function hostStart() {
+  if (!isHost() || T.status !== "lobby") return;
+  if (teamIds("blue").length < 1 || teamIds("red").length < 1) return;
+  const t = tnow();
+  const u = { status: "countdown", startAt: t + TEAM.countMs, endedAt: null, st: null, hits: null, kills: null, items: null, itemWave: 0 };
+  if (T.botFill) ["blue", "red"].forEach(team => {
+    for (let i = teamIds(team).length; i < TEAM.max; i++) u["players/bot" + team + i] = { nickname: "AI " + TEAM_NAME[team] + (i + 1), team, isAI: true, joinedAt: t + i + 1 };
+  });
+  T.ref.update(u);
+}
+function hostBackToLobby() {
+  if (!isHost()) return;
+  const u = { status: "lobby", st: null, hits: null, kills: null, items: null, itemWave: 0, startAt: null, endedAt: null };
+  okeys(T.players).forEach(id => { if (T.players[id] && T.players[id].isAI) u["players/" + id] = null; });
+  T.ref.update(u);
+}
+
+function onStatus(st) {
+  if (st === null) { if (!T.leaving) exitRoom("방이 종료되었어요."); return; }
+  const prev = T.status; T.status = st;
+  if (st === "lobby") { if (T.match) resetMatchLocal(); teamScreen("lobby"); return; }
+  if (!T.match && (st === "countdown" || st === "playing" || (st === "ended" && prev !== "lobby"))) startMatchLocal();
+  if (st === "ended") showTeamResult();
+}
+function resetMatchLocal() {
+  okeys(T.ents).forEach(removeEnt);
+  T.bullets.forEach(b => scene.remove(b.g)); T.bullets.length = 0;
+  transient.forEach(t => scene.remove(t.obj)); transient.length = 0;
+  unsub(T.botSubs);
+  T.bots = {}; T.me = null; T.match = null; T.sent = {}; T.statusSent = ""; T.spec = false; T.itemWave = 0;
+  $("killFeed").innerHTML = "";
+}
+function startMatchLocal() {
+  resetMatchLocal();
+  const me = T.players[T.myId];
+  T.spec = !me || me.team === "spec";
+  T.match = { shownEnd: false, lastCount: -1, startedFor: T.startAt, feed: [] };
+  STAT.shots = STAT.hits = STAT.heads = 0;
+  if (!T.spec) {
+    T.me = { team: me.team, slot: Math.max(0, teamIds(me.team).indexOf(T.myId)), alive: true, protectUntil: 0, deadUntil: 0, shots: 0, moving: false };
+    spawnMe(false);
+  }
+  if (isHost()) adoptBots();
+  teamScreen("game");
+  okeys(T.raw).forEach(id => onRemoteState(id, T.raw[id]));
+}
+function spawnMe(protect) {
+  const sp = TEAM_SPAWNS[T.me.team][T.me.slot % 2];
+  P.x = sp.x; P.z = sp.z; P.yaw = TEAM_YAW[T.me.team]; P.pitch = 0; P.hp = PLAYER_CONFIG.hp; P.ammo = PLAYER_CONFIG.ammo;
+  P.fireT = 0; P.recoil = 0; P.flip = 0; setWeapon("rifle"); P.swap = 0;
+  if (T.spec || T.screen !== "game") { gun.visible = false; pistolG.visible = false; }
+  T.me.alive = true; T.me.protectUntil = protect ? tnow() + TEAM.protectMs : 0; T.forceNet = true;
+  renderHud();
+}
+function teamCanAct() {
+  if (!T.me || !T.me.alive || !T.match || T.screen !== "game") return false;
+  const t = tnow();
+  return t >= T.startAt && t < T.startAt + TEAM.matchMs;
+}
+
+function nameTag(text, color) {
+  const cv = document.createElement("canvas"); cv.width = 256; cv.height = 64;
+  const c = cv.getContext("2d");
+  c.font = 'bold 34px "Nanum Gothic", "Malgun Gothic", sans-serif'; c.textAlign = "center"; c.textBaseline = "middle";
+  c.lineWidth = 7; c.strokeStyle = "#FFFFFF"; c.strokeText(text, 128, 34); c.fillStyle = color; c.fillText(text, 128, 34);
+  const tex = new THREE.CanvasTexture(cv); tex.encoding = THREE.sRGBEncoding;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+  sp.scale.set(1.6, 0.4, 1);
+  return sp;
+}
+function ensureEnt(id) {
+  if (T.ents[id]) return T.ents[id];
+  const p = T.players[id];
+  if (!p || (p.team !== "blue" && p.team !== "red") || id === T.myId) return null;
+  const s = T.spec ? null : makeSoldier(0, 0, TEAM_COLOR[p.team]);
+  const ent = { id, team: p.team, isAI: !!p.isAI, s, x: 0, z: 0, yaw: 0, pitch: 0, hp: 100, alive: true, pistol: false, prot: false, moving: false,
+                shots: 0, seen: false, from: null, to: null, t0: 0, deadT: 0, deadAt: 0, shotAt: 0 };
+  if (s) {
+    s.ownerId = id;
+    s.allMats.forEach(m => { m.transparent = true; });
+    s.tag = nameTag(p.nickname, TEAM_CSS[p.team]); s.tag.position.set(0, 2.6, 0); s.g.add(s.tag);
+    s.g.visible = false;
+    scene.add(s.g);
+  }
+  T.ents[id] = ent;
+  return ent;
+}
+function removeEnt(id) {
+  const ent = T.ents[id]; if (!ent) return;
+  if (ent.s) { scene.remove(ent.s.g); disposeMaterials(ent.s.allMats); ent.s.tag.material.map.dispose(); ent.s.tag.material.dispose(); }
+  delete T.ents[id];
+}
+function killEnt(ent) {
+  if (!ent.alive) return;
+  ent.alive = false; ent.deadT = 0;
+  if (ent.s) { ent.s.armR.rotation.x = -0.3; ent.s.legR.rotation.x = ent.s.legL.rotation.x = 0; enemyFlash(ent.s, false); }
+}
+function reviveEnt(ent) {
+  ent.alive = true; ent.deadT = 0;
+  if (ent.s) { ent.s.g.rotation.set(0, ent.yaw + Math.PI, 0); ent.s.g.position.set(ent.x, 0, ent.z); ent.s.g.visible = true; }
+}
+function aimDir(yaw, pitch) { return new THREE.Vector3(-Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch)); }
+function stateString(x, z, yaw, pitch, flags, shots, hp) {
+  let d = Math.round(yaw * 180 / Math.PI) % 360; if (d < 0) d += 360;
+  return +x.toFixed(2) + "," + +z.toFixed(2) + "," + d + "," + Math.round(pitch * 180 / Math.PI) + "," + flags + "," + shots + "," + Math.round(hp);
+}
+function onRemoteState(id, str) {
+  if (netDebug) T.net.down += id.length + String(str).length + 60;
+  T.raw[id] = str;
+  if (id === T.myId || T.bots[id] || !T.match) return;
+  const a = String(str).split(",");
+  if (a.length < 7) return;
+  const ent = ensureEnt(id); if (!ent) return;
+  const x = +a[0], z = +a[1], yaw = +a[2] * Math.PI / 180, pitch = +a[3] * Math.PI / 180, f = +a[4], shots = +a[5], hp = +a[6];
+  const alive = !!(f & 1);
+  const snap = !ent.seen || (alive && !ent.alive);
+  ent.to = { x, z, yaw, pitch };
+  ent.from = snap ? ent.to : { x: ent.x, z: ent.z, yaw: ent.yaw, pitch: ent.pitch };
+  ent.t0 = performance.now();
+  if (snap) { ent.x = x; ent.z = z; ent.yaw = yaw; ent.pitch = pitch; }
+  if (!ent.seen) { ent.seen = true; ent.shots = shots; ent.alive = alive; if (ent.s) ent.s.g.visible = alive; }
+  else if (alive !== ent.alive) { if (alive) reviveEnt(ent); else killEnt(ent); }
+  ent.pistol = !!(f & 2); ent.prot = !!(f & 4); ent.moving = !!(f & 8); ent.hp = hp;
+  if (shots > ent.shots) remoteShotFx(ent);
+  ent.shots = shots;
+}
+function remoteShotFx(ent) {
+  ent.shotAt = performance.now();
+  if (!ent.s || !ent.alive) return;
+  scene.updateMatrixWorld();
+  const from = new THREE.Vector3(); ent.s.pistol.getWorldPosition(from);
+  const dir = aimDir(ent.yaw, ent.pitch);
+  if (ent.isAI) fireTeamBullet(from, dir, ent.team, false, ent.id);
+  else {
+    ray.set(from, dir); ray.far = 60;
+    const hit = ray.intersectObjects(obstacleMeshes, false)[0];
+    const end = hit ? hit.point : from.clone().addScaledVector(dir, 60), len = from.distanceTo(end);
+    const tracer = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.035, len, 6), playerTracerMat.clone());
+    tracer.geometry.translate(0, len / 2, 0); tracer.geometry.rotateX(Math.PI / 2);
+    tracer.position.copy(from); tracer.lookAt(end); addTransient(tracer, 120, true);
+  }
+  const fl = new THREE.Mesh(sparkGeo, sparkMat); fl.position.copy(from); fl.scale.setScalar(1.6); addTransient(fl, 50);
+  SFX.enemyShot();
+}
+function updateEnts(dt, nowMs) {
+  for (const id in T.ents) {
+    const ent = T.ents[id], b = T.bots[id];
+    if (b) {
+      ent.x = b.x; ent.z = b.z; ent.yaw = b.yaw; ent.pitch = b.pitch; ent.hp = b.hp; ent.moving = b.moving; ent.prot = tnow() < b.protectUntil; ent.seen = true;
+      if (b.alive !== ent.alive) { if (b.alive) reviveEnt(ent); else killEnt(ent); }
+    } else if (ent.to && ent.alive) {
+      const k = clamp((nowMs - ent.t0) / TEAM.lerpMs, 0, 1);
+      ent.x = ent.from.x + (ent.to.x - ent.from.x) * k; ent.z = ent.from.z + (ent.to.z - ent.from.z) * k;
+      ent.yaw = ent.from.yaw + angDiff(ent.to.yaw, ent.from.yaw) * k; ent.pitch = ent.from.pitch + (ent.to.pitch - ent.from.pitch) * k;
+    }
+    const s = ent.s; if (!s) continue;
+    const g = s.g;
+    if (s.flashT > 0) { s.flashT -= dt; if (s.flashT <= 0) enemyFlash(s, false); }
+    if (ent.alive) {
+      g.visible = ent.seen;
+      g.position.set(ent.x, 0, ent.z); g.rotation.set(0, ent.yaw + Math.PI, 0);
+      if (ent.moving) { s.walk += dt * 9; const sw = Math.sin(s.walk) * 0.55; s.legR.rotation.x = sw; s.legL.rotation.x = -sw; g.position.y = Math.abs(Math.cos(s.walk)) * 0.04; }
+      else { s.legR.rotation.x = s.legL.rotation.x = 0; }
+      s.armR.rotation.x = -Math.PI / 2 + 0.1 - ent.pitch * 0.8;
+      const op = ent.prot ? 0.3 + 0.25 * (1 + Math.sin(nowMs / 70)) : 1;
+      s.allMats.forEach(m => { m.opacity = op; });
+    } else {
+      ent.deadT += dt; const c = ent.deadT;
+      if (c < 0.55) { const k = c / 0.55, ease = 1 - (1 - k) * (1 - k) * (1 - k); g.rotation.x = -Math.PI / 2 * ease; g.position.y = 0; }
+      else if (c > 1.4) { g.position.y = -(c - 1.4) * 1.2; if (c > 2.2) g.visible = false; }
+      s.allMats.forEach(m => { m.opacity = 1; });
+    }
+  }
+}
+
+function fireTeamBullet(from, dir, team, real, shooter) {
+  const g = new THREE.Group();
+  const core = new THREE.Mesh(bulletGeo, bulletMat);
+  const trail = new THREE.Mesh(bulletTrailGeo, bulletTrailMat); trail.rotation.x = Math.PI / 2; trail.position.z = 0.35;
+  g.add(core, trail); g.position.copy(from); g.lookAt(from.clone().sub(dir));
+  scene.add(g);
+  T.bullets.push({ g, v: dir.clone().multiplyScalar(DIFFICULTY_CONFIG.enemyBulletSpeed), team, real, shooter, life: 3, ox: from.x, oz: from.z });
+}
+function bulletVictim(b) {
+  const p = b.g.position, R = PLAYER_CONFIG.radius + 0.1;
+  if (p.y <= 0.2 || p.y >= 2.0) return null;
+  if (T.me && T.me.alive && T.me.team !== b.team && Math.hypot(p.x - P.x, p.z - P.z) < R) return T.myId;
+  for (const id in T.ents) { const e = T.ents[id]; if (e.alive && e.team !== b.team && Math.hypot(p.x - e.x, p.z - e.z) < R) return id; }
+  return null;
+}
+function updateTeamBullets(dt) {
+  for (let i = T.bullets.length - 1; i >= 0; i--) {
+    const b = T.bullets[i], p = b.g.position;
+    p.addScaledVector(b.v, dt); b.life -= dt;
+    let gone = b.life <= 0 || blockedAt(p.x, p.y, p.z);
+    if (!gone) { const victim = bulletVictim(b); if (victim) { gone = true; if (b.real) dealDamage(victim, DIFFICULTY_CONFIG.enemyDamage, false, b.shooter, b.ox, b.oz); } }
+    if (gone) { const s = new THREE.Mesh(sparkGeo, sparkMat); s.position.copy(p); addTransient(s, 60); scene.remove(b.g); T.bullets.splice(i, 1); }
+  }
+}
+function dealDamage(target, dmg, head, by, fx, fz) {
+  const hit = { d: dmg, h: head ? 1 : 0, by, x: Math.round(fx * 10) / 10, z: Math.round(fz * 10) / 10 };
+  if (target === T.myId || T.bots[target]) onHit(target, hit);
+  else if (T.ref) T.ref.child("hits/" + target).push(hit);
+}
+function inPlay() { const t = tnow(); return !!T.match && t >= T.startAt && t < T.startAt + TEAM.matchMs; }
+function onHit(target, h) {
+  if (!h || !inPlay()) return;
+  const d = clamp(+h.d || 0, 0, 100);
+  if (target === T.myId) {
+    const me = T.me;
+    if (!me || !me.alive || tnow() < me.protectUntil) return;
+    P.hp = Math.max(0, P.hp - d); SFX.hurt(); showHitDir(+h.x, +h.z); renderHud(); T.forceNet = true;
+    if (P.hp <= 0) meDie(h.by, !!h.h);
+    return;
+  }
+  const b = T.bots[target];
+  if (!b || !b.alive || tnow() < b.protectUntil) return;
+  b.hp = Math.max(0, b.hp - d);
+  const ent = T.ents[target]; if (ent && ent.s) { enemyFlash(ent.s, true); ent.s.flashT = 0.08; }
+  if (b.hp <= 0) { b.alive = false; b.deadUntil = tnow() + TEAM.respawnMs; pushKill(h.by, target, b.team, !!h.h); }
+}
+function pushKill(k, v, vt, head) {
+  const kp = T.players[k];
+  T.ref.child("kills").push({ k: String(k || ""), v, kt: kp ? kp.team : (vt === "blue" ? "red" : "blue"), vt, h: head ? 1 : 0, at: firebase.database.ServerValue.TIMESTAMP });
+}
+function meDie(by, head) {
+  T.me.alive = false; T.me.deadUntil = tnow() + TEAM.respawnMs; T.forceNet = true;
+  pushKill(by, T.myId, T.me.team, head);
+  SFX.over();
+  gun.visible = pistolG.visible = false;
+}
+function killCounts(k) { return k.at >= T.startAt - 1000 && k.at <= T.startAt + TEAM.matchMs + 1500; }
+function teamScore(team) { let n = 0; for (const key in T.kills) { const k = T.kills[key]; if (k.kt === team && killCounts(k)) n++; } return n; }
+function onKill(key, v) {
+  if (!v) return;
+  T.kills[key] = v;
+  if (!T.match) return;
+  const ent = T.ents[v.v];
+  if (ent && !T.bots[v.v]) { ent.deadAt = v.at; killEnt(ent); }
+  if (ent && T.bots[v.v]) ent.deadAt = v.at;
+  if (!(v.at > tnow() - 4000)) return;
+  T.match.feed.push({ v, t: performance.now() });
+  if (!T.spec) {
+    const el = document.createElement("div"); el.className = "kf";
+    el.innerHTML = '<b style="color:' + TEAM_CSS[v.kt] + '">' + escHtml(nickOf(v.k)) + "</b> " + (v.h ? "🎯" : "▶") + ' <b style="color:' + TEAM_CSS[v.vt] + '">' + escHtml(nickOf(v.v)) + "</b>";
+    $("killFeed").prepend(el); setTimeout(() => el.remove(), 4000);
+    while ($("killFeed").children.length > 5) $("killFeed").lastChild.remove();
+  }
+  if (v.k === T.myId && T.me) { v.h ? SFX.killHead() : SFX.killBody(); setTimeout(() => popup("+1", "kill"), 120); }
+}
+
+function teamTargetParts() {
+  const parts = [];
+  for (const id in T.ents) { const e = T.ents[id]; if (e.s && e.alive && T.me && e.team !== T.me.team) e.s.parts.forEach(m => parts.push(m)); }
+  return parts;
+}
+function teamShoot() {
+  const W = WEAPONS[P.weapon], h = fireWeapon(teamTargetParts());
+  T.me.shots++;
+  const ud = h && h.object.userData;
+  if (ud && ud.enemy) {
+    const ent = T.ents[ud.enemy.ownerId];
+    if (ent && ent.alive) {
+      if (ent.prot) popup("보호 중", "warn");
+      else {
+        const head = ud.part === "head", dmg = head ? W.head() : W.body();
+        STAT.hits++; if (head) STAT.heads++;
+        hitmark(); SFX.hitmark(); popup("-" + dmg + "%", head ? "head" : "");
+        enemyFlash(ud.enemy, true); ud.enemy.flashT = 0.08;
+        dealDamage(ent.id, dmg, head, T.myId, P.x, P.z);
+      }
+    }
+  }
+  afterShot();
+}
+
+function onItemAdded(key, v) {
+  if (!v || T.items[key]) return;
+  const g = itemMesh(v.k); g.position.set(+v.x, 1, +v.z); scene.add(g);
+  T.items[key] = { g, kind: v.k, x: +v.x, z: +v.z, t: Math.random() * 6, pending: false };
+}
+function onItemRemoved(key) { const it = T.items[key]; if (it) { scene.remove(it.g); delete T.items[key]; } }
+function clearTeamItems() { okeys(T.items).forEach(onItemRemoved); }
+function updateTeamItems(dt) {
+  for (const key in T.items) {
+    const it = T.items[key]; it.t += dt;
+    it.g.rotation.y += dt * 2.5; it.g.position.y = 1 + Math.sin(it.t * 3) * 0.15;
+    if (!it.pending && teamCanAct() && Math.hypot(it.x - P.x, it.z - P.z) < ITEM_CONFIG.pickupDist) tryPickup(key, it);
+  }
+}
+function tryPickup(key, it) {
+  it.pending = true;
+  let got = false;
+  T.ref.child("items/" + key).transaction(cur => { got = false; if (cur === null) return; got = true; return null; })
+    .then(res => { if (res.committed && got) applyPickup(it.kind); else it.pending = false; })
+    .catch(() => { it.pending = false; });
+}
+function applyPickup(kind) {
+  if (!T.me || !T.me.alive) return;
+  if (kind === "ammo") { P.ammo = ITEM_CONFIG.ammo.refill; SFX.ammo(); popup("탄약 +" + ITEM_CONFIG.ammo.refill, ""); if (P.weapon !== "rifle") setWeapon("rifle"); }
+  else { const before = P.hp; P.hp = Math.min(PLAYER_CONFIG.hp, P.hp + ITEM_CONFIG.heal.amount); SFX.heal(); popup("체력 +" + (P.hp - before), "heal"); }
+  T.forceNet = true; renderHud();
+}
+function spawnItemPair(kind) {
+  const list = Object.values(T.items);
+  if (list.filter(it => it.kind === kind).length + 2 > ITEM_CONFIG[kind].maxItems) return;
+  const free = TEAM_ITEM_PAIRS.filter(pair => pair.every(p => list.every(it => Math.hypot(it.x - p[0], it.z - p[1]) > 1)));
+  if (!free.length) return;
+  free[Math.floor(Math.random() * free.length)].forEach(p => T.ref.child("items").push({ k: kind, x: p[0], z: p[1] }));
+}
+
+function adoptBots() {
+  if (!T.match || !T.ref) return;
+  okeys(T.players).forEach(id => {
+    const p = T.players[id];
+    if (!p || !p.isAI || T.bots[id]) return;
+    const slot = Math.max(0, teamIds(p.team).indexOf(id)), sp = TEAM_SPAWNS[p.team][slot % 2], ent = T.ents[id], known = ent && ent.seen;
+    T.bots[id] = { id, team: p.team, slot, x: known ? ent.x : sp.x, z: known ? ent.z : sp.z, yaw: known ? ent.yaw : TEAM_YAW[p.team], pitch: 0,
+                   hp: known ? ent.hp : 100, alive: known ? ent.alive : true, protectUntil: 0, deadUntil: known && !ent.alive ? tnow() + TEAM.respawnMs : 0,
+                   shots: known ? ent.shots : 0, fire: rnd(0.8, DIFFICULTY_CONFIG.enemyFireCooldownSec), strafe: Math.random() < 0.5 ? 1 : -1, strafeT: rnd(1.5, 3), moving: false };
+    ensureEnt(id);
+    sub(T.ref.child("hits/" + id), "child_added", s => { onHit(id, s.val()); s.ref.remove(); }, T.botSubs);
+  });
+}
+function botTarget(b) {
+  let best = null, bd = 1e9;
+  const consider = (id, x, z, prot) => { const d = Math.hypot(x - b.x, z - b.z) + (prot ? 30 : 0); if (d < bd) { bd = d; best = { id, x, z }; } };
+  if (T.me && T.me.alive && T.me.team !== b.team) consider(T.myId, P.x, P.z, tnow() < T.me.protectUntil);
+  for (const id in T.ents) { const e = T.ents[id]; if (id !== b.id && e.alive && e.team !== b.team) consider(id, e.x, e.z, e.prot); }
+  return best;
+}
+function botCanSee(b, tx, tz) {
+  _v1.set(b.x, 1.5, b.z); _v2.set(tx, PLAYER_CONFIG.eyeHeight, tz).sub(_v1);
+  const dist = _v2.length();
+  ray.set(_v1, _v2.normalize()); ray.far = dist;
+  return ray.intersectObjects(obstacleMeshes, false).length === 0;
+}
+function updateBotSim(b, dt, t) {
+  const C = DIFFICULTY_CONFIG;
+  if (!b.alive) {
+    b.moving = false;
+    if (t >= b.deadUntil) {
+      const sp = TEAM_SPAWNS[b.team][b.slot % 2];
+      Object.assign(b, { x: sp.x, z: sp.z, yaw: TEAM_YAW[b.team], pitch: 0, hp: 100, alive: true, protectUntil: t + TEAM.protectMs, fire: rnd(0.8, C.enemyFireCooldownSec) });
+    }
+    return;
+  }
+  const tg = botTarget(b), tx = tg ? tg.x : 0, tz = tg ? tg.z : 0;
+  const dx = tx - b.x, dz = tz - b.z, dist = Math.hypot(dx, dz) || 0.001, nx = dx / dist, nz = dz / dist;
+  let radial = 0;
+  if (!tg || dist > C.enemyKeepMax) radial = 1; else if (dist < C.enemyKeepMin) radial = -1;
+  b.strafeT -= dt; if (b.strafeT <= 0) { b.strafe = -b.strafe; b.strafeT = rnd(1.5, 3); }
+  let mx = nx * radial + (-nz) * b.strafe * 0.9, mz = nz * radial + nx * b.strafe * 0.9;
+  const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml;
+  if (slide(b, mx * C.enemyMoveSpeed * dt, mz * C.enemyMoveSpeed * dt, 0.4)) { b.strafe = -b.strafe; b.strafeT = rnd(1, 2); }
+  b.moving = true;
+  b.yaw = Math.atan2(-nx, -nz); b.pitch = Math.atan2(PLAYER_CONFIG.eyeHeight - 1.5, dist);
+  b.fire -= dt;
+  if (tg && b.fire <= 0 && dist <= C.enemyFireRange && botCanSee(b, tx, tz)) {
+    b.fire = C.enemyFireCooldownSec; b.shots++;
+    const ent = T.ents[b.id], from = new THREE.Vector3(b.x, 1.45, b.z);
+    if (ent && ent.s) { ent.s.g.updateMatrixWorld(true); ent.s.pistol.getWorldPosition(from); ent.shotAt = performance.now(); }
+    else if (ent) ent.shotAt = performance.now();
+    const to = new THREE.Vector3(tx, PLAYER_CONFIG.eyeHeight - 0.3, tz);
+    if (Math.random() >= C.enemyHitChance) { const s = C.enemyBulletSpread; to.add(new THREE.Vector3(rnd(-s, s), rnd(-s * 0.6, s * 0.6), rnd(-s, s))); }
+    fireTeamBullet(from, to.sub(from).normalize(), b.team, true, b.id);
+    if (!T.spec) { SFX.enemyShot(); const fl = new THREE.Mesh(sparkGeo, sparkMat); fl.position.copy(from); fl.scale.setScalar(1.6); addTransient(fl, 50); }
+  }
+}
+function hostTick(dt, t, phase) {
+  if (T.status === "countdown" && t >= T.startAt && T.statusSent !== "playing") { T.statusSent = "playing"; T.ref.update({ status: "playing" }); }
+  if (phase === "end" && T.status !== "ended" && T.statusSent !== "ended") { T.statusSent = "ended"; T.ref.update({ status: "ended", endedAt: t }); }
+  if (phase !== "play") return;
+  for (const id in T.bots) updateBotSim(T.bots[id], dt, t);
+  while (T.itemWave < TEAM_ITEM_WAVES.length && (t - T.startAt) / 1000 >= TEAM_ITEM_WAVES[T.itemWave].at) {
+    spawnItemPair(TEAM_ITEM_WAVES[T.itemWave].k);
+    T.itemWave++;
+    T.ref.update({ itemWave: T.itemWave });
+  }
+}
+function netTick() {
+  const nowMs = Date.now();
+  if (!T.ref || (!T.forceNet && nowMs - T.lastNet < TEAM.netMs)) return;
+  T.lastNet = nowMs; T.forceNet = false;
+  const u = {}, t = tnow();
+  if (T.me) {
+    const flags = (T.me.alive ? 1 : 0) | (P.weapon === "pistol" ? 2 : 0) | (t < T.me.protectUntil ? 4 : 0) | (T.me.moving ? 8 : 0);
+    const s = stateString(P.x, P.z, P.yaw, P.pitch, flags, T.me.shots, P.hp);
+    if (s !== T.sent[T.myId]) u[T.myId] = s;
+  }
+  if (isHost()) for (const id in T.bots) {
+    const b = T.bots[id];
+    const s = stateString(b.x, b.z, b.yaw, b.pitch, (b.alive ? 1 : 0) | (t < b.protectUntil ? 4 : 0) | (b.moving ? 8 : 0), b.shots, b.hp);
+    if (s !== T.sent[id]) u[id] = s;
+  }
+  const ids = okeys(u);
+  if (!ids.length) return;
+  ids.forEach(id => { T.sent[id] = u[id]; });
+  T.ref.child("st").update(u);
+  if (netDebug) T.net.up += JSON.stringify(u).length + 80;
+}
+function poseView(dead) {
+  if (dead) { camera.position.set(P.x, 0.6, P.z); camera.rotation.set(-0.35, P.yaw, 0.35); return; }
+  camera.position.set(P.x, PLAYER_CONFIG.eyeHeight, P.z); camera.rotation.set(P.pitch, P.yaw, 0);
+  const W = WEAPONS[P.weapon]; W.g.position.set(W.base[0], W.base[1], W.base[2]); W.g.rotation.x = 0;
+}
+function renderTeamHud(t) {
+  const left = clamp(T.startAt + TEAM.matchMs - Math.max(t, T.startAt), 0, TEAM.matchMs);
+  setText($("tsTime"), fmtTime(Math.ceil(left / 1000)));
+  setText($("tsBlue"), String(teamScore("blue"))); setText($("tsRed"), String(teamScore("red")));
+  const me = T.me;
+  if (me && !T.spec) {
+    const dead = !me.alive && t < T.startAt + TEAM.matchMs;
+    $("teamMsg").hidden = !dead;
+    if (dead) setText($("teamMsg"), "쓰러졌습니다 — " + Math.max(1, Math.ceil((me.deadUntil - t) / 1000)) + "초 뒤 부활");
+    const prot = me.alive && t < me.protectUntil;
+    $("protBadge").hidden = !prot;
+    if (prot) setText($("protBadge"), "🛡 보호 중 " + ((me.protectUntil - t) / 1000).toFixed(1) + "초");
+  }
+  const cd = $("countBig");
+  if (t < T.startAt) {
+    const n = Math.ceil((T.startAt - t) / 1000);
+    cd.hidden = false; setText(cd, String(n));
+    if (T.match.lastCount !== n) { T.match.lastCount = n; tone(660, 0.12, "square", 0.07); }
+  } else if (t < T.startAt + 700) {
+    cd.hidden = false; setText(cd, "GO!");
+    if (T.match.lastCount !== 0) { T.match.lastCount = 0; tone(990, 0.3, "square", 0.08); }
+  } else cd.hidden = true;
+}
+function showTeamResult() {
+  if (!T.match || T.match.shownEnd) return;
+  T.match.shownEnd = true;
+  const b = teamScore("blue"), r = teamScore("red"), my = T.me ? T.me.team : null;
+  const winner = b === r ? null : (b > r ? "blue" : "red");
+  const title = winner ? (my ? (my === winner ? "🏆 승리! " : "😢 패배 — ") : "🏆 ") + TEAM_NAME[winner] + "팀 승리" : "🤝 무승부";
+  $("teamResult").textContent = title;
+  $("finBlue").textContent = b; $("finRed").textContent = r;
+  const rows = [];
+  ["blue", "red"].forEach(team => teamIds(team).forEach(id => {
+    let k = 0, d = 0;
+    for (const key in T.kills) { const v = T.kills[key]; if (!killCounts(v)) continue; if (v.k === id) k++; if (v.v === id) d++; }
+    rows.push('<tr class="' + (id === T.myId ? "mine" : "") + '"><td><span class="dot" style="background:' + TEAM_CSS[team] + '"></span></td><td>' + escHtml(T.players[id].nickname) + "</td><td>" + k + "</td><td>" + d + "</td></tr>");
+  }));
+  $("boardBody").innerHTML = rows.join("");
+  $("teamStats").hidden = !T.me;
+  const pct = (a, n) => n > 0 ? Math.round(a / n * 100) + "%" : "—";
+  $("tStatShots").textContent = STAT.shots + "발"; $("tStatAcc").textContent = pct(STAT.hits, STAT.shots); $("tStatHead").textContent = pct(STAT.heads, STAT.hits);
+  $("btnBackLobby").hidden = !isHost();
+  $("teamOverHint").textContent = isHost() ? "" : "방장이 로비로 돌아가면 함께 이동해요.";
+  if (T.me) { if (winner && my === winner) SFX.killHead(); else if (winner) SFX.over(); }
+  T.bullets.forEach(bl => scene.remove(bl.g)); T.bullets.length = 0;
+  teamScreen("over");
+}
+function teamFrame(nowMs, dt) {
+  if (T.screen !== "game" || !T.match || !T.startAt || T.startAt < T.match.startedFor) {
+    const tt = nowMs / 1000;
+    camera.position.set(Math.sin(tt * 0.12) * 16, 9, Math.cos(tt * 0.12) * 9); camera.lookAt(0, 0.5, 0);
+    renderer.render(scene, camera);
+    return;
+  }
+  const t = tnow(), endAt = T.startAt + TEAM.matchMs;
+  const phase = t < T.startAt ? "count" : t < endAt ? "play" : "end";
+  if (T.me) {
+    if (phase === "play" && T.me.alive) { T.me.moving = controlPlayer(dt, nowMs / 1000, teamShoot); }
+    else { T.me.moving = false; poseView(!T.me.alive); }
+    if (!T.me.alive && phase === "play" && t >= T.me.deadUntil) spawnMe(true);
+  }
+  if (isHost()) hostTick(dt, t, phase);
+  updateEnts(dt, nowMs);
+  updateTeamBullets(dt);
+  updateTeamItems(dt);
+  netTick();
+  renderTeamHud(t);
+  if (phase === "end" && t >= endAt + 800) showTeamResult();
+  if (netDebug && nowMs - T.net.t > 5000) {
+    const sec = (nowMs - T.net.t) / 1000;
+    if (T.net.t) console.log("[netdebug] 보냄 " + (T.net.up / sec).toFixed(0) + " B/s · 받음(상태) " + (T.net.down / sec).toFixed(0) + " B/s");
+    T.net.t = nowMs; T.net.up = 0; T.net.down = 0;
+  }
+  if (T.screen !== "game") return;
+  if (T.spec) drawSpectator(t, nowMs); else renderer.render(scene, camera);
+}
+
+function drawSpectator(t, nowMs) {
+  const cv = $("specCv"), dpr = Math.min(2, window.devicePixelRatio || 1), W = window.innerWidth, H = window.innerHeight;
+  if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  const c = cv.getContext("2d");
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.fillStyle = "#DDE3E8"; c.fillRect(0, 0, W, H);
+  const FONT = '"Nanum Gothic", "Malgun Gothic", sans-serif';
+  const wide = W >= 760, side = wide ? Math.min(230, W * 0.22) : 0, top = 110, bottom = wide ? 56 : 170;
+  const aw = W - 2 * side - 40, ah = H - top - bottom;
+  const s = Math.max(4, Math.min(aw / (ARENA.hx * 2), ah / (ARENA.hz * 2)));
+  const mx = W / 2, my = top + ah / 2;
+  const X = x => mx + x * s, Y = z => my + z * s;
+  c.fillStyle = "#B4B9B1"; c.fillRect(X(-ARENA.hx), Y(-ARENA.hz), ARENA.hx * 2 * s, ARENA.hz * 2 * s);
+  c.strokeStyle = "rgba(60,70,60,.18)"; c.lineWidth = 1;
+  for (let x = -ARENA.hx + 5; x < ARENA.hx; x += 5) { c.beginPath(); c.moveTo(X(x), Y(-ARENA.hz)); c.lineTo(X(x), Y(ARENA.hz)); c.stroke(); }
+  for (let z = -ARENA.hz + 5; z < ARENA.hz; z += 5) { c.beginPath(); c.moveTo(X(-ARENA.hx), Y(z)); c.lineTo(X(ARENA.hx), Y(z)); c.stroke(); }
+  TEAM_MAP.pads.forEach(p => {
+    c.fillStyle = p.color === TEAM_COLOR.blue ? "rgba(47,111,214,.25)" : "rgba(214,69,61,.25)";
+    c.beginPath(); c.arc(X(p.x), Y(p.z), 2 * s, 0, 7); c.fill();
+  });
+  TEAM_MAP.lows.forEach(l => { c.fillStyle = "#9AA39C"; c.fillRect(X(l.x - l.w / 2), Y(l.z - l.d / 2), l.w * s, l.d * s); c.fillStyle = "#E2B93B"; c.fillRect(X(l.x - l.w / 2), Y(l.z - l.d / 2), l.w * s, l.d * s * 0.35); });
+  TEAM_MAP.boxes.forEach(b => { c.fillStyle = "#8C7350"; c.fillRect(X(b.x - b.w / 2), Y(b.z - b.d / 2), b.w * s, b.d * s); c.strokeStyle = "#4C5550"; c.lineWidth = 3; c.strokeRect(X(b.x - b.w / 2), Y(b.z - b.d / 2), b.w * s, b.d * s); });
+  TEAM_MAP.cyls.forEach(cy => { c.fillStyle = "#C9C4B8"; c.beginPath(); c.arc(X(cy.x), Y(cy.z), cy.r * s, 0, 7); c.fill(); c.strokeStyle = "#D97B4F"; c.lineWidth = 3; c.stroke(); });
+  c.strokeStyle = "#24402F"; c.lineWidth = 5; c.strokeRect(X(-ARENA.hx), Y(-ARENA.hz), ARENA.hx * 2 * s, ARENA.hz * 2 * s);
+  for (const key in T.items) {
+    const it = T.items[key], ix = X(it.x), iy = Y(it.z), r = Math.max(6, 0.45 * s);
+    if (it.kind === "ammo") { c.fillStyle = "#F2C94C"; c.strokeStyle = "#A8731C"; c.lineWidth = 2; c.beginPath(); c.arc(ix, iy, r, 0, 7); c.fill(); c.stroke(); }
+    else { c.fillStyle = "#FF6B7A"; c.beginPath(); c.arc(ix, iy, r, 0, 7); c.fill(); c.fillStyle = "#fff"; c.fillRect(ix - r * 0.6, iy - r * 0.2, r * 1.2, r * 0.4); c.fillRect(ix - r * 0.2, iy - r * 0.6, r * 0.4, r * 1.2); }
+  }
+  for (const b of T.bullets) { c.fillStyle = "#FFB347"; c.beginPath(); c.arc(X(b.g.position.x), Y(b.g.position.z), 3, 0, 7); c.fill(); }
+  const pr = Math.max(8, 0.6 * s);
+  for (const id in T.ents) {
+    const e = T.ents[id]; if (!e.seen) continue;
+    const px = X(e.x), py = Y(e.z), col = TEAM_CSS[e.team], fx = -Math.sin(e.yaw), fz = -Math.cos(e.yaw);
+    if (!e.alive) {
+      c.strokeStyle = "#5B6B5E"; c.lineWidth = 4; c.beginPath(); c.moveTo(px - pr * 0.7, py - pr * 0.7); c.lineTo(px + pr * 0.7, py + pr * 0.7); c.moveTo(px + pr * 0.7, py - pr * 0.7); c.lineTo(px - pr * 0.7, py + pr * 0.7); c.stroke();
+      const leftSec = e.deadAt ? Math.ceil((e.deadAt + TEAM.respawnMs - t) / 1000) : 0;
+      if (leftSec > 0) { c.font = "bold 14px " + FONT; c.fillStyle = "#1B2B20"; c.textAlign = "center"; c.fillText(leftSec + "초", px, py - pr - 4); }
+      continue;
+    }
+    if (nowMs - e.shotAt < 120) { c.strokeStyle = "#FFD07A"; c.lineWidth = 3; c.beginPath(); c.moveTo(px, py); c.lineTo(px + fx * 8 * s, py + fz * 8 * s); c.stroke(); }
+    c.globalAlpha = e.prot ? 0.45 + 0.35 * Math.sin(nowMs / 70) : 1;
+    c.fillStyle = col; c.strokeStyle = "#fff"; c.lineWidth = 2.5;
+    c.beginPath(); c.arc(px, py, pr, 0, 7); c.fill(); c.stroke();
+    c.fillStyle = "#fff"; c.beginPath(); c.moveTo(px + fx * pr * 1.7, py + fz * pr * 1.7); c.lineTo(px + fz * pr * 0.6, py - fx * pr * 0.6); c.lineTo(px - fz * pr * 0.6, py + fx * pr * 0.6); c.closePath(); c.fill();
+    c.globalAlpha = 1;
+    c.font = "bold 13px " + FONT; c.textAlign = "center"; c.lineWidth = 4; c.strokeStyle = "#fff"; c.strokeText(nickOf(id), px, py - pr - 6); c.fillStyle = col; c.fillText(nickOf(id), px, py - pr - 6);
+    const bw = 32; c.fillStyle = "#fff"; c.fillRect(px - bw / 2, py + pr + 4, bw, 5); c.fillStyle = e.hp > 30 ? "#2F7D4F" : "#B33951"; c.fillRect(px - bw / 2, py + pr + 4, bw * clamp(e.hp, 0, 100) / 100, 5);
+  }
+  const left = clamp(T.startAt + TEAM.matchMs - Math.max(t, T.startAt), 0, TEAM.matchMs);
+  c.textAlign = "center"; c.textBaseline = "middle";
+  c.fillStyle = "rgba(255,255,255,.92)"; c.strokeStyle = "#24402F"; c.lineWidth = 2;
+  c.fillRect(W / 2 - 150, 52, 300, 48); c.strokeRect(W / 2 - 150, 52, 300, 48);
+  c.font = "bold 30px " + FONT; c.fillStyle = TEAM_CSS.blue; c.fillText(String(teamScore("blue")), W / 2 - 105, 77);
+  c.fillStyle = TEAM_CSS.red; c.fillText(String(teamScore("red")), W / 2 + 105, 77);
+  c.fillStyle = "#1B2B20"; c.font = "bold 24px " + FONT; c.fillText(fmtTime(Math.ceil(left / 1000)), W / 2, 72);
+  c.font = "bold 11px " + FONT; c.fillStyle = "#5B6B5E"; c.fillText("👀 관전 중", W / 2, 92);
+  const card = (id, x, y, w) => {
+    const e = T.ents[id], hp = e ? (e.alive ? e.hp : 0) : 100; let k = 0, d = 0;
+    for (const key in T.kills) { const v = T.kills[key]; if (!killCounts(v)) continue; if (v.k === id) k++; if (v.v === id) d++; }
+    c.fillStyle = "rgba(255,255,255,.95)"; c.fillRect(x, y, w, 46); c.strokeStyle = TEAM_CSS[T.players[id].team]; c.lineWidth = 2; c.strokeRect(x, y, w, 46);
+    c.textAlign = "left"; c.font = "bold 14px " + FONT; c.fillStyle = "#1B2B20"; c.fillText((T.players[id].isAI ? "🤖 " : "") + nickOf(id), x + 8, y + 14);
+    c.textAlign = "right"; c.font = "bold 12px " + FONT; c.fillStyle = "#5B6B5E"; c.fillText(k + "킬 " + d + "데스", x + w - 8, y + 14);
+    c.fillStyle = "#E4E8DE"; c.fillRect(x + 8, y + 28, w - 16, 9); c.fillStyle = hp > 30 ? "#2F7D4F" : "#B33951"; c.fillRect(x + 8, y + 28, (w - 16) * clamp(hp, 0, 100) / 100, 9);
+  };
+  ["blue", "red"].forEach((team, i) => {
+    const ids = teamIds(team);
+    if (wide) {
+      const x = i === 0 ? 12 : W - side - 8, w = side - 4;
+      c.fillStyle = TEAM_CSS[team]; c.fillRect(x, top, w, 28); c.fillStyle = "#fff"; c.textAlign = "center"; c.font = "bold 15px " + FONT; c.fillText(TEAM_NAME[team] + "팀 " + teamScore(team) + "점", x + w / 2, top + 14);
+      ids.forEach((id, j) => card(id, x, top + 34 + j * 52, w));
+    } else {
+      const w = (W - 36) / 2, x = 12 + i * (w + 12), y = H - bottom + 8;
+      ids.forEach((id, j) => card(id, x, y + j * 52, w));
+    }
+  });
+  const feed = T.match.feed.filter(f => nowMs - f.t < 4000).slice(-4);
+  c.font = "bold 14px " + FONT; c.textAlign = "center";
+  feed.forEach((f, i) => {
+    const txt = nickOf(f.v.k) + (f.v.h ? " 🎯 " : " ▶ ") + nickOf(f.v.v), y = top + ah - 18 - (feed.length - 1 - i) * 24, w = c.measureText(txt).width + 20;
+    c.fillStyle = "rgba(255,255,255,.9)"; c.fillRect(W / 2 - w / 2, y - 11, w, 22); c.fillStyle = "#1B2B20"; c.fillText(txt, W / 2, y);
+  });
+  if (t < T.startAt || t < T.startAt + 700) {
+    c.font = "bold 110px " + FONT; c.textAlign = "center"; c.lineWidth = 6; c.strokeStyle = "#1B2B20"; c.fillStyle = "#fff";
+    const txt = t < T.startAt ? String(Math.ceil((T.startAt - t) / 1000)) : "GO!";
+    c.strokeText(txt, W / 2, my); c.fillText(txt, W / 2, my);
+  }
+  c.textBaseline = "alphabetic";
+}
+
+$("btnCreate").onclick = e => { e.currentTarget.blur(); createRoom(); };
+$("btnJoin").onclick = e => { e.currentTarget.blur(); joinRoom(); };
+$("joinCode").addEventListener("keydown", e => { if (e.key === "Enter") joinRoom(); });
+$("nickInput").addEventListener("keydown", e => { if (e.key === "Enter") createRoom(); });
+$("btnTeamBack").onclick = e => { e.currentTarget.blur(); exitTeamMode(); };
+$("btnJoinBlue").onclick = () => pickTeam("blue");
+$("btnJoinRed").onclick = () => pickTeam("red");
+$("btnJoinSpec").onclick = () => pickTeam("spec");
+$("botFill").onchange = e => { if (isHost()) T.ref.update({ botFill: e.currentTarget.checked }); else e.currentTarget.checked = T.botFill; };
+$("btnTeamStart").onclick = e => { e.currentTarget.blur(); hostStart(); };
+$("btnLobbyLeave").onclick = e => { e.currentTarget.blur(); leaveRoom(); teamScreen("start"); };
+$("btnBackLobby").onclick = e => { e.currentTarget.blur(); hostBackToLobby(); };
+$("btnOverLeave").onclick = e => { e.currentTarget.blur(); leaveRoom(); teamScreen("start"); };
+$("btnGameLeave").onclick = e => { e.currentTarget.blur(); if (confirm("방을 나갈까요?")) { leaveRoom(); teamScreen("start"); } };
+
 function loop(now) {
   requestAnimationFrame(loop);
+  if (state === "team") {
+    teamFrame(now, Math.min(0.05, (now - lastT) / 1000));
+    lastT = now;
+    pruneTransient(now);
+    return;
+  }
   if (state === "play") {
     const dt = Math.min(0.05, (now - lastT) / 1000);
     update(dt);
@@ -884,13 +1890,14 @@ window.addEventListener("keydown", e => {
     if (state === "menu" && !e.repeat) { startGame(); return; }
     if (state === "over") { if (!e.repeat && spaceFresh && performance.now() - overAt > 900 && !document.querySelector(".wr-back")) startGame(); return; }
   }
-  if (e.code === "KeyQ" && state === "play" && !e.repeat && P.flip <= 0) P.flip = Math.PI;
+  if (e.code === "KeyQ" && (state === "play" || (state === "team" && teamCanAct())) && !e.repeat && P.flip <= 0) P.flip = Math.PI;
   keys[e.code] = true;
 });
 window.addEventListener("keyup", e => { keys[e.code] = false; if (e.code === "Space") spaceFresh = true; });
 window.addEventListener("blur", () => { for (const k in keys) keys[k] = false; });
 $("btnStart").onclick = e => { e.currentTarget.blur(); startGame(); };
 $("btnRetry").onclick = e => { e.currentTarget.blur(); startGame(); };
+$("btnTeam").onclick = e => { e.currentTarget.blur(); enterTeamMode(); };
 $("btnWipe").onclick = e => {
   e.currentTarget.blur();
   if (!confirm("이 기기에 저장된 나의 최고 기록을 지울까요? (세계 신기록에는 영향이 없습니다)")) return;

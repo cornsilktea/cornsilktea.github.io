@@ -10,6 +10,36 @@
         "$room": { ".write": "$room.matches(/^[0-9]{5}$/)" }
       }
     },
+    "fpsbattle": {
+      ".read": true,
+      "rooms": {
+        "$room": {
+          ".write": "$room.matches(/^[0-9]{5}$/)",
+          "players": {
+            "$pid": {
+              "nickname": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 12" },
+              "team": { ".validate": "newData.isString() && newData.val().matches(/^(blue|red|spec)$/)" }
+            }
+          },
+          "st": {
+            "$pid": { ".validate": "newData.isString() && newData.val().length <= 80" }
+          },
+          "hits": {
+            "$pid": {
+              "$hit": {
+                ".validate": "newData.hasChildren(['d', 'by']) && newData.child('d').isNumber() && newData.child('d').val() >= 0 && newData.child('d').val() <= 100"
+              }
+            }
+          },
+          "kills": {
+            "$kill": { ".validate": "newData.hasChildren(['k', 'v', 'kt', 'vt', 'at'])" }
+          },
+          "items": {
+            "$item": { ".validate": "newData.hasChildren(['k', 'x', 'z']) && newData.child('k').val().matches(/^(ammo|heal)$/)" }
+          }
+        }
+      }
+    },
     "court": {
       ".read": true,
       "now": { ".write": true },
