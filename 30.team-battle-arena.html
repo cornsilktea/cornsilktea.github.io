@@ -10,7 +10,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
 <meta property="og:title" content="3v3 팀 배틀 아레나">
-<meta property="og:description" content="방 코드로 모여 블루 vs 레드로 싸우는 3v3 실시간 팀 대전(또는 모두 블루팀이 되어 AI 3명과 대결) / 사격수·힐러 중 선택, 궁극기 게이지·풀숲 숨기 / 상대 팀 전멸 또는 3분 뒤 누적 피해가 많은 팀 승리">
+<meta property="og:description" content="방 코드로 모여 블루 vs 레드로 싸우는 3v3 실시간 팀 대전(또는 모두 블루팀이 되어 AI 3명과 대결) / 사격수·힐러·탱커 중 선택, 궁극기 게이지·풀숲 숨기 / 상대 팀 전멸 또는 1분 뒤 누적 피해가 많은 팀 승리">
 <meta property="og:url" content="https://cornsilktea.github.io/30.team-battle-arena.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
@@ -166,7 +166,7 @@
   <div class="wrap">
     <div class="card">
       <h1>3v3 팀 배틀 아레나</h1>
-      <p class="sub">상대 팀 3명을 모두 쓰러뜨리면 승리!<br>3분이 지나면 적에게 준 피해가 많은 팀이 이깁니다.</p>
+      <p class="sub">상대 팀 3명을 모두 쓰러뜨리면 승리!<br>1분이 지나면 적에게 준 피해가 많은 팀이 이깁니다.</p>
       <div class="hello">안녕하세요, <b id="helloNick"></b>님 👋 <button id="btnNickEdit" class="mini" type="button">✏️ 변경</button></div>
       <button id="btnCreate" class="big primary" type="button">방 만들기</button>
       <button id="btnJoinOpen" class="big" type="button">방 코드로 입장하기</button>
@@ -274,7 +274,7 @@
   var MW = 900, MH = 1350;           // 맵 크기(월드 좌표). 블루팀 = 위쪽(y 작음), 레드팀 = 아래쪽
   var BOUND = { l: 48, r: 852, t: 38, b: 1312 };   // 배경 그림의 돌담 안쪽
   var BODY_R = 24;                   // 캐릭터 몸 반지름(피격·충돌)
-  var MATCH_MS = 180000;             // 3분
+  var MATCH_MS = 60000;              // 1분
   var COUNT_MS = 3000;               // 시작 카운트다운
   var GAUGE_MAX = 10;
   var ATK_POSE_MS = 150;             // 기본 공격 포즈 유지 시간
@@ -1520,7 +1520,7 @@
     var left = st === "countdown" || t < room.startAt ? MATCH_MS : room.startAt + MATCH_MS - t;
     if (st === "ended") left = Math.max(0, Math.min(MATCH_MS, room.startAt + MATCH_MS - (room.endedAt || t)));
     setText($("hudTimer"), fmtTime(left));
-    $("hudTimer").className = left < 30000 && st === "playing" ? "low" : "";
+    $("hudTimer").className = left < 15000 && st === "playing" ? "low" : "";
     var s = teamTotals();
     setHtml($("hudCount"), '<span class="b">🔵 ' + s.blueAlive + '</span> vs <span class="r">🔴 ' + s.redAlive + "</span>");
     setHtml($("hudDmg"), '누적 피해<br><span class="b">블루 ' + Math.round(s.blue) + '</span> · <span class="r">레드 ' + Math.round(s.red) + "</span>");
