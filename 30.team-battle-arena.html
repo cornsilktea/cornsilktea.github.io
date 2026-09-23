@@ -124,17 +124,29 @@
     .spTime b { font-size: 26px; }
     .spTime small { font-size: 12px; }
   }
-  .charCard { flex: 1 1 0; min-width: 0; border: 3px solid var(--sg-line-mid); border-radius: 10px; background: var(--sg-panel); padding: 10px 6px; text-align: center; position: relative; }
-  .charCard img { display: block; height: 110px; max-width: 100%; margin: 0 auto 6px; object-fit: contain; }
+  /* 캐릭터 카드: 고른 카드를 한 번 더 누르면 뒤집혀 뒷면(능력치 표·궁극기 설명)이 보임 */
+  .charCard { flex: 1 1 0; min-width: 0; padding: 0; border: 0; background: transparent; text-align: center; perspective: 900px; color: inherit; }
+  .cardIn { position: relative; height: 270px; transition: transform .45s ease; transform-style: preserve-3d; }
+  .charCard.flip .cardIn { transform: rotateY(180deg); }
+  .face { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; flex-direction: column; overflow: hidden;
+          -webkit-backface-visibility: hidden; backface-visibility: hidden;
+          border: 3px solid var(--sg-line-mid); border-radius: 10px; background: var(--sg-panel); padding: 8px 6px; }
+  .face.back { transform: rotateY(180deg); }
+  .charCard.on .face { border-color: #D97B4F; background: #FFF6F0; box-shadow: 0 0 0 3px rgba(217,123,79,.25); }
+  .front img { display: block; flex: 1 1 auto; min-height: 0; width: 100%; object-fit: contain; }
+  .front .nm { margin-top: auto; padding-top: 4px; }
   .charCard .nm { font-size: 20px; font-weight: 800; }
-  .charCard .st { width: 100%; margin-top: 6px; border-collapse: collapse; font-size: 13px; line-height: 1.35; }
+  .back .nm { font-size: 16px; margin-bottom: 2px; }
+  .charCard .st { width: 100%; border-collapse: collapse; font-size: 13px; line-height: 1.3; }
   .charCard .st th, .charCard .st td { padding: 2px 4px; border-top: 1px solid var(--sg-line); }
   .charCard .st th { text-align: left; font-weight: 700; color: var(--sg-ink-soft); white-space: nowrap; }
   .charCard .st td { text-align: right; font-weight: 800; color: var(--sg-ink); }
-  .charCard.on { border-color: #D97B4F; background: #FFF6F0; box-shadow: 0 0 0 3px rgba(217,123,79,.25); }
+  .ultDesc { margin-top: 4px; padding: 4px 4px 0; border-top: 1px solid var(--sg-line); text-align: left; font-size: 12px; line-height: 1.4; color: var(--sg-ink-mid); }
+  .ultDesc b { display: block; font-size: 12px; color: var(--sg-ink-soft); }
   .charCard:disabled { opacity: .5; cursor: default; }
   .charCard .soon { position: absolute; top: 8px; right: 8px; font-size: 12px; font-weight: 800; background: var(--sg-ink-faint); color: #fff; border-radius: 4px; padding: 2px 6px; }
-  .tankPh { height: 110px; display: flex; align-items: center; justify-content: center; font-size: 60px; margin-bottom: 6px; }
+  .tankPh { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; font-size: 60px; }
+  .secHint { font-size: 12px; font-weight: 700; color: var(--sg-ink-soft); margin-left: 6px; }
   .startHint { text-align: center; font-size: 15px; font-weight: 700; color: var(--sg-ink-soft); margin-top: 8px; min-height: 20px; }
   .secTitle { font-size: 17px; font-weight: 800; margin-bottom: 10px; }
 
@@ -205,8 +217,11 @@
     .slot .ch { font-size: 11px; }
     .chars { flex-wrap: wrap; }
     .charCard { flex: 1 1 40%; }
-    .charCard img, .tankPh { height: 80px; }
+    .cardIn { height: 250px; }
     .charCard .nm { font-size: 17px; }
+    .back .nm { font-size: 14px; }
+    .charCard .st { font-size: 12px; }
+    .ultDesc { font-size: 11px; }
     #btnAtk { width: 96px; height: 96px; right: 16px; bottom: 40px; }
     #btnUlt { width: 74px; height: 74px; right: 124px; bottom: 46px; }
     #hudTimer { font-size: 22px; }
@@ -279,7 +294,7 @@
     </div>
 
     <div id="charCardBox" class="card">
-      <div class="secTitle">캐릭터 선택</div>
+      <div class="secTitle">캐릭터 선택<span class="secHint">선택한 역할을 한 번 더 클릭하면 자세한 설명이 나옵니다.</span></div>
       <div class="chars" id="chars"></div>
     </div>
 
@@ -356,7 +371,7 @@
   };
   var CHAR_LIST = ["marksman", "healer", "tank", "assassin"];
   var ULT = { mkCount: 20, mkGap: 55, mkDmg: 18, mkSpeed: 1150, mkRange: KEY * 8, mkPr: 8,
-              hlPct: 0.10, hlDur: 4000, hlSelf: 2, hlPoseMs: 1000, tkDur: 5000, tkDef: 0.5, tkSpeed: 1.5,
+              hlPct: 0.10, hlDur: 3000, hlSelf: 2, hlPoseMs: 1000, tkDur: 5000, tkDef: 0.5, tkSpeed: 1.5,
               asSmokeMs: 400, asDur: 10000, asSpeed: 1.4 };
   var STEALTH_ALPHA = 0.4;           // 풀숲·은신 중인 아군이 보이는 투명도
   var BOT_VIEW = 600;                // AI 시야
@@ -725,11 +740,37 @@
     return "img/teambattle/" + SPR[c].pre + "-" + tm + "-front-idle.png";
   }
 
-  /* 캐릭터 카드 능력치 표: HP · 공격당 데미지(여러 발이면 * n) · 사거리 · 궁극기 */
+  /* 캐릭터 카드 — 앞면: 그림 + 이름 / 뒷면: 능력치 표 + 궁극기 설명.
+     숫자는 모두 CHARS·ULT 에서 가져오므로 밸런스를 고치면 카드도 저절로 바뀜 */
+  var flipped = null;                              // 뒤집혀 있는 캐릭터
+  function num(v) { return String(Math.round(v * 10) / 10); }
+  function ultDesc(k) {
+    if (k === "marksman") return "짧은 시간 내에 " + num(ULT.mkDmg) + "의 데미지를 주는 " + ULT.mkCount + "발의 총알을 발사합니다.";
+    if (k === "healer") return "아군 모두 " + num(ULT.hlDur / 1000) + "초간 매 초 최대 체력의 " + num(ULT.hlPct * 100) + "%를 회복합니다. (힐러 자신은 " + ULT.hlSelf + "배)";
+    if (k === "tank") return num(ULT.tkDur / 1000) + "초간 이동속도를 " + num((ULT.tkSpeed - 1) * 100) + "% 얻고 받는 피해가 " + num((1 - ULT.tkDef) * 100) + "% 감소합니다.";
+    if (k === "assassin") return num(ULT.asDur / 1000) + "초간 이동속도를 " + num((ULT.asSpeed - 1) * 100) + "% 얻고 은신 상태가 됩니다. 다음 공격을 하면 은신이 해제됩니다.";
+    return "";
+  }
+  /* 능력치 표: HP · 공격당 데미지(여러 발이면 * n) · 초당 공격 횟수 · 사거리 · 궁극기 */
   function statTable(c) {
-    var dmg = c.dmg + (c.shots > 1 ? " * " + c.shots : "");
+    var dmg = num(c.dmg) + (c.shots > 1 ? " * " + c.shots : "");
     return '<table class="st"><tr><th>HP</th><td>' + c.hp + "</td></tr><tr><th>공격</th><td>" + dmg + "</td></tr>" +
+           "<tr><th>초당 공격</th><td>" + num(1000 / c.cd) + "회</td></tr>" +
            "<tr><th>사거리</th><td>" + Math.round(c.range) + "</td></tr><tr><th>궁극기</th><td>" + c.ultName + "</td></tr></table>";
+  }
+  function cardsHtml(me) {
+    var h = "";
+    CHAR_LIST.forEach(function (k) {
+      var c = CHARS[k], off = k === "tank" && !TANK_ENABLED;
+      h += '<button type="button" class="charCard' + (me.characterType === k ? " on" : "") + (flipped === k && me.characterType === k ? " flip" : "") +
+        '" data-c="' + k + '"' + (off ? " disabled" : "") + '><div class="cardIn">' +
+        '<div class="face front">' + (off ? '<span class="soon">준비 중</span><div class="tankPh">🛡️</div>' : '<img alt="" src="' + charImgSrc(k, me.team) + '">') +
+          '<div class="nm">' + c.name + "</div></div>" +
+        '<div class="face back"><div class="nm">' + c.name + "</div>" + statTable(c) +
+          '<div class="ultDesc"><b>궁극기 설명</b>' + ultDesc(k) + "</div></div>" +
+        "</div></button>";
+    });
+    return h;
   }
   function renderLobby() {
     if (!room || screenNow !== "lobby") return;
@@ -769,14 +810,7 @@
     show($("charCardBox"), !imSpec);
 
     /* 캐릭터 선택 */
-    var cards = "";
-    CHAR_LIST.forEach(function (c) {
-      var off = c === "tank" && !TANK_ENABLED;
-      cards += '<button type="button" class="charCard' + (me.characterType === c ? " on" : "") + '" data-c="' + c + '"' + (off ? " disabled" : "") + ">" +
-        (off ? '<span class="soon">준비 중</span><div class="tankPh">🛡️</div>' : '<img alt="" src="' + charImgSrc(c, me.team) + '">') +
-        '<div class="nm">' + CHARS[c].name + "</div>" + statTable(CHARS[c]) + "</button>";
-    });
-    setHtml($("chars"), cards);
+    setHtml($("chars"), cardsHtml(me));
 
     /* 시작 버튼 */
     var host = isHost(), ok = false, hint = "";
@@ -800,6 +834,14 @@
     if (!b || b.disabled || !room || room.status !== "lobby") return;
     var c = b.getAttribute("data-c");
     if (c === "tank" && !TANK_ENABLED) return;
+    var me = P[myId]; if (!me) return;
+    if (me.characterType === c) {                 // 이미 고른 카드를 한 번 더 → 뒤집어 자세한 설명
+      flipped = flipped === c ? null : c;
+      b.classList.toggle("flip", flipped === c);
+      $("chars")._h = cardsHtml(me);              // 화면은 그대로 두고(뒤집히는 애니메이션 유지) 기억만 맞춤
+      return;
+    }
+    flipped = null;
     room.ref.child("players/" + myId + "/characterType").set(c);
   };
   $("btnJoinBlue").onclick = function () { pickTeam("blue"); };
