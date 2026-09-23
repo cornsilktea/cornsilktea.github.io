@@ -51,6 +51,10 @@
   .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 14px; font-weight: 800; background: var(--sg-primary-soft); color: var(--sg-primary); }
   .badge.ai { background: #D97B4F; color: #fff; }
   .danger { border-color: var(--sg-danger); color: var(--sg-danger); }
+  .modeBtns { display: inline-flex; gap: 6px; flex-wrap: wrap; margin-left: 6px; }
+  .modeBtn.on { background: var(--sg-primary); border-color: var(--sg-primary); color: var(--sg-primary-ink); }
+  .modeBtn:disabled { cursor: default; }
+  .modeBtn:disabled:not(.on) { opacity: .5; }
 
   .modeRow { display: flex; gap: 12px; }
   .modeRow button { flex: 1 1 0; min-width: 0; height: 110px; border-radius: 8px; border: 2px solid var(--sg-line-strong); background: var(--sg-panel); font-size: 24px; font-weight: 800; color: var(--sg-ink); line-height: 1.3; }
@@ -267,7 +271,7 @@
         <div class="codeBox"><span class="codeLab">방 코드</span><span id="lobbyCode" class="codeNum">-----</span><span id="lobbyMode" class="badge"></span></div>
         <button id="btnLeaveLobby" class="mini danger" type="button">방 나가기</button>
       </div>
-      <div class="hello" style="justify-content:flex-start;margin:12px 0 0;font-size:16px;">내 닉네임: <b id="lobbyNick"></b> <button id="btnNickEdit2" class="mini" type="button">✏️ 변경</button></div>
+      <div class="hello" style="justify-content:flex-start;margin:12px 0 0;font-size:16px;">내 닉네임: <b id="lobbyNick"></b> <button id="btnNickEdit2" class="mini" type="button">✏️ 변경</button><span id="modeBtns" class="modeBtns"></span></div>
     </div>
 
     <div id="modeCard" class="card" hidden>
@@ -701,11 +705,11 @@
     room.ref.child("players").transaction(function (ps) {
       if (!ps || !ps[myId]) return ps;
       var blue = humans(ps).filter(function (id) { return id !== myId && ps[id].team === "blue"; });
-      if (blue.length >= 3) return;
-      ps[myId].team = "blue"; return ps;
+      ps[myId].team = blue.length >= 3 ? "spec" : "blue";   // 블루팀이 꽉 찼으면 관전자로
+      return ps;
     }).then(function (res) {
       assigning = false;
-      if (!res.committed && room) { leaveRoom(); startMsg("방이 가득 찼습니다."); }
+      if (res.committed && P[myId] && P[myId].team === "spec") flashHint("블루팀이 가득 차서 관전자가 되었어요.");
     }).catch(function () { assigning = false; });
   }
 
@@ -721,9 +725,22 @@
   var hintUntil = 0, hintText = "";
   function flashHint(t) { hintText = t; hintUntil = Date.now() + 2500; renderLobby(); setTimeout(renderLobby, 2600); }
 
+  /* 게임 방식 — 새 방식은 여기에 한 줄 추가하면 로비의 방식 버튼(AI 대전 오른쪽)에 붙음 */
+  var MODES = [
+    { id: "pvp", name: "3v3 플레이" },
+    { id: "ai", name: "AI 대전" }
+  ];
+  function modeName(id) { for (var i = 0; i < MODES.length; i++) if (MODES[i].id === id) return MODES[i].name; return "모드 선택 중"; }
+  /* 방장만, 로비에서 언제든 바꿀 수 있음 */
   function setMode(mode) {
-    if (!isHost() || room.mode) return;
+    if (!isHost() || room.status !== "lobby" || room.mode === mode) return;
     var u = { mode: mode };
+    /* 전에 있던 AI 봇은 치우고, AI 대전으로 가면 레드팀 학생은 중립으로 (중립은 곧 블루팀으로 자동 배정) */
+    keys(P).forEach(function (id) {
+      var p = P[id]; if (!p) return;
+      if (p.isAI) u["players/" + id] = null;
+      else if (mode === "ai" && p.team === "red") u["players/" + id + "/team"] = "neutral";
+    });
     if (mode === "ai") {
       var chars = ["marksman", "healer", TANK_ENABLED ? "tank" : "marksman"];
       var t = now();
@@ -778,7 +795,11 @@
     if (!room || screenNow !== "lobby") return;
     var me = P[myId]; if (!me) return;
     var mode = room.mode;
-    setText($("lobbyMode"), mode === "ai" ? "AI 대전" : (mode === "pvp" ? "3v3 플레이" : "모드 선택 중"));
+    setText($("lobbyMode"), modeName(mode));
+    /* 방식 바꾸기 버튼: 방장만 누를 수 있고, 지금 방식이 칠해져 있음 */
+    setHtml($("modeBtns"), MODES.map(function (m) {
+      return '<button type="button" class="mini modeBtn' + (m.id === mode ? " on" : "") + '" data-mode="' + m.id + '"' + (isHost() ? "" : " disabled") + ">" + m.name + "</button>";
+    }).join(""));
     $("lobbyMode").className = "badge" + (mode === "ai" ? " ai" : "");
     show($("modeCard"), !mode && isHost());
     show($("modeWait"), !mode && !isHost());
@@ -852,6 +873,10 @@
   $("btnSpec").onclick = function () { if (room && room.status === "lobby") room.ref.child("players/" + myId + "/team").set("spec"); };
   $("btnModePvp").onclick = function () { setMode("pvp"); };
   $("btnModeAi").onclick = function () { setMode("ai"); };
+  $("modeBtns").onclick = function (e) {
+    var b = e.target.closest ? e.target.closest(".modeBtn") : null;
+    if (b && !b.disabled) setMode(b.getAttribute("data-mode"));
+  };
   $("btnLeaveLobby").onclick = leaveRoom;
   $("btnLeaveGame").onclick = function () { if (confirm("방을 나갈까요?")) leaveRoom(); };
   $("btnLeaveEnd").onclick = leaveRoom;
