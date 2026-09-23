@@ -181,7 +181,6 @@
   #btnUlt.act { border-color: #F9B8DA; }
   #btnUlt.act .fill { background: rgba(240,107,181,.85); }
   @keyframes glow { from { box-shadow: 0 0 6px 2px rgba(255,120,80,.6); } to { box-shadow: 0 0 22px 8px rgba(255,90,60,.95); } }
-  #ctlHint { position: absolute; left: 16px; bottom: 186px; font-size: 13px; font-weight: 700; color: rgba(255,255,255,.85); pointer-events: none; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
   #deadMsg { position: absolute; left: 50%; bottom: 30%; transform: translateX(-50%); background: rgba(27,43,32,.82); color: #fff; font-size: 20px; font-weight: 800; padding: 10px 20px; border-radius: 8px; pointer-events: none; white-space: nowrap; }
   #countOv { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; pointer-events: none; }
   #countNum { font-size: 150px; font-weight: 800; color: #fff; text-shadow: 0 4px 18px rgba(0,0,0,.55); line-height: 1; }
@@ -191,9 +190,7 @@
   #endOv.red { background: rgba(214,69,61,.62); }
   #endOv.draw { background: rgba(60,60,60,.62); }
   .endBox { background: #fff; border-radius: 12px; padding: 24px 22px; width: 100%; max-width: 440px; text-align: center; border: 3px solid var(--sg-line-strong); }
-  #endTitle { font-size: 38px; font-weight: 800; margin-bottom: 4px; }
-  #endSub { font-size: 18px; font-weight: 800; color: var(--sg-ink-soft); margin-bottom: 14px; }
-  #endReason { font-size: 14px; color: var(--sg-ink-soft); margin-bottom: 12px; }
+  #endTitle { font-size: 38px; font-weight: 800; margin-bottom: 16px; }
   .scoreRow { display: flex; gap: 10px; margin-bottom: 16px; }
   .scoreRow div { flex: 1 1 0; border-radius: 8px; padding: 10px 6px; font-size: 15px; font-weight: 800; }
   .scoreRow b { display: block; font-size: 32px; }
@@ -307,7 +304,6 @@
   <button id="btnLeaveGame" type="button">방 나가기</button>
   <div id="specL" class="specPanel blue" hidden></div>
   <div id="specR" class="specPanel red" hidden></div>
-  <div id="ctlHint">← 여기를 누르고 끌어서 이동</div>
   <div id="btnUlt" class="actBtn"><div class="fill"></div><span>궁극기</span></div>
   <div id="btnAtk" class="actBtn"><div class="cd"></div><span>공격</span></div>
   <div id="deadMsg" hidden>쓰러졌습니다 — 팀원을 응원하세요!</div>
@@ -315,10 +311,8 @@
   <div id="endOv" hidden>
     <div class="endBox">
       <div id="endTitle"></div>
-      <div id="endSub"></div>
-      <div id="endReason"></div>
       <div class="scoreRow"><div class="sb">블루팀 누적 피해<b id="endBlue">0</b></div><div class="sr">레드팀 누적 피해<b id="endRed">0</b></div></div>
-      <div class="endBtns"><button id="btnAgain" class="primary" type="button">다시하기 (스페이스)</button><button id="btnLeaveEnd" type="button">방 나가기</button></div>
+      <div class="endBtns"><button id="btnAgain" class="primary" type="button">다시하기</button><button id="btnLeaveEnd" type="button">방 나가기</button></div>
     </div>
   </div>
 </div>
@@ -353,7 +347,7 @@
   var GAUGE_MAX = 10;
   var TEAM_MAX = 3, SPEC_MAX = 2;    // 팀당 인원, 관전자 최대 인원
   var ATK_POSE_MS = 150;             // 기본 공격 포즈 유지 시간
-  var NET_MS = 100;                  // 위치 전송 간격(초당 10회)
+  var NET_MS = 143;                  // 위치 전송 간격(초당 약 7회) — 줄이면 부드럽지만 데이터베이스 사용량이 늘어남
   var CHARS = {
     /* shots·gap: 한 번 공격에 여러 발(gap ms 간격). perHit: 명중 1회당 궁극기 게이지 */
     /* speed: 이동속도(초당 월드 px), ultSpeed: 궁극기 지속 중 이동속도 */
@@ -921,7 +915,7 @@
              burst: null, volley: null, mv: false, pending: null };
   }
   function initGame() {
-    G = { startAt: room.startAt, endSent: false, playingSent: false, lastNet: 0, finalSent: false, beeped: -1 };
+    G = { startAt: room.startAt, endSent: false, playingSent: false, lastNet: 0, sent: {}, finalSent: false, beeped: -1 };
     ME = isSpec() ? null : makeEnt(myId, P[myId]);    // 관전자는 캐릭터 없음
     BOTS = {}; R = {}; FX = []; handled = {};
     lastHp = {};
@@ -1333,19 +1327,23 @@
     }
   }
 
-  /* ---------- 네트워크 쓰기 (초당 10회) ---------- */
+  /* ---------- 네트워크 쓰기 (초당 약 7회, 바뀐 값만) ----------
+     데이터베이스 사용량(다운로드)을 줄이려고 지난번에 보낸 값과 같은 항목은 빼고 보낸다.
+     G.sent 에 마지막으로 보낸 값을 기억(판이 새로 시작하면 비워서 처음엔 전부 보냄) */
   function entFields(u, E) {
-    var b = "players/" + E.id + "/";
-    u[b + "x"] = r1(E.x); u[b + "y"] = r1(E.y); u[b + "angle"] = Math.round(E.angle * 100) / 100;
-    u[b + "hp"] = Math.round(E.hp * 10) / 10; u[b + "alive"] = E.alive; u[b + "skillGauge"] = E.gauge; u[b + "damageDealt"] = E.dmg;
-    u[b + "mv"] = !!E.mv; u[b + "atkAt"] = E.atkAt; u[b + "ultUntil"] = E.ultUntil; u[b + "buffUntil"] = E.buffUntil;
-    u[b + "stealthUntil"] = E.stealthUntil; u[b + "regenUntil"] = E.regenUntil;
-    u[b + "skillUntil"] = E.skillUntil; u[b + "skillDur"] = E.skillDur; u[b + "lastUpdate"] = now();
+    var b = "players/" + E.id + "/", sent = G.sent;
+    function put(k, v) { if (sent[b + k] !== v) { sent[b + k] = v; u[b + k] = v; } }
+    put("x", r1(E.x)); put("y", r1(E.y)); put("angle", Math.round(E.angle * 100) / 100);
+    put("hp", Math.round(E.hp * 10) / 10); put("alive", E.alive); put("skillGauge", E.gauge); put("damageDealt", E.dmg);
+    put("mv", !!E.mv); put("atkAt", E.atkAt); put("ultUntil", E.ultUntil); put("buffUntil", E.buffUntil);
+    put("stealthUntil", E.stealthUntil); put("regenUntil", E.regenUntil);
+    put("skillUntil", E.skillUntil); put("skillDur", E.skillDur);
   }
   function netWrite(force) {
     var t = Date.now();
     if (!force && !G.forceNet && t - G.lastNet < NET_MS) return;
     G.lastNet = t; G.forceNet = false;
+    if (!G.sent) G.sent = {};
     var u = {};
     if (ME && P[myId]) entFields(u, ME);
     if (isHost()) keys(BOTS).forEach(function (id) { if (P[id]) entFields(u, BOTS[id]); });
@@ -1791,7 +1789,6 @@
 
     var alive = ME && ME.alive, playing = st === "playing" && t >= room.startAt;
     show($("btnAtk"), alive && st !== "ended"); show($("btnUlt"), alive && st !== "ended");
-    show($("ctlHint"), alive && st !== "ended" && joy.id === null && t - room.startAt < 15000);
     show($("deadMsg"), ME && !ME.alive && st === "playing");
     if (ME) {
       var cdLeft = Math.max(0, ME.cdUntil - t) / CHARS[ME.char].cd;
@@ -1815,13 +1812,11 @@
     }
     /* 종료 */
     if (st === "ended") {
-      var w = room.winner, f = room.final || {}, mine = ME ? ME.team : null;
+      var w = room.winner, f = room.final || {};
       show($("endOv"), true);
       $("endOv").className = w === "blue" ? "blue" : (w === "red" ? "red" : "draw");
       setText($("endTitle"), w === "draw" ? "무승부" : (w === "blue" ? "블루팀 승리!" : (w === "red" ? "레드팀 승리!" : "게임 종료")));
       $("endTitle").style.color = w === "blue" ? "#2F6FD6" : (w === "red" ? "#D6453D" : "#3B4B40");
-      setText($("endSub"), !mine || w === "draw" || !w ? "" : (w === mine ? "🎉 우리 팀이 이겼어요!" : "아쉽게 졌어요. 다시 도전!"));
-      setText($("endReason"), f.reason || "");
       setText($("endBlue"), String(f.blue != null ? f.blue : Math.round(s.blue)));
       setText($("endRed"), String(f.red != null ? f.red : Math.round(s.red)));
     } else show($("endOv"), false);
