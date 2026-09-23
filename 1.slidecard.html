@@ -8,7 +8,6 @@
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="slidecard"></script>
 <script charset="utf-8" src="world-record.js"></script>
-<!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
 <title>카드 옮기기</title>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
@@ -17,54 +16,40 @@
 <meta property="og:url" content="https://cornsilktea.github.io/1.slidecard.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
-<!-- 링크 미리보기 끝 -->
 <style>
-:root{
-  --wrks-viz-font-family:var(--sg-font);
-  --wrks-viz-primary:var(--sg-primary);
-  --wrks-viz-bg:var(--sg-bg);
-  --wrks-viz-fg:var(--sg-ink);
-  --wrks-viz-border:var(--sg-line-mid);
-  --wrks-viz-radius:var(--sg-radius);
-  --wrks-viz-space-1:4px;
-  --wrks-viz-space-2:8px;
-  --wrks-viz-space-3:12px;
-  --wrks-viz-space-4:16px;
-}
 *{box-sizing:border-box;}
 body{
-  margin:0;padding:var(--wrks-viz-space-4);
-  background:var(--wrks-viz-bg);color:var(--wrks-viz-fg);
-  font-family:var(--wrks-viz-font-family);
+  margin:0;padding:16px;
+  background:var(--sg-bg);color:var(--sg-ink);
+  font-family:var(--sg-font);
   -webkit-user-select:none;user-select:none;
 }
-.wrap{display:flex;gap:var(--wrks-viz-space-4);align-items:flex-start;flex-wrap:wrap;}
+.wrap{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;}
 .boardpane{flex:1 1 380px;max-width:520px;min-width:280px;}
-.board{position:relative;width:100%;border:2px solid var(--sg-line-strong);border-radius:var(--wrks-viz-radius);background:var(--sg-panel);padding:8px;touch-action:none;}
-.card{position:absolute;border-radius:var(--sg-radius);background:var(--wrks-viz-primary);cursor:grab;}
+.board{position:relative;width:100%;border:2px solid var(--sg-line-strong);border-radius:var(--sg-radius);background:var(--sg-panel);padding:8px;touch-action:none;}
+.card{position:absolute;border-radius:var(--sg-radius);background:var(--sg-primary);cursor:grab;}
 .card.red{background:#D97B4F;}
-.card.movable{cursor:grab;}
 .card.locked{cursor:default;}
 .card.anim{transition:left .13s ease-out, top .13s ease-out;}
 .card.dragging{cursor:grabbing;z-index:5;}
-.panel{flex:0 0 216px;display:flex;flex-direction:column;gap:var(--wrks-viz-space-2);}
-.tile{background:var(--sg-panel);border:1px solid var(--wrks-viz-border);border-radius:var(--wrks-viz-radius);padding:var(--wrks-viz-space-3);}
-.k{font-size:12px;color:var(--sg-ink-soft);margin-bottom:var(--wrks-viz-space-1);}
+.panel{flex:0 0 216px;display:flex;flex-direction:column;gap:8px;}
+.tile{background:var(--sg-panel);border:1px solid var(--sg-line-mid);border-radius:var(--sg-radius);padding:12px;}
+.k{font-size:12px;color:var(--sg-ink-soft);margin-bottom:4px;}
 .v{font-size:30px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.15;}
 .v.done{color:var(--sg-ok);}
-.s{font-size:12px;color:var(--sg-ink-soft);margin-top:var(--wrks-viz-space-1);}
+.s{font-size:12px;color:var(--sg-ink-soft);margin-top:4px;}
 .goal{font-size:13px;line-height:1.5;}
 .legend{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--sg-ink-mid);margin-top:6px;}
 .dot{width:10px;height:10px;border-radius:3px;display:inline-block;}
 .dot.red{background:#D97B4F;}
-.dot.blue{background:var(--wrks-viz-primary);}
+.dot.blue{background:var(--sg-primary);}
 button{
   font-family:inherit;font-size:13px;padding:9px 12px;
   border:1.5px solid var(--sg-line-strong);border-radius:var(--sg-radius);
-  background:#fff;color:var(--wrks-viz-fg);cursor:pointer;
+  background:#fff;color:var(--sg-ink);cursor:pointer;
 }
 button:hover{background:var(--sg-panel-alt);}
-  [hidden]{display:none !important;}
+[hidden]{display:none !important;}
 </style>
 </head>
 <body>
@@ -109,34 +94,36 @@ button:hover{background:var(--sg-panel-alt);}
 (function(){
   var ROWS=6, COLS=6, GAP=8, PAD=8;
   var RED_ID=0, START_EMPTY=1, GOAL_SLOT=ROWS*COLS-1;
+  var CARD_COUNT=ROWS*COLS-1;
 
-  var board=document.getElementById('board');
-  var clockEl=document.getElementById('clock');
-  var movesEl=document.getElementById('moves');
-  var statusEl=document.getElementById('status');
-  var resetBtn=document.getElementById('reset');
-  var bestEl=document.getElementById('best');
-  var bestMovesEl=document.getElementById('bestMoves');
+  function byId(id){return document.getElementById(id);}
+  var board=byId('board');
+  var clockEl=byId('clock');
+  var movesEl=byId('moves');
+  var statusEl=byId('status');
+  var bestEl=byId('best');
+  var bestMovesEl=byId('bestMoves');
+  var worldEl=byId('world');
+  var worldNameEl=byId('worldName');
+  var classTile=byId('clsTile');
+  var classValEl=byId('clsVal');
+  var classNameEl=byId('clsName');
   var BEST_KEY='slidecard6x6_best_v1';
 
-  var N=ROWS*COLS, CARDN=N-1;
   var els=[], slotOf=[], empty=START_EMPTY;
   var cell=56, step=64;
   var moves=0, startAt=0, running=false, finished=false, elapsed=0, raf=0;
   var best=loadBest();
 
-  /* 세계 신기록 (모든 학생 공통, Firebase). 시간은 작을수록 좋으므로 lower:true */
-  var worldEl=document.getElementById('world');
-  var worldNameEl=document.getElementById('worldName');
   var WR=window.WorldRecord?WorldRecord('slidecard',{lower:true,format:fmt}):null;
   function renderWorld(){
     if(WR&&WR.rec){worldEl.textContent=WR.text();worldNameEl.textContent=WR.who();}
     else{worldEl.textContent='-';worldNameEl.textContent=(WR&&!WR.loaded)?'불러오는 중…':'아직 기록 없음';}
-    /* 반별 링크로 들어왔을 때만 우리 반 신기록 칸을 보인다 */
-    var C=WR&&WR.cls;
-    if(C){document.getElementById('clsTile').hidden=false;
-      if(C.rec){document.getElementById('clsVal').textContent=C.text();document.getElementById('clsName').textContent=C.who();}
-      else{document.getElementById('clsVal').textContent='-';document.getElementById('clsName').textContent=C.loaded?'아직 기록 없음':'불러오는 중…';}}
+    var classRecord=WR&&WR.cls;
+    if(!classRecord){return;}
+    classTile.hidden=false;
+    if(classRecord.rec){classValEl.textContent=classRecord.text();classNameEl.textContent=classRecord.who();}
+    else{classValEl.textContent='-';classNameEl.textContent=classRecord.loaded?'아직 기록 없음':'불러오는 중…';}
   }
   if(WR){WR.onChange(renderWorld);WR.load();}
 
@@ -167,7 +154,7 @@ button:hover{background:var(--sg-panel-alt);}
   function build(){
     board.innerHTML='';
     els=[];slotOf=[];
-    for(var i=0;i<CARDN;i++){
+    for(var i=0;i<CARD_COUNT;i++){
       var el=document.createElement('div');
       el.className='card'+(i===RED_ID?' red':'');
       el.addEventListener('pointerdown',onDown);
@@ -179,7 +166,7 @@ button:hover{background:var(--sg-panel-alt);}
 
   function resetState(){
     empty=START_EMPTY;
-    for(var i=0;i<CARDN;i++){
+    for(var i=0;i<CARD_COUNT;i++){
       slotOf[i]=(i<START_EMPTY)?i:i+1;
     }
     moves=0;movesEl.textContent='0';
@@ -188,7 +175,7 @@ button:hover{background:var(--sg-panel-alt);}
     clockEl.textContent='00:00.00';
     clockEl.classList.remove('done');
     statusEl.textContent='대기 중 · 첫 이동에서 시작';
-    for(var j=0;j<CARDN;j++){
+    for(var j=0;j<CARD_COUNT;j++){
       els[j].classList.remove('locked');
     }
     renderBest();
@@ -208,7 +195,7 @@ button:hover{background:var(--sg-panel-alt);}
 
   function layout(animate){
     measure();
-    for(var i=0;i<CARDN;i++){
+    for(var i=0;i<CARD_COUNT;i++){
       var el=els[i];
       el.classList.toggle('anim',!!animate);
       el.style.width=cell+'px';
@@ -329,23 +316,17 @@ button:hover{background:var(--sg-panel-alt);}
     }
     statusEl.textContent=(isNewBest?'완료 · 신기록! ':'완료 · 기록 ')+fmt(elapsed)+' / '+moves+'회';
     if(WR){WR.prompt(elapsed);}
-    for(var i=0;i<CARDN;i++){
+    for(var i=0;i<CARD_COUNT;i++){
       els[i].classList.add('locked');
     }
   }
 
-  resetBtn.addEventListener('click',resetState);
-  window.addEventListener('resize',function(){layout(false);postH();});
-
-  function postH(){
-    try{
-      parent.postMessage({type:'wrks:viz:resize',height:document.documentElement.scrollHeight},'*');
-    }catch(e){}
-  }
+  function relayout(){layout(false);}
+  byId('reset').addEventListener('click',resetState);
+  window.addEventListener('resize',relayout);
 
   build();
-  postH();
-  window.addEventListener('load',function(){layout(false);postH();});
+  window.addEventListener('load',relayout);
 })();
 </script>
 </body>
