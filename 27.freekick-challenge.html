@@ -6,7 +6,6 @@
 <script charset="utf-8" src="world-record.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
 <title>프리킥 챌린지</title>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
@@ -15,14 +14,12 @@
 <meta property="og:url" content="https://cornsilktea.github.io/27.freekick-challenge.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
-<!-- 링크 미리보기 끝 -->
 <link rel="stylesheet" href="theme.css">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: #DDE3E8; font-family: var(--sg-font); color: var(--sg-ink); }
   canvas#gl { position: fixed; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 
-  /* ── HUD (위쪽 46px 는 access-guard.js 의 '← 목록으로' 버튼 자리) ── */
   .hud { position: fixed; z-index: 5; display: none; }
   .hud-box { background: rgba(255,255,255,.92); border: 2px solid var(--sg-line-strong); border-radius: 10px; padding: 6px 12px; font-weight: 800; font-variant-numeric: tabular-nums; box-shadow: 0 3px 0 rgba(27,43,32,.25); }
   .hud-box .lab { font-size: 11px; color: var(--sg-ink-soft); font-weight: 700; display: block; }
@@ -39,7 +36,6 @@
   #hudBest { top: 52px; right: 10px; pointer-events: none; font-size: 14px; text-align: right; }
   #hudBest .who { display: block; font-size: 11px; color: var(--sg-ink-soft); font-weight: 700; }
 
-  /* ── 아래 조작판: 조준 · 킥 종류 · 높이 · 파워 게이지 ── */
   #panel { left: 0; right: 0; bottom: 0; padding: 6px 10px 8px; display: none; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 10px; pointer-events: none; }
   #panel > * { pointer-events: auto; }
   #powerWrap { flex: 1 1 280px; max-width: 520px; background: rgba(255,255,255,.92); border: 2px solid var(--sg-line-strong); border-radius: 10px; padding: 4px 10px 6px; box-shadow: 0 3px 0 rgba(27,43,32,.25); }
@@ -60,14 +56,12 @@
   #btnKick { font: inherit; font-weight: 800; font-size: 16px; padding: 0 16px; height: 42px; border-radius: 10px; border: 3px solid var(--sg-line-strong); background: var(--sg-primary); color: #fff; cursor: pointer; box-shadow: 0 4px 0 var(--sg-ink); touch-action: none; user-select: none; }
   #btnKick:active, #btnKick.hold { transform: translateY(3px); box-shadow: 0 1px 0 var(--sg-ink); background: #D97B4F; }
 
-  /* 결과 팝업 글자 */
   #pops { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 6; pointer-events: none; overflow: hidden; }
   .pop { position: absolute; left: 50%; top: 42%; font-size: 64px; font-size: clamp(34px, 7vw, 64px); font-weight: 800; color: #fff; -webkit-text-stroke: 2px var(--sg-ink); text-shadow: 0 5px 0 rgba(27,43,32,.4); animation: pop 1.3s ease-out forwards; white-space: nowrap; }
   .pop.goal { color: #F2D06B; }
   .pop.fail { color: #FF6B7A; }
   @keyframes pop { 0% { opacity: 0; transform: translate(-50%,-50%) scale(1.6); } 15% { opacity: 1; transform: translate(-50%,-50%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%,-90%); } }
 
-  /* ── 카드 (시작 · 결과) ── */
   #overlay { position: fixed; top: 0; right: 0; bottom: 0; left: 0; display: flex; align-items: center; justify-content: center; padding: 56px 12px 12px; z-index: 7; overflow-y: auto; background: rgba(27,43,32,.25); }
   .card { width: 100%; max-width: 560px; background: var(--sg-panel); border: 3px solid var(--sg-line-strong); border-radius: 14px; padding: 22px 22px 18px; box-shadow: 0 10px 0 rgba(27,43,32,.3), 0 20px 40px rgba(0,0,0,.2); text-align: center; }
   .logo { font-size: 58px; font-size: clamp(38px, 8vw, 58px); font-weight: 800; line-height: 1.05; color: #D97B4F; -webkit-text-stroke: 2px var(--sg-ink); text-shadow: 4px 5px 0 var(--sg-ink); letter-spacing: -1px; margin-bottom: 4px; }
@@ -193,53 +187,45 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 "use strict";
-/* ═══════════════════════════════════════════════════════════════════
-   프리킥 챌린지 — Three.js 3D 프리킥 (쉬는시간용, 개인전, 10단계 순차 언락)
-   좌표: 골 중심이 원점, 골라인이 x축, 공은 +z 쪽(D m)에서 -z 방향으로 찬다. y 는 높이.
-   기록: 클리어한 최고 단계 우선, 같으면 골인 슛 최고 속도.  저장값 = 단계 × 1000 + 속도(km/h, ≤999)
-     · 진행·개인 최고: localStorage freekick_progress_v1 / freekick_best_v1
-     · 세계 신기록: Firebase records/freekick/all (world-record.js)
-   ═══════════════════════════════════════════════════════════════════ */
 
-/* ───────── 단계 · 밸런스 설정 (선생님이 값만 바꿔 조정) ───────── */
 const STAGES = [];
 for (let n = 1; n <= 10; n++) {
   const tier = n <= 3 ? 0 : n <= 7 ? 1 : 2;
   STAGES.push({
-    n, tier, strict: n >= 6,               // strict: 6단계부터 — 수비벽 6명이 정면을 다 막고, 골키퍼는 골대 위 양쪽 구석(TOP_CORNER) 말고는 다 막는다 → 감아차기로 벽을 넘겨 위 구석에만 골
-    dist:      [18, 22, 25][tier],         // 공 ~ 골라인 거리(m) — 페널티 박스(16.5m) 바로 밖부터 실제 프리킥 거리
-    defenders: n >= 9 ? 10 : n >= 6 ? 6 : [2, 4][tier],  // 수비벽 인원 (6단계부터 6명: 22m 에서 골대 폭 전체를 가린다. 9~10단계는 10명)
-    pos:       [0, 1, -1, 0, -1, 1, 0, -1, 1, 0][n - 1],   // 슛 위치: 0 아크 정면, 1 오른쪽 대각선, -1 왼쪽 대각선 (단계마다 고정, HOME_SIDE 참고)
-    wallSide:  n % 2 ? 1 : -1,             // (5단계까지) 수비벽이 막는 기둥 쪽(+x/−x). 골키퍼는 반대쪽으로 한 발. 6단계부터는 벽이 한가운데
-    wallDist:  9.15,                       // 공 ~ 수비벽 거리(m) — 규칙상 9.15m(10야드)
-    gkSigma:   [1.7, 0.6, 0.55][tier],     // 골키퍼 예측 오차(표준편차, m) — 클수록 쉬움
-    gkWrong:   [0.30, 0.10, 0.03][tier],   // 골키퍼가 아예 반대쪽으로 가는 확률
-    gkReact:   [0.32, 0.16, 0.14][tier],   // 골키퍼 반응 지연(초)
-    cornerSave: [0, 0.25, 0.35][tier],     // (6단계부터) 위 구석으로 정확히 온 공을 골키퍼가 막아낼 확률 — 나머지는 손이 닿지 않게 짧게 뛴다
-    wallDelay: [0.35, 0.18, 0.08][tier],   // 수비수 점프 타이밍이 늦어지는 최대치(초)
+    n, tier, strict: n >= 6,
+    dist:      [18, 22, 25][tier],
+    defenders: n >= 9 ? 10 : n >= 6 ? 6 : [2, 4][tier],
+    pos:       [0, 1, -1, 0, -1, 1, 0, -1, 1, 0][n - 1],
+    wallSide:  n % 2 ? 1 : -1,
+    wallDist:  9.15,
+    gkSigma:   [1.7, 0.6, 0.55][tier],
+    gkWrong:   [0.30, 0.10, 0.03][tier],
+    gkReact:   [0.32, 0.16, 0.14][tier],
+    cornerSave: [0, 0.25, 0.35][tier],
+    wallDelay: [0.35, 0.18, 0.08][tier],
   });
 }
 const KICKS = {
-  in:   { name: "인프런트 킥", curve: -1, speedMin: 14, speedMax: 32, rpmMin: 200, rpmMax: 1000, loftMin: 6, loftMax: 28, color: 0xD97B4F },   // 우→좌(화면 기준) 감아차기
-  out:  { name: "아웃프런트 킥", curve: +1, speedMin: 14, speedMax: 31, rpmMin: 200, rpmMax: 900, loftMin: 6, loftMax: 28, color: 0x5FA8FF },  // 좌→우 바깥 커브
-  step: { name: "인스텝 슛", curve: 0, speedMin: 17, speedMax: 34, rpmMin: 40, rpmMax: 160, loftMin: 3, loftMax: 14, color: 0xFFFFFF },      // 직선, 최고 속도
+  in:   { name: "인프런트 킥", curve: -1, speedMin: 14, speedMax: 32, rpmMin: 200, rpmMax: 1000, loftMin: 6, loftMax: 28, color: 0xD97B4F },
+  out:  { name: "아웃프런트 킥", curve: +1, speedMin: 14, speedMax: 31, rpmMin: 200, rpmMax: 900, loftMin: 6, loftMax: 28, color: 0x5FA8FF },
+  step: { name: "인스텝 슛", curve: 0, speedMin: 17, speedMax: 34, rpmMin: 40, rpmMax: 160, loftMin: 3, loftMax: 14, color: 0xFFFFFF },
 };
 const PHYS = {
   g: 9.8, drag: 0.10, ballR: 0.11,
-  magnus: 0.045,        // 횡가속도 = magnus × 회전(rps) × 속도  (마그누스 효과 근사)
-  dip: 0.025,           // 추가 낙하가속도 = dip × 회전(rps) × 속도 (톱스핀 — 회전 많은 공이 뚝 떨어짐)
-  topY: 2.2,            // 게이지를 다 채운 슛이 골라인에서 닿는 높이(m) — 단계 거리마다 loftMax 를 자동으로 맞춘다(solveLofts). 크로스바 2.44
-  maxCharge: 2,         // 파워 최대 입력 시간(초). 파워 = 세기 + 높이(킥 종류별 loftMin~loftMax)
+  magnus: 0.045,
+  dip: 0.025,
+  topY: 2.2,
+  maxCharge: 2,
 };
 const GOAL = { hw: 3.66, h: 2.44, post: 0.06, depth: 1.8 };
-const TRAJ_SHOW = 5;   // 예상 궤적을 공에서 몇 m 까지만 보여 줄지
+const TRAJ_SHOW = 5;
 const POS_NAME = { 0: "정면", 1: "오른쪽", "-1": "왼쪽" };
-const HOME_SIDE = 0.36;   // 대각선 위치일 때 좌우 치우침 = 거리 × 이 값 (18m → ±6.5m, 25m → ±9m, 약 20°)
-const AIM = { range: 15, speed: 5.5, accel: 2.4, accelT: 0.6, previewPower: 0.5 };   // 조준 범위(골라인 x, m — 커브 보정을 위해 골대보다 훨씬 넓게) · 이동 속도(m/s) · 길게 누르면 accelT초에 걸쳐 accel배까지 빨라짐 · 누르기 전 궤적 미리보기 파워
+const HOME_SIDE = 0.36;
+const AIM = { range: 15, speed: 5.5, accel: 2.4, accelT: 0.6, previewPower: 0.5 };
 const DEF = { w: 0.5, h: 1.83, gap: 0.58, jumpH: 0.4, jumpDur: 0.6 };
-const TOP_CORNER = { x: 2.2, y: 1.5 };   // 6단계부터 골키퍼가 못 막는 유일한 곳: 골라인에서 |x| ≥ 2.2m 이고 높이 ≥ 1.5m (골대 폭 ±3.66, 높이 2.44)
+const TOP_CORNER = { x: 2.2, y: 1.5 };
 function inTopCorner(x, y) { return Math.abs(x) >= TOP_CORNER.x && Math.abs(x) < GOAL.hw && y >= TOP_CORNER.y && y < GOAL.h; }
-const GK = { diveSpeed: 5.2, shuffle: 3.2, reach: 0.45, arm: 1.0, maxX: 3.2, armDrop: [0.95, 1.05, 0.9], slowCatch: 9 };   // shuffle: 다이빙 전 잔발 이동 속도(m/s) · slowCatch: 이보다 느린 공(m/s)은 몸 가까이 오면 그냥 잡는다
+const GK = { diveSpeed: 5.2, shuffle: 3.2, reach: 0.45, arm: 1.0, maxX: 3.2, armDrop: [0.95, 1.05, 0.9], slowCatch: 9 };
 
 const $ = id => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -248,7 +234,6 @@ function gauss() { let u = 0, v = 0; while (u === 0) u = Math.random(); while (v
 function packScore(stage, kmh) { return stage * 1000 + clamp(Math.round(kmh), 0, 999); }
 function fmtPacked(v) { const s = Math.floor(v / 1000), k = v % 1000; return s >= 10 ? "전부 클리어 · " + k + " km/h" : s + "단계 · " + k + " km/h"; }
 
-/* ═══════════════════ 기록 · 진행 ═══════════════════ */
 const PROG_KEY = "freekick_progress_v1", BEST_KEY = "freekick_best_v1";
 function loadJSON(k) { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch (e) { return null; } }
 function saveJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
@@ -262,7 +247,6 @@ function wrInfo() {
   if (WR.loaded) return { val: "아직 없음", who: "", none: true };
   return { val: !WR.url() ? "오프라인" : (wrTried ? "불러오지 못함" : "불러오는 중…"), who: "", none: true };
 }
-/* 우리 반 신기록(반별 링크로 들어왔을 때만; WR.cls) */
 function crInfo() {
   const C = WR && WR.cls;
   if (!C) return null;
@@ -288,7 +272,6 @@ function renderRecords() {
 }
 if (WR) { WR.onChange(renderRecords); WR.load().then(() => { wrTried = true; renderRecords(); }); }
 
-/* ═══════════════════ 소리 (Web Audio, 외부 파일 없음) ═══════════════════ */
 const AUD = { ctx: null, noise: null };
 function audioInit() {
   try {
@@ -332,7 +315,6 @@ const SFX = {
   select() { tone(700, 0.05, "square", 0.05); },
 };
 
-/* ═══════════════════ 3D 씬 ═══════════════════ */
 const canvas = $("gl");
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
@@ -357,7 +339,6 @@ function canvasTex(w, h, draw, repeat) {
   t.anisotropy = 4; t.encoding = THREE.sRGBEncoding;
   return t;
 }
-/* 잔디: 밝기가 번갈아 바뀌는 줄무늬 + 잔털 */
 const grassTex = canvasTex(256, 256, (c, w, h) => {
   c.fillStyle = "#4E9A3C"; c.fillRect(0, 0, w, h);
   c.fillStyle = "#58A845"; c.fillRect(0, 0, w, h / 2);
@@ -367,7 +348,6 @@ const ground = new THREE.Mesh(new THREE.PlaneGeometry(220, 260), new THREE.MeshS
 ground.rotation.x = -Math.PI / 2; ground.position.y = 0; ground.receiveShadow = true; scene.add(ground);
 grassTex.repeat.set(22, 52); ground.position.z = 52;
 
-/* 라인(골라인 · 페널티 박스 · 골 에어리어) */
 const lineMat = new THREE.MeshBasicMaterial({ color: 0xF6F8F2 });
 function line(x1, z1, x2, z2, w) {
   const len = Math.hypot(x2 - x1, z2 - z1);
@@ -375,8 +355,6 @@ function line(x1, z1, x2, z2, w) {
   m.rotation.x = -Math.PI / 2; m.rotation.z = -Math.atan2(z2 - z1, x2 - x1);
   m.position.set((x1 + x2) / 2, 0.012, (z1 + z2) / 2); scene.add(m);
 }
-/* 실제 규격(105×68m): 골라인 z=0, 하프라인 z=52.5, 터치라인 x=±34
-   페널티 박스 16.5m × 40.32m, 골 에어리어 5.5m × 18.32m, 페널티 마크 11m, 페널티 아크 반지름 9.15m, 센터서클 반지름 9.15m */
 line(-34, 0, 34, 0); line(-34, 0, -34, 105); line(34, 0, 34, 105); line(-34, 105, 34, 105); line(-34, 52.5, 34, 52.5);
 line(-20.16, 0, -20.16, 16.5); line(20.16, 0, 20.16, 16.5); line(-20.16, 16.5, 20.16, 16.5);
 line(-9.16, 0, -9.16, 5.5); line(9.16, 0, 9.16, 5.5); line(-9.16, 5.5, 9.16, 5.5);
@@ -386,10 +364,9 @@ function ringLine(cx, cz, r, start, len) { const m = new THREE.Mesh(new THREE.Ri
 function spot(cx, cz) { const m = new THREE.Mesh(new THREE.CircleGeometry(0.12, 16), lineMat); m.rotation.x = -Math.PI / 2; m.position.set(cx, 0.012, cz); scene.add(m); }
 spot(0, 11); spot(0, 94); spot(0, 52.5);
 ringLine(0, 52.5, 9.15, 0, Math.PI * 2);
-(function () { const a = Math.asin(5.5 / 9.15); ringLine(0, 11, 9.15, Math.PI + a, Math.PI - 2 * a); ringLine(0, 94, 9.15, a, Math.PI - 2 * a); })();   // 페널티 아크(박스 밖 부분만)
-[[-34, 0, Math.PI * 1.5], [34, 0, Math.PI], [-34, 105, 0], [34, 105, Math.PI / 2]].forEach(c => ringLine(c[0], c[1], 1, c[2], Math.PI / 2));   // 코너 아크
+(function () { const a = Math.asin(5.5 / 9.15); ringLine(0, 11, 9.15, Math.PI + a, Math.PI - 2 * a); ringLine(0, 94, 9.15, a, Math.PI - 2 * a); })();
+[[-34, 0, Math.PI * 1.5], [34, 0, Math.PI], [-34, 105, 0], [34, 105, Math.PI / 2]].forEach(c => ringLine(c[0], c[1], 1, c[2], Math.PI / 2));
 
-/* 골대: 포스트·크로스바(흰 원기둥) + 그물(격자 텍스처 반투명 평면) */
 const netTex = canvasTex(64, 64, (c, w, h) => { c.clearRect(0, 0, w, h); c.strokeStyle = "rgba(255,255,255,.85)"; c.lineWidth = 2; c.beginPath(); for (let i = 0; i <= 64; i += 8) { c.moveTo(i, 0); c.lineTo(i, h); c.moveTo(0, i); c.lineTo(w, i); } c.stroke(); });
 const postMat = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 0.4 });
 const netMat = new THREE.MeshBasicMaterial({ map: netTex, transparent: true, opacity: 0.75, side: THREE.DoubleSide, depthWrite: false });
@@ -410,18 +387,14 @@ const netMat = new THREE.MeshBasicMaterial({ map: netTex, transparent: true, opa
   scene.add(g);
 })();
 
-/* ── 경기장 배경 ──
-   ① 같은 폴더에 27.freekick-stadium.jpg(가로로 긴 파노라마, 아래 STADIUM_IMG) 가 있으면 골대 뒤를 감싸는 곡면에 그 그림을 붙이고
-   ② 없으면(로드 실패) 코드로 만든 계단식 관중석을 보여 준다. 그림 생성용 프롬프트는 저장소의 27.freekick-stadium-prompt.md 참고. */
 const STADIUM_IMG = "27.freekick-stadium.jpg";
-const STADIUM_GRASS = 0.14;   // 그림 맨 아래에서 잔디가 차지하는 비율(0~1) — 이 부분은 땅 밑으로 숨긴다
-const STADIUM_R = 45, STADIUM_ARC = 120, STADIUM_BEHIND = 14;   // 곡면 반지름(m)·그림이 덮는 각도(°)·골라인 뒤 거리(m). 반지름이 작을수록 관중석이 낮아져 지붕·하늘까지 보인다
+const STADIUM_GRASS = 0.14;
+const STADIUM_R = 45, STADIUM_ARC = 120, STADIUM_BEHIND = 14;
 const standsGroup = new THREE.Group(); scene.add(standsGroup);
 (function stands() {
   const m1 = new THREE.MeshStandardMaterial({ color: 0x8A97A8, roughness: 0.9 }), m2 = new THREE.MeshStandardMaterial({ color: 0x6F7D8E, roughness: 0.9 });
   const crowd = canvasTex(256, 32, (c, w, h) => { c.fillStyle = "#5C6672"; c.fillRect(0, 0, w, h); for (let i = 0; i < 70; i++) { c.fillStyle = `hsl(${Math.random() * 360},22%,${38 + Math.random() * 22}%)`; c.fillRect(Math.random() * w, 4 + Math.random() * (h - 12), 6, 8); } }, [10, 1]);
   const cm = new THREE.MeshBasicMaterial({ map: crowd });
-  /* 골 뒤: 12 단, 양옆: 10 단 */
   for (let i = 0; i < 12; i++) {
     const b = new THREE.Mesh(new THREE.BoxGeometry(130, 1.4, 3), i % 2 ? m1 : m2); b.position.set(0, 0.7 + i * 1.2, -16 - i * 3); standsGroup.add(b);
     const p = new THREE.Mesh(new THREE.PlaneGeometry(130, 1.3), cm); p.position.set(0, 1.5 + i * 1.2, -14.45 - i * 3); standsGroup.add(p);
@@ -430,10 +403,8 @@ const standsGroup = new THREE.Group(); scene.add(standsGroup);
     const b = new THREE.Mesh(new THREE.BoxGeometry(3, 1.4, 130), i % 2 ? m1 : m2); b.position.set(s * (44 + i * 3), 0.7 + i * 1.2, 45); standsGroup.add(b);
     const p = new THREE.Mesh(new THREE.PlaneGeometry(130, 1.3), cm); p.rotation.y = -s * Math.PI / 2; p.position.set(s * (42.45 + i * 3), 1.5 + i * 1.2, 45); standsGroup.add(p);
   });
-  /* 지붕 */
   const roof = new THREE.Mesh(new THREE.BoxGeometry(150, 0.6, 24), new THREE.MeshStandardMaterial({ color: 0xD8DEE6, roughness: 0.6 })); roof.position.set(0, 16.5, -40); standsGroup.add(roof);
 })();
-/* 광고판(골 뒤 A보드)은 그림이 있어도 남긴다 */
 (function adBoard() {
   const ad = canvasTex(512, 64, (c, w, h) => { c.fillStyle = "#24402F"; c.fillRect(0, 0, w, h); c.fillStyle = "#F4F6F1"; c.font = "bold 34px 'Nanum Gothic', 'Malgun Gothic', sans-serif"; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText("정보 수업 프리킥 챌린지   ★   FREE KICK CHALLENGE", w / 2, h / 2); }, [5, 1]);
   const board = new THREE.Mesh(new THREE.PlaneGeometry(130, 1.0), new THREE.MeshBasicMaterial({ map: ad })); board.position.set(0, 0.5, -13.9); scene.add(board);
@@ -442,11 +413,7 @@ const standsGroup = new THREE.Group(); scene.add(standsGroup);
   try {
     new THREE.TextureLoader().load(STADIUM_IMG, tex => {
       tex.encoding = THREE.sRGBEncoding; tex.wrapS = THREE.ClampToEdgeWrapping;
-      /* 골 뒤쪽(-z)을 감싸는 곡면(원통의 일부). 안쪽에서 보므로 BackSide, 좌우가 뒤집히지 않게 repeat.x = -1 */
       tex.repeat.x = -1; tex.offset.x = 1;
-      /* 크기: 그림을 STADIUM_ARC(120°) 호에 붙이고 높이는 그림 비율에 맞춘다(호 길이 ÷ 가로세로비) — 그림이 찌그러지지 않게.
-         호의 한가운데가 골라인 뒤 STADIUM_BEHIND m 에 오고, 반지름은 낮은 카메라에서도 지붕까지 보이도록 작게(관중석 높이 ≈ 38 m).
-         그림 아래쪽 잔디 부분(STADIUM_GRASS 비율)은 땅(y=0) 밑으로 내려 관중석 바닥이 잔디와 이어지게 한다 */
       const R = STADIUM_R, arc = STADIUM_ARC * Math.PI / 180, im = tex.image, H = arc * R / ((im && im.width && im.height) ? im.width / im.height : 4);
       const geo = new THREE.CylinderGeometry(R, R, H, 48, 1, true, Math.PI - arc / 2, arc);
       const wall = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide, fog: false }));
@@ -455,31 +422,26 @@ const standsGroup = new THREE.Group(); scene.add(standsGroup);
     }, undefined, () => {});
   } catch (e) {}
 })();
-/* ── 사람: 로우폴리 인체(머리·목·가슴·배·어깨·상완/전완·허벅지/정강이·축구화·등번호)
-   기준 키 PERSON_BASE_H 로 만든 뒤 group.scale 로 실제 키(m)에 맞춘다. 모든 관절은 Group 이라 회전으로 동작을 만든다.
-   userData: legs(엉덩이 pivot 2) · knees(무릎 pivot 2) · arms(어깨 pivot 2) · elbows(팔꿈치 pivot 2) · torso · head */
 const PERSON_BASE_H = 1.845;
 function makePerson(o) {
   const g = new THREE.Group();
   const M = (c, r) => new THREE.MeshStandardMaterial({ color: c, roughness: r == null ? 0.75 : r });
   const mS = M(o.shirt), mP = M(o.shorts), mK = M(o.skin || 0xE8B892, 0.65), mSock = M(o.socks == null ? o.shirt : o.socks), mHair = M(o.hair == null ? 0x2A1E14 : o.hair, 0.9), mBoot = M(o.boots == null ? 0x1B2B20 : o.boots, 0.5), mEye = M(0x101010, 0.3), mGlove = M(0xF4F6F1, 0.6);
   const add = (geo, mat, x, y, z, parent) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; (parent || g).add(m); return m; };
-  /* 골반·몸통 (엉덩이 pivot 높이 0.98) */
-  add(new THREE.BoxGeometry(0.40, 0.26, 0.25), mP, 0, 0.88, 0);                       // 반바지
+  add(new THREE.BoxGeometry(0.40, 0.26, 0.25), mP, 0, 0.88, 0);
   const torso = new THREE.Group(); torso.position.y = 0.98; g.add(torso);
-  add(new THREE.BoxGeometry(0.38, 0.34, 0.23), mS, 0, 0.17, 0, torso);                // 배
-  add(new THREE.BoxGeometry(0.46, 0.28, 0.26), mS, 0, 0.46, 0, torso);                // 가슴
-  [-1, 1].forEach(s => add(new THREE.SphereGeometry(0.08, 10, 8), mS, s * 0.24, 0.55, 0, torso));   // 어깨
-  add(new THREE.CylinderGeometry(0.055, 0.06, 0.12, 10), mK, 0, 0.66, 0, torso);      // 목
-  const head = add(new THREE.SphereGeometry(0.115, 16, 12), mK, 0, 0.75, 0, torso);   // 머리(정수리 1.845)
-  const hair = add(new THREE.SphereGeometry(0.122, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), mHair, 0, 0.752, -0.02, torso); hair.rotation.x = -0.4;   // 머리카락(위·뒤, 이마는 드러나게 뒤로 젖힘)
-  [-1, 1].forEach(s => add(new THREE.SphereGeometry(0.014, 6, 6), mEye, s * 0.042, 0.762, 0.106, torso));   // 눈
-  add(new THREE.BoxGeometry(0.02, 0.05, 0.03), mK, 0, 0.735, 0.115, torso);           // 코
-  if (o.number != null) {   // 등번호(캔버스 → 등 뒤 작은 판)
+  add(new THREE.BoxGeometry(0.38, 0.34, 0.23), mS, 0, 0.17, 0, torso);
+  add(new THREE.BoxGeometry(0.46, 0.28, 0.26), mS, 0, 0.46, 0, torso);
+  [-1, 1].forEach(s => add(new THREE.SphereGeometry(0.08, 10, 8), mS, s * 0.24, 0.55, 0, torso));
+  add(new THREE.CylinderGeometry(0.055, 0.06, 0.12, 10), mK, 0, 0.66, 0, torso);
+  const head = add(new THREE.SphereGeometry(0.115, 16, 12), mK, 0, 0.75, 0, torso);
+  const hair = add(new THREE.SphereGeometry(0.122, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), mHair, 0, 0.752, -0.02, torso); hair.rotation.x = -0.4;
+  [-1, 1].forEach(s => add(new THREE.SphereGeometry(0.014, 6, 6), mEye, s * 0.042, 0.762, 0.106, torso));
+  add(new THREE.BoxGeometry(0.02, 0.05, 0.03), mK, 0, 0.735, 0.115, torso);
+  if (o.number != null) {
     const nt = canvasTex(64, 80, (c, w, h) => { c.clearRect(0, 0, w, h); c.fillStyle = o.numberColor || "#FFFFFF"; c.font = "bold 62px 'Nanum Gothic', 'Malgun Gothic', sans-serif"; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(String(o.number), w / 2, h / 2 + 4); });
     const n = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.25), new THREE.MeshBasicMaterial({ map: nt, transparent: true })); n.position.set(0, 0.42, -0.135); n.rotation.y = Math.PI; torso.add(n);
   }
-  /* 팔: 어깨 pivot (±0.29, 1.53) → 상완 → 팔꿈치 pivot → 전완 → 손(골키퍼는 장갑) */
   const arms = [], elbows = [];
   [-1, 1].forEach(s => {
     const sh = new THREE.Group(); sh.position.set(s * 0.29, 0.55, 0); torso.add(sh);
@@ -490,7 +452,6 @@ function makePerson(o) {
     add(o.gloves ? new THREE.BoxGeometry(0.1, 0.13, 0.06) : new THREE.SphereGeometry(0.048, 8, 8), o.gloves ? mGlove : mK, 0, -0.3, 0, el);
     arms.push(sh); elbows.push(el);
   });
-  /* 다리: 엉덩이 pivot (±0.11, 0.98) → 허벅지 → 무릎 pivot → 정강이(양말) → 축구화 */
   const legs = [], knees = [];
   [-1, 1].forEach(s => {
     const hip = new THREE.Group(); hip.position.set(s * 0.11, 0.98, 0); g.add(hip);
@@ -510,7 +471,6 @@ const keeper = makePerson({ height: 1.90, shirt: 0xF2B233, shorts: 0x1B2B20, soc
 const defenders = [];
 for (let i = 0; i < 10; i++) { const d = makePerson({ height: 1.83, shirt: 0x4A4F55, shorts: 0x2B2F33, socks: 0x4A4F55, hair: [0x2A1E14, 0x111111, 0x6B4A2B, 0x1E1E1E, 0x3A2A1A, 0x2A1E14, 0x111111, 0x6B4A2B, 0x3A2A1A, 0x1E1E1E][i], number: [4, 5, 6, 8, 3, 2, 7, 11, 9, 15][i] }); d.visible = false; scene.add(d); defenders.push({ g: d, x: 0, jumpAt: -1, hit: false }); }
 
-/* ── 축구공: 오각형 흑백 패턴을 캔버스로 그려 CanvasTexture 로 ── */
 const ballTex = canvasTex(256, 128, (c, w, h) => {
   c.fillStyle = "#FFFFFF"; c.fillRect(0, 0, w, h);
   c.fillStyle = "#1B2B20";
@@ -523,60 +483,52 @@ ball.castShadow = true; scene.add(ball);
 const ballShadow = new THREE.Mesh(new THREE.CircleGeometry(PHYS.ballR * 1.2, 16), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.25 }));
 ballShadow.rotation.x = -Math.PI / 2; ballShadow.position.y = 0.015; scene.add(ballShadow);
 
-/* ── 조준 표시: 바닥 점선 + 도착 표시 + 예상 궤적(킥 종류 색) ── */
 const aimLineMat = new THREE.LineDashedMaterial({ color: 0xFFFFFF, dashSize: 0.35, gapSize: 0.22, linewidth: 1 });
 let aimLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), aimLineMat); scene.add(aimLine);
 const aimMark = new THREE.Mesh(new THREE.RingGeometry(0.22, 0.34, 24), new THREE.MeshBasicMaterial({ color: 0xD97B4F, side: THREE.DoubleSide }));
 aimMark.rotation.x = -Math.PI / 2; aimMark.position.y = 0.02; scene.add(aimMark);
 const trajMat = new THREE.MeshBasicMaterial({ color: 0xD97B4F, transparent: true, opacity: 0.85, depthWrite: false });
-const trajLine = new THREE.Mesh(new THREE.BufferGeometry(), trajMat); scene.add(trajLine);   // 궤적은 가는 관(tube)으로 — WebGL 선은 굵기가 안 먹음
+const trajLine = new THREE.Mesh(new THREE.BufferGeometry(), trajMat); scene.add(trajLine);
 const trajMark = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 10), new THREE.MeshBasicMaterial({ color: 0xD97B4F, transparent: true, opacity: 0.8 })); scene.add(trajMark);
+const UP = new THREE.Vector3(0, 1, 0);
+const aimEls = { aimVal: $("aimVal"), loftVal: $("loftVal"), trajNote: $("trajNote") };
+const powerEls = { fill: $("powerFill"), pct: $("powerPct"), sec: $("powerSec") };
+let aimLineKey = "";
 
-/* ═══════════════════ 게임 상태 ═══════════════════ */
-let state = "menu";            // menu | aim | charge | flight | result
+let state = "menu";
 let stage = STAGES[0];
 let aimX = 0, kickType = "in";
 let power = 0, chargeAt = 0, lastT = 0, spaceFresh = true;
-let wallX = 0;                 // 수비벽 중심 x
+let wallX = 0;
 const keys = {};
 const hold = { aimL: false, aimR: false };
-let aimHeld = 0;               // 조준 키를 계속 누른 시간(초) — 길게 누르면 가속
+let aimHeld = 0;
 const B = { p: new THREE.Vector3(), v: new THREE.Vector3(), rpm: 0, curve: 0, t: 0, active: false, result: null, resultAt: 0, inNet: false, wallChecked: false, gkChecked: false, spinAxis: new THREE.Vector3(1, 0, 0) };
-/* 키커 킥 동작. swing: 진행 시간(초), -1 = 안 함. 오른발(legs[1])로만 찬다.
-   타임라인: 0~run 도움닫기(from→to, 세 걸음) → 백스윙 → impact 에 공을 참(shoot) → 팔로스루·착지 → end 에 원래 자세 */
 const K = { swing: -1, run: 0.55, back: 0.66, impact: 0.76, end: 1.5, yaw: Math.PI + 0.4, from: new THREE.Vector3(), to: new THREE.Vector3(), fwd: new THREE.Vector3() };
-/* 킥 종류별 동작(오른발 기준). yaw: 도움닫기 각도(라디안, 클수록 왼쪽 뒤에서 비스듬히) · run: 도움닫기 길이(m) · back/knee: 백스윙 때 다리 뒤로·무릎 접힘 ·
-   zBack/zFollow: 백스윙·팔로스루 때 다리가 옆으로 벌어지는 정도(+ 바깥/오른쪽, − 안쪽/몸 앞을 가로지름) · foot: 발끝 돌림(+ 바깥) · lean: 임팩트 때 몸을 공 위로 덮는 정도 ·
-   tilt: 상체 옆 기울기(+ 왼쪽) · twist/wrap: 상체 비틀림 배율·팔로스루 때 감기는 양 · follow: 팔로스루 다리 높이 배율 · hop/step: 착지 때 뜨는 높이·앞으로 나가는 거리 · armL/armR: 팔 벌림 */
 const KM = {
-  in:   { yaw: 0.55, run: 1.4, back: 1.15, knee: 1.6, zBack: 0.35, zFollow: -0.4, foot: 0.6,  lean: 0,    tilt: 0.22,  twist: 1.3, wrap: 0.6,  follow: 1.0,  hop: 0.12, step: 0.5,  armL: 1.3, armR: 0.5 },   // 인프런트: 비스듬히, 안쪽 면으로 감아 몸 앞을 가로지르는 팔로스루
-  out:  { yaw: 0.05, run: 1.2, back: 1.0,  knee: 1.5, zBack: -0.2, zFollow: 0.5, foot: -0.55, lean: 0,    tilt: -0.12, twist: 0.6, wrap: -0.3, follow: 0.85, hop: 0.08, step: 0.4,  armL: 0.8, armR: 1.0 },   // 아웃프런트: 정면에서 짧게, 발끝 안으로, 바깥으로 튕기며 다리가 오른쪽으로 빠짐
-  step: { yaw: 0.25, run: 1.9, back: 1.4,  knee: 1.8, zBack: 0.05, zFollow: 0.05, foot: 0,    lean: 0.15, tilt: 0.05,  twist: 0.9, wrap: 0.3,  follow: 1.3,  hop: 0.2,  step: 0.65, armL: 1.0, armR: 0.7 },   // 인스텝: 길게 달려와 크게 백스윙, 몸을 공 위로 덮고 높이 따라 올라가며 크게 뛰어 착지
+  in:   { yaw: 0.55, run: 1.4, back: 1.15, knee: 1.6, zBack: 0.35, zFollow: -0.4, foot: 0.6,  lean: 0,    tilt: 0.22,  twist: 1.3, wrap: 0.6,  follow: 1.0,  hop: 0.12, step: 0.5,  armL: 1.3, armR: 0.5 },
+  out:  { yaw: 0.05, run: 1.2, back: 1.0,  knee: 1.5, zBack: -0.2, zFollow: 0.5, foot: -0.55, lean: 0,    tilt: -0.12, twist: 0.6, wrap: -0.3, follow: 0.85, hop: 0.08, step: 0.4,  armL: 0.8, armR: 1.0 },
+  step: { yaw: 0.25, run: 1.9, back: 1.4,  knee: 1.8, zBack: 0.05, zFollow: 0.05, foot: 0,    lean: 0.15, tilt: 0.05,  twist: 0.9, wrap: 0.3,  follow: 1.3,  hop: 0.2,  step: 0.65, armL: 1.0, armR: 0.7 },
 };
-/* 골키퍼. phase: ready(대기) → wait(반응 지연) → shuffle(공을 보며 잔발로 이동, 예측 오차가 점점 줄어듦) → dive(방향을 정하고 몸을 날림) → land(착지) → recover(공이 아직 살아 있으면 일어나서 다시 따라감)
-   keeperEst(): 지금 시점의 예상 도착 x. 공이 골대에 가까워질수록 오차(err)가 줄어들어 느린 공·이상한 공은 결국 따라잡는다 */
 const G = { x: 0, y: 0, baseX: 0, dir: 0, footX: 0, phase: "ready", tStart: 0, commitAt: 0, arrive: 0, goalX: 0, goalY: 0, err: 0, errY: 0, diveFrom: 0, targetX: 0, targetY: 0, lean: 0, high: false, armAng: 0.9, armLen: 0.6, step: 0, landT: 0, sure: false, miss: false };
 let shotStat = { kmh: 0, rpm: 0 };
 
-/* 공 위치: 골라인에서 stage.dist(m) 앞, 좌우는 단계마다 정해진 stage.pos — 아크 정면(0) 또는 아크 양쪽 대각선(±HOME_SIDE × 거리) */
 let homeSide = 0;
 function ballHome() { return new THREE.Vector3(homeSide * HOME_SIDE * stage.dist, PHYS.ballR, stage.dist); }
-/* 공→골 중심 기준 좌표계: u = 공에서 골로 가는 방향(xz), r = 그에 수직(벽의 가로 방향, 정면일 때 +x). 수비벽은 이 축에 맞춰 선다 */
 const F = { u: new THREE.Vector2(0, -1), r: new THREE.Vector2(1, 0), a: 0 };
 function updateFrame() {
   const home = ballHome();
   F.u.set(-home.x, -home.z).normalize(); F.r.set(-F.u.y, F.u.x);
-  F.a = Math.atan2(home.x, home.z);   // 정면에서 돌아간 각도 (공이 +x 쪽에 있으면 양수)
+  F.a = Math.atan2(home.x, home.z);
 }
-const alongOf = (px, pz) => { const h = ballHome(); return (px - h.x) * F.u.x + (pz - h.z) * F.u.y; };   // 공에서 골 방향으로 얼마나 갔나
-const latOf = (px, pz) => { const h = ballHome(); return (px - h.x) * F.r.x + (pz - h.z) * F.r.y; };     // 공→골 선에서 옆으로 얼마나 벗어났나(벽 좌표)
-const latAtWall = (px, pz) => latOf(px, pz) * stage.wallDist / Math.max(0.1, alongOf(px, pz));          // 공에서 (px,pz)로 가는 직선이 벽을 지나는 옆 위치
-const rotXZ = (ox, oz) => new THREE.Vector3(ox * Math.cos(F.a) + oz * Math.sin(F.a), 0, -ox * Math.sin(F.a) + oz * Math.cos(F.a));   // 정면 기준 오프셋을 공→골 축에 맞춰 돌림
-/* 키커 자리: 항상 오른발. 킥 종류마다 도움닫기 각도·길이가 다르다(KM). 임팩트 때 오른발이 공 바로 뒤에 오도록 킥 위치(to)를 역산한다 */
+const alongOf = (px, pz) => { const h = ballHome(); return (px - h.x) * F.u.x + (pz - h.z) * F.u.y; };
+const latOf = (px, pz) => { const h = ballHome(); return (px - h.x) * F.r.x + (pz - h.z) * F.r.y; };
+const latAtWall = (px, pz) => latOf(px, pz) * stage.wallDist / Math.max(0.1, alongOf(px, pz));
+const rotXZ = (ox, oz) => new THREE.Vector3(ox * Math.cos(F.a) + oz * Math.sin(F.a), 0, -ox * Math.sin(F.a) + oz * Math.cos(F.a));
 function placeKicker() {
   const home = ballHome(), P = KM[kickType];
-  K.yaw = Math.PI + F.a - P.yaw; K.fwd.set(Math.sin(K.yaw), 0, Math.cos(K.yaw));   // 오른발잡이: 공의 왼쪽 뒤에서 오른쪽 앞으로 비스듬히 달려온다(P.yaw)
-  const fx = -0.11, fz = 0.33;   // 임팩트 순간 오른발 위치(몸 기준, 오른쪽 = −x): 엉덩이 옆 0.11, 앞으로 0.33
+  K.yaw = Math.PI + F.a - P.yaw; K.fwd.set(Math.sin(K.yaw), 0, Math.cos(K.yaw));
+  const fx = -0.11, fz = 0.33;
   K.to.set(home.x, 0, home.z).add(rotXZ(-0.05, 0.36)).sub(new THREE.Vector3(fx * Math.cos(K.yaw) + fz * Math.sin(K.yaw), 0, -fx * Math.sin(K.yaw) + fz * Math.cos(K.yaw)));
   K.from.copy(K.to).add(rotXZ(-(0.1 + P.yaw * 0.2), P.run));
   kicker.rotation.set(0, K.yaw, 0); K.swing = -1; kickerRest(); kicker.position.copy(K.from);
@@ -590,11 +542,9 @@ function placeScene() {
   keeper.position.set(0, 0, 0.6); keeper.rotation.set(0, Math.PI, 0);
   keeperPose("ready");
   G.x = 0; G.y = 0; G.phase = "ready"; G.lean = 0; G.dir = 0; G.footX = 0; G.sure = G.miss = false;
-  /* 수비벽: 공→골 선 위 9.15m 에 그 선과 수직으로 서서 공을 본다. 골 중심에서 살짝 치우쳐 한쪽을 막고, 골키퍼가 반대쪽을 맡는 느낌 */
-  /* 수비벽은 실제처럼 '가까운 골대 기둥 쪽'을 막는다: 벽 바깥쪽 끝이 공→기둥 선보다 조금 밖에 오도록 맞추고, 골키퍼는 열린 쪽으로 한 발 옮긴다 */
   const n = stage.defenders, side = stage.wallSide;
   const postAtWall = Math.abs(latAtWall(side * GOAL.hw, 0)), wallW = n * DEF.gap;
-  wallX = stage.strict ? 0 : side * Math.max(postAtWall + 0.25 - wallW / 2, wallW / 2 - 0.35);   // 먼 쪽은 최소 중앙선 조금까지만 → 먼 구석은 골키퍼 몫. 6단계부터는 6명이 한가운데서 골대 폭 전체를 가린다
+  wallX = stage.strict ? 0 : side * Math.max(postAtWall + 0.25 - wallW / 2, wallW / 2 - 0.35);
   G.baseX = stage.strict ? 0 : -side * 0.6;
   keeper.position.x = G.baseX; G.x = G.footX = G.baseX;
   const wc = new THREE.Vector3(home.x + F.u.x * stage.wallDist, 0, home.z + F.u.y * stage.wallDist), faceBall = Math.atan2(-F.u.x, -F.u.y);
@@ -602,7 +552,7 @@ function placeScene() {
     d.g.visible = i < n; d.jumpAt = -1; d.hit = false; d.g.position.y = 0;
     if (i < n) { d.x = wallX + (i - (n - 1) / 2) * DEF.gap; d.g.position.set(wc.x + F.r.x * d.x, 0, wc.z + F.r.y * d.x); d.g.rotation.set(0, faceBall, 0); wallPose(d.g, 0); }
   });
-  camera.position.copy(home).setY(4.0).add(rotXZ(2.4, 6.0));   // 공 뒤 오른쪽(키커가 왼쪽 뒤에 서므로 공을 가리지 않게), 조금 높은 곳
+  camera.position.copy(home).setY(4.0).add(rotXZ(2.4, 6.0));
   updateAimVisual();
 }
 function updateAimVisual() {
@@ -610,23 +560,24 @@ function updateAimVisual() {
   const show = state === "aim" || state === "charge";
   aimLine.visible = aimMark.visible = trajLine.visible = trajMark.visible = show;
   if (!show) return;
-  const pts = [new THREE.Vector3(home.x, 0.03, home.z), new THREE.Vector3(aimX, 0.03, 0)];
-  aimLine.geometry.dispose(); aimLine.geometry = new THREE.BufferGeometry().setFromPoints(pts); aimLine.computeLineDistances();
+  const key = home.x + "," + home.z + "," + aimX;
+  if (key !== aimLineKey) {
+    aimLineKey = key;
+    const pts = [new THREE.Vector3(home.x, 0.03, home.z), new THREE.Vector3(aimX, 0.03, 0)];
+    aimLine.geometry.dispose(); aimLine.geometry = new THREE.BufferGeometry().setFromPoints(pts); aimLine.computeLineDistances();
+  }
   aimMark.position.set(aimX, 0.02, 0);
-  /* 예상 궤적: 누르는 동안은 지금 파워, 누르기 전엔 미리보기 파워 기준 (수비수·골키퍼는 계산에 넣지 않은 "대략적" 궤적) */
   const pw = state === "charge" ? clamp(power, 0.02, 1) : AIM.previewPower;
   const L = launchVelocity(kickType, pw), tp = trajectory(L.v, L.rpm, L.curve);
-  /* 궤적은 공에서 TRAJ_SHOW(5m)만큼만 보여 준다 — 어디에 떨어질지는 직접 가늠해야 한다 */
   const seg = [tp.pts[0]]; let len = 0;
   for (let i = 1; i < tp.pts.length && len < TRAJ_SHOW; i++) { len += tp.pts[i].distanceTo(tp.pts[i - 1]); seg.push(tp.pts[i]); }
   trajLine.geometry.dispose(); trajLine.geometry = seg.length > 2 ? new THREE.TubeGeometry(new THREE.CatmullRomCurve3(seg), Math.min(96, seg.length * 2), 0.06, 6, false) : new THREE.BufferGeometry();
   trajMat.color.setHex(KICKS[kickType].color); trajMark.material.color.setHex(KICKS[kickType].color);
   trajMark.position.copy(seg[seg.length - 1]);
-  $("aimVal").textContent = (aimX >= 0 ? "+" : "") + aimX.toFixed(1); $("loftVal").textContent = tp.goal ? tp.goal.y.toFixed(1) : "—";
-  $("trajNote").textContent = (stage.strict ? "🎯 위 구석만 골 · " : "") + (state === "charge" ? "파워 " + Math.round(pw * 100) + "% 기준" : "파워 " + Math.round(AIM.previewPower * 100) + "% 기준 (누르면 실시간)");
+  aimEls.aimVal.textContent = (aimX >= 0 ? "+" : "") + aimX.toFixed(1); aimEls.loftVal.textContent = tp.goal ? tp.goal.y.toFixed(1) : "—";
+  aimEls.trajNote.textContent = (stage.strict ? "🎯 위 구석만 골 · " : "") + (state === "charge" ? "파워 " + Math.round(pw * 100) + "% 기준" : "파워 " + Math.round(AIM.previewPower * 100) + "% 기준 (누르면 실시간)");
 }
 
-/* ═══════════════════ 공 물리 (실제 비행과 예측에 같은 적분기를 씀) ═══════════════════ */
 function stepBall(p, v, rpm, curve, dt) {
   const sp = v.length(), rps = rpm / 60;
   const ax = PHYS.magnus * rps * sp * curve - v.x * PHYS.drag;
@@ -638,20 +589,18 @@ function stepBall(p, v, rpm, curve, dt) {
   if (p.y < PHYS.ballR) { p.y = PHYS.ballR; if (v.y < 0) { v.y = -v.y * 0.5; v.x *= 0.85; v.z *= 0.85; bounced = true; } }
   return bounced;
 }
-function loftFor(kt, pw) { const k = KICKS[kt]; return k.loftMin + ((k.loftTop || k.loftMax) - k.loftMin) * pw; }   // 파워가 높이를 함께 정한다 (loftTop = 이 단계에서 풀파워가 topY 높이에 닿는 각도)
-/* 단계 거리마다 풀파워 슛이 골라인 PHYS.topY 높이에 오도록 킥 종류별 loftTop 을 구한다 (정면 조준, 파워 1) */
+function loftFor(kt, pw) { const k = KICKS[kt]; return k.loftMin + ((k.loftTop || k.loftMax) - k.loftMin) * pw; }
 function solveLofts() {
-  const savedAim = aimX, savedSide = homeSide; aimX = 0; homeSide = 0; updateFrame();   // 정면 위치 기준으로 맞춘다
+  const savedAim = aimX, savedSide = homeSide; aimX = 0; homeSide = 0; updateFrame();
   for (const kt in KICKS) {
     const k = KICKS[kt]; let lo = k.loftMin, found = k.loftMax;
-    const yAt = el => { k.loftTop = el; const L = launchVelocity(kt, 1); const pr = predict(L.v, L.rpm, L.curve, stage.wallDist); return pr.goal ? pr.goal.y : -1; };   // 골라인까지 못 오면(땅에 구름) 낮은 것으로 본다
-    for (let el = k.loftMin + 1; el <= 45; el += 1) { if (yAt(el) >= PHYS.topY) { found = el; break; } lo = el; }   // 낮은 각도부터 올라가며 처음 topY 를 넘는 구간을 찾고
-    let hi = found; for (let i = 0; i < 12; i++) { const mid = (lo + hi) / 2; if (yAt(mid) >= PHYS.topY) hi = mid; else lo = mid; }   // 이분법으로 정밀화
+    const yAt = el => { k.loftTop = el; const L = launchVelocity(kt, 1); const pr = predict(L.v, L.rpm, L.curve, stage.wallDist); return pr.goal ? pr.goal.y : -1; };
+    for (let el = k.loftMin + 1; el <= 45; el += 1) { if (yAt(el) >= PHYS.topY) { found = el; break; } lo = el; }
+    let hi = found; for (let i = 0; i < 12; i++) { const mid = (lo + hi) / 2; if (yAt(mid) >= PHYS.topY) hi = mid; else lo = mid; }
     k.loftTop = hi;
   }
   aimX = savedAim; homeSide = savedSide; updateFrame();
 }
-/* 예상 궤적 점 목록 (골라인을 지나거나 땅에 두 번 닿으면 끝) */
 function trajectory(v0, rpm, curve) {
   const p = ballHome(), v = v0.clone(), pts = [p.clone()]; let t = 0, goal = null, bounces = 0; const dt = 1 / 120;
   for (let i = 0; i < 120 * 3; i++) {
@@ -671,7 +620,6 @@ function launchVelocity(kt, pw) {
   const v = new THREE.Vector3(dir.x * Math.cos(el), Math.sin(el), dir.z * Math.cos(el)).multiplyScalar(speed);
   return { v, rpm, speed, curve: k.curve };
 }
-/* 예측: 골라인(z=0)과 수비벽(공에서 wallDist 만큼 간 곳)을 지나는 시각·위치 (수비수·골키퍼 판단용). wall.x 는 벽 좌표(옆으로 벗어난 거리) */
 function predict(v0, rpm, curve, wallDist) {
   const p = ballHome(), v = v0.clone(); let t = 0; const dt = 1 / 240; let wall = null, goal = null;
   for (let i = 0; i < 240 * 4; i++) {
@@ -683,7 +631,6 @@ function predict(v0, rpm, curve, wallDist) {
   return { wall, goal };
 }
 
-/* ═══════════════════ 슛 ═══════════════════ */
 function shoot() {
   const pw = clamp(power, 0.02, 1);
   const L = launchVelocity(kickType, pw);
@@ -692,29 +639,25 @@ function shoot() {
   shotStat = { kmh: Math.round(L.speed * 3.6), rpm: Math.round(L.rpm) };
   state = "flight"; updateAimVisual(); SFX.kick(pw);
   const pr = predict(B.v, B.rpm, B.curve, stage.wallDist);
-  /* 수비수: 공이 자기 근처로 온다고 보이면 점프 (예측 시각 - 점프 정점까지 걸리는 시간 + 반응 지연) */
   defenders.forEach(d => {
     if (!d.g.visible) return;
     const wx = pr.wall ? pr.wall.x : latAtWall(aimX, 0);
     const wt = pr.wall ? pr.wall.t : stage.wallDist / Math.max(1, B.v.length());
     if (Math.abs(wx - d.x) < 1.3) d.jumpAt = Math.max(0.02, wt - DEF.jumpDur * 0.5 + rnd(-0.05, stage.wallDelay));
   });
-  /* 골키퍼: 예상 도착점 + 단계별 오차. 오차는 공이 다가올수록 줄어들고(keeperEst), 공이 느리거나 몸 근처로 오면 오차를 거의 없앤다 → 어이없는 실점 방지 */
   const gt = pr.goal || { x: aimX, y: 1.0, t: stage.dist / Math.max(1, B.v.length()) };
   G.goalX = gt.x; G.goalY = gt.y;
-  /* 오차 크기는 공이 골키퍼한테서 얼마나 떨어져 오느냐에 비례: 정면(0.6m 안)으로 오는 공은 오차 0, 2m 이상 떨어진 공은 오차 100%. 느린 공(1.5초 이상)도 오차를 크게 줄인다 */
   const off = Math.abs(gt.x - G.baseX);
   const scale = clamp((off - 0.6) / 1.4, 0, 1) * (gt.t > 1.5 ? 0.25 : 1);
   let err = gauss() * stage.gkSigma;
-  if (scale >= 0.99 && Math.random() < stage.gkWrong) err = -Math.sign(gt.x - G.baseX || 1) * rnd(3, 5);   // 반대쪽을 읽음 (다가오면서 고치지만 늦는다)
+  if (scale >= 0.99 && Math.random() < stage.gkWrong) err = -Math.sign(gt.x - G.baseX || 1) * rnd(3, 5);
   G.err = err * scale; G.errY = gauss() * stage.gkSigma * 0.35 * Math.max(scale, 0.15);
-  /* 6단계부터: 골대 위 양쪽 구석(TOP_CORNER)이 아니면 골키퍼가 정확히 읽고 반드시 막는다(sure). 위 구석은 평소대로 예측 오차 + 멀리 날수록 손이 낮아짐 */
   G.sure = stage.strict && !inTopCorner(gt.x, gt.y);
   if (G.sure) { G.err = 0; G.errY = 0; }
-  G.miss = stage.strict && !G.sure && Math.random() >= stage.cornerSave;   // 위 구석 공: cornerSave 확률로만 막고, 아니면 일부러 짧고 낮게 뛰어 공이 손 위로 지나간다
+  G.miss = stage.strict && !G.sure && Math.random() >= stage.cornerSave;
   if (G.miss) { G.err = -Math.sign(gt.x - G.baseX || 1) * rnd(1.2, 2.0); G.errY = -rnd(0.4, 0.8); }
   G.tStart = stage.gkReact + rnd(0, 0.08); G.arrive = Math.max(G.tStart + 0.2, gt.t);
-  G.commitAt = Math.max(G.tStart + 0.02, G.arrive - clamp(gt.t * 0.45, 0.35, 0.6));   // 도착 0.35~0.6초 전에 방향을 정하고 몸을 날린다
+  G.commitAt = Math.max(G.tStart + 0.02, G.arrive - clamp(gt.t * 0.45, 0.35, 0.6));
   G.phase = "wait"; G.lean = 0; G.high = false; G.dir = 0;
 }
 function finishShot(result, reason) {
@@ -727,16 +670,14 @@ function finishShot(result, reason) {
 }
 function popText(text, cls) { const d = document.createElement("div"); d.className = "pop " + cls; d.textContent = text; $("pops").appendChild(d); setTimeout(() => d.remove(), 1400); }
 
-/* ── 비행 갱신 ── */
 function updateFlight(dt) {
-  const home = ballHome(), ws = stage.wallDist - 0.2;   // 벽 바로 앞(공→골 방향 거리)
+  const home = ballHome(), ws = stage.wallDist - 0.2;
   const sub = 4, h = dt / sub;
   for (let i = 0; i < sub; i++) {
     const prev = B.p.clone();
     const bounced = stepBall(B.p, B.v, B.rpm, B.curve, h); B.t += h;
     if (bounced) B.rpm *= 0.6;
     if (B.result) continue;
-    /* 수비벽: 공→골 축으로 벽 면을 지나는 순간, 벽 좌표(옆 위치)로 누구에게 맞았는지 본다 */
     if (!B.wallChecked && alongOf(prev.x, prev.z) < ws && alongOf(B.p.x, B.p.z) >= ws) {
       B.wallChecked = true;
       const lat = latOf(B.p.x, B.p.z);
@@ -745,28 +686,25 @@ function updateFlight(dt) {
         const top = DEF.h + d.g.position.y;
         if (Math.abs(lat - d.x) < DEF.w / 2 + PHYS.ballR && B.p.y < top + PHYS.ballR) {
           d.hit = true;
-          const back = Math.min(6, Math.abs(B.v.x * F.u.x + B.v.z * F.u.y) * 0.25), sideV = rnd(-1.5, 1.5);   // 벽에 맞고 공 쪽으로 튕겨 나온다
+          const back = Math.min(6, Math.abs(B.v.x * F.u.x + B.v.z * F.u.y) * 0.25), sideV = rnd(-1.5, 1.5);
           B.v.x = -F.u.x * back + F.r.x * sideV; B.v.z = -F.u.y * back + F.r.y * sideV; B.v.y = Math.abs(B.v.y) * 0.4 + 2; B.rpm *= 0.3;
           finishShot("wall", "수비벽에 막힘!"); break;
         }
       }
     }
-    /* 골키퍼: 몸통~손끝 선분과의 거리 (다이빙 전·후에도 몸에 맞으면 막힌다) */
     if (!B.gkChecked && B.p.z < 1.3 && B.p.z > -0.4) {
-      /* 판정 선분 = 발(출발점 근처) ~ 손끝: 몸을 날리면 발부터 손까지 몸 전체가 공을 막는다 */
       const gx = G.x, gy = 1.0 + G.y, dir = G.dir || 1, hx = gx + dir * G.armLen * Math.cos(G.armAng), hy = gy + G.armLen * Math.sin(G.armAng);
       const fx = G.footX, fy = 0.35;
-      const lean = G.lean, tx = gx + dir * lean * 0.5, ty = gy + 0.8 * (1 - lean);   // 머리 끝: 서 있으면 몸통 위로, 누우면 옆으로 (가슴 높이로 오는 공은 몸으로 막는다)
+      const lean = G.lean, tx = gx + dir * lean * 0.5, ty = gy + 0.8 * (1 - lean);
       const dist = Math.min(segDist(B.p.x, B.p.y, gx, gy, hx, hy), segDist(B.p.x, B.p.y, fx, fy, gx, gy), segDist(B.p.x, B.p.y, gx, gy, tx, ty));
-      const slow = B.v.length() < GK.slowCatch && G.phase !== "dive" && Math.abs(B.p.x - gx) < 0.9 && B.p.y < 2.1;   // 느린 공은 서서 그냥 잡는다
-      const sure = G.sure && (G.phase === "dive" || G.phase === "land") && Math.hypot(B.p.x - G.targetX, B.p.y - G.targetY) < 1.0;   // 6단계부터 위 구석이 아닌 공은 정확히 도착점으로 손을 뻗어 막는다
+      const slow = B.v.length() < GK.slowCatch && G.phase !== "dive" && Math.abs(B.p.x - gx) < 0.9 && B.p.y < 2.1;
+      const sure = G.sure && (G.phase === "dive" || G.phase === "land") && Math.hypot(B.p.x - G.targetX, B.p.y - G.targetY) < 1.0;
       if (!G.miss && (dist < GK.reach + PHYS.ballR || slow || sure)) {
         B.gkChecked = true;
         B.v.z = Math.abs(B.v.z) * 0.3; B.v.x = (B.p.x - gx) * 3 + rnd(-1, 1); B.v.y = Math.max(1.5, B.v.y * 0.3); B.rpm *= 0.3;
         finishShot("save", "골키퍼 선방!");
       }
     }
-    /* 골라인 통과 */
     if (prev.z > 0 && B.p.z <= 0) {
       const f = prev.z / (prev.z - B.p.z), x = prev.x + (B.p.x - prev.x) * f, y = prev.y + (B.p.y - prev.y) * f;
       const inside = Math.abs(x) < GOAL.hw && y < GOAL.h;
@@ -779,7 +717,6 @@ function updateFlight(dt) {
       else finishShot("miss", "빗나감!");
     }
   }
-  /* 그물 안: 세게 감속해서 그물 뒤에서 멈춤 */
   if (B.inNet) {
     const k = Math.max(0, 1 - 6 * dt); B.v.multiplyScalar(k);
     if (B.p.z < -GOAL.depth + 0.15) { B.p.z = -GOAL.depth + 0.15; B.v.z = Math.abs(B.v.z) * 0.2; }
@@ -787,9 +724,8 @@ function updateFlight(dt) {
     if (B.p.y > GOAL.h - 0.15 && B.p.z < 0) { B.p.y = GOAL.h - 0.15; B.v.y = -Math.abs(B.v.y) * 0.2; }
   }
   if (!B.result && (B.t > 4.5 || Math.abs(B.p.x) > 14 || B.p.z < -3 || B.p.z > home.z + 3)) finishShot("miss", "빗나감!");
-  /* 공 굴림 회전 */
   const sp = B.v.length();
-  if (sp > 0.05) { B.spinAxis.set(0, 1, 0).cross(B.v).normalize(); ball.rotateOnWorldAxis(B.spinAxis, sp / PHYS.ballR * dt * 0.35); if (B.curve) ball.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), -B.curve * B.rpm / 60 * 2 * Math.PI * dt * 0.5); }
+  if (sp > 0.05) { B.spinAxis.set(0, 1, 0).cross(B.v).normalize(); ball.rotateOnWorldAxis(B.spinAxis, sp / PHYS.ballR * dt * 0.35); if (B.curve) ball.rotateOnWorldAxis(UP, -B.curve * B.rpm / 60 * 2 * Math.PI * dt * 0.5); }
   ball.position.copy(B.p);
   if (B.result && B.t - B.resultAt > (B.result === "goal" ? 1.6 : 1.3)) showResult();
 }
@@ -799,8 +735,6 @@ function segDist(px, py, ax, ay, bx, by) {
   return Math.hypot(px - (ax + dx * t), py - (ay + dy * t));
 }
 
-/* ── 사람 자세 · 애니메이션 ── */
-/* 수비벽 자세: u=0 서서 두 손을 앞에 모음, u=1 점프 정점(두 팔 위로) */
 function wallPose(g, u) {
   const U = g.userData;
   U.arms.forEach((a, i) => { const s = i ? 1 : -1; a.rotation.set(-1.25 * (1 - u), 0, s * (0.35 * (1 - u) + 2.75 * u)); });
@@ -808,7 +742,6 @@ function wallPose(g, u) {
   U.knees.forEach(k => k.rotation.x = 0.25 * u); U.legs.forEach(l => l.rotation.x = -0.15 * u);
   U.torso.rotation.x = 0.08 * (1 - u);
 }
-/* 골키퍼 자세: ready(무릎 굽히고 손 앞) / dive */
 function keeperPose(kind, dir, lean, high) {
   const U = keeper.userData;
   if (kind === "ready") {
@@ -818,7 +751,7 @@ function keeperPose(kind, dir, lean, high) {
     U.arms.forEach((a, i) => a.rotation.set(-0.7, 0, (i ? 1 : -1) * 0.7)); U.elbows.forEach(e => e.rotation.x = -1.0);
     return;
   }
-  if (kind === "shuffle") {   // 잔발: 준비 자세에서 다리를 번갈아 옆으로 딛는다 (lean = -1~1 발 위상)
+  if (kind === "shuffle") {
     const ph = lean || 0;
     U.legs.forEach((l, i) => l.rotation.set(-0.4, 0, (i ? -1 : 1) * 0.18 + dir * 0.3 * ph * (i ? 1 : -1)));
     U.knees.forEach((k, i) => k.rotation.x = 0.7 + 0.3 * Math.max(0, i ? ph : -ph));
@@ -826,54 +759,48 @@ function keeperPose(kind, dir, lean, high) {
     U.arms.forEach((a, i) => a.rotation.set(-0.6, 0, (i ? 1 : -1) * (0.8 + 0.2 * dir * (i ? 1 : -1)))); U.elbows.forEach(e => e.rotation.x = -1.0);
     return;
   }
-  /* 다이빙: 몸을 dir 쪽으로 눕히고 그쪽 팔을 쭉 뻗는다. lean 0~1 */
   const s = dir;
   U.legs.forEach((l, i) => l.rotation.set(-0.3 + 0.2 * lean, 0, (i ? -1 : 1) * 0.25 + s * 0.35 * lean)); U.knees.forEach(k => k.rotation.x = 0.6 * (1 - lean) + 0.15);
   U.torso.rotation.x = 0.25 * (1 - lean);
   U.arms.forEach((a, i) => {
-    const isLead = (i === 1) === (s > 0);   // 다이빙 방향 쪽 팔
-    if (high) a.rotation.set(0, 0, (i ? 1 : -1) * 2.9);                 // 높은 공: 두 팔 위로
+    const isLead = (i === 1) === (s > 0);
+    if (high) a.rotation.set(0, 0, (i ? 1 : -1) * 2.9);
     else if (isLead) a.rotation.set(0, 0, (i ? 1 : -1) * (0.6 + 2.2 * lean));
     else a.rotation.set(-0.8 * (1 - lean), 0, (i ? 1 : -1) * (0.7 + 0.9 * lean));
   });
   U.elbows.forEach(e => e.rotation.x = -0.3 * (1 - lean));
 }
-function kickerRest() {   // 키커 기본 자세(선 채로 팔만 살짝 벌림)
+function kickerRest() {
   const U = kicker.userData; U.legs.forEach(l => l.rotation.set(0, 0, 0)); U.knees.forEach(k => k.rotation.set(0, 0, 0));
   U.arms.forEach((a, i) => a.rotation.set(0, 0, (i ? 1 : -1) * 0.15)); U.elbows.forEach(e => e.rotation.set(0, 0, 0)); U.torso.rotation.set(0, 0, 0); kicker.position.y = 0;
 }
 function updateActors(dt) {
-  /* 키커: 도움닫기(팔·다리 엇갈려 흔들기) → 왼발 딛고 오른발 백스윙 → 임팩트 → 팔로스루 → 원래 자세.
-     킥 종류마다 KM 값으로 달라진다 — 인프런트: 비스듬히 달려와 발을 바깥으로 돌려 안쪽 면으로 감고, 몸은 왼쪽으로 기울며 다리가 몸 앞을 가로지른다 /
-     아웃프런트: 거의 정면에서 짧게, 발끝을 안으로 돌려 바깥 면으로 튕기며 다리가 바깥으로 빠지고 몸은 오른쪽으로 /
-     인스텝: 길게 달려와 크게 백스윙, 발등을 펴고 몸을 공 위로 덮으며 다리가 높이 올라가고 크게 뛰어 착지 */
   if (K.swing >= 0) {
-    /* 모델은 얼굴이 +z 를 보므로 몸 기준 오른쪽은 −x: legs[0]·knees[0]·arms[0] 이 오른쪽, [1] 이 왼쪽. 옆 방향(rotation.y·z)은 오른발 기준으로 부호를 맞춘다(mz) */
     K.swing += dt; const s = K.swing, U = kicker.userData, legR = U.legs[0], kneeR = U.knees[0], legL = U.legs[1], kneeL = U.knees[1], aR = U.arms[0], aL = U.arms[1], P = KM[kickType], mz = -1;
     const ez = u => u * u * (3 - 2 * u), ei = u => u * u, eo = u => 1 - (1 - u) * (1 - u);
-    let posY = 0, adv = -1;   // adv: to 에서 앞으로 나간 거리(m), -1 = 도움닫기 중(lerp 로 위치를 정함)
+    let posY = 0, adv = -1;
     legR.rotation.z = legL.rotation.z = legR.rotation.y = 0; U.torso.rotation.z = 0;
-    if (s < K.run) {   // 도움닫기: 점점 빨라지며 2.5걸음, 마지막에 오른발이 뒤로 남는다
+    if (s < K.run) {
       const u = s / K.run, w = u * Math.PI * 2.5, sw = Math.sin(w);
       kicker.position.lerpVectors(K.from, K.to, Math.pow(u, 1.3));
       legR.rotation.x = sw * 0.75; legL.rotation.x = -sw * 0.75;
       kneeR.rotation.x = 0.25 + 0.85 * Math.max(0, sw); kneeL.rotation.x = 0.25 + 0.85 * Math.max(0, -sw);
       aL.rotation.set(-sw * 0.55, 0, mz * -0.3); aR.rotation.set(sw * 0.55, 0, mz * 0.3); U.elbows.forEach(e => e.rotation.x = -0.9);
       U.torso.rotation.set(0.18 + P.lean * 0.3, 0, mz * P.tilt * u * 0.5); posY = Math.abs(sw) * 0.04;
-    } else if (s < K.back) {   // 백스윙: 왼발을 공 옆에 딛고 오른 다리를 크게 뒤로, 무릎을 접고, 상체를 젖히며 팔을 벌린다
+    } else if (s < K.back) {
       const u = ez((s - K.run) / (K.back - K.run));
       legR.rotation.x = 0.75 + (P.back - 0.75) * u; kneeR.rotation.x = 1.1 + (P.knee - 1.1) * u; legR.rotation.z = mz * P.zBack * u; legR.rotation.y = mz * P.foot * u;
       legL.rotation.x = -0.75 + 0.35 * u; kneeL.rotation.x = 0.25 + 0.15 * u;
       aL.rotation.set(-0.4, 0, mz * (-0.3 - (P.armL - 0.3) * u)); aR.rotation.set(0.55, 0, mz * (0.3 + (P.armR - 0.3) * u)); U.elbows.forEach(e => e.rotation.x = -0.9 + 0.5 * u);
       U.torso.rotation.set(0.18 - (0.35 - P.lean * 0.8) * u, mz * -0.35 * P.twist * u, mz * P.tilt * (0.5 + 0.5 * u));
-    } else if (s < K.impact) {   // 스윙: 다리를 채찍처럼 앞으로(가속), 무릎이 펴지며 공에 닿는다. 다리 옆 방향은 뒤(zBack)에서 앞(zFollow)으로
+    } else if (s < K.impact) {
       const u = ei((s - K.back) / (K.impact - K.back));
       legR.rotation.x = P.back - (P.back + 0.35) * u; kneeR.rotation.x = P.knee - (P.knee - 0.15) * u;
       legR.rotation.z = mz * (P.zBack + (P.zFollow - P.zBack) * u * 0.6); legR.rotation.y = mz * P.foot;
       legL.rotation.x = -0.4 + 0.1 * u; kneeL.rotation.x = 0.4;
       aL.rotation.set(-0.4 + 0.2 * u, 0, mz * -P.armL); aR.rotation.set(0.55 - 0.3 * u, 0, mz * P.armR); U.elbows.forEach(e => e.rotation.x = -0.4);
       U.torso.rotation.set(-0.17 + P.lean * 0.8 + (0.25 + P.lean * 0.5) * u, mz * (-0.35 + 0.45 * u) * P.twist, mz * P.tilt);
-    } else {   // 팔로스루: 다리가 따라 올라가고(옆으로 zFollow 만큼 빠지며) 몸이 앞으로 넘어가며 오른발로 착지, 마지막에 자세를 푼다
+    } else {
       const u = (s - K.impact) / (K.end - K.impact), up = Math.sin(Math.min(1, u / 0.35) * Math.PI / 2), rel = u < 0.5 ? 0 : ez((u - 0.5) / 0.5), keep = 1 - rel;
       legR.rotation.x = (-0.35 - 0.95 * P.follow * up) * keep; kneeR.rotation.x = (0.15 + 0.35 * up) * keep;
       legR.rotation.z = mz * (P.zBack * 0.4 + (P.zFollow - P.zBack * 0.4) * up) * keep; legR.rotation.y = mz * P.foot * keep;
@@ -881,22 +808,21 @@ function updateActors(dt) {
       aL.rotation.set((-0.2 + 0.7 * up) * keep, 0, mz * ((-P.armL + 0.6 * up) * keep - 0.15 * rel)); aR.rotation.set((0.25 - 0.85 * up) * keep, 0, mz * ((P.armR - 0.2 * up) * keep + 0.15 * rel));
       U.elbows.forEach(e => e.rotation.x = -0.4 * keep - 0.2 * rel);
       U.torso.rotation.set((0.08 + P.lean * 1.3 + 0.32 * up) * keep, mz * (0.1 + P.wrap * up) * keep, mz * P.tilt * (1 - up * 0.5) * keep);
-      posY = Math.sin(Math.min(1, u / 0.4) * Math.PI) * P.hop;   // 살짝 뜬다
+      posY = Math.sin(Math.min(1, u / 0.4) * Math.PI) * P.hop;
       adv = P.step * eo(Math.min(1, u / 0.45));
       if (u >= 1) { K.swing = -1; kickerRest(); }
     }
     if (adv >= 0) kicker.position.copy(K.to).addScaledVector(K.fwd, adv);
     kicker.position.y = posY;
-  } else if (state === "charge") {   // 힘을 모으는 동안: 도움닫기 자리에서 살짝 웅크리고 몸을 앞뒤로 흔든다 (파워가 클수록 크게)
+  } else if (state === "charge") {
     const t = performance.now() / 1000, U = kicker.userData, b = Math.sin(t * 7) * 0.04;
-    U.legs.forEach((l, i) => l.rotation.x = (i ? -0.12 : 0.12) + b); U.knees.forEach(k => k.rotation.x = 0.25 + power * 0.3);   // 오른발(0)이 뒤
+    U.legs.forEach((l, i) => l.rotation.x = (i ? -0.12 : 0.12) + b); U.knees.forEach(k => k.rotation.x = 0.25 + power * 0.3);
     U.torso.rotation.set(0.1 + power * 0.15 + b, 0, 0); kicker.position.y = -(0.03 + power * 0.06);
     U.arms.forEach((a, i) => a.rotation.set(-0.2 - power * 0.3, 0, (i ? 1 : -1) * (0.25 + power * 0.35))); U.elbows.forEach(e => e.rotation.x = -0.5 - power * 0.4);
-  } else if (state === "aim") {   // 조준 중: 서서 숨 쉬듯 팔만 살짝
+  } else if (state === "aim") {
     const t = performance.now() / 1000, U = kicker.userData;
     U.arms.forEach((a, i) => a.rotation.set(0, 0, (i ? 1 : -1) * (0.15 + Math.sin(t * 1.5) * 0.03)));
   }
-  /* 수비수: 점프 */
   defenders.forEach(d => {
     if (!d.g.visible) return;
     if (d.jumpAt >= 0 && B.t >= d.jumpAt) {
@@ -904,18 +830,16 @@ function updateActors(dt) {
       d.g.position.y = u < 1 ? Math.sin(u * Math.PI) * DEF.jumpH : 0;
       wallPose(d.g, u < 1 ? Math.min(1, Math.sin(u * Math.PI) * 1.4) : 0);
       if (u >= 1) d.jumpAt = -1;
-    } else if (state === "flight" || state === "result") { /* 슛 중 기본 자세 유지 */ }
-    else { const t = performance.now() / 1000 + d.x; d.g.position.y = 0; wallPose(d.g, 0); d.g.userData.torso.rotation.y = Math.sin(t * 1.2) * 0.04; }
-    if (d.hit && d.g.rotation.x > -0.5) d.g.rotation.x -= dt * 2;   // 맞으면 살짝 뒤로 젖힘
+    } else if (state !== "flight" && state !== "result") { const t = performance.now() / 1000 + d.x; d.g.position.y = 0; wallPose(d.g, 0); d.g.userData.torso.rotation.y = Math.sin(t * 1.2) * 0.04; }
+    if (d.hit && d.g.rotation.x > -0.5) d.g.rotation.x -= dt * 2;
   });
-  /* 골키퍼 */
   updateKeeper(dt);
 }
-function keeperEst() {   // 지금 시점의 예상 도착 x: 공이 다가올수록 오차가 줄어든다
+function keeperEst() {
   const w = Math.pow(clamp(B.p.z / stage.dist, 0, 1), 0.7);
   return G.goalX + G.err * w;
 }
-function keeperShuffle(dt, want, flying) {   // 잔발로 want 쪽으로 이동
+function keeperShuffle(dt, want, flying) {
   const dx = want - G.x, mv = clamp(dx, -GK.shuffle * dt, GK.shuffle * dt);
   G.x += mv; G.footX = G.x; G.y = 0; G.armAng = 0.9; G.armLen = GK.arm * 0.6; G.lean = 0; G.step += Math.abs(mv) * 6;
   keeper.position.set(G.x, Math.abs(Math.sin(G.step)) * 0.05, 0.6); keeper.rotation.z = -Math.sign(dx) * Math.min(0.25, Math.abs(dx) * 0.3);
@@ -925,21 +849,21 @@ function keeperShuffle(dt, want, flying) {   // 잔발로 want 쪽으로 이동
 function updateKeeper(dt) {
   const t2 = performance.now() / 1000;
   const flying = state === "flight" && B.active && !B.result;
-  if (G.phase === "ready" || (!flying && G.phase === "wait")) {   // 대기: 제자리 잔발
+  if (G.phase === "ready" || (!flying && G.phase === "wait")) {
     G.armAng = 0.9; G.armLen = GK.arm * 0.6; G.lean = 0; G.y = 0;
     const k = Math.min(1, dt * 5);
     G.x += (G.baseX + Math.sin(t2 * 2) * 0.08 - G.x) * k; G.footX = G.x; keeper.position.set(G.x, Math.abs(Math.sin(t2 * 6)) * 0.03, 0.6); keeper.rotation.z *= 1 - k; keeperPose("ready");
     return;
   }
   const t = B.t;
-  if (G.phase === "wait") {   // 반응 지연
+  if (G.phase === "wait") {
     G.armAng = 0.9; G.armLen = GK.arm * 0.6; G.footX = G.x = G.baseX + Math.sin(t2 * 2) * 0.05; keeper.position.set(G.x, 0, 0.6); keeperPose("ready");
     if (t >= G.tStart) { G.phase = "shuffle"; G.step = 0; }
     return;
   }
-  if (G.phase === "shuffle") {   // 공을 보며 잔발로 예상 지점 쪽으로 이동
+  if (G.phase === "shuffle") {
     keeperShuffle(dt, clamp(keeperEst(), -GK.maxX, GK.maxX), flying);
-    if (t >= G.commitAt) {   // 방향을 정하고 몸을 날린다
+    if (t >= G.commitAt) {
       G.targetX = clamp(keeperEst(), -GK.maxX, GK.maxX); G.targetY = clamp(G.goalY + G.errY, 0.3, 2.2);
       G.diveFrom = G.x; G.dir = Math.sign((G.targetX - G.x) || (G.goalX - G.x) || 1); G.high = G.targetY > 1.3; G.phase = "dive";
     }
@@ -948,26 +872,26 @@ function updateKeeper(dt) {
   if (G.phase === "dive") {
     const span = Math.max(0.15, G.arrive - G.commitAt), u = clamp((t - G.commitAt) / span, 0, 1);
     const maxReach = GK.diveSpeed * span;
-    const tgt = G.sure ? G.targetX - G.diveFrom : clamp(G.targetX - G.diveFrom, -maxReach, maxReach);   // sure: 거리 제한 없이 반드시 닿는다
-    const ease = 1 - (1 - u) * (1 - u);   // 처음에 확 뛰어나가고 끝에서 뻗는다
+    const tgt = G.sure ? G.targetX - G.diveFrom : clamp(G.targetX - G.diveFrom, -maxReach, maxReach);
+    const ease = 1 - (1 - u) * (1 - u);
     G.x = G.diveFrom + tgt * ease; G.footX = G.diveFrom + (G.x - G.diveFrom) * 0.3;
     const high = G.high;
     const lean = G.lean = Math.abs(tgt) > 0.5 ? clamp(Math.abs(tgt) / 2.2, 0, 1) * ease : 0;
-    G.y = high ? ease * (G.targetY - 1.0) * 0.6 * (1 - lean * 0.7) : -ease * (G.targetY < 0.7 ? 0.62 : 0.35);   // 위로 뛰거나 낮게 몸을 던짐 (멀리 날수록 높이 못 뜀, 낮은 공은 바닥까지 눕는다)
+    G.y = high ? ease * (G.targetY - 1.0) * 0.6 * (1 - lean * 0.7) : -ease * (G.targetY < 0.7 ? 0.62 : 0.35);
     keeper.position.set(G.x, G.y + (lean * 0.15), 0.6);
     keeper.rotation.z = G.dir * lean * 1.35;
-    G.armAng = high ? 1.2 - GK.armDrop[stage.tier] * lean : 0.9 - 0.75 * clamp((lean - 0.2) / 0.5, 0, 1); G.armLen = GK.arm;   // 멀리 몸을 날릴수록 손이 낮아져 위쪽 구석은 못 막는다(단계가 오를수록 덜 낮아짐)
-    if (G.sure) G.armAng = clamp(Math.atan2(G.targetY - (1.0 + G.y), Math.max(0.3, Math.abs(G.targetX - G.x) + 0.6)), -0.2, 1.4);   // sure: 손을 공 도착점으로 뻗는다
+    G.armAng = high ? 1.2 - GK.armDrop[stage.tier] * lean : 0.9 - 0.75 * clamp((lean - 0.2) / 0.5, 0, 1); G.armLen = GK.arm;
+    if (G.sure) G.armAng = clamp(Math.atan2(G.targetY - (1.0 + G.y), Math.max(0.3, Math.abs(G.targetX - G.x) + 0.6)), -0.2, 1.4);
     keeperPose("dive", G.dir, lean, high);
     if (u >= 1) { G.phase = "land"; G.landT = 0; }
     return;
   }
-  if (G.phase === "land") {   // 착지: 눕거나 내려앉았다가 일어난다
+  if (G.phase === "land") {
     G.landT += dt; const k = clamp(G.landT / 0.35, 0, 1), lean = G.lean;
     const fallY = lean > 0.4 ? -0.55 * lean : (G.high ? 0 : G.y);
     keeper.position.set(G.x, G.y + (fallY - G.y) * k + lean * 0.15 * (1 - k * 0.5), 0.6); keeper.rotation.z = G.dir * lean * (1.35 + 0.2 * k);
     G.armAng = lean > 0.3 ? 0.1 : 0.9;
-    if (G.landT > 0.55 && flying) { G.phase = "recover"; G.lean = 0; G.y = 0; }   // 공이 아직 살아 있으면 일어나서 다시 따라간다
+    if (G.landT > 0.55 && flying) { G.phase = "recover"; G.lean = 0; G.y = 0; }
     else if (G.landT > 1.2 && !flying) G.phase = "ready";
     return;
   }
@@ -976,7 +900,6 @@ function updateKeeper(dt) {
     if (!flying && Math.abs(dx) < 0.05) G.phase = "ready";
   }
 }
-/* ═══════════════════ 흐름 ═══════════════════ */
 function showCard(which) {
   $("overlay").style.display = "flex";
   $("cardStart").style.display = which === "start" ? "block" : "none";
@@ -1013,7 +936,7 @@ function startStage(n) {
 }
 function retry() { startStage(stage.n); }
 function onGoal() {
-  aimX = 0;   // 골을 넣으면 다음 슛은 정면 조준에서 시작
+  aimX = 0;
   if (stage.n > prog.cleared) { prog.cleared = stage.n; saveJSON(PROG_KEY, prog); SFX.clear(); }
 }
 function showResult() {
@@ -1029,7 +952,7 @@ function showResult() {
     newBest = packed > prevPacked;
     if (newBest) { best = { stage: stage.n, speed: shotStat.kmh, date: new Date().toLocaleDateString("ko-KR") }; saveJSON(BEST_KEY, best); }
     wrBeat = !!(WR && WR.beats(packed));
-    crBeat = !!(WR && WR.beatsClass(packed));   /* 우리 반 신기록(반별 링크일 때만) */
+    crBeat = !!(WR && WR.beatsClass(packed));
     $("finalMsg").textContent = wrBeat ? "🏆 세계 신기록!" : crBeat ? "🏫 우리 반 신기록!" : newBest ? "🎉 개인 최고 기록 경신!" : "";
     if (wrBeat || crBeat) setTimeout(() => WR.prompt(packed).then(() => renderRecords()), 50);
   } else $("finalMsg").textContent = "";
@@ -1048,12 +971,11 @@ function resultSpace() {
   if (goal && stage.n < 10) startStage(stage.n + 1); else if (goal) { state = "menu"; placeScene(); renderStageGrid(); showCard("start"); } else retry();
 }
 
-/* ── 조작 ── */
 function renderKickButtons() { document.querySelectorAll(".kick").forEach(b => b.classList.toggle("on", b.dataset.kick === kickType)); }
-function setKick(k) { if (!KICKS[k] || kickType === k) return; kickType = k; if (state === "aim" || state === "charge") { placeKicker(); updateAimVisual(); } renderKickButtons(); SFX.select(); }   // 킥 종류마다 도움닫기 자리가 달라 키커를 다시 세운다
+function setKick(k) { if (!KICKS[k] || kickType === k) return; kickType = k; if (state === "aim" || state === "charge") { placeKicker(); updateAimVisual(); } renderKickButtons(); SFX.select(); }
 function renderPower() {
   const sec = power * PHYS.maxCharge;
-  $("powerFill").style.width = (power * 100).toFixed(1) + "%"; $("powerPct").textContent = Math.round(power * 100) + "%"; $("powerSec").textContent = sec.toFixed(1);
+  powerEls.fill.style.width = (power * 100).toFixed(1) + "%"; powerEls.pct.textContent = Math.round(power * 100) + "%"; powerEls.sec.textContent = sec.toFixed(1);
 }
 function chargeStart() {
   if (state !== "aim") return;
@@ -1063,7 +985,7 @@ function chargeEnd() {
   if (state !== "charge") return;
   $("btnKick").classList.remove("hold");
   K.swing = 0; state = "kicking"; updateAimVisual();
-  setTimeout(() => { if (state === "kicking") shoot(); }, K.impact * 1000);   // 도움닫기 뒤 발이 공에 닿는 순간 발사
+  setTimeout(() => { if (state === "kicking") shoot(); }, K.impact * 1000);
 }
 let tickAcc = 0;
 function updateInput(dt) {
@@ -1072,25 +994,25 @@ function updateInput(dt) {
   let changed = false;
   if (L !== R) {
     aimHeld += dt;
-    const sp = AIM.speed * (1 + (AIM.accel - 1) * clamp(aimHeld / AIM.accelT, 0, 1));   // 처음엔 미세 조정, 계속 누르면 빨라짐
+    const sp = AIM.speed * (1 + (AIM.accel - 1) * clamp(aimHeld / AIM.accelT, 0, 1));
     aimX = clamp(aimX + (R ? 1 : -1) * sp * dt, -AIM.range, AIM.range); changed = true;
   } else aimHeld = 0;
   if (changed) updateAimVisual();
   if (state === "charge") {
     const prev = power;
-    power = clamp((performance.now() - chargeAt) / 1000 / PHYS.maxCharge, 0, 1); renderPower(); updateAimVisual();   // 누르는 동안 궤적을 실시간으로
+    power = clamp((performance.now() - chargeAt) / 1000 / PHYS.maxCharge, 0, 1); renderPower(); updateAimVisual();
     tickAcc += dt; if (tickAcc > 0.22) { tickAcc = 0; SFX.tick(power); }
-    if (power >= 1 && prev < 1) chargeEnd();   // 최대 시간 도달 → 자동 발사
+    if (power >= 1 && prev < 1) chargeEnd();
   }
 }
 
-/* ═══════════════════ 루프 ═══════════════════ */
+const camTarget = new THREE.Vector3();
 function updateCamera(dt) {
   const home = ballHome();
-  let lx = home.x * 0.45 + F.r.x * aimX * 0.2, ly = 0.5 - (window.innerWidth < window.innerHeight ? 0.3 : 0), lz = home.z * 0.45 + F.r.y * aimX * 0.2;   // 시선: 공→골 선의 55% 지점 + 조준 쪽으로 조금. 공이 화면 아래에 들어오면서 골 뒤 관중석·지붕이 보이는 높이. 세로 화면은 아래 조작판에 공이 가리지 않게 조금 낮춤
+  let lx = home.x * 0.45 + F.r.x * aimX * 0.2, ly = 0.5 - (window.innerWidth < window.innerHeight ? 0.3 : 0), lz = home.z * 0.45 + F.r.y * aimX * 0.2;
   if (state === "flight" || state === "result") { lx = clamp(B.p.x, -4, 4) * 0.45; ly = 0.9 + B.p.y * 0.25; lz = Math.min(home.z * 0.15, B.p.z * 0.3); }
   camera.userData.look = camera.userData.look || new THREE.Vector3(lx, ly, lz);
-  if (!B.result) camera.userData.look.lerp(new THREE.Vector3(lx, ly, lz), Math.min(1, dt * 6));   // 결과가 난 뒤엔 시선 고정
+  if (!B.result) camera.userData.look.lerp(camTarget.set(lx, ly, lz), Math.min(1, dt * 6));
   camera.lookAt(camera.userData.look);
 }
 function loop(now) {
@@ -1103,7 +1025,7 @@ function loop(now) {
     updateActors(dt);
   } else {
     updateInput(dt);
-    if (state === "flight" || state === "result") { if (state === "flight") updateFlight(dt); }
+    if (state === "flight") updateFlight(dt);
     updateActors(dt); updateCamera(dt);
   }
   ballShadow.position.set(ball.position.x, 0.015, ball.position.z);
@@ -1113,11 +1035,10 @@ function loop(now) {
 function resize() {
   const w = window.innerWidth, h = window.innerHeight;
   if (!w || !h) return;
-  renderer.setSize(w, h, false); camera.aspect = w / h; camera.fov = w < h ? 68 : 50; camera.updateProjectionMatrix();   // 세로 화면은 시야각을 넓혀 골대가 다 보이게
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.fov = w < h ? 68 : 50; camera.updateProjectionMatrix();
 }
 window.addEventListener("resize", resize); resize();
 
-/* ───────── 입력 ───────── */
 window.addEventListener("keydown", e => {
   if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
   if (/^(Arrow(Up|Down|Left|Right)|Space)$/.test(e.code)) e.preventDefault();
@@ -1134,7 +1055,6 @@ window.addEventListener("keydown", e => {
 });
 window.addEventListener("keyup", e => { keys[e.code] = false; if (e.code === "Space") { spaceFresh = true; chargeEnd(); } });
 window.addEventListener("blur", () => { for (const k in keys) keys[k] = false; for (const k in hold) hold[k] = false; chargeEnd(); });
-/* 마우스·터치: 화면(캔버스)이나 '차기' 버튼을 누르고 있으면 파워, 떼면 발사 */
 function bindHold(el, down, up) {
   el.addEventListener("pointerdown", e => { e.preventDefault(); try { el.setPointerCapture(e.pointerId); } catch (err) {} down(); });
   ["pointerup", "pointercancel"].forEach(ev => el.addEventListener(ev, e => { e.preventDefault(); up(); }));
