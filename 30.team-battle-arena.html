@@ -83,7 +83,11 @@
   .specList .none { color: var(--sg-ink-faint); font-weight: 400; }
 
   /* ── 관전 화면: 왼쪽 블루팀, 오른쪽 레드팀 상태판 ── */
-  .specPanel { position: absolute; top: 92px; bottom: 12px; width: 300px; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+  .specPanel { position: absolute; top: 50px; bottom: 12px; width: 300px; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+  .spTime { background: rgba(255,255,255,.95); border-radius: 10px; padding: 6px 10px; text-align: center; border: 3px solid var(--sg-line-mid); }
+  .spTime b { display: block; font-size: 40px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .spTime b.low { color: var(--sg-danger); }
+  .spTime small { display: block; font-size: 15px; font-weight: 800; color: var(--sg-ink-soft); }
   .specPanel.blue { left: 12px; }
   .specPanel.red { right: 12px; }
   .spHead { border-radius: 10px; padding: 10px 14px; color: #fff; font-size: 24px; font-weight: 800; line-height: 1.3; }
@@ -116,6 +120,8 @@
     .spName small { display: none; }
     .spBar { height: 15px; }
     .spBar span { font-size: 11px; line-height: 15px; }
+    .spTime b { font-size: 26px; }
+    .spTime small { font-size: 12px; }
   }
   .charCard { flex: 1 1 0; min-width: 0; border: 3px solid var(--sg-line-mid); border-radius: 10px; background: var(--sg-panel); padding: 10px 6px; text-align: center; position: relative; }
   .charCard img { display: block; height: 110px; max-width: 100%; margin: 0 auto 6px; object-fit: contain; }
@@ -131,18 +137,20 @@
   /* ── 게임 화면 ── */
   #scrGame { position: fixed; top: 0; right: 0; bottom: 0; left: 0; background: #2A2F2B; }
   #cv { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block; touch-action: none; }
-  #hudTL { position: absolute; top: 46px; left: 8px; display: flex; gap: 6px; align-items: center; pointer-events: none; }
-  #hudTL .pill { background: rgba(255,255,255,.92); border: 1px solid var(--sg-line-mid); border-radius: 6px; padding: 4px 9px; font-size: 14px; font-weight: 800; }
-  #hudTop { position: absolute; top: 6px; left: 50%; transform: translateX(-50%); text-align: center; pointer-events: none; background: rgba(255,255,255,.92); border: 1px solid var(--sg-line-mid); border-radius: 8px; padding: 4px 16px 6px; }
-  #hudTimer { font-size: 30px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  /* 위쪽 가운데: 블루 피해 | 시계·생존 수 | 레드 피해 — 화면 맨 위에 붙임 */
+  #hudTop { position: absolute; top: 0; left: 50%; transform: translateX(-50%); display: flex; align-items: stretch; pointer-events: none; white-space: nowrap;
+            background: rgba(255,255,255,.94); border: 1px solid var(--sg-line-mid); border-top: 0; border-radius: 0 0 10px 10px; padding: 2px 4px 4px; }
+  .hdSide { display: flex; flex-direction: column; justify-content: center; padding: 0 10px; text-align: center; font-size: 12px; font-weight: 800; line-height: 1.15; min-width: 64px; }
+  .hdSide b { font-size: 20px; font-variant-numeric: tabular-nums; }
+  .hdSide.b { color: var(--blue); }
+  .hdSide.r { color: var(--red); }
+  #hudMid { padding: 0 10px; border-left: 1px solid var(--sg-line-mid); border-right: 1px solid var(--sg-line-mid); text-align: center; }
+  #hudTimer { font-size: 26px; font-weight: 800; line-height: 1.05; font-variant-numeric: tabular-nums; }
   #hudTimer.low { color: var(--sg-danger); }
-  #hudCount { font-size: 16px; font-weight: 800; }
+  #hudCount { font-size: 13px; font-weight: 800; }
   #hudCount .b { color: var(--blue); }
   #hudCount .r { color: var(--red); }
   #btnLeaveGame { position: absolute; top: 8px; right: 8px; height: 34px; padding: 0 12px; font-size: 14px; font-weight: 800; border-radius: 6px; border: 1px solid var(--sg-danger); background: rgba(255,255,255,.94); color: var(--sg-danger); }
-  #hudDmg { position: absolute; top: 48px; right: 8px; background: rgba(255,255,255,.92); border: 1px solid var(--sg-line-mid); border-radius: 6px; padding: 4px 9px; font-size: 13px; font-weight: 800; pointer-events: none; text-align: right; line-height: 1.5; }
-  #hudDmg .b { color: var(--blue); }
-  #hudDmg .r { color: var(--red); }
 
   .actBtn { position: absolute; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column; font-weight: 800; color: #fff; touch-action: none; -webkit-user-select: none; user-select: none; overflow: hidden; }
   #btnAtk { right: 26px; bottom: 44px; width: 112px; height: 112px; background: rgba(36,64,47,.88); border: 4px solid rgba(255,255,255,.9); font-size: 20px; }
@@ -153,7 +161,7 @@
   #btnUlt.ready { background: rgba(229,57,53,.9); border-color: #FFE08A; animation: glow 0.9s ease-in-out infinite alternate; }
   #btnUlt.ready .fill { background: rgba(229,57,53,0); }
   @keyframes glow { from { box-shadow: 0 0 6px 2px rgba(255,120,80,.6); } to { box-shadow: 0 0 22px 8px rgba(255,90,60,.95); } }
-  #ctlHint { position: absolute; left: 16px; bottom: 30px; font-size: 13px; font-weight: 700; color: rgba(255,255,255,.85); pointer-events: none; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+  #ctlHint { position: absolute; left: 16px; bottom: 186px; font-size: 13px; font-weight: 700; color: rgba(255,255,255,.85); pointer-events: none; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
   #deadMsg { position: absolute; left: 50%; bottom: 30%; transform: translateX(-50%); background: rgba(27,43,32,.82); color: #fff; font-size: 20px; font-weight: 800; padding: 10px 20px; border-radius: 8px; pointer-events: none; white-space: nowrap; }
   #countOv { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; pointer-events: none; }
   #countNum { font-size: 150px; font-weight: 800; color: #fff; text-shadow: 0 4px 18px rgba(0,0,0,.55); line-height: 1; }
@@ -195,10 +203,12 @@
     .charCard .nm { font-size: 17px; }
     #btnAtk { width: 96px; height: 96px; right: 16px; bottom: 40px; }
     #btnUlt { width: 74px; height: 74px; right: 124px; bottom: 46px; }
-    #hudTimer { font-size: 24px; }
-    #hudDmg { top: 92px; }
-    #hudTL { top: 92px; }
-    .specPanel { top: 124px; }
+    #hudTimer { font-size: 22px; }
+    .hdSide { padding: 0 5px; min-width: 40px; font-size: 11px; }
+    .hdSide span { display: none; }
+    .hdSide b { font-size: 17px; }
+    #hudMid { padding: 0 6px; }
+    #btnLeaveGame { padding: 0 8px; font-size: 13px; }
   }
 </style>
 </head>
@@ -277,10 +287,12 @@
 <!-- 게임 -->
 <div id="scrGame" hidden>
   <canvas id="cv"></canvas>
-  <div id="hudTL"><span class="pill" id="hudCode"></span><span class="badge" id="hudMode"></span></div>
-  <div id="hudTop"><div id="hudTimer">3:00</div><div id="hudCount"></div></div>
+  <div id="hudTop">
+    <div class="hdSide b"><span>블루 피해</span><b id="hudDmgB">0</b></div>
+    <div id="hudMid"><div id="hudTimer">1:00</div><div id="hudCount"></div></div>
+    <div class="hdSide r"><span>레드 피해</span><b id="hudDmgR">0</b></div>
+  </div>
   <button id="btnLeaveGame" type="button">방 나가기</button>
-  <div id="hudDmg"></div>
   <div id="specL" class="specPanel blue" hidden></div>
   <div id="specR" class="specPanel red" hidden></div>
   <div id="ctlHint">← 여기를 누르고 끌어서 이동</div>
@@ -337,7 +349,7 @@
     tank:     { name: "탱커", hp: 350, speed: 160, cd: 1000, dmg: 30, range: KEY * 1 + 50, arc: Math.PI * 0.7,   // 이동속도 = 사격수·힐러(200)의 80%
                 info: "HP 350 · 조금 느림 · 망치 근접<br>궁극기: 5초간 받는 피해 50% 감소 + 이속 50%" },
     assassin: { name: "암살자", hp: 90, speed: 220, cd: 600, dmg: 20, range: 250, pSpeed: 900, pr: 8, shots: 3, gap: 80,
-                info: "HP 90 · 가장 빠름 · 표창 3연발(개당 20)<br>궁극기: 10초간 은신 + 이속 40%" }
+                info: "HP 90 · 가장 빠름 · 표창 3연발(개당 20)<br>궁극기: 10초간 은신 + 이속 40%(공격하면 풀림)" }
   };
   var CHAR_LIST = ["marksman", "healer", "tank", "assassin"];
   var ULT = { mkCount: 20, mkGap: 55, mkDmg: 18, mkSpeed: 1150, mkRange: KEY * 8, mkPr: 8,
@@ -607,7 +619,7 @@
     sub(ref.child("hits"), "child_added", onHit);
     sub(ref.child("effects"), "child_added", onEffect);
 
-    setText($("lobbyCode"), code); setText($("hudCode"), "방 " + code);
+    setText($("lobbyCode"), code);
     showScreen("lobby");
   }
 
@@ -1110,7 +1122,9 @@
     var c = CHARS[E.char];
     E.cdUntil = now() + c.cd; E.angle = ang;
     if (E.char === "tank") swing(E, ang);
-    else if (E.char === "assassin") { E.volley = { left: c.shots, next: now(), ang: ang }; stepVolley(E); }   // 표창 3연발
+    else if (E.char === "assassin") {
+      if (E.stealthUntil > now()) { E.stealthUntil = now(); G.forceNet = true; }   // 은신 중 첫 공격 → 은신(과 이속 증가) 해제
+      E.volley = { left: c.shots, next: now(), ang: ang }; stepVolley(E); }   // 표창 3연발
     else spawnProj(E, ang, false);
   }
   function stepVolley(E) {
@@ -1321,7 +1335,7 @@
   });
 
   /* =====================================================================
-     입력: 왼쪽 = 이동 조이스틱(누른 곳이 중심), 오른쪽 = 공격·궁극기 버튼
+     입력: 왼쪽 아래 = 고정 이동 조이스틱, 오른쪽 아래 = 공격·궁극기 버튼
      ===================================================================== */
   var cv = $("cv"), ctx = cv.getContext("2d");
   var joy = { id: null, ox: 0, oy: 0, x: 0, y: 0 };
@@ -1329,12 +1343,19 @@
   var JOY_R = 60, DRAG_MIN = 14;
   function flip() { return ME && ME.team === "blue"; }
   function screenToWorldAngle(a) { return flip() ? a + Math.PI : a; }
+  /* 조이스틱 중심은 왼쪽 아래에 고정(공격 버튼과 같은 높이) */
+  function joyBase() {
+    var small = W <= 560;
+    JOY_R = small ? 54 : 64;
+    return { x: (small ? 16 : 26) + JOY_R + 8, y: H - (small ? 88 : 100) };
+  }
 
   cv.addEventListener("pointerdown", function (e) {
     audio();
     if (!canAct() || joy.id !== null) return;
-    if (e.clientX > window.innerWidth * 0.6) return;
-    joy.id = e.pointerId; joy.ox = joy.x = e.clientX; joy.oy = joy.y = e.clientY;
+    var jb = joyBase();
+    if (hyp(e.clientX - jb.x, e.clientY - jb.y) > JOY_R * 2.5) return;   // 조이스틱 근처를 눌렀을 때만
+    joy.id = e.pointerId; joy.ox = jb.x; joy.oy = jb.y; joy.x = e.clientX; joy.y = e.clientY;
     try { cv.setPointerCapture(e.pointerId); } catch (er) {}
     e.preventDefault();
   });
@@ -1548,14 +1569,18 @@
     ctx.restore();
   }
   function drawJoystick() {
-    if (joy.id === null) return;
-    var dx = joy.x - joy.ox, dy = joy.y - joy.oy, d = hyp(dx, dy);
-    if (d > JOY_R) { dx = dx / d * JOY_R; dy = dy / d * JOY_R; }
+    if (!ME || !ME.alive || !room || room.status === "ended") return;   // 살아 있는 동안 항상 제자리에 표시
+    var jb = joyBase(), on = joy.id !== null, dx = 0, dy = 0;
+    if (on) {
+      dx = joy.x - jb.x; dy = joy.y - jb.y; var d = hyp(dx, dy);
+      if (d > JOY_R) { dx = dx / d * JOY_R; dy = dy / d * JOY_R; }
+    }
     ctx.save();
-    ctx.fillStyle = "rgba(255,255,255,.18)"; ctx.strokeStyle = "rgba(255,255,255,.7)"; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.arc(joy.ox, joy.oy, JOY_R, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "rgba(255,255,255,.85)";
-    ctx.beginPath(); ctx.arc(joy.ox + dx, joy.oy + dy, 26, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = on ? "rgba(255,255,255,.22)" : "rgba(255,255,255,.14)";
+    ctx.strokeStyle = on ? "rgba(255,255,255,.8)" : "rgba(255,255,255,.5)"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(jb.x, jb.y, JOY_R, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = on ? "rgba(255,255,255,.9)" : "rgba(255,255,255,.6)";
+    ctx.beginPath(); ctx.arc(jb.x + dx, jb.y + dy, JOY_R * 0.42, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   }
 
@@ -1565,8 +1590,8 @@
     ctx.fillStyle = "#2A2F2B"; ctx.fillRect(0, 0, W, H);
     var spec = !me;
     if (spec) {
-      /* 관전: 맵 전체를 양옆 상태판 사이에 꽉 차게 (블루팀이 위, 레드팀이 아래) */
-      var pw = specPanelW() + 24, top = 80, bottom = 8;
+      /* 관전: 맵 전체를 양옆 상태판 사이에 위아래 꽉 차게 (블루팀이 위, 레드팀이 아래). 시계·점수는 양옆 상태판에 */
+      var pw = specPanelW() + 20, top = 0, bottom = 0;
       S = Math.max(0.1, Math.min((W - pw * 2) / MW, (H - top - bottom) / MH));
       camX = -((W - MW * S) / 2) / S;
       camY = -(top + (H - top - bottom - MH * S) / 2) / S;
@@ -1670,18 +1695,21 @@
   function fmtTime(ms) { ms = Math.max(0, ms); var s = Math.ceil(ms / 1000); return Math.floor(s / 60) + ":" + (s % 60 < 10 ? "0" : "") + (s % 60); }
   function updateHud(t) {
     var st = room.status;
-    setText($("hudMode"), room.mode === "ai" ? "AI 대전" : "3v3 플레이");
-    $("hudMode").className = "badge" + (room.mode === "ai" ? " ai" : "");
     var left = st === "countdown" || t < room.startAt ? MATCH_MS : room.startAt + MATCH_MS - t;
     if (st === "ended") left = Math.max(0, Math.min(MATCH_MS, room.startAt + MATCH_MS - (room.endedAt || t)));
     setText($("hudTimer"), fmtTime(left));
     $("hudTimer").className = left < 15000 && st === "playing" ? "low" : "";
     var s = teamTotals();
     setHtml($("hudCount"), '<span class="b">🔵 ' + s.blueAlive + '</span> vs <span class="r">🔴 ' + s.redAlive + "</span>");
-    setHtml($("hudDmg"), '누적 피해<br><span class="b">블루 ' + Math.round(s.blue) + '</span> · <span class="r">레드 ' + Math.round(s.red) + "</span>");
+    setText($("hudDmgB"), String(Math.round(s.blue))); setText($("hudDmgR"), String(Math.round(s.red)));
     var spec = !ME;
-    show($("hudDmg"), !spec); show($("specL"), spec); show($("specR"), spec);
-    if (spec) { setHtml($("specL"), specPanel("blue", s)); setHtml($("specR"), specPanel("red", s)); }
+    /* 관전: 가운데 위 시계를 없애고 왼쪽(시계·생존)·오른쪽(누적 피해) 상태판으로 나눔 → 맵이 위아래로 꽉 참 */
+    show($("hudTop"), !spec); show($("specL"), spec); show($("specR"), spec);
+    if (spec) {
+      var low = left < 15000 && st === "playing" ? ' class="low"' : "";
+      setHtml($("specL"), '<div class="spTime"><b' + low + ">" + fmtTime(left) + "</b><small>생존 🔵 " + s.blueAlive + " vs 🔴 " + s.redAlive + "</small></div>" + specPanel("blue", s));
+      setHtml($("specR"), '<div class="spTime"><b><span style="color:#2F6FD6">' + Math.round(s.blue) + '</span> : <span style="color:#D6453D">' + Math.round(s.red) + "</span></b><small>누적 피해 (블루 : 레드)</small></div>" + specPanel("red", s));
+    }
 
     var alive = ME && ME.alive, playing = st === "playing" && t >= room.startAt;
     show($("btnAtk"), alive && st !== "ended"); show($("btnUlt"), alive && st !== "ended");
