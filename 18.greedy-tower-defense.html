@@ -6,7 +6,6 @@
 <meta charset="utf-8">
 <link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
 <title>풍선 디펜스</title>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
@@ -15,7 +14,6 @@
 <meta property="og:url" content="https://cornsilktea.github.io/18.greedy-tower-defense.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
-<!-- 링크 미리보기 끝 -->
 <style>
   :root{
     --bg1:var(--sg-bg);
@@ -46,7 +44,6 @@
 
   .wrap{max-width:1400px;margin:0 auto;padding:12px;}
 
-  /* ---------- 상단 상태바 ---------- */
   .topbar{
     display:flex;flex-wrap:wrap;gap:8px;
     background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
@@ -67,7 +64,6 @@
   .stat.gold .v{color:var(--gold);}
   .stat.life .v{color:var(--life);}
 
-  /* ---------- 레이아웃 ---------- */
   .main{display:flex;gap:12px;align-items:flex-start;}
   .left{flex:1 1 auto;min-width:0;}
   .right{flex:0 0 336px;display:flex;flex-direction:column;gap:12px;}
@@ -78,7 +74,6 @@
   }
   canvas#cv{display:block;width:100%;height:auto;border-radius:var(--sg-radius);touch-action:manipulation;}
 
-  /* 라운드 시작 바 */
   .startbar{
     display:flex;gap:10px;align-items:center;margin-top:10px;
     background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
@@ -94,7 +89,6 @@
   #goBtn:active{transform:translateY(1px);box-shadow:0 1px 0 var(--sg-primary);}
   #goBtn[disabled]{background:var(--sg-ink-faint);box-shadow:0 2px 0 var(--sg-ink-faint);cursor:default;}
 
-  /* ---------- 패널 ---------- */
   .panel{
     background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
     padding:11px;box-shadow:var(--shadow);
@@ -138,10 +132,6 @@
 
   .hint{font-size:12px;color:var(--sub);margin-top:9px;line-height:1.5;}
 
-  /* ---------- 오버레이 화면 ---------- */
-  /* 카드가 화면보다 길면(휴대폰) align-items:center 는 위쪽을 잘라 스크롤로도 못 보게 하므로
-     margin:auto 로 가운데 맞춤 — 작으면 가운데, 크면 위에서부터 스크롤.
-     위 여백은 접근 가드의 '← 목록으로' 버튼, 아래 여백은 저작권 표시에 버튼이 가려지지 않게 둡니다. */
   .screen{
     position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(232,239,247,.94);backdrop-filter:blur(3px);
     display:flex;padding:calc(52px + env(safe-area-inset-top, 0px)) 16px calc(40px + env(safe-area-inset-bottom, 0px));
@@ -175,7 +165,6 @@
   .msg{font-size:12.5px;color:var(--sub);margin:8px 0 0;min-height:18px;}
   .hidden{display:none !important;}
 
-  /* ---------- 최고 기록 ---------- */
   .stat.best .ic{background:#fff7e0;}
   .stat.best .v{color:#b3720a;}
   .bestbox{
@@ -202,7 +191,6 @@
   }
   @keyframes bestpop{0%{transform:scale(.96);opacity:.4}60%{transform:scale(1.02)}100%{transform:scale(1);opacity:1}}
 
-  /* ---------- 반응형 ---------- */
   @media (max-width:940px){
     .main{flex-direction:column;}
     .right{flex:1 1 auto;width:100%;}
@@ -221,7 +209,6 @@
 </head>
 <body>
 
-<!-- ================= 시작 화면 ================= -->
 <div class="screen" id="startScreen">
   <div class="card">
     <h1>🎈 풍선 타워 디펜스</h1>
@@ -242,7 +229,6 @@
   </div>
 </div>
 
-<!-- ================= 결과 화면 ================= -->
 <div class="screen hidden" id="endScreen">
   <div class="card">
     <h1 id="endTitle">결과</h1>
@@ -258,7 +244,6 @@
   </div>
 </div>
 
-<!-- ================= 게임 화면 ================= -->
 <div class="wrap">
   <div class="topbar">
     <div class="stat"><span class="ic">🌊</span><span class="tx"><span class="k">웨이브</span><span class="v" id="uiWave">1 / 40</span></span></div>
@@ -305,21 +290,9 @@ var CONFIG = {
   SAVE_LOG_GOLD: 100,
   BOSS_GOLD_WEIGHT: 6,
 
-  // 풍선이 경로 전체를 통과하는 시간(초)
   TRAVEL: { red:13, blue:10.5, yellow:8.5, boss:22 }
 };
 
-/* =====================================================================
-   ★★★ CONFIG ★★★  여기 숫자를 조정하면 난이도와 전체 플레이타임이 바뀐다.
-   - TRAVEL : 풍선이 경로 전체를 지나는 시간(초). 경로 길이와 무관.
-   - 투사체 속도는 항상 풍선 최고 속도의 2.5배 이상으로 자동 보정된다.
-   - WAVES[].gold : 풍선을 다 잡았을 때 받는 총 골드(1마리마다 나누어 지급).
-   - boss : 놓치면 즉시 패배. hp/armor 를 낮추면 쉬워진다.
-   ===================================================================== */
-/* ---- 타워 스펙 : 효율(DPS/비용)은 화살→레일건 순으로 내려간다.
-   대신 칸당 DPS는 올라가고(칸 제한 40개), 플라즈마는 범위 피해로 물량에,
-   레일건은 한 발 데미지로 방어력 보스에 강하다.
-   화살 0.57 > 대포 0.45 > 레이저 0.42 > 저격 0.28 > 플라즈마 0.25 > 레일건 0.23 ---- */
 var TOWERS = [
   { id:'arrow',  name:'화살타워',     tier:1, cost:20,  dmg:5,   cd:0.44, range:110, proj:'arrow',  pspd:1200, color:'#4f8f3a', dark:'#33682a', desc:'화살을 쏘는 목조 망루' },
   { id:'cannon', name:'대포타워',     tier:1, cost:50,  dmg:18,  cd:0.80, range:100, proj:'shell',  pspd:1200, color:'#8a6134', dark:'#5e3f1f', desc:'포탄이 터지며 주변에도 피해', splash:46, splashRate:0.4 },
@@ -337,71 +310,59 @@ var BTYPE = {
   boss:   { color:'#8043c9', dark:'#54258f', r:28 }
 };
 
-/* ---- 웨이브 구성 ---- */
 function g(t,n,hp,gap,start){ return {t:t,n:n,hp:hp,gap:gap,start:start||0}; }
 var WAVES = [
-  /* --- 1~6 관대한 구간 --- */
-  /* 1 */ { gold:80,  groups:[ g('red',8,26,0.50) ] },
-  /* 2 */ { gold:85,  groups:[ g('red',10,29,0.45) ] },
-  /* 3 */ { gold:90,  groups:[ g('red',8,32,0.45), g('blue',4,43,0.50,3.5) ] },
-  /* 4 */ { gold:95,  groups:[ g('red',10,39,0.40), g('yellow',6,27,0.35,4) ] },
-  /* 5 */ { gold:105, groups:[ g('red',8,43,0.40), g('blue',5,51,0.45,3) ], boss:{hp:200,armor:10,start:1} },
-  /* 6 */ { gold:110, groups:[ g('red',10,41,0.38), g('yellow',8,27,0.30,3.5) ] },
+  { gold:80,  groups:[ g('red',8,26,0.50) ] },
+  { gold:85,  groups:[ g('red',10,29,0.45) ] },
+  { gold:90,  groups:[ g('red',8,32,0.45), g('blue',4,43,0.50,3.5) ] },
+  { gold:95,  groups:[ g('red',10,39,0.40), g('yellow',6,27,0.35,4) ] },
+  { gold:105, groups:[ g('red',8,43,0.40), g('blue',5,51,0.45,3) ], boss:{hp:200,armor:10,start:1} },
+  { gold:110, groups:[ g('red',10,41,0.38), g('yellow',8,27,0.30,3.5) ] },
 
-  /* --- 7~14 중간 구간 --- */
-  /* 7 */ { gold:90,  groups:[ g('red',10,54,0.35), g('blue',8,61,0.40,3) ] },
-  /* 8 */ { gold:90,  groups:[ g('red',12,59,0.33), g('yellow',10,39,0.28,3.5) ] },
-  /* 9 */ { gold:100, groups:[ g('blue',12,71,0.35), g('yellow',10,46,0.28,4) ] },
-  /*10 */ { gold:105, groups:[ g('red',8,65,0.35), g('blue',6,77,0.40,2.5) ], boss:{hp:408,armor:2,start:1} },
-  /*11 */ { gold:115, groups:[ g('blue',12,94,0.32), g('yellow',12,58,0.26,3.5) ] },
-  /*12 */ { gold:120, groups:[ g('red',12,88,0.30), g('blue',8,104,0.35,3.5) ] },
-  /*13 */ { gold:130, groups:[ g('yellow',14,68,0.24), g('blue',10,117,0.32,3) ] },
-  /*14 */ { gold:135, groups:[ g('red',12,117,0.30), g('yellow',12,75,0.24,3.5) ] },
+  { gold:90,  groups:[ g('red',10,54,0.35), g('blue',8,61,0.40,3) ] },
+  { gold:90,  groups:[ g('red',12,59,0.33), g('yellow',10,39,0.28,3.5) ] },
+  { gold:100, groups:[ g('blue',12,71,0.35), g('yellow',10,46,0.28,4) ] },
+  { gold:105, groups:[ g('red',8,65,0.35), g('blue',6,77,0.40,2.5) ], boss:{hp:408,armor:2,start:1} },
+  { gold:115, groups:[ g('blue',12,94,0.32), g('yellow',12,58,0.26,3.5) ] },
+  { gold:120, groups:[ g('red',12,88,0.30), g('blue',8,104,0.35,3.5) ] },
+  { gold:130, groups:[ g('yellow',14,68,0.24), g('blue',10,117,0.32,3) ] },
+  { gold:135, groups:[ g('red',12,117,0.30), g('yellow',12,75,0.24,3.5) ] },
 
-  /* --- 15~20 엄격한 구간 : 3티어 없이는 버티기 어렵다 --- */
-  /*15 */ { gold:165, groups:[ g('blue',10,116,0.30), g('yellow',10,78,0.24,3) ], boss:{hp:880,armor:3,start:1} },
-  /*16 */ { gold:180, groups:[ g('blue',14,122,0.28), g('yellow',12,92,0.22,3.5) ] },
-  /*17 */ { gold:195, groups:[ g('red',14,122,0.26), g('blue',10,133,0.30,3.5) ] },
-  /*18 */ { gold:210, groups:[ g('blue',12,144,0.27), g('yellow',16,98,0.20,3) ] },
-  /*19 */ { gold:225, groups:[ g('red',14,144,0.25), g('blue',10,158,0.28,3.5) ] },
-  /*20 */ { gold:192, groups:[ g('red',8,136,0.28), g('blue',8,141,0.30,2.5), g('yellow',8,96,0.20,5) ], boss:{hp:1120,armor:4,start:1} },
+  { gold:165, groups:[ g('blue',10,116,0.30), g('yellow',10,78,0.24,3) ], boss:{hp:880,armor:3,start:1} },
+  { gold:180, groups:[ g('blue',14,122,0.28), g('yellow',12,92,0.22,3.5) ] },
+  { gold:195, groups:[ g('red',14,122,0.26), g('blue',10,133,0.30,3.5) ] },
+  { gold:210, groups:[ g('blue',12,144,0.27), g('yellow',16,98,0.20,3) ] },
+  { gold:225, groups:[ g('red',14,144,0.25), g('blue',10,158,0.28,3.5) ] },
+  { gold:192, groups:[ g('red',8,136,0.28), g('blue',8,141,0.30,2.5), g('yellow',8,96,0.20,5) ], boss:{hp:1120,armor:4,start:1} },
 
-  /* --- 21~25 : 20웨이브 클리어 실력이면 통과 --- */
-  /*21 */ { gold:204, groups:[ g('red',14,150,0.25), g('blue',12,161,0.28,3) ] },
-  /*22 */ { gold:216, groups:[ g('blue',14,169,0.26), g('yellow',18,113,0.18,3) ] },
-  /*23 */ { gold:228, groups:[ g('red',16,176,0.24), g('blue',12,188,0.27,3.5) ] },
-  /*24 */ { gold:240, groups:[ g('yellow',20,128,0.17), g('blue',12,203,0.26,3) ] },
-  /*25 */ { gold:264, groups:[ g('red',10,195,0.26), g('blue',10,210,0.28,2.5) ], boss:{hp:1950,armor:5,start:1} },
+  { gold:204, groups:[ g('red',14,150,0.25), g('blue',12,161,0.28,3) ] },
+  { gold:216, groups:[ g('blue',14,169,0.26), g('yellow',18,113,0.18,3) ] },
+  { gold:228, groups:[ g('red',16,176,0.24), g('blue',12,188,0.27,3.5) ] },
+  { gold:240, groups:[ g('yellow',20,128,0.17), g('blue',12,203,0.26,3) ] },
+  { gold:264, groups:[ g('red',10,195,0.26), g('blue',10,210,0.28,2.5) ], boss:{hp:1950,armor:5,start:1} },
 
-  /* --- 26~30 : 어느 정도 효율(3티어 여러 개)이 있어야 통과 --- */
-  /*26 */ { gold:264, groups:[ g('blue',16,198,0.25), g('yellow',16,132,0.17,3) ] },
-  /*27 */ { gold:280, groups:[ g('red',16,212,0.23), g('blue',12,218,0.26,3) ] },
-  /*28 */ { gold:296, groups:[ g('yellow',22,149,0.16), g('blue',12,231,0.25,3) ] },
-  /*29 */ { gold:312, groups:[ g('red',16,238,0.22), g('blue',14,245,0.25,3) ] },
-  /*30 */ { gold:336, groups:[ g('red',10,323,0.25), g('blue',10,351,0.27,2.5), g('yellow',10,241,0.18,5) ], boss:{hp:2914,armor:6,start:1} },
+  { gold:264, groups:[ g('blue',16,198,0.25), g('yellow',16,132,0.17,3) ] },
+  { gold:280, groups:[ g('red',16,212,0.23), g('blue',12,218,0.26,3) ] },
+  { gold:296, groups:[ g('yellow',22,149,0.16), g('blue',12,231,0.25,3) ] },
+  { gold:312, groups:[ g('red',16,238,0.22), g('blue',14,245,0.25,3) ] },
+  { gold:336, groups:[ g('red',10,323,0.25), g('blue',10,351,0.27,2.5), g('yellow',10,241,0.18,5) ], boss:{hp:2914,armor:6,start:1} },
 
-  /* --- 31~35 : 30부터 체력 급상승(×1.4→1.9). 효율적인 플레이(칸당 DPS·배치)를 해야 통과 --- */
-  /*31 */ { gold:336, groups:[ g('blue',18,346,0.23), g('yellow',18,235,0.16,3) ] },
-  /*32 */ { gold:352, groups:[ g('red',18,416,0.21), g('blue',14,427,0.24,3) ] },
-  /*33 */ { gold:368, groups:[ g('yellow',24,310,0.15), g('blue',14,479,0.23,3) ] },
-  /*34 */ { gold:384, groups:[ g('red',18,500,0.20), g('blue',16,509,0.23,3) ] },
-  /*35 */ { gold:416, groups:[ g('red',12,479,0.24), g('blue',12,519,0.26,2.5), g('yellow',12,350,0.17,5) ], boss:{hp:3773,armor:8,start:1} },
+  { gold:336, groups:[ g('blue',18,346,0.23), g('yellow',18,235,0.16,3) ] },
+  { gold:352, groups:[ g('red',18,416,0.21), g('blue',14,427,0.24,3) ] },
+  { gold:368, groups:[ g('yellow',24,310,0.15), g('blue',14,479,0.23,3) ] },
+  { gold:384, groups:[ g('red',18,500,0.20), g('blue',16,509,0.23,3) ] },
+  { gold:416, groups:[ g('red',12,479,0.24), g('blue',12,519,0.26,2.5), g('yellow',12,350,0.17,5) ], boss:{hp:3773,armor:8,start:1} },
 
-  /* --- 36~40 : 최고 효율의 플레이만 통과 --- */
-  /*36 */ { gold:416, groups:[ g('blue',20,390,0.22), g('yellow',20,264,0.15,3) ] },
-  /*37 */ { gold:432, groups:[ g('red',20,416,0.20), g('blue',16,431,0.22,3) ] },
-  /*38 */ { gold:448, groups:[ g('yellow',26,293,0.14), g('blue',16,458,0.22,3) ] },
-  /*39 */ { gold:464, groups:[ g('red',20,485,0.19), g('blue',18,500,0.21,3) ] },
-  /*40 */ { gold:520, groups:[ g('red',14,485,0.22), g('blue',14,513,0.24,2.5), g('yellow',14,348,0.16,5) ], boss:{hp:4004,armor:10,start:1} }
+  { gold:416, groups:[ g('blue',20,390,0.22), g('yellow',20,264,0.15,3) ] },
+  { gold:432, groups:[ g('red',20,416,0.20), g('blue',16,431,0.22,3) ] },
+  { gold:448, groups:[ g('yellow',26,293,0.14), g('blue',16,458,0.22,3) ] },
+  { gold:464, groups:[ g('red',20,485,0.19), g('blue',18,500,0.21,3) ] },
+  { gold:520, groups:[ g('red',14,485,0.22), g('blue',14,513,0.24,2.5), g('yellow',14,348,0.16,5) ], boss:{hp:4004,armor:10,start:1} }
 ];
 var TOTAL_WAVES = WAVES.length;
 
-/* =====================================================================
-   맵
-   ===================================================================== */
 var LAND = {
   w:960, h:640, road:20, cell:46,
-  // 13번 꺾이는 구불구불한 경로 (왼쪽에서 들어와 오른쪽 아래로 빠져나감)
   pts:[[-40,80],[400,80],[400,210],[90,210],[90,350],[280,350],[280,540],[520,540],[520,60],[720,60],[720,420],[860,420],[860,580],[1000,580]],
   lake:{x:850,y:200,rx:82,ry:72}
 };
@@ -421,6 +382,8 @@ function buildPath(map){
     total+=len;
   }
   map.segs=segs; map.total=total;
+  var fastestTravel=Math.min.apply(null, Object.keys(CONFIG.TRAVEL).map(function(k){ return CONFIG.TRAVEL[k]; }));
+  map.maxBalloonSpeed=total/fastestTravel;
 }
 function posAt(d){
   var s=MAP.segs;
@@ -445,8 +408,6 @@ function distToPath(px,py){
   return best;
 }
 
-/* 설치 가능 칸 목록 : 길이 사거리 안에 가장 많이 들어오는 칸 상위 MAX_TOWERS개만 남긴다.
-   → 칸 수 = 타워 상한. "나쁜 자리"가 거의 없으므로 어떤 타워를 어느 칸에 두느냐가 승부. */
 var VALID = [];
 function computeValidCells(){
   var c=MAP.cell, cand=[];
@@ -484,9 +445,6 @@ function cellOf(x,y){
   return { x:Math.floor(x/c)*c+c/2, y:Math.floor(y/c)*c+c/2 };
 }
 
-/* =====================================================================
-   배경
-   ===================================================================== */
 var bgCanvas=null;
 function seedRand(s){ return function(){ s=(s*1103515245+12345)&0x7fffffff; return s/0x7fffffff; }; }
 
@@ -503,16 +461,14 @@ function renderBackground(){
   var rnd=seedRand(20260911);
   var W=MAP.w, H=MAP.h;
 
-  /* 1) 모래 바탕 */
   var gr=b.createLinearGradient(0,0,W*0.4,H);
   gr.addColorStop(0,'#e9dcb4'); gr.addColorStop(1,'#dcc99a');
   b.fillStyle=gr; b.fillRect(0,0,W,H);
-  for(var i=0;i<2600;i++){                       // 모래 알갱이
+  for(var i=0;i<2600;i++){
     b.fillStyle = rnd()<0.5 ? 'rgba(255,255,255,0.22)' : 'rgba(120,95,50,0.12)';
     b.fillRect(rnd()*W, rnd()*H, 1.6, 1.6);
   }
 
-  /* 2) 잔디 덩어리 : 경로 주변에 불규칙한 초록 영역 */
   var blobs=[];
   for(var d=30; d<MAP.total; d+=38){
     var p=posAt(d);
@@ -525,7 +481,7 @@ function renderBackground(){
   drawBlobs('rgba(150,178,105,0.55)',10);
   drawBlobs('#b5d287',0);
   drawBlobs('#c2db93',-14);
-  for(var k=0;k<900;k++){                        // 잔디 결
+  for(var k=0;k<900;k++){
     var bl=blobs[Math.floor(rnd()*blobs.length)];
     var a=rnd()*6.2832, rr=rnd()*bl.r*0.9;
     var gx=bl.x+Math.cos(a)*rr, gy=bl.y+Math.sin(a)*rr;
@@ -533,7 +489,6 @@ function renderBackground(){
     b.beginPath(); b.moveTo(gx,gy+2); b.lineTo(gx+(rnd()-0.5)*3, gy-4); b.stroke();
   }
 
-  /* 3) 호수 */
   var L=MAP.lake;
   if(L){
     b.fillStyle='#d7cba0';
@@ -545,29 +500,27 @@ function renderBackground(){
     b.fillStyle=wg;
     b.beginPath(); b.ellipse(L.x,L.y,L.rx,L.ry,0,0,6.2832); b.fill();
     b.strokeStyle='rgba(255,255,255,0.55)'; b.lineWidth=1.6;
-    for(var wv=0; wv<7; wv++){                   // 물결
+    for(var wv=0; wv<7; wv++){
       var wx=L.x+(rnd()-0.5)*L.rx*1.3, wy=L.y+(rnd()-0.5)*L.ry*1.3;
       b.beginPath(); b.moveTo(wx-9,wy); b.quadraticCurveTo(wx-4,wy-3,wx,wy); b.quadraticCurveTo(wx+4,wy+3,wx+9,wy); b.stroke();
     }
   }
 
-  /* 4) 돌·조개·작은 덤불 */
   for(var s=0;s<70;s++){
     var sx=rnd()*W, sy=rnd()*H;
     if(distToPath(sx,sy)<MAP.road+24 || inLake(sx,sy,18)) continue;
     var t=rnd(), sc=0.7+rnd()*0.8;
-    if(t<0.5){                                   // 돌
+    if(t<0.5){
       b.fillStyle='rgba(60,60,55,0.18)'; b.beginPath(); b.ellipse(sx+1.5,sy+2,6*sc,4*sc,0.3,0,6.2832); b.fill();
       b.fillStyle='#b4b1a6'; b.beginPath(); b.ellipse(sx,sy,6*sc,4.4*sc,0.3,0,6.2832); b.fill();
       b.fillStyle='#d3d0c6'; b.beginPath(); b.ellipse(sx-1.5*sc,sy-1.5*sc,3*sc,2*sc,0.3,0,6.2832); b.fill();
-    }else{                                       // 덤불
+    }else{
       b.fillStyle='rgba(60,80,40,0.18)'; b.beginPath(); b.arc(sx+1,sy+3,7*sc,0,6.2832); b.fill();
       b.fillStyle='#6f9b4c'; b.beginPath(); b.arc(sx-3*sc,sy+1,5*sc,0,6.2832); b.arc(sx+3*sc,sy+1,5*sc,0,6.2832); b.fill();
       b.fillStyle='#86b35d'; b.beginPath(); b.arc(sx,sy-2*sc,5.5*sc,0,6.2832); b.fill();
     }
   }
 
-  /* 5) 야자수 : 호수 주변 + 빈 곳 */
   var palms=[];
   for(var q=0;q<160 && palms.length<12;q++){
     var px,py;
@@ -596,7 +549,6 @@ function renderBackground(){
     b.restore();
   });
 
-  /* 6) 도로 : 아스팔트 + 노란 중앙선 */
   b.lineCap='round'; b.lineJoin='round';
   var stroke=function(w,c){ b.strokeStyle=c; b.lineWidth=w; pathTo(b); b.stroke(); };
   stroke(MAP.road*2+16, 'rgba(70,60,40,0.16)');
@@ -608,7 +560,6 @@ function renderBackground(){
   stroke(3.2, '#f2c744');
   b.setLineDash([]);
 
-  /* 6.5) 설치 칸(돌판) — 항상 보이게 */
   VALID.forEach(function(v){
     var h=MAP.cell/2-5;
     b.fillStyle='rgba(60,50,30,0.14)';
@@ -620,7 +571,6 @@ function renderBackground(){
     b.beginPath(); b.roundRect(v.x-h+3, v.y-h+3, h*2-6, h*2-6, 5); b.stroke();
   });
 
-  /* 7) 시작(동굴) / 도착(집) */
   var p0=posAt(4), p1=posAt(MAP.total-22);
   b.fillStyle='#6a5a43'; b.beginPath(); b.arc(p0.x,p0.y,MAP.road+8,0,6.2832); b.fill();
   b.fillStyle='#2f2a24'; b.beginPath(); b.arc(p0.x,p0.y,MAP.road-1,0,6.2832); b.fill();
@@ -636,9 +586,6 @@ function pathTo(c){
   for(var i=1;i<p.length;i++) c.lineTo(p[i][0],p[i][1]);
 }
 
-/* =====================================================================
-   게임 상태
-   ===================================================================== */
 var G=null;
 function newGame(){
   return {
@@ -652,9 +599,6 @@ function newGame(){
   };
 }
 
-/* =====================================================================
-   캔버스 설정
-   ===================================================================== */
 var cv=document.getElementById('cv');
 var ctx=cv.getContext('2d',{alpha:false});
 var DPR=1;
@@ -681,9 +625,6 @@ window.addEventListener('resize', function(){
   if(!G || G.state==='over'){ setupCanvas(); draw(); }
 });
 
-/* =====================================================================
-   타워 아트
-   ===================================================================== */
 function drawTowerArt(c, s, x, y, ang, k, flash){
   c.save(); c.translate(x,y); c.scale(k,k);
 
@@ -810,10 +751,8 @@ function drawTowerArt(c, s, x, y, ang, k, flash){
   c.restore();
 }
 
-/* =====================================================================
-   타워 구매 패널
-   ===================================================================== */
 var towerList=document.getElementById('towerList');
+var towerButtons=[];
 function buildTowerPanel(){
   var h='';
   TOWERS.forEach(function(t){
@@ -831,7 +770,8 @@ function buildTowerPanel(){
     var c=ic.getContext('2d'); c.setTransform(2,0,0,2,0,0);
     drawTowerArt(c, s, 17, 17, -Math.PI/2, 0.85, 0);
   });
-  Array.prototype.forEach.call(towerList.querySelectorAll('.tw'), function(b){
+  towerButtons=Array.prototype.slice.call(towerList.querySelectorAll('.tw'));
+  towerButtons.forEach(function(b){
     b.addEventListener('click', function(){
       if(b.hasAttribute('disabled')) return;
       var id=b.getAttribute('data-id');
@@ -842,7 +782,7 @@ function buildTowerPanel(){
   });
 }
 function updatePanel(){
-  Array.prototype.forEach.call(towerList.querySelectorAll('.tw'), function(b){
+  towerButtons.forEach(function(b){
     var t=towerById(b.getAttribute('data-id'));
     var can = G.gold>=t.cost && G.towers.length<CONFIG.MAX_TOWERS;
     if(can) b.removeAttribute('disabled'); else b.setAttribute('disabled','');
@@ -854,9 +794,6 @@ function towerById(id){
   return null;
 }
 
-/* =====================================================================
-   로그
-   ===================================================================== */
 var logBox=document.getElementById('logBox');
 function addLog(tag,text,kind){
   G.logs.push({tag:tag,t:text,k:kind||''});
@@ -871,16 +808,10 @@ function renderLog(){
   logBox.innerHTML=h;
 }
 
-/* =====================================================================
-   입력
-   ===================================================================== */
 function canvasPos(e){
   var r=cv.getBoundingClientRect();
   return { x:(e.clientX-r.left)/r.width*MAP.w, y:(e.clientY-r.top)/r.height*MAP.h };
 }
-/* 마우스가 벗어나면 미리보기를 지웁니다.
-   손가락·펜은 뗄 때마다 pointerleave 가 오므로(터치는 화면을 떠나는 셈)
-   여기서 지우면 '한 번 더 눌러 설치'가 절대 성립하지 않습니다 → 마우스만 처리 */
 function onLeave(e){
   if(G && (!e || !e.pointerType || e.pointerType==='mouse')) G.pending=null;
 }
@@ -900,7 +831,6 @@ function onDown(e, type){
     if(ok) placeTower(c.x,c.y); else G.pending={x:c.x,y:c.y,ok:false};
     return;
   }
-  /* 터치·펜: 첫 탭은 사거리 미리보기, 같은 칸을 한 번 더 탭하면 설치 */
   if(G.pending && G.pending.x===c.x && G.pending.y===c.y && G.pending.ok){
     placeTower(c.x,c.y); G.pending=null;
   }else{
@@ -922,7 +852,6 @@ if(window.PointerEvent){
     onDown(e, e.pointerType==='mouse' ? 'mouse' : 'touch');
   }, {passive:false});
 }else{
-  /* 포인터 이벤트가 없는 구형 전자칠판·태블릿 브라우저: 터치/마우스 이벤트로 대신 처리 */
   var lastTouch=0;
   cv.addEventListener('touchstart', function(e){
     lastTouch=Date.now();
@@ -933,7 +862,7 @@ if(window.PointerEvent){
   cv.addEventListener('mousemove', function(e){ if(Date.now()-lastTouch>800) onMove(e); });
   cv.addEventListener('mouseleave', function(){ onLeave(null); });
   cv.addEventListener('mousedown', function(e){
-    if(Date.now()-lastTouch<800) return;      /* 터치 뒤에 따라오는 가짜 마우스 이벤트 무시 */
+    if(Date.now()-lastTouch<800) return;
     e.preventDefault();
     onDown(e, 'mouse');
   });
@@ -952,9 +881,6 @@ function placeTower(x,y){
   updateHUD(); updatePanel();
 }
 
-/* =====================================================================
-   웨이브
-   ===================================================================== */
 var goBtn=document.getElementById('goBtn');
 var goMsg=document.getElementById('goMsg');
 
@@ -1001,13 +927,7 @@ function endWave(){
   prepareWave(G.wave+1);
 }
 
-/* =====================================================================
-   전투
-   ===================================================================== */
-function maxBalloonSpeed(){
-  var m=1e9; for(var k in CONFIG.TRAVEL) if(CONFIG.TRAVEL[k]<m) m=CONFIG.TRAVEL[k];
-  return MAP.total/m;
-}
+
 function spawn(item){
   var bt=BTYPE[item.type];
   G.balloons.push({
@@ -1057,7 +977,6 @@ function update(dt){
     while(G.queue.length && G.queue[0].time<=G.waveTime && G.balloons.length<CONFIG.MAX_BALLOONS){
       spawn(G.queue.shift());
     }
-    // 풍선
     for(var i=G.balloons.length-1;i>=0;i--){
       var b=G.balloons[i];
       b.d+=b.speed*dt;
@@ -1065,25 +984,16 @@ function update(dt){
       if(b.d>=MAP.total){
         var isBoss = (b.type==='boss');
         G.balloons.splice(i,1);
-        
-        if(isBoss){
-          G.bossEscaped = true;
-          G.life = 0;
-          addEffect({k:'leak',x:posAt(MAP.total-20).x,y:posAt(MAP.total-20).y,t:0.5,life:0.5,c:'#d5504a'});
-          updateHUD();
-          gameOver(false);
-          return;
-        } else {
-          G.life--;
-          addEffect({k:'leak',x:posAt(MAP.total-20).x,y:posAt(MAP.total-20).y,t:0.5,life:0.5,c:'#d5504a'});
-          updateHUD();
-          if(G.life<=0){ gameOver(false); return; }
-        }
+        if(isBoss){ G.bossEscaped = true; G.life = 0; }
+        else G.life--;
+        var leakAt=posAt(MAP.total-20);
+        addEffect({k:'leak',x:leakAt.x,y:leakAt.y,t:0.5,life:0.5,c:'#d5504a'});
+        updateHUD();
+        if(G.life<=0){ gameOver(false); return; }
         continue;
       }
       var p=posAt(b.d); b.x=p.x; b.y=p.y;
     }
-    // 타워
     for(var ti=0;ti<G.towers.length;ti++){
       var tw=G.towers[ti];
       tw.cool-=dt;
@@ -1094,7 +1004,7 @@ function update(dt){
         var bb=G.balloons[bi];
         var dx=bb.x-tw.x, dy=bb.y-tw.y;
         if(dx*dx+dy*dy>rr) continue;
-        var pri = bb.d + (bb.type==="boss" ? 1e6 : 0);   // 사거리 안에 보스가 있으면 보스 우선, 아니면 가장 앞선 풍선
+        var pri = bb.d + (bb.type==="boss" ? 1e6 : 0);
         if(pri>bestD){ bestD=pri; target=bb; }
       }
       if(!target) continue;
@@ -1106,7 +1016,7 @@ function update(dt){
         var mz=tw.s.id==='cannon'?16:14;
         addProj({ kind:tw.s.proj, spec:tw.s, target:target,
                   x:tw.x+Math.cos(tw.angle)*mz, y:tw.y+Math.sin(tw.angle)*mz,
-                  ang:tw.angle, spd:Math.max(tw.s.pspd, maxBalloonSpeed()*2.5), life:1.6 });
+                  ang:tw.angle, spd:Math.max(tw.s.pspd, MAP.maxBalloonSpeed*2.5), life:1.6 });
         if(tw.s.id==='cannon') addEffect({k:'muzzle',x:tw.x+Math.cos(tw.angle)*20,y:tw.y+Math.sin(tw.angle)*20,t:0.1,life:0.1,c:'#ffd076'});
       }else{
         applyHit(tw.s, target, target.x, target.y);
@@ -1117,13 +1027,11 @@ function update(dt){
         if(tw.s.id==='rail') addEffect({k:'shock',x:tw.x,y:tw.y,r:26,t:0.25,life:0.25,c:tw.s.color});
       }
     }
-    // 투사체 (유도탄: 목표를 따라가며, 속도는 항상 풍선 최고 속도의 2.5배 이상)
     for(var pi=G.projs.length-1;pi>=0;pi--){
       var pr=G.projs[pi];
       pr.life-=dt;
       var alive = pr.target && pr.target.hp>0 && G.balloons.indexOf(pr.target)>=0;
       if(!alive){
-        // 목표가 먼저 터졌으면 가까운 다른 풍선으로 갈아타고, 없으면 그 자리에서 소멸
         var nt=null, nd=90*90;
         for(var ni=0;ni<G.balloons.length;ni++){
           var nb=G.balloons[ni], ndx=nb.x-pr.x, ndy=nb.y-pr.y, dd=ndx*ndx+ndy*ndy;
@@ -1141,14 +1049,11 @@ function update(dt){
       var ddx=pr.target.x-pr.x, ddy=pr.target.y-pr.y, dist=Math.sqrt(ddx*ddx+ddy*ddy);
       if(dist <= step+pr.target.r*0.6){
         applyHit(pr.spec, pr.target, pr.target.x, pr.target.y);
-        // 플라즈마 폭발 이펙트는 applyHit의 splash 처리에서 그린다
         G.projs.splice(pi,1); continue;
       }
       pr.x+=Math.cos(pr.ang)*step; pr.y+=Math.sin(pr.ang)*step;
     }
-    // 사망
     for(var di=G.balloons.length-1;di>=0;di--){ if(G.balloons[di].hp<=0) killBalloon(di); }
-    // 종료
     if(G.queue.length===0 && G.balloons.length===0){ G.projs.length=0; endWave(); }
   }
 
@@ -1159,9 +1064,6 @@ function update(dt){
   if(G.inspectT>0){ G.inspectT-=dt; if(G.inspectT<=0) G.inspect=null; }
 }
 
-/* =====================================================================
-   그리기
-   ===================================================================== */
 function drawGrid(){
   var c=MAP.cell, half=c/2-2;
   ctx.lineWidth=1.5;
@@ -1191,25 +1093,20 @@ function drawBalloon(b){
   var r=b.r;
   var sway=Math.sin(performance.now()/300+b.wob)*1.5;
   ctx.save(); ctx.translate(b.x+sway,b.y);
-  // 줄
   ctx.strokeStyle='rgba(90,100,110,0.5)'; ctx.lineWidth=1;
   ctx.beginPath(); ctx.moveTo(0,r*0.95);
   ctx.quadraticCurveTo(-sway*2, r*1.5, sway, r*1.9); ctx.stroke();
-  // 몸통
   var grd=ctx.createRadialGradient(-r*0.3,-r*0.4,r*0.15,0,0,r*1.15);
-  grd.addColorStop(0, b.hit>0?'#ffffff':'#ffffff');
+  grd.addColorStop(0, '#ffffff');
   grd.addColorStop(0.22, b.hit>0?'#ffffff':b.color);
   grd.addColorStop(1, b.hit>0?'#ffdddd':b.dark);
   ctx.fillStyle=grd;
   ctx.beginPath(); ctx.ellipse(0,0,r*0.87,r,0,0,6.2832); ctx.fill();
-  // 매듭
   ctx.fillStyle=b.hit>0?'#ffdddd':b.dark;
   ctx.beginPath(); ctx.moveTo(-r*0.2,r*0.9); ctx.lineTo(r*0.2,r*0.9); ctx.lineTo(0,r*1.3); ctx.closePath(); ctx.fill();
-  // 하이라이트
   ctx.fillStyle='rgba(255,255,255,0.5)';
   ctx.beginPath(); ctx.ellipse(-r*0.3,-r*0.36,r*0.17,r*0.26,-0.5,0,6.2832); ctx.fill();
 
-  // 중앙 숫자 : 남은 체력(=터뜨리려면 더 줘야 하는 데미지)
   var hpTxt=String(Math.ceil(b.hp));
   ctx.font='800 '+(b.type==='boss'?16:(hpTxt.length>2?10:11.5))+'px "Nanum Gothic", "Malgun Gothic", sans-serif';
   ctx.textAlign='center'; ctx.textBaseline='middle';
@@ -1218,11 +1115,11 @@ function drawBalloon(b){
   ctx.fillStyle='#ffffff'; ctx.fillText(hpTxt, 0, 1);
 
   if(b.type==='boss'){
-    ctx.fillStyle='#ffd766';                  // 왕관
+    ctx.fillStyle='#ffd766';
     ctx.beginPath();
     ctx.moveTo(-13,-r+3); ctx.lineTo(-9,-r-8); ctx.lineTo(-4.5,-r); ctx.lineTo(0,-r-11);
     ctx.lineTo(4.5,-r); ctx.lineTo(9,-r-8); ctx.lineTo(13,-r+3); ctx.closePath(); ctx.fill();
-    ctx.font='800 11px "Nanum Gothic", "Malgun Gothic", sans-serif';           // 방어력 배지
+    ctx.font='800 11px "Nanum Gothic", "Malgun Gothic", sans-serif';
     ctx.fillStyle='rgba(0,0,0,0.5)'; roundRect(-19,r*0.35,38,15,7); ctx.fill();
     ctx.fillStyle='#ffe9a8'; ctx.fillText('방어 '+b.armor, 0, r*0.35+8);
   }
@@ -1335,9 +1232,6 @@ function draw(){
   }
 }
 
-/* =====================================================================
-   HUD / 루프
-   ===================================================================== */
 var uiWave=document.getElementById('uiWave'), uiLife=document.getElementById('uiLife'),
     uiGold=document.getElementById('uiGold'), uiScore=document.getElementById('uiScore'),
     uiTime=document.getElementById('uiTime'), uiTC=document.getElementById('uiTowerCount'),
@@ -1362,9 +1256,6 @@ function loop(ts){
   requestAnimationFrame(loop);
 }
 
-/* =====================================================================
-   최고 기록 (이 기기의 localStorage 에 저장)
-   ===================================================================== */
 var BEST_KEY='greedytd_best_v1';
 function loadBest(){
   try{
@@ -1377,7 +1268,6 @@ function loadBest(){
 function saveBest(b){
   try{ window.localStorage.setItem(BEST_KEY, JSON.stringify(b)); }catch(e){}
 }
-/* 더 좋은 기록인가: 클리어 웨이브 > 남은 목숨 > 짧은 시간 순으로 비교 */
 function isBetter(a, b){
   if(!b) return true;
   if(a.waves!==b.waves) return a.waves>b.waves;
@@ -1407,9 +1297,6 @@ function todayStr(){
   return d.getFullYear()+'.'+(m<10?'0':'')+m+'.'+(day<10?'0':'')+day;
 }
 
-/* =====================================================================
-   시작 / 종료
-   ===================================================================== */
 var startScreen=document.getElementById('startScreen'), endScreen=document.getElementById('endScreen');
 document.getElementById('startBtn').addEventListener('click', function(){
   startScreen.classList.add('hidden'); begin();
@@ -1459,7 +1346,6 @@ function gameOver(cleared){
 
   lastResult=[wavesDone, Math.max(0,G.life), score, G.tier3, fmtTime(G.elapsed)].join(',');
 
-  /* 최고 기록 갱신 여부 */
   var cur={waves:wavesDone, life:Math.max(0,G.life), score:score, elapsed:Math.round(G.elapsed), cleared:!!cleared, date:todayStr()};
   var prev=loadBest(), box=document.getElementById('endBest');
   if(isBetter(cur, prev)){
