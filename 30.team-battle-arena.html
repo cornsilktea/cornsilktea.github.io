@@ -70,12 +70,13 @@
   .slot .me { font-size: 12px; background: var(--sg-primary); color: #fff; border-radius: 4px; padding: 1px 5px; }
   .slot.mine { box-shadow: inset 0 0 0 2px var(--sg-primary); }
   .slot .host { font-size: 14px; }
-  .team .join { width: 100%; height: 46px; margin-top: 4px; border-radius: 6px; border: 2px solid; font-size: 17px; font-weight: 800; color: #fff; }
+  .team h3 { display: flex; align-items: center; gap: 8px; }
+  /* 이동하기: 팀 색, 옮길 수 없으면 회색 */
+  .team .join { height: 30px; padding: 0 10px; border-radius: 6px; border: 2px solid; font-size: 14px; font-weight: 800; color: #fff; }
   .team.blue .join { background: var(--blue); border-color: var(--blue); }
   .team.red .join { background: var(--red); border-color: var(--red); }
-  .team .join:disabled { opacity: .4; cursor: default; }
-  .neutral { margin-top: 12px; padding: 10px 12px; border-radius: 8px; border: 2px dashed #D97B4F; background: #FFF6F0; font-size: 16px; font-weight: 700; }
-  .neutral b { color: #D97B4F; }
+  .team .join:disabled { background: #B8BDB5; border-color: #B8BDB5; color: #F4F5F2; cursor: default; }
+  #btnSpec:disabled { background: #E6E8E3; color: #9AA096; border-color: #D2D6CF; cursor: default; }
 
   .chars { display: flex; gap: 10px; }
   .specBox { margin-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border-radius: 8px; border: 2px solid var(--sg-line-mid); background: var(--sg-panel-alt); font-size: 16px; }
@@ -273,16 +274,14 @@
 
     <div id="teamCard" class="card">
       <div class="teams">
-        <div class="team blue"><h3>블루팀</h3><div id="listBlue"></div><button id="btnJoinBlue" class="join" type="button">블루팀으로</button></div>
-        <div class="team red"><h3>레드팀</h3><div id="listRed"></div><button id="btnJoinRed" class="join" type="button">레드팀으로</button></div>
+        <div class="team blue"><h3>블루팀 <button id="btnJoinBlue" class="join" type="button">이동하기</button></h3><div id="listBlue"></div></div>
+        <div class="team red"><h3>레드팀 <button id="btnJoinRed" class="join" type="button">이동하기</button></h3><div id="listRed"></div></div>
       </div>
-      <div id="neutralBox" class="neutral" hidden></div>
-      <button id="btnTeamChange" class="mini" type="button" style="margin-top:12px;" hidden>🔄 팀 변경</button>
       <div class="specBox">
         <div class="specHead"><b>📺 관전자</b><span id="listSpec" class="specList"></span></div>
         <button id="btnSpec" class="mini" type="button">📺 관전자로 보기</button>
       </div>
-      <div class="note" style="margin-top:6px;">전자칠판은 관전자로 두면 맵 전체와 양 팀 체력·궁극기를 한눈에 볼 수 있어요. 관전자는 게임에 참여하지 않고, 게임 중에도 방 코드로 관전자 입장이 됩니다.</div>
+      <div class="note" style="margin-top:6px;">전자칠판은 관전자로 두면 맵 전체와 양 팀 체력·궁극기를 한눈에 볼 수 있어요. 관전자는 최대 2명이고 게임에 참여하지 않아요. 게임 중에도 자리가 있으면 방 코드로 관전자 입장이 됩니다.</div>
     </div>
 
     <div id="charCardBox" class="card">
@@ -352,6 +351,7 @@
   var MATCH_MS = 60000;              // 1분
   var COUNT_MS = 3000;               // 시작 카운트다운
   var GAUGE_MAX = 10;
+  var TEAM_MAX = 3, SPEC_MAX = 2;    // 팀당 인원, 관전자 최대 인원
   var ATK_POSE_MS = 150;             // 기본 공격 포즈 유지 시간
   var NET_MS = 100;                  // 위치 전송 간격(초당 10회)
   var CHARS = {
@@ -579,14 +579,16 @@
       $("btnJoin").disabled = false;
       var r = s.val();
       if (!r || !r.players || !humans(r.players).length) { startMsg("그런 방이 없어요. 코드를 확인해 주세요."); return; }
-      /* 게임 중이거나 자리가 없으면 관전자로 입장 */
-      var hs = humans(r.players).filter(function (id) { return r.players[id].team !== "spec"; });
-      var team = r.mode === "ai" ? "blue" : "neutral";
-      if (r.status !== "lobby") team = "spec";
-      else if (r.mode === "ai") {
-        var blue = hs.filter(function (id) { return r.players[id].team === "blue"; });
-        if (blue.length >= 3) team = "spec";
-      } else if (hs.length >= 6) team = "spec";
+      /* 로비면 자리가 남은 팀(인원이 적은 쪽)으로, 게임 중이거나 팀이 꽉 찼으면 관전자로 */
+      var cnt = function (tm) { return keys(r.players).filter(function (id) { return r.players[id] && r.players[id].team === tm; }).length; };
+      var team = null;
+      if (r.status === "lobby") {
+        var nb = cnt("blue"), nr = cnt("red");
+        if (r.mode === "ai") { if (nb < TEAM_MAX) team = "blue"; }
+        else if (nb < TEAM_MAX || nr < TEAM_MAX) team = nr < nb ? "red" : "blue";
+      }
+      if (!team && cnt("spec") < SPEC_MAX) team = "spec";
+      if (!team) { startMsg(r.status === "lobby" ? "방이 가득 찼어요." : "게임 중이고 관전자 자리(" + SPEC_MAX + "명)도 찼어요."); return; }
       var me = newPlayer(team, now());
       ref.child("players/" + myId).set(me).then(function () { enterRoom(code); })
         .catch(function () { startMsg("입장하지 못했어요."); });
@@ -684,32 +686,25 @@
   var lobbyQueued = false;
   function playersChanged() {
     if (lobbyQueued) return; lobbyQueued = true;
-    setTimeout(function () { lobbyQueued = false; renderLobby(); autoAssign(); }, 0);
-  }
-  var assigning = false;
-  /* AI 대전: 중립으로 들어와 있던 학생은 자동으로 블루팀 (자리 없으면 퇴장) */
-  function autoAssign() {
-    if (!room || room.mode !== "ai" || room.status !== "lobby" || !P[myId] || P[myId].team !== "neutral" || assigning) return;
-    assigning = true;
-    room.ref.child("players").transaction(function (ps) {
-      if (!ps || !ps[myId]) return ps;
-      var blue = humans(ps).filter(function (id) { return id !== myId && ps[id].team === "blue"; });
-      ps[myId].team = blue.length >= 3 ? "spec" : "blue";   // 블루팀이 꽉 찼으면 관전자로
-      return ps;
-    }).then(function (res) {
-      assigning = false;
-      if (res.committed && P[myId] && P[myId].team === "spec") flashHint("블루팀이 가득 차서 관전자가 되었어요.");
-    }).catch(function () { assigning = false; });
+    setTimeout(function () { lobbyQueued = false; renderLobby(); }, 0);
   }
 
+  /* 자리: 블루·레드 3명씩, 관전자 2명. 중립 없음 */
+  function capOf(team) { return team === "spec" ? SPEC_MAX : TEAM_MAX; }
+  function countIn(ps, team, except) { return keys(ps).filter(function (id) { return id !== except && ps[id] && ps[id].team === team; }).length; }
+  function canMoveTo(team) {
+    var me = P[myId];
+    if (!room || room.status !== "lobby" || !me || me.team === team) return false;
+    if (team === "red" && room.mode === "ai") return false;          // AI 대전의 레드팀은 AI 자리
+    return countIn(P, team, myId) < capOf(team);
+  }
   function pickTeam(team) {
-    if (!room || room.status !== "lobby") return;
+    if (!canMoveTo(team)) return;
     room.ref.child("players").transaction(function (ps) {
       if (!ps || !ps[myId]) return ps;
-      var n = keys(ps).filter(function (id) { return id !== myId && ps[id] && ps[id].team === team; }).length;
-      if (n >= 3) return;                 // 꽉 참 → 중립으로 대기
+      if (countIn(ps, team, myId) >= capOf(team)) return;              // 그새 꽉 참 → 취소
       ps[myId].team = team; return ps;
-    }).then(function (res) { if (!res.committed) flashHint("그 팀은 3명이 다 찼어요. 자리가 나면 다시 눌러 주세요."); });
+    }).then(function (res) { if (!res.committed) flashHint("자리가 다 찼어요. 자리가 나면 다시 눌러 주세요."); });
   }
   var hintUntil = 0, hintText = "";
   function flashHint(t) { hintText = t; hintUntil = Date.now() + 2500; renderLobby(); setTimeout(renderLobby, 2600); }
@@ -724,12 +719,18 @@
   function setMode(mode) {
     if (!isHost() || room.status !== "lobby" || room.mode === mode) return;
     var u = { mode: mode };
-    /* 전에 있던 AI 봇은 치우고, AI 대전으로 가면 레드팀 학생은 중립으로 (중립은 곧 블루팀으로 자동 배정) */
-    keys(P).forEach(function (id) {
+    /* 전에 있던 AI 봇은 치우고, AI 대전으로 가면 레드팀 학생은 블루팀 빈자리 → 관전자 자리 순으로 옮김 */
+    var nb = countIn(P, "blue"), ns = countIn(P, "spec"), moved = true;
+    keys(P).sort(byJoin(P)).forEach(function (id) {
       var p = P[id]; if (!p) return;
-      if (p.isAI) u["players/" + id] = null;
-      else if (mode === "ai" && p.team === "red") u["players/" + id + "/team"] = "neutral";
+      if (p.isAI) { u["players/" + id] = null; return; }
+      if (mode === "ai" && p.team === "red") {
+        if (nb < TEAM_MAX) { u["players/" + id + "/team"] = "blue"; nb++; }
+        else if (ns < SPEC_MAX) { u["players/" + id + "/team"] = "spec"; ns++; }
+        else moved = false;
+      }
     });
+    if (!moved) { flashHint("AI 대전은 블루팀 " + TEAM_MAX + "명 + 관전자 " + SPEC_MAX + "명까지예요. 레드팀 인원을 줄인 뒤 바꿔 주세요."); return; }
     if (mode === "ai") {
       var chars = ["marksman", "healer", TANK_ENABLED ? "tank" : "marksman"];
       var t = now();
@@ -804,19 +805,15 @@
     }
     setHtml($("listBlue"), list("blue"));
     setHtml($("listRed"), list("red"));
-    var neutral = teamIds("neutral");
     var nb = teamIds("blue").length, nr = teamIds("red").length;
-    show($("neutralBox"), neutral.length > 0);
-    setHtml($("neutralBox"), "<b>중립 대기 중</b> — " + neutral.map(function (id) { return esc(P[id].nickname) + (id === myId ? "(나)" : ""); }).join(", "));
-    var pvp = mode === "pvp";
-    var imNeutral = me.team === "neutral", imSpec = me.team === "spec";
-    show($("btnJoinBlue"), (pvp && (imNeutral || imSpec)) || (mode === "ai" && imSpec));
-    show($("btnJoinRed"), pvp && (imNeutral || imSpec));
-    $("btnJoinBlue").disabled = nb >= 3; $("btnJoinRed").disabled = nr >= 3;
-    show($("btnTeamChange"), pvp && !imNeutral && !imSpec);
+    var imSpec = me.team === "spec";
+    /* 이동하기: 내가 없는 팀 옆에만(관전자면 두 팀 모두). 옮길 수 없으면 회색 */
+    show($("btnJoinBlue"), me.team !== "blue"); $("btnJoinBlue").disabled = !canMoveTo("blue");
+    show($("btnJoinRed"), me.team !== "red");   $("btnJoinRed").disabled = !canMoveTo("red");
     var specs = teamIds("spec");
-    setHtml($("listSpec"), specs.length ? specs.map(function (id) { return (room.host === id ? "👑" : "") + esc(P[id].nickname) + (id === myId ? "(나)" : ""); }).join(", ") : '<span class="none">없음</span>');
-    show($("btnSpec"), !imSpec);
+    setHtml($("listSpec"), (specs.length ? specs.map(function (id) { return (room.host === id ? "👑" : "") + esc(P[id].nickname) + (id === myId ? "(나)" : ""); }).join(", ") : '<span class="none">없음</span>') +
+            " (" + specs.length + "/" + SPEC_MAX + ")");
+    show($("btnSpec"), !imSpec); $("btnSpec").disabled = !canMoveTo("spec");
     show($("charCardBox"), !imSpec);
 
     /* 캐릭터 선택 */
@@ -825,7 +822,6 @@
     /* 시작 버튼 */
     var host = isHost(), ok = false, hint = "";
     if (!mode) hint = "게임 방식을 먼저 골라 주세요.";
-    else if (neutral.length) hint = "중립 대기 중인 학생이 있으면 시작할 수 없어요.";
     else if (mode === "pvp") {
       if (nb < 1 || nr < 1) hint = "양 팀에 1명 이상 있어야 시작할 수 있어요.";
       else { ok = true; hint = nb !== nr ? "인원이 달라요 (블루 " + nb + " vs 레드 " + nr + ") — 그래도 시작할 수 있어요." : "블루 " + nb + " vs 레드 " + nr; }
@@ -856,8 +852,7 @@
   };
   $("btnJoinBlue").onclick = function () { pickTeam("blue"); };
   $("btnJoinRed").onclick = function () { pickTeam("red"); };
-  $("btnTeamChange").onclick = function () { if (room && room.status === "lobby") room.ref.child("players/" + myId + "/team").set("neutral"); };
-  $("btnSpec").onclick = function () { if (room && room.status === "lobby") room.ref.child("players/" + myId + "/team").set("spec"); };
+  $("btnSpec").onclick = function () { pickTeam("spec"); };
   $("modeBtns").onclick = function (e) {
     var b = e.target.closest ? e.target.closest(".modeBtn") : null;
     if (b && !b.disabled) setMode(b.getAttribute("data-mode"));
