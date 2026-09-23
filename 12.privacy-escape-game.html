@@ -6,7 +6,6 @@
 <meta charset="UTF-8">
 <link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
 <title>개인정보 보호하기</title>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
@@ -15,7 +14,6 @@
 <meta property="og:url" content="https://cornsilktea.github.io/12.privacy-escape-game.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
-<!-- 링크 미리보기 끝 -->
 <style>
   :root{
     --bg:var(--sg-bg);
@@ -28,7 +26,6 @@
     --safe:var(--sg-ok);
     --safe-soft:#E1F1E5;
     --accent:var(--sg-primary);
-    --accent-soft:var(--sg-primary-soft);
     --radius:var(--sg-radius);
   }
   *{box-sizing:border-box;}
@@ -70,7 +67,7 @@
     flex:1;
     display:flex;
     justify-content:center;
-    align-items:flex-start;   /* 화면이 짧을 때 카드 위쪽이 잘리지 않도록 */
+    align-items:flex-start;
     padding:10px 20px 30px;
   }
 
@@ -121,7 +118,6 @@
   .handle{font-weight:800;}
   .handle-sub{font-size:0.85rem;color:var(--sub);}
 
-  /* 글이 16개로 늘어나서, 넓은 화면에서는 두 줄로 나눠 한눈에 보이게 합니다. */
   .items{
     display:grid;
     grid-template-columns:repeat(auto-fit, minmax(300px, 1fr));
@@ -242,7 +238,6 @@
 </main>
 
 <script>
-/* 위험한 글 모음 — 이 중에서 매번 PER_SIDE 개를 뽑아 씁니다. */
 const POOL_RISKY = [
   {text:"OO중학교 2학년 3반 김민준입니다!", why:"학교·학년·반·이름이 함께 있으면 누군지 특정하기 쉬워져요."},
   {text:"제 전화번호는 010-1234-5678이에요, 연락주세요!", why:"전화번호는 모르는 사람에게 공개하면 위험해요."},
@@ -270,7 +265,6 @@ const POOL_RISKY = [
   {text:"학교에서 집까지 이 골목으로 가면 빨라요 (지도 캡처)", why:"등하교 경로가 알려지면 어디서 기다리면 되는지도 알려지는 셈이에요."},
 ];
 
-/* 올려도 괜찮은 글 모음 */
 const POOL_SAFE = [
   {text:"제 취미는 그림 그리기예요! 🎨"},
   {text:"오늘 급식 진짜 맛있었다ㅎㅎ"},
@@ -298,14 +292,14 @@ const POOL_SAFE = [
   {text:"강아지 산책 시키고 왔어요 🐶"},
 ];
 
-const PER_SIDE = 8;              /* 위험한 글 8개 + 안전한 글 8개 = 한 판에 16개 */
+const PER_SIDE = 8;
 const TIME_LIMIT = 80;
 let timeLeft = TIME_LIMIT;
 let timerId = null;
 let removedCount = 0;
 let removedTexts = new Set();
-let roundItems = [];             /* 이번 판에 뽑힌 16개 */
-const totalRisky = PER_SIDE;
+let roundItems = [];
+
 
 const introScreen = document.getElementById('introScreen');
 const playScreen = document.getElementById('playScreen');
@@ -314,6 +308,13 @@ const itemsBox = document.getElementById('itemsBox');
 const toast = document.getElementById('toast');
 const progressPill = document.getElementById('progressPill');
 const timerPill = document.getElementById('timerPill');
+const endTitle = document.getElementById('endTitle');
+const endDesc = document.getElementById('endDesc');
+const missedList = document.getElementById('missedList');
+
+function renderTimer(){
+  timerPill.textContent = `⏱ ${timeLeft}초`;
+}
 
 function shuffle(arr){
   const a = arr.slice();
@@ -336,14 +337,13 @@ function startGame(){
   timeLeft = TIME_LIMIT;
   removedCount = 0;
   removedTexts = new Set();
-  progressPill.textContent = `제거 0 / ${totalRisky}`;
-  timerPill.textContent = `⏱ ${timeLeft}초`;
+  progressPill.textContent = `제거 0 / ${PER_SIDE}`;
+  renderTimer();
   toast.textContent = '';
   toast.className = 'toast';
 
   itemsBox.innerHTML = '';
 
-  /* 매번 새로 뽑습니다. 위험한 글과 안전한 글의 개수는 항상 같습니다. */
   const risky = shuffle(POOL_RISKY).slice(0, PER_SIDE).map(o=>({text:o.text, why:o.why, risky:true}));
   const safe  = shuffle(POOL_SAFE ).slice(0, PER_SIDE).map(o=>({text:o.text, why:'', risky:false}));
   roundItems = shuffle(risky.concat(safe));
@@ -361,15 +361,9 @@ function startGame(){
 }
 
 function tick(){
-  timeLeft -= 1;
-  if(timeLeft <= 0){
-    timeLeft = 0;
-    timerPill.textContent = `⏱ 0초`;
-    clearInterval(timerId);
-    endGame(false);
-    return;
-  }
-  timerPill.textContent = `⏱ ${timeLeft}초`;
+  timeLeft = Math.max(0, timeLeft - 1);
+  renderTimer();
+  if(timeLeft <= 0) endGame(false);
 }
 
 function handleClick(el, item){
@@ -377,34 +371,27 @@ function handleClick(el, item){
     el.classList.add('removed');
     removedCount += 1;
     removedTexts.add(item.text);
-    progressPill.textContent = `제거 ${removedCount} / ${totalRisky}`;
+    progressPill.textContent = `제거 ${removedCount} / ${PER_SIDE}`;
     toast.textContent = `✅ 제거 완료! ${item.why}`;
     toast.className = 'toast ok';
-    if(removedCount >= totalRisky){
-      clearInterval(timerId);
-      endGame(true);
-    }
+    if(removedCount >= PER_SIDE) endGame(true);
   } else {
     el.classList.remove('shake');
     void el.offsetWidth;
     el.classList.add('shake');
     timeLeft = Math.max(0, timeLeft - 5);
-    timerPill.textContent = `⏱ ${timeLeft}초`;
+    renderTimer();
     toast.textContent = `❌ 이건 안전한 글이에요! 시간이 5초 줄었어요.`;
     toast.className = 'toast no';
-    if(timeLeft <= 0){
-      clearInterval(timerId);
-      endGame(false);
-    }
+    if(timeLeft <= 0) endGame(false);
+
   }
 }
 
 function endGame(success){
+  clearInterval(timerId);
   playScreen.style.display = 'none';
   endScreen.style.display = 'flex';
-  const endTitle = document.getElementById('endTitle');
-  const endDesc = document.getElementById('endDesc');
-  const missedList = document.getElementById('missedList');
 
   if(success){
     endTitle.textContent = `🎉 탈출 성공! (${timeLeft}초 남음)`;
