@@ -6,7 +6,6 @@
 <script charset="utf-8" src="world-record.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
 <title>농구 자유투 챌린지</title>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
@@ -15,25 +14,21 @@
 <meta property="og:url" content="https://cornsilktea.github.io/28.basketball-freethrow.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
-<!-- 링크 미리보기 끝 -->
 <link rel="stylesheet" href="theme.css">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: var(--sg-bg); font-family: var(--sg-font); color: var(--sg-ink); }
   canvas#gl { position: fixed; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 
-  /* ── HUD (위쪽 46px 는 access-guard.js 의 '← 목록으로' 버튼 자리) ── */
   .hud { position: fixed; z-index: 5; display: none; pointer-events: none; }
   body.playing .hud { display: block; }
-  #powerWrap, #tip { display: none; }   /* 이 둘은 스크립트가 직접 켜고 끈다 */
+  #powerWrap, #tip { display: none; }
   .hud-box { background: rgba(255,255,255,.92); border: 2px solid var(--sg-line-strong); border-radius: 10px; padding: 6px 12px; font-weight: 800; font-variant-numeric: tabular-nums; box-shadow: 0 3px 0 rgba(27,43,32,.25); text-align: center; min-width: 96px; }
   .hud-box .lab { font-size: 12px; color: var(--sg-ink-soft); font-weight: 700; display: block; }
   .hud-box .big { font-size: 34px; font-size: clamp(22px, 4vw, 34px); line-height: 1.15; color: var(--sg-ink); }
-  /* 라운드: 왼쪽 위(← 목록으로 버튼 아래) · 개인 최고: 왼쪽 아래 */
   #hudRound { top: 52px; left: 10px; }
   #hudBest { bottom: 14px; left: 10px; min-width: 0; }
   #hudBest .big { font-size: 20px; }
-  /* 현재 점수·통과 점수: 오른쪽 위, 굵은 주황 글자(피버 점수 모양 재활용) */
   #hudScore { top: 52px; right: 12px; text-align: right; }
   #hudScore .num { font-size: 84px; font-size: clamp(40px, 9vw, 84px); font-weight: 800; color: #D97B4F; -webkit-text-stroke: 2px var(--sg-ink); text-shadow: 0 5px 0 rgba(27,43,32,.35); line-height: 1; font-variant-numeric: tabular-nums; }
   #hudScore .pass { display: inline-block; margin-top: 6px; font-size: 42px; font-size: clamp(20px, 4.5vw, 42px); font-weight: 800; color: #fff; background: var(--sg-primary); border: 2px solid var(--sg-ink); border-radius: 8px; padding: 2px 10px; box-shadow: 0 3px 0 var(--sg-ink); }
@@ -43,10 +38,8 @@
   body.fever .hud-box { border-color: #D97B4F; box-shadow: 0 3px 0 #D97B4F; }
   @keyframes blink { 50% { opacity: .35; } }
 
-  /* 피버 타임 표시 (누적 점수를 크게) */
   @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.08); } }
 
-  /* 파워 게이지 (드래그하는 동안만) */
   #powerWrap { left: 50%; bottom: 14px; transform: translateX(-50%); width: calc(100% - 24px); max-width: 420px; background: rgba(255,255,255,.92); border: 2px solid var(--sg-line-strong); border-radius: 10px; padding: 5px 10px 7px; box-shadow: 0 3px 0 rgba(27,43,32,.25); }
   #powerWrap .lab { display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; color: var(--sg-ink-soft); margin-bottom: 3px; }
   #powerWrap .lab b { color: var(--sg-ink); font-size: 15px; }
@@ -54,10 +47,8 @@
   #powerFill { height: 100%; width: 0; background: linear-gradient(90deg, var(--sg-ok), var(--sg-warn) 60%, #D97B4F); }
   #sweet { position: absolute; top: 0; bottom: 0; width: 3px; background: var(--sg-ink); }
 
-  /* 안내 문구 (공 아래) */
   #tip { left: 0; right: 0; bottom: 14px; text-align: center; font-size: 14px; font-weight: 700; color: var(--sg-ink-soft); }
 
-  /* 라운드 배너 · 득점 팝업 */
   #banner { position: fixed; z-index: 6; left: 0; right: 0; top: 63%; text-align: center; pointer-events: none; display: none; }
   #banner .t { display: inline-block; font-size: 60px; font-size: clamp(30px, 7vw, 60px); font-weight: 800; color: #fff; -webkit-text-stroke: 2px var(--sg-ink); text-shadow: 0 5px 0 rgba(27,43,32,.4); }
   #banner .s { display: block; font-size: 22px; font-size: clamp(15px, 3vw, 22px); font-weight: 800; color: var(--sg-primary); margin-top: 6px; }
@@ -68,7 +59,6 @@
   .pop.miss { color: #FF6B7A; font-size: 40px; font-size: clamp(22px, 4.5vw, 40px); }
   @keyframes pop { 0% { opacity: 0; transform: translate(-50%,-50%) scale(1.6); } 15% { opacity: 1; transform: translate(-50%,-50%) scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%,-100%); } }
 
-  /* ── 카드 (시작 · 결과) ── */
   #overlay { position: fixed; top: 0; right: 0; bottom: 0; left: 0; display: flex; align-items: center; justify-content: center; padding: 56px 12px 12px; z-index: 7; overflow-y: auto; background: rgba(27,43,32,.25); }
   .card { width: 100%; max-width: 520px; background: var(--sg-panel); border: 3px solid var(--sg-line-strong); border-radius: 14px; padding: 22px 22px 18px; box-shadow: 0 10px 0 rgba(27,43,32,.3), 0 20px 40px rgba(0,0,0,.2); text-align: center; }
   .logo { font-size: 54px; font-size: clamp(36px, 8vw, 54px); font-weight: 800; line-height: 1.05; color: #D97B4F; -webkit-text-stroke: 2px var(--sg-ink); text-shadow: 4px 5px 0 var(--sg-ink); letter-spacing: -1px; margin-bottom: 4px; }
@@ -102,7 +92,7 @@
   .wipe button { font: inherit; font-size: 12px; color: var(--sg-ink-soft); background: none; border: none; text-decoration: underline; cursor: pointer; }
   @media (max-width: 640px) {
     .hud-box { padding: 4px 8px; min-width: 0; }
-    #powerWrap { bottom: 64px; }   /* 왼쪽 아래 개인 최고 기록과 겹치지 않게 */
+    #powerWrap { bottom: 64px; }
     .hud-box .lab { font-size: 10px; }
     .btn { font-size: 18px; padding: 11px 24px; }
     .desc { font-size: 13px; }
@@ -164,33 +154,27 @@
 
 <script>
 "use strict";
-/* ═══════════════════════════════════════════════════════════════════
-   농구 자유투 챌린지 — Canvas 2D 유사 3D (쉬는시간용, 개인전, 라운드제 누적 점수)
-   좌표(m): 공이 서는 곳이 원점, 골대 쪽이 +z, 위가 +y, 오른쪽이 +x. 카메라는 공 뒤(−z)·눈높이.
-   기록: 최종 누적 점수. 개인 최고: localStorage basketball_best_v1 / 세계 신기록: Firebase records/basketball/all
-   ═══════════════════════════════════════════════════════════════════ */
 
-/* ───────── 밸런스 설정 (선생님이 값만 바꿔 조정) ───────── */
 const CFG = {
-  ROUND_SEC: 40,          // 라운드 시간(초)
-  FEVER_SEC: 15,          // 라운드 마지막 피버 타임(초)
-  FEVER_MULT: 2,          // 피버 타임 점수 배율
-  PASS: [60, 120, 190, 260, 340, 400, 500],   // 라운드별 누적 통과 기준 (마지막 항목 이후는 PASS_STEP 씩 증가). 전부 클린 슛이면 라운드당 약 90~100점
+  ROUND_SEC: 40,
+  FEVER_SEC: 15,
+  FEVER_MULT: 2,
+  PASS: [60, 120, 190, 260, 340, 400, 500],
   PASS_STEP: 100,
-  CLEAR_SCORE: 500,       // 누적 점수가 여기에 닿으면 바로 클리어 창
-  CLEAN: 3, BANK: 2,      // 클린 슛 · 뱅크 슛 점수
-  HOOP_MOVE_FROM: 2,      // 이 라운드부터 골대가 좌우로 움직인다
-  HOOP_AMP: 1.0,          // 골대 좌우 이동 폭(m, 한쪽)
-  HOOP_SPEED: [0, 0.7, 1.0, 1.3, 1.6],   // 라운드별 이동 속도(rad/s) — 마지막 항목 이후는 HOOP_SPEED_STEP 씩 증가
+  CLEAR_SCORE: 500,
+  CLEAN: 3, BANK: 2,
+  HOOP_MOVE_FROM: 2,
+  HOOP_AMP: 1.0,
+  HOOP_SPEED: [0, 0.7, 1.0, 1.3, 1.6],
   HOOP_SPEED_STEP: 0.3, HOOP_SPEED_MAX: 3.0,
-  DIST: 3.2,              // 공 ~ 림 중심 거리(m) (실제 자유투선 4.225m 보다 가깝게)
-  RIM_Y: 3.05, HOOP_SCALE: 1.35, BALL_R: 0.14, BALL_DRAW: 2.1, HAND_Y: 1.2,   // HOOP_SCALE: 골대(림·백보드) 크기 배율 — 1 이 실제 규격(림 지름 45cm)
-  ELEV: 64,               // 발사 각도(도) — 고정. 드래그 길이는 세기만 정한다 (낮추면 공이 얕게 들어와 앞 림에 잘 걸린다)
-  SPEED_MIN: 6.9, SPEED_MAX: 8.1,   // 드래그 최소·최대 세기(m/s) — 범위가 좁을수록 세기 조절이 쉽다 (적정 세기는 중간보다 약간 위)
-  DRAG_LEN: 0.30,         // 최대 세기가 되는 드래그 길이 (화면 높이 비율)
-  LAT_GAIN: 0.9,          // 드래그 좌우 기울기 → 좌우 속도 비율
-  ASSIST: 0.6,            // 조준 보정(0 없음 ~ 1 무조건 정중앙). 림 근처 오차를 이 비율만큼 줄여 준다
-  SHOW_SWEET: false,      // 파워 게이지에 적당한 세기 표시
+  DIST: 3.2,
+  RIM_Y: 3.05, HOOP_SCALE: 1.35, BALL_R: 0.14, BALL_DRAW: 2.1, HAND_Y: 1.2,
+  ELEV: 64,
+  SPEED_MIN: 6.9, SPEED_MAX: 8.1,
+  DRAG_LEN: 0.30,
+  LAT_GAIN: 0.9,
+  ASSIST: 0.6,
+  SHOW_SWEET: false,
   GRAVITY: 9.81,
 };
 function passOf(r) { const P = CFG.PASS; return r <= P.length ? P[r - 1] : P[P.length - 1] + CFG.PASS_STEP * (r - P.length); }
@@ -203,7 +187,6 @@ function hoopSpeedOf(r) {
 const $ = id => document.getElementById(id);
 const canvas = $("gl"), ctx = canvas.getContext("2d");
 
-/* ═══════════════════ 기록 (개인 최고 · 세계 신기록 · 우리 반 신기록) ═══════════════════ */
 const BEST_KEY = "basketball_best_v1";
 function loadJSON(k) { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch (e) { return null; } }
 function saveJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
@@ -243,7 +226,6 @@ function renderRecords() {
 if (WR) { WR.onChange(renderRecords); WR.load().then(() => { wrTried = true; renderRecords(); }); }
 renderRecords();
 
-/* ═══════════════════ 소리 (Web Audio, 외부 파일 없음) ═══════════════════ */
 const AUD = { ctx: null };
 function audioInit() { try { if (!AUD.ctx) AUD.ctx = new (window.AudioContext || window.webkitAudioContext)(); if (AUD.ctx.state === "suspended") AUD.ctx.resume(); } catch (e) {} }
 function tone(freq, dur, type, vol, slide) {
@@ -268,37 +250,34 @@ const SFX = {
   over() { [440, 370, 311, 262].forEach((f, i) => setTimeout(() => tone(f, .3, "triangle", .12), i * 160)); },
 };
 
-/* ═══════════════════ 화면 · 투영 ═══════════════════ */
 const V = { W: 0, H: 0, dpr: 1, f: 0, cx: 0, hy: 0, camY: 1.5, camZ: -1.5 };
 function resize() {
   V.dpr = Math.min(2, window.devicePixelRatio || 1);
   V.W = window.innerWidth; V.H = window.innerHeight;
   canvas.width = Math.round(V.W * V.dpr); canvas.height = Math.round(V.H * V.dpr);
   ctx.setTransform(V.dpr, 0, 0, V.dpr, 0, 0);
-  V.f = Math.min(0.9 * V.H, 1.45 * V.W);   // 초점 거리(px) — 공은 화면 76% 높이, 림은 그 위에 오도록
+  V.f = Math.min(0.9 * V.H, 1.45 * V.W);
   V.cx = V.W / 2;
-  V.hy = 0.76 * V.H - (V.camY - CFG.HAND_Y) * V.f / (0 - V.camZ);   // 지평선(카메라 눈높이) 화면 y
+  V.hy = 0.76 * V.H - (V.camY - CFG.HAND_Y) * V.f / (0 - V.camZ);
 }
 window.addEventListener("resize", resize);
 resize();
-/* 월드 (x,y,z) → 화면. s 는 그 깊이에서 1m 가 몇 px 인지 */
 function proj(x, y, z) { const s = V.f / (z - V.camZ); return { x: V.cx + x * s, y: V.hy - (y - V.camY) * s, s }; }
 
-/* ═══════════════════ 게임 상태 ═══════════════════ */
 const G = {
-  state: "idle",     // idle · play · ending(시간 끝, 공 판정 대기) · between(라운드 통과 연출) · over
+  state: "idle",
   round: 1, score: 0, timeLeft: CFG.ROUND_SEC, fever: false, t: 0,
   hoopX: 0, hoopPhase: 0,
-  ball: null,        // 날아가는 공 (하나만)
-  ghosts: [],        // 판정이 끝난 뒤 남아서 떨어지는 공
+  ball: null,
+  ghosts: [],
   spin: 0,
-  drag: null,        // { x0, y0, x, y }
+  drag: null,
   shots: 0, made: 0,
 };
 CFG.RIM_R = 0.225 * CFG.HOOP_SCALE;
-const HS = CFG.HOOP_SCALE, HOOP_Z = CFG.DIST, BOARD_Z = CFG.DIST + CFG.RIM_R + 0.1 * HS, BOARD_HW = 0.62 * HS, BOARD_Y0 = CFG.RIM_Y - 0.14 * HS, BOARD_Y1 = CFG.RIM_Y + 0.5 * HS;   // 백보드 크기는 28.hoop.png 그림 비율에 맞춤
+const HS = CFG.HOOP_SCALE, HOOP_Z = CFG.DIST, BOARD_Z = CFG.DIST + CFG.RIM_R + 0.1 * HS, BOARD_HW = 0.62 * HS, BOARD_Y0 = CFG.RIM_Y - 0.14 * HS, BOARD_Y1 = CFG.RIM_Y + 0.5 * HS;
 
-function sweetSpeed() {   // 클린 슛이 되는 세기의 한가운데(포물선 공식). 앞 림을 넘겨야 하므로 림 중심보다 조금 뒤를 겨냥한다
+function sweetSpeed() {
   const th = CFG.ELEV * Math.PI / 180, D = CFG.DIST + 0.25, h = CFG.RIM_Y - CFG.HAND_Y;
   return Math.sqrt(CFG.GRAVITY * D * D / (2 * Math.cos(th) * Math.cos(th) * (D * Math.tan(th) - h)));
 }
@@ -307,7 +286,6 @@ $("sweet").style.left = "calc(" + (SWEET_P * 100).toFixed(1) + "% - 1px)";
 $("sweet").style.display = $("sweetLab").style.display = CFG.SHOW_SWEET ? "" : "none";
 
 function canShoot() { return G.state === "play" && !G.ball; }
-/* 놓는 순간의 판정: 버저 전에 끌기 시작했으면 버저 뒤에 놓아도 슛이 나간다(버저비터) */
 function canRelease() { return (G.state === "play" || G.state === "ending") && !G.ball; }
 
 function startGame() {
@@ -350,7 +328,7 @@ function gameOver(cleared) {
     newBest = !best || score > best.score;
     if (newBest) { best = { score, round, date: new Date().toLocaleDateString("ko-KR") }; saveJSON(BEST_KEY, best); }
     wrBeat = !!(WR && WR.beats(score));
-    crBeat = !!(WR && WR.beatsClass(score));   /* 우리 반 신기록(반별 링크일 때만) */
+    crBeat = !!(WR && WR.beatsClass(score));
   }
   const m = $("finalMsg");
   m.textContent = wrBeat ? "🏆 세계 신기록 달성! 🎉" : crBeat ? "🏫 우리 반 신기록!" : newBest ? "🎉 개인 최고 기록 경신!" : "";
@@ -370,14 +348,15 @@ function popText(txt, cls) {
   const el = document.createElement("div"); el.className = "pop " + cls; el.textContent = txt;
   $("pops").appendChild(el); setTimeout(() => el.remove(), 1200);
 }
+const hudEls = { round: $("hudRoundVal"), pass: $("hudPass"), score: $("hudScoreVal") };
+function setText(el, text) { if (el.textContent !== text) el.textContent = text; }
 function updateHud() {
-  $("hudRoundVal").textContent = G.round;
-  $("hudPass").textContent = "통과 " + passOf(G.round) + "점";
-  $("hudScoreVal").textContent = G.score + "점";
+  setText(hudEls.round, String(G.round));
+  setText(hudEls.pass, "통과 " + passOf(G.round) + "점");
+  setText(hudEls.score, G.score + "점");
 }
 
-/* ═══════════════════ 슛 · 물리 ═══════════════════ */
-function shoot(dx, dy) {   // dx: 오른쪽 +, dy: 위쪽 + (px)
+function shoot(dx, dy) {
   const len = Math.hypot(dx, dy);
   const power = Math.min(1, len / (CFG.DRAG_LEN * V.H));
   const v = CFG.SPEED_MIN + power * (CFG.SPEED_MAX - CFG.SPEED_MIN);
@@ -386,7 +365,6 @@ function shoot(dx, dy) {   // dx: 오른쪽 +, dy: 위쪽 + (px)
   let vx = vz * (dx / Math.max(1, dy)) * CFG.LAT_GAIN;
   vx = Math.max(-3, Math.min(3, vx));
   const b = { x: 0, y: CFG.HAND_Y, z: 0, vx, vy, vz, touched: false, scored: false, done: false, fever: G.fever, age: 0 };
-  /* 조준 보정: 림 높이로 내려올 때의 위치를 미리 계산해 오차를 ASSIST 비율만큼 줄인다 */
   if (CFG.ASSIST > 0) {
     const g = CFG.GRAVITY, dh = CFG.RIM_Y - b.y, disc = vy * vy - 2 * g * dh;
     if (disc > 0) {
@@ -397,7 +375,7 @@ function shoot(dx, dy) {   // dx: 오른쪽 +, dy: 위쪽 + (px)
       if (Math.abs(ex) < 0.6) b.vx += CFG.ASSIST * ex / t;
     }
   }
-  G.ball = b; G.shots++; G.ghosts = [];   // 앞 슛의 공은 새 슛을 던질 때 치운다
+  G.ball = b; G.shots++; G.ghosts = [];
   SFX.throw();
 }
 function hoopXAt(t) { const w = hoopSpeedOf(G.round); return w ? CFG.HOOP_AMP * Math.sin(G.hoopPhase + w * t) : 0; }
@@ -408,16 +386,13 @@ function stepBall(b, dt) {
   b.vy -= g * dt;
   b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
   b.age += dt;
-  /* 림 통과 판정: 림 높이를 내려오면서 지나고 중심이 링 안쪽이면 골 */
   if (!b.scored && py >= CFG.RIM_Y && b.y < CFG.RIM_Y && b.vy < 0) {
     const d = Math.hypot(b.x - hx, b.z - HOOP_Z);
-    if (d < R - r) { b.scored = true;   /* 공 전체가 링 안쪽을 지나야 골 */ b.vx *= 0.3; b.vz *= 0.3; b.vy *= 0.6; judge(b); return; }
+    if (d < R - r) { b.scored = true; b.vx *= 0.3; b.vz *= 0.3; b.vy *= 0.6; judge(b); return; }
   }
-  /* 백보드 */
   if (b.z + r > BOARD_Z && b.vz > 0 && Math.abs(b.x - hx) < BOARD_HW + r && b.y > BOARD_Y0 - r && b.y < BOARD_Y1 + r) {
     b.z = BOARD_Z - r; b.vz = -b.vz * 0.55; b.vx *= 0.8; if (!b.touched) SFX.board(); b.touched = true;
   }
-  /* 림(링) 충돌 — 링에서 가장 가까운 점과의 거리로 */
   if (!b.scored || b.y > CFG.RIM_Y - 0.3) {
     const dx = b.x - hx, dz = b.z - HOOP_Z, rad = Math.hypot(dx, dz) || 1e-6;
     const nx = dx / rad * (rad - R), ny = b.y - CFG.RIM_Y, nz = dz / rad * (rad - R);
@@ -434,10 +409,8 @@ function stepBall(b, dt) {
       const push = r - d + 0.002; b.x += ux * push; b.y += uy * push; b.z += uz * push;
     }
   }
-  /* 노골 판정: 림보다 충분히 아래로 내려가며 떨어지는 중이면 더는 들어갈 수 없다 */
   if (!b.done && !b.scored && b.vy < 0 && b.y < CFG.RIM_Y - 0.45) judge(b);
   if (!b.done && !b.scored && b.z > BOARD_Z + 1.5) judge(b);
-  /* 바닥 */
   if (b.y < r) { b.y = r; b.vy = -b.vy * 0.5; b.vx *= 0.8; b.vz *= 0.8; }
 }
 function judge(b) {
@@ -459,7 +432,6 @@ function judge(b) {
   if (G.state === "ending") endRound();
 }
 
-/* ═══════════════════ 진행 ═══════════════════ */
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
@@ -473,17 +445,16 @@ function update(dt) {
     if (G.state === "play") {
       G.timeLeft -= dt;
       if (!G.fever && G.timeLeft <= CFG.FEVER_SEC) {
-        G.fever = true; G.feverAt = G.t; document.body.classList.add("fever"); SFX.fever();
+        G.fever = true; document.body.classList.add("fever"); SFX.fever();
         showBanner("🔥 FEVER TIME!", "지금부터 점수 " + CFG.FEVER_MULT + "배", 1300);
       }
       if (G.timeLeft <= 0) {
-        /* 버저비터: 시간이 끝나도 날아가는 공이 있으면 그 판정까지, 끌고 있던 손가락이 있으면 놓을 때까지(최대 1.5초) 라운드 종료를 미룬다 */
         G.timeLeft = 0; G.state = "ending"; G.endingAt = G.t;
         if (!G.ball && !G.drag) endRound();
       }
       updateHud();
     }
-    if (G.state === "ending" && G.drag && G.t - G.endingAt > 1.5) {   // 버저 뒤 1.5초 안에 안 놓으면 취소
+    if (G.state === "ending" && G.drag && G.t - G.endingAt > 1.5) {
       G.drag = null; hidePower();
       if (!G.ball) endRound();
     }
@@ -493,34 +464,28 @@ function update(dt) {
     if (G.ball) stepBall(G.ball, h);
     G.ghosts.forEach(b => stepBall(b, h));
   }
-  G.ghosts = G.ghosts.filter(b => b.age < 12 && Math.abs(b.x) < 6);   // 새 슛 전까지 남겨 둔다(너무 오래되거나 옆으로 멀리 간 공만 정리)
+  G.ghosts = G.ghosts.filter(b => b.age < 12 && Math.abs(b.x) < 6);
   const spd = G.ball ? Math.hypot(G.ball.vx, G.ball.vy, G.ball.vz) : 0;
   G.spin += (G.ball ? spd * 1.6 : 0) * dt;
 }
 
-/* ═══════════════════ 그리기 ═══════════════════ */
-/* 그림 파일 (28.court.jpg 배경 · 28.hoop.png 골대 · 28.ball.png 공). 아직 안 읽혔으면 간단한 도형으로 그린다 */
 const IMG = {};
 [["court", "28.court.jpg"], ["hoop", "28.hoop.png"], ["ball", "28.ball.png"]].forEach(([k, src]) => {
   const im = new Image(); im.onload = () => { IMG[k] = im; }; im.src = src;
 });
-/* 골대 그림(28.hoop.png 768×512)에서 잰 위치: 림 타원 중심·지름, 받침대 아래쪽 */
-/* 골대 그림(28.hoop.png 768×512)에서 잰 위치: 림 타원 중심·지름, 받침대를 잘라 낼 높이(파란 받침대 아랫부분은 버린다) */
-const HOOP_IMG = { rimX: 384, rimY: 142, rimW: 112, baseTop: 300, baseBottom: 496, net: { x: 318, y: 116, w: 132, h: 150 } };   // net: 림+네트 영역(골인한 공 위에 반투명으로 다시 그린다)   // baseTop~baseBottom: 파란 받침대(이 부분만 세로로 늘려 바닥까지 잇는다)
-const COURT_END = 0.465;  // 배경 그림에서 코트 아웃라인(파란 구역 위 흰 선) 높이 비율 — 골대 받침대 아래를 여기에 맞춘다
-const STAND_Z = 2.0;      // 받침대가 서는 바닥 지점(아웃라인)은 백보드보다 이만큼 뒤(m) — 키우면 받침대가 짧아지고 코트가 더 보인다
+const HOOP_IMG = { rimX: 384, rimY: 142, rimW: 112, baseTop: 300, baseBottom: 496, net: { x: 318, y: 116, w: 132, h: 150 } };
+const COURT_END = 0.465;
+const STAND_Z = 2.0;
 
-/* 골대 그림 배치: 림 지름을 물리 림에 맞추고, 잘라 낸 받침대 아래가 코트 엔드라인에 닿게 */
 function hoopLayout() {
   const rimP = proj(G.hoopX, CFG.RIM_Y, HOOP_Z);
-  const k = (2 * CFG.RIM_R * rimP.s) / HOOP_IMG.rimW;   // 그림 1px 당 화면 px
+  const k = (2 * CFG.RIM_R * rimP.s) / HOOP_IMG.rimW;
   return { k, x0: rimP.x - HOOP_IMG.rimX * k, y0: rimP.y - HOOP_IMG.rimY * k, endY: proj(G.hoopX, 0, BOARD_Z + STAND_Z).y, rimP };
 }
 function draw() {
   const W = V.W, H = V.H, L = hoopLayout();
   if (IMG.court) {
     const im = IMG.court, iw = im.naturalWidth, ih = im.naturalHeight, ey = L.endY;
-    /* 엔드라인을 골대 받침대 아래(ey)에 맞추고 화면을 다 덮도록 키운다 */
     const s = Math.max(W / iw, ey / (COURT_END * ih), (H - ey) / ((1 - COURT_END) * ih));
     ctx.drawImage(im, (W - iw * s) / 2, ey - COURT_END * ih * s, iw * s, ih * s);
   } else {
@@ -530,28 +495,24 @@ function draw() {
   if (G.fever) drawFeverGlow(W, H);
 
   const balls = (G.ball ? [G.ball] : []).concat(G.ghosts);
-  /* 백보드 면을 넘어간(위나 옆으로 지나간) 공만 골대보다 먼저(뒤에) 그린다. 림 앞·위·네트 안의 공은 골대 그림에 가려지지 않게 앞에 그린다 */
-  const behind = x => x.z > BOARD_Z - CFG.BALL_R * 0.5 && x.y > CFG.RIM_Y - 0.05;   // 백보드 면을 넘어간 공만 뒤
+  const behind = x => x.z > BOARD_Z - CFG.BALL_R * 0.5 && x.y > CFG.RIM_Y - 0.05;
   balls.filter(behind).forEach(drawBall);
   drawHoop(L);
   if (G.state === "play" || G.state === "ending" || G.state === "between") drawClock(L);
   balls.filter(x => !behind(x)).forEach(drawBall);
-  /* 골인해서 네트 안을 지나는 공은 림·네트 그림을 반투명으로 한 번 더 덮어 "안쪽으로 들어간" 느낌을 준다 */
   if (IMG.hoop && balls.some(inNet)) drawNetOver(L);
   if (canShoot()) drawReadyBall();
   if (G.drag) drawDrag();
 }
-/* 피버 타임: 처음 배너 한 번 뒤로는 주황 불빛(화면 가장자리 맥동)으로만 표현 */
 function drawFeverGlow(W, H) {
-  const p = 0.5 + 0.5 * Math.sin(G.t * 6);   // 0~1 맥동
+  const p = 0.5 + 0.5 * Math.sin(G.t * 6);
   ctx.fillStyle = "rgba(217,123,79," + (0.08 + 0.06 * p).toFixed(3) + ")"; ctx.fillRect(0, 0, W, H);
   const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);
   g.addColorStop(0, "rgba(217,123,79,0)"); g.addColorStop(1, "rgba(217,123,79," + (0.35 + 0.25 * p).toFixed(3) + ")");
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
 }
-/* 남은 시간: 백보드 위에 얹힌 전자시계 (골대가 움직이면 같이 움직인다) */
 function drawClock(L) {
-  const k = L.k, w = Math.max(84, 150 * k), h = w * 0.4, x = L.rimP.x - w / 2, y = L.y0 + 30 * k - h;   // 백보드 윗변(그림 30px)에 아랫면을 붙인다
+  const k = L.k, w = Math.max(84, 150 * k), h = w * 0.4, x = L.rimP.x - w / 2, y = L.y0 + 30 * k - h;
   const tl = Math.max(0, G.timeLeft), text = Math.floor(tl / 60) + ":" + String(Math.ceil(tl % 60)).padStart(2, "0");
   const blink = G.fever && Math.floor(G.t * 4) % 2 === 0;
   ctx.save();
@@ -559,7 +520,7 @@ function drawClock(L) {
   ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, y, w, h, h * 0.18); else ctx.rect(x, y, w, h); ctx.fill(); ctx.stroke();
   ctx.font = "800 " + Math.round(h * 0.72) + 'px "Courier New", "Consolas", monospace';
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  ctx.fillStyle = "rgba(255,90,60,.14)"; ctx.fillText("8:88", L.rimP.x, y + h / 2 + h * 0.03);   // 꺼진 자리
+  ctx.fillStyle = "rgba(255,90,60,.14)"; ctx.fillText("8:88", L.rimP.x, y + h / 2 + h * 0.03);
   ctx.fillStyle = G.fever ? (blink ? "#FFB347" : "#D97B4F") : (tl <= 5 ? "#FF5A3C" : "#7CFF9A");
   ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = h * 0.3;
   ctx.fillText(text, L.rimP.x, y + h / 2 + h * 0.03);
@@ -580,13 +541,11 @@ function drawHoop(L) {
     const im = IMG.hoop, k = L.k;
     ctx.fillStyle = "rgba(27,43,32,.2)";
     ctx.beginPath(); ctx.ellipse(rimP.x, L.endY, 120 * k, 16 * k, 0, 0, Math.PI * 2); ctx.fill();
-    /* 백보드·림·기둥은 그대로, 파란 받침대는 세로로 늘려 아웃라인(L.endY)까지 잇는다 */
     const bt = HOOP_IMG.baseTop, bb = HOOP_IMG.baseBottom, topY = L.y0 + bt * k;
     ctx.drawImage(im, 0, bt, im.naturalWidth, bb - bt, L.x0, topY - 1, im.naturalWidth * k, Math.max(bb - bt, (L.endY - topY) / k) * k + 1);
     ctx.drawImage(im, 0, 0, im.naturalWidth, bt, L.x0, L.y0, im.naturalWidth * k, bt * k);
     return;
   }
-  /* 그림이 없을 때의 도형 골대 */
   const bl = proj(hx - BOARD_HW, BOARD_Y0, BOARD_Z), br = proj(hx + BOARD_HW, BOARD_Y1, BOARD_Z);
   ctx.strokeStyle = "#B4BDB5"; ctx.lineWidth = Math.max(2, 0.06 * rimP.s); ctx.lineCap = "round";
   ctx.beginPath(); ctx.moveTo(rimP.x, L.endY); ctx.lineTo(rimP.x, bl.y); ctx.stroke();
@@ -607,13 +566,11 @@ function drawHoop(L) {
 function drawBallAt(x, y, z, alpha) {
   const p = proj(x, y, z), sh = proj(x, 0, z), r = CFG.BALL_R * p.s;
   ctx.save(); ctx.globalAlpha = alpha;
-  /* 그림자 */
   ctx.fillStyle = "rgba(27,43,32,.25)";
   ctx.beginPath(); ctx.ellipse(sh.x, sh.y, r * 0.9, r * 0.3, 0, 0, Math.PI * 2); ctx.fill();
-  /* 공 */
   ctx.translate(p.x, p.y); ctx.rotate(G.spin);
   if (IMG.ball) {
-    const d = r * (CFG.BALL_DRAW || 2.08);   // 그림 여백 + 보기 좋게 조금 크게(물리 크기는 BALL_R)
+    const d = r * (CFG.BALL_DRAW || 2.08);
     ctx.drawImage(IMG.ball, -d / 2, -d / 2, d, d);
   } else {
     ctx.fillStyle = "#E58A3E"; ctx.strokeStyle = "#1B2B20"; ctx.lineWidth = Math.max(1.5, r * 0.07);
@@ -623,7 +580,7 @@ function drawBallAt(x, y, z, alpha) {
   }
   ctx.restore();
 }
-function drawBall(b) { drawBallAt(b.x, b.y, b.z, 1); }   // 판정이 끝난 공도 다음 슛을 던질 때까지 그대로 보인다
+function drawBall(b) { drawBallAt(b.x, b.y, b.z, 1); }
 function drawReadyBall() { drawBallAt(0, CFG.HAND_Y, 0, 1); }
 function drawDrag() {
   const d = G.drag, dx = d.x - d.x0, dy = d.y0 - d.y;
@@ -639,7 +596,6 @@ function drawDrag() {
   ctx.restore();
 }
 
-/* ═══════════════════ 입력 (드래그 슛 · 마우스/터치 공통) ═══════════════════ */
 function showPower(power) {
   $("powerWrap").style.display = "block"; $("tip").style.display = "none";
   $("powerFill").style.width = (power * 100).toFixed(0) + "%"; $("powerPct").textContent = (power * 100).toFixed(0) + "%";
@@ -662,7 +618,7 @@ function endDrag(e) {
   if (!G.drag || e.pointerId !== G.drag.id) return;
   const dx = e.clientX - G.drag.x0, dy = G.drag.y0 - e.clientY;
   G.drag = null; hidePower();
-  if (dy < 24 || !canRelease()) { if (G.state === "ending" && !G.ball) endRound(); return; }   // 너무 짧거나 아래로 끌면 취소
+  if (dy < 24 || !canRelease()) { if (G.state === "ending" && !G.ball) endRound(); return; }
   shoot(dx, dy);
 }
 canvas.addEventListener("pointerup", endDrag);
