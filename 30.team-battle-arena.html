@@ -281,13 +281,13 @@
   var NET_MS = 100;                  // 위치 전송 간격(초당 10회)
   var CHARS = {
     marksman: { name: "사격수", hp: 100, speed: 200, cd: 400, dmg: 12, range: KEY * 6, pSpeed: 950, pr: 6,
-                info: "HP 100 · 연사 · 사거리 키×6<br>궁극기: 20발 난사" },
-    healer:   { name: "힐러", hp: 100, speed: 200, cd: 500, dmg: 6, heal: 12, range: KEY * 4, pSpeed: 700, pr: 9,
-                info: "HP 100 · 사거리 키×4 · 적 6 피해 / 아군 12 회복<br>궁극기: 나 100% · 아군 30% 회복" },
-    tank:     { name: "탱커", hp: 200, speed: 140, cd: 1000, dmg: 20, range: KEY * 1, arc: Math.PI * 0.7,
-                info: "HP 200 · 느림 · 망치 근접<br>궁극기: 5초 회복 + 이속 50%" }
+                info: "HP 100 · 연사 · 사거리 키×6<br>궁극기: 20발 난사(발당 18)" },
+    healer:   { name: "힐러", hp: 150, speed: 200, cd: 500, dmg: 6, heal: 12, range: KEY * 4, pSpeed: 700, pr: 9,
+                info: "HP 150 · 사거리 키×4 · 적 6 피해 / 아군 12 회복<br>궁극기: 나 100% · 아군 30% 회복" },
+    tank:     { name: "탱커", hp: 400, speed: 160, cd: 1000, dmg: 20, range: KEY * 1, arc: Math.PI * 0.7,   // 이동속도 = 사격수·힐러(200)의 80%
+                info: "HP 400 · 조금 느림 · 망치 근접<br>궁극기: 5초간 초당 10% 회복 + 이속 50%" }
   };
-  var ULT = { mkCount: 20, mkGap: 55, mkDmg: 20, mkSpeed: 1150, mkRange: KEY * 8, mkPr: 8,
+  var ULT = { mkCount: 20, mkGap: 55, mkDmg: 18, mkSpeed: 1150, mkRange: KEY * 8, mkPr: 8,
               hlPct: 0.3, hlPoseMs: 1000, tkDur: 5000, tkRegen: 0.10, tkSpeed: 1.5 };
   var BOT_VIEW = 600;                // AI 시야
   var BOT_REACT_MS = 550;            // AI 가 적을 발견하고 첫 공격까지 걸리는 시간
