@@ -6,7 +6,6 @@
 <meta charset="UTF-8">
 <link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
 <title>AI판사 체험하기</title>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
@@ -15,7 +14,6 @@
 <meta property="og:url" content="https://cornsilktea.github.io/13.ai-ethics-court.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
-<!-- 링크 미리보기 끝 -->
 <style>
   :root{
     --bg:var(--sg-bg);
@@ -103,7 +101,6 @@
     line-height:1.5;
   }
 
-  /* ----- 저울 ----- */
   .scale-wrap{
     display:flex;
     justify-content:center;
@@ -113,7 +110,6 @@
   .beam{transition:transform .5s cubic-bezier(.34,1.3,.64,1);transform-origin:200px 40px;}
   .pan-label{font-size:13px;font-weight:800;}
 
-  /* ----- 막대 ----- */
   .bars{display:flex;flex-direction:column;gap:12px;}
   .bar-row{
     display:grid;
@@ -130,7 +126,6 @@
   .bar-count{font-size:1.05rem;font-weight:800;text-align:right;}
   .bar-count small{color:var(--sub);font-weight:700;font-size:0.85rem;}
 
-  /* ----- 참여 안내 ----- */
   #joinPanel{display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;padding:20px;}
   .join-title{font-size:0.92rem;font-weight:800;color:var(--sub);}
   .join-code{
@@ -151,7 +146,6 @@
   .join-url{font-size:0.8rem;color:var(--sub);word-break:break-all;line-height:1.4;}
   .join-hint{font-size:0.85rem;color:var(--sub);line-height:1.5;}
 
-  /* ----- 버튼 ----- */
   .btnbar{
     grid-column:1 / -1;
     display:flex;
@@ -171,7 +165,6 @@
   }
   button:disabled{opacity:.45;cursor:default;}
 
-  /* ----- 결과 모음 ----- */
   #summaryScreen{display:none;grid-column:1 / -1;flex-direction:column;gap:20px;}
   #summaryScreen h2{margin:0;font-size:1.6rem;}
   .summary-list{display:flex;flex-direction:column;gap:14px;max-height:62vh;overflow-y:auto;padding-right:6px;}
@@ -266,18 +259,15 @@
   var OPTIONS = window.COURT_OPTIONS || [];
   var CFG     = window.PORTAL_CONFIG || {};
 
-  /* 학생 태블릿이 접속할 주소 — 오른쪽 QR은 이 주소로 미리 만들어 둔 것입니다.
-     파일 이름이나 사이트 주소를 바꾸면 QR도 다시 만들어야 합니다(사용법.md 참고). */
   var VOTE_URL = "https://cornsilktea.github.io/13.ai-ethics-court-vote.html";
 
-  /* 헷갈리기 쉬운 글자(0 O 1 I)는 빼고 코드를 만듭니다. */
   var CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   var STORE_KEY  = "court_board_room_v1";
+  var POLL_MS = 15000;
 
-  var room = null;       /* 참여 코드 */
-  var idx = 0;           /* 지금 보여 주는 사건 번호(0부터) */
-  var data = {};         /* 서버에서 받아 온 이 세션 전체 */
-  var pollTimer = null;
+  var room = null;
+  var idx = 0;
+  var data = {};
   var lastOk = 0;
 
   var el = function(id){ return document.getElementById(id); };
@@ -286,6 +276,7 @@
   var codeText = el('codeText'), joinUrl = el('joinUrl'), beam = el('beam');
   var stage = el('stage'), joinPanel = el('joinPanel'), btnbar = el('btnbar');
   var summaryScreen = el('summaryScreen'), summaryList = el('summaryList');
+  var prevBtn = el('prevBtn'), nextBtn = el('nextBtn');
 
   function dbUrl(path){
     return String(CFG.DB_URL || "").replace(/\/+$/, "") + "/" + path + ".json";
@@ -313,8 +304,6 @@
     return s;
   }
 
-  /* ---------- 세션 ---------- */
-
   function startSession(){
     if (!ready()){ setLink(false, "설정 파일 확인 필요"); return; }
     room = makeCode();
@@ -323,7 +312,6 @@
     try { localStorage.setItem(STORE_KEY, room); } catch(e){}
     codeText.textContent = room;
 
-    /* 방을 새로 만들고, 태블릿이 찾아올 수 있게 '지금 열린 방'으로 등록합니다. */
     put("court/room/" + room, { state: { i: 0, t: Date.now() } })
       .then(function(){ return put("court/now", { code: room, t: Date.now() }); })
       .then(function(){ setLink(true); refresh(); })
@@ -338,14 +326,12 @@
     if (saved && /^[A-Z0-9]{4}$/.test(saved)){
       room = saved;
       codeText.textContent = room;
-      /* 이 화면이 여전히 '지금 열린 방'인지 확인하고, 아니면 다시 등록합니다. */
       fetch(dbUrl("court/now"), {cache:"no-store"})
         .then(function(r){ return r.json(); })
         .then(function(now){
           if (!now || now.code !== room){ put("court/now", { code: room, t: Date.now() }); }
         })
         .catch(function(){});
-      /* 새로고침해도 학생 화면이 같은 사건을 따라오도록 사건 번호를 다시 알려 줍니다. */
       pushState();
       refresh();
       render();
@@ -358,8 +344,6 @@
     if (!room) return;
     put("court/room/" + room + "/state", { i: idx, t: Date.now() }).catch(function(){});
   }
-
-  /* ---------- 서버에서 판결 받아오기 ---------- */
 
   function refresh(){
     if (!room || !ready()) return;
@@ -392,36 +376,32 @@
     return out;
   }
 
-  /* ---------- 화면 그리기 ---------- */
-
   function render(){
     var c = CASES[idx] || { text:"" };
     caseLabel.textContent = "사건 " + (idx + 1);
     progressPill.textContent = "사건 " + (idx + 1) + " / " + CASES.length;
     caseText.textContent = c.text;
-    el('prevBtn').style.visibility = idx === 0 ? "hidden" : "visible";
-    el('nextBtn').textContent = idx === CASES.length - 1 ? "결과 보기 →" : "다음 사건 →";
+    prevBtn.style.visibility = idx === 0 ? "hidden" : "visible";
+    nextBtn.textContent = idx === CASES.length - 1 ? "결과 보기 →" : "다음 사건 →";
     renderBars();
+  }
+
+  function barRowsHtml(t, showPercent){
+    return OPTIONS.map(function(opt){
+      var count = t[opt.key];
+      var pct = t.total > 0 ? Math.round((count / t.total) * 100) : 0;
+      return '<div class="bar-row">' +
+             '<div class="bar-label">' + opt.label + '</div>' +
+             '<div class="bar-track"><div class="bar-fill ' + opt.key + '" style="width:' + pct + '%"></div></div>' +
+             '<div class="bar-count">' + count + '표' + (showPercent ? ' <small>' + pct + '%</small>' : '') + '</div></div>';
+    }).join("");
   }
 
   function renderBars(){
     var t = tally(idx);
     votePill.textContent = "판결 " + t.total + "표";
+    barsBox.innerHTML = barRowsHtml(t, true);
 
-    barsBox.innerHTML = "";
-    OPTIONS.forEach(function(opt){
-      var count = t[opt.key];
-      var pct = t.total > 0 ? Math.round((count / t.total) * 100) : 0;
-      var row = document.createElement('div');
-      row.className = "bar-row";
-      row.innerHTML =
-        '<div class="bar-label">' + opt.label + '</div>' +
-        '<div class="bar-track"><div class="bar-fill ' + opt.key + '" style="width:' + pct + '%"></div></div>' +
-        '<div class="bar-count">' + count + '표 <small>' + pct + '%</small></div>';
-      barsBox.appendChild(row);
-    });
-
-    /* 저울 — 조건부 찬성은 양쪽에 반씩 얹습니다. */
     var left = t.agree + t.cond * 0.5;
     var right = t.disagree + t.cond * 0.5;
     var angle = t.total > 0 ? ((right - left) / t.total) * 16 : 0;
@@ -432,14 +412,6 @@
     summaryList.innerHTML = "";
     CASES.forEach(function(c, i){
       var t = tally(i);
-      var bars = OPTIONS.map(function(opt){
-        var count = t[opt.key];
-        var pct = t.total > 0 ? Math.round((count / t.total) * 100) : 0;
-        return '<div class="bar-row">' +
-               '<div class="bar-label">' + opt.label + '</div>' +
-               '<div class="bar-track"><div class="bar-fill ' + opt.key + '" style="width:' + pct + '%"></div></div>' +
-               '<div class="bar-count">' + count + '표</div></div>';
-      }).join("");
 
       var wrap = document.createElement('div');
       wrap.className = "summary-case";
@@ -451,7 +423,7 @@
       text.textContent = c.text;
       var barsWrap = document.createElement('div');
       barsWrap.className = "bars";
-      barsWrap.innerHTML = bars;
+      barsWrap.innerHTML = barRowsHtml(t, false);
       wrap.appendChild(label); wrap.appendChild(text); wrap.appendChild(barsWrap);
       summaryList.appendChild(wrap);
     });
@@ -472,13 +444,11 @@
     render();
   }
 
-  /* ---------- 버튼 ---------- */
-
-  el('nextBtn').addEventListener('click', function(){
+  nextBtn.addEventListener('click', function(){
     if (idx < CASES.length - 1){ idx += 1; pushState(); render(); }
     else { showSummary(); }
   });
-  el('prevBtn').addEventListener('click', function(){
+  prevBtn.addEventListener('click', function(){
     if (idx > 0){ idx -= 1; pushState(); render(); }
   });
   el('backBtn').addEventListener('click', hideSummary);
@@ -497,8 +467,6 @@
     startSession();
   });
 
-  /* ---------- 시작 ---------- */
-
   joinUrl.textContent = VOTE_URL.replace(/^https?:\/\//, "");
   render();
   if (!ready()){
@@ -506,7 +474,7 @@
     caseText.textContent = "설정 파일(firebase-config.js)의 주소를 읽지 못했습니다.";
   } else {
     resumeSession();
-    pollTimer = setInterval(refresh, 1200);
+    setInterval(function(){ if (!document.hidden) refresh(); }, POLL_MS);
     document.addEventListener("visibilitychange", function(){
       if (!document.hidden) refresh();
     });
