@@ -343,6 +343,7 @@
               hlPct: 0.10, hlDur: 3000, hlSelf: 2, hlPoseMs: 1000, tkDur: 5000, tkDef: 0.5,
               asSmokeMs: 400, asDur: 10000 };
   var STEALTH_ALPHA = 0.4;
+  var STEALTH_REVEAL_DIST = 100;
   var BOT_VIEW = 600;
   var BOT_REACT_MS = 550;
   var BOT_AIM_ERR = 0.16;
@@ -923,14 +924,23 @@
     });
   }
 
-  function inBush(x, y) {
-    for (var i = 0; i < BUSH.length; i++) if (hyp(x - BUSH[i].x, y - BUSH[i].y) < BUSH[i].r * 0.85) return true;
-    return false;
-  }
+  function inBush(x, y) { return bushIndexAt(x, y) >= 0; }
   function stealthed(E, t) { t = t || now(); return E.stealthUntil > t && t >= E.stealthUntil - ULT.asDur; }
   function skillActive(E, t) { return E.skillUntil > (t || now()); }
   function skillLeft(E, t) { return E.skillDur ? clamp((E.skillUntil - t) / E.skillDur, 0, 1) : 0; }
   function hiddenFrom(E, t) { return inBush(E.x, E.y) || stealthed(E, t); }
+  function bushIndexAt(x, y) {
+    for (var i = 0; i < BUSH.length; i++) if (hyp(x - BUSH[i].x, y - BUSH[i].y) < BUSH[i].r * 0.85) return i;
+    return -1;
+  }
+  function revealedTo(E, viewer, t) {
+    if (!viewer) return false;
+    var bush = bushIndexAt(E.x, E.y);
+    if (bush >= 0 && bushIndexAt(viewer.x, viewer.y) !== bush) return false;
+    if (stealthed(E, t) && hyp(E.x - viewer.x, E.y - viewer.y) > STEALTH_REVEAL_DIST) return false;
+    return true;
+  }
+  function visibleTo(E, viewer, t) { return !hiddenFrom(E, t) || revealedTo(E, viewer, t); }
   function resolve(E) {
     for (var pass = 0; pass < 2; pass++) {
       for (var i = 0; i < OBST.length; i++) {
@@ -1069,7 +1079,7 @@
       if (!T || !T.alive || T.id === d.owner || T.team === d.team) continue;
       if (segHit(a.x, a.y, b.x, b.y, T.x, T.y, BODY_R + (d.pr || 6))) {
         p.gone = true;
-        if (!ME || ME.team === T.team || !hiddenFrom(T, t)) spark(T.x, T.y, d.team === "blue" ? "#5FA2FF" : "#FF6A5F");
+        if (!ME || ME.team === T.team || visibleTo(T, ME, t)) spark(T.x, T.y, d.team === "blue" ? "#5FA2FF" : "#FF6A5F");
         return;
       }
     }
@@ -1203,7 +1213,7 @@
     var best = null, bd = Infinity, open = null, od = Infinity;
     participants().forEach(function (id) {
       var o = ent(id); if (!o || !o.alive || o.team === E.team) return;
-      if (hiddenFrom(o)) return;
+      if (!visibleTo(o, E)) return;
       var d = hyp(o.x - E.x, o.y - E.y);
       if (d < bd) { bd = d; best = o; }
       if (d < od && losClear(E.x, E.y, o.x, o.y)) { od = d; open = o; }
@@ -1236,7 +1246,7 @@
     enemies.forEach(function (o) {
       var d = hyp(o.x - B.x, o.y - B.y);
       if (d > BOT_VIEW) return;
-      if (hiddenFrom(o, t) && d > 110) return;
+      if (!visibleTo(o, B, t)) return;
       if (d < td) { td = d; target = o; }
     });
     if (target !== k.target) { k.target = target; k.seenAt = t; }
@@ -1674,7 +1684,7 @@
     participants().forEach(function (id) {
       var E = ent(id); if (!E) return;
       var ally = spec || E.team === me.team, hid = hiddenFrom(E, t);
-      if (!ally && hid) { lastHp[id] = E.hp; return; }
+      if (!ally && hid && !revealedTo(E, me, t)) { lastHp[id] = E.hp; return; }
       var alpha = !E.alive ? 0.35 : (hid ? (spec ? 0.55 : STEALTH_ALPHA) : 1);
       if (lastHp[id] !== undefined && Math.abs(E.hp - lastHp[id]) >= 1) {
         var d = Math.round(E.hp - lastHp[id]);
