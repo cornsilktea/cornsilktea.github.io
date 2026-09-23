@@ -10,7 +10,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
 <meta property="og:title" content="3v3 팀 배틀 아레나">
-<meta property="og:description" content="방 코드로 모여 블루 vs 레드로 싸우는 3v3 실시간 팀 대전(또는 모두 블루팀이 되어 AI 3명과 대결) / 사격수·힐러·탱커 중 선택, 궁극기 게이지·풀숲 숨기 / 상대 팀 전멸 또는 1분 뒤 누적 피해가 많은 팀 승리">
+<meta property="og:description" content="방 코드로 모여 블루 vs 레드로 싸우는 3v3 실시간 팀 대전(또는 모두 블루팀이 되어 AI 3명과 대결) / 사격수·힐러·탱커·암살자 중 선택, 궁극기 게이지·풀숲 숨기 / 상대 팀 전멸 또는 1분 뒤 누적 피해가 많은 팀 승리">
 <meta property="og:url" content="https://cornsilktea.github.io/30.team-battle-arena.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
@@ -189,6 +189,8 @@
     .slot { font-size: 15px; padding: 0 6px; gap: 4px; }
     .slot .me { display: none; }
     .slot .ch { font-size: 11px; }
+    .chars { flex-wrap: wrap; }
+    .charCard { flex: 1 1 40%; }
     .charCard img, .tankPh { height: 80px; }
     .charCard .nm { font-size: 17px; }
     #btnAtk { width: 96px; height: 96px; right: 16px; bottom: 40px; }
@@ -221,7 +223,7 @@
     </div>
     <div class="card note">
       <b>조작</b> — 왼쪽 아래를 누르고 끌면 이동, 오른쪽 아래 <b>공격</b> 버튼을 누른 채 끌어 방향을 정하고 떼면 발사(그냥 톡 누르면 가까운 적을 자동 조준).
-      <b>궁극기</b>는 게이지가 10 모이면(명중 +2, 피격 +1) 빨갛게 빛납니다. 풀숲에 들어가면 상대 팀에게 보이지 않아요.
+      <b>궁극기</b>는 게이지가 10 모이면(명중 +2 · 암살자는 표창 1개당 +1, 피격 +1) 빨갛게 빛납니다. 풀숲에 들어가면 상대 팀에게 보이지 않아요.
     </div>
   </div>
 </div>
@@ -330,13 +332,18 @@
   var CHARS = {
     marksman: { name: "사격수", hp: 100, speed: 200, cd: 400, dmg: 12, range: KEY * 6, pSpeed: 950, pr: 6,
                 info: "HP 100 · 연사 · 사거리 키×6<br>궁극기: 20발 난사(발당 18)" },
-    healer:   { name: "힐러", hp: 150, speed: 200, cd: 500, dmg: 6, heal: 12, range: KEY * 4, pSpeed: 700, pr: 9,
-                info: "HP 150 · 사거리 키×4 · 적 6 피해 / 아군 12 회복<br>궁극기: 나 100% · 아군 30% 회복" },
-    tank:     { name: "탱커", hp: 400, speed: 160, cd: 1000, dmg: 20, range: KEY * 1, arc: Math.PI * 0.7,   // 이동속도 = 사격수·힐러(200)의 80%
-                info: "HP 400 · 조금 느림 · 망치 근접<br>궁극기: 5초간 초당 10% 회복 + 이속 50%" }
+    healer:   { name: "힐러", hp: 150, speed: 200, cd: 500, dmg: 11, range: KEY * 4, pSpeed: 700, pr: 9,
+                info: "HP 150 · 사거리 키×4 · 적 11 피해<br>궁극기: 4초간 아군 초당 10% 회복(나는 20%)" },
+    tank:     { name: "탱커", hp: 350, speed: 160, cd: 1000, dmg: 30, range: KEY * 1 + 50, arc: Math.PI * 0.7,   // 이동속도 = 사격수·힐러(200)의 80%
+                info: "HP 350 · 조금 느림 · 망치 근접<br>궁극기: 5초간 받는 피해 50% 감소 + 이속 50%" },
+    assassin: { name: "암살자", hp: 90, speed: 220, cd: 600, dmg: 20, range: 250, pSpeed: 900, pr: 8, shots: 3, gap: 80,
+                info: "HP 90 · 가장 빠름 · 표창 3연발(개당 20)<br>궁극기: 10초간 은신 + 이속 40%" }
   };
+  var CHAR_LIST = ["marksman", "healer", "tank", "assassin"];
   var ULT = { mkCount: 20, mkGap: 55, mkDmg: 18, mkSpeed: 1150, mkRange: KEY * 8, mkPr: 8,
-              hlPct: 0.3, hlPoseMs: 1000, tkDur: 5000, tkRegen: 0.10, tkSpeed: 1.5 };
+              hlPct: 0.10, hlDur: 4000, hlSelf: 2, hlPoseMs: 1000, tkDur: 5000, tkDef: 0.5, tkSpeed: 1.5,
+              asSmokeMs: 400, asDur: 10000, asSpeed: 1.4 };
+  var STEALTH_ALPHA = 0.4;           // 풀숲·은신 중인 아군이 보이는 투명도
   var BOT_VIEW = 600;                // AI 시야
   var BOT_REACT_MS = 550;            // AI 가 적을 발견하고 첫 공격까지 걸리는 시간
   var BOT_AIM_ERR = 0.16;            // AI 조준 오차(라디안, ±9° 정도) — 키우면 쉬워짐
@@ -367,7 +374,11 @@
     /* 탱커: 뒷모습 대기·걷기는 망치를 왼쪽 어깨에 멤, 공격은 뒷모습 한 벌뿐(앞모습 공격은 대기 그림 + 휘두르기 효과). 궁극기는 포즈 대신 오라 */
     tank: { pre: "tk",
       back:  { idle: [100, false], walk: [100, false], atk: [108, true] },
-      front: { idle: [100, true], walk: [100, true] } }
+      front: { idle: [100, true], walk: [100, true] } },
+    /* 암살자: 궁극기 그림은 연기 회오리까지 포함이라 조금 큼 */
+    assassin: { pre: "as",
+      back:  { idle: [88, true], walk: [88, true], atk: [92, true], ult: [104, true] },
+      front: { idle: [88, true], walk: [90, true], atk: [90, false], ult: [104, true] } }
   };
   var BULLET_NATIVE = Math.atan2(-128, 99);   // 궁극기 총알 그림이 원래 향하는 각도(오른쪽 위)
 
@@ -387,11 +398,11 @@
   /* ---------- 그림 ---------- */
   var IMG = {};
   (function loadImages() {
-    var names = ["rock", "wall", "bush", "aura", "ult-bullet-blue", "ult-bullet-red"];
+    var names = ["rock", "wall", "bush", "aura", "smoke", "ult-bullet-blue", "ult-bullet-red", "shuriken-blue", "shuriken-red"];
     ["blue", "red"].forEach(function (tm) {
       ["back", "front"].forEach(function (v) {
         ["idle", "atk", "ult"].forEach(function (p) { names.push("mk-" + tm + "-" + v + "-" + p); });
-        ["idle", "walk", "atk", "ult"].forEach(function (p) { names.push("hl-" + tm + "-" + v + "-" + p); });
+        ["idle", "walk", "atk", "ult"].forEach(function (p) { names.push("hl-" + tm + "-" + v + "-" + p); names.push("as-" + tm + "-" + v + "-" + p); });
         ["idle", "walk"].forEach(function (p) { names.push("tk-" + tm + "-" + v + "-" + p); });
       });
       names.push("tk-" + tm + "-back-atk");
@@ -428,6 +439,7 @@
     else if (k === "heal") { tone(760, 0.12, "sine", 0.07, 1.3); setTimeout(function () { tone(1140, 0.14, "sine", 0.06); }, 70); }
     else if (k === "ult") { tone(300, 0.35, "sawtooth", 0.08, 3); }
     else if (k === "swing") tone(240, 0.12, "triangle", 0.1, 0.4);
+    else if (k === "star") tone(1500, 0.05, "triangle", 0.05, 0.6);
     else if (k === "beep") tone(660, 0.12, "square", 0.07);
     else if (k === "go") tone(990, 0.3, "square", 0.08);
     else if (k === "down") tone(400, 0.5, "sawtooth", 0.08, 0.25);
@@ -737,7 +749,7 @@
 
     /* 캐릭터 선택 */
     var cards = "";
-    ["marksman", "healer", "tank"].forEach(function (c) {
+    CHAR_LIST.forEach(function (c) {
       var off = c === "tank" && !TANK_ENABLED;
       cards += '<button type="button" class="charCard' + (me.characterType === c ? " on" : "") + '" data-c="' + c + '"' + (off ? " disabled" : "") + ">" +
         (off ? '<span class="soon">준비 중</span><div class="tankPh">🛡️</div>' : '<img alt="" src="' + charImgSrc(c, me.team) + '">') +
@@ -801,7 +813,7 @@
         u[base + "slot"] = i + 1; u[base + "characterType"] = c;
         u[base + "x"] = sp.x; u[base + "y"] = sp.y; u[base + "angle"] = r1(sp.angle);
         u[base + "hp"] = CHARS[c].hp; u[base + "alive"] = true; u[base + "skillGauge"] = 0; u[base + "damageDealt"] = 0;
-        u[base + "mv"] = false; u[base + "atkAt"] = 0; u[base + "ultUntil"] = 0; u[base + "buffUntil"] = 0;
+        u[base + "mv"] = false; u[base + "atkAt"] = 0; u[base + "ultUntil"] = 0; u[base + "buffUntil"] = 0; u[base + "stealthUntil"] = 0; u[base + "regenUntil"] = 0;
       });
     });
     u.status = "countdown"; u.startAt = now() + COUNT_MS; u.winner = null; u.final = null; u.endedAt = null;
@@ -826,7 +838,8 @@
     return { id: id, team: d.team, char: c, nickname: d.nickname, isAI: !!d.isAI,
              x: +d.x || 0, y: +d.y || 0, angle: +d.angle || 0, hp: d.hp == null ? CHARS[c].hp : +d.hp, maxHp: CHARS[c].hp,
              alive: d.alive !== false, gauge: +d.skillGauge || 0, dmg: +d.damageDealt || 0,
-             cdUntil: 0, atkAt: 0, ultUntil: 0, buffUntil: 0, burst: null, mv: false, pending: null };
+             cdUntil: 0, atkAt: 0, ultUntil: 0, buffUntil: 0, stealthUntil: +d.stealthUntil || 0, regenUntil: 0, regenRate: 0,
+             burst: null, volley: null, mv: false, pending: null };
   }
   function initGame() {
     G = { startAt: room.startAt, endSent: false, playingSent: false, lastNet: 0, finalSent: false, beeped: -1 };
@@ -863,6 +876,10 @@
       r.team = d.team; r.char = CHARS[d.characterType] ? d.characterType : "marksman"; r.maxHp = CHARS[r.char].hp;
       r.hp = +d.hp; r.alive = d.alive !== false; r.gauge = +d.skillGauge || 0; r.dmg = +d.damageDealt || 0;
       r.mv = !!d.mv; r.atkAt = +d.atkAt || 0; r.ultUntil = +d.ultUntil || 0; r.buffUntil = +d.buffUntil || 0; r.nickname = d.nickname; r.isAI = !!d.isAI;
+      r.regenUntil = +d.regenUntil || 0;
+      var su = +d.stealthUntil || 0;
+      if (su > r.stealthUntil && su > now()) smoke(r.x, r.y);   // 다른 사람이 은신 궁극기를 씀 → 연막
+      r.stealthUntil = su;
     });
   }
 
@@ -871,6 +888,10 @@
     for (var i = 0; i < BUSH.length; i++) if (hyp(x - BUSH[i].x, y - BUSH[i].y) < BUSH[i].r * 0.85) return true;
     return false;
   }
+  /* 암살자 은신: 연막(0.4초)이 끝난 뒤부터 stealthUntil 까지 */
+  function stealthed(E, t) { t = t || now(); return E.stealthUntil > t && t >= E.stealthUntil - ULT.asDur; }
+  /* 상대 팀에게 안 보이는가 — 풀숲과 은신이 같은 규칙을 씀 */
+  function hiddenFrom(E, t) { return inBush(E.x, E.y) || stealthed(E, t); }
   function resolve(E) {
     for (var pass = 0; pass < 2; pass++) {
       for (var i = 0; i < OBST.length; i++) {
@@ -895,7 +916,12 @@
       E.y = clamp(E.y, BOUND.t + BODY_R, BOUND.b - BODY_R);
     }
   }
-  function speedOf(E) { return CHARS[E.char].speed * (E.buffUntil > now() ? ULT.tkSpeed : 1); }
+  function speedOf(E) {
+    var t = now(), k = 1;
+    if (E.buffUntil > t) k = ULT.tkSpeed;
+    if (E.char === "assassin" && E.stealthUntil > t) k = ULT.asSpeed;
+    return CHARS[E.char].speed * k;
+  }
   function moveEnt(E, vx, vy, dt) {
     var m = hyp(vx, vy); if (m > 1) { vx /= m; vy /= m; }
     var sp = speedOf(E);
@@ -957,12 +983,12 @@
   function spawnProj(E, ang, skill) {
     var c = CHARS[E.char], sp = skill ? ULT.mkSpeed : c.pSpeed, dx = Math.cos(ang), dy = Math.sin(ang);
     var d = { team: E.team, owner: E.id, ownerCharacterType: E.char, x: r1(E.x + dx * 20), y: r1(E.y + dy * 20),
-              vx: r1(dx * sp), vy: r1(dy * sp), isSkill: !!skill, dmg: skill ? ULT.mkDmg : c.dmg, heal: c.heal || 0,
-              pr: skill ? ULT.mkPr : c.pr, range: skill ? ULT.mkRange : c.range, createdAt: now() };
+              vx: r1(dx * sp), vy: r1(dy * sp), isSkill: !!skill, dmg: skill ? ULT.mkDmg : c.dmg,
+              pr:skill ? ULT.mkPr : c.pr, range: skill ? ULT.mkRange : c.range, createdAt: now() };
     var ref = room.ref.child("projectiles").push(d);
     setTimeout(function () { ref.remove(); }, d.range / sp * 1000 + 700);
     E.atkAt = now();
-    if (hear(E)) sfx(E.char === "healer" ? "orb" : "shoot");
+    if (hear(E)) sfx(E.char === "healer" ? "orb" : (E.char === "assassin" ? "star" : "shoot"));
   }
   function hear(E) { return ME && hyp(E.x - ME.x, E.y - ME.y) < 700; }
 
@@ -982,32 +1008,43 @@
       if (e > p.life + 40) return;
       for (var i = 0; i < targets.length; i++) {
         var T = targets[i];
-        if (d.owner === T.id || !T.alive) continue;
-        var friendly = d.team === T.team;
-        if (friendly && !(d.ownerCharacterType === "healer" && !d.isSkill && T.hp < T.maxHp)) continue;
+        if (d.owner === T.id || !T.alive || d.team === T.team) continue;
         var pe = p.lt[T.id]; if (pe === undefined) pe = 0;
         p.lt[T.id] = e;
         var a = projAt(p, pe), b = projAt(p, e);
-        if (segHit(a.x, a.y, b.x, b.y, T.x, T.y, BODY_R + (d.pr || 6))) { projHit(id, p, T, friendly); break; }
+        if (segHit(a.x, a.y, b.x, b.y, T.x, T.y, BODY_R + (d.pr || 6))) { projHit(id, p, T); break; }
       }
     });
   }
-  function projHit(id, p, T, friendly) {
+  function projHit(id, p, T) {
     var d = p.d; p.dead = true;
-    if (friendly) {
-      var h = Math.min(d.heal || 12, T.maxHp - T.hp); T.hp += h;
-      pushHit({ owner: d.owner, target: T.id, heal: h, basic: true });
-      if (T === ME) sfx("heal");
-    } else {
-      damage(T, d.dmg, d.owner, !d.isSkill);
-    }
+    damage(T, d.dmg, d.owner, !d.isSkill);
     room.ref.child("projectiles/" + id).remove();
-    spark(T.x, T.y, friendly ? "#7CE08A" : (d.team === "blue" ? "#5FA2FF" : "#FF6A5F"));
+    spark(T.x, T.y, d.team === "blue" ? "#5FA2FF" : "#FF6A5F");
+  }
+  /* 화면에서만: 투사체가 (내가 판정하지 않는) 다른 캐릭터에 닿으면 바로 사라진 것처럼 보이게.
+     실제 명중 판정·삭제는 맞은 사람 쪽에서 하므로, 그 소식이 도착하기 전까지 몸을 뚫고 지나가 보이던 것을 막는다. */
+  function projVisualHit(p, t) {
+    if (p.dead || p.gone) return;
+    var d = p.d, e = clamp(t - d.createdAt, 0, p.life), pe = p.ve === undefined ? 0 : p.ve;
+    p.ve = e;
+    var a = projAt(p, pe), b = projAt(p, e);
+    var ids = participants();
+    for (var i = 0; i < ids.length; i++) {
+      var T = ent(ids[i]);
+      if (!T || !T.alive || T.id === d.owner || T.team === d.team) continue;
+      if (segHit(a.x, a.y, b.x, b.y, T.x, T.y, BODY_R + (d.pr || 6))) {
+        p.gone = true;
+        if (!ME || ME.team === T.team || !hiddenFrom(T, t)) spark(T.x, T.y, d.team === "blue" ? "#5FA2FF" : "#FF6A5F");
+        return;
+      }
+    }
   }
   function damage(T, amount, owner, basic) {
+    if (T.char === "tank" && T.buffUntil > now()) amount = Math.round(amount * ULT.tkDef);     // 탱커 궁극기: 받는 피해 감소
     var dm = Math.min(amount, T.hp);
     T.hp -= dm; T.gauge = Math.min(GAUGE_MAX, T.gauge + 1);
-    if (T.hp <= 0) { T.hp = 0; T.alive = false; T.burst = null; if (T === ME) { sfx("down"); aim.id = null; joy.id = null; } }
+    if (T.hp <= 0) { T.hp = 0; T.alive = false; T.burst = null; T.volley = null; T.regenUntil = 0; if (T === ME) { sfx("down"); aim.id = null; joy.id = null; } }
     else if (T === ME) sfx("hit");
     pushHit({ owner: owner, target: T.id, dmg: dm, basic: basic });
     if (T === ME || T.bot) G.forceNet = true;
@@ -1022,21 +1059,22 @@
     handled[s.key] = 1;
     if (h.createdAt >= G.startAt - 1000) {
       if (h.dmg) owner.dmg += h.dmg;
-      if (h.basic) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + 2);
+      if (h.basic) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + (owner.char === "assassin" ? 1 : 2));   // 암살자는 표창 1개당 +1
       if (owner === ME && h.dmg) sfx("confirm");
       G.forceNet = true;
     }
     s.ref.remove();
   }
-  /* 힐러 궁극기: 같은 팀 전체 회복 */
+  /* 힐러 궁극기: 같은 팀 전체가 몇 초에 걸쳐 회복(힐러 자신은 2배) */
   function onEffect(s) {
     var e = s.val(); if (!e || !G || handled[s.key]) return;
     handled[s.key] = 1;
-    if (now() - e.createdAt > 4000) return;
+    var until = e.createdAt + (e.dur || ULT.hlDur);
+    if (now() > until) return;
     if (e.type === "healAll") {
       localTargets().forEach(function (T) {
-        if (T.team !== e.team || !T.alive || T.id === e.owner) return;
-        T.hp = Math.min(T.maxHp, T.hp + Math.round(T.maxHp * e.pct));
+        if (T.team !== e.team || !T.alive) return;
+        T.regenUntil = until; T.regenRate = e.pct * (T.id === e.owner ? ULT.hlSelf : 1);
         if (T === ME) sfx("heal");
       });
       G.forceNet = true;
@@ -1071,7 +1109,17 @@
   function fireBasic(E, ang) {
     var c = CHARS[E.char];
     E.cdUntil = now() + c.cd; E.angle = ang;
-    if (E.char === "tank") swing(E, ang); else spawnProj(E, ang, false);
+    if (E.char === "tank") swing(E, ang);
+    else if (E.char === "assassin") { E.volley = { left: c.shots, next: now(), ang: ang }; stepVolley(E); }   // 표창 3연발
+    else spawnProj(E, ang, false);
+  }
+  function stepVolley(E) {
+    var t = now(), c = CHARS.assassin;
+    while (E.volley && E.volley.left > 0 && t >= E.volley.next) {
+      spawnProj(E, E.volley.ang, false);
+      E.volley.left--; E.volley.next += c.gap;
+    }
+    if (E.volley && E.volley.left <= 0) E.volley = null;
   }
   function tryFire(E, ang) {
     if (now() >= E.cdUntil) { fireBasic(E, ang); E.pending = null; }
@@ -1085,11 +1133,15 @@
       E.angle = ang; E.burst = { left: ULT.mkCount, next: t, ang: ang };
       E.ultUntil = t + ULT.mkCount * ULT.mkGap + 200;
     } else if (E.char === "healer") {
-      E.hp = E.maxHp; E.ultUntil = t + ULT.hlPoseMs;
-      var ref = room.ref.child("effects").push({ type: "healAll", team: E.team, owner: E.id, pct: ULT.hlPct, createdAt: t });
-      setTimeout(function () { ref.remove(); }, 3000);
+      E.ultUntil = t + ULT.hlPoseMs;
+      var ref = room.ref.child("effects").push({ type: "healAll", team: E.team, owner: E.id, pct: ULT.hlPct, dur: ULT.hlDur, createdAt: t });
+      setTimeout(function () { ref.remove(); }, ULT.hlDur);
     } else if (E.char === "tank") {
       E.buffUntil = t + ULT.tkDur;
+    } else if (E.char === "assassin") {
+      E.ultUntil = t + ULT.asSmokeMs;                        // 사라지는 포즈 + 연막 → 끝나면 은신 시작
+      E.stealthUntil = t + ULT.asSmokeMs + ULT.asDur;
+      smoke(E.x, E.y);
     }
     if (hear(E)) sfx("ult");
     G.forceNet = true;
@@ -1107,7 +1159,8 @@
       }
       if (E.burst && E.burst.left <= 0) E.burst = null;
     }
-    if (E.buffUntil > t && E.char === "tank") E.hp = Math.min(E.maxHp, E.hp + E.maxHp * ULT.tkRegen * dt);
+    if (E.volley) stepVolley(E);
+    if (E.regenUntil > t) E.hp = Math.min(E.maxHp, E.hp + E.maxHp * E.regenRate * dt);   // 힐러 궁극기 회복
   }
   /* 클릭(드래그 없이 톡) = 거리와 상관없이 가장 가까운 보이는 적 자동 조준.
      장애물에 가리지 않은 적을 먼저 고르고, 모두 가려져 있으면 그냥 가장 가까운 적. 풀숲 속 적은 제외(안 보이므로) */
@@ -1115,7 +1168,7 @@
     var best = null, bd = Infinity, open = null, od = Infinity;
     participants().forEach(function (id) {
       var o = ent(id); if (!o || !o.alive || o.team === E.team) return;
-      if (inBush(o.x, o.y)) return;
+      if (hiddenFrom(o)) return;
       var d = hyp(o.x - E.x, o.y - E.y);
       if (d < bd) { bd = d; best = o; }
       if (d < od && losClear(E.x, E.y, o.x, o.y)) { od = d; open = o; }
@@ -1137,24 +1190,22 @@
     enemies.forEach(function (o) {
       var d = hyp(o.x - B.x, o.y - B.y);
       if (d > BOT_VIEW) return;
-      if (inBush(o.x, o.y) && d > 110) return;       // 풀숲 속은 아주 가까이 오기 전엔 못 봄
+      if (hiddenFrom(o, t) && d > 110) return;       // 풀숲·은신 속은 아주 가까이 오기 전엔 못 봄
       if (d < td) { td = d; target = o; }
     });
     if (target !== k.target) { k.target = target; k.seenAt = t; }
+    /* 힐러: 싸울 적이 없으면 가장 다친 아군 곁으로 */
     var healT = null;
-    if (B.char === "healer") {
-      var low = 1;
-      allies.forEach(function (a) {
-        var ratio = a.hp / a.maxHp, d = hyp(a.x - B.x, a.y - B.y);
-        if (ratio < 0.9 && ratio < low && d < c.range * 0.95 && losClear(B.x, B.y, a.x, a.y)) { low = ratio; healT = a; }
-      });
+    if (B.char === "healer" && !target) {
+      var low = 0.9;
+      allies.forEach(function (a) { var ratio = a.hp / a.maxHp; if (ratio < low) { low = ratio; healT = a; } });
     }
 
     /* 이동 */
     var mx = 0, my = 0;
     if (target) {
       var dx = target.x - B.x, dy = target.y - B.y, d = hyp(dx, dy) || 1, ux = dx / d, uy = dy / d;
-      var want = B.char === "tank" ? 50 : c.range * 0.72;
+      var want = B.char === "tank" ? c.range * 0.6 : c.range * 0.72;
       var los = losClear(B.x, B.y, target.x, target.y);
       if (!los || d > want + 40) { mx += ux; my += uy; }
       else if (d < want - 90) { mx -= ux * 0.8; my -= uy * 0.8; }
@@ -1179,9 +1230,7 @@
     } else B.mv = false;
 
     /* 조준·공격 */
-    var aimAt = null;
-    if (healT && (!target || B.hp > 40)) aimAt = healT;
-    else if (target) aimAt = target;
+    var aimAt = target;
     if (aimAt) B.angle = Math.atan2(aimAt.y - B.y, aimAt.x - B.x);
     else if (B.mv) B.angle = Math.atan2(my, mx);
     if (B.burst) return;
@@ -1200,7 +1249,8 @@
     var b = "players/" + E.id + "/";
     u[b + "x"] = r1(E.x); u[b + "y"] = r1(E.y); u[b + "angle"] = Math.round(E.angle * 100) / 100;
     u[b + "hp"] = Math.round(E.hp * 10) / 10; u[b + "alive"] = E.alive; u[b + "skillGauge"] = E.gauge; u[b + "damageDealt"] = E.dmg;
-    u[b + "mv"] = !!E.mv; u[b + "atkAt"] = E.atkAt; u[b + "ultUntil"] = E.ultUntil; u[b + "buffUntil"] = E.buffUntil; u[b + "lastUpdate"] = now();
+    u[b + "mv"] = !!E.mv; u[b + "atkAt"] = E.atkAt; u[b + "ultUntil"] = E.ultUntil; u[b + "buffUntil"] = E.buffUntil;
+    u[b + "stealthUntil"] = E.stealthUntil; u[b + "regenUntil"] = E.regenUntil; u[b + "lastUpdate"] = now();
   }
   function netWrite(force) {
     var t = Date.now();
@@ -1339,6 +1389,7 @@
   /* ---------- 효과 ---------- */
   var lastHp = {};
   function spark(x, y, color) { FX.push({ k: "spark", x: x, y: y, c: color, t: Date.now(), life: 260 }); }
+  function smoke(x, y) { FX.push({ k: "smoke", x: x, y: y, t: Date.now(), life: ULT.asSmokeMs + 150 }); }
   function floatText(x, y, text, color) { FX.push({ k: "txt", x: x, y: y, s: text, c: color, t: Date.now(), life: 800 }); }
 
   /* =====================================================================
@@ -1371,6 +1422,13 @@
       var ah = E.char === "tank" ? 130 : 110, aw = ah * IMG.aura.naturalWidth / IMG.aura.naturalHeight;
       ctx.globalAlpha = alpha * (0.75 + 0.25 * Math.sin(t / 120));
       ctx.drawImage(IMG.aura, p.x - aw / 2, p.y - 6 - ah / 2, aw, ah);
+      ctx.globalAlpha = alpha;
+    }
+    /* 힐러 궁극기 회복 중: 발밑 초록 빛 */
+    if (E.regenUntil > t && E.alive) {
+      ctx.globalAlpha = alpha * (0.55 + 0.25 * Math.sin(t / 110));
+      ctx.fillStyle = "rgba(90,220,120,.45)"; ctx.strokeStyle = "#5ADC78"; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.ellipse(p.x, p.y + 22, 34, 14, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       ctx.globalAlpha = alpha;
     }
 
@@ -1428,6 +1486,11 @@
         ctx.rotate(a - BULLET_NATIVE);
         ctx.drawImage(im, -w * 0.72, -h * 0.28, w, h);   // 그림의 앞머리(오른쪽 위)가 실제 위치에 오도록
       } else { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI * 2); ctx.fill(); }
+    } else if (p.d.ownerCharacterType === "assassin") {
+      var st = IMG["shuriken-" + (blue ? "blue" : "red")];
+      ctx.rotate(a);                                   // 날아가는 방향으로
+      if (ready(st)) { var sw = 34, sh = sw * st.naturalHeight / st.naturalWidth; ctx.drawImage(st, -sw / 2, -sh / 2, sw, sh); }
+      else { ctx.fillStyle = "#C9CED6"; ctx.beginPath(); ctx.arc(0, 0, 7, 0, Math.PI * 2); ctx.fill(); }
     } else if (p.d.ownerCharacterType === "healer") {
       ctx.shadowColor = col; ctx.shadowBlur = 14;
       ctx.fillStyle = col; ctx.beginPath(); ctx.arc(0, 0, 9, 0, Math.PI * 2); ctx.fill();
@@ -1536,9 +1599,9 @@
     var list = [];
     participants().forEach(function (id) {
       var E = ent(id); if (!E) return;
-      var ally = spec || E.team === me.team, hid = inBush(E.x, E.y);   // 관전자는 모두를 아군처럼(게이지까지) 봄
-      if (!ally && hid) { lastHp[id] = E.hp; return; }            // 풀숲 속 적은 아예 안 그림
-      var alpha = !E.alive ? 0.35 : (E === me ? 1 : (hid ? (spec ? 0.55 : 0.4) : 1));
+      var ally = spec || E.team === me.team, hid = hiddenFrom(E, t);   // 관전자는 모두를 아군처럼(게이지까지) 봄
+      if (!ally && hid) { lastHp[id] = E.hp; return; }            // 풀숲·은신 중인 적은 아예 안 그림
+      var alpha = !E.alive ? 0.35 : (E === me ? 1 : (hid ? (spec ? 0.55 : STEALTH_ALPHA) : 1));
       /* 체력 변화 → 떠오르는 숫자 */
       if (lastHp[id] !== undefined && Math.abs(E.hp - lastHp[id]) >= 1) {
         var d = Math.round(E.hp - lastHp[id]);
@@ -1551,7 +1614,7 @@
     });
     items.sort(function (a, b) { return a.y - b.y; });
     items.forEach(function (it) { if (it.o) drawObstacle(it.o); else drawSprite(it.e, it.alpha, t); });
-    keys(PR).forEach(function (id) { if (!PR[id].dead) drawProjectile(PR[id], t); });
+    keys(PR).forEach(function (id) { var p = PR[id]; projVisualHit(p, t); if (!p.dead && !p.gone) drawProjectile(p, t); });
     list.forEach(function (it) { if (it.e.alive) drawBars(it.e, it.alpha, it.ally); });
     drawAimGuide();
 
@@ -1564,6 +1627,12 @@
       if (f.k === "spark") {
         ctx.strokeStyle = f.c; ctx.lineWidth = 3;
         ctx.beginPath(); ctx.arc(v.x, v.y, 8 + k * 22, 0, Math.PI * 2); ctx.stroke();
+      } else if (f.k === "smoke") {                    // 연막: 뭉게뭉게 커졌다가 사라짐
+        var sm = IMG.smoke, sz = 70 + 90 * Math.sin(Math.min(1, k * 1.4) * Math.PI / 2);
+        ctx.globalAlpha = k < 0.6 ? 0.95 : 0.95 * (1 - (k - 0.6) / 0.4);
+        ctx.translate(v.x, v.y - 20); ctx.rotate(k * 0.6);
+        if (ready(sm)) ctx.drawImage(sm, -sz / 2, -sz / 2, sz, sz);
+        else { ctx.fillStyle = "rgba(200,200,205,.9)"; ctx.beginPath(); ctx.arc(0, 0, sz / 2, 0, Math.PI * 2); ctx.fill(); }
       } else {
         ctx.font = "800 20px " + FONT; ctx.textAlign = "center";
         ctx.lineWidth = 4; ctx.strokeStyle = "rgba(255,255,255,.95)";
