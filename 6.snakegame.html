@@ -7,7 +7,6 @@
 <meta charset="UTF-8">
 <link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
 <title>스네이크</title>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
@@ -16,17 +15,12 @@
 <meta property="og:url" content="https://cornsilktea.github.io/6.snakegame.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
-<!-- 링크 미리보기 끝 -->
 <style>
   :root {
     --bg: #F4F6F1;
     --board-bg: #FFFFFF;
-    --grid-line: #E4E8DE;
     --ink: #1B2B20;
     --ink-soft: #5B6B5E;
-    --snake: #24402F;
-    --snake-head: #1B2B20;
-    --food: #B33951;
     --control-bg: #FFFFFF;
     --control-border: #24402F;
     --control-active: #EAF0E6;
@@ -52,9 +46,7 @@
 
   .wrap {
     width: 100%;
-    /* 세로가 짧은 화면(전자칠판 등)에서는 화면 높이에 맞춰 줄어든다 */
     max-width: min(480px, 68vh);
-    /* 공간이 남으면 가운데, 모자라면 위가 잘리지 않도록 */
     margin: auto;
     display: flex;
     flex-direction: column;
@@ -92,8 +84,6 @@
     overflow: hidden;
   }
 
-  /* aspect-ratio 를 모르는 구형 전자칠판 대비.
-     정사각형 판이 납작해지지 않도록 예전 방식(padding)으로 높이를 만든다. */
   @supports not (aspect-ratio: 1 / 1) {
     .board-frame { height: 0; padding-top: 100%; }
     .board-frame > canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
@@ -205,9 +195,6 @@
     line-height: 1.6;
   }
 
-  @media (min-width: 480px) {
-    .hint.mobile-only { display: none; }
-  }
   [hidden]{display:none !important;}
 </style>
 </head>
@@ -267,6 +254,8 @@
 <script>
 (function () {
   const COLS = 20, ROWS = 20;
+  const COLOR_GRID = '#E4E8DE', COLOR_FOOD = '#B33951', COLOR_SNAKE = '#24402F', COLOR_SNAKE_HEAD = '#1B2B20';
+  const BUTTON_DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
   const canvas = document.getElementById('board');
   const ctx = canvas.getContext('2d');
   const scoreEl = document.getElementById('score');
@@ -278,22 +267,23 @@
   const overlayMsg = document.getElementById('overlayMsg');
   const restartBtn = document.getElementById('restartBtn');
   const pauseBtn = document.getElementById('pauseBtn');
+  const classStat = document.getElementById('clsStat');
+  const classVal = document.getElementById('clsVal');
+  const classWho = document.getElementById('clsWho');
 
   let cellSize, snake, dir, nextDir, food, score, best, tickMs, timer, running, started, paused;
 
   const BEST_KEY = 'snake_best_v1';
 
-  /* 세계 신기록 (모든 학생 공통, Firebase): 점수 · 이름 */
   const WR = window.WorldRecord ? WorldRecord('snakegame') : null;
   function renderWorld() {
     if (WR && WR.rec) { worldEl.textContent = WR.value(); worldWhoEl.textContent = WR.who(); }
     else { worldEl.textContent = (WR && !WR.loaded) ? '…' : '-'; worldWhoEl.textContent = ''; }
-    /* 반별 링크로 들어왔을 때만 우리 반 신기록 칸을 보인다 */
-    const C = WR && WR.cls;
-    if (C) {
-      document.getElementById('clsStat').hidden = false;
-      document.getElementById('clsVal').textContent = C.rec ? C.value() : (C.loaded ? '-' : '…');
-      document.getElementById('clsWho').textContent = C.rec ? C.who() : '';
+    const classRecord = WR && WR.cls;
+    if (classRecord) {
+      classStat.hidden = false;
+      classVal.textContent = classRecord.rec ? classRecord.value() : (classRecord.loaded ? '-' : '…');
+      classWho.textContent = classRecord.rec ? classRecord.who() : '';
     }
   }
   if (WR) { WR.onChange(renderWorld); WR.load(); }
@@ -353,15 +343,13 @@
   function setDir(x, y) {
     if (!running) return;
     if (!started) {
-      // 시작 화면: 어떤 방향키를 눌러도 바로 시작한다
       started = true;
       overlay.classList.add('hidden');
       startLoop();
     } else if (paused) {
-      // 일시정지 화면: 어떤 방향키를 눌러도 다시 진행한다
       togglePause();
     }
-    if (dir.x === -x && dir.y === -y) return; // 역방향 무시
+    if (dir.x === -x && dir.y === -y) return;
     nextDir = { x, y };
   }
 
@@ -423,7 +411,7 @@
   function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--grid-line');
+    ctx.strokeStyle = COLOR_GRID;
     ctx.lineWidth = 1;
     for (let i = 1; i < COLS; i++) {
       ctx.beginPath();
@@ -438,14 +426,13 @@
       ctx.stroke();
     }
 
-    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--food');
+    ctx.fillStyle = COLOR_FOOD;
     roundRect(food.x * cellSize + 2, food.y * cellSize + 2, cellSize - 4, cellSize - 4, 4);
     ctx.fill();
 
     snake.forEach((seg, i) => {
-      ctx.fillStyle = i === 0
-        ? getComputedStyle(document.documentElement).getPropertyValue('--snake-head')
-        : getComputedStyle(document.documentElement).getPropertyValue('--snake');
+      ctx.fillStyle = i === 0 ? COLOR_SNAKE_HEAD : COLOR_SNAKE;
+
       roundRect(seg.x * cellSize + 1, seg.y * cellSize + 1, cellSize - 2, cellSize - 2, 3);
       ctx.fill();
     });
@@ -473,7 +460,6 @@
     ArrowRight: [1, 0], d: [1, 0], D: [1, 0]
   };
 
-  // 한글 IME가 켜져 있으면 e.key가 'ㅈ' 등으로 오므로 물리 키(code)로도 판정한다
   const CODE_DIRS = {
     KeyW: [0, -1], KeyS: [0, 1], KeyA: [-1, 0], KeyD: [1, 0]
   };
@@ -482,17 +468,19 @@
     return ARROW_DIRS[e.key] || CODE_DIRS[e.code] || null;
   }
 
+  function steer(direction) {
+    if (!running) {
+      restartGame();
+      return;
+    }
+    setDir(direction[0], direction[1]);
+  }
+
   document.addEventListener('keydown', (e) => {
-    const dir = dirFromKey(e);
-    if (dir) {
+    const direction = dirFromKey(e);
+    if (direction) {
       e.preventDefault();
-      if (!running) {
-        // 게임 오버 화면에서는 방향키 입력으로 바로 재시작
-        restartGame();
-        return;
-      }
-      const [x, y] = dir;
-      setDir(x, y);
+      steer(direction);
       return;
     }
     if (e.key === ' ') {
@@ -502,15 +490,7 @@
   });
 
   document.querySelectorAll('.dpad .btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const map = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
-      const [x, y] = map[btn.dataset.dir];
-      if (!running) {
-        restartGame();
-        return;
-      }
-      setDir(x, y);
-    });
+    btn.addEventListener('click', () => steer(BUTTON_DIRS[btn.dataset.dir]));
   });
 
   pauseBtn.addEventListener('click', togglePause);
@@ -519,7 +499,7 @@
 
   best = loadBest();
   bestEl.textContent = best;
-  resetState();      // 뱀·먹이를 먼저 만들어야 draw() 가 그릴 수 있다
+  resetState();
   resizeCanvas();
 })();
 </script>
