@@ -241,7 +241,7 @@
       <div id="startMsg" class="msg"></div>
     </div>
     <div class="card note">
-      <b>조작</b> — 왼쪽 아래를 누르고 끌면 이동, 오른쪽 아래 <b>공격</b> 버튼을 누른 채 끌어 방향을 정하고 떼면 발사(그냥 톡 누르면 가까운 적을 자동 조준). 컴퓨터에서는 <b>WASD</b>(방향키)로 이동, <b>J</b> 기본 공격, <b>K</b> 궁극기(자동 조준).
+      <b>조작</b> — 왼쪽 아래를 누르고 끌면 이동, 오른쪽 아래 <b>공격</b> 버튼을 누른 채 끌어 방향을 정하고 떼면 발사(그냥 톡 누르면 가까운 적을 자동 조준). 컴퓨터에서는 <b>WASD</b>(방향키)로 이동, <b>K</b> 기본 공격, <b>J</b> 궁극기(자동 조준).
       <b>궁극기</b>는 게이지가 10 모이면(명중 +2 · 사격수·암살자는 1발당 +1, 피격 +1) 빨갛게 빛나고, 궁극기를 쓰면 지속시간 동안 분홍색으로 줄어듭니다. 풀숲에 들어가면 상대 팀에게 보이지 않아요.
     </div>
   </div>
@@ -1362,7 +1362,7 @@
   }
   $("btnAgain").onclick = restart;
   var KEY_ON = { up: false, down: false, left: false, right: false, atk: false };
-  var KEY_MAP = { KeyW: "up", KeyS: "down", KeyA: "left", KeyD: "right", KeyJ: "atk",
+  var KEY_MAP = { KeyW: "up", KeyS: "down", KeyA: "left", KeyD: "right", KeyK: "atk",
                   ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right" };
   function keyName(e) { return KEY_MAP[e.code] || KEY_MAP[e.key] || null; }
   window.addEventListener("keydown", function (e) {
@@ -1370,7 +1370,7 @@
     if (screenNow !== "game" || (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName))) return;
     var k = keyName(e);
     if (k) { KEY_ON[k] = true; e.preventDefault(); audio(); return; }
-    if (e.code === "KeyK" && !e.repeat && canAct() && ME.gauge >= GAUGE_MAX && !ME.burst) {
+    if (e.code === "KeyJ" && !e.repeat && canAct() && ME.gauge >= GAUGE_MAX && !ME.burst) {
       e.preventDefault(); var ua = autoAimAngle(ME); ME.angle = ua; useUlt(ME, ua);
     }
   });
@@ -1675,7 +1675,7 @@
       var E = ent(id); if (!E) return;
       var ally = spec || E.team === me.team, hid = hiddenFrom(E, t);
       if (!ally && hid) { lastHp[id] = E.hp; return; }
-      var alpha = !E.alive ? 0.35 : (E === me ? (stealthed(E, t) ? STEALTH_ALPHA : 1) : (hid ? (spec ? 0.55 : STEALTH_ALPHA) : 1));
+      var alpha = !E.alive ? 0.35 : (hid ? (spec ? 0.55 : STEALTH_ALPHA) : 1);
       if (lastHp[id] !== undefined && Math.abs(E.hp - lastHp[id]) >= 1) {
         var d = Math.round(E.hp - lastHp[id]);
         if (d < 0) { floatText(E.x, E.y, String(d), "#FF4B3E"); E.flashUntil = Date.now() + 90; }
