@@ -6,7 +6,6 @@
 <script charset="utf-8" src="world-record.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
 <title>터보 랩</title>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
@@ -15,14 +14,12 @@
 <meta property="og:url" content="https://cornsilktea.github.io/24.turbo-lap.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
-<!-- 링크 미리보기 끝 -->
 <link rel="stylesheet" href="theme.css">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: #8FD3FF; font-family: var(--sg-font); color: var(--sg-ink); }
   canvas#gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 
-  /* ── HUD (위쪽 46px 는 access-guard.js 의 '← 목록으로' 버튼 자리) ── */
   #hud { position: fixed; top: 52px; left: 10px; right: 10px; display: none; align-items: flex-start; justify-content: space-between; gap: 8px; pointer-events: none; z-index: 5; }
   .hud-box { background: rgba(255,255,255,.92); border: 2px solid var(--sg-line-strong); border-radius: 10px; padding: 6px 12px; font-weight: 800; font-variant-numeric: tabular-nums; box-shadow: 0 3px 0 rgba(27,43,32,.25); }
   .hud-box .lab { font-size: 11px; color: var(--sg-ink-soft); font-weight: 700; display: block; }
@@ -41,20 +38,17 @@
   .laps b { color: var(--sg-primary); }
   #minimap { position: fixed; right: 12px; bottom: 12px; width: 150px; height: 150px; background: rgba(255,255,255,.85); border: 2px solid var(--sg-line-strong); border-radius: 10px; z-index: 5; display: none; pointer-events: none; }
 
-  /* ── 바퀴 통과 안내 (화면 위쪽 가운데) ── */
   #lapToast { position: fixed; top: 130px; left: 50%; transform: translateX(-50%); display: none; pointer-events: none; z-index: 6; text-align: center; white-space: nowrap; }
   #lapToast b { display: block; font-size: clamp(30px, 6vw, 48px); font-weight: 800; color: #fff; -webkit-text-stroke: 2px var(--sg-ink); text-shadow: 0 5px 0 rgba(27,43,32,.35); }
   #lapToast span { display: inline-block; margin-top: 4px; padding: 4px 14px; border-radius: 10px; background: #D97B4F; color: #fff; font-size: 18px; font-weight: 800; border: 2px solid var(--sg-ink); }
   #lapToast.show { display: block; animation: toast 1.8s ease-out forwards; }
   @keyframes toast { 0% { opacity: 0; transform: translateX(-50%) scale(1.4); } 12% { opacity: 1; transform: translateX(-50%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; } }
 
-  /* ── 카운트다운 ── */
   #count { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; pointer-events: none; z-index: 6; }
   #count span { font-size: clamp(90px, 22vmin, 180px); font-weight: 800; color: #fff; -webkit-text-stroke: 4px var(--sg-ink); text-shadow: 0 8px 0 rgba(27,43,32,.35); animation: pop .5s ease-out; }
   #count span.go { color: #D97B4F; }
   @keyframes pop { from { transform: scale(1.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
-  /* ── 시작 / 완주 카드 ── */
   #overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 56px 12px 12px; z-index: 7; overflow-y: auto; }
   .card { width: min(480px, 100%); background: var(--sg-panel); border: 3px solid var(--sg-line-strong); border-radius: 14px; padding: 22px 22px 18px; box-shadow: 0 10px 0 rgba(27,43,32,.3), 0 20px 40px rgba(0,0,0,.2); text-align: center; }
   .logo { font-size: clamp(44px, 9vw, 64px); font-weight: 800; line-height: 1.05; color: #D97B4F; -webkit-text-stroke: 2px var(--sg-ink); text-shadow: 4px 5px 0 var(--sg-ink); letter-spacing: -1px; margin-bottom: 4px; }
@@ -65,7 +59,6 @@
   .rec .val { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; margin-top: 2px; color: var(--sg-primary); }
   .rec .val.none { font-size: 14px; color: var(--sg-ink-faint); font-weight: 700; }
   .rec .who { font-size: 12px; color: var(--sg-ink-soft); min-height: 15px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  /* 시작 화면: 난이도별 기록 표 */
   .rtab { width: 100%; border-collapse: collapse; margin: 14px 0 12px; font-size: 13px; }
   .rtab th, .rtab td { padding: 7px 6px; border-bottom: 2px solid var(--sg-line); text-align: center; vertical-align: middle; }
   .rtab th { color: var(--sg-ink-soft); font-size: 12px; font-weight: 700; }
@@ -211,41 +204,33 @@
 (function () {
 "use strict";
 
-/* ═══════════════════ 밸런스 설정 (여기 숫자만 바꾸면 됨) ═══════════════════ */
 const CFG = {
-  laps: 3,               // 완주 바퀴 수 (트랙에 laps 가 없을 때 기본값)
-  countdown: 3,          // 출발 카운트다운(초)
-  maxSpeed: 44,          // 최고 속도 (단위/초). 표시 km/h = ×4 → 평지 직선 약 170
-  accel: 20,             // 가속도
-  brake: 42,             // 브레이크 감속도
-  reverseMax: 12,        // 후진 최고 속도
-  coastDrag: 0.45,       // 가속 안 할 때 관성 감속 (초당 비율)
-  steerRate: 2.1,        // 최대 조향 속도 (rad/초)
-  steerFullAt: 0.3,      // 이 비율 속도부터 조향이 최대가 됨
-  steerHighSpeed: 0.55,  // 최고 속도에서 조향 배율 (고속일수록 둔하게)
-  offroadMax: 15,        // 오프로드 최고 속도
-  offroadDrag: 2.4,      // 오프로드 감속 (초당 비율)
-  wallKeep: 0.3,         // 울타리 충돌 시 남는 속도 비율
-  gravity: 40,           // 경사 가속도(오르막에서 느려지고 내리막에서 빨라짐, 아케이드용으로 과장)
-  cornerDrag: 0.12,      // 코너에서 조향량×속도에 비례해 잃는 속도 (직선보다 코너가 느리게)
-  downhillMax: 1.1,      // 내리막에서 허용하는 최고 속도 배율 (약 190km/h)
-  shoulder: 4.5,         // 도로 밖 갓길 폭 (여기까지 나가면 울타리)
-  /* 속도감 연출 (물리·기록에는 영향 없음) */
-  carScale: 0.8,         // 차를 작게 → 같은 속도라도 풍경이 더 빨리 지나가 보임
+  laps: 3,
+  countdown: 3,
+  maxSpeed: 44,
+  accel: 20,
+  brake: 42,
+  reverseMax: 12,
+  coastDrag: 0.45,
+  steerRate: 2.1,
+  steerFullAt: 0.3,
+  steerHighSpeed: 0.55,
+  offroadMax: 15,
+  offroadDrag: 2.4,
+  wallKeep: 0.3,
+  gravity: 40,
+  cornerDrag: 0.12,
+  downhillMax: 1.1,
+  shoulder: 4.5,
+  carScale: 0.8,
   camBack: 8.5, camUp: 3.9, camLerp: 7,
-  fovBase: 66, fovBoost: 16,   // 시야각: 정지 66° → 최고 속도 82°
-  speedLinesFrom: 0.45,  // 이 비율 속도부터 화면 가장자리 속도선
-  postEvery: 6,          // 울타리 기둥 간격(샘플)
-  flagEvery: 36,         // 트랙 옆 깃대 간격(샘플)
-  samples: 800,          // 트랙 곡선 샘플 수
-  kmh: 4                 // 표시용 속도 배율
+  fovBase: 66, fovBoost: 16,
+  speedLinesFrom: 0.45,
+  postEvery: 6,
+  flagEvery: 36,
+  samples: 800,
+  kmh: 4
 };
-/* 난이도별 트랙 — points: 제어점 [x, y(높이), z] (닫힌 곡선), width: 도로 폭, laps: 완주 바퀴 수
-   세계 신기록 경로 records/turbolap/<key>, 개인 기록 localStorage turbolap_best_<key>_v1
-   ※ key 는 기록 경로라서 바꾸면 그동안의 기록이 끊긴다. 예전 "어려움" 트랙이 "보통" 이 되었지만 key 는 hard 그대로,
-     새 "어려움" 트랙은 key expert.
-   ※ 코너 반지름은 width/2 + shoulder(4.5) 보다 커야 한다. 더 급하면 안쪽 난간이 도로 안으로 꼬여 들어와
-     차가 난간을 통과한다. 제어점을 고친 뒤 콘솔의 "[turbolap] … minR" 값(쉬움 ≥ 11.5, 보통 ≥ 10, 어려움 ≥ 10.5)을 확인할 것. */
 const TRACKS = {
   easy: {
     key: "easy", name: "쉬움", width: 14, trees: 90, laps: 3,
@@ -262,23 +247,21 @@ const TRACKS = {
       [-105, 5, -100], [-140, 0, -70], [-135, 0, -40], [-95, 0, -20], [-100, 0, 5], [-135, 0, 35], [-125, 0, 80]
     ]
   },
-  /* 어려움: 약 2배 긴 트랙을 2바퀴. 출발 직선(370m) → 오른쪽 큰 원호(반지름 약 95, 속도를 안 줄여도 돎)
-     → 시케인·헤어핀(감속) → 언덕을 넘어 아래쪽 내리막 직선 → S자 시케인(감속) → 왼쪽 큰 원호 → 출발선 */
   expert: {
     key: "expert", name: "어려움", width: 12, trees: 150, laps: 2,
     points: [
-      [-110, 0, 150], [-30, 0, 150], [50, 0, 150], [130, 0, 150], [180, 0, 146],                    // 출발 직선(출발선 다음 290m)
-      [233, 0, 127], [266, 0, 69], [255, 0, 3], [203, 0, -40], [150, 0, -45],                       // 오른쪽 큰 원호
-      [95, 0, -30], [60, 0, -60], [45, 0, -95], [75, 2, -115], [115, 4, -105],                       // 시케인 → 헤어핀(감속)
-      [160, 8, -135], [150, 11, -180], [100, 11, -200], [40, 8, -200], [-20, 4, -195], [-80, 0, -185],  // 언덕 → 내리막 직선
-      [-125, 0, -165], [-165, 0, -190], [-205, 0, -160],                                            // S자 시케인(감속)
-      [-245, 0, -100], [-262, 0, -25], [-258, 0, 50], [-235, 0, 115], [-190, 0, 150]                 // 왼쪽 큰 원호 → 출발선
+      [-110, 0, 150], [-30, 0, 150], [50, 0, 150], [130, 0, 150], [180, 0, 146],
+      [233, 0, 127], [266, 0, 69], [255, 0, 3], [203, 0, -40], [150, 0, -45],
+      [95, 0, -30], [60, 0, -60], [45, 0, -95], [75, 2, -115], [115, 4, -105],
+      [160, 8, -135], [150, 11, -180], [100, 11, -200], [40, 8, -200], [-20, 4, -195], [-80, 0, -185],
+      [-125, 0, -165], [-165, 0, -190], [-205, 0, -160],
+      [-245, 0, -100], [-262, 0, -25], [-258, 0, 50], [-235, 0, 115], [-190, 0, 150]
     ]
   }
 };
-const DIFFS = Object.keys(TRACKS);                // ["easy", "hard", "expert"] — 기록·버튼·표 모두 이 순서
-function capKey(k) { return k[0].toUpperCase() + k.slice(1); }   // 요소 id 접미사: bestEasy · wrHard · wrWhoExpert …
-let LAPS = CFG.laps;                              // 현재 트랙의 완주 바퀴 수 (buildTrack 에서 설정)
+const DIFFS = Object.keys(TRACKS);
+function capKey(k) { return k[0].toUpperCase() + k.slice(1); }
+let LAPS = CFG.laps;
 const CARS = {
   black:  { name: "검정", color: 0x2A2E35, model: "cayenne" },
   yellow: { name: "노랑", color: 0xFFC23D, model: "aventador" },
@@ -290,20 +273,15 @@ let pendingDiff = "easy";
 
 const $ = id => document.getElementById(id);
 
-/* ═══════════════════ 기록 (난이도별) ═══════════════════ */
 function bestKey(k) { return "turbolap_best_" + k + "_v1"; }
 function loadBest(k) { try { const v = parseInt(localStorage.getItem(bestKey(k)), 10); return v > 0 ? v : 0; } catch (e) { return 0; } }
 function saveBest(k, v) { try { localStorage.setItem(bestKey(k), String(v)); } catch (e) {} }
 const best = {}; DIFFS.forEach(k => { best[k] = loadBest(k); });
-/* ═══════════════════ 고스트 (지난 주행을 반투명 차로 재생) ═══════════════════
-   기록 형식: [[t(ms), x, y, z, 방향, 기울기], …] 를 0.1초마다 → 3바퀴 약 15~35KB
-   나의 최고 기록 고스트: localStorage turbolap_ghost_<key>_v1 = {"ms":…, "data":"[…]"}
-   세계 신기록 고스트:   Firebase ghosts/turbolap/<key> = { score, name, data } (규칙: score 가 현재 세계 신기록과 같아야 씀) */
 const GHOST_STEP = 100;
 let ghostPick = "none"; try { if (/^(none|mine|world)$/.test(localStorage.getItem("turbolap_ghostpick_v1") || "")) ghostPick = localStorage.getItem("turbolap_ghostpick_v1"); } catch (e) {}
-const worldGhost = { tried: {} }; DIFFS.forEach(k => { worldGhost[k] = null; worldGhost.tried[k] = false; });   // 내려받은 세계 신기록 고스트
-let ghostPlay = null, ghostCar = null, ghostIdx = 0, ghostLabel = "", ghostShort = "";               // 이번 경기에 재생 중인 고스트
-let recData = [], recLast = -Infinity;                                              // 이번 경기 녹화
+const worldGhost = { tried: {} }; DIFFS.forEach(k => { worldGhost[k] = null; worldGhost.tried[k] = false; });
+let ghostPlay = null, ghostCar = null, ghostIdx = 0, ghostLabel = "", ghostShort = "";
+let recData = [], recLast = -Infinity;
 function ghostKey(k) { return "turbolap_ghost_" + k + "_v1"; }
 function loadMyGhost(k) { try { const j = JSON.parse(localStorage.getItem(ghostKey(k)) || "null"); return (j && j.ms > 0 && typeof j.data === "string") ? j : null; } catch (e) { return null; } }
 function saveMyGhost(k, ms, data) { try { localStorage.setItem(ghostKey(k), JSON.stringify({ ms, data, car: carKey })); } catch (e) {} }
@@ -315,10 +293,10 @@ function fetchWorldGhost(k) {
     worldGhost.tried[k] = true; renderGhostButtons(); return worldGhost[k];
   }).catch(() => { worldGhost.tried[k] = true; renderGhostButtons(); return null; });
 }
-function uploadWorldGhost(k, rec, data, retry) {  // 세계 신기록을 등록한 직후에만 부른다 (규칙이 score 일치를 요구)
+function uploadWorldGhost(k, rec, data, retry) {
   const u = ghostUrl(k), note = $("ghostUpNote"); if (!u) return Promise.resolve();
   note.textContent = "세계신기록 고스트 저장 중…";
-  return fetch(u, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(retry ? { score: rec.score, name: rec.name, data } : { score: rec.score, name: rec.name, data, car: carKey }) })   // 재시도 땐 car 없이(옛 규칙 대비)
+  return fetch(u, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(retry ? { score: rec.score, name: rec.name, data } : { score: rec.score, name: rec.name, data, car: carKey }) })
     .then(r => {
       if (r.ok) { worldGhost[k] = { score: rec.score, name: rec.name, data, car: carKey }; worldGhost.tried[k] = true; renderGhostButtons(); note.textContent = "세계신기록 고스트 저장 완료 · 스페이스바: 다시 하기"; return; }
       return r.text().then(t => { throw new Error(r.status + " " + t); });
@@ -329,7 +307,6 @@ function uploadWorldGhost(k, rec, data, retry) {  // 세계 신기록을 등록�
       note.textContent = "세계신기록 고스트 저장 실패 (" + err.message.slice(0, 60) + ")";
     });
 }
-/* 세계 신기록 고스트가 현재 기록과 같은 주행인지 (기록이 바뀌었는데 고스트가 옛것이면 안 쓴다) */
 function worldGhostValid(k) { const g = worldGhost[k], WR = WRS[k]; return !!(g && WR && WR.rec && g.score === WR.rec.score); }
 function renderGhostButtons() {
   const k = (state === "menu") ? pendingDiff : diff, mine = loadMyGhost(k), wv = worldGhostValid(k);
@@ -341,13 +318,13 @@ function renderGhostButtons() {
     b.classList.toggle("on", g === ghostPick);
   });
 }
-function makeGhostCar(ck) {                      // 고스트를 세울 당시의 차(모델·색)를 반투명으로
+function makeGhostCar(ck) {
   const c = CARS[ck] || CARS[carKey];
   const g = makeCar(c.color, c.model);
   g.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.4; o.material.depthWrite = false; } });
   return g;
 }
-function setupGhost() {                           // 출발 때: 고른 고스트를 풀어 차를 세워 둔다
+function setupGhost() {
   if (ghostCar) { scene.remove(ghostCar); ghostCar = null; }
   ghostPlay = null; ghostLabel = ""; ghostShort = ""; ghostIdx = 0;
   let src = null, gcar = carKey;
@@ -368,7 +345,7 @@ function placeGhost(t) {
   ghostCar.position.set(p[1] + (q[1] - p[1]) * f, p[2] + (q[2] - p[2]) * f, p[3] + (q[3] - p[3]) * f);
   ghostCar.rotation.y = p[4] + dh * f; ghostCar.rotation.x = p[5] + (q[5] - p[5]) * f;
 }
-function recordSample(t) {                        // 0.1초마다 한 점, t === Infinity 면 마지막 점(완주 순간)
+function recordSample(t) {
   if (t === Infinity) t = elapsed; else if (t - recLast < GHOST_STEP) return;
   recLast = t;
   recData.push([Math.round(t), +P.x.toFixed(2), +P.y.toFixed(2), +P.z.toFixed(2), +P.h.toFixed(3), +car.rotation.x.toFixed(3)]);
@@ -378,7 +355,6 @@ function fmtTime(ms) {
   const m = Math.floor(ms / 60000), s = Math.floor(ms % 60000 / 1000), c = Math.floor(ms % 1000 / 10);
   return m + ":" + String(s).padStart(2, "0") + "." + String(c).padStart(2, "0");
 }
-/* 세계 신기록 — records/turbolap/easy · hard · expert, 시간(ms)은 작을수록 좋으므로 lower:true */
 const WRS = {};
 DIFFS.forEach(k => { WRS[k] = window.WorldRecord ? WorldRecord("turbolap", { key: k, lower: true, format: fmtTime }) : null; });
 const wrTried = {};
@@ -389,7 +365,6 @@ function wrInfo(k) {
   if (WR.loaded) return { val: "아직 없음", who: "", none: true };
   return { val: !WR.url() ? "오프라인" : (wrTried[k] ? "불러오지 못함" : "불러오는 중…"), who: "", none: true };
 }
-/* 우리 반 신기록(반별 링크로 들어왔을 때만; WR.cls) */
 function crInfo(k) {
   const C = WRS[k] && WRS[k].cls;
   if (!C) return null;
@@ -413,7 +388,6 @@ function renderRecords() {
   if (c) document.querySelectorAll(".clsCol").forEach(el => { el.hidden = false; });
 }
 
-/* ═══════════════════ 소리 (Web Audio, 외부 파일 없음) ═══════════════════ */
 const AUD = { ctx: null, eng: null };
 function audioInit() {
   try {
@@ -450,7 +424,6 @@ function engineUpdate(ratio, on) {
   AUD.eng.g.gain.setTargetAtTime(on ? 0.03 + ratio * 0.03 : 0, t, 0.1);
 }
 
-/* ═══════════════════ 카툰 텍스처 (캔버스로 생성) ═══════════════════ */
 function canvasTex(w, h, draw, repeat) {
   const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
   draw(cv.getContext("2d"), w, h);
@@ -460,9 +433,6 @@ function canvasTex(w, h, draw, repeat) {
   return t;
 }
 function rnd(a, b) { return a + Math.random() * (b - a); }
-/* 잔디·연석·하늘은 img/turbo/ 의 그림을 쓴다.
-   그림이 아직 안 왔거나(느린 학교 망) 못 불러오면 three 는 그 면을 새까맣게 그리므로,
-   먼저 캔버스로 그린 대체 무늬를 쓰고 그림이 도착하면 같은 텍스처 객체의 image 만 바꿔 끼운다. */
 function imgTex(src, rx, ry, mirror, fallbackDraw, fw, fh) {
   const t = canvasTex(fw || 256, fh || 256, fallbackDraw);
   t.wrapS = t.wrapT = mirror ? THREE.MirroredRepeatWrapping : THREE.RepeatWrapping; t.repeat.set(rx, ry); t.anisotropy = 8;
@@ -472,7 +442,7 @@ function imgTex(src, rx, ry, mirror, fallbackDraw, fw, fh) {
   img.src = src;
   return t;
 }
-function drawGrass(c, w, h) {                  // 대체 잔디 무늬
+function drawGrass(c, w, h) {
   c.fillStyle = "#78C539"; c.fillRect(0, 0, w, h);
   c.lineWidth = 3; c.lineJoin = "round";
   for (let i = 0; i < 7; i++) {
@@ -495,12 +465,12 @@ function drawGrass(c, w, h) {                  // 대체 잔디 무늬
     c.fillStyle = yellow ? "#F08A2A" : "#FFC23D"; c.beginPath(); c.arc(x, y, 2.5, 0, Math.PI * 2); c.fill();
   }
 }
-function drawCurb(c, w, h) {                   // 대체 연석: 왼쪽 빨강, 오른쪽 흰색 (그림과 같은 배치)
+function drawCurb(c, w, h) {
   c.fillStyle = "#1B2B20"; c.fillRect(0, 0, w, h);
   c.fillStyle = "#F23B3B"; c.fillRect(3, 4, w / 2 - 6, h - 8);
   c.fillStyle = "#FFFFFF"; c.fillRect(w / 2 + 3, 4, w / 2 - 6, h - 8);
 }
-function drawSky(c, w, h) {                    // 대체 하늘: 위 진한 파랑 → 지평선 연한 파랑
+function drawSky(c, w, h) {
   const g = c.createLinearGradient(0, 0, 0, h);
   g.addColorStop(0, "#4FB1FD"); g.addColorStop(1, "#B8EAFD");
   c.fillStyle = g; c.fillRect(0, 0, w, h);
@@ -513,13 +483,12 @@ function makeRoadTex() {
     for (let i = 0; i < 60; i++) c.fillRect(rnd(0, w), rnd(0, h), 3, 3);
   }, [1, 1]);
 }
-const texCurb = imgTex("img/turbo/curb.png", 1, 1, false, drawCurb, 256, 128); texCurb.rotation = Math.PI / 2; texCurb.center.set(0.5, 0.5);   // 띠 방향(가로)을 도로 진행 방향(v)으로
+const texCurb = imgTex("img/turbo/curb.png", 1, 1, false, drawCurb, 256, 128); texCurb.rotation = Math.PI / 2; texCurb.center.set(0.5, 0.5);
 const texChecker = canvasTex(128, 128, (c, w, h) => {
   const n = 8, s = w / n;
   for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { c.fillStyle = (x + y) % 2 ? "#1B2B20" : "#FFFFFF"; c.fillRect(x * s, y * s, s, s); }
 }, [1, 1]);
 
-/* ═══════════════════ 3D 장면 ═══════════════════ */
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.domElement.id = "gl";
@@ -532,28 +501,23 @@ scene.add(new THREE.HemisphereLight(0xE6F4FF, 0x4E9A3E, 0.95));
 const sun = new THREE.DirectionalLight(0xFFFFFF, 0.75); sun.position.set(80, 140, 60); scene.add(sun);
 function lambert(color, extra) { return new THREE.MeshLambertMaterial(Object.assign({ color }, extra || {})); }
 
-/* 하늘: img/turbo/sky.png 를 반구 돔 안쪽에 통째로(가로 4번 거울 반복) — 한 그림이라 색이 끊기지 않는다 */
 {
   const sky = imgTex("img/turbo/sky.jpg", 4, 1, true, drawSky, 64, 512); sky.wrapT = THREE.ClampToEdgeWrapping;
   const dome = new THREE.Mesh(new THREE.SphereGeometry(900, 48, 16, 0, Math.PI * 2, 0, Math.PI / 2 + 0.05),
     new THREE.MeshBasicMaterial({ map: sky, side: THREE.BackSide, fog: false }));
   scene.add(dome);
 }
-/* 땅 */
 {
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(1800, 1800), lambert(0xFFFFFF, { map: texGrass }));
   ground.rotation.x = -Math.PI / 2; ground.position.y = -0.05; scene.add(ground);
-  // 먼 배경 언덕은 트랙 크기에 맞춰 buildTrack 에서 놓는다 (트랙 바깥으로)
 }
 
-/* ═══════════════════ 트랙 만들기 (난이도 바꿀 때마다 다시 만듦) ═══════════════════ */
 let diff = "easy";
 let S = [], N = CFG.samples, W = 14, SEG = 1, TRACK_LEN = 1, MM = null;
 const SH = CFG.shoulder;
 let trackGroup = null;
 
 function edgeAt(i, off, yAdd) { const s = S[i % N]; return new THREE.Vector3(s.p.x + s.n.x * off, s.p.y + (yAdd || 0), s.p.z + s.n.z * off); }
-/* 닫힌 띠 메시: edgeFn(i) → [왼쪽 점, 오른쪽 점] */
 function ribbon(group, edgeFn, vRepeat, mat, from, to) {
   from = from || 0; to = (to === undefined) ? N : to;
   const cnt = to - from + 1, pos = new Float32Array(cnt * 6), uv = new Float32Array(cnt * 4), idx = [];
@@ -578,24 +542,23 @@ function buildTrack(def) {
   W = def.width;
   const curve = new THREE.CatmullRomCurve3(def.points.map(p => new THREE.Vector3(p[0], p[1], p[2])), true, "catmullrom", 0.5);
   N = CFG.samples; TRACK_LEN = curve.getLength(); SEG = TRACK_LEN / N; LAPS = def.laps || CFG.laps;
-  S = [];  // { p: 위치, t: 접선(xz 정규화), n: 왼쪽 법선(xz) }
+  S = [];
   for (let i = 0; i < N; i++) {
     const u = i / N, p = curve.getPointAt(u), tg = curve.getTangentAt(u);
-    p.y = Math.max(0, p.y);      // 스플라인이 언덕 앞뒤에서 땅 밑으로 살짝 파고드는 것(도로가 땅에 묻혀 안 보임) 방지
+    p.y = Math.max(0, p.y);
     const t = new THREE.Vector3(tg.x, 0, tg.z).normalize();
-    S.push({ p, t, n: new THREE.Vector3(t.z, 0, -t.x) });   // n = up × t (왼쪽)
+    S.push({ p, t, n: new THREE.Vector3(t.z, 0, -t.x) });
   }
   const grassMat = lambert(0x66C858);
-  ribbon(G, i => [edgeAt(i, W / 2 + SH + 1, -0.02), edgeAt(i, -(W / 2 + SH + 1), -0.02)], 1, grassMat);           // 갓길(언덕 높이 따라감)
-  ribbon(G, i => { const h = S[i].p.y, k = W / 2 + SH + 1; return [edgeAt(i, k + 3 + h * 2.2, -h - 0.04), edgeAt(i, k, -0.03)]; }, 1, grassMat);      // 왼쪽 비탈
-  ribbon(G, i => { const h = S[i].p.y, k = W / 2 + SH + 1; return [edgeAt(i, -k, -0.03), edgeAt(i, -(k + 3 + h * 2.2), -h - 0.04)]; }, 1, grassMat);  // 오른쪽 비탈
+  ribbon(G, i => [edgeAt(i, W / 2 + SH + 1, -0.02), edgeAt(i, -(W / 2 + SH + 1), -0.02)], 1, grassMat);
+  ribbon(G, i => { const h = S[i].p.y, k = W / 2 + SH + 1; return [edgeAt(i, k + 3 + h * 2.2, -h - 0.04), edgeAt(i, k, -0.03)]; }, 1, grassMat);
+  ribbon(G, i => { const h = S[i].p.y, k = W / 2 + SH + 1; return [edgeAt(i, -k, -0.03), edgeAt(i, -(k + 3 + h * 2.2), -h - 0.04)]; }, 1, grassMat);
   const roadRep = Math.round(TRACK_LEN / 5), texRoad = makeRoadTex(); texRoad.repeat.set(1, roadRep);
-  ribbon(G, i => [edgeAt(i, W / 2, 0.05), edgeAt(i, -W / 2, 0.05)], roadRep, lambert(0xFFFFFF, { map: texRoad }));   // 도로
+  ribbon(G, i => [edgeAt(i, W / 2, 0.05), edgeAt(i, -W / 2, 0.05)], roadRep, lambert(0xFFFFFF, { map: texRoad }));
   const curbMat = lambert(0xFFFFFF, { map: texCurb }), curbRep = Math.round(TRACK_LEN / 3);
   ribbon(G, i => [edgeAt(i, W / 2 + 1.3, 0.09), edgeAt(i, W / 2, 0.09)], curbRep, curbMat);
   ribbon(G, i => [edgeAt(i, -W / 2, 0.09), edgeAt(i, -(W / 2 + 1.3), 0.09)], curbRep, curbMat);
-  ribbon(G, i => [edgeAt(i, W / 2, 0.12), edgeAt(i, -W / 2, 0.12)], 1, lambert(0xFFFFFF, { map: texChecker }), 0, 5);   // 결승선
-  /* 결승 아치 */
+  ribbon(G, i => [edgeAt(i, W / 2, 0.12), edgeAt(i, -W / 2, 0.12)], 1, lambert(0xFFFFFF, { map: texChecker }), 0, 5);
   {
     const postMat = lambert(0xF23B3B), beamTex = texChecker.clone(); beamTex.needsUpdate = true; beamTex.repeat.set(1.5, 0.125);
     const s0 = S[2], side = W / 2 + 2.2, hgt = 9;
@@ -606,12 +569,9 @@ function buildTrack(def) {
     const beam = new THREE.Mesh(new THREE.BoxGeometry(side * 2 + 1, 1.6, 1.2), lambert(0xFFFFFF, { map: beamTex }));
     beam.position.set(s0.p.x, s0.p.y + hgt, s0.p.z); beam.rotation.y = Math.atan2(s0.n.x, s0.n.z); G.add(beam);
   }
-  /* 울타리 (양쪽) — 튜브 난간 + 기둥 */
   {
     const railMat = lambert(0xFFFFFF), postMat = lambert(0xF23B3B);
     const off = W / 2 + SH;
-    /* 급한 코너 안쪽에서는 offset 점이 다른 샘플의 중심선에 더 가까워진다(= 난간이 도로 안으로 꼬여 들어옴).
-       물리는 "중심선까지 거리" 로만 판정하므로 그런 점은 난간·기둥에서 빼서 물리 경계와 그림을 맞춘다. */
     let folded = 0;
     const railOk = (i, sg) => {
       const e = edgeAt(i, off * sg, 0);
@@ -627,7 +587,6 @@ function buildTrack(def) {
       for (let i = 0; i < N; i += CFG.postEvery) { if (!railOk(i, sg)) continue; const m = new THREE.Mesh(postGeo, postMat); m.position.copy(edgeAt(i, off * sg, 0.7)); G.add(m); }
     });
     if (folded) console.warn("[turbolap] " + def.key + ": 난간이 꼬이는 코너가 있습니다(" + folded + "점 제외). 제어점을 완만하게 고치세요.");
-    /* 깃대 (양쪽 번갈아) — 카메라 가까이 지나가는 키 큰 물체가 속도감을 살린다 */
     const poleGeo = new THREE.CylinderGeometry(0.12, 0.12, 7, 5), poleMat = lambert(0xF4F4F4);
     const flagGeo = new THREE.BufferGeometry();
     flagGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array([0, 0, 0, 2.2, -0.5, 0, 0, -1.1, 0]), 3));
@@ -640,10 +599,8 @@ function buildTrack(def) {
       flag.rotation.y = Math.atan2(S[i].t.x, S[i].t.z); G.add(flag);
     }
   }
-  /* 트랙 범위 (나무 배치·미니맵에 씀) */
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
   S.forEach(s => { minX = Math.min(minX, s.p.x); maxX = Math.max(maxX, s.p.x); minZ = Math.min(minZ, s.p.z); maxZ = Math.max(maxZ, s.p.z); });
-  /* 먼 배경 언덕 — 트랙 중심에서 트랙 가장 먼 점보다 더 바깥에 놓아 도로와 겹치지 않게 */
   {
     const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
     let reach = 0; S.forEach(s => { reach = Math.max(reach, Math.hypot(s.p.x - cx, s.p.z - cz)); });
@@ -654,7 +611,6 @@ function buildTrack(def) {
       m.position.set(cx + Math.cos(a) * d, -r * 0.55, cz + Math.sin(a) * d); m.scale.y = 0.75; G.add(m);
     }
   }
-  /* 나무 — 트랙 범위보다 사방 100 넓게 */
   {
     const trunk = new THREE.CylinderGeometry(0.4, 0.55, 2.2, 6), leaf1 = new THREE.ConeGeometry(2.6, 4.2, 7), leaf2 = new THREE.ConeGeometry(1.9, 3.4, 7);
     const trunkMat = lambert(0x8B5A2B);
@@ -673,24 +629,15 @@ function buildTrack(def) {
       g.position.set(x, 0, z); g.scale.setScalar(sc); g.rotation.y = rnd(0, 6.28); G.add(g); placed++;
     }
   }
-  /* 미니맵 좌표 변환 */
   {
     const pad = 22, sc = Math.min((300 - pad * 2) / (maxX - minX), (300 - pad * 2) / (maxZ - minZ));
     const ox = 150 - (minX + maxX) / 2 * sc, oz = 150 - (minZ + maxZ) / 2 * sc;
     MM = { sc, mx: x => ox + x * sc, mz: z => oz + z * sc };
   }
-  let minR = Infinity;                                                // 가장 급한 코너의 반지름 (난간 offset 보다 커야 함)
-  for (let i = 0; i < N; i++) { const a = S[(i + N - 2) % N].t, b = S[(i + 2) % N].t; const ang = Math.acos(Math.max(-1, Math.min(1, a.x * b.x + a.z * b.z))); minR = Math.min(minR, SEG * 4 / Math.max(ang, 1e-6)); }
-  console.log("[turbolap] " + def.key + " track length", TRACK_LEN.toFixed(1), "/ laps", LAPS, "/ min time at max speed", (LAPS * TRACK_LEN / CFG.maxSpeed).toFixed(1), "s / minR", minR.toFixed(1), "(rail offset " + (W / 2 + SH) + ")");
 }
 
-/* ── 자동차 ── */
-/* ═══════════════════ 자동차 모델 ═══════════════════
-   옆모습(Shape)을 차폭만큼 밀어(Extrude) 몸체를 만들고, 그 위에 유리 캐빈·등화·흡기구 같은 부품을 얹는다.
-   옆모습 좌표: x = 앞(+)·뒤(-), y = 높이(바닥 0). 밀어낸 뒤 y축으로 90° 돌려 앞이 -z 를 보게 한다.
-   점 목록: [x,y] 직선, {arc:[cx,cy,r,a0,a1,clockwise]} 원호(휠아치), {q:[cx,cy,x,y]} 2차 곡선, {c:[c1x,c1y,c2x,c2y,x,y]} 3차 곡선 */
+
 const CAR_MODELS = {
-  /* ── 포르쉐 카이엔: 키 큰 SUV, 긴 지붕, 루프레일, 4점 LED, 가로 라이트바 ── */
   cayenne: {
     width: 2.05, wheelR: 0.5, archR: 0.56, wheelZ: 1.52, bottom: 0.46, mirrorY: 1.36, mirrorZ: -0.55,
     body: [[2.45, 0.55], [2.48, 0.95], [2.35, 1.2], [1.3, 1.26], [0.95, 1.28], [0.35, 1.86], [-1.3, 1.92], [-2.1, 1.74], [-2.4, 1.35], [-2.46, 0.95], [-2.35, 0.5],
@@ -698,24 +645,23 @@ const CAR_MODELS = {
     cabin: [[0.95, 1.27], [0.35, 1.84], [-1.3, 1.9], [-2.1, 1.72], [-2.12, 1.45], [-1.3, 1.5], [0.95, 1.34]], cabinInset: 0.24,
     extras(g, M, H) {
       const W = 2.05;
-      H.box(W - 0.6, 0.07, 1.6, M.body, 0, 1.95, 0.45);                                 // 지붕 패널
-      [1, -1].forEach(sg => H.box(0.08, 0.08, 2.3, M.dark, sg * (W / 2 - 0.35), 1.99, 0.35));   // 루프레일
-      H.box(W - 0.5, 0.1, 0.35, M.body, 0, 1.92, 2.05);                                 // 루프 스포일러
-      [1, -1].forEach(sg => {                                                             // 4점 LED 헤드램프
+      H.box(W - 0.6, 0.07, 1.6, M.body, 0, 1.95, 0.45);
+      [1, -1].forEach(sg => H.box(0.08, 0.08, 2.3, M.dark, sg * (W / 2 - 0.35), 1.99, 0.35));
+      H.box(W - 0.5, 0.1, 0.35, M.body, 0, 1.92, 2.05);
+      [1, -1].forEach(sg => {
         H.box(0.5, 0.2, 0.12, M.dark, sg * 0.66, 1.02, -2.45);
         [[-0.12, 0.05], [0.12, 0.05], [-0.12, -0.05], [0.12, -0.05]].forEach(o => H.box(0.09, 0.05, 0.14, M.lamp, sg * 0.66 + o[0], 1.02 + o[1], -2.47));
       });
-      H.box(1.2, 0.3, 0.1, M.dark, 0, 0.7, -2.48);                                       // 아래 그릴
-      H.box(W - 0.3, 0.09, 0.1, M.tail, 0, 1.28, 2.45);                                  // 가로 라이트바
+      H.box(1.2, 0.3, 0.1, M.dark, 0, 0.7, -2.48);
+      H.box(W - 0.3, 0.09, 0.1, M.tail, 0, 1.28, 2.45);
       [1, -1].forEach(sg => H.box(0.4, 0.22, 0.1, M.tail, sg * 0.7, 1.15, 2.45));
-      H.box(W - 0.4, 0.1, 0.2, M.dark, 0, 0.5, 2.4);                                     // 디퓨저
-      [1, -1].forEach(sg => H.cyl(0.07, 0.25, M.chrome, sg * 0.55, 0.52, 2.48, "z"));   // 배기
-      [1, -1].forEach(sg => H.box(0.04, 0.5, 0.05, M.dark, sg * (W / 2 - 0.13), 1.55, -0.2)); // B필러
-      [1, -1].forEach(sg => H.box(0.04, 0.42, 0.05, M.dark, sg * (W / 2 - 0.13), 1.62, 1.0));  // C필러
-      [1, -1].forEach(sg => H.box(0.06, 0.1, 1.2, M.chrome, sg * (W / 2 + 0.02), 1.0, 0.3)); // 도어 라인
+      H.box(W - 0.4, 0.1, 0.2, M.dark, 0, 0.5, 2.4);
+      [1, -1].forEach(sg => H.cyl(0.07, 0.25, M.chrome, sg * 0.55, 0.52, 2.48, "z"));
+      [1, -1].forEach(sg => H.box(0.04, 0.5, 0.05, M.dark, sg * (W / 2 - 0.13), 1.55, -0.2));
+      [1, -1].forEach(sg => H.box(0.04, 0.42, 0.05, M.dark, sg * (W / 2 - 0.13), 1.62, 1.0));
+      [1, -1].forEach(sg => H.box(0.06, 0.1, 1.2, M.chrome, sg * (W / 2 + 0.02), 1.0, 0.3));
     }
   },
-  /* ── 람보르기니 아벤타도르: 아주 낮은 쐐기, 앞으로 당긴 캐빈, 옆 흡기구, Y자 등화, 엔진 덮개 슬랫 ── */
   aventador: {
     width: 2.08, wheelR: 0.42, archR: 0.5, wheelZ: 1.52, bottom: 0.26, mirrorY: 0.95, mirrorZ: -0.45,
     body: [[2.4, 0.3], [2.44, 0.46], [2.2, 0.56], [1.78, 0.68], [1.4, 0.8], [0.8, 0.8], [0.12, 1.12], [-0.42, 1.16], [-0.95, 1.05], [-1.55, 0.95], [-2.3, 0.88], [-2.44, 0.62], [-2.36, 0.3],
@@ -723,28 +669,27 @@ const CAR_MODELS = {
     cabin: [[0.8, 0.79], [0.12, 1.1], [-0.42, 1.14], [-0.95, 1.03], [-1.1, 0.96], [-0.95, 0.9], [-0.42, 0.98], [0.8, 0.72]], cabinInset: 0.36,
     extras(g, M, H) {
       const W = 2.08;
-      H.box(0.7, 0.05, 0.5, M.body, 0, 1.18, 0.25);                                     // 지붕
-      [1, -1].forEach(sg => {                                                             // 옆 흡기구 (문 뒤)
+      H.box(0.7, 0.05, 0.5, M.body, 0, 1.18, 0.25);
+      [1, -1].forEach(sg => {
         H.box(0.1, 0.32, 0.85, M.dark, sg * (W / 2 + 0.03), 0.6, 0.95);
         H.box(0.12, 0.06, 0.85, M.body, sg * (W / 2 + 0.05), 0.79, 0.95);
       });
-      for (let i = 0; i < 6; i++) H.box(1.3, 0.03, 0.06, M.dark, 0, 1.1 - i * 0.03, 0.95 + i * 0.18); // 엔진 덮개 슬랫
-      [1, -1].forEach(sg => {                                                             // Y자 헤드램프
+      for (let i = 0; i < 6; i++) H.box(1.3, 0.03, 0.06, M.dark, 0, 1.1 - i * 0.03, 0.95 + i * 0.18);
+      [1, -1].forEach(sg => {
         H.box(0.42, 0.04, 0.1, M.lamp, sg * 0.7, 0.66, -2.36, [0, 0, sg * 0.35]);
         H.box(0.3, 0.04, 0.1, M.lamp, sg * 0.62, 0.6, -2.38, [0, 0, -sg * 0.5]);
       });
-      H.box(1.5, 0.12, 0.1, M.dark, 0, 0.38, -2.44);                                     // 앞 스플리터 흡기
-      [1, -1].forEach(sg => {                                                             // Y자 테일램프
+      H.box(1.5, 0.12, 0.1, M.dark, 0, 0.38, -2.44);
+      [1, -1].forEach(sg => {
         H.box(0.32, 0.05, 0.08, M.tail, sg * 0.72, 0.8, 2.43, [0, 0, -sg * 0.5]);
         H.box(0.26, 0.05, 0.08, M.tail, sg * 0.66, 0.72, 2.43, [0, 0, sg * 0.5]);
       });
-      H.box(W - 0.4, 0.28, 0.12, M.dark, 0, 0.5, 2.42);                                  // 뒤 그물망
-      [-0.32, -0.1, 0.1, 0.32].forEach(x => H.cyl(0.06, 0.2, M.chrome, x, 0.42, 2.5, "z")); // 4구 배기
-      H.box(1.7, 0.05, 0.35, M.dark, 0, 1.0, 2.15, [-0.15, 0, 0]);                        // 낮은 리어 윙
+      H.box(W - 0.4, 0.28, 0.12, M.dark, 0, 0.5, 2.42);
+      [-0.32, -0.1, 0.1, 0.32].forEach(x => H.cyl(0.06, 0.2, M.chrome, x, 0.42, 2.5, "z"));
+      H.box(1.7, 0.05, 0.35, M.dark, 0, 1.0, 2.15, [-0.15, 0, 0]);
       [1, -1].forEach(sg => H.box(0.08, 0.14, 0.12, M.dark, sg * 0.55, 0.93, 2.2));
     }
   },
-  /* ── 맥라렌 750S: 둥근 물방울 캐빈, 옆 대형 흡기구, 눈매 헤드램프, 올려 세운 에어브레이크 윙 ── */
   mclaren: {
     width: 2.0, wheelR: 0.42, archR: 0.5, wheelZ: 1.46, bottom: 0.28, mirrorY: 1.0, mirrorZ: -0.5,
     body: [[2.3, 0.3], [2.32, 0.5], { q: [2.3, 0.68, 2.05, 0.72] }, [1.46, 0.84], [0.85, 0.84], { c: [0.45, 1.0, 0.25, 1.18, -0.1, 1.22] }, [-0.5, 1.22],
@@ -753,24 +698,23 @@ const CAR_MODELS = {
     cabin: [[0.85, 0.83], { c: [0.45, 0.99, 0.25, 1.17, -0.1, 1.21] }, [-0.5, 1.21], { c: [-0.9, 1.19, -1.2, 1.03, -1.5, 0.95] }, [-1.5, 0.9], [-0.5, 1.06], [0.85, 0.77]], cabinInset: 0.3,
     extras(g, M, H) {
       const W = 2.0;
-      H.box(0.9, 0.05, 0.5, M.body, 0, 1.24, 0.3);                                      // 지붕
-      [1, -1].forEach(sg => {                                                             // 옆 흡기구 (문 뒤로 파인 홈)
+      H.box(0.9, 0.05, 0.5, M.body, 0, 1.24, 0.3);
+      [1, -1].forEach(sg => {
         H.box(0.1, 0.36, 0.9, M.dark, sg * (W / 2 + 0.03), 0.62, 0.9);
         H.box(0.14, 0.08, 0.7, M.body, sg * (W / 2 + 0.06), 0.84, 1.0);
       });
-      [1, -1].forEach(sg => {                                                             // 눈매 헤드램프: 검은 홈 + LED 줄
+      [1, -1].forEach(sg => {
         H.box(0.5, 0.2, 0.12, M.dark, sg * 0.68, 0.7, -2.28, [0, sg * 0.35, 0]);
         H.box(0.45, 0.04, 0.12, M.lamp, sg * 0.66, 0.78, -2.3, [0, sg * 0.35, 0]);
       });
-      H.box(1.2, 0.14, 0.1, M.dark, 0, 0.4, -2.34);                                      // 앞 흡기
-      H.box(W - 0.36, 0.3, 0.1, M.dark, 0, 0.62, 2.34);                                  // 뒤 그물망
-      [1, -1].forEach(sg => H.cyl(0.07, 0.1, M.tail, sg * 0.75, 0.8, 2.37, "z"));       // 둥근 테일램프
-      [1, -1].forEach(sg => H.cyl(0.07, 0.3, M.chrome, sg * 0.18, 0.72, 2.42, "z"));    // 높은 중앙 배기
-      H.box(W - 0.3, 0.06, 0.55, M.body, 0, 1.28, 1.9, [-0.32, 0, 0]);                   // 에어브레이크 윙 (세워 둠)
+      H.box(1.2, 0.14, 0.1, M.dark, 0, 0.4, -2.34);
+      H.box(W - 0.36, 0.3, 0.1, M.dark, 0, 0.62, 2.34);
+      [1, -1].forEach(sg => H.cyl(0.07, 0.1, M.tail, sg * 0.75, 0.8, 2.37, "z"));
+      [1, -1].forEach(sg => H.cyl(0.07, 0.3, M.chrome, sg * 0.18, 0.72, 2.42, "z"));
+      H.box(W - 0.3, 0.06, 0.55, M.body, 0, 1.28, 1.9, [-0.32, 0, 0]);
       [1, -1].forEach(sg => H.box(0.06, 0.32, 0.4, M.dark, sg * 0.5, 1.1, 2.0));
     }
   },
-  /* ── 포르쉐 911: 둥근 보닛, 지붕에서 꼬리까지 한 번에 흐르는 플라이라인, 둥근 헤드램프, 넓은 뒷 힙, 덕테일 ── */
   p911: {
     width: 1.88, wheelR: 0.44, archR: 0.5, wheelZ: 1.45, bottom: 0.34, mirrorY: 1.02, mirrorZ: -0.5,
     body: [[2.25, 0.42], [2.29, 0.64], { q: [2.28, 0.8, 2.02, 0.82] }, [1.05, 0.94], [0.36, 1.32], { q: [-0.1, 1.41, -0.55, 1.37] }, { c: [-1.05, 1.27, -1.45, 1.06, -1.9, 0.93] },
@@ -779,16 +723,16 @@ const CAR_MODELS = {
     cabin: [[0.5, 1.26], { q: [0.1, 1.4, -0.4, 1.38] }, { c: [-0.9, 1.32, -1.2, 1.15, -1.5, 1.02] }, [-1.5, 0.96], [-0.4, 1.2], [0.5, 1.18]], cabinInset: 0.26,
     extras(g, M, H) {
       const W = 1.88;
-      H.box(W - 0.5, 0.06, 0.9, M.body, 0, 1.43, 0.25);                                 // 지붕
-      [1, -1].forEach(sg => H.cyl(0.17, 0.16, M.lamp, sg * 0.66, 0.9, -2.14, "z"));    // 둥근 헤드램프 (펜더 위)
-      H.box(1.1, 0.12, 0.1, M.dark, 0, 0.5, -2.3);                                       // 앞 흡기
-      H.box(W + 0.14, 0.42, 1.4, M.body, 0, 0.7, 1.35);                                  // 넓은 뒷 힙
-      H.box(1.5, 0.05, 0.42, M.body, 0, 1.0, 1.95, [-0.22, 0, 0]);                       // 덕테일
-      for (let i = 0; i < 5; i++) H.box(1.0, 0.02, 0.05, M.dark, 0, 0.92 - i * 0.03, 1.3 + i * 0.13); // 엔진 그릴
-      H.box(W - 0.5, 0.07, 0.1, M.tail, 0, 0.84, 2.27);                                  // 가로 라이트바
+      H.box(W - 0.5, 0.06, 0.9, M.body, 0, 1.43, 0.25);
+      [1, -1].forEach(sg => H.cyl(0.17, 0.16, M.lamp, sg * 0.66, 0.9, -2.14, "z"));
+      H.box(1.1, 0.12, 0.1, M.dark, 0, 0.5, -2.3);
+      H.box(W + 0.14, 0.42, 1.4, M.body, 0, 0.7, 1.35);
+      H.box(1.5, 0.05, 0.42, M.body, 0, 1.0, 1.95, [-0.22, 0, 0]);
+      for (let i = 0; i < 5; i++) H.box(1.0, 0.02, 0.05, M.dark, 0, 0.92 - i * 0.03, 1.3 + i * 0.13);
+      H.box(W - 0.5, 0.07, 0.1, M.tail, 0, 0.84, 2.27);
       [1, -1].forEach(sg => H.box(0.34, 0.14, 0.1, M.tail, sg * 0.68, 0.8, 2.27));
-      H.box(W - 0.5, 0.1, 0.16, M.dark, 0, 0.44, 2.22);                                  // 디퓨저
-      [1, -1].forEach(sg => H.cyl(0.06, 0.22, M.chrome, sg * 0.32, 0.45, 2.3, "z"));    // 중앙 배기
+      H.box(W - 0.5, 0.1, 0.16, M.dark, 0, 0.44, 2.22);
+      [1, -1].forEach(sg => H.cyl(0.06, 0.22, M.chrome, sg * 0.32, 0.45, 2.3, "z"));
     }
   }
 };
@@ -811,34 +755,29 @@ function makeCar(color, modelKey) {
   }
   function extrude(pts, width, opts) {
     const geo = new THREE.ExtrudeGeometry(shapeOf(pts), Object.assign({ depth: width, bevelEnabled: true, bevelThickness: 0.06, bevelSize: 0.06, bevelSegments: 2, curveSegments: 10 }, opts || {}));
-    geo.translate(0, 0, -width / 2); geo.rotateY(Math.PI / 2);   // 앞(+x) → -z
+    geo.translate(0, 0, -width / 2); geo.rotateY(Math.PI / 2);
     return geo;
   }
   const H = {
     box(w, h, d, mat, x, y, z, rot) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); if (rot) m.rotation.set(rot[0], rot[1], rot[2]); g.add(m); return m; },
     cyl(r, len, mat, x, y, z, axis) { const geo = new THREE.CylinderGeometry(r, r, len, 12); if (axis === "z") geo.rotateX(Math.PI / 2); else if (axis === "x") geo.rotateZ(Math.PI / 2); const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); g.add(m); return m; }
   };
-  /* 몸체 + 외곽선 */
   const body = extrude(D.body, BW);
   g.add(new THREE.Mesh(body, M.body));
   const ol = new THREE.Mesh(body, outline); ol.scale.set(1.03, 1.05, 1.03); ol.position.y = -0.02; g.add(ol);
-  /* 유리 캐빈 (차폭보다 좁게) + 외곽선 */
   const cabin = extrude(D.cabin, BW - D.cabinInset, { bevelThickness: 0.03, bevelSize: 0.03 });
   const cabinMesh = new THREE.Mesh(cabin, M.glass); cabinMesh.position.y = 0.09; g.add(cabinMesh);
   const cabinOl = new THREE.Mesh(cabin, outline); cabinOl.scale.set(1.03, 1.04, 1.03); cabinOl.position.y = 0.08; g.add(cabinOl);
-  /* 사이드미러 */
   [1, -1].forEach(sg => H.box(0.22, 0.12, 0.18, M.body, sg * (BW / 2 + 0.1), D.mirrorY, D.mirrorZ));
-  /* 모델별 부품 */
   D.extras(g, M, H);
-  /* 바퀴: 타이어 + 림 + 5스포크 */
   const R = D.wheelR, tw = 0.44;
   const tireGeo = new THREE.CylinderGeometry(R, R, tw, 18); tireGeo.rotateZ(Math.PI / 2);
   const rimGeo = new THREE.CylinderGeometry(R * 0.66, R * 0.66, tw + 0.02, 18); rimGeo.rotateZ(Math.PI / 2);
   const spokeGeo = new THREE.BoxGeometry(tw + 0.04, R * 1.2, R * 0.16);
   const wheels = [];
   [[BW / 2 - 0.12, -D.wheelZ], [-(BW / 2 - 0.12), -D.wheelZ], [BW / 2 - 0.12, D.wheelZ], [-(BW / 2 - 0.12), D.wheelZ]].forEach(([x, z], k) => {
-    const pivot = new THREE.Group(); pivot.position.set(x, R, z);     // 조향(y축)
-    const w = new THREE.Group(); pivot.add(w);                          // 굴림(x축) — 피벗 안에 두어야 조향각이 흔들리지 않는다
+    const pivot = new THREE.Group(); pivot.position.set(x, R, z);
+    const w = new THREE.Group(); pivot.add(w);
     w.add(new THREE.Mesh(tireGeo, M.dark));
     const rim = new THREE.Mesh(rimGeo, M.dark); rim.scale.setScalar(0.98); w.add(rim);
     for (let i = 0; i < 5; i++) { const s = new THREE.Mesh(spokeGeo, M.rim); s.rotation.x = i * Math.PI / 5; w.add(s); }
@@ -853,7 +792,6 @@ function makeCar(color, modelKey) {
   return g;
 }
 let car = makeCar(CARS[carKey].color, CARS[carKey].model); scene.add(car);
-/* 차량 선택 카드의 회전 미리보기: 버튼마다 작은 렌더러·장면 */
 const carPreviews = [];
 document.querySelectorAll(".carbtn").forEach(b => {
   const key = b.getAttribute("data-car"), cv = b.querySelector("canvas");
@@ -872,9 +810,8 @@ function renderCarPreviews(dt) {
   carPreviews.forEach(p => { p.m.rotation.y += dt * 1.1; p.r.render(p.sc, p.cam); });
 }
 
-/* ═══════════════════ 게임 상태 ═══════════════════ */
 const P = { x: 0, z: 0, y: 0, h: 0, v: 0, ci: 0, prevCi: 0, lap: 0, expected: 0, off: false, wallT: 0, steerVis: 0 };
-let state = "menu";       // menu | countdown | race | done
+let state = "menu";
 let cdTime = 0, cdShown = -1, goTimer = 0, t0 = 0, elapsed = 0, finalMs = 0, doneTimer = 0, shake = 0, menuAng = 0;
 const keys = { up: false, down: false, left: false, right: false };
 const hud = $("hud"), overlay = $("overlay"), cardStart = $("cardStart"), cardDone = $("cardDone"), cardCar = $("cardCar");
@@ -882,9 +819,8 @@ const hudLap = $("hudLap"), hudTime = $("hudTime"), hudOff = $("hudOff"), speedB
 const countBox = $("count"), countNum = $("countNum"), mini = $("minimap"), mctx = mini.getContext("2d");
 const lapToast = $("lapToast"), lapToastMain = $("lapToastMain"), lapToastSub = $("lapToastSub"), hudBest = $("hudBest");
 const fx = $("fx"), fctx = fx.getContext("2d");
-let lapTimes = [], lapStartMs = 0, raceBest = 0;   // 이번 경기의 랩타임들 · 이번 경기 최고 랩 (경기마다 0부터)
+let lapTimes = [], lapStartMs = 0, raceBest = 0;
 function renderHudBest() { hudBest.textContent = raceBest > 0 ? fmtTime(raceBest) : "—"; }
-/* 랩 하나 끝남: 랩타임 기록, 최고 랩 갱신 여부 반환 */
 function closeLap() {
   const lt = Math.round(elapsed - lapStartMs); lapStartMs = elapsed; lapTimes.push(lt);
   const isNew = raceBest === 0 || lt < raceBest;
@@ -895,7 +831,7 @@ function closeLap() {
 function placeAt(i) {
   const s = S[i % N];
   P.x = s.p.x; P.z = s.p.z; P.y = s.p.y; P.v = 0; P.ci = i % N; P.prevCi = P.ci;
-  P.h = Math.atan2(-s.t.x, -s.t.z);        // 전방 = (-sinθ, 0, -cosθ) 가 접선과 같게
+  P.h = Math.atan2(-s.t.x, -s.t.z);
 }
 function resetCar() { placeAt(N - 14); P.off = false; P.wallT = 0; P.steerVis = 0; }
 function showCard(which) {
@@ -904,18 +840,18 @@ function showCard(which) {
   cardDone.style.display = which === "done" ? "" : "none";
   cardCar.style.display = which === "car" ? "" : "none";
 }
-function pickCourse(k) {                  // 코스 고른 뒤 차량 색 고르기 화면으로
+function pickCourse(k) {
   pendingDiff = k; $("carCourse").textContent = TRACKS[k].name + " 코스";
   document.querySelectorAll(".carbtn").forEach(b => b.classList.toggle("on", b.getAttribute("data-car") === carKey));
   showCard("car");
   renderGhostButtons(); if (!worldGhost.tried[k] || !worldGhostValid(k)) fetchWorldGhost(k);
 }
 function setHud(on) { hud.style.display = on ? "flex" : "none"; speedBox.style.display = on ? "block" : "none"; mini.style.display = on ? "block" : "none"; }
-function showLapToast(done, lt, isNew) {     // done = 방금 끝낸 바퀴 수, lt = 그 랩타임
+function showLapToast(done, lt, isNew) {
   const left = LAPS - done;
   lapToastMain.textContent = done + "바퀴 완료! " + fmtTime(lt);
   lapToastSub.textContent = (left === 1 ? "마지막 바퀴!" : "남은 " + left + "바퀴") + "  ·  이번 경기 최고 랩 " + fmtTime(raceBest) + (isNew && lapTimes.length > 1 ? " NEW" : "");
-  lapToast.className = ""; void lapToast.offsetWidth;   // 애니메이션 다시 시작
+  lapToast.className = ""; void lapToast.offsetWidth;
   lapToast.className = "show";
 }
 
@@ -932,14 +868,17 @@ function startRace(which) {
   engineStart();
   snapCamera();
 }
-function recover() {                      // 가장 가까운 트랙 지점으로 복귀 (진행도는 그대로)
+function recover() {
   if (state !== "race") return;
   placeAt(P.ci); P.off = false; shake = 0;
+}
+function loadRecords() {
+  DIFFS.forEach(k => { const WR = WRS[k]; if (WR) WR.load().then(() => { wrTried[k] = true; renderRecords(); }); });
 }
 function showMenu() {
   state = "menu"; setHud(false); fctx.clearRect(0, 0, fx.width, fx.height); countBox.style.display = "none"; lapToast.className = ""; showCard("start");
   engineUpdate(0, false); renderRecords();
-  DIFFS.forEach(k => { if (WRS[k]) WRS[k].load(); });
+  loadRecords();
 }
 function finish() {
   state = "done"; finalMs = Math.round(elapsed); doneTimer = 0;
@@ -962,7 +901,7 @@ function finish() {
   renderRecords();
   $("bestDoneNew").innerHTML = isBest ? '<span class="new">NEW</span> 개인 신기록 갱신!' : "";
   const wrBeat = WR && WR.beats(finalMs);
-  const crBeat = WR && WR.beatsClass(finalMs);   /* 우리 반 신기록(반별 링크일 때만) */
+  const crBeat = WR && WR.beatsClass(finalMs);
   $("finalMsg").textContent = (wrBeat ? "🏆 세계 신기록입니다!" : crBeat ? "🏫 우리 반 신기록입니다!" : (isBest ? "개인 신기록입니다!" : "완주를 축하합니다!")) + ghostNote;
   setTimeout(() => {
     if (state !== "done") return;
@@ -971,7 +910,6 @@ function finish() {
   }, 1300);
 }
 
-/* ═══════════════════ 물리 ═══════════════════ */
 function nearestIndex() {
   let bi = P.ci, bd = Infinity;
   for (let k = -40; k <= 40; k++) {
@@ -986,17 +924,15 @@ function updateCar(dt) {
   const str = racing ? ((keys.left ? 1 : 0) - (keys.right ? 1 : 0)) : 0;
   const maxV = P.off ? CFG.offroadMax : CFG.maxSpeed;
   const fx0 = -Math.sin(P.h), fz0 = -Math.cos(P.h);
-  /* 진행 방향의 경사: 도로 앞뒤 샘플의 높이차 × (차 방향·도로 방향 일치도) */
   const sA = S[(P.ci + 5) % N], sB = S[(P.ci + N - 5) % N], s0 = S[P.ci];
-  const slope = Math.atan2(sA.p.y - sB.p.y, SEG * 10) * (fx0 * s0.t.x + fz0 * s0.t.z);   // +: 오르막
+  const slope = Math.atan2(sA.p.y - sB.p.y, SEG * 10) * (fx0 * s0.t.x + fz0 * s0.t.z);
 
-  /* 가속·브레이크·후진 — 엔진 힘에서 공기저항(속도² 비례, 평지 최고속도에서 균형)·경사·코너 손실을 뺀다 */
   const ratio0 = Math.abs(P.v) / CFG.maxSpeed;
   if (thr > 0) P.v += CFG.accel * (1 - ratio0 * ratio0) * dt;
   else if (thr < 0) { if (P.v > 0.5) P.v -= CFG.brake * dt; else P.v -= CFG.accel * 0.6 * dt; }
   else P.v -= P.v * CFG.coastDrag * dt;
-  P.v -= CFG.gravity * Math.sin(slope) * dt;                                   // 오르막 감속·내리막 가속
-  if (thr <= 0 && P.v > 0) P.v -= CFG.accel * ratio0 * ratio0 * dt;             // 가속 안 할 때도 공기저항은 받음
+  P.v -= CFG.gravity * Math.sin(slope) * dt;
+  if (thr <= 0 && P.v > 0) P.v -= CFG.accel * ratio0 * ratio0 * dt;
   if (state === "done") P.v -= P.v * 1.5 * dt;
   if (P.off) { P.v -= P.v * CFG.offroadDrag * dt; }
   const capV = maxV * (slope < 0 ? CFG.downhillMax : 1);
@@ -1004,22 +940,19 @@ function updateCar(dt) {
   if (P.v < -CFG.reverseMax) P.v = -CFG.reverseMax;
   if (Math.abs(P.v) < 0.02 && thr === 0) P.v = 0;
 
-  /* 조향 (속도에 비례, 고속에서는 둔하게) */
   const ratio = Math.abs(P.v) / CFG.maxSpeed;
   const gain = Math.min(1, ratio / CFG.steerFullAt) * (1 - (1 - CFG.steerHighSpeed) * ratio);
   const turn = str * CFG.steerRate * gain;
   P.h += turn * dt * (P.v >= 0 ? 1 : -1);
-  P.v -= CFG.cornerDrag * Math.abs(turn) * P.v * dt;                            // 코너를 돌수록 속도를 잃는다
+  P.v -= CFG.cornerDrag * Math.abs(turn) * P.v * dt;
   P.steerVis += (str * 0.45 - P.steerVis) * Math.min(1, dt * 10);
 
-  /* 이동 */
   const fx = -Math.sin(P.h), fz = -Math.cos(P.h);
   P.x += fx * P.v * dt; P.z += fz * P.v * dt;
 
-  /* 트랙 기준 위치: 가장 가까운 샘플, 옆으로 벗어난 거리 */
   P.prevCi = P.ci; P.ci = nearestIndex();
   const s = S[P.ci], dxs = P.x - s.p.x, dzs = P.z - s.p.z;
-  const lat = dxs * s.n.x + dzs * s.n.z;                       // 왼쪽(+)/오른쪽(-) 거리
+  const lat = dxs * s.n.x + dzs * s.n.z;
   const along = dxs * s.t.x + dzs * s.t.z;
   const s2 = S[(P.ci + (along >= 0 ? 1 : N - 1)) % N];
   const frac = Math.min(1, Math.abs(along) / SEG);
@@ -1027,14 +960,13 @@ function updateCar(dt) {
   P.off = Math.abs(lat) > W / 2 + 0.8;
   const limit = W / 2 + SH - 1.0;
   P.wallT = Math.max(0, P.wallT - dt);
-  if (Math.abs(lat) > limit) {                                   // 울타리 충돌 → 안으로 밀어 넣고 감속
+  if (Math.abs(lat) > limit) {
     const sg = lat > 0 ? 1 : -1;
     P.x = s.p.x + s.n.x * limit * sg + s.t.x * along; P.z = s.p.z + s.n.z * limit * sg + s.t.z * along;
     if (P.wallT === 0 && Math.abs(P.v) > 6) { P.v *= CFG.wallKeep; beep(80, 0.18, "square", 0.12); shake = 0.35; }
     P.wallT = 0.4;
   }
 
-  /* 바퀴 판정: 4구간을 순서대로 지나고 결승선을 앞으로 통과해야 1바퀴 */
   if (racing) {
     const sec = Math.floor(P.ci * 4 / N);
     const fwdCross = P.prevCi > N * 0.9 && P.ci < N * 0.1, backCross = P.prevCi < N * 0.1 && P.ci > N * 0.9;
@@ -1047,7 +979,6 @@ function updateCar(dt) {
     } else if (backCross) P.expected = 0;
   }
 
-  /* 메시 배치 */
   car.position.set(P.x, P.y, P.z);
   car.rotation.y = P.h;
   const i1 = (P.ci + 5) % N, i0 = (P.ci + N - 5) % N;
@@ -1056,7 +987,6 @@ function updateCar(dt) {
   car.userData.wheels.forEach(w => { w.spin.rotation.x += P.v * dt / car.userData.wheelR; if (w.front) w.g.rotation.y = P.steerVis; });
 }
 
-/* ═══════════════════ 카메라 ═══════════════════ */
 const camTarget = new THREE.Vector3(), camLook = new THREE.Vector3();
 function snapCamera() {
   const fx = -Math.sin(P.h), fz = -Math.cos(P.h);
@@ -1071,18 +1001,16 @@ function updateCamera(dt) {
   }
   const fx = -Math.sin(P.h), fz = -Math.cos(P.h);
   const r = Math.min(1, Math.abs(P.v) / CFG.maxSpeed);
-  const back = CFG.camBack - r * 0.8, up = CFG.camUp - r * 0.8;      // 빠를수록 낮고 바짝 붙어서
+  const back = CFG.camBack - r * 0.8, up = CFG.camUp - r * 0.8;
   camTarget.set(P.x - fx * back, P.y + up, P.z - fz * back);
   camera.position.lerp(camTarget, 1 - Math.exp(-CFG.camLerp * dt));
   if (shake > 0) { shake -= dt; camera.position.x += rnd(-0.3, 0.3) * shake * 3; camera.position.y += rnd(-0.3, 0.3) * shake * 3; }
-  if (r > 0.85 && state === "race") { const j = (r - 0.85) * 0.5; camera.position.x += rnd(-j, j); camera.position.y += rnd(-j, j); }   // 고속 진동
+  if (r > 0.85 && state === "race") { const j = (r - 0.85) * 0.5; camera.position.x += rnd(-j, j); camera.position.y += rnd(-j, j); }
   camLook.set(P.x + fx * (4 + r * 8), P.y + 1.2, P.z + fz * (4 + r * 8));
   camera.lookAt(camLook);
   camera.fov = CFG.fovBase + r * r * CFG.fovBoost; camera.updateProjectionMatrix();
 }
 
-/* ═══════════════════ 미니맵 ═══════════════════ */
-/* 속도선: 빠를수록 화면 가장자리에서 가운데로 흰 줄이 흐른다 */
 function drawSpeedLines(ratio) {
   const w = fx.width, h = fx.height;
   fctx.clearRect(0, 0, w, h);
@@ -1113,7 +1041,10 @@ function drawMinimap() {
   mctx.beginPath(); mctx.arc(cx, cz, 8, 0, Math.PI * 2); mctx.fill(); mctx.stroke();
 }
 
-/* ═══════════════════ 메인 루프 ═══════════════════ */
+function setText(el, text) {
+  if (el.textContent !== text) el.textContent = text;
+}
+
 let last = performance.now();
 function frame(now) { requestAnimationFrame(frame); tick(now); }
 function tick(now) {
@@ -1142,9 +1073,9 @@ function tick(now) {
 
   if (state !== "menu") {
     hudTime.firstChild.nodeValue = fmtTime(state === "done" ? finalMs : elapsed);
-    hudLap.textContent = Math.min(LAPS, P.lap + 1) + " / " + LAPS;
-    hudOff.textContent = P.off ? "오프로드 — 감속 중" : "";
-    speedVal.textContent = Math.round(Math.abs(P.v) * CFG.kmh);
+    setText(hudLap, Math.min(LAPS, P.lap + 1) + " / " + LAPS);
+    setText(hudOff, P.off ? "오프로드 — 감속 중" : "");
+    setText(speedVal, String(Math.round(Math.abs(P.v) * CFG.kmh)));
     drawMinimap();
     drawSpeedLines(Math.abs(P.v) / CFG.maxSpeed);
   }
@@ -1157,7 +1088,6 @@ function resize() {
 }
 window.addEventListener("resize", resize); resize();
 
-/* ═══════════════════ 입력 (방향키는 e.key, WASD 는 한글 IME 대비 e.code) ═══════════════════ */
 function onKey(e, down) {
   let k = null;
   if (e.key === "ArrowUp" || e.code === "KeyW") k = "up";
@@ -1168,7 +1098,7 @@ function onKey(e, down) {
   if (!down) return;
   if (e.code === "KeyR" && state !== "menu") startRace();
   else if (e.code === "KeyT") recover();
-  else if (e.code === "Space") {                                              // 스페이스바 = 시작하기(차량 선택 카드) / 다시 하기(완주 카드)
+  else if (e.code === "Space") {
     e.preventDefault();
     if (state === "done") startRace();
     else if (state === "menu" && cardCar.style.display !== "none") startRace(pendingDiff);
@@ -1203,10 +1133,9 @@ $("btnMenu").onclick = e => { e.currentTarget.blur(); showMenu(); };
 $("btnReset").onclick = e => { e.currentTarget.blur(); startRace(); };
 $("btnRecover").onclick = e => { e.currentTarget.blur(); recover(); };
 
-/* 콘솔 디버그용 */
 window.TL = { keys, P, CFG, camera, scene, renderer, tick, makeCar, CARS, get S() { return S; }, setTrack: k => { diff = k; buildTrack(TRACKS[k]); resetCar(); } };
+DIFFS.forEach(k => { if (WRS[k]) WRS[k].onChange(renderRecords); });
 buildTrack(TRACKS[diff]); resetCar(); updateCar(0); showMenu();
-DIFFS.forEach(k => { const WR = WRS[k]; if (WR) { WR.onChange(renderRecords); WR.load().then(() => { wrTried[k] = true; renderRecords(); }); } });
 requestAnimationFrame(frame);
 })();
 </script>
