@@ -6,7 +6,6 @@
 <meta charset="utf-8">
 <link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
 <title>코딩 미로</title>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
@@ -15,49 +14,47 @@
 <meta property="og:url" content="https://cornsilktea.github.io/4.function.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
-<!-- 링크 미리보기 끝 -->
 <style>
-:root{--bd:var(--sg-line-mid);--fg:var(--sg-ink);--sub:var(--sg-ink-soft);--pri:var(--sg-primary);--bg:var(--sg-bg);}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);
+body{margin:0;background:var(--sg-bg);color:var(--sg-ink);
  font-family:var(--sg-font);}
-header{background:#fff;border-bottom:1px solid var(--bd);padding:10px 16px;}
+header{background:#fff;border-bottom:1px solid var(--sg-line-mid);padding:10px 16px;}
 h1{font-size:18px;margin:0 0 8px;}
 #stagebar{display:flex;flex-wrap:wrap;gap:6px;}
-#stagebar button{width:40px;height:34px;border:1px solid var(--bd);background:#fff;
- border-radius:var(--sg-radius);font-size:14px;font-weight:600;cursor:pointer;color:var(--sub);}
-#stagebar button.on{background:var(--pri);border-color:var(--pri);color:#fff;}
+#stagebar button{width:40px;height:34px;border:1px solid var(--sg-line-mid);background:#fff;
+ border-radius:var(--sg-radius);font-size:14px;font-weight:600;cursor:pointer;color:var(--sg-ink-soft);}
+#stagebar button.on{background:var(--sg-primary);border-color:var(--sg-primary);color:#fff;}
 #stagebar button.clear{border-color:var(--sg-ok);color:var(--sg-ok);}
 #stagebar button.on.clear{background:var(--sg-ok);border-color:var(--sg-ok);color:#fff;}
 main{display:flex;gap:14px;padding:14px;align-items:flex-start;flex-wrap:wrap;}
-.panel{background:#fff;border:1px solid var(--bd);border-radius:var(--sg-radius);padding:12px;}
+.panel{background:#fff;border:1px solid var(--sg-line-mid);border-radius:var(--sg-radius);padding:12px;}
 #left{flex:1 1 420px;min-width:340px;}
 #right{flex:1 1 340px;min-width:300px;}
 #title{font-size:16px;font-weight:700;margin-bottom:4px;}
-#hint{font-size:13px;color:var(--sub);line-height:1.5;margin-bottom:10px;}
+#hint{font-size:13px;color:var(--sg-ink-soft);line-height:1.5;margin-bottom:10px;}
 canvas{display:block;background:var(--sg-panel);border:2px solid var(--sg-line-strong);border-radius:var(--sg-radius);margin:0 auto;}
 #msg{margin-top:10px;font-size:14px;min-height:22px;line-height:1.5;font-weight:600;}
 .ok{color:var(--sg-ok)}.bad{color:var(--sg-danger)}.warn{color:var(--sg-warn)}
-#counter{font-size:13px;color:var(--sub);margin-bottom:8px;}
-#counter b{color:var(--fg);font-size:15px;}
+#counter{font-size:13px;color:var(--sg-ink-soft);margin-bottom:8px;}
+#counter b{color:var(--sg-ink);font-size:15px;}
 .tabs{display:flex;gap:6px;margin-bottom:8px;}
-.tabs button{flex:1;padding:7px;border:1px solid var(--bd);background:#fff;border-radius:var(--sg-radius);
- font-size:13px;font-weight:600;cursor:pointer;color:var(--sub);}
-.tabs button.on{background:var(--sg-primary-soft);border-color:var(--pri);color:var(--pri);}
+.tabs button{flex:1;padding:7px;border:1px solid var(--sg-line-mid);background:#fff;border-radius:var(--sg-radius);
+ font-size:13px;font-weight:600;cursor:pointer;color:var(--sg-ink-soft);}
+.tabs button.on{background:var(--sg-primary-soft);border-color:var(--sg-primary);color:var(--sg-primary);}
 .pal{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
-.pal button{padding:8px 11px;border:1px solid var(--bd);background:#fff;border-radius:var(--sg-radius);
+.pal button{padding:8px 11px;border:1px solid var(--sg-line-mid);background:#fff;border-radius:var(--sg-radius);
  font-size:13px;font-weight:600;cursor:pointer;}
 .pal button:hover{background:var(--sg-bg);}
 .pal .go{border-color:var(--sg-primary);color:var(--sg-primary);}
 .pal .turn{border-color:#7c3aed;color:#7c3aed;}
 .pal .rep{border-color:var(--sg-warn);color:var(--sg-warn);}
 .pal .fn{border-color:#0d9488;color:#0d9488;}
-.pal input{width:52px;padding:6px;border:1px solid var(--bd);border-radius:var(--sg-radius);text-align:right;}
-#code,#fcode{border:1px solid var(--bd);border-radius:var(--sg-radius);padding:8px;min-height:120px;
+.pal input{width:52px;padding:6px;border:1px solid var(--sg-line-mid);border-radius:var(--sg-radius);text-align:right;}
+#code,#fcode{border:1px solid var(--sg-line-mid);border-radius:var(--sg-radius);padding:8px;min-height:120px;
  max-height:300px;overflow:auto;background:var(--sg-panel);}
 .list{padding-left:0;}
-.list.active{outline:2px dashed var(--pri);outline-offset:2px;border-radius:var(--sg-radius);min-height:22px;}
-.blk{border:1px solid var(--bd);border-radius:var(--sg-radius);padding:5px 8px;margin:3px 0;font-size:13px;
+.list.active{outline:2px dashed var(--sg-primary);outline-offset:2px;border-radius:var(--sg-radius);min-height:22px;}
+.blk{border:1px solid var(--sg-line-mid);border-radius:var(--sg-radius);padding:5px 8px;margin:3px 0;font-size:13px;
  background:#fff;font-weight:600;}
 .b-M{border-left:4px solid var(--sg-primary);}
 .b-L,.b-R{border-left:4px solid #7c3aed;}
@@ -69,9 +66,9 @@ canvas{display:block;background:var(--sg-panel);border:2px solid var(--sg-line-s
 #runbar{display:flex;gap:6px;margin-top:10px;align-items:center;flex-wrap:wrap;}
 #runbar button{padding:9px 14px;border-radius:var(--sg-radius);font-size:14px;font-weight:700;cursor:pointer;
  border:1.5px solid var(--sg-line-strong);background:#fff;}
-#runbar button#run{background:var(--pri);border-color:var(--pri);color:#fff;}
-#runbar select{padding:7px;border:1px solid var(--bd);border-radius:var(--sg-radius);}
-.note{font-size:12px;color:var(--sub);margin-top:8px;line-height:1.5;}
+#runbar button#run{background:var(--sg-primary);border-color:var(--sg-primary);color:#fff;}
+#runbar select{padding:7px;border:1px solid var(--sg-line-mid);border-radius:var(--sg-radius);}
+.note{font-size:12px;color:var(--sg-ink-soft);margin-top:8px;line-height:1.5;}
 </style>
 </head>
 <body>
@@ -121,66 +118,72 @@ canvas{display:block;background:var(--sg-panel);border:2px solid var(--sg-line-s
   </section>
 </main>
 <script>
+(function(){
 var STAGES = [{"name": "1단계 · 첫 걸음", "hint": "앞으로 가기 버튼만 눌러 도착 깃발까지 가 보세요.", "grid": ["#########", "#S.....G#", "#########"], "dir": "E", "limit": 8, "best": 6, "func": false}, {"name": "2단계 · 블록이 모자라요", "hint": "앞으로 15칸! 그런데 블록은 5개뿐입니다. 반복 블록을 써 보세요.", "grid": ["##################", "#S..............G#", "##################"], "dir": "E", "limit": 5, "best": 2, "func": false}, {"name": "3단계 · 모퉁이 돌기", "hint": "직진 구간마다 반복 블록으로 묶어 보세요.", "grid": ["##########", "#S.......#", "########.#", "########.#", "########.#", "########.#", "########G#", "##########"], "dir": "E", "limit": 7, "best": 5, "func": false}, {"name": "4단계 · 계단 오르기", "hint": "앞으로-왼쪽-앞으로-오른쪽. 이 네 개가 계속 되풀이됩니다.", "grid": ["########", "######G#", "#####..#", "####..##", "###..###", "##..####", "#S.#####", "########"], "dir": "E", "limit": 7, "best": 5, "func": false}, {"name": "5단계 · 반복 속의 반복", "hint": "반복 블록 안에 반복 블록을 넣을 수 있어요.", "grid": ["###############", "#############G#", "#############.#", "###########...#", "###########.###", "#########...###", "#########.#####", "#######...#####", "#######.#######", "#####...#######", "#####.#########", "###...#########", "###.###########", "#S..###########", "###############"], "dir": "E", "limit": 8, "best": 7, "func": false}, {"name": "6단계 · 별을 모두 모아라", "hint": "별을 하나도 빠짐없이 지나간 뒤 도착해야 성공입니다.", "grid": ["########", "#S.*...#", "#G####.#", "#.####*#", "#*####.#", "#.####.#", "#...*..#", "########"], "dir": "E", "limit": 7, "best": 6, "func": false}, {"name": "7단계 · 똑같은 동작에 이름 붙이기", "hint": "같은 계단 동작이 네 번 나오는데 사이 간격이 제각각입니다. 나만의 블록을 만들어 보세요.", "grid": ["#############", "###########G#", "#######.....#", "#####...#####", "##....#######", "#S.##########", "#############"], "dir": "E", "limit": 15, "best": 13, "func": true}, {"name": "8단계 · 블록 속의 블록", "hint": "나만의 블록 안에도 반복 블록을 넣을 수 있어요.", "grid": ["#############", "###########G#", "###########.#", "######......#", "######.######", "###....######", "###.#########", "#S..#########", "#############"], "dir": "E", "limit": 14, "best": 12, "func": true}, {"name": "9단계 · 밭갈이", "hint": "좌우로 왔다 갔다 하는 큰 규칙 하나가 숨어 있습니다.", "grid": ["########", "#S.....#", "######.#", "#....*.#", "#.######", "#......#", "######.#", "#.....*#", "#.######", "#.....*#", "######.#", "#......#", "#.######", "#G######", "########"], "dir": "E", "limit": 14, "best": 13, "func": false}, {"name": "10단계 · 마지막 관문", "hint": "반복 블록과 나만의 블록을 함께 써야 통과할 수 있습니다.", "grid": ["##############", "############G#", "############.#", "######*....*.#", "######.#######", "###*...#######", "###.##########", "#S..##########", "##############"], "dir": "E", "limit": 13, "best": 12, "func": true}];
 var DIRS={E:[0,1],S:[1,0],W:[0,-1],N:[-1,0]};
 var RIGHT={E:'S',S:'W',W:'N',N:'E'};
 var LEFT={E:'N',N:'W',W:'S',S:'E'};
 var LABEL={M:'앞으로 가기',L:'왼쪽 돌기',R:'오른쪽 돌기',CALL:'나만의 블록'};
+var CLEARED_KEY='rmz10';
+var FONT_FAMILY='"Nanum Gothic", "Malgun Gothic", sans-serif';
 
-var idx=0, st=null, grid=[], startPos=null, goalPos=null, allStars=[];
+function byId(id){ return document.getElementById(id); }
+var ui={
+  stagebar:byId('stagebar'), title:byId('title'), hint:byId('hint'), record:byId('record'),
+  msg:byId('msg'), counter:byId('counter'), tabs:byId('tabs'), tabMain:byId('tabMain'), tabFunc:byId('tabFunc'),
+  repN:byId('repN'), callbtn:byId('callbtn'), code:byId('code'), fwrap:byId('fwrap'), fcode:byId('fcode'), speed:byId('speed')
+};
+
+var idx=0, st=null, grid=[], startPos=null, goalPos=null, stars=[];
 var robot={r:0,c:0,d:'E'}, got={}, running=false;
 var prog={main:[],func:[]}, target='main', cursor=[];
-var cv=document.getElementById('cv'), cx=cv.getContext('2d');
+var cv=byId('cv'), cx=cv.getContext('2d');
 
 function cleared(){
-  try{ return JSON.parse(localStorage.getItem('rmz10')||'{}'); }catch(e){ return {}; }
+  try{ return JSON.parse(localStorage.getItem(CLEARED_KEY)||'{}'); }catch(e){ return {}; }
 }
 function markClear(i,used){
   var c=cleared();
   if(!c[i] || used<c[i]) c[i]=used;
-  try{ localStorage.setItem('rmz10', JSON.stringify(c)); }catch(e){}
+  try{ localStorage.setItem(CLEARED_KEY, JSON.stringify(c)); }catch(e){}
 }
 function renderRecord(){
-  var box=document.getElementById('record');
-  if(!box) return;
   var mine=cleared()[idx];
-  box.textContent = mine
+  ui.record.textContent = mine
     ? '역대 최고 기록: 블록 ' + mine + '개 (최소 ' + st.best + '개)'
     : '역대 최고 기록: 아직 없음 (최소 ' + st.best + '개로 통과할 수 있어요)';
 }
 
 function buildBar(){
-  var bar=document.getElementById('stagebar'); bar.innerHTML='';
+  ui.stagebar.innerHTML='';
   var c=cleared();
-  for(var i=0;i<STAGES.length;i++){
-    (function(i){
-      var b=document.createElement('button');
-      b.textContent=(i+1);
-      if(i===idx) b.className='on';
-      if(c[i]) b.className+=' clear';
-      b.onclick=function(){ load(i); };
-      bar.appendChild(b);
-    })(i);
-  }
+  STAGES.forEach(function(stage,i){
+    var b=document.createElement('button');
+    b.textContent=(i+1);
+    if(i===idx) b.className='on';
+    if(c[i]) b.className+=' clear';
+    b.onclick=function(){ load(i); };
+    ui.stagebar.appendChild(b);
+  });
 }
 
 function load(i){
   idx=i; st=STAGES[i];
   grid=st.grid.map(function(r){ return r.split(''); });
-  allStars=[];
+  stars=[];
   for(var r=0;r<grid.length;r++){
     for(var c=0;c<grid[r].length;c++){
       if(grid[r][c]==='S') startPos={r:r,c:c};
       if(grid[r][c]==='G') goalPos={r:r,c:c};
-      if(grid[r][c]==='*') allStars.push(r+','+c);
+      if(grid[r][c]==='*') stars.push({r:r,c:c,key:r+','+c});
     }
   }
   prog={main:[],func:[]}; target='main'; cursor=[];
-  document.getElementById('title').textContent=st.name;
-  document.getElementById('hint').textContent=st.hint;
-  document.getElementById('tabs').style.display = st.func?'flex':'none';
-  document.getElementById('fwrap').style.display = st.func?'block':'none';
-  document.getElementById('callbtn').style.display = st.func?'inline-block':'none';
+  ui.title.textContent=st.name;
+  ui.hint.textContent=st.hint;
+  ui.tabs.style.display = st.func?'flex':'none';
+  ui.fwrap.style.display = st.func?'block':'none';
+  ui.callbtn.style.display = st.func?'inline-block':'none';
   setMsg('','');
   renderRecord();
   resetRobot(); buildBar(); render();
@@ -190,34 +193,33 @@ function resetRobot(){
   robot={r:startPos.r,c:startPos.c,d:st.dir}; got={};
 }
 function setMsg(t,cls){
-  var m=document.getElementById('msg'); m.textContent=t; m.className=cls||'';
+  ui.msg.textContent=t; ui.msg.className=cls||'';
 }
+function collectedCount(){ return Object.keys(got).length; }
 
-/* ---------- 그리기 ---------- */
 function draw(){
   var H=grid.length, W=grid[0].length;
-  var cell=Math.floor(Math.min(500/W, 400/H));
-  if(cell<18) cell=18;
-  cv.width=W*cell; cv.height=H*cell;
+  var cell=Math.max(18, Math.floor(Math.min(500/W, 400/H)));
+  if(cv.width!==W*cell) cv.width=W*cell;
+  if(cv.height!==H*cell) cv.height=H*cell;
   for(var r=0;r<H;r++){
     for(var c=0;c<W;c++){
-      var ch=grid[r][c];
-      cx.fillStyle=(ch==='#')?'#5B6B5E':'#ffffff';
+      var wall=grid[r][c]==='#';
+      cx.fillStyle=wall?'#5B6B5E':'#ffffff';
       cx.fillRect(c*cell,r*cell,cell,cell);
-      cx.strokeStyle=(ch==='#')?'#5B6B5E':'#E4E8DE';
+      cx.strokeStyle=wall?'#5B6B5E':'#E4E8DE';
       cx.strokeRect(c*cell+0.5,r*cell+0.5,cell-1,cell-1);
     }
   }
   cx.textAlign='center'; cx.textBaseline='middle';
-  for(var i=0;i<allStars.length;i++){
-    var p=allStars[i].split(','), sr=+p[0], sc=+p[1];
-    cx.fillStyle = got[allStars[i]] ? '#C9D2C3' : '#f59e0b';
-    cx.font='bold '+Math.floor(cell*0.62)+'px "Nanum Gothic", "Malgun Gothic", sans-serif';
-    cx.fillText('★', sc*cell+cell/2, sr*cell+cell/2+1);
-  }
+  cx.font='bold '+Math.floor(cell*0.62)+'px '+FONT_FAMILY;
+  stars.forEach(function(s){
+    cx.fillStyle = got[s.key] ? '#C9D2C3' : '#f59e0b';
+    cx.fillText('★', s.c*cell+cell/2, s.r*cell+cell/2+1);
+  });
   cx.fillStyle='#2F7D4F';
   cx.fillRect(goalPos.c*cell+cell*0.2, goalPos.r*cell+cell*0.2, cell*0.6, cell*0.6);
-  cx.fillStyle='#fff'; cx.font='bold '+Math.floor(cell*0.4)+'px "Nanum Gothic", "Malgun Gothic", sans-serif';
+  cx.fillStyle='#fff'; cx.font='bold '+Math.floor(cell*0.4)+'px '+FONT_FAMILY;
   cx.fillText('G', goalPos.c*cell+cell/2, goalPos.r*cell+cell/2+1);
   var x=robot.c*cell+cell/2, y=robot.r*cell+cell/2;
   cx.fillStyle='#B33951';
@@ -231,7 +233,6 @@ function draw(){
   cx.fill();
 }
 
-/* ---------- 블록 편집 ---------- */
 function root(){ return target==='main'?prog.main:prog.func; }
 function container(){
   var a=root();
@@ -259,7 +260,7 @@ function addBlock(t){
   }
   var c=container();
   if(t==='REP'){
-    var n=parseInt(document.getElementById('repN').value,10);
+    var n=parseInt(ui.repN.value,10);
     if(!(n>=2)) n=2;
     if(n>20) n=20;
     c.push({t:'REP',n:n,body:[]});
@@ -271,14 +272,14 @@ function addBlock(t){
   render();
 }
 function endRep(){
-  if(cursor.length>0){ cursor=cursor.slice(0,cursor.length-1); render(); }
+  if(cursor.length>0){ cursor=cursor.slice(0,-1); render(); }
 }
 function undo(){
   if(running) return;
   var c=container();
   if(c.length>0){ c.pop(); }
   else if(cursor.length>0){
-    cursor=cursor.slice(0,cursor.length-1);
+    cursor=cursor.slice(0,-1);
     container().pop();
   }
   setMsg('','');
@@ -292,10 +293,8 @@ function clearAll(){
 }
 
 function renderList(list, path, wrap){
-  wrap.className='list';
-  var isHere = (path.join(',')===cursor.join(',')) &&
-               ((path.length===0 ? true : true));
-  if(isHere && wrap.dataset.target===target) wrap.className='list active';
+  var isCursorHere = path.join(',')===cursor.join(',') && wrap.dataset.target===target;
+  wrap.className = isCursorHere ? 'list active' : 'list';
   if(list.length===0){
     var e=document.createElement('div');
     e.className='empty'; e.textContent='(블록을 추가해 보세요)';
@@ -326,31 +325,24 @@ function renderList(list, path, wrap){
   }
 }
 
-function render(){
-  draw();
-  document.getElementById('tabMain').className = (target==='main')?'on':'';
-  document.getElementById('tabFunc').className = (target==='func')?'on':'';
-  var codeEl=document.getElementById('code');
-  codeEl.innerHTML='';
-  var w1=document.createElement('div');
-  w1.dataset.target='main';
-  renderList(prog.main, [], w1);
-  codeEl.appendChild(w1);
-  if(st.func){
-    var fEl=document.getElementById('fcode');
-    fEl.innerHTML='';
-    var w2=document.createElement('div');
-    w2.dataset.target='func';
-    renderList(prog.func, [], w2);
-    fEl.appendChild(w2);
-  }
-  var used=total();
-  var starTxt = allStars.length? ' · 별 '+Object.keys(got).length+'/'+allStars.length : '';
-  document.getElementById('counter').innerHTML =
-    '사용한 블록 <b>'+used+'</b> / 최대 '+st.limit+'개'+starTxt;
+function renderProgram(host, list, name){
+  host.innerHTML='';
+  var wrap=document.createElement('div');
+  wrap.dataset.target=name;
+  renderList(list, [], wrap);
+  host.appendChild(wrap);
 }
 
-/* ---------- 실행 ---------- */
+function render(){
+  draw();
+  ui.tabMain.className = (target==='main')?'on':'';
+  ui.tabFunc.className = (target==='func')?'on':'';
+  renderProgram(ui.code, prog.main, 'main');
+  if(st.func) renderProgram(ui.fcode, prog.func, 'func');
+  var starTxt = stars.length? ' · 별 '+collectedCount()+'/'+stars.length : '';
+  ui.counter.innerHTML = '사용한 블록 <b>'+total()+'</b> / 최대 '+st.limit+'개'+starTxt;
+}
+
 function expandList(list, out){
   for(var i=0;i<list.length;i++){
     if(out.length>4000) return;
@@ -366,17 +358,16 @@ function expandList(list, out){
 function run(){
   if(running) return;
   if(prog.main.length===0){ setMsg('먼저 블록을 놓아 주세요.','warn'); return; }
-  var raw=[]; expandList(prog.main, raw);
+  var commands=[]; expandList(prog.main, commands);
   var used=total();
   resetRobot(); render();
   running=true; setMsg('로봇이 움직입니다...','');
   var i=0;
-  var speed=parseInt(document.getElementById('speed').value,10);
   var timer=setInterval(function(){
-    if(i>=raw.length){
+    if(i>=commands.length){
       clearInterval(timer); running=false; finish(used); return;
     }
-    var cmd=raw[i++];
+    var cmd=commands[i++];
     if(cmd==='L'){ robot.d=LEFT[robot.d]; }
     else if(cmd==='R'){ robot.d=RIGHT[robot.d]; }
     else {
@@ -388,16 +379,15 @@ function run(){
         return;
       }
       robot.r=nr; robot.c=nc;
-      var key=nr+','+nc;
-      if(allStars.indexOf(key)>=0) got[key]=true;
+      if(grid[nr][nc]==='*') got[nr+','+nc]=true;
     }
     render();
-  }, speed);
+  }, parseInt(ui.speed.value,10));
 }
 
 function finish(used){
   var atGoal = (robot.r===goalPos.r && robot.c===goalPos.c);
-  var allGot = (Object.keys(got).length===allStars.length);
+  var allGot = (collectedCount()===stars.length);
   if(atGoal && allGot){
     markClear(idx, used); buildBar(); renderRecord();
     if(used>st.best){
@@ -405,27 +395,26 @@ function finish(used){
     } else {
       setMsg('완벽합니다! 최소 블록 '+st.best+'개로 통과했어요.','ok');
     }
-  } else if(atGoal && !allGot){
+  } else if(atGoal){
     setMsg('도착은 했지만 별을 다 모으지 못했어요. 별을 모두 지나가야 합니다.','bad');
   } else {
     setMsg('도착 깃발까지 가지 못했어요. 명령을 다시 살펴보세요.','bad');
   }
 }
 
-/* ---------- 이벤트 ---------- */
-var pal=document.querySelectorAll('.pal button[data-t]');
-for(var i=0;i<pal.length;i++){
-  (function(b){
-    b.onclick=function(){ addBlock(b.dataset.t); };
-  })(pal[i]);
-}
-document.getElementById('endrep').onclick=endRep;
-document.getElementById('undo').onclick=undo;
-document.getElementById('clear').onclick=clearAll;
-document.getElementById('run').onclick=run;
-document.getElementById('tabMain').onclick=function(){ target='main'; cursor=[]; render(); };
-document.getElementById('tabFunc').onclick=function(){ target='func'; cursor=[]; render(); };
+function selectTarget(name){ target=name; cursor=[]; render(); }
+
+Array.prototype.forEach.call(document.querySelectorAll('.pal button[data-t]'),function(b){
+  b.onclick=function(){ addBlock(b.dataset.t); };
+});
+byId('endrep').onclick=endRep;
+byId('undo').onclick=undo;
+byId('clear').onclick=clearAll;
+byId('run').onclick=run;
+ui.tabMain.onclick=function(){ selectTarget('main'); };
+ui.tabFunc.onclick=function(){ selectTarget('func'); };
 load(0);
+})();
 </script>
 </body>
 </html>
