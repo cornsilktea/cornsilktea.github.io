@@ -109,6 +109,17 @@
     .btn { font-size: 18px; padding: 11px 22px; }
     .rtab small { max-width: 100px; }
   }
+  .qbtns { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 18px 0 12px; }
+  .qbtn { font: inherit; padding: 16px 8px 12px; border-radius: 12px; border: 3px solid var(--sg-line-strong); background: #fff; color: var(--sg-ink); cursor: pointer; box-shadow: 0 5px 0 var(--sg-ink); }
+  .qbtn:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--sg-ink); }
+  .qbtn b { display: block; font-size: 22px; font-weight: 800; }
+  .qbtn small { display: block; font-size: 12px; font-weight: 700; color: var(--sg-ink-soft); margin-top: 6px; line-height: 1.5; }
+  .qbtn.hq b { color: #D97B4F; }
+  .qrow { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 0 0 12px; font-size: 13px; font-weight: 800; color: var(--sg-ink-soft); }
+  .qpick { font: inherit; font-size: 13px; font-weight: 800; padding: 5px 14px; border-radius: 8px; border: 2px solid var(--sg-line-mid); background: var(--sg-panel-alt); color: var(--sg-ink); cursor: pointer; }
+  .qpick.on { background: #fff; border-color: #D97B4F; outline: 2px solid #D97B4F; }
+  .credits { font-size: 11px; line-height: 1.55; color: var(--sg-ink-faint); margin-top: 10px; }
+  #loadNote { font-size: 12px; font-weight: 700; color: var(--sg-ink-soft); min-height: 16px; margin-top: 6px; }
   [hidden]{display:none !important;}
 </style>
 </head>
@@ -130,6 +141,14 @@
 <div id="count"><span id="countNum">3</span></div>
 
 <div id="overlay">
+  <div class="card" id="cardQuality" style="display:none">
+    <div class="logo">TURBO LAP<small>먼저 화질을 골라 주세요 (처음 화면에서 언제든 바꿀 수 있어요)</small></div>
+    <div class="qbtns">
+      <button type="button" class="qbtn hq" data-q="high"><b>고화질</b><small>실사 슈퍼카·아스팔트·잔디·하늘<br>데스크톱·빠른 노트북 추천</small></button>
+      <button type="button" class="qbtn" data-q="low"><b>저화질</b><small>카툰 그래픽 (기존 버전)<br>태블릿·크롬북 추천</small></button>
+    </div>
+    <div class="credits creditText"></div>
+  </div>
   <div class="card" id="cardStart">
     <div class="logo">TURBO LAP<small>터보 랩 — 완주 최단 시간 도전 (쉬움·보통 3바퀴, 어려움 2바퀴)</small></div>
     <table class="rtab">
@@ -147,6 +166,7 @@
       </div>
       <p><b>W / ↑</b> 가속<br><b>S / ↓</b> 브레이크·후진<br><b>A D / ← →</b> 조향<br><b>R</b> 처음부터 다시</p>
     </div>
+    <div class="qrow">화질 <button type="button" class="qpick" data-q="high">고화질</button><button type="button" class="qpick" data-q="low">저화질</button></div>
     <div class="btns">
       <button type="button" class="btn" id="btnEasy">쉬움</button>
       <button type="button" class="btn mid" id="btnHard">보통</button>
@@ -154,7 +174,8 @@
     </div>
     <div class="hint">트랙을 벗어나면 느려지고, 울타리에 부딪히면 크게 감속합니다.</div>
     <div class="wipe"><button type="button" id="btnWipe">이 기기의 나의 최고 기록·고스트 지우기</button></div>
-    <div class="wipe">자동차 모델: “Car Concept” © Eric Chadwick, CC BY 4.0 (Khronos glTF Sample Assets)</div>
+    <div id="loadNote"></div>
+    <div class="credits creditText"></div>
   </div>
 
   <div class="card" id="cardCar" style="display:none">
@@ -205,8 +226,23 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
+import { RGBELoader } from "three/addons/loaders/RGBELoader.js";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 (function () {
 "use strict";
+
+const CREDITS_HTML = "저작권 · 자동차 모델 “Car Concept” © Eric Chadwick (CC BY 4.0, Khronos glTF Sample Assets)<br>" +
+  "하늘 HDRI Greg Zaal·Jarod Guest, 아스팔트·나무껍질 Dimitrios Savva, 나뭇잎 Rob Tuytel (Poly Haven, CC0) · 잔디 Lennart Demes (ambientCG, CC0)";
+document.querySelectorAll(".creditText").forEach(el => { el.innerHTML = CREDITS_HTML; });
+let QUALITY = null;
+try { const q = localStorage.getItem("turbolap_quality_v1"); if (q === "high" || q === "low") QUALITY = q; } catch (e) {}
+const HQ = QUALITY === "high";
+function chooseQuality(q) {
+  try { localStorage.setItem("turbolap_quality_v1", q); } catch (e) {}
+  if ((q === "high") !== HQ) { location.reload(); return; }
+  QUALITY = q; renderQualityPicks(); showCard("start");
+}
+function renderQualityPicks() { document.querySelectorAll(".qpick").forEach(b => b.classList.toggle("on", b.getAttribute("data-q") === (HQ ? "high" : "low"))); }
 
 const CFG = {
   laps: 3,
@@ -227,6 +263,7 @@ const CFG = {
   downhillMax: 1.1,
   shoulder: 4.5,
   carScale: 0.8,
+  wheelSteerMax: 0.3, wheelSteerSpeedFalloff: 6, wheelSteerRate: 3, bodyRollRate: 4,
   camBack: 8.5, camUp: 3.9, camLerp: 7,
   fovBase: 66, fovBoost: 16,
   speedLinesFrom: 0.45,
@@ -328,7 +365,7 @@ function makeGhostCar(ck) {
   g.traverse(o => {
     if (!o.isMesh) return;
     const m = o.material.clone();
-    if (m.userData.filmic) filmicLook(m);
+    o.castShadow = false;
     m.transparent = true; m.opacity = Math.min(m.opacity, 0.4); m.depthWrite = false;
     o.material = m;
   });
@@ -447,7 +484,7 @@ function imgTex(src, rx, ry, mirror, fallbackDraw, fw, fh) {
   const t = canvasTex(fw || 256, fh || 256, fallbackDraw);
   t.wrapS = t.wrapT = mirror ? THREE.MirroredRepeatWrapping : THREE.RepeatWrapping; t.repeat.set(rx, ry); t.anisotropy = 8;
   const img = new Image();
-  img.onload = function () { t.image = img; t.needsUpdate = true; };
+  img.onload = function () { t.dispose(); t.image = img; t.needsUpdate = true; };
   img.onerror = function () { console.warn("[turbolap] 그림을 못 불러와 캔버스 무늬로 대신함:", src); };
   img.src = src;
   return t;
@@ -499,12 +536,15 @@ const texChecker = canvasTex(128, 128, (c, w, h) => {
   for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { c.fillStyle = (x + y) % 2 ? "#1B2B20" : "#FFFFFF"; c.fillRect(x * s, y * s, s, s); }
 }, [1, 1]);
 
-THREE.ColorManagement.enabled = false;
+THREE.ColorManagement.enabled = HQ;
 const LEGACY_LIGHT = Math.PI;
+const HQ_DIR = "img/turbo/hq/";
+const HQ_EXPOSURE = 0.95;
+const SHARED_TEX = new Set([texCurb, texChecker]);
 function makeRenderer(opts) {
   const r = new THREE.WebGLRenderer(opts);
-  r.outputColorSpace = THREE.LinearSRGBColorSpace;
-  r.toneMapping = THREE.NoToneMapping;
+  if (HQ) { r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = HQ_EXPOSURE; }
+  else { r.outputColorSpace = THREE.LinearSRGBColorSpace; r.toneMapping = THREE.NoToneMapping; }
   return r;
 }
 const renderer = makeRenderer({ antialias: true, powerPreference: "high-performance" });
@@ -512,24 +552,122 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.domElement.id = "gl";
 document.body.insertBefore(renderer.domElement, document.body.firstChild);
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xB8EAFD);
-scene.fog = new THREE.Fog(0xBFE8FC, 180, 520);
-const camera = new THREE.PerspectiveCamera(62, 1, 0.5, 1200);
-scene.add(new THREE.HemisphereLight(0xE6F4FF, 0x4E9A3E, 0.95 * LEGACY_LIGHT));
-const sun = new THREE.DirectionalLight(0xFFFFFF, 0.75 * LEGACY_LIGHT); sun.position.set(80, 140, 60); scene.add(sun);
-scene.environment = makeSkyEnvironment(renderer);
+const camera = new THREE.PerspectiveCamera(62, 1, 0.5, HQ ? 1700 : 1200);
+let sun = null;
+const SUN_DIR = new THREE.Vector3(0.45, 0.75, 0.35).normalize();
+const HQENV = { hdr: null, ready: [] };
+const HQM = {};
 function lambert(color, extra) { return new THREE.MeshLambertMaterial(Object.assign({ color }, extra || {})); }
 
-{
+function setupWorldToon() {
+  scene.background = new THREE.Color(0xB8EAFD);
+  scene.fog = new THREE.Fog(0xBFE8FC, 180, 520);
+  scene.add(new THREE.HemisphereLight(0xE6F4FF, 0x4E9A3E, 0.95 * LEGACY_LIGHT));
+  sun = new THREE.DirectionalLight(0xFFFFFF, 0.75 * LEGACY_LIGHT); sun.position.set(80, 140, 60); scene.add(sun);
   const sky = imgTex("img/turbo/sky.jpg", 4, 1, true, drawSky, 64, 512); sky.wrapT = THREE.ClampToEdgeWrapping;
   const dome = new THREE.Mesh(new THREE.SphereGeometry(900, 48, 16, 0, Math.PI * 2, 0, Math.PI / 2 + 0.05),
     new THREE.MeshBasicMaterial({ map: sky, side: THREE.BackSide, fog: false }));
   scene.add(dome);
-}
-{
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(1800, 1800), lambert(0xFFFFFF, { map: texGrass }));
   ground.rotation.x = -Math.PI / 2; ground.position.y = -0.05; scene.add(ground);
 }
+
+function worldUvMaterial(params, tile, macro) {
+  const m = new THREE.MeshStandardMaterial(params);
+  m.onBeforeCompile = sh => {
+    sh.vertexShader = "varying vec2 vMacroUv;\n" + sh.vertexShader.replace("#include <uv_vertex>",
+      "#include <uv_vertex>\n\tvec2 worldUv = (modelMatrix * vec4(position, 1.0)).xz / " + tile.toFixed(3) + ";\n" +
+      "#ifdef USE_MAP\n\tvMapUv = worldUv;\n#endif\n#ifdef USE_NORMALMAP\n\tvNormalMapUv = worldUv;\n#endif\n#ifdef USE_ROUGHNESSMAP\n\tvRoughnessMapUv = worldUv;\n#endif\n\tvMacroUv = worldUv * 0.0713;");
+    if (macro) sh.fragmentShader = "varying vec2 vMacroUv;\n" + sh.fragmentShader.replace("#include <map_fragment>",
+      "#include <map_fragment>\n\t{ vec3 macroTex = texture2D(map, vMacroUv).rgb; diffuseColor.rgb *= clamp(0.35 + dot(macroTex, vec3(0.8, 1.6, 0.3)), 0.7, 1.35); }");
+  };
+  m.customProgramCacheKey = () => "worldUv" + tile + (macro ? "M" : "");
+  return m;
+}
+function hqTex(name, srgb) {
+  const t = new THREE.TextureLoader().load(HQ_DIR + name, undefined, undefined, () => console.warn("[turbolap] 고화질 텍스처를 못 불러옴:", name));
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+  SHARED_TEX.add(t);
+  return t;
+}
+function srgbCanvasTex(w, h, draw, repeat) { const t = canvasTex(w, h, draw, repeat); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; SHARED_TEX.add(t); return t; }
+function initMaterialsHQ() {
+  const asphaltNormal = hqTex("asphalt_normal.jpg");
+  HQM.grass = worldUvMaterial({ map: hqTex("grass_color.jpg", true), normalMap: hqTex("grass_normal.jpg"), roughness: 0.95, color: 0xE8F0DC }, 3.4, true);
+  HQM.asphalt = worldUvMaterial({ map: hqTex("asphalt_color.jpg", true), normalMap: asphaltNormal, roughnessMap: hqTex("asphalt_rough.jpg"), roughness: 1, color: new THREE.Color(2.1, 2.1, 2.15) }, 4.5, false);
+  HQM.line = new THREE.MeshStandardMaterial({ color: 0xEDEDE8, roughness: 0.7 });
+  const curbTex = srgbCanvasTex(64, 128, (c, w, h) => {
+    c.fillStyle = "#C3241E"; c.fillRect(0, 0, w, h / 2);
+    c.fillStyle = "#EDEDE7"; c.fillRect(0, h / 2, w, h / 2);
+    for (let i = 0; i < 260; i++) { c.fillStyle = "rgba(40,30,25," + rnd(0.03, 0.12).toFixed(2) + ")"; c.fillRect(rnd(0, w), rnd(0, h), rnd(1, 3), rnd(1, 3)); }
+    const edge = c.createLinearGradient(0, 0, w, 0); edge.addColorStop(0, "rgba(0,0,0,0.18)"); edge.addColorStop(0.12, "rgba(0,0,0,0)"); edge.addColorStop(0.88, "rgba(0,0,0,0)"); edge.addColorStop(1, "rgba(0,0,0,0.18)");
+    c.fillStyle = edge; c.fillRect(0, 0, w, h);
+  }, [1, 1]);
+  HQM.curb = new THREE.MeshStandardMaterial({ map: curbTex, normalMap: asphaltNormal, normalScale: new THREE.Vector2(0.35, 0.35), roughness: 0.5 });
+  const drawChecks = (c, w, h) => { const n = 8, s = w / n; for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { c.fillStyle = (x + y) % 2 ? "#1A1A1A" : "#F2F2F2"; c.fillRect(x * s, y * s, s, s); } };
+  HQM.checker = new THREE.MeshStandardMaterial({ map: srgbCanvasTex(128, 128, drawChecks, [1, 1]), roughness: 0.65 });
+  HQM.beam = new THREE.MeshStandardMaterial({ map: srgbCanvasTex(128, 128, drawChecks, [3.1, 0.25]), roughness: 0.5, metalness: 0.1 });
+  HQM.armco = new THREE.MeshStandardMaterial({ color: 0xC6CCD4, metalness: 0.85, roughness: 0.3, side: THREE.DoubleSide });
+  HQM.post = new THREE.MeshStandardMaterial({ color: 0x80878F, metalness: 0.7, roughness: 0.42 });
+  HQM.pole = new THREE.MeshStandardMaterial({ color: 0xE6E6E6, metalness: 0.4, roughness: 0.35 });
+  HQM.flags = [0xD8322A, 0x2F6FD8, 0xF2B632, 0x3FAE55].map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.8, side: THREE.DoubleSide }));
+  HQM.bark = new THREE.MeshStandardMaterial({ map: hqTex("bark_color.jpg", true), normalMap: hqTex("bark_normal.jpg"), roughness: 0.95 });
+  const leafMap = hqTex("leaves_color.jpg", true), leafNormal = hqTex("leaves_normal.jpg");
+  leafMap.repeat.set(3, 3); leafNormal.repeat.set(3, 3);
+  HQM.leaves = new THREE.MeshStandardMaterial({ map: leafMap, normalMap: leafNormal, roughness: 0.88 });
+}
+function brightestDirection(tex) {
+  const { data, width, height } = tex.image, half = data instanceof Uint16Array;
+  let best = -1, bx = 0, by = 0;
+  for (let y = 0; y < height / 2; y++) for (let x = 0; x < width; x++) {
+    const o = (y * width + x) * 4;
+    const r = half ? THREE.DataUtils.fromHalfFloat(data[o]) : data[o], g = half ? THREE.DataUtils.fromHalfFloat(data[o + 1]) : data[o + 1];
+    const lum = r + g;
+    if (lum > best) { best = lum; bx = x; by = y; }
+  }
+  const u = (bx + 0.5) / width, v = 1 - (by + 0.5) / height;
+  const lat = (v - 0.5) * Math.PI, lon = (u - 0.5) * Math.PI * 2;
+  return new THREE.Vector3(Math.cos(lat) * Math.cos(lon), Math.sin(lat), Math.cos(lat) * Math.sin(lon)).normalize();
+}
+function horizonColor(img) {
+  const cv = document.createElement("canvas"); cv.width = 64; cv.height = 64;
+  const c = cv.getContext("2d"); c.drawImage(img, 0, 0, 64, 64);
+  const d = c.getImageData(0, 30, 64, 1).data;
+  let r = 0, g = 0, b = 0; for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; }
+  return new THREE.Color().setRGB(r / 64 / 255, g / 64 / 255, b / 64 / 255, THREE.SRGBColorSpace);
+}
+function envFromHdr(r, hdr) { const pm = new THREE.PMREMGenerator(r); const t = pm.fromEquirectangular(hdr).texture; pm.dispose(); return t; }
+function setupWorldHQ() {
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  scene.background = new THREE.Color(0xA9C6E2);
+  scene.fog = new THREE.Fog(0xC9D9E8, 280, 1600);
+  scene.add(new THREE.HemisphereLight(0xD8E8FF, 0x55703F, 0.45));
+  sun = new THREE.DirectionalLight(0xFFF2DF, 3.0);
+  sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -36, right: 36, top: 36, bottom: -36, near: 1, far: 300 });
+  sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.04;
+  scene.add(sun); scene.add(sun.target);
+  initMaterialsHQ();
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(5000, 5000), HQM.grass);
+  ground.rotation.x = -Math.PI / 2; ground.position.y = -0.05; ground.receiveShadow = true; scene.add(ground);
+  new RGBELoader().load(HQ_DIR + "sky_1k.hdr", hdr => {
+    hdr.mapping = THREE.EquirectangularReflectionMapping;
+    SUN_DIR.copy(brightestDirection(hdr));
+    HQENV.hdr = hdr; scene.environment = envFromHdr(renderer, hdr); scene.environmentIntensity = 0.9;
+    HQENV.ready.forEach(f => f(hdr)); HQENV.ready = [];
+  }, undefined, err => console.warn("[turbolap] 하늘 HDRI를 못 불러옴:", err));
+  new THREE.TextureLoader().load(HQ_DIR + "sky.jpg", t => {
+    t.mapping = THREE.EquirectangularReflectionMapping; t.colorSpace = THREE.SRGBColorSpace;
+    scene.background = t; scene.fog.color.copy(horizonColor(t.image));
+  }, undefined, () => console.warn("[turbolap] 하늘 배경을 못 불러옴"));
+}
+function followSun() {
+  if (!HQ) return;
+  sun.target.position.set(P.x, P.y, P.z);
+  sun.position.set(P.x + SUN_DIR.x * 150, P.y + SUN_DIR.y * 150, P.z + SUN_DIR.z * 150);
+}
+if (HQ) setupWorldHQ(); else setupWorldToon();
 
 let diff = "easy";
 let S = [], N = CFG.samples, W = 14, SEG = 1, TRACK_LEN = 1, MM = null;
@@ -555,7 +693,11 @@ function ribbon(group, edgeFn, vRepeat, mat, from, to) {
 function buildTrack(def) {
   if (trackGroup) {
     scene.remove(trackGroup);
-    trackGroup.traverse(o => { if (o.isMesh) { o.geometry.dispose(); if (o.material.map && o.material.map !== texCurb && o.material.map !== texChecker) o.material.map.dispose(); o.material.dispose(); } });
+    trackGroup.traverse(o => {
+      if (!o.isMesh) return;
+      o.geometry.dispose();
+      [].concat(o.material).forEach(m => { if (m.map && !SHARED_TEX.has(m.map)) m.map.dispose(); m.dispose(); });
+    });
   }
   const G = trackGroup = new THREE.Group(); scene.add(G);
   W = def.width;
@@ -568,6 +710,40 @@ function buildTrack(def) {
     const t = new THREE.Vector3(tg.x, 0, tg.z).normalize();
     S.push({ p, t, n: new THREE.Vector3(t.z, 0, -t.x) });
   }
+  const B = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity };
+  S.forEach(s => { B.minX = Math.min(B.minX, s.p.x); B.maxX = Math.max(B.maxX, s.p.x); B.minZ = Math.min(B.minZ, s.p.z); B.maxZ = Math.max(B.maxZ, s.p.z); });
+  if (HQ) buildSceneryHQ(G, def, B); else buildSceneryToon(G, def, B);
+  {
+    const pad = 22, sc = Math.min((300 - pad * 2) / (B.maxX - B.minX), (300 - pad * 2) / (B.maxZ - B.minZ));
+    const ox = 150 - (B.minX + B.maxX) / 2 * sc, oz = 150 - (B.minZ + B.maxZ) / 2 * sc;
+    MM = { sc, mx: x => ox + x * sc, mz: z => oz + z * sc };
+  }
+}
+function railPoints(off, sg, step) {
+  let folded = 0;
+  const ok = i => {
+    const e = edgeAt(i, off * sg, 0);
+    for (let j = 0; j < N; j += 2) { const dx = S[j].p.x - e.x, dz = S[j].p.z - e.z; if (dx * dx + dz * dz < (off - 0.3) * (off - 0.3)) { folded++; return false; } }
+    return true;
+  };
+  const idx = [];
+  for (let i = 0; i < N; i += step) if (ok(i)) idx.push(i);
+  return { idx, ok, folded: () => folded };
+}
+function treeSpots(def, B, count) {
+  const spots = [];
+  let tries = 0;
+  while (spots.length < count && tries < count * 30) {
+    tries++;
+    const x = rnd(B.minX - 100, B.maxX + 100), z = rnd(B.minZ - 100, B.maxZ + 100);
+    let ok = true;
+    for (let i = 0; i < N; i += 3) { const s = S[i]; const dx = s.p.x - x, dz = s.p.z - z; if (dx * dx + dz * dz < 24 * 24) { ok = false; break; } }
+    if (ok) spots.push({ x, z, sc: rnd(0.8, 1.5), rot: rnd(0, 6.28) });
+  }
+  return spots;
+}
+function buildSceneryToon(G, def, B) {
+  const { minX, maxX, minZ, maxZ } = B;
   const grassMat = lambert(0x66C858);
   ribbon(G, i => [edgeAt(i, W / 2 + SH + 1, -0.02), edgeAt(i, -(W / 2 + SH + 1), -0.02)], 1, grassMat);
   ribbon(G, i => { const h = S[i].p.y, k = W / 2 + SH + 1; return [edgeAt(i, k + 3 + h * 2.2, -h - 0.04), edgeAt(i, k, -0.03)]; }, 1, grassMat);
@@ -618,8 +794,6 @@ function buildTrack(def) {
       flag.rotation.y = Math.atan2(S[i].t.x, S[i].t.z); G.add(flag);
     }
   }
-  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-  S.forEach(s => { minX = Math.min(minX, s.p.x); maxX = Math.max(maxX, s.p.x); minZ = Math.min(minZ, s.p.z); maxZ = Math.max(maxZ, s.p.z); });
   {
     const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
     let reach = 0; S.forEach(s => { reach = Math.max(reach, Math.hypot(s.p.x - cx, s.p.z - cz)); });
@@ -648,11 +822,132 @@ function buildTrack(def) {
       g.position.set(x, 0, z); g.scale.setScalar(sc); g.rotation.y = rnd(0, 6.28); G.add(g); placed++;
     }
   }
-  {
-    const pad = 22, sc = Math.min((300 - pad * 2) / (maxX - minX), (300 - pad * 2) / (maxZ - minZ));
-    const ox = 150 - (minX + maxX) / 2 * sc, oz = 150 - (minZ + maxZ) / 2 * sc;
-    MM = { sc, mx: x => ox + x * sc, mz: z => oz + z * sc };
+}
+
+function band(a, b, ya, yb) {
+  return i => a >= b ? [edgeAt(i, a, ya), edgeAt(i, b, yb)] : [edgeAt(i, b, yb), edgeAt(i, a, ya)];
+}
+function wallStrip(pts, yLo, yHi, mat) {
+  const n = pts.length, pos = new Float32Array((n + 1) * 6), uv = new Float32Array((n + 1) * 4), idx = [];
+  let dist = 0;
+  for (let k = 0; k <= n; k++) {
+    const p = pts[k % n];
+    if (k > 0) dist += p.distanceTo(pts[k - 1]);
+    pos.set([p.x, p.y + yHi, p.z, p.x, p.y + yLo, p.z], k * 6);
+    uv.set([dist / 4, 1, dist / 4, 0], k * 4);
+    if (k < n) { const a = k * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
   }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  g.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+  g.setIndex(idx); g.computeVertexNormals();
+  const m = new THREE.Mesh(g, mat); m.castShadow = true; m.receiveShadow = true;
+  return m;
+}
+function hash3(x, y, z) { const s = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453; return s - Math.floor(s); }
+function lumpy(geo, amount, radialNormals) {
+  const p = geo.attributes.position, nrm = geo.attributes.normal, v = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    const k = 1 + (hash3(+x.toFixed(3), +y.toFixed(3), +z.toFixed(3)) - 0.5) * amount;
+    p.setXYZ(i, x * k, y + (hash3(+z.toFixed(3), +x.toFixed(3), +y.toFixed(3)) - 0.5) * amount * 0.6, z * k);
+    if (radialNormals) { v.set(x, y, z).normalize(); nrm.setXYZ(i, v.x, v.y, v.z); }
+  }
+  if (!radialNormals) geo.computeVertexNormals();
+  return geo.index ? geo.toNonIndexed() : geo;
+}
+function branchyCone(r, h, teeth) {
+  const g = new THREE.ConeGeometry(r, h, teeth * 2, 6), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i), rad = Math.hypot(x, z);
+    if (rad < 1e-4) continue;
+    const w = Math.max(0, 1 - (y + h / 2) / (h * 0.45)), tooth = 0.5 + 0.5 * Math.cos(Math.atan2(z, x) * teeth);
+    const k = 1 + w * (tooth * 0.34 - 0.12);
+    p.setXYZ(i, x * k, y - w * tooth * h * 0.14, z * k);
+  }
+  return g;
+}
+function makeTreeKindsHQ() {
+  const pineLayers = [[3.1, 4.6, 3.6], [2.45, 4.0, 5.6], [1.75, 3.3, 7.4], [1.0, 2.4, 8.9]].map(([r, h, y], k) => lumpy(branchyCone(r, h, 11 - k * 2), 0.16).translate(0, y, 0));
+  const leafBlobs = [[0, 5.6, 0, 2.5], [1.5, 4.9, 0.6, 1.9], [-1.4, 5.0, -0.5, 2.0], [0.3, 6.9, -0.4, 1.8], [-0.4, 4.6, 1.5, 1.7], [0.6, 4.7, -1.5, 1.7]]
+    .map(([x, y, z, r]) => lumpy(new THREE.IcosahedronGeometry(r, 2), 0.28, true).translate(x, y, z));
+  return [
+    { trunk: new THREE.CylinderGeometry(0.2, 0.38, 4.4, 10).translate(0, 2.2, 0), foliage: mergeGeometries(pineLayers), tints: [0x5E8F4E, 0x4F7F45, 0x6A9A55, 0x46743F], share: 0.62 },
+    { trunk: new THREE.CylinderGeometry(0.26, 0.44, 5.0, 10).translate(0, 2.5, 0), foliage: mergeGeometries(leafBlobs), tints: [0x4F9238, 0x5A9C40, 0x468632, 0x62A044], share: 0.38 }
+  ];
+}
+let TREE_KINDS_HQ = null;
+function buildTreesHQ(G, spots) {
+  if (!TREE_KINDS_HQ) TREE_KINDS_HQ = makeTreeKindsHQ();
+  const groups = TREE_KINDS_HQ.map(() => []);
+  spots.forEach(s => groups[Math.random() < TREE_KINDS_HQ[0].share ? 0 : 1].push(s));
+  const mtx = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), tint = new THREE.Color();
+  TREE_KINDS_HQ.forEach((kind, k) => {
+    const list = groups[k]; if (!list.length) return;
+    const trunks = new THREE.InstancedMesh(kind.trunk, HQM.bark, list.length), leaves = new THREE.InstancedMesh(kind.foliage, HQM.leaves, list.length);
+    list.forEach((s, i) => {
+      q.setFromAxisAngle(up, s.rot);
+      mtx.compose(new THREE.Vector3(s.x, 0, s.z), q, new THREE.Vector3(s.sc, s.sc * rnd(0.9, 1.15), s.sc));
+      trunks.setMatrixAt(i, mtx); leaves.setMatrixAt(i, mtx);
+      leaves.setColorAt(i, tint.setHex(kind.tints[i % kind.tints.length]));
+    });
+    [trunks, leaves].forEach(m => { m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false; G.add(m); });
+  });
+}
+function buildSceneryHQ(G, def, B) {
+  const ground = m => { m.receiveShadow = true; return m; };
+  ground(ribbon(G, band(W / 2 + SH + 1, -(W / 2 + SH + 1), -0.02, -0.02), 1, HQM.grass));
+  ground(ribbon(G, i => { const h = S[i].p.y, k = W / 2 + SH + 1; return [edgeAt(i, k + 3 + h * 2.2, -h - 0.04), edgeAt(i, k, -0.03)]; }, 1, HQM.grass));
+  ground(ribbon(G, i => { const h = S[i].p.y, k = W / 2 + SH + 1; return [edgeAt(i, -k, -0.03), edgeAt(i, -(k + 3 + h * 2.2), -h - 0.04)]; }, 1, HQM.grass));
+  ground(ribbon(G, band(W / 2, -W / 2, 0.05, 0.05), 1, HQM.asphalt));
+  [1, -1].forEach(sg => ground(ribbon(G, band(sg * (W / 2 - 0.35), sg * (W / 2 - 0.6), 0.062, 0.062), 1, HQM.line)));
+  const curbRep = Math.round(TRACK_LEN / 3);
+  ground(ribbon(G, band(W / 2 + 1.3, W / 2, 0.15, 0.07), curbRep, HQM.curb));
+  ground(ribbon(G, band(-W / 2, -(W / 2 + 1.3), 0.07, 0.15), curbRep, HQM.curb));
+  ground(ribbon(G, band(W / 2, -W / 2, 0.075, 0.075), 1, HQM.checker, 0, 5));
+  {
+    const s0 = S[2], side = W / 2 + 2.2, hgt = 9;
+    [1, -1].forEach(sg => {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.42, hgt, 20), HQM.post);
+      post.position.set(s0.p.x + s0.n.x * side * sg, s0.p.y + hgt / 2, s0.p.z + s0.n.z * side * sg); post.castShadow = true; G.add(post);
+    });
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(side * 2 + 1, 1.6, 1.0), [HQM.post, HQM.post, HQM.post, HQM.post, HQM.beam, HQM.beam]);
+    beam.position.set(s0.p.x, s0.p.y + hgt, s0.p.z); beam.rotation.y = Math.atan2(s0.n.x, s0.n.z); beam.castShadow = true; G.add(beam);
+  }
+  {
+    const off = W / 2 + SH;
+    let folded = 0;
+    const postGeo = new THREE.BoxGeometry(0.16, 1.0, 0.16).translate(0, 0.5, 0), mtx = new THREE.Matrix4();
+    [1, -1].forEach(sg => {
+      const rp = railPoints(off, sg, 4), pts = rp.idx.map(i => edgeAt(i, off * sg, 0));
+      G.add(wallStrip(pts, 0.56, 0.7, HQM.armco)); G.add(wallStrip(pts, 0.74, 0.88, HQM.armco));
+      const postIdx = [];
+      for (let i = 0; i < N; i += CFG.postEvery / 2) if (rp.ok(i)) postIdx.push(i);
+      const posts = new THREE.InstancedMesh(postGeo, HQM.post, postIdx.length);
+      postIdx.forEach((i, k) => { const e = edgeAt(i, (off + 0.12) * sg, 0); posts.setMatrixAt(k, mtx.makeTranslation(e.x, e.y, e.z)); });
+      posts.castShadow = true; posts.frustumCulled = false; G.add(posts);
+      folded += rp.folded();
+    });
+    if (folded) console.warn("[turbolap] " + def.key + ": 난간이 꼬이는 코너가 있습니다(" + folded + "점 제외). 제어점을 완만하게 고치세요.");
+    const poleGeo = new THREE.CylinderGeometry(0.07, 0.09, 7, 10);
+    const flagGeo = new THREE.PlaneGeometry(2.2, 1.2, 8, 4).translate(1.1, -0.6, 0);
+    for (let i = 18, k = 0; i < N; i += CFG.flagEvery, k++) {
+      const sg = k % 2 ? 1 : -1, base = edgeAt(i, (off + 1.4) * sg, 0);
+      const pole = new THREE.Mesh(poleGeo, HQM.pole); pole.position.set(base.x, base.y + 3.5, base.z); pole.castShadow = true; G.add(pole);
+      const flag = new THREE.Mesh(flagGeo, HQM.flags[k % HQM.flags.length]); flag.position.set(base.x, base.y + 6.9, base.z);
+      flag.rotation.y = Math.atan2(S[i].t.x, S[i].t.z) - Math.PI / 2; flag.castShadow = true; G.add(flag);
+    }
+  }
+  {
+    const cx = (B.minX + B.maxX) / 2, cz = (B.minZ + B.maxZ) / 2;
+    let reach = 0; S.forEach(s => { reach = Math.max(reach, Math.hypot(s.p.x - cx, s.p.z - cz)); });
+    for (let i = 0; i < 14; i++) {
+      const a = i / 14 * Math.PI * 2 + rnd(-.2, .2), r = rnd(60, 130), d = reach + r + rnd(60, 140);
+      const m = new THREE.Mesh(new THREE.SphereGeometry(r, 40, 20), HQM.grass);
+      m.position.set(cx + Math.cos(a) * d, -r * 0.6, cz + Math.sin(a) * d); m.scale.y = 0.6; m.receiveShadow = true; G.add(m);
+    }
+  }
+  buildTreesHQ(G, treeSpots(def, B, Math.round(def.trees * 1.6)));
 }
 
 
@@ -810,47 +1105,13 @@ function makeCartoonCar(color, modelKey) {
   g.userData.wheels = wheels; g.userData.wheelR = R;
   return g;
 }
-function makeSkyEnvironment(r) {
-  const envScene = new THREE.Scene();
-  const skyGradient = canvasTex(8, 256, (c, w, h) => {
-    const g = c.createLinearGradient(0, 0, 0, h);
-    g.addColorStop(0, "#2F7FD8"); g.addColorStop(0.44, "#BFE6FF"); g.addColorStop(0.5, "#FFFFFF");
-    g.addColorStop(0.53, "#5E9E4C"); g.addColorStop(1, "#23421F");
-    c.fillStyle = g; c.fillRect(0, 0, w, h);
-  });
-  envScene.add(new THREE.Mesh(new THREE.SphereGeometry(50, 32, 16), new THREE.MeshBasicMaterial({ map: skyGradient, side: THREE.BackSide })));
-  const sunDisc = new THREE.Mesh(new THREE.CircleGeometry(4, 24), new THREE.MeshBasicMaterial({ color: new THREE.Color(8, 8, 7.4) }));
-  sunDisc.position.set(24, 38, 18); sunDisc.lookAt(0, 0, 0); envScene.add(sunDisc);
-  const softboxMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 2.4, 2.4), side: THREE.DoubleSide });
-  [[-32, 16, 4], [0, 22, -32], [30, 12, -14], [6, 14, 34]].forEach(p => {
-    const box = new THREE.Mesh(new THREE.PlaneGeometry(26, 5), softboxMat); box.position.set(p[0], p[1], p[2]); box.lookAt(0, 0, 0); envScene.add(box);
-  });
-  const pmrem = new THREE.PMREMGenerator(r);
-  const tex = pmrem.fromScene(envScene, 0.02).texture;
-  pmrem.dispose(); skyGradient.dispose();
-  return tex;
-}
-
-const FILMIC_EXPOSURE = "1.15";
-const FILMIC_GLSL = "vec3 filmicCurve(vec3 c) { c *= " + FILMIC_EXPOSURE + "; return clamp((c * (2.51 * c + 0.03)) / (c * (2.43 * c + 0.59) + 0.14), 0.0, 1.0); }\n";
-function filmicLook(mat) {
-  mat.userData.filmic = true;
-  mat.onBeforeCompile = sh => {
-    sh.fragmentShader = FILMIC_GLSL + sh.fragmentShader.replace("#include <colorspace_fragment>",
-      "gl_FragColor.rgb = filmicCurve(gl_FragColor.rgb);\n\tgl_FragColor = sRGBTransferOETF(gl_FragColor);");
-  };
-  mat.customProgramCacheKey = () => "filmic";
-  mat.needsUpdate = true;
-  return mat;
-}
-
 const SUPERCAR = { tpl: null, paintBase: null, paint: {}, wheelR: 0.4 };
 const SUPERCAR_LENGTH = 4.8;
 const SUPERCAR_WHEELS = ["FrontL", "FrontR", "RearL", "RearR"];
 function paintMaterial(color) {
   if (!SUPERCAR.paint[color]) {
-    const m = filmicLook(SUPERCAR.paintBase.clone());
-    m.color.setHex(color).convertSRGBToLinear();
+    const m = SUPERCAR.paintBase.clone();
+    m.color.setHex(color);
     SUPERCAR.paint[color] = m;
   }
   return SUPERCAR.paint[color];
@@ -859,7 +1120,7 @@ function makeBlobShadowTex() {
   return canvasTex(128, 256, (c, w, h) => {
     c.save(); c.scale(1, h / w);
     const g = c.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2);
-    g.addColorStop(0, "rgba(27,43,32,0.62)"); g.addColorStop(0.6, "rgba(27,43,32,0.38)"); g.addColorStop(1, "rgba(27,43,32,0)");
+    g.addColorStop(0, "rgba(10,12,10,0.55)"); g.addColorStop(0.6, "rgba(10,12,10,0.3)"); g.addColorStop(1, "rgba(10,12,10,0)");
     c.fillStyle = g; c.fillRect(0, 0, w, w);
     c.restore();
   });
@@ -891,16 +1152,14 @@ function prepareSupercar(root) {
     n.children.slice().forEach(part => { if (/BrakePad/.test(part.name)) pivot.attach(part); else spin.attach(part); });
   });
 
-  const seen = new Set();
   model.traverse(o => {
     if (!o.isMesh) return;
     let m = o.material;
     if (m.transmission > 0) {
       m = m.clone(); m.transmission = 0; m.transparent = true; m.opacity = 0.32; m.depthWrite = false; m.roughness = 0.05; m.color.setRGB(0.05, 0.07, 0.09);
       o.material = m;
-    }
+    } else o.castShadow = true;
     if (m.name === "Paint 1 Carmine") SUPERCAR.paintBase = m;
-    if (!seen.has(m)) { seen.add(m); filmicLook(m); }
   });
   if (!SUPERCAR.paintBase) throw new Error("차체 도색 재질 없음");
 
@@ -931,9 +1190,15 @@ try {
   previewRenderer = makeRenderer({ alpha: true, antialias: true });
   previewRenderer.setPixelRatio(1); previewRenderer.setSize(PREVIEW_W, PREVIEW_H, false);
   previewScene = new THREE.Scene();
-  previewScene.add(new THREE.HemisphereLight(0xE6F4FF, 0x8FB37A, 1.0 * LEGACY_LIGHT));
-  const dl = new THREE.DirectionalLight(0xFFFFFF, 0.7 * LEGACY_LIGHT); dl.position.set(3, 6, 4); previewScene.add(dl);
-  previewScene.environment = makeSkyEnvironment(previewRenderer);
+  if (HQ) {
+    previewScene.add(new THREE.HemisphereLight(0xE6F4FF, 0x8FB37A, 0.6));
+    const dl = new THREE.DirectionalLight(0xFFFFFF, 2.2); dl.position.set(3, 6, 4); previewScene.add(dl);
+    const applyEnv = hdr => { previewScene.environment = envFromHdr(previewRenderer, hdr); };
+    if (HQENV.hdr) applyEnv(HQENV.hdr); else HQENV.ready.push(applyEnv);
+  } else {
+    previewScene.add(new THREE.HemisphereLight(0xE6F4FF, 0x8FB37A, 1.0 * LEGACY_LIGHT));
+    const dl = new THREE.DirectionalLight(0xFFFFFF, 0.7 * LEGACY_LIGHT); dl.position.set(3, 6, 4); previewScene.add(dl);
+  }
   previewCam = new THREE.PerspectiveCamera(28, PREVIEW_W / PREVIEW_H, 0.1, 50); previewCam.position.set(0, 2.9, 7.4); previewCam.lookAt(0, 0.45, 0);
 } catch (e) { previewRenderer = null; }
 function buildPreviewCar(p) {
@@ -962,12 +1227,15 @@ function refreshCars() {
   }
   carPreviews.forEach(buildPreviewCar);
 }
-new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load("img/turbo/supercar.glb", gltf => {
-  try { SUPERCAR.tpl = prepareSupercar(gltf.scene); refreshCars(); }
-  catch (e) { SUPERCAR.tpl = null; console.warn("[turbolap] 슈퍼카 모델 준비 실패, 기본 차로 달립니다:", e); }
-}, undefined, err => console.warn("[turbolap] 슈퍼카 모델을 못 불러와 기본 차로 달립니다:", err));
+if (HQ) {
+  $("loadNote").textContent = "고화질 자동차 불러오는 중…";
+  new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load("img/turbo/supercar.glb", gltf => {
+    try { SUPERCAR.tpl = prepareSupercar(gltf.scene); refreshCars(); $("loadNote").textContent = ""; }
+    catch (e) { SUPERCAR.tpl = null; $("loadNote").textContent = "고화질 자동차를 준비하지 못해 기본 차로 달립니다."; console.warn("[turbolap] 슈퍼카 모델 준비 실패:", e); }
+  }, undefined, err => { $("loadNote").textContent = "고화질 자동차를 불러오지 못해 기본 차로 달립니다."; console.warn("[turbolap] 슈퍼카 모델을 못 불러옴:", err); });
+}
 
-const P = { x: 0, z: 0, y: 0, h: 0, v: 0, ci: 0, prevCi: 0, lap: 0, expected: 0, off: false, wallT: 0, steerVis: 0 };
+const P = { x: 0, z: 0, y: 0, h: 0, v: 0, ci: 0, prevCi: 0, lap: 0, expected: 0, off: false, wallT: 0, steerVis: 0, rollVis: 0 };
 let state = "menu";
 let cdTime = 0, cdShown = -1, goTimer = 0, t0 = 0, elapsed = 0, finalMs = 0, doneTimer = 0, shake = 0, menuAng = 0;
 const keys = { up: false, down: false, left: false, right: false };
@@ -990,12 +1258,13 @@ function placeAt(i) {
   P.x = s.p.x; P.z = s.p.z; P.y = s.p.y; P.v = 0; P.ci = i % N; P.prevCi = P.ci;
   P.h = Math.atan2(-s.t.x, -s.t.z);
 }
-function resetCar() { placeAt(N - 14); P.off = false; P.wallT = 0; P.steerVis = 0; }
+function resetCar() { placeAt(N - 14); P.off = false; P.wallT = 0; P.steerVis = 0; P.rollVis = 0; }
 function showCard(which) {
   overlay.style.display = which ? "flex" : "none";
   cardStart.style.display = which === "start" ? "" : "none";
   cardDone.style.display = which === "done" ? "" : "none";
   cardCar.style.display = which === "car" ? "" : "none";
+  $("cardQuality").style.display = which === "quality" ? "" : "none";
 }
 function pickCourse(k) {
   pendingDiff = k; $("carCourse").textContent = TRACKS[k].name + " 코스";
@@ -1033,7 +1302,7 @@ function loadRecords() {
   DIFFS.forEach(k => { const WR = WRS[k]; if (WR) WR.load().then(() => { wrTried[k] = true; renderRecords(); }); });
 }
 function showMenu() {
-  state = "menu"; setHud(false); fctx.clearRect(0, 0, fx.width, fx.height); countBox.style.display = "none"; lapToast.className = ""; showCard("start");
+  state = "menu"; setHud(false); fctx.clearRect(0, 0, fx.width, fx.height); countBox.style.display = "none"; lapToast.className = ""; showCard(QUALITY ? "start" : "quality"); renderQualityPicks();
   engineUpdate(0, false); renderRecords();
   loadRecords();
 }
@@ -1102,7 +1371,9 @@ function updateCar(dt) {
   const turn = str * CFG.steerRate * gain;
   P.h += turn * dt * (P.v >= 0 ? 1 : -1);
   P.v -= CFG.cornerDrag * Math.abs(turn) * P.v * dt;
-  P.steerVis += (str * 0.45 - P.steerVis) * Math.min(1, dt * 10);
+  const wheelSteerTarget = str * CFG.wheelSteerMax / (1 + CFG.wheelSteerSpeedFalloff * Math.min(1, ratio));
+  P.steerVis += (wheelSteerTarget - P.steerVis) * Math.min(1, dt * CFG.wheelSteerRate);
+  P.rollVis += (-str * Math.min(1, ratio) * 0.05 - P.rollVis) * Math.min(1, dt * CFG.bodyRollRate);
 
   const fx = -Math.sin(P.h), fz = -Math.cos(P.h);
   P.x += fx * P.v * dt; P.z += fz * P.v * dt;
@@ -1140,7 +1411,7 @@ function updateCar(dt) {
   car.rotation.y = P.h;
   const i1 = (P.ci + 5) % N, i0 = (P.ci + N - 5) % N;
   car.rotation.x = Math.atan2(S[i1].p.y - S[i0].p.y, SEG * 10) * (fx * s.t.x + fz * s.t.z);
-  car.rotation.z = -str * Math.min(1, ratio) * 0.06;
+  car.rotation.z = P.rollVis;
   car.userData.wheels.forEach(w => { w.spin.rotation.x -= P.v * dt / car.userData.wheelR; if (w.front) w.g.rotation.y = P.steerVis; });
 }
 
@@ -1236,6 +1507,7 @@ function tick(now) {
     drawMinimap();
     drawSpeedLines(Math.abs(P.v) / CFG.maxSpeed);
   }
+  followSun();
   renderer.render(scene, camera);
 }
 function resize() {
@@ -1279,6 +1551,7 @@ document.querySelectorAll(".carbtn").forEach(b => b.onclick = e => {
   document.querySelectorAll(".carbtn").forEach(x => x.classList.toggle("on", x === b));
 });
 $("btnGo").onclick = e => { e.currentTarget.blur(); startRace(pendingDiff); };
+document.querySelectorAll(".qbtn, .qpick").forEach(b => b.onclick = e => { e.currentTarget.blur(); chooseQuality(b.getAttribute("data-q")); });
 $("btnWipe").onclick = e => {
   e.currentTarget.blur();
   if (!confirm("이 기기에 저장된 나의 최고 기록과 고스트를 모두 지울까요? (세계 신기록에는 영향이 없습니다)")) return;
