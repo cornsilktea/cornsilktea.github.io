@@ -154,6 +154,7 @@
     </div>
     <div class="hint">트랙을 벗어나면 느려지고, 울타리에 부딪히면 크게 감속합니다.</div>
     <div class="wipe"><button type="button" id="btnWipe">이 기기의 나의 최고 기록·고스트 지우기</button></div>
+    <div class="wipe">자동차 모델: “Car Concept” © Eric Chadwick, CC BY 4.0 (Khronos glTF Sample Assets)</div>
   </div>
 
   <div class="card" id="cardCar" style="display:none">
@@ -199,8 +200,11 @@
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 (function () {
 "use strict";
 
@@ -280,7 +284,7 @@ const best = {}; DIFFS.forEach(k => { best[k] = loadBest(k); });
 const GHOST_STEP = 100;
 let ghostPick = "none"; try { if (/^(none|mine|world)$/.test(localStorage.getItem("turbolap_ghostpick_v1") || "")) ghostPick = localStorage.getItem("turbolap_ghostpick_v1"); } catch (e) {}
 const worldGhost = { tried: {} }; DIFFS.forEach(k => { worldGhost[k] = null; worldGhost.tried[k] = false; });
-let ghostPlay = null, ghostCar = null, ghostIdx = 0, ghostLabel = "", ghostShort = "";
+let ghostPlay = null, ghostCar = null, ghostCarKey = null, ghostIdx = 0, ghostLabel = "", ghostShort = "";
 let recData = [], recLast = -Infinity;
 function ghostKey(k) { return "turbolap_ghost_" + k + "_v1"; }
 function loadMyGhost(k) { try { const j = JSON.parse(localStorage.getItem(ghostKey(k)) || "null"); return (j && j.ms > 0 && typeof j.data === "string") ? j : null; } catch (e) { return null; } }
@@ -321,7 +325,13 @@ function renderGhostButtons() {
 function makeGhostCar(ck) {
   const c = CARS[ck] || CARS[carKey];
   const g = makeCar(c.color, c.model);
-  g.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.4; o.material.depthWrite = false; } });
+  g.traverse(o => {
+    if (!o.isMesh) return;
+    const m = o.material.clone();
+    if (m.userData.filmic) filmicLook(m);
+    m.transparent = true; m.opacity = Math.min(m.opacity, 0.4); m.depthWrite = false;
+    o.material = m;
+  });
   return g;
 }
 function setupGhost() {
@@ -333,7 +343,7 @@ function setupGhost() {
   if (!src) return;
   try { const arr = JSON.parse(src); if (Array.isArray(arr) && arr.length > 1) ghostPlay = arr; } catch (e) {}
   if (!ghostPlay) { ghostLabel = ""; return; }
-  ghostCar = makeGhostCar(gcar); scene.add(ghostCar); placeGhost(0);
+  ghostCarKey = gcar; ghostCar = makeGhostCar(gcar); scene.add(ghostCar); placeGhost(0);
 }
 function placeGhost(t) {
   const a = ghostPlay; if (!a || !ghostCar) return;
@@ -489,7 +499,15 @@ const texChecker = canvasTex(128, 128, (c, w, h) => {
   for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { c.fillStyle = (x + y) % 2 ? "#1B2B20" : "#FFFFFF"; c.fillRect(x * s, y * s, s, s); }
 }, [1, 1]);
 
-const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+THREE.ColorManagement.enabled = false;
+const LEGACY_LIGHT = Math.PI;
+function makeRenderer(opts) {
+  const r = new THREE.WebGLRenderer(opts);
+  r.outputColorSpace = THREE.LinearSRGBColorSpace;
+  r.toneMapping = THREE.NoToneMapping;
+  return r;
+}
+const renderer = makeRenderer({ antialias: true, powerPreference: "high-performance" });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.domElement.id = "gl";
 document.body.insertBefore(renderer.domElement, document.body.firstChild);
@@ -497,8 +515,9 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xB8EAFD);
 scene.fog = new THREE.Fog(0xBFE8FC, 180, 520);
 const camera = new THREE.PerspectiveCamera(62, 1, 0.5, 1200);
-scene.add(new THREE.HemisphereLight(0xE6F4FF, 0x4E9A3E, 0.95));
-const sun = new THREE.DirectionalLight(0xFFFFFF, 0.75); sun.position.set(80, 140, 60); scene.add(sun);
+scene.add(new THREE.HemisphereLight(0xE6F4FF, 0x4E9A3E, 0.95 * LEGACY_LIGHT));
+const sun = new THREE.DirectionalLight(0xFFFFFF, 0.75 * LEGACY_LIGHT); sun.position.set(80, 140, 60); scene.add(sun);
+scene.environment = makeSkyEnvironment(renderer);
 function lambert(color, extra) { return new THREE.MeshLambertMaterial(Object.assign({ color }, extra || {})); }
 
 {
@@ -736,7 +755,7 @@ const CAR_MODELS = {
     }
   }
 };
-function makeCar(color, modelKey) {
+function makeCartoonCar(color, modelKey) {
   const D = CAR_MODELS[modelKey] || CAR_MODELS.p911;
   const g = new THREE.Group();
   const outline = new THREE.MeshBasicMaterial({ color: 0x1B2B20, side: THREE.BackSide });
@@ -791,24 +810,162 @@ function makeCar(color, modelKey) {
   g.userData.wheels = wheels; g.userData.wheelR = R;
   return g;
 }
+function makeSkyEnvironment(r) {
+  const envScene = new THREE.Scene();
+  const skyGradient = canvasTex(8, 256, (c, w, h) => {
+    const g = c.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, "#2F7FD8"); g.addColorStop(0.44, "#BFE6FF"); g.addColorStop(0.5, "#FFFFFF");
+    g.addColorStop(0.53, "#5E9E4C"); g.addColorStop(1, "#23421F");
+    c.fillStyle = g; c.fillRect(0, 0, w, h);
+  });
+  envScene.add(new THREE.Mesh(new THREE.SphereGeometry(50, 32, 16), new THREE.MeshBasicMaterial({ map: skyGradient, side: THREE.BackSide })));
+  const sunDisc = new THREE.Mesh(new THREE.CircleGeometry(4, 24), new THREE.MeshBasicMaterial({ color: new THREE.Color(8, 8, 7.4) }));
+  sunDisc.position.set(24, 38, 18); sunDisc.lookAt(0, 0, 0); envScene.add(sunDisc);
+  const softboxMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 2.4, 2.4), side: THREE.DoubleSide });
+  [[-32, 16, 4], [0, 22, -32], [30, 12, -14], [6, 14, 34]].forEach(p => {
+    const box = new THREE.Mesh(new THREE.PlaneGeometry(26, 5), softboxMat); box.position.set(p[0], p[1], p[2]); box.lookAt(0, 0, 0); envScene.add(box);
+  });
+  const pmrem = new THREE.PMREMGenerator(r);
+  const tex = pmrem.fromScene(envScene, 0.02).texture;
+  pmrem.dispose(); skyGradient.dispose();
+  return tex;
+}
+
+const FILMIC_EXPOSURE = "1.15";
+const FILMIC_GLSL = "vec3 filmicCurve(vec3 c) { c *= " + FILMIC_EXPOSURE + "; return clamp((c * (2.51 * c + 0.03)) / (c * (2.43 * c + 0.59) + 0.14), 0.0, 1.0); }\n";
+function filmicLook(mat) {
+  mat.userData.filmic = true;
+  mat.onBeforeCompile = sh => {
+    sh.fragmentShader = FILMIC_GLSL + sh.fragmentShader.replace("#include <colorspace_fragment>",
+      "gl_FragColor.rgb = filmicCurve(gl_FragColor.rgb);\n\tgl_FragColor = sRGBTransferOETF(gl_FragColor);");
+  };
+  mat.customProgramCacheKey = () => "filmic";
+  mat.needsUpdate = true;
+  return mat;
+}
+
+const SUPERCAR = { tpl: null, paintBase: null, paint: {}, wheelR: 0.4 };
+const SUPERCAR_LENGTH = 4.8;
+const SUPERCAR_WHEELS = ["FrontL", "FrontR", "RearL", "RearR"];
+function paintMaterial(color) {
+  if (!SUPERCAR.paint[color]) {
+    const m = filmicLook(SUPERCAR.paintBase.clone());
+    m.color.setHex(color).convertSRGBToLinear();
+    SUPERCAR.paint[color] = m;
+  }
+  return SUPERCAR.paint[color];
+}
+function makeBlobShadowTex() {
+  return canvasTex(128, 256, (c, w, h) => {
+    c.save(); c.scale(1, h / w);
+    const g = c.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2);
+    g.addColorStop(0, "rgba(27,43,32,0.62)"); g.addColorStop(0.6, "rgba(27,43,32,0.38)"); g.addColorStop(1, "rgba(27,43,32,0)");
+    c.fillStyle = g; c.fillRect(0, 0, w, w);
+    c.restore();
+  });
+}
+function prepareSupercar(root) {
+  root.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(root);
+  const fit = SUPERCAR_LENGTH / (box.max.z - box.min.z);
+  const wheelNodes = {}, wheelPos = {};
+  SUPERCAR_WHEELS.forEach(k => {
+    const n = root.getObjectByName("Wheel" + k);
+    if (!n) throw new Error("바퀴 노드 없음: Wheel" + k);
+    wheelNodes[k] = n; wheelPos[k] = n.getWorldPosition(new THREE.Vector3());
+  });
+  const axleMid = (wheelPos.FrontL.z + wheelPos.RearL.z) / 2;
+  const tireBox = new THREE.Box3().setFromObject(wheelNodes.FrontL);
+  SUPERCAR.wheelR = (tireBox.max.y - tireBox.min.y) / 2 * fit;
+
+  const model = new THREE.Group();
+  const holder = new THREE.Group(); holder.rotation.y = Math.PI; holder.scale.setScalar(fit); model.add(holder);
+  root.position.set(0, -box.min.y, -axleMid); holder.add(root);
+  model.updateMatrixWorld(true);
+  SUPERCAR_WHEELS.forEach(k => {
+    const n = wheelNodes[k];
+    const pivot = new THREE.Group(); pivot.name = "pivot" + k;
+    pivot.position.copy(n.getWorldPosition(new THREE.Vector3()));
+    const spin = new THREE.Group(); spin.name = "spin" + k; pivot.add(spin);
+    model.add(pivot); model.updateMatrixWorld(true);
+    n.children.slice().forEach(part => { if (/BrakePad/.test(part.name)) pivot.attach(part); else spin.attach(part); });
+  });
+
+  const seen = new Set();
+  model.traverse(o => {
+    if (!o.isMesh) return;
+    let m = o.material;
+    if (m.transmission > 0) {
+      m = m.clone(); m.transmission = 0; m.transparent = true; m.opacity = 0.32; m.depthWrite = false; m.roughness = 0.05; m.color.setRGB(0.05, 0.07, 0.09);
+      o.material = m;
+    }
+    if (m.name === "Paint 1 Carmine") SUPERCAR.paintBase = m;
+    if (!seen.has(m)) { seen.add(m); filmicLook(m); }
+  });
+  if (!SUPERCAR.paintBase) throw new Error("차체 도색 재질 없음");
+
+  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(2.9, 6.0), new THREE.MeshBasicMaterial({ map: makeBlobShadowTex(), transparent: true, depthWrite: false }));
+  shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.06; shadow.renderOrder = -1; model.add(shadow);
+  return model;
+}
+function makeSupercar(color) {
+  const g = new THREE.Group();
+  const m = SUPERCAR.tpl.clone(true);
+  m.traverse(o => { if (o.isMesh && o.material === SUPERCAR.paintBase) o.material = paintMaterial(color); });
+  g.add(m);
+  const wheels = SUPERCAR_WHEELS.map(k => { const p = m.getObjectByName("pivot" + k); return { g: p, spin: p.getObjectByName("spin" + k), front: k.startsWith("Front") }; });
+  g.rotation.order = "YXZ";
+  g.scale.setScalar(CFG.carScale);
+  g.userData.wheels = wheels; g.userData.wheelR = SUPERCAR.wheelR;
+  return g;
+}
+function makeCar(color, modelKey) {
+  return SUPERCAR.tpl ? makeSupercar(color) : makeCartoonCar(color, modelKey);
+}
+
 let car = makeCar(CARS[carKey].color, CARS[carKey].model); scene.add(car);
+const PREVIEW_W = 220, PREVIEW_H = 132;
 const carPreviews = [];
+let previewRenderer = null, previewScene = null, previewCam = null;
+try {
+  previewRenderer = makeRenderer({ alpha: true, antialias: true });
+  previewRenderer.setPixelRatio(1); previewRenderer.setSize(PREVIEW_W, PREVIEW_H, false);
+  previewScene = new THREE.Scene();
+  previewScene.add(new THREE.HemisphereLight(0xE6F4FF, 0x8FB37A, 1.0 * LEGACY_LIGHT));
+  const dl = new THREE.DirectionalLight(0xFFFFFF, 0.7 * LEGACY_LIGHT); dl.position.set(3, 6, 4); previewScene.add(dl);
+  previewScene.environment = makeSkyEnvironment(previewRenderer);
+  previewCam = new THREE.PerspectiveCamera(28, PREVIEW_W / PREVIEW_H, 0.1, 50); previewCam.position.set(0, 2.9, 7.4); previewCam.lookAt(0, 0.45, 0);
+} catch (e) { previewRenderer = null; }
+function buildPreviewCar(p) {
+  p.m = makeCar(CARS[p.key].color, CARS[p.key].model); p.m.scale.setScalar(0.92); p.m.rotation.y = p.ang;
+}
 document.querySelectorAll(".carbtn").forEach(b => {
-  const key = b.getAttribute("data-car"), cv = b.querySelector("canvas");
-  try {
-    const r = new THREE.WebGLRenderer({ canvas: cv, alpha: true, antialias: true }); r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); r.setSize(220, 132, false);
-    const sc = new THREE.Scene();
-    sc.add(new THREE.HemisphereLight(0xE6F4FF, 0x8FB37A, 1.0));
-    const dl = new THREE.DirectionalLight(0xFFFFFF, 0.7); dl.position.set(3, 6, 4); sc.add(dl);
-    const cam = new THREE.PerspectiveCamera(28, 220 / 132, 0.1, 50); cam.position.set(0, 3.4, 9); cam.lookAt(0, 0.55, 0);
-    const m = makeCar(CARS[key].color, CARS[key].model); m.scale.setScalar(0.92); m.rotation.y = 0.6; sc.add(m);
-    carPreviews.push({ r, sc, cam, m });
-  } catch (e) { cv.style.display = "none"; }
+  const cv = b.querySelector("canvas"), ctx = previewRenderer && cv.getContext("2d");
+  if (!ctx) { cv.style.display = "none"; return; }
+  const p = { key: b.getAttribute("data-car"), ctx, m: null, ang: 0.6 };
+  buildPreviewCar(p); carPreviews.push(p);
 });
 function renderCarPreviews(dt) {
-  if (state !== "menu" || cardCar.style.display === "none") return;
-  carPreviews.forEach(p => { p.m.rotation.y += dt * 1.1; p.r.render(p.sc, p.cam); });
+  if (!previewRenderer || state !== "menu" || cardCar.style.display === "none") return;
+  carPreviews.forEach(p => {
+    p.ang += dt * 1.1; p.m.rotation.y = p.ang;
+    previewScene.add(p.m); previewRenderer.render(previewScene, previewCam); previewScene.remove(p.m);
+    p.ctx.clearRect(0, 0, PREVIEW_W, PREVIEW_H); p.ctx.drawImage(previewRenderer.domElement, 0, 0);
+  });
 }
+function refreshCars() {
+  const pos = car.position.clone(), rot = car.rotation.clone();
+  scene.remove(car); car = makeCar(CARS[carKey].color, CARS[carKey].model); car.position.copy(pos); car.rotation.copy(rot); scene.add(car);
+  if (ghostCar) {
+    const gpos = ghostCar.position.clone(), grot = ghostCar.rotation.clone();
+    scene.remove(ghostCar); ghostCar = makeGhostCar(ghostCarKey); ghostCar.position.copy(gpos); ghostCar.rotation.copy(grot); scene.add(ghostCar);
+  }
+  carPreviews.forEach(buildPreviewCar);
+}
+new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load("img/turbo/supercar.glb", gltf => {
+  try { SUPERCAR.tpl = prepareSupercar(gltf.scene); refreshCars(); }
+  catch (e) { SUPERCAR.tpl = null; console.warn("[turbolap] 슈퍼카 모델 준비 실패, 기본 차로 달립니다:", e); }
+}, undefined, err => console.warn("[turbolap] 슈퍼카 모델을 못 불러와 기본 차로 달립니다:", err));
 
 const P = { x: 0, z: 0, y: 0, h: 0, v: 0, ci: 0, prevCi: 0, lap: 0, expected: 0, off: false, wallT: 0, steerVis: 0 };
 let state = "menu";
@@ -984,7 +1141,7 @@ function updateCar(dt) {
   const i1 = (P.ci + 5) % N, i0 = (P.ci + N - 5) % N;
   car.rotation.x = Math.atan2(S[i1].p.y - S[i0].p.y, SEG * 10) * (fx * s.t.x + fz * s.t.z);
   car.rotation.z = -str * Math.min(1, ratio) * 0.06;
-  car.userData.wheels.forEach(w => { w.spin.rotation.x += P.v * dt / car.userData.wheelR; if (w.front) w.g.rotation.y = P.steerVis; });
+  car.userData.wheels.forEach(w => { w.spin.rotation.x -= P.v * dt / car.userData.wheelR; if (w.front) w.g.rotation.y = P.steerVis; });
 }
 
 const camTarget = new THREE.Vector3(), camLook = new THREE.Vector3();
