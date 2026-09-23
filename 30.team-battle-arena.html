@@ -126,7 +126,7 @@
   }
   /* 캐릭터 카드: 고른 카드를 한 번 더 누르면 뒤집혀 뒷면(능력치 표·궁극기 설명)이 보임 */
   .charCard { flex: 1 1 0; min-width: 0; padding: 0; border: 0; background: transparent; text-align: center; perspective: 900px; color: inherit; }
-  .cardIn { position: relative; height: 270px; transition: transform .45s ease; transform-style: preserve-3d; }
+  .cardIn { position: relative; height: 285px; transition: transform .45s ease; transform-style: preserve-3d; }
   .charCard.flip .cardIn { transform: rotateY(180deg); }
   .face { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; flex-direction: column; overflow: hidden;
           -webkit-backface-visibility: hidden; backface-visibility: hidden;
@@ -217,7 +217,7 @@
     .slot .ch { font-size: 11px; }
     .chars { flex-wrap: wrap; }
     .charCard { flex: 1 1 40%; }
-    .cardIn { height: 250px; }
+    .cardIn { height: 290px; }
     .charCard .nm { font-size: 17px; }
     .back .nm { font-size: 14px; }
     .charCard .st { font-size: 12px; }
@@ -364,15 +364,16 @@
   var NET_MS = 100;                  // 위치 전송 간격(초당 10회)
   var CHARS = {
     /* shots·gap: 한 번 공격에 여러 발(gap ms 간격). perHit: 명중 1회당 궁극기 게이지 */
-    marksman: { name: "사격수", hp: 100, speed: 200, cd: 400, dmg: 8.4, range: KEY * 6, pSpeed: 950, pr: 6, shots: 2, gap: 70, perHit: 1, ultName: "난사" },
-    healer:   { name: "힐러", hp: 150, speed: 200, cd: 500, dmg: 11, range: KEY * 4, pSpeed: 700, pr: 9, perHit: 2, ultName: "회복" },
-    tank:     { name: "탱커", hp: 350, speed: 160, cd: 1000, dmg: 30, range: KEY * 1 + 50, arc: Math.PI * 0.7, perHit: 2, ultName: "방어태세" },   // 이동속도 = 사격수·힐러(200)의 80%
-    assassin: { name: "암살자", hp: 90, speed: 220, cd: 600, dmg: 20, range: 250, pSpeed: 900, pr: 8, shots: 3, gap: 80, perHit: 1, ultName: "은신" }
+    /* speed: 이동속도(초당 월드 px), ultSpeed: 궁극기 지속 중 이동속도 */
+    marksman: { name: "사격수", hp: 100, speed: 250, cd: 400, dmg: 8.4, range: KEY * 6, pSpeed: 950, pr: 6, shots: 2, gap: 70, perHit: 1, ultName: "난사" },
+    healer:   { name: "힐러", hp: 150, speed: 250, cd: 500, dmg: 11, range: KEY * 4, pSpeed: 700, pr: 9, perHit: 2, ultName: "회복" },
+    tank:     { name: "탱커", hp: 350, speed: 220, ultSpeed: 300, cd: 1000, dmg: 30, range: KEY * 1 + 50, arc: Math.PI * 0.7, perHit: 2, ultName: "방어태세" },
+    assassin: { name: "암살자", hp: 90, speed: 300, ultSpeed: 420, cd: 600, dmg: 20, range: 250, pSpeed: 900, pr: 8, shots: 3, gap: 80, perHit: 1, ultName: "은신" }
   };
   var CHAR_LIST = ["marksman", "healer", "tank", "assassin"];
   var ULT = { mkCount: 20, mkGap: 55, mkDmg: 18, mkSpeed: 1150, mkRange: KEY * 8, mkPr: 8,
-              hlPct: 0.10, hlDur: 3000, hlSelf: 2, hlPoseMs: 1000, tkDur: 5000, tkDef: 0.5, tkSpeed: 1.5,
-              asSmokeMs: 400, asDur: 10000, asSpeed: 1.4 };
+              hlPct: 0.10, hlDur: 3000, hlSelf: 2, hlPoseMs: 1000, tkDur: 5000, tkDef: 0.5,
+              asSmokeMs: 400, asDur: 10000 };
   var STEALTH_ALPHA = 0.4;           // 풀숲·은신 중인 아군이 보이는 투명도
   var BOT_VIEW = 600;                // AI 시야
   var BOT_REACT_MS = 550;            // AI 가 적을 발견하고 첫 공격까지 걸리는 시간
@@ -747,15 +748,16 @@
   function ultDesc(k) {
     if (k === "marksman") return "짧은 시간 내에 " + num(ULT.mkDmg) + "의 데미지를 주는 " + ULT.mkCount + "발의 총알을 발사합니다.";
     if (k === "healer") return "아군 모두 " + num(ULT.hlDur / 1000) + "초간 매 초 최대 체력의 " + num(ULT.hlPct * 100) + "%를 회복합니다. (힐러 자신은 " + ULT.hlSelf + "배)";
-    if (k === "tank") return num(ULT.tkDur / 1000) + "초간 이동속도를 " + num((ULT.tkSpeed - 1) * 100) + "% 얻고 받는 피해가 " + num((1 - ULT.tkDef) * 100) + "% 감소합니다.";
-    if (k === "assassin") return num(ULT.asDur / 1000) + "초간 이동속도를 " + num((ULT.asSpeed - 1) * 100) + "% 얻고 은신 상태가 됩니다. 다음 공격을 하면 은신이 해제됩니다.";
+    if (k === "tank") return num(ULT.tkDur / 1000) + "초간 이동속도가 " + CHARS.tank.ultSpeed + "으로 빨라지고 받는 피해가 " + num((1 - ULT.tkDef) * 100) + "% 감소합니다.";
+    if (k === "assassin") return num(ULT.asDur / 1000) + "초간 이동속도가 " + CHARS.assassin.ultSpeed + "으로 빨라지고 은신 상태가 됩니다. 다음 공격을 하면 은신이 해제됩니다.";
     return "";
   }
-  /* 능력치 표: HP · 공격당 데미지(여러 발이면 * n) · 초당 공격 횟수 · 사거리 · 궁극기 */
+  /* 능력치 표: HP · 공격당 데미지(여러 발이면 * n) · 초당 공격 횟수 · 이동속도(궁극기 중) · 사거리 · 궁극기 */
   function statTable(c) {
     var dmg = num(c.dmg) + (c.shots > 1 ? " * " + c.shots : "");
     return '<table class="st"><tr><th>HP</th><td>' + c.hp + "</td></tr><tr><th>공격</th><td>" + dmg + "</td></tr>" +
            "<tr><th>초당 공격</th><td>" + num(1000 / c.cd) + "회</td></tr>" +
+           "<tr><th>이동속도</th><td>" + c.speed + (c.ultSpeed ? " (궁 " + c.ultSpeed + ")" : "") + "</td></tr>" +
            "<tr><th>사거리</th><td>" + Math.round(c.range) + "</td></tr><tr><th>궁극기</th><td>" + c.ultName + "</td></tr></table>";
   }
   function cardsHtml(me) {
@@ -984,10 +986,10 @@
     }
   }
   function speedOf(E) {
-    var t = now(), k = 1;
-    if (E.buffUntil > t) k = ULT.tkSpeed;
-    if (E.char === "assassin" && E.stealthUntil > t) k = ULT.asSpeed;
-    return CHARS[E.char].speed * k;
+    var t = now(), c = CHARS[E.char];
+    if (E.char === "tank" && E.buffUntil > t) return c.ultSpeed;              // 방어태세
+    if (E.char === "assassin" && E.stealthUntil > t) return c.ultSpeed;       // 은신
+    return c.speed;
   }
   function moveEnt(E, vx, vy, dt) {
     var m = hyp(vx, vy); if (m > 1) { vx /= m; vy /= m; }
