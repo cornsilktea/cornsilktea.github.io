@@ -214,7 +214,8 @@ const CONFIG = {
     veryhard: {
       label: "매우 어려움",
       songs: [
-        { id: "heukgeon", title: "흑건",         bpm: 80,  song: "HARD_SONG_2", fallDurationMs: 1200, missScore: 30 }
+        { id: "heukgeon", title: "흑건",         bpm: 80,  song: "HARD_SONG_2", fallDurationMs: 1200, missScore: 30 },
+        { id: "dansemacabre", title: "dance macabre", bpm: 120, song: "DANCE_SONG", accomp: "DANCE_ACCOMP", fallDurationMs: 1300, missScore: 30 }
       ]
     }
   }
@@ -223,7 +224,7 @@ const CONFIG = {
 const NOTE_FREQ = {};
 (function(){
   const names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-  for (let midi = 48; midi <= 107; midi++) {
+  for (let midi = 21; midi <= 108; midi++) {
     NOTE_FREQ[names[midi % 12] + (Math.floor(midi / 12) - 1)] = Math.round(440 * Math.pow(2, (midi - 69) / 12) * 100) / 100;
   }
 })();
@@ -700,7 +701,109 @@ const ONELOVE_SONG = seq(`
   G5:4
 `);
 
-const SONG_DATA = { EASY_SONG_1, EASY_SONG_2, EASY_SONG_3, MEDIUM_SONG_1, MEDIUM_SONG_2, MEDIUM_SONG_3, HARD_SONG_1, HARD_SONG_2, HARD_SONG_3, LITH_SONG, KERNING_SONG, TERRAN_SONG, COUNTRYROADS_SONG, TOYOU_SONG, ZENZENZENSE_SONG, HAPPYDAY_SONG, MANCHANGA_SONG, ANTIFREEZE_SONG, ONELOVE_SONG };
+const DANCE_SONG = seq(`
+  D#5:0 A4:2.04:0.3 A4:0 D4:2.05:0.3 D#5:0 A4:1.3:0.3 D#5:0 A4:0.67:0.3 A4:0 D4:1.17:0.3 C7:0 A4:0.65:0.3 D#5:0 A4:0.37:0.3
+  D#5:0 A4:0.23:0.3 D#5:0 A4:0.56:0.3 A4:0 D4:0.3:0.3 D#5:0.3 D#5:0 A4:0.33:0.3 D#5:0 A4:0.28:0.3 D#5:0 A4:0.55:0.3 A4:0
+  D4:0.59:0.3 D#5:0 A4:0.58:0.3 A4:0 D4:0.6:0.3 D#5:0 A4:0.58:0.3 A4:0 D4:0.54:0.3 D#5:0 A4:0.57:0.3 D5:0 D2:0.73:0.3 G5:0
+  A#4:0.14:0.3 G1:0.65 G4:0 A#3:0.3:0.3 A#4:0.18 D3:0.38 A4:0.27 A#4:0 G2:0.35:0.3 D3:0.28 A4:0 D3:0.3:0.3 A#4:0.28 G4:0
+  A#3:0.28:0.3 A#4:0.3 A4:0 G2:0.26:0.3 G4:0.3 G4:0 D3:0.33:0.3 A#4:0.18 G4:0 A#3:0.37:0.3 A4:0.31 A#4:0 G2:0.58:0.3 A4:0
+  D3:0.35:0.3 A#4:0.23 G4:0 A#3:0.46:0.3 F2:0.14 G#4:0 F2:0.54:0.3 G#4:0 G#3:0.3:0.3 C5:0 C4:0.23:0.3 G#4:0 D#3:0.3:0.3 A#4:0
+  D#3:0.28:0.3 C5:0 F2:0.56:0.3 A#4:0 F2:0.19:0.3 D#3:0.18 C5:0.28 G#4:0 F2:0.28:0.3 C5:0 F2:0.28:0.3 A#4:0 F2:0.28:0.3 G#4:0
+  D#3:0.3:0.3 G#3:0 D#3:0.32:0.3 C5:0 C4:0.24:0.3 G#4:0 D#3:0.3:0.3 A#4:0 D#3:0.26:0.3 C5:0 F2:0.62:0.3 G#4:0 G#3:0.33:0.3 C5:0
+  C4:0.28:0.3 A#4:0 D#3:0.25:0.3 G#4:0 G#3:0.3:0.3 G2:0 G4:0.33:0.3 G5:0.35 G5:0 A#3:0.27:0.3 A#5:0.28 G5:0 A#3:0.28:0.3 A5:0.24
+  A#5:0 G3:0.16:0.3 G2:0.39 A5:0 D4:0.28:0.3 A#5:0.3 G5:0 D4:0.26:0.3 A#5:0.28 A5:0 G3:0.3:0.3 G5:0 G4:0.35:0.3 G5:0
+  D4:0.28:0.3 A#5:0.23 G5:0 A#3:0.26:0.3 A5:0.27 A#5:0 G3:0.35:0.3 D4:0.21 D4:0 A#3:0.31:0.3 A#5:0.3 G5:0 D4:0.23:0.3 A#5:0.3
+  G#5:0 F3:0.63:0.3 G#5:0 F3:0.25:0.3 C6:0.26 G#5:0 D#4:0.3:0.3 A#5:0.28 F3:0 F4:0.53:0.3 A#5:0 C4:0.35:0.3 C6:0.26 G#5:0
+  D#4:0.23:0.3 C6:0.14 F3:0.19 A#5:0 F3:0.28:0.3 G#5:0.27 G#5:0 D#4:0.28:0.3 C6:0.28 G#5:0 C4:0.28:0.3 A#5:0.33 F3:0.58 G#5:0
+  C4:0.23:0.3 C6:0.3 A#5:0 D#4:0.28:0.3 G#5:0.3 G5:0 D4:0.47:0.3 D3:0.16 D3:0.56 D4:0 D3:0.74:0.3 G4:0 G2:0.65:0.3 A#3:0
+  D3:0.56:0.3 G4:0 A#3:0.56:0.3 F4:0 G2:0.6:0.3 A#3:0 F3:0.58:0.3 F4:0 A#3:0.61:0.3 E4:0 G2:0.6:0.3 A#3:0 G2:0.58:0.3 A#3:0
+  E3:0.37:0.3 E4:0.21 D#4:0 G2:0.44:0.3 D#3:0.14 A#3:0 G2:0.63:0.3 D#4:0 D#3:0.58:0.3 D4:0 G2:0.63:0.3 E4:0 D3:0.56:0.3 G4:0
+  D3:0.62:0.3 F#4:0 A2:0.58:0.3 E4:0 D3:0.61:0.3 D4:0 D3:0.6:0.3 A2:0 E4:0.58:0.3 A3:0 E3:0.63:0.3 E4:0 E3:0.58:0.3 D2:0
+  F#4:0.67:0.3 D4:0 F#3:0.58:0.3 C7:0 D4:0.56:0.3 G2:0 G1:0.14:0.3 G4:0 G3:1.19:0.3 G4:0 A#3:0.46:0.3 G2:0.16 F4:0 G2:0.61:0.3
+  A#3:0 F3:0.56:0.3 F4:0 G2:0.58:0.3 E4:0 G2:0.65:0.3 A#3:0 G2:0.56:0.3 E4:0 E3:0.2:0.3 A#2:0.42 D#4:0 G2:0.4:0.3 D#3:0.18
+  A#3:0 G2:0.56:0.3 D#4:0 D#3:0.58:0.3 D4:0 G2:0.59:0.3 G4:0 D3:0.6:0.3 A#4:0 D3:0.6:0.3 A4:0 A2:0.61:0.3 F#4:0 D3:0.58:0.3
+  F#4:0 D3:0.37:0.3 A2:0.23 F#4:0 A2:0.58:0.3 F#4:0 D3:0.56:0.3 E4:0 E3:0.25:0.3 D2:0.31 D4:0 D2:1.02:0.3 D5:0 D3:0.32:0.3
+  F#5:0.21 D5:0 D4:0.28:0.3 E5:0.3 F#5:0 D3:0.56:0.3 E5:0 F#3:0.28:0.3 F#5:0.21 D5:0 D4:0.3:0.3 F#5:0.26 E5:0 D3:0.25:0.3
+  D5:0.33 D4:0 D3:0.3:0.3 F#5:0.21 D5:0 F#3:0.3:0.3 E5:0.35 D3:0 F#5:0.56:0.3 E5:0 D3:0.35:0.3 F#5:0.23 D5:0 A3:0.21:0.3
+  F#5:0.33 G5:0 D#5:0.65:0.3 G4:0 G3:0.23:0.3 A#4:0 G5:0.34:0.3 G4:0 A#3:0.21:0.3 A4:0.28 A#4:0 C2:0.61:0.3 D#4:0 G3:0.3:0.3
+  G4:0 A#4:0.28:0.3 A#4:0 D#4:0.28:0.3 F4:0.2 G4:0 A#3:0.61:0.3 A#3:0 G3:0.26:0.3 D#4:0.32 A#3:0.28 D4:0.3 D#4:0 A#3:0.16:0.3
+  C2:0.45 D#4:0 A#3:0.32:0.3 D#4:0.26 D#4:0 A#3:0.3:0.3 D#4:0.25 D4:0 D2:0.68:0.3 D5:0 F#3:0.28:0.3 F#5:0.25 D5:0 F#3:0.31:0.3
+  E5:0.32 F#5:0 D3:0.19:0.3 A3:0.34 E5:0 D3:0.28:0.3 F#5:0.31 D5:0 D3:0.3:0.3 F#5:0.28 E5:0 D3:0.34:0.3 D5:0.26 D5:0
+  D3:0.32:0.3 F#5:0.26 D5:0 F#3:0.24:0.3 E5:0.25 F#5:0 D3:0.58:0.3 E5:0 D3:0.3:0.3 F#5:0.26 D5:0 D3:0.28:0.3 F#5:0.25 G5:0
+  D#5:0.14:0.3 C2:0.51 G4:0 C2:0.26:0.3 A#4:0.23 G4:0 A#3:0.32:0.3 A4:0.26 A#4:0 C3:0.54:0.3 D#4:0 C#7:0.14:0.3 D#5:0.14 G4:0.25
+  D#4:0 A#3:0.3:0.3 F4:0.28 G4:0 C3:0.56:0.3 A#3:0 G3:0.28:0.3 D#4:0.25 A#3:0 G3:0.23:0.3 D4:0.38 D#4:0 A#3:0.21:0.3 D#5:0.37
+  D#4:0 A#3:0.3:0.3 D#4:0.26 D#4:0 A#3:0.3:0.3 D#4:0.3 D4:0 D2:0.67:0.3 A4:0.31 A4:0 D4:0.27:0.3 A4:0 D4:0.28:0.3 A4:0.3
+  D#5:0 A4:0.59:0.3 A4:0 D4:0.25:0.3 D4:0.28 A4:0 D4:0.26:0.3 C7:0 D4:0.37:0.3 D#5:0 A4:0.58:0.3 A4:0 D4:0.53:0.3 D#5:0
+  A4:0.4:0.3 D4:0.18 A4:0 D4:0.58:0.3 D#5:0 A4:0.4:0.3 D2:0.16 F#4:0 D2:0.68:0.3 A#4:0 G2:0.14:0.3 G5:0 G1:0.79:0.3 A#5:0.25
+  G5:0.3 A5:0.26 D5:0 D4:0.63:0.3 A5:0.27 A#5:0.28 G5:0.21 A#5:0.35 G4:0 D4:0.31:0.3 G5:0 G2:0.3:0.3 G5:0 A#3:0.27:0.3
+  A#5:0 A#4:0.31:0.3 A#5:0 G5:0.28:0.3 A5:0.28 A#5:0 D4:0.65:0.3 A5:0.27 A#5:0.26 A#5:0 G5:0.3:0.3 A#5:0.3 G#5:0 G#3:0.61:0.3
+  G#5:0 G#3:0.23:0.3 C6:0.3 G#5:0.28 A#5:0.26 D#4:0 G#3:0.44:0.3 F2:0.14 A#5:0 D#4:0.3:0.3 G#3:0.26 G#5:0 G#3:0.25:0.3 C6:0
+  F3:0.35:0.3 D#4:0 F3:0.32:0.3 G#5:0.3 G#5:0.26 C6:0.3 G#5:0.31 A#5:0.28 D#4:0 G#3:0.6:0.3 G#5:0.28 C6:0 G#3:0.32:0.3 A#5:0.28
+  G#5:0.35 G5:0 G2:0.65:0.3 G4:0 G2:0.21:0.3 A#5:0 A#4:0.35:0.3 G5:0 A#3:0.28:0.3 A5:0.25 A#5:0 G3:0.26:0.3 A#5:0.28 A5:0
+  D4:0.3:0.3 A#5:0.35 G5:0 D4:0.25:0.3 A#5:0.26 A5:0 G3:0.3:0.3 G5:0 G4:0.3:0.3 G5:0 A#3:0.31:0.3 A#5:0.25 G5:0 A#3:0.32:0.3
+  A5:0.24 A#5:0 G3:0.28:0.3 A#5:0.28 D4:0 A#3:0.3:0.3 A#5:0.33 G5:0 G4:0.25:0.3 A#5:0.3 G#5:0 F3:0.61:0.3 G#5:0 D#4:0.25:0.3
+  C6:0 C5:0.26:0.3 G#5:0 D#4:0.3:0.3 A#5:0.25 F3:0.58 A#5:0 C4:0.31:0.3 C6:0.25 G#5:0 D#4:0.26:0.3 C6:0.3 A#5:0 F3:0.28:0.3
+  A#5:0 G#5:0.3:0.3 G#5:0 C4:0.26:0.3 C6:0.27 G#5:0 G#4:0.28:0.3 A#5:0.33 F3:0 C6:0.58:0.3 G#5:0 D#4:0.33:0.3 C6:0.25 A#5:0
+  D#4:0.3:0.3 G#5:0.31 G5:0 G4:0.72:0.3 G4:0 G3:0.34:0.3 D3:0.19 D4:0 D3:0.42:0.3 G2:0.28 G4:0 G2:0.62:0.3 D4:0 A#3:0.61:0.3
+  G4:0 D4:0.6:0.3 F4:0 F3:0.19:0.3 G1:0.35 D4:0 G2:0.14:0.3 G1:0.46 F4:0 F3:0.14:0.3 G1:0.51 E4:0 E3:0.28:0.3 G1:0.32
+  A#3:0.54 A#3:0 E3:0.63:0.3 D#3:0 G2:0.27:0.3 G1:0.29 A#3:0 D#3:0.23:0.3 D#2:0.37 A#3:0 D#3:0.21:0.3 D#3:0 D#2:0.42:0.3 D4:0
+  G2:0.14:0.3 G1:0.44 E4:0 E3:0.55:0.3 G4:0 G3:0.63:0.3 F#4:0 F#3:0.61:0.3 A3:0 E3:0.2:0.3 A1:0.4 D4:0 D3:0.16:0.3 A2:0.28
+  A2:0.21 E3:0 A2:0.61:0.3 C#4:0 A3:0.53:0.3 E4:0 C#4:0.16:0.3 A1:0.51 F#3:0 D2:0.16:0.3 D2:0.42 D4:0 D3:0.61:0.3 D4:0
+  D3:0.63:0.3 G4:0 G2:0.21:0.3 G1:0.37 D4:0 A#3:0.58:0.3 G4:0 A#3:0.18:0.3 G1:0.47 F4:0 F3:0.35:0.3 G1:0.27 D4:0 A#3:0.59:0.3
+  F4:0 F3:0.23:0.3 D3:0 G1:0.37:0.3 E4:0 E3:0.26:0.3 G1:0.37 A#3:0.16 G1:0.37 E4:0 E3:0.68:0.3 D#4:0 D#3:0.27:0.3 G1:0.31
+  A#3:0 G3:0.58:0.3 A#3:0 D#3:0.27:0.3 D#2:0.38 D4:0 G2:0.53:0.3 G4:0 A#3:0.68:0.3 A#4:0 A#3:0.6:0.3 A4:0 A2:0.21:0.3 A1:0.39
+  F#4:0 F#3:0.59:0.3 D4:0 D3:0.62:0.3 F#4:0 F#3:0.28:0.3 A1:0.28 D4:0 A3:0.16:0.3 A2:0 A1:0.47:0.3 E4:0 C#4:0.44:0.3 D2:0.16
+  D4:0 D2:0.65:0.3 D3:0.3 D5:0 F#3:0.33:0.3 F#5:0.21 D4:0 D3:0.32:0.3 E5:0.3 F#5:0 D3:0.54:0.3 E5:0 D3:0.16:0.3 F#5:0
+  D2:0.4:0.3 D5:0 D3:0.53:0.3 E5:0 D3:0.28:0.3 D5:0.33 D5:0 D3:0.3:0.3 F#5:0.23 D5:0 A3:0.3:0.3 E5:0 A3:0.31:0.3 F#5:0
+  D3:0.57:0.3 A3:0 D3:0.35:0.3 F#5:0.19 D5:0 D3:0.3:0.3 F#5:0.28 G5:0 A#4:0.72:0.3 A#4:0 G4:0.28:0.3 A#4:0.26 G4:0 A#3:0.3:0.3
+  A4:0 C2:0.28:0.3 A#4:0 C2:0.6:0.3 D#4:0 A#3:0.3:0.3 A#4:0 G4:0.23:0.3 D#4:0 A#3:0.33:0.3 F4:0.19 G4:0 A#3:0.6:0.3 A#3:0
+  G3:0.3:0.3 D#4:0 A#3:0.26:0.3 A#3:0 G3:0.26:0.3 D4:0.34 D#4:0 A#3:0.65:0.3 D#4:0 A#3:0.31:0.3 D#4:0.27 D#4:0 A#3:0.28:0.3 D#4:0.33
+  D4:0 D2:0.7:0.3 D5:0 A3:0.32:0.3 F#5:0.26 D5:0 A3:0.3:0.3 E5:0.28 F#5:0 D3:0.58:0.3 E5:0 D3:0.28:0.3 F#5:0.3 D5:0
+  D3:0.28:0.3 F#5:0.28 E5:0 D3:0.3:0.3 D5:0.3 D5:0 D3:0.3:0.3 F#5:0.28 D5:0 D3:0.14:0.3 A3:0.16 E5:0 A3:0.24:0.3 F#5:0
+  D3:0.58:0.3 E5:0 D3:0.3:0.3 F#5:0 F#3:0.25:0.3 D5:0 D3:0.28:0.3 F#5:0.31 D#5:0 A#4:0.69:0.3 G4:0 G3:0.21:0.3 A#4:0.26 G4:0
+  A#3:0.3:0.3 A4:0.23 A#4:0 C3:0.58:0.3 D#4:0 A#3:0.33:0.3 G4:0.28 D#4:0 A#3:0.3:0.3 F4:0.23 G4:0 C3:0.58:0.3 A#3:0 G3:0.3:0.3
+  D#4:0.26 G4:0 A#3:0.28:0.3 D4:0.3 D#4:0 C3:0.26:0.3 G2:0.32 D#4:0 C3:0.33:0.3 D#4:0.28 D#4:0 A#3:0.3:0.3 D#4:0.32 D4:0
+  D2:0.68:0.3 D4:0.28 D4:0.27 D4:0 A4:0.26:0.3 A4:0 D3:0.35:0.3 D#5:0 A4:0.51:0.3 A4:0 D4:0.3:0.3 A4:0.3 A4:0 D4:0.24:0.3
+  A4:0 D4:0.37:0.3 D#5:0 A4:0.35:0.3 D4:0.25 A4:0 D4:0.58:0.3 D#5:0 A4:0.56:0.3 A4:0 D4:0.56:0.3 D#5:0 A4:0.39:0.3 D2:0.17
+  D4:0 D2:0.81:0.3 G5:0 G1:1.65:0.3 D3:2
+`);
+
+const DANCE_ACCOMP = seq(`
+  A5:2.04:0.3 C7:0:0.3 D3:4.02:0.3 C7:1.17:0.3 D4:2.41:0.3 A5:0.33:0.3 A5:4.29:0.3 D4:0:0.3 D3:0.03:0.3 F#4:0.7:0.3 G2:0.02:0.3 G4:0:0.3 G3:1.93:0.3 D4:0.62:0.3
+  A#3:1.14:0.3 D4:0.56:0.3 A#3:0.58:0.3 G3:0.61:0.3 D4:0.09:0.3 A#3:0.53:0.3 A#3:1.7:0.3 C5:0:0.3 C4:0:0.3 D#3:0.51:0.3 C4:0.03:0.3 G#3:1.11:0.3 D#3:0.09:0.3 C5:0:0.3
+  G#3:0.03:0.3 C4:0.53:0.3 G#3:0.02:0.3 C4:0:0.3 D#3:0.28:0.3 C4:0.84:0.3 C4:0.56:0.3 F2:0.02:0.3 G#3:1.21:0.3 D#3:1.79:0.3 D4:0:0.3 G2:0.55:0.3 D4:1.1:0.3 A#3:0.55:0.3
+  A#3:0.54:0.3 D4:0.02:0.3 G4:0.63:0.3 A#3:0.51:0.3 D4:1.09:0.3 A5:0.61:0.3 A#3:1.16:0.3 C4:0.51:0.3 C4:0.6:0.3 C6:0.51:0.3 C5:0.05:0.3 F3:0.02:0.3 D#4:0.54:0.3 C4:1.11:0.3
+  C4:0:0.3 F3:0.56:0.3 D#4:1.19:0.3 F3:0.02:0.3 D#4:0.56:0.3 C4:0.53:0.3 G4:0:0.3 A#3:0:0.3 A#2:0.03:0.3 G3:0:0.3 G2:1.18:0.3 G2:0.84:0.3 G1:2.83:0.3 F3:0.02:0.3
+  D4:1.21:0.3 E3:1.72:0.3 D#3:0.03:0.3 G3:0.6:0.3 A#3:1.21:0.3 A#3:0.56:0.3 A#3:1.23:0.3 A3:0.02:0.3 F#3:0:0.3 A2:0.56:0.3 A3:0.02:0.3 F#3:0.03:0.3 A2:1.13:0.3 C#3:0.03:0.3
+  A2:0.6:0.3 A3:0:0.3 C#3:0.02:0.3 A2:1.26:0.3 D3:0.55:0.3 F#4:0:0.3 A3:0:0.3 D3:0.03:0.3 D2:0.67:0.3 G5:1.21:0.3 G3:0.6:0.3 D4:1.17:0.3 D4:0:0.3 A#3:0.02:0.3
+  F3:1.21:0.3 E3:0.56:0.3 A#3:0.04:0.3 G2:1.16:0.3 D#3:0.56:0.3 A#3:1.17:0.3 A#3:0:0.3 G3:0:0.3 G2:0.6:0.3 A#3:0.02:0.3 G4:1.19:0.3 F#3:0.58:0.3 D4:0:0.3 A3:1.18:0.3
+  A3:0.03:0.3 F#3:0:0.3 A2:0.53:0.3 A3:0.02:0.3 C#3:0.63:0.3 D3:0.93:0.3 D4:0:0.3 F#3:0.53:0.3 A3:1.14:0.3 F#4:0:0.3 A3:1.63:0.3 D5:0:0.3 A3:0:0.3 F#3:0.51:0.3
+  D3:0.02:0.3 D4:0:0.3 A3:1.21:0.3 A3:0:0.3 F#3:0.05:0.3 D2:1.05:0.3 C2:0.02:0.3 A#4:0:0.3 G4:0:0.3 C3:0.63:0.3 A#3:1.06:0.3 C3:0.03:0.3 G4:0:0.3 D#4:0.58:0.3
+  A#3:0.02:0.3 G4:0.56:0.3 A#3:0.02:0.3 G4:0.46:0.3 C2:0.03:0.3 D#4:0:0.3 C3:1.74:0.3 D#5:0:0.3 G4:0:0.3 G3:0:0.3 D#3:0:0.3 C3:0:0.3 C2:1.19:0.3 G4:1.23:0.3
+  D4:0.53:0.3 D4:0.1:0.3 D3:1.06:0.3 D4:0:0.3 A3:0:0.3 F#3:0.61:0.3 D4:0:0.3 A3:0:0.3 F#3:0.56:0.3 A3:0.6:0.3 D4:0:0.3 A3:0:0.3 F#3:0.58:0.3 D4:0:0.3
+  A3:1.09:0.3 D4:0:0.3 A3:0:0.3 F#3:0.54:0.3 D4:0:0.3 A3:0.53:0.3 C2:0.03:0.3 A#4:0:0.3 C3:0.62:0.3 G3:0:0.3 C3:0.54:0.3 G3:0.53:0.3 D#5:0:0.3 G4:0:0.3
+  D#3:0.02:0.3 D#4:0.52:0.3 A#3:0:0.3 G3:0.02:0.3 G4:0.51:0.3 G3:0.58:0.3 D#4:0:0.3 A#3:0:0.3 D#3:1.7:0.3 D#3:0:0.3 C3:0.02:0.3 G3:0.56:0.3 G4:0:0.3 C3:0.02:0.3
+  D#5:0.54:0.3 G3:0.6:0.3 D3:0.98:0.3 D3:1.44:0.3 D3:0.02:0.3 A3:0.81:0.3 A4:0:0.3 D3:3.16:0.3 D5:0:0.3 D3:0.02:0.3 D4:0.66:0.3 D5:0.02:0.3 G4:1.72:0.3 A#5:0:0.3
+  G3:0:0.3 G2:0.02:0.3 A#3:1.72:0.3 A#3:0:0.3 G3:0.02:0.3 A#2:1.75:0.3 D5:0:0.3 G4:0:0.3 A#3:0:0.3 G3:0:0.3 A#2:1.79:0.3 D#5:0:0.3 F3:0:0.3 G#2:0.02:0.3
+  D#4:0:0.3 C4:1.63:0.3 C4:0:0.3 F3:1.74:0.3 G#3:0.02:0.3 C4:0:0.3 F2:1.75:0.3 D#5:0:0.3 C4:0:0.3 F3:0:0.3 F2:1.83:0.3 A#4:0.02:0.3 D5:0.63:0.3 D4:0:0.3
+  A#3:0.21:0.3 G5:0.35:0.3 G4:0:0.3 D4:0.65:0.3 G2:0.44:0.3 G4:0:0.3 A#3:0.63:0.3 G4:0:0.3 A#3:0.51:0.3 G4:0.6:0.3 G4:0:0.3 D4:0:0.3 G3:0.58:0.3 G4:0:0.3
+  D4:1.1:0.3 A5:0.02:0.3 G4:0.61:0.3 D4:0:0.3 A#3:0:0.3 G3:1.16:0.3 G#4:0:0.3 C4:0:0.3 F3:0.51:0.3 C5:0:0.3 G#4:0.02:0.3 C4:1.11:0.3 G#4:0.03:0.3 C5:0:0.3
+  D#4:0:0.3 F3:0.53:0.3 G#4:0.03:0.3 C4:1.11:0.3 C5:0:0.3 G#4:0:0.3 F3:0.02:0.3 D#4:0.51:0.3 D#4:0:0.3 C4:1.19:0.3 G#4:0.02:0.3 C4:0.58:0.3 G#4:0.59:0.3 G3:0.02:0.3
+  D4:0:0.3 A#3:0:0.3 A#2:0.72:0.3 A#3:0.53:0.3 G4:0:0.3 G3:0.7:0.3 G3:0.09:0.3 G1:1.12:0.3 A#3:0:0.3 G2:0.6:0.3 G2:0.54:0.3 A#3:0.6:0.3 D4:0:0.3 A#3:0:0.3
+  D3:0:0.3 G2:0.68:0.3 G2:1.13:0.3 E4:0.61:0.3 D#2:0.11:0.3 D#4:1.7:0.3 D3:0.56:0.3 G2:0.02:0.3 A#3:0.56:0.3 A#3:0.6:0.3 A2:0.63:0.3 A2:0.58:0.3 A3:0.02:0.3 F#3:0.03:0.3
+  E3:0.6:0.3 E4:0.07:0.3 A1:0.56:0.3 A2:0.53:0.3 A3:0:0.3 E3:0:0.3 A2:0.65:0.3 F#4:0:0.3 D3:0.03:0.3 A3:1.81:0.3 G3:1.14:0.3 D4:0:0.3 G3:0:0.3 D3:0.65:0.3
+  D3:0:0.3 G2:1.21:0.3 D4:0:0.3 A#3:0.65:0.3 G2:1.13:0.3 A#3:0:0.3 G2:0.7:0.3 G2:1.12:0.3 G2:0.04:0.3 G3:0.63:0.3 D3:0.51:0.3 G2:0.68:0.3 D4:1.81:0.3 C7:0.6:0.3
+  A2:1.19:0.3 A3:0:0.3 E3:0:0.3 A2:0.09:0.3 A1:0.51:0.3 D3:0.98:0.3 D4:0:0.3 D3:0.51:0.3 A3:0.65:0.3 F#3:0.51:0.3 A3:0.03:0.3 F#3:0.55:0.3 D4:0:0.3 A3:0:0.3
+  F#3:0.51:0.3 A3:0.61:0.3 D4:0.02:0.3 A3:0:0.3 F#3:0.53:0.3 D4:0:0.3 F#3:1.16:0.3 E5:0.03:0.3 F#3:0.51:0.3 D4:0.03:0.3 A3:0:0.3 F#3:0.07:0.3 D2:0.48:0.3 C2:0.03:0.3
+  C3:0.02:0.3 D#5:0.67:0.3 A#3:0:0.3 G3:0.03:0.3 C3:0.51:0.3 G3:0.58:0.3 D#5:0:0.3 G4:0:0.3 D#4:0:0.3 D#3:0:0.3 C3:1.13:0.3 G3:0.52:0.3 D#4:0.02:0.3 C3:0:0.3
+  C2:0.58:0.3 C2:0.56:0.3 G4:0.6:0.3 D#5:0:0.3 D#3:0:0.3 C2:0.03:0.3 G4:0:0.3 G3:0:0.3 C3:0.62:0.3 G3:0.58:0.3 G3:0.61:0.3 D3:1.28:0.3 D4:0.11:0.3 F#3:0.54:0.3
+  F#3:0.51:0.3 A3:0.58:0.3 D4:0:0.3 A3:0.02:0.3 F#3:0.54:0.3 A3:0.6:0.3 D4:0:0.3 A3:0:0.3 F#3:0.58:0.3 D4:1.14:0.3 D4:0:0.3 A3:0:0.3 F#3:0.53:0.3 D4:0.03:0.3
+  F#4:0:0.3 A3:0:0.3 F#3:0.56:0.3 C2:0.02:0.3 C3:0.02:0.3 G5:0.65:0.3 A#3:0:0.3 C2:1:0.3 D#3:0.03:0.3 D#5:0:0.3 G4:0:0.3 D#4:0.55:0.3 G3:0.03:0.3 D#5:0:0.3
+  G4:0:0.3 C3:0.58:0.3 G3:0.53:0.3 D#4:0:0.3 A#3:0:0.3 D#3:0.6:0.3 C3:0.56:0.3 G3:0.56:0.3 D#5:0:0.3 A#3:0.02:0.3 G3:0.56:0.3 G4:0.03:0.3 A#3:0:0.3 G3:1.2:0.3
+  D3:1.49:0.3 D4:0.88:0.3 D3:4.05:0.3 D3:0.02:0.3 D5:0:0.3 F#4:0.79:0.3 A#4:0:0.3 G4:0.02:0.3 G2:2:0.3
+`);
+
+const SONG_DATA = { EASY_SONG_1, EASY_SONG_2, EASY_SONG_3, MEDIUM_SONG_1, MEDIUM_SONG_2, MEDIUM_SONG_3, HARD_SONG_1, HARD_SONG_2, HARD_SONG_3, LITH_SONG, KERNING_SONG, TERRAN_SONG, COUNTRYROADS_SONG, TOYOU_SONG, ZENZENZENSE_SONG, HAPPYDAY_SONG, MANCHANGA_SONG, ANTIFREEZE_SONG, ONELOVE_SONG, DANCE_SONG, DANCE_ACCOMP };
 
 const Best = {
   KEY: "pianotiles_best_v1",
@@ -708,6 +811,13 @@ const Best = {
   get(id){ const b = this.all()[id]; return (b && typeof b.score === "number") ? b : null; },
   set(id, rec){ try { const a = this.all(); a[id] = rec; localStorage.setItem(this.KEY, JSON.stringify(a)); } catch (e) {} }
 };
+
+function songEvents(data, bpm, t0Ms, volScale){
+  const beatMs = 60000 / bpm, events = [];
+  let acc = 0;
+  data.forEach(n => { if (n.pitch) events.push({ at: (t0Ms + acc) / 1000, freq: NOTE_FREQ[n.pitch], vol: volScale * (n.vol || 1) }); acc += n.beats * beatMs; });
+  return events;
+}
 
 const Sound = {
   ctx: null,
@@ -755,36 +865,58 @@ const Sound = {
     const ns = c.createBufferSource(); ns.buffer = buf;
     const hp = c.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 1500;
     ns.connect(hp); hp.connect(master); ns.start(t); ns.stop(t + 0.02);
+    master.endAt = end;
     return master;
   },
+  stream(events, onDone){
+    const c = this.ctx;
+    const s = { nodes: [], next: 0, timer: 0, stopped: false };
+    const lastAt = events.length ? events[events.length - 1].at : c.currentTime;
+    const tick = () => {
+      if (s.stopped) return;
+      const horizon = c.currentTime + 1.0;
+      while (s.next < events.length && events[s.next].at < horizon) {
+        const e = events[s.next++];
+        const g = this.playNote(e.freq, e.vol, e.at); if (g) s.nodes.push(g);
+      }
+      s.nodes = s.nodes.filter(g => g.endAt > c.currentTime);
+      if (s.next >= events.length && c.currentTime > lastAt + 0.4) { s.stopped = true; if (onDone) onDone(); return; }
+      s.timer = setTimeout(tick, 250);
+    };
+    tick();
+    return s;
+  },
+  silence(s){
+    if (!s || s.stopped) return;
+    s.stopped = true;
+    clearTimeout(s.timer);
+    s.nodes.forEach(g => { try { g.gain.cancelScheduledValues(0); g.gain.value = 0; g.disconnect(); } catch (e) {} });
+  },
   preview: null,
-  playSong(id, data, bpm, onEnd){
+  playSong(id, cfg, onEnd){
     this.stopPreview();
     const c = this.ensure(); if (!c) return;
-    const beatMs = 60000 / bpm, t0 = c.currentTime + 0.1;
-    const events = []; let acc = 0;
-    data.forEach(n => { if (n.pitch) events.push({ at: t0 + acc / 1000, freq: NOTE_FREQ[n.pitch], vol: n.vol || 1 }); acc += n.beats * beatMs; });
-    const p = { id, nodes: [], next: 0, onEnd, timer: 0 };
-    const tick = () => {
-      if (this.preview !== p) return;
-      const horizon = c.currentTime + 1.0;
-      while (p.next < events.length && events[p.next].at < horizon) {
-        const g = this.playNote(events[p.next].freq, 0.4 * events[p.next].vol, events[p.next].at); if (g) p.nodes.push(g);
-        p.next++;
-      }
-      if (p.next >= events.length && c.currentTime > t0 + acc / 1000 + 0.4) { this.preview = null; if (onEnd) onEnd(); return; }
-      p.timer = setTimeout(tick, 250);
-    };
+    const t0Ms = (c.currentTime + 0.1) * 1000;
+    const events = songEvents(SONG_DATA[cfg.song], cfg.bpm, t0Ms, 0.4);
+    if (cfg.accomp) events.push(...songEvents(SONG_DATA[cfg.accomp], cfg.bpm, t0Ms, 0.4));
+    events.sort((a, b) => a.at - b.at);
+    const p = { id, onEnd };
+    p.stream = this.stream(events, () => { if (this.preview === p) { this.preview = null; if (onEnd) onEnd(); } });
     this.preview = p;
-    tick();
   },
   stopPreview(){
     const p = this.preview; if (!p) return;
-    clearTimeout(p.timer);
-    p.nodes.forEach(g => { try { g.gain.cancelScheduledValues(0); g.gain.value = 0; g.disconnect(); } catch (e) {} });
     this.preview = null;
+    this.silence(p.stream);
     if (p.onEnd) p.onEnd();
   },
+  backing: null,
+  playBacking(cfg, startMs){
+    this.stopBacking();
+    if (!cfg.accomp || !this.ctx) return;
+    this.backing = this.stream(songEvents(SONG_DATA[cfg.accomp], cfg.bpm, startMs, 0.5));
+  },
+  stopBacking(){ this.silence(this.backing); this.backing = null; },
   playThud(){
     const c = this.ctx; if (!c) return;
     const t = c.currentTime;
@@ -883,7 +1015,7 @@ function renderSongs(){
     lb.addEventListener("click", e => {
       e.stopPropagation();
       if (Sound.preview && Sound.preview.id === s.id) { Sound.stopPreview(); return; }
-      Sound.playSong(s.id, SONG_DATA[s.song], s.bpm, syncListenBtns);
+      Sound.playSong(s.id, s, syncListenBtns);
       syncListenBtns();
     });
     row.appendChild(card);
@@ -940,7 +1072,9 @@ function startGame(){
   updateHud();
   S.startMs = Sound.nowMs() + CONFIG.leadInMs + cfg.fallDurationMs;
   S.notes.forEach(n => n.targetMs = S.startMs + n.offset);
-  S.endMs = S.notes[S.notes.length - 1].targetMs + 1200;
+  const accompMs = cfg.accomp ? SONG_DATA[cfg.accomp].reduce((a, n) => a + n.beats, 0) * beatMs : 0;
+  S.endMs = Math.max(S.notes[S.notes.length - 1].targetMs, S.startMs + accompMs) + 1200;
+  Sound.playBacking(cfg, S.startMs);
   S.running = true;
   cancelAnimationFrame(S.raf);
   S.raf = requestAnimationFrame(loop);
@@ -1130,6 +1264,7 @@ $("exitBtn").addEventListener("click", () => { if (S.running) finish(); });
 function finish(){
   S.running = false;
   cancelAnimationFrame(S.raf);
+  Sound.stopBacking();
   const now = Sound.nowMs();
   S.notes.forEach(n => { if (!n.judged) judge(n, "MISS", now, false, true); });
   const cfg = S.song, prev = Best.get(cfg.id);
