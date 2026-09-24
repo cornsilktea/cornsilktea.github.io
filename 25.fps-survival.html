@@ -1052,7 +1052,9 @@ function updateEnemy(e, dt) {
   const C = DIFFICULTY_CONFIG, p = e.g.position;
   const dx = P.x - p.x, dz = P.z - p.z, dist = Math.hypot(dx, dz) || 0.001, nx = dx / dist, nz = dz / dist;
   let radial = 0;
-  if (dist > C.enemyKeepMax) radial = 1; else if (dist < C.enemyKeepMin) radial = -1;
+  e.sightT = (e.sightT || 0) - dt;
+  if (e.sightT <= 0) { e.sightT = 0.3; e.seesTarget = enemyCanSee(e); }
+  if (dist > C.enemyKeepMax || (!e.seesTarget && dist > 3)) radial = 1; else if (dist < C.enemyKeepMin) radial = -1;
   e.strafeT -= dt; if (e.strafeT <= 0) { e.strafe = -e.strafe; e.strafeT = rnd(1.5, 3); }
   let mx = nx * radial + (-nz) * e.strafe * 0.9, mz = nz * radial + nx * e.strafe * 0.9;
   const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml;
@@ -2026,7 +2028,9 @@ function updateBotSim(b, dt, t) {
   const tg = botTarget(b), tx = tg ? tg.x : 0, tz = tg ? tg.z : 0;
   const dx = tx - b.x, dz = tz - b.z, dist = Math.hypot(dx, dz) || 0.001, nx = dx / dist, nz = dz / dist;
   let radial = 0;
-  if (!tg || dist > C.enemyKeepMax) radial = 1; else if (dist < C.enemyKeepMin) radial = -1;
+  b.sightT = (b.sightT || 0) - dt;
+  if (b.sightT <= 0) { b.sightT = 0.3; b.seesTarget = !!tg && botCanSee(b, tx, tz); }
+  if (!tg || dist > C.enemyKeepMax || (!b.seesTarget && dist > 3)) radial = 1; else if (dist < C.enemyKeepMin) radial = -1;
   b.strafeT -= dt; if (b.strafeT <= 0) { b.strafe = -b.strafe; b.strafeT = rnd(1.5, 3); }
   let mx = nx * radial + (-nz) * b.strafe * 0.9, mz = nz * radial + nx * b.strafe * 0.9;
   const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml;
