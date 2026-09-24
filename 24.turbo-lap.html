@@ -3109,7 +3109,7 @@ function makeBlobShadowTex() {
   return canvasTex(128, 256, (c, w, h) => {
     c.save(); c.scale(1, h / w);
     const g = c.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2);
-    g.addColorStop(0, "rgba(10,12,10,0.55)"); g.addColorStop(0.6, "rgba(10,12,10,0.3)"); g.addColorStop(1, "rgba(10,12,10,0)");
+    g.addColorStop(0, "rgba(8,10,8,0.78)"); g.addColorStop(0.45, "rgba(8,10,8,0.55)"); g.addColorStop(0.75, "rgba(8,10,8,0.22)"); g.addColorStop(1, "rgba(8,10,8,0)");
     c.fillStyle = g; c.fillRect(0, 0, w, w);
     c.restore();
   });
@@ -3177,8 +3177,8 @@ function prepareSupercar(root) {
   });
   if (!SUPERCAR.paintBase) throw new Error("차체 도색 재질 없음");
 
-  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(2.9, 6.0), new THREE.MeshBasicMaterial({ map: makeBlobShadowTex(), transparent: true, depthWrite: false }));
-  shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.06; shadow.renderOrder = -1; model.add(shadow);
+  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(2.7, 5.6), new THREE.MeshBasicMaterial({ map: makeBlobShadowTex(), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }));
+  shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.14; shadow.renderOrder = -1; model.add(shadow);
   return model;
 }
 function makeSupercar(color) {
@@ -3273,7 +3273,7 @@ function placeAt(i, lat) {
   P.kx = 0; P.kz = 0; P.spin = 0;
 }
 function startLat() { return (playMode === "battle" && myTeam() === "right" ? -1 : 1) * gridLat(); }
-function resetCar() { placeAt(START_I, startLat()); P.off = false; P.wallT = 0; P.steerVis = 0; P.rollVis = 0; P.fin = 0; P.chase = 0; P.tailT = 0; P.boostT = 0; P.boostCap = 0; }
+function resetCar() { placeAt(START_I, startLat()); clearGroundFx(); P.gfxT = newGroundTrack(); P.off = false; P.wallT = 0; P.steerVis = 0; P.rollVis = 0; P.fin = 0; P.chase = 0; P.tailT = 0; P.boostT = 0; P.boostCap = 0; }
 const CARDS = { start: "cardStart", course: "cardCourse", car: "cardCar", done: "cardDone", bstart: "cardBStart", lobby: "cardLobby", bdone: "cardBDone" };
 let cardNow = "start";
 function showCard(which) {
@@ -3424,7 +3424,9 @@ function updateCar(dt) {
   if (Math.abs(lat) > limit) {
     const sg = lat > 0 ? 1 : -1;
     P.x = s.p.x + s.n.x * limit * sg + s.t.x * along; P.z = s.p.z + s.n.z * limit * sg + s.t.z * along;
-    if (P.wallT === 0 && Math.abs(P.v) > 6) { P.v *= CFG.wallKeep; beep(80, 0.18, "square", 0.12); shake = 0.35; }
+    const wallX = P.x + s.n.x * sg * 0.9, wallZ = P.z + s.n.z * sg * 0.9;
+    if (P.wallT === 0 && Math.abs(P.v) > 6) { gfxSparks(wallX, P.y + 0.3, wallZ, -s.n.x * sg, -s.n.z * sg, 14); P.v *= CFG.wallKeep; beep(80, 0.18, "square", 0.12); shake = 0.35; }
+    else if (Math.abs(P.v) > 10 && Math.random() < dt * 25) gfxSparks(wallX, P.y + 0.3, wallZ, -s.n.x * sg, -s.n.z * sg, 1);
     P.wallT = 0.4;
     const intoWall = (P.kx * s.n.x + P.kz * s.n.z) * sg;
     if (intoWall > 0) { P.kx -= s.n.x * sg * intoWall * 1.3; P.kz -= s.n.z * sg * intoWall * 1.3; }
@@ -3545,10 +3547,134 @@ function setText(el, text) {
 }
 
 let last = performance.now();
+const GFX = { on: true, rear: null, skidMax: 1600, puffMax: 260, skidWidth: 0.26, skidStep: 0.3, lift: 0.08, nearM: 160 };
+const GFX_TINT = { rubber: new THREE.Color(0x141414), dirt: new THREE.Color(0x5A4630), smoke: new THREE.Color(0xD8D8D2), dust: new THREE.Color(0xB39A70), spark: new THREE.Color(0xFFC46A) };
+function rearWheelSpots() {
+  if (GFX.rear) return GFX.rear;
+  const tpl = SUPERCAR.tpl, l = tpl && tpl.getObjectByName("pivotRearL"), r = tpl && tpl.getObjectByName("pivotRearR");
+  if (!l || !r) return [[-0.62, 1.1], [0.62, 1.1]];
+  return (GFX.rear = [l, r].map(o => [o.position.x * CFG.carScale, o.position.z * CFG.carScale]));
+}
+function dynamicAttr(n, size) { const a = new THREE.BufferAttribute(new Float32Array(n * size), size); a.setUsage(THREE.DynamicDrawUsage); return a; }
+const SKID = (() => {
+  const n = GFX.skidMax, geo = new THREE.BufferGeometry(), idx = new Uint16Array(n * 6);
+  for (let k = 0; k < n; k++) idx.set([k * 4, k * 4 + 1, k * 4 + 2, k * 4 + 1, k * 4 + 3, k * 4 + 2], k * 6);
+  const pos = dynamicAttr(n * 4, 3), col = dynamicAttr(n * 4, 4);
+  geo.setAttribute("position", pos); geo.setAttribute("color", col); geo.setIndex(new THREE.BufferAttribute(idx, 1));
+  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }));
+  mesh.frustumCulled = false; mesh.renderOrder = -1; scene.add(mesh);
+  return { mesh, pos, col, next: 0 };
+})();
+const PUFF = (() => {
+  const n = GFX.puffMax, geo = new THREE.BufferGeometry();
+  const pos = dynamicAttr(n, 3), col = dynamicAttr(n, 3), size = dynamicAttr(n, 1), alpha = dynamicAttr(n, 1);
+  geo.setAttribute("position", pos); geo.setAttribute("aColor", col); geo.setAttribute("aSize", size); geo.setAttribute("aAlpha", alpha);
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { uScale: { value: 1 } }, transparent: true, depthWrite: false,
+    vertexShader: "attribute vec3 aColor; attribute float aSize; attribute float aAlpha; uniform float uScale; varying vec3 vColor; varying float vAlpha;\n" +
+      "void main() { vColor = aColor; vAlpha = aAlpha; vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv;\n" +
+      "  gl_PointSize = aAlpha > 0.0 ? min(256.0, aSize * uScale / max(0.5, -mv.z)) : 0.0; }",
+    fragmentShader: "varying vec3 vColor; varying float vAlpha;\n" +
+      "void main() { vec2 d = gl_PointCoord - 0.5; float r = dot(d, d) * 4.0; if (r > 1.0) discard; gl_FragColor = vec4(vColor, vAlpha * (1.0 - r) * (1.0 - r));\n" +
+      "  #include <tonemapping_fragment>\n  #include <colorspace_fragment>\n}"
+  });
+  const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; scene.add(pts);
+  const f = () => new Float32Array(n);
+  return { pts, mat, pos, col, size, alpha, vel: new Float32Array(n * 3), age: f(), life: f(), s0: f(), s1: f(), a0: f(), grav: f(), drag: f(), next: 0, live: 0 };
+})();
+function newGroundTrack() { return { fresh: true, h: 0, yaw: 0, w: [0, 1].map(() => ({ on: false, x: 0, y: 0, z: 0, a: 0, acc: 0 })) }; }
+function addSkid(W, x, y, z, a, tint) {
+  const dx = x - W.x, dz = z - W.z, len = Math.hypot(dx, dz) || 1, hw = GFX.skidWidth / 2, px = -dz / len * hw, pz = dx / len * hw;
+  const k = SKID.next; SKID.next = (k + 1) % GFX.skidMax;
+  SKID.pos.array.set([W.x + px, W.y, W.z + pz, W.x - px, W.y, W.z - pz, x + px, y, z + pz, x - px, y, z - pz], k * 12);
+  const r = tint.r, g = tint.g, b = tint.b;
+  SKID.col.array.set([r, g, b, W.a, r, g, b, W.a, r, g, b, a, r, g, b, a], k * 16);
+  SKID.pos.addUpdateRange(k * 12, 12); SKID.col.addUpdateRange(k * 16, 16);
+  SKID.pos.needsUpdate = SKID.col.needsUpdate = true;
+}
+function emitPuff(x, y, z, vx, vy, vz, tint, s0, s1, a0, life, grav, drag) {
+  const k = PUFF.next; PUFF.next = (k + 1) % GFX.puffMax;
+  PUFF.pos.array.set([x, y, z], k * 3); PUFF.vel.set([vx, vy, vz], k * 3); PUFF.col.array.set([tint.r, tint.g, tint.b], k * 3);
+  PUFF.age[k] = 0; PUFF.life[k] = life; PUFF.s0[k] = s0; PUFF.s1[k] = s1; PUFF.a0[k] = a0; PUFF.grav[k] = grav; PUFF.drag[k] = drag;
+  PUFF.col.needsUpdate = true; PUFF.live = GFX.puffMax;
+}
+function gfxSparks(x, y, z, nx, nz, count) {
+  if (!GFX.on) return;
+  for (let i = 0; i < count; i++) {
+    const sp = rnd(3, 9), a = rnd(-1.2, 1.2), c = Math.cos(a), s = Math.sin(a);
+    emitPuff(x, y, z, (nx * c - nz * s) * sp, rnd(1.5, 5), (nz * c + nx * s) * sp, GFX_TINT.spark, 0.16, 0.1, 1, rnd(0.2, 0.45), -12, 0.6);
+  }
+}
+function groundTrack(T, x, y, z, h, v, pitch, kx, kz, spin, off, braking, dt) {
+  if (!GFX.on || !T || dt <= 0) return;
+  if (T.fresh) { T.fresh = false; T.h = h; return; }
+  const yaw = Math.max(-4, Math.min(4, wrapAngle(h - T.h) / dt)); T.h = h;
+  T.yaw += (yaw - T.yaw) * Math.min(1, dt * 10);
+  const sp = Math.abs(v);
+  let skid = Math.max(0, Math.min(1, (Math.abs(T.yaw) * sp - 28) / 25));
+  if (braking && sp > 14) skid = Math.max(skid, 0.55);
+  skid = Math.max(skid, Math.min(1, (Math.hypot(kx, kz) - 1.5) / 4), Math.min(1, (Math.abs(spin) - 0.5) / 1.2));
+  const dust = off && sp > 4 ? Math.min(1, sp / 20) : 0;
+  const amt = Math.max(skid, dust * 0.7), tint = dust ? GFX_TINT.dirt : GFX_TINT.rubber, mark = amt * (dust ? 0.35 : 0.5);
+  const nearCam = (camera.position.x - x) ** 2 + (camera.position.z - z) ** 2 < GFX.nearM * GFX.nearM;
+  const c = Math.cos(h), s = Math.sin(h), sinP = Math.sin(pitch), fx = -s * v + kx, fz = -c * v + kz;
+  rearWheelSpots().forEach(([lx, lz], i) => {
+    const W = T.w[i], wx = x + lx * c + lz * s, wz = z - lx * s + lz * c, wy = y - lz * sinP + GFX.lift;
+    if (amt > 0.08) {
+      const d = W.on ? Math.hypot(wx - W.x, wz - W.z) : 0;
+      if (!W.on || d > 4) { W.on = true; W.x = wx; W.y = wy; W.z = wz; W.a = 0; }
+      else if (d >= GFX.skidStep) { addSkid(W, wx, wy, wz, mark, tint); W.x = wx; W.y = wy; W.z = wz; W.a = mark; }
+    } else W.on = false;
+    if (!nearCam) return;
+    const rate = dust ? 22 * dust : skid > 0.25 ? 26 * skid : 0;
+    W.acc = rate ? W.acc + rate * dt : 0;
+    while (W.acc >= 1) {
+      W.acc--;
+      if (dust) emitPuff(wx + rnd(-0.2, 0.2), wy + 0.1, wz + rnd(-0.2, 0.2), fx * 0.15 + rnd(-0.8, 0.8), rnd(0.4, 1.2), fz * 0.15 + rnd(-0.8, 0.8), GFX_TINT.dust, 0.5, 2.2, 0.35, rnd(0.8, 1.2), -0.5, 1.8);
+      else emitPuff(wx + rnd(-0.15, 0.15), wy + 0.12, wz + rnd(-0.15, 0.15), fx * 0.15 + rnd(-0.6, 0.6), rnd(0.5, 1.0), fz * 0.15 + rnd(-0.6, 0.6), GFX_TINT.smoke, 0.6, 2.8 * (0.6 + 0.4 * skid), 0.1 + 0.3 * skid, rnd(1.0, 1.5), 0.2, 1.8);
+    }
+  });
+}
+function stepPuffs(dt) {
+  if (!PUFF.live) return;
+  const A = PUFF, n = GFX.puffMax, pa = A.pos.array, sa = A.size.array, aa = A.alpha.array;
+  let live = 0;
+  for (let k = 0; k < n; k++) {
+    if (A.age[k] >= A.life[k]) { aa[k] = 0; continue; }
+    live++;
+    A.age[k] += dt;
+    const t = Math.min(1, A.age[k] / A.life[k]), keep = Math.exp(-A.drag[k] * dt), j = k * 3;
+    A.vel[j] *= keep; A.vel[j + 2] *= keep; A.vel[j + 1] = A.vel[j + 1] * keep + A.grav[k] * dt;
+    pa[j] += A.vel[j] * dt; pa[j + 1] += A.vel[j + 1] * dt; pa[j + 2] += A.vel[j + 2] * dt;
+    sa[k] = A.s0[k] + (A.s1[k] - A.s0[k]) * Math.sqrt(t);
+    aa[k] = A.a0[k] * (1 - t);
+  }
+  A.live = live;
+  A.pos.needsUpdate = A.size.needsUpdate = A.alpha.needsUpdate = true;
+}
+function clearGroundFx() {
+  SKID.col.array.fill(0); SKID.col.clearUpdateRanges(); SKID.col.needsUpdate = true; SKID.next = 0;
+  PUFF.age.fill(0); PUFF.life.fill(0); PUFF.alpha.array.fill(0); PUFF.alpha.needsUpdate = true; PUFF.live = 0;
+}
+function setGroundFx(on) { GFX.on = on; SKID.mesh.visible = PUFF.pts.visible = on; if (!on) clearGroundFx(); }
+function entOffRoad(e) {
+  const s = S[e.ci], lat = (e.x - s.p.x) * s.n.x + (e.z - s.p.z) * s.n.z;
+  return Math.abs(lat) > (s.lim ? s.lim + 1 : W / 2 + 0.8);
+}
+function updateGroundFx(dt) {
+  if (!GFX.on) return;
+  PUFF.mat.uniforms.uScale.value = renderer.domElement.height / (2 * Math.tan(camera.fov * Math.PI / 360));
+  if (state !== "menu") {
+    if (!(playMode === "battle" && BT.spec)) groundTrack(P.gfxT, P.x, P.y, P.z, P.h, P.v, car.rotation.x, P.kx, P.kz, P.spin, P.off, state === "race" && keys.down && P.v > 0, dt);
+    if (playMode === "battle") okeys(BT.ents).forEach(id => { const e = BT.ents[id]; if (e.seen) groundTrack(e.gfxT, e.x, e.y, e.z, e.h, e.v, e.car.rotation.x, e.rkx, e.rkz, 0, entOffRoad(e), false, dt); });
+  }
+  stepPuffs(dt);
+}
 const ADAPT = { slowFrames: 0, bloomOn: !IS_TOUCH };
 function lowerQuality() {
   const pr = renderer.getPixelRatio();
-  if (pr > MIN_PIXEL_RATIO) { renderer.setPixelRatio(Math.max(MIN_PIXEL_RATIO, pr - 0.25)); resize(); }
+  if (GFX.on) setGroundFx(false);
+  else if (pr > MIN_PIXEL_RATIO) { renderer.setPixelRatio(Math.max(MIN_PIXEL_RATIO, pr - 0.25)); resize(); }
   else if (NIGHT.on && ADAPT.bloomOn) ADAPT.bloomOn = false;
   else if (renderer.shadowMap.enabled) {
     renderer.shadowMap.enabled = false;
@@ -3587,6 +3713,7 @@ function tick(now) {
   if (!spectating) updateCar(dt);
   if (battle) battleFrame(dt);
   updateCamera(dt);
+  updateGroundFx(dt);
   renderCarPreviews(dt);
   const V = viewTarget();
   engineUpdate(Math.min(1, Math.abs(V.v) / CFG.maxSpeed), state === "race" || state === "countdown" || (spectating && state === "done"));
@@ -3674,6 +3801,7 @@ $("btnReset").onclick = e => { e.currentTarget.blur(); startRace(); };
 $("btnRecover").onclick = e => { e.currentTarget.blur(); recover(); };
 
 const CAR_HIT = { radius: 0.82, offset: 1.08, restitution: 0.45, push: 0.55, spinGain: 0.55, spinMax: 2.6, spinFriction: 3.2, slideFriction: 2.6, inertia: 1.45 };
+const HIT_NOTICE = { minGapMs: 250, dedupeMs: 300, staleMs: 1000 };
 const CHASE = { farKmh: 10, tailM: 15, tailSec: 2, boostKmh: 30, holdSec: 1, fadeSec: 1.5 };
 const BATTLE = {
   root: "turbolap/rooms", specMax: 1, netMs: 143, countMs: 3600, dnfMs: 30000, rankRowH: 48,
@@ -3687,7 +3815,7 @@ const BT = {
   db: null, ref: null, code: "", myId: "p" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4),
   nick: "", nickRequired: false, players: {}, status: "", host: null, hostLoaded: false, course: "hongkong", startAt: 0, result: null,
   subs: [], leaving: false, spec: false, match: null, ents: {}, raw: {}, sent: "", lastNet: 0, forceNet: false, statusSent: "",
-  viewId: null, viewKey: "", serverOffset: 0, rankRows: {}, rankNums: 0, lobbyCarSig: "", queued: false
+  viewId: null, viewKey: "", serverOffset: 0, hitSeq: 0, rankRows: {}, rankNums: 0, lobbyCarSig: "", queued: false
 };
 try { BT.nick = localStorage.getItem(NICK_KEY) || ""; } catch (e) {}
 const tnow = () => Date.now() + BT.serverOffset;
@@ -3803,6 +3931,7 @@ function enterRoom(code) {
   const ref = BT.ref;
   ref.child("players/" + BT.myId).onDisconnect().remove();
   ref.child("st/" + BT.myId).onDisconnect().remove();
+  ref.child("hit/" + BT.myId).onDisconnect().remove();
   const pref = ref.child("players");
   sub(pref, "child_added", s => { BT.players[s.key] = s.val(); playersChanged(); });
   sub(pref, "child_changed", s => { BT.players[s.key] = s.val(); playersChanged(); });
@@ -3824,6 +3953,7 @@ function enterRoom(code) {
   sub(stRef, "child_added", s => onRemoteState(s.key, s.val()));
   sub(stRef, "child_changed", s => onRemoteState(s.key, s.val()));
   sub(stRef, "child_removed", s => { delete BT.raw[s.key]; });
+  sub(ref.child("hit/" + BT.myId), "value", s => onHitNotice(s.val()));
   $("lobbyCode").textContent = code;
   refreshNick();
   showCard("lobby");
@@ -3845,8 +3975,8 @@ function leaveRoom() {
   if (!BT.ref) return;
   const ref = BT.ref, me = BT.myId;
   BT.leaving = true; unsubAll();
-  try { ref.child("players/" + me).onDisconnect().cancel(); ref.child("st/" + me).onDisconnect().cancel(); } catch (e) {}
-  ref.child("st/" + me).remove().catch(() => {});
+  try { ref.child("players/" + me).onDisconnect().cancel(); ref.child("st/" + me).onDisconnect().cancel(); ref.child("hit/" + me).onDisconnect().cancel(); } catch (e) {}
+  ref.child("st/" + me).remove().catch(() => {}); ref.child("hit/" + me).remove().catch(() => {});
   ref.child("players/" + me).remove().then(() => ref.child("players").once("value")).then(s => {
     const ps = s.val() || {};
     if (!okeys(ps).length) return ref.remove();
@@ -4086,7 +4216,8 @@ function ensureEnt(id) {
   if (BT.ents[id]) return BT.ents[id];
   const p = BT.players[id]; if (!p) return null;
   const ck = CARS[p.car] ? p.car : "blue";
-  const e = { id, x: 0, y: 0, z: 0, h: 0, v: 0, rx: 0, rz: 0, rh: 0, rv: 0, rt: 0, prog: -1, fin: 0, steer: 0, steerVis: 0, ci: 0, seen: false,
+  const e = { id, x: 0, y: 0, z: 0, h: 0, v: 0, rx: 0, rz: 0, rh: 0, rv: 0, rt: 0, st: 0, rw: 0, rkx: 0, rkz: 0, ex: 0, ez: 0, eh: 0, fresh: false, hitAt: 0, hitSentAt: 0, gfxT: newGroundTrack(),
+    prog: -1, fin: 0, steer: 0, steerVis: 0, ci: 0, seen: false,
     car: makeCar(CARS[ck].color), tag: nameTag(p.nickname, SIDE_COLOR[p.team] || "#8A978C") };
   e.car.visible = false; e.tag.visible = false;
   scene.add(e.car); scene.add(e.tag);
@@ -4111,6 +4242,7 @@ function nearestFrom(x, z, ci) {
 function stateString() {
   return [+P.x.toFixed(2), +P.z.toFixed(2), +P.h.toFixed(3), +P.v.toFixed(2), +myProg().toFixed(4), P.fin, +P.steerVis.toFixed(2)].join(",");
 }
+function slideString() { return +P.kx.toFixed(2) + "," + +P.kz.toFixed(2); }
 function onRemoteState(id, str) {
   BT.raw[id] = str;
   if (!BT.match || (id === BT.myId && !BT.spec)) return;
@@ -4119,21 +4251,28 @@ function onRemoteState(id, str) {
   const a = String(str).split(",");
   if (a.length < 7) return;
   const e = ensureEnt(id); if (!e) return;
+  const sentAt = +a[7] || 0, prevH = e.rh, prevAt = e.st;
   e.rx = +a[0]; e.rz = +a[1]; e.rh = +a[2]; e.rv = +a[3]; e.prog = +a[4]; e.fin = +a[5]; e.steer = +a[6]; e.rt = performance.now();
+  e.st = sentAt; e.rkx = +a[8] || 0; e.rkz = +a[9] || 0;
+  e.rw = e.seen && sentAt > prevAt && prevAt ? Math.max(-3, Math.min(3, wrapAngle(e.rh - prevH) / ((sentAt - prevAt) / 1000))) : 0;
+  e.fresh = true;
   if (!e.seen) {
-    e.seen = true; e.x = e.rx; e.z = e.rz; e.h = e.rh; e.v = e.rv; e.ci = nearestAll(e.x, e.z);
+    e.seen = true; e.x = e.rx; e.z = e.rz; e.h = e.rh; e.v = e.rv; e.ci = nearestAll(e.x, e.z); e.ex = e.ez = e.eh = 0;
     e.car.visible = true; e.tag.visible = true;
     if (BT.spec && id === BT.viewId) snapCamera();
   }
 }
 function updateEnts(dt) {
-  const nowMs = performance.now(), k = 1 - Math.exp(-10 * dt);
+  const nowMs = performance.now(), k = 1 - Math.exp(-10 * dt), errKeep = Math.exp(-8 * dt), nowNet = tnow();
   okeys(BT.ents).forEach(id => {
     const e = BT.ents[id]; if (!e.seen) return;
-    const age = Math.min(0.35, (nowMs - e.rt) / 1000);
-    const tx = e.rx - Math.sin(e.rh) * e.rv * age, tz = e.rz - Math.cos(e.rh) * e.rv * age;
-    if (Math.hypot(tx - e.x, tz - e.z) > 20) { e.x = tx; e.z = tz; e.h = e.rh; e.ci = nearestAll(e.x, e.z); }
-    else { e.x += (tx - e.x) * k; e.z += (tz - e.z) * k; e.h += wrapAngle(e.rh - e.h) * k; }
+    const age = Math.max(0, Math.min(0.5, (e.st ? nowNet - e.st : nowMs - e.rt) / 1000));
+    const midH = e.rh + e.rw * age * 0.5, slid = (1 - Math.exp(-CAR_HIT.slideFriction * age)) / CAR_HIT.slideFriction;
+    const tx = e.rx - Math.sin(midH) * e.rv * age + e.rkx * slid, tz = e.rz - Math.cos(midH) * e.rv * age + e.rkz * slid, th = e.rh + e.rw * age;
+    if (e.fresh) { e.fresh = false; e.ex = e.x - tx; e.ez = e.z - tz; e.eh = wrapAngle(e.h - th); }
+    if (Math.hypot(e.ex, e.ez) > 20) { e.ex = e.ez = e.eh = 0; e.x = tx; e.z = tz; e.h = th; e.ci = nearestAll(tx, tz); e.gfxT = newGroundTrack(); }
+    e.ex *= errKeep; e.ez *= errKeep; e.eh *= errKeep;
+    e.x = tx + e.ex; e.z = tz + e.ez; e.h = th + e.eh;
     e.v += (e.rv - e.v) * k;
     e.ci = nearestFrom(e.x, e.z, e.ci);
     const s = S[e.ci], along = (e.x - s.p.x) * s.t.x + (e.z - s.p.z) * s.t.z, s2 = S[wrapI(e.ci + (along >= 0 ? 1 : -1))];
@@ -4164,18 +4303,39 @@ function collideWithRivals() {
     if (!hit) return;
     P.x += hit.nx * hit.pen * CAR_HIT.push; P.z += hit.nz * hit.pen * CAR_HIT.push;
     const fx = -Math.sin(P.h), fz = -Math.cos(P.h), ofx = -Math.sin(e.h), ofz = -Math.cos(e.h);
-    const rel = (fx * P.v + P.kx - ofx * e.v) * hit.nx + (fz * P.v + P.kz - ofz * e.v) * hit.nz;
+    const rel = (fx * P.v + P.kx - ofx * e.v - e.rkx) * hit.nx + (fz * P.v + P.kz - ofz * e.v - e.rkz) * hit.nz;
     if (rel >= 0) return;
-    const j = -(1 + CAR_HIT.restitution) * rel / 2;
-    const dvx = hit.nx * j, dvz = hit.nz * j, along = dvx * fx + dvz * fz;
-    P.v += along; P.kx += dvx - fx * along; P.kz += dvz - fz * along;
-    const rx = hit.ax - hit.nx * CAR_HIT.radius - P.x, rz = hit.az - hit.nz * CAR_HIT.radius - P.z;
-    P.spin = Math.max(-CAR_HIT.spinMax, Math.min(CAR_HIT.spinMax, P.spin + (rz * dvx - rx * dvz) / CAR_HIT.inertia * CAR_HIT.spinGain));
-    if (P.bumpT === 0 && j > 1) {
-      beep(150, 0.16, "square", Math.min(0.15, 0.05 + j * 0.01)); beep(70, 0.22, "sawtooth", 0.07);
-      shake = Math.min(0.45, 0.12 + j * 0.03); P.bumpT = 0.25;
+    const j = -(1 + CAR_HIT.restitution) * rel / 2, nowMs = performance.now();
+    const cx = hit.ax - hit.nx * CAR_HIT.radius, cz = hit.az - hit.nz * CAR_HIT.radius;
+    applyBump(hit.nx, hit.nz, j, cx - P.x, cz - P.z, cx, cz);
+    e.hitAt = nowMs;
+    if (j > 0.4 && nowMs - e.hitSentAt > HIT_NOTICE.minGapMs) {
+      e.hitSentAt = nowMs; BT.hitSeq++;
+      BT.ref.child("hit/" + id).set([BT.myId, BT.hitSeq, -hit.nx.toFixed(3), -hit.nz.toFixed(3), +j.toFixed(2), Math.round(tnow())].join(","));
     }
   });
+}
+function applyBump(nx, nz, j, rx, rz, cx, cz) {
+  const fx = -Math.sin(P.h), fz = -Math.cos(P.h);
+  const dvx = nx * j, dvz = nz * j, along = dvx * fx + dvz * fz;
+  P.v += along; P.kx += dvx - fx * along; P.kz += dvz - fz * along;
+  P.spin = Math.max(-CAR_HIT.spinMax, Math.min(CAR_HIT.spinMax, P.spin + (rz * dvx - rx * dvz) / CAR_HIT.inertia * CAR_HIT.spinGain));
+  if (P.bumpT === 0 && j > 1) {
+    beep(150, 0.16, "square", Math.min(0.15, 0.05 + j * 0.01)); beep(70, 0.22, "sawtooth", 0.07);
+    shake = Math.min(0.45, 0.12 + j * 0.03); P.bumpT = 0.25;
+    gfxSparks(cx, P.y + 0.4, cz, nx, nz, Math.min(18, 6 + Math.round(j * 2)));
+  }
+}
+function onHitNotice(str) {
+  if (!str || !BT.match || BT.spec || P.fin || (state !== "race" && state !== "done")) return;
+  const a = String(str).split(","), from = a[0], seq = +a[1], nx = +a[2], nz = +a[3], j = +a[4], at = +a[5];
+  const e = BT.ents[from], nowMs = performance.now();
+  if (!e || !e.seen || !(j > 0) || !isFinite(nx + nz) || tnow() - at > HIT_NOTICE.staleMs || e.hitSeq === seq) return;
+  e.hitSeq = seq;
+  if (nowMs - e.hitAt < HIT_NOTICE.dedupeMs) return;
+  e.hitAt = nowMs;
+  const cx = (P.x + e.x) / 2, cz = (P.z + e.z) / 2;
+  applyBump(nx, nz, Math.min(j, 25), cx - P.x, cz - P.z, cx, cz);
 }
 function raceFinished() { if (playMode === "battle") battleFinish(); else finish(); }
 function battleFinish() {
@@ -4190,10 +4350,10 @@ function netTick() {
   const nowMs = Date.now();
   if (!BT.forceNet && nowMs - BT.lastNet < BATTLE.netMs) return;
   BT.lastNet = nowMs; BT.forceNet = false;
-  const s = stateString();
-  if (s === BT.sent) return;
-  BT.sent = s;
-  BT.ref.child("st/" + BT.myId).set(s);
+  const s = stateString(), slide = slideString();
+  if (s + "|" + slide === BT.sent) return;
+  BT.sent = s + "|" + slide;
+  BT.ref.child("st/" + BT.myId).set(s + "," + Math.round(tnow()) + "," + slide);
 }
 function hostTick() {
   if (!isHost() || !BT.match) return;
