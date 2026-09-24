@@ -10,7 +10,7 @@
     paintedmetal009_*  배리어 경고띠  https://ambientcg.com/view?id=PaintedMetal009
   [모델] img/fps/models/  — Quaternius "Toon Shooter Game Kit" (CC0) https://quaternius.com/packs/toonshootergamekit.html
     받은 곳: Poly Pizza 번들 https://poly.pizza/bundle/Toon-Shooter-Game-Kit-qraiSXoAru (CC0 표기)
-    ak47.glb (라이플), pistol.glb (권총)
+    ak47.glb (라이플), pistol.glb (권총), enemy.glb (적·팀 병사, Character Enemy — 걷기/조준 애니메이션 포함)
   [라이브러리] three.js r128 GLTFLoader·SkeletonUtils (MIT) — cdn.jsdelivr.net/npm/three@0.128.0/examples/js/
 -->
 <head>
@@ -808,8 +808,65 @@ function makeSoldier(x, z, color) {
   bodyParts.forEach(m => { m.userData = { enemy: e, part: "body" }; });
   headParts.forEach(m => { m.userData = { enemy: e, part: "head" }; });
   e.parts = bodyParts.concat(headParts);
+  dressSoldier(e);
   return e;
 }
+const SOLDIER_WEAPON_KEPT = "Pistol";
+const SOLDIER_UNIFORM_MAT = "Enemy_Red";
+const soldierLooks = new Set();
+let soldierTemplate = null;
+function dressSoldier(e) {
+  if (!soldierTemplate || e.look) return;
+  const uniformColor = e.baseCols[0];
+  e.g.traverse(o => { if (o.isMesh) o.visible = false; });
+  const model = THREE.SkeletonUtils.clone(soldierTemplate.scene);
+  const hand = model.getObjectByName("Index1R");
+  if (hand) hand.children.slice().forEach(w => { if (!w.isBone && w.name !== SOLDIER_WEAPON_KEPT) hand.remove(w); });
+  const cloned = new Map();
+  model.traverse(o => {
+    if (!o.isMesh) return;
+    if (!cloned.has(o.material)) {
+      const m = o.material.clone();
+      if (m.name === SOLDIER_UNIFORM_MAT) m.color.set(uniformColor);
+      m.transparent = e.allMats[0].transparent;
+      cloned.set(o.material, m);
+    }
+    o.material = cloned.get(o.material);
+    o.castShadow = true; o.frustumCulled = false;
+  });
+  model.scale.set(-1, 1, 1);
+  e.g.add(model);
+  const lookMats = [...cloned.values()];
+  e.mats = lookMats; e.baseCols = lookMats.map(m => m.color.getHex());
+  e.allMats = e.allMats.concat(lookMats);
+  const mixer = new THREE.AnimationMixer(model);
+  const clip = name => THREE.AnimationClip.findByName(soldierTemplate.animations, name);
+  const walk = mixer.clipAction(clip("Walk_Shoot")), idle = mixer.clipAction(clip("Idle_Shoot"));
+  walk.play(); idle.play(); walk.setEffectiveWeight(0); idle.setEffectiveWeight(1);
+  mixer.update(Math.random());
+  e.look = { model, mixer, walk, idle, lastWalk: e.walk, blend: 0, seenInScene: false };
+  soldierLooks.add(e);
+}
+let lastLookT = 0;
+function animateSoldierLooks(now) {
+  const dt = Math.min(0.05, (now - lastLookT) / 1000); lastLookT = now;
+  soldierLooks.forEach(e => {
+    const look = e.look;
+    if (!e.g.parent) { if (look.seenInScene) soldierLooks.delete(e); return; }
+    look.seenInScene = true;
+    if (!e.g.visible) return;
+    const moving = e.walk !== look.lastWalk; look.lastWalk = e.walk;
+    look.blend += ((moving ? 1 : 0) - look.blend) * Math.min(1, dt * 8);
+    look.walk.setEffectiveWeight(look.blend); look.idle.setEffectiveWeight(1 - look.blend);
+    look.mixer.update(e.g.rotation.x !== 0 ? 0 : dt);
+  });
+}
+loadModel("enemy.glb").then(gltf => {
+  finishModel(gltf.scene, true);
+  soldierTemplate = gltf;
+  enemies.forEach(dressSoldier);
+  if (typeof T !== "undefined") Object.values(T.ents).forEach(ent => { if (ent.s) dressSoldier(ent.s); });
+}).catch(() => {});
 function removeEnemy(e) {
   scene.remove(e.g);
   enemies.splice(enemies.indexOf(e), 1);
@@ -2045,6 +2102,7 @@ $("btnGameLeave").onclick = e => { e.currentTarget.blur(); if (confirm("방을 �
 
 function loop(now) {
   requestAnimationFrame(loop);
+  animateSoldierLooks(now);
   if (state === "team") {
     teamFrame(now, Math.min(0.05, (now - lastT) / 1000));
     lastT = now;
