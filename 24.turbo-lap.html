@@ -627,9 +627,20 @@ function rnd(a, b) { return a + Math.random() * (b - a); }
 const HQ_DIR = "img/turbo/hq/";
 const HQ_LOAD = { ready: false, loaded: 0, total: 0, failed: [], slow: false };
 const HQ_MANAGER = new THREE.LoadingManager(
-  () => { HQ_LOAD.ready = true; renderLoadGate(); },
+  () => { HQ_LOAD.ready = true; warmUpGpu(); renderLoadGate(); },
   (url, loaded, total) => { HQ_LOAD.loaded = loaded; HQ_LOAD.total = total; renderLoadGate(); },
   url => { HQ_LOAD.failed.push(String(url).split("/").pop()); renderLoadGate(); });
+function warmUpGpu() {
+  if (!HQ_LOAD.ready || !trackGroup) return;
+  const screenTarget = renderer.getRenderTarget();
+  renderer.compile(scene, camera);
+  if (NIGHT.on && NIGHT.composer) { renderer.setRenderTarget(NIGHT.composer.renderTarget1); renderer.compile(scene, camera); }
+  renderer.setRenderTarget(screenTarget);
+  const seen = new Set();
+  scene.traverse(o => [].concat(o.material || []).forEach(m => Object.values(m).forEach(v => {
+    if (v && v.isTexture && !seen.has(v)) { seen.add(v); renderer.initTexture(v); }
+  })));
+}
 function renderLoadGate() {
   const ok = HQ_LOAD.ready && !!SUPERCAR.tpl;
   ["btnModeTA", "btnModeBattle", "btnHongkong", "btnSingapore", "btnSeoul"].forEach(id => { $(id).disabled = !ok; });
@@ -885,6 +896,7 @@ function buildTrack(def) {
   S.forEach(s => { B.minX = Math.min(B.minX, s.p.x); B.maxX = Math.max(B.maxX, s.p.x); B.minZ = Math.min(B.minZ, s.p.z); B.maxZ = Math.max(B.maxZ, s.p.z); });
   buildSceneryHQ(G, def, B);
   applyAtmosphere(def);
+  warmUpGpu();
   {
     const pad = 22, sc = Math.min((300 - pad * 2) / (B.maxX - B.minX), (300 - pad * 2) / (B.maxZ - B.minZ));
     const ox = 150 - (B.minX + B.maxX) / 2 * sc, oz = 150 - (B.minZ + B.maxZ) / 2 * sc;
@@ -2082,6 +2094,21 @@ const HK_LIT = {
     for (let y = 0; y < h; y += 3) { c.fillStyle = "rgba(0,0,0," + rnd(0, 0.7).toFixed(2) + ")"; c.fillRect(0, y, w, 1 + (Math.random() * 2 | 0)); }
   }
 };
+const FAR_FACADE = { start: 220, blend: 60, nightAmbient: new THREE.Color(0.052, 0.065, 0.116) };
+function unlitWhenFar(m) {
+  const compileFacade = m.onBeforeCompile, facadeKey = m.customProgramCacheKey;
+  m.onBeforeCompile = sh => {
+    compileFacade(sh);
+    Object.assign(sh.uniforms, { farStart: { value: FAR_FACADE.start }, farBlend: { value: FAR_FACADE.blend }, farAmbient: { value: FAR_FACADE.nightAmbient } });
+    sh.vertexShader = "varying float vViewDist;\n" + sh.vertexShader.replace("#include <fog_vertex>", "#include <fog_vertex>\n\tvViewDist = -mvPosition.z;");
+    sh.fragmentShader = "uniform float farStart;\nuniform float farBlend;\nuniform vec3 farAmbient;\nvarying float vViewDist;\n" + sh.fragmentShader
+      .replace("#include <emissivemap_fragment>", "#include <emissivemap_fragment>\n\tvec3 farLook = diffuseColor.rgb * farAmbient + totalEmissiveRadiance;\n" +
+        "\tif (vViewDist > farStart + farBlend) {\n\t\tvec3 outgoingLight = farLook;\n\t\t#include <opaque_fragment>\n\t\t#include <tonemapping_fragment>\n\t\t#include <colorspace_fragment>\n\t\t#include <fog_fragment>\n\t\treturn;\n\t}")
+      .replace("#include <opaque_fragment>", "outgoingLight = mix(outgoingLight, farLook, smoothstep(farStart, farStart + farBlend, vViewDist));\n#include <opaque_fragment>");
+  };
+  m.customProgramCacheKey = () => facadeKey() + "far";
+  return m;
+}
 function makeHKMaterials() {
   if (HK_M) return HK_M;
   const std = p => new THREE.MeshStandardMaterial(p), T = {}, L = {}, S0 = makeSeoulMaterials();
@@ -2097,11 +2124,11 @@ function makeHKMaterials() {
   T.jardineN = heightNormalTex(128, 128, (x, y) => { const d = Math.hypot((x % 32) - 16, (y % 32) - 16); return d < 10 ? 0 : d < 12 ? 1 : 0.55; }, 2.4);
   T.pinkTile.repeat.set(1 / 6, 1 / 6); T.domeTile.repeat.set(14, 5); T.sail.repeat.set(0.1, 0.1);
   HK_M = Object.assign({}, S0, {
-    resi: facadeMaterial(nightPhoto("night_dense"), 40, 0x3A3A3C),
-    monster: facadeMaterial(nightPhoto("night_brown"), 55, 0x3A3836),
-    glass: facadeMaterial(nightPhoto("night_blinds"), 34, 0x2E3238),
-    office: facadeMaterial(nightPhoto("night_grid"), 48, 0x34343A),
-    hkShop: facadeMaterial(lit({ map: T.shop, roughness: 0.5, metalness: 0.1 }, L.shop, 0.9), 30, 0x55585C, 5),
+    resi: unlitWhenFar(facadeMaterial(nightPhoto("night_dense"), 40, 0x3A3A3C)),
+    monster: unlitWhenFar(facadeMaterial(nightPhoto("night_brown"), 55, 0x3A3836)),
+    glass: unlitWhenFar(facadeMaterial(nightPhoto("night_blinds"), 34, 0x2E3238)),
+    office: unlitWhenFar(facadeMaterial(nightPhoto("night_grid"), 48, 0x34343A)),
+    hkShop: unlitWhenFar(facadeMaterial(lit({ map: T.shop, roughness: 0.5, metalness: 0.1 }, L.shop, 0.9), 30, 0x55585C, 5)),
     ifc: facadeMaterial(photo("ifc", 0.8, { metalness: 0.4, roughness: 0.3 }), 18, 0xDDE3E8, 46),
     crownLit: std({ color: 0xF4F8FF, emissive: 0xE8F2FF, emissiveIntensity: 0.75, roughness: 0.4 }),
     oieFacade: facadeMaterial(Object.assign(nightPhoto("night_grid"), { color: 0x8FB4E8, emissiveIntensity: 0.6, metalness: 0.5, roughness: 0.25 }), 40, 0x1E2632, 48),
@@ -2722,16 +2749,8 @@ function hkTreeSpots() {
   const R = HK.harbour, spots = [], green = [0x4F9238, 0x5A9C40, 0x468632];
   [R.z0 - 11, R.z1 + 11].forEach(z => {
     for (let x = -1500; x <= 1500; x += rnd(12, 20)) {
-      if (nearTrackXZ(x, z, 22) || HK.reserve.some(([rx, rz, rr]) => Math.hypot(x - rx, z - rz) < rr + 4)) continue;
+      if (nearTrackXZ(x, z, 22) || !nearTrackXZ(x, z, TREE_DRAW_DIST) || HK.reserve.some(([rx, rz, rr]) => Math.hypot(x - rx, z - rz) < rr + 4)) continue;
       spots.push({ x, z, sc: rnd(0.6, 0.85), rot: rnd(0, 6.28), kind: 1, tint: green[spots.length % 3] });
-    }
-  });
-  HK_HILLS.forEach(o => {
-    const limit = o.z < 0 ? 150 : 45;
-    for (let k = 0; k < 70; k++) {
-      const th = rnd(0, Math.PI * 2), q = hillPoint(o, th, rnd(0.08, 0.85));
-      if (q[1] < limit) continue;
-      spots.push({ x: o.x + q[0], y: q[1] - 0.5, z: o.z + q[2], sc: rnd(1.6, 2.4), rot: rnd(0, 6.28), kind: 1, tint: green[k % 3] });
     }
   });
   return spots;
