@@ -8,6 +8,10 @@
     planks021_*    상자 판자  https://ambientcg.com/view?id=Planks021
     metal032_*     상자 테두리·배리어 윗판·외곽 테두리  https://ambientcg.com/view?id=Metal032
     paintedmetal009_*  배리어 경고띠  https://ambientcg.com/view?id=PaintedMetal009
+  [모델] img/fps/models/  — Quaternius "Toon Shooter Game Kit" (CC0) https://quaternius.com/packs/toonshootergamekit.html
+    받은 곳: Poly Pizza 번들 https://poly.pizza/bundle/Toon-Shooter-Game-Kit-qraiSXoAru (CC0 표기)
+    ak47.glb (라이플), pistol.glb (권총)
+  [라이브러리] three.js r128 GLTFLoader·SkeletonUtils (MIT) — cdn.jsdelivr.net/npm/three@0.128.0/examples/js/
 -->
 <head>
 <script charset="utf-8" src="firebase-config.js"></script>
@@ -261,6 +265,8 @@
 <button type="button" id="btnGameLeave" hidden>나가기</button>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
 <script>
 "use strict";
 
@@ -683,6 +689,52 @@ function setWeapon(name) {
   gun.visible = name === "rifle"; pistolG.visible = name === "pistol";
   P.swap = 1;
 }
+
+const MODEL_DIR = "img/fps/models/";
+const gltfLoader = THREE.GLTFLoader ? new THREE.GLTFLoader() : null;
+function loadModel(file) {
+  return new Promise((ok, fail) => { if (!gltfLoader) return fail(new Error("no GLTFLoader")); gltfLoader.load(MODEL_DIR + file, ok, undefined, fail); });
+}
+const reflectionEnv = (() => {
+  const envScene = new THREE.Scene();
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(40, 32, 16), skyDome.material);
+  envScene.add(dome);
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const tex = pmrem.fromScene(envScene, 0.04).texture;
+  pmrem.dispose();
+  return tex;
+})();
+const MODEL_FINISH = {
+  Black: { metalness: 0.45, roughness: 0.42 }, DarkGrey: { metalness: 0.55, roughness: 0.34 }, Grey: { metalness: 0.6, roughness: 0.3 },
+  Grey2: { metalness: 0.5, roughness: 0.38 }, LightGrey: { metalness: 0.7, roughness: 0.25 },
+  Wood: { metalness: 0.0, roughness: 0.62 }, DarkWood: { metalness: 0.0, roughness: 0.7 },
+  Skin: { metalness: 0.0, roughness: 0.55 }, Enemy_Red: { metalness: 0.0, roughness: 0.78 }, Red: { metalness: 0.1, roughness: 0.6 },
+  Green: { metalness: 0.15, roughness: 0.5 }, DarkGreen: { metalness: 0.3, roughness: 0.45 }, White: { metalness: 0.0, roughness: 0.4 },
+};
+function finishMaterial(m) {
+  const f = MODEL_FINISH[m.name] || { metalness: 0.2, roughness: 0.6 };
+  m.metalness = f.metalness; m.roughness = f.roughness;
+  m.envMap = reflectionEnv; m.envMapIntensity = 0.45;
+  m.needsUpdate = true;
+}
+function finishModel(root, castShadow) {
+  root.traverse(o => { if (!o.isMesh) return; o.castShadow = castShadow; o.receiveShadow = true; finishMaterial(o.material); });
+  return root;
+}
+function swapViewModel(group, file, fit) {
+  return loadModel(file).then(gltf => {
+    const model = finishModel(gltf.scene, true);
+    model.rotation.y = -Math.PI / 2;
+    model.scale.setScalar(fit.scale);
+    model.position.set(fit.x, fit.y, fit.z);
+    group.children.forEach(c => { if (c !== group.userData.flash) c.visible = false; });
+    group.add(model);
+    group.userData.model = model;
+  });
+}
+swapViewModel(gun, "ak47.glb", { scale: 0.85, x: 0, y: -0.22, z: -0.25 }).catch(() => {});
+swapViewModel(pistolG, "pistol.glb", { scale: 0.5, x: 0, y: -0.08, z: -0.01 }).catch(() => {});
+
 const sparkGeo = new THREE.SphereGeometry(0.08, 6, 6), sparkMat = new THREE.MeshBasicMaterial({ color: 0xFFE28A, transparent: true });
 const tracerMat = new THREE.LineBasicMaterial({ color: 0xFFD07A });
 const transient = [];
