@@ -891,6 +891,33 @@ function slide(p, dx, dz, r) {
   if (blocked(p.x, p.z, r)) { p.x = x0; p.z = z0; hit = true; }
   return hit;
 }
+const HELD_GUN = { reach: 1.75, side: -0.18, y0: 1.05, y1: 1.65, step: 0.1 };
+function gunSolidAt(x, z) {
+  if (Math.abs(x) > ARENA.hx || Math.abs(z) > ARENA.hz) return true;
+  for (const b of RECTS) if (b.y0 < HELD_GUN.y1 && b.h > HELD_GUN.y0 && Math.abs(x - b.x) < b.w / 2 && Math.abs(z - b.z) < b.d / 2) return true;
+  for (const c of CYLS) { const dx = x - c.x, dz = z - c.z; if (c.h > HELD_GUN.y0 && dx * dx + dz * dz < c.r * c.r) return true; }
+  return false;
+}
+function gunPokesThroughWall(x, z, yaw) {
+  const fx = -Math.sin(yaw), fz = -Math.cos(yaw), sx = Math.cos(yaw) * HELD_GUN.side, sz = -Math.sin(yaw) * HELD_GUN.side;
+  let insideWall = false;
+  for (let d = 0; d <= HELD_GUN.reach + 1e-6; d += HELD_GUN.step) {
+    const solid = gunSolidAt(x + fx * d + sx, z + fz * d + sz);
+    if (solid) insideWall = true; else if (insideWall) return true;
+  }
+  return false;
+}
+function keepGunInsideWalls(p, x0, z0, yaw0, r) {
+  if (!gunPokesThroughWall(p.x, p.z, p.yaw)) return;
+  const bx = Math.sin(p.yaw), bz = Math.cos(p.yaw);
+  for (let k = 0.05; k <= 1.3; k += 0.05) {
+    const x = p.x + bx * k, z = p.z + bz * k;
+    if (blocked(x, z, r)) break;
+    if (!gunPokesThroughWall(x, z, p.yaw)) { p.x = x; p.z = z; return; }
+  }
+  p.x = x0; p.z = z0;
+  if (gunPokesThroughWall(p.x, p.z, p.yaw) && !gunPokesThroughWall(p.x, p.z, yaw0)) { p.yaw = yaw0; p.flip = 0; }
+}
 function moveAroundObstacles(mover, pos, dx, dz, dt) {
   const x0 = pos.x, z0 = pos.z;
   if (slide(pos, dx, dz, 0.4)) {
@@ -1376,6 +1403,7 @@ function controlPlayer(dt, t, fire) {
   const turning = keys.ArrowLeft || keys.ArrowRight || keys.ArrowUp || keys.ArrowDown;
   P.turnT = turning ? Math.min(PC.turnRampSec, (P.turnT || 0) + dt) : 0;
   const ramp = 0.4 + 0.6 * (P.turnT / PC.turnRampSec);
+  const x0 = P.x, z0 = P.z, yaw0 = P.yaw;
   const yawR = PC.yawSpeed * Math.PI / 180 * dt * ramp, pitchR = PC.pitchSpeed * Math.PI / 180 * dt * ramp, lim = PC.pitchLimit * Math.PI / 180;
   if (keys.ArrowLeft) P.yaw += yawR; if (keys.ArrowRight) P.yaw -= yawR;
   if (keys.ArrowUp) P.pitch += pitchR; if (keys.ArrowDown) P.pitch -= pitchR;
@@ -1387,6 +1415,7 @@ function controlPlayer(dt, t, fire) {
   if (keys.KeyD) { mx += rx; mz += rz; } if (keys.KeyA) { mx -= rx; mz -= rz; }
   const ml = Math.hypot(mx, mz);
   if (ml > 0) slide(P, mx / ml * PC.moveSpeed * dt, mz / ml * PC.moveSpeed * dt, PC.radius);
+  keepGunInsideWalls(P, x0, z0, yaw0, PC.radius);
   P.fireT -= dt;
   if (keys.Space && P.fireT <= 0 && P.swap <= 0) { P.fireT = 1 / WEAPONS[P.weapon].rate(); fire(); }
   P.recoil = Math.max(0, P.recoil - dt * (P.weapon === "pistol" ? 5 : 8));
