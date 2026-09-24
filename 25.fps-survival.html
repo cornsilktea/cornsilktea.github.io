@@ -1825,7 +1825,7 @@ function updateEnts(dt, nowMs) {
   for (const id in T.ents) {
     const ent = T.ents[id], b = T.bots[id];
     if (b) {
-      ent.x = b.x; ent.z = b.z; ent.yaw = b.yaw; ent.pitch = b.pitch; ent.hp = b.hp; ent.moving = b.moving; ent.prot = tnow() < b.protectUntil; ent.seen = true; ent.ammo = -1;
+      ent.x = b.x; ent.z = b.z; ent.yaw = b.yaw; ent.pitch = b.pitch; ent.hp = b.hp; ent.moving = b.moving; ent.prot = tnow() < b.protectUntil; ent.seen = true; ent.ammo = b.ammo;
       if (b.alive !== ent.alive) { if (b.alive) reviveEnt(ent); else killEnt(ent); }
     } else if (ent.to && ent.alive) {
       const k = clamp((nowMs - ent.t0) / TEAM.lerpMs, 0, 1);
@@ -1998,7 +1998,7 @@ function adoptBots() {
     const slot = Math.max(0, teamIds(p.team).indexOf(id)), sp = TEAM_SPAWNS[p.team][slot % 2], ent = T.ents[id], known = ent && ent.seen;
     T.bots[id] = { id, team: p.team, slot, x: known ? ent.x : sp.x, z: known ? ent.z : sp.z, yaw: known ? ent.yaw : TEAM_YAW[p.team], pitch: 0,
                    hp: known ? ent.hp : 100, alive: known ? ent.alive : true, protectUntil: 0, deadUntil: known && !ent.alive ? tnow() + TEAM.respawnMs : 0,
-                   shots: known ? ent.shots : 0, fire: rnd(0.8, DIFFICULTY_CONFIG.enemyFireCooldownSec), strafe: Math.random() < 0.5 ? 1 : -1, strafeT: rnd(1.5, 3), moving: false };
+                   shots: known ? ent.shots : 0, ammo: known && ent.ammo >= 0 ? ent.ammo : PLAYER_CONFIG.ammo, fire: rnd(0.8, DIFFICULTY_CONFIG.enemyFireCooldownSec), strafe: Math.random() < 0.5 ? 1 : -1, strafeT: rnd(1.5, 3), moving: false };
     ensureEnt(id);
     sub(T.ref.child("hits/" + id), "child_added", s => { onHit(id, s.val()); s.ref.remove(); }, T.botSubs);
   });
@@ -2022,7 +2022,7 @@ function updateBotSim(b, dt, t) {
     b.moving = false;
     if (t >= b.deadUntil) {
       const sp = TEAM_SPAWNS[b.team][b.slot % 2];
-      Object.assign(b, { x: sp.x, z: sp.z, yaw: TEAM_YAW[b.team], pitch: 0, hp: 100, alive: true, protectUntil: t + TEAM.protectMs, fire: rnd(0.8, C.enemyFireCooldownSec) });
+      Object.assign(b, { x: sp.x, z: sp.z, yaw: TEAM_YAW[b.team], pitch: 0, hp: 100, ammo: PLAYER_CONFIG.ammo, alive: true, protectUntil: t + TEAM.protectMs, fire: rnd(0.8, C.enemyFireCooldownSec) });
     }
     return;
   }
@@ -2040,7 +2040,7 @@ function updateBotSim(b, dt, t) {
   b.yaw = Math.atan2(-nx, -nz); b.pitch = Math.atan2(PLAYER_CONFIG.eyeHeight - 1.5, dist);
   b.fire -= dt;
   if (tg && b.fire <= 0 && dist <= C.enemyFireRange && botCanSee(b, tx, tz)) {
-    b.fire = C.enemyFireCooldownSec; b.shots++;
+    b.fire = C.enemyFireCooldownSec; b.shots++; b.ammo = Math.max(0, b.ammo - 1);
     const ent = T.ents[b.id], from = new THREE.Vector3(b.x, 1.45, b.z);
     if (ent && ent.s) { ent.s.g.updateMatrixWorld(true); ent.s.pistol.getWorldPosition(from); ent.shotAt = performance.now(); }
     else if (ent) ent.shotAt = performance.now();
@@ -2073,7 +2073,7 @@ function netTick() {
   }
   if (isHost()) for (const id in T.bots) {
     const b = T.bots[id];
-    const s = stateString(b.x, b.z, b.yaw, b.pitch, (b.alive ? 1 : 0) | (t < b.protectUntil ? 4 : 0) | (b.moving ? 8 : 0), b.shots, b.hp, -1);
+    const s = stateString(b.x, b.z, b.yaw, b.pitch, (b.alive ? 1 : 0) | (t < b.protectUntil ? 4 : 0) | (b.moving ? 8 : 0), b.shots, b.hp, b.ammo);
     if (s !== T.sent[id]) u[id] = s;
   }
   const ids = okeys(u);
@@ -2254,7 +2254,7 @@ function drawSpectator(t, nowMs) {
   });
   c.fillStyle = "#1B2B20"; c.font = "bold 24px " + FONT; c.fillText(fmtTime(Math.ceil(left / 1000)), W / 2, boxMid - 4);
   c.font = "bold 11px " + FONT; c.fillStyle = "#5B6B5E"; c.fillText("👀 관전 중", W / 2, boxY + boxH - 9);
-  const ammoText = e => !e || e.ammo === null || e.ammo === undefined ? "—" : e.ammo < 0 ? "∞" : e.pistol ? "권총" : String(e.ammo);
+  const ammoText = e => !e || typeof e.ammo !== "number" || !(e.ammo >= 0) ? "—" : String(e.ammo);
   const card = (id, x, y, w) => {
     const e = T.ents[id], hp = e ? (e.alive ? e.hp : 0) : 100; let k = 0, d = 0;
     for (const key in T.kills) { const v = T.kills[key]; if (!killCounts(v)) continue; if (v.k === id) k++; if (v.v === id) d++; }
