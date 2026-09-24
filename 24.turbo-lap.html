@@ -33,6 +33,8 @@
   #hudBtns button:active { transform: translateY(2px); box-shadow: none; }
   #speed { position: fixed; left: 12px; bottom: 12px; z-index: 5; display: none; pointer-events: none; }
   #speed b { font-size: 30px; }
+  #chaseTag { display: block; font-size: 13px; font-weight: 800; color: var(--sg-primary); }
+  #chaseTag.boost { color: #D97B4F; font-size: 16px; }
   #fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 4; }
   #hudBest { font-size: 18px; }
   #hudBest .lab { white-space: nowrap; }
@@ -201,7 +203,7 @@
     <button type="button" id="btnRecover">🚗 트랙 복귀 (T)</button>
   </div>
 </div>
-<div class="hud-box" id="speed"><span class="lab">속도</span><b id="speedVal">0</b> km/h</div>
+<div class="hud-box" id="speed"><span id="chaseTag" hidden></span><span class="lab">속도</span><b id="speedVal">0</b> km/h</div>
 <canvas id="minimap" width="300" height="300"></canvas>
 <canvas id="fx"></canvas>
 <div id="lapToast"><b id="lapToastMain"></b><span id="lapToastSub"></span></div>
@@ -246,7 +248,7 @@
   </div>
 
   <div class="card" id="cardBStart" style="display:none">
-    <div class="logo" style="font-size:36px">⚔️ 대전모드<small>1대1 실시간 레이스 — 부딪히면 밀려납니다</small></div>
+    <div class="logo" style="font-size:36px">⚔️ 대전모드<small>1대1 실시간 레이스 — 부딪히면 밀려납니다<br>뒤처진 차는 조금 더 빠르고, 앞차 10m 뒤에 2초 붙어 있으면 부스트!</small></div>
     <div class="hello">안녕하세요, <b id="helloNick"></b>님 <button type="button" class="mini" id="btnNickEdit">✏️ 닉네임 변경</button></div>
     <div class="modeBtns">
       <button type="button" class="btn" id="btnCreate">1대1 방 만들기</button>
@@ -3245,12 +3247,12 @@ new GLTFLoader(HQ_MANAGER).setMeshoptDecoder(MeshoptDecoder).load("img/turbo/sup
 renderLoadGate();
 
 
-const P = { x: 0, z: 0, y: 0, h: 0, v: 0, ci: 0, prevCi: 0, lap: 0, expected: 0, off: false, wallT: 0, steerVis: 0, rollVis: 0, kx: 0, kz: 0, spin: 0, bumpT: 0, fin: 0 };
+const P = { x: 0, z: 0, y: 0, h: 0, v: 0, ci: 0, prevCi: 0, lap: 0, expected: 0, off: false, wallT: 0, steerVis: 0, rollVis: 0, kx: 0, kz: 0, spin: 0, bumpT: 0, fin: 0, chase: 0, tailT: 0, boostT: 0, boostCap: 0 };
 let state = "menu", playMode = "ta";
 let cdTime = 0, cdShown = -1, goTimer = 0, t0 = 0, elapsed = 0, finalMs = 0, doneTimer = 0, shake = 0, menuAng = 0;
 const keys = { up: false, down: false, left: false, right: false };
 const hud = $("hud"), overlay = $("overlay"), cardStart = $("cardStart"), cardDone = $("cardDone"), cardCar = $("cardCar");
-const hudLap = $("hudLap"), hudTime = $("hudTime"), hudOff = $("hudOff"), speedBox = $("speed"), speedVal = $("speedVal");
+const hudLap = $("hudLap"), hudTime = $("hudTime"), hudOff = $("hudOff"), speedBox = $("speed"), speedVal = $("speedVal"), chaseTag = $("chaseTag");
 const countBox = $("count"), countNum = $("countNum"), mini = $("minimap"), mctx = mini.getContext("2d");
 const lapToast = $("lapToast"), lapToastMain = $("lapToastMain"), lapToastSub = $("lapToastSub"), hudBest = $("hudBest");
 const fx = $("fx"), fctx = fx.getContext("2d");
@@ -3271,7 +3273,7 @@ function placeAt(i, lat) {
   P.kx = 0; P.kz = 0; P.spin = 0;
 }
 function startLat() { return (playMode === "battle" && myTeam() === "right" ? -1 : 1) * gridLat(); }
-function resetCar() { placeAt(START_I, startLat()); P.off = false; P.wallT = 0; P.steerVis = 0; P.rollVis = 0; P.fin = 0; }
+function resetCar() { placeAt(START_I, startLat()); P.off = false; P.wallT = 0; P.steerVis = 0; P.rollVis = 0; P.fin = 0; P.chase = 0; P.tailT = 0; P.boostT = 0; P.boostCap = 0; }
 const CARDS = { start: "cardStart", course: "cardCourse", car: "cardCar", done: "cardDone", bstart: "cardBStart", lobby: "cardLobby", bdone: "cardBDone" };
 let cardNow = "start";
 function showCard(which) {
@@ -3370,12 +3372,14 @@ function updateCar(dt) {
   const racing = state === "race";
   const thr = racing ? ((keys.up ? 1 : 0) - (keys.down ? 1 : 0)) : 0;
   const str = racing ? ((keys.left ? 1 : 0) - (keys.right ? 1 : 0)) : 0;
-  const maxV = P.off ? CFG.offroadMax : CFG.maxSpeed;
+  updateChase(dt);
+  const topV = CFG.maxSpeed + P.chase + P.boostCap;
+  const maxV = P.off ? CFG.offroadMax : topV;
   const fx0 = -Math.sin(P.h), fz0 = -Math.cos(P.h);
   const sA = S[wrapI(P.ci + 5)], sB = S[wrapI(P.ci - 5)], s0 = S[P.ci];
   const slope = Math.atan2(sA.p.y - sB.p.y, SEG * 10) * (fx0 * s0.t.x + fz0 * s0.t.z);
 
-  const ratio0 = Math.abs(P.v) / CFG.maxSpeed;
+  const ratio0 = Math.abs(P.v) / topV;
   if (thr > 0) P.v += CFG.accel * (1 - ratio0 * ratio0) * dt;
   else if (thr < 0) { if (P.v > 0.5) P.v -= CFG.brake * dt; else P.v -= CFG.accel * 0.6 * dt; }
   else P.v -= P.v * CFG.coastDrag * dt;
@@ -3593,6 +3597,8 @@ function tick(now) {
     if (!OPEN) setText(hudLap, Math.min(LAPS, P.lap + 1) + " / " + LAPS);
     setText(hudOff, P.off ? "오프로드 — 감속 중" : "");
     setText(speedVal, String(Math.round(Math.abs(P.v) * CFG.kmh)));
+    const chaseText = chaseTagText();
+    chaseTag.hidden = !chaseText; setText(chaseTag, chaseText); chaseTag.className = P.boostCap > 0 ? "boost" : "";
     drawMinimap();
     drawSpeedLines(Math.abs(P.v) / CFG.maxSpeed);
   }
@@ -3668,6 +3674,7 @@ $("btnReset").onclick = e => { e.currentTarget.blur(); startRace(); };
 $("btnRecover").onclick = e => { e.currentTarget.blur(); recover(); };
 
 const CAR_HIT = { radius: 0.82, offset: 1.08, restitution: 0.45, push: 0.55, spinGain: 0.55, spinMax: 2.6, spinFriction: 3.2, slideFriction: 2.6, inertia: 1.45 };
+const CHASE = { farKmh: 8, nearKmh: 3, nearCars: 5, carLen: 2 * (CAR_HIT.offset + CAR_HIT.radius), tailM: 10, tailSec: 2, boostKmh: 30, holdSec: 1, fadeSec: 1.5 };
 const BATTLE = {
   root: "turbolap/rooms", specMax: 1, netMs: 143, countMs: 3600, dnfMs: 30000, rankRowH: 48,
   sdk: ["https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js", "https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"]
@@ -4003,6 +4010,35 @@ function rankCmp(a, b) {
 function myProg() {
   if (OPEN) return (P.ci - START_I) / Math.max(1, FINISH_I - START_I);
   return P.expected === 0 ? (P.ci - N) / N : P.lap + P.ci / N;
+}
+function courseLen() { return OPEN ? (FINISH_I - START_I) * SEG : TRACK_LEN; }
+function entProgNow(e) {
+  if (OPEN) return (e.ci - START_I) / Math.max(1, FINISH_I - START_I);
+  let ciDrift = e.ci - (e.prog - Math.floor(e.prog)) * N;
+  if (ciDrift > N / 2) ciDrift -= N; else if (ciDrift < -N / 2) ciDrift += N;
+  return e.prog + ciDrift / N;
+}
+function metersBehindRival() {
+  if (playMode !== "battle" || BT.spec || state !== "race" || P.fin) return 0;
+  const rivalId = racerIds().find(id => id !== BT.myId), e = rivalId && BT.ents[rivalId];
+  if (!e || !e.seen || e.fin) return 0;
+  return (entProgNow(e) - myProg()) * courseLen();
+}
+function updateChase(dt) {
+  const behind = metersBehindRival(), boostV = CHASE.boostKmh / CFG.kmh;
+  P.chase = behind <= 0 ? 0 : (behind <= CHASE.nearCars * CHASE.carLen ? CHASE.nearKmh : CHASE.farKmh) / CFG.kmh;
+  if (P.boostCap > 0) { P.boostT += dt; P.boostCap = boostV * Math.max(0, Math.min(1, 1 - (P.boostT - CHASE.holdSec) / CHASE.fadeSec)); }
+  P.tailT = behind > 0 && behind <= CHASE.tailM ? P.tailT + dt : 0;
+  if (P.tailT >= CHASE.tailSec) {
+    P.tailT = 0; P.v += boostV; P.boostCap = boostV; P.boostT = 0; shake = Math.max(shake, 0.2);
+    beep(660, 0.12, "sawtooth", 0.08); beep(990, 0.25, "sawtooth", 0.08, 0.08);
+  }
+}
+function chaseTagText() {
+  if (P.boostCap > 0) return "🔥 부스트!";
+  if (P.tailT > 0) { const n = Math.min(4, Math.floor(P.tailT / CHASE.tailSec * 5)); return "부스트 충전 " + "▮".repeat(n) + "▯".repeat(4 - n); }
+  if (P.chase > 0) return "따라잡기 +" + Math.round(P.chase * CFG.kmh) + " km/h";
+  return "";
 }
 function racerState(id) {
   if (id === BT.myId && !BT.spec) return { prog: myProg(), fin: P.fin };
