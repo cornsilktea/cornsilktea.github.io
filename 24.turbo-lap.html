@@ -596,10 +596,6 @@ function initMaterialsHQ() {
   HQM.curb = new THREE.MeshStandardMaterial({ map: curbTex, normalMap: asphaltNormal, normalScale: new THREE.Vector2(0.35, 0.35), roughness: 0.5 });
   const drawChecks = (c, w, h) => { const n = 8, s = w / n; for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { c.fillStyle = (x + y) % 2 ? "#1A1A1A" : "#F2F2F2"; c.fillRect(x * s, y * s, s, s); } };
   HQM.checker = new THREE.MeshStandardMaterial({ map: srgbCanvasTex(128, 128, drawChecks, [1, 1]), roughness: 0.65 });
-  HQM.stripe = new THREE.MeshStandardMaterial({ roughness: 0.6, emissive: 0x401010, emissiveIntensity: 0.6, map: srgbCanvasTex(128, 128, (c, w, h) => {
-    c.fillStyle = "#EDEDE7"; c.fillRect(0, 0, w, h); c.fillStyle = "#C3241E";
-    for (let k = -1; k < 2; k++) { c.beginPath(); c.moveTo(k * w, h); c.lineTo(k * w + w / 2, h); c.lineTo(k * w + w, 0); c.lineTo(k * w + w / 2, 0); c.fill(); }
-  }, [1, 1]) });
   HQM.beam = new THREE.MeshStandardMaterial({ map: srgbCanvasTex(128, 128, drawChecks, [3.1, 0.25]), roughness: 0.5, metalness: 0.1 });
   HQM.armco = new THREE.MeshStandardMaterial({ color: 0xC6CCD4, metalness: 0.85, roughness: 0.3, side: THREE.DoubleSide });
   HQM.post = new THREE.MeshStandardMaterial({ color: 0x80878F, metalness: 0.7, roughness: 0.42 });
@@ -873,8 +869,9 @@ function buildRoadSurface(G) {
     gantry(FINISH_I);
     [0, N - 1].forEach(i => {
       const e = S[i], yaw = Math.atan2(e.n.x, e.n.z);
-      const block = new THREE.Mesh(scaleBoxUv(new THREE.BoxGeometry(W + 2 * SH + 1.2, 1.5, 0.9), W + 2 * SH + 1.2, 1.5, 0.9, 1.5, 1.5), HQM.stripe); block.position.set(e.p.x, e.p.y + 0.75, e.p.z); block.rotation.y = yaw; block.castShadow = true; G.add(block);
-      const rail = new THREE.Mesh(new THREE.BoxGeometry(W + 2 * SH + 1.2, 0.35, 0.2), HQM.armco); rail.position.set(e.p.x, e.p.y + 1.65, e.p.z); rail.rotation.y = yaw; G.add(rail);
+      HQM.endWall = HQM.endWall || new THREE.MeshStandardMaterial({ map: HQM.real.concrete_light, normalMap: HQM.real.concrete_lightN, roughness: 0.85 });
+      const wall = new THREE.Mesh(scaleBoxUv(new THREE.BoxGeometry(W + 2 * SH + 0.4, 1.05, 0.6), W + 2 * SH + 0.4, 1.05, 0.6, 4, 1.05), HQM.endWall);
+      wall.position.set(e.p.x, e.p.y + 0.525, e.p.z); wall.rotation.y = yaw; wall.castShadow = true; wall.receiveShadow = true; G.add(wall);
     });
   }
 }
@@ -1943,7 +1940,8 @@ function makeHKMaterials() {
     escGlass: std({ color: 0xCFE6EE, transparent: true, opacity: 0.16, emissive: 0x3A6E88, emissiveIntensity: 0.25, side: THREE.DoubleSide, depthWrite: false }),
     greenLine: new THREE.MeshBasicMaterial({ color: 0x4CFF7A }),
     redLight: new THREE.MeshBasicMaterial({ color: 0xFF2A20 }),
-    peakLit: std({ color: 0xF0EEE9, roughness: 0.45, emissive: 0xFFF0D0, emissiveIntensity: 0.7 }),
+    peakLit: std({ color: 0xCFCBC2, roughness: 0.55, metalness: 0.2, emissive: 0x4A3F30, emissiveIntensity: 0.35, side: THREE.DoubleSide }),
+    peakRim: new THREE.MeshBasicMaterial({ color: 0xE8C890 }),
     beam: [0xFFFFFF, 0x7FE8FF, 0xB07CFF, 0x7CFF9E].map(c => new THREE.MeshBasicMaterial({ color: c, vertexColors: true, transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })),
     pinkTile: std({ map: T.pinkTile, roughness: 0.7 }),
     domeTile: std({ map: T.domeTile, roughness: 0.6 }),
@@ -2251,7 +2249,10 @@ function buildNinaTower(G, M, o) {
 function buildPeakTower(G, M) {
   const o = HK.peakTower, g = groupAt(G, o.x, o.z, 0.2);
   const pts = [[5, 0], [5, 12], [9, 13], [18, 16], [27, 21], [29, 24], [26, 24.6], [14, 20.5], [0.1, 20]].map(([r, y]) => new THREE.Vector2(r, y));
-  seoulMesh(g, new THREE.LatheGeometry(pts, 48), M.peakLit, 0, 0, 0).scale.set(1, 1, 0.62);
+  seoulMesh(g, new THREE.LatheGeometry(pts, 64), M.peakLit, 0, 0, 0).scale.set(1, 1, 0.62);
+  seoulMesh(g, new THREE.CylinderGeometry(15, 13, 7, 48, 1, true).translate(0, 16.5, 0), M.glass, 0, 0, 0).scale.set(1, 1, 0.62);
+  seoulMesh(g, new THREE.TorusGeometry(28.6, 0.22, 6, 96).rotateX(Math.PI / 2), M.peakRim, 0, 24.2, 0).scale.set(1, 1, 0.62);
+  seoulMesh(g, new THREE.BoxGeometry(12, 12, 8).translate(0, 6, 0), M.glass, 0, 0, 0);
   seoulMesh(g, new THREE.BoxGeometry(40, 14, 26).translate(0, 7, 0), M.glass, 48, -2, 18);
 }
 function inEscalator(z) { const e = HK.escalator; return z > e.z0 && z < e.z1; }
