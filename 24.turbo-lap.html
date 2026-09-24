@@ -2673,6 +2673,29 @@ function buildHKCity(G, M) {
     list.forEach(([x, y, z, w, h, r], i) => { q.setFromAxisAngle(WORLD_UP, r); mesh.setMatrixAt(i, mtx.compose(v.set(x, y, z), q, sc.set(w, h, 1))); });
     mesh.frustumCulled = false; G.add(mesh);
   });
+  return Object.values(sets).flat();
+}
+function footprintLookup(boxes) {
+  const CELL = 40, grid = new Map(), keyOf = (cx, cz) => cx + "," + cz;
+  boxes.forEach(b => {
+    const [x, , z, w, , d] = b, reach = Math.hypot(w, d) / 2;
+    for (let cx = Math.floor((x - reach) / CELL); cx <= Math.floor((x + reach) / CELL); cx++)
+      for (let cz = Math.floor((z - reach) / CELL); cz <= Math.floor((z + reach) / CELL); cz++) {
+        const k = keyOf(cx, cz); if (!grid.has(k)) grid.set(k, []); grid.get(k).push(b);
+      }
+  });
+  const hitsBox = ([bx, , bz, w, , d, rot], x, z, r) => {
+    const dx = x - bx, dz = z - bz, c = Math.cos(rot), sn = Math.sin(rot);
+    return Math.abs(dx * c - dz * sn) < w / 2 + r && Math.abs(dx * sn + dz * c) < d / 2 + r;
+  };
+  return (x, z, r) => {
+    for (let cx = Math.floor((x - r) / CELL); cx <= Math.floor((x + r) / CELL); cx++)
+      for (let cz = Math.floor((z - r) / CELL); cz <= Math.floor((z + r) / CELL); cz++) {
+        const list = grid.get(keyOf(cx, cz));
+        if (list && list.some(b => hitsBox(b, x, z, r))) return true;
+      }
+    return false;
+  };
 }
 function shadowPassSwitch() {
   const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.Float32BufferAttribute([], 3));
@@ -2796,11 +2819,12 @@ function buildHongKong(G) {
   buildPeakTower(G, M);
   buildHarbourBoats(G, M);
   buildMidLevelsEscalator(G, M, escalatorZone);
-  buildHKCity(G, M);
+  const hitsBuilding = footprintLookup(buildHKCity(G, M)), canopy = s => 3.5 * s.sc;
+  const clearOfBuildings = s => !hitsBuilding(s.x, s.z, canopy(s)) && !HK.reserve.some(([rx, rz, rr]) => Math.hypot(s.x - rx, s.z - rz) < rr + canopy(s));
   buildPhotoAccents(G, M);
   buildSkyBeams(G, M);
   buildHarbourGlow(G, M);
-  buildTreesHQ(G, hkTreeSpots().concat(hillsideTreeSpots(terrainAt)));
+  buildTreesHQ(G, hkTreeSpots().concat(hillsideTreeSpots(terrainAt)).filter(clearOfBuildings));
 }
 
 const SG = {
