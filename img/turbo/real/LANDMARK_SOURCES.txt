@@ -9,8 +9,8 @@ landmark_icc.jpg  - "International Commerce Centre 201006.jpg", WiNG, CC BY-SA 3
                     https://commons.wikimedia.org/wiki/File:International_Commerce_Centre_201006.jpg
 landmark_vd.jpg   - "Victoria Dockside night view 201906.jpg", Wpcpey, CC BY-SA 4.0
                     https://commons.wikimedia.org/wiki/File:Victoria_Dockside_night_view_201906.jpg
-landmark_oie.jpg  - "One Island East 201302.jpg", WiNG, CC BY 3.0
-                    https://commons.wikimedia.org/wiki/File:One_Island_East_201302.jpg
 landmark_nina.jpg - "Nina Tower, Tsuen Wan.jpg", Typhoonchaser, CC BY-SA 3.0
                     https://commons.wikimedia.org/wiki/File:Nina_Tower,_Tsuen_Wan.jpg
+landmark_mbs_glass.jpg, landmark_mbs_rear.jpg - "Singapore (SG), Marina Bay Sands Hotel -- 2019 -- 4535.jpg", "... -- 4754.jpg", Dietmar Rabich, CC BY-SA 4.0
+                    https://commons.wikimedia.org/wiki/File:Singapore_(SG),_Marina_Bay_Sands_Hotel_--_2019_--_4535.jpg
 CC BY-SA 사진에서 잘라낸 이 파일들은 같은 CC BY-SA 조건으로 배포합니다.
