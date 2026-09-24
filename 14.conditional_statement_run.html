@@ -23,32 +23,48 @@
   #scene{position:fixed;top:0;left:0;width:100%;height:100%;display:block;}
 
   #topbar{position:fixed;top:0;left:0;right:0;z-index:20;
-    padding:calc(env(safe-area-inset-top,0px) + 8px) 8px 0;
-    display:flex;flex-direction:column;gap:6px;pointer-events:none;}
-  #logPanel{background:rgba(255,255,255,0.92);backdrop-filter:blur(4px);border:1px solid #d9dcdf;border-radius:8px;
-    padding:8px 10px;}
-  #logTitle{font-size:11px;color:#7a828a;letter-spacing:.02em;margin-bottom:5px;}
-  #logList{margin:0;padding:0;list-style:none;
-    font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
-    font-size:12.5px;line-height:1.55;color:#1f2933;}
-  #logList li{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  #logList li.ok{color:#1f2933;}
-  #logList li.no{color:#b03a2e;}
-  #logList li.empty{color:#a5adb5;}
-  #hud{display:flex;gap:6px;flex-wrap:wrap;}
-  .chip{background:rgba(255,255,255,0.92);backdrop-filter:blur(4px);border:1px solid #d9dcdf;border-radius:6px;
-    padding:5px 9px;font-size:12px;color:#3d454d;}
-  .chip b{font-weight:700;color:#111827;font-variant-numeric:tabular-nums;}
-  .chip small{display:block;font-size:10.5px;color:#5b6670;line-height:1.2;margin-top:1px;}
-  .chip small:empty{display:none;}
+    padding:calc(env(safe-area-inset-top,0px) + 8px) 12px 28px;
+    display:flex;justify-content:space-between;align-items:flex-start;gap:10px;pointer-events:none;
+    color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.55);
+    background:linear-gradient(to bottom, rgba(10,30,18,.55), rgba(10,30,18,0));}
+  #stageBox{margin-top:40px;min-width:130px;}
+  #stageLabel{font-size:11px;font-weight:700;letter-spacing:.18em;color:#DCE6D6;}
+  #stageLine{display:flex;align-items:baseline;gap:4px;line-height:1;margin:2px 0 6px;}
+  #hStage{font-size:34px;font-weight:800;font-variant-numeric:tabular-nums;}
+  #stageTotal{font-size:14px;font-weight:700;color:#DCE6D6;}
+  #stageBar{width:130px;height:6px;border-radius:3px;background:rgba(255,255,255,.28);overflow:hidden;
+    box-shadow:0 1px 3px rgba(0,0,0,.35);}
+  #stageFill{height:100%;width:0;border-radius:3px;background:linear-gradient(90deg,#9fd08a,#D97B4F);
+    transition:width .25s ease-out;}
+  #records{display:flex;flex-direction:column;align-items:flex-end;gap:6px;text-align:right;min-width:0;}
+  .rec{display:flex;align-items:center;gap:7px;min-width:0;}
+  .recIcon{flex:none;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:12px;text-shadow:none;box-shadow:0 1px 3px rgba(0,0,0,.35);}
+  .recIcon.me{background:#DCE6D6;}
+  .recIcon.world{background:#D97B4F;}
+  .recIcon.cls{background:#fff;}
+  .recText{min-width:0;}
+  .recText span{display:block;font-size:10.5px;font-weight:700;color:#DCE6D6;letter-spacing:.02em;line-height:1.2;}
+  .recText b{font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.15;}
+  .recText small{display:block;font-size:10.5px;color:#fff;opacity:.85;line-height:1.2;
+    max-width:44vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .recText small:empty{display:none;}
 
-  #controls{position:fixed;left:0;right:0;bottom:0;z-index:20;
-    padding:8px 8px calc(env(safe-area-inset-bottom,0px) + 8px);
-    display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
-  #controls button{appearance:none;background:rgba(255,255,255,0.92);border:1px solid #d9dcdf;
-    border-radius:8px;padding:14px 0;font-size:15px;font-weight:600;color:#1f2933;
-    font-family:inherit;cursor:pointer;user-select:none;}
-  #controls button:active{background:#eef1f3;}
+  #controls{position:fixed;z-index:20;
+    left:calc(env(safe-area-inset-left,0px) + 14px);bottom:calc(env(safe-area-inset-bottom,0px) + 14px);
+    width:156px;height:156px;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);
+    touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;}
+  #controls::before{content:"";position:absolute;inset:0;border-radius:50%;
+    background:rgba(10,30,18,.28);border:1px solid rgba(255,255,255,.25);}
+  .pad{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+    margin:3px;border-radius:12px;background:rgba(255,255,255,.88);border:1px solid rgba(36,64,47,.35);
+    color:var(--sg-primary);box-shadow:0 2px 5px rgba(0,0,0,.3);pointer-events:none;
+    transition:transform .06s, background .06s;}
+  .pad svg{width:20px;height:20px;}
+  .pad i{font-style:normal;font-size:10px;font-weight:700;line-height:1;}
+  .pad.on{background:var(--sg-primary);color:#fff;transform:scale(.93);}
+  #pUp{grid-area:1/2;} #pLeft{grid-area:2/1;} #pRight{grid-area:2/3;} #pDown{grid-area:3/2;}
+  #padCenter{grid-area:2/2;margin:12px;border-radius:50%;background:rgba(255,255,255,.35);pointer-events:none;position:relative;}
 
   .screen{position:fixed;top:0;left:0;right:0;bottom:0;z-index:40;background:rgba(16,44,47,.72);
     display:flex;align-items:center;justify-content:center;padding:14px;overflow-y:auto;}
@@ -80,8 +96,9 @@
   #fullLog div.no{color:#b03a2e;}
   .hide{display:none !important;}
   @media (max-height:620px){
-    #logList{font-size:11.5px;line-height:1.45;}
-    #controls button{padding:11px 0;font-size:14px;}
+    #controls{width:138px;height:138px;}
+    #stageBox{margin-top:38px;}
+    #hStage{font-size:28px;}
     .card{padding:16px;}
   }
   [hidden]{display:none !important;}
@@ -91,23 +108,24 @@
 <canvas id="scene"></canvas>
 
 <div id="topbar">
-  <div id="logPanel">
-    <div id="logTitle">조건문 실행 로그</div>
-    <ul id="logList"><li class="empty">// 장애물을 판정하면 여기에 기록됩니다</li></ul>
+  <div id="stageBox">
+    <div id="stageLabel">STAGE</div>
+    <div id="stageLine"><span id="hStage">0</span><span id="stageTotal">/ 100</span></div>
+    <div id="stageBar"><div id="stageFill"></div></div>
   </div>
-  <div id="hud">
-    <div class="chip">스테이지 <b id="hStage">0</b> / 100</div>
-    <div class="chip">최고 기록 <b id="hBest">0</b></div>
-    <div class="chip">세계 신기록 <b id="hWorld">-</b><small id="hWorldWho"></small></div>
-    <div class="chip" id="hClsChip" hidden>우리 반 신기록 <b id="hCls">-</b><small id="hClsWho"></small></div>
+  <div id="records">
+    <div class="rec"><div class="recText"><span>개인 최고 기록</span><b id="hBest">0</b></div><div class="recIcon me">⭐</div></div>
+    <div class="rec"><div class="recText"><span>세계 신기록</span><b id="hWorld">-</b><small id="hWorldWho"></small></div><div class="recIcon world">🏆</div></div>
+    <div class="rec" id="hClsChip" hidden><div class="recText"><span>우리 반 신기록</span><b id="hCls">-</b><small id="hClsWho"></small></div><div class="recIcon cls">🏫</div></div>
   </div>
 </div>
 
-<div id="controls">
-  <button id="bLeft" type="button">◀ 이동</button>
-  <button id="bJump" type="button">▲ 점프</button>
-  <button id="bSlide" type="button">▼ 숙이기</button>
-  <button id="bRight" type="button">이동 ▶</button>
+<div id="controls" aria-label="방향키">
+  <div class="pad" id="pUp"><svg viewBox="0 0 24 24"><path d="M12 5l7 9H5z" fill="currentColor"/></svg><i>점프</i></div>
+  <div class="pad" id="pLeft"><svg viewBox="0 0 24 24"><path d="M5 12l9-7v14z" fill="currentColor"/></svg><i>이동</i></div>
+  <div id="padCenter"></div>
+  <div class="pad" id="pRight"><svg viewBox="0 0 24 24"><path d="M19 12l-9 7V5z" fill="currentColor"/></svg><i>이동</i></div>
+  <div class="pad" id="pDown"><i>숙이기</i><svg viewBox="0 0 24 24"><path d="M12 19l-7-9h14z" fill="currentColor"/></svg></div>
 </div>
 
 <div class="screen" id="startScreen">
@@ -124,7 +142,7 @@
       </tbody>
     </table>
     <p>총 <b>100개</b>의 장애물을 통과하면 완주입니다.<br>
-       조작은 화면 스와이프, 하단 버튼, 방향키(WASD) 모두 가능합니다.</p>
+       조작은 화면 스와이프, 왼쪽 아래 방향키, 키보드 방향키(WASD) 모두 가능합니다.</p>
     <button class="bigbtn" id="startBtn" type="button">시작하기 (Space)</button>
   </div>
 </div>
@@ -195,7 +213,7 @@
   }
 
   var $ = function(id){ return document.getElementById(id); };
-  var elLogList=$("logList"), elStage=$("hStage"), elBest=$("hBest"),
+  var elStage=$("hStage"), elStageFill=$("stageFill"), elBest=$("hBest"),
       elStart=$("startScreen"), elResult=$("resultScreen"), elTop=$("topbar"),
       elCtrl=$("controls");
   var recordEls = {
@@ -1035,29 +1053,61 @@
   cv.addEventListener("mousedown", function(e){ pStart(e.clientX, e.clientY); });
   cv.addEventListener("mouseup", function(e){ pEnd(e.clientX, e.clientY); });
 
-  function bindBtn(id, kind){
-    var b = $(id);
-    if (kind === "slide") {
-      var startSlide = function(e){ isSlidePressed = true; act("slide"); e.preventDefault(); };
-      var endSlide = function(e){ isSlidePressed = false; player.sliding = false; e.preventDefault(); };
-      b.addEventListener("touchstart", startSlide, { passive:false });
-      b.addEventListener("touchend", endSlide, { passive:false });
-      b.addEventListener("mousedown", startSlide);
-      b.addEventListener("mouseup", endSlide);
-      b.addEventListener("mouseleave", endSlide);
-    } else {
-      b.addEventListener("touchstart", function(e){ act(kind); e.preventDefault(); }, { passive:false });
-      b.addEventListener("click", function(e){ act(kind); e.preventDefault(); });
+  var PAD_KEYS = { jump:"pUp", slide:"pDown", left:"pLeft", right:"pRight" };
+  var PAD_SWITCH_DIST = 18;
+  var padEl = $("controls"), padPointers = {};
+
+  function padDirection(e, current){
+    var r = padEl.getBoundingClientRect();
+    var dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+    if (current && Math.hypot(dx, dy) < PAD_SWITCH_DIST) return current;
+    var horizontal = Math.abs(dx) > Math.abs(dy);
+    var next = horizontal ? (dx > 0 ? "right" : "left") : (dy > 0 ? "slide" : "jump");
+    if (current && next !== current) {
+      var ax = Math.abs(dx), ay = Math.abs(dy);
+      if (Math.max(ax, ay) < Math.min(ax, ay) * 1.4) return current;
     }
+    return next;
   }
-  bindBtn("bLeft","left"); bindBtn("bRight","right");
-  bindBtn("bJump","jump"); bindBtn("bSlide","slide");
+  function padLight(kind, on){ $(PAD_KEYS[kind]).classList.toggle("on", on); }
+  function padPress(kind){
+    padLight(kind, true);
+    if (kind === "slide") { isSlidePressed = true; act("slide"); }
+    else act(kind);
+  }
+  function padRelease(kind){
+    padLight(kind, false);
+    if (kind === "slide") { isSlidePressed = false; player.sliding = false; }
+  }
+  padEl.addEventListener("touchstart", function(e){ e.preventDefault(); }, { passive:false });
+  padEl.addEventListener("contextmenu", function(e){ e.preventDefault(); });
+  padEl.addEventListener("pointerdown", function(e){
+    e.preventDefault();
+    try { padEl.setPointerCapture(e.pointerId); } catch (err) {}
+    var kind = padDirection(e, null);
+    padPointers[e.pointerId] = kind;
+    padPress(kind);
+  });
+  padEl.addEventListener("pointermove", function(e){
+    var kind = padPointers[e.pointerId];
+    if (!kind) return;
+    var next = padDirection(e, kind);
+    if (next === kind) return;
+    padRelease(kind);
+    padPointers[e.pointerId] = next;
+    padPress(next);
+  });
+  function padEnd(e){
+    var kind = padPointers[e.pointerId];
+    if (!kind) return;
+    delete padPointers[e.pointerId];
+    padRelease(kind);
+  }
+  padEl.addEventListener("pointerup", padEnd);
+  padEl.addEventListener("pointercancel", padEnd);
 
   function pushLog(text, ok){
     state.logs.push({ text:text, ok:ok });
-    var items = state.logs.slice(-6), html = "";
-    for (var i = 0; i < items.length; i++) html += '<li class="' + (items[i].ok ? "ok" : "no") + '">' + esc(items[i].text) + "</li>";
-    elLogList.innerHTML = html;
   }
   function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
@@ -1085,6 +1135,7 @@
   function updateHUD(){
     renderWorld();
     elStage.textContent = state.passed;
+    elStageFill.style.width = Math.min(100, state.passed / TOTAL * 100) + "%";
     elBest.textContent = bestStage;
   }
 
@@ -1277,7 +1328,6 @@
     isSlidePressed = false;
 
     updateEnvironment();
-    elLogList.innerHTML = '<li class="empty">// 장애물을 판정하면 여기에 기록됩니다</li>';
     elStart.classList.add("hide");
     elResult.classList.add("hide");
     elTop.style.display = "flex";
