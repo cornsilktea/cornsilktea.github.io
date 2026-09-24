@@ -2365,7 +2365,7 @@ let adaptSlowFrames = 0;
 function adaptQuality(frameSec) {
   const playing = state === "play" || (state === "team" && T.screen === "game");
   if (!playing || frameSec > 0.25) return;
-  if (frameSec > 0.028) adaptSlowFrames++; else if (adaptSlowFrames > 0) adaptSlowFrames--;
+  if (frameSec > 0.022) adaptSlowFrames++; else if (adaptSlowFrames > 0) adaptSlowFrames--;
   if (adaptSlowFrames <= 90) return;
   adaptSlowFrames = 0;
   const pr = renderer.getPixelRatio();

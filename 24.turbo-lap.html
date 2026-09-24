@@ -640,6 +640,7 @@ function renderLoadGate() {
 setTimeout(() => { HQ_LOAD.slow = true; renderLoadGate(); }, 15000);
 const HQ_EXPOSURE = 0.95;
 const SHARED_TEX = new Set();
+const TREE_CELL = 120, TREE_DRAW_DIST = 900, TREE_CELL_MESHES = [];
 function makeRenderer(opts) {
   const r = new THREE.WebGLRenderer(opts);
   r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = HQ_EXPOSURE;
@@ -648,7 +649,7 @@ function makeRenderer(opts) {
 const renderer = makeRenderer({ antialias: true, powerPreference: "high-performance" });
 const IS_TOUCH = (navigator.maxTouchPoints || 0) > 0 || "ontouchstart" in window;
 const MIN_PIXEL_RATIO = 1.0;
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, IS_TOUCH ? 1.5 : 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, IS_TOUCH ? 1.25 : 2));
 renderer.domElement.id = "gl";
 document.body.insertBefore(renderer.domElement, document.body.firstChild);
 const scene = new THREE.Scene();
@@ -862,7 +863,7 @@ function buildTrack(def) {
     });
   }
   const G = trackGroup = new THREE.Group(); scene.add(G);
-  CITY_WATER = []; CITY_ANIM = [];
+  CITY_WATER = []; CITY_ANIM = []; TREE_CELL_MESHES.length = 0;
   W = def.width; OPEN = !!def.open;
   const curve = new THREE.CatmullRomCurve3(def.points.map(p => new THREE.Vector3(p[0], p[1], p[2])), !OPEN, "catmullrom", 0.5);
   N = def.samples || CFG.samples; TRACK_LEN = curve.getLength(); SEG = TRACK_LEN / (OPEN ? N - 1 : N); LAPS = def.laps || CFG.laps;
@@ -994,15 +995,29 @@ function buildTreesHQ(G, spots) {
   spots.forEach(s => groups[s.kind !== undefined ? s.kind : (Math.random() < TREE_KINDS_HQ[0].share ? 0 : 1)].push(s));
   const mtx = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), tint = new THREE.Color();
   TREE_KINDS_HQ.forEach((kind, k) => {
-    const list = groups[k]; if (!list.length) return;
-    const trunks = new THREE.InstancedMesh(kind.trunk, HQM.bark, list.length), leaves = new THREE.InstancedMesh(kind.foliage, kind.leafMat || HQM.leaves, list.length);
-    list.forEach((s, i) => {
-      q.setFromAxisAngle(up, s.rot);
-      mtx.compose(new THREE.Vector3(s.x, s.y || 0, s.z), q, new THREE.Vector3(s.sc, s.sc * rnd(0.9, 1.15), s.sc));
-      trunks.setMatrixAt(i, mtx); leaves.setMatrixAt(i, mtx);
-      leaves.setColorAt(i, tint.setHex(s.tint || kind.tints[i % kind.tints.length]));
+    const cells = new Map();
+    groups[k].forEach((s, i) => {
+      const key = Math.floor(s.x / TREE_CELL) + "," + Math.floor(s.z / TREE_CELL);
+      if (!cells.has(key)) cells.set(key, []);
+      cells.get(key).push([s, i]);
     });
-    [trunks, leaves].forEach(m => { m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false; G.add(m); });
+    cells.forEach(list => {
+      const trunks = new THREE.InstancedMesh(kind.trunk, HQM.bark, list.length), leaves = new THREE.InstancedMesh(kind.foliage, kind.leafMat || HQM.leaves, list.length);
+      list.forEach(([s, kindIndex], i) => {
+        q.setFromAxisAngle(up, s.rot);
+        mtx.compose(new THREE.Vector3(s.x, s.y || 0, s.z), q, new THREE.Vector3(s.sc, s.sc * rnd(0.9, 1.15), s.sc));
+        trunks.setMatrixAt(i, mtx); leaves.setMatrixAt(i, mtx);
+        leaves.setColorAt(i, tint.setHex(s.tint || kind.tints[kindIndex % kind.tints.length]));
+      });
+      [trunks, leaves].forEach(m => { m.castShadow = true; m.receiveShadow = true; m.computeBoundingSphere(); G.add(m); TREE_CELL_MESHES.push(m); });
+    });
+  });
+}
+function cullFarTrees() {
+  const cam = camera.position;
+  TREE_CELL_MESHES.forEach(m => {
+    const c = m.boundingSphere.center;
+    m.visible = Math.hypot(c.x - cam.x, c.z - cam.z) - m.boundingSphere.radius < TREE_DRAW_DIST;
   });
 }
 function gridLat() { return W / 4; }
@@ -3526,15 +3541,22 @@ function setText(el, text) {
 }
 
 let last = performance.now();
-const ADAPT = { slowFrames: 0, bloomOn: true };
-function adaptQuality(frameSec) {
-  if (state !== "race" || frameSec > 0.25) return;
-  if (frameSec > 0.028) ADAPT.slowFrames++; else if (ADAPT.slowFrames > 0) ADAPT.slowFrames--;
-  if (ADAPT.slowFrames <= 90) return;
-  ADAPT.slowFrames = 0;
+const ADAPT = { slowFrames: 0, bloomOn: !IS_TOUCH };
+function lowerQuality() {
   const pr = renderer.getPixelRatio();
   if (pr > MIN_PIXEL_RATIO) { renderer.setPixelRatio(Math.max(MIN_PIXEL_RATIO, pr - 0.25)); resize(); }
   else if (NIGHT.on && ADAPT.bloomOn) ADAPT.bloomOn = false;
+  else if (renderer.shadowMap.enabled) {
+    renderer.shadowMap.enabled = false;
+    scene.traverse(o => { if (o.material) [].concat(o.material).forEach(m => { m.needsUpdate = true; }); });
+  }
+}
+function adaptQuality(frameSec) {
+  if (state !== "race" || frameSec > 0.25) return;
+  if (frameSec > 0.022) ADAPT.slowFrames++; else if (ADAPT.slowFrames > 0) ADAPT.slowFrames--;
+  if (ADAPT.slowFrames <= 90) return;
+  ADAPT.slowFrames = 0;
+  lowerQuality();
 }
 function frame(now) { requestAnimationFrame(frame); adaptQuality((now - last) / 1000); tick(now); }
 function tick(now) {
@@ -3575,6 +3597,7 @@ function tick(now) {
     drawSpeedLines(Math.abs(P.v) / CFG.maxSpeed);
   }
   followSun();
+  cullFarTrees();
   CITY_WATER.forEach(m => { m.normalMap.offset.x += dt * 0.012; m.normalMap.offset.y += dt * 0.005; });
   CITY_ANIM.forEach(f => f(now / 1000));
   if (NIGHT.on) {

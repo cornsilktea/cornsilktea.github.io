@@ -1266,7 +1266,7 @@
 
   var curPR = 0, slowFrames = 0;
   function adaptQuality(dt){
-    if (dt > 0.028) slowFrames++; else if (slowFrames > 0) slowFrames--;
+    if (dt > 0.022) slowFrames++; else if (slowFrames > 0) slowFrames--;
     if (slowFrames <= 90) return;
     slowFrames = 0;
     if (curPR > MIN_PIXEL_RATIO) {
