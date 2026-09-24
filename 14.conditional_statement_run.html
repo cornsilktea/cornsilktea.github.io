@@ -144,6 +144,14 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/GammaCorrectionShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
 <script>
 (function(){
   "use strict";
@@ -228,87 +236,90 @@
   var isJumpPressed = false;
 
   var scene, camera, renderer, clock, roadSegs=[], obstacles=[], pool=[], playerObj;
-  var dirLight, waterMesh, skyMesh;
+  var dirLight, skyFarMesh, skyNearMesh, composer = null, bloomOn = true;
   var sunPosition = null, sunStrength = 1;
 
+  var ASSET_DIR = "img/conditionrun/";
   var IMG = {
-    bg_sky: "img/conditionrun/bg_sky.jpg",
-    bush_flower: "img/conditionrun/bush_flower.png",
-    lamp_post: "img/conditionrun/lamp_post.png",
-    obstacle_log: "img/conditionrun/obstacle_log.png",
-    obstacle_vine: "img/conditionrun/obstacle_vine.png",
-    obstacle_wall: "img/conditionrun/obstacle_wall.png",
-    player_sprites: "img/conditionrun/player_sprites.png",
-    tex_curb: "img/conditionrun/tex_curb.jpg",
-    tex_ground_grass: "img/conditionrun/tex_ground_grass.jpg",
-    tex_road: "img/conditionrun/tex_road.jpg",
-    tex_water: "img/conditionrun/tex_water.jpg",
-    tree_big: "img/conditionrun/tree_big.png",
-    tree_palm: "img/conditionrun/tree_palm.png"
+    bg_sky_far: ASSET_DIR + "bg_sky_far.jpg",
+    bg_sky_near: ASSET_DIR + "bg_sky_near.webp",
+    bush_flower: ASSET_DIR + "bush_flower.webp",
+    ruin_pillar: ASSET_DIR + "ruin_pillar.webp",
+    obstacle_log: ASSET_DIR + "obstacle_log.webp",
+    obstacle_vine: ASSET_DIR + "obstacle_vine.webp",
+    obstacle_wall: ASSET_DIR + "obstacle_wall.webp",
+    light_shaft: ASSET_DIR + "light_shaft.webp",
+    tex_curb: ASSET_DIR + "tex_curb.jpg",
+    tex_ground_grass: ASSET_DIR + "tex_ground_grass.jpg",
+    tex_road: ASSET_DIR + "tex_road.jpg",
+    tree_big: ASSET_DIR + "tree_big.webp",
+    tree_palm: ASSET_DIR + "tree_palm.webp"
   };
-
-  var SPRITE = {
-    run: [
-      [0.0208, 0.6204, 0.1442, 0.9854],
-      [0.1795, 0.6204, 0.3205, 0.9927],
-      [0.3446, 0.6204, 0.4888, 0.9945],
-      [0.5144, 0.6204, 0.6522, 0.9891],
-      [0.6827, 0.6204, 0.8173, 0.9927],
-      [0.8510, 0.6204, 0.9824, 0.9964]
-    ],
-    jump: [
-      [0.0272, 0.2536, 0.1378, 0.5529],
-      [0.1667, 0.2536, 0.3333, 0.6131],
-      [0.3638, 0.2536, 0.4696, 0.5547]
-    ],
-    slide: [
-      [0.0224, 0.0036, 0.1442, 0.1788],
-      [0.1747, 0.0036, 0.3237, 0.2354],
-      [0.3542, 0.0036, 0.4792, 0.2464]
-    ]
-  };
-  var SPRITE_ASPECT = 624 / 548;
+  var LINEAR_MAP_SUFFIXES = ["_normal", "_rough"];
+  var PLAYER_MODEL_URL = ASSET_DIR + "player.glb";
   var PLAYER_H = 2.3;
-  var RUN_FRAME_H = SPRITE.run[0][3] - SPRITE.run[0][1];
+  var playerGltf = null;
 
   var TEX = {};
   var MAT = {};
   var TINT_MATS = [];
   var billboards = [];
 
+  function isLinearMap(key){
+    return LINEAR_MAP_SUFFIXES.some(function(s){ return key.slice(-s.length) === s; });
+  }
   function makeTexture(src, repeatX, repeatY){
     var t = TEX[src];
     if (repeatX !== undefined) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(repeatX, repeatY); }
-    t.encoding = THREE.sRGBEncoding;
-    t.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+    t.encoding = isLinearMap(src) ? THREE.LinearEncoding : THREE.sRGBEncoding;
+    t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
     return t;
   }
+  function optionalTexture(src, repeatX, repeatY){
+    return TEX[src] ? makeTexture(src, repeatX, repeatY) : null;
+  }
   function spriteMat(src){
-    var m = new THREE.MeshBasicMaterial({ map:makeTexture(src), transparent:true, alphaTest:0.5, side:THREE.DoubleSide, fog:true });
+    var m = new THREE.MeshStandardMaterial({ map:makeTexture(src), transparent:true, alphaTest:0.5, side:THREE.DoubleSide,
+      roughness:0.92, metalness:0 });
     TINT_MATS.push(m);
     return m;
   }
-  function tileMat(src, rx, ry){
-    var m = new THREE.MeshBasicMaterial({ map:makeTexture(src, rx, ry) });
+  function tileMat(src, rx, ry, roughness){
+    var m = new THREE.MeshStandardMaterial({ map:makeTexture(src, rx, ry), roughness:roughness, metalness:0 });
+    var normal = optionalTexture(src + "_normal", rx, ry);
+    var rough = optionalTexture(src + "_rough", rx, ry);
+    if (normal) m.normalMap = normal;
+    if (rough) { m.roughnessMap = rough; m.roughness = 1; }
     TINT_MATS.push(m);
     return m;
+  }
+  function skyMat(src){
+    return new THREE.MeshBasicMaterial({ map:makeTexture(src), fog:false, transparent:true, depthWrite:false, toneMapped:false });
   }
 
   function makeMaterials(){
-    MAT.road   = tileMat("tex_road", 2, 4);
-    MAT.curb   = tileMat("tex_curb", 8, 1);
-    MAT.ground = tileMat("tex_ground_grass", 12, 4);
-    MAT.water  = tileMat("tex_water", 42, 52);
-    MAT.line   = new THREE.MeshBasicMaterial({ color:0xfff4d6, transparent:true, opacity:0.32 });
-    MAT.sky    = new THREE.MeshBasicMaterial({ map:makeTexture("bg_sky"), fog:false });
+    MAT.road   = tileMat("tex_road", 1, 3, 0.82);
+    MAT.curb   = tileMat("tex_curb", 7, 1, 0.9);
+    MAT.curbTop = MAT.curb.clone();
+    MAT.curbTop.map = MAT.curb.map.clone();
+    MAT.curbTop.map.center.set(0.5, 0.5);
+    MAT.curbTop.map.rotation = Math.PI / 2;
+    MAT.curbTop.map.repeat.set(7, 0.5);
+    MAT.curbTop.map.needsUpdate = true;
+    TINT_MATS.push(MAT.curbTop);
+    MAT.curbFaces = [MAT.curb, MAT.curb, MAT.curbTop, MAT.curb, MAT.curb, MAT.curb];
+    MAT.ground = tileMat("tex_ground_grass", 32, 3, 0.95);
+    MAT.skyFar  = skyMat("bg_sky_far");
+    MAT.skyNear = skyMat("bg_sky_near");
     MAT.treeBig  = spriteMat("tree_big");
     MAT.treePalm = spriteMat("tree_palm");
     MAT.bush     = spriteMat("bush_flower");
-    MAT.lamp     = spriteMat("lamp_post");
+    MAT.pillar   = spriteMat("ruin_pillar");
     MAT.obLog    = spriteMat("obstacle_log");
     MAT.obVine   = spriteMat("obstacle_vine");
     MAT.obWall   = spriteMat("obstacle_wall");
-    MAT.player   = new THREE.MeshBasicMaterial({ map:makeTexture("player_sprites"), transparent:true, alphaTest:0.5, side:THREE.DoubleSide });
+    MAT.shaft    = new THREE.MeshBasicMaterial({ map:makeTexture("light_shaft"), transparent:true, depthWrite:false,
+                     blending:THREE.AdditiveBlending, fog:false, toneMapped:false, side:THREE.DoubleSide, opacity:0.3 });
     MAT.shadow   = new THREE.MeshBasicMaterial({ map:makeShadowTexture(), color:0x000000, transparent:true, opacity:0.4,
                      depthWrite:false, fog:true });
   }
@@ -345,20 +356,24 @@
     return m;
   }
 
-  function preloadTextures(done){
-    var keys = Object.keys(IMG), left = keys.length, loader = new THREE.TextureLoader();
+  function preloadAssets(done){
+    var keys = Object.keys(IMG), left = keys.length + 1, loader = new THREE.TextureLoader();
+    function finishOne(){ if (--left === 0) done(); }
     keys.forEach(function(k){
-      loader.load(IMG[k], function(t){ TEX[k] = t; if (--left === 0) done(); },
-        undefined, function(){ TEX[k] = new THREE.Texture(); if (--left === 0) done(); });
+      loader.load(IMG[k], function(t){ TEX[k] = t; finishOne(); },
+        undefined, function(){ TEX[k] = new THREE.Texture(); finishOne(); });
     });
+    if (!THREE.GLTFLoader) { finishOne(); return; }
+    new THREE.GLTFLoader().load(PLAYER_MODEL_URL, function(g){ playerGltf = g; finishOne(); }, undefined, finishOne);
   }
 
   var IS_TOUCH = (navigator.maxTouchPoints || 0) > 0 || "ontouchstart" in window;
   var CORES = navigator.hardwareConcurrency || 4;
-  var LOW_END = IS_TOUCH && (CORES <= 4 || window.innerWidth * window.innerHeight > 1600 * 900);
+  var LOW_END = IS_TOUCH && CORES <= 2;
+  var MIN_PIXEL_RATIO = 1.0;
   var QUALITY = {
-    pixelRatio: LOW_END ? 1 : (IS_TOUCH ? 1.35 : Math.min(2, window.devicePixelRatio || 1)),
-    antialias:  !IS_TOUCH,
+    pixelRatio: LOW_END ? 1 : Math.min(IS_TOUCH ? 1.5 : 2, window.devicePixelRatio || 1),
+    antialias:  true,
     tuftPerSide: LOW_END ? 2 : (IS_TOUCH ? 3 : 6),
     blades:      LOW_END ? 2 : 3,
     extraTrees:  !LOW_END,
@@ -368,8 +383,7 @@
   var GEO = {
     road:   new THREE.BoxGeometry(10.4, 0.6, SEG_LEN),
     curb:   new THREE.BoxGeometry(0.7, 0.9, SEG_LEN),
-    line:   new THREE.BoxGeometry(0.11, 0.06, SEG_LEN),
-    ground: new THREE.BoxGeometry(60, 0.55, SEG_LEN),
+    ground: new THREE.BoxGeometry(160, 0.55, SEG_LEN),
 
     sprite: new THREE.PlaneGeometry(1, 1).translate(0, 0.5, 0),
 
@@ -384,24 +398,38 @@
     return g;
   }
 
+  var BUSH_ASPECT = 1.414;
   function buildGrassTuft(){
-    var s = 1.3 + Math.random() * 0.9;
-    return makeBillboard(MAT.bush, s * 1.5, s);
+    var h = 0.9 + Math.random() * 0.7;
+    return makeBillboard(MAT.bush, h * BUSH_ASPECT, h);
   }
 
-  function buildFlower(isYellow){
-    var s = isYellow ? 1.1 : 0.9;
-    return makeBillboard(MAT.bush, s * 1.5, s);
+  function buildFlower(isLarge){
+    var h = isLarge ? 1.25 : 1.0;
+    return makeBillboard(MAT.bush, h * BUSH_ASPECT, h);
   }
 
   var treeToggle = 0;
   function buildDetailedTree(){
     var palm = (treeToggle++ % 2) === 1;
-    return makeBillboard(palm ? MAT.treePalm : MAT.treeBig, 4.4, 6.6);
+    return palm ? makeBillboard(MAT.treePalm, 4.0, 6.8) : makeBillboard(MAT.treeBig, 4.5, 6.6);
   }
 
   function buildDetailedPillar(){
-    return makeBillboard(MAT.lamp, 4.0, 6.0);
+    return makeBillboard(MAT.pillar, 2.0, 5.6);
+  }
+
+  var SHAFT_TILTS = [0.22, -0.18, 0.3, -0.26];
+  var shafts = [];
+  function buildLightShaft(k){
+    var g = new THREE.Group();
+    var mat = MAT.shaft.clone();
+    var m = new THREE.Mesh(GEO.sprite, mat);
+    m.scale.set(5.5, 26, 1);
+    m.rotation.z = SHAFT_TILTS[k % SHAFT_TILTS.length];
+    g.add(m);
+    shafts.push({ mesh:m, mat:mat, phase:k * 1.9, tilt:m.rotation.z });
+    return g;
   }
 
   function initThree(){
@@ -409,42 +437,72 @@
     renderer = new THREE.WebGLRenderer({ canvas:canvas, antialias:QUALITY.antialias, powerPreference:"high-performance" });
     renderer.setPixelRatio(Math.min(QUALITY.pixelRatio, window.devicePixelRatio || 1));
     renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     makeMaterials();
 
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xf6cf8c);
-    scene.fog = new THREE.Fog(0xf6cf8c, 40, 142);
+    scene.background = new THREE.Color(0x7fae7c);
+    scene.fog = new THREE.Fog(0x7fae7c, 40, 220);
 
-    camera = new THREE.PerspectiveCamera(62, 1, 0.1, 200);
+    camera = new THREE.PerspectiveCamera(62, 1, 0.1, 260);
     camera.position.set(0, 5.0, 8.4);
     camera.lookAt(0, 1.6, -12);
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-    dirLight = new THREE.DirectionalLight(0xffeedd, 0.9);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+    scene.add(new THREE.HemisphereLight(0xcfe8ff, 0x28451f, 0.55));
+    dirLight = new THREE.DirectionalLight(0xffeedd, 1.1);
     dirLight.position.set(12, 20, 6);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.set(2048, 2048);
+    dirLight.shadow.bias = -0.0004;
+    dirLight.shadow.normalBias = 0.02;
+    var sc = dirLight.shadow.camera;
+    sc.left = -14; sc.right = 14; sc.top = 10; sc.bottom = -2; sc.near = 1; sc.far = 60;
+    sc.updateProjectionMatrix();
+    dirLight.target.position.set(0, 0, PLAYER_Z);
     scene.add(dirLight);
+    scene.add(dirLight.target);
 
     sunPosition = new THREE.Vector3(-30, 20, -150);
 
-
-    skyMesh = new THREE.Mesh(new THREE.PlaneGeometry(500, 250), MAT.sky);
-    skyMesh.position.set(0, 250 * 0.35 - 3, -186);
-    scene.add(skyMesh);
-
-    waterMesh = new THREE.Mesh(new THREE.PlaneGeometry(420, 520), MAT.water);
-    waterMesh.rotation.x = -Math.PI / 2;
-    waterMesh.position.set(0, -1.4, -160);
-    scene.add(waterMesh);
+    skyFarMesh = new THREE.Mesh(new THREE.PlaneGeometry(520, 292), MAT.skyFar);
+    skyFarMesh.position.set(0, 27, -236);
+    skyFarMesh.renderOrder = -2;
+    scene.add(skyFarMesh);
+    skyNearMesh = new THREE.Mesh(new THREE.PlaneGeometry(400, 225), MAT.skyNear);
+    skyNearMesh.position.set(0, 47.5, -160);
+    skyNearMesh.renderOrder = -1;
+    scene.add(skyNearMesh);
 
     for (var i = 0; i < SEG_COUNT; i++) roadSegs.push(buildSegment(i));
     playerObj = buildPlayer();
     initDust();
+    initAirParticles();
     scene.add(playerObj);
 
+    setupComposer();
     curPR = renderer.getPixelRatio();
     clock = new THREE.Clock();
     resize();
     window.addEventListener("resize", resize);
+  }
+
+  function setupComposer(){
+    if (!THREE.EffectComposer || !THREE.UnrealBloomPass || !THREE.GammaCorrectionShader) return;
+    var gl = renderer.getContext();
+    var isWebGL2 = typeof WebGL2RenderingContext !== "undefined" && gl instanceof WebGL2RenderingContext;
+    var size = renderer.getDrawingBufferSize(new THREE.Vector2());
+    var targetOpts = { type:THREE.HalfFloatType, minFilter:THREE.LinearFilter, magFilter:THREE.LinearFilter, format:THREE.RGBAFormat };
+    var target = (isWebGL2 && THREE.WebGLMultisampleRenderTarget)
+      ? new THREE.WebGLMultisampleRenderTarget(size.x, size.y, targetOpts)
+      : new THREE.WebGLRenderTarget(size.x, size.y, targetOpts);
+    composer = new THREE.EffectComposer(renderer, target);
+    composer.addPass(new THREE.RenderPass(scene, camera));
+    composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.35, 0.5, 0.86));
+    composer.addPass(new THREE.ShaderPass(THREE.GammaCorrectionShader));
   }
 
   function registerBillboard(mesh, seg){ billboards.push({ mesh:mesh, seg:seg }); return mesh; }
@@ -458,16 +516,21 @@
 
   function buildSegment(i){
     var g = new THREE.Group();
-    var road = new THREE.Mesh(GEO.road, MAT.road); road.position.y = -0.3; g.add(road);
-    var cl = new THREE.Mesh(GEO.curb, MAT.curb); cl.position.set(-5.2, 0.05, 0); g.add(cl);
-    var cr = new THREE.Mesh(GEO.curb, MAT.curb); cr.position.set(5.2, 0.05, 0); g.add(cr);
-    var l1 = new THREE.Mesh(GEO.line, MAT.line); l1.position.set(-1.6, 0.02, 0); g.add(l1);
-    var l2 = new THREE.Mesh(GEO.line, MAT.line); l2.position.set(1.6, 0.02, 0); g.add(l2);
+    var road = new THREE.Mesh(GEO.road, MAT.road); road.position.y = -0.3; road.receiveShadow = true; g.add(road);
+    var cl = new THREE.Mesh(GEO.curb, MAT.curbFaces); cl.position.set(-5.2, 0.05, 0); cl.receiveShadow = true; g.add(cl);
+    var cr = new THREE.Mesh(GEO.curb, MAT.curbFaces); cr.position.set(5.2, 0.05, 0); cr.receiveShadow = true; g.add(cr);
 
     var groundL = new THREE.Mesh(GEO.ground, MAT.ground);
-    groundL.position.set(-35.2, -0.32, 0); g.add(groundL);
+    groundL.position.set(-85.2, -0.32, 0); groundL.receiveShadow = true; g.add(groundL);
     var groundR = new THREE.Mesh(GEO.ground, MAT.ground);
-    groundR.position.set(35.2, -0.32, 0); g.add(groundR);
+    groundR.position.set(85.2, -0.32, 0); groundR.receiveShadow = true; g.add(groundR);
+
+    if (i % 2 === 1) {
+      var shaft = registerBillboard(buildLightShaft(i), g);
+      var side = (i % 4 === 1) ? -1 : 1;
+      shaft.position.set(side * (6 + Math.random() * 9), -1, (Math.random() - 0.5) * SEG_LEN * 0.6);
+      g.add(shaft);
+    }
 
     for (var k = 0; k < QUALITY.tuftPerSide; k++) {
       var tuftL = registerBillboard(buildGrassTuft(), g);
@@ -508,33 +571,93 @@
     return g;
   }
 
-  function buildPlayer(){
-    var root = new THREE.Group();
-    var geo = new THREE.PlaneGeometry(1, 1).translate(0, 0.5, 0);
-    var mesh = new THREE.Mesh(geo, MAT.player);
-    root.add(mesh);
-    var sh = makeShadow(1.8, 1.0, 0.46);
-    sh.position.z = PLAYER_Z;
-    scene.add(sh);
-    root.userData = { mesh:mesh, uv:geo.attributes.uv, curFrame:null, shadow:sh, baseW:1, baseH:1 };
-    root.position.set(0, 0, PLAYER_Z);
-    setPlayerFrame(root, SPRITE.run[0]);
-    return root;
+  var SLIDE_CLIP_RANGE = [0.08, 0.70];
+  var POSE_FADE = 0.08;
+  var SLIDE_TIME_SCALE = 2.2;
+  var RUN_CLIP_SPEED = 34;
+  var poseActions = {}, poseMixer = null, currentPose = null;
+
+  function buildFallbackModel(){
+    var mat = new THREE.MeshStandardMaterial({ color:0xb59b6a, roughness:0.8 });
+    var body = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.36, PLAYER_H, 16).translate(0, PLAYER_H / 2, 0), mat);
+    body.castShadow = true;
+    return body;
   }
 
-  function setPlayerFrame(root, f){
-    var d = root.userData;
-    if (d.curFrame === f) return;
-    d.curFrame = f;
-    var u0 = f[0], v0 = f[1], u1 = f[2], v1 = f[3];
-    var a = d.uv.array;
-    a[0] = u0; a[1] = v1;  a[2] = u1; a[3] = v1;
-    a[4] = u0; a[5] = v0;  a[6] = u1; a[7] = v0;
-    d.uv.needsUpdate = true;
-    var h = PLAYER_H * (v1 - v0) / RUN_FRAME_H;
-    var w = h * ((u1 - u0) * SPRITE_ASPECT) / (v1 - v0);
-    d.baseW = w; d.baseH = h;
-    d.mesh.scale.set(w, h, 1);
+  function buildPlayerModel(){
+    if (!playerGltf) return buildFallbackModel();
+    var model = playerGltf.scene;
+    model.traverse(function(o){
+      if (!o.isMesh) return;
+      o.castShadow = true;
+      o.frustumCulled = false;
+    });
+    var holder = new THREE.Group();
+    holder.rotation.y = Math.PI;
+    holder.add(model);
+
+    poseMixer = new THREE.AnimationMixer(model);
+    var clips = {};
+    playerGltf.animations.forEach(function(c){ clips[c.name] = c; });
+    if (clips.slide) {
+      var fps = 60;
+      clips.slide = THREE.AnimationUtils.subclip(clips.slide, "slideHold",
+        Math.round(SLIDE_CLIP_RANGE[0] * fps), Math.round(SLIDE_CLIP_RANGE[1] * fps), fps);
+    }
+    ["run", "jump", "slide"].forEach(function(name){
+      if (!clips[name]) return;
+      var a = poseMixer.clipAction(clips[name]);
+      if (name !== "run") { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; }
+      poseActions[name] = a;
+    });
+    if (poseActions.run) { poseActions.run.play(); currentPose = "run"; }
+    fitModelToPlayerHeight(model);
+    return holder;
+  }
+
+  function fitModelToPlayerHeight(model){
+    poseMixer.update(0);
+    model.updateMatrixWorld(true);
+    var minY = Infinity, maxY = -Infinity, p = new THREE.Vector3();
+    model.traverse(function(o){
+      if (!o.isBone) return;
+      o.getWorldPosition(p);
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    });
+    if (!isFinite(minY) || maxY - minY < 0.01) return;
+    var k = PLAYER_H / (maxY - minY);
+    model.scale.multiplyScalar(k);
+    model.position.y -= minY * k;
+  }
+
+  function setPose(name, restart, timeScale){
+    var next = poseActions[name];
+    if (!next) return;
+    if (timeScale !== undefined) next.timeScale = timeScale;
+    if (name === currentPose && !restart) return;
+    var prev = poseActions[currentPose];
+    next.reset();
+    next.setEffectiveWeight(1);
+    next.play();
+    if (prev && prev !== next) {
+      next.fadeIn(POSE_FADE);
+      prev.fadeOut(POSE_FADE);
+    }
+    currentPose = name;
+  }
+
+  function buildPlayer(){
+    var root = new THREE.Group();
+    var body = new THREE.Group();
+    body.add(buildPlayerModel());
+    root.add(body);
+    var sh = makeShadow(1.6, 0.9, 0.28);
+    sh.position.z = PLAYER_Z;
+    scene.add(sh);
+    root.userData = { body:body, shadow:sh };
+    root.position.set(0, 0, PLAYER_Z);
+    return root;
   }
 
   function buildObstacle(type){
@@ -542,22 +665,22 @@
     g.userData.shadows = [];
     var sh;
     if (type === "log") {
-      var log = makeBillboard(MAT.obLog, 11.5, 5.75);
-      log.position.y = -5.75 * 0.238 + 0.05;
+      var log = makeBillboard(MAT.obLog, 10.0, 2.75);
+      log.position.y = -0.12;
       g.add(log);
       sh = makeShadow(10.4, 2.6, 0.4);
       g.add(sh); g.userData.shadows.push({ mesh:sh, h:1.9 });
     }
     else if (type === "ceil") {
-      var vine = makeBillboard(MAT.obVine, 11.2, 7.47);
-      vine.position.y = 2.5 - 7.47 * 0.512;
+      var vine = makeBillboard(MAT.obVine, 10.8, 4.98);
+      vine.position.y = 0.8;
       g.add(vine);
       sh = makeShadow(10.0, 1.4, 0.16);
       g.add(sh); g.userData.shadows.push({ mesh:sh, h:3.0 });
     }
     else {
       function makeSingleWall(){
-        var w = makeBillboard(MAT.obWall, 2.95, 3.1);
+        var w = makeBillboard(MAT.obWall, 3.15, 2.4);
         var ws = makeShadow(3.3, 1.6, 0.4);
         w.add(ws); g.userData.shadows.push({ mesh:ws, h:3.1 });
         return w;
@@ -626,9 +749,9 @@
 
   function recycle(rec){ rec.mesh.visible = false; pool.push(rec.mesh); }
 
-  var C_DAWN=new THREE.Color(0xf6cf8c), C_NOON=new THREE.Color(0xfbe8b8), C_DUSK=new THREE.Color(0xe6884f),
+  var C_DAWN=new THREE.Color(0x7fae7c), C_NOON=new THREE.Color(0xbfe0b0), C_DUSK=new THREE.Color(0x5f7a52),
       C_L1=new THREE.Color(0xffedd5), C_L2=new THREE.Color(0xffffff), C_L3=new THREE.Color(0xffaa77),
-      C_WHITE=new THREE.Color(0xffffff),
+      C_WHITE=new THREE.Color(0xffffff), C_CANOPY_SHADE=new THREE.Color(0x3f5a3a),
       skyColor=new THREE.Color(), lightColor=new THREE.Color(), tintColor=new THREE.Color();
 
   function updateEnvironment(){
@@ -647,14 +770,16 @@
     }
 
     scene.background = skyColor;
-    scene.fog.color.copy(skyColor);
+    scene.fog.color.copy(skyColor).lerp(C_CANOPY_SHADE, 0.4);
     dirLight.color.copy(lightColor);
     tintColor.copy(C_WHITE).lerp(skyColor, 0.22);
     for (var i = 0; i < TINT_MATS.length; i++) TINT_MATS[i].color.copy(tintColor);
-    MAT.sky.color.copy(C_WHITE).lerp(skyColor, 0.3);
+    MAT.skyFar.color.copy(C_WHITE).lerp(skyColor, 0.3);
+    MAT.skyNear.color.copy(C_WHITE).lerp(skyColor, 0.22);
 
     var sunH = Math.max(0, Math.min(1, (sunPosition.y - 10) / 55));
     shadowDir = Math.max(-0.7, Math.min(0.7, -sunPosition.x / sunPosition.y));
+    dirLight.position.set(-shadowDir * 20, 22, PLAYER_Z + 10);
     sunStrength = 0.72 + 0.28 * sunH;
     for (var s = 0; s < SHADOW_MATS.length; s++) SHADOW_MATS[s].opacity = SHADOW_MATS[s].userData.baseOpacity * sunStrength;
     for (var k = 0; k < shadows.length; k++) {
@@ -698,11 +823,84 @@
     }
   }
 
+  var SPORE_COUNT = 240, FIREFLY_COUNT = 40, AIR_DEPTH = 110, AIR_NEAR_Z = 12;
+  var spores = null, fireflies = null, fireflyPhase = [], atmosphereTime = 0;
+  function randomAirPoint(arr, i, minSideX){
+    var side = Math.random() < 0.5 ? -1 : 1;
+    arr[i * 3] = minSideX ? side * (minSideX + Math.random() * 12) : (Math.random() - 0.5) * 30;
+    arr[i * 3 + 1] = 0.3 + Math.random() * (minSideX ? 3.5 : 9);
+    arr[i * 3 + 2] = AIR_NEAR_Z - Math.random() * AIR_DEPTH;
+  }
+  function initAirParticles(){
+    var sporePos = new Float32Array(SPORE_COUNT * 3);
+    for (var i = 0; i < SPORE_COUNT; i++) randomAirPoint(sporePos, i, 0);
+    var sg = new THREE.BufferGeometry();
+    sg.setAttribute("position", new THREE.BufferAttribute(sporePos, 3));
+    spores = new THREE.Points(sg, new THREE.PointsMaterial({ map:MAT.shadow.map, color:0xf1efc4, size:0.13, transparent:true,
+      opacity:0.55, depthWrite:false, blending:THREE.AdditiveBlending, sizeAttenuation:true, toneMapped:false }));
+    spores.frustumCulled = false;
+    scene.add(spores);
+
+    var flyPos = new Float32Array(FIREFLY_COUNT * 3), flyCol = new Float32Array(FIREFLY_COUNT * 3);
+    for (var j = 0; j < FIREFLY_COUNT; j++) { randomAirPoint(flyPos, j, 6); fireflyPhase.push(Math.random() * 10); }
+    var fg = new THREE.BufferGeometry();
+    fg.setAttribute("position", new THREE.BufferAttribute(flyPos, 3));
+    fg.setAttribute("color", new THREE.BufferAttribute(flyCol, 3));
+    fireflies = new THREE.Points(fg, new THREE.PointsMaterial({ map:MAT.shadow.map, size:0.42, transparent:true, vertexColors:true,
+      depthWrite:false, blending:THREE.AdditiveBlending, sizeAttenuation:true, toneMapped:false }));
+    fireflies.frustumCulled = false;
+    fireflies.visible = false;
+    scene.add(fireflies);
+  }
+
+  function driftAir(points, move, dt, sway, minSideX){
+    var pos = points.geometry.attributes.position, a = pos.array, n = pos.count;
+    for (var i = 0; i < n; i++) {
+      a[i * 3 + 2] += move;
+      a[i * 3] += Math.sin(atmosphereTime * 0.7 + i) * sway * dt;
+      a[i * 3 + 1] += Math.cos(atmosphereTime * 0.5 + i * 1.3) * sway * 0.6 * dt;
+      if (a[i * 3 + 2] > AIR_NEAR_Z) { randomAirPoint(a, i, minSideX); a[i * 3 + 2] = AIR_NEAR_Z - AIR_DEPTH; }
+    }
+    pos.needsUpdate = true;
+  }
+
+  function nightAmount(){
+    return Math.max(0, Math.min(1, (state.passed / TOTAL - 0.72) / 0.18));
+  }
+
+  function updateAtmosphere(dt, move){
+    atmosphereTime += dt;
+    driftAir(spores, move, dt, 0.25, 0);
+
+    var night = nightAmount();
+    fireflies.visible = night > 0;
+    if (night > 0) {
+      driftAir(fireflies, move, dt, 0.9, 6);
+      var col = fireflies.geometry.attributes.color.array;
+      for (var i = 0; i < FIREFLY_COUNT; i++) {
+        var b = Math.pow(Math.max(0, Math.sin(atmosphereTime * 2.3 + fireflyPhase[i])), 3) * night;
+        col[i * 3] = b; col[i * 3 + 1] = b * 0.88; col[i * 3 + 2] = b * 0.3;
+      }
+      fireflies.geometry.attributes.color.needsUpdate = true;
+    }
+
+    var shaftLight = 0.5 + 0.5 * sunStrength * (1 - night * 0.8);
+    for (var s = 0; s < shafts.length; s++) {
+      var sh = shafts[s];
+      sh.mat.opacity = 0.26 * shaftLight * (0.75 + 0.25 * Math.sin(atmosphereTime * 0.8 + sh.phase));
+      sh.mesh.rotation.z = sh.tilt + Math.sin(atmosphereTime * 0.35 + sh.phase) * 0.03;
+    }
+
+    skyFarMesh.position.x = camera.position.x * 0.92;
+    skyNearMesh.position.x = camera.position.x * 0.8;
+  }
+
   var hit = { t:0, dur:0.7, active:false };
   function startHit(){
     state.phase = "hit";
     hit.t = 0; hit.active = true;
     isSlidePressed = false; player.sliding = false; player.jumping = false;
+    setPose("jump", true, 1);
     puff(player.x, PLAYER_Z, 6, 2.4);
   }
 
@@ -714,10 +912,13 @@
     if (kind === "jump") {
       player.jumping = true; player.sliding = false; player.tAct = 0;
       player.durAct = Math.min(0.68, Math.max(0.17, 12.4 / state.speed));
+      if (poseActions.jump) setPose("jump", true, poseActions.jump.getClip().duration / player.durAct);
       puff(player.x, PLAYER_Z, 2, 0.8);
     } else if (kind === "slide") {
+      var wasSliding = player.sliding;
       player.sliding = true; player.jumping = false; player.y = 0; player.tAct = 0;
       player.durAct = Math.min(0.62, Math.max(0.16, 11.0 / state.speed));
+      if (!wasSliding) setPose("slide", true, SLIDE_TIME_SCALE);
     }
   }
 
@@ -842,9 +1043,10 @@
     playerObj.position.z = PLAYER_Z + e * 3.0;
     playerObj.position.y = Math.sin(Math.PI * Math.min(1, p * 1.25)) * 0.9;
     playerObj.rotation.z = -e * 1.35;
-    setPlayerFrame(playerObj, SPRITE.jump[0]);
     var pd = playerObj.userData;
-    pd.mesh.scale.set(pd.baseW, pd.baseH, 1);
+    pd.body.scale.set(1, 1, 1);
+    if (poseMixer) poseMixer.update(dt);
+    updateAtmosphere(dt, move);
 
     var sh = pd.shadow;
     sh.position.x = player.x + shadowDir * 0.35; sh.position.z = playerObj.position.z;
@@ -862,7 +1064,11 @@
 
   function update(dt){
     if (state.phase === "hit") { updateHit(dt); return; }
-    if (state.phase !== "run") return;
+    if (state.phase !== "run") {
+      if (poseMixer) poseMixer.update(0);
+      updateAtmosphere(dt, 0);
+      return;
+    }
 
     state.targetSpeed = TIERS[tierOf(state.passed)].speed;
     state.speed += (state.targetSpeed - state.speed) * Math.min(1, dt * 3.0);
@@ -915,32 +1121,24 @@
     player.animTime += dt * (state.speed * 0.45);
 
     playerObj.position.x = player.x;
-    playerObj.position.y = player.y;
+    playerObj.position.y = player.sliding ? 0 : player.y;
     playerObj.rotation.z = (tx - player.x) * 0.09;
+    playerObj.rotation.y = -(tx - player.x) * 0.12;
 
-    var frameSet, fi;
-    if (player.sliding) {
-      var rs = player.tAct / player.durAct;
-      frameSet = SPRITE.slide; fi = rs < 0.33 ? 0 : (rs < 0.66 ? 1 : 2);
-      playerObj.position.y = 0;
-    } else if (player.jumping) {
-      var rj = player.tAct / player.durAct;
-      frameSet = SPRITE.jump; fi = rj < 0.33 ? 0 : (rj < 0.66 ? 1 : 2);
-    } else {
-      frameSet = SPRITE.run; fi = Math.floor(player.animTime * 0.8) % 6;
-      playerObj.position.y = Math.abs(Math.sin(player.animTime * 2)) * 0.12;
-    }
-    setPlayerFrame(playerObj, frameSet[fi]);
+    if (!player.sliding && !player.jumping) setPose("run");
+    if (poseActions.run) poseActions.run.timeScale = state.speed / RUN_CLIP_SPEED;
+    if (poseMixer) poseMixer.update(dt);
 
     var pd = playerObj.userData;
     if (player.squash > 0) {
       player.squash = Math.max(0, player.squash - dt / 0.14);
-      var q = Math.sin(player.squash * Math.PI) * 0.16;
-      pd.mesh.scale.set(pd.baseW * (1 + q), pd.baseH * (1 - q), 1);
+      var q = Math.sin(player.squash * Math.PI) * 0.05;
+      pd.body.scale.set(1 + q * 0.5, 1 - q, 1 + q * 0.5);
     } else {
-      pd.mesh.scale.set(pd.baseW, pd.baseH, 1);
+      pd.body.scale.set(1, 1, 1);
     }
     updateDust(dt);
+    updateAtmosphere(dt, move);
 
     var sh = pd.shadow, hr = Math.min(1, player.y / player.jumpH);
     var shrink = 1 - hr * 0.45;
@@ -957,11 +1155,14 @@
   var curPR = 0, slowFrames = 0;
   function adaptQuality(dt){
     if (dt > 0.028) slowFrames++; else if (slowFrames > 0) slowFrames--;
-    if (slowFrames > 45 && curPR > 0.75) {
-      curPR = Math.max(0.75, curPR - 0.25);
+    if (slowFrames <= 90) return;
+    slowFrames = 0;
+    if (curPR > MIN_PIXEL_RATIO) {
+      curPR = Math.max(MIN_PIXEL_RATIO, curPR - 0.25);
       renderer.setPixelRatio(curPR);
       resize();
-      slowFrames = 0;
+    } else if (bloomOn) {
+      bloomOn = false;
     }
   }
 
@@ -970,7 +1171,8 @@
     var dt = Math.min(0.05, clock.getDelta());
     adaptQuality(dt);
     update(dt);
-    renderer.render(scene, camera);
+    if (composer && bloomOn) composer.render(dt);
+    else renderer.render(scene, camera);
   }
 
   var BASE_FOV = 62;
@@ -981,6 +1183,7 @@
     var w = window.innerWidth, h = window.innerHeight;
     var aspect = w / h;
     renderer.setSize(w, h, false);
+    if (composer) { composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(w, h); }
     camera.aspect = aspect;
 
     var fov = BASE_FOV;
@@ -1005,7 +1208,8 @@
 
     player.lane = 1; player.x = 0; player.y = 0;
     player.jumping = false; player.sliding = false; player.animTime = 0; player.squash = 0;
-    playerObj.position.set(0, 0, PLAYER_Z); playerObj.rotation.z = 0;
+    playerObj.position.set(0, 0, PLAYER_Z); playerObj.rotation.z = 0; playerObj.rotation.y = 0;
+    setPose("run", true, 1);
     playerObj.userData.shadow.position.z = PLAYER_Z;
     for (var d = 0; d < dust.length; d++) dust[d].mesh.visible = false;
     hit.active = false;
@@ -1057,7 +1261,7 @@
     elCtrl.style.display = "none";
     var sb = $("startBtn"), label = sb.textContent;
     sb.disabled = true; sb.textContent = "이미지 불러오는 중…";
-    preloadTextures(function(){
+    preloadAssets(function(){
       initThree();
       updateBillboards();
       assetsReady = true;
