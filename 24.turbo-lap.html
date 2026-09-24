@@ -220,7 +220,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 
 const CREDITS_HTML = "저작권 · 자동차 모델 “Car Concept” © Eric Chadwick (CC BY 4.0, Khronos glTF Sample Assets)<br>" +
   "하늘 HDRI Greg Zaal·Jarod Guest, 아스팔트·나무껍질 Dimitrios Savva, 나뭇잎 Rob Tuytel (Poly Haven, CC0) · 잔디 Lennart Demes, 건물 외벽·보도블록·콘크리트·벽돌 사진 (ambientCG, CC0)<br>" +
-  "홍콩 랜드마크 외벽 사진 (Wikimedia Commons, 원근 보정): IFC David (Public domain) · 중국은행 PrzemekJaczewski (CC BY-SA 4.0) · 청콩센터 Sengkang · ICC WiNG (CC BY-SA 3.0) · 빅토리아 독사이드 Wpcpey (CC BY-SA 4.0) · 니나 타워 Typhoonchaser (CC BY-SA 3.0) · 마리나 베이 샌즈 Dietmar Rabich (CC BY-SA 4.0)";
+  "홍콩 랜드마크 외벽 사진 (Wikimedia Commons, 원근 보정): IFC David (Public domain) · 중국은행 PrzemekJaczewski (CC BY-SA 4.0) · 청콩센터 Sengkang · 빅토리아 독사이드 Wpcpey (CC BY-SA 4.0) · 마리나 베이 샌즈 Dietmar Rabich (CC BY-SA 4.0)";
 document.querySelectorAll(".creditText").forEach(el => { el.innerHTML = CREDITS_HTML; });
 
 const CFG = {
@@ -609,7 +609,7 @@ function initMaterialsHQ() {
   const real = (n, srgb) => hqTex(n, srgb, srgb ? "#707070" : "#8080FF", REAL_DIR);
   HQM.real = {};
   ["facade_glass", "facade_mirror", "facade_office", "facade_concrete", "facade_brick", "night_blinds", "night_dense", "night_grid", "night_brown", "paving", "plaza", "concrete_light", "concrete", "brick", "stone_block"].forEach(k => { HQM.real[k] = real(k + "_color.jpg", true); });
-  ["boc", "ckc", "icc", "ifc", "vd", "nina", "mbs_glass", "mbs_rear"].forEach(k => { HQM.real["landmark_" + k] = real("landmark_" + k + ".jpg", true); });
+  ["boc", "ckc", "ifc", "vd", "mbs_glass", "mbs_rear"].forEach(k => { HQM.real["landmark_" + k] = real("landmark_" + k + ".jpg", true); });
   ["facade_office", "facade_concrete", "facade_brick", "paving", "plaza", "concrete_light", "concrete", "brick", "stone_block"].forEach(k => { HQM.real[k + "N"] = real(k + "_normal.jpg", false); });
   ["night_blinds", "night_dense", "night_grid", "night_brown"].forEach(k => { HQM.real[k + "E"] = real(k + "_emit.jpg", true); });
 }
@@ -715,7 +715,7 @@ function buildTrack(def) {
     const t = new THREE.Vector3(tg.x, 0, tg.z).normalize();
     S.push({ p, t, n: new THREE.Vector3(t.z, 0, -t.x) });
   }
-  START_I = OPEN ? 3 : N - 14;
+  START_I = OPEN ? 7 : N - 14;
   FINISH_I = 0;
   if (OPEN) { let bd = Infinity; S.forEach((s, i) => { const d = Math.hypot(s.p.x - def.finish[0], s.p.z - def.finish[1]); if (d < bd) { bd = d; FINISH_I = i; } }); }
   const B = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity };
@@ -867,7 +867,7 @@ function buildRoadSurface(G) {
   gantry(OPEN ? START_I + 8 : 2);
   if (OPEN) {
     gantry(FINISH_I);
-    [0, N - 1].forEach(i => {
+    [N - 1].forEach(i => {
       const e = S[i], yaw = Math.atan2(e.n.x, e.n.z);
       HQM.endWall = HQM.endWall || new THREE.MeshStandardMaterial({ map: HQM.real.concrete_light, normalMap: HQM.real.concrete_lightN, roughness: 0.85 });
       const wall = new THREE.Mesh(scaleBoxUv(new THREE.BoxGeometry(W + 2 * SH + 0.4, 1.05, 0.6), W + 2 * SH + 0.4, 1.05, 0.6, 4, 1.05), HQM.endWall);
@@ -1910,11 +1910,12 @@ function makeHKMaterials() {
     cpBands: [0, 1, 2, 3].map(() => new THREE.MeshBasicMaterial({ color: 0xFFFFFF })),
     cpCrown: std({ color: 0x3A3020, emissive: 0xFFC860, emissiveIntensity: 0.7, metalness: 0.6, roughness: 0.3 }),
     mastRing: new THREE.MeshBasicMaterial({ color: 0xC060FF }),
-    icc: std(photo("icc", 0.85, { metalness: 0.4, roughness: 0.3 })),
+    icc: facadeMaterial(Object.assign(nightPhoto("night_blinds"), { color: 0x9FB8D0, emissiveIntensity: 0.75, metalness: 0.5, roughness: 0.2 }), 36, 0x202830, 40),
+    iccEdge: new THREE.MeshBasicMaterial({ color: 0xBFE2FF }),
     boc: std(photo("boc", 1.0, { metalness: 0.4, roughness: 0.25 })),
     ckcPhoto: facadeMaterial(photo("ckc", 0.9, { roughness: 0.4 }), 44, 0x2A2E34, 180),
     vdPhoto: facadeMaterial(photo("vd", 0.9, { roughness: 0.4 }), 44, 0x2A2E34, 100),
-    ninaPhoto: std(photo("nina", 0.35, { metalness: 0.5, roughness: 0.25 })),
+    ninaPhoto: facadeMaterial(Object.assign(nightPhoto("night_grid"), { color: 0xC8D0D8, emissiveIntensity: 0.6, metalness: 0.5, roughness: 0.25 }), 40, 0x2A2E34, 48),
     hsbc: facadeMaterial(lit({ map: T.hsbc, metalness: 0.5, roughness: 0.3 }, L.hsbc), 16, 0x6A6E72),
     truss: std({ map: T.truss, metalness: 0.6, roughness: 0.4, emissive: 0x405060, emissiveIntensity: 0.6 }),
     jardine: facadeMaterial(lit({ map: T.jardine, normalMap: T.jardineN, metalness: 0.6, roughness: 0.3 }, L.jardine), 12, 0x8C9096),
@@ -2218,8 +2219,11 @@ function buildPeninsula(G, M, o) {
 }
 function buildICC(G, M, o) {
   const g = groupAt(G, o.x, o.z), H = 390;
-  seoulMesh(g, loftGeometry(H, 30, 64, t => { const a = 30 + 5 * Math.max(0, 1 - t / 0.1) ** 2 - 2 * t; return { a, b: a, n: 10 }; }, 4, 280), M.icc, 0, 0, 0);
-  seoulMesh(g, loftGeometry(22, 4, 64, t => { const a = 28 * (1 - 0.3 * t); return { a, b: a * (1 - 0.55 * t), n: 10 }; }, 8, 16), M.icc, 0, H, 0);
+  const top = towerStack(g, M.icc, [[72, 72, 12, 14], [66, 66, 10, 16], [62, 62, 9, H - 30], [56, 56, 8, 12], [46, 50, 7, 10]]);
+  seoulMesh(g, prism(chamferShape(30, 38, 5), 5), M.crownLit, 0, top, 0);
+  const e = 31 - 4.5, e2 = 28 - 4;
+  rodsMesh(g, M.iccEdge, [[1, 1], [1, -1], [-1, 1], [-1, -1]].map(([sx, sz]) => [new THREE.Vector3(sx * e, 30, sz * e), new THREE.Vector3(sx * e, H, sz * e)]).concat(
+    [[1, 1], [1, -1], [-1, 1], [-1, -1]].map(([sx, sz]) => [new THREE.Vector3(sx * e2, H, sz * e2), new THREE.Vector3(sx * e2, H + 12, sz * e2)])), 0.4, 6);
   seoulMesh(G, new THREE.BoxGeometry(120, 24, 80).translate(0, 12, 0), M.glass, -350, 0, 295);
   [[-450, 330], [-470, 250]].forEach(([x, z]) => seoulMesh(G, new THREE.BoxGeometry(30, 262, 54).translate(0, 131, 0), M.glass, x, 0, z));
 }
@@ -2242,7 +2246,7 @@ function buildVictoriaDockside(G, M, o) {
 }
 function buildNinaTower(G, M, o) {
   const g = groupAt(G, o.x, o.z, -0.4), H = 318;
-  seoulMesh(g, loftGeometry(H, 24, 64, t => { const a = 25 * (1 - 0.12 * t); return { a, b: a * 0.92, n: 6 }; }, 4, 140), M.ninaPhoto, 0, 0, 0);
+  towerStack(g, M.ninaPhoto, [[50, 46, 7, H * 0.55], [47, 43, 7, H * 0.3], [44, 40, 7, H * 0.15]]);
   const crown = seoulMesh(g, new THREE.BoxGeometry(34, 30, 30), M.escGlass, 0, H + 8, 0); crown.rotation.z = 0.28; crown.castShadow = false;
   [[-1, 170], [1, 150]].forEach(([s, h]) => seoulMesh(g, new THREE.CylinderGeometry(34, 34, h, 40, 1, false, 0, Math.PI * 0.75).translate(0, h / 2, 0), M.ninaPhoto, s * 62, 0, 40).rotation.y = s > 0 ? Math.PI * 0.9 : Math.PI * 0.35);
 }
@@ -2560,18 +2564,18 @@ function buildHongKong(G) {
 }
 
 const SG = {
-  bay: { x: -40, z: -370, r: 175 },
+  bay: { x: -40, z: -345, r: 175 },
   sea: -760,
   mbs: { x: 110, z: -600 },
   artscience: { x: -45, z: -600 },
   helixX: 60,
-  merlionAngle: Math.PI * 0.93,
+  merlionAngle: Math.PI * 0.5,
   esplanade: [[-240, -200, 44, 26, 34], [-292, -158, 36, 21, 29]],
   supertrees: { x: 280, z: -390 },
   domes: [{ x: 340, z: -610, rot: 0.35, ax: 58, h: 32, az: 40 }, { x: 440, z: -500, rot: -0.2, ax: 40, h: 46, az: 32, mountain: true }],
   flyer: { x: 330, z: -120, rot: Math.PI / 2, r: 75, hub: 88, depth: 3.2, hubW: 6, hubR: 3, tube: 0.9, spokes: 48, cabins: 28, cabR: 2.3, cabL: 5.5, legX: 30, legZ: 14, legR: 1.2, speed: 0.012, terminal: true },
   cbd: { x0: -950, x1: -330, z0: -780, z1: -230 },
-  reserve: [[110, -595, 115], [-45, -600, 45], [60, -214, 14], [60, -526, 14], [-216, -331, 16], [-240, -200, 52], [-292, -158, 44], [280, -390, 85], [340, -610, 72], [440, -500, 52], [330, -120, 95]]
+  reserve: [[110, -595, 115], [-45, -600, 45], [60, -189, 14], [60, -501, 14], [-40, -165, 18], [-240, -200, 52], [-292, -158, 44], [280, -390, 85], [340, -610, 72], [440, -500, 52], [330, -120, 95]]
 };
 let SG_M = null;
 const SG_DRAW = {
