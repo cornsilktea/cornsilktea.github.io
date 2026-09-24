@@ -379,7 +379,8 @@
     tuftPerSide: LOW_END ? 2 : (IS_TOUCH ? 3 : 6),
     blades:      LOW_END ? 2 : 3,
     extraTrees:  !LOW_END,
-    flowers:     !LOW_END
+    flowers:     !LOW_END,
+    propsPerSide: LOW_END ? 2 : (IS_TOUCH ? 4 : 6)
   };
 
   var GEO = {
@@ -419,6 +420,55 @@
 
   function buildDetailedPillar(){
     return makeBillboard(MAT.pillar, 2.0, 5.6);
+  }
+
+  function buildLeaningPillar(){
+    var g = makeBillboard(MAT.pillar, 1.6, 4.5);
+    g.children[0].rotation.z = (Math.random() < 0.5 ? -1 : 1) * (0.12 + Math.random() * 0.14);
+    return g;
+  }
+
+  function randomBetween(a, b){ return a + Math.random() * (b - a); }
+
+  var ROADSIDE_BANDS = [
+    { xMin:8.0,  xMax:12.5, scaleMin:0.75, scaleMax:1.0 },
+    { xMin:13.5, xMax:22.0, scaleMin:0.9,  scaleMax:1.2 },
+    { xMin:24.0, xMax:40.0, scaleMin:1.2,  scaleMax:1.7 }
+  ];
+
+  function placeRoadsideProp(seg, side, band, z){
+    var x = side * randomBetween(band.xMin, band.xMax);
+    var scale = randomBetween(band.scaleMin, band.scaleMax);
+    var r = Math.random();
+    if (r < 0.62) {
+      var tree = registerBillboard(buildDetailedTree(), seg);
+      tree.position.set(x, 0, z); tree.scale.set(scale, scale, scale); seg.add(tree);
+      addGroundShadow(seg, x, z, 4.0 * scale, 1.9 * scale, 6.4 * scale, 0.34);
+    } else if (r < 0.82) {
+      var pillar = registerBillboard(buildDetailedPillar(), seg);
+      pillar.position.set(x, 0, z); pillar.scale.set(scale, scale, scale); seg.add(pillar);
+      addGroundShadow(seg, x, z, 1.6 * scale, 1.0 * scale, 5.6 * scale, 0.32);
+    } else {
+      var tall = registerBillboard(buildDetailedPillar(), seg);
+      tall.position.set(x, 0, z); tall.scale.set(scale, scale, scale); seg.add(tall);
+      addGroundShadow(seg, x, z, 1.6 * scale, 1.0 * scale, 5.6 * scale, 0.32);
+      var leanX = x + side * 1.9 * scale, leanZ = z + randomBetween(-1.5, 1.5);
+      var lean = registerBillboard(buildLeaningPillar(), seg);
+      lean.position.set(leanX, 0, leanZ); lean.scale.set(scale, scale, scale); seg.add(lean);
+      addGroundShadow(seg, leanX, leanZ, 1.4 * scale, 0.9 * scale, 4.5 * scale, 0.3);
+    }
+  }
+
+  function fillRoadside(seg){
+    var slots = QUALITY.propsPerSide;
+    [-1, 1].forEach(function(side){
+      for (var k = 0; k < slots; k++) {
+        var band = ROADSIDE_BANDS[k % ROADSIDE_BANDS.length];
+        var zSlot = SEG_LEN / slots;
+        var z = -SEG_LEN / 2 + zSlot * (k + 0.2 + Math.random() * 0.6);
+        placeRoadsideProp(seg, side, band, z);
+      }
+    });
   }
 
   var SHAFT_TILTS = [0.22, -0.18, 0.3, -0.26];
@@ -568,6 +618,7 @@
         addGroundShadow(g, 17.5, 3, 3.8, 1.8, 5.9, 0.34);
       }
     }
+    fillRoadside(g);
     g.position.z = 30 - i * SEG_LEN;
     scene.add(g);
     return g;
@@ -674,11 +725,19 @@
       g.add(sh); g.userData.shadows.push({ mesh:sh, h:1.9 });
     }
     else if (type === "ceil") {
-      var vine = makeBillboard(MAT.obVine, 10.8, 4.98);
-      vine.position.y = 0.8;
+      var vine = makeBillboard(MAT.obVine, 11.6, 5.35);
+      vine.position.y = 0.75;
       g.add(vine);
       sh = makeShadow(10.0, 1.4, 0.16);
       g.add(sh); g.userData.shadows.push({ mesh:sh, h:3.0 });
+      [-1, 1].forEach(function(side){
+        var gatePillar = makeBillboard(MAT.pillar, 2.0, 5.6);
+        gatePillar.position.set(side * 6.0, 0, -0.08);
+        g.add(gatePillar);
+        var ps = makeShadow(1.8, 1.1, 0.36);
+        ps.position.set(side * 6.0, SHADOW_Y, 0);
+        g.add(ps); g.userData.shadows.push({ mesh:ps, h:5.6, baseX:side * 6.0 });
+      });
     }
     else {
       function makeSingleWall(){
@@ -744,7 +803,7 @@
     }
     g.position.set(0, 0, SPAWN_Z);
     var shs = g.userData.shadows;
-    for (var s = 0; s < shs.length; s++) shs[s].mesh.position.x = shadowDir * shs[s].h * 0.22;
+    for (var s = 0; s < shs.length; s++) shs[s].mesh.position.x = (shs[s].baseX || 0) + shadowDir * shs[s].h * 0.22;
     obstacles.push({ mesh:g, type:type, kindBase:base, blocked:blocked, safe:safe, judged:false });
     state.spawned++;
   }
