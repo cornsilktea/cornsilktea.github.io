@@ -20,14 +20,16 @@
   html, body { width: 100%; height: 100%; overflow: hidden; background: #8FD3FF; font-family: var(--sg-font); color: var(--sg-ink); }
   canvas#gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 
-  #hud { position: fixed; top: 52px; left: 10px; right: 10px; display: none; align-items: flex-start; justify-content: space-between; gap: 8px; pointer-events: none; z-index: 5; }
+  #hud { position: fixed; top: 6px; left: 122px; right: 10px; display: none; flex-wrap: wrap; align-items: flex-start; justify-content: flex-start; gap: 6px; pointer-events: none; z-index: 5; }
+  #hud.battle { right: 110px; }
+  #hud .hud-box { padding: 3px 10px; }
   .hud-box { background: rgba(255,255,255,.92); border: 2px solid var(--sg-line-strong); border-radius: 10px; padding: 6px 12px; font-weight: 800; font-variant-numeric: tabular-nums; box-shadow: 0 3px 0 rgba(27,43,32,.25); }
   .hud-box .lab { font-size: 11px; color: var(--sg-ink-soft); font-weight: 700; display: block; }
   #hudLap { font-size: 22px; }
   #hudTime { font-size: 26px; text-align: center; min-width: 140px; }
   #hudTime .off { display: block; font-size: 12px; color: var(--sg-danger); min-height: 15px; }
-  #hudBtns { display: flex; flex-direction: column; gap: 6px; pointer-events: auto; }
-  #hudBtns button { font: inherit; font-weight: 800; font-size: 13px; padding: 7px 12px; border-radius: 8px; border: 2px solid var(--sg-line-strong); background: #fff; color: var(--sg-ink); cursor: pointer; box-shadow: 0 3px 0 rgba(27,43,32,.25); }
+  #hudBtns { display: flex; gap: 6px; margin-left: auto; pointer-events: auto; }
+  #hudBtns button { font: inherit; font-weight: 800; font-size: 13px; padding: 6px 10px; border-radius: 8px; border: 2px solid var(--sg-line-strong); background: #fff; color: var(--sg-ink); cursor: pointer; box-shadow: 0 3px 0 rgba(27,43,32,.25); }
   #hudBtns button:active { transform: translateY(2px); box-shadow: none; }
   #speed { position: fixed; left: 12px; bottom: 12px; z-index: 5; display: none; pointer-events: none; }
   #speed b { font-size: 30px; }
@@ -38,7 +40,7 @@
   .laps b { color: var(--sg-primary); }
   #minimap { position: fixed; right: 12px; bottom: 12px; width: 150px; height: 150px; background: rgba(255,255,255,.85); border: 2px solid var(--sg-line-strong); border-radius: 10px; z-index: 5; display: none; pointer-events: none; }
 
-  #lapToast { position: fixed; top: 130px; left: 50%; transform: translateX(-50%); display: none; pointer-events: none; z-index: 6; text-align: center; white-space: nowrap; }
+  #lapToast { position: fixed; top: 64px; left: 50%; transform: translateX(-50%); display: none; pointer-events: none; z-index: 6; text-align: center; white-space: nowrap; }
   #lapToast b { display: block; font-size: clamp(30px, 6vw, 48px); font-weight: 800; color: #fff; -webkit-text-stroke: 2px var(--sg-ink); text-shadow: 0 5px 0 rgba(27,43,32,.35); }
   #lapToast span { display: inline-block; margin-top: 4px; padding: 4px 14px; border-radius: 10px; background: #D97B4F; color: #fff; font-size: 18px; font-weight: 800; border: 2px solid var(--sg-ink); }
   #lapToast.show { display: block; animation: toast 1.8s ease-out forwards; }
@@ -95,7 +97,7 @@
   .ghostbtn.on { background: #fff; border-color: #D97B4F; outline: 2px solid #D97B4F; }
   .ghostbtn:disabled { opacity: .45; cursor: default; }
   .sect { font-size: 13px; font-weight: 800; color: var(--sg-ink-soft); text-align: left; margin: 10px 0 4px; }
-  #hudGhost { position: fixed; left: 50%; transform: translateX(-50%); top: 118px; z-index: 5; display: none; pointer-events: none; font-size: 12px; padding: 3px 10px; }
+  #hud #hudGhost { display: none; align-self: center; font-size: 12px; white-space: nowrap; }
   @media (max-width: 520px) { .cars { grid-template-columns: repeat(2, 1fr); } }
   .final { font-size: clamp(40px, 9vw, 58px); font-weight: 800; font-variant-numeric: tabular-nums; color: var(--sg-primary); line-height: 1.1; }
   .courseTag { display: inline-block; padding: 2px 12px; border-radius: 8px; background: var(--sg-panel-alt); border: 2px solid var(--sg-line-mid); font-size: 14px; font-weight: 800; margin-bottom: 6px; }
@@ -105,7 +107,9 @@
     #hudTime { font-size: 20px; min-width: 110px; }
     #hudLap { font-size: 17px; }
     #minimap { width: 110px; height: 110px; }
-    #lapToast { top: 150px; }
+    #lapToast { top: 110px; }
+    #hud { left: 10px; top: 46px; }
+    #hud.battle { right: 10px; }
     .keys { gap: 12px; }
     .btn { font-size: 18px; padding: 11px 22px; }
     .rtab small { max-width: 100px; }
@@ -164,7 +168,7 @@
   .modalBox .mini { margin-top: 10px; }
 
   #hudPos { font-size: 22px; }
-  #battleNote { position: fixed; left: 50%; transform: translateX(-50%); top: 150px; z-index: 5; pointer-events: none; font-size: 15px; padding: 6px 14px; text-align: center; white-space: nowrap; }
+  #battleNote { position: fixed; left: 50%; transform: translateX(-50%); top: 64px; z-index: 5; pointer-events: none; font-size: 15px; padding: 6px 14px; text-align: center; white-space: nowrap; }
   #btnMatchLeave { position: fixed; top: 8px; right: 8px; z-index: 8; }
   #rankBox { position: fixed; top: 48px; left: 10px; z-index: 5; pointer-events: none; width: 250px; }
   #rkTime { display: inline-block; margin-bottom: 6px; padding: 4px 12px; font-size: 20px; }
@@ -181,7 +185,7 @@
     .codeNum { font-size: 36px; }
     #rankBox { width: 200px; }
     .rkRow b { font-size: 15px; }
-    #battleNote { top: 165px; font-size: 13px; }
+    #battleNote { top: 110px; font-size: 13px; }
   }
 </style>
 </head>
@@ -191,12 +195,12 @@
   <div class="hud-box" id="hudTime">0:00.00<span class="off" id="hudOff"></span></div>
   <div class="hud-box" id="hudPosBox" hidden><span class="lab">순위</span><span id="hudPos">1 / 2</span></div>
   <div class="hud-box"><span class="lab">이번 경기 최고 랩</span><span id="hudBest">—</span></div>
+  <div class="hud-box" id="hudGhost"></div>
   <div id="hudBtns">
     <button type="button" id="btnReset">↻ 처음부터 (R)</button>
     <button type="button" id="btnRecover">🚗 트랙 복귀 (T)</button>
   </div>
 </div>
-<div class="hud-box" id="hudGhost"></div>
 <div class="hud-box" id="speed"><span class="lab">속도</span><b id="speedVal">0</b> km/h</div>
 <canvas id="minimap" width="300" height="300"></canvas>
 <canvas id="fx"></canvas>
@@ -657,7 +661,9 @@ const ATMOSPHERE = {
   hongkong: { near: 260, far: 2600, camFar: 4200, paved: true, night: true },
   singapore: { near: 330, far: 2700, camFar: 3600, paved: false }
 };
-const NIGHT = { on: false, sky: null, fog: new THREE.Color(0x1A2238), composer: null, bloom: null, headlight: null };
+const NIGHT = { on: false, sky: null, fog: new THREE.Color(0x1A2238), composer: null, bloom: null, headlight: null, carLight: null };
+const SUPERCAR = { tpl: null, paintBase: null, paint: {}, lamps: {}, wheelR: 0.4 };
+const CAR_NIGHT = { paintGlow: 0.16, brake: 9, head: 2 };
 function nightSkyTexture() {
   const t = canvasTex(2048, 1024, (c, w, h) => {
     const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, "#02040C"); g.addColorStop(0.36, "#08112A"); g.addColorStop(0.49, "#2A2F52"); g.addColorStop(0.53, "#4A3A4E"); g.addColorStop(0.6, "#10131E"); g.addColorStop(1, "#05060A");
@@ -680,6 +686,8 @@ function setupNight() {
   NIGHT.composer.setPixelRatio(renderer.getPixelRatio()); NIGHT.composer.setSize(size.x, size.y);
   NIGHT.headlight = new THREE.SpotLight(0xFFF1DC, 90, 90, 0.42, 0.55, 1.1);
   NIGHT.headlight.visible = false; scene.add(NIGHT.headlight); scene.add(NIGHT.headlight.target);
+  NIGHT.carLight = new THREE.PointLight(0xFFF4E6, 40, 16, 1.6);
+  NIGHT.carLight.visible = false; scene.add(NIGHT.carLight);
 }
 function setNight(on) {
   NIGHT.on = on;
@@ -692,6 +700,8 @@ function setNight(on) {
   scene.environmentIntensity = on ? 0.12 : 0.9;
   renderer.toneMappingExposure = on ? 0.9 : HQ_EXPOSURE;
   if (NIGHT.headlight) NIGHT.headlight.visible = on;
+  if (NIGHT.carLight) NIGHT.carLight.visible = on;
+  applyCarNightLook();
 }
 function applyAtmosphere(def) {
   const a = ATMOSPHERE[def.theme] || { near: 280, far: 1600, camFar: 1700, paved: false };
@@ -3056,7 +3066,6 @@ function buildSingapore(G) {
   buildTreesHQ(G, sgTreeSpots());
 }
 
-const SUPERCAR = { tpl: null, paintBase: null, paint: {}, wheelR: 0.4 };
 const SUPERCAR_LENGTH = 4.8;
 const SUPERCAR_WHEELS = ["FrontL", "FrontR", "RearL", "RearR"];
 function paintMaterial(color) {
@@ -3064,8 +3073,18 @@ function paintMaterial(color) {
     const m = SUPERCAR.paintBase.clone();
     m.color.setHex(color);
     SUPERCAR.paint[color] = m;
+    applyCarNightLook();
   }
   return SUPERCAR.paint[color];
+}
+function applyCarNightLook() {
+  const on = NIGHT.on, L = SUPERCAR.lamps;
+  Object.keys(SUPERCAR.paint).forEach(c => {
+    const m = SUPERCAR.paint[c];
+    m.emissive.setHex(Number(c)); m.emissiveIntensity = on ? CAR_NIGHT.paintGlow : 0;
+  });
+  if (L.brake) { if (L.brakeDay == null) L.brakeDay = L.brake.emissiveIntensity; L.brake.emissiveIntensity = on ? CAR_NIGHT.brake : L.brakeDay; }
+  if (L.head) { if (L.headDay == null) L.headDay = L.head.emissiveIntensity; L.head.emissiveIntensity = on ? CAR_NIGHT.head : L.headDay; }
 }
 function makeBlobShadowTex() {
   return canvasTex(128, 256, (c, w, h) => {
@@ -3134,6 +3153,8 @@ function prepareSupercar(root) {
       o.material = m;
     } else o.castShadow = true;
     if (m.name === "Paint 1 Carmine") SUPERCAR.paintBase = m;
+    if (m.name === "Brakelight") SUPERCAR.lamps.brake = m;
+    if (m.name === "Headlight") SUPERCAR.lamps.head = m;
   });
   if (!SUPERCAR.paintBase) throw new Error("차체 도색 재질 없음");
 
@@ -3272,8 +3293,8 @@ function startRace(which) {
   $("hudGhost").style.display = ghostLabel ? "block" : "none"; $("hudGhost").textContent = "👻 " + ghostLabel;
   state = "countdown"; cdTime = 0; cdShown = -1; goTimer = 0; elapsed = 0; finalMs = 0; shake = 0;
   showCard(null); setHud(true); countBox.style.display = "flex"; lapToast.className = "";
-  hudLap.previousElementSibling.textContent = OPEN ? "진행" : "바퀴"; hudBest.parentElement.style.display = OPEN ? "none" : "";
-  hudLap.textContent = OPEN ? "0%" : "1 / " + LAPS; hudTime.firstChild.nodeValue = fmtTime(0); hudOff.textContent = "";
+  hudLap.parentElement.style.display = hudBest.parentElement.style.display = OPEN ? "none" : "";
+  hudLap.textContent = "1 / " + LAPS; hudTime.firstChild.nodeValue = fmtTime(0); hudOff.textContent = "";
   engineStart();
   snapCamera();
 }
@@ -3476,13 +3497,26 @@ function drawMinimap() {
   mctx.beginPath(); mctx.moveTo(MM.mx(f.p.x + f.n.x * W / 2), MM.mz(f.p.z + f.n.z * W / 2)); mctx.lineTo(MM.mx(f.p.x - f.n.x * W / 2), MM.mz(f.p.z - f.n.z * W / 2)); mctx.stroke();
   mctx.strokeStyle = "#1B2B20"; mctx.lineWidth = 3;
   if (playMode === "battle") Object.keys(BT.ents).forEach(id => {
-    const e = BT.ents[id]; if (!e.seen) return;
-    mctx.fillStyle = "#FFFFFF";
-    mctx.beginPath(); mctx.arc(MM.mx(e.x), MM.mz(e.z), 7, 0, Math.PI * 2); mctx.fill(); mctx.stroke();
+    const e = BT.ents[id]; if (!e.seen || id === BT.myId) return;
+    const pl = BT.players[id];
+    minimapDot(e.x, e.z, (pl && SIDE_COLOR[pl.team]) || "#FFFFFF", 1);
   });
-  const cx = MM.mx(P.x), cz = MM.mz(P.z);
-  mctx.fillStyle = "#D97B4F";
-  mctx.beginPath(); mctx.arc(cx, cz, 8, 0, Math.PI * 2); mctx.fill(); mctx.stroke();
+  else if (ghostCar && ghostPlay) minimapDot(ghostCar.position.x, ghostCar.position.z, "#8FD3FF", 0.85);
+  const cx = MM.mx(P.x), cz = MM.mz(P.z), hx = -Math.sin(P.h), hz = -Math.cos(P.h), r = 13;
+  mctx.fillStyle = "#D97B4F"; mctx.lineWidth = 3;
+  mctx.beginPath();
+  mctx.moveTo(cx + hx * r, cz + hz * r);
+  mctx.lineTo(cx - hx * r * 0.6 + hz * r * 0.7, cz - hz * r * 0.6 - hx * r * 0.7);
+  mctx.lineTo(cx - hx * r * 0.3, cz - hz * r * 0.3);
+  mctx.lineTo(cx - hx * r * 0.6 - hz * r * 0.7, cz - hz * r * 0.6 + hx * r * 0.7);
+  mctx.closePath(); mctx.fill(); mctx.stroke();
+}
+function minimapDot(x, z, color, alpha) {
+  mctx.globalAlpha = alpha; mctx.fillStyle = color; mctx.strokeStyle = "#FFFFFF"; mctx.lineWidth = 3;
+  mctx.beginPath(); mctx.arc(MM.mx(x), MM.mz(z), 10, 0, Math.PI * 2); mctx.fill(); mctx.stroke();
+  mctx.strokeStyle = "#1B2B20"; mctx.lineWidth = 2;
+  mctx.beginPath(); mctx.arc(MM.mx(x), MM.mz(z), 12, 0, Math.PI * 2); mctx.stroke();
+  mctx.globalAlpha = 1; mctx.strokeStyle = "#1B2B20";
 }
 
 function setText(el, text) {
@@ -3522,7 +3556,7 @@ function tick(now) {
   if (spectating && state !== "menu") drawSpeedLines(Math.abs(V.v) / CFG.maxSpeed);
   else if (state !== "menu") {
     hudTime.firstChild.nodeValue = fmtTime(state === "done" ? finalMs : elapsed);
-    setText(hudLap, OPEN ? Math.min(100, Math.round(Math.max(0, P.ci - START_I) / (FINISH_I - START_I) * 100)) + "%" : Math.min(LAPS, P.lap + 1) + " / " + LAPS);
+    if (!OPEN) setText(hudLap, Math.min(LAPS, P.lap + 1) + " / " + LAPS);
     setText(hudOff, P.off ? "오프로드 — 감속 중" : "");
     setText(speedVal, String(Math.round(Math.abs(P.v) * CFG.kmh)));
     drawMinimap();
@@ -3534,6 +3568,7 @@ function tick(now) {
   if (NIGHT.on) {
     const hl = NIGHT.headlight, hx = -Math.sin(V.h), hz = -Math.cos(V.h);
     hl.position.set(V.x + hx * 1.5, V.y + 1.6, V.z + hz * 1.5); hl.target.position.set(V.x + hx * 30, V.y - 0.5, V.z + hz * 30); hl.target.updateMatrixWorld();
+    NIGHT.carLight.position.set(V.x + hx * 2.5, V.y + 4.5, V.z + hz * 2.5);
     NIGHT.composer.render(dt);
   } else renderer.render(scene, camera);
 }
@@ -3879,7 +3914,7 @@ function onStatus(st) {
 }
 function setBattleHud(on) {
   const spec = on && BT.spec;
-  $("hudPosBox").hidden = !on || spec;
+  $("hudPosBox").hidden = !on || spec; hud.classList.toggle("battle", on);
   $("btnReset").style.display = on ? "none" : "";
   $("btnMatchLeave").hidden = !on;
   $("rankBox").hidden = !spec; $("viewBtns").hidden = !spec;
@@ -3911,8 +3946,8 @@ function startMatchLocal() {
   showCard(null); setHud(!BT.spec); setBattleHud(true);
   $("hudGhost").style.display = "none";
   countBox.style.display = late ? "none" : "flex"; countNum.textContent = ""; countNum.className = ""; lapToast.className = "";
-  hudLap.previousElementSibling.textContent = OPEN ? "진행" : "바퀴"; hudBest.parentElement.style.display = OPEN ? "none" : "";
-  hudLap.textContent = OPEN ? "0%" : "1 / " + LAPS; hudTime.firstChild.nodeValue = fmtTime(0); hudOff.textContent = "";
+  hudLap.parentElement.style.display = hudBest.parentElement.style.display = OPEN ? "none" : "";
+  hudLap.textContent = "1 / " + LAPS; hudTime.firstChild.nodeValue = fmtTime(0); hudOff.textContent = "";
   engineStart();
   okeys(BT.raw).forEach(id => onRemoteState(id, BT.raw[id]));
   snapCamera();
