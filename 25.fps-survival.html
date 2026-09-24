@@ -855,9 +855,7 @@ swapViewModel(gun, "ak47.glb", { scale: 0.85, x: 0, y: -0.22, z: -0.25 }).catch(
 swapViewModel(pistolG, "pistol.glb", { scale: 0.5, x: 0, y: -0.08, z: -0.01 }).catch(() => {});
 
 const sparkGeo = new THREE.SphereGeometry(0.08, 6, 6), sparkMat = new THREE.MeshBasicMaterial({ color: 0xFFE28A, transparent: true });
-const tracerMat = new THREE.LineBasicMaterial({ color: 0xFFD07A });
 const transient = [];
-const playerTracerMat = new THREE.MeshBasicMaterial({ color: 0xFFE9A8, transparent: true, opacity: 0.95 });
 function addTransient(obj, ms, fade) { scene.add(obj); transient.push({ obj, until: performance.now() + ms, ms, fade: !!fade }); }
 function pruneTransient(now) {
   for (let i = transient.length - 1; i >= 0; i--) {
@@ -1091,6 +1089,27 @@ function fireBullet(from, to, speed, dmg) {
   scene.add(g);
   bullets.push({ g, v: dir.multiplyScalar(speed), dmg, life: 3, ox: from.x, oz: from.z });
 }
+const visualShots = [];
+const VISUAL_BULLET_SPEED = 90;
+function fireVisualBullet(from, to, sparkAtEnd) {
+  const dir = to.clone().sub(from), dist = dir.length(); dir.normalize();
+  const g = new THREE.Group();
+  const core = new THREE.Mesh(bulletGeo, bulletMat);
+  const trail = new THREE.Mesh(bulletTrailGeo, bulletTrailMat); trail.rotation.x = Math.PI / 2; trail.position.z = 0.35;
+  g.add(core, trail); g.position.copy(from); g.lookAt(from.clone().sub(dir));
+  scene.add(g);
+  visualShots.push({ g, dir, left: dist, sparkAtEnd });
+}
+function updateVisualShots(dt) {
+  for (let i = visualShots.length - 1; i >= 0; i--) {
+    const v = visualShots[i], step = VISUAL_BULLET_SPEED * dt;
+    if (step < v.left) { v.g.position.addScaledVector(v.dir, step); v.left -= step; continue; }
+    v.g.position.addScaledVector(v.dir, v.left);
+    if (v.sparkAtEnd) { const spark = new THREE.Mesh(sparkGeo, sparkMat.clone()); spark.position.copy(v.g.position); spark.scale.setScalar(2.2); addTransient(spark, 160, true); }
+    scene.remove(v.g); visualShots.splice(i, 1);
+  }
+}
+function clearVisualShots() { visualShots.forEach(v => scene.remove(v.g)); visualShots.length = 0; }
 function blockedAt(x, y, z) {
   if (y <= 0 || y >= ARENA.wallH || Math.abs(x) > ARENA.hx || Math.abs(z) > ARENA.hz) return true;
   for (const b of RECTS) if (y >= b.y0 && y < b.h && Math.abs(x - b.x) < b.w / 2 && Math.abs(z - b.z) < b.d / 2) return true;
@@ -1222,6 +1241,7 @@ function clearSoloWorld() {
   bullets.forEach(b => scene.remove(b.g)); bullets.length = 0;
   corpses.forEach(c => { scene.remove(c.g); disposeMaterials(c.mats); }); corpses.length = 0;
   transient.forEach(t => scene.remove(t.obj)); transient.length = 0;
+  clearVisualShots();
 }
 function resetGame() {
   clearSoloWorld();
@@ -1325,13 +1345,8 @@ function fireWeapon(targetParts) {
   STAT.shots++;
   const muzzle = new THREE.Vector3(); wg.userData.flash.getWorldPosition(muzzle);
   const end = hits.length ? hits[0].point.clone() : ray.ray.at(60, new THREE.Vector3());
-  const len = muzzle.distanceTo(end);
-  const tracer = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.045, len, 6), playerTracerMat.clone());
-  tracer.geometry.translate(0, len / 2, 0); tracer.geometry.rotateX(Math.PI / 2);
-  tracer.position.copy(muzzle); tracer.lookAt(end); addTransient(tracer, 180, true);
-  if (!hits.length) return null;
-  const spark = new THREE.Mesh(sparkGeo, sparkMat.clone()); spark.position.copy(hits[0].point); spark.scale.setScalar(2.2); addTransient(spark, 160, true);
-  return hits[0];
+  fireVisualBullet(muzzle, end, hits.length > 0);
+  return hits.length ? hits[0] : null;
 }
 function afterShot() {
   if (P.weapon === "rifle" && P.ammo <= 0) { setWeapon("pistol"); SFX.empty(); popup("탄약 소진 → 권총", "warn"); }
@@ -1704,6 +1719,7 @@ function resetMatchLocal() {
   okeys(T.ents).forEach(removeEnt);
   T.bullets.forEach(b => scene.remove(b.g)); T.bullets.length = 0;
   transient.forEach(t => scene.remove(t.obj)); transient.length = 0;
+  clearVisualShots();
   unsub(T.botSubs);
   T.bots = {}; T.me = null; T.match = null; T.sent = {}; T.statusSent = ""; T.spec = false; T.itemWave = 0;
   $("killFeed").innerHTML = "";
@@ -1805,19 +1821,17 @@ function onRemoteState(id, str) {
 }
 function remoteShotFx(ent) {
   ent.shotAt = performance.now();
-  if (!ent.s || !ent.alive) return;
-  scene.updateMatrixWorld();
-  const from = new THREE.Vector3(); ent.s.pistol.getWorldPosition(from);
+  if (!ent.alive) return;
+  const from = new THREE.Vector3(ent.x, 1.45, ent.z);
+  if (ent.s) { scene.updateMatrixWorld(); ent.s.pistol.getWorldPosition(from); }
   const dir = aimDir(ent.yaw, ent.pitch);
   if (ent.isAI) fireTeamBullet(from, dir, ent.team, false, ent.id);
   else {
     ray.set(from, dir); ray.far = 60;
     const hit = ray.intersectObjects(obstacleMeshes, false)[0];
-    const end = hit ? hit.point : from.clone().addScaledVector(dir, 60), len = from.distanceTo(end);
-    const tracer = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.035, len, 6), playerTracerMat.clone());
-    tracer.geometry.translate(0, len / 2, 0); tracer.geometry.rotateX(Math.PI / 2);
-    tracer.position.copy(from); tracer.lookAt(end); addTransient(tracer, 120, true);
+    fireVisualBullet(from, hit ? hit.point.clone() : from.clone().addScaledVector(dir, 60), !!hit);
   }
+  if (!ent.s) return;
   const fl = new THREE.Mesh(sparkGeo, sparkMat); fl.position.copy(from); fl.scale.setScalar(1.6); addTransient(fl, 50);
   SFX.enemyShot();
 }
@@ -1825,7 +1839,7 @@ function updateEnts(dt, nowMs) {
   for (const id in T.ents) {
     const ent = T.ents[id], b = T.bots[id];
     if (b) {
-      ent.x = b.x; ent.z = b.z; ent.yaw = b.yaw; ent.pitch = b.pitch; ent.hp = b.hp; ent.moving = b.moving; ent.prot = tnow() < b.protectUntil; ent.seen = true; ent.ammo = b.ammo;
+      ent.x = b.x; ent.z = b.z; ent.yaw = b.yaw; ent.pitch = b.pitch; ent.hp = b.hp; ent.moving = b.moving; ent.prot = tnow() < b.protectUntil; ent.seen = true; ent.ammo = b.ammo; ent.pistol = b.ammo === 0;
       if (b.alive !== ent.alive) { if (b.alive) reviveEnt(ent); else killEnt(ent); }
     } else if (ent.to && ent.alive) {
       const k = clamp((nowMs - ent.t0) / TEAM.lerpMs, 0, 1);
@@ -2073,7 +2087,7 @@ function netTick() {
   }
   if (isHost()) for (const id in T.bots) {
     const b = T.bots[id];
-    const s = stateString(b.x, b.z, b.yaw, b.pitch, (b.alive ? 1 : 0) | (t < b.protectUntil ? 4 : 0) | (b.moving ? 8 : 0), b.shots, b.hp, b.ammo);
+    const s = stateString(b.x, b.z, b.yaw, b.pitch, (b.alive ? 1 : 0) | (b.ammo === 0 ? 2 : 0) | (t < b.protectUntil ? 4 : 0) | (b.moving ? 8 : 0), b.shots, b.hp, b.ammo);
     if (s !== T.sent[id]) u[id] = s;
   }
   const ids = okeys(u);
@@ -2222,7 +2236,8 @@ function drawSpectator(t, nowMs) {
     if (it.kind === "ammo") { c.fillStyle = "#F2C94C"; c.strokeStyle = "#A8731C"; c.lineWidth = 2; c.beginPath(); c.arc(ix, iy, r, 0, 7); c.fill(); c.stroke(); }
     else { c.fillStyle = "#FF6B7A"; c.beginPath(); c.arc(ix, iy, r, 0, 7); c.fill(); c.fillStyle = "#fff"; c.fillRect(ix - r * 0.6, iy - r * 0.2, r * 1.2, r * 0.4); c.fillRect(ix - r * 0.2, iy - r * 0.6, r * 0.4, r * 1.2); }
   }
-  for (const b of T.bullets) { c.fillStyle = "#FFB347"; c.beginPath(); c.arc(X(b.g.position.x), Y(b.g.position.z), 3, 0, 7); c.fill(); }
+  c.fillStyle = "#FFB347";
+  for (const b of T.bullets.map(b => b.g).concat(visualShots.map(v => v.g))) { c.beginPath(); c.arc(X(b.position.x), Y(b.position.z), 3, 0, 7); c.fill(); }
   const pr = Math.max(8, 0.6 * s);
   for (const id in T.ents) {
     const e = T.ents[id]; if (!e.seen) continue;
@@ -2233,7 +2248,6 @@ function drawSpectator(t, nowMs) {
       if (leftSec > 0) { c.font = "bold 14px " + FONT; c.fillStyle = "#1B2B20"; c.textAlign = "center"; c.fillText(leftSec + "초", px, py - pr - 4); }
       continue;
     }
-    if (nowMs - e.shotAt < 120) { c.strokeStyle = "#FFD07A"; c.lineWidth = 3; c.beginPath(); c.moveTo(px, py); c.lineTo(px + fx * 8 * s, py + fz * 8 * s); c.stroke(); }
     c.globalAlpha = e.prot ? 0.45 + 0.35 * Math.sin(nowMs / 70) : 1;
     c.fillStyle = col; c.strokeStyle = "#fff"; c.lineWidth = 2.5;
     c.beginPath(); c.arc(px, py, pr, 0, 7); c.fill(); c.stroke();
@@ -2254,7 +2268,7 @@ function drawSpectator(t, nowMs) {
   });
   c.fillStyle = "#1B2B20"; c.font = "bold 24px " + FONT; c.fillText(fmtTime(Math.ceil(left / 1000)), W / 2, boxMid - 4);
   c.font = "bold 11px " + FONT; c.fillStyle = "#5B6B5E"; c.fillText("👀 관전 중", W / 2, boxY + boxH - 9);
-  const ammoText = e => !e || typeof e.ammo !== "number" || !(e.ammo >= 0) ? "—" : String(e.ammo);
+  const ammoText = e => !e ? "—" : e.pistol ? "∞" : typeof e.ammo !== "number" || !(e.ammo >= 0) ? "—" : String(e.ammo);
   const card = (id, x, y, w) => {
     const e = T.ents[id], hp = e ? (e.alive ? e.hp : 0) : 100; let k = 0, d = 0;
     for (const key in T.kills) { const v = T.kills[key]; if (!killCounts(v)) continue; if (v.k === id) k++; if (v.v === id) d++; }
@@ -2263,7 +2277,7 @@ function drawSpectator(t, nowMs) {
     c.textAlign = "right"; c.font = "bold 12px " + FONT; c.fillStyle = "#5B6B5E"; c.fillText(k + "킬 " + d + "데스", x + w - 8, y + 14);
     const ammoW = 62, barW = w - 16 - ammoW;
     c.fillStyle = "#E4E8DE"; c.fillRect(x + 8, y + 28, barW, 9); c.fillStyle = hp > 30 ? "#2F7D4F" : "#B33951"; c.fillRect(x + 8, y + 28, barW * clamp(hp, 0, 100) / 100, 9);
-    c.textAlign = "right"; c.font = "bold 13px " + FONT; c.fillStyle = e && e.ammo === 0 ? "#B33951" : "#1B2B20"; c.fillText("탄 " + ammoText(e), x + w - 8, y + 33);
+    c.textAlign = "right"; c.font = "bold 13px " + FONT; c.fillStyle = "#1B2B20"; c.fillText("탄 " + ammoText(e), x + w - 8, y + 33);
   };
   const bandBottom = H - leaveBtnRoom;
   if (wide) {
@@ -2309,6 +2323,7 @@ function loop(now) {
   requestAnimationFrame(loop);
   animateSoldierLooks(now);
   updateLamps(now);
+  updateVisualShots(Math.min(0.05, (now - lastT) / 1000));
   if (state === "team") {
     teamFrame(now, Math.min(0.05, (now - lastT) / 1000));
     lastT = now;
