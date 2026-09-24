@@ -8,6 +8,18 @@
       ".read": true,
       "rooms": {
         "$room": { ".write": "$room.matches(/^[0-9]{5}$/)" }
+      },
+      "stats": {
+        ".write": "(newData.exists() && ((!data.exists() && newData.child('matches').val() === 1) || (data.exists() && newData.child('matches').val() === data.child('matches').val() + 1))) || (auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3'))",
+        "matches": { ".validate": "newData.isNumber()" },
+        "$char": {
+          ".validate": "$char.matches(/^(marksman|healer|tank|assassin)$/) && newData.hasChildren(['picks', 'wins', 'dmg', 'heal']) && newData.child('wins').val() <= newData.child('picks').val() && ((!data.exists() && newData.child('picks').val() <= 6) || (data.exists() && newData.child('picks').val() >= data.child('picks').val() && newData.child('picks').val() <= data.child('picks').val() + 6))",
+          "picks": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+          "wins": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+          "dmg": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5000" },
+          "heal": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5000" },
+          "$other": { ".validate": false }
+        }
       }
     },
     "turbolap": {

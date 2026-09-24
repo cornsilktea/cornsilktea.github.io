@@ -576,7 +576,7 @@
   function enterRoom(code) {
     leaving = false;
     var ref = db.ref(ROOT + "/" + code);
-    room = { code: code, ref: ref, mode: null, status: "lobby", host: null, startAt: 0, winner: null, endedAt: 0, final: null };
+    room = { code: code, ref: ref, mode: null, status: "lobby", host: null, startAt: 0, winner: null, endedAt: 0, final: null, roster: null };
     P = {}; R = {}; PR = {}; MELEE = {}; FX = []; G = null; ME = null; BOTS = {};
     ref.child("players/" + myId).onDisconnect().remove();
 
@@ -594,6 +594,7 @@
     sub(ref.child("winner"), "value", function (s) { room.winner = s.val(); });
     sub(ref.child("endedAt"), "value", function (s) { room.endedAt = s.val() || 0; });
     sub(ref.child("final"), "value", function (s) { room.final = s.val(); });
+    sub(ref.child("roster"), "value", function (s) { room.roster = s.val(); });
     sub(ref.child("status"), "value", function (s) {
       var st = s.val();
       if (st === null) { if (!leaving) exitToStart("방이 종료되었어요."); return; }
@@ -844,7 +845,7 @@
   function startGame() {
     if (!isHost() || room.status !== "lobby") return;
     audio();
-    var u = {};
+    var u = {}, roster = {};
     ["blue", "red"].forEach(function (team) {
       teamIds(team).slice(0, 3).forEach(function (id, i) {
         var p = P[id], c = CHARS[p.characterType] ? p.characterType : "marksman";
@@ -857,8 +858,11 @@
         u[base + "x"] = sp.x; u[base + "y"] = sp.y; u[base + "angle"] = r1(sp.angle);
         u[base + "hp"] = CHARS[c].hp; u[base + "alive"] = true; u[base + "skillGauge"] = 0; u[base + "damageDealt"] = 0;
         u[base + "mv"] = false; u[base + "atkAt"] = 0; u[base + "ultUntil"] = 0; u[base + "buffUntil"] = 0; u[base + "stealthUntil"] = 0; u[base + "regenUntil"] = 0; u[base + "skillUntil"] = 0; u[base + "skillDur"] = 0;
+        u[base + "healGot"] = null;
+        roster[id] = { team: team, c: c, ai: !!p.isAI };
       });
     });
+    u.roster = roster;
     u.status = "countdown"; u.startAt = now() + COUNT_MS; u.winner = null; u.final = null; u.endedAt = null;
     u.projectiles = null; u.meleeHits = null; u.hits = null; u.effects = null;
     room.ref.update(u);
@@ -880,7 +884,7 @@
              alive: d.alive !== false, gauge: +d.skillGauge || 0, dmg: +d.damageDealt || 0,
              cdUntil: 0, atkAt: 0, ultUntil: 0, buffUntil: 0, stealthUntil: +d.stealthUntil || 0, regenUntil: 0, regenRate: 0,
              skillUntil: +d.skillUntil || 0, skillDur: +d.skillDur || 0,
-             burst: null, volley: null, mv: false, pending: null };
+             burst: null, volley: null, mv: false, pending: null, regenOwner: null, healGot: {} };
   }
   function initGame() {
     G = { startAt: room.startAt, endSent: false, playingSent: false, lastNet: 0, sent: {}, finalSent: false, beeped: -1 };
@@ -1116,7 +1120,7 @@
     if (e.type === "healAll") {
       localTargets().forEach(function (T) {
         if (T.team !== e.team || !T.alive) return;
-        T.regenUntil = until; T.regenRate = e.pct * (T.id === e.owner ? ULT.hlSelf : 1);
+        T.regenUntil = until; T.regenRate = e.pct * (T.id === e.owner ? ULT.hlSelf : 1); T.regenOwner = e.owner;
         if (T === ME) sfx("heal");
       });
       G.forceNet = true;
@@ -1207,7 +1211,11 @@
       if (E.burst && E.burst.left <= 0) E.burst = null;
     }
     if (E.volley) stepVolley(E);
-    if (E.regenUntil > t) E.hp = Math.min(E.maxHp, E.hp + E.maxHp * E.regenRate * dt);
+    if (E.regenUntil > t) {
+      var hpBefore = E.hp;
+      E.hp = Math.min(E.maxHp, E.hp + E.maxHp * E.regenRate * dt);
+      if (E.regenOwner) E.healGot[E.regenOwner] = (E.healGot[E.regenOwner] || 0) + (E.hp - hpBefore);
+    }
   }
   function autoAimAngle(E) {
     var best = null, bd = Infinity, open = null, od = Infinity;
@@ -1306,6 +1314,7 @@
     put("mv", !!E.mv); put("atkAt", E.atkAt); put("ultUntil", E.ultUntil); put("buffUntil", E.buffUntil);
     put("stealthUntil", E.stealthUntil); put("regenUntil", E.regenUntil);
     put("skillUntil", E.skillUntil); put("skillDur", E.skillDur);
+    keys(E.healGot).forEach(function (healerId) { put("healGot/" + healerId, Math.round(E.healGot[healerId])); });
   }
   function netWrite(force) {
     var t = Date.now();
@@ -1344,6 +1353,48 @@
     netWrite(true);
     room.ref.update({ status: "ended", winner: winner, endedAt: t,
       final: { blue: Math.round(s.blue), red: Math.round(s.red), reason: reason } });
+    if (isFairHumanMatch(room.mode, room.roster, P)) setTimeout(function () { recordClassStats(t); }, STATS_SETTLE_MS);
+  }
+
+  var STATS_PATH = "teambattle/stats";
+  var STATS_SETTLE_MS = 1500;
+  function isFairHumanMatch(mode, roster, ps) {
+    if (mode !== "pvp" || !roster) return false;
+    var count = { blue: 0, red: 0 }, ids = keys(roster);
+    for (var i = 0; i < ids.length; i++) {
+      var id = ids[i], r = roster[id], d = ps[id];
+      if (!r || r.ai || !d || d.isAI || !d.slot || d.team !== r.team || d.characterType !== r.c) return false;
+      if (!(r.team in count) || !CHARS[r.c]) return false;
+      count[r.team]++;
+    }
+    return count.blue >= 1 && count.blue === count.red;
+  }
+  function recordClassStats(endedAt) {
+    if (!db || !room) return;
+    room.ref.once("value").then(function (s) {
+      var r = s.val();
+      if (!r || r.status !== "ended" || r.endedAt !== endedAt || r.winner == null) return;
+      var ps = r.players || {};
+      if (!isFairHumanMatch(r.mode, r.roster, ps)) return;
+      var rows = keys(r.roster).map(function (id) {
+        var healed = 0;
+        keys(ps).forEach(function (other) { var got = ps[other] && ps[other].healGot; if (got && got[id]) healed += +got[id] || 0; });
+        return { c: r.roster[id].c, win: r.winner === r.roster[id].team, dmg: +ps[id].damageDealt || 0, heal: healed };
+      });
+      return db.ref(STATS_PATH).transaction(function (cur) {
+        cur = cur || {};
+        cur.matches = (+cur.matches || 0) + 1;
+        rows.forEach(function (w) {
+          var st = cur[w.c] || {}, n = +st.picks || 0;
+          st.dmg = r1(((+st.dmg || 0) * n + w.dmg) / (n + 1));
+          st.heal = r1(((+st.heal || 0) * n + w.heal) / (n + 1));
+          st.picks = n + 1;
+          st.wins = (+st.wins || 0) + (w.win ? 1 : 0);
+          cur[w.c] = st;
+        });
+        return cur;
+      });
+    }).catch(function () {});
   }
   function hostCleanup() {
     var t = now();
@@ -1367,7 +1418,8 @@
   }
   function restart() {
     if (!room || room.status !== "ended") return;
-    room.ref.update({ status: "lobby", winner: null, final: null, startAt: null, endedAt: null,
+    if (room.endedAt && now() - room.endedAt < STATS_SETTLE_MS + 500) return;
+    room.ref.update({ status: "lobby", winner: null, final: null, startAt: null, endedAt: null, roster: null,
                       projectiles: null, meleeHits: null, hits: null, effects: null });
   }
   $("btnAgain").onclick = restart;
