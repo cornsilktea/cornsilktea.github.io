@@ -1610,12 +1610,27 @@ function buildSeoulGround(G, M) {
   [[-900, -2700, 800, 650, 0.9], [-150, -2900, 900, 720, 1.0], [700, -2700, 800, 600, 0.85], [1500, -2500, 700, 520, 0.9], [-1800, -2400, 700, 480, 0.8],
    [-800, 2800, 800, 440, 0.8], [500, 2900, 900, 540, 0.85]].forEach(([x, z, r, h, pw], k) => seoulMesh(G, hillGeometry({ r, h, pow: pw, seed: k * 1.7 }, true), M.hill, x, 0, z));
 }
+function unfoldedOffsets(off) {
+  const h = 3, reach = 6, raw = { 1: [], "-1": [] };
+  for (let i = 0; i < N; i++) {
+    const t0 = S[wrapI(i - h)].t, t1 = S[wrapI(i + h)].t, span = SEG * (wrapI(i + h) - wrapI(i - h) || 1);
+    const bend = ((t1.x - t0.x) * S[i].n.x + (t1.z - t0.z) * S[i].n.z) / span, inner = bend > 0 ? 1 : -1;
+    raw[inner][i] = Math.min(off, 0.9 / Math.max(Math.abs(bend), 1e-6)); raw[-inner][i] = off;
+  }
+  const res = {};
+  [1, -1].forEach(sg => {
+    res[sg] = raw[sg].map((_, i) => { let m = off; for (let d = -reach; d <= reach; d++) m = Math.min(m, raw[sg][wrapI(i + d)]); return m; });
+  });
+  return res;
+}
 function buildRiverRoadside(G, M, R, noPiers, wallDrop) {
-  const outer = W / 2 + SH + 1.5, drop = wallDrop || (i => S[i].p.y);
+  const outer = W / 2 + SH + 1.5, drop = wallDrop || (i => S[i].p.y), sideOff = unfoldedOffsets(outer);
   const wet = i => { const z = S[i].p.z; return z > R.z0 - 2 && z < R.z1 + 2; };
-  ribbon(G, band(outer, -outer, -0.02, -0.02), 1, M.sidewalk).receiveShadow = true;
+  const underCurb = W / 2 - 0.3;
+  ribbon(G, i => [edgeAt(i, sideOff[1][i], -0.02), edgeAt(i, underCurb, -0.02)], 1, M.sidewalk).receiveShadow = true;
+  ribbon(G, i => [edgeAt(i, -underCurb, -0.02), edgeAt(i, -sideOff[-1][i], -0.02)], 1, M.sidewalk).receiveShadow = true;
   sampleRanges(i => S[i].p.y > 0.25 && !wet(i)).forEach(([a, b]) => [1, -1].forEach(sg => {
-    ribbon(G, i => [edgeAt(i, sg * outer, -0.02), edgeAt(i, sg * outer, -drop(i) - 0.05)], 1, M.concrete, a, b).receiveShadow = true;
+    ribbon(G, i => [edgeAt(i, sg * sideOff[sg][i], -0.02), edgeAt(i, sg * sideOff[sg][i], -drop(i) - 0.05)], 1, M.concrete, a, b).receiveShadow = true;
   }));
   sampleRanges(wet).forEach(([a, b]) => {
     [1, -1].forEach(sg => { ribbon(G, i => [edgeAt(i, sg * outer, -0.02), edgeAt(i, sg * outer, -2.6)], 1, M.concrete, a, b).castShadow = true; });
