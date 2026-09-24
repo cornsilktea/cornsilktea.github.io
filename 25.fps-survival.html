@@ -1,5 +1,14 @@
 <!DOCTYPE html>
 <html lang="ko">
+<!--
+  에셋 출처 목록 (모두 CC0 1.0 — 저작자 표시 의무 없음, 수업용으로 정리해 둠)
+  [텍스처] img/fps/textures/  — ambientCG (https://ambientcg.com), 1K-JPG 를 웹용으로 재압축
+    concrete031_*  바닥   https://ambientcg.com/view?id=Concrete031
+    concrete034_*  벽·기둥·배리어  https://ambientcg.com/view?id=Concrete034
+    planks021_*    상자 판자  https://ambientcg.com/view?id=Planks021
+    metal032_*     상자 테두리·배리어 윗판·외곽 테두리  https://ambientcg.com/view?id=Metal032
+    paintedmetal009_*  배리어 경고띠  https://ambientcg.com/view?id=PaintedMetal009
+-->
 <head>
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="fpssurvival"></script>
@@ -466,6 +475,7 @@ function outline(mesh) { mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry
 function solid(mesh, cast) { mesh.castShadow = cast !== false; mesh.receiveShadow = true; return mesh; }
 
 const wallMeshes = [];
+const rimM = MS({ color: 0x24402F });
 {
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(ARENA.hx * 2, ARENA.hz * 2), MS({ map: TEX.floor }));
   floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
@@ -476,7 +486,6 @@ const wallMeshes = [];
   };
   mkWall(ARENA.hx * 2, 0, -ARENA.hz, 0); mkWall(ARENA.hx * 2, 0, ARENA.hz, Math.PI);
   mkWall(ARENA.hz * 2, -ARENA.hx, 0, Math.PI / 2); mkWall(ARENA.hz * 2, ARENA.hx, 0, -Math.PI / 2);
-  const rimM = MS({ color: 0x24402F });
   [[ARENA.hx * 2 + 0.4, 0.4, 0, -ARENA.hz], [ARENA.hx * 2 + 0.4, 0.4, 0, ARENA.hz], [0.4, ARENA.hz * 2 + 0.4, -ARENA.hx, 0], [0.4, ARENA.hz * 2 + 0.4, ARENA.hx, 0]]
     .forEach(r => {
       const m = new THREE.Mesh(new THREE.BoxGeometry(r[0], 0.25, r[1]), rimM); m.position.set(r[2], ARENA.wallH, r[3]); scene.add(m);
@@ -517,6 +526,110 @@ function useMap(name) {
   obstacleMeshes = wallMeshes.concat(m.meshes);
 }
 useMap("solo");
+
+const skyDome = new THREE.Mesh(new THREE.SphereGeometry(160, 32, 16), new THREE.ShaderMaterial({
+  side: THREE.BackSide, depthWrite: false, fog: false,
+  uniforms: { zenith: { value: new THREE.Color(0x5E8FC0) }, horizon: { value: scene.fog.color.clone() }, ground: { value: new THREE.Color(0xB9C2BD) } },
+  vertexShader: "varying vec3 vDir; void main() { vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+  fragmentShader: "uniform vec3 zenith; uniform vec3 horizon; uniform vec3 ground; varying vec3 vDir;\n" +
+    "void main() { float h = vDir.y; vec3 col = h > 0.0 ? mix(horizon, zenith, pow(smoothstep(0.0, 1.0, h), 0.7)) : mix(horizon, ground, smoothstep(0.0, 0.25, -h));\n" +
+    "gl_FragColor = vec4(col, 1.0);\n#include <encodings_fragment>\n}"
+}));
+skyDome.renderOrder = -1; skyDome.frustumCulled = false;
+scene.add(skyDome);
+
+const PBR_DIR = "img/fps/textures/";
+const PBR_KINDS = ["color", "normal", "rough"];
+const MAX_ANISO = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+function loadPbrImage(file) {
+  return new Promise((ok, fail) => { const im = new Image(); im.onload = () => ok(im); im.onerror = fail; im.src = PBR_DIR + file + ".jpg"; });
+}
+function loadPbrSet(id) {
+  return Promise.all(PBR_KINDS.map(k => loadPbrImage(id + "_" + k))).then(imgs => ({ color: imgs[0], normal: imgs[1], rough: imgs[2] }));
+}
+function paintPbrMaps(w, h, paint) {
+  return PBR_KINDS.map(kind => {
+    const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+    const c = cv.getContext("2d"); paint(c, w, h, kind); c.getImageData(0, 0, 1, 1);
+    const t = new THREE.CanvasTexture(cv);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = MAX_ANISO;
+    if (kind === "color") t.encoding = THREE.sRGBEncoding;
+    return t;
+  });
+}
+function cloneMaps(maps) { return maps.map(t => { const c = t.clone(); c.needsUpdate = true; return c; }); }
+function applyPbr(mat, maps, repeat, normalStrength) {
+  maps.forEach(t => t.repeat.set(repeat[0], repeat[1]));
+  mat.map = maps[0]; mat.normalMap = maps[1]; mat.roughnessMap = maps[2];
+  mat.roughness = 1; mat.normalScale.set(normalStrength, normalStrength);
+  mat.needsUpdate = true;
+}
+function tileImage(c, img, x, y, w, h, tile) {
+  for (let ty = y; ty < y + h; ty += tile) for (let tx = x; tx < x + w; tx += tile) c.drawImage(img, tx, ty, tile, tile);
+}
+function hazardStripes(c, y0, y1, w, alpha) {
+  c.save(); c.beginPath(); c.rect(0, y0, w, y1 - y0); c.clip();
+  c.fillStyle = `rgba(27,43,32,${alpha})`;
+  const band = y1 - y0;
+  for (let x = -band; x < w + band; x += band * 1.1) { c.beginPath(); c.moveTo(x, y0); c.lineTo(x + band * 0.45, y0); c.lineTo(x + band * 1.0, y1); c.lineTo(x + band * 0.55, y1); c.fill(); }
+  c.restore();
+}
+const FLAT_NORMAL = "#8080FF";
+
+Promise.all(["concrete031", "concrete034", "planks021", "metal032", "paintedmetal009"].map(loadPbrSet)).then(([floorSet, wallSet, plankSet, metalSet, paintSet]) => {
+  const floorMaps = paintPbrMaps(1024, 1024, (c, w, h, k) => {
+    c.drawImage(floorSet[k], 0, 0, w, h);
+    if (k === "color") { c.globalCompositeOperation = "screen"; c.fillStyle = "rgba(150,158,148,.3)"; c.fillRect(0, 0, w, h); c.globalCompositeOperation = "source-over"; }
+  });
+  const wallMaps = paintPbrMaps(1024, 1024, (c, w, h, k) => {
+    c.drawImage(wallSet[k], 0, 0, w, h);
+    if (k === "color") { c.fillStyle = "rgba(150,170,190,.18)"; c.fillRect(0, 0, w, h); }
+  });
+  const crateMaps = paintPbrMaps(512, 512, (c, w, h, k) => {
+    c.drawImage(plankSet[k], 0, 0, w, h);
+    if (k === "color") { c.fillStyle = "rgba(110,70,30,.22)"; c.fillRect(0, 0, w, h); }
+    const frame = 30, brace = 22, diag = Math.hypot(w, h);
+    c.save(); c.beginPath();
+    c.rect(0, 0, w, frame); c.rect(0, h - frame, w, frame); c.rect(0, 0, frame, h); c.rect(w - frame, 0, frame, h);
+    [Math.PI / 4, -Math.PI / 4].forEach(a => { c.save(); c.translate(w / 2, h / 2); c.rotate(a); c.rect(-diag / 2, -brace / 2, diag, brace); c.restore(); });
+    c.clip(); c.drawImage(metalSet[k], 0, 0, w, h);
+    if (k === "color") { c.fillStyle = "rgba(55,66,60,.6)"; c.fillRect(0, 0, w, h); }
+    c.restore();
+    if (k === "color") {
+      [[15, 15], [w - 15, 15], [15, h - 15], [w - 15, h - 15], [w / 2, h / 2]].forEach(p => {
+        c.fillStyle = "#2B3330"; c.beginPath(); c.arc(p[0], p[1], 6, 0, 7); c.fill();
+        c.fillStyle = "#C9CFC8"; c.beginPath(); c.arc(p[0] - 1, p[1] - 1, 3.5, 0, 7); c.fill();
+      });
+    }
+  });
+  const pillarMaps = paintPbrMaps(256, 512, (c, w, h, k) => {
+    tileImage(c, wallSet[k], 0, 0, w, h, 256);
+    [[40, 112], [h - 112, h - 40]].forEach(([y0, y1]) => {
+      if (k === "color") { c.fillStyle = "rgba(217,123,79,.88)"; c.fillRect(0, y0, w, y1 - y0); hazardStripes(c, y0, y1, w, 0.92); }
+      else if (k === "rough") { c.fillStyle = "rgba(90,90,90,.8)"; c.fillRect(0, y0, w, y1 - y0); }
+      else { c.fillStyle = FLAT_NORMAL; c.globalAlpha = 0.6; c.fillRect(0, y0, w, y1 - y0); c.globalAlpha = 1; }
+    });
+  });
+  const barrierMaps = paintPbrMaps(512, 128, (c, w, h, k) => {
+    tileImage(c, wallSet[k], 0, 0, w, h, 128);
+    const y0 = h - 44;
+    c.save(); c.beginPath(); c.rect(0, y0, w, 44); c.clip(); tileImage(c, paintSet[k], 0, y0, w, 44, 128); c.restore();
+    if (k === "color") { c.fillStyle = "rgba(226,185,59,.35)"; c.fillRect(0, y0, w, 44); hazardStripes(c, y0, h, w, 0.85); }
+    if (k === "color") { c.fillStyle = "rgba(210,215,208,.2)"; c.fillRect(0, 0, w, y0); }
+  });
+  const metalMaps = paintPbrMaps(512, 512, (c, w, h, k) => c.drawImage(metalSet[k], 0, 0, w, h));
+  const concreteMaps = paintPbrMaps(512, 512, (c, w, h, k) => c.drawImage(wallSet[k], 0, 0, w, h));
+
+  scene.children.filter(o => o.isMesh && o.material && o.material.map === TEX.floor).forEach(f => applyPbr(f.material, floorMaps, [ARENA.hx, ARENA.hz], 0.8));
+  wallMeshes.forEach(m => applyPbr(m.material, cloneMaps(wallMaps), [m.material.map.repeat.x, 1], 0.9));
+  applyPbr(crateM, crateMaps, [1, 1], 1.0);
+  applyPbr(pillarM, pillarMaps, [3, 1], 0.8);
+  applyPbr(barrierM, barrierMaps, [3, 1], 0.9);
+  applyPbr(rimM, cloneMaps(metalMaps), [8, 1], 0.6); rimM.metalness = 0.35;
+  applyPbr(barrierTopM, cloneMaps(metalMaps), [2, 1], 0.6); barrierTopM.metalness = 0.35;
+  applyPbr(pillarRimM, cloneMaps(concreteMaps), [2, 1], 0.7);
+}).catch(() => {});
+
 const gun = new THREE.Group();
 {
   const dark = MS({ color: 0x2A3230, roughness: 0.5, metalness: 0.5 }), poly = MS({ color: 0x3C4744, roughness: 0.8 }), tan = MS({ color: 0x8A7A5C, roughness: 0.9 });
