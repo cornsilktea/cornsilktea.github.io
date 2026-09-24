@@ -10,7 +10,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
 <meta property="og:title" content="터보 랩">
-<meta property="og:description" content="3D 실사 레이싱 / 홍콩 피크→구룡 편도·싱가포르 3바퀴·서울 2바퀴 완주 시간 개인전 (WASD·방향키)">
+<meta property="og:description" content="3D 실사 레이싱 / 타임어택(홍콩 편도·싱가포르 3바퀴·서울 2바퀴 완주 시간 개인전·고스트) + 대전모드(방 코드 1대1 실시간 레이스·충돌·관전) (WASD·방향키)">
 <meta property="og:url" content="https://cornsilktea.github.io/24.turbo-lap.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
@@ -113,12 +113,83 @@
   .credits { font-size: 11px; line-height: 1.55; color: var(--sg-ink-faint); margin-top: 10px; }
   #loadNote { font-size: 12px; font-weight: 700; color: var(--sg-ink-soft); min-height: 16px; margin-top: 6px; }
   [hidden]{display:none !important;}
+
+  .modeBtns { display: flex; flex-direction: column; gap: 12px; margin: 18px 0 8px; }
+  .modeBtns .btn { width: 100%; font-size: 24px; padding: 16px 20px; }
+  .card.wide { width: min(600px, 100%); }
+  .hello { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; font-size: 18px; font-weight: 700; margin: 12px 0 14px; }
+  .hello b { color: var(--sg-primary); }
+  .hello.left { justify-content: flex-start; font-size: 15px; margin: 10px 0 4px; }
+  .mini { font: inherit; font-size: 13px; font-weight: 800; height: 32px; padding: 0 12px; border-radius: 8px; border: 2px solid var(--sg-line-mid); background: #fff; color: var(--sg-ink-mid); cursor: pointer; }
+  .mini:disabled { opacity: .45; cursor: default; }
+  .mini.danger { border-color: var(--sg-danger); color: var(--sg-danger); }
+  .joinRow { display: flex; gap: 8px; margin-top: 12px; }
+  .joinRow input { flex: 1; min-width: 0; height: 58px; font: inherit; font-size: 26px; font-weight: 800; letter-spacing: 6px; text-align: center; border: 3px solid var(--sg-line-strong); border-radius: 12px; background: #fff; color: var(--sg-ink); }
+  .joinRow .btn { padding: 0 22px; }
+  .codeBar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .codeLab { font-size: 14px; font-weight: 800; color: var(--sg-ink-soft); margin-right: 6px; }
+  .codeNum { font-size: 46px; font-weight: 800; letter-spacing: 6px; color: var(--sg-primary); line-height: 1; font-variant-numeric: tabular-nums; }
+  .mapBtns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .mapBtn { font: inherit; font-weight: 800; font-size: 16px; padding: 8px 4px; border-radius: 10px; border: 2px solid var(--sg-line-mid); background: var(--sg-panel-alt); color: var(--sg-ink); cursor: pointer; }
+  .mapBtn small { display: block; font-size: 11px; font-weight: 700; color: var(--sg-ink-soft); }
+  .mapBtn.on { background: #fff; border-color: #D97B4F; outline: 2px solid #D97B4F; }
+  .mapBtn:disabled { cursor: default; }
+  .mapBtn:disabled:not(.on) { opacity: .5; }
+  .sides { display: flex; gap: 10px; margin-top: 12px; }
+  .side { flex: 1 1 0; min-width: 0; border: 3px solid; border-radius: 12px; padding: 10px; text-align: left; }
+  .side.left { border-color: var(--sg-primary); background: var(--sg-primary-soft); }
+  .side.right { border-color: #D97B4F; background: #FBEDE6; }
+  .side h3 { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 16px; font-weight: 800; margin-bottom: 8px; }
+  .side.left h3 { color: var(--sg-primary); }
+  .side.right h3 { color: #D97B4F; }
+  .side .join { font: inherit; font-size: 12px; font-weight: 800; height: 28px; padding: 0 10px; border-radius: 7px; border: 0; color: #fff; cursor: pointer; }
+  .side.left .join { background: var(--sg-primary); }
+  .side.right .join { background: #D97B4F; }
+  .side .join:disabled { background: #B8BDB5; cursor: default; }
+  .slot { min-height: 46px; display: flex; flex-direction: column; justify-content: center; padding: 4px 10px; border-radius: 8px; background: rgba(255,255,255,.9); font-size: 17px; font-weight: 800; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .slot small { font-size: 12px; font-weight: 700; color: var(--sg-ink-soft); }
+  .slot.empty { color: var(--sg-ink-faint); font-weight: 700; background: rgba(255,255,255,.45); }
+  .slot.mine { box-shadow: inset 0 0 0 2px var(--sg-ink); }
+  .specBox { margin-top: 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding: 8px 12px; border-radius: 10px; border: 2px solid var(--sg-line-mid); background: var(--sg-panel-alt); font-size: 15px; text-align: left; }
+  .specBox .none { color: var(--sg-ink-faint); font-weight: 400; }
+  #btnBStart { width: 100%; margin-top: 12px; }
+  .rtab.res td:first-child { width: 56px; }
+  .rtab.res td:nth-child(2) { font-weight: 800; font-size: 16px; }
+  .sideDot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+
+  .modal { position: fixed; inset: 0; z-index: 30; background: rgba(27,43,32,.55); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .modalBox { width: min(400px, 100%); background: var(--sg-panel); border: 3px solid var(--sg-line-strong); border-radius: 14px; padding: 20px; text-align: center; }
+  .modalBox h3 { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
+  .modalBox .joinRow input { font-size: 22px; letter-spacing: 1px; }
+  .modalBox .mini { margin-top: 10px; }
+
+  #hudPos { font-size: 22px; }
+  #battleNote { position: fixed; left: 50%; transform: translateX(-50%); top: 150px; z-index: 5; pointer-events: none; font-size: 15px; padding: 6px 14px; text-align: center; white-space: nowrap; }
+  #btnMatchLeave { position: fixed; top: 8px; right: 8px; z-index: 8; }
+  #rankBox { position: fixed; top: 48px; left: 10px; z-index: 5; pointer-events: none; width: 250px; }
+  #rkTime { display: inline-block; margin-bottom: 6px; padding: 4px 12px; font-size: 20px; }
+  #rkList { position: relative; }
+  .rkNum { position: absolute; left: 0; width: 50px; height: 46px; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 800; color: #fff; -webkit-text-stroke: 1px var(--sg-ink); text-shadow: 0 2px 0 rgba(27,43,32,.4); }
+  .rkRow { position: absolute; left: 54px; right: 0; height: 42px; display: flex; align-items: center; gap: 6px; padding: 0 10px; background: rgba(255,255,255,.93); border: 2px solid var(--sg-line-strong); border-radius: 10px; box-shadow: 0 3px 0 rgba(27,43,32,.25); transition: top .55s cubic-bezier(.4, 1.3, .5, 1); }
+  .rkRow b { flex: 1 1 auto; min-width: 0; font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rkRow small { flex: 0 0 auto; font-size: 12px; font-weight: 800; color: var(--sg-ink-soft); font-variant-numeric: tabular-nums; }
+  #viewBtns { position: fixed; left: 12px; bottom: 12px; z-index: 6; display: flex; gap: 8px; flex-wrap: wrap; }
+  #viewBtns button { font: inherit; font-weight: 800; font-size: 16px; padding: 10px 16px; border-radius: 10px; border: 3px solid var(--sg-line-strong); background: rgba(255,255,255,.93); color: var(--sg-ink); cursor: pointer; box-shadow: 0 4px 0 var(--sg-ink); }
+  #viewBtns button.on { background: var(--sg-ink); color: #fff; }
+  #viewBtns button small { display: block; font-size: 11px; font-weight: 700; opacity: .8; }
+  @media (max-width: 520px) {
+    .codeNum { font-size: 36px; }
+    #rankBox { width: 200px; }
+    .rkRow b { font-size: 15px; }
+    #battleNote { top: 165px; font-size: 13px; }
+  }
 </style>
 </head>
 <body>
 <div id="hud">
   <div class="hud-box"><span class="lab">바퀴</span><span id="hudLap">1 / 3</span></div>
   <div class="hud-box" id="hudTime">0:00.00<span class="off" id="hudOff"></span></div>
+  <div class="hud-box" id="hudPosBox" hidden><span class="lab">순위</span><span id="hudPos">1 / 2</span></div>
   <div class="hud-box"><span class="lab">이번 경기 최고 랩</span><span id="hudBest">—</span></div>
   <div id="hudBtns">
     <button type="button" id="btnReset">↻ 처음부터 (R)</button>
@@ -134,7 +205,24 @@
 
 <div id="overlay">
   <div class="card" id="cardStart">
-    <div class="logo">TURBO LAP<small>터보 랩 — 완주 최단 시간 도전 (홍콩 피크→구룡 편도, 싱가포르 3바퀴, 서울 2바퀴)</small></div>
+    <div class="logo">TURBO LAP<small>터보 랩 — 홍콩 피크→구룡 편도, 싱가포르 3바퀴, 서울 2바퀴</small></div>
+    <div class="modeBtns">
+      <button type="button" class="btn" id="btnModeTA">⏱ 타임어택<small>혼자 달려 완주 최단 시간 도전 · 고스트</small></button>
+      <button type="button" class="btn hard" id="btnModeBattle">⚔️ 대전모드<small>방 코드로 모여 1대1 실시간 레이스</small></button>
+    </div>
+    <div class="keys">
+      <div>
+        <div class="keypad"><span class="e"></span><span>W</span><span class="e"></span><span>A</span><span>S</span><span>D</span></div>
+        <div class="lab">또는 방향키 ↑ ← ↓ →</div>
+      </div>
+      <p><b>W / ↑</b> 가속<br><b>S / ↓</b> 브레이크·후진<br><b>A D / ← →</b> 조향<br><b>T</b> 트랙 복귀</p>
+    </div>
+    <div id="loadNote"></div>
+    <div class="credits creditText"></div>
+  </div>
+
+  <div class="card" id="cardCourse" style="display:none">
+    <div class="logo" style="font-size:36px">⏱ 타임어택<small>코스를 고르세요</small></div>
     <table class="rtab">
       <thead><tr><th>코스</th><th>나의 최고 기록</th><th>🏆 세계신기록</th><th class="clsCol" hidden>🏫 우리 반</th></tr></thead>
       <tbody>
@@ -143,22 +231,66 @@
         <tr><td>서울<small style="font-weight:400">2바퀴</small></td><td><em id="bestSeoul">—</em></td><td><em id="wrSeoul">—</em><small id="wrWhoSeoul"></small></td><td class="clsCol" hidden><em id="crSeoul">—</em><small id="crWhoSeoul"></small></td></tr>
       </tbody>
     </table>
-    <div class="keys">
-      <div>
-        <div class="keypad"><span class="e"></span><span>W</span><span class="e"></span><span>A</span><span>S</span><span>D</span></div>
-        <div class="lab">또는 방향키 ↑ ← ↓ →</div>
-      </div>
-      <p><b>W / ↑</b> 가속<br><b>S / ↓</b> 브레이크·후진<br><b>A D / ← →</b> 조향<br><b>R</b> 처음부터 다시</p>
-    </div>
     <div class="btns">
       <button type="button" class="btn" id="btnHongkong">홍콩<small>편도 코스</small></button>
       <button type="button" class="btn mid" id="btnSingapore">싱가포르<small>3바퀴</small></button>
       <button type="button" class="btn hard" id="btnSeoul">서울<small>2바퀴</small></button>
     </div>
-    <div class="hint">트랙을 벗어나면 느려지고, 울타리에 부딪히면 크게 감속합니다.</div>
+    <div class="hint">트랙을 벗어나면 느려지고, 울타리에 부딪히면 크게 감속합니다. R 키: 처음부터 다시</div>
+    <div class="btns" style="margin-top:12px"><button type="button" class="btn sub" id="btnCourseBack">← 처음 화면</button></div>
     <div class="wipe"><button type="button" id="btnWipe">이 기기의 나의 최고 기록·고스트 지우기</button></div>
-    <div id="loadNote"></div>
-    <div class="credits creditText"></div>
+  </div>
+
+  <div class="card" id="cardBStart" style="display:none">
+    <div class="logo" style="font-size:36px">⚔️ 대전모드<small>1대1 실시간 레이스 — 부딪히면 밀려납니다</small></div>
+    <div class="hello">안녕하세요, <b id="helloNick"></b>님 <button type="button" class="mini" id="btnNickEdit">✏️ 닉네임 변경</button></div>
+    <div class="modeBtns">
+      <button type="button" class="btn" id="btnCreate">1대1 방 만들기</button>
+      <button type="button" class="btn mid" id="btnJoinOpen">방 참여하기</button>
+    </div>
+    <div id="joinBox" hidden>
+      <div class="joinRow"><input id="joinCode" inputmode="numeric" pattern="[0-9]*" maxlength="5" placeholder="5자리 코드" autocomplete="off"><button type="button" class="btn" id="btnJoin">입장</button></div>
+    </div>
+    <div class="msg" id="bStartMsg"></div>
+    <div class="btns" style="margin-top:8px"><button type="button" class="btn sub" id="btnBBack">← 처음 화면</button></div>
+  </div>
+
+  <div class="card wide" id="cardLobby" style="display:none">
+    <div class="codeBar">
+      <div><span class="codeLab">방 코드</span><span class="codeNum" id="lobbyCode">-----</span></div>
+      <button type="button" class="mini danger" id="btnLeaveLobby">방 나가기</button>
+    </div>
+    <div class="hello left">내 닉네임: <b id="lobbyNick"></b> <button type="button" class="mini" id="btnNickEdit2">✏️ 변경</button></div>
+    <div class="sect">🗺️ 맵 <span id="mapHint" style="font-weight:700"></span></div>
+    <div class="mapBtns" id="mapBtns"></div>
+    <div class="sides">
+      <div class="side left"><h3>왼쪽 자리 <button type="button" class="join" id="btnJoinLeft">이동하기</button></h3><div id="slotLeft"></div></div>
+      <div class="side right"><h3>오른쪽 자리 <button type="button" class="join" id="btnJoinRight">이동하기</button></h3><div id="slotRight"></div></div>
+    </div>
+    <div class="specBox"><div><b>📺 관전자</b> <span id="listSpec"></span></div><button type="button" class="mini" id="btnJoinSpec">📺 관전자로 보기</button></div>
+    <div id="lobbyCarBox">
+      <div class="sect">🚗 차량 선택</div>
+      <div class="cars">
+        <button type="button" class="carbtn" data-car="black"><canvas width="220" height="132"></canvas>검정</button>
+        <button type="button" class="carbtn" data-car="yellow"><canvas width="220" height="132"></canvas>노랑</button>
+        <button type="button" class="carbtn" data-car="blue"><canvas width="220" height="132"></canvas>파랑</button>
+        <button type="button" class="carbtn" data-car="red"><canvas width="220" height="132"></canvas>빨강</button>
+      </div>
+    </div>
+    <button type="button" class="btn" id="btnBStart" hidden>게임 시작</button>
+    <div class="hint" id="lobbyHint"></div>
+  </div>
+
+  <div class="card" id="cardBDone" style="display:none">
+    <div class="logo" style="font-size:38px">🏁 경기 결과</div>
+    <div class="courseTag" id="bDoneCourse">홍콩</div>
+    <div class="msg" id="bDoneMsg"></div>
+    <table class="rtab res"><tbody id="bDoneRows"></tbody></table>
+    <div class="btns">
+      <button type="button" class="btn" id="btnToLobby">대기실로</button>
+      <button type="button" class="btn sub" id="btnLeaveEnd">방 나가기</button>
+    </div>
+    <div class="hint" id="bDoneHint"></div>
   </div>
 
   <div class="card" id="cardCar" style="display:none">
@@ -201,6 +333,20 @@
       <button type="button" class="ghostbtn" data-ghost="world">세계신기록<small>확인 중…</small></button>
     </div>
     <div class="hint" id="ghostUpNote">스페이스바: 다시 하기</div>
+  </div>
+</div>
+
+<div class="hud-box" id="battleNote" hidden></div>
+<button type="button" class="mini danger" id="btnMatchLeave" hidden>방 나가기</button>
+<div id="rankBox" hidden><div class="hud-box" id="rkTime">0:00.00</div><div id="rkList"></div></div>
+<div id="viewBtns" hidden></div>
+
+<div class="modal" id="nickModal" hidden>
+  <div class="modalBox">
+    <h3>닉네임을 입력해 주세요</h3>
+    <div class="joinRow"><input id="nickInput" maxlength="6" placeholder="최대 6자" autocomplete="off"><button type="button" class="btn" id="btnNickSave">저장</button></div>
+    <div class="msg" id="nickMsg"></div>
+    <button type="button" class="mini" id="btnNickCancel">취소</button>
   </div>
 </div>
 
@@ -480,7 +626,7 @@ const HQ_MANAGER = new THREE.LoadingManager(
   url => { HQ_LOAD.failed.push(String(url).split("/").pop()); renderLoadGate(); });
 function renderLoadGate() {
   const ok = HQ_LOAD.ready && !!SUPERCAR.tpl;
-  ["btnHongkong", "btnSingapore", "btnSeoul"].forEach(id => { $(id).disabled = !ok; });
+  ["btnModeTA", "btnModeBattle", "btnHongkong", "btnSingapore", "btnSeoul"].forEach(id => { $(id).disabled = !ok; });
   const note = $("loadNote");
   if (!HQ_LOAD.ready) note.textContent = "그래픽 자료 불러오는 중… " + HQ_LOAD.loaded + " / " + (HQ_LOAD.total || "?") + (HQ_LOAD.slow ? " — 인터넷이 느리면 조금 더 기다려 주세요" : "");
   else if (!SUPERCAR.tpl) note.textContent = "자동차 모델을 불러오지 못했습니다. 새로 고침(F5) 해 주세요.";
@@ -847,6 +993,19 @@ function buildTreesHQ(G, spots) {
     [trunks, leaves].forEach(m => { m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false; G.add(m); });
   });
 }
+function gridLat() { return W / 4; }
+function startGridBox(G, i, lat) {
+  const s = S[wrapI(i)], ahead = S[wrapI(i + 5)], behind = S[wrapI(i - 5)];
+  const box = new THREE.Group(); box.rotation.order = "YXZ";
+  box.position.set(s.p.x + s.n.x * lat, s.p.y + 0.09, s.p.z + s.n.z * lat);
+  box.rotation.y = Math.atan2(-s.t.x, -s.t.z);
+  box.rotation.x = Math.atan2(ahead.p.y - behind.p.y, SEG * 10);
+  [[0, -2.6, 2.7, 0.3], [-1.35, -0.45, 0.24, 4.6], [1.35, -0.45, 0.24, 4.6]].forEach(([x, z, w, d]) => {
+    const bar = new THREE.Mesh(new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2), HQM.line);
+    bar.position.set(x, 0, z); bar.receiveShadow = true; box.add(bar);
+  });
+  G.add(box);
+}
 function buildRoadSurface(G) {
   const ground = m => { m.receiveShadow = true; return m; };
   ground(ribbon(G, band(W / 2, -W / 2, 0.05, 0.05), 1, HQM.asphalt));
@@ -865,6 +1024,7 @@ function buildRoadSurface(G) {
     beam.position.set(s0.p.x, s0.p.y + hgt, s0.p.z); beam.rotation.y = Math.atan2(s0.n.x, s0.n.z); beam.castShadow = true; G.add(beam);
   };
   gantry(OPEN ? START_I + 8 : 2);
+  [1, -1].forEach(sg => startGridBox(G, START_I, sg * gridLat()));
   if (OPEN) {
     gantry(FINISH_I);
     [N - 1].forEach(i => {
@@ -3018,12 +3178,13 @@ function buildPreviewCar(p) {
 document.querySelectorAll(".carbtn").forEach(b => {
   const cv = b.querySelector("canvas"), ctx = previewRenderer && cv.getContext("2d");
   if (!ctx) { cv.style.display = "none"; return; }
-  const p = { key: b.getAttribute("data-car"), ctx, m: null, ang: 0.6 };
+  const p = { key: b.getAttribute("data-car"), ctx, m: null, ang: 0.6, btn: b };
   buildPreviewCar(p); carPreviews.push(p);
 });
 function renderCarPreviews(dt) {
-  if (!previewRenderer || state !== "menu" || cardCar.style.display === "none") return;
+  if (!previewRenderer || state !== "menu" || overlay.style.display === "none") return;
   carPreviews.forEach(p => {
+    if (!p.btn.offsetParent) return;
     p.ang += dt * 1.1; p.m.rotation.y = p.ang;
     previewScene.add(p.m); previewRenderer.render(previewScene, previewCam); previewScene.remove(p.m);
     p.ctx.clearRect(0, 0, PREVIEW_W, PREVIEW_H); p.ctx.drawImage(previewRenderer.domElement, 0, 0);
@@ -3046,8 +3207,8 @@ new GLTFLoader(HQ_MANAGER).setMeshoptDecoder(MeshoptDecoder).load("img/turbo/sup
 renderLoadGate();
 
 
-const P = { x: 0, z: 0, y: 0, h: 0, v: 0, ci: 0, prevCi: 0, lap: 0, expected: 0, off: false, wallT: 0, steerVis: 0, rollVis: 0 };
-let state = "menu";
+const P = { x: 0, z: 0, y: 0, h: 0, v: 0, ci: 0, prevCi: 0, lap: 0, expected: 0, off: false, wallT: 0, steerVis: 0, rollVis: 0, kx: 0, kz: 0, spin: 0, bumpT: 0, fin: 0 };
+let state = "menu", playMode = "ta";
 let cdTime = 0, cdShown = -1, goTimer = 0, t0 = 0, elapsed = 0, finalMs = 0, doneTimer = 0, shake = 0, menuAng = 0;
 const keys = { up: false, down: false, left: false, right: false };
 const hud = $("hud"), overlay = $("overlay"), cardStart = $("cardStart"), cardDone = $("cardDone"), cardCar = $("cardCar");
@@ -3064,17 +3225,21 @@ function closeLap() {
   renderHudBest(); return isNew;
 }
 
-function placeAt(i) {
+function placeAt(i, lat) {
   const s = S[wrapI(i)];
-  P.x = s.p.x; P.z = s.p.z; P.y = s.p.y; P.v = 0; P.ci = wrapI(i); P.prevCi = P.ci;
+  lat = lat || 0;
+  P.x = s.p.x + s.n.x * lat; P.z = s.p.z + s.n.z * lat; P.y = s.p.y; P.v = 0; P.ci = wrapI(i); P.prevCi = P.ci;
   P.h = Math.atan2(-s.t.x, -s.t.z);
+  P.kx = 0; P.kz = 0; P.spin = 0;
 }
-function resetCar() { placeAt(START_I); P.off = false; P.wallT = 0; P.steerVis = 0; P.rollVis = 0; }
+function startLat() { return (playMode === "battle" && myTeam() === "right" ? -1 : 1) * gridLat(); }
+function resetCar() { placeAt(START_I, startLat()); P.off = false; P.wallT = 0; P.steerVis = 0; P.rollVis = 0; P.fin = 0; }
+const CARDS = { start: "cardStart", course: "cardCourse", car: "cardCar", done: "cardDone", bstart: "cardBStart", lobby: "cardLobby", bdone: "cardBDone" };
+let cardNow = "start";
 function showCard(which) {
+  cardNow = which;
   overlay.style.display = which ? "flex" : "none";
-  cardStart.style.display = which === "start" ? "" : "none";
-  cardDone.style.display = which === "done" ? "" : "none";
-  cardCar.style.display = which === "car" ? "" : "none";
+  Object.keys(CARDS).forEach(k => { $(CARDS[k]).style.display = which === k ? "" : "none"; });
 }
 function showCourse(k) {
   if (ghostCar) { scene.remove(ghostCar); ghostCar = null; }
@@ -3099,6 +3264,7 @@ function showLapToast(done, lt, isNew) {
 
 function startRace(which) {
   audioInit();
+  playMode = "ta"; setBattleHud(false);
   if (which && which !== course) { course = which; buildTrack(TRACKS[course]); }
   scene.remove(car); car = makeCar(CARS[carKey].color, CARS[carKey].model); scene.add(car);
   resetCar(); P.lap = 0; P.expected = 0; lapTimes = []; lapStartMs = 0; raceBest = 0; renderHudBest();
@@ -3119,6 +3285,7 @@ function loadRecords() {
   COURSES.forEach(k => { const WR = WRS[k]; if (WR) WR.load().then(() => { wrTried[k] = true; renderRecords(); }); });
 }
 function showMenu() {
+  playMode = "ta"; setBattleHud(false);
   state = "menu"; setHud(false); fctx.clearRect(0, 0, fx.width, fx.height); countBox.style.display = "none"; lapToast.className = ""; showCard("start");
   engineUpdate(0, false); renderRecords();
   loadRecords();
@@ -3182,7 +3349,7 @@ function updateCar(dt) {
   if (P.v > capV) P.v = Math.max(capV, P.v - 40 * dt);
   if (P.v < -CFG.reverseMax) P.v = -CFG.reverseMax;
   if (Math.abs(P.v) < 0.02 && thr === 0) P.v = 0;
-  if (state === "countdown" || state === "menu") P.v = 0;
+  if (state === "countdown" || state === "menu") { P.v = 0; P.kx = 0; P.kz = 0; P.spin = 0; }
 
   const ratio = Math.abs(P.v) / CFG.maxSpeed;
   const gain = Math.min(1, ratio / CFG.steerFullAt) * (1 - (1 - CFG.steerHighSpeed) * ratio);
@@ -3193,8 +3360,14 @@ function updateCar(dt) {
   P.steerVis += (wheelSteerTarget - P.steerVis) * Math.min(1, dt * CFG.wheelSteerRate);
   P.rollVis += (-str * Math.min(1, ratio) * 0.05 - P.rollVis) * Math.min(1, dt * CFG.bodyRollRate);
 
+  P.h += P.spin * dt;
+  P.spin *= Math.exp(-CAR_HIT.spinFriction * dt);
   const fx = -Math.sin(P.h), fz = -Math.cos(P.h);
-  P.x += fx * P.v * dt; P.z += fz * P.v * dt;
+  P.x += fx * P.v * dt + P.kx * dt; P.z += fz * P.v * dt + P.kz * dt;
+  const slideKeep = Math.exp(-CAR_HIT.slideFriction * dt);
+  P.kx *= slideKeep; P.kz *= slideKeep;
+  P.bumpT = Math.max(0, P.bumpT - dt);
+  if (playMode === "battle" && (state === "race" || state === "done") && !P.fin) collideWithRivals();
 
   P.prevCi = P.ci; P.ci = nearestIndex();
   const s = S[P.ci], dxs = P.x - s.p.x, dzs = P.z - s.p.z;
@@ -3211,6 +3384,9 @@ function updateCar(dt) {
     P.x = s.p.x + s.n.x * limit * sg + s.t.x * along; P.z = s.p.z + s.n.z * limit * sg + s.t.z * along;
     if (P.wallT === 0 && Math.abs(P.v) > 6) { P.v *= CFG.wallKeep; beep(80, 0.18, "square", 0.12); shake = 0.35; }
     P.wallT = 0.4;
+    const intoWall = (P.kx * s.n.x + P.kz * s.n.z) * sg;
+    if (intoWall > 0) { P.kx -= s.n.x * sg * intoWall * 1.3; P.kz -= s.n.z * sg * intoWall * 1.3; }
+    P.spin *= 0.5;
   }
   const endGap = !OPEN ? 0 : P.ci === 0 ? Math.min(0, along) : P.ci === N - 1 ? Math.max(0, along) : 0;
   if (endGap) {
@@ -3222,7 +3398,7 @@ function updateCar(dt) {
   if (racing && OPEN) {
     const span = FINISH_I - START_I, next = START_I + (P.expected + 1) * span / 8;
     if (P.expected < 7 && P.ci >= next) P.expected++;
-    if (P.expected >= 7 && P.ci >= FINISH_I) { P.lap = 1; closeLap(); finish(); }
+    if (P.expected >= 7 && P.ci >= FINISH_I) { P.lap = 1; closeLap(); raceFinished(); }
   } else if (racing) {
     const sec = Math.floor(P.ci * 4 / N);
     const fwdCross = P.prevCi > N * 0.9 && P.ci < N * 0.1, backCross = P.prevCi < N * 0.1 && P.ci > N * 0.9;
@@ -3230,7 +3406,7 @@ function updateCar(dt) {
     if (fwdCross && P.expected >= 4) {
       P.lap++; P.expected = 1;
       const isNew = closeLap();
-      if (P.lap >= LAPS) finish();
+      if (P.lap >= LAPS) raceFinished();
       else { showLapToast(P.lap, lapTimes[lapTimes.length - 1], isNew); beep(880, 0.12, "square", 0.08); beep(1175, 0.2, "square", 0.08, 0.12); }
     } else if (backCross) P.expected = 0;
   }
@@ -3244,24 +3420,30 @@ function updateCar(dt) {
 }
 
 const camTarget = new THREE.Vector3(), camLook = new THREE.Vector3();
+function viewTarget() {
+  if (playMode === "battle" && BT.spec) { const e = BT.ents[BT.viewId]; if (e && e.seen) return e; }
+  return P;
+}
 function snapCamera() {
-  const fx = -Math.sin(P.h), fz = -Math.cos(P.h);
-  camera.position.set(P.x - fx * CFG.camBack, P.y + CFG.camUp, P.z - fz * CFG.camBack); camera.fov = CFG.fovBase; camera.updateProjectionMatrix();
+  const V = viewTarget(), fx = -Math.sin(V.h), fz = -Math.cos(V.h);
+  camera.position.set(V.x - fx * CFG.camBack, V.y + CFG.camUp, V.z - fz * CFG.camBack); camera.fov = CFG.fovBase; camera.updateProjectionMatrix();
 }
 function updateCamera(dt) {
+  const V = viewTarget();
   if (state === "menu") {
     menuAng += dt * 0.2;
-    camera.position.set(P.x + Math.cos(menuAng) * 26, P.y + 9, P.z + Math.sin(menuAng) * 26);
-    camera.lookAt(P.x, P.y + 4, P.z);
+    camera.position.set(V.x + Math.cos(menuAng) * 26, V.y + 9, V.z + Math.sin(menuAng) * 26);
+    camera.lookAt(V.x, V.y + 4, V.z);
     return;
   }
-  const fx = -Math.sin(P.h), fz = -Math.cos(P.h);
-  const r = Math.min(1, Math.abs(P.v) / CFG.maxSpeed);
+  const fx = -Math.sin(V.h), fz = -Math.cos(V.h);
+  const r = Math.min(1, Math.abs(V.v) / CFG.maxSpeed);
   const back = CFG.camBack - r * 0.8, up = CFG.camUp - r * 0.8;
-  camTarget.set(P.x - fx * back, P.y + up, P.z - fz * back);
+  camTarget.set(V.x - fx * back, V.y + up, V.z - fz * back);
+  if (camTarget.distanceTo(camera.position) > 60) camera.position.copy(camTarget);
   camera.position.lerp(camTarget, 1 - Math.exp(-CFG.camLerp * dt));
   if (shake > 0) { shake -= dt; camera.position.x += rnd(-0.3, 0.3) * shake * 3; camera.position.y += rnd(-0.3, 0.3) * shake * 3; }
-  camLook.set(P.x + fx * (4 + r * 8), P.y + 1.2, P.z + fz * (4 + r * 8));
+  camLook.set(V.x + fx * (4 + r * 8), V.y + 1.2, V.z + fz * (4 + r * 8));
   camera.lookAt(camLook);
   camera.fov = CFG.fovBase + r * r * CFG.fovBoost; camera.updateProjectionMatrix();
 }
@@ -3292,8 +3474,14 @@ function drawMinimap() {
   const f = S[OPEN ? FINISH_I : 2];
   mctx.strokeStyle = "#FFFFFF"; mctx.lineWidth = 4;
   mctx.beginPath(); mctx.moveTo(MM.mx(f.p.x + f.n.x * W / 2), MM.mz(f.p.z + f.n.z * W / 2)); mctx.lineTo(MM.mx(f.p.x - f.n.x * W / 2), MM.mz(f.p.z - f.n.z * W / 2)); mctx.stroke();
+  mctx.strokeStyle = "#1B2B20"; mctx.lineWidth = 3;
+  if (playMode === "battle") Object.keys(BT.ents).forEach(id => {
+    const e = BT.ents[id]; if (!e.seen) return;
+    mctx.fillStyle = "#FFFFFF";
+    mctx.beginPath(); mctx.arc(MM.mx(e.x), MM.mz(e.z), 7, 0, Math.PI * 2); mctx.fill(); mctx.stroke();
+  });
   const cx = MM.mx(P.x), cz = MM.mz(P.z);
-  mctx.fillStyle = "#D97B4F"; mctx.strokeStyle = "#1B2B20"; mctx.lineWidth = 3;
+  mctx.fillStyle = "#D97B4F";
   mctx.beginPath(); mctx.arc(cx, cz, 8, 0, Math.PI * 2); mctx.fill(); mctx.stroke();
 }
 
@@ -3306,28 +3494,33 @@ function frame(now) { requestAnimationFrame(frame); tick(now); }
 function tick(now) {
   const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
 
+  const battle = playMode === "battle";
   if (state === "countdown") {
-    cdTime += dt;
+    if (battle) cdTime = CFG.countdown - (BT.startAt - tnow()) / 1000; else cdTime += dt;
     const n = Math.ceil(CFG.countdown - cdTime);
-    if (n !== cdShown && n > 0) { cdShown = n; countNum.textContent = n; countNum.className = ""; beep(440, 0.15, "square", 0.1); }
+    if (n !== cdShown && n > 0 && n <= CFG.countdown) { cdShown = n; countNum.textContent = n; countNum.className = ""; beep(440, 0.15, "square", 0.1); }
     if (cdTime >= CFG.countdown) {
       state = "race"; t0 = performance.now(); goTimer = 0.9; lapStartMs = 0;
       countNum.textContent = "GO!"; countNum.className = "go"; beep(880, 0.45, "square", 0.12);
     }
   }
   if (state === "race") {
-    elapsed = performance.now() - t0;
-    recordSample(elapsed); placeGhost(elapsed);
+    elapsed = battle ? tnow() - BT.startAt : performance.now() - t0;
+    if (!battle) { recordSample(elapsed); placeGhost(elapsed); }
     if (goTimer > 0) { goTimer -= dt; if (goTimer <= 0) countBox.style.display = "none"; }
   }
   if (state === "done") doneTimer += dt;
 
-  updateCar(dt);
+  const spectating = battle && BT.spec;
+  if (!spectating) updateCar(dt);
+  if (battle) battleFrame(dt);
   updateCamera(dt);
   renderCarPreviews(dt);
-  engineUpdate(Math.min(1, Math.abs(P.v) / CFG.maxSpeed), state === "race" || state === "countdown");
+  const V = viewTarget();
+  engineUpdate(Math.min(1, Math.abs(V.v) / CFG.maxSpeed), state === "race" || state === "countdown" || (spectating && state === "done"));
 
-  if (state !== "menu") {
+  if (spectating && state !== "menu") drawSpeedLines(Math.abs(V.v) / CFG.maxSpeed);
+  else if (state !== "menu") {
     hudTime.firstChild.nodeValue = fmtTime(state === "done" ? finalMs : elapsed);
     setText(hudLap, OPEN ? Math.min(100, Math.round(Math.max(0, P.ci - START_I) / (FINISH_I - START_I) * 100)) + "%" : Math.min(LAPS, P.lap + 1) + " / " + LAPS);
     setText(hudOff, P.off ? "오프로드 — 감속 중" : "");
@@ -3339,8 +3532,8 @@ function tick(now) {
   CITY_WATER.forEach(m => { m.normalMap.offset.x += dt * 0.012; m.normalMap.offset.y += dt * 0.005; });
   CITY_ANIM.forEach(f => f(now / 1000));
   if (NIGHT.on) {
-    const hl = NIGHT.headlight, hx = -Math.sin(P.h), hz = -Math.cos(P.h);
-    hl.position.set(P.x + hx * 1.5, P.y + 1.6, P.z + hz * 1.5); hl.target.position.set(P.x + hx * 30, P.y - 0.5, P.z + hz * 30); hl.target.updateMatrixWorld();
+    const hl = NIGHT.headlight, hx = -Math.sin(V.h), hz = -Math.cos(V.h);
+    hl.position.set(V.x + hx * 1.5, V.y + 1.6, V.z + hz * 1.5); hl.target.position.set(V.x + hx * 30, V.y - 0.5, V.z + hz * 30); hl.target.updateMatrixWorld();
     NIGHT.composer.render(dt);
   } else renderer.render(scene, camera);
 }
@@ -3353,6 +3546,7 @@ function resize() {
 window.addEventListener("resize", resize); resize();
 
 function onKey(e, down) {
+  if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
   let k = null;
   if (e.key === "ArrowUp" || e.code === "KeyW") k = "up";
   else if (e.key === "ArrowDown" || e.code === "KeyS") k = "down";
@@ -3360,12 +3554,13 @@ function onKey(e, down) {
   else if (e.key === "ArrowRight" || e.code === "KeyD") k = "right";
   if (k) { keys[k] = down; e.preventDefault(); }
   if (!down) return;
+  if (e.code === "KeyT") { if (!(playMode === "battle" && BT.spec)) recover(); return; }
+  if (playMode === "battle") return;
   if (e.code === "KeyR" && state !== "menu") startRace();
-  else if (e.code === "KeyT") recover();
   else if (e.code === "Space") {
     e.preventDefault();
     if (state === "done") startRace();
-    else if (state === "menu" && cardCar.style.display !== "none") startRace(pendingCourse);
+    else if (state === "menu" && cardNow === "car") startRace(pendingCourse);
   }
 }
 window.addEventListener("keydown", e => onKey(e, true));
@@ -3374,7 +3569,10 @@ window.addEventListener("blur", () => { keys.up = keys.down = keys.left = keys.r
 $("btnHongkong").onclick = e => { e.currentTarget.blur(); pickCourse("hongkong"); };
 $("btnSingapore").onclick = e => { e.currentTarget.blur(); pickCourse("singapore"); };
 $("btnSeoul").onclick = e => { e.currentTarget.blur(); pickCourse("seoul"); };
-$("btnCarBack").onclick = e => { e.currentTarget.blur(); showCard("start"); };
+$("btnCarBack").onclick = e => { e.currentTarget.blur(); showCard("course"); };
+$("btnModeTA").onclick = e => { e.currentTarget.blur(); audioInit(); showCard("course"); renderRecords(); };
+$("btnModeBattle").onclick = e => { e.currentTarget.blur(); audioInit(); enterBattleMenu(); };
+$("btnCourseBack").onclick = e => { e.currentTarget.blur(); showCard("start"); };
 document.querySelectorAll(".ghostbtn").forEach(b => b.onclick = e => {
   e.currentTarget.blur(); ghostPick = b.getAttribute("data-ghost");
   try { localStorage.setItem("turbolap_ghostpick_v1", ghostPick); } catch (err) {}
@@ -3383,8 +3581,10 @@ document.querySelectorAll(".ghostbtn").forEach(b => b.onclick = e => {
 document.querySelectorAll(".carbtn").forEach(b => b.onclick = e => {
   e.currentTarget.blur(); carKey = b.getAttribute("data-car");
   try { localStorage.setItem("turbolap_car_v1", carKey); } catch (err) {}
-  document.querySelectorAll(".carbtn").forEach(x => x.classList.toggle("on", x === b));
+  markCarButtons();
+  if (playMode === "battle" && BT.ref && BT.status === "lobby") { BT.ref.child("players/" + BT.myId + "/car").set(carKey); showLobbyCar(); }
 });
+function markCarButtons() { document.querySelectorAll(".carbtn").forEach(x => x.classList.toggle("on", x.getAttribute("data-car") === carKey)); }
 $("btnGo").onclick = e => { e.currentTarget.blur(); startRace(pendingCourse); };
 $("btnWipe").onclick = e => {
   e.currentTarget.blur();
@@ -3397,7 +3597,603 @@ $("btnMenu").onclick = e => { e.currentTarget.blur(); showMenu(); };
 $("btnReset").onclick = e => { e.currentTarget.blur(); startRace(); };
 $("btnRecover").onclick = e => { e.currentTarget.blur(); recover(); };
 
-window.TL = { keys, P, CFG, camera, scene, renderer, tick, makeCar, CARS, get S() { return S; }, setTrack: k => { course = k; buildTrack(TRACKS[k]); resetCar(); } };
+const CAR_HIT = { radius: 0.82, offset: 1.08, restitution: 0.45, push: 0.55, spinGain: 0.55, spinMax: 2.6, spinFriction: 3.2, slideFriction: 2.6, inertia: 1.45 };
+const BATTLE = {
+  root: "turbolap/rooms", specMax: 1, netMs: 143, countMs: 3600, dnfMs: 30000, rankRowH: 48,
+  sdk: ["https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js", "https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"]
+};
+const NICK_KEY = "turbolap_nick_v1";
+const SIDES = ["left", "right"];
+const SIDE_NAME = { left: "왼쪽", right: "오른쪽", spec: "관전" };
+const SIDE_COLOR = { left: "#24402F", right: "#D97B4F" };
+const BT = {
+  db: null, ref: null, code: "", myId: "p" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4),
+  nick: "", nickRequired: false, players: {}, status: "", host: null, hostLoaded: false, course: "hongkong", startAt: 0, result: null,
+  subs: [], leaving: false, spec: false, match: null, ents: {}, raw: {}, sent: "", lastNet: 0, forceNet: false, statusSent: "",
+  viewId: null, viewKey: "", serverOffset: 0, rankRows: {}, rankNums: 0, lobbyCarSig: "", queued: false
+};
+try { BT.nick = localStorage.getItem(NICK_KEY) || ""; } catch (e) {}
+const tnow = () => Date.now() + BT.serverOffset;
+const okeys = o => o ? Object.keys(o) : [];
+const byJoin = ps => (a, b) => ((ps[a] && ps[a].joinedAt) || 0) - ((ps[b] && ps[b].joinedAt) || 0);
+const escHtml = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+function wrapAngle(d) { while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; }
+function setHtml(el, h) { if (el._h !== h) { el._h = h; el.innerHTML = h; } }
+function sideIds(side, ps) { ps = ps || BT.players; return okeys(ps).filter(id => ps[id] && ps[id].team === side).sort(byJoin(ps)); }
+function racerOf(side) { return sideIds(side)[0] || null; }
+function racerIds() { return SIDES.map(racerOf).filter(Boolean); }
+function myTeam() { const p = BT.players[BT.myId]; return p ? p.team : "left"; }
+function isHost() { return !!BT.ref && BT.host === BT.myId; }
+function nickOf(id) { const p = BT.players[id]; return p ? p.nickname : "?"; }
+function sub(ref, ev, fn) { ref.on(ev, fn); BT.subs.push([ref, ev, fn]); }
+function unsubAll() { BT.subs.forEach(s => { try { s[0].off(s[1], s[2]); } catch (e) {} }); BT.subs = []; }
+
+function loadScript(src) {
+  return new Promise((ok, fail) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = fail; document.head.appendChild(s); });
+}
+let dbReady = null;
+function connectDb() {
+  if (!dbReady) dbReady = (async () => {
+    const CONF = window.PORTAL_CONFIG;
+    if (!CONF || !CONF.isReady || !CONF.isReady()) throw new Error("config");
+    if (!window.firebase) { await loadScript(BATTLE.sdk[0]); await loadScript(BATTLE.sdk[1]); }
+    if (!firebase.apps.length) firebase.initializeApp({ apiKey: CONF.API_KEY, authDomain: CONF.AUTH_DOMAIN, databaseURL: CONF.DB_URL.replace(/\/+$/, "") });
+    BT.db = firebase.database();
+    BT.db.ref(".info/serverTimeOffset").on("value", s => { BT.serverOffset = s.val() || 0; });
+    return BT.db;
+  })().catch(err => { dbReady = null; throw err; });
+  return dbReady;
+}
+
+function refreshNick() { $("helloNick").textContent = BT.nick || "(닉네임 없음)"; $("lobbyNick").textContent = BT.nick; }
+function openNick(required) {
+  BT.nickRequired = required;
+  $("nickInput").value = BT.nick; $("nickMsg").textContent = "";
+  $("nickModal").hidden = false;
+  setTimeout(() => { try { $("nickInput").focus(); } catch (e) {} }, 50);
+}
+function saveNick() {
+  const v = $("nickInput").value.replace(/\s+/g, " ").trim().slice(0, 6);
+  if (!v) { $("nickMsg").textContent = "닉네임을 입력해 주세요."; return; }
+  BT.nick = v;
+  try { localStorage.setItem(NICK_KEY, v); } catch (e) {}
+  $("nickModal").hidden = true; refreshNick();
+  if (BT.ref && BT.players[BT.myId]) BT.ref.child("players/" + BT.myId + "/nickname").set(v);
+}
+function cancelNick() {
+  $("nickModal").hidden = true;
+  if (BT.nickRequired && !BT.nick) showCard("start");
+}
+function enterBattleMenu() {
+  bMsg(""); $("joinBox").hidden = true; refreshNick(); showCard("bstart");
+  if (!BT.nick) openNick(true);
+}
+function bMsg(t) { $("bStartMsg").textContent = t || ""; }
+function newPlayer(team, t) { return { nickname: BT.nick, team, car: carKey, joinedAt: t }; }
+
+function sweepRooms() {
+  return BT.db.ref(BATTLE.root).once("value").then(s => {
+    const all = s.val() || {}, t = tnow(), u = {};
+    okeys(all).forEach(code => {
+      const r = all[code] || {}, age = t - (r.createdAt || 0);
+      if ((!okeys(r.players).length && age > 60000) || (r.status === "ended" && t - (r.endedAt || 0) > 300000) || age > 6 * 3600000) u[code] = null;
+    });
+    if (okeys(u).length) return BT.db.ref(BATTLE.root).update(u);
+  }).catch(() => {});
+}
+async function createRoom() {
+  if (!BT.nick) { openNick(true); return; }
+  $("btnCreate").disabled = true; bMsg("연결하는 중…");
+  try {
+    await connectDb();
+    await sweepRooms();
+    for (let n = 0; n < 8; n++) {
+      const code = String(10000 + Math.floor(Math.random() * 90000)), t = tnow();
+      const obj = { status: "lobby", hostPlayerId: BT.myId, createdAt: t, course: pendingCourse, players: { [BT.myId]: newPlayer("left", t) } };
+      const res = await BT.db.ref(BATTLE.root + "/" + code).transaction(cur => cur === null ? obj : undefined);
+      if (res.committed) { bMsg(""); enterRoom(code); return; }
+    }
+    bMsg("방을 만들지 못했어요. 다시 눌러 주세요.");
+  } catch (e) { bMsg("온라인 연결을 할 수 없어요. (인터넷·데이터베이스 규칙 확인)"); }
+  finally { $("btnCreate").disabled = false; }
+}
+async function joinRoom() {
+  if (!BT.nick) { openNick(true); return; }
+  const code = $("joinCode").value.replace(/\D/g, "");
+  if (code.length !== 5) { bMsg("방 코드 5자리를 입력해 주세요."); return; }
+  $("btnJoin").disabled = true; bMsg("연결하는 중…");
+  try {
+    await connectDb();
+    const ref = BT.db.ref(BATTLE.root + "/" + code);
+    const st = (await ref.child("status").once("value")).val();
+    const ps = (await ref.child("players").once("value")).val() || {};
+    if (!st || !okeys(ps).length) { bMsg("그런 방이 없어요. 코드를 확인해 주세요."); return; }
+    let team = null;
+    if (st === "lobby") team = !sideIds("left", ps).length ? "left" : !sideIds("right", ps).length ? "right" : null;
+    if (!team && sideIds("spec", ps).length < BATTLE.specMax) team = "spec";
+    if (!team) { bMsg(st === "lobby" ? "방이 가득 찼어요." : "경기 중이고 관전자 자리도 찼어요."); return; }
+    await ref.child("players/" + BT.myId).set(newPlayer(team, tnow()));
+    bMsg("");
+    enterRoom(code);
+  } catch (e) { bMsg("입장하지 못했어요. (인터넷 확인)"); }
+  finally { $("btnJoin").disabled = false; }
+}
+function enterRoom(code) {
+  playMode = "battle";
+  BT.leaving = false; BT.code = code; BT.ref = BT.db.ref(BATTLE.root + "/" + code);
+  BT.players = {}; BT.status = "lobby"; BT.host = null; BT.hostLoaded = false; BT.raw = {}; BT.result = null; BT.lobbyCarSig = "";
+  resetMatchLocal();
+  const ref = BT.ref;
+  ref.child("players/" + BT.myId).onDisconnect().remove();
+  ref.child("st/" + BT.myId).onDisconnect().remove();
+  const pref = ref.child("players");
+  sub(pref, "child_added", s => { BT.players[s.key] = s.val(); playersChanged(); });
+  sub(pref, "child_changed", s => { BT.players[s.key] = s.val(); playersChanged(); });
+  sub(pref, "child_removed", s => {
+    delete BT.players[s.key]; removeEnt(s.key); delete BT.raw[s.key];
+    if (s.key === BT.myId && !BT.leaving) { exitRoom("방에서 나가졌어요."); return; }
+    checkHost(); playersChanged();
+  });
+  sub(ref.child("hostPlayerId"), "value", s => { BT.host = s.val(); BT.hostLoaded = true; checkHost(); playersChanged(); });
+  sub(ref.child("course"), "value", s => {
+    BT.course = TRACKS[s.val()] ? s.val() : "hongkong";
+    if (!BT.match && BT.course !== course) { showCourse(BT.course); BT.lobbyCarSig = ""; }
+    playersChanged();
+  });
+  sub(ref.child("startAt"), "value", s => { BT.startAt = s.val() || 0; if (BT.match) BT.match.startAt = BT.startAt; });
+  sub(ref.child("result"), "value", s => { BT.result = s.val(); if (cardNow === "bdone") renderResult(); });
+  sub(ref.child("status"), "value", s => onStatus(s.val()));
+  const stRef = ref.child("st");
+  sub(stRef, "child_added", s => onRemoteState(s.key, s.val()));
+  sub(stRef, "child_changed", s => onRemoteState(s.key, s.val()));
+  sub(stRef, "child_removed", s => { delete BT.raw[s.key]; });
+  $("lobbyCode").textContent = code;
+  refreshNick();
+  showCard("lobby");
+}
+const HOST_ORDER = { left: 0, right: 1, spec: 2 };
+function nextHost(ps) {
+  const join = byJoin(ps);
+  return okeys(ps).filter(id => ps[id]).sort((a, b) => {
+    const ta = HOST_ORDER[ps[a].team] == null ? 3 : HOST_ORDER[ps[a].team], tb = HOST_ORDER[ps[b].team] == null ? 3 : HOST_ORDER[ps[b].team];
+    return ta !== tb ? ta - tb : join(a, b);
+  })[0];
+}
+function checkHost() {
+  if (!BT.ref || !BT.hostLoaded || !BT.players[BT.myId]) return;
+  if (BT.host && BT.players[BT.host]) return;
+  if (nextHost(BT.players) === BT.myId) { BT.host = BT.myId; BT.ref.update({ hostPlayerId: BT.myId }); }
+}
+function leaveRoom() {
+  if (!BT.ref) return;
+  const ref = BT.ref, me = BT.myId;
+  BT.leaving = true; unsubAll();
+  try { ref.child("players/" + me).onDisconnect().cancel(); ref.child("st/" + me).onDisconnect().cancel(); } catch (e) {}
+  ref.child("st/" + me).remove().catch(() => {});
+  ref.child("players/" + me).remove().then(() => ref.child("players").once("value")).then(s => {
+    const ps = s.val() || {};
+    if (!okeys(ps).length) return ref.remove();
+    return ref.child("hostPlayerId").once("value").then(h => {
+      const hid = h.val();
+      if (!hid || hid === me || !ps[hid]) return ref.update({ hostPlayerId: nextHost(ps) });
+    });
+  }).catch(() => {});
+  closeRoomLocal("");
+}
+function exitRoom(msg) {
+  if (BT.ref) {
+    BT.leaving = true; unsubAll();
+    try { BT.ref.child("players/" + BT.myId).onDisconnect().cancel(); BT.ref.child("st/" + BT.myId).onDisconnect().cancel(); } catch (e) {}
+  }
+  closeRoomLocal(msg);
+}
+function closeRoomLocal(msg) {
+  BT.ref = null; BT.players = {}; BT.raw = {}; BT.result = null;
+  resetMatchLocal();
+  playMode = "ta"; setBattleHud(false);
+  scene.remove(car); car = makeCar(CARS[carKey].color); scene.add(car); resetCar(); updateCar(0);
+  refreshNick(); showCard("bstart"); bMsg(msg);
+}
+window.addEventListener("pagehide", () => { if (BT.ref) { try { BT.ref.child("players/" + BT.myId).remove(); BT.ref.child("st/" + BT.myId).remove(); } catch (e) {} } });
+
+function playersChanged() {
+  if (BT.queued) return;
+  BT.queued = true;
+  setTimeout(() => { BT.queued = false; fixSeat(); renderLobby(); if (cardNow === "bdone") renderResult(); }, 0);
+}
+function capOf(team) { return team === "spec" ? BATTLE.specMax : 1; }
+function canMoveTo(team) {
+  const me = BT.players[BT.myId];
+  if (!BT.ref || BT.status !== "lobby" || !me || me.team === team) return false;
+  return sideIds(team).filter(id => id !== BT.myId).length < capOf(team);
+}
+function pickTeam(team) {
+  if (!canMoveTo(team)) return;
+  BT.ref.child("players").transaction(ps => {
+    if (!ps || !ps[BT.myId]) return ps;
+    if (okeys(ps).filter(id => id !== BT.myId && ps[id] && ps[id].team === team).length >= capOf(team)) return;
+    ps[BT.myId].team = team; return ps;
+  }).then(res => { if (!res.committed) $("lobbyHint").textContent = "자리가 다 찼어요."; });
+}
+function fixSeat() {
+  const me = BT.players[BT.myId];
+  if (!BT.ref || BT.status !== "lobby" || !me) return;
+  if (sideIds(me.team).indexOf(BT.myId) < capOf(me.team)) return;
+  const free = ["left", "right", "spec"].find(t => t !== me.team && sideIds(t).length < capOf(t));
+  if (free) pickTeam(free);
+}
+function showLobbyCar() {
+  const me = BT.players[BT.myId];
+  BT.lobbyCarSig = carKey + ":" + myTeam() + ":" + course;
+  scene.remove(car); car = makeCar(CARS[carKey].color); scene.add(car);
+  car.visible = !!me && me.team !== "spec";
+  resetCar(); updateCar(0);
+}
+function slotHtml(side) {
+  const id = racerOf(side);
+  if (!id) return '<div class="slot empty">빈 자리</div>';
+  const p = BT.players[id], ck = CARS[p.car] ? p.car : "blue";
+  return '<div class="slot' + (id === BT.myId ? " mine" : "") + '">' + (BT.host === id ? "👑 " : "") + escHtml(p.nickname) + (id === BT.myId ? " (나)" : "") +
+    "<small>🚗 " + CARS[ck].name + "</small></div>";
+}
+function renderLobby() {
+  if (!BT.ref || cardNow !== "lobby") return;
+  const me = BT.players[BT.myId]; if (!me) return;
+  const host = isHost();
+  setHtml($("mapBtns"), COURSES.map(k => '<button type="button" class="mapBtn' + (k === BT.course ? " on" : "") + '" data-course="' + k + '"' + (host ? "" : " disabled") + ">" +
+    TRACKS[k].name + "<small>" + (TRACKS[k].open ? "편도 코스" : TRACKS[k].laps + "바퀴") + "</small></button>").join(""));
+  $("mapHint").textContent = host ? "— 눌러서 바꿀 수 있어요" : "— 방장이 고릅니다";
+  setHtml($("slotLeft"), slotHtml("left"));
+  setHtml($("slotRight"), slotHtml("right"));
+  $("btnJoinLeft").hidden = me.team === "left"; $("btnJoinLeft").disabled = !canMoveTo("left");
+  $("btnJoinRight").hidden = me.team === "right"; $("btnJoinRight").disabled = !canMoveTo("right");
+  const specs = sideIds("spec");
+  setHtml($("listSpec"), (specs.length ? specs.map(id => (BT.host === id ? "👑" : "") + escHtml(nickOf(id)) + (id === BT.myId ? "(나)" : "")).join(", ") : '<span class="none">없음</span>') +
+    " (" + specs.length + "/" + BATTLE.specMax + ")");
+  $("btnJoinSpec").hidden = me.team === "spec"; $("btnJoinSpec").disabled = !canMoveTo("spec");
+  $("lobbyCarBox").hidden = me.team === "spec";
+  markCarButtons();
+  if (BT.lobbyCarSig !== carKey + ":" + me.team + ":" + course) showLobbyCar();
+  const ok = !!racerOf("left") && !!racerOf("right");
+  let hint = ok ? nickOf(racerOf("left")) + " vs " + nickOf(racerOf("right")) + " · " + TRACKS[BT.course].name : "왼쪽·오른쪽 자리에 한 명씩 있어야 시작할 수 있어요. 방 코드를 알려 주세요.";
+  if (!host) hint = (ok ? "방장이 시작하기를 기다리는 중… " : "") + hint;
+  $("lobbyHint").textContent = hint;
+  $("btnBStart").hidden = !host; $("btnBStart").disabled = !ok;
+}
+function hostStart() {
+  if (!isHost() || BT.status !== "lobby" || !racerOf("left") || !racerOf("right")) return;
+  audioInit();
+  BT.ref.update({ status: "countdown", startAt: tnow() + BATTLE.countMs, endedAt: null, st: null, result: null });
+}
+function hostBackToLobby() {
+  if (!isHost()) return;
+  BT.ref.update({ status: "lobby", st: null, result: null, startAt: null, endedAt: null });
+}
+
+function onStatus(st) {
+  if (st === null) { if (!BT.leaving) exitRoom("방이 종료되었어요."); return; }
+  BT.status = st;
+  if (st === "lobby") { resetMatchLocal(); BT.lobbyCarSig = ""; showCard("lobby"); playersChanged(); return; }
+  if (!BT.match && (st === "countdown" || st === "playing")) startMatchLocal();
+  if (st === "ended") endMatchLocal();
+}
+function setBattleHud(on) {
+  const spec = on && BT.spec;
+  $("hudPosBox").hidden = !on || spec;
+  $("btnReset").style.display = on ? "none" : "";
+  $("btnMatchLeave").hidden = !on;
+  $("rankBox").hidden = !spec; $("viewBtns").hidden = !spec;
+  $("battleNote").hidden = true;
+}
+function resetMatchLocal() {
+  okeys(BT.ents).forEach(removeEnt);
+  BT.match = null; BT.spec = false; BT.sent = ""; BT.statusSent = ""; BT.viewKey = "";
+  $("rkList").innerHTML = ""; BT.rankRows = {}; BT.rankNums = 0;
+  if (playMode !== "battle") return;
+  state = "menu"; setHud(false); setBattleHud(false);
+  countBox.style.display = "none"; lapToast.className = ""; fctx.clearRect(0, 0, fx.width, fx.height);
+  engineUpdate(0, false);
+}
+function startMatchLocal() {
+  resetMatchLocal();
+  const me = BT.players[BT.myId];
+  BT.spec = !me || me.team === "spec";
+  if (BT.course !== course) showCourse(BT.course);
+  if (ghostCar) { scene.remove(ghostCar); ghostCar = null; }
+  ghostPlay = null; ghostLabel = "";
+  scene.remove(car); car = makeCar(CARS[carKey].color); scene.add(car); car.visible = !BT.spec;
+  resetCar(); P.lap = 0; P.expected = 0; lapTimes = []; lapStartMs = 0; raceBest = 0; renderHudBest();
+  BT.match = { startAt: BT.startAt, firstFinAt: 0 };
+  BT.statusSent = ""; BT.sent = ""; BT.lastNet = 0; BT.forceNet = true;
+  BT.viewId = racerOf("left") || racerOf("right");
+  const late = tnow() > BT.startAt + 1000;
+  state = late ? "race" : "countdown"; cdTime = 0; cdShown = -1; goTimer = 0; elapsed = 0; finalMs = 0; shake = 0;
+  showCard(null); setHud(!BT.spec); setBattleHud(true);
+  $("hudGhost").style.display = "none";
+  countBox.style.display = late ? "none" : "flex"; countNum.textContent = ""; countNum.className = ""; lapToast.className = "";
+  hudLap.previousElementSibling.textContent = OPEN ? "진행" : "바퀴"; hudBest.parentElement.style.display = OPEN ? "none" : "";
+  hudLap.textContent = OPEN ? "0%" : "1 / " + LAPS; hudTime.firstChild.nodeValue = fmtTime(0); hudOff.textContent = "";
+  engineStart();
+  okeys(BT.raw).forEach(id => onRemoteState(id, BT.raw[id]));
+  snapCamera();
+}
+function endMatchLocal() {
+  state = "menu";
+  setHud(false); $("battleNote").hidden = true; $("rankBox").hidden = true; $("viewBtns").hidden = true; $("btnMatchLeave").hidden = true;
+  countBox.style.display = "none"; lapToast.className = ""; fctx.clearRect(0, 0, fx.width, fx.height);
+  engineUpdate(0, false);
+  showCard("bdone"); renderResult();
+}
+function rankCmp(a, b) {
+  if (a.fin && b.fin) return a.fin - b.fin;
+  if (a.fin) return -1;
+  if (b.fin) return 1;
+  return b.prog - a.prog;
+}
+function myProg() {
+  if (OPEN) return (P.ci - START_I) / Math.max(1, FINISH_I - START_I);
+  return P.expected === 0 ? (P.ci - N) / N : P.lap + P.ci / N;
+}
+function racerState(id) {
+  if (id === BT.myId && !BT.spec) return { prog: myProg(), fin: P.fin };
+  const e = BT.ents[id];
+  return e && e.seen ? { prog: e.prog, fin: e.fin } : { prog: -1, fin: 0 };
+}
+function standings() { return racerIds().map(id => Object.assign({ id }, racerState(id))).sort(rankCmp); }
+function progText(prog) {
+  if (OPEN) return Math.max(0, Math.min(100, Math.round(prog * 100))) + "%";
+  return Math.min(LAPS, Math.max(0, Math.floor(prog)) + 1) + "/" + LAPS + "바퀴";
+}
+function renderResult() {
+  const r = BT.result || {};
+  const rows = okeys(r).map(id => Object.assign({ id }, r[id])).sort(rankCmp);
+  $("bDoneCourse").textContent = TRACKS[BT.course].name;
+  setHtml($("bDoneRows"), rows.length ? rows.map((x, i) => '<tr><td>' + (i + 1) + "위</td><td>" +
+    '<span class="sideDot" style="background:' + (SIDE_COLOR[x.team] || "#8A978C") + '"></span>' + escHtml(x.nick) + (x.id === BT.myId ? " (나)" : "") + "</td><td>" +
+    (x.fin ? "<em>" + fmtTime(x.fin) + "</em>" : '<em class="none">미완주 · ' + progText(x.prog) + "</em>") + "</td></tr>").join("")
+    : '<tr><td colspan="3">결과를 불러오는 중…</td></tr>');
+  const mine = rows.findIndex(x => x.id === BT.myId);
+  let msg = "";
+  if (rows.length && mine === 0 && rows[0].fin) msg = "🏆 승리했습니다!";
+  else if (mine > 0) msg = "아쉽게 " + (mine + 1) + "위! 다시 도전해 보세요.";
+  else if (rows.length && rows[0].fin) msg = "🏆 승리: " + rows[0].nick;
+  $("bDoneMsg").textContent = msg;
+  const host = isHost();
+  $("btnToLobby").disabled = !host;
+  $("bDoneHint").textContent = host ? "대기실로 돌아가면 같은 방에서 맵·차량을 바꿔 다시 할 수 있어요." : "방장이 '대기실로'를 누르면 다시 할 수 있어요.";
+}
+
+function nameTag(text, color) {
+  const tex = canvasTex(256, 64, (c, w, h) => {
+    c.fillStyle = "rgba(255,255,255,0.92)"; c.fillRect(0, 0, w, h);
+    c.fillStyle = color; c.fillRect(0, 0, 16, h);
+    c.strokeStyle = "#1B2B20"; c.lineWidth = 4; c.strokeRect(2, 2, w - 4, h - 4);
+    c.font = 'bold 34px "Nanum Gothic", "Malgun Gothic", sans-serif'; c.textAlign = "center"; c.textBaseline = "middle";
+    c.fillStyle = "#1B2B20"; c.fillText(text, w / 2 + 8, h / 2 + 2);
+  });
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthWrite: false, fog: false, toneMapped: false }));
+  tag.scale.set(3.2, 0.8, 1);
+  return tag;
+}
+function ensureEnt(id) {
+  if (BT.ents[id]) return BT.ents[id];
+  const p = BT.players[id]; if (!p) return null;
+  const ck = CARS[p.car] ? p.car : "blue";
+  const e = { id, x: 0, y: 0, z: 0, h: 0, v: 0, rx: 0, rz: 0, rh: 0, rv: 0, rt: 0, prog: -1, fin: 0, steer: 0, steerVis: 0, ci: 0, seen: false,
+    car: makeCar(CARS[ck].color), tag: nameTag(p.nickname, SIDE_COLOR[p.team] || "#8A978C") };
+  e.car.visible = false; e.tag.visible = false;
+  scene.add(e.car); scene.add(e.tag);
+  BT.ents[id] = e;
+  return e;
+}
+function removeEnt(id) {
+  const e = BT.ents[id]; if (!e) return;
+  scene.remove(e.car); scene.remove(e.tag); e.tag.material.map.dispose(); e.tag.material.dispose();
+  delete BT.ents[id];
+}
+function nearestAll(x, z) {
+  let bi = 0, bd = Infinity;
+  for (let i = 0; i < N; i++) { const s = S[i], d = (s.p.x - x) * (s.p.x - x) + (s.p.z - z) * (s.p.z - z); if (d < bd) { bd = d; bi = i; } }
+  return bi;
+}
+function nearestFrom(x, z, ci) {
+  let bi = ci, bd = Infinity;
+  for (let k = -40; k <= 40; k++) { const i = wrapI(ci + k), s = S[i], d = (s.p.x - x) * (s.p.x - x) + (s.p.z - z) * (s.p.z - z); if (d < bd) { bd = d; bi = i; } }
+  return bi;
+}
+function stateString() {
+  return [+P.x.toFixed(2), +P.z.toFixed(2), +P.h.toFixed(3), +P.v.toFixed(2), +myProg().toFixed(4), P.fin, +P.steerVis.toFixed(2)].join(",");
+}
+function onRemoteState(id, str) {
+  BT.raw[id] = str;
+  if (!BT.match || (id === BT.myId && !BT.spec)) return;
+  const p = BT.players[id];
+  if (!p || (p.team !== "left" && p.team !== "right")) return;
+  const a = String(str).split(",");
+  if (a.length < 7) return;
+  const e = ensureEnt(id); if (!e) return;
+  e.rx = +a[0]; e.rz = +a[1]; e.rh = +a[2]; e.rv = +a[3]; e.prog = +a[4]; e.fin = +a[5]; e.steer = +a[6]; e.rt = performance.now();
+  if (!e.seen) {
+    e.seen = true; e.x = e.rx; e.z = e.rz; e.h = e.rh; e.v = e.rv; e.ci = nearestAll(e.x, e.z);
+    e.car.visible = true; e.tag.visible = true;
+    if (BT.spec && id === BT.viewId) snapCamera();
+  }
+}
+function updateEnts(dt) {
+  const nowMs = performance.now(), k = 1 - Math.exp(-10 * dt);
+  okeys(BT.ents).forEach(id => {
+    const e = BT.ents[id]; if (!e.seen) return;
+    const age = Math.min(0.35, (nowMs - e.rt) / 1000);
+    const tx = e.rx - Math.sin(e.rh) * e.rv * age, tz = e.rz - Math.cos(e.rh) * e.rv * age;
+    if (Math.hypot(tx - e.x, tz - e.z) > 20) { e.x = tx; e.z = tz; e.h = e.rh; e.ci = nearestAll(e.x, e.z); }
+    else { e.x += (tx - e.x) * k; e.z += (tz - e.z) * k; e.h += wrapAngle(e.rh - e.h) * k; }
+    e.v += (e.rv - e.v) * k;
+    e.ci = nearestFrom(e.x, e.z, e.ci);
+    const s = S[e.ci], along = (e.x - s.p.x) * s.t.x + (e.z - s.p.z) * s.t.z, s2 = S[wrapI(e.ci + (along >= 0 ? 1 : -1))];
+    e.y = s.p.y + (s2.p.y - s.p.y) * Math.min(1, Math.abs(along) / SEG);
+    const fx = -Math.sin(e.h), fz = -Math.cos(e.h), i1 = wrapI(e.ci + 5), i0 = wrapI(e.ci - 5);
+    e.car.position.set(e.x, e.y, e.z);
+    e.car.rotation.y = e.h;
+    e.car.rotation.x = Math.atan2(S[i1].p.y - S[i0].p.y, SEG * 10) * (fx * s.t.x + fz * s.t.z);
+    e.steerVis += (e.steer - e.steerVis) * k;
+    e.car.userData.wheels.forEach(w => { w.spin.rotation.x -= e.v * dt / e.car.userData.wheelR; if (w.front) w.g.rotation.y = e.steerVis; });
+    e.tag.position.set(e.x, e.y + 2.9, e.z);
+  });
+}
+function carCircles(x, z, h) {
+  const fx = -Math.sin(h), fz = -Math.cos(h), o = CAR_HIT.offset;
+  return [[x + fx * o, z + fz * o], [x - fx * o, z - fz * o]];
+}
+function collideWithRivals() {
+  const R2 = CAR_HIT.radius * 2;
+  okeys(BT.ents).forEach(id => {
+    const e = BT.ents[id]; if (!e.seen || e.fin) return;
+    const mine = carCircles(P.x, P.z, P.h), theirs = carCircles(e.x, e.z, e.h);
+    let hit = null;
+    mine.forEach(a => theirs.forEach(b => {
+      const dx = a[0] - b[0], dz = a[1] - b[1], d = Math.hypot(dx, dz);
+      if (d < R2 && (!hit || R2 - d > hit.pen)) hit = { pen: R2 - d, nx: d > 1e-4 ? dx / d : 1, nz: d > 1e-4 ? dz / d : 0, ax: a[0], az: a[1] };
+    }));
+    if (!hit) return;
+    P.x += hit.nx * hit.pen * CAR_HIT.push; P.z += hit.nz * hit.pen * CAR_HIT.push;
+    const fx = -Math.sin(P.h), fz = -Math.cos(P.h), ofx = -Math.sin(e.h), ofz = -Math.cos(e.h);
+    const rel = (fx * P.v + P.kx - ofx * e.v) * hit.nx + (fz * P.v + P.kz - ofz * e.v) * hit.nz;
+    if (rel >= 0) return;
+    const j = -(1 + CAR_HIT.restitution) * rel / 2;
+    const dvx = hit.nx * j, dvz = hit.nz * j, along = dvx * fx + dvz * fz;
+    P.v += along; P.kx += dvx - fx * along; P.kz += dvz - fz * along;
+    const rx = hit.ax - hit.nx * CAR_HIT.radius - P.x, rz = hit.az - hit.nz * CAR_HIT.radius - P.z;
+    P.spin = Math.max(-CAR_HIT.spinMax, Math.min(CAR_HIT.spinMax, P.spin + (rz * dvx - rx * dvz) / CAR_HIT.inertia * CAR_HIT.spinGain));
+    if (P.bumpT === 0 && j > 1) {
+      beep(150, 0.16, "square", Math.min(0.15, 0.05 + j * 0.01)); beep(70, 0.22, "sawtooth", 0.07);
+      shake = Math.min(0.45, 0.12 + j * 0.03); P.bumpT = 0.25;
+    }
+  });
+}
+function raceFinished() { if (playMode === "battle") battleFinish(); else finish(); }
+function battleFinish() {
+  state = "done"; finalMs = Math.round(elapsed); P.fin = Math.max(1, finalMs); doneTimer = 0; BT.forceNet = true;
+  engineUpdate(0, false);
+  [523, 659, 784, 1047].forEach((f, i) => beep(f, 0.35, "triangle", 0.1, i * 0.13));
+  lapToastMain.textContent = "🏁 완주! " + fmtTime(finalMs); lapToastSub.textContent = TRACKS[course].name;
+  lapToast.className = ""; void lapToast.offsetWidth; lapToast.className = "show";
+}
+function netTick() {
+  if (!BT.ref || !BT.match || BT.spec || BT.status === "ended") return;
+  const nowMs = Date.now();
+  if (!BT.forceNet && nowMs - BT.lastNet < BATTLE.netMs) return;
+  BT.lastNet = nowMs; BT.forceNet = false;
+  const s = stateString();
+  if (s === BT.sent) return;
+  BT.sent = s;
+  BT.ref.child("st/" + BT.myId).set(s);
+}
+function hostTick() {
+  if (!isHost() || !BT.match) return;
+  const t = tnow();
+  if (BT.status === "countdown" && t >= BT.startAt && BT.statusSent !== "playing") { BT.statusSent = "playing"; BT.ref.update({ status: "playing" }); }
+  if (BT.status !== "playing" && BT.status !== "countdown") return;
+  const st = standings();
+  const over = !st.length || st.every(r => r.fin) || (BT.match.firstFinAt && t - BT.match.firstFinAt > BATTLE.dnfMs);
+  if (!over || BT.statusSent === "ended") return;
+  BT.statusSent = "ended";
+  const result = {};
+  st.forEach(r => { const p = BT.players[r.id] || {}; result[r.id] = { nick: p.nickname || "?", team: p.team || "left", fin: r.fin || 0, prog: +(+r.prog).toFixed(4) }; });
+  BT.ref.update({ status: "ended", endedAt: t, result });
+}
+function setNote(text) { const el = $("battleNote"); el.hidden = !text; setText(el, text); }
+function renderRankBox(st) {
+  const list = $("rkList"), rowH = BATTLE.rankRowH;
+  list.style.height = (st.length * rowH) + "px";
+  while (BT.rankNums < st.length) {
+    const num = document.createElement("div"); num.className = "rkNum"; num.style.top = (BT.rankNums * rowH) + "px"; num.textContent = (BT.rankNums + 1) + "위";
+    list.appendChild(num); BT.rankNums++;
+  }
+  const live = {};
+  st.forEach((r, i) => {
+    live[r.id] = true;
+    let row = BT.rankRows[r.id];
+    if (!row) {
+      row = document.createElement("div"); row.className = "rkRow";
+      row.innerHTML = '<span class="sideDot"></span><b></b><small></small>';
+      row.style.top = (i * rowH) + "px";
+      list.appendChild(row); BT.rankRows[r.id] = row;
+    }
+    const p = BT.players[r.id] || {};
+    row.children[0].style.background = SIDE_COLOR[p.team] || "#8A978C";
+    setText(row.children[1], p.nickname || "?");
+    setText(row.children[2], r.fin ? "🏁 " + fmtTime(r.fin) : progText(r.prog));
+    const top = (i * rowH) + "px";
+    if (row.style.top !== top) row.style.top = top;
+  });
+  okeys(BT.rankRows).forEach(id => { if (!live[id]) { BT.rankRows[id].remove(); delete BT.rankRows[id]; } });
+}
+function renderViewBtns() {
+  const ids = racerIds();
+  if (ids.indexOf(BT.viewId) < 0) BT.viewId = ids[0] || null;
+  const key = ids.map(id => id + ":" + nickOf(id) + (id === BT.viewId ? "*" : "")).join("|");
+  if (BT.viewKey === key) return;
+  BT.viewKey = key;
+  $("viewBtns").innerHTML = ids.map(id => {
+    const p = BT.players[id];
+    return '<button type="button" data-id="' + id + '" class="' + (id === BT.viewId ? "on" : "") + '" style="border-color:' + SIDE_COLOR[p.team] + '"><small>' + SIDE_NAME[p.team] + " 자리</small>" + escHtml(p.nickname) + "</button>";
+  }).join("");
+}
+function renderBattleHud() {
+  const st = standings(), t = tnow();
+  if (st.some(r => r.fin) && !BT.match.firstFinAt) BT.match.firstFinAt = t;
+  if (BT.spec) {
+    renderRankBox(st); renderViewBtns();
+    setText($("rkTime"), "⏱ " + fmtTime(state === "race" ? elapsed : 0));
+    return;
+  }
+  const idx = st.findIndex(r => r.id === BT.myId);
+  setText($("hudPos"), idx < 0 ? "—" : (idx + 1) + " / " + st.length);
+  let note = "";
+  if (P.fin) note = "🏁 완주! " + fmtTime(P.fin) + " · " + (idx + 1) + "위" + (st.every(r => r.fin) ? "" : " — 상대를 기다리는 중…");
+  else if (BT.match.firstFinAt) note = "⏱ 상대가 완주했어요! " + Math.max(0, Math.ceil((BATTLE.dnfMs - (t - BT.match.firstFinAt)) / 1000)) + "초 안에 들어오세요";
+  setNote(note);
+}
+function battleFrame(dt) {
+  if (!BT.ref) return;
+  updateEnts(dt);
+  netTick();
+  if (BT.match && state !== "menu") { hostTick(); renderBattleHud(); }
+}
+
+$("btnNickSave").onclick = saveNick;
+$("nickInput").onkeydown = e => { if (e.key === "Enter") saveNick(); };
+$("btnNickCancel").onclick = cancelNick;
+$("btnNickEdit").onclick = e => { e.currentTarget.blur(); openNick(false); };
+$("btnNickEdit2").onclick = e => { e.currentTarget.blur(); openNick(false); };
+$("btnBBack").onclick = e => { e.currentTarget.blur(); showCard("start"); };
+$("btnCreate").onclick = e => { e.currentTarget.blur(); audioInit(); createRoom(); };
+$("btnJoinOpen").onclick = e => { e.currentTarget.blur(); audioInit(); $("joinBox").hidden = false; try { $("joinCode").focus(); } catch (err) {} };
+$("btnJoin").onclick = joinRoom;
+$("joinCode").onkeydown = e => { if (e.key === "Enter") joinRoom(); };
+$("btnLeaveLobby").onclick = e => { e.currentTarget.blur(); leaveRoom(); };
+$("btnLeaveEnd").onclick = e => { e.currentTarget.blur(); leaveRoom(); };
+$("btnMatchLeave").onclick = e => { e.currentTarget.blur(); if (confirm("방을 나갈까요? 경기 중이면 미완주로 처리됩니다.")) leaveRoom(); };
+$("btnToLobby").onclick = e => { e.currentTarget.blur(); hostBackToLobby(); };
+$("btnBStart").onclick = e => { e.currentTarget.blur(); hostStart(); };
+$("btnJoinLeft").onclick = e => { e.currentTarget.blur(); pickTeam("left"); };
+$("btnJoinRight").onclick = e => { e.currentTarget.blur(); pickTeam("right"); };
+$("btnJoinSpec").onclick = e => { e.currentTarget.blur(); pickTeam("spec"); };
+$("mapBtns").onclick = e => {
+  const b = e.target.closest ? e.target.closest(".mapBtn") : null;
+  if (!b || b.disabled || !isHost() || BT.status !== "lobby") return;
+  b.blur();
+  const k = b.getAttribute("data-course");
+  if (TRACKS[k] && k !== BT.course) BT.ref.update({ course: k });
+};
+$("viewBtns").onclick = e => {
+  const b = e.target.closest ? e.target.closest("button") : null;
+  if (!b) return;
+  b.blur(); BT.viewId = b.getAttribute("data-id"); BT.viewKey = ""; renderViewBtns(); snapCamera();
+};
+
+window.TL = { keys, P, CFG, camera, scene, renderer, tick, makeCar, CARS, BT, get S() { return S; }, setTrack: k => { course = k; buildTrack(TRACKS[k]); resetCar(); } };
 COURSES.forEach(k => { if (WRS[k]) WRS[k].onChange(renderRecords); });
 buildTrack(TRACKS[course]); resetCar(); updateCar(0); showMenu();
 requestAnimationFrame(frame);

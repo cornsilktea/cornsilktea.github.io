@@ -10,6 +10,23 @@
         "$room": { ".write": "$room.matches(/^[0-9]{5}$/)" }
       }
     },
+    "turbolap": {
+      ".read": true,
+      "rooms": {
+        "$room": {
+          ".write": "$room.matches(/^[0-9]{5}$/)",
+          "players": {
+            "$pid": {
+              "nickname": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 12" },
+              "team": { ".validate": "newData.isString() && newData.val().matches(/^(left|right|spec)$/)" }
+            }
+          },
+          "st": {
+            "$pid": { ".validate": "newData.isString() && newData.val().length <= 120" }
+          }
+        }
+      }
+    },
     "fpsbattle": {
       ".read": true,
       "rooms": {
