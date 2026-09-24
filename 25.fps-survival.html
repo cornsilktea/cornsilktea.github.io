@@ -1697,7 +1697,7 @@ function hostStart() {
   const t = tnow();
   const u = { status: "countdown", startAt: t + TEAM.countMs, endedAt: null, st: null, hits: null, kills: null, items: null, dmg: null, itemWave: 0 };
   if (T.botFill) ["blue", "red"].forEach(team => {
-    for (let i = teamIds(team).length; i < TEAM.max; i++) u["players/bot" + team + i] = { nickname: "AI " + TEAM_NAME[team] + (i + 1), team, isAI: true, joinedAt: t + i + 1 };
+    for (let i = teamIds(team).length; i < TEAM.max; i++) u["players/bot" + team + i] = { nickname: "AI " + (i + 1), team, isAI: true, joinedAt: t + i + 1 };
   });
   T.ref.update(u);
 }
@@ -2205,7 +2205,7 @@ function drawSpectator(t, nowMs) {
   c.setTransform(dpr, 0, 0, dpr, 0, 0);
   c.fillStyle = "#DDE3E8"; c.fillRect(0, 0, W, H);
   const FONT = '"Nanum Gothic", "Malgun Gothic", sans-serif';
-  const wide = W >= 760, cardH = 46, cardGap = 6, leaveBtnRoom = 52, edge = 12;
+  const wide = W >= 760, cardH = 60, cardGap = 6, leaveBtnRoom = 52, edge = 12;
   const cardRows = wide ? 1 : 2, topNeed = 68, bottomNeed = cardRows * (cardH + cardGap) + edge + leaveBtnRoom;
   const s = Math.max(2, Math.min((W - edge * 2) / (ARENA.hx * 2), (H - topNeed - bottomNeed) / (ARENA.hz * 2)));
   const mapH = ARENA.hz * 2 * s;
@@ -2255,6 +2255,7 @@ function drawSpectator(t, nowMs) {
     c.globalAlpha = 1;
     c.font = "bold 13px " + FONT; c.textAlign = "center"; c.lineWidth = 4; c.strokeStyle = "#fff"; c.strokeText(nickOf(id), px, py - pr - 6); c.fillStyle = col; c.fillText(nickOf(id), px, py - pr - 6);
     const bw = 32; c.fillStyle = "#fff"; c.fillRect(px - bw / 2, py + pr + 4, bw, 5); c.fillStyle = e.hp > 30 ? "#2F7D4F" : "#B33951"; c.fillRect(px - bw / 2, py + pr + 4, bw * clamp(e.hp, 0, 100) / 100, 5);
+    c.font = "bold 11px " + FONT; c.lineWidth = 3; c.strokeStyle = "#fff"; c.strokeText(String(Math.round(clamp(e.hp, 0, 100))), px, py + pr + 18); c.fillStyle = e.hp > 30 ? "#2F7D4F" : "#B33951"; c.fillText(String(Math.round(clamp(e.hp, 0, 100))), px, py + pr + 18);
   }
   const left = clamp(T.startAt + TEAM.matchMs - Math.max(t, T.startAt), 0, TEAM.matchMs);
   c.textAlign = "center"; c.textBaseline = "middle";
@@ -2277,6 +2278,7 @@ function drawSpectator(t, nowMs) {
     c.textAlign = "right"; c.font = "bold 12px " + FONT; c.fillStyle = "#5B6B5E"; c.fillText(k + "킬 " + d + "데스", x + w - 8, y + 14);
     const ammoW = 62, barW = w - 16 - ammoW;
     c.fillStyle = "#E4E8DE"; c.fillRect(x + 8, y + 28, barW, 9); c.fillStyle = hp > 30 ? "#2F7D4F" : "#B33951"; c.fillRect(x + 8, y + 28, barW * clamp(hp, 0, 100) / 100, 9);
+    c.textAlign = "left"; c.font = "bold 12px " + FONT; c.fillStyle = "#1B2B20"; c.fillText("체력 " + Math.round(clamp(hp, 0, 100)), x + 8, y + 48);
     c.textAlign = "right"; c.font = "bold 13px " + FONT; c.fillStyle = "#1B2B20"; c.fillText("탄 " + ammoText(e), x + w - 8, y + 33);
   };
   const bandBottom = H - leaveBtnRoom;
@@ -2293,8 +2295,12 @@ function drawSpectator(t, nowMs) {
   const feed = T.match.feed.filter(f => nowMs - f.t < 4000).slice(-4);
   c.font = "bold 14px " + FONT; c.textAlign = "center";
   feed.forEach((f, i) => {
-    const txt = nickOf(f.v.k) + (f.v.h ? " 🎯 " : " ▶ ") + nickOf(f.v.v), y = top + ah - 18 - (feed.length - 1 - i) * 24, w = c.measureText(txt).width + 20;
-    c.fillStyle = "rgba(255,255,255,.9)"; c.fillRect(W / 2 - w / 2, y - 11, w, 22); c.fillStyle = "#1B2B20"; c.fillText(txt, W / 2, y);
+    const parts = [[nickOf(f.v.k), TEAM_CSS[f.v.kt] || "#1B2B20"], [f.v.h ? " 🎯 " : " ▶ ", "#1B2B20"], [nickOf(f.v.v), TEAM_CSS[f.v.vt] || "#1B2B20"]];
+    const y = top + ah - 18 - (feed.length - 1 - i) * 24, textW = parts.reduce((sum, p) => sum + c.measureText(p[0]).width, 0), w = textW + 20;
+    c.fillStyle = "rgba(255,255,255,.9)"; c.fillRect(W / 2 - w / 2, y - 11, w, 22);
+    c.textAlign = "left"; let tx = W / 2 - textW / 2;
+    parts.forEach(p => { c.fillStyle = p[1]; c.fillText(p[0], tx, y); tx += c.measureText(p[0]).width; });
+    c.textAlign = "center";
   });
   if (t < T.startAt || t < T.startAt + 700) {
     c.font = "bold 110px " + FONT; c.textAlign = "center"; c.lineWidth = 6; c.strokeStyle = "#1B2B20"; c.fillStyle = "#fff";
