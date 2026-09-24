@@ -1778,9 +1778,9 @@ function reviveEnt(ent) {
   if (ent.s) { ent.s.g.rotation.set(0, ent.yaw + Math.PI, 0); ent.s.g.position.set(ent.x, 0, ent.z); ent.s.g.visible = true; }
 }
 function aimDir(yaw, pitch) { return new THREE.Vector3(-Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch)); }
-function stateString(x, z, yaw, pitch, flags, shots, hp) {
+function stateString(x, z, yaw, pitch, flags, shots, hp, ammo) {
   let d = Math.round(yaw * 180 / Math.PI) % 360; if (d < 0) d += 360;
-  return +x.toFixed(2) + "," + +z.toFixed(2) + "," + d + "," + Math.round(pitch * 180 / Math.PI) + "," + flags + "," + shots + "," + Math.round(hp);
+  return +x.toFixed(2) + "," + +z.toFixed(2) + "," + d + "," + Math.round(pitch * 180 / Math.PI) + "," + flags + "," + shots + "," + Math.round(hp) + "," + ammo;
 }
 function onRemoteState(id, str) {
   if (netDebug) T.net.down += id.length + String(str).length + 60;
@@ -1799,6 +1799,7 @@ function onRemoteState(id, str) {
   if (!ent.seen) { ent.seen = true; ent.shots = shots; ent.alive = alive; if (ent.s) ent.s.g.visible = alive; }
   else if (alive !== ent.alive) { if (alive) reviveEnt(ent); else killEnt(ent); }
   ent.pistol = !!(f & 2); ent.prot = !!(f & 4); ent.moving = !!(f & 8); ent.hp = hp;
+  ent.ammo = a.length > 7 ? +a[7] : null;
   if (shots > ent.shots) remoteShotFx(ent);
   ent.shots = shots;
 }
@@ -1824,7 +1825,7 @@ function updateEnts(dt, nowMs) {
   for (const id in T.ents) {
     const ent = T.ents[id], b = T.bots[id];
     if (b) {
-      ent.x = b.x; ent.z = b.z; ent.yaw = b.yaw; ent.pitch = b.pitch; ent.hp = b.hp; ent.moving = b.moving; ent.prot = tnow() < b.protectUntil; ent.seen = true;
+      ent.x = b.x; ent.z = b.z; ent.yaw = b.yaw; ent.pitch = b.pitch; ent.hp = b.hp; ent.moving = b.moving; ent.prot = tnow() < b.protectUntil; ent.seen = true; ent.ammo = -1;
       if (b.alive !== ent.alive) { if (b.alive) reviveEnt(ent); else killEnt(ent); }
     } else if (ent.to && ent.alive) {
       const k = clamp((nowMs - ent.t0) / TEAM.lerpMs, 0, 1);
@@ -2067,12 +2068,12 @@ function netTick() {
   const u = {}, t = tnow();
   if (T.me) {
     const flags = (T.me.alive ? 1 : 0) | (P.weapon === "pistol" ? 2 : 0) | (t < T.me.protectUntil ? 4 : 0) | (T.me.moving ? 8 : 0);
-    const s = stateString(P.x, P.z, P.yaw, P.pitch, flags, T.me.shots, P.hp);
+    const s = stateString(P.x, P.z, P.yaw, P.pitch, flags, T.me.shots, P.hp, P.ammo);
     if (s !== T.sent[T.myId]) u[T.myId] = s;
   }
   if (isHost()) for (const id in T.bots) {
     const b = T.bots[id];
-    const s = stateString(b.x, b.z, b.yaw, b.pitch, (b.alive ? 1 : 0) | (t < b.protectUntil ? 4 : 0) | (b.moving ? 8 : 0), b.shots, b.hp);
+    const s = stateString(b.x, b.z, b.yaw, b.pitch, (b.alive ? 1 : 0) | (t < b.protectUntil ? 4 : 0) | (b.moving ? 8 : 0), b.shots, b.hp, -1);
     if (s !== T.sent[id]) u[id] = s;
   }
   const ids = okeys(u);
@@ -2190,10 +2191,13 @@ function drawSpectator(t, nowMs) {
   c.setTransform(dpr, 0, 0, dpr, 0, 0);
   c.fillStyle = "#DDE3E8"; c.fillRect(0, 0, W, H);
   const FONT = '"Nanum Gothic", "Malgun Gothic", sans-serif';
-  const wide = W >= 760, side = wide ? Math.min(230, W * 0.22) : 0, top = 110, bottom = wide ? 56 : 170;
-  const aw = W - 2 * side - 40, ah = H - top - bottom;
-  const s = Math.max(4, Math.min(aw / (ARENA.hx * 2), ah / (ARENA.hz * 2)));
-  const mx = W / 2, my = top + ah / 2;
+  const wide = W >= 760, cardH = 46, cardGap = 6, leaveBtnRoom = 52, edge = 12;
+  const cardRows = wide ? 1 : 2, topNeed = 68, bottomNeed = cardRows * (cardH + cardGap) + edge + leaveBtnRoom;
+  const s = Math.max(2, Math.min((W - edge * 2) / (ARENA.hx * 2), (H - topNeed - bottomNeed) / (ARENA.hz * 2)));
+  const mapH = ARENA.hz * 2 * s;
+  const mapTop = Math.max(topNeed, Math.min((H - mapH) / 2, H - bottomNeed - mapH)), mapBottom = mapTop + mapH;
+  const top = mapTop, ah = mapH;
+  const mx = W / 2, my = mapTop + mapH / 2;
   const X = x => mx + x * s, Y = z => my + z * s;
   c.fillStyle = "#B4B9B1"; c.fillRect(X(-ARENA.hx), Y(-ARENA.hz), ARENA.hx * 2 * s, ARENA.hz * 2 * s);
   c.strokeStyle = "rgba(60,70,60,.18)"; c.lineWidth = 1;
@@ -2240,31 +2244,38 @@ function drawSpectator(t, nowMs) {
   }
   const left = clamp(T.startAt + TEAM.matchMs - Math.max(t, T.startAt), 0, TEAM.matchMs);
   c.textAlign = "center"; c.textBaseline = "middle";
+  const boxW = 320, boxH = 52, boxY = Math.max(8, (mapTop - boxH) / 2), boxMid = boxY + boxH / 2;
   c.fillStyle = "rgba(255,255,255,.92)"; c.strokeStyle = "#24402F"; c.lineWidth = 2;
-  c.fillRect(W / 2 - 150, 52, 300, 48); c.strokeRect(W / 2 - 150, 52, 300, 48);
-  c.font = "bold 30px " + FONT; c.fillStyle = TEAM_CSS.blue; c.fillText(String(teamScore("blue")), W / 2 - 105, 77);
-  c.fillStyle = TEAM_CSS.red; c.fillText(String(teamScore("red")), W / 2 + 105, 77);
-  c.fillStyle = "#1B2B20"; c.font = "bold 24px " + FONT; c.fillText(fmtTime(Math.ceil(left / 1000)), W / 2, 72);
-  c.font = "bold 11px " + FONT; c.fillStyle = "#5B6B5E"; c.fillText("👀 관전 중", W / 2, 92);
+  c.fillRect(W / 2 - boxW / 2, boxY, boxW, boxH); c.strokeRect(W / 2 - boxW / 2, boxY, boxW, boxH);
+  ["blue", "red"].forEach((team, i) => {
+    const sx = W / 2 + (i === 0 ? -1 : 1) * 110;
+    c.font = "bold 11px " + FONT; c.fillStyle = TEAM_CSS[team]; c.fillText(TEAM_NAME[team] + "팀", sx, boxY + 11);
+    c.font = "bold 28px " + FONT; c.fillText(String(teamScore(team)), sx, boxMid + 7);
+  });
+  c.fillStyle = "#1B2B20"; c.font = "bold 24px " + FONT; c.fillText(fmtTime(Math.ceil(left / 1000)), W / 2, boxMid - 4);
+  c.font = "bold 11px " + FONT; c.fillStyle = "#5B6B5E"; c.fillText("👀 관전 중", W / 2, boxY + boxH - 9);
+  const ammoText = e => !e || e.ammo === null || e.ammo === undefined ? "—" : e.ammo < 0 ? "∞" : e.pistol ? "권총" : String(e.ammo);
   const card = (id, x, y, w) => {
     const e = T.ents[id], hp = e ? (e.alive ? e.hp : 0) : 100; let k = 0, d = 0;
     for (const key in T.kills) { const v = T.kills[key]; if (!killCounts(v)) continue; if (v.k === id) k++; if (v.v === id) d++; }
-    c.fillStyle = "rgba(255,255,255,.95)"; c.fillRect(x, y, w, 46); c.strokeStyle = TEAM_CSS[T.players[id].team]; c.lineWidth = 2; c.strokeRect(x, y, w, 46);
+    c.fillStyle = "rgba(255,255,255,.95)"; c.fillRect(x, y, w, cardH); c.strokeStyle = TEAM_CSS[T.players[id].team]; c.lineWidth = 2; c.strokeRect(x, y, w, cardH);
     c.textAlign = "left"; c.font = "bold 14px " + FONT; c.fillStyle = "#1B2B20"; c.fillText((T.players[id].isAI ? "🤖 " : "") + nickOf(id), x + 8, y + 14);
     c.textAlign = "right"; c.font = "bold 12px " + FONT; c.fillStyle = "#5B6B5E"; c.fillText(k + "킬 " + d + "데스", x + w - 8, y + 14);
-    c.fillStyle = "#E4E8DE"; c.fillRect(x + 8, y + 28, w - 16, 9); c.fillStyle = hp > 30 ? "#2F7D4F" : "#B33951"; c.fillRect(x + 8, y + 28, (w - 16) * clamp(hp, 0, 100) / 100, 9);
+    const ammoW = 62, barW = w - 16 - ammoW;
+    c.fillStyle = "#E4E8DE"; c.fillRect(x + 8, y + 28, barW, 9); c.fillStyle = hp > 30 ? "#2F7D4F" : "#B33951"; c.fillRect(x + 8, y + 28, barW * clamp(hp, 0, 100) / 100, 9);
+    c.textAlign = "right"; c.font = "bold 13px " + FONT; c.fillStyle = e && e.ammo === 0 ? "#B33951" : "#1B2B20"; c.fillText("탄 " + ammoText(e), x + w - 8, y + 33);
   };
-  ["blue", "red"].forEach((team, i) => {
-    const ids = teamIds(team);
-    if (wide) {
-      const x = i === 0 ? 12 : W - side - 8, w = side - 4;
-      c.fillStyle = TEAM_CSS[team]; c.fillRect(x, top, w, 28); c.fillStyle = "#fff"; c.textAlign = "center"; c.font = "bold 15px " + FONT; c.fillText(TEAM_NAME[team] + "팀 " + teamScore(team) + "점", x + w / 2, top + 14);
-      ids.forEach((id, j) => card(id, x, top + 34 + j * 52, w));
-    } else {
-      const w = (W - 36) / 2, x = 12 + i * (w + 12), y = H - bottom + 8;
-      ids.forEach((id, j) => card(id, x, y + j * 52, w));
-    }
-  });
+  const bandBottom = H - leaveBtnRoom;
+  if (wide) {
+    const w = Math.min(260, (W - edge * 2 - 24 - 16) / 4), y = clamp(mapBottom + (bandBottom - mapBottom - cardH) / 2, mapBottom + 8, bandBottom - cardH);
+    ["blue", "red"].forEach((team, i) => teamIds(team).forEach((id, j) => {
+      const x = i === 0 ? W / 2 - 12 - (2 - j) * w - (1 - j) * 8 : W / 2 + 12 + j * (w + 8);
+      card(id, x, y, w);
+    }));
+  } else {
+    const w = (W - edge * 2 - 12) / 2, y0 = clamp(mapBottom + (bandBottom - mapBottom - (2 * cardH + cardGap)) / 2, mapBottom + 8, bandBottom - 2 * cardH - cardGap);
+    ["blue", "red"].forEach((team, i) => teamIds(team).forEach((id, j) => card(id, edge + i * (w + 12), y0 + j * (cardH + cardGap), w)));
+  }
   const feed = T.match.feed.filter(f => nowMs - f.t < 4000).slice(-4);
   c.font = "bold 14px " + FONT; c.textAlign = "center";
   feed.forEach((f, i) => {
