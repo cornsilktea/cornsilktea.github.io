@@ -58,6 +58,7 @@
   .song{ border:1px solid var(--line-mid); border-radius:var(--radius); background:var(--panel); padding:12px 10px; cursor:pointer; text-align:left; font:inherit; color:var(--ink); min-height:72px; display:flex; flex-direction:column; gap:6px; }
   .song.sel{ border-color:var(--primary); background:var(--primary-soft); }
   .song .t{ font-size:16px; font-weight:700; display:block; }
+  .song .c{ font-size:13px; color:var(--ink-mid); display:block; margin-top:-4px; }
   .song .b{ font-size:12px; color:var(--ink-soft); display:block; }
   .song .b em{ font-style:normal; color:var(--warn); font-weight:700; }
   .song .listen{ height:32px; font:inherit; font-size:13px; font-weight:700; border:1px solid var(--line-strong); border-radius:var(--radius); background:var(--panel); color:var(--ink); cursor:pointer; margin-top:auto; }
@@ -181,41 +182,42 @@ const CONFIG = {
     easy: {
       label: "쉬움",
       songs: [
-        { id: "twinkle", title: "반짝반짝 작은 별", bpm: 90,  song: "EASY_SONG_1", fallDurationMs: 2200 },
-        { id: "ode",     title: "환희의 송가",       bpm: 100, song: "EASY_SONG_2", fallDurationMs: 2000 },
-        { id: "cuckoo",  title: "뻐꾹 왈츠",         bpm: 120, song: "EASY_SONG_3", fallDurationMs: 2000 },
-        { id: "lith",     title: "리스 항구", bpm: 130, song: "LITH_SONG", fallDurationMs: 1700 },
-        { id: "countryroads", title: "Take Me Home, Country Roads", bpm: 84, song: "COUNTRYROADS_SONG", fallDurationMs: 2200 }
+        { id: "twinkle", title: "반짝반짝 작은 별", composer: "프랑스 민요", bpm: 90,  song: "EASY_SONG_1", fallDurationMs: 2200 },
+        { id: "ode",     title: "환희의 송가", composer: "베토벤", bpm: 100, song: "EASY_SONG_2", fallDurationMs: 2000 },
+        { id: "cuckoo",  title: "뻐꾹 왈츠", composer: "요나손", bpm: 120, song: "EASY_SONG_3", fallDurationMs: 2000 },
+        { id: "lith",     title: "리스 항구", composer: "maplestory", bpm: 130, song: "LITH_SONG", fallDurationMs: 1700 },
+        { id: "countryroads", title: "Take Me Home, Country Roads", composer: "존 덴버", bpm: 84, song: "COUNTRYROADS_SONG", fallDurationMs: 2200 }
       ]
     },
     medium: {
       label: "보통",
       songs: [
-        { id: "furelise", title: "엘리제를 위하여", bpm: 120, song: "MEDIUM_SONG_1", fallDurationMs: 1800 },
-        { id: "turkish",  title: "터키 행진곡",     bpm: 160, song: "MEDIUM_SONG_2", fallDurationMs: 1700 },
-        { id: "kerning",  title: "커닝시티", bpm: 135, song: "KERNING_SONG", fallDurationMs: 1500 },
-        { id: "terran",   title: "StarCraft - Terran", bpm: 135, song: "TERRAN_SONG", fallDurationMs: 1500 },
-        { id: "happyday", title: "Happy Day", bpm: 120, song: "HAPPYDAY_SONG", fallDurationMs: 1600 },
-        { id: "antifreeze", title: "Antifreeze", bpm: 120, song: "ANTIFREEZE_SONG", fallDurationMs: 1600 },
-        { id: "onelove",  title: "one love", bpm: 65, song: "ONELOVE_SONG", fallDurationMs: 1800 }
+        { id: "furelise", title: "엘리제를 위하여", composer: "베토벤", bpm: 120, song: "MEDIUM_SONG_1", fallDurationMs: 1800 },
+        { id: "turkish",  title: "터키 행진곡", composer: "모차르트", bpm: 160, song: "MEDIUM_SONG_2", fallDurationMs: 1700 },
+        { id: "kerning",  title: "커닝시티", composer: "maplestory", bpm: 135, song: "KERNING_SONG", fallDurationMs: 1500 },
+        { id: "terran",   title: "StarCraft - Terran", composer: "글렌 스태포드", bpm: 135, song: "TERRAN_SONG", fallDurationMs: 1500 },
+        { id: "happyday", title: "Happy Day", composer: "체리필터", bpm: 120, song: "HAPPYDAY_SONG", fallDurationMs: 1600 },
+        { id: "antifreeze", title: "Antifreeze", composer: "검정치마", bpm: 120, song: "ANTIFREEZE_SONG", fallDurationMs: 1600 },
+        { id: "onelove",  title: "one love", composer: "M.C The Max", bpm: 65, song: "ONELOVE_SONG", fallDurationMs: 1800 }
       ]
     },
     hard: {
       label: "어려움",
       songs: [
-        { id: "canon",    title: "캐논 변주곡", bpm: 100, song: "HARD_SONG_1", fallDurationMs: 1400 },
-        { id: "bach",     title: "바흐 프렐류드 C장조", bpm: 76, song: "MEDIUM_SONG_3", fallDurationMs: 1700 },
-        { id: "moonlight", title: "월광 소나타 1악장", bpm: 108, song: "HARD_SONG_3", fallDurationMs: 1600 },
-        { id: "toyou",    title: "그대에게", bpm: 160, song: "TOYOU_SONG", fallDurationMs: 1500 },
-        { id: "zenzenzense", title: "sparkle", bpm: 180, song: "ZENZENZENSE_SONG", fallDurationMs: 1500 },
-        { id: "manchanga", title: "만찬가", bpm: 120, song: "MANCHANGA_SONG", fallDurationMs: 1500 }
+        { id: "canon",    title: "캐논 변주곡", composer: "파헬벨", bpm: 100, song: "HARD_SONG_1", fallDurationMs: 1400 },
+        { id: "bach",     title: "바흐 프렐류드 C장조", composer: "바흐", bpm: 76, song: "MEDIUM_SONG_3", fallDurationMs: 1700 },
+        { id: "moonlight", title: "월광 소나타 1악장", composer: "베토벤", bpm: 108, song: "HARD_SONG_3", fallDurationMs: 1600 },
+        { id: "toyou",    title: "그대에게", composer: "신해철", bpm: 160, song: "TOYOU_SONG", fallDurationMs: 1500 },
+        { id: "zenzenzense", title: "sparkle", composer: "RADWIMPS", bpm: 180, song: "ZENZENZENSE_SONG", fallDurationMs: 1500 },
+        { id: "manchanga", title: "만찬가", composer: "tuki.", bpm: 120, song: "MANCHANGA_SONG", fallDurationMs: 1500 }
       ]
     },
     veryhard: {
       label: "매우 어려움",
       songs: [
-        { id: "heukgeon", title: "흑건",         bpm: 80,  song: "HARD_SONG_2", fallDurationMs: 1200, missScore: 30 },
-        { id: "dansemacabre", title: "Danse Macabre", bpm: 120, song: "DANCE_SONG", fallDurationMs: 1400, missScore: 30 }
+        { id: "heukgeon", title: "흑건", composer: "쇼팽", bpm: 80,  song: "HARD_SONG_2", fallDurationMs: 1200, missScore: 30 },
+        { id: "dansemacabre", title: "Danse Macabre", composer: "생상스", bpm: 120, song: "DANCE_SONG", fallDurationMs: 1400, missScore: 30 },
+        { id: "moonlightpresto", title: "월광 소나타 3악장", composer: "베토벤", bpm: 120, song: "MOONLIGHT3_SONG", fallDurationMs: 1300, missScore: 30 }
       ]
     }
   }
@@ -748,7 +750,110 @@ const DANCE_SONG = seq(`
   D4:0.56:0.3 D#5:0 A4:0.39:0.3 D2:0.17:0.3 D4:0.81:0.3 G5:1.65 D3:2
 `);
 
-const SONG_DATA = { EASY_SONG_1, EASY_SONG_2, EASY_SONG_3, MEDIUM_SONG_1, MEDIUM_SONG_2, MEDIUM_SONG_3, HARD_SONG_1, HARD_SONG_2, HARD_SONG_3, LITH_SONG, KERNING_SONG, TERRAN_SONG, COUNTRYROADS_SONG, TOYOU_SONG, ZENZENZENSE_SONG, HAPPYDAY_SONG, MANCHANGA_SONG, ANTIFREEZE_SONG, ONELOVE_SONG, DANCE_SONG };
+const MOONLIGHT3_SONG = seq(`
+  C#2:0.23 G#2:0.19 C#4:0.16 E4:0.21 G#3:0.21 C#4:0.19 E4:0.18 G#3:0.19 C#4:0.21 E4:0.21 G#3:0.21 C#4:0.18 E4:0.21 G#3:0.16
+  C#4:0.23 E4:0.21 G#4:0.14 C#4:0.28 E4:0.19 G#4:0.18 C#5:0.21 E4:0.19 G#4:0.19 C#5:0.18 E5:0.21 G#4:0.21 C#5:0.19 E5:0.23
+  G#4:0.39 G#5:0 G#2:0.65:0.3 G#2:0.23 C3:0.14 D#4:0.24 G#3:0.16 C3:0.21 D#4:0.21 G#3:0.21 C4:0.37 G#3:0.18 C4:0.19 D#4:0.21
+  G#3:0.21 D#4:0.21 D#4:0.16 G#4:0.26 C4:0.18 D#4:0.21 G#4:0.21 C5:0.19 D#4:0.18 G#4:0.21 C5:0.19 D#5:0.21 G#4:0.2 C5:0.21
+  D#5:0.19 G#5:0.4 G#5:0 G#2:0.6:0.3 C#3:0.21 G#3:0.21 G#3:0.18 C#4:0.19 F3:0.21 G#3:0.21 C#4:0.18 F4:0.19 G#3:0.21 C#4:0.18
+  F4:0.21 G#4:0.21 C#4:0.21 F4:0.19 G#4:0.21 C#5:0.2 F4:0.19 G#4:0.19 C#5:0.21 F5:0.18 G#4:0.19 C#5:0.23 F5:0.19 G#5:0.18
+  C#5:0.21 F5:0.19 G#5:0.16 G#5:0.14 B1:0.33 G#5:0 G#2:0.39:0.3 A2:0.21 C#4:0.23 F#3:0.4 C#4:0.16 C#4:0.19 F#4:0.23 A4:0.19
+  C#5:0.39 F#5:0.16 A5:0.26 F#5:0.35 F#5:0 A1:0.51:0.3 A2:0.18 C#3:0.19 A3:0.18 C#4:0.21 C#4:0.37 E4:0.19 G4:0.18 C#5:0.19
+  C#5:0.21 E5:0.19 G5:0.21 G5:0.14 A1:0.25 G5:0.4 G#5:0.23 G#1:0.21 G#4:0.21 G#5:0.21 G#4:0.23 G#5:0.18 A#4:0.21 G#5:0.19
+  C5:0.21 G#5:0.18 C#5:0.24 G#5:0.18 G#5:0.17 G#5:0.21 C5:0.11 G#2:0.07 G#5:0.21 F#5:0.19 G#5:0.23 C#5:0.18 G#5:0.19 A5:0.07
+  A2:0.14 G#5:0.21 E5:0.21 G#5:0.18 G#5:0.07 G#3:0.14 G#5:0.21 G#5:0.16 G#5:0.23 C5:0.21 G#5:0.19 A4:0.09 G#2:0.12 G5:0.23
+  G#4:0.14 G#5:0.21 G#5:0.23 G#5:0.19 G#5:0.21 G#5:0.18 A#4:0.21 G#5:0.19 C5:0.21 G#5:0.21 C#5:0.18 G#5:0.19 F#5:0.21 G#5:0.18
+  C5:0.23 G#5:0.19 F#5:0.21 G#5:0.19 C#5:0.2 G#5:0.21 A5:0.19 G#5:0.19 E5:0.23 G#5:0.19 G#5:0.2 G#5:0.19 C#5:0.09 A2:0.12
+  G#5:0.16 C5:0.23 G#5:0.19 A4:0.19 G5:0.21 G#4:0.2 G#5:0.21 A4:0.21 G5:0.21 G#5:0.19 G#5:0.21 A4:0.18 G5:0.19 G#5:0.18
+  G#5:0.19 A4:0.21 G5:0.19 G#5:0.2 G#5:0.22 A4:0.18 G5:0.21 G#5:0.86 G#2:2.58 C#2:0.21:0.3 G#2:0.21 C#4:0.21 E4:0.2 G#2:0.17
+  C#3:0.23 E4:0.07 E3:0.12 G#3:0.18 C#4:0.21 E4:0.18 G#3:0.21 C#4:0.21 E4:0.21 G#3:0.19 C#4:0.16 E4:0.21 G#4:0.1 C#2:0.09
+  C#4:0.21 E4:0.18 G#4:0.23 C#5:0.19 E4:0.21 G#4:0.19 C#5:0.2 E5:0.4 G#5:0.19 C#6:0.2 E5:0.42 E6:0 C#2:0.44:0.3 A#1:0.21
+  E4:0.21 C#4:0.19 C#4:0.07 A#1:0.12 E4:0.2 G3:0.19 C#4:0.18 E4:0.21 G4:0.21 C#4:0.19 E4:0.18 G4:0.21 C#5:0.19 E4:0.21
+  G4:0.21 C#5:0.21 E5:0.18 G4:0.19 C#5:0.21 E5:0.2 G5:0.22 C#5:0.2 E5:0.19 G5:0.19 A#2:0.18 E5:0.21 G6:0.19 C#6:0.21
+  E5:0.39 E5:0.47 D3:0.14 D#4:0.18 D#4:0.16 A#3:0.1 C#4:0.18 D#4:0.21 A#3:0.21 D#4:0.21 D#4:0.21 A#4:0.18 C#4:0.21 D#4:0.19
+  A#4:0.16 C#5:0.21 D#4:0.21 A#4:0.19 C#5:0.18 D#5:0.21 A#4:0.19 C#5:0.21 D#5:0.18 A#5:0.21 C#5:0.21 D#5:0.19 A#5:0.21 G2:0.2
+  A#5:0.19 D#5:0.21 C#5:0.21 A#5:0.18 D#5:0.21 C#5:0.19 A#4:0.21 B4:0.21 D#4:0.21 D#4:0.18 D#4:0.19 D#5:0.26 D#3:0.18 B2:0.16
+  D#4:0.26 G#2:0.16 D#4:0.21 B2:0.19 D#4:0.2 B4:0.22 D#4:0.18 D#4:0.19 G#4:0.18 A#4:0.07 G#4:0.16 A#2:0.21 C#3:0.19 D#4:0.19
+  G4:0.23 D#4:0.21 A#3:0.16 D#4:0.23 A#2:0.19 D#4:0.21 G4:0.18 D#4:0.21 D#5:0.21 D#4:0.19 C#3:0.18 A#4:0.21 A#4:0.21 D#4:0.19
+  D#4:0.2 D#4:0.19 G#4:0.23 D#3:0.19 B2:0.19:0.3 D#4:0.21:0.3 B3:0.18:0.3 D#4:0.23:0.3 G#4:0.19 D#3:0.21 D#5:0.18 D#4:0.21 B2:0.19 G#4:0.19
+  B4:0.23 D#4:0.18 G2:0.19 D#4:0.21 A#4:0.41 G2:0.22:0.3 D#4:0.2:0.3 G2:0.19:0.3 D#4:0.19:0.3 A#4:0.18 D#4:0.21 D#5:0.42 D#4:0.19 A#4:0.18
+  B4:0.4 D#6:0.21 D#4:0.18 G#3:0.19 D#3:0.21 D#6:0.18 D#3:0.23 G#3:0.21 D#3:0.16 D#5:0.24 D#4:0.18 B4:0.24 D#4:0.16 G#5:0.21
+  D#4:0.21 G#5:0.23 D#3:0.19 G6:0.18 D#4:0.21 A#3:0.19 D#4:0.18 G6:0.21 D#4:0.21 A#3:0.19 G5:0.21 G5:0.2 D#4:0.19 D#5:0.23
+  D#4:0.19 G5:0.18 D#4:0.21 A#5:0.21 D#4:0.19 G#5:0.21 D#4:0.23 B2:0.14 D#3:0.21 G#5:0.44 B2:0.19 D#4:0.18 G#5:0.4 D#5:0.18
+  D#4:0.21 G#5:0.19 D#4:0.21 B4:0.23 D#4:0.18 A#5:0.22 D#4:0.2 G2:0.19 D#4:0.16 A#5:0.21 D#4:0.24 G2:0.18 D#4:0.19 A#5:0.39
+  D#5:0.19 D#4:0.23 A#5:0.19 D#4:0.2 C5:0.21 D#3:0.19 G#2:0.19 D#4:0.2 F#2:0.19 D#3:0.21 G#2:0.19 D#4:0.2 C#5:0.21 C#4:0.21
+  G#2:0.19 C#3:0.23 G#2:0.21 C#3:0.16 G#2:0.24 C#3:0.18 A#5:0.19 A#5:0.18 G#5:0.21 A#5:0.21 B4:0.23 B2:0.17 A#3:0.23 B3:0.18
+  D#2:0.19 B3:0.21 F#2:0.23 B2:0.16 D#2:0.21 B3:0.17 D#4:0.25 B2:0.17 G#5:0.25 B2:0.14 E2:0.26 B2:0.13 D2:0.24 B2:0.21
+  E2:0.18 B2:0.19 A5:0.18 A2:0.23 E2:0.24:0.3 A2:0.39:0.3 A2:0.21:0.3 E2:0.19 A2:0.16 G5:0.23 G5:0.17 F5:0.18 G5:0.23 G#5:0.19
+  G#3:0.23 D#2:0.19 G#2:0.18 B1:0.45 D#2:0.18 G#2:0.4 G#2:0.23 G#2:0.14 G#2:0.21 A5:0.18 E2:1.58 E5:0.26 F#5:0.18 G#5:0.19
+  A5:0.21 B5:0.21 C#6:0.39 A5:0.19 E5:0.23 F#5:0.16 G#5:0.21 A5:0.21 B5:0.21 C#6:0.39 A5:0.19 A5:0.21 F#5:0.19 G#5:0.23
+  A5:0.37 C#6:0.42 A5:0.19 E5:0.18 F#5:0.19 G#5:0.21 A5:0.6 D6:0.23 A4:0.21 E6:0.19 E6:0.23 D#6:0.19 E6:0.55 A5:0.24
+  G#5:0.21 B4:0.21 G#5:0.18 B4:0.21 D#4:0.19 B4:0.18 G#4:0.19 B4:0.21 A#5:0.18 A#5:0.21 A#5:0.21 A#5:0.21 A#5:0.18 A#5:0.24
+  A#5:0.16 G#5:0.11 A#5:0.12 G#5:0.82 E4:0.11 E2:0.21 C#4:0.65 E4:0.21 F#4:0.19 G#4:0.21 A4:0.18 B4:0.19 C#5:0.21 B4:0.2
+  A4:0.21 E4:0.21 F#4:0.21 G#4:0.21 A4:0.17 B4:0.18 C#5:0.19 B4:0.21 A4:0.21 E4:0.18 F#4:0.21 G#4:0.23 B4:0.19 B4:0.18
+  C#5:0.21 B4:0.21 A4:0.19 E4:0.21 F#4:0.23 G#4:0.19 A4:0.2 B4:0.19 C#5:0.21 B4:0.19 A4:0.16 E4:0.23 F#4:0.21 G#4:0.16
+  A4:0.21 B4:0.21 C#5:0.19 B4:0.21 E4:0.2 E4:0.21 F#4:0.19 G#4:0.21 A4:0.21 B4:0.18 C#5:0.19 D5:0.21 E5:0.21 F#5:0.18
+  G#5:0.19 A5:0.21 B5:0.37 D6:0.19 D#6:0.23 E5:0.21 A3:0.18 E4:0.24 A3:0.18 C#4:0.19 A3:0.23 E3:0.19 A3:0.18 G#5:0.21
+  B3:0.21 F3:0.21 B3:0.16:0.3 D4:0.26:0.3 B3:0.21:0.3 D4:0.18:0.3 B3:0.19 B4:0.21 B3:0.18 G#3:0.19 B3:0.21 D#3:0.21 B3:0.18 G#3:0.19
+  B3:0.19 G4:0.41 D4:0.42 D4:0.21 G4:0.16 D4:0.21 D#4:0.21 G#4:0 G#2:0.4:0.3 B4:0.39 B4:0.42 B4:0.42 B4:0 G#3:0.39:0.3
+  B4:0 G#3:0.4:0.3 A#4:0 A#3:0.42:0.3 G#4:0.41 G5:0.4 D#5:0 C#4:0.39:0.3 D#5:0 C#4:0.4:0.3 D#5:0 C#4:0.37:0.3 D#5:0 C#4:0.42:0.3
+  D#5:0 C#4:0.4:0.3 D#5:0 B3:0.39:0.3 D#5:0.39 D#5:0 G#2:0.42:0.3 B4:0 G#2:0.42:0.3 B4:0 G#2:0.4:0.3 B4:0 G#2:0.39:0.3 B4:0
+  G#2:0.4:0.3 B4:0.37 A#4:0 A#3:0.39:0.3 G#4:0.42 G4:0 D#3:0.4:0.3 D#5:0 C#4:0.41:0.3 D#5:0 C#4:0.4:0.3 D#5:0 C#4:0.39:0.3 D#5:0
+  C#4:0.4:0.3 D#5:0 C#4:0.42:0.3 D#5:0 B3:0.41:0.3 D#5:0 A#3:0.38:0.3 D#5:0 G#2:0.42:0.3 D#5:0 G#2:0.39:0.3 D#5:0 G#2:0.4:0.3 G#4:0
+  G#3:0.37:0.3 C#4:0.42 E5:0 C#3:0.41:0.3 E5:0 G#3:0.37:0.3 C#5:0.12 C#3:0.3 D#4:0.42 D#5:0.35 D#5:0.4 B4:0 G#3:0.39:0.3 D#4:0.42
+  D#5:0 G3:0.39:0.3 D#5:0 G3:0.4:0.3 A#5:0.42 B4:0 G#2:0.39:0.3 D#5:0 D#4:0.4:0.3 D#5:0 G#2:0.39:0.3 D#5:0 G#2:0.38:0.3 D#5:0
+  G#2:0.39:0.3 D#5:0 G#2:0.42:0.3 A#5:0 A#2:0.39:0.3 G#5:0 B2:0.4:0.3 A#5:0.11 D#2:0.3 G6:0.42 G6:0.4 G6:0.44 G5:0 D#3:0.39:0.3
+  G5:0.35 G6:0.35 G5:0.44 G#5:0.42 D#5:0.12 G#1:0.28 D#5:0.39 D#5:0 G#2:0.4:0.3 D#5:0.39 D#5:0 G#2:0.42:0.3 A#5:0 A#2:0.39:0.3
+  G#5:0 B2:0.38:0.3 G5:0 D#2:0.44:0.3 G5:0 G4:0.39:0.3 G5:0 D#3:0.4:0.3 G6:0.42 G5:0.09 D#2:0.3 G5:0.42 G5:0 D#3:0.39:0.3
+  G5:0 D#3:0.4:0.3 G#5:0 G#2:0.39:0.3 G#5:0 B3:0.38:0.3 G#5:0 B3:0.39:0.3 G#5:0 G#3:0.4:0.3 C#4:0.41 E4:0 C#3:0.4:0.3 E4:0.42
+  G#3:0.37 D#4:0.44 G#5:0 B3:0.37:0.3 G#5:0 B3:0.4:0.3 G#5:0.42 C#4:0.39 A#5:0 A#3:0.42:0.3 A#5:0 A#3:0.37:0.3 D#6:0 G3:0.4:0.3
+  B3:0.39 D#5:0 B2:0.42:0.3 G#4:0.39 G#5:0.4 C#3:0.39 A5:0.4 A5:0.07 A2:0.33 E5:0.39 D#4:0.39 G#5:0 G#4:0.42:0.3 G#5:0
+  D#4:0.4:0.3 G#5:0 D#3:0.41:0.3 D#4:0.4:0.3 G5:0.39 G5:0 C#4:0.4:0.3 A#5:0 D#2:0.4:0.3 G#5:0.23 G#3:0.16 G#4:0.44 G#3:0.19 G#4:0.18
+  D#3:0.21 G#3:0.21 G#2:0.4 D#3:0.21 G#3:0.18 B4:0.21 G#3:0.21 D#3:0.16 G#4:0.21 G4:0.21 A#3:0.19 D#4:0.18 A#3:0.21 D#5:0.23
+  A#3:0.19 D#4:0.07 G#2:0.12 A#3:0.21 D#5:0.23 D#3:0.18 D#4:0.19 A#3:0.21 D#5:0.21 A#3:0.16 D#4:0.21 A#3:0.18 G#5:0.17 D#5:0.23
+  D#4:0.18 G#3:0.21:0.3 G#3:0.24:0.3 G#3:0.21 D#3:0.18 G#3:0.19 G#3:0.42 D#4:0.21 G#3:0.18 B5:0.23 G#3:0.19 D#3:0.16 G#5:0.21 G5:0.23
+  A#3:0.17 D#4:0.23 A#3:0.18 D#6:0.24 A#3:0.21 D#4:0.18 A#3:0.19 G6:0.41 D#4:0.19 A#3:0.19 G5:0.21 A#3:0.18 D#4:0.21 A#3:0.16
+  B4:0.08 G#5:0.11 D#6:0.21 D#4:0.21 G#3:0.21 G#3:0.23 G#2:0.16 D#4:0.23 G#3:0.19 C#5:0.09 G5:0.1 D#6:0.21 D#4:0.2 A#3:0.21
+  G#2:0.19 A#3:0.21 D#3:0.16 A#3:0.21 G#5:0.17 D#6:0.23 D#4:0.23 G#3:0.21 G#3:0.18 G#3:0.21 G#4:0.21 G#4:0.19 C#5:0.09 G5:0.09
+  D#6:0.21 D#4:0.21 A#3:0.19 G#2:0.18 A#3:0.23 D#4:0.19 D#4:0.21 B3:0.21 G#4:0.16 D#4:0.21 G#4:0.19 B3:0.21 G#4:0.21 D#4:0.21
+  G#4:0.2 B3:0.19 G#4:0.18 D#4:0.22 G#4:0.2 B3:0.19 G#4:0.21 D#4:0.21 G#4:0.21 C4:0.21 F#4:0.18 D#4:0.21 F#4:0.21 C4:0.18
+  F#4:0.19 D#4:0.21 F#4:0.21 C4:0.19 F#5:0.16 D#4:0.23 F#5:0.23 C4:0.19 F#4:0.16 D#4:0.23 F#4:0.33 G#4:0.21 G#3:0.42 G#3:0.18:0.3
+  G#5:0.14 E3:0.26:0.3 E3:0.21:0.3 G#3:0.18:0.3 E4:0.19 G#3:0.19 E4:0.2 G#3:0.19 E5:0.21 G#3:0.39 C#5:0.24 C#5:0.21 G#3:0.18 F#3:0.21
+  G#3:0.19 C5:0.21 G#3:0.16 F#4:0.23 G#3:0.18:0.3 F#4:0.4 C5:0.23 G#4:0.16 G#5:0.4 F#3:0.16 C5:0.24 D#5:0.23 G#3:0.18 E3:0.19
+  G#3:0.19 C#5:0.21 G#3:0.2 E3:0.4:0.3 E3:0.21:0.3 G#3:0.21:0.3 C#5:0.21 G#3:0.18 G#5:0.23 G#3:0.17 E4:0.18 C#5:0.21 E5:0.19 G#3:0.21
+  C3:0.19 G#3:0.18 D#5:0.47 C3:0.18:0.3 G#3:0.23:0.3 C3:0.33:0.3 D#5:0.42 G#5:0.2 G#3:0.26 C3:0.12 D#4:0.21 F#5:0.09 C#3:0.11 G#3:0.19
+  E5:0.44 C#5:0.19 G#3:0.19 E5:0.2 G#3:0.19 F#5:0.21 C#3:0.19 F5:0.23 C#3:0.16 C#5:0.23 C#3:0.19 F5:0 B2:0.39:0.3 G#5:0.21
+  C#4:0.19 F#5:0.21 C#3:0.18 C#5:0.19 C#3:0.21 F#5:0.18 A2:0.21 A5:0.24 C#3:0.16 G#5:0.23 C#4:0.19 C#5:0.18 C#4:0.19 G#5:0.16
+  C#4:0.37 A5:0.26 F#5:0.32 C#5:0.3 A4:0.28 F#4:0.26 C#4:0.28 A4:0.3 F#4:0.25 A4:0.22 A3:0.28 F#4:0.25 C#4:0.07 A3:0.23
+  A3:0.19 C#4:0.18 C#4:0.19 A3:0.23 C#4:0.19 F#3:0.09 F#2:0.11 A3:0.35 F#4:0.26 A4:0.16 C#5:0.19 F#5:0.21 A5:0.21 A5:0.2
+  C#5:0.24 A5:0.28 A5:0.09 D2:0.21 F#5:0.25 D5:0.26 A4:0.28 F#4:0.25 D4:0.26 A4:0.3 F#4:0.23 D4:0.1:0.3 D3:0.18:0.3 A3:0.28:0.3
+  F#4:0.23:0.3 D4:0.19 F#4:0.07 A3:0.21 F#3:0.18 D4:0.19 A2:0.19:0.3 D4:0.21 F#4:0.18 A3:0.21 D4:0.19 F#4:0.21 A4:0.2 D5:0.19
+  F#5:0.21 A5:0.23 A5:0.24 D5:0.23 A4:0.28 G2:0.18 C#2:0.16 A#5:0.24 G5:0.27 E5:0.28 C#5:0.22 A#4:0.23 E5:0.25 C#5:0.23
+  A#4:0.21 G5:0.19 E4:0.19 C#4:0.16 A#3:0.18:0.3 E4:0.17:0.3 C#4:0.23:0.3 A#3:0.16:0.3 G3:0.21:0.3 E4:0.16 C#4:0.09 G2:0.12 E4:0.19 G4:0.18
+  A#3:0.16 C#4:0.12 E4:0.14 G4:0.12 A#4:0.11 C#5:0.12 E5:0.12 G5:0.11 A#5:0.28 A#5:0.12 G5:0.07 E5:0.23 E5:0.07 C#2:0.25
+  G#1:0.19 G#5:0.23 E5:0.19 C#5:0.23 G#4:0.19 E5:0.25 C#5:0.26 G#4:0.09 C#3:0.16 E4:0.21 C#5:0.21 G#4:0.14 E4:0.16 C#4:0.17
+  G#4:0.18 E4:0.17 C#4:0.16 G#3:0.16 E4:0.16 C#4:0.17 G#3:0.11 E4:0.19 C#4:0.16 G#3:0.14 E4:0.16 C#4:0.24 G#3:0.23 E4:0.23
+  C#3:0.35:0.3 G#3:0.25 A2:0.21 A#2:0.14 B2:0.16 C3:0.17 C#3:0.3 D#3:0.3 F3:0.17 F#3:0.16 G3:0.14 G#3:0.16 A3:0.14 A#3:0.14
+  B3:0.16 C4:0.16 C#4:0.14 D4:0.16 D#4:0.17 E4:0.14 F4:0.14 F#4:0.14 G4:0.14 G#4:0.23 A#4:0.21 C5:0.13 C#5:0.22 D#5:0.23
+  F5:0.16 F#5:0.12 G5:0.14 G#5:0.18 F#4:0.07 A5:0.33 A5:0.16 A5:0.28 A5:0.35 A5:0.39 A5:0.26 A5:0.14 A5:0.14 A5:0.23
+  A5:0.25 A5:0.14 A5:0.42 B5:0.12 A5:0.35 G#5:0.3 A5:0.23 E5:0.21 D#5:0.26 F#5:0.25 C#5:0.19 C5:0.11 G#5:0.26 A4:0.19
+  G#4:0.2 F#4:0.19 A4:0.21 E4:0.21 C#5:0.18 F#5:0.23 C#4:0.22 C4:0.2 D#4:0.24 A3:0.16 G#3:0.23 F#3:0.26 A3:0.23 E4:0.23
+  D#4:0.28 D#4:0.28 C#4:0.32 C4:0.42 D#4:0.65 A2:0.61 G#2:0.77 G2:0.37 G1:2.3 G#3:0.25 G#1:0.07 G#2:2.05 G#1:0.72:0.3 C#3:0.42
+  C#2:0.16 G#2:0.25 C#3:0.21 G#2:0.21 C#3:0.21 C#3:0.26 C#4:0.18 C#3:0.28 C#3:0.21 G#2:0.28 C#3:0.21 E4:0.25 C#3:0.21 G#2:0.21
+  C#4:0.31 C4:0.25 D#4:0.21 G#2:0.23 D#4:0.19 G#4:0 G#2:0.44:0.3 G#3:0.49 G#4:0 G#2:0.51:0.3 G#3:0.44 G#4:0.26 D#4:0.16 G#3:0.51
+  E4:0.12:0.3 C#3:0.13:0.3 G#4:0.24 G#2:0.23 C#3:0.25 G#2:0.19 C#3:0.07 E3:0.19 G#2:0.48 G#2:0.23 C#3:0.19 G#2:0.44 E5:0.28 C#3:0.19
+  G#2:0.21 C#5:0.21 C5:0.25 D#4:0.23 G#2:0.24 D#3:0.21 G#5:0 F#4:0.48:0.3 G#2:0.42 G#5:0 G#2:0.89:0.3 G#5:0.23 D#3:0.23 G#2:0.19
+  D#3:0.23 E4:0.09 C#5:0.14 G#5:0.21 G#2:0.28 C#3:0.21 G#2:0.18 C#3:0.23 G#2:0.24 C#4:0.18 F#4:0.12 C5:0.09 G#5:0.1 C#2:0.14
+  G#2:0.23 D#3:0.44 D#4:0.19 G#2:0.23 D#4:0.21 E4:0.09 C#5:0.12 G#5:0.25 G#2:0.26 C#3:0.18 C#2:0.26 C#3:0.21 G#2:0.21 C#4:0.18
+  F#4:0.12 G#5:0.37 G#2:0.16 D#4:0.49 D#3:0.23 G#3:0.21 D#3:0.21 C#5:0.12 G#5:0.46 E3:0.24 G#4:0.2 C#5:0.21 E5:0.24 G#4:0.2
+  C#5:0.24 E5:0.21 G#5:0.2 C#5:0.21 E5:0.19 G#5:0.11 C#3:0.12 C#5:0.21 E5:0.07 G#2:0.14 G#5:0.21 C#5:0.23 E5:0.19 C#5:0.21
+  G#5:0.21 E5:0.21 C#5:0.2 G#5:0.21 E5:0.21 C#5:0.19 G#5:0.23 E5:0.19 C#5:0.18 G#3:0.21 E5:0.21 C#5:0.23 C#5:0.19 E4:0.23
+  C#5:0.21 G#4:0.21 E4:0.18 C#3:0.19 G#4:0.23 E4:0.21 C#4:0.17 G#3:0.23 C#4:0.18 C#4:0.12 E3:0.12 G#3:0.16 E4:0.25 C#4:0.1
+  G#2:0.14 G#3:0.11 G#2:0.12 G#2:0.21 G#3:0.14 G#2:0.11 C#3:0.28 G#2:1.44 E5:0.1 E2:0.07 G#2:0.23 G#2:0.32 G#2:0.65:0.3 C#4:0.44
+  C#5:0.17 C#3:0.16 G#2:0.14 G#2:1.93 C#5:0.32 C#5:0.31 C#3:1.04 C#4:0.12 C#5:0.25 E4:0.26 G#4:1
+`);
+
+const SONG_DATA = { EASY_SONG_1, EASY_SONG_2, EASY_SONG_3, MEDIUM_SONG_1, MEDIUM_SONG_2, MEDIUM_SONG_3, HARD_SONG_1, HARD_SONG_2, HARD_SONG_3, LITH_SONG, KERNING_SONG, TERRAN_SONG, COUNTRYROADS_SONG, TOYOU_SONG, ZENZENZENSE_SONG, HAPPYDAY_SONG, MANCHANGA_SONG, ANTIFREEZE_SONG, ONELOVE_SONG, DANCE_SONG, MOONLIGHT3_SONG };
 
 const Best = {
   KEY: "pianotiles_best_v1",
@@ -933,11 +1038,12 @@ function renderSongs(){
     card.setAttribute("role", "button");
     const best = Best.get(s.id);
     const len = songLengthSec(s);
-    card.innerHTML = '<span class="t"></span><span class="b">' + Math.floor(len / 60) + '분 ' + (len % 60) + '초 · 10초당 ' + tilesPerTenSec(s) + '개 · ' +
+    card.innerHTML = '<span class="t"></span><span class="c"></span><span class="b">' + Math.floor(len / 60) + '분 ' + (len % 60) + '초 · 10초당 ' + tilesPerTenSec(s) + '개 · ' +
       (best ? '내 최고 <em>' + best.score + '</em>점' : '내 기록 없음') + '</span>' +
       '<span class="h">' + hallText(s.id) + '</span>' +
       '<button type="button" class="listen">▶ 미리 듣기</button>';
     card.querySelector(".t").textContent = s.title;
+    card.querySelector(".c").textContent = s.composer;
     card.addEventListener("click", () => { S.songIdx = i; renderSongs(); updateStartBtn(); });
     const lb = card.querySelector(".listen");
     lb.dataset.id = s.id;
@@ -978,6 +1084,9 @@ window.addEventListener("resize", () => { if (S.running) resize(); });
 document.addEventListener("visibilitychange", () => { if (document.hidden) Sound.stopPreview(); });
 window.addEventListener("pagehide", () => { Sound.stopPreview(); });
 
+function songHeading(cfg){
+  return [CONFIG.difficulties[S.diff].label, cfg.title, cfg.composer].filter(Boolean).join(" · ");
+}
 function startGame(){
   const cfg = CONFIG.difficulties[S.diff].songs[S.songIdx];
   Sound.stopPreview();
@@ -997,7 +1106,7 @@ function startGame(){
   S.popups = []; S.flash = [0,0,0,0]; S.missCursor = 0; S.drawCursor = 0;
   const best = Best.get(cfg.id);
   $("hBest").textContent = best ? "최고 " + best.score : "최고 —";
-  $("gameTitle").textContent = CONFIG.difficulties[S.diff].label + " · " + cfg.title;
+  $("gameTitle").textContent = songHeading(cfg);
   updateHud();
   S.startMs = Sound.nowMs() + CONFIG.leadInMs + cfg.fallDurationMs;
   S.notes.forEach(n => n.targetMs = S.startMs + n.offset);
@@ -1196,7 +1305,7 @@ function finish(){
   const cfg = S.song, prev = Best.get(cfg.id);
   const isNew = !prev || S.score > prev.score;
   if (isNew) Best.set(cfg.id, { score: S.score, acc: accuracy(), at: Date.now() });
-  $("rSong").textContent = CONFIG.difficulties[S.diff].label + " · " + cfg.title;
+  $("rSong").textContent = songHeading(cfg);
   $("rScore").textContent = S.score;
   $("rNew").style.display = isNew ? "" : "none";
   $("rBest").textContent = "이 기기 최고 기록 " + (isNew ? S.score : prev.score) + "점";
