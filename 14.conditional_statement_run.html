@@ -255,8 +255,10 @@
     tree_big: ASSET_DIR + "tree_big.webp",
     tree_palm: ASSET_DIR + "tree_palm.webp"
   };
+  var ASSET_VERSION = "?v=2";
+  Object.keys(IMG).forEach(function(k){ IMG[k] += ASSET_VERSION; });
   var LINEAR_MAP_SUFFIXES = ["_normal", "_rough"];
-  var PLAYER_MODEL_URL = ASSET_DIR + "player.glb";
+  var PLAYER_MODEL_URL = ASSET_DIR + "player.glb" + ASSET_VERSION;
   var PLAYER_H = 2.3;
   var playerGltf = null;
 
