@@ -248,7 +248,7 @@
   </div>
 
   <div class="card" id="cardBStart" style="display:none">
-    <div class="logo" style="font-size:36px">⚔️ 대전모드<small>1대1 실시간 레이스 — 부딪히면 밀려납니다<br>뒤처진 차는 조금 더 빠르고, 앞차 10m 뒤에 2초 붙어 있으면 부스트!</small></div>
+    <div class="logo" style="font-size:36px">⚔️ 대전모드<small>1대1 실시간 레이스 — 부딪히면 밀려납니다<br>뒤처진 차는 10km/h 더 빠르고, 앞차 15m 뒤에 2초 붙어 있으면 부스트!</small></div>
     <div class="hello">안녕하세요, <b id="helloNick"></b>님 <button type="button" class="mini" id="btnNickEdit">✏️ 닉네임 변경</button></div>
     <div class="modeBtns">
       <button type="button" class="btn" id="btnCreate">1대1 방 만들기</button>
@@ -3674,7 +3674,7 @@ $("btnReset").onclick = e => { e.currentTarget.blur(); startRace(); };
 $("btnRecover").onclick = e => { e.currentTarget.blur(); recover(); };
 
 const CAR_HIT = { radius: 0.82, offset: 1.08, restitution: 0.45, push: 0.55, spinGain: 0.55, spinMax: 2.6, spinFriction: 3.2, slideFriction: 2.6, inertia: 1.45 };
-const CHASE = { farKmh: 8, nearKmh: 3, nearCars: 5, carLen: 2 * (CAR_HIT.offset + CAR_HIT.radius), tailM: 10, tailSec: 2, boostKmh: 30, holdSec: 1, fadeSec: 1.5 };
+const CHASE = { farKmh: 10, tailM: 15, tailSec: 2, boostKmh: 30, holdSec: 1, fadeSec: 1.5 };
 const BATTLE = {
   root: "turbolap/rooms", specMax: 1, netMs: 143, countMs: 3600, dnfMs: 30000, rankRowH: 48,
   sdk: ["https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js", "https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"]
@@ -4026,7 +4026,7 @@ function metersBehindRival() {
 }
 function updateChase(dt) {
   const behind = metersBehindRival(), boostV = CHASE.boostKmh / CFG.kmh;
-  P.chase = behind <= 0 ? 0 : (behind <= CHASE.nearCars * CHASE.carLen ? CHASE.nearKmh : CHASE.farKmh) / CFG.kmh;
+  P.chase = behind > CHASE.tailM ? CHASE.farKmh / CFG.kmh : 0;
   if (P.boostCap > 0) { P.boostT += dt; P.boostCap = boostV * Math.max(0, Math.min(1, 1 - (P.boostT - CHASE.holdSec) / CHASE.fadeSec)); }
   P.tailT = behind > 0 && behind <= CHASE.tailM ? P.tailT + dt : 0;
   if (P.tailT >= CHASE.tailSec) {
