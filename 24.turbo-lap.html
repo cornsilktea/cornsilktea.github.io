@@ -643,6 +643,7 @@ setTimeout(() => { HQ_LOAD.slow = true; renderLoadGate(); }, 15000);
 const HQ_EXPOSURE = 0.95;
 const SHARED_TEX = new Set();
 const TREE_CELL = 120, TREE_DRAW_DIST = 900, TREE_CELL_MESHES = [];
+const SHADOW_CELL = 160, SHADOW_ONLY = [];
 function makeRenderer(opts) {
   const r = new THREE.WebGLRenderer(opts);
   r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = HQ_EXPOSURE;
@@ -656,6 +657,7 @@ renderer.domElement.id = "gl";
 document.body.insertBefore(renderer.domElement, document.body.firstChild);
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(62, 1, 0.5, 1700);
+scene.onBeforeRender = () => SHADOW_ONLY.forEach(m => { m.visible = false; });
 let sun = null;
 const SUN_DIR = new THREE.Vector3(0.45, 0.75, 0.35).normalize();
 const HQENV = { hdr: null, ready: [] };
@@ -865,7 +867,7 @@ function buildTrack(def) {
     });
   }
   const G = trackGroup = new THREE.Group(); scene.add(G);
-  CITY_WATER = []; CITY_ANIM = []; TREE_CELL_MESHES.length = 0;
+  CITY_WATER = []; CITY_ANIM = []; TREE_CELL_MESHES.length = 0; SHADOW_ONLY.length = 0;
   W = def.width; OPEN = !!def.open;
   const curve = new THREE.CatmullRomCurve3(def.points.map(p => new THREE.Vector3(p[0], p[1], p[2])), !OPEN, "catmullrom", 0.5);
   N = def.samples || CFG.samples; TRACK_LEN = curve.getLength(); SEG = TRACK_LEN / (OPEN ? N - 1 : N); LAPS = def.laps || CFG.laps;
@@ -1035,13 +1037,18 @@ function startGridBox(G, i, lat) {
   });
   G.add(box);
 }
-function buildRoadSurface(G) {
+function buildRoadSurface(G, gap) {
   const ground = m => { m.receiveShadow = true; return m; };
-  ground(ribbon(G, band(W / 2, -W / 2, 0.05, 0.05), 1, HQM.asphalt));
-  [1, -1].forEach(sg => ground(ribbon(G, band(sg * (W / 2 - 0.35), sg * (W / 2 - 0.6), 0.062, 0.062), 1, HQM.line)));
+  const spans = gap ? [[0, gap[0]], [gap[1], N - 1]] : [[0, undefined]];
+  const road = (edgeFn, vRepeat, mat) => spans.forEach(([from, to]) => {
+    const share = to === undefined ? 1 : (to - from) / (N - 1);
+    ground(ribbon(G, edgeFn, Math.max(1, Math.round(vRepeat * share)), mat, from, to));
+  });
+  road(band(W / 2, -W / 2, 0.05, 0.05), 1, HQM.asphalt);
+  [1, -1].forEach(sg => road(band(sg * (W / 2 - 0.35), sg * (W / 2 - 0.6), 0.062, 0.062), 1, HQM.line));
   const curbRep = Math.round(TRACK_LEN / 3);
-  ground(ribbon(G, band(W / 2 + 1.3, W / 2, 0.15, 0.07), curbRep, HQM.curb));
-  ground(ribbon(G, band(-W / 2, -(W / 2 + 1.3), 0.07, 0.15), curbRep, HQM.curb));
+  road(band(W / 2 + 1.3, W / 2, 0.15, 0.07), curbRep, HQM.curb);
+  road(band(-W / 2, -(W / 2 + 1.3), 0.07, 0.15), curbRep, HQM.curb);
   const gantry = gi => {
     ground(ribbon(G, band(W / 2, -W / 2, 0.075, 0.075), 1, HQM.checker, gi - 2, gi + 3));
     const s0 = S[gi], side = W / 2 + 2.2, hgt = 9;
@@ -1591,12 +1598,12 @@ function buildSeoulGround(G, M) {
   [[-900, -2700, 800, 650, 0.9], [-150, -2900, 900, 720, 1.0], [700, -2700, 800, 600, 0.85], [1500, -2500, 700, 520, 0.9], [-1800, -2400, 700, 480, 0.8],
    [-800, 2800, 800, 440, 0.8], [500, 2900, 900, 540, 0.85]].forEach(([x, z, r, h, pw], k) => seoulMesh(G, hillGeometry({ r, h, pow: pw, seed: k * 1.7 }, true), M.hill, x, 0, z));
 }
-function buildRiverRoadside(G, M, R, noPiers) {
-  const outer = W / 2 + SH + 1.5;
+function buildRiverRoadside(G, M, R, noPiers, wallDrop) {
+  const outer = W / 2 + SH + 1.5, drop = wallDrop || (i => S[i].p.y);
   const wet = i => { const z = S[i].p.z; return z > R.z0 - 2 && z < R.z1 + 2; };
   ribbon(G, band(outer, -outer, -0.02, -0.02), 1, M.sidewalk).receiveShadow = true;
   sampleRanges(i => S[i].p.y > 0.25 && !wet(i)).forEach(([a, b]) => [1, -1].forEach(sg => {
-    ribbon(G, i => [edgeAt(i, sg * outer, -0.02), edgeAt(i, sg * outer, -S[i].p.y - 0.05)], 1, M.concrete, a, b).receiveShadow = true;
+    ribbon(G, i => [edgeAt(i, sg * outer, -0.02), edgeAt(i, sg * outer, -drop(i) - 0.05)], 1, M.concrete, a, b).receiveShadow = true;
   }));
   sampleRanges(wet).forEach(([a, b]) => {
     [1, -1].forEach(sg => { ribbon(G, i => [edgeAt(i, sg * outer, -0.02), edgeAt(i, sg * outer, -2.6)], 1, M.concrete, a, b).castShadow = true; });
@@ -1649,17 +1656,22 @@ function buildStreetDetails(G, M, centerLine) {
   for (let i = 6; i < N; i += 16) [1, -1].forEach(sg => {
     const e = edgeAt(i, off * sg, 0);
     if (nearTrackXZ(e.x, e.z, off - 1)) return;
-    spots.push([e, Math.atan2(-sg * S[i].n.z, sg * S[i].n.x)]);
+    spots.push([e, Math.atan2(-sg * S[i].n.z, sg * S[i].n.x), i]);
   });
   const lamps = new THREE.InstancedMesh(lampGeo, M.lamp, spots.length), mtx = new THREE.Matrix4(), q = new THREE.Quaternion(), one = new THREE.Vector3(1, 1, 1);
   spots.forEach(([e, a], k) => { q.setFromAxisAngle(WORLD_UP, a); lamps.setMatrixAt(k, mtx.compose(e, q, one)); });
   lamps.castShadow = true; lamps.frustumCulled = false; G.add(lamps);
   if (!M.lampHead) return;
   const heads = new THREE.InstancedMesh(new THREE.BoxGeometry(1.1, 0.3, 0.55).translate(-2.4, 8.78, 0), M.lampHead, spots.length);
-  const pools = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), M.lightPool, spots.length), v = new THREE.Vector3(), sc = new THREE.Vector3(15, 1, 15);
-  spots.forEach(([e, a], k) => {
+  const pools = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), M.lightPool, spots.length), v = new THREE.Vector3();
+  const across = new THREE.Vector3(), along = new THREE.Vector3(), normal = new THREE.Vector3();
+  spots.forEach(([e, a, i], k) => {
     q.setFromAxisAngle(WORLD_UP, a); heads.setMatrixAt(k, mtx.compose(e, q, one));
-    v.set(-5, 0.09, 0).applyQuaternion(q).add(e); pools.setMatrixAt(k, mtx.compose(v, q, sc));
+    v.set(-5, 0.09, 0).applyQuaternion(q).add(e);
+    const rise = (S[wrapI(i + 2)].p.y - S[wrapI(i - 2)].p.y) / (4 * SEG);
+    along.set(S[i].t.x, rise, S[i].t.z).normalize(); across.set(S[i].n.x, 0, S[i].n.z).normalize(); normal.crossVectors(along, across);
+    if (normal.y < 0) { across.negate(); normal.negate(); }
+    pools.setMatrixAt(k, mtx.makeBasis(across.multiplyScalar(15), normal, along.multiplyScalar(15)).setPosition(v));
   });
   heads.frustumCulled = false; pools.frustumCulled = false; pools.renderOrder = 1; G.add(heads); G.add(pools);
 }
@@ -2126,6 +2138,7 @@ function makeHKMaterials() {
     goldLine: new THREE.MeshBasicMaterial({ color: 0xFFB866 }),
     escRoof: std({ color: 0x3C4450, metalness: 0.6, roughness: 0.4, side: THREE.DoubleSide }),
     escSteps: std({ color: 0x7A8088, metalness: 0.7, roughness: 0.35, side: THREE.DoubleSide, emissive: 0x20303A, emissiveIntensity: 0.6 }),
+    escLanding: [false, true].map(flip => { const t = escalatorLandingTexture(); if (flip) { t.repeat.set(1, -1); t.offset.set(0, 1); } return std({ map: t, metalness: 0.7, roughness: 0.35, side: THREE.DoubleSide }); }),
     escLight: new THREE.MeshBasicMaterial({ color: 0xEAF6FF, side: THREE.DoubleSide }),
     escGlass: std({ color: 0xCFE6EE, transparent: true, opacity: 0.16, emissive: 0x3A6E88, emissiveIntensity: 0.25, side: THREE.DoubleSide, depthWrite: false }),
     greenLine: new THREE.MeshBasicMaterial({ color: 0x4CFF7A }),
@@ -2261,7 +2274,7 @@ function suspensionBridge(G, M, a, b, off) {
     [pts[0], pts[pts.length - 1]].forEach(p => seoulMesh(G, new THREE.BoxGeometry(11, 9, 15), M.concrete, p.x, p.y - 3, p.z));
   });
   rodsMesh(G, M.cable, hangers, 0.08, 4);
-  const reds = new THREE.InstancedMesh(new THREE.SphereGeometry(0.8, 8, 6), M.redLight, lights.length), mtx = new THREE.Matrix4();
+  const reds = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.8, 0), M.redLight, lights.length), mtx = new THREE.Matrix4();
   lights.forEach(([x, y, z], k) => reds.setMatrixAt(k, mtx.makeTranslation(x, y, z))); reds.frustumCulled = false; G.add(reds);
 }
 function buildHKBridges(G, M) {
@@ -2465,6 +2478,14 @@ function escalatorTreadTexture() {
     c.fillStyle = "#121418"; c.fillRect(0, h - 14, w, 4);
   });
 }
+function escalatorLandingTexture() {
+  return seoulTex(128, 128, (c, w, h) => {
+    c.fillStyle = "#8C939B"; c.fillRect(0, 0, w, h);
+    for (let x = 2; x < w; x += 6) { c.fillStyle = "#5E656D"; c.fillRect(x, 12, 2, h - 12); }
+    c.fillStyle = "#F2C230"; c.fillRect(0, 0, w, 9);
+    c.fillStyle = "#121418"; c.fillRect(0, 9, w, 3);
+  });
+}
 function setupEscalatorLanes() {
   const zone = sampleRanges(i => inEscalator(S[i].p.z) && Math.abs(S[i].t.z) > 0.7)[0];
   if (!zone) return null;
@@ -2472,24 +2493,30 @@ function setupEscalatorLanes() {
   for (let i = a; i <= b; i++) S[i].lim = THREE.MathUtils.lerp(wide, narrow, THREE.MathUtils.smoothstep(Math.min(i - a, b - i) / ramp, 0, 1));
   return [a, b, ramp];
 }
-function buildMidLevelsEscalator(G, M) {
-  const zone = setupEscalatorLanes(); if (!zone) return;
-  const [a, b, ramp] = zone, lim = i => S[i].lim, roofY = 6.4, step = Math.max(1, Math.round(3.2 / SEG)), rods = [], sign = new THREE.MeshBasicMaterial({ map: escalatorSignTexture() });
-  ribbon(G, i => [edgeAt(i, lim(i) + 0.2, 0.11), edgeAt(i, -lim(i) - 0.2, 0.11)], Math.round((b - a) * SEG / 0.42), M.escTread, a, b).receiveShadow = true;
+function buildMidLevelsEscalator(G, M, zone) {
+  if (!zone) return;
+  const [a, b, ramp] = zone, lim = i => S[i].lim, roofY = 6.4, step = Math.max(1, Math.round(3.2 / SEG)), rods = [], posts = [], sign = new THREE.MeshBasicMaterial({ map: escalatorSignTexture() });
+  const landing = Math.max(2, Math.round(3 / SEG)), treadY = i => 0.05 + 0.06 * THREE.MathUtils.smoothstep(Math.min(i - a, b - i) / landing, 0, 1);
+  const deck = (mat, vRepeat, from, to) => { ribbon(G, i => [edgeAt(i, lim(i) + 0.2, treadY(i)), edgeAt(i, -lim(i) - 0.2, treadY(i))], vRepeat, mat, from, to).receiveShadow = true; };
+  deck(M.escTread, Math.round((b - a - 2 * landing) * SEG / 0.42), a + landing, b - landing);
+  deck(M.escLanding[0], 1, a, a + landing);
+  deck(M.escLanding[1], 1, b - landing, b);
   [1, -1].forEach(sg => {
     const at = (i, d, y) => edgeAt(i, sg * (lim(i) + d), y);
     ribbon(G, i => [at(i, 0.2, 0.12), at(i, 1.45, 0.12)], 1, M.escFloor, a, b);
-    ribbon(G, i => [at(i, 0.35, 1.05), at(i, 0.35, 0.13)], 1, M.escGlass, a, b).renderOrder = 2;
     ribbon(G, i => [at(i, 0.22, 1.13), at(i, 0.48, 1.13)], 1, M.handrail, a, b);
     ribbon(G, i => [at(i, 0.48, 1.13), at(i, 0.48, 0.97)], 1, M.handrail, a, b);
     ribbon(G, i => [at(i, 1.4, 0.95), at(i, 1.4, 0.12)], 1, M.escRoof, a, b);
-    ribbon(G, i => [at(i, 1.42, roofY), at(i, 1.42, 0.95)], 1, M.escGlass, a, b).renderOrder = 2;
-    for (let i = a; i <= b; i += step) { const e = at(i, 1.46, 0); rods.push([e.clone(), new THREE.Vector3(e.x, e.y + roofY, e.z)]); }
+    for (let i = a; i <= b; i += step) {
+      const e = at(i, 1.46, 0); rods.push([e.clone(), new THREE.Vector3(e.x, e.y + roofY, e.z)]);
+      const h = at(i, 0.35, 0.12); posts.push([h.clone(), new THREE.Vector3(h.x, h.y + 0.98, h.z)]);
+    }
   });
-  ribbon(G, i => [edgeAt(i, lim(i) + 1.7, roofY), edgeAt(i, -lim(i) - 1.7, roofY)], 1, M.escRoof, a, b).castShadow = true;
+  ribbon(G, i => [edgeAt(i, lim(i) + 1.7, roofY), edgeAt(i, -lim(i) - 1.7, roofY)], 1, M.escRoof, a, b);
   [1, -1].forEach(d => ribbon(G, i => [edgeAt(i, d * 1.1 + 0.25, roofY - 0.08), edgeAt(i, d * 1.1 - 0.25, roofY - 0.08)], 1, M.escLight, a, b));
   for (let i = a; i <= b; i += step) rods.push([edgeAt(i, lim(i) + 1.46, roofY - 0.1), edgeAt(i, -lim(i) - 1.46, roofY - 0.1)]);
   rodsMesh(G, M.escRoof, rods, 0.12, 6);
+  rodsMesh(G, M.handrail, posts, 0.05, 6);
   [a + Math.round(ramp * 0.6), b - Math.round(ramp * 0.6)].forEach((i, k) => {
     const s = S[i], w2 = lim(i) + 1.7, yaw = Math.atan2(s.t.x, s.t.z);
     seoulMesh(G, new THREE.BoxGeometry(2 * w2 + 0.6, 2, 0.7), M.escRoof, s.p.x, s.p.y + roofY + 0.3, s.p.z).rotation.y = yaw;
@@ -2630,10 +2657,11 @@ function buildHKCity(G, M) {
       q.setFromAxisAngle(WORLD_UP, r); mesh.setMatrixAt(i, mtx.compose(v.set(x, y, z), q, sc.set(w, h, d)));
       mesh.setColorAt(i, col !== null ? tint.setHex(col) : k === "shop" ? tint.setRGB(1, 1, 1) : tint.setRGB(rnd(0.86, 1), rnd(0.88, 1), rnd(0.9, 1)));
     });
-    mesh.castShadow = true; mesh.receiveShadow = true; mesh.frustumCulled = false; G.add(mesh);
+    mesh.receiveShadow = true; mesh.frustumCulled = false; G.add(mesh);
   });
+  buildShadowCasterCells(G, Object.values(sets).flat(), box, M.concrete);
   if (redLights.length) {
-    const reds = new THREE.InstancedMesh(new THREE.SphereGeometry(0.9, 8, 6), M.redLight, redLights.length);
+    const reds = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.9, 0), M.redLight, redLights.length);
     redLights.forEach(([x, y, z], i) => reds.setMatrixAt(i, mtx.makeTranslation(x, y, z)));
     reds.frustumCulled = false; G.add(reds);
     CITY_ANIM.push(t => { M.redLight.color.setRGB(Math.sin(t * 2.2) > 0 ? 1.6 : 0.35, 0.08, 0.06); });
@@ -2643,7 +2671,28 @@ function buildHKCity(G, M) {
     if (!list.length) return;
     const mesh = new THREE.InstancedMesh(neonGeos[k], M.neon, list.length);
     list.forEach(([x, y, z, w, h, r], i) => { q.setFromAxisAngle(WORLD_UP, r); mesh.setMatrixAt(i, mtx.compose(v.set(x, y, z), q, sc.set(w, h, 1))); });
-    mesh.castShadow = true; mesh.frustumCulled = false; G.add(mesh);
+    mesh.frustumCulled = false; G.add(mesh);
+  });
+}
+function shadowPassSwitch() {
+  const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.Float32BufferAttribute([], 3));
+  const sw = new THREE.Mesh(geo, new THREE.MeshBasicMaterial());
+  sw.castShadow = true; sw.frustumCulled = false;
+  sw.onBeforeShadow = () => SHADOW_ONLY.forEach(m => { m.visible = true; });
+  return sw;
+}
+function buildShadowCasterCells(G, boxes, geo, mat) {
+  G.add(shadowPassSwitch());
+  const cells = new Map(), mtx = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), sc = new THREE.Vector3();
+  boxes.forEach(b => {
+    const key = Math.floor(b[0] / SHADOW_CELL) + "," + Math.floor(b[2] / SHADOW_CELL);
+    if (!cells.has(key)) cells.set(key, []);
+    cells.get(key).push(b);
+  });
+  cells.forEach(list => {
+    const mesh = new THREE.InstancedMesh(geo, mat, list.length);
+    list.forEach(([x, y, z, w, h, d, r], i) => { q.setFromAxisAngle(WORLD_UP, r); mesh.setMatrixAt(i, mtx.compose(v.set(x, y, z), q, sc.set(w, h, d))); });
+    mesh.computeBoundingSphere(); mesh.castShadow = true; G.add(mesh); SHADOW_ONLY.push(mesh);
   });
 }
 function hkTreeSpots() {
@@ -2716,8 +2765,10 @@ function buildHongKong(G) {
   const M = makeHKMaterials();
   HK_HILLS = fitHillsToTrack(HK.hills); HK_TERRAIN = null;
   G.userData.groundAt = hkLandmarkBase;
-  buildRoadSurface(G);
-  buildRiverRoadside(G, M, HK.harbour, true);
+  const escalatorZone = setupEscalatorLanes();
+  buildRoadSurface(G, escalatorZone);
+  const o = HK.slope, onHillTerrain = p => p.x > o.x0 && p.x < o.x3 && p.z > o.zEnd && p.z < -270;
+  buildRiverRoadside(G, M, HK.harbour, true, i => onHillTerrain(S[i].p) ? Math.min(S[i].p.y, 3) : S[i].p.y);
   buildStreetDetails(G, M, false);
   buildHKGround(G, M);
   const terrainAt = HK_TERRAIN = buildHKTerrain(G, M);
@@ -2744,7 +2795,7 @@ function buildHongKong(G) {
   buildNinaTower(G, M, HK.nina);
   buildPeakTower(G, M);
   buildHarbourBoats(G, M);
-  buildMidLevelsEscalator(G, M);
+  buildMidLevelsEscalator(G, M, escalatorZone);
   buildHKCity(G, M);
   buildPhotoAccents(G, M);
   buildSkyBeams(G, M);
