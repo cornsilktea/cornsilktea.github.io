@@ -646,7 +646,9 @@ function makeRenderer(opts) {
   return r;
 }
 const renderer = makeRenderer({ antialias: true, powerPreference: "high-performance" });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+const IS_TOUCH = (navigator.maxTouchPoints || 0) > 0 || "ontouchstart" in window;
+const MIN_PIXEL_RATIO = 1.0;
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, IS_TOUCH ? 1.5 : 2));
 renderer.domElement.id = "gl";
 document.body.insertBefore(renderer.domElement, document.body.firstChild);
 const scene = new THREE.Scene();
@@ -809,7 +811,7 @@ function setupWorld() {
     HQENV.hdr = hdr; scene.environment = envFromHdr(renderer, hdr); scene.environmentIntensity = NIGHT.on ? 0.12 : 0.9;
     HQENV.ready.forEach(f => f(hdr)); HQENV.ready = [];
   }, undefined, err => console.warn("[turbolap] 하늘 HDRI를 못 불러옴:", err));
-  new THREE.TextureLoader(HQ_MANAGER).load(HQ_DIR + "sky.jpg", t => {
+  new THREE.TextureLoader(HQ_MANAGER).load(HQ_DIR + "sky.jpg?v=2", t => {
     t.mapping = THREE.EquirectangularReflectionMapping; t.colorSpace = THREE.SRGBColorSpace;
     WORLD.daySky = t; WORLD.dayFog = horizonColor(t.image);
     if (!NIGHT.on) { scene.background = t; scene.fog.color.copy(WORLD.dayFog); }
@@ -3524,7 +3526,17 @@ function setText(el, text) {
 }
 
 let last = performance.now();
-function frame(now) { requestAnimationFrame(frame); tick(now); }
+const ADAPT = { slowFrames: 0, bloomOn: true };
+function adaptQuality(frameSec) {
+  if (state !== "race" || frameSec > 0.25) return;
+  if (frameSec > 0.028) ADAPT.slowFrames++; else if (ADAPT.slowFrames > 0) ADAPT.slowFrames--;
+  if (ADAPT.slowFrames <= 90) return;
+  ADAPT.slowFrames = 0;
+  const pr = renderer.getPixelRatio();
+  if (pr > MIN_PIXEL_RATIO) { renderer.setPixelRatio(Math.max(MIN_PIXEL_RATIO, pr - 0.25)); resize(); }
+  else if (NIGHT.on && ADAPT.bloomOn) ADAPT.bloomOn = false;
+}
+function frame(now) { requestAnimationFrame(frame); adaptQuality((now - last) / 1000); tick(now); }
 function tick(now) {
   const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
 
@@ -3569,7 +3581,7 @@ function tick(now) {
     const hl = NIGHT.headlight, hx = -Math.sin(V.h), hz = -Math.cos(V.h);
     hl.position.set(V.x + hx * 1.5, V.y + 1.6, V.z + hz * 1.5); hl.target.position.set(V.x + hx * 30, V.y - 0.5, V.z + hz * 30); hl.target.updateMatrixWorld();
     NIGHT.carLight.position.set(V.x + hx * 2.5, V.y + 4.5, V.z + hz * 2.5);
-    NIGHT.composer.render(dt);
+    if (ADAPT.bloomOn) NIGHT.composer.render(dt); else renderer.render(scene, camera);
   } else renderer.render(scene, camera);
 }
 function resize() {

@@ -162,6 +162,51 @@
     addHomeButton();
   }
 
+  /* ---------- 주소 끝에 ?fps (또는 &fps) 를 붙이면 초당 화면 수 표시 ----------
+     학생 태블릿에서 자료가 부드럽게 도는지 수업 전에 확인하려고 둡니다.
+     1초 평균과 그 1초 동안 가장 느렸던 순간을 함께 보여 줍니다.
+     30 아래로 자주 떨어지면 그 기기에서는 버벅인다고 느낍니다. */
+  if (/[?&]fps(?:[=&]|$)/.test(location.search)) {
+    var addFpsMeter = function () {
+      var meter = document.createElement("div");
+      meter.style.cssText = [
+        "position:fixed",
+        "bottom:calc(8px + env(safe-area-inset-bottom, 0px))",
+        "left:50%",
+        "transform:translateX(-50%)",
+        "z-index:2147483000",
+        "height:32px",
+        "padding:0 10px",
+        "background:rgba(0,0,0,0.72)",
+        "color:#fff",
+        "border-radius:4px",
+        "font:600 13px/32px monospace",
+        "pointer-events:none"
+      ].join(";");
+      document.body.appendChild(meter);
+      var frames = 0, worst = 0, last = performance.now(), windowStart = last;
+      var tick = function (now) {
+        var gap = now - last;
+        last = now;
+        frames++;
+        if (gap > worst) worst = gap;
+        if (now - windowStart >= 1000) {
+          var fps = Math.round(frames * 1000 / (now - windowStart));
+          meter.textContent = "FPS " + fps + " · 최저 " + Math.round(1000 / worst);   /* · 최저 */
+          meter.style.color = fps >= 50 ? "#7CFC9A" : fps >= 30 ? "#FFE27A" : "#FF7A7A";
+          frames = 0; worst = 0; windowStart = now;
+        }
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    };
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", addFpsMeter);
+    } else {
+      addFpsMeter();
+    }
+  }
+
   /* data-game 이 없으면 잠금 확인은 하지 않고 버튼만 붙입니다. */
   if (!slug) return;
 

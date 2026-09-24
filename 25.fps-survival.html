@@ -432,7 +432,9 @@ const SFX = {
 
 const canvas = $("gl");
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+const IS_TOUCH = (navigator.maxTouchPoints || 0) > 0 || "ontouchstart" in window;
+const MIN_PIXEL_RATIO = 1.0;
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, IS_TOUCH ? 1.25 : 1.5));
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputEncoding = THREE.sRGBEncoding;
 const scene = new THREE.Scene();
@@ -448,7 +450,8 @@ scene.add(hemi);
 const moon = new THREE.DirectionalLight(0x9FB4D9, 0.5); moon.position.set(18, 30, 12); scene.add(moon);
 moon.castShadow = true; moon.shadow.mapSize.set(2048, 2048);
 Object.assign(moon.shadow.camera, { left: -44, right: 44, top: 20, bottom: -20, near: 1, far: 90 }); moon.shadow.bias = -0.0008;
-const flashlight = new THREE.SpotLight(0xFFF1D6, 0.9, 30, 0.5, 0.8, 1.2);
+const FLASHLIGHT_INTENSITY = 0.9;
+const flashlight = new THREE.SpotLight(0xFFF1D6, FLASHLIGHT_INTENSITY, 30, 0.5, 0.8, 1.2);
 flashlight.position.set(0.25, -0.15, 0); camera.add(flashlight);
 flashlight.target.position.set(0, -0.1, -1); camera.add(flashlight.target);
 
@@ -598,11 +601,16 @@ const ceilingSlab = new THREE.Mesh(new THREE.PlaneGeometry(ARENA.hx * 2, ARENA.h
   }
   const fixtureM = MS({ color: 0x2B3036, roughness: 0.5, metalness: 0.5 });
   const tubeM = new THREE.MeshBasicMaterial({ color: 0xFFE4B8 });
+  const LAMP_LIGHT_BASE = 1.6;
+  const lampLightByX = new Map();
+  new Set(LAMP_SPOTS.map(([x]) => x)).forEach(x => {
+    const light = new THREE.PointLight(0xFFD2A0, LAMP_LIGHT_BASE, 22, 2); light.position.set(x, ARENA.wallH - 1.6, 0); scene.add(light);
+    lampLightByX.set(x, light);
+  });
   LAMP_SPOTS.forEach(([x, z], i) => {
     const housing = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.14, 0.5), fixtureM); housing.position.set(x, ARENA.wallH - 0.12, z); ceiling.add(housing);
     const tube = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.05, 0.3), tubeM.clone()); tube.position.set(x, ARENA.wallH - 0.21, z); ceiling.add(tube);
-    const light = new THREE.PointLight(0xFFD2A0, 1.15, 16, 2); light.position.set(x, ARENA.wallH - 0.8, z); scene.add(light);
-    lamps.push({ light, tube, base: 1.15, flicker: i === 5 });
+    lamps.push({ light: lampLightByX.get(x), tube, base: LAMP_LIGHT_BASE, flicker: i === 5 });
   });
   const exitTex = canvasTex(256, 96, (c, w, h) => {
     c.fillStyle = "#1FA35A"; c.fillRect(0, 0, w, h); c.fillStyle = "#FFFFFF";
@@ -611,7 +619,6 @@ const ceilingSlab = new THREE.Mesh(new THREE.PlaneGeometry(ARENA.hx * 2, ARENA.h
   const exitM = new THREE.MeshBasicMaterial({ map: exitTex });
   [[-20, -ARENA.hz + 0.05, 0], [20, ARENA.hz - 0.05, Math.PI], [-ARENA.hx + 0.05, 8, Math.PI / 2], [ARENA.hx - 0.05, -8, -Math.PI / 2]].forEach(([x, z, ry]) => {
     const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.45), exitM); sign.position.set(x, ARENA.wallH - 1.2, z); sign.rotation.y = ry; scene.add(sign);
-    const glow = new THREE.PointLight(0x33D07A, 0.6, 5, 2); glow.position.set(x + Math.sin(ry) * 0.6, ARENA.wallH - 1.2, z + Math.cos(ry) * 0.6); scene.add(glow);
   });
   scene.add(ceiling);
 }
@@ -619,7 +626,7 @@ function updateLamps(now) {
   lamps.forEach(l => {
     if (!l.flicker) return;
     const t = now / 1000, off = Math.sin(t * 1.3) > 0.82 && Math.sin(t * 37) > -0.2;
-    l.light.intensity = off ? 0.15 : l.base; l.tube.material.color.setHex(off ? 0x5A5040 : 0xFFE4B8);
+    l.light.intensity = off ? l.base * 0.55 : l.base; l.tube.material.color.setHex(off ? 0x5A5040 : 0xFFE4B8);
   });
 }
 const INDOOR_LOOK = {
@@ -634,7 +641,7 @@ function setIndoor(inside) {
   scene.fog.color.setHex(L.fog[0]); scene.fog.near = L.fog[1]; scene.fog.far = L.fog[2];
   scene.background.setHex(L.bg);
   hemi.intensity = L.hemi; moon.intensity = L.moon;
-  ceiling.visible = L.ceiling; flashlight.visible = inside;
+  ceiling.visible = L.ceiling; flashlight.intensity = inside ? FLASHLIGHT_INTENSITY : 0;
   viewModel.visible = inside;
 }
 setIndoor(false);
@@ -2354,8 +2361,19 @@ $("btnBackLobby").onclick = e => { e.currentTarget.blur(); hostBackToLobby(); };
 $("btnOverLeave").onclick = e => { e.currentTarget.blur(); leaveRoom(); teamScreen("start"); };
 $("btnGameLeave").onclick = e => { e.currentTarget.blur(); if (confirm("방을 나갈까요?")) { leaveRoom(); teamScreen("start"); } };
 
+let adaptSlowFrames = 0;
+function adaptQuality(frameSec) {
+  const playing = state === "play" || (state === "team" && T.screen === "game");
+  if (!playing || frameSec > 0.25) return;
+  if (frameSec > 0.028) adaptSlowFrames++; else if (adaptSlowFrames > 0) adaptSlowFrames--;
+  if (adaptSlowFrames <= 90) return;
+  adaptSlowFrames = 0;
+  const pr = renderer.getPixelRatio();
+  if (pr > MIN_PIXEL_RATIO) { renderer.setPixelRatio(Math.max(MIN_PIXEL_RATIO, pr - 0.25)); resize(); }
+}
 function loop(now) {
   requestAnimationFrame(loop);
+  adaptQuality((now - lastT) / 1000);
   animateSoldierLooks(now);
   updateLamps(now);
   updateVisualShots(Math.min(0.05, (now - lastT) / 1000));
