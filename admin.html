@@ -470,7 +470,7 @@ const REC_GAMES = {
   timeguess:    { title: "5초 타이머 맞히기",   lower: true, unit: "백만분의 1초 (0.000001초)", fmt: (v) => "오차 " + (v / 1000000).toFixed(6) + "초" },
   turbolap:     { title: "터보 랩",             lower: true, unit: "밀리초(ms)", fmt: (v) => clock(v), keyed: "코스",
                   // 기록 키는 코스를 바꿀 때마다 새로 만들어서(예전 기록과 섞이지 않게) 화면에는 도시 이름으로 바꿔 보여 준다
-                  keyNames: { hkcircuit: "홍콩", hard: "싱가포르", seoulcity: "서울", hongkong: "홍콩(이전 코스)", easy: "이전 코스", expert: "이전 코스", seoul: "이전 코스" } },
+                  keyNames: { hkpeak: "홍콩", hkcircuit: "홍콩(이전 코스)", hard: "싱가포르", seoulcity: "서울", hongkong: "홍콩(이전 코스)", easy: "이전 코스", expert: "이전 코스", seoul: "이전 코스" } },
   fpssurvival:  { title: "FPS 서바이벌",        unit: "처치×10000+초", fmt: (v) => Math.floor(v / 10000) + "명 · " + clock((v % 10000) * 1000) },
   blockblast:   { title: "블록 블라스트",        unit: "점", fmt: (v) => v.toLocaleString("ko-KR") + "점" },
   freekick:     { title: "프리킥 챌린지",        unit: "단계×1000+km/h", fmt: (v) => Math.floor(v / 1000) + "단계 · " + (v % 1000) + " km/h" }

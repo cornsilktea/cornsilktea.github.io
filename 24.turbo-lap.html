@@ -10,7 +10,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
 <meta property="og:title" content="터보 랩">
-<meta property="og:description" content="3D 실사 레이싱 / 홍콩·서울 2바퀴, 싱가포르 3바퀴 완주 시간 개인전 (WASD·방향키)">
+<meta property="og:description" content="3D 실사 레이싱 / 홍콩 피크→구룡 편도·싱가포르 3바퀴·서울 2바퀴 완주 시간 개인전 (WASD·방향키)">
 <meta property="og:url" content="https://cornsilktea.github.io/24.turbo-lap.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
@@ -134,11 +134,11 @@
 
 <div id="overlay">
   <div class="card" id="cardStart">
-    <div class="logo">TURBO LAP<small>터보 랩 — 완주 최단 시간 도전 (홍콩·서울 2바퀴, 싱가포르 3바퀴)</small></div>
+    <div class="logo">TURBO LAP<small>터보 랩 — 완주 최단 시간 도전 (홍콩 피크→구룡 편도, 싱가포르 3바퀴, 서울 2바퀴)</small></div>
     <table class="rtab">
       <thead><tr><th>코스</th><th>나의 최고 기록</th><th>🏆 세계신기록</th><th class="clsCol" hidden>🏫 우리 반</th></tr></thead>
       <tbody>
-        <tr><td>홍콩<small style="font-weight:400">2바퀴</small></td><td><em id="bestHongkong">—</em></td><td><em id="wrHongkong">—</em><small id="wrWhoHongkong"></small></td><td class="clsCol" hidden><em id="crHongkong">—</em><small id="crWhoHongkong"></small></td></tr>
+        <tr><td>홍콩<small style="font-weight:400">편도 코스</small></td><td><em id="bestHongkong">—</em></td><td><em id="wrHongkong">—</em><small id="wrWhoHongkong"></small></td><td class="clsCol" hidden><em id="crHongkong">—</em><small id="crWhoHongkong"></small></td></tr>
         <tr><td>싱가포르<small style="font-weight:400">3바퀴</small></td><td><em id="bestSingapore">—</em></td><td><em id="wrSingapore">—</em><small id="wrWhoSingapore"></small></td><td class="clsCol" hidden><em id="crSingapore">—</em><small id="crWhoSingapore"></small></td></tr>
         <tr><td>서울<small style="font-weight:400">2바퀴</small></td><td><em id="bestSeoul">—</em></td><td><em id="wrSeoul">—</em><small id="wrWhoSeoul"></small></td><td class="clsCol" hidden><em id="crSeoul">—</em><small id="crWhoSeoul"></small></td></tr>
       </tbody>
@@ -151,7 +151,7 @@
       <p><b>W / ↑</b> 가속<br><b>S / ↓</b> 브레이크·후진<br><b>A D / ← →</b> 조향<br><b>R</b> 처음부터 다시</p>
     </div>
     <div class="btns">
-      <button type="button" class="btn" id="btnHongkong">홍콩<small>2바퀴</small></button>
+      <button type="button" class="btn" id="btnHongkong">홍콩<small>편도 코스</small></button>
       <button type="button" class="btn mid" id="btnSingapore">싱가포르<small>3바퀴</small></button>
       <button type="button" class="btn hard" id="btnSeoul">서울<small>2바퀴</small></button>
     </div>
@@ -250,19 +250,26 @@ const CFG = {
   samples: 800,
   kmh: 4
 };
+function descendFrom(pts, yTop, yEnd) {
+  const d = [0]; for (let i = 1; i < pts.length; i++) d.push(d[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][2] - pts[i - 1][2]));
+  const L = d[d.length - 1];
+  return pts.map((p, i) => [p[0], yTop + (yEnd - yTop) * d[i] / L, p[2]]);
+}
 const TRACKS = {
   hongkong: {
-    key: "hongkong", recKey: "hkcircuit", name: "홍콩", width: 11, laps: 2, theme: "hongkong", samples: 1300,
-    points: [
-      [60, 0, 196], [20, 0, 192], [-25, 0, 196], [-62, 0, 212], [-78, 0, 250], [-70, 0, 290], [-88, 0, 325], [-125, 0, 345],
-      [-160, 0, 338], [-172, 0, 305], [-150, 0, 280], [-120, 0, 262], [-125, 0, 235], [-160, 0, 224], [-205, 0, 230], [-228, 0, 205],
-      [-234, 1, 170], [-235, 4, 135], [-236, 9, 100], [-236, 12, 40], [-236, 12, -40], [-236, 9, -100], [-234, 4, -135], [-230, 1, -170],
-      [-225, 2, -205], [-218, 8, -245], [-212, 17, -285], [-214, 26, -325], [-222, 35, -362], [-212, 45, -400], [-185, 53, -428],
-      [-140, 59, -442], [-80, 62, -448], [-20, 62, -450], [40, 61, -448], [85, 59, -440],
-      [104, 55, -418], [98, 47, -388], [90, 36, -350], [82, 24, -310], [78, 13, -275], [85, 5, -248], [105, 1, -228], [150, 0, -214],
-      [195, 0, -202], [217, 1, -178], [222, 4, -135], [224, 9, -100], [225, 12, -40], [225, 12, 40], [224, 9, 100], [222, 4, 135],
-      [216, 1, 168], [208, 0, 212], [180, 0, 248], [135, 0, 255], [105, 0, 230], [85, 0, 205]
-    ]
+    key: "hongkong", recKey: "hkpeak", name: "홍콩", width: 11, laps: 1, open: true, theme: "hongkong", samples: 1700,
+    finish: [-470, 182], route: "빅토리아 피크 → 미드레벨 에스컬레이터 → 센트럴 → 빅토리아 항 → 침사추이 → 네이선 로드 → 서구룡",
+    points: descendFrom([
+      [-200, 0, -905], [-60, 0, -900], [80, 0, -890], [165, 0, -868], [188, 0, -842], [160, 0, -820], [20, 0, -805], [-140, 0, -790],
+      [-232, 0, -772], [-255, 0, -748], [-228, 0, -727], [-100, 0, -712], [20, 0, -697], [78, 0, -676], [90, 0, -645], [88, 0, -600],
+      [85, 0, -555], [83, 0, -510], [82, 0, -460], [82, 0, -410], [88, 0, -360], [105, 0, -318]
+    ], 235, 1).concat([
+      [150, 0, -296], [195, 0, -284], [217, 1, -260], [222, 4, -218], [224, 9, -182], [225, 12, -120], [225, 12, 120], [224, 9, 182],
+      [222, 4, 218], [216, 1, 250], [208, 0, 292], [180, 0, 328], [135, 0, 335], [105, 0, 310], [85, 0, 285], [60, 0, 276],
+      [20, 0, 272], [-25, 0, 276], [-62, 0, 292], [-78, 0, 330], [-70, 0, 370], [-88, 0, 405], [-125, 0, 425], [-160, 0, 418],
+      [-172, 0, 385], [-150, 0, 360], [-120, 0, 342], [-125, 0, 315], [-160, 0, 304], [-205, 0, 300], [-240, 0, 275], [-265, 0, 240],
+      [-292, 0, 200], [-330, 0, 180], [-390, 0, 176], [-450, 0, 180], [-520, 0, 190], [-560, 0, 196]
+    ])
   },
   singapore: {
     key: "singapore", recKey: "hard", name: "싱가포르", width: 11, trees: 110, laps: 3, theme: "singapore",
@@ -666,14 +673,15 @@ setupWorld();
 let course = pendingCourse;
 let S = [], N = CFG.samples, W = 14, SEG = 1, TRACK_LEN = 1, MM = null;
 const SH = CFG.shoulder;
-let trackGroup = null;
+let trackGroup = null, OPEN = false, START_I = 0, FINISH_I = 0;
+function wrapI(i) { return OPEN ? Math.max(0, Math.min(N - 1, i)) : ((i % N) + N) % N; }
 
-function edgeAt(i, off, yAdd) { const s = S[i % N]; return new THREE.Vector3(s.p.x + s.n.x * off, s.p.y + (yAdd || 0), s.p.z + s.n.z * off); }
+function edgeAt(i, off, yAdd) { const s = S[wrapI(i)]; return new THREE.Vector3(s.p.x + s.n.x * off, s.p.y + (yAdd || 0), s.p.z + s.n.z * off); }
 function ribbon(group, edgeFn, vRepeat, mat, from, to) {
-  from = from || 0; to = (to === undefined) ? N : to;
+  from = from || 0; to = (to === undefined) ? (OPEN ? N - 1 : N) : Math.min(to, OPEN ? N - 1 : N);
   const cnt = to - from + 1, pos = new Float32Array(cnt * 6), uv = new Float32Array(cnt * 4), idx = [];
   for (let k = 0; k < cnt; k++) {
-    const e = edgeFn((from + k) % N), v = k / (cnt - 1) * vRepeat;
+    const e = edgeFn(wrapI(from + k)), v = k / (cnt - 1) * vRepeat;
     pos.set([e[0].x, e[0].y, e[0].z, e[1].x, e[1].y, e[1].z], k * 6);
     uv.set([0, v, 1, v], k * 4);
     if (k < cnt - 1) { const a = k * 2, b = a + 1, c = a + 2, d = a + 3; idx.push(a, b, c, b, d, c); }
@@ -695,16 +703,19 @@ function buildTrack(def) {
   }
   const G = trackGroup = new THREE.Group(); scene.add(G);
   CITY_WATER = []; CITY_ANIM = [];
-  W = def.width;
-  const curve = new THREE.CatmullRomCurve3(def.points.map(p => new THREE.Vector3(p[0], p[1], p[2])), true, "catmullrom", 0.5);
-  N = def.samples || CFG.samples; TRACK_LEN = curve.getLength(); SEG = TRACK_LEN / N; LAPS = def.laps || CFG.laps;
+  W = def.width; OPEN = !!def.open;
+  const curve = new THREE.CatmullRomCurve3(def.points.map(p => new THREE.Vector3(p[0], p[1], p[2])), !OPEN, "catmullrom", 0.5);
+  N = def.samples || CFG.samples; TRACK_LEN = curve.getLength(); SEG = TRACK_LEN / (OPEN ? N - 1 : N); LAPS = def.laps || CFG.laps;
   S = [];
   for (let i = 0; i < N; i++) {
-    const u = i / N, p = curve.getPointAt(u), tg = curve.getTangentAt(u);
+    const u = OPEN ? i / (N - 1) : i / N, p = curve.getPointAt(u), tg = curve.getTangentAt(u);
     p.y = Math.max(0, p.y);
     const t = new THREE.Vector3(tg.x, 0, tg.z).normalize();
     S.push({ p, t, n: new THREE.Vector3(t.z, 0, -t.x) });
   }
+  START_I = OPEN ? 3 : N - 14;
+  FINISH_I = 0;
+  if (OPEN) { let bd = Infinity; S.forEach((s, i) => { const d = Math.hypot(s.p.x - def.finish[0], s.p.z - def.finish[1]); if (d < bd) { bd = d; FINISH_I = i; } }); }
   const B = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity };
   S.forEach(s => { B.minX = Math.min(B.minX, s.p.x); B.maxX = Math.max(B.maxX, s.p.x); B.minZ = Math.min(B.minZ, s.p.z); B.maxZ = Math.max(B.maxZ, s.p.z); });
   buildSceneryHQ(G, def, B);
@@ -743,14 +754,14 @@ function band(a, b, ya, yb) {
   return i => a >= b ? [edgeAt(i, a, ya), edgeAt(i, b, yb)] : [edgeAt(i, b, yb), edgeAt(i, a, ya)];
 }
 function wallStrip(pts, yLo, yHi, mat) {
-  const n = pts.length, pos = new Float32Array((n + 1) * 6), uv = new Float32Array((n + 1) * 4), idx = [];
+  const n = pts.length, last = OPEN ? n - 1 : n, pos = new Float32Array((last + 1) * 6), uv = new Float32Array((last + 1) * 4), idx = [];
   let dist = 0;
-  for (let k = 0; k <= n; k++) {
+  for (let k = 0; k <= last; k++) {
     const p = pts[k % n];
     if (k > 0) dist += p.distanceTo(pts[k - 1]);
     pos.set([p.x, p.y + yHi, p.z, p.x, p.y + yLo, p.z], k * 6);
     uv.set([dist / 4, 1, dist / 4, 0], k * 4);
-    if (k < n) { const a = k * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+    if (k < last) { const a = k * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
@@ -841,15 +852,21 @@ function buildRoadSurface(G) {
   const curbRep = Math.round(TRACK_LEN / 3);
   ground(ribbon(G, band(W / 2 + 1.3, W / 2, 0.15, 0.07), curbRep, HQM.curb));
   ground(ribbon(G, band(-W / 2, -(W / 2 + 1.3), 0.07, 0.15), curbRep, HQM.curb));
-  ground(ribbon(G, band(W / 2, -W / 2, 0.075, 0.075), 1, HQM.checker, 0, 5));
-  {
-    const s0 = S[2], side = W / 2 + 2.2, hgt = 9;
+  const gantry = gi => {
+    ground(ribbon(G, band(W / 2, -W / 2, 0.075, 0.075), 1, HQM.checker, gi - 2, gi + 3));
+    const s0 = S[gi], side = W / 2 + 2.2, hgt = 9;
     [1, -1].forEach(sg => {
       const post = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.42, hgt, 20), HQM.post);
       post.position.set(s0.p.x + s0.n.x * side * sg, s0.p.y + hgt / 2, s0.p.z + s0.n.z * side * sg); post.castShadow = true; G.add(post);
     });
     const beam = new THREE.Mesh(new THREE.BoxGeometry(side * 2 + 1, 1.6, 1.0), [HQM.post, HQM.post, HQM.post, HQM.post, HQM.beam, HQM.beam]);
     beam.position.set(s0.p.x, s0.p.y + hgt, s0.p.z); beam.rotation.y = Math.atan2(s0.n.x, s0.n.z); beam.castShadow = true; G.add(beam);
+  };
+  gantry(OPEN ? START_I + 8 : 2);
+  if (OPEN) {
+    gantry(FINISH_I);
+    const e = S[N - 1], wall = new THREE.Mesh(new THREE.BoxGeometry(W + 2 * SH, 1.1, 0.8), HQM.armco);
+    wall.position.set(e.p.x, e.p.y + 0.55, e.p.z); wall.rotation.y = Math.atan2(e.n.x, e.n.z); G.add(wall);
   }
 }
 function buildSceneryHQ(G, def, B) {
@@ -1628,44 +1645,45 @@ function buildFerrisWheel(G, M, o) {
 }
 
 const HK = {
-  harbour: { z0: -80, z1: 80, water: -2.2 },
+  harbour: { z0: -160, z1: 160, water: -2.2 },
   hills: [
-    { x: 20, z: -960, r: 560, h: 480, pow: 1.5, seed: 2.2 },
-    { x: -720, z: -1000, r: 540, h: 380, pow: 1.3, seed: 4.1 },
-    { x: 800, z: -1020, r: 560, h: 400, pow: 1.35, seed: 5.3 },
-    { x: -1500, z: -820, r: 480, h: 220, pow: 1.0, seed: 6.7 },
-    { x: 1550, z: -840, r: 480, h: 240, pow: 1.0, seed: 7.9 },
-    { x: -700, z: 1350, r: 520, h: 250, pow: 1.0, seed: 1.1, rocky: true },
-    { x: 120, z: 1420, r: 520, h: 330, pow: 0.9, seed: 3.3, rocky: true },
-    { x: 900, z: 1300, r: 520, h: 260, pow: 1.0, seed: 8.4 },
-    { x: 1700, z: 1100, r: 460, h: 220, pow: 1.0, seed: 9.2 },
-    { x: -1600, z: 1150, r: 460, h: 230, pow: 1.0, seed: 2.9 },
+    { x: 0, z: -1230, r: 380, h: 340, pow: 1.3, seed: 2.2 },
+    { x: -760, z: -1120, r: 540, h: 360, pow: 1.3, seed: 4.1 },
+    { x: 820, z: -1140, r: 560, h: 380, pow: 1.35, seed: 5.3 },
+    { x: -1500, z: -900, r: 480, h: 220, pow: 1.0, seed: 6.7 },
+    { x: 1550, z: -920, r: 480, h: 240, pow: 1.0, seed: 7.9 },
+    { x: -700, z: 1430, r: 520, h: 250, pow: 1.0, seed: 1.1, rocky: true },
+    { x: 120, z: 1500, r: 520, h: 330, pow: 0.9, seed: 3.3, rocky: true },
+    { x: 900, z: 1380, r: 520, h: 260, pow: 1.0, seed: 8.4 },
+    { x: 1700, z: 1180, r: 460, h: 220, pow: 1.0, seed: 9.2 },
+    { x: -1600, z: 1230, r: 460, h: 230, pow: 1.0, seed: 2.9 },
     { x: -2500, z: 0, r: 650, h: 260, pow: 0.9, seed: 3.7, rocky: true },
     { x: 2500, z: 0, r: 650, h: 230, pow: 0.9, seed: 5.9 }
   ],
-  ifc2: { x: -150, z: -138, a: 28, H: 350 },
-  ifc1: { x: -90, z: -150, a: 17, H: 175 },
-  jardine: { x: -30, z: -140 },
-  wheel: { x: 40, z: -125, rot: 0, r: 28, hub: 33, depth: 1.3, hubW: 2.6, hubR: 1.4, tube: 0.45, spokes: 36, cabins: 42, cabR: 1.1, cabL: 1.8, legX: 12, legZ: 6, legR: 0.55, speed: 0.025 },
-  hkcec: { x: 125, z: -125 },
-  boc: { x: -40, z: -290 },
-  hsbc: { x: -130, z: -285 },
-  cheungKong: { x: -120, z: -360 },
-  midLevels: { z0: -235, z1: -470, z2: -640, z3: -730, h: 64, x0: -460, x1: -380, x2: 300, x3: 380 },
-  viewCorridor: { x0: 5, x1: 160, z0: -470, z1: -95 },
-  center: { x: -300, z: -265 },
-  centralPlaza: { x: 165, z: -290 },
-  hopewell: { x: 260, z: -350 },
-  clock: { x: 30, z: 105 },
-  cultural: { x: 150, z: 120 },
-  space: { x: -40, z: 128 },
-  peninsula: { x: 15, z: 245 },
-  icc: { x: -340, z: 150 },
-  reserve: [[-150, -138, 44], [-90, -150, 26], [-120, -178, 42], [-30, -140, 32], [8, -78, 22], [40, -125, 34], [125, -125, 72], [-40, -290, 48], [-130, -285, 40],
-    [-120, -360, 36], [-300, -265, 34], [165, -290, 44], [260, -350, 24], [30, 105, 12], [150, 120, 60], [75, 125, 32], [-40, 128, 28], [15, 245, 40], [8, 78, 22],
-    [-340, 150, 46], [-350, 215, 72], [-450, 250, 36], [-470, 170, 36]]
-};
-let HK_M = null;
+  slope: { z0: -400, z1: -1000, h: 245, x0: -580, x1: -490, x2: 330, x3: 420, zEnd: -1080 },
+  viewCorridor: { x0: 20, x1: 170, z0: -500, z1: -170 },
+  escalator: { z0: -650, z1: -505 },
+  peakTower: { x: -110, z: -952 },
+  ifc2: { x: -150, z: -218, a: 28, H: 350 },
+  ifc1: { x: -90, z: -230, a: 17, H: 175 },
+  jardine: { x: -30, z: -220 },
+  wheel: { x: 40, z: -205, rot: 0, r: 28, hub: 33, depth: 1.3, hubW: 2.6, hubR: 1.4, tube: 0.45, spokes: 36, cabins: 42, cabR: 1.1, cabL: 1.8, legX: 12, legZ: 6, legR: 0.55, speed: 0.025 },
+  hkcec: { x: 125, z: -205 },
+  boc: { x: -40, z: -370 },
+  hsbc: { x: -130, z: -365 },
+  cheungKong: { x: -120, z: -440 },
+  center: { x: -300, z: -345 },
+  centralPlaza: { x: 165, z: -370 },
+  hopewell: { x: 260, z: -430 },
+  clock: { x: 30, z: 185 },
+  cultural: { x: 150, z: 200 },
+  space: { x: -40, z: 208 },
+  peninsula: { x: 15, z: 325 },
+  icc: { x: -340, z: 230 },
+  reserve: [[-150, -218, 44], [-90, -230, 26], [-120, -258, 42], [-30, -220, 32], [8, -158, 22], [40, -205, 34], [125, -205, 72], [-40, -370, 48], [-130, -365, 40],
+    [-120, -440, 36], [-300, -345, 34], [165, -370, 44], [260, -430, 24], [-110, -952, 40], [30, 185, 12], [150, 200, 60], [75, 205, 32], [-40, 208, 28], [15, 325, 40], [8, 158, 22],
+    [-340, 230, 46], [-350, 295, 72], [-450, 330, 36], [-470, 250, 36]]
+};let HK_M = null;
 const HK_FONT = n => "bold " + n + "px \"Malgun Gothic\", \"Microsoft JhengHei\", \"Nanum Gothic\", sans-serif";
 const HK_DRAW = {
   shop(c, w, h) {
@@ -1874,7 +1892,7 @@ function makeHKMaterials() {
     hkShop: facadeMaterial(lit({ map: T.shop, roughness: 0.5, metalness: 0.1 }, L.shop, 0.9), 30, 0x55585C, 5),
     ifc: std(lit({ map: T.ifc, metalness: 0.7, roughness: 0.16 }, L.ifc, 0.65)),
     icc: std(lit({ map: T.ifc, color: 0x9DB2C6, metalness: 0.75, roughness: 0.12 }, L.ifc, 0.65)),
-    boc: std(lit({ map: T.boc, metalness: 0.6, roughness: 0.15 }, L.boc, 1.6)),
+    boc: std(Object.assign(lit({ map: T.boc, metalness: 0.6, roughness: 0.15 }, L.boc, 1.6), { emissive: 0xD6FFE2 })),
     hsbc: facadeMaterial(lit({ map: T.hsbc, metalness: 0.5, roughness: 0.3 }, L.hsbc), 16, 0x6A6E72),
     truss: std({ map: T.truss, metalness: 0.6, roughness: 0.4, emissive: 0x405060, emissiveIntensity: 0.6 }),
     jardine: facadeMaterial(lit({ map: T.jardine, normalMap: T.jardineN, metalness: 0.6, roughness: 0.3 }, L.jardine), 12, 0x8C9096),
@@ -1887,7 +1905,15 @@ function makeHKMaterials() {
     lightPool: new THREE.MeshBasicMaterial({ map: pool, color: 0x5E4630, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }),
     streak: [0xFFB347, 0xE8F0FF, 0x4FE3FF, 0xFF4FD8, 0x8CFF6A].map(c => new THREE.MeshBasicMaterial({ map: streak, color: c, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false })),
     bridgeLit: std({ color: 0xC9D2DC, roughness: 0.6, emissive: 0x7F9CC0, emissiveIntensity: 0.55 }),
-    cable: std({ color: 0xE8EEF4, metalness: 0.5, roughness: 0.4, emissive: 0xFFFFFF, emissiveIntensity: 1.3 }),
+    cable: std({ color: 0xE8EEF4, metalness: 0.5, roughness: 0.4, emissive: 0xFFF4DC, emissiveIntensity: 0.6 }),
+    escFloor: std({ color: 0x9A9A96, roughness: 0.85, side: THREE.DoubleSide }),
+    escRoof: std({ color: 0x3C4450, metalness: 0.6, roughness: 0.4, side: THREE.DoubleSide }),
+    escSteps: std({ color: 0x7A8088, metalness: 0.7, roughness: 0.35, side: THREE.DoubleSide, emissive: 0x20303A, emissiveIntensity: 0.6 }),
+    escLight: new THREE.MeshBasicMaterial({ color: 0xEAF6FF, side: THREE.DoubleSide }),
+    escGlass: std({ color: 0xA8D8F0, transparent: true, opacity: 0.32, emissive: 0x4FA8D8, emissiveIntensity: 0.55, side: THREE.DoubleSide, depthWrite: false }),
+    greenLine: new THREE.MeshBasicMaterial({ color: 0x4CFF7A }),
+    ledPanel: new THREE.MeshBasicMaterial({ color: 0x2EE870 }),
+    redLight: new THREE.MeshBasicMaterial({ color: 0xFF2A20 }),
     peakLit: std({ color: 0xF0EEE9, roughness: 0.45, emissive: 0xFFF0D0, emissiveIntensity: 0.7 }),
     beam: [0xFFFFFF, 0x7FE8FF, 0xB07CFF, 0x7CFF9E].map(c => new THREE.MeshBasicMaterial({ color: c, vertexColors: true, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })),
     pinkTile: std({ map: T.pinkTile, roughness: 0.7 }),
@@ -1912,13 +1938,13 @@ function hkKeepOut(x, z, pad) {
   return HK.reserve.some(([rx, rz, rr]) => Math.hypot(x - rx, z - rz) < rr + pad);
 }
 let HK_HILLS = HK.hills;
-function midLevelsHeight(x, z) {
-  const m = HK.midLevels, s = THREE.MathUtils.smoothstep;
-  return m.h * s(-z, -m.z0, -m.z1) * (1 - s(-z, -m.z2, -m.z3)) * s(x, m.x0, m.x1) * (1 - s(x, m.x2, m.x3));
+let HK_TERRAIN = null;
+function islandSlope(x, z) {
+  const o = HK.slope, s = THREE.MathUtils.smoothstep;
+  return o.h * s(-z, -o.z0, -o.z1) * s(x, o.x0, o.x1) * (1 - s(x, o.x2, o.x3));
 }
-function hkBase(x, z) { let y = midLevelsHeight(x, z); HK_HILLS.forEach(o => { y = Math.max(y, hillHeightAt(o, x, z)); }); return y; }
-function hkLandmarkBase(x, z) { return Math.min(...[[0, 0], [22, 22], [-22, 22], [22, -22], [-22, -22]].map(([a, b]) => hkBase(x + a, z + b))); }
-function fitHillsToTrack(hills) {
+function hkBase(x, z) { let y = HK_TERRAIN ? HK_TERRAIN(x, z) : islandSlope(x, z); HK_HILLS.forEach(o => { y = Math.max(y, hillHeightAt(o, x, z)); }); return y; }
+function hkLandmarkBase(x, z) { return Math.min(...[[0, 0], [22, 22], [-22, 22], [22, -22], [-22, -22]].map(([a, b]) => hkBase(x + a, z + b))); }function fitHillsToTrack(hills) {
   const side = W / 2 + SH + 8;
   return hills.map(src => {
     const o = Object.assign({}, src);
@@ -1935,14 +1961,17 @@ function fitHillsToTrack(hills) {
   });
 }
 function buildHKTerrain(G, M) {
-  const m = HK.midLevels, x0 = m.x0, x1 = m.x3, z0 = m.z3, z1 = -195, step = 6, isl = S.filter(s => s.p.z < -185);
-  const edge = W / 2 + SH + 2, blend = 26;
+  const o = HK.slope, x0 = o.x0, x1 = o.x3, z0 = o.zEnd, z1 = -270, step = 6, isl = S.filter(s => s.p.z < -262), few = isl.filter((s, i) => i % 4 === 0);
+  const edge = W / 2 + SH + 2, s = THREE.MathUtils.smoothstep, lerp = THREE.MathUtils.lerp;
   const terrainAt = (x, z) => {
-    let h = midLevelsHeight(x, z), bd = Infinity, ty = 0;
-    for (const s of isl) { const d = (s.p.x - x) ** 2 + (s.p.z - z) ** 2; if (d < bd) { bd = d; ty = s.p.y; } }
+    if (z > z1) return 0;
+    let bd = Infinity, ty = 0, sw = 0, sy = 0;
+    for (const q of isl) { const d = (q.p.x - x) ** 2 + (q.p.z - z) ** 2; if (d < bd) { bd = d; ty = q.p.y; } }
+    for (const q of few) { const d = (q.p.x - x) ** 2 + (q.p.z - z) ** 2; if (d < 48400) { const w = 1 / (d + 100); sw += w; sy += w * q.p.y; } }
     bd = Math.sqrt(bd);
-    if (bd < edge + blend) h = THREE.MathUtils.lerp(ty - 0.3, h, THREE.MathUtils.smoothstep(bd, edge, edge + blend));
-    return h;
+    if (bd < edge) return ty - 0.3;
+    const idw = sw > 0 ? sy / sw : ty, near = lerp(ty - 0.3, idw, s(bd, edge, edge + 22));
+    return lerp(near, islandSlope(x, z), s(bd, 45, 230));
   };
   const g = new THREE.PlaneGeometry(x1 - x0, z1 - z0, Math.round((x1 - x0) / step), Math.round((z1 - z0) / step)).rotateX(-Math.PI / 2);
   const p = g.attributes.position, col = [], green = new THREE.Color(0x2E5231), tmp = new THREE.Color(), cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
@@ -1954,8 +1983,7 @@ function buildHKTerrain(G, M) {
   g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3)); g.computeVertexNormals();
   const mesh = new THREE.Mesh(g, M.hill); mesh.position.set(cx, 0, cz); mesh.receiveShadow = true; G.add(mesh);
   return terrainAt;
-}
-function buildHKGround(G, M) {
+}function buildHKGround(G, M) {
   const R = HK.harbour, X = 4500;
   flatPlane(G, M.pavement, -X, X, -3600, R.z0 - 20, -0.05);
   flatPlane(G, M.plaza, -X, X, R.z0 - 20, R.z0, -0.04);
@@ -1993,25 +2021,9 @@ function suspensionBridge(G, M, a, b, off) {
   });
   rodsMesh(G, M.cable, rods, 0.09, 4);
 }
-function cableStayedBridge(G, M, a, b, off) {
-  const R = HK.harbour, iP = nearestSampleInRange(a, b, (R.z0 + R.z1) / 2), s = S[iP], lat = off + 2.4, top = s.p.y + 78, rods = [];
-  [1, -1].forEach(sg => {
-    const e = edgeAt(iP, sg * lat, 0), h = top - R.water;
-    seoulMesh(G, new THREE.CylinderGeometry(1.5, 3.2, h * 0.72, 24), M.bridgeLit, e.x, R.water + h * 0.36, e.z);
-    seoulMesh(G, new THREE.CylinderGeometry(0.8, 1.5, h * 0.28, 24), M.cable, e.x, R.water + h * 0.86, e.z);
-    for (let k = 0; k < 12; k++) [1, -1].forEach(dir => {
-      const i = nearestSampleInRange(a, b, s.p.z + dir * (14 + k * 7.5)), d = edgeAt(i, sg * (off + 0.6), 0);
-      rods.push([new THREE.Vector3(d.x, S[i].p.y + 0.6, d.z), new THREE.Vector3(e.x, s.p.y + 36 + k * 3.2, e.z)]);
-    });
-  });
-  seoulMesh(G, new THREE.BoxGeometry(2 * lat + 4, 2.6, 4), M.concrete, s.p.x, s.p.y - 3.6, s.p.z).rotation.y = Math.atan2(s.t.x, s.t.z);
-  rodsMesh(G, M.cable, rods, 0.12, 5);
-}
 function buildHKBridges(G, M) {
   const R = HK.harbour, off = W / 2 + SH + 1.5;
-  sampleRanges(i => { const z = S[i].p.z; return z > R.z0 - 60 && z < R.z1 + 60; }).forEach(([a, b]) => {
-    if (S[Math.round((a + b) / 2) % N].p.x > 0) suspensionBridge(G, M, a, b, off); else cableStayedBridge(G, M, a, b, off);
-  });
+  sampleRanges(i => { const z = S[i].p.z; return z > R.z0 - 60 && z < R.z1 + 60 && S[i].p.y > 2; }).forEach(([a, b]) => suspensionBridge(G, M, a, b, off));
 }
 function buildIFC(G, M, o) {
   const g = groupAt(G, o.x, o.z), a = o.a, H = o.H, shaft = H * 0.84, top = a * 0.86;
@@ -2131,14 +2143,56 @@ function buildICC(G, M, o) {
   const g = groupAt(G, o.x, o.z), H = 390;
   seoulMesh(g, loftGeometry(H, 30, 64, t => { const a = 30 + 5 * Math.max(0, 1 - t / 0.1) ** 2 - 2 * t; return { a, b: a, n: 10 }; }, 16, 16), M.icc, 0, 0, 0);
   seoulMesh(g, loftGeometry(22, 4, 64, t => { const a = 28 * (1 - 0.3 * t); return { a, b: a * (1 - 0.55 * t), n: 10 }; }, 8, 16), M.icc, 0, H, 0);
-  seoulMesh(G, new THREE.BoxGeometry(120, 24, 80).translate(0, 12, 0), M.glass, -350, 0, 215);
-  [[-450, 250], [-470, 170]].forEach(([x, z]) => seoulMesh(G, new THREE.BoxGeometry(30, 262, 54).translate(0, 131, 0), M.glass, x, 0, z));
+  seoulMesh(G, new THREE.BoxGeometry(120, 24, 80).translate(0, 12, 0), M.glass, -350, 0, 295);
+  [[-450, 330], [-470, 250]].forEach(([x, z]) => seoulMesh(G, new THREE.BoxGeometry(30, 262, 54).translate(0, 131, 0), M.glass, x, 0, z));
 }
 function buildPeakTower(G, M) {
-  const p = HK_HILLS[0], y0 = p.h - 6;
+  const o = HK.peakTower, g = groupAt(G, o.x, o.z, 0.2);
   const pts = [[5, 0], [5, 12], [9, 13], [18, 16], [27, 21], [29, 24], [26, 24.6], [14, 20.5], [0.1, 20]].map(([r, y]) => new THREE.Vector2(r, y));
-  seoulMesh(G, new THREE.LatheGeometry(pts, 48), M.peakLit, p.x, y0, p.z).scale.set(1, 1, 0.62);
-  seoulMesh(G, new THREE.BoxGeometry(40, 14, 26).translate(0, 7, 0), M.glass, p.x + 45, y0 - 4, p.z + 20);
+  seoulMesh(g, new THREE.LatheGeometry(pts, 48), M.peakLit, 0, 0, 0).scale.set(1, 1, 0.62);
+  seoulMesh(g, new THREE.BoxGeometry(40, 14, 26).translate(0, 7, 0), M.glass, 48, -2, 18);
+}
+function inEscalator(z) { const e = HK.escalator; return z > e.z0 && z < e.z1; }
+function escalatorSignTexture() {
+  return seoulTex(512, 64, (c, w, h) => {
+    c.fillStyle = "#0E2A1E"; c.fillRect(0, 0, w, h);
+    c.fillStyle = "#FFFFFF"; c.textAlign = "center"; c.textBaseline = "middle";
+    c.font = HK_FONT(30); c.fillText("中環至半山自動扶梯", w * 0.36, h / 2);
+    c.font = "bold 18px \"Nanum Gothic\", \"Malgun Gothic\", sans-serif"; c.fillText("MID-LEVELS ESCALATOR", w * 0.82, h / 2);
+  });
+}
+function buildMidLevelsEscalator(G, M) {
+  const off = W / 2 + SH + 2.2, lo = 5.8, hi = 9.2, rods = [], sign = new THREE.MeshBasicMaterial({ map: escalatorSignTexture() });
+  sampleRanges(i => inEscalator(S[i].p.z) && Math.abs(S[i].t.z) > 0.7).forEach(([a, b]) => {
+    [1, -1].forEach(sg => {
+      const c = sg * off;
+      ribbon(G, band(c + 1.7, c - 1.7, lo, lo), 1, M.escFloor, a, b).castShadow = true;
+      ribbon(G, band(c + 1.9, c - 1.9, hi, hi), 1, M.escRoof, a, b).castShadow = true;
+      ribbon(G, band(c + 1.25, c - 1.25, lo + 0.06, lo + 0.06), Math.round((b - a) * SEG / 1.1), M.escSteps, a, b);
+      ribbon(G, band(c + 0.45, c - 0.45, hi - 0.28, hi - 0.28), 1, M.escLight, a, b);
+      [1.7, -1.7].forEach(d => ribbon(G, i => [edgeAt(i, c + d, hi - 0.2), edgeAt(i, c + d, lo + 0.1)], 1, M.escGlass, a, b).renderOrder = 2);
+      for (let i = a; i <= b; i += Math.max(1, Math.round(9 / SEG))) { const e = edgeAt(i, c, 0); rods.push([new THREE.Vector3(e.x, e.y - 2, e.z), new THREE.Vector3(e.x, e.y + lo, e.z)]); }
+    });
+    for (let i = a + Math.round(15 / SEG); i < b - Math.round(8 / SEG); i += Math.round(45 / SEG)) {
+      const s = S[i], yaw = Math.atan2(s.t.x, s.t.z), span = 2 * off + 3.4;
+      seoulMesh(G, new THREE.BoxGeometry(span, 0.5, 3.4), M.escFloor, s.p.x, s.p.y + lo, s.p.z).rotation.y = yaw;
+      const glass = seoulMesh(G, new THREE.BoxGeometry(span, hi - lo - 0.3, 3.2), M.escGlass, s.p.x, s.p.y + (lo + hi) / 2, s.p.z); glass.rotation.y = yaw; glass.castShadow = false; glass.renderOrder = 2;
+      seoulMesh(G, new THREE.BoxGeometry(span + 0.4, 0.4, 3.8), M.escRoof, s.p.x, s.p.y + hi, s.p.z).rotation.y = yaw;
+      [1, -1].forEach(dir => {
+        const pl = new THREE.Mesh(new THREE.PlaneGeometry(13, 1.6), sign);
+        pl.position.set(s.p.x - s.t.x * 1.75 * dir, s.p.y + hi - 1.2, s.p.z - s.t.z * 1.75 * dir); pl.rotation.y = Math.atan2(-s.t.x * dir, -s.t.z * dir); G.add(pl);
+      });
+    }
+  });
+  rodsMesh(G, M.escRoof, rods, 0.28, 8);
+}
+function buildPhotoAccents(G, M) {
+  const ck = HK.cheungKong, cy = G.userData.groundAt(ck.x, ck.z), rods = [];
+  [[1, 1], [1, -1], [-1, 1], [-1, -1]].forEach(([a, b]) => rods.push([new THREE.Vector3(ck.x + a * 22.2, cy, ck.z + b * 22.2), new THREE.Vector3(ck.x + a * 22.2, cy + 260, ck.z + b * 22.2)]));
+  rodsMesh(G, M.greenLine, rods, 0.45, 6);
+  const c = HK.center, panel = new THREE.Mesh(new THREE.PlaneGeometry(34, 90), M.ledPanel);
+  panel.position.set(c.x, G.userData.groundAt(c.x, c.z) + 120, c.z + 20.4); G.add(panel);
+  CITY_ANIM.push(t => { M.ledPanel.color.setHSL(0.33 + 0.12 * Math.sin(t * 0.35), 0.9, 0.5); });
 }
 function buildFerryPiers(G, M) {
   const R = HK.harbour;
@@ -2208,7 +2262,7 @@ function hkNeonGeometries() {
   });
 }
 function buildHKCity(G, M) {
-  const sets = { resi: [], monster: [], glass: [], office: [], shop: [], roof: [] }, signs = [0, 1, 2, 3, 4, 5, 6, 7].map(() => []), placed = [];
+  const sets = { resi: [], monster: [], glass: [], office: [], shop: [], roof: [] }, signs = [0, 1, 2, 3, 4, 5, 6, 7].map(() => []), placed = [], redLights = [];
   const offBase = W / 2 + SH + 6, pastel = [0xF4E9DC, 0xF2D9D2, 0xDCE7F0, 0xDDEBDD, 0xF3EDC9, 0xFFFFFF, 0xE9E2F0];
   const pick = kinds => { let r = Math.random(); for (const [k, p] of kinds) { r -= p; if (r < 0) return k; } return kinds[0][0]; };
   const push = (k, x, y, z, w, h, d, rot) => sets[k].push([x, y, z, w, h, d, rot, k === "resi" ? pastel[(Math.random() * pastel.length) | 0] : null]);
@@ -2217,7 +2271,9 @@ function buildHKCity(G, M) {
     while (i < N) {
       const len = rnd(12, 22), gap = rnd(1.5, 4), steps = Math.max(1, Math.round(len / SEG)), s = S[(i + Math.round(steps / 2)) % N];
       i += steps + Math.max(1, Math.round(gap / SEG));
-      if (s.p.y > 0.4) continue;
+      const hill = s.p.z < -300;
+      if (s.p.y > 0.4 && !hill) continue;
+      if (hill && Math.abs(s.t.z) < 0.7 && s.n.z * sg > 0) continue;
       const kowloon = s.p.z > 0, depth = rnd(14, 22), off = offBase + depth / 2, rot = Math.atan2(-s.t.z, s.t.x), c = Math.cos(rot), sn = Math.sin(rot);
       const x = s.p.x + s.n.x * off * sg, z = s.p.z + s.n.z * off * sg, hw = len / 2, hd = depth / 2;
       const corners = [[hw, hd], [hw, -hd], [-hw, hd], [-hw, -hd]].map(([a, b]) => [x + a * c + b * sn, z - a * sn + b * c]);
@@ -2226,16 +2282,17 @@ function buildHKCity(G, M) {
       const rad = Math.hypot(hw, hd) * 0.8;
       if (placed.some(p => Math.hypot(p[0] - x, p[1] - z) < p[2] + rad)) continue;
       placed.push([x, z, rad]);
-      const h = kowloon ? (Math.random() < 0.3 ? rnd(80, 140) : rnd(34, 80)) : (Math.random() < 0.45 ? rnd(120, 210) : rnd(55, 120));
-      push(pick(kowloon ? [["resi", 0.5], ["monster", 0.22], ["office", 0.28]] : [["glass", 0.5], ["office", 0.3], ["resi", 0.2]]), x, 0, z, len, h, depth, rot);
-      sets.shop.push([x, 0, z, len + 0.3, 5, depth + 0.3, rot, null]);
-      if (!kowloon && Math.random() > 0.35) continue;
+      const esc = inEscalator(s.p.z), y0 = hill ? s.p.y - 3 : 0;
+      const h = kowloon ? (Math.random() < 0.3 ? rnd(80, 140) : rnd(34, 80)) : hill ? (esc ? rnd(45, 100) : rnd(22, 60)) : (Math.random() < 0.45 ? rnd(120, 210) : rnd(55, 120));
+      push(pick(kowloon ? [["resi", 0.5], ["monster", 0.22], ["office", 0.28]] : hill ? [["resi", 0.7], ["office", 0.3]] : [["glass", 0.5], ["office", 0.3], ["resi", 0.2]]), x, y0, z, len, h + 3, depth, rot);
+      sets.shop.push([x, y0, z, len + 0.3, 8, depth + 0.3, rot, null]);
+      if (!kowloon && !(esc && Math.random() < 0.6) && (hill || Math.random() > 0.35)) continue;
       for (let a = -hw + 2; a < hw - 1; a += rnd(3.5, 6)) {
         const type = Math.random() < 0.5 ? (Math.random() * 4) | 0 : 4 + ((Math.random() * 4) | 0), vertical = type < 4;
         const out = vertical ? 2.3 : rnd(4.2, 5.6), hgt = vertical ? rnd(6, 10) : out * rnd(0.34, 0.42), bottom = rnd(5.5, vertical ? 12 : 17);
         if (bottom + hgt > h - 2) continue;
         const lat = offBase - out / 2 - 0.3;
-        signs[type].push([s.p.x + s.n.x * lat * sg + s.t.x * a, bottom + hgt / 2, s.p.z + s.n.z * lat * sg + s.t.z * a, out, hgt, rot + Math.PI / 2]);
+        signs[type].push([s.p.x + s.n.x * lat * sg + s.t.x * a, y0 + (hill ? 3 : 0) + bottom + hgt / 2, s.p.z + s.n.z * lat * sg + s.t.z * a, out, hgt, rot + Math.PI / 2]);
       }
     }
   });
@@ -2244,14 +2301,15 @@ function buildHKCity(G, M) {
     const x = gx + rnd(-7, 7), z = gz + rnd(-7, 7), kowloon = z > 0, w = rnd(12, 23), d = rnd(12, 23), rad = Math.hypot(w, d) / 2;
     if (hkKeepOut(x, z, rad) || nearTrackXZ(x, z, 36 + rad)) continue;
     if (placed.some(p => Math.hypot(p[0] - x, p[1] - z) < p[2] + rad)) continue;
-    const base = hkBase(x, z); if (base > (kowloon ? 45 : 150)) continue;
+    const base = hkBase(x, z); if (base > (kowloon ? 45 : 170)) continue;
     const slope = base > 4, core = !kowloon && z > -520 && Math.abs(x) < 700;
     const vc = HK.viewCorridor, inView = x > vc.x0 && x < vc.x1 && z > vc.z0 && z < vc.z1;
-    const h = inView ? rnd(14, 30) : kowloon ? (Math.random() < 0.16 ? rnd(95, 170) : rnd(32, 90)) : slope ? rnd(45, 115) : core ? (Math.random() < 0.3 ? rnd(160, 250) : rnd(70, 150)) : rnd(50, 130);
+    const h = inView ? rnd(14, 30) : kowloon ? (Math.random() < 0.16 ? rnd(95, 170) : rnd(32, 90)) : slope ? (z < -600 ? rnd(14, 40) : rnd(40, 100)) : core ? (Math.random() < 0.3 ? rnd(120, 185) : rnd(55, 125)) : rnd(50, 130);
     const kind = pick(kowloon ? [["resi", 0.58], ["monster", 0.14], ["office", 0.18], ["glass", 0.1]] : slope ? [["resi", 0.8], ["glass", 0.2]] : core ? [["glass", 0.5], ["office", 0.3], ["resi", 0.2]] : [["resi", 0.55], ["office", 0.25], ["glass", 0.2]]);
     const y0 = slope ? base - 4 : 0, hh = h + (slope ? 4 : 0), rot = rnd(-0.08, 0.08);
     push(kind, x, y0, z, w, hh, d, rot);
     if (Math.random() < 0.5) sets.roof.push([x, y0 + hh, z, w * rnd(0.25, 0.45), rnd(2.5, 5), d * rnd(0.25, 0.45), rot, null]);
+    if (h > 110) redLights.push([x, y0 + hh + 1.2, z]);
   }
   const box = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), mtx = new THREE.Matrix4(), q = new THREE.Quaternion(), tint = new THREE.Color(), v = new THREE.Vector3(), sc = new THREE.Vector3();
   const mats = { resi: M.resi, monster: M.monster, glass: M.glass, office: M.office, shop: M.hkShop, roof: M.concrete };
@@ -2264,6 +2322,12 @@ function buildHKCity(G, M) {
     });
     mesh.castShadow = true; mesh.receiveShadow = true; mesh.frustumCulled = false; G.add(mesh);
   });
+  if (redLights.length) {
+    const reds = new THREE.InstancedMesh(new THREE.SphereGeometry(0.9, 8, 6), M.redLight, redLights.length);
+    redLights.forEach(([x, y, z], i) => reds.setMatrixAt(i, mtx.makeTranslation(x, y, z)));
+    reds.frustumCulled = false; G.add(reds);
+    CITY_ANIM.push(t => { M.redLight.color.setRGB(Math.sin(t * 2.2) > 0 ? 1.6 : 0.35, 0.08, 0.06); });
+  }
   const neonGeos = hkNeonGeometries();
   signs.forEach((list, k) => {
     if (!list.length) return;
@@ -2318,7 +2382,7 @@ function buildSkyBeams(G, M) {
   });
 }
 function buildHarbourGlow(G, M) {
-  const R = HK.harbour, lists = M.streak.map(() => []), weights = [0.34, 0.3, 0.14, 0.12, 0.1];
+  const R = HK.harbour, lists = M.streak.map(() => []), weights = [0.46, 0.38, 0.06, 0.05, 0.05];
   const pick = () => { let r = Math.random(); for (let k = 0; k < weights.length; k++) { r -= weights[k]; if (r < 0) return k; } return 0; };
   [[R.z0, 0], [R.z1, Math.PI]].forEach(([shore, rot]) => {
     for (let x = -1300; x <= 1300; x += rnd(6, 18)) {
@@ -2340,16 +2404,16 @@ function buildHarbourGlow(G, M) {
 }
 function buildHongKong(G) {
   const M = makeHKMaterials();
-  HK_HILLS = fitHillsToTrack(HK.hills);
+  HK_HILLS = fitHillsToTrack(HK.hills); HK_TERRAIN = null;
   G.userData.groundAt = hkLandmarkBase;
   buildRoadSurface(G);
   buildRiverRoadside(G, M, HK.harbour, true);
   buildStreetDetails(G, M, false);
   buildHKGround(G, M);
-  const terrainAt = buildHKTerrain(G, M);
+  const terrainAt = HK_TERRAIN = buildHKTerrain(G, M);
   buildHKBridges(G, M);
   buildIFC(G, M, HK.ifc2); buildIFC(G, M, HK.ifc1);
-  seoulMesh(G, new THREE.BoxGeometry(80, 16, 24).translate(0, 8, 0), M.glass, -120, 0, -178);
+  seoulMesh(G, new THREE.BoxGeometry(80, 16, 24).translate(0, 8, 0), M.glass, -120, 0, -258);
   buildJardine(G, M, HK.jardine);
   buildBOC(G, M, HK.boc);
   buildHSBC(G, M, HK.hsbc);
@@ -2367,7 +2431,9 @@ function buildHongKong(G) {
   buildICC(G, M, HK.icc);
   buildPeakTower(G, M);
   buildHarbourBoats(G, M);
+  buildMidLevelsEscalator(G, M);
   buildHKCity(G, M);
+  buildPhotoAccents(G, M);
   buildSkyBeams(G, M);
   buildHarbourGlow(G, M);
   CITY_ANIM.push(t => { M.cplaza.emissive.setHSL((t * 0.04) % 1, 0.8, 0.55); });
@@ -2871,11 +2937,11 @@ function closeLap() {
 }
 
 function placeAt(i) {
-  const s = S[i % N];
-  P.x = s.p.x; P.z = s.p.z; P.y = s.p.y; P.v = 0; P.ci = i % N; P.prevCi = P.ci;
+  const s = S[wrapI(i)];
+  P.x = s.p.x; P.z = s.p.z; P.y = s.p.y; P.v = 0; P.ci = wrapI(i); P.prevCi = P.ci;
   P.h = Math.atan2(-s.t.x, -s.t.z);
 }
-function resetCar() { placeAt(N - 14); P.off = false; P.wallT = 0; P.steerVis = 0; P.rollVis = 0; }
+function resetCar() { placeAt(START_I); P.off = false; P.wallT = 0; P.steerVis = 0; P.rollVis = 0; }
 function showCard(which) {
   overlay.style.display = which ? "flex" : "none";
   cardStart.style.display = which === "start" ? "" : "none";
@@ -2912,7 +2978,8 @@ function startRace(which) {
   $("hudGhost").style.display = ghostLabel ? "block" : "none"; $("hudGhost").textContent = "👻 " + ghostLabel;
   state = "countdown"; cdTime = 0; cdShown = -1; goTimer = 0; elapsed = 0; finalMs = 0; shake = 0;
   showCard(null); setHud(true); countBox.style.display = "flex"; lapToast.className = "";
-  hudLap.textContent = "1 / " + LAPS; hudTime.firstChild.nodeValue = fmtTime(0); hudOff.textContent = "";
+  hudLap.previousElementSibling.textContent = OPEN ? "진행" : "바퀴"; hudBest.parentElement.style.display = OPEN ? "none" : "";
+  hudLap.textContent = OPEN ? "0%" : "1 / " + LAPS; hudTime.firstChild.nodeValue = fmtTime(0); hudOff.textContent = "";
   engineStart();
   snapCamera();
 }
@@ -2934,7 +3001,7 @@ function finish() {
   [523, 659, 784, 1047].forEach((f, i) => beep(f, 0.35, "triangle", 0.1, i * 0.13));
   const k = course, WR = WRS[k];
   $("finalTime").textContent = fmtTime(finalMs);
-  $("lapList").innerHTML = lapTimes.map((t, i) => "랩" + (i + 1) + " " + fmtTime(t)).join(" · ") +
+  $("lapList").innerHTML = OPEN ? TRACKS[course].route : lapTimes.map((t, i) => "랩" + (i + 1) + " " + fmtTime(t)).join(" · ") +
     "<br>이번 경기 최고 랩타임 <b>" + fmtTime(raceBest) + "</b>";
   $("doneCourse").textContent = TRACKS[k].name;
   recordSample(Infinity);
@@ -2961,7 +3028,7 @@ function finish() {
 function nearestIndex() {
   let bi = P.ci, bd = Infinity;
   for (let k = -40; k <= 40; k++) {
-    const i = (P.ci + k + N) % N, s = S[i], dx = s.p.x - P.x, dz = s.p.z - P.z, d = dx * dx + dz * dz;
+    const i = wrapI(P.ci + k), s = S[i], dx = s.p.x - P.x, dz = s.p.z - P.z, d = dx * dx + dz * dz;
     if (d < bd) { bd = d; bi = i; }
   }
   return bi;
@@ -2972,7 +3039,7 @@ function updateCar(dt) {
   const str = racing ? ((keys.left ? 1 : 0) - (keys.right ? 1 : 0)) : 0;
   const maxV = P.off ? CFG.offroadMax : CFG.maxSpeed;
   const fx0 = -Math.sin(P.h), fz0 = -Math.cos(P.h);
-  const sA = S[(P.ci + 5) % N], sB = S[(P.ci + N - 5) % N], s0 = S[P.ci];
+  const sA = S[wrapI(P.ci + 5)], sB = S[wrapI(P.ci - 5)], s0 = S[P.ci];
   const slope = Math.atan2(sA.p.y - sB.p.y, SEG * 10) * (fx0 * s0.t.x + fz0 * s0.t.z);
 
   const ratio0 = Math.abs(P.v) / CFG.maxSpeed;
@@ -2981,7 +3048,7 @@ function updateCar(dt) {
   else P.v -= P.v * CFG.coastDrag * dt;
   P.v -= CFG.gravity * Math.sin(slope) * dt;
   if (thr <= 0 && P.v > 0) P.v -= CFG.accel * ratio0 * ratio0 * dt;
-  if (state === "done") P.v -= P.v * 1.5 * dt;
+  if (state === "done") P.v -= P.v * (OPEN ? 3.5 : 1.5) * dt;
   if (P.off) { P.v -= P.v * CFG.offroadDrag * dt; }
   const capV = maxV * (slope < 0 ? CFG.downhillMax : 1);
   if (P.v > capV) P.v = Math.max(capV, P.v - 40 * dt);
@@ -3004,7 +3071,7 @@ function updateCar(dt) {
   const s = S[P.ci], dxs = P.x - s.p.x, dzs = P.z - s.p.z;
   const lat = dxs * s.n.x + dzs * s.n.z;
   const along = dxs * s.t.x + dzs * s.t.z;
-  const s2 = S[(P.ci + (along >= 0 ? 1 : N - 1)) % N];
+  const s2 = S[wrapI(P.ci + (along >= 0 ? 1 : -1))];
   const frac = Math.min(1, Math.abs(along) / SEG);
   P.y = s.p.y + (s2.p.y - s.p.y) * frac;
   P.off = Math.abs(lat) > W / 2 + 0.8;
@@ -3017,7 +3084,11 @@ function updateCar(dt) {
     P.wallT = 0.4;
   }
 
-  if (racing) {
+  if (racing && OPEN) {
+    const span = FINISH_I - START_I, next = START_I + (P.expected + 1) * span / 8;
+    if (P.expected < 7 && P.ci >= next) P.expected++;
+    if (P.expected >= 7 && P.ci >= FINISH_I) { P.lap = 1; closeLap(); finish(); }
+  } else if (racing) {
     const sec = Math.floor(P.ci * 4 / N);
     const fwdCross = P.prevCi > N * 0.9 && P.ci < N * 0.1, backCross = P.prevCi < N * 0.1 && P.ci > N * 0.9;
     if (P.expected < 4 && sec === P.expected % 4 && (P.expected > 0 || fwdCross)) P.expected++;
@@ -3031,7 +3102,7 @@ function updateCar(dt) {
 
   car.position.set(P.x, P.y, P.z);
   car.rotation.y = P.h;
-  const i1 = (P.ci + 5) % N, i0 = (P.ci + N - 5) % N;
+  const i1 = wrapI(P.ci + 5), i0 = wrapI(P.ci - 5);
   car.rotation.x = Math.atan2(S[i1].p.y - S[i0].p.y, SEG * 10) * (fx * s.t.x + fz * s.t.z);
   car.rotation.z = P.rollVis;
   car.userData.wheels.forEach(w => { w.spin.rotation.x -= P.v * dt / car.userData.wheelR; if (w.front) w.g.rotation.y = P.steerVis; });
@@ -3078,11 +3149,12 @@ function drawMinimap() {
   mctx.clearRect(0, 0, 300, 300);
   mctx.lineCap = mctx.lineJoin = "round";
   mctx.beginPath();
-  for (let i = 0; i <= N; i += 4) { const s = S[i % N]; if (i === 0) mctx.moveTo(MM.mx(s.p.x), MM.mz(s.p.z)); else mctx.lineTo(MM.mx(s.p.x), MM.mz(s.p.z)); }
-  mctx.closePath();
+  const last = OPEN ? N - 1 : N;
+  for (let i = 0; i <= last; i += (i + 4 > last && i < last ? last - i : 4)) { const s = S[i % N]; if (i === 0) mctx.moveTo(MM.mx(s.p.x), MM.mz(s.p.z)); else mctx.lineTo(MM.mx(s.p.x), MM.mz(s.p.z)); }
+  if (!OPEN) mctx.closePath();
   mctx.strokeStyle = "#1B2B20"; mctx.lineWidth = W * MM.sc + 6; mctx.stroke();
   mctx.strokeStyle = "#7A7E8C"; mctx.lineWidth = W * MM.sc; mctx.stroke();
-  const f = S[2];
+  const f = S[OPEN ? FINISH_I : 2];
   mctx.strokeStyle = "#FFFFFF"; mctx.lineWidth = 4;
   mctx.beginPath(); mctx.moveTo(MM.mx(f.p.x + f.n.x * W / 2), MM.mz(f.p.z + f.n.z * W / 2)); mctx.lineTo(MM.mx(f.p.x - f.n.x * W / 2), MM.mz(f.p.z - f.n.z * W / 2)); mctx.stroke();
   const cx = MM.mx(P.x), cz = MM.mz(P.z);
@@ -3122,7 +3194,7 @@ function tick(now) {
 
   if (state !== "menu") {
     hudTime.firstChild.nodeValue = fmtTime(state === "done" ? finalMs : elapsed);
-    setText(hudLap, Math.min(LAPS, P.lap + 1) + " / " + LAPS);
+    setText(hudLap, OPEN ? Math.min(100, Math.round(Math.max(0, P.ci - START_I) / (FINISH_I - START_I) * 100)) + "%" : Math.min(LAPS, P.lap + 1) + " / " + LAPS);
     setText(hudOff, P.off ? "오프로드 — 감속 중" : "");
     setText(speedVal, String(Math.round(Math.abs(P.v) * CFG.kmh)));
     drawMinimap();
