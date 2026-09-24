@@ -3764,16 +3764,23 @@ function updateGroundFx(dt) {
   }
   stepPuffs(dt);
 }
-const ADAPT = { slowFrames: 0, bloomOn: !IS_TOUCH };
+const ADAPT = { slowFrames: 0, bloomOn: !IS_TOUCH, steps: 0 };
+const QUALITY_KEY = "turbolap_quality_v1";
+function savedQualitySteps() {
+  try { return Math.max(0, Math.min(12, parseInt(localStorage.getItem(QUALITY_KEY), 10) || 0)); } catch (e) { return 0; }
+}
 function lowerQuality() {
   const pr = renderer.getPixelRatio();
   if (GFX.on) setGroundFx(false);
   else if (pr > MIN_PIXEL_RATIO) { renderer.setPixelRatio(Math.max(MIN_PIXEL_RATIO, pr - 0.25)); resize(); }
-  else if (NIGHT.on && ADAPT.bloomOn) ADAPT.bloomOn = false;
+  else if (ADAPT.bloomOn) ADAPT.bloomOn = false;
   else if (renderer.shadowMap.enabled) {
     renderer.shadowMap.enabled = false;
     scene.traverse(o => { if (o.material) [].concat(o.material).forEach(m => { m.needsUpdate = true; }); });
-  }
+  } else return false;
+  ADAPT.steps++;
+  try { localStorage.setItem(QUALITY_KEY, String(ADAPT.steps)); } catch (e) {}
+  return true;
 }
 function adaptQuality(frameSec) {
   if (state !== "race" || frameSec > 0.25) return;
@@ -3841,6 +3848,7 @@ function resize() {
   fx.width = w; fx.height = h;
 }
 window.addEventListener("resize", resize); resize();
+for (let k = savedQualitySteps(); k > 0 && lowerQuality(); k--);
 
 function onKey(e, down) {
   if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
