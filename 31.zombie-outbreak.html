@@ -108,6 +108,10 @@
     0% { box-shadow: inset 0 0 45vmin 16vmin rgba(255, 30, 40, .95); }
     100% { box-shadow: inset 0 0 18vmin 3vmin rgba(200, 24, 36, .5); }
   }
+  #dread { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 15; pointer-events: none; opacity: 0; will-change: opacity; transition: opacity .35s ease;
+    background: radial-gradient(ellipse at 50% 50%, rgba(60, 0, 8, 0) 45%, rgba(90, 0, 12, .55) 100%); }
+  #lightning { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 13; pointer-events: none; opacity: 0; will-change: opacity;
+    background: radial-gradient(ellipse at 50% 20%, rgba(214, 226, 255, .75), rgba(150, 170, 230, .25) 70%); }
   #speedLines { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 14; pointer-events: none; opacity: 0;
     background: repeating-conic-gradient(from 0deg at 50% 50%, rgba(255, 255, 255, 0) 0deg 3deg, rgba(255, 220, 220, .35) 3deg 3.6deg);
     -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent 30%, #000 72%);
@@ -174,6 +178,8 @@
 <canvas id="scene"></canvas>
 <div id="speedLines"></div>
 <div id="vignette"></div>
+<div id="dread"></div>
+<div id="lightning"></div>
 <div id="tourOverlay"><div id="tourGrain"></div><div id="tourFade"></div></div>
 <div id="tourCaption"><span class="rec"></span><span id="tourCam">CAM 01</span><span id="tourTime"></span></div>
 
@@ -206,7 +212,7 @@
     <div id="dashBar"><div id="dashFill"></div></div>
   </div>
   <div id="specList"></div>
-  <div id="keyHint">WASD 이동 · ←→ 시점 회전 · ↑↓ 시점 높이 · Q 뒤돌기 · Space 대쉬(최초 좀비)</div>
+  <div id="keyHint">WASD 이동 · ←→ 시점 회전 · ↑↓ 시점 높이 · Q 뒤돌기 · Space 대쉬(숙주 좀비)</div>
   <button type="button" id="btnGameLeave">나가기</button>
 </div>
 
@@ -325,7 +331,9 @@ const MODEL_DIR = "img/zombie/";
 const FLOOR_H = 4, PLAYER_RADIUS = 0.35, STEP_UP = 0.55, BODY_H = 1.75, GRAVITY = 22;
 const SPAWN = { x: 0, z: -9 }, HOLD_RADIUS = 6;
 const CAM_DIST = 3.4, CAM_SHOULDER = 0.45, CAM_PIVOT_H = 1.55, BASE_FOV = 70, DASH_FOV = 92;
-const MAX_PIXEL_RATIO = 1.5, MIN_PIXEL_RATIO = 1.0;
+const IS_TOUCH_DEVICE = window.matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 1;
+const MAX_PIXEL_RATIO = IS_TOUCH_DEVICE ? 1.25 : 1.5, MIN_PIXEL_RATIO = 1.0;
+const QUALITY_KEY = "zombieoutbreak_quality_v1";
 const MOTION = { idle: 0, run: 1, back: 2, dash: 5, injure: 6, fall: 7, standup: 8 };
 
 const loadingEl = $("loading");
@@ -364,7 +372,7 @@ function envelope(gainNode, start, peak, attack, dur) {
   g.linearRampToValueAtTime(peak, start + attack);
   g.exponentialRampToValueAtTime(0.0001, start + dur);
 }
-function playTone(freq, delay, dur, type, peak, endFreq, filterFreq) {
+function playTone(freq, delay, dur, type, peak, endFreq, filterFreq, out) {
   if (!audioCtx) return;
   const start = audioCtx.currentTime + delay;
   const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
@@ -373,17 +381,18 @@ function playTone(freq, delay, dur, type, peak, endFreq, filterFreq) {
   envelope(gain, start, peak, 0.008, dur);
   let tail = osc;
   if (filterFreq) { const f = audioCtx.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = filterFreq; osc.connect(f); tail = f; }
-  tail.connect(gain); gain.connect(masterGain);
+  tail.connect(gain); gain.connect(out || masterGain);
   osc.start(start); osc.stop(start + dur + 0.05);
 }
-function playNoise(delay, dur, filterType, freqFrom, freqTo, peak) {
+function playNoise(delay, dur, filterType, freqFrom, freqTo, peak, out) {
   if (!audioCtx) return;
   const start = audioCtx.currentTime + delay;
   const src = audioCtx.createBufferSource(); src.buffer = noiseBuffer;
   const filter = audioCtx.createBiquadFilter(); filter.type = filterType; filter.Q.value = 1.2;
   filter.frequency.setValueAtTime(freqFrom, start); filter.frequency.exponentialRampToValueAtTime(freqTo, start + dur);
   const gain = audioCtx.createGain(); envelope(gain, start, peak, 0.01, dur);
-  src.connect(filter); filter.connect(gain); gain.connect(masterGain);
+  src.connect(filter); filter.connect(gain); gain.connect(out || masterGain);
+  src.loopStart = 0; src.loop = dur > 0.9;
   src.start(start); src.stop(start + dur + 0.05);
 }
 function strikeBell(delay) {
@@ -404,6 +413,131 @@ function playReleaseHorn() { playTone(98, 0, 1.2, "sawtooth", 0.25, 70, 600); pl
 function playEndSting(humansWon) {
   const notes = humansWon ? [523, 659, 784, 1047] : [392, 311, 262, 196];
   notes.forEach((f, i) => playTone(f, i * 0.16, 0.4, "triangle", 0.2));
+}
+
+const HORROR_VOLUME = 0.5;
+let horrorBus = null, droneStarted = false;
+function ensureHorrorBus() {
+  if (!audioCtx) return null;
+  if (!horrorBus) { horrorBus = audioCtx.createGain(); horrorBus.gain.value = 0; horrorBus.connect(masterGain); }
+  return horrorBus;
+}
+function setHorrorActive(active) {
+  const bus = ensureHorrorBus(); if (!bus) return;
+  const target = active ? HORROR_VOLUME : 0;
+  if (Math.abs(bus.gain.value - target) > 0.01 && bus.targetLevel !== target) {
+    bus.targetLevel = target;
+    bus.gain.cancelScheduledValues(audioCtx.currentTime);
+    bus.gain.setTargetAtTime(target, audioCtx.currentTime, active ? 1.5 : 0.3);
+  }
+  if (active && !droneStarted) startDrone(bus);
+}
+function startDrone(bus) {
+  droneStarted = true;
+  const droneGain = audioCtx.createGain(); droneGain.gain.value = 0.05; droneGain.connect(bus);
+  for (const [freq, type] of [[55, "sine"], [55.8, "sine"], [82.4, "triangle"]]) {
+    const osc = audioCtx.createOscillator(); osc.type = type; osc.frequency.value = freq;
+    const g = audioCtx.createGain(); g.gain.value = type === "triangle" ? 0.25 : 0.5;
+    osc.connect(g); g.connect(droneGain); osc.start();
+  }
+  const wind = audioCtx.createBufferSource(); wind.buffer = noiseBuffer; wind.loop = true;
+  const windFilter = audioCtx.createBiquadFilter(); windFilter.type = "bandpass"; windFilter.Q.value = 0.9; windFilter.frequency.value = 420;
+  const windGain = audioCtx.createGain(); windGain.gain.value = 0.07;
+  const sweep = audioCtx.createOscillator(); sweep.frequency.value = 0.07;
+  const sweepDepth = audioCtx.createGain(); sweepDepth.gain.value = 260;
+  sweep.connect(sweepDepth); sweepDepth.connect(windFilter.frequency);
+  const swell = audioCtx.createOscillator(); swell.frequency.value = 0.11;
+  const swellDepth = audioCtx.createGain(); swellDepth.gain.value = 0.045;
+  swell.connect(swellDepth); swellDepth.connect(windGain.gain);
+  wind.connect(windFilter); windFilter.connect(windGain); windGain.connect(bus);
+  wind.start(); sweep.start(); swell.start();
+}
+const listenerRight = { x: 1, z: 0 };
+function spatialOut(p, range, loudness) {
+  const bus = ensureHorrorBus(); if (!bus || bus.gain.value < 0.01) return null;
+  const cam = camera.position, dx = p.x - cam.x, dy = p.y - cam.y, dz = p.z - cam.z;
+  const d = Math.hypot(dx, dy * 1.6, dz);
+  if (d > range) return null;
+  const otherFloor = Math.abs(dy) > FLOOR_H * 0.6;
+  const g = audioCtx.createGain(); g.gain.value = Math.pow(1 - d / range, 1.6) * (loudness || 1) * (otherFloor ? 0.6 : 1);
+  let tail = g;
+  if (audioCtx.createStereoPanner) {
+    const pan = audioCtx.createStereoPanner();
+    pan.pan.value = clamp((dx * listenerRight.x + dz * listenerRight.z) / Math.max(1, Math.hypot(dx, dz)), -0.85, 0.85);
+    tail.connect(pan); tail = pan;
+  }
+  const muffle = audioCtx.createBiquadFilter(); muffle.type = "lowpass"; muffle.frequency.value = otherFloor ? 420 : 2400 + 9000 * (1 - d / range);
+  tail.connect(muffle); muffle.connect(bus);
+  return g;
+}
+const eerieSounds = {
+  glassBreak(out) {
+    playNoise(0, 0.12, "highpass", 2500, 6000, 0.55, out);
+    playNoise(0.02, 0.5, "bandpass", 5200, 2600, 0.25, out);
+    for (let i = 0; i < 9; i++) playTone(2600 + Math.random() * 3200, 0.05 + Math.random() * 0.7, 0.12 + Math.random() * 0.2, "sine", 0.05 + Math.random() * 0.05, null, null, out);
+  },
+  lockerBang(out) {
+    playNoise(0, 0.18, "lowpass", 900, 200, 0.6, out);
+    playTone(210, 0, 0.7, "triangle", 0.18, 190, null, out);
+    playTone(517, 0, 0.5, "triangle", 0.07, 500, null, out);
+  },
+  doorCreak(out) {
+    const f0 = 95 + Math.random() * 40;
+    playTone(f0, 0, 1.5, "sawtooth", 0.1, f0 * 1.6, 1100, out);
+    playTone(f0 * 1.52, 0.25, 1.1, "sawtooth", 0.05, f0 * 1.2, 900, out);
+  },
+  doorSlam(out) {
+    playNoise(0, 0.25, "lowpass", 600, 90, 0.7, out);
+    playTone(68, 0, 0.35, "sine", 0.45, 42, null, out);
+  },
+  deskScrape(out) {
+    playNoise(0, 0.55, "bandpass", 320, 950, 0.35, out);
+    playNoise(0.6, 0.35, "bandpass", 900, 420, 0.22, out);
+  },
+  runningSteps(out) {
+    const n = 5 + Math.floor(Math.random() * 4), gap = 0.24 + Math.random() * 0.08;
+    for (let i = 0; i < n; i++) { playNoise(i * gap, 0.07, "lowpass", 420, 120, 0.5 * (1 - i / (n + 2)), out); playTone(75, i * gap, 0.08, "sine", 0.18, 50, null, out); }
+  },
+  waterDrip(out) {
+    const n = 3 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < n; i++) playTone(1500 + Math.random() * 500, i * (0.6 + Math.random() * 0.5), 0.09, "sine", 0.14, 700, null, out);
+  },
+  distantMoan(out) {
+    const f0 = 120 + Math.random() * 40;
+    playTone(f0, 0, 2.2, "sawtooth", 0.14, f0 * 0.68, 520, out);
+    playTone(f0 * 1.01, 0.05, 2.1, "sawtooth", 0.09, f0 * 0.7, 440, out);
+  },
+  chairFall(out) {
+    playNoise(0, 0.1, "lowpass", 1400, 400, 0.5, out);
+    playNoise(0.16, 0.08, "lowpass", 1100, 300, 0.35, out);
+    playTone(340, 0.02, 0.3, "triangle", 0.08, 310, null, out);
+  },
+  knocking(out) {
+    const n = 3 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < n; i++) { playNoise(i * 0.38, 0.06, "bandpass", 700, 500, 0.5, out); playTone(160, i * 0.38, 0.1, "sine", 0.2, 110, null, out); }
+  }
+};
+const EERIE_NAMES = Object.keys(eerieSounds);
+function playEerieAt(name, p, range) { const out = spatialOut(p, range || 26, 1); if (out) eerieSounds[name](out); }
+function playTubeZap(p) {
+  const out = spatialOut(p, 9, 0.7); if (!out) return;
+  playNoise(0, 0.05, "highpass", 3000, 5200, 0.25, out);
+  playTone(120, 0, 0.07, "square", 0.05, null, 900, out);
+}
+function playCurtainFlap(p) {
+  const out = spatialOut(p, 10, 0.8); if (!out) return;
+  playNoise(0, 0.22, "bandpass", 500, 1300, 0.3, out);
+  playNoise(0.24, 0.16, "bandpass", 700, 1500, 0.2, out);
+}
+function playHeartbeat(strength) {
+  const bus = ensureHorrorBus(); if (!bus) return;
+  playTone(62, 0, 0.14, "sine", 0.55 * strength, 42, null, bus);
+  playTone(56, 0.17, 0.16, "sine", 0.4 * strength, 38, null, bus);
+}
+function playThunder() {
+  const bus = ensureHorrorBus(); if (!bus) return;
+  playNoise(0, 2.8, "lowpass", 260, 60, 0.4, bus);
+  playNoise(0.1, 0.5, "lowpass", 500, 150, 0.2, bus);
 }
 
 const canvas = $("scene");
@@ -474,6 +608,9 @@ const rand = seededRandom(20260925);
 const randIn = (a, b) => a + (b - a) * rand();
 const chance = p => rand() < p;
 const texNoise = (a, b) => a + (b - a) * Math.random();
+const curtainRand = seededRandom(20261031);
+const WIND_CURTAIN_CHANCE = 0.22;
+const windCurtains = [];
 
 function canvasTexture(size, draw, repeat, height) {
   const cv = document.createElement("canvas"); cv.width = size; cv.height = height || size;
@@ -974,7 +1111,9 @@ function facadeBay(axis, side, ua, ub, y, opt) {
     const cw = Math.min(1.1, pw * 0.6);
     for (const [c0, c1] of [[wa - 0.1, wa + cw], [wb - cw, wb + 0.1]]) {
       const torn = chance(0.3);
-      f(c0, c1, y + (torn ? randIn(1.0, 1.8) : 0.5), y + head + 0.25, W - 0.5, W - 0.3, C.curtainClass, "plaster", false);
+      const bottom = y + (torn ? randIn(1.0, 1.8) : 0.5);
+      if (curtainRand() < WIND_CURTAIN_CHANCE) windCurtains.push({ axis, side, u0: c0, u1: c1, y0: bottom, y1: y + head + 0.25, w: W - 0.4 });
+      else f(c0, c1, bottom, y + head + 0.25, W - 0.5, W - 0.3, C.curtainClass, "plaster", false);
     }
     f(wa - 0.2, wb + 0.2, y + head + 0.2, y + head + 0.28, W - 0.52, W - 0.26, C.alu, "metal", false);
   }
@@ -1868,7 +2007,7 @@ function buildFlickerLights() {
     const glow = new THREE.Mesh(new THREE.PlaneGeometry(spot.kind === "tube" ? 6 : 12, spot.kind === "tube" ? 5 : 12), glowMat);
     glow.rotation.x = -Math.PI / 2; glow.position.set(spot.pos.x, spot.floorY !== undefined ? spot.floorY + 0.035 : GROUND_Y + 0.05, spot.pos.z); glow.renderOrder = 3;
     scene.add(glow);
-    flickerMeshes.push({ mat, glowMat, phase: Math.random() * 100, speed: randIn(0.7, 1.4), base: spot.kind === "tube" ? 0.28 : 0.35 });
+    flickerMeshes.push({ mat, glowMat, glow, pos: spot.pos, lit: true, phase: Math.random() * 100, speed: randIn(0.7, 1.4), base: spot.kind === "tube" ? 0.28 : 0.35 });
   }
 }
 function updateFlicker(nowMs) {
@@ -1880,6 +2019,50 @@ function updateFlicker(nowMs) {
     const k = on ? 0.75 + Math.random() * 0.25 : 0.05;
     f.mat.color.setScalar(k).multiplyScalar(1);
     f.glowMat.opacity = f.base * k;
+    if (on !== f.lit) { f.lit = on; if (!on) playTubeZap(f.pos); }
+  }
+}
+
+let curtainsAnimated = true;
+const curtainMeshes = [];
+function buildWindCurtains() {
+  const light = [0, 0, 0];
+  for (const c of windCurtains) {
+    const width = c.u1 - c.u0, height = c.y1 - c.y0, uc = (c.u0 + c.u1) / 2, yc = (c.y0 + c.y1) / 2;
+    const geo = new THREE.PlaneGeometry(width, height, 5, 8);
+    const center = facadePoint(c.axis, c.side, uc, yc, c.w);
+    const inward = c.axis === "x" ? [0, 0, -c.side] : [-c.side, 0, 0];
+    bakeLight(center[0] + inward[0] * 0.3, center[1], center[2] + inward[2] * 0.3, inward, light);
+    const col = colorOf(C.curtainClass);
+    const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(col[0] * light[0], col[1] * light[1], col[2] * light[2]), side: THREE.DoubleSide });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(center[0], center[1], center[2]);
+    mesh.rotation.y = c.axis === "x" ? (c.side > 0 ? Math.PI : 0) : (c.side > 0 ? -Math.PI / 2 : Math.PI / 2);
+    mesh.updateMatrix(); mesh.matrixAutoUpdate = false;
+    geo.computeBoundingSphere(); geo.boundingSphere.radius += 0.6;
+    scene.add(mesh);
+    const pos = geo.getAttribute("position");
+    curtainMeshes.push({ mesh, pos, base: Float32Array.from(pos.array), height, phase: curtainRand() * 50, center, nextFlapMs: 0 });
+  }
+}
+function updateCurtains(nowMs) {
+  if (!curtainsAnimated) return;
+  const t = nowMs / 1000, cam = camera.position;
+  for (const c of curtainMeshes) {
+    const dx = c.center[0] - cam.x, dy = c.center[1] - cam.y, dz = c.center[2] - cam.z;
+    if (dx * dx + dy * dy + dz * dz > 400) continue;
+    const gust = Math.max(0, Math.sin(t * 0.61 + c.phase) * 0.6 + Math.sin(t * 0.23 + c.phase * 1.7) * 0.5 + 0.25);
+    const a = c.pos.array, b = c.base;
+    for (let i = 0; i < a.length; i += 3) {
+      const x = b[i], y = b[i + 1], hang = Math.pow(clamp(0.5 - y / c.height, 0, 1), 1.4);
+      const billow = (0.1 + 0.32 * gust) * (0.65 + 0.35 * Math.sin(t * 3.1 + x * 3 + c.phase));
+      const ripple = Math.sin(t * 7.3 + y * 6 + x * 4 + c.phase) * 0.035 * gust;
+      a[i] = x + Math.sin(t * 2.3 + c.phase + y * 2) * 0.05 * hang * gust;
+      a[i + 1] = y + hang * gust * 0.12;
+      a[i + 2] = hang * (billow + ripple);
+    }
+    c.pos.needsUpdate = true;
+    if (gust > 0.95 && nowMs > c.nextFlapMs) { c.nextFlapMs = nowMs + 2600 + Math.random() * 2400; playCurtainFlap(c.center); }
   }
 }
 
@@ -1913,7 +2096,7 @@ function buildSky() {
   skyGroup.traverse(o => { o.frustumCulled = false; });
   scene.add(skyGroup);
 }
-function updateSky() { skyGroup.position.copy(camera.position); skyGroup.scale.setScalar(camera.far * 0.9); }
+function updateSky() { skyGroup.visible = camera.far > 20; skyGroup.position.copy(camera.position); skyGroup.scale.setScalar(camera.far * 0.9); }
 
 function buildSchool() {
   for (let f = 0; f < FLOORS; f++) for (const cx of [-27, 9, 33]) flickerSpots.push({ kind: "tube", pos: { x: cx + f * 6, y: f * FLOOR_H + FLOOR_H - 0.3, z: 0 }, floorY: f * FLOOR_H, hex: 0xe8f0ff });
@@ -1928,6 +2111,7 @@ function buildSchool() {
   const fence = decalMesh(fenceQuads.map(q => ({ p: q.p, uv: q.uv, col: colorOf(C.fence, 0.5) })), new THREE.MeshBasicMaterial({ map: fenceTexture, vertexColors: true, alphaTest: 0.5, side: THREE.DoubleSide }), 0);
   fence.frustumCulled = true;
   buildFlickerLights();
+  buildWindCurtains();
   buildSky();
 }
 buildSchool();
@@ -2032,7 +2216,11 @@ function prepareTemplate(gltf, targetHeight) {
   gltf.scene.scale.multiplyScalar(s);
   gltf.scene.position.y = -bounds.min.y * s;
   gltf.scene.traverse(o => {
-    if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; o.receiveShadow = false; }
+    if (!o.isMesh) return;
+    o.frustumCulled = false; o.castShadow = false; o.receiveShadow = false;
+    const pbr = o.material;
+    o.material = new THREE.MeshLambertMaterial({ map: pbr.map, color: pbr.color, side: pbr.side, alphaTest: pbr.alphaTest, transparent: pbr.transparent, opacity: pbr.opacity });
+    pbr.dispose();
   });
   const clips = {};
   gltf.animations.forEach(c => { clips[c.name.toLowerCase().replace(/[^a-z0-9]/g, "")] = c; });
@@ -2080,6 +2268,7 @@ const blobTexture = (() => {
 })();
 
 const AFTERIMAGE_EVERY_MS = 28, AFTERIMAGE_POOL = 7, AFTERIMAGE_LIFE_MS = 340, AFTERIMAGE_OPACITY = 0.6;
+let afterimageLimit = AFTERIMAGE_POOL;
 const afterimageMaterial = new THREE.MeshBasicMaterial({ color: 0xff3344, transparent: true, opacity: AFTERIMAGE_OPACITY, blending: THREE.AdditiveBlending, depthWrite: false });
 
 class Avatar {
@@ -2113,7 +2302,7 @@ class Avatar {
     const form = this.forms[this.kind];
     let ghost = form.ghosts.find(g => !g.obj.visible);
     if (!ghost) {
-      if (form.ghosts.length < AFTERIMAGE_POOL) {
+      if (form.ghosts.length < afterimageLimit) {
         const obj = SkeletonUtils.clone(form.obj), mat = afterimageMaterial.clone(), nodes = [];
         obj.traverse(o => { nodes.push(o); if (o.isMesh) { o.material = mat; o.frustumCulled = false; } });
         scene.add(obj);
@@ -2903,7 +3092,7 @@ function roundEvents(t) {
   }
   if (elapsed >= ROUND_MS - FINAL_RUSH_MS && prev < ROUND_MS - FINAL_RUSH_MS && !round.rushAnnounced) {
     round.rushAnnounced = true; playRushAlarm();
-    flashCenter("마지막 30초!", "좀비가 50% 빨라지고 최초 좀비의 대쉬 대기시간이 2초로 줄어듭니다.", 3200, true);
+    flashCenter("마지막 30초!", "좀비가 50% 빨라지고 숙주 좀비의 대쉬 대기시간이 2초로 줄어듭니다.", 3200, true);
   }
   round.lastElapsed = elapsed;
 }
@@ -2949,7 +3138,7 @@ function renderResult() {
   setText(winnerEl, humansWon ? "인간 승리!" : "좀비 승리!");
   const survivors = ids.filter(id => final[id].r === "survived").map(id => final[id].n);
   setText($("resSub"), humansWon ? "끝까지 살아남은 학생: " + survivors.join(", ") : "모든 학생이 감염되었습니다.");
-  const label = { origin: '<span class="badge zombie">최초 좀비</span>', infected: '<span class="badge zombie">감염</span>', survived: '<span class="badge alive">생존</span>' };
+  const label = { origin: '<span class="badge zombie">숙주 좀비</span>', infected: '<span class="badge zombie">감염</span>', survived: '<span class="badge alive">생존</span>' };
   $("resBody").innerHTML = ids.map(id => {
     const f = final[id];
     return '<tr class="' + (id === myId ? "me" : "") + '"><td>' + escapeHtml(f.n) + (id === myId ? " (나)" : "") + "</td><td>" + label[f.r] + '</td><td class="num">' + (f.r === "origin" ? "-" : f.s + "초") + "</td></tr>";
@@ -2962,7 +3151,7 @@ function renderResult() {
     playEndSting(humansWon);
   }
   show($("resNewBest"), !!(mine && round.newBest));
-  if (mine) setText($("resMine"), (mine.r === "origin" ? "이번 판에는 최초 좀비였습니다." : "이번 생존 시간 " + mine.s + "초") + " · 개인 최고 기록 " + bestText());
+  if (mine) setText($("resMine"), (mine.r === "origin" ? "이번 판에는 숙주 좀비였습니다." : "이번 생존 시간 " + mine.s + "초") + " · 개인 최고 기록 " + bestText());
   else setText($("resMine"), (isSpectator(myId) ? "이번 판은 관전했습니다." : "이번 판에는 참가하지 않았습니다.") + " · 개인 최고 기록 " + bestText());
 }
 function playAgain() {
@@ -2985,15 +3174,101 @@ function cullAvatars() {
   }
 }
 
+const HORROR_EVENT_GAP_MS = [7000, 15000], LIGHTNING_GAP_MS = [28000, 55000], ZOMBIE_GROAN_GAP_MS = [4500, 9000];
+const HEARTBEAT_RANGE = 10;
+const horror = { nextEventMs: 0, nextLightningMs: 0, nextBeatMs: 0, dread: -1, lastEvent: "" };
+const camDirScratch = new THREE.Vector3();
+function randomBetween(range) { return range[0] + Math.random() * (range[1] - range[0]); }
+function pickEeriePoint() {
+  const cam = camera.position;
+  for (let tries = 0; tries < 8; tries++) {
+    const floor = Math.random() < 0.7 ? clamp(Math.floor((cam.y + 0.3) / FLOOR_H), 0, FLOORS - 1) : Math.floor(Math.random() * FLOORS);
+    const zBand = Math.random();
+    const p = { x: Math.random() * 100 - 50, y: floor * FLOOR_H + 1.2, z: zBand < 0.4 ? Math.random() * 5 - 2.5 : (zBand < 0.7 ? -1 : 1) * (5 + Math.random() * 11) };
+    const d = Math.hypot(p.x - cam.x, p.z - cam.z);
+    if (d > 7 && d < 24) return p;
+  }
+  return null;
+}
+function flashLightning() {
+  $("lightning").animate([{ opacity: 0 }, { opacity: 0.32, offset: 0.05 }, { opacity: 0.04, offset: 0.16 }, { opacity: 0.2, offset: 0.26 }, { opacity: 0 }], { duration: 950, easing: "ease-out" });
+  setTimeout(playThunder, 1200 + Math.random() * 1800);
+}
+function setDread(level) {
+  const v = Math.round(level * 20) / 20;
+  if (v === horror.dread) return;
+  horror.dread = v; $("dread").style.opacity = String(v);
+}
+function updateHorror(t, nowMs) {
+  const inRound = screenNow === "game" && round.active;
+  setHorrorActive(inRound);
+  if (!inRound || !audioCtx) { setDread(0); horror.nextEventMs = 0; return; }
+  camera.getWorldDirection(camDirScratch);
+  const fl = Math.hypot(camDirScratch.x, camDirScratch.z) || 1;
+  listenerRight.x = -camDirScratch.z / fl; listenerRight.z = camDirScratch.x / fl;
+  if (!horror.nextEventMs) { horror.nextEventMs = nowMs + 4000; horror.nextLightningMs = nowMs + randomBetween(LIGHTNING_GAP_MS) * 0.5; }
+  if (nowMs >= horror.nextEventMs) {
+    horror.nextEventMs = nowMs + randomBetween(HORROR_EVENT_GAP_MS);
+    const p = pickEeriePoint();
+    if (p) {
+      let name; do { name = EERIE_NAMES[Math.floor(Math.random() * EERIE_NAMES.length)]; } while (name === horror.lastEvent);
+      horror.lastEvent = name;
+      playEerieAt(name, p);
+    }
+  }
+  if (nowMs >= horror.nextLightningMs) { horror.nextLightningMs = nowMs + randomBetween(LIGHTNING_GAP_MS); flashLightning(); }
+  let nearestZombie = Infinity;
+  const meHuman = round.iAmIn && !amIZombieRole();
+  for (const id in avatars) {
+    if (id === myId || !zombieFormActive(id, t)) continue;
+    const av = avatars[id];
+    if (meHuman) nearestZombie = Math.min(nearestZombie, Math.hypot(av.pos.x - me.x, (av.pos.y - me.y) * 2, av.pos.z - me.z));
+    if (!av.nextGroanMs) av.nextGroanMs = nowMs + randomBetween(ZOMBIE_GROAN_GAP_MS);
+    if (nowMs >= av.nextGroanMs) {
+      av.nextGroanMs = nowMs + randomBetween(ZOMBIE_GROAN_GAP_MS);
+      const out = spatialOut({ x: av.pos.x, y: av.pos.y + 1.5, z: av.pos.z }, 16, 0.9);
+      if (out) eerieSounds.distantMoan(out);
+    }
+  }
+  const closeness = meHuman && t >= room.startAt ? clamp(1 - nearestZombie / HEARTBEAT_RANGE, 0, 1) : 0;
+  if (closeness > 0 && nowMs >= horror.nextBeatMs) {
+    horror.nextBeatMs = nowMs + 1150 - closeness * 650;
+    playHeartbeat(0.35 + closeness * 0.65);
+  }
+  setDread(closeness * 0.85);
+}
+
 let lastFrame = performance.now(), slowFrames = 0;
+const QUALITY_STEPS = ["fogclip", "pixel", "pixel", "afterimage", "glow", "curtain", "beam"];
+let qualityLevel = 0, fogClipIndoors = false;
+function applyQualityStep(step) {
+  if (step === "fogclip") fogClipIndoors = true;
+  else if (step === "pixel") {
+    const pr = renderer.getPixelRatio();
+    if (pr <= MIN_PIXEL_RATIO) return false;
+    renderer.setPixelRatio(Math.max(MIN_PIXEL_RATIO, pr - 0.25)); resize();
+  } else if (step === "afterimage") afterimageLimit = 3;
+  else if (step === "glow") flickerMeshes.forEach(f => { f.glow.visible = false; });
+  else if (step === "curtain") curtainsAnimated = false;
+  else if (step === "beam" && beamMesh) beamMesh.visible = false;
+  return true;
+}
+function lowerQuality() {
+  while (qualityLevel < QUALITY_STEPS.length) if (applyQualityStep(QUALITY_STEPS[qualityLevel++])) break;
+  try { localStorage.setItem(QUALITY_KEY, String(qualityLevel)); } catch (e) {}
+}
+(() => {
+  let saved = 0;
+  try { saved = clamp(Math.floor(+localStorage.getItem(QUALITY_KEY) || 0), 0, QUALITY_STEPS.length); } catch (e) {}
+  if (IS_TOUCH_DEVICE) saved = Math.max(saved, 1);
+  while (qualityLevel < saved) applyQualityStep(QUALITY_STEPS[qualityLevel++]);
+})();
 function adaptQuality(frameSec) {
   if (screenNow !== "game" || frameSec > 0.25) return;
   if (frameSec > 1 / 45) slowFrames++; else if (slowFrames > 0) slowFrames--;
   if (slowFrames < 150) return;
   slowFrames = 0;
-  const pr = renderer.getPixelRatio();
-  if (pr > MIN_PIXEL_RATIO) { renderer.setPixelRatio(Math.max(MIN_PIXEL_RATIO, pr - 0.25)); resize(); }
-  else if (beamMesh && beamMesh.visible) beamMesh.visible = false;
+  if (qualityLevel < QUALITY_STEPS.length) lowerQuality();
 }
 
 const OUTDOOR_VIEW = [30, 170, 420], INDOOR_VIEW = [4, 34, 60];
@@ -3050,7 +3325,9 @@ function frame(nowMs) {
   if (screenNow === "game" && round.active) {
     const viewerId = round.iAmIn ? myId : round.viewedId;
     const viewScale = viewerId && zombieFormActive(viewerId, t) ? ZOMBIE_VIEW_SCALE : HUMAN_VIEW_SCALE;
-    setViewDistance(GAME_VIEW.near * viewScale, GAME_VIEW.far * viewScale, GAME_VIEW.cameraFar);
+    const fogEnd = GAME_VIEW.far * viewScale;
+    const clipAtFog = fogClipIndoors && isIndoor(camera.position.x, camera.position.y, camera.position.z);
+    setViewDistance(GAME_VIEW.near * viewScale, fogEnd, clipAtFog ? Math.ceil(fogEnd + 2) : GAME_VIEW.cameraFar);
     if (round.iAmIn) updateLocalPlayer(dt, t, nowMs);
     updateRemotePlayers(dt, t, nowMs);
     roundEvents(t);
@@ -3064,13 +3341,15 @@ function frame(nowMs) {
     updateTour(nowMs);
   }
   updateFlicker(nowMs);
+  updateCurtains(nowMs);
+  updateHorror(t, nowMs);
   updateClock();
   updateSky();
   cullAvatars();
   renderer.render(scene, camera);
 }
 requestAnimationFrame(frame);
-window.__zo = { THREE, scene, camera, renderer, round, tour, TOUR_SHOTS };
+window.__zo = { THREE, scene, camera, renderer, round, tour, TOUR_SHOTS, curtainMeshes, updateCurtains, eerieSounds, flashLightning, playHeartbeat };
 
 function blurAfter(fn) { return e => { e.currentTarget.blur(); fn(); }; }
 $("btnCreate").onclick = blurAfter(createRoom);
