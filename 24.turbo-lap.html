@@ -3970,7 +3970,7 @@ const CAR_HIT = { impact: 1 / 3, radius: 0.82, offset: 1.08, restitution: 0.45, 
 const HIT_NOTICE = { minGapMs: 250, dedupeMs: 300, staleMs: 1000 };
 const CHASE = { gapSteps: [{ overM: 30, kmh: 25 }, { overM: 20, kmh: 15 }, { overM: 10, kmh: 10 }, { overM: 0, kmh: 5 }], tailM: 25, tailSideM: 2.5 * 2 * CAR_HIT.radius, tailSec: 2, boostKmh: 40, rampSec: 0.5, holdSec: 1, fadeSec: 1.5, cooldownSec: 6, startLockSec: 5 };
 const BATTLE = {
-  root: "turbolap/rooms", specMax: 1, netMs: 143, countMs: 3600, countLagMaxMs: 1500,dnfMs: 30000, rankRowH: 48,
+  root: "turbolap/rooms", specMax: 1, netMs: 100, countMs: 3600, countLagMaxMs: 1500,dnfMs: 30000, rankRowH: 48,
   sdk: ["https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js", "https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"]
 };
 const NICK_KEY = "turbolap_nick_v1";

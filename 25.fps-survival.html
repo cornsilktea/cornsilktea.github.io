@@ -2034,7 +2034,7 @@ function update(dt) {
   updateBullets(dt); updateCorpses(dt);
   if (Math.floor(elapsed) !== Math.floor(elapsed - dt)) renderHud();
 }
-const TEAM = { max: 2, specMax: 2, netMs: 143, matchMs: 120000, countMs: 3000, respawnMs: 3000, protectMs: 3000, lerpMs: 160, root: "fpsbattle/rooms" };
+const TEAM = { max: 2, specMax: 1, netMs: 143, matchMs: 120000, countMs: 3000, respawnMs: 3000, protectMs: 3000, lerpMs: 160, root: "fpsbattle/rooms" };
 const FIREBASE_SDK = ["https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js", "https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"];
 const NICK_KEY = "fpsbattle_nick";
 const TEAM_NAME = { blue: "블루", red: "레드" };
