@@ -164,7 +164,7 @@
 
   <div class="arena">
   <div class="stage" id="stage">
-    <img class="field" src="img/field-bg.png" alt="" aria-hidden="true">
+    <img class="field" src="img/baseball/field-bg.png" alt="" aria-hidden="true">
     <svg width="0" height="0" style="position:absolute" aria-hidden="true">
       <defs>
         <radialGradient id="leather" cx="38%" cy="32%" r="70%">
@@ -173,13 +173,13 @@
       </defs>
     </svg>
 
-    <img class="fielder in"  style="left:24%;top:52.4%"     src="img/fielder-3b.png" alt="">
-    <img class="fielder in"  style="left:39%;top:51.3%"     src="img/fielder-2b.png" alt="">
-    <img class="fielder in"  style="left:61%;top:51.3%"     src="img/fielder-ss.png" alt="">
-    <img class="fielder in"  style="left:76%;top:52.4%"     src="img/fielder-1b.png" alt="">
-    <img class="fielder out" style="left:15%;top:49%"     src="img/fielder-lf.png" alt="">
-    <img class="fielder out" style="left:85%;top:49%"     src="img/fielder-rf.png" alt="">
-    <img class="fielder out" style="left:56%;top:48%" src="img/fielder-cf.png" alt="">
+    <img class="fielder in"  style="left:24%;top:52.4%"     src="img/baseball/fielder-3b.png" alt="">
+    <img class="fielder in"  style="left:39%;top:51.3%"     src="img/baseball/fielder-2b.png" alt="">
+    <img class="fielder in"  style="left:61%;top:51.3%"     src="img/baseball/fielder-ss.png" alt="">
+    <img class="fielder in"  style="left:76%;top:52.4%"     src="img/baseball/fielder-1b.png" alt="">
+    <img class="fielder out" style="left:15%;top:49%"     src="img/baseball/fielder-lf.png" alt="">
+    <img class="fielder out" style="left:85%;top:49%"     src="img/baseball/fielder-rf.png" alt="">
+    <img class="fielder out" style="left:56%;top:48%" src="img/baseball/fielder-cf.png" alt="">
 
     <div class="slot" id="pitcher">
       <div class="ph">투수<small id="pitcherState">대기</small></div>
@@ -268,17 +268,17 @@
 "use strict";
 const IMAGES = {
   pitcher: [
-    ["idle",   "img/pitcher-idle.png",   "대기"],
-    ["windup", "img/pitcher-windup.png", "와인드업"],
-    ["throw",  "img/pitcher-throw.png",  "투구"],
-    ["follow", "img/pitcher-follow.png", "팔로스루"]
+    ["idle",   "img/baseball/pitcher-idle.png",   "대기"],
+    ["windup", "img/baseball/pitcher-windup.png", "와인드업"],
+    ["throw",  "img/baseball/pitcher-throw.png",  "투구"],
+    ["follow", "img/baseball/pitcher-follow.png", "팔로스루"]
   ],
   batter: [
-    ["ready",  "img/batter-ready.png",  "준비 자세"],
-    ["swing1", "img/batter-swing1.png", "스윙 시작"],
-    ["swing2", "img/batter-swing2.png", "타격"],
-    ["swing3", "img/batter-swing3.png", "팔로스루"],
-    ["swing4", "img/batter-swing4.png", "스윙 마무리"]
+    ["ready",  "img/baseball/batter-ready.png",  "준비 자세"],
+    ["swing1", "img/baseball/batter-swing1.png", "스윙 시작"],
+    ["swing2", "img/baseball/batter-swing2.png", "타격"],
+    ["swing3", "img/baseball/batter-swing3.png", "팔로스루"],
+    ["swing4", "img/baseball/batter-swing4.png", "스윙 마무리"]
   ]
 };
 const SWING_SEQ = [["swing1", 0], ["swing2", 20], ["swing3", 45], ["swing4", 80]];
