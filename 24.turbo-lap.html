@@ -292,7 +292,7 @@
   </div>
 
   <div class="card" id="cardBStart" style="display:none">
-    <div class="logo" style="font-size:36px">⚔️ 대전모드<small>1대1 실시간 레이스 — 부딪히면 밀려납니다<br>뒤처진 차는 거리에 따라 10~25km/h 더 빠르고, 앞차 뒤 25m 안에 2초 붙어 있으면 부스트!</small></div>
+    <div class="logo" style="font-size:36px">⚔️ 대전모드<small></small></div>
     <div class="hello">안녕하세요, <b id="helloNick"></b>님 <button type="button" class="mini" id="btnNickEdit">✏️ 닉네임 변경</button></div>
     <div class="modeBtns">
       <button type="button" class="btn" id="btnCreate">1대1 방 만들기</button>
@@ -4212,7 +4212,7 @@ function renderLobby() {
   const host = isHost();
   setHtml($("mapBtns"), COURSES.map(k => '<button type="button" class="mapBtn' + (k === BT.course ? " on" : "") + '" data-course="' + k + '"' + (host ? "" : " disabled") + ">" +
     TRACKS[k].name + "<small>" + (TRACKS[k].open ? "편도 코스" : TRACKS[k].laps + "바퀴") + "</small></button>").join(""));
-  $("mapHint").textContent = host ? "— 눌러서 바꿀 수 있어요" : "— 방장이 고릅니다";
+  $("mapHint").textContent = host ? "" : "— 방장이 고릅니다";
   setHtml($("slotLeft"), slotHtml("left"));
   setHtml($("slotRight"), slotHtml("right"));
   $("btnJoinLeft").hidden = me.team === "left"; $("btnJoinLeft").disabled = !canMoveTo("left");
