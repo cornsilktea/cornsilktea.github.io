@@ -4408,34 +4408,21 @@ function renderResult() {
   $("bDoneHint").textContent = host ? "대기실로 돌아가면 같은 방에서 맵·차량을 바꿔 다시 할 수 있어요." : "방장이 '대기실로'를 누르면 다시 할 수 있어요.";
 }
 
-function nameTag(text, color) {
-  const tex = canvasTex(256, 64, (c, w, h) => {
-    c.fillStyle = "rgba(255,255,255,0.92)"; c.fillRect(0, 0, w, h);
-    c.fillStyle = color; c.fillRect(0, 0, 16, h);
-    c.strokeStyle = "#1B2B20"; c.lineWidth = 4; c.strokeRect(2, 2, w - 4, h - 4);
-    c.font = 'bold 34px "Nanum Gothic", "Malgun Gothic", sans-serif'; c.textAlign = "center"; c.textBaseline = "middle";
-    c.fillStyle = "#1B2B20"; c.fillText(text, w / 2 + 8, h / 2 + 2);
-  });
-  tex.colorSpace = THREE.SRGBColorSpace;
-  const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthWrite: false, fog: false, toneMapped: false }));
-  tag.scale.set(3.2, 0.8, 1);
-  return tag;
-}
 function ensureEnt(id) {
   if (BT.ents[id]) return BT.ents[id];
   const p = BT.players[id]; if (!p) return null;
   const ck = CARS[p.car] ? p.car : "blue";
   const e = { id, x: 0, y: 0, z: 0, h: 0, v: 0, rx: 0, rz: 0, rh: 0, rv: 0, rt: 0, st: 0, rw: 0, rkx: 0, rkz: 0, ex: 0, ez: 0, eh: 0, fresh: false, hitAt: 0, hitSentAt: 0, gfxT: newGroundTrack(),
     prog: -1, fin: 0, steer: 0, steerVis: 0, ci: 0, seen: false, snaps: [], lagHi: 0, playDelay: 0,
-    car: makeCar(CARS[ck].color), tag: nameTag(p.nickname, SIDE_COLOR[p.team] || "#8A978C") };
-  e.car.visible = false; e.tag.visible = false;
-  scene.add(e.car); scene.add(e.tag);
+    car: makeCar(CARS[ck].color) };
+  e.car.visible = false;
+  scene.add(e.car);
   BT.ents[id] = e;
   return e;
 }
 function removeEnt(id) {
   const e = BT.ents[id]; if (!e) return;
-  scene.remove(e.car); scene.remove(e.tag); e.tag.material.map.dispose(); e.tag.material.dispose();
+  scene.remove(e.car);
   delete BT.ents[id];
 }
 function nearestAll(x, z) {
@@ -4468,7 +4455,7 @@ function onRemoteState(id, str) {
   if (BT.spec && sentAt) pushSnap(e, sentAt);
   if (!e.seen) {
     e.seen = true; e.x = e.rx; e.z = e.rz; e.h = e.rh; e.v = e.rv; e.ci = nearestAll(e.x, e.z); e.ex = e.ez = e.eh = 0;
-    e.car.visible = true; e.tag.visible = true;
+    e.car.visible = true;
     if (BT.spec && id === BT.viewId) snapCamera();
   }
 }
@@ -4536,7 +4523,6 @@ function drawEnt(e, dt, k) {
   e.car.rotation.x = Math.atan2(S[i1].p.y - S[i0].p.y, SEG * 10) * (fx * s.t.x + fz * s.t.z);
   e.steerVis += (e.steer - e.steerVis) * k;
   e.car.userData.wheels.forEach(w => { w.spin.rotation.x -= e.v * dt / e.car.userData.wheelR; if (w.front) w.g.rotation.y = e.steerVis; });
-  e.tag.position.set(e.x, e.y + 2.9, e.z);
 }
 function carCircles(x, z, h) {
   const fx = -Math.sin(h), fz = -Math.cos(h), o = CAR_HIT.offset;
