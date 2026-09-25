@@ -3858,7 +3858,7 @@ function tick(now) {
 
   const battle = playMode === "battle";
   if (state === "countdown") {
-    if (battle) cdTime = CFG.countdown - (BT.startAt - tnow()) / 1000; else cdTime += dt;
+    if (battle) cdTime = CFG.countdown - msToGo() / 1000; else cdTime += dt;
     const n = Math.ceil(CFG.countdown - cdTime);
     if (n !== cdShown && n > 0 && n <= CFG.countdown) { cdShown = n; countNum.textContent = n; countNum.className = ""; beep(440, 0.15, "square", 0.1); }
     if (cdTime >= CFG.countdown) {
@@ -3867,7 +3867,7 @@ function tick(now) {
     }
   }
   if (state === "race") {
-    elapsed = battle ? tnow() - BT.startAt : performance.now() - t0;
+    elapsed = battle ? Math.max(0, -msToGo()) : performance.now() - t0;
     if (!battle) { recordSample(elapsed); placeGhost(elapsed); }
     if (goTimer > 0) { goTimer -= dt; if (goTimer <= 0) countBox.style.display = "none"; }
   }
@@ -3970,7 +3970,7 @@ const CAR_HIT = { impact: 1 / 3, radius: 0.82, offset: 1.08, restitution: 0.45, 
 const HIT_NOTICE = { minGapMs: 250, dedupeMs: 300, staleMs: 1000 };
 const CHASE = { gapSteps: [{ overM: 30, kmh: 25 }, { overM: 20, kmh: 15 }, { overM: 10, kmh: 10 }, { overM: 0, kmh: 5 }], tailM: 25, tailSideM: 2.5 * 2 * CAR_HIT.radius, tailSec: 2, boostKmh: 40, rampSec: 0.5, holdSec: 1, fadeSec: 1.5, cooldownSec: 6, startLockSec: 5 };
 const BATTLE = {
-  root: "turbolap/rooms", specMax: 1, netMs: 143, countMs: 3600, dnfMs: 30000, rankRowH: 48,
+  root: "turbolap/rooms", specMax: 1, netMs: 143, countMs: 3600, countLagMaxMs: 1500,dnfMs: 30000, rankRowH: 48,
   sdk: ["https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js", "https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"]
 };
 const NICK_KEY = "turbolap_nick_v1";
@@ -4289,7 +4289,8 @@ function startMatchLocal() {
   BT.match = { startAt: BT.startAt, firstFinAt: 0 };
   BT.statusSent = ""; BT.sent = ""; BT.lastNet = 0; BT.forceNet = true;
   BT.viewId = racerOf("left") || racerOf("right");
-  const late = tnow() > BT.startAt + 1000;
+  BT.match.goPerf = performance.now() + goDelayMs();
+  const late = msToGo() < -1000;
   state = late ? "race" : "countdown"; cdTime = 0; cdShown = -1; goTimer = 0; elapsed = 0; finalMs = 0; shake = 0;
   showCard(null); setHud(!BT.spec); setBattleHud(true);
   $("hudGhost").style.display = "none";
@@ -4300,6 +4301,12 @@ function startMatchLocal() {
   okeys(BT.raw).forEach(id => onRemoteState(id, BT.raw[id]));
   snapCamera();
 }
+function goDelayMs() {
+  const serverLeft = BT.startAt > 0 ? BT.startAt - tnow() : BATTLE.countMs;
+  if (BT.status !== "countdown") return serverLeft;
+  return Math.max(BATTLE.countMs - BATTLE.countLagMaxMs, Math.min(BATTLE.countMs, serverLeft));
+}
+function msToGo() { return BT.match ? BT.match.goPerf - performance.now() : Infinity; }
 function endMatchLocal() {
   state = "menu";
   setHud(false); $("battleNote").hidden = true; $("rankBox").hidden = true; $("viewBtns").hidden = true; $("btnMatchLeave").hidden = true;
@@ -4347,7 +4354,7 @@ function stepChase(r, gap, dt) {
     r.boostGain = Math.max(0, cap - r.boostCap); r.boostCap = cap;
     if (r.boostT >= CHASE.holdSec + CHASE.fadeSec) { r.boostOn = false; r.boostCap = 0; }
   }
-  const startLockLeft = playMode === "battle" ? CHASE.startLockSec - (tnow() - BT.startAt) / 1000 : 0;
+  const startLockLeft = playMode === "battle" && BT.match ? CHASE.startLockSec + msToGo() / 1000 : 0;
   r.boostCool = Math.max(0, r.boostCool - dt, startLockLeft);
   const inTailRange = behind > 0 && behind <= CHASE.tailM;
   r.offLine = inTailRange && gap.side > CHASE.tailSideM;
@@ -4419,7 +4426,7 @@ function ensureEnt(id) {
   const p = BT.players[id]; if (!p) return null;
   const ck = CARS[p.car] ? p.car : "blue";
   const e = { id, x: 0, y: 0, z: 0, h: 0, v: 0, rx: 0, rz: 0, rh: 0, rv: 0, rt: 0, st: 0, rw: 0, rkx: 0, rkz: 0, ex: 0, ez: 0, eh: 0, fresh: false, hitAt: 0, hitSentAt: 0, gfxT: newGroundTrack(),
-    prog: -1, fin: 0, steer: 0, steerVis: 0, ci: 0, seen: false,
+    prog: -1, fin: 0, steer: 0, steerVis: 0, ci: 0, seen: false, snaps: [], lagHi: 0, playDelay: 0,
     car: makeCar(CARS[ck].color), tag: nameTag(p.nickname, SIDE_COLOR[p.team] || "#8A978C") };
   e.car.visible = false; e.tag.visible = false;
   scene.add(e.car); scene.add(e.tag);
@@ -4458,16 +4465,48 @@ function onRemoteState(id, str) {
   e.st = sentAt; e.rkx = +a[8] || 0; e.rkz = +a[9] || 0;
   e.rw = e.seen && sentAt > prevAt && prevAt ? Math.max(-3, Math.min(3, wrapAngle(e.rh - prevH) / ((sentAt - prevAt) / 1000))) : 0;
   e.fresh = true;
+  if (BT.spec && sentAt) pushSnap(e, sentAt);
   if (!e.seen) {
     e.seen = true; e.x = e.rx; e.z = e.rz; e.h = e.rh; e.v = e.rv; e.ci = nearestAll(e.x, e.z); e.ex = e.ez = e.eh = 0;
     e.car.visible = true; e.tag.visible = true;
     if (BT.spec && id === BT.viewId) snapCamera();
   }
 }
+const SPEC_PLAY = { marginMs: 60, minDelayMs: 150, maxDelayMs: 1500, lagEase: 0.05, delayRate: 0.15, maxExtrapSec: 0.3, keepMs: 2000 };
+function pushSnap(e, sentAt) {
+  const snaps = e.snaps, last = snaps[snaps.length - 1];
+  if (last && sentAt <= last.t) return;
+  const lag = tnow() - sentAt;
+  e.lagHi = snaps.length ? Math.max(lag, e.lagHi + (lag - e.lagHi) * SPEC_PLAY.lagEase) : lag;
+  if (!snaps.length) e.playDelay = specDelayTarget(e);
+  snaps.push({ t: sentAt, x: e.rx, z: e.rz, h: e.rh, v: e.rv, kx: e.rkx, kz: e.rkz, w: e.rw });
+  while (snaps.length > 2 && snaps[1].t < sentAt - SPEC_PLAY.keepMs) snaps.shift();
+}
+function specDelayTarget(e) { return Math.max(SPEC_PLAY.minDelayMs, Math.min(SPEC_PLAY.maxDelayMs, e.lagHi + BATTLE.netMs + SPEC_PLAY.marginMs)); }
+function snapVel(s) { return [-Math.sin(s.h) * s.v + s.kx, -Math.cos(s.h) * s.v + s.kz]; }
+function specPose(e, playT) {
+  const snaps = e.snaps, last = snaps[snaps.length - 1];
+  if (playT >= last.t || snaps.length < 2) {
+    const age = Math.max(0, Math.min(SPEC_PLAY.maxExtrapSec, (playT - last.t) / 1000)), vel = snapVel(last);
+    return { x: last.x + vel[0] * age, z: last.z + vel[1] * age, h: last.h + last.w * age, v: last.v };
+  }
+  if (playT <= snaps[0].t) return snaps[0];
+  let i = snaps.length - 1;
+  while (i > 1 && snaps[i - 1].t > playT) i--;
+  const a = snaps[i - 1], b = snaps[i], span = (b.t - a.t) / 1000, u = (playT - a.t) / (b.t - a.t);
+  const u2 = u * u, u3 = u2 * u, h00 = 2 * u3 - 3 * u2 + 1, h10 = u3 - 2 * u2 + u, h01 = -2 * u3 + 3 * u2, h11 = u3 - u2;
+  const va = snapVel(a), vb = snapVel(b);
+  return {
+    x: h00 * a.x + h10 * span * va[0] + h01 * b.x + h11 * span * vb[0],
+    z: h00 * a.z + h10 * span * va[1] + h01 * b.z + h11 * span * vb[1],
+    h: a.h + wrapAngle(b.h - a.h) * u, v: a.v + (b.v - a.v) * u
+  };
+}
 function updateEnts(dt) {
   const nowMs = performance.now(), k = 1 - Math.exp(-10 * dt), errKeep = Math.exp(-8 * dt), nowNet = tnow();
   okeys(BT.ents).forEach(id => {
     const e = BT.ents[id]; if (!e.seen) return;
+    if (BT.spec && e.snaps.length) { placeSpecEnt(e, dt, nowNet, k); return; }
     const age = Math.max(0, Math.min(0.5, (e.st ? nowNet - e.st : nowMs - e.rt) / 1000));
     const midH = e.rh + e.rw * age * 0.5, slid = (1 - Math.exp(-CAR_HIT.slideFriction * age)) / CAR_HIT.slideFriction;
     const tx = e.rx - Math.sin(midH) * e.rv * age + e.rkx * slid, tz = e.rz - Math.cos(midH) * e.rv * age + e.rkz * slid, th = e.rh + e.rw * age;
@@ -4476,17 +4515,28 @@ function updateEnts(dt) {
     e.ex *= errKeep; e.ez *= errKeep; e.eh *= errKeep;
     e.x = tx + e.ex; e.z = tz + e.ez; e.h = th + e.eh;
     e.v += (e.rv - e.v) * k;
-    e.ci = nearestFrom(e.x, e.z, e.ci);
-    const s = S[e.ci], along = (e.x - s.p.x) * s.t.x + (e.z - s.p.z) * s.t.z, s2 = S[wrapI(e.ci + (along >= 0 ? 1 : -1))];
-    e.y = s.p.y + (s2.p.y - s.p.y) * Math.min(1, Math.abs(along) / SEG);
-    const fx = -Math.sin(e.h), fz = -Math.cos(e.h), i1 = wrapI(e.ci + 5), i0 = wrapI(e.ci - 5);
-    e.car.position.set(e.x, e.y, e.z);
-    e.car.rotation.y = e.h;
-    e.car.rotation.x = Math.atan2(S[i1].p.y - S[i0].p.y, SEG * 10) * (fx * s.t.x + fz * s.t.z);
-    e.steerVis += (e.steer - e.steerVis) * k;
-    e.car.userData.wheels.forEach(w => { w.spin.rotation.x -= e.v * dt / e.car.userData.wheelR; if (w.front) w.g.rotation.y = e.steerVis; });
-    e.tag.position.set(e.x, e.y + 2.9, e.z);
+    drawEnt(e, dt, k);
   });
+}
+function placeSpecEnt(e, dt, nowNet, k) {
+  const target = specDelayTarget(e), rate = SPEC_PLAY.delayRate * dt * 1000;
+  e.playDelay += Math.max(-rate, Math.min(rate, target - e.playDelay));
+  const pose = specPose(e, nowNet - e.playDelay), jumped = Math.hypot(pose.x - e.x, pose.z - e.z) > 20;
+  e.x = pose.x; e.z = pose.z; e.h = pose.h; e.v = pose.v;
+  if (jumped) { e.ci = nearestAll(e.x, e.z); e.gfxT = newGroundTrack(); }
+  drawEnt(e, dt, k);
+}
+function drawEnt(e, dt, k) {
+  e.ci = nearestFrom(e.x, e.z, e.ci);
+  const s = S[e.ci], along = (e.x - s.p.x) * s.t.x + (e.z - s.p.z) * s.t.z, s2 = S[wrapI(e.ci + (along >= 0 ? 1 : -1))];
+  e.y = s.p.y + (s2.p.y - s.p.y) * Math.min(1, Math.abs(along) / SEG);
+  const fx = -Math.sin(e.h), fz = -Math.cos(e.h), i1 = wrapI(e.ci + 5), i0 = wrapI(e.ci - 5);
+  e.car.position.set(e.x, e.y, e.z);
+  e.car.rotation.y = e.h;
+  e.car.rotation.x = Math.atan2(S[i1].p.y - S[i0].p.y, SEG * 10) * (fx * s.t.x + fz * s.t.z);
+  e.steerVis += (e.steer - e.steerVis) * k;
+  e.car.userData.wheels.forEach(w => { w.spin.rotation.x -= e.v * dt / e.car.userData.wheelR; if (w.front) w.g.rotation.y = e.steerVis; });
+  e.tag.position.set(e.x, e.y + 2.9, e.z);
 }
 function carCircles(x, z, h) {
   const fx = -Math.sin(h), fz = -Math.cos(h), o = CAR_HIT.offset;
@@ -4614,7 +4664,7 @@ function botChaseGap(b, rivals) {
   return ahead ? { behind: ahead.aheadM, side: Math.abs(ahead.lat - b.lat), lat: ahead.lat } : { behind: 0, side: 0, lat: 0 };
 }
 function botStep(b, dt) {
-  const rivals = botRivals(b), go = tnow() >= BT.startAt;
+  const rivals = botRivals(b), go = msToGo() <= 0;
   const chaseGap = go && !b.fin ? botChaseGap(b, rivals) : { behind: 0, side: 0, lat: 0 };
   stepChase(b, chaseGap, dt);
   let want = 0;
@@ -4648,7 +4698,7 @@ function botStep(b, dt) {
   else if (!go) { const s = S[b.ci]; b.h = Math.atan2(-s.t.x, -s.t.z); }
   const yawRate = dt > 0 ? wrapAngle(b.h - ph) / dt : 0;
   b.steer += (Math.max(-1, Math.min(1, yawRate / CFG.steerRate)) * CFG.wheelSteerMax - b.steer) * Math.min(1, dt * CFG.wheelSteerRate);
-  if (go && !b.fin && botProg(b) >= (OPEN ? 1 : LAPS)) b.fin = Math.max(1, Math.round(tnow() - BT.startAt));
+  if (go && !b.fin && botProg(b) >= (OPEN ? 1 : LAPS)) b.fin = Math.max(1, Math.round(-msToGo()));
 }
 function botString(b) {
   return [+b.x.toFixed(2), +b.z.toFixed(2), +b.h.toFixed(3), +b.v.toFixed(2), +botProg(b).toFixed(4), b.fin, +b.steer.toFixed(2), Math.round(tnow()), 0, 0, +b.dist.toFixed(2), +b.lat.toFixed(2)].join(",");
@@ -4689,7 +4739,7 @@ function netTick() {
 function hostTick() {
   if (!isHost() || !BT.match) return;
   const t = tnow();
-  if (BT.status === "countdown" && t >= BT.startAt && BT.statusSent !== "playing") { BT.statusSent = "playing"; BT.ref.update({ status: "playing" }); }
+  if (BT.status === "countdown" && msToGo() <= 0 && BT.statusSent !== "playing") { BT.statusSent = "playing"; BT.ref.update({ status: "playing" }); }
   if (BT.status !== "playing" && BT.status !== "countdown") return;
   const st = standings();
   const over = !st.length || st.every(r => r.fin) || (BT.match.firstFinAt && t - BT.match.firstFinAt > BATTLE.dnfMs);
