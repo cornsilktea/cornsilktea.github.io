@@ -42,21 +42,38 @@
   canvas#gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 
   .hud { position: fixed; z-index: 5; pointer-events: none; display: none; }
-  .hud-box { background: rgba(255,255,255,.92); border: 2px solid var(--sg-line-strong); border-radius: 10px; padding: 6px 12px; font-weight: 800; font-variant-numeric: tabular-nums; box-shadow: 0 3px 0 rgba(27,43,32,.25); }
-  .hud-box .lab { font-size: 11px; color: var(--sg-ink-soft); font-weight: 700; display: block; }
-  #hudHp { top: 52px; left: 10px; width: 230px; }
-  #hpBar { height: 16px; border: 2px solid var(--sg-line-strong); border-radius: 6px; background: #fff; overflow: hidden; margin-top: 3px; }
-  #hpFill { height: 100%; width: 100%; background: var(--sg-ok); transition: width .12s; }
-  #hpFill.low { background: var(--sg-danger); }
-  #hpNum { font-size: 20px; float: right; }
-  #hudTop { top: 52px; left: 50%; transform: translateX(-50%); text-align: center; display: none; gap: 10px; }
-  #hudTop .hud-box { min-width: 110px; font-size: 24px; }
-  #hudAmmo { right: 12px; bottom: 12px; font-size: 34px; text-align: right; }
-  #hudAmmo.empty { color: var(--sg-danger); border-color: var(--sg-danger); animation: blink .5s steps(2) infinite; }
-  #hudAmmo.empty .lab { color: var(--sg-danger); }
+  .hud-text { color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.55); font-weight: 800; font-variant-numeric: tabular-nums; }
+  .hud-text .lab { display: block; font-size: 11px; font-weight: 700; letter-spacing: .18em; color: #DCE6D6; }
+  #hudHp { top: calc(env(safe-area-inset-top,0px) + 48px); left: 12px; min-width: 150px; }
+  #hudHp::before { content: ""; position: fixed; top: 0; left: 0; right: 0; height: 150px; z-index: -1; pointer-events: none;
+    background: linear-gradient(to bottom, rgba(10,30,18,.55), rgba(10,30,18,0)); }
+  #hpLine { display: flex; align-items: baseline; gap: 4px; line-height: 1; margin: 2px 0 6px; }
+  #hpNum { font-size: 34px; }
+  #hpTotal { font-size: 14px; font-weight: 700; color: #DCE6D6; }
+  #hpBar { width: 150px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.28); overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.35); }
+  #hpFill { height: 100%; width: 100%; border-radius: 3px; background: linear-gradient(90deg, #9fd08a, #2F7D4F); transition: width .12s; }
+  #hpFill.low { background: linear-gradient(90deg, #E0707F, #B33951); }
+  #hudTop { display: none; gap: 16px; margin-top: 8px; }
+  #hudTop > div { font-size: 18px; line-height: 1.1; }
+  #hudTop .lab { font-size: 10.5px; letter-spacing: .02em; }
+  #hudAmmo { right: 12px; bottom: 12px; font-size: 34px; text-align: right; line-height: 1.05; }
+  #hudAmmo::before { content: ""; position: absolute; right: -12px; bottom: -12px; width: 240px; height: 140px; z-index: -1; pointer-events: none;
+    background: radial-gradient(ellipse at 100% 100%, rgba(10,30,18,.5), rgba(10,30,18,0) 70%); }
+  #hudAmmo.empty, #hudAmmo.empty .lab { color: #FF8A98; animation: blink .5s steps(2) infinite; }
   @keyframes blink { 50% { opacity: .55; } }
-  #hudBest { left: 12px; bottom: 12px; font-size: 15px; }
-  #hudBest .who { display: block; font-size: 11px; color: var(--sg-ink-soft); font-weight: 700; }
+  #hudBest { top: calc(env(safe-area-inset-top,0px) + 10px); right: 12px; text-align: right; }
+  .hrec { display: flex; align-items: center; justify-content: flex-end; gap: 7px; min-width: 0; }
+  .hrec + .hrec { margin-top: 6px; }
+  .recIcon { flex: none; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; text-shadow: none; box-shadow: 0 1px 3px rgba(0,0,0,.35); }
+  .recIcon.me { background: #DCE6D6; }
+  .recIcon.world { background: #D97B4F; }
+  .recText { min-width: 0; }
+  .recText span { display: block; font-size: 10.5px; font-weight: 700; color: #DCE6D6; letter-spacing: .02em; line-height: 1.2; }
+  .recText b { font-size: 17px; font-weight: 800; line-height: 1.15; }
+  .recText small { display: block; font-size: 10.5px; font-weight: 700; color: #fff; opacity: .85; line-height: 1.2;
+    max-width: 44vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .recText small:empty { display: none; }
 
   #cross { position: fixed; left: 50%; top: 50%; width: 28px; height: 28px; transform: translate(-50%,-50%); z-index: 5; pointer-events: none; display: none; }
   #cross::before, #cross::after { content: ""; position: absolute; background: #fff; box-shadow: 0 0 0 1px var(--sg-ink); }
@@ -116,7 +133,7 @@
   .wipe { font-size: 12px; color: var(--sg-ink-faint); margin-top: 8px; }
   .wipe button { font: inherit; font-size: 12px; color: var(--sg-ink-soft); background: none; border: none; text-decoration: underline; cursor: pointer; }
   @media (max-width: 520px) {
-    #hudHp { width: 160px; } #hudTop .hud-box { min-width: 80px; font-size: 18px; } #hudAmmo { font-size: 26px; }
+    #hudAmmo { font-size: 26px; }
     #hudBest { display: none !important; }
     .btn { font-size: 18px; padding: 11px 22px; }
   }
@@ -151,9 +168,11 @@
   .board td { padding: 6px 4px; font-weight: 800; border-bottom: 1px solid var(--sg-line); font-variant-numeric: tabular-nums; }
   .board tr.mine td { background: var(--sg-primary-soft); }
   .dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: middle; }
-  #hudTeam { top: 52px; left: 50%; transform: translateX(-50%); display: none; gap: 8px; text-align: center; }
-  #hudTeam .hud-box { min-width: 90px; font-size: 26px; }
-  #hudTeam .tb.blue { color: #2F6FD6; border-color: #2F6FD6; } #hudTeam .tb.red { color: #D6453D; border-color: #D6453D; }
+  #hudTeam { top: calc(env(safe-area-inset-top,0px) + 10px); left: 50%; transform: translateX(-50%); display: none; gap: 18px; text-align: center; }
+  #hudTeam > div { min-width: 64px; font-size: 30px; line-height: 1.05; }
+  #hudTeam .tb { text-shadow: 0 0 2px #fff, 0 0 6px rgba(255,255,255,.9), 0 1px 3px rgba(0,0,0,.4); }
+  #hudTeam .tb.blue { color: #2F6FD6; } #hudTeam .tb.red { color: #D6453D; }
+  #hudTeam .tb .lab { text-shadow: 0 1px 3px rgba(0,0,0,.55); }
   #killFeed { position: fixed; top: 52px; right: 12px; z-index: 5; pointer-events: none; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
   .kf { background: rgba(255,255,255,.92); border: 2px solid var(--sg-line-strong); border-radius: 8px; padding: 3px 10px; font-size: 14px; font-weight: 800; white-space: nowrap; }
   #teamMsg { position: fixed; left: 50%; bottom: 28%; transform: translateX(-50%); z-index: 6; pointer-events: none; background: rgba(27,43,32,.85); color: #fff; font-size: 22px; font-weight: 800; padding: 12px 22px; border-radius: 12px; white-space: nowrap; }
@@ -161,7 +180,16 @@
   #countBig { position: fixed; inset: 0; z-index: 6; pointer-events: none; display: flex; align-items: center; justify-content: center; font-size: 120px; font-weight: 800; color: #fff; -webkit-text-stroke: 3px var(--sg-ink); text-shadow: 0 6px 0 rgba(27,43,32,.35); }
   #specCv { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 4; background: #DDE3E8; }
   #btnGameLeave { position: fixed; left: 12px; bottom: 12px; z-index: 6; font: inherit; font-size: 14px; font-weight: 800; padding: 6px 14px; border-radius: 10px; border: 2px solid var(--sg-line-strong); background: rgba(255,255,255,.92); color: var(--sg-ink); cursor: pointer; }
-  @media (max-width: 520px) { .teams { flex-direction: column; } #hudTeam .hud-box { min-width: 64px; font-size: 20px; } #countBig { font-size: 90px; } }
+  @media (max-width: 520px) { .teams { flex-direction: column; } #hudTeam { left: auto; right: 12px; transform: none; gap: 12px; } #hudTeam > div { min-width: 48px; font-size: 22px; } #countBig { font-size: 90px; } }
+  @media (max-height: 620px) {
+    #hudHp { top: calc(env(safe-area-inset-top,0px) + 44px); }
+    #hudHp::before { height: 120px; }
+    #hpNum { font-size: 26px; } #hpLine { margin-bottom: 4px; } #hpBar { width: 120px; }
+    #hudTop { margin-top: 5px; gap: 12px; } #hudTop > div { font-size: 15px; }
+    .recText b { font-size: 14px; } .hrec + .hrec { margin-top: 4px; }
+    #hudAmmo { font-size: 26px; }
+    #hudTeam > div { font-size: 22px; }
+  }
   [hidden]{display:none !important;}
 </style>
 </head>
@@ -172,13 +200,20 @@
 <div id="hitmark"><span></span><span></span><span></span><span></span></div>
 <div id="pops"></div>
 
-<div class="hud hud-box" id="hudHp"><span class="lab">체력 <span id="hpNum">100</span></span><div id="hpBar"><div id="hpFill"></div></div></div>
-<div class="hud" id="hudTop">
-  <div class="hud-box"><span class="lab">처치</span><span id="hudScore">0</span></div>
-  <div class="hud-box"><span class="lab">생존 시간</span><span id="hudTime">0:00</span></div>
+<div class="hud hud-text" id="hudHp">
+  <span class="lab">체력</span>
+  <div id="hpLine"><span id="hpNum">100</span><span id="hpTotal">/ 100</span></div>
+  <div id="hpBar"><div id="hpFill"></div></div>
+  <div id="hudTop">
+    <div><span class="lab">처치</span><span id="hudScore">0</span></div>
+    <div><span class="lab">생존 시간</span><span id="hudTime">0:00</span></div>
+  </div>
 </div>
-<div class="hud hud-box" id="hudAmmo"><span class="lab" id="ammoLab">소총 탄약</span><span id="ammoNum">∞</span></div>
-<div class="hud hud-box" id="hudBest"><span class="lab">개인 최고 기록</span><span id="hudBestVal">—</span><span class="lab" style="margin-top:4px">🏆 세계 신기록</span><span id="hudWrVal">—</span><span class="who" id="hudWrWho"></span></div>
+<div class="hud hud-text" id="hudAmmo"><span class="lab" id="ammoLab">소총 탄약</span><span id="ammoNum">∞</span></div>
+<div class="hud hud-text" id="hudBest">
+  <div class="hrec"><div class="recText"><span>개인 최고 기록</span><b id="hudBestVal">—</b></div><div class="recIcon me">⭐</div></div>
+  <div class="hrec"><div class="recText"><span>세계 신기록</span><b id="hudWrVal">—</b><small id="hudWrWho"></small></div><div class="recIcon world">🏆</div></div>
+</div>
 
 <div id="overlay">
   <div class="card" id="cardStart">
@@ -260,10 +295,10 @@
   </div>
 </div>
 
-<div class="hud" id="hudTeam">
-  <div class="hud-box tb blue"><span class="lab">블루</span><span id="tsBlue">0</span></div>
-  <div class="hud-box"><span class="lab">남은 시간</span><span id="tsTime">1:00</span></div>
-  <div class="hud-box tb red"><span class="lab">레드</span><span id="tsRed">0</span></div>
+<div class="hud hud-text" id="hudTeam">
+  <div class="tb blue"><span class="lab">블루</span><span id="tsBlue">0</span></div>
+  <div><span class="lab">남은 시간</span><span id="tsTime">1:00</span></div>
+  <div class="tb red"><span class="lab">레드</span><span id="tsRed">0</span></div>
 </div>
 <div id="killFeed" hidden></div>
 <div id="teamMsg" hidden></div>
