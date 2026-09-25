@@ -433,6 +433,7 @@ const CFG = {
   offroadMax: 15,
   offroadDrag: 2.4,
   wallKeep: 0.3,
+  offroadWallKeep: 0.7,
   gravity: 40,
   cornerDrag: 0.12,
   downhillMax: 1.1,
@@ -3579,7 +3580,7 @@ function updateCar(dt) {
     const sg = lat > 0 ? 1 : -1;
     P.x = s.p.x + s.n.x * limit * sg + s.t.x * along; P.z = s.p.z + s.n.z * limit * sg + s.t.z * along;
     const wallX = P.x + s.n.x * sg * 0.9, wallZ = P.z + s.n.z * sg * 0.9;
-    if (P.wallT === 0 && Math.abs(P.v) > 6) { gfxSparks(wallX, P.y + 0.3, wallZ, -s.n.x * sg, -s.n.z * sg, 14); P.v *= CFG.wallKeep; beep(80, 0.18, "square", 0.12); shake = 0.35; }
+    if (P.wallT === 0 && Math.abs(P.v) > 6) { gfxSparks(wallX, P.y + 0.3, wallZ, -s.n.x * sg, -s.n.z * sg, 14); P.v *= s.lim ? CFG.wallKeep : CFG.offroadWallKeep; beep(80, 0.18, "square", 0.12); shake = 0.35; }
     else if (Math.abs(P.v) > 10 && Math.random() < dt * 25) gfxSparks(wallX, P.y + 0.3, wallZ, -s.n.x * sg, -s.n.z * sg, 1);
     P.wallT = 0.4;
     const intoWall = (P.kx * s.n.x + P.kz * s.n.z) * sg;
