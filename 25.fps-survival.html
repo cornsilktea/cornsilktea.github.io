@@ -339,7 +339,7 @@ const PLAYER_CONFIG = {
   yawSpeed: 75, pitchSpeed: 55, pitchLimit: 60,
   turnRampSec: 0.35,
   radius: 0.45, eyeHeight: 1.6,
-  headDamage: 100, bodyDamage: 50, bulletSpeed: 180,
+  headDamage: 80, bodyDamage: 40, limbDamage: 20, bulletSpeed: 180,
   flipSec: 0.15,
 };
 const ITEM_CONFIG = {
@@ -842,7 +842,7 @@ const gun = new THREE.Group();
   gun.position.set(0.19, -0.22, -0.17);
   viewModel.add(gun);
 }
-const RIFLE = { g: gun, base: [0.19, -0.22, -0.17], rate: () => PLAYER_CONFIG.fireRate, head: () => PLAYER_CONFIG.headDamage, body: () => PLAYER_CONFIG.bodyDamage };
+const RIFLE = { g: gun, base: [0.19, -0.22, -0.17], rate: () => PLAYER_CONFIG.fireRate, head: () => PLAYER_CONFIG.headDamage, body: () => PLAYER_CONFIG.bodyDamage, limb: () => PLAYER_CONFIG.limbDamage };
 
 const MODEL_DIR = "img/fps/models/";
 const gltfLoader = THREE.GLTFLoader ? new THREE.GLTFLoader() : null;
@@ -1010,7 +1010,7 @@ function makeSoldier(x, z, color) {
   const g = new THREE.Group();
   const uniform = MS({ color }), skin = MS({ color: 0xE8C9A8 }), dark = MS({ color: 0x2E3A33 }), vestM = MS({ color: 0x4A3F3A }), bootM = MS({ color: 0x1B2B20 });
   const mk = (geo, mat, x, y, z, parent) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; (parent || g).add(m); return m; };
-  const bodyParts = [], headParts = [];
+  const bodyParts = [], headParts = [], limbParts = [];
   bodyParts.push(mk(EG.torso, uniform, 0, 1.35, 0), mk(EG.vest, vestM, 0, 1.4, 0), mk(EG.belt, dark, 0, 0.98, 0), mk(EG.hip, uniform, 0, 0.83, 0));
   mk(EG.pouch, dark, -0.18, 1.25, 0.24); mk(EG.pouch, dark, 0.18, 1.25, 0.24); mk(EG.pouch, dark, 0, 1.0, -0.22);
   const face = mk(EG.face, skin, 0, 1.95, 0);
@@ -1025,16 +1025,17 @@ function makeSoldier(x, z, color) {
   armR.rotation.x = -Math.PI / 2 + 0.1;
   const upL = mk(EG.upperArm, uniform, 0, -0.22, 0, armL), foreL = mk(EG.foreArm, uniform, 0, -0.6, 0, armL), handL = mk(EG.hand, skin, 0, -0.85, 0, armL);
   armL.rotation.x = -Math.PI / 2 + 0.45; armL.rotation.y = 0.35;
-  bodyParts.push(upR, foreR, handR, upL, foreL, handL);
+  limbParts.push(upR, foreR, handR, upL, foreL, handL);
   const legPivot = (side) => { const p = new THREE.Group(); p.position.set(side * 0.16, 0.72, 0); g.add(p); return p; };
   const legR = legPivot(1), legL = legPivot(-1);
-  [legR, legL].forEach(p => bodyParts.push(mk(EG.thigh, uniform, 0, -0.2, 0, p), mk(EG.shin, uniform, 0, -0.55, 0, p), mk(EG.boot, bootM, 0, -0.72, 0.04, p)));
+  [legR, legL].forEach(p => limbParts.push(mk(EG.thigh, uniform, 0, -0.2, 0, p), mk(EG.shin, uniform, 0, -0.55, 0, p), mk(EG.boot, bootM, 0, -0.72, 0.04, p)));
   g.position.set(x, 0, z); g.rotation.order = "YXZ";
   const e = { g, hp: 100, fire: rnd(0.8, DIFFICULTY_CONFIG.enemyFireCooldownSec), strafe: Math.random() < 0.5 ? 1 : -1, strafeT: rnd(1.5, 3), flashT: 0,
               mats: [uniform, skin, vestM], allMats: [uniform, skin, dark, vestM, bootM], baseCols: [color, 0xE8C9A8, 0x4A3F3A], muzzle, legR, legL, armR, walk: Math.random() * 6, spawnIdx: 0 };
   bodyParts.forEach(m => { m.userData = { enemy: e, part: "body" }; });
   headParts.forEach(m => { m.userData = { enemy: e, part: "head" }; });
-  e.parts = bodyParts.concat(headParts);
+  limbParts.forEach(m => { m.userData = { enemy: e, part: "limb" }; });
+  e.parts = bodyParts.concat(headParts, limbParts);
   dressSoldier(e);
   return e;
 }
@@ -1744,10 +1745,11 @@ function shoot() {
   fireWeapon(() => enemyParts, soloBulletHit);
   afterShot();
 }
+function partDamage(W, part) { return part === "head" ? W.head() : part === "limb" ? W.limb() : W.body(); }
 function soloBulletHit(h) {
   const W = RIFLE, ud = h.object.userData, e = ud.enemy;
   if (e.hp <= 0) return;
-  const head = ud.part === "head", dmg = head ? W.head() : W.body();
+  const head = ud.part === "head", dmg = partDamage(W, ud.part);
   STAT.hits++; if (head) STAT.heads++;
   e.hp -= dmg; hitmark(); popup("-" + dmg + "%", head ? "head" : "");
   enemyFlash(e, true); e.flashT = 0.08;
@@ -2347,7 +2349,7 @@ function teamBulletHit(h) {
   const ent = T.ents[ud.enemy.ownerId];
   if (!ent || !ent.alive) return;
   if (ent.prot) { popup("보호 중", "warn"); return; }
-  const head = ud.part === "head", dmg = head ? W.head() : W.body();
+  const head = ud.part === "head", dmg = partDamage(W, ud.part);
   STAT.hits++; if (head) STAT.heads++;
   hitmark(); SFX.hitmark(); popup("-" + dmg + "%", head ? "head" : "");
   enemyFlash(ud.enemy, true); ud.enemy.flashT = 0.08;
