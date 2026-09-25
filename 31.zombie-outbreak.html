@@ -183,7 +183,7 @@
     <div id="dashLab">대쉬 준비 완료 [Space]</div>
     <div id="dashBar"><div id="dashFill"></div></div>
   </div>
-  <div id="keyHint">WASD 이동 · ←→ 시점 회전 · ↑↓ 시점 높이 · Q 뒤돌기 · Space 대쉬(좀비)</div>
+  <div id="keyHint">WASD 이동 · ←→ 시점 회전 · ↑↓ 시점 높이 · Q 뒤돌기 · Space 대쉬(최초 좀비)</div>
   <button type="button" id="btnGameLeave">나가기</button>
 </div>
 
@@ -213,7 +213,7 @@
         <span><kbd>←</kbd> <kbd>→</kbd></span><span>카메라를 좌우로 돌립니다.</span>
         <span><kbd>↑</kbd> <kbd>↓</kbd></span><span>카메라 높이(각도)를 바꿉니다.</span>
         <span><kbd>Q</kbd></span><span>뒤로 돌아섭니다.</span>
-        <span><kbd>Space</kbd></span><span>좀비일 때 바라보는 방향으로 대쉬합니다.</span>
+        <span><kbd>Space</kbd></span><span>최초 좀비만 바라보는 방향으로 대쉬합니다. (감염된 좀비는 대쉬할 수 없습니다)</span>
       </div>
     </div>
     <div class="card">
@@ -285,7 +285,8 @@ const ROUND_MS = 180000, COUNTDOWN_MS = 3000, ZOMBIE_HOLD_MS = 15000, FINAL_RUSH
 const INFECT_INJURE_MS = 700, INFECT_FALL_MS = 1600, INFECT_STANDUP_MS = 2400, STANDUP_SKIP_SEC = 1.0;
 const INFECT_ZOMBIE_MODEL_MS = INFECT_INJURE_MS + INFECT_FALL_MS, INFECT_TOTAL_MS = INFECT_ZOMBIE_MODEL_MS + INFECT_STANDUP_MS;
 const BELL_ELAPSED_MS = [60000, 120000];
-const HUMAN_SPEED = 5.2, ZOMBIE_SPEED = 5.0, RUSH_SPEED_MULT = 1.5;
+const HUMAN_SPEED = 5.2, ZOMBIE_SPEED = 6.0, RUSH_SPEED_MULT = 1.5;
+const HUMAN_VIEW_SCALE = 0.8, ZOMBIE_VIEW_SCALE = 0.7;
 const ZOMBIE_RUN_ANIM = 1.5, ZOMBIE_RUN_ANIM_RUSH = 1.95;
 const DASH_MS = 170, DASH_DISTANCE = 8.5, DASH_COOLDOWN_MS = 5000, DASH_COOLDOWN_RUSH_MS = 2000;
 const INFECT_RADIUS = 1.05, INFECT_HEIGHT_GAP = 1.5;
@@ -411,8 +412,10 @@ const colliders = [], flatSurfaces = [], ramps = [];
 const GRID_CELL = 4, colliderGrid = new Map();
 let colliderQueryStamp = 0;
 function gridKey(ix, iz) { return ix * 4096 + iz; }
+const MIN_OBSTACLE_H = 0.8;
 function addCollider(x0, x1, y0, y1, z0, z1) {
-  const c = { x0: Math.min(x0, x1), x1: Math.max(x0, x1), y0: Math.min(y0, y1), y1: Math.max(y0, y1), z0: Math.min(z0, z1), z1: Math.max(z0, z1), stamp: 0 };
+  const bottom = Math.min(y0, y1), top = Math.max(y0, y1, bottom + MIN_OBSTACLE_H);
+  const c = { x0: Math.min(x0, x1), x1: Math.max(x0, x1), y0: bottom, y1: top, z0: Math.min(z0, z1), z1: Math.max(z0, z1), stamp: 0 };
   colliders.push(c);
   for (let ix = Math.floor(c.x0 / GRID_CELL); ix <= Math.floor(c.x1 / GRID_CELL); ix++)
     for (let iz = Math.floor(c.z0 / GRID_CELL); iz <= Math.floor(c.z1 / GRID_CELL); iz++) {
@@ -480,18 +483,18 @@ const DETAIL_TEXTURES = {
   tile: canvasTexture(256, (ctx, s) => {
     grey(ctx, 228); ctx.fillRect(0, 0, s, s);
     for (let i = 0; i < 4; i++) { grey(ctx, Math.round(texNoise(220, 236))); ctx.fillRect((i % 2) * 128 + 2, Math.floor(i / 2) * 128 + 2, 124, 124); }
-    speckle(ctx, s, s, 900, 205, 245, 1.8, 0.3); stains(ctx, s, s, 6, 185, 0.14, 60);
-    grey(ctx, 178); ctx.fillRect(0, 0, s, 3); ctx.fillRect(0, 0, 3, s); ctx.fillRect(0, 127, s, 3); ctx.fillRect(127, 0, 3, s);
-    softenTiling(ctx, s, s, 1.2);
+    speckle(ctx, s, s, 500, 215, 242, 1.8, 0.22); stains(ctx, s, s, 6, 190, 0.12, 60);
+    grey(ctx, 192); ctx.fillRect(0, 0, s, 4); ctx.fillRect(0, 0, 4, s); ctx.fillRect(0, 126, s, 4); ctx.fillRect(126, 0, 4, s);
+    softenTiling(ctx, s, s, 2.2);
   }, true),
   wood: canvasTexture(256, (ctx, s) => {
     for (let r = 0; r < 8; r++) {
       grey(ctx, Math.round(texNoise(190, 230))); ctx.fillRect(0, r * 32, s, 32);
       for (let k = 0; k < 8; k++) { grey(ctx, Math.round(texNoise(170, 210)), 0.25); ctx.fillRect(0, r * 32 + Math.random() * 32, s, 1.5); }
-      grey(ctx, 130); ctx.fillRect(0, r * 32, s, 2); ctx.fillRect(((r * 97) % 200) + 20, r * 32, 2, 32);
+      grey(ctx, 150); ctx.fillRect(0, r * 32, s, 3); ctx.fillRect(((r * 97) % 200) + 20, r * 32, 3, 32);
     }
-    stains(ctx, s, s, 8, 140, 0.16, 50);
-    softenTiling(ctx, s, s, 1);
+    stains(ctx, s, s, 8, 150, 0.14, 50);
+    softenTiling(ctx, s, s, 2);
   }, true),
   ceil: canvasTexture(256, (ctx, s) => {
     grey(ctx, 236); ctx.fillRect(0, 0, s, s);
@@ -1108,6 +1111,8 @@ function schoolChair(cx, y, cz, yaw, fallen) {
   g(0, oy + 0.22, -0.18, 0.38, 0.44, 0.03, C.deskFrame, "metal");
   g(0.19, oy + 0.6, 0.18, 0.03, 0.3, 0.03, C.deskFrame, "metal");
   g(0.19, oy + 0.6, -0.18, 0.03, 0.3, 0.03, C.deskFrame, "metal");
+  const reach = fallen ? 0.35 : 0.18;
+  addCollider(cx - reach, cx + reach, y, y + 0.9, cz - reach, cz + reach);
 }
 function scatterPapers(x0, x1, z0, z1, y, count) {
   for (let i = 0; i < count; i++) {
@@ -1190,7 +1195,6 @@ function drawBoard(variant) {
     schoolDesk(dx, y, dz, yaw, state);
     const chairFallen = chance(0.25);
     schoolChair(dx + (chairFallen ? 0.75 : 0.5), y, dz + randIn(-0.2, 0.2), chairFallen ? randIn(0, 6.28) : randIn(-0.4, 0.4), chairFallen);
-    if (!chairFallen) addCollider(dx + 0.3, dx + 0.72, y, y + 0.46, dz - 0.22, dz + 0.22);
   }
   const lz0 = zIn + dir * 1.4, lz1 = zOut - dir * 0.9;
   box(x1 - 0.65, x1 - 0.2, y, y + 1.2, lz0, lz1, C.locker, "metal");
@@ -1216,8 +1220,8 @@ function furnishScience(x0, x1, zIn, zOut, dir, y) {
     box(tx - 0.3, tx + 0.3, y + 0.915, y + 0.925, tz - 0.25, tz + 0.25, 0x1a1c1e, "plain", false);
     box(tx - 0.03, tx + 0.03, y + 0.92, y + 1.25, tz - 0.3, tz - 0.25, 0xb8bec2, "metal", false);
     for (const s of [-1, 1]) for (const k of [-0.7, 0.7]) {
-      if (chance(0.25)) obox(tx + k, y + 0.2, tz + s * 1.0, 0.32, 0.6, 0.32, Math.PI / 2, randIn(0, 6), 0, 0x4a5a66, "metal", false);
-      else cyl(tx + k, y, tz + s * 1.0, 0.16, 0.16, 0.6, 7, 0x4a5a66, "metal", false);
+      if (chance(0.25)) obox(tx + k, y + 0.2, tz + s * 1.0, 0.32, 0.6, 0.32, Math.PI / 2, randIn(0, 6), 0, 0x4a5a66, "metal", true);
+      else cyl(tx + k, y, tz + s * 1.0, 0.16, 0.16, 0.6, 7, 0x4a5a66, "metal", true);
     }
     if (chance(0.5)) for (let k = 0; k < 3; k++) cyl(tx + randIn(-1, 1), y + 0.92, tz + randIn(-0.4, 0.4), 0.05, 0.03, 0.2, 6, 0x9fd0d8, "plain", false);
   }
@@ -1356,6 +1360,7 @@ function furnishArt(x0, x1, zIn, zOut, dir, y) {
     const oy = fallen ? -0.1 : 0;
     g(0, oy + 0.9, 0, 0.05, 1.8, 0.05, 0x8a6a45); g(-0.3, oy + 0.8, 0.1, 0.04, 1.6, 0.04, 0x8a6a45); g(0.3, oy + 0.8, 0.1, 0.04, 1.6, 0.04, 0x8a6a45);
     g(0, oy + 1.1, 0.05, 0.7, 0.55, 0.02, 0xf0ece0);
+    if (!fallen) addCollider(ex - 0.3, ex + 0.3, y, y + 1.8, ez - 0.35, ez + 0.35);
   }
   roomCeilingLights(x0, x1, zIn, zOut, y);
   scatterPapers(x0 + 1, x1 - 1, Math.min(zIn, zOut) + 1, Math.max(zIn, zOut) - 1, y, 10);
@@ -1482,15 +1487,32 @@ function buildGym() {
   box(57, 75, 0, 0.006, 12.96, 13.04, C.gymLine, "plain", false);
   box(68.96, 69.04, 0, 0.006, -13, 13, C.gymLine, "plain", false);
   for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2; obox(69 + Math.cos(a) * 3, 0.004, Math.sin(a) * 3, 0.06, 0.004, 0.8, 0, -a, 0, C.gymLine, "plain", false); }
-  box(78, 84, 0, 1.2, -11, 11, C.podium, "wood");
-  flatSurfaces.push({ y: 1.2, x0: 78, x1: 84, z0: -11, z1: 11, holes: [] });
-  ramps.push({ axis: "x", x0: 75.6, x1: 78, z0: -1.5, z1: 1.5, a0: 75.6, h0: 0, a1: 78, h1: 1.2 });
-  for (let i = 0; i < 6; i++) box(75.6 + i * 0.4, 75.6 + (i + 1) * 0.4, 0, (i + 1) * 0.2, -1.5, 1.5, C.stair, "wood", false);
-  for (let zc = -10.2; zc < 11; zc += 2.2) {
-    if (chance(0.25)) { obox(78.8, 0.6 + 1.2, zc, 0.12, 1.2, 1.9, 0, 0, 1.2, C.curtainGym, "plaster", false); continue; }
-    box(78.15, 78.4, 1.2, 7.2, zc - 1.05, zc + 1.05, C.curtainGym, "plaster");
+  const stageH = 1.2, stageX0 = 78, stageX1 = 84, stageZ = 11;
+  box(stageX0, stageX1, 0, stageH, -stageZ, stageZ, C.podium, "wood");
+  box(stageX0 - 0.04, stageX0, 0, stageH - 0.08, -stageZ, stageZ, 0x5a3f28, "wood", false);
+  box(stageX0 - 0.06, stageX1, stageH - 0.06, stageH + 0.01, -stageZ - 0.03, stageZ + 0.03, 0x6b4a2e, "wood", false);
+  flatSurfaces.push({ y: stageH, x0: stageX0, x1: stageX1, z0: -stageZ, z1: stageZ, holes: [] });
+  for (const sz of [-9.2, 9.2]) {
+    ramps.push({ axis: "x", x0: 75.6, x1: stageX0, z0: sz - 1, z1: sz + 1, a0: 75.6, h0: 0, a1: stageX0, h1: stageH });
+    for (let i = 0; i < 6; i++) box(75.6 + i * 0.4, 75.6 + (i + 1) * 0.4, 0, (i + 1) * 0.2, sz - 1, sz + 1, C.stair, "wood", false);
+    for (const side of [-1, 1]) {
+      obox(76.8, 1.5, sz + side * 1.02, 2.7, 0.05, 0.05, 0, 0, Math.atan2(stageH, 2.4), C.rail, "metal", false);
+      for (const px of [75.8, 77.8]) box(px - 0.025, px + 0.025, 0, 0.9 + (px - 75.6) / 2.4 * stageH, sz + side * 1.02 - 0.025, sz + side * 1.02 + 0.025, C.rail, "metal", false);
+    }
   }
-  box(78, 84, 7.2, 7.8, -11.2, 11.2, C.curtainGym, "plaster", false);
+  box(stageX0 - 0.05, stageX0 + 0.15, 5.6, GYM.h - 0.05, -stageZ - 0.2, stageZ + 0.2, C.curtainGym, "plaster", false);
+  for (const s of [-1, 1]) {
+    box(stageX0 + 0.05, stageX0 + 0.5, stageH, 5.6, s * (stageZ - 1.3), s * stageZ, C.curtainGym, "plaster");
+    for (let k = 0; k < 4; k++) box(stageX0 + 0.5, stageX0 + 0.53, stageH + 0.1, 5.5, s * (stageZ - 1.25 + k * 0.3), s * (stageZ - 1.15 + k * 0.3), 0x6a1a26, "plain", false);
+  }
+  box(stageX1 - 0.45, stageX1 - 0.2, stageH, GYM.h - 0.05, -stageZ, stageZ, C.curtainGym, "plaster");
+  box(81, 81.6, stageH, stageH + 1.05, -0.4, 0.4, C.podium, "wood");
+  box(80.95, 81.65, stageH + 1.05, stageH + 1.1, -0.45, 0.45, 0x5e4128, "plain", false);
+  cyl(82.8, stageH, 3.5, 0.25, 0.2, 0.08, 8, 0x333333, "metal", false);
+  cyl(82.8, stageH, 3.5, 0.025, 0.025, 2.4, 6, 0xc8b060, "metal", false);
+  obox(82.8, stageH + 2.0, 3.1, 0.02, 0.7, 0.8, 0, 0, 0, 0xf0ece0, "plain", false);
+  box(80.2, 81.6, stageH, stageH + 1.25, -7.5, -6.0, 0x151517, "plain");
+  obox(79.4, stageH + 0.12, 5.2, 1.1, 0.24, 0.5, Math.PI / 2, 0.4, 0, C.chairSeat, "wood", true);
   for (const zc of [-14.6, 14.6]) {
     const s = Math.sign(zc);
     box(68.85, 69.15, 0, 3.6, zc - 0.15, zc + 0.15, C.darkFrame, "metal");
@@ -1641,6 +1663,74 @@ const apartmentTexture = canvasTexture(256, (ctx, w, h) => {
     ctx.fillRect(c * 32 + 6, r * 16 + 4, 20, 9);
   }
 }, true);
+const clockHands = {};
+const clockFaceTexture = canvasTexture(512, (ctx, w) => {
+  const c = w / 2, r = w * 0.48;
+  const face = ctx.createRadialGradient(c, c * 0.9, r * 0.1, c, c, r);
+  face.addColorStop(0, "#F6F1E1"); face.addColorStop(0.8, "#E9E1CB"); face.addColorStop(1, "#CFC4A6");
+  ctx.fillStyle = "#2a2e33"; ctx.fillRect(0, 0, w, w);
+  ctx.fillStyle = face; ctx.beginPath(); ctx.arc(c, c, r, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = "#2B3A30"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(c, c, r * 0.93, 0, Math.PI * 2); ctx.stroke();
+  ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(c, c, r * 0.83, 0, Math.PI * 2); ctx.stroke();
+  for (let i = 0; i < 60; i++) {
+    const a = i / 60 * Math.PI * 2, hour = i % 5 === 0;
+    ctx.lineWidth = hour ? 9 : 3; ctx.strokeStyle = "#1E2A22";
+    ctx.beginPath(); ctx.moveTo(c + Math.sin(a) * r * (hour ? 0.8 : 0.86), c - Math.cos(a) * r * (hour ? 0.8 : 0.86)); ctx.lineTo(c + Math.sin(a) * r * 0.92, c - Math.cos(a) * r * 0.92); ctx.stroke();
+  }
+  ctx.fillStyle = "#1E2A22"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.font = "800 44px " + FONT;
+  for (let n = 1; n <= 12; n++) { const a = n / 12 * Math.PI * 2; ctx.fillText(String(n), c + Math.sin(a) * r * 0.66, c - Math.cos(a) * r * 0.66 + 2); }
+  ctx.font = "800 22px " + FONT; ctx.fillStyle = "#6B2A30"; ctx.fillText("한밤중학교", c, c + r * 0.34);
+  ctx.font = "700 14px " + FONT; ctx.fillStyle = "#5a5a50"; ctx.fillText("SINCE 1987", c, c + r * 0.44);
+  stains(ctx, w, w, 10, 120, 0.12, 90);
+  ctx.strokeStyle = "rgba(255,255,255,0.55)"; ctx.lineWidth = 1.5; ctx.beginPath();
+  ctx.moveTo(c + r * 0.2, c - r * 0.9); ctx.lineTo(c + r * 0.05, c - r * 0.45); ctx.lineTo(c + r * 0.3, c - r * 0.1); ctx.lineTo(c + r * 0.15, c + r * 0.3);
+  ctx.moveTo(c + r * 0.05, c - r * 0.45); ctx.lineTo(c - r * 0.35, c - r * 0.3); ctx.stroke();
+});
+function buildClockTower(R) {
+  const zFront = -BUILDING_Z - 0.15;
+  box(-2.1, 2.1, R, R + 0.45, zFront - 0.3, zFront + 0.9, C.band, "plaster", false);
+  box(-1.8, 1.8, R + 0.45, R + 3.7, zFront - 0.2, zFront + 0.8, C.brick, "brick", false);
+  for (const s of [-1, 1]) box(s * 1.8 - 0.14, s * 1.8 + 0.14, R + 0.45, R + 3.7, zFront - 0.28, zFront + 0.88, C.band, "plaster", false);
+  box(-1.5, 1.5, R + 0.75, R + 3.4, zFront - 0.26, zFront - 0.2, 0xe4dfd2, "plaster", false);
+  box(-2.0, 2.0, R + 3.7, R + 3.9, zFront - 0.4, zFront + 1.0, C.band, "plaster", false);
+  box(-2.1, 2.1, R + 3.9, R + 3.98, zFront - 0.48, zFront + 1.08, 0x8a8e92, "metal", false);
+  obox(0, R + 4.25, zFront + 0.3, 3.6, 0.08, 0.9, 0.62, 0, 0, C.roof, "plain", false);
+  obox(0, R + 4.25, zFront + 0.3, 3.6, 0.08, 0.9, -0.62, 0, 0, C.roof, "plain", false);
+  const emblem = atlasCell("clockplate", drawPlate("한 밤 중 학 교", "#1c2a22", "#E8D7A0", "#B89A50"));
+  panel(emblem, 0, R + 0.95, zFront - 0.27, 2.2, 0.36, Math.PI, 0xffffff, { shade: 1.3 });
+  const group = new THREE.Group();
+  group.position.set(0, R + 2.2, zFront - 0.3); group.rotation.y = Math.PI;
+  const dim = 0xa8adb4;
+  const back = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 0.14, 48), new THREE.MeshBasicMaterial({ color: 0x23272c }));
+  back.rotation.x = Math.PI / 2; back.position.z = -0.02; group.add(back);
+  const bezel = new THREE.Mesh(new THREE.TorusGeometry(1.14, 0.075, 10, 56), new THREE.MeshBasicMaterial({ color: 0x5b6168 }));
+  bezel.position.z = 0.07; group.add(bezel);
+  const face = new THREE.Mesh(new THREE.CircleGeometry(1.1, 64), new THREE.MeshBasicMaterial({ map: clockFaceTexture, color: dim }));
+  face.position.z = 0.055; group.add(face);
+  const handMat = new THREE.MeshBasicMaterial({ color: 0x1a1d20 });
+  const makeHand = (len, width, tail, mat, z) => {
+    const pivot = new THREE.Group(); pivot.position.z = z;
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(width, len + tail, 0.015), mat);
+    bar.position.y = (len - tail) / 2; pivot.add(bar); group.add(pivot);
+    return pivot;
+  };
+  clockHands.hour = makeHand(0.55, 0.075, 0.12, handMat, 0.075);
+  clockHands.minute = makeHand(0.85, 0.05, 0.14, handMat, 0.09);
+  clockHands.second = makeHand(0.92, 0.018, 0.22, new THREE.MeshBasicMaterial({ color: 0xa8323a }), 0.105);
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.05, 16), handMat);
+  cap.rotation.x = Math.PI / 2; cap.position.z = 0.12; group.add(cap);
+  const cover = new THREE.Mesh(new THREE.CircleGeometry(1.1, 48), new THREE.MeshBasicMaterial({ color: 0x9fb4d8, transparent: true, opacity: 0.08, depthWrite: false }));
+  cover.position.z = 0.14; group.add(cover);
+  scene.add(group);
+  glowDecal(0, R + 0.02, zFront - 1.2, 3, 1.6, 0, 0x9fb4e0, 0.05);
+}
+function updateClock() {
+  if (!clockHands.hour) return;
+  const d = new Date(), s = d.getSeconds() + d.getMilliseconds() / 1000, m = d.getMinutes() + s / 60, h = (d.getHours() % 12) + m / 60;
+  clockHands.second.rotation.z = -s / 60 * Math.PI * 2;
+  clockHands.minute.rotation.z = -m / 60 * Math.PI * 2;
+  clockHands.hour.rotation.z = -h / 12 * Math.PI * 2;
+}
 function buildExterior() {
   box(-400, 400, GROUND_Y - 0.1, GROUND_Y, -400, 400, C.grass, "ground", false, { sub: false });
   box(-60, 60, GROUND_Y, GROUND_Y + 0.012, -28, -18.2, 0x55595c, "ground", false);
@@ -1724,16 +1814,7 @@ function buildExterior() {
   cyl(47.5, R + 3.25, 11, 1.6, 1.6, 2.2, 12, 0x9aa2aa, "metal", false);
   for (let k = 0; k < 4; k++) box(-20 + k * 3.5, -18.6 + k * 3.5, R, R + 1.1, 14, 15.2, 0xc8ccd0, "metal", false);
   cyl(0, R, 0, 0.04, 0.02, 4, 4, 0x8a8e92, "metal", false);
-  const clock = atlasCell("clock", (ctx, w, h) => {
-    ctx.fillStyle = "#1c2a22"; ctx.fillRect(0, 0, w, h);
-    const cx = w / 2, cy = h / 2, r = h * 0.44;
-    ctx.fillStyle = "#EFEAD8"; ctx.beginPath(); ctx.arc(cx, cy, r, 0, 6.29); ctx.fill();
-    ctx.strokeStyle = "#1c2a22"; ctx.lineWidth = 3;
-    for (let i = 0; i < 12; i++) { const a = i / 12 * 6.28; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * r * 0.8, cy + Math.sin(a) * r * 0.8); ctx.lineTo(cx + Math.cos(a) * r * 0.95, cy + Math.sin(a) * r * 0.95); ctx.stroke(); }
-    ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx, cy - r * 0.75); ctx.moveTo(cx, cy); ctx.lineTo(cx + r * 0.5, cy - r * 0.05); ctx.stroke();
-  });
-  box(-1.3, 1.3, R + 1.0, R + 2.6, -18.3, -17.95, C.band, "plaster", false);
-  panel(clock, 0, R + 1.8, -18.32, 5.2, 1.3, Math.PI, 0xffffff, { shade: 1.2 });
+  buildClockTower(R);
   const banner = atlasCell("banner", drawPlate("안전한 학교, 행복한 우리", "#F2EEE2", "#B33951"), 2, 1);
   panel(banner, -30, 5.3, -18.4, 9, 1.0, Math.PI, 0xffffff, { shade: 1.1 });
   obox(-24.8, 4.9, -18.45, 1.2, 1.0, 0.02, 0, 0, 0.6, 0xF2EEE2, "plain", false);
@@ -2435,8 +2516,8 @@ function startQuickTurn() {
 function tryDash() {
   if (!round.active || !round.iAmIn || !avatars[myId]) return;
   const t = serverNow();
-  if (t < room.startAt || !zombieFormActive(myId, t) || isFrozen(myId, t)) return;
-  if (isOriginZombie(myId) && t < room.startAt + ZOMBIE_HOLD_MS) return;
+  if (t < room.startAt || !isOriginZombie(myId) || !zombieFormActive(myId, t) || isFrozen(myId, t)) return;
+  if (t < room.startAt + ZOMBIE_HOLD_MS) return;
   const nowMs = performance.now();
   if (nowMs < round.dashReadyAt) return;
   const rush = room.startAt + ROUND_MS - t <= FINAL_RUSH_MS;
@@ -2681,7 +2762,7 @@ function updateHud(t, nowMs) {
     setTimeout(() => { if (vignette.classList.contains("flash")) vignette.className = "zombie"; }, 1650);
     flashCenter("당신은 이제 좀비입니다", "다른 인간을 쫓아 감염시키세요!", 2600, true);
   }
-  show($("dashBox"), zombieForm);
+  show($("dashBox"), zombieForm && isOriginZombie(myId));
   if (zombieForm) {
     const held = isOriginZombie(myId) && t < room.startAt + ZOMBIE_HOLD_MS;
     const rush = left <= FINAL_RUSH_MS, cd = rush ? DASH_COOLDOWN_RUSH_MS : DASH_COOLDOWN_MS;
@@ -2723,7 +2804,7 @@ function roundEvents(t) {
   }
   if (elapsed >= ROUND_MS - FINAL_RUSH_MS && prev < ROUND_MS - FINAL_RUSH_MS && !round.rushAnnounced) {
     round.rushAnnounced = true; playRushAlarm();
-    flashCenter("마지막 30초!", "좀비가 50% 빨라지고 대쉬 대기시간이 2초로 줄어듭니다.", 3200, true);
+    flashCenter("마지막 30초!", "좀비가 50% 빨라지고 최초 좀비의 대쉬 대기시간이 2초로 줄어듭니다.", 3200, true);
   }
   round.lastElapsed = elapsed;
 }
@@ -2855,7 +2936,8 @@ function frame(nowMs) {
   const touring = !(screenNow === "game" && round.active);
   show($("tourOverlay"), touring); show($("tourCaption"), touring);
   if (screenNow === "game" && round.active) {
-    setViewDistance(GAME_VIEW.near, GAME_VIEW.far, GAME_VIEW.cameraFar);
+    const viewScale = round.iAmIn && zombieFormActive(myId, t) ? ZOMBIE_VIEW_SCALE : HUMAN_VIEW_SCALE;
+    setViewDistance(GAME_VIEW.near * viewScale, GAME_VIEW.far * viewScale, GAME_VIEW.cameraFar);
     if (round.iAmIn) updateLocalPlayer(dt, t, nowMs);
     updateRemotePlayers(dt, t, nowMs);
     roundEvents(t);
@@ -2873,6 +2955,7 @@ function frame(nowMs) {
     updateTour(nowMs);
   }
   updateFlicker(nowMs);
+  updateClock();
   updateSky();
   renderer.render(scene, camera);
 }
