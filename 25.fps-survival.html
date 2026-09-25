@@ -822,10 +822,10 @@ const gun = new THREE.Group();
   add(new THREE.BoxGeometry(0.04, 0.04, 0.06), dark, -0.075, 0.02, 0.05);
   const flash = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 8), new THREE.MeshBasicMaterial({ color: 0xFFE28A })); flash.position.set(0, 0.02, -1.12); flash.scale.set(1, 1, 1.8); flash.visible = false; gun.add(flash);
   gun.userData.flash = flash;
-  gun.position.set(0.32, -0.28, -0.5);
+  gun.position.set(0.2, -0.23, -0.24);
   viewModel.add(gun);
 }
-const RIFLE = { g: gun, base: [0.32, -0.28, -0.5], rate: () => PLAYER_CONFIG.fireRate, head: () => PLAYER_CONFIG.headDamage, body: () => PLAYER_CONFIG.bodyDamage };
+const RIFLE = { g: gun, base: [0.2, -0.23, -0.24], rate: () => PLAYER_CONFIG.fireRate, head: () => PLAYER_CONFIG.headDamage, body: () => PLAYER_CONFIG.bodyDamage };
 
 const MODEL_DIR = "img/fps/models/";
 const gltfLoader = THREE.GLTFLoader ? new THREE.GLTFLoader() : null;
@@ -1002,7 +1002,7 @@ const SOLDIER_ENGAGE_SEC = 2.2;
 const SOLDIER_BACK_RATIO = 0.3;
 const SOLDIER_HIT = { from: 0.3, fadeIn: 0.06, hold: 0.3, fadeOut: 0.25, peak: 0.7, cooldown: 0.9 };
 const SOLDIER_DEATH = { fadeIn: 0.15, timeScale: 1.15, sinkAt: 2.0, sinkSec: 0.8, sinkSpeed: 1.2 };
-const VIEW_RIFLE = { length: 1.25, muzzle: [0, 0.02, -1.12], barrel: /barrel/i, magazine: /magazine/i };
+const VIEW_RIFLE = { length: 1.0, muzzle: [0, 0.02, -0.72], barrel: /barrel/i, magazine: /magazine/i };
 const soldierLooks = new Set();
 let soldierTemplate = null, soldierRifleMuzzle = null;
 function findNamed(root, pattern) {
@@ -1067,6 +1067,7 @@ function equipViewRifle(template) {
     .decompose(body.position, body.quaternion, body.scale);
   body.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
   gun.children.forEach(c => { if (c !== gun.userData.flash) c.visible = false; });
+  gun.userData.flash.position.set(at[0], at[1], at[2]);
   gun.add(body);
   gun.userData.model = body;
 }
