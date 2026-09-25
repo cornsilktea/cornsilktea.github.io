@@ -162,7 +162,10 @@
   #specList button { display: flex; align-items: center; gap: 8px; width: 200px; max-width: 60vw; height: 40px; padding: 0 12px; border-radius: 4px;
     border: 1px solid rgba(255, 255, 255, .18); border-left: 3px solid rgba(255, 255, 255, .35); background: rgba(8, 10, 16, .72); color: #D5DCEA; font-size: 15px; font-weight: 800; text-align: left; }
   #specList button.on { border-color: rgba(200, 50, 60, .6); border-left-color: #E0293D; background: rgba(120, 18, 28, .8); color: #fff; }
-  #specList .sIcon { font-size: 16px; }
+  #specList .sIcon { flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 15px; text-shadow: none; }
+  #specList .sIcon.human { background: #DCE6D6; }
+  #specList .sIcon.infected { background: #5F7F3A; }
+  #specList .sIcon.origin { background: #C8323C; box-shadow: 0 0 0 2px #FFD27A; }
   #specList .sNm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #specList .sFloor { flex: 0 0 auto; padding: 2px 8px; border-radius: 999px; background: #E0293D; color: #fff; font-size: 13px; }
   @media (max-width: 640px) {
@@ -2043,7 +2046,7 @@ function buildWindCurtains() {
     geo.computeBoundingSphere(); geo.boundingSphere.radius += 0.6;
     scene.add(mesh);
     const pos = geo.getAttribute("position");
-    curtainMeshes.push({ mesh, pos, base: Float32Array.from(pos.array), height, phase: curtainRand() * 50, center, nextFlapMs: 0 });
+    curtainMeshes.push({ mesh, pos, base: Float32Array.from(pos.array), height, phase: curtainRand() * 50, center, flapAt: { x: center[0], y: center[1], z: center[2] }, nextFlapMs: 0 });
   }
 }
 function updateCurtains(nowMs) {
@@ -2063,7 +2066,7 @@ function updateCurtains(nowMs) {
       a[i + 2] = hang * (billow + ripple);
     }
     c.pos.needsUpdate = true;
-    if (gust > 0.95 && nowMs > c.nextFlapMs) { c.nextFlapMs = nowMs + 2600 + Math.random() * 2400; playCurtainFlap(c.center); }
+    if (gust > 0.95 && nowMs > c.nextFlapMs) { c.nextFlapMs = nowMs + 2600 + Math.random() * 2400; playCurtainFlap(c.flapAt); }
   }
 }
 
@@ -2975,7 +2978,7 @@ function netTick(nowMs, t) {
 }
 
 const NAV_CELL = 0.5, NAV_FIELD_MS = 400, NAV_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
-const BOT_AHEAD_STEPS = 4, BOT_PANIC_STEPS = 12, BOT_GOAL_SAMPLES = 80, BOT_REPLAN_MS = [3500, 7000], BOT_RETRY_MS = 600, BOT_CLOSE_M = 2.2;
+const BOT_AHEAD_STEPS = 4, BOT_PANIC_STEPS = 12, BOT_CALM_STEPS = 20, BOT_GOAL_SAMPLES = 80, BOT_GOAL_TRIES = 5, BOT_REPLAN_MS = [3500, 7000], BOT_RETRY_MS = 600, BOT_CLOSE_M = 2.2;
 const BOT_ZOMBIE_SPEED_MULT = 0.92, BOT_DASH_RANGE = 7, BOT_STUCK_SEC = 0.6, BOT_SIDESTEP_SEC = 0.45;
 let nav = null;
 const bots = { key: 0, list: {}, fieldAt: 0, prey: null, danger: null, hasPrey: false, hasDanger: false };
@@ -2985,20 +2988,28 @@ function buildNav() {
   for (const s of flatSurfaces.concat(ramps)) { x0 = Math.min(x0, s.x0); x1 = Math.max(x1, s.x1); z0 = Math.min(z0, s.z0); z1 = Math.max(z1, s.z1); }
   const cols = Math.ceil((x1 - x0) / NAV_CELL), rows = Math.ceil((z1 - z0) / NAV_CELL), cells = cols * rows;
   const first = new Int32Array(cells + 1), xs = [], ys = [], zs = [], cellOf = [], heights = [];
+  const surfFirst = new Int32Array(cells + 1), surfY = [], surfNode = [];
   for (let c = 0; c < cells; c++) {
-    first[c] = ys.length;
+    first[c] = ys.length; surfFirst[c] = surfY.length;
     const x = x0 + (c % cols + 0.5) * NAV_CELL, z = z0 + (Math.floor(c / cols) + 0.5) * NAV_CELL;
     const hs = surfaceHeightsAt(x, z, heights).slice().sort((a, b) => a - b);
     let prev = -Infinity;
     for (const h of hs) {
       if (h - prev < 0.1) continue;
       prev = h;
-      if (!blockedAt(x, z, h)) { xs.push(x); ys.push(h); zs.push(z); cellOf.push(c); }
+      surfY.push(h);
+      if (blockedAt(x, z, h)) { surfNode.push(-1); continue; }
+      surfNode.push(ys.length);
+      xs.push(x); ys.push(h); zs.push(z); cellOf.push(c);
     }
   }
-  first[cells] = ys.length;
+  first[cells] = ys.length; surfFirst[cells] = surfY.length;
   const n = ys.length, adj = new Int32Array(n * 8).fill(-1);
-  const landIn = (c, y) => { let best = -1, by = -Infinity; for (let k = first[c]; k < first[c + 1]; k++) if (ys[k] <= y + STEP_UP && ys[k] > by) { by = ys[k]; best = k; } return best; };
+  const landIn = (c, y) => {
+    let standOn = -1, by = -Infinity;
+    for (let k = surfFirst[c]; k < surfFirst[c + 1]; k++) if (surfY[k] <= y + STEP_UP && surfY[k] > by) { by = surfY[k]; standOn = surfNode[k]; }
+    return standOn;
+  };
   for (let i = 0; i < n; i++) {
     const c = cellOf[i], ix = c % cols, iz = Math.floor(c / cols);
     NAV_DIRS.forEach(([dx, dz], d) => {
@@ -3008,7 +3019,12 @@ function buildNav() {
       adj[i * 8 + d] = landIn(jz * cols + jx, ys[i]);
     });
   }
-  nav = { x0, z0, cols, rows, first, n, adj, xs: Float32Array.from(xs), ys: Float32Array.from(ys), zs: Float32Array.from(zs), queue: new Int32Array(n) };
+  const inFirst = new Int32Array(n + 1);
+  for (let e = 0; e < n * 8; e++) if (adj[e] >= 0) inFirst[adj[e] + 1]++;
+  for (let i = 0; i < n; i++) inFirst[i + 1] += inFirst[i];
+  const inFrom = new Int32Array(inFirst[n]), inFill = inFirst.slice(0, n);
+  for (let e = 0; e < n * 8; e++) if (adj[e] >= 0) inFrom[inFill[adj[e]]++] = Math.floor(e / 8);
+  nav = { x0, z0, cols, rows, first, n, adj, inFirst, inFrom, xs: Float32Array.from(xs), ys: Float32Array.from(ys), zs: Float32Array.from(zs), queue: new Int32Array(n) };
   bots.prey = new Int32Array(n); bots.danger = new Int32Array(n);
   return nav;
 }
@@ -3030,13 +3046,17 @@ function navNodeAt(x, y, z) {
   }
   return -1;
 }
-function navField(sources, out) {
+function navField(sources, out, stepsToReachSources) {
   out.fill(-1);
   const q = nav.queue; let head = 0, tail = 0;
   for (const s of sources) if (s >= 0 && out[s] < 0) { out[s] = 0; q[tail++] = s; }
   while (head < tail) {
     const i = q[head++], d = out[i] + 1;
-    for (let k = 0; k < 8; k++) { const j = nav.adj[i * 8 + k]; if (j >= 0 && out[j] < 0) { out[j] = d; q[tail++] = j; } }
+    if (stepsToReachSources) {
+      for (let e = nav.inFirst[i]; e < nav.inFirst[i + 1]; e++) { const j = nav.inFrom[e]; if (out[j] < 0) { out[j] = d; q[tail++] = j; } }
+    } else {
+      for (let k = 0; k < 8; k++) { const j = nav.adj[i * 8 + k]; if (j >= 0 && out[j] < 0) { out[j] = d; q[tail++] = j; } }
+    }
   }
   return tail > 0;
 }
@@ -3061,26 +3081,33 @@ function refreshBotFields(t) {
     const node = navNodeAt(av.pos.x, av.pos.y, av.pos.z);
     (isZombieNow(id, t) ? danger : prey).push(node);
   }
-  bots.hasPrey = navField(prey, bots.prey);
+  bots.hasPrey = navField(prey, bots.prey, true);
   bots.hasDanger = navField(danger, bots.danger);
 }
 function newBotState(id) {
   const av = avatars[id];
   return { body: { x: av.pos.x, y: av.pos.y, z: av.pos.z, vy: 0 }, face: av.face, motion: MOTION.idle, lastNet: 0, lastSent: "", goal: -1, goalField: null, replanAt: 0, retryAt: 0,
-    dashReadyAt: 0, dashDir: null, dashStartMs: 0, dashProgress: 0, stuckT: 0, sideT: 0, sideSign: 1, infectSent: false };
+    dashReadyAt: 0, dashDir: null, dashStartMs: 0, dashProgress: 0, stuckT: 0, sideT: 0, sideSign: 1, infectSent: false, panicking: false };
 }
 function pickHideGoal(b, myNode) {
-  let best = -1, bs = -Infinity;
+  const candidates = [];
   for (let k = 0; k < BOT_GOAL_SAMPLES; k++) {
     const i = Math.floor(Math.random() * nav.n), d = bots.hasDanger ? bots.danger[i] : 100;
     if (d < 0) continue;
-    const score = Math.min(d, 220) + Math.random() * 40;
-    if (score > bs) { bs = score; best = i; }
+    candidates.push({ i, score: Math.min(d, 220) + Math.random() * 40 });
   }
-  if (best < 0) return;
+  candidates.sort((a, c) => c.score - a.score);
   b.goalField = b.goalField || new Int32Array(nav.n);
-  navField([best], b.goalField);
-  b.goal = b.goalField[myNode] >= 0 ? best : -1;
+  b.goal = -1;
+  let reachableFallback = -1;
+  for (const cand of candidates.slice(0, BOT_GOAL_TRIES)) {
+    navField([cand.i], b.goalField, true);
+    if (b.goalField[myNode] < 0) continue;
+    const firstStep = navFollow(myNode, b.goalField, false);
+    if (!bots.hasDanger || bots.danger[firstStep] >= bots.danger[myNode]) { b.goal = cand.i; return; }
+    if (reachableFallback < 0) reachableFallback = cand.i;
+  }
+  if (reachableFallback >= 0) { navField([reachableFallback], b.goalField, true); b.goal = reachableFallback; }
 }
 function nearestOther(b, id, t, wantZombie) {
   let best = null, bd = Infinity;
@@ -3130,14 +3157,18 @@ function stepBot(id, b, dt, t, nowMs) {
         if (botMoveToward(b, nav.xs[to], nav.zs[to], speed, dt)) motion = MOTION.run;
       }
     } else if (node >= 0) {
-      const panic = bots.hasDanger && bots.danger[node] >= 0 && bots.danger[node] < BOT_PANIC_STEPS;
+      const dangerSteps = bots.hasDanger && bots.danger[node] >= 0 ? bots.danger[node] : Infinity;
+      const wasPanicking = b.panicking;
+      b.panicking = dangerSteps < (wasPanicking ? BOT_CALM_STEPS : BOT_PANIC_STEPS);
+      if (wasPanicking && !b.panicking) { b.goal = -1; b.retryAt = 0; }
+      const panic = b.panicking;
       const goalSpoiled = b.goal < 0 || b.goalField[node] <= 1 || (bots.hasDanger && bots.danger[b.goal] < BOT_PANIC_STEPS * 2);
       if (!panic && nowMs > b.retryAt && (goalSpoiled || nowMs > b.replanAt)) {
         pickHideGoal(b, node); b.replanAt = nowMs + randomBetween(BOT_REPLAN_MS); b.retryAt = nowMs + BOT_RETRY_MS;
       }
       let to = -1;
       if (panic) to = navFollow(node, bots.danger, true);
-      else if (b.goal >= 0 && b.goalField[node] > 1) to = navFollow(node, b.goalField, false);
+      if ((to < 0 || to === node) && b.goal >= 0 && b.goalField[node] > 1) to = navFollow(node, b.goalField, false);
       if (to >= 0 && to !== node && botMoveToward(b, nav.xs[to], nav.zs[to], HUMAN_SPEED, dt)) motion = MOTION.run;
     }
   }
@@ -3234,6 +3265,7 @@ function updateSpectatorCamera(dt, nowMs) {
 }
 function floorOf(pos) { return clamp(Math.floor((pos.y + 0.3) / FLOOR_H), 0, FLOORS - 1) + 1; }
 let specListKey = "";
+const SPECTATE_KINDS = { human: { icon: "🧑", label: "사람" }, infected: { icon: "🧟", label: "감염 좀비" }, origin: { icon: "👹", label: "숙주 좀비" } };
 function renderSpecList() {
   const box = $("specList"), ids = spectateIds(), key = ids.join(",");
   if (key !== specListKey) {
@@ -3243,7 +3275,12 @@ function renderSpecList() {
   ids.forEach((id, i) => {
     const b = box.children[i], p = room.players[id], watching = id === round.viewedId;
     b.classList.toggle("on", watching);
-    setText(b.children[0], p.role === "zombie" ? "🧟" : "🧑");
+    const kind = p.role !== "zombie" ? "human" : isOriginZombie(id) ? "origin" : "infected";
+    if (b.children[0].className !== "sIcon " + kind) {
+      b.children[0].className = "sIcon " + kind;
+      b.children[0].title = SPECTATE_KINDS[kind].label;
+      setText(b.children[0], SPECTATE_KINDS[kind].icon);
+    }
     setText(b.children[1], p.nickname || "이름 없음");
     show(b.children[2], watching);
     if (watching) setText(b.children[2], floorOf(avatars[id].pos) + "층");
