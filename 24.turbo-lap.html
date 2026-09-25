@@ -3402,7 +3402,7 @@ new GLTFLoader(HQ_MANAGER).setMeshoptDecoder(MeshoptDecoder).load("img/turbo/sup
 renderLoadGate();
 
 
-const P = { x: 0, z: 0, y: 0, h: 0, v: 0, ci: 0, prevCi: 0, lap: 0, expected: 0, off: false, wallT: 0, steerVis: 0, rollVis: 0, kx: 0, kz: 0, spin: 0, bumpT: 0, fin: 0, chase: 0, tailT: 0, offLine: false, boostT: 0, boostCap: 0 };
+const P = { x: 0, z: 0, y: 0, h: 0, v: 0, ci: 0, prevCi: 0, lap: 0, expected: 0, off: false, wallT: 0, steerVis: 0, rollVis: 0, kx: 0, kz: 0, spin: 0, bumpT: 0, fin: 0, chase: 0, tailT: 0, offLine: false, boostOn: false, boostT: 0, boostCap: 0, boostGain: 0, boostCool: 0 };
 let state = "menu", playMode = "ta";
 let cdTime = 0, cdShown = -1, goTimer = 0, t0 = 0, elapsed = 0, finalMs = 0, doneTimer = 0, shake = 0, menuAng = 0;
 const keys = { up: false, down: false, left: false, right: false };
@@ -3429,7 +3429,8 @@ function placeAt(i, lat) {
   P.kx = 0; P.kz = 0; P.spin = 0;
 }
 function startLat() { return (playMode === "battle" && myTeam() === "right" ? -1 : 1) * gridLat(); }
-function resetCar() { placeAt(START_I, startLat()); clearGroundFx(); P.gfxT = newGroundTrack(); P.off = false; P.wallT = 0; P.steerVis = 0; P.rollVis = 0; P.fin = 0; P.chase = 0; P.tailT = 0; P.offLine = false; P.boostT = 0; P.boostCap = 0; }
+function resetCar() { placeAt(START_I, startLat()); clearGroundFx(); P.gfxT = newGroundTrack(); P.off = false; P.wallT = 0; P.steerVis = 0; P.rollVis = 0; P.fin = 0; resetBoost(P); }
+function resetBoost(r) { r.chase = 0; r.tailT = 0; r.offLine = false; r.boostOn = false; r.boostT = 0; r.boostCap = 0; r.boostGain = 0; r.boostCool = 0; }
 const CARDS = { start: "cardStart", course: "cardCourse", car: "cardCar", done: "cardDone", bstart: "cardBStart", lobby: "cardLobby", bdone: "cardBDone" };
 let cardNow = "start";
 function showCard(which) {
@@ -3889,7 +3890,7 @@ function tick(now) {
     setText(hudOff, P.off ? "오프로드 — 감속 중" : "");
     setText(speedVal, String(Math.round(Math.abs(P.v) * CFG.kmh)));
     const chaseText = chaseTagText();
-    chaseTag.hidden = !chaseText; setText(chaseTag, chaseText); chaseTag.className = P.boostCap > 0 ? "boost" : "";
+    chaseTag.hidden = !chaseText; setText(chaseTag, chaseText); chaseTag.className = P.boostOn ? "boost" : "";
     drawMinimap();
     drawSpeedLines(Math.abs(P.v) / CFG.maxSpeed);
   }
@@ -3967,7 +3968,7 @@ $("btnRecover").onclick = e => { e.currentTarget.blur(); recover(); };
 
 const CAR_HIT = { impact: 1 / 3, radius: 0.82, offset: 1.08, restitution: 0.45, push: 0.55, spinGain: 0.55, spinMax: 2.6, spinFriction: 3.2, slideFriction: 2.6, inertia: 1.45 };
 const HIT_NOTICE = { minGapMs: 250, dedupeMs: 300, staleMs: 1000 };
-const CHASE = { gapSteps: [{ overM: 25, kmh: 25 }, { overM: 15, kmh: 15 }, { overM: 0, kmh: 10 }], tailM: 25, tailSideM: 2.5 * 2 * CAR_HIT.radius, tailSec: 2, boostKmh: 45, holdSec: 1, fadeSec: 1.5 };
+const CHASE = { gapSteps: [{ overM: 25, kmh: 25 }, { overM: 15, kmh: 15 }, { overM: 0, kmh: 10 }], tailM: 25, tailSideM: 2.5 * 2 * CAR_HIT.radius, tailSec: 2, boostKmh: 40, rampSec: 0.5, holdSec: 1, fadeSec: 1.5, cooldownSec: 4 };
 const BATTLE = {
   root: "turbolap/rooms", specMax: 1, netMs: 143, countMs: 3600, dnfMs: 30000, rankRowH: 48,
   sdk: ["https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js", "https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"]
@@ -3983,7 +3984,7 @@ const BT = {
   viewId: null, viewKey: "", serverOffset: 0, hitSeq: 0, rankRows: {}, rankNums: 0, lobbyCarSig: "", queued: false
 };
 try { BT.nick = localStorage.getItem(NICK_KEY) || ""; } catch (e) {}
-const BOT = { max: 1, topRatio: 0.9, grip: 0.86, brake: 24, lookSamples: 45, leadEaseM: 60, leadEase: 0.88, laneRatio: 0.35, latRate: 1.8, dodgeAheadM: 14, dodgeGap: 2.4, edgeGap: 1.6 };
+const BOT = { max: 1, topRatio: 0.9, grip: 0.86, brake: 24, lookSamples: 45, leadEaseM: 60, leadEase: 0.88, laneRatio: 0.35, latRate: 1.8, latPerSpeed: 0.25, dodgeAheadM: 14, dodgeGap: 2.4, edgeGap: 1.6 };
 const BOTS = {};
 let botCornerV = null, botCornerFor = null;
 const tnow = () => Date.now() + BT.serverOffset;
@@ -4331,22 +4332,41 @@ function gapToRival() {
   const s = S[P.ci];
   return { behind: (entProgNow(e) - myProg()) * courseLen(), side: Math.abs((P.x - e.x) * s.n.x + (P.z - e.z) * s.n.z) };
 }
-function updateChase(dt) {
-  const gap = gapToRival(), behind = gap.behind, boostV = CHASE.boostKmh / CFG.kmh;
+function boostLevel(t) {
+  if (t < CHASE.rampSec) return t / CHASE.rampSec;
+  return Math.max(0, Math.min(1, 1 - (t - CHASE.holdSec) / CHASE.fadeSec));
+}
+function stepChase(r, gap, dt) {
+  const behind = gap.behind, boostV = CHASE.boostKmh / CFG.kmh;
   const gapStep = behind > 0 && CHASE.gapSteps.find(step => behind >= step.overM);
-  P.chase = gapStep ? gapStep.kmh / CFG.kmh : 0;
-  if (P.boostCap > 0) { P.boostT += dt; P.boostCap = boostV * Math.max(0, Math.min(1, 1 - (P.boostT - CHASE.holdSec) / CHASE.fadeSec)); }
+  r.chase = gapStep ? gapStep.kmh / CFG.kmh : 0;
+  r.boostGain = 0;
+  if (r.boostOn) {
+    r.boostT += dt;
+    const cap = boostV * boostLevel(r.boostT);
+    r.boostGain = Math.max(0, cap - r.boostCap); r.boostCap = cap;
+    if (r.boostT >= CHASE.holdSec + CHASE.fadeSec) { r.boostOn = false; r.boostCap = 0; }
+  }
+  r.boostCool = Math.max(0, r.boostCool - dt);
   const inTailRange = behind > 0 && behind <= CHASE.tailM;
-  P.offLine = inTailRange && gap.side > CHASE.tailSideM;
-  P.tailT = inTailRange && !P.offLine ? P.tailT + dt : 0;
-  if (P.tailT >= CHASE.tailSec) {
-    P.tailT = 0; P.v += boostV; P.boostCap = boostV; P.boostT = 0; shake = Math.max(shake, 0.2);
+  r.offLine = inTailRange && gap.side > CHASE.tailSideM;
+  r.tailT = inTailRange && !r.offLine && !r.boostCool ? r.tailT + dt : 0;
+  if (r.tailT < CHASE.tailSec) return false;
+  r.tailT = 0; r.boostOn = true; r.boostT = 0; r.boostCap = 0; r.boostCool = CHASE.cooldownSec;
+  return true;
+}
+function updateChase(dt) {
+  const fired = stepChase(P, gapToRival(), dt);
+  P.v += P.boostGain;
+  if (fired) {
+    shake = Math.max(shake, 0.2);
     beep(660, 0.12, "sawtooth", 0.08); beep(990, 0.25, "sawtooth", 0.08, 0.08);
   }
 }
 function chaseTagText() {
-  if (P.boostCap > 0) return "🔥 부스트!";
+  if (P.boostOn) return "🔥 부스트!";
   if (P.tailT > 0) { const n = Math.min(4, Math.floor(P.tailT / CHASE.tailSec * 5)); return "부스트 충전 " + "▮".repeat(n) + "▯".repeat(4 - n); }
+  if (P.boostCool > 0) return "부스트 재충전 " + Math.ceil(P.boostCool) + "초";
   if (P.offLine) return "앞차 바로 뒤로 붙으세요";
   if (P.chase > 0) return "따라잡기 +" + Math.round(P.chase * CFG.kmh) + " km/h";
   return "";
@@ -4547,11 +4567,11 @@ function removeBot(id) {
 }
 function botCornerSpeeds() {
   if (botCornerFor === S) return botCornerV;
-  const span = 3, top = CFG.maxSpeed * BOT.topRatio, speedTurnLoss = CFG.steerRate * (1 - CFG.steerHighSpeed) / CFG.maxSpeed;
+  const span = 3, speedTurnLoss = CFG.steerRate * (1 - CFG.steerHighSpeed) / CFG.maxSpeed;
   botCornerV = S.map((s, i) => {
     const a = S[wrapI(i + span)].t, b = S[wrapI(i - span)].t;
     const bend = Math.abs(Math.atan2(a.x * b.z - a.z * b.x, a.x * b.x + a.z * b.z)) / (SEG * 2 * span);
-    return Math.min(top, BOT.grip * CFG.steerRate / (bend + speedTurnLoss));
+    return BOT.grip * CFG.steerRate / (bend + speedTurnLoss);
   });
   botCornerFor = S;
   return botCornerV;
@@ -4569,6 +4589,7 @@ function botLatLimit(ci) { const s = S[ci]; return Math.max(0, Math.min(W / 2, s
 function newBot(id) {
   const p = BT.players[id], lat0 = (p.team === "right" ? -1 : 1) * gridLat();
   const b = { id, dist: 0, lat: lat0, lane: lat0 * BOT.laneRatio, v: 0, kLat: 0, fin: 0, h: 0, steer: 0, sentAt: 0, sentFin: -1, hitKey: "", x: 0, z: 0, ci: START_I };
+  resetBoost(b);
   const a = String(BT.raw[id] || "").split(",");
   if (a.length >= 12 && +a[7] >= BT.startAt - 5000) { b.v = +a[3] || 0; b.fin = +a[5] || 0; b.dist = +a[10] || 0; b.lat = +a[11] || 0; b.h = +a[2] || 0; }
   botPose(b);
@@ -4584,27 +4605,37 @@ function botRivals(b) {
   return racerIds().filter(id => id !== b.id).map(id => {
     const r = racerPoint(id); if (!r) return null;
     const s = S[r.ci];
-    return { aheadM: (r.prog - botProg(b)) * courseLen(), lat: (r.x - s.p.x) * s.n.x + (r.z - s.p.z) * s.n.z };
+    return { aheadM: (r.prog - botProg(b)) * courseLen(), lat: (r.x - s.p.x) * s.n.x + (r.z - s.p.z) * s.n.z, fin: racerState(id).fin };
   }).filter(Boolean);
+}
+function botChaseGap(b, rivals) {
+  const ahead = rivals.filter(r => !r.fin && r.aheadM > 0).sort((p, q) => p.aheadM - q.aheadM)[0];
+  return ahead ? { behind: ahead.aheadM, side: Math.abs(ahead.lat - b.lat), lat: ahead.lat } : { behind: 0, side: 0, lat: 0 };
 }
 function botStep(b, dt) {
   const rivals = botRivals(b), go = tnow() >= BT.startAt;
+  const chaseGap = go && !b.fin ? botChaseGap(b, rivals) : { behind: 0, side: 0, lat: 0 };
+  stepChase(b, chaseGap, dt);
   let want = 0;
   if (go && !b.fin) {
     const cornerV = botCornerSpeeds(), i = Math.floor(START_I + b.dist);
-    want = Infinity;
+    want = CFG.maxSpeed * BOT.topRatio + b.chase + b.boostCap;
     for (let j = 0; j <= BOT.lookSamples; j++) { const k = OPEN ? Math.min(N - 1, i + j) : wrapI(i + j); want = Math.min(want, Math.sqrt(cornerV[k] * cornerV[k] + 2 * BOT.brake * j * SEG)); }
     if (rivals.length && rivals.every(r => -r.aheadM > BOT.leadEaseM)) want *= BOT.leadEase;
   }
+  b.v += b.boostGain;
   if (!go) b.v = 0;
   else if (b.v < want) b.v = Math.min(want, b.v + CFG.accel * Math.max(0.15, 1 - (b.v / CFG.maxSpeed) ** 2) * dt);
   else b.v = Math.max(want, b.v - (b.fin ? CFG.brake * 0.4 : CFG.brake) * dt);
 
   let target = b.lane;
+  const chasingTail = chaseGap.behind > BOT.dodgeAheadM && chaseGap.behind <= CHASE.tailM && !b.boostCool && !b.boostOn;
+  if (chasingTail) target = chaseGap.lat;
   rivals.forEach(r => { if (r.aheadM > 0 && r.aheadM < BOT.dodgeAheadM && Math.abs(r.lat - b.lat) < BOT.dodgeGap) target = r.lat + (b.lat >= r.lat ? 1 : -1) * BOT.dodgeGap * 1.3; });
   const lim = botLatLimit(b.ci);
   target = Math.max(-lim, Math.min(lim, target));
-  const latStep = Math.max(-BOT.latRate * dt, Math.min(BOT.latRate * dt, target - b.lat));
+  const latRate = go ? Math.min(BOT.latRate, b.v * BOT.latPerSpeed) : 0;
+  const latStep = Math.max(-latRate * dt, Math.min(latRate * dt, target - b.lat));
   b.lat = Math.max(-lim - BOT.edgeGap * 0.5, Math.min(lim + BOT.edgeGap * 0.5, b.lat + latStep + b.kLat * dt));
   b.kLat *= Math.exp(-CAR_HIT.slideFriction * dt);
 
