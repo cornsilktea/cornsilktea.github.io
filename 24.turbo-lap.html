@@ -192,6 +192,7 @@
   .slot small { font-size: 12px; font-weight: 700; color: var(--sg-ink-soft); }
   .slot.empty { color: var(--sg-ink-faint); font-weight: 700; background: rgba(255,255,255,.45); }
   .slot.mine { box-shadow: inset 0 0 0 2px var(--sg-ink); }
+  .slot .botBtn { align-self: flex-start; height: 28px; margin-top: 4px; font-size: 12px; }
   .specBox { margin-top: 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding: 8px 12px; border-radius: 10px; border: 2px solid var(--sg-line-mid); background: var(--sg-panel-alt); font-size: 15px; text-align: left; }
   .specBox .none { color: var(--sg-ink-faint); font-weight: 400; }
   #btnBStart { width: 100%; margin-top: 12px; }
@@ -3982,6 +3983,9 @@ const BT = {
   viewId: null, viewKey: "", serverOffset: 0, hitSeq: 0, rankRows: {}, rankNums: 0, lobbyCarSig: "", queued: false
 };
 try { BT.nick = localStorage.getItem(NICK_KEY) || ""; } catch (e) {}
+const BOT = { max: 1, topRatio: 0.9, grip: 0.86, brake: 24, lookSamples: 45, leadEaseM: 60, leadEase: 0.88, laneRatio: 0.35, latRate: 1.8, dodgeAheadM: 14, dodgeGap: 2.4, edgeGap: 1.6 };
+const BOTS = {};
+let botCornerV = null, botCornerFor = null;
 const tnow = () => Date.now() + BT.serverOffset;
 const okeys = o => o ? Object.keys(o) : [];
 const byJoin = ps => (a, b) => ((ps[a] && ps[a].joinedAt) || 0) - ((ps[b] && ps[b].joinedAt) || 0);
@@ -4045,7 +4049,7 @@ function sweepRooms() {
     const all = s.val() || {}, t = tnow(), u = {};
     okeys(all).forEach(code => {
       const r = all[code] || {}, age = t - (r.createdAt || 0);
-      if ((!okeys(r.players).length && age > 60000) || (r.status === "ended" && t - (r.endedAt || 0) > 300000) || age > 6 * 3600000) u[code] = null;
+      if ((!humanIds(r.players || {}).length && age > 60000) || (r.status === "ended" && t - (r.endedAt || 0) > 300000) || age > 6 * 3600000) u[code] = null;
     });
     if (okeys(u).length) return BT.db.ref(BATTLE.root).update(u);
   }).catch(() => {});
@@ -4076,7 +4080,7 @@ async function joinRoom() {
     const ref = BT.db.ref(BATTLE.root + "/" + code);
     const st = (await ref.child("status").once("value")).val();
     const ps = (await ref.child("players").once("value")).val() || {};
-    if (!st || !okeys(ps).length) { bMsg("그런 방이 없어요. 코드를 확인해 주세요."); return; }
+    if (!st || !humanIds(ps).length) { bMsg("그런 방이 없어요. 코드를 확인해 주세요."); return; }
     let team = null;
     if (st === "lobby") team = !sideIds("left", ps).length ? "left" : !sideIds("right", ps).length ? "right" : null;
     if (!team && sideIds("spec", ps).length < BATTLE.specMax) team = "spec";
@@ -4118,6 +4122,9 @@ function enterRoom(code) {
   sub(stRef, "child_changed", s => onRemoteState(s.key, s.val()));
   sub(stRef, "child_removed", s => { delete BT.raw[s.key]; });
   sub(ref.child("hit/" + BT.myId), "value", s => onHitNotice(s.val()));
+  const hitRef = ref.child("hit"), botHit = s => { if (isBot(s.key) && isHost()) onBotHit(s.key, s.val()); };
+  sub(hitRef, "child_added", botHit);
+  sub(hitRef, "child_changed", botHit);
   $("lobbyCode").textContent = code;
   refreshNick();
   showCard("lobby");
@@ -4125,7 +4132,7 @@ function enterRoom(code) {
 const HOST_ORDER = { left: 0, right: 1, spec: 2 };
 function nextHost(ps) {
   const join = byJoin(ps);
-  return okeys(ps).filter(id => ps[id]).sort((a, b) => {
+  return humanIds(ps).sort((a, b) => {
     const ta = HOST_ORDER[ps[a].team] == null ? 3 : HOST_ORDER[ps[a].team], tb = HOST_ORDER[ps[b].team] == null ? 3 : HOST_ORDER[ps[b].team];
     return ta !== tb ? ta - tb : join(a, b);
   })[0];
@@ -4143,7 +4150,7 @@ function leaveRoom() {
   ref.child("st/" + me).remove().catch(() => {}); ref.child("hit/" + me).remove().catch(() => {});
   ref.child("players/" + me).remove().then(() => ref.child("players").once("value")).then(s => {
     const ps = s.val() || {};
-    if (!okeys(ps).length) return ref.remove();
+    if (!humanIds(ps).length) return ref.remove();
     return ref.child("hostPlayerId").once("value").then(h => {
       const hid = h.val();
       if (!hid || hid === me || !ps[hid]) return ref.update({ hostPlayerId: nextHost(ps) });
@@ -4201,12 +4208,13 @@ function showLobbyCar() {
   resetCar(); updateCar(0);
 }
 function slotHtml(side) {
-  const id = racerOf(side);
-  if (!id) return '<div class="slot empty">빈 자리</div>';
-  const p = BT.players[id], ck = CARS[p.car] ? p.car : "blue";
-  return '<div class="slot' + (id === BT.myId ? " mine" : "") + '">' + (BT.host === id ? "👑 " : "") + escHtml(p.nickname) + (id === BT.myId ? " (나)" : "") +
-    "<small>🚗 " + CARS[ck].name + "</small></div>";
+  const id = racerOf(side), host = isHost();
+  if (!id) return '<div class="slot empty">빈 자리' + (host && canAddBot(side) ? '<button type="button" class="mini botBtn" data-bot-add="' + side + '">🤖 AI 추가</button>' : "") + "</div>";
+  const p = BT.players[id], ck = CARS[p.car] ? p.car : "blue", bot = !!p.bot;
+  return '<div class="slot' + (id === BT.myId ? " mine" : "") + '">' + (BT.host === id ? "👑 " : "") + (bot ? "🤖 " : "") + escHtml(p.nickname) + (id === BT.myId ? " (나)" : "") +
+    "<small>🚗 " + CARS[ck].name + "</small>" + (bot && host ? '<button type="button" class="mini botBtn" data-bot-del="' + id + '">AI 빼기</button>' : "") + "</div>";
 }
+function humanRacerReady() { return !!racerOf("left") && !!racerOf("right") && racerIds().some(id => !isBot(id)); }
 function renderLobby() {
   if (!BT.ref || cardNow !== "lobby") return;
   const me = BT.players[BT.myId]; if (!me) return;
@@ -4225,14 +4233,16 @@ function renderLobby() {
   $("lobbyCarBox").hidden = me.team === "spec";
   markCarButtons();
   if (BT.lobbyCarSig !== carKey + ":" + me.team + ":" + course) showLobbyCar();
-  const ok = !!racerOf("left") && !!racerOf("right");
-  let hint = ok ? nickOf(racerOf("left")) + " vs " + nickOf(racerOf("right")) + " · " + TRACKS[BT.course].name : "왼쪽·오른쪽 자리에 한 명씩 있어야 시작할 수 있어요. 방 코드를 알려 주세요.";
+  const ok = humanRacerReady(), full = !!racerOf("left") && !!racerOf("right");
+  let hint = ok ? nickOf(racerOf("left")) + " vs " + nickOf(racerOf("right")) + " · " + TRACKS[BT.course].name
+    : full ? "사람이 한 명은 왼쪽이나 오른쪽 자리에 있어야 시작할 수 있어요."
+    : "왼쪽·오른쪽 자리에 한 명씩 있어야 시작할 수 있어요. 방 코드를 알려 주거나 방장이 🤖 AI를 추가하세요.";
   if (!host) hint = (ok ? "방장이 시작하기를 기다리는 중… " : "") + hint;
   $("lobbyHint").textContent = hint;
   $("btnBStart").hidden = !host; $("btnBStart").disabled = !ok;
 }
 function hostStart() {
-  if (!isHost() || BT.status !== "lobby" || !racerOf("left") || !racerOf("right")) return;
+  if (!isHost() || BT.status !== "lobby" || !humanRacerReady()) return;
   audioInit();
   BT.ref.update({ status: "countdown", startAt: tnow() + BATTLE.countMs, endedAt: null, st: null, result: null });
 }
@@ -4258,6 +4268,7 @@ function setBattleHud(on) {
 }
 function resetMatchLocal() {
   okeys(BT.ents).forEach(removeEnt);
+  okeys(BOTS).forEach(id => { delete BOTS[id]; });
   BT.match = null; BT.spec = false; BT.sent = ""; BT.statusSent = ""; BT.viewKey = "";
   $("rkList").innerHTML = ""; BT.rankRows = {}; BT.rankNums = 0;
   if (playMode !== "battle") return;
@@ -4515,6 +4526,124 @@ function battleFinish() {
   lapToastMain.textContent = "🏁 완주! " + fmtTime(finalMs); lapToastSub.textContent = TRACKS[course].name;
   lapToast.className = ""; void lapToast.offsetWidth; lapToast.className = "show";
 }
+function isBot(id) { const p = BT.players[id]; return !!(p && p.bot); }
+function humanIds(ps) { ps = ps || BT.players; return okeys(ps).filter(id => ps[id] && !ps[id].bot); }
+function botCount() { return okeys(BT.players).filter(isBot).length; }
+function canAddBot(side) { return BT.status === "lobby" && !racerOf(side) && botCount() < BOT.max; }
+function freeBotName() {
+  const used = okeys(BT.players).map(nickOf);
+  let n = 1; while (used.indexOf("AI" + n) >= 0) n++;
+  return "AI" + n;
+}
+function addBot(side) {
+  if (!isHost() || !canAddBot(side)) return;
+  const rival = racerOf(side === "left" ? "right" : "left"), rivalCar = rival && BT.players[rival].car;
+  const cars = Object.keys(CARS).filter(k => k !== rivalCar), id = "bot" + Math.random().toString(36).slice(2, 10);
+  BT.ref.child("players/" + id).set({ nickname: freeBotName(), team: side, car: cars[(Math.random() * cars.length) | 0], joinedAt: tnow(), bot: true });
+}
+function removeBot(id) {
+  if (!isHost() || BT.status !== "lobby" || !isBot(id)) return;
+  BT.ref.child("st/" + id).remove(); BT.ref.child("hit/" + id).remove(); BT.ref.child("players/" + id).remove();
+}
+function botCornerSpeeds() {
+  if (botCornerFor === S) return botCornerV;
+  const span = 3, top = CFG.maxSpeed * BOT.topRatio, speedTurnLoss = CFG.steerRate * (1 - CFG.steerHighSpeed) / CFG.maxSpeed;
+  botCornerV = S.map((s, i) => {
+    const a = S[wrapI(i + span)].t, b = S[wrapI(i - span)].t;
+    const bend = Math.abs(Math.atan2(a.x * b.z - a.z * b.x, a.x * b.x + a.z * b.z)) / (SEG * 2 * span);
+    return Math.min(top, BOT.grip * CFG.steerRate / (bend + speedTurnLoss));
+  });
+  botCornerFor = S;
+  return botCornerV;
+}
+function botMaxDist() { return OPEN ? N - 1 - START_I : Infinity; }
+function botProg(b) { return OPEN ? b.dist / Math.max(1, FINISH_I - START_I) : (START_I - N + b.dist) / N; }
+function botPose(b) {
+  const a = START_I + b.dist, i0 = Math.floor(a), f = a - i0, s0 = S[wrapI(i0)], s1 = S[wrapI(i0 + 1)];
+  const nx = s0.n.x + (s1.n.x - s0.n.x) * f, nz = s0.n.z + (s1.n.z - s0.n.z) * f;
+  b.x = s0.p.x + (s1.p.x - s0.p.x) * f + nx * b.lat;
+  b.z = s0.p.z + (s1.p.z - s0.p.z) * f + nz * b.lat;
+  b.ci = wrapI(i0 + (f > 0.5 ? 1 : 0));
+}
+function botLatLimit(ci) { const s = S[ci]; return Math.max(0, Math.min(W / 2, s.lim || Infinity) - BOT.edgeGap); }
+function newBot(id) {
+  const p = BT.players[id], lat0 = (p.team === "right" ? -1 : 1) * gridLat();
+  const b = { id, dist: 0, lat: lat0, lane: lat0 * BOT.laneRatio, v: 0, kLat: 0, fin: 0, h: 0, steer: 0, sentAt: 0, sentFin: -1, hitKey: "", x: 0, z: 0, ci: START_I };
+  const a = String(BT.raw[id] || "").split(",");
+  if (a.length >= 12 && +a[7] >= BT.startAt - 5000) { b.v = +a[3] || 0; b.fin = +a[5] || 0; b.dist = +a[10] || 0; b.lat = +a[11] || 0; b.h = +a[2] || 0; }
+  botPose(b);
+  if (!b.h) { const s = S[b.ci]; b.h = Math.atan2(-s.t.x, -s.t.z); }
+  return b;
+}
+function racerPoint(id) {
+  if (id === BT.myId && !BT.spec) return { prog: myProg(), x: P.x, z: P.z, ci: P.ci };
+  const e = BT.ents[id];
+  return e && e.seen ? { prog: entProgNow(e), x: e.x, z: e.z, ci: e.ci } : null;
+}
+function botRivals(b) {
+  return racerIds().filter(id => id !== b.id).map(id => {
+    const r = racerPoint(id); if (!r) return null;
+    const s = S[r.ci];
+    return { aheadM: (r.prog - botProg(b)) * courseLen(), lat: (r.x - s.p.x) * s.n.x + (r.z - s.p.z) * s.n.z };
+  }).filter(Boolean);
+}
+function botStep(b, dt) {
+  const rivals = botRivals(b), go = tnow() >= BT.startAt;
+  let want = 0;
+  if (go && !b.fin) {
+    const cornerV = botCornerSpeeds(), i = Math.floor(START_I + b.dist);
+    want = Infinity;
+    for (let j = 0; j <= BOT.lookSamples; j++) { const k = OPEN ? Math.min(N - 1, i + j) : wrapI(i + j); want = Math.min(want, Math.sqrt(cornerV[k] * cornerV[k] + 2 * BOT.brake * j * SEG)); }
+    if (rivals.length && rivals.every(r => -r.aheadM > BOT.leadEaseM)) want *= BOT.leadEase;
+  }
+  if (!go) b.v = 0;
+  else if (b.v < want) b.v = Math.min(want, b.v + CFG.accel * Math.max(0.15, 1 - (b.v / CFG.maxSpeed) ** 2) * dt);
+  else b.v = Math.max(want, b.v - (b.fin ? CFG.brake * 0.4 : CFG.brake) * dt);
+
+  let target = b.lane;
+  rivals.forEach(r => { if (r.aheadM > 0 && r.aheadM < BOT.dodgeAheadM && Math.abs(r.lat - b.lat) < BOT.dodgeGap) target = r.lat + (b.lat >= r.lat ? 1 : -1) * BOT.dodgeGap * 1.3; });
+  const lim = botLatLimit(b.ci);
+  target = Math.max(-lim, Math.min(lim, target));
+  const latStep = Math.max(-BOT.latRate * dt, Math.min(BOT.latRate * dt, target - b.lat));
+  b.lat = Math.max(-lim - BOT.edgeGap * 0.5, Math.min(lim + BOT.edgeGap * 0.5, b.lat + latStep + b.kLat * dt));
+  b.kLat *= Math.exp(-CAR_HIT.slideFriction * dt);
+
+  const px = b.x, pz = b.z, ph = b.h;
+  b.dist = Math.min(botMaxDist(), b.dist + b.v * dt / SEG);
+  botPose(b);
+  const dx = b.x - px, dz = b.z - pz;
+  if (dx * dx + dz * dz > 1e-6) b.h = Math.atan2(-dx, -dz);
+  else if (!go) { const s = S[b.ci]; b.h = Math.atan2(-s.t.x, -s.t.z); }
+  const yawRate = dt > 0 ? wrapAngle(b.h - ph) / dt : 0;
+  b.steer += (Math.max(-1, Math.min(1, yawRate / CFG.steerRate)) * CFG.wheelSteerMax - b.steer) * Math.min(1, dt * CFG.wheelSteerRate);
+  if (go && !b.fin && botProg(b) >= (OPEN ? 1 : LAPS)) b.fin = Math.max(1, Math.round(tnow() - BT.startAt));
+}
+function botString(b) {
+  return [+b.x.toFixed(2), +b.z.toFixed(2), +b.h.toFixed(3), +b.v.toFixed(2), +botProg(b).toFixed(4), b.fin, +b.steer.toFixed(2), Math.round(tnow()), 0, 0, +b.dist.toFixed(2), +b.lat.toFixed(2)].join(",");
+}
+function botsTick(dt) {
+  if (!isHost() || !BT.match || BT.status === "ended") return;
+  okeys(BT.players).forEach(id => {
+    const p = BT.players[id];
+    if (!p.bot || (p.team !== "left" && p.team !== "right")) return;
+    const b = BOTS[id] || (BOTS[id] = newBot(id));
+    botStep(b, dt);
+    const nowMs = Date.now();
+    if (nowMs - b.sentAt < BATTLE.netMs && b.sentFin === b.fin) return;
+    b.sentAt = nowMs; b.sentFin = b.fin;
+    BT.ref.child("st/" + id).set(botString(b));
+  });
+}
+function onBotHit(id, str) {
+  const b = BOTS[id];
+  if (!b || !str || b.fin) return;
+  const a = String(str).split(","), key = a[0] + ":" + a[1], nx = +a[2], nz = +a[3], j = Math.min(+a[4], 25), at = +a[5];
+  if (!(j > 0) || !isFinite(nx + nz) || tnow() - at > HIT_NOTICE.staleMs || b.hitKey === key) return;
+  b.hitKey = key;
+  const s = S[b.ci], push = j * CAR_HIT.impact;
+  b.v = Math.max(0, b.v + (nx * s.t.x + nz * s.t.z) * push);
+  b.kLat += (nx * s.n.x + nz * s.n.z) * push;
+}
 function netTick() {
   if (!BT.ref || !BT.match || BT.spec || BT.status === "ended") return;
   const nowMs = Date.now();
@@ -4595,7 +4724,7 @@ function battleFrame(dt) {
   if (!BT.ref) return;
   updateEnts(dt);
   netTick();
-  if (BT.match && state !== "menu") { hostTick(); renderBattleHud(); }
+  if (BT.match && state !== "menu") { botsTick(dt); hostTick(); renderBattleHud(); }
 }
 
 $("btnNickSave").onclick = saveNick;
@@ -4616,6 +4745,12 @@ $("btnBStart").onclick = e => { e.currentTarget.blur(); hostStart(); };
 $("btnJoinLeft").onclick = e => { e.currentTarget.blur(); pickTeam("left"); };
 $("btnJoinRight").onclick = e => { e.currentTarget.blur(); pickTeam("right"); };
 $("btnJoinSpec").onclick = e => { e.currentTarget.blur(); pickTeam("spec"); };
+document.querySelector("#cardLobby .sides").onclick = e => {
+  const b = e.target.closest ? e.target.closest(".botBtn") : null;
+  if (!b) return;
+  b.blur();
+  if (b.hasAttribute("data-bot-add")) addBot(b.getAttribute("data-bot-add")); else removeBot(b.getAttribute("data-bot-del"));
+};
 $("mapBtns").onclick = e => {
   const b = e.target.closest ? e.target.closest(".mapBtn") : null;
   if (!b || b.disabled || !isHost() || BT.status !== "lobby") return;
