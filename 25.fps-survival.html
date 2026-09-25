@@ -187,9 +187,15 @@
   #teamMsg { position: fixed; left: 50%; bottom: 28%; transform: translateX(-50%); z-index: 6; pointer-events: none; background: rgba(27,43,32,.85); color: #fff; font-size: 22px; font-weight: 800; padding: 12px 22px; border-radius: 12px; white-space: nowrap; }
   #protBadge { position: fixed; left: 50%; top: calc(50% + 34px); transform: translateX(-50%); z-index: 5; pointer-events: none; background: rgba(47,125,79,.9); color: #fff; font-size: 15px; font-weight: 800; padding: 4px 12px; border-radius: 10px; white-space: nowrap; }
   #countBig { position: fixed; inset: 0; z-index: 6; pointer-events: none; display: flex; align-items: center; justify-content: center; font-size: 120px; font-weight: 800; color: #fff; -webkit-text-stroke: 3px var(--sg-ink); text-shadow: 0 6px 0 rgba(27,43,32,.35); }
-  #specCv { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 4; background: #DDE3E8; }
+  #specCv { position: fixed; left: 0; right: 0; bottom: 0; top: 50%; width: 100%; height: 50%; z-index: 4; background: #DDE3E8; border-top: 3px solid var(--sg-ink); }
+  #povBar { position: fixed; top: calc(env(safe-area-inset-top,0px) + 8px); left: 50%; transform: translateX(-50%); z-index: 6; display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; max-width: calc(100vw - 230px); }
+  #povBar button { font: inherit; font-size: 14px; font-weight: 800; padding: 5px 12px; border-radius: 10px; border: 2px solid rgba(255,255,255,.55); border-left-width: 6px; background: rgba(20,28,24,.72); color: #fff; cursor: pointer; white-space: nowrap; }
+  #povBar button.on { background: rgba(255,255,255,.95); color: var(--sg-ink); }
+  #povBar button .k { opacity: .7; margin-right: 4px; }
+  #povBar button .hp { margin-left: 6px; font-variant-numeric: tabular-nums; opacity: .85; }
+  #miniMap { position: fixed; left: 12px; bottom: 52px; z-index: 5; pointer-events: none; width: min(260px, 38vw); border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.45); }
   #btnGameLeave { position: fixed; left: 12px; bottom: 12px; z-index: 6; font: inherit; font-size: 14px; font-weight: 800; padding: 6px 14px; border-radius: 10px; border: 2px solid var(--sg-line-strong); background: rgba(255,255,255,.92); color: var(--sg-ink); cursor: pointer; }
-  @media (max-width: 520px) { .teams { flex-direction: column; } #hudTeam { left: auto; right: 12px; transform: none; gap: 12px; } #hudTeam > div { min-width: 48px; font-size: 22px; } #countBig { font-size: 90px; } }
+  @media (max-width: 520px) { #povBar { top: calc(env(safe-area-inset-top,0px) + 46px); max-width: calc(100vw - 24px); } .teams { flex-direction: column; } #hudTeam { left: auto; right: 12px; transform: none; gap: 12px; } #hudTeam > div { min-width: 48px; font-size: 22px; } #countBig { font-size: 90px; } }
   @media (max-height: 620px) {
     #hudHp { top: calc(env(safe-area-inset-top,0px) + 44px); }
     #hudHp::before { height: 120px; }
@@ -267,7 +273,7 @@
 
   <div class="card" id="cardTeamStart" style="display:none">
     <div class="logo" style="font-size:44px">팀 대전<small>블루 vs 레드 · 최대 2대2 · 2분 동안 처치 수 대결</small></div>
-    <div class="desc">상대를 처치하면 우리 팀 <b>+1점</b>. 쓰러지면 <b>3초 뒤</b> 우리 팀 시작 위치에서 부활하고, 부활 후 <b>3초 동안은 피해를 받지 않아요</b>. 무기·탄약·물약 규칙은 AI 대전과 같아요. 관전자는 경기장을 위에서 내려다봐요.</div>
+    <div class="desc">상대를 처치하면 우리 팀 <b>+1점</b>. 쓰러지면 <b>3초 뒤</b> 우리 팀 시작 위치에서 부활하고, 부활 후 <b>3초 동안은 피해를 받지 않아요</b>. 무기·탄약·물약 규칙은 AI 대전과 같아요. 관전자 화면은 위쪽에 고른 선수의 시점(버튼 또는 숫자 1~4), 아래쪽에 경기장 지도가 나와요. 내 화면 왼쪽 아래 지도에는 나와 우리 팀만 보여요.</div>
     <div class="field"><label for="nickInput">닉네임</label><input id="nickInput" maxlength="6" placeholder="최대 6글자" autocomplete="off"></div>
     <div class="btns"><button type="button" class="btn" id="btnCreate">방 만들기</button></div>
     <div class="joinRow"><input id="joinCode" inputmode="numeric" maxlength="5" placeholder="방 코드 5자리" autocomplete="off"><button type="button" class="btn sub" id="btnJoin">입장</button></div>
@@ -314,6 +320,8 @@
 <div id="protBadge" hidden></div>
 <div id="countBig" hidden></div>
 <canvas id="specCv" hidden></canvas>
+<div id="povBar" hidden></div>
+<canvas id="miniMap" hidden></canvas>
 <button type="button" id="btnGameLeave" hidden>나가기</button>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -345,8 +353,8 @@ const DIFFICULTY_CONFIG = {
 };
 const PLAYER_CONFIG = {
   hp: 100, moveSpeed: 6, fireRate: 6,
-  yawSpeed: 75, pitchSpeed: 55, pitchLimit: 60,
-  turnRampSec: 0.35,
+  yawSpeed: 180, pitchSpeed: 100, pitchLimit: 60,
+  turnRampSec: 0.25, turnRampFrom: 0.5,
   radius: 0.45, eyeHeight: 1.6,
   headDamage: 80, bodyDamage: 40, limbDamage: 20, bulletSpeed: 180,
   rifleMagazine: 30, rifleLowAmmo: 5,
@@ -1967,7 +1975,7 @@ function controlPlayer(dt, t, fire) {
   const PC = PLAYER_CONFIG;
   const turning = keys.ArrowLeft || keys.ArrowRight || keys.ArrowUp || keys.ArrowDown;
   P.turnT = turning ? Math.min(PC.turnRampSec, (P.turnT || 0) + dt) : 0;
-  const ramp = 0.4 + 0.6 * (P.turnT / PC.turnRampSec);
+  const ramp = PC.turnRampFrom + (1 - PC.turnRampFrom) * (P.turnT / PC.turnRampSec);
   const x0 = P.x, z0 = P.z, yaw0 = P.yaw;
   const yawR = PC.yawSpeed * Math.PI / 180 * dt * ramp, pitchR = PC.pitchSpeed * Math.PI / 180 * dt * ramp, lim = PC.pitchLimit * Math.PI / 180;
   if (keys.ArrowLeft) P.yaw += yawR; if (keys.ArrowRight) P.yaw -= yawR;
@@ -2041,7 +2049,7 @@ const netDebug = /netdebug/.test(location.hash);
 const T = {
   db: null, ref: null, code: "", myId: "p" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4),
   nick: "", serverOffset: 0, players: {}, status: null, host: null, hostLoaded: false, startAt: 0, botFill: true, itemWave: 0,
-  subs: [], botSubs: [], leaving: false, screen: "", spec: false, match: null, me: null,
+  subs: [], botSubs: [], leaving: false, screen: "", spec: false, match: null, me: null, pov: null,
   ents: {}, bots: {}, raw: {}, kills: {}, dmg: {}, items: {}, bullets: [], sent: {}, lastNet: 0, forceNet: false, statusSent: "",
   lobbyQueued: false, textCache: {}, net: { up: 0, down: 0, t: 0 },
 };
@@ -2103,6 +2111,8 @@ function teamScreen(name) {
   $("hudTeam").style.display = playing ? "flex" : "none";
   $("cross").style.display = playing ? "block" : "none";
   $("specCv").hidden = !(inGame && T.spec);
+  $("povBar").hidden = !(inGame && T.spec);
+  $("miniMap").hidden = !playing;
   $("killFeed").hidden = !playing;
   $("btnGameLeave").hidden = !inGame;
   if (!inGame) { $("teamMsg").hidden = true; $("protBadge").hidden = true; $("countBig").hidden = true; }
@@ -2368,7 +2378,7 @@ function ensureEnt(id) {
   if (T.ents[id]) return T.ents[id];
   const p = T.players[id];
   if (!p || (p.team !== "blue" && p.team !== "red") || id === T.myId) return null;
-  const s = T.spec ? null : makeSoldier(0, 0, TEAM_COLOR[p.team]);
+  const s = makeSoldier(0, 0, TEAM_COLOR[p.team]);
   const ent = { id, team: p.team, isAI: !!p.isAI, s, x: 0, z: 0, yaw: 0, pitch: 0, hp: 100, alive: true, prot: false, moving: false, weapon: "rifle",
                 shots: 0, seen: false, from: null, to: null, t0: 0, deadT: 0, deadAt: 0, shotAt: 0 };
   if (s) {
@@ -2439,8 +2449,8 @@ function remoteShotFx(ent) {
     fireVisualBullet(from, hit ? hit.point.clone() : from.clone().addScaledVector(dir, 60), !!hit, WEAPONS[ent.weapon] || RIFLE);
   }
   if (!ent.s) return;
-  spawnMuzzleFlash(from, dir, G.flash);
-  G.sound();
+  if (T.spec && ent.id === T.pov) { flashPovGun(ent.weapon); G.sound(); }
+  else { spawnMuzzleFlash(from, dir, G.flash); if (!T.spec) G.sound(); }
 }
 function updateEnts(dt, nowMs) {
   for (const id in T.ents) {
@@ -2671,7 +2681,8 @@ function updateBotSim(b, dt, t) {
     if (Math.random() >= C.enemyHitChance) { const s = C.enemyBulletSpread; to.add(new THREE.Vector3(rnd(-s, s), rnd(-s * 0.6, s * 0.6), rnd(-s, s))); }
     const dir = to.sub(from).normalize(), G = soldierGun(b.weapon);
     fireTeamBullet(from, dir, b.team, true, b.id, G);
-    if (!T.spec) { G.sound(); spawnMuzzleFlash(from, dir, G.flash); }
+    if (T.spec && b.id === T.pov) { flashPovGun(b.weapon); G.sound(); }
+    else { spawnMuzzleFlash(from, dir, G.flash); if (!T.spec) G.sound(); }
     if (soldierSpentRound(b)) b.weapon = "pistol";
   }
 }
@@ -2734,6 +2745,7 @@ function renderTeamHud(t) {
     cd.hidden = false; setText(cd, "GO!");
     if (T.match.lastCount !== 0) { T.match.lastCount = 0; tone(990, 0.3, "square", 0.08); }
   } else cd.hidden = true;
+  if (T.spec) cd.hidden = true;
 }
 function damageDealtBy(id) {
   let n = 0;
@@ -2806,11 +2818,129 @@ function teamFrame(nowMs, dt) {
     T.net.t = nowMs; T.net.up = 0; T.net.down = 0;
   }
   if (T.screen !== "game") return;
-  if (T.spec) drawSpectator(t, nowMs); else renderView();
+  if (T.spec) { renderSpectatorPov(nowMs); drawSpectator(t, nowMs); }
+  else { renderView(); drawMiniMap(nowMs); }
+}
+
+function drawArena(c, X, Y, s, lineK) {
+  c.fillStyle = "#B4B9B1"; c.fillRect(X(-ARENA.hx), Y(-ARENA.hz), ARENA.hx * 2 * s, ARENA.hz * 2 * s);
+  c.strokeStyle = "rgba(60,70,60,.18)"; c.lineWidth = 1;
+  for (let x = -ARENA.hx + 5; x < ARENA.hx; x += 5) { c.beginPath(); c.moveTo(X(x), Y(-ARENA.hz)); c.lineTo(X(x), Y(ARENA.hz)); c.stroke(); }
+  for (let z = -ARENA.hz + 5; z < ARENA.hz; z += 5) { c.beginPath(); c.moveTo(X(-ARENA.hx), Y(z)); c.lineTo(X(ARENA.hx), Y(z)); c.stroke(); }
+  PADS.team.forEach(p => {
+    c.fillStyle = p.color === TEAM_COLOR.blue ? "rgba(47,111,214,.25)" : "rgba(214,69,61,.25)";
+    c.beginPath(); c.arc(X(p.x), Y(p.z), 2 * s, 0, 7); c.fill();
+  });
+  LAYOUT.containers.forEach(ct => {
+    const w = ct.alongX ? CONTAINER.len : CONTAINER.wid, d = ct.alongX ? CONTAINER.wid : CONTAINER.len;
+    c.fillStyle = "#" + ct.color.toString(16).padStart(6, "0"); c.globalAlpha = 0.35; c.fillRect(X(ct.x - w / 2), Y(ct.z - d / 2), w * s, d * s); c.globalAlpha = 1;
+    containerRects(ct).filter(r => r.y0 === 0).forEach(r => { c.fillRect(X(r.x - r.w / 2), Y(r.z - r.d / 2), Math.max(2 * lineK, r.w * s), Math.max(2 * lineK, r.d * s)); });
+  });
+  LAYOUT.bigs.forEach(b => { c.fillStyle = "#5B6670"; c.fillRect(X(b.x - b.w / 2), Y(b.z - b.d / 2), b.w * s, b.d * s); c.strokeStyle = "#24402F"; c.lineWidth = 2 * lineK; c.strokeRect(X(b.x - b.w / 2), Y(b.z - b.d / 2), b.w * s, b.d * s); });
+  LAYOUT.lows.forEach(l => { c.fillStyle = "#9AA39C"; c.fillRect(X(l.x - l.w / 2), Y(l.z - l.d / 2), l.w * s, l.d * s); c.fillStyle = "#E2B93B"; c.fillRect(X(l.x - l.w / 2), Y(l.z - l.d / 2), l.w * s, l.d * s * 0.35); });
+  LAYOUT.boxes.forEach(b => { c.fillStyle = "#8C7350"; c.fillRect(X(b.x - b.w / 2), Y(b.z - b.d / 2), b.w * s, b.d * s); c.strokeStyle = "#4C5550"; c.lineWidth = 3 * lineK; c.strokeRect(X(b.x - b.w / 2), Y(b.z - b.d / 2), b.w * s, b.d * s); });
+  LAYOUT.cyls.forEach(cy => { c.fillStyle = "#C9C4B8"; c.beginPath(); c.arc(X(cy.x), Y(cy.z), cy.r * s, 0, 7); c.fill(); c.strokeStyle = "#D97B4F"; c.lineWidth = 3 * lineK; c.stroke(); });
+  c.strokeStyle = "#24402F"; c.lineWidth = 5 * lineK; c.strokeRect(X(-ARENA.hx), Y(-ARENA.hz), ARENA.hx * 2 * s, ARENA.hz * 2 * s);
+}
+
+const MINI_MAP_PAD = 6;
+const miniMapBase = { cv: document.createElement("canvas"), w: 0, h: 0, dpr: 0 };
+function miniMapBackground(w, h, dpr, s) {
+  const B = miniMapBase;
+  if (B.w === w && B.h === h && B.dpr === dpr) return B.cv;
+  B.w = w; B.h = h; B.dpr = dpr; B.cv.width = Math.round(w * dpr); B.cv.height = Math.round(h * dpr);
+  const c = B.cv.getContext("2d");
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.fillStyle = "rgba(221,227,232,.88)"; c.fillRect(0, 0, w, h);
+  drawArena(c, x => w / 2 + x * s, z => h / 2 + z * s, s, 0.4);
+  return B.cv;
+}
+function drawMiniMap(nowMs) {
+  const cv = $("miniMap"), w = cv.clientWidth; if (!w || !T.me) return;
+  const s = (w - MINI_MAP_PAD * 2) / (ARENA.hx * 2), h = Math.round(ARENA.hz * 2 * s + MINI_MAP_PAD * 2), dpr = Math.min(2, window.devicePixelRatio || 1);
+  if (cv.style.height !== h + "px") cv.style.height = h + "px";
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+  const c = cv.getContext("2d");
+  c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, cv.width, cv.height);
+  c.drawImage(miniMapBackground(w, h, dpr, s), 0, 0);
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const X = x => w / 2 + x * s, Y = z => h / 2 + z * s, r = 4.5, col = TEAM_CSS[T.me.team];
+  for (const id in T.ents) {
+    const e = T.ents[id];
+    if (e.team !== T.me.team || !e.seen) continue;
+    const px = X(e.x), py = Y(e.z);
+    if (!e.alive) { c.strokeStyle = "#5B6B5E"; c.lineWidth = 2; c.beginPath(); c.moveTo(px - r, py - r); c.lineTo(px + r, py + r); c.moveTo(px + r, py - r); c.lineTo(px - r, py + r); c.stroke(); continue; }
+    c.fillStyle = col; c.strokeStyle = "#fff"; c.lineWidth = 1.5;
+    c.beginPath(); c.arc(px, py, r, 0, 7); c.fill(); c.stroke();
+    c.font = 'bold 10px "Nanum Gothic", "Malgun Gothic", sans-serif'; c.textAlign = "center"; c.textBaseline = "alphabetic";
+    c.lineWidth = 3; c.strokeStyle = "#fff"; c.strokeText(nickOf(id), px, py - r - 3); c.fillStyle = col; c.fillText(nickOf(id), px, py - r - 3);
+  }
+  const px = X(P.x), py = Y(P.z), fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw), me = r * 1.3;
+  c.globalAlpha = T.me.alive ? 1 : 0.45;
+  c.fillStyle = "#1B2B20"; c.beginPath(); c.moveTo(px + fx * me * 2.2, py + fz * me * 2.2); c.lineTo(px + fz * me * 0.8, py - fx * me * 0.8); c.lineTo(px - fz * me * 0.8, py + fx * me * 0.8); c.closePath(); c.fill();
+  c.fillStyle = col; c.strokeStyle = "#FFD27A"; c.lineWidth = 2.5;
+  c.beginPath(); c.arc(px, py, me, 0, 7); c.fill(); c.stroke();
+  c.globalAlpha = 1;
+}
+
+function povIds() { return teamIds("blue").concat(teamIds("red")); }
+function currentPov() {
+  const ids = povIds();
+  if (!ids.includes(T.pov)) T.pov = ids[0] || null;
+  return T.pov;
+}
+let povBarKey = "";
+function renderPovBar() {
+  const bar = $("povBar"), ids = povIds(), key = ids.map(id => id + ":" + nickOf(id)).join("|");
+  if (key !== povBarKey) {
+    povBarKey = key;
+    bar.innerHTML = ids.map((id, i) => '<button type="button" data-id="' + escHtml(id) + '" style="border-left-color:' + TEAM_CSS[T.players[id].team] + '"><span class="k">' + (i + 1) + "</span>" +
+      (T.players[id].isAI ? "🤖 " : "") + escHtml(nickOf(id)) + '<span class="hp"></span></button>').join("");
+  }
+  ids.forEach((id, i) => {
+    const b = bar.children[i]; if (!b) return;
+    b.classList.toggle("on", id === T.pov);
+    const e = T.ents[id], hp = e && e.seen ? (e.alive ? "♥" + Math.round(clamp(e.hp, 0, 100)) : "💀") : "";
+    if (b.lastChild.textContent !== hp) b.lastChild.textContent = hp;
+  });
+}
+$("povBar").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; b.blur(); T.pov = b.dataset.id; });
+const POV_KICK_MS = 120;
+function flashPovGun(kind) {
+  const W = WEAPONS[kind] || RIFLE, flash = W.g.userData.flash;
+  if (!flash) return;
+  jitterMuzzleFlash(flash.userData.rig, W.flashSize);
+  flash.visible = true; setTimeout(() => { flash.visible = false; }, MUZZLE_FLASH.showMs);
+  muzzleLightT = MUZZLE_FLASH.lightMs;
+}
+function poseSpectatedWeapon(ent, nowMs) {
+  viewModel.visible = ent.alive;
+  if (!ent.alive) return;
+  RIFLE.g.visible = ent.weapon === "rifle"; PISTOL.g.visible = ent.weapon === "pistol";
+  const W = WEAPONS[ent.weapon] || RIFLE, kick = clamp(1 - (nowMs - ent.shotAt) / POV_KICK_MS, 0, 1), bob = ent.moving ? Math.sin(nowMs / 100) * 0.012 : 0;
+  W.g.position.set(W.base[0], W.base[1] + bob, W.base[2] + kick * W.kick);
+  W.g.rotation.x = kick * W.tilt;
+}
+function renderSpectatorPov(nowMs) {
+  const id = currentPov(), ent = id && T.ents[id], W = viewSize.w, H = viewSize.h, h = Math.round(H / 2);
+  const soldierShown = !!(ent && ent.s && ent.s.g.visible);
+  if (ent && ent.seen) {
+    if (ent.alive) { camera.position.set(ent.x, PLAYER_CONFIG.eyeHeight, ent.z); camera.rotation.set(ent.pitch, ent.yaw, 0); }
+    else { camera.position.set(ent.x, 0.6, ent.z); camera.rotation.set(-0.35, ent.yaw, 0.35); }
+    if (ent.s) ent.s.g.visible = false;
+    poseSpectatedWeapon(ent, nowMs);
+  } else { overviewCamera(nowMs); viewModel.visible = false; }
+  fitCameraAspect(W / h);
+  renderer.setScissorTest(true); renderer.setViewport(0, H - h, W, h); renderer.setScissor(0, H - h, W, h);
+  renderView();
+  renderer.setScissorTest(false); renderer.setViewport(0, 0, W, H);
+  fitCameraAspect(W / H);
+  if (soldierShown) ent.s.g.visible = true;
+  renderPovBar();
 }
 
 function drawSpectator(t, nowMs) {
-  const cv = $("specCv"), dpr = Math.min(2, window.devicePixelRatio || 1), W = window.innerWidth, H = window.innerHeight;
+  const cv = $("specCv"), dpr = Math.min(2, window.devicePixelRatio || 1), W = cv.clientWidth || window.innerWidth, H = cv.clientHeight || Math.round(window.innerHeight / 2);
   if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
   const c = cv.getContext("2d");
   c.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -2824,24 +2954,7 @@ function drawSpectator(t, nowMs) {
   const top = mapTop, ah = mapH;
   const mx = W / 2, my = mapTop + mapH / 2;
   const X = x => mx + x * s, Y = z => my + z * s;
-  c.fillStyle = "#B4B9B1"; c.fillRect(X(-ARENA.hx), Y(-ARENA.hz), ARENA.hx * 2 * s, ARENA.hz * 2 * s);
-  c.strokeStyle = "rgba(60,70,60,.18)"; c.lineWidth = 1;
-  for (let x = -ARENA.hx + 5; x < ARENA.hx; x += 5) { c.beginPath(); c.moveTo(X(x), Y(-ARENA.hz)); c.lineTo(X(x), Y(ARENA.hz)); c.stroke(); }
-  for (let z = -ARENA.hz + 5; z < ARENA.hz; z += 5) { c.beginPath(); c.moveTo(X(-ARENA.hx), Y(z)); c.lineTo(X(ARENA.hx), Y(z)); c.stroke(); }
-  PADS.team.forEach(p => {
-    c.fillStyle = p.color === TEAM_COLOR.blue ? "rgba(47,111,214,.25)" : "rgba(214,69,61,.25)";
-    c.beginPath(); c.arc(X(p.x), Y(p.z), 2 * s, 0, 7); c.fill();
-  });
-  LAYOUT.containers.forEach(ct => {
-    const w = ct.alongX ? CONTAINER.len : CONTAINER.wid, d = ct.alongX ? CONTAINER.wid : CONTAINER.len;
-    c.fillStyle = "#" + ct.color.toString(16).padStart(6, "0"); c.globalAlpha = 0.35; c.fillRect(X(ct.x - w / 2), Y(ct.z - d / 2), w * s, d * s); c.globalAlpha = 1;
-    containerRects(ct).filter(r => r.y0 === 0).forEach(r => { c.fillRect(X(r.x - r.w / 2), Y(r.z - r.d / 2), Math.max(2, r.w * s), Math.max(2, r.d * s)); });
-  });
-  LAYOUT.bigs.forEach(b => { c.fillStyle = "#5B6670"; c.fillRect(X(b.x - b.w / 2), Y(b.z - b.d / 2), b.w * s, b.d * s); c.strokeStyle = "#24402F"; c.lineWidth = 2; c.strokeRect(X(b.x - b.w / 2), Y(b.z - b.d / 2), b.w * s, b.d * s); });
-  LAYOUT.lows.forEach(l => { c.fillStyle = "#9AA39C"; c.fillRect(X(l.x - l.w / 2), Y(l.z - l.d / 2), l.w * s, l.d * s); c.fillStyle = "#E2B93B"; c.fillRect(X(l.x - l.w / 2), Y(l.z - l.d / 2), l.w * s, l.d * s * 0.35); });
-  LAYOUT.boxes.forEach(b => { c.fillStyle = "#8C7350"; c.fillRect(X(b.x - b.w / 2), Y(b.z - b.d / 2), b.w * s, b.d * s); c.strokeStyle = "#4C5550"; c.lineWidth = 3; c.strokeRect(X(b.x - b.w / 2), Y(b.z - b.d / 2), b.w * s, b.d * s); });
-  LAYOUT.cyls.forEach(cy => { c.fillStyle = "#C9C4B8"; c.beginPath(); c.arc(X(cy.x), Y(cy.z), cy.r * s, 0, 7); c.fill(); c.strokeStyle = "#D97B4F"; c.lineWidth = 3; c.stroke(); });
-  c.strokeStyle = "#24402F"; c.lineWidth = 5; c.strokeRect(X(-ARENA.hx), Y(-ARENA.hz), ARENA.hx * 2 * s, ARENA.hz * 2 * s);
+  drawArena(c, X, Y, s, 1);
   for (const key in T.items) {
     const it = T.items[key], ix = X(it.x), iy = Y(it.z), r = Math.max(6, 0.45 * s);
     if (it.kind === "ammo") { c.fillStyle = "#F2B84B"; c.beginPath(); c.arc(ix, iy, r, 0, 7); c.fill(); c.fillStyle = "#fff"; c.fillRect(ix - r * 0.18, iy - r * 0.3, r * 0.36, r * 0.9); c.beginPath(); c.arc(ix, iy - r * 0.3, r * 0.18, Math.PI, 0); c.fill(); }
@@ -2859,6 +2972,7 @@ function drawSpectator(t, nowMs) {
       if (leftSec > 0) { c.font = "bold 14px " + FONT; c.fillStyle = "#1B2B20"; c.textAlign = "center"; c.fillText(leftSec + "초", px, py - pr - 4); }
       continue;
     }
+    if (id === T.pov) { c.strokeStyle = "#FFD27A"; c.lineWidth = 4; c.beginPath(); c.arc(px, py, pr + 5, 0, 7); c.stroke(); }
     c.globalAlpha = e.prot ? 0.45 + 0.35 * Math.sin(nowMs / 70) : 1;
     c.fillStyle = col; c.strokeStyle = "#fff"; c.lineWidth = 2.5;
     c.beginPath(); c.arc(px, py, pr, 0, 7); c.fill(); c.stroke();
@@ -2974,9 +3088,12 @@ function loop(now) {
   pruneTransient(now);
   renderView();
 }
+const viewSize = { w: 1, h: 1 };
+function fitCameraAspect(aspect) { if (Math.abs(camera.aspect - aspect) > 1e-4) { camera.aspect = aspect; camera.updateProjectionMatrix(); } }
 function resize() {
   const w = window.innerWidth, h = window.innerHeight;
   if (!w || !h) return;
+  viewSize.w = w; viewSize.h = h;
   renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
 }
 window.addEventListener("resize", resize); resize();
@@ -2990,6 +3107,7 @@ window.addEventListener("keydown", e => {
     if (state === "over") { if (!e.repeat && spaceFresh && performance.now() - overAt > 900 && !document.querySelector(".wr-back")) startGame(); return; }
   }
   if (e.code === "KeyQ" && (state === "play" || (state === "team" && teamCanAct())) && !e.repeat && P.flip <= 0) P.flip = Math.PI;
+  if (state === "team" && T.spec && T.screen === "game" && /^(Digit|Numpad)[1-4]$/.test(e.code)) { const id = povIds()[+e.code.slice(-1) - 1]; if (id) T.pov = id; }
   keys[e.code] = true;
 });
 window.addEventListener("keyup", e => { keys[e.code] = false; if (e.code === "Space") spaceFresh = true; });

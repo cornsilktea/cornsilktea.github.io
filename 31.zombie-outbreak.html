@@ -168,6 +168,8 @@
   #specList .sIcon.origin { background: #C8323C; box-shadow: 0 0 0 2px #FFD27A; }
   #specList .sNm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #specList .sFloor { flex: 0 0 auto; padding: 2px 8px; border-radius: 999px; background: #E0293D; color: #fff; font-size: 13px; }
+  #floorMap { position: absolute; right: 12px; bottom: calc(env(safe-area-inset-bottom, 0px) + 58px); width: min(340px, 46vw); display: block; border-radius: 6px; background: rgba(6, 9, 18, .62); box-shadow: 0 1px 4px rgba(0, 0, 0, .5); }
+  #hud.spec #floorMap { bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); width: min(560px, calc(100vw - 244px)); }
   @media (max-width: 640px) {
     #timer { font-size: 30px; }
     #specList button { height: 36px; font-size: 14px; }
@@ -215,6 +217,7 @@
     <div id="dashBar"><div id="dashFill"></div></div>
   </div>
   <div id="specList"></div>
+  <canvas id="floorMap"></canvas>
   <div id="keyHint">WASD 이동 · ←→ 시점 회전 · ↑↓ 시점 높이 · Q 뒤돌기 · Space 대쉬(숙주 좀비)</div>
   <button type="button" id="btnGameLeave">나가기</button>
 </div>
@@ -258,6 +261,7 @@
         <li>좀비에게 닿으면 2초 동안 굳은 뒤 좀비로 변합니다.</li>
         <li>1분마다 학교 종이 울리고, 마지막 30초에는 좀비가 더 빨라집니다.</li>
         <li>3분 동안 한 명이라도 살아남으면 인간 승리, 모두 감염되면 좀비 승리입니다.</li>
+        <li>오른쪽 아래 학교 지도(1·2층)에 나와 같은 편(인간끼리·좀비끼리)의 위치가 점으로 보입니다.</li>
         <li>방마다 관전자 1명이 따로 들어와 플레이어들의 시점을 번갈아 볼 수 있습니다. 게임 중에 들어온 플레이어는 다음 판부터 참가합니다.</li>
       </ul>
     </div>
@@ -326,7 +330,7 @@ const HUMAN_VIEW_SCALE = 0.8, ZOMBIE_VIEW_SCALE = 0.63;
 const ZOMBIE_RUN_ANIM = 1.5, ZOMBIE_RUN_ANIM_RUSH = 1.95;
 const DASH_MS = 170, DASH_DISTANCE = 10, DASH_COOLDOWN_MS = 5000, DASH_COOLDOWN_RUSH_MS = 2000;
 const INFECT_RADIUS = 1.05, INFECT_HEIGHT_GAP = 1.5;
-const TURN_SPEED = 3.6, PITCH_SPEED = 1.5, QUICK_TURN_MS = 150;
+const TURN_SPEED = Math.PI, PITCH_SPEED = 1.75, TURN_RAMP_SEC = 0.25, TURN_RAMP_FROM = 0.5, QUICK_TURN_MS = 150;
 const NET_MS = 100, REMOTE_LERP_MS = 120;
 const MAX_PLAYERS = 5, MIN_PLAYERS = 2, MAX_SPECTATORS = 1;
 const ROOM_ROOT = "zombieoutbreak/rooms";
@@ -2835,14 +2839,17 @@ function lerpAngle(a, b, k) { let d = b - a; while (d > Math.PI) d -= Math.PI * 
 function updateLocalPlayer(dt, t, nowMs) {
   const av = avatars[myId]; if (!av) return;
   const turnLeft = (pressed.left ? 1 : 0) - (pressed.right ? 1 : 0);
+  const turning = pressed.left || pressed.right || pressed.up || pressed.down;
+  round.turnHeldSec = turning ? Math.min(TURN_RAMP_SEC, (round.turnHeldSec || 0) + dt) : 0;
+  const turnRamp = TURN_RAMP_FROM + (1 - TURN_RAMP_FROM) * round.turnHeldSec / TURN_RAMP_SEC;
   if (round.turnStart && nowMs - round.turnStart < QUICK_TURN_MS) {
     const k = (nowMs - round.turnStart) / QUICK_TURN_MS, e = k * (2 - k);
     round.camYaw = round.turnFrom + (round.turnTo - round.turnFrom) * e;
   } else {
     if (round.turnStart) { round.camYaw = round.turnTo; round.turnStart = 0; av.face += Math.PI; }
-    round.camYaw += turnLeft * TURN_SPEED * dt;
+    round.camYaw += turnLeft * TURN_SPEED * turnRamp * dt;
   }
-  round.camElev = clamp(round.camElev + ((pressed.down ? 1 : 0) - (pressed.up ? 1 : 0)) * PITCH_SPEED * dt, -0.25, 0.95);
+  round.camElev = clamp(round.camElev + ((pressed.down ? 1 : 0) - (pressed.up ? 1 : 0)) * PITCH_SPEED * turnRamp * dt, -0.25, 0.95);
 
   const frozen = isFrozen(myId, t), zombie = zombieFormActive(myId, t);
   const countdown = t < room.startAt;
@@ -3291,7 +3298,115 @@ $("specList").addEventListener("click", e => {
   b.blur(); round.spectateIndex = +b.dataset.i;
 });
 
+const FLOOR_MAP = { x0: -BUILDING_X, x1: GYM.x1, z0: -BUILDING_Z, z1: BUILDING_Z, shear: 0.42, depth: 0.5, gap: 9, pad: 5, labelW: 15, edge: 1.6 };
+const MAP_COLORS = { slab: "#27303C", slabEdge: "#121821", corridor: "#3A4555", room: "#566272", stairs: "#3F5A45", gym: "#3A342C", outline: "#8A96A6",
+                     here: "#D97B4F", label: "#C9D3E6", human: "#7CC4FF", zombie: "#E0293D", origin: "#FFD27A" };
+const floorMapBase = { cv: document.createElement("canvas"), w: 0, h: 0, dpr: 0 };
+function floorMapUnits() {
+  const M = FLOOR_MAP, slabH = (M.z1 - M.z0) * M.depth;
+  return { w: M.pad * 2 + M.labelW + (M.x1 - M.x0) + (M.z1 - M.z0) * M.shear, h: M.pad * 2 + slabH * FLOORS + M.gap * (FLOORS - 1) + M.edge };
+}
+function floorMapPoint(x, z, floorIdx, s) {
+  const M = FLOOR_MAP, slabH = (M.z1 - M.z0) * M.depth, top = M.pad + (FLOORS - 1 - floorIdx) * (slabH + M.gap);
+  return [(M.pad + M.labelW + (x - M.x0) + (z - M.z0) * M.shear) * s, (top + (M.z1 - z) * M.depth) * s];
+}
+function mapQuad(c, x0, x1, z0, z1, f, s) {
+  const a = floorMapPoint(x0, z0, f, s), b = floorMapPoint(x1, z0, f, s), d = floorMapPoint(x1, z1, f, s), e = floorMapPoint(x0, z1, f, s);
+  c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.lineTo(d[0], d[1]); c.lineTo(e[0], e[1]); c.closePath();
+}
+function slabFront(c, x0, x1, z0, f, s) {
+  const a = floorMapPoint(x0, z0, f, s), b = floorMapPoint(x1, z0, f, s);
+  c.fillStyle = MAP_COLORS.slabEdge; c.fillRect(a[0], a[1], b[0] - a[0], FLOOR_MAP.edge * s);
+}
+function drawFloorPlan(c, f, s) {
+  const outlineW = Math.max(1, s * 0.45);
+  if (f === 0) {
+    slabFront(c, GYM.x0, GYM.x1, GYM.z0, f, s);
+    mapQuad(c, GYM.x0, GYM.x1, GYM.z0, GYM.z1, f, s);
+    c.fillStyle = MAP_COLORS.gym; c.fill(); c.strokeStyle = MAP_COLORS.outline; c.lineWidth = outlineW; c.stroke();
+    const g = floorMapPoint((GYM.x0 + GYM.x1) / 2, 0, f, s);
+    c.fillStyle = MAP_COLORS.label; c.font = "800 " + Math.max(9, Math.round(4.2 * s)) + "px " + FONT; c.textAlign = "center"; c.textBaseline = "middle";
+    c.fillText("체육관", g[0], g[1]);
+  }
+  slabFront(c, -BUILDING_X, BUILDING_X, -BUILDING_Z, f, s);
+  mapQuad(c, -BUILDING_X, BUILDING_X, -BUILDING_Z, BUILDING_Z, f, s); c.fillStyle = MAP_COLORS.slab; c.fill();
+  mapQuad(c, -BUILDING_X, BUILDING_X, -CORRIDOR_Z, CORRIDOR_Z, f, s); c.fillStyle = MAP_COLORS.corridor; c.fill();
+  c.strokeStyle = MAP_COLORS.room; c.lineWidth = Math.max(0.6, s * 0.25);
+  for (const side of ["N", "S"]) FLOOR_PLANS[f][side].forEach(([type, bayA, bayB]) => {
+    const x0 = -BUILDING_X + BAY_W * bayA, x1 = -BUILDING_X + BAY_W * (bayB + 1);
+    const zA = side === "N" ? CORRIDOR_Z : -BUILDING_Z, zB = side === "N" ? BUILDING_Z : -CORRIDOR_Z;
+    mapQuad(c, x0, x1, zA, zB, f, s);
+    if (type === "lobby") { c.fillStyle = MAP_COLORS.corridor; c.fill(); return; }
+    if (type === "stairs") { c.fillStyle = MAP_COLORS.stairs; c.fill(); }
+    c.stroke();
+  });
+  mapQuad(c, -BUILDING_X, BUILDING_X, -BUILDING_Z, BUILDING_Z, f, s); c.strokeStyle = MAP_COLORS.outline; c.lineWidth = outlineW; c.stroke();
+  const lab = floorMapPoint(-BUILDING_X, 0, f, s);
+  c.fillStyle = MAP_COLORS.label; c.font = "800 " + Math.max(11, Math.round(6 * s)) + "px " + FONT; c.textAlign = "right"; c.textBaseline = "middle";
+  c.fillText((f + 1) + "층", lab[0] - 2 * s, lab[1]);
+}
+function floorMapBackground(w, h, dpr, s) {
+  const B = floorMapBase;
+  if (B.w === w && B.h === h && B.dpr === dpr) return B.cv;
+  B.w = w; B.h = h; B.dpr = dpr; B.cv.width = Math.round(w * dpr); B.cv.height = Math.round(h * dpr);
+  const c = B.cv.getContext("2d");
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  for (let f = FLOORS - 1; f >= 0; f--) drawFloorPlan(c, f, s);
+  c.setLineDash([2 * s, 1.6 * s]); c.strokeStyle = "rgba(201, 211, 230, .45)"; c.lineWidth = Math.max(1, s * 0.4);
+  for (const x of [-48, 48]) {
+    const a = floorMapPoint(x, (STAIR_Z0 + LANDING_Z1) / 2, 0, s), b = floorMapPoint(x, (STAIR_Z0 + LANDING_Z1) / 2, FLOORS - 1, s);
+    c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke();
+  }
+  c.setLineDash([]);
+  return B.cv;
+}
+function mapPosOf(id) { return id === myId && round.iAmIn ? me : avatars[id].pos; }
+function drawFloorMap(t) {
+  const cv = $("floorMap"), w = cv.clientWidth; if (!w) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1), units = floorMapUnits(), s = w / units.w, h = Math.round(units.h * s);
+  if (cv.style.height !== h + "px") cv.style.height = h + "px";
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+  const c = cv.getContext("2d");
+  c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, cv.width, cv.height);
+  c.drawImage(floorMapBackground(w, h, dpr, s), 0, 0);
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const focusId = round.iAmIn ? myId : round.viewedId;
+  if (focusId && avatars[focusId]) {
+    const f = floorOf(mapPosOf(focusId)) - 1, inGym = mapPosOf(focusId).x > BUILDING_X;
+    if (inGym) mapQuad(c, GYM.x0, GYM.x1, GYM.z0, GYM.z1, f, s); else mapQuad(c, -BUILDING_X, BUILDING_X, -BUILDING_Z, BUILDING_Z, f, s);
+    c.strokeStyle = MAP_COLORS.here; c.lineWidth = Math.max(1.5, s * 0.7); c.stroke();
+  }
+  const myZombieSide = round.iAmIn && isZombieNow(myId, t);
+  const shown = roundIds().filter(id => avatars[id] && (!round.iAmIn || id === myId || isZombieNow(id, t) === myZombieSide));
+  shown.sort((a, b) => (a === focusId) - (b === focusId));
+  const r = Math.max(3, s * 1.5);
+  shown.forEach(id => {
+    const pos = mapPosOf(id), p = floorMapPoint(pos.x, pos.z, floorOf(pos) - 1, s), zombie = isZombieNow(id, t), focus = id === focusId;
+    if (focus && round.iAmIn) {
+      const ahead = floorMapPoint(pos.x + Math.sin(round.camYaw) * 6, pos.z + Math.cos(round.camYaw) * 6, floorOf(pos) - 1, s);
+      const dx = ahead[0] - p[0], dy = ahead[1] - p[1], len = Math.hypot(dx, dy) || 1, ux = dx / len, uy = dy / len, tip = r * 2.6;
+      c.beginPath(); c.moveTo(p[0] + ux * tip, p[1] + uy * tip); c.lineTo(p[0] - uy * r * 0.9, p[1] + ux * r * 0.9); c.lineTo(p[0] + uy * r * 0.9, p[1] - ux * r * 0.9); c.closePath();
+      c.fillStyle = "#FFFFFF"; c.fill();
+    }
+    c.beginPath(); c.arc(p[0], p[1], focus ? r * 1.35 : r, 0, Math.PI * 2);
+    c.fillStyle = zombie ? MAP_COLORS.zombie : MAP_COLORS.human; c.fill();
+    c.lineWidth = focus ? 2 : 1.2;
+    c.strokeStyle = focus ? "#FFFFFF" : zombie && isOriginZombie(id) ? MAP_COLORS.origin : "rgba(0, 0, 0, .65)"; c.stroke();
+  });
+  if (!round.iAmIn) {
+    c.font = "800 " + Math.max(11, Math.round(4.6 * s)) + "px " + FONT; c.textAlign = "right"; c.textBaseline = "middle";
+    const lx = w - 6, ly = FLOOR_MAP.pad * s;
+    [["사람", MAP_COLORS.human], ["좀비", MAP_COLORS.zombie]].forEach(([label, color], i) => {
+      const y = ly + i * Math.max(14, 6 * s);
+      c.fillStyle = MAP_COLORS.label; c.fillText(label, lx, y);
+      const tw = c.measureText(label).width;
+      c.beginPath(); c.arc(lx - tw - r - 4, y, r, 0, Math.PI * 2); c.fillStyle = color; c.fill();
+    });
+  }
+}
+
 function updateHud(t, nowMs) {
+  drawFloorMap(t);
   const left = room.startAt + ROUND_MS - Math.max(t, room.startAt);
   const timerEl = $("timer");
   setText(timerEl, fmtClock(left));
