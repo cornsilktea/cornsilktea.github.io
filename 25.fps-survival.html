@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ko">
 <!--
-  에셋 출처 목록 (모두 CC0 1.0 — 저작자 표시 의무 없음, 수업용으로 정리해 둠)
+  에셋 출처 목록 (캐릭터 외에는 모두 CC0 1.0 — 저작자 표시 의무 없음, 수업용으로 정리해 둠)
   [텍스처] img/fps/textures/  — ambientCG (https://ambientcg.com), 1K-JPG 를 웹용으로 재압축
     concrete031_*  바닥   https://ambientcg.com/view?id=Concrete031
     concrete034_*  벽·기둥·배리어  https://ambientcg.com/view?id=Concrete034
@@ -10,7 +10,14 @@
     paintedmetal009_*  배리어 경고띠  https://ambientcg.com/view?id=PaintedMetal009
   [모델] img/fps/models/  — Quaternius "Toon Shooter Game Kit" (CC0) https://quaternius.com/packs/toonshootergamekit.html
     받은 곳: Poly Pizza 번들 https://poly.pizza/bundle/Toon-Shooter-Game-Kit-qraiSXoAru (CC0 표기)
-    ak47.glb (라이플), pistol.glb (권총), enemy.glb (적·팀 병사, Character Enemy — 걷기/조준 애니메이션 포함), health.glb (회복 구급함)
+    ak47.glb (라이플 — 1인칭 총), pistol.glb (권총 — 1인칭 총 + 1인용 모드 적의 손), health.glb (회복 구급함)
+    (교체됨) 예전 enemy.glb = Quaternius "Character Enemy" — 2026-09-25 에 아래 Mixamo 병사로 바꿈
+  [캐릭터] img/fps/models/enemy.glb — Adobe Mixamo (https://www.mixamo.com) 캐릭터 "Soldier" + 애니메이션
+    클립: idle, walk, walkbackward, firestand, firewalk, hitreaction, death (파일에 남은 중복 클립 firestand.001·mixamo.com 은 안 씀)
+    라이선스: Mixamo 이용 약관(Adobe 계정) — 게임·수업 자료 안에서 쓰는 것은 로열티 없이 허용, 모델 파일만 따로 재배포하는 것은 불가
+  [라이플] enemy.glb 오른손 뼈의 "m16" 노드 — "M16 Assault Rifle" by Mateusz Woliński (https://sketchfab.com/jeandiz)
+    https://sketchfab.com/3d-models/m16-assault-rifle-339d0f7b21024387853dd926a5d51b50 — CC BY 4.0 (저작자 표시 필수)
+    변경: 캐릭터 손에 붙임, 텍스처를 512px JPEG 로 줄임. 2대2 대전 병사만 들고, 1인용 모드 적은 코드에서 빼고 pistol.glb 를 붙임
   [직접 제작] 탄약 탄피 모델·총구 화염 텍스처는 코드로 그림 (외부 에셋 없음)
   [라이브러리] three.js r128 GLTFLoader·SkeletonUtils (MIT) — cdn.jsdelivr.net/npm/three@0.128.0/examples/js/
 -->
@@ -836,6 +843,7 @@ const MODEL_FINISH = {
   Wood: { metalness: 0.0, roughness: 0.62 }, DarkWood: { metalness: 0.0, roughness: 0.7 },
   Skin: { metalness: 0.0, roughness: 0.55 }, Enemy_Red: { metalness: 0.0, roughness: 0.78 }, Red: { metalness: 0.1, roughness: 0.6 },
   Green: { metalness: 0.15, roughness: 0.5 }, DarkGreen: { metalness: 0.3, roughness: 0.45 }, White: { metalness: 0.0, roughness: 0.4 },
+  "Soldier_body1.003": { metalness: 0.0, roughness: 0.8 }, "Soldier_body1.002": { metalness: 0.0, roughness: 0.75 }, "Soldier_head6.001": { metalness: 0.0, roughness: 0.7 }, M16A3: { metalness: 1.0, roughness: 1.0 },
 };
 function finishMaterial(m) {
   const f = MODEL_FINISH[m.name] || { metalness: 0.2, roughness: 0.6 };
@@ -954,7 +962,7 @@ function makeEnemy(x, z) {
   scene.add(e.g); enemies.push(e);
   return e;
 }
-function makeSoldier(x, z, color) {
+function makeSoldier(x, z, color, weapon) {
   const g = new THREE.Group();
   const uniform = MS({ color }), skin = MS({ color: 0xE8C9A8 }), dark = MS({ color: 0x2E3A33 }), vestM = MS({ color: 0x4A3F3A }), bootM = MS({ color: 0x1B2B20 });
   const mk = (geo, mat, x, y, z, parent) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; (parent || g).add(m); return m; };
@@ -979,48 +987,206 @@ function makeSoldier(x, z, color) {
   [legR, legL].forEach(p => bodyParts.push(mk(EG.thigh, uniform, 0, -0.2, 0, p), mk(EG.shin, uniform, 0, -0.55, 0, p), mk(EG.boot, bootM, 0, -0.72, 0.04, p)));
   g.position.set(x, 0, z); g.rotation.order = "YXZ";
   const e = { g, hp: 100, fire: rnd(0.8, DIFFICULTY_CONFIG.enemyFireCooldownSec), strafe: Math.random() < 0.5 ? 1 : -1, strafeT: rnd(1.5, 3), flashT: 0,
-              mats: [uniform, skin, vestM], allMats: [uniform, skin, dark, vestM, bootM], baseCols: [color, 0xE8C9A8, 0x4A3F3A], pistol, legR, legL, armR, walk: Math.random() * 6, spawnIdx: 0 };
+              mats: [uniform, skin, vestM], allMats: [uniform, skin, dark, vestM, bootM], baseCols: [color, 0xE8C9A8, 0x4A3F3A], pistol, legR, legL, armR, walk: Math.random() * 6, spawnIdx: 0, weapon: weapon || "pistol" };
   bodyParts.forEach(m => { m.userData = { enemy: e, part: "body" }; });
   headParts.forEach(m => { m.userData = { enemy: e, part: "head" }; });
   e.parts = bodyParts.concat(headParts);
   dressSoldier(e);
   return e;
 }
-const SOLDIER_WEAPON_KEPT = "Pistol";
-const SOLDIER_UNIFORM_MAT = "Enemy_Red";
+const SOLDIER_MODEL_FILE = "enemy.glb?v=mixamo2";
+const SOLDIER_SCALE = 1.17;
+const SOLDIER_HAND_BONE = "";
+const SOLDIER_EMBEDDED_RIFLE = /m16$/i;
+const SOLDIER_UNIFORM_MATS = /^Soldier_body/;
+const SOLDIER_UNIFORM_TINT = 0.7;
+const SOLDIER_FLASH_EMISSIVE = 0x9A9A9A;
+const SOLDIER_CLIPS = { idle: "idle", walk: "walk", back: "walkbackward", fireStand: "firestand", fireWalk: "firewalk", hit: "hitreaction", death: "death" };
+const SOLDIER_LOOPED = ["idle", "walk", "back", "fireWalk"];
+const SOLDIER_ONE_SHOT = ["fireStand", "hit", "death"];
+const SOLDIER_BLEND_RATE = 8;
+const SOLDIER_WALK_CLIP_SPEED = 1.5;
+const SOLDIER_ENGAGE_SEC = 2.2;
+const SOLDIER_BACK_RATIO = 0.3;
+const SOLDIER_HIT = { from: 0.3, fadeIn: 0.06, hold: 0.3, fadeOut: 0.25, peak: 0.7, cooldown: 0.9 };
+const SOLDIER_DEATH = { fadeIn: 0.15, timeScale: 1.15, sinkAt: 2.0, sinkSec: 0.8, sinkSpeed: 1.2 };
+const SOLDIER_WEAPONS = {
+  pistol: { file: "pistol.glb", length: 0.2, muzzleAxis: [-1, 0, 0], grip: [0.86, 0.3] },
+};
 const soldierLooks = new Set();
-let soldierTemplate = null;
+const soldierWeapons = {};
+let soldierTemplate = null, soldierRifleMuzzle = null;
+function findNamed(root, pattern) {
+  let found = null;
+  root.traverse(o => { if (!found && pattern.test(o.name)) found = o; });
+  return found;
+}
+function hasMesh(root) { let yes = false; root.traverse(o => { if (o.isMesh) yes = true; }); return yes; }
+function findHandBone(root, side) {
+  if (side === "right" && SOLDIER_HAND_BONE) return root.getObjectByName(THREE.PropertyBinding.sanitizeNodeName(SOLDIER_HAND_BONE));
+  const sidePattern = side === "right" ? /right|handr$|^rhand/ : /left|handl$|^lhand/;
+  let best = null;
+  root.traverse(o => {
+    if (!o.isBone) return;
+    const n = o.name.toLowerCase().replace(/[^a-z]/g, "");
+    if (!n.includes("hand") || /index|middle|ring|pinky|thumb|finger/.test(n) || !sidePattern.test(n)) return;
+    if (!best || o.name.length < best.name.length) best = o;
+  });
+  return best;
+}
+function soldierGripFrame(template) {
+  const root = template.scene, hand = findHandBone(root, "right"), support = findHandBone(root, "left");
+  if (!hand || !support) return null;
+  const aimClip = THREE.AnimationClip.findByName(template.animations, SOLDIER_CLIPS.fireStand) || THREE.AnimationClip.findByName(template.animations, SOLDIER_CLIPS.idle);
+  const poser = new THREE.AnimationMixer(root);
+  if (aimClip) { poser.clipAction(aimClip).play(); poser.update(0); }
+  root.updateMatrixWorld(true);
+  const handW = new THREE.Vector3().setFromMatrixPosition(hand.matrixWorld);
+  const supportW = new THREE.Vector3().setFromMatrixPosition(support.matrixWorld);
+  const knuckle = hand.children.find(b => b.isBone && /middle/i.test(b.name));
+  const palmW = knuckle ? handW.clone().lerp(new THREE.Vector3().setFromMatrixPosition(knuckle.matrixWorld), 0.5) : handW;
+  const aimW = supportW.clone().sub(palmW).normalize();
+  const upW = new THREE.Vector3(0, 1, 0).addScaledVector(aimW, -aimW.y).normalize();
+  const frame = { handInv: hand.matrixWorld.clone().invert(), palmW, aimW, upW, rifleMuzzle: null };
+  const socket = findNamed(root, SOLDIER_EMBEDDED_RIFLE);
+  if (socket && hasMesh(socket)) frame.rifleMuzzle = farthestAlong(new THREE.Box3().setFromObject(socket), aimW).applyMatrix4(frame.handInv);
+  poser.stopAllAction(); poser.uncacheRoot(root);
+  return frame;
+}
+function farthestAlong(box, dir) {
+  const center = box.getCenter(new THREE.Vector3()), half = box.getSize(new THREE.Vector3()).multiplyScalar(0.5);
+  const reach = Math.abs(dir.x) * half.x + Math.abs(dir.y) * half.y + Math.abs(dir.z) * half.z;
+  return center.addScaledVector(dir, reach);
+}
+function fitSoldierWeapon(frame, weaponScene, spec) {
+  weaponScene.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(weaponScene), size = box.getSize(new THREE.Vector3()), center = box.getCenter(new THREE.Vector3());
+  const axis = new THREE.Vector3().fromArray(spec.muzzleAxis), up = new THREE.Vector3(0, 1, 0);
+  const reach = Math.abs(axis.dot(size));
+  const muzzle = center.clone().addScaledVector(axis, reach / 2);
+  const grip = muzzle.clone().addScaledVector(axis, -reach * spec.grip[0]); grip.y = box.min.y + size.y * spec.grip[1];
+  const scale = spec.length / reach;
+  const nativeBasis = new THREE.Matrix4().makeBasis(axis, up, new THREE.Vector3().crossVectors(axis, up));
+  const worldBasis = new THREE.Matrix4().makeBasis(frame.aimW, frame.upW, new THREE.Vector3().crossVectors(frame.aimW, frame.upW));
+  const mount = frame.handInv.clone()
+    .multiply(new THREE.Matrix4().makeTranslation(frame.palmW.x, frame.palmW.y, frame.palmW.z))
+    .multiply(worldBasis).multiply(nativeBasis.transpose())
+    .multiply(new THREE.Matrix4().makeScale(scale, scale, scale))
+    .multiply(new THREE.Matrix4().makeTranslation(-grip.x, -grip.y, -grip.z));
+  return { scene: weaponScene, mount, muzzle: muzzle.applyMatrix4(mount) };
+}
+function attachSoldierWeapon(model, kind) {
+  const socket = findNamed(model, SOLDIER_EMBEDDED_RIFLE), embeddedRifle = !!socket && hasMesh(socket);
+  if (kind === "rifle" && embeddedRifle) return soldierRifleMuzzle;
+  if (embeddedRifle) socket.parent.remove(socket);
+  const weapon = soldierWeapons[kind], hand = findHandBone(model, "right");
+  if (!weapon || !hand) return null;
+  const gun = weapon.scene.clone();
+  weapon.mount.decompose(gun.position, gun.quaternion, gun.scale);
+  hand.add(gun);
+  return weapon.muzzle;
+}
 function dressSoldier(e) {
   if (!soldierTemplate || e.look) return;
-  const uniformColor = e.baseCols[0];
+  const uniformColor = new THREE.Color(e.baseCols[0]);
   e.g.traverse(o => { if (o.isMesh) o.visible = false; });
   const model = THREE.SkeletonUtils.clone(soldierTemplate.scene);
-  const hand = model.getObjectByName("Index1R");
-  if (hand) hand.children.slice().forEach(w => { if (!w.isBone && w.name !== SOLDIER_WEAPON_KEPT) hand.remove(w); });
+  const muzzleAt = attachSoldierWeapon(model, e.weapon), hand = findHandBone(model, "right");
+  if (muzzleAt && hand) { const muzzle = new THREE.Object3D(); muzzle.position.copy(muzzleAt); hand.add(muzzle); e.pistol = muzzle; }
   const cloned = new Map();
   model.traverse(o => {
     if (!o.isMesh) return;
     if (!cloned.has(o.material)) {
       const m = o.material.clone();
-      if (m.name === SOLDIER_UNIFORM_MAT) m.color.set(uniformColor);
+      if (SOLDIER_UNIFORM_MATS.test(m.name)) m.color.set(0xFFFFFF).lerp(uniformColor, SOLDIER_UNIFORM_TINT);
       m.transparent = e.allMats[0].transparent;
       cloned.set(o.material, m);
     }
     o.material = cloned.get(o.material);
     o.castShadow = true; o.frustumCulled = false;
   });
-  model.scale.set(-1, 1, 1);
+  model.scale.setScalar(SOLDIER_SCALE);
   e.g.add(model);
   const lookMats = [...cloned.values()];
   e.mats = lookMats; e.baseCols = lookMats.map(m => m.color.getHex());
   e.allMats = e.allMats.concat(lookMats);
   const mixer = new THREE.AnimationMixer(model);
-  const clip = name => THREE.AnimationClip.findByName(soldierTemplate.animations, name);
-  const walk = mixer.clipAction(clip("Walk_Shoot")), idle = mixer.clipAction(clip("Idle_Shoot"));
-  walk.play(); idle.play(); walk.setEffectiveWeight(0); idle.setEffectiveWeight(1);
+  const acts = {}, weights = {};
+  for (const key in SOLDIER_CLIPS) {
+    const clip = THREE.AnimationClip.findByName(soldierTemplate.animations, SOLDIER_CLIPS[key]);
+    if (clip) acts[key] = mixer.clipAction(clip);
+  }
+  SOLDIER_ONE_SHOT.forEach(key => { if (acts[key]) { acts[key].setLoop(THREE.LoopOnce, 1); acts[key].clampWhenFinished = true; } });
+  if (acts.death) acts.death.timeScale = SOLDIER_DEATH.timeScale;
+  SOLDIER_LOOPED.concat("fireStand").forEach(key => { if (acts[key]) acts[key].play(); });
+  for (const key in acts) { weights[key] = key === "idle" ? 1 : 0; acts[key].setEffectiveWeight(weights[key]); }
   mixer.update(Math.random());
-  e.look = { model, mixer, walk, idle, lastWalk: e.walk, blend: 0, seenInScene: false };
+  const p = e.g.position;
+  e.look = { model, mixer, acts, weights, lastWalk: e.walk, lastFire: e.fire, shotAt: 0, px: p.x, pz: p.z, vx: 0, vz: 0, back: false,
+             hitT: 99, hitReadyAt: 0, dead: false, deathW: 0, seenInScene: false };
   soldierLooks.add(e);
+}
+function soldierOwnerShotAt(e) {
+  if (e.ownerId === undefined || typeof T === "undefined") return null;
+  const ent = T.ents[e.ownerId];
+  return ent ? ent.shotAt : null;
+}
+function soldierFired(look, now) {
+  look.shotAt = now;
+  if (look.acts.fireStand) look.acts.fireStand.reset().play();
+}
+function blendSoldier(e, look, dt, now) {
+  const g = e.g, acts = look.acts, W = look.weights, k = Math.min(1, dt * SOLDIER_BLEND_RATE);
+  const moving = e.walk !== look.lastWalk; look.lastWalk = e.walk;
+  if (dt > 0) {
+    look.vx += ((g.position.x - look.px) / dt - look.vx) * k; look.vz += ((g.position.z - look.pz) / dt - look.vz) * k;
+  }
+  look.px = g.position.x; look.pz = g.position.z;
+  const speed = Math.hypot(look.vx, look.vz), forward = look.vx * Math.sin(g.rotation.y) + look.vz * Math.cos(g.rotation.y);
+  if (forward < -SOLDIER_BACK_RATIO * speed) look.back = true; else if (forward > 0) look.back = false;
+  const ownerShotAt = soldierOwnerShotAt(e);
+  if (ownerShotAt !== null) { if (ownerShotAt > look.shotAt) soldierFired(look, ownerShotAt); }
+  else if (e.fire > look.lastFire) soldierFired(look, now);
+  look.lastFire = e.fire;
+  const m = moving ? 1 : 0, f = now - look.shotAt < SOLDIER_ENGAGE_SEC * 1000 ? 1 : 0;
+  const walkOnly = m * (1 - f), backwards = look.back && acts.back;
+  const target = { idle: (1 - m) * (1 - f), walk: backwards ? 0 : walkOnly, back: backwards ? walkOnly : 0, fireStand: (1 - m) * f, fireWalk: m * f };
+  for (const key in target) W[key] = (W[key] || 0) + (target[key] - (W[key] || 0)) * k;
+  const H = SOLDIER_HIT, hitSpan = H.fadeIn + H.hold + H.fadeOut;
+  let hitW = 0;
+  if (acts.hit && look.hitT < hitSpan) {
+    look.hitT += dt; const t = look.hitT;
+    hitW = H.peak * (t < H.fadeIn ? t / H.fadeIn : t < H.fadeIn + H.hold ? 1 : Math.max(0, 1 - (t - H.fadeIn - H.hold) / H.fadeOut));
+    if (look.hitT >= hitSpan) acts.hit.stop();
+  }
+  if (look.dead) look.deathW = Math.min(1, look.deathW + dt / SOLDIER_DEATH.fadeIn);
+  const keep = (1 - hitW) * (1 - look.deathW);
+  for (const key in target) if (acts[key]) acts[key].setEffectiveWeight(W[key] * keep);
+  if (acts.hit) acts.hit.setEffectiveWeight(hitW * (1 - look.deathW));
+  if (acts.death) acts.death.setEffectiveWeight(look.deathW);
+  const pace = clamp(speed / SOLDIER_WALK_CLIP_SPEED, 0.8, 1.7);
+  ["walk", "back", "fireWalk"].forEach(key => { if (acts[key]) acts[key].timeScale = pace; });
+}
+function soldierDie(e) {
+  const look = e.look;
+  if (!look || !look.acts.death) return false;
+  look.dead = true; look.deathW = 0;
+  look.acts.death.reset().play();
+  return true;
+}
+function soldierRevive(e) {
+  const look = e.look;
+  if (!look) return;
+  look.dead = false; look.deathW = 0; look.hitT = 99;
+  if (look.acts.death) look.acts.death.stop();
+  if (look.acts.hit) look.acts.hit.stop();
+  look.px = e.g.position.x; look.pz = e.g.position.z; look.vx = look.vz = 0;
+}
+function soldierHitReact(e) {
+  const look = e.look, t = performance.now();
+  if (!look || look.dead || !look.acts.hit || t < look.hitReadyAt) return;
+  look.hitReadyAt = t + SOLDIER_HIT.cooldown * 1000; look.hitT = 0;
+  look.acts.hit.reset().play(); look.acts.hit.time = SOLDIER_HIT.from;
 }
 let lastLookT = 0;
 function animateSoldierLooks(now) {
@@ -1029,15 +1195,16 @@ function animateSoldierLooks(now) {
     const look = e.look;
     if (!e.g.parent) { if (look.seenInScene) soldierLooks.delete(e); return; }
     look.seenInScene = true;
-    if (!e.g.visible) return;
-    const moving = e.walk !== look.lastWalk; look.lastWalk = e.walk;
-    look.blend += ((moving ? 1 : 0) - look.blend) * Math.min(1, dt * 8);
-    look.walk.setEffectiveWeight(look.blend); look.idle.setEffectiveWeight(1 - look.blend);
+    if (!e.g.visible) { look.px = e.g.position.x; look.pz = e.g.position.z; return; }
+    blendSoldier(e, look, dt, now);
     look.mixer.update(e.g.rotation.x !== 0 ? 0 : dt);
   });
 }
-loadModel("enemy.glb").then(gltf => {
+Promise.all([loadModel(SOLDIER_MODEL_FILE)].concat(Object.keys(SOLDIER_WEAPONS).map(kind => loadModel(SOLDIER_WEAPONS[kind].file).catch(() => null)))).then(([gltf, ...guns]) => {
   finishModel(gltf.scene, true);
+  const frame = soldierGripFrame(gltf);
+  if (frame) soldierRifleMuzzle = frame.rifleMuzzle;
+  Object.keys(SOLDIER_WEAPONS).forEach((kind, i) => { if (frame && guns[i]) soldierWeapons[kind] = fitSoldierWeapon(frame, finishModel(guns[i].scene, true), SOLDIER_WEAPONS[kind]); });
   soldierTemplate = gltf;
   enemies.forEach(dressSoldier);
   if (typeof T !== "undefined") Object.values(T.ents).forEach(ent => { if (ent.s) dressSoldier(ent.s); });
@@ -1047,19 +1214,27 @@ function removeEnemy(e) {
   enemies.splice(enemies.indexOf(e), 1);
   e.parts.forEach(m => { const i = enemyParts.indexOf(m); if (i >= 0) enemyParts.splice(i, 1); });
 }
-function enemyFlash(e, on) { e.mats.forEach((m, i) => m.color.set(on ? 0xFFFFFF : e.baseCols[i])); }
+function enemyFlash(e, on) {
+  e.mats.forEach((m, i) => { m.color.set(on ? 0xFFFFFF : e.baseCols[i]); if (m.map) m.emissive.setHex(on ? SOLDIER_FLASH_EMISSIVE : 0x000000); });
+  if (on) soldierHitReact(e);
+}
 function disposeMaterials(mats) { mats.forEach(m => m.dispose()); }
 
 const corpses = [];
 function killEnemy(e, head) {
   removeEnemy(e); enemyFlash(e, false);
   e.armR.rotation.x = -0.3; e.legR.rotation.x = e.legL.rotation.x = 0;
-  scene.add(e.g); corpses.push({ g: e.g, t: 0, head, yaw0: e.g.rotation.y, spin: rnd(-0.6, 0.6), mats: e.allMats });
+  const animated = soldierDie(e);
+  scene.add(e.g); corpses.push({ g: e.g, t: 0, head, animated, yaw0: e.g.rotation.y, spin: rnd(-0.6, 0.6), mats: e.allMats });
 }
 function updateCorpses(dt) {
   for (let i = corpses.length - 1; i >= 0; i--) {
     const c = corpses[i]; c.t += dt; const g = c.g;
-    if (c.t < 0.55) {
+    if (c.animated) {
+      const sunk = c.t - SOLDIER_DEATH.sinkAt;
+      g.position.y = sunk > 0 ? -sunk * SOLDIER_DEATH.sinkSpeed : 0;
+      if (sunk > SOLDIER_DEATH.sinkSec) { scene.remove(g); disposeMaterials(c.mats); corpses.splice(i, 1); }
+    } else if (c.t < 0.55) {
       const k = c.t / 0.55, ease = 1 - (1 - k) * (1 - k) * (1 - k);
       g.rotation.x = -Math.PI / 2 * ease * (c.head ? 1.0 : 0.97); g.rotation.y = c.yaw0 + c.spin * ease;
       g.position.y = c.head ? Math.sin(k * Math.PI) * 0.35 : 0;
@@ -1357,7 +1532,7 @@ function renderHud() {
   E.hpFill.style.width = P.hp + "%"; E.hpFill.classList.toggle("low", P.hp <= 30);
   const pistol = P.weapon === "pistol";
   E.ammoLab.textContent = pistol ? "권총 (탄약 없음)" : "소총 탄약";
-  E.ammoNum.textContent = pistol ? "∞" : P.ammo + "/" + PLAYER_CONFIG.ammo;
+  E.ammoNum.textContent = pistol || rifleAmmoInfinite() ? "∞" : P.ammo + "/" + PLAYER_CONFIG.ammo;
   E.hudAmmo.classList.toggle("empty", pistol);
   E.hudScore.textContent = score; E.hudTime.textContent = fmtTime(elapsed);
 }
@@ -1370,7 +1545,7 @@ function hitmark() { const h = $("hitmark"); h.classList.remove("show"); void h.
 
 function fireWeapon(targetParts) {
   const W = WEAPONS[P.weapon], wg = W.g;
-  if (P.weapon === "rifle") { P.ammo--; SFX.shoot(); } else SFX.pistol();
+  if (P.weapon === "rifle") { if (!rifleAmmoInfinite()) P.ammo--; SFX.shoot(); } else SFX.pistol();
   P.recoil = 1;
   wg.userData.flash.visible = true; setTimeout(() => { wg.userData.flash.visible = false; }, 45);
   scene.updateMatrixWorld();
@@ -1459,6 +1634,8 @@ function update(dt) {
   updateBullets(dt); updateCorpses(dt);
   if (Math.floor(elapsed) !== Math.floor(elapsed - dt)) renderHud();
 }
+const TEAM_RIFLE_INFINITE_AMMO = true;
+const rifleAmmoInfinite = () => TEAM_RIFLE_INFINITE_AMMO && state === "team";
 const TEAM = { max: 2, specMax: 2, netMs: 143, matchMs: 60000, countMs: 3000, respawnMs: 3000, protectMs: 3000, lerpMs: 160, root: "fpsbattle/rooms" };
 const FIREBASE_SDK = ["https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js", "https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"];
 const NICK_KEY = "fpsbattle_nick";
@@ -1802,7 +1979,7 @@ function ensureEnt(id) {
   if (T.ents[id]) return T.ents[id];
   const p = T.players[id];
   if (!p || (p.team !== "blue" && p.team !== "red") || id === T.myId) return null;
-  const s = T.spec ? null : makeSoldier(0, 0, TEAM_COLOR[p.team]);
+  const s = T.spec ? null : makeSoldier(0, 0, TEAM_COLOR[p.team], "rifle");
   const ent = { id, team: p.team, isAI: !!p.isAI, s, x: 0, z: 0, yaw: 0, pitch: 0, hp: 100, alive: true, pistol: false, prot: false, moving: false,
                 shots: 0, seen: false, from: null, to: null, t0: 0, deadT: 0, deadAt: 0, shotAt: 0 };
   if (s) {
@@ -1823,11 +2000,11 @@ function removeEnt(id) {
 function killEnt(ent) {
   if (!ent.alive) return;
   ent.alive = false; ent.deadT = 0;
-  if (ent.s) { ent.s.armR.rotation.x = -0.3; ent.s.legR.rotation.x = ent.s.legL.rotation.x = 0; enemyFlash(ent.s, false); }
+  if (ent.s) { ent.s.armR.rotation.x = -0.3; ent.s.legR.rotation.x = ent.s.legL.rotation.x = 0; enemyFlash(ent.s, false); soldierDie(ent.s); }
 }
 function reviveEnt(ent) {
   ent.alive = true; ent.deadT = 0;
-  if (ent.s) { ent.s.g.rotation.set(0, ent.yaw + Math.PI, 0); ent.s.g.position.set(ent.x, 0, ent.z); ent.s.g.visible = true; }
+  if (ent.s) { ent.s.g.rotation.set(0, ent.yaw + Math.PI, 0); ent.s.g.position.set(ent.x, 0, ent.z); ent.s.g.visible = true; soldierRevive(ent.s); }
 }
 function aimDir(yaw, pitch) { return new THREE.Vector3(-Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch)); }
 function stateString(x, z, yaw, pitch, flags, shots, hp, ammo) {
@@ -1895,7 +2072,12 @@ function updateEnts(dt, nowMs) {
       s.allMats.forEach(m => { m.opacity = op; });
     } else {
       ent.deadT += dt; const c = ent.deadT;
-      if (c < 0.55) { const k = c / 0.55, ease = 1 - (1 - k) * (1 - k) * (1 - k); g.rotation.x = -Math.PI / 2 * ease; g.position.y = 0; }
+      if (s.look && s.look.dead) {
+        const sunk = c - SOLDIER_DEATH.sinkAt;
+        g.position.y = sunk > 0 ? -sunk * SOLDIER_DEATH.sinkSpeed : 0;
+        if (sunk > SOLDIER_DEATH.sinkSec) g.visible = false;
+      }
+      else if (c < 0.55) { const k = c / 0.55, ease = 1 - (1 - k) * (1 - k) * (1 - k); g.rotation.x = -Math.PI / 2 * ease; g.position.y = 0; }
       else if (c > 1.4) { g.position.y = -(c - 1.4) * 1.2; if (c > 2.2) g.visible = false; }
       s.allMats.forEach(m => { m.opacity = 1; });
     }
@@ -2090,7 +2272,7 @@ function updateBotSim(b, dt, t) {
   b.yaw = Math.atan2(-nx, -nz); b.pitch = Math.atan2(PLAYER_CONFIG.eyeHeight - 1.5, dist);
   b.fire -= dt;
   if (tg && b.fire <= 0 && dist <= C.enemyFireRange && botCanSee(b, tx, tz)) {
-    b.fire = C.enemyFireCooldownSec; b.shots++; b.ammo = Math.max(0, b.ammo - 1);
+    b.fire = C.enemyFireCooldownSec; b.shots++; if (!TEAM_RIFLE_INFINITE_AMMO) b.ammo = Math.max(0, b.ammo - 1);
     const ent = T.ents[b.id], from = new THREE.Vector3(b.x, 1.45, b.z);
     if (ent && ent.s) { ent.s.g.updateMatrixWorld(true); ent.s.pistol.getWorldPosition(from); ent.shotAt = performance.now(); }
     else if (ent) ent.shotAt = performance.now();
@@ -2305,7 +2487,7 @@ function drawSpectator(t, nowMs) {
   });
   c.fillStyle = "#1B2B20"; c.font = "bold 24px " + FONT; c.fillText(fmtTime(Math.ceil(left / 1000)), W / 2, boxMid - 4);
   c.font = "bold 11px " + FONT; c.fillStyle = "#5B6B5E"; c.fillText("👀 관전 중", W / 2, boxY + boxH - 9);
-  const ammoText = e => !e ? "—" : e.pistol ? "∞" : typeof e.ammo !== "number" || !(e.ammo >= 0) ? "—" : String(e.ammo);
+  const ammoText = e => !e ? "—" : e.pistol || TEAM_RIFLE_INFINITE_AMMO ? "∞" : typeof e.ammo !== "number" || !(e.ammo >= 0) ? "—" : String(e.ammo);
   const card = (id, x, y, w) => {
     const e = T.ents[id], hp = e ? (e.alive ? e.hp : 0) : 100; let k = 0, d = 0;
     for (const key in T.kills) { const v = T.kills[key]; if (!killCounts(v)) continue; if (v.k === id) k++; if (v.v === id) d++; }
