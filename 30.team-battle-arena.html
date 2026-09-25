@@ -508,20 +508,31 @@
   function isHost() { return !!room && room.host === myId; }
 
   function newPlayer(team, joinedAt) {
-    return { nickname: nick, isHost: false, isAI: false, team: team, slot: null, characterType: "marksman",
-             x: 0, y: 0, angle: 0, hp: 100, alive: true, skillGauge: 0, damageDealt: 0,
-             joinedAt: joinedAt, lastUpdate: joinedAt };
+    return { nickname: nick, isAI: false, team: team, characterType: "marksman", joinedAt: joinedAt };
   }
 
-  function sweep() {
-    return db.ref(ROOT).once("value").then(function (s) {
-      var all = s.val() || {}, t = now(), u = {};
-      keys(all).forEach(function (code) {
-        var r = all[code] || {}, hs = humans(r.players || {});
-        var age = t - (r.createdAt || 0);
-        if ((!hs.length && age > 60000) || (r.status === "ended" && t - (r.endedAt || 0) > 300000) || age > 6 * 3600000) u[code] = null;
+  function roomCodes() {
+    var base = String(CONF.DB_URL || "").replace(/\/+$/, "");
+    if (!base || !window.fetch) return Promise.resolve([]);
+    return fetch(base + "/" + ROOT + ".json?shallow=true").then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (codes) { return keys(codes); });
+  }
+  function isStaleRoom(code, t) {
+    var r = db.ref(ROOT + "/" + code);
+    return Promise.all(["createdAt", "status", "endedAt", "players"].map(function (k) { return r.child(k).once("value"); }))
+      .then(function (a) {
+        var age = t - (a[0].val() || 0), status = a[1].val(), endedAt = a[2].val() || 0, hs = humans(a[3].val() || {});
+        return (!hs.length && age > 60000) || (status === "ended" && t - endedAt > 300000) || age > 6 * 3600000;
       });
-      if (keys(u).length) return db.ref(ROOT).update(u);
+  }
+  function sweep() {
+    return roomCodes().then(function (codes) {
+      var t = now();
+      return Promise.all(codes.map(function (code) { return isStaleRoom(code, t); })).then(function (stale) {
+        var u = {};
+        codes.forEach(function (code, i) { if (stale[i]) u[code] = null; });
+        if (keys(u).length) return db.ref(ROOT).update(u);
+      });
     }).catch(function () {});
   }
 
@@ -534,7 +545,7 @@
     function tryCode(n) {
       var code = String(10000 + Math.floor(Math.random() * 90000));
       var t = now();
-      var me = newPlayer("blue", t); me.isHost = true;
+      var me = newPlayer("blue", t);
       var obj = { mode: "pvp", status: "lobby", hostPlayerId: myId, createdAt: t, winner: null, players: {} };
       obj.players[myId] = me;
       db.ref(ROOT + "/" + code).transaction(function (cur) {
@@ -554,10 +565,10 @@
     if (!db) { startMsg("온라인 연결을 할 수 없어요."); return; }
     $("btnJoin").disabled = true; startMsg("");
     var ref = db.ref(ROOT + "/" + code);
-    ref.once("value").then(function (s) {
+    Promise.all(["players", "status", "mode"].map(function (k) { return ref.child(k).once("value"); })).then(function (a) {
       $("btnJoin").disabled = false;
-      var r = s.val();
-      if (!r || !r.players || !humans(r.players).length) { startMsg("그런 방이 없어요. 코드를 확인해 주세요."); return; }
+      var r = { players: a[0].val(), status: a[1].val(), mode: a[2].val() };
+      if (!r.players || !humans(r.players).length) { startMsg("그런 방이 없어요. 코드를 확인해 주세요."); return; }
       var cnt = function (tm) { return keys(r.players).filter(function (id) { return r.players[id] && r.players[id].team === tm; }).length; };
       var team = null;
       if (r.status === "lobby") {
@@ -577,7 +588,7 @@
     leaving = false;
     var ref = db.ref(ROOT + "/" + code);
     room = { code: code, ref: ref, mode: null, status: "lobby", host: null, startAt: 0, winner: null, endedAt: 0, final: null, roster: null };
-    P = {}; R = {}; PR = {}; MELEE = {}; FX = []; G = null; ME = null; BOTS = {};
+    P = {}; R = {}; PR = {}; MELEE = {}; FX = []; G = null; ME = null; BOTS = {}; ST = {}; SHOTS = []; hitSubs = {};
     ref.child("players/" + myId).onDisconnect().remove();
 
     var pref = ref.child("players");
@@ -603,13 +614,13 @@
       else showScreen("game");
       if (st === "ended" && prev !== "ended") onEnded();
     });
-    var prRef = ref.child("projectiles");
-    sub(prRef, "child_added", function (s) { addProj(s.key, s.val()); });
-    sub(prRef, "child_removed", function (s) { delete PR[s.key]; });
-    var mRef = ref.child("meleeHits");
-    sub(mRef, "child_added", function (s) { onMelee(s.key, s.val()); });
-    sub(mRef, "child_removed", function (s) { delete MELEE[s.key]; });
-    sub(ref.child("hits"), "child_added", onHit);
+    var stRef = ref.child("st");
+    sub(stRef, "child_added", function (s) { ST[s.key] = s.val(); });
+    sub(stRef, "child_changed", function (s) { ST[s.key] = s.val(); });
+    sub(stRef, "child_removed", function (s) { delete ST[s.key]; });
+    sub(ref.child("shots"), "child_added", onShot);
+    sub(ref.child("meleeHits"), "child_added", function (s) { onMelee(s.key, s.val()); });
+    listenHits(myId);
     sub(ref.child("effects"), "child_added", onEffect);
 
     setText($("lobbyCode"), code);
@@ -629,8 +640,7 @@
     if (!room || !room.hostLoaded || !P[myId]) return;
     if (room.host && P[room.host] && !P[room.host].isAI) return;
     if (nextHost(P) === myId) {
-      var u = { hostPlayerId: myId }; u["players/" + myId + "/isHost"] = true;
-      room.host = myId; room.ref.update(u);
+      room.host = myId; room.ref.update({ hostPlayerId: myId });
     }
   }
 
@@ -647,7 +657,7 @@
       if (!hs.length) return r.ref.remove();
       return r.ref.child("hostPlayerId").once("value").then(function (h) {
         var hid = h.val(), nx = nextHost(ps);
-        if (!hid || !ps[hid] || ps[hid].isAI) { var u = { hostPlayerId: nx }; u["players/" + nx + "/isHost"] = true; return r.ref.update(u); }
+        if (!hid || !ps[hid] || ps[hid].isAI) return r.ref.update({ hostPlayerId: nx });
       });
     }).catch(function () {});
     room = null; resetLocal(); showScreen("start"); startMsg("");
@@ -656,7 +666,7 @@
     if (room) { leaving = true; unsubAll(); try { room.ref.child("players/" + myId).onDisconnect().cancel(); } catch (e) {} }
     room = null; resetLocal(); showScreen("start"); startMsg(msg || "");
   }
-  function resetLocal() { P = {}; R = {}; PR = {}; MELEE = {}; FX = []; G = null; ME = null; BOTS = {}; joy.id = null; aim.id = null; }
+  function resetLocal() { P = {}; R = {}; PR = {}; MELEE = {}; FX = []; G = null; ME = null; BOTS = {}; ST = {}; SHOTS = []; hitSubs = {}; joy.id = null; aim.id = null; }
   window.addEventListener("pagehide", function () { if (room) { try { room.ref.child("players/" + myId).remove(); } catch (e) {} } });
 
   var screenNow = "start";
@@ -714,9 +724,7 @@
       var chars = ["marksman", Math.random() < 0.5 ? "healer" : "assassin", TANK_ENABLED ? "tank" : "marksman"];
       var t = now();
       chars.forEach(function (c, i) {
-        var b = { nickname: CHARS[c].name, isHost: false, isAI: true, team: "red", slot: null, characterType: c,
-                  x: 0, y: 0, angle: 0, hp: CHARS[c].hp, alive: true, skillGauge: 0, damageDealt: 0, joinedAt: t + i, lastUpdate: t };
-        u["players/ai" + (i + 1)] = b;
+        u["players/ai" + (i + 1)] = { nickname: CHARS[c].name, isAI: true, team: "red", characterType: c, joinedAt: t + i };
       });
     }
     room.ref.update(u);
@@ -845,7 +853,7 @@
   function startGame() {
     if (!isHost() || room.status !== "lobby") return;
     audio();
-    var u = {}, roster = {};
+    var u = {}, roster = {}, st = {};
     ["blue", "red"].forEach(function (team) {
       teamIds(team).slice(0, 3).forEach(function (id, i) {
         var p = P[id], c = CHARS[p.characterType] ? p.characterType : "marksman";
@@ -855,17 +863,31 @@
           c = Math.random() < 0.5 ? "healer" : "assassin"; u[base + "nickname"] = CHARS[c].name;
         }
         u[base + "slot"] = i + 1; u[base + "characterType"] = c;
-        u[base + "x"] = sp.x; u[base + "y"] = sp.y; u[base + "angle"] = r1(sp.angle);
+        st[stKey(team, i + 1)] = packState(sp.x, sp.y, sp.angle, false);
         u[base + "hp"] = CHARS[c].hp; u[base + "alive"] = true; u[base + "skillGauge"] = 0; u[base + "damageDealt"] = 0;
-        u[base + "mv"] = false; u[base + "atkAt"] = 0; u[base + "ultUntil"] = 0; u[base + "buffUntil"] = 0; u[base + "stealthUntil"] = 0; u[base + "regenUntil"] = 0; u[base + "skillUntil"] = 0; u[base + "skillDur"] = 0;
+        u[base + "atkAt"] = 0; u[base + "ultUntil"] = 0; u[base + "buffUntil"] = 0; u[base + "stealthUntil"] = 0; u[base + "regenUntil"] = 0; u[base + "skillUntil"] = 0; u[base + "skillDur"] = 0;
         u[base + "healGot"] = null;
         roster[id] = { team: team, c: c, ai: !!p.isAI };
       });
     });
-    u.roster = roster;
+    u.roster = roster; u.st = st;
     u.status = "countdown"; u.startAt = now() + COUNT_MS; u.winner = null; u.final = null; u.endedAt = null;
-    u.projectiles = null; u.meleeHits = null; u.hits = null; u.effects = null;
+    u.shots = null; u.meleeHits = null; u.hits = null; u.effects = null; u.projectiles = null;
     room.ref.update(u);
+  }
+
+  var ST = {};
+  function stKey(team, slot) { return (team === "blue" ? "b" : "r") + slot; }
+  function angDeg(a) { var d = Math.round(a * 180 / Math.PI / 3) * 3; return ((d % 360) + 360) % 360; }
+  function packState(x, y, a, mv) { return Math.round(x) + "," + Math.round(y) + "," + angDeg(a) + "," + (mv ? 1 : 0); }
+  function stateOf(d) {
+    var s = d && d.slot ? ST[stKey(d.team, d.slot)] : null;
+    if (typeof s === "string") {
+      var f = s.split(",");
+      return { x: +f[0] || 0, y: +f[1] || 0, angle: (+f[2] || 0) * Math.PI / 180, mv: f[3] === "1" };
+    }
+    var sp = d && d.slot && (d.team === "blue" || d.team === "red") ? spawnOf(d.team, d.slot) : { x: 0, y: 0, angle: 0 };
+    return { x: sp.x, y: sp.y, angle: sp.angle, mv: false };
   }
 
   var G = null;
@@ -878,9 +900,9 @@
   var handled = {};
 
   function makeEnt(id, d) {
-    var c = CHARS[d.characterType] ? d.characterType : "marksman";
+    var c = CHARS[d.characterType] ? d.characterType : "marksman", pos = stateOf(d);
     return { id: id, team: d.team, char: c, nickname: d.nickname, isAI: !!d.isAI,
-             x: +d.x || 0, y: +d.y || 0, angle: +d.angle || 0, hp: d.hp == null ? CHARS[c].hp : +d.hp, maxHp: CHARS[c].hp,
+             x: pos.x, y: pos.y, angle: pos.angle, hp: d.hp == null ? CHARS[c].hp : +d.hp, maxHp: CHARS[c].hp,
              alive: d.alive !== false, gauge: +d.skillGauge || 0, dmg: +d.damageDealt || 0,
              cdUntil: 0, atkAt: 0, ultUntil: 0, buffUntil: 0, stealthUntil: +d.stealthUntil || 0, regenUntil: 0, regenRate: 0,
              skillUntil: +d.skillUntil || 0, skillDur: +d.skillDur || 0,
@@ -908,19 +930,19 @@
       if (id === myId) return;
       var d = P[id];
       if (d.isAI && host) {
-        if (!BOTS[id]) { BOTS[id] = makeEnt(id, d); BOTS[id].bot = { seed: Math.random() * 10, seenAt: 0, target: null, stuck: 0, detour: 0, detourDir: 1 }; delete R[id]; }
+        if (!BOTS[id]) { BOTS[id] = makeEnt(id, d); BOTS[id].bot = { seed: Math.random() * 10, seenAt: 0, target: null, stuck: 0, detour: 0, detourDir: 1 }; delete R[id]; listenHits(id); }
         return;
       }
       var r = R[id];
       if (!r) { r = R[id] = makeEnt(id, d); }
-      var k = Math.min(1, dt * 12);
-      var tx = +d.x || 0, ty = +d.y || 0;
-      if (d.mv && hyp(tx - r.x, ty - r.y) > 3) { r.moveAng = Math.atan2(ty - r.y, tx - r.x); r.moveAt = now(); }
+      var k = Math.min(1, dt * 12), pos = stateOf(d);
+      var tx = pos.x, ty = pos.y;
+      if (pos.mv && hyp(tx - r.x, ty - r.y) > 3) { r.moveAng = Math.atan2(ty - r.y, tx - r.x); r.moveAt = now(); }
       if (hyp(tx - r.x, ty - r.y) > 250) { r.x = tx; r.y = ty; } else { r.x += (tx - r.x) * k; r.y += (ty - r.y) * k; }
-      r.angle = lerpAng(r.angle, +d.angle || 0, Math.min(1, dt * 15));
+      r.angle = lerpAng(r.angle, pos.angle, Math.min(1, dt * 15));
       r.team = d.team; r.char = CHARS[d.characterType] ? d.characterType : "marksman"; r.maxHp = CHARS[r.char].hp;
       r.hp = +d.hp; r.alive = d.alive !== false; r.gauge = +d.skillGauge || 0; r.dmg = +d.damageDealt || 0;
-      r.mv = !!d.mv; r.atkAt = +d.atkAt || 0; r.ultUntil = +d.ultUntil || 0; r.buffUntil = +d.buffUntil || 0; r.nickname = d.nickname; r.isAI = !!d.isAI;
+      r.mv = pos.mv; r.atkAt = +d.atkAt || 0; r.ultUntil = +d.ultUntil || 0; r.buffUntil = +d.buffUntil || 0; r.nickname = d.nickname; r.isAI = !!d.isAI;
       r.regenUntil = +d.regenUntil || 0; r.skillUntil = +d.skillUntil || 0; r.skillDur = +d.skillDur || 0;
       var su = +d.stealthUntil || 0;
       if (su > r.stealthUntil && su > now()) smoke(r.x, r.y);
@@ -1031,15 +1053,47 @@
     if (L > 0) t = clamp(((cx - ax) * vx + (cy - ay) * vy) / L, 0, 1);
     return hyp(ax + vx * t - cx, ay + vy * t - cy) <= r;
   }
-  function spawnProj(E, ang, skill) {
-    var c = CHARS[E.char], sp = skill ? ULT.mkSpeed : c.pSpeed, dx = Math.cos(ang), dy = Math.sin(ang);
-    var d = { team: E.team, owner: E.id, ownerCharacterType: E.char, x: r1(E.x + dx * 20), y: r1(E.y + dy * 20),
-              vx: r1(dx * sp), vy: r1(dy * sp), isSkill: !!skill, dmg: skill ? ULT.mkDmg : c.dmg,
-              pr:skill ? ULT.mkPr : c.pr, range: skill ? ULT.mkRange : c.range, createdAt: now() };
-    var ref = room.ref.child("projectiles").push(d);
-    setTimeout(function () { ref.remove(); }, d.range / sp * 1000 + 700);
-    if (skill || !E.volley || E.volley.left === c.shots) E.atkAt = now();
-    if (hear(E)) sfx(E.char === "healer" ? "orb" : (E.char === "assassin" ? "star" : "shoot"));
+  var SHOTS = [];
+  function emitShots(E, ang, skill) {
+    var t = now(), ev = { o: E.id, x: Math.round(E.x), y: Math.round(E.y), a: Math.round(ang * 100) / 100, t: t };
+    if (skill) ev.s = 1;
+    E.atkAt = t;
+    room.ref.child("shots").push(ev);
+  }
+  function onShot(s) {
+    var ev = s.val(); if (!ev || !G || handled[s.key]) return;
+    handled[s.key] = 1;
+    var info = P[ev.o]; if (!info || (info.team !== "blue" && info.team !== "red")) return;
+    var c = CHARS[info.characterType] ? info.characterType : "marksman", skill = !!ev.s;
+    var count = skill ? ULT.mkCount : (CHARS[c].shots || 1), gap = skill ? ULT.mkGap : (CHARS[c].gap || 0);
+    if (now() - ev.t > count * gap + 3000) return;
+    SHOTS.push({ key: s.key, ev: ev, team: info.team, char: c, skill: skill, count: count, gap: gap, next: 0 });
+    stepShots(now());
+  }
+  function stepShots(t) {
+    SHOTS = SHOTS.filter(function (v) {
+      while (v.next < v.count && t >= v.ev.t + v.next * v.gap) {
+        if (!spawnShot(v, v.next)) return false;
+        v.next++;
+      }
+      return v.next < v.count;
+    });
+  }
+  function spawnShot(v, i) {
+    var E = ent(v.ev.o);
+    if (i > 0 && E && !E.alive) return false;
+    var c = CHARS[v.char], sp = v.skill ? ULT.mkSpeed : c.pSpeed, dx = Math.cos(v.ev.a), dy = Math.sin(v.ev.a);
+    var ox = i > 0 && E ? E.x : v.ev.x, oy = i > 0 && E ? E.y : v.ev.y;
+    addProj(v.key + "_" + i, { team: v.team, owner: v.ev.o, ownerCharacterType: v.char, x: ox + dx * 20, y: oy + dy * 20,
+      vx: dx * sp, vy: dy * sp, isSkill: v.skill, dmg: v.skill ? ULT.mkDmg : c.dmg,
+      pr: v.skill ? ULT.mkPr : c.pr, range: v.skill ? ULT.mkRange : c.range, createdAt: v.ev.t + i * v.gap });
+    if (E && (E === ME || BOTS[E.id]) && hear(E)) sfx(v.char === "healer" ? "orb" : (v.char === "assassin" ? "star" : "shoot"));
+    return true;
+  }
+  function pruneLocal(t) {
+    keys(PR).forEach(function (id) { if (t - PR[id].d.createdAt > PR[id].life + 1000) delete PR[id]; });
+    var ms = Date.now();
+    keys(MELEE).forEach(function (id) { if (ms - MELEE[id].at > 1000) delete MELEE[id]; });
   }
   function hear(E) { return ME && hyp(E.x - ME.x, E.y - ME.y) < 700; }
 
@@ -1052,7 +1106,7 @@
   function checkProjectiles(t) {
     var targets = localTargets(); if (!targets.length) return;
     keys(PR).forEach(function (id) {
-      var p = PR[id]; if (p.dead) return;
+      var p = PR[id]; if (p.dead || p.gone) return;
       var d = p.d, e = t - d.createdAt;
       if (e < 0) e = 0;
       if (e > p.life + 40) return;
@@ -1069,7 +1123,6 @@
   function projHit(id, p, T) {
     var d = p.d; p.dead = true;
     damage(T, d.dmg, d.owner, !d.isSkill);
-    room.ref.child("projectiles/" + id).remove();
     if (!ME || ME.team === T.team || visibleTo(T, ME)) spark(T.x, T.y, d.team === "blue" ? "#5FA2FF" : "#FF6A5F");
   }
   function projVisualHit(p, t) {
@@ -1094,20 +1147,26 @@
     T.hp -= dm; if (!skillActive(T)) T.gauge = Math.min(GAUGE_MAX, T.gauge + 1);
     if (T.hp <= 0) { T.hp = 0; T.alive = false; T.burst = null; T.volley = null; T.regenUntil = 0; T.skillUntil = 0; if (T === ME) { sfx("down"); aim.id = null; joy.id = null; } }
     else if (T === ME) sfx("hit");
-    pushHit({ owner: owner, target: T.id, dmg: dm, basic: basic });
+    pushHit(owner, dm, basic);
     if (T === ME || T.bot) G.forceNet = true;
   }
-  function pushHit(h) { h.createdAt = now(); room.ref.child("hits").push(h); }
+  function pushHit(owner, dmg, basic) { room.ref.child("hits/" + owner).push({ d: dmg, b: basic ? 1 : 0, t: now() }); }
+  var hitSubs = {};
+  function listenHits(ownerId) {
+    if (hitSubs[ownerId]) return;
+    hitSubs[ownerId] = 1;
+    sub(room.ref.child("hits/" + ownerId), "child_added", onHit);
+  }
 
   function onHit(s) {
-    var h = s.val(); if (!h || !G || handled[s.key]) return;
-    var owner = h.owner === myId ? ME : (isHost() ? BOTS[h.owner] : null);
-    if (!owner) { if (isHost() && !P[h.owner]) s.ref.remove(); return; }
+    var h = s.val(), ownerId = s.ref.parent.key; if (!h || !G || handled[s.key]) return;
+    var owner = ownerId === myId ? ME : (isHost() ? BOTS[ownerId] : null);
+    if (!owner) return;
     handled[s.key] = 1;
-    if (h.createdAt >= G.startAt - 1000) {
-      if (h.dmg) owner.dmg += h.dmg;
-      if (h.basic && !skillActive(owner)) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + (CHARS[owner.char].perHit || 2));
-      if (owner === ME && h.dmg) sfx("confirm");
+    if (h.t >= G.startAt - 1000) {
+      if (h.d) owner.dmg += h.d;
+      if (h.b && !skillActive(owner)) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + (CHARS[owner.char].perHit || 2));
+      if (owner === ME && h.d) sfx("confirm");
       G.forceNet = true;
     }
     s.ref.remove();
@@ -1143,8 +1202,7 @@
   function swing(E, ang) {
     var c = CHARS.tank;
     var d = { team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), radius: c.range, angle: r1(ang), arc: c.arc, dmg: c.dmg, createdAt: now() };
-    var ref = room.ref.child("meleeHits").push(d);
-    setTimeout(function () { ref.remove(); }, 700);
+    room.ref.child("meleeHits").push(d);
     E.atkAt = now();
     if (hear(E)) sfx("swing");
   }
@@ -1156,17 +1214,9 @@
     if (E.char === "assassin" && E.stealthUntil > now()) {
       E.stealthUntil = E.skillUntil = now(); G.forceNet = true;
     }
-    if (E.char === "tank") swing(E, ang);
-    else if (c.shots > 1) { E.volley = { left: c.shots, next: now(), ang: ang }; stepVolley(E); }
-    else spawnProj(E, ang, false);
-  }
-  function stepVolley(E) {
-    var t = now(), c = CHARS[E.char];
-    while (E.volley && E.volley.left > 0 && t >= E.volley.next) {
-      spawnProj(E, E.volley.ang, false);
-      E.volley.left--; E.volley.next += c.gap;
-    }
-    if (E.volley && E.volley.left <= 0) E.volley = null;
+    if (E.char === "tank") { swing(E, ang); return; }
+    emitShots(E, ang, false);
+    if (c.shots > 1) E.volley = { until: now() + (c.shots - 1) * c.gap };
   }
   function tryFire(E, ang) {
     if (now() >= E.cdUntil) { fireBasic(E, ang); E.pending = null; }
@@ -1177,12 +1227,12 @@
     E.gauge = 0;
     var t = now();
     if (E.char === "marksman") {
-      E.angle = ang; E.burst = { left: ULT.mkCount, next: t, ang: ang };
+      E.angle = ang; E.burst = { until: t + (ULT.mkCount - 1) * ULT.mkGap };
       E.ultUntil = t + ULT.mkCount * ULT.mkGap + 200;
+      emitShots(E, ang, true);
     } else if (E.char === "healer") {
       E.ultUntil = t + ULT.hlPoseMs;
-      var ref = room.ref.child("effects").push({ type: "healAll", team: E.team, owner: E.id, pct: ULT.hlPct, dur: ULT.hlDur, createdAt: t });
-      setTimeout(function () { ref.remove(); }, ULT.hlDur);
+      room.ref.child("effects").push({ type: "healAll", team: E.team, owner: E.id, pct: ULT.hlPct, dur: ULT.hlDur, createdAt: t });
       E.skillDur = ULT.hlDur;
     } else if (E.char === "tank") {
       E.buffUntil = t + ULT.tkDur;
@@ -1203,14 +1253,8 @@
       if (t > E.pending.until) E.pending = null;
       else if (t >= E.cdUntil) { fireBasic(E, E.pending.ang); E.pending = null; }
     }
-    if (E.burst) {
-      while (E.burst && E.burst.left > 0 && t >= E.burst.next) {
-        spawnProj(E, E.burst.ang, true);
-        E.burst.left--; E.burst.next += ULT.mkGap;
-      }
-      if (E.burst && E.burst.left <= 0) E.burst = null;
-    }
-    if (E.volley) stepVolley(E);
+    if (E.burst && t >= E.burst.until) E.burst = null;
+    if (E.volley && t >= E.volley.until) E.volley = null;
     if (E.regenUntil > t) {
       var hpBefore = E.hp;
       E.hp = Math.min(E.maxHp, E.hp + E.maxHp * E.regenRate * dt);
@@ -1307,14 +1351,15 @@
   }
 
   function entFields(u, E) {
-    var b = "players/" + E.id + "/", sent = G.sent;
-    function put(k, v) { if (sent[b + k] !== v) { sent[b + k] = v; u[b + k] = v; } }
-    put("x", r1(E.x)); put("y", r1(E.y)); put("angle", Math.round(E.angle * 100) / 100);
-    put("hp", Math.round(E.hp * 10) / 10); put("alive", E.alive); put("skillGauge", E.gauge); put("damageDealt", E.dmg);
-    put("mv", !!E.mv); put("atkAt", E.atkAt); put("ultUntil", E.ultUntil); put("buffUntil", E.buffUntil);
+    var b = "players/" + E.id + "/", sent = G.sent, d = P[E.id];
+    function send(path, v) { if (sent[path] !== v) { sent[path] = v; u[path] = v; } }
+    function put(k, v) { send(b + k, v); }
+    if (d && d.slot) send("st/" + stKey(d.team, d.slot), packState(E.x, E.y, E.angle, E.mv));
+    put("hp", Math.ceil(E.hp)); put("alive", E.alive); put("skillGauge", E.gauge); put("damageDealt", E.dmg);
+    put("atkAt", E.atkAt); put("ultUntil", E.ultUntil); put("buffUntil", E.buffUntil);
     put("stealthUntil", E.stealthUntil); put("regenUntil", E.regenUntil);
     put("skillUntil", E.skillUntil); put("skillDur", E.skillDur);
-    keys(E.healGot).forEach(function (healerId) { put("healGot/" + healerId, Math.round(E.healGot[healerId])); });
+    if (room.status === "ended") keys(E.healGot).forEach(function (healerId) { put("healGot/" + healerId, Math.round(E.healGot[healerId])); });
   }
   function netWrite(force) {
     var t = Date.now();
@@ -1371,40 +1416,30 @@
   }
   function recordClassStats(endedAt) {
     if (!db || !room) return;
-    room.ref.once("value").then(function (s) {
-      var r = s.val();
-      if (!r || r.status !== "ended" || r.endedAt !== endedAt || r.winner == null) return;
-      var ps = r.players || {};
-      if (!isFairHumanMatch(r.mode, r.roster, ps)) return;
-      var rows = keys(r.roster).map(function (id) {
-        var healed = 0;
-        keys(ps).forEach(function (other) { var got = ps[other] && ps[other].healGot; if (got && got[id]) healed += +got[id] || 0; });
-        return { c: r.roster[id].c, win: r.winner === r.roster[id].team, dmg: +ps[id].damageDealt || 0, heal: healed };
+    var r = room, ps = P;
+    if (r.status !== "ended" || r.endedAt !== endedAt || r.winner == null) return;
+    if (!isFairHumanMatch(r.mode, r.roster, ps)) return;
+    var rows = keys(r.roster).map(function (id) {
+      var healed = 0;
+      keys(ps).forEach(function (other) { var got = ps[other] && ps[other].healGot; if (got && got[id]) healed += +got[id] || 0; });
+      return { c: r.roster[id].c, win: r.winner === r.roster[id].team, dmg: +ps[id].damageDealt || 0, heal: healed };
+    });
+    db.ref(STATS_PATH).transaction(function (cur) {
+      cur = cur || {};
+      cur.matches = (+cur.matches || 0) + 1;
+      rows.forEach(function (w) {
+        var st = cur[w.c] || {}, n = +st.picks || 0;
+        st.dmg = r1(((+st.dmg || 0) * n + w.dmg) / (n + 1));
+        st.heal = r1(((+st.heal || 0) * n + w.heal) / (n + 1));
+        st.picks = n + 1;
+        st.wins = (+st.wins || 0) + (w.win ? 1 : 0);
+        cur[w.c] = st;
       });
-      return db.ref(STATS_PATH).transaction(function (cur) {
-        cur = cur || {};
-        cur.matches = (+cur.matches || 0) + 1;
-        rows.forEach(function (w) {
-          var st = cur[w.c] || {}, n = +st.picks || 0;
-          st.dmg = r1(((+st.dmg || 0) * n + w.dmg) / (n + 1));
-          st.heal = r1(((+st.heal || 0) * n + w.heal) / (n + 1));
-          st.picks = n + 1;
-          st.wins = (+st.wins || 0) + (w.win ? 1 : 0);
-          cur[w.c] = st;
-        });
-        return cur;
-      });
+      return cur;
     }).catch(function () {});
   }
   function hostCleanup() {
     var t = now();
-    if (!G.lastClean || Date.now() - G.lastClean > 1500) {
-      G.lastClean = Date.now();
-      var u = {};
-      keys(PR).forEach(function (id) { if (t - PR[id].d.createdAt > PR[id].life + 3000) u["projectiles/" + id] = null; });
-      keys(MELEE).forEach(function (id) { if (t - MELEE[id].d.createdAt > 3000) u["meleeHits/" + id] = null; });
-      if (keys(u).length) room.ref.update(u);
-    }
     if (room.status === "ended" && room.endedAt && t - room.endedAt > 300000) room.ref.remove();
   }
   function onEnded() {
@@ -1420,7 +1455,7 @@
     if (!room || room.status !== "ended") return;
     if (room.endedAt && now() - room.endedAt < STATS_SETTLE_MS + 500) return;
     room.ref.update({ status: "lobby", winner: null, final: null, startAt: null, endedAt: null, roster: null,
-                      projectiles: null, meleeHits: null, hits: null, effects: null });
+                      st: null, shots: null, meleeHits: null, hits: null, effects: null, projectiles: null });
   }
   $("btnAgain").onclick = restart;
   var KEY_ON = { up: false, down: false, left: false, right: false, atk: false };
@@ -1864,6 +1899,8 @@
     if (!G) return;
     var t = now();
     syncRemote(dt);
+    stepShots(t);
+    pruneLocal(t);
     var active = st === "playing" && t >= room.startAt;
     if (active) {
       if (ME && ME.alive) {
