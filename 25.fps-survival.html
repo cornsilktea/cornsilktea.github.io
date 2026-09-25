@@ -482,6 +482,20 @@ camera.rotation.order = "YXZ";
 scene.add(camera);
 const viewModel = new THREE.Group();
 camera.add(viewModel);
+const VIEW_LAYER = 1;
+function putOnViewLayer(obj) { obj.traverse(o => o.layers.set(VIEW_LAYER)); }
+function renderView() {
+  camera.layers.set(0);
+  renderer.render(scene, camera);
+  if (!viewModel.visible) return;
+  const background = scene.background;
+  scene.background = null; renderer.autoClear = false; renderer.shadowMap.autoUpdate = false;
+  camera.layers.set(VIEW_LAYER);
+  renderer.clearDepth();
+  renderer.render(scene, camera);
+  camera.layers.set(0);
+  scene.background = background; renderer.autoClear = true; renderer.shadowMap.autoUpdate = true;
+}
 const hemi = new THREE.HemisphereLight(0x8C9BB8, 0x1A1C22, 0.7);
 scene.add(hemi);
 const moon = new THREE.DirectionalLight(0x9FB4D9, 0.5); moon.position.set(18, 30, 12); scene.add(moon);
@@ -667,7 +681,7 @@ function updateLamps(now) {
   });
 }
 const INDOOR_LOOK = {
-  inside:  { fog: [0x05070A, 4, 38], bg: 0x05070A, hemi: 0.1, moon: 0.06, ceiling: true },
+  inside:  { fog: [0x05070A, 4, 38], bg: 0x05070A, hemi: 0.1, moon: 0.5, ceiling: true },
   outside: { fog: [0x06080C, 60, 160], bg: 0x0E1522, hemi: 0.7, moon: 0.5, ceiling: false },
 };
 let indoorNow = null;
@@ -822,10 +836,10 @@ const gun = new THREE.Group();
   add(new THREE.BoxGeometry(0.04, 0.04, 0.06), dark, -0.075, 0.02, 0.05);
   const flash = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 8), new THREE.MeshBasicMaterial({ color: 0xFFE28A })); flash.position.set(0, 0.02, -1.12); flash.scale.set(1, 1, 1.8); flash.visible = false; gun.add(flash);
   gun.userData.flash = flash;
-  gun.position.set(0.2, -0.23, -0.24);
+  gun.position.set(0.19, -0.22, -0.17);
   viewModel.add(gun);
 }
-const RIFLE = { g: gun, base: [0.2, -0.23, -0.24], rate: () => PLAYER_CONFIG.fireRate, head: () => PLAYER_CONFIG.headDamage, body: () => PLAYER_CONFIG.bodyDamage };
+const RIFLE = { g: gun, base: [0.19, -0.22, -0.17], rate: () => PLAYER_CONFIG.fireRate, head: () => PLAYER_CONFIG.headDamage, body: () => PLAYER_CONFIG.bodyDamage };
 
 const MODEL_DIR = "img/fps/models/";
 const gltfLoader = THREE.GLTFLoader ? new THREE.GLTFLoader() : null;
@@ -898,7 +912,7 @@ function slide(p, dx, dz, r) {
   if (blocked(p.x, p.z, r)) { p.x = x0; p.z = z0; hit = true; }
   return hit;
 }
-const HELD_GUN = { reach: 1.75, side: -0.18, y0: 1.05, y1: 1.65, step: 0.1 };
+const HELD_GUN = { reach: 1.0, side: 0.05, y0: 1.05, y1: 1.65, step: 0.1 };
 function gunSolidAt(x, z) {
   if (Math.abs(x) > ARENA.hx || Math.abs(z) > ARENA.hz) return true;
   for (const b of RECTS) if (b.y0 < HELD_GUN.y1 && b.h > HELD_GUN.y0 && Math.abs(x - b.x) < b.w / 2 && Math.abs(z - b.z) < b.d / 2) return true;
@@ -924,6 +938,40 @@ function keepGunInsideWalls(p, x0, z0, yaw0, r) {
   }
   p.x = x0; p.z = z0;
   if (gunPokesThroughWall(p.x, p.z, p.yaw) && !gunPokesThroughWall(p.x, p.z, yaw0)) { p.yaw = yaw0; p.flip = 0; }
+}
+function pushSoldierOffWall(pos, yaw, r) {
+  if (!gunPokesThroughWall(pos.x, pos.z, yaw)) return;
+  const bx = Math.sin(yaw), bz = Math.cos(yaw);
+  for (let k = 0.05; k <= HELD_GUN.reach; k += 0.05) {
+    const x = pos.x + bx * k, z = pos.z + bz * k;
+    if (blocked(x, z, r)) return;
+    if (!gunPokesThroughWall(x, z, yaw)) { pos.x = x; pos.z = z; return; }
+  }
+}
+const SOLDIER_FALL = { x0: -0.7, x1: 1.15, z0: -2.75, z1: 0.3, step: 0.25, bodyTop: 1.0 };
+function fallSpotSolid(x, z) {
+  if (Math.abs(x) > ARENA.hx || Math.abs(z) > ARENA.hz) return true;
+  for (const b of RECTS) if (b.y0 < SOLDIER_FALL.bodyTop && Math.abs(x - b.x) < b.w / 2 && Math.abs(z - b.z) < b.d / 2) return true;
+  for (const c of CYLS) { const dx = x - c.x, dz = z - c.z; if (dx * dx + dz * dz < c.r * c.r) return true; }
+  return false;
+}
+function fallAreaHits(x, z, ry) {
+  const F = SOLDIER_FALL, cs = Math.cos(ry), sn = Math.sin(ry);
+  let hits = 0;
+  for (let lx = F.x0; lx <= F.x1 + 1e-6; lx += F.step)
+    for (let lz = F.z0; lz <= F.z1 + 1e-6; lz += F.step)
+      if (fallSpotSolid(x + lx * cs + lz * sn, z - lx * sn + lz * cs)) hits++;
+  return hits;
+}
+function turnFallAwayFromWalls(g) {
+  const ry0 = g.rotation.y;
+  let bestRy = ry0, bestHits = Infinity;
+  for (let i = 0; i < 16; i++) {
+    const turn = (i % 2 ? 1 : -1) * Math.ceil(i / 2), ry = ry0 + turn * Math.PI / 8, hits = fallAreaHits(g.position.x, g.position.z, ry);
+    if (hits < bestHits) { bestHits = hits; bestRy = ry; }
+    if (hits === 0) break;
+  }
+  g.rotation.y = bestRy;
 }
 function moveAroundObstacles(mover, pos, dx, dz, dt) {
   const x0 = pos.x, z0 = pos.z;
@@ -1070,7 +1118,17 @@ function equipViewRifle(template) {
   gun.userData.flash.position.set(at[0], at[1], at[2]);
   gun.add(body);
   gun.userData.model = body;
+  putOnViewLayer(gun);
 }
+const SOLDIER_FOOT_SHADOW = { size: 1.1, opacity: 0.5, y: 0.035 };
+const soldierFootShadowGeo = new THREE.PlaneGeometry(SOLDIER_FOOT_SHADOW.size, SOLDIER_FOOT_SHADOW.size);
+const soldierFootShadowMat = (() => {
+  const cv = document.createElement("canvas"); cv.width = cv.height = 64;
+  const c = cv.getContext("2d"), grad = c.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, "rgba(0,0,0,1)"); grad.addColorStop(0.5, "rgba(0,0,0,0.6)"); grad.addColorStop(1, "rgba(0,0,0,0)");
+  c.fillStyle = grad; c.fillRect(0, 0, 64, 64);
+  return new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, opacity: SOLDIER_FOOT_SHADOW.opacity, depthWrite: false });
+})();
 function dressSoldier(e) {
   if (!soldierTemplate || e.look) return;
   const uniformColor = new THREE.Color(e.baseCols[0]);
@@ -1092,6 +1150,9 @@ function dressSoldier(e) {
   });
   model.scale.setScalar(SOLDIER_SCALE);
   e.g.add(model);
+  const footShadow = new THREE.Mesh(soldierFootShadowGeo, soldierFootShadowMat);
+  footShadow.rotation.x = -Math.PI / 2; footShadow.position.y = SOLDIER_FOOT_SHADOW.y;
+  e.g.add(footShadow); e.footShadow = footShadow;
   const lookMats = [...cloned.values()];
   e.mats = lookMats; e.baseCols = lookMats.map(m => m.color.getHex());
   e.allMats = e.allMats.concat(lookMats);
@@ -1157,12 +1218,14 @@ function soldierDie(e) {
   if (!look || !look.acts.death) return false;
   look.dead = true; look.deathW = 0;
   look.acts.death.reset().play();
+  if (e.footShadow) e.footShadow.visible = false;
   return true;
 }
 function soldierRevive(e) {
   const look = e.look;
   if (!look) return;
   look.dead = false; look.deathW = 0; look.hitT = 99;
+  if (e.footShadow) e.footShadow.visible = true;
   if (look.acts.death) look.acts.death.stop();
   if (look.acts.hit) look.acts.hit.stop();
   look.px = e.g.position.x; look.pz = e.g.position.z; look.vx = look.vz = 0;
@@ -1209,6 +1272,7 @@ function killEnemy(e, head) {
   removeEnemy(e); enemyFlash(e, false);
   e.armR.rotation.x = -0.3; e.legR.rotation.x = e.legL.rotation.x = 0;
   const animated = soldierDie(e);
+  if (animated) turnFallAwayFromWalls(e.g);
   scene.add(e.g); corpses.push({ g: e.g, t: 0, head, animated, yaw0: e.g.rotation.y, spin: rnd(-0.6, 0.6), mats: e.allMats });
 }
 function updateCorpses(dt) {
@@ -1251,6 +1315,7 @@ function updateEnemy(e, dt) {
   const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml;
   const step = C.enemyMoveSpeed * dt;
   moveAroundObstacles(e, p, mx * step, mz * step, dt);
+  pushSoldierOffWall(p, Math.atan2(-nx, -nz), 0.4);
   e.g.rotation.y = Math.atan2(nx, nz);
   e.walk += dt * 9; const sw = Math.sin(e.walk) * 0.55;
   e.legR.rotation.x = sw; e.legL.rotation.x = -sw; e.g.position.y = Math.abs(Math.cos(e.walk)) * 0.04;
@@ -1361,7 +1426,9 @@ const muzzleGlowTexture = (() => {
   flash.material.transparent = true; flash.material.opacity = 0.85; flash.material.depthWrite = false;
   const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: muzzleGlowTexture, transparent: true, depthWrite: false }));
   glow.scale.set(size, size, 1); flash.add(glow);
+  putOnViewLayer(wg);
 });
+scene.traverse(o => { if (o.isLight) o.layers.enable(VIEW_LAYER); });
 let healthKitTemplate = null;
 loadModel("health.glb").then(gltf => { healthKitTemplate = finishModel(gltf.scene, false); }).catch(() => {});
 function itemMesh(kind) {
@@ -1948,7 +2015,7 @@ function removeEnt(id) {
 function killEnt(ent) {
   if (!ent.alive) return;
   ent.alive = false; ent.deadT = 0;
-  if (ent.s) { ent.s.armR.rotation.x = -0.3; ent.s.legR.rotation.x = ent.s.legL.rotation.x = 0; enemyFlash(ent.s, false); soldierDie(ent.s); }
+  if (ent.s) { ent.s.armR.rotation.x = -0.3; ent.s.legR.rotation.x = ent.s.legL.rotation.x = 0; enemyFlash(ent.s, false); if (soldierDie(ent.s)) turnFallAwayFromWalls(ent.s.g); }
 }
 function reviveEnt(ent) {
   ent.alive = true; ent.deadT = 0;
@@ -2216,6 +2283,7 @@ function updateBotSim(b, dt, t) {
   moveAroundObstacles(b, b, mx * C.enemyMoveSpeed * dt, mz * C.enemyMoveSpeed * dt, dt);
   b.moving = true;
   b.yaw = Math.atan2(-nx, -nz); b.pitch = Math.atan2(PLAYER_CONFIG.eyeHeight - 1.5, dist);
+  pushSoldierOffWall(b, b.yaw, 0.4);
   b.fire -= dt;
   if (tg && b.fire <= 0 && dist <= C.enemyFireRange && botCanSee(b, tx, tz)) {
     b.fire = C.enemyFireCooldownSec; b.shots++;
@@ -2334,7 +2402,7 @@ function showTeamResult() {
 function teamFrame(nowMs, dt) {
   if (T.screen !== "game" || !T.match || !T.startAt || T.startAt < T.match.startedFor) {
     setIndoor(false); overviewCamera(nowMs);
-    renderer.render(scene, camera);
+    renderView();
     return;
   }
   setIndoor(true);
@@ -2359,7 +2427,7 @@ function teamFrame(nowMs, dt) {
     T.net.t = nowMs; T.net.up = 0; T.net.down = 0;
   }
   if (T.screen !== "game") return;
-  if (T.spec) drawSpectator(t, nowMs); else renderer.render(scene, camera);
+  if (T.spec) drawSpectator(t, nowMs); else renderView();
 }
 
 function drawSpectator(t, nowMs) {
@@ -2521,7 +2589,7 @@ function loop(now) {
   } else overviewCamera(now);
   lastT = now;
   pruneTransient(now);
-  renderer.render(scene, camera);
+  renderView();
 }
 function resize() {
   const w = window.innerWidth, h = window.innerHeight;
