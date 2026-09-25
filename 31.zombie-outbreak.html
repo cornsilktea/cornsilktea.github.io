@@ -272,6 +272,7 @@
       <ul class="plist" id="lobbyList"></ul>
       <button type="button" class="btn primary" id="btnStart">게임 시작</button>
       <button type="button" class="btn primary" id="btnReady">준비하기</button>
+      <button type="button" class="btn" id="btnBots">🤖 빈 자리 AI로 채우기: 켜짐</button>
       <div class="msg ok" id="lobbyMsg"></div>
       <button type="button" class="btn" id="btnSpecToggle">관전자로 바꾸기</button>
       <button type="button" class="btn" id="btnLobbyLeave">방 나가기</button>
@@ -2417,8 +2418,11 @@ function readNickname() {
 const room = {
   code: null, ref: null, subs: [], leaving: false,
   players: {}, status: null, host: null, hostLoaded: false,
-  startAt: 0, originZombieId: null, final: null, winner: null
+  startAt: 0, originZombieId: null, final: null, winner: null, fillBots: true
 };
+function isBot(id) { const p = room.players[id]; return !!(p && p.bot); }
+function humanIdsOf(ps) { return okeys(ps || {}).filter(id => ps[id] && !ps[id].bot); }
+function botsWanted() { return room.fillBots !== false; }
 function sub(ref, ev, fn) { ref.on(ev, fn); room.subs.push([ref, ev, fn]); }
 function unsubAll() { room.subs.forEach(s => { try { s[0].off(s[1], s[2]); } catch (e) {} }); room.subs = []; }
 function isHost() { return !!room.ref && room.host === myId; }
@@ -2427,7 +2431,7 @@ function playerIds() { return okeys(room.players).filter(id => room.players[id])
 function roundIds() { return playerIds().filter(id => room.players[id].inRound); }
 function isSpectator(id) { const p = room.players[id]; return !!(p && p.spec); }
 function countSlots(ps) {
-  const ids = okeys(ps).filter(id => ps[id]);
+  const ids = humanIdsOf(ps);
   const spectators = ids.filter(id => ps[id].spec).length;
   return { players: ids.length - spectators, spectators };
 }
@@ -2439,7 +2443,7 @@ function sweepRooms() {
     const all = s.val() || {}, t = serverNow(), u = {};
     okeys(all).forEach(code => {
       const r = all[code] || {}, age = t - (r.createdAt || 0);
-      if ((!okeys(r.players).length && age > 60000) || (r.status === "ended" && t - (r.endedAt || 0) > 600000) || age > 6 * 3600000) u[code] = null;
+      if ((!humanIdsOf(r.players).length && age > 60000) || (r.status === "ended" && t - (r.endedAt || 0) > 600000) || age > 6 * 3600000) u[code] = null;
     });
     if (okeys(u).length) return db.ref(ROOM_ROOT).update(u);
   }).catch(() => {});
@@ -2453,7 +2457,7 @@ async function createRoom() {
     await sweepRooms();
     for (let n = 0; n < 8; n++) {
       const code = String(10000 + Math.floor(Math.random() * 90000)), t = serverNow();
-      const obj = { status: "lobby", hostPlayerId: myId, createdAt: t, players: { [myId]: newPlayer(t) } };
+      const obj = { status: "lobby", hostPlayerId: myId, createdAt: t, fillBots: true, players: { [myId]: newPlayer(t) } };
       const res = await db.ref(ROOM_ROOT + "/" + code).transaction(cur => cur === null ? obj : undefined);
       if (res.committed) { enterRoom(code); return; }
     }
@@ -2471,7 +2475,7 @@ async function joinRoom(asSpectator) {
   try {
     const ref = db.ref(ROOM_ROOT + "/" + code);
     const snap = await ref.once("value"), r = snap.val();
-    if (!r || !okeys(r.players).length) { startMsg("그런 방이 없습니다. 방 코드를 확인해 주세요."); return; }
+    if (!r || !humanIdsOf(r.players).length) { startMsg("그런 방이 없습니다. 방 코드를 확인해 주세요."); return; }
     const slots = countSlots(r.players);
     if (asSpectator && slots.spectators >= MAX_SPECTATORS) { startMsg("이 방에는 이미 관전자가 있습니다. (관전자 " + MAX_SPECTATORS + "명)"); return; }
     if (!asSpectator && slots.players >= MAX_PLAYERS) { startMsg("플레이어 자리가 가득 찼습니다. (최대 " + MAX_PLAYERS + "명)"); return; }
@@ -2496,6 +2500,7 @@ function enterRoom(code) {
   });
   sub(ref.child("hostPlayerId"), "value", s => { room.host = s.val(); room.hostLoaded = true; checkHost(); playersChanged(); });
   sub(ref.child("startAt"), "value", s => { room.startAt = s.val() || 0; });
+  sub(ref.child("fillBots"), "value", s => { room.fillBots = s.val() !== false; playersChanged(); });
   sub(ref.child("originZombieId"), "value", s => { room.originZombieId = s.val(); });
   sub(ref.child("final"), "value", s => { room.final = s.val(); if (screenNow === "result") renderResult(); });
   sub(ref.child("winner"), "value", s => { room.winner = s.val(); if (screenNow === "result") renderResult(); });
@@ -2506,7 +2511,7 @@ function enterRoom(code) {
   setText($("lobbyCode"), code);
   showScreen("lobby");
 }
-function nextHost(ps) { const joinOrder = byJoin(ps); return okeys(ps).filter(id => ps[id]).sort((a, b) => (!!ps[a].spec - !!ps[b].spec) || joinOrder(a, b))[0]; }
+function nextHost(ps) { const joinOrder = byJoin(ps); return humanIdsOf(ps).sort((a, b) => (!!ps[a].spec - !!ps[b].spec) || joinOrder(a, b))[0]; }
 function checkHost() {
   if (!room.ref || !room.hostLoaded || !room.players[myId]) return;
   if (room.host && room.players[room.host]) return;
@@ -2520,7 +2525,7 @@ function leaveRoom() {
   ref.child("st/" + myId).remove().catch(() => {});
   ref.child("players/" + myId).remove().then(() => ref.child("players").once("value")).then(s => {
     const ps = s.val() || {};
-    if (!okeys(ps).length) return ref.remove();
+    if (!humanIdsOf(ps).length) return ref.remove();
     return ref.child("hostPlayerId").once("value").then(h => {
       const hid = h.val();
       if (!hid || hid === myId || !ps[hid]) return ref.update({ hostPlayerId: nextHost(ps) });
@@ -2564,6 +2569,7 @@ function onStatus(st) {
   const prev = room.status; room.status = st;
   if (st === "lobby") {
     clearRound();
+    if (isHost()) removeBotPlayers();
     if (prev && prev !== "lobby" && !isHost() && room.players[myId] && room.players[myId].ready) room.ref.child("players/" + myId + "/ready").set(false);
     if (screenNow !== "result") showScreen("lobby"); else renderLobby();
   } else if (st === "playing") {
@@ -2585,10 +2591,20 @@ function playersChanged() {
   }, 0);
 }
 function watchesRound() { const p = room.players[myId]; return !!(p && (p.inRound || p.spec)); }
-function isReadyParticipant(id) { const p = room.players[id]; return !!p && !p.spec && (id === room.host || p.ready); }
+function isReadyParticipant(id) { const p = room.players[id]; return !!p && !p.spec && !p.bot && (id === room.host || p.ready); }
 function readyCount() { return playerIds().filter(isReadyParticipant).length; }
+function playersNeeded() { return botsWanted() ? 1 : MIN_PLAYERS; }
+function removeBotPlayers() {
+  const u = {};
+  playerIds().filter(isBot).forEach(id => { u["players/" + id] = null; u["st/" + id] = null; });
+  if (okeys(u).length) room.ref.update(u);
+}
+function toggleBots() {
+  if (!isHost() || room.status !== "lobby") return;
+  room.ref.child("fillBots").set(!botsWanted());
+}
 function renderLobby() {
-  const ids = playerIds(), slots = countSlots(room.players);
+  const ids = playerIds().filter(id => !isBot(id)), slots = countSlots(room.players);
   setText($("lobbyCount"), "플레이어 " + slots.players + " / " + MAX_PLAYERS + " · 관전자 " + slots.spectators + " / " + MAX_SPECTATORS);
   $("lobbyList").innerHTML = ids.map(id => {
     const p = room.players[id], host = id === room.host, ready = isReadyParticipant(id);
@@ -2599,8 +2615,11 @@ function renderLobby() {
   const host = isHost(), me = room.players[myId], mySpec = isSpectator(myId);
   const waitingRound = room.status === "playing" || room.status === "ended";
   show($("btnStart"), host); show($("btnReady"), !host && !mySpec);
-  const rc = readyCount();
-  $("btnStart").disabled = !(host && room.status === "lobby" && rc >= MIN_PLAYERS);
+  const rc = readyCount(), need = playersNeeded(), fill = botsWanted(), botSeats = fill ? MAX_PLAYERS - rc : 0;
+  $("btnStart").disabled = !(host && room.status === "lobby" && rc >= need);
+  show($("btnBots"), host);
+  $("btnBots").disabled = room.status !== "lobby";
+  setText($("btnBots"), "🤖 빈 자리 AI로 채우기: " + (fill ? "켜짐" : "꺼짐"));
   $("btnReady").disabled = room.status !== "lobby";
   setText($("btnReady"), me && me.ready ? "준비 취소" : "준비하기");
   const specBtn = $("btnSpecToggle");
@@ -2609,7 +2628,7 @@ function renderLobby() {
   let msg;
   if (room.status === "playing") msg = "게임이 진행 중입니다. 이번 판이 끝나면 함께할 수 있습니다.";
   else if (waitingRound) msg = "지난 판이 정리되는 중입니다. 잠시만 기다려 주세요.";
-  else if (host) msg = rc >= MIN_PLAYERS ? "준비된 " + rc + "명으로 시작할 수 있습니다. (Space 키로도 시작)" : "준비된 플레이어가 2명 이상이어야 시작할 수 있습니다.";
+  else if (host) msg = rc >= need ? "준비된 " + rc + "명" + (botSeats > 0 ? " + AI " + botSeats + "명" : "") + "으로 시작할 수 있습니다. (Space 키로도 시작)" : "준비된 플레이어가 " + need + "명 이상이어야 시작할 수 있습니다.";
   else if (mySpec) msg = "관전자로 들어왔습니다. 게임이 시작되면 플레이어들의 시점을 볼 수 있습니다.";
   else msg = me && me.ready ? "방장이 게임을 시작할 때까지 기다려 주세요." : "준비하기를 눌러 주세요. (Space 키로도 준비)";
   setText($("lobbyMsg"), msg);
@@ -2628,11 +2647,20 @@ function toggleSpectator() {
 function hostStart() {
   if (!isHost() || room.status !== "lobby") return;
   const participants = playerIds().filter(isReadyParticipant);
-  if (participants.length < MIN_PLAYERS) return;
-  const zombieId = participants[Math.floor(Math.random() * participants.length)];
-  const startAt = serverNow() + COUNTDOWN_MS;
-  const u = { status: "playing", startAt, endedAt: null, winner: null, final: null, originZombieId: zombieId, zombieIds: { [zombieId]: startAt } };
-  playerIds().forEach(id => {
+  if (participants.length < playersNeeded()) return;
+  const u = {};
+  playerIds().filter(isBot).forEach(id => { u["players/" + id] = null; u["st/" + id] = null; });
+  const t0 = serverNow(), botIds = [];
+  if (botsWanted()) for (let k = participants.length; k < MAX_PLAYERS; k++) botIds.push("bot" + (botIds.length + 1) + Math.random().toString(36).slice(2, 8));
+  const everyone = participants.concat(botIds);
+  const zombieId = everyone[Math.floor(Math.random() * everyone.length)];
+  const startAt = t0 + COUNTDOWN_MS;
+  Object.assign(u, { status: "playing", startAt, endedAt: null, winner: null, final: null, originZombieId: zombieId, zombieIds: { [zombieId]: startAt } });
+  botIds.forEach((id, k) => {
+    u["players/" + id] = { nickname: "AI" + (k + 1), ready: true, joinedAt: t0 + k + 1, role: id === zombieId ? "zombie" : "human", infected: false, inRound: true, spec: false, bot: true };
+  });
+  if (botIds.length) buildNav();
+  playerIds().filter(id => !isBot(id)).forEach(id => {
     const inRound = participants.includes(id);
     u["players/" + id + "/inRound"] = inRound;
     u["players/" + id + "/role"] = id === zombieId ? "zombie" : "human";
@@ -2790,7 +2818,7 @@ function pushFeed(text, involvesMe) {
 function fmtClock(ms) { const s = Math.max(0, Math.ceil(ms / 1000)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }
 
 function onRemoteState(id, str) {
-  if (id === myId) return;
+  if (id === myId || (isHost() && isBot(id))) return;
   const av = avatars[id]; if (!av || !round.active) return;
   const a = String(str).split(","); if (a.length < 5) return;
   const to = { x: +a[0], y: +a[1], z: +a[2], face: +a[3] * Math.PI / 180, motion: +a[4] };
@@ -2944,6 +2972,217 @@ function netTick(nowMs, t) {
   if (s === round.lastSent) return;
   round.lastSent = s;
   room.ref.child("st/" + myId).set(s);
+}
+
+const NAV_CELL = 0.5, NAV_FIELD_MS = 400, NAV_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+const BOT_AHEAD_STEPS = 4, BOT_PANIC_STEPS = 12, BOT_GOAL_SAMPLES = 80, BOT_REPLAN_MS = [3500, 7000], BOT_RETRY_MS = 600, BOT_CLOSE_M = 2.2;
+const BOT_ZOMBIE_SPEED_MULT = 0.92, BOT_DASH_RANGE = 7, BOT_STUCK_SEC = 0.6, BOT_SIDESTEP_SEC = 0.45;
+let nav = null;
+const bots = { key: 0, list: {}, fieldAt: 0, prey: null, danger: null, hasPrey: false, hasDanger: false };
+function buildNav() {
+  if (nav) return nav;
+  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+  for (const s of flatSurfaces.concat(ramps)) { x0 = Math.min(x0, s.x0); x1 = Math.max(x1, s.x1); z0 = Math.min(z0, s.z0); z1 = Math.max(z1, s.z1); }
+  const cols = Math.ceil((x1 - x0) / NAV_CELL), rows = Math.ceil((z1 - z0) / NAV_CELL), cells = cols * rows;
+  const first = new Int32Array(cells + 1), xs = [], ys = [], zs = [], cellOf = [], heights = [];
+  for (let c = 0; c < cells; c++) {
+    first[c] = ys.length;
+    const x = x0 + (c % cols + 0.5) * NAV_CELL, z = z0 + (Math.floor(c / cols) + 0.5) * NAV_CELL;
+    const hs = surfaceHeightsAt(x, z, heights).slice().sort((a, b) => a - b);
+    let prev = -Infinity;
+    for (const h of hs) {
+      if (h - prev < 0.1) continue;
+      prev = h;
+      if (!blockedAt(x, z, h)) { xs.push(x); ys.push(h); zs.push(z); cellOf.push(c); }
+    }
+  }
+  first[cells] = ys.length;
+  const n = ys.length, adj = new Int32Array(n * 8).fill(-1);
+  const landIn = (c, y) => { let best = -1, by = -Infinity; for (let k = first[c]; k < first[c + 1]; k++) if (ys[k] <= y + STEP_UP && ys[k] > by) { by = ys[k]; best = k; } return best; };
+  for (let i = 0; i < n; i++) {
+    const c = cellOf[i], ix = c % cols, iz = Math.floor(c / cols);
+    NAV_DIRS.forEach(([dx, dz], d) => {
+      const jx = ix + dx, jz = iz + dz;
+      if (jx < 0 || jz < 0 || jx >= cols || jz >= rows) return;
+      if (d >= 4 && (adj[i * 8 + (dx > 0 ? 0 : 1)] < 0 || adj[i * 8 + (dz > 0 ? 2 : 3)] < 0)) return;
+      adj[i * 8 + d] = landIn(jz * cols + jx, ys[i]);
+    });
+  }
+  nav = { x0, z0, cols, rows, first, n, adj, xs: Float32Array.from(xs), ys: Float32Array.from(ys), zs: Float32Array.from(zs), queue: new Int32Array(n) };
+  bots.prey = new Int32Array(n); bots.danger = new Int32Array(n);
+  return nav;
+}
+function navNodeAt(x, y, z) {
+  const cx = Math.floor((x - nav.x0) / NAV_CELL), cz = Math.floor((z - nav.z0) / NAV_CELL);
+  for (let r = 0; r <= 4; r++) {
+    let best = -1, bd = Infinity;
+    for (let jz = cz - r; jz <= cz + r; jz++) for (let jx = cx - r; jx <= cx + r; jx++) {
+      if (Math.max(Math.abs(jx - cx), Math.abs(jz - cz)) !== r || jx < 0 || jz < 0 || jx >= nav.cols || jz >= nav.rows) continue;
+      const c = jz * nav.cols + jx;
+      for (let k = nav.first[c]; k < nav.first[c + 1]; k++) {
+        const dy = nav.ys[k] - y;
+        if (dy > STEP_UP + 0.05 || dy < -1.2) continue;
+        const d = (nav.xs[k] - x) ** 2 + (nav.zs[k] - z) ** 2 + dy * dy * 4;
+        if (d < bd) { bd = d; best = k; }
+      }
+    }
+    if (best >= 0) return best;
+  }
+  return -1;
+}
+function navField(sources, out) {
+  out.fill(-1);
+  const q = nav.queue; let head = 0, tail = 0;
+  for (const s of sources) if (s >= 0 && out[s] < 0) { out[s] = 0; q[tail++] = s; }
+  while (head < tail) {
+    const i = q[head++], d = out[i] + 1;
+    for (let k = 0; k < 8; k++) { const j = nav.adj[i * 8 + k]; if (j >= 0 && out[j] < 0) { out[j] = d; q[tail++] = j; } }
+  }
+  return tail > 0;
+}
+function navFollow(from, field, uphill) {
+  let cur = from;
+  for (let s = 0; s < BOT_AHEAD_STEPS; s++) {
+    let best = -1, bv = field[cur];
+    for (let k = 0; k < 8; k++) {
+      const j = nav.adj[cur * 8 + k]; if (j < 0 || field[j] < 0) continue;
+      if (uphill ? field[j] > bv : field[j] < bv) { bv = field[j]; best = j; }
+    }
+    if (best < 0) break;
+    cur = best;
+  }
+  return cur;
+}
+function isZombieNow(id, t) { const p = room.players[id]; return (id === myId && round.myInfectedAt) || !!(p && p.role === "zombie"); }
+function refreshBotFields(t) {
+  const prey = [], danger = [];
+  for (const id of roundIds()) {
+    const av = avatars[id]; if (!av) continue;
+    const node = navNodeAt(av.pos.x, av.pos.y, av.pos.z);
+    (isZombieNow(id, t) ? danger : prey).push(node);
+  }
+  bots.hasPrey = navField(prey, bots.prey);
+  bots.hasDanger = navField(danger, bots.danger);
+}
+function newBotState(id) {
+  const av = avatars[id];
+  return { body: { x: av.pos.x, y: av.pos.y, z: av.pos.z, vy: 0 }, face: av.face, motion: MOTION.idle, lastNet: 0, lastSent: "", goal: -1, goalField: null, replanAt: 0, retryAt: 0,
+    dashReadyAt: 0, dashDir: null, dashStartMs: 0, dashProgress: 0, stuckT: 0, sideT: 0, sideSign: 1, infectSent: false };
+}
+function pickHideGoal(b, myNode) {
+  let best = -1, bs = -Infinity;
+  for (let k = 0; k < BOT_GOAL_SAMPLES; k++) {
+    const i = Math.floor(Math.random() * nav.n), d = bots.hasDanger ? bots.danger[i] : 100;
+    if (d < 0) continue;
+    const score = Math.min(d, 220) + Math.random() * 40;
+    if (score > bs) { bs = score; best = i; }
+  }
+  if (best < 0) return;
+  b.goalField = b.goalField || new Int32Array(nav.n);
+  navField([best], b.goalField);
+  b.goal = b.goalField[myNode] >= 0 ? best : -1;
+}
+function nearestOther(b, id, t, wantZombie) {
+  let best = null, bd = Infinity;
+  for (const other of roundIds()) {
+    if (other === id || isZombieNow(other, t) !== wantZombie) continue;
+    const av = avatars[other]; if (!av || Math.abs(av.pos.y - b.body.y) > INFECT_HEIGHT_GAP) continue;
+    const d = Math.hypot(av.pos.x - b.body.x, av.pos.z - b.body.z);
+    if (d < bd) { bd = d; best = av; }
+  }
+  return best ? { av: best, d: bd } : null;
+}
+function botMoveToward(b, tx, tz, speed, dt) {
+  let dx = tx - b.body.x, dz = tz - b.body.z;
+  const len = Math.hypot(dx, dz);
+  if (len < 0.05) return false;
+  dx /= len; dz /= len;
+  if (b.sideT > 0) { b.sideT -= dt; const sx = -dz * b.sideSign, sz = dx * b.sideSign; dx = dx * 0.3 + sx; dz = dz * 0.3 + sz; const l = Math.hypot(dx, dz); dx /= l; dz /= l; }
+  const step = Math.min(len, speed * dt), px = b.body.x, pz = b.body.z;
+  moveWithCollision(b.body, dx * step, dz * step);
+  const moved = Math.hypot(b.body.x - px, b.body.z - pz);
+  if (moved < step * 0.35) { b.stuckT += dt; if (b.stuckT > BOT_STUCK_SEC) { b.stuckT = 0; b.sideT = BOT_SIDESTEP_SEC; b.sideSign = Math.random() < 0.5 ? -1 : 1; b.goal = -1; } }
+  else b.stuckT = Math.max(0, b.stuckT - dt);
+  if (moved > 1e-3) b.face = lerpAngle(b.face, Math.atan2(b.body.x - px, b.body.z - pz), clamp(dt * 14, 0, 1));
+  return moved > 1e-3;
+}
+function stepBot(id, b, dt, t, nowMs) {
+  const zombie = zombieFormActive(id, t), frozen = isFrozen(id, t), countdown = t < room.startAt;
+  const rush = room.startAt + ROUND_MS - t <= FINAL_RUSH_MS, held = isOriginZombie(id) && t < room.startAt + ZOMBIE_HOLD_MS;
+  let motion = MOTION.idle;
+  if (!frozen && !countdown && !(zombie && held)) {
+    const node = navNodeAt(b.body.x, b.body.y, b.body.z);
+    if (b.dashDir) {
+      const progress = clamp((nowMs - b.dashStartMs) / DASH_MS, 0, 1), step = (progress - b.dashProgress) * DASH_DISTANCE;
+      b.dashProgress = progress;
+      moveWithCollision(b.body, b.dashDir.x * step, b.dashDir.z * step);
+      b.face = Math.atan2(b.dashDir.x, b.dashDir.z); motion = MOTION.dash;
+      if (progress >= 1) b.dashDir = null;
+    } else if (zombie) {
+      const speed = ZOMBIE_SPEED * (rush ? RUSH_SPEED_MULT : 1) * BOT_ZOMBIE_SPEED_MULT, prey = nearestOther(b, id, t, false);
+      if (prey && isOriginZombie(id) && prey.d < BOT_DASH_RANGE && nowMs >= b.dashReadyAt) {
+        b.dashReadyAt = nowMs + (rush ? DASH_COOLDOWN_RUSH_MS : DASH_COOLDOWN_MS);
+        b.dashDir = { x: (prey.av.pos.x - b.body.x) / prey.d, z: (prey.av.pos.z - b.body.z) / prey.d }; b.dashStartMs = nowMs; b.dashProgress = 0;
+        motion = MOTION.dash;
+      } else if (prey && prey.d < BOT_CLOSE_M) { if (botMoveToward(b, prey.av.pos.x, prey.av.pos.z, speed, dt)) motion = MOTION.run; }
+      else if (node >= 0 && bots.hasPrey && bots.prey[node] > 0) {
+        const to = navFollow(node, bots.prey, false);
+        if (botMoveToward(b, nav.xs[to], nav.zs[to], speed, dt)) motion = MOTION.run;
+      }
+    } else if (node >= 0) {
+      const panic = bots.hasDanger && bots.danger[node] >= 0 && bots.danger[node] < BOT_PANIC_STEPS;
+      const goalSpoiled = b.goal < 0 || b.goalField[node] <= 1 || (bots.hasDanger && bots.danger[b.goal] < BOT_PANIC_STEPS * 2);
+      if (!panic && nowMs > b.retryAt && (goalSpoiled || nowMs > b.replanAt)) {
+        pickHideGoal(b, node); b.replanAt = nowMs + randomBetween(BOT_REPLAN_MS); b.retryAt = nowMs + BOT_RETRY_MS;
+      }
+      let to = -1;
+      if (panic) to = navFollow(node, bots.danger, true);
+      else if (b.goal >= 0 && b.goalField[node] > 1) to = navFollow(node, b.goalField, false);
+      if (to >= 0 && to !== node && botMoveToward(b, nav.xs[to], nav.zs[to], HUMAN_SPEED, dt)) motion = MOTION.run;
+    }
+  }
+  if (zombie && held) {
+    const dx = b.body.x - SPAWN.x, dz = b.body.z - SPAWN.z, d = Math.hypot(dx, dz);
+    if (d > HOLD_RADIUS - PLAYER_RADIUS) { const s = (HOLD_RADIUS - PLAYER_RADIUS) / d; b.body.x = SPAWN.x + dx * s; b.body.z = SPAWN.z + dz * s; }
+  }
+  applyGravity(b.body, dt);
+  b.motion = motion;
+}
+function checkBotInfection(id, b, t) {
+  if (b.infectSent || t < room.startAt + ZOMBIE_HOLD_MS || isZombieNow(id, t)) return;
+  for (const other in avatars) {
+    if (other === id || !zombieFormActive(other, t) || isFrozen(other, t)) continue;
+    const z = avatars[other];
+    if (Math.abs(z.pos.y - b.body.y) > INFECT_HEIGHT_GAP) continue;
+    if (distToSegment2D(b.body.x, b.body.z, z.prevPos.x, z.prevPos.z, z.pos.x, z.pos.z) >= INFECT_RADIUS) continue;
+    b.infectSent = true;
+    room.ref.update({
+      ["players/" + id + "/infected"]: true, ["players/" + id + "/infectedAt"]: t, ["players/" + id + "/infectedBy"]: other,
+      ["players/" + id + "/role"]: "zombie", ["zombieIds/" + id]: t
+    });
+    return;
+  }
+}
+function botsTick(dt, t, nowMs) {
+  if (!isHost() || !round.active || room.status !== "playing") return;
+  const ids = roundIds().filter(id => isBot(id) && avatars[id]);
+  if (!ids.length) return;
+  buildNav();
+  if (bots.key !== round.key) { bots.key = round.key; bots.list = {}; bots.fieldAt = 0; }
+  if (nowMs - bots.fieldAt > NAV_FIELD_MS) { bots.fieldAt = nowMs; refreshBotFields(t); }
+  for (const id of ids) {
+    const b = bots.list[id] || (bots.list[id] = newBotState(id));
+    stepBot(id, b, dt, t, nowMs);
+    checkBotInfection(id, b, t);
+    const av = avatars[id], pose = { x: b.body.x, y: b.body.y, z: b.body.z, face: b.face };
+    av.netFrom = pose; av.netTo = pose; av.netT0 = nowMs; av.remoteMotion = b.motion;
+    if (nowMs - b.lastNet < NET_MS && b.motion !== MOTION.dash) continue;
+    b.lastNet = nowMs;
+    const s = b.body.x.toFixed(2) + "," + b.body.y.toFixed(2) + "," + b.body.z.toFixed(2) + "," + (Math.round(b.face * 180 / Math.PI) % 360) + "," + b.motion;
+    if (s === b.lastSent) continue;
+    b.lastSent = s;
+    room.ref.child("st/" + id).set(s);
+  }
 }
 
 const camPivot = new THREE.Vector3(), camWanted = new THREE.Vector3(), camLook = new THREE.Vector3();
@@ -3330,6 +3569,7 @@ function frame(nowMs) {
     setViewDistance(GAME_VIEW.near * viewScale, fogEnd, clipAtFog ? Math.ceil(fogEnd + 2) : GAME_VIEW.cameraFar);
     if (round.iAmIn) updateLocalPlayer(dt, t, nowMs);
     updateRemotePlayers(dt, t, nowMs);
+    botsTick(dt, t, nowMs);
     roundEvents(t);
     netTick(nowMs, t);
     checkRoundEnd(t);
@@ -3337,7 +3577,7 @@ function frame(nowMs) {
     else updateSpectatorCamera(dt, nowMs);
     updateHud(t, nowMs);
   } else {
-    if (room.status === "playing" && round.active) { updateRemotePlayers(dt, t, nowMs); checkRoundEnd(t); }
+    if (room.status === "playing" && round.active) { updateRemotePlayers(dt, t, nowMs); botsTick(dt, t, nowMs); checkRoundEnd(t); }
     updateTour(nowMs);
   }
   updateFlicker(nowMs);
@@ -3360,6 +3600,7 @@ $("btnSpecToggle").onclick = blurAfter(toggleSpectator);
 $("nickInput").addEventListener("keydown", e => { if (e.key === "Enter") e.currentTarget.blur(); });
 $("btnStart").onclick = blurAfter(hostStart);
 $("btnReady").onclick = blurAfter(toggleReady);
+$("btnBots").onclick = blurAfter(toggleBots);
 $("btnLobbyLeave").onclick = blurAfter(leaveRoom);
 $("btnAgain").onclick = blurAfter(playAgain);
 $("btnResultLeave").onclick = blurAfter(leaveRoom);
