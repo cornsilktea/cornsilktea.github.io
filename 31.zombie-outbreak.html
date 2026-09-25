@@ -1,0 +1,1797 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<script charset="utf-8" src="firebase-config.js"></script>
+<script charset="utf-8" src="access-guard.js" data-game="zombieoutbreak"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>미드나잇 좀비 아웃브레이크</title>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="정보 수업용 링크 모음">
+<meta property="og:title" content="미드나잇 좀비 아웃브레이크">
+<meta property="og:description" content="한밤중 3층 학교에서 2~5명이 방 코드로 모여 하는 3D 좀비 술래잡기 / 좀비 1명이 15초 뒤 출발, 닿으면 감염되어 좀비로 변신 / 3분 동안 살아남으면 인간 승리 (WASD 이동·방향키 시점·Q 뒤돌기·스페이스 대쉬)">
+<meta property="og:url" content="https://cornsilktea.github.io/31.zombie-outbreak.html">
+<meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="theme.css">
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"
+} }
+</script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  [hidden] { display: none !important; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #070b18; font-family: var(--sg-font); color: var(--sg-ink); }
+  button { font-family: inherit; cursor: pointer; }
+  #scene { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: block; }
+
+  .screen { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 30; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 54px 16px 24px; background: var(--sg-bg); }
+  .wrap { width: 100%; max-width: 640px; margin: 0 auto; }
+  .card { background: var(--sg-panel); border: 1px solid var(--sg-line-mid); border-radius: 8px; padding: 22px 20px; margin-bottom: 14px; }
+  h1 { font-size: 28px; font-weight: 800; text-align: center; margin-bottom: 6px; line-height: 1.3; }
+  h2 { font-size: 20px; font-weight: 800; margin-bottom: 12px; }
+  .sub { text-align: center; color: var(--sg-ink-soft); font-size: 16px; line-height: 1.6; margin-bottom: 4px; }
+  .label { display: block; font-size: 16px; font-weight: 700; color: var(--sg-ink-mid); margin-bottom: 8px; }
+  .btn { display: block; width: 100%; height: 54px; font-size: 18px; font-weight: 800; border-radius: 6px; border: 2px solid var(--sg-line-strong); background: var(--sg-panel); color: var(--sg-ink); margin-top: 10px; }
+  .btn.primary { background: var(--sg-primary); color: var(--sg-primary-ink); border-color: var(--sg-primary); }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .field { display: flex; gap: 8px; }
+  .field input { flex: 1; min-width: 0; height: 54px; font: inherit; font-size: 18px; font-weight: 700; padding: 0 14px; border: 2px solid var(--sg-line-strong); border-radius: 6px; background: #fff; color: var(--sg-ink); }
+  .field input.codeIn { font-size: 24px; letter-spacing: 6px; text-align: center; }
+  .field .btn { width: auto; flex: 0 0 auto; padding: 0 22px; margin-top: 0; }
+  .gap { height: 16px; }
+  .msg { min-height: 22px; margin-top: 10px; text-align: center; font-size: 16px; font-weight: 700; color: var(--sg-danger); }
+  .msg.ok { color: var(--sg-ink-soft); }
+  .keys { display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; font-size: 16px; line-height: 1.5; align-items: center; }
+  kbd { display: inline-block; min-width: 30px; padding: 2px 8px; border: 1px solid var(--sg-line-strong); border-bottom-width: 3px; border-radius: 4px; background: var(--sg-panel-alt); font-family: inherit; font-size: 14px; font-weight: 800; text-align: center; }
+  .rules { font-size: 16px; line-height: 1.7; color: var(--sg-ink-mid); padding-left: 20px; }
+  .bestLine { text-align: center; font-size: 16px; font-weight: 700; color: var(--sg-warn); margin-top: 8px; }
+
+  .codeBar { display: flex; align-items: baseline; justify-content: center; gap: 14px; flex-wrap: wrap; }
+  .codeLab { font-size: 16px; font-weight: 700; color: var(--sg-ink-soft); }
+  .codeNum { font-size: 56px; font-weight: 800; letter-spacing: 8px; color: var(--sg-primary); line-height: 1; }
+  .plist { list-style: none; }
+  .plist li { display: flex; align-items: center; gap: 10px; min-height: 50px; padding: 8px 12px; border: 1px solid var(--sg-line-mid); border-radius: 6px; margin-bottom: 8px; font-size: 18px; font-weight: 700; }
+  .plist li.me { border-color: var(--sg-primary); background: var(--sg-primary-soft); }
+  .plist .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 14px; font-weight: 800; background: var(--sg-panel-alt); color: var(--sg-ink-soft); white-space: nowrap; }
+  .badge.host { background: #D97B4F; color: #fff; }
+  .badge.ready { background: var(--sg-primary); color: #fff; }
+  .badge.zombie { background: var(--sg-danger); color: #fff; }
+  .badge.alive { background: var(--sg-ok); color: #fff; }
+  .row2 { display: flex; gap: 10px; }
+  .row2 .btn { flex: 1 1 0; }
+
+  .winner { text-align: center; font-size: 30px; font-weight: 800; margin-bottom: 6px; }
+  .winner.human { color: var(--sg-ok); }
+  .winner.zombie { color: var(--sg-danger); }
+  table.res { width: 100%; border-collapse: collapse; font-size: 17px; }
+  table.res th { text-align: left; font-size: 14px; color: var(--sg-ink-soft); font-weight: 700; padding: 6px 8px; border-bottom: 2px solid var(--sg-line-mid); }
+  table.res td { padding: 10px 8px; border-bottom: 1px solid var(--sg-line); font-weight: 700; }
+  table.res tr.me td { background: var(--sg-primary-soft); }
+  table.res td.num { font-variant-numeric: tabular-nums; text-align: right; }
+  table.res th.num { text-align: right; }
+  .newBest { text-align: center; margin-top: 14px; font-size: 20px; font-weight: 800; color: #D97B4F; }
+  .myRec { text-align: center; margin-top: 10px; font-size: 16px; font-weight: 700; color: var(--sg-ink-mid); }
+
+  #loading { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; padding: 10px 16px; text-align: center; font-size: 15px; font-weight: 700; background: var(--sg-primary); color: #fff; }
+
+  #vignette { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 15; pointer-events: none; box-shadow: inset 0 0 16vmin 2vmin rgba(0, 0, 0, .28); transition: box-shadow .8s ease; }
+  #vignette.zombie { box-shadow: inset 0 0 18vmin 3vmin rgba(200, 24, 36, .5); }
+  #vignette.flash { animation: vignetteFlash 1.6s ease-out; }
+  @keyframes vignetteFlash {
+    0% { box-shadow: inset 0 0 45vmin 16vmin rgba(255, 30, 40, .95); }
+    100% { box-shadow: inset 0 0 18vmin 3vmin rgba(200, 24, 36, .5); }
+  }
+  #speedLines { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 14; pointer-events: none; opacity: 0;
+    background: repeating-conic-gradient(from 0deg at 50% 50%, rgba(255, 255, 255, 0) 0deg 3deg, rgba(255, 220, 220, .35) 3deg 3.6deg);
+    -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent 30%, #000 72%);
+    mask-image: radial-gradient(circle at 50% 50%, transparent 30%, #000 72%); }
+
+  #hud { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 20; pointer-events: none; color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, .7); }
+  #topbar { position: absolute; top: 0; left: 0; right: 0; padding: calc(env(safe-area-inset-top, 0px) + 8px) 12px 30px;
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
+    background: linear-gradient(to bottom, rgba(4, 7, 18, .7), rgba(4, 7, 18, 0)); }
+  #roleBox { margin-top: 40px; min-width: 130px; }
+  .hudLab { font-size: 11px; font-weight: 700; letter-spacing: .12em; color: #C9D3E6; }
+  #roleLine { display: flex; align-items: center; gap: 8px; margin: 3px 0 4px; }
+  #roleIcon { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 17px; background: #DCE6D6; text-shadow: none; box-shadow: 0 1px 3px rgba(0, 0, 0, .4); }
+  #roleIcon.zombie { background: #C8323C; }
+  #roleText { font-size: 26px; font-weight: 800; }
+  #roleSub { font-size: 13px; font-weight: 700; color: #E4E9F2; max-width: 44vw; }
+  #timerBox { position: absolute; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 8px); transform: translateX(-50%); text-align: center; }
+  #timer { font-size: 38px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.05; }
+  #timer.danger { color: #FF6B6B; }
+  #aliveLine { font-size: 13px; font-weight: 700; color: #E4E9F2; }
+  #bestBox { text-align: right; margin-top: 40px; }
+  #hBest { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  #centerMsg { position: absolute; left: 50%; top: 30%; transform: translate(-50%, -50%); width: 92vw; text-align: center; font-size: clamp(24px, 4.2vw, 44px); font-weight: 800; line-height: 1.3; }
+  #centerMsg small { display: block; font-size: .5em; font-weight: 700; margin-top: 6px; color: #F1F4FA; }
+  #centerMsg.red { color: #FF6B6B; }
+  #feed { position: absolute; right: 12px; top: 120px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  #feed div { padding: 5px 10px; border-radius: 4px; background: rgba(8, 10, 22, .6); font-size: 14px; font-weight: 700; text-shadow: none; }
+  #dashBox { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 26px); transform: translateX(-50%); width: min(300px, 70vw); text-align: center; }
+  #dashLab { font-size: 14px; font-weight: 800; margin-bottom: 5px; }
+  #dashBar { height: 14px; border-radius: 7px; background: rgba(255, 255, 255, .22); overflow: hidden; box-shadow: 0 1px 3px rgba(0, 0, 0, .4); }
+  #dashFill { height: 100%; width: 100%; border-radius: 7px; background: #D97B4F; }
+  #dashFill.ready { background: #FF5A5A; }
+  #keyHint { position: absolute; left: 12px; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); font-size: 12px; font-weight: 700; color: #D5DCEA; line-height: 1.6; }
+  #btnGameLeave { pointer-events: auto; position: absolute; right: 12px; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); height: 36px; padding: 0 14px; font-size: 14px; font-weight: 800; border-radius: 4px; border: 1px solid rgba(255, 255, 255, .5); background: rgba(8, 10, 22, .55); color: #fff; }
+  @media (max-width: 640px) {
+    #timer { font-size: 30px; }
+    #roleText { font-size: 20px; }
+    #keyHint { display: none; }
+    .codeNum { font-size: 44px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+<div id="speedLines"></div>
+<div id="vignette"></div>
+
+<div id="hud" hidden>
+  <div id="topbar">
+    <div id="roleBox">
+      <div class="hudLab">내 역할</div>
+      <div id="roleLine"><div id="roleIcon">🧑</div><div id="roleText">인간</div></div>
+      <div id="roleSub"></div>
+    </div>
+    <div id="bestBox">
+      <div class="hudLab">개인 최고 기록</div>
+      <div id="hBest">-</div>
+    </div>
+  </div>
+  <div id="timerBox">
+    <div class="hudLab">남은 시간</div>
+    <div id="timer">3:00</div>
+    <div id="aliveLine"></div>
+  </div>
+  <div id="centerMsg"></div>
+  <div id="feed"></div>
+  <div id="dashBox" hidden>
+    <div id="dashLab">대쉬 준비 완료 [Space]</div>
+    <div id="dashBar"><div id="dashFill"></div></div>
+  </div>
+  <div id="keyHint">WASD 이동 · ←→ 시점 회전 · ↑↓ 시점 높이 · Q 뒤돌기 · Space 대쉬(좀비)</div>
+  <button type="button" id="btnGameLeave">나가기</button>
+</div>
+
+<section id="scrStart" class="screen">
+  <div class="wrap">
+    <div class="card">
+      <h1>미드나잇 좀비 아웃브레이크</h1>
+      <p class="sub">불 꺼진 한밤중의 학교에서 3분 동안 좀비를 피해 살아남으세요.</p>
+      <p class="bestLine" id="startBest"></p>
+    </div>
+    <div class="card">
+      <label class="label" for="nickInput">닉네임</label>
+      <div class="field"><input id="nickInput" maxlength="8" placeholder="닉네임을 입력해 주세요" autocomplete="off"></div>
+      <button type="button" class="btn primary" id="btnCreate">방 만들기</button>
+      <div class="gap"></div>
+      <label class="label" for="joinCode">방 코드로 입장</label>
+      <div class="field">
+        <input id="joinCode" class="codeIn" inputmode="numeric" maxlength="5" placeholder="12345" autocomplete="off">
+        <button type="button" class="btn primary" id="btnJoin">입장</button>
+      </div>
+      <div class="msg" id="startMsg"></div>
+    </div>
+    <div class="card">
+      <h2>조작 방법</h2>
+      <div class="keys">
+        <span><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd></span><span>앞·왼쪽·뒤·오른쪽으로 달립니다.</span>
+        <span><kbd>←</kbd> <kbd>→</kbd></span><span>카메라를 좌우로 돌립니다.</span>
+        <span><kbd>↑</kbd> <kbd>↓</kbd></span><span>카메라 높이(각도)를 바꿉니다.</span>
+        <span><kbd>Q</kbd></span><span>뒤로 돌아섭니다.</span>
+        <span><kbd>Space</kbd></span><span>좀비일 때 바라보는 방향으로 대쉬합니다.</span>
+      </div>
+    </div>
+    <div class="card">
+      <h2>규칙</h2>
+      <ul class="rules">
+        <li>2~5명이 방 코드로 모이고, 방장이 시작하면 한 명이 무작위로 좀비가 됩니다.</li>
+        <li>좀비는 중앙현관에서 15초 동안 기다린 뒤 출발합니다.</li>
+        <li>좀비에게 닿으면 2초 동안 굳은 뒤 좀비로 변합니다.</li>
+        <li>1분마다 학교 종이 울리고, 마지막 30초에는 좀비가 더 빨라집니다.</li>
+        <li>3분 동안 한 명이라도 살아남으면 인간 승리, 모두 감염되면 좀비 승리입니다.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="scrLobby" class="screen" hidden>
+  <div class="wrap">
+    <div class="card">
+      <div class="codeBar"><span class="codeLab">방 코드</span><span class="codeNum" id="lobbyCode">-----</span></div>
+      <p class="sub" style="margin-top:10px">친구들에게 방 코드를 알려 주세요. (최대 5명)</p>
+    </div>
+    <div class="card">
+      <h2 id="lobbyCount">참가자</h2>
+      <ul class="plist" id="lobbyList"></ul>
+      <button type="button" class="btn primary" id="btnStart">게임 시작</button>
+      <button type="button" class="btn primary" id="btnReady">준비하기</button>
+      <div class="msg ok" id="lobbyMsg"></div>
+      <button type="button" class="btn" id="btnLobbyLeave">방 나가기</button>
+    </div>
+  </div>
+</section>
+
+<section id="scrResult" class="screen" hidden>
+  <div class="wrap">
+    <div class="card">
+      <div class="winner" id="resWinner"></div>
+      <p class="sub" id="resSub"></p>
+    </div>
+    <div class="card">
+      <table class="res">
+        <thead><tr><th>닉네임</th><th>결과</th><th class="num">생존 시간</th></tr></thead>
+        <tbody id="resBody"></tbody>
+      </table>
+      <div class="newBest" id="resNewBest" hidden>개인 최고 기록 갱신!</div>
+      <div class="myRec" id="resMine"></div>
+    </div>
+    <div class="card">
+      <button type="button" class="btn primary" id="btnAgain">다시하기 (Space)</button>
+      <button type="button" class="btn" id="btnResultLeave">방 나가기</button>
+    </div>
+  </div>
+</section>
+
+<div id="loading">3D 학교를 준비하는 중입니다…</div>
+
+<script>
+(async () => {
+"use strict";
+
+const $ = id => document.getElementById(id);
+const setText = (el, s) => { s = String(s); if (el.textContent !== s) el.textContent = s; };
+const show = (el, on) => { el.hidden = !on; };
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const okeys = o => Object.keys(o || {});
+const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+const ROUND_MS = 180000, COUNTDOWN_MS = 3000, ZOMBIE_HOLD_MS = 15000, FINAL_RUSH_MS = 30000;
+const INFECT_INJURE_MS = 700, INFECT_FALL_MS = 1600, INFECT_STANDUP_MS = 2400, STANDUP_SKIP_SEC = 1.0;
+const INFECT_ZOMBIE_MODEL_MS = INFECT_INJURE_MS + INFECT_FALL_MS, INFECT_TOTAL_MS = INFECT_ZOMBIE_MODEL_MS + INFECT_STANDUP_MS;
+const BELL_ELAPSED_MS = [60000, 120000];
+const HUMAN_SPEED = 5.2, ZOMBIE_SPEED = 5.0, RUSH_SPEED_MULT = 1.5;
+const DASH_MS = 170, DASH_DISTANCE = 8.5, DASH_COOLDOWN_MS = 5000, DASH_COOLDOWN_RUSH_MS = 2000;
+const INFECT_RADIUS = 1.05, INFECT_HEIGHT_GAP = 1.5;
+const TURN_SPEED = 3.6, PITCH_SPEED = 1.5, QUICK_TURN_MS = 150;
+const NET_MS = 100, REMOTE_LERP_MS = 120;
+const MAX_PLAYERS = 5, MIN_PLAYERS = 2;
+const ROOM_ROOT = "zombieoutbreak/rooms";
+const NICK_KEY = "zombieoutbreak_nick", BEST_KEY = "zombieoutbreak_best_v1";
+const MODEL_DIR = "img/zombie/";
+const FLOOR_H = 4, PLAYER_RADIUS = 0.35, STEP_UP = 0.55, BODY_H = 1.75, GRAVITY = 22;
+const SPAWN = { x: 0, z: -9 }, HOLD_RADIUS = 6;
+const CAM_DIST = 3.4, CAM_SHOULDER = 0.45, CAM_PIVOT_H = 1.55, BASE_FOV = 70, DASH_FOV = 92;
+const MAX_PIXEL_RATIO = 1.5, MIN_PIXEL_RATIO = 1.0;
+const MOTION = { idle: 0, run: 1, back: 2, dash: 5, injure: 6, fall: 7, standup: 8 };
+
+const loadingEl = $("loading");
+let THREE, GLTFLoader, SkeletonUtils;
+try {
+  THREE = await import("three");
+  ({ GLTFLoader } = await import("three/addons/loaders/GLTFLoader.js"));
+  SkeletonUtils = await import("three/addons/utils/SkeletonUtils.js");
+} catch (e) {
+  setText(loadingEl, "3D 화면을 불러오지 못했습니다. 인터넷 연결을 확인한 뒤 새로고침해 주세요.");
+  return;
+}
+
+let bestSeconds = 0;
+try { bestSeconds = +localStorage.getItem(BEST_KEY) || 0; } catch (e) {}
+function saveBest(v) { bestSeconds = v; try { localStorage.setItem(BEST_KEY, String(v)); } catch (e) {} }
+function bestText() { return bestSeconds > 0 ? bestSeconds + "초" : "기록 없음"; }
+function renderStartBest() { setText($("startBest"), "개인 최고 생존 기록: " + bestText()); }
+renderStartBest();
+
+let audioCtx = null, masterGain = null, noiseBuffer = null;
+function audioInit() {
+  if (!audioCtx) {
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      masterGain = audioCtx.createGain(); masterGain.gain.value = 0.6; masterGain.connect(audioCtx.destination);
+      noiseBuffer = audioCtx.createBuffer(1, audioCtx.sampleRate, audioCtx.sampleRate);
+      const d = noiseBuffer.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    } catch (e) { audioCtx = null; }
+  }
+  if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+}
+function envelope(gainNode, start, peak, attack, dur) {
+  const g = gainNode.gain;
+  g.setValueAtTime(0.0001, start);
+  g.linearRampToValueAtTime(peak, start + attack);
+  g.exponentialRampToValueAtTime(0.0001, start + dur);
+}
+function playTone(freq, delay, dur, type, peak, endFreq, filterFreq) {
+  if (!audioCtx) return;
+  const start = audioCtx.currentTime + delay;
+  const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+  osc.type = type; osc.frequency.setValueAtTime(freq, start);
+  if (endFreq) osc.frequency.exponentialRampToValueAtTime(endFreq, start + dur);
+  envelope(gain, start, peak, 0.008, dur);
+  let tail = osc;
+  if (filterFreq) { const f = audioCtx.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = filterFreq; osc.connect(f); tail = f; }
+  tail.connect(gain); gain.connect(masterGain);
+  osc.start(start); osc.stop(start + dur + 0.05);
+}
+function playNoise(delay, dur, filterType, freqFrom, freqTo, peak) {
+  if (!audioCtx) return;
+  const start = audioCtx.currentTime + delay;
+  const src = audioCtx.createBufferSource(); src.buffer = noiseBuffer;
+  const filter = audioCtx.createBiquadFilter(); filter.type = filterType; filter.Q.value = 1.2;
+  filter.frequency.setValueAtTime(freqFrom, start); filter.frequency.exponentialRampToValueAtTime(freqTo, start + dur);
+  const gain = audioCtx.createGain(); envelope(gain, start, peak, 0.01, dur);
+  src.connect(filter); filter.connect(gain); gain.connect(masterGain);
+  src.start(start); src.stop(start + dur + 0.05);
+}
+function strikeBell(delay) {
+  const base = 1175;
+  [[1, 0.42, 1.5], [2.32, 0.22, 0.9], [4.25, 0.12, 0.55], [6.63, 0.06, 0.3], [0.5, 0.1, 1.2]].forEach(([ratio, peak, dur]) => playTone(base * ratio, delay, dur, "sine", peak));
+  playNoise(delay, 0.04, "highpass", 4000, 6000, 0.25);
+}
+function ringSchoolBell() { for (let i = 0; i < 5; i++) strikeBell(i * 0.36); }
+function playCountBeep(isGo) { playTone(isGo ? 1320 : 880, 0, isGo ? 0.45 : 0.18, "square", 0.12); }
+function playDashSound() { playNoise(0, 0.3, "bandpass", 400, 4200, 0.7); playTone(95, 0, 0.2, "sine", 0.45, 40); }
+function playInfectSound(volume) {
+  playTone(240, 0, 0.8, "sawtooth", 0.28 * volume, 55, 900);
+  playTone(180, 0.05, 0.7, "sawtooth", 0.2 * volume, 48, 700);
+  playNoise(0, 0.6, "lowpass", 900, 180, 0.3 * volume);
+}
+function playRushAlarm() { for (let i = 0; i < 6; i++) playTone(i % 2 ? 620 : 880, i * 0.2, 0.19, "square", 0.11); }
+function playReleaseHorn() { playTone(98, 0, 1.2, "sawtooth", 0.25, 70, 600); playTone(147, 0, 1.2, "sawtooth", 0.15, 105, 600); }
+function playEndSting(humansWon) {
+  const notes = humansWon ? [523, 659, 784, 1047] : [392, 311, 262, 196];
+  notes.forEach((f, i) => playTone(f, i * 0.16, 0.4, "triangle", 0.2));
+}
+
+const canvas = $("scene");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+const scene = new THREE.Scene();
+const NIGHT_COLOR = 0x070b18;
+scene.background = new THREE.Color(NIGHT_COLOR);
+scene.fog = new THREE.Fog(NIGHT_COLOR, 9, 44);
+const camera = new THREE.PerspectiveCamera(BASE_FOV, 1, 0.08, 150);
+scene.add(new THREE.HemisphereLight(0x8ea4d6, 0x1c1e28, 2.2));
+const moonLight = new THREE.DirectionalLight(0xb8c8ff, 2.0);
+moonLight.position.set(-40, 60, -30);
+scene.add(moonLight);
+
+function resize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+window.addEventListener("resize", resize);
+resize();
+
+const colliders = [], flatSurfaces = [], ramps = [];
+const GRID_CELL = 4, colliderGrid = new Map();
+let colliderQueryStamp = 0;
+function gridKey(ix, iz) { return ix * 4096 + iz; }
+function addCollider(x0, x1, y0, y1, z0, z1) {
+  const c = { x0: Math.min(x0, x1), x1: Math.max(x0, x1), y0: Math.min(y0, y1), y1: Math.max(y0, y1), z0: Math.min(z0, z1), z1: Math.max(z0, z1), stamp: 0 };
+  colliders.push(c);
+  for (let ix = Math.floor(c.x0 / GRID_CELL); ix <= Math.floor(c.x1 / GRID_CELL); ix++)
+    for (let iz = Math.floor(c.z0 / GRID_CELL); iz <= Math.floor(c.z1 / GRID_CELL); iz++) {
+      const k = gridKey(ix, iz); let list = colliderGrid.get(k);
+      if (!list) colliderGrid.set(k, list = []);
+      list.push(c);
+    }
+}
+function collidersNear(x0, x1, z0, z1, out) {
+  out.length = 0; colliderQueryStamp++;
+  for (let ix = Math.floor(x0 / GRID_CELL); ix <= Math.floor(x1 / GRID_CELL); ix++)
+    for (let iz = Math.floor(z0 / GRID_CELL); iz <= Math.floor(z1 / GRID_CELL); iz++) {
+      const list = colliderGrid.get(gridKey(ix, iz)); if (!list) continue;
+      for (const c of list) if (c.stamp !== colliderQueryStamp) { c.stamp = colliderQueryStamp; out.push(c); }
+    }
+  return out;
+}
+
+const geometryBuckets = new Map();
+function bucketFor(name) {
+  let b = geometryBuckets.get(name);
+  if (!b) geometryBuckets.set(name, b = { pos: [], nor: [], col: [] });
+  return b;
+}
+function chunkName(x, y) {
+  const floorIndex = x > 54 ? "g" : clamp(Math.floor((y + 0.3) / FLOOR_H), 0, 3);
+  return floorIndex + ":" + Math.floor((x + 60) / 24);
+}
+const tmpColor = new THREE.Color();
+function moonShade(x, z) {
+  if (x > 54) return 0.9;
+  if (Math.abs(x) > 54.5 || Math.abs(z) > 18.5) return 1;
+  const fromWindow = 18 - Math.abs(z);
+  return 0.55 + 0.45 * Math.max(0, 1 - fromWindow / 10);
+}
+function pushFace(b, a, bb, c, d, n, col) {
+  for (const p of [a, bb, c, a, c, d]) { b.pos.push(p[0], p[1], p[2]); b.nor.push(n[0], n[1], n[2]); b.col.push(col.r, col.g, col.b); }
+}
+function pushBox(b, x0, x1, y0, y1, z0, z1, hex, shade) {
+  tmpColor.setHex(hex).multiplyScalar(shade);
+  const col = { r: tmpColor.r, g: tmpColor.g, b: tmpColor.b };
+  pushFace(b, [x1, y0, z1], [x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [1, 0, 0], col);
+  pushFace(b, [x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0], [-1, 0, 0], col);
+  pushFace(b, [x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0], [0, 1, 0], col);
+  pushFace(b, [x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1], [0, -1, 0], col);
+  pushFace(b, [x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1], [0, 0, 1], col);
+  pushFace(b, [x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0], [0, 0, -1], col);
+}
+function box(x0, x1, y0, y1, z0, z1, hex, solid) {
+  const ax = Math.min(x0, x1), bx = Math.max(x0, x1), ay = Math.min(y0, y1), by = Math.max(y0, y1), az = Math.min(z0, z1), bz = Math.max(z0, z1);
+  const cx = (ax + bx) / 2, cz = (az + bz) / 2;
+  pushBox(bucketFor("s" + chunkName(cx, ay)), ax, bx, ay, by, az, bz, hex, moonShade(cx, cz));
+  if (solid !== false) addCollider(ax, bx, ay, by, az, bz);
+}
+function glass(x0, x1, y0, y1, z0, z1, solid) {
+  const cx = (x0 + x1) / 2;
+  pushBox(bucketFor("g" + chunkName(cx, Math.min(y0, y1))), Math.min(x0, x1), Math.max(x0, x1), Math.min(y0, y1), Math.max(y0, y1), Math.min(z0, z1), Math.max(z0, z1), 0xffffff, 1);
+  if (solid !== false) addCollider(x0, x1, y0, y1, z0, z1);
+}
+
+const C = {
+  wall: 0xc4bdad, wallLow: 0x7d8b80, slabTop: 0x747d78, ceiling: 0xc9ccc8, roomFloor: 0x7b5a3b, labFloor: 0x6d7572,
+  deskTop: 0xcdb58c, desk: 0x8d6d4a, chair: 0x4f6385, locker: 0x6a7f95, board: 0x1d3a2a, boardFrame: 0x8a6a45,
+  pillar: 0xb3ad9f, cabinet: 0x8b9096, labTable: 0x2c3136, bed: 0xe4e6e8, curtainNurse: 0x93bccb, curtainGym: 0x7c1f2b,
+  gymFloor: 0xa8794b, gymLine: 0xe8e2d0, mat: 0x2f5c9c, vault: 0xb58a55, stair: 0x9aa19c, rail: 0x4f5a55,
+  shoe: 0x8a6c4a, frame: 0x363c42, ground: 0x18261d, podium: 0x6d4f33, sign: 0x24402f, partition: 0x9aa5ad
+};
+
+function wallAlongX(zc, xa, xb, y0, h, gaps, hex, thick) {
+  const t = (thick || 0.2) / 2;
+  const sorted = (gaps || []).slice().sort((p, q) => p[0] - q[0]);
+  let cursor = xa;
+  for (const g of sorted) {
+    if (g[0] > cursor) box(cursor, g[0], y0, y0 + h, zc - t, zc + t, hex);
+    const top = g[2] || 2.4;
+    if (top < h) box(g[0], g[1], y0 + top, y0 + h, zc - t, zc + t, hex);
+    cursor = g[1];
+  }
+  if (cursor < xb) box(cursor, xb, y0, y0 + h, zc - t, zc + t, hex);
+}
+function wallAlongZ(xc, za, zb, y0, h, gaps, hex, thick) {
+  const t = (thick || 0.2) / 2;
+  const sorted = (gaps || []).slice().sort((p, q) => p[0] - q[0]);
+  let cursor = za;
+  for (const g of sorted) {
+    if (g[0] > cursor) box(xc - t, xc + t, y0, y0 + h, cursor, g[0], hex);
+    const top = g[2] || 2.4;
+    if (top < h) box(xc - t, xc + t, y0 + top, y0 + h, g[0], g[1], hex);
+    cursor = g[1];
+  }
+  if (cursor < zb) box(xc - t, xc + t, y0, y0 + h, cursor, zb, hex);
+}
+function windowWallAlongX(zc, xa, xb, y0, h, sill, head) {
+  const t = 0.1, pier = 0.6;
+  box(xa, xa + pier, y0, y0 + h, zc - t, zc + t, C.wall);
+  box(xb - pier, xb, y0, y0 + h, zc - t, zc + t, C.wall);
+  box(xa + pier, xb - pier, y0, y0 + sill, zc - t, zc + t, C.wallLow);
+  box(xa + pier, xb - pier, y0 + head, y0 + h, zc - t, zc + t, C.wall);
+  glass(xa + pier, xb - pier, y0 + sill, y0 + head, zc - 0.03, zc + 0.03, false);
+  addCollider(xa + pier, xb - pier, y0 + sill, y0 + head, zc - t, zc + t);
+  const mid = (xa + xb) / 2;
+  box(mid - 0.05, mid + 0.05, y0 + sill, y0 + head, zc - 0.06, zc + 0.06, C.frame, false);
+}
+function windowWallAlongZ(xc, za, zb, y0, h, sill, head) {
+  const t = 0.1, pier = 0.6;
+  box(xc - t, xc + t, y0, y0 + h, za, za + pier, C.wall);
+  box(xc - t, xc + t, y0, y0 + h, zb - pier, zb, C.wall);
+  box(xc - t, xc + t, y0, y0 + sill, za + pier, zb - pier, C.wallLow);
+  box(xc - t, xc + t, y0 + head, y0 + h, za + pier, zb - pier, C.wall);
+  glass(xc - 0.03, xc + 0.03, y0 + sill, y0 + head, za + pier, zb - pier, false);
+  addCollider(xc - t, xc + t, y0 + sill, y0 + head, za + pier, zb - pier);
+}
+function slabWithHoles(y0, y1, x0, x1, z0, z1, holes, hex) {
+  const xs = [x0, x1];
+  holes.forEach(hl => { if (hl.x0 > x0 && hl.x0 < x1) xs.push(hl.x0); if (hl.x1 > x0 && hl.x1 < x1) xs.push(hl.x1); });
+  xs.sort((a, b) => a - b);
+  for (let i = 0; i < xs.length - 1; i++) {
+    const xa = xs[i], xb = xs[i + 1]; if (xb - xa < 0.001) continue;
+    const cuts = holes.filter(hl => hl.x0 <= xa + 0.001 && hl.x1 >= xb - 0.001).sort((p, q) => p.z0 - q.z0);
+    let cursor = z0;
+    for (const hl of cuts) { if (hl.z0 > cursor) box(xa, xb, y0, y1, cursor, hl.z0, hex, false); cursor = Math.max(cursor, hl.z1); }
+    if (cursor < z1) box(xa, xb, y0, y1, cursor, z1, hex, false);
+  }
+}
+
+const signMeshes = [];
+function makeSignTexture(text, wide) {
+  const cv = document.createElement("canvas"); cv.width = wide ? 512 : 256; cv.height = 64;
+  const ctx = cv.getContext("2d");
+  ctx.fillStyle = "#24402F"; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.strokeStyle = "#DCE6D6"; ctx.lineWidth = 3; ctx.strokeRect(3, 3, cv.width - 6, cv.height - 6);
+  ctx.fillStyle = "#ffffff"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.font = '800 30px "Nanum Gothic", "Malgun Gothic", sans-serif';
+  ctx.fillText(text, cv.width / 2, cv.height / 2 + 1);
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+function addSign(text, x, y, z, facingYaw, wide) {
+  const w = wide ? 2.6 : 1.3;
+  const mat = new THREE.MeshBasicMaterial({ map: makeSignTexture(text, wide), color: 0x9aa6b4 });
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, 0.33), mat);
+  mesh.position.set(x, y, z); mesh.rotation.y = facingYaw;
+  scene.add(mesh); signMeshes.push(mesh);
+}
+
+function furnishClassroom(x0, x1, zIn, zOut, dir, y) {
+  const zMid = (zIn + zOut) / 2;
+  box(x0, x1, y, y + 0.015, zIn, zOut, C.roomFloor, false);
+  box(x0 + 0.2, x0 + 0.27, y + 0.9, y + 2.15, zMid - 3.2, zMid + 3.2, C.boardFrame, false);
+  box(x0 + 0.27, x0 + 0.3, y + 0.98, y + 2.07, zMid - 3.1, zMid + 3.1, C.board, false);
+  box(x0 + 1.2, x0 + 1.8, y, y + 1.1, zMid - 0.55, zMid + 0.55, C.podium);
+  for (let r = 0; r < 5; r++) {
+    const dx = x0 + 3.2 + r * 1.45;
+    if (dx + 0.8 > x1 - 2.2) break;
+    for (let c = 0; c < 6; c++) {
+      const dz = zIn + dir * (1.9 + c * 2.15);
+      box(dx - 0.28, dx + 0.28, y + 0.7, y + 0.75, dz - 0.34, dz + 0.34, C.deskTop, false);
+      box(dx - 0.26, dx - 0.22, y + 0.3, y + 0.7, dz - 0.32, dz + 0.32, C.desk, false);
+      box(dx - 0.26, dx + 0.26, y, y + 0.3, dz - 0.3, dz - 0.26, C.desk, false);
+      box(dx - 0.26, dx + 0.26, y, y + 0.3, dz + 0.26, dz + 0.3, C.desk, false);
+      box(dx + 0.36, dx + 0.74, y + 0.42, y + 0.46, dz - 0.2, dz + 0.2, C.chair, false);
+      box(dx + 0.7, dx + 0.74, y + 0.46, y + 0.92, dz - 0.2, dz + 0.2, C.chair, false);
+      addCollider(dx - 0.28, dx + 0.74, y, y + 0.75, dz - 0.34, dz + 0.34);
+    }
+  }
+  const lx0 = x1 - 1.8, lx1 = x1 - 1.2;
+  box(lx0, lx1, y, y + 1.8, zIn + dir * 1.2, zMid - dir * 0.7, C.locker);
+  box(lx0, lx1, y, y + 1.8, zMid + dir * 0.7, zOut - dir * 1.2, C.locker);
+}
+function furnishScience(x0, x1, zIn, zOut, dir, y) {
+  box(x0, x1, y, y + 0.015, zIn, zOut, C.labFloor, false);
+  for (let tx = x0 + 3.2; tx <= x1 - 3.2; tx += 4.2) {
+    for (const off of [4.5, 10]) {
+      const tz = zIn + dir * off;
+      box(tx - 1.3, tx + 1.3, y + 0.85, y + 0.92, tz - 0.65, tz + 0.65, C.labTable);
+      box(tx - 1.2, tx + 1.2, y, y + 0.85, tz - 0.55, tz + 0.55, C.cabinet, false);
+      box(tx - 0.2, tx + 0.2, y + 0.92, y + 1.25, tz - 0.05, tz + 0.05, C.frame, false);
+    }
+  }
+  const zMid = (zIn + zOut) / 2;
+  box(x1 - 0.9, x1 - 0.3, y, y + 2.1, zIn + dir * 1.4, zMid - dir * 0.8, C.cabinet);
+  box(x1 - 0.9, x1 - 0.3, y, y + 2.1, zMid + dir * 0.8, zOut - dir * 1.4, C.cabinet);
+  box(x0 + 0.3, x0 + 0.9, y, y + 2.1, zMid - 2.5, zMid + 2.5, C.cabinet);
+  box(x0 + 0.25, x0 + 0.3, y + 0.9, y + 2.1, zMid - 2.4, zMid + 2.4, C.board, false);
+}
+function furnishNurse(x0, x1, zIn, zOut, dir, y) {
+  box(x0, x1, y, y + 0.015, zIn, zOut, C.labFloor, false);
+  const bedZ0 = zOut - dir * 0.4, bedZ1 = zOut - dir * 2.5;
+  for (let k = 0; k < 3; k++) {
+    const bx = x0 + 1.8 + k * 3.3;
+    box(bx - 0.5, bx + 0.5, y, y + 0.55, bedZ0, bedZ1, C.bed);
+    box(bx - 0.5, bx + 0.5, y + 0.55, y + 0.7, bedZ0, bedZ0 - dir * 0.4, 0xffffff, false);
+    box(bx + 1.6, bx + 1.66, y + 0.1, y + 2.0, bedZ0, zOut - dir * 3.2, C.curtainNurse);
+    box(bx - 0.6, bx + 0.9, y + 0.1, y + 2.0, zOut - dir * 3.2, zOut - dir * 3.26, C.curtainNurse);
+  }
+  box(x0 + 2.0, x0 + 3.4, y, y + 0.75, zIn + dir * 2.0, zIn + dir * 2.8, C.desk);
+  box(x1 - 0.9, x1 - 0.3, y, y + 2.0, zIn + dir * 1.5, zIn + dir * 6, C.cabinet);
+}
+function furnishStaffRoom(x0, x1, zIn, zOut, dir, y) {
+  box(x0, x1, y, y + 0.015, zIn, zOut, C.labFloor, false);
+  for (let cx = x0 + 4; cx <= x1 - 3.5; cx += 6) {
+    for (const off of [5, 10.5]) {
+      const cz = zIn + dir * off;
+      box(cx - 1.9, cx + 1.9, y + 0.7, y + 0.76, cz - 0.75, cz + 0.75, C.deskTop, false);
+      box(cx - 1.85, cx + 1.85, y, y + 0.7, cz - 0.7, cz + 0.7, C.desk, false);
+      box(cx - 1.9, cx + 1.9, y + 0.76, y + 1.3, cz - 0.03, cz + 0.03, C.partition, false);
+      addCollider(cx - 1.9, cx + 1.9, y, y + 1.3, cz - 0.75, cz + 0.75);
+    }
+  }
+  const zMid = (zIn + zOut) / 2;
+  box(x0 + 0.3, x0 + 0.9, y, y + 1.9, zIn + dir * 1.5, zMid, C.cabinet);
+  box(x1 - 1.6, x1 - 0.6, y, y + 1.3, zOut - dir * 1.2, zOut - dir * 2.0, C.frame);
+}
+function furnishLobby(y) {
+  box(-18, 18, y, y + 0.015, -18, 18, 0x8b8f89, false);
+  [[-12, -8], [12, -8], [-12, 8], [12, 8], [-6, 13], [6, 13]].forEach(([px, pz]) => box(px - 0.45, px + 0.45, y, y + 4, pz - 0.45, pz + 0.45, C.pillar));
+  for (const side of [-1, 1]) {
+    for (const rowZ of [-15.2, -11.8]) {
+      const xa = side * 9, xb = side * 16.2;
+      box(Math.min(xa, xb), Math.max(xa, xb), y, y + 1.8, rowZ - 0.3, rowZ + 0.3, C.shoe);
+    }
+  }
+  box(-1.4, 1.4, y, y + 2.1, 9.8, 10.1, C.partition);
+  box(-1.3, 1.3, y + 0.7, y + 2.0, 9.75, 9.8, 0x3d5a73, false);
+  box(-17.6, -14, y, y + 1.9, 16.8, 17.7, C.cabinet);
+  box(14, 17.6, y, y + 1.9, 16.8, 17.7, C.cabinet);
+  box(-4, -1.5, y, y + 0.45, 4.6, 5.2, C.desk);
+  box(1.5, 4, y, y + 0.45, 4.6, 5.2, C.desk);
+  addSign("중앙현관", 0, y + 3.2, 17.78, Math.PI, true);
+}
+
+function buildStairwell(laneA, laneB) {
+  const zLow = 4, zHigh = 14, steps = 14;
+  ramps.push({ axis: "z", x0: laneA[0], x1: laneA[1], z0: zLow, z1: zHigh, a0: zLow, h0: 0, a1: zHigh, h1: FLOOR_H });
+  ramps.push({ axis: "z", x0: laneB[0], x1: laneB[1], z0: zLow, z1: zHigh, a0: zHigh, h0: FLOOR_H, a1: zLow, h1: FLOOR_H * 2 });
+  const run = (zHigh - zLow) / steps, rise = FLOOR_H / steps;
+  for (let i = 0; i < steps; i++) {
+    const za = zLow + i * run, top1 = (i + 1) * rise;
+    box(laneA[0] + 0.05, laneA[1] - 0.05, top1 - 0.28, top1, za, za + run, C.stair, false);
+    const zb = zHigh - (i + 1) * run, top2 = FLOOR_H + (i + 1) * rise;
+    box(laneB[0] + 0.05, laneB[1] - 0.05, top2 - 0.28, top2, zb, zb + run, C.stair, false);
+  }
+  const divider = laneA[0] > laneB[0] ? laneA[0] : laneA[1];
+  box(divider - 0.1, divider + 0.1, 0, FLOOR_H * 3, zLow, zHigh, C.wall);
+  box(laneA[0], laneA[1], FLOOR_H, FLOOR_H + 1.05, zLow - 0.06, zLow + 0.06, C.rail);
+  box(laneB[0], laneB[1], FLOOR_H * 2, FLOOR_H * 2 + 1.05, zHigh - 0.06, zHigh + 0.06, C.rail);
+  const cx = (Math.min(laneA[0], laneB[0]) + Math.max(laneA[1], laneB[1])) / 2;
+  for (let f = 0; f < 3; f++) addSign("계단 " + (f + 1) + "층", cx, f * FLOOR_H + 2.9, 3.05, Math.PI);
+}
+
+const FLOOR_PLANS = [
+  {
+    N: [["stairs", 0, 0], ["staff", 1, 2, "교무실"], ["lobby", 3, 5], ["class", 6, 6, "1학년 1반"], ["class", 7, 7, "1학년 2반"], ["stairs", 8, 8]],
+    S: [["science", 0, 0, "과학실"], ["nurse", 1, 1, "보건실"], ["class", 2, 2, "1학년 3반"], ["lobby", 3, 5], ["class", 6, 6, "1학년 4반"], ["class", 7, 7, "1학년 5반"], ["class", 8, 8, "1학년 6반"]]
+  },
+  {
+    N: [["stairs", 0, 0], ["class", 1, 1, "2학년 1반"], ["class", 2, 2, "2학년 2반"], ["science", 3, 4, "제2과학실"], ["class", 5, 5, "2학년 3반"], ["class", 6, 6, "2학년 4반"], ["class", 7, 7, "2학년 5반"], ["stairs", 8, 8]],
+    S: [["class", 0, 0, "2학년 6반"], ["class", 1, 1, "2학년 7반"], ["class", 2, 2, "2학년 8반"], ["class", 3, 3, "2학년 9반"], ["staff", 4, 5, "2학년 교무실"], ["class", 6, 6, "2학년 10반"], ["class", 7, 7, "2학년 11반"], ["class", 8, 8, "2학년 12반"]]
+  },
+  {
+    N: [["stairs", 0, 0], ["science", 1, 2, "제3과학실"], ["class", 3, 3, "3학년 1반"], ["class", 4, 4, "3학년 2반"], ["class", 5, 5, "3학년 3반"], ["staff", 6, 7, "3학년 교무실"], ["stairs", 8, 8]],
+    S: [["class", 0, 0, "3학년 4반"], ["class", 1, 1, "3학년 5반"], ["class", 2, 2, "3학년 6반"], ["class", 3, 3, "3학년 7반"], ["class", 4, 4, "3학년 8반"], ["class", 5, 5, "3학년 9반"], ["class", 6, 6, "3학년 10반"], ["class", 7, 7, "3학년 11반"], ["class", 8, 8, "3학년 12반"]]
+  }
+];
+const BUILDING_X = 54, BUILDING_Z = 18, CORRIDOR_Z = 3, BAY_W = 12;
+const STAIR_WEST = { laneA: [-54, -48], laneB: [-48, -42] }, STAIR_EAST = { laneA: [48, 54], laneB: [42, 48] };
+
+function buildRoom(f, spec, side) {
+  const [type, bayA, bayB, label] = spec;
+  if (type === "lobby" || type === "stairs") return;
+  const y = f * FLOOR_H, x0 = -BUILDING_X + BAY_W * bayA, x1 = -BUILDING_X + BAY_W * (bayB + 1);
+  const dir = side === "N" ? 1 : -1, zIn = dir * CORRIDOR_Z, zOut = dir * BUILDING_Z;
+  wallAlongX(zIn + dir * 0.1, x0, x1, y, FLOOR_H, [[x0 + 1.1, x0 + 2.8], [x1 - 2.8, x1 - 1.1]], C.wall);
+  wallAlongZ(x0 + 0.1, Math.min(zIn, zOut), Math.max(zIn, zOut), y, FLOOR_H, [], C.wall);
+  wallAlongZ(x1 - 0.1, Math.min(zIn, zOut), Math.max(zIn, zOut), y, FLOOR_H, [], C.wall);
+  addSign(label, x0 + 1.95, y + 2.75, zIn - dir * 0.02, side === "N" ? Math.PI : 0);
+  if (type === "class") furnishClassroom(x0, x1, zIn, zOut, dir, y);
+  else if (type === "science") furnishScience(x0, x1, zIn, zOut, dir, y);
+  else if (type === "nurse") furnishNurse(x0, x1, zIn, zOut, dir, y);
+  else if (type === "staff") furnishStaffRoom(x0, x1, zIn, zOut, dir, y);
+}
+
+function buildGym() {
+  const x0 = 54, x1 = 84, z0 = -15, z1 = 15, H = 8;
+  flatSurfaces.push({ y: 0, x0, x1, z0, z1, holes: [] });
+  box(x0, x1, -0.2, 0, z0, z1, C.gymFloor, false);
+  box(x0, x1, H, H + 0.2, z0, z1, C.ceiling, false);
+  for (const zc of [z1 - 0.1, z0 + 0.1]) {
+    for (let xa = x0; xa < x1 - 0.01; xa += 6) {
+      box(xa, xa + 6, 0, 4.6, zc - 0.1, zc + 0.1, C.wall);
+      box(xa, xa + 0.5, 4.6, H, zc - 0.1, zc + 0.1, C.wall);
+      box(xa + 5.5, xa + 6, 4.6, H, zc - 0.1, zc + 0.1, C.wall);
+      box(xa + 0.5, xa + 5.5, 6.9, H, zc - 0.1, zc + 0.1, C.wall);
+      glass(xa + 0.5, xa + 5.5, 4.6, 6.9, zc - 0.03, zc + 0.03);
+    }
+    box(x0 + 1, x1 - 7, 0, 2.6, zc - Math.sign(zc) * 0.25, zc - Math.sign(zc) * 0.2, C.curtainGym, false);
+  }
+  wallAlongZ(x1 - 0.1, z0, z1, 0, H, [], C.wall);
+  wallAlongZ(x0 + 0.1, z0, z1, 0, H, [[-2.5, 2.5, 3]], C.wall);
+  for (let lx = 57; lx <= 81; lx += 12) box(lx - 0.04, lx + 0.04, 0, 0.01, -13, 13, C.gymLine, false);
+  box(57, 75, 0, 0.01, -13.04, -12.96, C.gymLine, false);
+  box(57, 75, 0, 0.01, 12.96, 13.04, C.gymLine, false);
+  box(68.96, 69.04, 0, 0.01, -13, 13, C.gymLine, false);
+  box(78, 84, 0, 1.2, -11, 11, C.desk);
+  flatSurfaces.push({ y: 1.2, x0: 78, x1: 84, z0: -11, z1: 11, holes: [] });
+  ramps.push({ axis: "x", x0: 75.6, x1: 78, z0: -1.5, z1: 1.5, a0: 75.6, h0: 0, a1: 78, h1: 1.2 });
+  for (let i = 0; i < 6; i++) box(75.6 + i * 0.4, 75.6 + (i + 1) * 0.4, 0, (i + 1) * 0.2, -1.5, 1.5, C.stair, false);
+  for (let zc = -10.2; zc < 11; zc += 3.3) box(78.15, 78.45, 1.2, 7.2, zc - 1.1, zc + 1.1, C.curtainGym);
+  box(78, 84, 7.2, 7.8, -11, 11, C.curtainGym, false);
+  for (const zc of [-14.6, 14.6]) {
+    box(68.85, 69.15, 0, 3.6, zc - 0.15, zc + 0.15, C.frame);
+    box(68.1, 69.9, 2.9, 4.1, zc - Math.sign(zc) * 0.3, zc - Math.sign(zc) * 0.36, 0xe8e8e8, false);
+  }
+  box(58, 60.2, 0, 1.2, -9.5, -7.2, C.mat);
+  box(58, 60.2, 0, 1.2, 7.2, 9.5, C.mat);
+  box(64, 65.6, 0, 1.1, 5.4, 6.1, C.vault);
+  box(64, 65.6, 0, 1.1, -6.1, -5.4, C.vault);
+  box(71, 74, 0, 2.0, -12.8, -10.6, C.rail);
+  box(71, 74, 0, 2.0, 10.6, 12.8, C.rail);
+  addSign("체육관", 53.78, 3.3, 0, -Math.PI / 2);
+}
+
+function buildSchool() {
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(500, 500), new THREE.MeshLambertMaterial({ color: C.ground }));
+  ground.rotation.x = -Math.PI / 2; ground.position.y = -0.22; scene.add(ground);
+  const holesByFloor = [
+    [],
+    [{ x0: STAIR_WEST.laneA[0], x1: STAIR_WEST.laneA[1], z0: 4, z1: 14 }, { x0: STAIR_EAST.laneA[0], x1: STAIR_EAST.laneA[1], z0: 4, z1: 14 }],
+    [{ x0: STAIR_WEST.laneB[0], x1: STAIR_WEST.laneB[1], z0: 4, z1: 14 }, { x0: STAIR_EAST.laneB[0], x1: STAIR_EAST.laneB[1], z0: 4, z1: 14 }]
+  ];
+  for (let f = 0; f < 3; f++) {
+    const y = f * FLOOR_H, holes = holesByFloor[f];
+    flatSurfaces.push({ y, x0: -BUILDING_X, x1: BUILDING_X, z0: -BUILDING_Z, z1: BUILDING_Z, holes });
+    slabWithHoles(y - 0.2, y - 0.02, -BUILDING_X, BUILDING_X, -BUILDING_Z, BUILDING_Z, holes, C.ceiling);
+    slabWithHoles(y - 0.02, y, -BUILDING_X, BUILDING_X, -BUILDING_Z, BUILDING_Z, holes, C.slabTop);
+    for (let bay = 0; bay < 9; bay++) {
+      const xa = -BUILDING_X + bay * BAY_W, xb = xa + BAY_W;
+      windowWallAlongX(BUILDING_Z - 0.1, xa, xb, y, FLOOR_H, 1.0, 2.7);
+      if (f === 0 && bay >= 3 && bay <= 5) {
+        box(xa, xa + 0.4, y, y + FLOOR_H, -BUILDING_Z, -BUILDING_Z + 0.2, C.frame);
+        box(xa, xb, y + 3.0, y + FLOOR_H, -BUILDING_Z, -BUILDING_Z + 0.2, C.wall);
+        glass(xa + 0.4, xb, y, y + 3.0, -BUILDING_Z + 0.07, -BUILDING_Z + 0.13, false);
+        addCollider(xa, xb, y, y + 3.0, -BUILDING_Z, -BUILDING_Z + 0.2);
+      } else windowWallAlongX(-BUILDING_Z + 0.1, xa, xb, y, FLOOR_H, 1.0, 2.7);
+    }
+    windowWallAlongZ(-BUILDING_X + 0.1, -BUILDING_Z, -CORRIDOR_Z, y, FLOOR_H, 1.0, 2.7);
+    windowWallAlongZ(-BUILDING_X + 0.1, -CORRIDOR_Z, CORRIDOR_Z, y, FLOOR_H, 1.0, 2.7);
+    windowWallAlongZ(-BUILDING_X + 0.1, CORRIDOR_Z, BUILDING_Z, y, FLOOR_H, 1.0, 2.7);
+    if (f === 0) wallAlongZ(BUILDING_X - 0.1, -BUILDING_Z, BUILDING_Z, y, FLOOR_H, [[-2.5, 2.5, 3]], C.wall);
+    else {
+      windowWallAlongZ(BUILDING_X - 0.1, -BUILDING_Z, -CORRIDOR_Z, y, FLOOR_H, 1.0, 2.7);
+      windowWallAlongZ(BUILDING_X - 0.1, -CORRIDOR_Z, CORRIDOR_Z, y, FLOOR_H, 1.0, 2.7);
+      windowWallAlongZ(BUILDING_X - 0.1, CORRIDOR_Z, BUILDING_Z, y, FLOOR_H, 1.0, 2.7);
+    }
+    const plan = FLOOR_PLANS[f];
+    plan.N.forEach(spec => buildRoom(f, spec, "N"));
+    plan.S.forEach(spec => buildRoom(f, spec, "S"));
+    for (let bay = 1; bay < 9; bay++) {
+      const px = -BUILDING_X + bay * BAY_W;
+      if (f === 0 && px > -19 && px < 19) continue;
+      for (const zc of [CORRIDOR_Z - 0.1, -CORRIDOR_Z + 0.1]) box(px - 0.3, px + 0.3, y, y + FLOOR_H, zc - 0.25, zc + 0.25, C.pillar);
+    }
+    addSign((f + 1) + "층", -BUILDING_X + 0.25, y + 2.8, 0, Math.PI / 2);
+  }
+  box(-BUILDING_X, BUILDING_X, FLOOR_H * 3 - 0.2, FLOOR_H * 3 + 0.2, -BUILDING_Z, BUILDING_Z, C.ceiling, false);
+  furnishLobby(0);
+  buildStairwell(STAIR_WEST.laneA, STAIR_WEST.laneB);
+  buildStairwell(STAIR_EAST.laneA, STAIR_EAST.laneB);
+  buildGym();
+
+  const staticMaterial = new THREE.MeshLambertMaterial({ vertexColors: true });
+  const glassMaterial = new THREE.MeshBasicMaterial({ color: 0x5f82b8, transparent: true, opacity: 0.28, depthWrite: false });
+  for (const [name, b] of geometryBuckets) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(b.pos, 3));
+    g.setAttribute("normal", new THREE.Float32BufferAttribute(b.nor, 3));
+    g.setAttribute("color", new THREE.Float32BufferAttribute(b.col, 3));
+    g.computeBoundingSphere();
+    const mesh = new THREE.Mesh(g, name[0] === "g" ? glassMaterial : staticMaterial);
+    if (name[0] === "g") mesh.renderOrder = 2;
+    scene.add(mesh);
+  }
+  geometryBuckets.clear();
+
+  const moon = new THREE.Mesh(new THREE.SphereGeometry(6, 24, 16), new THREE.MeshBasicMaterial({ color: 0xf2f0dc, fog: false }));
+  moon.position.set(-60, 70, -110); scene.add(moon);
+  const starPositions = [];
+  for (let i = 0; i < 500; i++) {
+    const a = Math.random() * Math.PI * 2, e = 0.12 + Math.random() * 1.3, r = 140;
+    starPositions.push(Math.cos(a) * Math.cos(e) * r, Math.sin(e) * r, Math.sin(a) * Math.cos(e) * r);
+  }
+  const starGeo = new THREE.BufferGeometry(); starGeo.setAttribute("position", new THREE.Float32BufferAttribute(starPositions, 3));
+  scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xdfe6ff, size: 0.6, fog: false })));
+}
+buildSchool();
+
+const holdRing = new THREE.Group();
+const holdFloorRing = new THREE.Mesh(new THREE.RingGeometry(HOLD_RADIUS - 0.12, HOLD_RADIUS, 64), new THREE.MeshBasicMaterial({ color: 0xff3040, transparent: true, opacity: 0.85, depthWrite: false }));
+holdFloorRing.rotation.x = -Math.PI / 2; holdFloorRing.position.y = 0.03;
+const holdWallCanvas = document.createElement("canvas"); holdWallCanvas.width = 4; holdWallCanvas.height = 64;
+(ctx => { const g = ctx.createLinearGradient(0, 0, 0, 64); g.addColorStop(0, "rgba(255,48,64,0)"); g.addColorStop(1, "rgba(255,48,64,0.55)"); ctx.fillStyle = g; ctx.fillRect(0, 0, 4, 64); })(holdWallCanvas.getContext("2d"));
+const holdWall = new THREE.Mesh(new THREE.CylinderGeometry(HOLD_RADIUS, HOLD_RADIUS, 0.9, 64, 1, true), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(holdWallCanvas), transparent: true, side: THREE.DoubleSide, depthWrite: false }));
+holdWall.position.y = 0.45;
+holdRing.add(holdFloorRing, holdWall);
+holdRing.position.set(SPAWN.x, 0, SPAWN.z); holdRing.visible = false; scene.add(holdRing);
+
+function inRect(s, x, z) { return x >= s.x0 && x <= s.x1 && z >= s.z0 && z <= s.z1; }
+function surfaceHeightsAt(x, z, out) {
+  out.length = 0;
+  for (const s of flatSurfaces) {
+    if (!inRect(s, x, z)) continue;
+    let inHole = false;
+    for (const hl of s.holes) if (x > hl.x0 && x < hl.x1 && z > hl.z0 && z < hl.z1) { inHole = true; break; }
+    if (!inHole) out.push(s.y);
+  }
+  for (const r of ramps) {
+    if (!inRect(r, x, z)) continue;
+    const a = r.axis === "z" ? z : x;
+    out.push(r.h0 + (a - r.a0) / (r.a1 - r.a0) * (r.h1 - r.h0));
+  }
+  return out;
+}
+const heightScratch = [], colliderScratch = [];
+function groundAt(x, z, y) {
+  let best = -50;
+  for (const h of surfaceHeightsAt(x, z, heightScratch)) if (h <= y + STEP_UP && h > best) best = h;
+  return best;
+}
+function blockedAt(x, z, y) {
+  for (const h of surfaceHeightsAt(x, z, heightScratch)) if (h > y + STEP_UP && h < y + BODY_H) return true;
+  const r = PLAYER_RADIUS, bodyLow = y + STEP_UP, bodyHigh = y + BODY_H;
+  for (const c of collidersNear(x - r, x + r, z - r, z + r, colliderScratch)) {
+    if (c.y1 <= bodyLow || c.y0 >= bodyHigh) continue;
+    const dx = Math.max(c.x0 - x, 0, x - c.x1), dz = Math.max(c.z0 - z, 0, z - c.z1);
+    if (dx * dx + dz * dz < r * r) return true;
+  }
+  return false;
+}
+function moveWithCollision(p, dx, dz) {
+  const dist = Math.max(Math.abs(dx), Math.abs(dz));
+  const steps = Math.max(1, Math.ceil(dist / 0.12));
+  const sx = dx / steps, sz = dz / steps;
+  const stuck = blockedAt(p.x, p.z, p.y);
+  let hit = false;
+  for (let i = 0; i < steps; i++) {
+    if (sx) { if (stuck || !blockedAt(p.x + sx, p.z, p.y)) p.x += sx; else hit = true; }
+    if (sz) { if (stuck || !blockedAt(p.x, p.z + sz, p.y)) p.z += sz; else hit = true; }
+    const g = groundAt(p.x, p.z, p.y);
+    if (g > p.y) p.y = g;
+  }
+  return hit;
+}
+function applyGravity(p, dt) {
+  const g = groundAt(p.x, p.z, p.y);
+  if (p.y > g + 0.001) {
+    p.vy = (p.vy || 0) - GRAVITY * dt;
+    p.y += p.vy * dt;
+    if (p.y <= g) { p.y = g; p.vy = 0; }
+  } else { p.y = g; p.vy = 0; }
+  if (p.y < -5) { p.x = SPAWN.x; p.z = SPAWN.z; p.y = 0; p.vy = 0; }
+}
+
+function rayBoxHit(ox, oy, oz, dx, dy, dz, c) {
+  let tmin = 0, tmax = 1;
+  const axes = [[ox, dx, c.x0, c.x1], [oy, dy, c.y0, c.y1], [oz, dz, c.z0, c.z1]];
+  for (const [o, d, lo, hi] of axes) {
+    if (Math.abs(d) < 1e-9) { if (o < lo || o > hi) return 2; continue; }
+    let t1 = (lo - o) / d, t2 = (hi - o) / d;
+    if (t1 > t2) { const s = t1; t1 = t2; t2 = s; }
+    if (t1 > tmin) tmin = t1; if (t2 < tmax) tmax = t2;
+    if (tmin > tmax) return 2;
+  }
+  return tmin;
+}
+function cameraClearance(from, to) {
+  const dx = to.x - from.x, dy = to.y - from.y, dz = to.z - from.z;
+  let best = 1;
+  for (const c of collidersNear(Math.min(from.x, to.x) - 0.2, Math.max(from.x, to.x) + 0.2, Math.min(from.z, to.z) - 0.2, Math.max(from.z, to.z) + 0.2, colliderScratch)) {
+    if (c.y1 - c.y0 < 0.9) continue;
+    const t = rayBoxHit(from.x, from.y, from.z, dx, dy, dz, c);
+    if (t < best && t >= 0) best = t;
+  }
+  return best;
+}
+
+const gltfLoader = new GLTFLoader();
+const templates = {};
+function prepareTemplate(gltf, targetHeight) {
+  const holder = new THREE.Group();
+  holder.add(gltf.scene);
+  gltf.scene.updateMatrixWorld(true);
+  const bounds = new THREE.Box3().setFromObject(gltf.scene);
+  const s = targetHeight / Math.max(0.01, bounds.max.y - bounds.min.y);
+  gltf.scene.scale.multiplyScalar(s);
+  gltf.scene.position.y = -bounds.min.y * s;
+  gltf.scene.traverse(o => {
+    if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; o.receiveShadow = false; }
+  });
+  const clips = {};
+  gltf.animations.forEach(c => { clips[c.name.toLowerCase().replace(/[^a-z0-9]/g, "")] = c; });
+  return { holder, clips };
+}
+function findClip(clips, patterns) {
+  const names = okeys(clips);
+  for (const p of patterns) { const hit = names.find(n => p.test(n)); if (hit) return clips[hit]; }
+  return null;
+}
+async function loadCharacterModels() {
+  const load = file => new Promise((ok, fail) => gltfLoader.load(MODEL_DIR + file, ok, undefined, fail));
+  const [human, zombie, extraZombieMotions] = await Promise.all([load("student.glb"), load("zombie.glb"), load("zombie_1.glb").catch(() => null)]);
+  if (extraZombieMotions) {
+    const own = new Set(zombie.animations.map(c => c.name));
+    extraZombieMotions.animations.forEach(c => { if (!own.has(c.name)) zombie.animations.push(c); });
+  }
+  const h = prepareTemplate(human, 1.7), z = prepareTemplate(zombie, 1.72);
+  templates.human = { holder: h.holder, clips: {
+    idle: findClip(h.clips, [/idle/, /stand/]),
+    run: findClip(h.clips, [/run(?!.*back)/, /sprint/, /jog/, /walk/]),
+    back: findClip(h.clips, [/back/]),
+    injure: findClip(h.clips, [/injur/, /shock/, /hit/, /scare/]),
+    fall: findClip(h.clips, [/death/, /dying/, /die/, /fall/])
+  } };
+  templates.zombie = { holder: z.holder, clips: {
+    idle: findClip(z.clips, [/idle/]),
+    run: findClip(z.clips, [/run/, /sprint/, /walk/]),
+    back: findClip(z.clips, [/back/]),
+    dash: findClip(z.clips, [/dash/, /lunge/, /attack/, /bite/]),
+    standup: findClip(z.clips, [/standup/, /getup/, /stand/, /rise/])
+  } };
+}
+let modelsReady = false;
+loadCharacterModels().then(() => { modelsReady = true; show(loadingEl, false); }).catch(() => {
+  setText(loadingEl, "캐릭터 모델(img/zombie/student.glb, zombie.glb)을 불러오지 못했습니다. 새로고침해 주세요.");
+});
+
+function makeLabelSprite() {
+  const cv = document.createElement("canvas"); cv.width = 256; cv.height = 64;
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+  sprite.scale.set(1.3, 0.325, 1); sprite.position.y = 2.05;
+  return { sprite, cv, tex };
+}
+function drawLabel(label, text, isZombie) {
+  const ctx = label.cv.getContext("2d");
+  ctx.clearRect(0, 0, 256, 64);
+  ctx.fillStyle = isZombie ? "rgba(150,20,30,0.78)" : "rgba(10,14,30,0.62)";
+  const w = Math.min(248, 40 + text.length * 26);
+  ctx.beginPath(); ctx.roundRect((256 - w) / 2, 8, w, 48, 10); ctx.fill();
+  ctx.fillStyle = "#ffffff"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.font = '800 28px "Nanum Gothic", "Malgun Gothic", sans-serif';
+  ctx.fillText(text, 128, 33);
+  label.tex.needsUpdate = true;
+}
+const blobTexture = (() => {
+  const cv = document.createElement("canvas"); cv.width = cv.height = 64;
+  const ctx = cv.getContext("2d"), g = ctx.createRadialGradient(32, 32, 2, 32, 32, 31);
+  g.addColorStop(0, "rgba(0,0,0,0.6)"); g.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(cv);
+})();
+
+const AFTERIMAGE_EVERY_MS = 28, AFTERIMAGE_POOL = 7, AFTERIMAGE_LIFE_MS = 340, AFTERIMAGE_OPACITY = 0.6;
+const afterimageMaterial = new THREE.MeshBasicMaterial({ color: 0xff3344, transparent: true, opacity: AFTERIMAGE_OPACITY, blending: THREE.AdditiveBlending, depthWrite: false });
+
+class Avatar {
+  constructor(id, nickname, isLocal) {
+    this.id = id; this.nickname = nickname; this.isLocal = isLocal;
+    this.root = new THREE.Group(); scene.add(this.root);
+    this.forms = {};
+    for (const kind of ["human", "zombie"]) this.forms[kind] = this.buildForm(kind);
+    this.kind = null; this.motion = MOTION.idle; this.face = 0;
+    this.label = makeLabelSprite(); this.root.add(this.label.sprite);
+    this.label.sprite.visible = !isLocal;
+    const blob = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.1), new THREE.MeshBasicMaterial({ map: blobTexture, transparent: true, depthWrite: false }));
+    blob.rotation.x = -Math.PI / 2; blob.position.y = 0.03; this.root.add(blob);
+    this.setKind("human");
+    this.pos = { x: 0, y: 0, z: 0, vy: 0 };
+    this.prevPos = { x: 0, y: 0, z: 0 };
+    this.netFrom = null; this.netTo = null; this.netT0 = 0;
+    this.dashTrailFrom = null;
+  }
+  buildForm(kind) {
+    const tpl = templates[kind];
+    const obj = SkeletonUtils.clone(tpl.holder);
+    obj.visible = false; this.root.add(obj);
+    const mixer = new THREE.AnimationMixer(obj), actions = {};
+    for (const name in tpl.clips) if (tpl.clips[name]) actions[name] = mixer.clipAction(tpl.clips[name]);
+    for (const once of ["dash", "fall", "standup"]) if (actions[once]) { actions[once].setLoop(THREE.LoopOnce, 1); actions[once].clampWhenFinished = true; }
+    const nodes = []; obj.traverse(o => nodes.push(o));
+    return { obj, mixer, actions, current: null, currentScale: 1, nodes, ghosts: [] };
+  }
+  leaveAfterimage(nowMs) {
+    if (nowMs - (this.lastAfterimageMs || 0) < AFTERIMAGE_EVERY_MS) return;
+    this.lastAfterimageMs = nowMs;
+    const form = this.forms[this.kind];
+    let ghost = form.ghosts.find(g => !g.obj.visible);
+    if (!ghost) {
+      if (form.ghosts.length < AFTERIMAGE_POOL) {
+        const obj = SkeletonUtils.clone(form.obj), mat = afterimageMaterial.clone(), nodes = [];
+        obj.traverse(o => { nodes.push(o); if (o.isMesh) { o.material = mat; o.frustumCulled = false; } });
+        scene.add(obj);
+        ghost = { obj, mat, nodes, born: 0 };
+        form.ghosts.push(ghost);
+      } else ghost = form.ghosts.reduce((a, b) => a.born < b.born ? a : b);
+    }
+    for (let i = 1; i < form.nodes.length && i < ghost.nodes.length; i++) {
+      const src = form.nodes[i], dst = ghost.nodes[i];
+      dst.position.copy(src.position); dst.quaternion.copy(src.quaternion); dst.scale.copy(src.scale);
+    }
+    ghost.obj.position.set(this.pos.x + form.obj.position.x, this.pos.y + form.obj.position.y, this.pos.z + form.obj.position.z);
+    ghost.obj.rotation.set(0, this.face, 0);
+    ghost.obj.scale.copy(form.obj.scale);
+    ghost.obj.visible = true; ghost.born = nowMs; ghost.mat.opacity = AFTERIMAGE_OPACITY;
+  }
+  fadeAfterimages(nowMs) {
+    for (const k in this.forms) for (const g of this.forms[k].ghosts) {
+      if (!g.obj.visible) continue;
+      const age = (nowMs - g.born) / AFTERIMAGE_LIFE_MS;
+      if (age >= 1) g.obj.visible = false; else g.mat.opacity = AFTERIMAGE_OPACITY * (1 - age) * (1 - age);
+    }
+  }
+  setKind(kind) {
+    if (this.kind === kind) return;
+    this.kind = kind;
+    for (const k in this.forms) this.forms[k].obj.visible = k === kind;
+    drawLabel(this.label, this.nickname, kind === "zombie");
+    this.forms[kind].current = null;
+  }
+  setNickname(n) { if (n && n !== this.nickname) { this.nickname = n; drawLabel(this.label, n, this.kind === "zombie"); } }
+  playAction(name, timeScale, restart, startTime) {
+    const form = this.forms[this.kind];
+    const action = form.actions[name] || form.actions.run || form.actions.idle;
+    if (!action) return;
+    if (form.current === action && !restart) {
+      if (form.currentScale !== timeScale) { action.setEffectiveTimeScale(timeScale); form.currentScale = timeScale; }
+      return;
+    }
+    const fade = name === "dash" ? 0.05 : name === "standup" ? 0 : 0.18;
+    action.reset(); action.setEffectiveTimeScale(timeScale); action.setEffectiveWeight(1);
+    if (startTime) action.time = startTime;
+    if (fade) action.fadeIn(fade);
+    action.play();
+    if (form.current && form.current !== action) { if (fade) form.current.fadeOut(fade); else form.current.stop(); }
+    form.current = action; form.currentScale = timeScale;
+  }
+  applyMotion(motion, rush) {
+    const form = this.forms[this.kind];
+    const isZombie = this.kind === "zombie";
+    if (motion === MOTION.run) this.playAction("run", isZombie && rush ? 1.35 : 1);
+    else if (motion === MOTION.back) {
+      if (form.actions.back) this.playAction("back", 1); else this.playAction("run", -1);
+    } else if (motion === MOTION.dash) {
+      const clip = form.actions.dash ? form.actions.dash.getClip() : null;
+      if (isZombie && clip) this.playAction("dash", clip.duration / (DASH_MS / 1000) * 0.9, this.motion !== MOTION.dash);
+      else this.playAction("run", 2.5);
+    } else if (motion === MOTION.injure) {
+      if (form.actions.injure) this.playAction("injure", 1); else this.playAction("idle", 0);
+    } else if (motion === MOTION.fall) {
+      const clip = form.actions.fall ? form.actions.fall.getClip() : null;
+      if (clip) this.playAction("fall", clip.duration / (INFECT_FALL_MS / 1000), this.motion !== MOTION.fall); else this.playAction("idle", 0);
+    } else if (motion === MOTION.standup) {
+      const clip = form.actions.standup ? form.actions.standup.getClip() : null;
+      if (clip) {
+        const skip = Math.min(STANDUP_SKIP_SEC, clip.duration * 0.5);
+        this.playAction("standup", (clip.duration - skip) / (INFECT_STANDUP_MS / 1000), this.motion !== MOTION.standup, skip);
+      } else this.playAction("idle", 1);
+    } else this.playAction("idle", 1);
+    this.motion = motion;
+  }
+  update(dt, t) {
+    this.root.position.set(this.pos.x, this.pos.y, this.pos.z);
+    const form = this.forms[this.kind];
+    form.obj.rotation.y = this.face;
+    if (this.motion === MOTION.injure) {
+      form.obj.position.x = Math.sin(t * 0.09) * 0.035; form.obj.position.z = Math.cos(t * 0.11) * 0.035;
+    } else { form.obj.position.x = 0; form.obj.position.z = 0; }
+    form.mixer.update(dt);
+    if (this.motion === MOTION.dash) this.leaveAfterimage(t);
+    this.fadeAfterimages(t);
+  }
+  dispose() {
+    this.root.traverse(o => { if (o.isSprite) { o.material.map.dispose(); o.material.dispose(); } });
+    for (const k in this.forms) for (const g of this.forms[k].ghosts) { scene.remove(g.obj); g.mat.dispose(); }
+    scene.remove(this.root);
+  }
+}
+
+const CONF = window.PORTAL_CONFIG || {};
+let db = null;
+try {
+  if (window.firebase && CONF.isReady && CONF.isReady()) {
+    firebase.initializeApp({ apiKey: CONF.API_KEY, authDomain: CONF.AUTH_DOMAIN, databaseURL: CONF.DB_URL.replace(/\/+$/, "") });
+    db = firebase.database();
+  }
+} catch (e) { db = null; }
+let serverOffset = 0;
+if (db) db.ref(".info/serverTimeOffset").on("value", s => { serverOffset = s.val() || 0; });
+function serverNow() { return Date.now() + serverOffset; }
+const myId = "p" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+
+let nickname = "";
+try { nickname = localStorage.getItem(NICK_KEY) || ""; } catch (e) {}
+$("nickInput").value = nickname;
+function readNickname() {
+  const v = $("nickInput").value.replace(/\s+/g, " ").trim().slice(0, 8);
+  if (!v) return false;
+  nickname = v;
+  try { localStorage.setItem(NICK_KEY, v); } catch (e) {}
+  return true;
+}
+
+const room = {
+  code: null, ref: null, subs: [], leaving: false,
+  players: {}, status: null, host: null, hostLoaded: false,
+  startAt: 0, originZombieId: null, final: null, winner: null
+};
+function sub(ref, ev, fn) { ref.on(ev, fn); room.subs.push([ref, ev, fn]); }
+function unsubAll() { room.subs.forEach(s => { try { s[0].off(s[1], s[2]); } catch (e) {} }); room.subs = []; }
+function isHost() { return !!room.ref && room.host === myId; }
+function byJoin(ps) { return (a, b) => ((ps[a] && ps[a].joinedAt) || 0) - ((ps[b] && ps[b].joinedAt) || 0); }
+function playerIds() { return okeys(room.players).filter(id => room.players[id]).sort(byJoin(room.players)); }
+function roundIds() { return playerIds().filter(id => room.players[id].inRound); }
+function newPlayer(t) { return { nickname, ready: false, joinedAt: t, role: "human", infected: false, inRound: false }; }
+function startMsg(t) { setText($("startMsg"), t || ""); }
+
+function sweepRooms() {
+  return db.ref(ROOM_ROOT).once("value").then(s => {
+    const all = s.val() || {}, t = serverNow(), u = {};
+    okeys(all).forEach(code => {
+      const r = all[code] || {}, age = t - (r.createdAt || 0);
+      if ((!okeys(r.players).length && age > 60000) || (r.status === "ended" && t - (r.endedAt || 0) > 600000) || age > 6 * 3600000) u[code] = null;
+    });
+    if (okeys(u).length) return db.ref(ROOM_ROOT).update(u);
+  }).catch(() => {});
+}
+async function createRoom() {
+  audioInit();
+  if (!readNickname()) { startMsg("닉네임을 먼저 입력해 주세요."); return; }
+  if (!db) { startMsg("온라인 연결을 할 수 없습니다. (인터넷 연결을 확인해 주세요)"); return; }
+  $("btnCreate").disabled = true; startMsg("");
+  try {
+    await sweepRooms();
+    for (let n = 0; n < 8; n++) {
+      const code = String(10000 + Math.floor(Math.random() * 90000)), t = serverNow();
+      const obj = { status: "lobby", hostPlayerId: myId, createdAt: t, players: { [myId]: newPlayer(t) } };
+      const res = await db.ref(ROOM_ROOT + "/" + code).transaction(cur => cur === null ? obj : undefined);
+      if (res.committed) { enterRoom(code); return; }
+    }
+    startMsg("방을 만들지 못했습니다. 다시 눌러 주세요.");
+  } catch (e) { startMsg("방을 만들지 못했습니다. (데이터베이스 규칙을 확인해 주세요)"); }
+  finally { $("btnCreate").disabled = false; }
+}
+async function joinRoom() {
+  audioInit();
+  if (!readNickname()) { startMsg("닉네임을 먼저 입력해 주세요."); return; }
+  const code = $("joinCode").value.replace(/\D/g, "");
+  if (code.length !== 5) { startMsg("방 코드 5자리를 입력해 주세요."); return; }
+  if (!db) { startMsg("온라인 연결을 할 수 없습니다."); return; }
+  $("btnJoin").disabled = true; startMsg("");
+  try {
+    const ref = db.ref(ROOM_ROOT + "/" + code);
+    const snap = await ref.once("value"), r = snap.val();
+    if (!r || !okeys(r.players).length) { startMsg("그런 방이 없습니다. 방 코드를 확인해 주세요."); return; }
+    if (okeys(r.players).length >= MAX_PLAYERS) { startMsg("방이 가득 찼습니다. (최대 " + MAX_PLAYERS + "명)"); return; }
+    await ref.child("players/" + myId).set(newPlayer(serverNow()));
+    enterRoom(code);
+  } catch (e) { startMsg("입장하지 못했습니다. (인터넷 연결을 확인해 주세요)"); }
+  finally { $("btnJoin").disabled = false; }
+}
+function enterRoom(code) {
+  room.code = code; room.ref = db.ref(ROOM_ROOT + "/" + code); room.leaving = false;
+  room.players = {}; room.status = null; room.host = null; room.hostLoaded = false; room.startAt = 0; room.final = null;
+  const ref = room.ref;
+  ref.child("players/" + myId).onDisconnect().remove();
+  ref.child("st/" + myId).onDisconnect().remove();
+  const pref = ref.child("players");
+  sub(pref, "child_added", s => { room.players[s.key] = s.val(); playersChanged(); });
+  sub(pref, "child_changed", s => { room.players[s.key] = s.val(); playersChanged(); });
+  sub(pref, "child_removed", s => {
+    delete room.players[s.key]; removeAvatar(s.key);
+    if (s.key === myId && !room.leaving) { exitToStart("방에서 나가게 되었습니다."); return; }
+    checkHost(); playersChanged();
+  });
+  sub(ref.child("hostPlayerId"), "value", s => { room.host = s.val(); room.hostLoaded = true; checkHost(); playersChanged(); });
+  sub(ref.child("startAt"), "value", s => { room.startAt = s.val() || 0; });
+  sub(ref.child("originZombieId"), "value", s => { room.originZombieId = s.val(); });
+  sub(ref.child("final"), "value", s => { room.final = s.val(); if (screenNow === "result") renderResult(); });
+  sub(ref.child("winner"), "value", s => { room.winner = s.val(); if (screenNow === "result") renderResult(); });
+  sub(ref.child("status"), "value", s => onStatus(s.val()));
+  const stRef = ref.child("st");
+  sub(stRef, "child_added", s => onRemoteState(s.key, s.val()));
+  sub(stRef, "child_changed", s => onRemoteState(s.key, s.val()));
+  setText($("lobbyCode"), code);
+  showScreen("lobby");
+}
+function nextHost(ps) { return okeys(ps).filter(id => ps[id]).sort(byJoin(ps))[0]; }
+function checkHost() {
+  if (!room.ref || !room.hostLoaded || !room.players[myId]) return;
+  if (room.host && room.players[room.host]) return;
+  if (nextHost(room.players) === myId) { room.host = myId; room.ref.update({ hostPlayerId: myId }); }
+}
+function leaveRoom() {
+  if (!room.ref) return;
+  const ref = room.ref;
+  room.leaving = true; unsubAll();
+  try { ref.child("players/" + myId).onDisconnect().cancel(); ref.child("st/" + myId).onDisconnect().cancel(); } catch (e) {}
+  ref.child("st/" + myId).remove().catch(() => {});
+  ref.child("players/" + myId).remove().then(() => ref.child("players").once("value")).then(s => {
+    const ps = s.val() || {};
+    if (!okeys(ps).length) return ref.remove();
+    return ref.child("hostPlayerId").once("value").then(h => {
+      const hid = h.val();
+      if (!hid || hid === myId || !ps[hid]) return ref.update({ hostPlayerId: nextHost(ps) });
+    });
+  }).catch(() => {});
+  resetRoomLocal();
+  showScreen("start"); startMsg("");
+}
+function exitToStart(msg) {
+  if (room.ref) {
+    room.leaving = true; unsubAll();
+    try { room.ref.child("players/" + myId).onDisconnect().cancel(); room.ref.child("st/" + myId).onDisconnect().cancel(); } catch (e) {}
+  }
+  resetRoomLocal();
+  showScreen("start"); startMsg(msg || "");
+}
+function resetRoomLocal() {
+  room.ref = null; room.code = null; room.players = {}; room.status = null; room.final = null;
+  clearRound();
+}
+window.addEventListener("pagehide", () => {
+  if (room.ref) { try { room.ref.child("players/" + myId).remove(); room.ref.child("st/" + myId).remove(); } catch (e) {} }
+});
+
+let screenNow = "start";
+function showScreen(name) {
+  screenNow = name;
+  for (const k in pressed) pressed[k] = false;
+  show($("scrStart"), name === "start");
+  show($("scrLobby"), name === "lobby");
+  show($("scrResult"), name === "result");
+  show($("hud"), name === "game");
+  if (name !== "game") { $("vignette").className = ""; $("speedLines").style.opacity = "0"; }
+  if (name === "lobby") renderLobby();
+  if (name === "result") renderResult();
+  if (name === "start") renderStartBest();
+}
+
+function onStatus(st) {
+  if (st === null) { if (!room.leaving && room.ref) exitToStart("방이 종료되었습니다."); return; }
+  const prev = room.status; room.status = st;
+  if (st === "lobby") {
+    clearRound();
+    if (prev && prev !== "lobby" && !isHost() && room.players[myId] && room.players[myId].ready) room.ref.child("players/" + myId + "/ready").set(false);
+    if (screenNow !== "result") showScreen("lobby"); else renderLobby();
+  } else if (st === "playing") {
+    const me = room.players[myId];
+    if (screenNow !== "result" || (me && me.inRound)) showScreen("game");
+  } else if (st === "ended") {
+    if (screenNow === "game" || screenNow === "lobby") showScreen("result");
+  }
+}
+
+let lobbyQueued = false;
+function playersChanged() {
+  for (const id in avatars) { const p = room.players[id]; if (p) avatars[id].setNickname(p.nickname); }
+  if (lobbyQueued) return; lobbyQueued = true;
+  setTimeout(() => { lobbyQueued = false; if (screenNow === "lobby") renderLobby(); }, 0);
+}
+function readyCount() { return playerIds().filter(id => id === room.host || room.players[id].ready).length; }
+function renderLobby() {
+  const ids = playerIds();
+  setText($("lobbyCount"), "참가자 " + ids.length + " / " + MAX_PLAYERS);
+  $("lobbyList").innerHTML = ids.map(id => {
+    const p = room.players[id], host = id === room.host, ready = host || p.ready;
+    return '<li class="' + (id === myId ? "me" : "") + '"><span class="nm">' + escapeHtml(p.nickname || "이름 없음") + (id === myId ? " (나)" : "") + "</span>" +
+      (host ? '<span class="badge host">방장</span>' : "") +
+      '<span class="badge' + (ready ? " ready" : "") + '">' + (ready ? "준비 완료" : "대기 중") + "</span></li>";
+  }).join("");
+  const host = isHost(), me = room.players[myId];
+  const waitingRound = room.status === "playing" || room.status === "ended";
+  show($("btnStart"), host); show($("btnReady"), !host);
+  const rc = readyCount();
+  $("btnStart").disabled = !(host && room.status === "lobby" && rc >= MIN_PLAYERS);
+  $("btnReady").disabled = room.status !== "lobby";
+  setText($("btnReady"), me && me.ready ? "준비 취소" : "준비하기");
+  let msg;
+  if (waitingRound) msg = "지난 판이 정리되는 중입니다. 잠시만 기다려 주세요.";
+  else if (host) msg = rc >= MIN_PLAYERS ? "준비된 " + rc + "명으로 시작할 수 있습니다. (Space 키로도 시작)" : "준비된 인원이 2명 이상이어야 시작할 수 있습니다.";
+  else msg = me && me.ready ? "방장이 게임을 시작할 때까지 기다려 주세요." : "준비하기를 눌러 주세요. (Space 키로도 준비)";
+  setText($("lobbyMsg"), msg);
+}
+function toggleReady() {
+  if (!room.ref || isHost() || room.status !== "lobby") return;
+  const me = room.players[myId]; if (!me) return;
+  room.ref.child("players/" + myId + "/ready").set(!me.ready);
+}
+function hostStart() {
+  if (!isHost() || room.status !== "lobby") return;
+  const participants = playerIds().filter(id => id === room.host || room.players[id].ready);
+  if (participants.length < MIN_PLAYERS) return;
+  const zombieId = participants[Math.floor(Math.random() * participants.length)];
+  const startAt = serverNow() + COUNTDOWN_MS;
+  const u = { status: "playing", startAt, endedAt: null, winner: null, final: null, originZombieId: zombieId, zombieIds: { [zombieId]: startAt } };
+  playerIds().forEach(id => {
+    const inRound = participants.includes(id);
+    u["players/" + id + "/inRound"] = inRound;
+    u["players/" + id + "/role"] = id === zombieId ? "zombie" : "human";
+    u["players/" + id + "/infected"] = false;
+    u["players/" + id + "/infectedAt"] = null;
+  });
+  room.ref.update(u);
+}
+
+const avatars = {};
+const round = {
+  key: 0, active: false, iAmIn: false, lastElapsed: -1e9, bellsRung: {}, rushAnnounced: false, releaseAnnounced: false,
+  countBeeped: {}, myInfectedAt: 0, infectSent: false, dashReadyAt: 0, dashUntil: 0, dashDir: null, dashStartMs: 0, dashProgress: 0,
+  turnFrom: 0, turnTo: 0, turnStart: 0, lastNet: 0, lastSent: "", forceNet: false, knownInfected: {}, becameZombieShown: false,
+  endRequested: false, spectateIndex: 0, fov: BASE_FOV, camYaw: 0, camElev: 0.3, camDist: CAM_DIST, resultSaved: null
+};
+const me = { x: 0, y: 0, z: 0, vy: 0 };
+
+function removeAvatar(id) { if (avatars[id]) { avatars[id].dispose(); delete avatars[id]; } }
+function clearRound() {
+  for (const id in avatars) removeAvatar(id);
+  round.active = false; round.key = 0; holdRing.visible = false;
+  $("feed").innerHTML = "";
+}
+function spawnPointFor(id, ids) {
+  if (id === room.originZombieId) return { x: SPAWN.x, z: SPAWN.z };
+  const humans = ids.filter(i => i !== room.originZombieId);
+  const k = humans.indexOf(id), a = (k / Math.max(1, humans.length)) * Math.PI * 2 + 0.4;
+  return { x: SPAWN.x + Math.sin(a) * 3, z: SPAWN.z + Math.cos(a) * 3 };
+}
+function beginLocalRound() {
+  clearRound();
+  const ids = roundIds();
+  round.key = room.startAt; round.active = true;
+  round.iAmIn = ids.includes(myId);
+  round.lastElapsed = -1e9; round.bellsRung = {}; round.rushAnnounced = false; round.releaseAnnounced = false; round.countBeeped = {};
+  round.myInfectedAt = 0; round.infectSent = false; round.dashReadyAt = 0; round.dashUntil = 0; round.dashDir = null;
+  round.turnStart = 0; round.lastSent = ""; round.forceNet = true; round.knownInfected = {}; round.becameZombieShown = false;
+  round.endRequested = false; round.spectateIndex = 0; round.resultSaved = null;
+  round.camYaw = 0; round.camElev = 0.3; round.fov = BASE_FOV;
+  ids.forEach(id => {
+    const p = room.players[id];
+    const av = avatars[id] = new Avatar(id, p.nickname || "이름 없음", id === myId);
+    const sp = spawnPointFor(id, ids);
+    av.pos.x = sp.x; av.pos.z = sp.z; av.pos.y = 0; av.face = 0;
+    av.prevPos.x = sp.x; av.prevPos.z = sp.z;
+    if (p.infected) round.knownInfected[id] = true;
+  });
+  if (round.iAmIn) { const av = avatars[myId]; me.x = av.pos.x; me.z = av.pos.z; me.y = 0; me.vy = 0; }
+  $("vignette").className = "";
+  flashCenter("", "", 0);
+}
+
+function isOriginZombie(id) { return id === room.originZombieId; }
+function infectedAtOf(id) {
+  if (id === myId && round.myInfectedAt) return round.myInfectedAt;
+  const p = room.players[id];
+  if (!p || p.role !== "zombie" || isOriginZombie(id)) return 0;
+  return p.infectedAt || 1;
+}
+function zombieFormActive(id, t) {
+  const p = room.players[id];
+  if (!(id === myId && round.myInfectedAt) && (!p || p.role !== "zombie")) return false;
+  const at = infectedAtOf(id);
+  return !at || t >= at + INFECT_TOTAL_MS;
+}
+function showsZombieModel(id, t) {
+  const p = room.players[id];
+  if (!(id === myId && round.myInfectedAt) && (!p || p.role !== "zombie")) return false;
+  const at = infectedAtOf(id);
+  return !at || t >= at + INFECT_ZOMBIE_MODEL_MS;
+}
+function isFrozen(id, t) {
+  const at = infectedAtOf(id);
+  return !!at && t < at + INFECT_TOTAL_MS;
+}
+function infectionMotion(id, t) {
+  const since = t - infectedAtOf(id);
+  return since < INFECT_INJURE_MS ? MOTION.injure : since < INFECT_ZOMBIE_MODEL_MS ? MOTION.fall : MOTION.standup;
+}
+function amIZombieRole() {
+  if (round.myInfectedAt) return true;
+  const p = room.players[myId];
+  return !!(p && p.role === "zombie");
+}
+function humansLeft() { return roundIds().filter(id => { const p = room.players[id]; return p.role !== "zombie" && !(id === myId && round.myInfectedAt); }); }
+
+const pressed = {};
+function keyName(e) {
+  switch (e.code) { case "KeyW": return "w"; case "KeyA": return "a"; case "KeyS": return "s"; case "KeyD": return "d"; case "KeyQ": return "q"; case "Space": return "space"; }
+  switch (e.key) { case "ArrowLeft": return "left"; case "ArrowRight": return "right"; case "ArrowUp": return "up"; case "ArrowDown": return "down"; case " ": return "space"; }
+  return null;
+}
+window.addEventListener("keydown", e => {
+  audioInit();
+  const tag = e.target && e.target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA") return;
+  const k = keyName(e); if (!k) return;
+  if (k === "space" || (screenNow === "game" && ["up", "down", "left", "right"].includes(k))) e.preventDefault();
+  if (!pressed[k] && !e.repeat) {
+    if (k === "space") onSpace();
+    if (k === "q" && screenNow === "game") startQuickTurn();
+    if (screenNow === "game" && !round.iAmIn && (k === "left" || k === "right")) round.spectateIndex += k === "left" ? -1 : 1;
+  }
+  pressed[k] = true;
+});
+window.addEventListener("keyup", e => { const k = keyName(e); if (k) { pressed[k] = false; if (k === "space") e.preventDefault(); } });
+window.addEventListener("blur", () => { for (const k in pressed) pressed[k] = false; });
+function onSpace() {
+  if (screenNow === "lobby") { if (isHost()) hostStart(); else toggleReady(); }
+  else if (screenNow === "result") playAgain();
+  else if (screenNow === "game") tryDash();
+}
+function startQuickTurn() {
+  if (!round.active || !round.iAmIn) return;
+  const t = performance.now();
+  round.turnFrom = round.camYaw; round.turnTo = round.camYaw + Math.PI; round.turnStart = t;
+}
+
+function tryDash() {
+  if (!round.active || !round.iAmIn || !avatars[myId]) return;
+  const t = serverNow();
+  if (t < room.startAt || !zombieFormActive(myId, t) || isFrozen(myId, t)) return;
+  if (isOriginZombie(myId) && t < room.startAt + ZOMBIE_HOLD_MS) return;
+  const nowMs = performance.now();
+  if (nowMs < round.dashReadyAt) return;
+  const rush = room.startAt + ROUND_MS - t <= FINAL_RUSH_MS;
+  round.dashReadyAt = nowMs + (rush ? DASH_COOLDOWN_RUSH_MS : DASH_COOLDOWN_MS);
+  round.dashUntil = nowMs + DASH_MS;
+  round.dashStartMs = nowMs; round.dashProgress = 0;
+  round.dashDir = { x: Math.sin(round.camYaw), z: Math.cos(round.camYaw) };
+  round.fov = DASH_FOV;
+  $("speedLines").style.transition = "none"; $("speedLines").style.opacity = "1";
+  playDashSound();
+  round.forceNet = true;
+}
+
+function flashCenter(text, small, ms, red) {
+  const el = $("centerMsg");
+  el.className = red ? "red" : "";
+  el.innerHTML = text ? escapeHtml(text) + (small ? "<small>" + escapeHtml(small) + "</small>" : "") : "";
+  clearTimeout(flashCenter.timer);
+  if (text && ms) flashCenter.timer = setTimeout(() => { el.innerHTML = ""; }, ms);
+}
+function pushFeed(text) {
+  const feed = $("feed"), item = document.createElement("div");
+  item.textContent = text; feed.prepend(item);
+  while (feed.children.length > 4) feed.lastChild.remove();
+  setTimeout(() => item.remove(), 5000);
+}
+function fmtClock(ms) { const s = Math.max(0, Math.ceil(ms / 1000)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }
+
+function onRemoteState(id, str) {
+  if (id === myId) return;
+  const av = avatars[id]; if (!av || !round.active) return;
+  const a = String(str).split(","); if (a.length < 5) return;
+  const to = { x: +a[0], y: +a[1], z: +a[2], face: +a[3] * Math.PI / 180, motion: +a[4] };
+  if (!isFinite(to.x) || !isFinite(to.z)) return;
+  const from = { x: av.pos.x, y: av.pos.y, z: av.pos.z, face: av.face };
+  av.netFrom = av.netTo ? from : to; av.netTo = to; av.netT0 = performance.now();
+  av.remoteMotion = to.motion;
+}
+function lerpAngle(a, b, k) { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return a + d * k; }
+
+function updateLocalPlayer(dt, t, nowMs) {
+  const av = avatars[myId]; if (!av) return;
+  const turnLeft = (pressed.left ? 1 : 0) - (pressed.right ? 1 : 0);
+  if (round.turnStart && nowMs - round.turnStart < QUICK_TURN_MS) {
+    const k = (nowMs - round.turnStart) / QUICK_TURN_MS, e = k * (2 - k);
+    round.camYaw = round.turnFrom + (round.turnTo - round.turnFrom) * e;
+  } else {
+    if (round.turnStart) { round.camYaw = round.turnTo; round.turnStart = 0; av.face += Math.PI; }
+    round.camYaw += turnLeft * TURN_SPEED * dt;
+  }
+  round.camElev = clamp(round.camElev + ((pressed.down ? 1 : 0) - (pressed.up ? 1 : 0)) * PITCH_SPEED * dt, -0.25, 0.95);
+
+  const frozen = isFrozen(myId, t), zombie = zombieFormActive(myId, t);
+  const countdown = t < room.startAt;
+  const rush = room.startAt + ROUND_MS - t <= FINAL_RUSH_MS;
+  let motion = MOTION.idle;
+  const fx = Math.sin(round.camYaw), fz = Math.cos(round.camYaw);
+  const rx = -Math.cos(round.camYaw), rz = Math.sin(round.camYaw);
+  if (frozen) motion = infectionMotion(myId, t);
+  else if (!countdown) {
+    if (round.dashDir) {
+      const progress = clamp((nowMs - round.dashStartMs) / DASH_MS, 0, 1);
+      const step = (progress - round.dashProgress) * DASH_DISTANCE;
+      round.dashProgress = progress;
+      moveWithCollision(me, round.dashDir.x * step, round.dashDir.z * step);
+      motion = MOTION.dash;
+      av.face = Math.atan2(round.dashDir.x, round.dashDir.z);
+      if (progress >= 1) { round.dashDir = null; round.forceNet = true; }
+    } else {
+      const mf = (pressed.w ? 1 : 0) - (pressed.s ? 1 : 0), ms = (pressed.d ? 1 : 0) - (pressed.a ? 1 : 0);
+      if (mf || ms) {
+        const len = Math.hypot(mf, ms);
+        const wx = (fx * mf + rx * ms) / len, wz = (fz * mf + rz * ms) / len;
+        const speed = zombie ? ZOMBIE_SPEED * (rush ? RUSH_SPEED_MULT : 1) : HUMAN_SPEED;
+        moveWithCollision(me, wx * speed * dt, wz * speed * dt);
+        const backward = mf < 0;
+        const targetFace = backward ? Math.atan2(-wx, -wz) : Math.atan2(wx, wz);
+        av.face = lerpAngle(av.face, targetFace, clamp(dt * 14, 0, 1));
+        motion = backward ? MOTION.back : MOTION.run;
+      }
+    }
+    if (isOriginZombie(myId) && t < room.startAt + ZOMBIE_HOLD_MS) {
+      const dx = me.x - SPAWN.x, dz = me.z - SPAWN.z, d = Math.hypot(dx, dz);
+      if (d > HOLD_RADIUS - PLAYER_RADIUS) { const s = (HOLD_RADIUS - PLAYER_RADIUS) / d; me.x = SPAWN.x + dx * s; me.z = SPAWN.z + dz * s; }
+    }
+  }
+  applyGravity(me, dt);
+  av.prevPos.x = av.pos.x; av.prevPos.y = av.pos.y; av.prevPos.z = av.pos.z;
+  av.pos.x = me.x; av.pos.y = me.y; av.pos.z = me.z;
+  av.setKind(showsZombieModel(myId, t) ? "zombie" : "human");
+  av.applyMotion(motion, rush);
+  av.update(dt, nowMs);
+  if (!zombie && !round.myInfectedAt && !countdown) checkInfection(t);
+}
+
+function distToSegment2D(px, pz, ax, az, bx, bz) {
+  const vx = bx - ax, vz = bz - az, l2 = vx * vx + vz * vz;
+  let k = l2 > 0 ? ((px - ax) * vx + (pz - az) * vz) / l2 : 0; k = clamp(k, 0, 1);
+  return Math.hypot(px - (ax + vx * k), pz - (az + vz * k));
+}
+function checkInfection(t) {
+  if (round.infectSent) return;
+  const mine = room.players[myId];
+  if (!mine || mine.infected || mine.role === "zombie") return;
+  for (const id in avatars) {
+    if (id === myId || !zombieFormActive(id, t) || isFrozen(id, t)) continue;
+    const z = avatars[id];
+    if (Math.abs(z.pos.y - me.y) > INFECT_HEIGHT_GAP) continue;
+    if (distToSegment2D(me.x, me.z, z.prevPos.x, z.prevPos.z, z.pos.x, z.pos.z) < INFECT_RADIUS) { becomeInfected(t); return; }
+  }
+}
+function becomeInfected(t) {
+  if (round.infectSent || round.myInfectedAt) return;
+  round.infectSent = true; round.myInfectedAt = t; round.knownInfected[myId] = true;
+  round.forceNet = true; round.dashReadyAt = 0;
+  playInfectSound(1);
+  flashCenter("감염되었습니다!", "잠시 뒤 좀비로 깨어납니다.", INFECT_ZOMBIE_MODEL_MS, true);
+  room.ref.update({
+    ["players/" + myId + "/infected"]: true,
+    ["players/" + myId + "/infectedAt"]: t,
+    ["players/" + myId + "/role"]: "zombie",
+    ["zombieIds/" + myId]: t
+  });
+}
+
+function updateRemotePlayers(dt, t, nowMs) {
+  const rush = room.startAt + ROUND_MS - t <= FINAL_RUSH_MS;
+  for (const id in avatars) {
+    if (id === myId) continue;
+    const av = avatars[id];
+    av.prevPos.x = av.pos.x; av.prevPos.y = av.pos.y; av.prevPos.z = av.pos.z;
+    if (av.netTo) {
+      const k = clamp((nowMs - av.netT0) / REMOTE_LERP_MS, 0, 1);
+      const f = av.netFrom;
+      av.pos.x = f.x + (av.netTo.x - f.x) * k; av.pos.y = f.y + (av.netTo.y - f.y) * k; av.pos.z = f.z + (av.netTo.z - f.z) * k;
+      av.face = lerpAngle(f.face, av.netTo.face, k);
+    }
+    const p = room.players[id];
+    if (p && p.infected && !round.knownInfected[id]) {
+      round.knownInfected[id] = true;
+      pushFeed((p.nickname || "누군가") + "님이 감염되었습니다.");
+      const d = Math.hypot(av.pos.x - me.x, av.pos.z - me.z);
+      playInfectSound(clamp(1 - d / 30, 0.15, 0.8));
+    }
+    av.setKind(showsZombieModel(id, t) ? "zombie" : "human");
+    const frozen = isFrozen(id, t), netMotion = av.remoteMotion || MOTION.idle;
+    av.applyMotion(frozen ? infectionMotion(id, t) : netMotion >= MOTION.injure ? MOTION.idle : netMotion, rush);
+    av.update(dt, nowMs);
+  }
+}
+
+function netTick(nowMs, t) {
+  if (!room.ref || !round.iAmIn || !avatars[myId]) return;
+  if (!round.forceNet && nowMs - round.lastNet < NET_MS) return;
+  const av = avatars[myId];
+  const motion = av.motion;
+  let faceDeg = Math.round(av.face * 180 / Math.PI) % 360;
+  const s = me.x.toFixed(2) + "," + me.y.toFixed(2) + "," + me.z.toFixed(2) + "," + faceDeg + "," + motion;
+  round.lastNet = nowMs; round.forceNet = false;
+  if (s === round.lastSent) return;
+  round.lastSent = s;
+  room.ref.child("st/" + myId).set(s);
+}
+
+const camPivot = new THREE.Vector3(), camWanted = new THREE.Vector3(), camLook = new THREE.Vector3();
+function updateCamera(dt, target, yaw, nowMs) {
+  const fx = Math.sin(yaw), fz = Math.cos(yaw), rx = -Math.cos(yaw), rz = Math.sin(yaw);
+  camPivot.set(target.x + rx * CAM_SHOULDER, target.y + CAM_PIVOT_H, target.z + rz * CAM_SHOULDER);
+  const elev = round.camElev, horiz = Math.cos(elev) * CAM_DIST;
+  camWanted.set(camPivot.x - fx * horiz, camPivot.y + Math.sin(elev) * CAM_DIST, camPivot.z - fz * horiz);
+  const hitT = cameraClearance(camPivot, camWanted);
+  const wantDist = Math.max(0.35, hitT * CAM_DIST - 0.25);
+  round.camDist = wantDist < round.camDist ? wantDist : round.camDist + (wantDist - round.camDist) * clamp(dt * 5, 0, 1);
+  const k = round.camDist / CAM_DIST;
+  camera.position.set(camPivot.x + (camWanted.x - camPivot.x) * k, camPivot.y + (camWanted.y - camPivot.y) * k, camPivot.z + (camWanted.z - camPivot.z) * k);
+  const inGym = target.x > 54;
+  const floorBase = inGym ? 0 : Math.floor((target.y + 0.3) / FLOOR_H) * FLOOR_H;
+  const ceiling = inGym ? 7.7 : floorBase + FLOOR_H - 0.35;
+  camera.position.y = clamp(camera.position.y, floorBase + 0.3, Math.max(floorBase + 0.6, ceiling));
+  camLook.set(camPivot.x + fx * 4, camPivot.y - 0.25 - Math.sin(elev) * 1.2, camPivot.z + fz * 4);
+  camera.lookAt(camLook);
+  round.fov += (BASE_FOV - round.fov) * clamp(dt * 7, 0, 1);
+  if (Math.abs(camera.fov - round.fov) > 0.05) { camera.fov = round.fov; camera.updateProjectionMatrix(); }
+  const own = avatars[myId];
+  if (own) own.forms[own.kind].obj.visible = round.camDist > 0.7;
+}
+
+function updateHud(t, nowMs) {
+  const left = room.startAt + ROUND_MS - Math.max(t, room.startAt);
+  const timerEl = $("timer");
+  setText(timerEl, fmtClock(left));
+  timerEl.className = left <= FINAL_RUSH_MS ? "danger" : "";
+  const alive = humansLeft().length, total = roundIds().length;
+  setText($("aliveLine"), "생존자 " + alive + " / " + total + "명");
+  setText($("hBest"), bestText());
+  const vignette = $("vignette");
+  if (!round.iAmIn) {
+    setText($("roleText"), "관전 중"); $("roleIcon").className = ""; setText($("roleIcon"), "👀");
+    const ids = roundIds(), target = ids.length ? ids[((round.spectateIndex % ids.length) + ids.length) % ids.length] : null;
+    setText($("roleSub"), target ? (room.players[target].nickname || "") + "님을 보고 있습니다. (←/→ 바꾸기)" : "");
+    show($("dashBox"), false); vignette.className = "";
+    return;
+  }
+  const zombieRole = amIZombieRole(), zombieForm = zombieFormActive(myId, t);
+  setText($("roleText"), zombieRole ? "좀비" : "인간");
+  $("roleIcon").className = zombieRole ? "zombie" : ""; setText($("roleIcon"), zombieRole ? "🧟" : "🧑");
+  let sub = "";
+  if (t < room.startAt) sub = zombieRole ? "잠시 후 추격을 시작합니다." : "시작하면 바로 숨을 곳을 찾으세요.";
+  else if (isFrozen(myId, t)) sub = showsZombieModel(myId, t) ? "좀비로 깨어나는 중입니다…" : "감염되었습니다…";
+  else if (isOriginZombie(myId) && t < room.startAt + ZOMBIE_HOLD_MS) sub = Math.ceil((room.startAt + ZOMBIE_HOLD_MS - t) / 1000) + "초 뒤 추격할 수 있습니다.";
+  else if (zombieRole) sub = "인간에게 닿으면 감염시킵니다.";
+  else sub = "좀비에게 닿지 않게 도망치세요.";
+  setText($("roleSub"), sub);
+  if (zombieRole && !vignette.classList.contains("flash")) vignette.className = "zombie";
+  if (!zombieRole) vignette.className = "";
+  if (round.myInfectedAt && showsZombieModel(myId, t) && !round.becameZombieShown) {
+    round.becameZombieShown = true;
+    vignette.className = "zombie flash";
+    setTimeout(() => { if (vignette.classList.contains("flash")) vignette.className = "zombie"; }, 1650);
+    flashCenter("당신은 이제 좀비입니다", "다른 인간을 쫓아 감염시키세요!", 2600, true);
+  }
+  show($("dashBox"), zombieForm);
+  if (zombieForm) {
+    const held = isOriginZombie(myId) && t < room.startAt + ZOMBIE_HOLD_MS;
+    const rush = left <= FINAL_RUSH_MS, cd = rush ? DASH_COOLDOWN_RUSH_MS : DASH_COOLDOWN_MS;
+    const remain = Math.max(0, round.dashReadyAt - nowMs);
+    const k = held ? 0 : clamp(1 - remain / cd, 0, 1);
+    $("dashFill").style.width = (k * 100).toFixed(1) + "%";
+    $("dashFill").className = k >= 1 ? "ready" : "";
+    setText($("dashLab"), held ? "대기 중에는 대쉬할 수 없습니다" : k >= 1 ? "대쉬 준비 완료 [Space]" : "대쉬 충전 중 " + (remain / 1000).toFixed(1) + "초");
+  }
+  const lines = $("speedLines");
+  if (lines.style.opacity === "1" && nowMs > round.dashUntil) { lines.style.transition = "opacity .35s ease-out"; lines.style.opacity = "0"; }
+}
+
+function roundEvents(t) {
+  const elapsed = t - room.startAt, prev = round.lastElapsed;
+  if (elapsed < 0) {
+    const n = Math.ceil(-elapsed / 1000);
+    if (n >= 1 && n <= 3 && !round.countBeeped[n]) {
+      round.countBeeped[n] = true; playCountBeep(false);
+      const zombieRole = amIZombieRole() && round.iAmIn;
+      flashCenter(String(n), zombieRole ? "당신은 좀비입니다" : round.iAmIn ? "당신은 인간입니다" : "곧 시작합니다", 0, zombieRole);
+    }
+  } else if (!round.countBeeped.go) {
+    round.countBeeped.go = true; playCountBeep(true);
+    if (!round.iAmIn) flashCenter("시작!", "", 1500);
+    else if (isOriginZombie(myId)) flashCenter("당신은 좀비입니다", "15초 동안 중앙현관에서 기다린 뒤 추격을 시작합니다.", 3500, true);
+    else flashCenter("도망치세요!", "15초 뒤 좀비가 풀려납니다.", 2500);
+  }
+  holdRing.visible = elapsed < ZOMBIE_HOLD_MS && room.originZombieId && !!avatars[room.originZombieId];
+  if (elapsed >= ZOMBIE_HOLD_MS && prev < ZOMBIE_HOLD_MS && !round.releaseAnnounced) {
+    round.releaseAnnounced = true; playReleaseHorn();
+    flashCenter(isOriginZombie(myId) ? "추격을 시작하세요!" : "좀비가 풀려났습니다!", "", 2200, true);
+  }
+  for (const mark of BELL_ELAPSED_MS) {
+    if (elapsed >= mark && prev < mark && prev > -1e8 && !round.bellsRung[mark]) {
+      round.bellsRung[mark] = true; ringSchoolBell();
+      flashCenter("학교 종이 울립니다", "남은 시간 " + fmtClock(ROUND_MS - mark), 2600);
+    }
+  }
+  if (elapsed >= ROUND_MS - FINAL_RUSH_MS && prev < ROUND_MS - FINAL_RUSH_MS && !round.rushAnnounced) {
+    round.rushAnnounced = true; playRushAlarm();
+    flashCenter("마지막 30초!", "좀비가 50% 빨라지고 대쉬 대기시간이 2초로 줄어듭니다.", 3200, true);
+  }
+  round.lastElapsed = elapsed;
+}
+
+function checkRoundEnd(t) {
+  if (!room.ref || room.status !== "playing" || round.endRequested || t < room.startAt) return;
+  const ids = roundIds(); if (!ids.length) return;
+  const left = room.startAt + ROUND_MS - t;
+  const humans = humansLeft().length;
+  const zombies = ids.filter(id => room.players[id].role === "zombie").length;
+  const shouldEnd = left <= 0 || humans === 0 || zombies === 0;
+  if (!shouldEnd) return;
+  if (!isHost() && left > -2000) return;
+  round.endRequested = true;
+  const players = JSON.parse(JSON.stringify(room.players));
+  const startAt = room.startAt, origin = room.originZombieId;
+  room.ref.child("status").transaction(cur => cur === "playing" ? "ended" : undefined).then(res => {
+    if (!res.committed) return;
+    const final = {};
+    okeys(players).forEach(id => {
+      const p = players[id]; if (!p || !p.inRound) return;
+      let result, secs;
+      if (id === origin) { result = "origin"; secs = 0; }
+      else if (p.infected || p.role === "zombie") { result = "infected"; secs = clamp(Math.floor(((p.infectedAt || t) - startAt) / 1000), 0, ROUND_MS / 1000); }
+      else { result = "survived"; secs = ROUND_MS / 1000; }
+      final[id] = { n: p.nickname || "이름 없음", r: result, s: secs, j: p.joinedAt || 0 };
+    });
+    const winner = okeys(final).some(id => final[id].r === "survived") ? "human" : "zombie";
+    return room.ref.update({ final, winner, endedAt: serverNow() });
+  }).catch(() => { round.endRequested = false; });
+}
+
+function renderResult() {
+  const final = room.final || {}, ids = okeys(final).sort((a, b) => (final[b].s - final[a].s) || (final[a].j - final[b].j));
+  const winnerEl = $("resWinner");
+  if (!ids.length) {
+    winnerEl.className = "winner"; setText(winnerEl, "결과를 정리하는 중입니다…"); setText($("resSub"), "");
+    $("resBody").innerHTML = ""; show($("resNewBest"), false); setText($("resMine"), "");
+    return;
+  }
+  const humansWon = room.winner === "human";
+  winnerEl.className = "winner " + (humansWon ? "human" : "zombie");
+  setText(winnerEl, humansWon ? "인간 승리!" : "좀비 승리!");
+  const survivors = ids.filter(id => final[id].r === "survived").map(id => final[id].n);
+  setText($("resSub"), humansWon ? "끝까지 살아남은 학생: " + survivors.join(", ") : "모든 학생이 감염되었습니다.");
+  const label = { origin: '<span class="badge zombie">최초 좀비</span>', infected: '<span class="badge zombie">감염</span>', survived: '<span class="badge alive">생존</span>' };
+  $("resBody").innerHTML = ids.map(id => {
+    const f = final[id];
+    return '<tr class="' + (id === myId ? "me" : "") + '"><td>' + escapeHtml(f.n) + (id === myId ? " (나)" : "") + "</td><td>" + label[f.r] + '</td><td class="num">' + (f.r === "origin" ? "-" : f.s + "초") + "</td></tr>";
+  }).join("");
+  const mine = final[myId];
+  if (mine && round.resultSaved !== room.startAt) {
+    round.resultSaved = room.startAt;
+    round.newBest = false;
+    if (mine.r !== "origin" && mine.s > bestSeconds) { saveBest(mine.s); round.newBest = true; }
+    playEndSting(humansWon);
+  }
+  show($("resNewBest"), !!(mine && round.newBest));
+  if (mine) setText($("resMine"), (mine.r === "origin" ? "이번 판에는 최초 좀비였습니다." : "이번 생존 시간 " + mine.s + "초") + " · 개인 최고 기록 " + bestText());
+  else setText($("resMine"), "이번 판은 관전했습니다. · 개인 최고 기록 " + bestText());
+}
+function playAgain() {
+  if (!room.ref) { showScreen("start"); return; }
+  if (room.status === "ended") room.ref.update({ status: "lobby" });
+  if (!isHost() && room.players[myId] && room.players[myId].ready) room.ref.child("players/" + myId + "/ready").set(false);
+  showScreen(room.status === "playing" ? "game" : "lobby");
+}
+
+let lastFrame = performance.now(), slowFrames = 0;
+function adaptQuality(frameSec) {
+  if (screenNow !== "game" || frameSec > 0.25) return;
+  if (frameSec > 1 / 45) slowFrames++; else if (slowFrames > 0) slowFrames--;
+  if (slowFrames < 150) return;
+  slowFrames = 0;
+  const pr = renderer.getPixelRatio();
+  if (pr > MIN_PIXEL_RATIO) { renderer.setPixelRatio(Math.max(MIN_PIXEL_RATIO, pr - 0.25)); resize(); }
+}
+const idleCamTarget = { x: 0, y: 0, z: -2 };
+function frame(nowMs) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, (nowMs - lastFrame) / 1000);
+  adaptQuality((nowMs - lastFrame) / 1000);
+  lastFrame = nowMs;
+  const t = serverNow();
+  if (room.ref && room.status === "playing" && room.startAt && modelsReady && round.key !== room.startAt && room.players[myId]) beginLocalRound();
+  if (screenNow === "game" && round.active) {
+    if (round.iAmIn) updateLocalPlayer(dt, t, nowMs);
+    updateRemotePlayers(dt, t, nowMs);
+    roundEvents(t);
+    netTick(nowMs, t);
+    checkRoundEnd(t);
+    if (round.iAmIn) updateCamera(dt, me, round.camYaw, nowMs);
+    else {
+      const ids = roundIds().filter(id => avatars[id]);
+      const target = ids.length ? avatars[ids[((round.spectateIndex % ids.length) + ids.length) % ids.length]] : null;
+      if (target) { round.camYaw = lerpAngle(round.camYaw, target.face, clamp(dt * 3, 0, 1)); updateCamera(dt, target.pos, round.camYaw, nowMs); }
+    }
+    updateHud(t, nowMs);
+  } else {
+    if (room.status === "playing" && round.active) { updateRemotePlayers(dt, t, nowMs); checkRoundEnd(t); }
+    round.camYaw += dt * 0.05;
+    updateCamera(dt, idleCamTarget, round.camYaw, nowMs);
+  }
+  renderer.render(scene, camera);
+}
+requestAnimationFrame(frame);
+
+function blurAfter(fn) { return e => { e.currentTarget.blur(); fn(); }; }
+$("btnCreate").onclick = blurAfter(createRoom);
+$("btnJoin").onclick = blurAfter(joinRoom);
+$("joinCode").addEventListener("keydown", e => { if (e.key === "Enter") joinRoom(); });
+$("nickInput").addEventListener("keydown", e => { if (e.key === "Enter") e.currentTarget.blur(); });
+$("btnStart").onclick = blurAfter(hostStart);
+$("btnReady").onclick = blurAfter(toggleReady);
+$("btnLobbyLeave").onclick = blurAfter(leaveRoom);
+$("btnAgain").onclick = blurAfter(playAgain);
+$("btnResultLeave").onclick = blurAfter(leaveRoom);
+$("btnGameLeave").onclick = blurAfter(() => { if (confirm("방을 나가시겠습니까?")) leaveRoom(); });
+if (!db) startMsg("온라인 연결 설정을 불러오지 못했습니다. (firebase-config.js·인터넷 연결 확인)");
+})();
+</script>
+</body>
+</html>

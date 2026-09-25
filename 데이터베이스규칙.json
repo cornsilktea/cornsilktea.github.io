@@ -69,6 +69,23 @@
         }
       }
     },
+    "zombieoutbreak": {
+      ".read": true,
+      "rooms": {
+        "$room": {
+          ".write": "$room.matches(/^[0-9]{5}$/)",
+          "players": {
+            "$pid": {
+              "nickname": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 12" },
+              "role": { ".validate": "newData.isString() && newData.val().matches(/^(human|zombie)$/)" }
+            }
+          },
+          "st": {
+            "$pid": { ".validate": "newData.isString() && newData.val().length <= 60" }
+          }
+        }
+      }
+    },
     "court": {
       ".read": true,
       "now": { ".write": true },
