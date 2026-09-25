@@ -20,37 +20,61 @@
   html, body { width: 100%; height: 100%; overflow: hidden; background: #8FD3FF; font-family: var(--sg-font); color: var(--sg-ink); }
   canvas#gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 
-  #hud { position: fixed; top: 6px; left: 122px; right: 10px; display: none; flex-wrap: wrap; align-items: flex-start; justify-content: flex-start; gap: 6px; pointer-events: none; z-index: 5; }
-  #hud.battle { right: 110px; }
-  #hud .hud-box { padding: 3px 10px; }
-  .hud-box { background: rgba(255,255,255,.92); border: 2px solid var(--sg-line-strong); border-radius: 10px; padding: 6px 12px; font-weight: 800; font-variant-numeric: tabular-nums; box-shadow: 0 3px 0 rgba(27,43,32,.25); }
-  .hud-box .lab { font-size: 11px; color: var(--sg-ink-soft); font-weight: 700; display: block; }
-  #hudLap { font-size: 22px; }
-  #hudTime { font-size: 26px; text-align: center; min-width: 140px; }
-  #hudTime .off { display: block; font-size: 12px; color: var(--sg-danger); min-height: 15px; }
-  #hudBtns { display: flex; gap: 6px; margin-left: auto; pointer-events: auto; }
-  #hudBtns button { font: inherit; font-weight: 800; font-size: 13px; padding: 6px 10px; border-radius: 8px; border: 2px solid var(--sg-line-strong); background: #fff; color: var(--sg-ink); cursor: pointer; box-shadow: 0 3px 0 rgba(27,43,32,.25); }
-  #hudBtns button:active { transform: translateY(2px); box-shadow: none; }
-  #speed { position: fixed; left: 12px; bottom: 12px; z-index: 5; display: none; pointer-events: none; }
-  #speed b { font-size: 30px; }
-  #chaseTag { display: block; font-size: 13px; font-weight: 800; color: var(--sg-primary); }
-  #chaseTag.boost { color: #D97B4F; font-size: 16px; }
+  #hud { position: fixed; top: 0; left: 0; right: 0; z-index: 5; display: none; justify-content: space-between; align-items: flex-start; gap: 12px; padding: calc(env(safe-area-inset-top, 0px) + 50px) 16px 34px; pointer-events: none; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.6); background: linear-gradient(to bottom, rgba(16,18,28,.72) 0%, rgba(16,18,28,.42) 55%, rgba(16,18,28,0) 100%); }
+  #hud::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: linear-gradient(90deg, #D97B4F 0 18%, transparent 18% 82%, #D97B4F 82%); opacity: .85; }
+  #hud .lab { display: block; font-size: 11.5px; font-weight: 700; letter-spacing: .16em; color: #DCE6D6; line-height: 1.2; white-space: nowrap; }
+  .hudLeft { display: flex; align-items: flex-start; gap: 22px; min-width: 0; }
+  .lapBlock { min-width: 128px; }
+  .lapBlock .lab::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 6px; vertical-align: -1px; border-radius: 2px; background: conic-gradient(#fff 0 25%, #1B1D28 0 50%, #fff 0 75%, #1B1D28 0) 0 0 / 5px 5px; box-shadow: 0 0 0 1px rgba(255,255,255,.5); }
+  #hudLap { display: block; font-size: 36px; font-weight: 800; line-height: 1.05; margin: 2px 0 7px; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
+  .lapBar { width: 128px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.24); overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+  .lapBar i { display: block; height: 100%; width: 0; border-radius: 3px; background: linear-gradient(90deg, #DCE6D6, #D97B4F); }
+  .timeBlock { padding-left: 20px; border-left: 2px solid rgba(255,255,255,.2); }
+  #hudTime { font-size: 40px; font-weight: 800; line-height: 1.05; margin-top: 2px; font-variant-numeric: tabular-nums; letter-spacing: -.5px; min-width: 170px; }
+  #hudTime .off { display: block; font-size: 13px; font-weight: 800; letter-spacing: 0; color: #FFB08C; min-height: 17px; margin-top: 3px; }
+  .lapBlock[style*="none"] + .timeBlock { padding-left: 0; border-left: 0; }
+  .hudRight { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; text-align: right; min-width: 0; }
+  .chip { display: grid; grid-template-columns: auto 30px; grid-template-areas: "lab icon" "val icon"; column-gap: 8px; align-items: center; justify-items: end; }
+  .chip .lab { grid-area: lab; letter-spacing: .02em !important; }
+  .chip .chipIcon { grid-area: icon; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 15px; font-style: normal; text-shadow: none; box-shadow: 0 1px 4px rgba(0,0,0,.45), inset 0 0 0 2px rgba(255,255,255,.35); }
+  .chipIcon.best { background: #D97B4F; }
+  .chipIcon.pos { background: #fff; }
+  #hudBest, #hudPos { grid-area: val; font-size: 22px; font-weight: 800; line-height: 1.15; font-variant-numeric: tabular-nums; }
+  #hud #hudGhost { display: none; font-size: 13px; font-weight: 700; color: #DCE6D6; white-space: nowrap; max-width: 44vw; overflow: hidden; text-overflow: ellipsis; }
+  #hudBtns { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 8px); right: 12px; display: flex; gap: 6px; pointer-events: auto; }
+  #hud.battle #hudBtns { right: 110px; }
+  #hudBtns button { font: inherit; font-weight: 800; font-size: 14px; height: 34px; padding: 0 12px; border-radius: 8px; border: 1.5px solid rgba(255,255,255,.4); background: rgba(16,18,28,.55); color: #fff; cursor: pointer; text-shadow: none; box-shadow: 0 2px 6px rgba(0,0,0,.3); }
+  #hudBtns button:hover { border-color: #D97B4F; }
+  #hudBtns button:active { transform: translateY(1px); background: #D97B4F; border-color: #D97B4F; }
+
+  .hud-box { background: linear-gradient(135deg, rgba(16,18,28,.82), rgba(38,42,58,.72)); border: 1.5px solid rgba(255,255,255,.22); border-radius: 10px; padding: 6px 12px; color: #fff; font-weight: 800; font-variant-numeric: tabular-nums; text-shadow: 0 1px 3px rgba(0,0,0,.6); box-shadow: 0 4px 14px rgba(0,0,0,.3); }
+  .hud-box .lab { font-size: 11px; color: #DCE6D6; font-weight: 700; display: block; }
+  #speed { position: fixed; left: 18px; bottom: 16px; z-index: 5; display: none; pointer-events: none; min-width: 172px; padding: 8px 22px 12px 18px; border: 0; border-left: 5px solid #DCE6D6; border-radius: 6px; transform: skewX(-12deg); transform-origin: bottom left; transition: background .2s, border-color .2s, box-shadow .2s; }
+  #speed > * { transform: skewX(12deg); }
+  #speed::after { content: ""; position: absolute; left: 14px; right: 14px; bottom: 6px; height: 3px; border-radius: 2px; background: repeating-linear-gradient(90deg, rgba(255,255,255,.55) 0 10px, transparent 10px 14px); -webkit-mask: linear-gradient(90deg, #000 40%, rgba(0,0,0,.25)); mask: linear-gradient(90deg, #000 40%, rgba(0,0,0,.25)); }
+  #speed .lab { display: inline-block; font-size: 11.5px; letter-spacing: .18em; margin-right: 6px; vertical-align: 6px; }
+  #speed b { display: inline-block; font-size: 48px; line-height: 1; letter-spacing: -1px; min-width: 2.2ch; text-align: right; }
+  #speed .unit { display: inline-block; font-size: 15px; font-weight: 800; color: #DCE6D6; margin-left: 4px; }
+  #chaseTag { display: block; width: max-content; margin-bottom: 4px; padding: 2px 8px; border-radius: 6px; font-size: 13px; font-weight: 800; color: #DCE6D6; background: rgba(255,255,255,.12); }
+  #chaseTag.boost { color: #fff; font-size: 16px; background: #D97B4F; animation: boostPulse .5s ease-in-out infinite alternate; }
+  #speed:has(#chaseTag.boost) { background: linear-gradient(135deg, rgba(217,123,79,.95), rgba(150,64,34,.88)); border-left-color: #fff; box-shadow: 0 0 22px rgba(217,123,79,.75), 0 4px 14px rgba(0,0,0,.3); }
+  #speed:has(#chaseTag.boost) #chaseTag { background: #fff; color: #D97B4F; }
+  #speed:has(#chaseTag.boost) .lab, #speed:has(#chaseTag.boost) .unit { color: #fff; }
+  @keyframes boostPulse { from { opacity: .8; } to { opacity: 1; } }
   #fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 4; }
-  #hudBest { font-size: 18px; }
-  #hudBest .lab { white-space: nowrap; }
   .laps { font-size: 13px; color: var(--sg-ink-mid); margin: 4px 0 2px; font-variant-numeric: tabular-nums; }
   .laps b { color: var(--sg-primary); }
-  #minimap { position: fixed; right: 12px; bottom: 12px; width: 150px; height: 150px; background: rgba(255,255,255,.85); border: 2px solid var(--sg-line-strong); border-radius: 10px; z-index: 5; display: none; pointer-events: none; }
+  #minimap { position: fixed; right: 16px; bottom: 16px; width: 150px; height: 150px; background: radial-gradient(circle at 50% 45%, rgba(58,64,84,.55), rgba(16,18,28,.72)); border: 2px solid rgba(255,255,255,.35); border-top: 3px solid #D97B4F; border-radius: 14px; box-shadow: 0 4px 14px rgba(0,0,0,.35); z-index: 5; display: none; pointer-events: none; }
 
-  #lapToast { position: fixed; top: 64px; left: 50%; transform: translateX(-50%); display: none; pointer-events: none; z-index: 6; text-align: center; white-space: nowrap; }
-  #lapToast b { display: block; font-size: clamp(30px, 6vw, 48px); font-weight: 800; color: #fff; -webkit-text-stroke: 2px var(--sg-ink); text-shadow: 0 5px 0 rgba(27,43,32,.35); }
-  #lapToast span { display: inline-block; margin-top: 4px; padding: 4px 14px; border-radius: 10px; background: #D97B4F; color: #fff; font-size: 18px; font-weight: 800; border: 2px solid var(--sg-ink); }
+  #lapToast { position: fixed; top: 138px; left: 50%; transform: translateX(-50%); display: none; pointer-events: none; z-index: 6; text-align: center; white-space: nowrap; }
+  #lapToast b { display: block; font-size: clamp(30px, 6vw, 48px); font-weight: 800; color: #fff; -webkit-text-stroke: 2px #1B1D28; text-shadow: 0 4px 0 rgba(16,18,28,.45), 0 0 18px rgba(217,123,79,.55); }
+  #lapToast span { display: inline-block; margin-top: 6px; padding: 5px 16px; border-radius: 8px; background: linear-gradient(135deg, rgba(16,18,28,.88), rgba(38,42,58,.8)); color: #fff; font-size: 18px; font-weight: 800; border: 0; border-left: 4px solid #D97B4F; box-shadow: 0 4px 14px rgba(0,0,0,.3); }
   #lapToast.show { display: block; animation: toast 1.8s ease-out forwards; }
   @keyframes toast { 0% { opacity: 0; transform: translateX(-50%) scale(1.4); } 12% { opacity: 1; transform: translateX(-50%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; } }
 
   #count { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; pointer-events: none; z-index: 6; }
-  #count span { font-size: clamp(90px, 22vmin, 180px); font-weight: 800; color: #fff; -webkit-text-stroke: 4px var(--sg-ink); text-shadow: 0 8px 0 rgba(27,43,32,.35); animation: pop .5s ease-out; }
-  #count span.go { color: #D97B4F; }
+  #count span { font-size: clamp(90px, 22vmin, 180px); font-weight: 800; color: #fff; -webkit-text-stroke: 4px #1B1D28; text-shadow: 0 8px 0 rgba(16,18,28,.45), 0 0 30px rgba(16,18,28,.35); animation: pop .5s ease-out; }
+  #count span.go { color: #D97B4F; text-shadow: 0 8px 0 rgba(16,18,28,.45), 0 0 36px rgba(217,123,79,.8); }
   @keyframes pop { from { transform: scale(1.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
   #overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 56px 12px 12px; z-index: 7; overflow-y: auto; }
@@ -99,19 +123,31 @@
   .ghostbtn.on { background: #fff; border-color: #D97B4F; outline: 2px solid #D97B4F; }
   .ghostbtn:disabled { opacity: .45; cursor: default; }
   .sect { font-size: 13px; font-weight: 800; color: var(--sg-ink-soft); text-align: left; margin: 10px 0 4px; }
-  #hud #hudGhost { display: none; align-self: center; font-size: 12px; white-space: nowrap; }
   @media (max-width: 520px) { .cars { grid-template-columns: repeat(2, 1fr); } }
   .final { font-size: clamp(40px, 9vw, 58px); font-weight: 800; font-variant-numeric: tabular-nums; color: var(--sg-primary); line-height: 1.1; }
   .courseTag { display: inline-block; padding: 2px 12px; border-radius: 8px; background: var(--sg-panel-alt); border: 2px solid var(--sg-line-mid); font-size: 14px; font-weight: 800; margin-bottom: 6px; }
   .msg { font-size: 16px; font-weight: 800; color: #D97B4F; min-height: 20px; margin: 6px 0 2px; }
   .hint { font-size: 12px; color: var(--sg-ink-faint); margin-top: 12px; }
   @media (max-width: 520px) {
-    #hudTime { font-size: 20px; min-width: 110px; }
-    #hudLap { font-size: 17px; }
-    #minimap { width: 110px; height: 110px; }
-    #lapToast { top: 110px; }
-    #hud { left: 10px; top: 46px; }
-    #hud.battle { right: 10px; }
+    #hud { padding: calc(env(safe-area-inset-top, 0px) + 48px) 10px 26px; gap: 8px; }
+    #hud #hudLap { font-size: 26px; margin-bottom: 5px; }
+    .hudLeft { gap: 12px; }
+    .lapBlock { min-width: 84px; }
+    .lapBar { width: 84px; }
+    .timeBlock { padding-left: 12px; }
+    #hudTime { font-size: 26px; min-width: 108px; }
+    #hudTime .off { font-size: 12px; }
+    #hud .lab { font-size: 10.5px; letter-spacing: .1em; }
+    .chip { grid-template-columns: auto 24px; column-gap: 6px; }
+    .chip .chipIcon { width: 24px; height: 24px; font-size: 12px; }
+    #hudBest, #hudPos { font-size: 17px; }
+    #hudBtns { right: 8px; }
+    #hudBtns button { font-size: 13px; padding: 0 9px; }
+    #hud.battle #hudBtns { right: 100px; }
+    #speed { left: 12px; bottom: 12px; min-width: 132px; padding: 6px 16px 10px 12px; }
+    #speed b { font-size: 36px; }
+    #minimap { width: 110px; height: 110px; right: 12px; bottom: 12px; }
+    #lapToast { top: 150px; }
     .keys { gap: 12px; }
     .btn { font-size: 18px; padding: 11px 22px; }
     .rtab small { max-width: 100px; }
@@ -169,41 +205,49 @@
   .modalBox .joinRow input { font-size: 22px; letter-spacing: 1px; }
   .modalBox .mini { margin-top: 10px; }
 
-  #hudPos { font-size: 22px; }
-  #battleNote { position: fixed; left: 50%; transform: translateX(-50%); top: 64px; z-index: 5; pointer-events: none; font-size: 15px; padding: 6px 14px; text-align: center; white-space: nowrap; }
+  #battleNote { position: fixed; left: 50%; transform: translateX(-50%); top: 138px; z-index: 5; pointer-events: none; font-size: 16px; padding: 8px 16px; text-align: center; white-space: nowrap; border-left: 4px solid #D97B4F; }
   #btnMatchLeave { position: fixed; top: 8px; right: 8px; z-index: 8; }
-  #rankBox { position: fixed; top: 48px; left: 10px; z-index: 5; pointer-events: none; width: 250px; }
-  #rkTime { display: inline-block; margin-bottom: 6px; padding: 4px 12px; font-size: 20px; }
+  #rankBox { position: fixed; top: 48px; left: 10px; z-index: 5; pointer-events: none; width: 260px; padding: 10px 10px 12px; border-radius: 12px; border-top: 3px solid #D97B4F; background: linear-gradient(to bottom, rgba(16,18,28,.72), rgba(16,18,28,.38)); box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+  #rankBox #rkTime { display: block; margin: 0 0 8px 2px; padding: 0; font-size: 26px; background: none; border: 0; box-shadow: none; }
   #rkList { position: relative; }
-  .rkNum { position: absolute; left: 0; width: 50px; height: 46px; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 800; color: #fff; -webkit-text-stroke: 1px var(--sg-ink); text-shadow: 0 2px 0 rgba(27,43,32,.4); }
-  .rkRow { position: absolute; left: 54px; right: 0; height: 42px; display: flex; align-items: center; gap: 6px; padding: 0 10px; background: rgba(255,255,255,.93); border: 2px solid var(--sg-line-strong); border-radius: 10px; box-shadow: 0 3px 0 rgba(27,43,32,.25); transition: top .55s cubic-bezier(.4, 1.3, .5, 1); }
+  .rkNum { position: absolute; left: 0; width: 50px; height: 42px; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 800; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
+  .rkNum:first-child { color: #D97B4F; }
+  .rkRow { position: absolute; left: 54px; right: 0; height: 42px; display: flex; align-items: center; gap: 6px; padding: 0 10px; color: #fff; background: rgba(255,255,255,.1); border: 1.5px solid rgba(255,255,255,.22); border-radius: 10px; text-shadow: 0 1px 3px rgba(0,0,0,.55); transition: top .55s cubic-bezier(.4, 1.3, .5, 1); }
   .rkRow b { flex: 1 1 auto; min-width: 0; font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .rkRow small { flex: 0 0 auto; font-size: 12px; font-weight: 800; color: var(--sg-ink-soft); font-variant-numeric: tabular-nums; }
-  #viewBtns { position: fixed; left: 12px; bottom: 12px; z-index: 6; display: flex; gap: 8px; flex-wrap: wrap; }
-  #viewBtns button { font: inherit; font-weight: 800; font-size: 16px; padding: 10px 16px; border-radius: 10px; border: 3px solid var(--sg-line-strong); background: rgba(255,255,255,.93); color: var(--sg-ink); cursor: pointer; box-shadow: 0 4px 0 var(--sg-ink); }
-  #viewBtns button.on { background: var(--sg-ink); color: #fff; }
-  #viewBtns button small { display: block; font-size: 11px; font-weight: 700; opacity: .8; }
+  .rkRow small { flex: 0 0 auto; font-size: 13px; font-weight: 800; color: #DCE6D6; font-variant-numeric: tabular-nums; }
+  .rkRow .sideDot { box-shadow: 0 0 0 2px rgba(255,255,255,.8); }
+  #viewBtns { position: fixed; left: 50%; transform: translateX(-50%); bottom: 16px; z-index: 6; display: flex; gap: 8px; }
+  #viewBtns button { font: inherit; font-weight: 800; font-size: 16px; padding: 10px 18px; border-radius: 10px; border: 2px solid rgba(255,255,255,.4); border-bottom-width: 4px; background: linear-gradient(135deg, rgba(16,18,28,.82), rgba(38,42,58,.72)); color: #fff; cursor: pointer; white-space: nowrap; box-shadow: 0 4px 14px rgba(0,0,0,.3); }
+  #viewBtns button.on { background: #D97B4F; box-shadow: 0 0 18px rgba(217,123,79,.6); }
+  #viewBtns button small { display: block; font-size: 11px; font-weight: 700; opacity: .85; }
   @media (max-width: 520px) {
     .codeNum { font-size: 36px; }
-    #rankBox { width: 200px; }
+    #rankBox { width: 210px; }
+    #rankBox #rkTime { font-size: 22px; }
     .rkRow b { font-size: 15px; }
-    #battleNote { top: 110px; font-size: 13px; }
+    #battleNote { top: 150px; font-size: 14px; }
+    #viewBtns { bottom: 12px; }
+    #viewBtns button { font-size: 15px; padding: 8px 12px; }
   }
 </style>
 </head>
 <body>
 <div id="hud">
-  <div class="hud-box"><span class="lab">바퀴</span><span id="hudLap">1 / 3</span></div>
-  <div class="hud-box" id="hudTime">0:00.00<span class="off" id="hudOff"></span></div>
-  <div class="hud-box" id="hudPosBox" hidden><span class="lab">순위</span><span id="hudPos">1 / 2</span></div>
-  <div class="hud-box"><span class="lab">이번 경기 최고 랩</span><span id="hudBest">—</span></div>
-  <div class="hud-box" id="hudGhost"></div>
+  <div class="hudLeft">
+    <div class="lapBlock"><span class="lab">LAP · 바퀴</span><span id="hudLap">1 / 3</span><div class="lapBar"><i id="lapFill"></i></div></div>
+    <div class="timeBlock"><span class="lab">TIME · 기록</span><div id="hudTime">0:00.00<span class="off" id="hudOff"></span></div></div>
+  </div>
+  <div class="hudRight">
+    <div class="chip" id="hudPosBox" hidden><span class="lab">순위</span><span id="hudPos">1 / 2</span><i class="chipIcon pos">🏁</i></div>
+    <div class="chip"><span class="lab">이번 경기 최고 랩</span><span id="hudBest">—</span><i class="chipIcon best">⏱</i></div>
+    <div id="hudGhost"></div>
+  </div>
   <div id="hudBtns">
     <button type="button" id="btnReset">↻ 처음부터 (R)</button>
     <button type="button" id="btnRecover">🚗 트랙 복귀 (T)</button>
   </div>
 </div>
-<div class="hud-box" id="speed"><span id="chaseTag" hidden></span><span class="lab">속도</span><b id="speedVal">0</b> km/h</div>
+<div class="hud-box" id="speed"><span id="chaseTag" hidden></span><span class="lab">SPEED</span><b id="speedVal">0</b><span class="unit">km/h</span></div>
 <canvas id="minimap" width="300" height="300"></canvas>
 <canvas id="fx"></canvas>
 <div id="lapToast"><b id="lapToastMain"></b><span id="lapToastSub"></span></div>
@@ -3363,6 +3407,7 @@ const keys = { up: false, down: false, left: false, right: false };
 const hud = $("hud"), overlay = $("overlay"), cardStart = $("cardStart"), cardDone = $("cardDone"), cardCar = $("cardCar");
 const hudLap = $("hudLap"), hudTime = $("hudTime"), hudOff = $("hudOff"), speedBox = $("speed"), speedVal = $("speedVal"), chaseTag = $("chaseTag");
 const countBox = $("count"), countNum = $("countNum"), mini = $("minimap"), mctx = mini.getContext("2d");
+const lapFill = $("lapFill");
 const lapToast = $("lapToast"), lapToastMain = $("lapToastMain"), lapToastSub = $("lapToastSub"), hudBest = $("hudBest");
 const fx = $("fx"), fctx = fx.getContext("2d");
 let lapTimes = [], lapStartMs = 0, raceBest = 0;
@@ -3838,6 +3883,7 @@ function tick(now) {
   else if (state !== "menu") {
     hudTime.firstChild.nodeValue = fmtTime(state === "done" ? finalMs : elapsed);
     if (!OPEN) setText(hudLap, Math.min(LAPS, P.lap + 1) + " / " + LAPS);
+    if (!OPEN) { const lapFillWidth = (Math.max(0, Math.min(1, myProg() - P.lap)) * 100).toFixed(1) + "%"; if (lapFill.style.width !== lapFillWidth) lapFill.style.width = lapFillWidth; }
     setText(hudOff, P.off ? "오프로드 — 감속 중" : "");
     setText(speedVal, String(Math.round(Math.abs(P.v) * CFG.kmh)));
     const chaseText = chaseTagText();
