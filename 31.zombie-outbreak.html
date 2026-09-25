@@ -145,8 +145,25 @@
   #dashFill.ready { background: #FF5A5A; }
   #keyHint { position: absolute; left: 12px; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); font-size: 12px; font-weight: 700; color: #D5DCEA; line-height: 1.6; }
   #btnGameLeave { pointer-events: auto; position: absolute; right: 12px; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); height: 36px; padding: 0 14px; font-size: 14px; font-weight: 800; border-radius: 4px; border: 1px solid rgba(255, 255, 255, .5); background: rgba(8, 10, 22, .55); color: #fff; }
+  #specBox, #specList { display: none; }
+  #hud.spec #specBox { display: block; margin-top: 40px; min-width: 130px; }
+  #hud.spec #specList { display: flex; }
+  #hud.spec #roleBox, #hud.spec #bestBox, #hud.spec #keyHint, #hud.spec #dashBox { display: none; }
+  #hud.spec #btnGameLeave { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: auto; }
+  #hud.spec #feed { top: calc(env(safe-area-inset-top, 0px) + 54px); }
+  #specBox .rec { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #E0293D; margin-right: 6px; vertical-align: 1px; animation: recBlink 1.2s steps(1) infinite; }
+  #specTitle { font-size: 22px; font-weight: 800; margin-top: 3px; }
+  #specHint { font-size: 12px; font-weight: 700; color: #C9D3E6; margin-top: 2px; }
+  #specList { position: absolute; left: 12px; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); flex-direction: column; gap: 6px; pointer-events: auto; }
+  #specList button { display: flex; align-items: center; gap: 8px; width: 200px; max-width: 60vw; height: 40px; padding: 0 12px; border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, .18); border-left: 3px solid rgba(255, 255, 255, .35); background: rgba(8, 10, 16, .72); color: #D5DCEA; font-size: 15px; font-weight: 800; text-align: left; }
+  #specList button.on { border-color: rgba(200, 50, 60, .6); border-left-color: #E0293D; background: rgba(120, 18, 28, .8); color: #fff; }
+  #specList .sIcon { font-size: 16px; }
+  #specList .sNm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #specList .sFloor { flex: 0 0 auto; padding: 2px 8px; border-radius: 999px; background: #E0293D; color: #fff; font-size: 13px; }
   @media (max-width: 640px) {
     #timer { font-size: 30px; }
+    #specList button { height: 36px; font-size: 14px; }
     #roleText { font-size: 20px; }
     #keyHint { display: none; }
     .codeNum { font-size: 44px; }
@@ -162,6 +179,11 @@
 
 <div id="hud" hidden>
   <div id="topbar">
+    <div id="specBox">
+      <div class="hudLab"><span class="rec"></span>관전 중</div>
+      <div id="specTitle"></div>
+      <div id="specHint">←→ 또는 아래 버튼으로 시점 바꾸기</div>
+    </div>
     <div id="roleBox">
       <div class="hudLab">내 역할</div>
       <div id="roleLine"><div id="roleIcon">🧑</div><div id="roleText">인간</div></div>
@@ -183,6 +205,7 @@
     <div id="dashLab">대쉬 준비 완료 [Space]</div>
     <div id="dashBar"><div id="dashFill"></div></div>
   </div>
+  <div id="specList"></div>
   <div id="keyHint">WASD 이동 · ←→ 시점 회전 · ↑↓ 시점 높이 · Q 뒤돌기 · Space 대쉬(최초 좀비)</div>
   <button type="button" id="btnGameLeave">나가기</button>
 </div>
@@ -204,6 +227,7 @@
         <input id="joinCode" class="codeIn" inputmode="numeric" maxlength="5" placeholder="12345" autocomplete="off">
         <button type="button" class="btn primary" id="btnJoin">입장</button>
       </div>
+      <button type="button" class="btn" id="btnJoinSpec">👀 관전자로 입장 (방마다 1명)</button>
       <div class="msg" id="startMsg"></div>
     </div>
     <div class="card">
@@ -225,6 +249,7 @@
         <li>좀비에게 닿으면 2초 동안 굳은 뒤 좀비로 변합니다.</li>
         <li>1분마다 학교 종이 울리고, 마지막 30초에는 좀비가 더 빨라집니다.</li>
         <li>3분 동안 한 명이라도 살아남으면 인간 승리, 모두 감염되면 좀비 승리입니다.</li>
+        <li>방마다 관전자 1명이 따로 들어와 플레이어들의 시점을 번갈아 볼 수 있습니다. 게임 중에 들어온 플레이어는 다음 판부터 참가합니다.</li>
       </ul>
     </div>
   </div>
@@ -234,7 +259,7 @@
   <div class="wrap">
     <div class="card">
       <div class="codeBar"><span class="codeLab">방 코드</span><span class="codeNum" id="lobbyCode">-----</span></div>
-      <p class="sub" style="margin-top:10px">친구들에게 방 코드를 알려 주세요. (최대 5명)</p>
+      <p class="sub" style="margin-top:10px">친구들에게 방 코드를 알려 주세요. (플레이어 5명 · 관전자 1명)</p>
     </div>
     <div class="card">
       <h2 id="lobbyCount">참가자</h2>
@@ -242,6 +267,7 @@
       <button type="button" class="btn primary" id="btnStart">게임 시작</button>
       <button type="button" class="btn primary" id="btnReady">준비하기</button>
       <div class="msg ok" id="lobbyMsg"></div>
+      <button type="button" class="btn" id="btnSpecToggle">관전자로 바꾸기</button>
       <button type="button" class="btn" id="btnLobbyLeave">방 나가기</button>
     </div>
   </div>
@@ -292,7 +318,7 @@ const DASH_MS = 170, DASH_DISTANCE = 8.5, DASH_COOLDOWN_MS = 5000, DASH_COOLDOWN
 const INFECT_RADIUS = 1.05, INFECT_HEIGHT_GAP = 1.5;
 const TURN_SPEED = 3.6, PITCH_SPEED = 1.5, QUICK_TURN_MS = 150;
 const NET_MS = 100, REMOTE_LERP_MS = 120;
-const MAX_PLAYERS = 5, MIN_PLAYERS = 2;
+const MAX_PLAYERS = 5, MIN_PLAYERS = 2, MAX_SPECTATORS = 1;
 const ROOM_ROOT = "zombieoutbreak/rooms";
 const NICK_KEY = "zombieoutbreak_nick", BEST_KEY = "zombieoutbreak_best_v1";
 const MODEL_DIR = "img/zombie/";
@@ -2210,7 +2236,13 @@ function isHost() { return !!room.ref && room.host === myId; }
 function byJoin(ps) { return (a, b) => ((ps[a] && ps[a].joinedAt) || 0) - ((ps[b] && ps[b].joinedAt) || 0); }
 function playerIds() { return okeys(room.players).filter(id => room.players[id]).sort(byJoin(room.players)); }
 function roundIds() { return playerIds().filter(id => room.players[id].inRound); }
-function newPlayer(t) { return { nickname, ready: false, joinedAt: t, role: "human", infected: false, inRound: false }; }
+function isSpectator(id) { const p = room.players[id]; return !!(p && p.spec); }
+function countSlots(ps) {
+  const ids = okeys(ps).filter(id => ps[id]);
+  const spectators = ids.filter(id => ps[id].spec).length;
+  return { players: ids.length - spectators, spectators };
+}
+function newPlayer(t, spec) { return { nickname, ready: false, joinedAt: t, role: "human", infected: false, inRound: false, spec: !!spec }; }
 function startMsg(t) { setText($("startMsg"), t || ""); }
 
 function sweepRooms() {
@@ -2240,22 +2272,24 @@ async function createRoom() {
   } catch (e) { startMsg("방을 만들지 못했습니다. (데이터베이스 규칙을 확인해 주세요)"); }
   finally { $("btnCreate").disabled = false; }
 }
-async function joinRoom() {
+async function joinRoom(asSpectator) {
   audioInit();
   if (!readNickname()) { startMsg("닉네임을 먼저 입력해 주세요."); return; }
   const code = $("joinCode").value.replace(/\D/g, "");
   if (code.length !== 5) { startMsg("방 코드 5자리를 입력해 주세요."); return; }
   if (!db) { startMsg("온라인 연결을 할 수 없습니다."); return; }
-  $("btnJoin").disabled = true; startMsg("");
+  $("btnJoin").disabled = true; $("btnJoinSpec").disabled = true; startMsg("");
   try {
     const ref = db.ref(ROOM_ROOT + "/" + code);
     const snap = await ref.once("value"), r = snap.val();
     if (!r || !okeys(r.players).length) { startMsg("그런 방이 없습니다. 방 코드를 확인해 주세요."); return; }
-    if (okeys(r.players).length >= MAX_PLAYERS) { startMsg("방이 가득 찼습니다. (최대 " + MAX_PLAYERS + "명)"); return; }
-    await ref.child("players/" + myId).set(newPlayer(serverNow()));
+    const slots = countSlots(r.players);
+    if (asSpectator && slots.spectators >= MAX_SPECTATORS) { startMsg("이 방에는 이미 관전자가 있습니다. (관전자 " + MAX_SPECTATORS + "명)"); return; }
+    if (!asSpectator && slots.players >= MAX_PLAYERS) { startMsg("플레이어 자리가 가득 찼습니다. (최대 " + MAX_PLAYERS + "명)"); return; }
+    await ref.child("players/" + myId).set(newPlayer(serverNow(), asSpectator));
     enterRoom(code);
   } catch (e) { startMsg("입장하지 못했습니다. (인터넷 연결을 확인해 주세요)"); }
-  finally { $("btnJoin").disabled = false; }
+  finally { $("btnJoin").disabled = false; $("btnJoinSpec").disabled = false; }
 }
 function enterRoom(code) {
   room.code = code; room.ref = db.ref(ROOM_ROOT + "/" + code); room.leaving = false;
@@ -2283,7 +2317,7 @@ function enterRoom(code) {
   setText($("lobbyCode"), code);
   showScreen("lobby");
 }
-function nextHost(ps) { return okeys(ps).filter(id => ps[id]).sort(byJoin(ps))[0]; }
+function nextHost(ps) { const joinOrder = byJoin(ps); return okeys(ps).filter(id => ps[id]).sort((a, b) => (!!ps[a].spec - !!ps[b].spec) || joinOrder(a, b))[0]; }
 function checkHost() {
   if (!room.ref || !room.hostLoaded || !room.players[myId]) return;
   if (room.host && room.players[room.host]) return;
@@ -2344,8 +2378,8 @@ function onStatus(st) {
     if (prev && prev !== "lobby" && !isHost() && room.players[myId] && room.players[myId].ready) room.ref.child("players/" + myId + "/ready").set(false);
     if (screenNow !== "result") showScreen("lobby"); else renderLobby();
   } else if (st === "playing") {
-    const me = room.players[myId];
-    if (screenNow !== "result" || (me && me.inRound)) showScreen("game");
+    if (watchesRound()) showScreen("game");
+    else if (screenNow === "lobby") renderLobby();
   } else if (st === "ended") {
     if (screenNow === "game" || screenNow === "lobby") showScreen("result");
   }
@@ -2355,39 +2389,56 @@ let lobbyQueued = false;
 function playersChanged() {
   for (const id in avatars) { const p = room.players[id]; if (p) avatars[id].setNickname(p.nickname); }
   if (lobbyQueued) return; lobbyQueued = true;
-  setTimeout(() => { lobbyQueued = false; if (screenNow === "lobby") renderLobby(); }, 0);
+  setTimeout(() => {
+    lobbyQueued = false;
+    if (room.status === "playing" && screenNow === "lobby" && watchesRound()) { showScreen("game"); return; }
+    if (screenNow === "lobby") renderLobby();
+  }, 0);
 }
-function readyCount() { return playerIds().filter(id => id === room.host || room.players[id].ready).length; }
+function watchesRound() { const p = room.players[myId]; return !!(p && (p.inRound || p.spec)); }
+function isReadyParticipant(id) { const p = room.players[id]; return !!p && !p.spec && (id === room.host || p.ready); }
+function readyCount() { return playerIds().filter(isReadyParticipant).length; }
 function renderLobby() {
-  const ids = playerIds();
-  setText($("lobbyCount"), "참가자 " + ids.length + " / " + MAX_PLAYERS);
+  const ids = playerIds(), slots = countSlots(room.players);
+  setText($("lobbyCount"), "플레이어 " + slots.players + " / " + MAX_PLAYERS + " · 관전자 " + slots.spectators + " / " + MAX_SPECTATORS);
   $("lobbyList").innerHTML = ids.map(id => {
-    const p = room.players[id], host = id === room.host, ready = host || p.ready;
+    const p = room.players[id], host = id === room.host, ready = isReadyParticipant(id);
+    const stateBadge = p.spec ? '<span class="badge">👀 관전자</span>' : '<span class="badge' + (ready ? " ready" : "") + '">' + (ready ? "준비 완료" : "대기 중") + "</span>";
     return '<li class="' + (id === myId ? "me" : "") + '"><span class="nm">' + escapeHtml(p.nickname || "이름 없음") + (id === myId ? " (나)" : "") + "</span>" +
-      (host ? '<span class="badge host">방장</span>' : "") +
-      '<span class="badge' + (ready ? " ready" : "") + '">' + (ready ? "준비 완료" : "대기 중") + "</span></li>";
+      (host ? '<span class="badge host">방장</span>' : "") + stateBadge + "</li>";
   }).join("");
-  const host = isHost(), me = room.players[myId];
+  const host = isHost(), me = room.players[myId], mySpec = isSpectator(myId);
   const waitingRound = room.status === "playing" || room.status === "ended";
-  show($("btnStart"), host); show($("btnReady"), !host);
+  show($("btnStart"), host); show($("btnReady"), !host && !mySpec);
   const rc = readyCount();
   $("btnStart").disabled = !(host && room.status === "lobby" && rc >= MIN_PLAYERS);
   $("btnReady").disabled = room.status !== "lobby";
   setText($("btnReady"), me && me.ready ? "준비 취소" : "준비하기");
+  const specBtn = $("btnSpecToggle");
+  setText(specBtn, mySpec ? "플레이어로 바꾸기" : "👀 관전자로 바꾸기");
+  specBtn.disabled = room.status !== "lobby" || (mySpec ? slots.players >= MAX_PLAYERS : slots.spectators >= MAX_SPECTATORS);
   let msg;
-  if (waitingRound) msg = "지난 판이 정리되는 중입니다. 잠시만 기다려 주세요.";
-  else if (host) msg = rc >= MIN_PLAYERS ? "준비된 " + rc + "명으로 시작할 수 있습니다. (Space 키로도 시작)" : "준비된 인원이 2명 이상이어야 시작할 수 있습니다.";
+  if (room.status === "playing") msg = "게임이 진행 중입니다. 이번 판이 끝나면 함께할 수 있습니다.";
+  else if (waitingRound) msg = "지난 판이 정리되는 중입니다. 잠시만 기다려 주세요.";
+  else if (host) msg = rc >= MIN_PLAYERS ? "준비된 " + rc + "명으로 시작할 수 있습니다. (Space 키로도 시작)" : "준비된 플레이어가 2명 이상이어야 시작할 수 있습니다.";
+  else if (mySpec) msg = "관전자로 들어왔습니다. 게임이 시작되면 플레이어들의 시점을 볼 수 있습니다.";
   else msg = me && me.ready ? "방장이 게임을 시작할 때까지 기다려 주세요." : "준비하기를 눌러 주세요. (Space 키로도 준비)";
   setText($("lobbyMsg"), msg);
 }
 function toggleReady() {
-  if (!room.ref || isHost() || room.status !== "lobby") return;
+  if (!room.ref || isHost() || room.status !== "lobby" || isSpectator(myId)) return;
   const me = room.players[myId]; if (!me) return;
   room.ref.child("players/" + myId + "/ready").set(!me.ready);
 }
+function toggleSpectator() {
+  if (!room.ref || room.status !== "lobby" || !room.players[myId]) return;
+  const becomeSpec = !isSpectator(myId), slots = countSlots(room.players);
+  if (becomeSpec ? slots.spectators >= MAX_SPECTATORS : slots.players >= MAX_PLAYERS) return;
+  room.ref.child("players/" + myId).update({ spec: becomeSpec, ready: false });
+}
 function hostStart() {
   if (!isHost() || room.status !== "lobby") return;
-  const participants = playerIds().filter(id => id === room.host || room.players[id].ready);
+  const participants = playerIds().filter(isReadyParticipant);
   if (participants.length < MIN_PLAYERS) return;
   const zombieId = participants[Math.floor(Math.random() * participants.length)];
   const startAt = serverNow() + COUNTDOWN_MS;
@@ -2408,15 +2459,16 @@ const round = {
   key: 0, active: false, iAmIn: false, lastElapsed: -1e9, bellsRung: {}, rushAnnounced: false, releaseAnnounced: false,
   countBeeped: {}, myInfectedAt: 0, infectSent: false, dashReadyAt: 0, dashUntil: 0, dashDir: null, dashStartMs: 0, dashProgress: 0,
   turnFrom: 0, turnTo: 0, turnStart: 0, lastNet: 0, lastSent: "", forceNet: false, knownInfected: {}, becameZombieShown: false,
-  endRequested: false, spectateIndex: 0, fov: BASE_FOV, camYaw: 0, camElev: 0.3, camDist: CAM_DIST, resultSaved: null
+  endRequested: false, spectateIndex: 0, viewedId: null, fov: BASE_FOV, camYaw: 0, camElev: 0.3, camDist: CAM_DIST, resultSaved: null
 };
 const me = { x: 0, y: 0, z: 0, vy: 0 };
 
 function removeAvatar(id) { if (avatars[id]) { avatars[id].dispose(); delete avatars[id]; } }
 function clearRound() {
   for (const id in avatars) removeAvatar(id);
-  round.active = false; round.key = 0; holdRing.visible = false;
+  round.active = false; round.key = 0; round.viewedId = null; holdRing.visible = false;
   $("feed").innerHTML = "";
+  $("specList").innerHTML = ""; specListKey = "";
 }
 function spawnPointFor(id, ids) {
   if (id === room.originZombieId) return { x: SPAWN.x, z: SPAWN.z };
@@ -2496,7 +2548,7 @@ window.addEventListener("keydown", e => {
   if (!pressed[k] && !e.repeat) {
     if (k === "space") onSpace();
     if (k === "q" && screenNow === "game") startQuickTurn();
-    if (screenNow === "game" && !round.iAmIn && (k === "left" || k === "right")) round.spectateIndex += k === "left" ? -1 : 1;
+    if (screenNow === "game" && !round.iAmIn && ["left", "right", "a", "d"].includes(k)) round.spectateIndex += k === "left" || k === "a" ? -1 : 1;
   }
   pressed[k] = true;
 });
@@ -2681,7 +2733,8 @@ function updateRemotePlayers(dt, t, nowMs) {
     if (p && p.infected && !round.knownInfected[id]) {
       round.knownInfected[id] = true;
       pushKillFeed(p.infectedBy, id);
-      const d = Math.hypot(av.pos.x - me.x, av.pos.z - me.z);
+      const listener = round.iAmIn ? me : camera.position;
+      const d = Math.hypot(av.pos.x - listener.x, av.pos.z - listener.z);
       playInfectSound(clamp(1 - d / 30, 0.15, 0.8));
     }
     av.setKind(showsZombieModel(id, t) ? "zombie" : "human");
@@ -2724,9 +2777,54 @@ function updateCamera(dt, target, yaw, nowMs) {
   camera.lookAt(camLook);
   round.fov += (BASE_FOV - round.fov) * clamp(dt * 7, 0, 1);
   if (Math.abs(camera.fov - round.fov) > 0.05) { camera.fov = round.fov; camera.updateProjectionMatrix(); }
-  const own = avatars[myId];
+  const own = avatars[round.iAmIn ? myId : round.viewedId];
   if (own) own.forms[own.kind].obj.visible = round.camDist > 0.7;
 }
+
+function spectateTargetId() {
+  const ids = spectateIds();
+  return ids.length ? ids[((round.spectateIndex % ids.length) + ids.length) % ids.length] : null;
+}
+function spectateIds() { return roundIds().filter(id => avatars[id]); }
+function spectatorYawOf(av) { return av.face + (av.remoteMotion === MOTION.back ? Math.PI : 0); }
+function switchSpectateTarget(id) {
+  const old = avatars[round.viewedId];
+  if (old) old.forms[old.kind].obj.visible = true;
+  round.viewedId = id;
+  const av = avatars[id];
+  if (av) { round.camYaw = spectatorYawOf(av); round.camDist = CAM_DIST; }
+}
+function updateSpectatorCamera(dt, nowMs) {
+  const id = spectateTargetId();
+  if (id !== round.viewedId) switchSpectateTarget(id);
+  const target = id && avatars[id];
+  if (!target) return;
+  const up = pressed.up || pressed.w, down = pressed.down || pressed.s;
+  round.camElev = clamp(round.camElev + ((down ? 1 : 0) - (up ? 1 : 0)) * PITCH_SPEED * dt, -0.25, 0.95);
+  round.camYaw = lerpAngle(round.camYaw, spectatorYawOf(target), clamp(dt * 3, 0, 1));
+  updateCamera(dt, target.pos, round.camYaw, nowMs);
+}
+function floorOf(pos) { return clamp(Math.floor((pos.y + 0.3) / FLOOR_H), 0, FLOORS - 1) + 1; }
+let specListKey = "";
+function renderSpecList() {
+  const box = $("specList"), ids = spectateIds(), key = ids.join(",");
+  if (key !== specListKey) {
+    specListKey = key;
+    box.innerHTML = ids.map((id, i) => '<button type="button" data-i="' + i + '"><span class="sIcon"></span><span class="sNm"></span><span class="sFloor"></span></button>').join("");
+  }
+  ids.forEach((id, i) => {
+    const b = box.children[i], p = room.players[id], watching = id === round.viewedId;
+    b.classList.toggle("on", watching);
+    setText(b.children[0], p.role === "zombie" ? "🧟" : "🧑");
+    setText(b.children[1], p.nickname || "이름 없음");
+    show(b.children[2], watching);
+    if (watching) setText(b.children[2], floorOf(avatars[id].pos) + "층");
+  });
+}
+$("specList").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  b.blur(); round.spectateIndex = +b.dataset.i;
+});
 
 function updateHud(t, nowMs) {
   const left = room.startAt + ROUND_MS - Math.max(t, room.startAt);
@@ -2736,12 +2834,13 @@ function updateHud(t, nowMs) {
   const alive = humansLeft().length, total = roundIds().length;
   setText($("aliveLine"), "생존자 " + alive + " / " + total + "명");
   setText($("hBest"), bestText());
-  const vignette = $("vignette");
+  const vignette = $("vignette"), hud = $("hud");
+  if (hud.classList.contains("spec") === round.iAmIn) hud.classList.toggle("spec", !round.iAmIn);
   if (!round.iAmIn) {
-    setText($("roleText"), "관전 중"); $("roleIcon").className = ""; setText($("roleIcon"), "👀");
-    const ids = roundIds(), target = ids.length ? ids[((round.spectateIndex % ids.length) + ids.length) % ids.length] : null;
-    setText($("roleSub"), target ? (room.players[target].nickname || "") + "님을 보고 있습니다. (←/→ 바꾸기)" : "");
-    show($("dashBox"), false); vignette.className = "";
+    const id = round.viewedId;
+    setText($("specTitle"), id ? nickOf(id) + " 시점" : "플레이어를 기다리는 중");
+    renderSpecList();
+    vignette.className = id && zombieFormActive(id, t) ? "zombie" : "";
     return;
   }
   const zombieRole = amIZombieRole(), zombieForm = zombieFormActive(myId, t);
@@ -2864,13 +2963,13 @@ function renderResult() {
   }
   show($("resNewBest"), !!(mine && round.newBest));
   if (mine) setText($("resMine"), (mine.r === "origin" ? "이번 판에는 최초 좀비였습니다." : "이번 생존 시간 " + mine.s + "초") + " · 개인 최고 기록 " + bestText());
-  else setText($("resMine"), "이번 판은 관전했습니다. · 개인 최고 기록 " + bestText());
+  else setText($("resMine"), (isSpectator(myId) ? "이번 판은 관전했습니다." : "이번 판에는 참가하지 않았습니다.") + " · 개인 최고 기록 " + bestText());
 }
 function playAgain() {
   if (!room.ref) { showScreen("start"); return; }
   if (room.status === "ended") room.ref.update({ status: "lobby" });
   if (!isHost() && room.players[myId] && room.players[myId].ready) room.ref.child("players/" + myId + "/ready").set(false);
-  showScreen(room.status === "playing" ? "game" : "lobby");
+  showScreen(room.status === "playing" && watchesRound() ? "game" : "lobby");
 }
 
 let lastFrame = performance.now(), slowFrames = 0;
@@ -2936,7 +3035,8 @@ function frame(nowMs) {
   const touring = !(screenNow === "game" && round.active);
   show($("tourOverlay"), touring); show($("tourCaption"), touring);
   if (screenNow === "game" && round.active) {
-    const viewScale = round.iAmIn && zombieFormActive(myId, t) ? ZOMBIE_VIEW_SCALE : HUMAN_VIEW_SCALE;
+    const viewerId = round.iAmIn ? myId : round.viewedId;
+    const viewScale = viewerId && zombieFormActive(viewerId, t) ? ZOMBIE_VIEW_SCALE : HUMAN_VIEW_SCALE;
     setViewDistance(GAME_VIEW.near * viewScale, GAME_VIEW.far * viewScale, GAME_VIEW.cameraFar);
     if (round.iAmIn) updateLocalPlayer(dt, t, nowMs);
     updateRemotePlayers(dt, t, nowMs);
@@ -2944,11 +3044,7 @@ function frame(nowMs) {
     netTick(nowMs, t);
     checkRoundEnd(t);
     if (round.iAmIn) updateCamera(dt, me, round.camYaw, nowMs);
-    else {
-      const ids = roundIds().filter(id => avatars[id]);
-      const target = ids.length ? avatars[ids[((round.spectateIndex % ids.length) + ids.length) % ids.length]] : null;
-      if (target) { round.camYaw = lerpAngle(round.camYaw, target.face, clamp(dt * 3, 0, 1)); updateCamera(dt, target.pos, round.camYaw, nowMs); }
-    }
+    else updateSpectatorCamera(dt, nowMs);
     updateHud(t, nowMs);
   } else {
     if (room.status === "playing" && round.active) { updateRemotePlayers(dt, t, nowMs); checkRoundEnd(t); }
@@ -2964,8 +3060,10 @@ window.__zo = { THREE, scene, camera, renderer, round, tour, TOUR_SHOTS };
 
 function blurAfter(fn) { return e => { e.currentTarget.blur(); fn(); }; }
 $("btnCreate").onclick = blurAfter(createRoom);
-$("btnJoin").onclick = blurAfter(joinRoom);
-$("joinCode").addEventListener("keydown", e => { if (e.key === "Enter") joinRoom(); });
+$("btnJoin").onclick = blurAfter(() => joinRoom(false));
+$("btnJoinSpec").onclick = blurAfter(() => joinRoom(true));
+$("joinCode").addEventListener("keydown", e => { if (e.key === "Enter") joinRoom(false); });
+$("btnSpecToggle").onclick = blurAfter(toggleSpectator);
 $("nickInput").addEventListener("keydown", e => { if (e.key === "Enter") e.currentTarget.blur(); });
 $("btnStart").onclick = blurAfter(hostStart);
 $("btnReady").onclick = blurAfter(toggleReady);
