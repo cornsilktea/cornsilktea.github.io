@@ -413,6 +413,7 @@
 
   <div class="card wide" id="cardTeamOver" style="display:none">
     <div class="logo" style="font-size:40px" id="teamResult">무승부</div>
+    <div class="msg" id="teamQuitNote" style="color:#F2D06B;margin:-6px 0 12px" hidden></div>
     <div class="final">
       <div><div class="lab">블루팀</div><div class="num" id="finBlue" style="color:#2F6FD6">0</div></div>
       <div><div class="lab">레드팀</div><div class="num" id="finRed" style="color:#D6453D">0</div></div>
@@ -2332,6 +2333,7 @@ function enterRoom(code) {
   sub(ref.child("botFill"), "value", s => { T.botFill = s.val() !== false; playersChanged(); });
   sub(ref.child("startAt"), "value", s => { T.startAt = s.val() || 0; });
   sub(ref.child("itemWave"), "value", s => { T.itemWave = Math.max(T.itemWave, s.val() || 0); });
+  sub(ref.child("quitTeam"), "value", s => { T.quitTeam = s.val(); if (T.match && T.match.shownEnd) renderTeamResultTitle(); });
   sub(ref.child("status"), "value", s => onStatus(s.val()));
   const stRef = ref.child("st");
   sub(stRef, "child_added", s => onRemoteState(s.key, s.val()));
@@ -2443,7 +2445,7 @@ function hostStart() {
   if (!isHost() || T.status !== "lobby") return;
   if (teamIds("blue").length < 1 || teamIds("red").length < 1) return;
   const t = tnow();
-  const u = { status: "countdown", startAt: t + TEAM.countMs, endedAt: null, st: null, hits: null, kills: null, items: null, dmg: null, itemWave: 0 };
+  const u = { status: "countdown", startAt: t + TEAM.countMs, endedAt: null, quitTeam: null, st: null, hits: null, kills: null, items: null, dmg: null, itemWave: 0 };
   if (T.botFill) ["blue", "red"].forEach(team => {
     for (let i = teamIds(team).length; i < TEAM.max; i++) u["players/bot" + team + i] = { nickname: "AI " + (i + 1), team, isAI: true, joinedAt: t + i + 1 };
   });
@@ -2451,7 +2453,7 @@ function hostStart() {
 }
 function hostBackToLobby() {
   if (!isHost()) return;
-  const u = { status: "lobby", st: null, hits: null, kills: null, items: null, dmg: null, itemWave: 0, startAt: null, endedAt: null };
+  const u = { status: "lobby", quitTeam: null, st: null, hits: null, kills: null, items: null, dmg: null, itemWave: 0, startAt: null, endedAt: null };
   okeys(T.players).forEach(id => { if (T.players[id] && T.players[id].isAI) u["players/" + id] = null; });
   T.ref.update(u);
 }
@@ -2476,7 +2478,8 @@ function startMatchLocal() {
   resetMatchLocal();
   const me = T.players[T.myId];
   T.spec = !me || me.team === "spec";
-  T.match = { shownEnd: false, lastCount: -1, startedFor: T.startAt, feed: [], dmgTaken: {}, dmgSent: false };
+  const humansIn = tm => humanIds(T.players).filter(id => T.players[id].team === tm).length;
+  T.match = { shownEnd: false, lastCount: -1, startedFor: T.startAt, feed: [], dmgTaken: {}, dmgSent: false, humansAtStart: { blue: humansIn("blue"), red: humansIn("red") } };
   STAT.shots = STAT.hits = STAT.heads = 0;
   if (!T.spec) {
     T.me = { team: me.team, slot: Math.max(0, teamIds(me.team).indexOf(T.myId)), alive: true, protectUntil: 0, deadUntil: 0, shots: 0, moving: false };
@@ -2822,10 +2825,21 @@ function updateBotSim(b, dt, t) {
     if (soldierSpentRound(b)) b.weapon = "pistol";
   }
 }
+function teamAllQuit() {
+  const started = T.match && T.match.humansAtStart;
+  if (!started || !started.blue || !started.red) return null;
+  const left = tm => humanIds(T.players).filter(id => T.players[id].team === tm).length;
+  const b = left("blue"), r = left("red");
+  if (!r && b) return "red";
+  if (!b && r) return "blue";
+  return null;
+}
 function hostTick(dt, t, phase) {
   if (T.status === "countdown" && t >= T.startAt && T.statusSent !== "playing") { T.statusSent = "playing"; T.ref.update({ status: "playing" }); }
   if (phase === "end" && T.status !== "ended" && T.statusSent !== "ended") { T.statusSent = "ended"; T.ref.update({ status: "ended", endedAt: t }); }
   if (phase !== "play") return;
+  const quitTeam = teamAllQuit();
+  if (quitTeam && T.statusSent !== "ended") { T.statusSent = "ended"; T.ref.update({ status: "ended", endedAt: t, quitTeam }); return; }
   for (const id in T.bots) updateBotSim(T.bots[id], dt, t);
   while (T.itemWave < TEAM_ITEM_WAVES.length && (t - T.startAt) / 1000 >= TEAM_ITEM_WAVES[T.itemWave].at) {
     spawnItemPair(TEAM_ITEM_WAVES[T.itemWave].k);
@@ -2907,14 +2921,22 @@ function sendDamageTaken() {
   T.match.dmgSent = true;
   for (const victim in T.match.dmgTaken) if (okeys(T.match.dmgTaken[victim]).length) T.ref.child("dmg/" + victim).set(T.match.dmgTaken[victim]);
 }
+function renderTeamResultTitle() {
+  const b = teamScore("blue"), r = teamScore("red"), my = T.me ? T.me.team : null;
+  const quitWinner = T.quitTeam === "blue" ? "red" : T.quitTeam === "red" ? "blue" : null;
+  const winner = quitWinner || (b === r ? null : (b > r ? "blue" : "red"));
+  const title = winner ? (my ? (my === winner ? "🏆 승리! " : "😢 패배 — ") : "🏆 ") + TEAM_NAME[winner] + "팀 승리" : "🤝 무승부";
+  $("teamResult").textContent = title;
+  $("teamQuitNote").hidden = !quitWinner;
+  if (quitWinner) $("teamQuitNote").textContent = TEAM_NAME[T.quitTeam] + "팀이 모두 나가서 " + TEAM_NAME[quitWinner] + "팀이 승리했어요.";
+  return winner;
+}
 function showTeamResult() {
   if (!T.match || T.match.shownEnd) return;
   sendDamageTaken();
   T.match.shownEnd = true;
   const b = teamScore("blue"), r = teamScore("red"), my = T.me ? T.me.team : null;
-  const winner = b === r ? null : (b > r ? "blue" : "red");
-  const title = winner ? (my ? (my === winner ? "🏆 승리! " : "😢 패배 — ") : "🏆 ") + TEAM_NAME[winner] + "팀 승리" : "🤝 무승부";
-  $("teamResult").textContent = title;
+  const winner = renderTeamResultTitle();
   $("finBlue").textContent = b; $("finRed").textContent = r;
   renderBoard();
   $("teamStats").hidden = !T.me;

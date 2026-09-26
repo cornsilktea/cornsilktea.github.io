@@ -2538,6 +2538,8 @@ function enterRoom(code) {
   sub(pref, "child_added", s => { room.players[s.key] = s.val(); playersChanged(); });
   sub(pref, "child_changed", s => { room.players[s.key] = s.val(); playersChanged(); });
   sub(pref, "child_removed", s => {
+    const gone = room.players[s.key];
+    if (gone && !gone.bot && gone.inRound && room.status === "playing") round.quitSides[gone.role === "zombie" || gone.infected ? "zombie" : "human"] = true;
     delete room.players[s.key]; removeAvatar(s.key);
     if (s.key === myId && !room.leaving) { exitToStart("방에서 나가게 되었습니다."); return; }
     checkHost(); playersChanged();
@@ -2548,6 +2550,7 @@ function enterRoom(code) {
   sub(ref.child("originZombieId"), "value", s => { room.originZombieId = s.val(); });
   sub(ref.child("final"), "value", s => { room.final = s.val(); if (screenNow === "result") renderResult(); });
   sub(ref.child("winner"), "value", s => { room.winner = s.val(); if (screenNow === "result") renderResult(); });
+  sub(ref.child("quitSide"), "value", s => { room.quitSide = s.val(); if (screenNow === "result") renderResult(); });
   sub(ref.child("status"), "value", s => onStatus(s.val()));
   const stRef = ref.child("st");
   sub(stRef, "child_added", s => onRemoteState(s.key, s.val()));
@@ -2690,7 +2693,7 @@ function hostStart() {
   if (botsWanted()) for (let k = participants.length; k < MAX_PLAYERS; k++) botIds.push("bot" + (botIds.length + 1) + Math.random().toString(36).slice(2, 8));
   const zombieId = participants[Math.floor(Math.random() * participants.length)];
   const startAt = t0 + COUNTDOWN_MS;
-  Object.assign(u, { status: "playing", startAt, endedAt: null, winner: null, final: null, originZombieId: zombieId, zombieIds: { [zombieId]: startAt } });
+  Object.assign(u, { status: "playing", startAt, endedAt: null, winner: null, quitSide: null, final: null, originZombieId: zombieId, zombieIds: { [zombieId]: startAt } });
   botIds.forEach((id, k) => {
     u["players/" + id] = { nickname: "AI" + (k + 1), joinedAt: t0 + k + 1, role: id === zombieId ? "zombie" : "human", infected: false, inRound: true, spec: false, bot: true };
   });
@@ -2711,7 +2714,7 @@ const round = {
   key: 0, active: false, iAmIn: false, lastElapsed: -1e9, bellsRung: {}, rushAnnounced: false, releaseAnnounced: false,
   countBeeped: {}, myInfectedAt: 0, infectSent: false, dashReadyAt: 0, dashUntil: 0, dashDir: null, dashStartMs: 0, dashProgress: 0,
   turnFrom: 0, turnTo: 0, turnStart: 0, lastNet: 0, lastSent: "", forceNet: false, knownInfected: {}, becameZombieShown: false,
-  endRequested: false, spectateIndex: 0, viewedId: null, fov: BASE_FOV, camYaw: 0, camElev: 0.3, camDist: CAM_DIST, resultSaved: null
+  endRequested: false, quitSides: {}, spectateIndex: 0, viewedId: null, fov: BASE_FOV, camYaw: 0, camElev: 0.3, camDist: CAM_DIST, resultSaved: null
 };
 const me = { x: 0, y: 0, z: 0, vy: 0 };
 
@@ -2736,7 +2739,7 @@ function beginLocalRound() {
   round.lastElapsed = -1e9; round.bellsRung = {}; round.rushAnnounced = false; round.releaseAnnounced = false; round.countBeeped = {};
   round.myInfectedAt = 0; round.infectSent = false; round.dashReadyAt = 0; round.dashUntil = 0; round.dashDir = null;
   round.turnStart = 0; round.lastSent = ""; round.forceNet = true; round.knownInfected = {}; round.becameZombieShown = false;
-  round.endRequested = false; round.spectateIndex = 0; round.resultSaved = null;
+  round.endRequested = false; round.quitSides = {}; round.spectateIndex = 0; round.resultSaved = null;
   round.camYaw = 0; round.camElev = 0.3; round.fov = BASE_FOV;
   ids.forEach(id => {
     const p = room.players[id];
@@ -3521,13 +3524,21 @@ function roundEvents(t) {
   round.lastElapsed = elapsed;
 }
 
+function sideAllQuit(ids) {
+  const peopleOn = side => ids.filter(id => { const p = room.players[id]; return !p.bot && (p.role === "zombie") === (side === "zombie"); }).length;
+  const h = peopleOn("human"), z = peopleOn("zombie");
+  if (round.quitSides.zombie && !z && h) return "zombie";
+  if (round.quitSides.human && !h && z) return "human";
+  return null;
+}
 function checkRoundEnd(t) {
   if (!room.ref || room.status !== "playing" || round.endRequested || t < room.startAt) return;
   const ids = roundIds(); if (!ids.length) return;
   const left = room.startAt + ROUND_MS - t;
   const humans = humansLeft().length;
   const zombies = ids.filter(id => room.players[id].role === "zombie").length;
-  const shouldEnd = left <= 0 || humans === 0 || zombies === 0;
+  const quitSide = sideAllQuit(ids);
+  const shouldEnd = left <= 0 || humans === 0 || zombies === 0 || !!quitSide;
   if (!shouldEnd) return;
   if (!isHost() && left > -2000) return;
   round.endRequested = true;
@@ -3541,11 +3552,11 @@ function checkRoundEnd(t) {
       let result, secs;
       if (id === origin) { result = "origin"; secs = 0; }
       else if (p.infected || p.role === "zombie") { result = "infected"; secs = clamp(Math.floor(((p.infectedAt || t) - startAt) / 1000), 0, ROUND_MS / 1000); }
-      else { result = "survived"; secs = ROUND_MS / 1000; }
+      else { result = "survived"; secs = clamp(Math.floor((t - startAt) / 1000), 0, ROUND_MS / 1000); }
       final[id] = { n: p.nickname || "이름 없음", r: result, s: secs, j: p.joinedAt || 0 };
     });
-    const winner = okeys(final).some(id => final[id].r === "survived") ? "human" : "zombie";
-    return room.ref.update({ final, winner, endedAt: serverNow() });
+    const winner = quitSide ? (quitSide === "zombie" ? "human" : "zombie") : okeys(final).some(id => final[id].r === "survived") ? "human" : "zombie";
+    return room.ref.update({ final, winner, quitSide: quitSide || null, endedAt: serverNow() });
   }).catch(() => { round.endRequested = false; });
 }
 
@@ -3561,7 +3572,9 @@ function renderResult() {
   winnerEl.className = "winner " + (humansWon ? "human" : "zombie");
   setText(winnerEl, humansWon ? "인간 승리!" : "좀비 승리!");
   const survivors = ids.filter(id => final[id].r === "survived").map(id => final[id].n);
-  setText($("resSub"), humansWon ? "끝까지 살아남은 학생: " + survivors.join(", ") : "모든 학생이 감염되었습니다.");
+  setText($("resSub"), room.quitSide === "zombie" ? "좀비가 모두 나가서 인간이 승리했습니다."
+    : room.quitSide === "human" ? "인간이 모두 나가서 좀비가 승리했습니다."
+    : humansWon ? "끝까지 살아남은 학생: " + survivors.join(", ") : "모든 학생이 감염되었습니다.");
   const label = { origin: '<span class="badge zombie">숙주 좀비</span>', infected: '<span class="badge zombie">감염</span>', survived: '<span class="badge alive">생존</span>' };
   $("resBody").innerHTML = ids.map(id => {
     const f = final[id];

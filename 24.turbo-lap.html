@@ -4351,6 +4351,7 @@ function enterRoom(code) {
   });
   sub(ref.child("startAt"), "value", s => { BT.startAt = s.val() || 0; if (BT.match) BT.match.startAt = BT.startAt; });
   sub(ref.child("result"), "value", s => { BT.result = s.val(); if (cardNow === "bdone") renderResult(); });
+  sub(ref.child("quitSide"), "value", s => { BT.quitSide = s.val(); if (cardNow === "bdone") renderResult(); });
   sub(ref.child("status"), "value", s => onStatus(s.val()));
   const stRef = ref.child("st");
   sub(stRef, "child_added", s => onRemoteState(s.key, s.val()));
@@ -4479,11 +4480,11 @@ function renderLobby() {
 function hostStart() {
   if (!isHost() || BT.status !== "lobby" || !humanRacerReady()) return;
   audioInit();
-  BT.ref.update({ status: "countdown", startAt: tnow() + BATTLE.countMs, endedAt: null, st: null, result: null });
+  BT.ref.update({ status: "countdown", startAt: tnow() + BATTLE.countMs, endedAt: null, st: null, result: null, quitSide: null });
 }
 function hostBackToLobby() {
   if (!isHost()) return;
-  BT.ref.update({ status: "lobby", st: null, result: null, startAt: null, endedAt: null });
+  BT.ref.update({ status: "lobby", st: null, result: null, quitSide: null, startAt: null, endedAt: null });
 }
 
 function onStatus(st) {
@@ -4520,7 +4521,7 @@ function startMatchLocal() {
   ghostPlay = null; ghostLabel = "";
   scene.remove(car); car = makeCar(carKey); scene.add(car); car.visible = !BT.spec;
   resetCar(); P.lap = 0; P.expected = 0; lapTimes = []; lapStartMs = 0; raceBest = 0; renderHudBest();
-  BT.match = { startAt: BT.startAt, firstFinAt: 0 };
+  BT.match = { startAt: BT.startAt, firstFinAt: 0, humansAtStart: { left: humansOnSide("left"), right: humansOnSide("right") } };
   BT.statusSent = ""; BT.sent = ""; BT.lastNet = 0; BT.forceNet = true;
   BT.viewId = racerOf("left") || racerOf("right");
   BT.match.goPerf = performance.now() + goDelayMs();
@@ -4656,7 +4657,9 @@ function renderResult() {
     : '<tr><td colspan="3">결과를 불러오는 중…</td></tr>');
   const mine = rows.findIndex(x => x.id === BT.myId);
   let msg = "";
-  if (rows.length && mine === 0 && rows[0].fin) msg = "🏆 승리했습니다!";
+  const quitWinner = BT.quitSide && rows.find(x => x.team !== BT.quitSide && (x.team === "left" || x.team === "right"));
+  if (quitWinner) msg = quitWinner.id === BT.myId ? "🏆 상대가 나가서 승리했습니다!" : "🏆 상대가 나가서 " + quitWinner.nick + " 승리";
+  else if (rows.length && mine === 0 && rows[0].fin) msg = "🏆 승리했습니다!";
   else if (mine > 0) msg = "아쉽게 " + (mine + 1) + "위! 다시 도전해 보세요.";
   else if (rows.length && rows[0].fin) msg = "🏆 승리: " + rows[0].nick;
   $("bDoneMsg").textContent = msg;
@@ -4983,13 +4986,22 @@ function hostTick() {
   const t = tnow();
   if (BT.status === "countdown" && msToGo() <= 0 && BT.statusSent !== "playing") { BT.statusSent = "playing"; BT.ref.update({ status: "playing" }); }
   if (BT.status !== "playing" && BT.status !== "countdown") return;
-  const st = standings();
-  const over = !st.length || st.every(r => r.fin) || (BT.match.firstFinAt && t - BT.match.firstFinAt > BATTLE.dnfMs);
+  const st = standings(), quitSide = sideAllQuit();
+  const over = !st.length || st.every(r => r.fin) || (BT.match.firstFinAt && t - BT.match.firstFinAt > BATTLE.dnfMs) || !!quitSide;
   if (!over || BT.statusSent === "ended") return;
   BT.statusSent = "ended";
   const result = {};
   st.forEach(r => { const p = BT.players[r.id] || {}; result[r.id] = { nick: p.nickname || "?", team: p.team || "left", fin: r.fin || 0, prog: +(+r.prog).toFixed(4) }; });
-  BT.ref.update({ status: "ended", endedAt: t, result });
+  BT.ref.update({ status: "ended", endedAt: t, result, quitSide: quitSide || null });
+}
+function humansOnSide(side) { return sideIds(side).filter(id => !isBot(id)).length; }
+function sideAllQuit() {
+  const started = BT.match && BT.match.humansAtStart;
+  if (!started || !started.left || !started.right) return null;
+  const l = humansOnSide("left"), r = humansOnSide("right");
+  if (!r && l) return "right";
+  if (!l && r) return "left";
+  return null;
 }
 function setNote(text) { const el = $("battleNote"); el.hidden = !text; setText(el, text); }
 function renderRankBox(st) {
