@@ -2032,7 +2032,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var CAM_FOV = 40;
   var CAM = { pitchPlay: 0.92, pitchSpec: 1.12, dist: 1400, look: new THREE.Vector3(MW / 2, 0, MH / 2), fitKey: "", snap: true, halfW: 0, scopeX: 0, scopeZ: 0, zoom: 1, zoomGoal: 1 };
   var SCOPE_FIT_OUT = 0.82, SCOPE_FIT_IN = 0.65, SCOPE_ZOOM_MAX = 2.2;
-  var VIEW_AHEAD = 570, VIEW_BEHIND = 290, VIEW_HALF_W = 280, VIEW_NEAR_PAD = 110;
+  var VIEW_AHEAD = 570, VIEW_BEHIND = 290, VIEW_HALF_W = 280, VIEW_NEAR_PAD = 110, VIEW_TOP_SAFE_NDC = 0.55;
   var HEAD_Y = 110;
   var C_TEAM = { blue: 0x2F6FD6, red: 0xD6453D }, C_FX = { blue: 0x5FA2FF, red: 0xFF6A5F };
   var scene = new THREE.Scene();
@@ -2698,11 +2698,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     for (var i = 0; i < 24; i++) { var mid = (lo + hi) / 2; if (fitsView(pts, lx, lz, mid, pitch, xMax)) hi = mid; else lo = mid; }
     return hi;
   }
-  function groundReach(ndcY) {
+  function groundReach(ndcY, height) {
+    height = height || 0;
     placeCamera(0, 0, CAM.dist, CAM.pitchPlay, camBasis(false));
     tmpV.set(0, ndcY, 0.5).unproject(camera).sub(camera.position);
     if (tmpV.y >= -1e-6) return ndcY < 0 ? 9999 : -9999;
-    var k = -camera.position.y / tmpV.y;
+    var k = (height - camera.position.y) / tmpV.y;
     return camera.position.z + tmpV.z * k;
   }
   function updateCamera(dt) {
@@ -2718,7 +2719,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         CAM.dist = fitDist([[-VIEW_HALF_W, 0, -VIEW_AHEAD], [VIEW_HALF_W, 0, -VIEW_AHEAD], [-VIEW_HALF_W, 0, VIEW_BEHIND], [VIEW_HALF_W, 0, VIEW_BEHIND]],
                            0, -half, CAM.pitchPlay, 1);
         CAM.halfW = CAM.dist * Math.tan(CAM_FOV * Math.PI / 360) * camera.aspect;
-        CAM.nearReach = groundReach(-1); CAM.farReach = -groundReach(1);
+        CAM.nearReach = groundReach(-1); CAM.farReach = Math.min(-groundReach(1) - 40, -groundReach(VIEW_TOP_SAFE_NDC, HEAD_Y));
       }
     }
     var lx = MW / 2, lz = MH / 2, pitch = CAM.pitchSpec;
@@ -2726,7 +2727,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var focus = ME;
       if (!ME.alive) participants().forEach(function (id) { var o = ent(id); if (o && o.alive && o.team === ME.team && focus === ME) focus = o; });
       var ahead = (VIEW_AHEAD - VIEW_BEHIND) / 2;
-      var zLo = fl ? CAM.nearReach - VIEW_NEAR_PAD : CAM.farReach - 40, zHi = fl ? MH + 40 - CAM.farReach : MH + VIEW_NEAR_PAD - CAM.nearReach;
+      var zLo = fl ? CAM.nearReach - VIEW_NEAR_PAD : CAM.farReach, zHi = fl ? MH - CAM.farReach : MH + VIEW_NEAR_PAD - CAM.nearReach;
       lx = CAM.halfW * 2 >= MW + 40 ? MW / 2 : clamp(focus.x + b.fx * ahead, CAM.halfW - 20, MW - CAM.halfW + 20);
       lz = zLo > zHi ? MH / 2 : clamp(focus.y + b.fz * ahead, zLo, zHi);
       pitch = CAM.pitchPlay;
