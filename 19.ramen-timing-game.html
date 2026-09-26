@@ -201,6 +201,18 @@
   .grades .v{font-size:20px;font-weight:700}
   [hidden]{display:none !important;}
 
+  #btnRetry{position:fixed;top:calc(8px + env(safe-area-inset-top, 0px));right:10px;z-index:2147483000;
+    display:inline-flex;align-items:center;height:32px;padding:0 12px;background:#fff;border:1.5px solid #24402F;
+    border-radius:4px;color:#1B2B20;font-size:13px;font-weight:600;line-height:1;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+  #btnRetry:active{filter:brightness(.94)}
+  #countdown{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;
+    background:rgba(36,18,8,.45);touch-action:none}
+  #countdown b{font-size:min(40vw,200px);font-weight:800;color:#fff;line-height:1;
+    text-shadow:0 0 30px rgba(255,170,60,.8),0 4px 12px rgba(0,0,0,.4);animation:cdpop .9s ease-out both}
+  #countdown.go{background:transparent;pointer-events:none}
+  #countdown b.go{color:#FFC15E;font-size:min(22vw,120px)}
+  @keyframes cdpop{0%{transform:scale(1.6);opacity:0}25%{transform:scale(1);opacity:1}80%{opacity:1}100%{transform:scale(.9);opacity:.3}}
+
   #scrStart{--st-bg:36,18,8;--st-panel:rgba(44,24,12,.84);--st-accent:#D97B4F;--st-title2:#FFC15E;--st-glow:rgba(255,170,60,.55);
     --st-ink-mid:#E8D8C6;--st-ink-soft:#BFA78E}
   #scrStart .steps{margin:0 0 14px}
@@ -296,6 +308,8 @@
       </div>
       <div class="sub" id="trayTxt">쟁반: 완성 0그릇</div>
     </div>
+    <button id="btnRetry" type="button">↻ 다시하기</button>
+    <div id="countdown" hidden><b id="cdNum"></b></div>
   </section>
 
   <section id="scrEnd" class="screen">
@@ -592,15 +606,42 @@ const game = {
     }
   },
 
+  countdownTimer: 0,
+
+  stop(){
+    this.running = false; cancelAnimationFrame(this.raf);
+    clearTimeout(this.countdownTimer); $("countdown").hidden = true;
+    document.querySelectorAll(".fly").forEach(e=>e.remove());
+  },
+
   start(){
+    this.stop();
     this.money = 0; this.served = 0;
     this.grades = {best:0,good:0,fair:0,poor:0,mistake:0,fail:0};
     this.best = BEST.get(); this.shownTime = "";
     $("trayBowls").innerHTML = ""; this.updateHud();
     this.build();
+    this.pots.forEach(p => p.update());
+    hudTimeEl.textContent = CONFIG.GAME_SECONDS + "초";
+    show("scrGame");
+    this.countdown(3);
+  },
+
+  countdown(n){
+    const box = $("countdown"), num = $("cdNum");
+    box.hidden = false;
+    box.classList.toggle("go", n <= 0);
+    num.className = n > 0 ? "" : "go";
+    num.textContent = n > 0 ? n : "시작!";
+    num.style.animation = "none"; void num.offsetWidth; num.style.animation = "";
+    if (n > 0){
+      this.countdownTimer = setTimeout(() => this.countdown(n-1), 1000);
+      return;
+    }
+    this.countdownTimer = setTimeout(() => { box.hidden = true; }, 600);
+    this.pots.forEach(p => p.reset());
     this.startAt = now(); this.endAt = this.startAt + CONFIG.GAME_SECONDS;
     this.running = true;
-    show("scrGame");
     const loop = () => { if (!this.running) return; this.tick(); this.raf = requestAnimationFrame(loop); };
     loop();
   },
@@ -661,8 +702,7 @@ const game = {
 
   finish(){
     if (!this.running) return;
-    this.running = false; cancelAnimationFrame(this.raf);
-    document.querySelectorAll(".fly").forEach(e=>e.remove());
+    this.stop();
     const g = this.grades;
     $("endTitle").textContent = "최종 결과";
     $("endMoney").textContent = `누적 금액: ${fmt(this.money)}원`;
@@ -751,6 +791,7 @@ renderWorld();
 
 $("btnStart").addEventListener("click", () => game.start());
 $("btnAgain").addEventListener("click", () => show("scrStart"));
+$("btnRetry").addEventListener("click", () => game.start());
 </script>
 </body>
 </html>
