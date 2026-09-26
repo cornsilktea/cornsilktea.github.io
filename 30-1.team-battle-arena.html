@@ -327,6 +327,8 @@
 
 <script type="module">
 import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 (function () {
   "use strict";
 
@@ -1543,7 +1545,7 @@ import * as THREE from "three";
   var CAM_FOV = 40;
   var CAM = { pitchPlay: 0.92, pitchSpec: 1.12, dist: 1400, look: new THREE.Vector3(MW / 2, 0, MH / 2), fitKey: "", snap: true, halfW: 0 };
   var VIEW_AHEAD = 570, VIEW_BEHIND = 290, VIEW_HALF_W = 280, VIEW_NEAR_PAD = 110;
-  var HEAD_Y = 96;
+  var HEAD_Y = 110;
   var C_TEAM = { blue: 0x2F6FD6, red: 0xD6453D }, C_FX = { blue: 0x5FA2FF, red: 0xFF6A5F };
   var scene = new THREE.Scene();
   scene.background = new THREE.Color(0x2A2F2B);
@@ -1616,20 +1618,178 @@ import * as THREE from "three";
     return MATS[key] || (MATS[key] = new THREE.MeshBasicMaterial({ color: color, transparent: opacity < 1, opacity: opacity }));
   }
 
+  var KIT_DIR = "assets/kaykit/";
+  var MODEL = {
+    warrior: { file: "Barbarian", right: "axe_1handed" },
+    knight:  { file: "Knight", right: "sword_1handed", left: "shield_badge_color" },
+    ranger:  { file: "Ranger", right: "crossbow_2handed" },
+    mage:    { file: "Mage", right: "staff" },
+    rogue:   { file: "Rogue", right: "dagger", left: "dagger" }
+  };
+  var MODEL_SCALE = 38;
+  var KIT = { ready: false, chars: {}, weapons: {}, clips: {} };
+  function lambertize(root) {
+    var made = new Map();
+    root.traverse(function (o) {
+      if (!o.isMesh) return;
+      var m = made.get(o.material);
+      if (!m) { m = new THREE.MeshLambertMaterial({ map: o.material.map, side: o.material.side }); made.set(o.material, m); }
+      o.material = m;
+    });
+    return root;
+  }
+  function loadKit() {
+    var loader = new GLTFLoader();
+    function load(url) { return new Promise(function (ok, no) { loader.load(url, ok, undefined, no); }); }
+    var weaponNames = [];
+    CHAR_LIST.forEach(function (c) { [MODEL[c].right, MODEL[c].left].forEach(function (w) { if (w && weaponNames.indexOf(w) < 0) weaponNames.push(w); }); });
+    var jobs = [load(KIT_DIR + "animations/teambattle_anims.glb").then(function (g) { g.animations.forEach(function (clip) { KIT.clips[clip.name] = clip; }); })];
+    weaponNames.forEach(function (w) { jobs.push(load(KIT_DIR + "props/" + w + ".gltf").then(function (g) { KIT.weapons[w] = lambertize(g.scene); })); });
+    CHAR_LIST.forEach(function (c) { jobs.push(load(KIT_DIR + "characters/" + MODEL[c].file + ".glb").then(function (g) { KIT.chars[c] = lambertize(g.scene); })); });
+    Promise.all(jobs).then(function () {
+      CHAR_LIST.forEach(function (c) {
+        var m = KIT.chars[c], spec = MODEL[c];
+        if (spec.right) m.getObjectByName("handslotr").add(KIT.weapons[spec.right].clone());
+        if (spec.left) m.getObjectByName("handslotl").add(KIT.weapons[spec.left].clone());
+      });
+      KIT.ready = true;
+      makePortraits();
+    }).catch(function () { KIT.failed = true; });
+  }
+  function makePortraits() {
+    if (!renderer) return;
+    var PW = 200, PH = 220;
+    var rt = new THREE.WebGLRenderTarget(PW, PH);
+    rt.texture.colorSpace = THREE.SRGBColorSpace;
+    var ps = new THREE.Scene();
+    ps.add(new THREE.AmbientLight(0xffffff, 1.6));
+    var dl = new THREE.DirectionalLight(0xffffff, 2.2); dl.position.set(1.5, 3, 4); ps.add(dl);
+    var pc = new THREE.PerspectiveCamera(30, PW / PH, 0.1, 50);
+    var buf = new Uint8Array(PW * PH * 4), cvs = document.createElement("canvas");
+    cvs.width = PW; cvs.height = PH;
+    var c2 = cvs.getContext("2d"), img = c2.createImageData(PW, PH);
+    var oldClear = renderer.getClearColor(new THREE.Color()), oldAlpha = renderer.getClearAlpha();
+    renderer.setClearColor(0x000000, 0);
+    CHAR_LIST.forEach(function (c) {
+      var m = SkeletonUtils.clone(KIT.chars[c]);
+      m.rotation.y = -0.45; ps.add(m);
+      var mix = new THREE.AnimationMixer(m); mix.clipAction(KIT.clips.Idle_A).play(); mix.update(0.3);
+      m.updateMatrixWorld(true);
+      var box = new THREE.Box3().setFromObject(m), mid = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3());
+      var dist = size.y / 2 / Math.tan(15 * Math.PI / 180) * 1.12;
+      pc.position.set(mid.x, mid.y + size.y * 0.08, mid.z + dist); pc.lookAt(mid);
+      renderer.setRenderTarget(rt); renderer.clear(); renderer.render(ps, pc);
+      renderer.readRenderTargetPixels(rt, 0, 0, PW, PH, buf);
+      for (var y = 0; y < PH; y++) img.data.set(buf.subarray((PH - 1 - y) * PW * 4, (PH - y) * PW * 4), y * PW * 4);
+      c2.putImageData(img, 0, 0);
+      ICON_SRC[c] = cvs.toDataURL("image/png");
+      ps.remove(m);
+    });
+    renderer.setRenderTarget(null);
+    renderer.setClearColor(oldClear, oldAlpha);
+    rt.dispose();
+    playersChanged();
+  }
+
   var VIS = {}, PRV = {}, MLV = {};
+  var auraMat = new THREE.MeshBasicMaterial({ color: 0xFF3B1F, transparent: true, opacity: 0.3, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+  GEO.aura = new THREE.CylinderGeometry(30, 22, 84, 18, 1, true);
+  GEO.aura.translate(0, 42, 0);
   function makeVis(E) {
     var root = new THREE.Group(), body = new THREE.Group();
-    var mat = new THREE.MeshLambertMaterial({ color: C_TEAM[E.team], transparent: true });
-    var noseMat = new THREE.MeshLambertMaterial({ color: 0xFFF3D6, transparent: true });
-    var cap = new THREE.Mesh(GEO.body, mat); cap.position.y = 34;
-    var nose = new THREE.Mesh(GEO.nose, noseMat); nose.position.set(20, 48, 0);
-    body.add(cap); body.add(nose); root.add(body);
+    var v = { root: root, body: body, team: E.team, char: E.char, yaw: -E.angle, mats: [], glowMats: [], kit: false,
+              atkSeen: E.atkAt, combo: 0, cur: null, curName: "", once: null, speed: 0, px: E.x, py: E.y, dead: !E.alive };
+    if (KIT.ready) {
+      var model = SkeletonUtils.clone(KIT.chars[E.char]), made = new Map();
+      model.rotation.y = Math.PI / 2; model.scale.setScalar(MODEL_SCALE);
+      model.traverse(function (o) {
+        if (!o.isMesh) return;
+        o.frustumCulled = false;
+        var m = made.get(o.material);
+        if (!m) { m = o.material.clone(); m.transparent = true; made.set(o.material, m); v.mats.push(m); v.glowMats.push(m); }
+        o.material = m;
+      });
+      body.add(model);
+      v.kit = true; v.mixer = new THREE.AnimationMixer(model); v.actions = {};
+    } else {
+      var mat = new THREE.MeshLambertMaterial({ color: C_TEAM[E.team], transparent: true });
+      var noseMat = new THREE.MeshLambertMaterial({ color: 0xFFF3D6, transparent: true });
+      var cap = new THREE.Mesh(GEO.body, mat); cap.position.y = 34;
+      var nose = new THREE.Mesh(GEO.nose, noseMat); nose.position.set(20, 48, 0);
+      body.add(cap); body.add(nose);
+      v.mats.push(mat, noseMat); v.glowMats.push(mat);
+    }
+    root.add(body);
     var shadow = flatMesh(GEO.shadow, shadowMat); shadow.position.y = 0.6; root.add(shadow);
     var ringMat = new THREE.MeshBasicMaterial({ color: C_TEAM[E.team], transparent: true, depthWrite: false });
     var ring = flatMesh(GEO.ring, ringMat); ring.position.y = 1.2; root.add(ring);
+    v.mats.push(ringMat); v.ring = ring;
     var meRing = flatMesh(GEO.meRing, meRingMat); meRing.position.y = 1.4; meRing.visible = E.id === myId; root.add(meRing);
+    if (E.char === "warrior") { v.aura = new THREE.Mesh(GEO.aura, auraMat); v.aura.visible = false; root.add(v.aura); }
     scene.add(root);
-    return { root: root, body: body, ring: ring, mat: mat, mats: [mat, noseMat, ringMat], team: E.team, yaw: -E.angle };
+    return v;
+  }
+
+  function clipAction(v, name) {
+    return v.actions[name] || (v.actions[name] = v.mixer.clipAction(KIT.clips[name]));
+  }
+  function showClip(v, name, ts, loop, restart) {
+    var a = clipAction(v, name);
+    a.timeScale = ts;
+    if (name === v.curName && !restart) return;
+    a.reset();
+    if (loop) a.setLoop(THREE.LoopRepeat, Infinity);
+    else { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; }
+    var fade = v.cur ? (restart && name === v.curName ? 0 : 0.14) : 0;
+    if (v.cur && v.cur !== a) v.cur.fadeOut(fade);
+    a.setEffectiveWeight(1);
+    if (fade) a.fadeIn(fade);
+    a.play();
+    v.cur = a; v.curName = name;
+  }
+  function playOnce(v, name, ts, t) {
+    v.once = { name: name, ts: ts, until: t + KIT.clips[name].duration / ts * 1000 - 90, fresh: true };
+  }
+  var ROGUE_COMBO = ["Melee_Dualwield_Attack_Chop", "Melee_Dualwield_Attack_Slice", "Melee_Dualwield_Attack_Stab"];
+  function attackClip(v, E, t) {
+    if (E.char === "warrior") return ["Melee_1H_Attack_Chop", berserk(E, t) ? 2.0 : 1.4];
+    if (E.char === "knight") return ["Melee_1H_Attack_Slice_Horizontal", 1.5];
+    if (E.char === "ranger") return ["Ranged_2H_Shoot", 2.2];
+    if (E.char === "mage") return ["Ranged_Magic_Shoot", 1.8];
+    if (v.wasStealth) return ["Melee_Dualwield_Attack_Stab", 1.8];
+    return [ROGUE_COMBO[v.combo++ % 3], 2.0];
+  }
+  function animate(v, E, t, dt, hurt) {
+    if (!v.kit) return;
+    if (E.atkAt !== v.atkSeen) {
+      v.atkSeen = E.atkAt;
+      if (E.alive && t - E.atkAt < 600) {
+        var ac = attackClip(v, E, t);
+        playOnce(v, ac[0], ac[1], t);
+        if (E.char === "ranger" && !(E.ultUntil > t)) v.againAt = E.atkAt + CHARS.ranger.gap;
+      }
+    }
+    if (v.againAt && t >= v.againAt) { v.againAt = 0; if (v.once && v.once.name === "Ranged_2H_Shoot") v.once.fresh = true; }
+    if (hurt && E.alive && (!v.once || v.once.name === "Hit_A")) playOnce(v, "Hit_A", 1.6, t);
+    v.wasStealth = stealthed(E, t);
+    var moved = hyp(E.x - v.px, E.y - v.py) / Math.max(dt, 0.001);
+    v.px = E.x; v.py = E.y;
+    v.speed += (moved - v.speed) * Math.min(1, dt * 10);
+    if (v.once && (t > v.once.until || !E.alive)) v.once = null;
+    if (!E.alive) {
+      if (!v.dead) { v.dead = true; showClip(v, "Death_A", 1, false); }
+      else if (!v.curName) showClip(v, "Death_A_Pose", 1, false);
+    } else {
+      v.dead = false;
+      if (E.char === "ranger" && E.ultUntil > t) showClip(v, "Ranged_2H_Shoot", 3.5, true);
+      else if (v.once) { showClip(v, v.once.name, v.once.ts, false, v.once.fresh); v.once.fresh = false; }
+      else if (E.char === "knight" && E.buffUntil > t) showClip(v, "Melee_Block", 1, false);
+      else if (rooted(E)) showClip(v, "Ranged_Magic_Spellcasting_Long", 1, true);
+      else if (E.mv && v.speed > 150) showClip(v, "Running_A", clamp(v.speed / 260, 0.7, 1.6), true);
+      else if (E.mv && v.speed > 15) showClip(v, "Walking_A", clamp(v.speed / 110, 0.6, 1.4), true);
+      else showClip(v, "Idle_A", 1, true);
+    }
+    v.mixer.update(dt);
   }
   function dropVis(id) { var v = VIS[id]; if (!v) return; scene.remove(v.root); v.mats.forEach(function (m) { m.dispose(); }); delete VIS[id]; }
 
@@ -1825,24 +1985,27 @@ import * as THREE from "three";
       var E = ent(id); if (!E) return;
       shown[id] = 1;
       var v = VIS[id];
-      if (v && v.team !== E.team) { dropVis(id); v = null; }
+      if (v && (v.team !== E.team || v.char !== E.char || (KIT.ready && !v.kit))) { dropVis(id); v = null; }
       if (!v) v = VIS[id] = makeVis(E);
       var ally = spec || E.team === me.team, hid = hiddenFrom(E, t);
       if (!ally && hid && !revealedTo(E, me, t)) { lastHp[id] = E.hp; v.root.visible = false; return; }
       v.root.visible = true;
-      var alpha = !E.alive ? 0.35 : (hid ? (spec ? 0.55 : STEALTH_ALPHA) : 1);
+      var alpha = !E.alive ? (v.kit ? 0.6 : 0.35) : (hid ? (spec ? 0.55 : STEALTH_ALPHA) : 1), hurt = false;
       if (lastHp[id] !== undefined && Math.abs(E.hp - lastHp[id]) >= 1) {
         var d = Math.round(E.hp - lastHp[id]);
-        if (d < 0) { floatText(E.x, E.y, String(d), "#FF4B3E"); E.flashUntil = nowMs + 90; }
+        if (d < 0) { floatText(E.x, E.y, String(d), "#FF4B3E"); E.flashUntil = nowMs + 90; hurt = true; }
         else floatText(E.x, E.y, "+" + d, "#2FB35A");
       }
       lastHp[id] = E.hp;
       v.root.position.set(E.x, 0, E.y);
       v.yaw += angDiff(-faceAngle(E, t), v.yaw) * Math.min(1, dt * 14);
-      v.body.rotation.set(0, v.yaw, E.alive ? 0 : Math.PI / 2);
-      v.body.position.y = E.alive ? 0 : 17;
+      if (v.kit) v.body.rotation.y = v.yaw;
+      else { v.body.rotation.set(0, v.yaw, E.alive ? 0 : Math.PI / 2); v.body.position.y = E.alive ? 0 : 17; }
+      animate(v, E, t, dt, hurt);
       v.mats.forEach(function (m) { m.opacity = alpha; });
-      v.mat.emissive.setHex(glowOf(E, t));
+      var glow = glowOf(E, t);
+      v.glowMats.forEach(function (m) { m.emissive.setHex(glow); });
+      if (v.aura) { v.aura.visible = E.alive && berserk(E, t); v.aura.scale.y = 0.9 + 0.15 * Math.sin(nowMs / 90); }
       v.ring.visible = E.alive;
       if (E.alive) LABELS.push({ e: E, alpha: alpha, ally: ally });
     });
@@ -1951,6 +2114,7 @@ import * as THREE from "three";
     }
   }
   resize();
+  if (renderer) loadKit();
 
   function specPanelW() { return W > 900 ? 300 : 150; }
   function specPanel(team, s) {
