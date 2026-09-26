@@ -283,7 +283,7 @@
       <br>한 팀에서 같은 캐릭터는 1명만 고를 수 있어요(상대 팀과는 겹쳐도 돼요).
       <br><b>네크로</b>는 빠른 보라색 구체를 쏘고, 궁극기 <b>해골 소환</b>으로 앞쪽에 해골 병사 2마리를 불러내요. 해골은 8초 동안 보이는 적을 쫓아가 베고(적이 안 보이면 그 자리에 서 있음), 적의 공격에 맞으면 쓰러져요. 해골이 쓰러뜨린 적은 네크로의 킬이 되지만 궁극기 게이지는 차지 않아요. 해골이 있는 동안에도 네크로의 공격으로 게이지가 차서 다시 소환할 수 있어요. 해골은 최대 4마리까지 남고, 넘치면 가장 오래된 해골부터 사라져요.
       <br><b>저격수</b>는 석궁으로 아주 멀리(사거리 700) 강한 화살을 쏘지만 1초에 0.7발만 쏠 수 있어요. 공격 버튼을 끌어 조준하면 화면이 조준 방향으로 넓게 보여요. 궁극기 <b>거대 화살</b>은 3배 크기의 거대한 화살로, 처음 맞은 적에게 90의 피해를 줘요.
-      <br><b>투척병</b>은 조준한 곳(최대 380)에 1초마다 독약병을 던져요. 가까이 던질수록 빨리 떨어지고(가장 멀리 던지면 0.7초), 떨어진 자리에 초록 독 장판이 3초 동안 생기고, 장판 위의 적은 1초마다 20의 피해를 받아요(장판이 겹쳐도 1초에 한 번, 장판은 최대 4개까지 남고 넘치면 가장 오래된 것부터 사라져요). 공격 버튼을 짧게 끌면 가까이, 길게 끌면 멀리 던져요. 궁극기 <b>독안개</b>는 거대한 독 장판을 5초 동안 깔아 1초마다 20의 피해를 주고, 장판 안의 적은 40% 느려져요. 독 장판은 상대 팀에게도 보이니 밟지 않게 피하세요.
+      <br><b>투척병</b>은 조준한 곳(최대 380)에 1초마다 독약병을 던져요. 가까이 던질수록 빨리 떨어지고(가장 멀리 던지면 0.7초), 떨어진 자리에 초록 독 장판이 3초 동안 생기고, 장판 위의 적은 1초마다 20의 피해를 받아요(장판이 겹쳐도 1초에 한 번, 장판은 최대 4개까지 남고 넘치면 가장 오래된 것부터 사라져요). 공격 버튼을 짧게 끌면 가까이, 길게 끌면 멀리 던져요. 궁극기 <b>독안개</b>는 조준한 곳(최대 380)에 거대한 독 장판(반지름 200)을 5초 동안 깔아 1초마다 20의 피해를 주고, 장판 안의 적은 40% 느려져요. 장판 안의 아군(나 포함)은 1초마다 체력을 20 회복해요. 독 장판은 상대 팀에게도 보이니 밟지 않게 피하세요.
       <br><b>창기사</b>는 긴 창으로 앞을 곧게 찔러요(길이 250). 찌른 선 위에 있는 적은 모두 30의 피해를 받아요. 궁극기 <b>꿰뚫기</b>는 0.3초 동안 바닥에 빨간 선으로 예고한 뒤 더 길게(400) 찔러, 맞은 적 모두에게 90의 피해를 주고 1.2초 동안 기절시켜요. 기절한 동안은 움직이거나 공격할 수 없어요. 빨간 선이 보이면 옆으로 피하세요!
     </div>
   </div>
@@ -399,7 +399,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               smDur: 8000, smMax: 4, smRiseMs: 1100, smCorpseMs: 1400,
               pnDmg: 90, pnSpeed: 1500, pnRange: 700, pnPr: 16, pnRefund: 2, pnScale: 3,
               plFlight: 700, plFlightMin: 150, plR: 60, plDur: 3000, plTick: 1000, plMax: 4, plFade: 500, plLob: 90,
-              fgR: 150, fgDur: 5000, fgDmg: 20, fgSlowMul: 0.6, fgSlowMs: 400, fgCast: KEY * 4 + 50, fgRefund: 1,
+              fgR: 200, fgDur: 5000, fgDmg: 20, fgHeal: 20, fgSlowMul: 0.6, fgSlowMs: 400, fgCast: KEY * 4 + 100, fgRefund: 1,
               lnWind: 300, lnLen: 400, lnW: 36, lnDmg: 90, lnStunMs: 1200 };
   var SNIPER_KEEP = KEY * 5;
   function isMelee(c) { return !!(CHARS[c].arc || CHARS[c].width); }
@@ -859,7 +859,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "rogue") return num(ULT.asDur / 1000) + "초간 " + speedUp(CHARS.rogue) + ", 은신 상태로 변경, 공격 시 해제";
     if (k === "necro") return "앞쪽에 해골 병사 " + ULT.smCount + "마리 소환(HP " + ULT.smHp + ", 공격 " + ULT.smDmg + "), " + num(ULT.smDur / 1000) + "초간 보이는 적을 쫓아가 공격, 최대 " + ULT.smMax + "마리";
     if (k === "sniper") return "거대한 화살 1발(데미지 " + ULT.pnDmg + ", 사거리 " + ULT.pnRange + "), 적중 시 게이지 " + ULT.pnRefund + " 회복";
-    if (k === "thrower") return "지정한 곳에 반지름 " + ULT.fgR + " 독 장판 " + num(ULT.fgDur / 1000) + "초, 1초마다 " + ULT.fgDmg + "의 데미지, 장판 안의 적 이동속도 " + Math.round((1 - ULT.fgSlowMul) * 100) + "% 감소";
+    if (k === "thrower") return "지정한 곳에 반지름 " + ULT.fgR + " 독 장판 " + num(ULT.fgDur / 1000) + "초, 1초마다 " + ULT.fgDmg + "의 데미지, 장판 안의 적 이동속도 " + Math.round((1 - ULT.fgSlowMul) * 100) + "% 감소, 장판 안의 아군은 1초마다 " + ULT.fgHeal + " 회복";
     if (k === "lancer") return num(ULT.lnWind / 1000) + "초 준비 후 앞으로 길이 " + ULT.lnLen + " 찌르기, 맞은 적 모두 " + ULT.lnDmg + "의 데미지 + " + num(ULT.lnStunMs / 1000) + "초 기절";
     return "";
   }
@@ -1474,6 +1474,17 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     T.slowMul = was ? Math.min(T.slowMul, ULT.fgSlowMul) : ULT.fgSlowMul;
     if (!was) G.forceNet = true;
   }
+  function healInFog(T, e, t) {
+    var key = e.owner + "+" + T.id;
+    if (POOL_HIT[key] && t - POOL_HIT[key] < ULT.plTick) return;
+    POOL_HIT[key] = t;
+    var healed = Math.min(T.maxHp - T.hp, ULT.fgHeal);
+    if (healed <= 0) return;
+    T.hp += healed;
+    room.ref.child("hits/" + e.owner).push({ d: 0, b: 0, t: now(), hl: healed });
+    G.forceNet = true;
+    if (T === ME) sfx("heal");
+  }
   function stepPools(t) {
     POOLS = POOLS.filter(function (pl) {
       var e = pl.e, start = poolStart(e), end = start + e.dur;
@@ -1487,7 +1498,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (!pl.landed) { pl.landed = true; if (!ME || hyp(e.x - ME.x, e.y - ME.y) < 700) sfx("splash"); }
       if (room.status !== "playing") return true;
       localTargets().forEach(function (T) {
-        if (!T.alive || T.team === e.team || hyp(T.x - e.x, T.y - e.y) > e.r + BODY_R * 0.5) return;
+        if (!T.alive || hyp(T.x - e.x, T.y - e.y) > e.r + BODY_R * 0.5) return;
+        if (T.team === e.team) { if (e.u && !T.minion) healInFog(T, e, t); return; }
         if (e.u && !T.minion) slowInFog(T, t);
         var key = e.owner + ">" + T.id;
         if (POOL_HIT[key] && t - POOL_HIT[key] < ULT.plTick) return;
