@@ -2234,11 +2234,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     simpleProps.visible = false;
   }
 
-  var FOOT_PAD = 6;
-  function lowestOpaqueRow(buf, w, h) {
-    for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) if (buf[(y * w + x) * 4 + 3] > 24) return y;
-    return FOOT_PAD;
-  }
   function makePortraits() {
     if (!renderer) return;
     var PW = 200, PH = 220;
@@ -2253,21 +2248,24 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var c2 = cvs.getContext("2d"), img = c2.createImageData(PW, PH);
     var oldClear = renderer.getClearColor(new THREE.Color()), oldAlpha = renderer.getClearAlpha();
     renderer.setClearColor(0x000000, 0);
-    CHAR_LIST.forEach(function (c) {
+    var posed = CHAR_LIST.map(function (c) {
       var m = SkeletonUtils.clone(KIT.chars[c]);
-      m.rotation.y = -0.45; ps.add(m);
+      m.rotation.y = -0.45;
       var mix = new THREE.AnimationMixer(m); mix.clipAction(KIT.clips.Idle_A).play(); mix.update(0.3);
       m.updateMatrixWorld(true);
-      var box = new THREE.Box3().setFromObject(m), mid = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3());
-      var dist = size.y / 2 / Math.tan(15 * Math.PI / 180) * 1.12;
-      pc.position.set(mid.x, mid.y + size.y * 0.08, mid.z + dist); pc.lookAt(mid);
+      return { c: c, m: m, box: new THREE.Box3().setFromObject(m) };
+    });
+    var tallest = posed.reduce(function (h, p) { return Math.max(h, p.box.max.y); }, 0);
+    var frameH = tallest * 1.12, dist = frameH / 2 / Math.tan(15 * Math.PI / 180);
+    pc.position.set(0, frameH * 0.46, dist); pc.lookAt(0, frameH * 0.46, 0);
+    posed.forEach(function (p) {
+      var c = p.c, m = p.m;
+      ps.add(m);
       renderer.setRenderTarget(rt); renderer.clear(); renderer.render(ps, pc);
       renderer.readRenderTargetPixels(rt, 0, 0, PW, PH, buf);
-      var footRow = lowestOpaqueRow(buf, PW, PH), shift = footRow - FOOT_PAD;
-      img.data.fill(0);
       for (var y = 0; y < PH; y++) {
-        var src = PH - 1 - y + shift;
-        if (src >= 0 && src < PH) img.data.set(buf.subarray(src * PW * 4, (src + 1) * PW * 4), y * PW * 4);
+        var src = PH - 1 - y;
+        img.data.set(buf.subarray(src * PW * 4, (src + 1) * PW * 4), y * PW * 4);
       }
       c2.putImageData(img, 0, 0);
       ICON_SRC[c] = cvs.toDataURL("image/png");
