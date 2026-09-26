@@ -169,6 +169,27 @@
   #specList .sFloor { flex: 0 0 auto; padding: 2px 8px; border-radius: 999px; background: #E0293D; color: #fff; font-size: 13px; }
   #floorMap { position: absolute; right: 12px; bottom: calc(env(safe-area-inset-bottom, 0px) + 58px); width: min(340px, 46vw); display: block; border-radius: 6px; background: rgba(6, 9, 18, .62); box-shadow: 0 1px 4px rgba(0, 0, 0, .5); }
   #hud.spec #floorMap { bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); width: min(560px, calc(100vw - 244px)); }
+  #touchPad { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 19; pointer-events: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  #touchPad[hidden] { display: none; }
+  .tp-zone { position: absolute; top: 0; bottom: 0; width: 50%; pointer-events: auto; touch-action: none; }
+  #tpLeftZone { left: 0; } #tpRightZone { right: 0; }
+  .tp-stick { position: absolute; width: 150px; height: 150px; margin: -75px 0 0 -75px; border-radius: 50%; pointer-events: none;
+    background: rgba(8, 10, 22, .38); border: 2px solid rgba(255, 255, 255, .4); box-shadow: 0 2px 10px rgba(0, 0, 0, .35); }
+  .tp-stick.on { border-color: #D97B4F; }
+  #tpMove { left: 115px; top: calc(100% - 115px); }
+  #tpLook { left: calc(100% - 115px); top: calc(100% - 115px); }
+  .tp-knob { position: absolute; left: 50%; top: 50%; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%;
+    background: rgba(255, 255, 255, .55); box-shadow: 0 2px 6px rgba(0, 0, 0, .4); }
+  .tp-cap { position: absolute; left: -20px; right: -20px; top: calc(100% + 4px); text-align: center; font-size: 12px; font-weight: 800; color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, .7); white-space: nowrap; }
+  .tp-btn { position: absolute; border-radius: 50%; pointer-events: auto; touch-action: none; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: #fff; font-weight: 800; background: rgba(8, 10, 22, .6); border: 2px solid rgba(255, 255, 255, .55); box-shadow: 0 2px 10px rgba(0, 0, 0, .4); }
+  #tpFlip { left: 82px; bottom: 212px; width: 66px; height: 66px; font-size: 26px; line-height: 1; }
+  #tpFlip small { font-size: 10px; margin-top: 2px; }
+  #tpFlip.on { background: rgba(217, 123, 79, .6); }
+  body.touch #keyHint { display: none; }
+  body.touch #btnGameLeave { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: auto; }
+  body.touch #hud:not(.spec) #floorMap { left: 12px; right: auto; top: calc(env(safe-area-inset-top, 0px) + 150px); bottom: auto; width: min(240px, 30vw); }
+  body.touch #dashBox { bottom: calc(env(safe-area-inset-bottom, 0px) + 40px); width: min(260px, 34vw); }
   @media (max-width: 640px) {
     #timer { font-size: 30px; }
     #specList button { height: 36px; font-size: 14px; }
@@ -187,6 +208,13 @@
 <div id="tourOverlay"><div id="tourGrain"></div><div id="tourFade"></div></div>
 <div id="tourCaption"><span class="rec"></span><span id="tourCam">CAM 01</span><span id="tourTime"></span></div>
 
+<div id="touchPad" hidden>
+  <div class="tp-zone" id="tpLeftZone"></div>
+  <div class="tp-zone" id="tpRightZone"></div>
+  <div class="tp-stick" id="tpMove"><div class="tp-knob"></div><div class="tp-cap">이동</div></div>
+  <div class="tp-stick" id="tpLook"><div class="tp-knob"></div><div class="tp-cap" id="tpLookCap">시점</div></div>
+  <div class="tp-btn" id="tpFlip">↻<small>뒤돌기</small></div>
+</div>
 <div id="hud" hidden>
   <div id="topbar">
     <div id="specBox">
@@ -249,6 +277,7 @@
         <span><kbd>↑</kbd> <kbd>↓</kbd></span><span>카메라 높이(각도)를 바꿉니다.</span>
         <span><kbd>Q</kbd></span><span>뒤로 돌아섭니다.</span>
         <span><kbd>Space</kbd></span><span>숙주 좀비가 바라보는 방향으로 대쉬합니다. (감염된 좀비는 대쉬할 수 없습니다)</span>
+        <span><kbd>태블릿</kbd></span><span>왼쪽 조이스틱으로 이동, 오른쪽 화면을 끌어 카메라 회전, 오른쪽 화면을 톡 치면 대쉬(숙주 좀비), ↻ 버튼으로 뒤돌기</span>
       </div>
     </div>
     <div class="card">
@@ -2757,6 +2786,7 @@ window.addEventListener("keydown", e => {
   audioInit();
   const tag = e.target && e.target.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA") return;
+  if (touchMode && e.code && e.key !== "Unidentified") setTouchMode(false);
   const k = keyName(e); if (!k) return;
   if (k === "space" || (screenNow === "game" && ["up", "down", "left", "right"].includes(k))) e.preventDefault();
   if (!pressed[k] && !e.repeat) {
@@ -2837,9 +2867,10 @@ function updateLocalPlayer(dt, t, nowMs) {
     round.camYaw = round.turnFrom + (round.turnTo - round.turnFrom) * e;
   } else {
     if (round.turnStart) { round.camYaw = round.turnTo; round.turnStart = 0; av.face += Math.PI; }
-    round.camYaw += turnLeft * TURN_SPEED * turnRamp * dt;
+    round.camYaw += turnLeft * TURN_SPEED * turnRamp * dt - TOUCH.frameLookX * TOUCH_YAW_RAD_PER_PX;
   }
-  round.camElev = clamp(round.camElev + ((pressed.down ? 1 : 0) - (pressed.up ? 1 : 0)) * PITCH_SPEED * turnRamp * dt, -0.25, 0.95);
+  round.camElev = clamp(round.camElev + ((pressed.down ? 1 : 0) - (pressed.up ? 1 : 0)) * PITCH_SPEED * turnRamp * dt + TOUCH.frameLookY * TOUCH_ELEV_PER_PX, -0.25, 0.95);
+  TOUCH.frameLookX = TOUCH.frameLookY = 0;
 
   const frozen = isFrozen(myId, t), zombie = zombieFormActive(myId, t);
   const countdown = t < room.startAt;
@@ -2858,11 +2889,12 @@ function updateLocalPlayer(dt, t, nowMs) {
       av.face = Math.atan2(round.dashDir.x, round.dashDir.z);
       if (progress >= 1) { round.dashDir = null; round.forceNet = true; }
     } else {
-      const mf = (pressed.w ? 1 : 0) - (pressed.s ? 1 : 0), ms = (pressed.d ? 1 : 0) - (pressed.a ? 1 : 0);
+      let mf = (pressed.w ? 1 : 0) - (pressed.s ? 1 : 0), ms = (pressed.d ? 1 : 0) - (pressed.a ? 1 : 0), stickSpeed = 1;
+      if (!mf && !ms && (TOUCH.moveX || TOUCH.moveY)) { mf = -TOUCH.moveY; ms = TOUCH.moveX; stickSpeed = Math.min(1, Math.hypot(mf, ms)); }
       if (mf || ms) {
         const len = Math.hypot(mf, ms);
         const wx = (fx * mf + rx * ms) / len, wz = (fz * mf + rz * ms) / len;
-        const speed = zombie ? ZOMBIE_SPEED * (rush ? RUSH_SPEED_MULT : 1) : HUMAN_SPEED;
+        const speed = (zombie ? ZOMBIE_SPEED * (rush ? RUSH_SPEED_MULT : 1) : HUMAN_SPEED) * stickSpeed;
         moveWithCollision(me, wx * speed * dt, wz * speed * dt);
         const backward = mf < 0;
         const targetFace = backward ? Math.atan2(-wx, -wz) : Math.atan2(wx, wz);
@@ -3439,7 +3471,7 @@ function updateHud(t, nowMs) {
     const k = held ? 0 : clamp(1 - remain / cd, 0, 1);
     $("dashFill").style.width = (k * 100).toFixed(1) + "%";
     $("dashFill").className = k >= 1 ? "ready" : "";
-    setText($("dashLab"), held ? "대기 중에는 대쉬할 수 없습니다" : k >= 1 ? "대쉬 준비 완료 [Space]" : "대쉬 충전 중 " + (remain / 1000).toFixed(1) + "초");
+    setText($("dashLab"), held ? "대기 중에는 대쉬할 수 없습니다" : k >= 1 ? "대쉬 준비 완료 " + (touchMode ? "[오른쪽 화면 톡]" : "[Space]") : "대쉬 충전 중 " + (remain / 1000).toFixed(1) + "초");
   }
   const lines = $("speedLines");
   if (lines.style.opacity === "1" && nowMs > round.dashUntil) { lines.style.transition = "opacity .35s ease-out"; lines.style.opacity = "0"; }
@@ -3693,8 +3725,78 @@ function updateTour(nowMs) {
   const clock = new Date(), secs = (clock.getSeconds() + clock.getMinutes() * 60) % 3600;
   setText($("tourTime"), "00:" + String(Math.floor(secs / 60)).padStart(2, "0") + ":" + String(secs % 60).padStart(2, "0"));
 }
+const TOUCH_YAW_RAD_PER_PX = 0.006, TOUCH_ELEV_PER_PX = 0.004;
+const TOUCH_STICK_RADIUS = 60, TOUCH_STICK_DEADZONE = 0.15, TOUCH_TAP_MAX_PX = 14, TOUCH_TAP_MAX_MS = 350;
+const TOUCH = { moveX: 0, moveY: 0, lookX: 0, lookY: 0, frameLookX: 0, frameLookY: 0, moveId: null, lookId: null, last: {}, shown: false, dashCap: null };
+let touchMode = false;
+function setTouchMode(on) { touchMode = on; document.body.classList.toggle("touch", on); }
+setTouchMode(IS_TOUCH_DEVICE);
+window.addEventListener("pointerdown", e => { if (e.pointerType === "touch" && !touchMode) setTouchMode(true); }, true);
+function stickHome(el) { el.style.left = ""; el.style.top = ""; el.firstElementChild.style.transform = ""; el.classList.remove("on"); }
+function stickGrab(el, x, y) { el.style.left = x + "px"; el.style.top = y + "px"; el.classList.add("on"); }
+function stickKnob(el, dx, dy) {
+  const d = Math.hypot(dx, dy), k = d > TOUCH_STICK_RADIUS ? TOUCH_STICK_RADIUS / d : 1;
+  el.firstElementChild.style.transform = "translate(" + dx * k + "px," + dy * k + "px)";
+  return { nx: dx * k / TOUCH_STICK_RADIUS, ny: dy * k / TOUCH_STICK_RADIUS };
+}
+function capture(el, e) {
+  e.preventDefault(); audioInit();
+  try { el.setPointerCapture(e.pointerId); } catch (err) {}
+  TOUCH.last[e.pointerId] = { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, t0: performance.now(), far: 0 };
+}
+function releaseTouch() {
+  TOUCH.moveX = TOUCH.moveY = TOUCH.lookX = TOUCH.lookY = TOUCH.frameLookX = TOUCH.frameLookY = 0;
+  TOUCH.moveId = TOUCH.lookId = null; TOUCH.last = {};
+  stickHome($("tpMove")); stickHome($("tpLook"));
+}
+function onPointerEnd(el, idKey, fn) {
+  const end = e => { if (e.pointerId !== TOUCH[idKey]) return; const L = TOUCH.last[e.pointerId]; TOUCH[idKey] = null; delete TOUCH.last[e.pointerId]; fn(L, e); };
+  el.addEventListener("pointerup", end); el.addEventListener("pointercancel", end);
+}
+$("tpLeftZone").addEventListener("pointerdown", e => {
+  if (TOUCH.moveId !== null) return;
+  capture(e.currentTarget, e); TOUCH.moveId = e.pointerId; stickGrab($("tpMove"), e.clientX, e.clientY);
+});
+$("tpLeftZone").addEventListener("pointermove", e => {
+  if (e.pointerId !== TOUCH.moveId) return;
+  const L = TOUCH.last[e.pointerId], s = stickKnob($("tpMove"), e.clientX - L.x0, e.clientY - L.y0), m = Math.hypot(s.nx, s.ny);
+  const k = m < TOUCH_STICK_DEADZONE ? 0 : (m - TOUCH_STICK_DEADZONE) / (1 - TOUCH_STICK_DEADZONE) / m;
+  TOUCH.moveX = s.nx * k; TOUCH.moveY = s.ny * k;
+});
+onPointerEnd($("tpLeftZone"), "moveId", () => { TOUCH.moveX = TOUCH.moveY = 0; stickHome($("tpMove")); });
+$("tpRightZone").addEventListener("pointerdown", e => {
+  if (TOUCH.lookId !== null) return;
+  capture(e.currentTarget, e); TOUCH.lookId = e.pointerId; stickGrab($("tpLook"), e.clientX, e.clientY);
+});
+$("tpRightZone").addEventListener("pointermove", e => {
+  if (e.pointerId !== TOUCH.lookId) return;
+  const L = TOUCH.last[e.pointerId];
+  TOUCH.lookX += e.clientX - L.x; TOUCH.lookY += e.clientY - L.y; L.x = e.clientX; L.y = e.clientY;
+  L.far = Math.max(L.far, Math.hypot(L.x - L.x0, L.y - L.y0));
+  stickKnob($("tpLook"), L.x - L.x0, L.y - L.y0);
+});
+onPointerEnd($("tpRightZone"), "lookId", (L, e) => {
+  stickHome($("tpLook"));
+  if (L && e.type === "pointerup" && L.far < TOUCH_TAP_MAX_PX && performance.now() - L.t0 < TOUCH_TAP_MAX_MS) tryDash();
+});
+$("tpFlip").addEventListener("pointerdown", e => {
+  e.preventDefault(); audioInit(); startQuickTurn();
+  const b = e.currentTarget; b.classList.add("on"); setTimeout(() => b.classList.remove("on"), 150);
+});
+function syncTouchPad() {
+  TOUCH.frameLookX = TOUCH.lookX; TOUCH.frameLookY = TOUCH.lookY; TOUCH.lookX = TOUCH.lookY = 0;
+  const show = touchMode && screenNow === "game" && round.active && round.iAmIn;
+  if (show) {
+    const dashCap = isOriginZombie(myId) ? "시점 · 톡 대쉬" : "시점";
+    if (dashCap !== TOUCH.dashCap) { TOUCH.dashCap = dashCap; $("tpLookCap").textContent = dashCap; }
+  }
+  if (show === TOUCH.shown) return;
+  TOUCH.shown = show; $("touchPad").hidden = !show;
+  releaseTouch();
+}
 function frame(nowMs) {
   requestAnimationFrame(frame);
+  syncTouchPad();
   const dt = Math.min(0.05, (nowMs - lastFrame) / 1000);
   adaptQuality((nowMs - lastFrame) / 1000);
   lastFrame = nowMs;

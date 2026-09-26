@@ -194,6 +194,28 @@
   #povBar button .k { opacity: .7; margin-right: 4px; }
   #povBar button .hp { margin-left: 6px; font-variant-numeric: tabular-nums; opacity: .85; }
   #miniMap { position: fixed; left: 12px; bottom: 52px; z-index: 5; pointer-events: none; width: min(260px, 38vw); border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.45); }
+  #touchPad { position: fixed; inset: 0; z-index: 5; pointer-events: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  #touchPad[hidden] { display: none; }
+  .tp-zone { position: absolute; top: 0; bottom: 0; width: 50%; pointer-events: auto; touch-action: none; }
+  #tpLeftZone { left: 0; } #tpRightZone { right: 0; }
+  .tp-stick { position: absolute; width: 150px; height: 150px; margin: -75px 0 0 -75px; border-radius: 50%; pointer-events: none;
+    background: rgba(20,28,24,.35); border: 2px solid rgba(255,255,255,.4); box-shadow: 0 2px 10px rgba(0,0,0,.3); }
+  .tp-stick.on { border-color: #D97B4F; }
+  #tpMove { left: 115px; top: calc(100% - 115px); }
+  #tpLook { left: calc(100% - 115px); top: calc(100% - 115px); }
+  .tp-knob { position: absolute; left: 50%; top: 50%; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%;
+    background: rgba(255,255,255,.6); box-shadow: 0 2px 6px rgba(0,0,0,.35); }
+  .tp-cap { position: absolute; left: 0; right: 0; top: calc(100% + 4px); text-align: center; font-size: 12px; font-weight: 800; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
+  .tp-btn { position: absolute; border-radius: 50%; pointer-events: auto; touch-action: none; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: #fff; font-weight: 800; background: rgba(20,28,24,.6); border: 2px solid rgba(255,255,255,.55); box-shadow: 0 2px 10px rgba(0,0,0,.35); }
+  #tpFlip { left: 82px; bottom: 212px; width: 66px; height: 66px; font-size: 26px; line-height: 1; }
+  #tpFlip small { font-size: 10px; margin-top: 2px; }
+  #tpFire { right: 67px; bottom: 212px; width: 96px; height: 96px; border: 3px solid #D97B4F; font-size: 17px; }
+  #tpFire.on, #tpFlip.on { background: rgba(217,123,79,.6); }
+  body.touch #hudAmmo { right: 212px; bottom: 26px; }
+  body.touch #hudAmmo::before { display: none; }
+  body.touch #miniMap { bottom: auto; top: calc(env(safe-area-inset-top,0px) + 132px); width: min(200px, 28vw); }
+  body.touch #btnGameLeave { left: auto; right: 12px; bottom: auto; top: calc(env(safe-area-inset-top,0px) + 10px); }
   #btnGameLeave { position: fixed; left: 12px; bottom: 12px; z-index: 6; font: inherit; font-size: 14px; font-weight: 800; padding: 6px 14px; border-radius: 10px; border: 2px solid var(--sg-line-strong); background: rgba(255,255,255,.92); color: var(--sg-ink); cursor: pointer; }
   @media (max-width: 520px) { #povBar { top: calc(env(safe-area-inset-top,0px) + 46px); max-width: calc(100vw - 24px); } .teams { flex-direction: column; } #hudTeam { left: auto; right: 12px; transform: none; gap: 12px; } #hudTeam > div { min-width: 48px; font-size: 22px; } #countBig { font-size: 90px; } }
   @media (max-height: 620px) {
@@ -282,6 +304,14 @@
   </div>
 </div>
 <div class="hud hud-text" id="hudAmmo"><span class="lab" id="ammoLab">소총 탄약</span><span id="ammoNum">30</span><span id="ammoMax">/ 30</span></div>
+<div id="touchPad" hidden>
+  <div class="tp-zone" id="tpLeftZone"></div>
+  <div class="tp-zone" id="tpRightZone"></div>
+  <div class="tp-stick" id="tpMove"><div class="tp-knob"></div><div class="tp-cap">이동</div></div>
+  <div class="tp-stick" id="tpLook"><div class="tp-knob"></div><div class="tp-cap">시점</div></div>
+  <div class="tp-btn" id="tpFlip">↻<small>뒤돌기</small></div>
+  <div class="tp-btn" id="tpFire">발사</div>
+</div>
 <div class="hud hud-text" id="hudBest">
   <div class="hrec"><div class="recText"><span>개인 최고 기록</span><b id="hudBestVal">—</b></div><div class="recIcon me">⭐</div></div>
   <div class="hrec"><div class="recText"><span>세계 신기록</span><b id="hudWrVal">—</b><small id="hudWrWho"></small></div><div class="recIcon world">🏆</div></div>
@@ -293,7 +323,6 @@
       <h1 class="st-title">FPS<span>서바이벌</span></h1>
     </div>
     <div class="st-card">
-      <div class="warn" id="warnTouch">⌨️ 이 게임은 키보드가 필요합니다. 노트북·PC 또는 키보드를 연결한 전자칠판에서 실행하세요.</div>
       <div class="st-row">
         <button type="button" class="st-btn primary" id="btnStart">🤖 AI 대전<small>솔로 · Space</small></button>
         <button type="button" class="st-btn" id="btnTeam">👥 팀 대전<small>2대2 · 방 코드</small></button>
@@ -311,6 +340,7 @@
         <span><kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd></span><span>시점 회전</span>
         <span><kbd>Q</kbd></span><span>뒤돌기</span>
         <span><kbd>Space</kbd></span><span>발사 (누르고 있으면 연사)</span>
+        <span><kbd>태블릿</kbd></span><span>왼쪽 조이스틱 이동 · 오른쪽 화면 끌기 시점 · <b>발사</b> 버튼은 누르고 있으면 연사, 누른 채 끌면 조준 · ↻ 뒤돌기</span>
       </div>
     </div>
     <div class="st-card">
@@ -2070,18 +2100,24 @@ function controlPlayer(dt, t, fire) {
   const yawR = PC.yawSpeed * Math.PI / 180 * dt * ramp, pitchR = PC.pitchSpeed * Math.PI / 180 * dt * ramp, lim = PC.pitchLimit * Math.PI / 180;
   if (keys.ArrowLeft) P.yaw += yawR; if (keys.ArrowRight) P.yaw -= yawR;
   if (keys.ArrowUp) P.pitch += pitchR; if (keys.ArrowDown) P.pitch -= pitchR;
+  P.yaw -= TOUCH.frameLookX * TOUCH_LOOK_RAD_PER_PX; P.pitch -= TOUCH.frameLookY * TOUCH_LOOK_RAD_PER_PX;
+  TOUCH.frameLookX = TOUCH.frameLookY = 0;
   P.pitch = clamp(P.pitch, -lim, lim);
   if (P.flip > 0) { const s = Math.min(P.flip, dt * Math.PI / PC.flipSec); P.yaw += s; P.flip -= s; }
   const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw), rx = Math.cos(P.yaw), rz = -Math.sin(P.yaw);
   let mx = 0, mz = 0;
   if (keys.KeyW) { mx += fx; mz += fz; } if (keys.KeyS) { mx -= fx; mz -= fz; }
   if (keys.KeyD) { mx += rx; mz += rz; } if (keys.KeyA) { mx -= rx; mz -= rz; }
-  const ml = Math.hypot(mx, mz);
-  if (ml > 0) slide(P, mx / ml * PC.moveSpeed * dt, mz / ml * PC.moveSpeed * dt, PC.radius);
+  let ml = Math.hypot(mx, mz), stickSpeed = 1;
+  if (ml === 0 && (TOUCH.moveX || TOUCH.moveY)) {
+    mx = fx * -TOUCH.moveY + rx * TOUCH.moveX; mz = fz * -TOUCH.moveY + rz * TOUCH.moveX;
+    ml = Math.hypot(mx, mz); stickSpeed = Math.min(1, ml);
+  }
+  if (ml > 0) slide(P, mx / ml * PC.moveSpeed * stickSpeed * dt, mz / ml * PC.moveSpeed * stickSpeed * dt, PC.radius);
   keepGunInsideWalls(P, x0, z0, yaw0, PC.radius);
   const lowered = updateWeaponSwap(dt);
   P.fireT -= dt;
-  if (keys.Space && P.fireT <= 0 && P.swapT <= 0) { P.fireT = 1 / heldWeapon().rate(); fire(); }
+  if ((keys.Space || TOUCH.fire) && P.fireT <= 0 && P.swapT <= 0) { P.fireT = 1 / heldWeapon().rate(); fire(); }
   P.recoil = Math.max(0, P.recoil - dt * 8);
   camera.position.set(P.x, PC.eyeHeight, P.z);
   camera.rotation.set(P.pitch, P.yaw, 0);
@@ -3152,6 +3188,7 @@ function adaptQuality(frameSec) {
 }
 function loop(now) {
   requestAnimationFrame(loop);
+  syncTouchPad();
   adaptQuality((now - lastT) / 1000);
   animateSoldierLooks(now);
   updateLamps(now);
@@ -3190,13 +3227,14 @@ window.addEventListener("resize", resize); resize();
 
 window.addEventListener("keydown", e => {
   if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
+  if (touchMode && e.code && e.key !== "Unidentified") setTouchMode(false);
   if (/^(Arrow(Up|Down|Left|Right)|Space)$/.test(e.code)) e.preventDefault();
   audioInit();
   if (e.code === "Space") {
     if (state === "menu" && !e.repeat) { startGame(); return; }
     if (state === "over") { if (!e.repeat && spaceFresh && performance.now() - overAt > 900 && !document.querySelector(".wr-back")) startGame(); return; }
   }
-  if (e.code === "KeyQ" && (state === "play" || (state === "team" && teamCanAct())) && !e.repeat && P.flip <= 0) P.flip = Math.PI;
+  if (e.code === "KeyQ" && !e.repeat) tryFlip();
   if (state === "team" && T.spec && T.screen === "game" && /^(Digit|Numpad)[1-4]$/.test(e.code)) { const id = povIds()[+e.code.slice(-1) - 1]; if (id) T.pov = id; }
   keys[e.code] = true;
 });
@@ -3211,8 +3249,73 @@ $("btnWipe").onclick = e => {
   try { localStorage.removeItem(BEST_KEY); } catch (err) {}
   best = null; renderRecords(); alert("지웠습니다.");
 };
-function checkTouch() { try { $("warnTouch").style.display = (!window.matchMedia("(pointer: fine)").matches || window.innerWidth < 700) ? "block" : "none"; } catch (e) {} }
-window.addEventListener("resize", checkTouch); checkTouch();
+const TOUCH_LOOK_RAD_PER_PX = 0.0055;
+const TOUCH_STICK_RADIUS = 60, TOUCH_STICK_DEADZONE = 0.15;
+const TOUCH = { moveX: 0, moveY: 0, fire: false, lookX: 0, lookY: 0, frameLookX: 0, frameLookY: 0, moveId: null, lookId: null, fireId: null, last: {}, shown: false };
+let touchMode = false;
+function setTouchMode(on) { touchMode = on; document.body.classList.toggle("touch", on); }
+setTouchMode(IS_TOUCH);
+window.addEventListener("pointerdown", e => { if (e.pointerType === "touch" && !touchMode) setTouchMode(true); }, true);
+function tryFlip() { if ((state === "play" || (state === "team" && teamCanAct())) && P.flip <= 0) P.flip = Math.PI; }
+function stickHome(el) { el.style.left = ""; el.style.top = ""; el.firstElementChild.style.transform = ""; el.classList.remove("on"); }
+function stickGrab(el, x, y) { el.style.left = x + "px"; el.style.top = y + "px"; el.classList.add("on"); }
+function stickKnob(el, dx, dy) {
+  const d = Math.hypot(dx, dy), k = d > TOUCH_STICK_RADIUS ? TOUCH_STICK_RADIUS / d : 1;
+  el.firstElementChild.style.transform = "translate(" + dx * k + "px," + dy * k + "px)";
+  return { nx: dx * k / TOUCH_STICK_RADIUS, ny: dy * k / TOUCH_STICK_RADIUS };
+}
+function capture(el, e) { e.preventDefault(); audioInit(); try { el.setPointerCapture(e.pointerId); } catch (err) {} TOUCH.last[e.pointerId] = { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY }; }
+function lookFromPointer(e) {
+  const L = TOUCH.last[e.pointerId]; if (!L) return null;
+  TOUCH.lookX += e.clientX - L.x; TOUCH.lookY += e.clientY - L.y; L.x = e.clientX; L.y = e.clientY;
+  return L;
+}
+function releaseTouch() {
+  TOUCH.moveX = TOUCH.moveY = TOUCH.lookX = TOUCH.lookY = TOUCH.frameLookX = TOUCH.frameLookY = 0;
+  TOUCH.fire = false; TOUCH.moveId = TOUCH.lookId = TOUCH.fireId = null; TOUCH.last = {};
+  stickHome($("tpMove")); stickHome($("tpLook")); $("tpFire").classList.remove("on");
+}
+function onPointerEnd(el, idKey, fn) {
+  const end = e => { if (e.pointerId !== TOUCH[idKey]) return; TOUCH[idKey] = null; delete TOUCH.last[e.pointerId]; fn(); };
+  el.addEventListener("pointerup", end); el.addEventListener("pointercancel", end);
+}
+$("tpLeftZone").addEventListener("pointerdown", e => {
+  if (TOUCH.moveId !== null) return;
+  capture(e.currentTarget, e); TOUCH.moveId = e.pointerId; stickGrab($("tpMove"), e.clientX, e.clientY);
+});
+$("tpLeftZone").addEventListener("pointermove", e => {
+  if (e.pointerId !== TOUCH.moveId) return;
+  const L = TOUCH.last[e.pointerId], s = stickKnob($("tpMove"), e.clientX - L.x0, e.clientY - L.y0), m = Math.hypot(s.nx, s.ny);
+  const k = m < TOUCH_STICK_DEADZONE ? 0 : (m - TOUCH_STICK_DEADZONE) / (1 - TOUCH_STICK_DEADZONE) / m;
+  TOUCH.moveX = s.nx * k; TOUCH.moveY = s.ny * k;
+});
+onPointerEnd($("tpLeftZone"), "moveId", () => { TOUCH.moveX = TOUCH.moveY = 0; stickHome($("tpMove")); });
+$("tpRightZone").addEventListener("pointerdown", e => {
+  if (TOUCH.lookId !== null) return;
+  capture(e.currentTarget, e); TOUCH.lookId = e.pointerId; stickGrab($("tpLook"), e.clientX, e.clientY);
+});
+$("tpRightZone").addEventListener("pointermove", e => {
+  if (e.pointerId !== TOUCH.lookId) return;
+  const L = lookFromPointer(e); if (L) stickKnob($("tpLook"), L.x - L.x0, L.y - L.y0);
+});
+onPointerEnd($("tpRightZone"), "lookId", () => stickHome($("tpLook")));
+$("tpFire").addEventListener("pointerdown", e => {
+  if (TOUCH.fireId !== null) return;
+  capture(e.currentTarget, e); TOUCH.fireId = e.pointerId; TOUCH.fire = true; e.currentTarget.classList.add("on");
+});
+$("tpFire").addEventListener("pointermove", e => { if (e.pointerId === TOUCH.fireId) lookFromPointer(e); });
+onPointerEnd($("tpFire"), "fireId", () => { TOUCH.fire = false; $("tpFire").classList.remove("on"); });
+$("tpFlip").addEventListener("pointerdown", e => {
+  e.preventDefault(); audioInit(); tryFlip();
+  const b = e.currentTarget; b.classList.add("on"); setTimeout(() => b.classList.remove("on"), 150);
+});
+function syncTouchPad() {
+  TOUCH.frameLookX = TOUCH.lookX; TOUCH.frameLookY = TOUCH.lookY; TOUCH.lookX = TOUCH.lookY = 0;
+  const show = touchMode && $("cross").style.display === "block";
+  if (show === TOUCH.shown) return;
+  TOUCH.shown = show; $("touchPad").hidden = !show;
+  releaseTouch();
+}
 
 renderRecords();
 showCard("start");

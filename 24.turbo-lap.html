@@ -287,6 +287,24 @@
     #viewBtns { bottom: 12px; }
     #viewBtns button { font-size: 15px; padding: 8px 12px; }
   }
+  #touchPad { position: fixed; inset: 0; z-index: 5; pointer-events: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  #touchPad[hidden] { display: none; }
+  .tc-btn { position: absolute; pointer-events: auto; touch-action: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+    color: #fff; font-weight: 800; background: linear-gradient(135deg, rgba(16,18,28,.62), rgba(38,42,58,.5)); border: 2px solid rgba(255,255,255,.45); box-shadow: 0 4px 14px rgba(0,0,0,.35); }
+  .tc-btn.on { background: rgba(217,123,79,.72); border-color: #fff; }
+  .tc-arrow { bottom: calc(env(safe-area-inset-bottom, 0px) + 24px); width: 128px; height: 128px; border-radius: 50%; font-size: 44px; line-height: 1; }
+  #tcLeft { left: 24px; } #tcRight { right: 24px; }
+  #tcBrake { right: 32px; bottom: calc(env(safe-area-inset-bottom, 0px) + 164px); width: 112px; height: 96px; border-radius: 14px 14px 22px 22px; border-color: rgba(255,138,120,.8); font-size: 13px; }
+  #tcBrake i { width: 70px; height: 40px; border-radius: 8px 8px 14px 14px; background: repeating-linear-gradient(180deg, rgba(255,255,255,.85) 0 5px, rgba(255,255,255,.2) 5px 10px); box-shadow: inset 0 0 0 2px rgba(255,255,255,.7); }
+  #tcBrake.on { background: rgba(214,69,61,.78); }
+  body.touch #speed { left: 50%; margin-left: -126px; }
+  body.touch #minimap { left: 16px; right: auto; bottom: calc(env(safe-area-inset-bottom, 0px) + 170px); width: 130px; height: 130px; }
+  @media (max-width: 640px) {
+    body.touch #speed { margin-left: -66px; }
+    .tc-arrow { width: 104px; height: 104px; }
+    #tcBrake { right: 20px; bottom: calc(env(safe-area-inset-bottom, 0px) + 140px); width: 100px; height: 84px; }
+    body.touch #minimap { width: 100px; height: 100px; bottom: calc(env(safe-area-inset-bottom, 0px) + 140px); }
+  }
 </style>
 </head>
 <body>
@@ -304,6 +322,11 @@
     <button type="button" id="btnReset">↻ 처음부터 (R)</button>
     <button type="button" id="btnRecover">🚗 트랙 복귀 (T)</button>
   </div>
+</div>
+<div id="touchPad" hidden>
+  <div class="tc-btn tc-arrow" id="tcLeft">◀</div>
+  <div class="tc-btn tc-arrow" id="tcRight">▶</div>
+  <div class="tc-btn" id="tcBrake"><i></i><span>브레이크</span></div>
 </div>
 <div class="hud-box" id="speed"><span id="chaseTag" hidden></span><span id="followTag" hidden></span><div class="speedRow"><span class="lab">SPEED</span><b id="speedVal">0</b><span class="unit">km/h</span></div></div>
 <canvas id="minimap" width="300" height="300"></canvas>
@@ -329,6 +352,7 @@
         <span><kbd>A</kbd> <kbd>D</kbd> <kbd>←</kbd> <kbd>→</kbd></span><span>핸들 조향</span>
         <span><kbd>T</kbd></span><span>트랙으로 복귀</span>
         <span><kbd>R</kbd></span><span>처음부터 다시</span>
+        <span><kbd>태블릿</kbd></span><span>자동으로 가속합니다. ◀ ▶ 버튼으로 조향하고, 브레이크 버튼(또는 ◀ ▶ 동시에)으로 감속하며, 멈춘 뒤 계속 누르면 후진합니다.</span>
       </div>
     </div>
     <div class="st-card">
@@ -3599,8 +3623,9 @@ function nearestIndex() {
 }
 function updateCar(dt) {
   const racing = state === "race";
-  const thr = racing ? ((keys.up ? 1 : 0) - (keys.down ? 1 : 0)) : 0;
-  const str = racing ? ((keys.left ? 1 : 0) - (keys.right ? 1 : 0)) : 0;
+  const pad = drivePad();
+  const thr = racing ? ((pad.up ? 1 : 0) - (pad.down ? 1 : 0)) : 0;
+  const str = racing ? ((pad.left ? 1 : 0) - (pad.right ? 1 : 0)) : 0;
   updateChase(dt);
   const topV = CFG.maxSpeed + P.chase + P.boostCap;
   const maxV = P.off ? CFG.offroadMax : topV;
@@ -3917,7 +3942,7 @@ function updateGroundFx(dt) {
   if (!GFX.on) return;
   PUFF.mat.uniforms.uScale.value = renderer.domElement.height / (2 * Math.tan(camera.fov * Math.PI / 360));
   if (state !== "menu") {
-    if (!(playMode === "battle" && BT.spec)) groundTrack(P.gfxT, P.x, P.y, P.z, P.h, P.v, car.rotation.x, P.kx, P.kz, P.spin, P.off, state === "race" && keys.down && P.v > 0, dt);
+    if (!(playMode === "battle" && BT.spec)) groundTrack(P.gfxT, P.x, P.y, P.z, P.h, P.v, car.rotation.x, P.kx, P.kz, P.spin, P.off, state === "race" && drivePad().down && P.v > 0, dt);
     if (playMode === "battle") okeys(BT.ents).forEach(id => { const e = BT.ents[id]; if (e.seen) groundTrack(e.gfxT, e.x, e.y, e.z, e.h, e.v, e.car.rotation.x, e.rkx, e.rkz, 0, entOffRoad(e), false, dt); });
   }
   stepPuffs(dt);
@@ -3947,7 +3972,7 @@ function adaptQuality(frameSec) {
   ADAPT.slowFrames = 0;
   lowerQuality();
 }
-function frame(now) { requestAnimationFrame(frame); adaptQuality((now - last) / 1000); tick(now); }
+function frame(now) { requestAnimationFrame(frame); syncTouchPad(); adaptQuality((now - last) / 1000); tick(now); }
 function tick(now) {
   const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
 
@@ -4015,8 +4040,57 @@ function resize() {
 window.addEventListener("resize", resize); resize();
 for (let k = savedQualitySteps(); k > 0 && lowerQuality(); k--);
 
+const TOUCH = { left: false, right: false, brake: false, owner: {}, shown: false };
+const TOUCH_BTNS = { left: $("tcLeft"), right: $("tcRight"), brake: $("tcBrake") };
+const TOUCH_HIT_SLOP_PX = 12;
+let touchMode = false;
+function setTouchMode(on) { touchMode = on; document.body.classList.toggle("touch", on); }
+setTouchMode(IS_TOUCH);
+window.addEventListener("pointerdown", e => { if (e.pointerType === "touch" && !touchMode) setTouchMode(true); }, true);
+function drivePad() {
+  const brake = TOUCH.shown && (TOUCH.brake || (TOUCH.left && TOUCH.right));
+  return {
+    up: keys.up || (TOUCH.shown && !brake),
+    down: keys.down || brake,
+    left: keys.left || (TOUCH.shown && TOUCH.left && !TOUCH.right),
+    right: keys.right || (TOUCH.shown && TOUCH.right && !TOUCH.left),
+  };
+}
+function touchButtonAt(x, y) {
+  for (const k in TOUCH_BTNS) {
+    const r = TOUCH_BTNS[k].getBoundingClientRect(), s = TOUCH_HIT_SLOP_PX;
+    if (x >= r.left - s && x <= r.right + s && y >= r.top - s && y <= r.bottom + s) return k;
+  }
+  return null;
+}
+function refreshTouchButtons() {
+  const on = { left: false, right: false, brake: false };
+  for (const id in TOUCH.owner) if (TOUCH.owner[id]) on[TOUCH.owner[id]] = true;
+  for (const k in on) { TOUCH[k] = on[k]; TOUCH_BTNS[k].classList.toggle("on", on[k]); }
+}
+Object.values(TOUCH_BTNS).forEach(btn => {
+  btn.addEventListener("pointerdown", e => {
+    e.preventDefault(); audioInit();
+    try { btn.setPointerCapture(e.pointerId); } catch (err) {}
+    TOUCH.owner[e.pointerId] = touchButtonAt(e.clientX, e.clientY); refreshTouchButtons();
+  });
+  btn.addEventListener("pointermove", e => {
+    if (!(e.pointerId in TOUCH.owner)) return;
+    const k = touchButtonAt(e.clientX, e.clientY);
+    if (k !== TOUCH.owner[e.pointerId]) { TOUCH.owner[e.pointerId] = k; refreshTouchButtons(); }
+  });
+  const end = e => { delete TOUCH.owner[e.pointerId]; refreshTouchButtons(); };
+  btn.addEventListener("pointerup", end); btn.addEventListener("pointercancel", end);
+});
+function syncTouchPad() {
+  const show = touchMode && (state === "race" || state === "countdown") && !(playMode === "battle" && BT.spec);
+  if (show === TOUCH.shown) return;
+  TOUCH.shown = show; $("touchPad").hidden = !show;
+  TOUCH.owner = {}; refreshTouchButtons();
+}
 function onKey(e, down) {
   if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
+  if (down && touchMode && e.code && e.key !== "Unidentified") setTouchMode(false);
   let k = null;
   if (e.key === "ArrowUp" || e.code === "KeyW") k = "up";
   else if (e.key === "ArrowDown" || e.code === "KeyS") k = "down";
