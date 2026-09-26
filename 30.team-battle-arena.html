@@ -503,27 +503,27 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var ATK_POSE_MS = 150;
   var NET_MS = 143;
   var CHARS = {
-    warrior: { name: "전사", icon: "🪓", hp: 270, speed: 230, ultSpeed: 300, cd: 850, dmg: 45, range: 141, arc: Math.PI * 0.55, perHit: 2, ultName: "광폭화" },
-    knight:  { name: "기사", icon: "🛡️", hp: 400, speed: 220, ultSpeed: 300, cd: 1000, dmg: 30, range: KEY * 1 + 50, arc: Math.PI * 0.7, perHit: 2, kb: 28, ultName: "방어태세" },
+    warrior: { name: "전사", icon: "🪓", hp: 270, speed: 230, ultSpeed: 300, cd: 850, dmg: 45, range: 110, arc: Math.PI * 0.55, perHit: 2, ultName: "광폭화" },
+    knight:  { name: "기사", icon: "🛡️", hp: 400, speed: 220, cd: 1000, dmg: 30, range: 110, arc: Math.PI * 0.7, perHit: 2, kb: 28, ultName: "방어태세" },
     ranger:  { name: "궁수", icon: "🏹", hp: 100, speed: 250, cd: 400, dmg: 10, range: KEY * 6, pSpeed: 950, pr: 6, shots: 2, gap: 70, perHit: 1, ultName: "난사", ultAim: true },
     mage:    { name: "마법사", icon: "🔮", hp: 120, speed: 250, cd: 500, dmg: 11, range: 350, pSpeed: 700, pr: 9, perHit: 3, ultName: "메테오", ultAim: true },
     rogue:   { name: "도적", icon: "🗡️", hp: 100, speed: 300, ultSpeed: 420, cd: 600, dmg: 30, range: 110, arc: Math.PI * 0.6, hits: 2, hitGap: 160, throwDmg: 20, throwRange: 300, pSpeed: 900, pr: 8, perHit: 1, ultName: "은신" },
     necro:   { name: "네크로", icon: "💀", hp: 120, speed: 250, cd: 500, dmg: 11, range: KEY * 4, pSpeed: 1000, pr: 9, perHit: 3, ultName: "해골 소환" },
     sniper:  { name: "저격수", icon: "🎯", hp: 100, speed: 240, cd: 1429, dmg: 40, range: 700, pSpeed: 1500, pr: 7, perHit: 4, ultName: "거대 화살", ultAim: true },
-    thrower: { name: "투척병", icon: "🧪", hp: 160, speed: 240, cd: 1000, dmg: 20, ticks: 3, range: KEY * 4 + 100, minRange: KEY * 1, perHit: 1, ultName: "독안개", ultAim: true },
-    lancer:  { name: "창기사", icon: "🔱", hp: 300, speed: 225, cd: 1200, dmg: 30, range: 250, width: 50, perHit: 2, ultName: "꿰뚫기", ultAim: true }
+    thrower: { name: "투척병", icon: "🧪", hp: 120, speed: 240, cd: 1000, dmg: 20, ticks: 3, range: KEY * 4 + 100, minRange: KEY * 1, perHit: 1, ultName: "독안개", ultAim: true },
+    lancer:  { name: "창기사", icon: "🔱", hp: 300, speed: 225, cd: 1200, dmg: 30, range: 200, width: 50, perHit: 2, ultName: "꿰뚫기", ultAim: true }
   };
   var CHAR_LIST = ["warrior", "knight", "ranger", "mage", "rogue", "necro", "sniper", "thrower", "lancer"];
   var ULT = { mkCount: 10, mkGap: 55, mkDmg: 36, mkRefund: 1, mkSpeed: 1150, mkRange: KEY * 8, mkPr: 8,
-              bzDur: 4000, bzDmgMul: 1.5, bzCdMul: 0.7, tkDur: 5000, tkDef: 0.5,
+              bzDur: 4000, bzDmgMul: 1.5, bzCdMul: 0.7, bzHeal: 20, tkDur: 5000, tkDef: 0.3, tkStunR: 100, tkStunMs: 1000,
               mbDelay: 700, mbR: 150, mbDmg: 90, mbHeal: 50, mbRefund: 4, mbCast: 550, mbMin: 60,
-              asSmokeMs: 400, asDur: 10000,
+              asSmokeMs: 400, asDur: 15000,
               smCount: 2, smAhead: KEY * 1, smSide: 38, smHp: 50, smSpeed: 200, smDmg: 10, smCd: 800, smRange: 80, smArc: Math.PI * 0.6,
               smDur: 8000, smMax: 4, smRiseMs: 1100, smCorpseMs: 1400,
               pnDmg: 90, pnSpeed: 1500, pnRange: 700, pnPr: 16, pnRefund: 2, pnScale: 3,
               plFlight: 700, plFlightMin: 150, plR: 60, plDur: 3000, plTick: 1000, plMax: 4, plFade: 500, plLob: 90,
               fgR: 150, fgDur: 5000, fgDmg: 20, fgHeal: 20, fgSlowMul: 0.6, fgSlowMs: 400, fgCast: KEY * 4 + 100, fgRefund: 1,
-              lnWind: 300, lnLen: 400, lnW: 36, lnDmg: 90, lnStunMs: 1200 };
+              lnWind: 300, lnLen: 350, lnW: 36, lnDmg: 90, lnStunMs: 1200 };
   var SNIPER_KEEP = KEY * 5;
   function isMelee(c) { return !!(CHARS[c].arc || CHARS[c].width); }
   var STEALTH_ALPHA = 0.4;
@@ -1048,8 +1048,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function num(v) { return String(Math.round(v * 10) / 10); }
   function ultDesc(k) {
     function speedUp(c) { return "이동속도 " + (c.ultSpeed - c.speed) + " 증가"; }
-    if (k === "warrior") return num(ULT.bzDur / 1000) + "초간 공격력 " + num(ULT.bzDmgMul) + "배, " + speedUp(CHARS.warrior);
-    if (k === "knight") return num(ULT.tkDur / 1000) + "초간 받는 피해 " + num(ULT.tkDef) + "배, " + speedUp(CHARS.knight);
+    if (k === "warrior") return num(ULT.bzDur / 1000) + "초간 공격력 " + num(ULT.bzDmgMul) + "배, 공격 속도 " + num(1 / ULT.bzCdMul) + "배, " + speedUp(CHARS.warrior) + ", 기본 공격 적중 시 체력 " + ULT.bzHeal + " 회복";
+    if (k === "knight") return num(ULT.tkDur / 1000) + "초간 받는 피해 " + num(ULT.tkDef) + "배, 끝날 때 반경 " + ULT.tkStunR + " 안의 적 " + num(ULT.tkStunMs / 1000) + "초 기절";
     if (k === "ranger") return num(ULT.mkDmg) + "의 데미지를 주는 화살 " + ULT.mkCount + "발 사격";
     if (k === "mage") return "지정한 곳에 " + num(ULT.mbDelay / 1000) + "초 뒤 폭발 발생, 적은 " + ULT.mbDmg + "의 데미지, 아군은 " + ULT.mbHeal + " 회복";
     if (k === "rogue") return num(ULT.asDur / 1000) + "초간 " + speedUp(CHARS.rogue) + ", 은신 상태로 변경, 공격 시 해제";
@@ -1634,7 +1634,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function speedOf(E) {
     var t = now(), c = CHARS[E.char], sp = c.speed;
     if (stunned(E, t) || lancerWinding(E, t)) return 0;
-    if ((E.char === "knight" || E.char === "warrior") && E.buffUntil > t) sp = c.ultSpeed;
+    if (E.char === "warrior" && E.buffUntil > t) sp = c.ultSpeed;
     if (E.char === "rogue" && E.stealthUntil > t) sp = c.ultSpeed;
     return slowed(E, t) ? sp * (E.slowMul || 1) : sp;
   }
@@ -1838,6 +1838,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var sameSwing = h.s && owner.gaugeSwing === h.s;
       if (h.s) owner.gaugeSwing = h.s;
       if (h.b && !sameSwing && !gaugeLocked(owner)) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + (CHARS[owner.char].perHit || 2));
+      if (h.b && !sameSwing && owner.alive && berserk(owner, h.t)) owner.hp = Math.min(owner.maxHp, owner.hp + ULT.bzHeal);
       if (owner === ME && h.d) sfx("confirm");
       G.forceNet = true;
     }
@@ -1940,7 +1941,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var along = dx * ca + dy * sa, side = -dx * sa + dy * ca;
     return along >= -BODY_R && along <= d.len + BODY_R && Math.abs(side) <= d.width / 2 + BODY_R;
   }
-  function inStrike(T, d) { return d.len ? inLine(T, d) : inArc(T, d); }
+  function inStrike(T, d) { return d.len ? inLine(T, d) : inArc(T, d) && losClear(d.x, d.y, T.x, T.y); }
   function lineReach(x, y, ang, len) { return Math.min(len, rayObst(x, y, Math.cos(ang), Math.sin(ang), 2) + BODY_R); }
   function onMelee(key, d) {
     if (!d) return;
@@ -1964,6 +1965,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     MELEE[key] = { d: d, at: Date.now() };
     var who = P[d.owner] ? P[d.owner].characterType : "";
     if (d.u && hear(d)) sfx("boom");
+    if (d.slam) boom(d.x, d.y, d.radius + BODY_R, d.team);
     participants().map(ent).concat(allMinions()).forEach(function (T) {
       if (!T || T.team === d.team || !T.alive || !inStrike(T, d)) return;
       if (!ME || ME.team === T.team || visibleTo(T, ME)) spark(T.x, T.y, MELEE_SPARK[who] || "#FFFFFF", who === "knight" || d.u ? 1.5 : 1);
@@ -1972,7 +1974,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (T.team === d.team || !T.alive || !inStrike(T, d)) return;
       var dx = T.x - d.x, dy = T.y - d.y;
       if (protectedNow(T)) return;
-      damage(T, d.dmg, d.owner, !d.m && !d.u && (d.len ? d.createdAt : true), null, d.fx);
+      if (d.slam) { afflict(T, d.fx); return; }
+      damage(T, d.dmg, d.owner, !d.m && !d.u && d.createdAt, null, d.fx);
       if (d.kb && T.alive) {
         var dd = hyp(dx, dy) || 1;
         T.x += dx / dd * d.kb; T.y += dy / dd * d.kb; resolve(T);
@@ -1996,7 +1999,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     E.x = sp.x; E.y = sp.y; E.angle = sp.angle; E.mv = false;
     E.hp = E.maxHp; E.alive = true; E.protectUntil = t + RESPAWN_PROTECT_MS;
     E.cdUntil = 0; E.pending = null; E.burst = null; E.volley = null; E.slash = null;
-    E.buffUntil = 0; E.stealthUntil = 0; E.ultUntil = 0; E.skillUntil = 0; E.regenUntil = 0; E.slowUntil = 0; E.stunUntil = 0;
+    E.buffUntil = 0; E.slamAt = 0; E.stealthUntil = 0; E.ultUntil = 0; E.skillUntil = 0; E.regenUntil = 0; E.slowUntil = 0; E.stunUntil = 0;
     if (E === ME) CAM.snap = true;
     G.forceNet = true;
   }
@@ -2051,6 +2054,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     } else if (E.char === "knight") {
       E.buffUntil = t + ULT.tkDur;
       E.skillDur = ULT.tkDur;
+      E.slamAt = E.buffUntil;
     } else if (E.char === "rogue") {
       E.ultUntil = t + ULT.asSmokeMs;
       E.stealthUntil = t + ULT.asSmokeMs + ULT.asDur;
@@ -2080,6 +2084,16 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     if (E.skillDur && E.char !== "ranger" && E.char !== "mage" && E.char !== "necro") E.skillUntil = t + E.skillDur;
     if (hear(E)) sfx("ult");
+    G.forceNet = true;
+  }
+  function stepKnightSlam(E) {
+    var t = now();
+    if (!E.slamAt || t < E.slamAt) return;
+    E.slamAt = 0;
+    if (!E.alive) return;
+    E.atkAt = t; E.ultUntil = t + 500;
+    room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(E.angle), radius: ULT.tkStunR, arc: Math.PI * 2,
+                                      dmg: 0, u: 1, slam: 1, fx: { stunMs: ULT.tkStunMs }, createdAt: t });
     G.forceNet = true;
   }
   function stepCombat(E, dt) {
@@ -2952,7 +2966,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var ROGUE_COMBO = ["Melee_Dualwield_Attack_Chop", "Melee_Dualwield_Attack_Slice"];
   function attackClip(v, E, t) {
     if (E.char === "warrior") return ["Melee_1H_Attack_Slice_Diagonal", berserk(E, t) ? 1.9 : 1.3];
-    if (E.char === "knight") return ["Melee_1H_Attack_Slice_Horizontal", 1.5];
+    if (E.char === "knight") return E.ultUntil > E.atkAt ? ["Melee_1H_Attack_Chop", 1.6] : ["Melee_1H_Attack_Slice_Horizontal", 1.5];
     if (E.char === "ranger") return ["Ranged_Bow_Release", 3];
     if (E.char === "mage" || E.char === "necro") return ["Ranged_Magic_Shoot", 1.8];
     if (E.char === "sniper") return sniperShotClip(E);
@@ -3822,8 +3836,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (KEY_ON.atk && t >= ME.cdUntil && !ME.volley && !ME.slash) fireBasic(ME, autoAimAngle(ME));
         stepCombat(ME, dt);
       } else if (ME) ME.mv = false;
-      if (isHost()) keys(BOTS).forEach(function (id) { var B = BOTS[id]; stepBot(B, dt); if (B.alive) stepCombat(B, dt); stepMinions(B, dt, t); });
-      if (ME) stepMinions(ME, dt, t);
+      if (isHost()) keys(BOTS).forEach(function (id) { var B = BOTS[id]; stepBot(B, dt); if (B.alive) stepCombat(B, dt); stepKnightSlam(B); stepMinions(B, dt, t); });
+      if (ME) { stepKnightSlam(ME); stepMinions(ME, dt, t); }
       checkProjectiles(t);
     }
     if (st === "countdown" || st === "playing") netWrite(false);
