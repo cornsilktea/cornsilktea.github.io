@@ -55,9 +55,9 @@
   #speed .lab { display: inline-block; font-size: 11.5px; letter-spacing: .18em; margin-right: 6px; vertical-align: 6px; }
   #speed b { display: inline-block; font-size: 48px; line-height: 1; letter-spacing: -1px; min-width: 2.2ch; text-align: right; }
   #speed .unit { display: inline-block; font-size: 15px; font-weight: 800; color: #DCE6D6; margin-left: 4px; }
-  #chaseTag, #followTag { display: block; width: max-content; margin-bottom: 3px; padding: 1px 7px; border-radius: 6px; font-size: 12px; font-weight: 800; color: #DCE6D6; background: rgba(255,255,255,.12); }
-  #chaseTag[hidden], #followTag[hidden] { display: none; }
-  #chaseTag.boost { color: #fff; font-size: 16px; background: #D97B4F; animation: boostPulse .5s ease-in-out infinite alternate; }
+  #chaseTag, #followTag { display: block; width: max-content; margin-bottom: 3px; padding: 1px 7px; border-radius: 6px; font-size: 12px; line-height: 17px; min-height: 17px; font-weight: 800; color: #DCE6D6; background: rgba(255,255,255,.12); }
+  #chaseTag[hidden], #followTag[hidden] { display: block; visibility: hidden; }
+  #chaseTag.boost { color: #fff; font-size: 15px; background: #D97B4F; animation: boostPulse .5s ease-in-out infinite alternate; }
   #speed:has(#chaseTag.boost) { background: linear-gradient(135deg, rgba(217,123,79,.95), rgba(150,64,34,.88)); border-left-color: #fff; box-shadow: 0 0 22px rgba(217,123,79,.75), 0 4px 14px rgba(0,0,0,.3); }
   #speed:has(#chaseTag.boost) #chaseTag { background: #fff; color: #D97B4F; }
   #speed:has(#chaseTag.boost) .lab, #speed:has(#chaseTag.boost) .unit, #speed:has(#chaseTag.boost) #followTag { color: #fff; }
@@ -98,6 +98,7 @@
   #overlay.st-screen .card .logo small { color: #FFB08C; font-style: normal; }
   #overlay.st-screen .card .btn { box-shadow: none; border: 2px solid rgba(255, 255, 255, .3); border-radius: 6px; background: rgba(255, 255, 255, .06); color: #F4F1E8; }
   #overlay.st-screen .card .btn:not(.sub) { background: #D97B4F; border-color: #D97B4F; color: #fff; }
+  #overlay.st-screen .card #btnJoinOpen, #overlay.st-screen .card #btnJoin { background: #4C8DFF; border-color: #4C8DFF; color: #fff; }
   #overlay.st-screen .card .btn:active { transform: none; filter: brightness(.9); }
   #overlay.st-screen .card .btns { justify-content: flex-start; }
   #overlay.st-screen .card .hint, #overlay.st-screen .card .wipe, #overlay.st-screen .card .sect, #overlay.st-screen .codeLab { color: #A9AFC2; text-align: left; }
@@ -511,7 +512,7 @@ const CFG = {
   carScale: 0.8,
   wheelSteerMax: 0.3, wheelSteerSpeedFalloff: 6, wheelSteerRate: 3, bodyRollRate: 4,
   camBack: 8.5, camUp: 3.9, camLerp: 7,
-  fovBase: 66, fovBoost: 16,
+  fovBase: 66, fovBoost: 16, fovSurge: 14,
   speedLinesFrom: 0.45,
   postEvery: 6,
   flagEvery: 36,
@@ -3471,7 +3472,7 @@ new GLTFLoader(HQ_MANAGER).setMeshoptDecoder(MeshoptDecoder).load("img/turbo/sup
 renderLoadGate();
 
 
-const P = { x: 0, z: 0, y: 0, h: 0, v: 0, ci: 0, prevCi: 0, lap: 0, expected: 0, off: false, wallT: 0, steerVis: 0, rollVis: 0, kx: 0, kz: 0, spin: 0, bumpT: 0, fin: 0, chase: 0, tailT: 0, offLine: false, boostOn: false, boostT: 0, boostCap: 0, boostGain: 0, boostCool: 0 };
+const P = { x: 0, z: 0, y: 0, h: 0, v: 0, ci: 0, prevCi: 0, lap: 0, expected: 0, off: false, wallT: 0, steerVis: 0, rollVis: 0, kx: 0, kz: 0, spin: 0, bumpT: 0, fin: 0, chase: 0, chaseKmh: 0, tailLostT: 0, surgeVis: 0, surgeFlash: 0, tailT: 0, offLine: false, boostOn: false, boostT: 0, boostCap: 0, boostGain: 0, boostCool: 0 };
 let state = "menu", playMode = "ta";
 let cdTime = 0, cdShown = -1, goTimer = 0, t0 = 0, elapsed = 0, finalMs = 0, doneTimer = 0, shake = 0, menuAng = 0;
 const keys = { up: false, down: false, left: false, right: false };
@@ -3499,7 +3500,7 @@ function placeAt(i, lat) {
 }
 function startLat() { return (playMode === "battle" && myTeam() === "right" ? -1 : 1) * gridLat(); }
 function resetCar() { placeAt(START_I, startLat()); clearGroundFx(); P.gfxT = newGroundTrack(); P.off = false; P.wallT = 0; P.steerVis = 0; P.rollVis = 0; P.fin = 0; resetBoost(P); }
-function resetBoost(r) { r.chase = 0; r.tailT = 0; r.offLine = false; r.boostOn = false; r.boostT = 0; r.boostCap = 0; r.boostGain = 0; r.boostCool = 0; }
+function resetBoost(r) { r.chase = 0; r.chaseKmh = 0; r.tailLostT = 0; r.surgeVis = 0; r.surgeFlash = 0; r.tailT = 0; r.offLine = false; r.boostOn = false; r.boostT = 0; r.boostCap = 0; r.boostGain = 0; r.boostCool = 0; }
 const CARDS = { start: "cardStart", course: "cardCourse", car: "cardCar", done: "cardDone", bstart: "cardBStart", lobby: "cardLobby", bdone: "cardBDone" };
 let cardNow = "start";
 function showCard(which) {
@@ -3709,28 +3710,51 @@ function updateCamera(dt) {
   }
   const fx = -Math.sin(V.h), fz = -Math.cos(V.h);
   const r = Math.min(1, Math.abs(V.v) / CFG.maxSpeed);
-  const back = CFG.camBack - r * 0.8, up = CFG.camUp - r * 0.8;
+  const surge = V === P ? P.surgeVis : 0;
+  const back = CFG.camBack - r * 0.8 + surge * 1.2, up = CFG.camUp - r * 0.8 - surge * 0.3;
   camTarget.set(V.x - fx * back, V.y + up, V.z - fz * back);
   if (camTarget.distanceTo(camera.position) > 60) camera.position.copy(camTarget);
   camera.position.lerp(camTarget, 1 - Math.exp(-CFG.camLerp * dt));
   if (shake > 0) { shake -= dt; camera.position.x += rnd(-0.3, 0.3) * shake * 3; camera.position.y += rnd(-0.3, 0.3) * shake * 3; }
+  if (surge > 0.02) { camera.position.x += rnd(-0.1, 0.1) * surge; camera.position.y += rnd(-0.1, 0.1) * surge; }
   camLook.set(V.x + fx * (4 + r * 8), V.y + 1.2, V.z + fz * (4 + r * 8));
   camera.lookAt(camLook);
-  camera.fov = CFG.fovBase + r * r * CFG.fovBoost; camera.updateProjectionMatrix();
+  camera.fov = CFG.fovBase + r * r * CFG.fovBoost + surge * CFG.fovSurge; camera.updateProjectionMatrix();
 }
 
-function drawSpeedLines(ratio) {
+function drawSpeedLines(ratio, surge = 0, flash = 0) {
   const w = fx.width, h = fx.height;
   fctx.clearRect(0, 0, w, h);
+  if (state === "done") return;
   const a = (ratio - CFG.speedLinesFrom) / (1 - CFG.speedLinesFrom);
-  if (a <= 0 || state === "done") return;
-  const cx = w / 2, cy = h * 0.45, n = 26;
-  fctx.strokeStyle = "rgba(255,255,255," + (0.55 * a).toFixed(2) + ")"; fctx.lineCap = "round";
-  for (let i = 0; i < n; i++) {
-    const ang = (i / n) * Math.PI * 2 + Math.sin(i * 7.3) * 0.1, len = (0.18 + Math.random() * 0.22) * a;
-    const R = Math.hypot(w, h) * 0.5, r0 = R * (1 - len), r1 = R * 1.05;
-    fctx.lineWidth = 1.5 + Math.random() * 2.5;
-    fctx.beginPath(); fctx.moveTo(cx + Math.cos(ang) * r0, cy + Math.sin(ang) * r0); fctx.lineTo(cx + Math.cos(ang) * r1, cy + Math.sin(ang) * r1); fctx.stroke();
+  const cx = w / 2, cy = h * 0.45, R = Math.hypot(w, h) * 0.5;
+  fctx.lineCap = "round";
+  if (a > 0) {
+    const n = 26;
+    fctx.strokeStyle = "rgba(255,255,255," + (0.55 * a).toFixed(2) + ")";
+    for (let i = 0; i < n; i++) {
+      const ang = (i / n) * Math.PI * 2 + Math.sin(i * 7.3) * 0.1, len = (0.18 + Math.random() * 0.22) * a;
+      const r0 = R * (1 - len), r1 = R * 1.05;
+      fctx.lineWidth = 1.5 + Math.random() * 2.5;
+      fctx.beginPath(); fctx.moveTo(cx + Math.cos(ang) * r0, cy + Math.sin(ang) * r0); fctx.lineTo(cx + Math.cos(ang) * r1, cy + Math.sin(ang) * r1); fctx.stroke();
+    }
+  }
+  if (surge > 0.02) {
+    const streaks = Math.round(18 + 30 * surge);
+    fctx.strokeStyle = "rgba(255,255,255," + (0.9 * surge).toFixed(2) + ")";
+    for (let i = 0; i < streaks; i++) {
+      const ang = Math.random() * Math.PI * 2, len = 0.3 + Math.random() * 0.45 * surge;
+      const r0 = R * (1 - len), r1 = R * 1.05;
+      fctx.lineWidth = 2 + Math.random() * 5 * surge;
+      fctx.beginPath(); fctx.moveTo(cx + Math.cos(ang) * r0, cy + Math.sin(ang) * r0); fctx.lineTo(cx + Math.cos(ang) * r1, cy + Math.sin(ang) * r1); fctx.stroke();
+    }
+  }
+  const edgeGlow = Math.max(flash, surge * 0.35);
+  if (edgeGlow > 0.02) {
+    const glow = fctx.createRadialGradient(cx, cy, R * 0.45, cx, cy, R);
+    glow.addColorStop(0, "rgba(255,255,255,0)");
+    glow.addColorStop(1, "rgba(255,255,255," + (0.55 * edgeGlow).toFixed(2) + ")");
+    fctx.fillStyle = glow; fctx.fillRect(0, 0, w, h);
   }
 }
 function drawMinimap() {
@@ -3959,12 +3983,12 @@ function tick(now) {
     if (!OPEN) { const lapFillWidth = (Math.max(0, Math.min(1, myProg() - P.lap)) * 100).toFixed(1) + "%"; if (lapFill.style.width !== lapFillWidth) lapFill.style.width = lapFillWidth; }
     setText(hudOff, P.off ? "오프로드 — 감속 중" : "");
     setText(speedVal, String(Math.round(Math.abs(P.v) * CFG.kmh)));
-    const chaseText = chaseTagText();
+    const chaseText = heldTag(TAG_HOLD.chase, chaseTagText(), dt);
     chaseTag.hidden = !chaseText; setText(chaseTag, chaseText); chaseTag.className = P.boostOn ? "boost" : "";
-    const followText = followTagText();
+    const followText = heldTag(TAG_HOLD.follow, followTagText(), dt);
     followTag.hidden = !followText; setText(followTag, followText);
     drawMinimap();
-    drawSpeedLines(Math.abs(P.v) / CFG.maxSpeed);
+    drawSpeedLines(Math.abs(P.v) / CFG.maxSpeed, P.surgeVis, P.surgeFlash);
   }
   followSun();
   cullFarTrees();
@@ -4040,7 +4064,8 @@ $("btnRecover").onclick = e => { e.currentTarget.blur(); recover(); };
 
 const CAR_HIT = { impact: 1 / 3, radius: 0.82, offset: 1.08, restitution: 0.45, push: 0.55, spinGain: 0.55, spinMax: 2.6, spinFriction: 3.2, slideFriction: 2.6, inertia: 1.45 };
 const HIT_NOTICE = { minGapMs: 250, dedupeMs: 300, staleMs: 1000 };
-const CHASE = { gapSteps: [{ overM: 30, kmh: 25 }, { overM: 20, kmh: 15 }, { overM: 10, kmh: 10 }, { overM: 0, kmh: 5 }], tailM: 25, tailSideM: 2.5 * 2 * CAR_HIT.radius, tailSec: 2, boostKmh: 40, rampSec: 0.5, holdSec: 1, fadeSec: 1.5, cooldownSec: 6, startLockSec: 5 };
+const CHASE = { gapSteps: [{ overM: 30, kmh: 25 }, { overM: 20, kmh: 15 }, { overM: 10, kmh: 10 }, { overM: 0, kmh: 5 }], tailM: 25, tailSideM: 2.5 * 2 * CAR_HIT.radius, tailSec: 2, boostKmh: 40, rampSec: 0.5, holdSec: 1, fadeSec: 1.5, cooldownSec: 6, startLockSec: 5, stickyM: 3, stickySideM: 0.4, tailGraceSec: 0.5, tagHoldSec: 0.6, surgeFromRatio: 0.85, surgeFullKmh: 20 };
+const TAG_HOLD = { chase: { text: "", t: 0 }, follow: { text: "", t: 0 } };
 const BATTLE = {
   root: "turbolap/rooms", specMax: 1, netMs: 100, countMs: 3600, countLagMaxMs: 1500,dnfMs: 30000, rankRowH: 48,
   sdk: ["https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js", "https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"]
@@ -4415,10 +4440,16 @@ function boostLevel(t) {
   if (t < CHASE.rampSec) return t / CHASE.rampSec;
   return Math.max(0, Math.min(1, 1 - (t - CHASE.holdSec) / CHASE.fadeSec));
 }
+function chaseStepKmh(behind) {
+  const gapStep = behind > 0 && CHASE.gapSteps.find(step => behind >= step.overM);
+  return gapStep ? gapStep.kmh : 0;
+}
 function stepChase(r, gap, dt) {
   const behind = gap.behind, boostV = CHASE.boostKmh / CFG.kmh;
-  const gapStep = behind > 0 && CHASE.gapSteps.find(step => behind >= step.overM);
-  r.chase = gapStep ? gapStep.kmh / CFG.kmh : 0;
+  const lowKmh = chaseStepKmh(behind - CHASE.stickyM), highKmh = chaseStepKmh(behind + CHASE.stickyM);
+  if (behind <= 0) r.chaseKmh = 0;
+  else if (!(r.chaseKmh >= lowKmh && r.chaseKmh <= highKmh)) r.chaseKmh = chaseStepKmh(behind);
+  r.chase = r.chaseKmh / CFG.kmh;
   r.boostGain = 0;
   if (r.boostOn) {
     r.boostT += dt;
@@ -4428,20 +4459,35 @@ function stepChase(r, gap, dt) {
   }
   const startLockLeft = playMode === "battle" && BT.match ? CHASE.startLockSec + msToGo() / 1000 : 0;
   r.boostCool = Math.max(0, r.boostCool - dt, startLockLeft);
-  const inTailRange = behind > 0 && behind <= CHASE.tailM;
-  r.offLine = inTailRange && gap.side > CHASE.tailSideM;
-  r.tailT = inTailRange && !r.offLine && !r.boostCool ? r.tailT + dt : 0;
+  const inTailRange = behind > 0 && behind <= CHASE.tailM + (r.tailT > 0 ? CHASE.stickyM : 0);
+  r.offLine = inTailRange && gap.side > CHASE.tailSideM + (r.offLine ? -CHASE.stickySideM : CHASE.stickySideM);
+  const charging = inTailRange && !r.offLine && !r.boostCool;
+  if (charging) { r.tailT += dt; r.tailLostT = 0; }
+  else if (r.tailT > 0) { r.tailLostT += dt; if (r.tailLostT > CHASE.tailGraceSec || r.boostCool) { r.tailT = 0; r.tailLostT = 0; } }
   if (r.tailT < CHASE.tailSec) return false;
-  r.tailT = 0; r.boostOn = true; r.boostT = 0; r.boostCap = 0; r.boostCool = CHASE.cooldownSec;
+  r.tailT = 0; r.tailLostT = 0; r.boostOn = true; r.boostT = 0; r.boostCap = 0; r.boostCool = CHASE.cooldownSec;
   return true;
+}
+function boostSurgeTarget() {
+  if (!P.boostOn) return 0;
+  return Math.max(0, Math.min(1, (Math.abs(P.v) - CFG.maxSpeed) / (CHASE.surgeFullKmh / CFG.kmh)));
 }
 function updateChase(dt) {
   const fired = stepChase(P, gapToRival(), dt);
   P.v += P.boostGain;
   if (fired) {
-    shake = Math.max(shake, 0.2);
+    const nearTopSpeed = P.v >= CFG.maxSpeed * CHASE.surgeFromRatio;
+    if (nearTopSpeed) { shake = Math.max(shake, 0.6); P.surgeFlash = 1; beep(220, 0.35, "sawtooth", 0.07); }
+    else shake = Math.max(shake, 0.2);
     beep(660, 0.12, "sawtooth", 0.08); beep(990, 0.25, "sawtooth", 0.08, 0.08);
   }
+  P.surgeVis += (boostSurgeTarget() - P.surgeVis) * Math.min(1, dt * 6);
+  P.surgeFlash = Math.max(0, P.surgeFlash - dt * 2.2);
+}
+function heldTag(hold, text, dt) {
+  if (text) { hold.text = text; hold.t = CHASE.tagHoldSec; }
+  else if ((hold.t -= dt) <= 0) hold.text = "";
+  return hold.text;
 }
 function chaseTagText() {
   if (P.boostOn) return "🔥 부스트!";
