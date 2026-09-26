@@ -278,7 +278,7 @@
     <div class="card note">
       <b>조작</b> — 왼쪽 아래를 누르고 끌면 이동, 오른쪽 아래 <b>공격</b> 버튼을 누른 채 끌어 방향을 정하고 떼면 발사(그냥 톡 누르면 가까운 적을 자동 조준). 컴퓨터에서는 <b>WASD</b>(방향키)로 이동, <b>K</b> 기본 공격, <b>J</b> 궁극기(자동 조준).
       <b>궁극기</b>는 게이지가 10 모이면(명중 +2 · 마법사·네크로는 +3 · 궁수·도적은 1발당 +1, 피격 +1, 마법사 궁극기가 적에게 맞으면 4를 돌려받음, 궁수 궁극기는 화살이 맞을 때마다 1씩 돌려받음) 빨갛게 빛나고, 궁극기를 쓰면 지속시간 동안 분홍색으로 줄어듭니다. 풀숲에 들어가면 상대 팀에게 보이지 않아요.
-      <br><b>네크로</b>는 빠른 보라색 구체를 쏘고, 궁극기 <b>해골 소환</b>으로 앞쪽에 해골 병사 2마리를 불러내요. 해골은 8초 동안 보이는 적을 쫓아가 베고(적이 안 보이면 그 자리에 서 있음), 적의 공격에 맞으면 쓰러져요. 해골이 쓰러뜨린 적은 네크로의 킬이 되지만 궁극기 게이지는 차지 않아요.
+      <br><b>네크로</b>는 빠른 보라색 구체를 쏘고, 궁극기 <b>해골 소환</b>으로 앞쪽에 해골 병사 2마리를 불러내요. 해골은 8초 동안 보이는 적을 쫓아가 베고(적이 안 보이면 그 자리에 서 있음), 적의 공격에 맞으면 쓰러져요. 해골이 쓰러뜨린 적은 네크로의 킬이 되지만 궁극기 게이지는 차지 않아요. 해골이 있는 동안에도 네크로의 공격으로 게이지가 차서 다시 소환할 수 있고, 새로 부르면 이전 해골은 사라져요.
     </div>
   </div>
 </div>
@@ -1106,7 +1106,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (!E.minions || !E.minions.length) return;
     if (t >= E.summonAt + ULT.smDur) {
       E.minions = [];
-      if (E.skillUntil > t) E.skillUntil = t;
       G.forceNet = true;
       return;
     }
@@ -1134,7 +1133,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (hear(m)) sfx("swing");
       }
     });
-    if (E.skillUntil > t && !E.minions.some(function (m) { return m.alive; })) { E.skillUntil = t; G.forceNet = true; }
   }
 
   function inBush(x, y) { return bushIndexAt(x, y) >= 0; }
@@ -1466,8 +1464,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     E.x = sp.x; E.y = sp.y; E.angle = sp.angle; E.mv = false;
     E.hp = E.maxHp; E.alive = true; E.protectUntil = t + RESPAWN_PROTECT_MS;
     E.cdUntil = 0; E.pending = null; E.burst = null; E.volley = null; E.slash = null;
-    E.buffUntil = 0; E.stealthUntil = 0; E.ultUntil = 0; E.regenUntil = 0; E.slowUntil = 0; E.stunUntil = 0;
-    E.skillUntil = E.minions && E.minions.some(function (m) { return m.alive; }) ? E.summonAt + ULT.smDur : 0;
+    E.buffUntil = 0; E.stealthUntil = 0; E.ultUntil = 0; E.skillUntil = 0; E.regenUntil = 0; E.slowUntil = 0; E.stunUntil = 0;
     if (E === ME) CAM.snap = true;
     G.forceNet = true;
   }
@@ -1528,10 +1525,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     } else if (E.char === "necro") {
       E.angle = ang;
       E.ultUntil = t + 450;
-      E.skillDur = ULT.smDur;
       summonMinions(E, ang, t);
     }
-    if (E.skillDur && E.char !== "ranger" && E.char !== "mage") E.skillUntil = t + E.skillDur;
+    if (E.skillDur && E.char !== "ranger" && E.char !== "mage" && E.char !== "necro") E.skillUntil = t + E.skillDur;
     if (hear(E)) sfx("ult");
     G.forceNet = true;
   }
