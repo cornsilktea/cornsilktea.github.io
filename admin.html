@@ -96,15 +96,16 @@
   }
   .lightbox img { max-width: 100%; max-height: 92vh; border-radius:var(--sg-radius); background: #fff; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
   .stats-box {
-    background: #fff; border-radius: var(--sg-radius); padding: 20px; width: 100%; max-width: 560px;
+    background: #fff; border-radius: var(--sg-radius); padding: 24px; width: 100%; max-width: 760px;
     max-height: 92vh; overflow-y: auto; cursor: default; box-shadow: 0 10px 40px rgba(0,0,0,.4);
   }
   .stats-box h3 { margin: 0 0 6px; font-size: 18px; }
-  .stats-box table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
-  .stats-box th, .stats-box td { padding: 8px 6px; border-bottom: 1px solid var(--sg-line); text-align: right; white-space: nowrap; }
+  .stats-box table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 15px; }
+  .stats-box th, .stats-box td { padding: 10px 8px; border-bottom: 1px solid var(--sg-line); text-align: right; white-space: nowrap; }
   .stats-box th:first-child, .stats-box td:first-child { text-align: left; }
   .stats-box th { font-size: 12px; color: var(--sg-ink-soft); font-weight: 700; }
   .stats-box td b { font-size: 16px; }
+  .stats-box td small { margin-left: 6px; font-size: 13px; color: var(--sg-ink-soft); }
   .stats-box .actions { margin-top: 8px; }
   .lightbox p { position: absolute; top: 14px; left: 0; right: 0; text-align: center; color: var(--sg-line); font-size: 13px; margin: 0; }
 
@@ -932,28 +933,35 @@ async function showStats(g) {
     } catch (e) { msg.textContent = "통계를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요."; return; }
     s = s || {};
     const totalPicks = meta.roles.reduce((n, role) => n + ((s[role.id] && s[role.id].picks) || 0), 0);
-    msg.textContent = "집계된 경기 " + (s.matches || 0) + "판 · 참가 " + totalPicks + "명";
+    msg.textContent = "집계된 경기 " + (s.matches || 0) + "판 · 총 게임 수(참가 인원 합계) " + totalPicks + "게임";
 
+    /* 비율 옆에 (분자 / 분모) 를 작게 붙여 표본이 적은 직업을 알아볼 수 있게 한다 */
+    function rateCell(a, b) {
+      const td = el("td");
+      td.appendChild(el("b", null, pct(a, b)));
+      td.appendChild(el("small", null, "(" + a + " / " + b + ")"));
+      return td;
+    }
     const table = el("table");
     const head = el("tr");
-    ["직업", "선택률", "승률", "평균 피해 / 회복", "선택 수"].forEach((t) => head.appendChild(el("th", null, t)));
+    ["직업", "선택률 (선택 수 / 총 게임 수)", "승률 (승리 수 / 선택 수)", "평균 피해량"].forEach((t) => head.appendChild(el("th", null, t)));
     table.appendChild(head);
     meta.roles.forEach((role) => {
       const d = s[role.id] || {}, picks = d.picks || 0, wins = d.wins || 0;
       const tr = el("tr");
       tr.appendChild(el("td", null, role.name));
-      const pickTd = el("td"); pickTd.appendChild(el("b", null, pct(picks, totalPicks))); tr.appendChild(pickTd);
-      const winTd = el("td"); winTd.appendChild(el("b", null, pct(wins, picks))); tr.appendChild(winTd);
-      /* 힐러는 궁극기 회복량, 나머지는 적에게 준 피해의 1판 평균 */
-      const avg = role.heal ? d.heal : d.dmg;
-      tr.appendChild(el("td", null, picks ? (role.heal ? "회복 " : "피해 ") + Math.round(avg || 0) : "-"));
-      tr.appendChild(el("td", null, picks + " (" + wins + "승)"));
+      tr.appendChild(rateCell(picks, totalPicks));
+      tr.appendChild(rateCell(wins, picks));
+      /* 1판 평균. 마법사는 궁극기로 아군을 회복한 양도 피해량에 더한다 */
+      const avg = (d.dmg || 0) + (role.heal ? d.heal || 0 : 0);
+      tr.appendChild(el("td", null, picks ? String(Math.round(avg)) : "-"));
       table.appendChild(tr);
     });
     box.appendChild(table);
     box.appendChild(el("p", "hint",
       "AI 없이 양 팀 인원이 같은 3v3 플레이 경기만 집계합니다. 중간에 나가거나 연결이 끊긴 사람이 있는 경기는 빠집니다. " +
-      "선택률 = 그 직업을 고른 사람 수 ÷ 전체 참가 인원, 승률 = 그 직업으로 이긴 수 ÷ 고른 수(무승부는 승리로 세지 않음)."));
+      "총 게임 수는 한 사람이 한 판을 한 것을 1게임으로 셉니다(3v3 한 판 = 6게임). 무승부는 승리로 세지 않습니다. " +
+      "마법사의 평균 피해량에는 아군 회복량이 포함됩니다."));
 
     const acts = el("div", "actions");
     const reload = el("button", null, "새로고침"); reload.type = "button";
