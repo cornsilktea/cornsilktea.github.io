@@ -62,6 +62,9 @@
   .stat .k{font-size:11px;color:var(--sub);letter-spacing:.02em;display:block;line-height:1.3;}
   .stat .v{font-size:18px;font-weight:800;display:block;line-height:1.25;letter-spacing:-.01em;}
   .stat.gold .v{color:var(--gold);}
+  .coin{display:flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;font-style:normal;
+    font-size:11px;font-weight:800;color:#8a5a00;background:radial-gradient(circle at 35% 30%,#FFF3B0,#F2C230 55%,#C98F12);
+    box-shadow:inset 0 0 0 1.5px #B07A0C;}
   .stat.life .v{color:var(--life);}
 
   .main{display:flex;gap:12px;align-items:flex-start;}
@@ -268,7 +271,7 @@
   <div class="topbar">
     <div class="stat"><span class="ic">🌊</span><span class="tx"><span class="k">웨이브</span><span class="v" id="uiWave">1 / 40</span></span></div>
     <div class="stat life"><span class="ic">❤️</span><span class="tx"><span class="k">목숨</span><span class="v" id="uiLife">15</span></span></div>
-    <div class="stat gold"><span class="ic">🪙</span><span class="tx"><span class="k">골드</span><span class="v" id="uiGold">0</span></span></div>
+    <div class="stat gold"><span class="ic"><i class="coin">G</i></span><span class="tx"><span class="k">골드</span><span class="v" id="uiGold">0</span></span></div>
     <div class="stat"><span class="ic">📊</span><span class="tx"><span class="k">효율 점수</span><span class="v" id="uiScore">0</span></span></div>
     <div class="stat"><span class="ic">⏱️</span><span class="tx"><span class="k">시간</span><span class="v" id="uiTime">0:00</span></span></div>
     <div class="stat best"><span class="ic">🏅</span><span class="tx"><span class="k">최고 기록</span><span class="v" id="uiBest">-</span></span></div>

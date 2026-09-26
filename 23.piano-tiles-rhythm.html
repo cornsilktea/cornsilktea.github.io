@@ -7,10 +7,10 @@
 <meta charset="utf-8">
 <link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>피아노 타일 리듬</title>
+<title>피아노 타일</title>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
-<meta property="og:title" content="피아노 타일 리듬">
+<meta property="og:title" content="피아노 타일">
 <meta property="og:description" content="타이밍·이벤트 입력 판정(±50ms/±120ms) / 쉬움 3곡·보통 3곡·어려움 2곡·매우 어려움 1곡 개인전">
 <meta property="og:url" content="https://cornsilktea.github.io/23.piano-tiles-rhythm.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
@@ -92,13 +92,16 @@
   .song .h small{ display:block; font-size:11px; }
   #start{ --st-bg:10,10,18; --st-panel:rgba(18,18,28,.84); --st-accent:#D97B4F; --st-title2:#E9C98A; --st-glow:rgba(233,201,138,.45);
     background:
-      linear-gradient(90deg, rgba(10,10,18,.94) 0%, rgba(10,10,18,.74) 50%, rgba(10,10,18,.4) 85%),
-      linear-gradient(180deg, transparent 0 58%, #0b0b12 58% 100%),
-      repeating-linear-gradient(90deg, transparent 0 34px, #0b0b12 34px 56px, transparent 56px 80px),
-      repeating-linear-gradient(90deg, #EDE8DD 0 38px, #9C968C 38px 40px); }
+      linear-gradient(90deg, rgba(10,10,18,.92) 0%, rgba(10,10,18,.66) 48%, rgba(10,10,18,.12) 85%),
+      linear-gradient(180deg, transparent calc(62vh - 14px), #6E1522 calc(62vh - 14px) calc(62vh - 4px), #0b0b10 calc(62vh - 4px) 62vh, transparent 62vh),
+      url(img/pianotiles/keyboard.svg) left bottom / auto 38vh repeat-x,
+      radial-gradient(ellipse at 70% 20%, #2A2A34 0%, #111118 55%, #07070B 100%);
+    background-attachment:fixed; }
   @media (max-width:760px){ #start{ background:
-      linear-gradient(rgba(10,10,18,.84), rgba(10,10,18,.84)),
-      repeating-linear-gradient(90deg, #EDE8DD 0 38px, #9C968C 38px 40px); } }
+      linear-gradient(rgba(10,10,18,.8), rgba(10,10,18,.8)),
+      url(img/pianotiles/keyboard.svg) left bottom / auto 30vh repeat-x,
+      #0b0b10;
+    background-attachment:fixed; } }
   #start.on{ display:block; }
   #start .st-opts .btn{ height:auto; }
   #start .st-opts .btn.sel{ background:var(--st-accent); border-color:var(--st-accent); color:#fff; }
@@ -125,7 +128,7 @@
   <section id="start" class="screen on st-screen">
     <div class="st-wrap">
       <div class="st-hero">
-        <h1 class="st-title">피아노 타일<span>리듬</span></h1>
+        <h1 class="st-title">피아노 타일</h1>
       </div>
       <div class="st-card">
         <label class="st-label">① 난이도</label>

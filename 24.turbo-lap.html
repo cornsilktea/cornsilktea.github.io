@@ -88,6 +88,51 @@
   #cardStart #loadNote:empty { display: none; }
   #cardStart .credits { color: #7F8698; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, .1); }
   #cardStart .credits a { color: #A9AFC2; }
+
+  #overlay.st-screen .card { width: 100%; max-width: 560px; margin: 0 auto 14px; text-align: left; color: #EEF0F4;
+    background: rgba(20, 22, 34, .84); border: 1px solid rgba(255, 255, 255, .16); border-radius: 8px; box-shadow: none; padding: 20px;
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+  #overlay.st-screen .card.wide { max-width: 680px; }
+  @media (min-width: 1000px) { #overlay.st-screen .card { margin-left: 5vw; } }
+  #overlay.st-screen .card .logo { color: #F4F1E8; -webkit-text-stroke: 0; text-shadow: 0 4px 0 rgba(0, 0, 0, .45), 0 0 22px rgba(217, 123, 79, .6); font-style: italic; letter-spacing: -.5px; }
+  #overlay.st-screen .card .logo small { color: #FFB08C; font-style: normal; }
+  #overlay.st-screen .card .btn { box-shadow: none; border: 2px solid rgba(255, 255, 255, .3); border-radius: 6px; background: rgba(255, 255, 255, .06); color: #F4F1E8; }
+  #overlay.st-screen .card .btn:not(.sub) { background: #D97B4F; border-color: #D97B4F; color: #fff; }
+  #overlay.st-screen .card .btn:active { transform: none; filter: brightness(.9); }
+  #overlay.st-screen .card .btns { justify-content: flex-start; }
+  #overlay.st-screen .card .hint, #overlay.st-screen .card .wipe, #overlay.st-screen .card .sect, #overlay.st-screen .codeLab { color: #A9AFC2; text-align: left; }
+  #overlay.st-screen .card .wipe button { color: #7F8698; }
+  #overlay.st-screen .rtab th, #overlay.st-screen .rtab td { border-bottom-color: rgba(255, 255, 255, .1); color: #CDD2DC; }
+  #overlay.st-screen .rtab th { color: #A9AFC2; }
+  #overlay.st-screen .rtab em, #overlay.st-screen .final { color: #F4F1E8; }
+  #overlay.st-screen .rtab em.none { color: #6F7688; }
+  #overlay.st-screen .rtab small, #overlay.st-screen .laps { color: #A9AFC2; }
+  #overlay.st-screen .laps b { color: #FFB08C; }
+  #overlay.st-screen .carbtn, #overlay.st-screen .ghostbtn, #overlay.st-screen .mapBtn { background: rgba(255, 255, 255, .06); border: 2px solid rgba(255, 255, 255, .18); color: #F4F1E8; box-shadow: none; }
+  #overlay.st-screen .carbtn.on, #overlay.st-screen .ghostbtn.on, #overlay.st-screen .mapBtn.on { background: rgba(217, 123, 79, .22); border-color: #D97B4F; outline: 0; }
+  #overlay.st-screen .carbtn small, #overlay.st-screen .ghostbtn small, #overlay.st-screen .mapBtn small { color: #A9AFC2; }
+  #overlay.st-screen .rec > div, #overlay.st-screen .specBox, #overlay.st-screen .courseTag { background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .14); color: #EEF0F4; }
+  #overlay.st-screen .rec .lab, #overlay.st-screen .rec .who { color: #A9AFC2; }
+  #overlay.st-screen .rec .val { color: #F4F1E8; }
+  #overlay.st-screen .hello { justify-content: flex-start; color: #EEF0F4; }
+  #overlay.st-screen .hello b, #overlay.st-screen .codeNum { color: #FFB08C; }
+  #overlay.st-screen .mini, .modalBox .mini { background: rgba(255, 255, 255, .08); border-color: rgba(255, 255, 255, .24); color: #DDE1EA; }
+  #overlay.st-screen .mini.danger { border-color: #FF7A7A; color: #FF9A9A; }
+  #overlay.st-screen .joinRow input, .modalBox .joinRow input { background: rgba(255, 255, 255, .06); border: 2px solid rgba(255, 255, 255, .3); border-radius: 6px; color: #fff; }
+  #overlay.st-screen .side.left { border-color: #4C8DFF; background: rgba(76, 141, 255, .14); }
+  #overlay.st-screen .side.right { border-color: #D97B4F; background: rgba(217, 123, 79, .14); }
+  #overlay.st-screen .side.left h3 { color: #8DB8FF; }
+  #overlay.st-screen .side.left .join { background: #4C8DFF; }
+  #overlay.st-screen .slot { background: rgba(255, 255, 255, .1); color: #F4F1E8; }
+  #overlay.st-screen .slot.empty { background: rgba(255, 255, 255, .03); color: #6F7688; }
+  #overlay.st-screen .slot.mine { box-shadow: inset 0 0 0 2px #FFB08C; }
+  #overlay.st-screen .slot small, #overlay.st-screen .specBox .none { color: #A9AFC2; }
+  #overlay.st-screen #btnBStart { background: #D97B4F; border-color: #D97B4F; }
+  #nickModal.modal { background: rgba(8, 10, 18, .7); }
+  #nickModal .modalBox { background: #161826; border: 1px solid rgba(255, 255, 255, .18); border-radius: 8px; color: #EEF0F4; }
+  #nickModal .modalBox .btn { box-shadow: none; border-radius: 6px; background: #D97B4F; border-color: #D97B4F; color: #fff; }
+  #nickModal .modalBox .joinRow input { background: rgba(255, 255, 255, .06); border: 2px solid rgba(255, 255, 255, .3); border-radius: 6px; color: #fff; }
+  #nickModal .modalBox .mini { background: rgba(255, 255, 255, .08); border-color: rgba(255, 255, 255, .24); color: #DDE1EA; }
   .card { width: min(480px, 100%); background: var(--sg-panel); border: 3px solid var(--sg-line-strong); border-radius: 14px; padding: 22px 22px 18px; box-shadow: 0 10px 0 rgba(27,43,32,.3), 0 20px 40px rgba(0,0,0,.2); text-align: center; }
   .logo { font-size: clamp(44px, 9vw, 64px); font-weight: 800; line-height: 1.05; color: #D97B4F; -webkit-text-stroke: 2px var(--sg-ink); text-shadow: 4px 5px 0 var(--sg-ink); letter-spacing: -1px; margin-bottom: 4px; }
   .logo small { display: block; font-size: 15px; -webkit-text-stroke: 0; text-shadow: none; color: var(--sg-ink-soft); letter-spacing: 0; margin-top: 8px; font-weight: 700; }
@@ -267,7 +312,7 @@
 <div id="overlay" class="st-screen">
   <div class="st-wrap" id="cardStart">
     <div class="st-hero">
-      <h1 class="st-title">TURBO LAP<span>터보 랩</span></h1>
+      <h1 class="st-title">TURBO LAP</h1>
     </div>
     <div class="st-card">
       <button type="button" class="st-btn primary" id="btnModeTA">⏱ 타임어택<small>혼자 달려 완주 최단 시간 도전 · 고스트</small></button>
@@ -3459,9 +3504,8 @@ const CARDS = { start: "cardStart", course: "cardCourse", car: "cardCar", done: 
 let cardNow = "start";
 function showCard(which) {
   cardNow = which;
-  const isStartScreen = which === "start";
-  overlay.classList.toggle("st-screen", isStartScreen);
-  overlay.style.display = which ? (isStartScreen ? "block" : "flex") : "none";
+  overlay.style.display = which ? "block" : "none";
+  overlay.scrollTop = 0;
   Object.keys(CARDS).forEach(k => { $(CARDS[k]).style.display = which === k ? "" : "none"; });
 }
 function showCourse(k) {

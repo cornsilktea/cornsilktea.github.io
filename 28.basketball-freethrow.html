@@ -98,6 +98,26 @@
     .desc { font-size: 13px; }
   }
   [hidden]{display:none !important;}
+  .hud-box { background: linear-gradient(135deg, rgba(16,18,28,.82), rgba(38,42,58,.72)); border: 1.5px solid rgba(255,255,255,.22); border-radius: 10px;
+    color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.6); box-shadow: 0 4px 14px rgba(0,0,0,.3); }
+  .hud-box .lab { color: #DCE6D6; letter-spacing: .12em; }
+  .hud-box .big { color: #fff; }
+  #hudRound { border-left: 5px solid #D97B4F; text-align: left; }
+  #hudRound::before { content: ""; position: fixed; left: 0; right: 0; top: 0; height: 170px; z-index: -1; pointer-events: none;
+    background: linear-gradient(to bottom, rgba(16,18,28,.6), rgba(16,18,28,0)); }
+  #hudBest { border-left: 5px solid #DCE6D6; text-align: left; }
+  #hudScore .num { color: #fff; -webkit-text-stroke: 0; text-shadow: 0 4px 0 rgba(16,18,28,.45), 0 0 18px rgba(217,123,79,.55); }
+  #hudScore .pass { background: linear-gradient(135deg, rgba(16,18,28,.82), rgba(38,42,58,.72)); border: 0; border-right: 5px solid #D97B4F; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,.3); }
+  #hudScore .fev { color: #FFB08C; -webkit-text-stroke: 0; text-shadow: 0 0 12px rgba(217,123,79,.9), 0 1px 3px rgba(0,0,0,.6); }
+  body.fever .hud-box { border-color: #D97B4F; box-shadow: 0 0 18px rgba(217,123,79,.6); }
+  #powerWrap { background: linear-gradient(135deg, rgba(16,18,28,.82), rgba(38,42,58,.72)); border: 1.5px solid rgba(255,255,255,.22); box-shadow: 0 4px 14px rgba(0,0,0,.3); }
+  #powerWrap .lab { color: #DCE6D6; }
+  #powerWrap .lab b { color: #fff; }
+  #powerBar { background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.4); }
+  #sweet { background: #fff; }
+  #tip { color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.8); }
+  #banner .t { -webkit-text-stroke: 2px #1B1D28; text-shadow: 0 5px 0 rgba(16,18,28,.45), 0 0 18px rgba(217,123,79,.55); }
+  #banner .s { color: #fff; display: inline-block; padding: 4px 14px; border-radius: 8px; background: linear-gradient(135deg, rgba(16,18,28,.88), rgba(38,42,58,.8)); border-left: 4px solid #D97B4F; }
   #overlay.st-screen { display: block; align-items: initial; justify-content: initial; padding: 54px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
     --st-bg: 30, 16, 8; --st-panel: rgba(38, 22, 12, .84); --st-accent: #D97B4F; --st-title2: #FFB070; --st-glow: rgba(255, 150, 70, .5);
     background: linear-gradient(90deg, rgba(30, 16, 8, .88) 0%, rgba(30, 16, 8, .62) 46%, rgba(30, 16, 8, .1) 80%); }

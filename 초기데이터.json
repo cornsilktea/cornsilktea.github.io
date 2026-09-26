@@ -49,7 +49,7 @@
         "memo": "점프·와이어 타이밍 / 10단계 연속 코스(9단계부터 벽) 개인전",
         "open": true,
         "order": 21,
-        "title": "한옥 지붕 와이어 러너",
+        "title": "고양이 달리기",
         "units": [],
         "unitsSet": false,
         "url": "22.hanokroofrun.html"
@@ -220,7 +220,7 @@
         "memo": "타이밍·이벤트 입력 판정(±50ms/±120ms) / 쉬움 3곡·보통 3곡·어려움 2곡·매우 어려움 1곡 개인전",
         "open": false,
         "order": 22.0,
-        "title": "피아노 타일 리듬",
+        "title": "피아노 타일",
         "units": [],
         "unitsSet": false,
         "url": "23.piano-tiles-rhythm.html"
