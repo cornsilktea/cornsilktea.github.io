@@ -30,7 +30,8 @@
   :root { --blue: #2F6FD6; --blue-soft: #E3ECFB; --red: #D6453D; --red-soft: #FBE5E3; }
 
   .screen { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 30; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 54px 16px 24px;
-    background: linear-gradient(90deg, rgba(8, 14, 11, .88) 0%, rgba(8, 14, 11, .62) 48%, rgba(8, 14, 11, .12) 82%);
+    background: linear-gradient(90deg, rgba(8, 14, 11, .88) 0%, rgba(8, 14, 11, .62) 48%, rgba(8, 14, 11, .12) 82%); }
+  .screen, .modal {
     --sg-panel: rgba(16, 24, 19, .82); --sg-panel-alt: rgba(255, 255, 255, .07); --sg-line: rgba(255, 255, 255, .08); --sg-line-mid: rgba(255, 255, 255, .16); --sg-line-strong: rgba(255, 255, 255, .32);
     --sg-ink: #EEF2EE; --sg-ink-mid: #CFD8D0; --sg-ink-soft: #A3B0A6; --sg-ink-faint: #6F7C72; --sg-primary: #3E8E5E; --sg-primary-ink: #FFFFFF; --sg-primary-soft: rgba(62, 142, 94, .28); --sg-danger: #FF7A7A;
     --blue-soft: rgba(47, 111, 214, .2); --red-soft: rgba(214, 69, 61, .2); color: var(--sg-ink); }
@@ -222,8 +223,8 @@
   .endBtns button { flex: 1 1 0; height: 56px; font-size: 19px; font-weight: 800; border-radius: 8px; border: 2px solid rgba(255,255,255,.3); background: rgba(255,255,255,.06); color: #F4F1E8; }
   .endBtns .primary { background: #3E8E5E; border-color: #3E8E5E; color: #fff; }
 
-  .modal { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 50; background: rgba(27,43,32,.55); display: flex; align-items: center; justify-content: center; padding: 16px; }
-  .modalBox { background: #fff; border: 2px solid var(--sg-line-strong); border-radius: 10px; padding: 22px 20px; width: 100%; max-width: 400px; }
+  .modal { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 50; background: rgba(8, 14, 11, .7); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .modalBox { background: #18221B; border: 2px solid var(--sg-line-strong); border-radius: 10px; padding: 22px 20px; width: 100%; max-width: 400px; }
   .modalBox h3 { font-size: 22px; font-weight: 800; text-align: center; margin-bottom: 14px; }
   .modalBox .row input { font-size: 24px; letter-spacing: 1px; }
   .modalBox .cancel { display: block; margin: 12px auto 0; }
@@ -1919,6 +1920,21 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var auraMat = new THREE.MeshBasicMaterial({ color: 0xFF3B1F, transparent: true, opacity: 0.3, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
   GEO.aura = new THREE.CylinderGeometry(30, 22, 84, 18, 1, true);
   GEO.aura.translate(0, 42, 0);
+  var shieldDomeMat = new THREE.MeshBasicMaterial({ color: 0x3D8CFF, transparent: true, opacity: 0.32, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+  var shieldEdgeMat = new THREE.MeshBasicMaterial({ color: 0x8CCBFF, transparent: true, opacity: 0.5, wireframe: true, depthWrite: false, blending: THREE.AdditiveBlending });
+  var shieldRingMat = new THREE.MeshBasicMaterial({ color: 0xFFD54A, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide });
+  GEO.shieldDome = new THREE.SphereGeometry(46, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+  GEO.shieldEdge = new THREE.IcosahedronGeometry(47, 1);
+  GEO.shieldRing = new THREE.RingGeometry(44, 50, 6);
+  function makeShieldAura() {
+    var g = new THREE.Group();
+    var dome = new THREE.Mesh(GEO.shieldDome, shieldDomeMat); dome.scale.y = 2.1; g.add(dome);
+    var edge = new THREE.Mesh(GEO.shieldEdge, shieldEdgeMat); edge.scale.y = 2.15; g.add(edge);
+    var ring = flatMesh(GEO.shieldRing, shieldRingMat); ring.position.y = 2; g.add(ring);
+    g.userData.edge = edge; g.userData.ring = ring;
+    g.visible = false;
+    return g;
+  }
   function makeVis(E, parent) {
     var root = new THREE.Group(), body = new THREE.Group();
     var v = { root: root, body: body, team: E.team, char: E.char, yaw: -E.angle, mats: [], glowMats: [], kit: false,
@@ -1951,6 +1967,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     v.mats.push(ringMat); v.ring = ring;
     var meRing = flatMesh(GEO.meRing, meRingMat); meRing.position.y = 1.4; meRing.visible = E.id === myId; root.add(meRing);
     if (E.char === "warrior") { v.aura = new THREE.Mesh(GEO.aura, auraMat); v.aura.visible = false; root.add(v.aura); }
+    if (E.char === "knight") { v.shield = makeShieldAura(); root.add(v.shield); }
     (parent || scene).add(root);
     return v;
   }
@@ -2223,8 +2240,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var E = { id: "tour" + i, team: s[1], char: s[0], x: s[2], y: s[3], angle: s[1] === "blue" ? Math.PI / 2 : -Math.PI / 2,
                 atkAt: 0, ultUntil: 0, buffUntil: 0, stealthUntil: 0, alive: true, mv: false, nextAtk: 1200 + i * 700 + Math.random() * 1500 };
       var v = makeVis(E, tourGroup);
-      v.root.position.set(E.x, 0, E.y); v.body.rotation.y = -E.angle;
-      SHOWCASE.push({ E: E, v: v });
+      v.root.position.set(E.x, 0, E.y); v.body.rotation.y = -E.angle;      SHOWCASE.push({ E: E, v: v });
     });
   }
   var TOUR_SHOTS = [
@@ -2325,6 +2341,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var glow = glowOf(E, t);
       v.glowMats.forEach(function (m) { m.emissive.setHex(glow); });
       if (v.aura) { v.aura.visible = E.alive && berserk(E, t); v.aura.scale.y = 0.9 + 0.15 * Math.sin(nowMs / 90); }
+      if (v.shield) {
+        v.shield.visible = E.alive && E.buffUntil > t;
+        if (v.shield.visible) {
+          v.shield.scale.setScalar(1 + 0.04 * Math.sin(nowMs / 140));
+          v.shield.userData.edge.rotation.y = nowMs / 1400;
+          v.shield.userData.ring.rotation.z = -nowMs / 900;
+        }
+      }
       v.ring.visible = E.alive;
       if (E.alive) LABELS.push({ e: E, alpha: alpha, ally: ally });
     });

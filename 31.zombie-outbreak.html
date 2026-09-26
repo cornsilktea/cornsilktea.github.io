@@ -2688,8 +2688,7 @@ function hostStart() {
   playerIds().filter(isBot).forEach(id => { u["players/" + id] = null; u["st/" + id] = null; });
   const t0 = serverNow(), botIds = [];
   if (botsWanted()) for (let k = participants.length; k < MAX_PLAYERS; k++) botIds.push("bot" + (botIds.length + 1) + Math.random().toString(36).slice(2, 8));
-  const everyone = participants.concat(botIds);
-  const zombieId = everyone[Math.floor(Math.random() * everyone.length)];
+  const zombieId = participants[Math.floor(Math.random() * participants.length)];
   const startAt = t0 + COUNTDOWN_MS;
   Object.assign(u, { status: "playing", startAt, endedAt: null, winner: null, final: null, originZombieId: zombieId, zombieIds: { [zombieId]: startAt } });
   botIds.forEach((id, k) => {
