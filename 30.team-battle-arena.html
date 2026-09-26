@@ -9,7 +9,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
 <meta property="og:title" content="3v3 팀 배틀 아레나">
-<meta property="og:description" content="방 코드로 모여 블루 vs 레드로 싸우는 3D 3v3 실시간 팀 대전(숲속 공터·강 건너기·던전 회랑 맵 선택) / 전사·기사·궁수·마법사·도적·네크로·저격수·투척병·창기사 중 선택, 궁극기 게이지·풀숲 숨기 / 쓰러지면 3초 뒤 부활, 1분 30초 뒤 킬 스코어가 높은 팀 승리">
+<meta property="og:description" content="방 코드로 모여 블루 vs 레드로 싸우는 3D 3v3 실시간 팀 대전(숲속 공터·강 건너기·던전 회랑 맵 선택) / 전사·기사·궁수·마법사·도적·네크로·저격수·투척병·창기사 중 선택, 스킬 게이지·풀숲 숨기 / 쓰러지면 3초 뒤 부활, 1분 30초 뒤 킬 스코어가 높은 팀 승리">
 <meta property="og:url" content="https://cornsilktea.github.io/30.team-battle-arena.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
@@ -337,14 +337,14 @@
       </div>
     </div>
 
-    <div id="charCardBox" class="card">
-      <div class="secTitle">캐릭터 선택<span class="secHint">선택한 역할을 한 번 더 클릭하면 자세한 설명이 나옵니다.</span></div>
-      <div class="chars" id="chars"></div>
-    </div>
-
     <div class="card">
       <button id="btnStart" class="big primary" type="button" hidden>게임 시작</button>
       <div id="startHint" class="startHint"></div>
+    </div>
+
+    <div id="charCardBox" class="card">
+      <div class="secTitle">캐릭터 선택<span class="secHint">선택한 역할을 한 번 더 클릭하면 자세한 설명이 나옵니다.</span></div>
+      <div class="chars" id="chars"></div>
     </div>
   </div>
   <div class="card lobbyKeys">
@@ -368,7 +368,7 @@
   <div id="specL" class="specPanel blue" hidden></div>
   <div id="specR" class="specPanel red" hidden></div>
   <div id="specCode" hidden></div>
-  <div id="btnUlt" class="actBtn"><div class="fill"></div><span>궁극기</span></div>
+  <div id="btnUlt" class="actBtn"><div class="fill"></div><span>스킬</span></div>
   <div id="btnAtk" class="actBtn"><div class="cd"></div><span>공격</span></div>
   <div id="deadMsg" hidden></div>
   <div id="protBadge" hidden></div>
@@ -420,7 +420,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     knight:  { name: "기사", icon: "🛡️", hp: 400, speed: 220, ultSpeed: 300, cd: 1000, dmg: 30, range: KEY * 1 + 50, arc: Math.PI * 0.7, perHit: 2, kb: 28, ultName: "방어태세" },
     ranger:  { name: "궁수", icon: "🏹", hp: 100, speed: 250, cd: 400, dmg: 10, range: KEY * 6, pSpeed: 950, pr: 6, shots: 2, gap: 70, perHit: 1, ultName: "난사", ultAim: true },
     mage:    { name: "마법사", icon: "🔮", hp: 120, speed: 250, cd: 500, dmg: 11, range: KEY * 4, pSpeed: 700, pr: 9, perHit: 3, ultName: "메테오", ultAim: true },
-    rogue:   { name: "도적", icon: "🗡️", hp: 100, speed: 300, ultSpeed: 420, cd: 600, dmg: 30, range: 95, arc: Math.PI * 0.6, hits: 2, hitGap: 160, throwDmg: 20, throwRange: 300, pSpeed: 900, pr: 8, perHit: 1, ultName: "은신" },
+    rogue:   { name: "도적", icon: "🗡️", hp: 100, speed: 300, ultSpeed: 420, cd: 600, dmg: 30, range: 110, arc: Math.PI * 0.6, hits: 2, hitGap: 160, throwDmg: 20, throwRange: 300, pSpeed: 900, pr: 8, perHit: 1, ultName: "은신" },
     necro:   { name: "네크로", icon: "💀", hp: 120, speed: 250, cd: 500, dmg: 11, range: KEY * 4, pSpeed: 1000, pr: 9, perHit: 3, ultName: "해골 소환" },
     sniper:  { name: "저격수", icon: "🎯", hp: 100, speed: 240, cd: 1429, dmg: 40, range: 700, pSpeed: 1500, pr: 7, perHit: 4, ultName: "거대 화살", ultAim: true },
     thrower: { name: "투척병", icon: "🧪", hp: 160, speed: 240, cd: 1000, dmg: 20, ticks: 3, range: KEY * 4 + 100, minRange: KEY * 1, perHit: 1, ultName: "독안개", ultAim: true },
@@ -966,7 +966,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "rogue") return num(ULT.asDur / 1000) + "초간 " + speedUp(CHARS.rogue) + ", 은신 상태로 변경, 공격 시 해제";
     if (k === "necro") return "앞쪽에 해골 병사 " + ULT.smCount + "마리 소환(HP " + ULT.smHp + ", 공격 " + ULT.smDmg + "), " + num(ULT.smDur / 1000) + "초간 보이는 적을 쫓아가 공격, 최대 " + ULT.smMax + "마리";
     if (k === "sniper") return "거대한 화살 1발(데미지 " + ULT.pnDmg + ", 사거리 " + ULT.pnRange + "), 적중 시 게이지 " + ULT.pnRefund + " 회복";
-    if (k === "thrower") return "지정한 곳에 반지름 " + ULT.fgR + " 독 장판 " + num(ULT.fgDur / 1000) + "초, 1초마다 " + ULT.fgDmg + "의 데미지, 장판 안의 적 이동속도 " + Math.round((1 - ULT.fgSlowMul) * 100) + "% 감소, 장판 안의 아군은 1초마다 " + ULT.fgHeal + " 회복";
+    if (k === "thrower") return "반지름 " + ULT.fgR + "의 독안개 설치, 적은 장판 안에서 이동속도 " + Math.round((1 - ULT.fgSlowMul) * 100) + "% 감소, 1초당 " + ULT.fgDmg + "의 데미지<br>아군은 1초당 " + ULT.fgHeal + " 회복";
     if (k === "lancer") return num(ULT.lnWind / 1000) + "초 준비 후 앞으로 길이 " + ULT.lnLen + " 찌르기, 맞은 적 모두 " + ULT.lnDmg + "의 데미지 + " + num(ULT.lnStunMs / 1000) + "초 기절";
     return "";
   }
@@ -979,7 +979,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     return '<table class="st"><tr><th>HP</th><td>' + c.hp + "</td></tr><tr><th>공격</th><td>" + dmg + "</td></tr>" +
            "<tr><th>초당 공격</th><td>" + rate + "</td></tr>" +
            "<tr><th>이동속도</th><td>" + pair(c.speed, c.ultSpeed) + "</td></tr>" +
-           "<tr><th>사거리</th><td>" + pair(Math.round(c.range), c.throwRange) + "</td></tr><tr><th>궁극기</th><td>" + c.ultName + "</td></tr></table>";
+           "<tr><th>사거리</th><td>" + pair(Math.round(c.range), c.throwRange) + "</td></tr><tr><th>스킬</th><td>" + c.ultName + "</td></tr></table>";
   }
   function cardsHtml(me) {
     var h = "";
@@ -990,7 +990,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         '<div class="face front">' + (taken ? '<span class="soon">팀원 선택</span>' : "") + '<img alt="" src="' + charImgSrc(k) + '">' +
           '<div class="nm">' + c.name + "</div></div>" +
         '<div class="face back"><div class="nm">' + c.name + "</div>" + statTable(k) +
-          '<div class="ultDesc"><b>궁극기 설명</b>' + ultDesc(k) + "</div></div>" +
+          '<div class="ultDesc"><b>스킬 설명</b>' + ultDesc(k) + "</div></div>" +
         "</div></button>";
     });
     return h;
@@ -3422,7 +3422,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         (act ? '<div class="spBar ult act"><i style="width:' + Math.round(skillLeft(E, tn) * 100) + '%"></i><span>' +
                  CHARS[E.char].ultName + " " + Math.ceil((E.skillUntil - tn) / 1000) + "초</span></div>"
              : '<div class="spBar ult' + (full ? " full" : "") + '"><i style="width:' + g * 10 + '%"></i><span>' +
-                 (full ? "궁극기 준비 완료!" : "궁극기 " + g + " / " + GAUGE_MAX) + "</span></div>") + "</div></div>";
+                 (full ? "스킬 준비 완료!" : "스킬 " + g + " / " + GAUGE_MAX) + "</span></div>") + "</div></div>";
     });
     return h;
   }
@@ -3476,7 +3476,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       $("btnUlt").className = "actBtn" + (act ? " act" : (full && !ME.burst ? " ready" : ""));
       $("btnUlt").firstChild.style.height = Math.round((act ? skillLeft(ME, t) : clamp(ME.gauge / GAUGE_MAX, 0, 1)) * 100) + "%";
       setHtml($("btnUlt").lastChild, act ? CHARS[ME.char].ultName + "<br>" + Math.ceil((ME.skillUntil - t) / 1000) + "초"
-                                         : (full ? "궁극기!" : "궁극기<br>" + Math.floor(ME.gauge) + "/10"));
+                                         : (full ? "스킬!" : "스킬<br>" + Math.floor(ME.gauge) + "/10"));
     }
     var cd = room.startAt - t;
     var counting = (st === "countdown" || st === "playing") && cd > -700;
