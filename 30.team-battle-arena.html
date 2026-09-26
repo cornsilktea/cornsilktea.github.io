@@ -247,6 +247,57 @@
   .endBtns button { flex: 1 1 0; height: 56px; font-size: 19px; font-weight: 800; border-radius: 8px; border: 2px solid rgba(255,255,255,.3); background: rgba(255,255,255,.06); color: #F4F1E8; }
   .endBtns .primary { background: #3E8E5E; border-color: #3E8E5E; color: #fff; }
 
+  .mvpBox { margin-top: 16px; padding: 12px 10px; border-radius: 8px; border: 2px solid rgba(242,208,107,.5); background: rgba(242,208,107,.1); }
+  .mvpBox .mvpLab { font-size: 14px; font-weight: 800; color: #F2D06B; letter-spacing: .08em; }
+  .mvpBox .mvpName { font-size: 24px; font-weight: 800; margin-top: 2px; }
+  .mvpBox .mvpName small { font-size: 14px; color: #A3B0A6; margin-left: 4px; }
+  .mvpBox .mvpName .b { color: #6FA8FF; }
+  .mvpBox .mvpName .r { color: #FF7A70; }
+  .mvpBox .mvpNone { font-size: 20px; font-weight: 800; color: #A3B0A6; margin-top: 2px; }
+  .mvpBox .mvpRule { font-size: 12px; color: #A3B0A6; margin-top: 6px; }
+
+  #scrDraft .wrap { max-width: 900px; }
+  #btnLeaveDraft { display: block; margin: 0 auto; }
+  .dfHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .dfTitle { font-size: 24px; font-weight: 800; color: #F4F1E8; }
+  .dfTurn { margin-top: 4px; font-size: 17px; font-weight: 800; color: #F2D06B; min-height: 24px; }
+  .dfTurn.mine { color: #FFB38A; }
+  .dfTimer { flex: 0 0 auto; min-width: 84px; text-align: center; font-size: 46px; font-weight: 800; line-height: 1; color: #F4F1E8; font-variant-numeric: tabular-nums; }
+  .dfTimer.low { color: #FF6B6B; text-shadow: 0 0 10px rgba(255,80,80,.7); }
+  .dfTimer small { display: block; font-size: 12px; color: var(--sg-ink-soft); margin-top: 2px; }
+  .dfBar { height: 6px; margin-top: 12px; border-radius: 3px; background: rgba(255,255,255,.1); overflow: hidden; }
+  .dfBar i { display: block; height: 100%; background: #D97B4F; }
+  .dfSteps { display: flex; gap: 6px; margin-top: 12px; }
+  .dfSteps span { flex: 1 1 0; min-width: 0; padding: 6px 4px; border-radius: 6px; border: 2px solid transparent; background: rgba(255,255,255,.06); text-align: center; font-size: 14px; font-weight: 800; white-space: nowrap; }
+  .dfSteps .b { color: #8DB8FF; }
+  .dfSteps .r { color: #FF9A92; }
+  .dfSteps .now { border-color: #D97B4F; background: rgba(217,123,79,.2); }
+  .dfSteps .done { opacity: .45; }
+  .slot.turn { box-shadow: inset 0 0 0 2px #D97B4F; background: rgba(217,123,79,.16); }
+  .slot .pk { margin-left: auto; font-size: 15px; font-weight: 800; color: #F4F1E8; }
+  .slot .pk.wait { font-size: 13px; color: var(--sg-ink-faint); font-weight: 700; }
+  .slot .pk.think { font-size: 13px; color: #FFB38A; }
+  .dfChars { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+  .dfCard { position: relative; min-width: 0; padding: 6px 4px 8px; border-radius: 8px; border: 3px solid var(--sg-line-mid); background: var(--sg-panel); color: var(--sg-ink); text-align: center; }
+  .dfCard img { display: block; width: 100%; height: 58px; object-fit: contain; }
+  .dfCard .nm { font-size: 16px; font-weight: 800; }
+  .dfCard.view { border-color: rgba(255,255,255,.5); }
+  .dfCard.on { border-color: #D97B4F; background: rgba(217,123,79,.2); box-shadow: 0 0 0 3px rgba(217,123,79,.3); }
+  .dfCard.taken { opacity: .5; }
+  .dfCard.taken img { filter: grayscale(1); }
+  .dfCard .tag { position: absolute; top: 4px; left: 4px; right: 4px; padding: 1px 3px; border-radius: 4px; font-size: 11px; font-weight: 800; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dfCard .tag.b { background: var(--blue); }
+  .dfCard .tag.r { background: var(--red); }
+  .dfDetail { margin-top: 12px; }
+  .dfDetail:empty { display: none; }
+  .dfDetail .dfName { font-size: 18px; font-weight: 800; margin-bottom: 6px; }
+  .dfDetail .st { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .dfDetail .st th, .dfDetail .st td { padding: 4px; border-top: 1px solid var(--sg-line); }
+  .dfDetail .st th { text-align: left; color: var(--sg-ink-soft); font-weight: 700; }
+  .dfDetail .st td { text-align: right; font-weight: 800; }
+  .dfDetail .ultDesc { font-size: 14px; }
+  .dfDetail .big { margin: 12px 0 0; }
+
   .modal { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 50; background: rgba(8, 14, 11, .7); display: flex; align-items: center; justify-content: center; padding: 16px; }
   .modalBox { background: #18221B; border: 2px solid var(--sg-line-strong); border-radius: 10px; padding: 22px 20px; width: 100%; max-width: 400px; }
   .modalBox h3 { font-size: 22px; font-weight: 800; text-align: center; margin-bottom: 14px; }
@@ -276,6 +327,12 @@
     .hdSide b { font-size: 17px; }
     #hudMid { padding: 0 6px; }
     #btnLeaveGame { padding: 0 8px; font-size: 13px; }
+    .dfTitle { font-size: 19px; }
+    .dfTimer { min-width: 56px; font-size: 36px; }
+    .dfSteps { gap: 4px; }
+    .dfSteps span { font-size: 12px; padding: 5px 2px; }
+    .slot .pk { font-size: 13px; }
+    .dfChars { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   }
 </style>
 </head>
@@ -358,6 +415,31 @@
   </div>
 </div>
 
+<div id="scrDraft" class="screen" hidden>
+  <div class="wrap">
+    <div class="card">
+      <div class="dfHead">
+        <div><div class="dfTitle">🏆 대회모드 캐릭터 선택</div><div id="dfTurn" class="dfTurn"></div></div>
+        <div id="dfTimer" class="dfTimer">15<small>남은 시간</small></div>
+      </div>
+      <div class="dfBar"><i id="dfBarFill"></i></div>
+      <div id="dfSteps" class="dfSteps"></div>
+    </div>
+    <div class="card">
+      <div class="teams">
+        <div class="team blue"><h3>블루팀</h3><div id="dfBlue"></div></div>
+        <div class="team red"><h3>레드팀</h3><div id="dfRed"></div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="secTitle">캐릭터<span class="secHint">한 번 누르면 설명이 나오고, 내 차례일 때 결정 버튼으로 골라요.</span></div>
+      <div id="dfChars" class="dfChars"></div>
+      <div id="dfDetail" class="dfDetail"></div>
+    </div>
+    <button id="btnLeaveDraft" class="mini danger" type="button">방 나가기</button>
+  </div>
+</div>
+
 <div id="scrGame" hidden>
   <div id="hudTop">
     <div class="hdSide b"><span>블루 킬</span><b id="hudKillB">0</b></div>
@@ -380,6 +462,7 @@
       <div class="scoreRow"><div class="sb">블루팀 킬<b id="endBlue">0</b></div><div class="sr">레드팀 킬<b id="endRed">0</b></div></div>
       <table class="board"><thead><tr><th>팀</th><th>닉네임</th><th>처치</th><th>쓰러짐</th><th>입힌 피해</th><th>회복</th></tr></thead><tbody id="boardBody"></tbody></table>
       <div class="endBtns"><button id="btnAgain" class="primary" type="button">다시하기</button><button id="btnLeaveEnd" type="button">방 나가기</button></div>
+      <div id="endMvp" class="mvpBox"></div>
     </div>
   </div>
 </div>
@@ -767,7 +850,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function enterRoom(code) {
     leaving = false;
     var ref = db.ref(ROOT + "/" + code);
-    room = { code: code, ref: ref, mode: null, map: "forest", status: "lobby", host: null, startAt: 0, winner: null, endedAt: 0, final: null, roster: null };
+    room = { code: code, ref: ref, mode: null, map: "forest", status: "lobby", host: null, startAt: 0, winner: null, endedAt: 0, final: null, roster: null, draft: null };
     clear3d();
     P = {}; R = {}; PR = {}; MELEE = {}; FX = []; BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; G = null; ME = null; BOTS = {}; ST = {}; SHOTS = []; hitSubs = {};
     ref.child("players/" + myId).onDisconnect().remove();
@@ -795,11 +878,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     sub(ref.child("endedAt"), "value", function (s) { room.endedAt = s.val() || 0; });
     sub(ref.child("final"), "value", function (s) { room.final = s.val(); });
     sub(ref.child("roster"), "value", function (s) { room.roster = s.val(); });
+    sub(ref.child("draft"), "value", function (s) { room.draft = s.val(); renderDraft(); });
     sub(ref.child("status"), "value", function (s) {
       var st = s.val();
       if (st === null) { if (!leaving) exitToStart("방이 종료되었어요."); return; }
       var prev = room.status; room.status = st;
       if (st === "lobby") { G = null; ME = null; BOTS = {}; showScreen("lobby"); playersChanged(); }
+      else if (st === "draft") { G = null; ME = null; BOTS = {}; if (prev !== "draft") draftView = null; showScreen("draft"); renderDraft(); }
       else showScreen("game");
       if (st === "countdown" && prev !== "countdown") clockBurst();
       if (st === "ended" && prev !== "ended") onEnded();
@@ -864,7 +949,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var screenNow = "start";
   function showScreen(k) {
     screenNow = k;
-    show($("scrStart"), k === "start"); show($("scrLobby"), k === "lobby"); show($("scrGame"), k === "game");
+    show($("scrStart"), k === "start"); show($("scrLobby"), k === "lobby"); show($("scrDraft"), k === "draft"); show($("scrGame"), k === "game");
     if (k === "game") resize();
   }
 
@@ -1030,18 +1115,19 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     setHtml($("listSpec"), (specs.length ? specs.map(function (id) { return (room.host === id ? "👑" : "") + esc(P[id].nickname) + (id === myId ? "(나)" : ""); }).join(", ") : '<span class="none">없음</span>') +
             " (" + specs.length + "/" + SPEC_MAX + ")");
     show($("btnSpec"), !imSpec); $("btnSpec").disabled = !canMoveTo("spec");
-    show($("charCardBox"), !imSpec);
+    var cup = mode === "cup";
+    show($("charCardBox"), !imSpec && !cup);
 
-    setHtml($("chars"), cardsHtml(me));
+    if (!cup) setHtml($("chars"), cardsHtml(me));
 
     var host = isHost(), ok = false, hint = "";
     if (!mode) hint = "게임 방식을 먼저 골라 주세요.";
-    else if (mode === "cup") hint = "대회모드는 준비 중이에요. 3vs3을 골라 주세요.";
     else {
       if (nb < 1 || nr < 1) hint = "양 팀에 1명 이상 있어야 시작할 수 있어요.";
       else { ok = true; hint = nb !== nr ? "인원이 달라요 (블루 " + nb + " vs 레드 " + nr + ") — 그래도 시작할 수 있어요." : "블루 " + nb + " vs 레드 " + nr; }
+      if (cup) hint = "🏆 대회모드: 캐릭터는 게임 시작 후 순서대로 골라요 (블루1 → 레드1·2 → 블루2·3 → 레드3). " + hint;
     }
-    ["blue", "red"].forEach(function (team) {
+    if (!cup) ["blue", "red"].forEach(function (team) {
       teamIds(team).forEach(function (id) {
         var c = P[id].characterType;
         if (ok && !P[id].isAI && takenOnTeam(P, team, c, id)) { ok = false; hint = (team === "blue" ? "블루" : "레드") + "팀에 " + CHARS[c].name + "가 2명 이상이에요. 한 팀에서 같은 캐릭터는 1명만 고를 수 있어요."; }
@@ -1114,22 +1200,175 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function startGame() {
     if (!isHost() || room.status !== "lobby") return;
     audio();
-    if (room.mode === "cup") return;
+    if (room.mode === "cup") { startDraft(); return; }
+    launchMatch(function (id) { return P[id].characterType; }, COUNT_MS, resolveArena(room.map));
+  }
+  function launchMatch(charOf, countMs, arena) {
     var u = {}, roster = {}, st = {};
     ["blue", "red"].forEach(function (team) {
       teamIds(team).slice(0, 3).forEach(function (id, i) {
-        var p = P[id], c = CHARS[p.characterType] ? p.characterType : "ranger";
+        var p = P[id], want = charOf(id), c = CHARS[want] ? want : "ranger";
         var sp = spawnOf(team, i + 1), base = "players/" + id + "/";
         u[base + "slot"] = i + 1; u[base + "characterType"] = c;
         st[stKey(team, i + 1)] = packState({ x: sp.x, y: sp.y, angle: sp.angle, mv: false, hp: CHARS[c].hp, alive: true });
         roster[id] = { team: team, c: c, ai: !!p.isAI };
       });
     });
-    u.roster = roster; u.st = st; u.arena = resolveArena(room.map);
-    u.status = "countdown"; u.startAt = now() + COUNT_MS; u.winner = null; u.final = null; u.endedAt = null;
+    u.roster = roster; u.st = st; u.arena = arena; u.draft = null;
+    u.status = "countdown"; u.startAt = now() + countMs; u.winner = null; u.final = null; u.endedAt = null;
     u.shots = null; u.meleeHits = null; u.hits = null; u.effects = null; u.projectiles = null;
     room.ref.update(u);
   }
+
+  var DRAFT_STEPS = [["b1"], ["r1", "r2"], ["b2", "b3"], ["r3"]];
+  var DRAFT_SHOWN_MS = 15000, DRAFT_STEP_MS = 16000, DRAFT_AI_MS = 2500, CUP_START_MS = 5000;
+  var draftView = null, draftBusy = false, draftLaunched = 0;
+  function draftStepIds(d, step) {
+    return (DRAFT_STEPS[step] || []).map(function (k) { return d.seq && d.seq[k]; }).filter(function (id) { return !!id; });
+  }
+  function draftWaiting(d, step) {
+    var picks = d.picks || {};
+    return draftStepIds(d, step).filter(function (id) { return P[id] && !picks[id]; });
+  }
+  function draftTaken(d) {
+    var picks = d.picks || {};
+    return keys(picks).map(function (id) { return picks[id]; });
+  }
+  function draftLeft(d) {
+    var taken = draftTaken(d);
+    return CHAR_LIST.filter(function (c) { return taken.indexOf(c) < 0; });
+  }
+  function draftSettle(d, t) {
+    while (d.step < DRAFT_STEPS.length && !draftWaiting(d, d.step).length) { d.step++; d.stepAt = t; }
+    return d;
+  }
+  function startDraft() {
+    var seq = {}, t = now();
+    ["blue", "red"].forEach(function (team) {
+      teamIds(team).slice(0, 3).forEach(function (id, i) { seq[(team === "blue" ? "b" : "r") + (i + 1)] = id; });
+    });
+    var d = draftSettle({ seq: seq, step: 0, stepAt: t }, t);
+    room.ref.update({ draft: d, arena: resolveArena(room.map), status: "draft", roster: null, st: null, winner: null, final: null, endedAt: null, startAt: null,
+                      shots: null, meleeHits: null, hits: null, effects: null, projectiles: null });
+  }
+  function draftPick(c) {
+    var d = room && room.draft;
+    if (!d || room.status !== "draft" || draftWaiting(d, d.step).indexOf(myId) < 0 || draftLeft(d).indexOf(c) < 0) return;
+    room.ref.child("draft").transaction(function (cur) {
+      if (!cur || draftWaiting(cur, cur.step).indexOf(myId) < 0 || draftLeft(cur).indexOf(c) < 0) return;
+      cur.picks = cur.picks || {}; cur.picks[myId] = c;
+      return draftSettle(cur, now());
+    }).then(function (res) { if (res.committed) sfx("confirm"); });
+  }
+  function draftHover(c) {
+    var d = room && room.draft;
+    if (!d || draftWaiting(d, d.step).indexOf(myId) < 0) return;
+    room.ref.child("draft/hover/" + myId).set(c);
+  }
+  function hostDraftTick() {
+    var d = room.draft, t = now();
+    if (!d || draftBusy) return;
+    if (d.step >= DRAFT_STEPS.length) {
+      if (draftLaunched === d.stepAt) return;
+      draftLaunched = d.stepAt;
+      var picks = d.picks || {}, spare = draftLeft(d);
+      launchMatch(function (id) { return picks[id] || spare.splice(Math.floor(Math.random() * spare.length), 1)[0]; }, CUP_START_MS, ARENA);
+      return;
+    }
+    var step = d.step, timeUp = t >= d.stepAt + DRAFT_STEP_MS, aiDue = t >= d.stepAt + DRAFT_AI_MS;
+    var waiting = draftWaiting(d, step);
+    var auto = waiting.filter(function (id) { return timeUp || (aiDue && P[id].isAI); });
+    if (waiting.length && !auto.length) return;
+    draftBusy = true;
+    room.ref.child("draft").transaction(function (cur) {
+      if (!cur || cur.step !== step) return;
+      cur.picks = cur.picks || {};
+      auto.forEach(function (id) {
+        if (cur.picks[id]) return;
+        var left = draftLeft(cur), hover = cur.hover && cur.hover[id];
+        if (left.length) cur.picks[id] = left.indexOf(hover) >= 0 ? hover : pick(left);
+      });
+      return draftSettle(cur, now());
+    }).then(function () { draftBusy = false; }, function () { draftBusy = false; });
+  }
+  setInterval(function () {
+    if (!room || room.status !== "draft") return;
+    renderDraft();
+    if (isHost()) hostDraftTick();
+  }, 200);
+
+  function draftTeamName(team) { return team === "blue" ? "블루팀" : "레드팀"; }
+  function draftStepLabel(step) {
+    var ks = DRAFT_STEPS[step], team = ks[0].charAt(0) === "b" ? "blue" : "red";
+    return (team === "blue" ? "블루 " : "레드 ") + ks.map(function (k) { return k.charAt(1); }).join("·");
+  }
+  function renderDraft() {
+    if (!room || screenNow !== "draft") return;
+    var d = room.draft; if (!d) return;
+    var t = now(), done = d.step >= DRAFT_STEPS.length, picks = d.picks || {}, hover = d.hover || {};
+    var waiting = done ? [] : draftWaiting(d, d.step), myTurn = waiting.indexOf(myId) >= 0;
+    var me = P[myId], myTeam = me ? me.team : null;
+    var left = done ? 0 : Math.max(0, d.stepAt + DRAFT_SHOWN_MS - t);
+    var timer = $("dfTimer");
+    setHtml(timer, (done ? "✔" : String(Math.ceil(left / 1000))) + "<small>" + (done ? "선택 완료" : "남은 시간") + "</small>");
+    timer.className = "dfTimer" + (!done && left < 5000 ? " low" : "");
+    $("dfBarFill").style.width = (done ? 0 : Math.round(left / DRAFT_SHOWN_MS * 100)) + "%";
+    var turn = "";
+    if (done) turn = "선택 완료! 곧 게임이 시작돼요.";
+    else if (myTurn) turn = "내 차례예요! 캐릭터를 골라 주세요.";
+    else if (picks[myId] && draftStepIds(d, d.step).indexOf(myId) >= 0) turn = "선택 완료 — 다른 선수를 기다리는 중…";
+    else turn = draftTeamName(DRAFT_STEPS[d.step][0].charAt(0) === "b" ? "blue" : "red") + " " + DRAFT_STEPS[d.step].map(function (k) { return k.charAt(1); }).join("·") + "번 선수가 고르는 중…";
+    setText($("dfTurn"), turn);
+    $("dfTurn").className = "dfTurn" + (myTurn ? " mine" : "");
+    setHtml($("dfSteps"), DRAFT_STEPS.map(function (ks, i) {
+      return '<span class="' + (ks[0].charAt(0) === "b" ? "b" : "r") + (i === d.step ? " now" : (i < d.step ? " done" : "")) + '">' + (i + 1) + ". " + draftStepLabel(i) + "</span>";
+    }).join(""));
+
+    function slots(team) {
+      var h = "", pre = team === "blue" ? "b" : "r";
+      for (var i = 1; i <= 3; i++) {
+        var id = d.seq && d.seq[pre + i], p = id && P[id];
+        if (!p) { h += '<div class="slot empty">' + i + "번 · " + (id ? "나감" : "빈 자리") + "</div>"; continue; }
+        var c = picks[id], isTurn = waiting.indexOf(id) >= 0, pk;
+        if (c) pk = '<span class="pk">' + CHARS[c].icon + " " + CHARS[c].name + "</span>";
+        else if (isTurn && hover[id] && myTeam === team && CHARS[hover[id]]) pk = '<span class="pk think">' + CHARS[hover[id]].name + " 고민 중…</span>";
+        else pk = '<span class="pk wait">' + (isTurn ? "고르는 중…" : "대기") + "</span>";
+        h += '<div class="slot' + (id === myId ? " mine" : "") + (isTurn ? " turn" : "") + (p.isAI ? " ai" : "") + '">' + i + "번 " + (p.isAI ? "🤖 " : "") + esc(p.nickname) +
+             (id === myId ? ' <span class="me">나</span>' : "") + pk + "</div>";
+      }
+      return h;
+    }
+    setHtml($("dfBlue"), slots("blue"));
+    setHtml($("dfRed"), slots("red"));
+
+    var owner = {};
+    keys(picks).forEach(function (id) { owner[picks[id]] = id; });
+    var myHover = myTurn ? hover[myId] : null;
+    if (!draftView && myHover) draftView = myHover;
+    setHtml($("dfChars"), CHAR_LIST.map(function (k) {
+      var o = owner[k], op = o && P[o], oTeam = o && d.seq && keys(d.seq).filter(function (s) { return d.seq[s] === o; })[0];
+      var tag = o ? '<span class="tag ' + (oTeam && oTeam.charAt(0) === "b" ? "b" : "r") + '">' + esc(op ? op.nickname : "") + "</span>" : "";
+      return '<button type="button" class="dfCard' + (o ? " taken" : "") + (myHover === k ? " on" : (draftView === k ? " view" : "")) + '" data-c="' + k + '">' + tag +
+             '<img alt="" src="' + charImgSrc(k) + '"><div class="nm">' + CHARS[k].name + "</div></button>";
+    }).join(""));
+    var v = draftView && CHARS[draftView] ? draftView : null, canPick = v && myTurn && !owner[v];
+    setHtml($("dfDetail"), v ? '<div class="dfName">' + CHARS[v].icon + " " + CHARS[v].name + "</div>" + statTable(v) +
+      '<div class="ultDesc"><b>스킬 설명</b>' + ultDesc(v) + "</div>" +
+      (canPick ? '<button type="button" class="big primary" data-pick="' + v + '">✔ ' + CHARS[v].name + "(으)로 결정</button>" : "") : "");
+  }
+  $("dfChars").onclick = function (e) {
+    var b = e.target.closest ? e.target.closest(".dfCard") : null;
+    if (!b || !room || !room.draft) return;
+    var c = b.getAttribute("data-c");
+    draftView = c;
+    if (draftLeft(room.draft).indexOf(c) >= 0) draftHover(c);
+    renderDraft();
+  };
+  $("dfDetail").onclick = function (e) {
+    var b = e.target.closest ? e.target.closest("[data-pick]") : null;
+    if (b) draftPick(b.getAttribute("data-pick"));
+  };
+  $("btnLeaveDraft").onclick = function () { if (confirm("방을 나갈까요?")) leaveRoom(); };
 
   var ST = {};
   function stKey(team, slot) { return (team === "blue" ? "b" : "r") + slot; }
@@ -2043,7 +2282,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var STATS_PATH = "teambattle/stats";
   var STATS_SETTLE_MS = 1500;
   function isFairHumanMatch(mode, roster, ps) {
-    if (mode !== "pvp" || !roster) return false;
+    if ((mode !== "pvp" && mode !== "cup") || !roster) return false;
     var count = { blue: 0, red: 0 }, ids = keys(roster);
     for (var i = 0; i < ids.length; i++) {
       var id = ids[i], r = roster[id], d = ps[id];
@@ -2092,7 +2331,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function restart() {
     if (!room || room.status !== "ended") return;
     if (room.endedAt && now() - room.endedAt < STATS_SETTLE_MS + 500) return;
-    room.ref.update({ status: "lobby", winner: null, final: null, startAt: null, endedAt: null, roster: null,
+    room.ref.update({ status: "lobby", winner: null, final: null, startAt: null, endedAt: null, roster: null, draft: null,
                       st: null, shots: null, meleeHits: null, hits: null, effects: null, projectiles: null });
   }
   $("btnAgain").onclick = restart;
@@ -3442,6 +3681,23 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     });
     return rows;
   }
+  function mvpScore(E) { return E.kills * 100 + Math.round(E.dmg) + Math.round(E.heal || 0) - E.deaths * 100; }
+  function mvpHtml() {
+    var best = [];
+    participants().forEach(function (id) {
+      var E = ent(id); if (!E || E.kills <= 0) return;
+      var row = { id: id, E: E, score: mvpScore(E), dmg: Math.round(E.dmg) };
+      if (!best.length || row.score > best[0].score || (row.score === best[0].score && row.dmg > best[0].dmg)) best = [row];
+      else if (row.score === best[0].score && row.dmg === best[0].dmg) best.push(row);
+    });
+    var rule = '<div class="mvpRule">환산점수 = 처치×100 + 입힌 피해 + 회복 − 쓰러짐×100 (0킬은 제외)</div>';
+    if (!best.length) return '<div class="mvpLab">MVP</div><div class="mvpNone">MVP 없음</div>' + rule;
+    return '<div class="mvpLab">🏆 MVP' + (best.length > 1 ? " (공동)" : "") + "</div>" + best.map(function (b) {
+      var d = P[b.id] || {};
+      return '<div class="mvpName"><span class="' + (b.E.team === "blue" ? "b" : "r") + '">' + (d.isAI ? "🤖 " : "") + esc(d.nickname || b.E.nickname) + "</span><small>" +
+             CHARS[b.E.char].name + " · " + b.score + "점</small></div>";
+    }).join("") + rule;
+  }
   function fmtTime(ms) { ms = Math.max(0, ms); var s = Math.ceil(ms / 1000); return Math.floor(s / 60) + ":" + (s % 60 < 10 ? "0" : "") + (s % 60); }
   function updateHud(t) {
     var st = room.status;
@@ -3499,6 +3755,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       setText($("endBlue"), String(f.blue != null ? f.blue : s.blueKills));
       setText($("endRed"), String(f.red != null ? f.red : s.redKills));
       setHtml($("boardBody"), boardRows());
+      setHtml($("endMvp"), mvpHtml());
     } else show($("endOv"), false);
   }
 
