@@ -107,7 +107,10 @@
   .stats-box td b { font-size: 16px; }
   .stats-box td small { margin-left: 6px; font-size: 13px; color: var(--sg-ink-soft); }
   .stats-box .actions { margin-top: 8px; }
-  .lightbox p { position: absolute; top: 14px; left: 0; right: 0; text-align: center; color: var(--sg-line); font-size: 13px; margin: 0; }
+  .stats-box .msg { margin: 0 0 4px; font-size: 14px; color: var(--sg-ink-mid); }
+  .stats-box ul.hint { margin: 4px 0 12px; padding-left: 18px; font-size: 13px; line-height: 1.7; color: var(--sg-ink-soft); }
+  /* 빌드 그림의 설명 글만 위에 띄운다(통계 상자 안의 글까지 떠서 겹치지 않게 바로 아래 자식만) */
+  .lightbox > p { position: absolute; top: 14px; left: 0; right: 0; text-align: center; color: var(--sg-line); font-size: 13px; margin: 0; }
 
   /* 반 고르기 */
   .class-grade { font-size: 13px; color: var(--sg-ink-soft); margin: 0 0 6px; }
@@ -958,9 +961,12 @@ async function showStats(g) {
       table.appendChild(tr);
     });
     box.appendChild(table);
-    box.appendChild(el("p", "hint",
-      "AI 없이 양 팀 인원이 같은 3v3 플레이 경기만 집계합니다. 중간에 나가거나 연결이 끊긴 사람이 있는 경기는 빠집니다. " +
-      "총 게임 수는 한 사람이 한 판을 한 것을 1게임으로 셉니다(3v3 한 판 = 6게임). 무승부는 승리로 세지 않습니다."));
+    const notes = el("ul", "hint");
+    ["AI 없이 양 팀 인원이 같은 플레이 경기만 집계합니다.",
+     "중간에 나가거나 연결이 끊긴 사람이 있는 경기는 빠집니다.",
+     "총 게임 수는 한 사람이 한 판을 한 것을 1게임으로 셉니다(3v3 한 판 = 6게임).",
+     "무승부는 승리로 세지 않습니다."].forEach((t) => notes.appendChild(el("li", null, t)));
+    box.appendChild(notes);
 
     const acts = el("div", "actions");
     const reload = el("button", null, "새로고침"); reload.type = "button";
