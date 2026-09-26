@@ -3716,7 +3716,7 @@ function updateCamera(dt) {
   if (camTarget.distanceTo(camera.position) > 60) camera.position.copy(camTarget);
   camera.position.lerp(camTarget, 1 - Math.exp(-CFG.camLerp * dt));
   if (shake > 0) { shake -= dt; camera.position.x += rnd(-0.3, 0.3) * shake * 3; camera.position.y += rnd(-0.3, 0.3) * shake * 3; }
-  if (surge > 0.02) { camera.position.x += rnd(-0.1, 0.1) * surge; camera.position.y += rnd(-0.1, 0.1) * surge; }
+  if (surge > 0.02) { camera.position.x += rnd(-0.04, 0.04) * surge; camera.position.y += rnd(-0.04, 0.04) * surge; }
   camLook.set(V.x + fx * (4 + r * 8), V.y + 1.2, V.z + fz * (4 + r * 8));
   camera.lookAt(camLook);
   camera.fov = CFG.fovBase + r * r * CFG.fovBoost + surge * CFG.fovSurge; camera.updateProjectionMatrix();
@@ -3740,7 +3740,7 @@ function drawSpeedLines(ratio, surge = 0, flash = 0) {
     }
   }
   if (surge > 0.02) {
-    const streaks = Math.round(18 + 30 * surge);
+    const streaks = Math.round(5 * surge);
     fctx.strokeStyle = "rgba(255,255,255," + (0.9 * surge).toFixed(2) + ")";
     for (let i = 0; i < streaks; i++) {
       const ang = Math.random() * Math.PI * 2, len = 0.3 + Math.random() * 0.45 * surge;
@@ -4477,7 +4477,7 @@ function updateChase(dt) {
   P.v += P.boostGain;
   if (fired) {
     const nearTopSpeed = P.v >= CFG.maxSpeed * CHASE.surgeFromRatio;
-    if (nearTopSpeed) { shake = Math.max(shake, 0.6); P.surgeFlash = 1; beep(220, 0.35, "sawtooth", 0.07); }
+    if (nearTopSpeed) { shake = Math.max(shake, 0.3); P.surgeFlash = 1; beep(220, 0.35, "sawtooth", 0.07); }
     else shake = Math.max(shake, 0.2);
     beep(660, 0.12, "sawtooth", 0.08); beep(990, 0.25, "sawtooth", 0.08, 0.08);
   }
