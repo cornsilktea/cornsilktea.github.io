@@ -95,6 +95,8 @@
     color:#28303a;-webkit-overflow-scrolling:touch;}
   #fullLog div.no{color:#b03a2e;}
   .hide{display:none !important;}
+  #startScreen{--st-bg:8,30,32;--st-panel:rgba(12,38,40,.8);--st-accent:#D97B4F;--st-title2:#9fd08a;--st-glow:rgba(159,208,138,.4);}
+  #startScreen code{font-family:"SFMono-Regular",Consolas,Menlo,monospace;font-size:14px;padding:1px 6px;border-radius:4px;background:rgba(255,255,255,.1);color:#F4F1E8;}
   @media (max-height:620px){
     #controls{width:138px;height:138px;}
     #stageBox{margin-top:38px;}
@@ -128,22 +130,38 @@
   <div class="pad" id="pDown"><i>숙이기</i><svg viewBox="0 0 24 24"><path d="M12 19l-7-9h14z" fill="currentColor"/></svg></div>
 </div>
 
-<div class="screen" id="startScreen">
-  <div class="card">
-    <h1>조건문 러너 3D</h1>
-    <p>다가오는 <b>장애물의 종류가 조건</b>이고, 내가 누르는 <b>행동이 실행</b>입니다.
-       조건을 보고 알맞은 실행을 골라 <code>if(조건) 실행();</code> 구조를 익혀 봅시다.</p>
-    <table class="maptable">
-      <thead><tr><th>조건 (장애물)</th><th>실행 (행동)</th></tr></thead>
-      <tbody>
-        <tr><td><span class="sw" style="background:#a9743c"></span>바닥의 통나무</td><td>점프 (▲ / W / 스페이스)</td></tr>
-        <tr><td><span class="sw" style="background:#c2543f"></span>공중의 낮은 천장</td><td>숙이기 (▼ / S)</td></tr>
-        <tr><td><span class="sw" style="background:#5c7f8c"></span>차선을 막는 벽</td><td>차선 이동 (◀ ▶ / A D)</td></tr>
-      </tbody>
-    </table>
-    <p>총 <b>100개</b>의 장애물을 통과하면 완주입니다.<br>
-       조작은 화면 스와이프, 왼쪽 아래 방향키, 키보드 방향키(WASD) 모두 가능합니다.</p>
-    <button class="bigbtn" id="startBtn" type="button">시작하기 (Space)</button>
+<div class="st-screen" id="startScreen">
+  <div class="st-wrap">
+    <div class="st-hero">
+      <h1 class="st-title">조건문 러너<span>3D</span></h1>
+      <p class="st-sub">다가오는 <b>장애물이 조건</b>, 내가 누르는 <b>행동이 실행</b>입니다.<br>
+        <code>if(조건) 실행();</code> 구조로 장애물 <b>100개</b>를 통과해 보세요.</p>
+    </div>
+    <div class="st-card">
+      <button class="st-btn primary" id="startBtn" type="button">시작하기 (Space)</button>
+    </div>
+    <div class="st-card">
+      <h2>조건 → 실행</h2>
+      <table class="st-table">
+        <thead><tr><th>조건 (장애물)</th><th>실행 (행동)</th></tr></thead>
+        <tbody>
+          <tr><td><span class="sw" style="background:#a9743c"></span>바닥의 통나무</td><td><b>점프</b></td></tr>
+          <tr><td><span class="sw" style="background:#c2543f"></span>공중의 낮은 천장</td><td><b>숙이기</b></td></tr>
+          <tr><td><span class="sw" style="background:#5c7f8c"></span>차선을 막는 벽</td><td><b>차선 이동</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="st-card">
+      <h2>조작 방법</h2>
+      <div class="st-keys">
+        <span><kbd>↑</kbd> <kbd>W</kbd> <kbd>Space</kbd></span><span>점프</span>
+        <span><kbd>↓</kbd> <kbd>S</kbd></span><span>숙이기</span>
+        <span><kbd>←</kbd> <kbd>→</kbd> <kbd>A</kbd> <kbd>D</kbd></span><span>왼쪽·오른쪽 차선으로 이동</span>
+      </div>
+      <div class="st-keys">
+        <span><span class="st-tag">📱 터치</span></span><span>화면을 위·아래·옆으로 밀거나 왼쪽 아래 방향 버튼을 누릅니다.</span>
+      </div>
+    </div>
   </div>
 </div>
 

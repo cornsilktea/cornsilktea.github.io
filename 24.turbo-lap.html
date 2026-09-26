@@ -79,6 +79,15 @@
   @keyframes pop { from { transform: scale(1.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
   #overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 56px 12px 12px; z-index: 7; overflow-y: auto; }
+  #overlay.st-screen { display: block; align-items: initial; justify-content: initial; padding: 54px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
+    --st-bg: 14, 16, 26; --st-panel: rgba(20, 22, 34, .82); --st-accent: #D97B4F; --st-title2: #FFB08C; --st-glow: rgba(217, 123, 79, .6);
+    background: linear-gradient(90deg, rgba(14, 16, 26, .88) 0%, rgba(14, 16, 26, .6) 46%, rgba(14, 16, 26, .08) 80%); }
+  @media (max-width: 760px) { #overlay.st-screen { background: rgba(14, 16, 26, .74); } }
+  #overlay.st-screen .st-title { font-style: italic; letter-spacing: -.5px; }
+  #cardStart #loadNote { color: #A9AFC2; text-align: center; margin-top: 10px; }
+  #cardStart #loadNote:empty { display: none; }
+  #cardStart .credits { color: #7F8698; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, .1); }
+  #cardStart .credits a { color: #A9AFC2; }
   .card { width: min(480px, 100%); background: var(--sg-panel); border: 3px solid var(--sg-line-strong); border-radius: 14px; padding: 22px 22px 18px; box-shadow: 0 10px 0 rgba(27,43,32,.3), 0 20px 40px rgba(0,0,0,.2); text-align: center; }
   .logo { font-size: clamp(44px, 9vw, 64px); font-weight: 800; line-height: 1.05; color: #D97B4F; -webkit-text-stroke: 2px var(--sg-ink); text-shadow: 4px 5px 0 var(--sg-ink); letter-spacing: -1px; margin-bottom: 4px; }
   .logo small { display: block; font-size: 15px; -webkit-text-stroke: 0; text-shadow: none; color: var(--sg-ink-soft); letter-spacing: 0; margin-top: 8px; font-weight: 700; }
@@ -255,22 +264,37 @@
 <div id="lapToast"><b id="lapToastMain"></b><span id="lapToastSub"></span></div>
 <div id="count"><span id="countNum">3</span></div>
 
-<div id="overlay">
-  <div class="card" id="cardStart">
-    <div class="logo">TURBO LAP<small>터보 랩 — 홍콩 /  싱가포르 / 서울 </small></div>
-    <div class="modeBtns">
-      <button type="button" class="btn" id="btnModeTA">⏱ 타임어택<small>혼자 달려 완주 최단 시간 도전 · 고스트</small></button>
-      <button type="button" class="btn hard" id="btnModeBattle">⚔️ 대전모드<small>방 코드로 모여 1대1 실시간 레이스</small></button>
+<div id="overlay" class="st-screen">
+  <div class="st-wrap" id="cardStart">
+    <div class="st-hero">
+      <h1 class="st-title">TURBO LAP<span>터보 랩</span></h1>
+      <p class="st-sub"><b>홍콩 · 싱가포르 · 서울</b> 도심을 달리는 3D 레이스.<br>혼자 기록에 도전하거나, 친구와 1대1로 겨뤄 보세요.</p>
     </div>
-    <div class="keys">
-      <div>
-        <div class="keypad"><span class="e"></span><span>W</span><span class="e"></span><span>A</span><span>S</span><span>D</span></div>
-        <div class="lab">또는 방향키 ↑ ← ↓ →</div>
+    <div class="st-card">
+      <button type="button" class="st-btn primary" id="btnModeTA">⏱ 타임어택<small>혼자 달려 완주 최단 시간 도전 · 고스트</small></button>
+      <button type="button" class="st-btn" id="btnModeBattle">⚔️ 대전모드<small>방 코드로 모여 1대1 실시간 레이스</small></button>
+      <div id="loadNote"></div>
+    </div>
+    <div class="st-card">
+      <h2>조작 방법</h2>
+      <div class="st-keys">
+        <span><kbd>W</kbd> <kbd>↑</kbd></span><span>가속</span>
+        <span><kbd>S</kbd> <kbd>↓</kbd></span><span>브레이크 · 후진</span>
+        <span><kbd>A</kbd> <kbd>D</kbd> <kbd>←</kbd> <kbd>→</kbd></span><span>핸들 조향</span>
+        <span><kbd>T</kbd></span><span>트랙으로 복귀</span>
+        <span><kbd>R</kbd></span><span>처음부터 다시</span>
       </div>
-      <p><b>W / ↑</b> 가속<br><b>S / ↓</b> 브레이크·후진<br><b>A D / ← →</b> 조향<br><b>T</b> 트랙 복귀</p>
     </div>
-    <div id="loadNote"></div>
-    <div class="credits creditText"></div>
+    <div class="st-card">
+      <h2>규칙</h2>
+      <ul class="st-rules">
+        <li><b>타임어택</b>: 코스(홍콩 편도 · 싱가포르 3바퀴 · 서울 2바퀴)와 차를 고르고 가장 빠른 완주 시간에 도전합니다.</li>
+        <li><b>고스트</b>를 켜면 나의 최고 기록이나 세계신기록 주행이 반투명 차로 같이 달립니다.</li>
+        <li>트랙을 벗어나면 느려지고, 울타리에 부딪히면 크게 감속합니다.</li>
+        <li><b>대전모드</b>: 방 코드로 모여 1대1로 달리고, 관전자는 두 차의 시점을 번갈아 봅니다.</li>
+      </ul>
+      <div class="credits creditText"></div>
+    </div>
   </div>
 
   <div class="card" id="cardCourse" style="display:none">
@@ -3436,7 +3460,9 @@ const CARDS = { start: "cardStart", course: "cardCourse", car: "cardCar", done: 
 let cardNow = "start";
 function showCard(which) {
   cardNow = which;
-  overlay.style.display = which ? "flex" : "none";
+  const isStartScreen = which === "start";
+  overlay.classList.toggle("st-screen", isStartScreen);
+  overlay.style.display = which ? (isStartScreen ? "block" : "flex") : "none";
   Object.keys(CARDS).forEach(k => { $(CARDS[k]).style.display = which === k ? "" : "none"; });
 }
 function showCourse(k) {

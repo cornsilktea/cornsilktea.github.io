@@ -90,6 +90,28 @@
   .song .h{ font-size:12px; color:var(--ink-soft); display:block; }
   .song .h em{ font-style:normal; color:var(--accent); font-weight:700; }
   .song .h small{ display:block; font-size:11px; }
+  #start{ --st-bg:10,10,18; --st-panel:rgba(18,18,28,.84); --st-accent:#D97B4F; --st-title2:#E9C98A; --st-glow:rgba(233,201,138,.45);
+    background:
+      linear-gradient(90deg, rgba(10,10,18,.94) 0%, rgba(10,10,18,.74) 50%, rgba(10,10,18,.4) 85%),
+      linear-gradient(180deg, transparent 0 58%, #0b0b12 58% 100%),
+      repeating-linear-gradient(90deg, transparent 0 34px, #0b0b12 34px 56px, transparent 56px 80px),
+      repeating-linear-gradient(90deg, #EDE8DD 0 38px, #9C968C 38px 40px); }
+  @media (max-width:760px){ #start{ background:
+      linear-gradient(rgba(10,10,18,.84), rgba(10,10,18,.84)),
+      repeating-linear-gradient(90deg, #EDE8DD 0 38px, #9C968C 38px 40px); } }
+  #start.on{ display:block; }
+  #start .st-opts .btn{ height:auto; }
+  #start .st-opts .btn.sel{ background:var(--st-accent); border-color:var(--st-accent); color:#fff; }
+  #start .songs{ margin:0 0 4px; }
+  #start .song{ background:rgba(255,255,255,.05); border:2px solid rgba(255,255,255,.16); border-radius:8px; color:#F4F1E8; }
+  #start .song.sel{ border-color:var(--st-accent); background:rgba(217,123,79,.2); }
+  #start .song .c{ color:#CFCFD8; }
+  #start .song .b, #start .song .h{ color:#A6A6B4; }
+  #start .song .b em{ color:#FFD27A; }
+  #start .song .h em{ color:#FFB48A; }
+  #start .song .listen{ background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.3); color:#F4F1E8; border-radius:6px; }
+  #start .song .listen.playing{ background:var(--st-accent); border-color:var(--st-accent); }
+  #start .st-btn{ margin-top:14px; }
   .stats{ display:grid; grid-template-columns:repeat(2,1fr); gap:6px; margin:10px 0; }
   .stats .cell{ background:var(--panel); border:1px solid var(--line-mid); border-radius:var(--radius); padding:8px; text-align:center; }
   .stats .k{ font-size:12px; color:var(--ink-soft); }
@@ -100,20 +122,36 @@
 <body>
 <div id="app">
 
-  <section id="start" class="screen on">
-    <h1>피아노 타일 리듬</h1>
-    <div class="concept">
-      이 게임은 <b>정해진 순간</b>과 <b>여러분의 입력 순간</b>이 얼마나 가까운지를 판정합니다.
-      내려오는 타일이 아래 <b>버튼과 완전히 겹치는 순간</b>이 '정해진 순간'(PERFECT)입니다.
-      컴퓨터 프로그램이 '이벤트가 발생한 시각'을 어떻게 처리하는지 직접 느껴보세요.
+  <section id="start" class="screen on st-screen">
+    <div class="st-wrap">
+      <div class="st-hero">
+        <h1 class="st-title">피아노 타일<span>리듬</span></h1>
+        <p class="st-sub">내려오는 타일이 아래 버튼과 <b>완전히 겹치는 순간</b>에 누르세요.<br>컴퓨터가 '이벤트가 발생한 시각'을 어떻게 판정하는지 직접 느껴 봅니다.</p>
+      </div>
+      <div class="st-card">
+        <label class="st-label">① 난이도</label>
+        <div class="st-opts" id="diffRow"></div>
+        <label class="st-label" id="songLabel" style="display:none">② 곡 선택</label>
+        <div class="songs" id="songRow"></div>
+        <button class="st-btn primary" id="startBtn" disabled>시작하기</button>
+        <p class="st-hint" id="startHint">난이도와 곡을 고르면 시작할 수 있어요.</p>
+      </div>
+      <div class="st-card">
+        <h2>조작 방법</h2>
+        <div class="st-keys">
+          <span><kbd>D</kbd> <kbd>F</kbd> <kbd>J</kbd> <kbd>K</kbd></span><span>왼쪽부터 1·2·3·4번 줄을 누릅니다.</span>
+          <span><span class="st-tag">📱 터치</span></span><span>타일이 내려오는 <b>줄</b>을 손가락으로 누릅니다.</span>
+        </div>
+      </div>
+      <div class="st-card">
+        <h2>판정</h2>
+        <ul class="st-rules">
+          <li>타일이 버튼과 완전히 겹치는 순간이 '정해진 순간'입니다.</li>
+          <li><b>PERFECT</b> ±50ms · <b>GOOD</b> ±120ms 안에 누르면 인정, 그보다 벗어나면 <b>MISS</b>.</li>
+          <li>콤보가 이어질수록 점수 배율이 올라갑니다.</li>
+        </ul>
+      </div>
     </div>
-    <label class="field">난이도</label>
-    <div class="diffgrid" id="diffRow"></div>
-    <label class="field" id="songLabel" style="display:none">곡 선택</label>
-    <div class="songs" id="songRow"></div>
-    <div class="hint" id="keyHint">PC: D · F · J · K 키 / 모바일: 레인 터치</div>
-    <div class="spacer"></div>
-    <button class="btn primary" id="startBtn" disabled style="margin-top:14px">시작하기</button>
   </section>
 
   <section id="game" class="screen">
@@ -1022,7 +1060,9 @@ function syncListenBtns(){
   });
 }
 function updateStartBtn(){
-  $("startBtn").disabled = !(S.diff && S.songIdx !== null);
+  const ready = !!(S.diff && S.songIdx !== null);
+  $("startBtn").disabled = !ready;
+  $("startHint").textContent = ready ? "" : (S.diff ? "곡을 골라 주세요." : "난이도와 곡을 고르면 시작할 수 있어요.");
 }
 
 const cv = $("cv"), ctx = cv.getContext("2d");

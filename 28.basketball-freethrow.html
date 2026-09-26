@@ -98,6 +98,17 @@
     .desc { font-size: 13px; }
   }
   [hidden]{display:none !important;}
+  #overlay.st-screen { display: block; align-items: initial; justify-content: initial; padding: 54px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
+    --st-bg: 30, 16, 8; --st-panel: rgba(38, 22, 12, .84); --st-accent: #D97B4F; --st-title2: #FFB070; --st-glow: rgba(255, 150, 70, .5);
+    background: linear-gradient(90deg, rgba(30, 16, 8, .88) 0%, rgba(30, 16, 8, .62) 46%, rgba(30, 16, 8, .1) 80%); }
+  @media (max-width: 760px) { #overlay.st-screen { background: rgba(30, 16, 8, .8); } }
+  #cardStart .rec { margin: 14px 0 0; }
+  #cardStart .rec > div { background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .12); border-radius: 6px; text-align: center; }
+  #cardStart .rec .lab, #cardStart .rec .who { color: #BFA78E; }
+  #cardStart .rec .val { color: #F4F1E8; }
+  #cardStart .rec .val.none { color: #8C7A68; }
+  #cardStart .wipe { margin-top: 14px; text-align: center; }
+  #cardStart .wipe button { color: #8C7A68; }
 </style>
 </head>
 <body>
@@ -115,23 +126,38 @@
 </div>
 <div class="hud" id="tip">공을 골대 쪽으로 드래그해서 던지세요</div>
 
-<div id="overlay">
-  <div class="card" id="cardStart">
-    <div class="logo">🏀 자유투 챌린지<small>40초 라운드 · 누적 점수로 통과 기준을 넘겨라</small></div>
-    <div class="desc">화면을 <b>드래그</b>해서 공을 던집니다. 드래그 <b>방향</b>이 슛 방향, <b>길이</b>가 세기입니다. 림·백보드를 안 건드리고 들어가면 <b>클린 슛 3점</b>, 맞고 들어가면 <b>뱅크 슛 2점</b>. 라운드마다 40초가 주어지고, 끝날 때 누적 점수가 <b>통과 기준</b>에 못 미치면 탈락합니다. 마지막 <b>15초는 피버 타임(2배)</b>, <b>2라운드부터는 골대가 움직입니다.</b></div>
-    <div class="keys">
-      <div><b>↕ 드래그</b><span>길이 = 세기</span></div>
-      <div><b>↔ 드래그</b><span>방향 = 좌우 조준</span></div>
-      <div><b>🔥 15초</b><span>피버 타임 2배</span></div>
+<div id="overlay" class="st-screen">
+  <div class="st-wrap" id="cardStart">
+    <div class="st-hero">
+      <h1 class="st-title">🏀 자유투<span>챌린지</span></h1>
+      <p class="st-sub"><b>40초</b> 라운드마다 누적 점수로 <b>통과 기준</b>을 넘기세요.<br>몇 라운드까지 버틸 수 있을까요?</p>
     </div>
-    <div class="rec">
-      <div><div class="lab">개인 최고 기록</div><div class="val" id="bestStart">—</div><div class="who" id="bestStartDate"></div></div>
-      <div><div class="lab">🏆 세계 신기록</div><div class="val" id="wrStart">—</div><div class="who" id="wrWhoStart"></div></div>
-      <div class="clsCol" hidden><div class="lab">🏫 우리 반 신기록</div><div class="val" id="crStart">—</div><div class="who" id="crWhoStart"></div></div>
+    <div class="st-card">
+      <button type="button" class="st-btn primary" id="btnStart">시작하기 (Space)</button>
+      <div class="rec">
+        <div><div class="lab">개인 최고 기록</div><div class="val" id="bestStart">—</div><div class="who" id="bestStartDate"></div></div>
+        <div><div class="lab">🏆 세계 신기록</div><div class="val" id="wrStart">—</div><div class="who" id="wrWhoStart"></div></div>
+        <div class="clsCol" hidden><div class="lab">🏫 우리 반 신기록</div><div class="val" id="crStart">—</div><div class="who" id="crWhoStart"></div></div>
+      </div>
     </div>
-    <div class="btns"><button type="button" class="btn" id="btnStart">시작하기</button></div>
-    <div class="hint">스페이스바로도 시작할 수 있습니다</div>
-    <div class="wipe"><button type="button" id="btnWipe">이 기기의 최고 기록 지우기</button></div>
+    <div class="st-card">
+      <h2>조작 방법</h2>
+      <div class="st-keys">
+        <span><span class="st-tag">👆 드래그</span></span><span>화면을 끌었다 놓아 공을 던집니다.</span>
+        <span><span class="st-tag">↔ 방향</span></span><span>끄는 <b>방향</b> = 좌우 조준</span>
+        <span><span class="st-tag">↕ 길이</span></span><span>끄는 <b>길이</b> = 세기</span>
+      </div>
+    </div>
+    <div class="st-card">
+      <h2>규칙</h2>
+      <ul class="st-rules">
+        <li>림·백보드를 안 건드리고 들어가면 <b>클린 슛 3점</b>, 맞고 들어가면 <b>뱅크 슛 2점</b>.</li>
+        <li>라운드가 끝날 때 누적 점수가 통과 기준에 못 미치면 <b>탈락</b>합니다.</li>
+        <li>🔥 마지막 <b>15초는 피버 타임</b> — 점수 2배!</li>
+        <li><b>2라운드부터</b>는 골대가 움직입니다.</li>
+      </ul>
+      <div class="wipe"><button type="button" id="btnWipe">이 기기의 최고 기록 지우기</button></div>
+    </div>
   </div>
 
   <div class="card" id="cardOver" style="display:none">
@@ -335,7 +361,7 @@ function gameOver(cleared) {
   m.classList.toggle("wr", wrBeat);
   $("bestOverNew").innerHTML = (best ? best.round + "라운드 " : "") + (newBest ? '<span class="new">NEW</span>' : "");
   renderRecords();
-  $("cardStart").style.display = "none"; $("cardOver").style.display = "block"; $("overlay").style.display = "flex";
+  $("cardStart").style.display = "none"; $("cardOver").style.display = "block"; $("overlay").classList.remove("st-screen"); $("overlay").style.display = "flex";
   if (wrBeat || crBeat) setTimeout(() => WR.prompt(score).then(() => renderRecords()), 400);
 }
 

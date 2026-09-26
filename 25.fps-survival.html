@@ -206,6 +206,18 @@
     #hudTeam > div { font-size: 22px; }
   }
   [hidden]{display:none !important;}
+  #overlay.st-screen { display: block; align-items: initial; justify-content: initial; padding: 54px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
+    --st-bg: 12, 20, 16; --st-panel: rgba(16, 26, 20, .84); --st-accent: #D97B4F; --st-title2: #F2D06B; --st-glow: rgba(242, 208, 107, .45);
+    background: linear-gradient(90deg, rgba(12, 20, 16, .88) 0%, rgba(12, 20, 16, .62) 46%, rgba(12, 20, 16, .1) 80%); }
+  @media (max-width: 760px) { #overlay.st-screen { background: rgba(12, 20, 16, .76); } }
+  #cardStart .warn { margin: 0 0 12px; background: rgba(179, 57, 81, .2); border-color: #E0707F; color: #FFB3BE; }
+  #cardStart .rec { margin: 14px 0 0; }
+  #cardStart .rec > div { background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .12); border-radius: 6px; text-align: center; }
+  #cardStart .rec .lab, #cardStart .rec .who { color: #A3B0A6; }
+  #cardStart .rec .val { color: #F4F1E8; }
+  #cardStart .rec .val.none { color: #7F8C82; }
+  #cardStart .wipe { margin-top: 14px; text-align: center; }
+  #cardStart .wipe button { color: #7F8C82; }
 </style>
 </head>
 <body>
@@ -230,24 +242,43 @@
   <div class="hrec"><div class="recText"><span>세계 신기록</span><b id="hudWrVal">—</b><small id="hudWrWho"></small></div><div class="recIcon world">🏆</div></div>
 </div>
 
-<div id="overlay">
-  <div class="card" id="cardStart">
-    <div class="logo">FPS 서바이벌<small>2분 동안 살아남으며 최대한 많이 처치하라</small></div>
-    <div class="desc">세 방향에서 병사들이 몰려옵니다. 장애물 뒤에 숨어 싸우고, <b>구급함</b>으로 체력 +50, <b>노란 탄약 물약</b>으로 소총 30발 재장전.<br>적 총알은 느려서 옆으로 움직이면 피할 수 있어요. 소총(30발)은 머리 1발·몸통 2발, 탄약이 떨어지면 자동으로 <b>권총</b>(무한탄·피해 절반·탄속 느림)으로 바뀝니다. 적도 소총을 다 쓰면 권총을 꺼내요. <b>2분</b>이 지나거나 체력이 0이 되면 끝. <b>처치 수</b>가 높을수록, 같으면 <b>생존 시간</b>이 길수록 좋은 기록입니다.</div>
-    <div class="warn" id="warnTouch">⌨️ 이 게임은 키보드가 필요합니다. 노트북·PC 또는 키보드를 연결한 전자칠판에서 실행하세요.</div>
-    <div class="keys">
-      <div><b>← → ↑ ↓</b><span>시점 회전</span></div>
-      <div><b>W A S D</b><span>이동 · <b style="font-size:14px">Q</b> 뒤돌기</span></div>
-      <div><b>SPACE</b><span>발사 (누르고 있으면 연사)</span></div>
+<div id="overlay" class="st-screen">
+  <div class="st-wrap" id="cardStart">
+    <div class="st-hero">
+      <h1 class="st-title">FPS<span>서바이벌</span></h1>
+      <p class="st-sub"><b>2분</b> 동안 살아남으며 최대한 많이 처치하세요.<br>세 방향에서 병사들이 몰려옵니다.</p>
     </div>
-    <div class="rec">
-      <div><div class="lab">개인 최고 기록</div><div class="val" id="bestStart">—</div><div class="who" id="bestStartDate"></div></div>
-      <div><div class="lab">🏆 세계 신기록</div><div class="val" id="wrStart">—</div><div class="who" id="wrWhoStart"></div></div>
-      <div class="clsCol" hidden><div class="lab">🏫 우리 반 신기록</div><div class="val" id="crStart">—</div><div class="who" id="crWhoStart"></div></div>
+    <div class="st-card">
+      <div class="warn" id="warnTouch">⌨️ 이 게임은 키보드가 필요합니다. 노트북·PC 또는 키보드를 연결한 전자칠판에서 실행하세요.</div>
+      <div class="st-row">
+        <button type="button" class="st-btn primary" id="btnStart">🤖 AI 대전<small>솔로 · Space</small></button>
+        <button type="button" class="st-btn" id="btnTeam">👥 팀 대전<small>2대2 · 방 코드</small></button>
+      </div>
+      <div class="rec">
+        <div><div class="lab">개인 최고 기록</div><div class="val" id="bestStart">—</div><div class="who" id="bestStartDate"></div></div>
+        <div><div class="lab">🏆 세계 신기록</div><div class="val" id="wrStart">—</div><div class="who" id="wrWhoStart"></div></div>
+        <div class="clsCol" hidden><div class="lab">🏫 우리 반 신기록</div><div class="val" id="crStart">—</div><div class="who" id="crWhoStart"></div></div>
+      </div>
     </div>
-    <div class="btns"><button type="button" class="btn" id="btnStart">AI 대전 (솔로)</button><button type="button" class="btn alt" id="btnTeam">팀 대전 (2대2)</button></div>
-    <div class="hint">스페이스바: AI 대전 시작 · 팀 대전은 친구와 방 코드로 함께해요</div>
-    <div class="wipe"><button type="button" id="btnWipe">이 기기의 나의 최고 기록 지우기</button></div>
+    <div class="st-card">
+      <h2>조작 방법</h2>
+      <div class="st-keys">
+        <span><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd></span><span>이동</span>
+        <span><kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd></span><span>시점 회전</span>
+        <span><kbd>Q</kbd></span><span>뒤돌기</span>
+        <span><kbd>Space</kbd></span><span>발사 (누르고 있으면 연사)</span>
+      </div>
+    </div>
+    <div class="st-card">
+      <h2>규칙</h2>
+      <ul class="st-rules">
+        <li><b>소총</b>(30발)은 머리 1발 · 몸통 2발. 탄약이 떨어지면 자동으로 <b>권총</b>(무한탄 · 피해 절반 · 탄속 느림)으로 바뀝니다.</li>
+        <li>🩹 <b>구급함</b>: 체력 +50 · 🟡 <b>노란 탄약 물약</b>: 소총 30발 재장전</li>
+        <li>적 총알은 느려서 옆으로 움직이면 피할 수 있어요. 장애물 뒤에 숨어 싸우세요. 적도 소총을 다 쓰면 권총을 꺼냅니다.</li>
+        <li><b>2분</b>이 지나거나 체력이 0이 되면 끝. <b>처치 수</b>가 많을수록, 같으면 <b>생존 시간</b>이 길수록 좋은 기록입니다.</li>
+      </ul>
+      <div class="wipe"><button type="button" id="btnWipe">이 기기의 나의 최고 기록 지우기</button></div>
+    </div>
   </div>
 
   <div class="card" id="cardOver" style="display:none">
@@ -1809,9 +1840,11 @@ function startGame() {
   $("hudTop").style.display = "flex"; $("cross").style.display = "block";
 }
 function showCard(which) {
-  $("overlay").style.display = "flex";
   const cardId = { start: "cardStart", over: "cardOver" }[which] || which;
-  document.querySelectorAll("#overlay > .card").forEach(c => { c.style.display = c.id === cardId ? "block" : "none"; });
+  const isStartScreen = cardId === "cardStart";
+  $("overlay").classList.toggle("st-screen", isStartScreen);
+  $("overlay").style.display = isStartScreen ? "block" : "flex";
+  document.querySelectorAll("#overlay > .card, #cardStart").forEach(c => { c.style.display = c.id === cardId ? "block" : "none"; });
   ["hudHp", "hudAmmo", "hudBest", "hudTop", "hudTeam"].forEach(id => $(id).style.display = "none");
   $("cross").style.display = "none";
 }

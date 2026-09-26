@@ -23,3 +23,93 @@
   --sg-radius:4px;
   --sg-font:"Nanum Gothic","NanumGothic","나눔고딕","Malgun Gothic","맑은 고딕",sans-serif;
 }
+
+/* =====================================================================
+   게임 시작 화면(st-*) — 30·31번 시작 화면 모양을 여러 게임이 같이 쓴다.
+   게임 화면 위에 어두운 반투명 판을 왼쪽부터 깔아 뒤의 게임이 비쳐 보이게 하고,
+   위에서부터 제목 → 시작 버튼 → 기록 → 조작 방법 → 규칙 순으로 쌓는다.
+   게임마다 분위기가 달라서 색은 아래 --st-* 변수만 그 게임의 .st-screen 에서 바꾼다.
+   inset 대신 top/right/bottom/left 를 쓴 건 오래된 아이패드 사파리 때문.
+   ===================================================================== */
+.st-screen{
+  --st-bg:6,12,9;                    /* 판 색(rgb 숫자만, 투명도는 아래에서 섞음) */
+  --st-accent:#3E8E5E;              /* 시작 버튼·강조 */
+  --st-accent-ink:#FFFFFF;
+  --st-title:#F4F1E8;
+  --st-title2:#9FD08A;              /* 제목 둘째 줄 */
+  --st-glow:rgba(255,210,120,.35);  /* 제목 번짐 */
+  --st-panel:rgba(14,20,17,.8);
+  --st-ink:#EEF2EE; --st-ink-mid:#CFD8D0; --st-ink-soft:#A3B0A6;
+  position:fixed;top:0;right:0;bottom:0;left:0;z-index:40;
+  display:block;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:54px 16px calc(env(safe-area-inset-bottom,0px) + 24px);
+  background:linear-gradient(90deg,rgba(var(--st-bg),.9) 0%,rgba(var(--st-bg),.66) 46%,rgba(var(--st-bg),.18) 82%);
+  color:var(--st-ink);font-family:var(--sg-font);text-align:left;line-height:1.5;
+  touch-action:pan-y;
+}
+/* 좁은 화면은 판이 글자 뒤 게임 그림을 다 덮지 못하므로 고르게 어둡게 */
+@media (max-width:760px){ .st-screen{background:rgba(var(--st-bg),.86);} }
+.st-screen *{box-sizing:border-box;}
+.st-wrap{width:100%;max-width:560px;margin:0 auto;}
+@media (min-width:1000px){ .st-wrap{margin:0 0 0 5vw;max-width:520px;} }
+.st-hero{padding:6px 0 16px;}
+.st-title{margin:0;text-align:left;font-size:clamp(34px,6.4vw,56px);font-weight:800;line-height:1.08;letter-spacing:-.01em;
+  color:var(--st-title);text-shadow:0 4px 0 rgba(0,0,0,.45),0 0 22px var(--st-glow);}
+.st-title span{display:block;color:var(--st-title2);}
+.st-sub{margin:12px 0 0;font-size:16px;line-height:1.6;color:var(--st-ink-mid);}
+.st-sub b{color:var(--st-title);}
+.st-card{background:var(--st-panel);border:1px solid rgba(255,255,255,.16);border-radius:8px;
+  padding:20px;margin-bottom:14px;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);}
+.st-card h2{margin:0 0 12px;font-size:19px;font-weight:800;color:var(--st-title);}
+.st-card h3{margin:0 0 8px;font-size:16px;font-weight:800;color:var(--st-ink-mid);}
+.st-card p{margin:0 0 10px;font-size:15px;line-height:1.6;color:var(--st-ink-mid);}
+.st-btn{display:block;width:100%;min-height:56px;margin:10px 0 0;padding:8px 14px;font:inherit;font-size:19px;font-weight:800;
+  border-radius:6px;border:2px solid rgba(255,255,255,.3);background:rgba(255,255,255,.06);color:var(--st-ink);cursor:pointer;
+  -webkit-tap-highlight-color:transparent;}
+.st-btn:first-child{margin-top:0;}
+.st-btn.primary{background:var(--st-accent);border-color:var(--st-accent);color:var(--st-accent-ink);}
+.st-btn:active{filter:brightness(.9);}
+.st-btn:disabled{opacity:.45;cursor:default;}
+.st-btn small{display:block;font-size:13px;font-weight:700;opacity:.85;}
+.st-row{display:flex;gap:10px;}
+.st-row>.st-btn{flex:1 1 0;min-width:0;margin-top:10px;}
+.st-row:first-child>.st-btn{margin-top:0;}
+.st-label{display:block;margin:0 0 8px;font-size:15px;font-weight:800;color:var(--st-ink-soft);}
+.st-label + .st-row>.st-btn{margin-top:0;}
+/* 난이도·모드처럼 하나를 고르는 버튼 */
+.st-opts{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
+.st-opts>button{flex:1 1 0;min-width:84px;min-height:48px;padding:6px 10px;font:inherit;font-size:16px;font-weight:800;
+  border-radius:6px;border:2px solid rgba(255,255,255,.22);background:rgba(255,255,255,.05);color:var(--st-ink-mid);cursor:pointer;}
+.st-opts:last-child{margin-bottom:0;}
+.st-opts>button.on,.st-opts>button.active,.st-opts>button.sel{
+  border-color:var(--st-accent);background:var(--st-accent);color:var(--st-accent-ink);}
+/* 켜기/끄기 스위치는 시작 버튼과 헷갈리지 않게 테두리만 강조 */
+.st-opts>button[aria-pressed="true"]{border-color:var(--st-accent);color:var(--st-title);background:rgba(255,255,255,.1);}
+.st-opts>button small{display:block;font-size:12px;font-weight:700;opacity:.85;}
+/* 개인·세계·우리 반 기록 칸 */
+.st-recs{display:flex;gap:8px;margin-top:14px;}
+.st-recs:first-child{margin-top:0;}
+.st-rec{flex:1 1 0;min-width:0;padding:9px 10px;border-radius:6px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);}
+.st-rec span{display:block;font-size:12px;font-weight:700;color:var(--st-ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.st-rec b{display:block;font-size:20px;font-weight:800;color:var(--st-title);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.st-rec small{display:block;font-size:12px;color:var(--st-ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.st-rec small:empty{display:none;}
+@media (max-width:420px){ .st-recs{flex-wrap:wrap;} .st-rec{flex:1 1 40%;} }
+/* 조작 방법: 왼쪽 키, 오른쪽 설명 */
+.st-keys{display:grid;grid-template-columns:auto 1fr;gap:9px 14px;align-items:center;font-size:16px;line-height:1.5;color:var(--st-ink-mid);}
+.st-keys>span:nth-child(odd){white-space:nowrap;}
+.st-keys + .st-keys{margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1);}
+.st-screen kbd{display:inline-block;min-width:30px;padding:2px 8px;border:1px solid rgba(255,255,255,.3);border-bottom-width:3px;border-radius:4px;
+  background:rgba(255,255,255,.08);color:var(--st-ink);font-family:inherit;font-size:14px;font-weight:800;text-align:center;line-height:1.4;}
+.st-tag{display:inline-block;padding:2px 9px;border-radius:999px;background:rgba(255,255,255,.1);color:var(--st-ink);font-size:13px;font-weight:800;white-space:nowrap;}
+/* 규칙 목록 */
+.st-rules{margin:0;padding-left:20px;font-size:16px;line-height:1.65;color:var(--st-ink-mid);}
+.st-rules li+li{margin-top:5px;}
+.st-rules b,.st-keys b{color:var(--st-title);}
+/* 점수표·조건표 */
+.st-table{width:100%;border-collapse:collapse;font-size:15px;}
+.st-table th,.st-table td{padding:8px 9px;border-bottom:1px solid rgba(255,255,255,.1);text-align:left;color:var(--st-ink-mid);vertical-align:middle;}
+.st-table th{font-size:13px;font-weight:700;color:var(--st-ink-soft);border-bottom-width:2px;}
+.st-table td b{color:var(--st-title);}
+.st-hint{margin-top:10px;font-size:14px;font-weight:700;color:var(--st-ink-soft);text-align:center;min-height:0;}
+.st-hint:empty{display:none;}

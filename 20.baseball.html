@@ -150,6 +150,18 @@
   .newtag{display:inline-block;font-size:10.5px;font-weight:800;color:#fff;background:var(--accent);
     border-radius:999px;padding:1px 8px;margin-left:6px;vertical-align:1px}
   [hidden]{display:none !important;}
+
+  #scrStart{--st-bg:8,18,32;--st-panel:rgba(12,24,40,.84);--st-accent:#D97B4F;--st-title2:#FFE08A;--st-glow:rgba(255,240,200,.45)}
+  #scrStart{display:none}
+  #scrStart.on{display:block}
+  #scrStart .best-row{flex-direction:column}
+  #scrStart .best-box{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.14)}
+  #scrStart .best-box .bi{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.14)}
+  #scrStart .best-box .bk{color:#A9B6C6}
+  #scrStart .best-box .bv{color:#F4F1E8}
+  #scrStart .best-box .bd{color:#A9B6C6}
+  #scrStart .best-box.world .bk{color:#FFB48A}
+  #scrStart .st-table td:nth-child(3){white-space:nowrap}
 </style>
 </head>
 <body>
@@ -209,34 +221,51 @@
     </div>
   </div>
   </div>
-
+
 </div>
 
-<div class="overlay on" id="scrStart">
-  <div class="card">
-    <h1>야구 타격</h1>
-    <p class="sub">투수가 20개의 공을 던집니다. 공이 스트라이크 존에 들어오는 순간 야구장 화면 아무 곳이나 <b>터치</b>(또는 스페이스 키)해서 타이밍을 맞추세요.</p>
-    <ul class="steps">
-      <li>구종은 직구·커브·슬라이더·체인지업 — 궤적과 속도가 다릅니다.</li>
-      <li>타격에 성공할수록 다음 공의 구속이 빨라집니다 (120 → 최대 160 km/h).</li>
-      <li>빠르게 치면 당겨치기(왼쪽), 늦게 치면 밀어치기(오른쪽)로 날아갑니다.</li>
-      <li>홈런을 연속으로 치면 콤보 보너스가 붙습니다. 사이에 볼·파울이 끼어도 콤보는 이어집니다.</li>
-      <li>치지 않은 공은 존을 지나면 스트라이크, 벗어나면 볼 — 볼을 골라내면 +500점이고 투구 수도 줄지 않습니다.</li>
-    </ul>
-    <table class="tbl">
-      <tr><th>타이밍</th><th>결과</th><th>점수</th></tr>
-      <tr><td>정확</td><td>홈런</td><td>비거리에 비례 (가장 높음)</td></tr>
-      <tr><td>조금 빠름·늦음</td><td>장타 · 외야안타 · 내야안타</td><td>비거리에 비례</td></tr>
-      <tr><td>더 빠름·늦음</td><td>파울</td><td>0 (투구 수 유지)</td></tr>
-      <tr><td>훨씬 빠름·늦음 · 안 침</td><td>헛스윙 · 스트라이크</td><td>0</td></tr>
-      <tr><td>존 밖의 공을 안 침</td><td>볼</td><td>500 (투구 수 유지)</td></tr>
-    </table>
-    <div class="best-row">
-      <div class="best-box" id="startBest"></div>
-      <div class="best-box world" id="startWorld"></div>
-      <div class="best-box world" id="startCls" hidden></div>
+<div class="st-screen on" id="scrStart">
+  <div class="st-wrap">
+    <div class="st-hero">
+      <h1 class="st-title">⚾ 야구<span>홈런 타격</span></h1>
+      <p class="st-sub">투수가 <b>20개</b>의 공을 던집니다. 공이 스트라이크 존에 들어오는 순간 타이밍을 맞춰 치세요!</p>
     </div>
-    <button class="btn" id="btnStart">시작하기</button>
+    <div class="st-card">
+      <button class="st-btn primary" id="btnStart">시작하기</button>
+      <div class="best-row">
+        <div class="best-box" id="startBest"></div>
+        <div class="best-box world" id="startWorld"></div>
+        <div class="best-box world" id="startCls" hidden></div>
+      </div>
+    </div>
+    <div class="st-card">
+      <h2>조작 방법</h2>
+      <div class="st-keys">
+        <span><kbd>Space</kbd></span><span>스윙! 공이 존에 들어오는 순간 누릅니다.</span>
+        <span><span class="st-tag">📱 터치</span></span><span>야구장 화면 <b>아무 곳이나</b> 누르면 스윙합니다.</span>
+        <span><span class="st-tag">⏱ 타이밍</span></span><span>빠르면 <b>당겨치기</b>(왼쪽), 늦으면 <b>밀어치기</b>(오른쪽)로 날아갑니다.</span>
+      </div>
+    </div>
+    <div class="st-card">
+      <h2>점수표</h2>
+      <table class="st-table">
+        <tr><th>타이밍</th><th>결과</th><th>점수</th></tr>
+        <tr><td><b>정확</b></td><td>홈런</td><td>비거리 비례 (최고)</td></tr>
+        <tr><td>조금 빠름·늦음</td><td>장타 · 외야안타 · 내야안타</td><td>비거리 비례</td></tr>
+        <tr><td>더 빠름·늦음</td><td>파울</td><td>0 (투구 수 유지)</td></tr>
+        <tr><td>훨씬 빠름·늦음 · 안 침</td><td>헛스윙 · 스트라이크</td><td>0</td></tr>
+        <tr><td>존 밖의 공을 안 침</td><td>볼</td><td>500 (투구 수 유지)</td></tr>
+      </table>
+    </div>
+    <div class="st-card">
+      <h2>규칙</h2>
+      <ul class="st-rules">
+        <li>구종은 <b>직구·커브·슬라이더·체인지업</b> — 궤적과 속도가 다릅니다.</li>
+        <li>타격에 성공할수록 구속이 빨라집니다 (120 → 최대 <b>160 km/h</b>).</li>
+        <li>홈런을 연속으로 치면 <b>콤보 보너스</b>! 사이에 볼·파울이 끼어도 콤보는 이어집니다.</li>
+        <li>치지 않은 공이 존을 지나면 스트라이크, 벗어나면 볼 — <b>볼을 골라내면 +500점</b>이고 투구 수도 줄지 않습니다.</li>
+      </ul>
+    </div>
   </div>
 </div>
 

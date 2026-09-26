@@ -113,6 +113,22 @@
     .keys { grid-template-columns: 1fr 1fr; }
   }
   [hidden]{display:none !important;}
+  #overlay.st-screen { display: block; align-items: initial; justify-content: initial; padding: 54px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
+    --st-bg: 8, 22, 14; --st-panel: rgba(12, 30, 20, .84); --st-accent: #D97B4F; --st-title2: #F2D06B; --st-glow: rgba(242, 208, 107, .45);
+    background: linear-gradient(90deg, rgba(8, 22, 14, .88) 0%, rgba(8, 22, 14, .62) 46%, rgba(8, 22, 14, .1) 80%); }
+  @media (max-width: 760px) { #overlay.st-screen { background: rgba(8, 22, 14, .8); } }
+  #cardStart .stages { margin: 0; }
+  #cardStart .stages button { border-color: rgba(255, 255, 255, .3); box-shadow: 0 4px 0 rgba(0, 0, 0, .45); background: #3E8E5E; }
+  #cardStart .stages button.done { background: #2F7D4F; }
+  #cardStart .stages button.next { background: #D97B4F; }
+  #cardStart .stages button.lock { background: rgba(255, 255, 255, .06); color: #6F7C72; border-color: rgba(255, 255, 255, .12); box-shadow: none; }
+  #cardStart .rec { margin: 14px 0 0; }
+  #cardStart .rec > div { background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .12); border-radius: 6px; text-align: center; }
+  #cardStart .rec .lab, #cardStart .rec .who { color: #A3B0A6; }
+  #cardStart .rec .val { color: #F4F1E8; }
+  #cardStart .rec .val.none { color: #7F8C82; }
+  #cardStart .wipe { margin-top: 14px; text-align: center; }
+  #cardStart .wipe button { color: #7F8C82; }
 </style>
 </head>
 <body>
@@ -141,25 +157,42 @@
   </div>
 </div>
 
-<div id="overlay">
-  <div class="card" id="cardStart">
-    <div class="logo">프리킥 챌린지<small>수비벽과 골키퍼를 뚫고 10단계를 정복하라</small></div>
-    <div class="desc">좌우 <b>조준</b>과 <b>킥 종류</b>, 누르고 있는 시간(최대 2초)만큼 차는 <b>파워</b>로 골을 노립니다. 파워는 <b>세기와 높이를 함께</b> 정합니다(짧게 누르면 낮고 약하게, 길게 누르면 높고 세게). 파워가 강할수록 회전(rpm)이 많아져 <b>더 크게 휘어지고</b>, 화면의 점선이 공 앞 5m 까지의 <b>예상 궤적</b>을 보여 줍니다. 킥은 항상 오른발이고 공 위치는 단계마다 정해져 있습니다(아크 정면 또는 양쪽 대각선). 수비벽은 공이 올 때 점프하고, 골키퍼는 슛을 보고 도착 지점을 예측해 몸을 날립니다(단계가 오를수록 정확). <b>6단계부터</b>는 수비벽 6명이 정면을 완전히 막고 골키퍼가 낮은 공은 다 막으므로, <b>인프런트·아웃프런트 킥을 세게 차서 벽을 넘겨 골대 위 양쪽 구석</b>에 감아 넣어야 합니다(9~10단계는 수비벽 10명). 클리어하면 다음 단계가 열립니다.</div>
-    <div class="keys">
-      <div><b>← →</b><span>조준 좌우 (A·D)</span></div>
-      <div><b>점선</b><span>킥 종류별 예상 궤적</span></div>
-      <div><b>1 2 3</b><span>킥 종류</span></div>
-      <div><b>SPACE</b><span>누르고 있으면 파워 ↑</span></div>
+<div id="overlay" class="st-screen">
+  <div class="st-wrap" id="cardStart">
+    <div class="st-hero">
+      <h1 class="st-title">프리킥<span>챌린지</span></h1>
+      <p class="st-sub">수비벽과 골키퍼를 뚫고 <b>10단계</b>를 정복하세요.<br>클리어하면 다음 단계가 열립니다.</p>
     </div>
-    <div class="stages" id="stageGrid"></div>
-    <div class="rec">
-      <div><div class="lab">개인 최고 기록</div><div class="val" id="bestStart">—</div><div class="who" id="bestStartDate"></div></div>
-      <div><div class="lab">🏆 세계 신기록</div><div class="val" id="wrStart">—</div><div class="who" id="wrWhoStart"></div></div>
-      <div class="clsCol" hidden><div class="lab">🏫 우리 반 신기록</div><div class="val" id="crStart">—</div><div class="who" id="crWhoStart"></div></div>
+    <div class="st-card">
+      <button type="button" class="st-btn primary" id="btnStart">시작하기 <small>열려 있는 가장 높은 단계 · Space</small></button>
+      <label class="st-label" style="margin-top:16px">단계 고르기</label>
+      <div class="stages" id="stageGrid"></div>
+      <div class="rec">
+        <div><div class="lab">개인 최고 기록</div><div class="val" id="bestStart">—</div><div class="who" id="bestStartDate"></div></div>
+        <div><div class="lab">🏆 세계 신기록</div><div class="val" id="wrStart">—</div><div class="who" id="wrWhoStart"></div></div>
+        <div class="clsCol" hidden><div class="lab">🏫 우리 반 신기록</div><div class="val" id="crStart">—</div><div class="who" id="crWhoStart"></div></div>
+      </div>
     </div>
-    <div class="btns"><button type="button" class="btn" id="btnStart">시작하기</button></div>
-    <div class="hint">스페이스바: 열려 있는 가장 높은 단계 시작</div>
-    <div class="wipe"><button type="button" id="btnWipe">이 기기의 진행 상황·최고 기록 지우기</button></div>
+    <div class="st-card">
+      <h2>조작 방법</h2>
+      <div class="st-keys">
+        <span><kbd>←</kbd> <kbd>→</kbd> <kbd>A</kbd> <kbd>D</kbd></span><span>조준 좌우</span>
+        <span><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd></span><span>킥 종류: 인프런트(우→좌 감아차기) · 아웃프런트(좌→우 커브) · 인스텝(빠른 직선)</span>
+        <span><kbd>Space</kbd></span><span><b>누르고 있으면</b> 파워가 차오르고(최대 2초), 떼면 찹니다.</span>
+        <span><span class="st-tag">📱 터치</span></span><span>화면 아래 킥 버튼 · ◀ ▶ · <b>⚽ 차기</b>를 누릅니다.</span>
+      </div>
+    </div>
+    <div class="st-card">
+      <h2>규칙</h2>
+      <ul class="st-rules">
+        <li><b>파워</b>는 세기와 높이를 함께 정합니다. 짧게 누르면 낮고 약하게, 길게 누르면 높고 세게!</li>
+        <li>파워가 강할수록 회전(rpm)이 많아져 <b>더 크게 휘어집니다</b>. 점선이 공 앞 5m까지의 <b>예상 궤적</b>을 보여 줘요.</li>
+        <li>킥은 항상 오른발이고, 공 위치는 단계마다 정해져 있습니다(아크 정면 또는 양쪽 대각선).</li>
+        <li>수비벽은 공이 올 때 점프하고, 골키퍼는 도착 지점을 예측해 몸을 날립니다(단계가 오를수록 정확).</li>
+        <li><b>6단계부터</b>는 수비벽 6명이 정면을 막고 골키퍼가 낮은 공을 다 막습니다. 인프런트·아웃프런트를 세게 차서 <b>벽을 넘겨 골대 위 양쪽 구석</b>으로! (9~10단계는 수비벽 10명)</li>
+      </ul>
+      <div class="wipe"><button type="button" id="btnWipe">이 기기의 진행 상황·최고 기록 지우기</button></div>
+    </div>
   </div>
 
   <div class="card" id="cardOver" style="display:none">
@@ -901,7 +934,8 @@ function updateKeeper(dt) {
   }
 }
 function showCard(which) {
-  $("overlay").style.display = "flex";
+  $("overlay").classList.toggle("st-screen", which === "start");
+  $("overlay").style.display = which === "start" ? "block" : "flex";
   $("cardStart").style.display = which === "start" ? "block" : "none";
   $("cardOver").style.display = which === "over" ? "block" : "none";
   ["hudTop", "hudAim", "hudBest"].forEach(id => $(id).style.display = "none"); $("panel").style.display = "none";

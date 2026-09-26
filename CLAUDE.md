@@ -49,6 +49,10 @@
   M2 맥북 에어 대비 대략 S7 은 1/5, S9 은 1/2 성능으로 본다. 실시간 조명(PointLight·SpotLight)은 개수만큼 모든 화소가 계산하므로 몇 개로 합치고,
   빛나는 표지·전등은 MeshBasicMaterial 로만 표현한다. 조명의 `visible` 을 켜고 끄면 셰이더를 다시 만들어 화면이
   멈추므로 `intensity` 로 끈다. 텍스처는 2048px 이하. 주소 끝에 `&fps` 를 붙이면 `access-guard.js` 가 초당 화면 수를 띄운다.
+- **게임 시작 화면은 30·31번 모양으로 만든다.** 게임 화면 위에 어두운 반투명 판(`theme.css` 의 `st-*` 클래스:
+  `.st-screen > .st-wrap > .st-hero(.st-title·.st-sub) + .st-card…`)을 깔고, 위에서부터
+  제목 → **게임 실행 관련(시작·방 만들기·난이도 선택 등 버튼)** → 기록(`.st-recs`) → **조작 방법(`.st-keys`+`kbd`)** → **규칙(`.st-rules`)** 순.
+  색은 그 게임의 `.st-screen` 에서 `--st-*` 변수(판 색 `--st-bg`, 강조 `--st-accent`, 제목 둘째 줄 `--st-title2`, 번짐 `--st-glow`)만 바꿔 분위기를 맞춘다.
 - 칠판(전자칠판) 형식 퀴즈는 `7.drawing.html` 형식을 따르고 `theme.css` 를 링크하지 않는다(15번도 같은 형식).
 - 손가락으로 **꾹 누르는(길게 누르는) 조작**은 `<canvas>` 에 `touch-action:none` 을 주면 `access-guard.js` 가
   아이폰 돋보기(확대 창)·복사 풍선을 알아서 막는다. 캔버스가 아닌 요소(div 버튼 등)를 길게 누르는 조작은

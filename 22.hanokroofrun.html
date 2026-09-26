@@ -14,6 +14,7 @@
 <meta property="og:url" content="https://cornsilktea.github.io/22.hanokroofrun.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="theme.css">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: #0a0d2b; font-family: "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif; color: #f4f6ff; }
@@ -43,6 +44,19 @@
   .hall { font-size: clamp(14px, 2.2vw, 20px); margin: 4px 0 8px; }
   .hall em { font-style: normal; font-weight: 800; }
   .hall small { display: block; font-size: 0.8em; font-weight: 600; opacity: 0.85; margin-top: 2px; }
+  #overlay.st-screen { display: block; align-items: initial; justify-content: initial; z-index: 10;
+    padding: 54px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
+    --st-bg: 6, 8, 30; --st-panel: rgba(14, 18, 52, .8); --st-accent: #D97B4F; --st-title2: #FFD98A; --st-glow: rgba(255, 217, 138, .5);
+    --st-ink-mid: #D4D9F2; --st-ink-soft: #9EA6CC;
+    background: linear-gradient(90deg, rgba(6, 8, 30, .9) 0%, rgba(6, 8, 30, .66) 46%, rgba(6, 8, 30, .18) 82%); }
+  @media (max-width: 760px) { #overlay.st-screen { background: rgba(6, 8, 30, .78); } }
+  #overlay.st-screen.hidden { display: none; }
+  #overlay.st-screen .st-card h2 { margin-bottom: 12px; }
+  .st-screen .cat-row { display: flex; gap: 10px; }
+  .st-screen .cat-btn { flex: 1 1 0; min-width: 0; padding: 10px 6px 12px; border-radius: 8px; border: 2px solid #D97B4F; background: rgba(217, 123, 79, .16);
+    color: #F4F1E8; font-family: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
+  .st-screen .cat-btn:active { background: rgba(217, 123, 79, .4); }
+  .st-screen .cat-btn img { display: block; height: clamp(64px, 11vw, 104px); max-width: 100%; margin: 0 auto 6px; object-fit: contain; }
 </style>
 </head>
 <body>
@@ -559,6 +573,8 @@ function showResult(cleared) {
   if (isNew) { best = score; saveBest(best); }
   updateHud();
   if (cleared) beep(880, 0.5, 'triangle', 0.06);
+  overlay.className = '';
+  panel.className = 'panel';
   panel.innerHTML = `
     <h2>${cleared ? '코스 완주!' : '추락!'}</h2>
     <div class="score-line">점수 ${score}</div>
@@ -574,32 +590,58 @@ function showResult(cleared) {
   document.getElementById('btnMenu').onclick = showMenu;
   if (Hall) Hall.prompt(score).then(rec => { const el = document.getElementById('hallLine'); if (el) el.innerHTML = hallText() + (rec ? ' (등록 완료)' : ''); });
 }
+function menuRecordsHtml() {
+  const recCell = (label, value, who) => `<div class="st-rec"><span>${label}</span><b>${value}</b><small>${who}</small></div>`;
+  let html = recCell('개인 최고 기록', best + '점', '');
+  if (Hall) {
+    const loading = !Hall.loaded;
+    html += recCell('세계 신기록', Hall.rec ? Hall.rec.score + '점' : (loading ? '…' : '-'), Hall.rec ? Hall.escapeHtml(Hall.who()) : (loading ? '불러오는 중' : '첫 기록에 도전!'));
+    const C = Hall.cls;
+    if (C) html += recCell('우리 반 신기록', C.rec ? C.rec.score + '점' : (loading ? '…' : '-'), C.rec ? Hall.escapeHtml(C.who()) : (loading ? '불러오는 중' : '첫 기록에 도전!'));
+  }
+  return html;
+}
 function showMenu() {
   mode = 'menu'; hud.style.display = 'none';
+  overlay.className = 'st-screen';
+  panel.className = 'st-wrap';
   panel.innerHTML = `
-    <h1>고양이 달리기</h1>
-    <p>고양이가 한옥 지붕 위를 달립니다. 지붕 사이 낭떠러지를 점프와 와이어로 건너 10단계가 이어진 코스의 목표 지점(G)까지 가세요.</p>
-    <div class="score-line">내 최고 기록 ${best}점</div>
-    <div class="hall">${hallText()}</div>
-    <p>고양이를 골라 시작하세요</p>
-    <div class="btn-row cat-row">
-      <button class="btn cat-btn" id="btnBlack"><img src="${IMG_SRC_BLACK.run}" alt="">검은 고양이</button>
-      <button class="btn cat-btn" id="btnYellow"><img src="${IMG_SRC.run}" alt="">노란 고양이</button>
-      <button class="btn cat-btn" id="btnCalico"><img src="${IMG_SRC_CALICO.run}" alt="">삼색 고양이</button>
+    <div class="st-hero">
+      <h1 class="st-title">한옥 지붕<span>고양이 와이어 러너</span></h1>
+      <p class="st-sub">달밤의 한옥 지붕 위를 달려 낭떠러지를 <b>점프</b>와 <b>와이어</b>로 건너고,<br>10단계 코스의 목표 지점(G)까지 가세요.</p>
     </div>
-    <div class="help">
-      <p>· 스페이스바(또는 화면 터치) 1회: 점프</p>
-      <p>· 점프 중 한 번 더: 와이어 던지기 → 앞의 탑 꼭대기에 걸림</p>
-      <p>· 누르고 있는 동안 매달려 스윙, 떼면 날아감 (길게 누를수록 높이·멀리)</p>
-      <p>· 오래 매달리면 공중제비, 떼었다가 다시 누르면 와이어 재발사</p>
-      <p>· 9단계부터 나오는 높은 벽은 점프로는 못 넘습니다 — 앞 탑에 매달려 스윙으로 떠올라 넘으세요</p>
-      <p>· 은화 5점 · 금화 20점 · 쌓인 점수가 최고 기록으로 저장됩니다</p>
+    <div class="st-card">
+      <h2>고양이를 골라 시작하세요</h2>
+      <div class="cat-row">
+        <button class="cat-btn" id="btnBlack"><img src="${IMG_SRC_BLACK.run}" alt="">검은 고양이</button>
+        <button class="cat-btn" id="btnYellow"><img src="${IMG_SRC.run}" alt="">노란 고양이</button>
+        <button class="cat-btn" id="btnCalico"><img src="${IMG_SRC_CALICO.run}" alt="">삼색 고양이</button>
+      </div>
+      <div class="st-recs" id="menuRecs">${menuRecordsHtml()}</div>
+    </div>
+    <div class="st-card">
+      <h2>조작 방법</h2>
+      <div class="st-keys">
+        <span><kbd>Space</kbd> / <span class="st-tag">📱 터치</span></span><span><b>점프</b></span>
+        <span>점프 중 한 번 더</span><span><b>와이어 던지기</b> → 앞 탑 꼭대기에 걸립니다.</span>
+        <span>누르고 있기</span><span>매달려 <b>스윙</b>, 떼면 날아갑니다. 길게 누를수록 높이·멀리!</span>
+        <span>오래 매달리기</span><span>공중제비. 떼었다가 다시 누르면 와이어를 다시 던집니다.</span>
+      </div>
+    </div>
+    <div class="st-card">
+      <h2>규칙</h2>
+      <ul class="st-rules">
+        <li>지붕 사이로 떨어지면 끝! <b>10단계</b>가 한 코스로 이어집니다.</li>
+        <li><b>9단계</b>부터 나오는 높은 벽은 점프로 못 넘습니다 — 앞 탑에 매달려 스윙으로 떠올라 넘으세요.</li>
+        <li>은화 <b>5점</b> · 금화 <b>20점</b>. 쌓인 점수가 최고 기록으로 저장됩니다.</li>
+      </ul>
     </div>`;
   overlay.classList.remove('hidden');
+  overlay.scrollTop = 0;
   document.getElementById('btnBlack').onclick = () => startGame('black');
   document.getElementById('btnYellow').onclick = () => startGame('yellow');
   document.getElementById('btnCalico').onclick = () => startGame('calico');
-  if (Hall) Hall.load().then(() => { const el = panel.querySelector('.hall'); if (mode === 'menu' && el) el.innerHTML = hallText(); });
+  if (Hall) Hall.load().then(() => { const el = document.getElementById('menuRecs'); if (mode === 'menu' && el) el.innerHTML = menuRecordsHtml(); });
 }
 
 const sx = (wx) => (wx - camX) * S;

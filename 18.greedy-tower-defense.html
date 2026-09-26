@@ -189,6 +189,14 @@
     display:inline-block;font-size:10.5px;font-weight:800;color:#fff;background:#e0932b;
     border-radius:var(--sg-radius);padding:2px 8px;margin-left:6px;vertical-align:1px;letter-spacing:.03em;
   }
+  #startScreen{--st-bg:14,24,36;--st-panel:rgba(18,30,44,.84);--st-accent:#D97B4F;--st-title2:#FFD27A;--st-glow:rgba(255,120,150,.45);}
+  #startScreen .bestbox{margin-top:12px;background:rgba(255,210,122,.1);border-color:rgba(255,210,122,.35);}
+  #startScreen .bestbox .bi{background:rgba(255,255,255,.08);box-shadow:none;}
+  #startScreen .bestbox .bk{color:#FFD27A;}
+  #startScreen .bestbox .bv{color:#F4F1E8;}
+  #startScreen .bestbox .bd{color:#A9B4C2;}
+  #startScreen .bestbox.empty{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.12);}
+  #startScreen .bestbox.empty .bk,#startScreen .bestbox.empty .bv{color:#A9B4C2;}
   @keyframes bestpop{0%{transform:scale(.96);opacity:.4}60%{transform:scale(1.02)}100%{transform:scale(1);opacity:1}}
 
   @media (max-width:940px){
@@ -209,22 +217,34 @@
 </head>
 <body>
 
-<div class="screen" id="startScreen">
-  <div class="card">
-    <h1>🎈 풍선 타워 디펜스</h1>
-    <p class="lead">그리디 알고리즘(탐욕 알고리즘)과 자원 최적화를 체험하는 게임입니다. 40웨이브를 막아내세요. 20웨이브까지는 기본, 그 뒤부터는 효율이 승부를 가릅니다.</p>
-    <h2>규칙</h2>
-    <ul class="rules">
-      <li>골드는 <b>풍선을 하나 터뜨릴 때마다</b> 조금씩 들어옵니다. 놓친 풍선의 골드는 받지 못합니다.</li>
-      <li>한 번 지은 타워는 <b>팔거나 옮길 수 없습니다.</b> (되돌릴 수 없는 선택)</li>
-      <li>타워마다 <b>효율(DPS ÷ 비용)</b>이 다릅니다. 지금 싼 타워를 여러 개 지을지, 모아서 상위 타워를 지을지 스스로 판단하세요.</li>
-      <li>보스 풍선은 <b>방어력</b>이 있어 한 발당 데미지에서 방어력만큼 빠집니다. 효율은 화살이 최고지만 칸은 40개뿐이라, 칸당 화력·범위 피해·한 발 데미지를 따져 골라야 합니다. <b>보스를 놓치면 즉시 게임 오버</b>됩니다! (타워는 사거리 안에 보스가 있으면 보스를 먼저 쏩니다)</li>
-      <li>타워를 놓을 수 있는 <b>돌판은 40개뿐</b>입니다. 싼 타워로 돌판을 다 채우면 나중에 강한 타워를 놓을 자리가 없습니다.</li>
-      <li>웨이브는 <b>[시작] 버튼</b>을 눌러야 시작됩니다. 그 전에 타워를 배치하세요.</li>
-    </ul>
-    <div class="bestbox empty" id="startBest"></div>
-    <div class="btnrow">
-      <button class="btn pri" id="startBtn">게임 시작</button>
+<div class="st-screen" id="startScreen">
+  <div class="st-wrap">
+    <div class="st-hero">
+      <h1 class="st-title">🎈 풍선<span>타워 디펜스</span></h1>
+      <p class="st-sub">그리디(탐욕) 알고리즘과 자원 최적화를 체험하는 게임입니다.<br><b>40웨이브</b>를 막아내세요. 20웨이브부터는 효율이 승부를 가릅니다.</p>
+    </div>
+    <div class="st-card">
+      <button class="st-btn primary" id="startBtn">게임 시작</button>
+      <div class="bestbox empty" id="startBest"></div>
+    </div>
+    <div class="st-card">
+      <h2>조작 방법</h2>
+      <div class="st-keys">
+        <span><span class="st-tag">① 타워 고르기</span></span><span>오른쪽 <b>타워 구매</b>에서 타워를 누르면 빈 돌판이 초록으로 표시됩니다.</span>
+        <span><span class="st-tag">② 돌판 누르기</span></span><span>한 번 누르면 사거리가 보이고, <b>한 번 더 누르면 설치</b>됩니다.</span>
+        <span><span class="st-tag">③ 웨이브 시작</span></span><span>타워를 다 놓았으면 <b>▶ Wave 시작</b> 버튼을 누릅니다.</span>
+      </div>
+    </div>
+    <div class="st-card">
+      <h2>규칙</h2>
+      <ul class="st-rules">
+        <li>골드는 <b>풍선을 터뜨릴 때마다</b> 들어옵니다. 놓친 풍선의 골드는 받지 못합니다.</li>
+        <li>지은 타워는 <b>팔거나 옮길 수 없습니다.</b> (되돌릴 수 없는 선택)</li>
+        <li>타워를 놓을 <b>돌판은 40개뿐</b>입니다. 싼 타워로 다 채우면 강한 타워를 놓을 자리가 없어요.</li>
+        <li>타워마다 <b>효율(DPS ÷ 비용)</b>이 다릅니다. 싼 타워 여러 개? 모아서 상위 타워? 스스로 판단하세요.</li>
+        <li>보스 풍선은 <b>방어력</b>만큼 한 발 데미지를 줄입니다. 칸당 화력·범위 피해·한 발 데미지를 따져 고르세요.</li>
+        <li><b>보스를 놓치면 즉시 게임 오버!</b> 타워는 사거리 안의 보스를 먼저 쏩니다.</li>
+      </ul>
     </div>
   </div>
 </div>
