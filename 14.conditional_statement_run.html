@@ -270,12 +270,14 @@
     tex_curb: ASSET_DIR + "tex_curb.jpg",
     tex_ground_grass: ASSET_DIR + "tex_ground_grass.jpg",
     tex_road: ASSET_DIR + "tex_road.jpg",
+    tex_road_normal: ASSET_DIR + "tex_road_normal.jpg",
+    tex_road_orm: ASSET_DIR + "tex_road_orm.jpg",
     tree_big: ASSET_DIR + "tree_big.webp",
     tree_palm: ASSET_DIR + "tree_palm.webp"
   };
-  var ASSET_VERSION = "?v=2";
+  var ASSET_VERSION = "?v=3";
   Object.keys(IMG).forEach(function(k){ IMG[k] += ASSET_VERSION; });
-  var LINEAR_MAP_SUFFIXES = ["_normal", "_rough"];
+  var LINEAR_MAP_SUFFIXES = ["_normal", "_rough", "_orm"];
   var PLAYER_MODEL_URL = ASSET_DIR + "player.glb" + ASSET_VERSION;
   var PLAYER_H = 2.3;
   var playerGltf = null;
@@ -310,6 +312,8 @@
     var rough = optionalTexture(src + "_rough", rx, ry);
     if (normal) m.normalMap = normal;
     if (rough) { m.roughnessMap = rough; m.roughness = 1; }
+    var occlusionRoughness = optionalTexture(src + "_orm", rx, ry);
+    if (occlusionRoughness) { m.aoMap = occlusionRoughness; m.roughnessMap = occlusionRoughness; m.roughness = 1; }
     TINT_MATS.push(m);
     return m;
   }
@@ -410,6 +414,7 @@
 
     shadow: new THREE.PlaneGeometry(1, 1)
   };
+  GEO.road.setAttribute("uv2", GEO.road.attributes.uv);
 
   function makeBillboard(mat, w, h){
     var g = new THREE.Group();
