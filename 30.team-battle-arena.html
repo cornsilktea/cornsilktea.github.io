@@ -277,9 +277,9 @@
     </div>
     <div class="card note">
       <b>조작</b> — 왼쪽 아래를 누르고 끌면 이동, 오른쪽 아래 <b>공격</b> 버튼을 누른 채 끌어 방향을 정하고 떼면 발사(그냥 톡 누르면 가까운 적을 자동 조준). 컴퓨터에서는 <b>WASD</b>(방향키)로 이동, <b>K</b> 기본 공격, <b>J</b> 궁극기(자동 조준).
-      <b>궁극기</b>는 게이지가 10 모이면(명중 +2 · 마법사·네크로는 +3 · 궁수·도적은 1발당 +1 · 저격수는 +4, 피격 +1, 마법사 궁극기가 적에게 맞으면 4를 돌려받음, 궁수 궁극기는 화살이 맞을 때마다 1씩, 저격수 궁극기는 적을 꿰뚫을 때마다 2씩 돌려받음) 빨갛게 빛나고, 궁극기를 쓰면 지속시간 동안 분홍색으로 줄어듭니다. 풀숲에 들어가면 상대 팀에게 보이지 않아요.
+      <b>궁극기</b>는 게이지가 10 모이면(명중 +2 · 마법사·네크로는 +3 · 궁수·도적은 1발당 +1 · 저격수는 +4, 피격 +1, 마법사 궁극기가 적에게 맞으면 4를 돌려받음, 궁수 궁극기는 화살이 맞을 때마다 1씩, 저격수 궁극기는 적중하면 2를 돌려받음) 빨갛게 빛나고, 궁극기를 쓰면 지속시간 동안 분홍색으로 줄어듭니다. 풀숲에 들어가면 상대 팀에게 보이지 않아요.
       <br><b>네크로</b>는 빠른 보라색 구체를 쏘고, 궁극기 <b>해골 소환</b>으로 앞쪽에 해골 병사 2마리를 불러내요. 해골은 8초 동안 보이는 적을 쫓아가 베고(적이 안 보이면 그 자리에 서 있음), 적의 공격에 맞으면 쓰러져요. 해골이 쓰러뜨린 적은 네크로의 킬이 되지만 궁극기 게이지는 차지 않아요. 해골이 있는 동안에도 네크로의 공격으로 게이지가 차서 다시 소환할 수 있어요. 해골은 최대 4마리까지 남고, 넘치면 가장 오래된 해골부터 사라져요. 네크로는 팀에 1명만 고를 수 있어요.
-      <br><b>저격수</b>는 석궁으로 아주 멀리(사거리 700) 강한 화살을 쏘지만 1초에 한 발만 쏠 수 있어요. 공격 버튼을 끌어 조준하면 화면이 조준 방향으로 넓게 보여요. 궁극기 <b>관통 화살</b>은 3배 크기의 거대한 화살로, 벽에 닿기 전까지 앞의 적을 모두 꿰뚫어 각각 150의 피해를 줘요.
+      <br><b>저격수</b>는 석궁으로 아주 멀리(사거리 700) 강한 화살을 쏘지만 1초에 한 발만 쏠 수 있어요. 공격 버튼을 끌어 조준하면 화면이 조준 방향으로 넓게 보여요. 궁극기 <b>관통 화살</b>은 3배 크기의 거대한 화살로, 처음 맞은 적에게 150의 피해를 줘요.
     </div>
   </div>
 </div>
@@ -834,7 +834,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "mage") return "지정한 곳에 " + num(ULT.mbDelay / 1000) + "초 뒤 폭발 발생, 적은 " + ULT.mbDmg + "의 데미지, 아군은 " + ULT.mbHeal + " 회복";
     if (k === "rogue") return num(ULT.asDur / 1000) + "초간 " + speedUp(CHARS.rogue) + ", 은신 상태로 변경, 공격 시 해제";
     if (k === "necro") return "앞쪽에 해골 병사 " + ULT.smCount + "마리 소환(HP " + ULT.smHp + ", 공격 " + ULT.smDmg + "), " + num(ULT.smDur / 1000) + "초간 보이는 적을 쫓아가 공격, 최대 " + ULT.smMax + "마리";
-    if (k === "sniper") return "적을 꿰뚫는 거대한 화살 1발(데미지 " + ULT.pnDmg + ", 사거리 " + ULT.pnRange + "), 맞힐 때마다 게이지 " + ULT.pnRefund + " 회복";
+    if (k === "sniper") return "거대한 화살 1발(데미지 " + ULT.pnDmg + ", 사거리 " + ULT.pnRange + "), 적중 시 게이지 " + ULT.pnRefund + " 회복";
     return "";
   }
   function statTable(k) {
@@ -1276,7 +1276,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (!d) return;
     var sp = hyp(d.vx, d.vy) || 1, dx = d.vx / sp, dy = d.vy / sp;
     var dist = rayCast(d.x, d.y, dx, dy, d.range || 500, d.pr || 6);
-    PR[id] = { id: id, d: d, dx: dx, dy: dy, sp: sp, dist: dist, life: dist / sp * 1000, lt: {}, pierced: {}, dead: false, sparked: false };
+    PR[id] = { id: id, d: d, dx: dx, dy: dy, sp: sp, dist: dist, life: dist / sp * 1000, lt: {}, dead: false, sparked: false };
   }
   function projAt(p, e) { e = clamp(e, 0, p.life); return { x: p.d.x + p.dx * p.sp * e / 1000, y: p.d.y + p.dy * p.sp * e / 1000 }; }
   function segHit(ax, ay, bx, by, cx, cy, r) {
@@ -1302,7 +1302,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   function shotSpec(c, skill) {
     var C = CHARS[c];
-    if (skill && c === "sniper") return { count: 1, gap: 0, sp: ULT.pnSpeed, dmg: ULT.pnDmg, pr: ULT.pnPr, range: ULT.pnRange, ultKey: "pierce", pierce: true };
+    if (skill && c === "sniper") return { count: 1, gap: 0, sp: ULT.pnSpeed, dmg: ULT.pnDmg, pr: ULT.pnPr, range: ULT.pnRange, ultKey: "giant" };
     if (skill) return { count: ULT.mkCount, gap: ULT.mkGap, sp: ULT.mkSpeed, dmg: ULT.mkDmg, pr: ULT.mkPr, range: ULT.mkRange, ultKey: "volley" };
     return { count: C.shots || 1, gap: C.gap || 0, sp: C.pSpeed, dmg: C.throwDmg || C.dmg, pr: C.pr, range: C.throwRange || C.range };
   }
@@ -1321,7 +1321,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var sv = v.spec, sp = sv.sp, dx = Math.cos(v.ev.a), dy = Math.sin(v.ev.a);
     var ox = i > 0 && E ? E.x : v.ev.x, oy = i > 0 && E ? E.y : v.ev.y;
     addProj(v.key + "_" + i, { team: v.team, owner: v.ev.o, ownerCharacterType: v.char, x: ox + dx * 20, y: oy + dy * 20,
-      vx: dx * sp, vy: dy * sp, isSkill: v.skill, dmg: sv.dmg, ultKey: sv.ultKey, pierce: !!sv.pierce,
+      vx: dx * sp, vy: dy * sp, isSkill: v.skill, dmg: sv.dmg, ultKey: sv.ultKey,
       pr: sv.pr, range: sv.range, createdAt: v.ev.t + i * v.gap });
     if (E && (E === ME || BOTS[E.id]) && hear(E)) sfx(v.char === "mage" || v.char === "necro" ? "orb" : (v.char === "rogue" ? "star" : "shoot"));
     return true;
@@ -1349,19 +1349,19 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (e > p.life + 40) return;
       for (var i = 0; i < targets.length; i++) {
         var T = targets[i];
-        if (d.owner === T.id || !T.alive || d.team === T.team || p.pierced[T.id]) continue;
+        if (d.owner === T.id || !T.alive || d.team === T.team) continue;
         var pe = p.lt[T.id]; if (pe === undefined) pe = 0;
         p.lt[T.id] = e;
         var a = projAt(p, pe), b = projAt(p, e);
-        if (segHit(a.x, a.y, b.x, b.y, T.x, T.y, BODY_R + (d.pr || 6))) { projHit(id, p, T); if (!d.pierce) break; }
+        if (segHit(a.x, a.y, b.x, b.y, T.x, T.y, BODY_R + (d.pr || 6))) { projHit(id, p, T); break; }
       }
     });
   }
   function projHit(id, p, T) {
     var d = p.d;
-    if (d.pierce) p.pierced[T.id] = 1; else p.dead = true;
+    p.dead = true;
     damage(T, d.dmg, d.owner, !d.isSkill, d.isSkill ? d.ultKey : null, d.fx);
-    if (!ME || ME.team === T.team || visibleTo(T, ME)) spark(T.x, T.y, d.ownerCharacterType === "necro" ? hitColor(d) : (d.team === "blue" ? "#5FA2FF" : "#FF6A5F"), d.pierce ? 2.2 : 1);
+    if (!ME || ME.team === T.team || visibleTo(T, ME)) spark(T.x, T.y, d.ownerCharacterType === "necro" ? hitColor(d) : (d.team === "blue" ? "#5FA2FF" : "#FF6A5F"), d.ultKey === "giant" ? 2.2 : 1);
   }
   function projVisualHit(p, t) {
     if (p.dead || p.gone) return;
@@ -1371,11 +1371,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var list = participants().map(ent).concat(allMinions().filter(function (m) { return minionReady(m, t); }));
     for (var i = 0; i < list.length; i++) {
       var T = list[i];
-      if (!T || !T.alive || T.id === d.owner || T.team === d.team || p.pierced[T.id]) continue;
+      if (!T || !T.alive || T.id === d.owner || T.team === d.team) continue;
       if (segHit(a.x, a.y, b.x, b.y, T.x, T.y, BODY_R + (d.pr || 6))) {
-        if (d.pierce) p.pierced[T.id] = 1; else p.gone = true;
-        if (!ME || ME.team === T.team || visibleTo(T, ME, t)) spark(T.x, T.y, d.ownerCharacterType === "necro" ? hitColor(d) : (d.team === "blue" ? "#5FA2FF" : "#FF6A5F"), d.pierce ? 2.2 : 1);
-        if (!d.pierce) return;
+        p.gone = true;
+        if (!ME || ME.team === T.team || visibleTo(T, ME, t)) spark(T.x, T.y, d.ownerCharacterType === "necro" ? hitColor(d) : (d.team === "blue" ? "#5FA2FF" : "#FF6A5F"), d.ultKey === "giant" ? 2.2 : 1);
+        return;
       }
     }
   }
@@ -1423,7 +1423,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (h.hl) owner.heal += h.hl;
       if (h.u && owner.char === "mage" && owner.refundKey !== h.u) { owner.refundKey = h.u; owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.mbRefund); }
       if (h.u === "volley" && owner.char === "ranger") owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.mkRefund);
-      if (h.u === "pierce" && owner.char === "sniper") owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.pnRefund);
+      if (h.u === "giant" && owner.char === "sniper") owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.pnRefund);
       if (h.b && !skillActive(owner)) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + (CHARS[owner.char].perHit || 2));
       if (owner === ME && h.d) sfx("confirm");
       G.forceNet = true;
