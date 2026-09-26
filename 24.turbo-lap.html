@@ -49,13 +49,14 @@
 
   .hud-box { background: linear-gradient(135deg, rgba(16,18,28,.82), rgba(38,42,58,.72)); border: 1.5px solid rgba(255,255,255,.22); border-radius: 10px; padding: 6px 12px; color: #fff; font-weight: 800; font-variant-numeric: tabular-nums; text-shadow: 0 1px 3px rgba(0,0,0,.6); box-shadow: 0 4px 14px rgba(0,0,0,.3); }
   .hud-box .lab { font-size: 11px; color: #DCE6D6; font-weight: 700; display: block; }
-  #speed { position: fixed; left: 18px; bottom: 16px; z-index: 5; display: none; pointer-events: none; min-width: 172px; padding: 8px 22px 12px 18px; border: 0; border-left: 5px solid #DCE6D6; border-radius: 6px; transform: skewX(-12deg); transform-origin: bottom left; transition: background .2s, border-color .2s, box-shadow .2s; }
+  #speed { position: fixed; left: 18px; bottom: 16px; z-index: 5; display: none; pointer-events: none; width: 252px; padding: 8px 22px 12px 18px; border: 0; border-left: 5px solid #DCE6D6; border-radius: 6px; transform: skewX(-12deg); transform-origin: bottom left; transition: background .2s, border-color .2s, box-shadow .2s; }
   #speed > * { transform: skewX(12deg); }
   #speed::after { content: ""; position: absolute; left: 14px; right: 14px; bottom: 6px; height: 3px; border-radius: 2px; background: repeating-linear-gradient(90deg, rgba(255,255,255,.55) 0 10px, transparent 10px 14px); -webkit-mask: linear-gradient(90deg, #000 40%, rgba(0,0,0,.25)); mask: linear-gradient(90deg, #000 40%, rgba(0,0,0,.25)); }
-  #speed .lab { display: inline-block; font-size: 11.5px; letter-spacing: .18em; margin-right: 6px; vertical-align: 6px; }
-  #speed b { display: inline-block; font-size: 48px; line-height: 1; letter-spacing: -1px; min-width: 2.2ch; text-align: right; }
+  #speed .speedRow { display: flex; align-items: baseline; }
+  #speed .lab { display: inline-block; font-size: 11.5px; letter-spacing: .18em; margin-right: auto; }
+  #speed b { display: inline-block; font-size: 48px; line-height: 1; letter-spacing: -1px; text-align: right; }
   #speed .unit { display: inline-block; font-size: 15px; font-weight: 800; color: #DCE6D6; margin-left: 4px; }
-  #chaseTag, #followTag { display: block; width: max-content; margin-bottom: 3px; padding: 1px 7px; border-radius: 6px; font-size: 12px; line-height: 17px; min-height: 17px; font-weight: 800; color: #DCE6D6; background: rgba(255,255,255,.12); }
+  #chaseTag, #followTag { display: block; width: auto; white-space: nowrap; overflow: hidden; margin-bottom: 3px; padding: 1px 7px; border-radius: 6px; font-size: 12px; line-height: 17px; min-height: 17px; font-weight: 800; color: #DCE6D6; background: rgba(255,255,255,.12); }
   #chaseTag[hidden], #followTag[hidden] { display: block; visibility: hidden; }
   #chaseTag.boost { color: #fff; font-size: 15px; background: #D97B4F; animation: boostPulse .5s ease-in-out infinite alternate; }
   #speed:has(#chaseTag.boost) { background: linear-gradient(135deg, rgba(217,123,79,.95), rgba(150,64,34,.88)); border-left-color: #fff; box-shadow: 0 0 22px rgba(217,123,79,.75), 0 4px 14px rgba(0,0,0,.3); }
@@ -304,7 +305,7 @@
     <button type="button" id="btnRecover">🚗 트랙 복귀 (T)</button>
   </div>
 </div>
-<div class="hud-box" id="speed"><span id="chaseTag" hidden></span><span id="followTag" hidden></span><span class="lab">SPEED</span><b id="speedVal">0</b><span class="unit">km/h</span></div>
+<div class="hud-box" id="speed"><span id="chaseTag" hidden></span><span id="followTag" hidden></span><div class="speedRow"><span class="lab">SPEED</span><b id="speedVal">0</b><span class="unit">km/h</span></div></div>
 <canvas id="minimap" width="300" height="300"></canvas>
 <canvas id="fx"></canvas>
 <div id="lapToast"><b id="lapToastMain"></b><span id="lapToastSub"></span></div>
@@ -4497,7 +4498,7 @@ function chaseTagText() {
   return "";
 }
 function followTagText() {
-  return P.chase > 0 ? "따라잡기 +" + Math.round(P.chase * CFG.kmh) + " km/h" : "";
+  return playMode === "battle" ? "따라잡기 +" + Math.round(P.chase * CFG.kmh) + " km/h" : "";
 }
 function racerState(id) {
   if (id === BT.myId && !BT.spec) return { prog: myProg(), fin: P.fin };
