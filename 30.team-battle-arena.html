@@ -89,6 +89,12 @@
   .slot .ch { margin-left: auto; font-size: 13px; color: var(--sg-ink-soft); font-weight: 700; }
   .slot .me { font-size: 12px; background: var(--sg-primary); color: #fff; border-radius: 4px; padding: 1px 5px; }
   .slot.mine { box-shadow: inset 0 0 0 2px var(--sg-primary); }
+  button.slot { width: 100%; font: inherit; font-size: 17px; color: var(--sg-ink-faint); text-align: left; border: 0; cursor: pointer; }
+  .slot.addAi { box-shadow: inset 0 0 0 1px rgba(255,255,255,.14); transition: background .15s, box-shadow .15s; }
+  .slot.addAi:hover, .slot.addAi:active { background: rgba(217,123,79,.14); box-shadow: inset 0 0 0 2px rgba(217,123,79,.7); }
+  .slot .aiAdd { margin-left: auto; font-size: 13px; font-weight: 800; color: #D97B4F; }
+  .slot.ai { background: rgba(217,123,79,.12); }
+  .slot .aiDel { flex: none; height: 26px; padding: 0 8px; border-radius: 5px; border: 1px solid rgba(255,154,154,.45); background: rgba(0,0,0,.25); color: #FF9A9A; font-size: 12px; font-weight: 800; }
   .slot .host { font-size: 14px; }
   .team h3 { display: flex; align-items: center; gap: 8px; }
   .team .join { height: 30px; padding: 0 10px; border-radius: 6px; border: 2px solid; font-size: 14px; font-weight: 800; color: #fff; }
@@ -436,9 +442,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       '""....#..#....""',
       '""............""',
       "......####......",
-      ".#............#.",
-      '...""......""...',
-      '.#.""......"".#.',
+      ".....#....#.....",
+      '....""....""....',
+      "................",
       "~==~~~~==~~~~==~",
       "~==~~~~==~~~~==~"
     ] },
@@ -461,7 +467,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var MAP_IDS = ["forest", "river", "dungeon"];
   var BLOCK_TILES = "#x", WATER_TILES = "~";
   var ARENA = "", MAP = [], MAP_COLS = 16, MAP_ROWS = 25, SPAWN_ROWS = 3;
-  var OBST = [], WATER = [], BUSH_ID = [], BUSH = [];
+  var OBST = [], WATER = [], BRIDGES = [], BUSH_ID = [], BUSH = [];
   function tileX(c) { return MAP_X0 + (c + 0.5) * TILE; }
   function tileY(r) { return MAP_Y0 + (r + 0.5) * TILE; }
   function fullMap(half) {
@@ -510,6 +516,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     MAP_COLS = MAP[0].length; MAP_ROWS = MAP.length;
     OBST = tileRects(BLOCK_TILES);
     WATER = tileRects(WATER_TILES);
+    BRIDGES = tileRects("=");
     bushGroups();
   }
   loadMapData("forest");
@@ -966,14 +973,20 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     setHtml($("modeBtns"), choiceButtons(MODES, mode, "modeOpt"));
     setHtml($("mapBtns"), choiceButtons(MAP_CHOICES, room.map || "forest", "mapOpt"));
 
+    var hostCanFill = isHost() && room.status === "lobby";
     function list(team) {
       var ids = teamIds(team), h = "";
       for (var i = 0; i < 3; i++) {
         var id = ids[i];
-        if (!id) { h += '<div class="slot empty">빈 자리</div>'; continue; }
+        if (!id) {
+          h += hostCanFill ? '<button type="button" class="slot empty addAi" data-ai-add="' + team + '">빈 자리<span class="aiAdd">🤖 AI 추가</span></button>'
+                           : '<div class="slot empty">빈 자리</div>';
+          continue;
+        }
         var p = P[id];
-        h += '<div class="slot' + (id === myId ? " mine" : "") + '">' + (room.host === id ? '<span class="host">👑</span>' : "") + (p.isAI ? "🤖 " : "") + esc(p.nickname) +
-             (id === myId ? ' <span class="me">나</span>' : "") + '<span class="ch">' + esc((CHARS[p.characterType] || CHARS.ranger).name) + "</span></div>";
+        h += '<div class="slot' + (id === myId ? " mine" : "") + (p.isAI ? " ai" : "") + '">' + (room.host === id ? '<span class="host">👑</span>' : "") + (p.isAI ? "🤖 " : "") + esc(p.nickname) +
+             (id === myId ? ' <span class="me">나</span>' : "") + '<span class="ch">' + esc((CHARS[p.characterType] || CHARS.ranger).name) + "</span>" +
+             (p.isAI && hostCanFill ? '<button type="button" class="aiDel" data-ai-del="' + id + '" aria-label="AI 빼기">빼기</button>' : "") + "</div>";
       }
       return h;
     }
@@ -1024,6 +1037,26 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     flipped = null;
     pickChar(c);
   };
+  function freeAiName(ps) {
+    var used = keys(ps).map(function (id) { return ps[id] && ps[id].nickname; }), n = 1;
+    while (used.indexOf("AI" + n) >= 0) n++;
+    return "AI" + n;
+  }
+  function addAi(team) {
+    if (!isHost() || room.status !== "lobby" || countIn(P, team) >= TEAM_MAX) return;
+    var free = CHAR_LIST.filter(function (c) { return !takenOnTeam(P, team, c); });
+    var id = "ai" + Math.random().toString(36).slice(2, 10);
+    room.ref.child("players/" + id).set({ nickname: freeAiName(P), isAI: true, team: team, characterType: pick(free.length ? free : CHAR_LIST), joinedAt: now() });
+  }
+  function removeAi(id) {
+    if (!isHost() || room.status !== "lobby" || !P[id] || !P[id].isAI) return;
+    room.ref.child("players/" + id).remove();
+  }
+  $("teamCard").addEventListener("click", function (e) {
+    var add = e.target.closest ? e.target.closest("[data-ai-add]") : null, del = e.target.closest ? e.target.closest("[data-ai-del]") : null;
+    if (del) removeAi(del.getAttribute("data-ai-del"));
+    else if (add) addAi(add.getAttribute("data-ai-add"));
+  });
   $("btnJoinBlue").onclick = function () { pickTeam("blue"); };
   $("btnJoinRed").onclick = function () { pickTeam("red"); };
   $("btnSpec").onclick = function () { pickTeam("spec"); };
@@ -1799,6 +1832,22 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     k.wx = spot.x; k.wy = spot.y; k.wanderUntil = t + 4000 + Math.random() * 3000;
   }
 
+  function waterBlocks(ax, ay, bx, by) {
+    var d = hyp(bx - ax, by - ay); if (d < 1) return false;
+    for (var i = 0; i < WATER.length; i++) if (rayRect(ax, ay, (bx - ax) / d, (by - ay) / d, WATER[i], BODY_R - 6) < d) return true;
+    return false;
+  }
+  function bridgeWaypoint(B, tx, ty) {
+    if (!BRIDGES.length || !waterBlocks(B.x, B.y, tx, ty)) return null;
+    var best = null, bd = Infinity;
+    BRIDGES.forEach(function (br) {
+      var cost = hyp(br.x - B.x, br.y - B.y) + hyp(tx - br.x, ty - br.y);
+      if (cost < bd) { bd = cost; best = br; }
+    });
+    var reach = best.h / 2 + 34, onDeck = Math.abs(B.x - best.x) < best.w / 2 - BODY_R + 8 && Math.abs(B.y - best.y) < reach + 12;
+    if (onDeck) return { x: best.x, y: best.y + (ty > best.y ? reach + 20 : -reach - 20) };
+    return { x: best.x, y: best.y + (B.y < best.y ? -reach : reach) };
+  }
   function stepBot(B, dt) {
     if (!B.alive || stunned(B)) { B.mv = false; return; }
     var t = now(), c = CHARS[B.char], k = B.bot, melee = isMelee(B.char);
@@ -1821,17 +1870,20 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var dx = target.x - B.x, dy = target.y - B.y, d = hyp(dx, dy) || 1, ux = dx / d, uy = dy / d;
       var want = c.width ? c.range * 0.75 : (melee ? c.range * 0.6 : c.range * 0.72);
       var los = losClear(B.x, B.y, target.x, target.y);
+      var via = bridgeWaypoint(B, target.x, target.y), gx = ux, gy = uy;
+      if (via) { var vd = hyp(via.x - B.x, via.y - B.y) || 1; gx = (via.x - B.x) / vd; gy = (via.y - B.y) / vd; }
       if (sniper) {
         if (d < SNIPER_KEEP + 30) { mx -= ux; my -= uy; }
-        else if (!los || d > c.range * 0.85) { mx += ux; my += uy; }
+        else if (!los || d > c.range * 0.85) { mx += gx; my += gy; }
       }
-      else if (!los || d > want + 40) { mx += ux; my += uy; }
+      else if (!los || d > want + 40) { mx += gx; my += gy; }
       else if (d < want - 90) { mx -= ux * 0.8; my -= uy * 0.8; }
       var s = Math.sin(t / 900 + k.seed) * 0.7;
       mx += -uy * s; my += ux * s;
     } else {
       if (!k.wanderUntil || t > k.wanderUntil || hyp(k.wx - B.x, k.wy - B.y) < 50) pickWanderPoint(B, t);
-      var ddx = k.wx - B.x, ddy = k.wy - B.y, dd = hyp(ddx, ddy) || 1;
+      var goal = bridgeWaypoint(B, k.wx, k.wy) || { x: k.wx, y: k.wy };
+      var ddx = goal.x - B.x, ddy = goal.y - B.y, dd = hyp(ddx, ddy) || 1;
       mx = ddx / dd * 0.7; my = ddy / dd * 0.7;
     }
     if (k.detour > t) { var rx = -my * k.detourDir, ry = mx * k.detourDir; mx = rx; my = ry; }
@@ -2225,6 +2277,27 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return { mesh: boxField(b.tiles, 40, mat), mat: mat, full: 0.8 };
     });
   }
+  var railMat = new THREE.MeshLambertMaterial({ color: 0x8A5A34 }), postMat = new THREE.MeshLambertMaterial({ color: 0x5E3B22 });
+  function boxList(list, mat) {
+    var im = new THREE.InstancedMesh(UNIT_BOX, mat, list.length), m4 = new THREE.Matrix4();
+    list.forEach(function (b, i) { im.setMatrixAt(i, m4.makeScale(b.w, b.h, b.d).setPosition(b.x, b.y || 0, b.z)); });
+    im.computeBoundingSphere();
+    return im;
+  }
+  function buildBridgeRails() {
+    if (!BRIDGES.length) return;
+    var rails = [], posts = [];
+    BRIDGES.forEach(function (s) {
+      [-1, 1].forEach(function (side) {
+        var x = s.x + side * (s.w / 2 + 4), len = s.h + 16;
+        rails.push({ x: x, z: s.y, w: 6, h: 5, d: len, y: 14 });
+        rails.push({ x: x, z: s.y, w: 6, h: 4, d: len, y: 4 });
+        for (var k = 0; k <= 3; k++) posts.push({ x: x, z: s.y - len / 2 + len * k / 3, w: 10, h: 22, d: 10 });
+      });
+    });
+    arenaGroup.add(boxList(rails, railMat));
+    arenaGroup.add(boxList(posts, postMat));
+  }
   function clearArena() {
     arenaGroup.traverse(function (o) { if (o.isInstancedMesh) o.dispose(); });
     arenaGroup.clear();
@@ -2241,7 +2314,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (groundMat.map) groundMat.map.dispose();
     groundMat.map = paintFloor(th); groundMat.needsUpdate = true;
     SEED = 20260926;
+    ground.visible = !(KIT.propsReady && th.dungeon);
     if (KIT.propsReady) buildArenaProps(th); else buildSimpleArena(th);
+    buildBridgeRails();
     builtArena = ARENA + (KIT.propsReady ? ":kit" : "");
   }
   function useArena(id) {
@@ -2304,7 +2379,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var PROP_FILES = { bushBig: "props/Bush_1_D_Color1.gltf",
                      blockA: "props/Rock_2_C_Color1.gltf", blockB: "props/Rock_2_D_Color1.gltf", treeA: "props/Tree_1_A_Color1.gltf", treeB: "props/Tree_2_B_Color1.gltf",
                      treeC: "props/Tree_3_A_Color1.gltf", treeD: "props/Tree_4_B_Color1.gltf", tuft: "props/Grass_1_B_Color1.gltf",
-                     bridge: "medieval/objects/bridge.glb",
                      dgBlock: "dungeon/floor_foundation_allsides.gltf", dgFloor: "dungeon/floor_tile_small.gltf", dgFloorWeeds: "dungeon/floor_tile_small_weeds_A.gltf",
                      dgBox: "dungeon/box_large.gltf", dgBarrel: "dungeon/barrel_large.gltf", dgTorch: "dungeon/torch_lit.gltf",
                      dgBannerBlue: "dungeon/banner_patternA_blue.gltf", dgBannerRed: "dungeon/banner_patternA_red.gltf" };
@@ -2372,7 +2446,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var yaw = it.yaw || 0, cos = Math.cos(yaw), sin = Math.sin(yaw);
       s.set(it.w / size.x, it.h / size.y, it.d / size.z);
       var ox = mid.x * s.x, oz = mid.z * s.z;
-      p.set(it.x - (ox * cos + oz * sin), -b.min.y * s.y, it.z - (-ox * sin + oz * cos));
+      p.set(it.x - (ox * cos + oz * sin), -b.min.y * s.y + (it.y || 0), it.z - (-ox * sin + oz * cos));
       q.setFromAxisAngle(up, yaw);
       im.setMatrixAt(i, m4.compose(p, q, s));
       if (it.color != null) im.setColorAt(i, new THREE.Color(it.color));
@@ -2411,9 +2485,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }
     });
     if (tufts.length) g.add(instancedProp(P3.tuft, tufts));
-    tileRects("=").forEach(function (s) {
-      g.add(fitProp(P3.bridge, s.h + TILE * 0.5, 26, s.w - 6, s.x, s.y, Math.PI / 2));
-    });
     var trees = [P3.treeA, P3.treeB, P3.treeC, P3.treeD];
     for (var z = -60; z <= MH + 60; z += 170) {
       [-110 - seeded() * 80, MW + 110 + seeded() * 80].forEach(function (x) {
@@ -2422,6 +2493,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       });
     }
   }
+  var DUNGEON_TILE_H = 3;
   function buildDungeonProps() {
     var P3 = KIT.props, g = arenaGroup, floors = [[], []], blocks = [], boxes = [], barrels = [];
     MAP.forEach(function (row, r) {
@@ -2429,7 +2501,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var ch = row.charAt(c), zone = zoneOfRow(r);
         if (ch === "#") { blocks.push({ w: TILE * 1.02, h: 62, d: TILE * 1.02, x: tileX(c), z: tileY(r), yaw: quarterTurn() }); continue; }
         var shade = ch === '"' ? 0x6A6272 : zone === "blue" ? 0xB4CCFF : zone === "red" ? 0xFFBDB2 : 0xF2F0EC - Math.floor(seeded() * 3) * 0x0A0A0A;
-        floors[!zone && ch === "." && seeded() < 0.12 ? 1 : 0].push({ w: TILE, h: 4, d: TILE, x: tileX(c), z: tileY(r), yaw: quarterTurn(), color: shade });
+        floors[!zone && ch === "." && seeded() < 0.12 ? 1 : 0].push({ w: TILE, h: DUNGEON_TILE_H, d: TILE, y: 0.2 - DUNGEON_TILE_H, x: tileX(c), z: tileY(r), yaw: quarterTurn(), color: shade });
         if (ch === "x") (seeded() < 0.5 ? boxes : barrels).push({ x: tileX(c), z: tileY(r), yaw: seeded() * 6.28 });
       }
     });
@@ -2818,10 +2890,31 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
 
   var aimGrp = new THREE.Group(); aimGrp.visible = false; scene.add(aimGrp);
-  var aimMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.38, depthWrite: false });
-  var aimStrip = flatMesh(GEO.strip, aimMat); aimStrip.position.y = 2.5; aimGrp.add(aimStrip);
-  var aimSector = flatMesh(sectorGeo(100, 1), aimMat); aimSector.position.y = 2.5; aimGrp.add(aimSector);
-  var aimCircle = flatMesh(GEO.disc, aimMat); aimCircle.position.y = 2.5; aimGrp.add(aimCircle);
+  var AIM_Y = 8, AIM_BACK_PAD = 5;
+  var aimMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5, depthWrite: false, depthTest: false });
+  var aimBackMat = new THREE.MeshBasicMaterial({ color: 0x0B1410, transparent: true, opacity: 0.3, depthWrite: false, depthTest: false });
+  function aimPart(geo) {
+    var back = flatMesh(geo, aimBackMat), front = flatMesh(geo, aimMat);
+    back.position.y = front.position.y = AIM_Y; back.renderOrder = 8; front.renderOrder = 9;
+    aimGrp.add(back); aimGrp.add(front);
+    return { front: front, back: back };
+  }
+  var aimStrip = aimPart(GEO.strip), aimSector = aimPart(sectorGeo(100, 1)), aimCircle = aimPart(GEO.disc);
+  function showAimStrip(x0, len, width) {
+    aimStrip.front.visible = aimStrip.back.visible = true;
+    aimStrip.front.position.x = x0; aimStrip.front.scale.set(len, width, 1);
+    aimStrip.back.position.x = x0 - AIM_BACK_PAD; aimStrip.back.scale.set(len + AIM_BACK_PAD * 2, width + AIM_BACK_PAD * 2, 1);
+  }
+  function showAimSector(radius, arc) {
+    aimSector.front.visible = aimSector.back.visible = true;
+    aimSector.front.geometry = sectorGeo(radius, arc);
+    aimSector.back.geometry = sectorGeo(radius + AIM_BACK_PAD, arc + 0.1);
+  }
+  function showAimCircle(x, radius) {
+    aimCircle.front.visible = aimCircle.back.visible = true;
+    aimCircle.front.position.x = aimCircle.back.position.x = x;
+    aimCircle.front.scale.setScalar(radius); aimCircle.back.scale.setScalar(radius + AIM_BACK_PAD);
+  }
   function updateAimGuide() {
     var on = aim.id !== null && aim.drag && ME && ME.alive;
     aimGrp.visible = !!on;
@@ -2829,28 +2922,26 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var ult = aim.btn === "ult", c = CHARS[ME.char];
     aimGrp.position.set(ME.x, 0, ME.y); aimGrp.rotation.y = -ME.angle;
     aimMat.color.set(ult ? 0xFF503C : 0xffffff);
-    aimStrip.visible = aimSector.visible = aimCircle.visible = false;
+    [aimStrip, aimSector, aimCircle].forEach(function (p) { p.front.visible = p.back.visible = false; });
     if (ME.char === "thrower") {
-      aimCircle.visible = true; aimCircle.position.x = aimReach(ME, aim.btn); aimCircle.scale.setScalar(ult ? ULT.fgR : ULT.plR);
+      showAimCircle(aimReach(ME, aim.btn), ult ? ULT.fgR : ULT.plR);
     } else if (ult && ME.char === "mage") {
-      aimCircle.visible = true; aimCircle.position.x = aimReach(ME, "ult"); aimCircle.scale.setScalar(ULT.mbR);
+      showAimCircle(aimReach(ME, "ult"), ULT.mbR);
     } else if (ME.char === "lancer") {
-      var ll = lineReach(ME.x, ME.y, ME.angle, ult ? ULT.lnLen : c.range) + BODY_R;
-      aimStrip.visible = true; aimStrip.position.x = 0; aimStrip.scale.set(ll, ult ? ULT.lnW : c.width, 1);
+      showAimStrip(0, lineReach(ME.x, ME.y, ME.angle, ult ? ULT.lnLen : c.range) + BODY_R, ult ? ULT.lnW : c.width);
     } else if (c.arc && !ult && !c.throwRange) {
-      aimSector.visible = true; aimSector.geometry = sectorGeo(c.range + BODY_R, c.arc);
+      showAimSector(c.range + BODY_R, c.arc);
     } else if (c.throwRange && !ult) {
-      var near = enemyInMelee(ME);
-      aimSector.visible = near; aimSector.geometry = sectorGeo(c.range + BODY_R, c.arc);
-      if (!near) {
+      if (enemyInMelee(ME)) showAimSector(c.range + BODY_R, c.arc);
+      else {
         var tx = Math.cos(ME.angle), ty = Math.sin(ME.angle), tl = rayCast(ME.x + tx * 20, ME.y + ty * 20, tx, ty, c.throwRange, 6) + 20;
-        aimStrip.visible = true; aimStrip.position.x = 18; aimStrip.scale.set(Math.max(1, tl - 18), 12, 1);
+        showAimStrip(18, Math.max(1, tl - 18), 12);
       }
     } else {
       var sniperUlt = ult && ME.char === "sniper";
       var len = sniperUlt ? ULT.pnRange : (ult ? ULT.mkRange : c.range), wx = Math.cos(ME.angle), wy = Math.sin(ME.angle), hw = sniperUlt ? 22 : (ult ? 12 : 8);
       len = rayCast(ME.x + wx * 20, ME.y + wy * 20, wx, wy, len, 6) + 20;
-      aimStrip.visible = true; aimStrip.position.x = 18; aimStrip.scale.set(Math.max(1, len - 18), hw * 2, 1);
+      showAimStrip(18, Math.max(1, len - 18), hw * 2);
     }
   }
 
