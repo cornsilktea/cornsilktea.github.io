@@ -1252,6 +1252,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (h.k) owner.kills++;
       if (h.hl) owner.heal += h.hl;
       if (h.u && owner.char === "mage" && owner.refundKey !== h.u) { owner.refundKey = h.u; owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.mbRefund); }
+      if (h.u === "volley" && owner.char === "ranger") owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.mkRefund);
       if (h.b && !skillActive(owner)) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + (CHARS[owner.char].perHit || 2));
       if (owner === ME && h.d) sfx("confirm");
       G.forceNet = true;
