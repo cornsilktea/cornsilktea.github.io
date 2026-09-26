@@ -369,7 +369,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
   var KEY = 70;
   var MW = 900, MH = 1350;
-  var BOUND = { l: 48, r: 852, t: 38, b: 1312 };
+  var BOUND = { l: 50, r: 850, t: 50, b: 1300 };
   var BODY_R = 24;
   var MATCH_MS = 90000;
   var COUNT_MS = 3000;
@@ -410,23 +410,62 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var BOT_AIM_ERR = 0.16;
   var SPAWN_X = [250, 450, 650];
   var SPAWN_Y = { blue: 118, red: MH - 118 };
-  var OBST = [
-    { k: "rock", circle: true, x: 450, y: 675, r: 50 },
-    { k: "rock", circle: true, x: 682, y: 430, r: 42 },
-    { k: "rock", circle: true, x: 218, y: 920, r: 42 },
-    { k: "wall", x: 250, y: 470, w: 190, h: 44 },
-    { k: "wall", x: 650, y: 880, w: 190, h: 44 },
-    { k: "rock", circle: true, x: 130, y: 300, r: 36 },
-    { k: "rock", circle: true, x: 770, y: 1050, r: 36 },
-    { k: "wall", x: 640, y: 600, w: 150, h: 40 },
-    { k: "wall", x: 260, y: 750, w: 150, h: 40 }
+  var TILE = 50, MAP_X0 = BOUND.l, MAP_Y0 = BOUND.t;
+  var MAP_BLUE_HALF = [
+    "................",
+    "................",
+    "................",
+    "...##......##...",
+    "\"\"............\"\"",
+    "\"\"\"....##....\"\"\"",
+    "\"\"\"..........\"\"\"",
+    "....#......#....",
+    "....#..\"\"..#....",
+    ".##....\"\"....##.",
+    "................",
+    "..\"\"...##...\"\"..",
+    "..\"\"........\"\".."
   ];
-  var BUSH = [
-    { x: 110, y: 675, r: 72 }, { x: 790, y: 675, r: 72 },
-    { x: 440, y: 322, r: 70 }, { x: 460, y: 1028, r: 70 },
-    { x: 450, y: 500, r: 55 }, { x: 450, y: 850, r: 55 },
-    { x: 770, y: 350, r: 60 }, { x: 130, y: 1000, r: 60 }
-  ];
+  var MAP = MAP_BLUE_HALF.concat(MAP_BLUE_HALF.slice(0, MAP_BLUE_HALF.length - 1).reverse().map(function (row) { return row.split("").reverse().join(""); }));
+  var MAP_COLS = MAP[0].length, MAP_ROWS = MAP.length, SPAWN_ROWS = 3;
+  function tileX(c) { return MAP_X0 + (c + 0.5) * TILE; }
+  function tileY(r) { return MAP_Y0 + (r + 0.5) * TILE; }
+  function wallRects() {
+    var rects = [], open = {};
+    MAP.forEach(function (row, r) {
+      var next = {};
+      for (var c = 0; c < MAP_COLS; c++) {
+        if (row.charAt(c) !== "#") continue;
+        var c0 = c; while (c + 1 < MAP_COLS && row.charAt(c + 1) === "#") c++;
+        var key = c0 + ":" + c, rect = open[key];
+        if (rect) rect.r1 = r; else { rect = { c0: c0, c1: c, r0: r, r1: r }; rects.push(rect); }
+        next[key] = rect;
+      }
+      open = next;
+    });
+    return rects.map(function (q) {
+      return { k: "wall", x: MAP_X0 + (q.c0 + q.c1 + 1) * TILE / 2, y: MAP_Y0 + (q.r0 + q.r1 + 1) * TILE / 2,
+               w: (q.c1 - q.c0 + 1) * TILE, h: (q.r1 - q.r0 + 1) * TILE };
+    });
+  }
+  var OBST = wallRects();
+  var BUSH_ID = [], BUSH = [];
+  MAP.forEach(function (row, r) {
+    for (var c = 0; c < MAP_COLS; c++) {
+      if (row.charAt(c) !== '"' || BUSH_ID[r * MAP_COLS + c] !== undefined) continue;
+      var id = BUSH.length, tiles = [], queue = [[c, r]], sx = 0, sy = 0;
+      BUSH_ID[r * MAP_COLS + c] = id;
+      while (queue.length) {
+        var q = queue.pop(); tiles.push(q); sx += tileX(q[0]); sy += tileY(q[1]);
+        [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(function (d) {
+          var nc = q[0] + d[0], nr = q[1] + d[1];
+          if (nc < 0 || nr < 0 || nc >= MAP_COLS || nr >= MAP_ROWS || MAP[nr].charAt(nc) !== '"' || BUSH_ID[nr * MAP_COLS + nc] !== undefined) return;
+          BUSH_ID[nr * MAP_COLS + nc] = id; queue.push([nc, nr]);
+        });
+      }
+      BUSH.push({ x: sx / tiles.length, y: sy / tiles.length, tiles: tiles });
+    }
+  });
   var FONT = '"Nanum Gothic", "Malgun Gothic", sans-serif';
 
   var FACE_BY_MOVE = true;
@@ -1203,8 +1242,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function skillLeft(E, t) { return E.skillDur ? clamp((E.skillUntil - t) / E.skillDur, 0, 1) : 0; }
   function hiddenFrom(E, t) { return inBush(E.x, E.y) || stealthed(E, t); }
   function bushIndexAt(x, y) {
-    for (var i = 0; i < BUSH.length; i++) if (hyp(x - BUSH[i].x, y - BUSH[i].y) < BUSH[i].r * 0.85) return i;
-    return -1;
+    var c = Math.floor((x - MAP_X0) / TILE), r = Math.floor((y - MAP_Y0) / TILE);
+    if (c < 0 || r < 0 || c >= MAP_COLS || r >= MAP_ROWS) return -1;
+    var id = BUSH_ID[r * MAP_COLS + c];
+    return id === undefined ? -1 : id;
   }
   function revealedTo(E, viewer, t) {
     if (!viewer) return false;
@@ -1732,8 +1773,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function pickWanderPoint(B, t) {
     var k = B.bot, spot;
     if (Math.random() < 0.5) {
-      var b = BUSH[Math.floor(Math.random() * BUSH.length)];
-      spot = { x: b.x, y: b.y };
+      var b = BUSH[Math.floor(Math.random() * BUSH.length)], bt = b.tiles[Math.floor(Math.random() * b.tiles.length)];
+      spot = { x: tileX(bt[0]), y: tileY(bt[1]) };
     } else {
       spot = { x: BOUND.l + 60 + Math.random() * (BOUND.r - BOUND.l - 120), y: BOUND.t + 180 + Math.random() * (BOUND.b - BOUND.t - 360) };
     }
@@ -2059,28 +2100,63 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function flatMesh(geo, mat) { var m = new THREE.Mesh(geo, mat); m.rotation.x = -Math.PI / 2; return m; }
   var outerGround = flatMesh(new THREE.PlaneGeometry(MW * 14, MH * 14), new THREE.MeshLambertMaterial({ color: 0x4E6B43 }));
   outerGround.position.set(MW / 2, -3, MH / 2); scene.add(outerGround);
-  var groundMat = new THREE.MeshLambertMaterial({ color: 0xE9DCC6 });
-  var ground = flatMesh(new THREE.PlaneGeometry(MW, MH), groundMat);
-  ground.position.set(MW / 2, 0, MH / 2); scene.add(ground);
-  new THREE.TextureLoader().load("img/teambattle/arena-bg.jpg", function (tx) {
+  var FLOOR_TEX_SCALE = 1.2;
+  function paintFloor() {
+    var c2 = document.createElement("canvas"), S = FLOOR_TEX_SCALE;
+    c2.width = Math.round(MW * S); c2.height = Math.round(MH * S);
+    var g2 = c2.getContext("2d"), rnd = 7;
+    function noise() { rnd = (rnd * 16807) % 2147483647; return rnd / 2147483647; }
+    g2.scale(S, S);
+    g2.fillStyle = "#4E6B43"; g2.fillRect(0, 0, MW, MH);
+    for (var r = 0; r < MAP_ROWS; r++) for (var c = 0; c < MAP_COLS; c++) {
+      var x = MAP_X0 + c * TILE, y = MAP_Y0 + r * TILE, ch = MAP[r].charAt(c);
+      var odd = (r + c) % 2, zone = r < SPAWN_ROWS ? "blue" : (r >= MAP_ROWS - SPAWN_ROWS ? "red" : "");
+      g2.fillStyle = ch === "#" ? "#6F7A5A" : ch === '"' ? "#5E9640" :
+                     zone === "blue" ? (odd ? "#9DBEDF" : "#92B4D6") : zone === "red" ? (odd ? "#E5AE9F" : "#DCA293") : (odd ? "#8CC25B" : "#81B853");
+      g2.fillRect(x, y, TILE, TILE);
+      for (var k = 0; k < 5; k++) {
+        g2.fillStyle = noise() < 0.5 ? "rgba(255,255,230,.10)" : "rgba(30,60,20,.10)";
+        g2.beginPath(); g2.arc(x + 6 + noise() * (TILE - 12), y + 6 + noise() * (TILE - 12), 2 + noise() * 4, 0, Math.PI * 2); g2.fill();
+      }
+    }
+    g2.strokeStyle = "rgba(40,70,30,.10)"; g2.lineWidth = 1;
+    for (var gx = 0; gx <= MAP_COLS; gx++) { g2.beginPath(); g2.moveTo(MAP_X0 + gx * TILE, MAP_Y0); g2.lineTo(MAP_X0 + gx * TILE, BOUND.b); g2.stroke(); }
+    for (var gy = 0; gy <= MAP_ROWS; gy++) { g2.beginPath(); g2.moveTo(MAP_X0, MAP_Y0 + gy * TILE); g2.lineTo(BOUND.r, MAP_Y0 + gy * TILE); g2.stroke(); }
+    var zoneH = TILE * SPAWN_ROWS;
+    g2.lineWidth = 4;
+    g2.strokeStyle = "rgba(95,162,255,.8)"; g2.beginPath(); g2.moveTo(MAP_X0, MAP_Y0 + zoneH); g2.lineTo(BOUND.r, MAP_Y0 + zoneH); g2.stroke();
+    g2.strokeStyle = "rgba(255,106,95,.8)"; g2.beginPath(); g2.moveTo(MAP_X0, BOUND.b - zoneH); g2.lineTo(BOUND.r, BOUND.b - zoneH); g2.stroke();
+    g2.strokeStyle = "rgba(255,255,240,.45)"; g2.lineWidth = 5;
+    g2.beginPath(); g2.moveTo(MAP_X0, MH / 2); g2.lineTo(BOUND.r, MH / 2); g2.stroke();
+    g2.beginPath(); g2.arc(MW / 2, MH / 2, 80, 0, Math.PI * 2); g2.stroke();
+    var tx = new THREE.CanvasTexture(c2);
     tx.colorSpace = THREE.SRGBColorSpace;
     tx.anisotropy = renderer ? Math.min(4, renderer.capabilities.getMaxAnisotropy()) : 1;
-    groundMat.map = tx; groundMat.color.set(0xffffff); groundMat.needsUpdate = true;
-  });
+    return tx;
+  }
+  var groundMat = new THREE.MeshLambertMaterial({ map: paintFloor() });
+  var ground = flatMesh(new THREE.PlaneGeometry(MW, MH), groundMat);
+  ground.position.set(MW / 2, 0, MH / 2); scene.add(ground);
+
+  var BORDER_TILES = [];
+  for (var bc = -1; bc <= MAP_COLS; bc++) { BORDER_TILES.push([bc, -1]); BORDER_TILES.push([bc, MAP_ROWS]); }
+  for (var br = 0; br < MAP_ROWS; br++) { BORDER_TILES.push([-1, br]); BORDER_TILES.push([MAP_COLS, br]); }
+  var WALL_TILES = [];
+  MAP.forEach(function (row, r) { for (var c = 0; c < MAP_COLS; c++) if (row.charAt(c) === "#") WALL_TILES.push([c, r]); });
 
   var simpleProps = new THREE.Group(); scene.add(simpleProps);
-  var rockMat = new THREE.MeshLambertMaterial({ color: 0x8E8A7E }), wallMat = new THREE.MeshLambertMaterial({ color: 0xB08A5C });
+  var wallMat = new THREE.MeshLambertMaterial({ color: 0x9A9A92 });
   OBST.forEach(function (o) {
-    var m;
-    if (o.circle) { m = new THREE.Mesh(new THREE.CylinderGeometry(o.r * 0.82, o.r, 48, 14), rockMat); m.position.set(o.x, 24, o.y); }
-    else { m = new THREE.Mesh(new THREE.BoxGeometry(o.w, 54, o.h), wallMat); m.position.set(o.x, 27, o.y); }
+    var m = new THREE.Mesh(new THREE.BoxGeometry(o.w, 54, o.h), wallMat); m.position.set(o.x, 27, o.y);
     simpleProps.add(m);
   });
   var BUSH_VIS = BUSH.map(function (b) {
-    var mat = new THREE.MeshLambertMaterial({ color: 0x3E8E41, transparent: true, opacity: 0.6, depthWrite: false });
-    var m = new THREE.Mesh(new THREE.CylinderGeometry(b.r, b.r * 1.05, 36, 22), mat);
-    m.position.set(b.x, 18, b.y); m.renderOrder = 2; simpleProps.add(m);
-    return { mats: [mat], full: 0.6, fade: 1 };
+    var mat = new THREE.MeshLambertMaterial({ color: 0x3E8E41, transparent: true, opacity: 0.8, depthWrite: false });
+    b.tiles.forEach(function (tl) {
+      var m = new THREE.Mesh(new THREE.BoxGeometry(TILE, 40, TILE), mat);
+      m.position.set(tileX(tl[0]), 20, tileY(tl[1])); m.renderOrder = 2; simpleProps.add(m);
+    });
+    return { mats: [mat], full: 0.8, fade: 1 };
   });
 
   var GEO = {
@@ -2133,9 +2209,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     lancer:  { file: "Barbarian", right: "spear_A", rightScale: 1.35 }
   };
   var MINION_MODEL = { file: "Skeleton_Minion", right: "Skeleton_Blade", scale: 0.9 };
-  var PROP_FILES = { bushBig: "Bush_1_D_Color1", bushMid: "Bush_1_C_Color1", rockA: "Rock_1_H_Color1", rockB: "Rock_1_I_Color1",
+  var PROP_FILES = { bushBig: "Bush_1_D_Color1",
                      blockA: "Rock_2_C_Color1", blockB: "Rock_2_D_Color1", treeA: "Tree_1_A_Color1", treeB: "Tree_2_B_Color1",
-                     treeC: "Tree_3_A_Color1", treeD: "Tree_4_B_Color1" };
+                     treeC: "Tree_3_A_Color1", treeD: "Tree_4_B_Color1", tuft: "Grass_1_B_Color1" };
   var MODEL_SCALE = 38;
   var POTION_SCALE = MODEL_SCALE * 3;
   var KIT = { ready: false, chars: {}, weapons: {}, clips: {}, props: {} };
@@ -2190,39 +2266,52 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     m.position.set(x, -b.min.y * sy, z);
     return m;
   }
-  function buildArenaProps() {
-    var P3 = KIT.props, g = new THREE.Group();
-    OBST.forEach(function (o, i) {
-      if (o.circle) {
-        g.add(fitProp(i % 2 ? P3.rockB : P3.rockA, o.r * 2.1, o.r * 1.25, o.r * 2.1, o.x, o.y, seeded() * Math.PI * 2));
-        return;
-      }
-      var along = o.w >= o.h, len = along ? o.w : o.h, thick = along ? o.h : o.w;
-      var n = Math.max(2, Math.round(len / (thick * 1.15))), piece = len / n;
-      for (var j = 0; j < n; j++) {
-        var off = -len / 2 + piece * (j + 0.5), tpl = seeded() < 0.5 ? P3.blockA : P3.blockB, hgt = 52 + seeded() * 14;
-        var yaw = Math.floor(seeded() * 4) * Math.PI / 2;
-        var ww = piece * 1.1, dd = thick * 1.12;
-        if (yaw % Math.PI) { var sw = ww; ww = dd; dd = sw; }
-        g.add(fitProp(tpl, along ? ww : dd, hgt, along ? dd : ww, along ? o.x + off : o.x, along ? o.y : o.y + off, yaw));
-      }
+  function instancedProp(tpl, list, mat) {
+    var src = tpl.getObjectByProperty("isMesh", true), geo = src.geometry;
+    if (!geo.boundingBox) geo.computeBoundingBox();
+    var b = geo.boundingBox, size = b.getSize(new THREE.Vector3()), mid = b.getCenter(new THREE.Vector3());
+    var im = new THREE.InstancedMesh(geo, mat || src.material, list.length);
+    var m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+    list.forEach(function (it, i) {
+      var yaw = it.yaw || 0, cos = Math.cos(yaw), sin = Math.sin(yaw);
+      s.set(it.w / size.x, it.h / size.y, it.d / size.z);
+      var ox = mid.x * s.x, oz = mid.z * s.z;
+      p.set(it.x - (ox * cos + oz * sin), -b.min.y * s.y, it.z - (-ox * sin + oz * cos));
+      q.setFromAxisAngle(up, yaw);
+      im.setMatrixAt(i, m4.compose(p, q, s));
     });
+    im.computeBoundingSphere();
+    return im;
+  }
+  function buildArenaProps() {
+    var P3 = KIT.props, g = new THREE.Group(), blocks = [[], []];
+    function rockTile(c, r, hMin, hRange) {
+      blocks[seeded() < 0.5 ? 0 : 1].push({ w: TILE * 1.08, h: hMin + seeded() * hRange, d: TILE * 1.08, x: tileX(c), z: tileY(r), yaw: Math.floor(seeded() * 4) * Math.PI / 2 });
+    }
+    WALL_TILES.forEach(function (tl) { rockTile(tl[0], tl[1], 56, 14); });
+    BORDER_TILES.forEach(function (tl) { rockTile(tl[0], tl[1], 44, 24); });
+    g.add(instancedProp(P3.blockA, blocks[0]));
+    g.add(instancedProp(P3.blockB, blocks[1]));
     BUSH.forEach(function (b, i) {
-      var mat = null, bush = new THREE.Group();
-      bush.add(fitProp(P3.bushBig, b.r * 1.25, 74, b.r * 1.25, b.x, b.y, seeded() * 6.28));
-      var n = b.r > 62 ? 6 : 5;
-      for (var j = 0; j < n; j++) {
-        var a = j / n * Math.PI * 2 + seeded() * 0.4, rr = b.r * 0.62;
-        bush.add(fitProp(P3.bushMid, b.r * 0.8, 52 + seeded() * 10, b.r * 0.8, b.x + Math.cos(a) * rr, b.y + Math.sin(a) * rr, seeded() * 6.28));
-      }
-      bush.traverse(function (o) {
-        if (!o.isMesh) return;
-        if (!mat) { mat = o.material.clone(); mat.transparent = true; }
-        o.material = mat;
+      var mat = P3.bushBig.getObjectByProperty("isMesh", true).material.clone();
+      mat.transparent = true;
+      var list = b.tiles.map(function (tl) {
+        var sz = TILE * (1.35 + seeded() * 0.15);
+        return { w: sz, h: 60 + seeded() * 12, d: sz, x: tileX(tl[0]) + (seeded() - 0.5) * 8, z: tileY(tl[1]) + (seeded() - 0.5) * 8, yaw: seeded() * 6.28 };
       });
-      g.add(bush);
+      var im = instancedProp(P3.bushBig, list, mat); im.renderOrder = 2;
+      g.add(im);
       BUSH_VIS[i] = { mats: [mat], full: 1, fade: 1 };
     });
+    var tufts = [];
+    MAP.forEach(function (row, r) {
+      for (var c = 0; c < MAP_COLS; c++) {
+        if (row.charAt(c) !== "." || r < SPAWN_ROWS || r >= MAP_ROWS - SPAWN_ROWS || seeded() > 0.35) continue;
+        var sz = 16 + seeded() * 10;
+        tufts.push({ w: sz, h: sz * 0.8, d: sz, x: tileX(c) + (seeded() - 0.5) * TILE * 0.7, z: tileY(r) + (seeded() - 0.5) * TILE * 0.7, yaw: seeded() * 6.28 });
+      }
+    });
+    g.add(instancedProp(P3.tuft, tufts));
     var trees = [P3.treeA, P3.treeB, P3.treeC, P3.treeD];
     for (var z = -60; z <= MH + 60; z += 170) {
       [-110 - seeded() * 80, MW + 110 + seeded() * 80].forEach(function (x) {
@@ -2771,7 +2860,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     { name: "중앙 대치", from: [110, 100, 930], to: [790, 100, 930], lookFrom: [380, 60, 675], lookTo: [520, 60, 675] },
     { name: "블루 팀", from: [660, 140, 730], to: [560, 115, 710], lookFrom: [450, 55, 575], lookTo: [450, 50, 575] },
     { name: "레드 팀", from: [240, 140, 620], to: [340, 115, 640], lookFrom: [450, 55, 775], lookTo: [450, 50, 775] },
-    { name: "풀숲", from: [320, 170, 530], to: [260, 130, 600], lookFrom: [110, 30, 675], lookTo: [110, 30, 675] },
+    { name: "풀숲", from: [420, 170, 530], to: [360, 130, 600], lookFrom: [200, 30, 675], lookTo: [200, 30, 675] },
     { name: "하늘에서 본 아레나", orbit: true, center: [450, 0, 675], radius: 300, height: 1750, arc: [0.2, 0.9] }
   ];
   var TOUR = { on: false, index: 0, start: 0, caption: "" }, TOUR_MS = 7000, TOUR_FADE = 600;
