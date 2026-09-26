@@ -278,7 +278,7 @@
     <div class="card note">
       <b>조작</b> — 왼쪽 아래를 누르고 끌면 이동, 오른쪽 아래 <b>공격</b> 버튼을 누른 채 끌어 방향을 정하고 떼면 발사(그냥 톡 누르면 가까운 적을 자동 조준). 컴퓨터에서는 <b>WASD</b>(방향키)로 이동, <b>K</b> 기본 공격, <b>J</b> 궁극기(자동 조준).
       <b>궁극기</b>는 게이지가 10 모이면(명중 +2 · 마법사·네크로는 +3 · 궁수·도적은 1발당 +1, 피격 +1, 마법사 궁극기가 적에게 맞으면 4를 돌려받음, 궁수 궁극기는 화살이 맞을 때마다 1씩 돌려받음) 빨갛게 빛나고, 궁극기를 쓰면 지속시간 동안 분홍색으로 줄어듭니다. 풀숲에 들어가면 상대 팀에게 보이지 않아요.
-      <br><b>네크로</b>는 빠른 보라색 구체를 쏘고, 궁극기 <b>해골 소환</b>으로 앞쪽에 해골 병사 2마리를 불러내요. 해골은 8초 동안 보이는 적을 쫓아가 베고(적이 안 보이면 그 자리에 서 있음), 적의 공격에 맞으면 쓰러져요. 해골이 쓰러뜨린 적은 네크로의 킬이 되지만 궁극기 게이지는 차지 않아요. 해골이 있는 동안에도 네크로의 공격으로 게이지가 차서 다시 소환할 수 있고, 새로 부르면 이전 해골은 사라져요.
+      <br><b>네크로</b>는 빠른 보라색 구체를 쏘고, 궁극기 <b>해골 소환</b>으로 앞쪽에 해골 병사 2마리를 불러내요. 해골은 8초 동안 보이는 적을 쫓아가 베고(적이 안 보이면 그 자리에 서 있음), 적의 공격에 맞으면 쓰러져요. 해골이 쓰러뜨린 적은 네크로의 킬이 되지만 궁극기 게이지는 차지 않아요. 해골이 있는 동안에도 네크로의 공격으로 게이지가 차서 다시 소환할 수 있어요. 해골은 최대 4마리까지 남고, 넘치면 가장 오래된 해골부터 사라져요. 네크로는 팀에 1명만 고를 수 있어요.
     </div>
   </div>
 </div>
@@ -387,7 +387,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               mbDelay: 700, mbR: 150, mbDmg: 80, mbHeal: 40, mbRefund: 4, mbCast: 380, mbMin: 60,
               asSmokeMs: 400, asDur: 10000,
               smCount: 2, smAhead: KEY * 1, smSide: 38, smHp: 50, smSpeed: 200, smDmg: 10, smCd: 800, smRange: 80, smArc: Math.PI * 0.6,
-              smDur: 8000, smRiseMs: 1100, smCorpseMs: 1400 };
+              smDur: 8000, smMax: 4, smRiseMs: 1100, smCorpseMs: 1400 };
   function isMelee(c) { return !!CHARS[c].arc; }
   var STEALTH_ALPHA = 0.4;
   var STEALTH_REVEAL_DIST = 100;
@@ -743,13 +743,36 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (team === "red" && room.mode === "ai") return false;
     return countIn(P, team, myId) < capOf(team);
   }
+  var TEAM_ONLY = { necro: 1 };
+  function takenOnTeam(ps, team, c, except) {
+    if (!TEAM_ONLY[c] || (team !== "blue" && team !== "red")) return false;
+    return keys(ps).filter(function (id) { return id !== except && ps[id] && ps[id].team === team && ps[id].characterType === c; }).length >= TEAM_ONLY[c];
+  }
   function pickTeam(team) {
     if (!canMoveTo(team)) return;
+    var swapped = false;
     room.ref.child("players").transaction(function (ps) {
       if (!ps || !ps[myId]) return ps;
       if (countIn(ps, team, myId) >= capOf(team)) return;
-      ps[myId].team = team; return ps;
-    }).then(function (res) { if (!res.committed) flashHint("자리가 다 찼어요. 자리가 나면 다시 눌러 주세요."); });
+      ps[myId].team = team;
+      swapped = takenOnTeam(ps, team, ps[myId].characterType, myId);
+      if (swapped) ps[myId].characterType = "mage";
+      return ps;
+    }).then(function (res) {
+      if (!res.committed) flashHint("자리가 다 찼어요. 자리가 나면 다시 눌러 주세요.");
+      else if (swapped) flashHint("그 팀에는 이미 네크로가 있어서 마법사로 바꿨어요.");
+    });
+  }
+  function pickChar(c) {
+    var me = P[myId];
+    if (takenOnTeam(P, me.team, c, myId)) { flashHint(CHARS[c].name + "는 팀에 " + TEAM_ONLY[c] + "명만 고를 수 있어요."); return; }
+    var blocked = false;
+    room.ref.child("players").transaction(function (ps) {
+      if (!ps || !ps[myId]) return ps;
+      blocked = takenOnTeam(ps, ps[myId].team, c, myId);
+      if (blocked) return;
+      ps[myId].characterType = c; return ps;
+    }).then(function (res) { if (!res.committed && blocked) flashHint(CHARS[c].name + "는 팀에 " + TEAM_ONLY[c] + "명만 고를 수 있어요."); });
   }
   var hintUntil = 0, hintText = "";
   function flashHint(t) { hintText = t; hintUntil = Date.now() + 2500; renderLobby(); setTimeout(renderLobby, 2600); }
@@ -805,7 +828,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "ranger") return num(ULT.mkDmg) + "의 데미지를 주는 화살 " + ULT.mkCount + "발 사격";
     if (k === "mage") return "지정한 곳에 " + num(ULT.mbDelay / 1000) + "초 뒤 폭발 발생, 적은 " + ULT.mbDmg + "의 데미지, 아군은 " + ULT.mbHeal + " 회복";
     if (k === "rogue") return num(ULT.asDur / 1000) + "초간 " + speedUp(CHARS.rogue) + ", 은신 상태로 변경, 공격 시 해제";
-    if (k === "necro") return "앞쪽에 해골 병사 " + ULT.smCount + "마리 소환(HP " + ULT.smHp + ", 공격 " + ULT.smDmg + "), " + num(ULT.smDur / 1000) + "초간 보이는 적을 쫓아가 공격";
+    if (k === "necro") return "앞쪽에 해골 병사 " + ULT.smCount + "마리 소환(HP " + ULT.smHp + ", 공격 " + ULT.smDmg + "), " + num(ULT.smDur / 1000) + "초간 보이는 적을 쫓아가 공격, 최대 " + ULT.smMax + "마리";
     return "";
   }
   function statTable(k) {
@@ -822,10 +845,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function cardsHtml(me) {
     var h = "";
     CHAR_LIST.forEach(function (k) {
-      var c = CHARS[k];
+      var c = CHARS[k], taken = me.characterType !== k && takenOnTeam(P, me.team, k, myId);
       h += '<button type="button" class="charCard' + (me.characterType === k ? " on" : "") + (flipped === k && me.characterType === k ? " flip" : "") +
-        '" data-c="' + k + '"><div class="cardIn">' +
-        '<div class="face front"><img alt="" src="' + charImgSrc(k) + '">' +
+        '" data-c="' + k + '"' + (taken ? " disabled" : "") + '><div class="cardIn">' +
+        '<div class="face front">' + (taken ? '<span class="soon">팀원 선택</span>' : "") + '<img alt="" src="' + charImgSrc(k) + '">' +
           '<div class="nm">' + c.name + "</div></div>" +
         '<div class="face back"><div class="nm">' + c.name + "</div>" + statTable(k) +
           '<div class="ultDesc"><b>궁극기 설명</b>' + ultDesc(k) + "</div></div>" +
@@ -877,6 +900,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (nb < 1) hint = "블루팀에 1명 이상 있어야 해요.";
       else { ok = true; hint = "블루팀 " + nb + "명 vs AI 3명"; }
     }
+    ["blue", "red"].forEach(function (team) {
+      teamIds(team).forEach(function (id) {
+        var c = P[id].characterType;
+        if (ok && !P[id].isAI && takenOnTeam(P, team, c, id)) { ok = false; hint = (team === "blue" ? "블루" : "레드") + "팀에 " + CHARS[c].name + "가 " + (TEAM_ONLY[c] + 1) + "명 이상이에요. " + CHARS[c].name + "는 팀에 " + TEAM_ONLY[c] + "명만 고를 수 있어요."; }
+      });
+    });
     if (!host) hint = (ok ? "방장이 시작하기를 기다리는 중… " : "") + hint;
     if (Date.now() < hintUntil) hint = hintText;
     show($("btnStart"), host);
@@ -895,7 +924,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return;
     }
     flipped = null;
-    room.ref.child("players/" + myId + "/characterType").set(c);
+    pickChar(c);
   };
   $("btnJoinBlue").onclick = function () { pickTeam("blue"); };
   $("btnJoinRed").onclick = function () { pickTeam("red"); };
@@ -948,14 +977,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function absTime(v) { return v === "" || v == null ? 0 : room.startAt + (+v || 0); }
   function packMinions(E) {
     return (E.minions || []).map(function (m) {
-      return [Math.round(m.x), Math.round(m.y), angDeg(m.angle), Math.max(0, Math.ceil(m.hp)), relTime(m.atkAt)].join(":");
+      return [Math.round(m.x), Math.round(m.y), angDeg(m.angle), Math.max(0, Math.ceil(m.hp)), relTime(m.atkAt), relTime(m.born), m.n].join(":");
     }).join(";");
   }
   function unpackMinions(v) {
     if (!v) return [];
     return v.split(";").map(function (s) {
       var f = s.split(":");
-      return { x: +f[0] || 0, y: +f[1] || 0, angle: (+f[2] || 0) * Math.PI / 180, hp: +f[3] || 0, atkAt: absTime(f[4]) };
+      return { x: +f[0] || 0, y: +f[1] || 0, angle: (+f[2] || 0) * Math.PI / 180, hp: +f[3] || 0, atkAt: absTime(f[4]), born: absTime(f[5]), n: +f[6] || 0 };
     });
   }
   function packState(E) {
@@ -1053,16 +1082,18 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     });
   }
 
-  function newMinion(E, i, x, y, angle) {
-    var key = E.id + "_" + E.summonAt + "_" + i;
-    return { id: key, key: key, minion: true, owner: E.id, team: E.team, x: x, y: y, angle: angle,
+  function minionKey(E, born, n) { return E.id + "_" + born + "_" + n; }
+  function newMinion(E, born, n, x, y, angle) {
+    var key = minionKey(E, born, n);
+    return { id: key, key: key, minion: true, owner: E.id, team: E.team, born: born, n: n, x: x, y: y, angle: angle,
              hp: ULT.smHp, maxHp: ULT.smHp, alive: true, atkAt: 0, cdUntil: 0, diedAt: 0, mv: false,
-             rise: E.summonAt + ULT.smRiseMs, stuck: 0, detour: 0, detourDir: 1 };
+             rise: born + ULT.smRiseMs, stuck: 0, detour: 0, detourDir: 1 };
   }
   function adoptMinions(E, list, k) {
-    var old = E.minions || [], t = now();
-    E.minions = list.map(function (s, i) {
-      var m = old[i] && old[i].key === E.id + "_" + E.summonAt + "_" + i ? old[i] : newMinion(E, i, s.x, s.y, s.angle);
+    var byKey = {}, t = now();
+    (E.minions || []).forEach(function (m) { byKey[m.key] = m; });
+    E.minions = list.map(function (s) {
+      var m = byKey[minionKey(E, s.born, s.n)] || newMinion(E, s.born, s.n, s.x, s.y, s.angle);
       var gap = hyp(s.x - m.x, s.y - m.y);
       if (m.sx != null && hyp(s.x - m.sx, s.y - m.sy) > 1) m.mvAt = t;
       m.sx = s.x; m.sy = s.y;
@@ -1081,15 +1112,16 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   function minionReady(m, t) { return m.alive && (t || now()) >= m.rise; }
   function summonMinions(E, ang, t) {
-    E.summonAt = t;
-    var fx = Math.cos(ang), fy = Math.sin(ang), list = [];
+    var born = Math.round(t);
+    E.summonAt = born;
+    var fx = Math.cos(ang), fy = Math.sin(ang), list = (E.minions || []).filter(function (m) { return m.alive; });
     for (var i = 0; i < ULT.smCount; i++) {
       var side = (i - (ULT.smCount - 1) / 2) * 2 * ULT.smSide;
-      var m = newMinion(E, i, E.x + fx * ULT.smAhead - fy * side, E.y + fy * ULT.smAhead + fx * side, ang);
+      var m = newMinion(E, born, i, E.x + fx * ULT.smAhead - fy * side, E.y + fy * ULT.smAhead + fx * side, ang);
       resolve(m);
       list.push(m);
     }
-    E.minions = list;
+    E.minions = list.slice(-ULT.smMax);
   }
   function minionFoe(M, t) {
     var best = null, bd = BOT_VIEW;
@@ -1104,12 +1136,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   function stepMinions(E, dt, t) {
     if (!E.minions || !E.minions.length) return;
-    if (t >= E.summonAt + ULT.smDur) {
-      E.minions = [];
-      G.forceNet = true;
-      return;
-    }
-    E.minions = E.minions.filter(function (m) { return m.alive || t - m.diedAt < ULT.smCorpseMs; });
+    var before = E.minions.length;
+    E.minions = E.minions.filter(function (m) { return t < m.born + ULT.smDur && (m.alive || t - m.diedAt < ULT.smCorpseMs); });
+    if (E.minions.length !== before) G.forceNet = true;
     E.minions.forEach(function (m) {
       m.mv = false;
       if (!minionReady(m, t)) return;
