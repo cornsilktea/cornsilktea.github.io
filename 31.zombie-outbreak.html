@@ -358,7 +358,7 @@ const ZOMBIE_RUN_ANIM = 1.5, ZOMBIE_RUN_ANIM_RUSH = 1.95;
 const DASH_MS = 170, DASH_DISTANCE = 10, DASH_COOLDOWN_MS = 5000, DASH_COOLDOWN_RUSH_MS = 2000;
 const INFECT_RADIUS = 1.05, INFECT_HEIGHT_GAP = 1.5;
 const TURN_SPEED = Math.PI, PITCH_SPEED = 1.75, TURN_RAMP_SEC = 0.25, TURN_RAMP_FROM = 0.5, QUICK_TURN_MS = 150;
-const NET_MS = 100, REMOTE_LERP_MS = 120;
+const NET_MS = 100, BOT_NET_MS = 143, REMOTE_LERP_MS = 150;
 const MAX_PLAYERS = 5, MIN_PLAYERS = 2, MAX_SPECTATORS = 1;
 const ROOM_ROOT = "zombieoutbreak/rooms";
 const NICK_KEY = "zombieoutbreak_nick", BEST_KEY = "zombieoutbreak_best_v1";
@@ -2472,12 +2472,22 @@ function countSlots(ps) {
 function newPlayer(t, spec) { return { nickname, joinedAt: t, role: "human", infected: false, inRound: false, spec: !!spec }; }
 function startMsg(t) { setText($("startMsg"), t || ""); }
 
+function roomCodes() {
+  const base = String((window.PORTAL_CONFIG || {}).DB_URL || "").replace(/\/+$/, "");
+  if (!base) return Promise.resolve([]);
+  return fetch(base + "/" + ROOM_ROOT + ".json?shallow=true", { cache: "no-store" }).then(r => r.ok ? r.json() : null).then(okeys);
+}
+function roomSummary(code) {
+  const r = db.ref(ROOM_ROOT + "/" + code);
+  return Promise.all(["createdAt", "status", "endedAt", "players"].map(k => r.child(k).once("value")))
+    .then(a => ({ code, createdAt: a[0].val() || 0, status: a[1].val(), endedAt: a[2].val() || 0, players: a[3].val() || {} }));
+}
 function sweepRooms() {
-  return db.ref(ROOM_ROOT).once("value").then(s => {
-    const all = s.val() || {}, t = serverNow(), u = {};
-    okeys(all).forEach(code => {
-      const r = all[code] || {}, age = t - (r.createdAt || 0);
-      if ((!humanIdsOf(r.players).length && age > 60000) || (r.status === "ended" && t - (r.endedAt || 0) > 600000) || age > 6 * 3600000) u[code] = null;
+  return roomCodes().then(codes => Promise.all(codes.map(roomSummary))).then(rooms => {
+    const t = serverNow(), u = {};
+    rooms.forEach(r => {
+      const age = t - r.createdAt;
+      if ((!humanIdsOf(r.players).length && age > 60000) || (r.status === "ended" && t - r.endedAt > 600000) || age > 6 * 3600000) u[r.code] = null;
     });
     if (okeys(u).length) return db.ref(ROOM_ROOT).update(u);
   }).catch(() => {});
@@ -2993,13 +3003,15 @@ function updateRemotePlayers(dt, t, nowMs) {
   }
 }
 
+function poseString(x, y, z, face, motion) {
+  return x.toFixed(2) + "," + y.toFixed(1) + "," + z.toFixed(2) + "," + (Math.round(face * 180 / Math.PI) % 360) + "," + motion;
+}
 function netTick(nowMs, t) {
   if (!room.ref || !round.iAmIn || !avatars[myId]) return;
   if (!round.forceNet && nowMs - round.lastNet < NET_MS) return;
   const av = avatars[myId];
   const motion = av.motion;
-  let faceDeg = Math.round(av.face * 180 / Math.PI) % 360;
-  const s = me.x.toFixed(2) + "," + me.y.toFixed(2) + "," + me.z.toFixed(2) + "," + faceDeg + "," + motion;
+  const s = poseString(me.x, me.y, me.z, av.face, motion);
   round.lastNet = nowMs; round.forceNet = false;
   if (s === round.lastSent) return;
   round.lastSent = s;
@@ -3236,9 +3248,9 @@ function botsTick(dt, t, nowMs) {
     checkBotInfection(id, b, t);
     const av = avatars[id], pose = { x: b.body.x, y: b.body.y, z: b.body.z, face: b.face };
     av.netFrom = pose; av.netTo = pose; av.netT0 = nowMs; av.remoteMotion = b.motion;
-    if (nowMs - b.lastNet < NET_MS && b.motion !== MOTION.dash) continue;
-    b.lastNet = nowMs;
-    const s = b.body.x.toFixed(2) + "," + b.body.y.toFixed(2) + "," + b.body.z.toFixed(2) + "," + (Math.round(b.face * 180 / Math.PI) % 360) + "," + b.motion;
+    if (nowMs - b.lastNet < BOT_NET_MS && b.motion === b.lastMotion) continue;
+    b.lastNet = nowMs; b.lastMotion = b.motion;
+    const s = poseString(b.body.x, b.body.y, b.body.z, b.face, b.motion);
     if (s === b.lastSent) continue;
     b.lastSent = s;
     room.ref.child("st/" + id).set(s);

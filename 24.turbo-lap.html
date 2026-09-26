@@ -4269,12 +4269,22 @@ function enterBattleMenu() {
 function bMsg(t) { $("bStartMsg").textContent = t || ""; }
 function newPlayer(team, t) { return { nickname: BT.nick, team, car: carKey, joinedAt: t }; }
 
+function roomCodes() {
+  const base = String((window.PORTAL_CONFIG || {}).DB_URL || "").replace(/\/+$/, "");
+  if (!base) return Promise.resolve([]);
+  return fetch(base + "/" + BATTLE.root + ".json?shallow=true", { cache: "no-store" }).then(r => r.ok ? r.json() : null).then(okeys);
+}
+function roomSummary(code) {
+  const r = BT.db.ref(BATTLE.root + "/" + code);
+  return Promise.all(["createdAt", "status", "endedAt", "players"].map(k => r.child(k).once("value")))
+    .then(a => ({ code, createdAt: a[0].val() || 0, status: a[1].val(), endedAt: a[2].val() || 0, players: a[3].val() || {} }));
+}
 function sweepRooms() {
-  return BT.db.ref(BATTLE.root).once("value").then(s => {
-    const all = s.val() || {}, t = tnow(), u = {};
-    okeys(all).forEach(code => {
-      const r = all[code] || {}, age = t - (r.createdAt || 0);
-      if ((!humanIds(r.players || {}).length && age > 60000) || (r.status === "ended" && t - (r.endedAt || 0) > 300000) || age > 6 * 3600000) u[code] = null;
+  return roomCodes().then(codes => Promise.all(codes.map(roomSummary))).then(rooms => {
+    const t = tnow(), u = {};
+    rooms.forEach(r => {
+      const age = t - r.createdAt;
+      if ((!humanIds(r.players).length && age > 60000) || (r.status === "ended" && t - r.endedAt > 300000) || age > 6 * 3600000) u[r.code] = null;
     });
     if (okeys(u).length) return BT.db.ref(BATTLE.root).update(u);
   }).catch(() => {});
