@@ -281,8 +281,8 @@
       <b>조작</b> — 왼쪽 아래를 누르고 끌면 이동, 오른쪽 아래 <b>공격</b> 버튼을 누른 채 끌어 방향을 정하고 떼면 발사(그냥 톡 누르면 가까운 적을 자동 조준). 컴퓨터에서는 <b>WASD</b>(방향키)로 이동, <b>K</b> 기본 공격, <b>J</b> 궁극기(자동 조준).
       <b>궁극기</b>는 게이지가 10 모이면(명중 +2 · 마법사·네크로는 +3 · 궁수·도적은 1발당 +1 · 저격수는 +4 · 투척병은 독 피해 1번에 +1, 피격 +1, 마법사 궁극기가 적에게 맞으면 4를 돌려받음, 궁수 궁극기는 화살이 맞을 때마다 1씩, 저격수 궁극기는 적중하면 2를 돌려받음) 빨갛게 빛나고, 궁극기를 쓰면 지속시간 동안 분홍색으로 줄어듭니다. 풀숲에 들어가면 상대 팀에게 보이지 않아요.
       <br><b>네크로</b>는 빠른 보라색 구체를 쏘고, 궁극기 <b>해골 소환</b>으로 앞쪽에 해골 병사 2마리를 불러내요. 해골은 8초 동안 보이는 적을 쫓아가 베고(적이 안 보이면 그 자리에 서 있음), 적의 공격에 맞으면 쓰러져요. 해골이 쓰러뜨린 적은 네크로의 킬이 되지만 궁극기 게이지는 차지 않아요. 해골이 있는 동안에도 네크로의 공격으로 게이지가 차서 다시 소환할 수 있어요. 해골은 최대 4마리까지 남고, 넘치면 가장 오래된 해골부터 사라져요. 네크로는 팀에 1명만 고를 수 있어요.
-      <br><b>저격수</b>는 석궁으로 아주 멀리(사거리 700) 강한 화살을 쏘지만 1초에 한 발만 쏠 수 있어요. 공격 버튼을 끌어 조준하면 화면이 조준 방향으로 넓게 보여요. 궁극기 <b>관통 화살</b>은 3배 크기의 거대한 화살로, 처음 맞은 적에게 150의 피해를 줘요.
-      <br><b>투척병</b>은 조준한 곳(최대 280)에 독약병을 던져요. 0.5초 뒤 떨어진 자리에 초록 독 장판이 3초 동안 생기고, 장판 위의 적은 1초마다 20의 피해를 받아요(장판이 겹쳐도 1초에 한 번). 공격 버튼을 짧게 끌면 가까이, 길게 끌면 멀리 던져요. 궁극기 <b>독안개</b>는 거대한 독 장판을 5초 동안 깔아 1초마다 20의 피해를 주고, 장판 안의 적은 40% 느려져요. 독 장판은 상대 팀에게도 보이니 밟지 않게 피하세요.
+      <br><b>저격수</b>는 석궁으로 아주 멀리(사거리 700) 강한 화살을 쏘지만 1초에 0.7발만 쏠 수 있어요. 공격 버튼을 끌어 조준하면 화면이 조준 방향으로 넓게 보여요. 궁극기 <b>관통 화살</b>은 3배 크기의 거대한 화살로, 처음 맞은 적에게 90의 피해를 줘요.
+      <br><b>투척병</b>은 조준한 곳(최대 330)에 1초마다 독약병을 던져요. 0.5초 뒤 떨어진 자리에 초록 독 장판이 3초 동안 생기고, 장판 위의 적은 1초마다 20의 피해를 받아요(장판이 겹쳐도 1초에 한 번, 장판은 최대 3개까지 남고 넘치면 가장 오래된 것부터 사라져요). 공격 버튼을 짧게 끌면 가까이, 길게 끌면 멀리 던져요. 궁극기 <b>독안개</b>는 거대한 독 장판을 5초 동안 깔아 1초마다 20의 피해를 주고, 장판 안의 적은 40% 느려져요. 독 장판은 상대 팀에게도 보이니 밟지 않게 피하세요.
     </div>
   </div>
 </div>
@@ -381,11 +381,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     warrior: { name: "전사", icon: "🪓", hp: 270, speed: 230, ultSpeed: 300, cd: 850, dmg: 45, range: 141, arc: Math.PI * 0.55, perHit: 2, ultName: "광폭화" },
     knight:  { name: "기사", icon: "🛡️", hp: 400, speed: 220, ultSpeed: 300, cd: 1000, dmg: 30, range: KEY * 1 + 50, arc: Math.PI * 0.7, perHit: 2, kb: 28, ultName: "방어태세" },
     ranger:  { name: "궁수", icon: "🏹", hp: 100, speed: 250, cd: 400, dmg: 10, range: KEY * 6, pSpeed: 950, pr: 6, shots: 2, gap: 70, perHit: 1, ultName: "난사", ultAim: true },
-    mage:    { name: "마법사", icon: "🔮", hp: 150, speed: 250, cd: 500, dmg: 11, range: KEY * 4, pSpeed: 700, pr: 9, perHit: 3, ultName: "메테오", ultAim: true },
+    mage:    { name: "마법사", icon: "🔮", hp: 120, speed: 250, cd: 500, dmg: 11, range: KEY * 4, pSpeed: 700, pr: 9, perHit: 3, ultName: "메테오", ultAim: true },
     rogue:   { name: "도적", icon: "🗡️", hp: 100, speed: 300, ultSpeed: 420, cd: 600, dmg: 30, range: 95, arc: Math.PI * 0.6, hits: 2, hitGap: 160, throwDmg: 20, throwRange: 300, pSpeed: 900, pr: 8, perHit: 1, ultName: "은신" },
-    necro:   { name: "네크로", icon: "💀", hp: 150, speed: 250, cd: 500, dmg: 11, range: KEY * 4, pSpeed: 1000, pr: 9, perHit: 3, ultName: "해골 소환" },
-    sniper:  { name: "저격수", icon: "🎯", hp: 120, speed: 240, cd: 1000, dmg: 60, range: 700, pSpeed: 1500, pr: 7, perHit: 4, ultName: "관통 화살", ultAim: true },
-    thrower: { name: "투척병", icon: "🧪", hp: 160, speed: 240, cd: 900, dmg: 20, ticks: 3, range: KEY * 4, minRange: KEY * 1, perHit: 1, ultName: "독안개", ultAim: true }
+    necro:   { name: "네크로", icon: "💀", hp: 120, speed: 250, cd: 500, dmg: 11, range: KEY * 4, pSpeed: 1000, pr: 9, perHit: 3, ultName: "해골 소환" },
+    sniper:  { name: "저격수", icon: "🎯", hp: 100, speed: 240, cd: 1429, dmg: 40, range: 700, pSpeed: 1500, pr: 7, perHit: 4, ultName: "관통 화살", ultAim: true },
+    thrower: { name: "투척병", icon: "🧪", hp: 160, speed: 240, cd: 1000, dmg: 20, ticks: 3, range: KEY * 4 + 50, minRange: KEY * 1, perHit: 1, ultName: "독안개", ultAim: true }
   };
   var CHAR_LIST = ["warrior", "knight", "ranger", "mage", "rogue", "necro", "sniper", "thrower"];
   var ULT = { mkCount: 10, mkGap: 55, mkDmg: 36, mkRefund: 1, mkSpeed: 1150, mkRange: KEY * 8, mkPr: 8,
@@ -394,9 +394,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               asSmokeMs: 400, asDur: 10000,
               smCount: 2, smAhead: KEY * 1, smSide: 38, smHp: 50, smSpeed: 200, smDmg: 10, smCd: 800, smRange: 80, smArc: Math.PI * 0.6,
               smDur: 8000, smMax: 4, smRiseMs: 1100, smCorpseMs: 1400,
-              pnDmg: 150, pnSpeed: 1500, pnRange: 700, pnPr: 16, pnRefund: 2, pnScale: 3,
-              plFlight: 500, plR: 60, plDur: 3000, plTick: 1000, plFade: 500, plLob: 90,
-              fgR: 150, fgDur: 5000, fgDmg: 20, fgSlowMul: 0.6, fgSlowMs: 400, fgCast: KEY * 4 };
+              pnDmg: 90, pnSpeed: 1500, pnRange: 700, pnPr: 16, pnRefund: 2, pnScale: 3,
+              plFlight: 500, plR: 60, plDur: 3000, plTick: 1000, plMax: 3, plFade: 500, plLob: 90,
+              fgR: 150, fgDur: 5000, fgDmg: 20, fgSlowMul: 0.6, fgSlowMs: 400, fgCast: KEY * 4 + 50 };
   var SNIPER_KEEP = KEY * 5;
   function isMelee(c) { return !!CHARS[c].arc; }
   var STEALTH_ALPHA = 0.4;
@@ -1456,8 +1456,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function stepPools(t) {
     POOLS = POOLS.filter(function (pl) {
       var e = pl.e, start = poolStart(e), end = start + e.dur;
-      if (t >= end) { dropPoolVis(pl); return false; }
+      if (t >= end || pl.cut) { dropPoolVis(pl); return false; }
       if (t < start) return true;
+      if (!pl.landed && !e.u) {
+        var olderPools = POOLS.filter(function (q) { return q !== pl && q.landed && !q.cut && !q.e.u && q.e.owner === e.owner; })
+                              .sort(function (a, b) { return a.e.createdAt - b.e.createdAt; });
+        while (olderPools.length >= ULT.plMax) olderPools.shift().cut = true;
+      }
       if (!pl.landed) { pl.landed = true; if (!ME || hyp(e.x - ME.x, e.y - ME.y) < 700) sfx("splash"); }
       if (room.status !== "playing") return true;
       localTargets().forEach(function (T) {
