@@ -176,6 +176,8 @@
   .secHint { font-size: 12px; font-weight: 700; color: var(--sg-ink-soft); margin-left: 6px; }
   .startHint { text-align: center; font-size: 15px; font-weight: 700; color: var(--sg-ink-soft); margin-top: 8px; min-height: 20px; }
   .secTitle { font-size: 17px; font-weight: 800; margin-bottom: 10px; }
+  .charHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+  .charHead .mini { flex: 0 0 auto; }
   .keys { display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; font-size: 16px; line-height: 1.5; align-items: center; color: var(--sg-ink-mid); }
   .keys > span:nth-child(odd) { white-space: nowrap; }
   .keys b { color: #F4F1E8; }
@@ -402,7 +404,7 @@
     </div>
 
     <div id="charCardBox" class="card">
-      <div class="secTitle">캐릭터 선택<span class="secHint">선택한 역할을 한 번 더 클릭하면 자세한 설명이 나옵니다.</span></div>
+      <div class="secTitle charHead"><span>캐릭터 선택<span class="secHint">선택한 역할을 한 번 더 클릭하면 자세한 설명이 나옵니다.</span></span><button id="btnFlipAll" class="mini" type="button">모든 카드 뒤집기</button></div>
       <div class="chars" id="chars"></div>
     </div>
   </div>
@@ -504,7 +506,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     warrior: { name: "전사", icon: "🪓", hp: 270, speed: 230, ultSpeed: 300, cd: 850, dmg: 45, range: 141, arc: Math.PI * 0.55, perHit: 2, ultName: "광폭화" },
     knight:  { name: "기사", icon: "🛡️", hp: 400, speed: 220, ultSpeed: 300, cd: 1000, dmg: 30, range: KEY * 1 + 50, arc: Math.PI * 0.7, perHit: 2, kb: 28, ultName: "방어태세" },
     ranger:  { name: "궁수", icon: "🏹", hp: 100, speed: 250, cd: 400, dmg: 10, range: KEY * 6, pSpeed: 950, pr: 6, shots: 2, gap: 70, perHit: 1, ultName: "난사", ultAim: true },
-    mage:    { name: "마법사", icon: "🔮", hp: 120, speed: 250, cd: 500, dmg: 11, range: KEY * 4, pSpeed: 700, pr: 9, perHit: 3, ultName: "메테오", ultAim: true },
+    mage:    { name: "마법사", icon: "🔮", hp: 120, speed: 250, cd: 500, dmg: 11, range: 350, pSpeed: 700, pr: 9, perHit: 3, ultName: "메테오", ultAim: true },
     rogue:   { name: "도적", icon: "🗡️", hp: 100, speed: 300, ultSpeed: 420, cd: 600, dmg: 30, range: 110, arc: Math.PI * 0.6, hits: 2, hitGap: 160, throwDmg: 20, throwRange: 300, pSpeed: 900, pr: 8, perHit: 1, ultName: "은신" },
     necro:   { name: "네크로", icon: "💀", hp: 120, speed: 250, cd: 500, dmg: 11, range: KEY * 4, pSpeed: 1000, pr: 9, perHit: 3, ultName: "해골 소환" },
     sniper:  { name: "저격수", icon: "🎯", hp: 100, speed: 240, cd: 1429, dmg: 40, range: 700, pSpeed: 1500, pr: 7, perHit: 4, ultName: "거대 화살", ultAim: true },
@@ -514,7 +516,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var CHAR_LIST = ["warrior", "knight", "ranger", "mage", "rogue", "necro", "sniper", "thrower", "lancer"];
   var ULT = { mkCount: 10, mkGap: 55, mkDmg: 36, mkRefund: 1, mkSpeed: 1150, mkRange: KEY * 8, mkPr: 8,
               bzDur: 4000, bzDmgMul: 1.5, bzCdMul: 0.7, tkDur: 5000, tkDef: 0.5,
-              mbDelay: 700, mbR: 150, mbDmg: 80, mbHeal: 40, mbRefund: 4, mbCast: 380, mbMin: 60,
+              mbDelay: 700, mbR: 150, mbDmg: 90, mbHeal: 50, mbRefund: 4, mbCast: 550, mbMin: 60,
               asSmokeMs: 400, asDur: 10000,
               smCount: 2, smAhead: KEY * 1, smSide: 38, smHp: 50, smSpeed: 200, smDmg: 10, smCd: 800, smRange: 80, smArc: Math.PI * 0.6,
               smDur: 8000, smMax: 4, smRiseMs: 1100, smCorpseMs: 1400,
@@ -1042,7 +1044,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     return ICON_SRC[c];
   }
 
-  var flipped = null;
+  var flipped = {};
   function num(v) { return String(Math.round(v * 10) / 10); }
   function ultDesc(k) {
     function speedUp(c) { return "이동속도 " + (c.ultSpeed - c.speed) + " 증가"; }
@@ -1072,7 +1074,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var h = "";
     CHAR_LIST.forEach(function (k) {
       var c = CHARS[k], taken = me.characterType !== k && takenOnTeam(P, me.team, k, myId);
-      h += '<button type="button" class="charCard' + (me.characterType === k ? " on" : "") + (flipped === k && me.characterType === k ? " flip" : "") +
+      h += '<button type="button" class="charCard' + (me.characterType === k ? " on" : "") + (flipped[k] ? " flip" : "") +
         '" data-c="' + k + '"' + (taken ? " disabled" : "") + '><div class="cardIn">' +
         '<div class="face front">' + (taken ? '<span class="soon">팀원 선택</span>' : "") + '<img alt="" src="' + charImgSrc(k) + '">' +
           '<div class="nm">' + c.name + "</div></div>" +
@@ -1148,13 +1150,20 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var c = b.getAttribute("data-c");
     var me = P[myId]; if (!me) return;
     if (me.characterType === c) {
-      flipped = flipped === c ? null : c;
-      b.classList.toggle("flip", flipped === c);
+      flipped[c] = !flipped[c];
+      b.classList.toggle("flip", flipped[c]);
       $("chars")._h = cardsHtml(me);
       return;
     }
-    flipped = null;
     pickChar(c);
+  };
+  $("btnFlipAll").onclick = function () {
+    var backCount = CHAR_LIST.filter(function (k) { return flipped[k]; }).length;
+    var showBack = backCount <= CHAR_LIST.length - backCount;
+    CHAR_LIST.forEach(function (k) { flipped[k] = showBack; });
+    var me = P[myId];
+    [].forEach.call($("chars").querySelectorAll(".charCard"), function (b) { b.classList.toggle("flip", showBack); });
+    if (me) $("chars")._h = cardsHtml(me);
   };
   function freeAiName(ps) {
     var used = keys(ps).map(function (id) { return ps[id] && ps[id].nickname; }), n = 1;
@@ -1802,6 +1811,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function pushHit(owner, dmg, basic, ultKey, killed) {
     var h = { d: dmg, b: basic ? 1 : 0, t: now() };
     if (ultKey) h.u = ultKey;
+    if (typeof basic === "number") h.s = basic;
     if (killed) h.k = 1;
     room.ref.child("hits/" + owner).push(h);
   }
@@ -1825,7 +1835,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (h.u === "volley" && owner.char === "ranger") owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.mkRefund);
       if (h.u === "giant" && owner.char === "sniper") owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.pnRefund);
       if (h.u === "fog" && owner.char === "thrower" && !gaugeLocked(owner)) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.fgRefund);
-      if (h.b && !gaugeLocked(owner)) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + (CHARS[owner.char].perHit || 2));
+      var sameSwing = h.s && owner.gaugeSwing === h.s;
+      if (h.s) owner.gaugeSwing = h.s;
+      if (h.b && !sameSwing && !gaugeLocked(owner)) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + (CHARS[owner.char].perHit || 2));
       if (owner === ME && h.d) sfx("confirm");
       G.forceNet = true;
     }
@@ -1960,7 +1972,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (T.team === d.team || !T.alive || !inStrike(T, d)) return;
       var dx = T.x - d.x, dy = T.y - d.y;
       if (protectedNow(T)) return;
-      damage(T, d.dmg, d.owner, !d.m && !d.u, null, d.fx);
+      damage(T, d.dmg, d.owner, !d.m && !d.u && (d.len ? d.createdAt : true), null, d.fx);
       if (d.kb && T.alive) {
         var dd = hyp(dx, dy) || 1;
         T.x += dx / dd * d.kb; T.y += dy / dd * d.kb; resolve(T);
