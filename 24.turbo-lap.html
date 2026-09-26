@@ -510,7 +510,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 (function () {
 "use strict";
 
-const CREDITS_HTML = "저작권 · 자동차 모델 “Car Concept” © Eric Chadwick (CC BY 4.0, Khronos glTF Sample Assets)<br>" +
+const CREDITS_HTML = "저작권 · 자동차 모델 “2022 Porsche 911 GT3 (992)” © Ddiaz Design (Sketchfab, CC BY-NC-SA 4.0 — 게임용으로 가볍게 줄이고 바퀴를 나눔)<br>" +
   "하늘 HDRI Greg Zaal·Jarod Guest, 아스팔트·나무껍질 Dimitrios Savva, 나뭇잎 Rob Tuytel (Poly Haven, CC0) · 잔디 Lennart Demes, 건물 외벽·보도블록·콘크리트·벽돌 사진 (ambientCG, CC0)<br>" +
   "홍콩 랜드마크 외벽 사진 (Wikimedia Commons, 원근 보정): IFC David (Public domain) · 중국은행 PrzemekJaczewski (CC BY-SA 4.0) · 청콩센터 Sengkang · 빅토리아 독사이드 Wpcpey (CC BY-SA 4.0) · 마리나 베이 샌즈 Dietmar Rabich (CC BY-SA 4.0)";
 document.querySelectorAll(".creditText").forEach(el => { el.innerHTML = CREDITS_HTML; });
@@ -3421,7 +3421,7 @@ function prepareSupercar(root) {
       m = m.clone(); m.transmission = 0; m.transparent = true; m.opacity = 0.32; m.depthWrite = false; m.roughness = 0.05; m.color.setRGB(0.05, 0.07, 0.09);
       o.material = m;
     } else o.castShadow = true;
-    if (m.name === "Paint 1 Carmine") SUPERCAR.paintBase = m;
+    if (m.name === "Body Paint") SUPERCAR.paintBase = m;
     if (m.name === "Brakelight") SUPERCAR.lamps.brake = m;
     if (m.name === "Headlight") SUPERCAR.lamps.head = m;
   });
@@ -3489,7 +3489,7 @@ function refreshCars() {
   }
   carPreviews.forEach(buildPreviewCar);
 }
-new GLTFLoader(HQ_MANAGER).setMeshoptDecoder(MeshoptDecoder).load("img/turbo/supercar.glb", gltf => {
+new GLTFLoader(HQ_MANAGER).setMeshoptDecoder(MeshoptDecoder).load("img/turbo/porsche911gt3.glb", gltf => {
   try { SUPERCAR.tpl = prepareSupercar(gltf.scene); refreshCars(); }
   catch (e) { SUPERCAR.tpl = null; console.warn("[turbolap] 슈퍼카 모델 준비 실패:", e); }
   renderLoadGate();
