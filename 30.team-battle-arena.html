@@ -180,11 +180,12 @@
   .keys > span:nth-child(odd) { white-space: nowrap; }
   .keys b { color: #F4F1E8; }
   kbd { display: inline-block; min-width: 30px; padding: 2px 8px; border: 1px solid var(--sg-line-strong); border-bottom-width: 3px; border-radius: 4px; background: var(--sg-panel-alt); color: #F4F1E8; font-family: inherit; font-size: 14px; font-weight: 800; text-align: center; }
+  .quickKeys { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--sg-line-mid); font-size: 15px; gap: 6px 12px; }
   .lobbyKeys { width: 100%; max-width: 900px; margin: 0 auto 14px; }
   @media (min-width: 1180px) {
     .lobbyCols { display: flex; align-items: flex-start; gap: 14px; margin-left: 5vw; }
-    .lobbyCols > .wrap { flex: 1 1 auto; min-width: 0; margin: 0 !important; }
-    .lobbyKeys { flex: 0 0 300px; margin: 0; position: sticky; top: 0; }
+    .lobbyCols > .wrap { flex: 0 1 900px; min-width: 0; margin: 0 !important; }
+    .lobbyKeys { flex: 0 0 250px; margin: 0 0 0 auto; position: sticky; top: 0; }
     .lobbyKeys .keys { grid-template-columns: 1fr; gap: 2px; }
     .lobbyKeys .keys > span:nth-child(even) { margin-bottom: 8px; }
   }
@@ -299,14 +300,10 @@
         </div>
       </div>
       <div id="startMsg" class="msg"></div>
-    </div>
-    <div class="card">
-      <div class="secTitle">조작 방법</div>
-      <div class="keys">
-        <span><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd></span><span>이동 (방향키도 됩니다)</span>
-        <span><kbd>K</kbd></span><span>공격 · 가까운 적을 자동 조준 (누르고 있으면 계속 공격)</span>
-        <span><kbd>J</kbd></span><span>궁극기 (게이지가 가득 찼을 때)</span>
-        <span><kbd>태블릿</kbd></span><span>왼쪽 아래 조이스틱으로 이동 · <b>공격</b>·<b>궁극기</b> 버튼을 톡 치면 자동 조준, 누른 채 끌면 그 방향으로 조준</span>
+      <div class="keys quickKeys">
+        <span><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd></span><span>이동</span>
+        <span><kbd>J</kbd> <kbd>K</kbd></span><span><b>J</b> 스킬 · <b>K</b> 일반 공격 — 누르면 자동 조준</span>
+        <span><kbd>터치</kbd></span><span>조이스틱으로 수동 조준</span>
       </div>
     </div>
   </div>
@@ -353,10 +350,9 @@
   <div class="card lobbyKeys">
     <div class="secTitle">조작 방법</div>
     <div class="keys">
-      <span><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd></span><span>이동 (방향키도 됩니다)</span>
-      <span><kbd>K</kbd></span><span>공격 · 가까운 적을 자동 조준 (누르고 있으면 계속 공격)</span>
-      <span><kbd>J</kbd></span><span>궁극기 (게이지가 가득 찼을 때)</span>
-      <span><kbd>태블릿</kbd></span><span>왼쪽 아래 조이스틱으로 이동 · <b>공격</b>·<b>궁극기</b> 버튼을 톡 치면 자동 조준, 누른 채 끌면 그 방향으로 조준</span>
+      <span><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd></span><span>이동</span>
+      <span><kbd>J</kbd> <kbd>K</kbd></span><span><b>J</b> 스킬 · <b>K</b> 일반 공격 — 누르면 자동 조준</span>
+      <span><kbd>터치</kbd></span><span>조이스틱으로 수동 조준</span>
     </div>
   </div>
   </div>
