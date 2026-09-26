@@ -922,9 +922,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var sp = spawnOf(team, i + 1), base = "players/" + id + "/";
         if (p.isAI) { c = lineup[i]; u[base + "nickname"] = CHARS[c].name; }
         u[base + "slot"] = i + 1; u[base + "characterType"] = c;
-        st[stKey(team, i + 1)] = packState(sp.x, sp.y, sp.angle, false);
-        u[base + "hp"] = CHARS[c].hp; u[base + "alive"] = true; u[base + "skillGauge"] = 0; u[base + "damageDealt"] = 0; u[base + "deaths"] = 0; u[base + "diedAt"] = 0; u[base + "kills"] = 0; u[base + "healDone"] = 0; u[base + "protectUntil"] = 0;
-        u[base + "atkAt"] = 0; u[base + "ultUntil"] = 0; u[base + "buffUntil"] = 0; u[base + "stealthUntil"] = 0; u[base + "regenUntil"] = 0; u[base + "skillUntil"] = 0; u[base + "skillDur"] = 0;
+        st[stKey(team, i + 1)] = packState({ x: sp.x, y: sp.y, angle: sp.angle, mv: false, hp: CHARS[c].hp, alive: true });
         roster[id] = { team: team, c: c, ai: !!p.isAI };
       });
     });
@@ -937,15 +935,29 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var ST = {};
   function stKey(team, slot) { return (team === "blue" ? "b" : "r") + slot; }
   function angDeg(a) { var d = Math.round(a * 180 / Math.PI / 3) * 3; return ((d % 360) + 360) % 360; }
-  function packState(x, y, a, mv) { return Math.round(x) + "," + Math.round(y) + "," + angDeg(a) + "," + (mv ? 1 : 0); }
+  var STATE_TIMES = ["diedAt", "atkAt", "ultUntil", "buffUntil", "stealthUntil", "regenUntil", "skillUntil", "protectUntil"];
+  var STATE_TIMES_AT = 12;
+  function oneDecimal(v) { return Math.round((+v || 0) * 10) / 10; }
+  function relTime(t) { return t ? Math.round(t - room.startAt) : ""; }
+  function absTime(v) { return v === "" || v == null ? 0 : room.startAt + (+v || 0); }
+  function packState(E) {
+    return [Math.round(E.x), Math.round(E.y), angDeg(E.angle), E.mv ? 1 : 0, Math.ceil(E.hp), E.alive ? 1 : 0,
+      oneDecimal(E.gauge), oneDecimal(E.dmg), E.deaths || 0, E.kills || 0, Math.round(E.heal || 0), E.skillDur || ""]
+      .concat(STATE_TIMES.map(function (k) { return relTime(E[k]); })).join(",");
+  }
   function stateOf(d) {
     var s = d && d.slot ? ST[stKey(d.team, d.slot)] : null;
     if (typeof s === "string") {
       var f = s.split(",");
-      return { x: +f[0] || 0, y: +f[1] || 0, angle: (+f[2] || 0) * Math.PI / 180, mv: f[3] === "1" };
+      var o = { x: +f[0] || 0, y: +f[1] || 0, angle: (+f[2] || 0) * Math.PI / 180, mv: f[3] === "1", full: f.length > STATE_TIMES_AT };
+      if (o.full) {
+        o.hp = +f[4]; o.alive = f[5] !== "0"; o.gauge = +f[6] || 0; o.dmg = +f[7] || 0; o.deaths = +f[8] || 0; o.kills = +f[9] || 0; o.heal = +f[10] || 0; o.skillDur = +f[11] || 0;
+        STATE_TIMES.forEach(function (k, i) { o[k] = absTime(f[STATE_TIMES_AT + i]); });
+      }
+      return o;
     }
     var sp = d && d.slot && (d.team === "blue" || d.team === "red") ? spawnOf(d.team, d.slot) : { x: 0, y: 0, angle: 0 };
-    return { x: sp.x, y: sp.y, angle: sp.angle, mv: false };
+    return { x: sp.x, y: sp.y, angle: sp.angle, mv: false, full: false };
   }
 
   var G = null;
@@ -959,13 +971,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var handled = {};
 
   function makeEnt(id, d) {
-    var c = CHARS[d.characterType] ? d.characterType : "ranger", pos = stateOf(d);
+    var c = CHARS[d.characterType] ? d.characterType : "ranger", pos = stateOf(d), s = pos.full ? pos : {};
     return { id: id, team: d.team, char: c, nickname: d.nickname, isAI: !!d.isAI,
-             x: pos.x, y: pos.y, angle: pos.angle, hp: d.hp == null ? CHARS[c].hp : +d.hp, maxHp: CHARS[c].hp,
-             alive: d.alive !== false, gauge: +d.skillGauge || 0, dmg: +d.damageDealt || 0, deaths: +d.deaths || 0, diedAt: +d.diedAt || 0,
-             cdUntil: 0, cdDur: 0, atkAt: 0, ultUntil: 0, buffUntil: 0, stealthUntil: +d.stealthUntil || 0, regenUntil: 0,
-             skillUntil: +d.skillUntil || 0, skillDur: +d.skillDur || 0,
-             kills: +d.kills || 0, heal: +d.healDone || 0, protectUntil: +d.protectUntil || 0,
+             x: pos.x, y: pos.y, angle: pos.angle, hp: s.hp == null ? CHARS[c].hp : s.hp, maxHp: CHARS[c].hp,
+             alive: s.alive !== false, gauge: s.gauge || 0, dmg: s.dmg || 0, deaths: s.deaths || 0, diedAt: s.diedAt || 0,
+             cdUntil: 0, cdDur: 0, atkAt: 0, ultUntil: 0, buffUntil: 0, stealthUntil: s.stealthUntil || 0, regenUntil: 0,
+             skillUntil: s.skillUntil || 0, skillDur: s.skillDur || 0,
+             kills: s.kills || 0, heal: s.heal || 0, protectUntil: s.protectUntil || 0,
              burst: null, volley: null, mv: false, pending: null };
   }
   function initGame() {
@@ -997,18 +1009,19 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var r = R[id];
       if (!r) { r = R[id] = makeEnt(id, d); }
       var k = Math.min(1, dt * 12), pos = stateOf(d);
-      var tx = pos.x, ty = pos.y, revived = !r.alive && d.alive !== false;
+      var tx = pos.x, ty = pos.y, revived = pos.full && !r.alive && pos.alive;
       if (pos.mv && hyp(tx - r.x, ty - r.y) > 3) { r.moveAng = Math.atan2(ty - r.y, tx - r.x); r.moveAt = now(); }
       if (revived || hyp(tx - r.x, ty - r.y) > 250) { r.x = tx; r.y = ty; } else { r.x += (tx - r.x) * k; r.y += (ty - r.y) * k; }
-      r.deaths = +d.deaths || 0; r.diedAt = +d.diedAt || 0; r.kills = +d.kills || 0; r.heal = +d.healDone || 0; r.protectUntil = +d.protectUntil || 0;
       r.angle = lerpAng(r.angle, pos.angle, Math.min(1, dt * 15));
       r.team = d.team; r.char = CHARS[d.characterType] ? d.characterType : "ranger"; r.maxHp = CHARS[r.char].hp;
-      r.hp = +d.hp; r.alive = d.alive !== false; r.gauge = +d.skillGauge || 0; r.dmg = +d.damageDealt || 0;
-      r.mv = pos.mv; r.atkAt = +d.atkAt || 0; r.ultUntil = +d.ultUntil || 0; r.buffUntil = +d.buffUntil || 0; r.nickname = d.nickname; r.isAI = !!d.isAI;
-      r.regenUntil = +d.regenUntil || 0; r.skillUntil = +d.skillUntil || 0; r.skillDur = +d.skillDur || 0;
-      var su = +d.stealthUntil || 0;
-      if (su > r.stealthUntil && su > now()) smoke(r.x, r.y);
-      r.stealthUntil = su;
+      r.mv = pos.mv; r.nickname = d.nickname; r.isAI = !!d.isAI;
+      if (!pos.full) return;
+      r.deaths = pos.deaths; r.diedAt = pos.diedAt; r.kills = pos.kills; r.heal = pos.heal; r.protectUntil = pos.protectUntil;
+      r.hp = pos.hp; r.alive = pos.alive; r.gauge = pos.gauge; r.dmg = pos.dmg;
+      r.atkAt = pos.atkAt; r.ultUntil = pos.ultUntil; r.buffUntil = pos.buffUntil;
+      r.regenUntil = pos.regenUntil; r.skillUntil = pos.skillUntil; r.skillDur = pos.skillDur;
+      if (pos.stealthUntil > r.stealthUntil && pos.stealthUntil > now()) smoke(r.x, r.y);
+      r.stealthUntil = pos.stealthUntil;
     });
   }
 
@@ -1483,15 +1496,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
 
   function entFields(u, E) {
-    var b = "players/" + E.id + "/", sent = G.sent, d = P[E.id];
-    function send(path, v) { if (sent[path] !== v) { sent[path] = v; u[path] = v; } }
-    function put(k, v) { send(b + k, v); }
-    if (d && d.slot) send("st/" + stKey(d.team, d.slot), packState(E.x, E.y, E.angle, E.mv));
-    put("hp", Math.ceil(E.hp)); put("alive", E.alive); put("skillGauge", E.gauge); put("damageDealt", E.dmg); put("deaths", E.deaths); put("diedAt", E.diedAt);
-    put("atkAt", E.atkAt); put("ultUntil", E.ultUntil); put("buffUntil", E.buffUntil);
-    put("stealthUntil", E.stealthUntil); put("regenUntil", E.regenUntil);
-    put("skillUntil", E.skillUntil); put("skillDur", E.skillDur);
-    put("kills", E.kills); put("healDone", Math.round(E.heal)); put("protectUntil", E.protectUntil);
+    var d = P[E.id];
+    if (!d || !d.slot) return;
+    var path = "st/" + stKey(d.team, d.slot), v = packState(E);
+    if (G.sent[path] !== v) { G.sent[path] = v; u[path] = v; }
   }
   function netWrite(force) {
     var t = Date.now();
@@ -1507,9 +1515,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function teamTotals() {
     var s = { blue: 0, red: 0, blueAlive: 0, redAlive: 0, blueN: 0, redN: 0, blueKills: 0, redKills: 0 };
     participants().forEach(function (id) {
-      var e = ent(id), d = P[id]; var tm = d.team;
-      var dmg = e ? e.dmg : (+d.damageDealt || 0), alive = e ? e.alive : d.alive !== false;
-      var deaths = e ? e.deaths : (+d.deaths || 0);
+      var d = P[id], e = ent(id) || stateOf(d); var tm = d.team;
+      var dmg = +e.dmg || 0, alive = e.alive !== false;
+      var deaths = +e.deaths || 0;
       s[tm] += dmg; s[tm + "N"]++; if (alive) s[tm + "Alive"]++;
       s[(tm === "blue" ? "red" : "blue") + "Kills"] += deaths;
     });
@@ -1547,7 +1555,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (r.status !== "ended" || r.endedAt !== endedAt || r.winner == null) return;
     if (!isFairHumanMatch(r.mode, r.roster, ps)) return;
     var rows = keys(r.roster).map(function (id) {
-      return { c: r.roster[id].c, win: r.winner === r.roster[id].team, dmg: +ps[id].damageDealt || 0, heal: +ps[id].healDone || 0 };
+      var e = ent(id) || stateOf(ps[id]);
+      return { c: r.roster[id].c, win: r.winner === r.roster[id].team, dmg: +e.dmg || 0, heal: +e.heal || 0 };
     });
     db.ref(STATS_PATH).transaction(function (cur) {
       cur = cur || {};
