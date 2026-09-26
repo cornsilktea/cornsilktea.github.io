@@ -81,7 +81,6 @@
   .plist .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 14px; font-weight: 800; background: var(--sg-panel-alt); color: var(--sg-ink-soft); white-space: nowrap; }
   .badge.host { background: #D97B4F; color: #fff; }
-  .badge.ready { background: var(--sg-primary); color: #fff; }
   .badge.zombie { background: var(--sg-danger); color: #fff; }
   .badge.alive { background: var(--sg-ok); color: #fff; }
   .row2 { display: flex; gap: 10px; }
@@ -278,7 +277,6 @@
       <h2 id="lobbyCount">참가자</h2>
       <ul class="plist" id="lobbyList"></ul>
       <button type="button" class="btn primary" id="btnStart">게임 시작</button>
-      <button type="button" class="btn primary" id="btnReady">준비하기</button>
       <button type="button" class="btn" id="btnBots">🤖 빈 자리 AI로 채우기: 켜짐</button>
       <div class="msg ok" id="lobbyMsg"></div>
       <button type="button" class="btn" id="btnSpecToggle">관전자로 바꾸기</button>
@@ -2442,7 +2440,7 @@ function countSlots(ps) {
   const spectators = ids.filter(id => ps[id].spec).length;
   return { players: ids.length - spectators, spectators };
 }
-function newPlayer(t, spec) { return { nickname, ready: false, joinedAt: t, role: "human", infected: false, inRound: false, spec: !!spec }; }
+function newPlayer(t, spec) { return { nickname, joinedAt: t, role: "human", infected: false, inRound: false, spec: !!spec }; }
 function startMsg(t) { setText($("startMsg"), t || ""); }
 
 function sweepRooms() {
@@ -2577,7 +2575,6 @@ function onStatus(st) {
   if (st === "lobby") {
     clearRound();
     if (isHost()) removeBotPlayers();
-    if (prev && prev !== "lobby" && !isHost() && room.players[myId] && room.players[myId].ready) room.ref.child("players/" + myId + "/ready").set(false);
     if (screenNow !== "result") showScreen("lobby"); else renderLobby();
   } else if (st === "playing") {
     if (watchesRound()) showScreen("game");
@@ -2598,8 +2595,8 @@ function playersChanged() {
   }, 0);
 }
 function watchesRound() { const p = room.players[myId]; return !!(p && (p.inRound || p.spec)); }
-function isReadyParticipant(id) { const p = room.players[id]; return !!p && !p.spec && !p.bot && (id === room.host || p.ready); }
-function readyCount() { return playerIds().filter(isReadyParticipant).length; }
+function isParticipant(id) { const p = room.players[id]; return !!p && !p.spec && !p.bot; }
+function participantCount() { return playerIds().filter(isParticipant).length; }
 function playersNeeded() { return botsWanted() ? 1 : MIN_PLAYERS; }
 function removeBotPlayers() {
   const u = {};
@@ -2614,46 +2611,39 @@ function renderLobby() {
   const ids = playerIds().filter(id => !isBot(id)), slots = countSlots(room.players);
   setText($("lobbyCount"), "플레이어 " + slots.players + " / " + MAX_PLAYERS + " · 관전자 " + slots.spectators + " / " + MAX_SPECTATORS);
   $("lobbyList").innerHTML = ids.map(id => {
-    const p = room.players[id], host = id === room.host, ready = isReadyParticipant(id);
-    const stateBadge = p.spec ? '<span class="badge">👀 관전자</span>' : '<span class="badge' + (ready ? " ready" : "") + '">' + (ready ? "준비 완료" : "대기 중") + "</span>";
+    const p = room.players[id], host = id === room.host;
+    const stateBadge = p.spec ? '<span class="badge">👀 관전자</span>' : "";
     return '<li class="' + (id === myId ? "me" : "") + '"><span class="nm">' + escapeHtml(p.nickname || "이름 없음") + (id === myId ? " (나)" : "") + "</span>" +
       (host ? '<span class="badge host">방장</span>' : "") + stateBadge + "</li>";
   }).join("");
-  const host = isHost(), me = room.players[myId], mySpec = isSpectator(myId);
+  const host = isHost(), mySpec = isSpectator(myId);
   const waitingRound = room.status === "playing" || room.status === "ended";
-  show($("btnStart"), host); show($("btnReady"), !host && !mySpec);
-  const rc = readyCount(), need = playersNeeded(), fill = botsWanted(), botSeats = fill ? MAX_PLAYERS - rc : 0;
+  show($("btnStart"), host);
+  const rc = participantCount(), need = playersNeeded(), fill = botsWanted(), botSeats = fill ? MAX_PLAYERS - rc : 0;
   $("btnStart").disabled = !(host && room.status === "lobby" && rc >= need);
   show($("btnBots"), host);
   $("btnBots").disabled = room.status !== "lobby";
   setText($("btnBots"), "🤖 빈 자리 AI로 채우기: " + (fill ? "켜짐" : "꺼짐"));
-  $("btnReady").disabled = room.status !== "lobby";
-  setText($("btnReady"), me && me.ready ? "준비 취소" : "준비하기");
   const specBtn = $("btnSpecToggle");
   setText(specBtn, mySpec ? "플레이어로 바꾸기" : "👀 관전자로 바꾸기");
   specBtn.disabled = room.status !== "lobby" || (mySpec ? slots.players >= MAX_PLAYERS : slots.spectators >= MAX_SPECTATORS);
   let msg;
   if (room.status === "playing") msg = "게임이 진행 중입니다. 이번 판이 끝나면 함께할 수 있습니다.";
   else if (waitingRound) msg = "지난 판이 정리되는 중입니다. 잠시만 기다려 주세요.";
-  else if (host) msg = rc >= need ? "준비된 " + rc + "명" + (botSeats > 0 ? " + AI " + botSeats + "명" : "") + "으로 시작할 수 있습니다. (Space 키로도 시작)" : "준비된 플레이어가 " + need + "명 이상이어야 시작할 수 있습니다.";
+  else if (host) msg = rc >= need ? "플레이어 " + rc + "명" + (botSeats > 0 ? " + AI " + botSeats + "명" : "") + "으로 시작할 수 있습니다. (Space 키로도 시작)" : "플레이어가 " + need + "명 이상이어야 시작할 수 있습니다.";
   else if (mySpec) msg = "관전자로 들어왔습니다. 게임이 시작되면 플레이어들의 시점을 볼 수 있습니다.";
-  else msg = me && me.ready ? "방장이 게임을 시작할 때까지 기다려 주세요." : "준비하기를 눌러 주세요. (Space 키로도 준비)";
+  else msg = "방장이 게임을 시작할 때까지 기다려 주세요.";
   setText($("lobbyMsg"), msg);
-}
-function toggleReady() {
-  if (!room.ref || isHost() || room.status !== "lobby" || isSpectator(myId)) return;
-  const me = room.players[myId]; if (!me) return;
-  room.ref.child("players/" + myId + "/ready").set(!me.ready);
 }
 function toggleSpectator() {
   if (!room.ref || room.status !== "lobby" || !room.players[myId]) return;
   const becomeSpec = !isSpectator(myId), slots = countSlots(room.players);
   if (becomeSpec ? slots.spectators >= MAX_SPECTATORS : slots.players >= MAX_PLAYERS) return;
-  room.ref.child("players/" + myId).update({ spec: becomeSpec, ready: false });
+  room.ref.child("players/" + myId).update({ spec: becomeSpec });
 }
 function hostStart() {
   if (!isHost() || room.status !== "lobby") return;
-  const participants = playerIds().filter(isReadyParticipant);
+  const participants = playerIds().filter(isParticipant);
   if (participants.length < playersNeeded()) return;
   const u = {};
   playerIds().filter(isBot).forEach(id => { u["players/" + id] = null; u["st/" + id] = null; });
@@ -2664,7 +2654,7 @@ function hostStart() {
   const startAt = t0 + COUNTDOWN_MS;
   Object.assign(u, { status: "playing", startAt, endedAt: null, winner: null, final: null, originZombieId: zombieId, zombieIds: { [zombieId]: startAt } });
   botIds.forEach((id, k) => {
-    u["players/" + id] = { nickname: "AI" + (k + 1), ready: true, joinedAt: t0 + k + 1, role: id === zombieId ? "zombie" : "human", infected: false, inRound: true, spec: false, bot: true };
+    u["players/" + id] = { nickname: "AI" + (k + 1), joinedAt: t0 + k + 1, role: id === zombieId ? "zombie" : "human", infected: false, inRound: true, spec: false, bot: true };
   });
   if (botIds.length) buildNav();
   playerIds().filter(id => !isBot(id)).forEach(id => {
@@ -2779,7 +2769,7 @@ window.addEventListener("keydown", e => {
 window.addEventListener("keyup", e => { const k = keyName(e); if (k) { pressed[k] = false; if (k === "space") e.preventDefault(); } });
 window.addEventListener("blur", () => { for (const k in pressed) pressed[k] = false; });
 function onSpace() {
-  if (screenNow === "lobby") { if (isHost()) hostStart(); else toggleReady(); }
+  if (screenNow === "lobby") { if (isHost()) hostStart(); }
   else if (screenNow === "result") playAgain();
   else if (screenNow === "game") tryDash();
 }
@@ -3548,7 +3538,6 @@ function renderResult() {
 function playAgain() {
   if (!room.ref) { showScreen("start"); return; }
   if (room.status === "ended") room.ref.update({ status: "lobby" });
-  if (!isHost() && room.players[myId] && room.players[myId].ready) room.ref.child("players/" + myId + "/ready").set(false);
   showScreen(room.status === "playing" && watchesRound() ? "game" : "lobby");
 }
 
@@ -3751,7 +3740,6 @@ $("joinCode").addEventListener("keydown", e => { if (e.key === "Enter") joinRoom
 $("btnSpecToggle").onclick = blurAfter(toggleSpectator);
 $("nickInput").addEventListener("keydown", e => { if (e.key === "Enter") e.currentTarget.blur(); });
 $("btnStart").onclick = blurAfter(hostStart);
-$("btnReady").onclick = blurAfter(toggleReady);
 $("btnBots").onclick = blurAfter(toggleBots);
 $("btnLobbyLeave").onclick = blurAfter(leaveRoom);
 $("btnAgain").onclick = blurAfter(playAgain);
