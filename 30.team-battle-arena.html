@@ -264,7 +264,8 @@
   .board { width: 100%; border-collapse: collapse; margin: 0 0 16px; font-size: 15px; }
   .board th { font-size: 12px; color: #A3B0A6; font-weight: 700; padding: 4px; border-bottom: 2px solid rgba(255,255,255,.16); }
   .board td { padding: 6px 4px; font-weight: 800; color: #EEF2EE; border-bottom: 1px solid rgba(255,255,255,.08); font-variant-numeric: tabular-nums; }
-  .board td.nm { text-align: left; }
+  .board td.nm, .board th.nm { text-align: left; }
+  .board td.sc { color: #F2D06B; }
   .board td.nm small { margin-left: 4px; font-size: 12px; color: #A3B0A6; }
   .board tr.mine td { background: rgba(242,208,107,.14); }
   .board .dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: middle; }
@@ -516,7 +517,7 @@
       <div id="endTitle"></div>
       <div id="endReason" hidden></div>
       <div class="scoreRow"><div class="sb">블루팀 킬<b id="endBlue">0</b></div><div class="sr">레드팀 킬<b id="endRed">0</b></div></div>
-      <table class="board"><thead><tr><th>팀</th><th>닉네임</th><th>처치</th><th>쓰러짐</th><th>입힌 피해</th><th>회복</th></tr></thead><tbody id="boardBody"></tbody></table>
+      <table class="board"><thead><tr><th>팀</th><th class="nm">닉네임</th><th>처치</th><th>쓰러짐</th><th>입힌 피해</th><th>회복</th><th>환산점수</th></tr></thead><tbody id="boardBody"></tbody></table>
       <div class="endBtns"><button id="btnAgain" class="primary" type="button">다시하기</button><button id="btnLeaveEnd" type="button">방 나가기</button></div>
       <div id="endMvp" class="mvpBox"></div>
     </div>
@@ -3867,7 +3868,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           rows += '<tr class="' + (id === myId ? "mine" : "") + '"><td><span class="dot" style="background:' + (team === "blue" ? "#2F6FD6" : "#D6453D") + '"></span></td>' +
             '<td class="nm">' + (d.isAI ? "🤖 " : "") + esc(d.nickname) + "<small>" + CHARS[E.char].name + "</small></td>" +
             "<td>" + E.kills + "</td><td>" + E.deaths + "</td><td>" + Math.round(E.dmg) + "</td>" +
-            "<td>" + (E.char === "mage" ? Math.round(E.heal) : "-") + "</td></tr>";
+            "<td>" + (E.char === "mage" ? Math.round(E.heal) : "-") + "</td>" +
+            '<td class="sc">' + mvpScore(E) + "</td></tr>";
         });
     });
     return rows;
