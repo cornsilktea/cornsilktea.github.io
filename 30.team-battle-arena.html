@@ -9,7 +9,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
 <meta property="og:title" content="3v3 팀 배틀 아레나">
-<meta property="og:description" content="방 코드로 모여 블루 vs 레드로 싸우는 3D 3v3 실시간 팀 대전(숲속 공터·강 건너기·던전 회랑 맵 선택) / 전사·기사·궁수·마법사·도적·네크로·저격수·투척병·창기사 중 선택, 스킬 게이지·풀숲 숨기 / 쓰러지면 3초 뒤 부활, 1분 30초 뒤 킬 스코어가 높은 팀 승리">
+<meta property="og:description" content="방 코드로 모여 블루 vs 레드로 싸우는 3D 3v3 실시간 팀 대전(숲속 공터·강 건너기·던전 회랑 맵 선택) / 역할군별 캐릭터(전사: 광전사·기사·창기사 / 마법사: 주술사·네크로 / 원거리 딜러: 궁수·저격수·투척병 / 암살자: 도적) 중 선택, 역할군별 스킬 게이지·풀숲 숨기 / 쓰러지면 3초 뒤 부활, 1분 30초 뒤 킬 스코어가 높은 팀 승리">
 <meta property="og:url" content="https://cornsilktea.github.io/30.team-battle-arena.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
@@ -103,7 +103,17 @@
   .team .join:disabled { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.14); color: #8A948C; cursor: default; }
   #btnSpec:disabled { background: rgba(255,255,255,.05); color: #6F7C72; border-color: rgba(255,255,255,.1); cursor: default; }
 
-  .chars { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .chars, .dfChars { display: grid; gap: 10px; }
+  .roleRow { display: flex; gap: 8px; align-items: stretch; min-width: 0; }
+  .roleTag { flex: 0 0 76px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 6px 4px; border-radius: 8px; border: 1px solid var(--sg-line-mid); background: rgba(255,255,255,.06); text-align: center; }
+  .roleTag i { font-style: normal; font-size: 26px; line-height: 1.15; }
+  .roleTag b { font-size: 15px; font-weight: 800; line-height: 1.2; color: #F4F1E8; word-break: keep-all; }
+  .roleTag small { margin-top: 3px; font-size: 12px; font-weight: 700; line-height: 1.3; color: var(--sg-ink-soft); }
+  .roleCards { flex: 1 1 auto; min-width: 0; display: flex; gap: 8px; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; padding: 4px 4px 8px; scrollbar-width: thin; scrollbar-color: rgba(217,123,79,.6) rgba(255,255,255,.06); }
+  .roleCards::-webkit-scrollbar { height: 6px; }
+  .roleCards::-webkit-scrollbar-thumb { background: rgba(217,123,79,.6); border-radius: 3px; }
+  .roleCards::-webkit-scrollbar-track { background: rgba(255,255,255,.06); border-radius: 3px; }
+  .charCol .charHead, .charCol .secTitle, .charCol .dfDetail { width: 0; min-width: 100%; }
   .specBox { margin-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border-radius: 8px; border: 2px solid var(--sg-line-mid); background: var(--sg-panel-alt); font-size: 16px; }
   .specHead { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; min-width: 0; }
   .specList { font-weight: 700; color: var(--sg-ink-mid); }
@@ -151,14 +161,17 @@
     .spTime b { font-size: 26px; }
     .spTime small { font-size: 12px; }
   }
-  .charCard { min-width: 0; padding: 0; border: 0; background: transparent; text-align: center; perspective: 900px; color: inherit; }
-  #scrLobby .wrap { max-width: 900px; }
-  .cardIn { position: relative; height: 320px; transition: transform .45s ease; transform-style: preserve-3d; }
+  .charCard { flex: 0 0 132px; min-width: 0; padding: 0; border: 0; background: transparent; text-align: center; perspective: 900px; color: inherit; transition: flex-basis .35s ease; }
+  .charCard.flip { flex-basis: 320px; }
+  .cardIn { position: relative; height: 184px; transition: transform .45s ease; transform-style: preserve-3d; }
   .charCard.flip .cardIn { transform: rotateY(180deg); }
   .face { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; flex-direction: column; overflow: hidden;
           -webkit-backface-visibility: hidden; backface-visibility: hidden;
           border: 3px solid var(--sg-line-mid); border-radius: 10px; background: var(--sg-panel); padding: 8px 6px; }
-  .face.back { transform: rotateY(180deg); }
+  .face.back { transform: rotateY(180deg); overflow-y: auto; scrollbar-width: thin; }
+  .charCard .st tbody, .dfDetail .st tbody { display: grid; grid-template-columns: 1fr 1fr; column-gap: 10px; }
+  .charCard .st tr, .dfDetail .st tr { display: flex; justify-content: space-between; border-top: 1px solid var(--sg-line); }
+  .charCard .st th, .charCard .st td, .dfDetail .st th, .dfDetail .st td { border-top: 0 !important; }
   .charCard.on .face { border-color: #D97B4F; background: rgba(217,123,79,.2); box-shadow: 0 0 0 3px rgba(217,123,79,.3), 0 0 22px rgba(217,123,79,.35); }
   .front img { display: block; flex: 1 1 auto; min-height: 0; width: 100%; object-fit: contain; }
   .front .nm { margin-top: auto; padding-top: 4px; }
@@ -183,14 +196,26 @@
   .keys b { color: #F4F1E8; }
   kbd { display: inline-block; min-width: 30px; padding: 2px 8px; border: 1px solid var(--sg-line-strong); border-bottom-width: 3px; border-radius: 4px; background: var(--sg-panel-alt); color: #F4F1E8; font-family: inherit; font-size: 14px; font-weight: 800; text-align: center; }
   .quickKeys { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--sg-line-mid); font-size: 15px; gap: 6px 12px; }
-  .lobbyKeys { width: 100%; max-width: 900px; margin: 0 auto 14px; }
-  @media (min-width: 1180px) {
-    .lobbyCols { display: flex; align-items: flex-start; gap: 14px; margin-left: 5vw; }
-    .lobbyCols > .wrap { flex: 0 1 900px; min-width: 0; margin: 0 !important; }
-    .lobbyKeys { flex: 0 0 250px; margin: 0 0 0 auto; position: sticky; top: 0; }
-    .lobbyKeys .keys { grid-template-columns: 1fr; gap: 2px; }
-    .lobbyKeys .keys > span:nth-child(even) { margin-bottom: 8px; }
+  #scrLobby .wrap, #scrDraft .wrap { max-width: 760px; }
+  .charCol { width: 100%; max-width: 760px; margin: 0 auto 14px; }
+  @media (min-width: 1000px) {
+    .lobbyCols, .draftCols { display: flex; align-items: flex-start; gap: 14px; }
+    .lobbyCols > .wrap, .draftCols > .wrap { flex: 1 1 0; min-width: 0; margin: 0 !important; }
+    .charCol { flex: 0 0 auto; width: max-content; min-width: 0; max-width: 50%; margin: 0; }
+    .draftCols { align-items: stretch; min-height: calc(100vh - 78px); }
+    .draftLeft { display: flex; flex-direction: column; }
+    .dfTeamCard { flex: 1 1 auto; display: flex; flex-direction: column; }
+    .dfTeamCard .teams { flex: 1 1 auto; }
+    .dfTeamCard .team { display: flex; flex-direction: column; }
+    .dfSlots { flex: 1 1 auto; display: flex; flex-direction: column; gap: 8px; }
+    .dfSlots .slot { flex: 1 1 0; height: auto; min-height: 64px; max-height: 150px; margin: 0; font-size: 20px; }
+    .dfSlots .slot .pface { width: 76px; height: 76px; }
+    .dfSlots .slot .pk.picked b { font-size: 20px; }
+    .dfCharCol { align-self: flex-start; min-width: 380px; position: sticky; top: 0; max-height: calc(100vh - 78px); overflow-y: auto; scrollbar-width: thin; }
+    .dfCharCol .dfCard img { height: 48px; }
+    .dfCharCol .dfDetail .big { height: 54px; font-size: 20px; }
   }
+  @media (min-width: 1400px) { .lobbyCols, .draftCols { margin-left: 3vw; } }
 
   #scrGame { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 5; pointer-events: none; }
   #btnLeaveGame, .actBtn, #endOv { pointer-events: auto; }
@@ -258,7 +283,6 @@
   .mvpBox .mvpNone { font-size: 20px; font-weight: 800; color: #A3B0A6; margin-top: 2px; }
   .mvpBox .mvpRule { font-size: 12px; color: #A3B0A6; margin-top: 6px; }
 
-  #scrDraft .wrap { max-width: 900px; }
   #btnLeaveDraft { display: block; margin: 0 auto; }
   .swapBtn { display: block; margin: 0 auto 12px; border-color: #D97B4F; color: #FFB38A; }
   .dfHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -280,8 +304,13 @@
   .slot .pk { margin-left: auto; font-size: 15px; font-weight: 800; color: #F4F1E8; }
   .slot .pk.wait { font-size: 13px; color: var(--sg-ink-faint); font-weight: 700; }
   .slot .pk.think { font-size: 13px; color: #FFB38A; }
-  .dfChars { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
-  .dfCard { position: relative; min-width: 0; padding: 6px 4px 8px; border-radius: 8px; border: 3px solid var(--sg-line-mid); background: var(--sg-panel); color: var(--sg-ink); text-align: center; }
+  .slot .pk.picked { display: flex; align-items: center; gap: 8px; }
+  .pface { flex: none; width: 36px; height: 36px; border-radius: 8px; border: 1px solid rgba(255,255,255,.22); background-color: rgba(0,0,0,.28); background-repeat: no-repeat; background-size: 190% auto; background-position: 50% 4%; }
+  .dfSlots .slot { height: 50px; }
+  .dfChars .roleTag { flex-basis: 66px; }
+  .dfChars .roleTag i { font-size: 22px; }
+  .dfChars .roleTag b { font-size: 13px; }
+  .dfCard { flex: 0 0 96px; position: relative; min-width: 0;padding: 6px 4px 8px; border-radius: 8px; border: 3px solid var(--sg-line-mid); background: var(--sg-panel); color: var(--sg-ink); text-align: center; }
   .dfCard img { display: block; width: 100%; height: 58px; object-fit: contain; }
   .dfCard .nm { font-size: 16px; font-weight: 800; }
   .dfCard.view { border-color: rgba(255,255,255,.5); }
@@ -293,7 +322,9 @@
   .dfCard .tag.r { background: var(--red); }
   .dfDetail { margin-top: 12px; }
   .dfDetail:empty { display: none; }
-  .dfDetail .dfName { font-size: 18px; font-weight: 800; margin-bottom: 6px; }
+  .dfDetail .dfName { font-size: 18px; font-weight: 800; margin-bottom: 4px; }
+  .dfDetail .dfName small { margin-left: 8px; font-size: 14px; color: var(--sg-ink-soft); }
+  .dfRole { margin-bottom: 6px; font-size: 13px; font-weight: 700; color: #FFB38A; }
   .dfDetail .st { width: 100%; border-collapse: collapse; font-size: 14px; }
   .dfDetail .st th, .dfDetail .st td { padding: 4px; border-top: 1px solid var(--sg-line); }
   .dfDetail .st th { text-align: left; color: var(--sg-ink-soft); font-weight: 700; }
@@ -314,10 +345,15 @@
     .slot { font-size: 15px; padding: 0 6px; gap: 4px; }
     .slot .me { display: none; }
     .slot .ch { font-size: 11px; }
-    .chars { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+    .chars { gap: 6px; }
+    .roleTag { flex-basis: 58px; padding: 4px 2px; }
+    .roleTag i { font-size: 20px; }
+    .roleTag b { font-size: 12px; }
+    .roleTag small { font-size: 10px; }
+    .charCard { flex-basis: 104px; }
+    .charCard.flip { flex-basis: 260px; }
     .cardIn { height: 176px; }
-    .charCard.flip { grid-column: 1 / -1; }
-    .charCard.flip .cardIn { height: 290px; }
+    .charCard.flip .cardIn { height: 270px; }
     .charCard .nm { font-size: 16px; }
     .back .nm { font-size: 14px; }
     .charCard .st { font-size: 12px; }
@@ -335,7 +371,8 @@
     .dfSteps { gap: 4px; }
     .dfSteps span { font-size: 12px; padding: 5px 2px; }
     .slot .pk { font-size: 13px; }
-    .dfChars { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .dfCard { flex-basis: 84px; }
+    .dfChars .roleTag { flex-basis: 58px; }
   }
 </style>
 </head>
@@ -403,24 +440,25 @@
       <div id="startHint" class="startHint"></div>
     </div>
 
-    <div id="charCardBox" class="card">
-      <div class="secTitle charHead"><span>캐릭터 선택<span class="secHint">선택한 역할을 한 번 더 클릭하면 자세한 설명이 나옵니다.</span></span><button id="btnFlipAll" class="mini" type="button">모든 카드 뒤집기</button></div>
-      <div class="chars" id="chars"></div>
+    <div class="card lobbyKeys">
+      <div class="secTitle">조작 방법</div>
+      <div class="keys">
+        <span><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd></span><span>이동</span>
+        <span><kbd>J</kbd> <kbd>K</kbd></span><span><b>J</b> 스킬 · <b>K</b> 일반 공격 — 누르면 자동 조준</span>
+        <span><kbd>터치</kbd></span><span>조이스틱으로 수동 조준</span>
+      </div>
     </div>
   </div>
-  <div class="card lobbyKeys">
-    <div class="secTitle">조작 방법</div>
-    <div class="keys">
-      <span><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd></span><span>이동</span>
-      <span><kbd>J</kbd> <kbd>K</kbd></span><span><b>J</b> 스킬 · <b>K</b> 일반 공격 — 누르면 자동 조준</span>
-      <span><kbd>터치</kbd></span><span>조이스틱으로 수동 조준</span>
-    </div>
+  <div id="charCardBox" class="card charCol">
+    <div class="secTitle charHead"><span>캐릭터 선택<span class="secHint">선택한 캐릭터를 한 번 더 누르면 자세한 설명이 나옵니다.</span></span><button id="btnFlipAll" class="mini" type="button">모든 카드 뒤집기</button></div>
+    <div class="chars" id="chars"></div>
   </div>
   </div>
 </div>
 
 <div id="scrDraft" class="screen" hidden>
-  <div class="wrap">
+  <div class="draftCols">
+  <div class="wrap draftLeft">
     <div class="card">
       <div class="dfHead">
         <div><div class="dfTitle">🏆 대회모드 캐릭터 선택</div><div id="dfTurn" class="dfTurn"></div></div>
@@ -429,18 +467,19 @@
       <div class="dfBar"><i id="dfBarFill"></i></div>
       <div id="dfSteps" class="dfSteps"></div>
     </div>
-    <div class="card">
+    <div class="card dfTeamCard">
       <div class="teams">
-        <div class="team blue"><h3>블루팀</h3><div id="dfBlue"></div></div>
-        <div class="team red"><h3>레드팀</h3><div id="dfRed"></div></div>
+        <div class="team blue"><h3>블루팀</h3><div id="dfBlue" class="dfSlots"></div></div>
+        <div class="team red"><h3>레드팀</h3><div id="dfRed" class="dfSlots"></div></div>
       </div>
     </div>
-    <div class="card">
-      <div class="secTitle">캐릭터<span class="secHint">한 번 누르면 설명이 나오고, 내 차례일 때 결정 버튼으로 골라요.</span></div>
-      <div id="dfChars" class="dfChars"></div>
-      <div id="dfDetail" class="dfDetail"></div>
-    </div>
     <button id="btnLeaveDraft" class="mini danger" type="button">방 나가기</button>
+  </div>
+  <div class="card charCol dfCharCol">
+    <div class="secTitle">캐릭터<span class="secHint">한 번 누르면 설명이 나오고, 내 차례일 때 결정 버튼으로 골라요.</span></div>
+    <div id="dfChars" class="dfChars"></div>
+    <div id="dfDetail" class="dfDetail"></div>
+  </div>
   </div>
 </div>
 
@@ -503,17 +542,26 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var ATK_POSE_MS = 150;
   var NET_MS = 143;
   var CHARS = {
-    warrior: { name: "전사", icon: "🪓", hp: 270, speed: 230, ultSpeed: 300, cd: 850, dmg: 45, range: 110, arc: Math.PI * 0.55, perHit: 2, ultName: "광폭화" },
-    knight:  { name: "기사", icon: "🛡️", hp: 400, speed: 220, cd: 1000, dmg: 30, range: 110, arc: Math.PI * 0.7, perHit: 2, kb: 28, ultName: "방어태세" },
-    ranger:  { name: "궁수", icon: "🏹", hp: 100, speed: 250, cd: 400, dmg: 10, range: KEY * 6, pSpeed: 950, pr: 6, shots: 2, gap: 70, perHit: 1, ultName: "난사", ultAim: true },
-    mage:    { name: "마법사", icon: "🔮", hp: 120, speed: 250, cd: 500, dmg: 11, range: 350, pSpeed: 700, pr: 9, perHit: 3, ultName: "메테오", ultAim: true },
-    rogue:   { name: "도적", icon: "🗡️", hp: 100, speed: 300, ultSpeed: 420, cd: 600, dmg: 30, range: 110, arc: Math.PI * 0.6, hits: 2, hitGap: 160, throwDmg: 20, throwRange: 300, pSpeed: 900, pr: 8, perHit: 1, ultName: "은신" },
-    necro:   { name: "네크로", icon: "💀", hp: 120, speed: 250, cd: 500, dmg: 11, range: KEY * 4, pSpeed: 1000, pr: 9, perHit: 3, ultName: "해골 소환" },
-    sniper:  { name: "저격수", icon: "🎯", hp: 100, speed: 240, cd: 1429, dmg: 40, range: 700, pSpeed: 1500, pr: 7, perHit: 4, ultName: "거대 화살", ultAim: true },
-    thrower: { name: "투척병", icon: "🧪", hp: 120, speed: 240, cd: 1000, dmg: 20, ticks: 3, range: KEY * 4 + 100, minRange: KEY * 1, perHit: 1, ultName: "독안개", ultAim: true },
-    lancer:  { name: "창기사", icon: "🔱", hp: 300, speed: 225, cd: 1200, dmg: 30, range: 200, width: 50, perHit: 2, ultName: "꿰뚫기", ultAim: true }
+    warrior: { name: "광전사", role: "fighter", icon: "🪓", hp: 270, speed: 230, ultSpeed: 300, cd: 850, dmg: 45, range: 110, arc: Math.PI * 0.55, ultName: "광폭화" },
+    knight:  { name: "기사", role: "fighter", icon: "🛡️", hp: 400, speed: 220, cd: 1000, dmg: 30, range: 110, arc: Math.PI * 0.7, kb: 28, ultName: "방어태세" },
+    ranger:  { name: "궁수", role: "shooter", icon: "🏹", hp: 100, speed: 250, cd: 400, dmg: 10, range: KEY * 6, pSpeed: 950, pr: 6, shots: 2, gap: 70, ultName: "난사", ultAim: true },
+    mage:    { name: "주술사", role: "caster", icon: "🔮", hp: 120, speed: 250, cd: 500, dmg: 11, range: 350, pSpeed: 700, pr: 9, ultName: "메테오", ultAim: true },
+    rogue:   { name: "도적", role: "assassin", icon: "🗡️", hp: 100, speed: 300, ultSpeed: 420, cd: 600, dmg: 30, range: 110, arc: Math.PI * 0.6, hits: 2, hitGap: 160, throwDmg: 20, throwRange: 300, pSpeed: 900, pr: 8, ultName: "은신" },
+    necro:   { name: "네크로", role: "caster", icon: "💀", hp: 120, speed: 250, cd: 500, dmg: 11, range: KEY * 4, pSpeed: 1000, pr: 9, ultName: "해골 소환" },
+    sniper:  { name: "저격수", role: "shooter", icon: "🎯", hp: 100, speed: 240, cd: 1429, dmg: 40, range: 700, pSpeed: 1500, pr: 7, ultName: "거대 화살", ultAim: true },
+    thrower: { name: "투척병", role: "shooter", icon: "🧪", hp: 120, speed: 240, cd: 1000, dmg: 20, ticks: 3, range: KEY * 4 + 100, minRange: KEY * 1, ultName: "독안개", ultAim: true },
+    lancer:  { name: "창기사", role: "fighter", icon: "🔱", hp: 300, speed: 225, cd: 1200, dmg: 30, range: 200, width: 50, ultName: "꿰뚫기", ultAim: true }
   };
   var CHAR_LIST = ["warrior", "knight", "ranger", "mage", "rogue", "necro", "sniper", "thrower", "lancer"];
+  var ROLES = {
+    fighter:  { name: "전사", icon: "⚔️", gaugeOnHit: 2, gaugeOnHurt: 1 },
+    caster:   { name: "마법사", icon: "✨", gaugeOnHit: 3, gaugeOnHurt: 0 },
+    shooter:  { name: "원거리 딜러", icon: "🏹", gaugeOnHit: 2, gaugeOnHurt: 0 },
+    assassin: { name: "암살자", icon: "🗡️", gaugeOnHit: 2, gaugeOnHurt: 0 }
+  };
+  var ROLE_LIST = ["fighter", "caster", "shooter", "assassin"];
+  function roleOf(c) { return ROLES[CHARS[c].role]; }
+  function charsInRole(r) { return CHAR_LIST.filter(function (c) { return CHARS[c].role === r; }); }
   var ULT = { mkCount: 10, mkGap: 55, mkDmg: 36, mkRefund: 1, mkSpeed: 1150, mkRange: KEY * 8, mkPr: 8,
               bzDur: 4000, bzDmgMul: 1.5, bzCdMul: 0.7, bzHeal: 20, tkDur: 5000, tkDef: 0.3, tkStunR: 100, tkStunMs: 1000,
               mbDelay: 700, mbR: 150, mbDmg: 90, mbHeal: 50, mbRefund: 4, mbCast: 550, mbMin: 60,
@@ -652,6 +700,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function show(el, on) { if (on) el.removeAttribute("hidden"); else el.setAttribute("hidden", ""); }
   function setText(el, t) { if (el._t !== t) { el._t = t; el.textContent = t; } }
   function setHtml(el, t) { if (el._h !== t) { el._h = t; el.innerHTML = t; } }
+  function setHtmlKeepScroll(el, t) {
+    if (el._h === t) return;
+    var lefts = [].map.call(el.querySelectorAll(".roleCards"), function (row) { return row.scrollLeft; });
+    setHtml(el, t);
+    [].forEach.call(el.querySelectorAll(".roleCards"), function (row, i) { if (lefts[i]) row.scrollLeft = lefts[i]; });
+  }
 
   var AC = null;
   function audio() {
@@ -1050,12 +1104,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     function speedUp(c) { return "이동속도 " + (c.ultSpeed - c.speed) + " 증가"; }
     if (k === "warrior") return num(ULT.bzDur / 1000) + "초간 공격력 " + num(ULT.bzDmgMul) + "배, 공격 속도 " + num(1 / ULT.bzCdMul) + "배, " + speedUp(CHARS.warrior) + ", 기본 공격 적중 시 체력 " + ULT.bzHeal + " 회복";
     if (k === "knight") return num(ULT.tkDur / 1000) + "초간 받는 피해 " + num(ULT.tkDef) + "배, 끝날 때 반경 " + ULT.tkStunR + " 안의 적 " + num(ULT.tkStunMs / 1000) + "초 기절";
-    if (k === "ranger") return num(ULT.mkDmg) + "의 데미지를 주는 화살 " + ULT.mkCount + "발 사격";
-    if (k === "mage") return "지정한 곳에 " + num(ULT.mbDelay / 1000) + "초 뒤 폭발 발생, 적은 " + ULT.mbDmg + "의 데미지, 아군은 " + ULT.mbHeal + " 회복";
+    if (k === "ranger") return num(ULT.mkDmg) + "의 데미지를 주는 화살 " + ULT.mkCount + "발 사격, 화살 1발 적중마다 게이지 " + ULT.mkRefund + " 회복";
+    if (k === "mage") return "지정한 곳에 " + num(ULT.mbDelay / 1000) + "초 뒤 폭발 발생, 적은 " + ULT.mbDmg + "의 데미지, 아군은 " + ULT.mbHeal + " 회복, 적 적중 시 게이지 " + ULT.mbRefund + " 회복";
     if (k === "rogue") return num(ULT.asDur / 1000) + "초간 " + speedUp(CHARS.rogue) + ", 은신 상태로 변경, 공격 시 해제";
     if (k === "necro") return "앞쪽에 해골 병사 " + ULT.smCount + "마리 소환(HP " + ULT.smHp + ", 공격 " + ULT.smDmg + "), " + num(ULT.smDur / 1000) + "초간 보이는 적을 쫓아가 공격, 최대 " + ULT.smMax + "마리";
     if (k === "sniper") return "거대한 화살 1발(데미지 " + ULT.pnDmg + ", 사거리 " + ULT.pnRange + "), 적중 시 게이지 " + ULT.pnRefund + " 회복";
-    if (k === "thrower") return "반지름 " + ULT.fgR + "의 독안개 설치, 적은 장판 안에서 이동속도 " + Math.round((1 - ULT.fgSlowMul) * 100) + "% 감소, 1초당 " + ULT.fgDmg + "의 데미지<br>아군은 1초당 " + ULT.fgHeal + " 회복";
+    if (k === "thrower") return "반지름 " + ULT.fgR + "의 독안개 설치, 적은 장판 안에서 이동속도 " + Math.round((1 - ULT.fgSlowMul) * 100) + "% 감소, 1초당 " + ULT.fgDmg + "의 데미지(적중마다 게이지 " + ULT.fgRefund + " 회복)<br>아군은 1초당 " + ULT.fgHeal + " 회복";
     if (k === "lancer") return num(ULT.lnWind / 1000) + "초 준비 후 앞으로 길이 " + ULT.lnLen + " 찌르기, 맞은 적 모두 " + ULT.lnDmg + "의 데미지 + " + num(ULT.lnStunMs / 1000) + "초 기절";
     return "";
   }
@@ -1070,11 +1124,19 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
            "<tr><th>이동속도</th><td>" + pair(c.speed, c.ultSpeed) + "</td></tr>" +
            "<tr><th>사거리</th><td>" + pair(Math.round(c.range), c.throwRange) + "</td></tr><tr><th>스킬</th><td>" + c.ultName + "</td></tr></table>";
   }
+  function roleGaugeText(R) { return "기본 공격 적중 시 게이지 +" + R.gaugeOnHit + (R.gaugeOnHurt ? ", 피격 시 +" + R.gaugeOnHurt : ""); }
+  function roleRowsHtml(cardOf) {
+    return ROLE_LIST.map(function (r) {
+      var R = ROLES[r], list = charsInRole(r);
+      if (!list.length) return "";
+      return '<div class="roleRow"><div class="roleTag"><i>' + R.icon + "</i><b>" + R.name + "</b><small>게이지<br>적중 +" + R.gaugeOnHit +
+             (R.gaugeOnHurt ? "<br>피격 +" + R.gaugeOnHurt : "") + '</small></div><div class="roleCards">' + list.map(cardOf).join("") + "</div></div>";
+    }).join("");
+  }
   function cardsHtml(me) {
-    var h = "";
-    CHAR_LIST.forEach(function (k) {
+    return roleRowsHtml(function (k) {
       var c = CHARS[k], taken = me.characterType !== k && takenOnTeam(P, me.team, k, myId);
-      h += '<button type="button" class="charCard' + (me.characterType === k ? " on" : "") + (flipped[k] ? " flip" : "") +
+      return '<button type="button" class="charCard' + (me.characterType === k ? " on" : "") + (flipped[k] ? " flip" : "") +
         '" data-c="' + k + '"' + (taken ? " disabled" : "") + '><div class="cardIn">' +
         '<div class="face front">' + (taken ? '<span class="soon">팀원 선택</span>' : "") + '<img alt="" src="' + charImgSrc(k) + '">' +
           '<div class="nm">' + c.name + "</div></div>" +
@@ -1082,7 +1144,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           '<div class="ultDesc"><b>스킬 설명</b>' + ultDesc(k) + "</div></div>" +
         "</div></button>";
     });
-    return h;
   }
   function renderLobby() {
     if (!room || screenNow !== "lobby") return;
@@ -1123,7 +1184,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     show($("charCardBox"), !imSpec && !cup);
     show($("btnSwapTeams"), cup && isHost() && room.status === "lobby");
 
-    if (!cup) setHtml($("chars"), cardsHtml(me));
+    if (!cup) setHtmlKeepScroll($("chars"), cardsHtml(me));
 
     var host = isHost(), ok = false, hint = "";
     if (!mode) hint = "게임 방식을 먼저 골라 주세요.";
@@ -1351,7 +1412,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var id = d.seq && d.seq[pre + i], p = id && P[id];
         if (!p) { h += '<div class="slot empty">' + i + "번 · " + (id ? "나감" : "빈 자리") + "</div>"; continue; }
         var c = picks[id], isTurn = waiting.indexOf(id) >= 0, pk;
-        if (c) pk = '<span class="pk">' + CHARS[c].icon + " " + CHARS[c].name + "</span>";
+        if (c) pk = '<span class="pk picked"><b>' + CHARS[c].name + '</b><span class="pface" style="background-image:url(\'' + charImgSrc(c) + '\')"></span></span>';
         else if (isTurn && hover[id] && myTeam === team && CHARS[hover[id]]) pk = '<span class="pk think">' + CHARS[hover[id]].name + " 고민 중…</span>";
         else pk = '<span class="pk wait">' + (isTurn ? "고르는 중…" : "대기") + "</span>";
         h += '<div class="slot' + (id === myId ? " mine" : "") + (isTurn ? " turn" : "") + (p.isAI ? " ai" : "") + '">' + i + "번 " + (p.isAI ? "🤖 " : "") + esc(p.nickname) +
@@ -1366,14 +1427,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     keys(picks).forEach(function (id) { owner[picks[id]] = id; });
     var myHover = myTurn ? hover[myId] : null;
     if (!draftView && myHover) draftView = myHover;
-    setHtml($("dfChars"), CHAR_LIST.map(function (k) {
+    setHtmlKeepScroll($("dfChars"), roleRowsHtml(function (k) {
       var o = owner[k], op = o && P[o], oTeam = o && d.seq && keys(d.seq).filter(function (s) { return d.seq[s] === o; })[0];
       var tag = o ? '<span class="tag ' + (oTeam && oTeam.charAt(0) === "b" ? "b" : "r") + '">' + esc(op ? op.nickname : "") + "</span>" : "";
       return '<button type="button" class="dfCard' + (o ? " taken" : "") + (myHover === k ? " on" : (draftView === k ? " view" : "")) + '" data-c="' + k + '">' + tag +
              '<img alt="" src="' + charImgSrc(k) + '"><div class="nm">' + CHARS[k].name + "</div></button>";
-    }).join(""));
+    }));
     var v = draftView && CHARS[draftView] ? draftView : null, canPick = v && myTurn && !owner[v];
-    setHtml($("dfDetail"), v ? '<div class="dfName">' + CHARS[v].icon + " " + CHARS[v].name + "</div>" + statTable(v) +
+    setHtml($("dfDetail"), v ? '<div class="dfName">' + CHARS[v].icon + " " + CHARS[v].name + '<small>' + roleOf(v).icon + " " + roleOf(v).name + "</small></div>" +
+      '<div class="dfRole">' + roleGaugeText(roleOf(v)) + "</div>" + statTable(v) +
       '<div class="ultDesc"><b>스킬 설명</b>' + ultDesc(v) + "</div>" +
       (canPick ? '<button type="button" class="big primary" data-pick="' + v + '">✔ ' + CHARS[v].name + "(으)로 결정</button>" : "") : "");
   }
@@ -1384,6 +1446,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     draftView = c;
     if (draftLeft(room.draft).indexOf(c) >= 0) draftHover(c);
     renderDraft();
+    var detail = $("dfDetail");
+    if (detail.scrollIntoView) detail.scrollIntoView({ block: "nearest", behavior: "smooth" });
   };
   $("dfDetail").onclick = function (e) {
     var b = e.target.closest ? e.target.closest("[data-pick]") : null;
@@ -1802,7 +1866,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (protectedNow(T)) return;
     if (T.char === "knight" && T.buffUntil > now()) amount = Math.round(amount * ULT.tkDef);
     var dm = Math.min(amount, T.hp), killed = false;
-    T.hp -= dm; if (!gaugeLocked(T)) T.gauge = Math.min(GAUGE_MAX, T.gauge + 1);
+    T.hp -= dm; if (!gaugeLocked(T)) T.gauge = Math.min(GAUGE_MAX, T.gauge + roleOf(T.char).gaugeOnHurt);
     if (T.hp <= 0) { killed = true; T.hp = 0; T.alive = false; T.deaths++; T.diedAt = now(); T.burst = null; T.volley = null; T.slash = null; T.regenUntil = 0; T.skillUntil = 0; T.slowUntil = 0; T.stunUntil = 0; if (T === ME) { sfx("down"); aim.id = null; joy.id = null; } }
     else { if (T === ME) sfx("hit"); afflict(T, fx); }
     pushHit(owner, dm, basic, ultKey, killed);
@@ -1837,7 +1901,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (h.u === "fog" && owner.char === "thrower" && !gaugeLocked(owner)) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.fgRefund);
       var sameSwing = h.s && owner.gaugeSwing === h.s;
       if (h.s) owner.gaugeSwing = h.s;
-      if (h.b && !sameSwing && !gaugeLocked(owner)) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + (CHARS[owner.char].perHit || 2));
+      if (h.b && !sameSwing && !gaugeLocked(owner)) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + roleOf(owner.char).gaugeOnHit);
       if (h.b && !sameSwing && owner.alive && berserk(owner, h.t)) owner.hp = Math.min(owner.maxHp, owner.hp + ULT.bzHeal);
       if (owner === ME && h.d) sfx("confirm");
       G.forceNet = true;
