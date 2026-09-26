@@ -247,8 +247,8 @@
 <body>
 <canvas id="cv"></canvas>
 <canvas id="ov"></canvas>
-<div id="tourFade"></div>
-<div id="tourCaption"><i></i><span id="tourCam"></span></div>
+<div id="tourFade" hidden></div>
+<div id="tourCaption" hidden><i></i><span id="tourCam"></span></div>
 
 <div id="scrStart" class="screen">
   <div class="wrap">
@@ -1675,7 +1675,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var MODEL = {
     warrior: { file: "Barbarian", right: "axe_1handed" },
     knight:  { file: "Knight", right: "sword_1handed", left: "shield_badge_color" },
-    ranger:  { file: "Ranger", right: "crossbow_2handed" },
+    ranger:  { file: "Ranger", left: "bow_withString" },
     mage:    { file: "Mage", right: "staff" },
     rogue:   { file: "Rogue", right: "dagger", left: "dagger" }
   };
@@ -1699,6 +1699,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     function load(url) { return new Promise(function (ok, no) { loader.load(url, ok, undefined, no); }); }
     var weaponNames = [];
     CHAR_LIST.forEach(function (c) { [MODEL[c].right, MODEL[c].left].forEach(function (w) { if (w && weaponNames.indexOf(w) < 0) weaponNames.push(w); }); });
+    weaponNames.push("arrow_bow");
     var jobs = [load(KIT_DIR + "animations/teambattle_anims.glb").then(function (g) { g.animations.forEach(function (clip) { KIT.clips[clip.name] = clip; }); })];
     weaponNames.forEach(function (w) { jobs.push(load(KIT_DIR + "props/" + w + ".gltf").then(function (g) { KIT.weapons[w] = lambertize(g.scene); })); });
     CHAR_LIST.forEach(function (c) { jobs.push(load(KIT_DIR + "characters/" + MODEL[c].file + ".glb").then(function (g) { KIT.chars[c] = lambertize(g.scene); })); });
@@ -1773,12 +1774,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         g.add(fitProp(trees[Math.floor(seeded() * 4)], h * 0.7, h, h * 0.7, x, z + seeded() * 60, seeded() * 6.28));
       });
     }
-    for (var x = 60; x <= MW - 60; x += 200) {
-      [-140 - seeded() * 60, MH + 140 + seeded() * 60].forEach(function (zz) {
-        var h = 230 + seeded() * 120;
-        g.add(fitProp(trees[Math.floor(seeded() * 4)], h * 0.7, h, h * 0.7, x + seeded() * 60, zz, seeded() * 6.28));
-      });
-    }
     scene.add(g);
     simpleProps.visible = false;
   }
@@ -1838,6 +1833,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       });
       body.add(model);
       v.kit = true; v.mixer = new THREE.AnimationMixer(model); v.actions = {};
+      if (E.char === "ranger") v.bowHand = model.getObjectByName("handslotl");
     } else {
       var mat = new THREE.MeshLambertMaterial({ color: C_TEAM[E.team], transparent: true });
       var noseMat = new THREE.MeshLambertMaterial({ color: 0xFFF3D6, transparent: true });
@@ -1879,9 +1875,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   var ROGUE_COMBO = ["Melee_Dualwield_Attack_Chop", "Melee_Dualwield_Attack_Slice"];
   function attackClip(v, E, t) {
-    if (E.char === "warrior") return ["Melee_1H_Attack_Chop", berserk(E, t) ? 2.0 : 1.4];
+    if (E.char === "warrior") return ["Melee_1H_Attack_Slice_Diagonal", berserk(E, t) ? 1.9 : 1.3];
     if (E.char === "knight") return ["Melee_1H_Attack_Slice_Horizontal", 1.5];
-    if (E.char === "ranger") return ["Ranged_2H_Shoot", 2.2];
+    if (E.char === "ranger") return ["Ranged_Bow_Release", 3];
     if (E.char === "mage") return ["Ranged_Magic_Shoot", 1.8];
     if (v.wasStealth) { v.combo = 1; return ["Melee_Dualwield_Attack_Stab", 2.2]; }
     return [ROGUE_COMBO[v.combo++ % 2], 2.4];
@@ -1893,15 +1889,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (E.alive && t - E.atkAt < 600) {
         var ac = attackClip(v, E, t);
         playOnce(v, ac[0], ac[1], t);
-        if (E.char === "ranger" && !(E.ultUntil > t)) v.againAt = E.atkAt + CHARS.ranger.gap;
-      }
+     }
     }
     if (E.char === "mage" && E.ultUntil !== v.ultSeen) {
       v.ultSeen = E.ultUntil;
       if (E.alive && E.ultUntil > t) { playOnce(v, "Ranged_Magic_Spellcasting_Long", 2.6, t); v.once.soft = true; }
     }
-    if (v.againAt && t >= v.againAt) { v.againAt = 0; if (v.once && v.once.name === "Ranged_2H_Shoot") v.once.fresh = true; }
-    if (hurt && E.alive && (!v.once || v.once.name === "Hit_A")) playOnce(v, "Hit_A", 1.6, t);
+   if (hurt && E.alive && (!v.once || v.once.name === "Hit_A")) playOnce(v, "Hit_A", 1.6, t);
     v.wasStealth = stealthed(E, t);
     var moved = hyp(E.x - v.px, E.y - v.py) / Math.max(dt, 0.001);
     v.px = E.x; v.py = E.y;
@@ -1912,12 +1906,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       else if (!v.curName) showClip(v, "Death_A_Pose", 1, false);
     } else {
       v.dead = false;
-      if (E.char === "ranger" && E.ultUntil > t) showClip(v, "Ranged_2H_Shoot", 3.5, true);
+      if (E.char === "ranger" && E.ultUntil > t) showClip(v, "Ranged_Bow_Release", 4.5, true);
       else if (v.once) { showClip(v, v.once.name, v.once.ts, false, v.once.fresh); v.once.fresh = false; }
       else if (E.char === "knight" && E.buffUntil > t) showClip(v, "Melee_Blocking", 1, true);
       else if (E.mv && v.speed > 150) showClip(v, "Running_A", clamp(v.speed / 260, 0.7, 1.6), true);
       else if (E.mv && v.speed > 15) showClip(v, "Walking_A", clamp(v.speed / 110, 0.6, 1.4), true);
-      else showClip(v, "Idle_A", 1, true);
+      else showClip(v, E.char === "ranger" ? "Ranged_Bow_Idle" : "Idle_A", 1, true);
     }
     v.mixer.update(dt);
   }
@@ -1932,8 +1926,17 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       g.userData.pulse = orb;
     } else {
       var volley = d.isSkill, col = volley ? 0xFF8A3D : C_FX[d.team];
-      var shaft = new THREE.Mesh(GEO.shaft, basicMat("shaft", 0xEADFC4, 1)); if (volley) shaft.scale.set(1.2, 1.4, 1.4); g.add(shaft);
-      g.add(new THREE.Mesh(GEO.head, basicMat("head-" + (volley ? "v" : d.team), col, 1)));
+      if (KIT.weapons.arrow_bow) {
+        var arrow = KIT.weapons.arrow_bow.clone(); arrow.rotation.y = Math.PI / 2; arrow.scale.setScalar(volley ? 38 : 32); g.add(arrow);
+      } else {
+        var shaft = new THREE.Mesh(GEO.shaft, basicMat("shaft", 0xEADFC4, 1)); if (volley) shaft.scale.set(1.2, 1.4, 1.4); g.add(shaft);
+        g.add(new THREE.Mesh(GEO.head, basicMat("head-" + (volley ? "v" : d.team), col, 1)));
+      }
+      var shooter = VIS[d.owner];
+      if (shooter && shooter.bowHand && shooter.root.visible) {
+        shooter.bowHand.getWorldPosition(tmpV);
+        g.userData.from = new THREE.Vector3(tmpV.x - d.x, tmpV.y - PROJ_Y, tmpV.z - d.y);
+      }
       var trail = new THREE.Mesh(GEO.trail, glowMat("trail-" + (volley ? "v" : d.team), col, 0.45)); trail.position.x = -15; trail.scale.set(volley ? 70 : 50, volley ? 1.8 : 1.3, volley ? 1.8 : 1.3); g.add(trail);
     }
     g.rotation.y = -Math.atan2(p.dy, p.dx);
@@ -1942,6 +1945,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   function dropProjVis(id) { var g = PRV[id]; if (!g) return; scene.remove(g); delete PRV[id]; }
 
+  var PROJ_Y = 42, BOW_BLEND = 140;
   var MELEE_COLOR = { warrior: 0xFF9A3C, knight: 0xFFFFFF, rogue: 0xC9D6E6 };
   function makeMeleeVis(d) {
     var g = new THREE.Group(), who = P[d.owner] ? P[d.owner].characterType : "", col = MELEE_COLOR[who] || 0xFFFFFF, R = d.radius + BODY_R;
@@ -2223,8 +2227,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }
       if (p.dead || p.gone || e > p.life) { if (g) dropProjVis(id); return; }
       if (!g) g = PRV[id] = makeProjVis(p);
-      var pos = projAt(p, Math.max(0, e));
-      g.position.set(pos.x, 42, pos.y);
+      var pos = projAt(p, Math.max(0, e)), from = g.userData.from, kk = from ? 1 - clamp(p.sp * Math.max(0, e) / 1000 / BOW_BLEND, 0, 1) : 0;
+      if (from) g.position.set(pos.x + from.x * kk, PROJ_Y + from.y * kk, pos.y + from.z * kk);
+      else g.position.set(pos.x, PROJ_Y, pos.y);
       if (g.userData.pulse) g.userData.pulse.scale.setScalar(9 + 2 * Math.sin(nowMs / 50));
     });
     keys(PRV).forEach(function (id) { if (!PR[id]) dropProjVis(id); });
