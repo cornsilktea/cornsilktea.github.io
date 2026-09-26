@@ -55,11 +55,12 @@
   #speed .lab { display: inline-block; font-size: 11.5px; letter-spacing: .18em; margin-right: 6px; vertical-align: 6px; }
   #speed b { display: inline-block; font-size: 48px; line-height: 1; letter-spacing: -1px; min-width: 2.2ch; text-align: right; }
   #speed .unit { display: inline-block; font-size: 15px; font-weight: 800; color: #DCE6D6; margin-left: 4px; }
-  #chaseTag { display: block; width: max-content; margin-bottom: 4px; padding: 2px 8px; border-radius: 6px; font-size: 13px; font-weight: 800; color: #DCE6D6; background: rgba(255,255,255,.12); }
+  #chaseTag, #followTag { display: block; width: max-content; margin-bottom: 3px; padding: 1px 7px; border-radius: 6px; font-size: 12px; font-weight: 800; color: #DCE6D6; background: rgba(255,255,255,.12); }
+  #chaseTag[hidden], #followTag[hidden] { display: none; }
   #chaseTag.boost { color: #fff; font-size: 16px; background: #D97B4F; animation: boostPulse .5s ease-in-out infinite alternate; }
   #speed:has(#chaseTag.boost) { background: linear-gradient(135deg, rgba(217,123,79,.95), rgba(150,64,34,.88)); border-left-color: #fff; box-shadow: 0 0 22px rgba(217,123,79,.75), 0 4px 14px rgba(0,0,0,.3); }
   #speed:has(#chaseTag.boost) #chaseTag { background: #fff; color: #D97B4F; }
-  #speed:has(#chaseTag.boost) .lab, #speed:has(#chaseTag.boost) .unit { color: #fff; }
+  #speed:has(#chaseTag.boost) .lab, #speed:has(#chaseTag.boost) .unit, #speed:has(#chaseTag.boost) #followTag { color: #fff; }
   @keyframes boostPulse { from { opacity: .8; } to { opacity: 1; } }
   #fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 4; }
   .laps { font-size: 13px; color: var(--sg-ink-mid); margin: 4px 0 2px; font-variant-numeric: tabular-nums; }
@@ -248,7 +249,7 @@
     <button type="button" id="btnRecover">🚗 트랙 복귀 (T)</button>
   </div>
 </div>
-<div class="hud-box" id="speed"><span id="chaseTag" hidden></span><span class="lab">SPEED</span><b id="speedVal">0</b><span class="unit">km/h</span></div>
+<div class="hud-box" id="speed"><span id="chaseTag" hidden></span><span id="followTag" hidden></span><span class="lab">SPEED</span><b id="speedVal">0</b><span class="unit">km/h</span></div>
 <canvas id="minimap" width="300" height="300"></canvas>
 <canvas id="fx"></canvas>
 <div id="lapToast"><b id="lapToastMain"></b><span id="lapToastSub"></span></div>
@@ -3407,7 +3408,7 @@ let state = "menu", playMode = "ta";
 let cdTime = 0, cdShown = -1, goTimer = 0, t0 = 0, elapsed = 0, finalMs = 0, doneTimer = 0, shake = 0, menuAng = 0;
 const keys = { up: false, down: false, left: false, right: false };
 const hud = $("hud"), overlay = $("overlay"), cardStart = $("cardStart"), cardDone = $("cardDone"), cardCar = $("cardCar");
-const hudLap = $("hudLap"), hudTime = $("hudTime"), hudOff = $("hudOff"), speedBox = $("speed"), speedVal = $("speedVal"), chaseTag = $("chaseTag");
+const hudLap = $("hudLap"), hudTime = $("hudTime"), hudOff = $("hudOff"), speedBox = $("speed"), speedVal = $("speedVal"), chaseTag = $("chaseTag"), followTag = $("followTag");
 const countBox = $("count"), countNum = $("countNum"), mini = $("minimap"), mctx = mini.getContext("2d");
 const lapFill = $("lapFill");
 const lapToast = $("lapToast"), lapToastMain = $("lapToastMain"), lapToastSub = $("lapToastSub"), hudBest = $("hudBest");
@@ -3891,6 +3892,8 @@ function tick(now) {
     setText(speedVal, String(Math.round(Math.abs(P.v) * CFG.kmh)));
     const chaseText = chaseTagText();
     chaseTag.hidden = !chaseText; setText(chaseTag, chaseText); chaseTag.className = P.boostOn ? "boost" : "";
+    const followText = followTagText();
+    followTag.hidden = !followText; setText(followTag, followText);
     drawMinimap();
     drawSpeedLines(Math.abs(P.v) / CFG.maxSpeed);
   }
@@ -4376,8 +4379,10 @@ function chaseTagText() {
   if (P.tailT > 0) { const n = Math.min(4, Math.floor(P.tailT / CHASE.tailSec * 5)); return "부스트 충전 " + "▮".repeat(n) + "▯".repeat(4 - n); }
   if (P.boostCool > 0) return "부스트 재충전 " + Math.ceil(P.boostCool) + "초";
   if (P.offLine) return "앞차 바로 뒤로 붙으세요";
-  if (P.chase > 0) return "따라잡기 +" + Math.round(P.chase * CFG.kmh) + " km/h";
   return "";
+}
+function followTagText() {
+  return P.chase > 0 ? "따라잡기 +" + Math.round(P.chase * CFG.kmh) + " km/h" : "";
 }
 function racerState(id) {
   if (id === BT.myId && !BT.spec) return { prog: myProg(), fin: P.fin };
