@@ -268,7 +268,7 @@
     </div>
     <div class="card note">
       <b>조작</b> — 왼쪽 아래를 누르고 끌면 이동, 오른쪽 아래 <b>공격</b> 버튼을 누른 채 끌어 방향을 정하고 떼면 발사(그냥 톡 누르면 가까운 적을 자동 조준). 컴퓨터에서는 <b>WASD</b>(방향키)로 이동, <b>K</b> 기본 공격, <b>J</b> 궁극기(자동 조준).
-      <b>궁극기</b>는 게이지가 10 모이면(명중 +2 · 궁수·도적은 1발당 +1, 피격 +1) 빨갛게 빛나고, 궁극기를 쓰면 지속시간 동안 분홍색으로 줄어듭니다. 풀숲에 들어가면 상대 팀에게 보이지 않아요.
+      <b>궁극기</b>는 게이지가 10 모이면(명중 +2 · 마법사는 +3 · 궁수·도적은 1발당 +1, 피격 +1, 마법사 궁극기가 적에게 맞으면 절반을 돌려받음) 빨갛게 빛나고, 궁극기를 쓰면 지속시간 동안 분홍색으로 줄어듭니다. 풀숲에 들어가면 상대 팀에게 보이지 않아요.
     </div>
   </div>
 </div>
@@ -363,7 +363,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     warrior: { name: "전사", icon: "🪓", hp: 220, speed: 230, ultSpeed: 300, cd: 850, dmg: 45, range: 141, arc: Math.PI * 0.55, perHit: 2, ultName: "광폭화" },
     knight:  { name: "기사", icon: "🛡️", hp: 350, speed: 220, ultSpeed: 300, cd: 1000, dmg: 30, range: KEY * 1 + 50, arc: Math.PI * 0.7, perHit: 2, kb: 28, ultName: "방어태세" },
     ranger:  { name: "궁수", icon: "🏹", hp: 100, speed: 250, cd: 400, dmg: 10, range: KEY * 6, pSpeed: 950, pr: 6, shots: 2, gap: 70, perHit: 1, ultName: "난사", ultAim: true },
-    mage:    { name: "마법사", icon: "🔮", hp: 150, speed: 250, cd: 500, dmg: 11, range: KEY * 4, pSpeed: 700, pr: 9, perHit: 2, ultName: "매직 버스트", ultAim: true },
+    mage:    { name: "마법사", icon: "🔮", hp: 150, speed: 250, cd: 500, dmg: 11, range: KEY * 4, pSpeed: 700, pr: 9, perHit: 3, ultName: "매직 버스트", ultAim: true },
     rogue:   { name: "도적", icon: "🗡️", hp: 90, speed: 300, ultSpeed: 420, cd: 600, dmg: 30, range: 95, arc: Math.PI * 0.6, hits: 2, hitGap: 160, throwDmg: 20, throwRange: 300, pSpeed: 900, pr: 8, perHit: 1, ultName: "은신" }
   };
   var CHAR_LIST = ["warrior", "knight", "ranger", "mage", "rogue"];
@@ -743,7 +743,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "warrior") return num(ULT.bzDur / 1000) + "초간 공격력이 " + num(ULT.bzDmgMul) + "배가 되고 공격이 빨라지며 이동속도가 " + CHARS.warrior.ultSpeed + "으로 빨라집니다.";
     if (k === "knight") return num(ULT.tkDur / 1000) + "초간 이동속도가 " + CHARS.knight.ultSpeed + "으로 빨라지고 받는 피해가 " + num((1 - ULT.tkDef) * 100) + "% 감소합니다.";
     if (k === "ranger") return "짧은 시간 내에 " + num(ULT.mkDmg) + "의 데미지를 주는 " + ULT.mkCount + "발의 화살을 연속으로 쏩니다.";
-    if (k === "mage") return "정한 곳에 " + num(ULT.mbDelay / 1000) + "초 뒤 폭발을 일으켜 반경 " + ULT.mbR + " 안의 적에게 " + ULT.mbDmg + "의 데미지를 주고, 아군(자신 포함)은 " + ULT.mbDmg + "만큼 회복합니다.";
+    if (k === "mage") return "정한 곳에 " + num(ULT.mbDelay / 1000) + "초 뒤 폭발을 일으켜 반경 " + ULT.mbR + " 안의 적에게 " + ULT.mbDmg + "의 데미지를 주고, 아군(자신 포함)은 " + ULT.mbDmg + "만큼 회복합니다. 적에게 맞히면 궁극기 게이지 절반을 돌려받습니다.";
     if (k === "rogue") return num(ULT.asDur / 1000) + "초간 이동속도가 " + CHARS.rogue.ultSpeed + "으로 빨라지고 은신 상태가 됩니다. 다음 공격을 하면 은신이 풀리며 기습합니다.";
     return "";
   }
@@ -1143,16 +1143,16 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }
     }
   }
-  function damage(T, amount, owner, basic) {
+  function damage(T, amount, owner, basic, ultKey) {
     if (T.char === "knight" && T.buffUntil > now()) amount = Math.round(amount * ULT.tkDef);
     var dm = Math.min(amount, T.hp);
     T.hp -= dm; if (!skillActive(T)) T.gauge = Math.min(GAUGE_MAX, T.gauge + 1);
     if (T.hp <= 0) { T.hp = 0; T.alive = false; T.burst = null; T.volley = null; T.slash = null; T.regenUntil = 0; T.skillUntil = 0; if (T === ME) { sfx("down"); aim.id = null; joy.id = null; } }
     else if (T === ME) sfx("hit");
-    pushHit(owner, dm, basic);
+    pushHit(owner, dm, basic, ultKey);
     if (T === ME || T.bot) G.forceNet = true;
   }
-  function pushHit(owner, dmg, basic) { room.ref.child("hits/" + owner).push({ d: dmg, b: basic ? 1 : 0, t: now() }); }
+  function pushHit(owner, dmg, basic, ultKey) { var h = { d: dmg, b: basic ? 1 : 0, t: now() }; if (ultKey) h.u = ultKey; room.ref.child("hits/" + owner).push(h); }
   var hitSubs = {};
   function listenHits(ownerId) {
     if (hitSubs[ownerId]) return;
@@ -1167,6 +1167,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     handled[s.key] = 1;
     if (h.t >= G.startAt - 1000) {
       if (h.d) owner.dmg += h.d;
+      if (h.u && owner.char === "mage" && owner.refundKey !== h.u) { owner.refundKey = h.u; owner.gauge = Math.min(GAUGE_MAX, owner.gauge + GAUGE_MAX / 2); }
       if (h.b && !skillActive(owner)) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + (CHARS[owner.char].perHit || 2));
       if (owner === ME && h.d) sfx("confirm");
       G.forceNet = true;
@@ -1185,7 +1186,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (t < e.createdAt + e.delay) return true;
       if (room.status === "playing") localTargets().forEach(function (T) {
         if (!T.alive || hyp(T.x - e.x, T.y - e.y) > e.r + BODY_R) return;
-        if (T.team !== e.team) { damage(T, e.dmg, e.owner, false); return; }
+        if (T.team !== e.team) { damage(T, e.dmg, e.owner, false, e.createdAt); return; }
         var healed = Math.min(T.maxHp - T.hp, e.dmg);
         if (healed <= 0) return;
         T.hp += healed; T.healGot[e.owner] = (T.healGot[e.owner] || 0) + healed;
@@ -1933,11 +1934,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var core = new THREE.Mesh(GEO.ball, basicMat("orbCore", 0xffffff, 1)); core.scale.setScalar(5); g.add(core);
       g.userData.pulse = orb;
     } else if (d.ownerCharacterType === "rogue") {
-      var spin = new THREE.Group(); g.add(spin);
       if (KIT.weapons.dagger) {
-        var knife = KIT.weapons.dagger.clone(); knife.rotation.z = -Math.PI / 2; knife.scale.setScalar(MODEL_SCALE); knife.position.x = -22; spin.add(knife);
-      } else spin.add(new THREE.Mesh(GEO.shaft, basicMat("blade", 0xDCE3EC, 1)));
-      g.userData.spin = spin;
+        var knife = KIT.weapons.dagger.clone(); knife.rotation.z = -Math.PI / 2; knife.scale.setScalar(MODEL_SCALE); knife.position.x = -22; g.add(knife);
+      } else g.add(new THREE.Mesh(GEO.shaft, basicMat("blade", 0xDCE3EC, 1)));
       var streak = new THREE.Mesh(GEO.trail, glowMat("trail-rogue", 0xDCE3EC, 0.35)); streak.position.x = -10; streak.scale.set(40, 1.3, 1.3); g.add(streak);
     } else {
       var volley = d.isSkill, col = volley ? 0xFF8A3D : C_FX[d.team];
@@ -2252,8 +2251,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var pos = projAt(p, Math.max(0, e)), from = g.userData.from, kk = from ? 1 - clamp(p.sp * Math.max(0, e) / 1000 / BOW_BLEND, 0, 1) : 0;
       if (from) g.position.set(pos.x + from.x * kk, PROJ_Y + from.y * kk, pos.y + from.z * kk);
       else g.position.set(pos.x, PROJ_Y, pos.y);
-      if (g.userData.spin) g.userData.spin.rotation.y = -nowMs * 0.03;
-      if (g.userData.pulse) g.userData.pulse.scale.setScalar(9 + 2 * Math.sin(nowMs / 50));
+     if (g.userData.pulse) g.userData.pulse.scale.setScalar(9 + 2 * Math.sin(nowMs / 50));
     });
     keys(PRV).forEach(function (id) { if (!PR[id]) dropProjVis(id); });
 
