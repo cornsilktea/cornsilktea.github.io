@@ -9,23 +9,42 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
 <meta property="og:title" content="3v3 팀 배틀 아레나">
-<meta property="og:description" content="방 코드로 모여 블루 vs 레드로 싸우는 3v3 실시간 팀 대전(또는 모두 블루팀이 되어 AI 3명과 대결) / 사격수·힐러·탱커·암살자 중 선택, 궁극기 게이지·풀숲 숨기 / 상대 팀 전멸 또는 1분 뒤 누적 피해가 많은 팀 승리">
+<meta property="og:description" content="방 코드로 모여 블루 vs 레드로 싸우는 3D 3v3 실시간 팀 대전(또는 모두 블루팀이 되어 AI 3명과 대결) / 전사·기사·궁수·마법사·도적 중 선택, 궁극기 게이지·풀숲 숨기 / 상대 팀 전멸 또는 1분 뒤 누적 피해가 많은 팀 승리">
 <meta property="og:url" content="https://cornsilktea.github.io/30.team-battle-arena.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
 <link rel="stylesheet" href="theme.css">
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"
+} }
+</script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   [hidden] { display: none !important; }
-  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--sg-bg); font-family: var(--sg-font); color: var(--sg-ink); }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #1B241E; font-family: var(--sg-font); color: var(--sg-ink); }
   button { font-family: inherit; cursor: pointer; }
   :root { --blue: #2F6FD6; --blue-soft: #E3ECFB; --red: #D6453D; --red-soft: #FBE5E3; }
 
-  .screen { position: fixed; top: 0; right: 0; bottom: 0; left: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 54px 16px 24px; }
+  .screen { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 30; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 54px 16px 24px;
+    background: linear-gradient(90deg, rgba(8, 14, 11, .88) 0%, rgba(8, 14, 11, .62) 48%, rgba(8, 14, 11, .12) 82%);
+    --sg-panel: rgba(16, 24, 19, .82); --sg-panel-alt: rgba(255, 255, 255, .07); --sg-line: rgba(255, 255, 255, .08); --sg-line-mid: rgba(255, 255, 255, .16); --sg-line-strong: rgba(255, 255, 255, .32);
+    --sg-ink: #EEF2EE; --sg-ink-mid: #CFD8D0; --sg-ink-soft: #A3B0A6; --sg-ink-faint: #6F7C72; --sg-primary: #3E8E5E; --sg-primary-ink: #FFFFFF; --sg-primary-soft: rgba(62, 142, 94, .28); --sg-danger: #FF7A7A;
+    --blue-soft: rgba(47, 111, 214, .2); --red-soft: rgba(214, 69, 61, .2); color: var(--sg-ink); }
+  @media (max-width: 760px) { .screen { background: rgba(8, 14, 11, .7); } }
+  @media (min-width: 1100px) { .screen .wrap { margin: 0 0 0 5vw; } }
+  .titleCard { background: none !important; border: 0 !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+  .titleMain { font-size: clamp(34px, 6vw, 54px); line-height: 1.08; letter-spacing: -.01em; color: #F4F1E8; text-shadow: 0 4px 0 rgba(0, 0, 0, .45), 0 0 22px rgba(255, 210, 120, .35); margin-bottom: 12px; }
+  .titleMain .tb { color: #6FA8FF; text-shadow: 0 4px 0 rgba(0, 0, 0, .45), 0 0 18px rgba(76, 141, 255, .7); }
+  .titleMain .tr { color: #FF7A70; text-shadow: 0 4px 0 rgba(0, 0, 0, .45), 0 0 18px rgba(255, 90, 78, .7); }
+  #tourFade { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 1; background: #000; opacity: 1; pointer-events: none; }
+  #tourCaption { position: fixed; right: 18px; bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); z-index: 31; pointer-events: none; font-size: 14px; font-weight: 800; letter-spacing: .06em; color: #F4F1E8; text-shadow: 0 1px 3px #000; }
+  #tourCaption i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #F2C230; margin-right: 7px; box-shadow: 0 0 8px #F2C230; }
   .wrap { width: 100%; max-width: 760px; margin: 0 auto; }
-  .card { background: var(--sg-panel); border: 1px solid var(--sg-line-mid); border-radius: 8px; padding: 22px 20px; margin-bottom: 14px; }
+  .card { background: var(--sg-panel); border: 1px solid var(--sg-line-mid); border-radius: 8px; padding: 22px 20px; margin-bottom: 14px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
   h1 { font-size: 30px; font-weight: 800; text-align: center; margin-bottom: 6px; }
   .sub { text-align: center; color: var(--sg-ink-soft); font-size: 15px; margin-bottom: 18px; line-height: 1.5; }
   .hello { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 20px; margin-bottom: 20px; flex-wrap: wrap; }
@@ -35,7 +54,7 @@
   .primary { background: var(--sg-primary); color: var(--sg-primary-ink); border-color: var(--sg-primary); }
   .big:disabled, .primary:disabled { opacity: .45; cursor: default; }
   .row { display: flex; gap: 8px; }
-  .row input { flex: 1; min-width: 0; height: 60px; font: inherit; font-size: 28px; font-weight: 800; letter-spacing: 6px; text-align: center; border: 2px solid var(--sg-line-strong); border-radius: 6px; background: #fff; color: var(--sg-ink); }
+  .row input { flex: 1; min-width: 0; height: 60px; font: inherit; font-size: 28px; font-weight: 800; letter-spacing: 6px; text-align: center; border: 2px solid var(--sg-line-strong); border-radius: 6px; background: rgba(255, 255, 255, .06); color: #fff; }
   .row button { flex: 0 0 auto; height: 60px; padding: 0 22px; font-size: 20px; font-weight: 800; border-radius: 6px; border: 2px solid var(--sg-primary); }
   .msg { min-height: 22px; margin-top: 10px; text-align: center; font-size: 15px; font-weight: 700; color: var(--sg-danger); }
   .note { font-size: 13px; color: var(--sg-ink-soft); line-height: 1.6; }
@@ -58,10 +77,10 @@
   .team.blue { border-color: var(--blue); background: var(--blue-soft); }
   .team.red { border-color: var(--red); background: var(--red-soft); }
   .team h3 { font-size: 20px; font-weight: 800; margin-bottom: 8px; }
-  .team.blue h3 { color: var(--blue); }
-  .team.red h3 { color: var(--red); }
-  .slot { height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 10px; margin-bottom: 6px; border-radius: 6px; background: rgba(255,255,255,.85); font-size: 17px; font-weight: 700; overflow: hidden; white-space: nowrap; }
-  .slot.empty { color: var(--sg-ink-faint); font-weight: 400; background: rgba(255,255,255,.45); }
+  .team.blue h3 { color: #6FA8FF; }
+  .team.red h3 { color: #FF7A70; }
+  .slot { height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 10px; margin-bottom: 6px; border-radius: 6px; background: rgba(255,255,255,.09); font-size: 17px; font-weight: 700; overflow: hidden; white-space: nowrap; }
+  .slot.empty { color: var(--sg-ink-faint); font-weight: 400; background: rgba(255,255,255,.03); }
   .slot .ch { margin-left: auto; font-size: 13px; color: var(--sg-ink-soft); font-weight: 700; }
   .slot .me { font-size: 12px; background: var(--sg-primary); color: #fff; border-radius: 4px; padding: 1px 5px; }
   .slot.mine { box-shadow: inset 0 0 0 2px var(--sg-primary); }
@@ -70,8 +89,8 @@
   .team .join { height: 30px; padding: 0 10px; border-radius: 6px; border: 2px solid; font-size: 14px; font-weight: 800; color: #fff; }
   .team.blue .join { background: var(--blue); border-color: var(--blue); }
   .team.red .join { background: var(--red); border-color: var(--red); }
-  .team .join:disabled { background: #B8BDB5; border-color: #B8BDB5; color: #F4F5F2; cursor: default; }
-  #btnSpec:disabled { background: #E6E8E3; color: #9AA096; border-color: #D2D6CF; cursor: default; }
+  .team .join:disabled { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.14); color: #8A948C; cursor: default; }
+  #btnSpec:disabled { background: rgba(255,255,255,.05); color: #6F7C72; border-color: rgba(255,255,255,.1); cursor: default; }
 
   .chars { display: flex; gap: 10px; }
   .specBox { margin-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border-radius: 8px; border: 2px solid var(--sg-line-mid); background: var(--sg-panel-alt); font-size: 16px; }
@@ -81,31 +100,31 @@
 
   .specPanel { position: absolute; top: 50px; bottom: 28px; width: 300px; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
   #specCode { position: absolute; left: 12px; bottom: 6px; font-size: 13px; font-weight: 800; color: rgba(255,255,255,.8); pointer-events: none; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
-  .spTime {background: rgba(255,255,255,.95); border-radius: 10px; padding: 6px 10px; text-align: center; border: 3px solid var(--sg-line-mid); }
+  .spTime { background: rgba(16,24,19,.86); color: #F4F1E8; border-radius: 10px; padding: 6px 10px; text-align: center; border: 2px solid rgba(255,255,255,.16); }
   .spTime b { display: block; font-size: 40px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
   .spTime b.low { color: var(--sg-danger); }
-  .spTime small { display: block; font-size: 15px; font-weight: 800; color: var(--sg-ink-soft); }
+  .spTime small { display: block; font-size: 15px; font-weight: 800; color: #A3B0A6; }
   .specPanel.blue { left: 12px; }
   .specPanel.red { right: 12px; }
   .spHead { border-radius: 10px; padding: 10px 14px; color: #fff; font-size: 24px; font-weight: 800; line-height: 1.3; }
   .specPanel.blue .spHead { background: var(--blue); }
   .specPanel.red .spHead { background: var(--red); }
   .spHead small { display: block; font-size: 16px; font-weight: 700; opacity: .95; }
-  .spCard { display: flex; gap: 10px; align-items: center; background: rgba(255,255,255,.95); border-radius: 10px; padding: 8px 10px; border: 3px solid transparent; }
+  .spCard { display: flex; gap: 10px; align-items: center; background: rgba(16,24,19,.86); color: #F4F1E8; border-radius: 10px; padding: 8px 10px; border: 2px solid transparent; }
   .specPanel.blue .spCard { border-color: rgba(47,111,214,.55); }
   .specPanel.red .spCard { border-color: rgba(214,69,61,.55); }
   .spCard.dead { opacity: .45; filter: grayscale(1); }
   .spCard img { width: 58px; height: 64px; object-fit: contain; flex: 0 0 auto; }
   .spInfo { flex: 1 1 auto; min-width: 0; }
   .spName { font-size: 20px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
-  .spName small { font-size: 14px; color: var(--sg-ink-soft); font-weight: 700; margin-left: 4px; }
-  .spBar { position: relative; height: 20px; border-radius: 5px; background: #D9DED6; overflow: hidden; margin-top: 4px; }
+  .spName small { font-size: 14px; color: #A3B0A6; font-weight: 700; margin-left: 4px; }
+  .spBar { position: relative; height: 20px; border-radius: 5px; background: rgba(255,255,255,.12); overflow: hidden; margin-top: 4px; }
   .spBar i { position: absolute; left: 0; top: 0; bottom: 0; }
   .spBar.hp i { background: #3BB273; }
   .spBar.hp.low i { background: #E0474C; }
   .spBar.ult i { background: #F2C230; }
   .spBar.ult.full i { background: #E53935; }
-  .spBar span { position: relative; display: block; text-align: center; font-size: 14px; font-weight: 800; line-height: 20px; color: #1B2B20; }
+  .spBar span { position: relative; display: block; text-align: center; font-size: 14px; font-weight: 800; line-height: 20px; color: #FFFFFF; text-shadow: 0 1px 2px rgba(0,0,0,.75); }
   .spBar.ult.full span { color: #fff; }
   .spBar.ult.act i { background: #F06BB5; }
   @media (max-width: 900px) {
@@ -128,7 +147,7 @@
           -webkit-backface-visibility: hidden; backface-visibility: hidden;
           border: 3px solid var(--sg-line-mid); border-radius: 10px; background: var(--sg-panel); padding: 8px 6px; }
   .face.back { transform: rotateY(180deg); }
-  .charCard.on .face { border-color: #D97B4F; background: #FFF6F0; box-shadow: 0 0 0 3px rgba(217,123,79,.25); }
+  .charCard.on .face { border-color: #D97B4F; background: rgba(217,123,79,.2); box-shadow: 0 0 0 3px rgba(217,123,79,.3), 0 0 22px rgba(217,123,79,.35); }
   .front img { display: block; flex: 1 1 auto; min-height: 0; width: 100%; object-fit: contain; }
   .front .nm { margin-top: auto; padding-top: 4px; }
   .charCard .nm { font-size: 20px; font-weight: 800; }
@@ -146,27 +165,30 @@
   .startHint { text-align: center; font-size: 15px; font-weight: 700; color: var(--sg-ink-soft); margin-top: 8px; min-height: 20px; }
   .secTitle { font-size: 17px; font-weight: 800; margin-bottom: 10px; }
 
-  #scrGame { position: fixed; top: 0; right: 0; bottom: 0; left: 0; background: #2A2F2B; }
-  #cv { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #scrGame { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 5; pointer-events: none; }
+  #btnLeaveGame, .actBtn, #endOv { pointer-events: auto; }
+  #cv, #ov { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #ov { pointer-events: none; }
   #hudTop { position: absolute; top: 0; left: 50%; transform: translateX(-50%); display: flex; align-items: stretch; pointer-events: none; white-space: nowrap;
-            background: rgba(255,255,255,.94); border: 1px solid var(--sg-line-mid); border-top: 0; border-radius: 0 0 10px 10px; padding: 2px 4px 4px; }
+            background: rgba(14,20,17,.8); color: #F4F1E8; border: 1px solid rgba(255,255,255,.16); border-top: 0; border-radius: 0 0 12px 12px; padding: 2px 4px 5px; box-shadow: 0 6px 18px rgba(0,0,0,.3); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
   .hdSide { display: flex; flex-direction: column; justify-content: center; padding: 0 10px; text-align: center; font-size: 12px; font-weight: 800; line-height: 1.15; min-width: 64px; }
   .hdSide b { font-size: 20px; font-variant-numeric: tabular-nums; }
-  .hdSide.b { color: var(--blue); }
-  .hdSide.r { color: var(--red); }
-  #hudMid { padding: 0 10px; border-left: 1px solid var(--sg-line-mid); border-right: 1px solid var(--sg-line-mid); text-align: center; }
+  .hdSide.b { color: #6FA8FF; }
+  .hdSide.r { color: #FF7A70; }
+  #hudMid { padding: 0 10px; border-left: 1px solid rgba(255,255,255,.16); border-right: 1px solid rgba(255,255,255,.16); text-align: center; }
   #hudTimer { font-size: 26px; font-weight: 800; line-height: 1.05; font-variant-numeric: tabular-nums; }
-  #hudTimer.low { color: var(--sg-danger); }
+  #hudTimer.low { color: #FF6B6B; text-shadow: 0 0 10px rgba(255,80,80,.7); }
   #hudCount { font-size: 13px; font-weight: 800; }
-  #hudCount .b { color: var(--blue); }
-  #hudCount .r { color: var(--red); }
-  #btnLeaveGame { position: absolute; top: 8px; right: 8px; height: 34px; padding: 0 12px; font-size: 14px; font-weight: 800; border-radius: 6px; border: 1px solid var(--sg-danger); background: rgba(255,255,255,.94); color: var(--sg-danger); }
+  #hudCount .b { color: #6FA8FF; }
+  #hudCount .r { color: #FF7A70; }
+  #btnLeaveGame { position: absolute; top: 8px; right: 8px; height: 34px; padding: 0 12px; font-size: 14px; font-weight: 800; border-radius: 6px; border: 1px solid rgba(255,138,138,.6); background: rgba(14,20,17,.8); color: #FF9A9A; }
 
   .actBtn { position: absolute; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column; font-weight: 800; color: #fff; touch-action: none; -webkit-user-select: none; user-select: none; overflow: hidden; }
-  #btnAtk { right: 26px; bottom: 44px; width: 112px; height: 112px; background: rgba(36,64,47,.88); border: 4px solid rgba(255,255,255,.9); font-size: 20px; }
+  #btnAtk { right: 26px; bottom: 44px; width: 112px; height: 112px; background: radial-gradient(circle at 50% 32%, rgba(78,128,96,.96), rgba(22,38,28,.96)); border: 4px solid rgba(255,255,255,.88); box-shadow: 0 6px 18px rgba(0,0,0,.35); font-size: 19px; line-height: 1.1; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+  #btnAtk .ic { display: block; font-style: normal; font-size: 30px; }
   #btnAtk .cd { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.35); pointer-events: none; }
   #btnAtk span, #btnUlt span { position: relative; pointer-events: none; }
-  #btnUlt { right: 150px; bottom: 50px; width: 86px; height: 86px; background: rgba(60,60,60,.55); border: 4px solid rgba(255,255,255,.6); font-size: 16px; }
+  #btnUlt { right: 150px; bottom: 50px; width: 86px; height: 86px; background: radial-gradient(circle at 50% 32%, rgba(70,74,72,.9), rgba(24,28,26,.9)); border: 4px solid rgba(255,255,255,.6); box-shadow: 0 5px 14px rgba(0,0,0,.35); font-size: 16px; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
   #btnUlt .fill { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(242,194,48,.75); pointer-events: none; }
   #btnUlt.ready { background: rgba(229,57,53,.9); border-color: #FFE08A; animation: glow 0.9s ease-in-out infinite alternate; }
   #btnUlt.ready .fill { background: rgba(229,57,53,0); }
@@ -175,21 +197,21 @@
   @keyframes glow { from { box-shadow: 0 0 6px 2px rgba(255,120,80,.6); } to { box-shadow: 0 0 22px 8px rgba(255,90,60,.95); } }
   #deadMsg { position: absolute; left: 50%; bottom: 30%; transform: translateX(-50%); background: rgba(27,43,32,.82); color: #fff; font-size: 20px; font-weight: 800; padding: 10px 20px; border-radius: 8px; pointer-events: none; white-space: nowrap; }
   #countOv { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; pointer-events: none; }
-  #countNum { font-size: 150px; font-weight: 800; color: #fff; text-shadow: 0 4px 18px rgba(0,0,0,.55); line-height: 1; }
+  #countNum { font-size: 150px; font-weight: 800; color: #FFF4D6; text-shadow: 0 6px 0 rgba(0,0,0,.35), 0 0 28px rgba(255,190,80,.8); line-height: 1; }
   #endOv { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; align-items: center; justify-content: center; padding: 16px; }
   #endOv.blue { background: rgba(47,111,214,.62); }
   #endOv.red { background: rgba(214,69,61,.62); }
   #endOv.draw { background: rgba(60,60,60,.62); }
-  .endBox { background: #fff; border-radius: 12px; padding: 24px 22px; width: 100%; max-width: 440px; text-align: center; border: 3px solid var(--sg-line-strong); }
+  .endBox { background: rgba(16,24,19,.94); color: #F4F1E8; border-radius: 12px; padding: 24px 22px; width: 100%; max-width: 440px; text-align: center; border: 2px solid rgba(255,255,255,.2); box-shadow: 0 12px 40px rgba(0,0,0,.45); }
   #endTitle { font-size: 38px; font-weight: 800; margin-bottom: 16px; }
   .scoreRow { display: flex; gap: 10px; margin-bottom: 16px; }
   .scoreRow div { flex: 1 1 0; border-radius: 8px; padding: 10px 6px; font-size: 15px; font-weight: 800; }
   .scoreRow b { display: block; font-size: 32px; }
-  .scoreRow .sb { background: var(--blue-soft); color: var(--blue); }
-  .scoreRow .sr { background: var(--red-soft); color: var(--red); }
+  .scoreRow .sb { background: rgba(47,111,214,.22); color: #8DB8FF; }
+  .scoreRow .sr { background: rgba(214,69,61,.22); color: #FF9A92; }
   .endBtns { display: flex; gap: 10px; }
-  .endBtns button { flex: 1 1 0; height: 56px; font-size: 19px; font-weight: 800; border-radius: 8px; border: 2px solid var(--sg-line-strong); background: #fff; color: var(--sg-ink); }
-  .endBtns .primary { background: var(--sg-primary); color: #fff; }
+  .endBtns button { flex: 1 1 0; height: 56px; font-size: 19px; font-weight: 800; border-radius: 8px; border: 2px solid rgba(255,255,255,.3); background: rgba(255,255,255,.06); color: #F4F1E8; }
+  .endBtns .primary { background: #3E8E5E; border-color: #3E8E5E; color: #fff; }
 
   .modal { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 50; background: rgba(27,43,32,.55); display: flex; align-items: center; justify-content: center; padding: 16px; }
   .modalBox { background: #fff; border: 2px solid var(--sg-line-strong); border-radius: 10px; padding: 22px 20px; width: 100%; max-width: 400px; }
@@ -223,11 +245,15 @@
 </style>
 </head>
 <body>
+<canvas id="cv"></canvas>
+<canvas id="ov"></canvas>
+<div id="tourFade"></div>
+<div id="tourCaption"><i></i><span id="tourCam"></span></div>
 
 <div id="scrStart" class="screen">
   <div class="wrap">
     <div class="card">
-      <h1>3v3 팀 배틀 아레나</h1>
+      <h1 class="titleMain"><span class="tb">3v3</span> 팀 배틀 <span class="tr">아레나</span></h1>
       <p class="sub">상대 팀 3명을 모두 쓰러뜨리면 승리!<br>1분이 지나면 적에게 준 피해가 많은 팀이 이깁니다.</p>
       <div class="hello">안녕하세요, <b id="helloNick"></b>님 👋 <button id="btnNickEdit" class="mini" type="button">✏️ 변경</button></div>
       <button id="btnCreate" class="big primary" type="button">방 만들기</button>
@@ -242,7 +268,7 @@
     </div>
     <div class="card note">
       <b>조작</b> — 왼쪽 아래를 누르고 끌면 이동, 오른쪽 아래 <b>공격</b> 버튼을 누른 채 끌어 방향을 정하고 떼면 발사(그냥 톡 누르면 가까운 적을 자동 조준). 컴퓨터에서는 <b>WASD</b>(방향키)로 이동, <b>K</b> 기본 공격, <b>J</b> 궁극기(자동 조준).
-      <b>궁극기</b>는 게이지가 10 모이면(명중 +2 · 사격수·암살자는 1발당 +1, 피격 +1) 빨갛게 빛나고, 궁극기를 쓰면 지속시간 동안 분홍색으로 줄어듭니다. 풀숲에 들어가면 상대 팀에게 보이지 않아요.
+      <b>궁극기</b>는 게이지가 10 모이면(명중 +2 · 궁수·도적은 1발당 +1, 피격 +1) 빨갛게 빛나고, 궁극기를 쓰면 지속시간 동안 분홍색으로 줄어듭니다. 풀숲에 들어가면 상대 팀에게 보이지 않아요.
     </div>
   </div>
 </div>
@@ -282,7 +308,6 @@
 </div>
 
 <div id="scrGame" hidden>
-  <canvas id="cv"></canvas>
   <div id="hudTop">
     <div class="hdSide b"><span>블루 피해</span><b id="hudDmgB">0</b></div>
     <div id="hudMid"><div id="hudTimer">1:00</div><div id="hudCount"></div></div>
@@ -317,11 +342,13 @@
   </div>
 </div>
 
-<script>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 (function () {
   "use strict";
 
-  var TANK_ENABLED = true;
   var KEY = 70;
   var MW = 900, MH = 1350;
   var BOUND = { l: 48, r: 852, t: 38, b: 1312 };
@@ -333,15 +360,18 @@
   var ATK_POSE_MS = 150;
   var NET_MS = 143;
   var CHARS = {
-    marksman: { name: "사격수", hp: 100, speed: 250, cd: 400, dmg: 10, range: KEY * 6, pSpeed: 950, pr: 6, shots: 2, gap: 70, perHit: 1, ultName: "난사" },
-    healer:   { name: "힐러", hp: 150, speed: 250, cd: 500, dmg: 11, range: KEY * 4, pSpeed: 700, pr: 9, perHit: 2, ultName: "회복" },
-    tank:     { name: "탱커", hp: 350, speed: 220, ultSpeed: 300, cd: 1000, dmg: 30, range: KEY * 1 + 50, arc: Math.PI * 0.7, perHit: 2, ultName: "방어태세" },
-    assassin: { name: "암살자", hp: 90, speed: 300, ultSpeed: 420, cd: 600, dmg: 20, range: 250, pSpeed: 900, pr: 8, shots: 3, gap: 80, perHit: 1, ultName: "은신" }
+    warrior: { name: "전사", icon: "🪓", hp: 220, speed: 230, ultSpeed: 300, cd: 850, dmg: 45, range: 141, arc: Math.PI * 0.55, perHit: 2, ultName: "광폭화" },
+    knight:  { name: "기사", icon: "🛡️", hp: 350, speed: 220, ultSpeed: 300, cd: 1000, dmg: 30, range: KEY * 1 + 50, arc: Math.PI * 0.7, perHit: 2, kb: 28, ultName: "방어태세" },
+    ranger:  { name: "궁수", icon: "🏹", hp: 100, speed: 250, cd: 400, dmg: 10, range: KEY * 6, pSpeed: 950, pr: 6, shots: 2, gap: 70, perHit: 1, ultName: "난사", ultAim: true },
+    mage:    { name: "마법사", icon: "🔮", hp: 150, speed: 250, cd: 500, dmg: 11, range: KEY * 4, pSpeed: 700, pr: 9, perHit: 2, ultName: "매직 버스트", ultAim: true },
+    rogue:   { name: "도적", icon: "🗡️", hp: 90, speed: 300, ultSpeed: 420, cd: 600, dmg: 30, range: 95, arc: Math.PI * 0.6, hits: 2, hitGap: 160, perHit: 1, ultName: "은신" }
   };
-  var CHAR_LIST = ["marksman", "healer", "tank", "assassin"];
+  var CHAR_LIST = ["warrior", "knight", "ranger", "mage", "rogue"];
   var ULT = { mkCount: 20, mkGap: 55, mkDmg: 18, mkSpeed: 1150, mkRange: KEY * 8, mkPr: 8,
-              hlPct: 0.10, hlDur: 3000, hlSelf: 2, hlPoseMs: 1000, tkDur: 5000, tkDef: 0.5,
+              bzDur: 4000, bzDmgMul: 1.5, bzCdMul: 0.7, tkDur: 5000, tkDef: 0.5,
+              mbDelay: 700, mbR: 150, mbDmg: 90, mbCast: 380, mbMin: 60,
               asSmokeMs: 400, asDur: 10000 };
+  function isMelee(c) { return !!CHARS[c].arc; }
   var STEALTH_ALPHA = 0.4;
   var STEALTH_REVEAL_DIST = 100;
   var BOT_VIEW = 600;
@@ -368,29 +398,7 @@
   ];
   var FONT = '"Nanum Gothic", "Malgun Gothic", sans-serif';
 
-  var SPR = {
-    marksman: { pre: "mk",
-      back:  { idle: [88, true], atk: [92, true], ult: [104, true] },
-      front: { idle: [88, true], atk: [90, false], ult: [104, false] } },
-    healer: { pre: "hl",
-      back:  { idle: [84, true], walk: [84, true], atk: [90, true], ult: [112, true] },
-      front: { idle: [69, false], walk: [68, false], atk: [77, false], ult: [100, true] } },
-    tank: { pre: "tk",
-      back:  { idle: [100, false], walk: [100, false], atk: [108, true] },
-      front: { idle: [100, true], walk: [100, true] } },
-    assassin: { pre: "as",
-      back:  { idle: [88, true], walk: [88, true], atk: [92, true], ult: [104, true] },
-      front: { idle: [88, false], walk: [90, false], atk: [90, false], ult: [104, true] } }
-  };
-  var TIP = {
-    "mk-blue-back-atk": [0.85, 0.10], "mk-red-back-atk": [0.89, 0.10], "mk-blue-front-atk": [0.39, 0.80], "mk-red-front-atk": [0.37, 0.76],
-    "mk-blue-back-ult": [0.85, 0.10], "mk-red-back-ult": [0.91, 0.10], "mk-blue-front-ult": [0.52, 0.70], "mk-red-front-ult": [0.42, 0.80],
-    "hl-blue-back-atk": [0.68, 0.25], "hl-red-back-atk": [0.74, 0.25], "hl-blue-front-atk": [0.27, 0.33], "hl-red-front-atk": [0.31, 0.31],
-    "as-blue-back-atk": [0.81, 0.19], "as-red-back-atk": [0.82, 0.20], "as-blue-front-atk": [0.05, 0.53], "as-red-front-atk": [0.06, 0.52]
-  };
-  var TIP_BLEND = 110;
   var FACE_BY_MOVE = true;
-  var BULLET_NATIVE = Math.atan2(-128, 99);
 
   var $ = function (id) { return document.getElementById(id); };
   function hyp(x, y) { return Math.sqrt(x * x + y * y); }
@@ -403,22 +411,6 @@
   function show(el, on) { if (on) el.removeAttribute("hidden"); else el.setAttribute("hidden", ""); }
   function setText(el, t) { if (el._t !== t) { el._t = t; el.textContent = t; } }
   function setHtml(el, t) { if (el._h !== t) { el._h = t; el.innerHTML = t; } }
-
-  var IMG = {};
-  (function loadImages() {
-    var names = ["rock", "wall", "bush", "aura", "smoke", "ult-bullet-blue", "ult-bullet-red", "shuriken-blue", "shuriken-red"];
-    ["blue", "red"].forEach(function (tm) {
-      ["back", "front"].forEach(function (v) {
-        ["idle", "atk", "ult"].forEach(function (p) { names.push("mk-" + tm + "-" + v + "-" + p); });
-        ["idle", "walk", "atk", "ult"].forEach(function (p) { names.push("hl-" + tm + "-" + v + "-" + p); names.push("as-" + tm + "-" + v + "-" + p); });
-        ["idle", "walk"].forEach(function (p) { names.push("tk-" + tm + "-" + v + "-" + p); });
-      });
-      names.push("tk-" + tm + "-back-atk");
-    });
-    names.forEach(function (n) { var im = new Image(); im.src = "img/teambattle/" + n + ".png"; IMG[n] = im; });
-    var bg = new Image(); bg.src = "img/teambattle/arena-bg.jpg"; IMG.bg = bg;
-  })();
-  function ready(im) { return im && im.complete && im.naturalWidth > 0; }
 
   var AC = null;
   function audio() {
@@ -443,6 +435,7 @@
     else if (k === "orb") tone(620, 0.12, "sine", 0.08, 1.6);
     else if (k === "hit") tone(180, 0.12, "sawtooth", 0.09, 0.5);
     else if (k === "confirm") tone(1320, 0.05, "triangle", 0.06);
+    else if (k === "boom") tone(130, 0.4, "sawtooth", 0.1, 0.35);
     else if (k === "heal") { tone(760, 0.12, "sine", 0.07, 1.3); setTimeout(function () { tone(1140, 0.14, "sine", 0.06); }, 70); }
     else if (k === "ult") { tone(300, 0.35, "sawtooth", 0.08, 3); }
     else if (k === "swing") tone(240, 0.12, "triangle", 0.1, 0.4);
@@ -508,7 +501,7 @@
   function isHost() { return !!room && room.host === myId; }
 
   function newPlayer(team, joinedAt) {
-    return { nickname: nick, isAI: false, team: team, characterType: "marksman", joinedAt: joinedAt };
+    return { nickname: nick, isAI: false, team: team, characterType: "ranger", joinedAt: joinedAt };
   }
 
   function roomCodes() {
@@ -588,7 +581,8 @@
     leaving = false;
     var ref = db.ref(ROOT + "/" + code);
     room = { code: code, ref: ref, mode: null, status: "lobby", host: null, startAt: 0, winner: null, endedAt: 0, final: null, roster: null };
-    P = {}; R = {}; PR = {}; MELEE = {}; FX = []; G = null; ME = null; BOTS = {}; ST = {}; SHOTS = []; hitSubs = {};
+    clear3d();
+    P = {}; R = {}; PR = {}; MELEE = {}; FX = []; BURSTS = []; G = null; ME = null; BOTS = {}; ST = {}; SHOTS = []; hitSubs = {};
     ref.child("players/" + myId).onDisconnect().remove();
 
     var pref = ref.child("players");
@@ -666,7 +660,7 @@
     if (room) { leaving = true; unsubAll(); try { room.ref.child("players/" + myId).onDisconnect().cancel(); } catch (e) {} }
     room = null; resetLocal(); showScreen("start"); startMsg(msg || "");
   }
-  function resetLocal() { P = {}; R = {}; PR = {}; MELEE = {}; FX = []; G = null; ME = null; BOTS = {}; ST = {}; SHOTS = []; hitSubs = {}; joy.id = null; aim.id = null; }
+  function resetLocal() { clear3d(); BURSTS = []; P = {}; R = {}; PR = {}; MELEE = {}; FX = []; G = null; ME = null; BOTS = {}; ST = {}; SHOTS = []; hitSubs = {}; joy.id = null; aim.id = null; }
   window.addEventListener("pagehide", function () { if (room) { try { room.ref.child("players/" + myId).remove(); } catch (e) {} } });
 
   var screenNow = "start";
@@ -721,7 +715,7 @@
     });
     if (!moved) { flashHint("AI 대전은 블루팀 " + TEAM_MAX + "명 + 관전자 " + SPEC_MAX + "명까지예요. 레드팀 인원을 줄인 뒤 바꿔 주세요."); return; }
     if (mode === "ai") {
-      var chars = ["marksman", Math.random() < 0.5 ? "healer" : "assassin", TANK_ENABLED ? "tank" : "marksman"];
+      var chars = aiLineup();
       var t = now();
       chars.forEach(function (c, i) {
         u["players/ai" + (i + 1)] = { nickname: CHARS[c].name, isAI: true, team: "red", characterType: c, joinedAt: t + i };
@@ -730,22 +724,31 @@
     room.ref.update(u);
   }
 
-  function charImgSrc(c, team) {
-    var tm = team === "red" ? "red" : "blue";
-    return "img/teambattle/" + SPR[c].pre + "-" + tm + "-front-idle.png";
+  function pick(list) { return list[Math.floor(Math.random() * list.length)]; }
+  function aiLineup() {
+    var melee = pick(["warrior", "knight"]), ranged = pick(["ranger", "mage"]);
+    var rest = CHAR_LIST.filter(function (c) { return c !== melee && c !== ranged; });
+    return [ranged, pick(rest), melee];
+  }
+  var ICON_SRC = {};
+  function charImgSrc(c) {
+    if (!ICON_SRC[c]) ICON_SRC[c] = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 110"><text x="50" y="76" font-size="66" text-anchor="middle">' + CHARS[c].icon + "</text></svg>");
+    return ICON_SRC[c];
   }
 
   var flipped = null;
   function num(v) { return String(Math.round(v * 10) / 10); }
   function ultDesc(k) {
-    if (k === "marksman") return "짧은 시간 내에 " + num(ULT.mkDmg) + "의 데미지를 주는 " + ULT.mkCount + "발의 총알을 발사합니다.";
-    if (k === "healer") return "아군 모두 " + num(ULT.hlDur / 1000) + "초간 매 초 최대 체력의 " + num(ULT.hlPct * 100) + "%를 회복합니다. (힐러 자신은 " + ULT.hlSelf + "배)";
-    if (k === "tank") return num(ULT.tkDur / 1000) + "초간 이동속도가 " + CHARS.tank.ultSpeed + "으로 빨라지고 받는 피해가 " + num((1 - ULT.tkDef) * 100) + "% 감소합니다.";
-    if (k === "assassin") return num(ULT.asDur / 1000) + "초간 이동속도가 " + CHARS.assassin.ultSpeed + "으로 빨라지고 은신 상태가 됩니다. 다음 공격을 하면 은신이 해제됩니다.";
+    if (k === "warrior") return num(ULT.bzDur / 1000) + "초간 공격력이 " + num(ULT.bzDmgMul) + "배가 되고 공격이 빨라지며 이동속도가 " + CHARS.warrior.ultSpeed + "으로 빨라집니다.";
+    if (k === "knight") return num(ULT.tkDur / 1000) + "초간 이동속도가 " + CHARS.knight.ultSpeed + "으로 빨라지고 받는 피해가 " + num((1 - ULT.tkDef) * 100) + "% 감소합니다.";
+    if (k === "ranger") return "짧은 시간 내에 " + num(ULT.mkDmg) + "의 데미지를 주는 " + ULT.mkCount + "발의 화살을 연속으로 쏩니다.";
+    if (k === "mage") return "정한 곳에 " + num(ULT.mbDelay / 1000) + "초 뒤 폭발을 일으켜 반경 " + ULT.mbR + " 안의 적에게 " + ULT.mbDmg + "의 데미지를 주고, 아군(자신 포함)은 " + ULT.mbDmg + "만큼 회복합니다.";
+    if (k === "rogue") return num(ULT.asDur / 1000) + "초간 이동속도가 " + CHARS.rogue.ultSpeed + "으로 빨라지고 은신 상태가 됩니다. 다음 공격을 하면 은신이 풀리며 기습합니다.";
     return "";
   }
   function statTable(c) {
-    var dmg = num(c.dmg) + (c.shots > 1 ? " * " + c.shots : "");
+    var times = c.shots || c.hits || 1, dmg = num(c.dmg) + (times > 1 ? " * " + times : "");
     return '<table class="st"><tr><th>HP</th><td>' + c.hp + "</td></tr><tr><th>공격</th><td>" + dmg + "</td></tr>" +
            "<tr><th>초당 공격</th><td>" + num(1000 / c.cd) + "회</td></tr>" +
            "<tr><th>이동속도</th><td>" + c.speed + (c.ultSpeed ? " (궁 " + c.ultSpeed + ")" : "") + "</td></tr>" +
@@ -754,10 +757,10 @@
   function cardsHtml(me) {
     var h = "";
     CHAR_LIST.forEach(function (k) {
-      var c = CHARS[k], off = k === "tank" && !TANK_ENABLED;
+      var c = CHARS[k];
       h += '<button type="button" class="charCard' + (me.characterType === k ? " on" : "") + (flipped === k && me.characterType === k ? " flip" : "") +
-        '" data-c="' + k + '"' + (off ? " disabled" : "") + '><div class="cardIn">' +
-        '<div class="face front">' + (off ? '<span class="soon">준비 중</span><div class="tankPh">🛡️</div>' : '<img alt="" src="' + charImgSrc(k, me.team) + '">') +
+        '" data-c="' + k + '"><div class="cardIn">' +
+        '<div class="face front"><img alt="" src="' + charImgSrc(k) + '">' +
           '<div class="nm">' + c.name + "</div></div>" +
         '<div class="face back"><div class="nm">' + c.name + "</div>" + statTable(c) +
           '<div class="ultDesc"><b>궁극기 설명</b>' + ultDesc(k) + "</div></div>" +
@@ -782,7 +785,7 @@
         if (!id) { h += '<div class="slot empty">빈 자리</div>'; continue; }
         var p = P[id];
         h += '<div class="slot' + (id === myId ? " mine" : "") + '">' + (room.host === id ? '<span class="host">👑</span>' : "") + (p.isAI ? "🤖 " : "") + esc(p.nickname) +
-             (id === myId ? ' <span class="me">나</span>' : "") + '<span class="ch">' + esc((CHARS[p.characterType] || CHARS.marksman).name) + "</span></div>";
+             (id === myId ? ' <span class="me">나</span>' : "") + '<span class="ch">' + esc((CHARS[p.characterType] || CHARS.ranger).name) + "</span></div>";
       }
       return h;
     }
@@ -819,7 +822,6 @@
     var b = e.target.closest ? e.target.closest(".charCard") : null;
     if (!b || b.disabled || !room || room.status !== "lobby") return;
     var c = b.getAttribute("data-c");
-    if (c === "tank" && !TANK_ENABLED) return;
     var me = P[myId]; if (!me) return;
     if (me.characterType === c) {
       flipped = flipped === c ? null : c;
@@ -853,15 +855,12 @@
   function startGame() {
     if (!isHost() || room.status !== "lobby") return;
     audio();
-    var u = {}, roster = {}, st = {};
+    var u = {}, roster = {}, st = {}, lineup = aiLineup();
     ["blue", "red"].forEach(function (team) {
       teamIds(team).slice(0, 3).forEach(function (id, i) {
-        var p = P[id], c = CHARS[p.characterType] ? p.characterType : "marksman";
-        if (c === "tank" && !TANK_ENABLED) c = "marksman";
+        var p = P[id], c = CHARS[p.characterType] ? p.characterType : "ranger";
         var sp = spawnOf(team, i + 1), base = "players/" + id + "/";
-        if (p.isAI && (c === "healer" || c === "assassin")) {
-          c = Math.random() < 0.5 ? "healer" : "assassin"; u[base + "nickname"] = CHARS[c].name;
-        }
+        if (p.isAI) { c = lineup[i]; u[base + "nickname"] = CHARS[c].name; }
         u[base + "slot"] = i + 1; u[base + "characterType"] = c;
         st[stKey(team, i + 1)] = packState(sp.x, sp.y, sp.angle, false);
         u[base + "hp"] = CHARS[c].hp; u[base + "alive"] = true; u[base + "skillGauge"] = 0; u[base + "damageDealt"] = 0;
@@ -897,21 +896,23 @@
   var PR = {};
   var MELEE = {};
   var FX = [];
+  var BURSTS = [];
   var handled = {};
 
   function makeEnt(id, d) {
-    var c = CHARS[d.characterType] ? d.characterType : "marksman", pos = stateOf(d);
+    var c = CHARS[d.characterType] ? d.characterType : "ranger", pos = stateOf(d);
     return { id: id, team: d.team, char: c, nickname: d.nickname, isAI: !!d.isAI,
              x: pos.x, y: pos.y, angle: pos.angle, hp: d.hp == null ? CHARS[c].hp : +d.hp, maxHp: CHARS[c].hp,
              alive: d.alive !== false, gauge: +d.skillGauge || 0, dmg: +d.damageDealt || 0,
-             cdUntil: 0, atkAt: 0, ultUntil: 0, buffUntil: 0, stealthUntil: +d.stealthUntil || 0, regenUntil: 0, regenRate: 0,
+             cdUntil: 0, cdDur: 0, atkAt: 0, ultUntil: 0, buffUntil: 0, stealthUntil: +d.stealthUntil || 0, regenUntil: 0,
              skillUntil: +d.skillUntil || 0, skillDur: +d.skillDur || 0,
-             burst: null, volley: null, mv: false, pending: null, regenOwner: null, healGot: {} };
+             burst: null, volley: null, mv: false, pending: null, healGot: {} };
   }
   function initGame() {
+    clear3d();
     G = { startAt: room.startAt, endSent: false, playingSent: false, lastNet: 0, sent: {}, finalSent: false, beeped: -1 };
     ME = isSpec() ? null : makeEnt(myId, P[myId]);
-    BOTS = {}; R = {}; FX = []; handled = {};
+    BOTS = {}; R = {}; FX = []; BURSTS = []; handled = {};
     lastHp = {};
     show($("endOv"), false);
   }
@@ -940,7 +941,7 @@
       if (pos.mv && hyp(tx - r.x, ty - r.y) > 3) { r.moveAng = Math.atan2(ty - r.y, tx - r.x); r.moveAt = now(); }
       if (hyp(tx - r.x, ty - r.y) > 250) { r.x = tx; r.y = ty; } else { r.x += (tx - r.x) * k; r.y += (ty - r.y) * k; }
       r.angle = lerpAng(r.angle, pos.angle, Math.min(1, dt * 15));
-      r.team = d.team; r.char = CHARS[d.characterType] ? d.characterType : "marksman"; r.maxHp = CHARS[r.char].hp;
+      r.team = d.team; r.char = CHARS[d.characterType] ? d.characterType : "ranger"; r.maxHp = CHARS[r.char].hp;
       r.hp = +d.hp; r.alive = d.alive !== false; r.gauge = +d.skillGauge || 0; r.dmg = +d.damageDealt || 0;
       r.mv = pos.mv; r.atkAt = +d.atkAt || 0; r.ultUntil = +d.ultUntil || 0; r.buffUntil = +d.buffUntil || 0; r.nickname = d.nickname; r.isAI = !!d.isAI;
       r.regenUntil = +d.regenUntil || 0; r.skillUntil = +d.skillUntil || 0; r.skillDur = +d.skillDur || 0;
@@ -993,10 +994,11 @@
   }
   function speedOf(E) {
     var t = now(), c = CHARS[E.char];
-    if (E.char === "tank" && E.buffUntil > t) return c.ultSpeed;
-    if (E.char === "assassin" && E.stealthUntil > t) return c.ultSpeed;
+    if ((E.char === "knight" || E.char === "warrior") && E.buffUntil > t) return c.ultSpeed;
+    if (E.char === "rogue" && E.stealthUntil > t) return c.ultSpeed;
     return c.speed;
   }
+  function berserk(E, t) { return E.char === "warrior" && E.buffUntil > (t || now()); }
   function moveEnt(E, vx, vy, dt) {
     var m = hyp(vx, vy); if (m > 1) { vx /= m; vy /= m; }
     var sp = speedOf(E);
@@ -1064,7 +1066,7 @@
     var ev = s.val(); if (!ev || !G || handled[s.key]) return;
     handled[s.key] = 1;
     var info = P[ev.o]; if (!info || (info.team !== "blue" && info.team !== "red")) return;
-    var c = CHARS[info.characterType] ? info.characterType : "marksman", skill = !!ev.s;
+    var c = CHARS[info.characterType] ? info.characterType : "ranger", skill = !!ev.s;
     var count = skill ? ULT.mkCount : (CHARS[c].shots || 1), gap = skill ? ULT.mkGap : (CHARS[c].gap || 0);
     if (now() - ev.t > count * gap + 3000) return;
     SHOTS.push({ key: s.key, ev: ev, team: info.team, char: c, skill: skill, count: count, gap: gap, next: 0 });
@@ -1087,7 +1089,7 @@
     addProj(v.key + "_" + i, { team: v.team, owner: v.ev.o, ownerCharacterType: v.char, x: ox + dx * 20, y: oy + dy * 20,
       vx: dx * sp, vy: dy * sp, isSkill: v.skill, dmg: v.skill ? ULT.mkDmg : c.dmg,
       pr: v.skill ? ULT.mkPr : c.pr, range: v.skill ? ULT.mkRange : c.range, createdAt: v.ev.t + i * v.gap });
-    if (E && (E === ME || BOTS[E.id]) && hear(E)) sfx(v.char === "healer" ? "orb" : (v.char === "assassin" ? "star" : "shoot"));
+    if (E && (E === ME || BOTS[E.id]) && hear(E)) sfx(v.char === "mage" ? "orb" : (v.char === "rogue" ? "star" : "shoot"));
     return true;
   }
   function pruneLocal(t) {
@@ -1142,10 +1144,10 @@
     }
   }
   function damage(T, amount, owner, basic) {
-    if (T.char === "tank" && T.buffUntil > now()) amount = Math.round(amount * ULT.tkDef);
+    if (T.char === "knight" && T.buffUntil > now()) amount = Math.round(amount * ULT.tkDef);
     var dm = Math.min(amount, T.hp);
     T.hp -= dm; if (!skillActive(T)) T.gauge = Math.min(GAUGE_MAX, T.gauge + 1);
-    if (T.hp <= 0) { T.hp = 0; T.alive = false; T.burst = null; T.volley = null; T.regenUntil = 0; T.skillUntil = 0; if (T === ME) { sfx("down"); aim.id = null; joy.id = null; } }
+    if (T.hp <= 0) { T.hp = 0; T.alive = false; T.burst = null; T.volley = null; T.slash = null; T.regenUntil = 0; T.skillUntil = 0; if (T === ME) { sfx("down"); aim.id = null; joy.id = null; } }
     else if (T === ME) sfx("hit");
     pushHit(owner, dm, basic);
     if (T === ME || T.bot) G.forceNet = true;
@@ -1174,16 +1176,32 @@
   function onEffect(s) {
     var e = s.val(); if (!e || !G || handled[s.key]) return;
     handled[s.key] = 1;
-    var until = e.createdAt + (e.dur || ULT.hlDur);
-    if (now() > until) return;
-    if (e.type === "healAll") {
-      localTargets().forEach(function (T) {
-        if (T.team !== e.team || !T.alive) return;
-        T.regenUntil = until; T.regenRate = e.pct * (T.id === e.owner ? ULT.hlSelf : 1); T.regenOwner = e.owner;
+    if (e.type !== "burst" || now() > e.createdAt + e.delay + 1500) return;
+    BURSTS.push({ e: e, vis: null });
+  }
+  function stepBursts(t) {
+    BURSTS = BURSTS.filter(function (b) {
+      var e = b.e;
+      if (t < e.createdAt + e.delay) return true;
+      if (room.status === "playing") localTargets().forEach(function (T) {
+        if (!T.alive || hyp(T.x - e.x, T.y - e.y) > e.r + BODY_R) return;
+        if (T.team !== e.team) { damage(T, e.dmg, e.owner, false); return; }
+        var healed = Math.min(T.maxHp - T.hp, e.dmg);
+        if (healed <= 0) return;
+        T.hp += healed; T.healGot[e.owner] = (T.healGot[e.owner] || 0) + healed;
+        G.forceNet = true;
         if (T === ME) sfx("heal");
       });
-      G.forceNet = true;
-    }
+      boom(e.x, e.y, e.r, e.team);
+      if (!ME || hyp(e.x - ME.x, e.y - ME.y) < 700) sfx("boom");
+      dropBurstVis(b);
+      return false;
+    });
+  }
+  var MELEE_SPARK = { warrior: "#FF9A3C", knight: "#FFFFFF", rogue: "#DCE3EC" };
+  function inArc(T, d) {
+    var dx = T.x - d.x, dy = T.y - d.y;
+    return hyp(dx, dy) <= d.radius + BODY_R && Math.abs(angDiff(Math.atan2(dy, dx), d.angle)) <= d.arc / 2 + 0.25;
   }
   function onMelee(key, d) {
     if (!d) return;
@@ -1191,17 +1209,27 @@
     if (!G || handled[key]) return;
     handled[key] = 1;
     if (now() - d.createdAt > 1500) return;
+    var who = P[d.owner] ? P[d.owner].characterType : "";
+    participants().forEach(function (id) {
+      var T = ent(id);
+      if (!T || T.team === d.team || !T.alive || !inArc(T, d)) return;
+      if (!ME || ME.team === T.team || visibleTo(T, ME)) spark(T.x, T.y, MELEE_SPARK[who] || "#FFFFFF", who === "knight" ? 1.5 : 1);
+    });
     localTargets().forEach(function (T) {
-      if (T.team === d.team || !T.alive) return;
+      if (T.team === d.team || !T.alive || !inArc(T, d)) return;
       var dx = T.x - d.x, dy = T.y - d.y;
-      if (hyp(dx, dy) > d.radius + BODY_R) return;
-      if (Math.abs(angDiff(Math.atan2(dy, dx), d.angle)) > d.arc / 2 + 0.25) return;
       damage(T, d.dmg, d.owner, true);
+      if (d.kb && T.alive) {
+        var dd = hyp(dx, dy) || 1;
+        T.x += dx / dd * d.kb; T.y += dy / dd * d.kb; resolve(T);
+      }
     });
   }
-  function swing(E, ang) {
-    var c = CHARS.tank;
-    var d = { team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), radius: c.range, angle: r1(ang), arc: c.arc, dmg: c.dmg, createdAt: now() };
+  function swing(E, ang, rage) {
+    var c = CHARS[E.char];
+    var d = { team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), radius: c.range, angle: r1(ang), arc: c.arc,
+              dmg: Math.round(c.dmg * (rage ? ULT.bzDmgMul : 1)), createdAt: now() };
+    if (c.kb) d.kb = c.kb;
     room.ref.child("meleeHits").push(d);
     E.atkAt = now();
     if (hear(E)) sfx("swing");
@@ -1209,41 +1237,59 @@
 
   function canAct() { return G && room.status === "playing" && now() >= room.startAt && ME && ME.alive; }
   function fireBasic(E, ang) {
-    var c = CHARS[E.char];
-    E.cdUntil = now() + c.cd; E.angle = ang;
-    if (E.char === "assassin" && E.stealthUntil > now()) {
-      E.stealthUntil = E.skillUntil = now(); G.forceNet = true;
+    var c = CHARS[E.char], t = now(), rage = berserk(E, t);
+    E.cdDur = c.cd * (rage ? ULT.bzCdMul : 1); E.cdUntil = t + E.cdDur; E.angle = ang;
+    if (E.char === "rogue" && E.stealthUntil > t) {
+      E.stealthUntil = E.skillUntil = t; G.forceNet = true;
     }
-    if (E.char === "tank") { swing(E, ang); return; }
+    if (isMelee(E.char)) {
+      swing(E, ang, rage);
+      if (c.hits > 1) E.slash = { left: c.hits - 1, at: t + c.hitGap, ang: ang };
+      return;
+    }
     emitShots(E, ang, false);
-    if (c.shots > 1) E.volley = { until: now() + (c.shots - 1) * c.gap };
+    if (c.shots > 1) E.volley = { until: t + (c.shots - 1) * c.gap };
   }
   function tryFire(E, ang) {
     if (now() >= E.cdUntil) { fireBasic(E, ang); E.pending = null; }
     else E.pending = { ang: ang, until: now() + 350 };
   }
-  function useUlt(E, ang) {
+  function burstSpot(E, ang, reach) {
+    if (reach == null) {
+      var T = autoAimTarget(E);
+      if (T && hyp(T.x - E.x, T.y - E.y) <= ULT.mbCast) return { x: T.x, y: T.y };
+      reach = ULT.mbCast * 0.6;
+    }
+    reach = clamp(reach, ULT.mbMin, ULT.mbCast);
+    return { x: clamp(E.x + Math.cos(ang) * reach, BOUND.l, BOUND.r), y: clamp(E.y + Math.sin(ang) * reach, BOUND.t, BOUND.b) };
+  }
+  function useUlt(E, ang, reach) {
     if (E.gauge < GAUGE_MAX || !E.alive) return;
     E.gauge = 0;
     var t = now();
-    if (E.char === "marksman") {
+    if (E.char === "ranger") {
       E.angle = ang; E.burst = { until: t + (ULT.mkCount - 1) * ULT.mkGap };
       E.ultUntil = t + ULT.mkCount * ULT.mkGap + 200;
       emitShots(E, ang, true);
-    } else if (E.char === "healer") {
-      E.ultUntil = t + ULT.hlPoseMs;
-      room.ref.child("effects").push({ type: "healAll", team: E.team, owner: E.id, pct: ULT.hlPct, dur: ULT.hlDur, createdAt: t });
-      E.skillDur = ULT.hlDur;
-    } else if (E.char === "tank") {
+    } else if (E.char === "mage") {
+      var spot = burstSpot(E, ang, reach);
+      E.angle = Math.atan2(spot.y - E.y, spot.x - E.x);
+      E.ultUntil = t + 450;
+      room.ref.child("effects").push({ type: "burst", team: E.team, owner: E.id, x: Math.round(spot.x), y: Math.round(spot.y),
+                                       r: ULT.mbR, dmg: ULT.mbDmg, delay: ULT.mbDelay, createdAt: t });
+    } else if (E.char === "warrior") {
+      E.buffUntil = t + ULT.bzDur;
+      E.skillDur = ULT.bzDur;
+    } else if (E.char === "knight") {
       E.buffUntil = t + ULT.tkDur;
       E.skillDur = ULT.tkDur;
-    } else if (E.char === "assassin") {
+    } else if (E.char === "rogue") {
       E.ultUntil = t + ULT.asSmokeMs;
       E.stealthUntil = t + ULT.asSmokeMs + ULT.asDur;
       E.skillDur = ULT.asSmokeMs + ULT.asDur;
       smoke(E.x, E.y);
     }
-    if (E.skillDur && E.char !== "marksman") E.skillUntil = t + E.skillDur;
+    if (E.skillDur && E.char !== "ranger" && E.char !== "mage") E.skillUntil = t + E.skillDur;
     if (hear(E)) sfx("ult");
     G.forceNet = true;
   }
@@ -1255,13 +1301,14 @@
     }
     if (E.burst && t >= E.burst.until) E.burst = null;
     if (E.volley && t >= E.volley.until) E.volley = null;
-    if (E.regenUntil > t) {
-      var hpBefore = E.hp;
-      E.hp = Math.min(E.maxHp, E.hp + E.maxHp * E.regenRate * dt);
-      if (E.regenOwner) E.healGot[E.regenOwner] = (E.healGot[E.regenOwner] || 0) + (E.hp - hpBefore);
+    if (E.slash && t >= E.slash.at) {
+      var sl = E.slash;
+      swing(E, sl.ang, berserk(E, t));
+      sl.left--; sl.at += CHARS[E.char].hitGap;
+      if (sl.left <= 0) E.slash = null;
     }
   }
-  function autoAimAngle(E) {
+  function autoAimTarget(E) {
     var best = null, bd = Infinity, open = null, od = Infinity;
     participants().forEach(function (id) {
       var o = ent(id); if (!o || !o.alive || o.team === E.team) return;
@@ -1270,8 +1317,11 @@
       if (d < bd) { bd = d; best = o; }
       if (d < od && losClear(E.x, E.y, o.x, o.y)) { od = d; open = o; }
     });
-    var t = open || best;
-    return t ? Math.atan2(t.y - E.y, t.x - E.x) : E.angle;
+    return open || best;
+  }
+  function autoAimAngle(E) {
+    var T = autoAimTarget(E);
+    return T ? Math.atan2(T.y - E.y, T.x - E.x) : E.angle;
   }
 
   function pickWanderPoint(B, t) {
@@ -1288,11 +1338,11 @@
 
   function stepBot(B, dt) {
     if (!B.alive) { B.mv = false; return; }
-    var t = now(), c = CHARS[B.char], k = B.bot;
-    var enemies = [], allies = [];
+    var t = now(), c = CHARS[B.char], k = B.bot, melee = isMelee(B.char);
+    var enemies = [];
     participants().forEach(function (id) {
       var o = ent(id); if (!o || !o.alive || id === B.id) return;
-      if (o.team === B.team) allies.push(o); else enemies.push(o);
+      if (o.team !== B.team) enemies.push(o);
     });
     var target = null, td = Infinity;
     enemies.forEach(function (o) {
@@ -1302,24 +1352,16 @@
       if (d < td) { td = d; target = o; }
     });
     if (target !== k.target) { k.target = target; k.seenAt = t; }
-    var healT = null;
-    if (B.char === "healer" && !target) {
-      var low = 0.9;
-      allies.forEach(function (a) { var ratio = a.hp / a.maxHp; if (ratio < low) { low = ratio; healT = a; } });
-    }
 
     var mx = 0, my = 0;
     if (target) {
       var dx = target.x - B.x, dy = target.y - B.y, d = hyp(dx, dy) || 1, ux = dx / d, uy = dy / d;
-      var want = B.char === "tank" ? c.range * 0.6 : c.range * 0.72;
+      var want = melee ? c.range * 0.6 : c.range * 0.72;
       var los = losClear(B.x, B.y, target.x, target.y);
       if (!los || d > want + 40) { mx += ux; my += uy; }
       else if (d < want - 90) { mx -= ux * 0.8; my -= uy * 0.8; }
       var s = Math.sin(t / 900 + k.seed) * 0.7;
       mx += -uy * s; my += ux * s;
-    } else if (healT) {
-      var hx = healT.x - B.x, hy = healT.y - B.y, hd = hyp(hx, hy) || 1;
-      if (hd > 260) { mx = hx / hd; my = hy / hd; }
     } else {
       if (!k.wanderUntil || t > k.wanderUntil || hyp(k.wx - B.x, k.wy - B.y) < 50) pickWanderPoint(B, t);
       var ddx = k.wx - B.x, ddy = k.wy - B.y, dd = hyp(ddx, ddy) || 1;
@@ -1340,12 +1382,12 @@
     if (aimAt) B.angle = Math.atan2(aimAt.y - B.y, aimAt.x - B.x);
     else if (B.mv) B.angle = Math.atan2(my, mx);
     if (B.burst) return;
-    if (target && B.gauge >= GAUGE_MAX && t - k.seenAt > 500 && losClear(B.x, B.y, target.x, target.y)) {
-      useUlt(B, Math.atan2(target.y - B.y, target.x - B.x)); return;
+    if (target && B.gauge >= GAUGE_MAX && t - k.seenAt > 500 && losClear(B.x, B.y, target.x, target.y) && (B.char !== "mage" || td <= ULT.mbCast)) {
+      useUlt(B, Math.atan2(target.y - B.y, target.x - B.x), td); return;
     }
     if (aimAt && t >= B.cdUntil && t - k.seenAt > BOT_REACT_MS) {
       var ad = hyp(aimAt.x - B.x, aimAt.y - B.y);
-      var rng = B.char === "tank" ? c.range + BODY_R - 4 : c.range;
+      var rng = melee ? c.range + BODY_R - 4 : c.range;
       if (ad <= rng && losClear(B.x, B.y, aimAt.x, aimAt.y)) fireBasic(B, B.angle + (Math.random() - 0.5) * 2 * BOT_AIM_ERR);
     }
   }
@@ -1474,7 +1516,7 @@
   window.addEventListener("keyup", function (e) { var k = keyName(e); if (k) KEY_ON[k] = false; });
   window.addEventListener("blur", function () { for (var k in KEY_ON) KEY_ON[k] = false; });
 
-  var cv = $("cv"), ctx = cv.getContext("2d");
+  var cv = $("cv"), ov = $("ov"), octx = ov.getContext("2d");
   var joy = { id: null, ox: 0, oy: 0, x: 0, y: 0 };
   var aim = { id: null, btn: null, ox: 0, oy: 0, dx: 0, dy: 0, drag: false };
   var JOY_R = 60, DRAG_MIN = 14;
@@ -1499,13 +1541,14 @@
   function joyEnd(e) { if (e.pointerId === joy.id) joy.id = null; }
   cv.addEventListener("pointerup", joyEnd); cv.addEventListener("pointercancel", joyEnd);
 
+  function burstReach() { return ULT.mbMin + clamp((hyp(aim.dx, aim.dy) - DRAG_MIN) / 130, 0, 1) * (ULT.mbCast - ULT.mbMin); }
   function bindAimButton(el, which) {
     el.addEventListener("pointerdown", function (e) {
       audio(); e.preventDefault();
       if (!canAct() || aim.id !== null) return;
       if (which === "ult") {
         if (ME.gauge < GAUGE_MAX || ME.burst) return;
-        if (ME.char !== "marksman") {
+        if (!CHARS[ME.char].ultAim) {
           var ua = autoAimAngle(ME); ME.angle = ua; useUlt(ME, ua); return;
         }
       }
@@ -1519,13 +1562,13 @@
     });
     function up(e) {
       if (e.pointerId !== aim.id) return;
-      var btn = aim.btn, drag = aim.drag && hyp(aim.dx, aim.dy) > DRAG_MIN;
+      var btn = aim.btn, drag = aim.drag && hyp(aim.dx, aim.dy) > DRAG_MIN, reach = drag ? burstReach() : null;
       aim.id = null;
       if (!canAct() || e.type === "pointercancel") return;
       var ang = drag ? screenToWorldAngle(Math.atan2(aim.dy, aim.dx)) : autoAimAngle(ME);
       ME.angle = ang;
       if (btn === "atk") tryFire(ME, ang);
-      else if (btn === "ult") useUlt(ME, ang);
+      else if (btn === "ult") useUlt(ME, ang, reach);
     }
     el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up);
     el.addEventListener("touchstart", function (e) { e.preventDefault(); }, { passive: false });
@@ -1534,189 +1577,713 @@
   bindAimButton($("btnUlt"), "ult");
 
   var W = 0, H = 0, DPR = 1;
+  var TOUCH = !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+  var PIX = Math.min(window.devicePixelRatio || 1, TOUCH ? 1.5 : 1.75), PIX_MIN = 0.75;
+  var renderer = null;
+  try { renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: !TOUCH, powerPreference: "high-performance" }); } catch (e) { renderer = null; }
+  var CAM_FOV = 40;
+  var CAM = { pitchPlay: 0.92, pitchSpec: 1.12, dist: 1400, look: new THREE.Vector3(MW / 2, 0, MH / 2), fitKey: "", snap: true, halfW: 0 };
+  var VIEW_AHEAD = 570, VIEW_BEHIND = 290, VIEW_HALF_W = 280, VIEW_NEAR_PAD = 110;
+  var HEAD_Y = 110;
+  var C_TEAM = { blue: 0x2F6FD6, red: 0xD6453D }, C_FX = { blue: 0x5FA2FF, red: 0xFF6A5F };
+  var scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x2A2F2B);
+  var camera = new THREE.PerspectiveCamera(CAM_FOV, 1, 20, 9000);
+
   function resize() {
     DPR = Math.min(2, window.devicePixelRatio || 1);
     W = window.innerWidth; H = window.innerHeight;
-    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    ov.width = Math.round(W * DPR); ov.height = Math.round(H * DPR);
+    if (renderer) { renderer.setPixelRatio(PIX); renderer.setSize(W, H, false); }
+    camera.aspect = W / Math.max(1, H); camera.updateProjectionMatrix();
+    CAM.fitKey = "";
   }
   window.addEventListener("resize", resize);
-  resize();
+
+  scene.fog = new THREE.Fog(0x33443A, 3200, 7500);
+  scene.background = new THREE.Color(0x33443A);
+  scene.add(new THREE.AmbientLight(0xffffff, 1.5));
+  var sun = new THREE.DirectionalLight(0xffffff, 2.0);
+  sun.position.set(MW / 2 - 400, 900, MH / 2 + 300); sun.target.position.set(MW / 2, 0, MH / 2);
+  scene.add(sun); scene.add(sun.target);
+
+  function flatMesh(geo, mat) { var m = new THREE.Mesh(geo, mat); m.rotation.x = -Math.PI / 2; return m; }
+  var outerGround = flatMesh(new THREE.PlaneGeometry(MW * 14, MH * 14), new THREE.MeshLambertMaterial({ color: 0x4E6B43 }));
+  outerGround.position.set(MW / 2, -3, MH / 2); scene.add(outerGround);
+  var groundMat = new THREE.MeshLambertMaterial({ color: 0xE9DCC6 });
+  var ground = flatMesh(new THREE.PlaneGeometry(MW, MH), groundMat);
+  ground.position.set(MW / 2, 0, MH / 2); scene.add(ground);
+  new THREE.TextureLoader().load("img/teambattle/arena-bg.jpg", function (tx) {
+    tx.colorSpace = THREE.SRGBColorSpace;
+    tx.anisotropy = renderer ? Math.min(4, renderer.capabilities.getMaxAnisotropy()) : 1;
+    groundMat.map = tx; groundMat.color.set(0xffffff); groundMat.needsUpdate = true;
+  });
+
+  var simpleProps = new THREE.Group(); scene.add(simpleProps);
+  var rockMat = new THREE.MeshLambertMaterial({ color: 0x8E8A7E }), wallMat = new THREE.MeshLambertMaterial({ color: 0xB08A5C });
+  OBST.forEach(function (o) {
+    var m;
+    if (o.circle) { m = new THREE.Mesh(new THREE.CylinderGeometry(o.r * 0.82, o.r, 48, 14), rockMat); m.position.set(o.x, 24, o.y); }
+    else { m = new THREE.Mesh(new THREE.BoxGeometry(o.w, 54, o.h), wallMat); m.position.set(o.x, 27, o.y); }
+    simpleProps.add(m);
+  });
+  var BUSH_VIS = BUSH.map(function (b) {
+    var mat = new THREE.MeshLambertMaterial({ color: 0x3E8E41, transparent: true, opacity: 0.6, depthWrite: false });
+    var m = new THREE.Mesh(new THREE.CylinderGeometry(b.r, b.r * 1.05, 36, 22), mat);
+    m.position.set(b.x, 18, b.y); m.renderOrder = 2; simpleProps.add(m);
+    return { mats: [mat], full: 0.6, fade: 1 };
+  });
+
+  var GEO = {
+    body: new THREE.CapsuleGeometry(17, 34, 4, 12),
+    nose: new THREE.ConeGeometry(8, 18, 10),
+    ring: new THREE.RingGeometry(24, 29, 36),
+    meRing: new THREE.RingGeometry(31, 34, 36),
+    shadow: new THREE.CircleGeometry(24, 24),
+    ball: new THREE.SphereGeometry(1, 12, 8),
+    shaft: new THREE.BoxGeometry(30, 3, 3),
+    head: new THREE.ConeGeometry(3.5, 9, 6),
+    trail: new THREE.BoxGeometry(1, 3, 3),
+    ringFx: new THREE.RingGeometry(0.75, 1, 28),
+    disc: new THREE.CircleGeometry(1, 40),
+    strip: new THREE.PlaneGeometry(1, 1)
+  };
+  GEO.nose.rotateZ(-Math.PI / 2);
+  GEO.head.rotateZ(-Math.PI / 2); GEO.head.translate(18, 0, 0);
+  GEO.trail.translate(-0.5, 0, 0);
+  GEO.strip.translate(0.5, 0, 0);
+  var shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.22, depthWrite: false });
+  var meRingMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, depthWrite: false });
+  var SECTOR = {}, CRESCENT = {};
+  function sectorGeo(radius, arc) {
+    var k = Math.round(radius) + ":" + arc.toFixed(3);
+    return SECTOR[k] || (SECTOR[k] = new THREE.CircleGeometry(radius, 28, -arc / 2, arc));
+  }
+  function crescentGeo(radius, arc) {
+    var k = Math.round(radius) + ":" + arc.toFixed(3);
+    return CRESCENT[k] || (CRESCENT[k] = new THREE.RingGeometry(radius * 0.7, radius, 28, 1, -arc / 2, arc));
+  }
+  var MATS = {};
+  function basicMat(key, color, opacity) {
+    return MATS[key] || (MATS[key] = new THREE.MeshBasicMaterial({ color: color, transparent: opacity < 1, opacity: opacity }));
+  }
+  function glowMat(key, color, opacity) {
+    return MATS[key] || (MATS[key] = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: opacity, depthWrite: false, blending: THREE.AdditiveBlending }));
+  }
+
+  var KIT_DIR = "assets/kaykit/";
+  var MODEL = {
+    warrior: { file: "Barbarian", right: "axe_1handed" },
+    knight:  { file: "Knight", right: "sword_1handed", left: "shield_badge_color" },
+    ranger:  { file: "Ranger", right: "crossbow_2handed" },
+    mage:    { file: "Mage", right: "staff" },
+    rogue:   { file: "Rogue", right: "dagger", left: "dagger" }
+  };
+  var PROP_FILES = { bushBig: "Bush_1_D_Color1", bushMid: "Bush_1_C_Color1", rockA: "Rock_1_H_Color1", rockB: "Rock_1_I_Color1",
+                     blockA: "Rock_2_C_Color1", blockB: "Rock_2_D_Color1", treeA: "Tree_1_A_Color1", treeB: "Tree_2_B_Color1",
+                     treeC: "Tree_3_A_Color1", treeD: "Tree_4_B_Color1" };
+  var MODEL_SCALE = 38;
+  var KIT = { ready: false, chars: {}, weapons: {}, clips: {}, props: {} };
+  function lambertize(root) {
+    var made = new Map();
+    root.traverse(function (o) {
+      if (!o.isMesh) return;
+      var m = made.get(o.material);
+      if (!m) { m = new THREE.MeshLambertMaterial({ map: o.material.map, side: o.material.side }); made.set(o.material, m); }
+      o.material = m;
+    });
+    return root;
+  }
+  function loadKit() {
+    var loader = new GLTFLoader();
+    function load(url) { return new Promise(function (ok, no) { loader.load(url, ok, undefined, no); }); }
+    var weaponNames = [];
+    CHAR_LIST.forEach(function (c) { [MODEL[c].right, MODEL[c].left].forEach(function (w) { if (w && weaponNames.indexOf(w) < 0) weaponNames.push(w); }); });
+    var jobs = [load(KIT_DIR + "animations/teambattle_anims.glb").then(function (g) { g.animations.forEach(function (clip) { KIT.clips[clip.name] = clip; }); })];
+    weaponNames.forEach(function (w) { jobs.push(load(KIT_DIR + "props/" + w + ".gltf").then(function (g) { KIT.weapons[w] = lambertize(g.scene); })); });
+    CHAR_LIST.forEach(function (c) { jobs.push(load(KIT_DIR + "characters/" + MODEL[c].file + ".glb").then(function (g) { KIT.chars[c] = lambertize(g.scene); })); });
+    Promise.all(jobs).then(function () {
+      CHAR_LIST.forEach(function (c) {
+        var m = KIT.chars[c], spec = MODEL[c];
+        if (spec.right) m.getObjectByName("handslotr").add(KIT.weapons[spec.right].clone());
+        if (spec.left) m.getObjectByName("handslotl").add(KIT.weapons[spec.left].clone());
+      });
+      KIT.ready = true;
+      makePortraits();
+      buildShowcase();
+    }).catch(function () { KIT.failed = true; });
+    Promise.all(keys(PROP_FILES).map(function (k) {
+      return load(KIT_DIR + "props/" + PROP_FILES[k] + ".gltf").then(function (g) { KIT.props[k] = lambertize(g.scene); });
+    })).then(buildArenaProps).catch(function () {});
+  }
+
+  var SEED = 20260926;
+  function seeded() { SEED = (SEED * 1664525 + 1013904223) % 4294967296; return SEED / 4294967296; }
+  var PROP_BOX = new Map();
+  function propSize(tpl) {
+    var b = PROP_BOX.get(tpl);
+    if (!b) { b = new THREE.Box3().setFromObject(tpl); PROP_BOX.set(tpl, b); }
+    return b;
+  }
+  function fitProp(tpl, w, h, d, x, z, yaw) {
+    var b = propSize(tpl), size = b.getSize(new THREE.Vector3()), m = tpl.clone();
+    var sx = w / size.x, sy = h / size.y, sz = d / size.z;
+    m.scale.set(sx, sy, sz);
+    m.rotation.y = yaw || 0;
+    m.position.set(x, -b.min.y * sy, z);
+    return m;
+  }
+  function buildArenaProps() {
+    var P3 = KIT.props, g = new THREE.Group();
+    OBST.forEach(function (o, i) {
+      if (o.circle) {
+        g.add(fitProp(i % 2 ? P3.rockB : P3.rockA, o.r * 2.1, o.r * 1.25, o.r * 2.1, o.x, o.y, seeded() * Math.PI * 2));
+        return;
+      }
+      var along = o.w >= o.h, len = along ? o.w : o.h, thick = along ? o.h : o.w;
+      var n = Math.max(2, Math.round(len / (thick * 1.15))), piece = len / n;
+      for (var j = 0; j < n; j++) {
+        var off = -len / 2 + piece * (j + 0.5), tpl = seeded() < 0.5 ? P3.blockA : P3.blockB, hgt = 52 + seeded() * 14;
+        var yaw = Math.floor(seeded() * 4) * Math.PI / 2;
+        var ww = piece * 1.1, dd = thick * 1.12;
+        if (yaw % Math.PI) { var sw = ww; ww = dd; dd = sw; }
+        g.add(fitProp(tpl, along ? ww : dd, hgt, along ? dd : ww, along ? o.x + off : o.x, along ? o.y : o.y + off, yaw));
+      }
+    });
+    BUSH.forEach(function (b, i) {
+      var mat = null, bush = new THREE.Group();
+      bush.add(fitProp(P3.bushBig, b.r * 1.25, 74, b.r * 1.25, b.x, b.y, seeded() * 6.28));
+      var n = b.r > 62 ? 6 : 5;
+      for (var j = 0; j < n; j++) {
+        var a = j / n * Math.PI * 2 + seeded() * 0.4, rr = b.r * 0.62;
+        bush.add(fitProp(P3.bushMid, b.r * 0.8, 52 + seeded() * 10, b.r * 0.8, b.x + Math.cos(a) * rr, b.y + Math.sin(a) * rr, seeded() * 6.28));
+      }
+      bush.traverse(function (o) {
+        if (!o.isMesh) return;
+        if (!mat) { mat = o.material.clone(); mat.transparent = true; }
+        o.material = mat;
+      });
+      g.add(bush);
+      BUSH_VIS[i] = { mats: [mat], full: 1, fade: 1 };
+    });
+    var trees = [P3.treeA, P3.treeB, P3.treeC, P3.treeD];
+    for (var z = -60; z <= MH + 60; z += 170) {
+      [-110 - seeded() * 80, MW + 110 + seeded() * 80].forEach(function (x) {
+        var h = 230 + seeded() * 120;
+        g.add(fitProp(trees[Math.floor(seeded() * 4)], h * 0.7, h, h * 0.7, x, z + seeded() * 60, seeded() * 6.28));
+      });
+    }
+    for (var x = 60; x <= MW - 60; x += 200) {
+      [-140 - seeded() * 60, MH + 140 + seeded() * 60].forEach(function (zz) {
+        var h = 230 + seeded() * 120;
+        g.add(fitProp(trees[Math.floor(seeded() * 4)], h * 0.7, h, h * 0.7, x + seeded() * 60, zz, seeded() * 6.28));
+      });
+    }
+    scene.add(g);
+    simpleProps.visible = false;
+  }
+
+  function makePortraits() {
+    if (!renderer) return;
+    var PW = 200, PH = 220;
+    var rt = new THREE.WebGLRenderTarget(PW, PH);
+    rt.texture.colorSpace = THREE.SRGBColorSpace;
+    var ps = new THREE.Scene();
+    ps.add(new THREE.AmbientLight(0xffffff, 1.6));
+    var dl = new THREE.DirectionalLight(0xffffff, 2.2); dl.position.set(1.5, 3, 4); ps.add(dl);
+    var pc = new THREE.PerspectiveCamera(30, PW / PH, 0.1, 50);
+    var buf = new Uint8Array(PW * PH * 4), cvs = document.createElement("canvas");
+    cvs.width = PW; cvs.height = PH;
+    var c2 = cvs.getContext("2d"), img = c2.createImageData(PW, PH);
+    var oldClear = renderer.getClearColor(new THREE.Color()), oldAlpha = renderer.getClearAlpha();
+    renderer.setClearColor(0x000000, 0);
+    CHAR_LIST.forEach(function (c) {
+      var m = SkeletonUtils.clone(KIT.chars[c]);
+      m.rotation.y = -0.45; ps.add(m);
+      var mix = new THREE.AnimationMixer(m); mix.clipAction(KIT.clips.Idle_A).play(); mix.update(0.3);
+      m.updateMatrixWorld(true);
+      var box = new THREE.Box3().setFromObject(m), mid = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3());
+      var dist = size.y / 2 / Math.tan(15 * Math.PI / 180) * 1.12;
+      pc.position.set(mid.x, mid.y + size.y * 0.08, mid.z + dist); pc.lookAt(mid);
+      renderer.setRenderTarget(rt); renderer.clear(); renderer.render(ps, pc);
+      renderer.readRenderTargetPixels(rt, 0, 0, PW, PH, buf);
+      for (var y = 0; y < PH; y++) img.data.set(buf.subarray((PH - 1 - y) * PW * 4, (PH - y) * PW * 4), y * PW * 4);
+      c2.putImageData(img, 0, 0);
+      ICON_SRC[c] = cvs.toDataURL("image/png");
+      ps.remove(m);
+    });
+    renderer.setRenderTarget(null);
+    renderer.setClearColor(oldClear, oldAlpha);
+    rt.dispose();
+    playersChanged();
+  }
+
+  var VIS = {}, PRV = {}, MLV = {};
+  var auraMat = new THREE.MeshBasicMaterial({ color: 0xFF3B1F, transparent: true, opacity: 0.3, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+  GEO.aura = new THREE.CylinderGeometry(30, 22, 84, 18, 1, true);
+  GEO.aura.translate(0, 42, 0);
+  function makeVis(E, parent) {
+    var root = new THREE.Group(), body = new THREE.Group();
+    var v = { root: root, body: body, team: E.team, char: E.char, yaw: -E.angle, mats: [], glowMats: [], kit: false,
+              atkSeen: E.atkAt, ultSeen: E.ultUntil, combo: 0, cur: null, curName: "", once: null, speed: 0, px: E.x, py: E.y, dead: !E.alive };
+    if (KIT.ready) {
+      var model = SkeletonUtils.clone(KIT.chars[E.char]), made = new Map();
+      model.rotation.y = Math.PI / 2; model.scale.setScalar(MODEL_SCALE);
+      model.traverse(function (o) {
+        if (!o.isMesh) return;
+        o.frustumCulled = false;
+        var m = made.get(o.material);
+        if (!m) { m = o.material.clone(); m.transparent = true; made.set(o.material, m); v.mats.push(m); v.glowMats.push(m); }
+        o.material = m;
+      });
+      body.add(model);
+      v.kit = true; v.mixer = new THREE.AnimationMixer(model); v.actions = {};
+    } else {
+      var mat = new THREE.MeshLambertMaterial({ color: C_TEAM[E.team], transparent: true });
+      var noseMat = new THREE.MeshLambertMaterial({ color: 0xFFF3D6, transparent: true });
+      var cap = new THREE.Mesh(GEO.body, mat); cap.position.y = 34;
+      var nose = new THREE.Mesh(GEO.nose, noseMat); nose.position.set(20, 48, 0);
+      body.add(cap); body.add(nose);
+      v.mats.push(mat, noseMat); v.glowMats.push(mat);
+    }
+    root.add(body);
+    var shadow = flatMesh(GEO.shadow, shadowMat); shadow.position.y = 0.6; root.add(shadow);
+    var ringMat = new THREE.MeshBasicMaterial({ color: C_TEAM[E.team], transparent: true, depthWrite: false });
+    var ring = flatMesh(GEO.ring, ringMat); ring.position.y = 1.2; root.add(ring);
+    v.mats.push(ringMat); v.ring = ring;
+    var meRing = flatMesh(GEO.meRing, meRingMat); meRing.position.y = 1.4; meRing.visible = E.id === myId; root.add(meRing);
+    if (E.char === "warrior") { v.aura = new THREE.Mesh(GEO.aura, auraMat); v.aura.visible = false; root.add(v.aura); }
+    (parent || scene).add(root);
+    return v;
+  }
+
+  function clipAction(v, name) {
+    return v.actions[name] || (v.actions[name] = v.mixer.clipAction(KIT.clips[name]));
+  }
+  function showClip(v, name, ts, loop, restart) {
+    var a = clipAction(v, name);
+    a.timeScale = ts;
+    if (name === v.curName && !restart) return;
+    a.reset();
+    if (loop) a.setLoop(THREE.LoopRepeat, Infinity);
+    else { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; }
+    var fade = v.cur ? (restart && name === v.curName ? 0 : 0.14) : 0;
+    if (v.cur && v.cur !== a) v.cur.fadeOut(fade);
+    a.setEffectiveWeight(1);
+    if (fade) a.fadeIn(fade);
+    a.play();
+    v.cur = a; v.curName = name;
+  }
+  function playOnce(v, name, ts, t) {
+    v.once = { name: name, ts: ts, until: t + KIT.clips[name].duration / ts * 1000 - 90, fresh: true };
+  }
+  var ROGUE_COMBO = ["Melee_Dualwield_Attack_Chop", "Melee_Dualwield_Attack_Slice"];
+  function attackClip(v, E, t) {
+    if (E.char === "warrior") return ["Melee_1H_Attack_Chop", berserk(E, t) ? 2.0 : 1.4];
+    if (E.char === "knight") return ["Melee_1H_Attack_Slice_Horizontal", 1.5];
+    if (E.char === "ranger") return ["Ranged_2H_Shoot", 2.2];
+    if (E.char === "mage") return ["Ranged_Magic_Shoot", 1.8];
+    if (v.wasStealth) { v.combo = 1; return ["Melee_Dualwield_Attack_Stab", 2.2]; }
+    return [ROGUE_COMBO[v.combo++ % 2], 2.4];
+  }
+  function animate(v, E, t, dt, hurt) {
+    if (!v.kit) return;
+    if (E.atkAt !== v.atkSeen) {
+      v.atkSeen = E.atkAt;
+      if (E.alive && t - E.atkAt < 600) {
+        var ac = attackClip(v, E, t);
+        playOnce(v, ac[0], ac[1], t);
+        if (E.char === "ranger" && !(E.ultUntil > t)) v.againAt = E.atkAt + CHARS.ranger.gap;
+      }
+    }
+    if (E.char === "mage" && E.ultUntil !== v.ultSeen) {
+      v.ultSeen = E.ultUntil;
+      if (E.alive && E.ultUntil > t) { playOnce(v, "Ranged_Magic_Spellcasting_Long", 2.6, t); v.once.soft = true; }
+    }
+    if (v.againAt && t >= v.againAt) { v.againAt = 0; if (v.once && v.once.name === "Ranged_2H_Shoot") v.once.fresh = true; }
+    if (hurt && E.alive && (!v.once || v.once.name === "Hit_A")) playOnce(v, "Hit_A", 1.6, t);
+    v.wasStealth = stealthed(E, t);
+    var moved = hyp(E.x - v.px, E.y - v.py) / Math.max(dt, 0.001);
+    v.px = E.x; v.py = E.y;
+    v.speed += (moved - v.speed) * Math.min(1, dt * 10);
+    if (v.once && (t > v.once.until || !E.alive || (v.once.soft && E.mv && v.speed > 15))) v.once = null;
+    if (!E.alive) {
+      if (!v.dead) { v.dead = true; showClip(v, "Death_A", 1, false); }
+      else if (!v.curName) showClip(v, "Death_A_Pose", 1, false);
+    } else {
+      v.dead = false;
+      if (E.char === "ranger" && E.ultUntil > t) showClip(v, "Ranged_2H_Shoot", 3.5, true);
+      else if (v.once) { showClip(v, v.once.name, v.once.ts, false, v.once.fresh); v.once.fresh = false; }
+      else if (E.char === "knight" && E.buffUntil > t) showClip(v, "Melee_Blocking", 1, true);
+      else if (E.mv && v.speed > 150) showClip(v, "Running_A", clamp(v.speed / 260, 0.7, 1.6), true);
+      else if (E.mv && v.speed > 15) showClip(v, "Walking_A", clamp(v.speed / 110, 0.6, 1.4), true);
+      else showClip(v, "Idle_A", 1, true);
+    }
+    v.mixer.update(dt);
+  }
+  function dropVis(id) { var v = VIS[id]; if (!v) return; v.root.parent.remove(v.root); v.mats.forEach(function (m) { m.dispose(); }); delete VIS[id]; }
+
+  function makeProjVis(p) {
+    var d = p.d, g = new THREE.Group();
+    if (d.ownerCharacterType === "mage") {
+      var halo = new THREE.Mesh(GEO.ball, glowMat("orbGlow-" + d.team, C_FX[d.team], 0.35)); halo.scale.setScalar(20); g.add(halo);
+      var orb = new THREE.Mesh(GEO.ball, basicMat("orb-" + d.team, C_FX[d.team], 0.9)); orb.scale.setScalar(10); g.add(orb);
+      var core = new THREE.Mesh(GEO.ball, basicMat("orbCore", 0xffffff, 1)); core.scale.setScalar(5); g.add(core);
+      g.userData.pulse = orb;
+    } else {
+      var volley = d.isSkill, col = volley ? 0xFF8A3D : C_FX[d.team];
+      var shaft = new THREE.Mesh(GEO.shaft, basicMat("shaft", 0xEADFC4, 1)); if (volley) shaft.scale.set(1.2, 1.4, 1.4); g.add(shaft);
+      g.add(new THREE.Mesh(GEO.head, basicMat("head-" + (volley ? "v" : d.team), col, 1)));
+      var trail = new THREE.Mesh(GEO.trail, glowMat("trail-" + (volley ? "v" : d.team), col, 0.45)); trail.position.x = -15; trail.scale.set(volley ? 70 : 50, volley ? 1.8 : 1.3, volley ? 1.8 : 1.3); g.add(trail);
+    }
+    g.rotation.y = -Math.atan2(p.dy, p.dx);
+    scene.add(g);
+    return g;
+  }
+  function dropProjVis(id) { var g = PRV[id]; if (!g) return; scene.remove(g); delete PRV[id]; }
+
+  var MELEE_COLOR = { warrior: 0xFF9A3C, knight: 0xFFFFFF, rogue: 0xC9D6E6 };
+  function makeMeleeVis(d) {
+    var g = new THREE.Group(), who = P[d.owner] ? P[d.owner].characterType : "", col = MELEE_COLOR[who] || 0xFFFFFF, R = d.radius + BODY_R;
+    var fillM = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.2, depthWrite: false });
+    var edgeM = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending });
+    var fill = flatMesh(sectorGeo(R, d.arc), fillM); fill.position.y = 2;
+    var edge = flatMesh(crescentGeo(R, d.arc), edgeM); edge.position.y = 24;
+    g.add(fill); g.add(edge); g.position.set(d.x, 0, d.y); g.rotation.y = -d.angle;
+    g.userData = { fill: fillM, edge: edgeM, edgeMesh: edge };
+    scene.add(g);
+    return g;
+  }
+  function dropMelee(k) { var g = MLV[k]; if (!g) return; scene.remove(g); g.userData.fill.dispose(); g.userData.edge.dispose(); delete MLV[k]; }
+
+  function makeBurstVis(e) {
+    var g = new THREE.Group(), col = C_FX[e.team];
+    var baseMat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.18, depthWrite: false });
+    var fillMat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.35, depthWrite: false });
+    var edgeMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, depthWrite: false });
+    var base = flatMesh(GEO.disc, baseMat); base.scale.setScalar(e.r); base.position.y = 2;
+    var fill = flatMesh(GEO.disc, fillMat); fill.scale.setScalar(0.01); fill.position.y = 2.2;
+    var edge = flatMesh(GEO.ringFx, edgeMat); edge.scale.setScalar(e.r); edge.position.y = 2.4;
+    g.add(base); g.add(fill); g.add(edge);
+    g.position.set(e.x, 0, e.y);
+    g.userData = { fill: fill, edge: edge, mats: [baseMat, fillMat, edgeMat] };
+    scene.add(g);
+    return g;
+  }
+  function dropBurstVis(b) {
+    if (!b.vis) return;
+    scene.remove(b.vis); b.vis.userData.mats.forEach(function (m) { m.dispose(); }); b.vis = null;
+  }
+
+  var aimGrp = new THREE.Group(); aimGrp.visible = false; scene.add(aimGrp);
+  var aimMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.38, depthWrite: false });
+  var aimStrip = flatMesh(GEO.strip, aimMat); aimStrip.position.y = 2.5; aimGrp.add(aimStrip);
+  var aimSector = flatMesh(sectorGeo(100, 1), aimMat); aimSector.position.y = 2.5; aimGrp.add(aimSector);
+  var aimCircle = flatMesh(GEO.disc, aimMat); aimCircle.position.y = 2.5; aimGrp.add(aimCircle);
+  function updateAimGuide() {
+    var on = aim.id !== null && aim.drag && ME && ME.alive;
+    aimGrp.visible = !!on;
+    if (!on) return;
+    var ult = aim.btn === "ult", c = CHARS[ME.char];
+    aimGrp.position.set(ME.x, 0, ME.y); aimGrp.rotation.y = -ME.angle;
+    aimMat.color.set(ult ? 0xFF503C : 0xffffff);
+    aimStrip.visible = aimSector.visible = aimCircle.visible = false;
+    if (ult && ME.char === "mage") {
+      aimCircle.visible = true; aimCircle.position.x = burstReach(); aimCircle.scale.setScalar(ULT.mbR);
+    } else if (c.arc && !ult) {
+      aimSector.visible = true; aimSector.geometry = sectorGeo(c.range + BODY_R, c.arc);
+    } else {
+      var len = ult ? ULT.mkRange : c.range, wx = Math.cos(ME.angle), wy = Math.sin(ME.angle), hw = ult ? 12 : 8;
+      len = rayCast(ME.x + wx * 20, ME.y + wy * 20, wx, wy, len, 6) + 20;
+      aimStrip.visible = true; aimStrip.position.x = 18; aimStrip.scale.set(Math.max(1, len - 18), hw * 2, 1);
+    }
+  }
 
   var lastHp = {};
-  function spark(x, y, color) { FX.push({ k: "spark", x: x, y: y, c: color, t: Date.now(), life: 260 }); }
-  function smoke(x, y) { FX.push({ k: "smoke", x: x, y: y, t: Date.now(), life: ULT.asSmokeMs + 150 }); }
+  function spark(x, y, color, size) { FX.push({ k: "spark", x: x, y: y, c: color, s: size || 1, t: Date.now(), life: 260 }); }
+  function smoke(x, y) { FX.push({ k: "smoke", x: x, y: y, c: 0xC8C8CD, t: Date.now(), life: ULT.asSmokeMs + 150 }); }
+  function boom(x, y, r, team) { FX.push({ k: "boom", x: x, y: y, r: r, c: C_FX[team] || 0xffffff, t: Date.now(), life: 450 }); }
   function floatText(x, y, text, color) { FX.push({ k: "txt", x: x, y: y, s: text, c: color, t: Date.now(), life: 800 }); }
-
-  var S = 1, camX = 0, camY = 0;
-  function V(x, y) { return flip() ? { x: MW - x, y: MH - y } : { x: x, y: y }; }
-  function viewAngle(a) { return flip() ? a + Math.PI : a; }
-
-  function atkPoseMs(k) {
-    var c = CHARS[k];
-    return ATK_POSE_MS * (k === "tank" ? 2 : 1) + (c.shots > 1 ? (c.shots - 1) * c.gap : 0);
+  function hitColor(d) { return d.ownerCharacterType === "mage" ? (d.team === "blue" ? "#B08CFF" : "#FF8CE0") : (d.team === "blue" ? "#5FA2FF" : "#FF6A5F"); }
+  function fxMesh(f) {
+    var mat = new THREE.MeshBasicMaterial({ color: f.c, transparent: true, depthWrite: false, side: THREE.DoubleSide }), m;
+    if (f.k === "spark") { m = new THREE.Mesh(GEO.ringFx, mat); m.position.set(f.x, 36, f.y); }
+    else if (f.k === "smoke") { m = new THREE.Mesh(GEO.ball, mat); m.position.set(f.x, 30, f.y); }
+    else { m = flatMesh(GEO.ringFx, mat); m.position.set(f.x, 3, f.y); }
+    scene.add(m);
+    return m;
   }
-  function drawSprite(E, alpha, t) {
-    var p = V(E.x, E.y), pose = "idle", walking = false;
-    if (E.ultUntil > t && E.char !== "tank") pose = "ult";
-    else if (t >= E.atkAt && t - E.atkAt < atkPoseMs(E.char)) pose = "atk";
-    else if (E.mv && E.alive) { walking = true; pose = Math.floor(t / 200) % 2 ? "walk" : "idle"; }
-    var useMove = FACE_BY_MOVE && pose !== "atk" && pose !== "ult" && E.moveAng != null && E.moveAt > E.atkAt &&
-                  !(E === ME && aim.id !== null && aim.drag);
-    var va = viewAngle(useMove ? E.moveAng : E.angle);
-    var back = Math.sin(va) < 0, right = Math.cos(va) >= 0;
-    var bob = 0;
+  function stepFx(nowMs) {
+    FX = FX.filter(function (f) {
+      var alive = nowMs - f.t < f.life;
+      if (!alive && f.mesh) { scene.remove(f.mesh); f.mesh.material.dispose(); f.mesh = null; }
+      return alive;
+    });
+    FX.forEach(function (f) {
+      if (f.k === "txt") return;
+      if (!f.mesh) f.mesh = fxMesh(f);
+      var k = (nowMs - f.t) / f.life, m = f.mesh;
+      m.material.opacity = 1 - k;
+      if (f.k === "spark") { m.scale.setScalar((8 + k * 22) * f.s); m.quaternion.copy(camera.quaternion); }
+      else if (f.k === "smoke") { m.scale.setScalar(35 + 45 * Math.sin(Math.min(1, k * 1.4) * Math.PI / 2)); m.material.opacity = k < 0.6 ? 0.9 : 0.9 * (1 - (k - 0.6) / 0.4); }
+      else if (f.k === "boom") m.scale.setScalar(f.r * (0.4 + 0.7 * k));
+    });
+  }
+  function clear3d() {
+    keys(VIS).forEach(dropVis); keys(PRV).forEach(dropProjVis); keys(MLV).forEach(dropMelee);
+    FX.forEach(function (f) { if (f.mesh) { scene.remove(f.mesh); f.mesh.material.dispose(); f.mesh = null; } });
+    BURSTS.forEach(dropBurstVis);
+    aimGrp.visible = false; CAM.snap = true;
+  }
 
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.fillStyle = "rgba(0,0,0,.22)";
-    ctx.beginPath(); ctx.ellipse(p.x, p.y + 22, 22, 8, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = E.team === "blue" ? "#2F6FD6" : "#D6453D"; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.ellipse(p.x, p.y + 22, 24, 9, 0, 0, Math.PI * 2); ctx.stroke();
-    if (E === ME) { ctx.strokeStyle = "#FFFFFF"; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(p.x, p.y + 22, 29, 12, 0, 0, Math.PI * 2); ctx.stroke(); }
-
-    if (E.buffUntil > t && ready(IMG.aura)) {
-      var ah = E.char === "tank" ? 130 : 110, aw = ah * IMG.aura.naturalWidth / IMG.aura.naturalHeight;
-      ctx.globalAlpha = alpha * (0.75 + 0.25 * Math.sin(t / 120));
-      ctx.drawImage(IMG.aura, p.x - aw / 2, p.y - 6 - ah / 2, aw, ah);
-      ctx.globalAlpha = alpha;
+  var tmpV = new THREE.Vector3();
+  function camBasis(fl) { return fl ? { fx: 0, fz: 1 } : { fx: 0, fz: -1 }; }
+  function placeCamera(lx, lz, dist, pitch, b) {
+    var h = Math.cos(pitch) * dist;
+    camera.position.set(lx - b.fx * h, Math.sin(pitch) * dist, lz - b.fz * h);
+    camera.lookAt(lx, 0, lz);
+    camera.updateMatrixWorld();
+  }
+  function fitsView(pts, lx, lz, dist, pitch, xMax) {
+    placeCamera(lx, lz, dist, pitch, camBasis(false));
+    for (var i = 0; i < pts.length; i++) {
+      tmpV.set(pts[i][0], pts[i][1], pts[i][2]).project(camera);
+      if (tmpV.z > 1 || Math.abs(tmpV.x) > xMax || Math.abs(tmpV.y) > 0.97) return false;
     }
-    if (E.regenUntil > t && E.alive) {
-      ctx.globalAlpha = alpha * (0.55 + 0.25 * Math.sin(t / 110));
-      ctx.fillStyle = "rgba(90,220,120,.45)"; ctx.strokeStyle = "#5ADC78"; ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.ellipse(p.x, p.y + 22, 34, 14, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      ctx.globalAlpha = alpha;
+    return true;
+  }
+  function fitDist(pts, lx, lz, pitch, xMax) {
+    var lo = 100, hi = 9000;
+    for (var i = 0; i < 24; i++) { var mid = (lo + hi) / 2; if (fitsView(pts, lx, lz, mid, pitch, xMax)) hi = mid; else lo = mid; }
+    return hi;
+  }
+  function groundReach(ndcY) {
+    placeCamera(0, 0, CAM.dist, CAM.pitchPlay, camBasis(false));
+    tmpV.set(0, ndcY, 0.5).unproject(camera).sub(camera.position);
+    if (tmpV.y >= -1e-6) return ndcY < 0 ? 9999 : -9999;
+    var k = -camera.position.y / tmpV.y;
+    return camera.position.z + tmpV.z * k;
+  }
+  function updateCamera(dt) {
+    var spec = !ME, fl = !spec && flip(), b = camBasis(fl);
+    var key = W + "x" + H + (spec ? "s" + specPanelW() : "p") + (fl ? "f" : "");
+    if (CAM.fitKey !== key) {
+      CAM.fitKey = key; CAM.snap = true;
+      if (spec) {
+        var xMax = Math.max(0.3, 1 - 2 * (specPanelW() + 16) / Math.max(1, W));
+        CAM.dist = fitDist([[0, 0, MH], [MW, 0, MH], [0, HEAD_Y, 0], [MW, HEAD_Y, 0]], MW / 2, MH / 2, CAM.pitchSpec, xMax);
+      } else {
+        var half = (VIEW_AHEAD - VIEW_BEHIND) / 2;
+        CAM.dist = fitDist([[-VIEW_HALF_W, 0, -VIEW_AHEAD], [VIEW_HALF_W, 0, -VIEW_AHEAD], [-VIEW_HALF_W, 0, VIEW_BEHIND], [VIEW_HALF_W, 0, VIEW_BEHIND]],
+                           0, -half, CAM.pitchPlay, 1);
+        CAM.halfW = CAM.dist * Math.tan(CAM_FOV * Math.PI / 360) * camera.aspect;
+        CAM.nearReach = groundReach(-1); CAM.farReach = -groundReach(1);
+      }
     }
+    var lx = MW / 2, lz = MH / 2, pitch = CAM.pitchSpec;
+    if (!spec) {
+      var focus = ME;
+      if (!ME.alive) participants().forEach(function (id) { var o = ent(id); if (o && o.alive && o.team === ME.team && focus === ME) focus = o; });
+      var ahead = (VIEW_AHEAD - VIEW_BEHIND) / 2;
+      var zLo = fl ? CAM.nearReach - VIEW_NEAR_PAD : CAM.farReach - 40, zHi = fl ? MH + 40 - CAM.farReach : MH + VIEW_NEAR_PAD - CAM.nearReach;
+      lx = CAM.halfW * 2 >= MW + 40 ? MW / 2 : clamp(focus.x + b.fx * ahead, CAM.halfW - 20, MW - CAM.halfW + 20);
+      lz = zLo > zHi ? MH / 2 : clamp(focus.y + b.fz * ahead, zLo, zHi);
+      pitch = CAM.pitchPlay;
+    }
+    if (CAM.snap) { CAM.look.set(lx, 0, lz); CAM.snap = false; }
+    else { var k = 1 - Math.exp(-dt * 7); CAM.look.x += (lx - CAM.look.x) * k; CAM.look.z += (lz - CAM.look.z) * k; }
+    placeCamera(CAM.look.x, CAM.look.z, CAM.dist, pitch, b);
+  }
 
-    var spec = SPR[E.char], side = back ? "back" : "front";
-    var key = pose, entry = spec[side][pose];
-    if (!entry) { entry = spec[side].idle; key = "idle"; if (pose === "walk") bob = 3; }
-    var im = IMG[spec.pre + "-" + E.team + "-" + side + "-" + key];
-    if (ready(im)) {
-      var h = entry[0], w = h * im.naturalWidth / im.naturalHeight;
-      var mirror = right !== entry[1];
-      var cy = p.y + 26 - h / 2 - bob;
-      if (E.flashUntil > Date.now()) ctx.filter = "brightness(1.8)";
-      ctx.translate(p.x, cy);
-      if (mirror) ctx.scale(-1, 1);
-      ctx.drawImage(im, -w / 2, -h / 2, w, h);
-      ctx.filter = "none";
+  var tourGroup = new THREE.Group(); tourGroup.visible = false; scene.add(tourGroup);
+  var SHOWCASE = [];
+  var SHOWCASE_SPOTS = [["warrior", "blue", 330, 585], ["ranger", "blue", 450, 555], ["mage", "blue", 570, 585],
+                        ["knight", "red", 330, 765], ["rogue", "red", 450, 795], ["ranger", "red", 570, 765]];
+  function buildShowcase() {
+    SHOWCASE_SPOTS.forEach(function (s, i) {
+      var E = { id: "tour" + i, team: s[1], char: s[0], x: s[2], y: s[3], angle: s[1] === "blue" ? Math.PI / 2 : -Math.PI / 2,
+                atkAt: 0, ultUntil: 0, buffUntil: 0, stealthUntil: 0, alive: true, mv: false, nextAtk: 1200 + i * 700 + Math.random() * 1500 };
+      var v = makeVis(E, tourGroup);
+      v.root.position.set(E.x, 0, E.y); v.body.rotation.y = -E.angle;
+      SHOWCASE.push({ E: E, v: v });
+    });
+  }
+  var TOUR_SHOTS = [
+    { name: "아레나 전경", orbit: true, center: [450, 0, 675], radius: 1350, height: 850, arc: [1.1, 1.95] },
+    { name: "중앙 대치", from: [110, 100, 930], to: [790, 100, 930], lookFrom: [380, 60, 675], lookTo: [520, 60, 675] },
+    { name: "블루 팀", from: [660, 140, 730], to: [560, 115, 710], lookFrom: [450, 55, 575], lookTo: [450, 50, 575] },
+    { name: "레드 팀", from: [240, 140, 620], to: [340, 115, 640], lookFrom: [450, 55, 775], lookTo: [450, 50, 775] },
+    { name: "풀숲", from: [320, 170, 530], to: [260, 130, 600], lookFrom: [110, 30, 675], lookTo: [110, 30, 675] },
+    { name: "하늘에서 본 아레나", orbit: true, center: [450, 0, 675], radius: 300, height: 1750, arc: [0.2, 0.9] }
+  ];
+  var TOUR = { on: false, index: 0, start: 0, caption: "" }, TOUR_MS = 7000, TOUR_FADE = 600;
+  var tourLook = new THREE.Vector3();
+  function lerp3(a, b, k) { return [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k]; }
+  function startTour(nowMs) {
+    TOUR.on = true; TOUR.start = nowMs;
+    clear3d();
+    octx.setTransform(1, 0, 0, 1, 0, 0); octx.clearRect(0, 0, ov.width, ov.height);
+    tourGroup.visible = true;
+    show($("tourFade"), true); show($("tourCaption"), true);
+  }
+  function endTour() {
+    TOUR.on = false; tourGroup.visible = false;
+    show($("tourFade"), false); show($("tourCaption"), false);
+    CAM.snap = true; CAM.fitKey = "";
+  }
+  function renderTour(nowMs, dt) {
+    if (!renderer) return;
+    if (!TOUR.on) startTour(nowMs);
+    var elapsed = nowMs - TOUR.start;
+    if (elapsed > TOUR_MS) { TOUR.index = (TOUR.index + 1) % TOUR_SHOTS.length; TOUR.start = nowMs; elapsed = 0; }
+    var shot = TOUR_SHOTS[TOUR.index], k = elapsed / TOUR_MS, e = k * k * (3 - 2 * k) * 0.6 + k * 0.4;
+    if (shot.orbit) {
+      var a = shot.arc[0] + (shot.arc[1] - shot.arc[0]) * e;
+      camera.position.set(shot.center[0] + Math.cos(a) * shot.radius, shot.height, shot.center[2] + Math.sin(a) * shot.radius);
+      tourLook.fromArray(shot.center);
     } else {
-      ctx.fillStyle = E.team === "blue" ? "#2F6FD6" : "#D6453D";
-      ctx.beginPath(); ctx.arc(p.x, p.y, BODY_R, 0, Math.PI * 2); ctx.fill();
+      camera.position.fromArray(lerp3(shot.from, shot.to, e));
+      tourLook.fromArray(lerp3(shot.lookFrom, shot.lookTo, e));
     }
-    ctx.restore();
+    camera.lookAt(tourLook);
+    camera.updateMatrixWorld();
+    $("tourFade").style.opacity = Math.max(0, 1 - Math.min(elapsed, TOUR_MS - elapsed) / TOUR_FADE).toFixed(3);
+    var cap = "CAM " + (TOUR.index + 1 < 10 ? "0" : "") + (TOUR.index + 1) + " · " + shot.name;
+    if (cap !== TOUR.caption) { TOUR.caption = cap; setText($("tourCam"), cap); }
+    var t = now();
+    SHOWCASE.forEach(function (s) {
+      if (!s.E.nextAtk || s.E.nextAtk < 100000) s.E.nextAtk = t + s.E.nextAtk;
+      if (t >= s.E.nextAtk) { s.E.atkAt = t; s.E.nextAtk = t + 1800 + Math.random() * 2600; }
+      animate(s.v, s.E, t, dt, false);
+    });
+    BUSH_VIS.forEach(function (bv) { bv.mats.forEach(function (m) { m.opacity = bv.full; }); });
+    renderer.render(scene, camera);
+  }
+
+  function faceAngle(E, t) {
+    var attacking = (t >= E.atkAt && t - E.atkAt < 350) || E.ultUntil > t;
+    var useMove = FACE_BY_MOVE && !attacking && E.moveAng != null && E.moveAt > E.atkAt && !(E === ME && aim.id !== null && aim.drag);
+    return useMove ? E.moveAng : E.angle;
+  }
+  function glowOf(E, t) {
+    if (E.flashUntil > Date.now()) return 0x999999;
+    if (E.char === "warrior" && E.buffUntil > t) return 0x772200;
+    if (E.char === "knight" && E.buffUntil > t) return 0x2A3A66;
+    if (E.char === "mage" && E.ultUntil > t) return 0x442266;
+    return 0x000000;
+  }
+  var LABELS = [];
+  function render(t, dt) {
+    if (!renderer) return;
+    if (TOUR.on) endTour();
+    var me = ME, spec = !me, nowMs = Date.now(), shown = {}, bushSeen = {};
+    updateCamera(dt);
+    LABELS.length = 0;
+    participants().forEach(function (id) {
+      var E = ent(id); if (!E) return;
+      shown[id] = 1;
+      var v = VIS[id];
+      if (v && (v.team !== E.team || v.char !== E.char || (KIT.ready && !v.kit))) { dropVis(id); v = null; }
+      if (!v) v = VIS[id] = makeVis(E);
+      var ally = spec || E.team === me.team, hid = hiddenFrom(E, t);
+      if (!ally && hid && !revealedTo(E, me, t)) { lastHp[id] = E.hp; v.root.visible = false; return; }
+      v.root.visible = true;
+      var bi = bushIndexAt(E.x, E.y); if (bi >= 0) bushSeen[bi] = 1;
+      var alpha = !E.alive ? (v.kit ? 0.6 : 0.35) : (hid ? (spec ? 0.55 : STEALTH_ALPHA) : 1), hurt = false;
+      if (lastHp[id] !== undefined && Math.abs(E.hp - lastHp[id]) >= 1) {
+        var d = Math.round(E.hp - lastHp[id]);
+        if (d < 0) { floatText(E.x, E.y, String(d), "#FF4B3E"); E.flashUntil = nowMs + 90; hurt = true; }
+        else floatText(E.x, E.y, "+" + d, "#2FB35A");
+      }
+      lastHp[id] = E.hp;
+      v.root.position.set(E.x, 0, E.y);
+      v.yaw += angDiff(-faceAngle(E, t), v.yaw) * Math.min(1, dt * 14);
+      if (v.kit) v.body.rotation.y = v.yaw;
+      else { v.body.rotation.set(0, v.yaw, E.alive ? 0 : Math.PI / 2); v.body.position.y = E.alive ? 0 : 17; }
+      animate(v, E, t, dt, hurt);
+      v.mats.forEach(function (m) { m.opacity = alpha; });
+      var glow = glowOf(E, t);
+      v.glowMats.forEach(function (m) { m.emissive.setHex(glow); });
+      if (v.aura) { v.aura.visible = E.alive && berserk(E, t); v.aura.scale.y = 0.9 + 0.15 * Math.sin(nowMs / 90); }
+      v.ring.visible = E.alive;
+      if (E.alive) LABELS.push({ e: E, alpha: alpha, ally: ally });
+    });
+    keys(VIS).forEach(function (id) { if (!shown[id]) dropVis(id); });
+    BUSH_VIS.forEach(function (bv, i) {
+      bv.fade += ((bushSeen[i] ? 0.42 : 1) - bv.fade) * Math.min(1, dt * 8);
+      bv.mats.forEach(function (m) { m.opacity = bv.full * bv.fade; });
+    });
+
+    keys(PR).forEach(function (id) {
+      var p = PR[id], g = PRV[id], e = t - p.d.createdAt;
+      projVisualHit(p, t);
+      if (e > p.life && !p.sparked && p.dist < (p.d.range || 500) - 1) {
+        p.sparked = true; var q = projAt(p, p.life);
+        spark(q.x, q.y, p.d.ownerCharacterType === "mage" ? hitColor(p.d) : "#FFFFFF", p.d.ownerCharacterType === "mage" ? 1.8 : 1);
+      }
+      if (p.dead || p.gone || e > p.life) { if (g) dropProjVis(id); return; }
+      if (!g) g = PRV[id] = makeProjVis(p);
+      var pos = projAt(p, Math.max(0, e));
+      g.position.set(pos.x, 42, pos.y);
+      if (g.userData.pulse) g.userData.pulse.scale.setScalar(9 + 2 * Math.sin(nowMs / 50));
+    });
+    keys(PRV).forEach(function (id) { if (!PR[id]) dropProjVis(id); });
+
+    keys(MELEE).forEach(function (k) {
+      var m = MELEE[k], age = nowMs - m.at, g = MLV[k];
+      if (age > 240) { if (g) dropMelee(k); return; }
+      if (!g) g = MLV[k] = makeMeleeVis(m.d);
+      var f = age / 240;
+      g.userData.fill.opacity = 0.2 * (1 - f);
+      g.userData.edge.opacity = 0.9 * (1 - f);
+      g.userData.edgeMesh.scale.setScalar(0.85 + 0.2 * f);
+    });
+    keys(MLV).forEach(function (k) { if (!MELEE[k]) dropMelee(k); });
+
+    BURSTS.forEach(function (b) {
+      if (!b.vis) b.vis = makeBurstVis(b.e);
+      var k = clamp((t - b.e.createdAt) / b.e.delay, 0, 1);
+      b.vis.userData.fill.scale.setScalar(Math.max(0.01, k) * b.e.r);
+      b.vis.userData.edge.material.opacity = 0.55 + 0.4 * Math.sin(nowMs / 60);
+    });
+
+    stepFx(nowMs);
+    updateAimGuide();
+    renderer.render(scene, camera);
+    drawOverlay(nowMs);
+  }
+
+  function toScreen(x, h, y) {
+    tmpV.set(x, h, y).project(camera);
+    return tmpV.z > 1 ? null : { x: (tmpV.x + 1) / 2 * W, y: (1 - tmpV.y) / 2 * H };
+  }
+  function pill(x, y, w, h, r) {
+    octx.beginPath();
+    octx.moveTo(x + r, y); octx.arcTo(x + w, y, x + w, y + h, r); octx.arcTo(x + w, y + h, x, y + h, r);
+    octx.arcTo(x, y + h, x, y, r); octx.arcTo(x, y, x + w, y, r); octx.closePath();
   }
   function drawBars(E, alpha, ally) {
-    var p = V(E.x, E.y), top = p.y - (E.char === "tank" ? 86 : 74);
-    ctx.save(); ctx.globalAlpha = alpha;
-    ctx.font = "800 13px " + FONT; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
-    var name = E.nickname || "";
-    ctx.lineWidth = 3; ctx.strokeStyle = "rgba(255,255,255,.9)"; ctx.strokeText(name, p.x, top - 3);
-    ctx.fillStyle = E.team === "blue" ? "#1E4FA3" : "#A8322B"; ctx.fillText(name, p.x, top - 3);
-    var bw = 56, bh = 7, x0 = p.x - bw / 2;
-    ctx.fillStyle = "rgba(0,0,0,.55)"; ctx.fillRect(x0 - 1, top - 1, bw + 2, bh + 2);
-    ctx.fillStyle = ally ? "#3BB273" : "#E0474C";
-    ctx.fillRect(x0, top, bw * clamp(E.hp / E.maxHp, 0, 1), bh);
+    var p = toScreen(E.x, HEAD_Y, E.y); if (!p) return;
+    var bw = 62, bh = 7, x0 = p.x - bw / 2, top = p.y - 4, ratio = clamp(E.hp / E.maxHp, 0, 1);
+    octx.save(); octx.globalAlpha = alpha;
+    octx.font = "800 13px " + FONT; octx.textAlign = "center"; octx.textBaseline = "middle";
+    var name = E.nickname || "", tw = Math.max(40, octx.measureText(name).width + 16), ny = top - 13;
+    octx.fillStyle = "rgba(14,20,17,.78)"; pill(p.x - tw / 2, ny - 9, tw, 18, 9); octx.fill();
+    octx.lineWidth = 2; octx.strokeStyle = E.team === "blue" ? "#4C8DFF" : "#FF5A4E"; octx.stroke();
+    octx.fillStyle = "#FFFFFF"; octx.fillText(name, p.x, ny + 1);
+    octx.fillStyle = "rgba(10,14,12,.85)"; pill(x0 - 2, top - 2, bw + 4, bh + 4, 3); octx.fill();
+    octx.fillStyle = ally ? (ratio < 0.3 ? "#F2A33A" : "#4CC27E") : "#E8505A";
+    octx.fillRect(x0, top, bw * ratio, bh);
+    octx.fillStyle = "rgba(255,255,255,.28)"; octx.fillRect(x0, top, bw * ratio, 2);
+    octx.fillStyle = "rgba(10,14,12,.6)";
+    for (var hp = 50; hp < E.maxHp; hp += 50) octx.fillRect(x0 + bw * hp / E.maxHp, top, 1, bh);
     if (ally) {
-      var gy = top + bh + 2, full = E.gauge >= GAUGE_MAX, t = now(), act = skillActive(E, t);
-      ctx.fillStyle = "rgba(0,0,0,.5)"; ctx.fillRect(x0 - 1, gy - 1, bw + 2, 6);
-      ctx.fillStyle = act ? "#F06BB5" : (full ? "#E53935" : "#F2C230");
-      ctx.fillRect(x0, gy, bw * (act ? skillLeft(E, t) : clamp(E.gauge / GAUGE_MAX, 0, 1)), 4);
+      var gy = top + bh + 3, full = E.gauge >= GAUGE_MAX, t = now(), act = skillActive(E, t);
+      octx.fillStyle = "rgba(10,14,12,.8)"; octx.fillRect(x0 - 1, gy - 1, bw + 2, 6);
+      octx.fillStyle = act ? "#F06BB5" : (full ? "#FF5A4E" : "#F2C230");
+      octx.fillRect(x0, gy, bw * (act ? skillLeft(E, t) : clamp(E.gauge / GAUGE_MAX, 0, 1)), 4);
     }
-    ctx.restore();
-  }
-  function tipOffset(p) {
-    var d = p.d, c = d.ownerCharacterType, spec = SPR[c]; if (!spec) return null;
-    var va = viewAngle(Math.atan2(p.dy, p.dx)), side = Math.sin(va) < 0 ? "back" : "front", right = Math.cos(va) >= 0;
-    var pose = d.isSkill ? "ult" : "atk", entry = spec[side][pose];
-    var name = spec.pre + "-" + d.team + "-" + side + "-" + pose, uv = TIP[name], im = IMG[name];
-    if (!entry || !uv || !ready(im)) return null;
-    var h = entry[0], w = h * im.naturalWidth / im.naturalHeight, mir = right !== entry[1] ? -1 : 1;
-    var cx = d.x - p.dx * 20, cy = d.y - p.dy * 20;
-    var body = V(cx, cy), start = V(d.x, d.y);
-    return { x: body.x + (uv[0] - 0.5) * w * mir - start.x, y: body.y + 26 - h / 2 + (uv[1] - 0.5) * h - start.y };
-  }
-  function drawProjectile(p, t) {
-    var e = t - p.d.createdAt; if (e < 0) e = 0;
-    if (e > p.life) {
-      if (!p.sparked && p.dist < (p.d.range || 500) - 1) { p.sparked = true; var q = projAt(p, p.life); spark(q.x, q.y, "#FFFFFF"); }
-      return;
-    }
-    var pos = projAt(p, e), v = V(pos.x, pos.y), a = viewAngle(Math.atan2(p.dy, p.dx));
-    if (p.tipOff === undefined) p.tipOff = tipOffset(p);
-    if (p.tipOff) {
-      var kk = 1 - clamp(p.sp * e / 1000 / TIP_BLEND, 0, 1);
-      v = { x: v.x + p.tipOff.x * kk, y: v.y + p.tipOff.y * kk };
-    }
-    var blue = p.d.team === "blue", col = blue ? "#4C8DFF" : "#FF5A4E";
-    ctx.save(); ctx.translate(v.x, v.y);
-    if (p.d.isSkill) {
-      var im = IMG["ult-bullet-" + (blue ? "blue" : "red")];
-      if (ready(im)) {
-        var h = 46, w = h * im.naturalWidth / im.naturalHeight;
-        ctx.rotate(a - BULLET_NATIVE);
-        ctx.drawImage(im, -w * 0.72, -h * 0.28, w, h);
-      } else { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI * 2); ctx.fill(); }
-    } else if (p.d.ownerCharacterType === "assassin") {
-      var st = IMG["shuriken-" + (blue ? "blue" : "red")];
-      ctx.rotate(a);
-      if (ready(st)) { var sw = 34, sh = sw * st.naturalHeight / st.naturalWidth; ctx.drawImage(st, -sw / 2, -sh / 2, sw, sh); }
-      else { ctx.fillStyle = "#C9CED6"; ctx.beginPath(); ctx.arc(0, 0, 7, 0, Math.PI * 2); ctx.fill(); }
-    } else if (p.d.ownerCharacterType === "healer") {
-      ctx.shadowColor = col; ctx.shadowBlur = 14;
-      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(0, 0, 9, 0, Math.PI * 2); ctx.fill();
-      ctx.shadowBlur = 0; ctx.fillStyle = "#FFFFFF"; ctx.beginPath(); ctx.arc(-2, -2, 4, 0, Math.PI * 2); ctx.fill();
-    } else {
-      ctx.rotate(a);
-      ctx.shadowColor = col; ctx.shadowBlur = 10;
-      ctx.fillStyle = col; ctx.beginPath(); ctx.roundRect(-12, -4, 24, 8, 4); ctx.fill();
-      ctx.shadowBlur = 0; ctx.fillStyle = "#FFFFFF"; ctx.beginPath(); ctx.roundRect(-6, -2, 14, 4, 2); ctx.fill();
-    }
-    ctx.restore();
-  }
-  function drawMelee(m) {
-    var age = Date.now() - m.at; if (age > 220) return;
-    var d = m.d, v = V(d.x, d.y), a = viewAngle(d.angle);
-    ctx.save(); ctx.globalAlpha = 1 - age / 220;
-    ctx.fillStyle = d.team === "blue" ? "rgba(76,141,255,.45)" : "rgba(255,90,78,.45)";
-    ctx.beginPath(); ctx.moveTo(v.x, v.y); ctx.arc(v.x, v.y, d.radius + BODY_R, a - d.arc / 2, a + d.arc / 2); ctx.closePath(); ctx.fill();
-    ctx.restore();
-  }
-  function drawObstacle(o) {
-    var v = V(o.x, o.y), im = IMG[o.k];
-    if (o.circle) {
-      if (ready(im)) { var w = o.r * 2.9, h = w * im.naturalHeight / im.naturalWidth; ctx.drawImage(im, v.x - w / 2, v.y - h * 0.58, w, h); }
-      else { ctx.fillStyle = "#888"; ctx.beginPath(); ctx.arc(v.x, v.y, o.r, 0, Math.PI * 2); ctx.fill(); }
-    } else {
-      if (ready(im)) { var ww = o.w * 1.1, hh = ww * im.naturalHeight / im.naturalWidth; ctx.drawImage(im, v.x - ww / 2, v.y - hh * 0.55, ww, hh); }
-      else { ctx.fillStyle = "#999"; ctx.fillRect(v.x - o.w / 2, v.y - o.h / 2, o.w, o.h); }
-    }
-  }
-  function drawBush(b) {
-    var v = V(b.x, b.y), im = IMG.bush;
-    if (ready(im)) { var w = b.r * 2.3, h = w * im.naturalHeight / im.naturalWidth; ctx.drawImage(im, v.x - w / 2, v.y - h / 2, w, h); }
-    else { ctx.fillStyle = "#3E8E41"; ctx.beginPath(); ctx.arc(v.x, v.y, b.r, 0, Math.PI * 2); ctx.fill(); }
-  }
-  function drawAimGuide() {
-    if (aim.id === null || !aim.drag || !ME || !ME.alive) return;
-    var p = V(ME.x, ME.y), a = viewAngle(ME.angle);
-    var ult = aim.btn === "ult", c = CHARS[ME.char];
-    ctx.save();
-    if (ME.char === "tank" && !ult) {
-      ctx.fillStyle = "rgba(255,255,255,.35)";
-      ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.arc(p.x, p.y, c.range + BODY_R, a - c.arc / 2, a + c.arc / 2); ctx.closePath(); ctx.fill();
-    } else {
-      var len = ult ? ULT.mkRange : c.range;
-      var wx = Math.cos(ME.angle), wy = Math.sin(ME.angle);
-      len = rayCast(ME.x + wx * 20, ME.y + wy * 20, wx, wy, len, 6) + 20;
-      ctx.translate(p.x, p.y); ctx.rotate(a);
-      ctx.fillStyle = ult ? "rgba(255,80,60,.35)" : "rgba(255,255,255,.35)";
-      var hw = ult ? 12 : 8;
-      ctx.fillRect(18, -hw, len - 18, hw * 2);
-      ctx.fillStyle = ult ? "rgba(255,80,60,.8)" : "rgba(255,255,255,.85)";
-      ctx.beginPath(); ctx.moveTo(len + 12, 0); ctx.lineTo(len - 6, -hw - 6); ctx.lineTo(len - 6, hw + 6); ctx.closePath(); ctx.fill();
-    }
-    ctx.restore();
+    octx.restore();
   }
   function drawJoystick() {
     if (!ME || !ME.alive || !room || room.status === "ended") return;
@@ -1725,94 +2292,46 @@
       dx = joy.x - jb.x; dy = joy.y - jb.y; var d = hyp(dx, dy);
       if (d > JOY_R) { dx = dx / d * JOY_R; dy = dy / d * JOY_R; }
     }
-    ctx.save();
-    ctx.fillStyle = on ? "rgba(255,255,255,.22)" : "rgba(255,255,255,.14)";
-    ctx.strokeStyle = on ? "rgba(255,255,255,.8)" : "rgba(255,255,255,.5)"; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.arc(jb.x, jb.y, JOY_R, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = on ? "rgba(255,255,255,.9)" : "rgba(255,255,255,.6)";
-    ctx.beginPath(); ctx.arc(jb.x + dx, jb.y + dy, JOY_R * 0.42, 0, Math.PI * 2); ctx.fill();
-    ctx.restore();
+    octx.save();
+    octx.fillStyle = on ? "rgba(14,20,17,.45)" : "rgba(14,20,17,.3)";
+    octx.strokeStyle = on ? "rgba(255,255,255,.85)" : "rgba(255,255,255,.5)"; octx.lineWidth = 3;
+    octx.beginPath(); octx.arc(jb.x, jb.y, JOY_R, 0, Math.PI * 2); octx.fill(); octx.stroke();
+    octx.fillStyle = on ? "rgba(255,255,255,.92)" : "rgba(255,255,255,.65)";
+    octx.beginPath(); octx.arc(jb.x + dx, jb.y + dy, JOY_R * 0.42, 0, Math.PI * 2); octx.fill();
+    octx.restore();
   }
-
-  function render(t) {
-    var me = ME;
-    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    ctx.fillStyle = "#2A2F2B"; ctx.fillRect(0, 0, W, H);
-    var spec = !me;
-    if (spec) {
-      var pw = specPanelW() + 20, top = 0, bottom = 0;
-      S = Math.max(0.1, Math.min((W - pw * 2) / MW, (H - top - bottom) / MH));
-      camX = -((W - MW * S) / 2) / S;
-      camY = -(top + (H - top - bottom - MH * S) / 2) / S;
-    } else {
-      S = Math.max(0.5, Math.min(H / 860, W / 560));
-      var visW = W / S, visH = H / S;
-      var focus = me;
-      if (!me.alive) {
-        participants().forEach(function (id) { var o = ent(id); if (o && o.alive && o.team === me.team && focus === me) focus = o; });
-      }
-      var fv = V(focus.x, focus.y);
-      camX = visW >= MW ? (MW - visW) / 2 : clamp(fv.x - visW / 2, -20, MW - visW + 20);
-      camY = clamp(fv.y - visH * 0.66, -40, Math.max(-40, MH - visH + 40));
-    }
-    ctx.setTransform(DPR * S, 0, 0, DPR * S, -camX * S * DPR, -camY * S * DPR);
-
-    if (ready(IMG.bg)) {
-      ctx.save(); ctx.translate(MW / 2, MH / 2); if (flip()) ctx.rotate(Math.PI);
-      ctx.drawImage(IMG.bg, -MW / 2, -MH / 2, MW, MH); ctx.restore();
-    } else { ctx.fillStyle = "#E9DCC6"; ctx.fillRect(0, 0, MW, MH); }
-
-    BUSH.forEach(drawBush);
-    keys(MELEE).forEach(function (k) { drawMelee(MELEE[k]); });
-
-    var items = [];
-    OBST.forEach(function (o) { items.push({ y: V(o.x, o.y).y, o: o }); });
-    var list = [];
-    participants().forEach(function (id) {
-      var E = ent(id); if (!E) return;
-      var ally = spec || E.team === me.team, hid = hiddenFrom(E, t);
-      if (!ally && hid && !revealedTo(E, me, t)) { lastHp[id] = E.hp; return; }
-      var alpha = !E.alive ? 0.35 : (hid ? (spec ? 0.55 : STEALTH_ALPHA) : 1);
-      if (lastHp[id] !== undefined && Math.abs(E.hp - lastHp[id]) >= 1) {
-        var d = Math.round(E.hp - lastHp[id]);
-        if (d < 0) { floatText(E.x, E.y, String(d), "#FF4B3E"); E.flashUntil = Date.now() + 90; }
-        else floatText(E.x, E.y, "+" + d, "#2FB35A");
-      }
-      lastHp[id] = E.hp;
-      var it = { y: V(E.x, E.y).y, e: E, alpha: alpha, ally: ally };
-      items.push(it); list.push(it);
-    });
-    items.sort(function (a, b) { return a.y - b.y; });
-    items.forEach(function (it) { if (it.o) drawObstacle(it.o); else drawSprite(it.e, it.alpha, t); });
-    keys(PR).forEach(function (id) { var p = PR[id]; projVisualHit(p, t); if (!p.dead && !p.gone) drawProjectile(p, t); });
-    list.forEach(function (it) { if (it.e.alive) drawBars(it.e, it.alpha, it.ally); });
-    drawAimGuide();
-
-    var nowMs = Date.now();
-    FX = FX.filter(function (f) { return nowMs - f.t < f.life; });
+  function drawOverlay(nowMs) {
+    octx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    octx.clearRect(0, 0, W, H);
+    LABELS.forEach(function (L) { drawBars(L.e, L.alpha, L.ally); });
     FX.forEach(function (f) {
-      var k = (nowMs - f.t) / f.life, v = V(f.x, f.y);
-      ctx.save(); ctx.globalAlpha = 1 - k;
-      if (f.k === "spark") {
-        ctx.strokeStyle = f.c; ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.arc(v.x, v.y, 8 + k * 22, 0, Math.PI * 2); ctx.stroke();
-      } else if (f.k === "smoke") {
-        var sm = IMG.smoke, sz = 70 + 90 * Math.sin(Math.min(1, k * 1.4) * Math.PI / 2);
-        ctx.globalAlpha = k < 0.6 ? 0.95 : 0.95 * (1 - (k - 0.6) / 0.4);
-        ctx.translate(v.x, v.y - 20); ctx.rotate(k * 0.6);
-        if (ready(sm)) ctx.drawImage(sm, -sz / 2, -sz / 2, sz, sz);
-        else { ctx.fillStyle = "rgba(200,200,205,.9)"; ctx.beginPath(); ctx.arc(0, 0, sz / 2, 0, Math.PI * 2); ctx.fill(); }
-      } else {
-        ctx.font = "800 20px " + FONT; ctx.textAlign = "center";
-        ctx.lineWidth = 4; ctx.strokeStyle = "rgba(255,255,255,.95)";
-        ctx.strokeText(f.s, v.x, v.y - 70 - k * 30); ctx.fillStyle = f.c; ctx.fillText(f.s, v.x, v.y - 70 - k * 30);
-      }
-      ctx.restore();
+      if (f.k !== "txt") return;
+      var k = (nowMs - f.t) / f.life, p = toScreen(f.x, HEAD_Y, f.y); if (!p) return;
+      var y = p.y - 34 - k * 30;
+      octx.save(); octx.globalAlpha = 1 - k;
+      octx.font = "800 20px " + FONT; octx.textAlign = "center";
+      octx.lineWidth = 4; octx.strokeStyle = "rgba(14,20,17,.85)";
+      octx.strokeText(f.s, p.x, y); octx.fillStyle = f.c; octx.fillText(f.s, p.x, y);
+      octx.restore();
     });
-
-    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     drawJoystick();
   }
+
+  var QA = { acc: 0, frames: 0, slow: 0 };
+  function adaptQuality(frameMs) {
+    if (!renderer) return;
+    QA.acc += frameMs; QA.frames++;
+    if (QA.acc < 1000) return;
+    var fps = QA.frames * 1000 / QA.acc;
+    QA.acc = 0; QA.frames = 0;
+    QA.slow = fps < 45 ? QA.slow + 1 : 0;
+    if (QA.slow >= 3 && PIX > PIX_MIN) {
+      QA.slow = 0; PIX = Math.max(PIX_MIN, PIX - 0.25);
+      renderer.setPixelRatio(PIX); renderer.setSize(W, H, false);
+    }
+  }
+  resize();
+  if (renderer) loadKit();
 
   function specPanelW() { return W > 900 ? 300 : 150; }
   function specPanel(team, s) {
@@ -1859,7 +2378,8 @@
     show($("btnAtk"), alive && st !== "ended"); show($("btnUlt"), alive && st !== "ended");
     show($("deadMsg"), ME && !ME.alive && st === "playing");
     if (ME) {
-      var cdLeft = Math.max(0, ME.cdUntil - t) / CHARS[ME.char].cd;
+      setHtml($("btnAtk").lastChild, '<i class="ic">' + CHARS[ME.char].icon + "</i>공격");
+      var cdLeft = Math.max(0, ME.cdUntil - t) / (ME.cdDur || CHARS[ME.char].cd);
       $("btnAtk").firstChild.style.height = Math.round(cdLeft * 100) + "%";
       var full = ME.gauge >= GAUGE_MAX, act = skillActive(ME, t);
       $("btnUlt").className = "actBtn" + (act ? " act" : (full && !ME.burst ? " ready" : ""));
@@ -1881,7 +2401,7 @@
       show($("endOv"), true);
       $("endOv").className = w === "blue" ? "blue" : (w === "red" ? "red" : "draw");
       setText($("endTitle"), w === "draw" ? "무승부" : (w === "blue" ? "블루팀 승리!" : (w === "red" ? "레드팀 승리!" : "게임 종료")));
-      $("endTitle").style.color = w === "blue" ? "#2F6FD6" : (w === "red" ? "#D6453D" : "#3B4B40");
+      $("endTitle").style.color = w === "blue" ? "#6FA8FF" : (w === "red" ? "#FF7A70" : "#EEF2EE");
       setText($("endBlue"), String(f.blue != null ? f.blue : Math.round(s.blue)));
       setText($("endRed"), String(f.red != null ? f.red : Math.round(s.red)));
     } else show($("endOv"), false);
@@ -1890,8 +2410,8 @@
   var lastFrame = Date.now();
   function loop() {
     requestAnimationFrame(loop);
-    var nowMs = Date.now(), dt = Math.min(0.05, (nowMs - lastFrame) / 1000); lastFrame = nowMs;
-    if (!room || screenNow !== "game") return;
+    var nowMs = Date.now(), frameMs = nowMs - lastFrame, dt = Math.min(0.05, frameMs / 1000); lastFrame = nowMs;
+    if (!room || screenNow !== "game") { renderTour(nowMs, dt); adaptQuality(frameMs); return; }
     var st = room.status;
     if ((st === "countdown" || st === "playing" || st === "ended") && room.startAt && (!G || G.startAt !== room.startAt)) {
       if (P[myId] && (P[myId].slot || isSpec())) initGame(); else return;
@@ -1900,6 +2420,7 @@
     var t = now();
     syncRemote(dt);
     stepShots(t);
+    stepBursts(t);
     pruneLocal(t);
     var active = st === "playing" && t >= room.startAt;
     if (active) {
@@ -1918,7 +2439,7 @@
           ME.mv = hyp(ME.x - ox, ME.y - oy) > 0.2;
           if (ME.mv) { ME.moveAng = Math.atan2(ME.y - oy, ME.x - ox); ME.moveAt = now(); }
         } else ME.mv = false;
-        if (KEY_ON.atk && t >= ME.cdUntil && !ME.volley) fireBasic(ME, autoAimAngle(ME));
+        if (KEY_ON.atk && t >= ME.cdUntil && !ME.volley && !ME.slash) fireBasic(ME, autoAimAngle(ME));
         stepCombat(ME, dt);
       } else if (ME) ME.mv = false;
       if (isHost()) keys(BOTS).forEach(function (id) { var B = BOTS[id]; stepBot(B, dt); if (B.alive) stepCombat(B, dt); });
@@ -1926,8 +2447,9 @@
     }
     if (st === "countdown" || st === "playing") netWrite(false);
     if (isHost()) { hostJudge(); hostCleanup(); }
-    render(t);
+    render(t, dt);
     updateHud(t);
+    adaptQuality(frameMs);
   }
 
   refreshNick();

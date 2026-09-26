@@ -896,11 +896,14 @@ function showGuide(src, caption) {
 const STATS_GAMES = {
   teambattle: {
     path: "teambattle/stats",
+    /* 2026-09-26 3D 개편으로 직업이 5개로 바뀌었다. 옛 직업(marksman·healer·tank·assassin) 통계는
+       데이터베이스에 남아 있지만 새 직업과 비교할 수 없어서 표에서 뺐다. 회복은 마법사 궁극기(아군 회복)만 있다. */
     roles: [
-      { id: "marksman", name: "사격수" },
-      { id: "healer",   name: "힐러", heal: true },
-      { id: "tank",     name: "탱커" },
-      { id: "assassin", name: "암살자" }
+      { id: "warrior", name: "전사" },
+      { id: "knight",  name: "기사" },
+      { id: "ranger",  name: "궁수" },
+      { id: "mage",    name: "마법사", heal: true },
+      { id: "rogue",   name: "도적" }
     ]
   }
 };
