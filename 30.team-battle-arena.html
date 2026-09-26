@@ -231,7 +231,18 @@
   #hudMid { padding: 0 10px; border-left: 1px solid rgba(255,255,255,.16); border-right: 1px solid rgba(255,255,255,.16); text-align: center; }
   #hudTimer { font-size: 26px; font-weight: 800; line-height: 1.05; font-variant-numeric: tabular-nums; }
   #hudTimer.low { color: #FF6B6B; text-shadow: 0 0 10px rgba(255,80,80,.7); }
+  #hudTimer.tick { animation: timerTick 1s ease-out; }
+  @keyframes timerTick { 0% { transform: scale(1); } 18% { transform: scale(1.35); } 100% { transform: scale(1); } }
   #hudCount { font-size: 13px; font-weight: 800; }
+  #killFeed { position: absolute; top: 60px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none; }
+  .kf { display: flex; align-items: center; gap: 8px; white-space: nowrap; padding: 4px 12px; border-radius: 8px; font-size: 14px; font-weight: 800; color: #F4F1E8;
+        background: rgba(14,20,17,.78); border: 1px solid rgba(255,255,255,.14); box-shadow: 0 4px 12px rgba(0,0,0,.25); animation: kfIn .18s ease-out; }
+  .kf.mine { border-color: #D97B4F; box-shadow: 0 0 0 1px #D97B4F, 0 4px 12px rgba(0,0,0,.25); }
+  .kf .b { color: #6FA8FF; }
+  .kf .r { color: #FF7A70; }
+  .kf small { font-size: 11px; font-weight: 700; color: rgba(244,241,232,.6); }
+  .kfArrow { color: #D97B4F; font-size: 12px; }
+  @keyframes kfIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
   #hudCount .b { color: #6FA8FF; }
   #hudCount .r { color: #FF7A70; }
   #btnLeaveGame { position: absolute; top: 8px; right: 8px; height: 34px; padding: 0 12px; font-size: 14px; font-weight: 800; border-radius: 6px; border: 1px solid rgba(255,138,138,.6); background: rgba(14,20,17,.8); color: #FF9A9A; }
@@ -490,6 +501,7 @@
     <div id="hudMid"><div id="hudTimer">1:30</div><div id="hudCount"></div></div>
     <div class="hdSide r"><span>레드 킬</span><b id="hudKillR">0</b></div>
   </div>
+  <div id="killFeed"></div>
   <button id="btnLeaveGame" type="button">방 나가기</button>
   <div id="specL" class="specPanel blue" hidden></div>
   <div id="specR" class="specPanel red" hidden></div>
@@ -739,6 +751,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     else if (k === "star") tone(1500, 0.05, "triangle", 0.05, 0.6);
     else if (k === "beep") tone(660, 0.12, "square", 0.07);
     else if (k === "go") tone(990, 0.3, "square", 0.08);
+    else if (k === "count") tone(880, 0.09, "sine", 0.04);
     else if (k === "down") tone(400, 0.5, "sawtooth", 0.08, 0.25);
     else if (k === "win") { [523, 659, 784, 1047].forEach(function (f, i) { setTimeout(function () { tone(f, 0.18, "triangle", 0.09); }, i * 120); }); }
     else if (k === "lose") { [392, 330, 262].forEach(function (f, i) { setTimeout(function () { tone(f, 0.25, "triangle", 0.08); }, i * 160); }); }
@@ -956,6 +969,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     sub(ref.child("meleeHits"), "child_added", function (s) { onMelee(s.key, s.val()); });
     listenHits(myId);
     sub(ref.child("effects"), "child_added", onEffect);
+    sub(ref.child("kills"), "child_added", onKillFeed);
 
     setText($("lobbyCode"), code);
     showScreen("lobby");
@@ -1356,7 +1370,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     });
     var d = draftSettle({ seq: seq, step: 0, stepAt: t }, t);
     room.ref.update({ draft: d, arena: resolveArena(room.map), status: "draft", roster: null, st: null, winner: null, final: null, endedAt: null, startAt: null,
-                      shots: null, meleeHits: null, hits: null, effects: null, projectiles: null });
+                      shots: null, meleeHits: null, hits: null, effects: null, kills: null, projectiles: null });
   }
   function draftPick(c) {
     var d = room && room.draft;
@@ -1896,7 +1910,25 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (T.hp <= 0) { killed = true; T.hp = 0; T.alive = false; T.deaths++; T.diedAt = now(); T.burst = null; T.volley = null; T.slash = null; T.regenUntil = 0; T.skillUntil = 0; T.slowUntil = 0; T.stunUntil = 0; if (T === ME) { sfx("down"); aim.id = null; joy.id = null; } }
     else { if (T === ME) sfx("hit"); afflict(T, fx); }
     pushHit(owner, dm, basic, ultKey, killed);
+    if (killed) room.ref.child("kills").push({ k: owner, v: T.id, t: now() });
     if (T === ME || T.bot) G.forceNet = true;
+  }
+  var KILL_FEED_MS = 4000, KILL_FEED_MAX = 4;
+  function onKillFeed(s) {
+    var k = s.val(); if (!k || !G || handled[s.key]) return;
+    handled[s.key] = 1;
+    if (!(k.t > now() - KILL_FEED_MS)) return;
+    var killer = P[k.k] || {}, victim = P[k.v] || {}, feed = $("killFeed");
+    var nameTag = function (d, E) {
+      var team = d.team || (E && E.team), c = E && CHARS[E.char] ? " <small>" + CHARS[E.char].name + "</small>" : "";
+      return '<b class="' + (team === "blue" ? "b" : "r") + '">' + (d.isAI ? "🤖 " : "") + esc(d.nickname || (E && E.nickname) || "?") + c + "</b>";
+    };
+    var row = document.createElement("div");
+    row.className = "kf" + (k.k === myId || k.v === myId ? " mine" : "");
+    setHtml(row, nameTag(killer, ent(k.k)) + '<span class="kfArrow">▶</span>' + nameTag(victim, ent(k.v)));
+    feed.appendChild(row);
+    while (feed.children.length > KILL_FEED_MAX) feed.firstChild.remove();
+    setTimeout(function () { row.remove(); }, KILL_FEED_MS);
   }
   function pushHit(owner, dmg, basic, ultKey, killed) {
     var h = { d: dmg, b: basic ? 1 : 0, t: now() };
@@ -2460,7 +2492,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (!room || room.status !== "ended") return;
     if (room.endedAt && now() - room.endedAt < STATS_SETTLE_MS + 500) return;
     room.ref.update({ status: "lobby", winner: null, final: null, startAt: null, endedAt: null, roster: null, draft: null,
-                      st: null, shots: null, meleeHits: null, hits: null, effects: null, projectiles: null });
+                      st: null, shots: null, meleeHits: null, hits: null, effects: null, kills: null, projectiles: null });
   }
   $("btnAgain").onclick = restart;
   var KEY_ON = { up: false, down: false, left: false, right: false, atk: false };
@@ -3857,13 +3889,24 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
              CHARS[b.E.char].name + " · " + b.score + "점</small></div>";
     }).join("") + rule;
   }
+  var FINAL_COUNT_MS = 10000, lastCountSec = 0;
+  function finalCountdown(el, left) {
+    var sec = left > 0 && left <= FINAL_COUNT_MS ? Math.ceil(left / 1000) : 0;
+    if (!sec) { lastCountSec = 0; el.className = ""; return; }
+    if (sec === lastCountSec) return;
+    lastCountSec = sec;
+    el.className = "low";
+    void el.offsetWidth;
+    el.className = "low tick";
+    sfx("count");
+  }
   function fmtTime(ms) { ms = Math.max(0, ms); var s = Math.ceil(ms / 1000); return Math.floor(s / 60) + ":" + (s % 60 < 10 ? "0" : "") + (s % 60); }
   function updateHud(t) {
     var st = room.status;
     var left = st === "countdown" || t < room.startAt ? MATCH_MS : room.startAt + MATCH_MS - t;
     if (st === "ended") left = Math.max(0, Math.min(MATCH_MS, room.startAt + MATCH_MS - (room.endedAt || t)));
     setText($("hudTimer"), fmtTime(left));
-    $("hudTimer").className = left < 15000 && st === "playing" ? "low" : "";
+    finalCountdown($("hudTimer"), st === "playing" ? left : 0);
     var s = teamTotals();
     setHtml($("hudCount"), '<span class="b">🔵 ' + s.blueAlive + '</span> vs <span class="r">🔴 ' + s.redAlive + "</span>");
     setText($("hudKillB"), String(s.blueKills)); setText($("hudKillR"), String(s.redKills));

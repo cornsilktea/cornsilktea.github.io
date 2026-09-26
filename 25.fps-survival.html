@@ -182,6 +182,10 @@
   #hudTeam .tb { text-shadow: 0 0 2px #fff, 0 0 6px rgba(255,255,255,.9), 0 1px 3px rgba(0,0,0,.4); }
   #hudTeam .tb.blue { color: #2F6FD6; } #hudTeam .tb.red { color: #D6453D; }
   #hudTeam .tb .lab { text-shadow: 0 1px 3px rgba(0,0,0,.55); }
+  #tsTime { display: inline-block; }
+  #tsTime.low { color: #FF6B6B; text-shadow: 0 0 10px rgba(255,80,80,.7); }
+  #tsTime.tick { animation: timerTick 1s ease-out; }
+  @keyframes timerTick { 0% { transform: scale(1); } 18% { transform: scale(1.3); } 100% { transform: scale(1); } }
   #killFeed { position: fixed; top: 52px; right: 12px; z-index: 5; pointer-events: none; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
   .kf { background: rgba(255,255,255,.92); border: 2px solid var(--sg-line-strong); border-radius: 8px; padding: 3px 10px; font-size: 14px; font-weight: 800; white-space: nowrap; }
   #teamMsg { position: fixed; left: 50%; bottom: 28%; transform: translateX(-50%); z-index: 6; pointer-events: none; background: rgba(27,43,32,.85); color: #fff; font-size: 22px; font-weight: 800; padding: 12px 22px; border-radius: 12px; white-space: nowrap; }
@@ -610,6 +614,7 @@ const SFX = {
   weaponSwap(){ tone(1400, 0.025, "square", 0.05); noise(0.04, 0.12, 6000); tone(820, 0.035, "square", 0.05, 0.1); },
   reload()  { tone(900, 0.03, "square", 0.06); noise(0.05, 0.15, 5000); tone(600, 0.05, "square", 0.06, 0.09); tone(1300, 0.04, "square", 0.06, 0.2); },
   timeUp()  { [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.22, "square", 0.07, i * 0.12)); },
+  count()   { tone(880, 0.09, "sine", 0.05); },
   hurt()    { tone(220, 0.25, "sawtooth", 0.12, 0, 70); },
   hitmark() { tone(900, 0.05, "sine", 0.08); },
   killBody(){ tone(440, 0.1, "square", 0.08); tone(660, 0.14, "square", 0.08, 0.09); },
@@ -2873,9 +2878,20 @@ function poseView(dead) {
   camera.position.set(P.x, PLAYER_CONFIG.eyeHeight, P.z); camera.rotation.set(P.pitch, P.yaw, 0);
   P.recoil = 0; poseHeldWeapon(0, 0);
 }
+const FINAL_COUNT_MS = 10000;
+let lastCountSec = 0;
+function finalCountdown(el, left) {
+  const sec = left > 0 && left <= FINAL_COUNT_MS ? Math.ceil(left / 1000) : 0;
+  if (sec === lastCountSec) return;
+  lastCountSec = sec;
+  el.classList.remove("tick");
+  el.classList.toggle("low", !!sec);
+  if (sec) { void el.offsetWidth; el.classList.add("tick"); SFX.count(); }
+}
 function renderTeamHud(t) {
   const left = clamp(T.startAt + TEAM.matchMs - Math.max(t, T.startAt), 0, TEAM.matchMs);
   setText($("tsTime"), fmtTime(Math.ceil(left / 1000)));
+  finalCountdown($("tsTime"), t >= T.startAt ? left : 0);
   setText($("tsBlue"), String(teamScore("blue"))); setText($("tsRed"), String(teamScore("red")));
   const me = T.me;
   if (me && !T.spec) {

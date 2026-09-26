@@ -130,6 +130,8 @@
   #timerBox { position: absolute; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 8px); transform: translateX(-50%); text-align: center; }
   #timer { font-size: 38px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.05; }
   #timer.danger { color: #FF6B6B; }
+  #timer.tick { animation: timerTick 1s ease-out; text-shadow: 0 0 10px rgba(255, 80, 80, .7); }
+  @keyframes timerTick { 0% { transform: scale(1); } 18% { transform: scale(1.3); } 100% { transform: scale(1); } }
   #aliveLine { font-size: 13px; font-weight: 700; color: #E4E9F2; }
   #bestBox { text-align: right; margin-top: 40px; }
   #hBest { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
@@ -289,7 +291,7 @@
         <li>좀비에게 닿으면 2초 동안 굳은 뒤 좀비로 변합니다.</li>
         <li>1분마다 학교 종이 울리고, 마지막 30초에는 좀비가 더 빨라집니다.</li>
         <li>3분 동안 한 명이라도 살아남으면 인간 승리, 모두 감염되면 좀비 승리입니다.</li>
-        <li>오른쪽 아래 학교 지도(1·2층)에 나와 같은 편(인간끼리·좀비끼리)의 위치가 점으로 보입니다.</li>
+        <li>오른쪽 아래 학교 지도(1·2층)에 내 위치가 보이고, 좀비가 되면 다른 좀비의 위치도 점으로 보입니다(인간끼리는 서로 보이지 않습니다).</li>
         <li>방마다 관전자 1명이 따로 들어와 플레이어들의 시점을 번갈아 볼 수 있습니다. 게임 중에 들어온 플레이어는 다음 판부터 참가합니다.</li>
       </ul>
     </div>
@@ -437,6 +439,7 @@ function strikeBell(delay) {
 }
 function ringSchoolBell() { for (let i = 0; i < 5; i++) strikeBell(i * 0.36); }
 function playCountBeep(isGo) { playTone(isGo ? 1320 : 880, 0, isGo ? 0.45 : 0.18, "square", 0.12); }
+function playCountTick() { playTone(880, 0, 0.1, "sine", 0.07); }
 function playDashSound() { playNoise(0, 0.3, "bandpass", 400, 4200, 0.7); playTone(95, 0, 0.2, "sine", 0.45, 40); }
 function playInfectSound(volume) {
   playTone(240, 0, 0.8, "sawtooth", 0.28 * volume, 55, 900);
@@ -3413,7 +3416,7 @@ function drawFloorMap(t) {
     c.strokeStyle = MAP_COLORS.here; c.lineWidth = Math.max(1.5, s * 0.7); c.stroke();
   }
   const myZombieSide = round.iAmIn && isZombieNow(myId, t);
-  const shown = roundIds().filter(id => avatars[id] && (!round.iAmIn || id === myId || isZombieNow(id, t) === myZombieSide));
+  const shown = roundIds().filter(id => avatars[id] && (!round.iAmIn || id === myId || (myZombieSide && isZombieNow(id, t))));
   shown.sort((a, b) => (a === focusId) - (b === focusId));
   const r = Math.max(3, s * 1.5);
   shown.forEach(id => {
@@ -3441,12 +3444,20 @@ function drawFloorMap(t) {
   }
 }
 
+const FINAL_COUNT_MS = 10000;
+let lastCountSec = 0;
 function updateHud(t, nowMs) {
   drawFloorMap(t);
   const left = room.startAt + ROUND_MS - Math.max(t, room.startAt);
   const timerEl = $("timer");
   setText(timerEl, fmtClock(left));
-  timerEl.className = left <= FINAL_RUSH_MS ? "danger" : "";
+  timerEl.classList.toggle("danger", left <= FINAL_RUSH_MS);
+  const countSec = room.status === "playing" && left > 0 && left <= FINAL_COUNT_MS ? Math.ceil(left / 1000) : 0;
+  if (countSec !== lastCountSec) {
+    lastCountSec = countSec;
+    timerEl.classList.remove("tick");
+    if (countSec) { void timerEl.offsetWidth; timerEl.classList.add("tick"); playCountTick(); }
+  }
   const alive = humansLeft().length, total = roundIds().length;
   setText($("aliveLine"), "생존자 " + alive + " / " + total + "명");
   setText($("hBest"), bestText());

@@ -363,7 +363,7 @@
     <div class="st-card">
       <h2>규칙</h2>
       <ul class="st-rules">
-        <li><b>타임어택</b>: 코스(홍콩 편도 · 싱가포르 3바퀴 · 서울 2바퀴)와 차를 고르고 가장 빠른 완주 시간에 도전합니다.</li>
+        <li><b>타임어택</b>: 코스(서울 2바퀴 · 싱가포르 3바퀴 · 홍콩 편도)와 차를 고르고 가장 빠른 완주 시간에 도전합니다.</li>
         <li><b>고스트</b>를 켜면 나의 최고 기록이나 세계신기록 주행이 반투명 차로 같이 달립니다.</li>
         <li>트랙을 벗어나면 느려지고, 울타리에 부딪히면 크게 감속합니다.</li>
         <li><b>대전모드</b>: 방 코드로 모여 1대1로 달리고, 관전자는 두 차의 시점을 번갈아 봅니다.</li>
@@ -377,15 +377,15 @@
     <table class="rtab">
       <thead><tr><th>코스</th><th>나의 최고 기록</th><th>🏆 세계신기록</th><th class="clsCol" hidden>🏫 우리 반</th></tr></thead>
       <tbody>
-        <tr><td>홍콩<small style="font-weight:400">편도 코스</small></td><td><em id="bestHongkong">—</em></td><td><em id="wrHongkong">—</em><small id="wrWhoHongkong"></small></td><td class="clsCol" hidden><em id="crHongkong">—</em><small id="crWhoHongkong"></small></td></tr>
-        <tr><td>싱가포르<small style="font-weight:400">3바퀴</small></td><td><em id="bestSingapore">—</em></td><td><em id="wrSingapore">—</em><small id="wrWhoSingapore"></small></td><td class="clsCol" hidden><em id="crSingapore">—</em><small id="crWhoSingapore"></small></td></tr>
         <tr><td>서울<small style="font-weight:400">2바퀴</small></td><td><em id="bestSeoul">—</em></td><td><em id="wrSeoul">—</em><small id="wrWhoSeoul"></small></td><td class="clsCol" hidden><em id="crSeoul">—</em><small id="crWhoSeoul"></small></td></tr>
+        <tr><td>싱가포르<small style="font-weight:400">3바퀴</small></td><td><em id="bestSingapore">—</em></td><td><em id="wrSingapore">—</em><small id="wrWhoSingapore"></small></td><td class="clsCol" hidden><em id="crSingapore">—</em><small id="crWhoSingapore"></small></td></tr>
+        <tr><td>홍콩<small style="font-weight:400">편도 코스</small></td><td><em id="bestHongkong">—</em></td><td><em id="wrHongkong">—</em><small id="wrWhoHongkong"></small></td><td class="clsCol" hidden><em id="crHongkong">—</em><small id="crWhoHongkong"></small></td></tr>
       </tbody>
     </table>
     <div class="btns">
-      <button type="button" class="btn" id="btnHongkong">홍콩<small>편도 코스</small></button>
-      <button type="button" class="btn mid" id="btnSingapore">싱가포르<small>3바퀴</small></button>
       <button type="button" class="btn hard" id="btnSeoul">서울<small>2바퀴</small></button>
+      <button type="button" class="btn mid" id="btnSingapore">싱가포르<small>3바퀴</small></button>
+      <button type="button" class="btn" id="btnHongkong">홍콩<small>편도 코스</small></button>
     </div>
     <div class="hint">트랙을 벗어나면 느려지고, 울타리에 부딪히면 크게 감속합니다. R 키: 처음부터 다시</div>
     <div class="btns" style="margin-top:12px"><button type="button" class="btn sub" id="btnCourseBack">← 처음 화면</button></div>
@@ -579,7 +579,7 @@ const TRACKS = {
     ]
   }
 };
-const COURSES = Object.keys(TRACKS);
+const COURSES = ["seoul", "singapore", "hongkong"];
 function capKey(k) { return k[0].toUpperCase() + k.slice(1); }
 let LAPS = CFG.laps;
 const CAR_MODELS = {
@@ -608,7 +608,7 @@ function carLabel(id) { const c = parseCar(id); return CAR_MODELS[c.model].name 
 function carReady(id) { return !!CAR_MODELS[parseCar(id).model].tpl; }
 let carKey = carId("porsche", "blue");
 try { const saved = localStorage.getItem("turbolap_car_v1"); if (saved) { const c = parseCar(saved); carKey = carId(c.model, c.color); } } catch (e) {}
-let pendingCourse = "hongkong"; try { if (TRACKS[localStorage.getItem("turbolap_course_v1")]) pendingCourse = localStorage.getItem("turbolap_course_v1"); } catch (e) {}
+let pendingCourse = "seoul"; try { if (TRACKS[localStorage.getItem("turbolap_course_v1")]) pendingCourse = localStorage.getItem("turbolap_course_v1"); } catch (e) {}
 
 const $ = id => document.getElementById(id);
 
@@ -4189,9 +4189,9 @@ $("btnMenu").onclick = e => { e.currentTarget.blur(); showMenu(); };
 $("btnReset").onclick = e => { e.currentTarget.blur(); startRace(); };
 $("btnRecover").onclick = e => { e.currentTarget.blur(); recover(); };
 
-const CAR_HIT = { impact: 1 / 3, radius: 0.82, offset: 1.08, restitution: 0.45, push: 0.55, spinGain: 0.55, spinMax: 2.6, spinFriction: 3.2, slideFriction: 2.6, inertia: 1.45 };
+const CAR_HIT = { impact: 0.1, radius: 0.82, offset: 1.08, restitution: 0.45, push: 0.55, spinGain: 0.55, spinMax: 0.8, spinFriction: 3.2, slideFriction: 2.6, inertia: 1.45 };
 const HIT_NOTICE = { minGapMs: 250, dedupeMs: 300, staleMs: 1000 };
-const CHASE = { gapSteps: [{ overM: 30, kmh: 25 }, { overM: 20, kmh: 15 }, { overM: 10, kmh: 10 }, { overM: 0, kmh: 5 }], tailM: 25, tailSideM: 2.5 * 2 * CAR_HIT.radius, tailSec: 2, boostKmh: 40, rampSec: 0.5, holdSec: 1, fadeSec: 1.5, cooldownSec: 6, startLockSec: 5, stickyM: 3, stickySideM: 0.4, tailGraceSec: 0.5, tagHoldSec: 0.6, surgeFromRatio: 0.85, surgeFullKmh: 20 };
+const CHASE = { gapSteps: [{ overM: 30, kmh: 25 }, { overM: 20, kmh: 15 }, { overM: 10, kmh: 10 }, { overM: 0, kmh: 5 }], tailM: 25, tailSideM: 2.5 * 2 * CAR_HIT.radius, tailSec: 3, boostKmh: 40, rampSec: 0.5, holdSec: 1, fadeSec: 1.5, cooldownSec: 6, startLockSec: 5, stickyM: 3, stickySideM: 0.4, tailGraceSec: 0.5, tagHoldSec: 0.6, surgeFromRatio: 0.85, surgeFullKmh: 20 };
 const TAG_HOLD = { chase: { text: "", t: 0 }, follow: { text: "", t: 0 } };
 const BATTLE = {
   root: "turbolap/rooms", specMax: 1, netMs: 100, countMs: 3600, countLagMaxMs: 1500,dnfMs: 30000, rankRowH: 48,
@@ -4203,7 +4203,7 @@ const SIDE_NAME = { left: "왼쪽", right: "오른쪽", spec: "관전" };
 const SIDE_COLOR = { left: "#24402F", right: "#D97B4F" };
 const BT = {
   db: null, ref: null, code: "", myId: "p" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4),
-  nick: "", nickRequired: false, players: {}, status: "", host: null, hostLoaded: false, course: "hongkong", startAt: 0, result: null,
+  nick: "", nickRequired: false, players: {}, status: "", host: null, hostLoaded: false, course: "seoul", startAt: 0, result: null,
   subs: [], leaving: false, spec: false, match: null, ents: {}, raw: {}, sent: "", lastNet: 0, forceNet: false, statusSent: "",
   viewId: null, viewKey: "", serverOffset: 0, hitSeq: 0, rankRows: {}, rankNums: 0, lobbyCarSig: "", queued: false
 };
@@ -4345,7 +4345,7 @@ function enterRoom(code) {
   });
   sub(ref.child("hostPlayerId"), "value", s => { BT.host = s.val(); BT.hostLoaded = true; checkHost(); playersChanged(); });
   sub(ref.child("course"), "value", s => {
-    BT.course = TRACKS[s.val()] ? s.val() : "hongkong";
+    BT.course = TRACKS[s.val()] ? s.val() : "seoul";
     if (!BT.match && BT.course !== course) { showCourse(BT.course); BT.lobbyCarSig = ""; }
     playersChanged();
   });
