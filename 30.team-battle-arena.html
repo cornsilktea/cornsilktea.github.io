@@ -197,13 +197,21 @@
   #btnUlt.act .fill { background: rgba(240,107,181,.85); }
   @keyframes glow { from { box-shadow: 0 0 6px 2px rgba(255,120,80,.6); } to { box-shadow: 0 0 22px 8px rgba(255,90,60,.95); } }
   #deadMsg { position: absolute; left: 50%; bottom: 30%; transform: translateX(-50%); background: rgba(27,43,32,.82); color: #fff; font-size: 20px; font-weight: 800; padding: 10px 20px; border-radius: 8px; pointer-events: none; white-space: nowrap; }
+  #protBadge { position: absolute; left: 50%; bottom: 30%; transform: translateX(-50%); background: rgba(47,125,79,.9); color: #fff; font-size: 17px; font-weight: 800; padding: 6px 14px; border-radius: 10px; pointer-events: none; white-space: nowrap; }
+  .board { width: 100%; border-collapse: collapse; margin: 0 0 16px; font-size: 15px; }
+  .board th { font-size: 12px; color: #A3B0A6; font-weight: 700; padding: 4px; border-bottom: 2px solid rgba(255,255,255,.16); }
+  .board td { padding: 6px 4px; font-weight: 800; color: #EEF2EE; border-bottom: 1px solid rgba(255,255,255,.08); font-variant-numeric: tabular-nums; }
+  .board td.nm { text-align: left; }
+  .board td.nm small { margin-left: 4px; font-size: 12px; color: #A3B0A6; }
+  .board tr.mine td { background: rgba(242,208,107,.14); }
+  .board .dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: middle; }
   #countOv { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; pointer-events: none; }
   #countNum { font-size: 150px; font-weight: 800; color: #FFF4D6; text-shadow: 0 6px 0 rgba(0,0,0,.35), 0 0 28px rgba(255,190,80,.8); line-height: 1; }
   #endOv { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; align-items: center; justify-content: center; padding: 16px; }
   #endOv.blue { background: rgba(47,111,214,.62); }
   #endOv.red { background: rgba(214,69,61,.62); }
   #endOv.draw { background: rgba(60,60,60,.62); }
-  .endBox { background: rgba(16,24,19,.94); color: #F4F1E8; border-radius: 12px; padding: 24px 22px; width: 100%; max-width: 440px; text-align: center; border: 2px solid rgba(255,255,255,.2); box-shadow: 0 12px 40px rgba(0,0,0,.45); }
+  .endBox { background: rgba(16,24,19,.94); color: #F4F1E8; border-radius: 12px; padding: 24px 22px; width: 100%; max-width: 620px; max-height: 100%; overflow-y: auto; text-align: center; border: 2px solid rgba(255,255,255,.2); box-shadow: 0 12px 40px rgba(0,0,0,.45); }
   #endTitle { font-size: 38px; font-weight: 800; margin-bottom: 16px; }
   .scoreRow { display: flex; gap: 10px; margin-bottom: 16px; }
   .scoreRow div { flex: 1 1 0; border-radius: 8px; padding: 10px 6px; font-size: 15px; font-weight: 800; }
@@ -255,7 +263,7 @@
   <div class="wrap">
     <div class="card">
       <h1 class="titleMain"><span class="tb">3v3</span> 팀 배틀 <span class="tr">아레나</span></h1>
-      <p class="sub">1분 30초 동안 상대를 더 많이 쓰러뜨린 팀이 승리!<br>쓰러지면 3초 뒤 처음 자리에서 다시 시작합니다. 킬 스코어가 같으면 무승부.</p>
+      <p class="sub">1분 30초 동안 상대를 더 많이 쓰러뜨린 팀이 승리!<br>쓰러지면 3초 뒤 처음 자리에서 부활하고, 부활 후 3초 동안은 피해를 받지 않아요. 킬 스코어가 같으면 무승부.</p>
       <div class="hello">안녕하세요, <b id="helloNick"></b>님 👋 <button id="btnNickEdit" class="mini" type="button">✏️ 변경</button></div>
       <button id="btnCreate" class="big primary" type="button">방 만들기</button>
       <button id="btnJoinOpen" class="big" type="button">방 코드로 입장하기</button>
@@ -321,11 +329,13 @@
   <div id="btnUlt" class="actBtn"><div class="fill"></div><span>궁극기</span></div>
   <div id="btnAtk" class="actBtn"><div class="cd"></div><span>공격</span></div>
   <div id="deadMsg" hidden></div>
+  <div id="protBadge" hidden></div>
   <div id="countOv" hidden><div id="countNum">3</div></div>
   <div id="endOv" hidden>
     <div class="endBox">
       <div id="endTitle"></div>
       <div class="scoreRow"><div class="sb">블루팀 킬<b id="endBlue">0</b></div><div class="sr">레드팀 킬<b id="endRed">0</b></div></div>
+      <table class="board"><thead><tr><th>팀</th><th>닉네임</th><th>처치</th><th>쓰러짐</th><th>입힌 피해</th><th>회복</th></tr></thead><tbody id="boardBody"></tbody></table>
       <div class="endBtns"><button id="btnAgain" class="primary" type="button">다시하기</button><button id="btnLeaveEnd" type="button">방 나가기</button></div>
     </div>
   </div>
@@ -357,6 +367,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var MATCH_MS = 90000;
   var COUNT_MS = 3000;
   var RESPAWN_MS = 3000;
+  var RESPAWN_PROTECT_MS = 3000;
   var GAUGE_MAX = 10;
   var TEAM_MAX = 3, SPEC_MAX = 1;
   var ATK_POSE_MS = 150;
@@ -486,7 +497,40 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   } catch (e) { db = null; }
   var serverOffset = 0;
   if (db) db.ref(".info/serverTimeOffset").on("value", function (s) { serverOffset = s.val() || 0; });
-  function now() { return Date.now() + serverOffset; }
+  var CLOCK_PINGS = 5, CLOCK_GAP_MS = 500, CLOCK_KEEP = 10;
+  var CLOCK = { off: null, samples: [], host: null, timer: null };
+  function now() { return Date.now() + (CLOCK.off === null || isHost() ? serverOffset : CLOCK.off); }
+  function clockBurst() {
+    clearInterval(CLOCK.timer);
+    var left = CLOCK_PINGS;
+    function ping() {
+      if (!room || isHost() || left-- <= 0) { clearInterval(CLOCK.timer); return; }
+      room.ref.child("ping/" + myId).set({ a: Date.now() });
+    }
+    ping();
+    CLOCK.timer = setInterval(ping, CLOCK_GAP_MS);
+  }
+  function onPing(s) {
+    var v = s.val();
+    if (!room || !isHost() || !v || !v.a) return;
+    room.ref.child("pong/" + s.key).set({ a: v.a, t: now(), h: myId });
+  }
+  function onPong(s) {
+    var v = s.val(), got = Date.now();
+    if (!room || !v || v.h !== room.host || isHost()) return;
+    var rtt = got - v.a;
+    if (rtt < 0 || rtt > 5000) return;
+    CLOCK.samples.push({ rtt: rtt, off: v.t - (v.a + got) / 2 });
+    if (CLOCK.samples.length > CLOCK_KEEP) CLOCK.samples.shift();
+    var best = CLOCK.samples[0];
+    CLOCK.samples.forEach(function (x) { if (x.rtt < best.rtt) best = x; });
+    CLOCK.off = best.off;
+  }
+  function hostChangedClock(host) {
+    if (host === CLOCK.host) return;
+    CLOCK.host = host; CLOCK.samples = []; CLOCK.off = null;
+    if (host) clockBurst();
+  }
   var ROOT = "teambattle/rooms";
   var myId = "p" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 
@@ -586,6 +630,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     clear3d();
     P = {}; R = {}; PR = {}; MELEE = {}; FX = []; BURSTS = []; G = null; ME = null; BOTS = {}; ST = {}; SHOTS = []; hitSubs = {};
     ref.child("players/" + myId).onDisconnect().remove();
+    ref.child("ping/" + myId).onDisconnect().remove();
+    ref.child("pong/" + myId).onDisconnect().remove();
+    CLOCK.host = null; CLOCK.samples = []; CLOCK.off = null;
+    sub(ref.child("ping"), "child_added", onPing);
+    sub(ref.child("ping"), "child_changed", onPing);
+    sub(ref.child("pong/" + myId), "value", onPong);
 
     var pref = ref.child("players");
     sub(pref, "child_added", function (s) { P[s.key] = s.val(); playersChanged(); });
@@ -596,7 +646,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       checkHost(); playersChanged();
     });
     sub(ref.child("mode"), "value", function (s) { room.mode = s.val(); playersChanged(); });
-    sub(ref.child("hostPlayerId"), "value", function (s) { room.host = s.val(); room.hostLoaded = true; checkHost(); playersChanged(); });
+    sub(ref.child("hostPlayerId"), "value", function (s) { room.host = s.val(); room.hostLoaded = true; hostChangedClock(room.host); checkHost(); playersChanged(); });
     sub(ref.child("startAt"), "value", function (s) { room.startAt = s.val() || 0; });
     sub(ref.child("winner"), "value", function (s) { room.winner = s.val(); });
     sub(ref.child("endedAt"), "value", function (s) { room.endedAt = s.val() || 0; });
@@ -608,6 +658,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var prev = room.status; room.status = st;
       if (st === "lobby") { G = null; ME = null; BOTS = {}; showScreen("lobby"); playersChanged(); }
       else showScreen("game");
+      if (st === "countdown" && prev !== "countdown") clockBurst();
       if (st === "ended" && prev !== "ended") onEnded();
     });
     var stRef = ref.child("st");
@@ -646,6 +697,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     unsubAll();
     var myRef = r.ref.child("players/" + myId);
     try { myRef.onDisconnect().cancel(); } catch (e) {}
+    clearInterval(CLOCK.timer);
+    r.ref.child("ping/" + myId).remove(); r.ref.child("pong/" + myId).remove();
     myRef.remove().then(function () {
       return r.ref.child("players").once("value");
     }).then(function (s) {
@@ -870,9 +923,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (p.isAI) { c = lineup[i]; u[base + "nickname"] = CHARS[c].name; }
         u[base + "slot"] = i + 1; u[base + "characterType"] = c;
         st[stKey(team, i + 1)] = packState(sp.x, sp.y, sp.angle, false);
-        u[base + "hp"] = CHARS[c].hp; u[base + "alive"] = true; u[base + "skillGauge"] = 0; u[base + "damageDealt"] = 0; u[base + "deaths"] = 0; u[base + "diedAt"] = 0;
+        u[base + "hp"] = CHARS[c].hp; u[base + "alive"] = true; u[base + "skillGauge"] = 0; u[base + "damageDealt"] = 0; u[base + "deaths"] = 0; u[base + "diedAt"] = 0; u[base + "kills"] = 0; u[base + "healDone"] = 0; u[base + "protectUntil"] = 0;
         u[base + "atkAt"] = 0; u[base + "ultUntil"] = 0; u[base + "buffUntil"] = 0; u[base + "stealthUntil"] = 0; u[base + "regenUntil"] = 0; u[base + "skillUntil"] = 0; u[base + "skillDur"] = 0;
-        u[base + "healGot"] = null;
         roster[id] = { team: team, c: c, ai: !!p.isAI };
       });
     });
@@ -913,7 +965,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
              alive: d.alive !== false, gauge: +d.skillGauge || 0, dmg: +d.damageDealt || 0, deaths: +d.deaths || 0, diedAt: +d.diedAt || 0,
              cdUntil: 0, cdDur: 0, atkAt: 0, ultUntil: 0, buffUntil: 0, stealthUntil: +d.stealthUntil || 0, regenUntil: 0,
              skillUntil: +d.skillUntil || 0, skillDur: +d.skillDur || 0,
-             burst: null, volley: null, mv: false, pending: null, healGot: {} };
+             kills: +d.kills || 0, heal: +d.healDone || 0, protectUntil: +d.protectUntil || 0,
+             burst: null, volley: null, mv: false, pending: null };
   }
   function initGame() {
     clear3d();
@@ -947,7 +1000,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var tx = pos.x, ty = pos.y, revived = !r.alive && d.alive !== false;
       if (pos.mv && hyp(tx - r.x, ty - r.y) > 3) { r.moveAng = Math.atan2(ty - r.y, tx - r.x); r.moveAt = now(); }
       if (revived || hyp(tx - r.x, ty - r.y) > 250) { r.x = tx; r.y = ty; } else { r.x += (tx - r.x) * k; r.y += (ty - r.y) * k; }
-      r.deaths = +d.deaths || 0; r.diedAt = +d.diedAt || 0;
+      r.deaths = +d.deaths || 0; r.diedAt = +d.diedAt || 0; r.kills = +d.kills || 0; r.heal = +d.healDone || 0; r.protectUntil = +d.protectUntil || 0;
       r.angle = lerpAng(r.angle, pos.angle, Math.min(1, dt * 15));
       r.team = d.team; r.char = CHARS[d.characterType] ? d.characterType : "ranger"; r.maxHp = CHARS[r.char].hp;
       r.hp = +d.hp; r.alive = d.alive !== false; r.gauge = +d.skillGauge || 0; r.dmg = +d.damageDealt || 0;
@@ -1151,16 +1204,23 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }
     }
   }
+  function protectedNow(E, t) { return E.alive && E.protectUntil > (t || now()); }
   function damage(T, amount, owner, basic, ultKey) {
+    if (protectedNow(T)) return;
     if (T.char === "knight" && T.buffUntil > now()) amount = Math.round(amount * ULT.tkDef);
-    var dm = Math.min(amount, T.hp);
+    var dm = Math.min(amount, T.hp), killed = false;
     T.hp -= dm; if (!skillActive(T)) T.gauge = Math.min(GAUGE_MAX, T.gauge + 1);
-    if (T.hp <= 0) { T.hp = 0; T.alive = false; T.deaths++; T.diedAt = now(); T.burst = null; T.volley = null; T.slash = null; T.regenUntil = 0; T.skillUntil = 0; if (T === ME) { sfx("down"); aim.id = null; joy.id = null; } }
+    if (T.hp <= 0) { killed = true; T.hp = 0; T.alive = false; T.deaths++; T.diedAt = now(); T.burst = null; T.volley = null; T.slash = null; T.regenUntil = 0; T.skillUntil = 0; if (T === ME) { sfx("down"); aim.id = null; joy.id = null; } }
     else if (T === ME) sfx("hit");
-    pushHit(owner, dm, basic, ultKey);
+    pushHit(owner, dm, basic, ultKey, killed);
     if (T === ME || T.bot) G.forceNet = true;
   }
-  function pushHit(owner, dmg, basic, ultKey) { var h = { d: dmg, b: basic ? 1 : 0, t: now() }; if (ultKey) h.u = ultKey; room.ref.child("hits/" + owner).push(h); }
+  function pushHit(owner, dmg, basic, ultKey, killed) {
+    var h = { d: dmg, b: basic ? 1 : 0, t: now() };
+    if (ultKey) h.u = ultKey;
+    if (killed) h.k = 1;
+    room.ref.child("hits/" + owner).push(h);
+  }
   var hitSubs = {};
   function listenHits(ownerId) {
     if (hitSubs[ownerId]) return;
@@ -1175,6 +1235,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     handled[s.key] = 1;
     if (h.t >= G.startAt - 1000) {
       if (h.d) owner.dmg += h.d;
+      if (h.k) owner.kills++;
+      if (h.hl) owner.heal += h.hl;
       if (h.u && owner.char === "mage" && owner.refundKey !== h.u) { owner.refundKey = h.u; owner.gauge = Math.min(GAUGE_MAX, owner.gauge + GAUGE_MAX / 2); }
       if (h.b && !skillActive(owner)) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + (CHARS[owner.char].perHit || 2));
       if (owner === ME && h.d) sfx("confirm");
@@ -1197,7 +1259,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (T.team !== e.team) { damage(T, e.dmg, e.owner, false, e.createdAt); return; }
         var healed = Math.min(T.maxHp - T.hp, e.dmg);
         if (healed <= 0) return;
-        T.hp += healed; T.healGot[e.owner] = (T.healGot[e.owner] || 0) + healed;
+        T.hp += healed;
+        room.ref.child("hits/" + e.owner).push({ d: 0, b: 0, t: now(), hl: healed });
         G.forceNet = true;
         if (T === ME) sfx("heal");
       });
@@ -1234,6 +1297,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     localTargets().forEach(function (T) {
       if (T.team === d.team || !T.alive || !inArc(T, d)) return;
       var dx = T.x - d.x, dy = T.y - d.y;
+      if (protectedNow(T)) return;
       damage(T, d.dmg, d.owner, true);
       if (d.kb && T.alive) {
         var dd = hyp(dx, dy) || 1;
@@ -1255,7 +1319,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (E.alive || !E.diedAt || t < E.diedAt + RESPAWN_MS || !P[E.id] || !P[E.id].slot) return;
     var sp = spawnOf(E.team, P[E.id].slot);
     E.x = sp.x; E.y = sp.y; E.angle = sp.angle; E.mv = false;
-    E.hp = E.maxHp; E.alive = true;
+    E.hp = E.maxHp; E.alive = true; E.protectUntil = t + RESPAWN_PROTECT_MS;
     E.cdUntil = 0; E.pending = null; E.burst = null; E.volley = null; E.slash = null;
     E.buffUntil = 0; E.stealthUntil = 0; E.ultUntil = 0; E.skillUntil = 0; E.regenUntil = 0;
     if (E === ME) CAM.snap = true;
@@ -1427,7 +1491,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     put("atkAt", E.atkAt); put("ultUntil", E.ultUntil); put("buffUntil", E.buffUntil);
     put("stealthUntil", E.stealthUntil); put("regenUntil", E.regenUntil);
     put("skillUntil", E.skillUntil); put("skillDur", E.skillDur);
-    if (room.status === "ended") keys(E.healGot).forEach(function (healerId) { put("healGot/" + healerId, Math.round(E.healGot[healerId])); });
+    put("kills", E.kills); put("healDone", Math.round(E.heal)); put("protectUntil", E.protectUntil);
   }
   function netWrite(force) {
     var t = Date.now();
@@ -1483,9 +1547,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (r.status !== "ended" || r.endedAt !== endedAt || r.winner == null) return;
     if (!isFairHumanMatch(r.mode, r.roster, ps)) return;
     var rows = keys(r.roster).map(function (id) {
-      var healed = 0;
-      keys(ps).forEach(function (other) { var got = ps[other] && ps[other].healGot; if (got && got[id]) healed += +got[id] || 0; });
-      return { c: r.roster[id].c, win: r.winner === r.roster[id].team, dmg: +ps[id].damageDealt || 0, heal: healed };
+      return { c: r.roster[id].c, win: r.winner === r.roster[id].team, dmg: +ps[id].damageDealt || 0, heal: +ps[id].healDone || 0 };
     });
     db.ref(STATS_PATH).transaction(function (cur) {
       cur = cur || {};
@@ -2238,6 +2300,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       v.root.visible = true;
       var bi = bushIndexAt(E.x, E.y); if (bi >= 0) bushSeen[bi] = 1;
       var alpha = !E.alive ? (v.kit ? 0.6 : 0.35) : (hid ? (spec ? 0.55 : STEALTH_ALPHA) : 1), hurt = false;
+      if (protectedNow(E, t)) alpha = Math.min(alpha, 0.5 + 0.3 * Math.sin(nowMs / 70));
       if (lastHp[id] !== undefined && Math.abs(E.hp - lastHp[id]) >= 1) {
         var d = Math.round(E.hp - lastHp[id]);
         if (d < 0) { floatText(E.x, E.y, String(d), "#FF4B3E"); E.flashUntil = nowMs + 90; hurt = true; }
@@ -2404,6 +2467,21 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     return h;
   }
 
+  function boardRows() {
+    var rows = "";
+    ["blue", "red"].forEach(function (team) {
+      participants().filter(function (id) { return P[id].team === team; })
+        .sort(function (a, b) { return (P[a].slot || 0) - (P[b].slot || 0); })
+        .forEach(function (id) {
+          var E = ent(id), d = P[id]; if (!E) return;
+          rows += '<tr class="' + (id === myId ? "mine" : "") + '"><td><span class="dot" style="background:' + (team === "blue" ? "#2F6FD6" : "#D6453D") + '"></span></td>' +
+            '<td class="nm">' + (d.isAI ? "🤖 " : "") + esc(d.nickname) + "<small>" + CHARS[E.char].name + "</small></td>" +
+            "<td>" + E.kills + "</td><td>" + E.deaths + "</td><td>" + Math.round(E.dmg) + "</td>" +
+            "<td>" + (E.char === "mage" ? Math.round(E.heal) : "-") + "</td></tr>";
+        });
+    });
+    return rows;
+  }
   function fmtTime(ms) { ms = Math.max(0, ms); var s = Math.ceil(ms / 1000); return Math.floor(s / 60) + ":" + (s % 60 < 10 ? "0" : "") + (s % 60); }
   function updateHud(t) {
     var st = room.status;
@@ -2426,6 +2504,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var alive = ME && ME.alive, playing = st === "playing" && t >= room.startAt;
     show($("btnAtk"), alive && st !== "ended"); show($("btnUlt"), alive && st !== "ended");
     show($("deadMsg"), ME && !ME.alive && st === "playing");
+    var prot = ME && protectedNow(ME, t) && st === "playing";
+    show($("protBadge"), prot);
+    if (prot) setText($("protBadge"), "🛡 보호 중 " + ((ME.protectUntil - t) / 1000).toFixed(1) + "초");
     if (ME && !ME.alive) setText($("deadMsg"), "쓰러졌습니다 — " + Math.max(1, Math.ceil((ME.diedAt + RESPAWN_MS - t) / 1000)) + "초 뒤 부활");
     if (ME) {
       setHtml($("btnAtk").lastChild, '<i class="ic">' + CHARS[ME.char].icon + "</i>공격");
@@ -2454,6 +2535,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       $("endTitle").style.color = w === "blue" ? "#6FA8FF" : (w === "red" ? "#FF7A70" : "#EEF2EE");
       setText($("endBlue"), String(f.blue != null ? f.blue : s.blueKills));
       setText($("endRed"), String(f.red != null ? f.red : s.redKills));
+      setHtml($("boardBody"), boardRows());
     } else show($("endOv"), false);
   }
 

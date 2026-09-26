@@ -96,7 +96,7 @@
   }
   .lightbox img { max-width: 100%; max-height: 92vh; border-radius:var(--sg-radius); background: #fff; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
   .stats-box {
-    background: #fff; border-radius: var(--sg-radius); padding: 24px; width: 100%; max-width: 760px;
+    background: #fff; border-radius: var(--sg-radius); padding: 24px; width: 100%; max-width: 860px;
     max-height: 92vh; overflow-y: auto; cursor: default; box-shadow: 0 10px 40px rgba(0,0,0,.4);
   }
   .stats-box h3 { margin: 0 0 6px; font-size: 18px; }
@@ -944,7 +944,7 @@ async function showStats(g) {
     }
     const table = el("table");
     const head = el("tr");
-    ["직업", "선택률 (선택 수 / 총 게임 수)", "승률 (승리 수 / 선택 수)", "평균 피해량"].forEach((t) => head.appendChild(el("th", null, t)));
+    ["직업", "선택률 (선택 수 / 총 게임 수)", "승률 (승리 수 / 선택 수)", "평균 피해량", "평균 회복량"].forEach((t) => head.appendChild(el("th", null, t)));
     table.appendChild(head);
     meta.roles.forEach((role) => {
       const d = s[role.id] || {}, picks = d.picks || 0, wins = d.wins || 0;
@@ -952,16 +952,15 @@ async function showStats(g) {
       tr.appendChild(el("td", null, role.name));
       tr.appendChild(rateCell(picks, totalPicks));
       tr.appendChild(rateCell(wins, picks));
-      /* 1판 평균. 마법사는 궁극기로 아군을 회복한 양도 피해량에 더한다 */
-      const avg = (d.dmg || 0) + (role.heal ? d.heal || 0 : 0);
-      tr.appendChild(el("td", null, picks ? String(Math.round(avg)) : "-"));
+      /* 1판 평균. 회복은 마법사 궁극기(아군 회복)만 있어서 다른 직업은 "-" */
+      tr.appendChild(el("td", null, picks ? String(Math.round(d.dmg || 0)) : "-"));
+      tr.appendChild(el("td", null, picks && role.heal ? String(Math.round(d.heal || 0)) : "-"));
       table.appendChild(tr);
     });
     box.appendChild(table);
     box.appendChild(el("p", "hint",
       "AI 없이 양 팀 인원이 같은 3v3 플레이 경기만 집계합니다. 중간에 나가거나 연결이 끊긴 사람이 있는 경기는 빠집니다. " +
-      "총 게임 수는 한 사람이 한 판을 한 것을 1게임으로 셉니다(3v3 한 판 = 6게임). 무승부는 승리로 세지 않습니다. " +
-      "마법사의 평균 피해량에는 아군 회복량이 포함됩니다."));
+      "총 게임 수는 한 사람이 한 판을 한 것을 1게임으로 셉니다(3v3 한 판 = 6게임). 무승부는 승리로 세지 않습니다."));
 
     const acts = el("div", "actions");
     const reload = el("button", null, "새로고침"); reload.type = "button";
