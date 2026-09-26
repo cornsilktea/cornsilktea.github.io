@@ -9,7 +9,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
 <meta property="og:title" content="3v3 팀 배틀 아레나">
-<meta property="og:description" content="방 코드로 모여 블루 vs 레드로 싸우는 3D 3v3 실시간 팀 대전(또는 모두 블루팀이 되어 AI 3명과 대결) / 전사·기사·궁수·마법사·도적·네크로·저격수·투척병·창기사 중 선택, 궁극기 게이지·풀숲 숨기 / 쓰러지면 3초 뒤 부활, 1분 30초 뒤 킬 스코어가 높은 팀 승리">
+<meta property="og:description" content="방 코드로 모여 블루 vs 레드로 싸우는 3D 3v3 실시간 팀 대전(숲속 공터·강 건너기·던전 회랑 맵 선택) / 전사·기사·궁수·마법사·도적·네크로·저격수·투척병·창기사 중 선택, 궁극기 게이지·풀숲 숨기 / 쓰러지면 3초 뒤 부활, 1분 30초 뒤 킬 스코어가 높은 팀 승리">
 <meta property="og:url" content="https://cornsilktea.github.io/30.team-battle-arena.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
@@ -58,14 +58,18 @@
   .row input { flex: 1; min-width: 0; height: 60px; font: inherit; font-size: 28px; font-weight: 800; letter-spacing: 6px; text-align: center; border: 2px solid var(--sg-line-strong); border-radius: 6px; background: rgba(255, 255, 255, .06); color: #fff; }
   .row button { flex: 0 0 auto; height: 60px; padding: 0 22px; font-size: 20px; font-weight: 800; border-radius: 6px; border: 2px solid var(--sg-primary); }
   .msg { min-height: 22px; margin-top: 10px; text-align: center; font-size: 15px; font-weight: 700; color: var(--sg-danger); }
-  .note { font-size: 13px; color: var(--sg-ink-soft); line-height: 1.6; }
 
   .codeBar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
   .codeBox { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
   .codeLab { font-size: 16px; font-weight: 700; color: var(--sg-ink-soft); }
   .codeNum { font-size: 60px; font-weight: 800; letter-spacing: 8px; color: var(--sg-primary); line-height: 1; }
   .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 14px; font-weight: 800; background: var(--sg-primary-soft); color: var(--sg-primary); }
-  .badge.ai { background: #D97B4F; color: #fff; }
+  .lobbyTop { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 10px 22px; margin-top: 12px; }
+  .lobbyTop .hello { justify-content: flex-start; margin: 0; font-size: 16px; min-height: 34px; }
+  .optRows { display: grid; gap: 6px; }
+  .optRow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .optLab { min-width: 62px; font-size: 14px; font-weight: 800; color: var(--sg-ink-mid); }
+  .optRow .modeBtns { margin-left: 0; }
   .danger { border-color: var(--sg-danger); color: var(--sg-danger); }
   .modeBtns { display: inline-flex; gap: 6px; flex-wrap: wrap; margin-left: 6px; }
   .modeBtn.on { background: var(--sg-primary); border-color: var(--sg-primary); color: var(--sg-primary-ink); }
@@ -277,15 +281,6 @@
       </div>
       <div id="startMsg" class="msg"></div>
     </div>
-    <div class="card note">
-      <b>조작</b> — 왼쪽 아래를 누르고 끌면 이동, 오른쪽 아래 <b>공격</b> 버튼을 누른 채 끌어 방향을 정하고 떼면 발사(그냥 톡 누르면 가까운 적을 자동 조준). 컴퓨터에서는 <b>WASD</b>(방향키)로 이동, <b>K</b> 기본 공격, <b>J</b> 궁극기(자동 조준).
-      <b>궁극기</b>는 게이지가 10 모이면(명중 +2 · 마법사·네크로는 +3 · 궁수·도적은 1발당 +1 · 저격수는 +4 · 투척병은 독 피해 1번에 +1(궁극기 독안개 피해도 +1, 궁극기 중에도 게이지가 참), 피격 +1, 마법사 궁극기가 적에게 맞으면 4를 돌려받음, 궁수 궁극기는 화살이 맞을 때마다 1씩, 저격수 궁극기는 적중하면 2를 돌려받음) 빨갛게 빛나고, 궁극기를 쓰면 지속시간 동안 분홍색으로 줄어듭니다. 풀숲에 들어가면 상대 팀에게 보이지 않아요.
-      <br>한 팀에서 같은 캐릭터는 1명만 고를 수 있어요(상대 팀과는 겹쳐도 돼요).
-      <br><b>네크로</b>는 빠른 보라색 구체를 쏘고, 궁극기 <b>해골 소환</b>으로 앞쪽에 해골 병사 2마리를 불러내요. 해골은 8초 동안 보이는 적을 쫓아가 베고(적이 안 보이면 그 자리에 서 있음), 적의 공격에 맞으면 쓰러져요. 해골이 쓰러뜨린 적은 네크로의 킬이 되지만 궁극기 게이지는 차지 않아요. 해골이 있는 동안에도 네크로의 공격으로 게이지가 차서 다시 소환할 수 있어요. 해골은 최대 4마리까지 남고, 넘치면 가장 오래된 해골부터 사라져요.
-      <br><b>저격수</b>는 석궁으로 아주 멀리(사거리 700) 강한 화살을 쏘지만 1초에 0.7발만 쏠 수 있어요. 공격 버튼을 끌어 조준하면 화면이 조준 방향으로 넓게 보여요. 궁극기 <b>거대 화살</b>은 3배 크기의 거대한 화살로, 처음 맞은 적에게 90의 피해를 줘요.
-      <br><b>투척병</b>은 조준한 곳(최대 380)에 1초마다 독약병을 던져요. 가까이 던질수록 빨리 떨어지고(가장 멀리 던지면 0.7초), 떨어진 자리에 초록 독 장판이 3초 동안 생기고, 장판 위의 적은 1초마다 20의 피해를 받아요(장판이 겹쳐도 1초에 한 번, 장판은 최대 4개까지 남고 넘치면 가장 오래된 것부터 사라져요). 공격 버튼을 짧게 끌면 가까이, 길게 끌면 멀리 던져요. 궁극기 <b>독안개</b>는 조준한 곳(최대 380)에 거대한 독 장판(반지름 200)을 5초 동안 깔아 1초마다 20의 피해를 주고, 장판 안의 적은 40% 느려져요. 장판 안의 아군(나 포함)은 1초마다 체력을 20 회복해요. 독 장판은 상대 팀에게도 보이니 밟지 않게 피하세요.
-      <br><b>창기사</b>는 긴 창으로 앞을 곧게 찔러요(길이 250). 찌른 선 위에 있는 적은 모두 30의 피해를 받아요. 궁극기 <b>꿰뚫기</b>는 0.3초 동안 바닥에 빨간 선으로 예고한 뒤 더 길게(400) 찔러, 맞은 적 모두에게 90의 피해를 주고 1.2초 동안 기절시켜요. 기절한 동안은 움직이거나 공격할 수 없어요. 빨간 선이 보이면 옆으로 피하세요!
-    </div>
   </div>
 </div>
 
@@ -296,7 +291,13 @@
         <div class="codeBox"><span class="codeLab">방 코드</span><span id="lobbyCode" class="codeNum">-----</span><span id="lobbyMode" class="badge"></span></div>
         <button id="btnLeaveLobby" class="mini danger" type="button">방 나가기</button>
       </div>
-      <div class="hello" style="justify-content:flex-start;margin:12px 0 0;font-size:16px;">내 닉네임: <b id="lobbyNick"></b> <button id="btnNickEdit2" class="mini" type="button">✏️ 변경</button><span id="modeBtns" class="modeBtns"></span></div>
+      <div class="lobbyTop">
+        <div class="hello">내 닉네임: <b id="lobbyNick"></b> <button id="btnNickEdit2" class="mini" type="button">✏️ 변경</button></div>
+        <div class="optRows">
+          <div class="optRow"><span class="optLab">게임모드</span><span id="modeBtns" class="modeBtns"></span></div>
+          <div class="optRow"><span class="optLab">맵</span><span id="mapBtns" class="modeBtns"></span></div>
+        </div>
+      </div>
     </div>
 
     <div id="teamCard" class="card">
@@ -308,7 +309,6 @@
         <div class="specHead"><b>📺 관전자</b><span id="listSpec" class="specList"></span></div>
         <button id="btnSpec" class="mini" type="button">📺 관전자로 보기</button>
       </div>
-      <div class="note" style="margin-top:6px;">전자칠판은 관전자로 두면 맵 전체와 양 팀 체력·궁극기를 한눈에 볼 수 있어요. 관전자는 최대 1명이고 게임에 참여하지 않아요. 게임 중에도 자리가 있으면 방 코드로 관전자 입장이 됩니다.</div>
     </div>
 
     <div id="charCardBox" class="card">
@@ -411,32 +411,69 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var SPAWN_X = [250, 450, 650];
   var SPAWN_Y = { blue: 118, red: MH - 118 };
   var TILE = 50, MAP_X0 = BOUND.l, MAP_Y0 = BOUND.t;
-  var MAP_BLUE_HALF = [
-    "................",
-    "................",
-    "................",
-    "...##......##...",
-    "\"\"............\"\"",
-    "\"\"\"....##....\"\"\"",
-    "\"\"\"..........\"\"\"",
-    "....#......#....",
-    "....#..\"\"..#....",
-    ".##....\"\"....##.",
-    "................",
-    "..\"\"...##...\"\"..",
-    "..\"\"........\"\".."
-  ];
-  var MAP = MAP_BLUE_HALF.concat(MAP_BLUE_HALF.slice(0, MAP_BLUE_HALF.length - 1).reverse().map(function (row) { return row.split("").reverse().join(""); }));
-  var MAP_COLS = MAP[0].length, MAP_ROWS = MAP.length, SPAWN_ROWS = 3;
+  var MAPS = {
+    forest: { name: "숲속 공터", blueHalf: [
+      "................",
+      "................",
+      "................",
+      "...##......##...",
+      '""............""',
+      '"""....##...."""',
+      '""".........."""',
+      "....#......#....",
+      '....#..""..#....',
+      '.##....""....##.',
+      "................",
+      '..""...##...""..',
+      '..""........""..'
+    ] },
+    river: { name: "강 건너기", blueHalf: [
+      "................",
+      "................",
+      "................",
+      "..##........##..",
+      "................",
+      '""....#..#....""',
+      '""............""',
+      "......####......",
+      ".#............#.",
+      '...""......""...',
+      '.#.""......"".#.',
+      "~==~~~~==~~~~==~",
+      "~==~~~~==~~~~==~"
+    ] },
+    dungeon: { name: "던전 회랑", blueHalf: [
+      "................",
+      "................",
+      "................",
+      "##..##....##..##",
+      "....#......#....",
+      '"".x#......#x.""',
+      '""..#.x..x.#..""',
+      "....#..##..#....",
+      "....#......#....",
+      "................",
+      '###...""""...###',
+      "......x..x......",
+      "..##........##.."
+    ] }
+  };
+  var MAP_IDS = ["forest", "river", "dungeon"];
+  var BLOCK_TILES = "#x", WATER_TILES = "~";
+  var ARENA = "", MAP = [], MAP_COLS = 16, MAP_ROWS = 25, SPAWN_ROWS = 3;
+  var OBST = [], WATER = [], BUSH_ID = [], BUSH = [];
   function tileX(c) { return MAP_X0 + (c + 0.5) * TILE; }
   function tileY(r) { return MAP_Y0 + (r + 0.5) * TILE; }
-  function wallRects() {
+  function fullMap(half) {
+    return half.concat(half.slice(0, half.length - 1).reverse().map(function (row) { return row.split("").reverse().join(""); }));
+  }
+  function tileRects(kinds) {
     var rects = [], open = {};
     MAP.forEach(function (row, r) {
       var next = {};
       for (var c = 0; c < MAP_COLS; c++) {
-        if (row.charAt(c) !== "#") continue;
-        var c0 = c; while (c + 1 < MAP_COLS && row.charAt(c + 1) === "#") c++;
+        if (kinds.indexOf(row.charAt(c)) < 0) continue;
+        var c0 = c; while (c + 1 < MAP_COLS && kinds.indexOf(row.charAt(c + 1)) >= 0) c++;
         var key = c0 + ":" + c, rect = open[key];
         if (rect) rect.r1 = r; else { rect = { c0: c0, c1: c, r0: r, r1: r }; rects.push(rect); }
         next[key] = rect;
@@ -444,28 +481,38 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       open = next;
     });
     return rects.map(function (q) {
-      return { k: "wall", x: MAP_X0 + (q.c0 + q.c1 + 1) * TILE / 2, y: MAP_Y0 + (q.r0 + q.r1 + 1) * TILE / 2,
+      return { x: MAP_X0 + (q.c0 + q.c1 + 1) * TILE / 2, y: MAP_Y0 + (q.r0 + q.r1 + 1) * TILE / 2,
                w: (q.c1 - q.c0 + 1) * TILE, h: (q.r1 - q.r0 + 1) * TILE };
     });
   }
-  var OBST = wallRects();
-  var BUSH_ID = [], BUSH = [];
-  MAP.forEach(function (row, r) {
-    for (var c = 0; c < MAP_COLS; c++) {
-      if (row.charAt(c) !== '"' || BUSH_ID[r * MAP_COLS + c] !== undefined) continue;
-      var id = BUSH.length, tiles = [], queue = [[c, r]], sx = 0, sy = 0;
-      BUSH_ID[r * MAP_COLS + c] = id;
-      while (queue.length) {
-        var q = queue.pop(); tiles.push(q); sx += tileX(q[0]); sy += tileY(q[1]);
-        [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(function (d) {
-          var nc = q[0] + d[0], nr = q[1] + d[1];
-          if (nc < 0 || nr < 0 || nc >= MAP_COLS || nr >= MAP_ROWS || MAP[nr].charAt(nc) !== '"' || BUSH_ID[nr * MAP_COLS + nc] !== undefined) return;
-          BUSH_ID[nr * MAP_COLS + nc] = id; queue.push([nc, nr]);
-        });
+  function bushGroups() {
+    BUSH_ID = []; BUSH = [];
+    MAP.forEach(function (row, r) {
+      for (var c = 0; c < MAP_COLS; c++) {
+        if (row.charAt(c) !== '"' || BUSH_ID[r * MAP_COLS + c] !== undefined) continue;
+        var id = BUSH.length, tiles = [], queue = [[c, r]], sx = 0, sy = 0;
+        BUSH_ID[r * MAP_COLS + c] = id;
+        while (queue.length) {
+          var q = queue.pop(); tiles.push(q); sx += tileX(q[0]); sy += tileY(q[1]);
+          [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(function (d) {
+            var nc = q[0] + d[0], nr = q[1] + d[1];
+            if (nc < 0 || nr < 0 || nc >= MAP_COLS || nr >= MAP_ROWS || MAP[nr].charAt(nc) !== '"' || BUSH_ID[nr * MAP_COLS + nc] !== undefined) return;
+            BUSH_ID[nr * MAP_COLS + nc] = id; queue.push([nc, nr]);
+          });
+        }
+        BUSH.push({ x: sx / tiles.length, y: sy / tiles.length, tiles: tiles });
       }
-      BUSH.push({ x: sx / tiles.length, y: sy / tiles.length, tiles: tiles });
-    }
-  });
+    });
+  }
+  function loadMapData(id) {
+    ARENA = MAPS[id] ? id : "forest";
+    MAP = fullMap(MAPS[ARENA].blueHalf);
+    MAP_COLS = MAP[0].length; MAP_ROWS = MAP.length;
+    OBST = tileRects(BLOCK_TILES);
+    WATER = tileRects(WATER_TILES);
+    bushGroups();
+  }
+  loadMapData("forest");
   var FONT = '"Nanum Gothic", "Malgun Gothic", sans-serif';
 
   var FACE_BY_MOVE = true;
@@ -643,7 +690,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var code = String(10000 + Math.floor(Math.random() * 90000));
       var t = now();
       var me = newPlayer("blue", t);
-      var obj = { mode: "pvp", status: "lobby", hostPlayerId: myId, createdAt: t, winner: null, players: {} };
+      var obj = { mode: "pvp", map: "forest", arena: "forest", status: "lobby", hostPlayerId: myId, createdAt: t, winner: null, players: {} };
       obj.players[myId] = me;
       db.ref(ROOT + "/" + code).transaction(function (cur) {
         if (cur !== null) return;
@@ -662,16 +709,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (!db) { startMsg("온라인 연결을 할 수 없어요."); return; }
     $("btnJoin").disabled = true; startMsg("");
     var ref = db.ref(ROOT + "/" + code);
-    Promise.all(["players", "status", "mode"].map(function (k) { return ref.child(k).once("value"); })).then(function (a) {
+    Promise.all(["players", "status"].map(function (k) { return ref.child(k).once("value"); })).then(function (a) {
       $("btnJoin").disabled = false;
-      var r = { players: a[0].val(), status: a[1].val(), mode: a[2].val() };
+      var r = { players: a[0].val(), status: a[1].val() };
       if (!r.players || !humans(r.players).length) { startMsg("그런 방이 없어요. 코드를 확인해 주세요."); return; }
       var cnt = function (tm) { return keys(r.players).filter(function (id) { return r.players[id] && r.players[id].team === tm; }).length; };
       var team = null;
       if (r.status === "lobby") {
         var nb = cnt("blue"), nr = cnt("red");
-        if (r.mode === "ai") { if (nb < TEAM_MAX) team = "blue"; }
-        else if (nb < TEAM_MAX || nr < TEAM_MAX) team = nr < nb ? "red" : "blue";
+        if (nb < TEAM_MAX || nr < TEAM_MAX) team = nr < nb ? "red" : "blue";
       }
       if (!team && cnt("spec") < SPEC_MAX) team = "spec";
       if (!team) { startMsg(r.status === "lobby" ? "방이 가득 찼어요." : "게임 중이고 관전자 자리(" + SPEC_MAX + "명)도 찼어요."); return; }
@@ -684,7 +730,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function enterRoom(code) {
     leaving = false;
     var ref = db.ref(ROOT + "/" + code);
-    room = { code: code, ref: ref, mode: null, status: "lobby", host: null, startAt: 0, winner: null, endedAt: 0, final: null, roster: null };
+    room = { code: code, ref: ref, mode: null, map: "forest", status: "lobby", host: null, startAt: 0, winner: null, endedAt: 0, final: null, roster: null };
     clear3d();
     P = {}; R = {}; PR = {}; MELEE = {}; FX = []; BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; G = null; ME = null; BOTS = {}; ST = {}; SHOTS = []; hitSubs = {};
     ref.child("players/" + myId).onDisconnect().remove();
@@ -704,6 +750,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       checkHost(); playersChanged();
     });
     sub(ref.child("mode"), "value", function (s) { room.mode = s.val(); playersChanged(); });
+    sub(ref.child("map"), "value", function (s) { room.map = s.val() || "forest"; playersChanged(); });
+    sub(ref.child("arena"), "value", function (s) { useArena(s.val() || "forest"); });
     sub(ref.child("hostPlayerId"), "value", function (s) { room.host = s.val(); room.hostLoaded = true; hostChangedClock(room.host); checkHost(); playersChanged(); });
     sub(ref.child("startAt"), "value", function (s) { room.startAt = s.val() || 0; });
     sub(ref.child("winner"), "value", function (s) { room.winner = s.val(); });
@@ -794,7 +842,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function canMoveTo(team) {
     var me = P[myId];
     if (!room || room.status !== "lobby" || !me || me.team === team) return false;
-    if (team === "red" && room.mode === "ai") return false;
     return countIn(P, team, myId) < capOf(team);
   }
   function takenOnTeam(ps, team, c, except) {
@@ -840,46 +887,30 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function flashHint(t) { hintText = t; hintUntil = Date.now() + 2500; renderLobby(); setTimeout(renderLobby, 2600); }
 
   var MODES = [
-    { id: "pvp", name: "3v3 플레이" },
-    { id: "ai", name: "AI 대전" }
+    { id: "pvp", name: "3vs3" },
+    { id: "cup", name: "대회모드" }
   ];
-  function modeName(id) { for (var i = 0; i < MODES.length; i++) if (MODES[i].id === id) return MODES[i].name; return "모드 선택 중"; }
+  var MAP_CHOICES = MAP_IDS.map(function (id) { return { id: id, name: MAPS[id].name }; }).concat([{ id: "random", name: "랜덤" }]);
+  function nameIn(list, id, fallback) { for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i].name; return fallback; }
+  function modeName(id) { return nameIn(MODES, id, "모드 선택 중"); }
   function setMode(mode) {
     if (!isHost() || room.status !== "lobby" || room.mode === mode) return;
-    var u = { mode: mode };
-    var nb = countIn(P, "blue"), ns = countIn(P, "spec"), moved = true, planned = Object.assign({}, P);
-    keys(P).sort(byJoin(P)).forEach(function (id) {
-      var p = P[id]; if (!p) return;
-      if (p.isAI) { u["players/" + id] = null; return; }
-      if (mode === "ai" && p.team === "red") {
-        if (nb < TEAM_MAX) {
-          u["players/" + id + "/team"] = "blue"; nb++;
-          var c = takenOnTeam(planned, "blue", p.characterType, id) ? freeCharOn(planned, "blue", id) : p.characterType;
-          if (c !== p.characterType) u["players/" + id + "/characterType"] = c;
-          planned[id] = Object.assign({}, p, { team: "blue", characterType: c });
-        }
-        else if (ns < SPEC_MAX) { u["players/" + id + "/team"] = "spec"; ns++; }
-        else moved = false;
-      }
-    });
-    if (!moved) { flashHint("AI 대전은 블루팀 " + TEAM_MAX + "명 + 관전자 " + SPEC_MAX + "명까지예요. 레드팀 인원을 줄인 뒤 바꿔 주세요."); return; }
-    if (mode === "ai") {
-      var chars = aiLineup();
-      var t = now();
-      chars.forEach(function (c, i) {
-        u["players/ai" + (i + 1)] = { nickname: CHARS[c].name, isAI: true, team: "red", characterType: c, joinedAt: t + i };
-      });
-    }
-    room.ref.update(u);
+    room.ref.update({ mode: mode });
+  }
+  function setMapChoice(map) {
+    if (!isHost() || room.status !== "lobby" || room.map === map) return;
+    room.ref.update({ map: map });
+  }
+  function resolveArena(choice) {
+    return MAPS[choice] ? choice : MAP_IDS[Math.floor(Math.random() * MAP_IDS.length)];
+  }
+  function choiceButtons(list, current, cls) {
+    return list.map(function (m) {
+      return '<button type="button" class="mini modeBtn ' + cls + (m.id === current ? " on" : "") + '" data-id="' + m.id + '"' + (isHost() ? "" : " disabled") + ">" + m.name + "</button>";
+    }).join("");
   }
 
   function pick(list) { return list[Math.floor(Math.random() * list.length)]; }
-  function aiLineup() {
-    var rest = CHAR_LIST.filter(function (c) { return c !== "knight"; });
-    var first = pick(rest);
-    rest = rest.filter(function (c) { return c !== first; });
-    return [first, pick(rest), "knight"];
-  }
   var ICON_SRC = {};
   function charImgSrc(c) {
     if (!ICON_SRC[c]) ICON_SRC[c] = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(
@@ -931,11 +962,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (!room || screenNow !== "lobby") return;
     var me = P[myId]; if (!me) return;
     var mode = room.mode;
-    setText($("lobbyMode"), modeName(mode));
-    setHtml($("modeBtns"), MODES.map(function (m) {
-      return '<button type="button" class="mini modeBtn' + (m.id === mode ? " on" : "") + '" data-mode="' + m.id + '"' + (isHost() ? "" : " disabled") + ">" + m.name + "</button>";
-    }).join(""));
-    $("lobbyMode").className = "badge" + (mode === "ai" ? " ai" : "");
+    setText($("lobbyMode"), modeName(mode) + " · " + nameIn(MAP_CHOICES, room.map, MAPS.forest.name));
+    setHtml($("modeBtns"), choiceButtons(MODES, mode, "modeOpt"));
+    setHtml($("mapBtns"), choiceButtons(MAP_CHOICES, room.map || "forest", "mapOpt"));
 
     function list(team) {
       var ids = teamIds(team), h = "";
@@ -964,12 +993,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
     var host = isHost(), ok = false, hint = "";
     if (!mode) hint = "게임 방식을 먼저 골라 주세요.";
-    else if (mode === "pvp") {
+    else if (mode === "cup") hint = "대회모드는 준비 중이에요. 3vs3을 골라 주세요.";
+    else {
       if (nb < 1 || nr < 1) hint = "양 팀에 1명 이상 있어야 시작할 수 있어요.";
       else { ok = true; hint = nb !== nr ? "인원이 달라요 (블루 " + nb + " vs 레드 " + nr + ") — 그래도 시작할 수 있어요." : "블루 " + nb + " vs 레드 " + nr; }
-    } else {
-      if (nb < 1) hint = "블루팀에 1명 이상 있어야 해요.";
-      else { ok = true; hint = "블루팀 " + nb + "명 vs AI 3명"; }
     }
     ["blue", "red"].forEach(function (team) {
       teamIds(team).forEach(function (id) {
@@ -1000,10 +1027,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   $("btnJoinBlue").onclick = function () { pickTeam("blue"); };
   $("btnJoinRed").onclick = function () { pickTeam("red"); };
   $("btnSpec").onclick = function () { pickTeam("spec"); };
-  $("modeBtns").onclick = function (e) {
-    var b = e.target.closest ? e.target.closest(".modeBtn") : null;
-    if (b && !b.disabled) setMode(b.getAttribute("data-mode"));
-  };
+  function choiceClick(apply) {
+    return function (e) {
+      var b = e.target.closest ? e.target.closest(".modeBtn") : null;
+      if (b && !b.disabled) apply(b.getAttribute("data-id"));
+    };
+  }
+  $("modeBtns").onclick = choiceClick(setMode);
+  $("mapBtns").onclick = choiceClick(setMapChoice);
   $("btnLeaveLobby").onclick = leaveRoom;
   $("btnLeaveGame").onclick = function () { if (confirm("방을 나갈까요?")) leaveRoom(); };
   $("btnLeaveEnd").onclick = leaveRoom;
@@ -1020,18 +1051,18 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function startGame() {
     if (!isHost() || room.status !== "lobby") return;
     audio();
-    var u = {}, roster = {}, st = {}, lineup = aiLineup();
+    if (room.mode === "cup") return;
+    var u = {}, roster = {}, st = {};
     ["blue", "red"].forEach(function (team) {
       teamIds(team).slice(0, 3).forEach(function (id, i) {
         var p = P[id], c = CHARS[p.characterType] ? p.characterType : "ranger";
         var sp = spawnOf(team, i + 1), base = "players/" + id + "/";
-        if (p.isAI) { c = lineup[i]; u[base + "nickname"] = CHARS[c].name; }
         u[base + "slot"] = i + 1; u[base + "characterType"] = c;
         st[stKey(team, i + 1)] = packState({ x: sp.x, y: sp.y, angle: sp.angle, mv: false, hp: CHARS[c].hp, alive: true });
         roster[id] = { team: team, c: c, ai: !!p.isAI };
       });
     });
-    u.roster = roster; u.st = st;
+    u.roster = roster; u.st = st; u.arena = resolveArena(room.map);
     u.status = "countdown"; u.startAt = now() + COUNT_MS; u.winner = null; u.final = null; u.endedAt = null;
     u.shots = null; u.meleeHits = null; u.hits = null; u.effects = null; u.projectiles = null;
     room.ref.update(u);
@@ -1255,26 +1286,21 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     return true;
   }
   function visibleTo(E, viewer, t) { return !hiddenFrom(E, t) || revealedTo(E, viewer, t); }
+  function pushOutOfRect(E, o) {
+    var cx = clamp(E.x, o.x - o.w / 2, o.x + o.w / 2), cy = clamp(E.y, o.y - o.h / 2, o.y + o.h / 2);
+    var ex = E.x - cx, ey = E.y - cy, dd = hyp(ex, ey);
+    if (dd >= BODY_R) return;
+    if (dd < 0.01) {
+      var l = E.x - (o.x - o.w / 2), rr = (o.x + o.w / 2) - E.x, t = E.y - (o.y - o.h / 2), b = (o.y + o.h / 2) - E.y;
+      var mn = Math.min(l, rr, t, b);
+      if (mn === l) E.x = o.x - o.w / 2 - BODY_R; else if (mn === rr) E.x = o.x + o.w / 2 + BODY_R;
+      else if (mn === t) E.y = o.y - o.h / 2 - BODY_R; else E.y = o.y + o.h / 2 + BODY_R;
+    } else { E.x = cx + ex / dd * BODY_R; E.y = cy + ey / dd * BODY_R; }
+  }
   function resolve(E) {
     for (var pass = 0; pass < 2; pass++) {
-      for (var i = 0; i < OBST.length; i++) {
-        var o = OBST[i];
-        if (o.circle) {
-          var dx = E.x - o.x, dy = E.y - o.y, d = hyp(dx, dy), m = o.r + BODY_R;
-          if (d < m) { if (d < 0.01) { dx = 0; dy = 1; d = 1; } E.x = o.x + dx / d * m; E.y = o.y + dy / d * m; }
-        } else {
-          var cx = clamp(E.x, o.x - o.w / 2, o.x + o.w / 2), cy = clamp(E.y, o.y - o.h / 2, o.y + o.h / 2);
-          var ex = E.x - cx, ey = E.y - cy, dd = hyp(ex, ey);
-          if (dd < BODY_R) {
-            if (dd < 0.01) {
-              var l = E.x - (o.x - o.w / 2), rr = (o.x + o.w / 2) - E.x, t = E.y - (o.y - o.h / 2), b = (o.y + o.h / 2) - E.y;
-              var mn = Math.min(l, rr, t, b);
-              if (mn === l) E.x = o.x - o.w / 2 - BODY_R; else if (mn === rr) E.x = o.x + o.w / 2 + BODY_R;
-              else if (mn === t) E.y = o.y - o.h / 2 - BODY_R; else E.y = o.y + o.h / 2 + BODY_R;
-            } else { E.x = cx + ex / dd * BODY_R; E.y = cy + ey / dd * BODY_R; }
-          }
-        }
-      }
+      for (var i = 0; i < OBST.length; i++) pushOutOfRect(E, OBST[i]);
+      for (var j = 0; j < WATER.length; j++) pushOutOfRect(E, WATER[j]);
       E.x = clamp(E.x, BOUND.l + BODY_R, BOUND.r - BODY_R);
       E.y = clamp(E.y, BOUND.t + BODY_R, BOUND.b - BODY_R);
     }
@@ -1303,12 +1329,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     E.x += vx * sp * dt; E.y += vy * sp * dt;
     resolve(E);
   }
-  function rayCircle(x, y, dx, dy, cx, cy, r) {
-    var fx = x - cx, fy = y - cy, b = fx * dx + fy * dy, c = fx * fx + fy * fy - r * r;
-    if (c < 0) return 0;
-    var disc = b * b - c; if (disc < 0) return Infinity;
-    var t = -b - Math.sqrt(disc); return t >= 0 ? t : Infinity;
-  }
   function rayRect(x, y, dx, dy, o, pad) {
     var x0 = o.x - o.w / 2 - pad, x1 = o.x + o.w / 2 + pad, y0 = o.y - o.h / 2 - pad, y1 = o.y + o.h / 2 + pad;
     if (x > x0 && x < x1 && y > y0 && y < y1) return 0;
@@ -1322,10 +1342,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   function rayObst(x, y, dx, dy, pad) {
     var best = Infinity;
-    for (var i = 0; i < OBST.length; i++) {
-      var o = OBST[i];
-      best = Math.min(best, o.circle ? rayCircle(x, y, dx, dy, o.x, o.y, o.r + pad) : rayRect(x, y, dx, dy, o, pad));
-    }
+    for (var i = 0; i < OBST.length; i++) best = Math.min(best, rayRect(x, y, dx, dy, OBST[i], pad));
     return best;
   }
   function rayCast(x, y, dx, dy, maxD, pad) {
@@ -2092,7 +2109,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
   scene.fog = new THREE.Fog(0x33443A, 3200, 7500);
   scene.background = new THREE.Color(0x33443A);
-  scene.add(new THREE.AmbientLight(0xffffff, 1.5));
+  var ambient = new THREE.AmbientLight(0xffffff, 1.5); scene.add(ambient);
   var sun = new THREE.DirectionalLight(0xffffff, 2.0);
   sun.position.set(MW / 2 - 400, 900, MH / 2 + 300); sun.target.position.set(MW / 2, 0, MH / 2);
   scene.add(sun); scene.add(sun.target);
@@ -2100,64 +2117,139 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function flatMesh(geo, mat) { var m = new THREE.Mesh(geo, mat); m.rotation.x = -Math.PI / 2; return m; }
   var outerGround = flatMesh(new THREE.PlaneGeometry(MW * 14, MH * 14), new THREE.MeshLambertMaterial({ color: 0x4E6B43 }));
   outerGround.position.set(MW / 2, -3, MH / 2); scene.add(outerGround);
+  var GRASS_LOOK = { sky: 0x33443A, outer: 0x4E6B43, ambient: 1.5, sun: 0xffffff, sunI: 2.0,
+                     floor: ["#81B853", "#8CC25B"], wallFloor: "#6F7A5A", hideFloor: "#5E9640",
+                     fleck: ["rgba(255,255,230,.10)", "rgba(30,60,20,.10)"], line: "rgba(40,70,30,.10)" };
+  var THEMES = {
+    forest: GRASS_LOOK,
+    river: Object.assign({}, GRASS_LOOK, { water: "#3E9FC4", waterHi: "rgba(210,245,255,.45)", bank: "#D8C58E", bridgeFloor: "#9C6B45", noCenterMark: true }),
+    dungeon: { sky: 0x16131B, outer: 0x1C1922, ambient: 1.15, sun: 0xFFE2B8, sunI: 1.7, dungeon: true,
+               floor: ["#6B6762", "#625E59"], wallFloor: "#34313A", hideFloor: "#2B2533",
+               fleck: ["rgba(255,240,220,.06)", "rgba(0,0,0,.12)"], line: "rgba(0,0,0,.18)" }
+  };
+  var ZONE_FLOOR = { blue: ["#92B4D6", "#9DBEDF"], red: ["#DCA293", "#E5AE9F"] };
+  function zoneOfRow(r) { return r < SPAWN_ROWS ? "blue" : (r >= MAP_ROWS - SPAWN_ROWS ? "red" : ""); }
+  function tileAt(c, r) { return c < 0 || r < 0 || c >= MAP_COLS || r >= MAP_ROWS ? "#" : MAP[r].charAt(c); }
   var FLOOR_TEX_SCALE = 1.2;
-  function paintFloor() {
+  function paintFloor(th) {
     var c2 = document.createElement("canvas"), S = FLOOR_TEX_SCALE;
     c2.width = Math.round(MW * S); c2.height = Math.round(MH * S);
     var g2 = c2.getContext("2d"), rnd = 7;
     function noise() { rnd = (rnd * 16807) % 2147483647; return rnd / 2147483647; }
     g2.scale(S, S);
-    g2.fillStyle = "#4E6B43"; g2.fillRect(0, 0, MW, MH);
+    g2.fillStyle = "#" + new THREE.Color(th.outer).getHexString(); g2.fillRect(0, 0, MW, MH);
     for (var r = 0; r < MAP_ROWS; r++) for (var c = 0; c < MAP_COLS; c++) {
-      var x = MAP_X0 + c * TILE, y = MAP_Y0 + r * TILE, ch = MAP[r].charAt(c);
-      var odd = (r + c) % 2, zone = r < SPAWN_ROWS ? "blue" : (r >= MAP_ROWS - SPAWN_ROWS ? "red" : "");
-      g2.fillStyle = ch === "#" ? "#6F7A5A" : ch === '"' ? "#5E9640" :
-                     zone === "blue" ? (odd ? "#9DBEDF" : "#92B4D6") : zone === "red" ? (odd ? "#E5AE9F" : "#DCA293") : (odd ? "#8CC25B" : "#81B853");
+      var x = MAP_X0 + c * TILE, y = MAP_Y0 + r * TILE, ch = MAP[r].charAt(c), odd = (r + c) % 2, zone = zoneOfRow(r);
+      g2.fillStyle = BLOCK_TILES.indexOf(ch) >= 0 ? th.wallFloor : ch === '"' ? th.hideFloor : ch === "~" ? th.water : ch === "=" ? th.bridgeFloor :
+                     zone ? ZONE_FLOOR[zone][odd] : th.floor[odd];
       g2.fillRect(x, y, TILE, TILE);
+      if (ch === "~") {
+        g2.strokeStyle = th.waterHi; g2.lineWidth = 2;
+        for (var w = 0; w < 2; w++) {
+          var wx = x + 8 + noise() * (TILE - 26), wy = y + 10 + noise() * (TILE - 20);
+          g2.beginPath(); g2.moveTo(wx, wy); g2.quadraticCurveTo(wx + 5, wy - 4, wx + 10, wy); g2.quadraticCurveTo(wx + 15, wy + 4, wx + 20, wy); g2.stroke();
+        }
+        g2.fillStyle = th.bank;
+        if (tileAt(c, r - 1) !== "~" && tileAt(c, r - 1) !== "=") g2.fillRect(x, y, TILE, 5);
+        if (tileAt(c, r + 1) !== "~" && tileAt(c, r + 1) !== "=") g2.fillRect(x, y + TILE - 5, TILE, 5);
+        continue;
+      }
+      if (ch === "=") {
+        g2.fillStyle = "rgba(0,0,0,.18)";
+        for (var p = 1; p < 5; p++) g2.fillRect(x, y + p * TILE / 5 - 1, TILE, 2);
+        continue;
+      }
       for (var k = 0; k < 5; k++) {
-        g2.fillStyle = noise() < 0.5 ? "rgba(255,255,230,.10)" : "rgba(30,60,20,.10)";
+        g2.fillStyle = th.fleck[noise() < 0.5 ? 0 : 1];
         g2.beginPath(); g2.arc(x + 6 + noise() * (TILE - 12), y + 6 + noise() * (TILE - 12), 2 + noise() * 4, 0, Math.PI * 2); g2.fill();
       }
     }
-    g2.strokeStyle = "rgba(40,70,30,.10)"; g2.lineWidth = 1;
+    g2.strokeStyle = th.line; g2.lineWidth = 1;
     for (var gx = 0; gx <= MAP_COLS; gx++) { g2.beginPath(); g2.moveTo(MAP_X0 + gx * TILE, MAP_Y0); g2.lineTo(MAP_X0 + gx * TILE, BOUND.b); g2.stroke(); }
     for (var gy = 0; gy <= MAP_ROWS; gy++) { g2.beginPath(); g2.moveTo(MAP_X0, MAP_Y0 + gy * TILE); g2.lineTo(BOUND.r, MAP_Y0 + gy * TILE); g2.stroke(); }
     var zoneH = TILE * SPAWN_ROWS;
     g2.lineWidth = 4;
     g2.strokeStyle = "rgba(95,162,255,.8)"; g2.beginPath(); g2.moveTo(MAP_X0, MAP_Y0 + zoneH); g2.lineTo(BOUND.r, MAP_Y0 + zoneH); g2.stroke();
     g2.strokeStyle = "rgba(255,106,95,.8)"; g2.beginPath(); g2.moveTo(MAP_X0, BOUND.b - zoneH); g2.lineTo(BOUND.r, BOUND.b - zoneH); g2.stroke();
-    g2.strokeStyle = "rgba(255,255,240,.45)"; g2.lineWidth = 5;
-    g2.beginPath(); g2.moveTo(MAP_X0, MH / 2); g2.lineTo(BOUND.r, MH / 2); g2.stroke();
-    g2.beginPath(); g2.arc(MW / 2, MH / 2, 80, 0, Math.PI * 2); g2.stroke();
+    if (!th.noCenterMark) {
+      g2.strokeStyle = "rgba(255,255,240,.45)"; g2.lineWidth = 5;
+      g2.beginPath(); g2.moveTo(MAP_X0, MH / 2); g2.lineTo(BOUND.r, MH / 2); g2.stroke();
+      g2.beginPath(); g2.arc(MW / 2, MH / 2, 80, 0, Math.PI * 2); g2.stroke();
+    }
     var tx = new THREE.CanvasTexture(c2);
     tx.colorSpace = THREE.SRGBColorSpace;
     tx.anisotropy = renderer ? Math.min(4, renderer.capabilities.getMaxAnisotropy()) : 1;
     return tx;
   }
-  var groundMat = new THREE.MeshLambertMaterial({ map: paintFloor() });
+  var groundMat = new THREE.MeshLambertMaterial();
   var ground = flatMesh(new THREE.PlaneGeometry(MW, MH), groundMat);
   ground.position.set(MW / 2, 0, MH / 2); scene.add(ground);
 
-  var BORDER_TILES = [];
-  for (var bc = -1; bc <= MAP_COLS; bc++) { BORDER_TILES.push([bc, -1]); BORDER_TILES.push([bc, MAP_ROWS]); }
-  for (var br = 0; br < MAP_ROWS; br++) { BORDER_TILES.push([-1, br]); BORDER_TILES.push([MAP_COLS, br]); }
-  var WALL_TILES = [];
-  MAP.forEach(function (row, r) { for (var c = 0; c < MAP_COLS; c++) if (row.charAt(c) === "#") WALL_TILES.push([c, r]); });
-
-  var simpleProps = new THREE.Group(); scene.add(simpleProps);
+  var arenaGroup = new THREE.Group(); scene.add(arenaGroup);
+  var BUSH_VIS = [];
   var wallMat = new THREE.MeshLambertMaterial({ color: 0x9A9A92 });
-  OBST.forEach(function (o) {
-    var m = new THREE.Mesh(new THREE.BoxGeometry(o.w, 54, o.h), wallMat); m.position.set(o.x, 27, o.y);
-    simpleProps.add(m);
-  });
-  var BUSH_VIS = BUSH.map(function (b) {
-    var mat = new THREE.MeshLambertMaterial({ color: 0x3E8E41, transparent: true, opacity: 0.8, depthWrite: false });
-    b.tiles.forEach(function (tl) {
-      var m = new THREE.Mesh(new THREE.BoxGeometry(TILE, 40, TILE), mat);
-      m.position.set(tileX(tl[0]), 20, tileY(tl[1])); m.renderOrder = 2; simpleProps.add(m);
+  var UNIT_BOX = new THREE.BoxGeometry(1, 1, 1); UNIT_BOX.translate(0, 0.5, 0);
+  function tilesOf(kinds) {
+    var list = [];
+    MAP.forEach(function (row, r) { for (var c = 0; c < MAP_COLS; c++) if (kinds.indexOf(row.charAt(c)) >= 0) list.push([c, r]); });
+    return list;
+  }
+  function borderTiles() {
+    var list = [];
+    for (var c = -1; c <= MAP_COLS; c++) { list.push([c, -1]); list.push([c, MAP_ROWS]); }
+    for (var r = 0; r < MAP_ROWS; r++) { list.push([-1, r]); list.push([MAP_COLS, r]); }
+    return list;
+  }
+  function boxField(tiles, h, mat) {
+    var im = new THREE.InstancedMesh(UNIT_BOX, mat, tiles.length), m4 = new THREE.Matrix4();
+    tiles.forEach(function (tl, i) { im.setMatrixAt(i, m4.makeScale(TILE, h, TILE).setPosition(tileX(tl[0]), 0, tileY(tl[1]))); });
+    im.computeBoundingSphere();
+    return im;
+  }
+  function hideVolumes(th, makeGroup) {
+    BUSH.forEach(function (b, i) {
+      var built = makeGroup(b, i);
+      built.mesh.renderOrder = 2;
+      arenaGroup.add(built.mesh);
+      BUSH_VIS[i] = { mats: [built.mat], full: built.full, fade: 1 };
     });
-    return { mats: [mat], full: 0.8, fade: 1 };
-  });
+  }
+  function shadowVolume(b) {
+    var mat = new THREE.MeshBasicMaterial({ color: 0x241634, transparent: true, opacity: 0.55, depthWrite: false });
+    return { mesh: boxField(b.tiles, 60, mat), mat: mat, full: 0.55 };
+  }
+  function buildSimpleArena(th) {
+    arenaGroup.add(boxField(tilesOf(BLOCK_TILES), 54, wallMat));
+    hideVolumes(th, th.dungeon ? shadowVolume : function (b) {
+      var mat = new THREE.MeshLambertMaterial({ color: 0x3E8E41, transparent: true, opacity: 0.8, depthWrite: false });
+      return { mesh: boxField(b.tiles, 40, mat), mat: mat, full: 0.8 };
+    });
+  }
+  function clearArena() {
+    arenaGroup.traverse(function (o) { if (o.isInstancedMesh) o.dispose(); });
+    arenaGroup.clear();
+    BUSH_VIS.forEach(function (bv) { bv.mats.forEach(function (m) { m.dispose(); }); });
+    BUSH_VIS = [];
+  }
+  var builtArena = "";
+  function buildArena() {
+    clearArena();
+    var th = THEMES[ARENA];
+    scene.background.setHex(th.sky); scene.fog.color.setHex(th.sky);
+    outerGround.material.color.setHex(th.outer);
+    ambient.intensity = th.ambient; sun.color.setHex(th.sun); sun.intensity = th.sunI;
+    if (groundMat.map) groundMat.map.dispose();
+    groundMat.map = paintFloor(th); groundMat.needsUpdate = true;
+    SEED = 20260926;
+    if (KIT.propsReady) buildArenaProps(th); else buildSimpleArena(th);
+    builtArena = ARENA + (KIT.propsReady ? ":kit" : "");
+  }
+  function useArena(id) {
+    if (!MAPS[id]) id = "forest";
+    if (builtArena === id + (KIT.propsReady ? ":kit" : "")) return;
+    loadMapData(id);
+    buildArena();
+  }
 
   var GEO = {
     body: new THREE.CapsuleGeometry(17, 34, 4, 12),
@@ -2209,9 +2301,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     lancer:  { file: "Barbarian", right: "spear_A", rightScale: 1.35 }
   };
   var MINION_MODEL = { file: "Skeleton_Minion", right: "Skeleton_Blade", scale: 0.9 };
-  var PROP_FILES = { bushBig: "Bush_1_D_Color1",
-                     blockA: "Rock_2_C_Color1", blockB: "Rock_2_D_Color1", treeA: "Tree_1_A_Color1", treeB: "Tree_2_B_Color1",
-                     treeC: "Tree_3_A_Color1", treeD: "Tree_4_B_Color1", tuft: "Grass_1_B_Color1" };
+  var PROP_FILES = { bushBig: "props/Bush_1_D_Color1.gltf",
+                     blockA: "props/Rock_2_C_Color1.gltf", blockB: "props/Rock_2_D_Color1.gltf", treeA: "props/Tree_1_A_Color1.gltf", treeB: "props/Tree_2_B_Color1.gltf",
+                     treeC: "props/Tree_3_A_Color1.gltf", treeD: "props/Tree_4_B_Color1.gltf", tuft: "props/Grass_1_B_Color1.gltf",
+                     bridge: "medieval/objects/bridge.glb",
+                     dgBlock: "dungeon/floor_foundation_allsides.gltf", dgFloor: "dungeon/floor_tile_small.gltf", dgFloorWeeds: "dungeon/floor_tile_small_weeds_A.gltf",
+                     dgBox: "dungeon/box_large.gltf", dgBarrel: "dungeon/barrel_large.gltf", dgTorch: "dungeon/torch_lit.gltf",
+                     dgBannerBlue: "dungeon/banner_patternA_blue.gltf", dgBannerRed: "dungeon/banner_patternA_red.gltf" };
   var MODEL_SCALE = 38;
   var POTION_SCALE = MODEL_SCALE * 3;
   var KIT = { ready: false, chars: {}, weapons: {}, clips: {}, props: {} };
@@ -2220,7 +2316,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     root.traverse(function (o) {
       if (!o.isMesh) return;
       var m = made.get(o.material);
-      if (!m) { m = new THREE.MeshLambertMaterial({ map: o.material.map, side: o.material.side, vertexColors: !!keepVertexColors && !!o.material.vertexColors }); made.set(o.material, m); }
+      if (!m) { m = new THREE.MeshLambertMaterial({ map: o.material.map, color: o.material.color, side: o.material.side, vertexColors: !!keepVertexColors && !!o.material.vertexColors }); made.set(o.material, m); }
       o.material = m;
     });
     return root;
@@ -2246,8 +2342,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       buildShowcase();
     }).catch(function () { KIT.failed = true; });
     Promise.all(keys(PROP_FILES).map(function (k) {
-      return load(KIT_DIR + "props/" + PROP_FILES[k] + ".gltf").then(function (g) { KIT.props[k] = lambertize(g.scene); });
-    })).then(buildArenaProps).catch(function () {});
+      return load(KIT_DIR + PROP_FILES[k]).then(function (g) { KIT.props[k] = lambertize(g.scene); });
+    })).then(function () { KIT.propsReady = true; useArena(ARENA); }).catch(function () {});
   }
 
   var SEED = 20260926;
@@ -2279,39 +2375,45 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       p.set(it.x - (ox * cos + oz * sin), -b.min.y * s.y, it.z - (-ox * sin + oz * cos));
       q.setFromAxisAngle(up, yaw);
       im.setMatrixAt(i, m4.compose(p, q, s));
+      if (it.color != null) im.setColorAt(i, new THREE.Color(it.color));
     });
     im.computeBoundingSphere();
     return im;
   }
-  function buildArenaProps() {
-    var P3 = KIT.props, g = new THREE.Group(), blocks = [[], []];
+  function quarterTurn() { return Math.floor(seeded() * 4) * Math.PI / 2; }
+  function buildArenaProps(th) {
+    if (th.dungeon) buildDungeonProps(); else buildOutdoorProps(th);
+  }
+  function buildOutdoorProps(th) {
+    var P3 = KIT.props, g = arenaGroup, blocks = [[], []];
     function rockTile(c, r, hMin, hRange) {
-      blocks[seeded() < 0.5 ? 0 : 1].push({ w: TILE * 1.08, h: hMin + seeded() * hRange, d: TILE * 1.08, x: tileX(c), z: tileY(r), yaw: Math.floor(seeded() * 4) * Math.PI / 2 });
+      blocks[seeded() < 0.5 ? 0 : 1].push({ w: TILE * 1.08, h: hMin + seeded() * hRange, d: TILE * 1.08, x: tileX(c), z: tileY(r), yaw: quarterTurn() });
     }
-    WALL_TILES.forEach(function (tl) { rockTile(tl[0], tl[1], 56, 14); });
-    BORDER_TILES.forEach(function (tl) { rockTile(tl[0], tl[1], 44, 24); });
+    tilesOf(BLOCK_TILES).forEach(function (tl) { rockTile(tl[0], tl[1], 56, 14); });
+    borderTiles().forEach(function (tl) { rockTile(tl[0], tl[1], 44, 24); });
     g.add(instancedProp(P3.blockA, blocks[0]));
     g.add(instancedProp(P3.blockB, blocks[1]));
-    BUSH.forEach(function (b, i) {
+    hideVolumes(th, function (b) {
       var mat = P3.bushBig.getObjectByProperty("isMesh", true).material.clone();
       mat.transparent = true;
       var list = b.tiles.map(function (tl) {
         var sz = TILE * (1.35 + seeded() * 0.15);
         return { w: sz, h: 60 + seeded() * 12, d: sz, x: tileX(tl[0]) + (seeded() - 0.5) * 8, z: tileY(tl[1]) + (seeded() - 0.5) * 8, yaw: seeded() * 6.28 };
       });
-      var im = instancedProp(P3.bushBig, list, mat); im.renderOrder = 2;
-      g.add(im);
-      BUSH_VIS[i] = { mats: [mat], full: 1, fade: 1 };
+      return { mesh: instancedProp(P3.bushBig, list, mat), mat: mat, full: 1 };
     });
     var tufts = [];
     MAP.forEach(function (row, r) {
       for (var c = 0; c < MAP_COLS; c++) {
-        if (row.charAt(c) !== "." || r < SPAWN_ROWS || r >= MAP_ROWS - SPAWN_ROWS || seeded() > 0.35) continue;
+        if (row.charAt(c) !== "." || zoneOfRow(r) || seeded() > 0.35) continue;
         var sz = 16 + seeded() * 10;
         tufts.push({ w: sz, h: sz * 0.8, d: sz, x: tileX(c) + (seeded() - 0.5) * TILE * 0.7, z: tileY(r) + (seeded() - 0.5) * TILE * 0.7, yaw: seeded() * 6.28 });
       }
     });
-    g.add(instancedProp(P3.tuft, tufts));
+    if (tufts.length) g.add(instancedProp(P3.tuft, tufts));
+    tileRects("=").forEach(function (s) {
+      g.add(fitProp(P3.bridge, s.h + TILE * 0.5, 26, s.w - 6, s.x, s.y, Math.PI / 2));
+    });
     var trees = [P3.treeA, P3.treeB, P3.treeC, P3.treeD];
     for (var z = -60; z <= MH + 60; z += 170) {
       [-110 - seeded() * 80, MW + 110 + seeded() * 80].forEach(function (x) {
@@ -2319,8 +2421,32 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         g.add(fitProp(trees[Math.floor(seeded() * 4)], h * 0.7, h, h * 0.7, x, z + seeded() * 60, seeded() * 6.28));
       });
     }
-    scene.add(g);
-    simpleProps.visible = false;
+  }
+  function buildDungeonProps() {
+    var P3 = KIT.props, g = arenaGroup, floors = [[], []], blocks = [], boxes = [], barrels = [];
+    MAP.forEach(function (row, r) {
+      for (var c = 0; c < MAP_COLS; c++) {
+        var ch = row.charAt(c), zone = zoneOfRow(r);
+        if (ch === "#") { blocks.push({ w: TILE * 1.02, h: 62, d: TILE * 1.02, x: tileX(c), z: tileY(r), yaw: quarterTurn() }); continue; }
+        var shade = ch === '"' ? 0x6A6272 : zone === "blue" ? 0xB4CCFF : zone === "red" ? 0xFFBDB2 : 0xF2F0EC - Math.floor(seeded() * 3) * 0x0A0A0A;
+        floors[!zone && ch === "." && seeded() < 0.12 ? 1 : 0].push({ w: TILE, h: 4, d: TILE, x: tileX(c), z: tileY(r), yaw: quarterTurn(), color: shade });
+        if (ch === "x") (seeded() < 0.5 ? boxes : barrels).push({ x: tileX(c), z: tileY(r), yaw: seeded() * 6.28 });
+      }
+    });
+    borderTiles().forEach(function (tl) { blocks.push({ w: TILE * 1.02, h: 78, d: TILE * 1.02, x: tileX(tl[0]), z: tileY(tl[1]), yaw: quarterTurn() }); });
+    g.add(instancedProp(P3.dgFloor, floors[0]));
+    if (floors[1].length) g.add(instancedProp(P3.dgFloorWeeds, floors[1]));
+    g.add(instancedProp(P3.dgBlock, blocks));
+    if (boxes.length) g.add(instancedProp(P3.dgBox, boxes.map(function (o) { return { w: 46, h: 46, d: 46, x: o.x, z: o.z, yaw: o.yaw }; })));
+    if (barrels.length) g.add(instancedProp(P3.dgBarrel, barrels.map(function (o) { return { w: 44, h: 50, d: 44, x: o.x, z: o.z, yaw: o.yaw }; })));
+    hideVolumes(THEMES.dungeon, shadowVolume);
+    var torches = [];
+    for (var r = 2; r < MAP_ROWS; r += 5) [-1, MAP_COLS].forEach(function (c) { torches.push({ w: 16, h: 34, d: 16, x: tileX(c), z: tileY(r), yaw: 0 }); });
+    var torchMesh = instancedProp(P3.dgTorch, torches); torchMesh.position.y = 78; g.add(torchMesh);
+    [3, 8, 12].forEach(function (c) {
+      var top = fitProp(P3.dgBannerBlue, 40, 84, 8, tileX(c) - (c === 8 ? TILE / 2 : 0), MAP_Y0 - TILE / 2 + 18, 0); top.position.y += 78; g.add(top);
+      var bottom = fitProp(P3.dgBannerRed, 40, 84, 8, tileX(MAP_COLS - 1 - c) + (c === 8 ? TILE / 2 : 0), BOUND.b + TILE / 2 - 18, Math.PI); bottom.position.y += 78; g.add(bottom);
+    });
   }
 
   function makePortraits() {
@@ -3143,6 +3269,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   resize();
+  buildArena();
   if (renderer) loadKit();
 
   function specPanelW() { return W > 900 ? 300 : 150; }
