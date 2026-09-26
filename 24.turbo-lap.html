@@ -57,7 +57,7 @@
   #speed b { display: inline-block; font-size: 48px; line-height: 1; letter-spacing: -1px; text-align: right; }
   #speed .unit { display: inline-block; font-size: 15px; font-weight: 800; color: #DCE6D6; margin-left: 4px; }
   #chaseTag, #followTag { display: block; width: auto; white-space: nowrap; overflow: hidden; margin-bottom: 3px; padding: 1px 7px; border-radius: 6px; font-size: 12px; line-height: 17px; min-height: 17px; font-weight: 800; color: #DCE6D6; background: rgba(255,255,255,.12); }
-  #chaseTag[hidden], #followTag[hidden] { display: block; visibility: hidden; }
+  #chaseTag.blank, #followTag.blank { visibility: hidden; }
   #chaseTag.boost { color: #fff; font-size: 15px; background: #D97B4F; animation: boostPulse .5s ease-in-out infinite alternate; }
   #speed:has(#chaseTag.boost) { background: linear-gradient(135deg, rgba(217,123,79,.95), rgba(150,64,34,.88)); border-left-color: #fff; box-shadow: 0 0 22px rgba(217,123,79,.75), 0 4px 14px rgba(0,0,0,.3); }
   #speed:has(#chaseTag.boost) #chaseTag { background: #fff; color: #D97B4F; }
@@ -3985,9 +3985,13 @@ function tick(now) {
     setText(hudOff, P.off ? "오프로드 — 감속 중" : "");
     setText(speedVal, String(Math.round(Math.abs(P.v) * CFG.kmh)));
     const chaseText = heldTag(TAG_HOLD.chase, chaseTagText(), dt);
-    chaseTag.hidden = !chaseText; setText(chaseTag, chaseText); chaseTag.className = P.boostOn ? "boost" : "";
+    const keepTagRows = playMode === "battle";
+    chaseTag.hidden = !keepTagRows && !chaseText; setText(chaseTag, chaseText);
+    const chaseClass = chaseText ? (P.boostOn ? "boost" : "") : "blank";
+    if (chaseTag.className !== chaseClass) chaseTag.className = chaseClass;
     const followText = heldTag(TAG_HOLD.follow, followTagText(), dt);
-    followTag.hidden = !followText; setText(followTag, followText);
+    followTag.hidden = !keepTagRows && !followText; setText(followTag, followText);
+    followTag.classList.toggle("blank", !followText);
     drawMinimap();
     drawSpeedLines(Math.abs(P.v) / CFG.maxSpeed, P.surgeVis, P.surgeFlash);
   }
