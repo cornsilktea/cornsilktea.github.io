@@ -258,6 +258,7 @@
 
   #scrDraft .wrap { max-width: 900px; }
   #btnLeaveDraft { display: block; margin: 0 auto; }
+  .swapBtn { display: block; margin: 0 auto 12px; border-color: #D97B4F; color: #FFB38A; }
   .dfHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .dfTitle { font-size: 24px; font-weight: 800; color: #F4F1E8; }
   .dfTurn { margin-top: 4px; font-size: 17px; font-weight: 800; color: #F2D06B; min-height: 24px; }
@@ -384,6 +385,7 @@
     </div>
 
     <div id="teamCard" class="card">
+      <button id="btnSwapTeams" class="mini swapBtn" type="button" hidden>⇄ 팀 전환 (블루 ↔ 레드)</button>
       <div class="teams">
         <div class="team blue"><h3>블루팀 <button id="btnJoinBlue" class="join" type="button">이동하기</button></h3><div id="listBlue"></div></div>
         <div class="team red"><h3>레드팀 <button id="btnJoinRed" class="join" type="button">이동하기</button></h3><div id="listRed"></div></div>
@@ -518,7 +520,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               smDur: 8000, smMax: 4, smRiseMs: 1100, smCorpseMs: 1400,
               pnDmg: 90, pnSpeed: 1500, pnRange: 700, pnPr: 16, pnRefund: 2, pnScale: 3,
               plFlight: 700, plFlightMin: 150, plR: 60, plDur: 3000, plTick: 1000, plMax: 4, plFade: 500, plLob: 90,
-              fgR: 200, fgDur: 5000, fgDmg: 20, fgHeal: 20, fgSlowMul: 0.6, fgSlowMs: 400, fgCast: KEY * 4 + 100, fgRefund: 1,
+              fgR: 150, fgDur: 5000, fgDmg: 20, fgHeal: 20, fgSlowMul: 0.6, fgSlowMs: 400, fgCast: KEY * 4 + 100, fgRefund: 1,
               lnWind: 300, lnLen: 400, lnW: 36, lnDmg: 90, lnStunMs: 1200 };
   var SNIPER_KEEP = KEY * 5;
   function isMelee(c) { return !!(CHARS[c].arc || CHARS[c].width); }
@@ -1100,7 +1102,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         }
         var p = P[id];
         h += '<div class="slot' + (id === myId ? " mine" : "") + (p.isAI ? " ai" : "") + '">' + (room.host === id ? '<span class="host">👑</span>' : "") + (p.isAI ? "🤖 " : "") + esc(p.nickname) +
-             (id === myId ? ' <span class="me">나</span>' : "") + '<span class="ch">' + esc((CHARS[p.characterType] || CHARS.ranger).name) + "</span>" +
+             (id === myId ? ' <span class="me">나</span>' : "") + (room.mode === "cup" ? "" : '<span class="ch">' + esc((CHARS[p.characterType] || CHARS.ranger).name) + "</span>") +
              (p.isAI && hostCanFill ? '<button type="button" class="aiDel" data-ai-del="' + id + '" aria-label="AI 빼기">빼기</button>' : "") + "</div>";
       }
       return h;
@@ -1117,6 +1119,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     show($("btnSpec"), !imSpec); $("btnSpec").disabled = !canMoveTo("spec");
     var cup = mode === "cup";
     show($("charCardBox"), !imSpec && !cup);
+    show($("btnSwapTeams"), cup && isHost() && room.status === "lobby");
 
     if (!cup) setHtml($("chars"), cardsHtml(me));
 
@@ -1176,6 +1179,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   $("btnJoinBlue").onclick = function () { pickTeam("blue"); };
   $("btnJoinRed").onclick = function () { pickTeam("red"); };
   $("btnSpec").onclick = function () { pickTeam("spec"); };
+  var SWAPPED_TEAM = { blue: "red", red: "blue" };
+  $("btnSwapTeams").onclick = function () {
+    if (!isHost() || room.status !== "lobby" || room.mode !== "cup") return;
+    room.ref.child("players").transaction(function (ps) {
+      if (!ps) return ps;
+      keys(ps).forEach(function (id) { if (ps[id] && SWAPPED_TEAM[ps[id].team]) ps[id].team = SWAPPED_TEAM[ps[id].team]; });
+      return ps;
+    }).then(function (res) { if (res.committed) flashHint("블루팀과 레드팀을 바꿨어요."); });
+  };
   function choiceClick(apply) {
     return function (e) {
       var b = e.target.closest ? e.target.closest(".modeBtn") : null;
@@ -1221,7 +1233,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
 
   var DRAFT_STEPS = [["b1"], ["r1", "r2"], ["b2", "b3"], ["r3"]];
-  var DRAFT_SHOWN_MS = 15000, DRAFT_STEP_MS = 16000, DRAFT_AI_MS = 2500, CUP_START_MS = 5000;
+  var DRAFT_SHOWN_MS = 15000, DRAFT_STEP_MS = 16000, DRAFT_AI_MS = 2500, DRAFT_REVEAL_MS = 5000;
   var draftView = null, draftBusy = false, draftLaunched = 0;
   function draftStepIds(d, step) {
     return (DRAFT_STEPS[step] || []).map(function (k) { return d.seq && d.seq[k]; }).filter(function (id) { return !!id; });
@@ -1269,10 +1281,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var d = room.draft, t = now();
     if (!d || draftBusy) return;
     if (d.step >= DRAFT_STEPS.length) {
-      if (draftLaunched === d.stepAt) return;
+      if (draftLaunched === d.stepAt || t < d.stepAt + DRAFT_REVEAL_MS) return;
       draftLaunched = d.stepAt;
       var picks = d.picks || {}, spare = draftLeft(d);
-      launchMatch(function (id) { return picks[id] || spare.splice(Math.floor(Math.random() * spare.length), 1)[0]; }, CUP_START_MS, ARENA);
+      launchMatch(function (id) { return picks[id] || spare.splice(Math.floor(Math.random() * spare.length), 1)[0]; }, COUNT_MS, ARENA);
       return;
     }
     var step = d.step, timeUp = t >= d.stepAt + DRAFT_STEP_MS, aiDue = t >= d.stepAt + DRAFT_AI_MS;
@@ -1308,13 +1320,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var t = now(), done = d.step >= DRAFT_STEPS.length, picks = d.picks || {}, hover = d.hover || {};
     var waiting = done ? [] : draftWaiting(d, d.step), myTurn = waiting.indexOf(myId) >= 0;
     var me = P[myId], myTeam = me ? me.team : null;
-    var left = done ? 0 : Math.max(0, d.stepAt + DRAFT_SHOWN_MS - t);
+    var span = done ? DRAFT_REVEAL_MS : DRAFT_SHOWN_MS, left = Math.max(0, d.stepAt + span - t);
     var timer = $("dfTimer");
-    setHtml(timer, (done ? "✔" : String(Math.ceil(left / 1000))) + "<small>" + (done ? "선택 완료" : "남은 시간") + "</small>");
+    setHtml(timer, String(Math.ceil(left / 1000)) + "<small>" + (done ? "게임 입장까지" : "남은 시간") + "</small>");
     timer.className = "dfTimer" + (!done && left < 5000 ? " low" : "");
-    $("dfBarFill").style.width = (done ? 0 : Math.round(left / DRAFT_SHOWN_MS * 100)) + "%";
+    $("dfBarFill").style.width = Math.round(left / span * 100) + "%";
     var turn = "";
-    if (done) turn = "선택 완료! 곧 게임이 시작돼요.";
+    if (done) turn = "선택 완료! 양 팀 캐릭터를 확인하세요. 곧 게임에 들어가요.";
     else if (myTurn) turn = "내 차례예요! 캐릭터를 골라 주세요.";
     else if (picks[myId] && draftStepIds(d, d.step).indexOf(myId) >= 0) turn = "선택 완료 — 다른 선수를 기다리는 중…";
     else turn = draftTeamName(DRAFT_STEPS[d.step][0].charAt(0) === "b" ? "blue" : "red") + " " + DRAFT_STEPS[d.step].map(function (k) { return k.charAt(1); }).join("·") + "번 선수가 고르는 중…";
@@ -1571,7 +1583,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function inBush(x, y) { return bushIndexAt(x, y) >= 0; }
   function stealthed(E, t) { t = t || now(); return E.stealthUntil > t && t >= E.stealthUntil - ULT.asDur; }
   function skillActive(E, t) { return E.skillUntil > (t || now()); }
-  function gaugeLocked(E, t) { return E.char !== "thrower" && skillActive(E, t); }
+  function gaugeLocked(E, t) { return skillActive(E, t); }
   function skillLeft(E, t) { return E.skillDur ? clamp((E.skillUntil - t) / E.skillDur, 0, 1) : 0; }
   function hiddenFrom(E, t) { return inBush(E.x, E.y) || stealthed(E, t); }
   function bushIndexAt(x, y) {
@@ -1812,7 +1824,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (h.u && owner.char === "mage" && owner.refundKey !== h.u) { owner.refundKey = h.u; owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.mbRefund); }
       if (h.u === "volley" && owner.char === "ranger") owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.mkRefund);
       if (h.u === "giant" && owner.char === "sniper") owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.pnRefund);
-      if (h.u === "fog" && owner.char === "thrower") owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.fgRefund);
+      if (h.u === "fog" && owner.char === "thrower" && !gaugeLocked(owner)) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.fgRefund);
       if (h.b && !gaugeLocked(owner)) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + (CHARS[owner.char].perHit || 2));
       if (owner === ME && h.d) sfx("confirm");
       G.forceNet = true;
