@@ -3754,7 +3754,7 @@ function drawSpeedLines(ratio, surge = 0, flash = 0) {
   if (edgeGlow > 0.02) {
     const glow = fctx.createRadialGradient(cx, cy, R * 0.45, cx, cy, R);
     glow.addColorStop(0, "rgba(255,255,255,0)");
-    glow.addColorStop(1, "rgba(255,255,255," + (0.55 * edgeGlow).toFixed(2) + ")");
+    glow.addColorStop(1, "rgba(255,255,255," + (0.12 * edgeGlow).toFixed(2) + ")");
     fctx.fillStyle = glow; fctx.fillRect(0, 0, w, h);
   }
 }
