@@ -166,10 +166,16 @@
   .btn.mid { background: var(--sg-panel-alt); color: var(--sg-ink); }
   .btn.hard { background: #D97B4F; }
   .btn.sub { background: #fff; color: var(--sg-ink); font-size: 16px; padding: 10px 20px; }
-  .cars { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 14px 0 12px; }
-  .carbtn { font: inherit; font-weight: 800; font-size: 15px; padding: 10px 4px 8px; border-radius: 12px; border: 3px solid var(--sg-line-strong); background: #fff; color: var(--sg-ink); cursor: pointer; box-shadow: 0 4px 0 var(--sg-ink); }
+  .carPick { margin: 12px 0 10px; }
+  .carModels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .carbtn { font: inherit; font-weight: 800; font-size: 14px; padding: 12px 4px; border-radius: 12px; border: 3px solid var(--sg-line-strong); background: #fff; color: var(--sg-ink); cursor: pointer; box-shadow: 0 4px 0 var(--sg-ink); word-break: keep-all; }
   .carbtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--sg-ink); }
-  .carbtn canvas { display: block; width: 100%; height: 66px; margin-bottom: 4px; }
+  .carColors { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 10px; }
+  .colorbtn { font: inherit; font-size: 12px; font-weight: 700; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 52px; padding: 6px 6px 4px; border-radius: 10px; border: 2px solid rgba(255, 255, 255, .18); background: rgba(255, 255, 255, .06); color: #F4F1E8; cursor: pointer; }
+  .colorbtn i { width: 26px; height: 26px; border-radius: 50%; background: var(--car-color); box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .25), 0 0 0 2px rgba(255, 255, 255, .25); }
+  .colorbtn.on { border-color: #D97B4F; background: rgba(217, 123, 79, .22); }
+  .carStage { display: block; width: 100%; max-width: 440px; aspect-ratio: 440 / 200; margin: 8px auto 0; border-radius: 12px; background: radial-gradient(ellipse at 50% 72%, rgba(255, 255, 255, .12), rgba(255, 255, 255, 0) 68%); }
+  .carName { text-align: center; font-size: 13px; font-weight: 700; color: #A9AFC2; min-height: 18px; }
   .carbtn small { display: block; font-size: 10px; font-weight: 700; color: var(--sg-ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .wipe { font-size: 12px; color: var(--sg-ink-faint); margin-top: 8px; }
   .wipe button { font: inherit; font-size: 12px; color: var(--sg-ink-soft); background: none; border: none; text-decoration: underline; cursor: pointer; }
@@ -180,7 +186,6 @@
   .ghostbtn.on { background: #fff; border-color: #D97B4F; outline: 2px solid #D97B4F; }
   .ghostbtn:disabled { opacity: .45; cursor: default; }
   .sect { font-size: 13px; font-weight: 800; color: var(--sg-ink-soft); text-align: left; margin: 10px 0 4px; }
-  @media (max-width: 520px) { .cars { grid-template-columns: repeat(2, 1fr); } }
   .final { font-size: clamp(40px, 9vw, 58px); font-weight: 800; font-variant-numeric: tabular-nums; color: var(--sg-primary); line-height: 1.1; }
   .courseTag { display: inline-block; padding: 2px 12px; border-radius: 8px; background: var(--sg-panel-alt); border: 2px solid var(--sg-line-mid); font-size: 14px; font-weight: 800; margin-bottom: 6px; }
   .msg { font-size: 16px; font-weight: 800; color: #D97B4F; min-height: 20px; margin: 6px 0 2px; }
@@ -416,12 +421,7 @@
     <div class="specBox"><div><b>📺 관전자</b> <span id="listSpec"></span></div><button type="button" class="mini" id="btnJoinSpec">📺 관전자로 보기</button></div>
     <div id="lobbyCarBox">
       <div class="sect">🚗 차량 선택</div>
-      <div class="cars">
-        <button type="button" class="carbtn" data-car="black"><canvas width="220" height="132"></canvas>검정</button>
-        <button type="button" class="carbtn" data-car="yellow"><canvas width="220" height="132"></canvas>노랑</button>
-        <button type="button" class="carbtn" data-car="blue"><canvas width="220" height="132"></canvas>파랑</button>
-        <button type="button" class="carbtn" data-car="red"><canvas width="220" height="132"></canvas>빨강</button>
-      </div>
+      <div class="carPick"></div>
     </div>
     <button type="button" class="btn" id="btnBStart" hidden>게임 시작</button>
     <div class="hint" id="lobbyHint"></div>
@@ -441,12 +441,7 @@
 
   <div class="card" id="cardCar" style="display:none">
     <div class="logo" style="font-size:36px">차량 선택<small id="carCourse">홍콩 코스</small></div>
-    <div class="cars">
-      <button type="button" class="carbtn" data-car="black"><canvas width="220" height="132"></canvas>검정</button>
-      <button type="button" class="carbtn" data-car="yellow"><canvas width="220" height="132"></canvas>노랑</button>
-      <button type="button" class="carbtn" data-car="blue"><canvas width="220" height="132"></canvas>파랑</button>
-      <button type="button" class="carbtn" data-car="red"><canvas width="220" height="132"></canvas>빨강</button>
-    </div>
+    <div class="carPick"></div>
     <div class="sect">👻 고스트 고르기 <span style="font-weight:700">— 지난 주행이 반투명 차로 같이 달립니다</span></div>
     <div class="ghosts">
       <button type="button" class="ghostbtn on" data-ghost="none">없음<small>&nbsp;</small></button>
@@ -510,7 +505,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 (function () {
 "use strict";
 
-const CREDITS_HTML = "저작권 · 자동차 모델 “2022 Porsche 911 GT3 (992)” © Ddiaz Design (Sketchfab, CC BY-NC-SA 4.0 — 게임용으로 가볍게 줄이고 바퀴를 나눔)<br>" +
+const CREDITS_HTML = "저작권 · 자동차 모델 (Sketchfab, 게임용으로 가볍게 줄이고 바퀴를 나눔): “2022 Porsche 911 GT3 (992)”·“2022 Aston Martin Valkyrie Spider” © Ddiaz Design (CC BY-NC-SA 4.0) · “Bugatti chiron” © kevin (ケビン) (CC BY 4.0)<br>" +
   "하늘 HDRI Greg Zaal·Jarod Guest, 아스팔트·나무껍질 Dimitrios Savva, 나뭇잎 Rob Tuytel (Poly Haven, CC0) · 잔디 Lennart Demes, 건물 외벽·보도블록·콘크리트·벽돌 사진 (ambientCG, CC0)<br>" +
   "홍콩 랜드마크 외벽 사진 (Wikimedia Commons, 원근 보정): IFC David (Public domain) · 중국은행 PrzemekJaczewski (CC BY-SA 4.0) · 청콩센터 Sengkang · 빅토리아 독사이드 Wpcpey (CC BY-SA 4.0) · 마리나 베이 샌즈 Dietmar Rabich (CC BY-SA 4.0)";
 document.querySelectorAll(".creditText").forEach(el => { el.innerHTML = CREDITS_HTML; });
@@ -587,13 +582,32 @@ const TRACKS = {
 const COURSES = Object.keys(TRACKS);
 function capKey(k) { return k[0].toUpperCase() + k.slice(1); }
 let LAPS = CFG.laps;
-const CARS = {
-  black:  { name: "검정", color: 0x2A2E35, model: "cayenne" },
-  yellow: { name: "노랑", color: 0xFFC23D, model: "aventador" },
-  blue:   { name: "파랑", color: 0x3D8BFF, model: "mclaren" },
-  red:    { name: "빨강", color: 0xFF5A4E, model: "p911" }
+const CAR_MODELS = {
+  porsche:  { name: "포르쉐 911 GT3", file: "porsche911gt3.glb" },
+  valkyrie: { name: "애스턴마틴 발키리", file: "astonvalkyrie.glb" },
+  chiron:   { name: "부가티 시론", file: "bugattichiron.glb" }
 };
-let carKey = "blue"; try { if (CARS[localStorage.getItem("turbolap_car_v1")]) carKey = localStorage.getItem("turbolap_car_v1"); } catch (e) {}
+const CAR_MODEL_KEYS = Object.keys(CAR_MODELS);
+CAR_MODEL_KEYS.forEach(k => Object.assign(CAR_MODELS[k], { tpl: null, state: "idle", paintBase: null, paint: {}, lamps: {}, wheelR: 0.4 }));
+const CAR_COLORS = {
+  black:  { name: "검정", hex: 0x2A2E35 },
+  white:  { name: "흰색", hex: 0xE6E9EC },
+  yellow: { name: "노랑", hex: 0xFFC23D },
+  green:  { name: "초록", hex: 0x2E9B63 },
+  blue:   { name: "파랑", hex: 0x3D8BFF },
+  red:    { name: "빨강", hex: 0xFF5A4E }
+};
+const CAR_COLOR_KEYS = Object.keys(CAR_COLORS);
+function carId(model, color) { return model + color; }
+function parseCar(id) {
+  id = String(id || "");
+  const model = CAR_MODEL_KEYS.find(k => id.startsWith(k)), color = model ? id.slice(model.length) : id;
+  return { model: model || "porsche", color: CAR_COLORS[color] ? color : "blue" };
+}
+function carLabel(id) { const c = parseCar(id); return CAR_MODELS[c.model].name + " · " + CAR_COLORS[c.color].name; }
+function carReady(id) { return !!CAR_MODELS[parseCar(id).model].tpl; }
+let carKey = carId("porsche", "blue");
+try { const saved = localStorage.getItem("turbolap_car_v1"); if (saved) { const c = parseCar(saved); carKey = carId(c.model, c.color); } } catch (e) {}
 let pendingCourse = "hongkong"; try { if (TRACKS[localStorage.getItem("turbolap_course_v1")]) pendingCourse = localStorage.getItem("turbolap_course_v1"); } catch (e) {}
 
 const $ = id => document.getElementById(id);
@@ -645,8 +659,7 @@ function renderGhostButtons() {
   });
 }
 function makeGhostCar(ck) {
-  const c = CARS[ck] || CARS[carKey];
-  const g = makeCar(c.color, c.model);
+  const g = makeCar(ck || carKey);
   g.traverse(o => {
     if (!o.isMesh) return;
     const m = o.material.clone();
@@ -783,11 +796,14 @@ function warmUpGpu() {
   })));
 }
 function renderLoadGate() {
-  const ok = HQ_LOAD.ready && !!SUPERCAR.tpl;
+  const myModel = CAR_MODELS[parseCar(carKey).model], ok = HQ_LOAD.ready && !!myModel.tpl;
   ["btnModeTA", "btnModeBattle", "btnHongkong", "btnSingapore", "btnSeoul"].forEach(id => { $(id).disabled = !ok; });
+  $("btnGo").disabled = !ok;
+  markCarButtons();
   const note = $("loadNote");
   if (!HQ_LOAD.ready) note.textContent = "그래픽 자료 불러오는 중… " + HQ_LOAD.loaded + " / " + (HQ_LOAD.total || "?") + (HQ_LOAD.slow ? " — 인터넷이 느리면 조금 더 기다려 주세요" : "");
-  else if (!SUPERCAR.tpl) note.textContent = "자동차 모델을 불러오지 못했습니다. 새로 고침(F5) 해 주세요.";
+  else if (myModel.state === "failed") note.textContent = "자동차 모델을 불러오지 못했습니다. 새로 고침(F5) 해 주세요.";
+  else if (!myModel.tpl) note.textContent = "자동차 모델 불러오는 중…";
   else if (HQ_LOAD.failed.length) note.textContent = "일부 그래픽 자료를 불러오지 못했습니다(" + HQ_LOAD.failed.join(", ") + "). 새로 고침(F5) 해 보세요.";
   else note.textContent = "";
 }
@@ -821,7 +837,6 @@ const ATMOSPHERE = {
   singapore: { near: 330, far: 2700, camFar: 3600, paved: false }
 };
 const NIGHT = { on: false, sky: null, fog: new THREE.Color(0x1A2238), composer: null, bloom: null, headlight: null, carLight: null };
-const SUPERCAR = { tpl: null, paintBase: null, paint: {}, lamps: {}, wheelR: 0.4 };
 const CAR_NIGHT = { paintGlow: 0.16, brake: 9, head: 2 };
 function nightSkyTexture() {
   const t = canvasTex(2048, 1024, (c, w, h) => {
@@ -3337,23 +3352,26 @@ function buildSingapore(G) {
 
 const SUPERCAR_LENGTH = 4.8;
 const SUPERCAR_WHEELS = ["FrontL", "FrontR", "RearL", "RearR"];
-function paintMaterial(color) {
-  if (!SUPERCAR.paint[color]) {
-    const m = SUPERCAR.paintBase.clone();
+function paintMaterial(model, color) {
+  if (!model.paint[color]) {
+    const m = model.paintBase.clone();
     m.color.setHex(color);
-    SUPERCAR.paint[color] = m;
+    model.paint[color] = m;
     applyCarNightLook();
   }
-  return SUPERCAR.paint[color];
+  return model.paint[color];
 }
 function applyCarNightLook() {
-  const on = NIGHT.on, L = SUPERCAR.lamps;
-  Object.keys(SUPERCAR.paint).forEach(c => {
-    const m = SUPERCAR.paint[c];
-    m.emissive.setHex(Number(c)); m.emissiveIntensity = on ? CAR_NIGHT.paintGlow : 0;
+  const on = NIGHT.on;
+  CAR_MODEL_KEYS.forEach(k => {
+    const model = CAR_MODELS[k], L = model.lamps;
+    Object.keys(model.paint).forEach(c => {
+      const m = model.paint[c];
+      m.emissive.setHex(Number(c)); m.emissiveIntensity = on ? CAR_NIGHT.paintGlow : 0;
+    });
+    if (L.brake) { if (L.brakeDay == null) L.brakeDay = L.brake.emissiveIntensity; L.brake.emissiveIntensity = on ? CAR_NIGHT.brake : L.brakeDay; }
+    if (L.head) { if (L.headDay == null) L.headDay = L.head.emissiveIntensity; L.head.emissiveIntensity = on ? CAR_NIGHT.head : L.headDay; }
   });
-  if (L.brake) { if (L.brakeDay == null) L.brakeDay = L.brake.emissiveIntensity; L.brake.emissiveIntensity = on ? CAR_NIGHT.brake : L.brakeDay; }
-  if (L.head) { if (L.headDay == null) L.headDay = L.head.emissiveIntensity; L.head.emissiveIntensity = on ? CAR_NIGHT.head : L.headDay; }
 }
 function makeBlobShadowTex() {
   return canvasTex(128, 256, (c, w, h) => {
@@ -3384,7 +3402,7 @@ function tireAxis(spin, pivot) {
   const axis = new THREE.Vector3(a[0], a[1], a[2]);
   return axis.x < 0 ? axis.negate() : axis;
 }
-function prepareSupercar(root) {
+function prepareSupercar(root, carModel) {
   root.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(root);
   const fit = SUPERCAR_LENGTH / (box.max.z - box.min.z);
@@ -3396,7 +3414,7 @@ function prepareSupercar(root) {
   });
   const axleMid = (wheelPos.FrontL.z + wheelPos.RearL.z) / 2;
   const tireBox = new THREE.Box3().setFromObject(wheelNodes.FrontL);
-  SUPERCAR.wheelR = (tireBox.max.y - tireBox.min.y) / 2 * fit;
+  carModel.wheelR = (tireBox.max.y - tireBox.min.y) / 2 * fit;
 
   const model = new THREE.Group();
   const holder = new THREE.Group(); holder.rotation.y = Math.PI; holder.scale.setScalar(fit); model.add(holder);
@@ -3421,36 +3439,57 @@ function prepareSupercar(root) {
       m = m.clone(); m.transmission = 0; m.transparent = true; m.opacity = 0.32; m.depthWrite = false; m.roughness = 0.05; m.color.setRGB(0.05, 0.07, 0.09);
       o.material = m;
     } else o.castShadow = true;
-    if (m.name === "Body Paint") SUPERCAR.paintBase = m;
-    if (m.name === "Brakelight") SUPERCAR.lamps.brake = m;
-    if (m.name === "Headlight") SUPERCAR.lamps.head = m;
+    if (m.name === "Body Paint") carModel.paintBase = m;
+    if (m.name === "Brakelight") carModel.lamps.brake = m;
+    if (m.name === "Headlight") carModel.lamps.head = m;
   });
-  if (!SUPERCAR.paintBase) throw new Error("차체 도색 재질 없음");
+  if (!carModel.paintBase) throw new Error("차체 도색 재질 없음");
 
   const shadow = new THREE.Mesh(new THREE.PlaneGeometry(2.7, 5.6), new THREE.MeshBasicMaterial({ map: makeBlobShadowTex(), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }));
   shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.14; shadow.renderOrder = -1; model.add(shadow);
   return model;
 }
-function makeSupercar(color) {
+function makeSupercar(carModel, color) {
   const g = new THREE.Group();
-  const m = SUPERCAR.tpl.clone(true);
-  m.traverse(o => { if (o.isMesh && o.material === SUPERCAR.paintBase) o.material = paintMaterial(color); });
+  const m = carModel.tpl.clone(true);
+  m.traverse(o => { if (o.isMesh && o.material === carModel.paintBase) o.material = paintMaterial(carModel, color); });
   g.add(m);
   const wheels = SUPERCAR_WHEELS.map(k => { const p = m.getObjectByName("pivot" + k); return { g: p, spin: p.getObjectByName("spin" + k), front: k.startsWith("Front") }; });
   g.rotation.order = "YXZ";
   g.scale.setScalar(CFG.carScale);
-  g.userData.wheels = wheels; g.userData.wheelR = SUPERCAR.wheelR;
+  g.userData.wheels = wheels; g.userData.wheelR = carModel.wheelR;
   return g;
 }
-function makeCar(color) {
-  if (SUPERCAR.tpl) return makeSupercar(color);
-  const g = new THREE.Group(); g.rotation.order = "YXZ"; g.userData.wheels = []; g.userData.wheelR = 1;
+function makeCar(id) {
+  const c = parseCar(id), carModel = CAR_MODELS[c.model];
+  if (carModel.tpl) return makeSupercar(carModel, CAR_COLORS[c.color].hex);
+  loadCarModel(c.model);
+  const g = new THREE.Group(); g.rotation.order = "YXZ"; g.userData.wheels = []; g.userData.wheelR = 1; g.userData.waitingModel = true;
   return g;
+}
+function loadCarModel(key, manager) {
+  const carModel = CAR_MODELS[key];
+  if (carModel.state !== "idle") return;
+  carModel.state = "loading";
+  new GLTFLoader(manager).setMeshoptDecoder(MeshoptDecoder).load("img/turbo/" + carModel.file, gltf => {
+    try { carModel.tpl = prepareSupercar(gltf.scene, carModel); carModel.state = "ready"; refreshCars(); }
+    catch (e) { carModel.tpl = null; carModel.state = "failed"; console.warn("[turbolap] 자동차 모델 준비 실패:", key, e); }
+    renderLoadGate();
+  }, undefined, err => { carModel.state = "failed"; console.warn("[turbolap] 자동차 모델을 못 불러옴:", key, err); renderLoadGate(); });
 }
 
-let car = makeCar(CARS[carKey].color); scene.add(car);
-const PREVIEW_W = 220, PREVIEW_H = 132;
-const carPreviews = [];
+loadCarModel(parseCar(carKey).model, HQ_MANAGER);
+let car = makeCar(carKey); scene.add(car);
+const PREVIEW_W = 440, PREVIEW_H = 200;
+document.querySelectorAll(".carPick").forEach(box => {
+  box.innerHTML =
+    '<div class="carModels">' + CAR_MODEL_KEYS.map(k => '<button type="button" class="carbtn" data-model="' + k + '">' + CAR_MODELS[k].name + "</button>").join("") + "</div>" +
+    '<div class="carColors">' + CAR_COLOR_KEYS.map(k => '<button type="button" class="colorbtn" data-color="' + k + '" style="--car-color:#' + CAR_COLORS[k].hex.toString(16).padStart(6, "0") + '"><i></i>' + CAR_COLORS[k].name + "</button>").join("") + "</div>" +
+    '<canvas class="carStage" width="' + PREVIEW_W + '" height="' + PREVIEW_H + '"></canvas>' +
+    '<div class="carName"></div>';
+});
+const carStages = [];
+const carSpin = { key: "", m: null, ang: 0.6 };
 let previewRenderer = null, previewScene = null, previewCam = null;
 try {
   previewRenderer = makeRenderer({ alpha: true, antialias: true });
@@ -3460,40 +3499,37 @@ try {
   const dl = new THREE.DirectionalLight(0xFFFFFF, 2.2); dl.position.set(3, 6, 4); previewScene.add(dl);
   const applyEnv = hdr => { previewScene.environment = envFromHdr(previewRenderer, hdr); };
   if (HQENV.hdr) applyEnv(HQENV.hdr); else HQENV.ready.push(applyEnv);
-  previewCam = new THREE.PerspectiveCamera(28, PREVIEW_W / PREVIEW_H, 0.1, 50); previewCam.position.set(0, 2.9, 7.4); previewCam.lookAt(0, 0.45, 0);
+  previewCam = new THREE.PerspectiveCamera(24, PREVIEW_W / PREVIEW_H, 0.1, 50); previewCam.position.set(0, 2.7, 9.2); previewCam.lookAt(0, 0.5, 0);
 } catch (e) { previewRenderer = null; }
-function buildPreviewCar(p) {
-  p.m = makeCar(CARS[p.key].color); p.m.scale.setScalar(0.92); p.m.rotation.y = p.ang;
-}
-document.querySelectorAll(".carbtn").forEach(b => {
-  const cv = b.querySelector("canvas"), ctx = previewRenderer && cv.getContext("2d");
+document.querySelectorAll(".carStage").forEach(cv => {
+  const ctx = previewRenderer && cv.getContext("2d");
   if (!ctx) { cv.style.display = "none"; return; }
-  const p = { key: b.getAttribute("data-car"), ctx, m: null, ang: 0.6, btn: b };
-  buildPreviewCar(p); carPreviews.push(p);
+  carStages.push({ cv, ctx });
 });
 function renderCarPreviews(dt) {
   if (!previewRenderer || state !== "menu" || overlay.style.display === "none") return;
-  carPreviews.forEach(p => {
-    if (!p.btn.offsetParent) return;
-    p.ang += dt * 1.1; p.m.rotation.y = p.ang;
-    previewScene.add(p.m); previewRenderer.render(previewScene, previewCam); previewScene.remove(p.m);
-    p.ctx.clearRect(0, 0, PREVIEW_W, PREVIEW_H); p.ctx.drawImage(previewRenderer.domElement, 0, 0);
-  });
+  const stage = carStages.find(s => s.cv.offsetParent);
+  if (!stage) return;
+  if (carSpin.key !== carKey || !carSpin.m) { carSpin.key = carKey; carSpin.m = makeCar(carKey); }
+  carSpin.ang += dt * 0.9; carSpin.m.rotation.y = carSpin.ang;
+  previewScene.add(carSpin.m); previewRenderer.render(previewScene, previewCam); previewScene.remove(carSpin.m);
+  stage.ctx.clearRect(0, 0, PREVIEW_W, PREVIEW_H); stage.ctx.drawImage(previewRenderer.domElement, 0, 0);
+}
+function swapCar(old, id) {
+  const next = id === ghostCarKey && old === ghostCar ? makeGhostCar(id) : makeCar(id);
+  next.position.copy(old.position); next.rotation.copy(old.rotation); next.visible = old.visible;
+  scene.remove(old); scene.add(next);
+  return next;
 }
 function refreshCars() {
-  const pos = car.position.clone(), rot = car.rotation.clone();
-  scene.remove(car); car = makeCar(CARS[carKey].color); car.position.copy(pos); car.rotation.copy(rot); scene.add(car);
-  if (ghostCar) {
-    const gpos = ghostCar.position.clone(), grot = ghostCar.rotation.clone();
-    scene.remove(ghostCar); ghostCar = makeGhostCar(ghostCarKey); ghostCar.position.copy(gpos); ghostCar.rotation.copy(grot); scene.add(ghostCar);
-  }
-  carPreviews.forEach(buildPreviewCar);
+  if (car.userData.waitingModel) car = swapCar(car, carKey);
+  if (ghostCar && ghostCar.userData.waitingModel) ghostCar = swapCar(ghostCar, ghostCarKey);
+  okeys(BT.ents).forEach(id => {
+    const e = BT.ents[id], p = BT.players[id];
+    if (e.car.userData.waitingModel && p) e.car = swapCar(e.car, p.car);
+  });
+  carSpin.m = null; GFX.rear = null;
 }
-new GLTFLoader(HQ_MANAGER).setMeshoptDecoder(MeshoptDecoder).load("img/turbo/porsche911gt3.glb", gltf => {
-  try { SUPERCAR.tpl = prepareSupercar(gltf.scene); refreshCars(); }
-  catch (e) { SUPERCAR.tpl = null; console.warn("[turbolap] 슈퍼카 모델 준비 실패:", e); }
-  renderLoadGate();
-}, undefined, err => { console.warn("[turbolap] 슈퍼카 모델을 못 불러옴:", err); renderLoadGate(); });
 renderLoadGate();
 
 
@@ -3542,7 +3578,7 @@ function pickCourse(k) {
   pendingCourse = k; $("carCourse").textContent = TRACKS[k].name + " 코스";
   try { localStorage.setItem("turbolap_course_v1", k); } catch (e) {}
   if (k !== course) showCourse(k);
-  document.querySelectorAll(".carbtn").forEach(b => b.classList.toggle("on", b.getAttribute("data-car") === carKey));
+  markCarButtons();
   showCard("car");
   renderGhostButtons(); if (!worldGhost.tried[k] || !worldGhostValid(k)) fetchWorldGhost(k);
 }
@@ -3559,7 +3595,7 @@ function startRace(which) {
   audioInit();
   playMode = "ta"; setBattleHud(false);
   if (which && which !== course) { course = which; buildTrack(TRACKS[course]); }
-  scene.remove(car); car = makeCar(CARS[carKey].color, CARS[carKey].model); scene.add(car);
+  scene.remove(car); car = makeCar(carKey); scene.add(car);
   resetCar(); P.lap = 0; P.expected = 0; lapTimes = []; lapStartMs = 0; raceBest = 0; renderHudBest();
   recData = []; recLast = -Infinity; setupGhost();
   $("hudGhost").style.display = ghostLabel ? "block" : "none"; $("hudGhost").textContent = "👻 " + ghostLabel;
@@ -3828,7 +3864,7 @@ const GFX = { on: true, rear: null, skidMax: 1600, puffMax: 260, skidWidth: 0.26
 const GFX_TINT = { rubber: new THREE.Color(0x141414), dirt: new THREE.Color(0x5A4630), smoke: new THREE.Color(0xD8D8D2), dust: new THREE.Color(0xB39A70), spark: new THREE.Color(0xFFC46A) };
 function rearWheelSpots() {
   if (GFX.rear) return GFX.rear;
-  const tpl = SUPERCAR.tpl, l = tpl && tpl.getObjectByName("pivotRearL"), r = tpl && tpl.getObjectByName("pivotRearR");
+  const tpl = CAR_MODELS[parseCar(carKey).model].tpl, l = tpl && tpl.getObjectByName("pivotRearL"), r = tpl && tpl.getObjectByName("pivotRearR");
   if (!l || !r) return [[-0.62, 1.1], [0.62, 1.1]];
   return (GFX.rear = [l, r].map(o => [o.position.x * CFG.carScale, o.position.z * CFG.carScale]));
 }
@@ -4104,7 +4140,7 @@ function onKey(e, down) {
   else if (e.code === "Space") {
     e.preventDefault();
     if (state === "done") startRace();
-    else if (state === "menu" && cardNow === "car") startRace(pendingCourse);
+    else if (state === "menu" && cardNow === "car" && carReady(carKey)) startRace(pendingCourse);
   }
 }
 window.addEventListener("keydown", e => onKey(e, true));
@@ -4122,13 +4158,25 @@ document.querySelectorAll(".ghostbtn").forEach(b => b.onclick = e => {
   try { localStorage.setItem("turbolap_ghostpick_v1", ghostPick); } catch (err) {}
   renderGhostButtons();
 });
-document.querySelectorAll(".carbtn").forEach(b => b.onclick = e => {
-  e.currentTarget.blur(); carKey = b.getAttribute("data-car");
+function chooseCar(model, color) {
+  carKey = carId(model, color);
   try { localStorage.setItem("turbolap_car_v1", carKey); } catch (err) {}
-  markCarButtons();
+  loadCarModel(model); renderLoadGate();
   if (playMode === "battle" && BT.ref && BT.status === "lobby") { BT.ref.child("players/" + BT.myId + "/car").set(carKey); showLobbyCar(); }
-});
-function markCarButtons() { document.querySelectorAll(".carbtn").forEach(x => x.classList.toggle("on", x.getAttribute("data-car") === carKey)); }
+}
+document.querySelectorAll(".carPick").forEach(box => box.addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  b.blur();
+  const picked = parseCar(carKey);
+  if (b.dataset.model) chooseCar(b.dataset.model, picked.color);
+  else if (b.dataset.color) chooseCar(picked.model, b.dataset.color);
+}));
+function markCarButtons() {
+  const picked = parseCar(carKey), label = carLabel(carKey) + (carReady(carKey) ? "" : " — 불러오는 중…");
+  document.querySelectorAll(".carPick .carbtn").forEach(x => x.classList.toggle("on", x.dataset.model === picked.model));
+  document.querySelectorAll(".carPick .colorbtn").forEach(x => x.classList.toggle("on", x.dataset.color === picked.color));
+  document.querySelectorAll(".carPick .carName").forEach(x => { x.textContent = label; });
+}
 $("btnGo").onclick = e => { e.currentTarget.blur(); startRace(pendingCourse); };
 $("btnWipe").onclick = e => {
   e.currentTarget.blur();
@@ -4346,7 +4394,7 @@ function closeRoomLocal(msg) {
   BT.ref = null; BT.players = {}; BT.raw = {}; BT.result = null;
   resetMatchLocal();
   playMode = "ta"; setBattleHud(false);
-  scene.remove(car); car = makeCar(CARS[carKey].color); scene.add(car); resetCar(); updateCar(0);
+  scene.remove(car); car = makeCar(carKey); scene.add(car); resetCar(); updateCar(0);
   refreshNick(); showCard("bstart"); bMsg(msg);
 }
 window.addEventListener("pagehide", () => { if (BT.ref) { try { BT.ref.child("players/" + BT.myId).remove(); BT.ref.child("st/" + BT.myId).remove(); } catch (e) {} } });
@@ -4380,16 +4428,16 @@ function fixSeat() {
 function showLobbyCar() {
   const me = BT.players[BT.myId];
   BT.lobbyCarSig = carKey + ":" + myTeam() + ":" + course;
-  scene.remove(car); car = makeCar(CARS[carKey].color); scene.add(car);
+  scene.remove(car); car = makeCar(carKey); scene.add(car);
   car.visible = !!me && me.team !== "spec";
   resetCar(); updateCar(0);
 }
 function slotHtml(side) {
   const id = racerOf(side), host = isHost();
   if (!id) return '<div class="slot empty">빈 자리' + (host && canAddBot(side) ? '<button type="button" class="mini botBtn" data-bot-add="' + side + '">🤖 AI 추가</button>' : "") + "</div>";
-  const p = BT.players[id], ck = CARS[p.car] ? p.car : "blue", bot = !!p.bot;
+  const p = BT.players[id], bot = !!p.bot;
   return '<div class="slot' + (id === BT.myId ? " mine" : "") + '">' + (BT.host === id ? "👑 " : "") + (bot ? "🤖 " : "") + escHtml(p.nickname) + (id === BT.myId ? " (나)" : "") +
-    "<small>🚗 " + CARS[ck].name + "</small>" + (bot && host ? '<button type="button" class="mini botBtn" data-bot-del="' + id + '">AI 빼기</button>' : "") + "</div>";
+    "<small>🚗 " + escHtml(carLabel(p.car)) + "</small>" + (bot && host ? '<button type="button" class="mini botBtn" data-bot-del="' + id + '">AI 빼기</button>' : "") + "</div>";
 }
 function humanRacerReady() { return !!racerOf("left") && !!racerOf("right") && racerIds().some(id => !isBot(id)); }
 function renderLobby() {
@@ -4460,7 +4508,7 @@ function startMatchLocal() {
   if (BT.course !== course) showCourse(BT.course);
   if (ghostCar) { scene.remove(ghostCar); ghostCar = null; }
   ghostPlay = null; ghostLabel = "";
-  scene.remove(car); car = makeCar(CARS[carKey].color); scene.add(car); car.visible = !BT.spec;
+  scene.remove(car); car = makeCar(carKey); scene.add(car); car.visible = !BT.spec;
   resetCar(); P.lap = 0; P.expected = 0; lapTimes = []; lapStartMs = 0; raceBest = 0; renderHudBest();
   BT.match = { startAt: BT.startAt, firstFinAt: 0 };
   BT.statusSent = ""; BT.sent = ""; BT.lastNet = 0; BT.forceNet = true;
@@ -4610,10 +4658,9 @@ function renderResult() {
 function ensureEnt(id) {
   if (BT.ents[id]) return BT.ents[id];
   const p = BT.players[id]; if (!p) return null;
-  const ck = CARS[p.car] ? p.car : "blue";
   const e = { id, x: 0, y: 0, z: 0, h: 0, v: 0, rx: 0, rz: 0, rh: 0, rv: 0, rt: 0, st: 0, rw: 0, rkx: 0, rkz: 0, ex: 0, ez: 0, eh: 0, fresh: false, hitAt: 0, hitSentAt: 0, gfxT: newGroundTrack(),
     prog: -1, fin: 0, steer: 0, steerVis: 0, ci: 0, seen: false, snaps: [], lagHi: 0, playDelay: 0,
-    car: makeCar(CARS[ck].color) };
+    car: makeCar(p.car) };
   e.car.visible = false;
   scene.add(e.car);
   BT.ents[id] = e;
@@ -4794,7 +4841,7 @@ function freeBotName() {
 function addBot(side) {
   if (!isHost() || !canAddBot(side)) return;
   const rival = racerOf(side === "left" ? "right" : "left"), rivalCar = rival && BT.players[rival].car;
-  const cars = Object.keys(CARS).filter(k => k !== rivalCar), id = "bot" + Math.random().toString(36).slice(2, 10);
+  const cars = [].concat(...CAR_MODEL_KEYS.map(m => CAR_COLOR_KEYS.map(c => carId(m, c)))).filter(k => k !== rivalCar), id = "bot" + Math.random().toString(36).slice(2, 10);
   BT.ref.child("players/" + id).set({ nickname: freeBotName(), team: side, car: cars[(Math.random() * cars.length) | 0], joinedAt: tnow(), bot: true });
 }
 function removeBot(id) {
@@ -5031,7 +5078,7 @@ $("viewBtns").onclick = e => {
   b.blur(); BT.viewId = b.getAttribute("data-id"); BT.viewKey = ""; renderViewBtns(); snapCamera();
 };
 
-window.TL = { keys, P, CFG, camera, scene, renderer, tick, makeCar, CARS, BT, get S() { return S; }, setTrack: k => { course = k; buildTrack(TRACKS[k]); resetCar(); } };
+window.TL = { keys, P, CFG, camera, scene, renderer, tick, makeCar, CAR_MODELS, BT, get S() { return S; }, setTrack: k => { course = k; buildTrack(TRACKS[k]); resetCar(); } };
 COURSES.forEach(k => { if (WRS[k]) WRS[k].onChange(renderRecords); });
 buildTrack(TRACKS[course]); resetCar(); updateCar(0); showMenu();
 requestAnimationFrame(frame);
