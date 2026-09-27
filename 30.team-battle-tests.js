@@ -464,6 +464,112 @@ function collectResults(api) {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "기절·둔화 해제, 부활 시 체력·상태 초기화, 보호 3초");
   });
 
+  var FROST = "얼음술사·은신";
+  function frostDuel() {
+    var y = OPEN_Y.forest;
+    return world("forest", [
+      { id: "fr", team: "blue", char: "frost", x: 250, y: y, angle: 0 },
+      { id: "foe", team: "red", char: "knight", x: 450, y: y }
+    ]);
+  }
+  function frostShot(W) { var fr = W.ent("fr"); fr.cdUntil = 0; api.fireBasic(fr, angleTo(fr, W.ent("foe"))); W.step(450); }
+  run(FROST, "냉기 화살: 1타·2타는 점점 강한 둔화, 3타째에 " + api.ULT.frFreezeMs + "ms 빙결 후 스택이 처음부터 다시 쌓이는가", function (done) {
+    var W = frostDuel(), foe = W.ent("foe"), base = api.CHARS.knight.speed, got = [];
+    for (var i = 0; i < 3; i++) { frostShot(W); got.push(api.stunned(foe, W.t()) ? "빙결" : Math.round(api.speedOf(foe) / base * 100) + "%"); }
+    var freezeLeft = foe.stunUntil - W.t();
+    W.step(api.ULT.frFreezeMs);
+    frostShot(W);
+    got.push("다시 " + foe.frostStacks + "스택");
+    var want1 = Math.round(api.ULT.frSlowMul * 100) + "%", want2 = Math.round((api.ULT.frSlowMul - api.ULT.frSlowStep) * 100) + "%";
+    var ok = got[0] === want1 && got[1] === want2 && got[2] === "빙결" && freezeLeft <= api.ULT.frFreezeMs && foe.frostStacks === 1;
+    done(ok ? "pass" : "fail", "이동속도 " + got.join(" → ") + " (기대: " + want1 + " → " + want2 + " → 빙결 → 다시 1스택)");
+  });
+  run(FROST, "냉기 화살: 마지막 적중 후 " + api.ULT.frSlowMs + "ms가 지나면 스택이 초기화되는가", function (done) {
+    var W = frostDuel(), foe = W.ent("foe");
+    frostShot(W); frostShot(W);
+    W.step(api.ULT.frSlowMs + 200);
+    frostShot(W);
+    done(foe.frostStacks === 1 && !api.stunned(foe, W.t()) ? "pass" : "fail", "2스택 뒤 쉬었다 맞힘 → " + foe.frostStacks + "스택" + (api.stunned(foe, W.t()) ? ", 빙결됨" : ""));
+  });
+  run(FROST, "눈보라: 시전자를 따라다니고, 범위 안 적은 1초에 " + api.ULT.frBzDmg + " 피해, 아군은 먼 적에게 숨겨지는가", function (done) {
+    var y = OPEN_Y.forest;
+    var W = world("forest", [
+      { id: "fr", team: "blue", char: "frost", x: 300, y: y, gauge: api.GAUGE_MAX },
+      { id: "al", team: "blue", char: "knight", x: 420, y: y },
+      { id: "foe", team: "red", char: "knight", x: 300, y: y + 250 },
+      { id: "far", team: "red", char: "ranger", x: 300, y: y + 700 }
+    ]);
+    var fr = W.ent("fr"), al = W.ent("al"), foe = W.ent("foe"), far = W.ent("far"), bad = [];
+    api.useUlt(fr, 0);
+    W.step(api.ULT.frBzDelay + 50);
+    if (!api.hiddenFrom(al, W.t()) || api.visibleTo(al, far, W.t())) bad.push("범위 안 아군이 먼 적에게 보임");
+    var hp0 = foe.hp;
+    W.step(3000);
+    var lost = hp0 - foe.hp;
+    if (lost < api.ULT.frBzDmg * 3 || lost > api.ULT.frBzDmg * 4) bad.push("3초간 피해 " + lost);
+    fr.x += 150;
+    W.frame(FRAME);
+    var c = api.stormCenter(api.storms()[0]);
+    if (Math.abs(c.x - fr.x) > 1) bad.push("눈보라가 시전자를 따라가지 않음");
+    W.step(api.ULT.frBzDur);
+    var hp1 = foe.hp; W.step(2000);
+    if (foe.hp !== hp1) bad.push("끝난 뒤에도 피해");
+    if (api.hiddenFrom(al, W.t())) bad.push("끝난 뒤에도 숨겨짐");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "3초간 " + lost + " 피해, 따라다님, 끝나면 은신·피해 모두 멈춤");
+  });
+  run(FROST, "눈보라: 시전자가 지속 중 죽으면 그 자리에 멈추고, 부활해도 스폰 지점으로 튀지 않는가", function (done) {
+    var y = OPEN_Y.forest;
+    var W = world("forest", [
+      { id: "fr", team: "blue", char: "frost", x: 300, y: y, gauge: api.GAUGE_MAX },
+      { id: "foe", team: "red", char: "knight", x: 300, y: y + 200 }
+    ]);
+    var fr = W.ent("fr");
+    api.useUlt(fr, 0);
+    W.step(api.ULT.frBzDelay + 100);
+    var dx = fr.x, dy = fr.y;
+    api.damage(fr, 9999, "foe", false, null, null);
+    W.step(api.ULT.frBzDur - 200);
+    var s = api.storms()[0], c = s ? api.stormCenter(s) : null;
+    done(c && hyp(c.x - dx, c.y - dy) < 1 ? "pass" : "fail", c ? "죽은 자리(" + Math.round(dx) + ", " + Math.round(dy) + ") → 눈보라 중심(" + Math.round(c.x) + ", " + Math.round(c.y) + "), 시전자 " + (fr.alive ? "부활함" : "아직 죽어 있음") : "눈보라가 너무 일찍 사라짐");
+  });
+  run(FROST, "눈보라 안에서 공격하면 0.5초간 드러났다가 다시 숨고, 장판 도트 피해로는 다시 드러나지 않는가", function (done) {
+    var y = OPEN_Y.forest;
+    var W = world("forest", [
+      { id: "fr", team: "blue", char: "frost", x: 300, y: y, gauge: api.GAUGE_MAX },
+      { id: "foe", team: "red", char: "ranger", x: 300, y: y + 300 }
+    ]);
+    var fr = W.ent("fr"), foe = W.ent("foe"), seen = [];
+    foe.hp = foe.maxHp = 1e6;
+    api.useUlt(fr, 0);
+    W.step(api.ULT.frBzDelay + 50);
+    seen.push(api.visibleTo(fr, foe, W.t()));
+    fr.cdUntil = 0; api.fireBasic(fr, angleTo(fr, foe));
+    seen.push(api.visibleTo(fr, foe, W.t()));
+    W.step(600);
+    seen.push(api.visibleTo(fr, foe, W.t()));
+    var revealedByTick = false;
+    W.step(2500, FRAME, function (t) { if (api.visibleTo(fr, foe, t)) revealedByTick = true; });
+    var ok = !seen[0] && seen[1] && !seen[2] && !revealedByTick;
+    done(ok ? "pass" : "fail", "공격 전 " + (seen[0] ? "보임" : "숨음") + " → 공격 순간 " + (seen[1] ? "보임" : "숨음") + " → 0.6초 뒤 " + (seen[2] ? "보임" : "숨음") + (revealedByTick ? ", 도트 피해로 다시 드러남" : ", 도트 피해 중 계속 숨음"));
+  });
+  run(FROST, "부쉬 안 저격수가 쏘면 0.5초간 거리와 상관없이 보였다가 다시 숨는가", function (done) {
+    world("forest", []);
+    var tiles = [].concat.apply([], api.bushTiles()), spot = null;
+    tiles.forEach(function (b) { if (!spot && !blockedAt(b.x, b.y)) spot = b; });
+    if (!spot) { done("fail", "시험 준비 실패: 부쉬를 찾지 못함"); return; }
+    var W = world("forest", [
+      { id: "sn", team: "blue", char: "sniper", x: spot.x, y: spot.y },
+      { id: "foe", team: "red", char: "knight", x: 450, y: OPEN_Y.forest + 400 }
+    ]);
+    var sn = W.ent("sn"), foe = W.ent("foe"), seen = [];
+    seen.push(api.visibleTo(sn, foe, W.t()));
+    api.fireBasic(sn, angleTo(sn, foe));
+    seen.push(api.visibleTo(sn, foe, W.t()));
+    W.step(600);
+    seen.push(api.visibleTo(sn, foe, W.t()));
+    done(!seen[0] && seen[1] && !seen[2] ? "pass" : "fail", "쏘기 전 " + (seen[0] ? "보임" : "숨음") + " → 쏜 순간 " + (seen[1] ? "보임" : "숨음") + " → 0.6초 뒤 " + (seen[2] ? "보임" : "숨음"));
+  });
+
   function autoMelee(mapId, seconds, seed) {
     var rnd = seededRandom(seed), realRandom = Math.random;
     Math.random = rnd;
@@ -514,7 +620,7 @@ function collectResults(api) {
           if (!P0 || !P0.alive) return;
           var jump = hyp(E.x - P0.x, E.y - P0.y);
           if (!E.leap && !P0.leap && !teleported[e.id] && jump > 0.5 && segmentCrossesWall(P0.x, P0.y, E.x, E.y)) flag("벽 통과", E, t, Math.round(jump) + "만큼 이동");
-          if (P0.stunned && api.stunned(E, t) && jump > 0.5 && !E.shove && !E.dash && !E.leap && !teleported[e.id] && !holeActive(t)) flag("기절 중 이동", E, t, Math.round(jump) + "만큼");
+          if (P0.stunned && api.stunned(E, t) && jump > 0.5 && !E.shove && !E.dash && !E.leap && !P0.leap && !teleported[e.id] && !holeActive(t)) flag("기절 중 이동", E, t, Math.round(jump) + "만큼");
         });
       }
       var ults = W.log.filter(function (p) { return (p.path === "meleeHits" && p.v.u) || (p.path === "effects" && p.v.u !== 0 && p.v.type !== "pool") || (p.path === "shots" && p.v.s); }).length;

@@ -613,9 +613,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     hitman:  { name: "자객", role: "assassin", icon: "🔪", hp: 120, speed: 260, cd: 1350, dmg: 40, range: 100,
                dashRange: 200, dashWidth: 150, dashDmg: 40, dashMs: 300, finishDelay: 125, ultName: "처형", ultAim: true },
     guardian: { name: "수문장", role: "fighter", icon: "🏰", hp: 380, speed: 215, cd: 1050, dmg: 26, range: 140, arc: Math.PI * 130 / 180,
-                fx: { slowMs: 1000, slowMul: 0.7 }, ultName: "창벽" }
+                fx: { slowMs: 1000, slowMul: 0.7 }, ultName: "창벽" },
+    frost:   { name: "얼음술사", role: "caster", icon: "❄️", hp: 115, speed: 245, cd: 550, dmg: 10, range: 350, pSpeed: 650, pr: 8, ultName: "눈보라" }
   };
-  var CHAR_LIST = ["warrior", "knight", "ranger", "mage", "rogue", "necro", "sniper", "thrower", "lancer", "blacksmith", "priest", "hitman", "guardian"];
+  var CHAR_LIST = ["warrior", "knight", "ranger", "mage", "rogue", "necro", "sniper", "thrower", "lancer", "blacksmith", "priest", "hitman", "guardian", "frost"];
   var ROLES = {
     fighter:  { name: "전사", icon: "⚔️", gaugeOnHit: 2, gaugeOnHurt: 1 },
     caster:   { name: "마법사", icon: "✨", gaugeOnHit: 3, gaugeOnHurt: 0 },
@@ -638,11 +639,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               bsDelay: 700, bsR: 150, bsDmg: 60, bsStunMs: 800, bsCast: 450, bsMin: 60, bsHop: 45,
               bhR: 150, bhDur: 3000, bhDelay: 500, bhPull: 220, bhCast: 380, bhMin: 60,
               exRange: 500, exSpeed: 1300, exPr: 4, exDmg: 10, exStunMs: 1000,
-              gdR: 200, gdKb: 150, gdKbMs: 500 };
+              gdR: 200, gdKb: 150, gdKbMs: 500,
+              frSlowMs: 1200, frSlowMul: 0.85, frSlowStep: 0.15, frFreezeMs: 800,
+              frBzR: 400, frBzDur: 5000, frBzDmg: 5, frBzTick: 1000, frBzDelay: 400 };
   var SNIPER_KEEP = KEY * 5;
   function isMelee(c) { return !!(CHARS[c].arc || CHARS[c].width || CHARS[c].dashWidth); }
   var STEALTH_ALPHA = 0.4;
   var STEALTH_REVEAL_DIST = 100;
+  var REVEAL_BREAK_MS = 500;
   var BOT_VIEW = 600;
   var BOT_REACT_MS = 550;
   var BOT_AIM_ERR = 0.16;
@@ -986,7 +990,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var ref = db.ref(ROOT + "/" + code);
     room = { code: code, ref: ref, mode: null, map: "forest", status: "lobby", host: null, startAt: 0, winner: null, endedAt: 0, final: null, roster: null, draft: null };
     clear3d();
-    P = {}; R = {}; PR = {}; MELEE = {}; FX = []; BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; G = null; ME = null; BOTS = {}; ST = {}; SHOTS = []; hitSubs = {};
+    P = {}; R = {}; PR = {}; MELEE = {}; FX = []; BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; STORMS = []; G = null; ME = null; BOTS = {}; ST = {}; SHOTS = []; hitSubs = {};
     ref.child("players/" + myId).onDisconnect().remove();
     ref.child("ping/" + myId).onDisconnect().remove();
     ref.child("pong/" + myId).onDisconnect().remove();
@@ -1078,7 +1082,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (room) { leaving = true; unsubAll(); try { room.ref.child("players/" + myId).onDisconnect().cancel(); } catch (e) {} }
     room = null; resetLocal(); showScreen("start"); startMsg(msg || "");
   }
-  function resetLocal() { clear3d(); BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; P = {}; R = {}; PR = {}; MELEE = {}; FX = []; G = null; ME = null; BOTS = {}; ST = {}; SHOTS = []; hitSubs = {}; joy.id = null; aim.id = null; }
+  function resetLocal() { clear3d(); BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; STORMS = []; P = {}; R = {}; PR = {}; MELEE = {}; FX = []; G = null; ME = null; BOTS = {}; ST = {}; SHOTS = []; hitSubs = {}; joy.id = null; aim.id = null; }
   window.addEventListener("pagehide", function () { if (room) { try { room.ref.child("players/" + myId).remove(); } catch (e) {} } });
 
   var screenNow = "start";
@@ -1215,6 +1219,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "hitman") return "사거리 " + ULT.exRange + "의 칼날 발사, 처음 맞은 적에게 " + ULT.exDmg + "의 데미지 + " + num(ULT.exStunMs / 1000) + "초 기절, 명중 시 대상 위치로 순간이동";
     if (k === "guardian") return "주변 " + ULT.gdR + " 내의 적 모두를 " + ULT.gdKb + "만큼 밀어냄";
     if (k === "priest") return "지정한 곳에 " + num(ULT.bhDelay / 1000) + "초 뒤 반경 " + ULT.bhR + "의 블랙홀 생성, " + num(ULT.bhDur / 1000) + "초간 범위 안의 적을 중심으로 끌어당김";
+    if (k === "frost") return "자신을 중심으로 반경 " + ULT.frBzR + "의 눈보라 생성(시전자를 따라다님), " + num(ULT.frBzDur / 1000) +
+      "초간 유지. 범위 내 아군은 은신 상태가 되고, 적은 1초당 " + ULT.frBzDmg + "의 피해를 입는다";
     return "";
   }
   function statTable(k) {
@@ -1225,6 +1231,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
             : pair(hit, c.throwDmg || (rage ? Math.round(c.dmg * ULT.bzDmgMul) : null)) + (c.heal ? "(" + c.heal + ")" : "");
     var rate = pair(num(1000 / c.cd), rage ? num(1000 / (c.cd * ULT.bzCdMul)) : null) + "회";
     return '<table class="st"><tr><th>HP</th><td>' + c.hp + "</td></tr><tr><th>공격</th><td>" + dmg + "</td></tr>" +
+           (k === "frost" ? "<tr><th>효과</th><td>같은 대상 3연속 적중 시 " + num(ULT.frFreezeMs / 1000) + "초 빙결(그 전까지는 점점 강한 둔화)</td></tr>" : "") +
            "<tr><th>초당 공격</th><td>" + rate + "</td></tr>" +
            "<tr><th>이동속도</th><td>" + pair(c.speed, c.ultSpeed) + "</td></tr>" +
            "<tr><th>사거리</th><td>" + pair(Math.round(c.dashRange || c.range), c.throwRange) + "</td></tr><tr><th>스킬</th><td>" + c.ultName + "</td></tr></table>";
@@ -1584,7 +1591,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var ST = {};
   function stKey(team, slot) { return (team === "blue" ? "b" : "r") + slot; }
   function angDeg(a) { var d = Math.round(a * 180 / Math.PI / 3) * 3; return ((d % 360) + 360) % 360; }
-  var STATE_TIMES = ["diedAt", "atkAt", "ultUntil", "buffUntil", "stealthUntil", "regenUntil", "skillUntil", "protectUntil", "slowUntil", "stunUntil", "summonAt"];
+  var STATE_TIMES = ["diedAt", "atkAt", "ultUntil", "buffUntil", "stealthUntil", "regenUntil", "skillUntil", "protectUntil", "slowUntil", "stunUntil", "summonAt", "revealUntil", "frostStackAt"];
   var STATE_TIMES_AT = 12;
   var STATE_EXTRA_AT = STATE_TIMES_AT + STATE_TIMES.length;
   function oneDecimal(v) { return Math.round((+v || 0) * 10) / 10; }
@@ -1608,7 +1615,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       oneDecimal(E.gauge), oneDecimal(E.dmg), E.deaths || 0, E.kills || 0, Math.round(E.heal || 0), E.skillDur || ""]
       .concat(STATE_TIMES.map(function (k) { return relTime(E[k]); }))
       .concat([E.slowUntil ? Math.round(slowMulAt(E, now()) * 100) : "", packMinions(E),
-               oneDecimal(E.stunDealt), oneDecimal(E.slowDealt), twoDecimals(E.slowWeight), Math.round(E.blocked || 0)]).join(",");
+               oneDecimal(E.stunDealt), oneDecimal(E.slowDealt), twoDecimals(E.slowWeight), Math.round(E.blocked || 0), E.frostStacks || ""]).join(",");
   }
   function stateOf(d) {
     var s = d && d.slot ? ST[stKey(d.team, d.slot)] : null;
@@ -1621,7 +1628,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         o.slowMul = f[STATE_EXTRA_AT] ? +f[STATE_EXTRA_AT] / 100 : 1;
         o.minions = unpackMinions(f[STATE_EXTRA_AT + 1]);
         o.stunDealt = +f[STATE_EXTRA_AT + 2] || 0; o.slowDealt = +f[STATE_EXTRA_AT + 3] || 0;
-        o.slowWeight = +f[STATE_EXTRA_AT + 4] || 0; o.blocked = +f[STATE_EXTRA_AT + 5] || 0;
+        o.slowWeight = +f[STATE_EXTRA_AT + 4] || 0; o.blocked = +f[STATE_EXTRA_AT + 5] || 0; o.frostStacks = +f[STATE_EXTRA_AT + 6] || 0;
       }
       return o;
     }
@@ -1636,7 +1643,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var PR = {};
   var MELEE = {};
   var FX = [];
-  var BURSTS = [], POOLS = [], POOL_HIT = {}, LUNGES = [], WAVES = [], HOLES = [];
+  var BURSTS = [], POOLS = [], POOL_HIT = {}, LUNGES = [], WAVES = [], HOLES = [], STORMS = [];
   var handled = {};
 
   function makeEnt(id, d) {
@@ -1649,7 +1656,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
              kills: s.kills || 0, heal: s.heal || 0, protectUntil: s.protectUntil || 0,
              stunDealt: s.stunDealt || 0, slowDealt: s.slowDealt || 0, slowWeight: s.slowWeight || 0, blocked: s.blocked || 0,
              slowUntil: s.slowUntil || 0, slowMul: s.slowMul || 1, stunUntil: s.stunUntil || 0,
-             summonAt: s.summonAt || 0, minions: [],
+             summonAt: s.summonAt || 0, minions: [], revealUntil: s.revealUntil || 0, frostStacks: s.frostStacks || 0, frostStackAt: s.frostStackAt || 0,
              burst: null, volley: null, mv: false, pending: null };
     if (s.minions) adoptMinions(E, s.minions, null);
     return E;
@@ -1658,7 +1665,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     clear3d();
     G = { startAt: room.startAt, endSent: false, playingSent: false, lastNet: 0, sent: {}, finalSent: false, beeped: -1 };
     ME = isSpec() ? null : makeEnt(myId, P[myId]);
-    BOTS = {}; R = {}; FX = []; CC_PENDING = {}; hudMeShown = { k: -1, d: -1, dmg: -1 }; BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; handled = {};
+    BOTS = {}; R = {}; FX = []; CC_PENDING = {}; hudMeShown = { k: -1, d: -1, dmg: -1 }; BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; STORMS = []; handled = {};
     lastHp = {};
     show($("endOv"), false);
   }
@@ -1699,6 +1706,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       r.stealthUntil = pos.stealthUntil;
       r.slowUntil = pos.slowUntil; r.slowMul = pos.slowMul; r.stunUntil = pos.stunUntil;
       r.summonAt = pos.summonAt;
+      r.revealUntil = pos.revealUntil; r.frostStacks = pos.frostStacks; r.frostStackAt = pos.frostStackAt;
       adoptMinions(r, pos.minions, k);
     });
   }
@@ -1790,7 +1798,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function skillActive(E, t) { return E.skillUntil > (t || now()); }
   function gaugeLocked(E, t) { return skillActive(E, t); }
   function skillLeft(E, t) { return E.skillDur ? clamp((E.skillUntil - t) / E.skillDur, 0, 1) : 0; }
-  function hiddenFrom(E, t) { return inBush(E.x, E.y) || stealthed(E, t); }
+  function hiddenFrom(E, t) { return inBush(E.x, E.y) || stealthed(E, t) || inFriendlyStorm(E, t); }
   function bushIndexAt(x, y) {
     var c = Math.floor((x - MAP_X0) / TILE), r = Math.floor((y - MAP_Y0) / TILE);
     if (c < 0 || r < 0 || c >= MAP_COLS || r >= MAP_ROWS) return -1;
@@ -1799,9 +1807,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   function revealedTo(E, viewer, t) {
     if (!viewer) return false;
+    if (E.revealUntil > (t || now())) return true;
     var bush = bushIndexAt(E.x, E.y);
     if (bush >= 0 && bushIndexAt(viewer.x, viewer.y) !== bush) return false;
-    if (stealthed(E, t) && hyp(E.x - viewer.x, E.y - viewer.y) > STEALTH_REVEAL_DIST) return false;
+    if ((stealthed(E, t) || inFriendlyStorm(E, t)) && hyp(E.x - viewer.x, E.y - viewer.y) > STEALTH_REVEAL_DIST) return false;
     return true;
   }
   function visibleTo(E, viewer, t) { return !hiddenFrom(E, t) || revealedTo(E, viewer, t); }
@@ -1909,6 +1918,24 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       T.stunUntil = Math.max(T.stunUntil || 0, t + fx.stunMs); T.pending = null; T.burst = null; T.volley = null; T.slash = null; }
     G.forceNet = true;
   }
+  function frostStackFx(T) {
+    var t = now();
+    if (!T.frostStackAt || t - T.frostStackAt > ULT.frSlowMs) T.frostStacks = 0;
+    T.frostStacks = (T.frostStacks || 0) + 1;
+    T.frostStackAt = t;
+    if (T.frostStacks >= 3) {
+      T.frostStacks = 0;
+      return { stunMs: ULT.frFreezeMs };
+    }
+    return { slowMs: ULT.frSlowMs, slowMul: ULT.frSlowMul - (T.frostStacks - 1) * ULT.frSlowStep };
+  }
+  function frostStacksNow(E, t) { return E.frostStacks && t - E.frostStackAt <= ULT.frSlowMs ? E.frostStacks : 0; }
+  function revealBriefly(ownerId, t) {
+    var A = ent(ownerId);
+    if (!A || (A !== ME && !A.bot) || !hiddenFrom(A, t)) return;
+    A.revealUntil = t + REVEAL_BREAK_MS;
+    G.forceNet = true;
+  }
   function berserk(E, t) { return E.char === "warrior" && E.buffUntil > (t || now()); }
   function moveEnt(E, vx, vy, dt) {
     var m = hyp(vx, vy); if (m > 1) { vx /= m; vy /= m; }
@@ -1963,6 +1990,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (skill) ev.s = 1;
     E.atkAt = t;
     room.ref.child("shots").push(ev);
+    revealBriefly(E.id, t);
   }
   function onShot(s) {
     var ev = s.val(); if (!ev || !G || handled[s.key]) return;
@@ -1998,7 +2026,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       vx: dx * sp, vy: dy * sp, isSkill: v.skill, dmg: sv.dmg, ultKey: sv.ultKey, fx: sv.fx,
       pr: sv.pr, range: sv.range, createdAt: v.ev.t + i * v.gap });
     if (v.char === "hitman" && v.skill) spark(ox + dx * 30, oy + dy * 30, "#FF3A4A", 2);
-    if (E && (E === ME || BOTS[E.id]) && hear(E)) sfx(v.char === "mage" || v.char === "necro" ? "orb" : (v.char === "rogue" ? "star" : "shoot"));
+    if (E && (E === ME || BOTS[E.id]) && hear(E)) sfx(v.char === "mage" || v.char === "necro" || v.char === "frost" ? "orb" : (v.char === "rogue" ? "star" : "shoot"));
     return true;
   }
   function pruneLocal(t) {
@@ -2035,10 +2063,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function projHit(id, p, T) {
     var d = p.d;
     p.dead = true;
-    var immune = protectedNow(T);
-    damage(T, d.dmg, d.owner, !d.isSkill, d.isSkill ? d.ultKey : null, d.fx);
+    var immune = protectedNow(T), fx = d.fx, seen = !ME || ME.team === T.team || visibleTo(T, ME);
+    if (d.ownerCharacterType === "frost" && !d.isSkill && !immune && !T.minion) fx = frostStackFx(T);
+    damage(T, d.dmg, d.owner, !d.isSkill, d.isSkill ? d.ultKey : null, fx);
     if (d.ultKey === "execute" && !immune) { room.ref.child("hits/" + d.owner).push({ d: 0, b: 0, t: now(), tp: { x: r1(T.x), y: r1(T.y) } }); executeFx(T.x, T.y); }
-    if (!ME || ME.team === T.team || visibleTo(T, ME)) spark(T.x, T.y, d.ownerCharacterType === "necro" ? hitColor(d) : (d.team === "blue" ? "#5FA2FF" : "#FF6A5F"), d.ultKey === "giant" ? 2.2 : 1);
+    if (seen) spark(T.x, T.y, orbHitColor(d), d.ultKey === "giant" ? 2.2 : 1);
   }
   function projVisualHit(p, t) {
     if (p.dead || p.gone) return;
@@ -2052,7 +2081,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (segHit(a.x, a.y, b.x, b.y, T.x, T.y, BODY_R + (d.pr || 6))) {
         p.gone = true;
         if (d.ultKey === "execute") executeFx(T.x, T.y);
-        if (!ME || ME.team === T.team || visibleTo(T, ME, t)) spark(T.x, T.y, d.ownerCharacterType === "necro" ? hitColor(d) : (d.team === "blue" ? "#5FA2FF" : "#FF6A5F"), d.ultKey === "giant" ? 2.2 : 1);
+        if (!ME || ME.team === T.team || visibleTo(T, ME, t)) spark(T.x, T.y, orbHitColor(d), d.ultKey === "giant" ? 2.2 : 1);
         return;
       }
     }
@@ -2076,7 +2105,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     var dm = Math.min(amount, T.hp), killed = false;
     T.hp -= dm; if (!gaugeLocked(T)) T.gauge = Math.min(GAUGE_MAX, T.gauge + roleOf(T.char).gaugeOnHurt);
-    if (T.hp <= 0) { killed = true; T.hp = 0; T.alive = false; T.deaths++; T.diedAt = now(); T.burst = null; T.volley = null; T.slash = null; T.regenUntil = 0; T.skillUntil = 0; T.slowUntil = 0; T.slows = null; T.stunUntil = 0; T.lance = null; if (T === ME) { sfx("down"); aim.id = null; joy.id = null; } }
+    if (T.hp <= 0) { killed = true; T.hp = 0; T.alive = false; T.deaths++; T.diedAt = now(); T.burst = null; T.volley = null; T.slash = null; T.regenUntil = 0; T.skillUntil = 0; T.slowUntil = 0; T.slows = null; T.stunUntil = 0; T.lance = null; T.frostStacks = 0; if (T === ME) { sfx("down"); aim.id = null; joy.id = null; } }
     else { if (T === ME) sfx("hit"); afflict(T, fx, owner); }
     pushHit(owner, dm, basic, ultKey, killed, gaugeGain);
     if (killed) room.ref.child("kills").push({ k: owner, v: T.id, t: now() });
@@ -2171,6 +2200,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     handled[s.key] = 1;
     if (e.type === "pool") { if (now() < e.createdAt + e.delay + e.dur) POOLS.push({ e: e, vis: null, bottle: null }); return; }
     if (e.type === "hole") { if (now() < e.createdAt + e.delay + e.dur) HOLES.push({ e: e, vis: null }); return; }
+    if (e.type === "storm") { if (now() < e.createdAt + e.delay + e.dur) STORMS.push({ e: e, vis: null }); return; }
     if (e.type !== "burst" || now() > e.createdAt + e.delay + 1500) return;
     BURSTS.push({ e: e, vis: null });
   }
@@ -2238,11 +2268,47 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return true;
     });
   }
+  function stormCenter(s) {
+    var A = ent(s.e.owner);
+    if (A && !A.alive) s.ownerFell = true;
+    if (A && A.alive && !s.ownerFell) { s.lastX = A.x; s.lastY = A.y; }
+    else if (s.lastX == null) { s.lastX = s.e.x; s.lastY = s.e.y; }
+    return { x: s.lastX, y: s.lastY };
+  }
+  function stormActive(s, t) { return t >= s.e.createdAt + s.e.delay && t < s.e.createdAt + s.e.delay + s.e.dur; }
+  function inFriendlyStorm(E, t) {
+    t = t || now();
+    for (var i = 0; i < STORMS.length; i++) {
+      var s = STORMS[i];
+      if (s.e.team !== E.team || !stormActive(s, t)) continue;
+      var c = stormCenter(s);
+      if (hyp(E.x - c.x, E.y - c.y) <= s.e.r) return true;
+    }
+    return false;
+  }
+  function stepStorms(t) {
+    STORMS = STORMS.filter(function (s) {
+      var e = s.e;
+      if (t >= e.createdAt + e.delay + e.dur) { dropStormVis(s); return false; }
+      if (t < e.createdAt + e.delay) return true;
+      var c = stormCenter(s);
+      if (!s.landed) { s.landed = true; if (!ME || hyp(c.x - ME.x, c.y - ME.y) < 700) sfx("orb"); }
+      if (room.status !== "playing") return true;
+      if (s.nextTick && t < s.nextTick) return true;
+      s.nextTick = (s.nextTick || t) + ULT.frBzTick;
+      localTargets().forEach(function (T) {
+        if (!T.alive || T.team === e.team || hyp(T.x - c.x, T.y - c.y) > e.r) return;
+        damage(T, ULT.frBzDmg, e.owner, false, "blizzard");
+      });
+      return true;
+    });
+  }
   function potionFlightMs(dist) { return Math.round(Math.max(ULT.plFlightMin, ULT.plFlight * dist / CHARS.thrower.range)); }
   function throwPoison(E, ang, reach, ult) {
     var t = now(), c = CHARS.thrower, spot = burstSpot(E, ang, reach, ult ? ULT.fgCast : c.range, c.minRange);
     var flightMs = potionFlightMs(hyp(spot.x - E.x, spot.y - E.y));
     E.angle = Math.atan2(spot.y - E.y, spot.x - E.x); E.atkAt = t;
+    revealBriefly(E.id, t);
     room.ref.child("effects").push({ type: "pool", team: E.team, owner: E.id, x: Math.round(spot.x), y: Math.round(spot.y), ox: Math.round(E.x), oy: Math.round(E.y),
                                      r: ult ? ULT.fgR : ULT.plR, dmg: ult ? ULT.fgDmg : c.dmg, dur: ult ? ULT.fgDur : ULT.plDur, delay: flightMs, createdAt: t, u: ult ? 1 : 0 });
     if (hear(E)) sfx("swing");
@@ -2300,6 +2366,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     E.lance = null;
     room.ref.child("meleeHits").push({ team: d.team, owner: d.owner, x: d.x, y: d.y, angle: d.angle, len: d.len, width: d.width,
                                       dmg: ULT.lnDmg, u: 1, fx: { stunMs: ULT.lnStunMs }, createdAt: t });
+    revealBriefly(d.owner, t);
     G.forceNet = true;
   }
   function stepLunges(t) {
@@ -2389,6 +2456,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (c.fx) d.fx = c.fx;
     room.ref.child("meleeHits").push(d);
     E.atkAt = now();
+    revealBriefly(E.id, E.atkAt);
     if (hear(E)) sfx("swing");
   }
   function dashReach(E, ang, len) {
@@ -2401,6 +2469,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var tx = clamp(E.x + Math.cos(ang) * reach, BOUND.l + BODY_R, BOUND.r - BODY_R), ty = clamp(E.y + Math.sin(ang) * reach, BOUND.t + BODY_R, BOUND.b - BODY_R);
     reach = hyp(tx - E.x, ty - E.y);
     room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(ang), len: Math.max(1, Math.round(reach)), width: c.dashWidth, dmg: c.dashDmg, createdAt: t });
+    revealBriefly(E.id, t);
     E.dash = { sx: E.x, sy: E.y, tx: tx, ty: ty, at: t, ang: ang, swingId: t };
     E.slash = null;
     E.atkAt = t;
@@ -2423,6 +2492,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     E.atkAt = t;
     if (hear(E)) sfx("swing");
     room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(D.ang), radius: c.range, arc: Math.PI * 2, dmg: c.dmg, createdAt: D.swingId });
+    revealBriefly(E.id, t);
     G.forceNet = true;
   }
 
@@ -2433,6 +2503,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     E.hp = E.maxHp; E.alive = true; E.protectUntil = t + RESPAWN_PROTECT_MS;
     E.cdUntil = 0; E.pending = null; E.burst = null; E.volley = null; E.slash = null;
     E.buffUntil = 0; E.slamAt = 0; E.leap = null; E.dash = null; E.shove = null; E.stealthUntil = 0; E.ultUntil = 0; E.skillUntil = 0; E.regenUntil = 0; E.slowUntil = 0; E.slows = null; E.stunUntil = 0; E.lance = null;
+    E.frostStacks = 0; E.frostStackAt = 0; E.revealUntil = 0;
     if (E === ME) CAM.snap = true;
     G.forceNet = true;
   }
@@ -2482,6 +2553,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       E.ultUntil = t + 450;
       room.ref.child("effects").push({ type: "burst", team: E.team, owner: E.id, x: Math.round(spot.x), y: Math.round(spot.y),
                                        r: ULT.mbR, dmg: ULT.mbDmg, delay: ULT.mbDelay, createdAt: t });
+      revealBriefly(E.id, t);
     } else if (E.char === "warrior") {
       E.buffUntil = t + ULT.bzDur;
       E.skillDur = ULT.bzDur;
@@ -2536,6 +2608,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       E.ultUntil = t + 500;
       room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(E.angle), radius: ULT.gdR, arc: Math.PI * 2,
                                         dmg: 0, u: 1, slam: 1, kb: ULT.gdKb, createdAt: t });
+      revealBriefly(E.id, t);
     } else if (E.char === "priest") {
       var holeSpot = burstSpot(E, ang, reach, ULT.bhCast, ULT.bhMin);
       E.angle = Math.atan2(holeSpot.y - E.y, holeSpot.x - E.x);
@@ -2543,6 +2616,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       E.skillDur = ULT.bhDelay + ULT.bhDur;
       room.ref.child("effects").push({ type: "hole", team: E.team, owner: E.id, x: Math.round(holeSpot.x), y: Math.round(holeSpot.y),
                                        r: ULT.bhR, dur: ULT.bhDur, delay: ULT.bhDelay, createdAt: t });
+      revealBriefly(E.id, t);
+    } else if (E.char === "frost") {
+      E.ultUntil = t + ULT.frBzDelay + 500;
+      E.skillDur = ULT.frBzDelay + ULT.frBzDur;
+      E.pending = null;
+      room.ref.child("effects").push({ type: "storm", team: E.team, owner: E.id, x: Math.round(E.x), y: Math.round(E.y),
+                                       r: ULT.frBzR, dur: ULT.frBzDur, delay: ULT.frBzDelay, createdAt: t });
     }
     if (E.skillDur && E.char !== "ranger" && E.char !== "mage" && E.char !== "necro") E.skillUntil = t + E.skillDur;
     if (hear(E)) sfx("ult");
@@ -2556,6 +2636,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     E.atkAt = t; E.ultUntil = t + 500;
     room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(E.angle), radius: ULT.tkStunR, arc: Math.PI * 2,
                                       dmg: 0, u: 1, slam: 1, fx: { stunMs: ULT.tkStunMs }, createdAt: t });
+    revealBriefly(E.id, t);
     G.forceNet = true;
   }
   function leapProgress(t, ultUntil) { return clamp(1 - (ultUntil - t) / ULT.bsDelay, 0, 1); }
@@ -2570,6 +2651,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     resolve(E);
     room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(E.angle), radius: ULT.bsR, arc: Math.PI * 2,
                                       dmg: ULT.bsDmg, u: 1, slam: 1, hammer: 1, fx: { stunMs: ULT.bsStunMs }, createdAt: t });
+    revealBriefly(E.id, t);
     G.forceNet = true;
   }
   function stepCombat(E, dt) {
@@ -2687,7 +2769,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (B.burst) return;
     if (B.char === "thrower") { botThrow(B, target, enemies, t); return; }
     if (B.char === "lancer") { botLance(B, target, t); return; }
-    if (target && B.gauge >= GAUGE_MAX && t - k.seenAt > 500 && losClear(B.x, B.y, target.x, target.y) && (B.char !== "mage" || td <= ULT.mbCast) && (B.char !== "blacksmith" || td <= ULT.bsCast) && (B.char !== "priest" || td <= ULT.bhCast) && (B.char !== "hitman" || td <= ULT.exRange) && (B.char !== "guardian" || td <= ULT.gdR)) {
+    if (target && B.gauge >= GAUGE_MAX && t - k.seenAt > 500 && losClear(B.x, B.y, target.x, target.y) && (B.char !== "mage" || td <= ULT.mbCast) && (B.char !== "blacksmith" || td <= ULT.bsCast) && (B.char !== "priest" || td <= ULT.bhCast) && (B.char !== "hitman" || td <= ULT.exRange) && (B.char !== "guardian" || td <= ULT.gdR) && (B.char !== "frost" || td <= ULT.frBzR * 0.8)) {
       if (B.char === "blacksmith") {
         var drop = leadSpot(target, ULT.bsDelay / 1000, t);
         useUlt(B, Math.atan2(drop.y - B.y, drop.x - B.x), hyp(drop.x - B.x, drop.y - B.y)); return;
@@ -3202,7 +3284,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     hitman:  { file: "Rogue_Hooded", right: "dagger_A", left: "dagger_A",
                recolor: [[1, 0, 1, "#3A3D46", "#16181D"], [1, 1, 1, "#9A2230", "#4A0E16"], [2, 1, 1, "#9A2230", "#4A0E16"]] },
     guardian: { file: "Knight", right: "halberd", rightScale: 1.2,
-                recolor: [[0, 3, 1, "#1F4A2E", "#0E2417"], [1, 0, 1, "#1F4A2E", "#0E2417"], [2, 2, 1, "#1F4A2E", "#0E2417"], [1, 1, 1, "#E4EAEF", "#9AA4AC"], [1, 2, 2, "#C7D1D9", "#6E7880"]] }
+                recolor: [[0, 3, 1, "#1F4A2E", "#0E2417"], [1, 0, 1, "#1F4A2E", "#0E2417"], [2, 2, 1, "#1F4A2E", "#0E2417"], [1, 1, 1, "#E4EAEF", "#9AA4AC"], [1, 2, 2, "#C7D1D9", "#6E7880"]] },
+    frost:   { file: "Mage", right: "staff_A", left: "spellbook_closed",
+               recolor: [[1, 0, 1, "#F2F6FA", "#C9D6E2"], [1, 1, 1, "#8FD8F0", "#4FA9D9"], [1, 2, 1, "#8FD8F0", "#4FA9D9"], [2, 1, 1, "#8FD8F0", "#4FA9D9"], [0, 5, 1, "#F2F6FA", "#C9D6E2"]] }
   };
   var MINION_MODEL = { file: "Skeleton_Minion", right: "Skeleton_Blade", scale: 0.9 };
   var PROP_FILES = { bushBig: "props/Bush_1_D_Color1.gltf",
@@ -3252,7 +3336,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var weaponNames = [];
     CHAR_LIST.forEach(function (c) { [MODEL[c].right, MODEL[c].left].forEach(function (w) { if (w && weaponNames.indexOf(w) < 0) weaponNames.push(w); }); });
     weaponNames.push("arrow_bow", "arrow_crossbow", MINION_MODEL.right);
-    var jobs = [load(KIT_DIR + "animations/teambattle_anims.glb").then(function (g) { g.animations.forEach(function (clip) { KIT.clips[clip.name] = clip; }); })];
+    var jobs = [load(KIT_DIR + "animations/teambattle_anims.glb?v=frost").then(function (g) { g.animations.forEach(function (clip) { KIT.clips[clip.name] = clip; }); })];
     weaponNames.forEach(function (w) { jobs.push(load(KIT_DIR + "props/" + w + ".gltf").then(function (g) { KIT.weapons[w] = lambertize(g.scene, w === MODEL.thrower.right); })); });
     CHAR_LIST.forEach(function (c) { jobs.push(load(KIT_DIR + "characters/" + MODEL[c].file + ".glb").then(function (g) { KIT.chars[c] = lambertize(g.scene); })); });
     jobs.push(load(KIT_DIR + "characters/" + MINION_MODEL.file + ".glb").then(function (g) { KIT.chars.minion = lambertize(g.scene); }));
@@ -3509,7 +3593,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (E.char === "warrior") return ["Melee_1H_Attack_Slice_Diagonal", berserk(E, t) ? 1.9 : 1.3];
     if (E.char === "knight") return E.ultUntil > E.atkAt ? ["Melee_1H_Attack_Chop", 1.6] : ["Melee_1H_Attack_Slice_Horizontal", 1.5];
     if (E.char === "ranger") return ["Ranged_Bow_Release", 3];
-    if (E.char === "mage" || E.char === "necro") return ["Ranged_Magic_Shoot", 1.8];
+    if (E.char === "mage" || E.char === "necro" || E.char === "frost") return ["Ranged_Magic_Shoot", 1.8];
     if (E.char === "sniper") return sniperShotClip(E);
     if (E.char === "thrower") return ["Throw", E.ultUntil > E.atkAt ? 1.6 : 2.2];
     if (E.char === "lancer") return ["Melee_2H_Attack_Stab", KIT.clips.Melee_2H_Attack_Stab.duration * 1000 / (E.ultUntil > E.atkAt ? 520 : 800)];
@@ -3536,11 +3620,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         playOnce(v, ac[0], ac[1], t, ac[2]);
      }
     }
-    if ((E.char === "mage" || E.char === "necro" || E.char === "blacksmith" || E.char === "priest") && E.ultUntil !== v.ultSeen) {
+    if ((E.char === "mage" || E.char === "necro" || E.char === "blacksmith" || E.char === "priest" || E.char === "frost") && E.ultUntil !== v.ultSeen) {
       v.ultSeen = E.ultUntil;
       if (E.alive && E.ultUntil > t) {
         if (E.char === "blacksmith") playOnce(v, "Melee_1H_Attack_Jump_Chop", JUMP_CHOP_LAND_SEC * 1000 / ULT.bsDelay, t);
         else if (E.char === "necro") playOnce(v, "Ranged_Magic_Summon", 3.2, t);
+        else if (E.char === "frost") {
+          playOnce(v, "Ranged_Magic_Spellcasting", KIT.clips.Ranged_Magic_Spellcasting.duration * 1000 / ULT.frBzDelay, t);
+          v.once.next = ["Ranged_Magic_Raise", 1.8];
+        }
         else playOnce(v, "Ranged_Magic_Spellcasting_Long", 2.6, t);
         v.once.soft = true;
       }
@@ -3601,6 +3689,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var orb = new THREE.Mesh(GEO.ball, basicMat("orb-" + d.team, C_FX[d.team], 0.9)); orb.scale.setScalar(10); g.add(orb);
       var core = new THREE.Mesh(GEO.ball, basicMat("orbCore", 0xffffff, 1)); core.scale.setScalar(5); g.add(core);
       g.userData.pulse = orb;
+    } else if (d.ownerCharacterType === "frost") {
+      var frostHalo = new THREE.Mesh(GEO.ball, glowMat("frostGlow", 0x8FD8F0, 0.4)); frostHalo.scale.setScalar(16); g.add(frostHalo);
+      var shard = new THREE.Mesh(GEO.ball, basicMat("frostOrb", 0xBFEFFF, 0.95)); shard.scale.set(12, 5, 5); g.add(shard);
+      var frostCore = new THREE.Mesh(GEO.ball, basicMat("orbCore", 0xffffff, 1)); frostCore.scale.setScalar(4); g.add(frostCore);
+      var frostTail = new THREE.Mesh(GEO.trail, glowMat("trail-frost", 0xBFEFFF, 0.45)); frostTail.position.x = -6; frostTail.scale.set(46, 2.6, 2.6); g.add(frostTail);
     } else if (d.ownerCharacterType === "necro") {
       var aura = new THREE.Mesh(GEO.ball, glowMat("necroGlow", 0x8E4DFF, 0.4)); aura.scale.setScalar(18); g.add(aura);
       var sphere = new THREE.Mesh(GEO.ball, basicMat("necroOrb", 0x7A3BE0, 0.95)); sphere.scale.setScalar(9); g.add(sphere);
@@ -3755,6 +3848,64 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     ud.ring.rotation.z = -nowMs / 250;
     ud.fill.scale.setScalar(ud.r * (0.9 + 0.1 * Math.sin(nowMs / 180)));
   }
+  var STORM_BANDS = 6, STORM_ARMS = 3, STORM_FLAKES = 14;
+  GEO.stormArc = [];
+  for (var stormBand = 0; stormBand < STORM_BANDS; stormBand++) {
+    var bandIn = 0.12 + stormBand * 0.145;
+    GEO.stormArc.push(new THREE.RingGeometry(bandIn, bandIn + 0.09, 16, 1, 0, Math.PI * (0.55 - stormBand * 0.04)));
+  }
+  var STORM_OPACITY = { fill: 0.12, arm: 0.35, edge: 0.7, team: 0.6, flake: 0.85 };
+  function makeStormVis(e) {
+    var g = new THREE.Group();
+    var mats = {
+      fill: new THREE.MeshBasicMaterial({ color: 0xBFEFFF, transparent: true, opacity: STORM_OPACITY.fill, depthWrite: false }),
+      arm: new THREE.MeshBasicMaterial({ color: 0x8FD8F0, transparent: true, opacity: STORM_OPACITY.arm, side: THREE.DoubleSide, depthWrite: false }),
+      edge: new THREE.MeshBasicMaterial({ color: 0xE8F8FF, transparent: true, opacity: STORM_OPACITY.edge, depthWrite: false }),
+      team: new THREE.MeshBasicMaterial({ color: C_FX[e.team], transparent: true, opacity: STORM_OPACITY.team, depthWrite: false }),
+      flake: new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: STORM_OPACITY.flake, depthWrite: false })
+    };
+    var fill = flatMesh(GEO.disc, mats.fill); fill.scale.setScalar(e.r); fill.position.y = 1.5; g.add(fill);
+    var edge = flatMesh(GEO.poolEdge, mats.edge); edge.scale.setScalar(e.r); edge.position.y = 1.9; g.add(edge);
+    var team = flatMesh(GEO.teamEdge, mats.team); team.scale.setScalar(e.r); team.position.y = 1.8; g.add(team);
+    var bands = [];
+    for (var i = 0; i < STORM_BANDS; i++) {
+      var band = new THREE.Group();
+      for (var k = 0; k < STORM_ARMS; k++) {
+        var arm = flatMesh(GEO.stormArc[i], mats.arm);
+        arm.rotation.z = k * Math.PI * 2 / STORM_ARMS - i * 0.5;
+        arm.scale.setScalar(e.r); arm.position.y = 2 + i * 0.1;
+        band.add(arm);
+      }
+      g.add(band);
+      bands.push({ g: band, spin: 1.9 - i * 0.24 });
+    }
+    var flakes = new THREE.Group(), flakeList = [];
+    for (var j = 0; j < STORM_FLAKES; j++) {
+      var f = new THREE.Mesh(GEO.ball, mats.flake), rr = e.r * (0.15 + 0.8 * ((j * 0.618) % 1)), a = j * 2.4;
+      f.scale.setScalar(3 + (j % 3));
+      f.position.set(Math.cos(a) * rr, 8, Math.sin(a) * rr);
+      flakes.add(f);
+      flakeList.push({ m: f, ph: j * 0.37 });
+    }
+    g.add(flakes);
+    g.userData = { mats: mats, bands: bands, flakes: flakes, flakeList: flakeList };
+    scene.add(g);
+    return g;
+  }
+  function dropStormVis(s) { if (!s.vis) return; scene.remove(s.vis); keys(s.vis.userData.mats).forEach(function (k) { s.vis.userData.mats[k].dispose(); }); s.vis = null; }
+  function renderStorm(s, t, dt) {
+    var e = s.e, start = e.createdAt + e.delay, end = start + e.dur;
+    if (t < start || t >= end) return;
+    if (!s.vis) s.vis = makeStormVis(e);
+    var ud = s.vis.userData, c = stormCenter(s);
+    var fade = clamp((t - start) / 300, 0.01, 1) * clamp((end - t) / 400, 0, 1);
+    s.vis.position.set(c.x, 0, c.y);
+    s.vis.scale.set(0.6 + 0.4 * clamp((t - start) / 300, 0, 1), 1, 0.6 + 0.4 * clamp((t - start) / 300, 0, 1));
+    ud.bands.forEach(function (b) { b.g.rotation.y -= dt * b.spin; });
+    ud.flakes.rotation.y -= dt * 1.2;
+    ud.flakeList.forEach(function (f) { f.m.position.y = 6 + 10 * ((t / 900 + f.ph) % 1); });
+    keys(ud.mats).forEach(function (k) { ud.mats[k].opacity = STORM_OPACITY[k] * fade; });
+  }
   function makeBottleVis() {
     var g = new THREE.Group();
     if (KIT.weapons.Potion_1) { var p = KIT.weapons.Potion_1.clone(); p.scale.setScalar(POTION_SCALE); p.position.y = -6; g.add(p); }
@@ -3874,7 +4025,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function smoke(x, y) { FX.push({ k: "smoke", x: x, y: y, c: 0xC8C8CD, t: Date.now(), life: ULT.asSmokeMs + 150 }); }
   function boom(x, y, r, team) { FX.push({ k: "boom", x: x, y: y, r: r, c: C_FX[team] || 0xffffff, t: Date.now(), life: 450 }); }
   function floatText(x, y, text, color) { FX.push({ k: "txt", x: x, y: y, s: text, c: color, t: Date.now(), life: 800 }); }
-  function hitColor(d) { if (d.ownerCharacterType === "necro") return "#B07CFF"; return d.ownerCharacterType === "mage" ? (d.team === "blue" ? "#B08CFF" : "#FF8CE0") : (d.team === "blue" ? "#5FA2FF" : "#FF6A5F"); }
+  function orbHitColor(d) { return d.ownerCharacterType === "necro" || d.ownerCharacterType === "frost" ? hitColor(d) : (d.team === "blue" ? "#5FA2FF" : "#FF6A5F"); }
+  function hitColor(d) {
+    if (d.ownerCharacterType === "necro") return "#B07CFF";
+    if (d.ownerCharacterType === "frost") return "#BFEFFF";
+    return d.ownerCharacterType === "mage" ? (d.team === "blue" ? "#B08CFF" : "#FF8CE0") : (d.team === "blue" ? "#5FA2FF" : "#FF6A5F"); }
   var BOLT_TOP = 520, BOLT_SEGS = 8, BOLT_JITTER = 110, BOLT_FLASH_OPACITY = 0.45;
   GEO.boltSeg = new THREE.CylinderGeometry(1, 1, 1, 5, 1, true);
   GEO.boltSeg.translate(0, 0.5, 0);
@@ -3949,7 +4104,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     keys(VIS).forEach(dropVis); keys(PRV).forEach(dropProjVis); keys(MLV).forEach(dropMelee);
     keys(MVIS).forEach(function (id) { dropMinionVis(id, false); });
     FX.forEach(dropFxMesh);
-    BURSTS.forEach(dropBurstVis); POOLS.forEach(dropPoolVis); LUNGES.forEach(dropLungeVis); HOLES.forEach(dropHoleVis);
+    BURSTS.forEach(dropBurstVis); POOLS.forEach(dropPoolVis); LUNGES.forEach(dropLungeVis); HOLES.forEach(dropHoleVis); STORMS.forEach(dropStormVis);
     aimGrp.visible = false; CAM.snap = true;
   }
 
@@ -4132,6 +4287,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (E.char === "thrower" && E.ultUntil > t) return 0x1E5212;
     if (hammerLeaping(E, t)) return 0x553000;
     if (E.char === "hitman" && E.ultUntil > t) return 0x660010;
+    var frostStacks = frostStacksNow(E, t);
+    if (frostStacks === 1) return 0x3A6E99;
+    if (frostStacks === 2) return 0x2E8FD9;
+    if (stunned(E, t) && E.frostStackAt && E.stunUntil - E.frostStackAt <= ULT.frFreezeMs + 20) return 0x6FB8E0;
     return 0x000000;
   }
   var LABELS = [];
@@ -4160,6 +4319,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }
       lastHp[id] = E.hp;
       if (E.knockedAt && E.knockedAt !== v.knockSeen) { v.knockSeen = E.knockedAt; hurt = true; }
+      if (E.frostStackAt !== v.frostSeen) {
+        if (v.frostSeen !== undefined && E.alive && t - E.frostStackAt < 600) {
+          if (E.frostStacks > 0) floatText(E.x, E.y - 14, "❄" + E.frostStacks, "#8FD8F0");
+          else { boom(E.x, E.y, 60, E.team); spark(E.x, E.y, "#FFFFFF", 2); }
+        }
+        v.frostSeen = E.frostStackAt;
+      }
       v.root.position.set(E.x, 0, E.y);
       v.body.position.y = leapHeight(E, t);
       v.yaw += angDiff(-faceAngle(E, t), v.yaw) * Math.min(1, dt * 14);
@@ -4221,7 +4387,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       projVisualHit(p, t);
       if (e > p.life && !p.sparked && p.dist < (p.d.range || 500) - 1) {
         p.sparked = true; var q = projAt(p, p.life);
-        var orbShot = p.d.ownerCharacterType === "mage" || p.d.ownerCharacterType === "necro";
+        var orbShot = p.d.ownerCharacterType === "mage" || p.d.ownerCharacterType === "necro" || p.d.ownerCharacterType === "frost";
         spark(q.x, q.y, orbShot ? hitColor(p.d) : "#FFFFFF", orbShot ? 1.8 : 1);
       }
       if (p.dead || p.gone || e > p.life) { if (g) dropProjVis(id); return; }
@@ -4262,6 +4428,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     });
     POOLS.forEach(function (pl) { renderPool(pl, t, nowMs); });
     HOLES.forEach(function (h) { renderHole(h, t, nowMs); });
+    STORMS.forEach(function (s) { renderStorm(s, t, dt); });
 
     stepFx(nowMs);
     updateAimGuide();
@@ -4541,6 +4708,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     stepPools(t);
     flushCC(t);
     stepHoles(t, dt);
+    stepStorms(t);
     stepLunges(t);
     stepWaves(t);
     pruneLocal(t);
@@ -4580,11 +4748,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       loadMapData: loadMapData, makeEnt: makeEnt, resolve: resolve, stepWorld: stepWorld,
       useUlt: useUlt, fireBasic: fireBasic, damage: damage, afflict: afflict, speedOf: speedOf, stunned: stunned,
       onShot: onShot, onMelee: onMelee, onEffect: onEffect, onHit: onHit,
+      hiddenFrom: hiddenFrom, visibleTo: visibleTo, storms: function () { return STORMS; }, stormCenter: stormCenter,
+      bushTiles: function () { return BUSH.map(function (b) { return b.tiles.map(function (tl) { return { x: tileX(tl[0]), y: tileY(tl[1]) }; }); }); },
       isIdle: function () { return !room; },
       begin: function (fakeRoom, players, bots, clockMs) {
         TEST_CLOCK = clockMs; room = fakeRoom; P = players; BOTS = bots; ME = null; R = {};
         G = { startAt: fakeRoom.startAt, endSent: false, playingSent: false, lastNet: 0, sent: {}, finalSent: false, beeped: -1 };
-        PR = {}; SHOTS = []; BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; MELEE = {}; FX = []; handled = {}; CC_PENDING = {};
+        PR = {}; SHOTS = []; BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; STORMS = []; MELEE = {}; FX = []; handled = {}; CC_PENDING = {};
       },
       ccPending: function () { return CC_PENDING; },
       setClock: function (ms) { TEST_CLOCK = ms; },
