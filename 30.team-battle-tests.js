@@ -300,6 +300,19 @@ function collectResults(api) {
     done(ok ? "pass" : "fail", "1초: " + seen[0] + "%, 3초: " + seen[1] + "%, 4.2초: " + seen[2] + "% 속도 (기대 60% → 80% → 100%)");
   });
 
+  run(STUN, "MVP 기절·둔화 기여는 이미 걸린 효과와 겹친 만큼 빼고 쌓이는가", function (done) {
+    var W = world("forest", [{ id: "kn", team: "red", char: "knight", x: 450, y: OPEN_Y.forest }]);
+    var E = W.ent("kn"), pend = api.ccPending();
+    api.afflict(E, { stunMs: 1200 }, "a"); api.afflict(E, { stunMs: 800 }, "b");
+    api.afflict(E, { slowMs: 4000, slowMul: 0.8 }, "c"); api.afflict(E, { slowMs: 2000, slowMul: 0.6 }, "d");
+    var a = pend.a || {}, c = pend.c || {}, d = pend.d || {}, bad = [];
+    if (Math.round(a.stun) !== 1200) bad.push("첫 기절 " + a.stun + "ms (기대 1200)");
+    if (pend.b) bad.push("겹친 기절에 기여가 생김 " + pend.b.stun + "ms");
+    if (Math.round(c.slow) !== 4000 || Math.round(c.weight) !== 800) bad.push("20% 4초 둔화 " + c.slow + "ms·가중 " + c.weight + " (기대 4000·800)");
+    if (Math.round(d.slow || 0) !== 0 || Math.round(d.weight) !== 400) bad.push("겹친 40% 2초 둔화 " + d.slow + "ms·가중 " + d.weight + " (기대 0·400)");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "기절 1.2초만, 둔화는 늘어난 강도만(가중 0.8초 + 0.4초) 기여로 셈");
+  });
+
   run(STUN, "기절 중에는 이동·기본 공격·궁극기를 못 쓰는가", function (done) {
     var W = world("forest", [{ id: "kn", team: "red", char: "knight", x: 450, y: OPEN_Y.forest, gauge: api.GAUGE_MAX }]);
     var E = W.ent("kn");

@@ -265,6 +265,12 @@
   @keyframes kfIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
   #hudCount .b { color: #6FA8FF; }
   #hudCount .r { color: #FF7A70; }
+  #hudMe { position: absolute; top: 48px; right: 8px; display: flex; gap: 12px; padding: 5px 12px; border-radius: 8px; pointer-events: none; white-space: nowrap;
+           background: rgba(14,20,17,.8); color: #F4F1E8; border: 1px solid rgba(255,255,255,.16); border-top: 2px solid #D97B4F; font-size: 12px; font-weight: 800; }
+  #hudMe span { display: flex; flex-direction: column; align-items: center; line-height: 1.1; color: #A3B0A6; }
+  #hudMe b { font-size: 18px; color: #F4F1E8; font-variant-numeric: tabular-nums; }
+  #hudMe b.pop { animation: hudMePop .5s ease-out; }
+  @keyframes hudMePop { 0% { transform: scale(1); color: #F4F1E8; } 25% { transform: scale(1.6); color: #D97B4F; } 100% { transform: scale(1); color: #F4F1E8; } }
   #btnLeaveGame { position: absolute; top: 8px; right: 8px; height: 34px; padding: 0 12px; font-size: 14px; font-weight: 800; border-radius: 6px; border: 1px solid rgba(255,138,138,.6); background: rgba(14,20,17,.8); color: #FF9A9A; }
 
   .actBtn { position: absolute; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column; font-weight: 800; color: #fff; touch-action: none; -webkit-user-select: none; user-select: none; overflow: hidden; }
@@ -281,7 +287,8 @@
   @keyframes glow { from { box-shadow: 0 0 6px 2px rgba(255,120,80,.6); } to { box-shadow: 0 0 22px 8px rgba(255,90,60,.95); } }
   #deadMsg { position: absolute; left: 50%; bottom: 30%; transform: translateX(-50%); background: rgba(27,43,32,.82); color: #fff; font-size: 20px; font-weight: 800; padding: 10px 20px; border-radius: 8px; pointer-events: none; white-space: nowrap; }
   #protBadge { position: absolute; left: 50%; bottom: 30%; transform: translateX(-50%); background: rgba(47,125,79,.9); color: #fff; font-size: 17px; font-weight: 800; padding: 6px 14px; border-radius: 10px; pointer-events: none; white-space: nowrap; }
-  .board { width: 100%; border-collapse: collapse; margin: 0 0 16px; font-size: 15px; }
+  .boardWrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 0 16px; }
+  .board { width: 100%; border-collapse: collapse; font-size: 15px; white-space: nowrap; }
   .board th { font-size: 12px; color: #A3B0A6; font-weight: 700; padding: 4px; border-bottom: 2px solid rgba(255,255,255,.16); }
   .board td { padding: 6px 4px; font-weight: 800; color: #EEF2EE; border-bottom: 1px solid rgba(255,255,255,.08); font-variant-numeric: tabular-nums; }
   .board td.nm, .board th.nm { text-align: left; }
@@ -295,7 +302,7 @@
   #endOv.blue { background: rgba(47,111,214,.62); }
   #endOv.red { background: rgba(214,69,61,.62); }
   #endOv.draw { background: rgba(60,60,60,.62); }
-  .endBox { background: rgba(16,24,19,.94); color: #F4F1E8; border-radius: 12px; padding: 24px 22px; width: 100%; max-width: 620px; max-height: 100%; overflow-y: auto; text-align: center; border: 2px solid rgba(255,255,255,.2); box-shadow: 0 12px 40px rgba(0,0,0,.45); }
+  .endBox { background: rgba(16,24,19,.94); color: #F4F1E8; border-radius: 12px; padding: 24px 22px; width: 100%; max-width: 780px; max-height: 100%; overflow-y: auto; text-align: center; border: 2px solid rgba(255,255,255,.2); box-shadow: 0 12px 40px rgba(0,0,0,.45); }
   #endTitle { font-size: 38px; font-weight: 800; margin-bottom: 16px; }
   #endReason { margin: -8px 0 14px; font-size: 16px; font-weight: 800; color: #F2D06B; }
   .scoreRow { display: flex; gap: 10px; margin-bottom: 16px; }
@@ -399,6 +406,8 @@
     .hdSide b { font-size: 17px; }
     #hudMid { padding: 0 6px; }
     #btnLeaveGame { padding: 0 8px; font-size: 13px; }
+    #hudMe { gap: 8px; padding: 3px 8px; font-size: 11px; }
+    #hudMe b { font-size: 15px; }
     .dfTitle { font-size: 19px; }
     .dfTimer { min-width: 56px; font-size: 36px; }
     .dfSteps { gap: 4px; }
@@ -524,6 +533,7 @@
   </div>
   <div id="killFeed"></div>
   <button id="btnLeaveGame" type="button">방 나가기</button>
+  <div id="hudMe" hidden><span>킬<b id="hudMeK">0</b></span><span>데스<b id="hudMeD">0</b></span><span>피해량<b id="hudMeDmg">0</b></span></div>
   <div id="specL" class="specPanel blue" hidden></div>
   <div id="specR" class="specPanel red" hidden></div>
   <div id="specCode" hidden></div>
@@ -537,7 +547,7 @@
       <div id="endTitle"></div>
       <div id="endReason" hidden></div>
       <div class="scoreRow"><div class="sb">블루팀 킬<b id="endBlue">0</b></div><div class="sr">레드팀 킬<b id="endRed">0</b></div></div>
-      <table class="board"><thead><tr><th>팀</th><th class="nm">닉네임</th><th>처치</th><th>쓰러짐</th><th>입힌 피해</th><th>회복</th><th>환산점수</th></tr></thead><tbody id="boardBody"></tbody></table>
+      <div class="boardWrap"><table class="board"><thead><tr><th>팀</th><th class="nm">닉네임</th><th>처치</th><th>쓰러짐</th><th>입힌 피해</th><th>회복</th><th>막은 피해</th><th>기절</th><th>둔화</th><th>환산점수</th></tr></thead><tbody id="boardBody"></tbody></table></div>
       <div class="endBtns"><button id="btnAgain" class="primary" type="button">다시하기</button><button id="btnLeaveEnd" type="button">방 나가기</button></div>
       <div id="endMvp" class="mvpBox"></div>
     </div>
@@ -577,7 +587,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var NET_MS = 143;
   var CHARS = {
     warrior: { name: "광전사", role: "fighter", icon: "🪓", hp: 270, speed: 230, ultSpeed: 300, cd: 850, dmg: 45, range: 110, arc: Math.PI * 0.55, ultName: "광폭화", heals: true },
-    knight:  { name: "기사", role: "fighter", icon: "🛡️", hp: 400, speed: 220, cd: 1000, dmg: 30, range: 110, arc: Math.PI * 0.7, ultName: "방어태세" },
+    knight:  { name: "기사", role: "fighter", icon: "🛡️", hp: 400, speed: 220, cd: 1000, dmg: 30, range: 110, arc: Math.PI * 0.7, ultName: "방어태세", blocks: true },
     ranger:  { name: "궁수", role: "shooter", icon: "🏹", hp: 100, speed: 250, cd: 400, dmg: 10, range: KEY * 6, pSpeed: 950, pr: 6, shots: 2, gap: 70, ultName: "난사", ultAim: true },
     mage:    { name: "주술사", role: "caster", icon: "🔮", hp: 120, speed: 250, cd: 500, dmg: 11, range: 350, pSpeed: 700, pr: 9, ultName: "메테오", ultAim: true },
     rogue:   { name: "은신자", role: "assassin", icon: "🗡️", hp: 100, speed: 300, ultSpeed: 420, cd: 600, dmg: 30, range: 110, arc: Math.PI * 0.6, hits: 2, hitGap: 160, throwDmg: 20, throwRange: 300, pSpeed: 900, pr: 8, ultName: "은신" },
@@ -1558,6 +1568,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var STATE_TIMES_AT = 12;
   var STATE_EXTRA_AT = STATE_TIMES_AT + STATE_TIMES.length;
   function oneDecimal(v) { return Math.round((+v || 0) * 10) / 10; }
+  function twoDecimals(v) { return Math.round((+v || 0) * 100) / 100; }
   function relTime(t) { return t ? Math.round(t - room.startAt) : ""; }
   function absTime(v) { return v === "" || v == null ? 0 : room.startAt + (+v || 0); }
   function packMinions(E) {
@@ -1576,7 +1587,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     return [Math.round(E.x), Math.round(E.y), angDeg(E.angle), E.mv ? 1 : 0, Math.ceil(E.hp), E.alive ? 1 : 0,
       oneDecimal(E.gauge), oneDecimal(E.dmg), E.deaths || 0, E.kills || 0, Math.round(E.heal || 0), E.skillDur || ""]
       .concat(STATE_TIMES.map(function (k) { return relTime(E[k]); }))
-      .concat([E.slowUntil ? Math.round(slowMulAt(E, now()) * 100) : "", packMinions(E)]).join(",");
+      .concat([E.slowUntil ? Math.round(slowMulAt(E, now()) * 100) : "", packMinions(E),
+               oneDecimal(E.stunDealt), oneDecimal(E.slowDealt), twoDecimals(E.slowWeight), Math.round(E.blocked || 0)]).join(",");
   }
   function stateOf(d) {
     var s = d && d.slot ? ST[stKey(d.team, d.slot)] : null;
@@ -1588,6 +1600,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         STATE_TIMES.forEach(function (k, i) { o[k] = absTime(f[STATE_TIMES_AT + i]); });
         o.slowMul = f[STATE_EXTRA_AT] ? +f[STATE_EXTRA_AT] / 100 : 1;
         o.minions = unpackMinions(f[STATE_EXTRA_AT + 1]);
+        o.stunDealt = +f[STATE_EXTRA_AT + 2] || 0; o.slowDealt = +f[STATE_EXTRA_AT + 3] || 0;
+        o.slowWeight = +f[STATE_EXTRA_AT + 4] || 0; o.blocked = +f[STATE_EXTRA_AT + 5] || 0;
       }
       return o;
     }
@@ -1613,6 +1627,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
              cdUntil: 0, cdDur: 0, atkAt: 0, ultUntil: 0, buffUntil: 0, stealthUntil: s.stealthUntil || 0, regenUntil: 0,
              skillUntil: s.skillUntil || 0, skillDur: s.skillDur || 0,
              kills: s.kills || 0, heal: s.heal || 0, protectUntil: s.protectUntil || 0,
+             stunDealt: s.stunDealt || 0, slowDealt: s.slowDealt || 0, slowWeight: s.slowWeight || 0, blocked: s.blocked || 0,
              slowUntil: s.slowUntil || 0, slowMul: s.slowMul || 1, stunUntil: s.stunUntil || 0,
              summonAt: s.summonAt || 0, minions: [],
              burst: null, volley: null, mv: false, pending: null };
@@ -1623,7 +1638,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     clear3d();
     G = { startAt: room.startAt, endSent: false, playingSent: false, lastNet: 0, sent: {}, finalSent: false, beeped: -1 };
     ME = isSpec() ? null : makeEnt(myId, P[myId]);
-    BOTS = {}; R = {}; FX = []; BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; handled = {};
+    BOTS = {}; R = {}; FX = []; CC_PENDING = {}; hudMeShown = { k: -1, d: -1, dmg: -1 }; BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; handled = {};
     lastHp = {};
     show($("endOv"), false);
   }
@@ -1656,6 +1671,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       r.mv = pos.mv; r.nickname = d.nickname; r.isAI = !!d.isAI;
       if (!pos.full) return;
       r.deaths = pos.deaths; r.diedAt = pos.diedAt; r.kills = pos.kills; r.heal = pos.heal; r.protectUntil = pos.protectUntil;
+      r.stunDealt = pos.stunDealt; r.slowDealt = pos.slowDealt; r.slowWeight = pos.slowWeight; r.blocked = pos.blocked;
       r.hp = pos.hp; r.alive = pos.alive; r.gauge = pos.gauge; r.dmg = pos.dmg;
       r.atkAt = pos.atkAt; r.ultUntil = pos.ultUntil; r.buffUntil = pos.buffUntil;
       r.regenUntil = pos.regenUntil; r.skillUntil = pos.skillUntil; r.skillDur = pos.skillDur;
@@ -1802,6 +1818,50 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     E.slows.forEach(function (s) { if (s.until > t && s.mul < mul) mul = s.mul; });
     return mul;
   }
+  function activeSlows(T, t) {
+    var list = (T.slows || []).filter(function (s) { return s.until > t; });
+    if (!T.slows && T.slowUntil > t) list.push({ mul: T.slowMul || 1, until: T.slowUntil });
+    return list;
+  }
+  function slowLoadMs(list, t) {
+    var ends = list.map(function (s) { return s.until; }).sort(function (a, b) { return a - b; });
+    var load = 0, from = t;
+    ends.forEach(function (end) {
+      if (end <= from) return;
+      var mul = 1;
+      list.forEach(function (s) { if (s.until >= end && s.mul < mul) mul = s.mul; });
+      load += (end - from) * (1 - mul);
+      from = end;
+    });
+    return load;
+  }
+  function slowEndOf(list, t) { return list.reduce(function (m, s) { return Math.max(m, s.until); }, t); }
+  var CC_PENDING = {}, CC_FLUSH_MS = 500;
+  function creditCC(owner, stunMs, slowMs, slowWeightMs) {
+    if (!owner || !(stunMs > 0 || slowMs > 0 || slowWeightMs > 0)) return;
+    var pend = CC_PENDING[owner] || (CC_PENDING[owner] = { stun: 0, slow: 0, weight: 0, since: now() });
+    pend.stun += stunMs || 0; pend.slow += slowMs || 0; pend.weight += slowWeightMs || 0;
+  }
+  function attachCC(owner, h) {
+    var pend = CC_PENDING[owner]; if (!pend) return h;
+    delete CC_PENDING[owner];
+    if (pend.stun) h.cs = Math.round(pend.stun);
+    if (pend.slow) h.ss = Math.round(pend.slow);
+    if (pend.weight) h.sw = Math.round(pend.weight);
+    return h;
+  }
+  function flushCC(t) {
+    keys(CC_PENDING).forEach(function (owner) {
+      if (t - CC_PENDING[owner].since < CC_FLUSH_MS || !room) return;
+      room.ref.child("hits/" + owner).push(attachCC(owner, { d: 0, b: 0, t: now() }));
+    });
+  }
+  function addSlowCredited(T, mul, ms, t, owner) {
+    var before = activeSlows(T, t), loadBefore = slowLoadMs(before, t), endBefore = slowEndOf(before, t);
+    addSlow(T, mul, ms, t);
+    var after = activeSlows(T, t);
+    creditCC(owner, 0, slowEndOf(after, t) - endBefore, slowLoadMs(after, t) - loadBefore);
+  }
   function addSlow(T, mul, ms, t) {
     var list = (T.slows || []).filter(function (s) { return s.until > t; }), same = null;
     list.forEach(function (s) { if (s.mul === mul) same = s; });
@@ -1819,12 +1879,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (E.char === "rogue" && E.stealthUntil > t) sp = c.ultSpeed;
     return sp * slowMulAt(E, t);
   }
-  function afflict(T, fx) {
+  function afflict(T, fx, owner) {
     if (!fx || !T.alive || T.minion) return;
     var t = now();
     if (protectedNow(T, t)) return;
-    if (fx.slowMs) addSlow(T, fx.slowMul || 0.6, fx.slowMs, t);
-    if (fx.stunMs) { T.stunUntil = Math.max(T.stunUntil || 0, t + fx.stunMs); T.pending = null; T.burst = null; T.volley = null; T.slash = null; }
+    if (fx.slowMs) addSlowCredited(T, fx.slowMul || 0.6, fx.slowMs, t, owner);
+    if (fx.stunMs) {
+      creditCC(owner, Math.max(0, t + fx.stunMs - Math.max(T.stunUntil || 0, t)), 0, 0);
+      T.stunUntil = Math.max(T.stunUntil || 0, t + fx.stunMs); T.pending = null; T.burst = null; T.volley = null; T.slash = null; }
     G.forceNet = true;
   }
   function berserk(E, t) { return E.char === "warrior" && E.buffUntil > (t || now()); }
@@ -1987,11 +2049,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function damage(T, amount, owner, basic, ultKey, fx, gaugeGain) {
     if (T.minion) { damageMinion(T, amount, owner, basic, ultKey); return; }
     if (protectedNow(T)) return;
-    if (T.char === "knight" && T.buffUntil > now()) amount = Math.round(amount * ULT.tkDef);
+    if (T.char === "knight" && T.buffUntil > now()) {
+      var unguarded = amount;
+      amount = Math.round(amount * ULT.tkDef);
+      T.blocked = (T.blocked || 0) + Math.min(unguarded, T.hp) - Math.min(amount, T.hp);
+    }
     var dm = Math.min(amount, T.hp), killed = false;
     T.hp -= dm; if (!gaugeLocked(T)) T.gauge = Math.min(GAUGE_MAX, T.gauge + roleOf(T.char).gaugeOnHurt);
     if (T.hp <= 0) { killed = true; T.hp = 0; T.alive = false; T.deaths++; T.diedAt = now(); T.burst = null; T.volley = null; T.slash = null; T.regenUntil = 0; T.skillUntil = 0; T.slowUntil = 0; T.slows = null; T.stunUntil = 0; T.lance = null; if (T === ME) { sfx("down"); aim.id = null; joy.id = null; } }
-    else { if (T === ME) sfx("hit"); afflict(T, fx); }
+    else { if (T === ME) sfx("hit"); afflict(T, fx, owner); }
     pushHit(owner, dm, basic, ultKey, killed, gaugeGain);
     if (killed) room.ref.child("kills").push({ k: owner, v: T.id, t: now() });
     if (T === ME || T.bot) G.forceNet = true;
@@ -2032,7 +2098,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (ultKey) h.u = ultKey;
     if (typeof basic === "number") h.s = basic;
     if (killed) h.k = 1;
-    room.ref.child("hits/" + owner).push(h);
+    room.ref.child("hits/" + owner).push(attachCC(owner, h));
   }
   var hitSubs = {};
   function listenHits(ownerId) {
@@ -2050,6 +2116,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (h.d) owner.dmg += h.d;
       if (h.k) owner.kills++;
       if (h.hl) owner.heal += h.hl;
+      if (h.cs) owner.stunDealt = (owner.stunDealt || 0) + h.cs / 1000;
+      if (h.ss) owner.slowDealt = (owner.slowDealt || 0) + h.ss / 1000;
+      if (h.sw) owner.slowWeight = (owner.slowWeight || 0) + h.sw / 1000;
       if (h.u === "volley" && owner.char === "ranger") owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.mkRefund);
       if (h.tp && owner.char === "hitman" && owner.alive) {
         owner.x = h.tp.x; owner.y = h.tp.y; owner.dash = null; resolve(owner);
@@ -2077,11 +2146,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     BURSTS.push({ e: e, vis: null });
   }
   function poolStart(e) { return e.createdAt + e.delay; }
-  function slowInFog(T, t) {
+  function slowInFog(T, t, owner) {
     var fresh = (T.slows || []).some(function (s) { return s.mul === ULT.fgSlowMul && s.until - t > ULT.fgSlowMs / 2; });
     if (fresh) return;
     var was = slowed(T, t);
-    addSlow(T, ULT.fgSlowMul, ULT.fgSlowMs, t);
+    addSlowCredited(T, ULT.fgSlowMul, ULT.fgSlowMs, t, owner);
     if (!was) G.forceNet = true;
   }
   function healInFog(T, e, t) {
@@ -2111,7 +2180,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (!T.alive || hyp(T.x - e.x, T.y - e.y) > e.r + BODY_R * 0.5) return;
         if (T.team === e.team) { if (e.u && !T.minion) healInFog(T, e, t); return; }
         if (protectedNow(T, t)) return;
-        if (e.u && !T.minion) slowInFog(T, t);
+        if (e.u && !T.minion) slowInFog(T, t, e.owner);
         var key = e.owner + ">" + T.id;
         if (POOL_HIT[key] && t - POOL_HIT[key] < ULT.plTick) return;
         POOL_HIT[key] = t;
@@ -2156,7 +2225,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (t < e.createdAt + e.delay) return true;
       if (room.status === "playing") localTargets().forEach(function (T) {
         if (!T.alive || hyp(T.x - e.x, T.y - e.y) > e.r + BODY_R) return;
-        if (T.team !== e.team) { damage(T, e.dmg, e.owner, false, e.createdAt); afflict(T, { stunMs: ULT.mbStunMs }); }
+        if (T.team !== e.team) damage(T, e.dmg, e.owner, false, e.createdAt, { stunMs: ULT.mbStunMs });
       });
       boom(e.x, e.y, e.r, e.team);
       if (!ME || hyp(e.x - ME.x, e.y - ME.y) < 700) sfx("boom");
@@ -2224,7 +2293,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (T.team === d.team || !T.alive || !inStrike(T, d)) return;
     var dx = T.x - d.x, dy = T.y - d.y;
     if (protectedNow(T)) return;
-    if (d.slam && !d.dmg) afflict(T, d.fx);
+    if (d.slam && !d.dmg) afflict(T, d.fx, d.owner);
     else damage(T, d.dmg, d.owner, !d.m && !d.u && d.createdAt, d.hammer ? d.createdAt : null, d.fx);
     if (d.kb && T.alive) {
       var dd = hyp(dx, dy) || 1;
@@ -2719,7 +2788,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (!isFairHumanMatch(r.mode, r.roster, ps)) return;
     var rows = keys(r.roster).map(function (id) {
       var e = ent(id) || stateOf(ps[id]);
-      return { c: r.roster[id].c, win: r.winner === r.roster[id].team, dmg: +e.dmg || 0, heal: +e.heal || 0 };
+      return { c: r.roster[id].c, win: r.winner === r.roster[id].team, dmg: +e.dmg || 0, heal: +e.heal || 0,
+               blocked: +e.blocked || 0, stun: +e.stunDealt || 0, slow: +e.slowDealt || 0 };
     });
     db.ref(STATS_PATH).transaction(function (cur) {
       cur = cur || {};
@@ -2728,6 +2798,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var st = cur[w.c] || {}, n = +st.picks || 0;
         st.dmg = r1(((+st.dmg || 0) * n + w.dmg) / (n + 1));
         st.heal = r1(((+st.heal || 0) * n + w.heal) / (n + 1));
+        var ccN = +st.ccPicks || 0;
+        st.block = r1(((+st.block || 0) * ccN + w.blocked) / (ccN + 1));
+        st.stun = r1(((+st.stun || 0) * ccN + w.stun) / (ccN + 1));
+        st.slow = r1(((+st.slow || 0) * ccN + w.slow) / (ccN + 1));
+        st.ccPicks = ccN + 1;
         st.picks = n + 1;
         st.wins = (+st.wins || 0) + (w.win ? 1 : 0);
         cur[w.c] = st;
@@ -4297,12 +4372,19 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
             '<td class="nm">' + (d.isAI ? "🤖 " : "") + esc(d.nickname) + "<small>" + CHARS[E.char].name + "</small></td>" +
             "<td>" + E.kills + "</td><td>" + E.deaths + "</td><td>" + Math.round(E.dmg) + "</td>" +
             "<td>" + (CHARS[E.char].heals ? Math.round(E.heal) : "-") + "</td>" +
+            "<td>" + (CHARS[E.char].blocks ? Math.round(E.blocked || 0) : "-") + "</td>" +
+            "<td>" + secText(E.stunDealt) + "</td><td>" + secText(E.slowDealt) + "</td>" +
             '<td class="sc">' + mvpScore(E) + "</td></tr>";
         });
     });
     return rows;
   }
-  function mvpScore(E) { return E.kills * 100 + Math.round(E.dmg) + Math.round(E.heal || 0) - E.deaths * 100; }
+  var MVP_STUN_PER_SEC = 60, MVP_SLOW_PER_SEC = 40;
+  function secText(v) { return v > 0 ? oneDecimal(v) + "초" : "-"; }
+  function mvpScore(E) {
+    return E.kills * 100 + Math.round(E.dmg) + Math.round(E.heal || 0) + Math.round(E.blocked || 0)
+      + Math.round(oneDecimal(E.stunDealt) * MVP_STUN_PER_SEC) + Math.round(twoDecimals(E.slowWeight) * MVP_SLOW_PER_SEC) - E.deaths * 100;
+  }
   function mvpHtml() {
     var best = [];
     participants().forEach(function (id) {
@@ -4311,13 +4393,26 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (!best.length || row.score > best[0].score || (row.score === best[0].score && row.dmg > best[0].dmg)) best = [row];
       else if (row.score === best[0].score && row.dmg === best[0].dmg) best.push(row);
     });
-    var rule = '<div class="mvpRule">환산점수 = 처치×100 + 입힌 피해 + 회복 − 쓰러짐×100 (0킬은 제외)</div>';
+    var rule = '<div class="mvpRule">환산점수 = 처치×100 + 입힌 피해 + 회복 + 막은 피해 + 기절 1초×' + MVP_STUN_PER_SEC +
+               ' + 둔화 1초×둔화율×' + MVP_SLOW_PER_SEC + ' − 쓰러짐×100 (0킬은 제외)<br>기절·둔화는 이미 걸린 효과와 겹치지 않고 새로 늘어난 시간만 셉니다.</div>';
     if (!best.length) return '<div class="mvpLab">MVP</div><div class="mvpNone">MVP 없음</div>' + rule;
     return '<div class="mvpLab">🏆 MVP' + (best.length > 1 ? " (공동)" : "") + "</div>" + best.map(function (b) {
       var d = P[b.id] || {};
       return '<div class="mvpName"><span class="' + (b.E.team === "blue" ? "b" : "r") + '">' + (d.isAI ? "🤖 " : "") + esc(d.nickname || b.E.nickname) + "</span><small>" +
              CHARS[b.E.char].name + " · " + b.score + "점</small></div>";
     }).join("") + rule;
+  }
+  var hudMeShown = { k: -1, d: -1, dmg: -1 };
+  function updateMyHud() {
+    var dmg = Math.round(ME.dmg);
+    if (ME.kills !== hudMeShown.k) {
+      var kEl = $("hudMeK");
+      setText(kEl, String(ME.kills));
+      if (hudMeShown.k >= 0 && ME.kills > hudMeShown.k) { kEl.classList.remove("pop"); void kEl.offsetWidth; kEl.classList.add("pop"); }
+      hudMeShown.k = ME.kills;
+    }
+    if (ME.deaths !== hudMeShown.d) { setText($("hudMeD"), String(ME.deaths)); hudMeShown.d = ME.deaths; }
+    if (dmg !== hudMeShown.dmg) { setText($("hudMeDmg"), String(dmg)); hudMeShown.dmg = dmg; }
   }
   var FINAL_COUNT_MS = 10000, lastCountSec = 0;
   function finalCountdown(el, left) {
@@ -4341,7 +4436,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     setHtml($("hudCount"), '<span class="b">🔵 ' + s.blueAlive + '</span> vs <span class="r">🔴 ' + s.redAlive + "</span>");
     setText($("hudKillB"), String(s.blueKills)); setText($("hudKillR"), String(s.redKills));
     var spec = !ME;
-    show($("hudTop"), !spec); show($("specL"), spec); show($("specR"), spec); show($("specCode"), spec);
+    show($("hudTop"), !spec); show($("hudMe"), !spec);
+    if (!spec) updateMyHud(); show($("specL"), spec); show($("specR"), spec); show($("specCode"), spec);
     if (spec) setText($("specCode"), "방 코드 " + room.code);
     if (spec) {
       var low = left < 15000 && st === "playing" ? ' class="low"' : "";
@@ -4414,6 +4510,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     stepShots(t);
     stepBursts(t);
     stepPools(t);
+    flushCC(t);
     stepHoles(t, dt);
     stepLunges(t);
     stepWaves(t);
@@ -4458,8 +4555,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       begin: function (fakeRoom, players, bots, clockMs) {
         TEST_CLOCK = clockMs; room = fakeRoom; P = players; BOTS = bots; ME = null; R = {};
         G = { startAt: fakeRoom.startAt, endSent: false, playingSent: false, lastNet: 0, sent: {}, finalSent: false, beeped: -1 };
-        PR = {}; SHOTS = []; BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; MELEE = {}; FX = []; handled = {};
+        PR = {}; SHOTS = []; BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; MELEE = {}; FX = []; handled = {}; CC_PENDING = {};
       },
+      ccPending: function () { return CC_PENDING; },
       setClock: function (ms) { TEST_CLOCK = ms; },
       currentMap: function () { return ARENA; },
       finish: function (mapId) { TEST_CLOCK = null; room = null; resetLocal(); loadMapData(mapId); }

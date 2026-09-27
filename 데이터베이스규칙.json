@@ -25,6 +25,10 @@
           "wins": { ".validate": "newData.isNumber() && newData.val() >= 0" },
           "dmg": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5000" },
           "heal": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5000" },
+          "block": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5000" },
+          "stun": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 600" },
+          "slow": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 600" },
+          "ccPicks": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= newData.parent().child('picks').val()" },
           "$other": { ".validate": false }
         }
       }
