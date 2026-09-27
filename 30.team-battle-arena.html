@@ -192,6 +192,21 @@
   .secTitle { font-size: 17px; font-weight: 800; margin-bottom: 10px; }
   .charHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
   .charHead .mini { flex: 0 0 auto; }
+  .charBtns { flex: 0 0 auto; display: flex; gap: 6px; }
+  #btnZoomChars.on { border-color: #D97B4F; color: #F4F1E8; background: rgba(217,123,79,.28); }
+  #charCardBox.zoomed { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 40; width: auto !important; max-width: none; margin: 0; border: 0; border-radius: 0;
+    padding: 0 max(16px, 3vw) 24px; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+    background: rgba(10, 16, 12, .97); -webkit-backdrop-filter: none; backdrop-filter: none; animation: charZoomIn .22s ease-out; }
+  #charCardBox.zoomed .charHead { position: sticky; top: 0; z-index: 3; align-items: center; min-height: 50px; margin: 0 0 8px; padding: 8px 0 8px 118px; background: rgba(10, 16, 12, .97); border-bottom: 1px solid var(--sg-line-mid); }
+  #charCardBox.zoomed .roleCards { flex-wrap: wrap; overflow: visible; }
+  #charCardBox.zoomed .roleRow { padding-bottom: 6px; border-bottom: 1px solid var(--sg-line); }
+  #charCardBox.zoomed .charCard { transition: none; }
+  .liteMotion #charCardBox.zoomed { animation-name: charZoomFade; }
+  .liteMotion #charCardBox.zoomed .cardIn { transition-duration: .22s; }
+  @media (max-width: 640px) { #charCardBox.zoomed .charHead .secHint { display: none; } }
+  @keyframes charZoomIn { from { opacity: 0; transform: scale(.97); } to { opacity: 1; transform: none; } }
+  @keyframes charZoomFade { from { opacity: 0; } to { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { #charCardBox.zoomed { animation: none; } #charCardBox.zoomed .cardIn { transition: none; } }
   .keys { display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; font-size: 16px; line-height: 1.5; align-items: center; color: var(--sg-ink-mid); }
   .keys > span:nth-child(odd) { white-space: nowrap; }
   .keys b { color: #F4F1E8; }
@@ -468,7 +483,7 @@
     </div>
   </div>
   <div id="charCardBox" class="card charCol">
-    <div class="secTitle charHead"><span>캐릭터<span id="charHint" class="secHint">선택한 캐릭터를 한 번 더 누르면 자세한 설명이 나옵니다.</span></span><button id="btnFlipAll" class="mini" type="button">모든 카드 뒤집기</button></div>
+    <div class="secTitle charHead"><span>캐릭터<span id="charHint" class="secHint">선택한 캐릭터를 한 번 더 누르면 자세한 설명이 나옵니다.</span></span><span class="charBtns"><button id="btnZoomChars" class="mini" type="button">확대</button><button id="btnFlipAll" class="mini" type="button">모든 카드 뒤집기</button></span></div>
     <div class="chars" id="chars"></div>
   </div>
   </div>
@@ -1040,6 +1055,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     screenNow = k;
     show($("scrStart"), k === "start"); show($("scrLobby"), k === "lobby"); show($("scrDraft"), k === "draft"); show($("scrGame"), k === "game");
     if (k === "game") resize();
+    if (k !== "lobby") setCharZoom(false);
   }
 
   var lobbyQueued = false;
@@ -1240,6 +1256,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     show($("btnSpec"), !imSpec); $("btnSpec").disabled = !canMoveTo("spec");
     var cup = mode === "cup";
     show($("charCardBox"), cup || !imSpec);
+    if (!cup && imSpec) setCharZoom(false);
     setText($("charHint"), cup ? "대회모드에서는 게임 시작 후 캐릭터를 골라요. 카드를 누르면 자세한 설명이 나옵니다." : "선택한 캐릭터를 한 번 더 누르면 자세한 설명이 나옵니다.");
     show($("btnSwapTeams"), cup && isHost() && room.status === "lobby");
 
@@ -1288,6 +1305,21 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (me) $("chars")._h = cardsHtml(me, room && room.mode === "cup");
     fitCharCol($("charCardBox"));
   };
+  var LITE_MOTION = !!(window.matchMedia && matchMedia("(pointer: coarse)").matches);
+  if (LITE_MOTION) document.documentElement.classList.add("liteMotion");
+  function setCharZoom(on) {
+    var box = $("charCardBox"), btn = $("btnZoomChars");
+    if (box.classList.contains("zoomed") === on) return;
+    box.classList.toggle("zoomed", on);
+    btn.classList.toggle("on", on);
+    btn.textContent = on ? "접기" : "확대";
+    box.scrollTop = 0;
+    if (!on) fitCharCol(box);
+  }
+  $("btnZoomChars").onclick = function () { setCharZoom(!$("charCardBox").classList.contains("zoomed")); };
+  window.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && $("charCardBox").classList.contains("zoomed")) setCharZoom(false);
+  });
   function freeAiName(ps) {
     var used = keys(ps).map(function (id) { return ps[id] && ps[id].nickname; }), n = 1;
     while (used.indexOf("AI" + n) >= 0) n++;
