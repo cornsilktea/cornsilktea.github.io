@@ -600,7 +600,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               bsDelay: 700, bsR: 150, bsDmg: 60, bsStunMs: 800, bsCast: 450, bsMin: 60, bsHop: 45,
               bhR: 150, bhDur: 3000, bhDelay: 500, bhPull: 220, bhCast: 380, bhMin: 60,
               exRange: 500, exSpeed: 1300, exPr: 4, exDmg: 10, exStunMs: 1000,
-              gdR: 200, gdKb: 150 };
+              gdR: 200, gdKb: 150, gdKbMs: 300 };
   var SNIPER_KEEP = KEY * 5;
   function isMelee(c) { return !!(CHARS[c].arc || CHARS[c].width || CHARS[c].dashWidth); }
   var STEALTH_ALPHA = 0.4;
@@ -1762,7 +1762,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function hammerLeaping(E, t) { return E.char === "blacksmith" && E.ultUntil > (t || now()); }
   function speedOf(E) {
     var t = now(), c = CHARS[E.char], sp = c.speed;
-    if (stunned(E, t) || lancerWinding(E, t) || hammerLeaping(E, t) || E.dash) return 0;
+    if (stunned(E, t) || lancerWinding(E, t) || hammerLeaping(E, t) || E.dash || shoved(E)) return 0;
     if (E.char === "warrior" && E.buffUntil > t) sp = c.ultSpeed;
     if (E.char === "rogue" && E.stealthUntil > t) sp = c.ultSpeed;
     return slowed(E, t) ? sp * (E.slowMul || 1) : sp;
@@ -2149,6 +2149,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (!T || !T.alive || !inStrike(T, d)) return;
     var ally = T.team === d.team;
     if (ally && (!d.heal || T.minion || T.id === d.owner)) return;
+    if (!ally && d.slam && d.kb && !T.minion) T.knockedAt = Date.now();
     if (!ME || ME.team === T.team || visibleTo(T, ME)) spark(T.x, T.y, ally ? HEAL_SPARK : (MELEE_SPARK[who] || "#FFFFFF"), who === "knight" || d.u ? 1.5 : 1);
   }
   function strikeHit(T, d) {
@@ -2159,8 +2160,19 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     else damage(T, d.dmg, d.owner, !d.m && !d.u && d.createdAt, d.hammer ? d.createdAt : null, d.fx);
     if (d.kb && T.alive) {
       var dd = hyp(dx, dy) || 1;
+      if (d.slam) { T.shove = { ux: dx / dd, uy: dy / dd, dist: d.kb, at: now(), done: 0 }; return; }
       T.x += dx / dd * d.kb; T.y += dy / dd * d.kb; resolve(T);
     }
+  }
+  function shoved(E) { return !!E.shove; }
+  function stepShove(E, t) {
+    var S = E.shove; if (!S) return;
+    if (!E.alive) { E.shove = null; return; }
+    var k = clamp((t - S.at) / ULT.gdKbMs, 0, 1), eased = 1 - Math.pow(1 - k, 3), step = (eased - S.done) * S.dist;
+    S.done = eased;
+    E.x += S.ux * step; E.y += S.uy * step; resolve(E);
+    E.mv = false;
+    if (k >= 1) E.shove = null;
   }
   function strikeHeal(T, d) {
     if (!d.heal || T.team !== d.team || T.minion || T.id === d.owner || !T.alive || !inStrike(T, d)) return;
@@ -2254,7 +2266,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     E.x = sp.x; E.y = sp.y; E.angle = sp.angle; E.mv = false;
     E.hp = E.maxHp; E.alive = true; E.protectUntil = t + RESPAWN_PROTECT_MS;
     E.cdUntil = 0; E.pending = null; E.burst = null; E.volley = null; E.slash = null;
-    E.buffUntil = 0; E.slamAt = 0; E.leap = null; E.dash = null; E.stealthUntil = 0; E.ultUntil = 0; E.skillUntil = 0; E.regenUntil = 0; E.slowUntil = 0; E.stunUntil = 0;
+    E.buffUntil = 0; E.slamAt = 0; E.leap = null; E.dash = null; E.shove = null; E.stealthUntil = 0; E.ultUntil = 0; E.skillUntil = 0; E.regenUntil = 0; E.slowUntil = 0; E.stunUntil = 0;
     if (E === ME) CAM.snap = true;
     G.forceNet = true;
   }
@@ -3966,6 +3978,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         else floatText(E.x, E.y, "+" + d, "#2FB35A");
       }
       lastHp[id] = E.hp;
+      if (E.knockedAt && E.knockedAt !== v.knockSeen) { v.knockSeen = E.knockedAt; hurt = true; }
       v.root.position.set(E.x, 0, E.y);
       v.body.position.y = leapHeight(E, t);
       v.yaw += angDiff(-faceAngle(E, t), v.yaw) * Math.min(1, dt * 14);
@@ -4344,6 +4357,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       } else if (ME) ME.mv = false;
       if (isHost()) keys(BOTS).forEach(function (id) { var B = BOTS[id]; stepBot(B, dt); if (B.alive) stepCombat(B, dt); stepKnightSlam(B); stepHammerLeap(B); stepDash(B); stepMinions(B, dt, t); });
       if (ME) { stepKnightSlam(ME); stepHammerLeap(ME); stepDash(ME); stepMinions(ME, dt, t); }
+      localTargets().forEach(function (T) { stepShove(T, t); });
       checkProjectiles(t);
     }
     if (st === "countdown" || st === "playing") netWrite(false);
