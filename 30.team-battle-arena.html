@@ -564,9 +564,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     necro:   { name: "네크로", role: "caster", icon: "💀", hp: 120, speed: 250, cd: 500, dmg: 11, range: KEY * 4, pSpeed: 1000, pr: 9, ultName: "해골 소환" },
     sniper:  { name: "저격수", role: "shooter", icon: "🎯", hp: 100, speed: 240, cd: 1429, dmg: 40, range: 700, pSpeed: 1500, pr: 7, ultName: "거대 화살", ultAim: true },
     thrower: { name: "투척병", role: "shooter", icon: "🧪", hp: 120, speed: 240, cd: 1000, dmg: 20, ticks: 3, range: KEY * 4 + 100, minRange: KEY * 1, ultName: "독안개", ultAim: true },
-    lancer:  { name: "창기사", role: "fighter", icon: "🔱", hp: 300, speed: 225, cd: 1200, dmg: 30, range: 200, width: 50, ultName: "꿰뚫기", ultAim: true }
+    lancer:  { name: "창기사", role: "fighter", icon: "🔱", hp: 300, speed: 225, cd: 1200, dmg: 30, range: 200, width: 50, ultName: "꿰뚫기", ultAim: true },
+    blacksmith: { name: "대장장이", role: "fighter", icon: "🔨", hp: 350, speed: 225, cd: 1000, dmg: 32, range: 120, width: 80, ultName: "내려찍기", ultAim: true }
   };
-  var CHAR_LIST = ["warrior", "knight", "ranger", "mage", "rogue", "necro", "sniper", "thrower", "lancer"];
+  var CHAR_LIST = ["warrior", "knight", "ranger", "mage", "rogue", "necro", "sniper", "thrower", "lancer", "blacksmith"];
   var ROLES = {
     fighter:  { name: "전사", icon: "⚔️", gaugeOnHit: 2, gaugeOnHurt: 1 },
     caster:   { name: "마법사", icon: "✨", gaugeOnHit: 3, gaugeOnHurt: 0 },
@@ -585,7 +586,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               pnDmg: 90, pnSpeed: 1500, pnRange: 700, pnPr: 16, pnRefund: 2, pnScale: 3,
               plFlight: 700, plFlightMin: 150, plR: 60, plDur: 3000, plTick: 1000, plMax: 4, plFade: 500, plLob: 90,
               fgR: 150, fgDur: 5000, fgDmg: 20, fgHeal: 20, fgSlowMul: 0.6, fgSlowMs: 400, fgCast: KEY * 4 + 100, fgRefund: 1,
-              lnWind: 300, lnLen: 350, lnW: 36, lnDmg: 90, lnStunMs: 1200 };
+              lnWind: 300, lnLen: 350, lnW: 36, lnDmg: 90, lnStunMs: 1200,
+              bsDelay: 700, bsR: 150, bsDmg: 60, bsStunMs: 800, bsRefund: 3, bsCast: 450, bsMin: 60, bsHop: 45 };
   var SNIPER_KEEP = KEY * 5;
   function isMelee(c) { return !!(CHARS[c].arc || CHARS[c].width); }
   var STEALTH_ALPHA = 0.4;
@@ -1149,6 +1151,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "sniper") return "거대한 화살 1발(데미지 " + ULT.pnDmg + ", 사거리 " + ULT.pnRange + "), 적중 시 게이지 " + ULT.pnRefund + " 회복";
     if (k === "thrower") return "반지름 " + ULT.fgR + "의 독안개 설치, 적은 장판 안에서 이동속도 " + Math.round((1 - ULT.fgSlowMul) * 100) + "% 감소, 1초당 " + ULT.fgDmg + "의 데미지(적중마다 게이지 " + ULT.fgRefund + " 회복)<br>아군은 1초당 " + ULT.fgHeal + " 회복";
     if (k === "lancer") return num(ULT.lnWind / 1000) + "초 준비 후 앞으로 길이 " + ULT.lnLen + " 찌르기, 맞은 적 모두 " + ULT.lnDmg + "의 데미지 + " + num(ULT.lnStunMs / 1000) + "초 기절";
+    if (k === "blacksmith") return "지정한 곳으로 뛰어올라 " + num(ULT.bsDelay / 1000) + "초 뒤 착지하며 내려찍기, 반경 " + ULT.bsR + " 안의 적 " + ULT.bsDmg + "의 데미지 + " + num(ULT.bsStunMs / 1000) + "초 기절, 적 적중 시 게이지 " + ULT.bsRefund + " 회복";
     return "";
   }
   function statTable(k) {
@@ -1736,9 +1739,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function stunned(E, t) { return E.stunUntil > (t || now()); }
   function slowed(E, t) { return E.slowUntil > (t || now()); }
   function lancerWinding(E, t) { return E.char === "lancer" && E.ultUntil > (t || now()); }
+  function hammerLeaping(E, t) { return E.char === "blacksmith" && E.ultUntil > (t || now()); }
   function speedOf(E) {
     var t = now(), c = CHARS[E.char], sp = c.speed;
-    if (stunned(E, t) || lancerWinding(E, t)) return 0;
+    if (stunned(E, t) || lancerWinding(E, t) || hammerLeaping(E, t)) return 0;
     if (E.char === "warrior" && E.buffUntil > t) sp = c.ultSpeed;
     if (E.char === "rogue" && E.stealthUntil > t) sp = c.ultSpeed;
     return slowed(E, t) ? sp * (E.slowMul || 1) : sp;
@@ -1955,6 +1959,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (h.k) owner.kills++;
       if (h.hl) owner.heal += h.hl;
       if (h.u && owner.char === "mage" && owner.refundKey !== h.u) { owner.refundKey = h.u; owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.mbRefund); }
+      if (h.u && owner.char === "blacksmith" && owner.refundKey !== h.u) { owner.refundKey = h.u; owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.bsRefund); }
       if (h.u === "volley" && owner.char === "ranger") owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.mkRefund);
       if (h.u === "giant" && owner.char === "sniper") owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.pnRefund);
       if (h.u === "fog" && owner.char === "thrower" && !gaugeLocked(owner)) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.fgRefund);
@@ -2054,7 +2059,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return o && o.alive && o.team !== E.team && visibleTo(o, E) && hyp(o.x - E.x, o.y - E.y) <= reach;
     });
   }
-  var MELEE_SPARK = { warrior: "#FF9A3C", knight: "#FFFFFF", rogue: "#DCE3EC", necro: "#C9A6FF", lancer: "#FFD27A" };
+  var MELEE_SPARK = { warrior: "#FF9A3C", knight: "#FFFFFF", rogue: "#DCE3EC", necro: "#C9A6FF", lancer: "#FFD27A", blacksmith: "#FFB45A" };
   function inArc(T, d) {
     var dx = T.x - d.x, dy = T.y - d.y;
     return hyp(dx, dy) <= d.radius + BODY_R && Math.abs(angDiff(Math.atan2(dy, dx), d.angle)) <= d.arc / 2 + 0.25;
@@ -2089,6 +2094,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var who = P[d.owner] ? P[d.owner].characterType : "";
     if (d.u && hear(d)) sfx("boom");
     if (d.slam) boom(d.x, d.y, d.radius + BODY_R, d.team);
+    if (d.hammer) thunder(d.x, d.y);
     participants().map(ent).concat(allMinions()).forEach(function (T) {
       if (!T || T.team === d.team || !T.alive || !inStrike(T, d)) return;
       if (!ME || ME.team === T.team || visibleTo(T, ME)) spark(T.x, T.y, MELEE_SPARK[who] || "#FFFFFF", who === "knight" || d.u ? 1.5 : 1);
@@ -2097,8 +2103,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (T.team === d.team || !T.alive || !inStrike(T, d)) return;
       var dx = T.x - d.x, dy = T.y - d.y;
       if (protectedNow(T)) return;
-      if (d.slam) { afflict(T, d.fx); return; }
-      damage(T, d.dmg, d.owner, !d.m && !d.u && d.createdAt, null, d.fx);
+      if (d.slam && !d.dmg) { afflict(T, d.fx); return; }
+      damage(T, d.dmg, d.owner, !d.m && !d.u && d.createdAt, d.hammer ? d.createdAt : null, d.fx);
       if (d.kb && T.alive) {
         var dd = hyp(dx, dy) || 1;
         T.x += dx / dd * d.kb; T.y += dy / dd * d.kb; resolve(T);
@@ -2122,7 +2128,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     E.x = sp.x; E.y = sp.y; E.angle = sp.angle; E.mv = false;
     E.hp = E.maxHp; E.alive = true; E.protectUntil = t + RESPAWN_PROTECT_MS;
     E.cdUntil = 0; E.pending = null; E.burst = null; E.volley = null; E.slash = null;
-    E.buffUntil = 0; E.slamAt = 0; E.stealthUntil = 0; E.ultUntil = 0; E.skillUntil = 0; E.regenUntil = 0; E.slowUntil = 0; E.stunUntil = 0;
+    E.buffUntil = 0; E.slamAt = 0; E.leap = null; E.stealthUntil = 0; E.ultUntil = 0; E.skillUntil = 0; E.regenUntil = 0; E.slowUntil = 0; E.stunUntil = 0;
     if (E === ME) CAM.snap = true;
     G.forceNet = true;
   }
@@ -2204,6 +2210,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       E.pending = null;
       room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(ang), len: Math.round(lineReach(E.x, E.y, ang, ULT.lnLen)),
                                         width: ULT.lnW, dmg: ULT.lnDmg, u: 1, wind: ULT.lnWind, fx: { stunMs: ULT.lnStunMs }, createdAt: t });
+    } else if (E.char === "blacksmith") {
+      var landing = burstSpot(E, ang, reach, ULT.bsCast, ULT.bsMin);
+      resolve(landing);
+      E.angle = Math.atan2(landing.y - E.y, landing.x - E.x);
+      E.ultUntil = t + ULT.bsDelay;
+      E.cdUntil = Math.max(E.cdUntil, t + ULT.bsDelay + 250);
+      E.pending = null; E.slash = null;
+      E.leap = { sx: E.x, sy: E.y, tx: landing.x, ty: landing.y, at: t };
     }
     if (E.skillDur && E.char !== "ranger" && E.char !== "mage" && E.char !== "necro") E.skillUntil = t + E.skillDur;
     if (hear(E)) sfx("ult");
@@ -2217,6 +2231,20 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     E.atkAt = t; E.ultUntil = t + 500;
     room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(E.angle), radius: ULT.tkStunR, arc: Math.PI * 2,
                                       dmg: 0, u: 1, slam: 1, fx: { stunMs: ULT.tkStunMs }, createdAt: t });
+    G.forceNet = true;
+  }
+  function leapProgress(t, ultUntil) { return clamp(1 - (ultUntil - t) / ULT.bsDelay, 0, 1); }
+  function stepHammerLeap(E) {
+    var L = E.leap; if (!L) return;
+    if (!E.alive) { E.leap = null; return; }
+    var t = now(), k = leapProgress(t, L.at + ULT.bsDelay), ease = k * k * (3 - 2 * k);
+    E.x = L.sx + (L.tx - L.sx) * ease; E.y = L.sy + (L.ty - L.sy) * ease;
+    E.mv = false;
+    if (k < 1) return;
+    E.leap = null;
+    resolve(E);
+    room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(E.angle), radius: ULT.bsR, arc: Math.PI * 2,
+                                      dmg: ULT.bsDmg, u: 1, slam: 1, hammer: 1, fx: { stunMs: ULT.bsStunMs }, createdAt: t });
     G.forceNet = true;
   }
   function stepCombat(E, dt) {
@@ -2328,13 +2356,17 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     } else B.mv = false;
 
     var aimAt = target;
-    if (lancerWinding(B, t)) return;
+    if (lancerWinding(B, t) || hammerLeaping(B, t)) return;
     if (aimAt) B.angle = Math.atan2(aimAt.y - B.y, aimAt.x - B.x);
     else if (B.mv) B.angle = Math.atan2(my, mx);
     if (B.burst) return;
     if (B.char === "thrower") { botThrow(B, target, enemies, t); return; }
     if (B.char === "lancer") { botLance(B, target, t); return; }
-    if (target && B.gauge >= GAUGE_MAX && t - k.seenAt > 500 && losClear(B.x, B.y, target.x, target.y) && (B.char !== "mage" || td <= ULT.mbCast)) {
+    if (target && B.gauge >= GAUGE_MAX && t - k.seenAt > 500 && losClear(B.x, B.y, target.x, target.y) && (B.char !== "mage" || td <= ULT.mbCast) && (B.char !== "blacksmith" || td <= ULT.bsCast)) {
+      if (B.char === "blacksmith") {
+        var drop = leadSpot(target, ULT.bsDelay / 1000, t);
+        useUlt(B, Math.atan2(drop.y - B.y, drop.x - B.x), hyp(drop.x - B.x, drop.y - B.y)); return;
+      }
       useUlt(B, Math.atan2(target.y - B.y, target.x - B.x), td); return;
     }
     if (aimAt && t >= B.cdUntil && t - k.seenAt > BOT_REACT_MS) {
@@ -2539,6 +2571,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
   function aimRange(E, btn) {
     if (E.char === "thrower") return [CHARS.thrower.minRange, btn === "ult" ? ULT.fgCast : CHARS.thrower.range];
+    if (E.char === "blacksmith") return [ULT.bsMin, ULT.bsCast];
     return [ULT.mbMin, ULT.mbCast];
   }
   function aimReach(E, btn) { var rg = aimRange(E, btn); return rg[0] + clamp((hyp(aim.dx, aim.dy) - DRAG_MIN) / 130, 0, 1) * (rg[1] - rg[0]); }
@@ -2821,7 +2854,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     necro:   { file: "Skeleton_Mage", right: "Skeleton_Staff" },
     sniper:  { file: "Rogue_Hooded", right: "crossbow_2handed" },
     thrower: { file: "Skeleton_Rogue", right: "Potion_1", rightScale: 2.2 },
-    lancer:  { file: "Barbarian", right: "spear_A", rightScale: 1.35 }
+    lancer:  { file: "Barbarian", right: "spear_A", rightScale: 1.35 },
+    blacksmith: { file: "Knight", right: "hammer_A", hide: ["Knight_Helmet", "Knight_HelmetVisor", "Knight_Cape"] }
   };
   var MINION_MODEL = { file: "Skeleton_Minion", right: "Skeleton_Blade", scale: 0.9 };
   var PROP_FILES = { bushBig: "props/Bush_1_D_Color1.gltf",
@@ -2858,6 +2892,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var m = KIT.chars[c], spec = MODEL[c] || MINION_MODEL;
         if (spec.right) { var held = KIT.weapons[spec.right].clone(); if (spec.rightScale) held.scale.setScalar(spec.rightScale); m.getObjectByName("handslotr").add(held); }
         if (spec.left) m.getObjectByName("handslotl").add(KIT.weapons[spec.left].clone());
+        (spec.hide || []).forEach(function (part) { var o = m.getObjectByName(part); if (o) o.visible = false; });
       });
       KIT.ready = true;
       makePortraits();
@@ -3093,6 +3128,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     return ["Ranged_2H_Shoot", KIT.clips.Ranged_2H_Shoot.duration * 1000 / shootMs, ["Ranged_2H_Reload", KIT.clips.Ranged_2H_Reload.duration * 1000 / reloadMs]];
   }
   var ROGUE_COMBO = ["Melee_Dualwield_Attack_Chop", "Melee_Dualwield_Attack_Slice"];
+  var JUMP_CHOP_LAND_SEC = 0.75;
+  function leapHeight(E, t) {
+    if (!E.alive || !hammerLeaping(E, t)) return 0;
+    var k = leapProgress(t, E.ultUntil);
+    return 4 * ULT.bsHop * k * (1 - k);
+  }
   function attackClip(v, E, t) {
     if (E.char === "warrior") return ["Melee_1H_Attack_Slice_Diagonal", berserk(E, t) ? 1.9 : 1.3];
     if (E.char === "knight") return E.ultUntil > E.atkAt ? ["Melee_1H_Attack_Chop", 1.6] : ["Melee_1H_Attack_Slice_Horizontal", 1.5];
@@ -3101,6 +3142,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (E.char === "sniper") return sniperShotClip(E);
     if (E.char === "thrower") return ["Throw", E.ultUntil > E.atkAt ? 1.6 : 2.2];
     if (E.char === "lancer") return ["Melee_2H_Attack_Stab", KIT.clips.Melee_2H_Attack_Stab.duration * 1000 / (E.ultUntil > E.atkAt ? 520 : 800)];
+    if (E.char === "blacksmith") return ["Melee_1H_Attack_Chop", 1.6];
     if (!enemyInMelee(E)) return ["Throw", 2.2];
     if (v.wasStealth) { v.combo = 1; return ["Melee_Dualwield_Attack_Stab", 2.2]; }
     return [ROGUE_COMBO[v.combo++ % 2], 2.4];
@@ -3114,10 +3156,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         playOnce(v, ac[0], ac[1], t, ac[2]);
      }
     }
-    if ((E.char === "mage" || E.char === "necro") && E.ultUntil !== v.ultSeen) {
+    if ((E.char === "mage" || E.char === "necro" || E.char === "blacksmith") && E.ultUntil !== v.ultSeen) {
       v.ultSeen = E.ultUntil;
       if (E.alive && E.ultUntil > t) {
-        if (E.char === "necro") playOnce(v, "Ranged_Magic_Summon", 3.2, t);
+        if (E.char === "blacksmith") playOnce(v, "Melee_1H_Attack_Jump_Chop", JUMP_CHOP_LAND_SEC * 1000 / ULT.bsDelay, t);
+        else if (E.char === "necro") playOnce(v, "Ranged_Magic_Summon", 3.2, t);
         else playOnce(v, "Ranged_Magic_Spellcasting_Long", 2.6, t);
         v.once.soft = true;
       }
@@ -3220,7 +3263,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function dropProjVis(id) { var g = PRV[id]; if (!g) return; scene.remove(g); delete PRV[id]; }
 
   var PROJ_Y = 42, BOW_BLEND = 140;
-  var MELEE_COLOR = { warrior: 0xFF9A3C, knight: 0xFFFFFF, rogue: 0xC9D6E6, necro: 0xB07CFF, lancer: 0xFFD27A };
+  var MELEE_COLOR = { warrior: 0xFF9A3C, knight: 0xFFFFFF, rogue: 0xC9D6E6, necro: 0xB07CFF, lancer: 0xFFD27A, blacksmith: 0xFFB45A };
   function makeMeleeVis(d) {
     var g = new THREE.Group(), who = P[d.owner] ? P[d.owner].characterType : "", col = d.u ? 0xFF6A3D : (MELEE_COLOR[who] || 0xFFFFFF);
     var fillM = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.2, depthWrite: false });
@@ -3375,7 +3418,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       showAimCircle(aimReach(ME, aim.btn), ult ? ULT.fgR : ULT.plR);
     } else if (ult && ME.char === "mage") {
       showAimCircle(aimReach(ME, "ult"), ULT.mbR);
-    } else if (ME.char === "lancer") {
+    } else if (ult && ME.char === "blacksmith") {
+      showAimCircle(aimReach(ME, "ult"), ULT.bsR);
+    } else if (ME.char === "lancer" || c.width) {
       showAimStrip(0, lineReach(ME.x, ME.y, ME.angle, ult ? ULT.lnLen : c.range) + BODY_R, ult ? ULT.lnW : c.width);
     } else if (c.arc && !ult && !c.throwRange) {
       showAimSector(c.range + BODY_R, c.arc);
@@ -3399,7 +3444,47 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function boom(x, y, r, team) { FX.push({ k: "boom", x: x, y: y, r: r, c: C_FX[team] || 0xffffff, t: Date.now(), life: 450 }); }
   function floatText(x, y, text, color) { FX.push({ k: "txt", x: x, y: y, s: text, c: color, t: Date.now(), life: 800 }); }
   function hitColor(d) { if (d.ownerCharacterType === "necro") return "#B07CFF"; return d.ownerCharacterType === "mage" ? (d.team === "blue" ? "#B08CFF" : "#FF8CE0") : (d.team === "blue" ? "#5FA2FF" : "#FF6A5F"); }
+  var BOLT_TOP = 520, BOLT_SEGS = 8, BOLT_JITTER = 110, BOLT_FLASH_OPACITY = 0.45;
+  GEO.boltSeg = new THREE.CylinderGeometry(1, 1, 1, 5, 1, true);
+  GEO.boltSeg.translate(0, 0.5, 0);
+  function thunder(x, y) {
+    if (PIX < PIX_START) return;
+    FX.push({ k: "bolt", x: x, y: y, t: Date.now(), life: 380 });
+  }
+  function boltMesh(f) {
+    var g = new THREE.Group(), up = new THREE.Vector3(0, 1, 0);
+    var glow = new THREE.MeshBasicMaterial({ color: 0x8FC8FF, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+    var core = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, depthWrite: false });
+    var px = 0, py = BOLT_TOP, pz = 0;
+    for (var i = 1; i <= BOLT_SEGS; i++) {
+      var ground = i === BOLT_SEGS, ny = BOLT_TOP * (1 - i / BOLT_SEGS);
+      var nx = ground ? 0 : (Math.random() - 0.5) * BOLT_JITTER, nz = ground ? 0 : (Math.random() - 0.5) * BOLT_JITTER;
+      var dir = new THREE.Vector3(px - nx, py - ny, pz - nz), len = dir.length();
+      dir.normalize();
+      [[glow, 7], [core, 2.2]].forEach(function (layer) {
+        var seg = new THREE.Mesh(GEO.boltSeg, layer[0]);
+        seg.position.set(nx, ny, nz); seg.quaternion.setFromUnitVectors(up, dir); seg.scale.set(layer[1], len, layer[1]);
+        g.add(seg);
+      });
+      px = nx; py = ny; pz = nz;
+    }
+    var flashMat = new THREE.MeshBasicMaterial({ color: 0x8FC8FF, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+    var flash = flatMesh(GEO.disc, flashMat); flash.scale.setScalar(ULT.bsR * 0.55); flash.position.y = 2.6; g.add(flash);
+    g.position.set(f.x, 0, f.y);
+    g.userData.mats = [glow, core];
+    g.userData.flashMat = flashMat;
+    scene.add(g);
+    return g;
+  }
+  function dropFxMesh(f) {
+    if (!f.mesh) return;
+    scene.remove(f.mesh);
+    (f.mesh.userData.mats || [f.mesh.material]).forEach(function (m) { m.dispose(); });
+    if (f.mesh.userData.flashMat) f.mesh.userData.flashMat.dispose();
+    f.mesh = null;
+  }
   function fxMesh(f) {
+    if (f.k === "bolt") return boltMesh(f);
     var mat = new THREE.MeshBasicMaterial({ color: f.c, transparent: true, depthWrite: false, side: THREE.DoubleSide }), m;
     if (f.k === "spark") { m = new THREE.Mesh(GEO.ringFx, mat); m.position.set(f.x, 36, f.y); }
     else if (f.k === "smoke") { m = new THREE.Mesh(GEO.ball, mat); m.position.set(f.x, 30, f.y); }
@@ -3410,13 +3495,19 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function stepFx(nowMs) {
     FX = FX.filter(function (f) {
       var alive = nowMs - f.t < f.life;
-      if (!alive && f.mesh) { scene.remove(f.mesh); f.mesh.material.dispose(); f.mesh = null; }
+      if (!alive) dropFxMesh(f);
       return alive;
     });
     FX.forEach(function (f) {
       if (f.k === "txt") return;
       if (!f.mesh) f.mesh = fxMesh(f);
       var k = (nowMs - f.t) / f.life, m = f.mesh;
+      if (f.k === "bolt") {
+        var flicker = (1 - k) * (0.65 + 0.35 * Math.sin(nowMs / 22));
+        m.userData.mats.forEach(function (mat) { mat.opacity = flicker; });
+        m.userData.flashMat.opacity = flicker * BOLT_FLASH_OPACITY;
+        return;
+      }
       m.material.opacity = 1 - k;
       if (f.k === "spark") { m.scale.setScalar((8 + k * 22) * f.s); m.quaternion.copy(camera.quaternion); }
       else if (f.k === "smoke") { m.scale.setScalar(35 + 45 * Math.sin(Math.min(1, k * 1.4) * Math.PI / 2)); m.material.opacity = k < 0.6 ? 0.9 : 0.9 * (1 - (k - 0.6) / 0.4); }
@@ -3426,7 +3517,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function clear3d() {
     keys(VIS).forEach(dropVis); keys(PRV).forEach(dropProjVis); keys(MLV).forEach(dropMelee);
     keys(MVIS).forEach(function (id) { dropMinionVis(id, false); });
-    FX.forEach(function (f) { if (f.mesh) { scene.remove(f.mesh); f.mesh.material.dispose(); f.mesh = null; } });
+    FX.forEach(dropFxMesh);
     BURSTS.forEach(dropBurstVis); POOLS.forEach(dropPoolVis); LUNGES.forEach(dropLungeVis);
     aimGrp.visible = false; CAM.snap = true;
   }
@@ -3608,6 +3699,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (E.char === "knight" && E.buffUntil > t) return 0x2A3A66;
     if ((E.char === "mage" || E.char === "sniper") && E.ultUntil > t) return E.char === "mage" ? 0x442266 : 0x663300;
     if (E.char === "thrower" && E.ultUntil > t) return 0x1E5212;
+    if (hammerLeaping(E, t)) return 0x553000;
     return 0x000000;
   }
   var LABELS = [];
@@ -3636,6 +3728,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }
       lastHp[id] = E.hp;
       v.root.position.set(E.x, 0, E.y);
+      v.body.position.y = leapHeight(E, t);
       v.yaw += angDiff(-faceAngle(E, t), v.yaw) * Math.min(1, dt * 14);
       if (v.kit) v.body.rotation.y = v.yaw;
       else { v.body.rotation.set(0, v.yaw, E.alive ? 0 : Math.PI / 2); v.body.position.y = E.alive ? 0 : 17; }
@@ -4002,8 +4095,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (KEY_ON.atk && t >= ME.cdUntil && !ME.volley && !ME.slash) fireBasic(ME, autoAimAngle(ME));
         stepCombat(ME, dt);
       } else if (ME) ME.mv = false;
-      if (isHost()) keys(BOTS).forEach(function (id) { var B = BOTS[id]; stepBot(B, dt); if (B.alive) stepCombat(B, dt); stepKnightSlam(B); stepMinions(B, dt, t); });
-      if (ME) { stepKnightSlam(ME); stepMinions(ME, dt, t); }
+      if (isHost()) keys(BOTS).forEach(function (id) { var B = BOTS[id]; stepBot(B, dt); if (B.alive) stepCombat(B, dt); stepKnightSlam(B); stepHammerLeap(B); stepMinions(B, dt, t); });
+      if (ME) { stepKnightSlam(ME); stepHammerLeap(ME); stepMinions(ME, dt, t); }
       checkProjectiles(t);
     }
     if (st === "countdown" || st === "playing") netWrite(false);
