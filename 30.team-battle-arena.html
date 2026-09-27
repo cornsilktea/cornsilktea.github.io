@@ -1166,7 +1166,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "lancer") return num(ULT.lnWind / 1000) + "초 준비 후 앞으로 길이 " + ULT.lnLen + " 찌르기, 맞은 적 모두 " + ULT.lnDmg + "의 데미지 + " + num(ULT.lnStunMs / 1000) + "초 기절";
     if (k === "blacksmith") return "지정한 곳에 " + num(ULT.bsDelay / 1000) + "초 뒤 착지. 반경 " + ULT.bsR + " 내의 적은 " + ULT.bsDmg + "의 데미지, " + num(ULT.bsStunMs / 1000) + "초간 기절";
     if (k === "hitman") return "사거리 " + ULT.exRange + "의 칼날 발사, 처음 맞은 적에게 " + ULT.exDmg + "의 데미지 + " + num(ULT.exStunMs / 1000) + "초 기절, 명중 시 대상 위치로 순간이동";
-    if (k === "guardian") return "즉시 자신 주변 반경 " + ULT.gdR + " 안의 모든 적을 " + ULT.gdKb + "만큼 뒤로 밀어낸다(피해 없음)";
+    if (k === "guardian") return "주변 " + ULT.gdR + " 내의 적 모두를 " + ULT.gdKb + "만큼 밀어냄";
     if (k === "priest") return "지정한 곳에 " + num(ULT.bhDelay / 1000) + "초 뒤 반경 " + ULT.bhR + "의 블랙홀 생성, " + num(ULT.bhDur / 1000) + "초간 범위 안의 적을 중심으로 끌어당김";
     return "";
   }
@@ -1178,7 +1178,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
             : pair(hit, c.throwDmg || (rage ? Math.round(c.dmg * ULT.bzDmgMul) : null)) + (c.heal ? "(" + c.heal + ")" : "");
     var rate = pair(num(1000 / c.cd), rage ? num(1000 / (c.cd * ULT.bzCdMul)) : null) + "회";
     return '<table class="st"><tr><th>HP</th><td>' + c.hp + "</td></tr><tr><th>공격</th><td>" + dmg + "</td></tr>" +
-           (c.fx && c.fx.slowMs ? "<tr><th>효과</th><td>피격 시 " + num(c.fx.slowMs / 1000) + "초 둔화(속도 " + Math.round((1 - c.fx.slowMul) * 100) + "%↓)</td></tr>" : "") +
            "<tr><th>초당 공격</th><td>" + rate + "</td></tr>" +
            "<tr><th>이동속도</th><td>" + pair(c.speed, c.ultSpeed) + "</td></tr>" +
            "<tr><th>사거리</th><td>" + pair(Math.round(c.dashRange || c.range), c.throwRange) + "</td></tr><tr><th>스킬</th><td>" + c.ultName + "</td></tr></table>";
