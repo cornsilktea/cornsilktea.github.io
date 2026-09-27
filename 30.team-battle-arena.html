@@ -562,7 +562,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var NET_MS = 143;
   var CHARS = {
     warrior: { name: "광전사", role: "fighter", icon: "🪓", hp: 270, speed: 230, ultSpeed: 300, cd: 850, dmg: 45, range: 110, arc: Math.PI * 0.55, ultName: "광폭화", heals: true },
-    knight:  { name: "기사", role: "fighter", icon: "🛡️", hp: 400, speed: 220, cd: 1000, dmg: 30, range: 110, arc: Math.PI * 0.7, kb: 28, ultName: "방어태세" },
+    knight:  { name: "기사", role: "fighter", icon: "🛡️", hp: 400, speed: 220, cd: 1000, dmg: 30, range: 110, arc: Math.PI * 0.7, ultName: "방어태세" },
     ranger:  { name: "궁수", role: "shooter", icon: "🏹", hp: 100, speed: 250, cd: 400, dmg: 10, range: KEY * 6, pSpeed: 950, pr: 6, shots: 2, gap: 70, ultName: "난사", ultAim: true },
     mage:    { name: "주술사", role: "caster", icon: "🔮", hp: 120, speed: 250, cd: 500, dmg: 11, range: 350, pSpeed: 700, pr: 9, ultName: "메테오", ultAim: true },
     rogue:   { name: "은신자", role: "assassin", icon: "🗡️", hp: 100, speed: 300, ultSpeed: 420, cd: 600, dmg: 30, range: 110, arc: Math.PI * 0.6, hits: 2, hitGap: 160, throwDmg: 20, throwRange: 300, pSpeed: 900, pr: 8, ultName: "은신" },
@@ -600,7 +600,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               bsDelay: 700, bsR: 150, bsDmg: 60, bsStunMs: 800, bsCast: 450, bsMin: 60, bsHop: 45,
               bhR: 150, bhDur: 3000, bhDelay: 500, bhPull: 220, bhCast: 380, bhMin: 60,
               exRange: 500, exSpeed: 1300, exPr: 4, exDmg: 10, exStunMs: 1000,
-              gdR: 200, gdKb: 150, gdKbMs: 300 };
+              gdR: 200, gdKb: 150, gdKbMs: 500 };
   var SNIPER_KEEP = KEY * 5;
   function isMelee(c) { return !!(CHARS[c].arc || CHARS[c].width || CHARS[c].dashWidth); }
   var STEALTH_ALPHA = 0.4;
@@ -2149,7 +2149,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (!T || !T.alive || !inStrike(T, d)) return;
     var ally = T.team === d.team;
     if (ally && (!d.heal || T.minion || T.id === d.owner)) return;
-    if (!ally && d.slam && d.kb && !T.minion) T.knockedAt = Date.now();
+    if (!ally && d.kb && !T.minion) T.knockedAt = Date.now();
     if (!ME || ME.team === T.team || visibleTo(T, ME)) spark(T.x, T.y, ally ? HEAL_SPARK : (MELEE_SPARK[who] || "#FFFFFF"), who === "knight" || d.u ? 1.5 : 1);
   }
   function strikeHit(T, d) {
@@ -2160,8 +2160,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     else damage(T, d.dmg, d.owner, !d.m && !d.u && d.createdAt, d.hammer ? d.createdAt : null, d.fx);
     if (d.kb && T.alive) {
       var dd = hyp(dx, dy) || 1;
-      if (d.slam) { T.shove = { ux: dx / dd, uy: dy / dd, dist: d.kb, at: now(), done: 0 }; return; }
-      T.x += dx / dd * d.kb; T.y += dy / dd * d.kb; resolve(T);
+      T.shove = { ux: dx / dd, uy: dy / dd, dist: d.kb, at: now(), done: 0 };
     }
   }
   function shoved(E) { return !!E.shove; }
@@ -2218,7 +2217,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var d = { team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(ang), dmg: Math.round(c.dmg * (rage ? ULT.bzDmgMul : 1)), createdAt: now() };
     if (c.width) { d.len = Math.round(lineReach(E.x, E.y, ang, c.range)); d.width = c.width; }
     else { d.radius = c.range; d.arc = c.arc; }
-    if (c.kb) d.kb = c.kb;
     if (c.heal) d.heal = c.heal;
     if (c.fx) d.fx = c.fx;
     room.ref.child("meleeHits").push(d);
