@@ -2916,9 +2916,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     necro:   { file: "Skeleton_Mage", right: "Skeleton_Staff" },
     sniper:  { file: "Rogue_Hooded", right: "crossbow_2handed" },
     thrower: { file: "Skeleton_Rogue", right: "Potion_1", rightScale: 2.2 },
-    lancer:  { file: "Barbarian", right: "spear_A", rightScale: 1.35 },
+    lancer:  { file: "Barbarian", right: "spear_A", rightScale: 1.35, hide: ["Barbarian_BearHat"], wear: { from: "knight", part: "Knight_Helmet" },
+               recolor: [[0, 1, 1, "#8A5A38", "#4A2C1A"], [0, 7, 1, "#5B7FB0", "#2E4468"]] },
     blacksmith: { file: "Knight", right: "hammer_A", hide: ["Knight_Helmet", "Knight_HelmetVisor", "Knight_Cape"] },
-    priest:  { file: "Mage", right: "wand", left: "spellbook_open" }
+    priest:  { file: "Mage", right: "wand", left: "spellbook_open", hide: ["Mage_Hat"],
+               recolor: [[1, 0, 2, "#FFFFFF", "#CFC8BA"], [1, 2, 1, "#9CCBF2", "#3E6BA6"], [0, 1, 1, "#F2D38A", "#A87A3A"]] }
   };
   var MINION_MODEL = { file: "Skeleton_Minion", right: "Skeleton_Blade", scale: 0.9 };
   var PROP_FILES = { bushBig: "props/Bush_1_D_Color1.gltf",
@@ -2940,6 +2942,28 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     });
     return root;
   }
+  var SKIN_COLS = 8, SKIN_ROWS = 4;
+  function recolorSkin(root, swatches) {
+    var src = root.getObjectByProperty("isMesh", true).material.map.image;
+    var cv = document.createElement("canvas"); cv.width = src.width; cv.height = src.height;
+    var g = cv.getContext("2d"), cw = cv.width / SKIN_COLS, ch = cv.height / SKIN_ROWS;
+    g.drawImage(src, 0, 0);
+    swatches.forEach(function (sw) {
+      var x = sw[1] * cw, y = sw[0] * ch, grad = g.createLinearGradient(0, y, 0, y + ch);
+      grad.addColorStop(0, sw[3]); grad.addColorStop(1, sw[4]);
+      g.fillStyle = grad; g.fillRect(x, y, cw * sw[2], ch);
+    });
+    var tex = new THREE.CanvasTexture(cv);
+    tex.flipY = false; tex.colorSpace = THREE.SRGBColorSpace;
+    var done = new Set();
+    root.traverse(function (o) { if (o.isMesh && !done.has(o.material)) { done.add(o.material); o.material.map = tex; o.material.needsUpdate = true; } });
+  }
+  function wearPart(root, donor, partName) {
+    var part = donor.getObjectByName(partName).clone();
+    part.bind(new THREE.Skeleton(part.skeleton.bones.map(function (b) { return root.getObjectByName(b.name); }), part.skeleton.boneInverses), part.bindMatrix);
+    part.visible = true;
+    root.getObjectByProperty("isSkinnedMesh", true).parent.add(part);
+  }
   function loadKit() {
     var loader = new GLTFLoader();
     function load(url) { return new Promise(function (ok, no) { loader.load(url, ok, undefined, no); }); }
@@ -2953,6 +2977,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     Promise.all(jobs).then(function () {
       CHAR_LIST.concat(["minion"]).forEach(function (c) {
         var m = KIT.chars[c], spec = MODEL[c] || MINION_MODEL;
+        if (spec.recolor) recolorSkin(m, spec.recolor);
+        if (spec.wear) wearPart(m, KIT.chars[spec.wear.from], spec.wear.part);
         if (spec.right) { var held = KIT.weapons[spec.right].clone(); if (spec.rightScale) held.scale.setScalar(spec.rightScale); m.getObjectByName("handslotr").add(held); }
         if (spec.left) m.getObjectByName("handslotl").add(KIT.weapons[spec.left].clone());
         (spec.hide || []).forEach(function (part) { var o = m.getObjectByName(part); if (o) o.visible = false; });
