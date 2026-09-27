@@ -616,7 +616,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
                dashRange: 200, dashWidth: 150, dashDmg: 40, dashMs: 300, finishDelay: 125, ultName: "처형", ultAim: true },
     guardian: { name: "수문장", role: "fighter", icon: "🏰", hp: 380, speed: 215, cd: 1050, dmg: 26, range: 140, arc: Math.PI * 130 / 180,
                 fx: { slowMs: 1000, slowMul: 0.7 }, ultName: "창벽" },
-    frost:   { name: "얼음술사", role: "caster", icon: "❄️", hp: 115, speed: 245, cd: 550, dmg: 10, range: 350, pSpeed: 650, pr: 8, ultName: "눈보라" }
+    frost:   { name: "얼음술사", role: "caster", icon: "❄️", hp: 115, speed: 245, cd: 667, dmg: 10, range: 350, pSpeed: 650, pr: 8, ultName: "눈보라" }
   };
   var CHAR_LIST = ["warrior", "knight", "ranger", "mage", "rogue", "necro", "sniper", "thrower", "lancer", "blacksmith", "priest", "hitman", "guardian", "frost"];
   var ROLES = {
@@ -1238,8 +1238,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "hitman") return "사거리 " + ULT.exRange + "의 칼날 발사, 처음 맞은 적에게 " + ULT.exDmg + "의 데미지 + " + num(ULT.exStunMs / 1000) + "초 기절, 명중 시 대상 위치로 순간이동";
     if (k === "guardian") return "주변 " + ULT.gdR + " 내의 적 모두를 " + ULT.gdKb + "만큼 밀어냄";
     if (k === "priest") return "지정한 곳에 " + num(ULT.bhDelay / 1000) + "초 뒤 반경 " + ULT.bhR + "의 블랙홀 생성, " + num(ULT.bhDur / 1000) + "초간 범위 안의 적을 중심으로 끌어당김";
-    if (k === "frost") return "자신을 중심으로 반경 " + ULT.frBzR + "의 눈보라 생성(시전자를 따라다님), " + num(ULT.frBzDur / 1000) +
-      "초간 유지. 범위 내 아군은 은신 상태가 되고, 적은 1초당 " + ULT.frBzDmg + "의 피해를 입고 이동속도 " + Math.round((1 - ULT.frBzSlowMul) * 100) + "% 감소";
+    if (k === "frost") return "자신을 중심으로 " + num(ULT.frBzDur / 1000) + "초간 유지되는 반경 " + ULT.frBzR + "의 눈보라 생성. 눈보라에서 아군은 은신 상태가 되고, 적은 1초당 " +
+      ULT.frBzDmg + "의 피해를 입고 " + Math.round((1 - ULT.frBzSlowMul) * 100) + "% 둔화";
     return "";
   }
   function passiveDesc(k) {
