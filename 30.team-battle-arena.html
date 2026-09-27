@@ -164,14 +164,15 @@
   }
   .charCard { flex: 0 0 132px; min-width: 0; padding: 0; border: 0; background: transparent; text-align: center; perspective: 900px; color: inherit; transition: flex-basis .35s ease; }
   .charCard.flip { flex-basis: 320px; }
-  .cardIn { position: relative; height: 184px; transition: transform .45s ease; transform-style: preserve-3d; }
+  .cardIn { position: relative; height: var(--card-h, 184px); transition: transform .45s ease; transform-style: preserve-3d; }
   .charCard.flip .cardIn { transform: rotateY(180deg); }
   .face { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; flex-direction: column; overflow: hidden;
           -webkit-backface-visibility: hidden; backface-visibility: hidden;
           border: 3px solid var(--sg-line-mid); border-radius: 10px; background: var(--sg-panel); padding: 8px 6px; }
   .face.back { transform: rotateY(180deg); }
-  .charCard.flip .cardIn { height: auto; min-height: 184px; }
-  .charCard.flip .face.back { position: relative; min-height: inherit; }
+  .cardMeasure { position: absolute; left: -9999px; top: 0; visibility: hidden; pointer-events: none; }
+  .cardMeasure .cardIn { height: auto; transition: none; }
+  .cardMeasure .face.back { position: relative; transform: none; }
   .charCard .st tbody, .dfDetail .st tbody { display: grid; grid-template-columns: 1fr 1fr; column-gap: 10px; }
   .charCard .st tr, .dfDetail .st tr { display: flex; justify-content: space-between; border-top: 1px solid var(--sg-line); }
   .charCard .st th, .charCard .st td, .dfDetail .st th, .dfDetail .st td { border-top: 0 !important; }
@@ -404,8 +405,7 @@
     .roleTag small { font-size: 10px; }
     .charCard { flex-basis: 104px; }
     .charCard.flip { flex-basis: 260px; }
-    .cardIn { height: 176px; }
-    .charCard.flip .cardIn { min-height: 176px; }
+    .cardIn { height: var(--card-h, 176px); }
     .charCard .nm { font-size: 16px; }
     .back .nm { font-size: 14px; }
     .charCard .st { font-size: 12px; }
@@ -1203,6 +1203,23 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (cs.boxSizing === "border-box") frame = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth);
     box.style.width = Math.ceil(need + frame + 2) + "px";
   }
+  var cardHeightFor = null;
+  function fitCardHeight() {
+    var box = $("chars"), narrow = window.innerWidth <= 560;
+    if (!box || cardHeightFor === narrow || !box.offsetParent || !box.querySelector(".charCard")) return;
+    var probe = document.createElement("div");
+    probe.className = "roleCards cardMeasure";
+    probe.innerHTML = box.innerHTML;
+    [].forEach.call(probe.querySelectorAll(".charCard"), function (c) { c.classList.add("flip"); });
+    box.appendChild(probe);
+    var tallest = narrow ? 176 : 184;
+    [].forEach.call(probe.querySelectorAll(".face.back"), function (f) { tallest = Math.max(tallest, Math.ceil(f.offsetHeight)); });
+    box.removeChild(probe);
+    box.style.setProperty("--card-h", tallest + "px");
+    cardHeightFor = narrow;
+  }
+  window.addEventListener("resize", fitCardHeight);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { cardHeightFor = null; fitCardHeight(); });
   function fitCharCols() { fitCharCol($("charCardBox")); fitCharCol(document.querySelector(".dfCharCol")); }
   window.addEventListener("resize", fitCharCols);
   function num(v) { return String(Math.round(v * 10) / 10); }
@@ -1312,7 +1329,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     setText($("charHint"), cup ? "대회모드에서는 게임 시작 후 캐릭터를 골라요. 카드를 누르면 자세한 설명이 나옵니다." : "선택한 캐릭터를 한 번 더 누르면 자세한 설명이 나옵니다.");
     show($("btnSwapTeams"), cup && isHost() && room.status === "lobby");
 
-    setHtmlKeepScroll($("chars"), cardsHtml(me, cup)); fitCharCol($("charCardBox"));
+    setHtmlKeepScroll($("chars"), cardsHtml(me, cup)); fitCardHeight(); fitCharCol($("charCardBox"));
 
     var host = isHost(), ok = false, hint = "";
     if (!mode) hint = "게임 방식을 먼저 골라 주세요.";
