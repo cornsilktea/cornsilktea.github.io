@@ -580,15 +580,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function charsInRole(r) { return CHAR_LIST.filter(function (c) { return CHARS[c].role === r; }); }
   var ULT = { mkCount: 10, mkGap: 55, mkDmg: 36, mkRefund: 1, mkSpeed: 1150, mkRange: KEY * 8, mkPr: 8,
               bzDur: 4000, bzDmgMul: 1.5, bzCdMul: 1 / 1.5, bzHeal: 20, tkDur: 5000, tkDef: 0.3, tkStunR: 100, tkStunMs: 1000,
-              mbDelay: 700, mbR: 150, mbDmg: 90, mbCast: 550, mbMin: 60, mbStunMs: 500,
+              mbDelay: 700, mbR: 150, mbDmg: 90, mbCast: 550, mbMin: 60, mbStunMs: 1000,
               asSmokeMs: 400, asDur: 15000,
               smCount: 2, smAhead: KEY * 1, smSide: 38, smHp: 50, smSpeed: 200, smDmg: 10, smCd: 800, smRange: 80, smArc: Math.PI * 0.6,
               smDur: 8000, smMax: 4, smRiseMs: 1100, smCorpseMs: 1400,
               pnDmg: 90, pnSpeed: 1500, pnRange: 700, pnPr: 16, pnRefund: 2, pnScale: 3,
               plFlight: 700, plFlightMin: 150, plR: 60, plDur: 3000, plTick: 1000, plMax: 4, plFade: 500, plLob: 90,
-              fgR: 150, fgDur: 5000, fgDmg: 20, fgHeal: 20, fgSlowMul: 0.6, fgSlowMs: 400, fgCast: KEY * 4 + 100, fgRefund: 1,
+              fgR: 150, fgDur: 4000, fgDmg: 20, fgHeal: 20, fgSlowMul: 0.6, fgSlowMs: 400, fgCast: KEY * 4 + 100, fgRefund: 1,
               lnWind: 300, lnLen: 350, lnW: 36, lnDmg: 90, lnStunMs: 1200,
-              bsDelay: 700, bsR: 150, bsDmg: 60, bsStunMs: 800, bsRefund: 3, bsCast: 450, bsMin: 60, bsHop: 45,
+              bsDelay: 700, bsR: 150, bsDmg: 60, bsStunMs: 800, bsCast: 450, bsMin: 60, bsHop: 45,
               bhR: 150, bhDur: 3000, bhDelay: 500, bhPull: 220, bhCast: 380, bhMin: 60 };
   var SNIPER_KEEP = KEY * 5;
   function isMelee(c) { return !!(CHARS[c].arc || CHARS[c].width); }
@@ -929,7 +929,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var ref = db.ref(ROOT + "/" + code);
     room = { code: code, ref: ref, mode: null, map: "forest", status: "lobby", host: null, startAt: 0, winner: null, endedAt: 0, final: null, roster: null, draft: null };
     clear3d();
-    P = {}; R = {}; PR = {}; MELEE = {}; FX = []; BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; HOLES = []; G = null; ME = null; BOTS = {}; ST = {}; SHOTS = []; hitSubs = {};
+    P = {}; R = {}; PR = {}; MELEE = {}; FX = []; BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; G = null; ME = null; BOTS = {}; ST = {}; SHOTS = []; hitSubs = {};
     ref.child("players/" + myId).onDisconnect().remove();
     ref.child("ping/" + myId).onDisconnect().remove();
     ref.child("pong/" + myId).onDisconnect().remove();
@@ -1021,7 +1021,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (room) { leaving = true; unsubAll(); try { room.ref.child("players/" + myId).onDisconnect().cancel(); } catch (e) {} }
     room = null; resetLocal(); showScreen("start"); startMsg(msg || "");
   }
-  function resetLocal() { clear3d(); BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; HOLES = []; P = {}; R = {}; PR = {}; MELEE = {}; FX = []; G = null; ME = null; BOTS = {}; ST = {}; SHOTS = []; hitSubs = {}; joy.id = null; aim.id = null; }
+  function resetLocal() { clear3d(); BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; P = {}; R = {}; PR = {}; MELEE = {}; FX = []; G = null; ME = null; BOTS = {}; ST = {}; SHOTS = []; hitSubs = {}; joy.id = null; aim.id = null; }
   window.addEventListener("pagehide", function () { if (room) { try { room.ref.child("players/" + myId).remove(); } catch (e) {} } });
 
   var screenNow = "start";
@@ -1553,7 +1553,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var PR = {};
   var MELEE = {};
   var FX = [];
-  var BURSTS = [], POOLS = [], POOL_HIT = {}, LUNGES = [], HOLES = [];
+  var BURSTS = [], POOLS = [], POOL_HIT = {}, LUNGES = [], WAVES = [], HOLES = [];
   var handled = {};
 
   function makeEnt(id, d) {
@@ -1574,7 +1574,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     clear3d();
     G = { startAt: room.startAt, endSent: false, playingSent: false, lastNet: 0, sent: {}, finalSent: false, beeped: -1 };
     ME = isSpec() ? null : makeEnt(myId, P[myId]);
-    BOTS = {}; R = {}; FX = []; BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; HOLES = []; handled = {};
+    BOTS = {}; R = {}; FX = []; BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; handled = {};
     lastHp = {};
     show($("endOv"), false);
   }
@@ -1961,7 +1961,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (h.d) owner.dmg += h.d;
       if (h.k) owner.kills++;
       if (h.hl) owner.heal += h.hl;
-      if (h.u && owner.char === "blacksmith" && owner.refundKey !== h.u) { owner.refundKey = h.u; owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.bsRefund); }
       if (h.u === "volley" && owner.char === "ranger") owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.mkRefund);
       if (h.u === "giant" && owner.char === "sniper") owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.pnRefund);
       if (h.u === "fog" && owner.char === "thrower" && !gaugeLocked(owner)) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.fgRefund);
@@ -2109,37 +2108,60 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return false;
     });
   }
+  function strikeSpark(T, d, who) {
+    if (!T || !T.alive || !inStrike(T, d)) return;
+    var ally = T.team === d.team;
+    if (ally && (!d.heal || T.minion || T.id === d.owner)) return;
+    if (!ME || ME.team === T.team || visibleTo(T, ME)) spark(T.x, T.y, ally ? HEAL_SPARK : (MELEE_SPARK[who] || "#FFFFFF"), who === "knight" || d.u ? 1.5 : 1);
+  }
+  function strikeHit(T, d) {
+    if (T.team === d.team || !T.alive || !inStrike(T, d)) return;
+    var dx = T.x - d.x, dy = T.y - d.y;
+    if (protectedNow(T)) return;
+    if (d.slam && !d.dmg) { afflict(T, d.fx); return; }
+    damage(T, d.dmg, d.owner, !d.m && !d.u && d.createdAt, d.hammer ? d.createdAt : null, d.fx);
+    if (d.kb && T.alive) {
+      var dd = hyp(dx, dy) || 1;
+      T.x += dx / dd * d.kb; T.y += dy / dd * d.kb; resolve(T);
+    }
+  }
+  function strikeHeal(T, d) {
+    if (!d.heal || T.team !== d.team || T.minion || T.id === d.owner || !T.alive || !inStrike(T, d)) return;
+    var healed = Math.min(T.maxHp - T.hp, d.heal);
+    if (healed <= 0) return;
+    T.hp += healed;
+    room.ref.child("hits/" + d.owner).push({ d: 0, b: 0, t: now(), hl: healed });
+    G.forceNet = true;
+    if (T === ME) sfx("heal");
+  }
   function meleeStrike(key, d) {
-    MELEE[key] = { d: d, at: Date.now() };
     var who = P[d.owner] ? P[d.owner].characterType : "";
+    if (WAVE[who] && d.len) {
+      MELEE[key] = { d: d, at: Date.now() - Math.max(0, now() - d.createdAt) };
+      WAVES.push({ d: d, who: who, sparked: [], struck: [] });
+      return;
+    }
+    MELEE[key] = { d: d, at: Date.now() };
     if (d.u && hear(d)) sfx("boom");
     if (d.slam) boom(d.x, d.y, d.radius + BODY_R, d.team);
     if (d.hammer) thunder(d.x, d.y);
-    participants().map(ent).concat(allMinions()).forEach(function (T) {
-      if (!T || !T.alive || !inStrike(T, d)) return;
-      var ally = T.team === d.team;
-      if (ally && (!d.heal || T.minion || T.id === d.owner)) return;
-      if (!ME || ME.team === T.team || visibleTo(T, ME)) spark(T.x, T.y, ally ? HEAL_SPARK : (MELEE_SPARK[who] || "#FFFFFF"), who === "knight" || d.u ? 1.5 : 1);
-    });
-    localTargets().forEach(function (T) {
-      if (T.team === d.team || !T.alive || !inStrike(T, d)) return;
-      var dx = T.x - d.x, dy = T.y - d.y;
-      if (protectedNow(T)) return;
-      if (d.slam && !d.dmg) { afflict(T, d.fx); return; }
-      damage(T, d.dmg, d.owner, !d.m && !d.u && d.createdAt, d.hammer ? d.createdAt : null, d.fx);
-      if (d.kb && T.alive) {
-        var dd = hyp(dx, dy) || 1;
-        T.x += dx / dd * d.kb; T.y += dy / dd * d.kb; resolve(T);
-      }
-    });
-    if (d.heal) localTargets().forEach(function (T) {
-      if (T.team !== d.team || T.minion || T.id === d.owner || !T.alive || !inStrike(T, d)) return;
-      var healed = Math.min(T.maxHp - T.hp, d.heal);
-      if (healed <= 0) return;
-      T.hp += healed;
-      room.ref.child("hits/" + d.owner).push({ d: 0, b: 0, t: now(), hl: healed });
-      G.forceNet = true;
-      if (T === ME) sfx("heal");
+    participants().map(ent).concat(allMinions()).forEach(function (T) { strikeSpark(T, d, who); });
+    localTargets().forEach(function (T) { strikeHit(T, d); strikeHeal(T, d); });
+  }
+  function waveFront(d, t) { return Math.min(1, (t - d.createdAt) / WAVE_TRAVEL_MS) * (d.len + BODY_R); }
+  function reachedBy(T, d, front) { return T && (T.x - d.x) * Math.cos(d.angle) + (T.y - d.y) * Math.sin(d.angle) <= front; }
+  function stepWaves(t) {
+    WAVES = WAVES.filter(function (w) {
+      var d = w.d, front = waveFront(d, t);
+      participants().map(ent).concat(allMinions()).forEach(function (T) {
+        if (!reachedBy(T, d, front) || w.sparked.indexOf(T) >= 0) return;
+        w.sparked.push(T); strikeSpark(T, d, w.who);
+      });
+      localTargets().forEach(function (T) {
+        if (!reachedBy(T, d, front) || w.struck.indexOf(T) >= 0) return;
+        w.struck.push(T); strikeHit(T, d); strikeHeal(T, d);
+      });
+      return t < d.createdAt + WAVE_TRAVEL_MS;
     });
   }
   function swing(E, ang, rage) {
@@ -3305,7 +3327,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function dropProjVis(id) { var g = PRV[id]; if (!g) return; scene.remove(g); delete PRV[id]; }
 
   var PROJ_Y = 42, BOW_BLEND = 140;
-  var WAVE_MS = { priest: 520 };
+  var WAVE_TRAVEL_MS = 380;
+  var WAVE = { priest: { life: 540 } };
   var MELEE_COLOR = { warrior: 0xFF9A3C, knight: 0xFFFFFF, rogue: 0xC9D6E6, necro: 0xB07CFF, lancer: 0xFFD27A, blacksmith: 0xFFB45A, priest: 0x7CFFB2 };
   function makeMeleeVis(d) {
     var g = new THREE.Group(), who = P[d.owner] ? P[d.owner].characterType : "", col = d.u ? 0xFF6A3D : (MELEE_COLOR[who] || 0xFFFFFF);
@@ -3322,7 +3345,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     fill.position.y = 2; edge.position.y = 24;
     g.add(fill); g.add(edge); g.position.set(d.x, 0, d.y); g.rotation.y = -d.angle;
-    g.userData = { fill: fillM, edge: edgeM, edgeMesh: edge, line: d.len ? d.len + BODY_R : 0 };
+    g.userData = { fill: fillM, edge: edgeM, edgeMesh: edge, fillMesh: fill, line: d.len ? d.len + BODY_R : 0 };
     scene.add(g);
     return g;
   }
@@ -3867,13 +3890,17 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     keys(PRV).forEach(function (id) { if (!PR[id]) dropProjVis(id); });
 
     keys(MELEE).forEach(function (k) {
-      var m = MELEE[k], age = nowMs - m.at, g = MLV[k], wave = WAVE_MS[P[m.d.owner] ? P[m.d.owner].characterType : ""], life = wave || 240;
+      var m = MELEE[k], age = nowMs - m.at, g = MLV[k], wave = WAVE[P[m.d.owner] ? P[m.d.owner].characterType : ""], life = wave ? wave.life : 240;
       if (age > life) { if (g) dropMelee(k); return; }
       if (!g) g = MLV[k] = makeMeleeVis(m.d);
       var f = age / life;
       g.userData.fill.opacity = 0.2 * (1 - f);
       g.userData.edge.opacity = 0.9 * (1 - (wave ? f * f : f));
-      if (g.userData.line) g.userData.edgeMesh.scale.x = g.userData.line * (wave ? 0.1 + 0.9 * Math.min(1, f * 1.4) : 0.55 + 0.45 * Math.min(1, f * 3));
+      if (wave) {
+        var reach = Math.max(0.03, Math.min(1, age / WAVE_TRAVEL_MS));
+        g.userData.edgeMesh.scale.x = g.userData.line * reach;
+        g.userData.fillMesh.scale.x = g.userData.line * reach;
+      } else if (g.userData.line) g.userData.edgeMesh.scale.x = g.userData.line * (0.55 + 0.45 * Math.min(1, f * 3));
       else g.userData.edgeMesh.scale.setScalar(0.85 + 0.2 * f);
     });
     LUNGES.forEach(function (l) {
@@ -4140,6 +4167,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     stepPools(t);
     stepHoles(t, dt);
     stepLunges(t);
+    stepWaves(t);
     pruneLocal(t);
     var active = st === "playing" && t >= room.startAt;
     if (active) {
