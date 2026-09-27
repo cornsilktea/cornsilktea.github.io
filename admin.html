@@ -900,14 +900,21 @@ function showGuide(src, caption) {
 const STATS_GAMES = {
   teambattle: {
     path: "teambattle/stats",
-    /* 2026-09-26 3D 개편으로 직업이 5개로 바뀌었다. 옛 직업(marksman·healer·tank·assassin) 통계는
-       데이터베이스에 남아 있지만 새 직업과 비교할 수 없어서 표에서 뺐다. 회복은 마법사 스킬(아군 회복)만 있다. */
+    /* 30번 게임의 CHAR_LIST 와 같은 순서·이름으로 둔다. 캐릭터가 새로 생기면 여기에도 한 줄 추가해야
+       표에 나온다(데이터베이스규칙.json 의 teambattle/stats 허용 목록도 함께).
+       옛 직업(marksman·healer·tank·assassin) 통계는 데이터베이스에 남아 있지만 새 직업과 비교할 수 없어서 뺐다.
+       회복은 주술사 메테오·투척병 독안개(아군 회복)만 있다. */
     roles: [
-      { id: "warrior", name: "전사" },
-      { id: "knight",  name: "기사" },
-      { id: "ranger",  name: "궁수" },
-      { id: "mage",    name: "마법사", heal: true },
-      { id: "rogue",   name: "도적" }
+      { id: "warrior",    name: "광전사" },
+      { id: "knight",     name: "기사" },
+      { id: "ranger",     name: "궁수" },
+      { id: "mage",       name: "주술사", heal: true },
+      { id: "rogue",      name: "도적" },
+      { id: "necro",      name: "네크로" },
+      { id: "sniper",     name: "저격수" },
+      { id: "thrower",    name: "투척병", heal: true },
+      { id: "lancer",     name: "창기사" },
+      { id: "blacksmith", name: "대장장이" }
     ]
   }
 };
@@ -955,7 +962,7 @@ async function showStats(g) {
       tr.appendChild(el("td", null, role.name));
       tr.appendChild(rateCell(picks, totalPicks));
       tr.appendChild(rateCell(wins, picks));
-      /* 1판 평균. 회복은 마법사 스킬(아군 회복)만 있어서 다른 직업은 "-" */
+      /* 1판 평균. 회복 스킬이 있는 직업(heal: true)만 회복량을 보이고 나머지는 "-" */
       tr.appendChild(el("td", null, picks ? String(Math.round(d.dmg || 0)) : "-"));
       tr.appendChild(el("td", null, picks && role.heal ? String(Math.round(d.heal || 0)) : "-"));
       table.appendChild(tr);

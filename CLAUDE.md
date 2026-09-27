@@ -80,6 +80,10 @@
   화면에는 세계 신기록 옆에 "우리 반 신기록" 칸을 `hidden` 으로 두고 `WR.cls` 가 있을 때만 보인다(`[hidden]{display:none !important}` 필요).
   `wrBeat` 로 prompt 를 가리는 게임은 `WR.beatsClass(값)` 도 함께 본다. 패턴은 6·20·25번 참고.
 
+- **30번(팀 배틀)에 캐릭터를 추가하면 통계 두 곳도 반드시 함께 고친다.** `admin.html` 의 `STATS_GAMES.teambattle.roles`
+  (게임의 `CHAR_LIST` 순서·`CHARS` 이름 그대로, 아군 회복 스킬이 있으면 `heal: true`)와 `데이터베이스규칙.json` 의
+  `teambattle/stats/$char` 허용 목록. 규칙을 바꿨으면 선생님께 콘솔에 다시 게시하도록 알린다.
+
 ## 환경
 
 - 로컬 미리보기: `.claude/launch.json` 의 `static`(pwsh 정적 서버, 8765 포트). `.claude/` 는 gitignore 되어 있다.
