@@ -131,6 +131,9 @@
     width: 22px; height: 22px; border-radius: 50%; background: var(--sg-panel);
     box-shadow: var(--sg-shadow-md); transition: left .15s;
   }
+  /* 다크 모드에서는 꺼진 스위치 바탕·손잡이가 카드 배경과 거의 같아 안 보여서 한 단계씩 밝힌다 */
+  :root[data-theme="dark"] .switch input:not(:checked) + .track { background: var(--sg-line-mid); border-color: var(--sg-ink-faint); }
+  :root[data-theme="dark"] .switch input:not(:checked) + .track::after { background: var(--sg-ink-soft); }
   .switch input:checked + .track { background: var(--sg-primary); border-color: var(--sg-primary); }
   .switch input:checked + .track::after { left: 21px; }
   .switch input:focus-visible + .track { box-shadow: 0 0 0 3px var(--sg-focus); }
