@@ -1480,7 +1480,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     });
     u.roster = roster; u.st = st; u.arena = arena; u.draft = null;
     u.status = "countdown"; u.startAt = now() + countMs; u.winner = null; u.final = null; u.endedAt = null;
-    u.shots = null; u.meleeHits = null; u.hits = null; u.effects = null; u.projectiles = null;
+    u.shots = null; u.meleeHits = null; u.hits = null; u.effects = null; u.kills = null; u.projectiles = null;
     room.ref.update(u);
   }
 
@@ -1717,7 +1717,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     ME = isSpec() ? null : makeEnt(myId, P[myId]);
     BOTS = {}; R = {}; FX = []; CC_PENDING = {}; hudMeShown = { k: -1, d: -1, dmg: -1 }; BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; STORMS = []; handled = {};
     lastHp = {};
+    clearKillFeed();
     show($("endOv"), false);
+  }
+  function clearKillFeed() {
+    $("killFeed").innerHTML = "";
+    var banner = $("killBanner");
+    banner.className = ""; banner.innerHTML = ""; banner._h = "";
   }
   function isSpec() { return !!P[myId] && P[myId].team === "spec"; }
   function participants() {
