@@ -947,6 +947,10 @@ async function showStats(g) {
     s = s || {};
     const totalPicks = meta.roles.reduce((n, role) => n + ((s[role.id] && s[role.id].picks) || 0), 0);
     msg.textContent = "집계된 경기 " + (s.matches || 0) + "판 · 총 게임 수(참가 인원 합계) " + totalPicks + "게임";
+    /* 대회모드는 블루가 먼저 고르는 드래프트라 진영 유불리를 따로 본다(무승부는 어느 쪽 승리에도 안 셈) */
+    const cup = s.cup || {};
+    box.appendChild(el("p", "msg", "대회모드 진영 승률: 레드 " + pct(cup.red || 0, cup.matches || 0) +
+      " · 블루 " + pct(cup.blue || 0, cup.matches || 0) + " (" + (cup.matches || 0) + "경기)"));
 
     /* 비율 옆에 (분자 / 분모) 를 작게 붙여 표본이 적은 직업을 알아볼 수 있게 한다 */
     function rateCell(a, b) {

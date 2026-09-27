@@ -2732,6 +2732,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         st.wins = (+st.wins || 0) + (w.win ? 1 : 0);
         cur[w.c] = st;
       });
+      if (r.mode === "cup") {
+        var cup = cur.cup || {};
+        cup.matches = (+cup.matches || 0) + 1;
+        cup.red = (+cup.red || 0) + (r.winner === "red" ? 1 : 0);
+        cup.blue = (+cup.blue || 0) + (r.winner === "blue" ? 1 : 0);
+        cur.cup = cup;
+      }
       return cur;
     }).catch(function () {});
   }
