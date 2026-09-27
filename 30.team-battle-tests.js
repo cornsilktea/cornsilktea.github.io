@@ -491,7 +491,7 @@ function collectResults(api) {
     frostShot(W);
     done(foe.frostStacks === 1 && !api.stunned(foe, W.t()) ? "pass" : "fail", "2스택 뒤 쉬었다 맞힘 → " + foe.frostStacks + "스택" + (api.stunned(foe, W.t()) ? ", 빙결됨" : ""));
   });
-  run(FROST, "눈보라: 시전자를 따라다니고, 범위 안 적은 1초에 " + api.ULT.frBzDmg + " 피해, 아군은 먼 적에게 숨겨지는가", function (done) {
+  run(FROST, "눈보라: 시전자를 따라다니고, 범위 안 적은 1초에 " + api.ULT.frBzDmg + " 피해·이동속도 " + Math.round((1 - api.ULT.frBzSlowMul) * 100) + "% 감소, 아군은 먼 적에게 숨겨지는가", function (done) {
     var y = OPEN_Y.forest;
     var W = world("forest", [
       { id: "fr", team: "blue", char: "frost", x: 300, y: y, gauge: api.GAUGE_MAX },
@@ -507,6 +507,8 @@ function collectResults(api) {
     W.step(3000);
     var lost = hp0 - foe.hp;
     if (lost < api.ULT.frBzDmg * 3 || lost > api.ULT.frBzDmg * 4) bad.push("3초간 피해 " + lost);
+    var slowRatio = api.speedOf(foe) / api.CHARS.knight.speed;
+    if (Math.abs(slowRatio - api.ULT.frBzSlowMul) > 0.01) bad.push("범위 안 적 이동속도 " + Math.round(slowRatio * 100) + "%");
     fr.x += 150;
     W.frame(FRAME);
     var c = api.stormCenter(api.storms()[0]);
@@ -515,7 +517,7 @@ function collectResults(api) {
     var hp1 = foe.hp; W.step(2000);
     if (foe.hp !== hp1) bad.push("끝난 뒤에도 피해");
     if (api.hiddenFrom(al, W.t())) bad.push("끝난 뒤에도 숨겨짐");
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "3초간 " + lost + " 피해, 따라다님, 끝나면 은신·피해 모두 멈춤");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "3초간 " + lost + " 피해, 이동속도 " + Math.round(slowRatio * 100) + "%, 따라다님, 끝나면 은신·피해 모두 멈춤");
   });
   run(FROST, "눈보라: 시전자가 지속 중 죽으면 그 자리에 멈추고, 부활해도 스폰 지점으로 튀지 않는가", function (done) {
     var y = OPEN_Y.forest;

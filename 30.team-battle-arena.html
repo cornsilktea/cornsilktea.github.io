@@ -641,7 +641,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               exRange: 500, exSpeed: 1300, exPr: 4, exDmg: 10, exStunMs: 1000,
               gdR: 200, gdKb: 150, gdKbMs: 500,
               frSlowMs: 1200, frSlowMul: 0.85, frSlowStep: 0.15, frFreezeMs: 800,
-              frBzR: 400, frBzDur: 5000, frBzDmg: 5, frBzTick: 1000, frBzDelay: 400 };
+              frBzR: 400, frBzDur: 5000, frBzDmg: 5, frBzTick: 1000, frBzDelay: 400, frBzSlowMul: 0.8, frBzSlowMs: 400 };
   var SNIPER_KEEP = KEY * 5;
   function isMelee(c) { return !!(CHARS[c].arc || CHARS[c].width || CHARS[c].dashWidth); }
   var STEALTH_ALPHA = 0.4;
@@ -1220,7 +1220,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "guardian") return "주변 " + ULT.gdR + " 내의 적 모두를 " + ULT.gdKb + "만큼 밀어냄";
     if (k === "priest") return "지정한 곳에 " + num(ULT.bhDelay / 1000) + "초 뒤 반경 " + ULT.bhR + "의 블랙홀 생성, " + num(ULT.bhDur / 1000) + "초간 범위 안의 적을 중심으로 끌어당김";
     if (k === "frost") return "자신을 중심으로 반경 " + ULT.frBzR + "의 눈보라 생성(시전자를 따라다님), " + num(ULT.frBzDur / 1000) +
-      "초간 유지. 범위 내 아군은 은신 상태가 되고, 적은 1초당 " + ULT.frBzDmg + "의 피해를 입는다";
+      "초간 유지. 범위 내 아군은 은신 상태가 되고, 적은 1초당 " + ULT.frBzDmg + "의 피해를 입고 이동속도 " + Math.round((1 - ULT.frBzSlowMul) * 100) + "% 감소";
     return "";
   }
   function statTable(k) {
@@ -2205,11 +2205,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     BURSTS.push({ e: e, vis: null });
   }
   function poolStart(e) { return e.createdAt + e.delay; }
-  function slowInFog(T, t, owner) {
-    var fresh = (T.slows || []).some(function (s) { return s.mul === ULT.fgSlowMul && s.until - t > ULT.fgSlowMs / 2; });
+  function slowWhileInside(T, t, owner, mul, ms) {
+    var fresh = (T.slows || []).some(function (s) { return s.mul === mul && s.until - t > ms / 2; });
     if (fresh) return;
     var was = slowed(T, t);
-    addSlowCredited(T, ULT.fgSlowMul, ULT.fgSlowMs, t, owner);
+    addSlowCredited(T, mul, ms, t, owner);
     if (!was) G.forceNet = true;
   }
   function healInFog(T, e, t) {
@@ -2239,7 +2239,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (!T.alive || hyp(T.x - e.x, T.y - e.y) > e.r + BODY_R * 0.5) return;
         if (T.team === e.team) { if (e.u && !T.minion) healInFog(T, e, t); return; }
         if (protectedNow(T, t)) return;
-        if (e.u && !T.minion) slowInFog(T, t, e.owner);
+        if (e.u && !T.minion) slowWhileInside(T, t, e.owner, ULT.fgSlowMul, ULT.fgSlowMs);
         var key = e.owner + ">" + T.id;
         if (POOL_HIT[key] && t - POOL_HIT[key] < ULT.plTick) return;
         POOL_HIT[key] = t;
@@ -2294,12 +2294,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var c = stormCenter(s);
       if (!s.landed) { s.landed = true; if (!ME || hyp(c.x - ME.x, c.y - ME.y) < 700) sfx("orb"); }
       if (room.status !== "playing") return true;
+      var foesInside = localTargets().filter(function (T) { return T.alive && T.team !== e.team && hyp(T.x - c.x, T.y - c.y) <= e.r; });
+      foesInside.forEach(function (T) { if (!T.minion && !protectedNow(T, t)) slowWhileInside(T, t, e.owner, ULT.frBzSlowMul, ULT.frBzSlowMs); });
       if (s.nextTick && t < s.nextTick) return true;
       s.nextTick = (s.nextTick || t) + ULT.frBzTick;
-      localTargets().forEach(function (T) {
-        if (!T.alive || T.team === e.team || hyp(T.x - c.x, T.y - c.y) > e.r) return;
-        damage(T, ULT.frBzDmg, e.owner, false, "blizzard");
-      });
+      foesInside.forEach(function (T) { damage(T, ULT.frBzDmg, e.owner, false, "blizzard"); });
       return true;
     });
   }
@@ -4349,7 +4348,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (!ally && hid && !revealedTo(E, me, t)) { lastHp[id] = E.hp; v.root.visible = false; return; }
       v.root.visible = true;
       var bi = bushIndexAt(E.x, E.y); if (bi >= 0) bushSeen[bi] = 1;
-      var alpha = !E.alive ? (v.kit ? 0.6 : 0.35) : (hid ? (spec ? 0.55 : STEALTH_ALPHA) : 1), hurt = false;
+      var revealedByAttack = !ally && E.revealUntil > t;
+      var alpha = !E.alive ? (v.kit ? 0.6 : 0.35) : (hid && !revealedByAttack ? (spec ? 0.55 : STEALTH_ALPHA) : 1), hurt = false;
       if (protectedNow(E, t)) alpha = Math.min(alpha, 0.5 + 0.3 * Math.sin(nowMs / 70));
       if (lastHp[id] !== undefined && Math.abs(E.hp - lastHp[id]) >= 1) {
         var d = Math.round(E.hp - lastHp[id]);
