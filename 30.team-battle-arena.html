@@ -556,14 +556,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var ATK_POSE_MS = 150;
   var NET_MS = 143;
   var CHARS = {
-    warrior: { name: "광전사", role: "fighter", icon: "🪓", hp: 270, speed: 230, ultSpeed: 300, cd: 850, dmg: 45, range: 110, arc: Math.PI * 0.55, ultName: "광폭화" },
+    warrior: { name: "광전사", role: "fighter", icon: "🪓", hp: 270, speed: 230, ultSpeed: 300, cd: 850, dmg: 45, range: 110, arc: Math.PI * 0.55, ultName: "광폭화", heals: true },
     knight:  { name: "기사", role: "fighter", icon: "🛡️", hp: 400, speed: 220, cd: 1000, dmg: 30, range: 110, arc: Math.PI * 0.7, kb: 28, ultName: "방어태세" },
     ranger:  { name: "궁수", role: "shooter", icon: "🏹", hp: 100, speed: 250, cd: 400, dmg: 10, range: KEY * 6, pSpeed: 950, pr: 6, shots: 2, gap: 70, ultName: "난사", ultAim: true },
-    mage:    { name: "주술사", role: "caster", icon: "🔮", hp: 120, speed: 250, cd: 500, dmg: 11, range: 350, pSpeed: 700, pr: 9, ultName: "메테오", ultAim: true },
+    mage:    { name: "주술사", role: "caster", icon: "🔮", hp: 120, speed: 250, cd: 500, dmg: 11, range: 350, pSpeed: 700, pr: 9, ultName: "메테오", ultAim: true, heals: true },
     rogue:   { name: "도적", role: "assassin", icon: "🗡️", hp: 100, speed: 300, ultSpeed: 420, cd: 600, dmg: 30, range: 110, arc: Math.PI * 0.6, hits: 2, hitGap: 160, throwDmg: 20, throwRange: 300, pSpeed: 900, pr: 8, ultName: "은신" },
     necro:   { name: "네크로", role: "caster", icon: "💀", hp: 120, speed: 250, cd: 500, dmg: 11, range: KEY * 4, pSpeed: 1000, pr: 9, ultName: "해골 소환" },
     sniper:  { name: "저격수", role: "shooter", icon: "🎯", hp: 100, speed: 240, cd: 1429, dmg: 40, range: 700, pSpeed: 1500, pr: 7, ultName: "거대 화살", ultAim: true },
-    thrower: { name: "투척병", role: "shooter", icon: "🧪", hp: 120, speed: 240, cd: 1000, dmg: 20, ticks: 3, range: KEY * 4 + 100, minRange: KEY * 1, ultName: "독안개", ultAim: true },
+    thrower: { name: "투척병", role: "shooter", icon: "🧪", hp: 120, speed: 240, cd: 1000, dmg: 20, ticks: 3, range: KEY * 4 + 100, minRange: KEY * 1, ultName: "독안개", ultAim: true, heals: true },
     lancer:  { name: "창기사", role: "fighter", icon: "🔱", hp: 300, speed: 225, cd: 1200, dmg: 30, range: 200, width: 50, ultName: "꿰뚫기", ultAim: true },
     blacksmith: { name: "대장장이", role: "fighter", icon: "🔨", hp: 350, speed: 225, cd: 1000, dmg: 32, range: 120, width: 80, ultName: "내려찍기", ultAim: true }
   };
@@ -1966,7 +1966,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var sameSwing = h.s && owner.gaugeSwing === h.s;
       if (h.s) owner.gaugeSwing = h.s;
       if (h.b && !sameSwing && !gaugeLocked(owner)) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + roleOf(owner.char).gaugeOnHit);
-      if (h.b && !sameSwing && owner.alive && berserk(owner, h.t)) owner.hp = Math.min(owner.maxHp, owner.hp + ULT.bzHeal);
+      if (h.b && !sameSwing && owner.alive && berserk(owner, h.t)) {
+        var rageHeal = Math.min(owner.maxHp - owner.hp, ULT.bzHeal);
+        owner.hp += rageHeal; owner.heal += rageHeal;
+      }
       if (owner === ME && h.d) sfx("confirm");
       G.forceNet = true;
     }
@@ -3961,7 +3964,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           rows += '<tr class="' + (id === myId ? "mine" : "") + '"><td><span class="dot" style="background:' + (team === "blue" ? "#2F6FD6" : "#D6453D") + '"></span></td>' +
             '<td class="nm">' + (d.isAI ? "🤖 " : "") + esc(d.nickname) + "<small>" + CHARS[E.char].name + "</small></td>" +
             "<td>" + E.kills + "</td><td>" + E.deaths + "</td><td>" + Math.round(E.dmg) + "</td>" +
-            "<td>" + (E.char === "mage" ? Math.round(E.heal) : "-") + "</td>" +
+            "<td>" + (CHARS[E.char].heals ? Math.round(E.heal) : "-") + "</td>" +
             '<td class="sc">' + mvpScore(E) + "</td></tr>";
         });
     });

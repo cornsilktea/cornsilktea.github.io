@@ -81,7 +81,8 @@
   `wrBeat` 로 prompt 를 가리는 게임은 `WR.beatsClass(값)` 도 함께 본다. 패턴은 6·20·25번 참고.
 
 - **30번(팀 배틀)에 캐릭터를 추가하면 통계 두 곳도 반드시 함께 고친다.** `admin.html` 의 `STATS_GAMES.teambattle.roles`
-  (게임의 `CHAR_LIST` 순서·`CHARS` 이름 그대로, 아군 회복 스킬이 있으면 `heal: true`)와 `데이터베이스규칙.json` 의
+  (게임의 `CHAR_LIST` 순서·`CHARS` 이름 그대로, 회복 능력이 있으면 게임 `CHARS` 에 `heals: true`·통계표에 `heal: true` —
+  회복량은 `E.heal` 에 쌓아야 종료 창·통계에 잡힌다)와 `데이터베이스규칙.json` 의
   `teambattle/stats/$char` 허용 목록. 규칙을 바꿨으면 선생님께 콘솔에 다시 게시하도록 알린다.
 
 ## 환경
