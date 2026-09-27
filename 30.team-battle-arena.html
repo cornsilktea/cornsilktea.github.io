@@ -244,6 +244,9 @@
   .kfArrow { color: #D97B4F; font-size: 12px; }
   .kfStreak { margin-left: 4px; padding: 1px 7px; border-radius: 5px; font-size: 12px; font-weight: 800; color: #1B130E; background: #D97B4F; }
   .kfStreak.triple { background: #FFCF5A; box-shadow: 0 0 8px rgba(255,207,90,.7); }
+  .kfStreak.quadra { background: #FF8A3D; color: #fff; box-shadow: 0 0 10px rgba(255,138,61,.8); }
+  .kfStreak.penta { background: #E0413A; color: #fff; box-shadow: 0 0 12px rgba(255,80,70,.9); animation: kfPenta .6s ease-in-out infinite alternate; }
+  @keyframes kfPenta { from { transform: scale(1); } to { transform: scale(1.12); } }
   @keyframes kfIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
   #hudCount .b { color: #6FA8FF; }
   #hudCount .r { color: #FF7A70; }
@@ -1941,6 +1944,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     byKiller[k.k] = times;
     return times.length;
   }
+  var MULTI_KILL_TAGS = [null, null, ["", "더블 킬"], ["triple", "트리플 킬"], ["quadra", "쿼드라 킬"], ["penta", "펜타 킬"]];
+  function multiKillTag(streak) {
+    var tag = MULTI_KILL_TAGS[Math.min(streak, 5)];
+    return tag ? '<span class="kfStreak ' + tag[0] + '">' + tag[1] + "</span>" : "";
+  }
   function onKillFeed(s) {
     var k = s.val(); if (!k || !G || handled[s.key]) return;
     handled[s.key] = 1;
@@ -1954,7 +1962,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var row = document.createElement("div");
     row.className = "kf" + (k.k === myId || k.v === myId ? " mine" : "");
     setHtml(row, nameTag(killer, ent(k.k)) + '<span class="kfArrow">▶</span>' + nameTag(victim, ent(k.v))
-      + (streak >= 3 ? '<span class="kfStreak triple">트리플 킬</span>' : streak === 2 ? '<span class="kfStreak">더블 킬</span>' : ""));
+      + multiKillTag(streak));
     feed.appendChild(row);
     while (feed.children.length > KILL_FEED_MAX) feed.firstChild.remove();
     setTimeout(function () { row.remove(); }, KILL_FEED_MS);
