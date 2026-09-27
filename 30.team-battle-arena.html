@@ -559,7 +559,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     warrior: { name: "광전사", role: "fighter", icon: "🪓", hp: 270, speed: 230, ultSpeed: 300, cd: 850, dmg: 45, range: 110, arc: Math.PI * 0.55, ultName: "광폭화", heals: true },
     knight:  { name: "기사", role: "fighter", icon: "🛡️", hp: 400, speed: 220, cd: 1000, dmg: 30, range: 110, arc: Math.PI * 0.7, kb: 28, ultName: "방어태세" },
     ranger:  { name: "궁수", role: "shooter", icon: "🏹", hp: 100, speed: 250, cd: 400, dmg: 10, range: KEY * 6, pSpeed: 950, pr: 6, shots: 2, gap: 70, ultName: "난사", ultAim: true },
-    mage:    { name: "주술사", role: "caster", icon: "🔮", hp: 120, speed: 250, cd: 500, dmg: 11, range: 350, pSpeed: 700, pr: 9, ultName: "메테오", ultAim: true, heals: true },
+    mage:    { name: "주술사", role: "caster", icon: "🔮", hp: 120, speed: 250, cd: 500, dmg: 11, range: 350, pSpeed: 700, pr: 9, ultName: "메테오", ultAim: true },
     rogue:   { name: "도적", role: "assassin", icon: "🗡️", hp: 100, speed: 300, ultSpeed: 420, cd: 600, dmg: 30, range: 110, arc: Math.PI * 0.6, hits: 2, hitGap: 160, throwDmg: 20, throwRange: 300, pSpeed: 900, pr: 8, ultName: "은신" },
     necro:   { name: "네크로", role: "caster", icon: "💀", hp: 120, speed: 250, cd: 500, dmg: 11, range: KEY * 4, pSpeed: 1000, pr: 9, ultName: "해골 소환" },
     sniper:  { name: "저격수", role: "shooter", icon: "🎯", hp: 100, speed: 240, cd: 1429, dmg: 40, range: 700, pSpeed: 1500, pr: 7, ultName: "거대 화살", ultAim: true },
@@ -580,7 +580,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function charsInRole(r) { return CHAR_LIST.filter(function (c) { return CHARS[c].role === r; }); }
   var ULT = { mkCount: 10, mkGap: 55, mkDmg: 36, mkRefund: 1, mkSpeed: 1150, mkRange: KEY * 8, mkPr: 8,
               bzDur: 4000, bzDmgMul: 1.5, bzCdMul: 1 / 1.5, bzHeal: 20, tkDur: 5000, tkDef: 0.3, tkStunR: 100, tkStunMs: 1000,
-              mbDelay: 700, mbR: 150, mbDmg: 90, mbHeal: 50, mbRefund: 4, mbCast: 550, mbMin: 60, mbStunMs: 500,
+              mbDelay: 700, mbR: 150, mbDmg: 90, mbCast: 550, mbMin: 60, mbStunMs: 500,
               asSmokeMs: 400, asDur: 15000,
               smCount: 2, smAhead: KEY * 1, smSide: 38, smHp: 50, smSpeed: 200, smDmg: 10, smCd: 800, smRange: 80, smArc: Math.PI * 0.6,
               smDur: 8000, smMax: 4, smRiseMs: 1100, smCorpseMs: 1400,
@@ -1145,15 +1145,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function ultDesc(k) {
     function speedUp(c) { return "이동속도 " + (c.ultSpeed - c.speed) + " 증가"; }
     if (k === "warrior") return num(ULT.bzDur / 1000) + "초간 공격속도, 공격력 " + num(ULT.bzDmgMul) + "배, " + speedUp(CHARS.warrior) + ", 기본 공격 적중 시 체력 " + ULT.bzHeal + " 회복";
-    if (k === "knight") return num(ULT.tkDur / 1000) + "초간 받는 피해 " + num(ULT.tkDef) + "배, 끝날 때 반경 " + ULT.tkStunR + " 안의 적 " + num(ULT.tkStunMs / 1000) + "초 기절";
+    if (k === "knight") return num(ULT.tkDur / 1000) + "초간 받는 피해 " + num(ULT.tkDef) + "배, 스킬 지속시간이 끝날 때 반경 " + ULT.tkStunR + " 안의 적 " + num(ULT.tkStunMs / 1000) + "초 기절";
     if (k === "ranger") return num(ULT.mkDmg) + "의 데미지를 주는 화살 " + ULT.mkCount + "발 사격, 화살 1발 적중마다 게이지 " + ULT.mkRefund + " 회복";
-    if (k === "mage") return "지정한 곳에 " + num(ULT.mbDelay / 1000) + "초 뒤 폭발 발생, 적은 " + ULT.mbDmg + "의 데미지 + " + num(ULT.mbStunMs / 1000) + "초 기절,아군은 " + ULT.mbHeal + " 회복, 적 적중 시 게이지 " + ULT.mbRefund + " 회복";
+    if (k === "mage") return "지정한 곳에 반지름 " + ULT.mbR + " 범위의 폭발 발생. 범위 내의 적은 " + ULT.mbDmg + "의 데미지를 입고 " + num(ULT.mbStunMs / 1000) + "초간 기절";
     if (k === "rogue") return num(ULT.asDur / 1000) + "초간 " + speedUp(CHARS.rogue) + ", 은신 상태로 변경, 공격 시 해제";
-    if (k === "necro") return "앞쪽에 해골 병사 " + ULT.smCount + "마리 소환(HP " + ULT.smHp + ", 공격 " + ULT.smDmg + "), " + num(ULT.smDur / 1000) + "초간 보이는 적을 쫓아가 공격, 최대 " + ULT.smMax + "마리";
+    if (k === "necro") return "해골 병사 " + ULT.smCount + "마리 소환(HP " + ULT.smHp + ", 공격 " + ULT.smDmg + "), " + num(ULT.smDur / 1000) + "초간 보이는 적을 쫓아가 공격, 최대 " + ULT.smMax + "마리";
     if (k === "sniper") return "거대한 화살 1발(데미지 " + ULT.pnDmg + ", 사거리 " + ULT.pnRange + "), 적중 시 게이지 " + ULT.pnRefund + " 회복";
-    if (k === "thrower") return "반지름 " + ULT.fgR + "의 독안개 설치, 적은 장판 안에서 이동속도 " + Math.round((1 - ULT.fgSlowMul) * 100) + "% 감소, 1초당 " + ULT.fgDmg + "의 데미지(적중마다 게이지 " + ULT.fgRefund + " 회복)<br>아군은 1초당 " + ULT.fgHeal + " 회복";
+    if (k === "thrower") return num(ULT.fgDur / 1000) + "초간 유지되는 반지름 " + ULT.fgR + "의 독안개 설치. 적은 범위 안에서 이동속도 " + Math.round((1 - ULT.fgSlowMul) * 100) + "% 감소, 1초당 데미지 " + ULT.fgDmg + ". 아군은 1초당 " + ULT.fgHeal + " 회복";
     if (k === "lancer") return num(ULT.lnWind / 1000) + "초 준비 후 앞으로 길이 " + ULT.lnLen + " 찌르기, 맞은 적 모두 " + ULT.lnDmg + "의 데미지 + " + num(ULT.lnStunMs / 1000) + "초 기절";
-    if (k === "blacksmith") return "지정한 곳으로 뛰어올라 " + num(ULT.bsDelay / 1000) + "초 뒤 착지하며 내려찍기, 반경 " + ULT.bsR + " 안의 적 " + ULT.bsDmg + "의 데미지 + " + num(ULT.bsStunMs / 1000) + "초 기절, 적 적중 시 게이지 " + ULT.bsRefund + " 회복";
+    if (k === "blacksmith") return "지정한 곳에 " + num(ULT.bsDelay / 1000) + "초 뒤 착지. 반경 " + ULT.bsR + " 내의 적은 " + ULT.bsDmg + "의 데미지, " + num(ULT.bsStunMs / 1000) + "초간 기절";
     if (k === "priest") return "지정한 곳에 " + num(ULT.bhDelay / 1000) + "초 뒤 반경 " + ULT.bhR + "의 블랙홀 생성, " + num(ULT.bhDur / 1000) + "초간 범위 안의 적을 중심으로 끌어당김";
     return "";
   }
@@ -1161,10 +1161,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var c = CHARS[k], rage = k === "warrior";
     function pair(a, b) { return b == null ? String(a) : a + " / " + b; }
     var times = c.shots || c.hits || c.ticks || 1, hit = num(c.dmg) + (times > 1 ? "*" + times : "");
-    var dmg = pair(hit, c.throwDmg || (rage ? Math.round(c.dmg * ULT.bzDmgMul) : null));
+    var dmg = pair(hit, c.throwDmg || (rage ? Math.round(c.dmg * ULT.bzDmgMul) : null)) + (c.heal ? "(" + c.heal + ")" : "");
     var rate = pair(num(1000 / c.cd), rage ? num(1000 / (c.cd * ULT.bzCdMul)) : null) + "회";
     return '<table class="st"><tr><th>HP</th><td>' + c.hp + "</td></tr><tr><th>공격</th><td>" + dmg + "</td></tr>" +
-           (c.heal ? "<tr><th>회복</th><td>" + c.heal + "</td></tr>" : "") +
            "<tr><th>초당 공격</th><td>" + rate + "</td></tr>" +
            "<tr><th>이동속도</th><td>" + pair(c.speed, c.ultSpeed) + "</td></tr>" +
            "<tr><th>사거리</th><td>" + pair(Math.round(c.range), c.throwRange) + "</td></tr><tr><th>스킬</th><td>" + c.ultName + "</td></tr></table>";
@@ -1962,7 +1961,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (h.d) owner.dmg += h.d;
       if (h.k) owner.kills++;
       if (h.hl) owner.heal += h.hl;
-      if (h.u && owner.char === "mage" && owner.refundKey !== h.u) { owner.refundKey = h.u; owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.mbRefund); }
       if (h.u && owner.char === "blacksmith" && owner.refundKey !== h.u) { owner.refundKey = h.u; owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.bsRefund); }
       if (h.u === "volley" && owner.char === "ranger") owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.mkRefund);
       if (h.u === "giant" && owner.char === "sniper") owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.pnRefund);
@@ -2065,13 +2063,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (t < e.createdAt + e.delay) return true;
       if (room.status === "playing") localTargets().forEach(function (T) {
         if (!T.alive || hyp(T.x - e.x, T.y - e.y) > e.r + BODY_R) return;
-        if (T.team !== e.team) { damage(T, e.dmg, e.owner, false, e.createdAt); afflict(T, { stunMs: ULT.mbStunMs }); return; }
-        var healed = Math.min(T.maxHp - T.hp, e.heal || e.dmg);
-        if (healed <= 0) return;
-        T.hp += healed;
-        room.ref.child("hits/" + e.owner).push({ d: 0, b: 0, t: now(), hl: healed });
-        G.forceNet = true;
-        if (T === ME) sfx("heal");
+        if (T.team !== e.team) { damage(T, e.dmg, e.owner, false, e.createdAt); afflict(T, { stunMs: ULT.mbStunMs }); }
       });
       boom(e.x, e.y, e.r, e.team);
       if (!ME || hyp(e.x - ME.x, e.y - ME.y) < 700) sfx("boom");
@@ -2216,7 +2208,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       E.angle = Math.atan2(spot.y - E.y, spot.x - E.x);
       E.ultUntil = t + 450;
       room.ref.child("effects").push({ type: "burst", team: E.team, owner: E.id, x: Math.round(spot.x), y: Math.round(spot.y),
-                                       r: ULT.mbR, dmg: ULT.mbDmg, heal: ULT.mbHeal, delay: ULT.mbDelay, createdAt: t });
+                                       r: ULT.mbR, dmg: ULT.mbDmg, delay: ULT.mbDelay, createdAt: t });
     } else if (E.char === "warrior") {
       E.buffUntil = t + ULT.bzDur;
       E.skillDur = ULT.bzDur;
@@ -3313,6 +3305,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function dropProjVis(id) { var g = PRV[id]; if (!g) return; scene.remove(g); delete PRV[id]; }
 
   var PROJ_Y = 42, BOW_BLEND = 140;
+  var WAVE_MS = { priest: 520 };
   var MELEE_COLOR = { warrior: 0xFF9A3C, knight: 0xFFFFFF, rogue: 0xC9D6E6, necro: 0xB07CFF, lancer: 0xFFD27A, blacksmith: 0xFFB45A, priest: 0x7CFFB2 };
   function makeMeleeVis(d) {
     var g = new THREE.Group(), who = P[d.owner] ? P[d.owner].characterType : "", col = d.u ? 0xFF6A3D : (MELEE_COLOR[who] || 0xFFFFFF);
@@ -3874,13 +3867,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     keys(PRV).forEach(function (id) { if (!PR[id]) dropProjVis(id); });
 
     keys(MELEE).forEach(function (k) {
-      var m = MELEE[k], age = nowMs - m.at, g = MLV[k];
-      if (age > 240) { if (g) dropMelee(k); return; }
+      var m = MELEE[k], age = nowMs - m.at, g = MLV[k], wave = WAVE_MS[P[m.d.owner] ? P[m.d.owner].characterType : ""], life = wave || 240;
+      if (age > life) { if (g) dropMelee(k); return; }
       if (!g) g = MLV[k] = makeMeleeVis(m.d);
-      var f = age / 240;
+      var f = age / life;
       g.userData.fill.opacity = 0.2 * (1 - f);
-      g.userData.edge.opacity = 0.9 * (1 - f);
-      if (g.userData.line) g.userData.edgeMesh.scale.x = g.userData.line * (0.55 + 0.45 * Math.min(1, f * 3));
+      g.userData.edge.opacity = 0.9 * (1 - (wave ? f * f : f));
+      if (g.userData.line) g.userData.edgeMesh.scale.x = g.userData.line * (wave ? 0.1 + 0.9 * Math.min(1, f * 1.4) : 0.55 + 0.45 * Math.min(1, f * 3));
       else g.userData.edgeMesh.scale.setScalar(0.85 + 0.2 * f);
     });
     LUNGES.forEach(function (l) {

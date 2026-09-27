@@ -903,12 +903,12 @@ const STATS_GAMES = {
     /* 30번 게임의 CHAR_LIST 와 같은 순서·이름으로 둔다. 캐릭터가 새로 생기면 여기에도 한 줄 추가해야
        표에 나온다(데이터베이스규칙.json 의 teambattle/stats 허용 목록도 함께).
        옛 직업(marksman·healer·tank·assassin) 통계는 데이터베이스에 남아 있지만 새 직업과 비교할 수 없어서 뺐다.
-       회복은 광전사 광폭화(자기 회복)·주술사 메테오·투척병 독안개·사제 에너지 웨이브(아군 회복)만 있다(게임의 CHARS heals 와 같게). */
+       회복은 광전사 광폭화(자기 회복)·투척병 독안개·사제 에너지 웨이브(아군 회복)만 있다(게임의 CHARS heals 와 같게). */
     roles: [
       { id: "warrior",    name: "광전사", heal: true },
       { id: "knight",     name: "기사" },
       { id: "ranger",     name: "궁수" },
-      { id: "mage",       name: "주술사", heal: true },
+      { id: "mage",       name: "주술사" },
       { id: "rogue",      name: "도적" },
       { id: "necro",      name: "네크로" },
       { id: "sniper",     name: "저격수" },
