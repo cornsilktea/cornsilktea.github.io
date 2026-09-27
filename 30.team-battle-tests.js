@@ -205,18 +205,37 @@ function collectResults(api) {
     done(worst ? "fail" : "pass", worst ? worst : "최종 위치 (" + Math.round(W.ent("foe").x) + ", " + Math.round(W.ent("foe").y) + "), 끼지 않음");
   });
 
-  run(MOVE, "창기사 꿰뚫기 준비(0.3초) 중에 밀려나면 찌르기가 어디서 나가는가", function (done) {
+  function lancerDisplaced(push) {
     var y = OPEN_Y.forest;
     var W = world("forest", [
       { id: "ln", team: "blue", char: "lancer", x: 250, y: y, gauge: api.GAUGE_MAX },
-      { id: "gd", team: "red", char: "guardian", x: 190, y: y, gauge: api.GAUGE_MAX }
+      { id: "foe", team: "red", char: "knight", x: 480, y: y },
+      { id: "gd", team: "red", char: "guardian", x: 190, y: y, gauge: api.GAUGE_MAX },
+      { id: "pr", team: "red", char: "priest", x: 250, y: y + 250, gauge: api.GAUGE_MAX }
     ]);
+    if (push === "hole") { api.useUlt(W.ent("pr"), -Math.PI / 2, 120); W.step(api.ULT.bhDelay + 100); }
+    var castX = W.ent("ln").x, castY = W.ent("ln").y;
     api.useUlt(W.ent("ln"), 0);
-    api.useUlt(W.ent("gd"), 0);
-    W.step(400);
-    var lance = W.pushesFrom("ln", "meleeHits").filter(function (p) { return p.v.wind; })[0];
-    var gap = lance ? Math.round(hyp(W.ent("ln").x - lance.v.x, W.ent("ln").y - lance.v.y)) : 0;
-    done(gap > 30 ? "info" : "pass", gap > 30 ? "창기사는 " + gap + "만큼 밀려났는데 찌르기는 처음 서 있던 자리에서 나감 (화면에서는 빈 곳에서 창이 나가 보임)" : "밀린 거리 " + gap);
+    W.step(50);
+    if (push === "guardian") api.useUlt(W.ent("gd"), 0);
+    W.step(api.ULT.lnWind + 100);
+    var moved = Math.round(hyp(W.ent("ln").x - castX, W.ent("ln").y - castY));
+    W.step(500);
+    var struck = W.pushesFrom("ln", "meleeHits").filter(function (p) { return !p.v.wind && p.v.dmg; }).length;
+    return { struck: struck, hurt: W.ent("foe").hp < W.ent("foe").maxHp, moved: moved, free: api.speedOf(W.ent("ln")) > 0 };
+  }
+  run(MOVE, "창기사 꿰뚫기: 준비 동작 없이 두면 찌르기가 나가는가 (기준 확인)", function (done) {
+    var r = lancerDisplaced(null);
+    done(r.struck && r.hurt ? "pass" : "fail", r.struck && r.hurt ? "찌르기가 나가 적이 맞음" : "찌르기가 나가지 않음");
+  });
+  run(MOVE, "창기사 꿰뚫기: 준비 중 창벽에 밀려나면 취소되는가", function (done) {
+    var r = lancerDisplaced("guardian");
+    done(!r.struck && !r.hurt && r.free ? "pass" : "fail", r.struck || r.hurt ? r.moved + "만큼 밀렸는데 찌르기가 나감" : !r.free ? "취소됐지만 창기사가 계속 묶여 있음" : r.moved + "만큼 밀려 취소됨, 바로 움직일 수 있음");
+  });
+  run(MOVE, "창기사 꿰뚫기: 준비 중 블랙홀에 끌려가면 취소되는가", function (done) {
+    var r = lancerDisplaced("hole");
+    if (!r.moved) { done("fail", "시험 준비 실패: 블랙홀이 창기사를 끌지 못함"); return; }
+    done(!r.struck && !r.hurt ? "pass" : "fail", r.struck || r.hurt ? "끌려갔는데 찌르기가 나감" : r.moved + "만큼 끌려 취소됨");
   });
 
   function lancerStunnedBy(stunMs) {
@@ -235,23 +254,50 @@ function collectResults(api) {
     var sources = [["자객 처형·주술사 메테오·기사 방어태세", api.ULT.mbStunMs], ["대장장이 내려찍기", api.ULT.bsStunMs], ["창기사 꿰뚫기", api.ULT.lnStunMs]];
     var fired = sources.filter(function (s) { return lancerStunnedBy(s[1]); });
     done(fired.length ? "fail" : "pass", fired.length
-      ? "기절했는데도 찌르기가 나감: " + fired.map(function (s) { return s[0] + "(" + s[1] / 1000 + "초 기절)"; }).join(", ") + ". 창기사 꿰뚫기 기절(1.2초)만 취소됨"
+      ? "기절했는데도 찌르기가 나감: " + fired.map(function (s) { return s[0] + "(" + s[1] / 1000 + "초 기절)"; }).join(", ")
       : "모든 기절에서 취소됨");
   });
 
-  run(STUN, "부활 보호(3초) 중인 적이 주술사 메테오에 기절하는가", function (done) {
-    var y = OPEN_Y.forest;
-    var W = world("forest", [
-      { id: "mg", team: "blue", char: "mage", x: 250, y: y, gauge: api.GAUGE_MAX },
-      { id: "foe", team: "red", char: "knight", x: 450, y: y }
-    ]);
-    var foe = W.ent("foe");
+  run(MISC, "부활 보호(3초) 중에는 모든 공격·기절·둔화·넉백·끌어당김에 면역인가", function (done) {
+    var y = OPEN_Y.forest, casters = [
+      { id: "mg", team: "blue", char: "mage", x: 300, y: y - 220, gauge: api.GAUGE_MAX },
+      { id: "gd", team: "blue", char: "guardian", x: 520, y: y, gauge: api.GAUGE_MAX },
+      { id: "bs", team: "blue", char: "blacksmith", x: 420, y: y + 250, gauge: api.GAUGE_MAX },
+      { id: "th", team: "blue", char: "thrower", x: 250, y: y + 200, gauge: api.GAUGE_MAX },
+      { id: "pr", team: "blue", char: "priest", x: 250, y: y - 150, gauge: api.GAUGE_MAX },
+      { id: "hm", team: "blue", char: "hitman", x: 150, y: y, gauge: api.GAUGE_MAX },
+      { id: "gb", team: "blue", char: "guardian", x: 360, y: y, slot: 3 }
+    ];
+    var W = world("forest", casters.concat([{ id: "foe", team: "red", char: "warrior", x: 420, y: y }]));
+    var foe = W.ent("foe"), bad = [], sx = foe.x, sy = foe.y, hm = W.ent("hm"), hmX = hm.x;
     foe.protectUntil = W.t() + 3000;
-    api.useUlt(W.ent("mg"), 0, 200);
-    var wasStunned = false;
-    W.step(1000, FRAME, function (t) { if (api.stunned(foe, t)) wasStunned = true; });
-    var hurt = foe.hp < foe.maxHp;
-    done(wasStunned || hurt ? "fail" : "pass", wasStunned ? "피해는 안 받았지만 1초 기절함 (다른 기절 기술은 부활 보호 중에는 안 걸림)" : hurt ? "피해를 받음" : "피해·기절 모두 없음");
+    api.useUlt(W.ent("bs"), -Math.PI / 2, 250);
+    api.useUlt(W.ent("mg"), angleTo(W.ent("mg"), foe), hyp(foe.x - W.ent("mg").x, foe.y - W.ent("mg").y));
+    api.useUlt(W.ent("gd"), Math.PI);
+    api.useUlt(W.ent("th"), angleTo(W.ent("th"), foe), hyp(foe.x - W.ent("th").x, foe.y - W.ent("th").y));
+    api.useUlt(W.ent("pr"), angleTo(W.ent("pr"), foe), hyp(foe.x - W.ent("pr").x, foe.y - W.ent("pr").y));
+    api.useUlt(hm, 0);
+    api.fireBasic(W.ent("gb"), 0);
+    W.step(2500, FRAME, function (t) {
+      if (api.stunned(foe, t) && bad.indexOf("기절") < 0) bad.push("기절");
+      if (api.speedOf(foe) < api.CHARS.warrior.speed && !api.stunned(foe, t) && bad.indexOf("둔화") < 0) bad.push("둔화");
+    });
+    if (foe.hp < foe.maxHp) bad.push("피해 " + (foe.maxHp - foe.hp));
+    if (hyp(foe.x - sx, foe.y - sy) > 1) bad.push("위치가 " + Math.round(hyp(foe.x - sx, foe.y - sy)) + " 움직임(넉백·블랙홀)");
+    if (Math.abs(hm.x - hmX) > 100) bad.push("자객이 보호 중인 적에게 순간이동");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "메테오·창벽·내려찍기·독안개·블랙홀·처형·수문장 둔화 모두 면역");
+  });
+
+  run(STUN, "둔화가 겹치면 더 강한 둔화만 적용되는가 (20% 4초 + 40% 2초 동시)", function (done) {
+    var W = world("forest", [{ id: "kn", team: "red", char: "knight", x: 450, y: OPEN_Y.forest }]);
+    var E = W.ent("kn"), base = api.CHARS.knight.speed, seen = [];
+    api.afflict(E, { slowMs: 4000, slowMul: 0.8 }); api.afflict(E, { slowMs: 2000, slowMul: 0.6 });
+    [1000, 3000, 4200].forEach(function (at, i) {
+      W.step(at - (i ? [1000, 3000][i - 1] : 0));
+      seen.push(Math.round(api.speedOf(E) / base * 100));
+    });
+    var ok = seen[0] === 60 && seen[1] === 80 && seen[2] === 100;
+    done(ok ? "pass" : "fail", "1초: " + seen[0] + "%, 3초: " + seen[1] + "%, 4.2초: " + seen[2] + "% 속도 (기대 60% → 80% → 100%)");
   });
 
   run(STUN, "기절 중에는 이동·기본 공격·궁극기를 못 쓰는가", function (done) {
@@ -288,7 +334,7 @@ function collectResults(api) {
     done(finish || why || E.dash ? "fail" : "pass", finish ? "기절했는데 마무리 공격이 나감" : why ? why : E.dash ? "돌진 상태가 안 풀림" : "돌진은 끝까지 미끄러진 뒤 마무리 공격 취소");
   });
 
-  run(STUN, "대장장이 내려찍기 도약 중에 기절하면 어떻게 되는가", function (done) {
+  run(STUN, "대장장이 내려찍기: 도약 중에 기절해도 끝까지 진행되는가 (시전 동작 없음 → 기절 무시)", function (done) {
     var y = OPEN_Y.forest;
     var W = world("forest", [
       { id: "bs", team: "blue", char: "blacksmith", x: 250, y: y, gauge: api.GAUGE_MAX },
@@ -299,10 +345,10 @@ function collectResults(api) {
     api.afflict(W.ent("bs"), { stunMs: 1000 });
     W.step(800);
     var foe = W.ent("foe"), landed = foe.hp < foe.maxHp;
-    done("info", landed ? "기절해도 도약이 끝까지 이어져 착지 피해·기절이 들어감 (창기사는 기절하면 취소됨 — 규칙을 맞출지 정해야 함)" : "기절하면 착지 공격이 취소됨");
+    done(landed ? "pass" : "fail", landed ? "기절해도 착지 피해·기절이 들어감" : "기절하면 착지 공격이 취소됨");
   });
 
-  run(STUN, "기사 방어태세 중에 기절해 있으면 끝날 때 주변 기절이 발동하는가", function (done) {
+  run(STUN, "기사 방어태세: 기절해 있어도 끝날 때 주변 기절이 발동하는가 (시전 동작 없음)", function (done) {
     var y = OPEN_Y.forest;
     var W = world("forest", [
       { id: "kn", team: "blue", char: "knight", x: 250, y: y, gauge: api.GAUGE_MAX },
@@ -313,22 +359,22 @@ function collectResults(api) {
     api.afflict(W.ent("kn"), { stunMs: 1000 });
     var foeStunned = false;
     W.step(600, FRAME, function (t) { if (api.stunned(W.ent("foe"), t)) foeStunned = true; });
-    done("info", foeStunned ? "기사가 기절한 상태에서도 마무리 기절이 발동함" : "기사가 기절해 있으면 마무리 기절이 취소됨");
+    done(foeStunned ? "pass" : "fail", foeStunned ? "기사가 기절한 상태에서도 마무리 기절이 발동함" : "기사가 기절해 있으면 마무리 기절이 취소됨");
   });
 
-  run(STUN, "궁수 난사 도중 기절하면 남은 화살이 멈추는가", function (done) {
+  run(STUN, "궁수 난사: 기절하는 순간 남은 화살이 멈추는가", function (done) {
     var y = OPEN_Y.forest;
     var W = world("forest", [
       { id: "rg", team: "blue", char: "ranger", x: 250, y: y, gauge: api.GAUGE_MAX },
       { id: "foe", team: "red", char: "knight", x: 450, y: y }
     ]);
+    var stunAt = 120, firedBefore = Math.floor(stunAt / api.ULT.mkGap) + 1;
     api.useUlt(W.ent("rg"), 0);
-    W.step(120);
-    var hpAtStun = W.ent("foe").hp;
+    W.step(stunAt);
     api.afflict(W.ent("rg"), { stunMs: 1000 });
     W.step(1000);
-    var after = Math.round((hpAtStun - W.ent("foe").hp) / api.ULT.mkDmg);
-    done(after > 1 ? "info" : "pass", after > 1 ? "기절한 뒤에도 화살 " + after + "발이 계속 나가 맞음 (궁수 자세만 풀림)" : "기절 후 화살이 멈춤");
+    var hits = Math.round((W.ent("foe").maxHp - W.ent("foe").hp) / api.ULT.mkDmg);
+    done(hits <= firedBefore ? "pass" : "fail", "기절 전에 쏜 " + firedBefore + "발 중 " + hits + "발 적중" + (hits > firedBefore ? " — 기절 뒤에도 " + (hits - firedBefore) + "발 더 나감" : ", 기절 뒤로는 안 나감"));
   });
 
   run(GAUGE, "광전사 광폭화 중에는 공격해도 게이지가 오르지 않는가", function (done) {
@@ -345,7 +391,7 @@ function collectResults(api) {
     done(wr.gauge === 0 ? "pass" : "fail", "광폭화 중 적중 후 게이지 " + wr.gauge);
   });
 
-  run(GAUGE, "궁수 난사 10발을 모두 맞히면 게이지가 얼마나 돌아오는가", function (done) {
+  run(GAUGE, "궁수 난사 10발을 모두 맞히면 게이지가 가득 돌아오는가 (의도된 규칙)", function (done) {
     var y = OPEN_Y.forest;
     var W = world("forest", [
       { id: "rg", team: "blue", char: "ranger", x: 250, y: y, gauge: api.GAUGE_MAX },
@@ -354,11 +400,10 @@ function collectResults(api) {
     api.useUlt(W.ent("rg"), 0);
     W.step(1200);
     var g = W.ent("rg").gauge, hits = Math.round((W.ent("foe").maxHp - W.ent("foe").hp) / api.ULT.mkDmg);
-    done(g > api.GAUGE_MAX ? "fail" : (g >= api.GAUGE_MAX ? "info" : "pass"),
-      hits + "발 적중 → 게이지 " + g + "/" + api.GAUGE_MAX + (g >= api.GAUGE_MAX ? " — 다 맞히면 곧바로 난사를 다시 쓸 수 있음" : ""));
+    done(g === api.GAUGE_MAX && hits === api.ULT.mkCount ? "pass" : "fail", hits + "발 적중 → 게이지 " + g + "/" + api.GAUGE_MAX);
   });
 
-  run(GAUGE, "투척병 독병 1개가 적 3명에게 맞으면 게이지가 얼마나 오르는가", function (done) {
+  run(GAUGE, "투척병 독병: 1틱 적중마다 게이지 +1인가 (적 3명, 3틱)", function (done) {
     var y = OPEN_Y.forest;
     var W = world("forest", [
       { id: "th", team: "blue", char: "thrower", x: 250, y: y },
@@ -368,8 +413,8 @@ function collectResults(api) {
     ]);
     api.fireBasic(W.ent("th"), 0, 200);
     W.step(4000);
-    var g = W.ent("th").gauge;
-    done(g > 2 ? "info" : "pass", "독병 1개로 게이지 +" + g + " (다른 원거리 딜러는 공격 1번 적중에 +2, 여러 명을 맞혀도 +2)");
+    var g = W.ent("th").gauge, ticks = Math.round((W.ent("a").maxHp - W.ent("a").hp) / api.CHARS.thrower.dmg);
+    done(g === ticks ? "pass" : "fail", ticks + "틱 적중 → 게이지 +" + g + " (여러 명이 같은 틱에 맞아도 +1)");
   });
 
   run(GAUGE, "게이지가 0~" + api.GAUGE_MAX + " 범위를 벗어나지 않는가 (피격 200번)", function (done) {
