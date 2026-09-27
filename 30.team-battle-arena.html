@@ -4569,7 +4569,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (!ally && hid && !revealedTo(E, me, t)) { lastHp[id] = E.hp; v.root.visible = false; return; }
       v.root.visible = true;
       var bi = bushIndexAt(E.x, E.y); if (bi >= 0) bushSeen[bi] = 1;
-      var revealedByAttack = !ally && E.revealUntil > t;
+      var revealedByAttack = E.revealUntil > t;
       var alpha = !E.alive ? (v.kit ? 0.6 : 0.35) : (hid && !revealedByAttack ? (spec ? 0.55 : STEALTH_ALPHA) : 1), hurt = false;
       if (protectedNow(E, t)) alpha = Math.min(alpha, 0.5 + 0.3 * Math.sin(nowMs / 70));
       if (lastHp[id] !== undefined && Math.abs(E.hp - lastHp[id]) >= 1) {
