@@ -573,9 +573,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     blacksmith: { name: "대장장이", role: "fighter", icon: "🔨", hp: 350, speed: 225, cd: 1000, dmg: 32, range: 120, width: 80, ultName: "내려찍기", ultAim: true },
     priest:  { name: "사제", role: "caster", icon: "📖", hp: 120, speed: 250, cd: 900, dmg: 10, heal: 10, range: 400, width: 200, ultName: "블랙홀", ultAim: true, heals: true },
     hitman:  { name: "자객", role: "assassin", icon: "🔪", hp: 120, speed: 260, cd: 1350, dmg: 40, range: 100,
-               dashRange: 200, dashWidth: 150, dashDmg: 40, dashMs: 300, finishDelay: 125, ultName: "처형", ultAim: true }
+               dashRange: 200, dashWidth: 150, dashDmg: 40, dashMs: 300, finishDelay: 125, ultName: "처형", ultAim: true },
+    guardian: { name: "수문장", role: "fighter", icon: "🏰", hp: 380, speed: 215, cd: 1050, dmg: 26, range: 140, arc: Math.PI * 130 / 180,
+                fx: { slowMs: 1000, slowMul: 0.7 }, ultName: "창벽" }
   };
-  var CHAR_LIST = ["warrior", "knight", "ranger", "mage", "rogue", "necro", "sniper", "thrower", "lancer", "blacksmith", "priest", "hitman"];
+  var CHAR_LIST = ["warrior", "knight", "ranger", "mage", "rogue", "necro", "sniper", "thrower", "lancer", "blacksmith", "priest", "hitman", "guardian"];
   var ROLES = {
     fighter:  { name: "전사", icon: "⚔️", gaugeOnHit: 2, gaugeOnHurt: 1 },
     caster:   { name: "마법사", icon: "✨", gaugeOnHit: 3, gaugeOnHurt: 0 },
@@ -597,7 +599,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               lnWind: 300, lnLen: 350, lnW: 36, lnDmg: 90, lnStunMs: 1200,
               bsDelay: 700, bsR: 150, bsDmg: 60, bsStunMs: 800, bsCast: 450, bsMin: 60, bsHop: 45,
               bhR: 150, bhDur: 3000, bhDelay: 500, bhPull: 220, bhCast: 380, bhMin: 60,
-              exRange: 500, exSpeed: 1300, exPr: 4, exDmg: 10, exStunMs: 1000 };
+              exRange: 500, exSpeed: 1300, exPr: 4, exDmg: 10, exStunMs: 1000,
+              gdR: 200, gdKb: 150 };
   var SNIPER_KEEP = KEY * 5;
   function isMelee(c) { return !!(CHARS[c].arc || CHARS[c].width || CHARS[c].dashWidth); }
   var STEALTH_ALPHA = 0.4;
@@ -1163,6 +1166,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "lancer") return num(ULT.lnWind / 1000) + "초 준비 후 앞으로 길이 " + ULT.lnLen + " 찌르기, 맞은 적 모두 " + ULT.lnDmg + "의 데미지 + " + num(ULT.lnStunMs / 1000) + "초 기절";
     if (k === "blacksmith") return "지정한 곳에 " + num(ULT.bsDelay / 1000) + "초 뒤 착지. 반경 " + ULT.bsR + " 내의 적은 " + ULT.bsDmg + "의 데미지, " + num(ULT.bsStunMs / 1000) + "초간 기절";
     if (k === "hitman") return "사거리 " + ULT.exRange + "의 칼날 발사, 처음 맞은 적에게 " + ULT.exDmg + "의 데미지 + " + num(ULT.exStunMs / 1000) + "초 기절, 명중 시 대상 위치로 순간이동";
+    if (k === "guardian") return "즉시 자신 주변 반경 " + ULT.gdR + " 안의 모든 적을 " + ULT.gdKb + "만큼 뒤로 밀어낸다(피해 없음)";
     if (k === "priest") return "지정한 곳에 " + num(ULT.bhDelay / 1000) + "초 뒤 반경 " + ULT.bhR + "의 블랙홀 생성, " + num(ULT.bhDur / 1000) + "초간 범위 안의 적을 중심으로 끌어당김";
     return "";
   }
@@ -1174,6 +1178,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
             : pair(hit, c.throwDmg || (rage ? Math.round(c.dmg * ULT.bzDmgMul) : null)) + (c.heal ? "(" + c.heal + ")" : "");
     var rate = pair(num(1000 / c.cd), rage ? num(1000 / (c.cd * ULT.bzCdMul)) : null) + "회";
     return '<table class="st"><tr><th>HP</th><td>' + c.hp + "</td></tr><tr><th>공격</th><td>" + dmg + "</td></tr>" +
+           (c.fx && c.fx.slowMs ? "<tr><th>효과</th><td>피격 시 " + num(c.fx.slowMs / 1000) + "초 둔화(속도 " + Math.round((1 - c.fx.slowMul) * 100) + "%↓)</td></tr>" : "") +
            "<tr><th>초당 공격</th><td>" + rate + "</td></tr>" +
            "<tr><th>이동속도</th><td>" + pair(c.speed, c.ultSpeed) + "</td></tr>" +
            "<tr><th>사거리</th><td>" + pair(Math.round(c.dashRange || c.range), c.throwRange) + "</td></tr><tr><th>스킬</th><td>" + c.ultName + "</td></tr></table>";
@@ -2109,7 +2114,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return o && o.alive && o.team !== E.team && visibleTo(o, E) && hyp(o.x - E.x, o.y - E.y) <= reach;
     });
   }
-  var MELEE_SPARK = { warrior: "#FF9A3C", knight: "#FFFFFF", rogue: "#DCE3EC", necro: "#C9A6FF", lancer: "#FFD27A", blacksmith: "#FFB45A", priest: "#C9A6FF", hitman: "#FF4A5A" };
+  var MELEE_SPARK = { warrior: "#FF9A3C", knight: "#FFFFFF", rogue: "#DCE3EC", necro: "#C9A6FF", lancer: "#FFD27A", blacksmith: "#FFB45A", priest: "#C9A6FF", hitman: "#FF4A5A", guardian: "#8FD9A8" };
   var HEAL_SPARK = "#7CFFB2";
   function inArc(T, d) {
     var dx = T.x - d.x, dy = T.y - d.y;
@@ -2150,8 +2155,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (T.team === d.team || !T.alive || !inStrike(T, d)) return;
     var dx = T.x - d.x, dy = T.y - d.y;
     if (protectedNow(T)) return;
-    if (d.slam && !d.dmg) { afflict(T, d.fx); return; }
-    damage(T, d.dmg, d.owner, !d.m && !d.u && d.createdAt, d.hammer ? d.createdAt : null, d.fx);
+    if (d.slam && !d.dmg) afflict(T, d.fx);
+    else damage(T, d.dmg, d.owner, !d.m && !d.u && d.createdAt, d.hammer ? d.createdAt : null, d.fx);
     if (d.kb && T.alive) {
       var dd = hyp(dx, dy) || 1;
       T.x += dx / dd * d.kb; T.y += dy / dd * d.kb; resolve(T);
@@ -2203,6 +2208,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     else { d.radius = c.range; d.arc = c.arc; }
     if (c.kb) d.kb = c.kb;
     if (c.heal) d.heal = c.heal;
+    if (c.fx) d.fx = c.fx;
     room.ref.child("meleeHits").push(d);
     E.atkAt = now();
     if (hear(E)) sfx("swing");
@@ -2345,6 +2351,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       E.cdUntil = Math.max(E.cdUntil, t + ULT.bsDelay + 250);
       E.pending = null; E.slash = null;
       E.leap = { sx: E.x, sy: E.y, tx: landing.x, ty: landing.y, at: t };
+    } else if (E.char === "guardian") {
+      E.atkAt = t;
+      E.ultUntil = t + 500;
+      room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(E.angle), radius: ULT.gdR, arc: Math.PI * 2,
+                                        dmg: 0, u: 1, slam: 1, kb: ULT.gdKb, createdAt: t });
     } else if (E.char === "priest") {
       var holeSpot = burstSpot(E, ang, reach, ULT.bhCast, ULT.bhMin);
       E.angle = Math.atan2(holeSpot.y - E.y, holeSpot.x - E.x);
@@ -2496,7 +2507,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (B.burst) return;
     if (B.char === "thrower") { botThrow(B, target, enemies, t); return; }
     if (B.char === "lancer") { botLance(B, target, t); return; }
-    if (target && B.gauge >= GAUGE_MAX && t - k.seenAt > 500 && losClear(B.x, B.y, target.x, target.y) && (B.char !== "mage" || td <= ULT.mbCast) && (B.char !== "blacksmith" || td <= ULT.bsCast) && (B.char !== "priest" || td <= ULT.bhCast) && (B.char !== "hitman" || td <= ULT.exRange)) {
+    if (target && B.gauge >= GAUGE_MAX && t - k.seenAt > 500 && losClear(B.x, B.y, target.x, target.y) && (B.char !== "mage" || td <= ULT.mbCast) && (B.char !== "blacksmith" || td <= ULT.bsCast) && (B.char !== "priest" || td <= ULT.bhCast) && (B.char !== "hitman" || td <= ULT.exRange) && (B.char !== "guardian" || td <= ULT.gdR)) {
       if (B.char === "blacksmith") {
         var drop = leadSpot(target, ULT.bsDelay / 1000, t);
         useUlt(B, Math.atan2(drop.y - B.y, drop.x - B.x), hyp(drop.x - B.x, drop.y - B.y)); return;
@@ -2996,7 +3007,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     priest:  { file: "Mage", right: "wand", left: "spellbook_open", leftTurn: Math.PI, hide: ["Mage_Hat"],
                recolor: [[1, 0, 2, "#FFFFFF", "#CFC8BA"], [1, 2, 1, "#9CCBF2", "#3E6BA6"], [0, 1, 1, "#F2D38A", "#A87A3A"]] },
     hitman:  { file: "Rogue_Hooded", right: "dagger_A", left: "dagger_A",
-               recolor: [[1, 0, 1, "#3A3D46", "#16181D"], [1, 1, 1, "#9A2230", "#4A0E16"], [2, 1, 1, "#9A2230", "#4A0E16"]] }
+               recolor: [[1, 0, 1, "#3A3D46", "#16181D"], [1, 1, 1, "#9A2230", "#4A0E16"], [2, 1, 1, "#9A2230", "#4A0E16"]] },
+    guardian: { file: "Knight", right: "halberd", rightScale: 1.2,
+                recolor: [[0, 3, 1, "#1F4A2E", "#0E2417"], [1, 0, 1, "#1F4A2E", "#0E2417"], [2, 2, 1, "#1F4A2E", "#0E2417"], [1, 1, 1, "#E4EAEF", "#9AA4AC"], [1, 2, 2, "#C7D1D9", "#6E7880"]] }
   };
   var MINION_MODEL = { file: "Skeleton_Minion", right: "Skeleton_Blade", scale: 0.9 };
   var PROP_FILES = { bushBig: "props/Bush_1_D_Color1.gltf",
@@ -3308,6 +3321,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (E.char === "thrower") return ["Throw", E.ultUntil > E.atkAt ? 1.6 : 2.2];
     if (E.char === "lancer") return ["Melee_2H_Attack_Stab", KIT.clips.Melee_2H_Attack_Stab.duration * 1000 / (E.ultUntil > E.atkAt ? 520 : 800)];
     if (E.char === "blacksmith") return ["Melee_1H_Attack_Chop", 1.6];
+    if (E.char === "guardian") return E.ultUntil > E.atkAt ? ["Melee_2H_Attack_Spin", 1.4] : ["Melee_2H_Attack_Slice", 1.5];
     if (E.char === "priest") return ["Ranged_Magic_Shoot", 1.4];
     if (E.char === "hitman") {
       if (E.ultUntil > E.atkAt) return ["Throw", 2.6];
@@ -3355,7 +3369,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       else if (E.char === "knight" && E.buffUntil > t) showClip(v, "Melee_Blocking", 1, true);
       else if (E.mv && v.speed > 150) showClip(v, "Running_A", clamp(v.speed / 260, 0.7, 1.6), true);
       else if (E.mv && v.speed > 15) showClip(v, "Walking_A", clamp(v.speed / 110, 0.6, 1.4), true);
-      else showClip(v, E.char === "ranger" ? "Ranged_Bow_Idle" : (E.char === "sniper" ? "Ranged_2H_Aiming" : (E.char === "lancer" ? "Melee_2H_Idle" : "Idle_A")), 1, true);
+      else showClip(v, E.char === "ranger" ? "Ranged_Bow_Idle" : (E.char === "sniper" ? "Ranged_2H_Aiming" : (E.char === "lancer" || E.char === "guardian" ? "Melee_2H_Idle" : "Idle_A")), 1, true);
     }
     v.mixer.update(dt);
   }
@@ -3452,7 +3466,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
   var PROJ_Y = 42, BOW_BLEND = 140;
   var WAVE = { priest: { life: 540, travel: 380 }, hitman: { life: CHARS.hitman.dashMs + 160, travel: CHARS.hitman.dashMs } };
-  var MELEE_COLOR = { warrior: 0xFF9A3C, knight: 0xFFFFFF, rogue: 0xC9D6E6, necro: 0xB07CFF, lancer: 0xFFD27A, blacksmith: 0xFFB45A, priest: 0x7CFFB2, hitman: 0xFF4A5A };
+  var MELEE_COLOR = { warrior: 0xFF9A3C, knight: 0xFFFFFF, rogue: 0xC9D6E6, necro: 0xB07CFF, lancer: 0xFFD27A, blacksmith: 0xFFB45A, priest: 0x7CFFB2, hitman: 0xFF4A5A, guardian: 0x8FD9A8 };
   function makeMeleeVis(d) {
     var g = new THREE.Group(), who = P[d.owner] ? P[d.owner].characterType : "", col = d.u ? 0xFF6A3D : (MELEE_COLOR[who] || 0xFFFFFF);
     var fillM = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.2, depthWrite: false });
