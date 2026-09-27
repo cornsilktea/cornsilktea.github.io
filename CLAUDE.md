@@ -84,6 +84,8 @@
   (게임의 `CHAR_LIST` 순서·`CHARS` 이름 그대로, 회복 능력이 있으면 게임 `CHARS` 에 `heals: true`·통계표에 `heal: true` —
   회복량은 `E.heal` 에 쌓아야 종료 창·통계에 잡힌다)와 `데이터베이스규칙.json` 의
   `teambattle/stats/$char` 허용 목록. 규칙을 바꿨으면 선생님께 콘솔에 다시 게시하도록 알린다.
+  캐릭터·스킬 판정을 고친 뒤에는 첫 화면 주소 끝에 `&test` 를 붙여(`30.team-battle-arena.html?c=1-1&test`) 상호작용 검사
+  (`30.team-battle-tests.js`, Firebase 에 쓰지 않음)를 돌리고, 새 스킬이 기절·이동·넉백·게이지를 건드리면 검사 항목도 추가한다.
 
 ## 환경
 

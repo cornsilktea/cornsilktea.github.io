@@ -827,7 +827,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   if (db) db.ref(".info/serverTimeOffset").on("value", function (s) { serverOffset = s.val() || 0; });
   var CLOCK_PINGS = 5, CLOCK_GAP_MS = 500, CLOCK_KEEP = 10;
   var CLOCK = { off: null, samples: [], host: null, timer: null };
-  function now() { return Date.now() + (CLOCK.off === null || isHost() ? serverOffset : CLOCK.off); }
+  var TEST_CLOCK = null;
+  function now() { if (TEST_CLOCK !== null) return TEST_CLOCK; return Date.now() + (CLOCK.off === null || isHost() ? serverOffset : CLOCK.off); }
   function clockBurst() {
     clearInterval(CLOCK.timer);
     var left = CLOCK_PINGS;
@@ -4354,6 +4355,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     if (!G) return;
     var t = now();
+    stepWorld(t, dt, true);
+    if (st === "countdown" || st === "playing") netWrite(false);
+    if (isHost()) { hostJudge(); hostCleanup(); }
+    render(t, dt);
+    updateHud(t);
+    adaptQuality(frameMs);
+  }
+  function stepWorld(t, dt, driveBots) {
     syncRemote(dt);
     stepShots(t);
     stepBursts(t);
@@ -4362,7 +4371,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     stepLunges(t);
     stepWaves(t);
     pruneLocal(t);
-    var active = st === "playing" && t >= room.startAt;
+    var active = room.status === "playing" && t >= room.startAt;
     if (active) {
       if (ME) respawnIfReady(ME, t);
       if (isHost()) keys(BOTS).forEach(function (id) { respawnIfReady(BOTS[id], t); });
@@ -4384,17 +4393,32 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (KEY_ON.atk && t >= ME.cdUntil && !ME.volley && !ME.slash) fireBasic(ME, autoAimAngle(ME));
         stepCombat(ME, dt);
       } else if (ME) ME.mv = false;
-      if (isHost()) keys(BOTS).forEach(function (id) { var B = BOTS[id]; stepBot(B, dt); if (B.alive) stepCombat(B, dt); stepKnightSlam(B); stepHammerLeap(B); stepDash(B); stepMinions(B, dt, t); });
+      if (isHost()) keys(BOTS).forEach(function (id) { var B = BOTS[id]; if (driveBots) stepBot(B, dt); if (B.alive) stepCombat(B, dt); stepKnightSlam(B); stepHammerLeap(B); stepDash(B); stepMinions(B, dt, t); });
       if (ME) { stepKnightSlam(ME); stepHammerLeap(ME); stepDash(ME); stepMinions(ME, dt, t); }
       localTargets().forEach(function (T) { stepShove(T, t); });
       checkProjectiles(t);
     }
-    if (st === "countdown" || st === "playing") netWrite(false);
-    if (isHost()) { hostJudge(); hostCleanup(); }
-    render(t, dt);
-    updateHud(t);
-    adaptQuality(frameMs);
   }
+
+  function testHooks() {
+    return {
+      CHARS: CHARS, CHAR_LIST: CHAR_LIST, ULT: ULT, spawnOf: spawnOf, BODY_R: BODY_R, GAUGE_MAX: GAUGE_MAX, BOUND: BOUND, MAP_IDS: MAP_IDS, RESPAWN_MS: RESPAWN_MS, myId: myId,
+      obstacles: function () { return { walls: OBST, water: WATER }; },
+      loadMapData: loadMapData, makeEnt: makeEnt, resolve: resolve, stepWorld: stepWorld,
+      useUlt: useUlt, fireBasic: fireBasic, damage: damage, afflict: afflict, speedOf: speedOf, stunned: stunned,
+      onShot: onShot, onMelee: onMelee, onEffect: onEffect, onHit: onHit,
+      isIdle: function () { return !room; },
+      begin: function (fakeRoom, players, bots, clockMs) {
+        TEST_CLOCK = clockMs; room = fakeRoom; P = players; BOTS = bots; ME = null; R = {};
+        G = { startAt: fakeRoom.startAt, endSent: false, playingSent: false, lastNet: 0, sent: {}, finalSent: false, beeped: -1 };
+        PR = {}; SHOTS = []; BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; MELEE = {}; FX = []; handled = {};
+      },
+      setClock: function (ms) { TEST_CLOCK = ms; },
+      currentMap: function () { return ARENA; },
+      finish: function (mapId) { TEST_CLOCK = null; room = null; resetLocal(); loadMapData(mapId); }
+    };
+  }
+  if (/[?&]test(&|$)/.test(location.search)) import("./30.team-battle-tests.js").then(function (m) { m.runTeamBattleTests(testHooks()); });
 
   refreshNick();
   if (!db) startMsg("온라인 연결을 준비하지 못했어요. 인터넷 연결을 확인해 주세요.");
