@@ -649,7 +649,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               gdR: 200, gdKb: 150, gdKbMs: 500,
               frSlowMs: 1200, frSlowMul: 0.85, frSlowStep: 0.15, frFreezeMs: 800,
               frBzR: 400, frBzDur: 5000, frBzDmg: 5, frBzTick: 1000, frBzDelay: 400, frBzSlowMul: 0.8, frBzSlowMs: 400,
-              bwR: 150, bwDur: 3000, bwTick: 250, bwDmg: 15, bwKillGauge: 5, bdR: 50, bdDmg: 20 };
+              bwR: 150, bwDur: 3000, bwTick: 250, bwDmg: 15, bwKillGauge: 5, bdR: 70, bdDmg: 20, bdDelay: 300 };
   var SNIPER_KEEP = KEY * 5;
   function isMelee(c) { return !!(CHARS[c].arc || CHARS[c].width || CHARS[c].dashWidth); }
   var STEALTH_ALPHA = 0.4;
@@ -998,7 +998,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var ref = db.ref(ROOT + "/" + code);
     room = { code: code, ref: ref, mode: null, map: "forest", status: "lobby", host: null, startAt: 0, winner: null, endedAt: 0, final: null, roster: null, draft: null };
     clear3d();
-    P = {}; R = {}; PR = {}; MELEE = {}; FX = []; BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; STORMS = []; G = null; ME = null; BOTS = {}; ST = {}; SHOTS = []; hitSubs = {};
+    P = {}; R = {}; PR = {}; MELEE = {}; FX = []; BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; STORMS = []; BLADE_SPINS = []; G = null; ME = null; BOTS = {}; ST = {}; SHOTS = []; hitSubs = {};
     ref.child("players/" + myId).onDisconnect().remove();
     ref.child("ping/" + myId).onDisconnect().remove();
     ref.child("pong/" + myId).onDisconnect().remove();
@@ -1090,7 +1090,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (room) { leaving = true; unsubAll(); try { room.ref.child("players/" + myId).onDisconnect().cancel(); } catch (e) {} }
     room = null; resetLocal(); showScreen("start"); startMsg(msg || "");
   }
-  function resetLocal() { clear3d(); BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; STORMS = []; P = {}; R = {}; PR = {}; MELEE = {}; FX = []; G = null; ME = null; BOTS = {}; ST = {}; SHOTS = []; hitSubs = {}; joy.id = null; aim.id = null; }
+  function resetLocal() { clear3d(); BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; STORMS = []; BLADE_SPINS = []; P = {}; R = {}; PR = {}; MELEE = {}; FX = []; G = null; ME = null; BOTS = {}; ST = {}; SHOTS = []; hitSubs = {}; joy.id = null; aim.id = null; }
   window.addEventListener("pagehide", function () { if (room) { try { room.ref.child("players/" + myId).remove(); } catch (e) {} } });
 
   var screenNow = "start";
@@ -1268,7 +1268,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "frost") return "같은 적에게 기본 공격 3회 적중 시 " + secs(ULT.frFreezeMs) + "간 기절";
     if (k === "rogue") return "가까운 적은 근접 공격, 먼 적에게는 사거리 " + c.throwRange + "의 단검 투척";
     if (k === "hitman") return "기본 공격 시 " + c.dashRange + " 돌진 후 반경 " + c.range + " 회전베기";
-    if (k === "dancer") return "던진 단검이 멈춘 곳에서 회전해 반경 " + ULT.bdR + "의 적에게 " + ULT.bdDmg + "의 피해. 적을 처치하면 게이지 " + ULT.bwKillGauge + " 회복, 스킬 중 처치는 스킬이 끝난 뒤 회복";
+    if (k === "dancer") return "던진 단검이 멈춘 곳에서 " + secs(ULT.bdDelay) + " 뒤 회전해 반경 " + ULT.bdR + "의 적에게 " + ULT.bdDmg + "의 피해. 적을 처치하면 게이지 " + ULT.bwKillGauge + " 회복, 스킬 중 처치는 스킬이 끝난 뒤 회복";
     return "";
   }
   function skillBlocks(k) {
@@ -1717,7 +1717,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     clear3d();
     G = { startAt: room.startAt, endSent: false, playingSent: false, lastNet: 0, sent: {}, finalSent: false, beeped: -1 };
     ME = isSpec() ? null : makeEnt(myId, P[myId]);
-    BOTS = {}; R = {}; FX = []; CC_PENDING = {}; hudMeShown = { k: -1, d: -1, dmg: -1 }; BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; STORMS = []; handled = {};
+    BOTS = {}; R = {}; FX = []; CC_PENDING = {}; hudMeShown = { k: -1, d: -1, dmg: -1 }; BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; STORMS = []; BLADE_SPINS = []; handled = {};
     lastHp = {};
     clearKillFeed();
     show($("endOv"), false);
@@ -1974,7 +1974,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (fx.slowMs) addSlowCredited(T, fx.slowMul || 0.6, fx.slowMs, t, owner);
     if (fx.stunMs) {
       creditCC(owner, Math.max(0, t + fx.stunMs - Math.max(T.stunUntil || 0, t)), 0, 0);
-      T.stunUntil = Math.max(T.stunUntil || 0, t + fx.stunMs); T.pending = null; T.burst = null; T.volley = null; T.slash = null; }
+      T.stunUntil = Math.max(T.stunUntil || 0, t + fx.stunMs); T.pending = null; T.burst = null; T.volley = null; T.slash = null;
+      breakBladeStorm(T, t); }
     G.forceNet = true;
   }
   function frostStackFx(T) {
@@ -2019,15 +2020,30 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     E.killGaugeOwed = 0;
     G.forceNet = true;
   }
+  function breakBladeStorm(E, t) {
+    if (!bladeStorm(E, t)) return;
+    E.buffUntil = t;
+    E.skillUntil = Math.min(E.skillUntil || 0, t);
+    G.forceNet = true;
+  }
+  var BLADE_SPINS = [];
   function bladeSpin(p, x, y) {
     if (p.spun) return;
     p.spun = true;
-    var d = p.d;
-    FX.push({ k: "boom", x: x, y: y, r: ULT.bdR * 1.4, c: 0xDCE3EC, t: Date.now(), life: 320 });
-    spark(x, y, "#FFFFFF", 1.4);
-    localTargets().forEach(function (T) {
-      if (!T.alive || T.team === d.team || T.id === d.owner || hyp(T.x - x, T.y - y) > ULT.bdR + BODY_R * 0.5) return;
-      damage(T, ULT.bdDmg, d.owner, d.createdAt, null);
+    BLADE_SPINS.push({ d: p.d, x: x, y: y, at: now() + ULT.bdDelay });
+    FX.push({ k: "bladeZone", x: x, y: y, r: ULT.bdR, t: Date.now(), delay: ULT.bdDelay, life: ULT.bdDelay + 260 });
+  }
+  function stepBladeSpins(t) {
+    BLADE_SPINS = BLADE_SPINS.filter(function (s) {
+      if (t < s.at) return true;
+      var d = s.d;
+      FX.push({ k: "boom", x: s.x, y: s.y, r: ULT.bdR / 1.1, c: 0xDCE3EC, t: Date.now(), life: 260 });
+      spark(s.x, s.y, "#FFFFFF", 1.4);
+      localTargets().forEach(function (T) {
+        if (!T.alive || T.team === d.team || T.id === d.owner || hyp(T.x - s.x, T.y - s.y) > ULT.bdR + BODY_R * 0.5) return;
+        damage(T, ULT.bdDmg, d.owner, d.createdAt, null);
+      });
+      return false;
     });
   }
   function stepBladeDaggers(t) {
@@ -2514,6 +2530,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var dd = hyp(dx, dy) || 1, kbAt = now(), shoveEnd = T.shove ? T.shove.at + ULT.gdKbMs : 0;
       if (!T.minion) creditCC(d.owner, Math.max(0, kbAt + ULT.gdKbMs - Math.max(T.stunUntil || 0, shoveEnd, kbAt)), 0, 0);
       T.shove = { ux: dx / dd, uy: dy / dd, dist: d.kb, at: now(), done: 0 };
+      breakBladeStorm(T, kbAt);
     }
   }
   var SHOVE_SUBSTEP = BODY_R / 2;
@@ -4280,8 +4297,25 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (f.mesh.userData.flashMat) f.mesh.userData.flashMat.dispose();
     f.mesh = null;
   }
+  function bladeZoneMesh(f) {
+    var g = new THREE.Group(), mats = [];
+    function part(geo, color, opacity, y) {
+      var mat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: opacity, depthWrite: false, side: THREE.DoubleSide });
+      mat.userData.base = opacity; mats.push(mat);
+      var m = flatMesh(geo, mat); m.position.y = y; m.scale.setScalar(f.r); g.add(m);
+      return m;
+    }
+    part(GEO.disc, 0xB0272C, 0.22, 2);
+    g.userData.charge = part(GEO.disc, 0xFFD9C8, 0.3, 2.2);
+    part(GEO.poolEdge, 0xFFFFFF, 0.95, 2.4);
+    g.position.set(f.x, 0, f.y);
+    g.userData.mats = mats;
+    scene.add(g);
+    return g;
+  }
   function fxMesh(f) {
     if (f.k === "bolt") return boltMesh(f);
+    if (f.k === "bladeZone") return bladeZoneMesh(f);
     var mat = new THREE.MeshBasicMaterial({ color: f.c, transparent: true, depthWrite: false, side: THREE.DoubleSide }), m;
     if (f.k === "spark") { m = new THREE.Mesh(GEO.ringFx, mat); m.position.set(f.x, 36, f.y); }
     else if (f.k === "smoke") { m = new THREE.Mesh(GEO.ball, mat); m.position.set(f.x, 30, f.y); }
@@ -4303,6 +4337,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var flicker = (1 - k) * (0.65 + 0.35 * Math.sin(nowMs / 22));
         m.userData.mats.forEach(function (mat) { mat.opacity = flicker; });
         m.userData.flashMat.opacity = flicker * BOLT_FLASH_OPACITY;
+        return;
+      }
+      if (f.k === "bladeZone") {
+        var age = nowMs - f.t, charged = Math.min(1, age / f.delay), fade = age <= f.delay ? 1 : 1 - (age - f.delay) / (f.life - f.delay);
+        m.userData.charge.scale.setScalar(Math.max(0.01, f.r * charged));
+        m.userData.mats.forEach(function (mat) { mat.opacity = mat.userData.base * fade; });
         return;
       }
       m.material.opacity = 1 - k;
@@ -4957,6 +4997,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       localTargets().forEach(function (T) { stepShove(T, t); });
       checkProjectiles(t);
       stepBladeDaggers(t);
+      stepBladeSpins(t);
       stepBladeStorms(t);
     }
   }
@@ -4974,7 +5015,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       begin: function (fakeRoom, players, bots, clockMs) {
         TEST_CLOCK = clockMs; room = fakeRoom; P = players; BOTS = bots; ME = null; R = {};
         G = { startAt: fakeRoom.startAt, endSent: false, playingSent: false, lastNet: 0, sent: {}, finalSent: false, beeped: -1 };
-        PR = {}; SHOTS = []; BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; STORMS = []; MELEE = {}; FX = []; handled = {}; CC_PENDING = {};
+        PR = {}; SHOTS = []; BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; STORMS = []; BLADE_SPINS = []; MELEE = {}; FX = []; handled = {}; CC_PENDING = {};
       },
       ccPending: function () { return CC_PENDING; },
       setClock: function (ms) { TEST_CLOCK = ms; },

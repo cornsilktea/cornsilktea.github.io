@@ -612,6 +612,42 @@ function collectResults(api) {
     if (!nearLost && !farLost) { done("fail", "회전 피해가 없음 (사거리 끝이 벽에 막혔을 수 있음)"); return; }
     done(nearLost === api.ULT.bdDmg && !farLost ? "pass" : "fail", "끝점 50 옆 적 " + nearLost + " 피해, 120 옆 적 " + farLost + " 피해");
   });
+  run(DANCER, "단검 투척: 회전 피해는 적중 " + api.ULT.bdDelay / 1000 + "초 뒤에 들어가는가", function (done) {
+    var W = dancerDuel([{ id: "foe", team: "red", char: "knight", x: 450, y: OPEN_Y.forest }]);
+    var dn = W.ent("dn"), foe = W.ent("foe"), hitAt = null, lostAtHit = 0, lostBefore = 0;
+    api.fireBasic(dn, 0);
+    W.step(800, FRAME, function (t) {
+      var lost = foe.maxHp - foe.hp;
+      if (hitAt === null && lost > 0) { hitAt = t; lostAtHit = lost; }
+      if (hitAt !== null && t < hitAt + api.ULT.bdDelay - FRAME) lostBefore = lost;
+    });
+    var lost = foe.maxHp - foe.hp, dmg = api.CHARS.dancer.dmg;
+    done(lostAtHit === dmg && lostBefore === dmg && lost === dmg + api.ULT.bdDmg ? "pass" : "fail", "적중 순간 " + lostAtHit + ", " + api.ULT.bdDelay / 1000 + "초 전 " + lostBefore + ", 끝 " + lost + " 피해");
+  });
+  function dancerStormBroken(breaker) {
+    var y = OPEN_Y.forest;
+    var W = dancerDuel([
+      { id: "foe", team: "red", char: "knight", x: 350, y: y },
+      { id: "gd", team: "red", char: "guardian", x: 400, y: y, gauge: api.GAUGE_MAX }
+    ]);
+    var dn = W.ent("dn"), foe = W.ent("foe");
+    foe.hp = foe.maxHp = 1e6;
+    dn.gauge = api.GAUGE_MAX;
+    api.useUlt(dn, 0);
+    W.step(500);
+    if (breaker === "stun") api.afflict(dn, { stunMs: 1000 });
+    else api.useUlt(W.ent("gd"), Math.PI);
+    W.step(100);
+    var lostAtBreak = foe.maxHp - foe.hp;
+    W.step(1500);
+    return { storming: dn.buffUntil > W.t(), extra: foe.maxHp - foe.hp - lostAtBreak, gaugeLocked: dn.skillUntil > W.t() };
+  }
+  [["stun", "기절"], ["knock", "창벽 넉백"]].forEach(function (c) {
+    run(DANCER, "칼날 폭풍: " + c[1] + "을 맞으면 그 순간 끊기는가", function (done) {
+      var r = dancerStormBroken(c[0]);
+      done(!r.storming && !r.extra && !r.gaugeLocked ? "pass" : "fail", (r.storming ? "폭풍 계속됨" : "폭풍 끊김") + ", 끊긴 뒤 피해 " + r.extra + (r.gaugeLocked ? ", 게이지 잠김 남음" : ""));
+    });
+  });
   run(DANCER, "칼날 폭풍: " + api.ULT.bwDur / 1000 + "초간 이동속도 " + api.CHARS.dancer.ultSpeed + ", 반경 " + api.ULT.bwR + " 안 적에게 " + api.ULT.bwTick / 1000 + "초마다 " + api.ULT.bwDmg + " 피해, 따라다니고 끝나면 멈추는가", function (done) {
     var y = OPEN_Y.forest;
     var W = dancerDuel([
