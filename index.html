@@ -2,6 +2,16 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
+<script>
+/* 밝기(다크 모드): 화면을 그리기 전에 정해야 밝은 화면이 잠깐 번쩍이지 않는다. 키는 admin.html 과 같이 쓴다. */
+(function(){
+  try{
+    var t = localStorage.getItem('portal_theme');
+    if(!t){ t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light'; }
+    document.documentElement.setAttribute('data-theme', t);
+  }catch(e){}
+})();
+</script>
 <link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
@@ -251,6 +261,7 @@
   <div class="title-row">
     <h1 id="pageTitle">수업용 링크 모음</h1>
     <a class="admin-link" id="adminLink" href="admin.html" hidden>제어판</a>
+    <button id="themeToggle" type="button" class="btn" aria-label="화면 밝기 전환"></button>
   </div>
   <p class="sub" id="pageSub">전자칠판에서 학년과 반을 고르면 그 반의 QR 코드와 수업 자료 목록이 나옵니다.</p>
   <div class="viewtabs" id="viewtabs" hidden>
@@ -301,6 +312,27 @@
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="data.js"></script>
 <script charset="utf-8" src="qrcode.js"></script>
+<script>
+/* 밝기 전환 버튼: <html data-theme> 를 바꾸고 localStorage('portal_theme')에 남긴다(admin.html 과 같은 키).
+   주소창 색(theme-color)도 배경색에 맞춘다. */
+(function () {
+  var btn = document.getElementById("themeToggle");
+  var themeColor = document.querySelector('meta[name="theme-color"]');
+  function current() { return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light"; }
+  function paint() {
+    var dark = current() === "dark";
+    btn.textContent = dark ? "☀️ 밝게" : "🌙 어둡게";
+    if (themeColor) themeColor.setAttribute("content", dark ? "#12180F" : "#F4F6F1");
+  }
+  btn.addEventListener("click", function () {
+    var next = current() === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    try { localStorage.setItem("portal_theme", next); } catch (e) {}
+    paint();
+  });
+  paint();
+})();
+</script>
 <script>
 /* 수업 자료 목록은 선생님 화면(admin.html)에서 관리합니다.
    단원 구조와 학급 목록은 data.js 에 있습니다. 이 파일은 고칠 필요가 없습니다.

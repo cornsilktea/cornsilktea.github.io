@@ -2,6 +2,16 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
+<script>
+/* 밝기(다크 모드): 화면을 그리기 전에 정해야 밝은 화면이 잠깐 번쩍이지 않는다. 키는 index.html 과 같이 쓴다. */
+(function(){
+  try{
+    var t = localStorage.getItem('portal_theme');
+    if(!t){ t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light'; }
+    document.documentElement.setAttribute('data-theme', t);
+  }catch(e){}
+})();
+</script>
 <link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>수업 자료 제어판</title>
@@ -23,7 +33,8 @@
     -webkit-text-size-adjust: 100%;
   }
   .wrap { max-width: 880px; margin: 0 auto; }
-  h1 { font-size: var(--sg-fs-2xl); font-weight: 800; line-height: var(--sg-lh-tight); letter-spacing: -.01em; margin: 0 0 var(--sg-s2); }
+  .title-row { display: flex; align-items: center; gap: var(--sg-s3); flex-wrap: wrap; margin: 0 0 var(--sg-s2); }
+  h1 { font-size: var(--sg-fs-2xl); font-weight: 800; line-height: var(--sg-lh-tight); letter-spacing: -.01em; margin: 0; }
   .sub { font-size: var(--sg-fs-sm); line-height: var(--sg-lh); color: var(--sg-ink-soft); margin: 0 0 var(--sg-s6); }
 
   .panel {
@@ -249,7 +260,10 @@
 <body>
 <div class="wrap">
 
-  <h1>수업 자료 제어판</h1>
+  <div class="title-row">
+    <h1>수업 자료 제어판</h1>
+    <button id="themeToggle" type="button" class="btn" aria-label="화면 밝기 전환"></button>
+  </div>
   <p class="sub">반을 고른 뒤 스위치를 켜면 그 반 학생만 바로 들어갈 수 있고, 끄면 즉시 막힙니다. 저장 버튼은 없습니다.</p>
 
   <!-- 로그인 -->
@@ -383,6 +397,26 @@
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="data.js"></script>
 <script>
+/* 밝기 전환 버튼: <html data-theme> 를 바꾸고 localStorage('portal_theme')에 남긴다(index.html 과 같은 키).
+   주소창 색(theme-color)도 배경색에 맞춘다. */
+(function () {
+  var btn = document.getElementById("themeToggle");
+  var themeColor = document.querySelector('meta[name="theme-color"]');
+  function current() { return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light"; }
+  function paint() {
+    var dark = current() === "dark";
+    btn.textContent = dark ? "☀️ 밝게" : "🌙 어둡게";
+    if (themeColor) themeColor.setAttribute("content", dark ? "#12180F" : "#F4F6F1");
+  }
+  btn.addEventListener("click", function () {
+    var next = current() === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    try { localStorage.setItem("portal_theme", next); } catch (e) {}
+    paint();
+  });
+  paint();
+})();
+
 /* 로그인 도구(구글 서버)를 못 불러오는 경우에 대비한 안내 */
 window.__portalBooted = false;
 setTimeout(function () {
