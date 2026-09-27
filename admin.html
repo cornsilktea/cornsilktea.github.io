@@ -1011,7 +1011,7 @@ const STATS_GAMES = {
        표 순서는 게임의 CHAR_LIST 처럼 groups 순서 → 직업군 안에서 이름 가나다순으로 자동 정렬하므로 줄 순서는 상관없다.
        옛 직업(marksman·healer·tank·assassin) 통계는 데이터베이스에 남아 있지만 새 직업과 비교할 수 없어서 뺐다.
        회복은 광전사 광폭화(자기 회복)·투척병 독안개·사제 에너지 웨이브(아군 회복)만 있다(게임의 CHARS heals 와 같게).
-       막은 피해는 기사 방어태세만 있다(게임의 CHARS blocks 와 같게). */
+       막은 피해는 기사 방어태세·네크로 해골 병사가 받은 피해만 있다(게임의 CHARS blocks 와 같게). */
     groups: [
       { id: "fighter",  name: "전사", icon: "⚔️" },
       { id: "caster",   name: "마법사", icon: "✨" },
@@ -1024,7 +1024,7 @@ const STATS_GAMES = {
       { id: "blacksmith", name: "대장장이", group: "fighter" },
       { id: "guardian",   name: "수문장", group: "fighter" },
       { id: "lancer",     name: "창기사", group: "fighter" },
-      { id: "necro",      name: "네크로", group: "caster" },
+      { id: "necro",      name: "네크로", group: "caster", block: true },
       { id: "priest",     name: "사제", group: "caster", heal: true },
       { id: "frost",      name: "얼음술사", group: "caster" },
       { id: "mage",       name: "주술사", group: "caster" },

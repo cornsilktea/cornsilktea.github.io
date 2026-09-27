@@ -608,12 +608,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     ranger:  { name: "궁수", role: "shooter", icon: "🏹", hp: 100, speed: 250, cd: 400, dmg: 10, range: KEY * 6, pSpeed: 950, pr: 6, shots: 2, gap: 70, ultName: "난사", ultAim: true },
     mage:    { name: "주술사", role: "caster", icon: "🔮", hp: 120, speed: 250, cd: 500, dmg: 11, range: 350, pSpeed: 700, pr: 9, ultName: "메테오", ultAim: true },
     rogue:   { name: "은신자", role: "assassin", icon: "🗡️", hp: 100, speed: 300, ultSpeed: 420, cd: 600, dmg: 30, range: 110, arc: Math.PI * 0.6, hits: 2, hitGap: 160, throwDmg: 20, throwRange: 300, pSpeed: 900, pr: 8, ultName: "은신" },
-    necro:   { name: "네크로", role: "caster", icon: "💀", hp: 120, speed: 250, cd: 500, dmg: 11, range: KEY * 4, pSpeed: 1000, pr: 9, ultName: "해골 소환" },
+    necro:   { name: "네크로", role: "caster", icon: "💀", hp: 120, speed: 250, cd: 500, dmg: 11, range: KEY * 4, pSpeed: 1000, pr: 9, ultName: "해골 소환", blocks: true },
     sniper:  { name: "저격수", role: "shooter", icon: "🎯", hp: 100, speed: 240, cd: 1429, dmg: 40, range: 700, pSpeed: 1500, pr: 7, ultName: "거대 화살", ultAim: true },
     thrower: { name: "투척병", role: "shooter", icon: "🧪", hp: 120, speed: 240, cd: 1000, dmg: 20, ticks: 3, range: KEY * 4 + 100, minRange: KEY * 1, ultName: "독안개", ultAim: true, heals: true },
     lancer:  { name: "창기사", role: "fighter", icon: "🔱", hp: 300, speed: 225, cd: 1200, dmg: 30, range: 200, width: 50, ultName: "꿰뚫기", ultAim: true },
     blacksmith: { name: "대장장이", role: "fighter", icon: "🔨", hp: 350, speed: 225, cd: 1000, dmg: 25, range: 120, width: 80, ultName: "내려찍기", ultAim: true },
-    priest:  { name: "사제", role: "caster", icon: "📖", hp: 120, speed: 250, cd: 900, dmg: 10, heal: 10, range: 400, width: 200, ultName: "블랙홀", ultAim: true, heals: true },
+    priest:  { name: "사제", role: "caster", icon: "📖", hp: 120, speed: 250, cd: 900, dmg: 10, heal: 10, range: 320, width: 200, ultName: "블랙홀", ultAim: true, heals: true },
     hitman:  { name: "자객", role: "assassin", icon: "🔪", hp: 120, speed: 260, cd: 1350, dmg: 40, range: 100,
                dashRange: 200, dashWidth: 150, dashDmg: 40, dashMs: 300, finishDelay: 125, ultName: "처형", ultAim: true },
     guardian: { name: "수문장", role: "fighter", icon: "🏰", hp: 380, speed: 215, cd: 1050, dmg: 26, range: 140, arc: Math.PI * 130 / 180,
@@ -2219,6 +2219,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (!minionReady(M)) return;
     var dm = Math.min(amount, M.hp);
     M.hp -= dm;
+    var summoner = ent(M.owner);
+    if (summoner) summoner.blocked = (summoner.blocked || 0) + dm;
     if (M.hp <= 0) { M.hp = 0; M.alive = false; M.diedAt = now(); }
     pushHit(owner, dm, basic, ultKey, false);
     G.forceNet = true;
