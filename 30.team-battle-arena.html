@@ -567,8 +567,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     lancer:  { name: "창기사", role: "fighter", icon: "🔱", hp: 300, speed: 225, cd: 1200, dmg: 30, range: 200, width: 50, ultName: "꿰뚫기", ultAim: true },
     blacksmith: { name: "대장장이", role: "fighter", icon: "🔨", hp: 350, speed: 225, cd: 1000, dmg: 32, range: 120, width: 80, ultName: "내려찍기", ultAim: true },
     priest:  { name: "사제", role: "caster", icon: "📖", hp: 120, speed: 250, cd: 900, dmg: 10, heal: 10, range: 400, width: 200, ultName: "블랙홀", ultAim: true, heals: true },
-    hitman:  { name: "자객", role: "assassin", icon: "🔪", hp: 120, speed: 260, cd: 900, dmg: 40, range: 100,
-               dashRange: 200, dashWidth: 150, dashDmg: 40, dashMs: 120, ultName: "처형", ultAim: true }
+    hitman:  { name: "자객", role: "assassin", icon: "🔪", hp: 120, speed: 260, cd: 1350, dmg: 40, range: 100,
+               dashRange: 200, dashWidth: 150, dashDmg: 40, dashMs: 300, finishDelay: 250, ultName: "처형", ultAim: true }
   };
   var CHAR_LIST = ["warrior", "knight", "ranger", "mage", "rogue", "necro", "sniper", "thrower", "lancer", "blacksmith", "priest", "hitman"];
   var ROLES = {
@@ -2159,11 +2159,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     participants().map(ent).concat(allMinions()).forEach(function (T) { strikeSpark(T, d, who); });
     localTargets().forEach(function (T) { strikeHit(T, d); strikeHeal(T, d); });
   }
-  function waveFront(d, t) { return Math.min(1, (t - d.createdAt) / WAVE_TRAVEL_MS) * (d.len + BODY_R); }
+  function waveFront(d, t, travelMs) { return Math.min(1, (t - d.createdAt) / travelMs) * (d.len + BODY_R); }
   function reachedBy(T, d, front) { return T && (T.x - d.x) * Math.cos(d.angle) + (T.y - d.y) * Math.sin(d.angle) <= front; }
   function stepWaves(t) {
     WAVES = WAVES.filter(function (w) {
-      var d = w.d, front = waveFront(d, t);
+      var d = w.d, travelMs = WAVE[w.who].travel, front = waveFront(d, t, travelMs);
       participants().map(ent).concat(allMinions()).forEach(function (T) {
         if (!reachedBy(T, d, front) || w.sparked.indexOf(T) >= 0) return;
         w.sparked.push(T); strikeSpark(T, d, w.who);
@@ -2172,7 +2172,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (!reachedBy(T, d, front) || w.struck.indexOf(T) >= 0) return;
         w.struck.push(T); strikeHit(T, d); strikeHeal(T, d);
       });
-      return t < d.createdAt + WAVE_TRAVEL_MS;
+      return t < d.createdAt + travelMs;
     });
   }
   function swing(E, ang, rage) {
@@ -2195,7 +2195,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var c = CHARS[E.char], t = now(), reach = dashReach(E, ang, c.dashRange);
     var tx = clamp(E.x + Math.cos(ang) * reach, BOUND.l + BODY_R, BOUND.r - BODY_R), ty = clamp(E.y + Math.sin(ang) * reach, BOUND.t + BODY_R, BOUND.b - BODY_R);
     reach = hyp(tx - E.x, ty - E.y);
-    room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(ang), len: Math.round(reach), width: c.dashWidth, dmg: c.dashDmg, createdAt: t });
+    room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(ang), len: Math.max(1, Math.round(reach)), width: c.dashWidth, dmg: c.dashDmg, createdAt: t });
     E.dash = { sx: E.x, sy: E.y, tx: tx, ty: ty, at: t, ang: ang, swingId: t };
     E.slash = null;
     E.atkAt = t;
@@ -2205,11 +2205,18 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var D = E.dash; if (!D) return;
     if (!E.alive) { E.dash = null; return; }
     var t = now(), c = CHARS[E.char], k = clamp((t - D.at) / c.dashMs, 0, 1);
-    E.x = D.sx + (D.tx - D.sx) * k; E.y = D.sy + (D.ty - D.sy) * k;
     E.mv = false;
-    if (k < 1) return;
+    if (!D.landed) {
+      E.x = D.sx + (D.tx - D.sx) * k; E.y = D.sy + (D.ty - D.sy) * k;
+      if (k < 1) return;
+      D.landed = true;
+      resolve(E);
+    }
+    if (stunned(E, t)) { E.dash = null; return; }
+    if (t < D.at + c.dashMs + c.finishDelay) return;
     E.dash = null;
-    resolve(E);
+    E.atkAt = t;
+    if (hear(E)) sfx("swing");
     room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(D.ang), radius: c.range, arc: Math.PI * 2, dmg: c.dmg, createdAt: D.swingId });
     G.forceNet = true;
   }
@@ -3281,7 +3288,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (E.char === "lancer") return ["Melee_2H_Attack_Stab", KIT.clips.Melee_2H_Attack_Stab.duration * 1000 / (E.ultUntil > E.atkAt ? 520 : 800)];
     if (E.char === "blacksmith") return ["Melee_1H_Attack_Chop", 1.6];
     if (E.char === "priest") return ["Ranged_Magic_Shoot", 1.4];
-    if (E.char === "hitman") return E.ultUntil > E.atkAt ? ["Throw", 2.6] : ["Melee_Dualwield_Attack_Stab", 2.2];
+    if (E.char === "hitman") {
+      if (E.ultUntil > E.atkAt) return ["Throw", 2.6];
+      var hc = CHARS.hitman, finishing = E.atkAt - (v.dashAtkAt || 0) < hc.dashMs + hc.finishDelay + 200;
+      if (finishing) return ["Melee_Dualwield_Attack_Slice", 2.2];
+      v.dashAtkAt = E.atkAt;
+      return ["Melee_Dualwield_Attack_Stab", 1.4];
+    }
     if (!enemyInMelee(E)) return ["Throw", 2.2];
     if (v.wasStealth) { v.combo = 1; return ["Melee_Dualwield_Attack_Stab", 2.2]; }
     return [ROGUE_COMBO[v.combo++ % 2], 2.4];
@@ -3408,8 +3421,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function dropProjVis(id) { var g = PRV[id]; if (!g) return; scene.remove(g); delete PRV[id]; }
 
   var PROJ_Y = 42, BOW_BLEND = 140;
-  var WAVE_TRAVEL_MS = 380;
-  var WAVE = { priest: { life: 540 } };
+  var WAVE = { priest: { life: 540, travel: 380 }, hitman: { life: CHARS.hitman.dashMs + 160, travel: CHARS.hitman.dashMs } };
   var MELEE_COLOR = { warrior: 0xFF9A3C, knight: 0xFFFFFF, rogue: 0xC9D6E6, necro: 0xB07CFF, lancer: 0xFFD27A, blacksmith: 0xFFB45A, priest: 0x7CFFB2, hitman: 0xFF4A5A };
   function makeMeleeVis(d) {
     var g = new THREE.Group(), who = P[d.owner] ? P[d.owner].characterType : "", col = d.u ? 0xFF6A3D : (MELEE_COLOR[who] || 0xFFFFFF);
@@ -3976,14 +3988,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     keys(PRV).forEach(function (id) { if (!PR[id]) dropProjVis(id); });
 
     keys(MELEE).forEach(function (k) {
-      var m = MELEE[k], age = nowMs - m.at, g = MLV[k], wave = WAVE[P[m.d.owner] ? P[m.d.owner].characterType : ""], life = wave ? wave.life : 240;
+      var m = MELEE[k], age = nowMs - m.at, g = MLV[k], wave = m.d.len ? WAVE[P[m.d.owner] ? P[m.d.owner].characterType : ""] : null, life = wave ? wave.life : 240;
       if (age > life) { if (g) dropMelee(k); return; }
       if (!g) g = MLV[k] = makeMeleeVis(m.d);
       var f = age / life;
       g.userData.fill.opacity = 0.2 * (1 - f);
       g.userData.edge.opacity = 0.9 * (1 - (wave ? f * f : f));
       if (wave) {
-        var reach = Math.max(0.03, Math.min(1, age / WAVE_TRAVEL_MS));
+        var reach = Math.max(0.03, Math.min(1, age / wave.travel));
         g.userData.edgeMesh.scale.x = g.userData.line * reach;
         g.userData.fillMesh.scale.x = g.userData.line * reach;
       } else if (g.userData.line) g.userData.edgeMesh.scale.x = g.userData.line * (0.55 + 0.45 * Math.min(1, f * 3));
