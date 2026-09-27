@@ -1929,6 +1929,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     return { slowMs: ULT.frSlowMs, slowMul: ULT.frSlowMul - (T.frostStacks - 1) * ULT.frSlowStep };
   }
+  function frostFrozen(E, t) { return stunned(E, t) && E.frostStackAt > 0 && E.stunUntil - E.frostStackAt <= ULT.frFreezeMs + 20; }
   function frostStacksNow(E, t) { return E.frostStacks && t - E.frostStackAt <= ULT.frSlowMs ? E.frostStacks : 0; }
   function revealBriefly(ownerId, t) {
     var A = ent(ownerId);
@@ -3651,7 +3652,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       else if (E.mv && v.speed > 15) showClip(v, "Walking_A", clamp(v.speed / 110, 0.6, 1.4), true);
       else showClip(v, E.char === "ranger" ? "Ranged_Bow_Idle" : (E.char === "sniper" ? "Ranged_2H_Aiming" : (E.char === "lancer" || E.char === "guardian" ? "Melee_2H_Idle" : "Idle_A")), 1, true);
     }
-    v.mixer.update(dt);
+    v.mixer.update(E.alive && frostFrozen(E, t) ? 0 : dt);
   }
   function animateMinion(v, M, t, dt) {
     if (!v.kit) return;
@@ -3847,63 +3848,102 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     ud.ring.rotation.z = -nowMs / 250;
     ud.fill.scale.setScalar(ud.r * (0.9 + 0.1 * Math.sin(nowMs / 180)));
   }
-  var STORM_BANDS = 6, STORM_ARMS = 3, STORM_FLAKES = 14;
-  GEO.stormArc = [];
-  for (var stormBand = 0; stormBand < STORM_BANDS; stormBand++) {
-    var bandIn = 0.12 + stormBand * 0.145;
-    GEO.stormArc.push(new THREE.RingGeometry(bandIn, bandIn + 0.09, 16, 1, 0, Math.PI * (0.55 - stormBand * 0.04)));
+  var STORM_FLAKES = 18;
+  GEO.stormPlane = new THREE.PlaneGeometry(1, 1);
+  var STORM_MASK = { tex: null, arena: "" };
+  function stormMask() {
+    if (STORM_MASK.arena === ARENA && STORM_MASK.tex) return STORM_MASK.tex;
+    var px = 8, cv = document.createElement("canvas");
+    cv.width = MAP_COLS * px; cv.height = MAP_ROWS * px;
+    var g2 = cv.getContext("2d");
+    g2.fillStyle = "#FFFFFF"; g2.fillRect(0, 0, cv.width, cv.height);
+    g2.fillStyle = "#000000";
+    for (var r = 0; r < MAP_ROWS; r++) for (var c = 0; c < MAP_COLS; c++) {
+      var ch = MAP[r].charAt(c);
+      if (ch === "~" || ch === "=") g2.fillRect(c * px, r * px, px, px);
+    }
+    if (STORM_MASK.tex) STORM_MASK.tex.dispose();
+    var tex = new THREE.CanvasTexture(cv);
+    tex.flipY = false;
+    STORM_MASK.tex = tex; STORM_MASK.arena = ARENA;
+    return tex;
   }
-  var STORM_OPACITY = { fill: 0.12, arm: 0.35, edge: 0.7, team: 0.6, flake: 0.85 };
+  var STORM_VERT = [
+    "varying vec2 vW;",
+    "void main() {",
+    "  vec4 w = modelMatrix * vec4(position, 1.0);",
+    "  vW = w.xz;",
+    "  gl_Position = projectionMatrix * viewMatrix * w;",
+    "}"].join("\n");
+  var STORM_FRAG = [
+    "uniform vec2 center; uniform float radius; uniform float time; uniform float fade; uniform vec3 teamCol;",
+    "uniform sampler2D mask; uniform vec4 maskRect;",
+    "varying vec2 vW;",
+    "float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }",
+    "float noise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);",
+    "  return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y); }",
+    "void main() {",
+    "  vec2 d = vW - center; float r = length(d) / radius;",
+    "  if (r > 1.0) discard;",
+    "  float a = atan(d.y, d.x);",
+    "  float arms = 0.5 + 0.5 * sin(a * 3.0 + log(r + 0.05) * 4.5 - time * 1.8);",
+    "  arms = smoothstep(0.2, 1.0, arms);",
+    "  float spin = a + time * 0.8 / (r + 0.3);",
+    "  vec2 q = vec2(cos(spin), sin(spin)) * r * 7.0;",
+    "  float drift = noise(q * 1.2) * 0.65 + noise(q * 3.4) * 0.35;",
+    "  vec3 sky = vec3(0.56, 0.85, 0.94), snow = vec3(0.95, 0.975, 1.0);",
+    "  vec3 col = mix(sky, snow, clamp(arms * 0.75 + drift * 0.45, 0.0, 1.0));",
+    "  float alpha = 0.78 + 0.17 * arms;",
+    "  float flake = step(0.975, hash(floor((vW + vec2(time * 14.0, -time * 26.0)) / 5.0)));",
+    "  col = mix(col, vec3(1.0), flake);",
+    "  float rim = smoothstep(0.9, 0.96, r) * (1.0 - smoothstep(0.975, 0.99, r));",
+    "  float team = smoothstep(0.975, 0.99, r);",
+    "  float land = texture2D(mask, (vW - maskRect.xy) / maskRect.zw).r;",
+    "  alpha *= mix(0.14, 1.0, land);",
+    "  col = mix(col, vec3(1.0), rim); alpha = max(alpha, rim * 0.95);",
+    "  col = mix(col, teamCol, team); alpha = max(alpha, team * 0.9);",
+    "  alpha *= smoothstep(0.0, 0.25, r + 0.2) * fade;",
+    "  gl_FragColor = vec4(col, alpha);",
+    "}"].join("\n");
   function makeStormVis(e) {
     var g = new THREE.Group();
-    var mats = {
-      fill: new THREE.MeshBasicMaterial({ color: 0xBFEFFF, transparent: true, opacity: STORM_OPACITY.fill, depthWrite: false }),
-      arm: new THREE.MeshBasicMaterial({ color: 0x8FD8F0, transparent: true, opacity: STORM_OPACITY.arm, side: THREE.DoubleSide, depthWrite: false }),
-      edge: new THREE.MeshBasicMaterial({ color: 0xE8F8FF, transparent: true, opacity: STORM_OPACITY.edge, depthWrite: false }),
-      team: new THREE.MeshBasicMaterial({ color: C_FX[e.team], transparent: true, opacity: STORM_OPACITY.team, depthWrite: false }),
-      flake: new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: STORM_OPACITY.flake, depthWrite: false })
-    };
-    var fill = flatMesh(GEO.disc, mats.fill); fill.scale.setScalar(e.r); fill.position.y = 1.5; g.add(fill);
-    var edge = flatMesh(GEO.poolEdge, mats.edge); edge.scale.setScalar(e.r); edge.position.y = 1.9; g.add(edge);
-    var team = flatMesh(GEO.teamEdge, mats.team); team.scale.setScalar(e.r); team.position.y = 1.8; g.add(team);
-    var bands = [];
-    for (var i = 0; i < STORM_BANDS; i++) {
-      var band = new THREE.Group();
-      for (var k = 0; k < STORM_ARMS; k++) {
-        var arm = flatMesh(GEO.stormArc[i], mats.arm);
-        arm.rotation.z = k * Math.PI * 2 / STORM_ARMS - i * 0.5;
-        arm.scale.setScalar(e.r); arm.position.y = 2 + i * 0.1;
-        band.add(arm);
-      }
-      g.add(band);
-      bands.push({ g: band, spin: 1.9 - i * 0.24 });
-    }
+    var floorMat = new THREE.ShaderMaterial({
+      uniforms: { center: { value: new THREE.Vector2(e.x, e.y) }, radius: { value: e.r }, time: { value: 0 }, fade: { value: 0 },
+                  teamCol: { value: new THREE.Color(C_FX[e.team]) }, mask: { value: stormMask() },
+                  maskRect: { value: new THREE.Vector4(MAP_X0, MAP_Y0, MAP_COLS * TILE, MAP_ROWS * TILE) } },
+      vertexShader: STORM_VERT, fragmentShader: STORM_FRAG, transparent: true, depthWrite: false
+    });
+    var floor = flatMesh(GEO.stormPlane, floorMat); floor.scale.set(e.r * 2, e.r * 2, 1); floor.position.y = 1; floor.renderOrder = -1;
+    g.add(floor);
+    var flakeMat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.9, depthWrite: false });
     var flakes = new THREE.Group(), flakeList = [];
     for (var j = 0; j < STORM_FLAKES; j++) {
-      var f = new THREE.Mesh(GEO.ball, mats.flake), rr = e.r * (0.15 + 0.8 * ((j * 0.618) % 1)), a = j * 2.4;
+      var f = new THREE.Mesh(GEO.ball, flakeMat), rr = e.r * (0.12 + 0.82 * ((j * 0.618) % 1)), a = j * 2.4;
       f.scale.setScalar(3 + (j % 3));
       f.position.set(Math.cos(a) * rr, 8, Math.sin(a) * rr);
       flakes.add(f);
       flakeList.push({ m: f, ph: j * 0.37 });
     }
     g.add(flakes);
-    g.userData = { mats: mats, bands: bands, flakes: flakes, flakeList: flakeList };
+    g.userData = { mats: [floorMat, flakeMat], floor: floorMat, flakeMat: flakeMat, flakes: flakes, flakeList: flakeList };
     scene.add(g);
     return g;
   }
-  function dropStormVis(s) { if (!s.vis) return; scene.remove(s.vis); keys(s.vis.userData.mats).forEach(function (k) { s.vis.userData.mats[k].dispose(); }); s.vis = null; }
+  function dropStormVis(s) { if (!s.vis) return; scene.remove(s.vis); s.vis.userData.mats.forEach(function (m) { m.dispose(); }); s.vis = null; }
   function renderStorm(s, t, dt) {
     var e = s.e, start = e.createdAt + e.delay, end = start + e.dur;
     if (t < start || t >= end) return;
     if (!s.vis) s.vis = makeStormVis(e);
-    var ud = s.vis.userData, c = stormCenter(s);
-    var fade = clamp((t - start) / 300, 0.01, 1) * clamp((end - t) / 400, 0, 1);
+    var ud = s.vis.userData, c = stormCenter(s), grow = clamp((t - start) / 300, 0, 1);
+    var fade = Math.max(0.01, grow) * clamp((end - t) / 400, 0, 1);
     s.vis.position.set(c.x, 0, c.y);
-    s.vis.scale.set(0.6 + 0.4 * clamp((t - start) / 300, 0, 1), 1, 0.6 + 0.4 * clamp((t - start) / 300, 0, 1));
-    ud.bands.forEach(function (b) { b.g.rotation.y -= dt * b.spin; });
+    ud.floor.uniforms.center.value.set(c.x, c.y);
+    ud.floor.uniforms.radius.value = e.r * (0.6 + 0.4 * grow);
+    ud.floor.uniforms.time.value = (t - start) / 1000;
+    ud.floor.uniforms.fade.value = fade;
     ud.flakes.rotation.y -= dt * 1.2;
-    ud.flakeList.forEach(function (f) { f.m.position.y = 6 + 10 * ((t / 900 + f.ph) % 1); });
-    keys(ud.mats).forEach(function (k) { ud.mats[k].opacity = STORM_OPACITY[k] * fade; });
+    ud.flakeList.forEach(function (f) { f.m.position.y = 6 + 14 * ((t / 900 + f.ph) % 1); });
+    ud.flakeMat.opacity = 0.9 * fade;
   }
   function makeBottleVis() {
     var g = new THREE.Group();
@@ -4289,7 +4329,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var frostStacks = frostStacksNow(E, t);
     if (frostStacks === 1) return 0x3A6E99;
     if (frostStacks === 2) return 0x2E8FD9;
-    if (stunned(E, t) && E.frostStackAt && E.stunUntil - E.frostStackAt <= ULT.frFreezeMs + 20) return 0x6FB8E0;
+    if (frostFrozen(E, t)) return 0x6FB8E0;
     return 0x000000;
   }
   var LABELS = [];
