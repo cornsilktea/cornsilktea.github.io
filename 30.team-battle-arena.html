@@ -1934,7 +1934,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var A = ent(ownerId);
     if (!A || (A !== ME && !A.bot) || !hiddenFrom(A, t)) return;
     A.revealUntil = t + REVEAL_BREAK_MS;
-    G.forceNet = true;
   }
   function berserk(E, t) { return E.char === "warrior" && E.buffUntil > (t || now()); }
   function moveEnt(E, vx, vy, dt) {
