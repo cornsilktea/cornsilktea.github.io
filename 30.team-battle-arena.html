@@ -242,6 +242,8 @@
   .kf .r { color: #FF7A70; }
   .kf small { font-size: 11px; font-weight: 700; color: rgba(244,241,232,.6); }
   .kfArrow { color: #D97B4F; font-size: 12px; }
+  .kfStreak { margin-left: 4px; padding: 1px 7px; border-radius: 5px; font-size: 12px; font-weight: 800; color: #1B130E; background: #D97B4F; }
+  .kfStreak.triple { background: #FFCF5A; box-shadow: 0 0 8px rgba(255,207,90,.7); }
   @keyframes kfIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
   #hudCount .b { color: #6FA8FF; }
   #hudCount .r { color: #FF7A70; }
@@ -1932,10 +1934,17 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (killed) room.ref.child("kills").push({ k: owner, v: T.id, t: now() });
     if (T === ME || T.bot) G.forceNet = true;
   }
-  var KILL_FEED_MS = 4000, KILL_FEED_MAX = 4;
+  var KILL_FEED_MS = 4000, KILL_FEED_MAX = 4, MULTI_KILL_MS = 5000;
+  function multiKillCount(k) {
+    var byKiller = G.killTimes || (G.killTimes = {});
+    var times = (byKiller[k.k] || []).concat(k.t).filter(function (t) { return t > k.t - MULTI_KILL_MS; });
+    byKiller[k.k] = times;
+    return times.length;
+  }
   function onKillFeed(s) {
     var k = s.val(); if (!k || !G || handled[s.key]) return;
     handled[s.key] = 1;
+    var streak = multiKillCount(k);
     if (!(k.t > now() - KILL_FEED_MS)) return;
     var killer = P[k.k] || {}, victim = P[k.v] || {}, feed = $("killFeed");
     var nameTag = function (d, E) {
@@ -1944,7 +1953,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     };
     var row = document.createElement("div");
     row.className = "kf" + (k.k === myId || k.v === myId ? " mine" : "");
-    setHtml(row, nameTag(killer, ent(k.k)) + '<span class="kfArrow">▶</span>' + nameTag(victim, ent(k.v)));
+    setHtml(row, nameTag(killer, ent(k.k)) + '<span class="kfArrow">▶</span>' + nameTag(victim, ent(k.v))
+      + (streak >= 3 ? '<span class="kfStreak triple">트리플 킬</span>' : streak === 2 ? '<span class="kfStreak">더블 킬</span>' : ""));
     feed.appendChild(row);
     while (feed.children.length > KILL_FEED_MAX) feed.firstChild.remove();
     setTimeout(function () { row.remove(); }, KILL_FEED_MS);
