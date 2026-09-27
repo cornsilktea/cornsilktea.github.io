@@ -1223,6 +1223,19 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       "초간 유지. 범위 내 아군은 은신 상태가 되고, 적은 1초당 " + ULT.frBzDmg + "의 피해를 입고 이동속도 " + Math.round((1 - ULT.frBzSlowMul) * 100) + "% 감소";
     return "";
   }
+  function passiveDesc(k) {
+    var c = CHARS[k];
+    if (k === "guardian") return "기본 공격 적중 시 적 " + num(c.fx.slowMs / 1000) + "초간 이동속도 " + Math.round((1 - c.fx.slowMul) * 100) + "% 감소";
+    if (k === "priest") return "기본 공격이 아군에게 적중 시 체력 " + c.heal + " 회복";
+    if (k === "frost") return "같은 대상에게 기본 공격 3회 적중 시 " + num(ULT.frFreezeMs / 1000) + "초간 기절";
+    if (k === "rogue") return "대상이 가까우면 근접 공격, 대상이 멀면 원거리 단검 투척(사거리 " + c.throwRange + ")";
+    if (k === "hitman") return "기본 공격 시 " + c.dashRange + "의 거리 돌진 후 " + c.range + "의 범위 회전베기";
+    return "";
+  }
+  function skillBlocks(k) {
+    var p = passiveDesc(k);
+    return '<div class="ultDesc"><b>스킬 설명</b>' + ultDesc(k) + "</div>" + (p ? '<div class="ultDesc"><b>패시브</b>' + p + "</div>" : "");
+  }
   function statTable(k) {
     var c = CHARS[k], rage = k === "warrior";
     function pair(a, b) { return b == null ? String(a) : a + " / " + b; }
@@ -1231,7 +1244,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
             : pair(hit, c.throwDmg || (rage ? Math.round(c.dmg * ULT.bzDmgMul) : null)) + (c.heal ? "(" + c.heal + ")" : "");
     var rate = pair(num(1000 / c.cd), rage ? num(1000 / (c.cd * ULT.bzCdMul)) : null) + "회";
     return '<table class="st"><tr><th>HP</th><td>' + c.hp + "</td></tr><tr><th>공격</th><td>" + dmg + "</td></tr>" +
-           (k === "frost" ? "<tr><th>효과</th><td>같은 대상 3연속 적중 시 " + num(ULT.frFreezeMs / 1000) + "초 빙결(그 전까지는 점점 강한 둔화)</td></tr>" : "") +
            "<tr><th>초당 공격</th><td>" + rate + "</td></tr>" +
            "<tr><th>이동속도</th><td>" + pair(c.speed, c.ultSpeed) + "</td></tr>" +
            "<tr><th>사거리</th><td>" + pair(Math.round(c.dashRange || c.range), c.throwRange) + "</td></tr><tr><th>스킬</th><td>" + c.ultName + "</td></tr></table>";
@@ -1253,7 +1265,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         '<div class="face front">' + (taken ? '<span class="soon">팀원 선택</span>' : "") + '<img alt="" src="' + charImgSrc(k) + '">' +
           '<div class="nm">' + c.name + "</div></div>" +
         '<div class="face back"><div class="nm">' + c.name + "</div>" + statTable(k) +
-          '<div class="ultDesc"><b>스킬 설명</b>' + ultDesc(k) + "</div></div>" +
+          skillBlocks(k) + "</div>" +
         "</div></button>";
     });
   }
@@ -1569,7 +1581,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var v = draftView && CHARS[draftView] ? draftView : null, canPick = v && myTurn && !owner[v];
     setHtml($("dfDetail"), v ? '<div class="dfName">' + CHARS[v].icon + " " + CHARS[v].name + '<small>' + roleOf(v).icon + " " + roleOf(v).name + "</small></div>" +
       '<div class="dfRole">' + roleGaugeText(roleOf(v)) + "</div>" + statTable(v) +
-      '<div class="ultDesc"><b>스킬 설명</b>' + ultDesc(v) + "</div>" +
+      skillBlocks(v) +
       (canPick ? '<button type="button" class="big primary" data-pick="' + v + '">✔ ' + CHARS[v].name + "(으)로 결정</button>" : "") : "");
   }
   $("dfChars").onclick = function (e) {
