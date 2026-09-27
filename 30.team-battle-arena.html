@@ -249,7 +249,17 @@
   #hudTimer.tick { animation: timerTick 1s ease-out; }
   @keyframes timerTick { 0% { transform: scale(1); } 18% { transform: scale(1.35); } 100% { transform: scale(1); } }
   #hudCount { font-size: 13px; font-weight: 800; }
-  #killFeed { position: absolute; top: 60px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none; }
+  #killFeed { position: absolute; top: 50%; right: 8px; transform: translateY(-50%); display: flex; flex-direction: column; align-items: flex-end; gap: 4px; pointer-events: none; }
+  #killFeed.spec { top: 60px; right: auto; left: 50%; transform: translateX(-50%); align-items: center; }
+  #killBanner { position: absolute; top: 24%; left: 50%; transform: translateX(-50%); pointer-events: none; white-space: nowrap; padding: 5px 16px; border-radius: 8px;
+                background: rgba(14,20,17,.72); border: 1px solid rgba(255,255,255,.14); border-bottom: 2px solid #D97B4F; color: #F4F1E8; font-size: 18px; font-weight: 800; opacity: 0; }
+  #killBanner .kbHead { color: #D97B4F; margin-right: 8px; }
+  #killBanner.multi .kbHead { color: #FFCF5A; }
+  #killBanner .b { color: #6FA8FF; }
+  #killBanner .r { color: #FF7A70; }
+  #killBanner small { margin-left: 3px; font-size: 12px; font-weight: 700; color: rgba(244,241,232,.6); }
+  #killBanner.show { animation: killBannerPop 1.1s ease-out forwards; }
+  @keyframes killBannerPop { 0% { opacity: 0; transform: translateX(-50%) scale(.7); } 12% { opacity: 1; transform: translateX(-50%) scale(1.08); } 22% { transform: translateX(-50%) scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) translateY(-8px); } }
   .kf { display: flex; align-items: center; gap: 8px; white-space: nowrap; padding: 4px 12px; border-radius: 8px; font-size: 14px; font-weight: 800; color: #F4F1E8;
         background: rgba(14,20,17,.78); border: 1px solid rgba(255,255,255,.14); box-shadow: 0 4px 12px rgba(0,0,0,.25); animation: kfIn .18s ease-out; }
   .kf.mine { border-color: #D97B4F; box-shadow: 0 0 0 1px #D97B4F, 0 4px 12px rgba(0,0,0,.25); }
@@ -408,6 +418,8 @@
     #btnLeaveGame { padding: 0 8px; font-size: 13px; }
     #hudMe { gap: 8px; padding: 3px 8px; font-size: 11px; }
     #hudMe b { font-size: 15px; }
+    #killBanner { font-size: 15px; padding: 4px 12px; }
+    .kf { font-size: 12px; padding: 3px 8px; gap: 5px; }
     .dfTitle { font-size: 19px; }
     .dfTimer { min-width: 56px; font-size: 36px; }
     .dfSteps { gap: 4px; }
@@ -532,6 +544,7 @@
     <div class="hdSide r"><span>레드 킬</span><b id="hudKillR">0</b></div>
   </div>
   <div id="killFeed"></div>
+  <div id="killBanner"></div>
   <button id="btnLeaveGame" type="button">방 나가기</button>
   <div id="hudMe" hidden><span>킬<b id="hudMeK">0</b></span><span>데스<b id="hudMeD">0</b></span><span>피해량<b id="hudMeDmg">0</b></span></div>
   <div id="specL" class="specPanel blue" hidden></div>
@@ -778,6 +791,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     } catch (e) {}
   }
   var lastSfx = {};
+  var SEMITONE = Math.pow(2, 1 / 12);
+  function killSound(streak) {
+    var pitch = Math.pow(SEMITONE, Math.min(streak - 1, 4) * 2);
+    tone(110, 0.28, "sine", 0.16, 0.5);
+    setTimeout(function () { tone(1320 * pitch, 0.16, "triangle", 0.08); }, 60);
+    setTimeout(function () { tone(1760 * pitch, 0.22, "triangle", 0.06); }, 130);
+  }
   function sfx(k) {
     var t = Date.now(); if (lastSfx[k] && t - lastSfx[k] < 40) return; lastSfx[k] = t;
     if (k === "shoot") tone(880, 0.07, "square", 0.05, 0.5);
@@ -2089,8 +2109,17 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     setHtml(row, nameTag(killer, ent(k.k)) + '<span class="kfArrow">▶</span>' + nameTag(victim, ent(k.v))
       + multiKillTag(streak));
     feed.appendChild(row);
+    if (k.k === myId && k.v !== myId) showKillBanner(nameTag(victim, ent(k.v)), streak);
     while (feed.children.length > KILL_FEED_MAX) feed.firstChild.remove();
     setTimeout(function () { row.remove(); }, KILL_FEED_MS);
+  }
+  function showKillBanner(victimTag, streak) {
+    var tag = MULTI_KILL_TAGS[Math.min(streak, 5)], banner = $("killBanner");
+    setHtml(banner, '<span class="kbHead">' + (tag ? tag[1] + "!" : "처치!") + "</span>" + victimTag);
+    banner.className = "";
+    void banner.offsetWidth;
+    banner.className = "show" + (tag ? " multi" : "");
+    killSound(streak);
   }
   function pushHit(owner, dmg, basic, ultKey, killed, gaugeGain) {
     var h = { d: dmg, b: basic ? 1 : 0, t: now() };
@@ -4436,7 +4465,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     setHtml($("hudCount"), '<span class="b">🔵 ' + s.blueAlive + '</span> vs <span class="r">🔴 ' + s.redAlive + "</span>");
     setText($("hudKillB"), String(s.blueKills)); setText($("hudKillR"), String(s.redKills));
     var spec = !ME;
-    show($("hudTop"), !spec); show($("hudMe"), !spec);
+    show($("hudTop"), !spec); show($("hudMe"), !spec); $("killFeed").classList.toggle("spec", spec);
     if (!spec) updateMyHud(); show($("specL"), spec); show($("specR"), spec); show($("specCode"), spec);
     if (spec) setText($("specCode"), "방 코드 " + room.code);
     if (spec) {
