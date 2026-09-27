@@ -649,7 +649,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               gdR: 200, gdKb: 150, gdKbMs: 500,
               frSlowMs: 1200, frSlowMul: 0.85, frSlowStep: 0.15, frFreezeMs: 800,
               frBzR: 400, frBzDur: 5000, frBzDmg: 5, frBzTick: 1000, frBzDelay: 400, frBzSlowMul: 0.8, frBzSlowMs: 400,
-              bwR: 150, bwDur: 3000, bwTick: 250, bwDmg: 15, bwKillGauge: 5, bdR: 70, bdDmg: 20, bdDelay: 300 };
+              bwR: 150, bwDur: 3000, bwTick: 250, bwHurtGaugeEvery: 4, bwDmg: 15, bwKillGauge: 5, bdR: 70, bdDmg: 20, bdDelay: 300 };
   var SNIPER_KEEP = KEY * 5;
   function isMelee(c) { return !!(CHARS[c].arc || CHARS[c].width || CHARS[c].dashWidth); }
   var STEALTH_ALPHA = 0.4;
@@ -2008,9 +2008,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (t < tick.next) return;
       tick.next = Math.max(tick.next + ULT.bwTick, t + ULT.bwTick / 2);
       revealBriefly(E.id, t);
+      var tickIndex = Math.floor((t - (E.buffUntil - ULT.bwDur)) / ULT.bwTick);
+      var hurtGaugeGroup = Math.floor(tickIndex / ULT.bwHurtGaugeEvery);
+      var givesHurtGauge = hurtGaugeGroup !== tick.hurtGaugeGroup;
+      tick.hurtGaugeGroup = hurtGaugeGroup;
       localTargets().forEach(function (T) {
         if (!T.alive || T.team === E.team || hyp(T.x - E.x, T.y - E.y) > ULT.bwR + BODY_R * 0.5) return;
-        damage(T, ULT.bwDmg, E.id, false, "bladestorm");
+        damage(T, ULT.bwDmg, E.id, false, "bladestorm", null, null, !givesHurtGauge);
       });
     });
   }
@@ -2225,7 +2229,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     pushHit(owner, dm, basic, ultKey, false);
     G.forceNet = true;
   }
-  function damage(T, amount, owner, basic, ultKey, fx, gaugeGain) {
+  function damage(T, amount, owner, basic, ultKey, fx, gaugeGain, noHurtGauge) {
     if (T.minion) { damageMinion(T, amount, owner, basic, ultKey); return; }
     if (protectedNow(T)) return;
     if (T.char === "knight" && T.buffUntil > now()) {
@@ -2234,7 +2238,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       T.blocked = (T.blocked || 0) + Math.min(unguarded, T.hp) - Math.min(amount, T.hp);
     }
     var dm = Math.min(amount, T.hp), killed = false;
-    T.hp -= dm; if (!gaugeLocked(T)) T.gauge = Math.min(GAUGE_MAX, T.gauge + roleOf(T.char).gaugeOnHurt);
+    T.hp -= dm; if (!noHurtGauge && !gaugeLocked(T)) T.gauge = Math.min(GAUGE_MAX, T.gauge + roleOf(T.char).gaugeOnHurt);
     if (T.hp <= 0) { killed = true; T.hp = 0; T.alive = false; T.deaths++; T.diedAt = now(); T.burst = null; T.volley = null; T.slash = null; T.regenUntil = 0; T.skillUntil = 0; T.slowUntil = 0; T.slows = null; T.stunUntil = 0; T.lance = null; T.frostStacks = 0; if (T === ME) { sfx("down"); aim.id = null; joy.id = null; } }
     else { if (T === ME) sfx("hit"); afflict(T, fx, owner); }
     pushHit(owner, dm, basic, ultKey, killed, gaugeGain);
