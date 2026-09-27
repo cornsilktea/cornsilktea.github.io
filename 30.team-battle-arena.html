@@ -463,7 +463,7 @@
     </div>
   </div>
   <div id="charCardBox" class="card charCol">
-    <div class="secTitle charHead"><span>캐릭터 선택<span class="secHint">선택한 캐릭터를 한 번 더 누르면 자세한 설명이 나옵니다.</span></span><button id="btnFlipAll" class="mini" type="button">모든 카드 뒤집기</button></div>
+    <div class="secTitle charHead"><span>캐릭터<span id="charHint" class="secHint">선택한 캐릭터를 한 번 더 누르면 자세한 설명이 나옵니다.</span></span><button id="btnFlipAll" class="mini" type="button">모든 카드 뒤집기</button></div>
     <div class="chars" id="chars"></div>
   </div>
   </div>
@@ -1165,13 +1165,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var c = CHARS[k], rage = k === "warrior";
     function pair(a, b) { return b == null ? String(a) : a + " / " + b; }
     var times = c.shots || c.hits || c.ticks || 1, hit = num(c.dmg) + (times > 1 ? "*" + times : "");
-    var dmg = pair(hit, c.throwDmg || (rage ? Math.round(c.dmg * ULT.bzDmgMul) : null)) + (c.heal ? "(" + c.heal + ")" : "");
+    var dmg = c.dashDmg ? num(c.dashDmg) + "(" + num(c.dmg) + ")"
+            : pair(hit, c.throwDmg || (rage ? Math.round(c.dmg * ULT.bzDmgMul) : null)) + (c.heal ? "(" + c.heal + ")" : "");
     var rate = pair(num(1000 / c.cd), rage ? num(1000 / (c.cd * ULT.bzCdMul)) : null) + "회";
     return '<table class="st"><tr><th>HP</th><td>' + c.hp + "</td></tr><tr><th>공격</th><td>" + dmg + "</td></tr>" +
-           (c.dashRange ? "<tr><th>돌진</th><td>사거리 " + c.dashRange + " · 폭 " + c.dashWidth + " · 피해 " + c.dashDmg + "</td></tr>" : "") +
            "<tr><th>초당 공격</th><td>" + rate + "</td></tr>" +
            "<tr><th>이동속도</th><td>" + pair(c.speed, c.ultSpeed) + "</td></tr>" +
-           "<tr><th>사거리</th><td>" + pair(Math.round(c.range), c.throwRange) + "</td></tr><tr><th>스킬</th><td>" + c.ultName + "</td></tr></table>";
+           "<tr><th>사거리</th><td>" + pair(Math.round(c.dashRange || c.range), c.throwRange) + "</td></tr><tr><th>스킬</th><td>" + c.ultName + "</td></tr></table>";
   }
   function roleGaugeText(R) { return "기본 공격 적중 시 게이지 +" + R.gaugeOnHit + (R.gaugeOnHurt ? ", 피격 시 +" + R.gaugeOnHurt : ""); }
   function roleRowsHtml(cardOf) {
@@ -1182,10 +1182,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
              (R.gaugeOnHurt ? "<br>피격 +" + R.gaugeOnHurt : "") + '</small></div><div class="roleCards">' + list.map(cardOf).join("") + "</div></div>";
     }).join("");
   }
-  function cardsHtml(me) {
+  function cardsHtml(me, viewOnly) {
     return roleRowsHtml(function (k) {
-      var c = CHARS[k], taken = me.characterType !== k && takenOnTeam(P, me.team, k, myId);
-      return '<button type="button" class="charCard' + (me.characterType === k ? " on" : "") + (flipped[k] ? " flip" : "") +
+      var c = CHARS[k], taken = !viewOnly && me.characterType !== k && takenOnTeam(P, me.team, k, myId);
+      return '<button type="button" class="charCard' + (!viewOnly && me.characterType === k ? " on" : "") + (flipped[k] ? " flip" : "") +
         '" data-c="' + k + '"' + (taken ? " disabled" : "") + '><div class="cardIn">' +
         '<div class="face front">' + (taken ? '<span class="soon">팀원 선택</span>' : "") + '<img alt="" src="' + charImgSrc(k) + '">' +
           '<div class="nm">' + c.name + "</div></div>" +
@@ -1230,10 +1230,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
             " (" + specs.length + "/" + SPEC_MAX + ")");
     show($("btnSpec"), !imSpec); $("btnSpec").disabled = !canMoveTo("spec");
     var cup = mode === "cup";
-    show($("charCardBox"), !imSpec && !cup);
+    show($("charCardBox"), cup || !imSpec);
+    setText($("charHint"), cup ? "대회모드에서는 게임 시작 후 캐릭터를 골라요. 카드를 누르면 자세한 설명이 나옵니다." : "선택한 캐릭터를 한 번 더 누르면 자세한 설명이 나옵니다.");
     show($("btnSwapTeams"), cup && isHost() && room.status === "lobby");
 
-    if (!cup) { setHtmlKeepScroll($("chars"), cardsHtml(me)); fitCharCol($("charCardBox")); }
+    setHtmlKeepScroll($("chars"), cardsHtml(me, cup)); fitCharCol($("charCardBox"));
 
     var host = isHost(), ok = false, hint = "";
     if (!mode) hint = "게임 방식을 먼저 골라 주세요.";
@@ -1259,10 +1260,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (!b || b.disabled || !room || room.status !== "lobby") return;
     var c = b.getAttribute("data-c");
     var me = P[myId]; if (!me) return;
-    if (me.characterType === c) {
+    var viewOnly = room.mode === "cup";
+    if (viewOnly || me.characterType === c) {
       flipped[c] = !flipped[c];
       b.classList.toggle("flip", flipped[c]);
-      $("chars")._h = cardsHtml(me);
+      $("chars")._h = cardsHtml(me, viewOnly);
       fitCharCol($("charCardBox"));
       return;
     }
@@ -1274,7 +1276,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     CHAR_LIST.forEach(function (k) { flipped[k] = showBack; });
     var me = P[myId];
     [].forEach.call($("chars").querySelectorAll(".charCard"), function (b) { b.classList.toggle("flip", showBack); });
-    if (me) $("chars")._h = cardsHtml(me);
+    if (me) $("chars")._h = cardsHtml(me, room && room.mode === "cup");
     fitCharCol($("charCardBox"));
   };
   function freeAiName(ps) {
