@@ -84,9 +84,11 @@
   `wrBeat` 로 prompt 를 가리는 게임은 `WR.beatsClass(값)` 도 함께 본다. 패턴은 6·20·25번 참고.
 
 - **30번(팀 배틀)에 캐릭터를 추가하면 통계 두 곳도 반드시 함께 고친다.** `admin.html` 의 `STATS_GAMES.teambattle.roles`
-  (게임의 `CHAR_LIST` 순서·`CHARS` 이름 그대로, 회복 능력이 있으면 게임 `CHARS` 에 `heals: true`·통계표에 `heal: true` —
+  (게임 `CHARS` 의 아이디·이름·직업군(`group`) 그대로, 회복 능력이 있으면 게임 `CHARS` 에 `heals: true`·통계표에 `heal: true` —
   회복량은 `E.heal` 에 쌓아야 종료 창·통계에 잡힌다)와 `데이터베이스규칙.json` 의
   `teambattle/stats/$char` 허용 목록. 규칙을 바꿨으면 선생님께 콘솔에 다시 게시하도록 알린다.
+  **캐릭터 순서**(2026-09-27 선생님 결정): 캐릭터 선택창과 제어판 통계표 모두 직업군(전사 → 마법사 → 원거리 딜러 → 암살자)
+  안에서 이름 가나다순. 게임 `CHAR_LIST` 는 `CHARS` 에서, 통계표는 `roles` 에서 자동 정렬하므로 순서를 손으로 맞추지 않는다.
   캐릭터·스킬 판정을 고친 뒤에는 첫 화면 주소 끝에 `&test` 를 붙여(`30.team-battle-arena.html?c=1-1&test`) 상호작용 검사
   (`30.team-battle-tests.js`, Firebase 에 쓰지 않음)를 돌리고, 새 스킬이 기절·이동·넉백·게이지를 건드리면 검사 항목도 추가한다.
   캐릭터 설명란(`statTable`)의 표는 HP·공격·초당 공격·이동속도·사거리·스킬 6칸으로 고정하고 "효과" 같은 칸을 더하지 않는다.

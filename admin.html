@@ -163,6 +163,8 @@
   .stats-box tr:hover td { background: var(--sg-bg); }
   .stats-box td:first-child { font-weight: 700; }
   .stats-box td b { font-size: var(--sg-fs-lg); }
+  /* 직업군(전사·마법사…) 구분 줄 */
+  .stats-box tr.stats-group td { padding-top: var(--sg-s4); font-size: var(--sg-fs-sm); color: var(--sg-ink-mid); background: none; border-bottom: 2px solid var(--sg-line); }
   .stats-box td small { margin-left: var(--sg-s1); font-size: var(--sg-fs-xs); color: var(--sg-ink-soft); }
   .stats-box .actions { margin-top: var(--sg-s2); }
   .stats-box .msg { margin: 0 0 var(--sg-s1); font-size: var(--sg-fs-md); color: var(--sg-ink-mid); }
@@ -999,27 +1001,34 @@ function showGuide(src, caption) {
 const STATS_GAMES = {
   teambattle: {
     path: "teambattle/stats",
-    /* 30번 게임의 CHAR_LIST 와 같은 순서·이름으로 둔다. 캐릭터가 새로 생기면 여기에도 한 줄 추가해야
+    /* 30번 게임의 CHARS 와 같은 아이디·이름·직업군(group)으로 둔다. 캐릭터가 새로 생기면 여기에도 한 줄 추가해야
        표에 나온다(데이터베이스규칙.json 의 teambattle/stats 허용 목록도 함께).
+       표 순서는 게임의 CHAR_LIST 처럼 groups 순서 → 직업군 안에서 이름 가나다순으로 자동 정렬하므로 줄 순서는 상관없다.
        옛 직업(marksman·healer·tank·assassin) 통계는 데이터베이스에 남아 있지만 새 직업과 비교할 수 없어서 뺐다.
        회복은 광전사 광폭화(자기 회복)·투척병 독안개·사제 에너지 웨이브(아군 회복)만 있다(게임의 CHARS heals 와 같게).
        막은 피해는 기사 방어태세만 있다(게임의 CHARS blocks 와 같게). */
+    groups: [
+      { id: "fighter",  name: "전사" },
+      { id: "caster",   name: "마법사" },
+      { id: "shooter",  name: "원거리 딜러" },
+      { id: "assassin", name: "암살자" }
+    ],
     roles: [
-      { id: "warrior",    name: "광전사", heal: true },
-      { id: "knight",     name: "기사", block: true },
-      { id: "ranger",     name: "궁수" },
-      { id: "mage",       name: "주술사" },
-      { id: "rogue",      name: "은신자" },
-      { id: "necro",      name: "네크로" },
-      { id: "sniper",     name: "저격수" },
-      { id: "thrower",    name: "투척병", heal: true },
-      { id: "lancer",     name: "창기사" },
-      { id: "blacksmith", name: "대장장이" },
-      { id: "priest",     name: "사제", heal: true },
-      { id: "hitman",     name: "자객" },
-      { id: "guardian",   name: "수문장" },
-      { id: "frost",      name: "얼음술사" },
-      { id: "dancer",     name: "검무희" }
+      { id: "warrior",    name: "광전사", group: "fighter", heal: true },
+      { id: "knight",     name: "기사", group: "fighter", block: true },
+      { id: "blacksmith", name: "대장장이", group: "fighter" },
+      { id: "guardian",   name: "수문장", group: "fighter" },
+      { id: "lancer",     name: "창기사", group: "fighter" },
+      { id: "necro",      name: "네크로", group: "caster" },
+      { id: "priest",     name: "사제", group: "caster", heal: true },
+      { id: "frost",      name: "얼음술사", group: "caster" },
+      { id: "mage",       name: "주술사", group: "caster" },
+      { id: "ranger",     name: "궁수", group: "shooter" },
+      { id: "sniper",     name: "저격수", group: "shooter" },
+      { id: "thrower",    name: "투척병", group: "shooter", heal: true },
+      { id: "dancer",     name: "검무희", group: "assassin" },
+      { id: "rogue",      name: "은신자", group: "assassin" },
+      { id: "hitman",     name: "자객", group: "assassin" }
     ]
   }
 };
@@ -1065,7 +1074,21 @@ async function showStats(g) {
     const head = el("tr");
     ["직업", "선택률 (선택 수 / 총 게임 수)", "승률 (승리 수 / 선택 수)", "평균 피해량", "평균 회복량", "평균 막은 피해", "평균 기절", "평균 둔화"].forEach((t) => head.appendChild(el("th", null, t)));
     table.appendChild(head);
-    meta.roles.forEach((role) => {
+    /* 직업군 순서 → 이름 가나다순(게임 캐릭터 선택창과 같은 순서). 직업군이 바뀔 때마다 구분 줄을 넣는다 */
+    const groups = meta.groups || [];
+    const groupAt = (role) => groups.findIndex((gr) => gr.id === role.group);
+    const ordered = meta.roles.slice().sort((a, b) => groupAt(a) - groupAt(b) || a.name.localeCompare(b.name, "ko"));
+    let lastGroup = null;
+    ordered.forEach((role) => {
+      if (groups.length && role.group !== lastGroup) {
+        lastGroup = role.group;
+        const gr = groups[groupAt(role)];
+        const gtr = el("tr", "stats-group");
+        const gtd = el("td", null, gr ? gr.name : "기타");
+        gtd.colSpan = 8;
+        gtr.appendChild(gtd);
+        table.appendChild(gtr);
+      }
       const d = s[role.id] || {}, picks = d.picks || 0, wins = d.wins || 0;
       const tr = el("tr");
       tr.appendChild(el("td", null, role.name));

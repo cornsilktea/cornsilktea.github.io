@@ -621,7 +621,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     frost:   { name: "얼음술사", role: "caster", icon: "❄️", hp: 115, speed: 245, cd: 667, dmg: 10, range: 350, pSpeed: 650, pr: 8, ultName: "눈보라" },
     dancer:  { name: "검무희", role: "assassin", icon: "🌸", hp: 100, speed: 270, ultSpeed: 330, cd: 700, dmg: 20, range: 350, pSpeed: 900, pr: 8, ultName: "칼날 폭풍" }
   };
-  var CHAR_LIST = ["warrior", "knight", "ranger", "mage", "rogue", "necro", "sniper", "thrower", "lancer", "blacksmith", "priest", "hitman", "guardian", "frost", "dancer"];
   var ROLES = {
     fighter:  { name: "전사", icon: "⚔️", gaugeOnHit: 2, gaugeOnHurt: 1 },
     caster:   { name: "마법사", icon: "✨", gaugeOnHit: 3, gaugeOnHurt: 0 },
@@ -629,6 +628,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     assassin: { name: "암살자", icon: "🗡️", gaugeOnHit: 2, gaugeOnHurt: 0 }
   };
   var ROLE_LIST = ["fighter", "caster", "shooter", "assassin"];
+  var CHAR_LIST = Object.keys(CHARS).sort(function (a, b) {
+    return ROLE_LIST.indexOf(CHARS[a].role) - ROLE_LIST.indexOf(CHARS[b].role) || CHARS[a].name.localeCompare(CHARS[b].name, "ko");
+  });
   function roleOf(c) { return ROLES[CHARS[c].role]; }
   function charsInRole(r) { return CHAR_LIST.filter(function (c) { return CHARS[c].role === r; }); }
   var ULT = { mkCount: 10, mkGap: 55, mkDmg: 36, mkRefund: 1, mkSpeed: 1150, mkRange: KEY * 8, mkPr: 8,
@@ -641,7 +643,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               plFlight: 700, plFlightMin: 150, plR: 60, plDur: 3000, plTick: 1000, plMax: 4, plFade: 500, plLob: 90, plGauge: 1,
               fgR: 150, fgDur: 4000, fgDmg: 20, fgHeal: 20, fgSlowMul: 0.6, fgSlowMs: 400, fgCast: KEY * 4 + 100, fgRefund: 1,
               lnWind: 300, lnLen: 350, lnW: 36, lnDmg: 70, lnStunMs: 1200,
-              bsDelay: 700, bsR: 150, bsDmg: 60, bsStunMs: 800, bsCast: 450, bsMin: 60, bsHop: 45,
+              bsLeapMinMs: 200, bsLeapMaxMs: 1000, bsR: 150, bsDmg: 60, bsStunMs: 800, bsCast: 450, bsMin: 60, bsHop: 45,
               bhR: 150, bhDur: 3000, bhDelay: 500, bhPull: 220, bhCast: 380, bhMin: 60,
               exRange: 500, exSpeed: 1300, exPr: 4, exDmg: 10, exStunMs: 1000,
               gdR: 200, gdKb: 150, gdKbMs: 500,
@@ -1250,7 +1252,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "sniper") return "사거리 " + ULT.pnRange + "의 거대한 화살 발사. 적은 " + ULT.pnDmg + "의 피해, 적중 시 게이지 " + ULT.pnRefund + " 회복";
     if (k === "thrower") return "지정한 곳에 " + secs(ULT.fgDur) + "간 유지되는 반경 " + ULT.fgR + "의 독안개 설치. 아군은 1초당 체력 " + ULT.fgHeal + " 회복, 적은 1초당 " + ULT.fgDmg + "의 피해를 입고 " + slowPct(ULT.fgSlowMul);
     if (k === "lancer") return secs(ULT.lnWind) + " 준비 후 사거리 " + ULT.lnLen + "의 창 찌르기. 맞은 적은 모두 " + ULT.lnDmg + "의 피해를 입고 " + secs(ULT.lnStunMs) + "간 기절";
-    if (k === "blacksmith") return "지정한 곳에 " + secs(ULT.bsDelay) + " 뒤 착지. 반경 " + ULT.bsR + "의 적은 " + ULT.bsDmg + "의 피해를 입고 " + secs(ULT.bsStunMs) + "간 기절";
+    if (k === "blacksmith") return "지정한 곳에 거리에 따라 " + num(ULT.bsLeapMinMs / 1000) + "~" + secs(ULT.bsLeapMaxMs) + " 뒤 착지. 반경 " + ULT.bsR + "의 적은 " + ULT.bsDmg + "의 피해를 입고 " + secs(ULT.bsStunMs) + "간 기절";
     if (k === "hitman") return "사거리 " + ULT.exRange + "의 칼날 발사. 처음 맞은 적은 " + ULT.exDmg + "의 피해를 입고 " + secs(ULT.exStunMs) + "간 기절, 그 위치로 순간이동";
     if (k === "guardian") return "자신을 중심으로 반경 " + ULT.gdR + "의 적을 모두 " + ULT.gdKb + "만큼 밀어냄";
     if (k === "priest") return "지정한 곳에 " + secs(ULT.bhDelay) + " 뒤 " + secs(ULT.bhDur) + "간 유지되는 반경 " + ULT.bhR + "의 블랙홀 생성. 적은 중심으로 끌려감";
@@ -1641,7 +1643,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var ST = {};
   function stKey(team, slot) { return (team === "blue" ? "b" : "r") + slot; }
   function angDeg(a) { var d = Math.round(a * 180 / Math.PI / 3) * 3; return ((d % 360) + 360) % 360; }
-  var STATE_TIMES = ["diedAt", "atkAt", "ultUntil", "buffUntil", "stealthUntil", "regenUntil", "skillUntil", "protectUntil", "slowUntil", "stunUntil", "summonAt", "revealUntil", "frostStackAt"];
+  var STATE_TIMES = ["diedAt", "atkAt", "ultUntil", "buffUntil", "stealthUntil", "regenUntil", "skillUntil", "protectUntil", "slowUntil", "stunUntil", "summonAt", "revealUntil", "frostStackAt", "leapAt"];
   var STATE_TIMES_AT = 12;
   var STATE_EXTRA_AT = STATE_TIMES_AT + STATE_TIMES.length;
   function oneDecimal(v) { return Math.round((+v || 0) * 10) / 10; }
@@ -1756,7 +1758,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       r.deaths = pos.deaths; r.diedAt = pos.diedAt; r.kills = pos.kills; r.heal = pos.heal; r.protectUntil = pos.protectUntil;
       r.stunDealt = pos.stunDealt; r.slowDealt = pos.slowDealt; r.slowWeight = pos.slowWeight; r.blocked = pos.blocked;
       r.hp = pos.hp; r.alive = pos.alive; r.gauge = pos.gauge; r.dmg = pos.dmg;
-      r.atkAt = pos.atkAt; r.ultUntil = pos.ultUntil; r.buffUntil = pos.buffUntil;
+      r.atkAt = pos.atkAt; r.ultUntil = pos.ultUntil; r.leapAt = pos.leapAt; r.buffUntil = pos.buffUntil;
       r.regenUntil = pos.regenUntil; r.skillUntil = pos.skillUntil; r.skillDur = pos.skillDur;
       if (pos.stealthUntil > r.stealthUntil && pos.stealthUntil > now()) smoke(r.x, r.y);
       r.stealthUntil = pos.stealthUntil;
@@ -2384,12 +2386,16 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   function stormCenter(s) {
     var A = ent(s.e.owner);
-    if (A && !A.alive) s.ownerFell = true;
-    if (A && A.alive && !s.ownerFell) { s.lastX = A.x; s.lastY = A.y; }
+    if (A && A.alive) { s.lastX = A.x; s.lastY = A.y; }
     else if (s.lastX == null) { s.lastX = s.e.x; s.lastY = s.e.y; }
     return { x: s.lastX, y: s.lastY };
   }
-  function stormActive(s, t) { return t >= s.e.createdAt + s.e.delay && t < s.e.createdAt + s.e.delay + s.e.dur; }
+  function stormOwnerFell(s) {
+    var A = ent(s.e.owner);
+    if (A && !A.alive) s.ownerFell = true;
+    return !!s.ownerFell;
+  }
+  function stormActive(s, t) { return !s.ownerFell && t >= s.e.createdAt + s.e.delay && t < s.e.createdAt + s.e.delay + s.e.dur; }
   function inFriendlyStorm(E, t) {
     t = t || now();
     for (var i = 0; i < STORMS.length; i++) {
@@ -2403,7 +2409,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function stepStorms(t) {
     STORMS = STORMS.filter(function (s) {
       var e = s.e;
-      if (t >= e.createdAt + e.delay + e.dur) { dropStormVis(s); return false; }
+      if (t >= e.createdAt + e.delay + e.dur || stormOwnerFell(s)) { dropStormVis(s); return false; }
       if (t < e.createdAt + e.delay) return true;
       var c = stormCenter(s);
       if (!s.landed) { s.landed = true; if (!ME || hyp(c.x - ME.x, c.y - ME.y) < 700) sfx("orb"); }
@@ -2713,10 +2719,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var landing = burstSpot(E, ang, reach, ULT.bsCast, ULT.bsMin);
       resolve(landing);
       E.angle = Math.atan2(landing.y - E.y, landing.x - E.x);
-      E.ultUntil = t + ULT.bsDelay;
-      E.cdUntil = Math.max(E.cdUntil, t + ULT.bsDelay + 250);
+      var leapMs = hammerLeapMs(hyp(landing.x - E.x, landing.y - E.y));
+      E.leapAt = t;
+      E.ultUntil = t + leapMs;
+      E.cdUntil = Math.max(E.cdUntil, t + leapMs + 250);
       E.pending = null; E.slash = null;
-      E.leap = { sx: E.x, sy: E.y, tx: landing.x, ty: landing.y, at: t };
+      E.leap = { sx: E.x, sy: E.y, tx: landing.x, ty: landing.y, at: t, until: t + leapMs };
     } else if (E.char === "guardian") {
       E.atkAt = t;
       E.ultUntil = t + 500;
@@ -2757,11 +2765,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     revealBriefly(E.id, t);
     G.forceNet = true;
   }
-  function leapProgress(t, ultUntil) { return clamp(1 - (ultUntil - t) / ULT.bsDelay, 0, 1); }
+  function hammerLeapMs(dist) {
+    var k = clamp((dist - ULT.bsMin) / (ULT.bsCast - ULT.bsMin), 0, 1);
+    return Math.round(ULT.bsLeapMinMs + (ULT.bsLeapMaxMs - ULT.bsLeapMinMs) * k);
+  }
+  function leapProgress(t, leapAt, landAt) { return landAt > leapAt ? clamp((t - leapAt) / (landAt - leapAt), 0, 1) : 1; }
   function stepHammerLeap(E) {
     var L = E.leap; if (!L) return;
     if (!E.alive) { E.leap = null; return; }
-    var t = now(), k = leapProgress(t, L.at + ULT.bsDelay), ease = k * k * (3 - 2 * k);
+    var t = now(), k = leapProgress(t, L.at, L.until), ease = k * k * (3 - 2 * k);
     E.x = L.sx + (L.tx - L.sx) * ease; E.y = L.sy + (L.ty - L.sy) * ease;
     E.mv = false;
     if (k < 1) return;
@@ -2889,7 +2901,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (B.char === "lancer") { botLance(B, target, t); return; }
     if (target && B.gauge >= GAUGE_MAX && t - k.seenAt > 500 && losClear(B.x, B.y, target.x, target.y) && (B.char !== "mage" || td <= ULT.mbCast) && (B.char !== "blacksmith" || td <= ULT.bsCast) && (B.char !== "priest" || td <= ULT.bhCast) && (B.char !== "hitman" || td <= ULT.exRange) && (B.char !== "guardian" || td <= ULT.gdR) && (B.char !== "frost" || td <= ULT.frBzR * 0.8) && (B.char !== "dancer" || td <= ULT.bwR * 2)) {
       if (B.char === "blacksmith") {
-        var drop = leadSpot(target, ULT.bsDelay / 1000, t);
+        var drop = leadSpot(target, hammerLeapMs(td) / 1000, t);
         useUlt(B, Math.atan2(drop.y - B.y, drop.x - B.x), hyp(drop.x - B.x, drop.y - B.y)); return;
       }
       useUlt(B, Math.atan2(target.y - B.y, target.x - B.x), td); return;
@@ -3736,7 +3748,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var JUMP_CHOP_LAND_SEC = 0.75;
   function leapHeight(E, t) {
     if (!E.alive || !hammerLeaping(E, t)) return 0;
-    var k = leapProgress(t, E.ultUntil);
+    var k = leapProgress(t, E.leapAt, E.ultUntil);
     return 4 * ULT.bsHop * k * (1 - k);
   }
   function attackClip(v, E, t) {
@@ -3773,7 +3785,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if ((E.char === "mage" || E.char === "necro" || E.char === "blacksmith" || E.char === "priest" || E.char === "frost") && E.ultUntil !== v.ultSeen) {
       v.ultSeen = E.ultUntil;
       if (E.alive && E.ultUntil > t) {
-        if (E.char === "blacksmith") playOnce(v, "Melee_1H_Attack_Jump_Chop", JUMP_CHOP_LAND_SEC * 1000 / ULT.bsDelay, t);
+        if (E.char === "blacksmith") playOnce(v, "Melee_1H_Attack_Jump_Chop", JUMP_CHOP_LAND_SEC * 1000 / Math.max(1, E.ultUntil - (E.leapAt || t)), t);
         else if (E.char === "necro") playOnce(v, "Ranged_Magic_Summon", 3.2, t);
         else if (E.char === "frost") {
           playOnce(v, "Ranged_Magic_Spellcasting", KIT.clips.Ranged_Magic_Spellcasting.duration * 1000 / ULT.frBzDelay, t);

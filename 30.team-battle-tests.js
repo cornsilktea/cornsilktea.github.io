@@ -360,6 +360,18 @@ function collectResults(api) {
     var foe = W.ent("foe"), landed = foe.hp < foe.maxHp;
     done(landed ? "pass" : "fail", landed ? "기절해도 착지 피해·기절이 들어감" : "기절하면 착지 공격이 취소됨");
   });
+  run(MOVE, "대장장이 내려찍기: 최소 거리는 " + api.ULT.bsLeapMinMs / 1000 + "초, 최대 거리는 " + api.ULT.bsLeapMaxMs / 1000 + "초 뒤에 착지하는가", function (done) {
+    var y = OPEN_Y.forest, landedAfter = [];
+    [api.ULT.bsMin, api.ULT.bsCast].forEach(function (reach) {
+      var W = world("forest", [{ id: "bs", team: "blue", char: "blacksmith", x: 250, y: y, gauge: api.GAUGE_MAX }]);
+      var bs = W.ent("bs"), t0 = W.t(), landAt = null;
+      api.useUlt(bs, 0, reach);
+      W.step(api.ULT.bsLeapMaxMs + 300, FRAME, function (t) { if (landAt == null && !bs.leap) landAt = t; });
+      landedAfter.push(landAt == null ? null : landAt - t0);
+    });
+    var ok = landedAfter.every(function (ms, i) { var want = i ? api.ULT.bsLeapMaxMs : api.ULT.bsLeapMinMs; return ms != null && Math.abs(ms - want) <= FRAME * 2; });
+    done(ok ? "pass" : "fail", "최소 거리 " + landedAfter[0] + "ms, 최대 거리 " + landedAfter[1] + "ms 뒤 착지");
+  });
 
   run(STUN, "기사 방어태세: 기절해 있어도 끝날 때 주변 기절이 발동하는가 (시전 동작 없음)", function (done) {
     var y = OPEN_Y.forest;
@@ -519,20 +531,24 @@ function collectResults(api) {
     if (api.hiddenFrom(al, W.t())) bad.push("끝난 뒤에도 숨겨짐");
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "3초간 " + lost + " 피해, 이동속도 " + Math.round(slowRatio * 100) + "%, 따라다님, 끝나면 은신·피해 모두 멈춤");
   });
-  run(FROST, "눈보라: 시전자가 지속 중 죽으면 그 자리에 멈추고, 부활해도 스폰 지점으로 튀지 않는가", function (done) {
+  run(FROST, "눈보라: 시전자가 지속 중 죽으면 눈보라가 바로 사라지고 피해·아군 은신도 멈추는가", function (done) {
     var y = OPEN_Y.forest;
     var W = world("forest", [
       { id: "fr", team: "blue", char: "frost", x: 300, y: y, gauge: api.GAUGE_MAX },
-      { id: "foe", team: "red", char: "knight", x: 300, y: y + 200 }
+      { id: "al", team: "blue", char: "knight", x: 420, y: y },
+      { id: "foe", team: "red", char: "knight", x: 300, y: y + 200 },
+      { id: "far", team: "red", char: "ranger", x: 300, y: y + 700 }
     ]);
-    var fr = W.ent("fr");
+    var fr = W.ent("fr"), al = W.ent("al"), foe = W.ent("foe"), bad = [];
     api.useUlt(fr, 0);
     W.step(api.ULT.frBzDelay + 100);
-    var dx = fr.x, dy = fr.y;
     api.damage(fr, 9999, "foe", false, null, null);
-    W.step(api.ULT.frBzDur - 200);
-    var s = api.storms()[0], c = s ? api.stormCenter(s) : null;
-    done(c && hyp(c.x - dx, c.y - dy) < 1 ? "pass" : "fail", c ? "죽은 자리(" + Math.round(dx) + ", " + Math.round(dy) + ") → 눈보라 중심(" + Math.round(c.x) + ", " + Math.round(c.y) + "), 시전자 " + (fr.alive ? "부활함" : "아직 죽어 있음") : "눈보라가 너무 일찍 사라짐");
+    W.frame(FRAME);
+    if (api.storms().length) bad.push("죽은 뒤에도 눈보라가 남음");
+    if (api.hiddenFrom(al, W.t())) bad.push("아군이 계속 숨겨짐");
+    var hp0 = foe.hp; W.step(2000);
+    if (foe.hp !== hp0) bad.push("죽은 뒤에도 피해 " + (hp0 - foe.hp));
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "죽는 순간 눈보라·피해·아군 은신 모두 사라짐");
   });
   run(FROST, "눈보라 안에서 공격하면 0.5초간 드러났다가 다시 숨고, 장판 도트 피해로는 다시 드러나지 않는가", function (done) {
     var y = OPEN_Y.forest;
@@ -689,7 +705,7 @@ function collectResults(api) {
           if (E.stunUntil - t > maxStun + 20) flag("기절이 너무 김", E, t, Math.round(E.stunUntil - t) + "ms");
           if (!E.leap) { var why = blockedAt(E.x, E.y); if (why) flag(why, E, t); }
           if (E.dash && t - E.dash.at > api.CHARS.hitman.dashMs + api.CHARS.hitman.finishDelay + 200) flag("돌진이 안 끝남", E, t);
-          if (E.leap && t - E.leap.at > api.ULT.bsDelay + 200) flag("도약이 안 끝남", E, t);
+          if (E.leap && t - E.leap.at > api.ULT.bsLeapMaxMs + 200) flag("도약이 안 끝남", E, t);
           if (E.shove && t - E.shove.at > api.ULT.gdKbMs + 200) flag("넉백이 안 끝남", E, t);
           if (!P0 || !P0.alive) return;
           var jump = hyp(E.x - P0.x, E.y - P0.y);
