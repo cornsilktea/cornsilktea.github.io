@@ -627,6 +627,22 @@ function collectResults(api) {
     var want = api.ULT.bwKillGauge + api.roleGauge("dancer");
     done(!foe.alive && dn.gauge === want ? "pass" : "fail", (foe.alive ? "처치 실패, " : "처치 후 ") + "게이지 " + dn.gauge + " (기대 " + want + ")");
   });
+  run(DANCER, "검무희 패시브: 칼날 폭풍 중 처치는 폭풍이 끝난 뒤 처치당 게이지 " + api.ULT.bwKillGauge + " 회복", function (done) {
+    var y = OPEN_Y.forest;
+    var W = dancerDuel([
+      { id: "a", team: "red", char: "ranger", x: 320, y: y },
+      { id: "b", team: "red", char: "ranger", x: 250, y: y + 70 }
+    ]);
+    var dn = W.ent("dn"), a = W.ent("a"), b = W.ent("b");
+    a.hp = b.hp = 10;
+    dn.gauge = api.GAUGE_MAX;
+    api.useUlt(dn, 0);
+    W.step(600);
+    var during = dn.gauge, killed = (a.alive ? 0 : 1) + (b.alive ? 0 : 1);
+    W.step(api.ULT.bwDur);
+    var want = killed * api.ULT.bwKillGauge;
+    done(killed === 2 && during === 0 && dn.gauge === want ? "pass" : "fail", killed + "명 처치, 폭풍 중 게이지 " + during + " → 끝난 뒤 " + dn.gauge + " (기대 " + want + ")");
+  });
 
   function autoMelee(mapId, seconds, seed) {
     var rnd = seededRandom(seed), realRandom = Math.random;

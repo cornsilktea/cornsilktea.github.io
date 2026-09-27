@@ -1266,7 +1266,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "frost") return "같은 적에게 기본 공격 3회 적중 시 " + secs(ULT.frFreezeMs) + "간 기절";
     if (k === "rogue") return "가까운 적은 근접 공격, 먼 적에게는 사거리 " + c.throwRange + "의 단검 투척";
     if (k === "hitman") return "기본 공격 시 " + c.dashRange + " 돌진 후 반경 " + c.range + " 회전베기";
-    if (k === "dancer") return "던진 단검이 멈춘 곳에서 회전해 반경 " + ULT.bdR + "의 적에게 " + ULT.bdDmg + "의 피해. 적을 처치하면 게이지 " + ULT.bwKillGauge + " 회복";
+    if (k === "dancer") return "던진 단검이 멈춘 곳에서 회전해 반경 " + ULT.bdR + "의 적에게 " + ULT.bdDmg + "의 피해. 적을 처치하면 게이지 " + ULT.bwKillGauge + " 회복, 스킬 중 처치는 스킬이 끝난 뒤 회복";
     return "";
   }
   function skillBlocks(k) {
@@ -2005,6 +2005,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       });
     });
   }
+  function payKillGaugeOwed(E, t) {
+    if (!E.killGaugeOwed || gaugeLocked(E, t)) return;
+    E.gauge = Math.min(GAUGE_MAX, E.gauge + E.killGaugeOwed);
+    E.killGaugeOwed = 0;
+    G.forceNet = true;
+  }
   function bladeSpin(p, x, y) {
     if (p.spun) return;
     p.spun = true;
@@ -2271,7 +2277,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (h.t >= G.startAt - 1000) {
       if (h.d) owner.dmg += h.d;
       if (h.k) owner.kills++;
-      if (h.k && owner.char === "dancer" && !gaugeLocked(owner)) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.bwKillGauge);
+      if (h.k && owner.char === "dancer") {
+        if (gaugeLocked(owner)) owner.killGaugeOwed = (owner.killGaugeOwed || 0) + ULT.bwKillGauge;
+        else owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.bwKillGauge);
+      }
       if (h.hl) owner.heal += h.hl;
       if (h.cs) owner.stunDealt = (owner.stunDealt || 0) + h.cs / 1000;
       if (h.ss) owner.slowDealt = (owner.slowDealt || 0) + h.ss / 1000;
@@ -2490,7 +2499,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (d.slam && !d.dmg) afflict(T, d.fx, d.owner);
     else damage(T, d.dmg, d.owner, !d.m && !d.u && d.createdAt, d.hammer ? d.createdAt : null, d.fx);
     if (d.kb && T.alive) {
-      var dd = hyp(dx, dy) || 1;
+      var dd = hyp(dx, dy) || 1, kbAt = now(), shoveEnd = T.shove ? T.shove.at + ULT.gdKbMs : 0;
+      if (!T.minion) creditCC(d.owner, Math.max(0, kbAt + ULT.gdKbMs - Math.max(T.stunUntil || 0, shoveEnd, kbAt)), 0, 0);
       T.shove = { ux: dx / dd, uy: dy / dd, dist: d.kb, at: now(), done: 0 };
     }
   }
@@ -4924,8 +4934,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (KEY_ON.atk && t >= ME.cdUntil && !ME.volley && !ME.slash) fireBasic(ME, autoAimAngle(ME));
         stepCombat(ME, dt);
       } else if (ME) ME.mv = false;
-      if (isHost()) keys(BOTS).forEach(function (id) { var B = BOTS[id]; if (driveBots) stepBot(B, dt); if (B.alive) stepCombat(B, dt); stepKnightSlam(B); stepHammerLeap(B); stepLance(B); stepDash(B); stepMinions(B, dt, t); });
-      if (ME) { stepKnightSlam(ME); stepHammerLeap(ME); stepLance(ME); stepDash(ME); stepMinions(ME, dt, t); }
+      if (isHost()) keys(BOTS).forEach(function (id) { var B = BOTS[id]; if (driveBots) stepBot(B, dt); if (B.alive) stepCombat(B, dt); stepKnightSlam(B); stepHammerLeap(B); stepLance(B); stepDash(B); stepMinions(B, dt, t); payKillGaugeOwed(B, t); });
+      if (ME) { stepKnightSlam(ME); stepHammerLeap(ME); stepLance(ME); stepDash(ME); stepMinions(ME, dt, t); payKillGaugeOwed(ME, t); }
       localTargets().forEach(function (T) { stepShove(T, t); });
       checkProjectiles(t);
       stepBladeDaggers(t);
