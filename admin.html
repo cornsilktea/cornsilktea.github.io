@@ -164,7 +164,12 @@
   .stats-box td:first-child { font-weight: 700; }
   .stats-box td b { font-size: var(--sg-fs-lg); }
   /* 직업군(전사·마법사…) 구분 줄 */
-  .stats-box tr.stats-group td { padding-top: var(--sg-s4); font-size: var(--sg-fs-sm); color: var(--sg-ink-mid); background: none; border-bottom: 2px solid var(--sg-line); }
+  .stats-box tr.stats-group td { padding: var(--sg-s3); font-size: var(--sg-fs-xl); font-weight: 800; color: var(--sg-ink);
+    background: rgba(217, 123, 79, 0.12); border-top: var(--sg-s4) solid var(--sg-panel); border-bottom: 2px solid #D97B4F; }
+  .stats-box tr.stats-group:hover td { background: rgba(217, 123, 79, 0.12); }
+  /* 캐릭터 이름 칸: 글씨를 키우고 옅은 바탕·오른쪽 굵은 선으로 통계 숫자 칸과 나눈다 */
+  .stats-box tr:not(.stats-group) td:first-child { font-size: var(--sg-fs-lg); padding-left: var(--sg-s5); background: var(--sg-bg); border-right: 2px solid var(--sg-line-mid); }
+  .stats-box th:first-child { border-right: 2px solid var(--sg-line-mid); }
   .stats-box td small { margin-left: var(--sg-s1); font-size: var(--sg-fs-xs); color: var(--sg-ink-soft); }
   .stats-box .actions { margin-top: var(--sg-s2); }
   .stats-box .msg { margin: 0 0 var(--sg-s1); font-size: var(--sg-fs-md); color: var(--sg-ink-mid); }
@@ -1008,10 +1013,10 @@ const STATS_GAMES = {
        회복은 광전사 광폭화(자기 회복)·투척병 독안개·사제 에너지 웨이브(아군 회복)만 있다(게임의 CHARS heals 와 같게).
        막은 피해는 기사 방어태세만 있다(게임의 CHARS blocks 와 같게). */
     groups: [
-      { id: "fighter",  name: "전사" },
-      { id: "caster",   name: "마법사" },
-      { id: "shooter",  name: "원거리 딜러" },
-      { id: "assassin", name: "암살자" }
+      { id: "fighter",  name: "전사", icon: "⚔️" },
+      { id: "caster",   name: "마법사", icon: "✨" },
+      { id: "shooter",  name: "원거리 딜러", icon: "🏹" },
+      { id: "assassin", name: "암살자", icon: "🗡️" }
     ],
     roles: [
       { id: "warrior",    name: "광전사", group: "fighter", heal: true },
@@ -1084,7 +1089,7 @@ async function showStats(g) {
         lastGroup = role.group;
         const gr = groups[groupAt(role)];
         const gtr = el("tr", "stats-group");
-        const gtd = el("td", null, gr ? gr.name : "기타");
+        const gtd = el("td", null, gr ? gr.icon + " " + gr.name : "기타");
         gtd.colSpan = 8;
         gtr.appendChild(gtd);
         table.appendChild(gtr);
