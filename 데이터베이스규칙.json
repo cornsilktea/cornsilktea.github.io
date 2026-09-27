@@ -20,7 +20,7 @@
           "$other": { ".validate": false }
         },
         "$char": {
-          ".validate": "$char.matches(/^(marksman|healer|tank|assassin|warrior|knight|ranger|mage|rogue|necro|sniper|thrower|lancer|blacksmith|priest|hitman|guardian|frost)$/) && newData.hasChildren(['picks', 'wins', 'dmg', 'heal']) && newData.child('wins').val() <= newData.child('picks').val() && ((!data.exists() && newData.child('picks').val() <= 6) || (data.exists() && newData.child('picks').val() >= data.child('picks').val() && newData.child('picks').val() <= data.child('picks').val() + 6))",
+          ".validate": "$char.matches(/^(marksman|healer|tank|assassin|warrior|knight|ranger|mage|rogue|necro|sniper|thrower|lancer|blacksmith|priest|hitman|guardian|frost|dancer)$/) && newData.hasChildren(['picks', 'wins', 'dmg', 'heal']) && newData.child('wins').val() <= newData.child('picks').val() && ((!data.exists() && newData.child('picks').val() <= 6) || (data.exists() && newData.child('picks').val() >= data.child('picks').val() && newData.child('picks').val() <= data.child('picks').val() + 6))",
           "picks": { ".validate": "newData.isNumber() && newData.val() >= 0" },
           "wins": { ".validate": "newData.isNumber() && newData.val() >= 0" },
           "dmg": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5000" },

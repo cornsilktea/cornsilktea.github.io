@@ -572,6 +572,62 @@ function collectResults(api) {
     done(!seen[0] && seen[1] && !seen[2] ? "pass" : "fail", "쏘기 전 " + (seen[0] ? "보임" : "숨음") + " → 쏜 순간 " + (seen[1] ? "보임" : "숨음") + " → 0.6초 뒤 " + (seen[2] ? "보임" : "숨음"));
   });
 
+  var DANCER = "검무희";
+  function dancerDuel(foes) {
+    return world("forest", [{ id: "dn", team: "blue", char: "dancer", x: 250, y: OPEN_Y.forest, angle: 0 }].concat(foes));
+  }
+  run(DANCER, "단검 투척: 적에게 맞으면 직격 " + api.CHARS.dancer.dmg + " + 회전 " + api.ULT.bdDmg + " 피해가 한 번씩만 들어가고 게이지는 한 번만 오르는가", function (done) {
+    var W = dancerDuel([{ id: "foe", team: "red", char: "knight", x: 450, y: OPEN_Y.forest }]);
+    var dn = W.ent("dn"), foe = W.ent("foe");
+    api.fireBasic(dn, 0);
+    W.step(800);
+    var lost = foe.maxHp - foe.hp, want = api.CHARS.dancer.dmg + api.ULT.bdDmg, gain = api.roleGauge("dancer");
+    done(lost === want && dn.gauge === gain ? "pass" : "fail", "피해 " + lost + " (기대 " + want + "), 게이지 +" + dn.gauge + " (기대 +" + gain + ")");
+  });
+  run(DANCER, "단검 투척: 아무도 못 맞히면 사거리 끝에서 회전해 반경 " + api.ULT.bdR + " 안의 적만 맞히는가", function (done) {
+    var y = OPEN_Y.forest, endX = 250 + 20 + api.CHARS.dancer.range;
+    var W = dancerDuel([
+      { id: "near", team: "red", char: "knight", x: endX, y: y + 50 },
+      { id: "far", team: "red", char: "ranger", x: endX, y: y + 120 }
+    ]);
+    api.fireBasic(W.ent("dn"), 0);
+    W.step(800);
+    var near = W.ent("near"), far = W.ent("far"), nearLost = near.maxHp - near.hp, farLost = far.maxHp - far.hp;
+    if (!nearLost && !farLost) { done("fail", "회전 피해가 없음 (사거리 끝이 벽에 막혔을 수 있음)"); return; }
+    done(nearLost === api.ULT.bdDmg && !farLost ? "pass" : "fail", "끝점 50 옆 적 " + nearLost + " 피해, 120 옆 적 " + farLost + " 피해");
+  });
+  run(DANCER, "칼날 폭풍: " + api.ULT.bwDur / 1000 + "초간 이동속도 " + api.CHARS.dancer.ultSpeed + ", 반경 " + api.ULT.bwR + " 안 적에게 " + api.ULT.bwTick / 1000 + "초마다 " + api.ULT.bwDmg + " 피해, 따라다니고 끝나면 멈추는가", function (done) {
+    var y = OPEN_Y.forest;
+    var W = dancerDuel([
+      { id: "foe", team: "red", char: "knight", x: 350, y: y },
+      { id: "out", team: "red", char: "knight", x: 250, y: y + 260 }
+    ]);
+    var dn = W.ent("dn"), foe = W.ent("foe"), out = W.ent("out"), bad = [];
+    foe.hp = foe.maxHp = 1e6;
+    dn.gauge = api.GAUGE_MAX;
+    api.useUlt(dn, 0);
+    if (api.speedOf(dn) !== api.CHARS.dancer.ultSpeed) bad.push("폭풍 중 이동속도 " + api.speedOf(dn));
+    W.step(1000);
+    dn.x += 80; foe.x += 80;
+    W.step(api.ULT.bwDur - 1000 + 50);
+    var lost = foe.maxHp - foe.hp, ticks = api.ULT.bwDur / api.ULT.bwTick;
+    if (lost !== ticks * api.ULT.bwDmg) bad.push("피해 " + lost + " (기대 " + ticks * api.ULT.bwDmg + ")");
+    if (out.hp !== out.maxHp) bad.push("범위 밖 적이 " + (out.maxHp - out.hp) + " 피해");
+    var after = foe.hp; W.step(1000);
+    if (foe.hp !== after) bad.push("끝난 뒤에도 피해");
+    if (api.speedOf(dn) !== api.CHARS.dancer.speed) bad.push("끝난 뒤 이동속도 " + api.speedOf(dn));
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : ticks + "틱 " + lost + " 피해, 이동해도 따라다님, 끝나면 속도·피해 원래대로");
+  });
+  run(DANCER, "검무희 패시브: 적을 처치하면 게이지 " + api.ULT.bwKillGauge + " 회복 (기본 공격 적중 게이지와 따로 쌓임)", function (done) {
+    var W = dancerDuel([{ id: "foe", team: "red", char: "ranger", x: 450, y: OPEN_Y.forest }]);
+    var dn = W.ent("dn"), foe = W.ent("foe");
+    foe.hp = 10;
+    api.fireBasic(dn, 0);
+    W.step(800);
+    var want = api.ULT.bwKillGauge + api.roleGauge("dancer");
+    done(!foe.alive && dn.gauge === want ? "pass" : "fail", (foe.alive ? "처치 실패, " : "처치 후 ") + "게이지 " + dn.gauge + " (기대 " + want + ")");
+  });
+
   function autoMelee(mapId, seconds, seed) {
     var rnd = seededRandom(seed), realRandom = Math.random;
     Math.random = rnd;
