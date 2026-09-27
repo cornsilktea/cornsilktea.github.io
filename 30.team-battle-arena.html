@@ -568,7 +568,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     blacksmith: { name: "대장장이", role: "fighter", icon: "🔨", hp: 350, speed: 225, cd: 1000, dmg: 32, range: 120, width: 80, ultName: "내려찍기", ultAim: true },
     priest:  { name: "사제", role: "caster", icon: "📖", hp: 120, speed: 250, cd: 900, dmg: 10, heal: 10, range: 400, width: 200, ultName: "블랙홀", ultAim: true, heals: true },
     hitman:  { name: "자객", role: "assassin", icon: "🔪", hp: 120, speed: 260, cd: 1350, dmg: 40, range: 100,
-               dashRange: 200, dashWidth: 150, dashDmg: 40, dashMs: 300, finishDelay: 250, ultName: "처형", ultAim: true }
+               dashRange: 200, dashWidth: 150, dashDmg: 40, dashMs: 300, finishDelay: 125, ultName: "처형", ultAim: true }
   };
   var CHAR_LIST = ["warrior", "knight", "ranger", "mage", "rogue", "necro", "sniper", "thrower", "lancer", "blacksmith", "priest", "hitman"];
   var ROLES = {
@@ -1850,6 +1850,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     addProj(v.key + "_" + i, { team: v.team, owner: v.ev.o, ownerCharacterType: v.char, x: ox + dx * 20, y: oy + dy * 20,
       vx: dx * sp, vy: dy * sp, isSkill: v.skill, dmg: sv.dmg, ultKey: sv.ultKey, fx: sv.fx,
       pr: sv.pr, range: sv.range, createdAt: v.ev.t + i * v.gap });
+    if (v.char === "hitman" && v.skill) spark(ox + dx * 30, oy + dy * 30, "#FF3A4A", 2);
     if (E && (E === ME || BOTS[E.id]) && hear(E)) sfx(v.char === "mage" || v.char === "necro" ? "orb" : (v.char === "rogue" ? "star" : "shoot"));
     return true;
   }
@@ -1888,7 +1889,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var d = p.d;
     p.dead = true;
     damage(T, d.dmg, d.owner, !d.isSkill, d.isSkill ? d.ultKey : null, d.fx);
-    if (d.ultKey === "execute") { room.ref.child("hits/" + d.owner).push({ d: 0, b: 0, t: now(), tp: { x: r1(T.x), y: r1(T.y) } }); smoke(T.x, T.y); }
+    if (d.ultKey === "execute") { room.ref.child("hits/" + d.owner).push({ d: 0, b: 0, t: now(), tp: { x: r1(T.x), y: r1(T.y) } }); executeFx(T.x, T.y); }
     if (!ME || ME.team === T.team || visibleTo(T, ME)) spark(T.x, T.y, d.ownerCharacterType === "necro" ? hitColor(d) : (d.team === "blue" ? "#5FA2FF" : "#FF6A5F"), d.ultKey === "giant" ? 2.2 : 1);
   }
   function projVisualHit(p, t) {
@@ -1902,7 +1903,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (!T || !T.alive || T.id === d.owner || T.team === d.team) continue;
       if (segHit(a.x, a.y, b.x, b.y, T.x, T.y, BODY_R + (d.pr || 6))) {
         p.gone = true;
-        if (d.ultKey === "execute") smoke(T.x, T.y);
+        if (d.ultKey === "execute") executeFx(T.x, T.y);
         if (!ME || ME.team === T.team || visibleTo(T, ME, t)) spark(T.x, T.y, d.ownerCharacterType === "necro" ? hitColor(d) : (d.team === "blue" ? "#5FA2FF" : "#FF6A5F"), d.ultKey === "giant" ? 2.2 : 1);
         return;
       }
@@ -3385,11 +3386,20 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       } else g.add(new THREE.Mesh(GEO.shaft, basicMat("blade", 0xDCE3EC, 1)));
       var streak = new THREE.Mesh(GEO.trail, glowMat("trail-rogue", 0xDCE3EC, 0.35)); streak.position.x = -10; streak.scale.set(40, 1.3, 1.3); g.add(streak);
     } else if (d.ownerCharacterType === "hitman") {
-      var bladeProp = KIT.weapons[MODEL.hitman.right];
+      var bladeProp = KIT.weapons[MODEL.hitman.right], execBlade = d.isSkill;
       if (bladeProp) {
-        var blade = bladeProp.clone(); blade.rotation.z = -Math.PI / 2; blade.scale.setScalar(MODEL_SCALE * 1.2); blade.position.x = -10; g.add(blade);
+        var blade = bladeProp.clone(); blade.rotation.z = -Math.PI / 2; blade.scale.setScalar(MODEL_SCALE * (execBlade ? 3 : 1.2)); blade.position.x = execBlade ? -24 : -10;
+        var spinner = new THREE.Group(); spinner.add(blade); g.add(spinner);
+        if (execBlade) g.userData.spin = spinner;
       } else g.add(new THREE.Mesh(GEO.shaft, basicMat("blade", 0xDCE3EC, 1)));
-      var cut = new THREE.Mesh(GEO.trail, glowMat("trail-hitman", 0xFF4A5A, 0.55)); cut.position.x = -20; cut.scale.set(90, 1.1, 1.1); g.add(cut);
+      if (execBlade) {
+        var bloodHalo = new THREE.Mesh(GEO.ball, basicMat("execHalo", 0xE0142E, 0.3)); bloodHalo.scale.setScalar(34); g.add(bloodHalo);
+        var bloodCore = new THREE.Mesh(GEO.ball, basicMat("execCore", 0x9A0018, 0.8)); bloodCore.scale.setScalar(14); g.add(bloodCore);
+        var execTrail = new THREE.Mesh(GEO.trail, basicMat("trail-exec", 0xC8102E, 0.75)); execTrail.position.x = -40; execTrail.scale.set(220, 5, 5); g.add(execTrail);
+        var execEdge = new THREE.Mesh(GEO.trail, glowMat("trail-exec-core", 0xFFFFFF, 0.7)); execEdge.position.x = -25; execEdge.scale.set(140, 1.4, 1.4); g.add(execEdge);
+      } else {
+        var cut = new THREE.Mesh(GEO.trail, glowMat("trail-hitman", 0xFF4A5A, 0.55)); cut.position.x = -20; cut.scale.set(90, 1.1, 1.1); g.add(cut);
+      }
     } else if (d.ownerCharacterType === "sniper") {
       var big = d.isSkill ? ULT.pnScale : 1, boltCol = d.isSkill ? 0xFFB347 : C_FX[d.team];
       if (KIT.weapons.arrow_crossbow) {
@@ -3605,7 +3615,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     } else if (ME.char === "hitman") {
       if (ult) {
         var ex = Math.cos(ME.angle), ey = Math.sin(ME.angle), el = rayCast(ME.x + ex * 20, ME.y + ey * 20, ex, ey, ULT.exRange, ULT.exPr) + 20;
-        showAimStrip(18, Math.max(1, el - 18), 8);
+        showAimStrip(18, Math.max(1, el - 18), 18);
       } else showAimStrip(0, dashReach(ME, ME.angle, c.dashRange) + BODY_R, c.dashWidth);
     } else if (ME.char === "lancer" || c.width) {
       showAimStrip(0, lineReach(ME.x, ME.y, ME.angle, ult ? ULT.lnLen : c.range) + BODY_R, ult ? ULT.lnW : c.width);
@@ -3627,6 +3637,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
   var lastHp = {};
   function spark(x, y, color, size) { FX.push({ k: "spark", x: x, y: y, c: color, s: size || 1, t: Date.now(), life: 260 }); }
+  function executeFx(x, y) {
+    smoke(x, y);
+    spark(x, y, "#FF3A4A", 3);
+    spark(x, y, "#FFFFFF", 1.6);
+    FX.push({ k: "boom", x: x, y: y, r: 110, c: 0xFF2A3A, t: Date.now(), life: 500 });
+    if (ME && hyp(x - ME.x, y - ME.y) < 700) sfx("boom");
+  }
   function smoke(x, y) { FX.push({ k: "smoke", x: x, y: y, c: 0xC8C8CD, t: Date.now(), life: ULT.asSmokeMs + 150 }); }
   function boom(x, y, r, team) { FX.push({ k: "boom", x: x, y: y, r: r, c: C_FX[team] || 0xffffff, t: Date.now(), life: 450 }); }
   function floatText(x, y, text, color) { FX.push({ k: "txt", x: x, y: y, s: text, c: color, t: Date.now(), life: 800 }); }
@@ -3887,6 +3904,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if ((E.char === "mage" || E.char === "sniper") && E.ultUntil > t) return E.char === "mage" ? 0x442266 : 0x663300;
     if (E.char === "thrower" && E.ultUntil > t) return 0x1E5212;
     if (hammerLeaping(E, t)) return 0x553000;
+    if (E.char === "hitman" && E.ultUntil > t) return 0x660010;
     return 0x000000;
   }
   var LABELS = [];
@@ -3984,6 +4002,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (from) g.position.set(pos.x + from.x * kk, PROJ_Y + from.y * kk, pos.y + from.z * kk);
       else g.position.set(pos.x, PROJ_Y, pos.y);
      if (g.userData.pulse) g.userData.pulse.scale.setScalar(9 + 2 * Math.sin(nowMs / 50));
+      if (g.userData.spin) g.userData.spin.rotation.x = nowMs / 35;
     });
     keys(PRV).forEach(function (id) { if (!PR[id]) dropProjVis(id); });
 
