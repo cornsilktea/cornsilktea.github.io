@@ -644,7 +644,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               fgR: 150, fgDur: 4000, fgDmg: 20, fgHeal: 20, fgSlowMul: 0.6, fgSlowMs: 400, fgCast: KEY * 4 + 100, fgRefund: 1,
               lnWind: 300, lnLen: 350, lnW: 36, lnDmg: 70, lnStunMs: 1200,
               bsLeapMinMs: 200, bsLeapMaxMs: 1000, bsR: 150, bsDmg: 60, bsStunMs: 800, bsCast: 450, bsMin: 60, bsHop: 45,
-              bhR: 150, bhDur: 3000, bhDelay: 500, bhPull: 220, bhCast: 380, bhMin: 60,
+              bhR: 150, bhDur: 3000, bhDelay: 500, bhPull: 220, bhCast: 380, bhMin: 60, bhCcRate: 0.8,
               exRange: 500, exSpeed: 1300, exPr: 4, exDmg: 10, exStunMs: 1000,
               gdR: 200, gdKb: 150, gdKbMs: 500,
               frSlowMs: 1200, frSlowMul: 0.85, frSlowStep: 0.15, frFreezeMs: 800,
@@ -2381,6 +2381,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return true;
     });
   }
+  function creditHolePull(T, owner, t, dt) {
+    if (stunned(T, t)) return;
+    var already = 1 - slowMulAt(T, t), extra = ULT.bhCcRate - already;
+    if (extra <= 0) return;
+    creditCC(owner, 0, already > 0 ? 0 : dt * 1000, dt * 1000 * extra);
+  }
   function stepHoles(t, dt) {
     HOLES = HOLES.filter(function (h) {
       var e = h.e, start = e.createdAt + e.delay, end = start + e.dur;
@@ -2395,6 +2401,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var pull = Math.min(d - 6, ULT.bhPull * dt);
         T.x += dx / d * pull; T.y += dy / d * pull;
         resolve(T);
+        creditHolePull(T, e.owner, t, dt);
         G.forceNet = true;
       });
       return true;
@@ -4848,7 +4855,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       else if (row.score === best[0].score && row.dmg === best[0].dmg) best.push(row);
     });
     var rule = '<div class="mvpRule">환산점수 = 처치×100 + 입힌 피해 + 회복 + 막은 피해 + 기절 1초×' + MVP_STUN_PER_SEC +
-               ' + 둔화 1초×둔화율×' + MVP_SLOW_PER_SEC + ' − 쓰러짐×100 (0킬은 제외)<br>기절·둔화는 이미 걸린 효과와 겹치지 않고 새로 늘어난 시간만 셉니다.</div>';
+               ' + 둔화 1초×둔화율×' + MVP_SLOW_PER_SEC + ' − 쓰러짐×100 (0킬은 제외)<br>기절·둔화는 이미 걸린 효과와 겹치지 않고 새로 늘어난 시간만 셉니다. 블랙홀에 끌려간 시간은 ' + Math.round(ULT.bhCcRate * 100) + '% 둔화로 셉니다.</div>';
     if (!best.length) return '<div class="mvpLab">MVP</div><div class="mvpNone">MVP 없음</div>' + rule;
     return '<div class="mvpLab">🏆 MVP' + (best.length > 1 ? " (공동)" : "") + "</div>" + best.map(function (b) {
       var d = P[b.id] || {};

@@ -312,6 +312,25 @@ function collectResults(api) {
     if (Math.round(d.slow || 0) !== 0 || Math.round(d.weight) !== 400) bad.push("겹친 40% 2초 둔화 " + d.slow + "ms·가중 " + d.weight + " (기대 0·400)");
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "기절 1.2초만, 둔화는 늘어난 강도만(가중 0.8초 + 0.4초) 기여로 셈");
   });
+  run(STUN, "블랙홀에 끌려간 시간은 기절이 아니라 " + Math.round(api.ULT.bhCcRate * 100) + "% 둔화로 MVP 기여에 쌓이는가", function (done) {
+    var y = OPEN_Y.forest;
+    var W = world("forest", [
+      { id: "pr", team: "blue", char: "priest", x: 250, y: y, gauge: api.GAUGE_MAX },
+      { id: "foe", team: "red", char: "knight", x: 560, y: y }
+    ]);
+    var foe = W.ent("foe");
+    api.useUlt(W.ent("pr"), 0, 200);
+    W.step(api.ULT.bhDelay + 1000 + 20);
+    var left = api.ccPending().pr || {}, pulled = { stun: left.stun || 0, slow: left.slow || 0, weight: left.weight || 0 }, bad = [];
+    W.log.filter(function (p) { return p.path === "hits/pr"; }).forEach(function (p) {
+      pulled.stun += p.v.cs || 0; pulled.slow += p.v.ss || 0; pulled.weight += p.v.sw || 0;
+    });
+    if (pulled.stun) bad.push("기절 기여 " + Math.round(pulled.stun) + "ms");
+    if (api.stunned(foe, W.t())) bad.push("끌려가는 적이 기절 상태");
+    if (pulled.slow < 500) bad.push("둔화 " + Math.round(pulled.slow) + "ms (끌림 기여가 거의 없음)");
+    if (Math.abs(pulled.weight - pulled.slow * api.ULT.bhCcRate) > 5) bad.push("가중 " + Math.round(pulled.weight) + " (둔화 × " + api.ULT.bhCcRate + " 기대)");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "끌린 " + Math.round(pulled.slow) + "ms → 가중 " + Math.round(pulled.weight) + ", 기절 0");
+  });
 
   run(STUN, "기절 중에는 이동·기본 공격·궁극기를 못 쓰는가", function (done) {
     var W = world("forest", [{ id: "kn", team: "red", char: "knight", x: 450, y: OPEN_Y.forest, gauge: api.GAUGE_MAX }]);
