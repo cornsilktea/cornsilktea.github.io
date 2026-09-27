@@ -639,7 +639,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               pnDmg: 90, pnSpeed: 1500, pnRange: 700, pnPr: 16, pnRefund: 2, pnScale: 3,
               plFlight: 700, plFlightMin: 150, plR: 60, plDur: 3000, plTick: 1000, plMax: 4, plFade: 500, plLob: 90, plGauge: 1,
               fgR: 150, fgDur: 4000, fgDmg: 20, fgHeal: 20, fgSlowMul: 0.6, fgSlowMs: 400, fgCast: KEY * 4 + 100, fgRefund: 1,
-              lnWind: 300, lnLen: 350, lnW: 36, lnDmg: 90, lnStunMs: 1200,
+              lnWind: 300, lnLen: 350, lnW: 36, lnDmg: 70, lnStunMs: 1200,
               bsDelay: 700, bsR: 150, bsDmg: 60, bsStunMs: 800, bsCast: 450, bsMin: 60, bsHop: 45,
               bhR: 150, bhDur: 3000, bhDelay: 500, bhPull: 220, bhCast: 380, bhMin: 60,
               exRange: 500, exSpeed: 1300, exPr: 4, exDmg: 10, exStunMs: 1000,
@@ -1247,7 +1247,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "necro") return secs(ULT.smDur) + "간 유지되는 해골 병사 " + ULT.smCount + "마리 소환(최대 " + ULT.smMax + "마리). 해골은 체력 " + ULT.smHp + ", 공격 " + ULT.smDmg;
     if (k === "sniper") return "사거리 " + ULT.pnRange + "의 거대한 화살 발사. 적은 " + ULT.pnDmg + "의 피해, 적중 시 게이지 " + ULT.pnRefund + " 회복";
     if (k === "thrower") return "지정한 곳에 " + secs(ULT.fgDur) + "간 유지되는 반경 " + ULT.fgR + "의 독안개 설치. 아군은 1초당 체력 " + ULT.fgHeal + " 회복, 적은 1초당 " + ULT.fgDmg + "의 피해를 입고 " + slowPct(ULT.fgSlowMul);
-    if (k === "lancer") return secs(ULT.lnWind) + " 준비 후 앞으로 길이 " + ULT.lnLen + " 찌르기. 맞은 적은 모두 " + ULT.lnDmg + "의 피해를 입고 " + secs(ULT.lnStunMs) + "간 기절";
+    if (k === "lancer") return secs(ULT.lnWind) + " 준비 후 사거리 " + ULT.lnLen + "의 창 찌르기. 맞은 적은 모두 " + ULT.lnDmg + "의 피해를 입고 " + secs(ULT.lnStunMs) + "간 기절";
     if (k === "blacksmith") return "지정한 곳에 " + secs(ULT.bsDelay) + " 뒤 착지. 반경 " + ULT.bsR + "의 적은 " + ULT.bsDmg + "의 피해를 입고 " + secs(ULT.bsStunMs) + "간 기절";
     if (k === "hitman") return "사거리 " + ULT.exRange + "의 칼날 발사. 처음 맞은 적은 " + ULT.exDmg + "의 피해를 입고 " + secs(ULT.exStunMs) + "간 기절, 그 위치로 순간이동";
     if (k === "guardian") return "자신을 중심으로 반경 " + ULT.gdR + "의 적을 모두 " + ULT.gdKb + "만큼 밀어냄";
