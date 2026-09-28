@@ -3038,11 +3038,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     netWrite(true);
     room.ref.update({ status: "ended", winner: winner, endedAt: t,
       final: { blue: s.blueKills, red: s.redKills, reason: quitTeam ? "상대팀이 모두 나가서 승리" : "시간 종료 — 킬 스코어로 판정" } });
-    if (isStudentFullTeamMatch(room.mode, room.roster, P)) setTimeout(function () { recordClassStats(t); }, STATS_SETTLE_MS);
+    if (!quitTeam && isStudentFullTeamMatch(room.mode, room.roster, P)) setTimeout(function () { recordClassStats(t); }, STATS_SETTLE_MS);
   }
 
   var STATS_PATH = "teambattle/modestats/";
-  var STATS_SETTLE_MS = 1500;
+  var STATS_SETTLE_MS = 3000;
   var isTestLink = !!(window.PORTAL_CLASS && window.PORTAL_CLASS.test);
   function isStudentFullTeamMatch(mode, roster, ps) {
     if ((mode !== "pvp" && mode !== "cup") || !roster) return false;
@@ -3060,6 +3060,21 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var r = room, ps = P;
     if (r.status !== "ended" || r.endedAt !== endedAt || r.winner == null) return;
     if (!isStudentFullTeamMatch(r.mode, r.roster, ps)) return;
+    r.ref.child("done").once("value").then(function (s) {
+      var done = s.val() || {};
+      var everyoneStayed = keys(r.roster).every(function (id) { return done[id] === endedAt; });
+      if (everyoneStayed && room === r && r.endedAt === endedAt) saveClassStats(r, ps);
+    }).catch(function () {});
+  }
+  function markStayedToEnd() {
+    var r = room;
+    if (!r || !P[myId] || !r.roster || !r.roster[myId]) return;
+    r.ref.child("endedAt").once("value").then(function (s) {
+      var endedAt = s.val();
+      if (endedAt && room === r && P[myId]) r.ref.child("done/" + myId).set(endedAt);
+    }).catch(function () {});
+  }
+  function saveClassStats(r, ps) {
     var rows = keys(r.roster).map(function (id) {
       var e = ent(id) || stateOf(ps[id]);
       return { c: r.roster[id].c, win: r.winner === r.roster[id].team, dmg: +e.dmg || 0, heal: +e.heal || 0,
@@ -3094,6 +3109,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (!G) return;
     G.forceNet = true;
     try { netWrite(true); } catch (e) {}
+    markStayedToEnd();
     setTimeout(function () {
       var mine = ME ? ME.team : null;
       if (mine && room && room.winner && room.winner !== "draw") sfx(room.winner === mine ? "win" : "lose");
@@ -3103,7 +3119,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (!room || room.status !== "ended") return;
     if (room.endedAt && now() - room.endedAt < STATS_SETTLE_MS + 500) return;
     room.ref.update({ status: "lobby", winner: null, final: null, startAt: null, endedAt: null, roster: null, draft: null,
-                      st: null, shots: null, meleeHits: null, hits: null, effects: null, kills: null, projectiles: null });
+                      st: null, done: null, shots: null, meleeHits: null, hits: null, effects: null, kills: null, projectiles: null });
   }
   $("btnAgain").onclick = restart;
   var KEY_ON = { up: false, down: false, left: false, right: false, atk: false };

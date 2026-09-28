@@ -1099,8 +1099,9 @@ async function showStats(g) {
     const matches = s.matches || 0;
     msg.textContent = "집계된 경기(학생 3대3만) " + matches + "판 = 모든 직업의 게임 수";
     /* 진영 유불리(대회모드는 블루가 먼저 고르는 드래프트). 무승부는 어느 쪽 승리에도 안 셈 */
+    const draws = Math.max(0, matches - (s.red || 0) - (s.blue || 0));
     box.appendChild(el("p", "msg", "진영 승률: 레드 " + pct(s.red || 0, matches) +
-      " · 블루 " + pct(s.blue || 0, matches) + " (" + matches + "경기)"));
+      " · 블루 " + pct(s.blue || 0, matches) + " · 무승부 " + pct(draws, matches) + " (" + matches + "경기)"));
 
     /* 비율 옆에 (분자 / 분모) 를 작게 붙여 표본이 적은 직업을 알아볼 수 있게 한다 */
     function rateCell(a, b) {
@@ -1146,7 +1147,8 @@ async function showStats(g) {
     box.appendChild(table);
     const notes = el("ul", "hint");
     ["AI 없이 양 팀 인원이 같은 플레이 경기만 집계합니다.",
-     "중간에 나가거나 연결이 끊긴 사람이 있는 경기는 빠집니다.",
+     "끝까지 완료된 경기만 집계합니다. 중간에 나가거나 연결이 끊긴 사람이 있거나, 경기가 끝날 때 6명 기기 모두가 종료 확인을 보내지 않은 경기는 빠집니다.",
+     "시간 종료 때 킬 수가 같으면 무승부입니다(레드·블루 승리 어느 쪽에도 세지 않음).",
      "게임 수는 모든 직업이 같습니다(한 판마다 모든 직업 +1). 선택 수는 그 판에 고른 6명의 직업만 오릅니다.",
      mode.id === "pvp" ? "일반모드는 같은 캐릭터를 여러 명이 고를 수 있어 선택률이 100%를 넘을 수 있습니다(예: 한 판에 2명이 고르면 선택 수 +2)."
                        : "대회모드는 캐릭터 중복이 안 되므로 선택률은 그 직업이 나온 판의 비율입니다.",
