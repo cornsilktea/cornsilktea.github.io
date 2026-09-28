@@ -686,7 +686,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               frSlowMs: 1200, frSlowMul: 0.85, frSlowStep: 0.15, frFreezeMs: 800,
               frBzR: 400, frBzDur: 5000, frBzDmg: 5, frBzTick: 1000, frBzDelay: 400, frBzSlowMul: 0.8, frBzSlowMs: 400,
               bwR: 150, bwDur: 3000, bwTick: 250, bwHurtGaugeEvery: 4, bwDmg: 15, bwKillGauge: 5, bdR: 70, bdDmg: 20, bdDelay: 300,
-              rmDur: 3000, rmRate: 3, rmDashMs: 300 };
+              rmDur: 3000, rmRate: 3, rmDashMs: 300, rmDashRange: 100 };
   var SNIPER_KEEP = KEY * 5;
   function isMelee(c) { return !!(CHARS[c].arc || CHARS[c].width || CHARS[c].dashWidth || CHARS[c].stab); }
   var STEALTH_ALPHA = 0.4;
@@ -1328,7 +1328,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "priest") return "지정한 곳에 " + secs(ULT.bhDelay) + " 뒤 " + secs(ULT.bhDur) + "간 유지되는 반경 " + ULT.bhR + "의 블랙홀 생성. 적은 중심으로 끌려감";
     if (k === "frost") return "자신을 중심으로 " + secs(ULT.frBzDur) + "간 유지되는 반경 " + ULT.frBzR + "의 눈보라 생성. 눈보라에서 아군은 은신 상태가 되고, 적은 1초당 " +
       ULT.frBzDmg + "의 피해를 입고 " + slowPct(ULT.frBzSlowMul);
-    if (k === "duelist") return secs(ULT.rmDur) + "간 초당 공격 " + ULT.rmRate + "회, 돌진 시간 " + secs(ULT.rmDashMs) + "로 단축. 사용 즉시 기본 공격 대기시간 초기화";
+    if (k === "duelist") return secs(ULT.rmDur) + "간 초당 공격 " + ULT.rmRate + "회, 돌진 거리 " + ULT.rmDashRange + "·돌진 시간 " + secs(ULT.rmDashMs) + "로 단축. 사용 즉시 기본 공격 대기시간 초기화";
     if (k === "dancer") return secs(ULT.bwDur) + "간 회전하며 " + speedUp(CHARS.dancer) + ". 반경 " + ULT.bwR + "의 적은 " + secs(ULT.bwTick) + "마다 " + ULT.bwDmg + "의 피해";
     return "";
   }
@@ -2667,7 +2667,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var along = dx * ca + dy * sa, side = -dx * sa + dy * ca;
     return along >= -BODY_R && along <= d.len + BODY_R && Math.abs(side) <= d.width / 2 + BODY_R;
   }
-  function inStrike(T, d) { return d.tgt ? T.id === d.tgt : d.len ? inLine(T, d) : inArc(T, d) && losClear(d.x, d.y, T.x, T.y); }
+  function inStrike(T, d) { return d.stab ? !!d.tgt && T.id === d.tgt : d.len ? inLine(T, d) : inArc(T, d) && losClear(d.x, d.y, T.x, T.y); }
   function lineReach(x, y, ang, len) { return Math.min(len, rayObst(x, y, Math.cos(ang), Math.sin(ang), 2) + BODY_R); }
   function onMelee(key, d) {
     if (!d) return;
@@ -2815,11 +2815,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (hear(E)) sfx("swing");
   }
   function lungeDashMs(E, t) { return riposte(E, t) ? ULT.rmDashMs : CHARS[E.char].dashMs; }
+  function lungeRange(E, t) { return riposte(E, t) ? ULT.rmDashRange : CHARS[E.char].dashRange; }
   function lunge(E, ang) {
-    var c = CHARS[E.char], t = now(), reach = dashReach(E, ang, c.dashRange);
+    var t = now(), full = lungeRange(E, t), reach = dashReach(E, ang, full);
     var tx = clamp(E.x + Math.cos(ang) * reach, BOUND.l + BODY_R, BOUND.r - BODY_R), ty = clamp(E.y + Math.sin(ang) * reach, BOUND.t + BODY_R, BOUND.b - BODY_R);
+    reach = hyp(tx - E.x, ty - E.y);
     revealBriefly(E.id, t);
-    E.dash = { sx: E.x, sy: E.y, tx: tx, ty: ty, at: t, ang: ang, ms: lungeDashMs(E, t) };
+    E.dash = { sx: E.x, sy: E.y, tx: tx, ty: ty, at: t, ang: ang, ms: Math.max(1, Math.round(lungeDashMs(E, t) * reach / full)) };
     E.atkAt = t;
     G.forceNet = true;
   }
@@ -2838,10 +2840,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     revealBriefly(E.id, t);
     G.forceNet = true;
     if (hear(E)) sfx("swing");
-    if (!T) return;
-    E.angle = Math.atan2(T.y - E.y, T.x - E.x);
-    room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(E.angle), len: Math.max(1, Math.round(hyp(T.x - E.x, T.y - E.y) - BODY_R)),
-                                      width: 14, tgt: T.id, dmg: c.dmg, createdAt: t });
+    var d = { team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(E.angle), stab: 1, radius: c.range, dmg: c.dmg, createdAt: t };
+    if (T) {
+      E.angle = d.angle = r1(Math.atan2(T.y - E.y, T.x - E.x));
+      d.tgt = T.id; d.len = Math.max(1, Math.round(hyp(T.x - E.x, T.y - E.y) - BODY_R)); d.width = 14;
+    }
+    room.ref.child("meleeHits").push(d);
   }
   function stepDash(E) {
     var D = E.dash; if (!D) return;
@@ -3164,7 +3168,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     if (aimAt && t >= B.cdUntil && t - k.seenAt > BOT_REACT_MS) {
       var ad = hyp(aimAt.x - B.x, aimAt.y - B.y);
-      var rng = c.throwRange || c.dashRange || (melee ? c.range + BODY_R - 4 : c.range);
+      var rng = c.stab ? lungeRange(B, t) + c.range : c.throwRange || c.dashRange || (melee ? c.range + BODY_R - 4 : c.range);
       if (ad <= rng && losClear(B.x, B.y, aimAt.x, aimAt.y)) fireBasic(B, B.angle + (Math.random() - 0.5) * 2 * BOT_AIM_ERR);
     }
   }
@@ -4311,7 +4315,23 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var PROJ_Y = 42, BOW_BLEND = 140;
   var WAVE = { priest: { life: 540, travel: 380 }, hitman: { life: CHARS.hitman.dashMs + 160, travel: CHARS.hitman.dashMs } };
   var MELEE_COLOR = { warrior: 0xFF9A3C, knight: 0xFFFFFF, rogue: 0xC9D6E6, necro: 0xB07CFF, lancer: 0xFFD27A, blacksmith: 0xFFB45A, priest: 0x7CFFB2, hitman: 0xFF4A5A, guardian: 0x8FD9A8, duelist: 0xFFFFFF };
+  var STAB_VIS_MS = 450;
+  function makeStabVis(d) {
+    var g = new THREE.Group(), R = d.radius + BODY_R;
+    var fillM = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.14, depthWrite: false });
+    var edgeM = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.8, depthWrite: false, blending: THREE.AdditiveBlending });
+    var fill = flatMesh(sectorGeo(R, Math.PI * 2), fillM), rim = flatMesh(GEO.stabRim, edgeM);
+    rim.scale.setScalar(R); fill.position.y = 2; rim.position.y = 2.4;
+    g.add(fill); g.add(rim);
+    if (d.len) { var line = flatMesh(GEO.strip, edgeM); line.scale.set(d.len + BODY_R, d.width, 1); line.position.y = 24; g.add(line); }
+    g.position.set(d.x, 0, d.y); g.rotation.y = -d.angle;
+    g.userData = { fill: fillM, edge: edgeM, stab: true };
+    scene.add(g);
+    return g;
+  }
+  GEO.stabRim = new THREE.RingGeometry(0.97, 1, 48);
   function makeMeleeVis(d) {
+    if (d.stab) return makeStabVis(d);
     var g = new THREE.Group(), who = P[d.owner] ? P[d.owner].characterType : "", col = d.u ? 0xFF6A3D : (MELEE_COLOR[who] || 0xFFFFFF);
     var fillM = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.2, depthWrite: false });
     var edgeM = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending });
@@ -4614,7 +4634,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         showAimStrip(18, Math.max(1, el - 18), 18);
       } else showAimStrip(0, dashReach(ME, ME.angle, c.dashRange) + BODY_R, c.dashWidth);
     } else if (c.stab && !ult) {
-      var lungeLen = dashReach(ME, ME.angle, c.dashRange);
+      var lungeLen = dashReach(ME, ME.angle, lungeRange(ME, now()));
       showAimStrip(0, lungeLen, BODY_R * 2);
       showAimCircle(lungeLen, c.range + BODY_R);
     } else if (ME.char === "lancer" || c.width) {
@@ -5055,10 +5075,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     keys(PRV).forEach(function (id) { if (!PR[id]) dropProjVis(id); });
 
     keys(MELEE).forEach(function (k) {
-      var m = MELEE[k], age = nowMs - m.at, g = MLV[k], wave = m.d.len ? WAVE[P[m.d.owner] ? P[m.d.owner].characterType : ""] : null, life = wave ? wave.life : 240;
+      var m = MELEE[k], age = nowMs - m.at, g = MLV[k], wave = m.d.len && !m.d.stab ? WAVE[P[m.d.owner] ? P[m.d.owner].characterType : ""] : null, life = wave ? wave.life : m.d.stab ? STAB_VIS_MS : 240;
       if (age > life) { if (g) dropMelee(k); return; }
       if (!g) g = MLV[k] = makeMeleeVis(m.d);
       var f = age / life;
+      if (g.userData.stab) { g.userData.fill.opacity = 0.14 * (1 - f); g.userData.edge.opacity = 0.8 * (1 - f * f); return; }
       g.userData.fill.opacity = 0.2 * (1 - f);
       g.userData.edge.opacity = 0.9 * (1 - (wave ? f * f : f));
       if (wave) {
