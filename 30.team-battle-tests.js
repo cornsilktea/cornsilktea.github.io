@@ -1485,6 +1485,20 @@ function collectResults(api) {
     var ok = minion.hp < m0 && near.hp === n0;
     done(ok ? "pass" : "fail", "해골 체력 " + m0 + " → " + minion.hp + ", 더 먼 적 " + (n0 - near.hp) + " 피해");
   });
+  run(SHAMAN, "영역전개: 은신한 적은 번개 대상에서 빠지고, 보이는 적 중 가장 가까운 적이 맞는가", function (done) {
+    var y = OPEN_Y.forest, W = shamanTeam([{ id: "rg", team: "red", char: "rogue", x: 360, y: y, gauge: api.GAUGE_MAX }]), sh = W.ent("sh"), rg = W.ent("rg"), near = W.ent("near");
+    api.useUlt(sh, 0);
+    W.step(api.ULT.dmGrowMs + api.ULT.dmStunMs + 200);
+    api.useUlt(rg, 0);
+    W.step(api.ULT.asSmokeMs + 100);
+    rg.x = 330; rg.y = y + 150; W.frame(FRAME);
+    if (api.visibleTo(rg, sh, W.t())) { done("fail", "시험 준비 실패: 은신자가 보임"); return; }
+    var r0 = rg.hp, n0 = near.hp;
+    sh.cdUntil = 0; api.fireBasic(sh, 0);
+    W.step(100);
+    var ok = rg.hp === r0 && n0 - near.hp === api.ULT.dmStrikeDmg;
+    done(ok ? "pass" : "fail", "은신자 피해 " + (r0 - rg.hp) + ", 보이는 적 피해 " + (n0 - near.hp) + " (기대 0·" + api.ULT.dmStrikeDmg + ")");
+  });
   run(SHAMAN, "영역전개: 주술사가 쓰러지면 반구가 바로 사라지고, 부활 보호 중인 적은 기절·번개를 받지 않는가", function (done) {
     var W = shamanTeam(), sh = W.ent("sh"), near = W.ent("near"), far = W.ent("far"), bad = [];
     far.protectUntil = W.t() + api.ULT.dmDur + 500; far.x = 500;
