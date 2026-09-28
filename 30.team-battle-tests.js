@@ -1052,7 +1052,7 @@ function collectResults(api) {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "독병 위 적만 절반, 화상과 겹쳐도 절반");
   });
 
-  run(PASSIVE2, "기사: 모든 피해가 1회마다 " + api.CHARS.knight.armor + " 줄고, 줄어든 만큼 막은 피해에 쌓이는가", function (done) {
+  run(PASSIVE2, "기사: 모든 피해가 1회마다 " + api.CHARS.knight.armor + " 줄고(방어태세는 배율 먼저), 줄어든 만큼 막은 피해에 쌓이는가", function (done) {
     var y = OPEN_Y.forest, armor = api.CHARS.knight.armor;
     var W = world("forest", [
       { id: "rg", team: "blue", char: "ranger", x: 250, y: y - 200 },
@@ -1064,21 +1064,30 @@ function collectResults(api) {
     api.damage(kn, 15, "rg", 1, null); api.damage(kn, 15, "rg", 2, null);
     if (kn.maxHp - kn.hp !== 2 * (15 - armor)) bad.push("화살 15×2 → " + (kn.maxHp - kn.hp));
     if (kn.blocked !== 2 * armor) bad.push("막은 피해 " + kn.blocked);
+    var hp0 = kn.hp, blocked0 = kn.blocked;
+    kn.buffUntil = W.t() + 1000;
+    api.damage(kn, 30, "rg", 3, null);
+    var guarded = Math.round(30 * api.ULT.tkDef) - armor;
+    if (hp0 - kn.hp !== guarded) bad.push("방어태세 중 30 → " + (hp0 - kn.hp) + " (기대 " + guarded + ")");
+    if (kn.blocked - blocked0 !== 30 - guarded) bad.push("방어태세 막은 피해 " + (kn.blocked - blocked0));
+    kn.buffUntil = 0;
     api.fireBasic(W.ent("th"), 0, 200);
     W.step(4000);
     var tick = api.CHARS.thrower.dmg - armor;
     if (k2.maxHp - k2.hp !== tick * api.CHARS.thrower.ticks) bad.push("독병 → " + (k2.maxHp - k2.hp) + " (기대 " + tick * api.CHARS.thrower.ticks + ")");
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "화살 " + (15 - armor) + "×2, 독병 " + tick + "×" + api.CHARS.thrower.ticks + ", 막은 피해 기록");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "화살 " + (15 - armor) + "×2, 독병 " + tick + "×" + api.CHARS.thrower.ticks + ", 방어태세 중 30 → " + (Math.round(30 * api.ULT.tkDef) - armor) + ", 막은 피해 기록");
   });
 
-  run(PASSIVE2, "창기사: 부활할 때 보호막이 생겨 다음 피해 1회만 막고, 함께 온 기절은 그대로 받는가", function (done) {
+  run(PASSIVE2, "창기사: 게임 시작·부활할 때 보호막이 생겨 다음 피해 1회만 막고, 함께 온 기절은 그대로 받는가", function (done) {
     var y = OPEN_Y.forest;
     var W = world("forest", [
       { id: "gd", team: "blue", char: "guardian", x: 250, y: y },
       { id: "ln", team: "red", char: "lancer", x: 450, y: y }
     ]);
     var ln = W.ent("ln"), bad = [];
-    if (ln.shield) bad.push("첫 등장부터 보호막");
+    if (!ln.shield) bad.push("게임 시작 때 보호막 없음");
+    api.damage(ln, 1, "gd", false, null);
+    if (ln.shield || ln.hp !== ln.maxHp) bad.push("시작 보호막이 피해를 못 막음");
     api.damage(ln, 9999, "gd", false, null);
     W.step(api.RESPAWN_MS + 100);
     if (!ln.alive || !ln.shield) bad.push("부활 후 보호막 없음");
@@ -1091,7 +1100,7 @@ function collectResults(api) {
     if (ln.shield) bad.push("보호막이 남아 있음");
     api.damage(ln, 30, "gd", false, null);
     if (ln.maxHp - ln.hp !== 30) bad.push("두 번째 피해 " + (ln.maxHp - ln.hp));
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "부활 시 보호막, 피해 30 막고 기절은 적용, 다음 피해는 그대로");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "시작·부활 시 보호막, 피해 30 막고 기절은 적용, 다음 피해는 그대로");
   });
 
   run(PASSIVE2, "광전사: 체력 " + api.CHARS.warrior.rally.hpRate * 100 + "% 미만이 되면 " + api.CHARS.warrior.rally.ms / 1000 + "초간 1초당 " + api.CHARS.warrior.rally.perSec + " 회복하고, 죽기 전까지 다시 발동하지 않는가", function (done) {

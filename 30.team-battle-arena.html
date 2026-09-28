@@ -1346,7 +1346,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "mage") return "기본 공격·스킬에 맞은 적은 " + secs(c.burn.ms) + "간 불타며 1초당 " + c.burn.perSec + "의 피해를 입고 회복 " + healCutPct() + " 감소";
     if (k === "thrower") return "기본 공격·스킬 지역 위의 적은 회복 " + healCutPct() + " 감소";
     if (k === "knight") return "받는 모든 피해가 1회마다 " + c.armor + " 감소";
-    if (k === "lancer") return "부활할 때마다 적의 다음 피해 1회를 막는 보호막 생성. 기절·둔화 등 효과는 막지 못함";
+    if (k === "lancer") return "게임 시작과 부활할 때마다 적의 다음 피해 1회를 막는 보호막 생성. 기절·둔화 등 효과는 막지 못함";
     if (k === "warrior") return "체력이 " + Math.round(c.rally.hpRate * 100) + "% 미만으로 떨어지면 " + secs(c.rally.ms) + "간 1초당 체력 " + c.rally.perSec + " 회복. 죽을 때마다 한 번";
     if (k === "frost") return "같은 적에게 기본 공격 3회 적중 시 " + secs(ULT.frFreezeMs) + "간 기절";
     if (k === "rogue") return "가까운 적은 근접 공격, 먼 적에게는 사거리 " + c.throwRange + "의 단검 투척";
@@ -1605,7 +1605,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var p = P[id], want = charOf(id), c = CHARS[want] ? want : "ranger";
         var sp = spawnOf(team, i + 1), base = "players/" + id + "/";
         u[base + "slot"] = i + 1; u[base + "characterType"] = c;
-        st[stKey(team, i + 1)] = packState({ x: sp.x, y: sp.y, angle: sp.angle, mv: false, hp: CHARS[c].hp, alive: true });
+        st[stKey(team, i + 1)] = packState({ x: sp.x, y: sp.y, angle: sp.angle, mv: false, hp: CHARS[c].hp, alive: true, shield: !!CHARS[c].respawnShield });
         roster[id] = { team: team, c: c, ai: !!p.isAI };
       });
     });
@@ -1843,7 +1843,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
              summonAt: s.summonAt || 0, minions: [], revealUntil: s.revealUntil || 0, frostStacks: s.frostStacks || 0, frostStackAt: s.frostStackAt || 0,
              lastStandUsed: !!(CHARS[c].lastStandHp && s.hp != null && s.hp <= CHARS[c].lastStandHp),
              rallyUsed: !!(CHARS[c].rally && s.hp != null && s.hp < CHARS[c].hp * CHARS[c].rally.hpRate),
-             burnUntil: s.burnUntil || 0, burnNext: 0, regenNext: 0, shield: !!s.shield,
+             burnUntil: s.burnUntil || 0, burnNext: 0, regenNext: 0, shield: s.hp == null ? !!CHARS[c].respawnShield : !!s.shield,
              burst: null, volley: null, mv: false, pending: null };
     if (s.minions) adoptMinions(E, s.minions, null);
     return E;
@@ -2396,8 +2396,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (protectedNow(T)) return;
     var t = now(), unguarded = amount, C = CHARS[T.char];
     if (T.shield && amount > 0) { amount = 0; T.shield = false; spark(T.x, T.y, SHIELD_SPARK, 1.5); }
-    if (C.armor) amount = Math.max(0, amount - C.armor);
     if (T.char === "knight" && T.buffUntil > t) amount = Math.round(amount * ULT.tkDef);
+    if (C.armor) amount = Math.max(0, amount - C.armor);
     if (T.char === "knight") T.blocked = (T.blocked || 0) + Math.min(unguarded, T.hp) - Math.min(amount, T.hp);
     var floorHp = CHARS[T.char].lastStandHp;
     if (floorHp && !T.lastStandUsed && T.hp - amount < floorHp) {
