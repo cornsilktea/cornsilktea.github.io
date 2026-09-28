@@ -19,8 +19,8 @@
 <script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1.10.1/dist/es-module-shims.js"></script>
 <script type="importmap">
 { "imports": {
-  "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js",
-  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
 } }
 </script>
 <style>
@@ -5042,7 +5042,22 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   if (!db) startMsg("온라인 연결을 준비하지 못했어요. 인터넷 연결을 확인해 주세요.");
   if (!nick) openNick(true);
   requestAnimationFrame(loop);
+  window.TEAM_BATTLE_READY = true;
 })();
+</script>
+<script>
+window.addEventListener("load", function () {
+  setTimeout(function () {
+    if (window.TEAM_BATTLE_READY) return;
+    var chromeVersion = (navigator.userAgent.match(/Chrome\/(\d+)/) || [])[1];
+    var notice = document.createElement("div");
+    notice.style.cssText = "position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:9999;width:calc(100% - 32px);max-width:520px;padding:22px 24px;border-radius:14px;background:rgba(16,24,19,.94);border:1px solid rgba(255,255,255,.16);border-top:3px solid #D97B4F;color:#EEF2EE;font:700 17px/1.6 var(--sg-font);text-align:center";
+    notice.innerHTML = "이 기기의 브라우저가 오래되어 게임을 열 수 없어요.<br>크롬(Chrome)을 최신 버전으로 업데이트한 뒤 다시 열어 주세요." +
+      "<div style=\"margin-top:10px;font-size:13px;font-weight:400;color:#A3B0A6\">" +
+      (chromeVersion ? "현재 크롬 " + chromeVersion + " · 크롬 80 이상 필요" : navigator.userAgent.replace(/[<>&]/g, "")) + "</div>";
+    document.body.appendChild(notice);
+  }, 8000);
+});
 </script>
 </body>
 </html>
