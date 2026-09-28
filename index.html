@@ -220,6 +220,9 @@
   }
   .class-grid .btn { min-height: 110px; font-size: 24px; font-weight: 800; border-width: 1.5px; }
   .class-grid .btn:hover { border-color: var(--sg-primary); box-shadow: var(--sg-shadow-md); }
+  /* 대회서버 버튼: 반 버튼과 헷갈리지 않게 보색(#D97B4F) 테두리로 구분 */
+  .class-grid .contest-btn { grid-column: span 2; border-color: #D97B4F; color: #D97B4F; }
+  .class-grid .contest-btn:hover { border-color: #D97B4F; }
   @media (max-width: 720px) {
     .class-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sg-s3); }
     .class-grid .btn { min-height: 72px; font-size: 20px; }
@@ -279,6 +282,11 @@
   <div class="class-grid" id="classGrade1"></div>
   <h2>2학년</h2>
   <div class="class-grid" id="classGrade2"></div>
+  <!-- 대회서버: 반과 상관없이 모두 함께 들어오는 화면(contest.html). 제어판의 '대회서버' 버튼으로 잠금을 켜고 끕니다. -->
+  <h2>대회</h2>
+  <div class="class-grid">
+    <a class="btn contest-btn" href="contest.html">🏆 대회서버</a>
+  </div>
 </div>
 
 <div class="layout" id="layout" hidden>
@@ -361,6 +369,8 @@
   var tabList = document.getElementById("tabList");
 
   var klass = D.classFromSearch(location.search);   /* 지금 보고 있는 반(없으면 null) */
+  /* 대회서버는 화면이 따로 있습니다(대회용 자료만 보이는 contest.html) */
+  if (klass && klass.contest) { location.replace("contest.html"); return; }
 
   var keyword = "";
   var games = [];

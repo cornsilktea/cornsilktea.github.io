@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<script>
+/* 밝기(다크 모드): 화면을 그리기 전에 정해야 밝은 화면이 잠깐 번쩍이지 않는다. 키는 index.html·admin.html 과 같이 쓴다. */
+(function(){
+  try{
+    var t = localStorage.getItem('portal_theme');
+    if(!t){ t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light'; }
+    document.documentElement.setAttribute('data-theme', t);
+  }catch(e){}
+})();
+</script>
+<link rel="stylesheet" href="theme.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>대회서버</title>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="정보 수업용 링크 모음">
+<meta property="og:title" content="대회서버">
+<meta property="og:description" content="반과 상관없이 모두 함께 겨루는 대회용 게임 모음입니다.">
+<meta property="og:url" content="https://cornsilktea.github.io/contest.html">
+<meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#F4F6F1">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="대회서버">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<link rel="apple-touch-icon" href="icon-512-maskable.png">
+<style>
+  /* index.html(반 화면)과 같은 모양을 쓰되, 구조도·검색 없이 대회용 자료 카드와 QR 만 둡니다. */
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: var(--sg-s6);
+    font-family: var(--sg-font); font-size: var(--sg-fs-md); line-height: var(--sg-lh);
+    background: var(--sg-bg); color: var(--sg-ink);
+    -webkit-text-size-adjust: 100%;
+  }
+  header {
+    max-width: 1600px; margin: 0 auto var(--sg-s6);
+    display: flex; flex-wrap: wrap; align-items: center; gap: var(--sg-s3);
+  }
+  .title-row { flex: 1 1 100%; display: flex; align-items: center; gap: var(--sg-s3); margin: 0; }
+  h1 { font-size: var(--sg-fs-2xl); font-weight: 800; line-height: var(--sg-lh-tight); letter-spacing: -.01em; margin: 0; }
+  h1 .cup { color: #D97B4F; }
+  .admin-link {
+    display: inline-flex; align-items: center; height: 32px; padding: 0 var(--sg-s3);
+    border: 1px solid var(--sg-line-mid); border-radius: var(--sg-radius); background: var(--sg-panel);
+    color: var(--sg-ink-mid); font-size: var(--sg-fs-sm); font-weight: 700; text-decoration: none;
+    box-shadow: var(--sg-shadow-sm);
+  }
+  .admin-link:hover { border-color: var(--sg-primary); color: var(--sg-ink); }
+  .sub { flex: 1 1 100%; font-size: var(--sg-fs-sm); line-height: var(--sg-lh); color: var(--sg-ink-soft); margin: 0; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-height: 44px; padding: var(--sg-s2) var(--sg-s4);
+    font-family: inherit; font-size: var(--sg-fs-md); font-weight: 700; line-height: var(--sg-lh-tight);
+    text-align: center; text-decoration: none; word-break: keep-all;
+    background: var(--sg-panel); color: var(--sg-ink);
+    border: 1px solid var(--sg-line-strong); border-radius: var(--sg-radius); cursor: pointer;
+    box-shadow: var(--sg-shadow-sm);
+    transition: background-color .12s, border-color .12s, box-shadow .12s, transform .06s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn:hover { background: var(--sg-panel-alt); }
+  .btn:active { transform: translateY(1px); box-shadow: none; }
+  .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--sg-focus); }
+
+  .notice {
+    max-width: 1600px; margin: 0 auto var(--sg-s4);
+    padding: var(--sg-s3) var(--sg-s4);
+    background: var(--sg-panel); border: 1px solid var(--sg-line-mid); border-left: 3px solid var(--sg-warn);
+    border-radius: var(--sg-radius);
+    font-size: var(--sg-fs-sm); line-height: var(--sg-lh); color: var(--sg-ink-mid);
+  }
+
+  .layout {
+    max-width: 1600px; margin: 0 auto;
+    display: flex; align-items: stretch; gap: var(--sg-s6);
+    min-height: calc(100vh - 120px);
+  }
+  .main { flex: 0 0 50%; min-width: 0; }
+
+  /* 자료 카드: 대회용 자료는 넷뿐이라 두 칸씩 크게 */
+  .grid {
+    align-content: start;
+    display: grid; gap: var(--sg-s3);
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  }
+  .card {
+    position: relative;
+    display: flex; gap: var(--sg-s3); align-items: flex-start;
+    padding: var(--sg-s4); background: var(--sg-panel);
+    border: 1px solid var(--sg-line-mid); border-radius: var(--sg-radius);
+    box-shadow: var(--sg-shadow-sm);
+    text-decoration: none; color: inherit;
+    transition: border-color .12s, box-shadow .12s, transform .06s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .card > span:not(.num) { flex: 1 1 auto; min-width: 0; }
+  a.card:hover { border-color: var(--sg-primary); box-shadow: var(--sg-shadow-md); }
+  a.card:active { transform: translateY(1px); box-shadow: none; }
+  a.card:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--sg-focus); }
+  .card::after {
+    flex: none; align-self: flex-start;
+    padding: 2px var(--sg-s2); border-radius: 999px;
+    font-size: var(--sg-fs-xs); font-weight: 700; line-height: 1.5; white-space: nowrap;
+  }
+  a.card::after { content: "열림"; color: var(--sg-ok); background: var(--sg-ok-soft); }
+  .num {
+    flex: 0 0 28px; height: 28px; line-height: 28px; text-align: center;
+    font-size: var(--sg-fs-sm); font-weight: 700; font-variant-numeric: tabular-nums;
+    color: var(--sg-primary); background: var(--sg-primary-soft); border-radius: var(--sg-radius);
+  }
+  .title { font-size: var(--sg-fs-lg); font-weight: 700; line-height: var(--sg-lh-tight); margin: 3px 0 0; word-break: keep-all; }
+  .memo { font-size: var(--sg-fs-sm); line-height: var(--sg-lh); color: var(--sg-ink-soft); margin: var(--sg-s1) 0 0; }
+  .card.locked {
+    background: var(--sg-bg); border-style: dashed; box-shadow: none;
+    color: var(--sg-ink-soft); cursor: pointer;
+  }
+  .card.locked::after { content: "🔒 잠김"; color: var(--sg-ink-soft); background: var(--sg-panel-alt); }
+  .card.locked .num { color: var(--sg-ink-faint); background: var(--sg-panel-alt); }
+  .card.locked .title { color: var(--sg-ink-soft); }
+  .lock {
+    display: inline-block; margin-top: var(--sg-s2); padding: 2px var(--sg-s2);
+    font-size: var(--sg-fs-xs); line-height: 1.5; color: var(--sg-ink-soft);
+    background: var(--sg-panel-alt); border-radius: 999px;
+  }
+  .empty {
+    grid-column: 1 / -1;
+    padding: var(--sg-s6); text-align: center; font-size: var(--sg-fs-md); color: var(--sg-ink-soft);
+    background: var(--sg-panel-alt); border: 1px dashed var(--sg-line-mid); border-radius: var(--sg-radius);
+  }
+
+  /* 대회서버 QR: 반 QR 과 같은 자리·크기. 학생은 이 QR 로 대회서버에 들어옵니다. */
+  .qr-panel {
+    flex: 0 0 calc(50% - var(--sg-s6));
+    position: sticky; top: var(--sg-s6); align-self: flex-start;
+    background: var(--sg-panel); border: 1px solid var(--sg-line-mid); border-top: 3px solid #D97B4F;
+    border-radius: var(--sg-radius); box-shadow: var(--sg-shadow-sm);
+    padding: var(--sg-s6); text-align: center;
+  }
+  .qr-panel canvas {
+    display: block; margin: 0 auto;
+    width: 100%; max-width: 460px; height: auto;
+    border: 1px solid var(--sg-line); border-radius: var(--sg-radius);
+  }
+  .qr-panel p { margin: var(--sg-s4) 0 0; font-size: var(--sg-fs-lg); font-weight: 700; color: var(--sg-ink-mid); }
+  .qr-panel .qr-change { margin-top: var(--sg-s4); padding-top: var(--sg-s4); border-top: 1px solid var(--sg-line); }
+
+  .toast {
+    position: fixed; left: 50%; bottom: var(--sg-s6); transform: translateX(-50%);
+    max-width: calc(100% - var(--sg-s8));
+    padding: var(--sg-s3) var(--sg-s4); border-radius: var(--sg-radius);
+    background: var(--sg-ink); color: var(--sg-primary-ink);
+    font-size: var(--sg-fs-md); line-height: var(--sg-lh); text-align: center;
+    box-shadow: var(--sg-shadow-lg); z-index: 50;
+  }
+  [hidden] { display: none !important; }
+
+  @media (max-width: 900px) {
+    body { padding: var(--sg-s4); }
+    header { margin-bottom: var(--sg-s4); }
+    .layout { flex-direction: column; min-height: 0; gap: var(--sg-s4); }
+    .main { flex: 1 1 auto; }
+    .qr-panel { flex: 1 1 auto; position: static; width: 100%; padding: var(--sg-s4); }
+  }
+  @media (max-width: 720px) {
+    h1 { font-size: 20px; }
+    .qr-panel canvas { max-width: 320px; }
+  }
+  .copyright {
+    position: fixed; right: var(--sg-s2); bottom: calc(4px + env(safe-area-inset-bottom, 0px)); z-index: 1000;
+    padding: 2px var(--sg-s2); border-radius: var(--sg-radius); background: var(--sg-bg-glass);
+    color: var(--sg-ink-soft); font-size: 11px; line-height: 1.4; text-decoration: none; white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title-row">
+    <h1><span class="cup">🏆</span> 대회서버</h1>
+    <a class="admin-link" id="adminLink" href="admin.html" hidden>제어판</a>
+    <button id="themeToggle" type="button" class="btn" aria-label="화면 밝기 전환"></button>
+  </div>
+  <p class="sub">반과 상관없이 모두 함께 겨루는 곳이에요. 선생님이 연 게임만 들어갈 수 있어요.</p>
+</header>
+
+<p class="notice" id="notice" hidden></p>
+
+<div class="layout">
+  <div class="main">
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <!-- 대회서버 QR: 이 화면의 주소(contest.html)를 그립니다 -->
+  <div class="qr-panel">
+    <canvas id="qrCanvas" width="460" height="460"></canvas>
+    <p>디벗 카메라로 QR 코드를 촬영하세요</p>
+    <p class="qr-change"><a class="btn" href="index.html">반 고르기로 돌아가기</a></p>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script charset="utf-8" src="firebase-config.js"></script>
+<script charset="utf-8" src="data.js"></script>
+<script charset="utf-8" src="qrcode.js"></script>
+<script>
+/* 밝기 전환 버튼: index.html 과 같은 동작(localStorage 'portal_theme') */
+(function () {
+  var btn = document.getElementById("themeToggle");
+  var themeColor = document.querySelector('meta[name="theme-color"]');
+  function current() { return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light"; }
+  function paint() {
+    var dark = current() === "dark";
+    btn.textContent = dark ? "☀️ 밝게" : "🌙 어둡게";
+    if (themeColor) themeColor.setAttribute("content", dark ? "#12180F" : "#F4F6F1");
+  }
+  btn.addEventListener("click", function () {
+    var next = current() === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    try { localStorage.setItem("portal_theme", next); } catch (e) {}
+    paint();
+  });
+  paint();
+})();
+</script>
+<script>
+/* 대회서버 화면
+   반 화면(index.html?c=1-1)과 같은 방식이지만 학급 대신 "대회서버"(data.js 의 CONTEST_CLASS) 하나를 씁니다.
+   - 보이는 자료는 data.js 의 CONTEST_GAMES 뿐입니다(제어판에 등록된 것만).
+   - 잠금은 Firebase portal/classes/contest/<자료> 를 봅니다(제어판의 '대회서버' 버튼).
+   - 자료 링크에는 ?c=contest 를 붙여 게임 안의 잠금 확인도 대회서버 기준으로 합니다. */
+(function () {
+  "use strict";
+
+  var cfg = window.PORTAL_CONFIG;
+  var D = window.PORTAL_DATA;
+  var klass = D.CONTEST_CLASS;
+
+  var notice = document.getElementById("notice");
+  var toast = document.getElementById("toast");
+  var grid = document.getElementById("grid");
+  var toastTimer = null;
+  var games = [];
+  var snapshot = "";
+
+  var standalone = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches)
+                   || window.navigator.standalone === true;
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined) n.textContent = text;
+    return n;
+  }
+  function setNotice(text) {
+    if (text) { notice.textContent = text; notice.hidden = false; }
+    else { notice.hidden = true; }
+  }
+  function showToast(text) {
+    toast.textContent = text;
+    toast.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toast.hidden = true; }, 2600);
+  }
+
+  /* 선생님 기기에서만 '제어판' 버튼(index.html 과 같은 표시) */
+  try {
+    if (localStorage.getItem("portal_teacher") === "1") document.getElementById("adminLink").hidden = false;
+  } catch (e) {}
+
+  /* 대회서버 QR: 반 QR 과 같은 그리기 방식. ?c= 없이 contest.html 만 담아도 대회서버로 들어옵니다. */
+  (function drawQr() {
+    var url = location.origin + location.pathname;
+    try {
+      window.QR.draw(document.getElementById("qrCanvas"), url, { size: 460, margin: 3, dark: "#1B2B20" });
+    } catch (e) {
+      showToast("QR 을 그리지 못했어요. 화면을 새로고침해 주세요.");
+    }
+  })();
+
+  function gameHref(url) {
+    return url + (url.indexOf("?") === -1 ? "?" : "&") + "c=" + klass.id;
+  }
+
+  function card(g) {
+    var node = document.createElement(g.open ? "a" : "div");
+    node.className = g.open ? "card" : "card locked";
+    if (g.open) {
+      node.href = gameHref(g.url);
+      if (!standalone) { node.target = "_blank"; node.rel = "noopener noreferrer"; }
+    } else {
+      node.addEventListener("click", function () {
+        showToast("🔒 " + g.title + " — 선생님이 아직 대회서버에 열지 않았어요.");
+      });
+    }
+    node.appendChild(el("span", "num", String(g.num)));
+    var box = document.createElement("span");
+    box.appendChild(el("p", "title", g.title));
+    if (g.memo) box.appendChild(el("p", "memo", g.memo));
+    if (!g.open) box.appendChild(el("span", "lock", "🔒 선생님이 아직 열지 않았어요"));
+    node.appendChild(box);
+    return node;
+  }
+
+  function render() {
+    grid.innerHTML = "";
+    if (games.length === 0) {
+      grid.appendChild(el("div", "empty", "아직 대회용 게임이 등록되지 않았어요."));
+      return;
+    }
+    /* 열린 게임을 먼저 */
+    games.filter(function (g) { return g.open; })
+      .concat(games.filter(function (g) { return !g.open; }))
+      .forEach(function (g) { grid.appendChild(card(g)); });
+  }
+
+  function readJson(path) {
+    return fetch(cfg.dbPath(path), { cache: "no-store" }).then(function (r) {
+      if (!r.ok) throw new Error(r.status);
+      return r.json();
+    });
+  }
+
+  function load() {
+    if (!cfg.isReady()) {
+      setNotice("설정이 아직 끝나지 않았어요. firebase-config.js 를 먼저 채워 주세요.");
+      render();
+      return;
+    }
+    Promise.all([readJson("games"), readJson("classes/" + klass.id)])
+      .then(function (res) {
+        var opens = res[1] || {};
+        setNotice("");
+        games = D.toList(res[0]).filter(function (g) { return D.classHasGame(klass, g.slug); });
+        games.forEach(function (g, i) {
+          g.num = i + 1;
+          g.open = opens[g.slug] === true;
+        });
+        var next = JSON.stringify(games);
+        if (next !== snapshot) { snapshot = next; render(); }
+      })
+      .catch(function () {
+        setNotice("📡 연결을 확인하는 중이에요. 인터넷이 연결되면 자동으로 최신 상태가 됩니다.");
+        games.forEach(function (g) { g.open = false; });
+        var next = JSON.stringify(games);
+        if (next !== snapshot) { snapshot = next; render(); }
+      });
+  }
+
+  load();
+  setInterval(load, (cfg.POLL_SECONDS || 5) * 1000);
+})();
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", function () {
+    navigator.serviceWorker.register("sw.js").catch(function () {});
+  });
+}
+</script>
+
+<a class="copyright" href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.ko" target="_blank" rel="license noopener"
+   title="저작자를 밝히고, 비영리로, 같은 조건이면 자유롭게 쓸 수 있어요">© 2026 cornsilktea · CC BY-NC-SA 4.0</a>
+</body>
+</html>

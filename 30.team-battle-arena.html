@@ -67,10 +67,12 @@
   .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 14px; font-weight: 800; background: var(--sg-primary-soft); color: var(--sg-primary); }
   .lobbyTop { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 10px 22px; margin-top: 12px; }
   .lobbyTop .hello { justify-content: flex-start; margin: 0; font-size: 16px; min-height: 34px; }
-  .optRows { display: grid; gap: 6px; }
+  .optRows { display: grid; gap: 8px; padding: 10px 12px; border-radius: 8px; background: rgba(0, 0, 0, .38); border: 1px solid rgba(255, 255, 255, .14); }
   .optRow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .optLab { min-width: 62px; font-size: 14px; font-weight: 800; color: var(--sg-ink-mid); }
+  .optLab { min-width: 70px; padding-left: 8px; border-left: 3px solid #D97B4F; font-size: 15px; font-weight: 800; color: #FFFFFF; text-shadow: 0 1px 2px rgba(0, 0, 0, .6); }
+  .optRow .modeBtn:not(.on) { background: rgba(255, 255, 255, .10); border-color: rgba(255, 255, 255, .34); color: #FFFFFF; }
   .optRow .modeBtns { margin-left: 0; }
+  .optRow .modeBtn:disabled:not(.on) { opacity: .75; }
   .danger { border-color: var(--sg-danger); color: var(--sg-danger); }
   .modeBtns { display: inline-flex; gap: 6px; flex-wrap: wrap; margin-left: 6px; }
   .modeBtn.on { background: var(--sg-primary); border-color: var(--sg-primary); color: var(--sg-primary-ink); }
@@ -1157,7 +1159,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function flashHint(t) { hintText = t; hintUntil = Date.now() + 2500; renderLobby(); setTimeout(renderLobby, 2600); }
 
   var MODES = [
-    { id: "pvp", name: "3vs3" },
+    { id: "pvp", name: "일반모드" },
     { id: "cup", name: "대회모드" }
   ];
   var MAP_CHOICES = MAP_IDS.map(function (id) { return { id: id, name: MAPS[id].name }; }).concat([{ id: "random", name: "랜덤" }]);
@@ -3036,12 +3038,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     netWrite(true);
     room.ref.update({ status: "ended", winner: winner, endedAt: t,
       final: { blue: s.blueKills, red: s.redKills, reason: quitTeam ? "상대팀이 모두 나가서 승리" : "시간 종료 — 킬 스코어로 판정" } });
-    if (isFairHumanMatch(room.mode, room.roster, P)) setTimeout(function () { recordClassStats(t); }, STATS_SETTLE_MS);
+    if (isStudentFullTeamMatch(room.mode, room.roster, P)) setTimeout(function () { recordClassStats(t); }, STATS_SETTLE_MS);
   }
 
   var STATS_PATH = "teambattle/stats";
   var STATS_SETTLE_MS = 1500;
-  function isFairHumanMatch(mode, roster, ps) {
+  var isTestLink = !!(window.PORTAL_CLASS && window.PORTAL_CLASS.test);
+  function isStudentFullTeamMatch(mode, roster, ps) {
     if ((mode !== "pvp" && mode !== "cup") || !roster) return false;
     var count = { blue: 0, red: 0 }, ids = keys(roster);
     for (var i = 0; i < ids.length; i++) {
@@ -3050,13 +3053,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (!(r.team in count) || !CHARS[r.c]) return false;
       count[r.team]++;
     }
-    return count.blue >= 1 && count.blue === count.red;
+    return count.blue === 3 && count.red === 3 && !isTestLink;
   }
   function recordClassStats(endedAt) {
     if (!db || !room) return;
     var r = room, ps = P;
     if (r.status !== "ended" || r.endedAt !== endedAt || r.winner == null) return;
-    if (!isFairHumanMatch(r.mode, r.roster, ps)) return;
+    if (!isStudentFullTeamMatch(r.mode, r.roster, ps)) return;
     var rows = keys(r.roster).map(function (id) {
       var e = ent(id) || stateOf(ps[id]);
       return { c: r.roster[id].c, win: r.winner === r.roster[id].team, dmg: +e.dmg || 0, heal: +e.heal || 0,

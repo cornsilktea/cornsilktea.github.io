@@ -22,6 +22,10 @@
      가드가 `window.PORTAL_CLASS`(`{id,grade,cls,label}` 또는 null)를 만들어 주므로 학년·반이 필요한 게임은 이걸 읽는다.
      자료 안에서 다른 자료로 링크할 때는 `location.search` 를 그대로 붙여 반이 유지되게 한다.
      학급 목록(1·2학년 각 5반)은 `data.js` 의 `CLASSES` 한 곳에만 있다.
+   - **대회서버**(2026-09-28): 반 고르기 화면 맨 아래 버튼 → `contest.html`(대회서버 QR·목록). 자료 링크는 `?c=contest`,
+     잠금은 `portal/classes/contest/<자료>`, 제어판에서는 "대회서버" 버튼. 보이는 자료는 `data.js` 의 `CONTEST_GAMES`
+     (현재 turbolap·fpssurvival·teambattle·zombieoutbreak)뿐이고, 반이 섞이므로 반 신기록 없이 세계 신기록만 등록한다.
+     대회용 게임을 늘리거나 빼려면 `CONTEST_GAMES` 한 줄만 고친다.
    - 파일에 `Content-Security-Policy` 가 있으면 `connect-src` 에 Firebase 주소를 허용한다(사용법.md 3절).
 2. **파일 이름은 `<번호>.<영문이름>.html`**, 번호는 저장소 최대 번호 + 1 (`ls` 로 확인). 구분자는 점.
 3. **`초기데이터.json` 의 `portal.games` 에 항목 추가**(title·url·memo·order·open·units·unitsSet).
@@ -89,6 +93,8 @@
   `teambattle/stats/$char` 허용 목록. 규칙을 바꿨으면 선생님께 콘솔에 다시 게시하도록 알린다.
   **캐릭터 순서**(2026-09-27 선생님 결정): 캐릭터 선택창과 제어판 통계표 모두 직업군(전사 → 마법사 → 원거리 딜러 → 암살자)
   안에서 이름 가나다순. 게임 `CHAR_LIST` 는 `CHARS` 에서, 통계표는 `roles` 에서 자동 정렬하므로 순서를 손으로 맞추지 않는다.
+  **통계**(`teambattle/stats`)는 AI 없이 학생 6명이 3대3으로 꽉 찬 경기(일반모드·대회모드)만, 배포용 링크(`?c=test`)는 빼고 집계한다(2026-09-28 결정, `isStudentFullTeamMatch`).
+  게임모드 이름은 "일반모드"(id `pvp`)·"대회모드"(id `cup`).
   캐릭터·스킬 판정을 고친 뒤에는 첫 화면 주소 끝에 `&test` 를 붙여(`30.team-battle-arena.html?c=1-1&test`) 상호작용 검사
   (`30.team-battle-tests.js`, Firebase 에 쓰지 않음)를 돌리고, 새 스킬이 기절·이동·넉백·게이지를 건드리면 검사 항목도 추가한다.
   캐릭터 설명란(`statTable`)의 표는 HP·공격·초당 공격·이동속도·사거리·스킬 6칸으로 고정하고 "효과" 같은 칸을 더하지 않는다.

@@ -160,6 +160,9 @@
        세계·반 신기록은 등록하지 않는다(beats·beatsClass 는 false, prompt 는 바로 null, submit 은 거부). */
     var noRecord = !!(pc && pc.test);
     if (noRecord) pc = null;
+    /* 대회서버(?c=contest)는 여러 반이 섞여 있으므로 반 링크 없이 들어온 것처럼 세계 신기록만 둔다
+       (세계 신기록을 세우면 입력 창에서 고른 학년·반의 반 신기록은 평소처럼 함께 등록된다). */
+    if (pc && pc.contest) pc = null;
     var world = Store(game, key, lower, format);
     var cls = pc ? Store(game, classKey(key, pc), lower, format) : null;
     if (cls) cls.who = function () { return cls.rec ? cls.rec.name : ""; };   /* 반 안에서는 이름만 */

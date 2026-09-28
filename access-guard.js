@@ -110,9 +110,14 @@
     label: classMatch[1] + "학년 " + classMatch[2] + "반"      /* 1학년 1반 */
   } : (/[?&]c=test(?:&|$)/.test(location.search)
     ? { id: "test", grade: 0, cls: 0, label: "배포용", test: true }
+    : /[?&]c=contest(?:&|$)/.test(location.search)
+    ? { id: "contest", grade: 0, cls: 0, label: "대회서버", contest: true }
     : null);
   window.PORTAL_CLASS = klass;
-  var homeHref = klass ? "index.html?c=" + klass.id : "index.html";
+  /* 대회서버(?c=contest)에서 들어온 자료는 반 목록이 아니라 대회서버 화면(contest.html)으로 돌아갑니다 */
+  var homeHref = !klass ? "index.html"
+    : klass.contest ? "contest.html"
+    : "index.html?c=" + klass.id;
 
   /* ---------- 목록으로 돌아가는 버튼 ----------
      학생 기기는 전체화면으로 열려 있어 브라우저 뒤로가기가 없습니다.
