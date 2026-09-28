@@ -668,7 +668,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     lancer:  { name: "창기사", role: "fighter", icon: "🔱", hp: 300, speed: 200, cd: 1200, dmg: 30, range: 200, width: 50, respawnShield: true, ultName: "꿰뚫기", ultAim: true },
     blacksmith: { name: "대장장이", role: "fighter", icon: "🔨", hp: 350, speed: 200, cd: 1250, dmg: 25, range: 180, width: 150, windup: 500, fx: { stunMs: 500 }, ultName: "내려찍기", ultAim: true },
     priest:  { name: "사제", role: "caster", icon: "📖", hp: 120, speed: 240, cd: 1000, dmg: 10, heal: 10, range: 320, width: 200, ultName: "블랙홀", ultAim: true, heals: true },
-    cleric:  { name: "클레릭", role: "caster", icon: "✝️", hp: 120, speed: 240, cd: 1000, dmg: 0, graceHeal: 30, range: 400, noAim: true, healGauge: 500, ultName: "요한계시록", heals: true },
+    cleric:  { name: "클레릭", role: "caster", icon: "✝️", hp: 120, speed: 240, cd: 1000, dmg: 0, graceHeal: 30, range: 400, noAim: true, healGauge: 400, ultName: "요한계시록", heals: true },
     hitman:  { name: "자객", role: "assassin", icon: "🔪", hp: 120, speed: 250, cd: 1250, dmg: 40, range: 100,
                dashRange: 200, dashWidth: 150, dashDmg: 40, dashMs: 300, finishDelay: 125, ultName: "처형", ultAim: true },
     guardian: { name: "수문장", role: "fighter", icon: "🏰", hp: 380, speed: 200, cd: 1250, dmg: 25, range: 140, arc: Math.PI * 130 / 180,
@@ -1363,7 +1363,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "hitman") return "사거리 " + ULT.exRange + "의 칼날 발사. 처음 맞은 적은 " + ULT.exDmg + "의 피해를 입고 " + secs(ULT.exStunMs) + "간 기절, 그 위치로 순간이동";
     if (k === "guardian") return "자신을 중심으로 반경 " + ULT.gdR + "의 적을 모두 " + ULT.gdKb + "만큼 밀어냄";
     if (k === "priest") return "지정한 곳에 " + secs(ULT.bhDelay) + " 뒤 " + secs(ULT.bhDur) + "간 유지되는 반경 " + ULT.bhR + "의 블랙홀 생성. 적은 중심으로 끌려감";
-    if (k === "cleric") return "아군의 체력을 " + CHARS.cleric.healGauge + " 회복시키면 사용 가능. 사용 시 자신의 체력 모두 회복. " + secs(ULT.rvDur) + "간 아군 전체는 1초당 체력 " + ULT.rvHeal + " 회복, 적 전체는 1초당 " + ULT.rvDmg + "의 피해";
+    if (k === "cleric") return "아군의 체력을 " + CHARS.cleric.healGauge + " 회복시키면 사용 가능. 사용 시 자신의 체력을 모두 회복하고 " + secs(ULT.rvDur) + "간 제자리에서 기도. 아군 전체는 1초당 체력 " + ULT.rvHeal + " 회복, 적 전체는 1초당 " + ULT.rvDmg + "의 피해. 기절·넉백·끌어당김을 당하면 취소";
     if (k === "frost") return "자신을 중심으로 " + secs(ULT.frBzDur) + "간 유지되는 반경 " + ULT.frBzR + "의 눈보라 생성. 눈보라에서 아군은 은신 상태가 되고, 적은 1초당 " +
       ULT.frBzDmg + "의 피해를 입고 " + slowPct(ULT.frBzSlowMul);
     if (k === "duelist") return secs(ULT.rmDur) + "간 초당 공격 " + ULT.rmRate + "회, 돌진 거리 " + ULT.rmDashRange + "·돌진 시간 " + secs(ULT.rmDashMs) + "로 단축. 사용 즉시 기본 공격 대기시간 초기화";
@@ -2148,7 +2148,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function hammerLeaping(E, t) { return E.char === "blacksmith" && E.ultUntil > (t || now()); }
   function speedOf(E) {
     var t = now(), c = charStats(E), sp = c.speed;
-    if (stunned(E, t) || lancerWinding(E, t) || hammerWinding(E, t) || hammerLeaping(E, t) || E.dash || shoved(E)) return 0;
+    if (stunned(E, t) || lancerWinding(E, t) || hammerWinding(E, t) || hammerLeaping(E, t) || E.dash || shoved(E) || revelationOn(E, t)) return 0;
     if (E.char === "warrior" && E.buffUntil > t) sp = c.ultSpeed;
     if (E.char === "rogue" && E.stealthUntil > t) sp = c.ultSpeed;
     if (bladeStorm(E, t)) sp = c.ultSpeed;
@@ -2173,7 +2173,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       creditCC(owner, Math.max(0, t + fx.stunMs - Math.max(T.stunUntil || 0, t)), 0, 0);
       noteHurt(T, owner, t);
       T.stunUntil = Math.max(T.stunUntil || 0, t + fx.stunMs); T.pending = null; T.burst = null; T.volley = null; T.slash = null;
-      breakBladeStorm(T, t); }
+      breakBladeStorm(T, t); breakRevelation(T, t); }
     G.forceNet = true;
   }
   function frostStackFx(T) {
@@ -2222,6 +2222,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     E.gauge = Math.min(GAUGE_MAX, E.gauge + E.killGaugeOwed);
     E.killGaugeOwed = 0;
     G.forceNet = true;
+  }
+  function breakRevelation(E, t) {
+    if (!revelationOn(E, t)) return;
+    E.buffUntil = t;
+    E.skillUntil = Math.min(E.skillUntil || 0, t);
+    G.forceNet = true;
+    room.ref.child("effects").push({ type: "revCut", owner: E.id, createdAt: t });
   }
   function breakBladeStorm(E, t) {
     if (!bladeStorm(E, t)) return;
@@ -2483,7 +2490,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (C.rally && !T.rallyUsed && T.hp < T.maxHp * C.rally.hpRate) { T.rallyUsed = true; T.regenUntil = t + C.rally.ms; T.regenNext = t + 1000; }
     }
     pushHit(owner, dm, basic, ultKey, killed, gaugeGain);
-    if (killed) { reportKill(T, owner, t); T.hurtBy = {}; T.helpedBy = {}; }
+    if (killed) { breakRevelation(T, t); reportKill(T, owner, t); T.hurtBy = {}; T.helpedBy = {}; }
     if (T === ME || T.bot) G.forceNet = true;
   }
   function noteHurt(T, owner, t) {
@@ -2660,6 +2667,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (e.type === "storm") { if (now() < e.createdAt + e.delay + e.dur) STORMS.push({ e: e, vis: null }); return; }
     if (e.type === "rev") { if (now() < e.createdAt + e.dur) REVS.push({ e: e, vis: null, ticked: {} }); return; }
     if (e.type === "grace") { onGrace(e); return; }
+    if (e.type === "revCut") { REVS.forEach(function (r) { if (r.e.owner === e.owner && r.e.createdAt <= e.createdAt) r.cut = true; }); return; }
     if (e.type !== "burst" || now() > e.createdAt + e.delay + 1500) return;
     BURSTS.push({ e: e, vis: null });
   }
@@ -2727,6 +2735,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var dx = e.x - T.x, dy = e.y - T.y, d = hyp(dx, dy);
         if (d > e.r + BODY_R * 0.5 || d < 6) return;
         var pull = Math.min(d - 6, ULT.bhPull * dt);
+        breakRevelation(T, t);
         T.x += dx / d * pull; T.y += dy / d * pull;
         resolve(T);
         creditHolePull(T, e.owner, t, dt);
@@ -2817,7 +2826,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function stepRevs(t) {
     REVS = REVS.filter(function (r) {
       var e = r.e;
-      if (t >= e.createdAt + e.dur) { dropRevVis(r); return false; }
+      if (r.cut || t >= e.createdAt + e.dur) { dropRevVis(r); return false; }
       if (t < e.createdAt || room.status !== "playing") return true;
       var tick = revTickIndex(e, t);
       localTargets().forEach(function (T) {
@@ -2938,7 +2947,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var dd = hyp(dx, dy) || 1, kbAt = now(), shoveEnd = T.shove ? T.shove.at + ULT.gdKbMs : 0;
       if (!T.minion) { creditCC(d.owner, Math.max(0, kbAt + ULT.gdKbMs - Math.max(T.stunUntil || 0, shoveEnd, kbAt)), 0, 0); noteHurt(T, d.owner, kbAt); }
       T.shove = { ux: dx / dd, uy: dy / dd, dist: d.kb, at: now(), done: 0 };
-      breakBladeStorm(T, kbAt);
+      breakBladeStorm(T, kbAt); breakRevelation(T, kbAt);
     }
   }
   var SHOVE_SUBSTEP = BODY_R / 2;
@@ -4366,6 +4375,21 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     g.visible = false;
     return g;
   }
+  var clericRangeFillMat = new THREE.MeshBasicMaterial({ color: 0xFFF3C4, transparent: true, opacity: 0.05, depthWrite: false });
+  var clericRangeEdgeMat = new THREE.MeshBasicMaterial({ color: 0xFFF3C4, transparent: true, opacity: 0.35, depthWrite: false });
+  var clericRange = (function () {
+    var g = new THREE.Group();
+    var fill = flatMesh(GEO.disc, clericRangeFillMat); fill.position.y = 1.1; g.add(fill);
+    var edge = flatMesh(new THREE.RingGeometry(0.985, 1, 72), clericRangeEdgeMat); edge.position.y = 1.3; g.add(edge);
+    g.scale.set(CHARS.cleric.range, 1, CHARS.cleric.range);
+    g.visible = false;
+    scene.add(g);
+    return g;
+  })();
+  function renderClericRange() {
+    clericRange.visible = !!(ME && ME.alive && ME.char === "cleric");
+    if (clericRange.visible) clericRange.position.set(ME.x, 0, ME.y);
+  }
   function revelationOn(E, t) { return E.char === "cleric" && E.buffUntil > t; }
   function renderClericHalo(v, E, t, nowMs) {
     var on = E.alive && revelationOn(E, t), ud = v.halo.userData;
@@ -4519,6 +4543,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (E.char === "ranger" && E.ultUntil > t) showClip(v, "Ranged_Bow_Release", 4.5, true);
       else if (bladeStorm(E, t)) showClip(v, "Melee_2H_Attack_Spinning", 1.2, true);
       else if (v.once) { showClip(v, v.once.name, v.once.ts, false, v.once.fresh); v.once.fresh = false; }
+      else if (revelationOn(E, t)) showClip(v, "Ranged_Magic_Spellcasting", 1, true);
       else if (E.char === "knight" && E.buffUntil > t) showClip(v, "Melee_Blocking", 1, true);
       else if (E.mv && v.speed > 150) showClip(v, "Running_A", clamp(v.speed / 260, 0.7, 1.6), true);
       else if (E.mv && v.speed > 15) showClip(v, "Walking_A", clamp(v.speed / 110, 0.6, 1.4), true);
@@ -5181,7 +5206,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     keys(VIS).forEach(dropVis); keys(PRV).forEach(dropProjVis); keys(MLV).forEach(dropMelee);
     keys(MVIS).forEach(function (id) { dropMinionVis(id, false); });
     FX.forEach(dropFxMesh);
-    BURSTS.forEach(dropBurstVis); POOLS.forEach(dropPoolVis); LUNGES.forEach(dropLungeVis); HOLES.forEach(dropHoleVis); STORMS.forEach(dropStormVis); REVS.forEach(dropRevVis); GRACES.forEach(dropGraceVis);
+    BURSTS.forEach(dropBurstVis); POOLS.forEach(dropPoolVis); LUNGES.forEach(dropLungeVis); HOLES.forEach(dropHoleVis); STORMS.forEach(dropStormVis); REVS.forEach(dropRevVis); GRACES.forEach(dropGraceVis); clericRange.visible = false;
     aimGrp.visible = false; CAM.snap = true;
     STUCK_BOLTS = [];
   }
@@ -5543,6 +5568,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     HOLES.forEach(function (h) { renderHole(h, t, nowMs); });
     STORMS.forEach(function (s) { renderStorm(s, t, dt); });
     REVS.forEach(function (r) { renderRev(r, t, nowMs); });
+    renderClericRange();
     renderGraces(t, nowMs);
 
     stepFx(nowMs);

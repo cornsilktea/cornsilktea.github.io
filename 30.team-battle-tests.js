@@ -1331,16 +1331,17 @@ function collectResults(api) {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "체력 비율이 가장 낮은 아군만 " + api.CHARS.cleric.graceHeal + " 회복, 자신·먼 아군·보호 중 아군 제외");
   });
   run(CLERIC, "게이지: 아군을 " + api.CHARS.cleric.healGauge + " 회복시켜야 가득 차고, 넘친 회복(체력이 가득 찬 부분)은 세지 않는가", function (done) {
-    var W = clericTeam(), cl = W.ent("cl"), kn = W.ent("kn"), heal = api.CHARS.cleric.graceHeal, got = [];
+    var W = clericTeam(), cl = W.ent("cl"), kn = W.ent("kn"), heal = api.CHARS.cleric.graceHeal, need = api.CHARS.cleric.healGauge, got = [];
+    var n = Math.ceil(need / heal) - 1;
     kn.hp = 10; kn.maxHp = 1e6;
-    for (var i = 0; i < 16; i++) clericSwing(W);
-    got.push(Math.round(cl.gauge * 10) / 10);
-    clericSwing(W); got.push(Math.round(cl.gauge * 10) / 10);
+    for (var i = 0; i < n; i++) clericSwing(W);
+    got.push(Math.round(cl.gauge * 100) / 100);
+    clericSwing(W); got.push(Math.round(cl.gauge * 100) / 100);
     cl.gauge = 0; kn.maxHp = api.CHARS.knight.hp; kn.hp = kn.maxHp - 6; W.ent("rg").hp = W.ent("rg").maxHp;
     clericSwing(W); got.push(Math.round(cl.gauge * 100) / 100);
-    var want0 = Math.round(16 * heal * api.GAUGE_MAX / api.CHARS.cleric.healGauge * 10) / 10, want2 = Math.round(6 * api.GAUGE_MAX / api.CHARS.cleric.healGauge * 100) / 100;
+    var want0 = Math.round(n * heal * api.GAUGE_MAX / need * 100) / 100, want2 = Math.round(6 * api.GAUGE_MAX / need * 100) / 100;
     var ok = got[0] === want0 && got[1] === api.GAUGE_MAX && got[2] === want2;
-    done(ok ? "pass" : "fail", "16번 회복(" + 16 * heal + ") → " + got[0] + ", 17번째 → " + got[1] + ", 6만 회복 → " + got[2] + " (기대 " + want0 + "·" + api.GAUGE_MAX + "·" + want2 + ")");
+    done(ok ? "pass" : "fail", n + "번 회복(" + n * heal + ") → " + got[0] + ", " + (n + 1) + "번째 → " + got[1] + ", 6만 회복 → " + got[2] + " (기대 " + want0 + "·" + api.GAUGE_MAX + "·" + want2 + ")");
   });
   run(CLERIC, "요한계시록: " + api.ULT.rvDur / 1000 + "초간 아군은 1초당 " + api.ULT.rvHeal + " 회복, 적은 1초당 " + api.ULT.rvDmg + " 피해를 사용 순간·1초·2초에 3번 받고 거리와 상관없으며, 클레릭은 사용 순간 체력이 모두 차는가", function (done) {
     var W = clericTeam(), cl = W.ent("cl"), kn = W.ent("kn"), foe = W.ent("foe"), foe2 = W.ent("foe2"), bad = [], times = [];
@@ -1374,6 +1375,41 @@ function collectResults(api) {
     if (rg.hp !== 50 + api.ULT.rvHeal * 3) bad.push("보통 아군 회복 " + (rg.hp - 50));
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "보호 중·쓰러진 대상은 그대로, 보통 아군은 " + api.ULT.rvHeal * 3 + " 회복");
   });
+
+  run(CLERIC, "요한계시록: 사용 중에는 움직일 수 없고, 끝나면 다시 움직이는가", function (done) {
+    var W = clericTeam(), cl = W.ent("cl"), bad = [];
+    cl.gauge = api.GAUGE_MAX;
+    api.useUlt(cl, 0);
+    W.frame(FRAME);
+    if (api.speedOf(cl) !== 0) bad.push("사용 중 이동속도 " + api.speedOf(cl));
+    W.step(api.ULT.rvDur + 100);
+    if (api.speedOf(cl) !== api.CHARS.cleric.speed) bad.push("끝난 뒤 이동속도 " + api.speedOf(cl));
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "사용 중 이동속도 0, 끝나면 " + api.CHARS.cleric.speed);
+  });
+  function clericCutBy(label, hurt) {
+    run(CLERIC, "요한계시록: " + label + " 그 순간 취소되어 남은 피해·회복이 들어가지 않고 다시 움직이는가", function (done) {
+      var W = clericTeam(), cl = W.ent("cl"), foe = W.ent("foe"), bad = [];
+      foe.hp = foe.maxHp = 1000;
+      cl.gauge = api.GAUGE_MAX;
+      api.useUlt(cl, 0);
+      W.step(300);
+      var afterFirst = foe.hp;
+      hurt(W, cl);
+      W.step(api.ULT.rvDur);
+      if (afterFirst !== 1000 - api.ULT.rvDmg) bad.push("첫 틱 피해 " + (1000 - afterFirst));
+      if (foe.hp !== afterFirst) bad.push("취소 뒤에도 피해 " + (afterFirst - foe.hp));
+      if (api.revs().length) bad.push("스킬 효과가 남음");
+      if (cl.alive && api.speedOf(cl) === 0) bad.push("취소 뒤에도 못 움직임");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "첫 틱 " + api.ULT.rvDmg + " 뒤 취소, 이후 피해 없음");
+    });
+  }
+  clericCutBy("기절하면", function (W, cl) { api.afflict(cl, { stunMs: 300 }, "foe"); });
+  clericCutBy("밀려나면(수문장 창벽)", function (W, cl) {
+    var gd = W.ent("foe2"); gd.char = "guardian"; gd.x = cl.x + 60; gd.y = cl.y;
+    api.onMelee("kbtest", { team: "red", owner: "foe2", x: gd.x, y: gd.y, angle: Math.PI, radius: api.ULT.gdR, arc: Math.PI * 2, dmg: 0, u: 1, slam: 1, kb: api.ULT.gdKb, createdAt: W.t() });
+    W.step(api.ULT.gdKbMs + 50);
+  });
+  clericCutBy("쓰러지면", function (W, cl) { api.damage(cl, 9999, "foe", false, null); });
 
   api.MAP_IDS.forEach(function (m, i) {
     var seed = 1000 + i * 17;
