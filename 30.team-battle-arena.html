@@ -311,7 +311,16 @@
   .board td { padding: 6px 4px; font-weight: 800; color: #EEF2EE; border-bottom: 1px solid rgba(255,255,255,.08); font-variant-numeric: tabular-nums; }
   .board td.nm, .board th.nm { text-align: left; }
   .board td.sc { color: #F2D06B; }
-  .board td.nm small { margin-left: 4px; font-size: 12px; color: #A3B0A6; }
+  .board td.job { text-align: left; font-size: 12px; color: #A3B0A6; }
+  .board tr.teamSplit td { border-top: 3px solid rgba(255,255,255,.75); }
+  .scoreHelp { width: 18px; height: 18px; margin-left: 4px; padding: 0; border-radius: 50%; border: 1px solid rgba(255,255,255,.45); background: rgba(255,255,255,.1);
+    color: #EEF2EE; font: 800 11px/16px var(--sg-font); vertical-align: middle; cursor: pointer; }
+  .scoreHelpBox { max-width: 460px; }
+  .scoreHelpBox table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  .scoreHelpBox td { padding: 6px 4px; border-bottom: 1px solid rgba(255,255,255,.1); }
+  .scoreHelpBox td:last-child { text-align: right; font-weight: 800; color: #F2D06B; white-space: nowrap; }
+  .scoreHelpBox td.minus { color: #FF9A92; }
+  .scoreHelpBox ul { margin: 12px 0 0 18px; font-size: 13px; line-height: 1.6; color: #A3B0A6; }
   .board tr.mine td { background: rgba(242,208,107,.14); }
   .board .dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: middle; }
   #countOv { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; pointer-events: none; }
@@ -339,7 +348,6 @@
   .mvpBox .mvpName .b { color: #6FA8FF; }
   .mvpBox .mvpName .r { color: #FF7A70; }
   .mvpBox .mvpNone { font-size: 20px; font-weight: 800; color: #A3B0A6; margin-top: 2px; }
-  .mvpBox .mvpRule { font-size: 12px; color: #A3B0A6; margin-top: 6px; }
 
   #btnLeaveDraft { display: block; margin: 0 auto; }
   .swapBtn { display: block; margin: 0 auto 12px; border-color: #D97B4F; color: #FFB38A; }
@@ -582,8 +590,8 @@
     <div class="endBox">
       <div id="endTitle"></div>
       <div id="endReason" hidden></div>
-      <div class="scoreRow"><div class="sb">블루팀 킬<b id="endBlue">0</b></div><div class="sr">레드팀 킬<b id="endRed">0</b></div></div>
-      <div class="boardWrap"><table class="board"><thead><tr><th>팀</th><th class="nm">닉네임</th><th>처치</th><th>쓰러짐</th><th>어시스트</th><th>입힌 피해</th><th>회복</th><th>막은 피해</th><th>기절</th><th>둔화</th><th>환산점수</th></tr></thead><tbody id="boardBody"></tbody></table></div>
+      <div class="scoreRow"><div class="sb">블루팀<b id="endBlue">0</b></div><div class="sr">레드팀<b id="endRed">0</b></div></div>
+      <div class="boardWrap"><table class="board"><thead><tr><th>팀</th><th class="nm">닉네임</th><th class="nm">직업</th><th>처치</th><th>쓰러짐</th><th>어시스트</th><th>입힌 피해</th><th>회복</th><th>막은 피해</th><th>기절</th><th>둔화</th><th>환산점수<button id="btnScoreHelp" class="scoreHelp" type="button" aria-label="환산점수 계산식">?</button></th></tr></thead><tbody id="boardBody"></tbody></table></div>
       <div class="endBtns"><button id="btnAgain" class="primary" type="button">다시하기</button><button id="btnLeaveEnd" type="button">방 나가기</button></div>
       <div id="endMvp" class="mvpBox"></div>
     </div>
@@ -606,11 +614,19 @@
   </div>
 </div>
 
+<div id="scoreHelpModal" class="modal" hidden>
+  <div class="modalBox scoreHelpBox">
+    <h3>환산점수 계산식</h3>
+    <div id="scoreHelpBody"></div>
+    <button id="btnScoreHelpClose" class="mini cancel" type="button">닫기</button>
+  </div>
+</div>
+
 <div id="nickModal" class="modal" hidden>
   <div class="modalBox">
     <h3>닉네임을 입력해주세요</h3>
     <div class="row">
-      <input id="nickInput" maxlength="6" placeholder="최대 6자" autocomplete="off">
+      <input id="nickInput" maxlength="3" placeholder="최대 3자" autocomplete="off">
       <button id="btnNickSave" class="primary" type="button">저장</button>
     </div>
     <div id="nickMsg" class="msg"></div>
@@ -901,7 +917,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
 
   var nick = "";
-  try { nick = localStorage.getItem("tba_nickname") || ""; } catch (e) { nick = ""; }
+  var NICK_MAX = 3;
+  try { nick = (localStorage.getItem("tba_nickname") || "").slice(0, NICK_MAX); } catch (e) { nick = ""; }
   var nickRequired = false;
   function openNick(required) {
     nickRequired = required;
@@ -912,7 +929,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     setTimeout(function () { try { $("nickInput").focus(); } catch (e) {} }, 50);
   }
   function saveNick() {
-    var v = $("nickInput").value.replace(/\s+/g, " ").trim().slice(0, 6);
+    var v = $("nickInput").value.replace(/\s+/g, " ").trim().slice(0, NICK_MAX);
     if (!v) { setText($("nickMsg"), "닉네임을 입력해 주세요."); return; }
     nick = v;
     try { localStorage.setItem("tba_nickname", v); } catch (e) {}
@@ -3511,14 +3528,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     specResultHeld = false; setText($("btnAgain"), "다시하기"); show($("endOv"), false);
     if (room && room.status === "lobby") { showScreen("lobby"); playersChanged(); }
   }
-  function againOrBackToLobby() { if (specResultHeld) releaseSpecResult(); else restart(); }
+  function againOrBackToLobby() { show($("scoreHelpModal"), false); if (specResultHeld) releaseSpecResult(); else restart(); }
   $("btnAgain").onclick = againOrBackToLobby;
   var KEY_ON = { up: false, down: false, left: false, right: false, atk: false };
   var KEY_MAP = { KeyW: "up", KeyS: "down", KeyA: "left", KeyD: "right", KeyK: "atk",
                   ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right" };
   function keyName(e) { return KEY_MAP[e.code] || KEY_MAP[e.key] || null; }
   window.addEventListener("keydown", function (e) {
-    if ((e.code === "Space" || e.key === " ") && room && (room.status === "ended" || specResultHeld) && screenNow === "game") { e.preventDefault(); againOrBackToLobby(); return; }
+    if (!$("scoreHelpModal").hidden && (e.code === "Space" || e.key === " " || e.key === "Escape")) { e.preventDefault(); show($("scoreHelpModal"), false); return; }
+    if ((e.code === "Space"|| e.key === " ") && room && (room.status === "ended" || specResultHeld) && screenNow === "game") { e.preventDefault(); againOrBackToLobby(); return; }
     if (screenNow !== "game" || (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName))) return;
     var k = keyName(e);
     if (k) { KEY_ON[k] = true; e.preventDefault(); audio(); return; }
@@ -5467,14 +5485,16 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
 
   function boardRows() {
-    var rows = "";
+    var rows = "", redStarted = false;
     ["blue", "red"].forEach(function (team) {
       participants().filter(function (id) { return P[id].team === team; })
         .sort(function (a, b) { return (P[a].slot || 0) - (P[b].slot || 0); })
         .forEach(function (id) {
           var E = ent(id), d = P[id]; if (!E) return;
-          rows += '<tr class="' + (id === myId ? "mine" : "") + '"><td><span class="dot" style="background:' + (team === "blue" ? "#2F6FD6" : "#D6453D") + '"></span></td>' +
-            '<td class="nm">' + (d.isAI ? "🤖 " : "") + esc(d.nickname) + "<small>" + CHARS[E.char].name + "</small></td>" +
+          var rowClass = (id === myId ? "mine" : "") + (team === "red" && !redStarted ? " teamSplit" : "");
+          if (team === "red") redStarted = true;
+          rows += '<tr class="' + rowClass + '"><td><span class="dot" style="background:' + (team === "blue" ? "#2F6FD6" : "#D6453D") + '"></span></td>' +
+            '<td class="nm">' + (d.isAI ? "🤖 " : "") + esc(d.nickname) + '</td><td class="job">' + CHARS[E.char].name + "</td>" +
             "<td>" + E.kills + "</td><td>" + E.deaths + "</td><td>" + (E.assists || 0) + "</td><td>" + Math.round(E.dmg) + "</td>" +
             "<td>" + (CHARS[E.char].heals ? Math.round(E.heal) : "-") + "</td>" +
             "<td>" + (CHARS[E.char].blocks ? Math.round(E.blocked || 0) : "-") + "</td>" +
@@ -5498,15 +5518,29 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (!best.length || row.score > best[0].score || (row.score === best[0].score && row.dmg > best[0].dmg)) best = [row];
       else if (row.score === best[0].score && row.dmg === best[0].dmg) best.push(row);
     });
-    var rule = '<div class="mvpRule">환산점수 = 처치×100 + 어시스트×' + MVP_ASSIST + ' + 입힌 피해 + 회복 + 막은 피해 + 기절 1초×' + MVP_STUN_PER_SEC +
-               ' + 둔화 1초×둔화율×' + MVP_SLOW_PER_SEC + ' − 쓰러짐×100 (처치·어시스트가 하나도 없으면 제외)<br>기절·둔화는 이미 걸린 효과와 겹치지 않고 새로 늘어난 시간만 셉니다. 블랙홀에 끌려간 시간은 ' + Math.round(ULT.bhCcRate * 100) + '% 둔화로 셉니다.</div>';
-    if (!best.length) return '<div class="mvpLab">MVP</div><div class="mvpNone">MVP 없음</div>' + rule;
+    if (!best.length) return '<div class="mvpLab">MVP</div><div class="mvpNone">MVP 없음</div>';
     return '<div class="mvpLab">🏆 MVP' + (best.length > 1 ? " (공동)" : "") + "</div>" + best.map(function (b) {
       var d = P[b.id] || {};
       return '<div class="mvpName"><span class="' + (b.E.team === "blue" ? "b" : "r") + '">' + (d.isAI ? "🤖 " : "") + esc(d.nickname || b.E.nickname) + "</span><small>" +
              CHARS[b.E.char].name + " · " + b.score + "점</small></div>";
-    }).join("") + rule;
+    }).join("");
   }
+  function scoreHelpHtml() {
+    var items = [
+      ["처치 1번", "+100"], ["어시스트 1번", "+" + MVP_ASSIST], ["입힌 피해 1", "+1"], ["회복 1", "+1"], ["막은 피해 1", "+1"],
+      ["기절 1초", "+" + MVP_STUN_PER_SEC], ["둔화 1초 × 둔화율", "+" + MVP_SLOW_PER_SEC], ["쓰러짐 1번", "−100"]
+    ];
+    return "<table>" + items.map(function (item) {
+      return "<tr><td>" + item[0] + '</td><td class="' + (item[1].charAt(0) === "−" ? "minus" : "") + '">' + item[1] + "</td></tr>";
+    }).join("") + "</table><ul>" +
+      "<li>둔화는 둔화율을 곱합니다. 예) 50% 둔화 2초 = 2 × 0.5 × " + MVP_SLOW_PER_SEC + " = " + MVP_SLOW_PER_SEC + "점</li>" +
+      "<li>기절·둔화는 이미 걸린 효과와 겹치지 않고 새로 늘어난 시간만 셉니다</li>" +
+      "<li>블랙홀에 끌려간 시간은 " + Math.round(ULT.bhCcRate * 100) + "% 둔화로 셉니다</li>" +
+      "<li>MVP는 환산점수가 가장 높은 사람이고, 처치·어시스트가 하나도 없으면 MVP에서 제외합니다</li></ul>";
+  }
+  $("btnScoreHelp").onclick = function () { setHtml($("scoreHelpBody"), scoreHelpHtml()); show($("scoreHelpModal"), true); };
+  $("btnScoreHelpClose").onclick = function () { show($("scoreHelpModal"), false); };
+  $("scoreHelpModal").onclick = function (e) { if (e.target === $("scoreHelpModal")) show($("scoreHelpModal"), false); };
   var hudMeShown = { k: -1, d: -1, a: -1, dmg: -1 };
   function popHudNum(id, value, shown) {
     var el = $(id);
@@ -5590,7 +5624,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       setText($("endRed"), String(f.red != null ? f.red : s.redKills));
       setHtml($("boardBody"), boardRows());
       setHtml($("endMvp"), mvpHtml());
-    } else show($("endOv"), false);
+    } else { show($("endOv"), false); show($("scoreHelpModal"), false); }
   }
 
   var lastFrame = Date.now();
