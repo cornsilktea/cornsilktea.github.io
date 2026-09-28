@@ -350,7 +350,11 @@
   .mvpBox .mvpNone { font-size: 20px; font-weight: 800; color: #A3B0A6; margin-top: 2px; }
 
   #btnLeaveDraft { display: block; margin: 0 auto; }
-  .swapBtn { display: block; margin: 0 auto 12px; border-color: #D97B4F; color: #FFB38A; }
+  .startRow { display: flex; gap: 10px; }
+  .startRow .big { margin-bottom: 12px; }
+  .startRow #btnStart { flex: 3 1 0; min-width: 0; }
+  .startRow .swapBtn { flex: 1 1 0; min-width: 0; background: #B8352E; border-color: #D6453D; color: #fff; }
+  .startRow .swapBtn:hover { background: #C9433B; }
   .dfHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .dfTitle { font-size: 24px; font-weight: 800; color: #F4F1E8; }
   .dfMap { margin-left: auto; text-align: right; font-size: 24px; font-weight: 800; line-height: 1.1; color: #F2D06B; white-space: nowrap; }
@@ -508,7 +512,6 @@
     </div>
 
     <div id="teamCard" class="card">
-      <button id="btnSwapTeams" class="mini swapBtn" type="button" hidden>⇄ 팀 전환 (블루 ↔ 레드)</button>
       <div class="teams">
         <div class="team blue"><h3>블루팀 <button id="btnJoinBlue" class="join" type="button">이동하기</button></h3><div id="listBlue"></div></div>
         <div class="team red"><h3>레드팀 <button id="btnJoinRed" class="join" type="button">이동하기</button></h3><div id="listRed"></div></div>
@@ -520,7 +523,7 @@
     </div>
 
     <div class="card">
-      <button id="btnStart" class="big primary" type="button" hidden>게임 시작</button>
+      <div class="startRow"><button id="btnStart" class="big primary" type="button" hidden>게임 시작</button><button id="btnSwapTeams" class="big swapBtn" type="button" hidden>팀 전환</button></div>
       <div id="startHint" class="startHint"></div>
     </div>
 
@@ -1479,7 +1482,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     show($("charCardBox"), cup || !imSpec);
     if (!cup && imSpec) setCharZoom(false);
     setText($("charHint"), cup ? "대회모드에서는 게임 시작 후 캐릭터를 골라요. 카드를 누르면 자세한 설명이 나옵니다." : "선택한 캐릭터를 한 번 더 누르면 자세한 설명이 나옵니다.");
-    show($("btnSwapTeams"), cup && isHost() && room.status === "lobby");
+    show($("btnSwapTeams"), isHost() && room.status === "lobby");
 
     setHtmlKeepScroll($("chars"), cardsHtml(me, cup)); fitCardHeight(); fitCharCol($("charCardBox"));
 
@@ -1488,7 +1491,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     else {
       if (nb < 1 || nr < 1) hint = "양 팀에 1명 이상 있어야 시작할 수 있어요.";
       else { ok = true; hint = nb !== nr ? "인원이 달라요 (블루 " + nb + " vs 레드 " + nr + ") — 그래도 시작할 수 있어요." : "블루 " + nb + " vs 레드 " + nr; }
-      if (cup) hint = "🏆 대회모드: 캐릭터는 게임 시작 후 순서대로 골라요 (블루1 → 레드1·2 → 블루2·3 → 레드3). " + hint;
     }
     if (!cup) ["blue", "red"].forEach(function (team) {
       teamIds(team).forEach(function (id) {
@@ -1612,7 +1614,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   $("btnSpec").onclick = function () { pickTeam("spec"); };
   var SWAPPED_TEAM = { blue: "red", red: "blue" };
   $("btnSwapTeams").onclick = function () {
-    if (!isHost() || room.status !== "lobby" || room.mode !== "cup") return;
+    if (!isHost() || room.status !== "lobby") return;
     room.ref.child("players").transaction(function (ps) {
       if (!ps) return ps;
       keys(ps).forEach(function (id) { if (ps[id] && SWAPPED_TEAM[ps[id].team]) ps[id].team = SWAPPED_TEAM[ps[id].team]; });
@@ -2892,7 +2894,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (!zone) return null;
     var c = domainCenter(zone), reach = domainRadius(zone.e, t) + BODY_R * 0.5, best = null, bd = Infinity;
     participants().map(ent).concat(allMinions().filter(function (m) { return minionReady(m, t); })).forEach(function (o) {
-      if (!o || !o.alive || o.team === E.team || protectedNow(o, t) || hyp(o.x - c.x, o.y - c.y) > reach) return;
+      if (!o || !o.alive || o.team === E.team || protectedNow(o, t) || hyp(o.x - c.x, o.y - c.y) > reach || (!o.minion && !visibleTo(o, E, t))) return;
       var d = hyp(o.x - E.x, o.y - E.y);
       if (d < bd) { bd = d; best = o; }
     });
