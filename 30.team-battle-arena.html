@@ -3498,7 +3498,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     arenaGroup.clear();
     BUSH_VIS.forEach(function (bv) { bv.mats.forEach(function (m) { m.dispose(); }); });
     BUSH_VIS = [];
-    MILL_BLADES = [];
+    MILL_BLADES = []; SCENERY.group = null;
   }
   var builtArena = "";
   function buildArena() {
@@ -3765,6 +3765,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     return { w: TILE * 0.98, h: 26 + seeded() * 16, d: TILE * 0.62, x: tileX(c), z: tileY(r), yaw: yaw };
   }
   var MILL_BLADES = [], MILL_SPIN = 0.7;
+  var SCENERY = { group: null, droppedForFps: false };
+  function sceneryWanted() { return !TOUR_LOW_END && !SCENERY.droppedForFps; }
+  function dropSceneryForFps() {
+    if (!SCENERY.group || SCENERY.droppedForFps) return false;
+    SCENERY.droppedForFps = true; SCENERY.group.visible = false; MILL_BLADES = [];
+    return true;
+  }
   function spinMillBlades(dt) { MILL_BLADES.forEach(function (b) { b.rotation.z += dt * MILL_SPIN; }); }
   function uniformProp(tpl, h, x, z, yaw) {
     var size = propSize(tpl).getSize(new THREE.Vector3()), k = h / size.y;
@@ -3781,6 +3788,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     bushProps(th);
     // TODO: 들꽃 에셋이 생기면 교체 — 지금은 풀 덤불(tuft)을 더 촘촘히 뿌리고 바닥에 꽃 색 점을 찍어 대신함
     tuftProps(0.6);
+    if (!sceneryWanted()) return;
+    g = SCENERY.group = new THREE.Group(); arenaGroup.add(g);
     var turf = [];
     for (var z = -150; z <= MH + 150; z += 100) {
       [-60, -160, MW + 60, MW + 160].forEach(function (x) {
@@ -5002,6 +5011,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var fps = QA.frames * 1000 / QA.acc;
     QA.acc = 0; QA.frames = 0;
     QA.slow = fps < 45 ? QA.slow + 1 : 0;
+    if (QA.slow >= 3 && dropSceneryForFps()) { QA.slow = 0; return; }
     if (QA.slow >= 3 && PIX > PIX_MIN) {
       QA.slow = 0; PIX = Math.max(PIX_MIN, PIX - 0.25);
       renderer.setPixelRatio(PIX); renderer.setSize(W, H, false);
