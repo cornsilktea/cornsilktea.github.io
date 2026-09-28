@@ -752,7 +752,7 @@ function collectResults(api) {
         for (var i = logStart; i < W.log.length; i++) { var p = W.log[i]; if (p.v.tp) teleported[p.path.split("/")[1]] = 1; }
         list.forEach(function (e) {
           var E = W.ent(e.id), P0 = prev[e.id];
-          prev[e.id] = { x: E.x, y: E.y, alive: E.alive, leap: !!E.leap, stunned: api.stunned(E, t - ms) };
+          prev[e.id] = { x: E.x, y: E.y, alive: E.alive, leap: !!E.leap, dash: !!E.dash, stunned: api.stunned(E, t - ms) };
           if (!isFinite(E.x) || !isFinite(E.y) || !isFinite(E.hp) || !isFinite(E.gauge)) { flag("숫자 아님(NaN)", E, t); return; }
           if (E.hp < 0 || E.hp > E.maxHp) flag("체력 범위 이탈", E, t, "hp " + E.hp);
           if (E.gauge < 0 || E.gauge > api.GAUGE_MAX) flag("게이지 범위 이탈", E, t, "gauge " + E.gauge);
@@ -765,7 +765,7 @@ function collectResults(api) {
           if (!P0 || !P0.alive) return;
           var jump = hyp(E.x - P0.x, E.y - P0.y);
           if (!E.leap && !P0.leap && !teleported[e.id] && jump > 0.5 && segmentCrossesWall(P0.x, P0.y, E.x, E.y)) flag("벽 통과", E, t, Math.round(jump) + "만큼 이동");
-          if (P0.stunned && api.stunned(E, t) && jump > 0.5 && !E.shove && !E.dash && !E.leap && !P0.leap && !teleported[e.id] && !holeActive(t)) flag("기절 중 이동", E, t, Math.round(jump) + "만큼");
+          if (P0.stunned && api.stunned(E, t) && jump > 0.5 && !E.shove && !E.dash && !P0.dash && !E.leap && !P0.leap && !teleported[e.id] && !holeActive(t)) flag("기절 중 이동", E, t, Math.round(jump) + "만큼");
         });
       }
       var ults = W.log.filter(function (p) { return (p.path === "meleeHits" && p.v.u) || (p.path === "effects" && p.v.u !== 0 && p.v.type !== "pool") || (p.path === "shots" && p.v.s); }).length;
