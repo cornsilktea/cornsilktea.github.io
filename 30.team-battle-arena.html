@@ -668,7 +668,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     lancer:  { name: "창기사", role: "fighter", icon: "🔱", hp: 300, speed: 200, cd: 1200, dmg: 30, range: 200, width: 50, respawnShield: true, ultName: "꿰뚫기", ultAim: true },
     blacksmith: { name: "대장장이", role: "fighter", icon: "🔨", hp: 350, speed: 200, cd: 1250, dmg: 25, range: 180, width: 150, windup: 500, fx: { stunMs: 500 }, ultName: "내려찍기", ultAim: true },
     priest:  { name: "사제", role: "caster", icon: "📖", hp: 120, speed: 240, cd: 1000, dmg: 10, heal: 10, range: 320, width: 200, ultName: "블랙홀", ultAim: true, heals: true },
-    cleric:  { name: "클레릭", role: "caster", icon: "✝️", hp: 120, speed: 240, cd: 1000, dmg: 10, graceHeal: 30, range: 400, noAim: true, healGauge: 500, ultName: "요한계시록", heals: true },
+    cleric:  { name: "클레릭", role: "caster", icon: "✝️", hp: 120, speed: 240, cd: 1000, dmg: 0, graceHeal: 30, range: 400, noAim: true, healGauge: 500, ultName: "요한계시록", heals: true },
     hitman:  { name: "자객", role: "assassin", icon: "🔪", hp: 120, speed: 250, cd: 1250, dmg: 40, range: 100,
                dashRange: 200, dashWidth: 150, dashDmg: 40, dashMs: 300, finishDelay: 125, ultName: "처형", ultAim: true },
     guardian: { name: "수문장", role: "fighter", icon: "🏰", hp: 380, speed: 200, cd: 1250, dmg: 25, range: 140, arc: Math.PI * 130 / 180,
@@ -1363,7 +1363,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "hitman") return "사거리 " + ULT.exRange + "의 칼날 발사. 처음 맞은 적은 " + ULT.exDmg + "의 피해를 입고 " + secs(ULT.exStunMs) + "간 기절, 그 위치로 순간이동";
     if (k === "guardian") return "자신을 중심으로 반경 " + ULT.gdR + "의 적을 모두 " + ULT.gdKb + "만큼 밀어냄";
     if (k === "priest") return "지정한 곳에 " + secs(ULT.bhDelay) + " 뒤 " + secs(ULT.bhDur) + "간 유지되는 반경 " + ULT.bhR + "의 블랙홀 생성. 적은 중심으로 끌려감";
-    if (k === "cleric") return "아군의 체력을 " + CHARS.cleric.healGauge + " 회복시키면 사용 가능. " + secs(ULT.rvDur) + "간 아군 전체는 1초당 체력 " + ULT.rvHeal + " 회복, 적 전체는 1초당 " + ULT.rvDmg + "의 피해";
+    if (k === "cleric") return "아군의 체력을 " + CHARS.cleric.healGauge + " 회복시키면 사용 가능. 사용 시 자신의 체력 모두 회복. " + secs(ULT.rvDur) + "간 아군 전체는 1초당 체력 " + ULT.rvHeal + " 회복, 적 전체는 1초당 " + ULT.rvDmg + "의 피해";
     if (k === "frost") return "자신을 중심으로 " + secs(ULT.frBzDur) + "간 유지되는 반경 " + ULT.frBzR + "의 눈보라 생성. 눈보라에서 아군은 은신 상태가 되고, 적은 1초당 " +
       ULT.frBzDmg + "의 피해를 입고 " + slowPct(ULT.frBzSlowMul);
     if (k === "duelist") return secs(ULT.rmDur) + "간 초당 공격 " + ULT.rmRate + "회, 돌진 거리 " + ULT.rmDashRange + "·돌진 시간 " + secs(ULT.rmDashMs) + "로 단축. 사용 즉시 기본 공격 대기시간 초기화";
@@ -1380,7 +1380,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "necro") return "체력이 " + c.lastStandHp + " 미만으로 떨어지면 체력 " + c.lastStandHp + "을 남기고 " + secs(c.lastStandHideMs) + "간 은신. 죽을 때마다 한 번";
     if (k === "guardian") return "기본 공격에 맞은 적은 " + secs(c.fx.slowMs) + "간 " + slowPct(c.fx.slowMul);
     if (k === "priest") return "기본 공격에 맞은 아군은 체력 " + c.heal + " 회복";
-    if (k === "cleric") return "기본 공격은 조준 없이 반경 " + c.range + " 안에서 체력이 가장 낮은 아군의 체력 " + c.graceHeal + " 회복";
+    if (k === "cleric") return "기본 공격은 조준 없이 반경 " + c.range + " 안에서 체력 비율이 가장 낮은 아군의 체력 " + c.graceHeal + " 회복";
     if (k === "mage") return "기본 공격·스킬에 맞은 적은 " + secs(c.burn.ms) + "간 불타며 1초당 " + c.burn.perSec + "의 피해를 입고 회복 " + healCutPct() + " 감소";
     if (k === "thrower") return "기본 공격·스킬 지역 위의 적은 회복 " + healCutPct() + " 감소";
     if (k === "knight") return "받는 모든 피해가 1회마다 " + c.armor + " 감소";
@@ -1403,7 +1403,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var c = CHARS[k], rage = k === "warrior";
     function pair(a, b) { return b == null ? String(a) : a + " / " + b; }
     var times = c.shots || c.hits || c.ticks || 1, hit = num(c.dmg) + (times > 1 ? "*" + times : "");
-    var dmg = c.dashDmg ? num(c.dashDmg) + "(" + num(c.dmg) + ")"
+    var dmg = !c.dmg ? "-" : c.dashDmg ? num(c.dashDmg) + "(" + num(c.dmg) + ")"
             : k === "dancer" ? num(c.dmg) + "+" + num(ULT.bdDmg)
             : pair(hit, c.throwDmg || (rage ? Math.round(c.dmg * ULT.bzDmgMul) : null)) + (c.heal ? "(" + c.heal + ")" : "");
     var rate = pair(num(1000 / c.cd), rage ? num(1000 / (c.cd * ULT.bzCdMul)) : k === "duelist" ? ULT.rmRate : null) + "회";
@@ -2780,8 +2780,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     participants().forEach(function (id) {
       var A = ent(id);
       if (!A || id === E.id || A.team !== E.team || !A.alive || protectedNow(A, t) || hyp(A.x - E.x, A.y - E.y) > reach) return;
-      var hurt = A.hp < A.maxHp, bestHurt = best && best.hp < best.maxHp;
-      if (!best || (hurt && !bestHurt) || (hurt === bestHurt && A.hp < best.hp)) best = A;
+      if (!best || A.hp / A.maxHp < best.hp / best.maxHp) best = A;
     });
     return best;
   }
@@ -3222,6 +3221,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       E.buffUntil = t + ULT.rvDur;
       E.skillDur = ULT.rvDur;
       E.pending = null;
+      var fullHeal = E.maxHp - E.hp;
+      if (fullHeal > 0) { E.hp = E.maxHp; E.heal = (E.heal || 0) + fullHeal; if (E === ME) sfx("heal"); }
       room.ref.child("effects").push({ type: "rev", team: E.team, owner: E.id, dur: ULT.rvDur, tick: ULT.rvTick, heal: ULT.rvHeal, dmg: ULT.rvDmg, createdAt: t });
       revealBriefly(E.id, t);
     } else if (E.char === "duelist") {
