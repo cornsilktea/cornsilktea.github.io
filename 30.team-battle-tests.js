@@ -564,6 +564,35 @@ function collectResults(api) {
     done(after < before - 100 && after < api.ULT.smFollow + 40 ? "pass" : "fail", "가장 먼 해골과의 거리 " + Math.round(before) + " → " + Math.round(after));
   });
 
+  run(PASSIVE, "네크로 해골: 해골의 공격은 누구의 게이지도 채우지 않고, 해골에게 입힌 피해는 피해량에 안 들어가며 기본 공격 게이지는 오르는가", function (done) {
+    var y = OPEN_Y.forest;
+    var W = world("forest", [
+      { id: "nc", team: "blue", char: "necro", x: 250, y: y, gauge: api.GAUGE_MAX },
+      { id: "wr", team: "red", char: "warrior", x: 330, y: y, angle: Math.PI }
+    ]);
+    var nc = W.ent("nc"), wr = W.ent("wr"), bad = [];
+    api.useUlt(nc, 0);
+    nc.x = 150;
+    W.step(api.ULT.smRiseMs + 100);
+    if (!nc.minions || !nc.minions.length) { done("fail", "시험 준비 실패: 해골이 소환되지 않음"); return; }
+    var ncGauge = nc.gauge, wrHp = wr.hp;
+    wr.gauge = 0; wr.cdUntil = Infinity;
+    W.step(1500);
+    if (wr.hp >= wrHp) bad.push("해골이 광전사를 못 때림");
+    if (wr.gauge !== 0) bad.push("해골에게 맞은 광전사 게이지 " + wr.gauge);
+    if (nc.gauge !== ncGauge) bad.push("해골이 때렸는데 네크로 게이지 " + ncGauge + " → " + nc.gauge);
+    var M = nc.minions.filter(function (m) { return m.alive; })[0];
+    if (!M) { done("fail", "시험 준비 실패: 살아 있는 해골 없음"); return; }
+    var mHp = M.hp;
+    wr.hp = wr.maxHp; wr.gauge = 0; wr.dmg = 0;
+    api.damage(M, 5, "wr", W.t(), null, null);
+    W.step(50);
+    if (M.hp !== mHp - 5) bad.push("해골 체력 " + mHp + " → " + M.hp);
+    if (wr.dmg !== 0) bad.push("해골에게 준 피해가 피해량에 " + wr.dmg + " 들어감");
+    if (wr.gauge !== api.roleGauge("warrior")) bad.push("해골을 친 광전사 게이지 " + wr.gauge + " (기대 " + api.roleGauge("warrior") + ")");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "해골 공격: 광전사·네크로 게이지 그대로 / 해골 타격: 피해량 0, 게이지 +" + api.roleGauge("warrior"));
+  });
+
   var FROST = "얼음술사·은신";
   function frostDuel() {
     var y = OPEN_Y.forest;
