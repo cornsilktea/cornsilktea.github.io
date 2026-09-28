@@ -1017,7 +1017,7 @@ function showGuide(src, caption) {
 
 /* ---------------- 게임 통계 ----------------
    30번(3v3 팀 배틀)은 AI 없이 학생 6명이 3대3으로 꽉 채운 경기(일반모드·대회모드, 배포용 링크 제외)가 끝날 때마다 방장 기기가
-   teambattle/modestats/<모드> 에 게임 수(matches, 모든 직업 공통)와 직업별 누적치(선택 수·승리 수·평균 피해·평균 회복·
+   teambattle/modestats/<모드> 에 경기 수(matches)와 직업별 게임 수(games, 그 직업을 고를 수 있던 경기 수)와 직업별 누적치(선택 수·승리 수·평균 피해·평균 회복·
    평균 막은 피해·평균 기절/둔화 시간)를 갱신합니다. 일반모드는 같은 캐릭터를 여러 명이 고를 수 있고 대회모드는 안 되므로
    선택률 성격이 달라 모드별로 따로 모읍니다(예전 teambattle/stats 는 두 모드가 섞여 있어 더 이상 보여 주지 않음).
    막은 피해·기절·둔화는 나중에 추가돼서 그 뒤 경기 수(ccPicks)로, 어시스트는 그보다 더 나중이라 asPicks 로 따로 평균을 냅니다.
@@ -1097,9 +1097,11 @@ async function showStats(g) {
       s = await r.json();
     } catch (e) { msg.textContent = "통계를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요."; return; }
     s = s || {};
-    /* 한 판이 끝나면 모든 직업의 게임 수가 1 오른다(= 모드의 경기 수). 선택 수는 그 판에 고른 6명의 직업만 오른다 */
+    /* 한 판이 끝나면 그때 게임에 있던(고를 수 있던) 직업만 게임 수(games)가 1 오른다. 선택 수는 그 판에 고른 6명의 직업만 오른다.
+       새 직업은 추가된 뒤의 경기만 세므로 없던 시절 경기 때문에 선택률이 0% 로 깎이지 않는다.
+       games 가 생기기 전 기록은 그때 있던 직업이 모든 경기에 있었다고 보고 경기 수로 대신한다(첫 저장 때 게임 쪽도 같은 값으로 채움) */
     const matches = s.matches || 0;
-    msg.textContent = "집계된 경기(학생 3대3만) " + matches + "판 = 모든 직업의 게임 수";
+    msg.textContent = "집계된 경기(학생 3대3만) " + matches + "판 · 게임 수는 그 직업을 고를 수 있던 경기만 셈";
     /* 진영 유불리(대회모드는 블루가 먼저 고르는 드래프트). 무승부는 어느 쪽 승리에도 안 셈 */
     const draws = Math.max(0, matches - (s.red || 0) - (s.blue || 0));
     box.appendChild(el("p", "msg", "진영 승률: 레드 " + pct(s.red || 0, matches) +
@@ -1114,7 +1116,7 @@ async function showStats(g) {
     }
     const table = el("table");
     const head = el("tr");
-    ["직업", "선택률 (선택 수 / 게임 수)", "승률 (승리 수 / 선택 수)", "평균 어시스트", "평균 피해량", "평균 회복량", "평균 막은 피해", "평균 기절", "평균 둔화"].forEach((t) => head.appendChild(el("th", null, t)));
+    ["직업", "선택률 (선택 수 / 고를 수 있던 게임 수)", "승률 (승리 수 / 선택 수)", "평균 어시스트", "평균 피해량", "평균 회복량", "평균 막은 피해", "평균 기절", "평균 둔화"].forEach((t) => head.appendChild(el("th", null, t)));
     table.appendChild(head);
     /* 직업군 순서 → 이름 가나다순(게임 캐릭터 선택창과 같은 순서). 직업군이 바뀔 때마다 구분 줄을 넣는다 */
     const groups = meta.groups || [];
@@ -1132,9 +1134,10 @@ async function showStats(g) {
         table.appendChild(gtr);
       }
       const d = s[role.id] || {}, picks = d.picks || 0, wins = d.wins || 0;
+      const games = d.games != null ? d.games : (s[role.id] ? matches : 0);
       const tr = el("tr");
       tr.appendChild(el("td", null, role.name));
-      tr.appendChild(rateCell(picks, matches));
+      tr.appendChild(rateCell(picks, games));
       tr.appendChild(rateCell(wins, picks));
       /* 어시스트는 나중에 추가돼서 그 뒤 경기 수(asPicks)로 따로 평균을 낸다 */
       const asPicks = d.asPicks || 0;
