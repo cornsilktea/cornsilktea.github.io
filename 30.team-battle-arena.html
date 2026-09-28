@@ -669,7 +669,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function charsInRole(r) { return CHAR_LIST.filter(function (c) { return CHARS[c].role === r; }); }
   var ULT = { mkCount: 10, mkGap: 115, mkDmg: 40, mkRefund: 1, mkSpeed: 805, mkRange: KEY * 8, mkPr: 8,
               bzDur: 4000, bzDmgMul: 1.5, bzCdMul: 1 / 1.5, bzHeal: 20, tkDur: 5000, tkDef: 0.3, tkStunR: 100, tkStunMs: 1000,
-              mbDelay: 700, mbR: 150, mbDmg: 90, mbCast: 550, mbMin: 60, mbStunMs: 1000,
+              mbDelay: 1000, mbR: 200, mbDmg: 120, mbDmgMin: 40, mbCast: 550, mbMin: 60, mbStunMs: 1200, mbStunMin: 400, mbSteps: 5,
               asSmokeMs: 400, asDur: 15000,
               smCount: 2, smAhead: KEY * 1, smSide: 38, smHp: 50, smSpeed: 200, smDmg: 10, smCd: 800, smRange: 80, smArc: Math.PI * 0.6,
               smDur: 8000, smMax: 4, smFollow: KEY * 1.5, smRiseMs: 1100, smCorpseMs: 1400,
@@ -1312,7 +1312,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "warrior") return secs(ULT.bzDur) + "간 공격력·공격속도 " + num(ULT.bzDmgMul) + "배, " + speedUp(CHARS.warrior) + ". 기본 공격 적중 시 체력 " + ULT.bzHeal + " 회복";
     if (k === "knight") return secs(ULT.tkDur) + "간 받는 피해 " + num(ULT.tkDef) + "배. 끝날 때 반경 " + ULT.tkStunR + "의 적은 " + secs(ULT.tkStunMs) + "간 기절";
     if (k === "ranger") return ULT.mkDmg + "의 피해를 주는 화살 " + ULT.mkCount + "발 연사. 적중마다 게이지 " + ULT.mkRefund + " 회복";
-    if (k === "mage") return "지정한 곳에 반경 " + ULT.mbR + "의 폭발. 적은 " + ULT.mbDmg + "의 피해를 입고 " + secs(ULT.mbStunMs) + "간 기절";
+    if (k === "mage") return "지정한 곳에 " + secs(ULT.mbDelay) + " 뒤 반경 " + ULT.mbR + "의 폭발. 적은 가운데일수록 강하게 " + ULT.mbDmgMin + "~" + ULT.mbDmg + "의 피해를 입고 " +
+      num(ULT.mbStunMin / 1000) + "~" + secs(ULT.mbStunMs) + "간 기절";
     if (k === "rogue") return secs(ULT.asDur) + "간 은신 상태가 되고 " + speedUp(CHARS.rogue) + ". 공격 시 해제";
     if (k === "necro") return secs(ULT.smDur) + "간 유지되는 해골 병사 " + ULT.smCount + "마리 소환(최대 " + ULT.smMax + "마리). 해골은 체력 " + ULT.smHp + ", 공격 " + ULT.smDmg;
     if (k === "sniper") return "사거리 " + ULT.pnRange + "의 거대한 화살 발사. 적은 " + ULT.pnDmg + "의 피해, 적중 시 게이지 " + ULT.pnRefund + " 회복";
@@ -2619,17 +2620,20 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (hear(E)) sfx("swing");
     return flightMs;
   }
+  function meteorHitAt(dist, r) {
+    var step = Math.min(ULT.mbSteps - 1, Math.floor(dist / (r + BODY_R) * ULT.mbSteps)), fall = step / (ULT.mbSteps - 1);
+    return { dmg: Math.round(ULT.mbDmg - (ULT.mbDmg - ULT.mbDmgMin) * fall), stunMs: Math.round(ULT.mbStunMs - (ULT.mbStunMs - ULT.mbStunMin) * fall) };
+  }
   function stepBursts(t) {
     BURSTS = BURSTS.filter(function (b) {
       var e = b.e;
       if (t < e.createdAt + e.delay) return true;
       if (room.status === "playing") localTargets().forEach(function (T) {
         if (!T.alive || hyp(T.x - e.x, T.y - e.y) > e.r + BODY_R) return;
-        if (T.team !== e.team) damage(T, e.dmg, e.owner, false, e.createdAt, { stunMs: ULT.mbStunMs });
+        if (T.team !== e.team) { var hit = meteorHitAt(hyp(T.x - e.x, T.y - e.y), e.r); damage(T, hit.dmg, e.owner, false, e.createdAt, { stunMs: hit.stunMs }); }
       });
       boom(e.x, e.y, e.r, e.team);
-      smoke(e.x, e.y, 0x8A6A52);
-      spark(e.x, e.y, "#FFB45A", 2.2);
+      if (PIX >= PIX_START) { smoke(e.x, e.y, 0x8A6A52); spark(e.x, e.y, "#FFB45A", 2.2); }
       if (!ME || hyp(e.x - ME.x, e.y - ME.y) < 700) sfx("boom");
       dropBurstVis(b);
       return false;
@@ -4286,6 +4290,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   GEO.meteorTail = new THREE.ConeGeometry(1, 1, 8, 1, true);
   GEO.meteorTail.translate(0, 0.5, 0);
   function placeMeteor(vis, k, nowMs) {
+    vis.userData.meteor.visible = PIX >= PIX_START;
+    if (!vis.userData.meteor.visible) return;
     var fall = k * k, lift = METEOR_TOP * (1 - fall) + METEOR_R;
     vis.userData.meteor.position.set(METEOR_DIR.x / METEOR_DIR.y * (lift - METEOR_R), lift, METEOR_DIR.z / METEOR_DIR.y * (lift - METEOR_R));
     vis.userData.rock.rotation.set(nowMs / 170, nowMs / 230, 0);
@@ -5338,7 +5344,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       obstacles: function () { return { walls: OBST, water: WATER }; },
       loadMapData: loadMapData, makeEnt: makeEnt, resolve: resolve, stepWorld: stepWorld,
       useUlt: useUlt, fireBasic: fireBasic, damage: damage, afflict: afflict, speedOf: speedOf, stunned: stunned,
-      onShot: onShot, onMelee: onMelee, potionFlightMs: potionFlightMs, onEffect: onEffect, onHit: onHit,
+      onShot: onShot, onMelee: onMelee, potionFlightMs: potionFlightMs, meteorHitAt: meteorHitAt, onEffect: onEffect, onHit: onHit,
       multiKillCount: multiKillCount, MULTI_KILL_MS: MULTI_KILL_MS,
       hiddenFrom: hiddenFrom, visibleTo: visibleTo, storms: function () { return STORMS; }, stormCenter: stormCenter,
       bushTiles: function () { return BUSH.map(function (b) { return b.tiles.map(function (tl) { return { x: tileX(tl[0]), y: tileY(tl[1]) }; }); }); },
