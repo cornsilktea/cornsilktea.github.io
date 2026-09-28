@@ -638,7 +638,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var NET_MS = 143;
   var CHARS = {
     warrior: { name: "광전사", role: "fighter", icon: "🪓", hp: 270, speed: 220, ultSpeed: 300, cd: 1000, dmg: 30, range: 110, arc: Math.PI * 0.55, ultName: "광폭화", heals: true },
-    duelist: { name: "결투가", role: "fighter", icon: "🤺", hp: 220, speed: 250, cd: 1000, dmg: 30, range: 150,
+    duelist: { name: "결투가", role: "fighter", icon: "🤺", hp: 220, speed: 250, cd: 1000, dmg: 30, range: 100,
                dashRange: 250, dashMs: 500, stab: true, selfHeal: 10, ultName: "르미즈", heals: true },
     knight:  { name: "기사", role: "fighter", icon: "🛡️", hp: 400, speed: 200, cd: 1250, dmg: 25, range: 110, arc: Math.PI * 0.7, ultName: "방어태세", blocks: true },
     ranger:  { name: "궁수", role: "shooter", icon: "🏹", hp: 100, speed: 200, haste: { add: 10, ms: 3000, max: 40 }, cd: 667, dmg: 15, range: 450, pSpeed: 532, pr: 12, shots: 2, gap: 70, ultName: "난사", ultAim: true },
@@ -2656,7 +2656,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return o && o.alive && o.team !== E.team && visibleTo(o, E) && hyp(o.x - E.x, o.y - E.y) <= reach;
     });
   }
-  var MELEE_SPARK = { warrior: "#FF9A3C", knight: "#FFFFFF", duelist: "#FFFFFF", rogue: "#DCE3EC", necro: "#C9A6FF", lancer: "#FFD27A", blacksmith: "#FFB45A", priest: "#C9A6FF", hitman: "#FF4A5A", guardian: "#8FD9A8" };
+  var MELEE_SPARK = { warrior: "#FF9A3C", knight: "#FFFFFF", duelist: "#FF3B3B", rogue: "#DCE3EC", necro: "#C9A6FF", lancer: "#FFD27A", blacksmith: "#FFB45A", priest: "#C9A6FF", hitman: "#FF4A5A", guardian: "#8FD9A8" };
   var HEAL_SPARK = "#7CFFB2";
   function inArc(T, d) {
     var dx = T.x - d.x, dy = T.y - d.y;
@@ -4101,6 +4101,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (E.char === "duelist") { v.aura = new THREE.Mesh(GEO.aura, riposteAuraMat); v.aura.visible = false; root.add(v.aura); }
     if (E.char === "knight") { v.shield = makeShieldAura(); root.add(v.shield); }
     if (E.char === "dancer") { v.bladeRing = makeBladeRing(); root.add(v.bladeRing); }
+    if (E.char === "duelist" && v.kit) v.stabHand = body.getObjectByName("handslotr");
     (parent || scene).add(root);
     return v;
   }
@@ -4315,21 +4316,36 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var PROJ_Y = 42, BOW_BLEND = 140;
   var WAVE = { priest: { life: 540, travel: 380 }, hitman: { life: CHARS.hitman.dashMs + 160, travel: CHARS.hitman.dashMs } };
   var MELEE_COLOR = { warrior: 0xFF9A3C, knight: 0xFFFFFF, rogue: 0xC9D6E6, necro: 0xB07CFF, lancer: 0xFFD27A, blacksmith: 0xFFB45A, priest: 0x7CFFB2, hitman: 0xFF4A5A, guardian: 0x8FD9A8, duelist: 0xFFFFFF };
-  var STAB_VIS_MS = 450;
+  var STAB_VIS_MS = 320, STAB_CHEST_Y = 40;
+  GEO.stabLine = new THREE.BoxGeometry(1, 1, 1);
   function makeStabVis(d) {
-    var g = new THREE.Group(), R = d.radius + BODY_R;
-    var fillM = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.14, depthWrite: false });
-    var edgeM = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.8, depthWrite: false, blending: THREE.AdditiveBlending });
-    var fill = flatMesh(sectorGeo(R, Math.PI * 2), fillM), rim = flatMesh(GEO.stabRim, edgeM);
-    rim.scale.setScalar(R); fill.position.y = 2; rim.position.y = 2.4;
-    g.add(fill); g.add(rim);
-    if (d.len) { var line = flatMesh(GEO.strip, edgeM); line.scale.set(d.len + BODY_R, d.width, 1); line.position.y = 24; g.add(line); }
-    g.position.set(d.x, 0, d.y); g.rotation.y = -d.angle;
-    g.userData = { fill: fillM, edge: edgeM, stab: true };
+    var g = new THREE.Group();
+    var coreM = new THREE.MeshBasicMaterial({ color: 0xFF2A2A, transparent: true, opacity: 0.95, depthTest: false, depthWrite: false });
+    var glowM = new THREE.MeshBasicMaterial({ color: 0xFF3B3B, transparent: true, opacity: 0.35, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending });
+    var core = new THREE.Mesh(GEO.stabLine, coreM), glow = new THREE.Mesh(GEO.stabLine, glowM);
+    core.scale.set(1, 3, 3); glow.scale.set(1, 9, 9);
+    core.renderOrder = glow.renderOrder = 5;
+    g.add(glow); g.add(core);
+    g.visible = false;
+    g.userData = { fill: glowM, edge: coreM, stab: true, core: core, glow: glow };
     scene.add(g);
     return g;
   }
-  GEO.stabRim = new THREE.RingGeometry(0.97, 1, 48);
+  var stabFrom = new THREE.Vector3(), stabTo = new THREE.Vector3(), stabDir = new THREE.Vector3(), STAB_AXIS = new THREE.Vector3(1, 0, 0);
+  function placeStabLine(g, d, f) {
+    var A = VIS[d.owner], B = VIS[d.tgt] || MVIS[d.tgt];
+    g.visible = !!(d.tgt && A && B && A.root.visible && B.root.visible);
+    if (!g.visible) return;
+    if (A.stabHand) A.stabHand.getWorldPosition(stabFrom); else stabFrom.set(A.root.position.x, STAB_CHEST_Y, A.root.position.z);
+    stabTo.set(B.root.position.x, STAB_CHEST_Y, B.root.position.z);
+    stabDir.subVectors(stabTo, stabFrom);
+    var len = stabDir.length(); if (len < 1) { g.visible = false; return; }
+    g.position.copy(stabFrom).addScaledVector(stabDir, 0.5);
+    g.quaternion.setFromUnitVectors(STAB_AXIS, stabDir.divideScalar(len));
+    g.userData.core.scale.x = g.userData.glow.scale.x = len;
+    g.userData.edge.opacity = 0.95 * (1 - f * f);
+    g.userData.fill.opacity = 0.35 * (1 - f);
+  }
   function makeMeleeVis(d) {
     if (d.stab) return makeStabVis(d);
     var g = new THREE.Group(), who = P[d.owner] ? P[d.owner].characterType : "", col = d.u ? 0xFF6A3D : (MELEE_COLOR[who] || 0xFFFFFF);
@@ -5079,7 +5095,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (age > life) { if (g) dropMelee(k); return; }
       if (!g) g = MLV[k] = makeMeleeVis(m.d);
       var f = age / life;
-      if (g.userData.stab) { g.userData.fill.opacity = 0.14 * (1 - f); g.userData.edge.opacity = 0.8 * (1 - f * f); return; }
+      if (g.userData.stab) { placeStabLine(g, m.d, f); return; }
       g.userData.fill.opacity = 0.2 * (1 - f);
       g.userData.edge.opacity = 0.9 * (1 - (wave ? f * f : f));
       if (wave) {
