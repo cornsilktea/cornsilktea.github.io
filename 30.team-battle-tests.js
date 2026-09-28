@@ -1246,29 +1246,55 @@ function collectResults(api) {
     var ok = lost.every(function (v) { return v === api.CHARS.crossbow.dmg; });
     done(ok ? "pass" : "fail", "세 적이 잃은 체력 " + lost.join("·") + " (기대 " + api.CHARS.crossbow.dmg + "씩)");
   });
-  run(ASSIST, "석궁사수 패시브: 처치·어시스트마다 강해지고 " + api.CHARS.crossbow.grow.max + "회에서 멈추는가", function (done) {
+  run(ASSIST, "석궁사수 패시브: 처치 " + api.CHARS.crossbow.grow.perKill + "스택·어시스트 " + api.CHARS.crossbow.grow.perAssist + "스택씩 강해지고 " + api.CHARS.crossbow.grow.max + "스택에서 멈추는가", function (done) {
     var y = OPEN_Y.forest, c = api.CHARS.crossbow, g = c.grow;
     var W = world("forest", [
       { id: "cb", team: "blue", char: "crossbow", x: 150, y: y },
       { id: "ally", team: "blue", char: "knight", x: 150, y: y + 300 },
       { id: "foe", team: "red", char: "knight", x: 450, y: y + 500 },
-      { id: "dummy", team: "red", char: "ranger", x: 150 + c.range + g.range * g.max - 40, y: y }
+      { id: "foe2", team: "red", char: "guardian", x: 650, y: y + 500 },
+      { id: "dummy", team: "red", char: "ranger", x: 150 + c.range + 150, y: y }
     ]);
     var cb = W.ent("cb"), bad = [];
     api.damage(W.ent("foe"), 30, "cb", false, null);
     api.damage(W.ent("foe"), 9999, "ally", false, null);
     W.step(100);
+    var s1 = g.perAssist;
     if (cb.assists !== 1) bad.push("어시스트 " + cb.assists);
-    if (cb.maxHp !== c.hp + g.hp || cb.hp !== c.hp + g.hp) bad.push("1회 뒤 체력 " + cb.hp + "/" + cb.maxHp);
-    if (api.speedOf(cb) !== c.speed + g.speed) bad.push("1회 뒤 이동속도 " + api.speedOf(cb));
+    if (cb.maxHp !== c.hp + g.hp * s1 || cb.hp !== c.hp + g.hp * s1) bad.push("어시스트 뒤 체력 " + cb.hp + "/" + cb.maxHp);
+    if (api.speedOf(cb) !== c.speed + g.speed * s1) bad.push("어시스트 뒤 이동속도 " + api.speedOf(cb));
+    api.damage(W.ent("foe2"), 9999, "cb", false, null);
+    W.step(100);
+    var s2 = s1 + g.perKill;
+    if (cb.maxHp !== c.hp + g.hp * s2 || cb.hp !== c.hp + g.hp * s2) bad.push("처치 뒤 체력 " + cb.hp + "/" + cb.maxHp + " (기대 " + (c.hp + g.hp * s2) + ")");
     cb.kills = 30;
     api.fireBasic(cb, 0);
     if (cb.cdDur !== c.cd - g.cd * g.max) bad.push("최대 뒤 공격 대기시간 " + cb.cdDur);
     if (api.speedOf(cb) !== c.speed + g.speed * g.max) bad.push("최대 뒤 이동속도 " + api.speedOf(cb));
     W.step(1500);
     var dummy = W.ent("dummy"), lost = dummy.maxHp - dummy.hp, wantDmg = c.dmg + g.dmg * g.max;
-    if (lost !== Math.min(dummy.maxHp, wantDmg)) bad.push("최대 뒤 먼 적(사거리 끝 근처)에게 준 피해 " + lost + " (기대 " + wantDmg + ")");
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "1회: 체력 " + (c.hp + g.hp) + "·이동속도 " + (c.speed + g.speed) + " / " + g.max + "회: 대기시간 " + (c.cd - g.cd * g.max) + "ms·피해 " + wantDmg + "·사거리 " + (c.range + g.range * g.max));
+    if (lost !== Math.min(dummy.maxHp, wantDmg)) bad.push("최대 뒤 기본 사거리 밖 적에게 준 피해 " + lost + " (기대 " + wantDmg + ")");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "어시스트 1 → 체력 " + (c.hp + g.hp * s1) + ", 처치 1 더 → 체력 " + (c.hp + g.hp * s2) + " / " + g.max + "스택: 대기시간 " + (c.cd - g.cd * g.max) + "ms·피해 " + wantDmg + "·사거리 " + (c.range + g.range * g.max));
+  });
+  run(ASSIST, "해로운 효과 어시스트: 기절이나 둔화만 건 사람도 " + AMS / 1000 + "초 안에 적이 쓰러지면 어시스트를 받는가", function (done) {
+    var y = OPEN_Y.forest;
+    var W = world("forest", [
+      { id: "stunner", team: "blue", char: "knight", x: 200, y: y },
+      { id: "slower", team: "blue", char: "guardian", x: 300, y: y },
+      { id: "late", team: "blue", char: "priest", x: 400, y: y },
+      { id: "killer", team: "blue", char: "sniper", x: 500, y: y },
+      { id: "foe", team: "red", char: "ranger", x: 650, y: y + 400 }
+    ]);
+    var foe = W.ent("foe");
+    api.afflict(foe, { slowMs: 1000, slowMul: 0.7 }, "late");
+    W.step(AMS + 500);
+    api.afflict(foe, { stunMs: 500 }, "stunner");
+    api.afflict(foe, { slowMs: 1000, slowMul: 0.7 }, "slower");
+    W.step(1000);
+    api.damage(foe, 9999, "killer", false, null);
+    W.step(100);
+    var got = ["stunner", "slower", "late"].map(function (id) { return W.ent(id).assists || 0; });
+    done(got.join() === "1,1,0" ? "pass" : "fail", "기절 " + got[0] + " · 둔화 " + got[1] + " · " + AMS / 1000 + "초 넘은 둔화 " + got[2] + " (기대 1·1·0)");
   });
 
   api.MAP_IDS.forEach(function (m, i) {
