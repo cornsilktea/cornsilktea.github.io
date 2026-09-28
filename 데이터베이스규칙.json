@@ -20,7 +20,7 @@
           "red": { ".validate": "newData.isNumber() && newData.val() >= 0" },
           "blue": { ".validate": "newData.isNumber() && newData.val() >= 0" },
           "$char": {
-            ".validate": "$char.matches(/^(warrior|knight|ranger|mage|rogue|necro|sniper|thrower|lancer|blacksmith|priest|hitman|guardian|frost|dancer|duelist)$/) && newData.hasChildren(['picks', 'wins', 'dmg', 'heal']) && newData.child('wins').val() <= newData.child('picks').val() && ((!data.exists() && newData.child('picks').val() <= ($mode === 'cup' ? 1 : 6)) || (data.exists() && newData.child('picks').val() >= data.child('picks').val() && newData.child('picks').val() <= data.child('picks').val() + ($mode === 'cup' ? 1 : 6)))",
+            ".validate": "$char.matches(/^(warrior|knight|ranger|mage|rogue|necro|sniper|thrower|lancer|blacksmith|priest|hitman|guardian|frost|dancer|duelist|crossbow)$/) && newData.hasChildren(['picks', 'wins', 'dmg', 'heal']) && newData.child('wins').val() <= newData.child('picks').val() && ((!data.exists() && newData.child('picks').val() <= ($mode === 'cup' ? 1 : 6)) || (data.exists() && newData.child('picks').val() >= data.child('picks').val() && newData.child('picks').val() <= data.child('picks').val() + ($mode === 'cup' ? 1 : 6)))",
             "picks": { ".validate": "newData.isNumber() && newData.val() >= 0" },
             "wins": { ".validate": "newData.isNumber() && newData.val() >= 0" },
             "dmg": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5000" },
@@ -28,6 +28,8 @@
             "block": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5000" },
             "stun": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 600" },
             "slow": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 600" },
+            "assist": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100" },
+            "asPicks": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= newData.parent().child('picks').val()" },
             "ccPicks": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= newData.parent().child('picks').val()" },
             "$other": { ".validate": false }
           }

@@ -57,6 +57,7 @@ function collectResults(api) {
       else if (path === "meleeHits") api.onMelee(key, v);
       else if (path === "effects") api.onEffect(snap(path, key, v));
       else if (path.indexOf("hits/") === 0) api.onHit(snap(path, key, v));
+      else if (path === "kills") api.onKill(v);
     }
     function node(path) {
       return {
@@ -1135,6 +1136,139 @@ function collectResults(api) {
     got.push(api.multiKillCount(chains, { k: "b", t: T0 + 4 * W3 }));
     var want = [1, 2, 3, 4, 5, 1, 1];
     done(got.join() === want.join() ? "pass" : "fail", "나온 순서 " + got.join(",") + " / 기대 " + want.join(","));
+  });
+
+  var ASSIST = "어시스트·석궁사수", AMS = api.ASSIST_MS;
+  run(ASSIST, "피해 어시스트: 쓰러지기 " + AMS / 1000 + "초 안에 피해를 준 사람만 어시스트, 처치한 사람은 처치만 오르는가", function (done) {
+    var y = OPEN_Y.forest;
+    var W = world("forest", [
+      { id: "old", team: "blue", char: "guardian", x: 200, y: y },
+      { id: "helper", team: "blue", char: "knight", x: 300, y: y },
+      { id: "killer", team: "blue", char: "sniper", x: 400, y: y },
+      { id: "foe", team: "red", char: "ranger", x: 650, y: y }
+    ]);
+    var foe = W.ent("foe"), bad = [];
+    api.damage(foe, 10, "old", false, null);
+    W.step(1500);
+    api.damage(foe, 10, "helper", false, null);
+    api.damage(foe, 10, "killer", false, null);
+    W.step(AMS - 1000);
+    api.damage(foe, 9999, "killer", false, null);
+    W.step(100);
+    var kill = W.log.filter(function (p) { return p.path === "kills"; })[0];
+    if (!kill) bad.push("처치 기록 없음");
+    else if (JSON.stringify(kill.v.a || []) !== JSON.stringify(["helper"])) bad.push("처치 기록의 어시스트 " + JSON.stringify(kill.v.a || []));
+    if (W.ent("helper").assists !== 1) bad.push("도운 사람 어시스트 " + W.ent("helper").assists);
+    if (W.ent("old").assists) bad.push(AMS / 1000 + "초 넘은 피해가 어시스트 " + W.ent("old").assists);
+    if (W.ent("killer").kills !== 1 || W.ent("killer").assists) bad.push("처치한 사람 처치 " + W.ent("killer").kills + " · 어시스트 " + W.ent("killer").assists);
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "5.5초 전 피해는 제외, 4초 전 피해만 어시스트, 처치한 사람은 처치 1");
+  });
+
+  function priestHealsThenKill(waitMs) {
+    var y = OPEN_Y.forest;
+    var W = world("forest", [
+      { id: "pr", team: "blue", char: "priest", x: 250, y: y },
+      { id: "ally", team: "blue", char: "sniper", x: 450, y: y },
+      { id: "foe", team: "red", char: "ranger", x: 450, y: y + 400 }
+    ]);
+    var pr = W.ent("pr"), ally = W.ent("ally"), foe = W.ent("foe");
+    ally.hp = 50;
+    api.damage(foe, 5, "pr", false, null);
+    api.fireBasic(pr, 0);
+    W.step(800);
+    var healed = ally.hp > 50;
+    W.step(waitMs);
+    api.damage(foe, 9999, "ally", false, null);
+    W.step(100);
+    return { healed: healed, assists: pr.assists || 0, kills: ally.kills };
+  }
+  run(ASSIST, "회복 어시스트: 사제가 회복시킨 아군이 " + AMS / 1000 + "초 안에 처치하면 어시스트 1번(사제가 피해도 줬어도 1번만)", function (done) {
+    var r = priestHealsThenKill(1000);
+    if (!r.healed) { done("fail", "시험 준비 실패: 사제 기본 공격으로 아군이 회복되지 않음"); return; }
+    done(r.assists === 1 && r.kills === 1 ? "pass" : "fail", "사제 어시스트 " + r.assists + " (기대 1), 아군 처치 " + r.kills);
+  });
+  run(ASSIST, "회복 어시스트: 회복 뒤 " + AMS / 1000 + "초가 지나 처치하면 어시스트가 없는가", function (done) {
+    var y = OPEN_Y.forest;
+    var W = world("forest", [
+      { id: "pr", team: "blue", char: "priest", x: 250, y: y },
+      { id: "ally", team: "blue", char: "sniper", x: 450, y: y },
+      { id: "foe", team: "red", char: "ranger", x: 450, y: y + 400 }
+    ]);
+    var ally = W.ent("ally");
+    ally.hp = 50;
+    api.fireBasic(W.ent("pr"), 0);
+    W.step(800);
+    if (ally.hp <= 50) { done("fail", "시험 준비 실패: 회복되지 않음"); return; }
+    W.step(AMS);
+    api.damage(W.ent("foe"), 9999, "ally", false, null);
+    W.step(100);
+    var n = W.ent("pr").assists || 0;
+    done(n === 0 ? "pass" : "fail", "사제 어시스트 " + n + " (기대 0)");
+  });
+  run(ASSIST, "이로운 효과 어시스트: 얼음술사 눈보라로 은신한 아군이 처치하면 얼음술사가 어시스트를 받는가", function (done) {
+    var y = OPEN_Y.forest;
+    var W = world("forest", [
+      { id: "fr", team: "blue", char: "frost", x: 300, y: y, gauge: api.GAUGE_MAX },
+      { id: "ally", team: "blue", char: "sniper", x: 400, y: y },
+      { id: "foe", team: "red", char: "ranger", x: 450, y: y + 500 }
+    ]);
+    api.useUlt(W.ent("fr"), 0);
+    W.step(api.ULT.frBzDelay + 300);
+    if (!api.hiddenFrom(W.ent("ally"), W.t())) { done("fail", "시험 준비 실패: 아군이 눈보라 안에서 은신하지 않음"); return; }
+    api.damage(W.ent("foe"), 9999, "ally", false, null);
+    W.step(100);
+    var n = W.ent("fr").assists || 0;
+    done(n === 1 ? "pass" : "fail", "얼음술사 어시스트 " + n + " (기대 1)");
+  });
+
+  run(ASSIST, "석궁사수 기본 공격: 일직선의 적을 모두 꿰뚫고, 게이지는 한 발에 한 번만 오르는가", function (done) {
+    var y = OPEN_Y.forest, c = api.CHARS.crossbow;
+    var W = world("forest", [
+      { id: "cb", team: "blue", char: "crossbow", x: 150, y: y },
+      { id: "f1", team: "red", char: "ranger", x: 300, y: y },
+      { id: "f2", team: "red", char: "sniper", x: 400, y: y },
+      { id: "f3", team: "red", char: "mage", x: 500, y: y }
+    ]);
+    api.fireBasic(W.ent("cb"), 0);
+    W.step(1000);
+    var lost = ["f1", "f2", "f3"].map(function (id) { return W.ent(id).maxHp - W.ent(id).hp; });
+    var gauge = W.ent("cb").gauge, want = api.roleGauge("crossbow");
+    var ok = lost.every(function (v) { return v === c.dmg; }) && gauge === want;
+    done(ok ? "pass" : "fail", "잃은 체력 " + lost.join("·") + " (기대 " + c.dmg + "씩), 게이지 " + gauge + " (기대 " + want + ")");
+  });
+  run(ASSIST, "석궁사수 스킬: 볼트 " + api.ULT.tbCount + "발이 부채꼴로 나가 각 방향의 적을 맞히는가", function (done) {
+    var y = OPEN_Y.forest, sp = api.ULT.tbSpread, d = 180, list = [{ id: "cb", team: "blue", char: "crossbow", x: 200, y: y, gauge: api.GAUGE_MAX }];
+    [-1, 0, 1].forEach(function (k, i) { list.push({ id: "f" + i, team: "red", char: "ranger", x: 200 + Math.cos(k * sp) * d, y: y + Math.sin(k * sp) * d }); });
+    var W = world("forest", list);
+    api.useUlt(W.ent("cb"), 0);
+    W.step(1000);
+    var lost = [0, 1, 2].map(function (i) { return W.ent("f" + i).maxHp - W.ent("f" + i).hp; });
+    var ok = lost.every(function (v) { return v === api.CHARS.crossbow.dmg; });
+    done(ok ? "pass" : "fail", "세 적이 잃은 체력 " + lost.join("·") + " (기대 " + api.CHARS.crossbow.dmg + "씩)");
+  });
+  run(ASSIST, "석궁사수 패시브: 처치·어시스트마다 강해지고 " + api.CHARS.crossbow.grow.max + "회에서 멈추는가", function (done) {
+    var y = OPEN_Y.forest, c = api.CHARS.crossbow, g = c.grow;
+    var W = world("forest", [
+      { id: "cb", team: "blue", char: "crossbow", x: 150, y: y },
+      { id: "ally", team: "blue", char: "knight", x: 150, y: y + 300 },
+      { id: "foe", team: "red", char: "knight", x: 450, y: y + 500 },
+      { id: "dummy", team: "red", char: "ranger", x: 150 + c.range + g.range * g.max - 40, y: y }
+    ]);
+    var cb = W.ent("cb"), bad = [];
+    api.damage(W.ent("foe"), 30, "cb", false, null);
+    api.damage(W.ent("foe"), 9999, "ally", false, null);
+    W.step(100);
+    if (cb.assists !== 1) bad.push("어시스트 " + cb.assists);
+    if (cb.maxHp !== c.hp + g.hp || cb.hp !== c.hp + g.hp) bad.push("1회 뒤 체력 " + cb.hp + "/" + cb.maxHp);
+    if (api.speedOf(cb) !== c.speed + g.speed) bad.push("1회 뒤 이동속도 " + api.speedOf(cb));
+    cb.kills = 30;
+    api.fireBasic(cb, 0);
+    if (cb.cdDur !== c.cd - g.cd * g.max) bad.push("최대 뒤 공격 대기시간 " + cb.cdDur);
+    if (api.speedOf(cb) !== c.speed + g.speed * g.max) bad.push("최대 뒤 이동속도 " + api.speedOf(cb));
+    W.step(1500);
+    var dummy = W.ent("dummy"), lost = dummy.maxHp - dummy.hp, wantDmg = c.dmg + g.dmg * g.max;
+    if (lost !== Math.min(dummy.maxHp, wantDmg)) bad.push("최대 뒤 먼 적(사거리 끝 근처)에게 준 피해 " + lost + " (기대 " + wantDmg + ")");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "1회: 체력 " + (c.hp + g.hp) + "·이동속도 " + (c.speed + g.speed) + " / " + g.max + "회: 대기시간 " + (c.cd - g.cd * g.max) + "ms·피해 " + wantDmg + "·사거리 " + (c.range + g.range * g.max));
   });
 
   api.MAP_IDS.forEach(function (m, i) {
