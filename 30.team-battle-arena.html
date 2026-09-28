@@ -5484,13 +5484,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function mvpHtml() {
     var best = [];
     participants().forEach(function (id) {
-      var E = ent(id); if (!E || E.kills <= 0) return;
+      var E = ent(id); if (!E || E.kills + (E.assists || 0) <= 0) return;
       var row = { id: id, E: E, score: mvpScore(E), dmg: Math.round(E.dmg) };
       if (!best.length || row.score > best[0].score || (row.score === best[0].score && row.dmg > best[0].dmg)) best = [row];
       else if (row.score === best[0].score && row.dmg === best[0].dmg) best.push(row);
     });
     var rule = '<div class="mvpRule">환산점수 = 처치×100 + 어시스트×' + MVP_ASSIST + ' + 입힌 피해 + 회복 + 막은 피해 + 기절 1초×' + MVP_STUN_PER_SEC +
-               ' + 둔화 1초×둔화율×' + MVP_SLOW_PER_SEC + ' − 쓰러짐×100 (0킬은 제외)<br>기절·둔화는 이미 걸린 효과와 겹치지 않고 새로 늘어난 시간만 셉니다. 블랙홀에 끌려간 시간은 ' + Math.round(ULT.bhCcRate * 100) + '% 둔화로 셉니다.</div>';
+               ' + 둔화 1초×둔화율×' + MVP_SLOW_PER_SEC + ' − 쓰러짐×100 (처치·어시스트가 하나도 없으면 제외)<br>기절·둔화는 이미 걸린 효과와 겹치지 않고 새로 늘어난 시간만 셉니다. 블랙홀에 끌려간 시간은 ' + Math.round(ULT.bhCcRate * 100) + '% 둔화로 셉니다.</div>';
     if (!best.length) return '<div class="mvpLab">MVP</div><div class="mvpNone">MVP 없음</div>' + rule;
     return '<div class="mvpLab">🏆 MVP' + (best.length > 1 ? " (공동)" : "") + "</div>" + best.map(function (b) {
       var d = P[b.id] || {};
