@@ -1309,7 +1309,7 @@ function collectResults(api) {
     ].concat(extra || []));
   }
   function clericSwing(W) { var cl = W.ent("cl"); cl.cdUntil = 0; api.fireBasic(cl, 0); W.frame(FRAME); }
-  run(CLERIC, "기본 공격: 반경 " + api.CHARS.cleric.range + " 안에서 체력이 가장 낮은(깎인) 아군 1명만 " + api.CHARS.cleric.graceHeal + " 회복하고, 자신·먼 아군·부활 보호 중 아군은 고르지 않는가", function (done) {
+  run(CLERIC, "기본 공격: 반경 " + api.CHARS.cleric.range + " 안에서 체력 비율이 가장 낮은 아군 1명만 " + api.CHARS.cleric.graceHeal + " 회복하고, 자신·먼 아군·부활 보호 중 아군은 고르지 않는가", function (done) {
     var W = clericTeam([{ id: "far", team: "blue", char: "ranger", x: 300, y: OPEN_Y.forest - 480 }]);
     var cl = W.ent("cl"), kn = W.ent("kn"), rg = W.ent("rg"), far = W.ent("far"), bad = [];
     cl.hp = 10; kn.hp = 200; rg.hp = 40; far.hp = 5;
@@ -1319,13 +1319,16 @@ function collectResults(api) {
     rg.hp = rg.maxHp;
     clericSwing(W);
     if (kn.hp !== 200 + api.CHARS.cleric.graceHeal) bad.push("체력이 가득 찬 궁수 대신 깎인 기사를 고르지 않음(기사 " + kn.hp + ")");
+    kn.hp = 150; rg.hp = 60;
+    clericSwing(W);
+    if (kn.hp !== 150 + api.CHARS.cleric.graceHeal || rg.hp !== 60) bad.push("체력 수치(궁수 60)가 아니라 비율(기사 150/400)로 고르지 않음(기사 " + kn.hp + "·궁수 " + rg.hp + ")");
     kn.hp = 20; kn.protectUntil = W.t() + 2000; rg.hp = 30;
     clericSwing(W);
     if (kn.hp !== 20) bad.push("부활 보호 중 아군이 회복됨");
     if (rg.hp !== 30 + api.CHARS.cleric.graceHeal) bad.push("보호 중 아군을 빼고 다음 대상을 고르지 않음(궁수 " + rg.hp + ")");
     var enemyDmg = W.log.filter(function (p) { return p.path === "hits/cl" && p.v.d > 0; }).length;
     if (enemyDmg) bad.push("기본 공격이 적에게 피해를 줌");
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "가장 낮은 깎인 아군만 " + api.CHARS.cleric.graceHeal + " 회복, 자신·먼 아군·보호 중 아군 제외");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "체력 비율이 가장 낮은 아군만 " + api.CHARS.cleric.graceHeal + " 회복, 자신·먼 아군·보호 중 아군 제외");
   });
   run(CLERIC, "게이지: 아군을 " + api.CHARS.cleric.healGauge + " 회복시켜야 가득 차고, 넘친 회복(체력이 가득 찬 부분)은 세지 않는가", function (done) {
     var W = clericTeam(), cl = W.ent("cl"), kn = W.ent("kn"), heal = api.CHARS.cleric.graceHeal, got = [];
@@ -1339,7 +1342,7 @@ function collectResults(api) {
     var ok = got[0] === want0 && got[1] === api.GAUGE_MAX && got[2] === want2;
     done(ok ? "pass" : "fail", "16번 회복(" + 16 * heal + ") → " + got[0] + ", 17번째 → " + got[1] + ", 6만 회복 → " + got[2] + " (기대 " + want0 + "·" + api.GAUGE_MAX + "·" + want2 + ")");
   });
-  run(CLERIC, "요한계시록: " + api.ULT.rvDur / 1000 + "초간 아군은 1초당 " + api.ULT.rvHeal + " 회복, 적은 1초당 " + api.ULT.rvDmg + " 피해를 사용 순간·1초·2초에 3번 받고 거리와 상관없는가", function (done) {
+  run(CLERIC, "요한계시록: " + api.ULT.rvDur / 1000 + "초간 아군은 1초당 " + api.ULT.rvHeal + " 회복, 적은 1초당 " + api.ULT.rvDmg + " 피해를 사용 순간·1초·2초에 3번 받고 거리와 상관없으며, 클레릭은 사용 순간 체력이 모두 차는가", function (done) {
     var W = clericTeam(), cl = W.ent("cl"), kn = W.ent("kn"), foe = W.ent("foe"), foe2 = W.ent("foe2"), bad = [], times = [];
     kn.hp = 100; cl.hp = 50; foe.hp = foe.maxHp = 1000; foe2.x = 750; foe2.y = 1250; foe2.hp = foe2.maxHp = 1000;
     cl.gauge = api.GAUGE_MAX;
@@ -1351,10 +1354,10 @@ function collectResults(api) {
     if (1000 - foe.hp !== api.ULT.rvDmg * 3) bad.push("가까운 적 피해 " + (1000 - foe.hp));
     if (1000 - foe2.hp !== api.ULT.rvDmg * 3) bad.push("먼 적 피해 " + (1000 - foe2.hp));
     if (kn.hp !== 100 + api.ULT.rvHeal * 3) bad.push("아군 회복 " + (kn.hp - 100));
-    if (cl.hp !== 50) bad.push("클레릭 자신도 회복됨");
+    if (cl.hp !== cl.maxHp) bad.push("사용 시 자신의 체력이 모두 회복되지 않음(" + cl.hp + ")");
     if (times[0] !== 0) bad.push("사용 순간 피해 없음");
     if (cl.gauge !== 0) bad.push("스킬 중 회복으로 게이지가 참(" + cl.gauge + ")");
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "적 " + api.ULT.rvDmg * 3 + " 피해·아군 " + api.ULT.rvHeal * 3 + " 회복(" + times.join("초·") + "초), 먼 적도 같음, 자신은 제외");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "적 " + api.ULT.rvDmg * 3 + " 피해·아군 " + api.ULT.rvHeal * 3 + " 회복(" + times.join("초·") + "초), 먼 적도 같음, 자신은 사용 순간 체력 모두 회복");
   });
   run(CLERIC, "요한계시록: 쓰러진 적·아군과 부활 보호 중인 적·아군에게는 피해·회복이 들어가지 않는가", function (done) {
     var W = clericTeam(), cl = W.ent("cl"), kn = W.ent("kn"), rg = W.ent("rg"), foe = W.ent("foe"), foe2 = W.ent("foe2"), bad = [];
