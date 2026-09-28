@@ -715,6 +715,98 @@ function collectResults(api) {
     done(killed === 2 && during === 0 && dn.gauge === want ? "pass" : "fail", killed + "명 처치, 폭풍 중 게이지 " + during + " → 끝난 뒤 " + dn.gauge + " (기대 " + want + ")");
   });
 
+  var PASSIVE = "궁수·저격수·네크로 패시브";
+  var HASTE = api.CHARS.ranger.haste;
+  run(PASSIVE, "궁수: 기본 공격 화살 한 발 적중마다 이동속도 +" + HASTE.step + ", 최대 +" + HASTE.max + ", " + HASTE.ms / 1000 + "초 뒤 사라지는가", function (done) {
+    var y = OPEN_Y.forest;
+    var W = world("forest", [
+      { id: "rg", team: "blue", char: "ranger", x: 250, y: y },
+      { id: "foe", team: "red", char: "knight", x: 450, y: y }
+    ]);
+    var rg = W.ent("rg"), base = api.CHARS.ranger.speed, seen = [];
+    api.fireBasic(rg, 0);
+    W.step(400);
+    seen.push(api.speedOf(rg) - base);
+    for (var i = 0; i < 3; i++) { api.fireBasic(rg, 0); W.step(420); }
+    seen.push(api.speedOf(rg) - base);
+    W.step(HASTE.ms + 100);
+    seen.push(api.speedOf(rg) - base);
+    var ok = seen[0] === HASTE.step * 2 && seen[1] === HASTE.max && seen[2] === 0;
+    done(ok ? "pass" : "fail", "화살 2발 적중 후 +" + seen[0] + " → 8발 적중 후 +" + seen[1] + " → " + HASTE.ms / 1000 + "초 뒤 +" + seen[2]);
+  });
+
+  var FAR = api.CHARS.sniper.farShot;
+  run(PASSIVE, "저격수: 대상과의 거리가 " + FAR.dist + "보다 멀면 피해가 " + Math.round(FAR.bonus * 100) + "% 늘어나는가", function (done) {
+    var y = OPEN_Y.forest, lost = [];
+    [300, 600].forEach(function (gap) {
+      var W = world("forest", [
+        { id: "sn", team: "blue", char: "sniper", x: 120, y: y },
+        { id: "foe", team: "red", char: "knight", x: 120 + gap, y: y }
+      ]);
+      api.fireBasic(W.ent("sn"), 0);
+      W.step(800);
+      lost.push(W.ent("foe").maxHp - W.ent("foe").hp);
+    });
+    var dmg = api.CHARS.sniper.dmg, want = [dmg, Math.round(dmg * (1 + FAR.bonus))];
+    done(lost[0] === want[0] && lost[1] === want[1] ? "pass" : "fail", "거리 300 → " + lost[0] + " 피해 (기대 " + want[0] + "), 거리 600 → " + lost[1] + " 피해 (기대 " + want[1] + ")");
+  });
+
+  var STAND = api.CHARS.necro.lastStand;
+  run(PASSIVE, "네크로: 체력이 " + STAND.hp + " 아래로 떨어지는 피해는 " + STAND.hp + "에서 멈추고 " + STAND.hideMs / 1000 + "초 은신, 한 목숨에 1번만인가", function (done) {
+    var y = OPEN_Y.forest;
+    var W = world("forest", [
+      { id: "nc", team: "blue", char: "necro", x: 250, y: y },
+      { id: "foe", team: "red", char: "knight", x: 650, y: y }
+    ]);
+    var nc = W.ent("nc"), foe = W.ent("foe"), log = [];
+    api.damage(nc, 90, "foe", true);
+    log.push(nc.hp, api.hiddenFrom(nc, W.t()) && !api.visibleTo(nc, foe, W.t()));
+    W.step(STAND.hideMs + 100);
+    log.push(api.hiddenFrom(nc, W.t()));
+    api.damage(nc, 10, "foe", true);
+    log.push(nc.hp);
+    api.damage(nc, 100, "foe", true);
+    log.push(nc.alive);
+    W.step(api.RESPAWN_MS + 100);
+    nc.protectUntil = 0;
+    nc.hp = 70;
+    api.damage(nc, 80, "foe", true);
+    log.push(nc.alive, nc.hp);
+    var ok = log[0] === STAND.hp && log[1] && !log[2] && log[3] === STAND.hp - 10 && !log[4] && log[5] && log[6] === STAND.hp;
+    done(ok ? "pass" : "fail", "120에서 90 피해 → 체력 " + log[0] + (log[1] ? ", 은신" : ", 은신 안 됨") + " → " + STAND.hideMs / 1000 + "초 뒤 " + (log[2] ? "아직 숨음" : "드러남") +
+      " → 10 피해 → 체력 " + log[3] + " → 100 피해 → " + (log[4] ? "살아 있음" : "사망") + " → 부활 후 체력 70에서 80 피해 → " + (log[5] ? "생존, 체력 " + log[6] : "사망"));
+  });
+
+  run(PASSIVE, "네크로: 은신 중 해골 병사가 공격해도 은신이 풀리지 않는가", function (done) {
+    var y = OPEN_Y.forest;
+    var W = world("forest", [
+      { id: "nc", team: "blue", char: "necro", x: 250, y: y, gauge: api.GAUGE_MAX },
+      { id: "foe", team: "red", char: "knight", x: 470, y: y }
+    ]);
+    var nc = W.ent("nc"), foe = W.ent("foe");
+    api.useUlt(nc, 0);
+    W.step(api.ULT.smRiseMs + 300);
+    var hpBefore = foe.hp;
+    api.damage(nc, 90, "foe", true);
+    var hiddenAll = true;
+    W.step(STAND.hideMs - 100, FRAME, function (t) { if (!api.hiddenFrom(nc, t) || api.visibleTo(nc, foe, t)) hiddenAll = false; });
+    var struck = hpBefore - foe.hp;
+    done(struck > 0 && hiddenAll ? "pass" : "fail", "은신 중 해골이 준 피해 " + struck + (hiddenAll ? ", 은신 유지" : ", 은신이 풀림"));
+  });
+
+  run(PASSIVE, "네크로: 공격할 적이 없는 해골 병사는 네크로에게 다가오는가", function (done) {
+    var y = OPEN_Y.forest;
+    var W = world("forest", [{ id: "nc", team: "blue", char: "necro", x: 250, y: y, gauge: api.GAUGE_MAX }]);
+    var nc = W.ent("nc");
+    api.useUlt(nc, 0);
+    W.step(api.ULT.smRiseMs + 100);
+    nc.x = 650;
+    W.step(3000);
+    var far = nc.minions.map(function (m) { return Math.round(hyp(m.x - nc.x, m.y - nc.y)); });
+    var ok = far.length === api.ULT.smCount && far.every(function (d) { return d <= api.ULT.smFollow + 5; });
+    done(ok ? "pass" : "fail", "네크로가 400 떨어진 뒤 3초 후 해골과의 거리: " + far.join(", ") + " (기준 " + api.ULT.smFollow + " 이하)");
+  });
+
   function autoMelee(mapId, seconds, seed) {
     var rnd = seededRandom(seed), realRandom = Math.random;
     Math.random = rnd;

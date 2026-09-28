@@ -347,6 +347,10 @@
   .dfTitle { font-size: 24px; font-weight: 800; color: #F4F1E8; }
   .dfTurn { margin-top: 4px; font-size: 17px; font-weight: 800; color: #F2D06B; min-height: 24px; }
   .dfTurn.mine { color: #FFB38A; }
+  .dfMap { flex: 0 1 auto; min-width: 0; margin-left: auto; padding-right: 14px; border-right: 1px solid rgba(255,255,255,.14); text-align: right; line-height: 1; }
+  .dfMap b { display: block; font-size: 24px; font-weight: 800; color: #F4F1E8; word-break: keep-all; line-height: 1.15; }
+  .dfMap b::before { content: "🗺️ "; }
+  .dfMap small { display: block; font-size: 12px; color: var(--sg-ink-soft); margin-top: 6px; }
   .dfTimer { flex: 0 0 auto; min-width: 84px; text-align: center; font-size: 46px; font-weight: 800; line-height: 1; color: #F4F1E8; font-variant-numeric: tabular-nums; }
   .dfTimer.low { color: #FF6B6B; text-shadow: 0 0 10px rgba(255,80,80,.7); }
   .dfTimer small { display: block; font-size: 12px; color: var(--sg-ink-soft); margin-top: 2px; }
@@ -428,6 +432,9 @@
     #killBanner { font-size: 15px; padding: 4px 12px; }
     .kf { font-size: 12px; padding: 3px 8px; gap: 5px; }
     .dfTitle { font-size: 19px; }
+    .dfMap { padding-right: 10px; }
+    .dfMap b { font-size: 19px; }
+    .dfMap b::before { content: none; }
     .dfTimer { min-width: 56px; font-size: 36px; }
     .dfSteps { gap: 4px; }
     .dfSteps span { font-size: 12px; padding: 5px 2px; }
@@ -523,6 +530,7 @@
     <div class="card">
       <div class="dfHead">
         <div><div class="dfTitle">🏆 대회모드 캐릭터 선택</div><div id="dfTurn" class="dfTurn"></div></div>
+        <div id="dfMap" class="dfMap"><b></b><small>맵</small></div>
         <div id="dfTimer" class="dfTimer">15<small>남은 시간</small></div>
       </div>
       <div class="dfBar"><i id="dfBarFill"></i></div>
@@ -608,11 +616,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var CHARS = {
     warrior: { name: "광전사", role: "fighter", icon: "🪓", hp: 270, speed: 230, ultSpeed: 300, cd: 850, dmg: 45, range: 110, arc: Math.PI * 0.55, ultName: "광폭화", heals: true },
     knight:  { name: "기사", role: "fighter", icon: "🛡️", hp: 400, speed: 220, cd: 1000, dmg: 30, range: 110, arc: Math.PI * 0.7, ultName: "방어태세", blocks: true },
-    ranger:  { name: "궁수", role: "shooter", icon: "🏹", hp: 100, speed: 250, cd: 400, dmg: 10, range: KEY * 6, pSpeed: 950, pr: 6, shots: 2, gap: 70, ultName: "난사", ultAim: true },
+    ranger:  { name: "궁수", role: "shooter", icon: "🏹", hp: 100, speed: 250, cd: 400, dmg: 15, range: 450, pSpeed: 950, pr: 12, shots: 2, gap: 70, ultName: "난사", ultAim: true,
+               haste: { step: 10, ms: 3000, max: 40 } },
     mage:    { name: "주술사", role: "caster", icon: "🔮", hp: 120, speed: 250, cd: 500, dmg: 11, range: 350, pSpeed: 700, pr: 9, ultName: "메테오", ultAim: true },
     rogue:   { name: "은신자", role: "assassin", icon: "🗡️", hp: 100, speed: 300, ultSpeed: 420, cd: 600, dmg: 30, range: 110, arc: Math.PI * 0.6, hits: 2, hitGap: 160, throwDmg: 20, throwRange: 300, pSpeed: 900, pr: 8, ultName: "은신" },
-    necro:   { name: "네크로", role: "caster", icon: "💀", hp: 120, speed: 250, cd: 500, dmg: 11, range: KEY * 4, pSpeed: 1000, pr: 9, ultName: "해골 소환", blocks: true },
-    sniper:  { name: "저격수", role: "shooter", icon: "🎯", hp: 100, speed: 240, cd: 1429, dmg: 40, range: 700, pSpeed: 1500, pr: 7, ultName: "거대 화살", ultAim: true },
+    necro:   { name: "네크로", role: "caster", icon: "💀", hp: 120, speed: 250, cd: 500, dmg: 11, range: KEY * 4, pSpeed: 1000, pr: 9, ultName: "해골 소환", blocks: true,
+               lastStand: { hp: 50, hideMs: 1000 } },
+    sniper:  { name: "저격수", role: "shooter", icon: "🎯", hp: 100, speed: 240, cd: 1429, dmg: 40, range: 700, pSpeed: 1500, pr: 12, ultName: "거대 화살", ultAim: true,
+               farShot: { dist: 500, bonus: 0.5 } },
     thrower: { name: "투척병", role: "shooter", icon: "🧪", hp: 120, speed: 240, cd: 1000, dmg: 20, ticks: 3, range: KEY * 4 + 100, minRange: KEY * 1, ultName: "독안개", ultAim: true, heals: true },
     lancer:  { name: "창기사", role: "fighter", icon: "🔱", hp: 300, speed: 225, cd: 1200, dmg: 30, range: 200, width: 50, ultName: "꿰뚫기", ultAim: true },
     blacksmith: { name: "대장장이", role: "fighter", icon: "🔨", hp: 350, speed: 225, cd: 1000, dmg: 25, range: 120, width: 80, ultName: "내려찍기", ultAim: true },
@@ -636,13 +647,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   });
   function roleOf(c) { return ROLES[CHARS[c].role]; }
   function charsInRole(r) { return CHAR_LIST.filter(function (c) { return CHARS[c].role === r; }); }
-  var ULT = { mkCount: 10, mkGap: 55, mkDmg: 36, mkRefund: 1, mkSpeed: 1150, mkRange: KEY * 8, mkPr: 8,
+  var ULT = { mkCount: 10, mkGap: 55, mkDmg: 40, mkRefund: 1, mkSpeed: 1150, mkRange: KEY * 8, mkPr: 8,
               bzDur: 4000, bzDmgMul: 1.5, bzCdMul: 1 / 1.5, bzHeal: 20, tkDur: 5000, tkDef: 0.3, tkStunR: 100, tkStunMs: 1000,
               mbDelay: 700, mbR: 150, mbDmg: 90, mbCast: 550, mbMin: 60, mbStunMs: 1000,
               asSmokeMs: 400, asDur: 15000,
               smCount: 2, smAhead: KEY * 1, smSide: 38, smHp: 50, smSpeed: 200, smDmg: 10, smCd: 800, smRange: 80, smArc: Math.PI * 0.6,
-              smDur: 8000, smMax: 4, smRiseMs: 1100, smCorpseMs: 1400,
-              pnDmg: 90, pnSpeed: 1500, pnRange: 700, pnPr: 16, pnRefund: 2, pnScale: 3,
+              smDur: 8000, smMax: 4, smRiseMs: 1100, smCorpseMs: 1400, smFollow: 90,
+              pnDmg: 90, pnSpeed: 1500, pnRange: 700, pnPr: 16, pnRefund: 4, pnScale: 3,
               plFlight: 700, plFlightMin: 150, plR: 60, plDur: 3000, plTick: 1000, plMax: 4, plFade: 500, plLob: 90, plGauge: 1,
               fgR: 150, fgDur: 4000, fgDmg: 20, fgHeal: 20, fgSlowMul: 0.6, fgSlowMs: 400, fgCast: KEY * 4 + 100, fgRefund: 1,
               lnWind: 300, lnLen: 350, lnW: 36, lnDmg: 70, lnStunMs: 1200,
@@ -1274,6 +1285,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "frost") return "같은 적에게 기본 공격 3회 적중 시 " + secs(ULT.frFreezeMs) + "간 기절";
     if (k === "rogue") return "가까운 적은 근접 공격, 먼 적에게는 사거리 " + c.throwRange + "의 단검 투척";
     if (k === "hitman") return "기본 공격 시 " + c.dashRange + " 돌진 후 반경 " + c.range + " 회전베기";
+    if (k === "ranger") return "기본 공격 적중 시 " + secs(c.haste.ms) + "간 이동속도 " + c.haste.step + " 증가, 최대 " + c.haste.max + "까지 중첩";
+    if (k === "sniper") return "대상과의 거리가 " + c.farShot.dist + "보다 멀면 피해 " + Math.round(c.farShot.bonus * 100) + "% 증가";
+    if (k === "necro") return "체력이 " + c.lastStand.hp + " 아래로 떨어지는 피해를 받으면 체력 " + c.lastStand.hp + "만 남기고 " + secs(c.lastStand.hideMs) + "간 은신. 부활할 때마다 1번 발동";
     if (k === "dancer") return "던진 단검이 멈춘 곳에서 " + secs(ULT.bdDelay) + " 뒤 회전해 반경 " + ULT.bdR + "의 적에게 " + ULT.bdDmg + "의 피해. 적을 처치하면 게이지 " + ULT.bwKillGauge + " 회복, 스킬 중 처치는 스킬이 끝난 뒤 회복";
     return "";
   }
@@ -1581,6 +1595,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var waiting = done ? [] : draftWaiting(d, d.step), myTurn = waiting.indexOf(myId) >= 0;
     var me = P[myId], myTeam = me ? me.team : null;
     var span = done ? DRAFT_REVEAL_MS : DRAFT_SHOWN_MS, left = Math.max(0, d.stepAt + span - t);
+    setText($("dfMap").firstChild, MAPS[MAPS[room.arena] ? room.arena : ARENA].name);
     var timer = $("dfTimer");
     setHtml(timer, String(Math.ceil(left / 1000)) + "<small>" + (done ? "게임 입장까지" : "남은 시간") + "</small>");
     timer.className = "dfTimer" + (!done && left < 5000 ? " low" : "");
@@ -1827,6 +1842,20 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     allMinions().forEach(function (o) { if (minionReady(o, t)) consider(o); });
     return best;
   }
+  function walkMinion(m, goal, stopAt, dt, t) {
+    var dx = goal.x - m.x, dy = goal.y - m.y, d = hyp(dx, dy) || 1;
+    if (d <= stopAt) return d;
+    m.angle = Math.atan2(dy, dx);
+    var mx = dx / d, my = dy / d;
+    if (m.detour > t) { var rx = -my * m.detourDir; my = mx * m.detourDir; mx = rx; }
+    var ox = m.x, oy = m.y, step = ULT.smSpeed * dt;
+    m.x += mx * step; m.y += my * step; resolve(m);
+    var moved = hyp(m.x - ox, m.y - oy);
+    if (moved < step * 0.3) { m.stuck += dt; if (m.stuck > 0.4) { m.detour = t + 600; m.detourDir = Math.random() < 0.5 ? -1 : 1; m.stuck = 0; } }
+    else m.stuck = 0;
+    m.mv = moved > 0.2;
+    return d;
+  }
   function stepMinions(E, dt, t) {
     if (!E.minions || !E.minions.length) return;
     var before = E.minions.length;
@@ -1835,19 +1864,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     E.minions.forEach(function (m) {
       m.mv = false;
       if (!minionReady(m, t)) return;
-      var foe = minionFoe(m, t); if (!foe) return;
-      var dx = foe.x - m.x, dy = foe.y - m.y, d = hyp(dx, dy) || 1, reach = ULT.smRange + BODY_R - 6;
-      m.angle = Math.atan2(dy, dx);
-      if (d > reach - 12) {
-        var mx = dx / d, my = dy / d;
-        if (m.detour > t) { var rx = -my * m.detourDir; my = mx * m.detourDir; mx = rx; }
-        var ox = m.x, oy = m.y, step = ULT.smSpeed * dt;
-        m.x += mx * step; m.y += my * step; resolve(m);
-        var moved = hyp(m.x - ox, m.y - oy);
-        if (moved < step * 0.3) { m.stuck += dt; if (m.stuck > 0.4) { m.detour = t + 600; m.detourDir = Math.random() < 0.5 ? -1 : 1; m.stuck = 0; } }
-        else m.stuck = 0;
-        m.mv = moved > 0.2;
-      }
+      var foe = minionFoe(m, t);
+      if (!foe) { if (E.alive) walkMinion(m, E, ULT.smFollow, dt, t); return; }
+      var reach = ULT.smRange + BODY_R - 6, d = walkMinion(m, foe, reach - 12, dt, t);
+      m.angle = Math.atan2(foe.y - m.y, foe.x - m.x);
       if (d <= reach && t >= m.cdUntil && losClear(m.x, m.y, foe.x, foe.y)) {
         m.cdUntil = t + ULT.smCd; m.atkAt = t;
         room.ref.child("meleeHits").push({ team: m.team, owner: E.id, m: 1, x: r1(m.x), y: r1(m.y), radius: ULT.smRange, angle: r1(m.angle),
@@ -1971,7 +1991,33 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (E.char === "warrior" && E.buffUntil > t) sp = c.ultSpeed;
     if (E.char === "rogue" && E.stealthUntil > t) sp = c.ultSpeed;
     if (bladeStorm(E, t)) sp = c.ultSpeed;
-    return sp * slowMulAt(E, t);
+    return (sp + hasteBonus(E, t)) * slowMulAt(E, t);
+  }
+  function hasteBonus(E, t) {
+    var h = CHARS[E.char].haste; if (!h || !E.hasteHits) return 0;
+    return Math.min(h.max, E.hasteHits.filter(function (until) { return until > t; }).length * h.step);
+  }
+  function addHaste(E, t) {
+    var h = CHARS[E.char].haste; if (!h) return;
+    E.hasteHits = (E.hasteHits || []).filter(function (until) { return until > t; }).concat(t + h.ms).slice(-Math.ceil(h.max / h.step));
+  }
+  function damageBonusRate(A, T, from) {
+    var rate = 0;
+    if (!A) return rate;
+    if (berserk(A)) rate += ULT.bzDmgMul - 1;
+    var far = CHARS[A.char].farShot;
+    if (far && T && from && hyp(T.x - from.x, T.y - from.y) > far.dist) rate += far.bonus;
+    return rate;
+  }
+  function withBonus(base, rate) { return Math.round(base * (1 + rate)); }
+  function lastStand(T, amount, t) {
+    var ls = CHARS[T.char].lastStand;
+    if (!ls || T.lastStandUsed || T.hp - amount >= ls.hp) return amount;
+    T.lastStandUsed = true;
+    T.stealthUntil = Math.max(T.stealthUntil || 0, t + ls.hideMs);
+    T.revealUntil = 0;
+    smoke(T.x, T.y);
+    return Math.max(0, T.hp - ls.hp);
   }
   function afflict(T, fx, owner) {
     if (!fx || !T.alive || T.minion) return;
@@ -2202,7 +2248,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var immune = protectedNow(T), fx = d.fx, seen = !ME || ME.team === T.team || visibleTo(T, ME);
     if (d.ownerCharacterType === "frost" && !d.isSkill && !immune && !T.minion) fx = frostStackFx(T);
     var dancer = d.ownerCharacterType === "dancer";
-    damage(T, d.dmg, d.owner, dancer ? d.createdAt : !d.isSkill, d.isSkill ? d.ultKey : null, fx);
+    var shooter = ent(d.owner), from = shooter && shooter.alive ? shooter : { x: d.x, y: d.y };
+    damage(T, withBonus(d.dmg, damageBonusRate(shooter, T, from)), d.owner, dancer ? d.createdAt : !d.isSkill, d.isSkill ? d.ultKey : null, fx);
     if (dancer) bladeSpin(p, T.x, T.y);
     if (d.ultKey === "execute" && !immune) { room.ref.child("hits/" + d.owner).push({ d: 0, b: 0, t: now(), tp: { x: r1(T.x), y: r1(T.y) } }); executeFx(T.x, T.y); }
     if (seen) spark(T.x, T.y, orbHitColor(d), d.ultKey === "giant" ? 2.2 : 1);
@@ -2243,6 +2290,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       amount = Math.round(amount * ULT.tkDef);
       T.blocked = (T.blocked || 0) + Math.min(unguarded, T.hp) - Math.min(amount, T.hp);
     }
+    amount = lastStand(T, amount, now());
     var dm = Math.min(amount, T.hp), killed = false;
     T.hp -= dm; if (!noHurtGauge && !gaugeLocked(T)) T.gauge = Math.min(GAUGE_MAX, T.gauge + roleOf(T.char).gaugeOnHurt);
     if (T.hp <= 0) { killed = true; T.hp = 0; T.alive = false; T.deaths++; T.diedAt = now(); T.burst = null; T.volley = null; T.slash = null; T.regenUntil = 0; T.skillUntil = 0; T.slowUntil = 0; T.slows = null; T.stunUntil = 0; T.lance = null; T.frostStacks = 0; if (T === ME) { sfx("down"); aim.id = null; joy.id = null; } }
@@ -2330,6 +2378,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var sameSwing = h.s && owner.gaugeSwing === h.s;
       if (h.s) owner.gaugeSwing = h.s;
       if (h.b && !sameSwing && !gaugeLocked(owner)) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + (h.g != null ? h.g : roleOf(owner.char).gaugeOnHit));
+      if (h.b && !h.u && owner.alive) addHaste(owner, now());
       if (h.b && !sameSwing && owner.alive && berserk(owner, h.t)) {
         var rageHeal = Math.min(owner.maxHp - owner.hp, ULT.bzHeal);
         owner.hp += rageHeal; owner.heal += rageHeal;
@@ -2603,9 +2652,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return t < d.createdAt + travelMs;
     });
   }
-  function swing(E, ang, rage) {
+  function swing(E, ang) {
     var c = CHARS[E.char];
-    var d = { team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(ang), dmg: Math.round(c.dmg * (rage ? ULT.bzDmgMul : 1)), createdAt: now() };
+    var d = { team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(ang), dmg: withBonus(c.dmg, damageBonusRate(E)), createdAt: now() };
     if (c.width) { d.len = Math.round(lineReach(E.x, E.y, ang, c.range)); d.width = c.width; }
     else { d.radius = c.range; d.arc = c.arc; }
     if (c.heal) d.heal = c.heal;
@@ -2659,7 +2708,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     E.hp = E.maxHp; E.alive = true; E.protectUntil = t + RESPAWN_PROTECT_MS;
     E.cdUntil = 0; E.pending = null; E.burst = null; E.volley = null; E.slash = null;
     E.buffUntil = 0; E.slamAt = 0; E.leap = null; E.dash = null; E.shove = null; E.stealthUntil = 0; E.ultUntil = 0; E.skillUntil = 0; E.regenUntil = 0; E.slowUntil = 0; E.slows = null; E.stunUntil = 0; E.lance = null;
-    E.frostStacks = 0; E.frostStackAt = 0; E.revealUntil = 0;
+    E.frostStacks = 0; E.frostStackAt = 0; E.revealUntil = 0; E.hasteHits = null; E.lastStandUsed = false;
     if (E === ME) CAM.snap = true;
     G.forceNet = true;
   }
@@ -2674,7 +2723,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       E.stealthUntil = E.skillUntil = t; G.forceNet = true;
     }
     if (isMelee(E.char) && (!c.throwRange || enemyInMelee(E))) {
-      swing(E, ang, rage);
+      swing(E, ang);
       if (c.hits > 1) E.slash = { left: c.hits - 1, at: t + c.hitGap, ang: ang };
       return;
     }
@@ -2830,7 +2879,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (E.volley && t >= E.volley.until) E.volley = null;
     if (E.slash && t >= E.slash.at) {
       var sl = E.slash;
-      swing(E, sl.ang, berserk(E, t));
+      swing(E, sl.ang);
       sl.left--; sl.at += CHARS[E.char].hitGap;
       if (sl.left <= 0) E.slash = null;
     }
