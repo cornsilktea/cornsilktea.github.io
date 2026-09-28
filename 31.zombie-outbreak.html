@@ -18,8 +18,8 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script type="importmap">
 { "imports": {
-  "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js",
-  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
 } }
 </script>
 <style>
@@ -375,12 +375,27 @@ const MOTION = { idle: 0, run: 1, back: 2, dash: 5, injure: 6, fall: 7, standup:
 
 const loadingEl = $("loading");
 let THREE, GLTFLoader, SkeletonUtils;
+const MODULE_SHIM_URL = "https://cdn.jsdelivr.net/npm/es-module-shims@1.10.1/dist/es-module-shims.js";
+const hasNativeImportMap = !!(window.HTMLScriptElement && HTMLScriptElement.supports && HTMLScriptElement.supports("importmap"));
+const loadModuleShim = () => window.importShim ? Promise.resolve() : new Promise((resolve, reject) => {
+  const script = document.createElement("script");
+  script.src = MODULE_SHIM_URL;
+  script.onload = resolve;
+  script.onerror = reject;
+  document.head.appendChild(script);
+});
+const importThree = spec => hasNativeImportMap ? import(spec) : loadModuleShim().then(() => window.importShim(spec));
+const browserEngineVersion = +((navigator.userAgent.match(/Chrome\/(\d+)/) || [])[1] || 0);
 try {
-  THREE = await import("three");
-  ({ GLTFLoader } = await import("three/addons/loaders/GLTFLoader.js"));
-  SkeletonUtils = await import("three/addons/utils/SkeletonUtils.js");
+  THREE = await importThree("three");
+  ({ GLTFLoader } = await importThree("three/addons/loaders/GLTFLoader.js"));
+  SkeletonUtils = await importThree("three/addons/utils/SkeletonUtils.js");
 } catch (e) {
-  setText(loadingEl, "3D 화면을 불러오지 못했습니다. 인터넷 연결을 확인한 뒤 새로고침해 주세요.");
+  const oldBrowser = (e && e.name === "SyntaxError") || (browserEngineVersion > 0 && browserEngineVersion < 80);
+  setText(loadingEl, oldBrowser
+    ? "이 기기의 인터넷 앱이 오래되어 3D 화면을 열 수 없습니다. 크롬(Chrome) 앱으로 열어 주세요."
+    : "3D 화면을 불러오지 못했습니다. 인터넷 연결을 확인한 뒤 새로고침해 주세요.");
+  if (browserEngineVersion) setText(loadingEl, loadingEl.textContent + " (브라우저 엔진 " + browserEngineVersion + " · 80 이상 필요)");
   return;
 }
 
