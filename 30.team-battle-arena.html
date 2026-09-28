@@ -395,6 +395,17 @@
   .modalBox h3 { font-size: 22px; font-weight: 800; text-align: center; margin-bottom: 14px; }
   .modalBox .row input { font-size: 24px; letter-spacing: 1px; }
   .modalBox .cancel { display: block; margin: 12px auto 0; }
+  .statsBox { max-width: 900px; max-height: calc(100vh - 32px); overflow-y: auto; overscroll-behavior: contain; }
+  .statsTop { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+  .statsTop h3 { margin: 0; text-align: left; }
+  #statsModes { margin: 0 0 8px; }
+  #statsModes .modeBtn:not(.on) { background: rgba(255, 255, 255, .10); border-color: rgba(255, 255, 255, .34); color: #FFFFFF; }
+  .statsMsg { font-size: 14px; font-weight: 700; color: var(--sg-ink-soft); line-height: 1.5; margin-bottom: 8px; }
+  .statsTable th small { display: block; font-size: 10px; font-weight: 400; }
+  .statsTable td { text-align: center; }
+  .statsTable td small { display: block; font-size: 11px; font-weight: 400; color: #A3B0A6; }
+  .statsTable tr.grp td { text-align: left; font-size: 13px; color: #FFB38A; background: rgba(217,123,79,.12); border-bottom-color: rgba(217,123,79,.5); }
+  .statsNotes { margin: 0 0 0 18px; font-size: 13px; line-height: 1.6; color: var(--sg-ink-soft); }
 
   @media (max-width: 560px) {
     .codeNum { font-size: 44px; letter-spacing: 5px; }
@@ -444,6 +455,7 @@
 <div id="tourCaption" hidden><i></i><span id="tourCam"></span></div>
 
 <div id="scrStart" class="screen">
+  <div id="startCols" class="lobbyCols">
   <div class="wrap">
     <div class="card">
       <h1 class="titleMain"><span class="tb">3v3</span> 팀 배틀 <span class="tr">아레나</span></h1>
@@ -465,10 +477,11 @@
       </div>
     </div>
   </div>
+  </div>
 </div>
 
 <div id="scrLobby" class="screen" hidden>
-  <div class="lobbyCols">
+  <div id="lobbyCols" class="lobbyCols">
   <div class="wrap">
     <div class="card">
       <div class="codeBar">
@@ -511,7 +524,7 @@
     </div>
   </div>
   <div id="charCardBox" class="card charCol">
-    <div class="secTitle charHead"><span>캐릭터<span id="charHint" class="secHint">선택한 캐릭터를 한 번 더 누르면 자세한 설명이 나옵니다.</span></span><span class="charBtns"><button id="btnZoomChars" class="mini" type="button">확대</button><button id="btnFlipAll" class="mini" type="button">모든 카드 뒤집기</button></span></div>
+    <div class="secTitle charHead"><span>캐릭터<span id="charHint" class="secHint">선택한 캐릭터를 한 번 더 누르면 자세한 설명이 나옵니다.</span></span><span class="charBtns"><button id="btnStats" class="mini" type="button">통계</button><button id="btnZoomChars" class="mini" type="button">확대</button><button id="btnFlipAll" class="mini" type="button">모든 카드 뒤집기</button></span></div>
     <div class="chars" id="chars"></div>
   </div>
   </div>
@@ -571,6 +584,21 @@
       <div class="endBtns"><button id="btnAgain" class="primary" type="button">다시하기</button><button id="btnLeaveEnd" type="button">방 나가기</button></div>
       <div id="endMvp" class="mvpBox"></div>
     </div>
+  </div>
+</div>
+
+<div id="statsModal" class="modal" hidden>
+  <div class="modalBox statsBox">
+    <div class="statsTop"><h3>캐릭터 통계</h3><button id="btnStatsClose" class="mini" type="button">닫기</button></div>
+    <div id="statsModes" class="modeBtns"></div>
+    <div id="statsMsg" class="statsMsg"></div>
+    <div class="boardWrap"><table class="board statsTable"><thead><tr><th class="nm">캐릭터</th><th>선택률<small>선택 수 / 게임 수</small></th><th>승률<small>승리 수 / 선택 수</small></th><th>평균 피해량</th><th>평균 회복량</th><th>평균 막은 피해</th><th>평균 기절</th><th>평균 둔화</th></tr></thead><tbody id="statsBody"></tbody></table></div>
+    <ul class="statsNotes">
+      <li>AI 없이 학생 6명이 3대3으로 끝까지 마친 경기만 집계합니다.</li>
+      <li>시간 종료 때 킬 수가 같으면 무승부이고, 무승부는 승리로 세지 않습니다.</li>
+      <li>한 경기에서 같은 캐릭터는 1명만 고를 수 있으므로 선택률은 그 캐릭터가 나온 판의 비율입니다.</li>
+      <li>막은 피해·기절·둔화는 이 항목이 추가된 뒤의 경기만으로 평균을 냅니다.</li>
+    </ul>
   </div>
 </div>
 
@@ -1100,10 +1128,24 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
   var screenNow = "start";
   function showScreen(k) {
+    var prev = screenNow;
     screenNow = k;
     show($("scrStart"), k === "start"); show($("scrLobby"), k === "lobby"); show($("scrDraft"), k === "draft"); show($("scrGame"), k === "game");
     if (k === "game") resize();
-    if (k !== "lobby") setCharZoom(false);
+    if (k !== prev || (k !== "lobby" && k !== "start")) setCharZoom(false);
+    if (k === "start" || k === "lobby") placeCharBox(k);
+    if (k !== "start" && k !== "lobby") show($("statsModal"), false);
+  }
+  function placeCharBox(k) {
+    var cols = $(k === "start" ? "startCols" : "lobbyCols"), box = $("charCardBox");
+    if (box.parentNode !== cols) cols.appendChild(box);
+    if (k === "start") renderStartChars();
+  }
+  function charsViewOnly() { return screenNow === "start" || !!(room && room.mode === "cup"); }
+  function renderStartChars() {
+    show($("charCardBox"), true);
+    setText($("charHint"), "카드를 누르면 자세한 설명이 나옵니다.");
+    setHtmlKeepScroll($("chars"), cardsHtml({}, true)); fitCardHeight(); fitCharCol($("charCardBox"));
   }
 
   var lobbyQueued = false;
@@ -1379,10 +1421,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   $("chars").onclick = function (e) {
     var b = e.target.closest ? e.target.closest(".charCard") : null;
-    if (!b || b.disabled || !room || room.status !== "lobby") return;
+    var onStart = screenNow === "start";
+    if (!b || b.disabled || (!onStart && (!room || room.status !== "lobby"))) return;
     var c = b.getAttribute("data-c");
-    var me = P[myId]; if (!me) return;
-    var viewOnly = room.mode === "cup";
+    var me = onStart ? {} : P[myId]; if (!me) return;
+    var viewOnly = charsViewOnly();
     if (viewOnly || me.characterType === c) {
       flipped[c] = !flipped[c];
       b.classList.toggle("flip", flipped[c]);
@@ -1396,9 +1439,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var backCount = CHAR_LIST.filter(function (k) { return flipped[k]; }).length;
     var showBack = backCount <= CHAR_LIST.length - backCount;
     CHAR_LIST.forEach(function (k) { flipped[k] = showBack; });
-    var me = P[myId];
+    var me = screenNow === "start" ? {} : P[myId];
     [].forEach.call($("chars").querySelectorAll(".charCard"), function (b) { b.classList.toggle("flip", showBack); });
-    if (me) $("chars")._h = cardsHtml(me, room && room.mode === "cup");
+    if (me) $("chars")._h = cardsHtml(me, charsViewOnly());
     fitCharCol($("charCardBox"));
   };
   var LITE_MOTION = !!(window.matchMedia && matchMedia("(pointer: coarse)").matches);
@@ -1414,8 +1457,52 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   $("btnZoomChars").onclick = function () { setCharZoom(!$("charCardBox").classList.contains("zoomed")); };
   window.addEventListener("keydown", function (e) {
-    if (e.key === "Escape" && $("charCardBox").classList.contains("zoomed")) setCharZoom(false);
+    if (e.key !== "Escape") return;
+    if (!$("statsModal").hidden) show($("statsModal"), false);
+    else if ($("charCardBox").classList.contains("zoomed")) setCharZoom(false);
   });
+  var statsMode = "pvp", statsLoadSeq = 0;
+  function statsPct(a, b) { return b ? (a / b * 100).toFixed(1) + "%" : "-"; }
+  function statsRateCell(a, b) { return "<td><b>" + statsPct(a, b) + "</b><small>(" + a + " / " + b + ")</small></td>"; }
+  function statsRowsHtml(s) {
+    var matches = +s.matches || 0, lastRole = null, h = "";
+    CHAR_LIST.forEach(function (k) {
+      var c = CHARS[k], d = s[k] || {}, picks = +d.picks || 0, wins = +d.wins || 0, ccPicks = +d.ccPicks || 0;
+      if (c.role !== lastRole) { lastRole = c.role; h += '<tr class="grp"><td colspan="8">' + ROLES[c.role].icon + " " + ROLES[c.role].name + "</td></tr>"; }
+      h += '<tr><td class="nm">' + c.icon + " " + esc(c.name) + "</td>" + statsRateCell(picks, matches) + statsRateCell(wins, picks) +
+        "<td>" + (picks ? Math.round(+d.dmg || 0) : "-") + "</td>" +
+        "<td>" + (picks && c.heals ? Math.round(+d.heal || 0) : "-") + "</td>" +
+        "<td>" + (ccPicks && c.blocks ? Math.round(+d.block || 0) : "-") + "</td>" +
+        "<td>" + (ccPicks ? (+d.stun || 0).toFixed(1) + "초" : "-") + "</td>" +
+        "<td>" + (ccPicks ? (+d.slow || 0).toFixed(1) + "초" : "-") + "</td></tr>";
+    });
+    return h;
+  }
+  function loadStats() {
+    var seq = ++statsLoadSeq;
+    setHtml($("statsModes"), MODES.map(function (m) {
+      return '<button type="button" class="mini modeBtn' + (m.id === statsMode ? " on" : "") + '" data-id="' + m.id + '">' + m.name + "</button>";
+    }).join(""));
+    setHtml($("statsBody"), "");
+    if (!db) { setText($("statsMsg"), "온라인 연결을 준비하지 못해 통계를 불러올 수 없어요."); return; }
+    setText($("statsMsg"), "불러오는 중…");
+    db.ref(STATS_PATH + statsMode).once("value").then(function (snap) {
+      if (seq !== statsLoadSeq) return;
+      var s = snap.val() || {}, matches = +s.matches || 0, red = +s.red || 0, blue = +s.blue || 0;
+      setText($("statsMsg"), "집계된 경기 " + matches + "판 · 진영 승률: 블루 " + statsPct(blue, matches) + " · 레드 " + statsPct(red, matches) +
+        " · 무승부 " + statsPct(Math.max(0, matches - red - blue), matches));
+      setHtml($("statsBody"), statsRowsHtml(s));
+    }).catch(function () {
+      if (seq === statsLoadSeq) setText($("statsMsg"), "통계를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.");
+    });
+  }
+  $("btnStats").onclick = function () { show($("statsModal"), true); $("statsModal").querySelector(".statsBox").scrollTop = 0; loadStats(); };
+  $("btnStatsClose").onclick = function () { show($("statsModal"), false); };
+  $("statsModal").addEventListener("click", function (e) { if (e.target === $("statsModal")) show($("statsModal"), false); });
+  $("statsModes").onclick = function (e) {
+    var b = e.target.closest ? e.target.closest(".modeBtn") : null;
+    if (b && b.getAttribute("data-id") !== statsMode) { statsMode = b.getAttribute("data-id"); loadStats(); }
+  };
   function freeAiName(ps) {
     var used = keys(ps).map(function (id) { return ps[id] && ps[id].nickname; }), n = 1;
     while (used.indexOf("AI" + n) >= 0) n++;
@@ -5065,6 +5152,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   if (/[?&]test(&|$)/.test(location.search)) import("./30.team-battle-tests.js").then(function (m) { m.runTeamBattleTests(testHooks()); });
 
   refreshNick();
+  showScreen("start");
   if (!db) startMsg("온라인 연결을 준비하지 못했어요. 인터넷 연결을 확인해 주세요.");
   if (!nick) openNick(true);
   requestAnimationFrame(loop);
