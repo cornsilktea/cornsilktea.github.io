@@ -5150,7 +5150,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       finish: function (mapId) { TEST_CLOCK = null; room = null; resetLocal(); loadMapData(mapId); }
     };
   }
-  if (/[?&]test(&|$)/.test(location.search)) import("./30.team-battle-tests.js").then(function (m) { m.runTeamBattleTests(testHooks()); });
+  if (/[?&]test(&|$)/.test(location.search)) import("./30.team-battle-tests.js?t=" + Date.now()).then(function (m) { m.runTeamBattleTests(testHooks()); });
 
   refreshNick();
   showScreen("start");
