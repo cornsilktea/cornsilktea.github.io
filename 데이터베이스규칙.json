@@ -10,26 +10,27 @@
         "$room": { ".write": "$room.matches(/^[0-9]{5}$/)" }
       },
       "stats": {
-        ".write": "(newData.exists() && ((!data.exists() && newData.child('matches').val() === 1) || (data.exists() && newData.child('matches').val() === data.child('matches').val() + 1))) || (auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3'))",
-        "matches": { ".validate": "newData.isNumber()" },
-        "cup": {
-          ".validate": "newData.hasChildren(['matches', 'red', 'blue']) && newData.child('red').val() + newData.child('blue').val() <= newData.child('matches').val() && newData.child('matches').val() <= newData.parent().child('matches').val()",
+        ".write": "auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+      },
+      "modestats": {
+        "$mode": {
+          ".write": "(newData.exists() && ((!data.exists() && newData.child('matches').val() === 1) || (data.exists() && newData.child('matches').val() === data.child('matches').val() + 1))) || (auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3'))",
+          ".validate": "$mode.matches(/^(pvp|cup)$/) && newData.hasChildren(['matches', 'red', 'blue']) && newData.child('red').val() + newData.child('blue').val() <= newData.child('matches').val()",
           "matches": { ".validate": "newData.isNumber() && newData.val() >= 0" },
           "red": { ".validate": "newData.isNumber() && newData.val() >= 0" },
           "blue": { ".validate": "newData.isNumber() && newData.val() >= 0" },
-          "$other": { ".validate": false }
-        },
-        "$char": {
-          ".validate": "$char.matches(/^(marksman|healer|tank|assassin|warrior|knight|ranger|mage|rogue|necro|sniper|thrower|lancer|blacksmith|priest|hitman|guardian|frost|dancer)$/) && newData.hasChildren(['picks', 'wins', 'dmg', 'heal']) && newData.child('wins').val() <= newData.child('picks').val() && ((!data.exists() && newData.child('picks').val() <= 6) || (data.exists() && newData.child('picks').val() >= data.child('picks').val() && newData.child('picks').val() <= data.child('picks').val() + 6))",
-          "picks": { ".validate": "newData.isNumber() && newData.val() >= 0" },
-          "wins": { ".validate": "newData.isNumber() && newData.val() >= 0" },
-          "dmg": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5000" },
-          "heal": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5000" },
-          "block": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5000" },
-          "stun": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 600" },
-          "slow": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 600" },
-          "ccPicks": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= newData.parent().child('picks').val()" },
-          "$other": { ".validate": false }
+          "$char": {
+            ".validate": "$char.matches(/^(warrior|knight|ranger|mage|rogue|necro|sniper|thrower|lancer|blacksmith|priest|hitman|guardian|frost|dancer)$/) && newData.hasChildren(['picks', 'wins', 'dmg', 'heal']) && newData.child('wins').val() <= newData.child('picks').val() && ((!data.exists() && newData.child('picks').val() <= ($mode === 'cup' ? 1 : 6)) || (data.exists() && newData.child('picks').val() >= data.child('picks').val() && newData.child('picks').val() <= data.child('picks').val() + ($mode === 'cup' ? 1 : 6)))",
+            "picks": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+            "wins": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+            "dmg": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5000" },
+            "heal": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5000" },
+            "block": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5000" },
+            "stun": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 600" },
+            "slow": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 600" },
+            "ccPicks": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= newData.parent().child('picks').val()" },
+            "$other": { ".validate": false }
+          }
         }
       }
     },

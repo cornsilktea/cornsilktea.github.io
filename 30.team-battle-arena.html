@@ -3041,7 +3041,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (isStudentFullTeamMatch(room.mode, room.roster, P)) setTimeout(function () { recordClassStats(t); }, STATS_SETTLE_MS);
   }
 
-  var STATS_PATH = "teambattle/stats";
+  var STATS_PATH = "teambattle/modestats/";
   var STATS_SETTLE_MS = 1500;
   var isTestLink = !!(window.PORTAL_CLASS && window.PORTAL_CLASS.test);
   function isStudentFullTeamMatch(mode, roster, ps) {
@@ -3065,9 +3065,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return { c: r.roster[id].c, win: r.winner === r.roster[id].team, dmg: +e.dmg || 0, heal: +e.heal || 0,
                blocked: +e.blocked || 0, stun: +e.stunDealt || 0, slow: +e.slowDealt || 0 };
     });
-    db.ref(STATS_PATH).transaction(function (cur) {
+    db.ref(STATS_PATH + r.mode).transaction(function (cur) {
       cur = cur || {};
       cur.matches = (+cur.matches || 0) + 1;
+      cur.red = (+cur.red || 0) + (r.winner === "red" ? 1 : 0);
+      cur.blue = (+cur.blue || 0) + (r.winner === "blue" ? 1 : 0);
       rows.forEach(function (w) {
         var st = cur[w.c] || {}, n = +st.picks || 0;
         st.dmg = r1(((+st.dmg || 0) * n + w.dmg) / (n + 1));
@@ -3081,13 +3083,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         st.wins = (+st.wins || 0) + (w.win ? 1 : 0);
         cur[w.c] = st;
       });
-      if (r.mode === "cup") {
-        var cup = cur.cup || {};
-        cup.matches = (+cup.matches || 0) + 1;
-        cup.red = (+cup.red || 0) + (r.winner === "red" ? 1 : 0);
-        cup.blue = (+cup.blue || 0) + (r.winner === "blue" ? 1 : 0);
-        cur.cup = cup;
-      }
       return cur;
     }).catch(function () {});
   }
