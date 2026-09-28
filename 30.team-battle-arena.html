@@ -646,7 +646,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     sniper:  { name: "저격수", role: "shooter", icon: "🎯", hp: 100, speed: 200, cd: 1250, dmg: 40, range: 700, pSpeed: 840, pr: 12, farDist: 500, farBonus: 0.5, ultName: "거대 화살", ultAim: true },
     thrower: { name: "투척병", role: "shooter", icon: "🧪", hp: 120, speed: 220, cd: 1000, dmg: 20, ticks: 3, range: KEY * 4 + 120, minRange: KEY * 1, ultName: "독안개", ultAim: true, heals: true },
     lancer:  { name: "창기사", role: "fighter", icon: "🔱", hp: 300, speed: 200, cd: 1200, dmg: 30, range: 200, width: 50, ultName: "꿰뚫기", ultAim: true },
-    blacksmith: { name: "대장장이", role: "fighter", icon: "🔨", hp: 350, speed: 200, cd: 1250, dmg: 25, range: 180, width: 150, windup: 200, fx: { stunMs: 200 }, ultName: "내려찍기", ultAim: true },
+    blacksmith: { name: "대장장이", role: "fighter", icon: "🔨", hp: 350, speed: 200, cd: 1250, dmg: 25, range: 180, width: 150, windup: 500, fx: { stunMs: 500 }, ultName: "내려찍기", ultAim: true },
     priest:  { name: "사제", role: "caster", icon: "📖", hp: 120, speed: 240, cd: 1000, dmg: 10, heal: 10, range: 320, width: 200, ultName: "블랙홀", ultAim: true, heals: true },
     hitman:  { name: "자객", role: "assassin", icon: "🔪", hp: 120, speed: 250, cd: 1250, dmg: 40, range: 100,
                dashRange: 200, dashWidth: 150, dashDmg: 40, dashMs: 300, finishDelay: 125, ultName: "처형", ultAim: true },
@@ -1312,8 +1312,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "warrior") return secs(ULT.bzDur) + "간 공격력·공격속도 " + num(ULT.bzDmgMul) + "배, " + speedUp(CHARS.warrior) + ". 기본 공격 적중 시 체력 " + ULT.bzHeal + " 회복";
     if (k === "knight") return secs(ULT.tkDur) + "간 받는 피해 " + num(ULT.tkDef) + "배. 끝날 때 반경 " + ULT.tkStunR + "의 적은 " + secs(ULT.tkStunMs) + "간 기절";
     if (k === "ranger") return ULT.mkDmg + "의 피해를 주는 화살 " + ULT.mkCount + "발 연사. 적중마다 게이지 " + ULT.mkRefund + " 회복";
-    if (k === "mage") return "지정한 곳에 " + secs(ULT.mbDelay) + " 뒤 반경 " + ULT.mbR + "의 폭발. 적은 가운데일수록 강하게 " + ULT.mbDmgMin + "~" + ULT.mbDmg + "의 피해를 입고 " +
-      num(ULT.mbStunMin / 1000) + "~" + secs(ULT.mbStunMs) + "간 기절";
+    if (k === "mage") return "지정한 곳에 " + secs(ULT.mbDelay) + " 뒤 반경 " + ULT.mbR + "의 폭발. 적은 " + ULT.mbDmgMin + "~" + ULT.mbDmg + "의 피해, " +
+      num(ULT.mbStunMin / 1000) + "~" + secs(ULT.mbStunMs) + "의 기절. 중심에 가까울수록 강함";
     if (k === "rogue") return secs(ULT.asDur) + "간 은신 상태가 되고 " + speedUp(CHARS.rogue) + ". 공격 시 해제";
     if (k === "necro") return secs(ULT.smDur) + "간 유지되는 해골 병사 " + ULT.smCount + "마리 소환(최대 " + ULT.smMax + "마리). 해골은 체력 " + ULT.smHp + ", 공격 " + ULT.smDmg;
     if (k === "sniper") return "사거리 " + ULT.pnRange + "의 거대한 화살 발사. 적은 " + ULT.pnDmg + "의 피해, 적중 시 게이지 " + ULT.pnRefund + " 회복";
