@@ -1877,7 +1877,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       r.hp = pos.hp; r.alive = pos.alive; r.gauge = pos.gauge; r.dmg = pos.dmg;
       r.atkAt = pos.atkAt; r.ultUntil = pos.ultUntil; r.leapAt = pos.leapAt; r.buffUntil = pos.buffUntil;
       r.regenUntil = pos.regenUntil; r.skillUntil = pos.skillUntil; r.skillDur = pos.skillDur;
-      if (pos.stealthUntil > r.stealthUntil && pos.stealthUntil > now()) smoke(r.x, r.y);
+      if (pos.stealthUntil > r.stealthUntil && pos.stealthUntil > now()) smoke(r.x, r.y, r.char === "necro" ? NECRO_SMOKE_COLOR : null);
       r.stealthUntil = pos.stealthUntil;
       r.slowUntil = pos.slowUntil; r.slowMul = pos.slowMul; r.stunUntil = pos.stunUntil;
       r.summonAt = pos.summonAt;
@@ -2367,7 +2367,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var summoner = ent(M.owner);
     if (summoner) summoner.blocked = (summoner.blocked || 0) + dm;
     if (M.hp <= 0) { M.hp = 0; M.alive = false; M.diedAt = now(); }
-    pushHit(owner, dm, basic, ultKey, false);
+    pushHit(owner, dm, basic, ultKey, false, null, true);
     G.forceNet = true;
   }
   function damage(T, amount, owner, basic, ultKey, fx, gaugeGain, noHurtGauge) {
@@ -2384,6 +2384,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       T.lastStandUsed = true;
       T.stealthUntil = Math.max(T.stealthUntil || 0, now() + CHARS[T.char].lastStandHideMs);
       T.revealUntil = 0;
+      smoke(T.x, T.y, NECRO_SMOKE_COLOR);
     }
     var dm = Math.min(amount, T.hp), killed = false;
     T.hp -= dm; if (!noHurtGauge && !gaugeLocked(T)) T.gauge = Math.min(GAUGE_MAX, T.gauge + roleOf(T.char).gaugeOnHurt);
@@ -2433,8 +2434,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     banner.className = "show" + (tag ? " multi" : "");
     killSound(streak);
   }
-  function pushHit(owner, dmg, basic, ultKey, killed, gaugeGain) {
+  function pushHit(owner, dmg, basic, ultKey, killed, gaugeGain, onMinion) {
     var h = { d: dmg, b: basic ? 1 : 0, t: now() };
+    if (onMinion) h.mn = 1;
     if (gaugeGain != null) h.g = gaugeGain;
     if (ultKey) h.u = ultKey;
     if (typeof basic === "number") h.s = basic;
@@ -2454,7 +2456,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (!owner) return;
     handled[s.key] = 1;
     if (h.t >= G.startAt - 1000) {
-      if (h.d) owner.dmg += h.d;
+      if (h.d && !h.mn) owner.dmg += h.d;
       if (h.k) owner.kills++;
       if (h.k && owner.char === "dancer") {
         if (gaugeLocked(owner)) owner.killGaugeOwed = (owner.killGaugeOwed || 0) + ULT.bwKillGauge;
@@ -2688,7 +2690,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var dx = T.x - d.x, dy = T.y - d.y;
     if (protectedNow(T)) return;
     if (d.slam && !d.dmg) afflict(T, d.fx, d.owner);
-    else damage(T, d.dmg, d.owner, !d.m && !d.u && d.createdAt, d.hammer ? d.createdAt : null, d.fx);
+    else damage(T, d.dmg, d.owner, !d.m && !d.u && d.createdAt, d.hammer ? d.createdAt : null, d.fx, null, !!d.m);
     if (d.kb && T.alive) {
       var dd = hyp(dx, dy) || 1, kbAt = now(), shoveEnd = T.shove ? T.shove.at + ULT.gdKbMs : 0;
       if (!T.minion) creditCC(d.owner, Math.max(0, kbAt + ULT.gdKbMs - Math.max(T.stunUntil || 0, shoveEnd, kbAt)), 0, 0);
@@ -4532,7 +4534,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     FX.push({ k: "boom", x: x, y: y, r: 110, c: 0xFF2A3A, t: Date.now(), life: 500 });
     if (ME && hyp(x - ME.x, y - ME.y) < 700) sfx("boom");
   }
-  function smoke(x, y) { FX.push({ k: "smoke", x: x, y: y, c: 0xC8C8CD, t: Date.now(), life: ULT.asSmokeMs + 150 }); }
+  var NECRO_SMOKE_COLOR = 0x8A2A48;
+  function smoke(x, y, color) { FX.push({ k: "smoke", x: x, y: y, c: color || 0xC8C8CD, t: Date.now(), life: ULT.asSmokeMs + 150 }); }
   function boom(x, y, r, team) { FX.push({ k: "boom", x: x, y: y, r: r, c: C_FX[team] || 0xffffff, t: Date.now(), life: 450 }); }
   function floatText(x, y, text, color) { FX.push({ k: "txt", x: x, y: y, s: text, c: color, t: Date.now(), life: 800 }); }
   function orbHitColor(d) { return d.ownerCharacterType === "necro" || d.ownerCharacterType === "frost" ? hitColor(d) : (d.team === "blue" ? "#5FA2FF" : "#FF6A5F"); }
