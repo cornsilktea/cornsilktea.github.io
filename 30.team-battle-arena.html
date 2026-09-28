@@ -2393,12 +2393,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (killed) room.ref.child("kills").push({ k: owner, v: T.id, t: now() });
     if (T === ME || T.bot) G.forceNet = true;
   }
-  var KILL_FEED_MS = 4000, KILL_FEED_MAX = 4, MULTI_KILL_MS = 5000;
-  function multiKillCount(k) {
-    var byKiller = G.killTimes || (G.killTimes = {});
-    var times = (byKiller[k.k] || []).concat(k.t).filter(function (t) { return t > k.t - MULTI_KILL_MS; });
-    byKiller[k.k] = times;
-    return times.length;
+  var KILL_FEED_MS = 4000, KILL_FEED_MAX = 4, MULTI_KILL_MS = 3000;
+  function multiKillCount(chainByKiller, k) {
+    var chain = chainByKiller[k.k];
+    var continuesChain = chain && Math.abs(k.t - chain.lastAt) <= MULTI_KILL_MS;
+    chain = continuesChain ? { count: chain.count + 1, lastAt: Math.max(chain.lastAt, k.t) } : { count: 1, lastAt: k.t };
+    chainByKiller[k.k] = chain;
+    return chain.count;
   }
   var MULTI_KILL_TAGS = [null, null, ["", "더블 킬"], ["triple", "트리플 킬"], ["quadra", "쿼드라 킬"], ["penta", "펜타 킬"]];
   function multiKillTag(streak) {
@@ -2408,7 +2409,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function onKillFeed(s) {
     var k = s.val(); if (!k || !G || handled[s.key]) return;
     handled[s.key] = 1;
-    var streak = multiKillCount(k);
+    var streak = multiKillCount(G.killChains || (G.killChains = {}), k);
     if (!(k.t > now() - KILL_FEED_MS)) return;
     var killer = P[k.k] || {}, victim = P[k.v] || {}, feed = $("killFeed");
     var nameTag = function (d, E) {
@@ -5292,6 +5293,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       loadMapData: loadMapData, makeEnt: makeEnt, resolve: resolve, stepWorld: stepWorld,
       useUlt: useUlt, fireBasic: fireBasic, damage: damage, afflict: afflict, speedOf: speedOf, stunned: stunned,
       onShot: onShot, onMelee: onMelee, onEffect: onEffect, onHit: onHit,
+      multiKillCount: multiKillCount, MULTI_KILL_MS: MULTI_KILL_MS,
       hiddenFrom: hiddenFrom, visibleTo: visibleTo, storms: function () { return STORMS; }, stormCenter: stormCenter,
       bushTiles: function () { return BUSH.map(function (b) { return b.tiles.map(function (tl) { return { x: tileX(tl[0]), y: tileY(tl[1]) }; }); }); },
       isIdle: function () { return !room; },

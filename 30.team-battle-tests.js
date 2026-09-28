@@ -842,6 +842,15 @@ function collectResults(api) {
       return { list: list, issues: issues, kills: kills, ults: ults };
     } finally { Math.random = realRandom; }
   }
+  run(MISC, "연속 킬: 마지막 킬부터 3초 안이면 더블→트리플→쿼드라→펜타, 한 번에 2킬도 이어서 셈", function (done) {
+    var W3 = api.MULTI_KILL_MS, chains = {}, got = [];
+    [0, W3 - 100, 2 * W3 - 200, 2 * W3 - 200, 3 * W3 - 300].forEach(function (t) { got.push(api.multiKillCount(chains, { k: "a", t: T0 + t })); });
+    got.push(api.multiKillCount(chains, { k: "a", t: T0 + 4 * W3 }));
+    got.push(api.multiKillCount(chains, { k: "b", t: T0 + 4 * W3 }));
+    var want = [1, 2, 3, 4, 5, 1, 1];
+    done(got.join() === want.join() ? "pass" : "fail", "나온 순서 " + got.join(",") + " / 기대 " + want.join(","));
+  });
+
   api.MAP_IDS.forEach(function (m, i) {
     var seed = 1000 + i * 17;
     run(AUTO, "AI 6명 60초 난전 — " + m + " (가끔 150ms 멈칫, 시드 " + seed + ")", function (done) {
