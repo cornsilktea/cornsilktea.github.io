@@ -204,8 +204,8 @@ function collectResults(api) {
     var y = OPEN_Y.forest, c = api.CHARS.duelist;
     var W = world("forest", [
       { id: "du", team: "blue", char: "duelist", x: 200, y: y },
-      { id: "near", team: "red", char: "knight", x: 200 + c.dashRange + 60, y: y },
-      { id: "far", team: "red", char: "knight", x: 200 + c.dashRange + 120, y: y }
+      { id: "near", team: "red", char: "guardian", x: 200 + c.dashRange + 60, y: y },
+      { id: "far", team: "red", char: "guardian", x: 200 + c.dashRange + 120, y: y }
     ]);
     var du = W.ent("du"), near = W.ent("near"), far = W.ent("far");
     du.hp = 200;
@@ -477,7 +477,7 @@ function collectResults(api) {
     function duel() {
       return world("forest", [
         { id: "bs", team: "blue", char: "blacksmith", x: 250, y: y },
-        { id: "foe", team: "red", char: "knight", x: 250 + c.range - 10, y: y + c.width / 2 - 10 }
+        { id: "foe", team: "red", char: "guardian", x: 250 + c.range - 10, y: y + c.width / 2 - 10 }
       ]);
     }
     var W = duel(), bs = W.ent("bs"), foe = W.ent("foe");
@@ -513,7 +513,7 @@ function collectResults(api) {
     if (tiers.join() !== want.join()) bad.push("단계 " + tiers.join(" · ") + " (기대 " + want.join(" · ") + ")");
     var W = world("forest", [
       { id: "mg", team: "blue", char: "mage", x: 250, y: y, gauge: api.GAUGE_MAX },
-      { id: "foe", team: "red", char: "knight", x: 450, y: y }
+      { id: "foe", team: "red", char: "guardian", x: 450, y: y }
     ]);
     var foe = W.ent("foe");
     api.useUlt(W.ent("mg"), 0, 200);
@@ -657,7 +657,7 @@ function collectResults(api) {
     function shotAt(dist) {
       var W = world("forest", [
         { id: "sn", team: "blue", char: "sniper", x: 100, y: y },
-        { id: "foe", team: "red", char: "knight", x: 100 + dist, y: y }
+        { id: "foe", team: "red", char: "guardian", x: 100 + dist, y: y }
       ]);
       var sn = W.ent("sn"), foe = W.ent("foe");
       api.fireBasic(sn, 0);
@@ -765,7 +765,7 @@ function collectResults(api) {
     var W = world("forest", [
       { id: "fr", team: "blue", char: "frost", x: 300, y: y, gauge: api.GAUGE_MAX },
       { id: "al", team: "blue", char: "knight", x: 420, y: y },
-      { id: "foe", team: "red", char: "knight", x: 300, y: y + 250 },
+      { id: "foe", team: "red", char: "guardian", x: 300, y: y + 250 },
       { id: "far", team: "red", char: "ranger", x: 300, y: y + 700 }
     ]);
     var fr = W.ent("fr"), al = W.ent("al"), foe = W.ent("foe"), far = W.ent("far"), bad = [];
@@ -850,7 +850,7 @@ function collectResults(api) {
     return world("forest", [{ id: "dn", team: "blue", char: "dancer", x: 250, y: OPEN_Y.forest, angle: 0 }].concat(foes));
   }
   run(DANCER, "단검 투척: 적에게 맞으면 직격 " + api.CHARS.dancer.dmg + " + 회전 " + api.ULT.bdDmg + " 피해가 한 번씩만 들어가고 게이지는 한 번만 오르는가", function (done) {
-    var W = dancerDuel([{ id: "foe", team: "red", char: "knight", x: 450, y: OPEN_Y.forest }]);
+    var W = dancerDuel([{ id: "foe", team: "red", char: "guardian", x: 450, y: OPEN_Y.forest }]);
     var dn = W.ent("dn"), foe = W.ent("foe");
     api.fireBasic(dn, 0);
     W.step(800);
@@ -860,7 +860,7 @@ function collectResults(api) {
   run(DANCER, "단검 투척: 아무도 못 맞히면 사거리 끝에서 회전해 반경 " + api.ULT.bdR + " 안의 적만 맞히는가", function (done) {
     var y = OPEN_Y.forest, endX = 250 + 20 + api.CHARS.dancer.range;
     var W = dancerDuel([
-      { id: "near", team: "red", char: "knight", x: endX, y: y + 50 },
+      { id: "near", team: "red", char: "guardian", x: endX, y: y + 50 },
       { id: "far", team: "red", char: "ranger", x: endX, y: y + 120 }
     ]);
     api.fireBasic(W.ent("dn"), 0);
@@ -870,7 +870,7 @@ function collectResults(api) {
     done(nearLost === api.ULT.bdDmg && !farLost ? "pass" : "fail", "끝점 50 옆 적 " + nearLost + " 피해, 120 옆 적 " + farLost + " 피해");
   });
   run(DANCER, "단검 투척: 회전 피해는 적중 " + api.ULT.bdDelay / 1000 + "초 뒤에 들어가는가", function (done) {
-    var W = dancerDuel([{ id: "foe", team: "red", char: "knight", x: 450, y: OPEN_Y.forest }]);
+    var W = dancerDuel([{ id: "foe", team: "red", char: "guardian", x: 450, y: OPEN_Y.forest }]);
     var dn = W.ent("dn"), foe = W.ent("foe"), hitAt = null, lostAtHit = 0, lostBefore = 0;
     api.fireBasic(dn, 0);
     W.step(800, FRAME, function (t) {
@@ -908,8 +908,8 @@ function collectResults(api) {
   run(DANCER, "칼날 폭풍: " + api.ULT.bwDur / 1000 + "초간 이동속도 " + api.CHARS.dancer.ultSpeed + ", 반경 " + api.ULT.bwR + " 안 적에게 " + api.ULT.bwTick / 1000 + "초마다 " + api.ULT.bwDmg + " 피해, 따라다니고 끝나면 멈추는가", function (done) {
     var y = OPEN_Y.forest;
     var W = dancerDuel([
-      { id: "foe", team: "red", char: "knight", x: 350, y: y },
-      { id: "out", team: "red", char: "knight", x: 250, y: y + 260 }
+      { id: "foe", team: "red", char: "guardian", x: 350, y: y },
+      { id: "out", team: "red", char: "guardian", x: 250, y: y + 260 }
     ]);
     var dn = W.ent("dn"), foe = W.ent("foe"), out = W.ent("out"), bad = [];
     foe.hp = foe.maxHp = 1e6;
@@ -990,7 +990,7 @@ function collectResults(api) {
         for (var i = logStart; i < W.log.length; i++) { var p = W.log[i]; if (p.v.tp) teleported[p.path.split("/")[1]] = 1; }
         list.forEach(function (e) {
           var E = W.ent(e.id), P0 = prev[e.id];
-          prev[e.id] = { x: E.x, y: E.y, alive: E.alive, leap: !!E.leap, dash: !!E.dash, stunned: api.stunned(E, t - ms) };
+          prev[e.id] = { x: E.x, y: E.y, alive: E.alive, leap: !!E.leap, dash: !!E.dash, stunned: api.stunned(E, t - ms), stunUntil: E.stunUntil };
           if (!isFinite(E.x) || !isFinite(E.y) || !isFinite(E.hp) || !isFinite(E.gauge)) { flag("숫자 아님(NaN)", E, t); return; }
           if (E.hp < 0 || E.hp > E.maxHp) flag("체력 범위 이탈", E, t, "hp " + E.hp);
           if (E.gauge < 0 || E.gauge > api.GAUGE_MAX) flag("게이지 범위 이탈", E, t, "gauge " + E.gauge);
@@ -1003,7 +1003,7 @@ function collectResults(api) {
           if (!P0 || !P0.alive) return;
           var jump = hyp(E.x - P0.x, E.y - P0.y);
           if (!E.leap && !P0.leap && !teleported[e.id] && jump > 0.5 && segmentCrossesWall(P0.x, P0.y, E.x, E.y)) flag("벽 통과", E, t, Math.round(jump) + "만큼 이동");
-          if (P0.stunned && api.stunned(E, t) && jump > 0.5 && !E.shove && !E.dash && !P0.dash && !E.leap && !P0.leap && !teleported[e.id] && !holeActive(t)) flag("기절 중 이동", E, t, Math.round(jump) + "만큼");
+          if (P0.stunned && P0.stunUntil >= t && api.stunned(E, t) && jump > 0.5 && !E.shove && !E.dash && !P0.dash && !E.leap && !P0.leap && !teleported[e.id] && !holeActive(t)) flag("기절 중 이동", E, t, Math.round(jump) + "만큼");
         });
       }
       var ults = W.log.filter(function (p) { return (p.path === "meleeHits" && p.v.u) || (p.path === "effects" && p.v.u !== 0 && p.v.type !== "pool") || (p.path === "shots" && p.v.s); }).length;
@@ -1011,6 +1011,114 @@ function collectResults(api) {
       return { list: list, issues: issues, kills: kills, ults: ults };
     } finally { Math.random = realRandom; }
   }
+  var PASSIVE2 = "주술사·투척병·기사·창기사·광전사 패시브";
+  run(PASSIVE2, "주술사: 적중한 적이 " + api.CHARS.mage.burn.ms / 1000 + "초간 불타며 1초당 " + api.CHARS.mage.burn.perSec + "의 피해를 입고, 그동안 회복이 절반인가", function (done) {
+    var y = OPEN_Y.forest, burn = api.CHARS.mage.burn;
+    var W = world("forest", [
+      { id: "mg", team: "blue", char: "mage", x: 250, y: y },
+      { id: "foe", team: "red", char: "warrior", x: 450, y: y }
+    ]);
+    var foe = W.ent("foe"), bad = [];
+    api.damage(foe, api.CHARS.mage.dmg, "mg", 1, null);
+    if (!api.healCut(foe, W.t())) bad.push("불타는 중 회복 감소 없음");
+    if (api.healAmount(foe, 10, W.t()) !== 5) bad.push("회복 10 → " + api.healAmount(foe, 10, W.t()));
+    W.step(burn.ms + 500);
+    var want = api.CHARS.mage.dmg + burn.perSec * burn.ms / 1000, lost = foe.maxHp - foe.hp;
+    if (lost !== want) bad.push("받은 피해 " + lost + " (기대 " + want + ")");
+    if (api.healCut(foe, W.t())) bad.push("화상이 끝나도 회복 감소 남음");
+    var mageDmg = W.log.filter(function (p) { return p.path === "hits/mg"; }).reduce(function (a, p) { return a + (p.v.d || 0); }, 0);
+    if (mageDmg !== want) bad.push("주술사 피해 기록 " + mageDmg);
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "기본 공격 " + api.CHARS.mage.dmg + " + 화상 " + (want - api.CHARS.mage.dmg) + " = " + want + ", 화상 중에만 회복 절반");
+  });
+
+  run(PASSIVE2, "투척병: 독병·독안개 위의 적만 회복이 절반이고, 화상과 겹쳐도 절반 1회만 적용되는가", function (done) {
+    var y = OPEN_Y.forest;
+    var W = world("forest", [
+      { id: "th", team: "blue", char: "thrower", x: 250, y: y },
+      { id: "mg", team: "blue", char: "mage", x: 250, y: y - 200 },
+      { id: "foe", team: "red", char: "knight", x: 450, y: y },
+      { id: "al", team: "blue", char: "knight", x: 450, y: y + 20 }
+    ]);
+    var foe = W.ent("foe"), al = W.ent("al"), bad = [];
+    foe.hp = al.hp = 100;
+    api.fireBasic(W.ent("th"), 0, 200);
+    W.step(900);
+    if (!api.healCut(foe, W.t())) bad.push("독병 위의 적 회복 감소 없음");
+    if (api.healCut(al, W.t())) bad.push("아군까지 회복 감소");
+    api.damage(foe, api.CHARS.mage.dmg, "mg", 2, null);
+    if (api.healAmount(foe, 20, W.t()) !== 10) bad.push("독병+화상 회복 20 → " + api.healAmount(foe, 20, W.t()));
+    W.step(api.ULT.plDur + 500);
+    if (api.healCut(foe, W.t())) bad.push("독병이 사라져도 회복 감소 남음");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "독병 위 적만 절반, 화상과 겹쳐도 절반");
+  });
+
+  run(PASSIVE2, "기사: 모든 피해가 1회마다 " + api.CHARS.knight.armor + " 줄고, 줄어든 만큼 막은 피해에 쌓이는가", function (done) {
+    var y = OPEN_Y.forest, armor = api.CHARS.knight.armor;
+    var W = world("forest", [
+      { id: "rg", team: "blue", char: "ranger", x: 250, y: y - 200 },
+      { id: "th", team: "blue", char: "thrower", x: 250, y: y },
+      { id: "kn", team: "red", char: "knight", x: 450, y: y - 200 },
+      { id: "k2", team: "red", char: "knight", x: 450, y: y }
+    ]);
+    var kn = W.ent("kn"), k2 = W.ent("k2"), bad = [];
+    api.damage(kn, 15, "rg", 1, null); api.damage(kn, 15, "rg", 2, null);
+    if (kn.maxHp - kn.hp !== 2 * (15 - armor)) bad.push("화살 15×2 → " + (kn.maxHp - kn.hp));
+    if (kn.blocked !== 2 * armor) bad.push("막은 피해 " + kn.blocked);
+    api.fireBasic(W.ent("th"), 0, 200);
+    W.step(4000);
+    var tick = api.CHARS.thrower.dmg - armor;
+    if (k2.maxHp - k2.hp !== tick * api.CHARS.thrower.ticks) bad.push("독병 → " + (k2.maxHp - k2.hp) + " (기대 " + tick * api.CHARS.thrower.ticks + ")");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "화살 " + (15 - armor) + "×2, 독병 " + tick + "×" + api.CHARS.thrower.ticks + ", 막은 피해 기록");
+  });
+
+  run(PASSIVE2, "창기사: 부활할 때 보호막이 생겨 다음 피해 1회만 막고, 함께 온 기절은 그대로 받는가", function (done) {
+    var y = OPEN_Y.forest;
+    var W = world("forest", [
+      { id: "gd", team: "blue", char: "guardian", x: 250, y: y },
+      { id: "ln", team: "red", char: "lancer", x: 450, y: y }
+    ]);
+    var ln = W.ent("ln"), bad = [];
+    if (ln.shield) bad.push("첫 등장부터 보호막");
+    api.damage(ln, 9999, "gd", false, null);
+    W.step(api.RESPAWN_MS + 100);
+    if (!ln.alive || !ln.shield) bad.push("부활 후 보호막 없음");
+    W.step(api.RESPAWN_PROTECT_MS);
+    api.afflict(ln, { slowMs: 500, slowMul: 0.7 });
+    if (!ln.shield) bad.push("피해 없는 둔화에 보호막이 사라짐");
+    api.damage(ln, 30, "gd", false, null, { stunMs: 800 });
+    if (ln.hp !== ln.maxHp) bad.push("보호막이 피해를 못 막음 (" + (ln.maxHp - ln.hp) + ")");
+    if (!api.stunned(ln, W.t())) bad.push("함께 온 기절이 안 걸림");
+    if (ln.shield) bad.push("보호막이 남아 있음");
+    api.damage(ln, 30, "gd", false, null);
+    if (ln.maxHp - ln.hp !== 30) bad.push("두 번째 피해 " + (ln.maxHp - ln.hp));
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "부활 시 보호막, 피해 30 막고 기절은 적용, 다음 피해는 그대로");
+  });
+
+  run(PASSIVE2, "광전사: 체력 " + api.CHARS.warrior.rally.hpRate * 100 + "% 미만이 되면 " + api.CHARS.warrior.rally.ms / 1000 + "초간 1초당 " + api.CHARS.warrior.rally.perSec + " 회복하고, 죽기 전까지 다시 발동하지 않는가", function (done) {
+    var y = OPEN_Y.forest, R = api.CHARS.warrior.rally;
+    var W = world("forest", [
+      { id: "kn", team: "blue", char: "knight", x: 250, y: y },
+      { id: "wr", team: "red", char: "warrior", x: 450, y: y }
+    ]);
+    var wr = W.ent("wr"), bad = [], full = R.perSec * R.ms / 1000;
+    api.damage(wr, wr.maxHp - 130, "kn", false, null);
+    var h0 = wr.hp, heal0 = wr.heal || 0;
+    W.step(R.ms + 500);
+    if (wr.hp - h0 !== full) bad.push("회복 " + (wr.hp - h0) + " (기대 " + full + ")");
+    if ((wr.heal || 0) - heal0 !== full) bad.push("회복 통계 " + ((wr.heal || 0) - heal0));
+    api.damage(wr, 80, "kn", false, null);
+    var h1 = wr.hp;
+    W.step(R.ms + 500);
+    if (wr.hp !== h1) bad.push("같은 목숨에서 다시 발동");
+    api.damage(wr, 9999, "kn", false, null);
+    W.step(api.RESPAWN_MS + api.RESPAWN_PROTECT_MS + 200);
+    api.damage(wr, wr.maxHp - 130, "kn", false, null);
+    var h2 = wr.hp;
+    W.step(1500);
+    if (wr.hp <= h2) bad.push("부활 뒤 재충전 안 됨");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : R.ms / 1000 + "초간 " + full + " 회복, 한 목숨에 한 번, 부활 시 재충전");
+  });
+
   run(MISC, "연속 킬: 마지막 킬부터 3초 안이면 더블→트리플→쿼드라→펜타, 한 번에 2킬도 이어서 셈", function (done) {
     var W3 = api.MULTI_KILL_MS, chains = {}, got = [];
     [0, W3 - 100, 2 * W3 - 200, 2 * W3 - 200, 3 * W3 - 300].forEach(function (t) { got.push(api.multiKillCount(chains, { k: "a", t: T0 + t })); });
