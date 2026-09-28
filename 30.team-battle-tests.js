@@ -200,7 +200,7 @@ function collectResults(api) {
     done(ok ? "pass" : "fail", ok ? "반경 " + hits[0].v.radius + " 범위 표시, 대상 없음" : "찌르기 기록 " + JSON.stringify(hits.map(function (h) { return h.v; })));
   });
 
-  run(MOVE, "결투가 찌르기: 0.7초 돌진 뒤 반경 안의 가장 가까운 적 1명만 찌르고 체력을 회복하는가", function (done) {
+  run(MOVE, "결투가 찌르기: 돌진이 끝난 뒤 반경 안의 가장 가까운 적 1명만 찌르고 체력을 회복하는가", function (done) {
     var y = OPEN_Y.forest, c = api.CHARS.duelist;
     var W = world("forest", [
       { id: "du", team: "blue", char: "duelist", x: 200, y: y },
