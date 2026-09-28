@@ -30,7 +30,7 @@
   button { font-family: inherit; cursor: pointer; }
   :root { --blue: #2F6FD6; --blue-soft: #E3ECFB; --red: #D6453D; --red-soft: #FBE5E3; }
 
-  .screen { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 30; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 54px 16px 24px;
+  .screen { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 30; overflow-y: auto; scrollbar-gutter: stable; -webkit-overflow-scrolling: touch; padding: 54px 16px 24px;
     background: linear-gradient(90deg, rgba(8, 14, 11, .88) 0%, rgba(8, 14, 11, .62) 48%, rgba(8, 14, 11, .12) 82%); }
   .screen, .modal {
     --sg-panel: rgba(16, 24, 19, .82); --sg-panel-alt: rgba(255, 255, 255, .07); --sg-line: rgba(255, 255, 255, .08); --sg-line-mid: rgba(255, 255, 255, .16); --sg-line-strong: rgba(255, 255, 255, .32);
@@ -3790,6 +3790,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     renderer.setClearColor(oldClear, oldAlpha);
     rt.dispose();
     playersChanged();
+    if (screenNow === "start") { $("chars")._h = null; renderStartChars(); }
   }
 
   var VIS = {}, PRV = {}, MLV = {}, MVIS = {};
