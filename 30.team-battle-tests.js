@@ -425,6 +425,27 @@ function collectResults(api) {
     done(ok ? "pass" : "fail", "거리 " + c.minRange + " → " + near + "ms, 중간 → " + mid + "ms, 거리 " + c.range + " → " + far + "ms");
   });
 
+  run(STUN, "주술사 메테오: 가운데 " + api.ULT.mbDmg + "·" + api.ULT.mbStunMs / 1000 + "초 ~ 끝 " + api.ULT.mbDmgMin + "·" + api.ULT.mbStunMin / 1000 + "초로 " + api.ULT.mbSteps + "단계로 줄고, 시전 뒤 기절해도 " + api.ULT.mbDelay / 1000 + "초 뒤 떨어지는가", function (done) {
+    var y = OPEN_Y.forest, U = api.ULT, reach = U.mbR + api.BODY_R, bad = [], tiers = [];
+    for (var i = 0; i < U.mbSteps; i++) { var h = api.meteorHitAt(reach * (i + 0.5) / U.mbSteps, U.mbR); tiers.push(h.dmg + "/" + h.stunMs / 1000); }
+    var want = [];
+    for (var j = 0; j < U.mbSteps; j++) want.push((U.mbDmg - (U.mbDmg - U.mbDmgMin) * j / (U.mbSteps - 1)) + "/" + (U.mbStunMs - (U.mbStunMs - U.mbStunMin) * j / (U.mbSteps - 1)) / 1000);
+    if (tiers.join() !== want.join()) bad.push("단계 " + tiers.join(" · ") + " (기대 " + want.join(" · ") + ")");
+    var W = world("forest", [
+      { id: "mg", team: "blue", char: "mage", x: 250, y: y, gauge: api.GAUGE_MAX },
+      { id: "foe", team: "red", char: "knight", x: 450, y: y }
+    ]);
+    var foe = W.ent("foe");
+    api.useUlt(W.ent("mg"), 0, 200);
+    W.step(100);
+    api.afflict(W.ent("mg"), { stunMs: 2000 });
+    W.step(U.mbDelay - 200);
+    if (foe.hp < foe.maxHp) bad.push(U.mbDelay + "ms 전에 떨어짐");
+    W.step(200);
+    if (foe.maxHp - foe.hp !== U.mbDmg) bad.push("가운데 피해 " + (foe.maxHp - foe.hp) + " (시전자 기절 뒤 취소됐거나 단계 오류)");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "단계 " + tiers.join(" · ") + ", 시전자가 기절해도 " + U.mbDelay + "ms 뒤 가운데 " + U.mbDmg + " 피해");
+  });
+
   run(STUN, "기사 방어태세: 기절해 있어도 끝날 때 주변 기절이 발동하는가 (시전 동작 없음)", function (done) {
     var y = OPEN_Y.forest;
     var W = world("forest", [
