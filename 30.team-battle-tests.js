@@ -1412,28 +1412,33 @@ function collectResults(api) {
   clericCutBy("쓰러지면", function (W, cl) { api.damage(cl, 9999, "foe", false, null); });
 
   var SHAMAN = "주술사";
-  function shamanTeam() {
+  function shamanTeam(extra) {
     var y = OPEN_Y.forest;
     var W = world("forest", [
       { id: "sh", team: "blue", char: "shaman", x: 300, y: y, gauge: api.GAUGE_MAX },
       { id: "al", team: "blue", char: "knight", x: 420, y: y + 20 },
       { id: "near", team: "red", char: "guardian", x: 420, y: y },
-      { id: "far", team: "red", char: "guardian", x: 680, y: y }
-    ]);
-    ["near", "far"].forEach(function (id) { var E = W.ent(id); E.hp = E.maxHp = 1000; });
+      { id: "far", team: "red", char: "guardian", x: 700, y: y }
+    ].concat(extra || []));
+    W.list = ["near", "far"].concat((extra || []).filter(function (e) { return e.team === "red"; }).map(function (e) { return e.id; }));
+    W.list.forEach(function (id) { var E = W.ent(id); E.hp = E.maxHp = 1000; });
     return W;
   }
-  run(SHAMAN, "기본 공격: 검은 파동이 적에게 " + api.CHARS.shaman.dmg + "의 피해를 주고 아군은 회복하지 않는가", function (done) {
-    var W = shamanTeam(), sh = W.ent("sh"), al = W.ent("al"), near = W.ent("near"), bad = [];
+  run(SHAMAN, "기본 공격: 가운데 강한 파동 " + api.CHARS.shaman.dmg + "·양쪽 약한 파동 " + api.CHARS.shaman.sideDmg + "의 피해, 사거리 " + api.CHARS.shaman.range + ", 아군 회복 없음", function (done) {
+    var y = OPEN_Y.forest, W = shamanTeam([{ id: "side", team: "red", char: "guardian", x: 460, y: y + 75 }, { id: "beyond", team: "red", char: "guardian", x: 300 + api.CHARS.shaman.range + api.BODY_R + 30, y: y }]);
+    var sh = W.ent("sh"), al = W.ent("al"), near = W.ent("near"), side = W.ent("side"), beyond = W.ent("beyond"), bad = [];
     al.hp = 100;
     sh.cdUntil = 0; api.fireBasic(sh, 0);
-    W.step(800);
-    if (1000 - near.hp !== api.CHARS.shaman.dmg) bad.push("적 피해 " + (1000 - near.hp));
+    W.step(900);
+    if (1000 - near.hp !== api.CHARS.shaman.dmg) bad.push("가운데 적 피해 " + (1000 - near.hp));
+    if (1000 - side.hp !== api.CHARS.shaman.sideDmg) bad.push("옆 적 피해 " + (1000 - side.hp));
+    if (beyond.hp !== 1000) bad.push("사거리 밖 적이 맞음");
     if (al.hp !== 100) bad.push("아군 체력이 " + (al.hp - 100) + " 바뀜");
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "적 " + api.CHARS.shaman.dmg + " 피해, 아군 회복 없음");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "가운데 " + api.CHARS.shaman.dmg + "·옆 " + api.CHARS.shaman.sideDmg + " 피해, 사거리 밖·아군은 그대로");
   });
-  run(SHAMAN, "영역전개: " + api.ULT.dmGrowMs / 1000 + "초간 반경 " + api.ULT.dmR + "까지 커지며 처음 닿은 적만 " + api.ULT.dmStunMs / 1000 + "초 기절하고, 기절이 풀릴 때 " + api.ULT.dmBoltDmg + " 피해를 한 번 받는가", function (done) {
+  run(SHAMAN, "영역전개: " + api.ULT.dmGrowMs / 1000 + "초간 반경 " + api.ULT.dmR + "까지 커지며 닿은 적은 " + api.ULT.dmStunMs / 1000 + "초 기절하고, 기절이 풀릴 때 " + api.ULT.dmBoltDmg + " 피해를 한 번 받는가", function (done) {
     var W = shamanTeam(), sh = W.ent("sh"), near = W.ent("near"), far = W.ent("far"), bad = [], at = { nearStun: null, farStun: null, nearBolt: null }, t0;
+    far.x = 300 + 380;
     api.useUlt(sh, 0); t0 = W.t();
     W.step(api.ULT.dmDur + 300, FRAME, function (t) {
       if (at.nearStun === null && api.stunned(near, t)) at.nearStun = t - t0;
@@ -1448,29 +1453,49 @@ function collectResults(api) {
     if (at.nearBolt === null || Math.abs(at.nearBolt - at.nearStun - api.ULT.dmStunMs) > 40) bad.push("번개가 기절 " + at.nearStun + "ms 뒤 " + at.nearBolt + "ms");
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "가까운 적 " + Math.round(at.nearStun) + "ms·먼 적 " + Math.round(at.farStun) + "ms에 기절, 기절이 풀린 " + Math.round(at.nearBolt) + "ms에 " + api.ULT.dmBoltDmg + " 피해 한 번");
   });
-  run(SHAMAN, "영역전개: 영역 안에서 기본 공격은 가장 가까운 적에게 " + api.ULT.dmStrikeDmg + " 번개, 영역 밖으로 나가면 다시 파동이 되는가", function (done) {
-    var W = shamanTeam(), sh = W.ent("sh"), near = W.ent("near"), far = W.ent("far"), bad = [];
+  run(SHAMAN, "영역전개: 주술사를 따라다니고, 다 커진 뒤 들어온 적은 기절하지 않지만 번개(" + api.ULT.dmStrikeDmg + ") 대상이 되는가", function (done) {
+    var y = OPEN_Y.forest, W = shamanTeam(), sh = W.ent("sh"), near = W.ent("near"), far = W.ent("far"), bad = [];
+    near.x = 300; near.y = y - 480; far.x = 300; far.y = y - 700;
     api.useUlt(sh, 0);
-    W.step(api.ULT.dmGrowMs + api.ULT.dmStunMs + 300);
+    W.step(api.ULT.dmGrowMs + 200);
+    sh.y = y - 300;
+    var stunnedLate = false;
+    W.step(300, FRAME, function (t) { if (api.stunned(near, t)) stunnedLate = true; });
+    if (stunnedLate) bad.push("다 커진 뒤 들어온 적이 기절함");
     var n0 = near.hp, f0 = far.hp;
     sh.cdUntil = 0; api.fireBasic(sh, Math.PI);
     W.step(100);
-    if (n0 - near.hp !== api.ULT.dmStrikeDmg) bad.push("가까운 적 번개 피해 " + (n0 - near.hp));
-    if (far.hp !== f0) bad.push("먼 적도 맞음");
-    sh.x = 300; sh.y = OPEN_Y.forest - 480;
-    var n1 = near.hp, f1 = far.hp;
-    sh.cdUntil = 0; api.fireBasic(sh, Math.PI);
-    W.step(800);
-    if (near.hp !== n1 || far.hp !== f1) bad.push("영역 밖에서도 번개가 나감");
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "영역 안: 가까운 적만 " + api.ULT.dmStrikeDmg + " 피해, 영역 밖: 번개 없음");
+    if (n0 - near.hp !== api.ULT.dmStrikeDmg) bad.push("따라온 영역 안 적 번개 피해 " + (n0 - near.hp));
+    if (far.hp !== f0) bad.push("영역 밖 적이 맞음");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "주술사가 움직이면 영역도 따라감, 늦게 들어온 적은 기절 없이 번개 " + api.ULT.dmStrikeDmg + " 피해");
   });
-  run(SHAMAN, "영역전개: 부활 보호 중인 적은 기절·번개를 받지 않는가", function (done) {
-    var W = shamanTeam(), sh = W.ent("sh"), near = W.ent("near");
-    near.protectUntil = W.t() + api.ULT.dmDur + 500;
+  run(SHAMAN, "영역전개: 영역 안의 네크로 해골도 번개 대상(가장 가까운 적)이 되는가", function (done) {
+    var y = OPEN_Y.forest, W = shamanTeam([{ id: "nc", team: "red", char: "necro", x: 300, y: y + 340, gauge: api.GAUGE_MAX }]), sh = W.ent("sh"), nc = W.ent("nc"), near = W.ent("near");
+    near.x = 300; near.y = y + 300; W.ent("far").y = y + 900;
+    api.useUlt(nc, -Math.PI / 2);
+    W.step(api.ULT.smRiseMs + 100);
+    var minion = (nc.minions || [])[0];
+    if (!minion) { done("fail", "시험 준비 실패: 해골이 없음"); return; }
+    minion.x = 300; minion.y = y + 120;
+    api.useUlt(sh, 0);
+    W.step(api.ULT.dmGrowMs + api.ULT.dmStunMs + 200);
+    var m0 = minion.hp, n0 = near.hp;
+    sh.cdUntil = 0; api.fireBasic(sh, 0);
+    W.step(100);
+    var ok = minion.hp < m0 && near.hp === n0;
+    done(ok ? "pass" : "fail", "해골 체력 " + m0 + " → " + minion.hp + ", 더 먼 적 " + (n0 - near.hp) + " 피해");
+  });
+  run(SHAMAN, "영역전개: 주술사가 쓰러지면 반구가 바로 사라지고, 부활 보호 중인 적은 기절·번개를 받지 않는가", function (done) {
+    var W = shamanTeam(), sh = W.ent("sh"), near = W.ent("near"), far = W.ent("far"), bad = [];
+    far.protectUntil = W.t() + api.ULT.dmDur + 500; far.x = 500;
     api.useUlt(sh, 0);
     var stunnedEver = false;
-    W.step(api.ULT.dmDur + 300, FRAME, function (t) { if (api.stunned(near, t)) stunnedEver = true; });
-    done(!stunnedEver && near.hp === 1000 ? "pass" : "fail", (stunnedEver ? "기절함" : "기절 안 함") + ", 피해 " + (1000 - near.hp));
+    W.step(api.ULT.dmGrowMs + 100, FRAME, function (t) { if (api.stunned(far, t)) stunnedEver = true; });
+    if (stunnedEver || far.hp !== 1000) bad.push("보호 중인 적이 기절하거나 맞음");
+    api.damage(sh, 9999, "near", false, null);
+    W.frame(FRAME);
+    if (api.domains().length) bad.push("쓰러진 뒤에도 반구가 남음");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "보호 중인 적은 그대로, 주술사가 쓰러지자 반구가 사라짐");
   });
 
   api.MAP_IDS.forEach(function (m, i) {
