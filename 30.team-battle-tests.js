@@ -176,6 +176,57 @@ function collectResults(api) {
     done(why ? "fail" : "pass", why ? "순간이동 후 " + why : "적 위치(" + Math.round(hm.x) + ", " + Math.round(hm.y) + ")로 이동, 벽 밖");
   });
 
+  run(MOVE, "결투가 돌진: 벽을 향해 돌진하면 벽 앞에서 멈추는가", function (done) {
+    var q = singleRowWall(), x0 = q.x - 25, y0 = q.y + q.h / 2 + 130;
+    var W = world("forest", [{ id: "du", team: "blue", char: "duelist", x: x0, y: y0, angle: -Math.PI / 2 }]);
+    if (blockedAt(x0, y0)) { done("fail", "시험 준비 실패: 출발 위치가 막혀 있음"); return; }
+    api.fireBasic(W.ent("du"), -Math.PI / 2);
+    var worst = null;
+    W.step(900, FRAME, function () { var why = blockedAt(W.ent("du").x, W.ent("du").y); if (why && !worst) worst = why; });
+    var E = W.ent("du");
+    done(worst || E.y < q.y ? "fail" : "pass", worst ? worst : "벽 아래 y=" + Math.round(E.y) + "에서 멈춤 (벽 아래면 " + (q.y + q.h / 2) + ")");
+  });
+
+  run(MOVE, "결투가 찌르기: 0.7초 돌진 뒤 반경 안의 가장 가까운 적 1명만 찌르고 체력을 회복하는가", function (done) {
+    var y = OPEN_Y.forest, c = api.CHARS.duelist;
+    var W = world("forest", [
+      { id: "du", team: "blue", char: "duelist", x: 200, y: y },
+      { id: "near", team: "red", char: "knight", x: 200 + c.dashRange + 60, y: y },
+      { id: "far", team: "red", char: "knight", x: 200 + c.dashRange + 120, y: y }
+    ]);
+    var du = W.ent("du"), near = W.ent("near"), far = W.ent("far");
+    du.hp = 200;
+    api.fireBasic(du, 0);
+    W.step(c.dashMs - 50);
+    var early = near.hp < near.maxHp || far.hp < far.maxHp;
+    W.step(150);
+    var bad = [];
+    if (early) bad.push("도착 전에 찌름");
+    if (near.hp !== near.maxHp - c.dmg) bad.push("가까운 적 피해 " + (near.maxHp - near.hp));
+    if (far.hp !== far.maxHp) bad.push("먼 적도 맞음");
+    if (du.hp !== 200 + c.selfHeal) bad.push("회복 후 체력 " + du.hp);
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "가까운 적만 " + c.dmg + " 피해, 체력 " + c.selfHeal + " 회복");
+  });
+
+  run(MOVE, "결투가 르미즈: 기본 공격 대기시간이 초기화되고 3초간 초당 3회·0.3초 돌진이 되는가", function (done) {
+    var y = OPEN_Y.forest, c = api.CHARS.duelist;
+    var W = world("forest", [{ id: "du", team: "blue", char: "duelist", x: 150, y: y, gauge: api.GAUGE_MAX }]);
+    var du = W.ent("du"), bad = [];
+    api.fireBasic(du, 0);
+    W.step(c.dashMs + 50);
+    api.useUlt(du, 0);
+    if (du.cdUntil > W.t()) bad.push("대기시간이 남음");
+    var start = W.t();
+    api.fireBasic(du, Math.PI);
+    if (Math.round(du.cdUntil - start) !== Math.round(1000 / api.ULT.rmRate)) bad.push("공격 간격 " + Math.round(du.cdUntil - start) + "ms");
+    W.step(api.ULT.rmDashMs + 20);
+    if (du.dash) bad.push("돌진이 0.3초에 안 끝남");
+    W.step(api.ULT.rmDur);
+    api.fireBasic(du, 0);
+    if (Math.round(du.cdUntil - W.t()) !== c.cd) bad.push("스킬 끝난 뒤 공격 간격 " + Math.round(du.cdUntil - W.t()) + "ms");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "초기화 → " + Math.round(1000 / api.ULT.rmRate) + "ms 간격·" + api.ULT.rmDashMs + "ms 돌진 → 끝난 뒤 " + c.cd + "ms 간격");
+  });
+
   run(MOVE, "블랙홀 중심을 벽 안에 찍어도 끌려간 적이 벽에 끼지 않는가", function (done) {
     var q = singleRowWall(), ty = q.y + q.h / 2 + api.BODY_R + 40;
     var W = world("forest", [
@@ -364,6 +415,20 @@ function collectResults(api) {
     W.step(700);
     var finish = W.pushesFrom("hm", "meleeHits").filter(function (p) { return p.v.arc; }).length, E = W.ent("hm"), why = blockedAt(E.x, E.y);
     done(finish || why || E.dash ? "fail" : "pass", finish ? "기절했는데 마무리 공격이 나감" : why ? why : E.dash ? "돌진 상태가 안 풀림" : "돌진은 끝까지 미끄러진 뒤 마무리 공격 취소");
+  });
+
+  run(STUN, "결투가 돌진 중에 기절하면 찌르기가 취소되는가", function (done) {
+    var y = OPEN_Y.forest, c = api.CHARS.duelist;
+    var W = world("forest", [
+      { id: "du", team: "blue", char: "duelist", x: 200, y: y },
+      { id: "foe", team: "red", char: "knight", x: 200 + c.dashRange + 60, y: y }
+    ]);
+    api.fireBasic(W.ent("du"), 0);
+    W.step(200);
+    api.afflict(W.ent("du"), { stunMs: 1000 });
+    W.step(900);
+    var foe = W.ent("foe"), E = W.ent("du"), why = blockedAt(E.x, E.y);
+    done(foe.hp < foe.maxHp || why || E.dash ? "fail" : "pass", foe.hp < foe.maxHp ? "기절했는데 찌르기가 나감" : why ? why : E.dash ? "돌진 상태가 안 풀림" : "돌진은 끝까지 미끄러진 뒤 찌르기 취소");
   });
 
   run(STUN, "대장장이 내려찍기: 도약 중에 기절해도 끝까지 진행되는가 (시전 동작 없음 → 기절 무시)", function (done) {
@@ -917,7 +982,7 @@ function collectResults(api) {
           if (!E.alive) return;
           if (E.stunUntil - t > maxStun + 20) flag("기절이 너무 김", E, t, Math.round(E.stunUntil - t) + "ms");
           if (!E.leap) { var why = blockedAt(E.x, E.y); if (why) flag(why, E, t); }
-          if (E.dash && t - E.dash.at > api.CHARS.hitman.dashMs + api.CHARS.hitman.finishDelay + 200) flag("돌진이 안 끝남", E, t);
+          if (E.dash && t - E.dash.at > (E.dash.ms || api.CHARS[E.char].dashMs) + (api.CHARS[E.char].finishDelay || 0) + 200) flag("돌진이 안 끝남", E, t);
           if (E.leap && t - E.leap.at > api.ULT.bsLeapMaxMs + 200) flag("도약이 안 끝남", E, t);
           if (E.shove && t - E.shove.at > api.ULT.gdKbMs + 200) flag("넉백이 안 끝남", E, t);
           if (!P0 || !P0.alive) return;
