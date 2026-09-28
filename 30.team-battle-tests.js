@@ -258,7 +258,7 @@ function collectResults(api) {
       : "모든 기절에서 취소됨");
   });
 
-  run(MISC, "부활 보호(3초) 중에는 모든 공격·기절·둔화·넉백·끌어당김에 면역인가", function (done) {
+  run(MISC, "부활 보호(" + api.RESPAWN_PROTECT_MS / 1000 + "초) 중에는 모든 공격·기절·둔화·넉백·끌어당김에 면역인가", function (done) {
     var y = OPEN_Y.forest, casters = [
       { id: "mg", team: "blue", char: "mage", x: 300, y: y - 220, gauge: api.GAUGE_MAX },
       { id: "gd", team: "blue", char: "guardian", x: 520, y: y, gauge: api.GAUGE_MAX },
@@ -392,6 +392,36 @@ function collectResults(api) {
     done(ok ? "pass" : "fail", "최소 거리 " + landedAfter[0] + "ms, 최대 거리 " + landedAfter[1] + "ms 뒤 착지");
   });
 
+  run(STUN, "대장장이 기본 공격: 멈춰 서서 " + api.CHARS.blacksmith.windup + "ms 뒤 타격하고, 그 전에 기절하면 취소되는가", function (done) {
+    var y = OPEN_Y.forest, c = api.CHARS.blacksmith, bad = [];
+    function duel() {
+      return world("forest", [
+        { id: "bs", team: "blue", char: "blacksmith", x: 250, y: y },
+        { id: "foe", team: "red", char: "knight", x: 330, y: y }
+      ]);
+    }
+    var W = duel(), bs = W.ent("bs"), foe = W.ent("foe");
+    api.fireBasic(bs, 0);
+    if (api.speedOf(bs) !== 0) bad.push("준비 중에 움직일 수 있음");
+    W.step(c.windup - 50);
+    if (foe.hp < foe.maxHp) bad.push("준비 시간 전에 피해가 들어감");
+    W.step(100);
+    if (foe.maxHp - foe.hp !== c.dmg) bad.push("타격 피해 " + (foe.maxHp - foe.hp) + " (기대 " + c.dmg + ")");
+    if (api.speedOf(bs) === 0) bad.push("타격 뒤에도 멈춰 있음");
+    W = duel(); bs = W.ent("bs"); foe = W.ent("foe");
+    api.fireBasic(bs, 0);
+    W.step(100);
+    api.afflict(bs, { stunMs: 500 });
+    W.step(400);
+    if (foe.hp < foe.maxHp) bad.push("기절했는데 타격이 나감");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "준비 중 정지, " + c.windup + "ms 뒤 " + c.dmg + " 피해, 기절 시 취소");
+  });
+  run(MOVE, "투척병 물약: 가까이 던질수록 빨리 떨어지는가 (최소 사거리 " + api.ULT.plFlightMin + "ms ~ 최대 사거리 " + api.ULT.plFlight + "ms)", function (done) {
+    var c = api.CHARS.thrower, near = api.potionFlightMs(c.minRange), mid = api.potionFlightMs((c.minRange + c.range) / 2), far = api.potionFlightMs(c.range);
+    var ok = near === api.ULT.plFlightMin && far === api.ULT.plFlight && mid > near && mid < far;
+    done(ok ? "pass" : "fail", "거리 " + c.minRange + " → " + near + "ms, 중간 → " + mid + "ms, 거리 " + c.range + " → " + far + "ms");
+  });
+
   run(STUN, "기사 방어태세: 기절해 있어도 끝날 때 주변 기절이 발동하는가 (시전 동작 없음)", function (done) {
     var y = OPEN_Y.forest;
     var W = world("forest", [
@@ -442,7 +472,7 @@ function collectResults(api) {
       { id: "foe", team: "red", char: "knight", x: 450, y: y }
     ]);
     api.useUlt(W.ent("rg"), 0);
-    W.step(1200);
+    W.step(api.ULT.mkCount * api.ULT.mkGap + 500);
     var g = W.ent("rg").gauge, hits = Math.round((W.ent("foe").maxHp - W.ent("foe").hp) / api.ULT.mkDmg);
     done(g === api.GAUGE_MAX && hits === api.ULT.mkCount ? "pass" : "fail", hits + "발 적중 → 게이지 " + g + "/" + api.GAUGE_MAX);
   });
@@ -492,7 +522,9 @@ function collectResults(api) {
     if (E.shove || E.leap || E.dash) bad.push("부활 후 이동 상태 남음");
     if (E.hp !== E.maxHp) bad.push("부활 체력 " + E.hp);
     if (!(E.protectUntil > W.t())) bad.push("부활 보호 없음");
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "기절·둔화 해제, 부활 시 체력·상태 초기화, 보호 3초");
+    W.step(api.RESPAWN_PROTECT_MS);
+    if (E.protectUntil > W.t()) bad.push("부활 보호가 " + api.RESPAWN_PROTECT_MS + "ms 넘게 이어짐");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "기절·둔화 해제, 부활 시 체력·상태 초기화, 보호 " + api.RESPAWN_PROTECT_MS / 1000 + "초");
   });
 
   var PASSIVE = "궁수·저격수·네크로 패시브";
@@ -507,10 +539,14 @@ function collectResults(api) {
     volley();
     if (foe.hp === foe.maxHp) { done("fail", "시험 준비 실패: 화살이 맞지 않음"); return; }
     volley(); volley();
-    W.step(h.ms + 100);
+    W.step(h.ms - 1000);
+    volley();
+    W.step(h.ms - 1000);
     got.push(api.speedOf(rg) - base);
-    var ok = got[0] === 2 * h.add && got[1] === Math.min(h.max, 4 * h.add) && got[2] === h.max && got[3] === 0;
-    done(ok ? "pass" : "fail", "이동속도 증가 " + got.map(function (v) { return "+" + v; }).join(" → ") + " (기대: +" + 2 * h.add + " → +" + h.max + " → +" + h.max + " → +0)");
+    W.step(1200);
+    got.push(api.speedOf(rg) - base);
+    var ok = got[0] === 2 * h.add && got[1] === Math.min(h.max, 4 * h.add) && got[2] === h.max && got[3] === h.max && got[4] === h.max && got[5] === 0;
+    done(ok ? "pass" : "fail", "이동속도 증가 " + got.map(function (v) { return "+" + v; }).join(" → ") + " (기대: +" + 2 * h.add + " → +" + h.max + " ×4 → +0, 적중마다 지속시간 초기화)");
   });
   run(PASSIVE, "저격수: " + api.CHARS.sniper.farDist + "보다 먼 적에게만 피해 +" + Math.round(api.CHARS.sniper.farBonus * 100) + "%인가", function (done) {
     var y = OPEN_Y.forest, c = api.CHARS.sniper;
