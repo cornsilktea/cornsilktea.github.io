@@ -1,7 +1,7 @@
 function collectResults(api) {
   var T0 = 1700000000000;
   var FRAME = 1000 / 60;
-  var OPEN_Y = { forest: 575, river: 575, dungeon: 525 };
+  var OPEN_Y = { forest: 575, river: 575, dungeon: 525, windhill: 575 };
 
   function hyp(x, y) { return Math.sqrt(x * x + y * y); }
   function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
@@ -110,7 +110,7 @@ function collectResults(api) {
 
   var WALL = "벽·물 끼임", STUN = "기절·행동 불가", MOVE = "이동기·넉백", GAUGE = "궁극기 게이지", MISC = "죽음·부활", AUTO = "자동 난전";
 
-  run(WALL, "무작위 위치 5,000곳 × 지도 3개를 밀어내기 처리하면 벽·물 밖으로 나오는가", function (done) {
+  run(WALL, "무작위 위치 5,000곳 × 지도 " + api.MAP_IDS.length + "개를 밀어내기 처리하면 벽·물 밖으로 나오는가", function (done) {
     var rnd = seededRandom(7), bad = [];
     api.MAP_IDS.forEach(function (m) {
       api.loadMapData(m);
@@ -121,7 +121,7 @@ function collectResults(api) {
         if (why) bad.push(m + " (" + Math.round(p.x) + ", " + Math.round(p.y) + ") " + why);
       }
     });
-    done(bad.length ? "fail" : "pass", bad.length ? bad.length + "곳 실패. 예: " + bad.slice(0, 3).join(" / ") : "15,000곳 모두 벽·물 밖으로 나옴");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.length + "곳 실패. 예: " + bad.slice(0, 3).join(" / ") : (5000 * api.MAP_IDS.length).toLocaleString() + "곳 모두 벽·물 밖으로 나옴");
   });
 
   function guardianIntoWall(hitchMs) {
