@@ -29,6 +29,7 @@
             "stun": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 600" },
             "slow": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 600" },
             "assist": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100" },
+            "games": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= newData.parent().parent().child('matches').val()" },
             "asPicks": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= newData.parent().child('picks').val()" },
             "ccPicks": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= newData.parent().child('picks').val()" },
             "$other": { ".validate": false }

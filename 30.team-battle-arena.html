@@ -595,7 +595,7 @@
     <div class="statsTop"><h3>캐릭터 통계</h3><button id="btnStatsClose" class="mini" type="button">닫기</button></div>
     <div id="statsModes" class="modeBtns"></div>
     <div id="statsMsg" class="statsMsg"></div>
-    <div class="boardWrap"><table class="board statsTable"><thead><tr><th class="nm">캐릭터</th><th>선택률<small>선택 수 / 게임 수</small></th><th>승률<small>승리 수 / 선택 수</small></th><th>평균 어시스트</th><th>평균 피해량</th><th>평균 회복량</th><th>평균 막은 피해</th><th>평균 기절</th><th>평균 둔화</th></tr></thead><tbody id="statsBody"></tbody></table></div>
+    <div class="boardWrap"><table class="board statsTable"><thead><tr><th class="nm">캐릭터</th><th>선택률<small>선택 수 / 고를 수 있던 게임 수</small></th><th>승률<small>승리 수 / 선택 수</small></th><th>평균 어시스트</th><th>평균 피해량</th><th>평균 회복량</th><th>평균 막은 피해</th><th>평균 기절</th><th>평균 둔화</th></tr></thead><tbody id="statsBody"></tbody></table></div>
     <ul class="statsNotes">
       <li>AI 없이 학생 6명이 3대3으로 끝까지 마친 경기만 집계합니다.</li>
       <li>시간 종료 때 킬 수가 같으면 무승부이고, 무승부는 승리로 세지 않습니다.</li>
@@ -1522,9 +1522,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function statsRowsHtml(s) {
     var matches = +s.matches || 0, lastRole = null, h = "";
     CHAR_LIST.forEach(function (k) {
-      var c = CHARS[k], d = s[k] || {}, picks = +d.picks || 0, wins = +d.wins || 0, ccPicks = +d.ccPicks || 0, asPicks = +d.asPicks || 0;
+      var c = CHARS[k], d = s[k] || {}, selectableGames = d.games != null ? +d.games : (s[k] ? matches : 0), picks = +d.picks || 0, wins = +d.wins || 0, ccPicks = +d.ccPicks || 0, asPicks = +d.asPicks || 0;
       if (c.role !== lastRole) { lastRole = c.role; h += '<tr class="grp"><td colspan="9">' + ROLES[c.role].icon + " " + ROLES[c.role].name + "</td></tr>"; }
-      h += '<tr><td class="nm">' + c.icon + " " + esc(c.name) + "</td>" + statsRateCell(picks, matches) + statsRateCell(wins, picks) +
+      h += '<tr><td class="nm">' + c.icon + " " + esc(c.name) + "</td>" + statsRateCell(picks, selectableGames) + statsRateCell(wins, picks) +
         "<td>" + (asPicks ? (+d.assist || 0).toFixed(1) : "-") + "</td>" +
         "<td>" + (picks ? Math.round(+d.dmg || 0) : "-") + "</td>" +
         "<td>" + (picks && c.heals ? Math.round(+d.heal || 0) : "-") + "</td>" +
@@ -3451,29 +3451,38 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return { c: r.roster[id].c, win: r.winner === r.roster[id].team, dmg: +e.dmg || 0, heal: +e.heal || 0,
                blocked: +e.blocked || 0, stun: +e.stunDealt || 0, slow: +e.slowDealt || 0, assists: +e.assists || 0 };
     });
-    db.ref(STATS_PATH + r.mode).transaction(function (cur) {
-      cur = cur || {};
-      cur.matches = (+cur.matches || 0) + 1;
-      cur.red = (+cur.red || 0) + (r.winner === "red" ? 1 : 0);
-      cur.blue = (+cur.blue || 0) + (r.winner === "blue" ? 1 : 0);
-      rows.forEach(function (w) {
-        var st = cur[w.c] || {}, n = +st.picks || 0;
-        st.dmg = r1(((+st.dmg || 0) * n + w.dmg) / (n + 1));
-        st.heal = r1(((+st.heal || 0) * n + w.heal) / (n + 1));
-        var ccN = +st.ccPicks || 0;
-        st.block = r1(((+st.block || 0) * ccN + w.blocked) / (ccN + 1));
-        st.stun = r1(((+st.stun || 0) * ccN + w.stun) / (ccN + 1));
-        st.slow = r1(((+st.slow || 0) * ccN + w.slow) / (ccN + 1));
-        st.ccPicks = ccN + 1;
-        var asN = +st.asPicks || 0;
-        st.assist = r1(((+st.assist || 0) * asN + w.assists) / (asN + 1));
-        st.asPicks = asN + 1;
-        st.picks = n + 1;
-        st.wins = (+st.wins || 0) + (w.win ? 1 : 0);
-        cur[w.c] = st;
+    function addStats(countSelectableGames) {
+      return db.ref(STATS_PATH + r.mode).transaction(function (cur) {
+        cur = cur || {};
+        var matchesBefore = +cur.matches || 0;
+        cur.matches = matchesBefore + 1;
+        if (countSelectableGames) CHAR_LIST.forEach(function (k) {
+          var st = cur[k] || { picks: 0, wins: 0, dmg: 0, heal: 0 };
+          st.games = (st.games != null ? +st.games : (cur[k] ? matchesBefore : 0)) + 1;
+          cur[k] = st;
+        });
+        cur.red = (+cur.red || 0) + (r.winner === "red" ? 1 : 0);
+        cur.blue = (+cur.blue || 0) + (r.winner === "blue" ? 1 : 0);
+        rows.forEach(function (w) {
+          var st = cur[w.c] || {}, n = +st.picks || 0;
+          st.dmg = r1(((+st.dmg || 0) * n + w.dmg) / (n + 1));
+          st.heal = r1(((+st.heal || 0) * n + w.heal) / (n + 1));
+          var ccN = +st.ccPicks || 0;
+          st.block = r1(((+st.block || 0) * ccN + w.blocked) / (ccN + 1));
+          st.stun = r1(((+st.stun || 0) * ccN + w.stun) / (ccN + 1));
+          st.slow = r1(((+st.slow || 0) * ccN + w.slow) / (ccN + 1));
+          st.ccPicks = ccN + 1;
+          var asN = +st.asPicks || 0;
+          st.assist = r1(((+st.assist || 0) * asN + w.assists) / (asN + 1));
+          st.asPicks = asN + 1;
+          st.picks = n + 1;
+          st.wins = (+st.wins || 0) + (w.win ? 1 : 0);
+          cur[w.c] = st;
+        });
+        return cur;
       });
-      return cur;
-    }).catch(function () {});
+    }
+    addStats(true).catch(function () { return addStats(false); }).catch(function () {});
   }
   function hostCleanup() {
     var t = now();
