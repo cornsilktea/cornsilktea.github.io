@@ -495,6 +495,75 @@ function collectResults(api) {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "기절·둔화 해제, 부활 시 체력·상태 초기화, 보호 3초");
   });
 
+  var PASSIVE = "궁수·저격수·네크로 패시브";
+  run(PASSIVE, "궁수: 기본 공격 적중마다 이동속도 +" + api.CHARS.ranger.haste.add + ", 최대 +" + api.CHARS.ranger.haste.max + ", " + api.CHARS.ranger.haste.ms + "ms 뒤 사라지는가", function (done) {
+    var y = OPEN_Y.forest, h = api.CHARS.ranger.haste, base = api.CHARS.ranger.speed;
+    var W = world("forest", [
+      { id: "rg", team: "blue", char: "ranger", x: 250, y: y },
+      { id: "foe", team: "red", char: "knight", x: 450, y: y }
+    ]);
+    var rg = W.ent("rg"), foe = W.ent("foe"), got = [];
+    function volley() { rg.cdUntil = 0; api.fireBasic(rg, angleTo(rg, foe)); W.step(450); got.push(api.speedOf(rg) - base); }
+    volley();
+    if (foe.hp === foe.maxHp) { done("fail", "시험 준비 실패: 화살이 맞지 않음"); return; }
+    volley(); volley();
+    W.step(h.ms + 100);
+    got.push(api.speedOf(rg) - base);
+    var ok = got[0] === 2 * h.add && got[1] === Math.min(h.max, 4 * h.add) && got[2] === h.max && got[3] === 0;
+    done(ok ? "pass" : "fail", "이동속도 증가 " + got.map(function (v) { return "+" + v; }).join(" → ") + " (기대: +" + 2 * h.add + " → +" + h.max + " → +" + h.max + " → +0)");
+  });
+  run(PASSIVE, "저격수: " + api.CHARS.sniper.farDist + "보다 먼 적에게만 피해 +" + Math.round(api.CHARS.sniper.farBonus * 100) + "%인가", function (done) {
+    var y = OPEN_Y.forest, c = api.CHARS.sniper;
+    function shotAt(dist) {
+      var W = world("forest", [
+        { id: "sn", team: "blue", char: "sniper", x: 100, y: y },
+        { id: "foe", team: "red", char: "knight", x: 100 + dist, y: y }
+      ]);
+      var sn = W.ent("sn"), foe = W.ent("foe");
+      api.fireBasic(sn, 0);
+      W.step(700);
+      return foe.maxHp - foe.hp;
+    }
+    var near = shotAt(300), far = shotAt(600);
+    if (!near || !far) { done("fail", "시험 준비 실패: 화살이 맞지 않음 (가까이 " + near + ", 멀리 " + far + ")"); return; }
+    var ok = near === c.dmg && far === Math.round(c.dmg * (1 + c.farBonus));
+    done(ok ? "pass" : "fail", "거리 300 → " + near + ", 거리 600 → " + far + " (기대: " + c.dmg + " / " + Math.round(c.dmg * (1 + c.farBonus)) + ")");
+  });
+  run(PASSIVE, "네크로: 체력이 " + api.CHARS.necro.lastStandHp + " 아래로 떨어질 피해는 " + api.CHARS.necro.lastStandHp + "에서 멈추고 은신, 한 목숨에 한 번, 부활하면 다시 되는가", function (done) {
+    var y = OPEN_Y.forest, c = api.CHARS.necro, bad = [];
+    var W = world("forest", [
+      { id: "nc", team: "blue", char: "necro", x: 250, y: y },
+      { id: "foe", team: "red", char: "knight", x: 700, y: y }
+    ]);
+    var nc = W.ent("nc"), foe = W.ent("foe");
+    api.damage(nc, 90, "foe", true, null, null);
+    if (nc.hp !== c.lastStandHp) bad.push("120에서 90 피해 → 체력 " + nc.hp);
+    if (!api.hiddenFrom(nc, W.t()) || api.visibleTo(nc, foe, W.t())) bad.push("발동 후 은신 안 됨");
+    W.step(c.lastStandHideMs + 100);
+    if (api.hiddenFrom(nc, W.t())) bad.push(c.lastStandHideMs + "ms 뒤에도 은신 유지");
+    api.damage(nc, 80, "foe", true, null, null);
+    if (nc.alive) bad.push("두 번째에도 발동해 살아남음");
+    W.step(api.RESPAWN_MS + 3100);
+    nc.hp = 70;
+    api.damage(nc, 80, "foe", true, null, null);
+    if (!nc.alive || nc.hp !== c.lastStandHp) bad.push("부활 뒤 70에서 80 피해 → " + (nc.alive ? "체력 " + nc.hp : "죽음"));
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "120-90 → 50·은신, 두 번째 치명타에 죽음, 부활 뒤 70-80 → 50");
+  });
+  run(PASSIVE, "네크로 해골: 공격할 대상이 없으면 네크로에게 다가오는가", function (done) {
+    var y = OPEN_Y.forest;
+    var W = world("forest", [{ id: "nc", team: "blue", char: "necro", x: 250, y: y, gauge: api.GAUGE_MAX }]);
+    var nc = W.ent("nc");
+    api.useUlt(nc, 0);
+    W.step(api.ULT.smRiseMs + 100);
+    if (!nc.minions || !nc.minions.length) { done("fail", "시험 준비 실패: 해골이 소환되지 않음"); return; }
+    nc.x = 600;
+    function far() { return Math.max.apply(null, nc.minions.map(function (m) { return hyp(m.x - nc.x, m.y - nc.y); })); }
+    var before = far();
+    W.step(2500);
+    var after = far();
+    done(after < before - 100 && after < api.ULT.smFollow + 40 ? "pass" : "fail", "가장 먼 해골과의 거리 " + Math.round(before) + " → " + Math.round(after));
+  });
+
   var FROST = "얼음술사·은신";
   function frostDuel() {
     var y = OPEN_Y.forest;
