@@ -1007,7 +1007,7 @@ function collectResults(api) {
           if (P0.stunned && P0.stunUntil >= t && api.stunned(E, t) && jump > 0.5 && !E.shove && !E.dash && !P0.dash && !E.leap && !P0.leap && !teleported[e.id] && !holeActive(t)) flag("기절 중 이동", E, t, Math.round(jump) + "만큼");
         });
       }
-      var ults = W.log.filter(function (p) { return (p.path === "meleeHits" && p.v.u) || (p.path === "effects" && p.v.u !== 0 && p.v.type !== "pool") || (p.path === "shots" && p.v.s); }).length;
+      var ults = W.log.filter(function (p) { return (p.path === "meleeHits" && p.v.u) || (p.path === "effects" && p.v.u !== 0 && p.v.type !== "pool" && p.v.type !== "grace") || (p.path === "shots" && p.v.s); }).length;
       var kills = W.log.filter(function (p) { return p.path === "kills"; }).length;
       return { list: list, issues: issues, kills: kills, ults: ults };
     } finally { Math.random = realRandom; }
@@ -1295,6 +1295,81 @@ function collectResults(api) {
     W.step(100);
     var got = ["stunner", "slower", "late"].map(function (id) { return W.ent(id).assists || 0; });
     done(got.join() === "1,1,0" ? "pass" : "fail", "기절 " + got[0] + " · 둔화 " + got[1] + " · " + AMS / 1000 + "초 넘은 둔화 " + got[2] + " (기대 1·1·0)");
+  });
+
+  var CLERIC = "클레릭";
+  function clericTeam(extra) {
+    var y = OPEN_Y.forest;
+    return world("forest", [
+      { id: "cl", team: "blue", char: "cleric", x: 300, y: y },
+      { id: "kn", team: "blue", char: "knight", x: 450, y: y },
+      { id: "rg", team: "blue", char: "ranger", x: 300, y: y + 120 },
+      { id: "foe", team: "red", char: "guardian", x: 300, y: y + 330 },
+      { id: "foe2", team: "red", char: "ranger", x: 600, y: y + 330 }
+    ].concat(extra || []));
+  }
+  function clericSwing(W) { var cl = W.ent("cl"); cl.cdUntil = 0; api.fireBasic(cl, 0); W.frame(FRAME); }
+  run(CLERIC, "기본 공격: 반경 " + api.CHARS.cleric.range + " 안에서 체력이 가장 낮은(깎인) 아군 1명만 " + api.CHARS.cleric.graceHeal + " 회복하고, 자신·먼 아군·부활 보호 중 아군은 고르지 않는가", function (done) {
+    var W = clericTeam([{ id: "far", team: "blue", char: "ranger", x: 300, y: OPEN_Y.forest - 480 }]);
+    var cl = W.ent("cl"), kn = W.ent("kn"), rg = W.ent("rg"), far = W.ent("far"), bad = [];
+    cl.hp = 10; kn.hp = 200; rg.hp = 40; far.hp = 5;
+    clericSwing(W);
+    if (rg.hp !== 40 + api.CHARS.cleric.graceHeal) bad.push("궁수(가장 낮음) " + rg.hp);
+    if (kn.hp !== 200 || cl.hp !== 10 || far.hp !== 5) bad.push("다른 대상도 회복됨(기사 " + kn.hp + "·자신 " + cl.hp + "·먼 아군 " + far.hp + ")");
+    rg.hp = rg.maxHp;
+    clericSwing(W);
+    if (kn.hp !== 200 + api.CHARS.cleric.graceHeal) bad.push("체력이 가득 찬 궁수 대신 깎인 기사를 고르지 않음(기사 " + kn.hp + ")");
+    kn.hp = 20; kn.protectUntil = W.t() + 2000; rg.hp = 30;
+    clericSwing(W);
+    if (kn.hp !== 20) bad.push("부활 보호 중 아군이 회복됨");
+    if (rg.hp !== 30 + api.CHARS.cleric.graceHeal) bad.push("보호 중 아군을 빼고 다음 대상을 고르지 않음(궁수 " + rg.hp + ")");
+    var enemyDmg = W.log.filter(function (p) { return p.path === "hits/cl" && p.v.d > 0; }).length;
+    if (enemyDmg) bad.push("기본 공격이 적에게 피해를 줌");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "가장 낮은 깎인 아군만 " + api.CHARS.cleric.graceHeal + " 회복, 자신·먼 아군·보호 중 아군 제외");
+  });
+  run(CLERIC, "게이지: 아군을 " + api.CHARS.cleric.healGauge + " 회복시켜야 가득 차고, 넘친 회복(체력이 가득 찬 부분)은 세지 않는가", function (done) {
+    var W = clericTeam(), cl = W.ent("cl"), kn = W.ent("kn"), heal = api.CHARS.cleric.graceHeal, got = [];
+    kn.hp = 10; kn.maxHp = 1e6;
+    for (var i = 0; i < 16; i++) clericSwing(W);
+    got.push(Math.round(cl.gauge * 10) / 10);
+    clericSwing(W); got.push(Math.round(cl.gauge * 10) / 10);
+    cl.gauge = 0; kn.maxHp = api.CHARS.knight.hp; kn.hp = kn.maxHp - 6; W.ent("rg").hp = W.ent("rg").maxHp;
+    clericSwing(W); got.push(Math.round(cl.gauge * 100) / 100);
+    var want0 = Math.round(16 * heal * api.GAUGE_MAX / api.CHARS.cleric.healGauge * 10) / 10, want2 = Math.round(6 * api.GAUGE_MAX / api.CHARS.cleric.healGauge * 100) / 100;
+    var ok = got[0] === want0 && got[1] === api.GAUGE_MAX && got[2] === want2;
+    done(ok ? "pass" : "fail", "16번 회복(" + 16 * heal + ") → " + got[0] + ", 17번째 → " + got[1] + ", 6만 회복 → " + got[2] + " (기대 " + want0 + "·" + api.GAUGE_MAX + "·" + want2 + ")");
+  });
+  run(CLERIC, "요한계시록: " + api.ULT.rvDur / 1000 + "초간 아군은 1초당 " + api.ULT.rvHeal + " 회복, 적은 1초당 " + api.ULT.rvDmg + " 피해를 사용 순간·1초·2초에 3번 받고 거리와 상관없는가", function (done) {
+    var W = clericTeam(), cl = W.ent("cl"), kn = W.ent("kn"), foe = W.ent("foe"), foe2 = W.ent("foe2"), bad = [], times = [];
+    kn.hp = 100; cl.hp = 50; foe.hp = foe.maxHp = 1000; foe2.x = 750; foe2.y = 1250; foe2.hp = foe2.maxHp = 1000;
+    cl.gauge = api.GAUGE_MAX;
+    var t0 = W.t(), last = foe.hp;
+    function mark(t) { if (foe.hp < last) { times.push(Math.round((t - t0) / 100) / 10); last = foe.hp; } }
+    api.useUlt(cl, 0);
+    W.frame(1); mark(W.t());
+    W.step(api.ULT.rvDur + 500, FRAME, mark);
+    if (1000 - foe.hp !== api.ULT.rvDmg * 3) bad.push("가까운 적 피해 " + (1000 - foe.hp));
+    if (1000 - foe2.hp !== api.ULT.rvDmg * 3) bad.push("먼 적 피해 " + (1000 - foe2.hp));
+    if (kn.hp !== 100 + api.ULT.rvHeal * 3) bad.push("아군 회복 " + (kn.hp - 100));
+    if (cl.hp !== 50) bad.push("클레릭 자신도 회복됨");
+    if (times[0] !== 0) bad.push("사용 순간 피해 없음");
+    if (cl.gauge !== 0) bad.push("스킬 중 회복으로 게이지가 참(" + cl.gauge + ")");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "적 " + api.ULT.rvDmg * 3 + " 피해·아군 " + api.ULT.rvHeal * 3 + " 회복(" + times.join("초·") + "초), 먼 적도 같음, 자신은 제외");
+  });
+  run(CLERIC, "요한계시록: 쓰러진 적·아군과 부활 보호 중인 적·아군에게는 피해·회복이 들어가지 않는가", function (done) {
+    var W = clericTeam(), cl = W.ent("cl"), kn = W.ent("kn"), rg = W.ent("rg"), foe = W.ent("foe"), foe2 = W.ent("foe2"), bad = [];
+    kn.hp = 100; rg.hp = 50; rg.maxHp = 1000; foe.hp = foe.maxHp = 1000;
+    kn.protectUntil = W.t() + 5000; foe.protectUntil = W.t() + 5000;
+    api.damage(foe2, 9999, "cl", false, null);
+    cl.gauge = api.GAUGE_MAX;
+    api.useUlt(cl, 0);
+    W.step(api.ULT.rvDur + 200);
+    var hitDead = W.log.filter(function (p) { return p.path === "hits/cl" && p.v.u === "revelation"; }).length;
+    if (kn.hp !== 100) bad.push("보호 중 아군 회복 " + (kn.hp - 100));
+    if (foe.hp !== 1000) bad.push("보호 중 적 피해 " + (1000 - foe.hp));
+    if (hitDead) bad.push("쓰러진 적(또는 보호 중 적)에게 스킬 피해 " + hitDead + "번");
+    if (rg.hp !== 50 + api.ULT.rvHeal * 3) bad.push("보통 아군 회복 " + (rg.hp - 50));
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "보호 중·쓰러진 대상은 그대로, 보통 아군은 " + api.ULT.rvHeal * 3 + " 회복");
   });
 
   api.MAP_IDS.forEach(function (m, i) {
