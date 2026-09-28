@@ -142,6 +142,7 @@
   .spInfo { flex: 1 1 auto; min-width: 0; }
   .spName { font-size: 20px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
   .spName small { font-size: 14px; color: #A3B0A6; font-weight: 700; margin-left: 4px; }
+  .spK { font-size: .8em; color: #FFD37A; margin-left: 6px; }
   .spBar { position: relative; height: 20px; border-radius: 5px; background: rgba(255,255,255,.12); overflow: hidden; margin-top: 4px; }
   .spBar i { position: absolute; left: 0; top: 0; bottom: 0; }
   .spBar.hp i { background: #3BB273; }
@@ -1031,7 +1032,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var st = s.val();
       if (st === null) { if (!leaving) exitToStart("방이 종료되었어요."); return; }
       var prev = room.status; room.status = st; syncArena();
-      if (st === "lobby") { G = null; ME = null; BOTS = {}; showScreen("lobby"); playersChanged(); }
+      var keepSpecResult = st === "lobby" && prev === "ended" && screenNow === "game" && isSpec();
+      if (!keepSpecResult) releaseSpecResult();
+      if (st === "lobby") { G = null; ME = null; BOTS = {}; if (keepSpecResult) holdSpecResult(); else showScreen("lobby"); playersChanged(); }
       else if (st === "draft") { G = null; ME = null; BOTS = {}; if (prev !== "draft") draftView = null; showScreen("draft"); renderDraft(); }
       else showScreen("game");
       if (st === "countdown" && prev !== "countdown") clockBurst();
@@ -1092,7 +1095,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (room) { leaving = true; unsubAll(); try { room.ref.child("players/" + myId).onDisconnect().cancel(); } catch (e) {} }
     room = null; resetLocal(); showScreen("start"); startMsg(msg || "");
   }
-  function resetLocal() { clear3d(); BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; STORMS = []; BLADE_SPINS = []; P = {}; R = {}; PR = {}; MELEE = {}; FX = []; G = null; ME = null; BOTS = {}; ST = {}; SHOTS = []; hitSubs = {}; joy.id = null; aim.id = null; }
+  function resetLocal() { clear3d(); BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; STORMS = []; BLADE_SPINS = []; P = {}; R = {}; PR = {}; MELEE = {}; FX = []; G = null; ME = null; BOTS = {}; ST = {}; SHOTS = []; hitSubs = {}; joy.id = null; aim.id = null; specResultHeld = false; setText($("btnAgain"), "다시하기"); }
   window.addEventListener("pagehide", function () { if (room) { try { room.ref.child("players/" + myId).remove(); } catch (e) {} } });
 
   var screenNow = "start";
@@ -1116,16 +1119,17 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (!room || room.status !== "lobby" || !me || me.team === team) return false;
     return countIn(P, team, myId) < capOf(team);
   }
-  function takenOnTeam(ps, team, c, except) {
-    if (team !== "blue" && team !== "red") return false;
-    return keys(ps || {}).some(function (id) { return id !== except && ps[id] && ps[id].team === team && ps[id].characterType === c; });
+  function isPlayingTeam(team) { return team === "blue" || team === "red"; }
+  function takenInMatch(ps, team, c, except) {
+    if (!isPlayingTeam(team)) return false;
+    return keys(ps || {}).some(function (id) { return id !== except && ps[id] && isPlayingTeam(ps[id].team) && ps[id].characterType === c; });
   }
   function freeCharOn(ps, team, except) {
     var order = ["ranger"].concat(CHAR_LIST.filter(function (c) { return c !== "ranger"; }));
-    for (var i = 0; i < order.length; i++) if (!takenOnTeam(ps, team, order[i], except)) return order[i];
+    for (var i = 0; i < order.length; i++) if (!takenInMatch(ps, team, order[i], except)) return order[i];
     return "ranger";
   }
-  function onlyOneMsg(c) { return CHARS[c].name + "는 이미 팀원이 골랐어요. 한 팀에서 같은 캐릭터는 1명만 고를 수 있어요."; }
+  function onlyOneMsg(c) { return "이미 다른 사람이 고른 캐릭터예요(" + CHARS[c].name + "). 한 경기에서 같은 캐릭터는 1명만 고를 수 있어요."; }
   function pickTeam(team) {
     if (!canMoveTo(team)) return;
     var swapped = null;
@@ -1134,23 +1138,23 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (countIn(ps, team, myId) >= capOf(team)) return;
       ps[myId].team = team;
       swapped = null;
-      if (takenOnTeam(ps, team, ps[myId].characterType, myId)) {
+      if (takenInMatch(ps, team, ps[myId].characterType, myId)) {
         swapped = { from: ps[myId].characterType, to: freeCharOn(ps, team, myId) };
         ps[myId].characterType = swapped.to;
       }
       return ps;
     }).then(function (res) {
       if (!res.committed) flashHint("자리가 다 찼어요. 자리가 나면 다시 눌러 주세요.");
-      else if (swapped) flashHint("그 팀에는 이미 " + CHARS[swapped.from].name + "가 있어서 " + CHARS[swapped.to].name + "로 바꿨어요.");
+      else if (swapped) flashHint("이미 다른 사람이 고른 캐릭터(" + CHARS[swapped.from].name + ")라서 " + CHARS[swapped.to].name + " 캐릭터로 바꿨어요.");
     });
   }
   function pickChar(c) {
     var me = P[myId];
-    if (takenOnTeam(P, me.team, c, myId)) { flashHint(onlyOneMsg(c)); return; }
+    if (takenInMatch(P, me.team, c, myId)) { flashHint(onlyOneMsg(c)); return; }
     var blocked = false;
     room.ref.child("players").transaction(function (ps) {
       if (!ps || !ps[myId]) return ps;
-      blocked = takenOnTeam(ps, ps[myId].team, c, myId);
+      blocked = takenInMatch(ps, ps[myId].team, c, myId);
       if (blocked) return;
       ps[myId].characterType = c; return ps;
     }).then(function (res) { if (!res.committed && blocked) flashHint(onlyOneMsg(c)); });
@@ -1301,10 +1305,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   function cardsHtml(me, viewOnly) {
     return roleRowsHtml(function (k) {
-      var c = CHARS[k], taken = !viewOnly && me.characterType !== k && takenOnTeam(P, me.team, k, myId);
+      var c = CHARS[k], taken = !viewOnly && me.characterType !== k && takenInMatch(P, me.team, k, myId);
       return '<button type="button" class="charCard' + (!viewOnly && me.characterType === k ? " on" : "") + (flipped[k] ? " flip" : "") +
         '" data-c="' + k + '"' + (taken ? " disabled" : "") + '><div class="cardIn">' +
-        '<div class="face front">' + (taken ? '<span class="soon">팀원 선택</span>' : "") + '<img alt="" src="' + charImgSrc(k) + '">' +
+        '<div class="face front">' + (taken ? '<span class="soon">선택됨</span>' : "") + '<img alt="" src="' + charImgSrc(k) + '">' +
           '<div class="nm">' + c.name + "</div></div>" +
         '<div class="face back"><div class="nm">' + c.name + "</div>" + statTable(k) +
           skillBlocks(k) + "</div>" +
@@ -1364,7 +1368,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (!cup) ["blue", "red"].forEach(function (team) {
       teamIds(team).forEach(function (id) {
         var c = P[id].characterType;
-        if (ok && !P[id].isAI && takenOnTeam(P, team, c, id)) { ok = false; hint = (team === "blue" ? "블루" : "레드") + "팀에 " + CHARS[c].name + "가 2명 이상이에요. 한 팀에서 같은 캐릭터는 1명만 고를 수 있어요."; }
+        if (ok && !P[id].isAI && takenInMatch(P, team, c, id)) { ok = false; hint = "같은 캐릭터(" + CHARS[c].name + ")를 2명 이상 골랐어요. 한 경기에서 같은 캐릭터는 1명만 고를 수 있어요."; }
       });
     });
     if (!host) hint = (ok ? "방장이 시작하기를 기다리는 중… " : "") + hint;
@@ -1419,7 +1423,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   function addAi(team) {
     if (!isHost() || room.status !== "lobby" || countIn(P, team) >= TEAM_MAX) return;
-    var free = CHAR_LIST.filter(function (c) { return !takenOnTeam(P, team, c); });
+    var free = CHAR_LIST.filter(function (c) { return !takenInMatch(P, team, c); });
     var id = "ai" + Math.random().toString(36).slice(2, 10);
     room.ref.child("players/" + id).set({ nickname: freeAiName(P), isAI: true, team: team, characterType: pick(free.length ? free : CHAR_LIST), joinedAt: now() });
   }
@@ -3121,13 +3125,21 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     room.ref.update({ status: "lobby", winner: null, final: null, startAt: null, endedAt: null, roster: null, draft: null,
                       st: null, done: null, shots: null, meleeHits: null, hits: null, effects: null, kills: null, projectiles: null });
   }
-  $("btnAgain").onclick = restart;
+  var specResultHeld = false;
+  function holdSpecResult() { specResultHeld = true; setText($("btnAgain"), "대기실로"); }
+  function releaseSpecResult() {
+    if (!specResultHeld) return;
+    specResultHeld = false; setText($("btnAgain"), "다시하기"); show($("endOv"), false);
+    if (room && room.status === "lobby") { showScreen("lobby"); playersChanged(); }
+  }
+  function againOrBackToLobby() { if (specResultHeld) releaseSpecResult(); else restart(); }
+  $("btnAgain").onclick = againOrBackToLobby;
   var KEY_ON = { up: false, down: false, left: false, right: false, atk: false };
   var KEY_MAP = { KeyW: "up", KeyS: "down", KeyA: "left", KeyD: "right", KeyK: "atk",
                   ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right" };
   function keyName(e) { return KEY_MAP[e.code] || KEY_MAP[e.key] || null; }
   window.addEventListener("keydown", function (e) {
-    if ((e.code === "Space" || e.key === " ") && room && room.status === "ended" && screenNow === "game") { e.preventDefault(); restart(); return; }
+    if ((e.code === "Space" || e.key === " ") && room && (room.status === "ended" || specResultHeld) && screenNow === "game") { e.preventDefault(); againOrBackToLobby(); return; }
     if (screenNow !== "game" || (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName))) return;
     var k = keyName(e);
     if (k) { KEY_ON[k] = true; e.preventDefault(); audio(); return; }
@@ -4753,7 +4765,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     octx.save(); octx.globalAlpha = alpha;
     drawStatus(E, p.x, top - 33);
     octx.font = "800 13px " + FONT; octx.textAlign = "center"; octx.textBaseline = "middle";
-    var name = E.nickname || "", tw = Math.max(40, octx.measureText(name).width + 16), ny = top - 13;
+    var name = (E.nickname || "") + (ME ? "" : " · " + (E.kills || 0) + "킬"), tw = Math.max(40, octx.measureText(name).width + 16), ny = top - 13;
     octx.fillStyle = "rgba(14,20,17,.78)"; pill(p.x - tw / 2, ny - 9, tw, 18, 9); octx.fill();
     octx.lineWidth = 2; octx.strokeStyle = E.team === "blue" ? "#4C8DFF" : "#FF5A4E"; octx.stroke();
     octx.fillStyle = "#FFFFFF"; octx.fillText(name, p.x, ny + 1);
@@ -4831,7 +4843,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var hp = Math.max(0, Math.round(E.hp)), ratio = clamp(E.hp / E.maxHp, 0, 1);
       var g = Math.min(GAUGE_MAX, Math.floor(E.gauge)), full = g >= GAUGE_MAX, tn = now(), act = E.alive && skillActive(E, tn);
       h += '<div class="spCard' + (E.alive ? "" : " dead") + '"><img alt="" src="' + charImgSrc(E.char, team) + '">' +
-        '<div class="spInfo"><div class="spName">' + (E.isAI ? "🤖 " : "") + esc(E.nickname) + "<small>" + CHARS[E.char].name + "</small></div>" +
+        '<div class="spInfo"><div class="spName">' + (E.isAI ? "🤖 " : "") + esc(E.nickname) + '<span class="spK">' + (E.kills || 0) + "킬</span><small>" + CHARS[E.char].name + "</small></div>" +
         '<div class="spBar hp' + (ratio < 0.3 ? " low" : "") + '"><i style="width:' + Math.round(ratio * 100) + '%"></i><span>' +
           (E.alive ? "HP " + hp + " / " + E.maxHp : "부활까지 " + Math.max(1, Math.ceil((E.diedAt + RESPAWN_MS - now()) / 1000)) + "초") + "</span></div>" +
         (act ? '<div class="spBar ult act"><i style="width:' + Math.round(skillLeft(E, tn) * 100) + '%"></i><span>' +
