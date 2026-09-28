@@ -176,15 +176,28 @@ function collectResults(api) {
     done(why ? "fail" : "pass", why ? "순간이동 후 " + why : "적 위치(" + Math.round(hm.x) + ", " + Math.round(hm.y) + ")로 이동, 벽 밖");
   });
 
-  run(MOVE, "결투가 돌진: 벽을 향해 돌진하면 벽 앞에서 멈추는가", function (done) {
-    var q = singleRowWall(), x0 = q.x - 25, y0 = q.y + q.h / 2 + 130;
+  run(MOVE, "결투가 돌진: 벽을 향해 돌진하면 벽 앞에서 바로 멈추고 찌르기로 넘어가는가", function (done) {
+    var q = singleRowWall(), x0 = q.x - 25, y0 = q.y + q.h / 2 + 130, c = api.CHARS.duelist;
     var W = world("forest", [{ id: "du", team: "blue", char: "duelist", x: x0, y: y0, angle: -Math.PI / 2 }]);
     if (blockedAt(x0, y0)) { done("fail", "시험 준비 실패: 출발 위치가 막혀 있음"); return; }
-    api.fireBasic(W.ent("du"), -Math.PI / 2);
-    var worst = null;
-    W.step(900, FRAME, function () { var why = blockedAt(W.ent("du").x, W.ent("du").y); if (why && !worst) worst = why; });
-    var E = W.ent("du");
-    done(worst || E.y < q.y ? "fail" : "pass", worst ? worst : "벽 아래 y=" + Math.round(E.y) + "에서 멈춤 (벽 아래면 " + (q.y + q.h / 2) + ")");
+    var E = W.ent("du"), start = W.t(), endedAt = 0, worst = null;
+    api.fireBasic(E, -Math.PI / 2);
+    W.step(900, FRAME, function (t) { var why = blockedAt(E.x, E.y); if (why && !worst) worst = why; if (!E.dash && !endedAt) endedAt = t; });
+    var moved = y0 - E.y, fullMs = c.dashMs * moved / c.dashRange, took = endedAt - start, bad = [];
+    if (worst) bad.push(worst);
+    if (E.y < q.y) bad.push("벽을 뚫음");
+    if (took > fullMs + 60) bad.push(Math.round(moved) + " 움직이는 데 " + Math.round(took) + "ms (벽 앞에서 느리게 미끄러짐)");
+    if (!E.stabAt) bad.push("찌르기가 안 나감");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "벽 아래 y=" + Math.round(E.y) + "까지 " + Math.round(moved) + " 돌진, " + Math.round(took) + "ms 만에 끝나고 찌름");
+  });
+
+  run(MOVE, "결투가 찌르기: 찌를 적이 없어도 찌르기 범위가 표시되는가 (피해 없음)", function (done) {
+    var W = world("forest", [{ id: "du", team: "blue", char: "duelist", x: 200, y: OPEN_Y.forest }]);
+    api.fireBasic(W.ent("du"), 0);
+    W.step(api.CHARS.duelist.dashMs + 100);
+    var hits = W.pushesFrom("du", "meleeHits");
+    var ok = hits.length === 1 && hits[0].v.stab && hits[0].v.radius === api.CHARS.duelist.range && !hits[0].v.tgt;
+    done(ok ? "pass" : "fail", ok ? "반경 " + hits[0].v.radius + " 범위 표시, 대상 없음" : "찌르기 기록 " + JSON.stringify(hits.map(function (h) { return h.v; })));
   });
 
   run(MOVE, "결투가 찌르기: 0.7초 돌진 뒤 반경 안의 가장 가까운 적 1명만 찌르고 체력을 회복하는가", function (done) {
@@ -219,12 +232,14 @@ function collectResults(api) {
     var start = W.t();
     api.fireBasic(du, Math.PI);
     if (Math.round(du.cdUntil - start) !== Math.round(1000 / api.ULT.rmRate)) bad.push("공격 간격 " + Math.round(du.cdUntil - start) + "ms");
+    var sx = du.x;
     W.step(api.ULT.rmDashMs + 20);
     if (du.dash) bad.push("돌진이 0.3초에 안 끝남");
+    if (Math.abs(Math.abs(du.x - sx) - api.ULT.rmDashRange) > 2) bad.push("스킬 중 돌진 거리 " + Math.round(Math.abs(du.x - sx)));
     W.step(api.ULT.rmDur);
     api.fireBasic(du, 0);
     if (Math.round(du.cdUntil - W.t()) !== c.cd) bad.push("스킬 끝난 뒤 공격 간격 " + Math.round(du.cdUntil - W.t()) + "ms");
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "초기화 → " + Math.round(1000 / api.ULT.rmRate) + "ms 간격·" + api.ULT.rmDashMs + "ms 돌진 → 끝난 뒤 " + c.cd + "ms 간격");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "초기화 → " + Math.round(1000 / api.ULT.rmRate) + "ms 간격·" + api.ULT.rmDashRange + " 거리 " + api.ULT.rmDashMs + "ms 돌진 → 끝난 뒤 " + c.cd + "ms 간격");
   });
 
   run(MOVE, "블랙홀 중심을 벽 안에 찍어도 끌려간 적이 벽에 끼지 않는가", function (done) {
