@@ -737,9 +737,24 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       '###...""""...###',
       "......x..x......",
       "..##........##.."
+    ] },
+    windhill: { name: "바람의 언덕", blueHalf: [
+      "................",
+      "................",
+      "................",
+      '""............""',
+      '""............""',
+      '"".##.........""',
+      '""............""',
+      '""............""',
+      '""........#...""',
+      '""........#...""',
+      '""............""',
+      '""...##.......""',
+      "................"
     ] }
   };
-  var MAP_IDS = ["forest", "river", "dungeon"];
+  var MAP_IDS = ["forest", "river", "dungeon", "windhill"];
   var BLOCK_TILES = "#x", WATER_TILES = "~";
   var ARENA = "", MAP = [], MAP_COLS = 16, MAP_ROWS = 25, SPAWN_ROWS = 3;
   var OBST = [], WATER = [], BRIDGES = [], BUSH_ID = [], BUSH = [];
@@ -3346,7 +3361,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     river: Object.assign({}, GRASS_LOOK, { water: "#3E9FC4", waterHi: "rgba(210,245,255,.45)", bank: "#D8C58E", bridgeFloor: "#9C6B45", noCenterMark: true }),
     dungeon: { sky: 0x16131B, outer: 0x1C1922, ambient: 1.15, sun: 0xFFE2B8, sunI: 1.7, dungeon: true,
                floor: ["#6B6762", "#625E59"], wallFloor: "#34313A", hideFloor: "#2B2533",
-               fleck: ["rgba(255,240,220,.06)", "rgba(0,0,0,.12)"], line: "rgba(0,0,0,.18)" }
+               fleck: ["rgba(255,240,220,.06)", "rgba(0,0,0,.12)"], line: "rgba(0,0,0,.18)" },
+    windhill: Object.assign({}, GRASS_LOOK, { sky: 0x9CCBEA, outer: 0x7FA650, ambient: 1.75, sun: 0xFFF4DC, sunI: 2.35,
+                                              floor: ["#98C660", "#A3CF69"], wallFloor: "#8A8466", hideFloor: "#4E8B35",
+                                              flowers: ["rgba(255,255,255,.9)", "rgba(255,222,90,.9)", "rgba(246,166,196,.9)"],
+                                              noCenterMark: true, windy: true })
   };
   var ZONE_FLOOR = { blue: ["#92B4D6", "#9DBEDF"], red: ["#DCA293", "#E5AE9F"] };
   function zoneOfRow(r) { return r < SPAWN_ROWS ? "blue" : (r >= MAP_ROWS - SPAWN_ROWS ? "red" : ""); }
@@ -3383,6 +3402,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       for (var k = 0; k < 5; k++) {
         g2.fillStyle = th.fleck[noise() < 0.5 ? 0 : 1];
         g2.beginPath(); g2.arc(x + 6 + noise() * (TILE - 12), y + 6 + noise() * (TILE - 12), 2 + noise() * 4, 0, Math.PI * 2); g2.fill();
+      }
+      if (th.flowers && ch === "." && !zone) {
+        for (var f = 0; f < 4; f++) {
+          if (noise() < 0.45) continue;
+          g2.fillStyle = th.flowers[Math.floor(noise() * th.flowers.length)];
+          g2.beginPath(); g2.arc(x + 4 + noise() * (TILE - 8), y + 4 + noise() * (TILE - 8), 1.3 + noise() * 1.2, 0, Math.PI * 2); g2.fill();
+        }
       }
     }
     g2.strokeStyle = th.line; g2.lineWidth = 1;
@@ -3472,6 +3498,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     arenaGroup.clear();
     BUSH_VIS.forEach(function (bv) { bv.mats.forEach(function (m) { m.dispose(); }); });
     BUSH_VIS = [];
+    MILL_BLADES = []; SCENERY.group = null;
   }
   var builtArena = "";
   function buildArena() {
@@ -3571,7 +3598,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
                      treeC: "props/Tree_3_A_Color1.gltf", treeD: "props/Tree_4_B_Color1.gltf", tuft: "props/Grass_1_B_Color1.gltf",
                      dgBlock: "dungeon/floor_foundation_allsides.gltf", dgFloor: "dungeon/floor_tile_small.gltf", dgFloorWeeds: "dungeon/floor_tile_small_weeds_A.gltf",
                      dgBox: "dungeon/box_large.gltf", dgBarrel: "dungeon/barrel_large.gltf", dgTorch: "dungeon/torch_lit.gltf",
-                     dgBannerBlue: "dungeon/banner_patternA_blue.gltf", dgBannerRed: "dungeon/banner_patternA_red.gltf" };
+                     dgBannerBlue: "dungeon/banner_patternA_blue.gltf", dgBannerRed: "dungeon/banner_patternA_red.gltf",
+                     mill: "medieval/objects/mill.glb", farmPlot: "medieval/objects/farm_plot.glb", hill: "medieval/objects/detail_hill.glb",
+                     forestTile: "medieval/tiles/square_forest.glb" };
   var MODEL_SCALE = 38;
   var POTION_SCALE = MODEL_SCALE * 3;
   var KIT = { ready: false, chars: {}, weapons: {}, clips: {}, props: {} };
@@ -3687,6 +3716,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (th.dungeon) buildDungeonProps(); else buildOutdoorProps(th);
   }
   function buildOutdoorProps(th) {
+    if (th.windy) { buildWindhillProps(th); return; }
     var P3 = KIT.props, g = arenaGroup, blocks = [[], []];
     function rockTile(c, r, hMin, hRange) {
       blocks[seeded() < 0.5 ? 0 : 1].push({ w: TILE * 1.08, h: hMin + seeded() * hRange, d: TILE * 1.08, x: tileX(c), z: tileY(r), yaw: quarterTurn() });
@@ -3695,6 +3725,18 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     borderTiles().forEach(function (tl) { rockTile(tl[0], tl[1], 44, 24); });
     g.add(instancedProp(P3.blockA, blocks[0]));
     g.add(instancedProp(P3.blockB, blocks[1]));
+    bushProps(th);
+    tuftProps(0.35);
+    var trees = [P3.treeA, P3.treeB, P3.treeC, P3.treeD];
+    for (var z = -60; z <= MH + 60; z += 170) {
+      [-110 - seeded() * 80, MW + 110 + seeded() * 80].forEach(function (x) {
+        var h = 230 + seeded() * 120;
+        g.add(fitProp(trees[Math.floor(seeded() * 4)], h * 0.7, h, h * 0.7, x, z + seeded() * 60, seeded() * 6.28));
+      });
+    }
+  }
+  function bushProps(th) {
+    var P3 = KIT.props;
     hideVolumes(th, function (b) {
       var mat = P3.bushBig.getObjectByProperty("isMesh", true).material.clone();
       mat.transparent = true;
@@ -3704,22 +3746,80 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       });
       return { mesh: instancedProp(P3.bushBig, list, mat), mat: mat, full: 1 };
     });
+  }
+  function tuftProps(chance) {
     var tufts = [];
     MAP.forEach(function (row, r) {
       for (var c = 0; c < MAP_COLS; c++) {
-        if (row.charAt(c) !== "." || zoneOfRow(r) || seeded() > 0.35) continue;
+        if (row.charAt(c) !== "." || zoneOfRow(r) || seeded() > chance) continue;
         var sz = 16 + seeded() * 10;
         tufts.push({ w: sz, h: sz * 0.8, d: sz, x: tileX(c) + (seeded() - 0.5) * TILE * 0.7, z: tileY(r) + (seeded() - 0.5) * TILE * 0.7, yaw: seeded() * 6.28 });
       }
     });
-    if (tufts.length) g.add(instancedProp(P3.tuft, tufts));
-    var trees = [P3.treeA, P3.treeB, P3.treeC, P3.treeD];
-    for (var z = -60; z <= MH + 60; z += 170) {
-      [-110 - seeded() * 80, MW + 110 + seeded() * 80].forEach(function (x) {
-        var h = 230 + seeded() * 120;
-        g.add(fitProp(trees[Math.floor(seeded() * 4)], h * 0.7, h, h * 0.7, x, z + seeded() * 60, seeded() * 6.28));
+    if (tufts.length) arenaGroup.add(instancedProp(KIT.props.tuft, tufts));
+  }
+  // TODO: 돌담 에셋으로 교체 — 지금은 Rock_2_C/D 를 낮고 넓게 눌러 무너진 돌담처럼 보이게 한 대체재
+  function wallPiece(c, r) {
+    var alongY = tileAt(c, r - 1) === "#" || tileAt(c, r + 1) === "#";
+    var yaw = (alongY ? Math.PI / 2 : 0) + (seeded() - 0.5) * 0.3;
+    return { w: TILE * 0.98, h: 26 + seeded() * 16, d: TILE * 0.62, x: tileX(c), z: tileY(r), yaw: yaw };
+  }
+  var MILL_BLADES = [], MILL_SPIN = 0.7;
+  var SCENERY = { group: null, droppedForFps: false };
+  function sceneryWanted() { return !TOUR_LOW_END && !SCENERY.droppedForFps; }
+  function dropSceneryForFps() {
+    if (!SCENERY.group || SCENERY.droppedForFps) return false;
+    SCENERY.droppedForFps = true; SCENERY.group.visible = false; MILL_BLADES = [];
+    return true;
+  }
+  function spinMillBlades(dt) { MILL_BLADES.forEach(function (b) { b.rotation.z += dt * MILL_SPIN; }); }
+  function uniformProp(tpl, h, x, z, yaw) {
+    var size = propSize(tpl).getSize(new THREE.Vector3()), k = h / size.y;
+    return fitProp(tpl, size.x * k, h, size.z * k, x, z, yaw);
+  }
+  function buildWindhillProps(th) {
+    var P3 = KIT.props, g = arenaGroup, blocks = [[], []];
+    tilesOf("#").forEach(function (tl) { blocks[seeded() < 0.5 ? 0 : 1].push(wallPiece(tl[0], tl[1])); });
+    borderTiles().forEach(function (tl) {
+      blocks[seeded() < 0.5 ? 0 : 1].push({ w: TILE * 1.04, h: 20 + seeded() * 14, d: TILE * 1.04, x: tileX(tl[0]), z: tileY(tl[1]), yaw: quarterTurn() });
+    });
+    g.add(instancedProp(P3.blockA, blocks[0]));
+    g.add(instancedProp(P3.blockB, blocks[1]));
+    bushProps(th);
+    // TODO: 들꽃 에셋이 생기면 교체 — 지금은 풀 덤불(tuft)을 더 촘촘히 뿌리고 바닥에 꽃 색 점을 찍어 대신함
+    tuftProps(0.6);
+    if (!sceneryWanted()) return;
+    g = SCENERY.group = new THREE.Group(); arenaGroup.add(g);
+    var turf = [];
+    for (var z = -150; z <= MH + 150; z += 100) {
+      [-60, -160, MW + 60, MW + 160].forEach(function (x) {
+        var sz = 96 + seeded() * 12;
+        turf.push({ w: sz, h: 16 + seeded() * 26, d: sz, x: x, z: z + (seeded() - 0.5) * 20, yaw: (seeded() - 0.5) * 0.2 });
       });
     }
+    g.add(instancedProp(P3.forestTile, turf));
+    [[-300, 380, Math.PI / 2], [MW + 300, MH - 380, -Math.PI / 2]].forEach(function (spot) {
+      var mill = uniformProp(P3.mill, 300, spot[0], spot[1], spot[2]);
+      var blades = mill.getObjectByName("mill_blades");
+      if (blades) { blades.rotation.z = seeded() * 6.28; MILL_BLADES.push(blades); }
+      g.add(mill);
+      var side = spot[0] < 0 ? -1 : 1;
+      [[-190, 20], [-60, 150], [150, -10]].forEach(function (off) {
+        g.add(uniformProp(P3.farmPlot, 28, spot[0] + side * (40 + seeded() * 30), spot[1] + off[0] + off[1], quarterTurn()));
+      });
+    });
+    for (var hz = -500; hz <= MH + 500; hz += 330) {
+      [-560 - seeded() * 160, MW + 560 + seeded() * 160].forEach(function (x) {
+        var hw = 420 + seeded() * 160;
+        g.add(fitProp(P3.hill, hw, 110 + seeded() * 70, hw, x, hz + seeded() * 80, seeded() * 6.28));
+      });
+    }
+    [-420, MH + 420].forEach(function (z) {
+      [MW * 0.2, MW * 0.8].forEach(function (x) {
+        var hw = 460 + seeded() * 160;
+        g.add(fitProp(P3.hill, hw, 100 + seeded() * 60, hw, x, z, seeded() * 6.28));
+      });
+    });
   }
   var DUNGEON_TILE_H = 3;
   function buildDungeonProps() {
@@ -4911,6 +5011,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var fps = QA.frames * 1000 / QA.acc;
     QA.acc = 0; QA.frames = 0;
     QA.slow = fps < 45 ? QA.slow + 1 : 0;
+    if (QA.slow >= 3 && dropSceneryForFps()) { QA.slow = 0; return; }
     if (QA.slow >= 3 && PIX > PIX_MIN) {
       QA.slow = 0; PIX = Math.max(PIX_MIN, PIX - 0.25);
       renderer.setPixelRatio(PIX); renderer.setSize(W, H, false);
@@ -5072,6 +5173,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function loop() {
     requestAnimationFrame(loop);
     var nowMs = Date.now(), frameMs = nowMs - lastFrame, dt = Math.min(0.05, frameMs / 1000); lastFrame = nowMs;
+    spinMillBlades(dt);
     if (!room || screenNow !== "game") { renderTour(nowMs, dt); adaptQuality(frameMs); return; }
     var st = room.status;
     if ((st === "countdown" || st === "playing" || st === "ended") && room.startAt && (!G || G.startAt !== room.startAt)) {
