@@ -345,6 +345,8 @@
   .swapBtn { display: block; margin: 0 auto 12px; border-color: #D97B4F; color: #FFB38A; }
   .dfHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .dfTitle { font-size: 24px; font-weight: 800; color: #F4F1E8; }
+  .dfMap { margin-left: auto; text-align: right; font-size: 24px; font-weight: 800; line-height: 1.1; color: #F2D06B; white-space: nowrap; }
+  .dfMap small { display: block; font-size: 12px; font-weight: 700; color: var(--sg-ink-soft); margin-top: 4px; }
   .dfTurn { margin-top: 4px; font-size: 17px; font-weight: 800; color: #F2D06B; min-height: 24px; }
   .dfTurn.mine { color: #FFB38A; }
   .dfTimer { flex: 0 0 auto; min-width: 84px; text-align: center; font-size: 46px; font-weight: 800; line-height: 1; color: #F4F1E8; font-variant-numeric: tabular-nums; }
@@ -438,7 +440,7 @@
     #hudMe b { font-size: 15px; }
     #killBanner { font-size: 15px; padding: 4px 12px; }
     .kf { font-size: 12px; padding: 3px 8px; gap: 5px; }
-    .dfTitle { font-size: 19px; }
+    .dfTitle, .dfMap { font-size: 19px; }
     .dfTimer { min-width: 56px; font-size: 36px; }
     .dfSteps { gap: 4px; }
     .dfSteps span { font-size: 12px; padding: 5px 2px; }
@@ -536,6 +538,7 @@
     <div class="card">
       <div class="dfHead">
         <div><div class="dfTitle">🏆 대회모드 캐릭터 선택</div><div id="dfTurn" class="dfTurn"></div></div>
+        <div id="dfMap" class="dfMap"></div>
         <div id="dfTimer" class="dfTimer">15<small>남은 시간</small></div>
       </div>
       <div class="dfBar"><i id="dfBarFill"></i></div>
@@ -636,11 +639,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var CHARS = {
     warrior: { name: "광전사", role: "fighter", icon: "🪓", hp: 270, speed: 230, ultSpeed: 300, cd: 850, dmg: 45, range: 110, arc: Math.PI * 0.55, ultName: "광폭화", heals: true },
     knight:  { name: "기사", role: "fighter", icon: "🛡️", hp: 400, speed: 220, cd: 1000, dmg: 30, range: 110, arc: Math.PI * 0.7, ultName: "방어태세", blocks: true },
-    ranger:  { name: "궁수", role: "shooter", icon: "🏹", hp: 100, speed: 250, cd: 400, dmg: 10, range: KEY * 6, pSpeed: 950, pr: 6, shots: 2, gap: 70, ultName: "난사", ultAim: true },
+    ranger:  { name: "궁수", role: "shooter", icon: "🏹", hp: 100, speed: 230, haste: { add: 10, ms: 3000, max: 40 }, cd: 400, dmg: 15, range: 450, pSpeed: 665, pr: 12, shots: 2, gap: 70, ultName: "난사", ultAim: true },
     mage:    { name: "주술사", role: "caster", icon: "🔮", hp: 120, speed: 250, cd: 500, dmg: 11, range: 350, pSpeed: 700, pr: 9, ultName: "메테오", ultAim: true },
     rogue:   { name: "은신자", role: "assassin", icon: "🗡️", hp: 100, speed: 300, ultSpeed: 420, cd: 600, dmg: 30, range: 110, arc: Math.PI * 0.6, hits: 2, hitGap: 160, throwDmg: 20, throwRange: 300, pSpeed: 900, pr: 8, ultName: "은신" },
-    necro:   { name: "네크로", role: "caster", icon: "💀", hp: 120, speed: 250, cd: 500, dmg: 11, range: KEY * 4, pSpeed: 1000, pr: 9, ultName: "해골 소환", blocks: true },
-    sniper:  { name: "저격수", role: "shooter", icon: "🎯", hp: 100, speed: 240, cd: 1429, dmg: 40, range: 700, pSpeed: 1500, pr: 7, ultName: "거대 화살", ultAim: true },
+    necro:   { name: "네크로", role: "caster", icon: "💀", hp: 120, lastStandHp: 50, lastStandHideMs: 1000, speed: 250, cd: 500, dmg: 11, range: KEY * 4, pSpeed: 1000, pr: 9, ultName: "해골 소환", blocks: true },
+    sniper:  { name: "저격수", role: "shooter", icon: "🎯", hp: 100, speed: 220, cd: 1429, dmg: 40, range: 700, pSpeed: 1050, pr: 12, farDist: 500, farBonus: 0.5, ultName: "거대 화살", ultAim: true },
     thrower: { name: "투척병", role: "shooter", icon: "🧪", hp: 120, speed: 240, cd: 1000, dmg: 20, ticks: 3, range: KEY * 4 + 100, minRange: KEY * 1, ultName: "독안개", ultAim: true, heals: true },
     lancer:  { name: "창기사", role: "fighter", icon: "🔱", hp: 300, speed: 225, cd: 1200, dmg: 30, range: 200, width: 50, ultName: "꿰뚫기", ultAim: true },
     blacksmith: { name: "대장장이", role: "fighter", icon: "🔨", hp: 350, speed: 225, cd: 1000, dmg: 25, range: 120, width: 80, ultName: "내려찍기", ultAim: true },
@@ -664,13 +667,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   });
   function roleOf(c) { return ROLES[CHARS[c].role]; }
   function charsInRole(r) { return CHAR_LIST.filter(function (c) { return CHARS[c].role === r; }); }
-  var ULT = { mkCount: 10, mkGap: 55, mkDmg: 36, mkRefund: 1, mkSpeed: 1150, mkRange: KEY * 8, mkPr: 8,
+  var ULT = { mkCount: 10, mkGap: 92, mkDmg: 40, mkRefund: 1, mkSpeed: 805, mkRange: KEY * 8, mkPr: 8,
               bzDur: 4000, bzDmgMul: 1.5, bzCdMul: 1 / 1.5, bzHeal: 20, tkDur: 5000, tkDef: 0.3, tkStunR: 100, tkStunMs: 1000,
               mbDelay: 700, mbR: 150, mbDmg: 90, mbCast: 550, mbMin: 60, mbStunMs: 1000,
               asSmokeMs: 400, asDur: 15000,
               smCount: 2, smAhead: KEY * 1, smSide: 38, smHp: 50, smSpeed: 200, smDmg: 10, smCd: 800, smRange: 80, smArc: Math.PI * 0.6,
-              smDur: 8000, smMax: 4, smRiseMs: 1100, smCorpseMs: 1400,
-              pnDmg: 90, pnSpeed: 1500, pnRange: 700, pnPr: 16, pnRefund: 2, pnScale: 3,
+              smDur: 8000, smMax: 4, smFollow: KEY * 1.5, smRiseMs: 1100, smCorpseMs: 1400,
+              pnDmg: 90, pnSpeed: 1050, pnRange: 700, pnPr: 16, pnRefund: 4, pnScale: 3,
               plFlight: 700, plFlightMin: 150, plR: 60, plDur: 3000, plTick: 1000, plMax: 4, plFade: 500, plLob: 90, plGauge: 1,
               fgR: 150, fgDur: 4000, fgDmg: 20, fgHeal: 20, fgSlowMul: 0.6, fgSlowMs: 400, fgCast: KEY * 4 + 100, fgRefund: 1,
               lnWind: 300, lnLen: 350, lnW: 36, lnDmg: 70, lnStunMs: 1200,
@@ -1326,6 +1329,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   function passiveDesc(k) {
     var c = CHARS[k];
+    if (k === "ranger") return "기본 공격 적중 시 " + secs(c.haste.ms) + "간 이동속도 " + c.haste.add + " 증가, 최대 " + c.haste.max + "까지 중첩";
+    if (k === "sniper") return "거리가 " + c.farDist + "보다 먼 적에게 주는 피해 " + Math.round(c.farBonus * 100) + "% 증가";
+    if (k === "necro") return "체력이 " + c.lastStandHp + " 미만으로 떨어지면 체력 " + c.lastStandHp + "을 남기고 " + secs(c.lastStandHideMs) + "간 은신. 죽을 때마다 한 번";
     if (k === "guardian") return "기본 공격에 맞은 적은 " + secs(c.fx.slowMs) + "간 " + slowPct(c.fx.slowMul);
     if (k === "priest") return "기본 공격에 맞은 아군은 체력 " + c.heal + " 회복";
     if (k === "frost") return "같은 적에게 기본 공격 3회 적중 시 " + secs(ULT.frFreezeMs) + "간 기절";
@@ -1683,6 +1689,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var waiting = done ? [] : draftWaiting(d, d.step), myTurn = waiting.indexOf(myId) >= 0;
     var me = P[myId], myTeam = me ? me.team : null;
     var span = done ? DRAFT_REVEAL_MS : DRAFT_SHOWN_MS, left = Math.max(0, d.stepAt + span - t);
+    var arena = MAPS[room.arena] || MAPS[ARENA];
+    setHtml($("dfMap"), arena ? "🗺️ " + esc(arena.name) + "<small>맵</small>" : "");
     var timer = $("dfTimer");
     setHtml(timer, String(Math.ceil(left / 1000)) + "<small>" + (done ? "게임 입장까지" : "남은 시간") + "</small>");
     timer.className = "dfTimer" + (!done && left < 5000 ? " low" : "");
@@ -1817,6 +1825,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
              stunDealt: s.stunDealt || 0, slowDealt: s.slowDealt || 0, slowWeight: s.slowWeight || 0, blocked: s.blocked || 0,
              slowUntil: s.slowUntil || 0, slowMul: s.slowMul || 1, stunUntil: s.stunUntil || 0,
              summonAt: s.summonAt || 0, minions: [], revealUntil: s.revealUntil || 0, frostStacks: s.frostStacks || 0, frostStackAt: s.frostStackAt || 0,
+             lastStandUsed: !!(CHARS[c].lastStandHp && s.hp != null && s.hp <= CHARS[c].lastStandHp),
              burst: null, volley: null, mv: false, pending: null };
     if (s.minions) adoptMinions(E, s.minions, null);
     return E;
@@ -1929,6 +1938,16 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     allMinions().forEach(function (o) { if (minionReady(o, t)) consider(o); });
     return best;
   }
+  function walkMinion(m, dx, dy, d, dt, t) {
+    var mx = dx / d, my = dy / d;
+    if (m.detour > t) { var rx = -my * m.detourDir; my = mx * m.detourDir; mx = rx; }
+    var ox = m.x, oy = m.y, step = ULT.smSpeed * dt;
+    m.x += mx * step; m.y += my * step; resolve(m);
+    var moved = hyp(m.x - ox, m.y - oy);
+    if (moved < step * 0.3) { m.stuck += dt; if (m.stuck > 0.4) { m.detour = t + 600; m.detourDir = Math.random() < 0.5 ? -1 : 1; m.stuck = 0; } }
+    else m.stuck = 0;
+    m.mv = moved > 0.2;
+  }
   function stepMinions(E, dt, t) {
     if (!E.minions || !E.minions.length) return;
     var before = E.minions.length;
@@ -1937,19 +1956,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     E.minions.forEach(function (m) {
       m.mv = false;
       if (!minionReady(m, t)) return;
-      var foe = minionFoe(m, t); if (!foe) return;
+      var foe = minionFoe(m, t);
+      if (!foe) {
+        var home = hyp(E.x - m.x, E.y - m.y);
+        if (E.alive && home > ULT.smFollow) { m.angle = Math.atan2(E.y - m.y, E.x - m.x); walkMinion(m, E.x - m.x, E.y - m.y, home, dt, t); }
+        return;
+      }
       var dx = foe.x - m.x, dy = foe.y - m.y, d = hyp(dx, dy) || 1, reach = ULT.smRange + BODY_R - 6;
       m.angle = Math.atan2(dy, dx);
-      if (d > reach - 12) {
-        var mx = dx / d, my = dy / d;
-        if (m.detour > t) { var rx = -my * m.detourDir; my = mx * m.detourDir; mx = rx; }
-        var ox = m.x, oy = m.y, step = ULT.smSpeed * dt;
-        m.x += mx * step; m.y += my * step; resolve(m);
-        var moved = hyp(m.x - ox, m.y - oy);
-        if (moved < step * 0.3) { m.stuck += dt; if (m.stuck > 0.4) { m.detour = t + 600; m.detourDir = Math.random() < 0.5 ? -1 : 1; m.stuck = 0; } }
-        else m.stuck = 0;
-        m.mv = moved > 0.2;
-      }
+      if (d > reach - 12) walkMinion(m, dx, dy, d, dt, t);
       if (d <= reach && t >= m.cdUntil && losClear(m.x, m.y, foe.x, foe.y)) {
         m.cdUntil = t + ULT.smCd; m.atkAt = t;
         room.ref.child("meleeHits").push({ team: m.team, owner: E.id, m: 1, x: r1(m.x), y: r1(m.y), radius: ULT.smRange, angle: r1(m.angle),
@@ -2073,7 +2088,17 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (E.char === "warrior" && E.buffUntil > t) sp = c.ultSpeed;
     if (E.char === "rogue" && E.stealthUntil > t) sp = c.ultSpeed;
     if (bladeStorm(E, t)) sp = c.ultSpeed;
+    if (c.haste) sp += hasteBonus(E, t);
     return sp * slowMulAt(E, t);
+  }
+  function hasteBonus(E, t) {
+    var h = CHARS[E.char].haste;
+    E.hasteUntil = (E.hasteUntil || []).filter(function (until) { return until > t; });
+    return Math.min(h.max, E.hasteUntil.length * h.add);
+  }
+  function addHaste(E, t) {
+    var h = CHARS[E.char].haste;
+    E.hasteUntil = (E.hasteUntil || []).filter(function (until) { return until > t; }).concat(t + h.ms).slice(-Math.floor(h.max / h.add));
   }
   function afflict(T, fx, owner) {
     if (!fx || !T.alive || T.minion) return;
@@ -2304,10 +2329,18 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var immune = protectedNow(T), fx = d.fx, seen = !ME || ME.team === T.team || visibleTo(T, ME);
     if (d.ownerCharacterType === "frost" && !d.isSkill && !immune && !T.minion) fx = frostStackFx(T);
     var dancer = d.ownerCharacterType === "dancer";
-    damage(T, d.dmg, d.owner, dancer ? d.createdAt : !d.isSkill, d.isSkill ? d.ultKey : null, fx);
+    damage(T, Math.round(d.dmg * (1 + damageBonusSum(d, T))), d.owner, dancer ? d.createdAt : !d.isSkill, d.isSkill ? d.ultKey : null, fx);
     if (dancer) bladeSpin(p, T.x, T.y);
     if (d.ultKey === "execute" && !immune) { room.ref.child("hits/" + d.owner).push({ d: 0, b: 0, t: now(), tp: { x: r1(T.x), y: r1(T.y) } }); executeFx(T.x, T.y); }
     if (seen) spark(T.x, T.y, orbHitColor(d), d.ultKey === "giant" ? 2.2 : 1);
+  }
+  function damageBonusSum(d, T) {
+    var bonus = 0, C = CHARS[d.ownerCharacterType], A = ent(d.owner);
+    if (C && C.farBonus) {
+      var fromX = A && A.alive ? A.x : d.x, fromY = A && A.alive ? A.y : d.y;
+      if (hyp(T.x - fromX, T.y - fromY) > C.farDist) bonus += C.farBonus;
+    }
+    return bonus;
   }
   function projVisualHit(p, t) {
     if (p.dead || p.gone) return;
@@ -2345,9 +2378,16 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       amount = Math.round(amount * ULT.tkDef);
       T.blocked = (T.blocked || 0) + Math.min(unguarded, T.hp) - Math.min(amount, T.hp);
     }
+    var floorHp = CHARS[T.char].lastStandHp;
+    if (floorHp && !T.lastStandUsed && T.hp - amount < floorHp) {
+      amount = Math.max(0, T.hp - floorHp);
+      T.lastStandUsed = true;
+      T.stealthUntil = Math.max(T.stealthUntil || 0, now() + CHARS[T.char].lastStandHideMs);
+      T.revealUntil = 0;
+    }
     var dm = Math.min(amount, T.hp), killed = false;
     T.hp -= dm; if (!noHurtGauge && !gaugeLocked(T)) T.gauge = Math.min(GAUGE_MAX, T.gauge + roleOf(T.char).gaugeOnHurt);
-    if (T.hp <= 0) { killed = true; T.hp = 0; T.alive = false; T.deaths++; T.diedAt = now(); T.burst = null; T.volley = null; T.slash = null; T.regenUntil = 0; T.skillUntil = 0; T.slowUntil = 0; T.slows = null; T.stunUntil = 0; T.lance = null; T.frostStacks = 0; if (T === ME) { sfx("down"); aim.id = null; joy.id = null; } }
+    if (T.hp <= 0) { killed = true; T.hp = 0; T.alive = false; T.deaths++; T.diedAt = now(); T.burst = null; T.volley = null; T.slash = null; T.regenUntil = 0; T.skillUntil = 0; T.slowUntil = 0; T.slows = null; T.stunUntil = 0; T.lance = null; T.frostStacks = 0; T.hasteUntil = null; if (T === ME) { sfx("down"); aim.id = null; joy.id = null; } }
     else { if (T === ME) sfx("hit"); afflict(T, fx, owner); }
     pushHit(owner, dm, basic, ultKey, killed, gaugeGain);
     if (killed) room.ref.child("kills").push({ k: owner, v: T.id, t: now() });
@@ -2423,6 +2463,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (h.cs) owner.stunDealt = (owner.stunDealt || 0) + h.cs / 1000;
       if (h.ss) owner.slowDealt = (owner.slowDealt || 0) + h.ss / 1000;
       if (h.sw) owner.slowWeight = (owner.slowWeight || 0) + h.sw / 1000;
+      if (h.b && owner.alive && CHARS[owner.char].haste) addHaste(owner, now());
       if (h.u === "volley" && owner.char === "ranger") owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.mkRefund);
       if (h.tp && owner.char === "hitman" && owner.alive) {
         owner.x = h.tp.x; owner.y = h.tp.y; owner.dash = null; resolve(owner);
@@ -2761,7 +2802,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     E.hp = E.maxHp; E.alive = true; E.protectUntil = t + RESPAWN_PROTECT_MS;
     E.cdUntil = 0; E.pending = null; E.burst = null; E.volley = null; E.slash = null;
     E.buffUntil = 0; E.slamAt = 0; E.leap = null; E.dash = null; E.shove = null; E.stealthUntil = 0; E.ultUntil = 0; E.skillUntil = 0; E.regenUntil = 0; E.slowUntil = 0; E.slows = null; E.stunUntil = 0; E.lance = null;
-    E.frostStacks = 0; E.frostStackAt = 0; E.revealUntil = 0;
+    E.frostStacks = 0; E.frostStackAt = 0; E.revealUntil = 0; E.lastStandUsed = false; E.hasteUntil = null;
     if (E === ME) CAM.snap = true;
     G.forceNet = true;
   }
@@ -3363,7 +3404,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
                floor: ["#6B6762", "#625E59"], wallFloor: "#34313A", hideFloor: "#2B2533",
                fleck: ["rgba(255,240,220,.06)", "rgba(0,0,0,.12)"], line: "rgba(0,0,0,.18)" },
     windhill: Object.assign({}, GRASS_LOOK, { sky: 0x9CCBEA, outer: 0x7FA650, ambient: 1.75, sun: 0xFFF4DC, sunI: 2.35,
-                                              floor: ["#98C660", "#A3CF69"], wallFloor: "#8A8466", hideFloor: "#4E8B35",
+                                              floor: ["#98C660", "#A3CF69"], wallFloor: "#8A8466", hideFloor: "#4E8B35", rockShade: "58,96,34",
                                               flowers: ["rgba(255,255,255,.9)", "rgba(255,222,90,.9)", "rgba(246,166,196,.9)"],
                                               noCenterMark: true, windy: true })
   };
@@ -3380,7 +3421,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     g2.fillStyle = "#" + new THREE.Color(th.outer).getHexString(); g2.fillRect(0, 0, MW, MH);
     for (var r = 0; r < MAP_ROWS; r++) for (var c = 0; c < MAP_COLS; c++) {
       var x = MAP_X0 + c * TILE, y = MAP_Y0 + r * TILE, ch = MAP[r].charAt(c), odd = (r + c) % 2, zone = zoneOfRow(r);
-      g2.fillStyle = BLOCK_TILES.indexOf(ch) >= 0 ? th.wallFloor : ch === '"' ? th.hideFloor : ch === "~" ? th.water : ch === "=" ? th.bridgeFloor :
+      g2.fillStyle = BLOCK_TILES.indexOf(ch) >= 0 ? (th.rockShade ? th.floor[odd] : th.wallFloor) : ch === '"' ? th.hideFloor : ch === "~" ? th.water : ch === "=" ? th.bridgeFloor :
                      zone ? ZONE_FLOOR[zone][odd] : th.floor[odd];
       g2.fillRect(x, y, TILE, TILE);
       if (ch === "~") {
@@ -3411,6 +3452,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         }
       }
     }
+    if (th.rockShade) paintRockShade(g2, th.rockShade);
     g2.strokeStyle = th.line; g2.lineWidth = 1;
     for (var gx = 0; gx <= MAP_COLS; gx++) { g2.beginPath(); g2.moveTo(MAP_X0 + gx * TILE, MAP_Y0); g2.lineTo(MAP_X0 + gx * TILE, BOUND.b); g2.stroke(); }
     for (var gy = 0; gy <= MAP_ROWS; gy++) { g2.beginPath(); g2.moveTo(MAP_X0, MAP_Y0 + gy * TILE); g2.lineTo(BOUND.r, MAP_Y0 + gy * TILE); g2.stroke(); }
@@ -3427,6 +3469,18 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     tx.colorSpace = THREE.SRGBColorSpace;
     tx.anisotropy = renderer ? Math.min(4, renderer.capabilities.getMaxAnisotropy()) : 1;
     return tx;
+  }
+  function paintRockShade(g2, rgb) {
+    for (var r = 0; r < MAP_ROWS; r++) for (var c = 0; c < MAP_COLS; c++) {
+      if (BLOCK_TILES.indexOf(MAP[r].charAt(c)) < 0) continue;
+      var cx = MAP_X0 + c * TILE + TILE / 2 + 4, cy = MAP_Y0 + r * TILE + TILE / 2 - 3, rad = TILE * 0.66;
+      var shade = g2.createRadialGradient(cx, cy, TILE * 0.2, cx, cy, rad);
+      shade.addColorStop(0, "rgba(" + rgb + ",.42)");
+      shade.addColorStop(0.6, "rgba(" + rgb + ",.22)");
+      shade.addColorStop(1, "rgba(" + rgb + ",0)");
+      g2.fillStyle = shade;
+      g2.fillRect(cx - rad, cy - rad, rad * 2, rad * 2);
+    }
   }
   var groundMat = new THREE.MeshLambertMaterial();
   var ground = flatMesh(new THREE.PlaneGeometry(MW, MH), groundMat);
