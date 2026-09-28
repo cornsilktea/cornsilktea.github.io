@@ -392,12 +392,12 @@ function collectResults(api) {
     done(ok ? "pass" : "fail", "최소 거리 " + landedAfter[0] + "ms, 최대 거리 " + landedAfter[1] + "ms 뒤 착지");
   });
 
-  run(STUN, "대장장이 기본 공격: 멈춰 서서 " + api.CHARS.blacksmith.windup + "ms 뒤 타격하고, 그 전에 기절하면 취소되는가", function (done) {
+  run(STUN, "대장장이 기본 공격: 멈춰 서서 " + api.CHARS.blacksmith.windup + "ms 뒤 타격해 " + api.CHARS.blacksmith.fx.stunMs + "ms 기절시키고, 그 전에 기절하면 취소되는가", function (done) {
     var y = OPEN_Y.forest, c = api.CHARS.blacksmith, bad = [];
     function duel() {
       return world("forest", [
         { id: "bs", team: "blue", char: "blacksmith", x: 250, y: y },
-        { id: "foe", team: "red", char: "knight", x: 330, y: y }
+        { id: "foe", team: "red", char: "knight", x: 250 + c.range - 10, y: y + c.width / 2 - 10 }
       ]);
     }
     var W = duel(), bs = W.ent("bs"), foe = W.ent("foe");
@@ -407,6 +407,9 @@ function collectResults(api) {
     if (foe.hp < foe.maxHp) bad.push("준비 시간 전에 피해가 들어감");
     W.step(100);
     if (foe.maxHp - foe.hp !== c.dmg) bad.push("타격 피해 " + (foe.maxHp - foe.hp) + " (기대 " + c.dmg + ")");
+    if (!api.stunned(foe, W.t())) bad.push("맞은 적이 기절하지 않음");
+    W.step(c.fx.stunMs);
+    if (api.stunned(foe, W.t())) bad.push("기절이 " + c.fx.stunMs + "ms 넘게 이어짐");
     if (api.speedOf(bs) === 0) bad.push("타격 뒤에도 멈춰 있음");
     W = duel(); bs = W.ent("bs"); foe = W.ent("foe");
     api.fireBasic(bs, 0);
@@ -414,7 +417,7 @@ function collectResults(api) {
     api.afflict(bs, { stunMs: 500 });
     W.step(400);
     if (foe.hp < foe.maxHp) bad.push("기절했는데 타격이 나감");
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "준비 중 정지, " + c.windup + "ms 뒤 " + c.dmg + " 피해, 기절 시 취소");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "준비 중 정지, 범위 끝(" + (c.range - 10) + ", 옆 " + (c.width / 2 - 10) + ")의 적에게 " + c.windup + "ms 뒤 " + c.dmg + " 피해·기절, 준비 중 기절 시 취소");
   });
   run(MOVE, "투척병 물약: 가까이 던질수록 빨리 떨어지는가 (최소 사거리 " + api.ULT.plFlightMin + "ms ~ 최대 사거리 " + api.ULT.plFlight + "ms)", function (done) {
     var c = api.CHARS.thrower, near = api.potionFlightMs(c.minRange), mid = api.potionFlightMs((c.minRange + c.range) / 2), far = api.potionFlightMs(c.range);
