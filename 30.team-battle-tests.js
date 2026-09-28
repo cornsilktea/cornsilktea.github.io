@@ -1411,6 +1411,68 @@ function collectResults(api) {
   });
   clericCutBy("쓰러지면", function (W, cl) { api.damage(cl, 9999, "foe", false, null); });
 
+  var SHAMAN = "주술사";
+  function shamanTeam() {
+    var y = OPEN_Y.forest;
+    var W = world("forest", [
+      { id: "sh", team: "blue", char: "shaman", x: 300, y: y, gauge: api.GAUGE_MAX },
+      { id: "al", team: "blue", char: "knight", x: 420, y: y + 20 },
+      { id: "near", team: "red", char: "guardian", x: 420, y: y },
+      { id: "far", team: "red", char: "guardian", x: 680, y: y }
+    ]);
+    ["near", "far"].forEach(function (id) { var E = W.ent(id); E.hp = E.maxHp = 1000; });
+    return W;
+  }
+  run(SHAMAN, "기본 공격: 검은 파동이 적에게 " + api.CHARS.shaman.dmg + "의 피해를 주고 아군은 회복하지 않는가", function (done) {
+    var W = shamanTeam(), sh = W.ent("sh"), al = W.ent("al"), near = W.ent("near"), bad = [];
+    al.hp = 100;
+    sh.cdUntil = 0; api.fireBasic(sh, 0);
+    W.step(800);
+    if (1000 - near.hp !== api.CHARS.shaman.dmg) bad.push("적 피해 " + (1000 - near.hp));
+    if (al.hp !== 100) bad.push("아군 체력이 " + (al.hp - 100) + " 바뀜");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "적 " + api.CHARS.shaman.dmg + " 피해, 아군 회복 없음");
+  });
+  run(SHAMAN, "영역전개: " + api.ULT.dmGrowMs / 1000 + "초간 반경 " + api.ULT.dmR + "까지 커지며 처음 닿은 적만 " + api.ULT.dmStunMs / 1000 + "초 기절하고, 기절이 풀릴 때 " + api.ULT.dmBoltDmg + " 피해를 한 번 받는가", function (done) {
+    var W = shamanTeam(), sh = W.ent("sh"), near = W.ent("near"), far = W.ent("far"), bad = [], at = { nearStun: null, farStun: null, nearBolt: null }, t0;
+    api.useUlt(sh, 0); t0 = W.t();
+    W.step(api.ULT.dmDur + 300, FRAME, function (t) {
+      if (at.nearStun === null && api.stunned(near, t)) at.nearStun = t - t0;
+      if (at.farStun === null && api.stunned(far, t)) at.farStun = t - t0;
+      if (at.nearBolt === null && near.hp < 1000) at.nearBolt = t - t0;
+    });
+    var growth = function (d) { return (d - api.BODY_R * 0.5) / api.ULT.dmR * api.ULT.dmGrowMs; };
+    if (at.nearStun === null || Math.abs(at.nearStun - growth(120)) > 50) bad.push("가까운 적(120) 기절 시점 " + at.nearStun);
+    if (at.farStun === null || Math.abs(at.farStun - growth(380)) > 50) bad.push("먼 적(380) 기절 시점 " + at.farStun);
+    if (1000 - near.hp !== api.ULT.dmBoltDmg) bad.push("가까운 적 피해 " + (1000 - near.hp));
+    if (1000 - far.hp !== api.ULT.dmBoltDmg) bad.push("먼 적 피해 " + (1000 - far.hp));
+    if (at.nearBolt === null || Math.abs(at.nearBolt - at.nearStun - api.ULT.dmStunMs) > 40) bad.push("번개가 기절 " + at.nearStun + "ms 뒤 " + at.nearBolt + "ms");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "가까운 적 " + Math.round(at.nearStun) + "ms·먼 적 " + Math.round(at.farStun) + "ms에 기절, 기절이 풀린 " + Math.round(at.nearBolt) + "ms에 " + api.ULT.dmBoltDmg + " 피해 한 번");
+  });
+  run(SHAMAN, "영역전개: 영역 안에서 기본 공격은 가장 가까운 적에게 " + api.ULT.dmStrikeDmg + " 번개, 영역 밖으로 나가면 다시 파동이 되는가", function (done) {
+    var W = shamanTeam(), sh = W.ent("sh"), near = W.ent("near"), far = W.ent("far"), bad = [];
+    api.useUlt(sh, 0);
+    W.step(api.ULT.dmGrowMs + api.ULT.dmStunMs + 300);
+    var n0 = near.hp, f0 = far.hp;
+    sh.cdUntil = 0; api.fireBasic(sh, Math.PI);
+    W.step(100);
+    if (n0 - near.hp !== api.ULT.dmStrikeDmg) bad.push("가까운 적 번개 피해 " + (n0 - near.hp));
+    if (far.hp !== f0) bad.push("먼 적도 맞음");
+    sh.x = 300; sh.y = OPEN_Y.forest - 480;
+    var n1 = near.hp, f1 = far.hp;
+    sh.cdUntil = 0; api.fireBasic(sh, Math.PI);
+    W.step(800);
+    if (near.hp !== n1 || far.hp !== f1) bad.push("영역 밖에서도 번개가 나감");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "영역 안: 가까운 적만 " + api.ULT.dmStrikeDmg + " 피해, 영역 밖: 번개 없음");
+  });
+  run(SHAMAN, "영역전개: 부활 보호 중인 적은 기절·번개를 받지 않는가", function (done) {
+    var W = shamanTeam(), sh = W.ent("sh"), near = W.ent("near");
+    near.protectUntil = W.t() + api.ULT.dmDur + 500;
+    api.useUlt(sh, 0);
+    var stunnedEver = false;
+    W.step(api.ULT.dmDur + 300, FRAME, function (t) { if (api.stunned(near, t)) stunnedEver = true; });
+    done(!stunnedEver && near.hp === 1000 ? "pass" : "fail", (stunnedEver ? "기절함" : "기절 안 함") + ", 피해 " + (1000 - near.hp));
+  });
+
   api.MAP_IDS.forEach(function (m, i) {
     var seed = 1000 + i * 17;
     run(AUTO, "AI 6명 60초 난전 — " + m + " (가끔 150ms 멈칫, 시드 " + seed + ")", function (done) {
@@ -1472,8 +1534,10 @@ export function runTeamBattleTests(api) {
   function once() {
     if (!api.isIdle()) { alert("방에 들어가 있지 않은 첫 화면에서만 검사할 수 있어요."); return; }
     var mapBefore = api.currentMap(), started = performance.now(), results;
+    var retired = Object.keys(api.CHARS).filter(function (c) { return api.CHARS[c].retired; });
+    retired.forEach(function (c) { api.CHARS[c].retired = false; });
     try { results = collectResults(api); }
-    finally { api.finish(mapBefore); }
+    finally { retired.forEach(function (c) { api.CHARS[c].retired = true; }); api.finish(mapBefore); }
     renderPanel(results, performance.now() - started, once);
   }
   once();
