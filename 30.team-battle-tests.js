@@ -1528,7 +1528,7 @@ function collectResults(api) {
     var n0 = near.hp, f0 = far.hp;
     sh.cdUntil = 0; api.fireBasic(sh, Math.PI);
     W.step(100);
-    if (n0 - near.hp !== api.ULT.dmStrikeDmg) bad.push("따라온 영역 안 적 번개 피해 " + (n0 - near.hp));
+    if (n0 - near.hp !== api.ULT.dmStrikeDmg + api.ULT.dmStrikeFighterBonus) bad.push("따라온 영역 안 전사 번개 피해(기본+전사 추가) " + (n0 - near.hp));
     if (far.hp !== f0) bad.push("영역 밖 적이 맞음");
     if (near.curse !== 1) bad.push("영역 안 번개로 저주 1회여야 함: " + near.curse);
     var strikeStunLeft = near.stunUntil - W.t();
@@ -1562,8 +1562,8 @@ function collectResults(api) {
     var r0 = rg.hp, n0 = near.hp;
     sh.cdUntil = 0; api.fireBasic(sh, 0);
     W.step(100);
-    var ok = rg.hp === r0 && n0 - near.hp === api.ULT.dmStrikeDmg;
-    done(ok ? "pass" : "fail", "은신자 피해 " + (r0 - rg.hp) + ", 보이는 적 피해 " + (n0 - near.hp) + " (기대 0·" + api.ULT.dmStrikeDmg + ")");
+    var ok = rg.hp === r0 && n0 - near.hp === api.ULT.dmStrikeDmg + api.ULT.dmStrikeFighterBonus;
+    done(ok ? "pass" : "fail", "은신자 피해 " + (r0 - rg.hp) + ", 보이는 적 피해 " + (n0 - near.hp) + " (기대 0·" + (api.ULT.dmStrikeDmg + api.ULT.dmStrikeFighterBonus) + ")");
   });
   run(SHAMAN, "영역전개: 주술사가 쓰러지면 반구가 바로 사라지고, 부활 보호 중인 적은 기절·번개를 받지 않는가", function (done) {
     var W = shamanTeam(), sh = W.ent("sh"), near = W.ent("near"), far = W.ent("far"), bad = [];
