@@ -3656,13 +3656,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var skipReason = quitTeam ? "상대팀이 모두 나가서 통계에서 제외됐어요" : statsSkipReason(room.mode, room.roster, P);
     var ended = { status: "ended", winner: winner, endedAt: t,
       final: { blue: s.blueKills, red: s.redKills, reason: quitTeam ? "상대팀이 모두 나가서 승리" : "시간 종료 — 킬 스코어로 판정" } };
-    if (statsMode) ended.statsNote = skipReason || "통계를 저장하는 중이에요";
+    if (statsMode) ended.statsNote = skipReason || STATS_PENDING;
     room.ref.update(ended);
     if (!skipReason) setTimeout(function () { recordClassStats(t); }, STATS_SETTLE_MS);
   }
 
   var STATS_PATH = "teambattle/modestats/";
-  var STATS_SETTLE_MS = 3000;
+  var STATS_SETTLE_MS = 8000;
+  var STATS_PENDING = "통계를 저장하는 중이에요";
   var isTestLink = !!(window.PORTAL_CLASS && window.PORTAL_CLASS.test);
   function statsSkipReason(mode, roster, ps) {
     if (mode !== "pvp" && mode !== "cup") return "이 모드는 통계를 모으지 않아요";
@@ -3759,7 +3760,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   function restart() {
     if (!room || room.status !== "ended") return;
-    if (room.endedAt && now() - room.endedAt < STATS_SETTLE_MS + 500) return;
+    if (room.endedAt && now() - room.endedAt < (room.statsNote === STATS_PENDING ? STATS_SETTLE_MS + 500 : 3500)) return;
     room.ref.update({ status: "lobby", winner: null, final: null, statsNote: null, startAt: null, endedAt: null, roster: null, draft: null,
                       st: null, done: null, shots: null, meleeHits: null, hits: null, effects: null, kills: null, projectiles: null });
   }
