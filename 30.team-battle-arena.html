@@ -1225,8 +1225,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     sub(ref.child("pong/" + myId), "value", onPong);
 
     var pref = ref.child("players");
-    sub(pref, "child_added", function (s) { P[s.key] = s.val(); playersChanged(); });
-    sub(pref, "child_changed", function (s) { P[s.key] = s.val(); if (!G || room.status === "lobby") playersChanged(); });
+    sub(pref, "child_added", function (s) { P[s.key] = s.val(); if (s.key === myId) saveResume(); playersChanged(); });
+    sub(pref, "child_changed", function (s) { P[s.key] = s.val(); if (s.key === myId) saveResume(); if (!G || room.status === "lobby") playersChanged(); });
     sub(pref, "child_removed", function (s) {
       if (s.key === myId && !leaving) { rejoinAfterDrop(s.val() || P[myId]); return; }
       delete P[s.key]; delete R[s.key]; delete BOTS[s.key];
@@ -1305,14 +1305,52 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (!hid || !ps[hid] || ps[hid].isAI) return r.ref.update({ hostPlayerId: nx });
       });
     }).catch(function () {});
+    clearResume();
     room = null; resetLocal(); showScreen("start"); startMsg("");
   }
   function exitToStart(msg) {
+    clearResume();
     if (room) { leaving = true; unsubAll(); try { room.ref.child("players/" + myId).onDisconnect().cancel(); } catch (e) {} }
     room = null; resetLocal(); showScreen("start"); startMsg(msg || "");
   }
   function resetLocal() { clear3d(); BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; STORMS = []; REVS = []; GRACES = []; DOMAINS = []; CURSES = {}; BLADE_SPINS = []; P = {}; R = {}; PR = {}; MELEE = {}; FX = []; G = null; ME = null; BOTS = {}; ST = {}; SHOTS = []; hitSubs = {}; joy.id = null; aim.id = null; specResultHeld = false; setText($("btnAgain"), "다시하기"); }
-  window.addEventListener("pagehide", function () { if (room) { try { room.ref.child("players/" + myId).remove(); } catch (e) {} } });
+  window.addEventListener("pagehide", function () { saveResume(); if (room) { try { room.ref.child("players/" + myId).remove(); } catch (e) {} } });
+  document.addEventListener("visibilitychange", function () { if (document.hidden) saveResume(); });
+
+  var RESUME_KEY = "tba_resume_v1", RESUME_MS = 180000, RESUME_SAVE_MS = 20000;
+  setInterval(saveResume, RESUME_SAVE_MS);
+  function saveResume() {
+    if (!room || leaving || !P[myId]) return;
+    try { sessionStorage.setItem(RESUME_KEY, JSON.stringify({ code: room.code, id: myId, me: P[myId], at: Date.now() })); } catch (e) {}
+  }
+  function clearResume() { try { sessionStorage.removeItem(RESUME_KEY); } catch (e) {} }
+  function readResume() {
+    var s = null;
+    try { s = JSON.parse(sessionStorage.getItem(RESUME_KEY) || "null"); } catch (e) { s = null; }
+    return s && s.code && s.id && s.me && Date.now() - s.at < RESUME_MS ? s : null;
+  }
+  function resumeTeam(me, ps, status) {
+    if (status !== "lobby" || me.team === "spec") return me.team;
+    if (countIn(ps, me.team, myId) < TEAM_MAX) return me.team;
+    return countIn(ps, "spec", myId) < SPEC_MAX ? "spec" : null;
+  }
+  function tryResume() {
+    var s = readResume();
+    if (!s || !db) { clearResume(); return; }
+    var ref = db.ref(ROOT + "/" + s.code);
+    startMsg("이전 방(" + s.code + ")으로 다시 들어가는 중…");
+    Promise.all(["status", "players"].map(function (k) { return ref.child(k).once("value"); })).then(function (a) {
+      var status = a[0].val(), ps = a[1].val() || {};
+      if (room) return;
+      if (status === null) { clearResume(); startMsg(""); return; }
+      myId = s.id;
+      var me = ps[myId] || Object.assign({}, s.me, { nickname: nick || s.me.nickname });
+      var team = resumeTeam(me, ps, status);
+      if (!team) { clearResume(); startMsg("이전 방이 가득 차서 다시 들어가지 못했어요."); return; }
+      me.team = team;
+      return ref.child("players/" + myId).set(me).then(function () { startMsg(""); enterRoom(s.code); });
+    }).catch(function () { clearResume(); startMsg(""); });
+  }
 
   var screenNow = "start";
   function showScreen(k) {
@@ -6704,6 +6742,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   showScreen("start");
   if (!db) startMsg("온라인 연결을 준비하지 못했어요. 인터넷 연결을 확인해 주세요.");
   if (!nick) openNick(true);
+  if (!/[?&](test|sim)(&|$)/.test(location.search)) tryResume();
   requestAnimationFrame(loop);
   window.TEAM_BATTLE_READY = true;
 })();
