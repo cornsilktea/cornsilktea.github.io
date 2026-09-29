@@ -1,6 +1,6 @@
 window.TEAM_BATTLE_VIDEOS = {
   warrior:    { name: "광전사",   basic: "", passive: "", skill: "" },
-  duelist:    { name: "결투가",   basic: "", passive: "", skill: "" },
+  duelist:    { name: "결투가",   basic: "https://youtu.be/EmZoRe89rjc", passive: "https://youtu.be/EmZoRe89rjc", skill: "https://youtu.be/b9wxWpGDEbA" },
   knight:     { name: "기사",     basic: "", passive: "", skill: "" },
   blacksmith: { name: "대장장이", basic: "", passive: "", skill: "" },
   guardian:   { name: "수문장",   basic: "", passive: "", skill: "" },
