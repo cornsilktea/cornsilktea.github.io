@@ -1456,21 +1456,38 @@ function collectResults(api) {
     if (far.curse) bad.push("맞지 않은 적에게 저주 " + far.curse);
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "저주 1·2·3회 쌓임, 3회째 0.5초 뒤 " + api.ULT.cuBoomDmg + " 폭발 피해, 저주 초기화");
   });
+  run(SHAMAN, "패시브: 저주가 " + api.ULT.cuExpireMs / 1000 + "초 갱신되지 않으면 사라지고, 그 안에 다시 맞으면 유지되는가", function (done) {
+    var W = shamanTeam(), sh = W.ent("sh"), near = W.ent("near"), far = W.ent("far"), bad = [];
+    far.x = 700;
+    sh.cdUntil = 0; api.fireBasic(sh, 0);
+    W.step(600);
+    if (near.curse !== 1) bad.push("첫 저주 " + near.curse);
+    W.step(api.ULT.cuExpireMs - 900);
+    sh.cdUntil = 0; api.fireBasic(sh, 0);
+    W.step(600);
+    if (near.curse !== 2) bad.push("갱신하면 유지되어야 함 " + near.curse);
+    W.step(api.ULT.cuExpireMs - 900);
+    if (near.curse !== 2) bad.push("갱신 뒤 3초 안인데 사라짐 " + near.curse);
+    W.step(1200);
+    if (near.curse) bad.push("3초 넘게 갱신 안 됐는데 남음 " + near.curse);
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "3초 안에 다시 맞으면 유지, 갱신 없이 3초가 지나면 0으로 초기화");
+  });
   run(SHAMAN, "영역전개: " + api.ULT.dmGrowMs / 1000 + "초간 반경 " + api.ULT.dmR + "까지 커지며 닿은 적은 " + api.ULT.dmStunMs / 1000 + "초 기절하고, 기절이 풀릴 때 " + api.ULT.dmBoltDmg + " 피해를 한 번 받는가", function (done) {
-    var W = shamanTeam(), sh = W.ent("sh"), near = W.ent("near"), far = W.ent("far"), bad = [], at = { nearStun: null, farStun: null, nearBolt: null }, t0;
+    var W = shamanTeam(), sh = W.ent("sh"), near = W.ent("near"), far = W.ent("far"), bad = [], at = { nearStun: null, farStun: null, nearBolt: null, nearCurse: 0, farCurse: 0 }, t0;
     far.x = 300 + 380;
     api.useUlt(sh, 0); t0 = W.t();
     W.step(api.ULT.dmDur + 300, FRAME, function (t) {
       if (at.nearStun === null && api.stunned(near, t)) at.nearStun = t - t0;
       if (at.farStun === null && api.stunned(far, t)) at.farStun = t - t0;
       if (at.nearBolt === null && near.hp < 1000) at.nearBolt = t - t0;
+      at.nearCurse = Math.max(at.nearCurse, near.curse || 0); at.farCurse = Math.max(at.farCurse, far.curse || 0);
     });
     var growth = function (d) { return (d - api.BODY_R * 0.5) / api.ULT.dmR * api.ULT.dmGrowMs; };
     if (at.nearStun === null || Math.abs(at.nearStun - growth(120)) > 50) bad.push("가까운 적(120) 기절 시점 " + at.nearStun);
     if (at.farStun === null || Math.abs(at.farStun - growth(380)) > 50) bad.push("먼 적(380) 기절 시점 " + at.farStun);
     if (1000 - near.hp !== api.ULT.dmBoltDmg) bad.push("가까운 적 피해 " + (1000 - near.hp));
     if (1000 - far.hp !== api.ULT.dmBoltDmg) bad.push("먼 적 피해 " + (1000 - far.hp));
-    if (near.curse !== 1 || far.curse !== 1) bad.push("기절 뒤 번개로 저주 1회씩이어야 함: " + near.curse + "·" + far.curse);
+    if (at.nearCurse !== 1 || at.farCurse !== 1) bad.push("기절 뒤 번개로 저주 1회씩이어야 함: " + at.nearCurse + "·" + at.farCurse);
     if (at.nearBolt === null || Math.abs(at.nearBolt - at.nearStun - api.ULT.dmStunMs) > 40) bad.push("번개가 기절 " + at.nearStun + "ms 뒤 " + at.nearBolt + "ms");
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "가까운 적 " + Math.round(at.nearStun) + "ms·먼 적 " + Math.round(at.farStun) + "ms에 기절, 기절이 풀린 " + Math.round(at.nearBolt) + "ms에 " + api.ULT.dmBoltDmg + " 피해 한 번");
   });
