@@ -671,7 +671,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     lancer:  { name: "창기사", role: "fighter", icon: "🔱", hp: 300, speed: 200, cd: 1200, dmg: 30, range: 200, width: 50, respawnShield: true, ultName: "꿰뚫기", ultAim: true },
     blacksmith: { name: "대장장이", role: "fighter", icon: "🔨", hp: 350, speed: 200, cd: 1250, dmg: 25, range: 180, width: 150, windup: 500, fx: { stunMs: 500 }, ultName: "내려찍기", ultAim: true },
     priest:  { name: "사제", role: "caster", icon: "📖", hp: 120, speed: 240, cd: 1000, dmg: 10, heal: 10, range: 320, width: 200, ultName: "블랙홀", ultKind: "blackhole", ultAim: true, heals: true, retired: true },
-    shaman:  { name: "주술사", role: "caster", icon: "👊", hp: 120, speed: 240, cd: 1000, dmg: 10, range: 300, width: 100, ultName: "영역전개" },
+    shaman:  { name: "주술사", role: "caster", icon: "👊", hp: 120, speed: 240, cd: 1000, dmg: 5, range: 300, width: 100, ultName: "영역전개" },
     cleric:  { name: "클레릭", role: "caster", icon: "✝️", hp: 120, speed: 240, cd: 1000, dmg: 0, graceHeal: 30, range: 400, noAim: true, healGauge: 400, ultName: "요한계시록", heals: true },
     hitman:  { name: "자객", role: "assassin", icon: "🔪", hp: 120, speed: 250, cd: 1250, dmg: 40, range: 100,
                dashRange: 200, dashWidth: 150, dashDmg: 40, dashMs: 300, finishDelay: 125, ultName: "처형", ultAim: true },
@@ -714,7 +714,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               bwR: 150, bwDur: 3000, bwTick: 250, bwHurtGaugeEvery: 4, bwDmg: 15, bwKillGauge: 5, bdR: 70, bdDmg: 10, bdDelay: 300,
               rmDur: 3000, rmRate: 3, rmDashMs: 300, rmDashRange: 100,
               tbCount: 3, tbSpread: 0.26,
-              dmR: 450, dmGrowMs: 1500, dmDur: 5500, dmStunMs: 500, dmBoltDmg: 20, dmStrikeDmg: 30, dmStunGraceMs: 40, cuStacks: 3, cuBoomDmg: 20, cuBoomMs: 500,
+              dmR: 450, dmGrowMs: 1500, dmDur: 5500, dmStunMs: 500, dmBoltDmg: 20, dmStrikeDmg: 30, dmStunGraceMs: 40, cuStacks: 3, cuBoomDmg: 30, cuBoomMs: 500, cuExpireMs: 3000,
               rvDur: 3000, rvTick: 1000, rvHeal: 30, rvDmg: 30, rvCastMs: 600, grLife: 650 };
   var ASSIST_MS = 5000;
   function boltStacks(E) {
@@ -1389,7 +1389,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "necro") return "체력이 " + c.lastStandHp + " 미만으로 떨어지면 체력 " + c.lastStandHp + "을 남기고 " + secs(c.lastStandHideMs) + "간 은신. 죽을 때마다 한 번";
     if (k === "guardian") return "기본 공격에 맞은 적은 " + secs(c.fx.slowMs) + "간 " + slowPct(c.fx.slowMul);
     if (k === "priest") return "기본 공격에 맞은 아군은 체력 " + c.heal + " 회복";
-    if (k === "shaman") return "공격이 적중할 때마다 대상에게 저주 1회 부여. 저주가 " + ULT.cuStacks + "회 중첩되면 폭발하여 " + ULT.cuBoomDmg + "의 피해";
+    if (k === "shaman") return "공격이 적중할 때마다 대상에게 저주 1회 부여. 저주가 " + ULT.cuStacks + "회 중첩되면 폭발하여 " + ULT.cuBoomDmg + "의 피해. " + secs(ULT.cuExpireMs) + " 이상 갱신되지 않으면 저주 소멸";
     if (k === "cleric") return "기본 공격은 조준 없이 반경 " + c.range + " 안에서 체력 비율이 가장 낮은 아군의 체력 " + c.graceHeal + " 회복";
     if (k === "mage") return "기본 공격·스킬에 맞은 적은 " + secs(c.burn.ms) + "간 불타며 1초당 " + c.burn.perSec + "의 피해를 입고 회복 " + healCutPct() + " 감소";
     if (k === "thrower") return "기본 공격·스킬 지역 위의 적은 회복 " + healCutPct() + " 감소";
@@ -2883,12 +2883,17 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   function applyCurse(T, owner, t) {
     if (T.minion || !T.alive || T.curseBoom) return;
-    T.curse = (T.curse || 0) + 1;
+    T.curse = (T.curse || 0) + 1; T.curseAt = t;
     if (T.curse >= ULT.cuStacks) T.curseBoom = { at: t + ULT.cuBoomMs, owner: owner };
     room.ref.child("effects").push({ type: "curse", tgt: T.id, owner: owner, n: T.curse, createdAt: t });
   }
   function stepCurse(T, t) {
     var B = T.curseBoom;
+    if (!B && T.curse && t - T.curseAt >= ULT.cuExpireMs) {
+      T.curse = 0;
+      room.ref.child("effects").push({ type: "curse", tgt: T.id, owner: T.id, n: 0, createdAt: t });
+      return;
+    }
     if (!B || t < B.at) return;
     T.curse = 0; T.curseBoom = null;
     if (!T.alive || protectedNow(T, t)) return;
@@ -4837,7 +4842,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     g.userData.edge.opacity = 0.95 * (1 - f * f);
     g.userData.fill.opacity = 0.35 * (1 - f);
   }
-  var CURSE_BALL_Y = [30, 46, 62], CURSE_SIDE_X = 36, CURSE_BLAST_MS = 260, CURSE_CORE_R = 34, CURSE_BLAST_R = 64, CURSE_CENTER_Y = 46;
+  var CURSE_BALL_Y = [30, 46, 62], CURSE_SIDE_X = 36, CURSE_BLAST_MS = 260, CURSE_CORE_R = 52, CURSE_BLAST_R = 78, CURSE_CENTER_Y = 46;
   function makeCurseVis() {
     var g = new THREE.Group(), mats = [], balls = [];
     var ballM = new THREE.MeshBasicMaterial({ color: 0x1B1226 }), ballGlowM = new THREE.MeshBasicMaterial({ color: 0xB0101E, transparent: true, opacity: 0.45, depthWrite: false, blending: THREE.AdditiveBlending });
@@ -5169,15 +5174,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   GEO.domainRim = new THREE.RingGeometry(0.975, 1, 72);
   function makeDomainVis() {
     var g = new THREE.Group();
-    var domeMat = new THREE.MeshBasicMaterial({ color: 0x1A1222, transparent: true, opacity: 0.21, depthWrite: false });
-    var shardMat = new THREE.MeshBasicMaterial({ color: 0x9A0E1C, transparent: true, opacity: 0.24, depthWrite: false, wireframe: true });
-    var floorMat = new THREE.MeshBasicMaterial({ color: 0x0C0810, transparent: true, opacity: 0.2, depthWrite: false });
+    var domeMat = new THREE.MeshBasicMaterial({ color: 0x1A1222, transparent: true, opacity: 0.42, depthWrite: false });
+    var shardMat = new THREE.MeshBasicMaterial({ color: 0x9A0E1C, transparent: true, opacity: 0.45, depthWrite: false, wireframe: true });
+    var floorMat = new THREE.MeshBasicMaterial({ color: 0x0C0810, transparent: true, opacity: 0.38, depthWrite: false });
     var rimMat = new THREE.MeshBasicMaterial({ color: 0xC0101E, transparent: true, opacity: 0.8, depthWrite: false });
     var dome = new THREE.Mesh(GEO.domainDome, domeMat); g.add(dome);
     var shards = new THREE.Mesh(GEO.domainShards, shardMat); shards.scale.setScalar(0.995); g.add(shards);
     var floor = flatMesh(GEO.disc, floorMat); floor.position.y = 1.2 / 400; g.add(floor);
     var rim = flatMesh(GEO.domainRim, rimMat); rim.position.y = 1.6 / 400; g.add(rim);
-    g.userData = { mats: [domeMat, shardMat, floorMat, rimMat], base: [0.21, 0.24, 0.2, 0.85], shards: shards };
+    g.userData = { mats: [domeMat, shardMat, floorMat, rimMat], base: [0.42, 0.45, 0.38, 0.85], shards: shards };
     scene.add(g);
     return g;
   }
