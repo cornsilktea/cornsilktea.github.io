@@ -4,7 +4,7 @@ window.TEAM_BATTLE_VIDEOS = {
   knight:     { name: "기사",     basic: "", passive: "", skill: "" },
   blacksmith: { name: "대장장이", basic: "", passive: "", skill: "" },
   guardian:   { name: "수문장",   basic: "", passive: "", skill: "" },
-  lancer:     { name: "창기사",   basic: "", passive: "", skill: "" },
+  lancer:     { name: "창술사",   basic: "", passive: "", skill: "" },
   necro:      { name: "네크로",   basic: "", passive: "", skill: "" },
   frost:      { name: "얼음술사", basic: "", passive: "", skill: "" },
   shaman:     { name: "주술사",   basic: "", passive: "", skill: "" },

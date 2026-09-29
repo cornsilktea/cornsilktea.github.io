@@ -294,17 +294,17 @@ function collectResults(api) {
     var struck = W.pushesFrom("ln", "meleeHits").filter(function (p) { return !p.v.wind && p.v.dmg; }).length;
     return { struck: struck, hurt: W.ent("foe").hp < W.ent("foe").maxHp, moved: moved, free: api.speedOf(W.ent("ln")) > 0 };
   }
-  run(MOVE, "창기사 꿰뚫기: 준비 동작 없이 두면 찌르기가 나가는가 (기준 확인)", function (done) {
+  run(MOVE, "창술사 꿰뚫기: 준비 동작 없이 두면 찌르기가 나가는가 (기준 확인)", function (done) {
     var r = lancerDisplaced(null);
     done(r.struck && r.hurt ? "pass" : "fail", r.struck && r.hurt ? "찌르기가 나가 적이 맞음" : "찌르기가 나가지 않음");
   });
-  run(MOVE, "창기사 꿰뚫기: 준비 중 창벽에 밀려나면 취소되는가", function (done) {
+  run(MOVE, "창술사 꿰뚫기: 준비 중 창벽에 밀려나면 취소되는가", function (done) {
     var r = lancerDisplaced("guardian");
-    done(!r.struck && !r.hurt && r.free ? "pass" : "fail", r.struck || r.hurt ? r.moved + "만큼 밀렸는데 찌르기가 나감" : !r.free ? "취소됐지만 창기사가 계속 묶여 있음" : r.moved + "만큼 밀려 취소됨, 바로 움직일 수 있음");
+    done(!r.struck && !r.hurt && r.free ? "pass" : "fail", r.struck || r.hurt ? r.moved + "만큼 밀렸는데 찌르기가 나감" : !r.free ? "취소됐지만 창술사가 계속 묶여 있음" : r.moved + "만큼 밀려 취소됨, 바로 움직일 수 있음");
   });
-  run(MOVE, "창기사 꿰뚫기: 준비 중 블랙홀에 끌려가면 취소되는가", function (done) {
+  run(MOVE, "창술사 꿰뚫기: 준비 중 블랙홀에 끌려가면 취소되는가", function (done) {
     var r = lancerDisplaced("hole");
-    if (!r.moved) { done("fail", "시험 준비 실패: 블랙홀이 창기사를 끌지 못함"); return; }
+    if (!r.moved) { done("fail", "시험 준비 실패: 블랙홀이 창술사를 끌지 못함"); return; }
     done(!r.struck && !r.hurt ? "pass" : "fail", r.struck || r.hurt ? "끌려갔는데 찌르기가 나감" : r.moved + "만큼 끌려 취소됨");
   });
 
@@ -320,8 +320,8 @@ function collectResults(api) {
     W.step(500);
     return W.ent("foe").hp < W.ent("foe").maxHp;
   }
-  run(STUN, "창기사 꿰뚫기 준비 중에 기절하면 찌르기가 취소되는가 (기절 시간별)", function (done) {
-    var sources = [["자객 처형·주술사 메테오·기사 방어태세", api.ULT.mbStunMs], ["대장장이 내려찍기", api.ULT.bsStunMs], ["창기사 꿰뚫기", api.ULT.lnStunMs]];
+  run(STUN, "창술사 꿰뚫기 준비 중에 기절하면 찌르기가 취소되는가 (기절 시간별)", function (done) {
+    var sources = [["자객 처형·주술사 메테오·기사 방어태세", api.ULT.mbStunMs], ["대장장이 내려찍기", api.ULT.bsStunMs], ["창술사 꿰뚫기", api.ULT.lnStunMs]];
     var fired = sources.filter(function (s) { return lancerStunnedBy(s[1]); });
     done(fired.length ? "fail" : "pass", fired.length
       ? "기절했는데도 찌르기가 나감: " + fired.map(function (s) { return s[0] + "(" + s[1] / 1000 + "초 기절)"; }).join(", ")
@@ -1040,7 +1040,7 @@ function collectResults(api) {
       return { list: list, issues: issues, kills: kills, ults: ults };
     } finally { Math.random = realRandom; }
   }
-  var PASSIVE2 = "주술사·투척병·기사·창기사·광전사 패시브";
+  var PASSIVE2 = "주술사·투척병·기사·창술사·광전사 패시브";
   run(PASSIVE2, "주술사: 적중한 적이 " + api.CHARS.mage.burn.ms / 1000 + "초간 불타며 1초당 " + api.CHARS.mage.burn.perSec + "의 피해를 입고, 그동안 회복이 절반인가", function (done) {
     var y = OPEN_Y.forest, burn = api.CHARS.mage.burn;
     var W = world("forest", [
@@ -1107,7 +1107,7 @@ function collectResults(api) {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "화살 " + (15 - armor) + "×2, 독병 " + tick + "×" + api.CHARS.thrower.ticks + ", 방어태세 중 30 → " + (Math.round(30 * api.ULT.tkDef) - armor) + ", 막은 피해 기록");
   });
 
-  run(PASSIVE2, "창기사: 게임 시작·부활할 때 보호막이 생겨 다음 피해 1회만 막고, 함께 온 기절은 그대로 받는가", function (done) {
+  run(PASSIVE2, "창술사: 게임 시작·부활할 때 보호막이 생겨 다음 피해 1회만 막고, 함께 온 기절은 그대로 받는가", function (done) {
     var y = OPEN_Y.forest;
     var W = world("forest", [
       { id: "gd", team: "blue", char: "guardian", x: 250, y: y },

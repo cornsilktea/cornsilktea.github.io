@@ -9,7 +9,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
 <meta property="og:title" content="3v3 팀 배틀 아레나">
-<meta property="og:description" content="방 코드로 모여 블루 vs 레드로 싸우는 3D 3v3 실시간 팀 대전(숲속 공터·강 건너기·던전 회랑 맵 선택) / 역할군별 캐릭터(전사: 광전사·기사·창기사 / 마법사: 주술사·네크로 / 원거리 딜러: 궁수·저격수·투척병 / 암살자: 은신자·자객) 중 선택, 역할군별 스킬 게이지·풀숲 숨기 / 쓰러지면 3초 뒤 부활, 1분 30초 뒤 킬 스코어가 높은 팀 승리">
+<meta property="og:description" content="방 코드로 모여 블루 vs 레드로 싸우는 3D 3v3 실시간 팀 대전(숲속 공터·강 건너기·던전 회랑 맵 선택) / 역할군별 캐릭터(전사: 광전사·기사·창술사 / 마법사: 주술사·네크로 / 원거리 딜러: 궁수·저격수·투척병 / 암살자: 은신자·자객) 중 선택, 역할군별 스킬 게이지·풀숲 숨기 / 쓰러지면 3초 뒤 부활, 1분 30초 뒤 킬 스코어가 높은 팀 승리">
 <meta property="og:url" content="https://cornsilktea.github.io/30.team-battle-arena.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
@@ -553,7 +553,7 @@
       <div id="startMsg" class="msg"></div>
       <div class="keys quickKeys">
         <span><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd></span><span>이동</span>
-        <span><kbd>J</kbd> <kbd>K</kbd></span><span><b>J</b> 스킬 · <b>K</b> 일반 공격 — 누르면 자동 조준</span>
+        <span><kbd>J</kbd> <kbd>K</kbd></span><span><b>J</b> 스킬 · <b>K</b> 기본 공격 — 누르면 자동 조준</span>
         <span><kbd>터치</kbd></span><span>조이스틱으로 수동 조준</span>
       </div>
     </div>
@@ -598,13 +598,13 @@
       <div class="secTitle">조작 방법</div>
       <div class="keys">
         <span><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd></span><span>이동</span>
-        <span><kbd>J</kbd> <kbd>K</kbd></span><span><b>J</b> 스킬 · <b>K</b> 일반 공격 — 누르면 자동 조준</span>
+        <span><kbd>J</kbd> <kbd>K</kbd></span><span><b>J</b> 스킬 · <b>K</b> 기본 공격 — 누르면 자동 조준</span>
         <span><kbd>터치</kbd></span><span>조이스틱으로 수동 조준</span>
       </div>
     </div>
   </div>
   <div id="charCardBox" class="card charCol">
-    <div class="secTitle charHead"><span>캐릭터<span id="charHint" class="secHint">선택한 캐릭터를 한 번 더 누르면 자세한 설명이 나옵니다.</span></span><span class="charBtns"><button id="btnVideos" class="mini" type="button">캐릭터 영상</button><button id="btnStats" class="mini" type="button">통계</button><button id="btnZoomChars" class="mini" type="button">확대</button><button id="btnFlipAll" class="mini" type="button">모든 카드 뒤집기</button></span></div>
+    <div class="secTitle charHead"><span>캐릭터<span id="charHint" class="secHint">선택한 캐릭터를 한 번 더 누르면 자세한 설명이 나와요.</span></span><span class="charBtns"><button id="btnVideos" class="mini" type="button">캐릭터 영상</button><button id="btnStats" class="mini" type="button">통계</button><button id="btnZoomChars" class="mini" type="button">확대</button><button id="btnFlipAll" class="mini" type="button">모든 카드 뒤집기</button></span></div>
     <div class="chars" id="chars"></div>
   </div>
   </div>
@@ -678,7 +678,7 @@
     <div class="boardWrap"><table class="board statsTable"><thead><tr><th class="nm">캐릭터</th><th>선택률<small>선택 수 / 고를 수 있던 게임 수</small></th><th>승률<small>승리 수 / 선택 수</small></th><th>평균 어시스트</th><th>평균 피해량</th><th>평균 회복량</th><th>평균 막은 피해</th><th>평균 기절</th><th>평균 둔화</th></tr></thead><tbody id="statsBody"></tbody></table></div>
     <ul class="statsNotes">
       <li>AI 없이 학생 6명이 3대3으로 끝까지 마친 경기만 집계합니다.</li>
-      <li>시간 종료 때 킬 수가 같으면 무승부이고, 무승부는 승리로 세지 않습니다.</li>
+      <li>시간이 끝났을 때 킬 수가 같으면 무승부이고, 무승부는 승리로 세지 않습니다.</li>
       <li>한 경기에서 같은 캐릭터는 1명만 고를 수 있으므로 선택률은 그 캐릭터가 나온 판의 비율입니다.</li>
       <li>막은 피해·기절·둔화·어시스트는 이 항목이 추가된 뒤의 경기만으로 평균을 냅니다.</li>
       <li>어시스트: 내가 피해나 해로운 효과(기절·둔화·넉백·끌어당김)를 준 적이 5초 안에 쓰러지거나, 내가 회복·은신(눈보라)을 준 아군이 5초 안에 적을 처치하면 1회(처치한 사람은 제외, 한 처치에 1번만).</li>
@@ -711,7 +711,7 @@
 
 <div id="nickModal" class="modal" hidden>
   <div class="modalBox">
-    <h3>닉네임을 입력해주세요</h3>
+    <h3>닉네임을 입력해 주세요</h3>
     <div class="row">
       <input id="nickInput" maxlength="3" placeholder="최대 3자" autocomplete="off">
       <button id="btnNickSave" class="primary" type="button">저장</button>
@@ -752,7 +752,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     necro:   { name: "네크로", role: "caster", icon: "💀", hp: 120, lastStandHp: 50, lastStandHideMs: 1000, speed: 240, cd: 1000, dmg: 10, range: KEY * 4, pSpeed: 1000, pr: 9, ultName: "해골 소환", blocks: true },
     sniper:  { name: "저격수", role: "shooter", icon: "🎯", hp: 100, speed: 200, cd: 1250, dmg: 40, range: 700, pSpeed: 840, pr: 12, farDist: 500, farBonus: 0.5, ultName: "거대 화살", ultAim: true },
     thrower: { name: "투척병", role: "shooter", icon: "🧪", hp: 120, speed: 220, cd: 1000, dmg: 15, ticks: 3, range: KEY * 4 + 120, minRange: KEY * 1, healCut: true, ultName: "독안개", ultAim: true, heals: true },
-    lancer:  { name: "창기사", role: "fighter", icon: "🔱", hp: 300, speed: 200, cd: 1200, dmg: 30, range: 200, width: 50, respawnShield: true, ultName: "꿰뚫기", ultAim: true },
+    lancer:  { name: "창술사", role: "fighter", icon: "🔱", hp: 300, speed: 200, cd: 1200, dmg: 30, range: 200, width: 50, respawnShield: true, ultName: "꿰뚫기", ultAim: true },
     blacksmith: { name: "대장장이", role: "fighter", icon: "🔨", hp: 350, speed: 200, cd: 1250, dmg: 30, range: 180, width: 150, windup: 500, fx: { stunMs: 500 }, ultName: "내려찍기", ultAim: true },
     priest:  { name: "사제", role: "caster", icon: "📖", hp: 120, speed: 240, cd: 1000, dmg: 10, heal: 10, range: 320, width: 200, ultName: "블랙홀", ultKind: "blackhole", ultAim: true, heals: true, retired: true },
     shaman:  { name: "주술사", role: "caster", icon: "👊", hp: 120, speed: 240, cd: 1000, dmg: 5, range: 300, width: 100, ultName: "영역전개" },
@@ -781,6 +781,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     return ROLE_LIST.indexOf(CHARS[a].role) - ROLE_LIST.indexOf(CHARS[b].role) || CHARS[a].name.localeCompare(CHARS[b].name, "ko");
   });
   function roleOf(c) { return ROLES[CHARS[c].role]; }
+  function roParticle(word) {
+    var code = word.charCodeAt(word.length - 1) - 0xAC00;
+    if (code < 0 || code > 11171) return "(으)로";
+    var jong = code % 28;
+    return jong === 0 || jong === 8 ? "로" : "으로";
+  }
   function charsInRole(r) { return CHAR_LIST.filter(function (c) { return CHARS[c].role === r; }); }
   var ULT = { mkCount: 10, mkGap: 115, mkDmg: 40, mkRefund: 1, mkSpeed: 805, mkRange: KEY * 8, mkPr: 8,
               bzDur: 4000, bzDmgMul: 1.3, bzCdMul: 1 / 1.3, bzHeal: 20, tkDur: 4000, tkDef: 0.4, tkStunR: 120, tkStunMs: 1000,
@@ -1205,7 +1211,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function rejoinAfterDrop(last, tries) {
     var r = room;
     tries = tries || 0;
-    if (!r || !last || tries >= REJOIN_TRIES) { if (r && !leaving) exitToStart("방에서 나가졌어요."); return; }
+    if (!r || !last || tries >= REJOIN_TRIES) { if (r && !leaving) exitToStart("연결이 끊겨 방에서 나왔어요."); return; }
     r.ref.child("status").once("value").then(function (st) {
       if (room !== r || leaving) return;
       if (st.val() === null) { exitToStart("방이 종료되었어요."); return; }
@@ -1373,7 +1379,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function charsViewOnly() { return screenNow === "start" || !!(room && room.mode === "cup"); }
   function renderStartChars() {
     show($("charCardBox"), true);
-    setText($("charHint"), "카드를 누르면 자세한 설명이 나옵니다.");
+    setText($("charHint"), "카드를 누르면 자세한 설명이 나와요.");
     setHtmlKeepScroll($("chars"), cardsHtml({}, true)); fitCardHeight(); fitCharCol($("charCardBox"));
   }
 
@@ -1547,10 +1553,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "hitman") return "사거리 " + ULT.exRange + "의 칼날 발사. 처음 맞은 적은 " + ULT.exDmg + "의 피해를 입고 " + secs(ULT.exStunMs) + "간 기절, 그 위치로 순간이동";
     if (k === "guardian") return "자신을 중심으로 반경 " + ULT.gdR + "의 적을 모두 " + ULT.gdKb + "만큼 밀어내며 " + ULT.gdDmg + "의 피해. 밀려난 적은 " + secs(ULT.gdSlowMs) + "간 " + slowPct(ULT.gdSlowMul);
     if (k === "shaman") return "자신을 중심으로 " + secs(ULT.dmGrowMs) + "간 반경 " + ULT.dmR + "까지 커진 뒤 " + secs(ULT.dmDur - ULT.dmGrowMs) + "간 유지되는 영역 생성. 영역이 커지는 과정에서 닿은 적은 " + secs(ULT.dmStunMs) +
-      " 기절하고 이후 " + ULT.dmBoltDmg + "의 피해. 영역 안에서 주술사의 기본 공격은 영역 내 가장 가까운 적 1명에게 " + ULT.dmStrikeDmg + "의 피해를 입히고 " + secs(ULT.dmStrikeStunMs) + "간 기절";
+      "간 기절하고, 기절이 풀릴 때 " + ULT.dmBoltDmg + "의 피해. 영역 안에서 주술사의 기본 공격은 영역 내 가장 가까운 적 1명에게 " + ULT.dmStrikeDmg + "의 피해를 입히고 " + secs(ULT.dmStrikeStunMs) + "간 기절";
     if (k === "priest") return "지정한 곳에 " + secs(ULT.bhDelay) + " 뒤 " + secs(ULT.bhDur) + "간 유지되는 반경 " + ULT.bhR + "의 블랙홀 생성. 적은 중심으로 끌려감";
     if (k === "cleric") return "아군의 체력을 " + CHARS.cleric.healGauge + " 회복시키면 사용 가능. 사용 시 자신의 체력을 모두 회복하고 " + secs(ULT.rvDur) + "간 제자리에서 기도. 아군 전체는 1초당 체력 " + ULT.rvHeal + " 회복, 적 전체는 1초당 " + ULT.rvDmg + "의 피해. 기절·넉백·끌어당김을 당하면 취소";
-    if (k === "frost") return "자신을 중심으로 " + secs(ULT.frBzDur) + "간 유지되는 반경 " + ULT.frBzR + "의 눈보라 생성. 눈보라에서 아군은 은신 상태가 되고, 적은 1초당 " +
+    if (k === "frost") return "자신을 중심으로 " + secs(ULT.frBzDur) + "간 유지되는 반경 " + ULT.frBzR + "의 눈보라 생성. 눈보라 안의 아군은 은신 상태가 되고, 적은 1초당 " +
       ULT.frBzDmg + "의 피해를 입고 패시브 1중첩";
     if (k === "duelist") return secs(ULT.rmDur) + "간 초당 공격 " + ULT.rmRate + "회, 돌진 거리 " + ULT.rmDashRange + "·돌진 시간 " + secs(ULT.rmDashMs) + "로 단축. 사용 즉시 기본 공격 대기시간 초기화";
     if (k === "crossbow") return "앞으로 부채꼴로 적을 꿰뚫는 볼트 " + ULT.tbCount + "발 발사. 맞은 적은 기본 공격과 같은 피해";
@@ -1571,7 +1577,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "mage") return "기본 공격·스킬에 맞은 적은 " + secs(c.burn.ms) + "간 불타며 1초당 " + c.burn.perSec + "의 피해를 입고 회복 " + healCutPct() + " 감소";
     if (k === "thrower") return "기본 공격·스킬 지역 위의 적은 회복 " + healCutPct() + " 감소";
     if (k === "knight") return "받는 모든 피해가 1회마다 " + c.armor + " 감소";
-    if (k === "lancer") return "게임 시작과 부활할 때마다 적의 다음 피해 1회를 막는 보호막 생성. 기절·둔화 등 효과는 막지 못함";
+    if (k === "lancer") return "게임을 시작할 때와 부활할 때마다 적의 다음 피해 1회를 막는 보호막 생성. 기절·둔화 등 효과는 막지 못함";
     if (k === "warrior") return "체력이 " + Math.round(c.rally.hpRate * 100) + "% 미만으로 떨어지면 " + secs(c.rally.ms) + "간 1초당 체력 " + c.rally.perSec + " 회복. 죽을 때마다 한 번";
     if (k === "frost") return "기본 공격에 맞은 적은 " + secs(ULT.frSlowMs) + "간 " + slowPct(ULT.frSlowMul) + ". " + secs(ULT.frSlowMs) + " 안에 다시 맞을 때마다 둔화가 " + Math.round(ULT.frSlowStep * 100) + "%p씩 커지고 3중첩이 되면 " + secs(ULT.frFreezeMs) + "간 기절. 기절이 끝난 뒤부터 다시 중첩";
     if (k === "rogue") return "가까운 적은 근접 공격, 먼 적에게는 사거리 " + c.throwRange + "의 단검 투척";
@@ -1661,7 +1667,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var cup = mode === "cup";
     show($("charCardBox"), cup || !imSpec);
     if (!cup && imSpec) setCharZoom(false);
-    setText($("charHint"), cup ? "대회모드에서는 게임 시작 후 캐릭터를 골라요. 카드를 누르면 자세한 설명이 나옵니다." : "선택한 캐릭터를 한 번 더 누르면 자세한 설명이 나옵니다.");
+    setText($("charHint"), cup ? "대회모드에서는 게임 시작 후 캐릭터를 골라요. 카드를 누르면 자세한 설명이 나와요." : "선택한 캐릭터를 한 번 더 누르면 자세한 설명이 나와요.");
     show($("btnSwapTeams"), isHost() && room.status === "lobby");
 
     setHtmlKeepScroll($("chars"), cardsHtml(me, cup)); fitCardHeight(); fitCharCol($("charCardBox"));
@@ -2197,7 +2203,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     setHtml($("dfDetail"), v ? '<div class="dfName">' + CHARS[v].icon + " " + CHARS[v].name + '<small>' + roleOf(v).icon + " " + roleOf(v).name + "</small></div>" +
       '<div class="dfRole">' + roleGaugeText(roleOf(v)) + "</div>" + statTable(v) +
       skillBlocks(v) +
-      (canPick ? '<button type="button" class="big primary" data-pick="' + v + '">✔ ' + CHARS[v].name + "(으)로 결정</button>" : "") : "");
+      (canPick ? '<button type="button" class="big primary" data-pick="' + v + '">✔ ' + CHARS[v].name + roParticle(CHARS[v].name) + " 결정</button>" : "") : "");
   }
   $("dfChars").onclick = function (e) {
     var b = e.target.closest ? e.target.closest(".dfCard") : null;
@@ -6618,7 +6624,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var prot = ME && protectedNow(ME, t) && st === "playing";
     show($("protBadge"), prot);
     if (prot) setText($("protBadge"), "🛡 보호 중 " + ((ME.protectUntil - t) / 1000).toFixed(1) + "초");
-    if (ME && !ME.alive) setText($("deadMsg"), "쓰러졌습니다 — " + Math.max(1, Math.ceil((ME.diedAt + RESPAWN_MS - t) / 1000)) + "초 뒤 부활");
+    if (ME && !ME.alive) setText($("deadMsg"), "쓰러졌어요 — " + Math.max(1, Math.ceil((ME.diedAt + RESPAWN_MS - t) / 1000)) + "초 뒤 부활");
     if (ME) {
       setHtml($("btnAtk").lastChild, '<i class="ic">' + CHARS[ME.char].icon + "</i>공격");
       var cdLeft = Math.max(0, ME.cdUntil - t) / (ME.cdDur || CHARS[ME.char].cd);
