@@ -667,7 +667,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     rogue:   { name: "은신자", role: "assassin", icon: "🗡️", hp: 110, speed: 250, ultSpeed: 400, cd: 833, dmg: 30, range: 110, arc: Math.PI * 0.6, hits: 2, hitGap: 160, throwDmg: 20, throwRange: 300, pSpeed: 900, pr: 8, ultName: "은신" },
     necro:   { name: "네크로", role: "caster", icon: "💀", hp: 120, lastStandHp: 50, lastStandHideMs: 1000, speed: 240, cd: 1000, dmg: 10, range: KEY * 4, pSpeed: 1000, pr: 9, ultName: "해골 소환", blocks: true },
     sniper:  { name: "저격수", role: "shooter", icon: "🎯", hp: 100, speed: 200, cd: 1250, dmg: 40, range: 700, pSpeed: 840, pr: 12, farDist: 500, farBonus: 0.5, ultName: "거대 화살", ultAim: true },
-    thrower: { name: "투척병", role: "shooter", icon: "🧪", hp: 120, speed: 220, cd: 1000, dmg: 18, ticks: 3, range: KEY * 4 + 120, minRange: KEY * 1, healCut: true, ultName: "독안개", ultAim: true, heals: true },
+    thrower: { name: "투척병", role: "shooter", icon: "🧪", hp: 120, speed: 220, cd: 1000, dmg: 15, ticks: 3, range: KEY * 4 + 120, minRange: KEY * 1, healCut: true, ultName: "독안개", ultAim: true, heals: true },
     lancer:  { name: "창기사", role: "fighter", icon: "🔱", hp: 300, speed: 200, cd: 1200, dmg: 30, range: 200, width: 50, respawnShield: true, ultName: "꿰뚫기", ultAim: true },
     blacksmith: { name: "대장장이", role: "fighter", icon: "🔨", hp: 350, speed: 200, cd: 1250, dmg: 30, range: 180, width: 150, windup: 500, fx: { stunMs: 500 }, ultName: "내려찍기", ultAim: true },
     priest:  { name: "사제", role: "caster", icon: "📖", hp: 120, speed: 240, cd: 1000, dmg: 10, heal: 10, range: 320, width: 200, ultName: "블랙홀", ultKind: "blackhole", ultAim: true, heals: true, retired: true },
@@ -705,12 +705,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               plFlight: 700, plFlightMin: 100, plR: 60, plDur: 3000, plTick: 1000, plMax: 4, plFade: 500, plLob: 90, plGauge: 1,
               fgR: 150, fgDur: 4000, fgDmg: 20, fgHeal: 15, fgSlowMul: 0.6, fgSlowMs: 400, fgCast: KEY * 4 + 100, fgRefund: 1,
               lnWind: 300, lnLen: 350, lnW: 36, lnDmg: 60, lnStunMs: 1200,
-              bsLeapMinMs: 200, bsLeapMaxMs: 1000, bsR: 150, bsDmg: 20, bsStunMs: 1000, bsCast: 450, bsMin: 60, bsHop: 45,
+              bsLeapMinMs: 200, bsLeapMaxMs: 1000, bsR: 200, bsDmg: 20, bsStunMs: 1000, bsCast: 450, bsMin: 60, bsHop: 45,
               bhR: 200, bhDur: 3000, bhDelay: 500, bhPull: 220, bhCast: 380, bhMin: 60, bhCcRate: 0.8,
               exRange: 500, exSpeed: 1300, exPr: 4, exDmg: 10, exStunMs: 1000,
               gdR: 200, gdKb: 150, gdKbMs: 500,
               frSlowMs: 1200, frSlowMul: 0.85, frSlowStep: 0.15, frFreezeMs: 800,
-              frBzR: 400, frBzDur: 7000, frBzDmg: 5, frBzTick: 1000, frBzDelay: 400, frBzSlowMul: 0.6, frBzSlowMs: 400,
+              frBzR: 400, frBzDur: 7000, frBzDmg: 5, frBzTick: 1000, frBzDelay: 400,
               bwR: 150, bwDur: 3000, bwTick: 250, bwHurtGaugeEvery: 4, bwDmg: 15, bwKillGauge: 5, bdR: 70, bdDmg: 10, bdDelay: 300,
               rmDur: 3000, rmRate: 3, rmDashMs: 300, rmDashRange: 100,
               tbCount: 3, tbSpread: 0.26,
@@ -1354,7 +1354,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function fitCharCols() { fitCharCol($("charCardBox")); fitCharCol(document.querySelector(".dfCharCol")); }
   window.addEventListener("resize", fitCharCols);
   function num(v) { return String(Math.round(v * 10) / 10); }
-  function secs(ms) { return num(ms / 1000) + "초"; }
+  function secs(ms) { return (Math.round(ms / 10) / 100) + "초"; }
   function slowPct(mul) { return Math.round((1 - mul) * 100) + "% 둔화"; }
   function ultDesc(k) {
     function speedUp(c) { return "이동속도 " + (c.ultSpeed - c.speed) + " 증가"; }
@@ -1376,10 +1376,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "priest") return "지정한 곳에 " + secs(ULT.bhDelay) + " 뒤 " + secs(ULT.bhDur) + "간 유지되는 반경 " + ULT.bhR + "의 블랙홀 생성. 적은 중심으로 끌려감";
     if (k === "cleric") return "아군의 체력을 " + CHARS.cleric.healGauge + " 회복시키면 사용 가능. 사용 시 자신의 체력을 모두 회복하고 " + secs(ULT.rvDur) + "간 제자리에서 기도. 아군 전체는 1초당 체력 " + ULT.rvHeal + " 회복, 적 전체는 1초당 " + ULT.rvDmg + "의 피해. 기절·넉백·끌어당김을 당하면 취소";
     if (k === "frost") return "자신을 중심으로 " + secs(ULT.frBzDur) + "간 유지되는 반경 " + ULT.frBzR + "의 눈보라 생성. 눈보라에서 아군은 은신 상태가 되고, 적은 1초당 " +
-      ULT.frBzDmg + "의 피해를 입고 " + slowPct(ULT.frBzSlowMul);
+      ULT.frBzDmg + "의 피해를 입고 패시브 1중첩";
     if (k === "duelist") return secs(ULT.rmDur) + "간 초당 공격 " + ULT.rmRate + "회, 돌진 거리 " + ULT.rmDashRange + "·돌진 시간 " + secs(ULT.rmDashMs) + "로 단축. 사용 즉시 기본 공격 대기시간 초기화";
     if (k === "crossbow") return "앞으로 부채꼴로 적을 꿰뚫는 볼트 " + ULT.tbCount + "발 발사. 맞은 적은 기본 공격과 같은 피해";
-    if (k === "dancer") return secs(ULT.bwDur) + "간 회전하며 " + speedUp(CHARS.dancer) + ". 반경 " + ULT.bwR + "의 적은 " + secs(ULT.bwTick) + "마다 " + ULT.bwDmg + "의 피해";
+    if (k === "dancer") return secs(ULT.bwDur) + "간 회전하며 " + speedUp(CHARS.dancer) + ". 반경 " + ULT.bwR + "의 적은 " + secs(ULT.bwTick) + "마다 " + ULT.bwDmg + "의 피해. 기절·넉백을 당하면 취소";
     return "";
   }
   function healCutPct() { return Math.round((1 - HEAL_CUT_MUL) * 100) + "%"; }
@@ -1398,13 +1398,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "knight") return "받는 모든 피해가 1회마다 " + c.armor + " 감소";
     if (k === "lancer") return "게임 시작과 부활할 때마다 적의 다음 피해 1회를 막는 보호막 생성. 기절·둔화 등 효과는 막지 못함";
     if (k === "warrior") return "체력이 " + Math.round(c.rally.hpRate * 100) + "% 미만으로 떨어지면 " + secs(c.rally.ms) + "간 1초당 체력 " + c.rally.perSec + " 회복. 죽을 때마다 한 번";
-    if (k === "frost") return "같은 적에게 기본 공격 3회 적중 시 " + secs(ULT.frFreezeMs) + "간 기절";
+    if (k === "frost") return "기본 공격에 맞은 적은 " + secs(ULT.frSlowMs) + "간 " + slowPct(ULT.frSlowMul) + ". " + secs(ULT.frSlowMs) + " 안에 다시 맞을 때마다 둔화가 " + Math.round(ULT.frSlowStep * 100) + "%p씩 커지고 3중첩이 되면 " + secs(ULT.frFreezeMs) + "간 기절. 기절이 끝난 뒤부터 다시 중첩";
     if (k === "rogue") return "가까운 적은 근접 공격, 먼 적에게는 사거리 " + c.throwRange + "의 단검 투척";
     if (k === "hitman") return "기본 공격 시 " + c.dashRange + " 돌진 후 반경 " + c.range + " 회전베기";
     if (k === "duelist") return "기본 공격 시 " + secs(c.dashMs) + "간 " + c.dashRange + " 돌진 후 반경 " + c.range + "의 가장 가까운 적 1명을 찔러 " + c.dmg + "의 피해. 적중 시 체력 " + c.selfHeal + " 회복";
     if (k === "crossbow") return "볼트는 맞은 적을 모두 꿰뚫음. 처치마다 " + c.grow.perKill + "스택, 어시스트마다 " + c.grow.perAssist + "스택(최대 " + c.grow.max + "). 1스택마다 체력 " + c.grow.hp +
       "·이동속도 " + c.grow.speed + "·공격력 " + c.grow.dmg + "·사거리 " + c.grow.range + " 증가, 공격 대기시간 " + c.grow.cd / 1000 + "초 감소";
-    if (k === "dancer") return "던진 단검이 멈춘 곳에서 " + secs(ULT.bdDelay) + " 뒤 회전해 반경 " + ULT.bdR + "의 적에게 " + ULT.bdDmg + "의 피해. 적을 처치하면 게이지 " + ULT.bwKillGauge + " 회복, 스킬 중 처치는 스킬이 끝난 뒤 회복";
+    if (k === "dancer") return "던진 단검이 적에게 맞거나 사거리 끝에 닿은 곳에서 " + secs(ULT.bdDelay) + " 뒤 회전해 반경 " + ULT.bdR + "의 적에게 " + ULT.bdDmg + "의 피해. 적을 처치하면 게이지 " + ULT.bwKillGauge + " 회복, 스킬 중 처치는 스킬이 끝난 뒤 회복";
     return "";
   }
   function skillBlocks(k) {
@@ -2790,11 +2790,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (!s.landed) { s.landed = true; if (!ME || hyp(c.x - ME.x, c.y - ME.y) < 700) sfx("orb"); }
       if (room.status !== "playing") return true;
       var foesInside = localTargets().filter(function (T) { return T.alive && T.team !== e.team && hyp(T.x - c.x, T.y - c.y) <= e.r; });
-      foesInside.forEach(function (T) { if (!T.minion && !protectedNow(T, t)) slowWhileInside(T, t, e.owner, ULT.frBzSlowMul, ULT.frBzSlowMs); });
       localTargets().forEach(function (T) { if (!T.minion && T.alive && T.team === e.team && hyp(T.x - c.x, T.y - c.y) <= e.r) noteHelp(T, e.owner, t); });
       if (s.nextTick && t < s.nextTick) return true;
       s.nextTick = (s.nextTick || t) + ULT.frBzTick;
-      foesInside.forEach(function (T) { damage(T, ULT.frBzDmg, e.owner, false, "blizzard"); });
+      foesInside.forEach(function (T) {
+        var stack = !T.minion && !protectedNow(T, t) && !frostFrozen(T, t) ? frostStackFx(T) : null;
+        damage(T, ULT.frBzDmg, e.owner, false, "blizzard", stack);
+      });
       return true;
     });
   }
