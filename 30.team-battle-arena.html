@@ -986,7 +986,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
 
   var AC = null;
+  var SILENT_RUN = /[?&](test|sim)(&|$)/.test(location.search);
   function audio() {
+    if (SILENT_RUN) return null;
     if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
     if (AC && AC.state === "suspended") { try { AC.resume(); } catch (e) {} }
     return AC;
