@@ -1817,7 +1817,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function playYoutube(btn) {
     var box = btn.parentNode, id = btn.getAttribute("data-yt");
     stopVideos(box);
-    box.innerHTML = '<iframe data-yt="' + id + '" src="https://www.youtube-nocookie.com/embed/' + id + "?autoplay=1&rel=0&playsinline=1&loop=1&playlist=" + id +
+    box.innerHTML = '<iframe data-yt="' + id + '" src="https://www.youtube-nocookie.com/embed/' + id + "?autoplay=1&rel=0&playsinline=1" +
       '" title="캐릭터 영상" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>';
   }
   var INGAME_SRC = {}, INGAME_W = 360, INGAME_H = 360;
