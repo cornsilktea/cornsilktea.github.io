@@ -1194,6 +1194,22 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }).catch(function () { $("btnJoin").disabled = false; startMsg("방을 불러오지 못했어요."); });
   }
 
+  function armDisconnect(ref) {
+    ref.child("players/" + myId).onDisconnect().remove();
+    ref.child("ping/" + myId).onDisconnect().remove();
+    ref.child("pong/" + myId).onDisconnect().remove();
+  }
+  var REJOIN_TRIES = 3;
+  function rejoinAfterDrop(last, tries) {
+    var r = room;
+    tries = tries || 0;
+    if (!r || !last || tries >= REJOIN_TRIES) { if (r && !leaving) exitToStart("방에서 나가졌어요."); return; }
+    r.ref.child("status").once("value").then(function (st) {
+      if (room !== r || leaving) return;
+      if (st.val() === null) { exitToStart("방이 종료되었어요."); return; }
+      return r.ref.child("players/" + myId).set(last).then(function () { armDisconnect(r.ref); });
+    }).catch(function () { if (room === r && !leaving) setTimeout(function () { rejoinAfterDrop(last, tries + 1); }, 1000); });
+  }
   function enterRoom(code) {
     leaving = false;
     var ref = db.ref(ROOT + "/" + code);
@@ -1212,10 +1228,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     sub(pref, "child_added", function (s) { P[s.key] = s.val(); playersChanged(); });
     sub(pref, "child_changed", function (s) { P[s.key] = s.val(); if (!G || room.status === "lobby") playersChanged(); });
     sub(pref, "child_removed", function (s) {
+      if (s.key === myId && !leaving) { rejoinAfterDrop(s.val() || P[myId]); return; }
       delete P[s.key]; delete R[s.key]; delete BOTS[s.key];
-      if (s.key === myId && !leaving) { exitToStart("방에서 나가졌어요."); return; }
       checkHost(); playersChanged();
     });
+    sub(db.ref(".info/connected"), "value", function (s) { if (s.val() === true && room && room.ref === ref && !leaving) armDisconnect(ref); });
     sub(ref.child("mode"), "value", function (s) { room.mode = s.val(); playersChanged(); });
     sub(ref.child("map"), "value", function (s) { room.map = s.val() || "forest"; syncArena(); playersChanged(); });
     sub(ref.child("arena"), "value", function (s) { room.arena = s.val() || "forest"; syncArena(); });
