@@ -737,6 +737,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var BOT_VIEW = 600;
   var BOT_REACT_MS = 550;
   var BOT_AIM_ERR = 0.16;
+  var BOT_WEAK_FOCUS = 0.6;
+  var BOT_KITE_GAP = 40;
   var BOT_LOS_HOLD_MS = 450, BOT_STEER_RATE = 9, BOT_DETOUR_KEEP_MS = 1500;
   var SPAWN_X = [250, 450, 650];
   var SPAWN_Y = { blue: 118, red: MH - 118 };
@@ -3463,18 +3465,20 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var o = ent(id); if (!o || !o.alive || id === B.id) return;
       if (o.team !== B.team) enemies.push(o);
     });
-    var target = null, td = Infinity, sniper = B.char === "sniper", view = sniper ? c.range : BOT_VIEW;
+    var target = null, td = Infinity, bestScore = Infinity, sniper = B.char === "sniper", view = sniper ? c.range : BOT_VIEW;
     enemies.forEach(function (o) {
       var d = hyp(o.x - B.x, o.y - B.y);
       if (d > view) return;
       if (!visibleTo(o, B, t)) return;
-      if (d < td) { td = d; target = o; }
+      var score = d * (BOT_WEAK_FOCUS + (1 - BOT_WEAK_FOCUS) * o.hp / o.maxHp);
+      if (score < bestScore) { bestScore = score; td = d; target = o; }
     });
     if (target !== k.target) { k.target = target; k.seenAt = t; }
 
     var mx = 0, my = 0;
     if (target) {
       var dx = target.x - B.x, dy = target.y - B.y, d = hyp(dx, dy) || 1, ux = dx / d, uy = dy / d;
+      var kiter = B.char !== "sniper" && (CHARS[B.char].role === "caster" || CHARS[B.char].role === "shooter");
       var want = bladeStorm(B, t) ? BODY_R * 2 : c.dashRange ?c.dashRange * 0.7 : c.width ? c.range * 0.75 : (melee ? c.range * 0.6 : c.range * 0.72);
       var los = losClear(B.x, B.y, target.x, target.y);
       if (!los) k.chaseUntil = t + BOT_LOS_HOLD_MS;
@@ -3486,7 +3490,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         else if (!clearView || d > c.range * 0.85) { mx += gx; my += gy; }
       }
       else if (!clearView || d > want + 40) { mx += gx; my += gy; }
-      else if (d < want - 90) { mx -= ux * 0.8; my -= uy * 0.8; }
+      else if (d < want - (kiter ? BOT_KITE_GAP : 90)) { var back = kiter ? 1 : 0.8; mx -= ux * back; my -= uy * back; }
       var s = Math.sin(t / 900 + k.seed) * 0.7;
       mx += -uy * s; my += ux * s;
     } else {
@@ -3522,16 +3526,30 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var drop = leadSpot(target, hammerLeapMs(td) / 1000, t);
         useUlt(B, Math.atan2(drop.y - B.y, drop.x - B.x), hyp(drop.x - B.x, drop.y - B.y)); return;
       }
-      useUlt(B, Math.atan2(target.y - B.y, target.x - B.x), td); return;
+      var ultSpot = ultAimSpot(B, target, td, t);
+      useUlt(B, Math.atan2(ultSpot.y - B.y, ultSpot.x - B.x), hyp(ultSpot.x - B.x, ultSpot.y - B.y)); return;
     }
     if (B.char === "shaman" && t >= B.cdUntil && domainStrikeTarget(B, t)) { fireBasic(B, B.angle); return; }
     if (aimAt && t >= B.cdUntil && t - k.seenAt > BOT_REACT_MS) {
       var ad = hyp(aimAt.x - B.x, aimAt.y - B.y);
       var rng = c.stab ? lungeRange(B, t) + c.range : c.throwRange || c.dashRange || (melee ? c.range + BODY_R - 4 : c.range);
-      if (ad <= rng && losClear(B.x, B.y, aimAt.x, aimAt.y)) fireBasic(B, B.angle + (Math.random() - 0.5) * 2 * BOT_AIM_ERR);
+      if (ad <= rng && losClear(B.x, B.y, aimAt.x, aimAt.y)) {
+        var shotAim = c.pSpeed && !melee ? leadSpot(aimAt, ad / c.pSpeed, t) : aimAt;
+        fireBasic(B, Math.atan2(shotAim.y - B.y, shotAim.x - B.x) + (Math.random() - 0.5) * 2 * BOT_AIM_ERR);
+      }
     }
   }
 
+  function ultAimSpot(B, target, dist, t) {
+    var sec = 0;
+    if (B.char === "mage") sec = ULT.mbDelay / 1000;
+    else if (B.char === "sniper") sec = dist / ULT.pnSpeed;
+    else if (B.char === "ranger") sec = dist / ULT.mkSpeed;
+    if (!sec) return target;
+    var spot = leadSpot(target, sec, t), reach = hyp(spot.x - B.x, spot.y - B.y);
+    if (B.char === "mage" && reach > ULT.mbCast) return target;
+    return spot;
+  }
   function leadSpot(o, sec, t) {
     var moving = o.mv && o.moveAng != null && t - (o.moveAt || 0) < 400, lead = moving ? speedOf(o) * sec * 0.8 : 0;
     return { x: o.x + (moving ? Math.cos(o.moveAng) * lead : 0), y: o.y + (moving ? Math.sin(o.moveAng) * lead : 0) };
@@ -6158,6 +6176,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         PR = {}; SHOTS = []; BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; STORMS = []; REVS = []; GRACES = []; DOMAINS = []; CURSES = {}; BLADE_SPINS = []; MELEE = {}; FX = []; handled = {}; CC_PENDING = {};
       },
       ccPending: function () { return CC_PENDING; },
+      mvpScore: mvpScore,
       setClock: function (ms) { TEST_CLOCK = ms; },
       currentMap: function () { return ARENA; },
       finish: function (mapId) { TEST_CLOCK = null; room = null; resetLocal(); loadMapData(mapId); }

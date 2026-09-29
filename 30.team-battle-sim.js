@@ -67,14 +67,42 @@ export function createSim(api) {
         E.bot = { seed: Math.random() * 10, seenAt: 0, target: null, stuck: 0, detour: 0, detourDir: 1 };
         bots[e.id] = E;
       });
-      while (t < T0 + MATCH_END_MS) { t += FRAME_MS; api.setClock(t); api.stepWorld(t, FRAME_MS / 1000, true); }
+      var sampled = {};
+      list.forEach(function (e) { sampled[e.id] = { aliveN: 0, nearSum: 0, nearN: 0, fullN: 0, movedSum: 0, lastX: bots[e.id].x, lastY: bots[e.id].y, inRangeN: 0, sampleN: 0 }; });
+      var frameNo = 0;
+      while (t < T0 + MATCH_END_MS) {
+        t += FRAME_MS; api.setClock(t); api.stepWorld(t, FRAME_MS / 1000, true);
+        if (++frameNo % 15) continue;
+        list.forEach(function (e) {
+          var E = bots[e.id], S = sampled[e.id];
+          S.sampleN++;
+          if (!E.alive) return;
+          S.aliveN++;
+          if (E.gauge >= api.GAUGE_MAX) S.fullN++;
+          S.movedSum += Math.hypot(E.x - S.lastX, E.y - S.lastY); S.lastX = E.x; S.lastY = E.y;
+          var near = Infinity;
+          list.forEach(function (o) { var O = bots[o.id]; if (O.alive && o.team !== e.team) near = Math.min(near, Math.hypot(O.x - E.x, O.y - E.y)); });
+          if (near < Infinity) { S.nearSum += near; S.nearN++; if (near <= api.CHARS[e.char].range) S.inRangeN++; }
+        });
+      }
       var killsBy = {};
       log.forEach(function (p) { if (p.path === "kills" && p.v.k) killsBy[p.v.k] = (killsBy[p.v.k] || 0) + 1; });
       var score = { blue: 0, red: 0 };
       var chars = list.map(function (e) {
-        var E = bots[e.id];
+        var E = bots[e.id], S = sampled[e.id];
         score[e.team === "blue" ? "red" : "blue"] += E.deaths || 0;
-        return { char: e.char, team: e.team, dmg: E.dmg || 0, deaths: E.deaths || 0, kills: killsBy[e.id] || 0 };
+        var c = { char: e.char, team: e.team, dmg: E.dmg || 0, deaths: E.deaths || 0, kills: killsBy[e.id] || 0,
+                  shots: 0, skillShots: 0, melee: 0, skillMelee: 0, effects: 0, basicHits: 0, ultHits: 0, basicDmg: 0, ultDmg: 0,
+                  assists: E.assists || 0, heal: E.heal || 0, blocked: E.blocked || 0, stun: E.stunDealt || 0, slow: E.slowDealt || 0, slowWeight: E.slowWeight || 0, mvp: api.mvpScore(E),
+                  alive: S.aliveN / S.sampleN, gaugeFull: S.aliveN ? S.fullN / S.aliveN : 0, near: S.nearN ? S.nearSum / S.nearN : 0, inRange: S.nearN ? S.inRangeN / S.nearN : 0, moved: S.movedSum };
+        log.forEach(function (p) {
+          var v = p.v;
+          if (p.path === "shots" && v.o === e.id) { if (v.s) c.skillShots++; else c.shots++; }
+          else if (p.path === "meleeHits" && v.owner === e.id) { if (v.u) c.skillMelee++; else c.melee++; }
+          else if (p.path === "effects" && v.owner === e.id) c.effects++;
+          else if (p.path === "hits/" + e.id && !v.mn) { if (v.u) { c.ultHits++; c.ultDmg += v.d || 0; } else { c.basicHits++; c.basicDmg += v.d || 0; } }
+        });
+        return c;
       });
       return { map: mapId, seed: seed, blue: score.blue, red: score.red,
                winner: score.blue > score.red ? "blue" : (score.red > score.blue ? "red" : "draw"), chars: chars };
