@@ -1804,9 +1804,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     return m ? m[1] : (/^[A-Za-z0-9_-]{11}$/.test(src) ? src : null);
   }
   function videoSrc(k, kind) { return String((VIDEOS[k] && VIDEOS[k][kind]) || "").trim(); }
-  function videoCount(k) { return VIDEO_KINDS.filter(function (v) { return videoSrc(k, v[0]); }).length; }
+  var NO_VIDEO = "없음";
+  function videoCount(k) { return VIDEO_KINDS.filter(function (v) { var s = videoSrc(k, v[0]); return s && s !== NO_VIDEO; }).length; }
+  function videoSlots(k) { return VIDEO_KINDS.filter(function (v) { return videoSrc(k, v[0]) !== NO_VIDEO; }).length; }
   function videoHtml(src) {
     if (!src) return '<div class="vpNone">영상 준비 중</div>';
+    if (src === NO_VIDEO) return '<div class="vpNone">영상 없음</div>';
     var yt = youtubeId(src);
     if (yt) return '<button type="button" class="vpYt" data-yt="' + yt + '" aria-label="영상 재생" style="background-image:url(https://i.ytimg.com/vi/' + yt + '/hqdefault.jpg)"><i>▶</i></button>';
     return '<video src="' + esc(src) + '" controls playsinline preload="metadata"></video>';
@@ -1889,7 +1892,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return '<div class="roleRow"><div class="roleTag"><i>' + R.icon + "</i><b>" + R.name + '</b></div><div class="vpChars">' + list.map(function (k) {
         var n = videoCount(k);
         return '<button type="button" class="vpChar" data-c="' + k + '"><img alt="" src="' + charImgSrc(k) + '"><b>' + CHARS[k].name + "</b>" +
-               '<small class="' + (n ? "has" : "") + '">' + (n ? "영상 " + n + "/" + VIDEO_KINDS.length : "영상 준비 중") + "</small></button>";
+               '<small class="' + (n ? "has" : "") + '">' + (n ? "영상 " + n + "/" + videoSlots(k) : "영상 준비 중") + "</small></button>";
       }).join("") + "</div></div>";
     }).join("");
   }
