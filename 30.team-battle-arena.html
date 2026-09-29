@@ -439,6 +439,28 @@
   .dfSteps .r { color: #FF9A92; }
   .dfSteps .now { border-color: #D97B4F; background: rgba(217,123,79,.2); }
   .dfSteps .done { opacity: .45; }
+  .dfSteps .ban { background: rgba(216,69,59,.12); }
+  .dfBanRow { flex: none; margin-bottom: 6px; font-size: 14px; font-weight: 700; color: #FF9A92; }
+  .dfBanRow b { margin-left: 4px; color: #F4F1E8; }
+  .dfSlots .slot.ready { box-shadow: inset 0 0 0 3px #3FBF6A; background: rgba(63,191,106,.14); }
+  .pface.canTrade { cursor: pointer; box-shadow: 0 0 0 2px #F2D06B; }
+  .pface.canTrade:hover { box-shadow: 0 0 0 3px #F2D06B, 0 0 12px rgba(242,208,107,.6); }
+  .dfCard.banned { border-color: rgba(216,69,59,.7); }
+  .dfCard .tag.ban { background: #B8322A; }
+  .dfReadyBar { margin: 0 0 12px; text-align: center; }
+  .dfReadyBtn { display: block; width: 100%; height: 60px; border: 0; border-radius: 10px; background: #2FA35A; color: #fff; font: inherit; font-size: 22px; font-weight: 800; cursor: pointer; box-shadow: 0 4px 14px rgba(47,163,90,.35); }
+  .dfReadyBtn.on { background: #1E6E3C; box-shadow: inset 0 0 0 3px #3FBF6A; }
+  .dfReadyBtn:disabled { opacity: .5; cursor: default; }
+  .dfReadyHint { margin-top: 6px; font-size: 13px; font-weight: 700; color: var(--sg-ink-soft); }
+  .dfTradeBox { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); z-index: 60; min-width: 300px; max-width: calc(100vw - 32px); padding: 18px 22px 16px; border-radius: 12px;
+    background: rgba(12,16,14,.9); border: 1px solid rgba(255,255,255,.14); border-top: 3px solid #D97B4F; color: #fff; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+  .dfTradeBox b { display: block; font-size: 21px; font-weight: 800; }
+  .dfTradeBox small { display: block; margin-top: 6px; font-size: 14px; color: rgba(255,255,255,.72); }
+  .dfTradeBox .row { display: flex; gap: 10px; justify-content: center; margin-top: 14px; }
+  .dfTradeBox button { min-width: 100px; height: 42px; border: 0; border-radius: 8px; font: inherit; font-size: 17px; font-weight: 800; color: #fff; cursor: pointer; }
+  .dfTradeBox .ok { background: #2FA35A; }
+  .dfTradeBox .no { background: #D8453B; }
+  .dfTradeBox .cancel { background: rgba(255,255,255,.18); }
   .slot.turn { box-shadow: inset 0 0 0 2px #D97B4F; background: rgba(217,123,79,.16); }
   .slot .pk { margin-left: auto; font-size: 15px; font-weight: 800; color: #F4F1E8; }
   .slot .pk.wait { font-size: 13px; color: var(--sg-ink-faint); font-weight: 700; }
@@ -628,7 +650,9 @@
         <div class="team red"><h3>레드팀</h3><div id="dfRed" class="dfSlots"></div></div>
       </div>
     </div>
+    <div id="dfReadyBar" class="dfReadyBar" hidden><button id="btnDraftReady" class="dfReadyBtn" type="button">준비 완료</button><div id="dfReadyHint" class="dfReadyHint"></div></div>
     <button id="btnLeaveDraft" class="mini danger" type="button">방 나가기</button>
+    <div id="dfTradeBox" class="dfTradeBox" hidden></div>
   </div>
   <div class="card charCol dfCharCol">
     <div class="secTitle">캐릭터<span class="secHint">한 번 누르면 설명이 나오고, 내 차례일 때 결정 버튼으로 골라요.</span></div>
@@ -786,6 +810,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (code < 0 || code > 11171) return "(으)로";
     var jong = code % 28;
     return jong === 0 || jong === 8 ? "로" : "으로";
+  }
+  function josa(word, noFinal, withFinal) {
+    var code = word.charCodeAt(word.length - 1) - 0xAC00;
+    if (code < 0 || code > 11171) return noFinal + "(" + withFinal + ")";
+    return code % 28 === 0 ? noFinal : withFinal;
   }
   function charsInRole(r) { return CHAR_LIST.filter(function (c) { return CHARS[c].role === r; }); }
   var ULT = { mkCount: 10, mkGap: 115, mkDmg: 40, mkRefund: 1, mkSpeed: 805, mkRange: KEY * 8, mkPr: 8,
@@ -2068,23 +2097,48 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     room.ref.update(u);
   }
 
-  var DRAFT_STEPS = [["b1"], ["r1", "r2"], ["b2", "b3"], ["r3"]];
-  var DRAFT_SHOWN_MS = 15000, DRAFT_STEP_MS = 16000, DRAFT_AI_MS = 2500, DRAFT_REVEAL_MS = 5000;
+  var DRAFT_STEPS = [{ keys: ["b1"], ban: true }, { keys: ["r1"], ban: true }, { keys: ["b1"] }, { keys: ["r1", "r2"] }, { keys: ["b2", "b3"] }, { keys: ["r3"] }];
+  var DRAFT_SHOWN_MS = 15000, DRAFT_STEP_MS = 16000, DRAFT_AI_MS = 2500, DRAFT_AI_TRADE_MS = 1200, TRADE_DENIED_SHOW_MS = 2000, NO_BAN = "-";
   var draftView = null, draftBusy = false, draftLaunched = 0;
+  function stepSide(step) { return DRAFT_STEPS[step].keys[0].charAt(0); }
   function draftStepIds(d, step) {
-    return (DRAFT_STEPS[step] || []).map(function (k) { return d.seq && d.seq[k]; }).filter(function (id) { return !!id; });
+    return ((DRAFT_STEPS[step] || {}).keys || []).map(function (k) { return d.seq && d.seq[k]; }).filter(function (id) { return !!id; });
   }
   function draftWaiting(d, step) {
+    var S = DRAFT_STEPS[step];
+    if (!S) return [];
+    if (S.ban) return d.bans && d.bans[stepSide(step)] ? [] : draftStepIds(d, step).filter(function (id) { return P[id]; });
     var picks = d.picks || {};
     return draftStepIds(d, step).filter(function (id) { return P[id] && !picks[id]; });
+  }
+  function draftBanned(d) {
+    var bans = d.bans || {};
+    return ["b", "r"].map(function (k) { return bans[k]; }).filter(function (c) { return c && c !== NO_BAN; });
   }
   function draftTaken(d) {
     var picks = d.picks || {};
     return keys(picks).map(function (id) { return picks[id]; });
   }
   function draftLeft(d) {
-    var taken = draftTaken(d);
-    return CHAR_LIST.filter(function (c) { return taken.indexOf(c) < 0; });
+    var gone = draftTaken(d).concat(draftBanned(d));
+    return CHAR_LIST.filter(function (c) { return gone.indexOf(c) < 0; });
+  }
+  function draftDone(d) { return d.step >= DRAFT_STEPS.length; }
+  function draftSideOf(d, id) {
+    var k = keys(d.seq || {}).filter(function (s) { return d.seq[s] === id; })[0];
+    return k ? k.charAt(0) : null;
+  }
+  function draftHumans(d) {
+    return keys(d.seq || {}).map(function (k) { return d.seq[k]; }).filter(function (id) { return P[id] && !P[id].isAI; });
+  }
+  function draftReadyCount(d) {
+    var ready = d.ready || {};
+    return draftHumans(d).filter(function (id) { return ready[id]; }).length;
+  }
+  function canTradeWith(d, id) {
+    var ready = d.ready || {}, picks = d.picks || {};
+    return draftDone(d) && !d.trade && id !== myId && P[id] && P[myId] && !ready[id] && !ready[myId] &&
+      draftSideOf(d, id) && draftSideOf(d, id) === draftSideOf(d, myId) && !!picks[id] && !!picks[myId];
   }
   function draftSettle(d, t) {
     while (d.step < DRAFT_STEPS.length && !draftWaiting(d, d.step).length) { d.step++; d.stepAt = t; }
@@ -2099,12 +2153,17 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     room.ref.update({ draft: d, arena: resolveArena(room.map), status: "draft", roster: null, st: null, winner: null, final: null, statsNote: null, endedAt: null, startAt: null,
                       shots: null, meleeHits: null, hits: null, effects: null, kills: null, projectiles: null });
   }
+  function applyDraftChoice(cur, id, c) {
+    if (DRAFT_STEPS[cur.step].ban) { cur.bans = cur.bans || {}; cur.bans[stepSide(cur.step)] = c; }
+    else { cur.picks = cur.picks || {}; cur.picks[id] = c; }
+    if (cur.hover) delete cur.hover[id];
+  }
   function draftPick(c) {
     var d = room && room.draft;
     if (!d || room.status !== "draft" || draftWaiting(d, d.step).indexOf(myId) < 0 || draftLeft(d).indexOf(c) < 0) return;
     room.ref.child("draft").transaction(function (cur) {
       if (!cur || draftWaiting(cur, cur.step).indexOf(myId) < 0 || draftLeft(cur).indexOf(c) < 0) return;
-      cur.picks = cur.picks || {}; cur.picks[myId] = c;
+      applyDraftChoice(cur, myId, c);
       return draftSettle(cur, now());
     }).then(function (res) { if (res.committed) sfx("confirm"); });
   }
@@ -2113,28 +2172,79 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (!d || draftWaiting(d, d.step).indexOf(myId) < 0) return;
     room.ref.child("draft/hover/" + myId).set(c);
   }
+  function draftReady() {
+    room.ref.child("draft").transaction(function (cur) {
+      if (!cur || !draftDone(cur) || !P[myId] || !draftSideOf(cur, myId)) return;
+      if (cur.trade && (cur.trade.from === myId || cur.trade.to === myId)) return;
+      cur.ready = cur.ready || {};
+      cur.ready[myId] = !cur.ready[myId];
+      return cur;
+    }).then(function (res) { if (res.committed) sfx("confirm"); });
+  }
+  function draftTradeAsk(id) {
+    var d = room && room.draft;
+    if (!d || !canTradeWith(d, id)) return;
+    room.ref.child("draft").transaction(function (cur) {
+      if (!cur || !canTradeWith(cur, id)) return;
+      cur.trade = { from: myId, to: id, at: now() };
+      return cur;
+    });
+  }
+  function swapTradePicks(cur) {
+    var tr = cur.trade, mine = cur.picks[tr.from];
+    cur.picks[tr.from] = cur.picks[tr.to];
+    cur.picks[tr.to] = mine;
+    cur.trade = null;
+  }
+  function draftTradeAnswer(accept) {
+    room.ref.child("draft").transaction(function (cur) {
+      if (!cur || !cur.trade || cur.trade.to !== myId) return;
+      if (accept) swapTradePicks(cur);
+      else { cur.denied = { to: cur.trade.from, at: now() }; cur.trade = null; }
+      return cur;
+    }).then(function (res) { if (res.committed && accept) sfx("confirm"); });
+  }
+  function draftTradeCancel() {
+    room.ref.child("draft").transaction(function (cur) {
+      if (!cur || !cur.trade || cur.trade.from !== myId) return;
+      cur.trade = null;
+      return cur;
+    });
+  }
+  function hostDraftFinish(d, t) {
+    var tr = d.trade, ready = d.ready || {};
+    var tradeGone = tr && (!P[tr.from] || !P[tr.to] || ready[tr.from] || ready[tr.to]);
+    var aiAccepts = tr && !tradeGone && P[tr.to].isAI && t >= tr.at + DRAFT_AI_TRADE_MS;
+    if (tradeGone || aiAccepts) {
+      draftBusy = true;
+      room.ref.child("draft").transaction(function (cur) {
+        if (!cur || !cur.trade || cur.trade.at !== tr.at) return;
+        if (aiAccepts) swapTradePicks(cur); else cur.trade = null;
+        return cur;
+      }).then(function () { draftBusy = false; }, function () { draftBusy = false; });
+      return;
+    }
+    if (tr || draftReadyCount(d) < draftHumans(d).length || draftLaunched === d.stepAt) return;
+    draftLaunched = d.stepAt;
+    var picks = d.picks || {}, spare = draftLeft(d);
+    launchMatch(function (id) { return picks[id] || spare.splice(Math.floor(Math.random() * spare.length), 1)[0]; }, COUNT_MS, ARENA);
+  }
   function hostDraftTick() {
     var d = room.draft, t = now();
     if (!d || draftBusy) return;
-    if (d.step >= DRAFT_STEPS.length) {
-      if (draftLaunched === d.stepAt || t < d.stepAt + DRAFT_REVEAL_MS) return;
-      draftLaunched = d.stepAt;
-      var picks = d.picks || {}, spare = draftLeft(d);
-      launchMatch(function (id) { return picks[id] || spare.splice(Math.floor(Math.random() * spare.length), 1)[0]; }, COUNT_MS, ARENA);
-      return;
-    }
-    var step = d.step, timeUp = t >= d.stepAt + DRAFT_STEP_MS, aiDue = t >= d.stepAt + DRAFT_AI_MS;
+    if (draftDone(d)) { hostDraftFinish(d, t); return; }
+    var step = d.step, banStep = DRAFT_STEPS[step].ban, timeUp = t >= d.stepAt + DRAFT_STEP_MS, aiDue = t >= d.stepAt + DRAFT_AI_MS;
     var waiting = draftWaiting(d, step);
     var auto = waiting.filter(function (id) { return timeUp || (aiDue && P[id].isAI); });
     if (waiting.length && !auto.length) return;
     draftBusy = true;
     room.ref.child("draft").transaction(function (cur) {
       if (!cur || cur.step !== step) return;
-      cur.picks = cur.picks || {};
       auto.forEach(function (id) {
-        if (cur.picks[id]) return;
-        var left = draftLeft(cur), hover = cur.hover && cur.hover[id];
-        if (left.length) cur.picks[id] = left.indexOf(hover) >= 0 ? hover : pick(left);
+        if (draftWaiting(cur, step).indexOf(id) < 0) return;
+        var left = draftLeft(cur), hover = cur.hover && cur.hover[id], chosen = left.indexOf(hover) >= 0 ? hover : null;
+        if (banStep) applyDraftChoice(cur, id, chosen || (P[id].isAI && left.length ? pick(left) : NO_BAN));
+        else if (left.length) applyDraftChoice(cur, id, chosen || pick(left));
       });
       return draftSettle(cur, now());
     }).then(function () { draftBusy = false; }, function () { draftBusy = false; });
@@ -2147,43 +2257,64 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
   function draftTeamName(team) { return team === "blue" ? "블루팀" : "레드팀"; }
   function draftStepLabel(step) {
-    var ks = DRAFT_STEPS[step], team = ks[0].charAt(0) === "b" ? "blue" : "red";
-    return (team === "blue" ? "블루 " : "레드 ") + ks.map(function (k) { return k.charAt(1); }).join("·");
+    var S = DRAFT_STEPS[step], side = stepSide(step) === "b" ? "블루 " : "레드 ";
+    return side + (S.ban ? "밴" : S.keys.map(function (k) { return k.charAt(1); }).join("·"));
+  }
+  function draftTradeBoxHtml(d) {
+    var tr = d.trade, t = now(), picks = d.picks || {};
+    if (tr && tr.from === myId && P[tr.to]) {
+      return "<b>교환 대기 중입니다...</b><small>" + esc(P[tr.to].nickname) + "의 " + CHARS[picks[tr.to]].name + josa(CHARS[picks[tr.to]].name, "와", "과") + " 내 " + CHARS[picks[myId]].name + "</small>" +
+        '<div class="row"><button type="button" class="cancel" data-trade-act="cancel">신청 취소</button></div>';
+    }
+    if (tr && tr.to === myId && P[tr.from]) {
+      return "<b>교환 신청. (" + CHARS[picks[tr.from]].name + ")</b><small>" + esc(P[tr.from].nickname) + "의 " + CHARS[picks[tr.from]].name + josa(CHARS[picks[tr.from]].name, "와", "과") + " 내 " + CHARS[picks[myId]].name + josa(CHARS[picks[myId]].name, "를", "을") + " 바꿔요</small>" +
+        '<div class="row"><button type="button" class="ok" data-trade-act="yes">수락</button><button type="button" class="no" data-trade-act="no">거절</button></div>';
+    }
+    if (d.denied && d.denied.to === myId && t < d.denied.at + TRADE_DENIED_SHOW_MS) return "<b>교환 신청이 거절되었습니다.</b>";
+    return "";
   }
   function renderDraft() {
     if (!room || screenNow !== "draft") return;
     var d = room.draft; if (!d) return;
-    var t = now(), done = d.step >= DRAFT_STEPS.length, picks = d.picks || {}, hover = d.hover || {};
-    var waiting = done ? [] : draftWaiting(d, d.step), myTurn = waiting.indexOf(myId) >= 0;
-    var me = P[myId], myTeam = me ? me.team : null;
-    var span = done ? DRAFT_REVEAL_MS : DRAFT_SHOWN_MS, left = Math.max(0, d.stepAt + span - t);
+    var t = now(), done = draftDone(d), picks = d.picks || {}, hover = d.hover || {}, ready = d.ready || {}, bans = d.bans || {};
+    var waiting = done ? [] : draftWaiting(d, d.step), myTurn = waiting.indexOf(myId) >= 0, banTurn = !done && DRAFT_STEPS[d.step].ban;
+    var me = P[myId], myTeam = me ? me.team : null, mySide = draftSideOf(d, myId);
+    var left = Math.max(0, d.stepAt + DRAFT_SHOWN_MS - t), humans = draftHumans(d).length, readyN = draftReadyCount(d);
     var arena = MAPS[room.arena] || MAPS[ARENA];
     setHtml($("dfMap"), arena ? "🗺️ " + esc(arena.name) + "<small>맵</small>" : "");
     var timer = $("dfTimer");
-    setHtml(timer, String(Math.ceil(left / 1000)) + "<small>" + (done ? "게임 입장까지" : "남은 시간") + "</small>");
-    timer.className = "dfTimer" + (!done && left < 5000 ? " low" : "");
-    $("dfBarFill").style.width = Math.round(left / span * 100) + "%";
-    var turn = "";
-    if (done) turn = "선택 완료! 양 팀 캐릭터를 확인하세요. 곧 게임에 들어가요.";
-    else if (myTurn) turn = "내 차례예요! 캐릭터를 골라 주세요.";
-    else if (picks[myId] && draftStepIds(d, d.step).indexOf(myId) >= 0) turn = "선택 완료 — 다른 선수를 기다리는 중…";
-    else turn = draftTeamName(DRAFT_STEPS[d.step][0].charAt(0) === "b" ? "blue" : "red") + " " + DRAFT_STEPS[d.step].map(function (k) { return k.charAt(1); }).join("·") + "번 선수가 고르는 중…";
+    if (done) {
+      setHtml(timer, readyN + "/" + humans + "<small>준비 완료</small>");
+      timer.className = "dfTimer";
+      $("dfBarFill").style.width = Math.round(readyN / Math.max(1, humans) * 100) + "%";
+    } else {
+      setHtml(timer, String(Math.ceil(left / 1000)) + "<small>남은 시간</small>");
+      timer.className = "dfTimer" + (left < 5000 ? " low" : "");
+      $("dfBarFill").style.width = Math.round(left / DRAFT_SHOWN_MS * 100) + "%";
+    }
+    var turn = "", doing = banTurn ? "밴하는" : "고르는";
+    if (done) turn = mySide ? (ready[myId] ? "준비 완료! 다른 선수를 기다리는 중…" : "선택 완료! 준비가 되면 준비 완료를 눌러 주세요.") : "선수들이 준비하는 중…";
+    else if (myTurn) turn = banTurn ? "내 차례예요! 밴할 캐릭터를 골라 주세요." : "내 차례예요! 캐릭터를 골라 주세요.";
+    else if (!banTurn && picks[myId] && draftStepIds(d, d.step).indexOf(myId) >= 0) turn = "선택 완료 — 다른 선수를 기다리는 중…";
+    else turn = draftTeamName(stepSide(d.step) === "b" ? "blue" : "red") + " " + DRAFT_STEPS[d.step].keys.map(function (k) { return k.charAt(1); }).join("·") + "번 선수가 " + doing + " 중…";
     setText($("dfTurn"), turn);
     $("dfTurn").className = "dfTurn" + (myTurn ? " mine" : "");
-    setHtml($("dfSteps"), DRAFT_STEPS.map(function (ks, i) {
-      return '<span class="' + (ks[0].charAt(0) === "b" ? "b" : "r") + (i === d.step ? " now" : (i < d.step ? " done" : "")) + '">' + (i + 1) + ". " + draftStepLabel(i) + "</span>";
+    setHtml($("dfSteps"), DRAFT_STEPS.map(function (S, i) {
+      return '<span class="' + (stepSide(i) === "b" ? "b" : "r") + (S.ban ? " ban" : "") + (i === d.step ? " now" : (i < d.step ? " done" : "")) + '">' + (i + 1) + ". " + draftStepLabel(i) + "</span>";
     }).join(""));
 
     function slots(team) {
-      var h = "", pre = team === "blue" ? "b" : "r";
+      var pre = team === "blue" ? "b" : "r", ban = bans[pre], banStepNow = banTurn && stepSide(d.step) === pre;
+      var h = '<div class="dfBanRow">🚫 밴 <b>' + (ban && ban !== NO_BAN && CHARS[ban] ? CHARS[ban].name : (ban === NO_BAN ? "없음" : (banStepNow ? "고르는 중…" : "-"))) + "</b></div>";
       for (var i = 1; i <= 3; i++) {
         var id = d.seq && d.seq[pre + i], p = id && P[id];
         if (!p) { h += '<div class="slot empty">' + i + "번 · " + (id ? "나감" : "빈 자리") + "</div>"; continue; }
-        var c = picks[id], isTurn = waiting.indexOf(id) >= 0, pk;
-        if (c) pk = '<span class="pk picked"><b>' + CHARS[c].name + '</b><span class="pface" style="background-image:url(\'' + charImgSrc(c) + '\')"></span></span>';
+        var c = picks[id], isTurn = waiting.indexOf(id) >= 0, pk, tradable = canTradeWith(d, id);
+        if (c) pk = '<span class="pk picked"><b>' + CHARS[c].name + '</b><span class="pface' + (tradable ? " canTrade" : "") + '"' + (tradable ? ' data-trade="' + id + '" title="캐릭터 교환 신청"' : "") +
+                    ' style="background-image:url(\'' + charImgSrc(c) + '\')"></span></span>';
         else if (isTurn && hover[id] && myTeam === team && CHARS[hover[id]]) pk = '<span class="pk think">' + CHARS[hover[id]].name + " 고민 중…</span>";
-        else pk = '<span class="pk wait">' + (isTurn ? "고르는 중…" : "대기") + "</span>";
-        h += '<div class="slot' + (id === myId ? " mine" : "") + (isTurn ? " turn" : "") + (p.isAI ? " ai" : "") + '">' + i + "번 " + (p.isAI ? "🤖 " : "") + esc(p.nickname) +
+        else pk = '<span class="pk wait">' + (isTurn ? (banTurn ? "밴하는 중…" : "고르는 중…") : "대기") + "</span>";
+        h += '<div class="slot' + (id === myId ? " mine" : "") + (isTurn ? " turn" : "") + (p.isAI ? " ai" : "") + (done && ready[id] ? " ready" : "") + '">' + i + "번 " + (p.isAI ? "🤖 " : "") + esc(p.nickname) +
              (id === myId ? ' <span class="me">나</span>' : "") + pk + "</div>";
       }
       return h;
@@ -2191,22 +2322,36 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     setHtml($("dfBlue"), slots("blue"));
     setHtml($("dfRed"), slots("red"));
 
-    var owner = {};
+    var readyBar = $("dfReadyBar");
+    show(readyBar, done && !!mySide);
+    if (done && mySide) {
+      var busyTrade = d.trade && (d.trade.from === myId || d.trade.to === myId);
+      var btn = $("btnDraftReady");
+      btn.className = "dfReadyBtn" + (ready[myId] ? " on" : "");
+      btn.disabled = !!busyTrade;
+      setText(btn, ready[myId] ? "✔ 준비 완료 (누르면 취소)" : "준비 완료");
+      setText($("dfReadyHint"), ready[myId] ? "모두 준비 완료를 누르면 게임이 시작돼요." : "같은 팀의 초상화를 누르면 캐릭터 교환을 신청할 수 있어요.");
+    }
+    var tradeHtml = draftTradeBoxHtml(d), tradeBox = $("dfTradeBox");
+    show(tradeBox, !!tradeHtml);
+    if (tradeBox.getAttribute("data-html") !== tradeHtml) { tradeBox.setAttribute("data-html", tradeHtml); setHtml(tradeBox, tradeHtml); }
+
+    var owner = {}, banned = draftBanned(d);
     keys(picks).forEach(function (id) { owner[picks[id]] = id; });
     var myHover = myTurn ? hover[myId] : null;
     if (!draftView && myHover) draftView = myHover;
     setHtmlKeepScroll($("dfChars"), roleRowsHtml(function (k) {
-      var o = owner[k], op = o && P[o], oTeam = o && d.seq && keys(d.seq).filter(function (s) { return d.seq[s] === o; })[0];
-      var tag = o ? '<span class="tag ' + (oTeam && oTeam.charAt(0) === "b" ? "b" : "r") + '">' + esc(op ? op.nickname : "") + "</span>" : "";
-      return '<button type="button" class="dfCard' + (o ? " taken" : "") + (myHover === k ? " on" : (draftView === k ? " view" : "")) + '" data-c="' + k + '">' + tag +
+      var o = owner[k], op = o && P[o], oSide = o && draftSideOf(d, o), isBanned = banned.indexOf(k) >= 0;
+      var tag = isBanned ? '<span class="tag ban">밴</span>' : (o ? '<span class="tag ' + (oSide === "b" ? "b" : "r") + '">' + esc(op ? op.nickname : "") + "</span>" : "");
+      return '<button type="button" class="dfCard' + (o || isBanned ? " taken" : "") + (isBanned ? " banned" : "") + (myHover === k ? " on" : (draftView === k ? " view" : "")) + '" data-c="' + k + '">' + tag +
              '<img alt="" src="' + charImgSrc(k) + '"><div class="nm">' + CHARS[k].name + "</div></button>";
     }));
     fitCharCol(document.querySelector(".dfCharCol"));
-    var v = draftView && playable(draftView) ? draftView : null, canPick = v && myTurn && !owner[v];
+    var v = draftView && playable(draftView) ? draftView : null, canPick = v && myTurn && draftLeft(d).indexOf(v) >= 0;
+    var pickBtn = !canPick ? "" : banTurn ? '<button type="button" class="big danger" data-pick="' + v + '">🚫 ' + CHARS[v].name + " 밴</button>" :
+      '<button type="button" class="big primary" data-pick="' + v + '">✔ ' + CHARS[v].name + roParticle(CHARS[v].name) + " 결정</button>";
     setHtml($("dfDetail"), v ? '<div class="dfName">' + CHARS[v].icon + " " + CHARS[v].name + '<small>' + roleOf(v).icon + " " + roleOf(v).name + "</small></div>" +
-      '<div class="dfRole">' + roleGaugeText(roleOf(v)) + "</div>" + statTable(v) +
-      skillBlocks(v) +
-      (canPick ? '<button type="button" class="big primary" data-pick="' + v + '">✔ ' + CHARS[v].name + roParticle(CHARS[v].name) + " 결정</button>" : "") : "");
+      '<div class="dfRole">' + roleGaugeText(roleOf(v)) + "</div>" + statTable(v) + skillBlocks(v) + pickBtn : "");
   }
   $("dfChars").onclick = function (e) {
     var b = e.target.closest ? e.target.closest(".dfCard") : null;
@@ -2221,6 +2366,17 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   $("dfDetail").onclick = function (e) {
     var b = e.target.closest ? e.target.closest("[data-pick]") : null;
     if (b) draftPick(b.getAttribute("data-pick"));
+  };
+  $("dfBlue").onclick = $("dfRed").onclick = function (e) {
+    var f = e.target.closest ? e.target.closest("[data-trade]") : null;
+    if (f) draftTradeAsk(f.getAttribute("data-trade"));
+  };
+  $("btnDraftReady").onclick = draftReady;
+  $("dfTradeBox").onclick = function (e) {
+    var b = e.target.closest ? e.target.closest("[data-trade-act]") : null;
+    if (!b) return;
+    var act = b.getAttribute("data-trade-act");
+    if (act === "cancel") draftTradeCancel(); else draftTradeAnswer(act === "yes");
   };
   $("btnLeaveDraft").onclick = function () { if (confirm("방을 나갈까요?")) leaveRoom(); };
 

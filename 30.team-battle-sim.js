@@ -234,7 +234,7 @@ function renderReport() {
     ["win", "승률", function (v) { return fixed(v * 100, 1) + "%"; }],
     ["n", "판 수", function (v) { return Math.round(v); }],
     ["dmg", "피해량", function (v) { return Math.round(v); }],
-    ["skill", "그중 스킬 피해", function (v) { return v > 0 ? Math.round(v) : "–"; }],
+    ["skill", "스킬 피해(비중)", function (v, r) { return v > 0 ? Math.round(v) + " (" + Math.round(v / Math.max(1, r.dmg) * 100) + "%)" : "–"; }],
     ["heal", "회복량", function (v) { return Math.round(v); }],
     ["blk", "막은 피해", function (v) { return Math.round(v); }],
     ["stun", "기절(초)", function (v) { return fixed(v, 1); }],
@@ -259,7 +259,7 @@ function renderReport() {
     el.innerHTML = "<thead>" + head + "</thead><tbody>" + T.rows.map(function (r) {
       var tint = r.win >= 0.55 ? " hi" : (r.win < 0.40 ? " lo" : "");
       return "<tr><td>" + D.roles[r.role].icon + " " + r.name + "</td>" + COLS.map(function (c) {
-        return "<td class=\"" + (c[0] === "win" ? "win" + tint : "") + "\">" + c[2](r[c[0]]) + "</td>";
+        return "<td class=\"" + (c[0] === "win" ? "win" + tint : "") + "\">" + c[2](r[c[0]], r) + "</td>";
       }).join("") + "</tr>";
     }).join("") + "</tbody>";
   }
@@ -281,7 +281,7 @@ function renderReport() {
   var tab1 = totalsCards(D.totals, optCard) + "<h2>캐릭터별 메인 통계</h2>" + statTable(D.rows) +
     "<h2>팀 구성별 승률</h2><div class=\"wrap\" style=\"max-width:420px\"><table><thead><tr><th>팀 구성</th><th>팀 수</th><th>승률</th></tr></thead><tbody>" + comboRows + "</tbody></table></div>" +
     "<p class=\"note\">숫자는 모두 한 판(90초) 평균입니다. 승률 = 승리 ÷ 판 수(무승부 포함). 기절·둔화는 적에게 건 시간. " +
-    "그중 스킬 피해가 \"–\"인 캐릭터는 스킬 피해가 따로 집계되지 않는 캐릭터입니다(스킬이 기본 공격을 강화하는 방식 등). 제목을 누르면 정렬됩니다.</p>";
+    "스킬 피해(비중)은 입힌 피해 중 스킬로 준 피해와 그 비율. \"–\"인 캐릭터는 스킬 피해가 따로 집계되지 않는 캐릭터입니다(스킬이 기본 공격을 강화하는 방식 등). 제목을 누르면 정렬됩니다.</p>";
   var tab2 = D.roleOrder.map(function (role) {
     var rows = D.rows.filter(function (r) { return r.role === role; });
     return "<h2>" + D.roles[role].icon + " " + D.roles[role].name + "</h2>" + statTable(rows);
