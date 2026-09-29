@@ -32,6 +32,10 @@
             "games": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= newData.parent().parent().child('matches').val()" },
             "asPicks": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= newData.parent().child('picks').val()" },
             "ccPicks": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= newData.parent().child('picks').val()" },
+            "bans": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= newData.parent().parent().child('matches').val()" },
+            "kills": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100" },
+            "deaths": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100" },
+            "kdPicks": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= newData.parent().child('picks').val()" },
             "$other": { ".validate": false }
           }
         }

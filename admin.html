@@ -1117,7 +1117,7 @@ async function showStats(g) {
     }
     const table = el("table");
     const head = el("tr");
-    ["직업", "선택률 (선택 수 / 고를 수 있던 게임 수)", "승률 (승리 수 / 선택 수)", "평균 어시스트", "평균 피해량", "평균 회복량", "평균 막은 피해", "평균 기절", "평균 둔화"].forEach((t) => head.appendChild(el("th", null, t)));
+    ["직업", "밴픽률 ((밴 + 픽) / 고를 수 있던 게임 수)", "승률 (승리 수 / 픽 수)", "KDA (평균 킬 / 데스 / 어시스트)", "평균 피해량", "평균 회복량", "평균 막은 피해", "평균 기절", "평균 둔화"].forEach((t) => head.appendChild(el("th", null, t)));
     table.appendChild(head);
     /* 직업군 순서 → 이름 가나다순(게임 캐릭터 선택창과 같은 순서). 직업군이 바뀔 때마다 구분 줄을 넣는다 */
     const groups = meta.groups || [];
@@ -1130,7 +1130,7 @@ async function showStats(g) {
         const gr = groups[groupAt(role)];
         const gtr = el("tr", "stats-group");
         const gtd = el("td", null, gr ? gr.icon + " " + gr.name : "기타");
-        gtd.colSpan = 9;
+        gtd.colSpan = 8;
         gtr.appendChild(gtd);
         table.appendChild(gtr);
       }
@@ -1138,11 +1138,17 @@ async function showStats(g) {
       const games = d.games != null ? d.games : (s[role.id] ? matches : 0);
       const tr = el("tr");
       tr.appendChild(el("td", null, role.name));
-      tr.appendChild(rateCell(picks, games));
+      /* 밴픽률 = (밴 + 픽) / 고를 수 있던 게임 수. 밴은 대회모드에만 있다(2026-09-30 추가) */
+      const bans = d.bans || 0;
+      const bp = el("td");
+      bp.appendChild(el("b", null, pct(bans + picks, games)));
+      bp.appendChild(el("small", null, "(밴 " + bans + " + 픽 " + picks + " / " + games + ")"));
+      tr.appendChild(bp);
       tr.appendChild(rateCell(wins, picks));
-      /* 어시스트는 나중에 추가돼서 그 뒤 경기 수(asPicks)로 따로 평균을 낸다 */
-      const asPicks = d.asPicks || 0;
-      tr.appendChild(el("td", null, asPicks ? (d.assist || 0).toFixed(1) : "-"));
+      /* KDA: 킬·데스는 2026-09-30부터(kdPicks), 어시스트는 그 전부터(asPicks) 따로 평균을 낸다 */
+      const asPicks = d.asPicks || 0, kdPicks = d.kdPicks || 0;
+      const kd = kdPicks ? (d.kills || 0).toFixed(1) + " / " + (d.deaths || 0).toFixed(1) : "- / -";
+      tr.appendChild(el("td", null, kdPicks || asPicks ? kd + " / " + (asPicks ? (d.assist || 0).toFixed(1) : "-") : "-"));
       /* 1판 평균. 회복 스킬이 있는 직업(heal: true)만 회복량을 보이고 나머지는 "-" */
       tr.appendChild(el("td", null, picks ? String(Math.round(d.dmg || 0)) : "-"));
       tr.appendChild(el("td", null, picks && role.heal ? String(Math.round(d.heal || 0)) : "-"));
@@ -1160,10 +1166,10 @@ async function showStats(g) {
      "시간 종료 때 킬 수가 같으면 무승부입니다(레드·블루 승리 어느 쪽에도 세지 않음).",
      "게임 수는 모든 직업이 같습니다(한 판마다 모든 직업 +1). 선택 수는 그 판에 고른 6명의 직업만 오릅니다.",
      /* 일반모드도 2026-09-28부터 경기 전체 캐릭터 중복을 막았다. 그 전 기록은 양 팀이 같은 캐릭터를 골라 100%를 넘을 수 있다. */
-     "한 경기에서 같은 캐릭터는 1명만 고를 수 있으므로 선택률은 그 직업이 나온 판의 비율입니다." +
+     "한 경기에서 같은 캐릭터는 1명만 고를 수 있으므로 밴픽률은 그 직업이 밴되거나 나온 판의 비율입니다. 밴은 대회모드에만 있습니다." +
        (mode.id === "pvp" ? " (2026-09-28 이전 일반모드 기록은 양 팀 중복이 허용돼 100%를 넘을 수 있으니, 필요하면 통계를 초기화하세요.)" : ""),
      "무승부는 승리로 세지 않습니다.",
-     "막은 피해·기절·둔화·어시스트는 이 항목이 추가된 뒤의 경기만으로 평균을 냅니다.",
+     "막은 피해·기절·둔화·킬·데스·어시스트·밴은 이 항목이 추가된 뒤의 경기만으로 셉니다.",
      "어시스트: 내가 피해나 해로운 효과(기절·둔화·넉백·끌어당김)를 준 적이 5초 안에 쓰러지거나, 내가 회복·은신(눈보라)을 준 아군이 5초 안에 적을 처치하면 1회(처치한 사람은 제외, 한 처치에 1번만)."].forEach((t) => notes.appendChild(el("li", null, t)));
     box.appendChild(notes);
 

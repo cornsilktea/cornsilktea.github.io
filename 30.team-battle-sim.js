@@ -104,7 +104,7 @@ export function createSim(api) {
         var c = { char: e.char, team: e.team, dmg: E.dmg || 0, deaths: E.deaths || 0, kills: killsBy[e.id] || 0,
                   shots: 0, skillShots: 0, melee: 0, skillMelee: 0, effects: 0, basicHits: 0, ultHits: 0, basicDmg: 0, ultDmg: 0,
                   assists: E.assists || 0, heal: E.heal || 0, blocked: E.blocked || 0, stun: E.stunDealt || 0, slow: E.slowDealt || 0, slowWeight: E.slowWeight || 0, mvp: api.mvpScore(E),
-                  alive: S.aliveN / S.sampleN, gaugeFull: S.aliveN ? S.fullN / S.aliveN : 0, near: S.nearN ? S.nearSum / S.nearN : 0, inRange: S.nearN ? S.inRangeN / S.nearN : 0, moved: S.movedSum };
+                  gaugeFull: S.aliveN ? S.fullN / S.aliveN : 0, near: S.nearN ? S.nearSum / S.nearN : 0, inRange: S.nearN ? S.inRangeN / S.nearN : 0, moved: S.movedSum };
         log.forEach(function (p) {
           var v = p.v;
           if (p.path === "shots" && v.o === e.id) { if (v.s) c.skillShots++; else c.shots++; }
@@ -124,15 +124,15 @@ export function createSim(api) {
     results.forEach(function (g) {
       if (mapId && g.map !== mapId) return;
       g.chars.forEach(function (c) {
-        var a = acc[c.char] || (acc[c.char] = { n: 0, w: 0, dmg: 0, skill: 0, heal: 0, blk: 0, stun: 0, slow: 0, k: 0, de: 0, as: 0, alive: 0, mvp: 0 });
+        var a = acc[c.char] || (acc[c.char] = { n: 0, w: 0, dmg: 0, skill: 0, heal: 0, blk: 0, stun: 0, slow: 0, k: 0, de: 0, as: 0, mvp: 0 });
         a.n++; if (g.winner === c.team) a.w++;
         a.dmg += c.dmg; a.skill += c.ultDmg; a.heal += c.heal; a.blk += c.blocked; a.stun += c.stun; a.slow += c.slow;
-        a.k += c.kills; a.de += c.deaths; a.as += c.assists; a.alive += c.alive; a.mvp += c.mvp;
+        a.k += c.kills; a.de += c.deaths; a.as += c.assists; a.mvp += c.mvp;
       });
     });
     return Object.keys(acc).map(function (id) {
       var a = acc[id], ch = api.CHARS[id], row = { id: id, name: ch.name, role: ch.role, n: a.n, win: Math.round(a.w / a.n * 10000) / 10000 };
-      ["dmg", "skill", "heal", "blk", "stun", "slow", "k", "de", "as", "alive", "mvp"].forEach(function (key) { row[key] = Math.round(a[key] / a.n * 1000) / 1000; });
+      ["dmg", "skill", "heal", "blk", "stun", "slow", "k", "de", "as", "mvp"].forEach(function (key) { row[key] = Math.round(a[key] / a.n * 1000) / 1000; });
       return row;
     }).sort(function (x, y) { return y.win - x.win; });
   }
@@ -242,7 +242,6 @@ function renderReport() {
     ["k", "처치", function (v) { return fixed(v, 2); }],
     ["de", "죽음", function (v) { return fixed(v, 2); }],
     ["as", "어시스트", function (v) { return fixed(v, 2); }],
-    ["alive", "생존율", function (v) { return Math.round(v * 100) + "%"; }],
     ["mvp", "MVP", function (v) { return Math.round(v); }]
   ];
   var tables = [];

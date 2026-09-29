@@ -397,6 +397,7 @@
   #endOv.draw { background: rgba(60,60,60,.62); }
   .endBox { background: rgba(16,24,19,.94); color: #F4F1E8; border-radius: 12px; padding: 24px 22px; width: 100%; max-width: 780px; max-height: 100%; overflow-y: auto; text-align: center; border: 2px solid rgba(255,255,255,.2); box-shadow: 0 12px 40px rgba(0,0,0,.45); }
   #endTitle { font-size: 38px; font-weight: 800; margin-bottom: 16px; }
+  .endBtns button:disabled { opacity: .45; cursor: default; }
   #endStats { margin: -6px 0 12px; font-size: 13px; font-weight: 700; color: #A3B0A6; }
   #endReason { margin: -8px 0 14px; font-size: 16px; font-weight: 800; color: #F2D06B; }
   .scoreRow { display: flex; gap: 10px; margin-bottom: 16px; }
@@ -699,12 +700,12 @@
     <div class="statsTop"><h3>캐릭터 통계</h3><button id="btnStatsClose" class="mini" type="button">닫기</button></div>
     <div id="statsModes" class="modeBtns"></div>
     <div id="statsMsg" class="statsMsg"></div>
-    <div class="boardWrap"><table class="board statsTable"><thead><tr><th class="nm">캐릭터</th><th>선택률<small>선택 수 / 고를 수 있던 게임 수</small></th><th>승률<small>승리 수 / 선택 수</small></th><th>평균 어시스트</th><th>평균 피해량</th><th>평균 회복량</th><th>평균 막은 피해</th><th>평균 기절</th><th>평균 둔화</th></tr></thead><tbody id="statsBody"></tbody></table></div>
+    <div class="boardWrap"><table class="board statsTable"><thead><tr><th class="nm">캐릭터</th><th>밴픽률<small>(밴 + 픽) / 고를 수 있던 게임 수</small></th><th>승률<small>승리 수 / 픽 수</small></th><th>KDA<small>평균 킬 / 데스 / 어시스트</small></th><th>평균 피해량</th><th>평균 회복량</th><th>평균 막은 피해</th><th>평균 기절</th><th>평균 둔화</th></tr></thead><tbody id="statsBody"></tbody></table></div>
     <ul class="statsNotes">
       <li>AI 없이 학생 6명이 3대3으로 끝까지 마친 경기만 집계합니다.</li>
       <li>시간이 끝났을 때 킬 수가 같으면 무승부이고, 무승부는 승리로 세지 않습니다.</li>
-      <li>한 경기에서 같은 캐릭터는 1명만 고를 수 있으므로 선택률은 그 캐릭터가 나온 판의 비율입니다.</li>
-      <li>막은 피해·기절·둔화·어시스트는 이 항목이 추가된 뒤의 경기만으로 평균을 냅니다.</li>
+      <li>한 경기에서 같은 캐릭터는 1명만 고를 수 있으므로 밴픽률은 그 캐릭터가 밴되거나 나온 판의 비율입니다. 밴은 대회모드에만 있습니다.</li>
+      <li>막은 피해·기절·둔화·킬·데스·어시스트·밴은 이 항목이 추가된 뒤의 경기만으로 셉니다.</li>
       <li>어시스트: 내가 피해나 해로운 효과(기절·둔화·넉백·끌어당김)를 준 적이 5초 안에 쓰러지거나, 내가 회복·은신(눈보라)을 준 아군이 5초 안에 적을 처치하면 1회(처치한 사람은 제외, 한 처치에 1번만).</li>
     </ul>
   </div>
@@ -1250,7 +1251,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function enterRoom(code) {
     leaving = false;
     var ref = db.ref(ROOT + "/" + code);
-    room = { code: code, ref: ref, mode: null, map: "forest", status: "lobby", host: null, startAt: 0, winner: null, endedAt: 0, final: null, roster: null, draft: null, statsNote: null };
+    room = { code: code, ref: ref, mode: null, map: "forest", status: "lobby", host: null, startAt: 0, winner: null, endedAt: 0, final: null, roster: null, draft: null, bans: null, statsNote: null };
     clear3d();
     P = {}; R = {}; PR = {}; MELEE = {}; FX = []; BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; STORMS = []; REVS = []; GRACES = []; DOMAINS = []; CURSES = {}; BLADE_SPINS = []; G = null; ME = null; BOTS = {}; ST = {}; SHOTS = []; hitSubs = {};
     ref.child("players/" + myId).onDisconnect().remove();
@@ -1276,6 +1277,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     sub(ref.child("hostPlayerId"), "value", function (s) { room.host = s.val(); room.hostLoaded = true; hostChangedClock(room.host); checkHost(); playersChanged(); });
     sub(ref.child("startAt"), "value", function (s) { room.startAt = s.val() || 0; });
     sub(ref.child("winner"), "value", function (s) { room.winner = s.val(); });
+    sub(ref.child("bans"), "value", function (s) { room.bans = s.val(); });
     sub(ref.child("endedAt"), "value", function (s) { room.endedAt = s.val() || 0; });
     sub(ref.child("final"), "value", function (s) { room.final = s.val(); });
     sub(ref.child("roster"), "value", function (s) { room.roster = s.val(); });
@@ -1769,13 +1771,21 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var statsMode = "pvp", statsLoadSeq = 0;
   function statsPct(a, b) { return b ? (a / b * 100).toFixed(1) + "%" : "-"; }
   function statsRateCell(a, b) { return "<td><b>" + statsPct(a, b) + "</b><small>(" + a + " / " + b + ")</small></td>"; }
+  function banPickCell(bans, picks, games) {
+    return "<td><b>" + statsPct(bans + picks, games) + "</b><small>(밴 " + bans + " + 픽 " + picks + " / " + games + ")</small></td>";
+  }
+  function kdaText(d, kdPicks, asPicks) {
+    if (!kdPicks && !asPicks) return "-";
+    var kd = kdPicks ? (+d.kills || 0).toFixed(1) + " / " + (+d.deaths || 0).toFixed(1) : "- / -";
+    return kd + " / " + (asPicks ? (+d.assist || 0).toFixed(1) : "-");
+  }
   function statsRowsHtml(s) {
     var matches = +s.matches || 0, lastRole = null, h = "";
     CHAR_LIST.forEach(function (k) {
-      var c = CHARS[k], d = s[k] || {}, selectableGames = d.games != null ? +d.games : (s[k] ? matches : 0), picks = +d.picks || 0, wins = +d.wins || 0, ccPicks = +d.ccPicks || 0, asPicks = +d.asPicks || 0;
-      if (c.role !== lastRole) { lastRole = c.role; h += '<tr class="grp"><td colspan="9">' + ROLES[c.role].icon + " " + ROLES[c.role].name + "</td></tr>"; }
-      h += '<tr><td class="nm">' + c.icon + " " + esc(c.name) + "</td>" + statsRateCell(picks, selectableGames) + statsRateCell(wins, picks) +
-        "<td>" + (asPicks ? (+d.assist || 0).toFixed(1) : "-") + "</td>" +
+      var c = CHARS[k], d = s[k] || {}, selectableGames = d.games != null ? +d.games : (s[k] ? matches : 0), picks = +d.picks || 0, wins = +d.wins || 0, ccPicks = +d.ccPicks || 0, asPicks = +d.asPicks || 0, kdPicks = +d.kdPicks || 0, bans = +d.bans || 0;
+      if (c.role !== lastRole) { lastRole = c.role; h += '<tr class="grp"><td colspan="8">' + ROLES[c.role].icon + " " + ROLES[c.role].name + "</td></tr>"; }
+      h += '<tr><td class="nm">' + c.icon + " " + esc(c.name) + "</td>" + banPickCell(bans, picks, selectableGames) + statsRateCell(wins, picks) +
+        "<td>" + kdaText(d, kdPicks, asPicks) + "</td>" +
         "<td>" + (picks ? Math.round(+d.dmg || 0) : "-") + "</td>" +
         "<td>" + (picks && c.heals ? Math.round(+d.heal || 0) : "-") + "</td>" +
         "<td>" + (ccPicks && c.blocks ? Math.round(+d.block || 0) : "-") + "</td>" +
@@ -2070,7 +2080,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (room.mode === "cup") { startDraft(); return; }
     launchMatch(function (id) { return P[id].characterType; }, COUNT_MS, resolveArena(room.map));
   }
-  function launchMatch(charOf, countMs, arena) {
+  function launchMatch(charOf, countMs, arena, bans) {
     var u = {}, roster = {}, st = {};
     ["blue", "red"].forEach(function (team) {
       teamIds(team).filter(function (id) { return !practiceMode() || id === myId; }).slice(0, 3).forEach(function (id, i) {
@@ -2091,7 +2101,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         roster[b.id] = { team: team, c: b.c, ai: true };
       });
     }
-    u.roster = roster; u.st = st; u.arena = arena; u.draft = null;
+    u.roster = roster; u.st = st; u.arena = arena; u.draft = null; u.bans = bans && bans.length ? bans : null;
     u.status = "countdown"; u.startAt = now() + countMs; u.winner = null; u.final = null; u.statsNote = null; u.endedAt = null;
     u.shots = null; u.meleeHits = null; u.hits = null; u.effects = null; u.kills = null; u.projectiles = null;
     room.ref.update(u);
@@ -2227,7 +2237,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (tr || draftReadyCount(d) < draftHumans(d).length || draftLaunched === d.stepAt) return;
     draftLaunched = d.stepAt;
     var picks = d.picks || {}, spare = draftLeft(d);
-    launchMatch(function (id) { return picks[id] || spare.splice(Math.floor(Math.random() * spare.length), 1)[0]; }, COUNT_MS, ARENA);
+    launchMatch(function (id) { return picks[id] || spare.splice(Math.floor(Math.random() * spare.length), 1)[0]; }, COUNT_MS, ARENA, draftBanned(d));
   }
   function hostDraftTick() {
     var d = room.draft, t = now();
@@ -4242,11 +4252,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       final: { blue: s.blueKills, red: s.redKills, reason: quitTeam ? "상대팀이 모두 나가서 승리" : "시간 종료 — 킬 스코어로 판정" } };
     if (statsMode) ended.statsNote = skipReason || STATS_PENDING;
     room.ref.update(ended);
-    if (!skipReason) setTimeout(function () { recordClassStats(t); }, STATS_SETTLE_MS);
+    if (!skipReason) watchStatsDone(t);
   }
 
   var STATS_PATH = "teambattle/modestats/";
-  var STATS_SETTLE_MS = 8000;
+  var STATS_SETTLE_MS = 8000, STATS_HOLD_MAX_MS = 11000;
   var STATS_PENDING = "통계를 저장하는 중이에요";
   var isTestLink = !!(window.PORTAL_CLASS && window.PORTAL_CLASS.test);
   function statsSkipReason(mode, roster, ps) {
@@ -4265,21 +4275,32 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   function isStudentFullTeamMatch(mode, roster, ps) { return !statsSkipReason(mode, roster, ps); }
   function setStatsNote(r, text) { r.ref.update({ statsNote: text }).catch(function () {}); }
-  function recordClassStats(endedAt) {
+  function watchStatsDone(endedAt) {
     if (!db || !room) return;
-    var r = room, ps = P;
-    if (r.status !== "ended" || r.endedAt !== endedAt || r.winner == null) return;
-    if (!isStudentFullTeamMatch(r.mode, r.roster, ps)) return;
-    r.ref.child("done").once("value").then(function (s) {
-      var done = s.val() || {};
-      var everyoneStayed = keys(r.roster).every(function (id) { return done[id] === endedAt; });
-      if (!everyoneStayed) { setStatsNote(r, "결과 창까지 남지 않은 사람이 있어 통계에서 제외됐어요"); return; }
-      if (room === r && r.endedAt === endedAt) saveClassStats(r, ps);
-    }).catch(function () { setStatsNote(r, "통계 확인에 실패해서 저장하지 못했어요"); });
+    var r = room, ref = r.ref.child("done"), settled = false, timer = 0;
+    function everyoneStayed(done) { return !!r.roster && keys(r.roster).every(function (id) { return done[id] === endedAt; }); }
+    function settle(done, timedOut) {
+      if (settled || (!everyoneStayed(done) && !timedOut)) return;
+      settled = true; clearTimeout(timer); ref.off("value", onDone);
+      recordClassStats(r, endedAt, everyoneStayed(done));
+    }
+    function onDone(s) { settle(s.val() || {}, false); }
+    function failed() { if (settled) return; settled = true; clearTimeout(timer); ref.off("value", onDone); setStatsNote(r, "통계 확인에 실패해서 저장하지 못했어요"); }
+    ref.on("value", onDone, failed);
+    timer = setTimeout(function () { ref.once("value").then(function (s) { settle(s.val() || {}, true); }).catch(failed); }, STATS_SETTLE_MS);
   }
+  function recordClassStats(r, endedAt, stayed) {
+    var ps = P;
+    if (room !== r || r.status !== "ended" || r.endedAt !== endedAt || r.winner == null) return;
+    if (!stayed) { setStatsNote(r, "결과 창까지 남지 않은 사람이 있어 통계에서 제외됐어요"); return; }
+    if (!isStudentFullTeamMatch(r.mode, r.roster, ps)) { setStatsNote(r, "참가자 정보가 맞지 않아 통계에서 제외됐어요"); return; }
+    saveClassStats(r, ps);
+  }
+  function statsHoldActive() { return !!room && room.status === "ended" && room.statsNote === STATS_PENDING && now() - (room.endedAt || 0) < STATS_HOLD_MAX_MS; }
   function markStayedToEnd() {
     var r = room;
     if (!r || !P[myId] || !r.roster || !r.roster[myId]) return;
+    if (r.endedAt) { r.ref.child("done/" + myId).set(r.endedAt).catch(function () {}); return; }
     r.ref.child("endedAt").once("value").then(function (s) {
       var endedAt = s.val();
       if (endedAt && room === r && P[myId]) r.ref.child("done/" + myId).set(endedAt);
@@ -4289,8 +4310,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var rows = keys(r.roster).map(function (id) {
       var e = ent(id) || stateOf(ps[id]);
       return { c: r.roster[id].c, win: r.winner === r.roster[id].team, dmg: +e.dmg || 0, heal: +e.heal || 0,
-               blocked: +e.blocked || 0, stun: +e.stunDealt || 0, slow: +e.slowDealt || 0, assists: +e.assists || 0 };
+               blocked: +e.blocked || 0, stun: +e.stunDealt || 0, slow: +e.slowDealt || 0, assists: +e.assists || 0, kills: +e.kills || 0, deaths: +e.deaths || 0 };
     });
+    var banned = (r.bans || []).filter(function (c) { return CHARS[c]; });
     function addStats(countSelectableGames) {
       return db.ref(STATS_PATH + r.mode).transaction(function (cur) {
         cur = cur || {};
@@ -4315,9 +4337,18 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           var asN = +st.asPicks || 0;
           st.assist = r1(((+st.assist || 0) * asN + w.assists) / (asN + 1));
           st.asPicks = asN + 1;
+          var kdN = +st.kdPicks || 0;
+          st.kills = r1(((+st.kills || 0) * kdN + w.kills) / (kdN + 1));
+          st.deaths = r1(((+st.deaths || 0) * kdN + w.deaths) / (kdN + 1));
+          st.kdPicks = kdN + 1;
           st.picks = n + 1;
           st.wins = (+st.wins || 0) + (w.win ? 1 : 0);
           cur[w.c] = st;
+        });
+        banned.forEach(function (c) {
+          var st = cur[c] || { picks: 0, wins: 0, dmg: 0, heal: 0 };
+          st.bans = (+st.bans || 0) + 1;
+          cur[c] = st;
         });
         return cur;
       });
@@ -4344,11 +4375,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   function restart() {
     if (!room || room.status !== "ended") return;
-    if (room.endedAt && now() - room.endedAt < (room.statsNote === STATS_PENDING ? STATS_SETTLE_MS + 500 : 3500)) return;
+    if (statsHoldActive() || (room.endedAt && now() - room.endedAt < 1500)) return;
     backToLobby();
   }
   function backToLobby() {
-    var u = { status: "lobby", winner: null, final: null, statsNote: null, startAt: null, endedAt: null, roster: null, draft: null,
+    var u = { status: "lobby", winner: null, final: null, statsNote: null, startAt: null, endedAt: null, roster: null, draft: null, bans: null,
               st: null, done: null, shots: null, meleeHits: null, hits: null, effects: null, kills: null, projectiles: null };
     PRACTICE_BOTS.forEach(function (b) { if (P[b.id]) u["players/" + b.id] = null; });
     room.ref.update(u);
@@ -6814,6 +6845,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (quitWin) setText($("endReason"), "상대팀이 모두 나가서 " + (w === "blue" ? "블루팀" : "레드팀") + "이 승리했어요.");
       show($("endStats"), !!room.statsNote);
       if (room.statsNote) setText($("endStats"), room.statsNote);
+      var holdForStats = statsHoldActive() && !!room.roster && !!room.roster[myId];
+      $("btnAgain").disabled = statsHoldActive();
+      $("btnLeaveEnd").disabled = holdForStats;
       setText($("endBlue"), String(f.blue != null ? f.blue : s.blueKills));
       setText($("endRed"), String(f.red != null ? f.red : s.redKills));
       setHtml($("boardBody"), boardRows());
