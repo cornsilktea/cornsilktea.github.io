@@ -3103,7 +3103,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var c = CHARS[E.char];
     var d = { team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(ang), dmg: Math.round(c.dmg * (rage ? ULT.bzDmgMul : 1)), createdAt: now() };
     if (c.width) { d.len = Math.round(lineReach(E.x, E.y, ang, c.range)); d.width = c.width; }
-    d.radius = c.range; d.arc = c.arc;
+    d.radius = c.range;
+    if (c.arc) d.arc = c.arc;
     if (c.heal) d.heal = c.heal;
     if (c.fx) d.fx = c.fx;
     E.atkAt = now();

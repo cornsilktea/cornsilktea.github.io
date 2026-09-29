@@ -62,7 +62,7 @@ function collectResults(api) {
     function node(path) {
       return {
         child: function (p) { return node(path ? path + "/" + p : p); },
-        push: function (v) { var key = "k" + (++n); dispatch(path, key, v); return { key: key }; },
+        push: function (v) { rejectUndefined(v, path); var key = "k" + (++n); dispatch(path, key, v); return { key: key }; },
         set: function () {}, update: function () {}, remove: function () {}, on: function () {}, off: function () {},
         once: function () { return Promise.resolve({ val: function () { return null; } }); }
       };
@@ -103,6 +103,9 @@ function collectResults(api) {
   function fullGauge(E) { E.gauge = api.GAUGE_MAX; }
 
   var results = [];
+  function rejectUndefined(v, path) {
+    if (v && typeof v === "object") Object.keys(v).forEach(function (k) { if (v[k] === undefined) throw new Error("Firebase 는 undefined 를 받지 않음: " + path + "." + k); else rejectUndefined(v[k], path + "." + k); });
+  }
   function report(group, name, status, detail) { results.push({ group: group, name: name, status: status, detail: detail }); }
   function run(group, name, fn) {
     try { fn(function (status, detail) { report(group, name, status, detail); }); }
