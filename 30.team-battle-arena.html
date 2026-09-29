@@ -747,7 +747,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
                dashRange: 250, dashMs: 500, stab: true, selfHeal: 10, ultName: "르미즈", heals: true },
     knight:  { name: "기사", role: "fighter", icon: "🛡️", hp: 400, speed: 200, cd: 1250, dmg: 25, range: 110, arc: Math.PI * 0.7, armor: 2, ultName: "방어태세", blocks: true },
     ranger:  { name: "궁수", role: "shooter", icon: "🏹", hp: 100, speed: 200, haste: { add: 10, ms: 3000, max: 40 }, cd: 667, dmg: 15, range: 450, pSpeed: 532, pr: 12, shots: 2, gap: 70, ultName: "난사", ultAim: true },
-    mage:    { name: "화염술사", role: "caster", icon: "🔥", hp: 120, speed: 240, cd: 1000, dmg: 5, range: 350, pSpeed: 700, pr: 9, burn: { ms: 3000, perSec: 5 }, ultName: "메테오", ultAim: true },
+    mage:    { name: "화염술사", role: "caster", icon: "🔥", hp: 120, speed: 240, cd: 1000, dmg: 5, range: 350, pSpeed: 700, pr: 9, burn: { ms: 4000, perSec: 5 }, ultName: "메테오", ultAim: true },
     rogue:   { name: "은신자", role: "assassin", icon: "🗡️", hp: 110, speed: 250, ultSpeed: 400, cd: 833, dmg: 30, range: 110, arc: Math.PI * 0.6, hits: 2, hitGap: 160, ambushDmg: 45, throwDmg: 20, throwRange: 300, pSpeed: 900, pr: 8, ultName: "은신" },
     necro:   { name: "네크로", role: "caster", icon: "💀", hp: 120, lastStandHp: 50, lastStandHideMs: 1000, speed: 240, cd: 1000, dmg: 10, range: KEY * 4, pSpeed: 1000, pr: 9, ultName: "해골 소환", blocks: true },
     sniper:  { name: "저격수", role: "shooter", icon: "🎯", hp: 100, speed: 200, cd: 1250, dmg: 40, range: 700, pSpeed: 840, pr: 12, farDist: 500, farBonus: 0.5, ultName: "거대 화살", ultAim: true },
@@ -783,7 +783,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function roleOf(c) { return ROLES[CHARS[c].role]; }
   function charsInRole(r) { return CHAR_LIST.filter(function (c) { return CHARS[c].role === r; }); }
   var ULT = { mkCount: 10, mkGap: 115, mkDmg: 40, mkRefund: 1, mkSpeed: 805, mkRange: KEY * 8, mkPr: 8,
-              bzDur: 4000, bzDmgMul: 1.3, bzCdMul: 1 / 1.3, bzHeal: 20, tkDur: 4000, tkDef: 0.4, tkStunR: 150, tkStunMs: 1000,
+              bzDur: 4000, bzDmgMul: 1.3, bzCdMul: 1 / 1.3, bzHeal: 20, tkDur: 4000, tkDef: 0.4, tkStunR: 120, tkStunMs: 1000,
               mbDelay: 1000, mbR: 250, mbDmg: 120, mbDmgMin: 60, mbCast: 550, mbMin: 60, mbStunMs: 1200, mbStunMin: 600, mbSteps: 5,
               asSmokeMs: 400, asDur: 15000,
               smCount: 2, smAhead: KEY * 1, smSide: 38, smHp: 60, smSpeed: 240, smGauge: 0.5, smDmg: 12, smCd: 800, smRange: 80, smArc: Math.PI * 0.6,
@@ -797,7 +797,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               exRange: 500, exSpeed: 1300, exPr: 4, exDmg: 25, exStunMs: 1000,
               gdR: 200, gdKb: 150, gdKbMs: 500, gdDmg: 20, gdSlowMul: 0.8, gdSlowMs: 1000,
               frSlowMs: 1200, frSlowMul: 0.8, frSlowStep: 0.2, frFreezeMs: 800,
-              frBzR: 400, frBzDur: 7000, frBzDmg: 8, frBzTick: 1000, frBzDelay: 400,
+              frBzR: 400, frBzDur: 7000, frBzDmg: 10, frBzTick: 1000, frBzDelay: 400,
               bwR: 150, bwDur: 3000, bwTick: 250, bwHurtGaugeEvery: 4, bwDmg: 18, bwKillGauge: 5, bdR: 70, bdDmg: 10, bdDelay: 300,
               rmDur: 3000, rmRate: 3, rmDashMs: 300, rmDashRange: 100,
               tbCount: 3, tbSpread: 0.26,
@@ -3524,6 +3524,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function dashReach(E, ang, len) {
     var dx = Math.cos(ang), dy = Math.sin(ang), pad = BODY_R - 1, best = rayObst(E.x, E.y, dx, dy, pad);
     for (var i = 0; i < WATER.length; i++) best = Math.min(best, rayRect(E.x, E.y, dx, dy, WATER[i], pad));
+    if (dx > 1e-9) best = Math.min(best, (BOUND.r - BODY_R - E.x) / dx);
+    if (dx < -1e-9) best = Math.min(best, (BOUND.l + BODY_R - E.x) / dx);
+    if (dy > 1e-9) best = Math.min(best, (BOUND.b - BODY_R - E.y) / dy);
+    if (dy < -1e-9) best = Math.min(best, (BOUND.t + BODY_R - E.y) / dy);
     return clamp(Math.min(len, best), 0, len);
   }
   function dashStrike(E, ang) {

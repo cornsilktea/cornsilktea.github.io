@@ -1075,7 +1075,7 @@ function collectResults(api) {
     if (api.healCut(al, W.t())) bad.push("아군까지 회복 감소");
     api.damage(foe, api.CHARS.mage.dmg, "mg", 2, null);
     if (api.healAmount(foe, 20, W.t()) !== 10) bad.push("독병+화상 회복 20 → " + api.healAmount(foe, 20, W.t()));
-    W.step(api.ULT.plDur + 500);
+    W.step(Math.max(api.ULT.plDur, api.CHARS.mage.burn.ms) + 500);
     if (api.healCut(foe, W.t())) bad.push("독병이 사라져도 회복 감소 남음");
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "독병 위 적만 절반, 화상과 겹쳐도 절반");
   });
