@@ -331,6 +331,7 @@
   #endOv.draw { background: rgba(60,60,60,.62); }
   .endBox { background: rgba(16,24,19,.94); color: #F4F1E8; border-radius: 12px; padding: 24px 22px; width: 100%; max-width: 780px; max-height: 100%; overflow-y: auto; text-align: center; border: 2px solid rgba(255,255,255,.2); box-shadow: 0 12px 40px rgba(0,0,0,.45); }
   #endTitle { font-size: 38px; font-weight: 800; margin-bottom: 16px; }
+  #endStats { margin: -6px 0 12px; font-size: 13px; font-weight: 700; color: #A3B0A6; }
   #endReason { margin: -8px 0 14px; font-size: 16px; font-weight: 800; color: #F2D06B; }
   .scoreRow { display: flex; gap: 10px; margin-bottom: 16px; }
   .scoreRow div { flex: 1 1 0; border-radius: 8px; padding: 10px 6px; font-size: 15px; font-weight: 800; }
@@ -593,6 +594,7 @@
     <div class="endBox">
       <div id="endTitle"></div>
       <div id="endReason" hidden></div>
+      <div id="endStats" hidden></div>
       <div class="scoreRow"><div class="sb">블루팀<b id="endBlue">0</b></div><div class="sr">레드팀<b id="endRed">0</b></div></div>
       <div class="boardWrap"><table class="board"><thead><tr><th>팀</th><th class="nm">닉네임</th><th class="nm">직업</th><th>처치</th><th>쓰러짐</th><th>어시스트</th><th>입힌 피해</th><th>회복</th><th>막은 피해</th><th>기절</th><th>둔화</th><th>환산점수<button id="btnScoreHelp" class="scoreHelp" type="button" aria-label="환산점수 계산식">?</button></th></tr></thead><tbody id="boardBody"></tbody></table></div>
       <div class="endBtns"><button id="btnAgain" class="primary" type="button">다시하기</button><button id="btnLeaveEnd" type="button">방 나가기</button></div>
@@ -679,7 +681,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
                 fx: { slowMs: 1000, slowMul: 0.7 }, ultName: "창벽" },
     frost:   { name: "얼음술사", role: "caster", icon: "❄️", hp: 120, speed: 240, cd: 1000, dmg: 13, range: 350, pSpeed: 650, pr: 8, ultName: "눈보라" },
     dancer:  { name: "검무희", role: "assassin", icon: "🌸", hp: 110, speed: 250, ultSpeed: 300, cd: 833, dmg: 20, range: 350, pSpeed: 900, pr: 8, ultName: "칼날 폭풍" },
-    crossbow: { name: "석궁사수", role: "shooter", icon: "☠️", hp: 90, speed: 200, cd: 1000, dmg: 8, range: 400, pSpeed: 700, pr: 10, pierce: true,
+    crossbow: { name: "석궁사수", role: "shooter", icon: "☠️", hp: 80, speed: 200, cd: 1000, dmg: 5, range: 400, pSpeed: 700, pr: 10, pierce: true,
                 grow: { max: 20, perKill: 2, perAssist: 1, hp: 6, speed: 4, dmg: 4, cd: 40, range: 20 }, ultName: "세 갈래 볼트", ultAim: true }
   };
   var ROLES = {
@@ -699,7 +701,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               bzDur: 4000, bzDmgMul: 1.3, bzCdMul: 1 / 1.3, bzHeal: 20, tkDur: 5000, tkDef: 0.4, tkStunR: 100, tkStunMs: 1000,
               mbDelay: 1000, mbR: 250, mbDmg: 120, mbDmgMin: 40, mbCast: 550, mbMin: 60, mbStunMs: 1200, mbStunMin: 600, mbSteps: 5,
               asSmokeMs: 400, asDur: 15000,
-              smCount: 2, smAhead: KEY * 1, smSide: 38, smHp: 60, smSpeed: 240, smGauge: 1, smDmg: 12, smCd: 800, smRange: 80, smArc: Math.PI * 0.6,
+              smCount: 2, smAhead: KEY * 1, smSide: 38, smHp: 60, smSpeed: 240, smGauge: 0.5, smDmg: 12, smCd: 800, smRange: 80, smArc: Math.PI * 0.6,
               smDur: 8000, smMax: 4, smFollow: KEY * 1.5, smRiseMs: 1100, smCorpseMs: 1400,
               pnDmg: 90, pnSpeed: 735, pnRange: 900, pnPr: 16, pnRefund: 4, pnScale: 3,
               plFlight: 700, plFlightMin: 100, plR: 60, plDur: 3000, plTick: 1000, plMax: 4, plFade: 500, plLob: 90, plGauge: 1,
@@ -708,7 +710,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               bsLeapMinMs: 200, bsLeapMaxMs: 1000, bsR: 200, bsDmg: 20, bsStunMs: 1000, bsCast: 450, bsMin: 60, bsHop: 45,
               bhR: 200, bhDur: 3000, bhDelay: 500, bhPull: 220, bhCast: 380, bhMin: 60, bhCcRate: 0.8,
               exRange: 500, exSpeed: 1300, exPr: 4, exDmg: 10, exStunMs: 1000,
-              gdR: 200, gdKb: 150, gdKbMs: 500,
+              gdR: 200, gdKb: 150, gdKbMs: 500, gdDmg: 30, gdSlowMul: 0.6, gdSlowMs: 1000,
               frSlowMs: 1200, frSlowMul: 0.8, frSlowStep: 0.2, frFreezeMs: 800,
               frBzR: 400, frBzDur: 7000, frBzDmg: 5, frBzTick: 1000, frBzDelay: 400,
               bwR: 150, bwDur: 3000, bwTick: 250, bwHurtGaugeEvery: 4, bwDmg: 15, bwKillGauge: 5, bdR: 70, bdDmg: 10, bdDelay: 300,
@@ -1094,7 +1096,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function enterRoom(code) {
     leaving = false;
     var ref = db.ref(ROOT + "/" + code);
-    room = { code: code, ref: ref, mode: null, map: "forest", status: "lobby", host: null, startAt: 0, winner: null, endedAt: 0, final: null, roster: null, draft: null };
+    room = { code: code, ref: ref, mode: null, map: "forest", status: "lobby", host: null, startAt: 0, winner: null, endedAt: 0, final: null, roster: null, draft: null, statsNote: null };
     clear3d();
     P = {}; R = {}; PR = {}; MELEE = {}; FX = []; BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; STORMS = []; REVS = []; GRACES = []; DOMAINS = []; CURSES = {}; BLADE_SPINS = []; G = null; ME = null; BOTS = {}; ST = {}; SHOTS = []; hitSubs = {};
     ref.child("players/" + myId).onDisconnect().remove();
@@ -1122,6 +1124,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     sub(ref.child("endedAt"), "value", function (s) { room.endedAt = s.val() || 0; });
     sub(ref.child("final"), "value", function (s) { room.final = s.val(); });
     sub(ref.child("roster"), "value", function (s) { room.roster = s.val(); });
+    sub(ref.child("statsNote"), "value", function (s) { room.statsNote = s.val(); });
     sub(ref.child("draft"), "value", function (s) { room.draft = s.val(); renderDraft(); });
     sub(ref.child("status"), "value", function (s) {
       var st = s.val();
@@ -1370,7 +1373,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "lancer") return secs(ULT.lnWind) + " 준비 후 사거리 " + ULT.lnLen + "의 창 찌르기. 맞은 적은 모두 " + ULT.lnDmg + "의 피해를 입고 " + secs(ULT.lnStunMs) + "간 기절";
     if (k === "blacksmith") return "지정한 곳에 거리에 따라 " + num(ULT.bsLeapMinMs / 1000) + "~" + secs(ULT.bsLeapMaxMs) + " 뒤 착지. 반경 " + ULT.bsR + "의 적은 " + ULT.bsDmg + "의 피해를 입고 " + secs(ULT.bsStunMs) + "간 기절";
     if (k === "hitman") return "사거리 " + ULT.exRange + "의 칼날 발사. 처음 맞은 적은 " + ULT.exDmg + "의 피해를 입고 " + secs(ULT.exStunMs) + "간 기절, 그 위치로 순간이동";
-    if (k === "guardian") return "자신을 중심으로 반경 " + ULT.gdR + "의 적을 모두 " + ULT.gdKb + "만큼 밀어냄";
+    if (k === "guardian") return "자신을 중심으로 반경 " + ULT.gdR + "의 적을 모두 " + ULT.gdKb + "만큼 밀어내며 " + ULT.gdDmg + "의 피해. 밀려난 적은 " + secs(ULT.gdSlowMs) + "간 " + slowPct(ULT.gdSlowMul);
     if (k === "shaman") return "자신을 중심으로 " + secs(ULT.dmGrowMs) + "간 반경 " + ULT.dmR + "까지 커진 뒤 " + secs(ULT.dmDur - ULT.dmGrowMs) + "간 유지되는 영역 생성. 영역이 커지는 과정에서 닿은 적은 " + secs(ULT.dmStunMs) +
       " 기절하고 이후 " + ULT.dmBoltDmg + "의 피해. 영역 안에서 주술사의 기본 공격은 영역 내 가장 가까운 적 1명에게 " + ULT.dmStrikeDmg + "의 피해를 입힘";
     if (k === "priest") return "지정한 곳에 " + secs(ULT.bhDelay) + " 뒤 " + secs(ULT.bhDur) + "간 유지되는 반경 " + ULT.bhR + "의 블랙홀 생성. 적은 중심으로 끌려감";
@@ -1662,7 +1665,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       });
     });
     u.roster = roster; u.st = st; u.arena = arena; u.draft = null;
-    u.status = "countdown"; u.startAt = now() + countMs; u.winner = null; u.final = null; u.endedAt = null;
+    u.status = "countdown"; u.startAt = now() + countMs; u.winner = null; u.final = null; u.statsNote = null; u.endedAt = null;
     u.shots = null; u.meleeHits = null; u.hits = null; u.effects = null; u.kills = null; u.projectiles = null;
     room.ref.update(u);
   }
@@ -1695,7 +1698,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       teamIds(team).slice(0, 3).forEach(function (id, i) { seq[(team === "blue" ? "b" : "r") + (i + 1)] = id; });
     });
     var d = draftSettle({ seq: seq, step: 0, stepAt: t }, t);
-    room.ref.update({ draft: d, arena: resolveArena(room.map), status: "draft", roster: null, st: null, winner: null, final: null, endedAt: null, startAt: null,
+    room.ref.update({ draft: d, arena: resolveArena(room.map), status: "draft", roster: null, st: null, winner: null, final: null, statsNote: null, endedAt: null, startAt: null,
                       shots: null, meleeHits: null, hits: null, effects: null, kills: null, projectiles: null });
   }
   function draftPick(c) {
@@ -3317,7 +3320,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       E.atkAt = t;
       E.ultUntil = t + 500;
       room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(E.angle), radius: ULT.gdR, arc: Math.PI * 2,
-                                        dmg: 0, u: 1, slam: 1, kb: ULT.gdKb, createdAt: t });
+                                        dmg: ULT.gdDmg, u: 1, slam: 1, kb: ULT.gdKb, fx: { slowMs: ULT.gdSlowMs, slowMul: ULT.gdSlowMul }, createdAt: t });
       revealBriefly(E.id, t);
     } else if (E.char === "shaman") {
       E.ultUntil = t + 600;
@@ -3649,25 +3652,34 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       : (s.blueKills > s.redKills ? "blue" : (s.redKills > s.blueKills ? "red" : "draw"));
     G.endSent = true;
     netWrite(true);
-    room.ref.update({ status: "ended", winner: winner, endedAt: t,
-      final: { blue: s.blueKills, red: s.redKills, reason: quitTeam ? "상대팀이 모두 나가서 승리" : "시간 종료 — 킬 스코어로 판정" } });
-    if (!quitTeam && isStudentFullTeamMatch(room.mode, room.roster, P)) setTimeout(function () { recordClassStats(t); }, STATS_SETTLE_MS);
+    var statsMode = room.mode === "pvp" || room.mode === "cup";
+    var skipReason = quitTeam ? "상대팀이 모두 나가서 통계에서 제외됐어요" : statsSkipReason(room.mode, room.roster, P);
+    var ended = { status: "ended", winner: winner, endedAt: t,
+      final: { blue: s.blueKills, red: s.redKills, reason: quitTeam ? "상대팀이 모두 나가서 승리" : "시간 종료 — 킬 스코어로 판정" } };
+    if (statsMode) ended.statsNote = skipReason || "통계를 저장하는 중이에요";
+    room.ref.update(ended);
+    if (!skipReason) setTimeout(function () { recordClassStats(t); }, STATS_SETTLE_MS);
   }
 
   var STATS_PATH = "teambattle/modestats/";
   var STATS_SETTLE_MS = 3000;
   var isTestLink = !!(window.PORTAL_CLASS && window.PORTAL_CLASS.test);
-  function isStudentFullTeamMatch(mode, roster, ps) {
-    if ((mode !== "pvp" && mode !== "cup") || !roster) return false;
+  function statsSkipReason(mode, roster, ps) {
+    if (mode !== "pvp" && mode !== "cup") return "이 모드는 통계를 모으지 않아요";
+    if (!roster) return "참가자 정보를 못 받아서 통계에서 제외됐어요";
+    if (isTestLink) return "배포용(테스트) 링크로 열어서 통계에서 제외됐어요";
     var count = { blue: 0, red: 0 }, ids = keys(roster);
     for (var i = 0; i < ids.length; i++) {
       var id = ids[i], r = roster[id], d = ps[id];
-      if (!r || r.ai || !d || d.isAI || !d.slot || d.team !== r.team || d.characterType !== r.c) return false;
-      if (!(r.team in count) || !CHARS[r.c]) return false;
+      if (!r) return "참가자 정보가 맞지 않아 통계에서 제외됐어요";
+      if (r.ai || (d && d.isAI)) return "AI가 함께해서 통계에서 제외됐어요";
+      if (!d || !d.slot || d.team !== r.team || d.characterType !== r.c || !(r.team in count) || !CHARS[r.c]) return "참가자 정보가 맞지 않아 통계에서 제외됐어요";
       count[r.team]++;
     }
-    return count.blue === 3 && count.red === 3 && !isTestLink;
+    return count.blue === 3 && count.red === 3 ? "" : "양 팀이 3명씩이 아니어서 통계에서 제외됐어요";
   }
+  function isStudentFullTeamMatch(mode, roster, ps) { return !statsSkipReason(mode, roster, ps); }
+  function setStatsNote(r, text) { r.ref.update({ statsNote: text }).catch(function () {}); }
   function recordClassStats(endedAt) {
     if (!db || !room) return;
     var r = room, ps = P;
@@ -3676,8 +3688,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     r.ref.child("done").once("value").then(function (s) {
       var done = s.val() || {};
       var everyoneStayed = keys(r.roster).every(function (id) { return done[id] === endedAt; });
-      if (everyoneStayed && room === r && r.endedAt === endedAt) saveClassStats(r, ps);
-    }).catch(function () {});
+      if (!everyoneStayed) { setStatsNote(r, "결과 창까지 남지 않은 사람이 있어 통계에서 제외됐어요"); return; }
+      if (room === r && r.endedAt === endedAt) saveClassStats(r, ps);
+    }).catch(function () { setStatsNote(r, "통계 확인에 실패해서 저장하지 못했어요"); });
   }
   function markStayedToEnd() {
     var r = room;
@@ -3724,7 +3737,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         return cur;
       });
     }
-    addStats(true).catch(function () { return addStats(false); }).catch(function () {});
+    addStats(true).catch(function () { return addStats(false); }).then(function (res) {
+      setStatsNote(r, res && res.committed ? "이 경기는 통계에 반영됐어요" : "통계 저장이 취소됐어요. 다시 경기하면 반영돼요");
+    }).catch(function (err) {
+      setStatsNote(r, "통계 저장에 실패했어요(" + ((err && err.code) || err) + "). 데이터베이스 규칙 게시를 확인해 주세요");
+    });
   }
   function hostCleanup() {
     var t = now();
@@ -3743,7 +3760,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function restart() {
     if (!room || room.status !== "ended") return;
     if (room.endedAt && now() - room.endedAt < STATS_SETTLE_MS + 500) return;
-    room.ref.update({ status: "lobby", winner: null, final: null, startAt: null, endedAt: null, roster: null, draft: null,
+    room.ref.update({ status: "lobby", winner: null, final: null, statsNote: null, startAt: null, endedAt: null, roster: null, draft: null,
                       st: null, done: null, shots: null, meleeHits: null, hits: null, effects: null, kills: null, projectiles: null });
   }
   var specResultHeld = false;
@@ -6090,6 +6107,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var quitWin = !!f.reason && f.reason.indexOf("나가서") >= 0;
       show($("endReason"), quitWin);
       if (quitWin) setText($("endReason"), "상대팀이 모두 나가서 " + (w === "blue" ? "블루팀" : "레드팀") + "이 승리했어요.");
+      show($("endStats"), !!room.statsNote);
+      if (room.statsNote) setText($("endStats"), room.statsNote);
       setText($("endBlue"), String(f.blue != null ? f.blue : s.blueKills));
       setText($("endRed"), String(f.red != null ? f.red : s.redKills));
       setHtml($("boardBody"), boardRows());
