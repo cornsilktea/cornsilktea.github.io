@@ -1114,7 +1114,7 @@ function collectResults(api) {
       { id: "wr", team: "red", char: "warrior", x: 450, y: y }
     ]);
     var wr = W.ent("wr"), bad = [], full = R.perSec * R.ms / 1000;
-    api.damage(wr, wr.maxHp - 130, "kn", false, null);
+    api.damage(wr, wr.maxHp - (wr.maxHp * R.hpRate - 5), "kn", false, null);
     var h0 = wr.hp, heal0 = wr.heal || 0;
     W.step(R.ms + 500);
     if (wr.hp - h0 !== full) bad.push("회복 " + (wr.hp - h0) + " (기대 " + full + ")");
@@ -1125,7 +1125,7 @@ function collectResults(api) {
     if (wr.hp !== h1) bad.push("같은 목숨에서 다시 발동");
     api.damage(wr, 9999, "kn", false, null);
     W.step(api.RESPAWN_MS + api.RESPAWN_PROTECT_MS + 200);
-    api.damage(wr, wr.maxHp - 130, "kn", false, null);
+    api.damage(wr, wr.maxHp - (wr.maxHp * R.hpRate - 5), "kn", false, null);
     var h2 = wr.hp;
     W.step(1500);
     if (wr.hp <= h2) bad.push("부활 뒤 재충전 안 됨");
