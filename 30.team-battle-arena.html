@@ -429,6 +429,11 @@
   .dfMap small { display: block; font-size: 12px; font-weight: 700; color: var(--sg-ink-soft); margin-top: 4px; }
   .dfTurn { margin-top: 4px; font-size: 17px; font-weight: 800; color: #F2D06B; min-height: 24px; }
   .dfTurn.mine { color: #FFB38A; }
+  .dfCharCol { transition: box-shadow .4s ease, border-color .4s ease; }
+  .dfCharCol.myTurn { border-color: #3FBF6A; animation: dfTurnGlow 1.6s ease-in-out infinite; }
+  .dfCharCol.myTurnLow { border-color: #FF8A80; animation: dfTurnGlowLow 1s ease-in-out infinite; }
+  @keyframes dfTurnGlow { 0%, 100% { box-shadow: 0 0 0 2px rgba(63,191,106,.55), 0 0 12px rgba(63,191,106,.25); } 50% { box-shadow: 0 0 0 3px rgba(63,191,106,.95), 0 0 26px rgba(63,191,106,.55); } }
+  @keyframes dfTurnGlowLow { 0%, 100% { box-shadow: 0 0 0 2px rgba(255,138,128,.55), 0 0 12px rgba(255,138,128,.25); } 50% { box-shadow: 0 0 0 3px rgba(255,138,128,.95), 0 0 26px rgba(255,138,128,.55); } }
   .dfTimer { flex: 0 0 auto; min-width: 84px; text-align: center; font-size: 46px; font-weight: 800; line-height: 1; color: #F4F1E8; font-variant-numeric: tabular-nums; }
   .dfTimer.low { color: #FF6B6B; text-shadow: 0 0 10px rgba(255,80,80,.7); }
   .dfTimer small { display: block; font-size: 12px; color: var(--sg-ink-soft); margin-top: 2px; }
@@ -2309,6 +2314,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     else turn = draftTeamName(stepSide(d.step) === "b" ? "blue" : "red") + " " + DRAFT_STEPS[d.step].keys.map(function (k) { return k.charAt(1); }).join("·") + "번 선수가 " + doing + " 중…";
     setText($("dfTurn"), turn);
     $("dfTurn").className = "dfTurn" + (myTurn ? " mine" : "");
+    var charCol = document.querySelector(".dfCharCol");
+    charCol.classList.toggle("myTurn", myTurn && left >= 5000);
+    charCol.classList.toggle("myTurnLow", myTurn && left < 5000);
     setHtml($("dfSteps"), DRAFT_STEPS.map(function (S, i) {
       return '<span class="' + (stepSide(i) === "b" ? "b" : "r") + (S.ban ? " ban" : "") + (i === d.step ? " now" : (i < d.step ? " done" : "")) + '">' + (i + 1) + ". " + draftStepLabel(i) + "</span>";
     }).join(""));
