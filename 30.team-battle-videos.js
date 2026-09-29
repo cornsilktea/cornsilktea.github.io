@@ -1,0 +1,20 @@
+window.TEAM_BATTLE_VIDEOS = {
+  warrior:    { name: "광전사",   basic: "", passive: "", skill: "" },
+  duelist:    { name: "결투가",   basic: "", passive: "", skill: "" },
+  knight:     { name: "기사",     basic: "", passive: "", skill: "" },
+  blacksmith: { name: "대장장이", basic: "", passive: "", skill: "" },
+  guardian:   { name: "수문장",   basic: "", passive: "", skill: "" },
+  lancer:     { name: "창기사",   basic: "", passive: "", skill: "" },
+  necro:      { name: "네크로",   basic: "", passive: "", skill: "" },
+  frost:      { name: "얼음술사", basic: "", passive: "", skill: "" },
+  shaman:     { name: "주술사",   basic: "", passive: "", skill: "" },
+  cleric:     { name: "클레릭",   basic: "", passive: "", skill: "" },
+  mage:       { name: "화염술사", basic: "", passive: "", skill: "" },
+  ranger:     { name: "궁수",     basic: "", passive: "", skill: "" },
+  sniper:     { name: "저격수",   basic: "", passive: "", skill: "" },
+  crossbow:   { name: "석궁사수", basic: "", passive: "", skill: "" },
+  thrower:    { name: "투척병",   basic: "", passive: "", skill: "" },
+  dancer:     { name: "검무희",   basic: "", passive: "", skill: "" },
+  rogue:      { name: "은신자",   basic: "", passive: "", skill: "" },
+  hitman:     { name: "자객",     basic: "", passive: "", skill: "" }
+};

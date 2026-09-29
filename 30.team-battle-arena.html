@@ -14,6 +14,7 @@
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
 <link rel="stylesheet" href="theme.css">
+<script charset="utf-8" src="30.team-battle-videos.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1.10.1/dist/es-module-shims.js"></script>
@@ -290,6 +291,71 @@
   #hudMe b.pop { animation: hudMePop .5s ease-out; }
   @keyframes hudMePop { 0% { transform: scale(1); color: #F4F1E8; } 25% { transform: scale(1.6); color: #D97B4F; } 100% { transform: scale(1); color: #F4F1E8; } }
   #btnLeaveGame { position: absolute; top: 8px; right: 8px; height: 34px; padding: 0 12px; font-size: 14px; font-weight: 800; border-radius: 6px; border: 1px solid rgba(255,138,138,.6); background: rgba(14,20,17,.8); color: #FF9A9A; }
+  #practiceBar { position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; pointer-events: auto; }
+  #practiceBar button { height: 34px; padding: 0 12px; font-size: 14px; font-weight: 800; border-radius: 6px; border: 1px solid rgba(255,255,255,.28); border-bottom: 2px solid #D97B4F; background: rgba(14,20,17,.82); color: #F4F1E8; white-space: nowrap; }
+  #practiceBar #btnPracExit { border-color: rgba(255,138,138,.6); color: #FF9A9A; }
+  #scrGame.practice #hudMe { top: 48px; }
+  @media (max-width: 1100px) {
+    #practiceBar { flex-direction: column; align-items: flex-end; }
+    #scrGame.practice #hudMe { top: 128px; }
+  }
+  .modalBox.pcBox { max-width: 720px; max-height: calc(100vh - 32px); overflow-y: auto; overscroll-behavior: contain; }
+  .pcBox .roleCards { flex-wrap: wrap; overflow: visible; }
+  .pcBox .dfCard { cursor: pointer; }
+
+  .screen.vidPage { z-index: 45; background: #0B120E; padding: 54px max(16px, 3vw) 32px; }
+  .vpWrap { max-width: 1240px; margin: 0 auto; }
+  .vpHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--sg-line-mid); }
+  .vpHead h2 { font-size: 26px; font-weight: 800; color: #F4F1E8; }
+  .vpHead h2 small { margin-left: 10px; font-size: 14px; font-weight: 700; color: var(--sg-ink-soft); }
+  .vpList { display: grid; gap: 10px; }
+  .vpList .roleRow { padding-bottom: 10px; border-bottom: 1px solid var(--sg-line); }
+  .vpList .roleTag { flex-basis: 96px; }
+  .vpChars { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; gap: 10px; }
+  .vpChar { flex: 0 0 124px; padding: 8px 6px; border-radius: 10px; border: 3px solid var(--sg-line-mid); background: var(--sg-panel); color: var(--sg-ink); text-align: center; }
+  .vpChar:hover, .vpChar:focus-visible { border-color: #D97B4F; background: rgba(217,123,79,.2); outline: none; }
+  .vpChar img { display: block; width: 100%; height: 110px; object-fit: contain; }
+  .vpChar b { display: block; margin-top: 4px; font-size: 17px; font-weight: 800; }
+  .vpChar small { display: block; margin-top: 2px; font-size: 12px; font-weight: 700; color: var(--sg-ink-faint); }
+  .vpChar small.has { color: #FFB38A; }
+  .vpDetHead { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+  .vpName { font-size: 28px; font-weight: 800; color: #F4F1E8; }
+  .vpName small { margin-left: 10px; font-size: 15px; font-weight: 700; color: #FFB38A; }
+  .vpNav { margin-left: auto; display: flex; gap: 6px; }
+  .vpTop, .vpVids { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .vpTop { margin-bottom: 14px; }
+  .vpBox, .vpVid { display: flex; flex-direction: column; min-width: 0; border-radius: 10px; border: 1px solid var(--sg-line-mid); background: var(--sg-panel); padding: 12px; }
+  .vpBox { height: clamp(260px, 24vw, 320px); }
+  .vpBox h4, .vpVid h4 { flex: none; margin-bottom: 8px; padding-left: 8px; border-left: 3px solid #D97B4F; font-size: 16px; font-weight: 800; color: #F4F1E8; }
+  .vpVid h4 small { margin-left: 6px; font-size: 13px; color: #FFB38A; }
+  .vpBox .st { width: 100%; border-collapse: collapse; font-size: 15px; }
+  .vpBox .st th, .vpBox .st td { padding: 6px 4px; border-top: 1px solid var(--sg-line); }
+  .vpBox .st th { text-align: left; font-weight: 700; color: var(--sg-ink-soft); }
+  .vpBox .st td { text-align: right; font-weight: 800; color: var(--sg-ink); }
+  .vpGauge { margin-top: auto; padding-top: 8px; font-size: 13px; font-weight: 700; line-height: 1.45; color: var(--sg-ink-soft); word-break: keep-all; }
+  .vpPic { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; border-radius: 8px; background: rgba(0,0,0,.28); overflow: hidden; }
+  .vpPic img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .vpPic img.fill { width: 100%; height: 100%; max-width: none; max-height: none; object-fit: cover; }
+  .vpPic span { font-size: 14px; font-weight: 700; color: var(--sg-ink-faint); }
+  .vpPlayer { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; background: #000; }
+  .vpPlayer iframe, .vpPlayer video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
+  .vpYt { position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; border: 0; padding: 0; background: #000 center / cover no-repeat; }
+  .vpYt i { position: absolute; top: 50%; left: 50%; width: 68px; height: 48px; margin: -24px 0 0 -34px; border-radius: 12px; background: rgba(217,123,79,.92); font-style: normal; font-size: 22px; line-height: 48px; color: #fff; box-shadow: 0 4px 14px rgba(0,0,0,.45); }
+  .vpYt:hover i { background: #D97B4F; }
+  .vpNone { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,.05); font-size: 15px; font-weight: 800; color: var(--sg-ink-faint); }
+  .vpVid p { margin-top: 10px; font-size: 15px; line-height: 1.55; color: var(--sg-ink-mid); word-break: keep-all; }
+  @media (max-width: 900px) {
+    .vpTop, .vpVids { grid-template-columns: minmax(0, 1fr); }
+    .vpBox { height: 280px; }
+  }
+  @media (max-width: 560px) {
+    .vpHead h2 small { display: none; }
+    .vpHead .mini, .vpDetHead .mini { white-space: nowrap; }
+    .vpChar { flex-basis: 96px; }
+    .vpChar img { height: 84px; }
+    .vpList .roleTag { flex-basis: 58px; }
+    .vpName { font-size: 22px; }
+  }
 
   .actBtn { position: absolute; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column; font-weight: 800; color: #fff; touch-action: none; -webkit-user-select: none; user-select: none; overflow: hidden; }
   #btnAtk { right: 26px; bottom: 44px; width: 112px; height: 112px; background: radial-gradient(circle at 50% 32%, rgba(78,128,96,.96), rgba(22,38,28,.96)); border: 4px solid rgba(255,255,255,.88); box-shadow: 0 6px 18px rgba(0,0,0,.35); font-size: 19px; line-height: 1.1; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
@@ -538,7 +604,7 @@
     </div>
   </div>
   <div id="charCardBox" class="card charCol">
-    <div class="secTitle charHead"><span>캐릭터<span id="charHint" class="secHint">선택한 캐릭터를 한 번 더 누르면 자세한 설명이 나옵니다.</span></span><span class="charBtns"><button id="btnStats" class="mini" type="button">통계</button><button id="btnZoomChars" class="mini" type="button">확대</button><button id="btnFlipAll" class="mini" type="button">모든 카드 뒤집기</button></span></div>
+    <div class="secTitle charHead"><span>캐릭터<span id="charHint" class="secHint">선택한 캐릭터를 한 번 더 누르면 자세한 설명이 나옵니다.</span></span><span class="charBtns"><button id="btnVideos" class="mini" type="button">캐릭터 영상</button><button id="btnStats" class="mini" type="button">통계</button><button id="btnZoomChars" class="mini" type="button">확대</button><button id="btnFlipAll" class="mini" type="button">모든 카드 뒤집기</button></span></div>
     <div class="chars" id="chars"></div>
   </div>
   </div>
@@ -581,6 +647,7 @@
   <div id="killFeed"></div>
   <div id="killBanner"></div>
   <button id="btnLeaveGame" type="button">방 나가기</button>
+  <div id="practiceBar" hidden><button id="btnPracChar" type="button">캐릭터 변경</button><button id="btnPracGauge" type="button">스킬 게이지 채우기</button><button id="btnPracExit" type="button">연습장 나가기</button></div>
   <div id="hudMe" hidden><span>킬<b id="hudMeK">0</b></span><span>데스<b id="hudMeD">0</b></span><span>어시스트<b id="hudMeA">0</b></span><span>피해량<b id="hudMeDmg">0</b></span></div>
   <div id="specL" class="specPanel blue" hidden></div>
   <div id="specR" class="specPanel red" hidden></div>
@@ -616,6 +683,21 @@
       <li>막은 피해·기절·둔화·어시스트는 이 항목이 추가된 뒤의 경기만으로 평균을 냅니다.</li>
       <li>어시스트: 내가 피해나 해로운 효과(기절·둔화·넉백·끌어당김)를 준 적이 5초 안에 쓰러지거나, 내가 회복·은신(눈보라)을 준 아군이 5초 안에 적을 처치하면 1회(처치한 사람은 제외, 한 처치에 1번만).</li>
     </ul>
+  </div>
+</div>
+
+<div id="vidPage" class="screen vidPage" hidden>
+  <div class="vpWrap">
+    <div class="vpHead"><h2>캐릭터 영상<small>기본 공격 · 패시브 · 스킬</small></h2><button id="btnVidClose" class="mini" type="button">닫기</button></div>
+    <div id="vpList" class="vpList"></div>
+    <div id="vpDetail" hidden></div>
+  </div>
+</div>
+
+<div id="pcModal" class="modal" hidden>
+  <div class="modalBox pcBox">
+    <div class="statsTop"><h3>연습할 캐릭터</h3><button id="btnPcClose" class="mini" type="button">닫기</button></div>
+    <div id="pcChars" class="dfChars"></div>
   </div>
 </div>
 
@@ -682,7 +764,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     frost:   { name: "얼음술사", role: "caster", icon: "❄️", hp: 120, speed: 240, cd: 1000, dmg: 13, range: 350, pSpeed: 650, pr: 8, ultName: "눈보라" },
     dancer:  { name: "검무희", role: "assassin", icon: "🌸", hp: 110, speed: 250, ultSpeed: 300, cd: 833, dmg: 20, range: 350, pSpeed: 900, pr: 8, ultName: "칼날 폭풍" },
     crossbow: { name: "석궁사수", role: "shooter", icon: "☠️", hp: 80, speed: 200, cd: 1000, dmg: 5, range: 400, pSpeed: 700, pr: 10, pierce: true,
-                grow: { max: 20, perKill: 2, perAssist: 1, hp: 6, speed: 4, dmg: 4, cd: 40, range: 20 }, ultName: "세 갈래 볼트", ultAim: true }
+                grow: { max: 20, perKill: 2, perAssist: 1, hp: 6, speed: 4, dmg: 4, cd: 40, range: 20 }, ultName: "세 갈래 볼트", ultAim: true },
+    dummy:   { name: "연습 봇", role: "fighter", icon: "🎯", hp: 99999, speed: 200, cd: 1000, dmg: 0, range: 0, ultName: "없음", practiceBot: true }
   };
   var ROLES = {
     fighter:  { name: "전사", icon: "⚔️", gaugeOnHit: 2, gaugeOnHurt: 1 },
@@ -692,7 +775,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   };
   var ROLE_LIST = ["fighter", "caster", "shooter", "assassin"];
   function playable(c) { return !!(CHARS[c] && !CHARS[c].retired); }
-  var CHAR_LIST = Object.keys(CHARS).filter(playable).sort(function (a, b) {
+  function pickable(c) { return playable(c) && !CHARS[c].practiceBot; }
+  var CHAR_LIST = Object.keys(CHARS).filter(pickable).sort(function (a, b) {
     return ROLE_LIST.indexOf(CHARS[a].role) - ROLE_LIST.indexOf(CHARS[b].role) || CHARS[a].name.localeCompare(CHARS[b].name, "ko");
   });
   function roleOf(c) { return ROLES[CHARS[c].role]; }
@@ -805,10 +889,25 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       '""............""',
       '""...##.......""',
       "................"
+    ] },
+    practice: { name: "연습장", practice: true, spawnY: { blue: 375, red: MH - 375 }, blueHalf: [
+      "oooooooooooooooo",
+      "oooooooooooooooo",
+      "oooooooooooooooo",
+      "oooooooooooooooo",
+      "################",
+      "#..............#",
+      "#..............#",
+      "#..............#",
+      "#..............#",
+      "#..............#",
+      "#..............#",
+      "#..............#",
+      "#..............#"
     ] }
   };
   var MAP_IDS = ["forest", "river", "dungeon", "windhill"];
-  var BLOCK_TILES = "#x", WATER_TILES = "~";
+  var BLOCK_TILES = "#xo", WATER_TILES = "~", ROCK_TILES = "#x";
   var ARENA = "", MAP = [], MAP_COLS = 16, MAP_ROWS = 25, SPAWN_ROWS = 3;
   var OBST = [], WATER = [], BRIDGES = [], BUSH_ID = [], BUSH = [];
   function tileX(c) { return MAP_X0 + (c + 0.5) * TILE; }
@@ -1075,10 +1174,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (!db) { startMsg("온라인 연결을 할 수 없어요."); return; }
     $("btnJoin").disabled = true; startMsg("");
     var ref = db.ref(ROOT + "/" + code);
-    Promise.all(["players", "status"].map(function (k) { return ref.child(k).once("value"); })).then(function (a) {
+    Promise.all(["players", "status", "mode"].map(function (k) { return ref.child(k).once("value"); })).then(function (a) {
       $("btnJoin").disabled = false;
-      var r = { players: a[0].val(), status: a[1].val() };
+      var r = { players: a[0].val(), status: a[1].val(), mode: a[2].val() };
       if (!r.players || !humans(r.players).length) { startMsg("그런 방이 없어요. 코드를 확인해 주세요."); return; }
+      if (r.mode === "practice") { startMsg("혼자 연습 중인 방이라 들어갈 수 없어요."); return; }
       var cnt = function (tm) { return keys(r.players).filter(function (id) { return r.players[id] && r.players[id].team === tm; }).length; };
       var team = null;
       if (r.status === "lobby") {
@@ -1204,7 +1304,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "game") resize();
     if (k !== prev || (k !== "lobby" && k !== "start")) setCharZoom(false);
     if (k === "start" || k === "lobby") placeCharBox(k);
-    if (k !== "start" && k !== "lobby") show($("statsModal"), false);
+    if (k !== "start" && k !== "lobby") { show($("statsModal"), false); closeVideos(); }
+    if (k !== "game") show($("pcModal"), false);
   }
   function placeCharBox(k) {
     var cols = $(k === "start" ? "startCols" : "lobbyCols"), box = $("charCardBox");
@@ -1276,14 +1377,26 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
   var MODES = [
     { id: "pvp", name: "일반모드" },
+    { id: "practice", name: "연습모드" },
     { id: "cup", name: "대회모드" }
   ];
-  var MAP_CHOICES = MAP_IDS.map(function (id) { return { id: id, name: MAPS[id].name }; }).concat([{ id: "random", name: "랜덤" }]);
+  var STATS_MODES = MODES.filter(function (m) { return m.id !== "practice"; });
+  var PRACTICE_BOT_ID = "aiPracticeBot", PRACTICE_BOT_RETURN_MS = 2500;
+  function practiceMode() { return !!room && room.mode === "practice"; }
+  function mapChoices(mode) {
+    return MAP_IDS.map(function (id) { return { id: id, name: MAPS[id].name }; })
+      .concat([mode === "practice" ? { id: "practice", name: MAPS.practice.name } : { id: "random", name: "랜덤" }]);
+  }
   function nameIn(list, id, fallback) { for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i].name; return fallback; }
   function modeName(id) { return nameIn(MODES, id, "모드 선택 중"); }
   function setMode(mode) {
     if (!isHost() || room.status !== "lobby" || room.mode === mode) return;
-    room.ref.update({ mode: mode });
+    if (mode !== "practice") { room.ref.update(room.map === "practice" ? { mode: mode, map: "forest" } : { mode: mode }); return; }
+    if (humans(P).length > 1) { flashHint("연습모드는 방에 혼자 있을 때만 고를 수 있어요."); return; }
+    var u = { mode: "practice", map: "practice" };
+    keys(P).forEach(function (id) { if (P[id] && P[id].isAI) u["players/" + id] = null; });
+    if (P[myId] && !isPlayingTeam(P[myId].team)) u["players/" + myId + "/team"] = "blue";
+    room.ref.update(u);
   }
   function setMapChoice(map) {
     if (!isHost() || room.status !== "lobby" || room.map === map) return;
@@ -1452,15 +1565,18 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (!room || screenNow !== "lobby") return;
     var me = P[myId]; if (!me) return;
     var mode = room.mode;
-    setText($("lobbyMode"), modeName(mode) + " · " + nameIn(MAP_CHOICES, room.map, MAPS.forest.name));
+    var practice = mode === "practice", maps = mapChoices(mode);
+    setText($("lobbyMode"), modeName(mode) + " · " + nameIn(maps, room.map, MAPS.forest.name));
     setHtml($("modeBtns"), choiceButtons(MODES, mode, "modeOpt"));
-    setHtml($("mapBtns"), choiceButtons(MAP_CHOICES, room.map || "forest", "mapOpt"));
+    setHtml($("mapBtns"), choiceButtons(maps, room.map || "forest", "mapOpt"));
 
-    var hostCanFill = isHost() && room.status === "lobby";
+    var hostCanFill = isHost() && room.status === "lobby" && !practice;
     function list(team) {
       var ids = teamIds(team), h = "";
       for (var i = 0; i < 3; i++) {
         var id = ids[i];
+        if (practice && id !== myId) id = null;
+        if (!id && practice) { h += '<div class="slot empty">없음</div>'; continue; }
         if (!id) {
           h += hostCanFill ? '<button type="button" class="slot empty addAi" data-ai-add="' + team + '">빈 자리<span class="aiAdd">🤖 AI 추가</span></button>'
                            : '<div class="slot empty">빈 자리</div>';
@@ -1479,10 +1595,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var imSpec = me.team === "spec";
     show($("btnJoinBlue"), me.team !== "blue"); $("btnJoinBlue").disabled = !canMoveTo("blue");
     show($("btnJoinRed"), me.team !== "red");   $("btnJoinRed").disabled = !canMoveTo("red");
-    var specs = teamIds("spec");
+    var specs = practice ? [] : teamIds("spec");
     setHtml($("listSpec"), (specs.length ? specs.map(function (id) { return (room.host === id ? "👑" : "") + esc(P[id].nickname) + (id === myId ? "(나)" : ""); }).join(", ") : '<span class="none">없음</span>') +
-            " (" + specs.length + "/" + SPEC_MAX + ")");
-    show($("btnSpec"), !imSpec); $("btnSpec").disabled = !canMoveTo("spec");
+            " (" + specs.length + "/" + (practice ? 0 : SPEC_MAX) + ")");
+    show($("btnSpec"), !imSpec); $("btnSpec").disabled = practice || !canMoveTo("spec");
     var cup = mode === "cup";
     show($("charCardBox"), cup || !imSpec);
     if (!cup && imSpec) setCharZoom(false);
@@ -1493,11 +1609,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
     var host = isHost(), ok = false, hint = "";
     if (!mode) hint = "게임 방식을 먼저 골라 주세요.";
-    else {
+    else if (practice) {
+      ok = isPlayingTeam(me.team);
+      hint = ok ? "연습 봇을 상대로 혼자 연습해요. 게임 시작을 누르면 연습장에 들어가요." : "블루팀이나 레드팀으로 이동해 주세요.";
+    } else {
       if (nb < 1 || nr < 1) hint = "양 팀에 1명 이상 있어야 시작할 수 있어요.";
       else { ok = true; hint = nb !== nr ? "인원이 달라요 (블루 " + nb + " vs 레드 " + nr + ") — 그래도 시작할 수 있어요." : "블루 " + nb + " vs 레드 " + nr; }
     }
-    if (!cup) ["blue", "red"].forEach(function (team) {
+    if (!cup && !practice) ["blue", "red"].forEach(function (team) {
       teamIds(team).forEach(function (id) {
         var c = P[id].characterType;
         if (ok && !P[id].isAI && takenInMatch(P, team, c, id)) { ok = false; hint = "같은 캐릭터(" + CHARS[c].name + ")를 2명 이상 골랐어요. 한 경기에서 같은 캐릭터는 1명만 고를 수 있어요."; }
@@ -1548,7 +1667,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   $("btnZoomChars").onclick = function () { setCharZoom(!$("charCardBox").classList.contains("zoomed")); };
   window.addEventListener("keydown", function (e) {
     if (e.key !== "Escape") return;
-    if (!$("statsModal").hidden) show($("statsModal"), false);
+    if (!$("pcModal").hidden) show($("pcModal"), false);
+    else if (vidOpen) { if (vidChar) showVideoList(); else closeVideos(); }
+    else if (!$("statsModal").hidden) show($("statsModal"), false);
     else if ($("charCardBox").classList.contains("zoomed")) setCharZoom(false);
   });
   var statsMode = "pvp", statsLoadSeq = 0;
@@ -1571,7 +1692,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   function loadStats() {
     var seq = ++statsLoadSeq;
-    setHtml($("statsModes"), MODES.map(function (m) {
+    setHtml($("statsModes"), STATS_MODES.map(function (m) {
       return '<button type="button" class="mini modeBtn' + (m.id === statsMode ? " on" : "") + '" data-id="' + m.id + '">' + m.name + "</button>";
     }).join(""));
     setHtml($("statsBody"), "");
@@ -1594,6 +1715,179 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var b = e.target.closest ? e.target.closest(".modeBtn") : null;
     if (b && b.getAttribute("data-id") !== statsMode) { statsMode = b.getAttribute("data-id"); loadStats(); }
   };
+  function basicDesc(k) {
+    var c = CHARS[k];
+    if (k === "warrior" || k === "knight" || k === "guardian") return "앞쪽 반경 " + c.range + "의 부채꼴 안의 적에게 " + c.dmg + "의 피해";
+    if (k === "duelist") return "앞으로 " + c.dashRange + " 돌진한 뒤 반경 " + c.range + " 안의 가장 가까운 적 1명을 찔러 " + c.dmg + "의 피해";
+    if (k === "hitman") return "앞으로 " + c.dashRange + " 돌진하며 폭 " + c.dashWidth + " 안의 적에게 " + c.dashDmg + "의 피해. 이어서 반경 " + c.range + "의 회전베기로 " + c.dmg + "의 피해";
+    if (k === "lancer") return "앞으로 길이 " + c.range + "·폭 " + c.width + "의 창 찌르기. 맞은 적은 " + c.dmg + "의 피해";
+    if (k === "blacksmith") return "앞쪽 길이 " + c.range + "·폭 " + c.width + "의 지역을 망치로 내려쳐 " + c.dmg + "의 피해";
+    if (k === "shaman") return "앞으로 사거리 " + c.range + "·폭 " + c.width + "의 검은 구름 파동. 맞은 적은 " + c.dmg + "의 피해";
+    if (k === "cleric") return "반경 " + c.range + " 안에서 체력 비율이 가장 낮은 아군 1명의 체력 " + c.graceHeal + " 회복";
+    if (k === "ranger") return "사거리 " + c.range + "의 화살 " + c.shots + "발을 연달아 발사. 한 발마다 " + c.dmg + "의 피해";
+    if (k === "thrower") return "사거리 " + c.minRange + "~" + c.range + "의 지정한 곳에 독병을 던져 " + secs(ULT.plDur) + "간 유지되는 반경 " + ULT.plR + "의 독 웅덩이 생성. 적은 1초당 " + c.dmg + "의 피해";
+    if (k === "rogue") return "가까운 적은 " + c.hits + "번 베어 한 번마다 " + c.dmg + "의 피해, 먼 적에게는 단검을 던져 " + c.throwDmg + "의 피해";
+    if (k === "crossbow") return "사거리 " + c.range + "의 볼트 발사. 맞은 적은 모두 " + c.dmg + "의 피해";
+    var shot = { mage: "불꽃 구슬", necro: "마법 구슬", frost: "얼음 구슬", sniper: "화살", dancer: "단검" }[k] || "투사체";
+    return "사거리 " + c.range + "의 " + shot + " 발사. 맞은 적은 " + c.dmg + "의 피해";
+  }
+  var VIDEOS = window.TEAM_BATTLE_VIDEOS || {};
+  var VIDEO_KINDS = [["basic", "기본 공격"], ["passive", "패시브"], ["skill", "스킬"]];
+  var vidOpen = false, vidChar = null;
+  function youtubeId(src) {
+    var m = String(src).match(/(?:youtu\.be\/|youtube(?:-nocookie)?\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/))([A-Za-z0-9_-]{11})/);
+    return m ? m[1] : (/^[A-Za-z0-9_-]{11}$/.test(src) ? src : null);
+  }
+  function videoSrc(k, kind) { return String((VIDEOS[k] && VIDEOS[k][kind]) || "").trim(); }
+  function videoCount(k) { return VIDEO_KINDS.filter(function (v) { return videoSrc(k, v[0]); }).length; }
+  function videoHtml(src) {
+    if (!src) return '<div class="vpNone">영상 준비 중</div>';
+    var yt = youtubeId(src);
+    if (yt) return '<button type="button" class="vpYt" data-yt="' + yt + '" aria-label="영상 재생" style="background-image:url(https://i.ytimg.com/vi/' + yt + '/hqdefault.jpg)"><i>▶</i></button>';
+    return '<video src="' + esc(src) + '" controls playsinline preload="metadata"></video>';
+  }
+  function stopVideos(except) {
+    [].forEach.call($("vpDetail").querySelectorAll(".vpPlayer"), function (box) {
+      if (box === except) return;
+      var frame = box.querySelector("iframe");
+      if (frame) box.innerHTML = videoHtml(frame.getAttribute("data-yt"));
+      var vid = box.querySelector("video");
+      if (vid && !vid.paused) vid.pause();
+    });
+  }
+  function playYoutube(btn) {
+    var box = btn.parentNode, id = btn.getAttribute("data-yt");
+    stopVideos(box);
+    box.innerHTML = '<iframe data-yt="' + id + '" src="https://www.youtube-nocookie.com/embed/' + id + "?autoplay=1&rel=0&playsinline=1&loop=1&playlist=" + id +
+      '" title="캐릭터 영상" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>';
+  }
+  var INGAME_SRC = {}, INGAME_W = 360, INGAME_H = 360;
+  function idleClipOf(c) {
+    if (c === "ranger") return "Ranged_Bow_Idle";
+    if (c === "sniper" || c === "crossbow") return "Ranged_2H_Aiming";
+    if (c === "lancer" || c === "guardian") return "Melee_2H_Idle";
+    return "Idle_A";
+  }
+  function ingameShot(c) {
+    if (INGAME_SRC[c] || !renderer || !KIT.ready) return INGAME_SRC[c] || "";
+    var rt = new THREE.WebGLRenderTarget(INGAME_W, INGAME_H);
+    rt.texture.colorSpace = THREE.SRGBColorSpace;
+    var sc = new THREE.Scene();
+    sc.background = new THREE.Color(GRASS_LOOK.floor[0]);
+    sc.add(new THREE.AmbientLight(0xffffff, GRASS_LOOK.ambient));
+    var dl = new THREE.DirectionalLight(0xffffff, GRASS_LOOK.sunI); dl.position.set(-400, 900, 300); sc.add(dl);
+    var body = SkeletonUtils.clone(KIT.chars[c]);
+    body.rotation.y = Math.PI / 2 - (Math.PI / 2 + 0.55); body.scale.setScalar(MODEL_SCALE);
+    var mix = new THREE.AnimationMixer(body), clip = KIT.clips[idleClipOf(c)] || KIT.clips.Idle_A;
+    mix.clipAction(clip).play(); mix.update(0.3);
+    sc.add(body);
+    var shadow = flatMesh(GEO.shadow, shadowMat); shadow.position.y = 0.6; sc.add(shadow);
+    var disc = new THREE.Mesh(GEO.teamDisc, teamDiscMats.blue);
+    var ring = flatMesh(GEO.ring, new THREE.MeshBasicMaterial({ color: C_TEAM.blue, transparent: true, depthWrite: false })); ring.position.y = 1.2;
+    ring.add(disc); disc.position.set(0, 0, -0.1); sc.add(ring);
+    var cam = new THREE.PerspectiveCamera(CAM_FOV, INGAME_W / INGAME_H, 1, 3000), dist = 250;
+    cam.position.set(0, Math.sin(CAM.pitchPlay) * dist + 50, Math.cos(CAM.pitchPlay) * dist);
+    cam.lookAt(0, 58, 0);
+    var oldClear = renderer.getClearColor(new THREE.Color()), oldAlpha = renderer.getClearAlpha();
+    renderer.setRenderTarget(rt); renderer.clear(); renderer.render(sc, cam);
+    var buf = new Uint8Array(INGAME_W * INGAME_H * 4);
+    renderer.readRenderTargetPixels(rt, 0, 0, INGAME_W, INGAME_H, buf);
+    renderer.setRenderTarget(null); renderer.setClearColor(oldClear, oldAlpha);
+    rt.dispose(); ring.material.dispose();
+    var cvs = document.createElement("canvas"); cvs.width = INGAME_W; cvs.height = INGAME_H;
+    var g2 = cvs.getContext("2d"), img = g2.createImageData(INGAME_W, INGAME_H);
+    for (var y = 0; y < INGAME_H; y++) img.data.set(buf.subarray((INGAME_H - 1 - y) * INGAME_W * 4, (INGAME_H - y) * INGAME_W * 4), y * INGAME_W * 4);
+    g2.putImageData(img, 0, 0);
+    tmpV.set(0, HEAD_Y, 0).project(cam);
+    var hx = (tmpV.x + 1) / 2 * INGAME_W, top = (1 - tmpV.y) / 2 * INGAME_H - 4, bw = 62, bh = 7, name = CHARS[c].name;
+    g2.font = "800 13px " + FONT; g2.textAlign = "center"; g2.textBaseline = "middle";
+    var tw = Math.max(40, g2.measureText(name).width + 16);
+    g2.fillStyle = "#2F6FD6"; roundRect(g2, hx - tw / 2, top - 22, tw, 18, 9); g2.fill();
+    g2.lineWidth = 1.5; g2.strokeStyle = "rgba(255,255,255,.55)"; g2.stroke();
+    g2.fillStyle = "#FFFFFF"; g2.fillText(name, hx, top - 12);
+    g2.fillStyle = "rgba(10,14,12,.85)"; roundRect(g2, hx - bw / 2 - 2, top - 2, bw + 4, bh + 11, 3); g2.fill();
+    g2.strokeStyle = "#2F6FD6"; g2.stroke();
+    g2.fillStyle = "#4CC27E"; g2.fillRect(hx - bw / 2, top, bw, bh);
+    g2.fillStyle = "#F2C230"; g2.fillRect(hx - bw / 2, top + bh + 3, bw * 0.6, 4);
+    INGAME_SRC[c] = cvs.toDataURL("image/png");
+    return INGAME_SRC[c];
+  }
+  function roundRect(g2, x, y, w, h, r) {
+    g2.beginPath();
+    g2.moveTo(x + r, y); g2.arcTo(x + w, y, x + w, y + h, r); g2.arcTo(x + w, y + h, x, y + h, r);
+    g2.arcTo(x, y + h, x, y, r); g2.arcTo(x, y, x + w, y, r); g2.closePath();
+  }
+  function videoListHtml() {
+    return ROLE_LIST.map(function (r) {
+      var R = ROLES[r], list = charsInRole(r);
+      if (!list.length) return "";
+      return '<div class="roleRow"><div class="roleTag"><i>' + R.icon + "</i><b>" + R.name + '</b></div><div class="vpChars">' + list.map(function (k) {
+        var n = videoCount(k);
+        return '<button type="button" class="vpChar" data-c="' + k + '"><img alt="" src="' + charImgSrc(k) + '"><b>' + CHARS[k].name + "</b>" +
+               '<small class="' + (n ? "has" : "") + '">' + (n ? "영상 " + n + "/" + VIDEO_KINDS.length : "영상 준비 중") + "</small></button>";
+      }).join("") + "</div></div>";
+    }).join("");
+  }
+  function videoDetailHtml(k) {
+    var c = CHARS[k], shot = ingameShot(k), i = CHAR_LIST.indexOf(k);
+    var descs = { basic: basicDesc(k), passive: passiveDesc(k) || "없음", skill: ultDesc(k) };
+    return '<div class="vpDetHead"><button type="button" class="mini" data-vp="list">← 목록</button>' +
+      '<div class="vpName">' + c.icon + " " + c.name + "<small>" + ROLES[c.role].name + "</small></div>" +
+      '<div class="vpNav"><button type="button" class="mini" data-vp="' + CHAR_LIST[(i + CHAR_LIST.length - 1) % CHAR_LIST.length] + '">◀ 이전</button>' +
+      '<button type="button" class="mini" data-vp="' + CHAR_LIST[(i + 1) % CHAR_LIST.length] + '">다음 ▶</button></div></div>' +
+      '<div class="vpTop">' +
+        '<div class="vpBox"><h4>상세 스펙</h4>' + statTable(k) + '<div class="vpGauge">' + ROLES[c.role].name + " · " + roleGaugeText(ROLES[c.role]) + "</div></div>" +
+        '<div class="vpBox"><h4>초상화</h4><div class="vpPic"><img alt="" src="' + charImgSrc(k) + '"></div></div>' +
+        '<div class="vpBox"><h4>인게임 모습</h4><div class="vpPic">' + (shot ? '<img class="fill" alt="" src="' + shot + '">' : "<span>캐릭터 모델을 불러오는 중이에요</span>") + "</div></div>" +
+      "</div>" +
+      '<div class="vpVids">' + VIDEO_KINDS.map(function (v) {
+        return '<div class="vpVid"><h4>' + v[1] + (v[0] === "skill" ? "<small>" + c.ultName + "</small>" : "") + "</h4>" +
+               '<div class="vpPlayer">' + videoHtml(videoSrc(k, v[0])) + "</div><p>" + descs[v[0]] + "</p></div>";
+      }).join("") + "</div>";
+  }
+  function showVideoList() {
+    vidChar = null;
+    stopVideos();
+    setHtml($("vpDetail"), "");
+    show($("vpDetail"), false); show($("vpList"), true);
+    setHtml($("vpList"), videoListHtml());
+  }
+  function showVideoChar(k) {
+    if (!CHARS[k]) return;
+    vidChar = k;
+    $("vpDetail").innerHTML = videoDetailHtml(k); $("vpDetail")._h = null;
+    show($("vpList"), false); show($("vpDetail"), true);
+    $("vidPage").scrollTop = 0;
+  }
+  function openVideos() {
+    vidOpen = true;
+    show($("statsModal"), false);
+    show($("vidPage"), true);
+    showVideoList();
+    $("vidPage").scrollTop = 0;
+  }
+  function closeVideos() {
+    if (!vidOpen) return;
+    vidOpen = false;
+    stopVideos();
+    $("vpDetail").innerHTML = ""; $("vpDetail")._h = null;
+    show($("vidPage"), false);
+  }
+  $("btnVideos").onclick = openVideos;
+  $("btnVidClose").onclick = closeVideos;
+  $("vpList").onclick = function (e) {
+    var b = e.target.closest ? e.target.closest(".vpChar") : null;
+    if (b) showVideoChar(b.getAttribute("data-c"));
+  };
+  $("vpDetail").onclick = function (e) {
+    var yt = e.target.closest ? e.target.closest(".vpYt") : null;
+    if (yt) { playYoutube(yt); return; }
+    var nav = e.target.closest ? e.target.closest("[data-vp]") : null;
+    if (!nav) return;
+    var to = nav.getAttribute("data-vp");
+    if (to === "list") showVideoList(); else { stopVideos(); showVideoChar(to); }
+  };
+  $("vpDetail").addEventListener("play", function (e) { if (e.target.tagName === "VIDEO") stopVideos(e.target.parentNode); }, true);
   function freeAiName(ps) {
     var used = keys(ps).map(function (id) { return ps[id] && ps[id].nickname; }), n = 1;
     while (used.indexOf("AI" + n) >= 0) n++;
@@ -1643,9 +1937,24 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   $("joinCode").onkeydown = function (e) { if (e.key === "Enter") joinRoom(); };
   $("btnStart").onclick = startGame;
 
-  function spawnOf(team, slot) {
-    var x = SPAWN_X[slot - 1];
-    return { x: team === "blue" ? MW - x : x, y: SPAWN_Y[team], angle: team === "blue" ? Math.PI / 2 : -Math.PI / 2 };
+  function spawnOf(team, slot, arena) {
+    var x = SPAWN_X[slot - 1], map = MAPS[arena || ARENA], sy = (map && map.spawnY) || SPAWN_Y;
+    return { x: team === "blue" ? MW - x : x, y: sy[team], angle: team === "blue" ? Math.PI / 2 : -Math.PI / 2 };
+  }
+  function practiceBotSpot(arena, playerTeam) {
+    if (MAPS[arena].practice) return { x: MW / 2, y: MH / 2 };
+    var map = fullMap(MAPS[arena].blueHalf), best = null, bestScore = Infinity;
+    function open(c, r) {
+      for (var dr = -1; dr <= 1; dr++) for (var dc = -1; dc <= 1; dc++) if (!map[r + dr] || map[r + dr].charAt(c + dc) !== ".") return false;
+      return true;
+    }
+    for (var r = 1; r < map.length - 1; r++) for (var c = 1; c < map[0].length - 1; c++) {
+      if (!open(c, r)) continue;
+      var x = tileX(c), y = tileY(r), towardPlayer = playerTeam === "blue" ? y - MH / 2 : MH / 2 - y;
+      var score = hyp(x - MW / 2, y - MH / 2) + towardPlayer * 0.05;
+      if (score < bestScore) { bestScore = score; best = { x: x, y: y }; }
+    }
+    return best || { x: MW / 2, y: MH / 2 };
   }
   function startGame() {
     if (!isHost() || room.status !== "lobby") return;
@@ -1656,14 +1965,20 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function launchMatch(charOf, countMs, arena) {
     var u = {}, roster = {}, st = {};
     ["blue", "red"].forEach(function (team) {
-      teamIds(team).slice(0, 3).forEach(function (id, i) {
-        var p = P[id], want = charOf(id), c = playable(want) ? want : "ranger";
-        var sp = spawnOf(team, i + 1), base = "players/" + id + "/";
+      teamIds(team).filter(function (id) { return !practiceMode() || id === myId; }).slice(0, 3).forEach(function (id, i) {
+        var p = P[id], want = charOf(id), c = pickable(want) ? want : "ranger";
+        var sp = spawnOf(team, i + 1, arena), base = "players/" + id + "/";
         u[base + "slot"] = i + 1; u[base + "characterType"] = c;
         st[stKey(team, i + 1)] = packState({ x: sp.x, y: sp.y, angle: sp.angle, mv: false, hp: CHARS[c].hp, alive: true, shield: !!CHARS[c].respawnShield });
         roster[id] = { team: team, c: c, ai: !!p.isAI };
       });
     });
+    if (practiceMode() && P[myId]) {
+      var botTeam = SWAPPED_TEAM[P[myId].team], spot = practiceBotSpot(arena, P[myId].team), mine = spawnOf(P[myId].team, 1, arena);
+      u["players/" + PRACTICE_BOT_ID] = { nickname: CHARS.dummy.name, isAI: true, practiceBot: true, team: botTeam, characterType: "dummy", joinedAt: now(), slot: 1 };
+      st[stKey(botTeam, 1)] = packState({ x: spot.x, y: spot.y, angle: Math.atan2(mine.y - spot.y, mine.x - spot.x), mv: false, hp: CHARS.dummy.hp, alive: true });
+      roster[PRACTICE_BOT_ID] = { team: botTeam, c: "dummy", ai: true };
+    }
     u.roster = roster; u.st = st; u.arena = arena; u.draft = null;
     u.status = "countdown"; u.startAt = now() + countMs; u.winner = null; u.final = null; u.statsNote = null; u.endedAt = null;
     u.shots = null; u.meleeHits = null; u.hits = null; u.effects = null; u.kills = null; u.projectiles = null;
@@ -1888,7 +2203,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
   function makeEnt(id, d) {
     var c = playable(d.characterType) ? d.characterType : "ranger", pos = stateOf(d), s = pos.full ? pos : {};
-    var E = { id: id, team: d.team, char: c, nickname: d.nickname, isAI: !!d.isAI,
+    var E = { id: id, team: d.team, char: c, nickname: d.nickname, isAI: !!d.isAI, practiceBot: c === "dummy",
              x: pos.x, y: pos.y, angle: pos.angle, hp: s.hp == null ? CHARS[c].hp : s.hp, maxHp: CHARS[c].hp,
              alive: s.alive !== false, gauge: s.gauge || 0, dmg: s.dmg || 0, deaths: s.deaths || 0, diedAt: s.diedAt || 0,
              cdUntil: 0, cdDur: 0, atkAt: 0, ultUntil: 0, buffUntil: 0, stealthUntil: s.stealthUntil || 0, regenUntil: 0,
@@ -3205,7 +3520,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
   function respawnIfReady(E, t) {
     if (E.alive || !E.diedAt || t < E.diedAt + RESPAWN_MS || !P[E.id] || !P[E.id].slot) return;
-    var sp = spawnOf(E.team, P[E.id].slot);
+    var sp = E.practiceBot && E.home ? { x: E.home.x, y: E.home.y, angle: E.angle } : spawnOf(E.team, P[E.id].slot);
     E.x = sp.x; E.y = sp.y; E.angle = sp.angle; E.mv = false;
     E.hp = E.maxHp; E.alive = true; E.protectUntil = t + RESPAWN_PROTECT_MS;
     E.cdUntil = 0; E.pending = null; E.burst = null; E.volley = null; E.slash = null;
@@ -3462,7 +3777,27 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (onDeck) return { x: best.x, y: best.y + (ty > best.y ? reach + 20 : -reach - 20) };
     return { x: best.x, y: best.y + (B.y < best.y ? -reach : reach) };
   }
+  function stepPracticeBot(B, dt) {
+    var t = now(), foe = ME;
+    B.mv = false;
+    if (!B.home) {
+      B.home = practiceBotSpot(ARENA, foe ? foe.team : SWAPPED_TEAM[B.team]);
+      if (!B.homeSet) { B.homeSet = true; B.x = B.home.x; B.y = B.home.y; }
+    }
+    if (!B.alive) return;
+    if (B.hpSeen !== undefined && B.hp < B.hpSeen) B.backAt = t + PRACTICE_BOT_RETURN_MS;
+    B.hpSeen = B.hp;
+    var dx = B.home.x - B.x, dy = B.home.y - B.y, away = hyp(dx, dy);
+    if (away < 6) { B.backAt = 0; if (foe && foe.alive) B.angle = Math.atan2(foe.y - B.y, foe.x - B.x); return; }
+    if (!B.backAt) B.backAt = t + PRACTICE_BOT_RETURN_MS;
+    if (t < B.backAt || stunned(B, t)) return;
+    var ox = B.x, oy = B.y;
+    moveEnt(B, dx / away * Math.min(1, away / 40), dy / away * Math.min(1, away / 40), dt);
+    B.mv = hyp(B.x - ox, B.y - oy) > 0.2;
+    if (B.mv) { B.moveAng = Math.atan2(B.y - oy, B.x - ox); B.moveAt = t; B.angle = B.moveAng; }
+  }
   function stepBot(B, dt) {
+    if (B.practiceBot) { stepPracticeBot(B, dt); return; }
     if (!B.alive || stunned(B)) { B.mv = false; return; }
     var t = now(), c = charStats(B), k = B.bot, melee = isMelee(B.char);
     var enemies = [];
@@ -3644,7 +3979,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function hostJudge() {
     var t = now();
     if (room.status === "countdown" && t >= room.startAt && !G.playingSent) { G.playingSent = true; room.ref.update({ status: "playing" }); }
-    if (room.status !== "playing" || G.endSent || t < room.startAt) return;
+    if (room.status !== "playing" || G.endSent || t < room.startAt || room.mode === "practice") return;
     var s = teamTotals();
     var quitTeam = teamAllQuit();
     if (!quitTeam && t < room.startAt + MATCH_MS) return;
@@ -3761,9 +4096,61 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function restart() {
     if (!room || room.status !== "ended") return;
     if (room.endedAt && now() - room.endedAt < (room.statsNote === STATS_PENDING ? STATS_SETTLE_MS + 500 : 3500)) return;
-    room.ref.update({ status: "lobby", winner: null, final: null, statsNote: null, startAt: null, endedAt: null, roster: null, draft: null,
-                      st: null, done: null, shots: null, meleeHits: null, hits: null, effects: null, kills: null, projectiles: null });
+    backToLobby();
   }
+  function backToLobby() {
+    var u = { status: "lobby", winner: null, final: null, statsNote: null, startAt: null, endedAt: null, roster: null, draft: null,
+              st: null, done: null, shots: null, meleeHits: null, hits: null, effects: null, kills: null, projectiles: null };
+    if (P[PRACTICE_BOT_ID]) u["players/" + PRACTICE_BOT_ID] = null;
+    room.ref.update(u);
+  }
+  function leavePractice() {
+    if (!room || !practiceMode() || !isHost() || room.status === "lobby") return;
+    show($("pcModal"), false);
+    backToLobby();
+  }
+  function fillPracticeGauge() {
+    if (!practiceMode() || !ME || !ME.alive || skillActive(ME, now())) return;
+    ME.gauge = GAUGE_MAX; G.forceNet = true;
+  }
+  function practiceCharsHtml() {
+    return roleRowsHtml(function (k) {
+      return '<button type="button" class="dfCard' + (ME && ME.char === k ? " on" : "") + '" data-c="' + k + '"><img alt="" src="' + charImgSrc(k) + '"><div class="nm">' + CHARS[k].name + "</div></button>";
+    });
+  }
+  function openPracticeChars() {
+    if (!practiceMode() || !ME) return;
+    setHtmlKeepScroll($("pcChars"), practiceCharsHtml());
+    show($("pcModal"), true);
+  }
+  function changePracticeChar(c) {
+    if (!practiceMode() || !ME || !G || !pickable(c)) return;
+    var old = ME, d = Object.assign({}, P[myId], { characterType: c });
+    show($("pcModal"), false);
+    if (old.char === c) return;
+    P[myId] = d;
+    room.ref.child("players/" + myId + "/characterType").set(c);
+    if (room.roster && room.roster[myId]) room.ref.child("roster/" + myId + "/c").set(c);
+    var E = makeEnt(myId, d);
+    Object.assign(E, { x: old.x, y: old.y, angle: old.angle, alive: true, diedAt: 0, gauge: 0, minions: [], protectUntil: 0,
+                       stealthUntil: 0, skillUntil: 0, skillDur: 0, stunUntil: 0, slowUntil: 0, slowMul: 1, revealUntil: 0, burnUntil: 0,
+                       frostStacks: 0, frostStackAt: 0, lastStandUsed: false, rallyUsed: false, shield: !!CHARS[c].respawnShield,
+                       dmg: old.dmg, kills: old.kills, deaths: old.deaths, assists: old.assists, heal: old.heal });
+    E.maxHp = charStats(E).hp; E.hp = E.maxHp;
+    ME = E; lastHp[myId] = E.hp;
+    aim.id = null;
+    G.forceNet = true;
+    sfx("confirm");
+  }
+  $("btnPracChar").onclick = openPracticeChars;
+  $("btnPracGauge").onclick = fillPracticeGauge;
+  $("btnPracExit").onclick = leavePractice;
+  $("btnPcClose").onclick = function () { show($("pcModal"), false); };
+  $("pcModal").addEventListener("click", function (e) { if (e.target === $("pcModal")) show($("pcModal"), false); });
+  $("pcChars").onclick = function (e) {
+    var b = e.target.closest ? e.target.closest(".dfCard") : null;
+    if (b) changePracticeChar(b.getAttribute("data-c"));
+  };
   var specResultHeld = false;
   function holdSpecResult() { specResultHeld = true; setText($("btnAgain"), "대기실로"); }
   function releaseSpecResult() {
@@ -3904,10 +4291,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     windhill: Object.assign({}, GRASS_LOOK, { sky: 0x9CCBEA, outer: 0x7FA650, ambient: 1.75, sun: 0xFFF4DC, sunI: 2.35,
                                               floor: ["#98C660", "#A3CF69"], wallFloor: "#8A8466", hideFloor: "#4E8B35", rockShade: "58,96,34",
                                               flowers: ["rgba(255,255,255,.9)", "rgba(255,222,90,.9)", "rgba(246,166,196,.9)"],
-                                              noCenterMark: true, windy: true })
+                                              noCenterMark: true, windy: true }),
+    practice: Object.assign({}, GRASS_LOOK, { noCenterMark: true })
   };
   var ZONE_FLOOR = { blue: ["#92B4D6", "#9DBEDF"], red: ["#DCA293", "#E5AE9F"] };
-  function zoneOfRow(r) { return r < SPAWN_ROWS ? "blue" : (r >= MAP_ROWS - SPAWN_ROWS ? "red" : ""); }
+  function zoneOfRow(r) { return MAPS[ARENA].practice ? "" : r < SPAWN_ROWS ? "blue" : (r >= MAP_ROWS - SPAWN_ROWS ? "red" : ""); }
   function tileAt(c, r) { return c < 0 || r < 0 || c >= MAP_COLS || r >= MAP_ROWS ? "#" : MAP[r].charAt(c); }
   var FLOOR_TEX_SCALE = 1.2;
   function paintFloor(th) {
@@ -3919,7 +4307,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     g2.fillStyle = "#" + new THREE.Color(th.outer).getHexString(); g2.fillRect(0, 0, MW, MH);
     for (var r = 0; r < MAP_ROWS; r++) for (var c = 0; c < MAP_COLS; c++) {
       var x = MAP_X0 + c * TILE, y = MAP_Y0 + r * TILE, ch = MAP[r].charAt(c), odd = (r + c) % 2, zone = zoneOfRow(r);
-      g2.fillStyle = BLOCK_TILES.indexOf(ch) >= 0 ? (th.rockShade ? th.floor[odd] : th.wallFloor) : ch === '"' ? th.hideFloor : ch === "~" ? th.water : ch === "=" ? th.bridgeFloor :
+      if (ch === "o") continue;
+      g2.fillStyle = ROCK_TILES.indexOf(ch) >= 0 ? (th.rockShade ? th.floor[odd] : th.wallFloor) : ch === '"' ? th.hideFloor : ch === "~" ? th.water : ch === "=" ? th.bridgeFloor :
                      zone ? ZONE_FLOOR[zone][odd] : th.floor[odd];
       g2.fillRect(x, y, TILE, TILE);
       if (ch === "~") {
@@ -3951,13 +4340,16 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }
     }
     if (th.rockShade) paintRockShade(g2, th.rockShade);
+    var practice = !!MAPS[ARENA].practice;
     g2.strokeStyle = th.line; g2.lineWidth = 1;
-    for (var gx = 0; gx <= MAP_COLS; gx++) { g2.beginPath(); g2.moveTo(MAP_X0 + gx * TILE, MAP_Y0); g2.lineTo(MAP_X0 + gx * TILE, BOUND.b); g2.stroke(); }
-    for (var gy = 0; gy <= MAP_ROWS; gy++) { g2.beginPath(); g2.moveTo(MAP_X0, MAP_Y0 + gy * TILE); g2.lineTo(BOUND.r, MAP_Y0 + gy * TILE); g2.stroke(); }
-    var zoneH = TILE * SPAWN_ROWS;
-    g2.lineWidth = 4;
-    g2.strokeStyle = "rgba(95,162,255,.8)"; g2.beginPath(); g2.moveTo(MAP_X0, MAP_Y0 + zoneH); g2.lineTo(BOUND.r, MAP_Y0 + zoneH); g2.stroke();
-    g2.strokeStyle = "rgba(255,106,95,.8)"; g2.beginPath(); g2.moveTo(MAP_X0, BOUND.b - zoneH); g2.lineTo(BOUND.r, BOUND.b - zoneH); g2.stroke();
+    if (!practice) {
+      for (var gx = 0; gx <= MAP_COLS; gx++) { g2.beginPath(); g2.moveTo(MAP_X0 + gx * TILE, MAP_Y0); g2.lineTo(MAP_X0 + gx * TILE, BOUND.b); g2.stroke(); }
+      for (var gy = 0; gy <= MAP_ROWS; gy++) { g2.beginPath(); g2.moveTo(MAP_X0, MAP_Y0 + gy * TILE); g2.lineTo(BOUND.r, MAP_Y0 + gy * TILE); g2.stroke(); }
+      var zoneH = TILE * SPAWN_ROWS;
+      g2.lineWidth = 4;
+      g2.strokeStyle = "rgba(95,162,255,.8)"; g2.beginPath(); g2.moveTo(MAP_X0, MAP_Y0 + zoneH); g2.lineTo(BOUND.r, MAP_Y0 + zoneH); g2.stroke();
+      g2.strokeStyle = "rgba(255,106,95,.8)"; g2.beginPath(); g2.moveTo(MAP_X0, BOUND.b - zoneH); g2.lineTo(BOUND.r, BOUND.b - zoneH); g2.stroke();
+    }
     if (!th.noCenterMark) {
       g2.strokeStyle = "rgba(255,255,240,.45)"; g2.lineWidth = 5;
       g2.beginPath(); g2.moveTo(MAP_X0, MH / 2); g2.lineTo(BOUND.r, MH / 2); g2.stroke();
@@ -3995,6 +4387,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   function borderTiles() {
     var list = [];
+    if (MAPS[ARENA].practice) return list;
     for (var c = -1; c <= MAP_COLS; c++) { list.push([c, -1]); list.push([c, MAP_ROWS]); }
     for (var r = 0; r < MAP_ROWS; r++) { list.push([-1, r]); list.push([MAP_COLS, r]); }
     return list;
@@ -4018,7 +4411,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     return { mesh: boxField(b.tiles, 60, mat), mat: mat, full: 0.55 };
   }
   function buildSimpleArena(th) {
-    arenaGroup.add(boxField(tilesOf(BLOCK_TILES), 54, wallMat));
+    arenaGroup.add(boxField(tilesOf(ROCK_TILES), 54, wallMat));
     hideVolumes(th, th.dungeon ? shadowVolume : function (b) {
       var mat = new THREE.MeshLambertMaterial({ color: 0x3E8E41, transparent: true, opacity: 0.8, depthWrite: false });
       return { mesh: boxField(b.tiles, 40, mat), mat: mat, full: 0.8 };
@@ -4083,8 +4476,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var GEO = {
     body: new THREE.CapsuleGeometry(17, 34, 4, 12),
     nose: new THREE.ConeGeometry(8, 18, 10),
-    ring: new THREE.RingGeometry(24, 29, 36),
-    meRing: new THREE.RingGeometry(31, 34, 36),
+    ring: new THREE.RingGeometry(22, 31, 36),
+    teamDisc: new THREE.CircleGeometry(31, 36),
+    meRing: new THREE.RingGeometry(35, 41, 40),
     shadow: new THREE.CircleGeometry(24, 24),
     ball: new THREE.SphereGeometry(1, 12, 8),
     shaft: new THREE.BoxGeometry(30, 3, 3),
@@ -4099,7 +4493,47 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   GEO.trail.translate(-0.5, 0, 0);
   GEO.strip.translate(0.5, 0, 0);
   var shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.22, depthWrite: false });
-  var meRingMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, depthWrite: false });
+  var ME_COLOR = 0xFFD23F, ME_CSS = "#FFD23F", ME_OUTLINE_K = 0.045, ME_RIM_POWER = 2.0, ME_RIM_MIX = 0.6;
+  var meRingMat = new THREE.MeshBasicMaterial({ color: ME_COLOR, transparent: true, opacity: 0.95, depthWrite: false });
+  function glslVec3(v) { return "vec3(" + v.x.toFixed(4) + ", " + v.y.toFixed(4) + ", " + v.z.toFixed(4) + ")"; }
+  function meHullMat(geo) {
+    if (!geo.boundingBox) geo.computeBoundingBox();
+    var box = geo.boundingBox, mid = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3());
+    var grow = (Math.max(size.x, size.y, size.z) * ME_OUTLINE_K).toFixed(4), key = "meHull" + glslVec3(mid) + grow;
+    var mat = new THREE.MeshBasicMaterial({ color: ME_COLOR, side: THREE.BackSide });
+    mat.onBeforeCompile = function (sh) {
+      sh.vertexShader = sh.vertexShader.replace("#include <begin_vertex>",
+        "vec3 transformed = vec3( position ) + normalize( position - " + glslVec3(mid) + " + vec3( 0.0001 ) ) * " + grow + ";");
+    };
+    mat.customProgramCacheKey = function () { return key; };
+    return mat;
+  }
+  var teamDiscMats = {
+    blue: new THREE.MeshBasicMaterial({ color: C_TEAM.blue, transparent: true, opacity: 0.3, depthWrite: false }),
+    red: new THREE.MeshBasicMaterial({ color: C_TEAM.red, transparent: true, opacity: 0.3, depthWrite: false })
+  };
+  var ME_RIM_GLSL = "float meRim = pow(1.0 - clamp(abs(dot(normal, normalize(vViewPosition))), 0.0, 1.0), " + ME_RIM_POWER.toFixed(2) + ");\n" +
+    "outgoingLight = mix(outgoingLight, vec3(1.0, 0.82, 0.25), meRim * " + ME_RIM_MIX.toFixed(2) + ");\n#include <opaque_fragment>";
+  function addMeRim(mat) {
+    mat.onBeforeCompile = function (sh) { sh.fragmentShader = sh.fragmentShader.replace("#include <opaque_fragment>", ME_RIM_GLSL); };
+    mat.customProgramCacheKey = function () { return "meRim"; };
+  }
+  function addMeOutline(model, mats) {
+    var bodies = [], hulls = [];
+    model.traverse(function (o) { if (o.isSkinnedMesh) bodies.push(o); });
+    bodies.forEach(function (o) {
+      var shown = true;
+      for (var p = o; p; p = p.parent) if (!p.visible) shown = false;
+      if (!shown) return;
+      var mat = meHullMat(o.geometry), hull = new THREE.SkinnedMesh(o.geometry, mat);
+      hull.bind(o.skeleton, o.bindMatrix);
+      hull.position.copy(o.position); hull.quaternion.copy(o.quaternion); hull.scale.copy(o.scale);
+      hull.frustumCulled = false;
+      o.parent.add(hull);
+      hulls.push(hull); mats.push(mat);
+    });
+    return hulls;
+  }
   var SECTOR = {}, CRESCENT = {};
   function sectorGeo(radius, arc) {
     var k = Math.round(radius) + ":" + arc.toFixed(3);
@@ -4161,8 +4595,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
                recolor: [[1, 0, 1, "#FFFFFF", "#D6DAE2"], [1, 1, 1, "#FFFFFF", "#D6DAE2"], [0, 5, 1, "#D97B4F", "#9A4A28"], [0, 6, 1, "#F2F4F7", "#BFC5CE"],
                          [2, 3, 1, "#2B2F36", "#15171B"], [1, 7, 1, "#F2F4F7", "#BFC5CE"], [2, 7, 1, "#F2F4F7", "#BFC5CE"]],
                ponytail: { hair: "#9B5A45", tie: "#FFFFFF" } },
-    crossbow: { file: "Skeleton_Warrior", right: "Skeleton_Crossbow", rightTurn: Math.PI / 2, muzzle: [0, 0.12, 1.12] }
+    crossbow: { file: "Skeleton_Warrior", right: "Skeleton_Crossbow", rightTurn: Math.PI / 2, muzzle: [0, 0.12, 1.12] },
+    dummy:   { file: "Knight" }
   };
+  var MODEL_CHARS = CHAR_LIST.concat(["dummy"]);
   var MINION_MODEL = { file: "Skeleton_Minion", right: "Skeleton_Blade", scale: 0.9 };
   var PROP_FILES = { bushBig: "props/Bush_1_D_Color1.gltf",
                      blockA: "props/Rock_2_C_Color1.gltf", blockB: "props/Rock_2_D_Color1.gltf", treeA: "props/Tree_1_A_Color1.gltf", treeB: "props/Tree_2_B_Color1.gltf",
@@ -4234,14 +4670,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var loader = new GLTFLoader();
     function load(url) { return new Promise(function (ok, no) { loader.load(url, ok, undefined, no); }); }
     var weaponNames = [];
-    CHAR_LIST.forEach(function (c) { [MODEL[c].right, MODEL[c].left].forEach(function (w) { if (w && weaponNames.indexOf(w) < 0) weaponNames.push(w); }); });
+    MODEL_CHARS.forEach(function (c) { [MODEL[c].right, MODEL[c].left].forEach(function (w) { if (w && weaponNames.indexOf(w) < 0) weaponNames.push(w); }); });
     weaponNames.push("arrow_bow", "arrow_crossbow", "Skeleton_Arrow", "Skeleton_Arrow_Broken_Half", MINION_MODEL.right);
     var jobs = [load(KIT_DIR + "animations/teambattle_anims.glb?v=crossbow").then(function (g) { g.animations.forEach(function (clip) { KIT.clips[clip.name] = clip; }); })];
     weaponNames.forEach(function (w) { jobs.push(load(KIT_DIR + "props/" + w + ".gltf").then(function (g) { KIT.weapons[w] = lambertize(g.scene, w === MODEL.thrower.right); })); });
-    CHAR_LIST.forEach(function (c) { jobs.push(load(KIT_DIR + "characters/" + MODEL[c].file + ".glb").then(function (g) { KIT.chars[c] = lambertize(g.scene); })); });
+    MODEL_CHARS.forEach(function (c) { jobs.push(load(KIT_DIR + "characters/" + MODEL[c].file + ".glb").then(function (g) { KIT.chars[c] = lambertize(g.scene); })); });
     jobs.push(load(KIT_DIR + "characters/" + MINION_MODEL.file + ".glb").then(function (g) { KIT.chars.minion = lambertize(g.scene); }));
     Promise.all(jobs).then(function () {
-      CHAR_LIST.concat(["minion"]).forEach(function (c) {
+      MODEL_CHARS.concat(["minion"]).forEach(function (c) {
         var m = KIT.chars[c], spec = MODEL[c] || MINION_MODEL;
         if (spec.recolor) recolorSkin(m, spec.recolor);
         if (spec.wear) wearPart(m, KIT.chars[spec.wear.from], spec.wear.part);
@@ -4308,7 +4744,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     function rockTile(c, r, hMin, hRange) {
       blocks[seeded() < 0.5 ? 0 : 1].push({ w: TILE * 1.08, h: hMin + seeded() * hRange, d: TILE * 1.08, x: tileX(c), z: tileY(r), yaw: quarterTurn() });
     }
-    tilesOf(BLOCK_TILES).forEach(function (tl) { rockTile(tl[0], tl[1], 56, 14); });
+    tilesOf(ROCK_TILES).forEach(function (tl) { rockTile(tl[0], tl[1], 56, 14); });
     borderTiles().forEach(function (tl) { rockTile(tl[0], tl[1], 44, 24); });
     g.add(instancedProp(P3.blockA, blocks[0]));
     g.add(instancedProp(P3.blockB, blocks[1]));
@@ -4589,9 +5025,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (!o.isMesh) return;
         o.frustumCulled = false;
         var m = made.get(o.material);
-        if (!m) { m = o.material.clone(); m.transparent = true; made.set(o.material, m); v.mats.push(m); v.glowMats.push(m); }
+        if (!m) { m = o.material.clone(); m.transparent = true; if (E.id === myId) addMeRim(m); made.set(o.material, m); v.mats.push(m); v.glowMats.push(m); }
         o.material = m;
       });
+      if (E.id === myId) v.hulls = addMeOutline(model, v.mats);
       body.add(model);
       v.kit = true; v.mixer = new THREE.AnimationMixer(model); v.actions = {};
       v.launchHand = E.char === "ranger" ? model.getObjectByName("handslotl") : (model.getObjectByName("muzzle") || (E.char === "rogue" || E.char === "hitman" || E.char === "dancer" ? model.getObjectByName("handslotr") : null));
@@ -4605,10 +5042,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     root.add(body);
     var shadow = flatMesh(GEO.shadow, shadowMat); shadow.position.y = 0.6; root.add(shadow);
+    var disc = new THREE.Mesh(GEO.teamDisc, teamDiscMats[E.team] || teamDiscMats.blue);
     var ringMat = new THREE.MeshBasicMaterial({ color: C_TEAM[E.team], transparent: true, depthWrite: false });
-    var ring = flatMesh(GEO.ring, ringMat); ring.position.y = 1.2; root.add(ring);
+    var ring = flatMesh(GEO.ring, ringMat); ring.position.y = 1.2; ring.add(disc); disc.position.set(0, 0, -0.1); root.add(ring);
     v.mats.push(ringMat); v.ring = ring;
-    var meRing = flatMesh(GEO.meRing, meRingMat); meRing.position.y = 1.4; meRing.visible = E.id === myId; root.add(meRing);
+    if (E.id === myId) { var meRing = flatMesh(GEO.meRing, meRingMat); meRing.position.y = 1.4; root.add(meRing); v.meRing = meRing; }
     if (E.char === "warrior") { v.aura = new THREE.Mesh(GEO.aura, auraMat); v.aura.visible = false; root.add(v.aura); }
     if (E.char === "duelist") { v.aura = new THREE.Mesh(GEO.aura, riposteAuraMat); v.aura.visible = false; root.add(v.aura); }
     if (E.char === "knight") { v.shield = makeShieldAura(); root.add(v.shield); }
@@ -5739,6 +6177,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (v.bladeRing.visible) v.bladeRing.userData.spin.rotation.y = -nowMs / 90;
       }
       v.ring.visible = E.alive;
+      if (v.meRing) { v.meRing.visible = E.alive; v.meRing.scale.setScalar(1 + 0.07 * Math.sin(nowMs / 160)); }
+      if (v.hulls) { var outlined = E.alive && alpha > 0.99; v.hulls.forEach(function (h) { h.visible = outlined; }); }
       if (E.alive) LABELS.push({ e: E, alpha: alpha, ally: ally });
     });
     keys(VIS).forEach(function (id) { if (!shown[id]) dropVis(id); });
@@ -5873,18 +6313,22 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var p = toScreen(E.x, HEAD_Y, E.y); if (!p) return;
     var bw = 62, bh = 7, x0 = p.x - bw / 2, top = p.y - 4, ratio = clamp(E.hp / E.maxHp, 0, 1);
     octx.save(); octx.globalAlpha = alpha;
-    drawStatus(E, p.x, top - 33);
+    drawStatus(E, p.x, top - (E === ME ? 52 : 33));
     octx.font = "800 13px " + FONT; octx.textAlign = "center"; octx.textBaseline = "middle";
-    var name = (E.nickname || "") + (ME ? "" : " · " + (E.kills || 0) + "킬"), tw = Math.max(40, octx.measureText(name).width + 16), ny = top - 13;
-    octx.fillStyle = "rgba(14,20,17,.78)"; pill(p.x - tw / 2, ny - 9, tw, 18, 9); octx.fill();
-    octx.lineWidth = 2; octx.strokeStyle = E.team === "blue" ? "#4C8DFF" : "#FF5A4E"; octx.stroke();
+    var mine = E === ME, teamCss = E.team === "blue" ? "#2F6FD6" : "#D6453D";
+    var name = E.nickname || "", tw = Math.max(40, octx.measureText(name).width + 16), ny = top - 13;
+    octx.fillStyle = teamCss; pill(p.x - tw / 2, ny - 9, tw, 18, 9); octx.fill();
+    octx.lineWidth = mine ? 3 : 1.5; octx.strokeStyle = mine ? ME_CSS : "rgba(255,255,255,.55)"; octx.stroke();
     octx.fillStyle = "#FFFFFF"; octx.fillText(name, p.x, ny + 1);
-    octx.fillStyle = "rgba(10,14,12,.85)"; pill(x0 - 2, top - 2, bw + 4, bh + 4, 3); octx.fill();
+    if (mine) drawMeArrow(p.x, ny - 14);
+    var frameH = bh + 4 + (ally ? 7 : 0);
+    octx.fillStyle = "rgba(10,14,12,.85)"; pill(x0 - 2, top - 2, bw + 4, frameH, 3); octx.fill();
+    octx.lineWidth = mine ? 2.5 : 1.5; octx.strokeStyle = mine ? ME_CSS : teamCss; octx.stroke();
     octx.fillStyle = ally ? (ratio < 0.3 ? "#F2A33A" : "#4CC27E") : "#E8505A";
     octx.fillRect(x0, top, bw * ratio, bh);
     octx.fillStyle = "rgba(255,255,255,.28)"; octx.fillRect(x0, top, bw * ratio, 2);
     octx.fillStyle = "rgba(10,14,12,.6)";
-    for (var hp = 50; hp < E.maxHp; hp += 50) octx.fillRect(x0 + bw * hp / E.maxHp, top, 1, bh);
+    if (E.maxHp <= 1000) for (var hp = 50; hp < E.maxHp; hp += 50) octx.fillRect(x0 + bw * hp / E.maxHp, top, 1, bh);
     if (E.char === "crossbow") drawBoltStacks(E, x0 - 5, top + bh / 2);
     if (ally) {
       var gy = top + bh + 3, full = E.gauge >= GAUGE_MAX, t = now(), act = skillActive(E, t);
@@ -5893,6 +6337,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       octx.fillRect(x0, gy, bw * (act ? skillLeft(E, t) : clamp(E.gauge / GAUGE_MAX, 0, 1)), 4);
     }
     octx.restore();
+  }
+  function drawMeArrow(x, y) {
+    var bob = 3 * Math.sin(Date.now() / 180);
+    octx.beginPath(); octx.moveTo(x - 8, y - 10 + bob); octx.lineTo(x + 8, y - 10 + bob); octx.lineTo(x, y + bob); octx.closePath();
+    octx.lineWidth = 3; octx.strokeStyle = "rgba(14,20,17,.85)"; octx.stroke();
+    octx.fillStyle = ME_CSS; octx.fill();
   }
   function drawBoltStacks(E, right, y) {
     var label = "(" + boltStacks(E) + ")";
@@ -6058,8 +6508,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var st = room.status;
     var left = st === "countdown" || t < room.startAt ? MATCH_MS : room.startAt + MATCH_MS - t;
     if (st === "ended") left = Math.max(0, Math.min(MATCH_MS, room.startAt + MATCH_MS - (room.endedAt || t)));
-    setText($("hudTimer"), fmtTime(left));
-    finalCountdown($("hudTimer"), st === "playing" ? left : 0);
+    var practice = room.mode === "practice";
+    setText($("hudTimer"), practice ? fmtTime(Math.floor(Math.max(0, t - room.startAt) / 1000) * 1000) : fmtTime(left));
+    finalCountdown($("hudTimer"), st === "playing" && !practice ? left : 0);
+    $("scrGame").classList.toggle("practice", practice);
+    show($("practiceBar"), practice && !!ME && st !== "ended");
+    show($("btnLeaveGame"), !practice);
     var s = teamTotals();
     setHtml($("hudCount"), '<span class="b">🔵 ' + s.blueAlive + '</span> vs <span class="r">🔴 ' + s.redAlive + "</span>");
     setText($("hudKillB"), String(s.blueKills)); setText($("hudKillR"), String(s.redKills));
@@ -6122,7 +6576,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     requestAnimationFrame(loop);
     var nowMs = Date.now(), frameMs = nowMs - lastFrame, dt = Math.min(0.05, frameMs / 1000); lastFrame = nowMs;
     spinMillBlades(dt);
-    if (!room || screenNow !== "game") { renderTour(nowMs, dt); adaptQuality(frameMs); return; }
+    if (!room || screenNow !== "game") { if (!vidOpen) { renderTour(nowMs, dt); adaptQuality(frameMs); } return; }
     var st = room.status;
     if ((st === "countdown" || st === "playing" || st === "ended") && room.startAt && (!G || G.startAt !== room.startAt)) {
       if (P[myId] && (P[myId].slot || isSpec())) initGame(); else return;
