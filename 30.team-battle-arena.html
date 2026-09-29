@@ -714,7 +714,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               bwR: 150, bwDur: 3000, bwTick: 250, bwHurtGaugeEvery: 4, bwDmg: 15, bwKillGauge: 5, bdR: 70, bdDmg: 10, bdDelay: 300,
               rmDur: 3000, rmRate: 3, rmDashMs: 300, rmDashRange: 100,
               tbCount: 3, tbSpread: 0.26,
-              dmR: 450, dmGrowMs: 1000, dmDur: 5000, dmStunMs: 500, dmBoltDmg: 40, dmStrikeDmg: 30, dmStunGraceMs: 40,
+              dmR: 450, dmGrowMs: 1500, dmDur: 5500, dmStunMs: 500, dmBoltDmg: 20, dmStrikeDmg: 30, dmStunGraceMs: 40,
               rvDur: 3000, rvTick: 1000, rvHeal: 30, rvDmg: 30, rvCastMs: 600, grLife: 650 };
   var ASSIST_MS = 5000;
   function boltStacks(E) {
@@ -1369,7 +1369,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "blacksmith") return "지정한 곳에 거리에 따라 " + num(ULT.bsLeapMinMs / 1000) + "~" + secs(ULT.bsLeapMaxMs) + " 뒤 착지. 반경 " + ULT.bsR + "의 적은 " + ULT.bsDmg + "의 피해를 입고 " + secs(ULT.bsStunMs) + "간 기절";
     if (k === "hitman") return "사거리 " + ULT.exRange + "의 칼날 발사. 처음 맞은 적은 " + ULT.exDmg + "의 피해를 입고 " + secs(ULT.exStunMs) + "간 기절, 그 위치로 순간이동";
     if (k === "guardian") return "자신을 중심으로 반경 " + ULT.gdR + "의 적을 모두 " + ULT.gdKb + "만큼 밀어냄";
-    if (k === "shaman") return "자신을 중심으로 " + secs(ULT.dmGrowMs) + "간 반경 " + ULT.dmR + "까지 커지고 " + secs(ULT.dmDur) + "간 유지되는 영역 생성. 영역이 커지는 과정에서 닿은 적은 " + secs(ULT.dmStunMs) +
+    if (k === "shaman") return "자신을 중심으로 " + secs(ULT.dmGrowMs) + "간 반경 " + ULT.dmR + "까지 커진 뒤 " + secs(ULT.dmDur - ULT.dmGrowMs) + "간 유지되는 영역 생성. 영역이 커지는 과정에서 닿은 적은 " + secs(ULT.dmStunMs) +
       " 기절하고 이후 " + ULT.dmBoltDmg + "의 피해. 영역 안에서 주술사의 기본 공격은 영역 내 가장 가까운 적 1명에게 " + ULT.dmStrikeDmg + "의 피해를 입힘";
     if (k === "priest") return "지정한 곳에 " + secs(ULT.bhDelay) + " 뒤 " + secs(ULT.bhDur) + "간 유지되는 반경 " + ULT.bhR + "의 블랙홀 생성. 적은 중심으로 끌려감";
     if (k === "cleric") return "아군의 체력을 " + CHARS.cleric.healGauge + " 회복시키면 사용 가능. 사용 시 자신의 체력을 모두 회복하고 " + secs(ULT.rvDur) + "간 제자리에서 기도. 아군 전체는 1초당 체력 " + ULT.rvHeal + " 회복, 적 전체는 1초당 " + ULT.rvDmg + "의 피해. 기절·넉백·끌어당김을 당하면 취소";
