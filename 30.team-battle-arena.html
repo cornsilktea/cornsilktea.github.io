@@ -745,9 +745,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
                rally: { hpRate: 0.5, ms: 5000, perSec: 10 }, ultName: "광폭화", heals: true },
     duelist: { name: "결투가", role: "fighter", icon: "🤺", hp: 220, speed: 250, cd: 1000, dmg: 30, range: 100,
                dashRange: 250, dashMs: 500, stab: true, selfHeal: 10, ultName: "르미즈", heals: true },
-    knight:  { name: "기사", role: "fighter", icon: "🛡️", hp: 400, speed: 200, cd: 1250, dmg: 25, range: 110, arc: Math.PI * 0.7, armor: 2, ultName: "방어태세", blocks: true },
+    knight:  { name: "기사", role: "fighter", icon: "🛡️", hp: 360, speed: 200, cd: 1250, dmg: 25, range: 110, arc: Math.PI * 0.7, armor: 2, ultName: "방어태세", blocks: true },
     ranger:  { name: "궁수", role: "shooter", icon: "🏹", hp: 100, speed: 200, haste: { add: 10, ms: 3000, max: 40 }, cd: 667, dmg: 15, range: 450, pSpeed: 532, pr: 12, shots: 2, gap: 70, ultName: "난사", ultAim: true },
-    mage:    { name: "화염술사", role: "caster", icon: "🔥", hp: 120, speed: 240, cd: 1000, dmg: 5, range: 350, pSpeed: 700, pr: 9, burn: { ms: 4000, perSec: 5 }, ultName: "메테오", ultAim: true },
+    mage:    { name: "화염술사", role: "caster", icon: "🔥", hp: 120, speed: 240, cd: 1000, dmg: 5, range: 350, pSpeed: 700, pr: 9, burn: { ms: 4000, perSec: 7 }, ultName: "메테오", ultAim: true },
     rogue:   { name: "은신자", role: "assassin", icon: "🗡️", hp: 110, speed: 250, ultSpeed: 400, cd: 833, dmg: 30, range: 110, arc: Math.PI * 0.6, hits: 2, hitGap: 160, ambushDmg: 45, throwDmg: 20, throwRange: 300, pSpeed: 900, pr: 8, ultName: "은신" },
     necro:   { name: "네크로", role: "caster", icon: "💀", hp: 120, lastStandHp: 50, lastStandHideMs: 1000, speed: 240, cd: 1000, dmg: 10, range: KEY * 4, pSpeed: 1000, pr: 9, ultName: "해골 소환", blocks: true },
     sniper:  { name: "저격수", role: "shooter", icon: "🎯", hp: 100, speed: 200, cd: 1250, dmg: 40, range: 700, pSpeed: 840, pr: 12, farDist: 500, farBonus: 0.5, ultName: "거대 화살", ultAim: true },
@@ -801,7 +801,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               bwR: 150, bwDur: 3000, bwTick: 250, bwHurtGaugeEvery: 4, bwDmg: 18, bwKillGauge: 5, bdR: 70, bdDmg: 10, bdDelay: 300,
               rmDur: 3000, rmRate: 3, rmDashMs: 300, rmDashRange: 100,
               tbCount: 3, tbSpread: 0.26,
-              dmR: 450, dmGrowMs: 1500, dmDur: 5500, dmStunMs: 1000, dmBoltDmg: 20, dmStrikeDmg: 35, dmStunGraceMs: 40, cuStacks: 3, cuBoomDmg: 30, cuBoomMs: 500, cuExpireMs: 3000,
+              dmR: 450, dmGrowMs: 1500, dmDur: 5500, dmStunMs: 1000, dmBoltDmg: 20, dmStrikeDmg: 35, dmStrikeStunMs: 500, dmStunGraceMs: 40, cuStacks: 3, cuBoomDmg: 30, cuBoomMs: 500, cuExpireMs: 3000,
               rvDur: 3000, rvTick: 1000, rvHeal: 30, rvDmg: 30, rvCastMs: 600, grLife: 650 };
   var ASSIST_MS = 5000;
   function boltStacks(E) {
@@ -1547,7 +1547,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "hitman") return "사거리 " + ULT.exRange + "의 칼날 발사. 처음 맞은 적은 " + ULT.exDmg + "의 피해를 입고 " + secs(ULT.exStunMs) + "간 기절, 그 위치로 순간이동";
     if (k === "guardian") return "자신을 중심으로 반경 " + ULT.gdR + "의 적을 모두 " + ULT.gdKb + "만큼 밀어내며 " + ULT.gdDmg + "의 피해. 밀려난 적은 " + secs(ULT.gdSlowMs) + "간 " + slowPct(ULT.gdSlowMul);
     if (k === "shaman") return "자신을 중심으로 " + secs(ULT.dmGrowMs) + "간 반경 " + ULT.dmR + "까지 커진 뒤 " + secs(ULT.dmDur - ULT.dmGrowMs) + "간 유지되는 영역 생성. 영역이 커지는 과정에서 닿은 적은 " + secs(ULT.dmStunMs) +
-      " 기절하고 이후 " + ULT.dmBoltDmg + "의 피해. 영역 안에서 주술사의 기본 공격은 영역 내 가장 가까운 적 1명에게 " + ULT.dmStrikeDmg + "의 피해를 입힘";
+      " 기절하고 이후 " + ULT.dmBoltDmg + "의 피해. 영역 안에서 주술사의 기본 공격은 영역 내 가장 가까운 적 1명에게 " + ULT.dmStrikeDmg + "의 피해를 입히고 " + secs(ULT.dmStrikeStunMs) + "간 기절";
     if (k === "priest") return "지정한 곳에 " + secs(ULT.bhDelay) + " 뒤 " + secs(ULT.bhDur) + "간 유지되는 반경 " + ULT.bhR + "의 블랙홀 생성. 적은 중심으로 끌려감";
     if (k === "cleric") return "아군의 체력을 " + CHARS.cleric.healGauge + " 회복시키면 사용 가능. 사용 시 자신의 체력을 모두 회복하고 " + secs(ULT.rvDur) + "간 제자리에서 기도. 아군 전체는 1초당 체력 " + ULT.rvHeal + " 회복, 적 전체는 1초당 " + ULT.rvDmg + "의 피해. 기절·넉백·끌어당김을 당하면 취소";
     if (k === "frost") return "자신을 중심으로 " + secs(ULT.frBzDur) + "간 유지되는 반경 " + ULT.frBzR + "의 눈보라 생성. 눈보라에서 아군은 은신 상태가 되고, 적은 1초당 " +
@@ -3321,7 +3321,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     E.angle = Math.atan2(T.y - E.y, T.x - E.x);
     revealBriefly(E.id, t);
     G.forceNet = true;
-    room.ref.child("effects").push({ type: "strike", team: E.team, owner: E.id, tgt: T.id, dmg: ULT.dmStrikeDmg, createdAt: t });
+    room.ref.child("effects").push({ type: "strike", team: E.team, owner: E.id, tgt: T.id, dmg: ULT.dmStrikeDmg, stun: ULT.dmStrikeStunMs, createdAt: t });
   }
   function onDomainStrike(e) {
     var t = now();
@@ -3332,7 +3332,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (!e.dmg || room.status !== "playing") return;
     localTargets().forEach(function (T) {
       if (T.id !== e.tgt || !T.alive || T.team === e.team) return;
-      damage(T, e.dmg, e.owner, e.createdAt);
+      damage(T, e.dmg, e.owner, e.createdAt, null, e.stun ? { stunMs: e.stun } : null);
       applyCurse(T, e.owner, now());
     });
   }

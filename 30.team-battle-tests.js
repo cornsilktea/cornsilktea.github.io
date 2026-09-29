@@ -579,6 +579,7 @@ function collectResults(api) {
       { id: "rg", team: "blue", char: "ranger", x: 250, y: y, gauge: api.GAUGE_MAX },
       { id: "foe", team: "red", char: "knight", x: 450, y: y }
     ]);
+    W.ent("foe").maxHp = W.ent("foe").hp = 1000;
     api.useUlt(W.ent("rg"), 0);
     W.step(api.ULT.mkCount * api.ULT.mkGap + 500);
     var g = W.ent("rg").gauge, hits = Math.round((W.ent("foe").maxHp - W.ent("foe").hp) / api.ULT.mkDmg);
@@ -1530,7 +1531,9 @@ function collectResults(api) {
     if (n0 - near.hp !== api.ULT.dmStrikeDmg) bad.push("따라온 영역 안 적 번개 피해 " + (n0 - near.hp));
     if (far.hp !== f0) bad.push("영역 밖 적이 맞음");
     if (near.curse !== 1) bad.push("영역 안 번개로 저주 1회여야 함: " + near.curse);
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "주술사가 움직이면 영역도 따라감, 늦게 들어온 적은 기절 없이 번개 " + api.ULT.dmStrikeDmg + " 피해");
+    var strikeStunLeft = near.stunUntil - W.t();
+    if (!api.stunned(near, W.t()) || Math.abs(strikeStunLeft - (api.ULT.dmStrikeStunMs - 100)) > 40) bad.push("번개 기절 남은 시간 " + Math.round(strikeStunLeft) + "ms");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "주술사가 움직이면 영역도 따라감, 늦게 들어온 적은 커질 때 기절 없이 번개 " + api.ULT.dmStrikeDmg + " 피해와 " + api.ULT.dmStrikeStunMs + "ms 기절");
   });
   run(SHAMAN, "영역전개: 영역 안의 네크로 해골도 번개 대상(가장 가까운 적)이 되는가", function (done) {
     var y = OPEN_Y.forest, W = shamanTeam([{ id: "nc", team: "red", char: "necro", x: 300, y: y + 340, gauge: api.GAUGE_MAX }]), sh = W.ent("sh"), nc = W.ent("nc"), near = W.ent("near");
