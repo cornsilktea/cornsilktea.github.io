@@ -160,7 +160,7 @@ export function createSim(api) {
   var sim = { results: [], done: false, error: null, startedAt: 0, options: {} };
   sim.run = function (games, seedBase, options) {
     sim.results = []; sim.done = false; sim.error = null; sim.startedAt = Date.now();
-    sim.options = { games: games, seedBase: seedBase || 5000, avoid: (options && options.avoid) || [] };
+    sim.options = { games: games, seedBase: seedBase || 5000, avoid: options && options.avoid ? options.avoid : DEFAULT_AVOID.slice() };
     var i = 0;
     function next() {
       try {
@@ -200,6 +200,7 @@ export function createSim(api) {
 }
 
 var AVOID_MAX_TRIES = 200;
+var DEFAULT_AVOID = ["ACF", "AAF", "AFF"];
 var WEAK_COMBO_MAX_WIN = 0.35;
 var WEAK_COMBO_MIN_TEAMS = 100;
 var ROLE_CODE = { fighter: "F", caster: "C", shooter: "S", assassin: "A" };
