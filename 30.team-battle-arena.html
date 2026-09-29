@@ -6164,6 +6164,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     };
   }
   if (/[?&]test(&|$)/.test(location.search)) import("./30.team-battle-tests.js?t=" + Date.now()).then(function (m) { m.runTeamBattleTests(testHooks()); });
+  if (/[?&]sim(&|$)/.test(location.search)) import("./30.team-battle-sim.js?t=" + Date.now()).then(function (m) { window.TB_SIM = m.createSim(testHooks()); });
 
   refreshNick();
   showScreen("start");
