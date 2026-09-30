@@ -12,7 +12,7 @@ window.TEAM_BATTLE_VIDEOS = {
   mage:       { name: "화염술사", basic: "https://youtu.be/5BTckSXMUyU", passive: "https://youtu.be/5BTckSXMUyU", skill: "https://youtu.be/tuIJSHKfht8" },
   ranger:     { name: "궁수",     basic: "https://youtu.be/4tlbQHbsqOA", passive: "https://youtu.be/4tlbQHbsqOA", skill: "" },
   sniper:     { name: "저격수",   basic: "", passive: "", skill: "" },
-  stormbow:   { name: "뇌전 사수", basic: "", passive: "", skill: "" },
+  stormbow:   { name: "뇌전사수", basic: "", passive: "", skill: "" },
   thrower:    { name: "투척병",   basic: "", passive: "", skill: "" },
   dancer:     { name: "검무희",   basic: "", passive: "", skill: "" },
   rogue:      { name: "은신자",   basic: "", passive: "", skill: "" },

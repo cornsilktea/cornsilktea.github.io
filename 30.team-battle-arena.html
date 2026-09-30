@@ -810,8 +810,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
                 fx: { slowMs: 1000, slowMul: 0.7 }, ultName: "창벽" },
     frost:   { name: "얼음술사", role: "caster", icon: "❄️", hp: 120, speed: 240, cd: 1000, dmg: 16, range: 350, pSpeed: 650, pr: 8, ultName: "눈보라" },
     dancer:  { name: "검무희", role: "assassin", icon: "🌸", hp: 110, speed: 250, ultSpeed: 300, cd: 833, dmg: 20, range: 350, pSpeed: 900, pr: 8, ultName: "칼날 폭풍" },
-    stormbow: { name: "뇌전 사수", role: "shooter", icon: "⚡", hp: 100, speed: 200, cd: 600, dmg: 10, range: 420, pSpeed: 750, pr: 10,
-                chain: { every: 3, r: 250, count: 2, dmg: 30 }, ultName: "과충전" },
+    stormbow: { name: "뇌전사수", role: "shooter", icon: "⚡", hp: 100, speed: 200, cd: 600, dmg: 10, range: 420, pSpeed: 750, pr: 10,
+                chain: { every: 3, r: 250, count: 2, dmg: 25 }, ultName: "과충전" },
     dummy:   { name: "연습 봇", role: "fighter", icon: "🎯", hp: 99999, speed: 200, cd: 1000, dmg: 0, range: 0, ultName: "없음", practiceBot: true },
     dummyAlly: { name: "아군 봇", role: "fighter", icon: "💚", hp: 500, speed: 200, cd: 1000, dmg: 0, range: 0, ultName: "없음", practiceBot: true }
   };
@@ -858,7 +858,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               frBzR: 400, frBzDur: 7000, frBzDmg: 12, frBzTick: 1000, frBzDelay: 400,
               bwR: 150, bwDur: 3000, bwTick: 250, bwHurtGaugeEvery: 4, bwDmg: 18, bwKillGauge: 5, bdR: 70, bdDmg: 10, bdDelay: 300,
               rmDur: 3000, rmRate: 3, rmDashMs: 300, rmDashRange: 100,
-              ocDur: 5000, ocRate: 1.5, ocR: 200, ocDmg: 30, ocStunMs: 1000, ocRingPts: 10, ocAiWaitMs: 3000,
+              ocDur: 5000, ocRate: 1.5, ocR: 200, ocDmg: 30, ocStunMs: 1000, ocRingPts: 10,
               dmR: 450, dmGrowMs: 1500, dmDur: 5500, dmStunMs: 1000, dmBoltDmg: 20, dmStrikeDmg: 35, dmStrikeFighterBonus: 15, dmStrikeStunMs: 500, dmStunGraceMs: 40, cuStacks: 3, cuBoomDmg: 30, cuBoomMs: 500, cuExpireMs: 3000,
               rvDur: 3000, rvTick: 1000, rvHeal: 30, rvDmg: 30, rvCastMs: 600, grLife: 650 };
   var ASSIST_MS = 5000;
@@ -4142,8 +4142,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (B.char === "thrower") { botThrow(B, target, enemies, t); return; }
     if (B.char === "cleric") { botCleric(B, enemies, t); return; }
     if (B.char === "lancer") { botLance(B, target, t); return; }
-    if (B.char === "stormbow") k.fullAt = B.gauge >= GAUGE_MAX ? k.fullAt || t : 0;
-    if (target && B.gauge >= GAUGE_MAX && t - k.seenAt > 500 && losClear(B.x, B.y, target.x, target.y) && (B.char !== "mage" || td <= ULT.mbCast) && (B.char !== "blacksmith" || td <= ULT.bsCast) && (CHARS[B.char].ultKind !== "blackhole" || td <= ULT.bhCast) && (B.char !== "shaman" || td <= ULT.dmR * 0.7) && (B.char !== "hitman" || td <= ULT.exRange) && (B.char !== "guardian" || td <= ULT.gdR) && (B.char !== "frost" || td <= ULT.frBzR * 0.8) && (B.char !== "dancer" || td <= ULT.bwR * 2) && (B.char !== "duelist" || td <= c.dashRange + c.range) && (B.char !== "stormbow" || td <= ULT.ocR || (td <= c.range && t - k.fullAt > ULT.ocAiWaitMs))) {
+    if (target && B.gauge >= GAUGE_MAX && t - k.seenAt > 500 && losClear(B.x, B.y, target.x, target.y) && (B.char !== "mage" || td <= ULT.mbCast) && (B.char !== "blacksmith" || td <= ULT.bsCast) && (CHARS[B.char].ultKind !== "blackhole" || td <= ULT.bhCast) && (B.char !== "shaman" || td <= ULT.dmR * 0.7) && (B.char !== "hitman" || td <= ULT.exRange) && (B.char !== "guardian" || td <= ULT.gdR) && (B.char !== "frost" || td <= ULT.frBzR * 0.8) && (B.char !== "dancer" || td <= ULT.bwR * 2) && (B.char !== "duelist" || td <= c.dashRange + c.range) && (B.char !== "stormbow" || td <= c.range)) {
       if (B.char === "blacksmith") {
         var drop = leadSpot(target, hammerLeapMs(td) / 1000, t);
         useUlt(B, Math.atan2(drop.y - B.y, drop.x - B.x), hyp(drop.x - B.x, drop.y - B.y)); return;

@@ -1166,12 +1166,12 @@ function collectResults(api) {
     done(got.join() === want.join() ? "pass" : "fail", "나온 순서 " + got.join(",") + " / 기대 " + want.join(","));
   });
 
-  var STORM = "뇌전 사수", SB = api.CHARS.stormbow, CH = SB.chain;
+  var STORM = "뇌전사수", SB = api.CHARS.stormbow, CH = SB.chain;
   function zapsOf(W, id) { return W.log.filter(function (p) { return p.path === "effects" && p.v.type === "zap" && p.v.owner === id; }); }
   function lostHp(W, id) { var E = W.ent(id); return E.maxHp - E.hp; }
   function inBush(W, ids) { return ids.filter(function (id) { return api.hiddenFrom(W.ent(id), W.t()); }); }
   function shootTimes(W, sb, n, ang) { for (var i = 0; i < n; i++) { api.fireBasic(sb, ang || 0); W.step(SB.cd + 100); } }
-  run(STORM, "뇌전 사수 기본 공격: 관통하지 않고 첫 적에서 멈추며, 게이지는 기본 적중만큼 오르는가", function (done) {
+  run(STORM, "뇌전사수 기본 공격: 관통하지 않고 첫 적에서 멈추며, 게이지는 기본 적중만큼 오르는가", function (done) {
     var y = OPEN_Y.forest;
     var W = world("forest", [
       { id: "sb", team: "blue", char: "stormbow", x: 150, y: y },
@@ -1183,7 +1183,7 @@ function collectResults(api) {
     var ok = a === SB.dmg && b === 0 && gauge === want;
     done(ok ? "pass" : "fail", "첫 적 " + a + " (기대 " + SB.dmg + "), 뒤의 적 " + b + " (기대 0), 게이지 " + gauge + " (기대 " + want + ")");
   });
-  run(STORM, "뇌전 사수 패시브: " + CH.every + "번째 적중마다 맞은 적과 그 주변 반경 " + CH.r + "의 가까운 적 " + CH.count + "명에게만 " + CH.dmg + "의 번개 피해가 들어가는가", function (done) {
+  run(STORM, "뇌전사수 패시브: " + CH.every + "번째 적중마다 맞은 적과 그 주변 반경 " + CH.r + "의 가까운 적 " + CH.count + "명에게만 " + CH.dmg + "의 번개 피해가 들어가는가", function (done) {
     var y = OPEN_Y.forest;
     var W = world("forest", [
       { id: "sb", team: "blue", char: "stormbow", x: 150, y: y },
@@ -1214,7 +1214,7 @@ function collectResults(api) {
     if (dealt !== dealtWant) bad.push("딜 기록 " + dealt + " (기대 " + dealtWant + ")");
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : CH.every + "번째 적중에 맞은 적과 가까운 두 적 " + CH.dmg + "씩, 세 번째·반경 밖은 제외, 딜 " + dealt);
   });
-  run(STORM, "뇌전 사수 패시브: 번개는 해골 병사에게도 튕기지만 해골로는 게이지가 오르지 않고, 적 캐릭터로는 오르는가", function (done) {
+  run(STORM, "뇌전사수 패시브: 번개는 해골 병사에게도 튕기지만 해골로는 게이지가 오르지 않고, 적 캐릭터로는 오르는가", function (done) {
     var y = OPEN_Y.forest;
     var W = world("forest", [
       { id: "sb", team: "blue", char: "stormbow", x: 150, y: y },
@@ -1239,7 +1239,7 @@ function collectResults(api) {
     if (gauge !== want) bad.push("게이지 " + gauge + " (기대 " + want + ": 기본 적중 + 맞은 적·적 캐릭터 번개, 해골 0)");
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "해골·적 캐릭터 모두 " + CH.dmg + " 피해, 게이지 " + gauge + "(해골 몫 0)");
   });
-  run(STORM, "뇌전 사수 패시브: 은신 중인 적·부활 보호 중인 적·아군에게는 튕기지 않는가", function (done) {
+  run(STORM, "뇌전사수 패시브: 은신 중인 적·부활 보호 중인 적·아군에게는 튕기지 않는가", function (done) {
     var y = OPEN_Y.forest;
     var W = world("forest", [
       { id: "sb", team: "blue", char: "stormbow", x: 150, y: y },
@@ -1264,7 +1264,7 @@ function collectResults(api) {
     if (lostHp(W, "seen") !== CH.dmg) bad.push("보이는 적 " + lostHp(W, "seen") + " (기대 " + CH.dmg + ")");
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "가까운 은신·보호·아군은 건너뛰고 더 먼 보이는 적에게만 " + CH.dmg);
   });
-  run(STORM, "뇌전 사수 스킬 과충전: " + api.ULT.ocDur / 1000 + "초간 매 적중마다 번개, 공격 간격 " + api.ULT.ocRate + "배 빠르게, 적중 수는 그대로 두는가", function (done) {
+  run(STORM, "뇌전사수 스킬 과충전: " + api.ULT.ocDur / 1000 + "초간 매 적중마다 번개, 공격 간격 " + api.ULT.ocRate + "배 빠르게, 적중 수는 그대로 두는가", function (done) {
     var y = OPEN_Y.forest, U = api.ULT;
     var W = world("forest", [
       { id: "sb", team: "blue", char: "stormbow", x: 150, y: y, gauge: api.GAUGE_MAX },
@@ -1302,7 +1302,7 @@ function collectResults(api) {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "과충전 중 매 적중 번개·대기시간 " + wantCd + "ms, 스킬 전 적중 수 " + before + " 그대로 이어서 " + CH.every + "번째에 발동");
   });
 
-  run(STORM, "뇌전 사수 스킬 번개 막: 쓰는 순간 반경 " + api.ULT.ocR + " 안의 적만 " + api.ULT.ocDmg + "의 피해와 " + api.ULT.ocStunMs / 1000 + "초 기절", function (done) {
+  run(STORM, "뇌전사수 스킬 번개 막: 쓰는 순간 반경 " + api.ULT.ocR + " 안의 적만 " + api.ULT.ocDmg + "의 피해와 " + api.ULT.ocStunMs / 1000 + "초 기절", function (done) {
     var y = OPEN_Y.forest, U = api.ULT;
     var W = world("forest", [
       { id: "sb", team: "blue", char: "stormbow", x: 300, y: y, gauge: api.GAUGE_MAX },
