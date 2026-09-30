@@ -811,7 +811,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     frost:   { name: "얼음술사", role: "caster", icon: "❄️", hp: 120, speed: 240, cd: 1000, dmg: 16, range: 350, pSpeed: 650, pr: 8, ultName: "눈보라" },
     dancer:  { name: "검무희", role: "assassin", icon: "🌸", hp: 110, speed: 250, ultSpeed: 300, cd: 833, dmg: 20, range: 350, pSpeed: 900, pr: 8, ultName: "칼날 폭풍" },
     stormbow: { name: "뇌전 사수", role: "shooter", icon: "⚡", hp: 100, speed: 200, cd: 600, dmg: 10, range: 420, pSpeed: 750, pr: 10,
-                chain: { every: 4, r: 250, count: 2, dmg: 30 }, ultName: "과충전" },
+                chain: { every: 3, r: 250, count: 2, dmg: 30 }, ultName: "과충전" },
     dummy:   { name: "연습 봇", role: "fighter", icon: "🎯", hp: 99999, speed: 200, cd: 1000, dmg: 0, range: 0, ultName: "없음", practiceBot: true },
     dummyAlly: { name: "아군 봇", role: "fighter", icon: "💚", hp: 500, speed: 200, cd: 1000, dmg: 0, range: 0, ultName: "없음", practiceBot: true }
   };
@@ -858,7 +858,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               frBzR: 400, frBzDur: 7000, frBzDmg: 12, frBzTick: 1000, frBzDelay: 400,
               bwR: 150, bwDur: 3000, bwTick: 250, bwHurtGaugeEvery: 4, bwDmg: 18, bwKillGauge: 5, bdR: 70, bdDmg: 10, bdDelay: 300,
               rmDur: 3000, rmRate: 3, rmDashMs: 300, rmDashRange: 100,
-              ocDur: 5000, ocRate: 1.5,
+              ocDur: 5000, ocRate: 1.5, ocR: 200, ocDmg: 30, ocStunMs: 1000, ocRingPts: 10, ocAiWaitMs: 3000,
               dmR: 450, dmGrowMs: 1500, dmDur: 5500, dmStunMs: 1000, dmBoltDmg: 20, dmStrikeDmg: 35, dmStrikeFighterBonus: 15, dmStrikeStunMs: 500, dmStunGraceMs: 40, cuStacks: 3, cuBoomDmg: 30, cuBoomMs: 500, cuExpireMs: 3000,
               rvDur: 3000, rvTick: 1000, rvHeal: 30, rvDmg: 30, rvCastMs: 600, grLife: 650 };
   var ASSIST_MS = 5000;
@@ -1604,7 +1604,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "frost") return "자신을 중심으로 " + secs(ULT.frBzDur) + "간 유지되는 반경 " + ULT.frBzR + "의 눈보라 생성. 눈보라 안의 아군은 은신 상태가 되고, 적은 1초당 " +
       ULT.frBzDmg + "의 피해를 입고 패시브 1중첩";
     if (k === "duelist") return secs(ULT.rmDur) + "간 초당 공격 " + ULT.rmRate + "회, 돌진 거리 " + ULT.rmDashRange + "·돌진 시간 " + secs(ULT.rmDashMs) + "로 단축. 사용 즉시 기본 공격 대기시간 초기화";
-    if (k === "stormbow") return secs(ULT.ocDur) + "간 초당 공격 " + num(1000 / CHARS.stormbow.cd * ULT.ocRate) + "회. 기본 공격이 적중할 때마다 패시브 번개 발동";
+    if (k === "stormbow") return "자신을 중심으로 반경 " + ULT.ocR + "의 번개 막 생성. 적은 " + ULT.ocDmg + "의 피해를 입고 " + secs(ULT.ocStunMs) + "간 기절. 이후 " + secs(ULT.ocDur) + "간 초당 공격 " +
+      num(1000 / CHARS.stormbow.cd * ULT.ocRate) + "회, 기본 공격이 적중할 때마다 패시브 번개 발동";
     if (k === "dancer") return secs(ULT.bwDur) + "간 회전하며 " + speedUp(CHARS.dancer) + ". 반경 " + ULT.bwR + "의 적은 " + secs(ULT.bwTick) + "마다 " + ULT.bwDmg + "의 피해. 기절·넉백을 당하면 취소";
     return "";
   }
@@ -1628,7 +1629,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "rogue") return "가까운 적은 근접 공격, 먼 적에게는 사거리 " + c.throwRange + "의 단검 투척";
     if (k === "hitman") return "기본 공격 시 " + c.dashRange + " 돌진 후 반경 " + c.range + " 회전베기";
     if (k === "duelist") return "기본 공격 시 " + secs(c.dashMs) + "간 " + c.dashRange + " 돌진 후 반경 " + c.range + "의 가장 가까운 적 1명을 찔러 " + c.dmg + "의 피해. 적중 시 체력 " + c.selfHeal + " 회복";
-    if (k === "stormbow") return "기본 공격이 " + c.chain.every + "번 적중할 때마다 맞은 적 주변 반경 " + c.chain.r + "의 가까운 적 " + c.chain.count + "명에게 번개가 튕겨 " + c.chain.dmg + "의 피해";
+    if (k === "stormbow") return "기본 공격이 " + c.chain.every + "번 적중할 때마다 맞은 적과 그 주변 반경 " + c.chain.r + "의 가까운 적 " + c.chain.count + "명에게 번개가 튕겨 " + c.chain.dmg + "의 피해";
     if (k === "dancer") return "던진 단검이 적에게 맞거나 사거리 끝에 닿은 곳에서 " + secs(ULT.bdDelay) + " 뒤 회전해 반경 " + ULT.bdR + "의 적에게 " + ULT.bdDmg + "의 피해. 적을 처치하면 게이지 " + ULT.bwKillGauge + " 회복, 스킬 중 처치는 스킬이 끝난 뒤 회복";
     return "";
   }
@@ -3236,7 +3237,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     var links = chainTargets(E, hit, now()), pts = [[hit.x, hit.y]];
     links.forEach(function (o) { pts.push([r1(o.x), r1(o.y)]); });
-    room.ref.child("effects").push({ type: "zap", team: E.team, owner: E.id, pts: pts, tgt: links.map(function (o) { return o.id; }), dmg: chain.dmg, over: over ? 1 : 0, createdAt: now() });
+    room.ref.child("effects").push({ type: "zap", team: E.team, owner: E.id, pts: pts, tgt: [hit.v].concat(links.map(function (o) { return o.id; })), dmg: chain.dmg, over: over ? 1 : 0, createdAt: now() });
   }
   function chainTargets(E, hit, t) {
     var chain = CHARS.stormbow.chain;
@@ -3570,7 +3571,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return o && o.alive && o.team !== E.team && visibleTo(o, E) && hyp(o.x - E.x, o.y - E.y) <= reach;
     });
   }
-  var MELEE_SPARK = { warrior: "#FF9A3C", knight: "#FFFFFF", duelist: "#FF3B3B", rogue: "#DCE3EC", necro: "#C9A6FF", lancer: "#FFD27A", blacksmith: "#FFB45A", priest: "#C9A6FF", shaman: "#8A1420", hitman: "#FF4A5A", guardian: "#8FD9A8" };
+  var MELEE_SPARK = { warrior: "#FF9A3C", knight: "#FFFFFF", duelist: "#FF3B3B", rogue: "#DCE3EC", necro: "#C9A6FF", lancer: "#FFD27A", blacksmith: "#FFB45A", priest: "#C9A6FF", shaman: "#8A1420", hitman: "#FF4A5A", guardian: "#8FD9A8", stormbow: "#FFE45C" };
   var HEAL_SPARK = "#7CFFB2";
   function inArc(T, d) {
     var dx = T.x - d.x, dy = T.y - d.y;
@@ -3675,6 +3676,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (d.u && hear(d)) sfx("boom");
     if (d.slam) boom(d.x, d.y, d.radius + BODY_R, d.team);
     if (d.hammer) thunder(d.x, d.y);
+    if (d.zap) zapBarrier(d.x, d.y, d.radius + BODY_R);
     participants().map(ent).concat(allMinions()).forEach(function (T) { strikeSpark(T, d, who); });
     localTargets().forEach(function (T) { strikeHit(T, d); strikeHeal(T, d); });
   }
@@ -3951,6 +3953,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       E.buffUntil = t + ULT.ocDur;
       E.skillDur = ULT.ocDur;
       E.cdUntil = Math.min(E.cdUntil, t + CHARS.stormbow.cd / ULT.ocRate);
+      room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(E.angle), radius: ULT.ocR, arc: Math.PI * 2,
+                                        dmg: ULT.ocDmg, u: 1, slam: 1, zap: 1, fx: { stunMs: ULT.ocStunMs }, createdAt: t });
+      revealBriefly(E.id, t);
     } else if (E.char === "dancer") {
       E.buffUntil = t + ULT.bwDur;
       E.skillDur = ULT.bwDur;
@@ -4137,7 +4142,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (B.char === "thrower") { botThrow(B, target, enemies, t); return; }
     if (B.char === "cleric") { botCleric(B, enemies, t); return; }
     if (B.char === "lancer") { botLance(B, target, t); return; }
-    if (target && B.gauge >= GAUGE_MAX && t - k.seenAt > 500 && losClear(B.x, B.y, target.x, target.y) && (B.char !== "mage" || td <= ULT.mbCast) && (B.char !== "blacksmith" || td <= ULT.bsCast) && (CHARS[B.char].ultKind !== "blackhole" || td <= ULT.bhCast) && (B.char !== "shaman" || td <= ULT.dmR * 0.7) && (B.char !== "hitman" || td <= ULT.exRange) && (B.char !== "guardian" || td <= ULT.gdR) && (B.char !== "frost" || td <= ULT.frBzR * 0.8) && (B.char !== "dancer" || td <= ULT.bwR * 2) && (B.char !== "duelist" || td <= c.dashRange + c.range) && (B.char !== "stormbow" || td <= c.range)) {
+    if (B.char === "stormbow") k.fullAt = B.gauge >= GAUGE_MAX ? k.fullAt || t : 0;
+    if (target && B.gauge >= GAUGE_MAX && t - k.seenAt > 500 && losClear(B.x, B.y, target.x, target.y) && (B.char !== "mage" || td <= ULT.mbCast) && (B.char !== "blacksmith" || td <= ULT.bsCast) && (CHARS[B.char].ultKind !== "blackhole" || td <= ULT.bhCast) && (B.char !== "shaman" || td <= ULT.dmR * 0.7) && (B.char !== "hitman" || td <= ULT.exRange) && (B.char !== "guardian" || td <= ULT.gdR) && (B.char !== "frost" || td <= ULT.frBzR * 0.8) && (B.char !== "dancer" || td <= ULT.bwR * 2) && (B.char !== "duelist" || td <= c.dashRange + c.range) && (B.char !== "stormbow" || td <= ULT.ocR || (td <= c.range && t - k.fullAt > ULT.ocAiWaitMs))) {
       if (B.char === "blacksmith") {
         var drop = leadSpot(target, hammerLeapMs(td) / 1000, t);
         useUlt(B, Math.atan2(drop.y - B.y, drop.x - B.x), hyp(drop.x - B.x, drop.y - B.y)); return;
@@ -5675,7 +5681,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var CLOUD_PUFFS = 16, CLOUD_LANES = [-1, 0.4, -0.4, 1, 0];
   function makeMeleeVis(d) {
     if (d.stab) return makeStabVis(d);
-    var g = new THREE.Group(), who = P[d.owner] ? P[d.owner].characterType : "", col = d.u ? 0xFF6A3D : (MELEE_COLOR[who] || 0xFFFFFF);
+    var g = new THREE.Group(), who = P[d.owner] ? P[d.owner].characterType : "", col = d.zap ? ZAP_GLOW : d.u ? 0xFF6A3D : (MELEE_COLOR[who] || 0xFFFFFF);
     var fillM = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.2, depthWrite: false });
     var darkWave = who === "shaman" && !d.u;
     if (darkWave) fillM.opacity = 0.35;
@@ -6163,6 +6169,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     FX.push({ k: "chain", pts: pts, over: over, t: Date.now(), life: CHAIN_LIFE });
     pts.forEach(function (p, i) { spark(p[0], p[1], i ? "#FFE45C" : "#8FD8FF", i ? 1.4 : 1.8); });
   }
+  var BARRIER_SEGS = 2;
+  function zapBarrier(x, y, r) {
+    var pts = [];
+    for (var i = 0; i <= ULT.ocRingPts; i++) { var a = i / ULT.ocRingPts * Math.PI * 2; pts.push([x + Math.cos(a) * r, y + Math.sin(a) * r]); }
+    FX.push({ k: "chain", pts: pts, over: 1, segs: BARRIER_SEGS, t: Date.now(), life: CHAIN_LIFE });
+  }
   function zigzagPath(g, a, b, segs, jitter, layers) {
     var dx = b.x - a.x, dz = b.z - a.z, L = Math.hypot(dx, dz) || 1, nx = -dz / L, nz = dx / L, prev = a.clone();
     for (var i = 1; i <= segs; i++) {
@@ -6178,7 +6190,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var core = new THREE.MeshBasicMaterial({ color: ZAP_CORE, transparent: true, depthWrite: false });
     for (var i = 1; i < f.pts.length; i++) {
       var a = new THREE.Vector3(f.pts[i - 1][0], CHAIN_Y, f.pts[i - 1][1]), b = new THREE.Vector3(f.pts[i][0], CHAIN_Y, f.pts[i][1]);
-      zigzagPath(g, a, b, CHAIN_SEGS, CHAIN_JITTER, [[glow, 12], [core, 3.4]]);
+      zigzagPath(g, a, b, f.segs || CHAIN_SEGS, CHAIN_JITTER, [[glow, 12], [core, 3.4]]);
     }
     g.userData.mats = [glow, core];
     scene.add(g);

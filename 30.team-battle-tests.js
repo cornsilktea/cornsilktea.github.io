@@ -1183,7 +1183,7 @@ function collectResults(api) {
     var ok = a === SB.dmg && b === 0 && gauge === want;
     done(ok ? "pass" : "fail", "첫 적 " + a + " (기대 " + SB.dmg + "), 뒤의 적 " + b + " (기대 0), 게이지 " + gauge + " (기대 " + want + ")");
   });
-  run(STORM, "뇌전 사수 패시브: " + CH.every + "번째 적중마다 맞은 적 주변 반경 " + CH.r + "의 가까운 적 " + CH.count + "명에게만 " + CH.dmg + "의 피해가 튕기는가", function (done) {
+  run(STORM, "뇌전 사수 패시브: " + CH.every + "번째 적중마다 맞은 적과 그 주변 반경 " + CH.r + "의 가까운 적 " + CH.count + "명에게만 " + CH.dmg + "의 번개 피해가 들어가는가", function (done) {
     var y = OPEN_Y.forest;
     var W = world("forest", [
       { id: "sb", team: "blue", char: "stormbow", x: 150, y: y },
@@ -1202,16 +1202,17 @@ function collectResults(api) {
     var zaps = zapsOf(W, "sb");
     if (zaps.length !== 1) bad.push("번개 효과 " + zaps.length + "번 (기대 1)");
     else if (zaps[0].v.pts.length !== CH.count + 1) bad.push("번개 선 꼭짓점 " + zaps[0].v.pts.length + " (기대 " + (CH.count + 1) + ")");
-    else if (zaps[0].v.tgt.join() !== "n1,n2") bad.push("튕긴 순서 " + zaps[0].v.tgt.join() + " (기대 n1,n2 가까운 순)");
+    else if (zaps[0].v.tgt.join() !== "tg,n1,n2") bad.push("번개 대상 " + zaps[0].v.tgt.join() + " (기대 tg,n1,n2 — 맞은 적 다음 가까운 순)");
     if (lostHp(W, "n1") !== CH.dmg || lostHp(W, "n2") !== CH.dmg) bad.push("가까운 두 적 " + lostHp(W, "n1") + "·" + lostHp(W, "n2") + " (기대 " + CH.dmg + "씩)");
     if (lostHp(W, "n3")) bad.push("세 번째로 가까운 적도 맞음 " + lostHp(W, "n3"));
     if (lostHp(W, "out")) bad.push("반경 밖 적이 맞음 " + lostHp(W, "out"));
-    var tgLost = lostHp(W, "tg"), tgWant = CH.every * Math.max(0, SB.dmg - api.CHARS.knight.armor);
-    if (tgLost !== tgWant) bad.push("맞은 적 본인 " + tgLost + " (기대 " + tgWant + ", 번개 제외)");
+    var armor = api.CHARS.knight.armor, tgLost = lostHp(W, "tg"), tgWant = CH.every * Math.max(0, SB.dmg - armor) + CH.dmg - armor;
+    if (tgLost !== tgWant) bad.push("맞은 적 본인 " + tgLost + " (기대 " + tgWant + ", 기본 " + CH.every + "발 + 번개 1번, 기사 패시브 적용)");
     if (sb.zapHits) bad.push("발동 뒤 적중 수가 0 으로 돌아가지 않음: " + sb.zapHits);
     var dealt = sb.dmg, dealtWant = tgWant + CH.dmg * CH.count;
+    if (lostHp(W, "n1") && zaps.length === 1 && zaps[0].v.tgt.indexOf("n3") >= 0) bad.push("세 번째 적이 대상에 들어감");
     if (dealt !== dealtWant) bad.push("딜 기록 " + dealt + " (기대 " + dealtWant + ")");
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : CH.every + "번째 적중에 가까운 두 적 " + CH.dmg + "씩, 세 번째·반경 밖·맞은 적 본인은 제외, 딜 " + dealt);
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : CH.every + "번째 적중에 맞은 적과 가까운 두 적 " + CH.dmg + "씩, 세 번째·반경 밖은 제외, 딜 " + dealt);
   });
   run(STORM, "뇌전 사수 패시브: 번개는 해골 병사에게도 튕기지만 해골로는 게이지가 오르지 않고, 적 캐릭터로는 오르는가", function (done) {
     var y = OPEN_Y.forest;
@@ -1232,10 +1233,10 @@ function collectResults(api) {
     sb.gauge = 0;
     api.fireBasic(sb, 0);
     W.step(500);
-    var gauge = sb.gauge, want = api.roleGauge("stormbow") * 2, bad = [];
+    var gauge = sb.gauge, want = api.roleGauge("stormbow") * 3, bad = [];
     if (minion.hp !== Math.max(0, m0 - CH.dmg)) bad.push("해골 체력 " + m0 + " → " + minion.hp + " (기대 " + CH.dmg + " 감소)");
     if (lostHp(W, "n1") !== CH.dmg) bad.push("적 캐릭터 번개 피해 " + lostHp(W, "n1"));
-    if (gauge !== want) bad.push("게이지 " + gauge + " (기대 " + want + ": 기본 적중 + 적 캐릭터 번개, 해골 0)");
+    if (gauge !== want) bad.push("게이지 " + gauge + " (기대 " + want + ": 기본 적중 + 맞은 적·적 캐릭터 번개, 해골 0)");
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "해골·적 캐릭터 모두 " + CH.dmg + " 피해, 게이지 " + gauge + "(해골 몫 0)");
   });
   run(STORM, "뇌전 사수 패시브: 은신 중인 적·부활 보호 중인 적·아군에게는 튕기지 않는가", function (done) {
@@ -1256,7 +1257,7 @@ function collectResults(api) {
     if (!api.hiddenFrom(hid, W.t())) { done("fail", "시험 준비 실패: 은신 상태가 아님"); return; }
     shootTimes(W, sb, 1);
     var zaps = zapsOf(W, "sb");
-    if (zaps.length !== 1 || zaps[0].v.tgt.join() !== "seen") bad.push("튕긴 대상 " + (zaps[0] ? zaps[0].v.tgt.join() : "없음") + " (기대 seen 하나)");
+    if (zaps.length !== 1 || zaps[0].v.tgt.join() !== "tg,seen") bad.push("번개 대상 " + (zaps[0] ? zaps[0].v.tgt.join() : "없음") + " (기대 tg,seen)");
     if (lostHp(W, "hid")) bad.push("은신한 적이 맞음 " + lostHp(W, "hid"));
     if (lostHp(W, "safe")) bad.push("부활 보호 중인 적이 맞음 " + lostHp(W, "safe"));
     if (lostHp(W, "ally")) bad.push("아군이 맞음 " + lostHp(W, "ally"));
@@ -1274,7 +1275,7 @@ function collectResults(api) {
     if (hidden.length) { done("fail", "시험 준비 실패: 부쉬 안 " + hidden.join()); return; }
     W.ent("tg").hp = W.ent("tg").maxHp = 5000;
     W.ent("n1").hp = W.ent("n1").maxHp = 5000;
-    shootTimes(W, sb, 2);
+    shootTimes(W, sb, CH.every - 2);
     var before = sb.zapHits;
     api.useUlt(sb, 0);
     if (sb.gauge !== 0) bad.push("스킬 뒤 게이지 " + sb.gauge);
@@ -1301,6 +1302,24 @@ function collectResults(api) {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "과충전 중 매 적중 번개·대기시간 " + wantCd + "ms, 스킬 전 적중 수 " + before + " 그대로 이어서 " + CH.every + "번째에 발동");
   });
 
+  run(STORM, "뇌전 사수 스킬 번개 막: 쓰는 순간 반경 " + api.ULT.ocR + " 안의 적만 " + api.ULT.ocDmg + "의 피해와 " + api.ULT.ocStunMs / 1000 + "초 기절", function (done) {
+    var y = OPEN_Y.forest, U = api.ULT;
+    var W = world("forest", [
+      { id: "sb", team: "blue", char: "stormbow", x: 300, y: y, gauge: api.GAUGE_MAX },
+      { id: "near", team: "red", char: "ranger", x: 300 + U.ocR - 20, y: y },
+      { id: "far", team: "red", char: "mage", x: 300, y: y + U.ocR + api.BODY_R + 60 },
+      { id: "ally", team: "blue", char: "sniper", x: 300, y: y - 120 }
+    ]);
+    var bad = [], near = W.ent("near"), t0 = W.t();
+    api.useUlt(W.ent("sb"), 0);
+    W.step(100);
+    if (lostHp(W, "near") !== U.ocDmg) bad.push("범위 안 적 " + lostHp(W, "near") + " (기대 " + U.ocDmg + ")");
+    if (!api.stunned(near, W.t()) || Math.abs(near.stunUntil - t0 - U.ocStunMs) > 40) bad.push("범위 안 적 기절 끝 " + Math.round(near.stunUntil - t0) + "ms (기대 " + U.ocStunMs + ")");
+    if (lostHp(W, "far") || api.stunned(W.ent("far"), W.t())) bad.push("범위 밖 적이 맞음");
+    if (lostHp(W, "ally") || api.stunned(W.ent("ally"), W.t())) bad.push("아군이 맞음");
+    if (W.ent("sb").gauge !== 0) bad.push("번개 막으로 게이지가 오름 " + W.ent("sb").gauge);
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "범위 안 적 " + U.ocDmg + " 피해·" + U.ocStunMs + "ms 기절, 범위 밖·아군은 그대로");
+  });
   var ASSIST = "어시스트", AMS = api.ASSIST_MS;
   run(ASSIST, "피해 어시스트: 쓰러지기 " + AMS / 1000 + "초 안에 피해를 준 사람만 어시스트, 처치한 사람은 처치만 오르는가", function (done) {
     var y = OPEN_Y.forest;
