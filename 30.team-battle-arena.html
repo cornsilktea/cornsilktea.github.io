@@ -1152,10 +1152,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var CLOCK = { off: null, samples: [], host: null, timer: null };
   var TEST_CLOCK = null;
   var TS = 1;
+  var DEFAULT_SLOW = 0.7;
   var SLOW_REQUEST = (function () {
     var m = /[?&]slow(?:=([0-9.]+))?(&|$)/.exec(location.search);
-    if (!m) return 1;
-    var v = m[1] ? parseFloat(m[1]) : 0.7;
+    if (!m) return /[?&]test(&|$)/.test(location.search) ? 1 : DEFAULT_SLOW;
+    var v = m[1] ? parseFloat(m[1]) : DEFAULT_SLOW;
     return v >= 0.3 && v < 1 ? v : 1;
   })();
   function realNow() { return Date.now() + (CLOCK.off === null || isHost() ? serverOffset : CLOCK.off); }
@@ -1302,7 +1303,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var code = String(10000 + Math.floor(Math.random() * 90000));
       var t = now();
       var me = newPlayer("blue", t);
-      var obj = { mode: "pvp", map: "forest", arena: "forest", status: "lobby", hostPlayerId: myId, createdAt: t, winner: null, players: {}, timeScale: SLOW_REQUEST < 1 ? SLOW_REQUEST : null };
+      var obj = { mode: "pvp", map: "forest", arena: "forest", status: "lobby", hostPlayerId: myId, createdAt: t, winner: null, players: {}, timeScale: SLOW_REQUEST };
       obj.players[myId] = me;
       db.ref(ROOT + "/" + code).transaction(function (cur) {
         if (cur !== null) return;
@@ -4414,7 +4415,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (mode !== "pvp" && mode !== "cup") return "이 모드는 통계를 모으지 않아요";
     if (!roster) return "참가자 정보를 못 받아서 통계에서 제외됐어요";
     if (isTestLink) return "배포용(테스트) 링크로 열어서 통계에서 제외됐어요";
-    if (TS !== 1) return "느린 진행 시험 경기라 통계에서 제외됐어요";
+    if (TS !== DEFAULT_SLOW) return "옛 속도(시험용) 경기라 통계에서 제외됐어요";
     var count = { blue: 0, red: 0 }, ids = keys(roster);
     for (var i = 0; i < ids.length; i++) {
       var id = ids[i], r = roster[id], d = ps[id];
