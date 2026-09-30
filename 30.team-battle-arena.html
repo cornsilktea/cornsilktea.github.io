@@ -1151,7 +1151,23 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var CLOCK_PINGS = 5, CLOCK_GAP_MS = 500, CLOCK_KEEP = 10;
   var CLOCK = { off: null, samples: [], host: null, timer: null };
   var TEST_CLOCK = null;
-  function now() { if (TEST_CLOCK !== null) return TEST_CLOCK; return Date.now() + (CLOCK.off === null || isHost() ? serverOffset : CLOCK.off); }
+  var TS = 1;
+  var SLOW_REQUEST = (function () {
+    var m = /[?&]slow(?:=([0-9.]+))?(&|$)/.exec(location.search);
+    if (!m) return 1;
+    var v = m[1] ? parseFloat(m[1]) : 0.7;
+    return v >= 0.3 && v < 1 ? v : 1;
+  })();
+  function realNow() { return Date.now() + (CLOCK.off === null || isHost() ? serverOffset : CLOCK.off); }
+  function now() {
+    if (TEST_CLOCK !== null) return TEST_CLOCK;
+    var real = realNow();
+    return TS !== 1 && room && room.startAt && real > room.startAt ? room.startAt + (real - room.startAt) * TS : real;
+  }
+  function applyTimeScale(v) {
+    TS = v > 0 && v < 1 ? +v : 1;
+    MATCH_MS = 90000 * TS; RESPAWN_MS = 3000 * TS; RESPAWN_PROTECT_MS = 2500 * TS;
+  }
   function clockBurst() {
     clearInterval(CLOCK.timer);
     var left = CLOCK_PINGS;
@@ -1165,7 +1181,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function onPing(s) {
     var v = s.val();
     if (!room || !isHost() || !v || !v.a) return;
-    room.ref.child("pong/" + s.key).set({ a: v.a, t: now(), h: myId });
+    room.ref.child("pong/" + s.key).set({ a: v.a, t: realNow(), h: myId });
   }
   function onPong(s) {
     var v = s.val(), got = Date.now();
@@ -1319,6 +1335,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     sub(ref.child("arena"), "value", function (s) { room.arena = s.val() || "forest"; syncArena(); });
     sub(ref.child("hostPlayerId"), "value", function (s) { room.host = s.val(); room.hostLoaded = true; hostChangedClock(room.host); checkHost(); playersChanged(); });
     sub(ref.child("startAt"), "value", function (s) { room.startAt = s.val() || 0; });
+    sub(ref.child("timeScale"), "value", function (s) { room.timeScale = s.val(); applyTimeScale(room.timeScale); });
     sub(ref.child("winner"), "value", function (s) { room.winner = s.val(); });
     sub(ref.child("bans"), "value", function (s) { room.bans = s.val(); });
     sub(ref.child("endedAt"), "value", function (s) { room.endedAt = s.val() || 0; });
@@ -1395,7 +1412,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (room) { leaving = true; unsubAll(); try { room.ref.child("players/" + myId).onDisconnect().cancel(); } catch (e) {} }
     room = null; resetLocal(); showScreen("start"); startMsg(msg || "");
   }
-  function resetLocal() { clear3d(); BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; STORMS = []; REVS = []; GRACES = []; DOMAINS = []; CURSES = {}; BLADE_SPINS = []; P = {}; R = {}; PR = {}; MELEE = {}; FX = []; G = null; ME = null; BOTS = {}; ST = {}; SHOTS = []; hitSubs = {}; joy.id = null; aim.id = null; specResultHeld = false; setText($("btnAgain"), "다시하기"); }
+  function resetLocal() { applyTimeScale(null); clear3d(); BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; STORMS = []; REVS = []; GRACES = []; DOMAINS = []; CURSES = {}; BLADE_SPINS = []; P = {}; R = {}; PR = {}; MELEE = {}; FX = []; G = null; ME = null; BOTS = {}; ST = {}; SHOTS = []; hitSubs = {}; joy.id = null; aim.id = null; specResultHeld = false; setText($("btnAgain"), "다시하기"); }
   window.addEventListener("pagehide", function () { saveResume(); if (room) { try { room.ref.child("players/" + myId).remove(); } catch (e) {} } });
   document.addEventListener("visibilitychange", function () { if (document.hidden) saveResume(); });
 
@@ -2159,7 +2176,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       });
     }
     u.roster = roster; u.st = st; u.arena = arena; u.draft = null; u.bans = bans && bans.length ? bans : null;
-    u.status = "countdown"; u.startAt = now() + countMs; u.winner = null; u.final = null; u.statsNote = null; u.endedAt = null;
+    u.status = "countdown"; u.startAt = realNow() + countMs; u.timeScale = SLOW_REQUEST < 1 ? SLOW_REQUEST : null; u.winner = null; u.final = null; u.statsNote = null; u.endedAt = null;
     u.shots = null; u.meleeHits = null; u.hits = null; u.effects = null; u.kills = null; u.projectiles = null;
     room.ref.update(u);
   }
@@ -2888,7 +2905,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (p.spun) return;
     p.spun = true;
     BLADE_SPINS.push({ d: p.d, x: x, y: y, at: now() + ULT.bdDelay });
-    FX.push({ k: "bladeZone", x: x, y: y, r: ULT.bdR, t: Date.now(), delay: ULT.bdDelay, life: ULT.bdDelay + 260 });
+    FX.push({ k: "bladeZone", x: x, y: y, r: ULT.bdR, t: Date.now(), delay: ULT.bdDelay / TS, life: (ULT.bdDelay + 260) / TS });
   }
   function stepBladeSpins(t) {
     BLADE_SPINS = BLADE_SPINS.filter(function (s) {
@@ -3015,7 +3032,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function pruneLocal(t) {
     keys(PR).forEach(function (id) { if (t - PR[id].d.createdAt > PR[id].life + 1000) delete PR[id]; });
     var ms = Date.now();
-    keys(MELEE).forEach(function (id) { if (ms - MELEE[id].at > 1000) delete MELEE[id]; });
+    keys(MELEE).forEach(function (id) { if ((ms - MELEE[id].at) * TS > 1000) delete MELEE[id]; });
   }
   function hear(E) { return ME && hyp(E.x - ME.x, E.y - ME.y) < 700; }
 
@@ -3723,7 +3740,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function meleeStrike(key, d) {
     var who = P[d.owner] ? P[d.owner].characterType : "";
     if (WAVE[who] && d.len) {
-      MELEE[key] = { d: d, at: Date.now() - Math.max(0, now() - d.createdAt) };
+      MELEE[key] = { d: d, at: Date.now() - Math.max(0, now() - d.createdAt) / TS };
       WAVES.push({ d: d, who: who, sparked: [], struck: [] });
       return;
     }
@@ -4340,6 +4357,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (mode !== "pvp" && mode !== "cup") return "이 모드는 통계를 모으지 않아요";
     if (!roster) return "참가자 정보를 못 받아서 통계에서 제외됐어요";
     if (isTestLink) return "배포용(테스트) 링크로 열어서 통계에서 제외됐어요";
+    if (TS !== 1) return "느린 진행 시험 경기라 통계에서 제외됐어요";
     var count = { blue: 0, red: 0 }, ids = keys(roster);
     for (var i = 0; i < ids.length; i++) {
       var id = ids[i], r = roster[id], d = ps[id];
@@ -4456,7 +4474,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     backToLobby();
   }
   function backToLobby() {
-    var u = { status: "lobby", winner: null, final: null, statsNote: null, startAt: null, endedAt: null, roster: null, draft: null, bans: null,
+    var u = { status: "lobby", winner: null, final: null, statsNote: null, startAt: null, timeScale: null, endedAt: null, roster: null, draft: null, bans: null,
               st: null, done: null, shots: null, meleeHits: null, hits: null, effects: null, kills: null, projectiles: null };
     PRACTICE_BOTS.forEach(function (b) { if (P[b.id]) u["players/" + b.id] = null; });
     room.ref.update(u);
@@ -5517,7 +5535,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
    if (hurt && E.alive && (!v.once || v.once.name === "Hit_A")) playOnce(v, "Hit_A", 1.6, t);
     v.wasStealth = stealthed(E, t);
-    var moved = hyp(E.x - v.px, E.y - v.py) / Math.max(dt, 0.001);
+    var gameDt = dt * TS;
+    var moved = hyp(E.x - v.px, E.y - v.py) / Math.max(gameDt, 0.001);
     v.px = E.x; v.py = E.y;
     v.speed += (moved - v.speed) * Math.min(1, dt * 10);
     if (v.once && v.once.next && t > v.once.until && E.alive) { playOnce(v, v.once.next[0], v.once.next[1], t); v.once.soft = true; }
@@ -5536,7 +5555,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       else if (E.mv && v.speed > 15) showClip(v, "Walking_A", clamp(v.speed / 110, 0.6, 1.4), true);
       else showClip(v, idleClipOf(E.char), 1, true);
     }
-    v.mixer.update(E.alive && frostFrozen(E, t) ? 0 : dt);
+    v.mixer.update(E.alive && frostFrozen(E, t) ? 0 : gameDt);
   }
   function animateMinion(v, M, t, dt) {
     if (!v.kit) return;
@@ -5551,7 +5570,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       else if (M.mv) showClip(v, "Skeletons_Walking", 1.4, true);
       else showClip(v, "Skeletons_Idle", 1, true);
     }
-    v.mixer.update(dt);
+    v.mixer.update(dt * TS);
   }
   function dropMinionVis(id, vanish) {
     var v = MVIS[id]; if (!v) return;
@@ -6169,7 +6188,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (ME && hyp(x - ME.x, y - ME.y) < 700) sfx("boom");
   }
   var NECRO_SMOKE_COLOR = 0x8A2A48;
-  function smoke(x, y, color) { FX.push({ k: "smoke", x: x, y: y, c: color || 0xC8C8CD, t: Date.now(), life: ULT.asSmokeMs + 150 }); }
+  function smoke(x, y, color) { FX.push({ k: "smoke", x: x, y: y, c: color || 0xC8C8CD, t: Date.now(), life: (ULT.asSmokeMs + 150) / TS }); }
   function boom(x, y, r, team) { FX.push({ k: "boom", x: x, y: y, r: r, c: C_FX[team] || 0xffffff, t: Date.now(), life: 450 }); }
   function floatText(x, y, text, color) { FX.push({ k: "txt", x: x, y: y, s: text, c: color, t: Date.now(), life: 800 }); }
   function orbHitColor(d) { return d.ownerCharacterType === "necro" || d.ownerCharacterType === "frost" || d.ownerCharacterType === "mage" || d.ownerCharacterType === "stormbow" ? hitColor(d) : (d.team === "blue" ? "#5FA2FF" : "#FF6A5F"); }
@@ -6673,7 +6692,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     keys(PRV).forEach(function (id) { if (!PR[id]) dropProjVis(id); });
 
     keys(MELEE).forEach(function (k) {
-      var m = MELEE[k], age = nowMs - m.at, g = MLV[k], wave = m.d.len && !m.d.stab ? WAVE[P[m.d.owner] ? P[m.d.owner].characterType : ""] : null, life = wave ? wave.life : m.d.stab ? STAB_VIS_MS : 240;
+      var m = MELEE[k], age = (nowMs - m.at) * TS, g = MLV[k], wave = m.d.len && !m.d.stab ? WAVE[P[m.d.owner] ? P[m.d.owner].characterType : ""] : null, life = wave ? wave.life : m.d.stab ? STAB_VIS_MS : 240;
       if (age > life) { if (g) dropMelee(k); return; }
       if (!g) g = MLV[k] = makeMeleeVis(m.d);
       var f = age / life;
@@ -6842,9 +6861,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       h += '<div class="spCard' + (E.alive ? "" : " dead") + '"><img alt="" src="' + charImgSrc(E.char, team) + '">' +
         '<div class="spInfo"><div class="spName">' + (E.isAI ? "🤖 " : "") + esc(E.nickname) + '<span class="spK">' + (E.kills || 0) + "킬</span><small>" + CHARS[E.char].name + "</small></div>" +
         '<div class="spBar hp' + (ratio < 0.3 ? " low" : "") + '"><i style="width:' + Math.round(ratio * 100) + '%"></i><span>' +
-          (E.alive ? "HP " + hp + " / " + E.maxHp : "부활까지 " + Math.max(1, Math.ceil((E.diedAt + RESPAWN_MS - now()) / 1000)) + "초") + "</span></div>" +
+          (E.alive ? "HP " + hp + " / " + E.maxHp : "부활까지 " + Math.max(1, Math.ceil((E.diedAt + RESPAWN_MS - now()) / TS / 1000)) + "초") + "</span></div>" +
         (act ? '<div class="spBar ult act"><i style="width:' + Math.round(skillLeft(E, tn) * 100) + '%"></i><span>' +
-                 CHARS[E.char].ultName + " " + Math.ceil((E.skillUntil - tn) / 1000) + "초</span></div>"
+                 CHARS[E.char].ultName + " " + Math.ceil((E.skillUntil - tn) / TS / 1000) + "초</span></div>"
              : '<div class="spBar ult' + (full ? " full" : "") + '"><i style="width:' + g * 10 + '%"></i><span>' +
                  (full ? "스킬 준비 완료!" : "스킬 " + g + " / " + GAUGE_MAX) + "</span></div>") + "</div></div>";
     });
@@ -6937,8 +6956,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var st = room.status;
     var left = st === "countdown" || t < room.startAt ? MATCH_MS : room.startAt + MATCH_MS - t;
     if (st === "ended") left = Math.max(0, Math.min(MATCH_MS, room.startAt + MATCH_MS - (room.endedAt || t)));
+    left /= TS;
     var practice = room.mode === "practice";
-    setText($("hudTimer"), practice ? fmtTime(Math.floor(Math.max(0, t - room.startAt) / 1000) * 1000) : fmtTime(left));
+    setText($("hudTimer"), practice ? fmtTime(Math.floor(Math.max(0, t - room.startAt) / TS / 1000) * 1000) : fmtTime(left));
     finalCountdown($("hudTimer"), st === "playing" && !practice ? left : 0);
     $("scrGame").classList.toggle("practice", practice);
     show($("practiceBar"), practice && !!ME && st !== "ended");
@@ -6963,8 +6983,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     show($("deadMsg"), ME && !ME.alive && st === "playing");
     var prot = ME && protectedNow(ME, t) && st === "playing";
     show($("protBadge"), prot);
-    if (prot) setText($("protBadge"), "🛡 보호 중 " + ((ME.protectUntil - t) / 1000).toFixed(1) + "초");
-    if (ME && !ME.alive) setText($("deadMsg"), "쓰러졌어요 — " + Math.max(1, Math.ceil((ME.diedAt + RESPAWN_MS - t) / 1000)) + "초 뒤 부활");
+    if (prot) setText($("protBadge"), "🛡 보호 중 " + ((ME.protectUntil - t) / TS / 1000).toFixed(1) + "초");
+    if (ME && !ME.alive) setText($("deadMsg"), "쓰러졌어요 — " + Math.max(1, Math.ceil((ME.diedAt + RESPAWN_MS - t) / TS / 1000)) + "초 뒤 부활");
     if (ME) {
       setHtml($("btnAtk").lastChild, '<i class="ic">' + CHARS[ME.char].icon + "</i>공격");
       var cdLeft = Math.max(0, ME.cdUntil - t) / (ME.cdDur || CHARS[ME.char].cd);
@@ -6972,11 +6992,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var full = ME.gauge >= GAUGE_MAX, act = skillActive(ME, t);
       $("btnUlt").className = "actBtn" + (act ? " act" : (full && !ME.burst ? " ready" : ""));
       $("btnUlt").firstChild.style.height = Math.round((act ? skillLeft(ME, t) : clamp(ME.gauge / GAUGE_MAX, 0, 1)) * 100) + "%";
-      setHtml($("btnUlt").lastChild, act ? CHARS[ME.char].ultName + "<br>" + Math.ceil((ME.skillUntil - t) / 1000) + "초"
+      setHtml($("btnUlt").lastChild, act ? CHARS[ME.char].ultName + "<br>" + Math.ceil((ME.skillUntil - t) / TS / 1000) + "초"
                                          : (full ? "스킬!" : "스킬<br>" + Math.floor(ME.gauge) + "/10"));
     }
     var cd = room.startAt - t;
-    var counting = (st === "countdown" || st === "playing") && cd > -700;
+    var counting = (st === "countdown" || st === "playing") && cd > -700 * TS;
     show($("countOv"), counting);
     if (counting) {
       var n = cd > 0 ? String(Math.ceil(cd / 1000)) : "시작!";
@@ -7017,15 +7037,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     if (!G) return;
     var t = now();
-    stepWorld(t, dt, true);
+    stepWorld(t, dt * TS, true, dt);
     if (st === "countdown" || st === "playing") netWrite(false);
     if (isHost()) { hostJudge(); hostCleanup(); }
     render(t, dt);
     updateHud(t);
     adaptQuality(frameMs);
   }
-  function stepWorld(t, dt, driveBots) {
-    syncRemote(dt);
+  function stepWorld(t, dt, driveBots, viewDt) {
+    syncRemote(viewDt == null ? dt : viewDt);
     stepShots(t);
     stepBursts(t);
     stepPools(t);
