@@ -1166,7 +1166,142 @@ function collectResults(api) {
     done(got.join() === want.join() ? "pass" : "fail", "나온 순서 " + got.join(",") + " / 기대 " + want.join(","));
   });
 
-  var ASSIST = "어시스트·석궁사수", AMS = api.ASSIST_MS;
+  var STORM = "뇌전 사수", SB = api.CHARS.stormbow, CH = SB.chain;
+  function zapsOf(W, id) { return W.log.filter(function (p) { return p.path === "effects" && p.v.type === "zap" && p.v.owner === id; }); }
+  function lostHp(W, id) { var E = W.ent(id); return E.maxHp - E.hp; }
+  function inBush(W, ids) { return ids.filter(function (id) { return api.hiddenFrom(W.ent(id), W.t()); }); }
+  function shootTimes(W, sb, n, ang) { for (var i = 0; i < n; i++) { api.fireBasic(sb, ang || 0); W.step(SB.cd + 100); } }
+  run(STORM, "뇌전 사수 기본 공격: 관통하지 않고 첫 적에서 멈추며, 게이지는 기본 적중만큼 오르는가", function (done) {
+    var y = OPEN_Y.forest;
+    var W = world("forest", [
+      { id: "sb", team: "blue", char: "stormbow", x: 150, y: y },
+      { id: "f1", team: "red", char: "ranger", x: 350, y: y },
+      { id: "f2", team: "red", char: "sniper", x: 450, y: y }
+    ]);
+    shootTimes(W, W.ent("sb"), 1);
+    var a = lostHp(W, "f1"), b = lostHp(W, "f2"), gauge = W.ent("sb").gauge, want = api.roleGauge("stormbow");
+    var ok = a === SB.dmg && b === 0 && gauge === want;
+    done(ok ? "pass" : "fail", "첫 적 " + a + " (기대 " + SB.dmg + "), 뒤의 적 " + b + " (기대 0), 게이지 " + gauge + " (기대 " + want + ")");
+  });
+  run(STORM, "뇌전 사수 패시브: " + CH.every + "번째 적중마다 맞은 적 주변 반경 " + CH.r + "의 가까운 적 " + CH.count + "명에게만 " + CH.dmg + "의 피해가 튕기는가", function (done) {
+    var y = OPEN_Y.forest;
+    var W = world("forest", [
+      { id: "sb", team: "blue", char: "stormbow", x: 150, y: y },
+      { id: "tg", team: "red", char: "knight", x: 450, y: y },
+      { id: "n1", team: "red", char: "ranger", x: 450, y: y + 110 },
+      { id: "n2", team: "red", char: "mage", x: 450, y: y - 160 },
+      { id: "n3", team: "red", char: "frost", x: 450, y: y + 220 },
+      { id: "out", team: "red", char: "sniper", x: 450 + CH.r + 60, y: y + 60 }
+    ]);
+    var sb = W.ent("sb"), bad = [], hidden = inBush(W, ["tg", "n1", "n2", "n3", "out"]);
+    if (hidden.length) { done("fail", "시험 준비 실패: 부쉬 안 " + hidden.join()); return; }
+    shootTimes(W, sb, CH.every - 1);
+    if (zapsOf(W, "sb").length) bad.push(CH.every - 1 + "번 적중에 번개가 나감");
+    if (lostHp(W, "n1") || lostHp(W, "n2")) bad.push(CH.every + "번 전에 주변 적이 맞음");
+    shootTimes(W, sb, 1);
+    var zaps = zapsOf(W, "sb");
+    if (zaps.length !== 1) bad.push("번개 효과 " + zaps.length + "번 (기대 1)");
+    else if (zaps[0].v.pts.length !== CH.count + 1) bad.push("번개 선 꼭짓점 " + zaps[0].v.pts.length + " (기대 " + (CH.count + 1) + ")");
+    else if (zaps[0].v.tgt.join() !== "n1,n2") bad.push("튕긴 순서 " + zaps[0].v.tgt.join() + " (기대 n1,n2 가까운 순)");
+    if (lostHp(W, "n1") !== CH.dmg || lostHp(W, "n2") !== CH.dmg) bad.push("가까운 두 적 " + lostHp(W, "n1") + "·" + lostHp(W, "n2") + " (기대 " + CH.dmg + "씩)");
+    if (lostHp(W, "n3")) bad.push("세 번째로 가까운 적도 맞음 " + lostHp(W, "n3"));
+    if (lostHp(W, "out")) bad.push("반경 밖 적이 맞음 " + lostHp(W, "out"));
+    var tgLost = lostHp(W, "tg"), tgWant = CH.every * Math.max(0, SB.dmg - api.CHARS.knight.armor);
+    if (tgLost !== tgWant) bad.push("맞은 적 본인 " + tgLost + " (기대 " + tgWant + ", 번개 제외)");
+    if (sb.zapHits) bad.push("발동 뒤 적중 수가 0 으로 돌아가지 않음: " + sb.zapHits);
+    var dealt = sb.dmg, dealtWant = tgWant + CH.dmg * CH.count;
+    if (dealt !== dealtWant) bad.push("딜 기록 " + dealt + " (기대 " + dealtWant + ")");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : CH.every + "번째 적중에 가까운 두 적 " + CH.dmg + "씩, 세 번째·반경 밖·맞은 적 본인은 제외, 딜 " + dealt);
+  });
+  run(STORM, "뇌전 사수 패시브: 번개는 해골 병사에게도 튕기지만 해골로는 게이지가 오르지 않고, 적 캐릭터로는 오르는가", function (done) {
+    var y = OPEN_Y.forest;
+    var W = world("forest", [
+      { id: "sb", team: "blue", char: "stormbow", x: 150, y: y },
+      { id: "tg", team: "red", char: "knight", x: 450, y: y },
+      { id: "n1", team: "red", char: "ranger", x: 450, y: y - 180 },
+      { id: "nc", team: "red", char: "necro", x: 750, y: y + 600, gauge: api.GAUGE_MAX }
+    ]);
+    var sb = W.ent("sb"), nc = W.ent("nc");
+    shootTimes(W, sb, CH.every - 1);
+    api.useUlt(nc, Math.PI / 2);
+    W.step(api.ULT.smRiseMs + 100);
+    var minion = (nc.minions || [])[0];
+    if (!minion) { done("fail", "시험 준비 실패: 해골이 없음"); return; }
+    nc.minions.forEach(function (m, i) { m.x = i ? 800 : 480; m.y = i ? y + 700 : y + 120; });
+    var m0 = minion.hp;
+    sb.gauge = 0;
+    api.fireBasic(sb, 0);
+    W.step(500);
+    var gauge = sb.gauge, want = api.roleGauge("stormbow") * 2, bad = [];
+    if (minion.hp !== Math.max(0, m0 - CH.dmg)) bad.push("해골 체력 " + m0 + " → " + minion.hp + " (기대 " + CH.dmg + " 감소)");
+    if (lostHp(W, "n1") !== CH.dmg) bad.push("적 캐릭터 번개 피해 " + lostHp(W, "n1"));
+    if (gauge !== want) bad.push("게이지 " + gauge + " (기대 " + want + ": 기본 적중 + 적 캐릭터 번개, 해골 0)");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "해골·적 캐릭터 모두 " + CH.dmg + " 피해, 게이지 " + gauge + "(해골 몫 0)");
+  });
+  run(STORM, "뇌전 사수 패시브: 은신 중인 적·부활 보호 중인 적·아군에게는 튕기지 않는가", function (done) {
+    var y = OPEN_Y.forest;
+    var W = world("forest", [
+      { id: "sb", team: "blue", char: "stormbow", x: 150, y: y },
+      { id: "ally", team: "blue", char: "knight", x: 460, y: y + 60 },
+      { id: "tg", team: "red", char: "knight", x: 450, y: y },
+      { id: "hid", team: "red", char: "rogue", x: 450, y: y + 90 },
+      { id: "safe", team: "red", char: "ranger", x: 450, y: y + 110 },
+      { id: "seen", team: "red", char: "mage", x: 450, y: y - 160 }
+    ]);
+    var sb = W.ent("sb"), hid = W.ent("hid"), safe = W.ent("safe"), bad = [], hidden = inBush(W, ["tg", "hid", "safe", "seen"]);
+    if (hidden.length) { done("fail", "시험 준비 실패: 부쉬 안 " + hidden.join()); return; }
+    shootTimes(W, sb, CH.every - 1);
+    hid.stealthUntil = W.t() + 3000;
+    safe.protectUntil = W.t() + 3000;
+    if (!api.hiddenFrom(hid, W.t())) { done("fail", "시험 준비 실패: 은신 상태가 아님"); return; }
+    shootTimes(W, sb, 1);
+    var zaps = zapsOf(W, "sb");
+    if (zaps.length !== 1 || zaps[0].v.tgt.join() !== "seen") bad.push("튕긴 대상 " + (zaps[0] ? zaps[0].v.tgt.join() : "없음") + " (기대 seen 하나)");
+    if (lostHp(W, "hid")) bad.push("은신한 적이 맞음 " + lostHp(W, "hid"));
+    if (lostHp(W, "safe")) bad.push("부활 보호 중인 적이 맞음 " + lostHp(W, "safe"));
+    if (lostHp(W, "ally")) bad.push("아군이 맞음 " + lostHp(W, "ally"));
+    if (lostHp(W, "seen") !== CH.dmg) bad.push("보이는 적 " + lostHp(W, "seen") + " (기대 " + CH.dmg + ")");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "가까운 은신·보호·아군은 건너뛰고 더 먼 보이는 적에게만 " + CH.dmg);
+  });
+  run(STORM, "뇌전 사수 스킬 과충전: " + api.ULT.ocDur / 1000 + "초간 매 적중마다 번개, 공격 간격 " + api.ULT.ocRate + "배 빠르게, 적중 수는 그대로 두는가", function (done) {
+    var y = OPEN_Y.forest, U = api.ULT;
+    var W = world("forest", [
+      { id: "sb", team: "blue", char: "stormbow", x: 150, y: y, gauge: api.GAUGE_MAX },
+      { id: "tg", team: "red", char: "knight", x: 450, y: y },
+      { id: "n1", team: "red", char: "ranger", x: 450, y: y - 160 }
+    ]);
+    var sb = W.ent("sb"), bad = [], hidden = inBush(W, ["tg", "n1"]);
+    if (hidden.length) { done("fail", "시험 준비 실패: 부쉬 안 " + hidden.join()); return; }
+    W.ent("tg").hp = W.ent("tg").maxHp = 5000;
+    W.ent("n1").hp = W.ent("n1").maxHp = 5000;
+    shootTimes(W, sb, 2);
+    var before = sb.zapHits;
+    api.useUlt(sb, 0);
+    if (sb.gauge !== 0) bad.push("스킬 뒤 게이지 " + sb.gauge);
+    var start = W.t();
+    api.fireBasic(sb, 0);
+    var cd = sb.cdDur, wantCd = SB.cd / U.ocRate;
+    if (Math.abs(cd - wantCd) > 0.01) bad.push("과충전 공격 대기시간 " + cd + " (기대 " + wantCd + ")");
+    W.step(wantCd);
+    for (var i = 0; i < 2; i++) { api.fireBasic(sb, 0); W.step(wantCd); }
+    W.step(300);
+    var during = zapsOf(W, "sb").length;
+    if (during !== 3) bad.push("과충전 중 3번 적중에 번개 " + during + "번 (기대 3)");
+    if (sb.zapHits !== before) bad.push("과충전 중 적중 수가 바뀜 " + before + " → " + sb.zapHits);
+    if (sb.gauge !== 0) bad.push("과충전 중 게이지가 오름 " + sb.gauge);
+    if (lostHp(W, "n1") !== CH.dmg * 3) bad.push("주변 적 " + lostHp(W, "n1") + " (기대 " + CH.dmg * 3 + ")");
+    W.step(start + U.ocDur + 100 - W.t());
+    api.fireBasic(sb, 0);
+    if (sb.cdDur !== SB.cd) bad.push("과충전이 끝난 뒤 대기시간 " + sb.cdDur + " (기대 " + SB.cd + ")");
+    W.step(SB.cd + 100);
+    var after = zapsOf(W, "sb").length;
+    if (after !== 3 || sb.zapHits !== before + 1) bad.push("끝난 뒤 첫 적중: 번개 " + (after - 3) + "번·적중 수 " + sb.zapHits + " (기대 0번·" + (before + 1) + ")");
+    shootTimes(W, sb, 1);
+    if (zapsOf(W, "sb").length !== 4) bad.push("끝난 뒤 " + CH.every + "번째 적중에 번개가 안 나감");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "과충전 중 매 적중 번개·대기시간 " + wantCd + "ms, 스킬 전 적중 수 " + before + " 그대로 이어서 " + CH.every + "번째에 발동");
+  });
+
+  var ASSIST = "어시스트", AMS = api.ASSIST_MS;
   run(ASSIST, "피해 어시스트: 쓰러지기 " + AMS / 1000 + "초 안에 피해를 준 사람만 어시스트, 처치한 사람은 처치만 오르는가", function (done) {
     var y = OPEN_Y.forest;
     var W = world("forest", [
@@ -1249,61 +1384,6 @@ function collectResults(api) {
     done(n === 1 ? "pass" : "fail", "얼음술사 어시스트 " + n + " (기대 1)");
   });
 
-  run(ASSIST, "석궁사수 기본 공격: 일직선의 적을 모두 꿰뚫고, 게이지는 한 발에 한 번만 오르는가", function (done) {
-    var y = OPEN_Y.forest, c = api.CHARS.crossbow;
-    var W = world("forest", [
-      { id: "cb", team: "blue", char: "crossbow", x: 150, y: y },
-      { id: "f1", team: "red", char: "ranger", x: 300, y: y },
-      { id: "f2", team: "red", char: "sniper", x: 400, y: y },
-      { id: "f3", team: "red", char: "mage", x: 500, y: y }
-    ]);
-    api.fireBasic(W.ent("cb"), 0);
-    W.step(1000);
-    var lost = ["f1", "f2", "f3"].map(function (id) { return W.ent(id).maxHp - W.ent(id).hp; });
-    var gauge = W.ent("cb").gauge, want = api.roleGauge("crossbow");
-    var ok = lost.every(function (v) { return v === c.dmg; }) && gauge === want;
-    done(ok ? "pass" : "fail", "잃은 체력 " + lost.join("·") + " (기대 " + c.dmg + "씩), 게이지 " + gauge + " (기대 " + want + ")");
-  });
-  run(ASSIST, "석궁사수 스킬: 볼트 " + api.ULT.tbCount + "발이 부채꼴로 나가 각 방향의 적을 맞히는가", function (done) {
-    var y = OPEN_Y.forest, sp = api.ULT.tbSpread, d = 180, list = [{ id: "cb", team: "blue", char: "crossbow", x: 200, y: y, gauge: api.GAUGE_MAX }];
-    [-1, 0, 1].forEach(function (k, i) { list.push({ id: "f" + i, team: "red", char: "ranger", x: 200 + Math.cos(k * sp) * d, y: y + Math.sin(k * sp) * d }); });
-    var W = world("forest", list);
-    api.useUlt(W.ent("cb"), 0);
-    W.step(1000);
-    var lost = [0, 1, 2].map(function (i) { return W.ent("f" + i).maxHp - W.ent("f" + i).hp; });
-    var ok = lost.every(function (v) { return v === api.CHARS.crossbow.dmg; });
-    done(ok ? "pass" : "fail", "세 적이 잃은 체력 " + lost.join("·") + " (기대 " + api.CHARS.crossbow.dmg + "씩)");
-  });
-  run(ASSIST, "석궁사수 패시브: 처치 " + api.CHARS.crossbow.grow.perKill + "스택·어시스트 " + api.CHARS.crossbow.grow.perAssist + "스택씩 강해지고 " + api.CHARS.crossbow.grow.max + "스택에서 멈추는가", function (done) {
-    var y = OPEN_Y.forest, c = api.CHARS.crossbow, g = c.grow;
-    var W = world("forest", [
-      { id: "cb", team: "blue", char: "crossbow", x: 150, y: y },
-      { id: "ally", team: "blue", char: "knight", x: 150, y: y + 300 },
-      { id: "foe", team: "red", char: "knight", x: 450, y: y + 500 },
-      { id: "foe2", team: "red", char: "guardian", x: 650, y: y + 500 },
-      { id: "dummy", team: "red", char: "ranger", x: 150 + c.range + 150, y: y }
-    ]);
-    var cb = W.ent("cb"), bad = [];
-    api.damage(W.ent("foe"), 30, "cb", false, null);
-    api.damage(W.ent("foe"), 9999, "ally", false, null);
-    W.step(100);
-    var s1 = g.perAssist;
-    if (cb.assists !== 1) bad.push("어시스트 " + cb.assists);
-    if (cb.maxHp !== c.hp + g.hp * s1 || cb.hp !== c.hp + g.hp * s1) bad.push("어시스트 뒤 체력 " + cb.hp + "/" + cb.maxHp);
-    if (api.speedOf(cb) !== c.speed + g.speed * s1) bad.push("어시스트 뒤 이동속도 " + api.speedOf(cb));
-    api.damage(W.ent("foe2"), 9999, "cb", false, null);
-    W.step(100);
-    var s2 = s1 + g.perKill;
-    if (cb.maxHp !== c.hp + g.hp * s2 || cb.hp !== c.hp + g.hp * s2) bad.push("처치 뒤 체력 " + cb.hp + "/" + cb.maxHp + " (기대 " + (c.hp + g.hp * s2) + ")");
-    cb.kills = 30;
-    api.fireBasic(cb, 0);
-    if (cb.cdDur !== c.cd - g.cd * g.max) bad.push("최대 뒤 공격 대기시간 " + cb.cdDur);
-    if (api.speedOf(cb) !== c.speed + g.speed * g.max) bad.push("최대 뒤 이동속도 " + api.speedOf(cb));
-    W.step(1500);
-    var dummy = W.ent("dummy"), lost = dummy.maxHp - dummy.hp, wantDmg = c.dmg + g.dmg * g.max;
-    if (lost !== Math.min(dummy.maxHp, wantDmg)) bad.push("최대 뒤 기본 사거리 밖 적에게 준 피해 " + lost + " (기대 " + wantDmg + ")");
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "어시스트 1 → 체력 " + (c.hp + g.hp * s1) + ", 처치 1 더 → 체력 " + (c.hp + g.hp * s2) + " / " + g.max + "스택: 대기시간 " + (c.cd - g.cd * g.max) + "ms·피해 " + wantDmg + "·사거리 " + (c.range + g.range * g.max));
-  });
   run(ASSIST, "해로운 효과 어시스트: 기절이나 둔화만 건 사람도 " + AMS / 1000 + "초 안에 적이 쓰러지면 어시스트를 받는가", function (done) {
     var y = OPEN_Y.forest;
     var W = world("forest", [
