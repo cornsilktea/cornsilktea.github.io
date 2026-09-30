@@ -1185,14 +1185,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       [C.cleric, { cd: s(1.4), speed: v(170) }],
       [C.mage, { cd: s(1.4), speed: v(170) }],
       [C.mage.burn, { ms: s(6), maxHpRate: 0.04 }],
-      [C.ranger, { cd: s(1), speed: v(140) }],
+      [C.ranger, { cd: s(0.9), speed: v(140) }],
       [C.ranger.haste, { ms: s(4) }],
       [C.stormbow, { cd: s(0.9), speed: v(140) }],
       [C.sniper, { cd: s(1.8), speed: v(140) }],
-      [C.thrower, { cd: s(1.4), speed: v(155) }],
-      [C.dancer, { cd: s(1.2), speed: v(175), ultSpeed: v(210) }],
+      [C.thrower, { cd: s(1.4), speed: v(155), dmg: 13 }],
+      [C.dancer, { cd: s(1), speed: v(175), ultSpeed: v(210) }],
       [C.rogue, { cd: s(1.2), speed: v(175), ultSpeed: v(280) }],
-      [C.hitman, { cd: s(1.8), speed: v(175) }],
+      [C.hitman, { cd: s(1.5), speed: v(175) }],
       [ULT, { rmDur: s(4), rmRate: 1000 / s(0.5), rmDashMs: s(0.4),
               bzDur: s(6), tkDur: s(6), tkStunMs: s(1.5),
               bsLeapMinMs: s(0.3), bsLeapMaxMs: s(1.5), bsStunMs: s(1.5),
@@ -1203,7 +1203,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               mbDelay: s(1.5), mbStunMin: s(0.9), mbStunMs: s(1.7),
               ocDur: s(7), ocStunMs: s(1.5),
               fgDur: s(6), fgHeal: 7, fgDmg: 13, plTick: s(1), plDur: s(3),
-              bdDelay: s(0.4), bwDur: s(4), bwTick: s(0.35),
+              bdDelay: s(0.4), bwDur: s(4), bwTick: s(0.3),
               asDur: s(21), exStunMs: s(1.5) }]
     ];
   }
