@@ -841,7 +841,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
                 fx: { slowMs: 1000, slowMul: 0.7 }, ultName: "창벽" },
     frost:   { name: "얼음술사", role: "caster", icon: "❄️", hp: 120, speed: 240, cd: 1000, dmg: 16, range: 350, pSpeed: 650, pr: 8, ultName: "눈보라" },
     dancer:  { name: "검무희", role: "assassin", icon: "🌸", hp: 110, speed: 250, ultSpeed: 300, cd: 833, dmg: 20, range: 350, pSpeed: 900, pr: 8, ultName: "칼날 폭풍" },
-    stormbow: { name: "뇌전사수", role: "shooter", icon: "⚡", hp: 100, speed: 200, cd: 600, dmg: 10, range: 420, pSpeed: 750, pr: 10,
+    stormbow: { name: "뇌전사수", role: "shooter", icon: "⚡", hp: 110, speed: 200, cd: 600, dmg: 10, range: 420, pSpeed: 750, pr: 10,
                 chain: { every: 3, r: 250, count: 2, dmg: 30 }, ultName: "과충전" },
     dummy:   { name: "연습 봇", role: "fighter", icon: "🎯", hp: 99999, speed: 200, cd: 1000, dmg: 0, range: 0, ultName: "없음", practiceBot: true },
     dummyAlly: { name: "아군 봇", role: "fighter", icon: "💚", hp: 500, speed: 200, cd: 1000, dmg: 0, range: 0, ultName: "없음", practiceBot: true }
@@ -850,7 +850,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     fighter:  { name: "전사", icon: "⚔️", gaugeOnHit: 2, gaugeOnHurt: 1 },
     caster:   { name: "마법사", icon: "✨", gaugeOnHit: 3, gaugeOnHurt: 0 },
     shooter:  { name: "원거리 딜러", icon: "🏹", gaugeOnHit: 2, gaugeOnHurt: 0 },
-    assassin: { name: "암살자", icon: "🗡️", gaugeOnHit: 2, gaugeOnHurt: 0 }
+    assassin: { name: "암살자", icon: "🗡️", gaugeOnHit: 3, gaugeOnHurt: 0 }
   };
   var ROLE_LIST = ["fighter", "caster", "shooter", "assassin"];
   function playable(c) { return !!(CHARS[c] && !CHARS[c].retired); }
@@ -872,7 +872,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   function charsInRole(r) { return CHAR_LIST.filter(function (c) { return CHARS[c].role === r; }); }
   var ULT = { mkCount: 10, mkGap: 115, mkDmg: 40, mkRefund: 1, mkSpeed: 805, mkRange: KEY * 8, mkPr: 8,
-              bzDur: 4000, bzDmgMul: 1.3, bzCdMul: 1 / 1.3, bzHeal: 15, tkDur: 4000, tkDef: 0.4, tkStunR: 120, tkStunMs: 1000,
+              bzDur: 4000, bzDmgMul: 1.4, bzCdMul: 1 / 1.4, bzHeal: 15, tkDur: 4000, tkDef: 0.4, tkStunR: 120, tkStunMs: 1000,
               mbDelay: 1000, mbR: 250, mbDmg: 120, mbDmgMin: 80, mbCast: 550, mbMin: 60, mbStunMs: 1200, mbStunMin: 600, mbSteps: 5,
               asSmokeMs: 400, asDur: 15000,
               smCount: 2, smAhead: KEY * 1, smSide: 38, smHp: 65, smSpeed: 250, smGauge: 0.5, smDmg: 12, smCd: 800, smRange: 80, smArc: Math.PI * 0.6,
@@ -885,7 +885,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               bhR: 200, bhDur: 3000, bhDelay: 500, bhPull: 220, bhCast: 380, bhMin: 60, bhCcRate: 0.8,
               exRange: 500, exSpeed: 1300, exPr: 4, exDmg: 25, exStunMs: 1000,
               gdR: 200, gdKb: 150, gdKbMs: 500, gdDmg: 20, gdSlowMul: 0.8, gdSlowMs: 1000,
-              frSlowMs: 1200, frSlowMul: 0.8, frSlowStep: 0.2, frFreezeMs: 800, frFreezeMaxHpRate: 0.08,
+              frSlowMs: 1200, frSlowMul: 0.8, frSlowStep: 0.2, frFreezeMs: 800, frFreezeMaxHpRate: 0.07,
               frBzHides: true, frBzR: 400, frBzDur: 7000, frBzDmg: 12, frBzTick: 1000, frBzDelay: 400,
               bwR: 150, bwDur: 3000, bwTick: 250, bwHurtGaugeEvery: 4, bwDmg: 18, bwKillGauge: 5, bdR: 70, bdDmg: 10, bdDelay: 300,
               rmDur: 3000, rmRate: 3, rmDashMs: 300, rmDashRange: 100,
