@@ -1,0 +1,1693 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<script charset="utf-8" src="firebase-config.js"></script>
+<script charset="utf-8" src="access-guard.js" data-game="lasttile"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>마지막 발판</title>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="정보 수업용 링크 모음">
+<meta property="og:title" content="마지막 발판">
+<meta property="og:description" content="방 코드로 모여 2~6명이 겨루는 3D 발판 서바이벌 / 밟으면 무너지는 6×6 발판 3층, 밀치기와 대시로 상대를 떨어뜨리고 끝까지 남기 / 낙하 관성으로 아래층에 착지 / 3판 누적 점수제 · 혼자면 AI 1명과 시작">
+<meta property="og:url" content="https://cornsilktea.github.io/32.last-tile.html">
+<meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="theme.css">
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1.10.1/dist/es-module-shims.js"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  [hidden] { display: none !important; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #141826; font-family: var(--sg-font); color: #EEF0F4; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  button { font-family: inherit; cursor: pointer; }
+  input { font-family: inherit; }
+  #view { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #fade { position: fixed; top: 0; right: 0; bottom: 0; left: 0; background: #0C0F18; opacity: 0; pointer-events: none; z-index: 15; transition: opacity .15s linear; }
+
+  .st-screen { --st-bg: 14, 14, 28; --st-panel: rgba(20, 20, 36, .84); --st-accent: #D97B4F; --st-title2: #F2C879; --st-glow: rgba(217, 123, 79, .6); }
+  .st-screen .st-title { font-style: italic; letter-spacing: -.5px; }
+  .st-card { margin-bottom: 14px; }
+  .st-screen input[type=text] { width: 100%; min-height: 48px; padding: 6px 12px; font-size: 18px; font-weight: 800; border-radius: 6px; border: 2px solid rgba(255, 255, 255, .3); background: rgba(255, 255, 255, .06); color: #fff; outline: 0; -webkit-user-select: text; user-select: text; }
+  .st-screen input[type=text]:focus { border-color: #D97B4F; }
+  .st-joinrow { display: flex; gap: 10px; margin-top: 10px; }
+  .st-joinrow input { flex: 1 1 auto; min-width: 0; text-align: center; letter-spacing: .3em; }
+  .st-joinrow .st-btn { flex: 0 0 34%; margin: 0; }
+  .st-msg { margin-top: 10px; min-height: 0; font-size: 14px; font-weight: 700; color: #FF9A8A; }
+  .st-msg:empty { display: none; }
+  .st-btn.sub { background: rgba(255, 255, 255, .06); border-color: rgba(255, 255, 255, .3); color: #EEF0F4; }
+  .st-btn.blue { background: #4C8DFF; border-color: #4C8DFF; color: #fff; }
+  .st-btn.slim { min-height: 42px; font-size: 16px; }
+  .codeBig { font-size: 34px; font-weight: 800; letter-spacing: .18em; color: #FFB08C; font-variant-numeric: tabular-nums; }
+  .plRow { display: flex; align-items: center; gap: 10px; padding: 8px 10px; margin-top: 6px; border-radius: 6px; background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .1); font-size: 16px; font-weight: 800; }
+  .plRow.me { border-color: #D97B4F; box-shadow: inset 0 0 0 1px #D97B4F; }
+  .plRow i { width: 14px; height: 14px; border-radius: 50%; flex: 0 0 auto; border: 2px solid rgba(255, 255, 255, .6); }
+  .plRow b { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .plRow small { color: #A9AFC2; font-size: 13px; font-weight: 700; white-space: nowrap; }
+  .aiNote { margin-top: 10px; padding: 8px 10px; border-radius: 6px; background: rgba(217, 123, 79, .16); border: 1px solid rgba(217, 123, 79, .5); color: #FFD2B8; font-size: 14px; font-weight: 700; }
+  .palRow { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  .palRow > span { flex: 0 0 52px; font-size: 14px; font-weight: 800; color: #A9AFC2; }
+  .palRow > div { display: flex; flex-wrap: wrap; gap: 6px; }
+  .sw { width: 28px; height: 28px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .28); padding: 0; background: #888; }
+  .sw.def { background: repeating-linear-gradient(45deg, #59606E 0 4px, #8C93A3 4px 8px); }
+  .sw.on { border-color: #fff; box-shadow: 0 0 0 3px #D97B4F; }
+  .rotRow { display: flex; gap: 8px; margin-top: 12px; }
+  .rotRow button { flex: 1 1 0; min-height: 42px; font-size: 15px; font-weight: 800; border-radius: 6px; border: 2px solid rgba(255, 255, 255, .22); background: rgba(255, 255, 255, .05); color: #CDD2DC; }
+  .rotRow button.on { border-color: #D97B4F; background: rgba(217, 123, 79, .22); color: #fff; }
+  .st-card h2 small { font-size: 13px; font-weight: 700; color: #A9AFC2; margin-left: 6px; }
+  .rankDot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; border: 2px solid rgba(255, 255, 255, .6); }
+  .st-table td.n, .st-table th.n { text-align: right; }
+  .st-table tr.meRow td { background: rgba(217, 123, 79, .14); }
+  .nextIn { margin-top: 12px; text-align: center; font-size: 15px; font-weight: 800; color: #FFB08C; }
+
+  .hud-box { background: linear-gradient(135deg, rgba(16, 18, 28, .82), rgba(38, 42, 58, .72)); border: 1.5px solid rgba(255, 255, 255, .22); border-top: 3px solid #D97B4F; border-radius: 10px; padding: 6px 12px; color: #fff; font-weight: 800; font-variant-numeric: tabular-nums; text-shadow: 0 1px 3px rgba(0, 0, 0, .6); box-shadow: 0 4px 14px rgba(0, 0, 0, .3); }
+  .hud-box .lab { font-size: 11px; color: #DCE6D6; font-weight: 700; display: block; }
+  #hudList { position: fixed; left: 10px; top: 54px; z-index: 20; width: 200px; pointer-events: none; }
+  #hudList .pl { display: flex; align-items: center; gap: 6px; padding: 3px 0; font-size: 13px; }
+  #hudList .pl i { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; border: 1.5px solid rgba(255, 255, 255, .7); }
+  #hudList .pl b { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 800; }
+  #hudList .pl span { font-size: 12px; color: #DCE6D6; white-space: nowrap; }
+  #hudList .pl.me { border-left: 3px solid #D97B4F; padding-left: 5px; margin-left: -8px; }
+  #hudList .pl.dead { color: #8E93A0; }
+  #hudList .pl.dead b { text-decoration: line-through; }
+  #hudList .pl.dead span { color: #8E93A0; }
+  #hudFloors { margin-top: 6px; padding-top: 5px; border-top: 1px solid rgba(255, 255, 255, .18); font-size: 11px; color: #DCE6D6; font-weight: 700; }
+  #hudRight { position: fixed; right: 10px; top: 54px; z-index: 20; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; pointer-events: none; }
+  #hudRight .hud-box { min-width: 132px; }
+  #hudRight .big { font-size: 22px; line-height: 1.1; }
+  .cdRow { display: flex; align-items: center; gap: 8px; margin-top: 4px; font-size: 13px; }
+  .cdRow span { flex: 0 0 auto; width: 54px; }
+  .cdBar { flex: 1 1 auto; height: 8px; border-radius: 4px; background: rgba(255, 255, 255, .16); overflow: hidden; }
+  .cdBar i { display: block; height: 100%; width: 100%; background: #D97B4F; transform-origin: left; }
+  #banner { position: fixed; left: 50%; top: 54px; transform: translateX(-50%); z-index: 20; pointer-events: none; text-align: center; max-width: 60vw; }
+  #banner .hud-box { display: inline-block; font-size: 16px; }
+  #banner .hud-box.warn { border-top-color: #FF6B5A; color: #FFD2CC; }
+  #centerMsg { position: fixed; left: 0; right: 0; top: 30%; z-index: 20; pointer-events: none; text-align: center; font-size: clamp(56px, 14vw, 120px); font-weight: 800; color: #F4F1E8; text-shadow: 0 5px 0 rgba(0, 0, 0, .45), 0 0 26px rgba(217, 123, 79, .7); font-style: italic; }
+  #centerMsg small { display: block; font-size: 22px; font-style: normal; text-shadow: 0 2px 4px rgba(0, 0, 0, .6); }
+  #specBox { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 18px); transform: translateX(-50%); z-index: 22; text-align: center; }
+  #specBox button { min-height: 42px; padding: 6px 18px; font-size: 16px; font-weight: 800; border-radius: 8px; border: 2px solid rgba(255, 255, 255, .4); background: rgba(20, 20, 36, .84); color: #fff; }
+  #joyZone { position: fixed; left: 0; bottom: 0; width: 46%; height: 58%; z-index: 18; touch-action: none; }
+  #joyBase { position: fixed; width: 110px; height: 110px; margin: -55px 0 0 -55px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, .32); background: rgba(255, 255, 255, .08); z-index: 19; pointer-events: none; }
+  #joyKnob { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; background: rgba(217, 123, 79, .85); border: 2px solid #fff; }
+  .actBtn { position: fixed; z-index: 19; width: 88px; height: 88px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, .55); background: rgba(20, 20, 36, .72); color: #fff; font-size: 18px; font-weight: 800; touch-action: none; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+  .actBtn i { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: rgba(0, 0, 0, .55); }
+  .actBtn span { position: relative; }
+  #btnPush { right: 18px; bottom: calc(env(safe-area-inset-bottom, 0px) + 96px); background: rgba(217, 123, 79, .82); }
+  #btnDash { right: 112px; bottom: calc(env(safe-area-inset-bottom, 0px) + 28px); background: rgba(76, 141, 255, .8); }
+  @media (max-width: 760px) {
+    #hudList { width: 150px; }
+    #hudList .pl { font-size: 12px; }
+    #hudRight .hud-box { min-width: 104px; padding: 5px 9px; }
+    #hudRight .cdRow span { width: 44px; }
+    #banner { max-width: 44vw; top: 96px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div id="fade"></div>
+
+<div id="hudList" class="hud-box" hidden><div id="hudPlayers"></div><div id="hudFloors"></div></div>
+<div id="hudRight" hidden>
+  <div class="hud-box"><span class="lab" id="hudRound">1 / 3 판</span><span class="big" id="hudTime">0:00</span><span class="lab" id="hudAlive">남은 인원 0</span></div>
+  <div class="hud-box">
+    <div class="cdRow"><span>밀치기</span><div class="cdBar"><i id="cdPush"></i></div></div>
+    <div class="cdRow"><span>대시</span><div class="cdBar"><i id="cdDash"></i></div></div>
+  </div>
+</div>
+<div id="banner" hidden><div class="hud-box" id="bannerBox"></div></div>
+<div id="centerMsg" hidden></div>
+<div id="specBox" hidden><button type="button" id="btnSpec">다음 관전 대상</button></div>
+
+<div id="joyZone" hidden></div>
+<div id="joyBase" hidden><div id="joyKnob"></div></div>
+<button type="button" class="actBtn" id="btnPush" hidden><i id="btnPushCd"></i><span>밀치기</span></button>
+<button type="button" class="actBtn" id="btnDash" hidden><i id="btnDashCd"></i><span>대시</span></button>
+
+<div id="startScreen" class="st-screen">
+  <div class="st-wrap">
+    <div class="st-hero"><h1 class="st-title">마지막 발판</h1></div>
+    <div class="st-card">
+      <label class="st-label" for="nickStart">닉네임</label>
+      <input type="text" id="nickStart" maxlength="8" autocomplete="off" placeholder="닉네임 (최대 8글자)">
+      <button type="button" class="st-btn primary" id="btnCreate" style="margin-top:12px">방 만들기</button>
+      <div class="st-joinrow">
+        <input type="text" id="joinCode" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="방 코드 5자리">
+        <button type="button" class="st-btn blue" id="btnJoin">참여하기</button>
+      </div>
+      <div class="st-msg" id="startMsg"></div>
+      <div class="st-hint" id="loadNote">캐릭터를 불러오는 중…</div>
+    </div>
+    <div class="st-card">
+      <h2>조작 방법</h2>
+      <div class="st-keys">
+        <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd></span><span>이동 (관성이 있어 바로 서지 못해요)</span>
+        <span><kbd>J</kbd></span><span>밀치기 · 쿨타임 1초</span>
+        <span><kbd>K</kbd> <kbd>스페이스</kbd></span><span>대시 · 쿨타임 1.5초</span>
+        <span><kbd>Tab</kbd></span><span>탈락 후 다음 사람 관전</span>
+        <span><kbd>태블릿</kbd></span><span>왼쪽 화면을 눌러 끌면 조이스틱, 오른쪽 아래 버튼으로 밀치기·대시</span>
+      </div>
+    </div>
+    <div class="st-card">
+      <h2>규칙</h2>
+      <ul class="st-rules">
+        <li>6×6 발판이 <b>3층</b>으로 쌓여 있어요. 발판은 <b>밟으면 곧 무너지고</b> 되살아나지 않아요.</li>
+        <li><b>밀치기</b>로 같은 층의 상대를 밀어 떨어뜨리고, <b>대시</b>로 빈 곳을 건너요. 대시 중에는 밀리지 않지만 도착한 곳에 발판이 없으면 떨어져요.</li>
+        <li>발판 밖으로 나가면 <b>달리던 속도 그대로</b> 날아가 아래층 발판에 착지해요. 맨 아래층에서 떨어지면 탈락!</li>
+        <li>오래 끌면 위층 바깥 줄부터 무너져요(서든데스). 끝까지 남은 사람이 1등, 탈락한 순서대로 순위가 정해져요.</li>
+        <li><b>3판 누적 점수</b>: 1등 5점 · 2등 3점 · 3등 2점 · 나머지 1점. 혼자 시작하면 AI 1명이 함께해요.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div id="lobbyScreen" class="st-screen" hidden>
+  <div class="st-wrap">
+    <div class="st-hero"><h1 class="st-title">마지막 발판</h1></div>
+    <div class="st-card">
+      <h2>대기실 <span class="codeBig" id="lobbyCode">00000</span></h2>
+      <div id="lobbyPlayers"></div>
+      <div class="aiNote" id="aiNote" hidden>혼자면 AI 1명과 시작해요. 2명 이상 모이면 AI 없이 시작합니다.</div>
+      <button type="button" class="st-btn primary" id="btnStart" style="margin-top:14px">게임 시작</button>
+      <div class="st-hint" id="lobbyHint"></div>
+      <div class="st-row" style="margin-top:10px"><button type="button" class="st-btn sub slim" id="btnLeave">방 나가기</button></div>
+    </div>
+    <div class="st-card">
+      <h2>내 캐릭터 <small>끌어서 돌려 보기</small></h2>
+      <label class="st-label" for="nickLobby">닉네임</label>
+      <input type="text" id="nickLobby" maxlength="8" autocomplete="off">
+      <label class="st-label" style="margin-top:12px">캐릭터</label>
+      <div class="st-opts" id="charOpts"></div>
+      <div id="palettes"></div>
+      <div class="rotRow" id="toggleRow">
+        <button type="button" id="btnCape">망토</button>
+        <button type="button" id="btnHat">모자</button>
+        <button type="button" id="btnTurnL">◀ 돌리기</button>
+        <button type="button" id="btnTurnR">돌리기 ▶</button>
+      </div>
+    </div>
+    <div class="st-card" id="recCard" hidden>
+      <h2>이 방 누적 승수</h2>
+      <div class="st-recs" id="lobbyRecs" style="flex-wrap:wrap"></div>
+    </div>
+  </div>
+</div>
+
+<div id="resultScreen" class="st-screen" hidden>
+  <div class="st-wrap">
+    <div class="st-hero"><h1 class="st-title" id="resultTitle">1판 결과</h1></div>
+    <div class="st-card">
+      <table class="st-table"><thead id="resultHead"></thead><tbody id="resultBody"></tbody></table>
+      <div class="nextIn" id="nextIn"></div>
+      <button type="button" class="st-btn primary" id="btnToLobby" style="margin-top:14px" hidden>대기실로</button>
+      <button type="button" class="st-btn sub slim" id="btnResultLeave" style="margin-top:10px" hidden>방 나가기</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
+(function () {
+  "use strict";
+
+  var FLOOR_COUNT = 3;
+  var GRID = 6;
+  var TILE = 2;
+  var TILE_SCALE = 0.95;
+  var HALF = GRID * TILE / 2;
+  var FLOOR_GAP = 6;
+  var COLLAPSE_TOP_S = 0.8, COLLAPSE_BOTTOM_S = 1.2;
+  var BOTTOM_HOLES = 5;
+  var GRAVITY = 24;
+  var DEATH_DEPTH = 10;
+  var MAX_SPEED = 6.2, ACCEL = 34, FRICTION = 20;
+  var PUSH_RANGE = 2.5, PUSH_HALF_ANGLE = 0.95, PUSH_IMPULSE = 10.5, PUSH_COOLDOWN_MS = 1000, PUSH_BLEND_RADIAL = 0.3;
+  var DASH_DISTANCE = 4, DASH_TIME_S = 0.18, DASH_COOLDOWN_MS = 1500, DASH_EXIT_SPEED = 9;
+  var DASH_SPEED = DASH_DISTANCE / DASH_TIME_S;
+  var LAND_KEEP = 0.55;
+  var COUNTDOWN_MS = 3000;
+  var SUDDEN_START_S = 35, SUDDEN_STEP_S = 4;
+  var RESULT_MS = 8000;
+  var ROUND_END_DELAY_MS = 1500;
+  var TOTAL_ROUNDS = 3;
+  var POINTS = [5, 3, 2, 1, 1, 1];
+  var MAX_PLAYERS = 6;
+  var NET_MS = 143;
+  var TIE_MS = 150;
+  var CHAR_SCALE = 0.8;
+  var START_RING_R = 4.6;
+  var SLOT_COLORS = ["#E5484D", "#3E8EF0", "#3FB56B", "#F0C22E", "#B060E0", "#F08AB0"];
+  var FLOOR_COLORS = ["#A0673E", "#D9A45E", "#F2DDA4"];
+  var WARN_COLOR = "#E24A3A";
+  var AI_TUNE = { reactMin: 250, reactMax: 400, thinkMin: 150, thinkMax: 250, pushSuccess: 0.6, aimNoise: 0.3, targetNoise: 0.9, speedFactor: 0.85, idleSpeedFactor: 0.45, dangerMs: 700, safeMs: 1200, dashApproachChance: 0.4 };
+  var AI_NAMES = ["코코", "모모", "보리", "두부", "별이", "구름"];
+  var ROOT = "lasttile/rooms";
+  var KIT_DIR = "assets/kaykit/";
+
+  var COLOR_SET = ["#D94B4B", "#F08A3E", "#F2C93B", "#5DBB63", "#3FB6B0", "#4A86E8", "#7B5CD6", "#D965A8", "#F2F2EE", "#3B3F4A"];
+  var SKIN_SET = ["#FFE0C8", "#F6C09C", "#F2D2B5", "#E2A981", "#C98A62", "#A86A48", "#7E4B33", "#5A3524"];
+  var HAIR_SET = ["#1B191B", "#4A3222", "#7A4A2E", "#B0703A", "#E2C36A", "#F2E8C8", "#C94A4A", "#4A86E8", "#7B5CD6", "#9AA0A6"];
+  var CHAR_TYPES = [
+    { file: "Knight", prefix: "Knight", name: "기사" },
+    { file: "Barbarian", prefix: "Barbarian", name: "바바리안" },
+    { file: "Mage", prefix: "Mage", name: "마법사" },
+    { file: "Ranger", prefix: "Ranger", name: "레인저" },
+    { file: "Rogue", prefix: "Rogue", name: "도적" },
+    { file: "Rogue_Hooded", prefix: "RogueHooded", name: "후드 도적" }
+  ];
+  var PART_RULES = [
+    { top: { Body: [[0, 3]] }, arm: { ArmLeft: [[0, 3]], ArmRight: [[0, 3]] }, pants: { LegLeft: [[0, 3]], LegRight: [[0, 3]] }, cape: { Cape: [[1, 0]] }, hat: { Helmet: [[0, 3]], HelmetVisor: [[0, 3]] }, hair: { Head: [[0, 1]] } },
+    { top: { Body: [[0, 7]] }, arm: { ArmLeft: [[0, 6]], ArmRight: [[0, 6]] }, pants: { LegLeft: [[2, 3]], LegRight: [[2, 3]] }, hat: { BearHat: [[0, 7]] }, hair: { Head: [[0, 1]] } },
+    { top: { Body: [[1, 0]] }, arm: { ArmLeft: [[1, 0]], ArmRight: [[1, 0]] }, pants: { LegLeft: [[2, 3]], LegRight: [[2, 3]] }, cape: { Cape: [[1, 2]] }, hat: { Hat: [[1, 1]] }, hair: { Head: [[0, 1]] } },
+    { top: { Body: [[0, 5], [0, 6]] }, arm: { ArmLeft: [[0, 6]], ArmRight: [[0, 6]] }, pants: { LegLeft: [[2, 3]], LegRight: [[2, 3]] }, cape: { Cape: [[1, 0]] }, hair: { Head: [[0, 1]] } },
+    { top: { Body: [[1, 0]] }, arm: { ArmLeft: [[1, 0]], ArmRight: [[1, 0]] }, pants: { LegLeft: [[2, 3]], LegRight: [[2, 3]] }, cape: { Cape: [[1, 1]] }, hair: { Head: [[0, 1]] } },
+    { top: { Body: [[1, 0]] }, arm: { ArmLeft: [[1, 0]], ArmRight: [[1, 0]] }, pants: { LegLeft: [[2, 3]], LegRight: [[2, 3]] }, cape: { Cape: [[1, 1]] }, hat: { Head: [[1, 1]], Body: [[1, 1]] }, hair: { Head: [[0, 1]] } }
+  ];
+  var HAT_MESHES = [["Helmet", "HelmetVisor"], ["BearHat"], ["Hat"], [], [], []];
+  var HIDDEN_MESHES = ["Mask"];
+  var COLOR_PARTS = [
+    { key: "top", label: "옷", set: COLOR_SET },
+    { key: "arm", label: "팔", set: COLOR_SET },
+    { key: "pants", label: "바지", set: COLOR_SET },
+    { key: "cape", label: "망토", set: COLOR_SET },
+    { key: "hat", label: "모자", set: COLOR_SET },
+    { key: "skin", label: "피부", set: SKIN_SET },
+    { key: "hair", label: "머리색", set: HAIR_SET }
+  ];
+
+  var $ = function (id) { return document.getElementById(id); };
+  function keys(o) { return Object.keys(o || {}); }
+  function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+  function lerp(a, b, k) { return a + (b - a) * k; }
+  function rand(a, b) { return a + Math.random() * (b - a); }
+  function r2(v) { return Math.round(v * 100) / 100; }
+  function show(el, on) { el.hidden = !on; }
+  function setText(el, t) { if (el.textContent !== t) el.textContent = t; }
+  function angleDiff(a, b) { var d = a - b; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return d; }
+  function mulberry32(seed) {
+    var a = seed >>> 0;
+    return function () { a = (a + 0x6D2B79F5) >>> 0; var t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  }
+  var TOUCH = "ontouchstart" in window || (navigator.maxTouchPoints || 0) > 0;
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+
+  function floorY(f) { return f * FLOOR_GAP; }
+  function tileIndexAt(x, z) {
+    var ix = Math.floor((x + HALF) / TILE), iz = Math.floor((z + HALF) / TILE);
+    if (ix < 0 || iz < 0 || ix >= GRID || iz >= GRID) return -1;
+    return iz * GRID + ix;
+  }
+  function tileCenter(i) { return { x: (i % GRID) * TILE - HALF + TILE / 2, z: Math.floor(i / GRID) * TILE - HALF + TILE / 2 }; }
+  function ringOf(i) { var ix = i % GRID, iz = Math.floor(i / GRID); return Math.min(ix, iz, GRID - 1 - ix, GRID - 1 - iz); }
+  function collapseDelayMs(f) {
+    return (COLLAPSE_TOP_S + (FLOOR_COUNT - 1 - f) / Math.max(1, FLOOR_COUNT - 1) * (COLLAPSE_BOTTOM_S - COLLAPSE_TOP_S)) * 1000;
+  }
+
+  var CONF = window.PORTAL_CONFIG || {};
+  var db = null;
+  try {
+    if (window.firebase && CONF.isReady && CONF.isReady()) {
+      firebase.initializeApp({ apiKey: CONF.API_KEY, authDomain: CONF.AUTH_DOMAIN, databaseURL: CONF.DB_URL.replace(/\/+$/, "") });
+      db = firebase.database();
+    }
+  } catch (e) { db = null; }
+  var serverOffset = 0;
+  if (db) db.ref(".info/serverTimeOffset").on("value", function (s) { serverOffset = s.val() || 0; });
+  function now() { return Date.now() + serverOffset; }
+
+  var myId = "p" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+  var room = null, P = {}, subs = [], leaving = false;
+  var ENT = {}, ROSTER = [], OUTS = {}, BOARD = null;
+  var phase = "idle", curRid = 0, roundNo = 0;
+  var shownFloor = FLOOR_COUNT - 1, fadeSwitching = false;
+  var spectTargetId = null;
+  var showcase = { yaw: 0.4, entity: null, key: "" };
+  var screenNow = "start";
+
+  var NICK_KEY = "lasttile_nick_v1", LOOK_KEY = "lasttile_look_v1";
+  function defaultLook() { return { c: 0, p: { top: 0, arm: 0, pants: 0, cape: 0, hat: 0, skin: 0, hair: 0 }, cape: 1, hat: 1 }; }
+  function cleanLook(l) {
+    var d = defaultLook();
+    if (!l || typeof l !== "object") return d;
+    d.c = clamp(Math.floor(+l.c || 0), 0, CHAR_TYPES.length - 1);
+    COLOR_PARTS.forEach(function (cp) { var v = Math.floor(+((l.p || {})[cp.key]) || 0); d.p[cp.key] = clamp(v, 0, cp.set.length); });
+    d.cape = l.cape === 0 ? 0 : 1; d.hat = l.hat === 0 ? 0 : 1;
+    return d;
+  }
+  function randomLook() {
+    var l = defaultLook(); l.c = Math.floor(Math.random() * CHAR_TYPES.length);
+    COLOR_PARTS.forEach(function (cp) { l.p[cp.key] = Math.random() < 0.15 ? 0 : 1 + Math.floor(Math.random() * cp.set.length); l.p[cp.key] = Math.min(l.p[cp.key], cp.set.length); });
+    return l;
+  }
+  var myLook = defaultLook(), myNick = "";
+  try { myLook = cleanLook(JSON.parse(localStorage.getItem(LOOK_KEY))); myNick = String(localStorage.getItem(NICK_KEY) || "").slice(0, 8); } catch (e) {}
+  function saveLocal() { try { localStorage.setItem(LOOK_KEY, JSON.stringify(myLook)); localStorage.setItem(NICK_KEY, myNick); } catch (e) {} }
+  function cleanNick(s) { return String(s || "").replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, 8); }
+  function nickOrDefault() { return myNick || "학생" + Math.floor(rand(10, 99)); }
+
+  var TOUCH_ADAPT = TOUCH;
+  var canvas = $("view");
+  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: !TOUCH_ADAPT, powerPreference: "high-performance" });
+  var pixelRatio = Math.min(window.devicePixelRatio || 1, TOUCH_ADAPT ? 1.5 : 2);
+  renderer.setPixelRatio(pixelRatio);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  var scene = new THREE.Scene();
+  var SKY = new THREE.Color("#161A2C");
+  scene.background = SKY;
+  scene.fog = new THREE.Fog("#161A2C", 30, 78);
+  var camera = new THREE.PerspectiveCamera(42, 1, 0.5, 200);
+  scene.add(new THREE.HemisphereLight(0xDCE6FF, 0x40324A, 1.05));
+  var sun = new THREE.DirectionalLight(0xFFF0D2, 1.6);
+  sun.position.set(6, 16, 9);
+  scene.add(sun);
+  var world = new THREE.Group();
+  scene.add(world);
+
+  function resize() {
+    var w = window.innerWidth, h = window.innerHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.fov = w / h < 0.9 ? 52 : 42;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  var KIT = { ready: false, chars: {}, clips: {}, tile: null, props: {}, propsReady: false };
+  var FLOOR = [];
+  var TILE_MESH = [];
+  var TILE_COLORS = FLOOR_COLORS.map(function (c) { return new THREE.Color(c); });
+  var WARN = new THREE.Color(WARN_COLOR);
+  var tmpM = new THREE.Matrix4(), tmpQ = new THREE.Quaternion(), tmpS = new THREE.Vector3(), tmpP = new THREE.Vector3(), tmpC = new THREE.Color();
+
+  function floorColorIndex(f) {
+    if (FLOOR_COUNT <= 1) return 2;
+    return Math.round(f / (FLOOR_COUNT - 1) * 2);
+  }
+
+  function buildFloors() {
+    var geo = KIT.tile;
+    for (var f = 0; f < FLOOR_COUNT; f++) {
+      var g = new THREE.Group();
+      g.position.y = floorY(f);
+      var mat = new THREE.MeshLambertMaterial({ color: 0xFFFFFF });
+      var im = new THREE.InstancedMesh(geo, mat, GRID * GRID);
+      im.frustumCulled = false;
+      g.add(im);
+      TILE_MESH[f] = im;
+      addClouds(g, f);
+      addIslands(g, f);
+      g.visible = false;
+      scene.add(g);
+      FLOOR[f] = g;
+    }
+    KIT.floorsBuilt = true;
+    showFloorOnly(shownFloor);
+  }
+  function addClouds(g, f) {
+    var rng = mulberry32(900 + f);
+    var mat = new THREE.MeshBasicMaterial({ color: 0xC9D2EC, transparent: true, opacity: 0.22, depthWrite: false, fog: false });
+    for (var i = 0; i < 9; i++) {
+      var w = 14 + rng() * 22, d = 8 + rng() * 12;
+      var m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat);
+      m.rotation.x = -Math.PI / 2;
+      var a = rng() * Math.PI * 2, r = 10 + rng() * 22;
+      m.position.set(Math.cos(a) * r, -2.4 - rng() * 2.4, Math.sin(a) * r);
+      g.add(m);
+    }
+  }
+  function fitToHeight(tpl, h) {
+    var box = new THREE.Box3().setFromObject(tpl), size = box.getSize(new THREE.Vector3());
+    var m = tpl.clone(true), s = h / Math.max(0.001, size.y);
+    m.scale.setScalar(s);
+    m.position.y = -box.min.y * s;
+    var holder = new THREE.Group();
+    holder.add(m);
+    return holder;
+  }
+  var DECOR_PROPS = [["detail_treeA", 4.2], ["detail_treeB", 4.6], ["detail_treeC", 3.8], ["detail_rocks", 1.6], ["detail_rocks_small", 1.1], ["detail_hill", 2.4], ["detail_forestA", 3.4]];
+  function addIslands(g, f) {
+    var rng = mulberry32(300 + f * 17);
+    var count = 12;
+    for (var i = 0; i < count; i++) {
+      var a = (i + rng() * 0.6) / count * Math.PI * 2, r = 9.6 + rng() * 5;
+      var s = 2.4 + rng() * 2.4;
+      var island = new THREE.Mesh(KIT.tile, KIT.islandMat);
+      island.scale.set(s / 2, 0.9 + rng() * 1.2, s / 2);
+      island.position.set(Math.cos(a) * r, -island.scale.y - 0.2, Math.sin(a) * r);
+      island.rotation.y = rng() * Math.PI;
+      g.add(island);
+      var pick = DECOR_PROPS[Math.floor(rng() * DECOR_PROPS.length)];
+      var tpl = KIT.props[pick[0]];
+      if (tpl) {
+        var prop = fitToHeight(tpl, pick[1] * (0.8 + rng() * 0.5));
+        prop.position.set(island.position.x, -0.2, island.position.z);
+        prop.rotation.y = rng() * Math.PI * 2;
+        g.add(prop);
+      }
+    }
+  }
+  function showFloorOnly(f) {
+    for (var i = 0; i < FLOOR.length; i++) if (FLOOR[i]) FLOOR[i].visible = i === f;
+  }
+
+  function buildBoard(seed, startAt) {
+    var rng = mulberry32(seed);
+    var B = { startAt: startAt, hole: [], stepAt: [], suddenAt: [], collapseAt: [] };
+    var order = [];
+    for (var f = FLOOR_COUNT - 1; f >= 0; f--) for (var r = 0; r < GRID / 2; r++) order.push([f, r]);
+    for (var f2 = 0; f2 < FLOOR_COUNT; f2++) {
+      B.hole[f2] = []; B.stepAt[f2] = []; B.suddenAt[f2] = []; B.collapseAt[f2] = [];
+      for (var i = 0; i < GRID * GRID; i++) {
+        B.hole[f2][i] = false; B.stepAt[f2][i] = Infinity;
+        var k = -1;
+        for (var q = 0; q < order.length; q++) if (order[q][0] === f2 && order[q][1] === ringOf(i)) k = q;
+        B.suddenAt[f2][i] = isFinite(startAt) && k >= 0 ? startAt + (SUDDEN_START_S + k * SUDDEN_STEP_S) * 1000 : Infinity;
+        B.collapseAt[f2][i] = B.suddenAt[f2][i] === Infinity ? Infinity : B.suddenAt[f2][i] + collapseDelayMs(f2);
+      }
+    }
+    var ids = [];
+    for (var j = 0; j < GRID * GRID; j++) ids.push(j);
+    for (var n = 0; n < BOTTOM_HOLES; n++) {
+      var pick = Math.floor(rng() * ids.length);
+      B.hole[0][ids[pick]] = true;
+      ids.splice(pick, 1);
+    }
+    return B;
+  }
+  function recomputeCollapse(f, i) {
+    var trig = Math.min(BOARD.stepAt[f][i], BOARD.suddenAt[f][i]);
+    BOARD.collapseAt[f][i] = trig === Infinity ? Infinity : trig + collapseDelayMs(f);
+  }
+  function tileSolid(f, i, t) { return i >= 0 && !BOARD.hole[f][i] && t < BOARD.collapseAt[f][i]; }
+  function solidAt(f, x, z, t) { return tileSolid(f, tileIndexAt(x, z), t); }
+  BOARD = buildBoard(1, Infinity);
+
+  function renderTiles(f, t) {
+    var im = TILE_MESH[f];
+    if (!im) return;
+    var base = TILE_COLORS[floorColorIndex(f)];
+    for (var i = 0; i < GRID * GRID; i++) {
+      var c = tileCenter(i), y = -0.5, sx = TILE_SCALE, sz = TILE_SCALE, sy = 0.5, ox = 0, oz = 0, k = 0;
+      if (BOARD.hole[f][i]) { sx = sz = sy = 0; }
+      else {
+        var trig = Math.min(BOARD.stepAt[f][i], BOARD.suddenAt[f][i]), col = BOARD.collapseAt[f][i];
+        if (trig !== Infinity && t >= trig) {
+          if (t < col) {
+            var p = (t - trig) / Math.max(1, col - trig);
+            k = 0.35 + p * 0.65;
+            ox = Math.sin(t * 0.06 + i * 1.7) * 0.06 * p; oz = Math.cos(t * 0.07 + i) * 0.06 * p;
+            y -= 0.05 * p;
+          } else {
+            var ft = (t - col) / 1000;
+            k = 1; y -= 0.5 * GRAVITY * ft * ft * 0.6;
+            var sh = clamp(1 - ft / 1.0, 0, 1);
+            sx *= sh; sz *= sh; sy *= sh;
+          }
+        }
+      }
+      tmpP.set(c.x + ox, y, c.z + oz); tmpS.set(sx, sy, sz); tmpQ.identity();
+      tmpM.compose(tmpP, tmpQ, tmpS);
+      im.setMatrixAt(i, tmpM);
+      tmpC.copy(base);
+      if (((i % GRID) + Math.floor(i / GRID)) % 2) tmpC.multiplyScalar(0.9);
+      if (k > 0) tmpC.lerp(WARN, k);
+      im.setColorAt(i, tmpC);
+    }
+    im.instanceMatrix.needsUpdate = true;
+    if (im.instanceColor) im.instanceColor.needsUpdate = true;
+  }
+
+  function loadKit() {
+    var loader = new GLTFLoader();
+    function load(url) { return new Promise(function (ok, no) { loader.load(url, ok, undefined, no); }); }
+    var jobs = [];
+    jobs.push(load(KIT_DIR + "animations/teambattle_anims.glb?v=crossbow").then(function (g) { g.animations.forEach(function (c) { KIT.clips[c.name] = c; }); }));
+    CHAR_TYPES.forEach(function (ct) { jobs.push(load(KIT_DIR + "characters/" + ct.file + ".glb").then(function (g) { KIT.chars[ct.file] = g.scene; })); });
+    jobs.push(load(KIT_DIR + "medieval/tiles/square_sand.glb").then(function (g) {
+      var mesh = g.scene.getObjectByProperty("isMesh", true);
+      KIT.tile = mesh.geometry;
+      KIT.islandMat = new THREE.MeshLambertMaterial({ color: 0x4A4256 });
+    }));
+    var propJobs = DECOR_PROPS.map(function (d) {
+      return load(KIT_DIR + "medieval/objects/" + d[0] + ".glb").then(function (g) {
+        g.scene.traverse(function (o) { if (o.isMesh) o.material = new THREE.MeshLambertMaterial({ map: o.material.map, color: o.material.color }); });
+        KIT.props[d[0]] = g.scene;
+      }).catch(function () {});
+    });
+    Promise.all(jobs.concat(propJobs)).then(function () {
+      KIT.ready = true;
+      buildFloors();
+      setText($("loadNote"), "");
+      refreshShowcase(true);
+      updateStartButtons();
+    }).catch(function () { setText($("loadNote"), "캐릭터를 불러오지 못했어요. 새로고침해 주세요."); });
+  }
+
+  var TEX_CACHE = {};
+  function meshSuffix(name, prefix) { return name.indexOf(prefix + "_") === 0 ? name.slice(prefix.length + 1) : name; }
+  function partColor(look, key) {
+    var idx = look.p[key];
+    if (!idx) return null;
+    var cp = COLOR_PARTS.filter(function (x) { return x.key === key; })[0];
+    return cp.set[idx - 1];
+  }
+  function shade(hex, k) {
+    var n = parseInt(hex.slice(1), 16), r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    return "rgb(" + Math.round(r * k) + "," + Math.round(g * k) + "," + Math.round(b * k) + ")";
+  }
+  var TEX_SIZE = 256, TEX_COLS = 8, TEX_ROWS = 4;
+  function meshTexture(typeIdx, suffix, look, srcImage) {
+    var rules = PART_RULES[typeIdx], paint = [];
+    ["top", "arm", "pants", "cape", "hat", "hair"].forEach(function (part) {
+      var cells = rules[part] && rules[part][suffix], col = partColor(look, part);
+      if (cells && col) cells.forEach(function (c) { paint.push([c[0], c[1], col]); });
+    });
+    var skin = partColor(look, "skin");
+    if (skin) paint.push([0, 0, skin]);
+    var key = typeIdx + "|" + suffix + "|" + paint.map(function (p) { return p.join(":"); }).join("/");
+    if (TEX_CACHE[key]) return TEX_CACHE[key];
+    var cv = document.createElement("canvas"); cv.width = cv.height = TEX_SIZE;
+    var g = cv.getContext("2d"), cw = TEX_SIZE / TEX_COLS, ch = TEX_SIZE / TEX_ROWS;
+    g.drawImage(srcImage, 0, 0, TEX_SIZE, TEX_SIZE);
+    paint.forEach(function (p) {
+      var x = p[1] * cw, y = p[0] * ch, grad = g.createLinearGradient(0, y, 0, y + ch);
+      grad.addColorStop(0, shade(p[2], 1)); grad.addColorStop(1, shade(p[2], 0.82));
+      g.fillStyle = grad; g.fillRect(x, y, cw, ch);
+    });
+    var tex = new THREE.CanvasTexture(cv);
+    tex.flipY = false; tex.colorSpace = THREE.SRGBColorSpace;
+    tex.generateMipmaps = false; tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter;
+    TEX_CACHE[key] = tex;
+    return tex;
+  }
+
+  function roundedRect(g, x, y, w, h, r) {
+    g.beginPath(); g.moveTo(x + r, y); g.lineTo(x + w - r, y); g.arcTo(x + w, y, x + w, y + r, r); g.lineTo(x + w, y + h - r); g.arcTo(x + w, y + h, x + w - r, y + h, r);
+    g.lineTo(x + r, y + h); g.arcTo(x, y + h, x, y + h - r, r); g.lineTo(x, y + r); g.arcTo(x, y, x + r, y, r); g.closePath();
+  }
+  function makeLabel(text, color) {
+    var cv = document.createElement("canvas"); cv.width = 256; cv.height = 64;
+    var g = cv.getContext("2d");
+    roundedRect(g, 4, 6, 248, 52, 14);
+    g.fillStyle = "rgba(12,16,26,.78)"; g.fill();
+    g.lineWidth = 5; g.strokeStyle = color; g.stroke();
+    g.font = '800 30px "Nanum Gothic", "Malgun Gothic", sans-serif';
+    g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = "#FFFFFF";
+    g.fillText(text, 128, 34, 232);
+    var tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+    var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+    sp.scale.set(2.6, 0.65, 1);
+    return sp;
+  }
+  var BLOB_TEX = (function () {
+    var cv = document.createElement("canvas"); cv.width = cv.height = 64;
+    var g = cv.getContext("2d"), gr = g.createRadialGradient(32, 32, 2, 32, 32, 30);
+    gr.addColorStop(0, "rgba(0,0,0,.55)"); gr.addColorStop(1, "rgba(0,0,0,0)");
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+    return new THREE.CanvasTexture(cv);
+  })();
+  var BLOB_MAT = new THREE.MeshBasicMaterial({ map: BLOB_TEX, transparent: true, depthWrite: false });
+  var BLOB_GEO = new THREE.PlaneGeometry(1.5, 1.5);
+  var RING_GEO = new THREE.RingGeometry(0.55, 0.74, 28);
+
+  function buildModel(look) {
+    var ti = look.c, ct = CHAR_TYPES[ti], src = KIT.chars[ct.file];
+    var model = SkeletonUtils.clone(src);
+    var srcImage = src.getObjectByProperty("isMesh", true).material.map.image;
+    var hats = HAT_MESHES[ti];
+    model.traverse(function (o) {
+      if (!o.isMesh) return;
+      var suffix = meshSuffix(o.name, ct.prefix);
+      o.material = new THREE.MeshLambertMaterial({ map: meshTexture(ti, suffix, look, srcImage) });
+      o.frustumCulled = false;
+      if (HIDDEN_MESHES.indexOf(suffix) >= 0) o.visible = false;
+      if (suffix === "Cape" && !look.cape) o.visible = false;
+      if (hats.indexOf(suffix) >= 0 && !look.hat) o.visible = false;
+    });
+    model.scale.setScalar(CHAR_SCALE);
+    return model;
+  }
+
+  var CLIP_NAMES = { idle: "Idle_A", run: "Running_A", push: "Melee_1H_Attack_Chop", hit: "Hit_A", fall: "Hit_A", dash: "Running_A" };
+  function makeEntity(id, p) {
+    var look = cleanLook(p.look), slot = p.slot || 0, color = SLOT_COLORS[slot % SLOT_COLORS.length];
+    var e = { id: id, nick: p.nick || "?", ai: !!(p.ai || p.isAI), slot: slot, color: color, look: look,
+      fl: FLOOR_COUNT - 1, x: 0, y: floorY(FLOOR_COUNT - 1), z: 0, vx: 0, vz: 0, yaw: 0, yawShown: 0, mode: "G", fid: 0, fall: null,
+      dashLeft: 0, dashDx: 0, dashDz: 1, dashUntil: 0, dashCdUntil: 0, pushAt: 0, pushCdUntil: 0, hitAt: 0, input: { x: 0, z: 0 }, speedFactor: 1,
+      net: null, outAt: 0, left: false, brain: null, animName: "", spin: 0 };
+    var group = new THREE.Group();
+    var inner = new THREE.Group();
+    var model = buildModel(look);
+    inner.add(model);
+    var ring = new THREE.Mesh(RING_GEO, new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.95, depthWrite: false }));
+    ring.rotation.x = -Math.PI / 2; ring.position.y = 0.04;
+    var label = makeLabel(e.nick + (e.ai ? " (AI)" : ""), color);
+    label.position.y = 2.75;
+    var blob = new THREE.Mesh(BLOB_GEO, BLOB_MAT);
+    blob.rotation.x = -Math.PI / 2;
+    group.add(inner, ring, label);
+    world.add(group, blob);
+    var mixer = new THREE.AnimationMixer(model), actions = {};
+    keys(CLIP_NAMES).forEach(function (k) { var clip = KIT.clips[CLIP_NAMES[k]]; if (clip) actions[k] = mixer.clipAction(k === "fall" || k === "dash" ? clip.clone() : clip); });
+    if (actions.push) { actions.push.setLoop(THREE.LoopOnce, 1); actions.push.clampWhenFinished = true; }
+    if (actions.hit) { actions.hit.setLoop(THREE.LoopOnce, 1); actions.hit.clampWhenFinished = true; }
+    e.group = group; e.inner = inner; e.blob = blob; e.mixer = mixer; e.actions = actions; e.ring = ring; e.label = label;
+    playAnim(e, "idle");
+    return e;
+  }
+  function playAnim(e, name, speed) {
+    var a = e.actions[name];
+    if (!a) return;
+    if (e.animName !== name) {
+      var prev = e.actions[e.animName];
+      a.reset().setEffectiveWeight(1).play();
+      if (prev && prev !== a) prev.crossFadeTo(a, 0.12, false);
+      e.animName = name;
+    }
+    a.timeScale = speed || 1;
+  }
+  function disposeEntity(e) {
+    world.remove(e.group); world.remove(e.blob);
+    e.group.traverse(function (o) { if (o.isMesh && o.material && o.material !== BLOB_MAT) o.material.dispose(); });
+    if (e.label && e.label.material) { if (e.label.material.map) e.label.material.map.dispose(); e.label.material.dispose(); }
+  }
+  function clearEntities() {
+    keys(ENT).forEach(function (id) { disposeEntity(ENT[id]); });
+    ENT = {}; ROSTER = []; OUTS = {};
+  }
+
+  function isHost() { return !!room && room.host === myId; }
+  function isLocal(e) { return e.id === myId || (e.ai && isHost()); }
+  function myEntity() { return ENT[myId] || null; }
+  function playingNow(t) { return phase === "go" || (phase === "count" && t >= curStartAt()); }
+  function curStartAt() { return BOARD && BOARD.startAt !== Infinity ? BOARD.startAt : 0; }
+  function isDashing(e) { return e.dashLeft > 0; }
+
+  function startPosition(idx, n) {
+    var a = idx / n * Math.PI * 2 + 0.4;
+    return { x: Math.cos(a) * START_RING_R, z: Math.sin(a) * START_RING_R };
+  }
+  function triggerTile(f, i, t) {
+    if (BOARD.stepAt[f][i] !== Infinity) return;
+    BOARD.stepAt[f][i] = t; recomputeCollapse(f, i);
+    if (!room || !db) return;
+    var key = f + "_" + i;
+    if (isHost()) room.ref.child("tiles/" + key).set(t);
+    else room.ref.child("tileReq/" + key).transaction(function (cur) { return cur !== null && cur <= t ? undefined : t; });
+  }
+  function startFall(e, t) {
+    e.mode = "F"; e.fid++;
+    e.fall = { x: e.x, y: e.y, z: e.z, vx: e.vx, vz: e.vz, t0: t, pf: e.fl };
+    e.fl = -1; e.dashLeft = 0;
+    if (isLocal(e)) netFlush(t);
+  }
+  function eliminate(e, t) {
+    e.mode = "O"; e.outAt = t; e.fall = null;
+    OUTS[e.id] = OUTS[e.id] || { t: t };
+    if (isLocal(e) && room) { room.ref.child("out/" + e.id).set({ t: t }); netFlush(t); }
+  }
+  function fallStep(e, t, authoritative) {
+    var f = e.fall, tt = (t - f.t0) / 1000;
+    var nx = f.x + f.vx * tt, nz = f.z + f.vz * tt, ny = f.y - 0.5 * GRAVITY * tt * tt;
+    for (var k = f.pf - 1; k >= 0; k--) {
+      var yk = floorY(k);
+      if (ny > yk) break;
+      var tk = Math.sqrt(2 * (f.y - yk) / GRAVITY);
+      var px = f.x + f.vx * tk, pz = f.z + f.vz * tk, tms = f.t0 + tk * 1000;
+      if (tileSolid(k, tileIndexAt(px, pz), tms)) {
+        e.mode = "G"; e.fl = k; e.x = px; e.z = pz; e.y = yk;
+        e.vx = f.vx * LAND_KEEP; e.vz = f.vz * LAND_KEEP; e.fall = null;
+        if (!isLocal(e)) e.net = { mode: "G", ts: t, x: e.x, z: e.z, vx: e.vx, vz: e.vz, yaw: e.yaw };
+        if (isLocal(e)) netFlush(t);
+        return;
+      }
+      f.pf = k;
+    }
+    e.x = nx; e.y = ny; e.z = nz;
+    if (isLocal(e) && ny < floorY(0) - DEATH_DEPTH) eliminate(e, t);
+  }
+  function afterMove(e, t) {
+    var i = tileIndexAt(e.x, e.z);
+    if (!tileSolid(e.fl, i, t)) { startFall(e, t); return; }
+    if (t >= curStartAt() && BOARD.stepAt[e.fl][i] === Infinity) triggerTile(e.fl, i, t);
+  }
+  function stepGround(e, dt, t) {
+    if (e.dashLeft > 0) {
+      var step = Math.min(e.dashLeft, DASH_SPEED * dt);
+      e.x += e.dashDx * step; e.z += e.dashDz * step; e.dashLeft -= step;
+      if (e.dashLeft <= 0.0001) {
+        e.dashLeft = 0; e.vx = e.dashDx * DASH_EXIT_SPEED; e.vz = e.dashDz * DASH_EXIT_SPEED;
+        afterMove(e, t);
+      }
+      return;
+    }
+    var live = playingNow(t), wx = live ? e.input.x : 0, wz = live ? e.input.z : 0;
+    var tvx = wx * MAX_SPEED * e.speedFactor, tvz = wz * MAX_SPEED * e.speedFactor;
+    var dvx = tvx - e.vx, dvz = tvz - e.vz, len = Math.hypot(dvx, dvz), rate = (wx || wz) ? ACCEL : FRICTION, stp = rate * dt;
+    if (len <= stp) { e.vx = tvx; e.vz = tvz; }
+    else { e.vx += dvx / len * stp; e.vz += dvz / len * stp; }
+    e.x += e.vx * dt; e.z += e.vz * dt;
+    if (live && (wx || wz)) e.yaw = Math.atan2(wx, wz);
+    afterMove(e, t);
+  }
+  function stepLocal(e, dt, t) {
+    if (e.mode === "G") stepGround(e, dt, t);
+    else if (e.mode === "F") fallStep(e, t, true);
+  }
+  function stepRemote(e, dt, t) {
+    var s = e.net;
+    if (e.mode === "G" && s && s.mode === "G") {
+      var age = clamp((t - s.ts) / 1000, 0, 0.35), tx = s.x + s.vx * age, tz = s.z + s.vz * age, k = Math.min(1, dt * 14);
+      e.x += (tx - e.x) * k; e.z += (tz - e.z) * k;
+      e.y = lerp(e.y, floorY(e.fl), Math.min(1, dt * 18));
+      e.vx = s.vx; e.vz = s.vz;
+      e.yaw = s.yaw;
+      e.dashUntil = s.dashUntil; e.pushAt = s.pushAt;
+    } else if (e.mode === "F" && e.fall) fallStep(e, t, false);
+  }
+
+  function doPush(e, t) {
+    if (e.mode !== "G" || isDashing(e) || t < e.pushCdUntil || !playingNow(t)) return false;
+    e.pushAt = t; e.pushCdUntil = t + PUSH_COOLDOWN_MS;
+    if (room) room.ref.child("ev").push({ by: e.id, x: r2(e.x), z: r2(e.z), f: e.fl, a: r2(e.yaw), t: Math.round(t) });
+    netFlush(t);
+    return true;
+  }
+  function doDash(e, t, yaw) {
+    if (e.mode !== "G" || isDashing(e) || t < e.dashCdUntil || !playingNow(t)) return false;
+    var dx, dz;
+    if (yaw != null) { dx = Math.sin(yaw); dz = Math.cos(yaw); }
+    else if (e.input.x || e.input.z) { var l = Math.hypot(e.input.x, e.input.z); dx = e.input.x / l; dz = e.input.z / l; }
+    else { dx = Math.sin(e.yaw); dz = Math.cos(e.yaw); }
+    e.dashDx = dx; e.dashDz = dz; e.dashLeft = DASH_DISTANCE; e.yaw = Math.atan2(dx, dz);
+    e.dashUntil = t + DASH_TIME_S * 1000; e.dashCdUntil = t + DASH_COOLDOWN_MS;
+    netFlush(t);
+    return true;
+  }
+  function onPushEvent(ev) {
+    var t = now();
+    if (!ev || t - ev.t > 3000 || phase === "idle") return;
+    keys(ENT).forEach(function (id) {
+      var v = ENT[id];
+      if (!isLocal(v) || v.id === ev.by || v.mode !== "G" || v.fl !== ev.f || isDashing(v) || !playingNow(t)) return;
+      var dx = v.x - ev.x, dz = v.z - ev.z, d = Math.hypot(dx, dz);
+      if (d > PUSH_RANGE) return;
+      var ang = Math.atan2(dx, dz);
+      if (d > 0.8 && Math.abs(angleDiff(ang, ev.a)) > PUSH_HALF_ANGLE) return;
+      var rx = d > 0.001 ? dx / d : Math.sin(ev.a), rz = d > 0.001 ? dz / d : Math.cos(ev.a);
+      var fx = Math.sin(ev.a), fz = Math.cos(ev.a);
+      var ux = fx * (1 - PUSH_BLEND_RADIAL) + rx * PUSH_BLEND_RADIAL, uz = fz * (1 - PUSH_BLEND_RADIAL) + rz * PUSH_BLEND_RADIAL, ul = Math.hypot(ux, uz) || 1;
+      v.vx += ux / ul * PUSH_IMPULSE; v.vz += uz / ul * PUSH_IMPULSE;
+      v.hitAt = t;
+      netFlush(t);
+    });
+  }
+
+  function pathClear(f, x0, z0, x1, z1, t) {
+    var d = Math.hypot(x1 - x0, z1 - z0), n = Math.max(1, Math.ceil(d / 0.4));
+    for (var s = 1; s <= n; s++) {
+      if (!solidAt(f, lerp(x0, x1, s / n), lerp(z0, z1, s / n), t)) return false;
+    }
+    return true;
+  }
+  function aiStep(e, t) {
+    var b = e.brain || (e.brain = { nextThink: 0, queue: null });
+    if (e.mode !== "G") { e.input = { x: 0, z: 0 }; b.queue = null; return; }
+    e.speedFactor = AI_TUNE.speedFactor;
+    if (b.queue && t >= b.queue.at) {
+      var q = b.queue; b.queue = null;
+      if (q.kind === "push") { e.yaw = q.yaw; doPush(e, t); }
+      else if (q.kind === "dash") doDash(e, t, q.yaw);
+    }
+    if (t < b.nextThink) return;
+    b.nextThink = t + rand(AI_TUNE.thinkMin, AI_TUNE.thinkMax);
+    if (!playingNow(t)) return;
+    aiThink(e, t, b);
+  }
+  function aiThink(e, t, b) {
+    var f = e.fl, i = tileIndexAt(e.x, e.z);
+    var remain = i >= 0 ? BOARD.collapseAt[f][i] - t : 0;
+    var endangered = remain < AI_TUNE.dangerMs;
+    var foe = null, foeD = 99;
+    keys(ENT).forEach(function (id) {
+      var o = ENT[id];
+      if (o === e || o.mode !== "G" || o.fl !== f) return;
+      var d = Math.hypot(o.x - e.x, o.z - e.z);
+      if (d < foeD) { foeD = d; foe = o; }
+    });
+    var react = rand(AI_TUNE.reactMin, AI_TUNE.reactMax);
+    var pushReady = t >= e.pushCdUntil, dashReady = t >= e.dashCdUntil;
+    if (foe && !b.queue) {
+      var ang = Math.atan2(foe.x - e.x, foe.z - e.z);
+      var edgy = !solidAt(f, foe.x + Math.sin(ang) * 1.5, foe.z + Math.cos(ang) * 1.5, t + 400);
+      if (foeD < PUSH_RANGE * 0.92 && pushReady && edgy && Math.random() < AI_TUNE.pushSuccess) {
+        b.queue = { at: t + react, kind: "push", yaw: ang + rand(-AI_TUNE.aimNoise, AI_TUNE.aimNoise) };
+      } else if (foeD > 2.6 && foeD < 4.6 && dashReady && pushReady && edgy && !endangered && Math.random() < AI_TUNE.dashApproachChance
+          && pathClear(f, e.x, e.z, e.x + Math.sin(ang) * (foeD - 1.2), e.z + Math.cos(ang) * (foeD - 1.2), t)) {
+        b.queue = { at: t + react, kind: "dash", yaw: ang };
+      }
+    }
+    var best = null, bestScore = 1e9;
+    for (var j = 0; j < GRID * GRID; j++) {
+      if (j === i && endangered) continue;
+      var left = BOARD.collapseAt[f][j] - t;
+      if (BOARD.hole[f][j] || left < AI_TUNE.safeMs) continue;
+      var c = tileCenter(j), d = Math.hypot(c.x - e.x, c.z - e.z);
+      if (d > 7.5) continue;
+      if (!pathClear(f, e.x, e.z, c.x, c.z, t)) continue;
+      var fresh = BOARD.stepAt[f][j] === Infinity && BOARD.suddenAt[f][j] - t > AI_TUNE.safeMs;
+      var score = d + 0.35 * Math.hypot(c.x, c.z) + (fresh ? -1.4 : 1.5) + Math.random() * AI_TUNE.targetNoise;
+      if (j === i) score += 3;
+      if (score < bestScore) { bestScore = score; best = c; }
+    }
+    if (!best) {
+      var nearest = null, nd = 1e9;
+      for (var m = 0; m < GRID * GRID; m++) {
+        if (BOARD.hole[f][m] || BOARD.collapseAt[f][m] - t < 400) continue;
+        var cc = tileCenter(m), dd = Math.hypot(cc.x - e.x, cc.z - e.z);
+        if (dd < nd) { nd = dd; nearest = cc; }
+      }
+      if (nearest) {
+        var ya = Math.atan2(nearest.x - e.x, nearest.z - e.z);
+        if (dashReady && nd > 2.2 && nd < DASH_DISTANCE + 1 && !b.queue) b.queue = { at: t + 60, kind: "dash", yaw: ya };
+        best = nearest;
+      }
+    }
+    if (!best) { e.input = { x: 0, z: 0 }; return; }
+    var dx = best.x - e.x, dz = best.z - e.z, dl = Math.hypot(dx, dz);
+    if (dl < 0.3 && !endangered) { e.input = { x: 0, z: 0 }; return; }
+    var sp = endangered ? 1 : (dl < 1 ? AI_TUNE.idleSpeedFactor : 1);
+    e.speedFactor = AI_TUNE.speedFactor;
+    e.input = { x: dx / dl * sp, z: dz / dl * sp };
+  }
+
+  function packState(e, t) {
+    var f = e.mode === "F" ? e.fall : null;
+    var a = f ? [f.x, f.y, f.z, f.vx, f.vz] : [e.x, e.y, e.z, e.vx, e.vz];
+    return [e.mode, e.fl, r2(a[0]), r2(a[1]), r2(a[2]), r2(a[3]), r2(a[4]), r2(e.yaw), e.fid, f ? f.pf : 0, Math.round(t), Math.round(e.dashUntil || 0), Math.round(e.pushAt || 0), f ? Math.round(f.t0) : 0].join(",");
+  }
+  function parseState(str) {
+    var a = String(str).split(",");
+    if (a.length < 14) return null;
+    return { mode: a[0], fl: +a[1], x: +a[2], y: +a[3], z: +a[4], vx: +a[5], vz: +a[6], yaw: +a[7], fid: +a[8], pf: +a[9], ts: +a[10], dashUntil: +a[11], pushAt: +a[12], t0: +a[13] };
+  }
+  var lastNet = 0;
+  function netFlush(t) {
+    if (!room || !db || phase === "idle") return;
+    var u = {}, any = false;
+    keys(ENT).forEach(function (id) { var e = ENT[id]; if (isLocal(e) && !e.left) { u[id] = packState(e, t); any = true; } });
+    lastNet = t;
+    if (any) room.ref.child("st").update(u);
+  }
+  function applyNet(e, s) {
+    e.net = s;
+    if (s.mode === "O") { e.mode = "O"; e.fall = null; return; }
+    if (s.mode === "G") {
+      var need = e.mode !== "G" || e.fl !== s.fl || Math.hypot(e.x - s.x, e.z - s.z) > 2.5;
+      e.mode = "G"; e.fl = s.fl; e.fall = null;
+      if (need) { e.x = s.x + s.vx * 0.05; e.z = s.z + s.vz * 0.05; e.y = floorY(s.fl); }
+      e.yaw = s.yaw; e.dashUntil = s.dashUntil; e.pushAt = s.pushAt;
+    } else if (s.mode === "F") {
+      if (e.mode !== "F" || e.fid !== s.fid || !e.fall) {
+        e.mode = "F"; e.fid = s.fid; e.fl = -1;
+        e.fall = { x: s.x, y: s.y, z: s.z, vx: s.vx, vz: s.vz, t0: s.t0, pf: s.pf };
+      } else if (s.pf < e.fall.pf) e.fall.pf = s.pf;
+      e.yaw = s.yaw;
+    }
+  }
+
+  function subjectEntity() {
+    var me = myEntity();
+    if (me && me.mode !== "O") return me;
+    var t = spectTargetId && ENT[spectTargetId];
+    if (t && t.mode !== "O") return t;
+    var alive = ROSTER.map(function (id) { return ENT[id]; }).filter(function (x) { return x && x.mode !== "O"; });
+    if (alive.length) { spectTargetId = alive[0].id; return alive[0]; }
+    return me || t || null;
+  }
+  function cycleSpectate() {
+    var alive = ROSTER.map(function (id) { return ENT[id]; }).filter(function (x) { return x && x.mode !== "O" && x.id !== myId; });
+    if (!alive.length) return;
+    var idx = -1;
+    alive.forEach(function (x, k) { if (x.id === spectTargetId) idx = k; });
+    spectTargetId = alive[(idx + 1) % alive.length].id;
+  }
+
+  var camState = { fx: 0, fy: 0, fz: 0, init: false };
+  function updateCamera(dt, subject) {
+    var aspect = camera.aspect, zoom = clamp(1.3 / aspect, 1, 2.1);
+    var H = 15.5 * Math.pow(zoom, 0.8), D = 11.5 * Math.pow(zoom, 0.8);
+    var tx, ty, tz;
+    if (subject) { tx = subject.x * 0.62; tz = subject.z * 0.62; ty = subject.y; }
+    else { tx = 0; tz = 0; ty = floorY(shownFloor); }
+    if (!camState.init) { camState.fx = tx; camState.fy = ty; camState.fz = tz; camState.init = true; }
+    var k = Math.min(1, dt * 7);
+    camState.fx += (tx - camState.fx) * k; camState.fz += (tz - camState.fz) * k;
+    camState.fy = subject && subject.mode === "F" ? lerp(camState.fy, ty, Math.min(1, dt * 12)) : lerp(camState.fy, ty, Math.min(1, dt * 6));
+    camera.position.set(camState.fx, camState.fy + H, camState.fz + D);
+    camera.lookAt(camState.fx, camState.fy + 0.4, camState.fz - 0.4);
+  }
+  function updateShowcaseCamera() {
+    var y = floorY(FLOOR_COUNT - 1);
+    var shift = window.innerWidth > 1000 ? 2.4 : 0;
+    camera.position.set(-shift, y + 2.9, 7.4);
+    camera.lookAt(-shift * 1.5, y + 1.2, 0);
+  }
+
+  function refreshShowcase(force) {
+    if (!KIT.ready) return;
+    var key = JSON.stringify(myLook) + "|" + myNick;
+    if (!force && showcase.key === key && showcase.entity) return;
+    if (showcase.entity) { disposeEntity(showcase.entity); showcase.entity = null; }
+    var e = makeEntity("showcase", { nick: myNick || "나", look: myLook, slot: 0 });
+    e.x = 0; e.z = 0; e.fl = FLOOR_COUNT - 1; e.y = floorY(e.fl);
+    showcase.entity = e; showcase.key = key;
+    e.label.visible = false;
+  }
+  function inGameScreens() { return screenNow === "start" || screenNow === "lobby"; }
+
+  function fadeSwitch(target) {
+    if (fadeSwitching) return;
+    fadeSwitching = true;
+    var el = $("fade");
+    el.style.opacity = "1";
+    setTimeout(function () {
+      shownFloor = target; showFloorOnly(shownFloor);
+      el.style.opacity = "0";
+      setTimeout(function () { fadeSwitching = false; }, 150);
+    }, 150);
+  }
+
+  var fpsAcc = 0, fpsN = 0, lowMs = 0;
+  function adaptQuality(dt) {
+    fpsAcc += dt; fpsN++;
+    if (fpsAcc < 0.5) return;
+    var fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0;
+    if (fps < 45) lowMs += 500; else lowMs = Math.max(0, lowMs - 500);
+    if (lowMs >= 3000 && pixelRatio > 1) {
+      pixelRatio = Math.max(1, pixelRatio - 0.25); renderer.setPixelRatio(pixelRatio); resize(); lowMs = 0;
+    }
+  }
+
+  function updateEntityView(e, dt, t, subject) {
+    var visible = e.mode !== "O" && !e.left;
+    var vy = floorY(shownFloor);
+    if (visible && e !== subject) {
+      if (e.mode === "G") visible = e.fl === shownFloor;
+      else visible = e.y < vy + 6 && e.y > vy - 3.5;
+    }
+    e.group.visible = visible;
+    e.blob.visible = visible;
+    if (!visible) return;
+    var tumble = 0;
+    if (e.mode === "F") { e.spin += dt * 6; tumble = Math.sin(e.spin) * 0.35; }
+    else e.spin = 0;
+    e.group.position.set(e.x, e.y, e.z);
+    var dyaw = angleDiff(e.yaw, e.yawShown);
+    e.yawShown += dyaw * Math.min(1, dt * 16);
+    e.inner.rotation.y = e.yawShown;
+    e.inner.rotation.x = e.mode === "F" ? tumble : (t < e.dashUntil ? 0.35 : 0);
+    var surfaceY = e.mode === "G" ? e.y : vy;
+    e.blob.position.set(e.x, surfaceY + 0.03, e.z);
+    var h = e.mode === "G" ? 0 : Math.max(0, e.y - surfaceY);
+    e.blob.scale.setScalar(clamp(1 - h / 12, 0.3, 1));
+    e.blob.visible = (e.mode === "G" || e.y > vy) && visible;
+    e.ring.visible = e.mode === "G";
+    var speed = Math.hypot(e.vx, e.vz);
+    if (e.mode === "F") playAnim(e, "fall", 1.6);
+    else if (t < e.dashUntil) playAnim(e, "dash", 2.4);
+    else if (t - e.pushAt < 400 && e.pushAt > 0) playAnim(e, "push", 1.8);
+    else if (t - e.hitAt < 500 && e.hitAt > 0 && isLocal(e)) playAnim(e, "hit", 1.4);
+    else if (speed > 0.6) playAnim(e, "run", clamp(speed / 5, 0.7, 1.5));
+    else playAnim(e, "idle", 1);
+    e.mixer.update(dt);
+  }
+
+  var held = {};
+  var joy = { id: null, ox: 0, oy: 0, x: 0, z: 0 };
+  function inputVector() {
+    var dx = (held.right ? 1 : 0) - (held.left ? 1 : 0), dz = (held.down ? 1 : 0) - (held.up ? 1 : 0);
+    if (dx || dz) { var l = Math.hypot(dx, dz); return { x: dx / l, z: dz / l }; }
+    return { x: joy.x, z: joy.z };
+  }
+  var KEY_CODE = { KeyW: "up", KeyA: "left", KeyS: "down", KeyD: "right" };
+  var KEY_NAME = { ArrowUp: "up", ArrowLeft: "left", ArrowDown: "down", ArrowRight: "right" };
+  function typing(e) { var t = e.target; return t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA"); }
+  window.addEventListener("keydown", function (e) {
+    if (typing(e)) return;
+    var dir = KEY_NAME[e.key] || KEY_CODE[e.code];
+    if (dir) { held[dir] = true; e.preventDefault(); return; }
+    if (e.repeat) return;
+    var me = myEntity(), t = now();
+    if (e.code === "KeyJ") { if (me && phase !== "idle") doPush(me, t); }
+    else if (e.code === "KeyK" || e.code === "Space") { e.preventDefault(); if (me && phase !== "idle") doDash(me, t); }
+    else if (e.code === "Tab") { e.preventDefault(); cycleSpectate(); }
+  });
+  window.addEventListener("keyup", function (e) {
+    var dir = KEY_NAME[e.key] || KEY_CODE[e.code];
+    if (dir) held[dir] = false;
+  });
+  window.addEventListener("blur", function () { held = {}; joy.id = null; joy.x = joy.z = 0; show($("joyBase"), false); });
+
+  var joyZone = $("joyZone"), joyBase = $("joyBase"), joyKnob = $("joyKnob"), JOY_R = 50;
+  joyZone.addEventListener("pointerdown", function (e) {
+    if (joy.id !== null) return;
+    joy.id = e.pointerId; joy.ox = e.clientX; joy.oy = e.clientY;
+    joyBase.style.left = joy.ox + "px"; joyBase.style.top = joy.oy + "px";
+    joyKnob.style.transform = "translate(0,0)";
+    show(joyBase, true);
+    try { joyZone.setPointerCapture(e.pointerId); } catch (er) {}
+    e.preventDefault();
+  });
+  joyZone.addEventListener("pointermove", function (e) {
+    if (e.pointerId !== joy.id) return;
+    var dx = e.clientX - joy.ox, dy = e.clientY - joy.oy, l = Math.hypot(dx, dy);
+    var k = l > JOY_R ? JOY_R / l : 1;
+    joyKnob.style.transform = "translate(" + dx * k + "px," + dy * k + "px)";
+    var m = Math.min(1, l / JOY_R);
+    if (m < 0.18) { joy.x = joy.z = 0; }
+    else { joy.x = dx / l * m; joy.z = dy / l * m; }
+  });
+  function joyEnd(e) {
+    if (e.pointerId !== joy.id) return;
+    joy.id = null; joy.x = joy.z = 0; show(joyBase, false);
+  }
+  joyZone.addEventListener("pointerup", joyEnd);
+  joyZone.addEventListener("pointercancel", joyEnd);
+  function bindAction(id, fn) {
+    var el = $(id);
+    el.addEventListener("touchstart", function (e) { e.preventDefault(); }, { passive: false });
+    el.addEventListener("pointerdown", function (e) { e.preventDefault(); var me = myEntity(); if (me && phase !== "idle") fn(me, now()); });
+  }
+  bindAction("btnPush", doPush);
+  bindAction("btnDash", function (e, t) { doDash(e, t); });
+  $("btnSpec").onclick = cycleSpectate;
+  $("btnSpec").addEventListener("touchstart", function (e) { e.stopPropagation(); }, { passive: true });
+
+  var dragShow = { id: null, x: 0 };
+  ["startScreen", "lobbyScreen"].forEach(function (sid) {
+    var el = $(sid);
+    el.addEventListener("pointerdown", function (e) {
+      if (e.target !== el || !e.isPrimary) return;
+      dragShow.id = e.pointerId; dragShow.x = e.clientX;
+    });
+    el.addEventListener("pointermove", function (e) {
+      if (e.pointerId !== dragShow.id) return;
+      showcase.yaw += (e.clientX - dragShow.x) * 0.012; dragShow.x = e.clientX;
+    });
+    var end = function (e) { if (e.pointerId === dragShow.id) dragShow.id = null; };
+    el.addEventListener("pointerup", end); el.addEventListener("pointercancel", end);
+  });
+
+  function startMsg(t) { setText($("startMsg"), t || ""); }
+  function updateStartButtons() {
+    var ok = !!db && KIT.ready;
+    $("btnCreate").disabled = !ok; $("btnJoin").disabled = !ok;
+    if (!db) startMsg("온라인 연결을 할 수 없어요. (firebase-config.js·인터넷 확인)");
+  }
+
+  function sub(ref, ev, fn) { ref.on(ev, fn); subs.push([ref, ev, fn]); }
+  function unsubAll() { subs.forEach(function (s) { try { s[0].off(s[1], s[2]); } catch (e) {} }); subs = []; }
+  function humans(ps) { return keys(ps).filter(function (id) { return ps[id] && !ps[id].isAI; }); }
+  function playerIds() { return keys(P).sort(function (a, b) { return (P[a].joinedAt || 0) - (P[b].joinedAt || 0); }); }
+  function freeSlot(ps) {
+    var used = {};
+    keys(ps || {}).forEach(function (id) { used[ps[id].slot] = true; });
+    for (var s = 0; s < MAX_PLAYERS; s++) if (!used[s]) return s;
+    return 0;
+  }
+  function newPlayer(ps) { return { nick: cleanNick(myNick) || nickOrDefault(), isAI: false, joinedAt: now(), slot: freeSlot(ps), look: myLook }; }
+
+  function roomCodes() {
+    var base = String(CONF.DB_URL || "").replace(/\/+$/, "");
+    if (!base || !window.fetch) return Promise.resolve([]);
+    return fetch(base + "/" + ROOT + ".json?shallow=true").then(function (r) { return r.ok ? r.json() : null; }).then(function (codes) { return keys(codes); });
+  }
+  function isStaleRoom(code, t) {
+    var r = db.ref(ROOT + "/" + code);
+    return Promise.all(["createdAt", "status", "players"].map(function (k) { return r.child(k).once("value"); })).then(function (a) {
+      var age = t - (a[0].val() || 0), hs = humans(a[2].val() || {});
+      return (!hs.length && age > 60000) || age > 6 * 3600000;
+    });
+  }
+  function sweep() {
+    return roomCodes().then(function (codes) {
+      var t = now();
+      return Promise.all(codes.map(function (c) { return isStaleRoom(c, t); })).then(function (stale) {
+        var u = {};
+        codes.forEach(function (c, i) { if (stale[i]) u[c] = null; });
+        if (keys(u).length) return db.ref(ROOT).update(u);
+      });
+    }).catch(function () {});
+  }
+  function readNick(inputId) {
+    myNick = cleanNick($(inputId).value); saveLocal();
+    return myNick;
+  }
+
+  function createRoom() {
+    if (!db) return;
+    readNick("nickStart");
+    $("btnCreate").disabled = true; startMsg("");
+    sweep().then(function () { tryCode(0); });
+    function tryCode(n) {
+      var code = String(10000 + Math.floor(Math.random() * 90000)), t = now();
+      var obj = { status: "lobby", hostPlayerId: myId, createdAt: t, players: {} };
+      obj.players[myId] = newPlayer({});
+      db.ref(ROOT + "/" + code).transaction(function (cur) { if (cur !== null) return; return obj; }).then(function (res) {
+        if (res.committed) { $("btnCreate").disabled = false; enterRoom(code); }
+        else if (n < 8) tryCode(n + 1);
+        else { $("btnCreate").disabled = false; startMsg("방을 만들지 못했어요. 다시 눌러 주세요."); }
+      }).catch(function () { $("btnCreate").disabled = false; startMsg("방을 만들지 못했어요. (데이터베이스 규칙을 확인해 주세요)"); });
+    }
+  }
+  function joinRoom() {
+    if (!db) return;
+    readNick("nickStart");
+    var code = $("joinCode").value.replace(/\D/g, "");
+    if (code.length !== 5) { startMsg("방 코드 5자리를 입력해 주세요."); return; }
+    $("btnJoin").disabled = true; startMsg("");
+    var ref = db.ref(ROOT + "/" + code);
+    Promise.all(["players", "status"].map(function (k) { return ref.child(k).once("value"); })).then(function (a) {
+      $("btnJoin").disabled = false;
+      var ps = a[0].val(), status = a[1].val();
+      if (!ps || !humans(ps).length) { startMsg("그런 방이 없어요. 코드를 확인해 주세요."); return; }
+      if (status !== "lobby") { startMsg("이미 게임이 진행 중이에요. 끝난 뒤 다시 들어와 주세요."); return; }
+      if (keys(ps).length >= MAX_PLAYERS) { startMsg("방이 가득 찼어요. (최대 " + MAX_PLAYERS + "명)"); return; }
+      ref.child("players/" + myId).set(newPlayer(ps)).then(function () { enterRoom(code); }).catch(function () { startMsg("입장하지 못했어요."); });
+    }).catch(function () { $("btnJoin").disabled = false; startMsg("방을 불러오지 못했어요."); });
+  }
+
+  function armDisconnect(ref) {
+    ref.child("players/" + myId).onDisconnect().remove();
+    ref.child("st/" + myId).onDisconnect().remove();
+  }
+  var REJOIN_TRIES = 3;
+  function rejoinAfterDrop(last, tries) {
+    var r = room; tries = tries || 0;
+    if (!r || !last || tries >= REJOIN_TRIES) { if (r && !leaving) exitToStart("연결이 끊겨 방에서 나왔어요."); return; }
+    r.ref.child("status").once("value").then(function (st) {
+      if (room !== r || leaving) return;
+      if (st.val() === null) { exitToStart("방이 종료되었어요."); return; }
+      return r.ref.child("players/" + myId).set(last).then(function () { armDisconnect(r.ref); });
+    }).catch(function () { if (room === r && !leaving) setTimeout(function () { rejoinAfterDrop(last, tries + 1); }, 1000); });
+  }
+
+  function enterRoom(code) {
+    leaving = false;
+    var ref = db.ref(ROOT + "/" + code);
+    room = { code: code, ref: ref, status: "lobby", host: null, hostLoaded: false, round: null, results: null, wins: {}, nextAt: 0, endPending: 0, roundEnding: false };
+    clearEntities();
+    P = {}; phase = "idle"; curRid = 0;
+    armDisconnect(ref);
+    var pref = ref.child("players");
+    sub(pref, "child_added", function (s) { P[s.key] = s.val(); playersChanged(); });
+    sub(pref, "child_changed", function (s) { P[s.key] = s.val(); if (screenNow === "lobby") playersChanged(); });
+    sub(pref, "child_removed", function (s) {
+      if (s.key === myId && !leaving) { rejoinAfterDrop(s.val() || P[myId]); return; }
+      var gone = P[s.key];
+      delete P[s.key];
+      var e = ENT[s.key];
+      if (e && !OUTS[s.key]) { e.left = true; e.mode = "O"; if (isHost() && room.status === "play") room.ref.child("out/" + s.key).set({ t: now(), left: 1 }); }
+      checkHost(); playersChanged();
+    });
+    sub(db.ref(".info/connected"), "value", function (s) { if (s.val() === true && room && room.ref === ref && !leaving) armDisconnect(ref); });
+    sub(ref.child("hostPlayerId"), "value", function (s) { room.host = s.val(); room.hostLoaded = true; checkHost(); playersChanged(); });
+    sub(ref.child("status"), "value", function (s) {
+      var st = s.val();
+      if (st === null) { if (!leaving) exitToStart("방이 종료되었어요."); return; }
+      room.status = st; syncPhase();
+    });
+    sub(ref.child("round"), "value", function (s) { room.round = s.val(); syncPhase(); });
+    sub(ref.child("nextAt"), "value", function (s) { room.nextAt = s.val() || 0; });
+    sub(ref.child("results"), "value", function (s) { room.results = s.val(); if (room.status === "roundEnd" || room.status === "final") renderResult(); });
+    sub(ref.child("wins"), "value", function (s) { room.wins = s.val() || {}; playersChanged(); });
+    var stRef = ref.child("st");
+    var onSt = function (s) {
+      var e = ENT[s.key];
+      if (!e || isLocal(e) || OUTS[s.key]) return;
+      var st = parseState(s.val());
+      if (st) applyNet(e, st);
+    };
+    sub(stRef, "child_added", onSt); sub(stRef, "child_changed", onSt);
+    sub(ref.child("ev"), "child_added", function (s) { onPushEvent(s.val()); });
+    var tilesRef = ref.child("tiles");
+    var onTile = function (s) {
+      var parts = s.key.split("_"), f = +parts[0], i = +parts[1], v = +s.val();
+      if (!BOARD || !BOARD.stepAt[f] || isNaN(i) || !isFinite(v)) return;
+      BOARD.stepAt[f][i] = v; recomputeCollapse(f, i);
+    };
+    sub(tilesRef, "child_added", onTile); sub(tilesRef, "child_changed", onTile);
+    var reqRef = ref.child("tileReq");
+    var onReq = function (s) { if (isHost()) hostAcceptTile(s.key, +s.val()); };
+    sub(reqRef, "child_added", onReq); sub(reqRef, "child_changed", onReq);
+    var outRef = ref.child("out");
+    sub(outRef, "child_added", function (s) { markOut(s.key, s.val()); });
+    setText($("lobbyCode"), code);
+    setScreen("lobby");
+  }
+
+  function markOut(id, v) {
+    OUTS[id] = v || { t: now() };
+    var e = ENT[id];
+    if (e && e.mode !== "O") { e.mode = "O"; e.outAt = OUTS[id].t; e.fall = null; }
+  }
+  function checkHost() {
+    if (!room || !room.hostLoaded || !P[myId]) return;
+    if (room.host && P[room.host] && !P[room.host].isAI) return;
+    var hs = humans(P).sort(function (a, b) { return (P[a].joinedAt || 0) - (P[b].joinedAt || 0); });
+    if (hs[0] === myId) { room.host = myId; room.ref.update({ hostPlayerId: myId }); }
+  }
+  function leaveRoom() {
+    if (!room) return;
+    var r = room; leaving = true;
+    unsubAll();
+    var myRef = r.ref.child("players/" + myId);
+    try { myRef.onDisconnect().cancel(); } catch (e) {}
+    myRef.remove().then(function () { return r.ref.child("players").once("value"); }).then(function (s) {
+      var ps = s.val() || {}, hs = humans(ps);
+      if (!hs.length) return r.ref.remove();
+      return r.ref.child("hostPlayerId").once("value").then(function (h) {
+        var hid = h.val();
+        if (!hid || !ps[hid] || ps[hid].isAI) {
+          var nx = hs.sort(function (a, b) { return (ps[a].joinedAt || 0) - (ps[b].joinedAt || 0); })[0];
+          return r.ref.update({ hostPlayerId: nx });
+        }
+      });
+    }).catch(function () {});
+    room = null; resetLocal(); setScreen("start"); startMsg("");
+  }
+  function exitToStart(msg) {
+    if (room) { leaving = true; unsubAll(); try { room.ref.child("players/" + myId).onDisconnect().cancel(); } catch (e) {} }
+    room = null; resetLocal(); setScreen("start"); startMsg(msg || "");
+  }
+  function resetLocal() {
+    clearEntities(); P = {}; phase = "idle"; curRid = 0; BOARD = buildBoard(1, Infinity);
+    shownFloor = FLOOR_COUNT - 1; showFloorOnly(shownFloor); camState.init = false;
+    joy.id = null; joy.x = joy.z = 0; held = {};
+    refreshShowcase(true);
+  }
+  window.addEventListener("pagehide", function () { if (room) { try { room.ref.child("players/" + myId).remove(); } catch (e) {} } });
+
+  function setScreen(name) {
+    screenNow = name;
+    show($("startScreen"), name === "start");
+    show($("lobbyScreen"), name === "lobby");
+    show($("resultScreen"), name === "result");
+    var playing = name === "game";
+    show($("hudList"), playing); show($("hudRight"), playing);
+    var touchUi = playing && TOUCH;
+    show($("joyZone"), touchUi); show($("btnPush"), touchUi); show($("btnDash"), touchUi);
+    if (!touchUi) show($("joyBase"), false);
+    if (name === "lobby" || name === "start") { showFloorOnly(FLOOR_COUNT - 1); shownFloor = FLOOR_COUNT - 1; }
+    if (name !== "game") { show($("banner"), false); show($("centerMsg"), false); show($("specBox"), false); }
+    if (name === "lobby") playersChanged();
+  }
+
+  function syncPhase() {
+    if (!room) return;
+    var st = room.status, rd = room.round;
+    if (st === "lobby") {
+      phase = "idle"; curRid = 0; clearEntities(); BOARD = buildBoard(1, Infinity);
+      setScreen("lobby"); refreshShowcase(true);
+    } else if (st === "play") {
+      if (rd && rd.startAt !== curRid) beginRound(rd);
+    } else if (st === "roundEnd" || st === "final") {
+      if (phase !== "over") phase = "over";
+      renderResult(); setScreen("result");
+    }
+  }
+
+  function beginRound(rd) {
+    clearEntities();
+    curRid = rd.startAt; roundNo = rd.n;
+    BOARD = buildBoard(rd.seed, rd.startAt);
+    ROSTER = (rd.roster || []).slice();
+    ROSTER.forEach(function (id, idx) {
+      var p = P[id] || { nick: "?", look: defaultLook(), slot: idx };
+      var e = makeEntity(id, p);
+      var pos = startPosition(idx, ROSTER.length);
+      e.x = pos.x; e.z = pos.z; e.fl = FLOOR_COUNT - 1; e.y = floorY(e.fl);
+      e.yaw = Math.atan2(-pos.x, -pos.z); e.yawShown = e.yaw;
+      ENT[id] = e;
+    });
+    phase = "count";
+    shownFloor = FLOOR_COUNT - 1; showFloorOnly(shownFloor); camState.init = false;
+    spectTargetId = null; lastNet = 0;
+    setScreen("game");
+    netFlush(now());
+  }
+
+  function pointsFor(rank) { return POINTS[Math.min(rank, POINTS.length) - 1] || 1; }
+  function totalsFromResults(results) {
+    var tot = {}, names = {};
+    keys(results || {}).forEach(function (n) {
+      var r = results[n], ranks = r.ranks || {};
+      keys(ranks).forEach(function (id) { tot[id] = (tot[id] || 0) + pointsFor(ranks[id]); names[id] = (r.names || {})[id] || names[id] || "?"; });
+    });
+    return { tot: tot, names: names };
+  }
+  function renderResult() {
+    if (!room || !room.round) return;
+    var n = room.round.n, final = room.status === "final";
+    var res = (room.results || {})[n] || {};
+    var ranks = res.ranks || {}, names = res.names || {};
+    var agg = totalsFromResults(room.results);
+    var head = $("resultHead"), body = $("resultBody");
+    setText($("resultTitle"), final ? "최종 결과" : n + "판 결과");
+    var ids = keys(final ? agg.tot : ranks);
+    var meId = myId;
+    if (final) {
+      ids.sort(function (a, b) { return agg.tot[b] - agg.tot[a]; });
+      head.innerHTML = "<tr><th>순위</th><th>이름</th><th class='n'>누적 점수</th></tr>";
+      var place = 0, prev = null, html = "";
+      ids.forEach(function (id, i) {
+        if (agg.tot[id] !== prev) { place = i + 1; prev = agg.tot[id]; }
+        html += "<tr class='" + (id === meId ? "meRow" : "") + "'><td><b>" + place + "</b></td><td>" + nameCell(id, agg.names[id]) + "</td><td class='n'><b>" + agg.tot[id] + "</b>점</td></tr>";
+      });
+      body.innerHTML = html;
+      var top = ids.length ? agg.tot[ids[0]] : 0, winners = ids.filter(function (id) { return agg.tot[id] === top; }).map(function (id) { return agg.names[id]; });
+      setText($("nextIn"), winners.length ? "🏆 최종 우승: " + winners.join(", ") : "");
+    } else {
+      ids.sort(function (a, b) { return ranks[a] - ranks[b]; });
+      head.innerHTML = "<tr><th>순위</th><th>이름</th><th class='n'>이번 판</th><th class='n'>누적 점수</th></tr>";
+      body.innerHTML = ids.map(function (id) {
+        return "<tr class='" + (id === meId ? "meRow" : "") + "'><td><b>" + ranks[id] + "</b></td><td>" + nameCell(id, names[id]) + "</td><td class='n'>+" + pointsFor(ranks[id]) + "</td><td class='n'><b>" + (agg.tot[id] || 0) + "</b>점</td></tr>";
+      }).join("");
+    }
+    show($("btnToLobby"), final && isHost());
+    show($("btnResultLeave"), final);
+    if (final && !isHost()) setText($("nextIn"), $("nextIn").textContent + (isHost() ? "" : " · 방장이 대기실로 이동할 때까지 기다려 주세요"));
+  }
+  function nameCell(id, nick) {
+    var p = P[id], slot = p ? p.slot : (ENT[id] ? ENT[id].slot : 0), ai = p ? p.isAI : (ENT[id] ? ENT[id].ai : false);
+    return "<i class='rankDot' style='background:" + SLOT_COLORS[(slot || 0) % SLOT_COLORS.length] + "'></i>" + esc(nick || "?") + (ai ? " (AI)" : "");
+  }
+  setInterval(function () {
+    if (screenNow !== "result" || !room || room.status !== "roundEnd") return;
+    var left = Math.max(0, Math.ceil((room.nextAt - now()) / 1000));
+    setText($("nextIn"), room.round && room.round.n < TOTAL_ROUNDS ? "다음 판 " + left + "초 후 시작" : "최종 결과 " + left + "초 후");
+  }, 250);
+
+  function hostAcceptTile(key, t) {
+    if (!isHost() || !isFinite(t)) return;
+    var parts = key.split("_"), f = +parts[0], i = +parts[1];
+    var cur = BOARD && BOARD.stepAt[f] ? BOARD.stepAt[f][i] : null;
+    var tt = clamp(t, now() - 2000, now() + 300);
+    if (cur != null && cur <= tt) return;
+    room.ref.child("tiles/" + key).set(tt);
+  }
+  function makeAi(ps) {
+    var used = {};
+    keys(ps).forEach(function (id) { used[ps[id].nick] = true; });
+    var name = AI_NAMES.filter(function (n) { return !used[n]; })[0] || "봇";
+    var id = "ai_" + Math.random().toString(36).slice(2, 8);
+    return { id: id, data: { nick: name, isAI: true, ai: true, joinedAt: now() + 1, slot: freeSlot(ps), look: randomLook() } };
+  }
+
+  function startMatch() {
+    if (!isHost() || !room || room.status !== "lobby") return;
+    var ps = {}; keys(P).forEach(function (id) { ps[id] = P[id]; });
+    var u = {};
+    var hcount = humans(ps).length;
+    if (hcount === 1) {
+      if (!keys(ps).some(function (id) { return ps[id].isAI; })) {
+        var ai = makeAi(ps); u["players/" + ai.id] = ai.data; ps[ai.id] = ai.data;
+      }
+    } else keys(ps).forEach(function (id) { if (ps[id].isAI) { u["players/" + id] = null; delete ps[id]; } });
+    u.results = null;
+    room.ref.update(u).then(function () { startRound(1, ps); });
+  }
+  function startRound(n, knownPlayers) {
+    var src = knownPlayers || P;
+    var ids = keys(src).filter(function (id) { return src[id]; }).sort(function (a, b) { return (src[a].slot || 0) - (src[b].slot || 0); });
+    if (ids.length < 2) { room.ref.update({ status: "lobby" }); return; }
+    var startAt = now() + COUNTDOWN_MS + 500;
+    var u = { status: "play", ev: null, tiles: null, tileReq: null, out: null, st: null, nextAt: 0,
+      round: { n: n, seed: Math.floor(Math.random() * 1e9), startAt: startAt, roster: ids } };
+    room.endPending = 0; room.roundEnding = false;
+    room.ref.update(u);
+  }
+  function aliveRoster() {
+    return ROSTER.filter(function (id) { return !OUTS[id]; });
+  }
+  function rankRound() {
+    var ranks = {}, alive = aliveRoster();
+    alive.forEach(function (id) { ranks[id] = 1; });
+    var outs = ROSTER.filter(function (id) { return OUTS[id]; }).sort(function (a, b) { return OUTS[b].t - OUTS[a].t; });
+    var base = alive.length, prevRank = 0, prevT = null;
+    outs.forEach(function (id, i) {
+      var rk = prevT !== null && prevT - OUTS[id].t <= TIE_MS ? prevRank : base + i + 1;
+      ranks[id] = rk; prevRank = rk; prevT = OUTS[id].t;
+    });
+    return ranks;
+  }
+  function finishRound() {
+    if (room.roundEnding) return;
+    room.roundEnding = true;
+    var ranks = rankRound(), names = {};
+    ROSTER.forEach(function (id) { names[id] = (P[id] && P[id].nick) || (ENT[id] && ENT[id].nick) || "?"; });
+    var u = { status: "roundEnd", nextAt: now() + RESULT_MS };
+    u["results/" + room.round.n] = { ranks: ranks, names: names };
+    room.ref.update(u);
+  }
+  function finishMatch() {
+    if (room.roundEnding === "final") return;
+    room.roundEnding = "final";
+    var agg = totalsFromResults(room.results), best = -1;
+    keys(agg.tot).forEach(function (id) { best = Math.max(best, agg.tot[id]); });
+    var u = { status: "final" };
+    keys(agg.tot).forEach(function (id) { if (agg.tot[id] === best && P[id]) u["wins/" + id] = (room.wins[id] || 0) + 1; });
+    room.ref.update(u);
+  }
+  function backToLobby() {
+    if (!isHost() || !room) return;
+    var u = { status: "lobby", results: null, round: null, ev: null, tiles: null, tileReq: null, out: null, st: null, nextAt: 0 };
+    keys(P).forEach(function (id) { if (P[id].isAI) u["players/" + id] = null; });
+    room.roundEnding = false;
+    room.ref.update(u);
+  }
+  function hostTick() {
+    if (!room || !isHost() || leaving) return;
+    var t = now();
+    if (room.status === "play" && phase === "go") {
+      var alive = aliveRoster();
+      if (ROSTER.length >= 2 && alive.length <= 1) {
+        if (!room.endPending) room.endPending = t;
+        else if (t - room.endPending >= ROUND_END_DELAY_MS) finishRound();
+      } else room.endPending = 0;
+    } else if (room.status === "roundEnd" && room.nextAt && t >= room.nextAt) {
+      if (room.round.n < TOTAL_ROUNDS) { if (room.roundEnding !== "next") { room.roundEnding = "next"; startRound(room.round.n + 1); } }
+      else finishMatch();
+    }
+  }
+  setInterval(hostTick, 250);
+
+  function playersChanged() {
+    if (screenNow === "lobby") renderLobby();
+  }
+  function renderLobby() {
+    if (!room) return;
+    var ids = playerIds();
+    var html = ids.map(function (id) {
+      var p = P[id], color = SLOT_COLORS[(p.slot || 0) % SLOT_COLORS.length];
+      return "<div class='plRow" + (id === myId ? " me" : "") + "'><i style='background:" + color + "'></i><b>" + esc(p.nick) + (p.isAI ? " (AI)" : "") + "</b><small>" + (id === room.host ? "방장" : "") + "</small></div>";
+    }).join("");
+    $("lobbyPlayers").innerHTML = html;
+    var hc = humans(P).length;
+    show($("aiNote"), hc === 1);
+    var host = isHost();
+    $("btnStart").disabled = !host;
+    setText($("btnStart"), host ? (hc === 1 ? "AI와 게임 시작" : "게임 시작") : "방장이 시작하기를 기다리는 중");
+    setText($("lobbyHint"), host ? "참가자 " + ids.length + "명 · 최대 " + MAX_PLAYERS + "명" : "");
+    var winIds = ids.filter(function (id) { return room.wins[id]; });
+    show($("recCard"), winIds.length > 0);
+    $("lobbyRecs").innerHTML = winIds.map(function (id) { return "<div class='st-rec'><span>" + esc(P[id].nick) + "</span><b>" + room.wins[id] + "승</b></div>"; }).join("");
+    if (document.activeElement !== $("nickLobby")) $("nickLobby").value = (P[myId] && P[myId].nick) || myNick;
+  }
+  function pushMyProfile() {
+    if (room && P[myId]) room.ref.child("players/" + myId).update({ nick: cleanNick(myNick) || P[myId].nick, look: myLook });
+  }
+
+  function buildCustomizer() {
+    var opts = $("charOpts");
+    opts.innerHTML = CHAR_TYPES.map(function (ct, i) { return "<button type='button' data-c='" + i + "'>" + ct.name + "</button>"; }).join("");
+    opts.onclick = function (e) {
+      var b = e.target.closest("button[data-c]"); if (!b) return;
+      myLook.c = +b.dataset.c; lookChanged();
+    };
+    var pal = $("palettes");
+    pal.innerHTML = COLOR_PARTS.map(function (cp) {
+      var sw = "<button type='button' class='sw def' data-k='" + cp.key + "' data-i='0' title='기본'></button>" + cp.set.map(function (c, i) {
+        return "<button type='button' class='sw' style='background:" + c + "' data-k='" + cp.key + "' data-i='" + (i + 1) + "'></button>";
+      }).join("");
+      return "<div class='palRow' data-row='" + cp.key + "'><span>" + cp.label + "</span><div>" + sw + "</div></div>";
+    }).join("");
+    pal.onclick = function (e) {
+      var b = e.target.closest("button[data-k]"); if (!b) return;
+      myLook.p[b.dataset.k] = +b.dataset.i; lookChanged();
+    };
+    $("btnCape").onclick = function () { myLook.cape = myLook.cape ? 0 : 1; lookChanged(); };
+    $("btnHat").onclick = function () { myLook.hat = myLook.hat ? 0 : 1; lookChanged(); };
+    $("btnTurnL").onclick = function () { showcase.yaw -= 0.8; };
+    $("btnTurnR").onclick = function () { showcase.yaw += 0.8; };
+    syncCustomizer();
+  }
+  function hasCape(c) { return !!PART_RULES[c].cape; }
+  function syncCustomizer() {
+    var c = myLook.c, rules = PART_RULES[c];
+    [].forEach.call($("charOpts").children, function (b) { b.classList.toggle("on", +b.dataset.c === c); });
+    COLOR_PARTS.forEach(function (cp) {
+      var row = $("palettes").querySelector("[data-row='" + cp.key + "']");
+      var avail = cp.key === "skin" || !!rules[cp.key];
+      row.hidden = !avail;
+      [].forEach.call(row.querySelectorAll("button"), function (b) { b.classList.toggle("on", +b.dataset.i === myLook.p[cp.key]); });
+    });
+    show($("btnCape"), hasCape(c)); show($("btnHat"), HAT_MESHES[c].length > 0);
+    $("btnCape").classList.toggle("on", !!myLook.cape); $("btnHat").classList.toggle("on", !!myLook.hat);
+    setText($("btnCape"), myLook.cape ? "망토 켜짐" : "망토 꺼짐"); setText($("btnHat"), myLook.hat ? "모자 켜짐" : "모자 꺼짐");
+  }
+  function lookChanged() {
+    saveLocal(); syncCustomizer(); refreshShowcase(true); pushMyProfile();
+  }
+
+  $("nickStart").value = myNick;
+  $("nickStart").addEventListener("input", function () { myNick = cleanNick($("nickStart").value); saveLocal(); });
+  $("nickLobby").addEventListener("input", function () { myNick = cleanNick($("nickLobby").value); saveLocal(); });
+  $("nickLobby").addEventListener("change", function () { myNick = cleanNick($("nickLobby").value); saveLocal(); refreshShowcase(true); pushMyProfile(); });
+  $("btnCreate").onclick = createRoom;
+  $("btnJoin").onclick = joinRoom;
+  $("joinCode").onkeydown = function (e) { if (e.key === "Enter") joinRoom(); };
+  $("btnStart").onclick = startMatch;
+  $("btnLeave").onclick = leaveRoom;
+  $("btnResultLeave").onclick = leaveRoom;
+  $("btnToLobby").onclick = backToLobby;
+  buildCustomizer();
+  updateStartButtons();
+
+  var hudAcc = 0;
+  function floorLabel(e) {
+    if (e.mode === "O") { return OUTS[e.id] ? provisionalRank(e.id) + "위" : "탈락"; }
+    if (e.mode === "F") return "낙하";
+    return (e.fl + 1) + "층";
+  }
+  function provisionalRank(id) {
+    var mine = OUTS[id] && OUTS[id].t, earlier = 0;
+    ROSTER.forEach(function (o) { if (OUTS[o] && OUTS[o].t < mine - TIE_MS) earlier++; });
+    return ROSTER.length - earlier;
+  }
+  function updateHud(t, subject) {
+    var list = ROSTER.map(function (id) { return ENT[id]; }).filter(Boolean);
+    $("hudPlayers").innerHTML = list.map(function (e) {
+      return "<div class='pl" + (e.id === myId ? " me" : "") + (e.mode === "O" ? " dead" : "") + "'><i style='background:" + e.color + "'></i><b>" + esc(e.nick) + (e.ai ? " (AI)" : "") + "</b><span>" + floorLabel(e) + "</span></div>";
+    }).join("");
+    var counts = {}, falling = 0;
+    list.forEach(function (e) { if (e.mode === "G") counts[e.fl] = (counts[e.fl] || 0) + 1; else if (e.mode === "F") falling++; });
+    var parts = [];
+    for (var f = FLOOR_COUNT - 1; f >= 0; f--) if (counts[f]) parts.push((f + 1) + "층 " + counts[f] + "명");
+    if (falling) parts.push("낙하 " + falling + "명");
+    setText($("hudFloors"), parts.join(" · "));
+    setText($("hudRound"), roundNo + " / " + TOTAL_ROUNDS + " 판");
+    var alive = list.filter(function (e) { return e.mode !== "O"; }).length;
+    setText($("hudAlive"), "남은 인원 " + alive + "명");
+  }
+  function updateHudFast(t) {
+    var el = Math.max(0, (t - curStartAt()) / 1000);
+    setText($("hudTime"), phase === "count" && t < curStartAt() ? "0:00" : Math.floor(el / 60) + ":" + ("0" + Math.floor(el % 60)).slice(-2));
+    var me = myEntity();
+    var pk = me ? clamp((me.pushCdUntil - t) / PUSH_COOLDOWN_MS, 0, 1) : 0, dk = me ? clamp((me.dashCdUntil - t) / DASH_COOLDOWN_MS, 0, 1) : 0;
+    $("cdPush").style.transform = "scaleX(" + (1 - pk) + ")";
+    $("cdDash").style.transform = "scaleX(" + (1 - dk) + ")";
+    $("btnPushCd").style.height = pk * 100 + "%";
+    $("btnDashCd").style.height = dk * 100 + "%";
+  }
+  var lastBanner = "", lastCenter = "";
+  function updateMessages(t, subject) {
+    var me = myEntity(), msg = "", warn = false;
+    if (phase === "go" && t - curStartAt() > SUDDEN_START_S * 1000) { msg = "서든데스! 위층 바깥부터 무너집니다"; warn = true; }
+    if (me && me.mode === "O") msg = "탈락! " + (subject && subject !== me ? esc(subject.nick) + " 관전 중" : "관전 중");
+    var showSpec = me && me.mode === "O" && phase !== "over";
+    show($("specBox"), !!showSpec);
+    var key = msg + warn;
+    if (key !== lastBanner) {
+      lastBanner = key; show($("banner"), !!msg);
+      $("bannerBox").innerHTML = msg; $("bannerBox").classList.toggle("warn", warn);
+    }
+    var center = "";
+    if (phase === "count") {
+      var left = curStartAt() - t;
+      if (left > 0) center = String(Math.ceil(left / 1000));
+      else if (left > -700) center = "GO!";
+    }
+    if (center !== lastCenter) { lastCenter = center; show($("centerMsg"), !!center); $("centerMsg").textContent = center; }
+  }
+
+  var lastFrame = performance.now();
+  function frame(nowMs) {
+    requestAnimationFrame(frame);
+    var dt = Math.min(0.05, (nowMs - lastFrame) / 1000);
+    lastFrame = nowMs;
+    tick(dt, true);
+  }
+  setInterval(function () {
+    var nowMs = performance.now();
+    if (nowMs - lastFrame < 200) return;
+    tick(Math.min(0.1, (nowMs - lastTickMs) / 1000), false);
+  }, 50);
+  var lastTickMs = performance.now();
+  function tick(dt, draw) {
+    lastTickMs = performance.now();
+    var t = now();
+    adaptQuality(dt);
+    if (phase === "count" && t >= curStartAt()) phase = "go";
+    var host = isHost();
+    var mine = myEntity();
+    if (mine && mine.mode === "G") { mine.input = inputVector(); mine.speedFactor = 1; }
+    keys(ENT).forEach(function (id) {
+      var e = ENT[id];
+      if (e.mode === "O") return;
+      if (isLocal(e)) {
+        if (e.ai) aiStep(e, t);
+        stepLocal(e, dt, t);
+      } else stepRemote(e, dt, t);
+    });
+    if (phase !== "idle" && t - lastNet >= NET_MS) netFlush(t);
+    var subject = phase === "idle" ? null : subjectEntity();
+    if (phase === "idle" || screenNow === "lobby" || screenNow === "start") {
+      var se = showcase.entity;
+      if (se) {
+        se.yaw = showcase.yaw; se.yawShown = showcase.yaw;
+        updateEntityView(se, dt, t, se);
+      }
+      if (KIT.floorsBuilt) { showFloorOnly(FLOOR_COUNT - 1); renderTiles(FLOOR_COUNT - 1, t); }
+      updateShowcaseCamera();
+    } else {
+      if (showcase.entity) { showcase.entity.group.visible = false; showcase.entity.blob.visible = false; }
+      if (subject && subject.mode === "G" && subject.fl !== shownFloor && !fadeSwitching) fadeSwitch(subject.fl);
+      keys(ENT).forEach(function (id) { updateEntityView(ENT[id], dt, t, subject); });
+      if (KIT.floorsBuilt) renderTiles(shownFloor, t);
+      updateCamera(dt, subject);
+      hudAcc += dt;
+      if (hudAcc > 0.2) { hudAcc = 0; if (screenNow === "game") updateHud(t, subject); }
+      if (screenNow === "game") { updateHudFast(t); updateMessages(t, subject); }
+    }
+    if (draw) renderer.render(scene, camera);
+  }
+  requestAnimationFrame(frame);
+  loadKit();
+
+  window.__lt = { ENT: function () { return ENT; }, room: function () { return room; }, board: function () { return BOARD; }, phase: function () { return phase; }, P: function () { return P; }, now: now, scene: scene, camera: camera };
+})();
+</script>
+</body>
+</html>
