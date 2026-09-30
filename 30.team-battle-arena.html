@@ -299,7 +299,12 @@
     #practiceBar { flex-direction: column; align-items: flex-end; }
     #scrGame.practice #hudMe { top: 128px; }
   }
-  .modalBox.pcBox { max-width: 720px; max-height: calc(100vh - 32px); overflow-y: auto; overscroll-behavior: contain; }
+  .modalBox.pcBox { max-width: 1060px; max-height: calc(100vh - 32px); overflow-y: auto; overscroll-behavior: contain; }
+  .pcBody { display: flex; gap: 16px; align-items: flex-start; }
+  .pcInfo { flex: 0 0 300px; min-width: 0; }
+  .pcInfo .dfDetail { margin-top: 0; padding: 10px; border: 2px solid var(--sg-line-mid); border-radius: 8px; background: var(--sg-panel); }
+  .pcBody .dfChars { flex: 1 1 auto; min-width: 0; }
+  @media (max-width: 800px) { .pcBody { flex-direction: column; } .pcInfo { flex-basis: auto; width: 100%; } }
   .pcBox .roleCards { flex-wrap: wrap; overflow: visible; }
   .pcBox .dfCard { cursor: pointer; }
 
@@ -727,7 +732,7 @@
 <div id="pcModal" class="modal" hidden>
   <div class="modalBox pcBox">
     <div class="statsTop"><h3>연습할 캐릭터</h3><button id="btnPcClose" class="mini" type="button">닫기</button></div>
-    <div id="pcChars" class="dfChars"></div>
+    <div class="pcBody"><div id="pcInfo" class="pcInfo"><div class="dfDetail"></div></div><div id="pcChars" class="dfChars"></div></div>
   </div>
 </div>
 
@@ -4406,15 +4411,23 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return '<button type="button" class="dfCard' + (ME && ME.char === k ? " on" : "") + '" data-c="' + k + '"><img alt="" src="' + charImgSrc(k) + '"><div class="nm">' + CHARS[k].name + "</div></button>";
     });
   }
+  function practiceInfoHtml() {
+    var k = ME.char;
+    return '<div class="dfName">' + CHARS[k].icon + " " + CHARS[k].name + '<small>' + roleOf(k).icon + " " + roleOf(k).name + "</small></div>" +
+      '<div class="dfRole">' + roleGaugeText(roleOf(k)) + "</div>" + statTable(k) + skillBlocks(k);
+  }
+  function renderPracticeModal() {
+    setHtmlKeepScroll($("pcChars"), practiceCharsHtml());
+    $("pcInfo").firstChild.innerHTML = practiceInfoHtml();
+  }
   function openPracticeChars() {
     if (!practiceMode() || !ME) return;
-    setHtmlKeepScroll($("pcChars"), practiceCharsHtml());
+    renderPracticeModal();
     show($("pcModal"), true);
   }
   function changePracticeChar(c) {
     if (!practiceMode() || !ME || !G || !pickable(c)) return;
     var old = ME, d = Object.assign({}, P[myId], { characterType: c });
-    show($("pcModal"), false);
     if (old.char === c) return;
     P[myId] = d;
     room.ref.child("players/" + myId + "/characterType").set(c);
@@ -4429,6 +4442,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     aim.id = null;
     G.forceNet = true;
     sfx("confirm");
+    renderPracticeModal();
   }
   $("btnPracChar").onclick = openPracticeChars;
   $("btnPracGauge").onclick = fillPracticeGauge;
