@@ -295,6 +295,17 @@
   #practiceBar button { height: 34px; padding: 0 12px; font-size: 14px; font-weight: 800; border-radius: 6px; border: 1px solid rgba(255,255,255,.28); border-bottom: 2px solid #D97B4F; background: rgba(14,20,17,.82); color: #F4F1E8; white-space: nowrap; }
   #practiceBar #btnPracExit { border-color: rgba(255,138,138,.6); color: #FF9A9A; }
   #scrGame.practice #hudMe { top: 48px; }
+  #practiceInfo { position: absolute; top: 8px; left: 8px; width: 200px; max-height: calc(100% - 200px); overflow: hidden; padding: 6px 8px; border-radius: 8px; pointer-events: none;
+                  background: rgba(14,20,17,.6); color: #F4F1E8; border: 1px solid rgba(255,255,255,.16); border-top: 2px solid #D97B4F; }
+  #practiceInfo .dfName { font-size: 14px; margin-bottom: 2px; }
+  #practiceInfo .dfName small { font-size: 11px; }
+  #practiceInfo .st { width: 100%; border-collapse: collapse; font-size: 11px; line-height: 1.25; }
+  #practiceInfo .st tbody { display: grid; grid-template-columns: 1fr 1fr; column-gap: 8px; }
+  #practiceInfo .st tr { display: flex; justify-content: space-between; }
+  #practiceInfo .st th { text-align: left; font-weight: 700; color: #A3B0A6; white-space: nowrap; }
+  #practiceInfo .st td { text-align: right; font-weight: 800; white-space: nowrap; }
+  #practiceInfo .ultDesc { margin-top: 4px; padding: 3px 0 0; font-size: 10.5px; line-height: 1.3; color: #D5DCD6; border-top: 1px solid rgba(255,255,255,.16); }
+  #practiceInfo .ultDesc b { font-size: 10.5px; color: #FFB38A; }
   @media (max-width: 1100px) {
     #practiceBar { flex-direction: column; align-items: flex-end; }
     #scrGame.practice #hudMe { top: 128px; }
@@ -683,6 +694,7 @@
   <div id="killBanner"></div>
   <button id="btnLeaveGame" type="button">방 나가기</button>
   <div id="practiceBar" hidden><button id="btnPracChar" type="button">캐릭터 변경</button><button id="btnPracGauge" type="button">스킬 게이지 채우기</button><button id="btnPracExit" type="button">연습장 나가기</button></div>
+  <div id="practiceInfo" hidden></div>
   <div id="hudMe" hidden><span>킬<b id="hudMeK">0</b></span><span>데스<b id="hudMeD">0</b></span><span>어시스트<b id="hudMeA">0</b></span><span>피해량<b id="hudMeDmg">0</b></span></div>
   <div id="specL" class="specPanel blue" hidden></div>
   <div id="specR" class="specPanel red" hidden></div>
@@ -4411,6 +4423,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return '<button type="button" class="dfCard' + (ME && ME.char === k ? " on" : "") + '" data-c="' + k + '"><img alt="" src="' + charImgSrc(k) + '"><div class="nm">' + CHARS[k].name + "</div></button>";
     });
   }
+  var practiceInfoShown = null;
   function practiceInfoHtml() {
     var k = ME.char;
     return '<div class="dfName">' + CHARS[k].icon + " " + CHARS[k].name + '<small>' + roleOf(k).icon + " " + roleOf(k).name + "</small></div>" +
@@ -6816,6 +6829,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     finalCountdown($("hudTimer"), st === "playing" && !practice ? left : 0);
     $("scrGame").classList.toggle("practice", practice);
     show($("practiceBar"), practice && !!ME && st !== "ended");
+    show($("practiceInfo"), practice && !!ME && st !== "ended");
+    if (practice && ME && practiceInfoShown !== ME.char) { practiceInfoShown = ME.char; setHtml($("practiceInfo"), practiceInfoHtml()); }
     show($("btnLeaveGame"), !practice);
     var s = teamTotals();
     setHtml($("hudCount"), '<span class="b">🔵 ' + s.blueAlive + '</span> vs <span class="r">🔴 ' + s.redAlive + "</span>");
