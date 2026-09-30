@@ -894,7 +894,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               rvDur: 3000, rvTick: 1000, rvHeal: 30, rvDmg: 30, rvCastMs: 600, grLife: 650 };
   var ASSIST_MS = 5000;
   var SNIPER_KEEP = KEY * 5;
-  var SHIELD_SPARK = "#FFD27A", BURN_TICK_MS = 1000, HEAL_CUT_MUL = 0.5;
+  var SHIELD_SPARK = "#FFD27A", BURN_TICK_MS = 1000, REGEN_TICK_MS = 1000, HEAL_CUT_MUL = 0.5;
   function isMelee(c) { return !!(CHARS[c].arc || CHARS[c].width || CHARS[c].dashWidth || CHARS[c].stab); }
   var STEALTH_ALPHA = 0.4;
   var STEALTH_REVEAL_DIST = 100;
@@ -1164,9 +1164,58 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var real = realNow();
     return TS !== 1 && room && room.startAt && real > room.startAt ? room.startAt + (real - room.startAt) * TS : real;
   }
+  var TUNE_UNDO = [];
+  function slowTuning() {
+    function s(sec) { return Math.round(sec * 1000 * TS); }
+    function v(speed) { return Math.round(speed / TS); }
+    var C = CHARS;
+    return [
+      [C.duelist, { cd: s(1.4), dashMs: s(0.7), speed: v(175) }],
+      [C.warrior, { cd: s(1.4), speed: v(155), ultSpeed: v(210) }],
+      [C.warrior.rally, { ms: s(7), perSec: 7 }],
+      [C.knight, { cd: s(1.8), speed: v(140) }],
+      [C.blacksmith, { cd: s(1.8), speed: v(140), windup: s(0.7) }],
+      [C.blacksmith.fx, { stunMs: s(0.7) }],
+      [C.guardian, { cd: s(1.8), speed: v(140) }],
+      [C.guardian.fx, { slowMs: s(1.5) }],
+      [C.lancer, { cd: s(1.7), speed: v(140) }],
+      [C.necro, { cd: s(1.4), speed: v(170), lastStandHideMs: s(1.5) }],
+      [C.frost, { cd: s(1.4), speed: v(170) }],
+      [C.shaman, { cd: s(1.4), speed: v(170) }],
+      [C.cleric, { cd: s(1.4), speed: v(170) }],
+      [C.mage, { cd: s(1.4), speed: v(170) }],
+      [C.mage.burn, { ms: s(6), maxHpRate: 0.04 }],
+      [C.ranger, { cd: s(1), speed: v(140) }],
+      [C.ranger.haste, { ms: s(4) }],
+      [C.stormbow, { cd: s(0.9), speed: v(140) }],
+      [C.sniper, { cd: s(1.8), speed: v(140) }],
+      [C.thrower, { cd: s(1.4), speed: v(155) }],
+      [C.dancer, { cd: s(1.2), speed: v(175), ultSpeed: v(210) }],
+      [C.rogue, { cd: s(1.2), speed: v(175), ultSpeed: v(280) }],
+      [C.hitman, { cd: s(1.8), speed: v(175) }],
+      [ULT, { rmDur: s(4), rmRate: 1000 / s(0.5), rmDashMs: s(0.4),
+              bzDur: s(6), tkDur: s(6), tkStunMs: s(1.5),
+              bsLeapMinMs: s(0.3), bsLeapMaxMs: s(1.5), bsStunMs: s(1.5),
+              gdSlowMs: s(1.5), lnWind: s(0.4), lnStunMs: s(1.7),
+              smDur: s(11), frSlowMs: s(1.7), frFreezeMs: s(1.1), frBzDur: s(10), frBzDmg: 8, frBzTick: s(1),
+              cuExpireMs: s(4), dmGrowMs: s(2), dmDur: s(9), dmStunMs: s(1.5), dmStrikeStunMs: s(0.7),
+              rvDur: s(4), rvTick: s(1), rvHeal: 21, rvDmg: 21,
+              mbDelay: s(1.5), mbStunMin: s(0.9), mbStunMs: s(1.7),
+              ocDur: s(7), ocStunMs: s(1.5),
+              fgDur: s(6), fgHeal: 7, fgDmg: 13, plTick: s(1), plDur: s(3),
+              bdDelay: s(0.4), bwDur: s(4), bwTick: s(0.35),
+              asDur: s(21), exStunMs: s(1.5) }]
+    ];
+  }
   function applyTimeScale(v) {
+    TUNE_UNDO.forEach(function (u) { u[0][u[1]] = u[2]; });
+    TUNE_UNDO = [];
     TS = v > 0 && v < 1 ? +v : 1;
     MATCH_MS = 90000 * TS; RESPAWN_MS = 3000 * TS; RESPAWN_PROTECT_MS = 2500 * TS;
+    BURN_TICK_MS = REGEN_TICK_MS = 1000;
+    if (TS === 1) return;
+    slowTuning().forEach(function (e) { keys(e[1]).forEach(function (k) { TUNE_UNDO.push([e[0], k, e[0][k]]); e[0][k] = e[1][k]; }); });
+    BURN_TICK_MS = REGEN_TICK_MS = Math.round(1000 * TS);
   }
   function clockBurst() {
     clearInterval(CLOCK.timer);
@@ -1253,7 +1302,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var code = String(10000 + Math.floor(Math.random() * 90000));
       var t = now();
       var me = newPlayer("blue", t);
-      var obj = { mode: "pvp", map: "forest", arena: "forest", status: "lobby", hostPlayerId: myId, createdAt: t, winner: null, players: {} };
+      var obj = { mode: "pvp", map: "forest", arena: "forest", status: "lobby", hostPlayerId: myId, createdAt: t, winner: null, players: {}, timeScale: SLOW_REQUEST < 1 ? SLOW_REQUEST : null };
       obj.players[myId] = me;
       db.ref(ROOT + "/" + code).transaction(function (cur) {
         if (cur !== null) return;
@@ -1335,7 +1384,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     sub(ref.child("arena"), "value", function (s) { room.arena = s.val() || "forest"; syncArena(); });
     sub(ref.child("hostPlayerId"), "value", function (s) { room.host = s.val(); room.hostLoaded = true; hostChangedClock(room.host); checkHost(); playersChanged(); });
     sub(ref.child("startAt"), "value", function (s) { room.startAt = s.val() || 0; });
-    sub(ref.child("timeScale"), "value", function (s) { room.timeScale = s.val(); applyTimeScale(room.timeScale); });
+    sub(ref.child("timeScale"), "value", function (s) {
+      var before = TS;
+      room.timeScale = s.val(); applyTimeScale(room.timeScale);
+      if (TS !== before) { cardHeightFor = null; playersChanged(); }
+    });
     sub(ref.child("winner"), "value", function (s) { room.winner = s.val(); });
     sub(ref.child("bans"), "value", function (s) { room.bans = s.val(); });
     sub(ref.child("endedAt"), "value", function (s) { room.endedAt = s.val() || 0; });
@@ -1412,7 +1465,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (room) { leaving = true; unsubAll(); try { room.ref.child("players/" + myId).onDisconnect().cancel(); } catch (e) {} }
     room = null; resetLocal(); showScreen("start"); startMsg(msg || "");
   }
-  function resetLocal() { applyTimeScale(null); clear3d(); BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; STORMS = []; REVS = []; GRACES = []; DOMAINS = []; CURSES = {}; BLADE_SPINS = []; P = {}; R = {}; PR = {}; MELEE = {}; FX = []; G = null; ME = null; BOTS = {}; ST = {}; SHOTS = []; hitSubs = {}; joy.id = null; aim.id = null; specResultHeld = false; setText($("btnAgain"), "다시하기"); }
+  function resetLocal() { applyTimeScale(SLOW_REQUEST); clear3d(); BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; STORMS = []; REVS = []; GRACES = []; DOMAINS = []; CURSES = {}; BLADE_SPINS = []; P = {}; R = {}; PR = {}; MELEE = {}; FX = []; G = null; ME = null; BOTS = {}; ST = {}; SHOTS = []; hitSubs = {}; joy.id = null; aim.id = null; specResultHeld = false; setText($("btnAgain"), "다시하기"); }
   window.addEventListener("pagehide", function () { saveResume(); if (room) { try { room.ref.child("players/" + myId).remove(); } catch (e) {} } });
   document.addEventListener("visibilitychange", function () { if (document.hidden) saveResume(); });
 
@@ -1629,22 +1682,24 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function fitCharCols() { fitCharCol($("charCardBox")); fitCharCol(document.querySelector(".dfCharCol")); }
   window.addEventListener("resize", fitCharCols);
   function num(v) { return String(Math.round(v * 10) / 10); }
-  function secs(ms) { return (Math.round(ms / 10) / 100) + "초"; }
+  function secs(ms) { return (Math.round(ms / TS / 10) / 100) + "초"; }
+  function shownSpeed(v) { return Math.round(v * TS); }
+  function attackText(cdMs, perSec) { return TS !== 1 ? "공격 간격 " + num(cdMs / TS / 1000) + "초" : "초당 공격 " + perSec + "회"; }
   function pctOf(rate) { return Math.round(rate * 100); }
   function slowPct(mul) { return Math.round((1 - mul) * 100) + "% 둔화"; }
   function ultDesc(k) {
-    function speedUp(c) { return "이동속도 " + (c.ultSpeed - c.speed) + " 증가"; }
+    function speedUp(c) { return "이동속도 " + shownSpeed(c.ultSpeed - c.speed) + " 증가"; }
     if (k === "warrior") return secs(ULT.bzDur) + "간 공격력·공격속도 " + num(ULT.bzDmgMul) + "배, " + speedUp(CHARS.warrior) + ". 기본 공격 적중 시 체력 " + ULT.bzHeal + " 회복";
     if (k === "knight") return secs(ULT.tkDur) + "간 받는 피해 " + num(ULT.tkDef) + "배. 끝날 때 반경 " + ULT.tkStunR + "의 적은 " + secs(ULT.tkStunMs) + "간 기절";
     if (k === "ranger") return ULT.mkDmg + "의 피해를 주는 화살 " + ULT.mkCount + "발 연사. 적중마다 게이지 " + ULT.mkRefund + " 회복";
     if (k === "mage") return "지정한 곳에 " + secs(ULT.mbDelay) + " 뒤 반경 " + ULT.mbR + "의 폭발. 적은 " + ULT.mbDmgMin + "~" + ULT.mbDmg + "의 피해, " +
-      num(ULT.mbStunMin / 1000) + "~" + secs(ULT.mbStunMs) + "의 기절. 중심에 가까울수록 강함";
+      num(ULT.mbStunMin / TS / 1000) + "~" + secs(ULT.mbStunMs) + "의 기절. 중심에 가까울수록 강함";
     if (k === "rogue") return secs(ULT.asDur) + "간 은신 상태가 되고 " + speedUp(CHARS.rogue) + ". 공격 시 해제되며, 해제하는 공격이 베기면 한 번마다 " + CHARS.rogue.ambushDmg + "의 피해";
-    if (k === "necro") return secs(ULT.smDur) + "간 유지되는 해골 병사 " + ULT.smCount + "마리 소환(최대 " + ULT.smMax + "마리). 해골은 체력 " + ULT.smHp + ", 공격 " + ULT.smDmg + ", 이동속도 " + ULT.smSpeed + ". 해골이 적을 공격할 때마다 네크로의 게이지 " + ULT.smGauge + " 회복";
+    if (k === "necro") return secs(ULT.smDur) + "간 유지되는 해골 병사 " + ULT.smCount + "마리 소환(최대 " + ULT.smMax + "마리). 해골은 체력 " + ULT.smHp + ", 공격 " + ULT.smDmg + ", 이동속도 " + shownSpeed(ULT.smSpeed) + ". 해골이 적을 공격할 때마다 네크로의 게이지 " + ULT.smGauge + " 회복";
     if (k === "sniper") return "사거리 " + ULT.pnRange + "의 거대한 화살 발사. 적은 " + ULT.pnDmg + "의 피해, 적중 시 게이지 " + ULT.pnRefund + " 회복";
     if (k === "thrower") return "지정한 곳에 " + secs(ULT.fgDur) + "간 유지되는 반경 " + ULT.fgR + "의 독안개 설치. 아군은 1초당 체력 " + ULT.fgHeal + " 회복, 적은 1초당 " + ULT.fgDmg + "의 피해를 입고 " + slowPct(ULT.fgSlowMul);
     if (k === "lancer") return secs(ULT.lnWind) + " 준비 후 사거리 " + ULT.lnLen + "의 창 찌르기. 맞은 적은 모두 " + ULT.lnDmg + "의 피해를 입고 " + secs(ULT.lnStunMs) + "간 기절";
-    if (k === "blacksmith") return "지정한 곳에 거리에 따라 " + num(ULT.bsLeapMinMs / 1000) + "~" + secs(ULT.bsLeapMaxMs) + " 뒤 착지. 반경 " + ULT.bsR + "의 적은 " + ULT.bsDmg + "의 피해를 입고 " + secs(ULT.bsStunMs) + "간 기절";
+    if (k === "blacksmith") return "지정한 곳에 거리에 따라 " + num(ULT.bsLeapMinMs / TS / 1000) + "~" + secs(ULT.bsLeapMaxMs) + " 뒤 착지. 반경 " + ULT.bsR + "의 적은 " + ULT.bsDmg + "의 피해를 입고 " + secs(ULT.bsStunMs) + "간 기절";
     if (k === "hitman") return "사거리 " + ULT.exRange + "의 칼날 발사. 처음 맞은 적은 " + ULT.exDmg + "의 피해를 입고 " + secs(ULT.exStunMs) + "간 기절, 그 위치로 순간이동";
     if (k === "guardian") return "자신을 중심으로 반경 " + ULT.gdR + "의 적을 모두 " + ULT.gdKb + "만큼 밀어내며 " + ULT.gdDmg + "의 피해. 밀려난 적은 " + secs(ULT.gdSlowMs) + "간 " + slowPct(ULT.gdSlowMul);
     if (k === "shaman") return "자신을 중심으로 " + secs(ULT.dmGrowMs) + "간 반경 " + ULT.dmR + "까지 커진 뒤 " + secs(ULT.dmDur - ULT.dmGrowMs) + "간 유지되는 영역 생성. 영역이 커지는 과정에서 닿은 적은 " + secs(ULT.dmStunMs) +
@@ -1653,16 +1708,16 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "cleric") return "아군의 체력을 " + CHARS.cleric.healGauge + " 회복시키면 사용 가능. 사용 시 자신의 체력을 모두 회복하고 " + secs(ULT.rvDur) + "간 제자리에서 기도. 아군 전체는 1초당 체력 " + ULT.rvHeal + " 회복, 적 전체는 1초당 " + ULT.rvDmg + "의 피해. 기절·넉백·끌어당김을 당하면 취소";
     if (k === "frost") return "자신을 중심으로 " + secs(ULT.frBzDur) + "간 유지되는 반경 " + ULT.frBzR + "의 눈보라 생성. " + (ULT.frBzHides ? "눈보라 안의 아군은 은신 상태가 되고, " : "") + "적은 1초당 " +
       ULT.frBzDmg + "의 피해를 입고 패시브 1중첩";
-    if (k === "duelist") return secs(ULT.rmDur) + "간 초당 공격 " + ULT.rmRate + "회, 돌진 거리 " + ULT.rmDashRange + "·돌진 시간 " + secs(ULT.rmDashMs) + "로 단축. 사용 즉시 기본 공격 대기시간 초기화";
-    if (k === "stormbow") return "자신을 중심으로 반경 " + ULT.ocR + "의 번개 막 생성. 적은 " + ULT.ocDmg + "의 피해를 입고 " + secs(ULT.ocStunMs) + "간 기절. 이후 " + secs(ULT.ocDur) + "간 초당 공격 " +
-      num(1000 / CHARS.stormbow.cd * ULT.ocRate) + "회, 이동속도 " + ULT.ocSpeedBonus + "·사거리 " + ULT.ocRangeBonus + " 증가, 기본 공격이 적중할 때마다 패시브 번개 발동";
+    if (k === "duelist") return secs(ULT.rmDur) + "간 " + attackText(1000 / ULT.rmRate, ULT.rmRate) + ", 돌진 거리 " + ULT.rmDashRange + "·돌진 시간 " + secs(ULT.rmDashMs) + "로 단축. 사용 즉시 기본 공격 대기시간 초기화";
+    if (k === "stormbow") return "자신을 중심으로 반경 " + ULT.ocR + "의 번개 막 생성. 적은 " + ULT.ocDmg + "의 피해를 입고 " + secs(ULT.ocStunMs) + "간 기절. 이후 " + secs(ULT.ocDur) + "간 " +
+      attackText(CHARS.stormbow.cd / ULT.ocRate, num(1000 / CHARS.stormbow.cd * ULT.ocRate)) + ", 이동속도 " + shownSpeed(ULT.ocSpeedBonus) + "·사거리 " + ULT.ocRangeBonus + " 증가, 기본 공격이 적중할 때마다 패시브 번개 발동";
     if (k === "dancer") return secs(ULT.bwDur) + "간 회전하며 " + speedUp(CHARS.dancer) + ". 반경 " + ULT.bwR + "의 적은 " + secs(ULT.bwTick) + "마다 " + ULT.bwDmg + "의 피해. 기절·넉백을 당하면 취소";
     return "";
   }
   function healCutPct() { return Math.round((1 - HEAL_CUT_MUL) * 100) + "%"; }
   function passiveDesc(k) {
     var c = CHARS[k];
-    if (k === "ranger") return "기본 공격 적중 시 " + secs(c.haste.ms) + "간 이동속도 " + c.haste.add + " 증가, 최대 " + c.haste.max + "까지 중첩. 적중마다 지속시간 초기화";
+    if (k === "ranger") return "기본 공격 적중 시 " + secs(c.haste.ms) + "간 이동속도 " + shownSpeed(c.haste.add) + " 증가, 최대 " + shownSpeed(c.haste.max) + "까지 중첩. 적중마다 지속시간 초기화";
     if (k === "blacksmith") return "기본 공격 시 멈춰 서서 표시된 곳을 " + secs(c.windup) + " 뒤 타격. 맞은 적은 " + secs(c.fx.stunMs) + "간 기절";
     if (k === "sniper") return "거리가 " + c.farDist + "보다 먼 적에게 주는 피해 " + Math.round(c.farBonus * 100) + "% 증가";
     if (k === "necro") return "체력이 " + c.lastStandHp + " 미만으로 떨어지면 체력 " + c.lastStandHp + "을 남기고 " + secs(c.lastStandHideMs) + "간 은신. 죽을 때마다 한 번";
@@ -1694,10 +1749,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var dmg = !c.dmg ? "-" : c.dashDmg ? num(c.dashDmg) + "(" + num(c.dmg) + ")"
             : k === "dancer" ? num(c.dmg) + "+" + num(ULT.bdDmg)
             : pair(hit, c.throwDmg || (rage ? Math.round(c.dmg * ULT.bzDmgMul) : null)) + (c.heal ? "(" + c.heal + ")" : "");
-    var rate = pair(num(1000 / c.cd), rage ? num(1000 / (c.cd * ULT.bzCdMul)) : k === "duelist" ? ULT.rmRate : k === "stormbow" ? num(1000 / c.cd * ULT.ocRate) : null) + "회";
+    var altCd = rage ? c.cd * ULT.bzCdMul : k === "duelist" ? 1000 / ULT.rmRate : k === "stormbow" ? c.cd / ULT.ocRate : null;
+    var rateRow = TS !== 1 ? "<tr><th>공격 간격</th><td>" + pair(num(c.cd / TS / 1000), altCd == null ? null : num(altCd / TS / 1000)) + "초</td></tr>"
+                           : "<tr><th>초당 공격</th><td>" + pair(num(1000 / c.cd), altCd == null ? null : num(1000 / altCd)) + "회</td></tr>";
     return '<table class="st"><tr><th>HP</th><td>' + c.hp + "</td></tr><tr><th>공격</th><td>" + dmg + "</td></tr>" +
-           "<tr><th>초당 공격</th><td>" + rate + "</td></tr>" +
-           "<tr><th>이동속도</th><td>" + pair(c.speed, c.ultSpeed) + "</td></tr>" +
+           rateRow +
+           "<tr><th>이동속도</th><td>" + pair(shownSpeed(c.speed), c.ultSpeed == null ? null : shownSpeed(c.ultSpeed)) + "</td></tr>" +
            "<tr><th>사거리</th><td>" + pair(Math.round(c.stab ? c.range : c.dashRange || c.range), c.throwRange) + "</td></tr><tr><th>스킬</th><td>" + c.ultName + "</td></tr></table>";
   }
   function roleGaugeText(R) { return "기본 공격 적중 시 게이지 +" + R.gaugeOnHit + (R.gaugeOnHurt ? ", 피격 시 +" + R.gaugeOnHurt : ""); }
@@ -2176,7 +2233,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       });
     }
     u.roster = roster; u.st = st; u.arena = arena; u.draft = null; u.bans = bans && bans.length ? bans : null;
-    u.status = "countdown"; u.startAt = realNow() + countMs; u.timeScale = SLOW_REQUEST < 1 ? SLOW_REQUEST : null; u.winner = null; u.final = null; u.statsNote = null; u.endedAt = null;
+    u.status = "countdown"; u.startAt = realNow() + countMs; u.winner = null; u.final = null; u.statsNote = null; u.endedAt = null;
     u.shots = null; u.meleeHits = null; u.hits = null; u.effects = null; u.kills = null; u.projectiles = null;
     room.ref.update(u);
   }
@@ -3133,7 +3190,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       afflict(T, fx, owner);
       if (fx && fx.maxHpRate) damage(T, Math.round(T.maxHp * fx.maxHpRate), owner, false, ultKey);
       if (ultKey !== "burn" && P[owner] && P[owner].characterType === "mage") igniteBurn(T, owner, t);
-      if (C.rally && !T.rallyUsed && T.hp < T.maxHp * C.rally.hpRate) { T.rallyUsed = true; T.regenUntil = t + C.rally.ms; T.regenNext = t + 1000; }
+      if (C.rally && !T.rallyUsed && T.hp < T.maxHp * C.rally.hpRate) { T.rallyUsed = true; T.regenUntil = t + C.rally.ms; T.regenNext = t + REGEN_TICK_MS; }
     }
     pushHit(owner, dm, basic, ultKey, killed, gaugeGain);
     if (killed) { T.domainBolt = null; T.curse = 0; T.curseBoom = null; breakRevelation(T, t); reportKill(T, owner, t); T.hurtBy = {}; T.helpedBy = {}; }
@@ -3183,7 +3240,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (!E.regenNext || !E.alive) return;
     if (E.regenNext > E.regenUntil + 1) { E.regenNext = 0; return; }
     if (t < E.regenNext) return;
-    E.regenNext += 1000;
+    E.regenNext += REGEN_TICK_MS;
     var healed = healAmount(E, CHARS[E.char].rally.perSec, t);
     if (healed <= 0) return;
     E.hp += healed; E.heal = (E.heal || 0) + healed;
@@ -4474,7 +4531,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     backToLobby();
   }
   function backToLobby() {
-    var u = { status: "lobby", winner: null, final: null, statsNote: null, startAt: null, timeScale: null, endedAt: null, roster: null, draft: null, bans: null,
+    var u = { status: "lobby", winner: null, final: null, statsNote: null, startAt: null, endedAt: null, roster: null, draft: null, bans: null,
               st: null, done: null, shots: null, meleeHits: null, hits: null, effects: null, kills: null, projectiles: null };
     PRACTICE_BOTS.forEach(function (b) { if (P[b.id]) u["players/" + b.id] = null; });
     room.ref.update(u);
@@ -7128,6 +7185,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   if (/[?&]test(&|$)/.test(location.search)) import("./30.team-battle-tests.js?t=" + Date.now()).then(function (m) { m.runTeamBattleTests(testHooks()); });
   if (/[?&]sim(&|$)/.test(location.search)) import("./30.team-battle-sim.js?t=" + Date.now()).then(function (m) { window.TB_SIM = m.createSim(testHooks()); window.TB_SIM.mapTopShot = testHooks().mapTopShot; });
 
+  applyTimeScale(SLOW_REQUEST);
   refreshNick();
   showScreen("start");
   if (!db) startMsg("온라인 연결을 준비하지 못했어요. 인터넷 연결을 확인해 주세요.");
