@@ -3043,9 +3043,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     return hyp(ax + vx * t - cx, ay + vy * t - cy) <= r;
   }
   var SHOTS = [];
-  function emitShots(E, ang, skill) {
+  function emitShots(E, ang, skill, statSkill) {
     var t = now(), ev = { o: E.id, x: Math.round(E.x), y: Math.round(E.y), a: Math.round(ang * 100) / 100, t: t };
     if (skill) ev.s = 1;
+    if (statSkill) ev.sk = 1;
     E.atkAt = t;
     room.ref.child("shots").push(ev);
     revealBriefly(E.id, t);
@@ -3081,7 +3082,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var sv = v.spec, sp = sv.sp, a = v.ev.a, dx = Math.cos(a), dy = Math.sin(a);
     var ox = i > 0 && E ? E.x : v.ev.x, oy = i > 0 && E ? E.y : v.ev.y;
     addProj(v.key + "_" + i, { team: v.team, owner: v.ev.o, ownerCharacterType: v.char, x: ox + dx * 20, y: oy + dy * 20,
-      vx: dx * sp, vy: dy * sp, isSkill: v.skill, dmg: sv.dmg, ultKey: sv.ultKey, fx: sv.fx,
+      vx: dx * sp, vy: dy * sp, isSkill: v.skill, countsAsSkill: !!v.ev.sk, dmg: sv.dmg, ultKey: sv.ultKey, fx: sv.fx,
       pr: sv.pr, range: sv.range + (!v.skill && E && overcharged(E, v.ev.t) ? ULT.ocRangeBonus : 0), createdAt: v.ev.t + i * v.gap });
     if (v.char === "hitman" && v.skill) spark(ox + dx * 30, oy + dy * 30, "#FF3A4A", 2);
     if (E && (E === ME || BOTS[E.id]) && hear(E)) sfx(v.char === "mage" || v.char === "necro" || v.char === "frost" ? "orb" : (v.char === "rogue" || v.char === "dancer" ? "star" : "shoot"));
@@ -3124,7 +3125,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var immune = protectedNow(T), fx = d.fx, seen = !ME || ME.team === T.team || visibleTo(T, ME);
     if (d.ownerCharacterType === "frost" && !d.isSkill && !immune && !T.minion) fx = frostStackFx(T);
     var dancer = d.ownerCharacterType === "dancer";
-    damage(T, Math.round(d.dmg * (1 + damageBonusSum(d, T))), d.owner, dancer ? d.createdAt : !d.isSkill, d.isSkill ? d.ultKey : null, fx);
+    damage(T, Math.round(d.dmg * (1 + damageBonusSum(d, T))), d.owner, dancer ? d.createdAt : !d.isSkill, d.isSkill ? d.ultKey : (d.countsAsSkill ? "skill" : null), fx);
     if (dancer) bladeSpin(p, T.x, T.y);
     if (d.ultKey === "execute" && !immune) { room.ref.child("hits/" + d.owner).push({ d: 0, b: 0, t: now(), tp: { x: r1(T.x), y: r1(T.y) } }); executeFx(T.x, T.y); }
     if (d.ownerCharacterType === "stormbow" && !immune) room.ref.child("hits/" + d.owner).push({ d: 0, b: 0, t: now(), zap: { v: T.id, x: r1(T.x), y: r1(T.y) } });
@@ -3184,6 +3185,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     if (amount > 0) noteHurt(T, owner, t);
     var dm = Math.min(amount, T.hp), killed = false;
+    T.taken = (T.taken || 0) + dm;
     T.hp -= dm; if (!noHurtGauge && !gaugeLocked(T)) T.gauge = Math.min(GAUGE_MAX, T.gauge + roleOf(T.char).gaugeOnHurt);
     if (T.hp <= 0) { killed = true; T.hp = 0; T.alive = false; T.deaths++; T.diedAt = now(); T.burst = null; T.volley = null; T.slash = null; T.regenUntil = 0; T.skillUntil = 0; T.slowUntil = 0; T.slows = null; T.stunUntil = 0; T.lance = null; T.frostStacks = 0; T.hasteUntil = 0; T.hasteStacks = 0; T.burnUntil = 0; T.burnNext = 0; T.regenNext = 0; if (T === ME) { sfx("down"); aim.id = null; joy.id = null; } }
     else {
@@ -3764,7 +3766,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var dx = T.x - d.x, dy = T.y - d.y;
     if (protectedNow(T)) return;
     if (d.slam && !d.dmg) afflict(T, d.fx, d.owner);
-    else damage(T, d.dmg, d.owner, (d.m || !d.u) && d.createdAt + (d.mi || 0) / 1000, d.hammer ? d.createdAt : null, d.fx, d.m ? ULT.smGauge : null, !!d.m);
+    else damage(T, d.dmg, d.owner, (d.m || !d.u) && d.createdAt + (d.mi || 0) / 1000, d.hammer ? d.createdAt : (d.u || d.m || d.countsAsSkill ? "skill" : null), d.fx, d.m ? ULT.smGauge : null, !!d.m);
     if (P[d.owner] && P[d.owner].characterType === "shaman") applyCurse(T, d.owner, now());
     if (d.kb && T.alive) {
       var dd = hyp(dx, dy) || 1, kbAt = now(), shoveEnd = T.shove ? T.shove.at + ULT.gdKbMs : 0;
@@ -3830,6 +3832,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var c = CHARS[E.char];
     var d = { team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(ang), dmg: dmgOverride || Math.round(c.dmg * (rage ? ULT.bzDmgMul : 1)), createdAt: now() };
     if (c.width) { d.len = Math.round(lineReach(E.x, E.y, ang, c.range)); d.width = c.width; }
+    if (rage || dmgOverride) d.countsAsSkill = 1;
     d.radius = c.range;
     if (c.arc) d.arc = c.arc;
     if (c.heal) d.heal = c.heal;
@@ -3894,6 +3897,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     G.forceNet = true;
     if (hear(E)) sfx("swing");
     var d = { team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(E.angle), stab: 1, radius: c.range, dmg: c.dmg, createdAt: t };
+    if (riposte(E, t)) d.countsAsSkill = 1;
     if (T) {
       E.angle = d.angle = r1(Math.atan2(T.y - E.y, T.x - E.x));
       d.tgt = T.id; d.len = Math.max(1, Math.round(hyp(T.x - E.x, T.y - E.y) - BODY_R)); d.width = 14;
@@ -3954,7 +3958,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (c.hits > 1) E.slash = { left: c.hits - 1, at: t + c.hitGap, ang: ang, dmg: ambushDmg };
       return;
     }
-    emitShots(E, ang, false);
+    emitShots(E, ang, false, !!ambushDmg);
     if (c.shots > 1) E.volley = { until: t + (c.shots - 1) * c.gap };
   }
   function tryFire(E, ang, reach) {
