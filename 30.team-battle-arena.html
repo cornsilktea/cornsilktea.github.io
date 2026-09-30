@@ -229,11 +229,10 @@
     .charCol { flex: 0 0 auto; width: max-content; min-width: 0; max-width: 50%; margin: 0; }
     .draftCols { align-items: stretch; min-height: calc(100vh - 78px); }
     .draftLeft { display: flex; flex-direction: column; }
-    .dfTeamCard { flex: 1 1 auto; display: flex; flex-direction: column; }
-    .dfTeamCard .teams { flex: 1 1 auto; }
-    .dfTeamCard .team { display: flex; flex-direction: column; }
-    .dfSlots { flex: 1 1 auto; display: flex; flex-direction: column; gap: 8px; }
-    .dfSlots .slot { flex: 1 1 0; height: auto; min-height: 64px; max-height: 150px; margin: 0; font-size: 20px; }
+    .dfSlots { display: flex; flex-direction: column; gap: 8px; }
+    .dfTeamCard .dfSlots .slot { height: 84px; margin: 0; font-size: 20px; }
+    .dfMapCard { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 220px; }
+    .dfMapCard .dfMapImg { flex: 1 1 0; min-height: 0; height: auto; }
     .dfSlots .slot .pface { width: 76px; height: 76px; }
     .dfSlots .slot .pk.picked b { font-size: 20px; }
     .dfCharCol { align-self: flex-start; min-width: 380px; position: sticky; top: 0; max-height: calc(100vh - 78px); overflow-y: auto; scrollbar-width: thin; }
@@ -462,8 +461,30 @@
   .dfSteps .now { border-color: #D97B4F; background: rgba(217,123,79,.2); }
   .dfSteps .done { opacity: .45; }
   .dfSteps .ban { background: rgba(216,69,59,.12); }
-  .dfBanRow { flex: none; margin-bottom: 6px; font-size: 14px; font-weight: 700; color: #FF9A92; }
-  .dfBanRow b { margin-left: 4px; color: #F4F1E8; }
+  .dfTeamCard .team h3 { min-height: 36px; }
+  .dfBanBox { margin-left: auto; }
+  .dfBan { display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 800; color: #F4F1E8; }
+  .dfBan .banX { flex: none; width: 34px; height: 34px; border-radius: 8px; background: rgba(216,69,59,.18); border: 1px solid rgba(255,120,110,.45); }
+  .dfBan .banX svg { display: block; width: 100%; height: 100%; }
+  .dfBan .pface { width: 34px; height: 34px; filter: grayscale(.6); }
+  .dfBan.wait { font-size: 13px; font-weight: 700; color: var(--sg-ink-faint); }
+  .dfBan.now { font-size: 13px; color: #FFB38A; }
+  .dfMapCard { padding: 12px 14px 14px; }
+  .dfMapHead { margin-bottom: 8px; font-size: 15px; font-weight: 800; color: #F2D06B; display: flex; align-items: center; gap: 10px; }
+  .dfMapHead small { margin-left: auto; font-size: 12px; font-weight: 700; }
+  .dfMapHead .b { color: #8DB8FF; }
+  .dfMapHead .r { color: #FF9A92; }
+  .dfMapImg { display: block; width: 100%; height: auto; object-fit: contain; border-radius: 6px; }
+  .lobbyTop #btnMapView { margin-left: auto; align-self: flex-end; margin-bottom: 11px; }
+  .modalBox.mapViewBox { max-width: 1100px; max-height: calc(100vh - 32px); overflow-y: auto; overscroll-behavior: contain; }
+  .mapViewGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .mapViewGrid figure { margin: 0; }
+  .mapViewGrid figcaption { margin-bottom: 6px; font-size: 16px; font-weight: 800; color: #F4F1E8; }
+  .mapViewGrid figure.on figcaption { color: #F2D06B; }
+  .mapViewGrid img { display: block; width: auto; max-width: 100%; height: auto; max-height: calc(100vh - 190px); border-radius: 6px; border: 2px solid transparent; }
+  .mapViewGrid figure.on img { border-color: #D97B4F; }
+  .mapViewNote { margin-top: 10px; font-size: 13px; color: var(--sg-ink-soft); }
+  @media (max-width: 700px) { .mapViewGrid { grid-template-columns: repeat(2, 1fr); } }
   .dfSlots .slot.ready { box-shadow: inset 0 0 0 3px #3FBF6A; background: rgba(63,191,106,.14); }
   .pface.canTrade { cursor: pointer; box-shadow: 0 0 0 2px #F2D06B; }
   .pface.canTrade:hover { box-shadow: 0 0 0 3px #F2D06B, 0 0 12px rgba(242,208,107,.6); }
@@ -619,6 +640,7 @@
           <div class="optRow"><span class="optLab">게임모드</span><span id="modeBtns" class="modeBtns"></span></div>
           <div class="optRow"><span class="optLab">맵</span><span id="mapBtns" class="modeBtns"></span></div>
         </div>
+        <button id="btnMapView" class="mini" type="button">🗺️ 맵 보기</button>
       </div>
     </div>
 
@@ -668,11 +690,12 @@
     </div>
     <div class="card dfTeamCard">
       <div class="teams">
-        <div class="team blue"><h3>블루팀</h3><div id="dfBlue" class="dfSlots"></div></div>
-        <div class="team red"><h3>레드팀</h3><div id="dfRed" class="dfSlots"></div></div>
+        <div class="team blue"><h3>블루팀<span id="dfBanB" class="dfBanBox"></span></h3><div id="dfBlue" class="dfSlots"></div></div>
+        <div class="team red"><h3>레드팀<span id="dfBanR" class="dfBanBox"></span></h3><div id="dfRed" class="dfSlots"></div></div>
       </div>
     </div>
     <div id="dfReadyBar" class="dfReadyBar" hidden><button id="btnDraftReady" class="dfReadyBtn" type="button">준비 완료</button><div id="dfReadyHint" class="dfReadyHint"></div></div>
+    <div class="card dfMapCard"><div class="dfMapHead"><span id="dfMapName"></span><small><span class="b">◀ 블루 진영</span> · <span class="r">레드 진영 ▶</span></small></div><img id="dfMapImg" class="dfMapImg" alt=""></div>
     <button id="btnLeaveDraft" class="mini danger" type="button">방 나가기</button>
     <div id="dfTradeBox" class="dfTradeBox" hidden></div>
   </div>
@@ -730,6 +753,14 @@
       <li>막은 피해·기절·둔화·킬·데스·어시스트·밴은 이 항목이 추가된 뒤의 경기만으로 셉니다.</li>
       <li>어시스트: 내가 피해나 해로운 효과(기절·둔화·넉백·끌어당김)를 준 적이 5초 안에 쓰러지거나, 내가 회복·은신(눈보라)을 준 아군이 5초 안에 적을 처치하면 1회(처치한 사람은 제외, 한 처치에 1번만).</li>
     </ul>
+  </div>
+</div>
+
+<div id="mapViewModal" class="modal" hidden>
+  <div class="modalBox mapViewBox">
+    <div class="statsTop"><h3>맵 보기</h3><button id="btnMapViewClose" class="mini" type="button">닫기</button></div>
+    <div id="mapViewGrid" class="mapViewGrid"></div>
+    <div class="mapViewNote">위쪽이 블루팀 진영, 아래쪽이 레드팀 진영이에요.</div>
   </div>
 </div>
 
@@ -1414,6 +1445,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k !== prev || (k !== "lobby" && k !== "start")) setCharZoom(false);
     if (k === "start" || k === "lobby") placeCharBox(k);
     if (k !== "start" && k !== "lobby") { show($("statsModal"), false); closeVideos(); }
+    if (k !== "lobby") show($("mapViewModal"), false);
     if (k !== "game") show($("pcModal"), false);
   }
   function placeCharBox(k) {
@@ -1781,6 +1813,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (!$("pcModal").hidden) show($("pcModal"), false);
     else if (vidOpen) { if (vidChar) showVideoList(); else closeVideos(); }
     else if (!$("statsModal").hidden) show($("statsModal"), false);
+    else if (!$("mapViewModal").hidden) show($("mapViewModal"), false);
     else if ($("charCardBox").classList.contains("zoomed")) setCharZoom(false);
   });
   var statsMode = "pvp", statsLoadSeq = 0;
@@ -1829,6 +1862,16 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   $("btnStats").onclick = function () { show($("statsModal"), true); $("statsModal").querySelector(".statsBox").scrollTop = 0; loadStats(); };
   $("btnStatsClose").onclick = function () { show($("statsModal"), false); };
+  function mapShotSrc(id, wide) { return "img/teambattle/maps/" + id + (wide ? "-wide" : "") + ".webp"; }
+  $("btnMapView").onclick = function () {
+    var current = room && room.map;
+    setHtml($("mapViewGrid"), MAP_IDS.map(function (id) {
+      return '<figure class="' + (id === current ? "on" : "") + '"><figcaption>' + esc(MAPS[id].name) + '</figcaption><img alt="" src="' + mapShotSrc(id) + '"></figure>';
+    }).join(""));
+    show($("mapViewModal"), true);
+  };
+  $("btnMapViewClose").onclick = function () { show($("mapViewModal"), false); };
+  $("mapViewModal").addEventListener("click", function (e) { if (e.target === $("mapViewModal")) show($("mapViewModal"), false); });
   $("statsModal").addEventListener("click", function (e) { if (e.target === $("statsModal")) show($("statsModal"), false); });
   $("statsModes").onclick = function (e) {
     var b = e.target.closest ? e.target.closest(".modeBtn") : null;
@@ -2306,6 +2349,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var left = Math.max(0, d.stepAt + DRAFT_SHOWN_MS - t), humans = draftHumans(d).length, readyN = draftReadyCount(d);
     var arena = MAPS[room.arena] || MAPS[ARENA];
     setHtml($("dfMap"), arena ? "🗺️ " + esc(arena.name) + "<small>맵</small>" : "");
+    var arenaId = MAPS[room.arena] ? room.arena : ARENA, mapImg = $("dfMapImg");
+    setText($("dfMapName"), arena ? "🗺️ " + arena.name : "");
+    if (mapImg.getAttribute("src") !== mapShotSrc(arenaId, true)) mapImg.setAttribute("src", mapShotSrc(arenaId, true));
     var timer = $("dfTimer");
     if (done) {
       setHtml(timer, readyN + "/" + humans + "<small>준비 완료</small>");
@@ -2332,7 +2378,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
     function slots(team) {
       var pre = team === "blue" ? "b" : "r", ban = bans[pre], banStepNow = banTurn && stepSide(d.step) === pre;
-      var h = '<div class="dfBanRow">🚫 밴 <b>' + (ban && ban !== NO_BAN && CHARS[ban] ? CHARS[ban].name : (ban === NO_BAN ? "없음" : (banStepNow ? "고르는 중…" : "-"))) + "</b></div>";
+      var h = "";
+      if (ban && ban !== NO_BAN && CHARS[ban]) h = '<span class="dfBan"><span class="banX"><svg viewBox="0 0 10 10"><path d="M2.2 2.2L7.8 7.8M7.8 2.2L2.2 7.8" stroke="#FF4A3D" stroke-width="1.6" stroke-linecap="round"/></svg></span>' +
+        '<span class="pface" style="background-image:url(\'' + charImgSrc(ban) + '\')"></span>' + CHARS[ban].name + "</span>";
+      else h = '<span class="dfBan ' + (banStepNow ? "now" : "wait") + '">' + (ban === NO_BAN ? "밴 없음" : (banStepNow ? "밴 고르는 중…" : "밴 대기")) + "</span>";
+      setHtml($(team === "blue" ? "dfBanB" : "dfBanR"), h);
+      h = "";
       for (var i = 1; i <= 3; i++) {
         var id = d.seq && d.seq[pre + i], p = id && P[id];
         if (!p) { h += '<div class="slot empty">' + i + "번 · " + (id ? "나감" : "빈 자리") + "</div>"; continue; }
