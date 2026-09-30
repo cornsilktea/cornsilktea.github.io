@@ -161,13 +161,14 @@ export function createSim(api) {
   sim.run = function (games, seedBase, options) {
     sim.results = []; sim.done = false; sim.error = null; sim.startedAt = Date.now();
     sim.options = { games: games, seedBase: seedBase || 5000, avoid: options && options.avoid ? options.avoid : DEFAULT_AVOID.slice() };
-    var i = 0;
+    var i = 0, channel = new MessageChannel();
+    channel.port1.onmessage = function () { next(); };
     function next() {
       try {
         var end = Date.now() + 200;
         while (i < games && Date.now() < end) { sim.results.push(playOne(api.MAP_IDS[i % api.MAP_IDS.length], sim.options.seedBase + i, sim.options.avoid)); i++; }
       } catch (err) { sim.error = String(err && err.stack || err); return; }
-      if (i < games) setTimeout(next, 0); else { sim.done = true; sim.finishedAt = Date.now(); api.finish(api.MAP_IDS[0]); }
+      if (i < games) channel.port2.postMessage(0); else { sim.done = true; sim.finishedAt = Date.now(); api.finish(api.MAP_IDS[0]); }
     }
     next();
   };

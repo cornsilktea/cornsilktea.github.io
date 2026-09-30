@@ -752,14 +752,17 @@ function collectResults(api) {
   function frostShot(W) { var fr = W.ent("fr"); fr.cdUntil = 0; api.fireBasic(fr, angleTo(fr, W.ent("foe"))); W.step(450); }
   run(FROST, "냉기 화살: 1타·2타는 점점 강한 둔화, 3타째에 " + api.ULT.frFreezeMs + "ms 빙결 후 스택이 처음부터 다시 쌓이는가", function (done) {
     var W = frostDuel(), foe = W.ent("foe"), base = api.CHARS.knight.speed, got = [];
-    for (var i = 0; i < 3; i++) { frostShot(W); got.push(api.stunned(foe, W.t()) ? "빙결" : Math.round(api.speedOf(foe) / base * 100) + "%"); }
+    var hpBefore = [];
+    for (var i = 0; i < 3; i++) { hpBefore.push(foe.hp); frostShot(W); got.push(api.stunned(foe, W.t()) ? "빙결" : Math.round(api.speedOf(foe) / base * 100) + "%"); }
     var freezeLeft = foe.stunUntil - W.t();
+    var armor = api.CHARS.knight.armor, hit1 = hpBefore[0] - hpBefore[1], hit3 = hpBefore[2] - foe.hp;
+    var wantFreezeHit = hit1 + Math.max(0, Math.round(foe.maxHp * api.ULT.frFreezeMaxHpRate) - armor);
     W.step(api.ULT.frFreezeMs);
     frostShot(W);
     got.push("다시 " + foe.frostStacks + "스택");
     var want1 = Math.round(api.ULT.frSlowMul * 100) + "%", want2 = Math.round((api.ULT.frSlowMul - api.ULT.frSlowStep) * 100) + "%";
-    var ok = got[0] === want1 && got[1] === want2 && got[2] === "빙결" && freezeLeft <= api.ULT.frFreezeMs && foe.frostStacks === 1;
-    done(ok ? "pass" : "fail", "이동속도 " + got.join(" → ") + " (기대: " + want1 + " → " + want2 + " → 빙결 → 다시 1스택)");
+    var ok = got[0] === want1 && got[1] === want2 && got[2] === "빙결" && freezeLeft <= api.ULT.frFreezeMs && foe.frostStacks === 1 && hit3 === wantFreezeHit;
+    done(ok ? "pass" : "fail", "이동속도 " + got.join(" → ") + " (기대: " + want1 + " → " + want2 + " → 빙결 → 다시 1스택), 3타 피해 " + hit3 + " (기대 " + wantFreezeHit + ")");
   });
   run(FROST, "냉기 화살: 마지막 적중 후 " + api.ULT.frSlowMs + "ms가 지나면 스택이 초기화되는가", function (done) {
     var W = frostDuel(), foe = W.ent("foe");
@@ -783,7 +786,8 @@ function collectResults(api) {
     var hp0 = foe.hp;
     W.step(3000);
     var lost = hp0 - foe.hp;
-    if (lost < api.ULT.frBzDmg * 3 || lost > api.ULT.frBzDmg * 4) bad.push("3초간 피해 " + lost);
+    var freezeHit = Math.round(foe.maxHp * api.ULT.frFreezeMaxHpRate);
+    if (lost < api.ULT.frBzDmg * 3 || lost > api.ULT.frBzDmg * 4 + freezeHit) bad.push("3초간 피해 " + lost);
     fr.x += 150;
     W.frame(FRAME);
     var c = api.stormCenter(api.storms()[0]);
@@ -1041,7 +1045,7 @@ function collectResults(api) {
     } finally { Math.random = realRandom; }
   }
   var PASSIVE2 = "주술사·투척병·기사·창술사·광전사 패시브";
-  run(PASSIVE2, "주술사: 적중한 적이 " + api.CHARS.mage.burn.ms / 1000 + "초간 불타며 1초당 " + api.CHARS.mage.burn.perSec + "의 피해를 입고, 그동안 회복이 절반인가", function (done) {
+  run(PASSIVE2, "주술사: 적중한 적이 " + api.CHARS.mage.burn.ms / 1000 + "초간 불타며 1초당 최대 체력의 " + api.CHARS.mage.burn.maxHpRate * 100 + "%의 피해를 입고, 그동안 회복이 절반인가", function (done) {
     var y = OPEN_Y.forest, burn = api.CHARS.mage.burn;
     var W = world("forest", [
       { id: "mg", team: "blue", char: "mage", x: 250, y: y },
@@ -1052,7 +1056,7 @@ function collectResults(api) {
     if (!api.healCut(foe, W.t())) bad.push("불타는 중 회복 감소 없음");
     if (api.healAmount(foe, 10, W.t()) !== 5) bad.push("회복 10 → " + api.healAmount(foe, 10, W.t()));
     W.step(burn.ms + 500);
-    var want = api.CHARS.mage.dmg + burn.perSec * burn.ms / 1000, lost = foe.maxHp - foe.hp;
+    var want = api.CHARS.mage.dmg + Math.round(foe.maxHp * burn.maxHpRate) * burn.ms / 1000, lost = foe.maxHp - foe.hp;
     if (lost !== want) bad.push("받은 피해 " + lost + " (기대 " + want + ")");
     if (api.healCut(foe, W.t())) bad.push("화상이 끝나도 회복 감소 남음");
     var mageDmg = W.log.filter(function (p) { return p.path === "hits/mg"; }).reduce(function (a, p) { return a + (p.v.d || 0); }, 0);
@@ -1615,7 +1619,7 @@ function collectResults(api) {
     if (at.nearBolt === null || Math.abs(at.nearBolt - at.nearStun - api.ULT.dmStunMs) > 40) bad.push("번개가 기절 " + at.nearStun + "ms 뒤 " + at.nearBolt + "ms");
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "가까운 적 " + Math.round(at.nearStun) + "ms·먼 적 " + Math.round(at.farStun) + "ms에 기절, 기절이 풀린 " + Math.round(at.nearBolt) + "ms에 " + api.ULT.dmBoltDmg + " 피해 한 번");
   });
-  run(SHAMAN, "영역전개: 주술사를 따라다니고, 다 커진 뒤 들어온 적은 기절하지 않지만 번개(" + api.ULT.dmStrikeDmg + ") 대상이 되는가", function (done) {
+  run(SHAMAN, "영역전개: 주술사를 따라다니고, 다 커진 뒤 들어온 적은 기절하지 않지만 번개(최대 체력의 " + api.ULT.dmStrikeMaxHpRate * 100 + "%) 대상이 되는가", function (done) {
     var y = OPEN_Y.forest, W = shamanTeam(), sh = W.ent("sh"), near = W.ent("near"), far = W.ent("far"), bad = [];
     near.x = 300; near.y = y - 480; far.x = 300; far.y = y - 700;
     api.useUlt(sh, 0);
@@ -1627,12 +1631,12 @@ function collectResults(api) {
     var n0 = near.hp, f0 = far.hp;
     sh.cdUntil = 0; api.fireBasic(sh, Math.PI);
     W.step(100);
-    if (n0 - near.hp !== api.ULT.dmStrikeDmg + api.ULT.dmStrikeFighterBonus) bad.push("따라온 영역 안 전사 번개 피해(기본+전사 추가) " + (n0 - near.hp));
+    if (n0 - near.hp !== Math.round(near.maxHp * api.ULT.dmStrikeMaxHpRate)) bad.push("따라온 영역 안 적 번개 피해(최대 체력 비례) " + (n0 - near.hp));
     if (far.hp !== f0) bad.push("영역 밖 적이 맞음");
     if (near.curse !== 1) bad.push("영역 안 번개로 저주 1회여야 함: " + near.curse);
     var strikeStunLeft = near.stunUntil - W.t();
     if (!api.stunned(near, W.t()) || Math.abs(strikeStunLeft - (api.ULT.dmStrikeStunMs - 100)) > 40) bad.push("번개 기절 남은 시간 " + Math.round(strikeStunLeft) + "ms");
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "주술사가 움직이면 영역도 따라감, 늦게 들어온 적은 커질 때 기절 없이 번개 " + api.ULT.dmStrikeDmg + " 피해와 " + api.ULT.dmStrikeStunMs + "ms 기절");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "주술사가 움직이면 영역도 따라감, 늦게 들어온 적은 커질 때 기절 없이 번개(최대 체력의 " + api.ULT.dmStrikeMaxHpRate * 100 + "%) 피해와 " + api.ULT.dmStrikeStunMs + "ms 기절");
   });
   run(SHAMAN, "영역전개: 영역 안의 네크로 해골도 번개 대상(가장 가까운 적)이 되는가", function (done) {
     var y = OPEN_Y.forest, W = shamanTeam([{ id: "nc", team: "red", char: "necro", x: 300, y: y + 340, gauge: api.GAUGE_MAX }]), sh = W.ent("sh"), nc = W.ent("nc"), near = W.ent("near");
@@ -1661,8 +1665,9 @@ function collectResults(api) {
     var r0 = rg.hp, n0 = near.hp;
     sh.cdUntil = 0; api.fireBasic(sh, 0);
     W.step(100);
-    var ok = rg.hp === r0 && n0 - near.hp === api.ULT.dmStrikeDmg + api.ULT.dmStrikeFighterBonus;
-    done(ok ? "pass" : "fail", "은신자 피해 " + (r0 - rg.hp) + ", 보이는 적 피해 " + (n0 - near.hp) + " (기대 0·" + (api.ULT.dmStrikeDmg + api.ULT.dmStrikeFighterBonus) + ")");
+    var want = Math.round(near.maxHp * api.ULT.dmStrikeMaxHpRate);
+    var ok = rg.hp === r0 && n0 - near.hp === want;
+    done(ok ? "pass" : "fail", "은신자 피해 " + (r0 - rg.hp) + ", 보이는 적 피해 " + (n0 - near.hp) + " (기대 0·" + want + ")");
   });
   run(SHAMAN, "영역전개: 주술사가 쓰러지면 반구가 바로 사라지고, 부활 보호 중인 적은 기절·번개를 받지 않는가", function (done) {
     var W = shamanTeam(), sh = W.ent("sh"), near = W.ent("near"), far = W.ent("far"), bad = [];

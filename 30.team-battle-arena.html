@@ -794,7 +794,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
                dashRange: 250, dashMs: 500, stab: true, selfHeal: 10, ultName: "르미즈", heals: true },
     knight:  { name: "기사", role: "fighter", icon: "🛡️", hp: 350, speed: 200, cd: 1250, dmg: 25, range: 110, arc: Math.PI * 0.7, armor: 2, ultName: "방어태세", blocks: true },
     ranger:  { name: "궁수", role: "shooter", icon: "🏹", hp: 100, speed: 200, haste: { add: 10, ms: 3000, max: 40 }, cd: 667, dmg: 15, range: 450, pSpeed: 532, pr: 12, shots: 2, gap: 70, ultName: "난사", ultAim: true },
-    mage:    { name: "화염술사", role: "caster", icon: "🔥", hp: 120, speed: 240, cd: 1000, dmg: 5, range: 350, pSpeed: 700, pr: 9, burn: { ms: 4000, perSec: 9 }, ultName: "메테오", ultAim: true },
+    mage:    { name: "화염술사", role: "caster", icon: "🔥", hp: 120, speed: 240, cd: 1000, dmg: 5, range: 350, pSpeed: 700, pr: 9, burn: { ms: 4000, maxHpRate: 0.06 }, ultName: "메테오", ultAim: true },
     rogue:   { name: "은신자", role: "assassin", icon: "🗡️", hp: 110, speed: 250, ultSpeed: 400, cd: 833, dmg: 30, range: 110, arc: Math.PI * 0.6, hits: 2, hitGap: 160, ambushDmg: 45, throwDmg: 20, throwRange: 300, pSpeed: 900, pr: 8, ultName: "은신" },
     necro:   { name: "네크로", role: "caster", icon: "💀", hp: 120, lastStandHp: 50, lastStandHideMs: 1000, speed: 240, cd: 1000, dmg: 10, range: KEY * 4, pSpeed: 1000, pr: 9, ultName: "해골 소환", blocks: true },
     sniper:  { name: "저격수", role: "shooter", icon: "🎯", hp: 100, speed: 200, cd: 1250, dmg: 35, range: 700, pSpeed: 840, pr: 12, farDist: 500, farBonus: 0.5, ultName: "거대 화살", ultAim: true },
@@ -854,12 +854,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               bhR: 200, bhDur: 3000, bhDelay: 500, bhPull: 220, bhCast: 380, bhMin: 60, bhCcRate: 0.8,
               exRange: 500, exSpeed: 1300, exPr: 4, exDmg: 25, exStunMs: 1000,
               gdR: 200, gdKb: 150, gdKbMs: 500, gdDmg: 20, gdSlowMul: 0.8, gdSlowMs: 1000,
-              frSlowMs: 1200, frSlowMul: 0.8, frSlowStep: 0.2, frFreezeMs: 800,
+              frSlowMs: 1200, frSlowMul: 0.8, frSlowStep: 0.2, frFreezeMs: 800, frFreezeMaxHpRate: 0.1,
               frBzR: 400, frBzDur: 7000, frBzDmg: 12, frBzTick: 1000, frBzDelay: 400,
               bwR: 150, bwDur: 3000, bwTick: 250, bwHurtGaugeEvery: 4, bwDmg: 18, bwKillGauge: 5, bdR: 70, bdDmg: 10, bdDelay: 300,
               rmDur: 3000, rmRate: 3, rmDashMs: 300, rmDashRange: 100,
               ocDur: 5000, ocRate: 1.5, ocR: 200, ocDmg: 30, ocStunMs: 1000, ocRingPts: 10,
-              dmR: 450, dmGrowMs: 1500, dmDur: 5500, dmStunMs: 1000, dmBoltDmg: 20, dmStrikeDmg: 35, dmStrikeFighterBonus: 15, dmStrikeStunMs: 500, dmStunGraceMs: 40, cuStacks: 3, cuBoomDmg: 30, cuBoomMs: 500, cuExpireMs: 3000,
+              dmR: 450, dmGrowMs: 1500, dmDur: 5500, dmStunMs: 1000, dmBoltDmg: 20, dmStrikeMaxHpRate: 0.2, dmStrikeStunMs: 500, dmStunGraceMs: 40, cuStacks: 3, cuBoomDmg: 30, cuBoomMs: 500, cuExpireMs: 3000,
               rvDur: 3000, rvTick: 1000, rvHeal: 30, rvDmg: 30, rvCastMs: 600, grLife: 650 };
   var ASSIST_MS = 5000;
   var SNIPER_KEEP = KEY * 5;
@@ -1581,6 +1581,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   window.addEventListener("resize", fitCharCols);
   function num(v) { return String(Math.round(v * 10) / 10); }
   function secs(ms) { return (Math.round(ms / 10) / 100) + "초"; }
+  function pctOf(rate) { return Math.round(rate * 100); }
   function slowPct(mul) { return Math.round((1 - mul) * 100) + "% 둔화"; }
   function ultDesc(k) {
     function speedUp(c) { return "이동속도 " + (c.ultSpeed - c.speed) + " 증가"; }
@@ -1598,7 +1599,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "hitman") return "사거리 " + ULT.exRange + "의 칼날 발사. 처음 맞은 적은 " + ULT.exDmg + "의 피해를 입고 " + secs(ULT.exStunMs) + "간 기절, 그 위치로 순간이동";
     if (k === "guardian") return "자신을 중심으로 반경 " + ULT.gdR + "의 적을 모두 " + ULT.gdKb + "만큼 밀어내며 " + ULT.gdDmg + "의 피해. 밀려난 적은 " + secs(ULT.gdSlowMs) + "간 " + slowPct(ULT.gdSlowMul);
     if (k === "shaman") return "자신을 중심으로 " + secs(ULT.dmGrowMs) + "간 반경 " + ULT.dmR + "까지 커진 뒤 " + secs(ULT.dmDur - ULT.dmGrowMs) + "간 유지되는 영역 생성. 영역이 커지는 과정에서 닿은 적은 " + secs(ULT.dmStunMs) +
-      "간 기절하고, 기절이 풀릴 때 " + ULT.dmBoltDmg + "의 피해. 영역 안에서 주술사의 기본 공격은 영역 내 가장 가까운 적 1명에게 " + ULT.dmStrikeDmg + "의 피해(전사는 " + (ULT.dmStrikeDmg + ULT.dmStrikeFighterBonus) + ")를 입히고 " + secs(ULT.dmStrikeStunMs) + "간 기절";
+      "간 기절하고, 기절이 풀릴 때 " + ULT.dmBoltDmg + "의 피해. 영역 안에서 주술사의 기본 공격은 영역 내 가장 가까운 적 1명에게 최대 체력의 " + pctOf(ULT.dmStrikeMaxHpRate) + "%의 피해를 입히고 " + secs(ULT.dmStrikeStunMs) + "간 기절";
     if (k === "priest") return "지정한 곳에 " + secs(ULT.bhDelay) + " 뒤 " + secs(ULT.bhDur) + "간 유지되는 반경 " + ULT.bhR + "의 블랙홀 생성. 적은 중심으로 끌려감";
     if (k === "cleric") return "아군의 체력을 " + CHARS.cleric.healGauge + " 회복시키면 사용 가능. 사용 시 자신의 체력을 모두 회복하고 " + secs(ULT.rvDur) + "간 제자리에서 기도. 아군 전체는 1초당 체력 " + ULT.rvHeal + " 회복, 적 전체는 1초당 " + ULT.rvDmg + "의 피해. 기절·넉백·끌어당김을 당하면 취소";
     if (k === "frost") return "자신을 중심으로 " + secs(ULT.frBzDur) + "간 유지되는 반경 " + ULT.frBzR + "의 눈보라 생성. 눈보라 안의 아군은 은신 상태가 되고, 적은 1초당 " +
@@ -1620,12 +1621,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "priest") return "기본 공격에 맞은 아군은 체력 " + c.heal + " 회복";
     if (k === "shaman") return "공격이 적중할 때마다 대상에게 저주 1회 부여. 저주가 " + ULT.cuStacks + "회 중첩되면 폭발하여 " + ULT.cuBoomDmg + "의 피해. " + secs(ULT.cuExpireMs) + " 이상 갱신되지 않으면 저주 소멸";
     if (k === "cleric") return "기본 공격은 조준 없이 반경 " + c.range + " 안에서 체력 비율이 가장 낮은 아군의 체력 " + c.graceHeal + " 회복";
-    if (k === "mage") return "기본 공격·스킬에 맞은 적은 " + secs(c.burn.ms) + "간 불타며 1초당 " + c.burn.perSec + "의 피해를 입고 회복 " + healCutPct() + " 감소";
+    if (k === "mage") return "기본 공격·스킬에 맞은 적은 " + secs(c.burn.ms) + "간 불타며 1초당 최대 체력의 " + pctOf(c.burn.maxHpRate) + "%의 피해를 입고 회복 " + healCutPct() + " 감소";
     if (k === "thrower") return "기본 공격·스킬 지역 위의 적은 회복 " + healCutPct() + " 감소";
     if (k === "knight") return "받는 모든 피해가 1회마다 " + c.armor + " 감소";
     if (k === "lancer") return "게임을 시작할 때와 부활할 때마다 적의 다음 피해 1회를 막는 보호막 생성. 기절·둔화 등 효과는 막지 못함";
     if (k === "warrior") return "체력이 " + Math.round(c.rally.hpRate * 100) + "% 미만으로 떨어지면 " + secs(c.rally.ms) + "간 1초당 체력 " + c.rally.perSec + " 회복. 죽을 때마다 한 번";
-    if (k === "frost") return "기본 공격에 맞은 적은 " + secs(ULT.frSlowMs) + "간 " + slowPct(ULT.frSlowMul) + ". " + secs(ULT.frSlowMs) + " 안에 다시 맞을 때마다 둔화가 " + Math.round(ULT.frSlowStep * 100) + "%p씩 커지고 3중첩이 되면 " + secs(ULT.frFreezeMs) + "간 기절. 기절이 끝난 뒤부터 다시 중첩";
+    if (k === "frost") return "기본 공격에 맞은 적은 " + secs(ULT.frSlowMs) + "간 " + slowPct(ULT.frSlowMul) + ". " + secs(ULT.frSlowMs) + " 안에 다시 맞을 때마다 둔화가 " + Math.round(ULT.frSlowStep * 100) + "%p씩 커지고 3중첩이 되면 " + secs(ULT.frFreezeMs) + "간 기절하며 최대 체력의 " + pctOf(ULT.frFreezeMaxHpRate) + "%의 피해. 기절이 끝난 뒤부터 다시 중첩";
     if (k === "rogue") return "가까운 적은 근접 공격, 먼 적에게는 사거리 " + c.throwRange + "의 단검 투척";
     if (k === "hitman") return "기본 공격 시 " + c.dashRange + " 돌진 후 반경 " + c.range + " 회전베기";
     if (k === "duelist") return "기본 공격 시 " + secs(c.dashMs) + "간 " + c.dashRange + " 돌진 후 반경 " + c.range + "의 가장 가까운 적 1명을 찔러 " + c.dmg + "의 피해. 적중 시 체력 " + c.selfHeal + " 회복";
@@ -2777,7 +2778,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     T.frostStackAt = t;
     if (T.frostStacks >= 3) {
       T.frostStacks = 0;
-      return { stunMs: ULT.frFreezeMs };
+      return { stunMs: ULT.frFreezeMs, maxHpRate: ULT.frFreezeMaxHpRate };
     }
     return { slowMs: ULT.frSlowMs, slowMul: ULT.frSlowMul - (T.frostStacks - 1) * ULT.frSlowStep };
   }
@@ -3061,6 +3062,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     else {
       if (T === ME) sfx("hit");
       afflict(T, fx, owner);
+      if (fx && fx.maxHpRate) damage(T, Math.round(T.maxHp * fx.maxHpRate), owner, false, ultKey);
       if (ultKey !== "burn" && P[owner] && P[owner].characterType === "mage") igniteBurn(T, owner, t);
       if (C.rally && !T.rallyUsed && T.hp < T.maxHp * C.rally.hpRate) { T.rallyUsed = true; T.regenUntil = t + C.rally.ms; T.regenNext = t + 1000; }
     }
@@ -3106,7 +3108,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (E.burnNext > E.burnUntil + 1) { E.burnNext = 0; return; }
     if (t < E.burnNext) return;
     E.burnNext += BURN_TICK_MS;
-    damage(E, CHARS.mage.burn.perSec, E.burnOwner, false, "burn");
+    damage(E, Math.round(E.maxHp * CHARS.mage.burn.maxHpRate), E.burnOwner, false, "burn");
   }
   function stepRally(E, t) {
     if (!E.regenNext || !E.alive) return;
@@ -3516,7 +3518,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     E.angle = Math.atan2(T.y - E.y, T.x - E.x);
     revealBriefly(E.id, t);
     G.forceNet = true;
-    room.ref.child("effects").push({ type: "strike", team: E.team, owner: E.id, tgt: T.id, dmg: ULT.dmStrikeDmg + (!T.minion && CHARS[T.char] && CHARS[T.char].role === "fighter" ? ULT.dmStrikeFighterBonus : 0), stun: ULT.dmStrikeStunMs, createdAt: t });
+    room.ref.child("effects").push({ type: "strike", team: E.team, owner: E.id, tgt: T.id, dmg: Math.round(T.maxHp * ULT.dmStrikeMaxHpRate), stun: ULT.dmStrikeStunMs, createdAt: t });
   }
   function onDomainStrike(e) {
     var t = now();
