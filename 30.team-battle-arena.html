@@ -7170,6 +7170,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       hiddenFrom: hiddenFrom, visibleTo: visibleTo, storms: function () { return STORMS; }, stormCenter: stormCenter, revs: function () { return REVS; }, domains: function () { return DOMAINS; }, graceTarget: graceTarget,
       bushTiles: function () { return BUSH.map(function (b) { return b.tiles.map(function (tl) { return { x: tileX(tl[0]), y: tileY(tl[1]) }; }); }); },
       isIdle: function () { return !room; },
+      timeScale: function () { return TS; },
       begin: function (fakeRoom, players, bots, clockMs) {
         TEST_CLOCK = clockMs; room = fakeRoom; P = players; BOTS = bots; ME = null; R = {};
         G = { startAt: fakeRoom.startAt, endSent: false, playingSent: false, lastNet: 0, sent: {}, finalSent: false, beeped: -1 };

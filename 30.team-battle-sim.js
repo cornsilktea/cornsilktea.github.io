@@ -88,7 +88,8 @@ export function createSim(api) {
       var sampled = {};
       list.forEach(function (e) { sampled[e.id] = { aliveN: 0, nearSum: 0, nearN: 0, fullN: 0, movedSum: 0, lastX: bots[e.id].x, lastY: bots[e.id].y, inRangeN: 0, sampleN: 0 }; });
       var frameNo = 0;
-      while (t < T0 + MATCH_END_MS) {
+      var endMs = MATCH_END_MS * (api.timeScale ? api.timeScale() : 1);
+      while (t < T0 + endMs) {
         t += FRAME_MS; api.setClock(t); api.stepWorld(t, FRAME_MS / 1000, true);
         if (++frameNo % 15) continue;
         list.forEach(function (e) {
