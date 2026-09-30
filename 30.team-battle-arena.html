@@ -886,10 +886,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               exRange: 500, exSpeed: 1300, exPr: 4, exDmg: 25, exStunMs: 1000,
               gdR: 200, gdKb: 150, gdKbMs: 500, gdDmg: 20, gdSlowMul: 0.8, gdSlowMs: 1000,
               frSlowMs: 1200, frSlowMul: 0.8, frSlowStep: 0.2, frFreezeMs: 800, frFreezeMaxHpRate: 0.08,
-              frBzR: 400, frBzDur: 7000, frBzDmg: 12, frBzTick: 1000, frBzDelay: 400,
+              frBzHides: false, frBzR: 400, frBzDur: 7000, frBzDmg: 12, frBzTick: 1000, frBzDelay: 400,
               bwR: 150, bwDur: 3000, bwTick: 250, bwHurtGaugeEvery: 4, bwDmg: 18, bwKillGauge: 5, bdR: 70, bdDmg: 10, bdDelay: 300,
               rmDur: 3000, rmRate: 3, rmDashMs: 300, rmDashRange: 100,
-              ocDur: 5000, ocRate: 1.5, ocR: 200, ocDmg: 30, ocStunMs: 1000, ocRingPts: 10,
+              ocDur: 5000, ocRate: 1.5, ocSpeedBonus: 50, ocRangeBonus: 30, ocR: 200, ocDmg: 30, ocStunMs: 1000, ocRingPts: 10,
               dmR: 450, dmGrowMs: 1500, dmDur: 6500, dmStunMs: 1000, dmBoltDmg: 20, dmStrikeMaxHpRate: 0.2, dmStrikeStunMs: 500, dmStunGraceMs: 40, cuStacks: 3, cuBoomDmg: 30, cuBoomMs: 500, cuExpireMs: 3000,
               rvDur: 3000, rvTick: 1000, rvHeal: 30, rvDmg: 30, rvCastMs: 600, grLife: 650 };
   var ASSIST_MS = 5000;
@@ -1634,11 +1634,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       "간 기절하고, 기절이 풀릴 때 " + ULT.dmBoltDmg + "의 피해. 영역 안에서 주술사의 기본 공격은 영역 내 가장 가까운 적 1명에게 최대 체력의 " + pctOf(ULT.dmStrikeMaxHpRate) + "%의 피해를 입히고 " + secs(ULT.dmStrikeStunMs) + "간 기절";
     if (k === "priest") return "지정한 곳에 " + secs(ULT.bhDelay) + " 뒤 " + secs(ULT.bhDur) + "간 유지되는 반경 " + ULT.bhR + "의 블랙홀 생성. 적은 중심으로 끌려감";
     if (k === "cleric") return "아군의 체력을 " + CHARS.cleric.healGauge + " 회복시키면 사용 가능. 사용 시 자신의 체력을 모두 회복하고 " + secs(ULT.rvDur) + "간 제자리에서 기도. 아군 전체는 1초당 체력 " + ULT.rvHeal + " 회복, 적 전체는 1초당 " + ULT.rvDmg + "의 피해. 기절·넉백·끌어당김을 당하면 취소";
-    if (k === "frost") return "자신을 중심으로 " + secs(ULT.frBzDur) + "간 유지되는 반경 " + ULT.frBzR + "의 눈보라 생성. 눈보라 안의 아군은 은신 상태가 되고, 적은 1초당 " +
+    if (k === "frost") return "자신을 중심으로 " + secs(ULT.frBzDur) + "간 유지되는 반경 " + ULT.frBzR + "의 눈보라 생성. " + (ULT.frBzHides ? "눈보라 안의 아군은 은신 상태가 되고, " : "") + "적은 1초당 " +
       ULT.frBzDmg + "의 피해를 입고 패시브 1중첩";
     if (k === "duelist") return secs(ULT.rmDur) + "간 초당 공격 " + ULT.rmRate + "회, 돌진 거리 " + ULT.rmDashRange + "·돌진 시간 " + secs(ULT.rmDashMs) + "로 단축. 사용 즉시 기본 공격 대기시간 초기화";
     if (k === "stormbow") return "자신을 중심으로 반경 " + ULT.ocR + "의 번개 막 생성. 적은 " + ULT.ocDmg + "의 피해를 입고 " + secs(ULT.ocStunMs) + "간 기절. 이후 " + secs(ULT.ocDur) + "간 초당 공격 " +
-      num(1000 / CHARS.stormbow.cd * ULT.ocRate) + "회, 기본 공격이 적중할 때마다 패시브 번개 발동";
+      num(1000 / CHARS.stormbow.cd * ULT.ocRate) + "회, 이동속도 " + ULT.ocSpeedBonus + "·사거리 " + ULT.ocRangeBonus + " 증가, 기본 공격이 적중할 때마다 패시브 번개 발동";
     if (k === "dancer") return secs(ULT.bwDur) + "간 회전하며 " + speedUp(CHARS.dancer) + ". 반경 " + ULT.bwR + "의 적은 " + secs(ULT.bwTick) + "마다 " + ULT.bwDmg + "의 피해. 기절·넉백을 당하면 취소";
     return "";
   }
@@ -2799,6 +2799,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (E.char === "rogue" && E.stealthUntil > t) sp = c.ultSpeed;
     if (bladeStorm(E, t)) sp = c.ultSpeed;
     if (c.haste) sp += hasteBonus(E, t);
+    if (overcharged(E, t)) sp += ULT.ocSpeedBonus;
     return sp * slowMulAt(E, t);
   }
   function hasteBonus(E, t) {
@@ -3006,7 +3007,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var ox = i > 0 && E ? E.x : v.ev.x, oy = i > 0 && E ? E.y : v.ev.y;
     addProj(v.key + "_" + i, { team: v.team, owner: v.ev.o, ownerCharacterType: v.char, x: ox + dx * 20, y: oy + dy * 20,
       vx: dx * sp, vy: dy * sp, isSkill: v.skill, dmg: sv.dmg, ultKey: sv.ultKey, fx: sv.fx,
-      pr: sv.pr, range: sv.range, createdAt: v.ev.t + i * v.gap });
+      pr: sv.pr, range: sv.range + (!v.skill && E && overcharged(E, v.ev.t) ? ULT.ocRangeBonus : 0), createdAt: v.ev.t + i * v.gap });
     if (v.char === "hitman" && v.skill) spark(ox + dx * 30, oy + dy * 30, "#FF3A4A", 2);
     if (E && (E === ME || BOTS[E.id]) && hear(E)) sfx(v.char === "mage" || v.char === "necro" || v.char === "frost" ? "orb" : (v.char === "rogue" || v.char === "dancer" ? "star" : "shoot"));
     return true;
@@ -3412,6 +3413,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   function stormActive(s, t) { return !s.ownerFell && t >= s.e.createdAt + s.e.delay && t < s.e.createdAt + s.e.delay + s.e.dur; }
   function inFriendlyStorm(E, t) {
+    if (!ULT.frBzHides) return false;
     t = t || now();
     for (var i = 0; i < STORMS.length; i++) {
       var s = STORMS[i];
@@ -4206,7 +4208,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (B.char === "shaman" && t >= B.cdUntil && domainStrikeTarget(B, t)) { fireBasic(B, B.angle); return; }
     if (aimAt && t >= B.cdUntil && t - k.seenAt > BOT_REACT_MS) {
       var ad = hyp(aimAt.x - B.x, aimAt.y - B.y);
-      var rng = c.stab ? lungeRange(B, t) + c.range : c.throwRange || c.dashRange || (melee ? c.range + BODY_R - 4 : c.range);
+      var rng = c.stab ? lungeRange(B, t) + c.range : c.throwRange || c.dashRange || (melee ? c.range + BODY_R - 4 : c.range + (overcharged(B, t) ? ULT.ocRangeBonus : 0));
       if (ad <= rng && losClear(B.x, B.y, aimAt.x, aimAt.y)) {
         var shotAim = c.pSpeed && !melee ? leadSpot(aimAt, ad / c.pSpeed, t) : aimAt;
         fireBasic(B, Math.atan2(shotAim.y - B.y, shotAim.x - B.x) + (Math.random() - 0.5) * 2 * BOT_AIM_ERR);
@@ -4270,7 +4272,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     if (t < B.cdUntil) return;
     var d = hyp(target.x - B.x, target.y - B.y);
-    if (d <= c.range && losClear(B.x, B.y, target.x, target.y)) fireBasic(B, B.angle + (Math.random() - 0.5) * 2 * BOT_AIM_ERR);
+    if (d <= c.range + (overcharged(B, t) ? ULT.ocRangeBonus : 0) && losClear(B.x, B.y, target.x, target.y)) fireBasic(B, B.angle + (Math.random() - 0.5) * 2 * BOT_AIM_ERR);
   }
 
   function entFields(u, E) {
@@ -6151,7 +6153,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }
     } else {
       var sniperUlt = ult && ME.char === "sniper";
-      var len = sniperUlt ? ULT.pnRange : (ult ? ULT.mkRange : c.range), wx = Math.cos(ME.angle), wy = Math.sin(ME.angle), hw = sniperUlt ? 22 : (ult ? 12 : 8);
+      var len = sniperUlt ? ULT.pnRange : (ult ? ULT.mkRange : c.range + (overcharged(ME, now()) ? ULT.ocRangeBonus : 0)), wx = Math.cos(ME.angle), wy = Math.sin(ME.angle), hw = sniperUlt ? 22 : (ult ? 12 : 8);
       len = rayCast(ME.x + wx * 20, ME.y + wy * 20, wx, wy, len, 6) + 20;
       showAimStrip(18, Math.max(1, len - 18), hw * 2);
     }
