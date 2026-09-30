@@ -7020,6 +7020,19 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     return {
       CHARS: CHARS, CHAR_LIST: CHAR_LIST, ULT: ULT, ROLES: ROLES, ROLE_LIST: ROLE_LIST, MAPS: MAPS, roleGauge: function (c) { return roleOf(c).gaugeOnHit; }, spawnOf: spawnOf, BODY_R: BODY_R, GAUGE_MAX: GAUGE_MAX, BOUND: BOUND, MAP_IDS: MAP_IDS, RESPAWN_MS: RESPAWN_MS, RESPAWN_PROTECT_MS: RESPAWN_PROTECT_MS, myId: myId,
       obstacles: function () { return { walls: OBST, water: WATER }; },
+      mapTopShot: function (id, pxW, pxH) {
+        if (!renderer || !KIT.propsReady) return null;
+        useArena(id);
+        renderer.setPixelRatio(1); renderer.setSize(pxW, pxH, false);
+        camera.aspect = pxW / pxH; camera.updateProjectionMatrix();
+        camera.up.set(0, 0, -1);
+        camera.position.set(MW / 2, MH * 0.5 / Math.tan(CAM_FOV * Math.PI / 360) * 1.02, MH / 2);
+        camera.lookAt(MW / 2, 0, MH / 2); camera.up.set(0, 1, 0);
+        camera.updateMatrixWorld();
+        BUSH_VIS.forEach(function (bv) { bv.mats.forEach(function (m) { m.opacity = bv.full; }); });
+        renderer.render(scene, camera);
+        return renderer.domElement.toDataURL("image/png");
+      },
       loadMapData: loadMapData, makeEnt: makeEnt, resolve: resolve, stepWorld: stepWorld,
       useUlt: useUlt, fireBasic: fireBasic, damage: damage, healCut: healCut, healAmount: healAmount, respawnIfReady: respawnIfReady, afflict: afflict, speedOf: speedOf, stunned: stunned,
       onShot: onShot, onMelee: onMelee, potionFlightMs: potionFlightMs, meteorHitAt: meteorHitAt, onEffect: onEffect, onHit: onHit,
@@ -7040,7 +7053,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     };
   }
   if (/[?&]test(&|$)/.test(location.search)) import("./30.team-battle-tests.js?t=" + Date.now()).then(function (m) { m.runTeamBattleTests(testHooks()); });
-  if (/[?&]sim(&|$)/.test(location.search)) import("./30.team-battle-sim.js?t=" + Date.now()).then(function (m) { window.TB_SIM = m.createSim(testHooks()); });
+  if (/[?&]sim(&|$)/.test(location.search)) import("./30.team-battle-sim.js?t=" + Date.now()).then(function (m) { window.TB_SIM = m.createSim(testHooks()); window.TB_SIM.mapTopShot = testHooks().mapTopShot; });
 
   refreshNick();
   showScreen("start");
