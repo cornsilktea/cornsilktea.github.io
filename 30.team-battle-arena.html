@@ -237,7 +237,7 @@
     .dfSlots .slot .pk.picked b { font-size: 20px; }
     .dfCharCol { align-self: flex-start; min-width: 380px; position: sticky; top: 0; max-height: calc(100vh - 78px); overflow-y: auto; scrollbar-width: thin; }
     .dfCharCol .dfCard img { height: 48px; }
-    .dfCharCol .dfDetail .big { height: 54px; font-size: 20px; }
+    .dfCharCol .dfDetail .big, .dfCharCol .dfReadyBtn { height: 54px; font-size: 20px; }
   }
   @media (min-width: 1400px) { .lobbyCols, .draftCols { margin-left: 3vw; } }
 
@@ -490,7 +490,7 @@
   .pface.canTrade:hover { box-shadow: 0 0 0 3px #F2D06B, 0 0 12px rgba(242,208,107,.6); }
   .dfCard.banned { border-color: rgba(216,69,59,.7); }
   .dfCard .tag.ban { background: #B8322A; }
-  .dfReadyBar { margin: 0 0 12px; text-align: center; }
+  .dfReadyBar { margin: 12px 0 0; text-align: center; }
   .dfReadyBtn { display: block; width: 100%; height: 60px; border: 0; border-radius: 10px; background: #2FA35A; color: #fff; font: inherit; font-size: 22px; font-weight: 800; cursor: pointer; box-shadow: 0 4px 14px rgba(47,163,90,.35); }
   .dfReadyBtn.on { background: #1E6E3C; box-shadow: inset 0 0 0 3px #3FBF6A; }
   .dfReadyBtn:disabled { opacity: .5; cursor: default; }
@@ -694,7 +694,6 @@
         <div class="team red"><h3>레드팀<span id="dfBanR" class="dfBanBox"></span></h3><div id="dfRed" class="dfSlots"></div></div>
       </div>
     </div>
-    <div id="dfReadyBar" class="dfReadyBar" hidden><button id="btnDraftReady" class="dfReadyBtn" type="button">준비 완료</button><div id="dfReadyHint" class="dfReadyHint"></div></div>
     <div class="card dfMapCard"><div class="dfMapHead"><span id="dfMapName"></span><small><span class="b">◀ 블루 진영</span> · <span class="r">레드 진영 ▶</span></small></div><img id="dfMapImg" class="dfMapImg" alt=""></div>
     <button id="btnLeaveDraft" class="mini danger" type="button">방 나가기</button>
     <div id="dfTradeBox" class="dfTradeBox" hidden></div>
@@ -703,6 +702,7 @@
     <div class="secTitle">캐릭터<span class="secHint">한 번 누르면 설명이 나오고, 내 차례일 때 결정 버튼으로 골라요.</span></div>
     <div id="dfChars" class="dfChars"></div>
     <div id="dfDetail" class="dfDetail"></div>
+    <div id="dfReadyBar" class="dfReadyBar" hidden><button id="btnDraftReady" class="dfReadyBtn" type="button">준비 완료</button><div id="dfReadyHint" class="dfReadyHint"></div></div>
   </div>
   </div>
 </div>
