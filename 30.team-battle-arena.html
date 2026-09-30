@@ -1418,6 +1418,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var prev = screenNow;
     screenNow = k;
     show($("scrStart"), k === "start"); show($("scrLobby"), k === "lobby"); show($("scrDraft"), k === "draft"); show($("scrGame"), k === "game");
+    var guardHome = document.querySelector("[data-guard-home]");
+    if (guardHome) guardHome.style.display = k === "game" || k === "draft" ? "none" : "";
     if (k === "game") resize();
     if (k !== prev || (k !== "lobby" && k !== "start")) setCharZoom(false);
     if (k === "start" || k === "lobby") placeCharBox(k);
