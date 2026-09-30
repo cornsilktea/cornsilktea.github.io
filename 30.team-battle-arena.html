@@ -819,7 +819,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var ATK_POSE_MS = 150;
   var NET_MS = 143;
   var CHARS = {
-    warrior: { name: "광전사", role: "fighter", icon: "🪓", hp: 240, speed: 220, ultSpeed: 300, cd: 1000, dmg: 30, range: 110, arc: Math.PI * 0.55,
+    warrior: { name: "광전사", role: "fighter", icon: "🪓", hp: 235, speed: 220, ultSpeed: 300, cd: 1000, dmg: 30, range: 110, arc: Math.PI * 0.55,
                rally: { hpRate: 0.5, ms: 5000, perSec: 10 }, ultName: "광폭화", heals: true },
     duelist: { name: "결투가", role: "fighter", icon: "🤺", hp: 220, speed: 250, cd: 1000, dmg: 30, range: 100,
                dashRange: 250, dashMs: 500, stab: true, selfHeal: 10, ultName: "르미즈", heals: true },
@@ -837,7 +837,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     cleric:  { name: "클레릭", role: "caster", icon: "✝️", hp: 120, speed: 240, cd: 1000, dmg: 0, graceHeal: 25, range: 400, noAim: true, healGauge: 400, ultName: "요한계시록", heals: true },
     hitman:  { name: "자객", role: "assassin", icon: "🔪", hp: 120, speed: 250, cd: 1250, dmg: 40, range: 100,
                dashRange: 200, dashWidth: 150, dashDmg: 40, dashMs: 300, finishDelay: 125, ultName: "처형", ultAim: true },
-    guardian: { name: "수문장", role: "fighter", icon: "🏰", hp: 430, speed: 200, cd: 1250, dmg: 25, range: 140, arc: Math.PI * 130 / 180,
+    guardian: { name: "수문장", role: "fighter", icon: "🏰", hp: 435, speed: 200, cd: 1250, dmg: 25, range: 140, arc: Math.PI * 130 / 180,
                 fx: { slowMs: 1000, slowMul: 0.7 }, ultName: "창벽" },
     frost:   { name: "얼음술사", role: "caster", icon: "❄️", hp: 120, speed: 240, cd: 1000, dmg: 16, range: 350, pSpeed: 650, pr: 8, ultName: "눈보라" },
     dancer:  { name: "검무희", role: "assassin", icon: "🌸", hp: 110, speed: 250, ultSpeed: 300, cd: 833, dmg: 20, range: 350, pSpeed: 900, pr: 8, ultName: "칼날 폭풍" },
@@ -875,7 +875,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               bzDur: 4000, bzDmgMul: 1.4, bzCdMul: 1 / 1.4, bzHeal: 15, tkDur: 4000, tkDef: 0.4, tkStunR: 120, tkStunMs: 1000,
               mbDelay: 1000, mbR: 250, mbDmg: 120, mbDmgMin: 80, mbCast: 550, mbMin: 60, mbStunMs: 1200, mbStunMin: 600, mbSteps: 5,
               asSmokeMs: 400, asDur: 15000,
-              smCount: 2, smAhead: KEY * 1, smSide: 38, smHp: 65, smSpeed: 250, smGauge: 0.5, smDmg: 12, smCd: 800, smRange: 80, smArc: Math.PI * 0.6,
+              smCount: 2, smAhead: KEY * 1, smSide: 38, smHp: 70, smSpeed: 250, smGauge: 0.5, smDmg: 12, smCd: 800, smRange: 80, smArc: Math.PI * 0.6,
               smDur: 8000, smMax: 4, smFollow: KEY * 1.5, smRiseMs: 1100, smCorpseMs: 1400,
               pnDmg: 90, pnSpeed: 735, pnRange: 900, pnPr: 16, pnRefund: 4, pnScale: 3,
               plFlight: 700, plFlightMin: 100, plR: 60, plDur: 3000, plTick: 1000, plMax: 4, plFade: 500, plLob: 90, plGauge: 1,
