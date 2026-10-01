@@ -3,6 +3,7 @@
 <head>
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="zombieoutbreak"></script>
+<script charset="utf-8" src="quality-governor.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>미드나잇 좀비 아웃브레이크</title>
@@ -3700,38 +3701,26 @@ function updateHorror(t, nowMs) {
   setDread(closeness * 0.85);
 }
 
-let lastFrame = performance.now(), slowFrames = 0;
-const QUALITY_STEPS = ["fogclip", "pixel", "pixel", "afterimage", "glow", "curtain", "beam"];
-let qualityLevel = 0, fogClipIndoors = false;
-function applyQualityStep(step) {
-  if (step === "fogclip") fogClipIndoors = true;
-  else if (step === "pixel") {
-    const pr = renderer.getPixelRatio();
-    if (pr <= MIN_PIXEL_RATIO) return false;
-    renderer.setPixelRatio(Math.max(MIN_PIXEL_RATIO, pr - 0.25)); resize();
-  } else if (step === "afterimage") afterimageLimit = 3;
-  else if (step === "glow") flickerMeshes.forEach(f => { f.glow.visible = false; });
-  else if (step === "curtain") curtainsAnimated = false;
-  else if (step === "beam" && beamMesh) beamMesh.visible = false;
-  return true;
-}
-function lowerQuality() {
-  while (qualityLevel < QUALITY_STEPS.length) if (applyQualityStep(QUALITY_STEPS[qualityLevel++])) break;
-  try { localStorage.setItem(QUALITY_KEY, String(qualityLevel)); } catch (e) {}
-}
-(() => {
-  let saved = 0;
-  try { saved = clamp(Math.floor(+localStorage.getItem(QUALITY_KEY) || 0), 0, QUALITY_STEPS.length); } catch (e) {}
-  if (IS_TOUCH_DEVICE) saved = Math.max(saved, 1);
-  while (qualityLevel < saved) applyQualityStep(QUALITY_STEPS[qualityLevel++]);
-})();
-function adaptQuality(frameSec) {
-  if (screenNow !== "game" || frameSec > 0.25) return;
-  if (frameSec > 1 / 45) slowFrames++; else if (slowFrames > 0) slowFrames--;
-  if (slowFrames < 150) return;
-  slowFrames = 0;
-  if (qualityLevel < QUALITY_STEPS.length) lowerQuality();
-}
+let lastFrame = performance.now(), fogClipIndoors = false;
+const once = QualityGovernor.times.bind(null, 1);
+const QG = QualityGovernor({
+  storageKey: QUALITY_KEY,
+  isPlaying: () => screenNow === "game",
+  slowSec: 1 / 45, slowLimit: 149,
+  steps: [
+    once(() => { fogClipIndoors = true; }),
+    QualityGovernor.times(2, () => {
+      const pr = renderer.getPixelRatio();
+      if (pr <= MIN_PIXEL_RATIO) return false;
+      renderer.setPixelRatio(Math.max(MIN_PIXEL_RATIO, pr - 0.25)); resize();
+    }),
+    once(() => { afterimageLimit = 3; }),
+    once(() => { flickerMeshes.forEach(f => { f.glow.visible = false; }); }),
+    once(() => { curtainsAnimated = false; }),
+    once(() => { if (beamMesh) beamMesh.visible = false; else return false; })
+  ]
+});
+QG.restore(IS_TOUCH_DEVICE ? 1 : 0);
 
 const OUTDOOR_VIEW = [30, 170, 420], INDOOR_VIEW = [4, 34, 60];
 const TOUR_SHOTS = [
@@ -3848,7 +3837,7 @@ function frame(nowMs) {
   requestAnimationFrame(frame);
   syncTouchPad();
   const dt = Math.min(0.05, (nowMs - lastFrame) / 1000);
-  adaptQuality((nowMs - lastFrame) / 1000);
+  QG.update((nowMs - lastFrame) / 1000);
   lastFrame = nowMs;
   const t = serverNow();
   if (room.ref && room.status === "playing" && room.startAt && modelsReady && round.key !== room.startAt && room.players[myId]) beginLocalRound();
