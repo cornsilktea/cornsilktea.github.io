@@ -4446,119 +4446,122 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     G.endSent = true;
     netWrite(true);
     var statsMode = room.mode === "pvp" || room.mode === "cup";
-    var skipReason = quitTeam ? "상대팀이 모두 나가서 통계에서 제외됐어요" : statsSkipReason(room.mode, room.roster, P);
+    var skipReason = quitTeam ? "상대팀이 모두 나가서 통계에서 제외됐어요" : STATS.skipReason(room.mode, room.roster, P);
     var ended = { status: "ended", winner: winner, endedAt: t,
       final: { blue: s.blueKills, red: s.redKills, reason: quitTeam ? "상대팀이 모두 나가서 승리" : "시간 종료 — 킬 스코어로 판정" } };
     if (statsMode) ended.statsNote = skipReason || STATS_PENDING;
     room.ref.update(ended);
-    if (!skipReason) watchStatsDone(t);
+    if (!skipReason) STATS.watchDone(t);
   }
 
   var STATS_PATH = "teambattle/modestats/";
   var STATS_SETTLE_MS = 8000, STATS_HOLD_MAX_MS = 11000;
   var STATS_PENDING = "통계를 저장하는 중이에요";
   var isTestLink = !!(window.PORTAL_CLASS && window.PORTAL_CLASS.test);
-  function statsSkipReason(mode, roster, ps) {
-    if (mode !== "pvp" && mode !== "cup") return "이 모드는 통계를 모으지 않아요";
-    if (!roster) return "참가자 정보를 못 받아서 통계에서 제외됐어요";
-    if (isTestLink) return "배포용(테스트) 링크로 열어서 통계에서 제외됐어요";
-    if (CLOCK.scale !== DEFAULT_SLOW) return "옛 속도(시험용) 경기라 통계에서 제외됐어요";
-    var count = { blue: 0, red: 0 }, ids = keys(roster);
-    for (var i = 0; i < ids.length; i++) {
-      var id = ids[i], r = roster[id], d = ps[id];
-      if (!r) return "참가자 정보가 맞지 않아 통계에서 제외됐어요";
-      if (r.ai || (d && d.isAI)) return "AI가 함께해서 통계에서 제외됐어요";
-      if (!d || !d.slot || d.team !== r.team || d.characterType !== r.c || !(r.team in count) || !CHARS[r.c]) return "참가자 정보가 맞지 않아 통계에서 제외됐어요";
-      count[r.team]++;
+  class MatchStats {
+    skipReason(mode, roster, ps) {
+      if (mode !== "pvp" && mode !== "cup") return "이 모드는 통계를 모으지 않아요";
+      if (!roster) return "참가자 정보를 못 받아서 통계에서 제외됐어요";
+      if (isTestLink) return "배포용(테스트) 링크로 열어서 통계에서 제외됐어요";
+      if (CLOCK.scale !== DEFAULT_SLOW) return "옛 속도(시험용) 경기라 통계에서 제외됐어요";
+      var count = { blue: 0, red: 0 }, ids = keys(roster);
+      for (var i = 0; i < ids.length; i++) {
+        var id = ids[i], r = roster[id], d = ps[id];
+        if (!r) return "참가자 정보가 맞지 않아 통계에서 제외됐어요";
+        if (r.ai || (d && d.isAI)) return "AI가 함께해서 통계에서 제외됐어요";
+        if (!d || !d.slot || d.team !== r.team || d.characterType !== r.c || !(r.team in count) || !CHARS[r.c]) return "참가자 정보가 맞지 않아 통계에서 제외됐어요";
+        count[r.team]++;
+      }
+      return count.blue === 3 && count.red === 3 ? "" : "양 팀이 3명씩이 아니어서 통계에서 제외됐어요";
     }
-    return count.blue === 3 && count.red === 3 ? "" : "양 팀이 3명씩이 아니어서 통계에서 제외됐어요";
-  }
-  function isStudentFullTeamMatch(mode, roster, ps) { return !statsSkipReason(mode, roster, ps); }
-  function setStatsNote(r, text) { r.ref.update({ statsNote: text }).catch(function () {}); }
-  function watchStatsDone(endedAt) {
-    if (!db || !room) return;
-    var r = room, ref = r.ref.child("done"), settled = false, timer = 0;
-    function everyoneStayed(done) { return !!r.roster && keys(r.roster).every(function (id) { return done[id] === endedAt; }); }
-    function settle(done, timedOut) {
-      if (settled || (!everyoneStayed(done) && !timedOut)) return;
-      settled = true; clearTimeout(timer); ref.off("value", onDone);
-      recordClassStats(r, endedAt, everyoneStayed(done));
+    isFullStudentMatch(mode, roster, ps) { return !STATS.skipReason(mode, roster, ps); }
+    setNote(r, text) { r.ref.update({ statsNote: text }).catch(function () {}); }
+    watchDone(endedAt) {
+      if (!db || !room) return;
+      var r = room, ref = r.ref.child("done"), settled = false, timer = 0;
+      function everyoneStayed(done) { return !!r.roster && keys(r.roster).every(function (id) { return done[id] === endedAt; }); }
+      function settle(done, timedOut) {
+        if (settled || (!everyoneStayed(done) && !timedOut)) return;
+        settled = true; clearTimeout(timer); ref.off("value", onDone);
+        record(r, endedAt, everyoneStayed(done));
+      }
+      function onDone(s) { settle(s.val() || {}, false); }
+      function failed() { if (settled) return; settled = true; clearTimeout(timer); ref.off("value", onDone); STATS.setNote(r, "통계 확인에 실패해서 저장하지 못했어요"); }
+      ref.on("value", onDone, failed);
+      timer = setTimeout(function () { ref.once("value").then(function (s) { settle(s.val() || {}, true); }).catch(failed); }, STATS_SETTLE_MS);
     }
-    function onDone(s) { settle(s.val() || {}, false); }
-    function failed() { if (settled) return; settled = true; clearTimeout(timer); ref.off("value", onDone); setStatsNote(r, "통계 확인에 실패해서 저장하지 못했어요"); }
-    ref.on("value", onDone, failed);
-    timer = setTimeout(function () { ref.once("value").then(function (s) { settle(s.val() || {}, true); }).catch(failed); }, STATS_SETTLE_MS);
-  }
-  function recordClassStats(r, endedAt, stayed) {
-    var ps = P;
-    if (room !== r || r.status !== "ended" || r.endedAt !== endedAt || r.winner == null) return;
-    if (!stayed) { setStatsNote(r, "결과 창까지 남지 않은 사람이 있어 통계에서 제외됐어요"); return; }
-    if (!isStudentFullTeamMatch(r.mode, r.roster, ps)) { setStatsNote(r, "참가자 정보가 맞지 않아 통계에서 제외됐어요"); return; }
-    saveClassStats(r, ps);
-  }
-  function statsHoldActive() { return !!room && room.status === "ended" && room.statsNote === STATS_PENDING && now() - (room.endedAt || 0) < STATS_HOLD_MAX_MS; }
-  function markStayedToEnd() {
-    var r = room;
-    if (!r || !P[myId] || !r.roster || !r.roster[myId]) return;
-    if (r.endedAt) { r.ref.child("done/" + myId).set(r.endedAt).catch(function () {}); return; }
-    r.ref.child("endedAt").once("value").then(function (s) {
-      var endedAt = s.val();
-      if (endedAt && room === r && P[myId]) r.ref.child("done/" + myId).set(endedAt);
-    }).catch(function () {});
-  }
-  function saveClassStats(r, ps) {
-    var rows = keys(r.roster).map(function (id) {
-      var e = ent(id) || stateOf(ps[id]);
-      return { c: r.roster[id].c, win: r.winner === r.roster[id].team, dmg: +e.dmg || 0, heal: +e.heal || 0,
-               blocked: +e.blocked || 0, stun: +e.stunDealt || 0, slow: +e.slowDealt || 0, assists: +e.assists || 0, kills: +e.kills || 0, deaths: +e.deaths || 0 };
-    });
-    var banned = (r.bans || []).filter(function (c) { return CHARS[c]; });
-    function addStats(countSelectableGames) {
-      return db.ref(STATS_PATH + r.mode).transaction(function (cur) {
-        cur = cur || {};
-        var matchesBefore = +cur.matches || 0;
-        cur.matches = matchesBefore + 1;
-        if (countSelectableGames) CHAR_LIST.forEach(function (k) {
-          var st = cur[k] || { picks: 0, wins: 0, dmg: 0, heal: 0 };
-          st.games = (st.games != null ? +st.games : (cur[k] ? matchesBefore : 0)) + 1;
-          cur[k] = st;
+    record(r, endedAt, stayed) {
+      var ps = P;
+      if (room !== r || r.status !== "ended" || r.endedAt !== endedAt || r.winner == null) return;
+      if (!stayed) { STATS.setNote(r, "결과 창까지 남지 않은 사람이 있어 통계에서 제외됐어요"); return; }
+      if (!STATS.isFullStudentMatch(r.mode, r.roster, ps)) { STATS.setNote(r, "참가자 정보가 맞지 않아 통계에서 제외됐어요"); return; }
+      save(r, ps);
+    }
+    holdActive() { return !!room && room.status === "ended" && room.statsNote === STATS_PENDING && now() - (room.endedAt || 0) < STATS_HOLD_MAX_MS; }
+    markStayed() {
+      var r = room;
+      if (!r || !P[myId] || !r.roster || !r.roster[myId]) return;
+      if (r.endedAt) { r.ref.child("done/" + myId).set(r.endedAt).catch(function () {}); return; }
+      r.ref.child("endedAt").once("value").then(function (s) {
+        var endedAt = s.val();
+        if (endedAt && room === r && P[myId]) r.ref.child("done/" + myId).set(endedAt);
+      }).catch(function () {});
+    }
+    save(r, ps) {
+      var rows = keys(r.roster).map(function (id) {
+        var e = ent(id) || stateOf(ps[id]);
+        return { c: r.roster[id].c, win: r.winner === r.roster[id].team, dmg: +e.dmg || 0, heal: +e.heal || 0,
+                 blocked: +e.blocked || 0, stun: +e.stunDealt || 0, slow: +e.slowDealt || 0, assists: +e.assists || 0, kills: +e.kills || 0, deaths: +e.deaths || 0 };
+      });
+      var banned = (r.bans || []).filter(function (c) { return CHARS[c]; });
+      function addStats(countSelectableGames) {
+        return db.ref(STATS_PATH + r.mode).transaction(function (cur) {
+          cur = cur || {};
+          var matchesBefore = +cur.matches || 0;
+          cur.matches = matchesBefore + 1;
+          if (countSelectableGames) CHAR_LIST.forEach(function (k) {
+            var st = cur[k] || { picks: 0, wins: 0, dmg: 0, heal: 0 };
+            st.games = (st.games != null ? +st.games : (cur[k] ? matchesBefore : 0)) + 1;
+            cur[k] = st;
+          });
+          cur.red = (+cur.red || 0) + (r.winner === "red" ? 1 : 0);
+          cur.blue = (+cur.blue || 0) + (r.winner === "blue" ? 1 : 0);
+          rows.forEach(function (w) {
+            var st = cur[w.c] || {}, n = +st.picks || 0;
+            st.dmg = r1(((+st.dmg || 0) * n + w.dmg) / (n + 1));
+            st.heal = r1(((+st.heal || 0) * n + w.heal) / (n + 1));
+            var ccN = +st.ccPicks || 0;
+            st.block = r1(((+st.block || 0) * ccN + w.blocked) / (ccN + 1));
+            st.stun = r1(((+st.stun || 0) * ccN + w.stun) / (ccN + 1));
+            st.slow = r1(((+st.slow || 0) * ccN + w.slow) / (ccN + 1));
+            st.ccPicks = ccN + 1;
+            var asN = +st.asPicks || 0;
+            st.assist = r1(((+st.assist || 0) * asN + w.assists) / (asN + 1));
+            st.asPicks = asN + 1;
+            var kdN = +st.kdPicks || 0;
+            st.kills = r1(((+st.kills || 0) * kdN + w.kills) / (kdN + 1));
+            st.deaths = r1(((+st.deaths || 0) * kdN + w.deaths) / (kdN + 1));
+            st.kdPicks = kdN + 1;
+            st.picks = n + 1;
+            st.wins = (+st.wins || 0) + (w.win ? 1 : 0);
+            cur[w.c] = st;
+          });
+          banned.forEach(function (c) {
+            var st = cur[c] || { picks: 0, wins: 0, dmg: 0, heal: 0 };
+            st.bans = (+st.bans || 0) + 1;
+            cur[c] = st;
+          });
+          return cur;
         });
-        cur.red = (+cur.red || 0) + (r.winner === "red" ? 1 : 0);
-        cur.blue = (+cur.blue || 0) + (r.winner === "blue" ? 1 : 0);
-        rows.forEach(function (w) {
-          var st = cur[w.c] || {}, n = +st.picks || 0;
-          st.dmg = r1(((+st.dmg || 0) * n + w.dmg) / (n + 1));
-          st.heal = r1(((+st.heal || 0) * n + w.heal) / (n + 1));
-          var ccN = +st.ccPicks || 0;
-          st.block = r1(((+st.block || 0) * ccN + w.blocked) / (ccN + 1));
-          st.stun = r1(((+st.stun || 0) * ccN + w.stun) / (ccN + 1));
-          st.slow = r1(((+st.slow || 0) * ccN + w.slow) / (ccN + 1));
-          st.ccPicks = ccN + 1;
-          var asN = +st.asPicks || 0;
-          st.assist = r1(((+st.assist || 0) * asN + w.assists) / (asN + 1));
-          st.asPicks = asN + 1;
-          var kdN = +st.kdPicks || 0;
-          st.kills = r1(((+st.kills || 0) * kdN + w.kills) / (kdN + 1));
-          st.deaths = r1(((+st.deaths || 0) * kdN + w.deaths) / (kdN + 1));
-          st.kdPicks = kdN + 1;
-          st.picks = n + 1;
-          st.wins = (+st.wins || 0) + (w.win ? 1 : 0);
-          cur[w.c] = st;
-        });
-        banned.forEach(function (c) {
-          var st = cur[c] || { picks: 0, wins: 0, dmg: 0, heal: 0 };
-          st.bans = (+st.bans || 0) + 1;
-          cur[c] = st;
-        });
-        return cur;
+      }
+      addStats(true).catch(function () { return addStats(false); }).then(function (res) {
+        setNote(r, res && res.committed ? "이 경기는 통계에 반영됐어요" : "통계 저장이 취소됐어요. 다시 경기하면 반영돼요");
+      }).catch(function (err) {
+        setNote(r, "통계 저장에 실패했어요(" + ((err && err.code) || err) + "). 데이터베이스 규칙 게시를 확인해 주세요");
       });
     }
-    addStats(true).catch(function () { return addStats(false); }).then(function (res) {
-      setStatsNote(r, res && res.committed ? "이 경기는 통계에 반영됐어요" : "통계 저장이 취소됐어요. 다시 경기하면 반영돼요");
-    }).catch(function (err) {
-      setStatsNote(r, "통계 저장에 실패했어요(" + ((err && err.code) || err) + "). 데이터베이스 규칙 게시를 확인해 주세요");
-    });
   }
+  var STATS = new MatchStats();
   function hostCleanup() {
     var t = now();
     if (room.status === "ended" && room.endedAt && t - room.endedAt > 300000) room.ref.remove();
@@ -4567,7 +4570,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (!G) return;
     G.forceNet = true;
     try { netWrite(true); } catch (e) {}
-    markStayedToEnd();
+    STATS.markStayed();
     setTimeout(function () {
       var mine = ME ? ME.team : null;
       if (mine && room && room.winner && room.winner !== "draw") sfx(room.winner === mine ? "win" : "lose");
@@ -4575,7 +4578,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   function restart() {
     if (!room || room.status !== "ended") return;
-    if (statsHoldActive() || (room.endedAt && now() - room.endedAt < 1500)) return;
+    if (STATS.holdActive() || (room.endedAt && now() - room.endedAt < 1500)) return;
     backToLobby();
   }
   function backToLobby() {
@@ -7116,8 +7119,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (quitWin) setText($("endReason"), "상대팀이 모두 나가서 " + (w === "blue" ? "블루팀" : "레드팀") + "이 승리했어요.");
       show($("endStats"), !!room.statsNote);
       if (room.statsNote) setText($("endStats"), room.statsNote);
-      var holdForStats = statsHoldActive() && !!room.roster && !!room.roster[myId];
-      $("btnAgain").disabled = statsHoldActive();
+      var holdForStats = STATS.holdActive() && !!room.roster && !!room.roster[myId];
+      $("btnAgain").disabled = STATS.holdActive();
       $("btnLeaveEnd").disabled = holdForStats;
       setText($("endBlue"), String(f.blue != null ? f.blue : s.blueKills));
       setText($("endRed"), String(f.red != null ? f.red : s.redKills));
