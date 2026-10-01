@@ -7639,30 +7639,48 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     if (!MATCH.game) return;
     var t = now();
-    stepWorld(t, dt * CLOCK.scale, true, dt);
+    WORLD.stepWorld(t, dt * CLOCK.scale, true, dt);
     if (st === "countdown" || st === "playing") netWrite(false);
     if (isHost()) { hostJudge(); hostCleanup(); }
     FRAME_RENDERER.render(t, dt);
     HUD.updateHud(t);
     HUD.adaptQuality(frameMs);
   }
-  function stepWorld(t, dt, driveBots, viewDt) {
-    syncRemote(viewDt == null ? dt : viewDt);
-    PROJECTILES.stepShots(t);
-    FIELD_FX.stepBursts(t);
-    FIELD_FX.stepPools(t);
-    STATUS.flushCC(t);
-    FIELD_FX.stepHoles(t, dt);
-    FIELD_FX.stepStorms(t);
-    FIELD_FX.stepRevs(t);
-    FIELD_FX.stepDomains(t);
-    MELEE.stepLunges(t);
-    MELEE.stepWaves(t);
-    pruneLocal(t);
-    var active = room.status === "playing" && t >= room.startAt;
-    if (active) {
+  class WorldStepper {
+    stepWorld(t, dt, driveBots, viewDt) {
+      syncRemote(viewDt == null ? dt : viewDt);
+      WORLD.stepFlightsAndFields(t, dt);
+      if (room.status === "playing" && t >= room.startAt) WORLD.stepPlaying(t, dt, driveBots);
+    }
+    stepFlightsAndFields(t, dt) {
+      PROJECTILES.stepShots(t);
+      FIELD_FX.stepBursts(t);
+      FIELD_FX.stepPools(t);
+      STATUS.flushCC(t);
+      FIELD_FX.stepHoles(t, dt);
+      FIELD_FX.stepStorms(t);
+      FIELD_FX.stepRevs(t);
+      FIELD_FX.stepDomains(t);
+      MELEE.stepLunges(t);
+      MELEE.stepWaves(t);
+      pruneLocal(t);
+    }
+    stepPlaying(t, dt, driveBots) {
+      WORLD.stepRespawns(t);
+      WORLD.stepMyFighter(t, dt);
+      if (isHost()) keys(MATCH.bots).forEach(function (id) { var B = MATCH.bots[id]; if (driveBots) BRAIN.step(B, dt); if (B.alive) ATTACK.stepCombat(B, dt); WORLD.stepSkillMotion(B, t, dt); });
+      if (MATCH.me) WORLD.stepSkillMotion(MATCH.me, t, dt);
+      WORLD.stepStatusTicks(t);
+      PROJECTILES.checkProjectiles(t);
+      PROJECTILES.stepBladeDaggers(t);
+      PROJECTILES.stepBladeSpins(t);
+      FIELD_FX.stepBladeStorms(t);
+    }
+    stepRespawns(t) {
       if (MATCH.me) RESPAWN.respawnIfReady(MATCH.me, t);
       if (isHost()) keys(MATCH.bots).forEach(function (id) { RESPAWN.respawnIfReady(MATCH.bots[id], t); });
+    }
+    stepMyFighter(t, dt) {
       if (MATCH.me && MATCH.me.alive) {
         var kx = (KEY_ON.right ? 1 : 0) - (KEY_ON.left ? 1 : 0), ky = (KEY_ON.down ? 1 : 0) - (KEY_ON.up ? 1 : 0);
         if (joy.id !== null || kx || ky) {
@@ -7681,15 +7699,20 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (KEY_ON.atk && t >= MATCH.me.cdUntil && !MATCH.me.volley && !MATCH.me.slash) ATTACK.fireBasic(MATCH.me, ATTACK.autoAimAngle(MATCH.me));
         ATTACK.stepCombat(MATCH.me, dt);
       } else if (MATCH.me) MATCH.me.mv = false;
-      if (isHost()) keys(MATCH.bots).forEach(function (id) { var B = MATCH.bots[id]; if (driveBots) BRAIN.step(B, dt); if (B.alive) ATTACK.stepCombat(B, dt); MELEE.stepKnightSlam(B); MELEE.stepHammerLeap(B); MELEE.stepLance(B); MELEE.stepDash(B); MINIONS.stepMinions(B, dt, t); DAMAGE.payKillGaugeOwed(B, t); });
-      if (MATCH.me) { MELEE.stepKnightSlam(MATCH.me); MELEE.stepHammerLeap(MATCH.me); MELEE.stepLance(MATCH.me); MELEE.stepDash(MATCH.me); MINIONS.stepMinions(MATCH.me, dt, t); DAMAGE.payKillGaugeOwed(MATCH.me, t); }
+    }
+    stepSkillMotion(E, t, dt) {
+      MELEE.stepKnightSlam(E);
+      MELEE.stepHammerLeap(E);
+      MELEE.stepLance(E);
+      MELEE.stepDash(E);
+      MINIONS.stepMinions(E, dt, t);
+      DAMAGE.payKillGaugeOwed(E, t);
+    }
+    stepStatusTicks(t) {
       localTargets().forEach(function (T) { STATUS.stepShove(T, t); if (!T.minion) { STATUS.stepBurn(T, t); STATUS.stepRally(T, t); FIELD_FX.stepDomainBolt(T, t); FIELD_FX.stepCurse(T, t); } });
-      PROJECTILES.checkProjectiles(t);
-      PROJECTILES.stepBladeDaggers(t);
-      PROJECTILES.stepBladeSpins(t);
-      FIELD_FX.stepBladeStorms(t);
     }
   }
+  var WORLD = new WorldStepper();
 
   function testHooks() {
     return {
@@ -7708,7 +7731,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         renderer.render(scene, camera);
         return renderer.domElement.toDataURL("image/png");
       },
-      loadMapData: loadMapData, makeEnt: makeEnt, resolve: resolve, stepWorld: stepWorld,
+      loadMapData: loadMapData, makeEnt: makeEnt, resolve: resolve, stepWorld: WORLD.stepWorld.bind(WORLD),
       useUlt: ATTACK.useUlt.bind(ATTACK), fireBasic: ATTACK.fireBasic.bind(ATTACK), damage: DAMAGE.damage.bind(DAMAGE), healCut: STATUS.healCut.bind(STATUS), healAmount: STATUS.healAmount.bind(STATUS), respawnIfReady: RESPAWN.respawnIfReady.bind(RESPAWN), afflict: STATUS.afflict.bind(STATUS), speedOf: function (E) { return E.speed(); }, stunned: function (E, t) { return E.isStunned(t); },
       onShot: PROJECTILES.onShot.bind(PROJECTILES), onMelee: MELEE.onMelee.bind(MELEE), potionFlightMs: FIELD_FX.potionFlightMs.bind(FIELD_FX), meteorHitAt: FIELD_FX.meteorHitAt.bind(FIELD_FX), onEffect: FIELD_FX.onEffect.bind(FIELD_FX), onHit: DAMAGE.onHit.bind(DAMAGE),
       multiKillCount: multiKillCount, MULTI_KILL_MS: MULTI_KILL_MS, ASSIST_MS: ASSIST_MS, onKill: DAMAGE.creditHelpAssists.bind(DAMAGE),
