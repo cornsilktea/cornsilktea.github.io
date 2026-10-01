@@ -133,14 +133,14 @@ export function createSim(api) {
     results.forEach(function (g) {
       if (mapId && g.map !== mapId) return;
       g.chars.forEach(function (c) {
-        var a = acc[c.char] || (acc[c.char] = { n: 0, w: 0, dmg: 0, skill: 0, heal: 0, blk: 0, taken: 0, stun: 0, slow: 0, k: 0, de: 0, as: 0, mvp: 0 });
-        a.n++; if (g.winner === c.team) a.w++;
+        var a = acc[c.char] || (acc[c.char] = { n: 0, w: 0, d: 0, dmg: 0, skill: 0, heal: 0, blk: 0, taken: 0, stun: 0, slow: 0, k: 0, de: 0, as: 0, mvp: 0 });
+        a.n++; if (g.winner === "draw") a.d++; else if (g.winner === c.team) a.w++;
         a.dmg += c.dmg; a.skill += c.ultDmg; a.heal += c.heal; a.blk += c.blocked; a.taken += c.taken; a.stun += c.stun; a.slow += c.slow;
         a.k += c.kills; a.de += c.deaths; a.as += c.assists; a.mvp += c.mvp;
       });
     });
     return Object.keys(acc).map(function (id) {
-      var a = acc[id], ch = api.CHARS[id], row = { id: id, name: ch.name, role: ch.role, n: a.n, win: Math.round(a.w / a.n * 10000) / 10000 };
+      var a = acc[id], ch = api.CHARS[id], decided = a.n - a.d, row = { id: id, name: ch.name, role: ch.role, n: a.n, draws: a.d, win: decided ? Math.round(a.w / decided * 10000) / 10000 : 0 };
       ["dmg", "skill", "heal", "blk", "taken", "stun", "slow", "k", "de", "as", "mvp"].forEach(function (key) { row[key] = Math.round(a[key] / a.n * 1000) / 1000; });
       return row;
     }).sort(function (x, y) { return y.win - x.win; });
@@ -159,28 +159,56 @@ export function createSim(api) {
     results.forEach(function (g) {
       [["blue", g.blueCode], ["red", g.redCode]].forEach(function (side) {
         if (!side[1]) return;
-        var a = acc[side[1]] || (acc[side[1]] = { code: side[1], n: 0, w: 0 });
-        a.n++; if (g.winner === side[0]) a.w++;
+        var a = acc[side[1]] || (acc[side[1]] = { code: side[1], n: 0, w: 0, d: 0 });
+        a.n++; if (g.winner === "draw") a.d++; else if (g.winner === side[0]) a.w++;
       });
     });
-    return Object.keys(acc).map(function (k) { var a = acc[k]; a.win = Math.round(a.w / a.n * 10000) / 10000; return a; }).sort(function (x, y) { return y.win - x.win; });
+    return Object.keys(acc).map(function (k) { var a = acc[k], decided = a.n - a.d; a.win = decided ? Math.round(a.w / decided * 10000) / 10000 : 0; return a; }).sort(function (x, y) { return y.win - x.win; });
   }
 
+  function simOptions(games, seedBase, options) {
+    var matchup = options && options.matchup ? options.matchup.map(function (code) { return code.toUpperCase(); }) : null;
+    return { games: games, seedBase: seedBase || 5000, avoid: matchup ? [] : (options && options.avoid ? options.avoid : DEFAULT_AVOID.slice()), matchup: matchup };
+  }
   var sim = { results: [], done: false, error: null, startedAt: 0, options: {} };
   sim.run = function (games, seedBase, options) {
     sim.results = []; sim.done = false; sim.error = null; sim.startedAt = Date.now();
-    var matchup = options && options.matchup ? options.matchup.map(function (code) { return code.toUpperCase(); }) : null;
-    sim.options = { games: games, seedBase: seedBase || 5000, avoid: matchup ? [] : (options && options.avoid ? options.avoid : DEFAULT_AVOID.slice()), matchup: matchup };
-    var i = 0, channel = new MessageChannel();
+    sim.options = simOptions(games, seedBase, options);
+    var first = options && options.first || 0, last = options && options.end != null ? options.end : games;
+    var i = first, channel = new MessageChannel();
     channel.port1.onmessage = function () { next(); };
     function next() {
       try {
-        var end = Date.now() + 200;
-        while (i < games && Date.now() < end) { sim.results.push(playOne(api.MAP_IDS[i % api.MAP_IDS.length], sim.options.seedBase + i, sim.options.avoid, sim.options.matchup)); i++; }
+        var sliceEnd = Date.now() + 200;
+        while (i < last && Date.now() < sliceEnd) { sim.results.push(playOne(api.MAP_IDS[i % api.MAP_IDS.length], sim.options.seedBase + i, sim.options.avoid, sim.options.matchup)); i++; }
       } catch (err) { sim.error = String(err && err.stack || err); return; }
-      if (i < games) channel.port2.postMessage(0); else { sim.done = true; sim.finishedAt = Date.now(); api.finish(api.MAP_IDS[0]); }
+      if (i < last) channel.port2.postMessage(0);
+      else { sim.done = true; sim.finishedAt = Date.now(); api.finish(api.MAP_IDS[0]); if (options && options.onDone) options.onDone(sim.results); }
     }
     next();
+  };
+  sim.runShard = function (index, count, games, seedBase, options) {
+    var plan = new SimShardPlan(games, count, index), board = new SimShardChannel(), files = new SimShardFiles(games, seedBase, count);
+    sim.run(games, seedBase, Object.assign({}, options, { first: plan.first, end: plan.end, onDone: function (results) {
+      board.send(index, results);
+      if (options && options.upload) files.save(index, results).then(function (ok) { sim.uploaded = ok; });
+    } }));
+  };
+  sim.loadShards = function (count, games, seedBase, options) {
+    sim.results = []; sim.done = false; sim.error = null; sim.startedAt = Date.now();
+    sim.options = simOptions(games, seedBase, options);
+    return new SimShardFiles(games, seedBase, count).loadAll().then(function (results) {
+      sim.results = results; sim.done = true; sim.finishedAt = Date.now();
+      return results.length;
+    });
+  };
+  sim.collectShards = function (count, games, seedBase, options) {
+    sim.results = []; sim.done = false; sim.error = null; sim.startedAt = Date.now();
+    sim.options = simOptions(games, seedBase, options);
+    return new SimShardChannel().collect(count).then(function (results) {
+      sim.results = results; sim.done = true; sim.finishedAt = Date.now();
+      return results.length;
+    });
   };
   sim.comboRates = function (results) { return comboRates(results || sim.results); };
   sim.weakCombos = function (maxWin, minTeams, results) {
@@ -210,6 +238,54 @@ export function createSim(api) {
   return sim;
 }
 
+class SimShardPlan {
+  constructor(totalGames, shardCount, shardIndex) { this.total = totalGames; this.count = shardCount; this.index = shardIndex; }
+  get first() { return Math.floor(this.total * this.index / this.count); }
+  get end() { return Math.floor(this.total * (this.index + 1) / this.count); }
+}
+
+class SimShardChannel {
+  constructor() { this.channel = new BroadcastChannel("tb-sim-shards"); this.parts = {}; }
+  send(index, results) { this.channel.postMessage({ index: index, results: results }); }
+  merged(count) {
+    var all = [];
+    for (var i = 0; i < count; i++) all = all.concat(this.parts[i]);
+    return all;
+  }
+  collect(count) {
+    var board = this;
+    return new Promise(function (resolve) {
+      board.channel.onmessage = function (e) {
+        board.parts[e.data.index] = e.data.results;
+        if (Object.keys(board.parts).length === count) resolve(board.merged(count));
+      };
+    });
+  }
+}
+
+class SimShardFiles {
+  constructor(games, seedBase, count) { this.prefix = "sim-shard-" + games + "-" + seedBase + "-" + count + "-"; this.count = count; }
+  nameOf(index) { return this.prefix + index + ".html"; }
+  save(index, results) {
+    return fetch("/__save-report?name=" + encodeURIComponent(this.nameOf(index)), { method: "POST", body: JSON.stringify(results) }).then(function (res) { return res.ok; });
+  }
+  loadAll() {
+    var files = this;
+    var parts = [];
+    for (var i = 0; i < this.count; i++) parts.push(fetch("/sim-reports/" + encodeURIComponent(files.nameOf(i)), { cache: "no-store" }).then(function (res) { return res.json(); }));
+    return Promise.all(parts).then(function (lists) { return [].concat.apply([], lists); });
+  }
+}
+
+export class SimLauncher {
+  constructor(sim, search) { this.sim = sim; this.query = new URLSearchParams(search); }
+  start() {
+    var shard = (this.query.get("shard") || "").split("/");
+    if (shard.length !== 2) return false;
+    this.sim.runShard(+shard[0], +shard[1], +this.query.get("games") || 5000, +this.query.get("seed") || 5000, { upload: this.query.get("upload") === "1" });
+    return true;
+  }
+}
 var AVOID_MAX_TRIES = 200;
 var DEFAULT_AVOID = ["ACF", "AAF", "AFF"];
 var WEAK_COMBO_MAX_WIN = 0.35;
@@ -242,7 +318,7 @@ function renderReport() {
   var ICON = { F: D.roles.fighter.icon, C: D.roles.caster.icon, S: D.roles.shooter.icon, A: D.roles.assassin.icon };
   function fixed(v, d) { return (+v).toFixed(d); }
   var COLS = [
-    ["win", "승률", function (v) { return fixed(v * 100, 1) + "%"; }],
+    ["win", "승률(무승부 제외)", function (v) { return fixed(v * 100, 1) + "%"; }],
     ["n", "판 수", function (v) { return Math.round(v); }],
     ["dmg", "피해량", function (v) { return Math.round(v); }],
     ["skill", "스킬 피해(비중)", function (v, r) { return v > 0 ? Math.round(v) + " (" + Math.round(v / Math.max(1, r.dmg) * 100) + "%)" : "–"; }],
@@ -276,10 +352,11 @@ function renderReport() {
   }
   function totalsCards(t, extra) {
     function pct(v) { return t.games ? fixed(v / t.games * 100, 1) + "%" : "-"; }
+    function winPct(v) { var decided = t.games - t.draws; return decided ? fixed(v / decided * 100, 1) + "%" : "-"; }
     return "<div class=\"cards\"><div class=\"card\"><b>" + t.games.toLocaleString() + "</b><span>경기 수</span></div>" +
       "<div class=\"card\"><b>" + pct(t.draws) + "</b><span>무승부 (" + t.draws + "판)</span></div>" +
-      "<div class=\"card\"><b>" + pct(t.blue) + "</b><span>블루팀 승률</span></div>" +
-      "<div class=\"card\"><b>" + pct(t.red) + "</b><span>레드팀 승률</span></div>" +
+      "<div class=\"card\"><b>" + winPct(t.blue) + "</b><span>블루팀 승률(무승부 제외)</span></div>" +
+      "<div class=\"card\"><b>" + winPct(t.red) + "</b><span>레드팀 승률(무승부 제외)</span></div>" +
       "<div class=\"card\"><b>" + (t.games ? fixed(t.kills / t.games, 1) : "-") + "</b><span>경기당 킬(양 팀 합)</span></div>" + (extra || "") + "</div>";
   }
   function comboName(code) { return code.split("").map(function (ch) { return ICON[ch]; }).join(""); }
@@ -292,8 +369,8 @@ function renderReport() {
     return "<tr><td>" + comboName(c.code) + "</td><td>" + c.n + "</td><td class=\"win" + tint + "\">" + fixed(c.win * 100, 1) + "%</td></tr>";
   }).join("");
   var tab1 = totalsCards(D.totals, optCard) + "<h2>캐릭터별 메인 통계</h2>" + statTable(D.rows) +
-    "<h2>팀 구성별 승률</h2><div class=\"wrap\" style=\"max-width:420px\"><table><thead><tr><th>팀 구성</th><th>팀 수</th><th>승률</th></tr></thead><tbody>" + comboRows + "</tbody></table></div>" +
-    "<p class=\"note\">숫자는 모두 한 판(90초) 평균입니다. 승률 = 승리 ÷ 판 수(무승부 포함). 기절·둔화는 적에게 건 시간. " +
+    "<h2>팀 구성별 승률</h2><div class=\"wrap\" style=\"max-width:420px\"><table><thead><tr><th>팀 구성</th><th>팀 수</th><th>승률(무승부 제외)</th></tr></thead><tbody>" + comboRows + "</tbody></table></div>" +
+    "<p class=\"note\">숫자는 모두 무승부 판을 포함한 한 판(90초) 평균입니다. 승률만 무승부 판을 분모에서 뺍니다(승리 ÷ (판 수 - 무승부 판)). 기절·둔화는 적에게 건 시간. " +
     "스킬 피해(비중)은 입힌 피해 중 스킬로 준 피해와 그 비율. 네크로 해골 병사의 공격, 광전사 광폭화 중 기본 공격, 결투가 스킬 중 공격, 은신자 스킬 뒤 첫 공격도 스킬 피해로 셉니다. 받은 피해는 방어·보호막 등을 뺀 뒤 실제로 줄어든 체력의 양이고(해골 병사가 맞은 피해는 네크로의 막은 피해). 제목을 누르면 정렬됩니다.</p>";
   var tab2 = D.roleOrder.map(function (role) {
     var rows = D.rows.filter(function (r) { return r.role === role; });

@@ -42,6 +42,7 @@
             "kills": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100" },
             "deaths": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100" },
             "kdPicks": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= newData.parent().child('picks').val()" },
+            "draws": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= newData.parent().child('picks').val()" },
             "$other": { ".validate": false }
           }
         }

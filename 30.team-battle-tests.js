@@ -2020,6 +2020,16 @@ function collectResults(api) {
       api.MATCH.remotes = {}; api.MATCH.me = null; api.MATCH.stateByKey = {};
     }
   }
+  async function withStatsEnvAsync(fn) {
+    var scale = api.CLOCK.scale, link = api.setTestLink(false), db = api.setDb(null), previousId = api.myId;
+    api.MATCH.bots = {}; api.MATCH.remotes = {}; api.MATCH.me = null; api.MATCH.stateByKey = {};
+    api.CLOCK.scale = api.DEFAULT_SLOW;
+    try { return await fn(); }
+    finally {
+      api.CLOCK.scale = scale; api.setTestLink(link); api.setDb(db); api.setMyId(previousId); api.unbindRoom();
+      api.MATCH.remotes = {}; api.MATCH.me = null; api.MATCH.stateByKey = {};
+    }
+  }
   function fakeDb(initial) {
     var db = { store: initial || {}, paths: [] };
     db.ref = function (path) {
@@ -2027,6 +2037,7 @@ function collectResults(api) {
         db.paths.push(path);
         var cur = db.store[path] === undefined ? null : JSON.parse(JSON.stringify(db.store[path])), out = fn(cur);
         if (out === undefined) return Promise.resolve({ committed: false });
+        if (db.rejectDraws && Object.keys(out).some(function (k) { return out[k] && out[k].draws !== undefined; })) return Promise.reject(new Error("PERMISSION_DENIED"));
         db.store[path] = out;
         return Promise.resolve({ committed: true });
       } };
@@ -2144,6 +2155,24 @@ function collectResults(api) {
       if (s[L[1]].games !== 1) bad.push("새 캐릭터 판수 " + s[L[1]].games + " (기대 1)");
       if (s[L[0]].picks !== 5) bad.push("픽 " + s[L[0]].picks);
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "옛 4경기 뒤 5판째, 새 캐릭터는 1판째");
+    });
+  });
+  run(STATSG, "무승부 경기는 고른 6명 모두 draws 가 1 오르고, 승패가 난 경기는 draws 칸을 만들지 않는가", function (done) {
+    withStatsEnv(function () {
+      var bad = [], F = statsFixture(), L = api.CHAR_LIST, key = "teambattle/modestats/cup", db = fakeDb();
+      api.setDb(db);
+      var room = endedRoom(F); api.bindRoom(room, F.players);
+      room.winner = "draw"; STATS.save(room, F.players);
+      room.winner = "blue"; STATS.save(room, F.players);
+      var s = db.store[key], c0 = s[L[0]], c3 = s[L[3]];
+      if (s.matches !== 2 || s.blue !== 1 || s.red !== 0) bad.push("경기 수·승패 " + s.matches + "·" + s.blue + "·" + s.red);
+      if (c0.picks !== 2 || c0.wins !== 1 || c0.draws !== 1) bad.push("블루 선수 픽·승·무 " + c0.picks + "·" + c0.wins + "·" + c0.draws);
+      if (c3.picks !== 2 || c3.wins !== 0 || c3.draws !== 1) bad.push("레드 선수 픽·승·무 " + c3.picks + "·" + c3.wins + "·" + c3.draws);
+      var decided = L.filter(function (k) { return s[k] && s[k].picks && s[k].draws > s[k].picks; });
+      if (decided.length) bad.push("draws 가 picks 보다 큼 " + decided.length + "명");
+      var winOnly = c0.picks - c0.draws;
+      if (winOnly !== 1) bad.push("승패가 난 판 수 " + winOnly + " (기대 1)");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "무승부 판 draws +1·승패 판은 그대로 (" + L[0] + " 승 " + c0.wins + "·무 " + c0.draws + ")");
     });
   });
   run(STATSG, "결과 창 도착 확인(watchDone): 사람이 모두 같은 종료 시각을 쓸 때만 저장하고 구독을 끊는가", function (done) {
@@ -4321,6 +4350,20 @@ function collectResults(api) {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "카드 " + L.length + "장·캐릭터 교체(위치·통계 유지)·방 기록·잘못된 요청 무시·닫기");
   });
 
+  runAsync(STATSG, "저장 규칙에 draws 칸이 아직 없어 거부되면 draws 없이 다시 저장하는가", async function (done) {
+    var bad = [], F, L = api.CHAR_LIST, key = "teambattle/modestats/cup", strict = fakeDb();
+    strict.rejectDraws = true;
+    await withStatsEnvAsync(async function () {
+      F = statsFixture(); api.setDb(strict);
+      var room = endedRoom(F); api.bindRoom(room, F.players);
+      room.winner = "draw"; STATS.save(room, F.players);
+      await sleep(20);
+    });
+    var t = strict.store[key];
+    if (!t || t.matches !== 1 || (t[L[0]] && t[L[0]].draws !== undefined)) bad.push("draws 없이 저장돼야 함: " + JSON.stringify(t && t[L[0]]));
+    if (strict.paths.length !== 2) bad.push("저장 시도 " + strict.paths.length + "번 (기대 2: draws 포함 → draws 없이)");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "draws 거부 → draws 없이 두 번째 시도로 저장");
+  });
   runAsync(STATSVG, "통계 창 불러오기: 모드별 통계를 받아 집계 문구와 표로 보여 주고, 모드 버튼으로 바꾸며, 연결이 없거나 실패하면 안내하는가", async function (done) {
     var bad = [], L = HUMAN_CHARS, tree = { teambattle: { modestats: { pvp: { matches: 10, blue: 6, red: 3 }, cup: { matches: 4, blue: 1, red: 3 } } } };
     tree.teambattle.modestats.pvp[L[0]] = { picks: 4, wins: 3, games: 8, bans: 1, dmg: 100 };
@@ -4329,7 +4372,7 @@ function collectResults(api) {
       var modal = document.getElementById("statsModal"), msg = document.getElementById("statsMsg"), body = document.getElementById("statsBody");
       if (modal.hidden) bad.push("창이 안 열림");
       await waitFor(function () { return msg.textContent.indexOf("집계된 경기") === 0; }, 400);
-      if (msg.textContent.indexOf("집계된 경기 10판") !== 0 || msg.textContent.indexOf("블루 60.0%") < 0 || msg.textContent.indexOf("레드 30.0%") < 0 || msg.textContent.indexOf("무승부 10.0%") < 0) bad.push("집계 문구 '" + msg.textContent + "'");
+      if (msg.textContent.indexOf("집계된 경기 10판") !== 0 || msg.textContent.indexOf("블루 66.7%") < 0 || msg.textContent.indexOf("레드 33.3%") < 0 || msg.textContent.indexOf("무승부 10.0%") < 0) bad.push("집계 문구 '" + msg.textContent + "'");
       if (body.querySelectorAll("tr").length < L.length || body.innerHTML.indexOf("75.0%") < 0) bad.push("표 " + body.querySelectorAll("tr").length);
       var buttons = document.querySelectorAll("#statsModes .modeBtn");
       if (buttons.length !== 2 || document.querySelector("#statsModes .on").getAttribute("data-id") !== "pvp") bad.push("모드 버튼 " + buttons.length);

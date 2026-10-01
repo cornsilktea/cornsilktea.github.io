@@ -746,7 +746,7 @@
     <div class="statsTop"><h3>캐릭터 통계</h3><button id="btnStatsClose" class="mini" type="button">닫기</button></div>
     <div id="statsModes" class="modeBtns"></div>
     <div id="statsMsg" class="statsMsg"></div>
-    <div class="boardWrap"><table class="board statsTable"><thead><tr><th class="nm">캐릭터</th><th>밴픽률<small>(밴 + 픽) / 고를 수 있던 게임 수</small></th><th>승률<small>승리 수 / 픽 수</small></th><th>KDA<small>평균 킬 / 데스 / 어시스트</small></th><th>평균 피해량</th><th>평균 회복량</th><th>평균 막은 피해</th><th>평균 기절</th><th>평균 둔화</th></tr></thead><tbody id="statsBody"></tbody></table></div>
+    <div class="boardWrap"><table class="board statsTable"><thead><tr><th class="nm">캐릭터</th><th>밴픽률<small>(밴 + 픽) / 고를 수 있던 게임 수</small></th><th>승률<small>승리 수 / (픽 수 - 무승부)</small></th><th>KDA<small>평균 킬 / 데스 / 어시스트</small></th><th>평균 피해량</th><th>평균 회복량</th><th>평균 막은 피해</th><th>평균 기절</th><th>평균 둔화</th></tr></thead><tbody id="statsBody"></tbody></table></div>
     <ul class="statsNotes">
       <li>AI 없이 학생 6명이 3대3으로 끝까지 마친 경기만 집계합니다.</li>
       <li>시간이 끝났을 때 킬 수가 같으면 무승부이고, 무승부는 승리로 세지 않습니다.</li>
@@ -998,10 +998,29 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var MAP_IDS = ["forest", "river", "dungeon", "windhill"];
   var BLOCK_TILES = "#xo", WATER_TILES = "~", ROCK_TILES = "#x";
   var SPAWN_ROWS = 3;
+  class RectGrid {
+    constructor(reach) { this.reach = reach; this.cols = 1; this.rows = 1; this.cells = [[]]; }
+    cellOf(x, y) {
+      var c = clamp(Math.floor((x - MAP_X0) / TILE), 0, this.cols - 1), r = clamp(Math.floor((y - MAP_Y0) / TILE), 0, this.rows - 1);
+      return r * this.cols + c;
+    }
+    rebuild(rects, cols, rows) {
+      var grid = this, reach = this.reach;
+      this.cols = cols; this.rows = rows; this.cells = [];
+      for (var i = 0; i < cols * rows; i++) this.cells.push([]);
+      rects.forEach(function (o) {
+        var c0 = clamp(Math.floor((o.x - o.w / 2 - reach - MAP_X0) / TILE), 0, cols - 1), c1 = clamp(Math.floor((o.x + o.w / 2 + reach - MAP_X0) / TILE), 0, cols - 1);
+        var r0 = clamp(Math.floor((o.y - o.h / 2 - reach - MAP_Y0) / TILE), 0, rows - 1), r1 = clamp(Math.floor((o.y + o.h / 2 + reach - MAP_Y0) / TILE), 0, rows - 1);
+        for (var r = r0; r <= r1; r++) for (var c = c0; c <= c1; c++) grid.cells[r * cols + c].push(o);
+      });
+    }
+    near(x, y) { return this.cells[this.cellOf(x, y)]; }
+  }
   class ArenaMap {
     constructor() {
       this.id = ""; this.rows = []; this.cols = 16; this.rowCount = 25;
       this.obstacles = []; this.water = []; this.bridges = []; this.bushId = []; this.bushes = [];
+      this.wallGrid = new RectGrid(BODY_R * 3); this.waterGrid = new RectGrid(BODY_R * 3);
     }
     tileX(c) { return MAP_X0 + (c + 0.5) * TILE; }
     tileY(r) { return MAP_Y0 + (r + 0.5) * TILE; }
@@ -1052,6 +1071,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       ARENA_MAP.obstacles = ARENA_MAP.tileRects(BLOCK_TILES);
       ARENA_MAP.water = ARENA_MAP.tileRects(WATER_TILES);
       ARENA_MAP.bridges = ARENA_MAP.tileRects("=");
+      ARENA_MAP.wallGrid.rebuild(ARENA_MAP.obstacles, ARENA_MAP.cols, ARENA_MAP.rowCount);
+      ARENA_MAP.waterGrid.rebuild(ARENA_MAP.water, ARENA_MAP.cols, ARENA_MAP.rowCount);
       ARENA_MAP.bushGroups();
     }
     shotSrc(id, wide) { return "img/teambattle/maps/" + id + (wide ? "-wide" : "") + ".webp"; }
@@ -1970,9 +1991,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     statsRowsHtml(s) {
       var matches = +s.matches || 0, lastRole = null, h = "";
       CHAR_LIST.forEach(function (k) {
-        var c = CHARS[k], d = s[k] || {}, selectableGames = d.games != null ? +d.games : (s[k] ? matches : 0), picks = +d.picks || 0, wins = +d.wins || 0, ccPicks = +d.ccPicks || 0, asPicks = +d.asPicks || 0, kdPicks = +d.kdPicks || 0, bans = +d.bans || 0;
+        var c = CHARS[k], d = s[k] || {}, selectableGames = d.games != null ? +d.games : (s[k] ? matches : 0), picks = +d.picks || 0, drawPicks = +d.draws || 0, wins = +d.wins || 0, ccPicks = +d.ccPicks || 0, asPicks = +d.asPicks || 0, kdPicks = +d.kdPicks || 0, bans = +d.bans || 0;
         if (c.role !== lastRole) { lastRole = c.role; h += '<tr class="grp"><td colspan="8">' + ROLES[c.role].icon + " " + ROLES[c.role].name + "</td></tr>"; }
-        h += '<tr><td class="nm">' + c.icon + " " + esc(c.name) + "</td>" + STATS_VIEW.banPickCell(bans, picks, selectableGames) + STATS_VIEW.statsRateCell(wins, picks) +
+        h += '<tr><td class="nm">' + c.icon + " " + esc(c.name) + "</td>" + STATS_VIEW.banPickCell(bans, picks, selectableGames) + STATS_VIEW.statsRateCell(wins, Math.max(0, picks - drawPicks)) +
           "<td>" + STATS_VIEW.kdaText(d, kdPicks, asPicks) + "</td>" +
           "<td>" + (picks ? Math.round(+d.dmg || 0) : "-") + "</td>" +
           "<td>" + (picks && c.heals ? Math.round(+d.heal || 0) : "-") + "</td>" +
@@ -1992,9 +2013,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       setText($("statsMsg"), "불러오는 중…");
       BACKEND.db.ref(STATS_PATH + STATS_VIEW.mode).once("value").then(function (snap) {
         if (seq !== STATS_VIEW.loadSeq) return;
-        var s = snap.val() || {}, matches = +s.matches || 0, red = +s.red || 0, blue = +s.blue || 0;
-        setText($("statsMsg"), "집계된 경기 " + matches + "판 · 진영 승률: 블루 " + STATS_VIEW.statsPct(blue, matches) + " · 레드 " + STATS_VIEW.statsPct(red, matches) +
-          " · 무승부 " + STATS_VIEW.statsPct(Math.max(0, matches - red - blue), matches));
+        var s = snap.val() || {}, matches = +s.matches || 0, red = +s.red || 0, blue = +s.blue || 0, draws = Math.max(0, matches - red - blue);
+        setText($("statsMsg"), "집계된 경기 " + matches + "판 · 진영 승률(무승부 제외): 블루 " + STATS_VIEW.statsPct(blue, matches - draws) + " · 레드 " + STATS_VIEW.statsPct(red, matches - draws) +
+          " · 무승부 " + STATS_VIEW.statsPct(draws, matches));
         setHtml($("statsBody"), STATS_VIEW.statsRowsHtml(s));
       }).catch(function () {
         if (seq === STATS_VIEW.loadSeq) setText($("statsMsg"), "통계를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.");
@@ -3829,8 +3850,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     insideBound(x, y) { return x >= BOUND.l + BODY_R && x <= BOUND.r - BODY_R && y >= BOUND.t + BODY_R && y <= BOUND.b - BODY_R; }
     resolve(E) {
       for (var pass = 0; pass < 2; pass++) {
-        for (var i = 0; i < ARENA_MAP.obstacles.length; i++) PHYSICS.pushOutOfRect(E, ARENA_MAP.obstacles[i]);
-        for (var j = 0; j < ARENA_MAP.water.length; j++) PHYSICS.pushOutOfRect(E, ARENA_MAP.water[j]);
+        var walls = ARENA_MAP.wallGrid.near(E.x, E.y), pools = ARENA_MAP.waterGrid.near(E.x, E.y);
+        for (var i = 0; i < walls.length; i++) PHYSICS.pushOutOfRect(E, walls[i]);
+        for (var j = 0; j < pools.length; j++) PHYSICS.pushOutOfRect(E, pools[j]);
         E.x = clamp(E.x, BOUND.l + BODY_R, BOUND.r - BODY_R);
         E.y = clamp(E.y, BOUND.t + BODY_R, BOUND.b - BODY_R);
       }
@@ -5090,7 +5112,55 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   var BOT_ROLES = new BotRoleRegistry();
 
-  class BotPathfinder {
+  class TileGraph {
+    constructor(finder) { this.finder = finder; this.mapId = ""; this.total = 0; this.masks = null; this.fields = new Map(); }
+    sync() {
+      var total = ARENA_MAP.cols * ARENA_MAP.rowCount;
+      if (this.mapId === ARENA_MAP.id && this.total === total) return;
+      this.mapId = ARENA_MAP.id; this.total = total; this.fields = new Map(); this.masks = new Uint8Array(total);
+      for (var r = 0; r < ARENA_MAP.rowCount; r++) for (var c = 0; c < ARENA_MAP.cols; c++) {
+        if (!this.finder.walkable(c, r)) continue;
+        var mask = 0;
+        for (var n = 0; n < BOT_PATH_STEPS.length; n++) if (this.finder.canStep(c, r, BOT_PATH_STEPS[n][0], BOT_PATH_STEPS[n][1])) mask |= 1 << n;
+        this.masks[r * ARENA_MAP.cols + c] = mask;
+      }
+    }
+    open(key, n) { return (this.masks[key] & (1 << n)) !== 0; }
+    neighbor(key, n) { return key + BOT_PATH_STEPS[n][1] * ARENA_MAP.cols + BOT_PATH_STEPS[n][0]; }
+    fieldTo(goalKey) {
+      var field = this.fields.get(goalKey);
+      if (field) return field;
+      field = new Int16Array(this.total).fill(-1);
+      var queue = new Int32Array(this.total), head = 0, tail = 0;
+      field[goalKey] = 0; queue[tail++] = goalKey;
+      while (head < tail) {
+        var cur = queue[head++];
+        for (var n = 0; n < BOT_PATH_STEPS.length; n++) {
+          if (!this.open(cur, n)) continue;
+          var next = this.neighbor(cur, n);
+          if (field[next] !== -1 || !this.open(next, BOT_PATH_OPPOSITE[n])) continue;
+          field[next] = field[cur] + 1; queue[tail++] = next;
+        }
+      }
+      this.fields.set(goalKey, field);
+      return field;
+    }
+    pathBetween(startKey, goalKey) {
+      var field = this.fieldTo(goalKey), cols = ARENA_MAP.cols;
+      if (field[startKey] < 0) return null;
+      var path = [], cur = startKey;
+      while (true) {
+        path.push({ c: cur % cols, r: Math.floor(cur / cols) });
+        if (cur === goalKey) return path;
+        for (var n = 0; n < BOT_PATH_STEPS.length; n++) {
+          if (!this.open(cur, n)) continue;
+          var next = this.neighbor(cur, n);
+          if (field[next] === field[cur] - 1) { cur = next; break; }
+        }
+      }
+    }
+  }  class BotPathfinder {
+    constructor() { this.graph = new TileGraph(this); }
     walkable(c, r) {
       if (c < 0 || r < 0 || c >= ARENA_MAP.cols || r >= ARENA_MAP.rowCount) return false;
       var ch = ARENA_MAP.rows[r].charAt(c);
@@ -5123,36 +5193,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (!dc || !dr) return !BOT_PATH.squeezed(c, r, dc, dr);
       return BOT_PATH.canStep(c, r, dc, 0) && BOT_PATH.canStep(c + dc, r, 0, dr) && BOT_PATH.canStep(c, r, 0, dr) && BOT_PATH.canStep(c, r + dr, dc, 0);
     }
-    openCache() {
-      if (BOT_PATH.cacheMapId !== ARENA_MAP.id || BOT_PATH.cacheSize !== ARENA_MAP.cols * ARENA_MAP.rowCount) {
-        BOT_PATH.cacheMapId = ARENA_MAP.id; BOT_PATH.cacheSize = ARENA_MAP.cols * ARENA_MAP.rowCount; BOT_PATH.routes = new Map();
-      }
-      if (BOT_PATH.routes.size > BOT_PATH_CACHE_MAX) BOT_PATH.routes.clear();
-    }
     route(from, to) {
-      BOT_PATH.openCache();
-      var cols = ARENA_MAP.cols, total = BOT_PATH.cacheSize, startKey = from.r * cols + from.c, goalKey = to.r * cols + to.c, memoKey = startKey * total + goalKey;
-      if (BOT_PATH.routes.has(memoKey)) return BOT_PATH.routes.get(memoKey);
-      var prev = new Int32Array(total).fill(-2), queue = new Int32Array(total), head = 0, tail = 0;
-      prev[startKey] = -1; queue[tail++] = startKey;
-      while (head < tail) {
-        var curKey = queue[head++];
-        if (curKey === goalKey) break;
-        var cc = curKey % cols, cr = (curKey - cc) / cols;
-        for (var n = 0; n < BOT_PATH_STEPS.length; n++) {
-          var step = BOT_PATH_STEPS[n], key = (cr + step[1]) * cols + cc + step[0];
-          if (cc + step[0] < 0 || cc + step[0] >= cols || key < 0 || key >= total || prev[key] !== -2 || !BOT_PATH.canStep(cc, cr, step[0], step[1])) continue;
-          prev[key] = curKey; queue[tail++] = key;
-        }
-      }
-      var path = null;
-      if (prev[goalKey] !== -2) {
-        path = [];
-        for (var k = goalKey; k !== -1; k = prev[k]) path.push({ c: k % cols, r: Math.floor(k / cols) });
-        path.reverse();
-      }
-      BOT_PATH.routes.set(memoKey, path);
-      return path;
+      BOT_PATH.graph.sync();
+      return BOT_PATH.graph.pathBetween(from.r * ARENA_MAP.cols + from.c, to.r * ARENA_MAP.cols + to.c);
     }
     waypoint(B, tx, ty) {
       var memo = B.bot || B, here = BOT_PATH.tileOf(B.x, B.y), goal = BOT_PATH.tileOf(tx, ty), t = now();
@@ -5175,11 +5218,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return BOT_PATH.centerOf(path[1]);
     }
   }
-  var BOT_PATH_CACHE_MAX = 6000, BOT_PATH_REUSE_MS = 120;
-  var BOT_PATH_STEPS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+  var BOT_PATH_REUSE_MS = 120, BOT_THINK_MS = 66;
+  var BOT_PATH_STEPS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]], BOT_PATH_OPPOSITE = [1, 0, 3, 2, 7, 6, 5, 4];
   var BOT_PATH = new BotPathfinder();
 
-  class BotBrain {
+  class BotThought {
+    constructor(target, td, mx, my, at) { this.target = target; this.td = td; this.mx = mx; this.my = my; this.at = at; }
+    static phaseOf(seed) { return (seed * 7 % 1) * BOT_THINK_MS; }
+    holds(t) { return t >= this.at && t - this.at < BOT_THINK_MS && (!this.target || this.target.alive); }
+  }  class BotBrain {
     routeWaypoint(B, tx, ty) {
       var bridge = BRAIN.bridgeWaypoint(B, tx, ty);
       if (bridge) return BOT_PATH.waypoint(B, bridge.x, bridge.y) || bridge;
@@ -5238,12 +5285,17 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     step(B, dt) {
       if (B.practiceBot) { BRAIN.stepPractice(B, dt); return; }
       if (!B.alive || B.isStunned()) { B.mv = false; return; }
-      var t = now(), c = CHARS[B.char], k = B.bot, melee = CATALOG.isMelee(B.char);
-      var enemies = [], allies = [];
+      var t = now(), k = B.bot, enemies = [], allies = [];
       TARGETS.participants().forEach(function (id) {
         var o = TARGETS.ent(id); if (!o || !o.alive || id === B.id) return;
         (o.team !== B.team ? enemies : allies).push(o);
       });
+      if (!k.thought || !k.thought.holds(t)) k.thought = BRAIN.think(B, t, enemies, allies, k.thought);
+      BRAIN.move(B, k.thought, dt, t);
+      BRAIN.fight(B, k.thought, enemies, t);
+    }
+    think(B, t, enemies, allies, previous) {
+      var c = CHARS[B.char], k = B.bot, melee = CATALOG.isMelee(B.char);
       var squad = new Squad(B, allies, enemies);
       var botType = CHAR_TYPES.of(B.char), role = BOT_ROLES.of(botType.botRole), target = null, td = Infinity, bestScore = Infinity, sniper = botType.holdsFullRange, view = sniper ? c.range : BOT_VIEW;
       enemies.forEach(function (o) {
@@ -5289,6 +5341,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           mx = ddx / dd * 0.7; my = ddy / dd * 0.7;
         }
       }
+      return new BotThought(target, td, mx, my, previous ? t : t - BotThought.phaseOf(k.seed));
+    }
+    move(B, thought, dt, t) {
+      var k = B.bot, mx = thought.mx, my = thought.my;
       if (k.detour > t) { var rx = -my * k.detourDir, ry = mx * k.detourDir; mx = rx; my = ry; }
       var steer = Math.min(1, dt * BOT_STEER_RATE);
       k.vx = (k.vx || 0) + (mx - (k.vx || 0)) * steer; k.vy = (k.vy || 0) + (my - (k.vy || 0)) * steer;
@@ -5302,11 +5358,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         B.mv = moved > 0.2;
         if (B.mv) { B.moveAng = Math.atan2(B.y - oy, B.x - ox); B.moveAt = t; }
       } else B.mv = false;
-
+    }
+    fight(B, thought, enemies, t) {
+      var c = CHARS[B.char], k = B.bot, melee = CATALOG.isMelee(B.char), botType = CHAR_TYPES.of(B.char), target = thought.target, td = thought.td;
       var aimAt = target;
       if (B.isLancerWinding(t) || B.isHammerWinding(t) || B.isHammerLeaping(t) || B.dash) return;
       if (aimAt) B.angle = Math.atan2(aimAt.y - B.y, aimAt.x - B.x);
-      else if (B.mv) B.angle = Math.atan2(my, mx);
+      else if (B.mv) B.angle = Math.atan2(k.vy, k.vx);
       if (B.burst) return;
       if (botType.botAct(B, target, enemies, t)) return;
       if (target && B.gauge >= GAUGE_MAX && t - k.seenAt > 500 && PHYSICS.losClear(B.x, B.y, target.x, target.y) && td <= botType.botUltRange()) {
@@ -5322,8 +5380,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           ATTACK.fireBasic(B, Math.atan2(shotAim.y - B.y, shotAim.x - B.x) + (Math.random() - 0.5) * 2 * BOT_AIM_ERR);
         }
       }
-    }
-    ultAimSpot(B, target, dist, t) {
+    }    ultAimSpot(B, target, dist, t) {
       var type = CHAR_TYPES.of(B.char), sec = type.ultLeadSeconds(dist);
       if (!sec) return target;
       var spot = BRAIN.leadSpot(target, sec, t), reach = hyp(spot.x - B.x, spot.y - B.y);
@@ -5437,11 +5494,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     save(r, ps) {
       var rows = keys(r.roster).map(function (id) {
         var e = TARGETS.ent(id) || NETSTATE.stateOf(ps[id]);
-        return { c: r.roster[id].c, win: r.winner === r.roster[id].team, dmg: +e.dmg || 0, heal: +e.heal || 0,
+        return { c: r.roster[id].c, win: r.winner === r.roster[id].team, draw: r.winner === "draw", dmg: +e.dmg || 0, heal: +e.heal || 0,
                  blocked: +e.blocked || 0, stun: +e.stunDealt || 0, slow: +e.slowDealt || 0, assists: +e.assists || 0, kills: +e.kills || 0, deaths: +e.deaths || 0 };
       });
       var banned = (r.bans || []).filter(function (c) { return CHARS[c]; });
-      function addStats(countSelectableGames) {
+      function addStats(countSelectableGames, countDraws) {
         return BACKEND.db.ref(STATS_PATH + r.mode).transaction(function (cur) {
           cur = cur || {};
           var matchesBefore = +cur.matches || 0;
@@ -5471,6 +5528,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
             st.kdPicks = kdN + 1;
             st.picks = n + 1;
             st.wins = (+st.wins || 0) + (w.win ? 1 : 0);
+            if (countDraws && w.draw) st.draws = (+st.draws || 0) + 1;
             cur[w.c] = st;
           });
           banned.forEach(function (c) {
@@ -5481,7 +5539,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           return cur;
         });
       }
-      addStats(true).catch(function () { return addStats(false); }).then(function (res) {
+      addStats(true, true).catch(function () { return addStats(true, false); }).catch(function () { return addStats(false, false); }).then(function (res) {
         STATS.setNote(r, res && res.committed ? "이 경기는 통계에 반영됐어요" : "통계 저장이 취소됐어요. 다시 경기하면 반영돼요");
       }).catch(function (err) {
         STATS.setNote(r, "통계 저장에 실패했어요(" + ((err && err.code) || err) + "). 데이터베이스 규칙 게시를 확인해 주세요");
@@ -8116,7 +8174,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     };
   }
   if (/[?&]test(&|$)/.test(location.search)) import("./30.team-battle-tests.js?t=" + Date.now()).then(function (m) { m.runTeamBattleTests(testHooks()); });
-  if (/[?&]sim(&|$)/.test(location.search)) import("./30.team-battle-sim.js?t=" + Date.now()).then(function (m) { window.TB_SIM = m.createSim(testHooks()); window.TB_SIM.mapTopShot = testHooks().mapTopShot; });
+  if (/[?&]sim(&|$)/.test(location.search)) import("./30.team-battle-sim.js?t=" + Date.now()).then(function (m) { window.TB_SIM = m.createSim(testHooks()); window.TB_SIM.mapTopShot = testHooks().mapTopShot; new m.SimLauncher(window.TB_SIM, location.search).start(); });
 
   TIMESCALE.applyTimeScale(SLOW_REQUEST);
   NICK.refreshNick();
