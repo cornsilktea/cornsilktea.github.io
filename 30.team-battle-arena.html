@@ -855,6 +855,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var ROLE_LIST = ["fighter", "caster", "shooter", "assassin"];
   function playable(c) { return !!(CHARS[c] && !CHARS[c].retired); }
   function pickable(c) { return playable(c) && !CHARS[c].practiceBot; }
+  var FALLBACK_CHAR = "ranger";
   var CHAR_LIST = Object.keys(CHARS).filter(pickable).sort(function (a, b) {
     return ROLE_LIST.indexOf(CHARS[a].role) - ROLE_LIST.indexOf(CHARS[b].role) || CHARS[a].name.localeCompare(CHARS[b].name, "ko");
   });
@@ -1581,9 +1582,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     return keys(ps || {}).some(function (id) { return id !== except && ps[id] && isPlayingTeam(ps[id].team) && ps[id].characterType === c; });
   }
   function freeCharOn(ps, team, except) {
-    var order = ["ranger"].concat(CHAR_LIST.filter(function (c) { return c !== "ranger"; }));
+    var order = [FALLBACK_CHAR].concat(CHAR_LIST.filter(function (c) { return c !== FALLBACK_CHAR; }));
     for (var i = 0; i < order.length; i++) if (!takenInMatch(ps, team, order[i], except)) return order[i];
-    return "ranger";
+    return FALLBACK_CHAR;
   }
   function onlyOneMsg(c) { return "이미 다른 사람이 고른 캐릭터예요(" + CHARS[c].name + "). 한 경기에서 같은 캐릭터는 1명만 고를 수 있어요."; }
   function pickTeam(team) {
@@ -2179,7 +2180,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var u = {}, roster = {}, st = {};
     ["blue", "red"].forEach(function (team) {
       teamIds(team).filter(function (id) { return !practiceMode() || id === myId; }).slice(0, 3).forEach(function (id, i) {
-        var p = P[id], want = charOf(id), c = pickable(want) ? want : "ranger";
+        var p = P[id], want = charOf(id), c = pickable(want) ? want : FALLBACK_CHAR;
         var sp = spawnOf(team, i + 1, arena), base = "players/" + id + "/";
         u[base + "slot"] = i + 1; u[base + "characterType"] = c;
         st[stKey(team, i + 1)] = packState({ x: sp.x, y: sp.y, angle: sp.angle, mv: false, hp: CHARS[c].hp, alive: true, shield: !!CHARS[c].respawnShield });
@@ -2631,8 +2632,19 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }
       var trail = new THREE.Mesh(GEO.trail, MODELS.glowMat("trail-" + (volley ? "v" : d.team), col, 0.45)); trail.position.x = -15; trail.scale.set(volley ? 70 : 50, volley ? 1.8 : 1.3, volley ? 1.8 : 1.3); g.add(trail);
     }
+    isLancerWinding(E, t) { return false; }
+    isHammerLeaping(E, t) { return false; }
+    isBerserk(E, t) { return false; }
+    isRiposting(E, t) { return false; }
+    isBladeStorming(E, t) { return false; }
+    isOvercharged(E, t) { return false; }
+    isRevealing(E, t) { return false; }
+    isRooted(E, t) { return false; }
+    skillSpeed(E, t) { return null; }
+    speedBonus(E, t) { return 0; }
     get idleClip() { return "Idle_A"; }
     get hasDarkWave() { return false; }
+    get hidesBasicEdge() { return false; }
     get heavyStrikeSpark() { return false; }
     get scopesWhileAiming() { return false; }
     get showsHealRange() { return false; }
@@ -2679,6 +2691,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class WarriorType extends ArcMeleeType {
+    isBerserk(E, t) { return E.buffUntil > t; }
+    skillSpeed(E, t) { return E.buffUntil > t ? this.data.ultSpeed : null; }
     statSkillDamage(c) { return Math.round(c.dmg * ULT.bzDmgMul); }
     statAltCooldown(c) { return c.cd * ULT.bzCdMul; }
     addMarkers(v, root, body) { v.aura = new THREE.Mesh(GEO.aura, auraMat); v.aura.visible = false; root.add(v.aura); }
@@ -2699,6 +2713,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class DuelistType extends CharacterType {
+    isRiposting(E, t) { return E.buffUntil > t; }
     statAltCooldown(c) { return 1000 / ULT.rmRate; }
     botUltRange() { return this.data.dashRange + this.data.range; }
     addMarkers(v, root, body) {
@@ -2818,6 +2833,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class RogueType extends CharacterType {
+    skillSpeed(E, t) { return E.stealthUntil > t ? this.data.ultSpeed : null; }
     ambush(E, t) {
       if (E.stealthUntil <= t) return null;
       E.stealthUntil = E.skillUntil = t; MATCH.game.forceNet = true;
@@ -2942,6 +2958,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class LancerType extends CharacterType {
+    isLancerWinding(E, t) { return E.ultUntil > t; }
+    isRooted(E, t) { return this.isLancerWinding(E, t); }
     get idleClip() { return "Melee_2H_Idle"; }
     botAct(B, target, enemies, t) { BRAIN.botLance(B, target, t); return true; }
     cast(E, ang, reach, t) {
@@ -2969,6 +2987,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class BlacksmithType extends CharacterType {
+    get hidesBasicEdge() { return true; }
+    isHammerLeaping(E, t) { return E.ultUntil > t; }
+    isRooted(E, t) { return this.isHammerLeaping(E, t); }
     showAimGuide(E, ult, c) {
       if (!ult) return false;
       AIM_GUIDE.showAimCircle(aimReach(E, "ult"), ULT.bsR);
@@ -3056,6 +3077,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class ClericType extends CharacterType {
+    isRevealing(E, t) { return E.buffUntil > t; }
+    isRooted(E, t) { return this.isRevealing(E, t); }
     get showsHealRange() { return true; }
     overrideBasic(E, ang, reach, t) { graceStrike(E, t); return true; }
     botAct(B, target, enemies, t) { BRAIN.botCleric(B, enemies, t); return true; }
@@ -3200,6 +3223,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class DancerType extends CharacterType {
+    isBladeStorming(E, t) { return E.buffUntil > t; }
+    skillSpeed(E, t) { return E.buffUntil > t ? this.data.ultSpeed : null; }
     statDamageText(c) { return num(c.dmg) + "+" + num(ULT.bdDmg); }
     onHitEarly(owner, h) {
       if (!h.k) return;
@@ -3238,6 +3263,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class StormbowType extends CharacterType {
+    isOvercharged(E, t) { return E.buffUntil > t; }
+    speedBonus(E, t) { return this.isOvercharged(E, t) ? ULT.ocSpeedBonus : 0; }
     get idleClip() { return "Ranged_Bow_Idle"; }
     statAltCooldown(c) { return c.cd / ULT.ocRate; }
     onHitEarly(owner, h) { if (h.zap) stormZap(owner, h.zap, h.t); }
@@ -3280,7 +3307,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return "기본 공격이 " + c.chain.every + "번 적중할 때마다 맞은 적과 그 주변 반경 " + c.chain.r + "의 가까운 적 " + c.chain.count + "명에게 번개가 튕겨 " + c.chain.dmg + "의 피해";
     }
     attackClip(v, E, t) {
-      return ["Ranged_Bow_Release", overcharged(E, E.atkAt) ? 5 : 3.4];
+      return ["Ranged_Bow_Release", E.isOvercharged(E.atkAt) ? 5 : 3.4];
     }
   }
   class CharacterRegistry {
@@ -3318,12 +3345,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     isStealthed(t) { t = t || now(); return this.stealthUntil > t && t >= this.stealthUntil - ULT.asDur; }
     hasSkillActive(t) { return this.skillUntil > (t || now()); }
     isGaugeLocked(t) { return this.hasSkillActive(t); }
-    isLancerWinding(t) { return this.char === "lancer" && this.ultUntil > (t || now()); }
+    get type() { return CHAR_TYPES.of(this.char); }
+    isLancerWinding(t) { return this.type.isLancerWinding(this, t || now()); }
     isHammerWinding(t) { return !!this.lance && this.windUntil > (t || now()); }
-    isHammerLeaping(t) { return this.char === "blacksmith" && this.ultUntil > (t || now()); }
-    isBerserk(t) { return this.char === "warrior" && this.buffUntil > (t || now()); }
-    isRiposting(t) { return this.char === "duelist" && this.buffUntil > (t || now()); }
-    isBladeStorming(t) { return this.char === "dancer" && this.buffUntil > (t || now()); }
+    isHammerLeaping(t) { return this.type.isHammerLeaping(this, t || now()); }
+    isBerserk(t) { return this.type.isBerserk(this, t || now()); }
+    isRiposting(t) { return this.type.isRiposting(this, t || now()); }
+    isBladeStorming(t) { return this.type.isBladeStorming(this, t || now()); }
+    isOvercharged(t) { return this.type.isOvercharged(this, t || now()); }
+    isRevealing(t) { return this.type.isRevealing(this, t || now()); }
     isFrostFrozen(t) { return this.isStunned(t) && this.frostStackAt > 0 && this.stunUntil - this.frostStackAt <= ULT.frFreezeMs + 20; }
     frostStacksNow(t) { return this.frostStacks && t - this.frostStackAt <= ULT.frSlowMs ? this.frostStacks : 0; }
     slowMulAt(t) {
@@ -3343,19 +3373,18 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     speed() {
       var t = now(), c = CHARS[this.char], sp = c.speed;
-      if (this.isStunned(t) || this.isLancerWinding(t) || this.isHammerWinding(t) || this.isHammerLeaping(t) || this.dash || shoved(this) || FIGHTER_VIEW.revelationOn(this, t)) return 0;
-      if (this.char === "warrior" && this.buffUntil > t) sp = c.ultSpeed;
-      if (this.char === "rogue" && this.stealthUntil > t) sp = c.ultSpeed;
-      if (this.isBladeStorming(t)) sp = c.ultSpeed;
+      if (this.isStunned(t) || this.isHammerWinding(t) || this.dash || shoved(this) || this.type.isRooted(this, t)) return 0;
+      var skillSpeed = this.type.skillSpeed(this, t);
+      if (skillSpeed != null) sp = skillSpeed;
       if (c.haste) sp += this.hasteBonus(t);
-      if (overcharged(this, t)) sp += ULT.ocSpeedBonus;
+      sp += this.type.speedBonus(this, t);
       return sp * this.slowMulAt(t);
     }
   }
   class Fighter extends Unit {
     constructor(id, d) {
       super();
-      var c = playable(d.characterType) ? d.characterType : "ranger", pos = stateOf(d), s = pos.full ? pos : {};
+      var c = playable(d.characterType) ? d.characterType : FALLBACK_CHAR, pos = stateOf(d), s = pos.full ? pos : {};
       var E = this; Object.assign(E, { id: id, team: d.team, char: c, nickname: d.nickname, isAI: !!d.isAI, practiceBot: !!CHARS[c].practiceBot,
                x: pos.x, y: pos.y, angle: pos.angle, hp: s.hp == null ? CHARS[c].hp : s.hp, maxHp: CHARS[c].hp,
                alive: s.alive !== false, gauge: s.gauge || 0, dmg: s.dmg || 0, deaths: s.deaths || 0, diedAt: s.diedAt || 0,
@@ -3421,7 +3450,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (pos.mv && hyp(tx - r.x, ty - r.y) > 3) { r.moveAng = Math.atan2(ty - r.y, tx - r.x); r.moveAt = now(); }
       if (revived || hyp(tx - r.x, ty - r.y) > 250) { r.x = tx; r.y = ty; } else { r.x += (tx - r.x) * k; r.y += (ty - r.y) * k; }
       r.angle = lerpAng(r.angle, pos.angle, Math.min(1, dt * 15));
-      r.team = d.team; r.char = playable(d.characterType) ? d.characterType : "ranger"; r.maxHp = CHARS[r.char].hp;
+      r.team = d.team; r.char = playable(d.characterType) ? d.characterType : FALLBACK_CHAR; r.maxHp = CHARS[r.char].hp;
       r.mv = pos.mv; r.nickname = d.nickname; r.isAI = !!d.isAI;
       if (!pos.full) return;
       r.deaths = pos.deaths; r.diedAt = pos.diedAt; r.kills = pos.kills; r.assists = pos.assists; r.heal = pos.heal; r.protectUntil = pos.protectUntil;
@@ -3675,7 +3704,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     MATCH.game.forceNet = true;
   }
   function breakRevelation(E, t) {
-    if (!FIGHTER_VIEW.revelationOn(E, t)) return;
+    if (!E.isRevealing(t)) return;
     E.buffUntil = t;
     E.skillUntil = Math.min(E.skillUntil || 0, t);
     MATCH.game.forceNet = true;
@@ -3782,7 +3811,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var ev = s.val(); if (!ev || !MATCH.game || MATCH.handled[s.key]) return;
     MATCH.handled[s.key] = 1;
     var info = P[ev.o]; if (!info || (info.team !== "blue" && info.team !== "red")) return;
-    var c = playable(info.characterType) ? info.characterType : "ranger", skill = !!ev.s, spec = shotSpec(c, skill);
+    var c = playable(info.characterType) ? info.characterType : FALLBACK_CHAR, skill = !!ev.s, spec = shotSpec(c, skill);
     if (now() - ev.t > spec.count * spec.gap + 3000) return;
     MATCH.shots.push({ key: s.key, ev: ev, team: info.team, char: c, skill: skill, spec: spec, count: spec.count, gap: spec.gap, next: 0 });
     stepShots(now());
@@ -3808,7 +3837,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var ox = i > 0 && E ? E.x : v.ev.x, oy = i > 0 && E ? E.y : v.ev.y;
     addProj(v.key + "_" + i, { team: v.team, owner: v.ev.o, ownerCharacterType: v.char, x: ox + dx * 20, y: oy + dy * 20,
       vx: dx * sp, vy: dy * sp, isSkill: v.skill, countsAsSkill: !!v.ev.sk, dmg: sv.dmg, ultKey: sv.ultKey, fx: sv.fx,
-      pr: sv.pr, range: sv.range + (!v.skill && E && overcharged(E, v.ev.t) ? ULT.ocRangeBonus : 0), createdAt: v.ev.t + i * v.gap });
+      pr: sv.pr, range: sv.range + (!v.skill && E && E.isOvercharged(v.ev.t) ? ULT.ocRangeBonus : 0), createdAt: v.ev.t + i * v.gap });
     var shooterType = CHAR_TYPES.of(v.char);
     if (v.skill) shooterType.skillShotFx(ox, oy, dx, dy);
     if (E && (E === MATCH.me || MATCH.bots[E.id]) && hear(E)) sfx(shooterType.shotSound);
@@ -4075,9 +4104,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     s.ref.remove();
   }
-  function overcharged(E, t) { return E.char === "stormbow" && E.buffUntil > (t || now()); }
   function stormZap(E, hit, t) {
-    var chain = CHARS.stormbow.chain, over = overcharged(E, t);
+    var chain = CHARS.stormbow.chain, over = E.isOvercharged(t);
     if (!over) {
       E.zapHits = (E.zapHits || 0) + 1;
       if (E.zapHits < chain.every) return;
@@ -4655,7 +4683,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function fireBasic(E, ang, reach) {
     var c = CHARS[E.char], t = now(), rage = E.isBerserk(t);
     if (E.isStunned(t)) return;
-    E.cdDur = E.isRiposting(t) ? 1000 / ULT.rmRate : c.cd * (rage ? ULT.bzCdMul : 1) / (overcharged(E, t) ? ULT.ocRate : 1); E.cdUntil = t + E.cdDur; E.angle = ang;
+    E.cdDur = E.isRiposting(t) ? 1000 / ULT.rmRate : c.cd * (rage ? ULT.bzCdMul : 1) / (E.isOvercharged(t) ? ULT.ocRate : 1); E.cdUntil = t + E.cdDur; E.angle = ang;
     var type = CHAR_TYPES.of(E.char);
     if (type.overrideBasic(E, ang, reach, t)) return;
     if (c.stab) { lunge(E, ang); return; }
@@ -4874,7 +4902,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (botType.wantsBasicNow(B, t)) { fireBasic(B, B.angle); return; }
       if (aimAt && t >= B.cdUntil && t - k.seenAt > BOT_REACT_MS) {
         var ad = hyp(aimAt.x - B.x, aimAt.y - B.y);
-        var rng = c.stab ? lungeRange(B, t) + c.range : c.throwRange || c.dashRange || (melee ? c.range + BODY_R - 4 : c.range + (overcharged(B, t) ? ULT.ocRangeBonus : 0));
+        var rng = c.stab ? lungeRange(B, t) + c.range : c.throwRange || c.dashRange || (melee ? c.range + BODY_R - 4 : c.range + (B.isOvercharged(t) ? ULT.ocRangeBonus : 0));
         if (ad <= rng && losClear(B.x, B.y, aimAt.x, aimAt.y)) {
           var shotAim = c.pSpeed && !melee ? BRAIN.leadSpot(aimAt, ad / c.pSpeed, t) : aimAt;
           fireBasic(B, Math.atan2(shotAim.y - B.y, shotAim.x - B.x) + (Math.random() - 0.5) * 2 * BOT_AIM_ERR);
@@ -4933,7 +4961,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }
       if (t < B.cdUntil) return;
       var d = hyp(target.x - B.x, target.y - B.y);
-      if (d <= c.range + (overcharged(B, t) ? ULT.ocRangeBonus : 0) && losClear(B.x, B.y, target.x, target.y)) fireBasic(B, B.angle + (Math.random() - 0.5) * 2 * BOT_AIM_ERR);
+      if (d <= c.range + (B.isOvercharged(t) ? ULT.ocRangeBonus : 0) && losClear(B.x, B.y, target.x, target.y)) fireBasic(B, B.angle + (Math.random() - 0.5) * 2 * BOT_AIM_ERR);
     }
   }
   var BRAIN = new BotBrain();
@@ -5848,9 +5876,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       clericRange.visible = !!(MATCH.me && MATCH.me.alive && CHAR_TYPES.of(MATCH.me.char).showsHealRange);
       if (clericRange.visible) clericRange.position.set(MATCH.me.x, 0, MATCH.me.y);
     }
-    revelationOn(E, t) { return E.char === "cleric" && E.buffUntil > t; }
     renderClericHalo(v, E, t, nowMs) {
-      var on = E.alive && FIGHTER_VIEW.revelationOn(E, t), ud = v.halo.userData;
+      var on = E.alive && E.isRevealing(t), ud = v.halo.userData;
       v.halo.visible = on; ud.book.visible = on;
       if (ud.handBook) ud.handBook.visible = !on;
       if (!on) return;
@@ -5968,7 +5995,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (earlyPose) FIGHTER_VIEW.showClip(v, earlyPose[0], earlyPose[1], true);
         else if (E.isBladeStorming(t)) FIGHTER_VIEW.showClip(v, "Melee_2H_Attack_Spinning", 1.2, true);
         else if (v.once) { FIGHTER_VIEW.showClip(v, v.once.name, v.once.ts, false, v.once.fresh); v.once.fresh = false; }
-        else if (FIGHTER_VIEW.revelationOn(E, t)) FIGHTER_VIEW.showClip(v, "Ranged_Magic_Spellcasting", 1, true);
+        else if (E.isRevealing(t)) FIGHTER_VIEW.showClip(v, "Ranged_Magic_Spellcasting", 1, true);
         else if (latePose) FIGHTER_VIEW.showClip(v, latePose[0], latePose[1], true);
         else if (E.mv && v.speed > 150) FIGHTER_VIEW.showClip(v, "Running_A", clamp(v.speed / 260, 0.7, 1.6), true);
         else if (E.mv && v.speed > 15) FIGHTER_VIEW.showClip(v, "Walking_A", clamp(v.speed / 110, 0.6, 1.4), true);
@@ -6102,7 +6129,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (d.len) {
         fill = ARENA_VIEW.flatMesh(GEO.strip, fillM); fill.scale.set(d.len + BODY_R, d.width, 1);
         edge = ARENA_VIEW.flatMesh(GEO.strip, edgeM); edge.scale.set(d.len + BODY_R, Math.max(6, d.width * 0.22), 1);
-        if (who === "blacksmith" && !d.u) edge.visible = false;
+        if (CHAR_TYPES.of(who).hidesBasicEdge && !d.u) edge.visible = false;
         if (darkWave) {
           fill.visible = edge.visible = false;
           for (var pi = 0; pi < CLOUD_PUFFS; pi++) {
@@ -6434,7 +6461,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         }
       } else {
         var ultShot = ult ? aimType.ultAimShot() : null;
-        var len = ult ? ultShot.len : c.range + (overcharged(MATCH.me, now()) ? ULT.ocRangeBonus : 0), wx = Math.cos(MATCH.me.angle), wy = Math.sin(MATCH.me.angle), hw = ult ? ultShot.halfWidth : 8;
+        var len = ult ? ultShot.len : c.range + (MATCH.me.isOvercharged(now()) ? ULT.ocRangeBonus : 0), wx = Math.cos(MATCH.me.angle), wy = Math.sin(MATCH.me.angle), hw = ult ? ultShot.halfWidth : 8;
         len = rayCast(MATCH.me.x + wx * 20, MATCH.me.y + wy * 20, wx, wy, len, 6) + 20;
         AIM_GUIDE.showAimStrip(18, Math.max(1, len - 18), hw * 2);
       }
@@ -6543,7 +6570,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return g;
     }
     renderStormAura(v, E, t, nowMs) {
-      var g = v.stormAura, ud = g.userData, on = E.alive && overcharged(E, t);
+      var g = v.stormAura, ud = g.userData, on = E.alive && E.isOvercharged(t);
       g.visible = on;
       if (v.bowSpark) v.bowSpark.scale.setScalar((on ? 1.7 : 1) * (0.85 + 0.25 * Math.sin(nowMs / (on ? 40 : 110))));
       if (!on) return;
@@ -6808,8 +6835,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (E.isHammerLeaping(t)) return 0x553000;
       if (E.isRiposting(t)) return 0x9A9A9A;
       if (E.isBladeStorming(t)) return 0x551020;
-      if (FIGHTER_VIEW.revelationOn(E, t)) return 0x5A4A10;
-      if (overcharged(E, t)) return 0x1E3A8A;
+      if (E.isRevealing(t)) return 0x5A4A10;
+      if (E.isOvercharged(t)) return 0x1E3A8A;
       var frostStacks = E.frostStacksNow(t);
       if (frostStacks === 1) return 0x3A6E99;
       if (frostStacks === 2) return 0x2E8FD9;
