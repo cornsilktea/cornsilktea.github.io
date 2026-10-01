@@ -5123,24 +5123,46 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (!dc || !dr) return !BOT_PATH.squeezed(c, r, dc, dr);
       return BOT_PATH.canStep(c, r, dc, 0) && BOT_PATH.canStep(c + dc, r, 0, dr) && BOT_PATH.canStep(c, r, 0, dr) && BOT_PATH.canStep(c, r + dr, dc, 0);
     }
+    openCache() {
+      if (BOT_PATH.cacheMapId !== ARENA_MAP.id || BOT_PATH.cacheSize !== ARENA_MAP.cols * ARENA_MAP.rowCount) {
+        BOT_PATH.cacheMapId = ARENA_MAP.id; BOT_PATH.cacheSize = ARENA_MAP.cols * ARENA_MAP.rowCount; BOT_PATH.routes = new Map();
+      }
+      if (BOT_PATH.routes.size > BOT_PATH_CACHE_MAX) BOT_PATH.routes.clear();
+    }
     route(from, to) {
-      var cols = ARENA_MAP.cols, prev = {}, queue = [from], head = 0, startKey = from.r * cols + from.c, goalKey = to.r * cols + to.c;
-      prev[startKey] = -1;
-      while (head < queue.length) {
-        var cur = queue[head++], curKey = cur.r * cols + cur.c;
+      BOT_PATH.openCache();
+      var cols = ARENA_MAP.cols, total = BOT_PATH.cacheSize, startKey = from.r * cols + from.c, goalKey = to.r * cols + to.c, memoKey = startKey * total + goalKey;
+      if (BOT_PATH.routes.has(memoKey)) return BOT_PATH.routes.get(memoKey);
+      var prev = new Int32Array(total).fill(-2), queue = new Int32Array(total), head = 0, tail = 0;
+      prev[startKey] = -1; queue[tail++] = startKey;
+      while (head < tail) {
+        var curKey = queue[head++];
         if (curKey === goalKey) break;
+        var cc = curKey % cols, cr = (curKey - cc) / cols;
         for (var n = 0; n < BOT_PATH_STEPS.length; n++) {
-          var step = BOT_PATH_STEPS[n], nc = cur.c + step[0], nr = cur.r + step[1], key = nr * cols + nc;
-          if (prev[key] !== undefined || !BOT_PATH.canStep(cur.c, cur.r, step[0], step[1])) continue;
-          prev[key] = curKey; queue.push({ c: nc, r: nr });
+          var step = BOT_PATH_STEPS[n], key = (cr + step[1]) * cols + cc + step[0];
+          if (cc + step[0] < 0 || cc + step[0] >= cols || key < 0 || key >= total || prev[key] !== -2 || !BOT_PATH.canStep(cc, cr, step[0], step[1])) continue;
+          prev[key] = curKey; queue[tail++] = key;
         }
       }
-      if (prev[goalKey] === undefined) return null;
-      var path = [];
-      for (var k = goalKey; k !== -1; k = prev[k]) path.push({ c: k % cols, r: Math.floor(k / cols) });
-      return path.reverse();
+      var path = null;
+      if (prev[goalKey] !== -2) {
+        path = [];
+        for (var k = goalKey; k !== -1; k = prev[k]) path.push({ c: k % cols, r: Math.floor(k / cols) });
+        path.reverse();
+      }
+      BOT_PATH.routes.set(memoKey, path);
+      return path;
     }
     waypoint(B, tx, ty) {
+      var memo = B.bot || B, here = BOT_PATH.tileOf(B.x, B.y), goal = BOT_PATH.tileOf(tx, ty), t = now();
+      var key = here.c + "," + here.r + ">" + goal.c + "," + goal.r + "@" + ARENA_MAP.id, seen = memo.pathMemo;
+      if (seen && seen.key === key && t - seen.at < BOT_PATH_REUSE_MS) return seen.spot;
+      var spot = BOT_PATH.findWaypoint(B, tx, ty);
+      memo.pathMemo = { key: key, at: t, spot: spot };
+      return spot;
+    }
+    findWaypoint(B, tx, ty) {
       if (BOT_PATH.clearLine(B.x, B.y, tx, ty)) return null;
       var from = BOT_PATH.nearestWalkable(BOT_PATH.tileOf(B.x, B.y)), to = BOT_PATH.nearestWalkable(BOT_PATH.tileOf(tx, ty));
       if (!from || !to) return null;
@@ -5153,6 +5175,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return BOT_PATH.centerOf(path[1]);
     }
   }
+  var BOT_PATH_CACHE_MAX = 6000, BOT_PATH_REUSE_MS = 120;
   var BOT_PATH_STEPS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
   var BOT_PATH = new BotPathfinder();
 
