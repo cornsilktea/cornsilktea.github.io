@@ -1719,57 +1719,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function attackText(cdMs, perSec) { return CLOCK.scale !== 1 ? "공격 간격 " + num(cdMs / CLOCK.scale / 1000) + "초" : "초당 공격 " + perSec + "회"; }
   function pctOf(rate) { return Math.round(rate * 100); }
   function slowPct(mul) { return Math.round((1 - mul) * 100) + "% 둔화"; }
-  function ultDesc(k) {
-    function speedUp(c) { return "이동속도 " + shownSpeed(c.ultSpeed - c.speed) + " 증가"; }
-    if (k === "warrior") return secs(ULT.bzDur) + "간 공격력·공격속도 " + num(ULT.bzDmgMul) + "배, " + speedUp(CHARS.warrior) + ". 기본 공격 적중 시 체력 " + ULT.bzHeal + " 회복";
-    if (k === "knight") return secs(ULT.tkDur) + "간 받는 피해 " + num(ULT.tkDef) + "배. 끝날 때 반경 " + ULT.tkStunR + "의 적은 " + secs(ULT.tkStunMs) + "간 기절";
-    if (k === "ranger") return ULT.mkDmg + "의 피해를 주는 화살 " + ULT.mkCount + "발 연사. 적중마다 게이지 " + ULT.mkRefund + " 회복";
-    if (k === "mage") return "지정한 곳에 " + secs(ULT.mbDelay) + " 뒤 반경 " + ULT.mbR + "의 폭발. 적은 " + ULT.mbDmgMin + "~" + ULT.mbDmg + "의 피해, " +
-      num(ULT.mbStunMin / CLOCK.scale / 1000) + "~" + secs(ULT.mbStunMs) + "의 기절. 중심에 가까울수록 강함";
-    if (k === "rogue") return secs(ULT.asDur) + "간 은신 상태가 되고 " + speedUp(CHARS.rogue) + ". 공격 시 해제되며, 해제하는 공격이 베기면 한 번마다 " + CHARS.rogue.ambushDmg + "의 피해";
-    if (k === "necro") return secs(ULT.smDur) + "간 유지되는 해골 병사 " + ULT.smCount + "마리 소환(최대 " + ULT.smMax + "마리). 해골은 체력 " + ULT.smHp + ", 공격 " + ULT.smDmg + ", 이동속도 " + shownSpeed(ULT.smSpeed) + ". 해골이 적을 공격할 때마다 네크로의 게이지 " + ULT.smGauge + " 회복";
-    if (k === "sniper") return "사거리 " + ULT.pnRange + "의 거대한 화살 발사. 적은 " + ULT.pnDmg + "의 피해, 적중 시 게이지 " + ULT.pnRefund + " 회복";
-    if (k === "thrower") return "지정한 곳에 " + secs(ULT.fgDur) + "간 유지되는 반경 " + ULT.fgR + "의 독안개 설치. 아군은 1초당 체력 " + ULT.fgHeal + " 회복, 적은 1초당 " + ULT.fgDmg + "의 피해를 입고 " + slowPct(ULT.fgSlowMul);
-    if (k === "lancer") return secs(ULT.lnWind) + " 준비 후 사거리 " + ULT.lnLen + "의 창 찌르기. 맞은 적은 모두 " + ULT.lnDmg + "의 피해를 입고 " + secs(ULT.lnStunMs) + "간 기절";
-    if (k === "blacksmith") return "지정한 곳에 거리에 따라 " + num(ULT.bsLeapMinMs / CLOCK.scale / 1000) + "~" + secs(ULT.bsLeapMaxMs) + " 뒤 착지. 반경 " + ULT.bsR + "의 적은 " + ULT.bsDmg + "의 피해를 입고 " + secs(ULT.bsStunMs) + "간 기절";
-    if (k === "hitman") return "사거리 " + ULT.exRange + "의 칼날 발사. 처음 맞은 적은 " + ULT.exDmg + "의 피해를 입고 " + secs(ULT.exStunMs) + "간 기절, 그 위치로 순간이동";
-    if (k === "guardian") return "자신을 중심으로 반경 " + ULT.gdR + "의 적을 모두 " + ULT.gdKb + "만큼 밀어내며 " + ULT.gdDmg + "의 피해. 밀려난 적은 " + secs(ULT.gdSlowMs) + "간 " + slowPct(ULT.gdSlowMul);
-    if (k === "shaman") return "자신을 중심으로 " + secs(ULT.dmGrowMs) + "간 반경 " + ULT.dmR + "까지 커진 뒤 " + secs(ULT.dmDur - ULT.dmGrowMs) + "간 유지되는 영역 생성. 영역이 커지는 과정에서 닿은 적은 " + secs(ULT.dmStunMs) +
-      "간 기절하고, 기절이 풀릴 때 " + ULT.dmBoltDmg + "의 피해. 영역 안에서 주술사의 기본 공격은 영역 내 가장 가까운 적 1명에게 최대 체력의 " + pctOf(ULT.dmStrikeMaxHpRate) + "%의 피해를 입히고 " + secs(ULT.dmStrikeStunMs) + "간 기절";
-    if (k === "priest") return "지정한 곳에 " + secs(ULT.bhDelay) + " 뒤 " + secs(ULT.bhDur) + "간 유지되는 반경 " + ULT.bhR + "의 블랙홀 생성. 적은 중심으로 끌려감";
-    if (k === "cleric") return "아군의 체력을 " + CHARS.cleric.healGauge + " 회복시키면 사용 가능. 사용 시 자신의 체력을 모두 회복하고 " + secs(ULT.rvDur) + "간 제자리에서 기도. 아군 전체는 1초당 체력 " + ULT.rvHeal + " 회복, 적 전체는 1초당 " + ULT.rvDmg + "의 피해. 기절·넉백·끌어당김을 당하면 취소";
-    if (k === "frost") return "자신을 중심으로 " + secs(ULT.frBzDur) + "간 유지되는 반경 " + ULT.frBzR + "의 눈보라 생성. " + (ULT.frBzHides ? "눈보라 안의 아군은 은신 상태가 되고, " : "") + "적은 1초당 " +
-      ULT.frBzDmg + "의 피해를 입고 패시브 1중첩";
-    if (k === "duelist") return secs(ULT.rmDur) + "간 " + attackText(1000 / ULT.rmRate, ULT.rmRate) + ", 돌진 거리 " + ULT.rmDashRange + "·돌진 시간 " + secs(ULT.rmDashMs) + "로 단축. 사용 즉시 기본 공격 대기시간 초기화";
-    if (k === "stormbow") return "자신을 중심으로 반경 " + ULT.ocR + "의 번개 막 생성. 적은 " + ULT.ocDmg + "의 피해를 입고 " + secs(ULT.ocStunMs) + "간 기절. 이후 " + secs(ULT.ocDur) + "간 " +
-      attackText(CHARS.stormbow.cd / ULT.ocRate, num(1000 / CHARS.stormbow.cd * ULT.ocRate)) + ", 이동속도 " + shownSpeed(ULT.ocSpeedBonus) + "·사거리 " + ULT.ocRangeBonus + " 증가, 기본 공격이 적중할 때마다 패시브 번개 발동";
-    if (k === "dancer") return secs(ULT.bwDur) + "간 회전하며 " + speedUp(CHARS.dancer) + ". 반경 " + ULT.bwR + "의 적은 " + secs(ULT.bwTick) + "마다 " + ULT.bwDmg + "의 피해. 기절·넉백을 당하면 취소";
-    return "";
-  }
+  function ultDesc(k) { return CHAR_TYPES.of(k).ultDesc(); }
   function healCutPct() { return Math.round((1 - HEAL_CUT_MUL) * 100) + "%"; }
-  function passiveDesc(k) {
-    var c = CHARS[k];
-    if (k === "ranger") return "기본 공격 적중 시 " + secs(c.haste.ms) + "간 이동속도 " + shownSpeed(c.haste.add) + " 증가, 최대 " + shownSpeed(c.haste.max) + "까지 중첩. 적중마다 지속시간 초기화";
-    if (k === "blacksmith") return "기본 공격 시 멈춰 서서 표시된 곳을 " + secs(c.windup) + " 뒤 타격. 맞은 적은 " + secs(c.fx.stunMs) + "간 기절";
-    if (k === "sniper") return "거리가 " + c.farDist + "보다 먼 적에게 주는 피해 " + Math.round(c.farBonus * 100) + "% 증가";
-    if (k === "necro") return "체력이 " + c.lastStandHp + " 미만으로 떨어지면 체력 " + c.lastStandHp + "을 남기고 " + secs(c.lastStandHideMs) + "간 은신. 죽을 때마다 한 번";
-    if (k === "guardian") return "기본 공격에 맞은 적은 " + secs(c.fx.slowMs) + "간 " + slowPct(c.fx.slowMul);
-    if (k === "priest") return "기본 공격에 맞은 아군은 체력 " + c.heal + " 회복";
-    if (k === "shaman") return "공격이 적중할 때마다 대상에게 저주 1회 부여. 저주가 " + ULT.cuStacks + "회 중첩되면 폭발하여 " + ULT.cuBoomDmg + "의 피해. " + secs(ULT.cuExpireMs) + " 이상 갱신되지 않으면 저주 소멸";
-    if (k === "cleric") return "기본 공격은 조준 없이 반경 " + c.range + " 안에서 체력 비율이 가장 낮은 아군의 체력 " + c.graceHeal + " 회복";
-    if (k === "mage") return "기본 공격·스킬에 맞은 적은 " + secs(c.burn.ms) + "간 불타며 1초당 최대 체력의 " + pctOf(c.burn.maxHpRate) + "%의 피해를 입고 회복 " + healCutPct() + " 감소";
-    if (k === "thrower") return "기본 공격·스킬 지역 위의 적은 회복 " + healCutPct() + " 감소";
-    if (k === "knight") return "받는 모든 피해가 1회마다 " + c.armor + " 감소";
-    if (k === "lancer") return "게임을 시작할 때와 부활할 때마다 적의 다음 피해 1회를 막는 보호막 생성. 기절·둔화 등 효과는 막지 못함";
-    if (k === "warrior") return "체력이 " + Math.round(c.rally.hpRate * 100) + "% 미만으로 떨어지면 " + secs(c.rally.ms) + "간 1초당 체력 " + c.rally.perSec + " 회복. 죽을 때마다 한 번";
-    if (k === "frost") return "기본 공격에 맞은 적은 " + secs(ULT.frSlowMs) + "간 " + slowPct(ULT.frSlowMul) + ". " + secs(ULT.frSlowMs) + " 안에 다시 맞을 때마다 둔화가 " + Math.round(ULT.frSlowStep * 100) + "%p씩 커지고 3중첩이 되면 " + secs(ULT.frFreezeMs) + "간 기절하며 최대 체력의 " + pctOf(ULT.frFreezeMaxHpRate) + "%의 피해. 기절이 끝난 뒤부터 다시 중첩";
-    if (k === "rogue") return "가까운 적은 근접 공격, 먼 적에게는 사거리 " + c.throwRange + "의 단검 투척";
-    if (k === "hitman") return "기본 공격 시 " + c.dashRange + " 돌진 후 반경 " + c.range + " 회전베기";
-    if (k === "duelist") return "기본 공격 시 " + secs(c.dashMs) + "간 " + c.dashRange + " 돌진 후 반경 " + c.range + "의 가장 가까운 적 1명을 찔러 " + c.dmg + "의 피해. 적중 시 체력 " + c.selfHeal + " 회복";
-    if (k === "stormbow") return "기본 공격이 " + c.chain.every + "번 적중할 때마다 맞은 적과 그 주변 반경 " + c.chain.r + "의 가까운 적 " + c.chain.count + "명에게 번개가 튕겨 " + c.chain.dmg + "의 피해";
-    if (k === "dancer") return "던진 단검이 적에게 맞거나 사거리 끝에 닿은 곳에서 " + secs(ULT.bdDelay) + " 뒤 회전해 반경 " + ULT.bdR + "의 적에게 " + ULT.bdDmg + "의 피해. 적을 처치하면 게이지 " + ULT.bwKillGauge + " 회복, 스킬 중 처치는 스킬이 끝난 뒤 회복";
-    return "";
-  }
+  function passiveDesc(k) { return CHAR_TYPES.of(k).passiveDesc(); }
   function skillBlocks(k) {
     return '<div class="ultDesc pasDesc"><b>패시브</b>' + (passiveDesc(k) || "없음") + "</div>" +
            '<div class="ultDesc skDesc"><b>스킬 설명</b>' + ultDesc(k) + "</div>";
@@ -1983,21 +1935,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var b = e.target.closest ? e.target.closest(".modeBtn") : null;
     if (b && b.getAttribute("data-id") !== statsMode) { statsMode = b.getAttribute("data-id"); loadStats(); }
   };
-  function basicDesc(k) {
-    var c = CHARS[k];
-    if (k === "warrior" || k === "knight" || k === "guardian") return "앞쪽 반경 " + c.range + "의 부채꼴 안의 적에게 " + c.dmg + "의 피해";
-    if (k === "duelist") return "앞으로 " + c.dashRange + " 돌진한 뒤 반경 " + c.range + " 안의 가장 가까운 적 1명을 찔러 " + c.dmg + "의 피해";
-    if (k === "hitman") return "앞으로 " + c.dashRange + " 돌진하며 폭 " + c.dashWidth + " 안의 적에게 " + c.dashDmg + "의 피해. 이어서 반경 " + c.range + "의 회전베기로 " + c.dmg + "의 피해";
-    if (k === "lancer") return "앞으로 길이 " + c.range + "·폭 " + c.width + "의 창 찌르기. 맞은 적은 " + c.dmg + "의 피해";
-    if (k === "blacksmith") return "앞쪽 길이 " + c.range + "·폭 " + c.width + "의 지역을 망치로 내려쳐 " + c.dmg + "의 피해";
-    if (k === "shaman") return "앞으로 사거리 " + c.range + "·폭 " + c.width + "의 검은 구름 파동. 맞은 적은 " + c.dmg + "의 피해";
-    if (k === "cleric") return "반경 " + c.range + " 안에서 체력 비율이 가장 낮은 아군 1명의 체력 " + c.graceHeal + " 회복";
-    if (k === "ranger") return "사거리 " + c.range + "의 화살 " + c.shots + "발을 연달아 발사. 한 발마다 " + c.dmg + "의 피해";
-    if (k === "thrower") return "사거리 " + c.minRange + "~" + c.range + "의 지정한 곳에 독병을 던져 " + secs(ULT.plDur) + "간 유지되는 반경 " + ULT.plR + "의 독 웅덩이 생성. 적은 1초당 " + c.dmg + "의 피해";
-    if (k === "rogue") return "가까운 적은 " + c.hits + "번 베어 한 번마다 " + c.dmg + "의 피해, 먼 적에게는 단검을 던져 " + c.throwDmg + "의 피해";
-    var shot = { mage: "불꽃 구슬", necro: "마법 구슬", frost: "얼음 구슬", sniper: "화살", dancer: "단검", stormbow: "번개 화살" }[k] || "투사체";
-    return "사거리 " + c.range + "의 " + shot + " 발사. 맞은 적은 " + c.dmg + "의 피해";
-  }
+  function basicDesc(k) { return CHAR_TYPES.of(k).basicDesc(); }
   var VIDEOS = window.TEAM_BATTLE_VIDEOS || {};
   var VIDEO_KINDS = [["basic", "기본 공격"], ["passive", "패시브"], ["skill", "스킬"]];
   var vidOpen = false, vidChar = null;
@@ -2644,6 +2582,462 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   var FIELD = new BattleField();
 
+  function ultSpeedUpText(c) { return "이동속도 " + shownSpeed(c.ultSpeed - c.speed) + " 증가"; }
+  class CharacterType {
+    constructor(id) { this.id = id; }
+    get data() { return CHARS[this.id]; }
+    get shotName() { return "투사체"; }
+    get startsSkillTimer() { return true; }
+    cast(E, ang, reach, t) {
+      if (this.data.ultKind !== "blackhole") return;
+      var holeSpot = burstSpot(E, ang, reach, ULT.bhCast, ULT.bhMin);
+      E.angle = Math.atan2(holeSpot.y - E.y, holeSpot.x - E.x);
+      E.ultUntil = t + 450;
+      E.skillDur = ULT.bhDelay + ULT.bhDur;
+      room.ref.child("effects").push({ type: "hole", team: E.team, owner: E.id, x: Math.round(holeSpot.x), y: Math.round(holeSpot.y),
+                                       r: ULT.bhR, dur: ULT.bhDur, delay: ULT.bhDelay, createdAt: t });
+      revealBriefly(E.id, t);
+    }
+    ultDesc() { return ""; }
+    passiveDesc() { return ""; }
+    basicDesc() {
+      var c = this.data;
+      return "사거리 " + c.range + "의 " + this.shotName + " 발사. 맞은 적은 " + c.dmg + "의 피해";
+    }
+    attackClip(v, E, t) {
+      if (!enemyInMelee(E)) return ["Throw", 2.2];
+      if (v.wasStealth) { v.combo = 1; return ["Melee_Dualwield_Attack_Stab", 2.2]; }
+      return [ROGUE_COMBO[v.combo++ % 2], 2.4];
+    }
+  }
+  class ArcMeleeType extends CharacterType {
+    basicDesc() {
+      var c = this.data;
+      return "앞쪽 반경 " + c.range + "의 부채꼴 안의 적에게 " + c.dmg + "의 피해";
+    }
+  }
+  class MagicShooterType extends CharacterType {
+    attackClip(v, E, t) {
+      return ["Ranged_Magic_Shoot", 1.8];
+    }
+  }
+  class WarriorType extends ArcMeleeType {
+    cast(E, ang, reach, t) {
+      E.buffUntil = t + ULT.bzDur;
+      E.skillDur = ULT.bzDur;
+    }
+    ultDesc() {
+      return secs(ULT.bzDur) + "간 공격력·공격속도 " + num(ULT.bzDmgMul) + "배, " + ultSpeedUpText(CHARS.warrior) + ". 기본 공격 적중 시 체력 " + ULT.bzHeal + " 회복";
+    }
+    passiveDesc() {
+      var c = this.data;
+      return "체력이 " + Math.round(c.rally.hpRate * 100) + "% 미만으로 떨어지면 " + secs(c.rally.ms) + "간 1초당 체력 " + c.rally.perSec + " 회복. 죽을 때마다 한 번";
+    }
+    attackClip(v, E, t) {
+      return ["Melee_1H_Attack_Slice_Diagonal", E.isBerserk(t) ? 1.9 : 1.3];
+    }
+  }
+  class DuelistType extends CharacterType {
+    cast(E, ang, reach, t) {
+      E.buffUntil = t + ULT.rmDur;
+      E.skillDur = ULT.rmDur;
+      E.cdUntil = E.dash ? E.dash.at + E.dash.ms : t;
+      E.cdDur = 1000 / ULT.rmRate;
+      if (E.pending) E.pending.until = Math.max(E.pending.until, E.cdUntil + 350);
+    }
+    ultDesc() {
+      return secs(ULT.rmDur) + "간 " + attackText(1000 / ULT.rmRate, ULT.rmRate) + ", 돌진 거리 " + ULT.rmDashRange + "·돌진 시간 " + secs(ULT.rmDashMs) + "로 단축. 사용 즉시 기본 공격 대기시간 초기화";
+    }
+    passiveDesc() {
+      var c = this.data;
+      return "기본 공격 시 " + secs(c.dashMs) + "간 " + c.dashRange + " 돌진 후 반경 " + c.range + "의 가장 가까운 적 1명을 찔러 " + c.dmg + "의 피해. 적중 시 체력 " + c.selfHeal + " 회복";
+    }
+    basicDesc() {
+      var c = this.data;
+      return "앞으로 " + c.dashRange + " 돌진한 뒤 반경 " + c.range + " 안의 가장 가까운 적 1명을 찔러 " + c.dmg + "의 피해";
+    }
+    attackClip(v, E, t) {
+      return ["Running_A", KIT.clips.Running_A.duration * 1000 / lungeDashMs(E, E.atkAt)];
+    }
+  }
+  class KnightType extends ArcMeleeType {
+    cast(E, ang, reach, t) {
+      E.buffUntil = t + ULT.tkDur;
+      E.skillDur = ULT.tkDur;
+      E.slamAt = E.buffUntil;
+    }
+    ultDesc() {
+      return secs(ULT.tkDur) + "간 받는 피해 " + num(ULT.tkDef) + "배. 끝날 때 반경 " + ULT.tkStunR + "의 적은 " + secs(ULT.tkStunMs) + "간 기절";
+    }
+    passiveDesc() {
+      var c = this.data;
+      return "받는 모든 피해가 1회마다 " + c.armor + " 감소";
+    }
+    attackClip(v, E, t) {
+      return E.ultUntil > E.atkAt ? ["Melee_1H_Attack_Chop", 1.6] : ["Melee_1H_Attack_Slice_Horizontal", 1.5];
+    }
+  }
+  class RangerType extends CharacterType {
+    get startsSkillTimer() { return false; }
+    cast(E, ang, reach, t) {
+      E.angle = ang; E.burst = { until: t + (ULT.mkCount - 1) * ULT.mkGap };
+      E.ultUntil = t + ULT.mkCount * ULT.mkGap + 200;
+      emitShots(E, ang, true);
+    }
+    ultDesc() {
+      return ULT.mkDmg + "의 피해를 주는 화살 " + ULT.mkCount + "발 연사. 적중마다 게이지 " + ULT.mkRefund + " 회복";
+    }
+    passiveDesc() {
+      var c = this.data;
+      return "기본 공격 적중 시 " + secs(c.haste.ms) + "간 이동속도 " + shownSpeed(c.haste.add) + " 증가, 최대 " + shownSpeed(c.haste.max) + "까지 중첩. 적중마다 지속시간 초기화";
+    }
+    basicDesc() {
+      var c = this.data;
+      return "사거리 " + c.range + "의 화살 " + c.shots + "발을 연달아 발사. 한 발마다 " + c.dmg + "의 피해";
+    }
+    attackClip(v, E, t) {
+      return ["Ranged_Bow_Release", 3];
+    }
+  }
+  class MageType extends MagicShooterType {
+    get shotName() { return "불꽃 구슬"; }
+    get startsSkillTimer() { return false; }
+    cast(E, ang, reach, t) {
+      var spot = burstSpot(E, ang, reach);
+      E.angle = Math.atan2(spot.y - E.y, spot.x - E.x);
+      E.ultUntil = t + 450;
+      room.ref.child("effects").push({ type: "burst", team: E.team, owner: E.id, x: Math.round(spot.x), y: Math.round(spot.y),
+                                       r: ULT.mbR, dmg: ULT.mbDmg, delay: ULT.mbDelay, createdAt: t });
+      revealBriefly(E.id, t);
+    }
+    ultDesc() {
+      return "지정한 곳에 " + secs(ULT.mbDelay) + " 뒤 반경 " + ULT.mbR + "의 폭발. 적은 " + ULT.mbDmgMin + "~" + ULT.mbDmg + "의 피해, " +
+      num(ULT.mbStunMin / CLOCK.scale / 1000) + "~" + secs(ULT.mbStunMs) + "의 기절. 중심에 가까울수록 강함";
+    }
+    passiveDesc() {
+      var c = this.data;
+      return "기본 공격·스킬에 맞은 적은 " + secs(c.burn.ms) + "간 불타며 1초당 최대 체력의 " + pctOf(c.burn.maxHpRate) + "%의 피해를 입고 회복 " + healCutPct() + " 감소";
+    }
+  }
+  class RogueType extends CharacterType {
+    cast(E, ang, reach, t) {
+      E.ultUntil = t + ULT.asSmokeMs;
+      E.stealthUntil = t + ULT.asSmokeMs + ULT.asDur;
+      E.skillDur = ULT.asSmokeMs + ULT.asDur;
+      FX_VIEW.smoke(E.x, E.y);
+    }
+    ultDesc() {
+      return secs(ULT.asDur) + "간 은신 상태가 되고 " + ultSpeedUpText(CHARS.rogue) + ". 공격 시 해제되며, 해제하는 공격이 베기면 한 번마다 " + CHARS.rogue.ambushDmg + "의 피해";
+    }
+    passiveDesc() {
+      var c = this.data;
+      return "가까운 적은 근접 공격, 먼 적에게는 사거리 " + c.throwRange + "의 단검 투척";
+    }
+    basicDesc() {
+      var c = this.data;
+      return "가까운 적은 " + c.hits + "번 베어 한 번마다 " + c.dmg + "의 피해, 먼 적에게는 단검을 던져 " + c.throwDmg + "의 피해";
+    }
+  }
+  class NecroType extends MagicShooterType {
+    get shotName() { return "마법 구슬"; }
+    get startsSkillTimer() { return false; }
+    cast(E, ang, reach, t) {
+      E.angle = ang;
+      E.ultUntil = t + 450;
+      summonMinions(E, ang, t);
+    }
+    ultDesc() {
+      return secs(ULT.smDur) + "간 유지되는 해골 병사 " + ULT.smCount + "마리 소환(최대 " + ULT.smMax + "마리). 해골은 체력 " + ULT.smHp + ", 공격 " + ULT.smDmg + ", 이동속도 " + shownSpeed(ULT.smSpeed) + ". 해골이 적을 공격할 때마다 네크로의 게이지 " + ULT.smGauge + " 회복";
+    }
+    passiveDesc() {
+      var c = this.data;
+      return "체력이 " + c.lastStandHp + " 미만으로 떨어지면 체력 " + c.lastStandHp + "을 남기고 " + secs(c.lastStandHideMs) + "간 은신. 죽을 때마다 한 번";
+    }
+  }
+  class SniperType extends CharacterType {
+    get shotName() { return "화살"; }
+    cast(E, ang, reach, t) {
+      E.angle = ang;
+      E.ultUntil = t + 450;
+      E.cdUntil = Math.max(E.cdUntil, t + 450);
+      emitShots(E, ang, true);
+    }
+    ultDesc() {
+      return "사거리 " + ULT.pnRange + "의 거대한 화살 발사. 적은 " + ULT.pnDmg + "의 피해, 적중 시 게이지 " + ULT.pnRefund + " 회복";
+    }
+    passiveDesc() {
+      var c = this.data;
+      return "거리가 " + c.farDist + "보다 먼 적에게 주는 피해 " + Math.round(c.farBonus * 100) + "% 증가";
+    }
+    attackClip(v, E, t) {
+      return FIGHTER_VIEW.sniperShotClip(E);
+    }
+  }
+  class ThrowerType extends CharacterType {
+    cast(E, ang, reach, t) {
+      var fogFlightMs = throwPoison(E, ang, reach, true);
+      E.ultUntil = t + 450;
+      E.cdUntil = Math.max(E.cdUntil, t + 450);
+      E.skillDur = fogFlightMs + ULT.fgDur;
+    }
+    ultDesc() {
+      return "지정한 곳에 " + secs(ULT.fgDur) + "간 유지되는 반경 " + ULT.fgR + "의 독안개 설치. 아군은 1초당 체력 " + ULT.fgHeal + " 회복, 적은 1초당 " + ULT.fgDmg + "의 피해를 입고 " + slowPct(ULT.fgSlowMul);
+    }
+    passiveDesc() {
+      return "기본 공격·스킬 지역 위의 적은 회복 " + healCutPct() + " 감소";
+    }
+    basicDesc() {
+      var c = this.data;
+      return "사거리 " + c.minRange + "~" + c.range + "의 지정한 곳에 독병을 던져 " + secs(ULT.plDur) + "간 유지되는 반경 " + ULT.plR + "의 독 웅덩이 생성. 적은 1초당 " + c.dmg + "의 피해";
+    }
+    attackClip(v, E, t) {
+      return ["Throw", E.ultUntil > E.atkAt ? 1.6 : 2.2];
+    }
+  }
+  class LancerType extends CharacterType {
+    cast(E, ang, reach, t) {
+      E.angle = ang; E.atkAt = t;
+      E.ultUntil = t + ULT.lnWind;
+      E.cdUntil = Math.max(E.cdUntil, t + ULT.lnWind + 250);
+      E.pending = null;
+      var lanceCast = { team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(ang), len: Math.round(lineReach(E.x, E.y, ang, ULT.lnLen)),
+                        width: ULT.lnW, dmg: 0, u: 1, wind: ULT.lnWind, createdAt: t };
+      E.lance = { d: lanceCast };
+      room.ref.child("meleeHits").push(lanceCast);
+    }
+    ultDesc() {
+      return secs(ULT.lnWind) + " 준비 후 사거리 " + ULT.lnLen + "의 창 찌르기. 맞은 적은 모두 " + ULT.lnDmg + "의 피해를 입고 " + secs(ULT.lnStunMs) + "간 기절";
+    }
+    passiveDesc() {
+      return "게임을 시작할 때와 부활할 때마다 적의 다음 피해 1회를 막는 보호막 생성. 기절·둔화 등 효과는 막지 못함";
+    }
+    basicDesc() {
+      var c = this.data;
+      return "앞으로 길이 " + c.range + "·폭 " + c.width + "의 창 찌르기. 맞은 적은 " + c.dmg + "의 피해";
+    }
+    attackClip(v, E, t) {
+      return ["Melee_2H_Attack_Stab", KIT.clips.Melee_2H_Attack_Stab.duration * 1000 / (E.ultUntil > E.atkAt ? 520 : 800)];
+    }
+  }
+  class BlacksmithType extends CharacterType {
+    cast(E, ang, reach, t) {
+      var landing = burstSpot(E, ang, reach, ULT.bsCast, ULT.bsMin);
+      resolve(landing);
+      E.angle = Math.atan2(landing.y - E.y, landing.x - E.x);
+      var leapMs = hammerLeapMs(hyp(landing.x - E.x, landing.y - E.y));
+      E.leapAt = t;
+      E.ultUntil = t + leapMs;
+      E.cdUntil = Math.max(E.cdUntil, t + leapMs + 250);
+      E.pending = null; E.slash = null;
+      E.leap = { sx: E.x, sy: E.y, tx: landing.x, ty: landing.y, at: t, until: t + leapMs };
+    }
+    ultDesc() {
+      return "지정한 곳에 거리에 따라 " + num(ULT.bsLeapMinMs / CLOCK.scale / 1000) + "~" + secs(ULT.bsLeapMaxMs) + " 뒤 착지. 반경 " + ULT.bsR + "의 적은 " + ULT.bsDmg + "의 피해를 입고 " + secs(ULT.bsStunMs) + "간 기절";
+    }
+    passiveDesc() {
+      var c = this.data;
+      return "기본 공격 시 멈춰 서서 표시된 곳을 " + secs(c.windup) + " 뒤 타격. 맞은 적은 " + secs(c.fx.stunMs) + "간 기절";
+    }
+    basicDesc() {
+      var c = this.data;
+      return "앞쪽 길이 " + c.range + "·폭 " + c.width + "의 지역을 망치로 내려쳐 " + c.dmg + "의 피해";
+    }
+    attackClip(v, E, t) {
+      return ["Melee_1H_Attack_Chop", 1.6];
+    }
+  }
+  class PriestType extends CharacterType {
+    ultDesc() {
+      return "지정한 곳에 " + secs(ULT.bhDelay) + " 뒤 " + secs(ULT.bhDur) + "간 유지되는 반경 " + ULT.bhR + "의 블랙홀 생성. 적은 중심으로 끌려감";
+    }
+    passiveDesc() {
+      var c = this.data;
+      return "기본 공격에 맞은 아군은 체력 " + c.heal + " 회복";
+    }
+    attackClip(v, E, t) {
+      return ["Ranged_Magic_Shoot", 1.4];
+    }
+  }
+  class ShamanType extends CharacterType {
+    cast(E, ang, reach, t) {
+      E.ultUntil = t + 600;
+      E.skillDur = ULT.dmDur;
+      E.pending = null;
+      room.ref.child("effects").push({ type: "domain", team: E.team, owner: E.id, x: Math.round(E.x), y: Math.round(E.y), r: ULT.dmR, grow: ULT.dmGrowMs, dur: ULT.dmDur,
+                                       stun: ULT.dmStunMs, bolt: ULT.dmBoltDmg, createdAt: t });
+      revealBriefly(E.id, t);
+    }
+    ultDesc() {
+      return "자신을 중심으로 " + secs(ULT.dmGrowMs) + "간 반경 " + ULT.dmR + "까지 커진 뒤 " + secs(ULT.dmDur - ULT.dmGrowMs) + "간 유지되는 영역 생성. 영역이 커지는 과정에서 닿은 적은 " + secs(ULT.dmStunMs) +
+      "간 기절하고, 기절이 풀릴 때 " + ULT.dmBoltDmg + "의 피해. 영역 안에서 주술사의 기본 공격은 영역 내 가장 가까운 적 1명에게 최대 체력의 " + pctOf(ULT.dmStrikeMaxHpRate) + "%의 피해를 입히고 " + secs(ULT.dmStrikeStunMs) + "간 기절";
+    }
+    passiveDesc() {
+      return "공격이 적중할 때마다 대상에게 저주 1회 부여. 저주가 " + ULT.cuStacks + "회 중첩되면 폭발하여 " + ULT.cuBoomDmg + "의 피해. " + secs(ULT.cuExpireMs) + " 이상 갱신되지 않으면 저주 소멸";
+    }
+    basicDesc() {
+      var c = this.data;
+      return "앞으로 사거리 " + c.range + "·폭 " + c.width + "의 검은 구름 파동. 맞은 적은 " + c.dmg + "의 피해";
+    }
+    attackClip(v, E, t) {
+      return ["Melee_1H_Attack_Stab", 2.2];
+    }
+  }
+  class ClericType extends CharacterType {
+    cast(E, ang, reach, t) {
+      E.ultUntil = t + ULT.rvCastMs;
+      E.buffUntil = t + ULT.rvDur;
+      E.skillDur = ULT.rvDur;
+      E.pending = null;
+      var fullHeal = E.maxHp - E.hp;
+      if (fullHeal > 0) { E.hp = E.maxHp; E.heal = (E.heal || 0) + fullHeal; if (E === MATCH.me) sfx("heal"); }
+      room.ref.child("effects").push({ type: "rev", team: E.team, owner: E.id, dur: ULT.rvDur, tick: ULT.rvTick, heal: ULT.rvHeal, dmg: ULT.rvDmg, createdAt: t });
+      revealBriefly(E.id, t);
+    }
+    ultDesc() {
+      return "아군의 체력을 " + CHARS.cleric.healGauge + " 회복시키면 사용 가능. 사용 시 자신의 체력을 모두 회복하고 " + secs(ULT.rvDur) + "간 제자리에서 기도. 아군 전체는 1초당 체력 " + ULT.rvHeal + " 회복, 적 전체는 1초당 " + ULT.rvDmg + "의 피해. 기절·넉백·끌어당김을 당하면 취소";
+    }
+    passiveDesc() {
+      var c = this.data;
+      return "기본 공격은 조준 없이 반경 " + c.range + " 안에서 체력 비율이 가장 낮은 아군의 체력 " + c.graceHeal + " 회복";
+    }
+    basicDesc() {
+      var c = this.data;
+      return "반경 " + c.range + " 안에서 체력 비율이 가장 낮은 아군 1명의 체력 " + c.graceHeal + " 회복";
+    }
+    attackClip(v, E, t) {
+      return ["Melee_1H_Attack_Chop", 1.8];
+    }
+  }
+  class HitmanType extends CharacterType {
+    cast(E, ang, reach, t) {
+      E.angle = ang;
+      E.ultUntil = t + 300;
+      E.cdUntil = Math.max(E.cdUntil, t + 300);
+      E.pending = null;
+      emitShots(E, ang, true);
+    }
+    ultDesc() {
+      return "사거리 " + ULT.exRange + "의 칼날 발사. 처음 맞은 적은 " + ULT.exDmg + "의 피해를 입고 " + secs(ULT.exStunMs) + "간 기절, 그 위치로 순간이동";
+    }
+    passiveDesc() {
+      var c = this.data;
+      return "기본 공격 시 " + c.dashRange + " 돌진 후 반경 " + c.range + " 회전베기";
+    }
+    basicDesc() {
+      var c = this.data;
+      return "앞으로 " + c.dashRange + " 돌진하며 폭 " + c.dashWidth + " 안의 적에게 " + c.dashDmg + "의 피해. 이어서 반경 " + c.range + "의 회전베기로 " + c.dmg + "의 피해";
+    }
+    attackClip(v, E, t) {
+      if (E.ultUntil > E.atkAt) return ["Throw", 2.6];
+      var hc = CHARS.hitman, finishing = E.atkAt - (v.dashAtkAt || 0) < hc.dashMs + hc.finishDelay + 200;
+      if (finishing) return ["Melee_Dualwield_Attack_Slice", 2.2];
+      v.dashAtkAt = E.atkAt;
+      return ["Melee_Dualwield_Attack_Stab", 1.4];
+    }
+  }
+  class GuardianType extends ArcMeleeType {
+    cast(E, ang, reach, t) {
+      E.atkAt = t;
+      E.ultUntil = t + 500;
+      room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(E.angle), radius: ULT.gdR, arc: Math.PI * 2,
+                                        dmg: ULT.gdDmg, u: 1, slam: 1, kb: ULT.gdKb, fx: { slowMs: ULT.gdSlowMs, slowMul: ULT.gdSlowMul }, createdAt: t });
+      revealBriefly(E.id, t);
+    }
+    ultDesc() {
+      return "자신을 중심으로 반경 " + ULT.gdR + "의 적을 모두 " + ULT.gdKb + "만큼 밀어내며 " + ULT.gdDmg + "의 피해. 밀려난 적은 " + secs(ULT.gdSlowMs) + "간 " + slowPct(ULT.gdSlowMul);
+    }
+    passiveDesc() {
+      var c = this.data;
+      return "기본 공격에 맞은 적은 " + secs(c.fx.slowMs) + "간 " + slowPct(c.fx.slowMul);
+    }
+    attackClip(v, E, t) {
+      return E.ultUntil > E.atkAt ? ["Melee_2H_Attack_Spin", 1.4] : ["Melee_2H_Attack_Slice", 1.5];
+    }
+  }
+  class FrostType extends MagicShooterType {
+    get shotName() { return "얼음 구슬"; }
+    cast(E, ang, reach, t) {
+      E.ultUntil = t + ULT.frBzDelay + 500;
+      E.skillDur = ULT.frBzDelay + ULT.frBzDur;
+      E.pending = null;
+      room.ref.child("effects").push({ type: "storm", team: E.team, owner: E.id, x: Math.round(E.x), y: Math.round(E.y),
+                                       r: ULT.frBzR, dur: ULT.frBzDur, delay: ULT.frBzDelay, createdAt: t });
+    }
+    ultDesc() {
+      return "자신을 중심으로 " + secs(ULT.frBzDur) + "간 유지되는 반경 " + ULT.frBzR + "의 눈보라 생성. " + (ULT.frBzHides ? "눈보라 안의 아군은 은신 상태가 되고, " : "") + "적은 1초당 " +
+      ULT.frBzDmg + "의 피해를 입고 패시브 1중첩";
+    }
+    passiveDesc() {
+      return "기본 공격에 맞은 적은 " + secs(ULT.frSlowMs) + "간 " + slowPct(ULT.frSlowMul) + ". " + secs(ULT.frSlowMs) + " 안에 다시 맞을 때마다 둔화가 " + Math.round(ULT.frSlowStep * 100) + "%p씩 커지고 3중첩이 되면 " + secs(ULT.frFreezeMs) + "간 기절하며 최대 체력의 " + pctOf(ULT.frFreezeMaxHpRate) + "%의 피해. 기절이 끝난 뒤부터 다시 중첩";
+    }
+  }
+  class DancerType extends CharacterType {
+    get shotName() { return "단검"; }
+    cast(E, ang, reach, t) {
+      E.buffUntil = t + ULT.bwDur;
+      E.skillDur = ULT.bwDur;
+      E.pending = null;
+    }
+    ultDesc() {
+      return secs(ULT.bwDur) + "간 회전하며 " + ultSpeedUpText(CHARS.dancer) + ". 반경 " + ULT.bwR + "의 적은 " + secs(ULT.bwTick) + "마다 " + ULT.bwDmg + "의 피해. 기절·넉백을 당하면 취소";
+    }
+    passiveDesc() {
+      return "던진 단검이 적에게 맞거나 사거리 끝에 닿은 곳에서 " + secs(ULT.bdDelay) + " 뒤 회전해 반경 " + ULT.bdR + "의 적에게 " + ULT.bdDmg + "의 피해. 적을 처치하면 게이지 " + ULT.bwKillGauge + " 회복, 스킬 중 처치는 스킬이 끝난 뒤 회복";
+    }
+    attackClip(v, E, t) {
+      return ["Throw", 2.2];
+    }
+  }
+  class StormbowType extends CharacterType {
+    get shotName() { return "번개 화살"; }
+    cast(E, ang, reach, t) {
+      E.buffUntil = t + ULT.ocDur;
+      E.skillDur = ULT.ocDur;
+      E.cdUntil = Math.min(E.cdUntil, t + CHARS.stormbow.cd / ULT.ocRate);
+      room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(E.angle), radius: ULT.ocR, arc: Math.PI * 2,
+                                        dmg: ULT.ocDmg, u: 1, slam: 1, zap: 1, fx: { stunMs: ULT.ocStunMs }, createdAt: t });
+      revealBriefly(E.id, t);
+    }
+    ultDesc() {
+      return "자신을 중심으로 반경 " + ULT.ocR + "의 번개 막 생성. 적은 " + ULT.ocDmg + "의 피해를 입고 " + secs(ULT.ocStunMs) + "간 기절. 이후 " + secs(ULT.ocDur) + "간 " +
+      attackText(CHARS.stormbow.cd / ULT.ocRate, num(1000 / CHARS.stormbow.cd * ULT.ocRate)) + ", 이동속도 " + shownSpeed(ULT.ocSpeedBonus) + "·사거리 " + ULT.ocRangeBonus + " 증가, 기본 공격이 적중할 때마다 패시브 번개 발동";
+    }
+    passiveDesc() {
+      var c = this.data;
+      return "기본 공격이 " + c.chain.every + "번 적중할 때마다 맞은 적과 그 주변 반경 " + c.chain.r + "의 가까운 적 " + c.chain.count + "명에게 번개가 튕겨 " + c.chain.dmg + "의 피해";
+    }
+    attackClip(v, E, t) {
+      return ["Ranged_Bow_Release", overcharged(E, E.atkAt) ? 5 : 3.4];
+    }
+  }
+  class CharacterRegistry {
+    constructor() {
+      this.fallback = new CharacterType("");
+      this.byId = {
+        warrior: new WarriorType("warrior"),
+        duelist: new DuelistType("duelist"),
+        knight: new KnightType("knight"),
+        ranger: new RangerType("ranger"),
+        mage: new MageType("mage"),
+        rogue: new RogueType("rogue"),
+        necro: new NecroType("necro"),
+        sniper: new SniperType("sniper"),
+        thrower: new ThrowerType("thrower"),
+        lancer: new LancerType("lancer"),
+        blacksmith: new BlacksmithType("blacksmith"),
+        priest: new PriestType("priest"),
+        shaman: new ShamanType("shaman"),
+        cleric: new ClericType("cleric"),
+        hitman: new HitmanType("hitman"),
+        guardian: new GuardianType("guardian"),
+        frost: new FrostType("frost"),
+        dancer: new DancerType("dancer"),
+        stormbow: new StormbowType("stormbow")
+      };
+    }
+    of(id) { return this.byId[id] || (this.byId[id] = new CharacterType(id)); }
+  }
+  var CHAR_TYPES = new CharacterRegistry();
   class Unit {
     isStunned(t) { return this.stunUntil > (t || now()); }
     isSlowed(t) { return this.slowUntil > (t || now()); }
@@ -4033,123 +4427,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (E.gauge < GAUGE_MAX || !E.alive || E.isStunned()) return;
     E.gauge = 0;
     var t = now();
-    if (E.char === "ranger") {
-      E.angle = ang; E.burst = { until: t + (ULT.mkCount - 1) * ULT.mkGap };
-      E.ultUntil = t + ULT.mkCount * ULT.mkGap + 200;
-      emitShots(E, ang, true);
-    } else if (E.char === "mage") {
-      var spot = burstSpot(E, ang, reach);
-      E.angle = Math.atan2(spot.y - E.y, spot.x - E.x);
-      E.ultUntil = t + 450;
-      room.ref.child("effects").push({ type: "burst", team: E.team, owner: E.id, x: Math.round(spot.x), y: Math.round(spot.y),
-                                       r: ULT.mbR, dmg: ULT.mbDmg, delay: ULT.mbDelay, createdAt: t });
-      revealBriefly(E.id, t);
-    } else if (E.char === "warrior") {
-      E.buffUntil = t + ULT.bzDur;
-      E.skillDur = ULT.bzDur;
-    } else if (E.char === "knight") {
-      E.buffUntil = t + ULT.tkDur;
-      E.skillDur = ULT.tkDur;
-      E.slamAt = E.buffUntil;
-    } else if (E.char === "rogue") {
-      E.ultUntil = t + ULT.asSmokeMs;
-      E.stealthUntil = t + ULT.asSmokeMs + ULT.asDur;
-      E.skillDur = ULT.asSmokeMs + ULT.asDur;
-      FX_VIEW.smoke(E.x, E.y);
-    } else if (E.char === "necro") {
-      E.angle = ang;
-      E.ultUntil = t + 450;
-      summonMinions(E, ang, t);
-    } else if (E.char === "hitman") {
-      E.angle = ang;
-      E.ultUntil = t + 300;
-      E.cdUntil = Math.max(E.cdUntil, t + 300);
-      E.pending = null;
-      emitShots(E, ang, true);
-    } else if (E.char === "sniper") {
-      E.angle = ang;
-      E.ultUntil = t + 450;
-      E.cdUntil = Math.max(E.cdUntil, t + 450);
-      emitShots(E, ang, true);
-    } else if (E.char === "thrower") {
-      var fogFlightMs = throwPoison(E, ang, reach, true);
-      E.ultUntil = t + 450;
-      E.cdUntil = Math.max(E.cdUntil, t + 450);
-      E.skillDur = fogFlightMs + ULT.fgDur;
-    } else if (E.char === "lancer") {
-      E.angle = ang; E.atkAt = t;
-      E.ultUntil = t + ULT.lnWind;
-      E.cdUntil = Math.max(E.cdUntil, t + ULT.lnWind + 250);
-      E.pending = null;
-      var lanceCast = { team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(ang), len: Math.round(lineReach(E.x, E.y, ang, ULT.lnLen)),
-                        width: ULT.lnW, dmg: 0, u: 1, wind: ULT.lnWind, createdAt: t };
-      E.lance = { d: lanceCast };
-      room.ref.child("meleeHits").push(lanceCast);
-    } else if (E.char === "blacksmith") {
-      var landing = burstSpot(E, ang, reach, ULT.bsCast, ULT.bsMin);
-      resolve(landing);
-      E.angle = Math.atan2(landing.y - E.y, landing.x - E.x);
-      var leapMs = hammerLeapMs(hyp(landing.x - E.x, landing.y - E.y));
-      E.leapAt = t;
-      E.ultUntil = t + leapMs;
-      E.cdUntil = Math.max(E.cdUntil, t + leapMs + 250);
-      E.pending = null; E.slash = null;
-      E.leap = { sx: E.x, sy: E.y, tx: landing.x, ty: landing.y, at: t, until: t + leapMs };
-    } else if (E.char === "guardian") {
-      E.atkAt = t;
-      E.ultUntil = t + 500;
-      room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(E.angle), radius: ULT.gdR, arc: Math.PI * 2,
-                                        dmg: ULT.gdDmg, u: 1, slam: 1, kb: ULT.gdKb, fx: { slowMs: ULT.gdSlowMs, slowMul: ULT.gdSlowMul }, createdAt: t });
-      revealBriefly(E.id, t);
-    } else if (E.char === "shaman") {
-      E.ultUntil = t + 600;
-      E.skillDur = ULT.dmDur;
-      E.pending = null;
-      room.ref.child("effects").push({ type: "domain", team: E.team, owner: E.id, x: Math.round(E.x), y: Math.round(E.y), r: ULT.dmR, grow: ULT.dmGrowMs, dur: ULT.dmDur,
-                                       stun: ULT.dmStunMs, bolt: ULT.dmBoltDmg, createdAt: t });
-      revealBriefly(E.id, t);
-    } else if (CHARS[E.char].ultKind === "blackhole") {
-      var holeSpot = burstSpot(E, ang, reach, ULT.bhCast, ULT.bhMin);
-      E.angle = Math.atan2(holeSpot.y - E.y, holeSpot.x - E.x);
-      E.ultUntil = t + 450;
-      E.skillDur = ULT.bhDelay + ULT.bhDur;
-      room.ref.child("effects").push({ type: "hole", team: E.team, owner: E.id, x: Math.round(holeSpot.x), y: Math.round(holeSpot.y),
-                                       r: ULT.bhR, dur: ULT.bhDur, delay: ULT.bhDelay, createdAt: t });
-      revealBriefly(E.id, t);
-    } else if (E.char === "frost") {
-      E.ultUntil = t + ULT.frBzDelay + 500;
-      E.skillDur = ULT.frBzDelay + ULT.frBzDur;
-      E.pending = null;
-      room.ref.child("effects").push({ type: "storm", team: E.team, owner: E.id, x: Math.round(E.x), y: Math.round(E.y),
-                                       r: ULT.frBzR, dur: ULT.frBzDur, delay: ULT.frBzDelay, createdAt: t });
-    } else if (E.char === "cleric") {
-      E.ultUntil = t + ULT.rvCastMs;
-      E.buffUntil = t + ULT.rvDur;
-      E.skillDur = ULT.rvDur;
-      E.pending = null;
-      var fullHeal = E.maxHp - E.hp;
-      if (fullHeal > 0) { E.hp = E.maxHp; E.heal = (E.heal || 0) + fullHeal; if (E === MATCH.me) sfx("heal"); }
-      room.ref.child("effects").push({ type: "rev", team: E.team, owner: E.id, dur: ULT.rvDur, tick: ULT.rvTick, heal: ULT.rvHeal, dmg: ULT.rvDmg, createdAt: t });
-      revealBriefly(E.id, t);
-    } else if (E.char === "duelist") {
-      E.buffUntil = t + ULT.rmDur;
-      E.skillDur = ULT.rmDur;
-      E.cdUntil = E.dash ? E.dash.at + E.dash.ms : t;
-      E.cdDur = 1000 / ULT.rmRate;
-      if (E.pending) E.pending.until = Math.max(E.pending.until, E.cdUntil + 350);
-    } else if (E.char === "stormbow") {
-      E.buffUntil = t + ULT.ocDur;
-      E.skillDur = ULT.ocDur;
-      E.cdUntil = Math.min(E.cdUntil, t + CHARS.stormbow.cd / ULT.ocRate);
-      room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(E.angle), radius: ULT.ocR, arc: Math.PI * 2,
-                                        dmg: ULT.ocDmg, u: 1, slam: 1, zap: 1, fx: { stunMs: ULT.ocStunMs }, createdAt: t });
-      revealBriefly(E.id, t);
-    } else if (E.char === "dancer") {
-      E.buffUntil = t + ULT.bwDur;
-      E.skillDur = ULT.bwDur;
-      E.pending = null;
-    }
-    if (E.skillDur && E.char !== "ranger" && E.char !== "mage" && E.char !== "necro") E.skillUntil = t + E.skillDur;
+    var type = CHAR_TYPES.of(E.char);
+    type.cast(E, ang, reach, t);
+    if (E.skillDur && type.startsSkillTimer) E.skillUntil = t + E.skillDur;
     if (hear(E)) sfx("ult");
     MATCH.game.forceNet = true;
   }
@@ -5407,30 +5687,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return 4 * ULT.bsHop * k * (1 - k);
     }
     attackClip(v, E, t) {
-      if (E.char === "warrior") return ["Melee_1H_Attack_Slice_Diagonal", E.isBerserk(t) ? 1.9 : 1.3];
-      if (E.char === "knight") return E.ultUntil > E.atkAt ? ["Melee_1H_Attack_Chop", 1.6] : ["Melee_1H_Attack_Slice_Horizontal", 1.5];
-      if (E.char === "ranger") return ["Ranged_Bow_Release", 3];
-      if (E.char === "mage" || E.char === "necro" || E.char === "frost") return ["Ranged_Magic_Shoot", 1.8];
-      if (E.char === "sniper") return FIGHTER_VIEW.sniperShotClip(E);
-      if (E.char === "stormbow") return ["Ranged_Bow_Release", overcharged(E, E.atkAt) ? 5 : 3.4];
-      if (E.char === "thrower") return ["Throw", E.ultUntil > E.atkAt ? 1.6 : 2.2];
-      if (E.char === "lancer") return ["Melee_2H_Attack_Stab", KIT.clips.Melee_2H_Attack_Stab.duration * 1000 / (E.ultUntil > E.atkAt ? 520 : 800)];
-      if (E.char === "blacksmith") return ["Melee_1H_Attack_Chop", 1.6];
-      if (E.char === "guardian") return E.ultUntil > E.atkAt ? ["Melee_2H_Attack_Spin", 1.4] : ["Melee_2H_Attack_Slice", 1.5];
-      if (E.char === "priest") return ["Ranged_Magic_Shoot", 1.4];
-      if (E.char === "shaman") return ["Melee_1H_Attack_Stab", 2.2];
-      if (E.char === "cleric") return ["Melee_1H_Attack_Chop", 1.8];
-      if (E.char === "hitman") {
-        if (E.ultUntil > E.atkAt) return ["Throw", 2.6];
-        var hc = CHARS.hitman, finishing = E.atkAt - (v.dashAtkAt || 0) < hc.dashMs + hc.finishDelay + 200;
-        if (finishing) return ["Melee_Dualwield_Attack_Slice", 2.2];
-        v.dashAtkAt = E.atkAt;
-        return ["Melee_Dualwield_Attack_Stab", 1.4];
-      }
-      if (E.char === "duelist") return ["Running_A", KIT.clips.Running_A.duration * 1000 / lungeDashMs(E, E.atkAt)];
-      if (E.char === "dancer" || !enemyInMelee(E)) return ["Throw", 2.2];
-      if (v.wasStealth) { v.combo = 1; return ["Melee_Dualwield_Attack_Stab", 2.2]; }
-      return [ROGUE_COMBO[v.combo++ % 2], 2.4];
+      return CHAR_TYPES.of(E.char).attackClip(v, E, t);
     }
     animate(v, E, t, dt, hurt) {
       if (!v.kit) return;
