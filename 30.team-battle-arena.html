@@ -1154,6 +1154,16 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.stateByKey = {}; this.hitSubs = {}; this.lastHp = {};
       this.hudShown = { k: -1, d: -1, a: -1, dmg: -1 };
     }
+    leave() {
+      this.remotes = {}; this.remoteShots = {}; this.melee = {}; this.fx = []; this.game = null; this.me = null;
+      this.bots = {}; this.stateByKey = {}; this.shots = []; this.hitSubs = {};
+      FIELD.reset();
+    }
+    startRound() {
+      this.bots = {}; this.remotes = {}; this.fx = []; this.ccPending = {};
+      this.hudShown = { k: -1, d: -1, a: -1, dmg: -1 }; this.handled = {};
+      FIELD.reset();
+    }
   }
   var MATCH = new MatchState();
   var CLOCK_PINGS = 5, CLOCK_GAP_MS = 500, CLOCK_KEEP = 10;
@@ -1383,7 +1393,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var ref = db.ref(ROOT + "/" + code);
     room = { code: code, ref: ref, mode: null, map: "forest", status: "lobby", host: null, startAt: 0, winner: null, endedAt: 0, final: null, roster: null, draft: null, bans: null, statsNote: null };
     FX_VIEW.clear3d();
-    P = {}; MATCH.remotes = {}; MATCH.remoteShots = {}; MATCH.melee = {}; MATCH.fx = []; FIELD.reset(); MATCH.game = null; MATCH.me = null; MATCH.bots = {}; MATCH.stateByKey = {}; MATCH.shots = []; MATCH.hitSubs = {};
+    P = {}; MATCH.leave();
     ref.child("players/" + myId).onDisconnect().remove();
     ref.child("ping/" + myId).onDisconnect().remove();
     ref.child("pong/" + myId).onDisconnect().remove();
@@ -1487,7 +1497,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (room) { leaving = true; unsubAll(); try { room.ref.child("players/" + myId).onDisconnect().cancel(); } catch (e) {} }
     room = null; resetLocal(); showScreen("start"); startMsg(msg || "");
   }
-  function resetLocal() { applyTimeScale(SLOW_REQUEST); FX_VIEW.clear3d(); FIELD.reset(); P = {}; MATCH.remotes = {}; MATCH.remoteShots = {}; MATCH.melee = {}; MATCH.fx = []; MATCH.game = null; MATCH.me = null; MATCH.bots = {}; MATCH.stateByKey = {}; MATCH.shots = []; MATCH.hitSubs = {}; joy.id = null; aim.id = null; specResultHeld = false; setText($("btnAgain"), "다시하기"); }
+  function resetLocal() { applyTimeScale(SLOW_REQUEST); FX_VIEW.clear3d(); P = {}; MATCH.leave(); joy.id = null; aim.id = null; specResultHeld = false; setText($("btnAgain"), "다시하기"); }
   window.addEventListener("pagehide", function () { saveResume(); if (room) { try { room.ref.child("players/" + myId).remove(); } catch (e) {} } });
   document.addEventListener("visibilitychange", function () { if (document.hidden) saveResume(); });
 
@@ -2709,7 +2719,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     FX_VIEW.clear3d();
     MATCH.game = { startAt: room.startAt, endSent: false, playingSent: false, lastNet: 0, sent: {}, finalSent: false, beeped: -1 };
     MATCH.me = isSpec() ? null : makeEnt(myId, P[myId]);
-    MATCH.bots = {}; MATCH.remotes = {}; MATCH.fx = []; MATCH.ccPending = {}; MATCH.hudShown = { k: -1, d: -1, a: -1, dmg: -1 }; FIELD.reset(); MATCH.handled = {};
+    MATCH.startRound();
     MATCH.lastHp = {};
     clearKillFeed();
     show($("endOv"), false);
@@ -7252,9 +7262,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       isIdle: function () { return !room; },
       timeScale: function () { return CLOCK.scale; },
       begin: function (fakeRoom, players, bots, clockMs) {
-        CLOCK.testTime = clockMs; room = fakeRoom; P = players; MATCH.bots = bots; MATCH.me = null; MATCH.remotes = {};
+        CLOCK.testTime = clockMs; room = fakeRoom; P = players; MATCH.startRound(); MATCH.bots = bots; MATCH.me = null;
         MATCH.game = { startAt: fakeRoom.startAt, endSent: false, playingSent: false, lastNet: 0, sent: {}, finalSent: false, beeped: -1 };
-        MATCH.remoteShots = {}; MATCH.shots = []; FIELD.reset(); MATCH.melee = {}; MATCH.fx = []; MATCH.handled = {}; MATCH.ccPending = {};
+        MATCH.remoteShots = {}; MATCH.shots = []; MATCH.melee = {};
       },
       ccPending: function () { return MATCH.ccPending; },
       mvpScore: HUD.mvpScore.bind(HUD),
