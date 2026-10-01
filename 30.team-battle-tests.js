@@ -3779,12 +3779,56 @@ function collectResults(api) {
       if (JSON.stringify([api.CHARS, api.ULT]) !== once) bad.push("거듭 적용하면 값이 달라짐");
       api.applyTimeScale(0.5);
       if (api.CHARS.knight.cd !== 900 || api.CLOCK.scale !== 0.5) bad.push("0.5 배율");
+      var T = api.TIMESCALE;
+      api.applyTimeScale(0.7);
+      if (T.matchMs !== 90000 * 0.7 || T.respawnMs !== 3000 * 0.7 || T.respawnProtectMs !== 2500 * 0.7 || T.burnTickMs !== 700 || T.regenTickMs !== 700) bad.push("0.7 배율 시간 필드 " + JSON.stringify([T.matchMs, T.respawnMs, T.respawnProtectMs, T.burnTickMs, T.regenTickMs]));
+      api.applyTimeScale(0.7);
+      if (T.burnTickMs !== 700 || T.matchMs !== 90000 * 0.7) bad.push("거듭 적용하면 시간 필드가 달라짐");
+      api.applyTimeScale(1);
+      if (T.matchMs !== 90000 || T.respawnMs !== 3000 || T.respawnProtectMs !== 2500 || T.burnTickMs !== 1000 || T.regenTickMs !== 1000) bad.push("1 배율 시간 필드 " + JSON.stringify([T.matchMs, T.respawnMs, T.respawnProtectMs, T.burnTickMs, T.regenTickMs]));
+      api.applyTimeScale(0.5);
+      if (T.respawnMs !== 1500 || T.burnTickMs !== 500) bad.push("0.5 배율 시간 필드");
       [1, 2, 0, -1, NaN].forEach(function (v) { api.applyTimeScale(v); if (api.CLOCK.scale !== 1 || JSON.stringify([api.CHARS, api.ULT]) !== before) bad.push("배율 " + v + " 는 원래 값으로 돌아와야 함"); });
     } finally { api.applyTimeScale(scale); }
     if (JSON.stringify([api.CHARS, api.ULT]) !== before || api.matchMs() !== ms) bad.push("끝난 뒤 원상 복구 안 됨");
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "0.7·0.5 적용, 1·잘못된 값은 원상 복구, 거듭 적용 불변");
   });
 
+  run(CONNG, "연결 설정(BACKEND): 설정이 준비되면 주소 끝 슬래시를 뗀 채 연결하고, 준비 안 됐으면 건드리지 않으며, 연결이 던지면 db 를 비우는가", function (done) {
+    var B = api.BACKEND, bad = [], saved = { conf: B.conf, db: B.db }, firebaseBefore = window.firebase, calls = [], fakeDb = { name: "가짜" };
+    try {
+      window.firebase = { initializeApp: function (o) { calls.push(o); }, database: function () { return fakeDb; } };
+      B.conf = { isReady: function () { return false; } }; B.db = null; B.connect();
+      if (B.db !== null || calls.length) bad.push("준비 안 됐는데 연결함");
+      B.conf = { isReady: function () { return true; }, API_KEY: "k", AUTH_DOMAIN: "a.test", DB_URL: "https://x.test///" }; B.connect();
+      if (B.db !== fakeDb || calls.length !== 1 || calls[0].databaseURL !== "https://x.test" || calls[0].apiKey !== "k" || calls[0].authDomain !== "a.test") bad.push("연결 인자 " + JSON.stringify(calls));
+      window.firebase = { initializeApp: function () { throw new Error("실패"); }, database: function () { return fakeDb; } };
+      B.connect();
+      if (B.db !== null) bad.push("연결이 던졌는데 db 가 남음");
+      var before = api.setDb(fakeDb), conf = api.setConf({ x: 1 }), link = api.setTestLink(true);
+      if (B.db !== fakeDb || B.conf.x !== 1 || B.isTestLink !== true) bad.push("검사용 setDb·setConf·setTestLink 가 BACKEND 필드를 못 바꿈");
+      api.setDb(before); api.setConf(conf); api.setTestLink(link);
+    } finally { B.conf = saved.conf; B.db = saved.db; window.firebase = firebaseBefore; }
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "준비 안 됨 건드리지 않음, 슬래시 제거 연결, 던지면 db 비움, 검사용 교체");
+  });
+  run(SOUNDG, "소리(마지막 10초): 초가 바뀔 때마다 한 번만 소리를 내고, 끝나거나 10초 밖이면 초기화하는가", function (done) {
+    var el = { className: "", offsetWidth: 0 }, bad = [], played = 0, sfxBefore = api.SOUND.sfx, H = api.HUD;
+    api.SOUND.sfx = function (k) { if (k === "count") played++; };
+    try {
+      H.lastCountSec = 0;
+      H.finalCountdown(el, 12000);
+      if (played !== 0 || el.className !== "") bad.push("10초 밖인데 소리 " + played + " " + el.className);
+      H.finalCountdown(el, 10000); H.finalCountdown(el, 9500);
+      if (played !== 1 || H.lastCountSec !== 10 || el.className !== "low tick") bad.push("10초 첫 소리 " + played + " " + H.lastCountSec + " " + el.className);
+      H.finalCountdown(el, 9000);
+      if (played !== 2 || H.lastCountSec !== 9) bad.push("9초 소리 " + played + " " + H.lastCountSec);
+      H.finalCountdown(el, 0);
+      if (H.lastCountSec !== 0 || el.className !== "") bad.push("끝나면 초기화 " + H.lastCountSec + " " + el.className);
+      H.finalCountdown(el, 9000);
+      if (played !== 3 || H.lastCountSec !== 9) bad.push("다시 시작하면 소리 " + played);
+    } finally { api.SOUND.sfx = sfxBefore; H.lastCountSec = 0; }
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "초마다 한 번, 밖·끝에서 초기화");
+  });
   run(SOUNDG, "소리: 모든 효과음 이름과 연속 처치음을 불러도 오류가 없고, 검사·시뮬레이션 주소에서는 소리 엔진을 만들지 않는가", function (done) {
     var bad = [];
     try {
