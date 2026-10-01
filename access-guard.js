@@ -130,7 +130,22 @@
     }
     return false;
   }
+  /* 글꼴마다 글자 위아래 여백이 달라 가운데 맞춘 글씨가 위로 쏠려 보이므로,
+     한글 글자 잉크의 중심을 재서 글자 칸을 버튼 한가운데로 옮깁니다.
+     화살표는 글꼴 대신 그림(svg)으로 그려 다른 글꼴이 줄 높이를 흔들지 못하게 합니다. */
+  function centerHomeLabel(label) {
+    try {
+      var cs = getComputedStyle(label), size = parseFloat(cs.fontSize);
+      var c = document.createElement("canvas").getContext("2d");
+      c.font = cs.fontWeight + " " + cs.fontSize + " " + cs.fontFamily;
+      var m = c.measureText(label.textContent);
+      if (m.fontBoundingBoxAscent === undefined || m.actualBoundingBoxAscent === undefined) return;
+      var baseline = (size - (m.fontBoundingBoxAscent + m.fontBoundingBoxDescent)) / 2 + m.fontBoundingBoxAscent;
+      label.style.top = (size / 2 - (baseline - (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2)) + "px";
+    } catch (e) {}
+  }
   function paintHomeButton(home) {
+    centerHomeLabel(home.querySelector("span"));
     var light = pageBackgroundIsLight();
     home.style.background = light ? "rgba(0,0,0,0.07)" : "rgba(255,255,255,0.14)";
     home.style.color = light ? "rgba(27,43,32,0.78)" : "rgba(255,255,255,0.86)";
@@ -146,23 +161,35 @@
     /* 자료 화면을 가리지 않도록 본문 위쪽에 자리를 만들고, 그 자리에 버튼을 띄웁니다. */
     var space = document.createElement("style");
     space.textContent =
-      "body{padding-top:calc(46px + env(safe-area-inset-top, 0px)) !important;}";
+      "body{padding-top:calc(46px + env(safe-area-inset-top, 0px)) !important;}" +
+      "[data-guard-home]{display:inline-flex;}";
     (document.head || document.documentElement).appendChild(space);
 
     var home = document.createElement("a");
     home.setAttribute("data-guard-home", "1");
     home.href = homeHref;
-    home.textContent = "\u2190 \uBAA9\uB85D\uC73C\uB85C";   /* ← 목록으로 */
+    var arrow = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    arrow.setAttribute("width", "14"); arrow.setAttribute("height", "10"); arrow.setAttribute("viewBox", "0 0 14 10");
+    arrow.setAttribute("aria-hidden", "true"); arrow.style.cssText = "flex:none;display:block";
+    var shaft = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    shaft.setAttribute("d", "M13 5H2M5.5 1.5L2 5l3.5 3.5"); shaft.setAttribute("fill", "none");
+    shaft.setAttribute("stroke", "currentColor"); shaft.setAttribute("stroke-width", "1.7");
+    shaft.setAttribute("stroke-linecap", "round"); shaft.setAttribute("stroke-linejoin", "round");
+    arrow.appendChild(shaft);
+    var label = document.createElement("span");
+    label.textContent = "목록으로";   /* 목록으로 */
+    label.style.cssText = "position:relative;display:block;line-height:1";
+    home.appendChild(arrow); home.appendChild(label);
     home.style.cssText = [
       "position:fixed",
       "top:calc(8px + env(safe-area-inset-top, 0px))",
       "left:10px",
       "z-index:2147483000",
-      "display:inline-flex",
       "align-items:center",
       "justify-content:center",
       "height:32px",
-      "padding:2px 12px 0",
+      "padding:0 12px",
+      "gap:5px",
       "box-sizing:border-box",
       "border-radius:6px",
       "font-size:13px",
@@ -175,6 +202,7 @@
     paintHomeButton(home);
     window.addEventListener("load", function () { paintHomeButton(home); setTimeout(function () { paintHomeButton(home); }, 1200); });
     document.body.appendChild(home);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { paintHomeButton(home); });
   }
 
   /* 저작권 표시는 게임 화면을 가리지 않도록 여기서 붙이지 않습니다.
