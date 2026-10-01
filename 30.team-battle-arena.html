@@ -2586,7 +2586,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     get startsSkillTimer() { return true; }
     cast(E, ang, reach, t) {
       if (this.data.ultKind !== "blackhole") return;
-      var holeSpot = burstSpot(E, ang, reach, ULT.bhCast, ULT.bhMin);
+      var holeSpot = ATTACK.burstSpot(E, ang, reach, ULT.bhCast, ULT.bhMin);
       E.angle = Math.atan2(holeSpot.y - E.y, holeSpot.x - E.x);
       E.ultUntil = t + 450;
       E.skillDur = ULT.bhDelay + ULT.bhDur;
@@ -2816,7 +2816,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     get shotName() { return "불꽃 구슬"; }
     get startsSkillTimer() { return false; }
     cast(E, ang, reach, t) {
-      var spot = burstSpot(E, ang, reach);
+      var spot = ATTACK.burstSpot(E, ang, reach);
       E.angle = Math.atan2(spot.y - E.y, spot.x - E.x);
       E.ultUntil = t + 450;
       room.ref.child("effects").push({ type: "burst", team: E.team, owner: E.id, x: Math.round(spot.x), y: Math.round(spot.y),
@@ -2883,7 +2883,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     cast(E, ang, reach, t) {
       E.angle = ang;
       E.ultUntil = t + 450;
-      summonMinions(E, ang, t);
+      MINIONS.summonMinions(E, ang, t);
     }
     ultDesc() {
       return secs(ULT.smDur) + "간 유지되는 해골 병사 " + ULT.smCount + "마리 소환(최대 " + ULT.smMax + "마리). 해골은 체력 " + ULT.smHp + ", 공격 " + ULT.smDmg + ", 이동속도 " + shownSpeed(ULT.smSpeed) + ". 해골이 적을 공격할 때마다 네크로의 게이지 " + ULT.smGauge + " 회복";
@@ -3001,7 +3001,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     get hasSkillClip() { return true; }
     playSkillClip(v, E, t) { FIGHTER_VIEW.playOnce(v, "Melee_1H_Attack_Jump_Chop", JUMP_CHOP_LAND_SEC * 1000 / Math.max(1, E.ultUntil - (E.leapAt || t)), t); }
     cast(E, ang, reach, t) {
-      var landing = burstSpot(E, ang, reach, ULT.bsCast, ULT.bsMin);
+      var landing = ATTACK.burstSpot(E, ang, reach, ULT.bsCast, ULT.bsMin);
       resolve(landing);
       E.angle = Math.atan2(landing.y - E.y, landing.x - E.x);
       var leapMs = MELEE.hammerLeapMs(hyp(landing.x - E.x, landing.y - E.y));
@@ -3399,7 +3399,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
                burnUntil: s.burnUntil || 0, burnNext: 0, regenNext: 0, shield: s.hp == null ? !!CHARS[c].respawnShield : !!s.shield,
                burst: null, volley: null, mv: false, pending: null });
       E.maxHp = CHARS[E.char].hp;
-      if (s.minions) adoptMinions(E, s.minions, null);
+      if (s.minions) MINIONS.adoptMinions(E, s.minions, null);
     }
   }
   class Minion extends Unit {
@@ -3464,94 +3464,97 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       r.summonAt = pos.summonAt;
       r.revealUntil = pos.revealUntil; r.frostStacks = pos.frostStacks; r.frostStackAt = pos.frostStackAt;
       r.burnUntil = pos.burnUntil; r.shield = pos.shield;
-      adoptMinions(r, pos.minions, k);
+      MINIONS.adoptMinions(r, pos.minions, k);
     });
   }
 
-  function minionKey(E, born, n) { return E.id + "_" + born + "_" + n; }
-  function newMinion(E, born, n, x, y, angle) {
-    return new Minion(E, minionKey(E, born, n), born, n, x, y, angle);
-  }
-  function adoptMinions(E, list, k) {
-    var byKey = {}, t = now();
-    (E.minions || []).forEach(function (m) { byKey[m.key] = m; });
-    E.minions = list.map(function (s) {
-      var m = byKey[minionKey(E, s.born, s.n)] || newMinion(E, s.born, s.n, s.x, s.y, s.angle);
-      var gap = hyp(s.x - m.x, s.y - m.y);
-      if (m.sx != null && hyp(s.x - m.sx, s.y - m.sy) > 1) m.mvAt = t;
-      m.sx = s.x; m.sy = s.y;
-      m.mv = t - (m.mvAt || 0) < 350;
-      if (k == null || gap > 250) { m.x = s.x; m.y = s.y; } else { m.x += (s.x - m.x) * k; m.y += (s.y - m.y) * k; }
-      m.angle = k == null ? s.angle : lerpAng(m.angle, s.angle, Math.min(1, k * 1.25));
-      if (m.alive && s.hp <= 0) m.diedAt = t;
-      m.hp = s.hp; m.alive = s.hp > 0; m.atkAt = s.atkAt; m.team = E.team;
-      return m;
-    });
-  }
-  function allMinions() {
-    var out = [];
-    participants().forEach(function (id) { var E = ent(id); if (E && E.minions) out.push.apply(out, E.minions); });
-    return out;
-  }
-  function minionReady(m, t) { return m.alive && (t || now()) >= m.rise; }
-  function summonMinions(E, ang, t) {
-    var born = Math.round(t);
-    E.summonAt = born;
-    var fx = Math.cos(ang), fy = Math.sin(ang), list = (E.minions || []).filter(function (m) { return m.alive; });
-    for (var i = 0; i < ULT.smCount; i++) {
-      var side = (i - (ULT.smCount - 1) / 2) * 2 * ULT.smSide;
-      var m = newMinion(E, born, i, E.x + fx * ULT.smAhead - fy * side, E.y + fy * ULT.smAhead + fx * side, ang);
-      resolve(m);
-      list.push(m);
+  class MinionSystem {
+    minionKey(E, born, n) { return E.id + "_" + born + "_" + n; }
+    newMinion(E, born, n, x, y, angle) {
+      return new Minion(E, MINIONS.minionKey(E, born, n), born, n, x, y, angle);
     }
-    E.minions = list.slice(-ULT.smMax);
-  }
-  function minionFoe(M, t) {
-    var best = null, bd = BOT_VIEW;
-    function consider(o) {
-      if (!o || !o.alive || o.team === M.team || !visibleTo(o, M, t)) return;
-      var d = hyp(o.x - M.x, o.y - M.y);
-      if (d < bd) { bd = d; best = o; }
+    adoptMinions(E, list, k) {
+      var byKey = {}, t = now();
+      (E.minions || []).forEach(function (m) { byKey[m.key] = m; });
+      E.minions = list.map(function (s) {
+        var m = byKey[MINIONS.minionKey(E, s.born, s.n)] || MINIONS.newMinion(E, s.born, s.n, s.x, s.y, s.angle);
+        var gap = hyp(s.x - m.x, s.y - m.y);
+        if (m.sx != null && hyp(s.x - m.sx, s.y - m.sy) > 1) m.mvAt = t;
+        m.sx = s.x; m.sy = s.y;
+        m.mv = t - (m.mvAt || 0) < 350;
+        if (k == null || gap > 250) { m.x = s.x; m.y = s.y; } else { m.x += (s.x - m.x) * k; m.y += (s.y - m.y) * k; }
+        m.angle = k == null ? s.angle : lerpAng(m.angle, s.angle, Math.min(1, k * 1.25));
+        if (m.alive && s.hp <= 0) m.diedAt = t;
+        m.hp = s.hp; m.alive = s.hp > 0; m.atkAt = s.atkAt; m.team = E.team;
+        return m;
+      });
     }
-    participants().forEach(function (id) { consider(ent(id)); });
-    allMinions().forEach(function (o) { if (minionReady(o, t)) consider(o); });
-    return best;
-  }
-  function walkMinion(m, dx, dy, d, dt, t) {
-    var mx = dx / d, my = dy / d;
-    if (m.detour > t) { var rx = -my * m.detourDir; my = mx * m.detourDir; mx = rx; }
-    var ox = m.x, oy = m.y, step = ULT.smSpeed * dt;
-    m.x += mx * step; m.y += my * step; resolve(m);
-    var moved = hyp(m.x - ox, m.y - oy);
-    if (moved < step * 0.3) { m.stuck += dt; if (m.stuck > 0.4) { m.detour = t + 600; m.detourDir = Math.random() < 0.5 ? -1 : 1; m.stuck = 0; } }
-    else m.stuck = 0;
-    m.mv = moved > 0.2;
-  }
-  function stepMinions(E, dt, t) {
-    if (!E.minions || !E.minions.length) return;
-    var before = E.minions.length;
-    E.minions = E.minions.filter(function (m) { return t < m.born + ULT.smDur && (m.alive || t - m.diedAt < ULT.smCorpseMs); });
-    if (E.minions.length !== before) MATCH.game.forceNet = true;
-    E.minions.forEach(function (m) {
-      m.mv = false;
-      if (!minionReady(m, t)) return;
-      var foe = minionFoe(m, t);
-      if (!foe) {
-        var home = hyp(E.x - m.x, E.y - m.y);
-        if (E.alive && home > ULT.smFollow) { m.angle = Math.atan2(E.y - m.y, E.x - m.x); walkMinion(m, E.x - m.x, E.y - m.y, home, dt, t); }
-        return;
+    allMinions() {
+      var out = [];
+      participants().forEach(function (id) { var E = ent(id); if (E && E.minions) out.push.apply(out, E.minions); });
+      return out;
+    }
+    minionReady(m, t) { return m.alive && (t || now()) >= m.rise; }
+    summonMinions(E, ang, t) {
+      var born = Math.round(t);
+      E.summonAt = born;
+      var fx = Math.cos(ang), fy = Math.sin(ang), list = (E.minions || []).filter(function (m) { return m.alive; });
+      for (var i = 0; i < ULT.smCount; i++) {
+        var side = (i - (ULT.smCount - 1) / 2) * 2 * ULT.smSide;
+        var m = MINIONS.newMinion(E, born, i, E.x + fx * ULT.smAhead - fy * side, E.y + fy * ULT.smAhead + fx * side, ang);
+        resolve(m);
+        list.push(m);
       }
-      var dx = foe.x - m.x, dy = foe.y - m.y, d = hyp(dx, dy) || 1, reach = ULT.smRange + BODY_R - 6;
-      m.angle = Math.atan2(dy, dx);
-      if (d > reach - 12) walkMinion(m, dx, dy, d, dt, t);
-      if (d <= reach && t >= m.cdUntil && losClear(m.x, m.y, foe.x, foe.y)) {
-        m.cdUntil = t + ULT.smCd; m.atkAt = t;
-        room.ref.child("meleeHits").push({ team: m.team, owner: E.id, m: 1, mi: m.n, x: r1(m.x), y: r1(m.y), radius: ULT.smRange, angle: r1(m.angle),
-                                          arc: ULT.smArc, dmg: ULT.smDmg, createdAt: t });
-        if (hear(m)) sfx("swing");
+      E.minions = list.slice(-ULT.smMax);
+    }
+    minionFoe(M, t) {
+      var best = null, bd = BOT_VIEW;
+      function consider(o) {
+        if (!o || !o.alive || o.team === M.team || !visibleTo(o, M, t)) return;
+        var d = hyp(o.x - M.x, o.y - M.y);
+        if (d < bd) { bd = d; best = o; }
       }
-    });
+      participants().forEach(function (id) { consider(ent(id)); });
+      MINIONS.allMinions().forEach(function (o) { if (MINIONS.minionReady(o, t)) consider(o); });
+      return best;
+    }
+    walkMinion(m, dx, dy, d, dt, t) {
+      var mx = dx / d, my = dy / d;
+      if (m.detour > t) { var rx = -my * m.detourDir; my = mx * m.detourDir; mx = rx; }
+      var ox = m.x, oy = m.y, step = ULT.smSpeed * dt;
+      m.x += mx * step; m.y += my * step; resolve(m);
+      var moved = hyp(m.x - ox, m.y - oy);
+      if (moved < step * 0.3) { m.stuck += dt; if (m.stuck > 0.4) { m.detour = t + 600; m.detourDir = Math.random() < 0.5 ? -1 : 1; m.stuck = 0; } }
+      else m.stuck = 0;
+      m.mv = moved > 0.2;
+    }
+    stepMinions(E, dt, t) {
+      if (!E.minions || !E.minions.length) return;
+      var before = E.minions.length;
+      E.minions = E.minions.filter(function (m) { return t < m.born + ULT.smDur && (m.alive || t - m.diedAt < ULT.smCorpseMs); });
+      if (E.minions.length !== before) MATCH.game.forceNet = true;
+      E.minions.forEach(function (m) {
+        m.mv = false;
+        if (!MINIONS.minionReady(m, t)) return;
+        var foe = MINIONS.minionFoe(m, t);
+        if (!foe) {
+          var home = hyp(E.x - m.x, E.y - m.y);
+          if (E.alive && home > ULT.smFollow) { m.angle = Math.atan2(E.y - m.y, E.x - m.x); MINIONS.walkMinion(m, E.x - m.x, E.y - m.y, home, dt, t); }
+          return;
+        }
+        var dx = foe.x - m.x, dy = foe.y - m.y, d = hyp(dx, dy) || 1, reach = ULT.smRange + BODY_R - 6;
+        m.angle = Math.atan2(dy, dx);
+        if (d > reach - 12) MINIONS.walkMinion(m, dx, dy, d, dt, t);
+        if (d <= reach && t >= m.cdUntil && losClear(m.x, m.y, foe.x, foe.y)) {
+          m.cdUntil = t + ULT.smCd; m.atkAt = t;
+          room.ref.child("meleeHits").push({ team: m.team, owner: E.id, m: 1, mi: m.n, x: r1(m.x), y: r1(m.y), radius: ULT.smRange, angle: r1(m.angle),
+                                            arc: ULT.smArc, dmg: ULT.smDmg, createdAt: t });
+          if (hear(m)) sfx("swing");
+        }
+      });
+    }
   }
+  var MINIONS = new MinionSystem();
 
   function inBush(x, y) { return bushIndexAt(x, y) >= 0; }
   function skillLeft(E, t) { return E.skillDur ? clamp((E.skillUntil - t) / E.skillDur, 0, 1) : 0; }
@@ -3777,7 +3780,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       MATCH.game.forceNet = true;
     }
     damageMinion(M, amount, owner, basic, ultKey, gaugeGain) {
-      if (!minionReady(M)) return;
+      if (!MINIONS.minionReady(M)) return;
       var dm = Math.min(amount, M.hp);
       M.hp -= dm;
       var summoner = ent(M.owner);
@@ -3924,7 +3927,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var e = clamp(t - d.createdAt, 0, p.life), pe = p.se === undefined ? 0 : p.se;
         p.se = e;
         var a = PROJECTILES.projAt(p, pe), b = PROJECTILES.projAt(p, e);
-        foes = foes || participants().map(ent).concat(allMinions().filter(function (m) { return minionReady(m, t); }));
+        foes = foes || participants().map(ent).concat(MINIONS.allMinions().filter(function (m) { return MINIONS.minionReady(m, t); }));
         for (var i = 0; i < foes.length; i++) {
           var T = foes[i];
           if (!T || !T.alive || T.id === d.owner || T.team === d.team) continue;
@@ -4032,7 +4035,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var d = p.d, e = clamp(t - d.createdAt, 0, p.life), pe = p.ve === undefined ? 0 : p.ve;
       p.ve = e;
       var a = PROJECTILES.projAt(p, pe), b = PROJECTILES.projAt(p, e);
-      var list = participants().map(ent).concat(allMinions().filter(function (m) { return minionReady(m, t); }));
+      var list = participants().map(ent).concat(MINIONS.allMinions().filter(function (m) { return MINIONS.minionReady(m, t); }));
       for (var i = 0; i < list.length; i++) {
         var T = list[i];
         if (!T || !T.alive || T.id === d.owner || T.team === d.team) continue;
@@ -4090,7 +4093,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
   function localTargets() {
     var list = [], t = now();
-    function addMinions(E) { (E.minions || []).forEach(function (m) { if (minionReady(m, t)) list.push(m); }); }
+    function addMinions(E) { (E.minions || []).forEach(function (m) { if (MINIONS.minionReady(m, t)) list.push(m); }); }
     if (MATCH.me) { if (MATCH.me.alive) list.push(MATCH.me); addMinions(MATCH.me); }
     if (isHost()) keys(MATCH.bots).forEach(function (id) { if (MATCH.bots[id].alive) list.push(MATCH.bots[id]); addMinions(MATCH.bots[id]); });
     return list;
@@ -4150,7 +4153,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   function chainTargets(E, hit, t) {
     var chain = CHARS.stormbow.chain;
-    return participants().map(ent).concat(allMinions().filter(function (m) { return minionReady(m, t); })).filter(function (o) {
+    return participants().map(ent).concat(MINIONS.allMinions().filter(function (m) { return MINIONS.minionReady(m, t); })).filter(function (o) {
       return o && o.alive && o.team !== E.team && o.id !== hit.v && !o.isProtected(t) && !hiddenFrom(o, t) && hyp(o.x - hit.x, o.y - hit.y) <= chain.r;
     }).sort(function (a, b) { return hyp(a.x - hit.x, a.y - hit.y) - hyp(b.x - hit.x, b.y - hit.y); }).slice(0, chain.count);
   }
@@ -4397,7 +4400,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     FIELD.domains.forEach(function (dm) { if (dm.e.owner === E.id && domainActive(dm.e, t) && !domainOwnerFell(dm)) zone = dm; });
     if (!zone) return null;
     var c = domainCenter(zone), reach = domainRadius(zone.e, t) + BODY_R * 0.5, best = null, bd = Infinity;
-    participants().map(ent).concat(allMinions().filter(function (m) { return minionReady(m, t); })).forEach(function (o) {
+    participants().map(ent).concat(MINIONS.allMinions().filter(function (m) { return MINIONS.minionReady(m, t); })).forEach(function (o) {
       if (!o || !o.alive || o.team === E.team || o.isProtected(t) || hyp(o.x - c.x, o.y - c.y) > reach || (!o.minion && !visibleTo(o, E, t))) return;
       var d = hyp(o.x - E.x, o.y - E.y);
       if (d < bd) { bd = d; best = o; }
@@ -4414,7 +4417,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function onDomainStrike(e) {
     var t = now();
     if (t - e.createdAt > 1500) return;
-    var V = VIS[e.tgt] || MVIS[e.tgt], A = ent(e.tgt) || allMinions().filter(function (m) { return m.id === e.tgt; })[0];
+    var V = VIS[e.tgt] || MVIS[e.tgt], A = ent(e.tgt) || MINIONS.allMinions().filter(function (m) { return m.id === e.tgt; })[0];
     if (A && (!MATCH.me || MATCH.me.team === A.team || visibleTo(A, MATCH.me, t))) { FX_VIEW.bloodBolt(V ? V.root.position.x : A.x, V ? V.root.position.z : A.y); FX_VIEW.spark(A.x, A.y, "#FF2A36", 1.6); }
     if (A && (!MATCH.me || hyp(A.x - MATCH.me.x, A.y - MATCH.me.y) < 700)) sfx("boom");
     if (!e.dmg || room.status !== "playing") return;
@@ -4429,7 +4432,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     return Math.round(ULT.plFlightMin + (ULT.plFlight - ULT.plFlightMin) * far);
   }
   function throwPoison(E, ang, reach, ult) {
-    var t = now(), c = CHARS.thrower, spot = burstSpot(E, ang, reach, ult ? ULT.fgCast : c.range, c.minRange);
+    var t = now(), c = CHARS.thrower, spot = ATTACK.burstSpot(E, ang, reach, ult ? ULT.fgCast : c.range, c.minRange);
     var flightMs = potionFlightMs(hyp(spot.x - E.x, spot.y - E.y));
     E.angle = Math.atan2(spot.y - E.y, spot.x - E.x); E.atkAt = t;
     revealBriefly(E.id, t);
@@ -4556,7 +4559,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (d.slam) FX_VIEW.boom(d.x, d.y, d.radius + BODY_R, d.team);
       if (d.hammer) FX_VIEW.thunder(d.x, d.y);
       if (d.zap) FX_VIEW.zapBarrier(d.x, d.y, d.radius + BODY_R);
-      participants().map(ent).concat(allMinions()).forEach(function (T) { MELEE.strikeSpark(T, d, who); });
+      participants().map(ent).concat(MINIONS.allMinions()).forEach(function (T) { MELEE.strikeSpark(T, d, who); });
       localTargets().forEach(function (T) { MELEE.strikeHit(T, d); MELEE.strikeHeal(T, d); });
     }
     waveFront(d, t, travelMs) { return Math.min(1, (t - d.createdAt) / travelMs) * (d.len + BODY_R); }
@@ -4564,7 +4567,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     stepWaves(t) {
       FIELD.waves = FIELD.waves.filter(function (w) {
         var d = w.d, travelMs = WAVE[w.who].travel, front = MELEE.waveFront(d, t, travelMs);
-        participants().map(ent).concat(allMinions()).forEach(function (T) {
+        participants().map(ent).concat(MINIONS.allMinions()).forEach(function (T) {
           if (!MELEE.reachedBy(T, d, front) || w.sparked.indexOf(T) >= 0) return;
           w.sparked.push(T); MELEE.strikeSpark(T, d, w.who);
         });
@@ -4630,7 +4633,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     stabTarget(E, t) {
       var reach = CHARS[E.char].range + BODY_R, best = null, bd = Infinity;
-      participants().map(ent).concat(allMinions().filter(function (m) { return minionReady(m, t); })).forEach(function (o) {
+      participants().map(ent).concat(MINIONS.allMinions().filter(function (m) { return MINIONS.minionReady(m, t); })).forEach(function (o) {
         if (!o || !o.alive || o.team === E.team || o.isProtected(t) || !visibleTo(o, E)) return;
         var d = hyp(o.x - E.x, o.y - E.y);
         if (d <= reach && d < bd && losClear(E.x, E.y, o.x, o.y)) { bd = d; best = o; }
@@ -4709,89 +4712,95 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var LANCE_SLIP = 3, LANCE_VIS_SLIP = 60;
   var SHOVE_SUBSTEP = BODY_R / 2;
 
-  function respawnIfReady(E, t) {
-    if (E.alive || !E.diedAt || t < E.diedAt + RESPAWN_MS || !P[E.id] || !P[E.id].slot) return;
-    var sp = E.practiceBot && E.home ? { x: E.home.x, y: E.home.y, angle: E.angle } : spawnOf(E.team, P[E.id].slot);
-    E.x = sp.x; E.y = sp.y; E.angle = sp.angle; E.mv = false;
-    E.hp = E.maxHp; E.alive = true; E.protectUntil = t + RESPAWN_PROTECT_MS;
-    E.cdUntil = 0; E.pending = null; E.burst = null; E.volley = null; E.slash = null;
-    E.buffUntil = 0; E.slamAt = 0; E.leap = null; E.dash = null; E.shove = null; E.stealthUntil = 0; E.ultUntil = 0; E.skillUntil = 0; E.regenUntil = 0; E.slowUntil = 0; E.slows = null; E.stunUntil = 0; E.lance = null; E.windUntil = 0;
-    E.frostStacks = 0; E.frostStackAt = 0; E.revealUntil = 0; E.lastStandUsed = false; E.hasteUntil = 0; E.hasteStacks = 0;
-    E.burnUntil = 0; E.burnNext = 0; E.rallyUsed = false; E.regenNext = 0; E.shield = !!CHARS[E.char].respawnShield;
-    if (E === MATCH.me) CAM.snap = true;
-    MATCH.game.forceNet = true;
+  class RespawnSystem {
+    respawnIfReady(E, t) {
+      if (E.alive || !E.diedAt || t < E.diedAt + RESPAWN_MS || !P[E.id] || !P[E.id].slot) return;
+      var sp = E.practiceBot && E.home ? { x: E.home.x, y: E.home.y, angle: E.angle } : spawnOf(E.team, P[E.id].slot);
+      E.x = sp.x; E.y = sp.y; E.angle = sp.angle; E.mv = false;
+      E.hp = E.maxHp; E.alive = true; E.protectUntil = t + RESPAWN_PROTECT_MS;
+      E.cdUntil = 0; E.pending = null; E.burst = null; E.volley = null; E.slash = null;
+      E.buffUntil = 0; E.slamAt = 0; E.leap = null; E.dash = null; E.shove = null; E.stealthUntil = 0; E.ultUntil = 0; E.skillUntil = 0; E.regenUntil = 0; E.slowUntil = 0; E.slows = null; E.stunUntil = 0; E.lance = null; E.windUntil = 0;
+      E.frostStacks = 0; E.frostStackAt = 0; E.revealUntil = 0; E.lastStandUsed = false; E.hasteUntil = 0; E.hasteStacks = 0;
+      E.burnUntil = 0; E.burnNext = 0; E.rallyUsed = false; E.regenNext = 0; E.shield = !!CHARS[E.char].respawnShield;
+      if (E === MATCH.me) CAM.snap = true;
+      MATCH.game.forceNet = true;
+    }
   }
+  var RESPAWN = new RespawnSystem();
   function canAct() { return MATCH.game && room.status === "playing" && now() >= room.startAt && MATCH.me && MATCH.me.alive && !MATCH.me.isStunned(); }
-  function fireBasic(E, ang, reach) {
-    var c = CHARS[E.char], t = now(), rage = E.isBerserk(t);
-    if (E.isStunned(t)) return;
-    E.cdDur = E.isRiposting(t) ? 1000 / ULT.rmRate : c.cd * (rage ? ULT.bzCdMul : 1) / (E.isOvercharged(t) ? ULT.ocRate : 1); E.cdUntil = t + E.cdDur; E.angle = ang;
-    var type = CHAR_TYPES.of(E.char);
-    if (type.overrideBasic(E, ang, reach, t)) return;
-    if (c.stab) { MELEE.lunge(E, ang); return; }
-    var ambushDmg = type.ambush(E, t);
-    if (isMelee(E.char) && (!c.throwRange || MELEE.enemyInMelee(E))) {
-      MELEE.swing(E, ang, rage, ambushDmg);
-      if (c.hits > 1) E.slash = { left: c.hits - 1, at: t + c.hitGap, ang: ang, dmg: ambushDmg };
-      return;
+  class AttackController {
+    fireBasic(E, ang, reach) {
+      var c = CHARS[E.char], t = now(), rage = E.isBerserk(t);
+      if (E.isStunned(t)) return;
+      E.cdDur = E.isRiposting(t) ? 1000 / ULT.rmRate : c.cd * (rage ? ULT.bzCdMul : 1) / (E.isOvercharged(t) ? ULT.ocRate : 1); E.cdUntil = t + E.cdDur; E.angle = ang;
+      var type = CHAR_TYPES.of(E.char);
+      if (type.overrideBasic(E, ang, reach, t)) return;
+      if (c.stab) { MELEE.lunge(E, ang); return; }
+      var ambushDmg = type.ambush(E, t);
+      if (isMelee(E.char) && (!c.throwRange || MELEE.enemyInMelee(E))) {
+        MELEE.swing(E, ang, rage, ambushDmg);
+        if (c.hits > 1) E.slash = { left: c.hits - 1, at: t + c.hitGap, ang: ang, dmg: ambushDmg };
+        return;
+      }
+      PROJECTILES.emitShots(E, ang, false, !!ambushDmg);
+      if (c.shots > 1) E.volley = { until: t + (c.shots - 1) * c.gap };
     }
-    PROJECTILES.emitShots(E, ang, false, !!ambushDmg);
-    if (c.shots > 1) E.volley = { until: t + (c.shots - 1) * c.gap };
-  }
-  function tryFire(E, ang, reach) {
-    if (now() >= E.cdUntil) { fireBasic(E, ang, reach); E.pending = null; }
-    else E.pending = { ang: ang, reach: reach, until: now() + 350 };
-  }
-  function burstSpot(E, ang, reach, maxR, minR) {
-    maxR = maxR || ULT.mbCast; minR = minR || ULT.mbMin;
-    if (reach == null) {
-      var T = autoAimTarget(E);
-      if (T && hyp(T.x - E.x, T.y - E.y) <= maxR) return { x: T.x, y: T.y };
-      reach = maxR * 0.6;
+    tryFire(E, ang, reach) {
+      if (now() >= E.cdUntil) { ATTACK.fireBasic(E, ang, reach); E.pending = null; }
+      else E.pending = { ang: ang, reach: reach, until: now() + 350 };
     }
-    reach = clamp(reach, minR, maxR);
-    return { x: clamp(E.x + Math.cos(ang) * reach, BOUND.l, BOUND.r), y: clamp(E.y + Math.sin(ang) * reach, BOUND.t, BOUND.b) };
-  }
-  function useUlt(E, ang, reach) {
-    if (E.gauge < GAUGE_MAX || !E.alive || E.isStunned()) return;
-    E.gauge = 0;
-    var t = now();
-    var type = CHAR_TYPES.of(E.char);
-    type.cast(E, ang, reach, t);
-    if (E.skillDur && type.startsSkillTimer) E.skillUntil = t + E.skillDur;
-    if (hear(E)) sfx("ult");
-    MATCH.game.forceNet = true;
-  }
-  function stepCombat(E, dt) {
-    var t = now();
-    if (E.pending) {
-      if (t > E.pending.until) E.pending = null;
-      else if (t >= E.cdUntil) { fireBasic(E, E.pending.ang, E.pending.reach); E.pending = null; }
+    burstSpot(E, ang, reach, maxR, minR) {
+      maxR = maxR || ULT.mbCast; minR = minR || ULT.mbMin;
+      if (reach == null) {
+        var T = ATTACK.autoAimTarget(E);
+        if (T && hyp(T.x - E.x, T.y - E.y) <= maxR) return { x: T.x, y: T.y };
+        reach = maxR * 0.6;
+      }
+      reach = clamp(reach, minR, maxR);
+      return { x: clamp(E.x + Math.cos(ang) * reach, BOUND.l, BOUND.r), y: clamp(E.y + Math.sin(ang) * reach, BOUND.t, BOUND.b) };
     }
-    if (E.burst && t >= E.burst.until) E.burst = null;
-    if (E.volley && t >= E.volley.until) E.volley = null;
-    if (E.slash && t >= E.slash.at) {
-      var sl = E.slash;
-      MELEE.swing(E, sl.ang, E.isBerserk(t), sl.dmg);
-      sl.left--; sl.at += CHARS[E.char].hitGap;
-      if (sl.left <= 0) E.slash = null;
+    useUlt(E, ang, reach) {
+      if (E.gauge < GAUGE_MAX || !E.alive || E.isStunned()) return;
+      E.gauge = 0;
+      var t = now();
+      var type = CHAR_TYPES.of(E.char);
+      type.cast(E, ang, reach, t);
+      if (E.skillDur && type.startsSkillTimer) E.skillUntil = t + E.skillDur;
+      if (hear(E)) sfx("ult");
+      MATCH.game.forceNet = true;
+    }
+    stepCombat(E, dt) {
+      var t = now();
+      if (E.pending) {
+        if (t > E.pending.until) E.pending = null;
+        else if (t >= E.cdUntil) { ATTACK.fireBasic(E, E.pending.ang, E.pending.reach); E.pending = null; }
+      }
+      if (E.burst && t >= E.burst.until) E.burst = null;
+      if (E.volley && t >= E.volley.until) E.volley = null;
+      if (E.slash && t >= E.slash.at) {
+        var sl = E.slash;
+        MELEE.swing(E, sl.ang, E.isBerserk(t), sl.dmg);
+        sl.left--; sl.at += CHARS[E.char].hitGap;
+        if (sl.left <= 0) E.slash = null;
+      }
+    }
+    autoAimTarget(E) {
+      var best = null, bd = Infinity, open = null, od = Infinity, t = now();
+      participants().map(ent).concat(MINIONS.allMinions().filter(function (m) { return MINIONS.minionReady(m, t); })).forEach(function (o) {
+        if (!o || !o.alive || o.team === E.team) return;
+        if (!visibleTo(o, E)) return;
+        var d = hyp(o.x - E.x, o.y - E.y);
+        if (d < bd) { bd = d; best = o; }
+        if (d < od && losClear(E.x, E.y, o.x, o.y)) { od = d; open = o; }
+      });
+      return open || best;
+    }
+    autoAimAngle(E) {
+      var T = ATTACK.autoAimTarget(E);
+      return T ? Math.atan2(T.y - E.y, T.x - E.x) : E.angle;
     }
   }
-  function autoAimTarget(E) {
-    var best = null, bd = Infinity, open = null, od = Infinity, t = now();
-    participants().map(ent).concat(allMinions().filter(function (m) { return minionReady(m, t); })).forEach(function (o) {
-      if (!o || !o.alive || o.team === E.team) return;
-      if (!visibleTo(o, E)) return;
-      var d = hyp(o.x - E.x, o.y - E.y);
-      if (d < bd) { bd = d; best = o; }
-      if (d < od && losClear(E.x, E.y, o.x, o.y)) { od = d; open = o; }
-    });
-    return open || best;
-  }
-  function autoAimAngle(E) {
-    var T = autoAimTarget(E);
-    return T ? Math.atan2(T.y - E.y, T.x - E.x) : E.angle;
-  }
+  var ATTACK = new AttackController();
 
   class BotBrain {
     pickWanderPoint(B, t) {
@@ -4909,15 +4918,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (botType.botAct(B, target, enemies, t)) return;
       if (target && B.gauge >= GAUGE_MAX && t - k.seenAt > 500 && losClear(B.x, B.y, target.x, target.y) && td <= botType.botUltRange()) {
         var ultSpot = botType.botUltSpot(B, target, td, t);
-        useUlt(B, Math.atan2(ultSpot.y - B.y, ultSpot.x - B.x), hyp(ultSpot.x - B.x, ultSpot.y - B.y)); return;
+        ATTACK.useUlt(B, Math.atan2(ultSpot.y - B.y, ultSpot.x - B.x), hyp(ultSpot.x - B.x, ultSpot.y - B.y)); return;
       }
-      if (botType.wantsBasicNow(B, t)) { fireBasic(B, B.angle); return; }
+      if (botType.wantsBasicNow(B, t)) { ATTACK.fireBasic(B, B.angle); return; }
       if (aimAt && t >= B.cdUntil && t - k.seenAt > BOT_REACT_MS) {
         var ad = hyp(aimAt.x - B.x, aimAt.y - B.y);
         var rng = c.stab ? MELEE.lungeRange(B, t) + c.range : c.throwRange || c.dashRange || (melee ? c.range + BODY_R - 4 : c.range + (B.isOvercharged(t) ? ULT.ocRangeBonus : 0));
         if (ad <= rng && losClear(B.x, B.y, aimAt.x, aimAt.y)) {
           var shotAim = c.pSpeed && !melee ? BRAIN.leadSpot(aimAt, ad / c.pSpeed, t) : aimAt;
-          fireBasic(B, Math.atan2(shotAim.y - B.y, shotAim.x - B.x) + (Math.random() - 0.5) * 2 * BOT_AIM_ERR);
+          ATTACK.fireBasic(B, Math.atan2(shotAim.y - B.y, shotAim.x - B.x) + (Math.random() - 0.5) * 2 * BOT_AIM_ERR);
         }
       }
     }
@@ -4948,19 +4957,19 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (!k.fullAt) k.fullAt = t;
         spot = BRAIN.fogClusterSpot(B, enemies, t);
         if (!spot && target && t - k.fullAt > 5000 && t - k.seenAt > 500) spot = BRAIN.leadSpot(target, potionFlightMs(hyp(target.x - B.x, target.y - B.y)) / 1000, t);
-        if (spot) { k.fullAt = 0; useUlt(B, Math.atan2(spot.y - B.y, spot.x - B.x), hyp(spot.x - B.x, spot.y - B.y)); return; }
+        if (spot) { k.fullAt = 0; ATTACK.useUlt(B, Math.atan2(spot.y - B.y, spot.x - B.x), hyp(spot.x - B.x, spot.y - B.y)); return; }
       } else k.fullAt = 0;
       if (!target || t < B.cdUntil || t - k.seenAt <= BOT_REACT_MS) return;
       spot = BRAIN.leadSpot(target, potionFlightMs(hyp(target.x - B.x, target.y - B.y)) / 1000, t);
       var d =hyp(spot.x - B.x, spot.y - B.y);
       if (d > c.range + ULT.plR * 0.5) return;
-      fireBasic(B, Math.atan2(spot.y - B.y, spot.x - B.x) + (Math.random() - 0.5) * BOT_AIM_ERR, d + (Math.random() - 0.5) * 40);
+      ATTACK.fireBasic(B, Math.atan2(spot.y - B.y, spot.x - B.x) + (Math.random() - 0.5) * BOT_AIM_ERR, d + (Math.random() - 0.5) * 40);
     }
     botCleric(B, enemies, t) {
-      if (B.gauge >= GAUGE_MAX && enemies.length) { useUlt(B, B.angle); return; }
+      if (B.gauge >= GAUGE_MAX && enemies.length) { ATTACK.useUlt(B, B.angle); return; }
       if (t < B.cdUntil) return;
       var A = graceTarget(B);
-      if (A && A.hp < A.maxHp) fireBasic(B, B.angle);
+      if (A && A.hp < A.maxHp) ATTACK.fireBasic(B, B.angle);
     }
     botLance(B, target, t) {
       var c = CHARS.lancer, k = B.bot;
@@ -4968,12 +4977,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (B.gauge >= GAUGE_MAX) {
         var ahead = BRAIN.leadSpot(target, ULT.lnWind / 1000, t), ud = hyp(ahead.x - B.x, ahead.y - B.y);
         if (ud <= ULT.lnLen && losClear(B.x, B.y, ahead.x, ahead.y) && losClear(B.x, B.y, target.x, target.y)) {
-          useUlt(B, Math.atan2(ahead.y - B.y, ahead.x - B.x)); return;
+          ATTACK.useUlt(B, Math.atan2(ahead.y - B.y, ahead.x - B.x)); return;
         }
       }
       if (t < B.cdUntil) return;
       var d = hyp(target.x - B.x, target.y - B.y);
-      if (d <= c.range + (B.isOvercharged(t) ? ULT.ocRangeBonus : 0) && losClear(B.x, B.y, target.x, target.y)) fireBasic(B, B.angle + (Math.random() - 0.5) * 2 * BOT_AIM_ERR);
+      if (d <= c.range + (B.isOvercharged(t) ? ULT.ocRangeBonus : 0) && losClear(B.x, B.y, target.x, target.y)) ATTACK.fireBasic(B, B.angle + (Math.random() - 0.5) * 2 * BOT_AIM_ERR);
     }
   }
   var BRAIN = new BotBrain();
@@ -5245,7 +5254,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var k = keyName(e);
     if (k) { KEY_ON[k] = true; e.preventDefault(); audio(); return; }
     if (e.code === "KeyJ" && !e.repeat && canAct() && MATCH.me.gauge >= GAUGE_MAX && !MATCH.me.burst) {
-      e.preventDefault(); var ua = autoAimAngle(MATCH.me); MATCH.me.angle = ua; useUlt(MATCH.me, ua);
+      e.preventDefault(); var ua = ATTACK.autoAimAngle(MATCH.me); MATCH.me.angle = ua; ATTACK.useUlt(MATCH.me, ua);
     }
   });
   window.addEventListener("keyup", function (e) { var k = keyName(e); if (k) KEY_ON[k] = false; });
@@ -5284,11 +5293,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     el.addEventListener("pointerdown", function (e) {
       audio(); e.preventDefault();
       if (!canAct() || aim.id !== null) return;
-      if (which === "atk" && CHARS[MATCH.me.char].noAim) { tryFire(MATCH.me, MATCH.me.angle); return; }
+      if (which === "atk" && CHARS[MATCH.me.char].noAim) { ATTACK.tryFire(MATCH.me, MATCH.me.angle); return; }
       if (which === "ult") {
         if (MATCH.me.gauge < GAUGE_MAX || MATCH.me.burst) return;
         if (!CHARS[MATCH.me.char].ultAim) {
-          var ua = autoAimAngle(MATCH.me); MATCH.me.angle = ua; useUlt(MATCH.me, ua); return;
+          var ua = ATTACK.autoAimAngle(MATCH.me); MATCH.me.angle = ua; ATTACK.useUlt(MATCH.me, ua); return;
         }
       }
       aim.id = e.pointerId; aim.btn = which; aim.ox = e.clientX; aim.oy = e.clientY; aim.dx = 0; aim.dy = 0; aim.drag = false;
@@ -5304,10 +5313,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var btn = aim.btn, drag = aim.drag && hyp(aim.dx, aim.dy) > DRAG_MIN, reach = drag && MATCH.me ? aimReach(MATCH.me, btn) : null;
       aim.id = null;
       if (!canAct() || e.type === "pointercancel") return;
-      var ang = drag ? screenToWorldAngle(Math.atan2(aim.dy, aim.dx)) : autoAimAngle(MATCH.me);
+      var ang = drag ? screenToWorldAngle(Math.atan2(aim.dy, aim.dx)) : ATTACK.autoAimAngle(MATCH.me);
       MATCH.me.angle = ang;
-      if (btn === "atk") tryFire(MATCH.me, ang, reach);
-      else if (btn === "ult") useUlt(MATCH.me, ang, reach);
+      if (btn === "atk") ATTACK.tryFire(MATCH.me, ang, reach);
+      else if (btn === "ult") ATTACK.useUlt(MATCH.me, ang, reach);
     }
     el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up);
     el.addEventListener("touchstart", function (e) { e.preventDefault(); }, { passive: false });
@@ -6921,7 +6930,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (E.alive) LABELS.push({ e: E, alpha: alpha, ally: ally });
       });
       keys(VIS).forEach(function (id) { if (!shown[id]) FIGHTER_VIEW.dropVis(id); });
-      allMinions().forEach(function (M) {
+      MINIONS.allMinions().forEach(function (M) {
         var id = M.key, v = MVIS[id];
         shown[id] = 1;
         if (v && KIT.ready && !v.kit) { FIGHTER_VIEW.dropMinionVis(id, false); v = null; }
@@ -7649,8 +7658,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     pruneLocal(t);
     var active = room.status === "playing" && t >= room.startAt;
     if (active) {
-      if (MATCH.me) respawnIfReady(MATCH.me, t);
-      if (isHost()) keys(MATCH.bots).forEach(function (id) { respawnIfReady(MATCH.bots[id], t); });
+      if (MATCH.me) RESPAWN.respawnIfReady(MATCH.me, t);
+      if (isHost()) keys(MATCH.bots).forEach(function (id) { RESPAWN.respawnIfReady(MATCH.bots[id], t); });
       if (MATCH.me && MATCH.me.alive) {
         var kx = (KEY_ON.right ? 1 : 0) - (KEY_ON.left ? 1 : 0), ky = (KEY_ON.down ? 1 : 0) - (KEY_ON.up ? 1 : 0);
         if (joy.id !== null || kx || ky) {
@@ -7666,11 +7675,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           MATCH.me.mv = hyp(MATCH.me.x - ox, MATCH.me.y - oy) > 0.2;
           if (MATCH.me.mv) { MATCH.me.moveAng = Math.atan2(MATCH.me.y - oy, MATCH.me.x - ox); MATCH.me.moveAt = now(); }
         } else MATCH.me.mv = false;
-        if (KEY_ON.atk && t >= MATCH.me.cdUntil && !MATCH.me.volley && !MATCH.me.slash) fireBasic(MATCH.me, autoAimAngle(MATCH.me));
-        stepCombat(MATCH.me, dt);
+        if (KEY_ON.atk && t >= MATCH.me.cdUntil && !MATCH.me.volley && !MATCH.me.slash) ATTACK.fireBasic(MATCH.me, ATTACK.autoAimAngle(MATCH.me));
+        ATTACK.stepCombat(MATCH.me, dt);
       } else if (MATCH.me) MATCH.me.mv = false;
-      if (isHost()) keys(MATCH.bots).forEach(function (id) { var B = MATCH.bots[id]; if (driveBots) BRAIN.step(B, dt); if (B.alive) stepCombat(B, dt); MELEE.stepKnightSlam(B); MELEE.stepHammerLeap(B); MELEE.stepLance(B); MELEE.stepDash(B); stepMinions(B, dt, t); DAMAGE.payKillGaugeOwed(B, t); });
-      if (MATCH.me) { MELEE.stepKnightSlam(MATCH.me); MELEE.stepHammerLeap(MATCH.me); MELEE.stepLance(MATCH.me); MELEE.stepDash(MATCH.me); stepMinions(MATCH.me, dt, t); DAMAGE.payKillGaugeOwed(MATCH.me, t); }
+      if (isHost()) keys(MATCH.bots).forEach(function (id) { var B = MATCH.bots[id]; if (driveBots) BRAIN.step(B, dt); if (B.alive) ATTACK.stepCombat(B, dt); MELEE.stepKnightSlam(B); MELEE.stepHammerLeap(B); MELEE.stepLance(B); MELEE.stepDash(B); MINIONS.stepMinions(B, dt, t); DAMAGE.payKillGaugeOwed(B, t); });
+      if (MATCH.me) { MELEE.stepKnightSlam(MATCH.me); MELEE.stepHammerLeap(MATCH.me); MELEE.stepLance(MATCH.me); MELEE.stepDash(MATCH.me); MINIONS.stepMinions(MATCH.me, dt, t); DAMAGE.payKillGaugeOwed(MATCH.me, t); }
       localTargets().forEach(function (T) { STATUS.stepShove(T, t); if (!T.minion) { STATUS.stepBurn(T, t); STATUS.stepRally(T, t); stepDomainBolt(T, t); stepCurse(T, t); } });
       PROJECTILES.checkProjectiles(t);
       PROJECTILES.stepBladeDaggers(t);
@@ -7697,7 +7706,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         return renderer.domElement.toDataURL("image/png");
       },
       loadMapData: loadMapData, makeEnt: makeEnt, resolve: resolve, stepWorld: stepWorld,
-      useUlt: useUlt, fireBasic: fireBasic, damage: DAMAGE.damage.bind(DAMAGE), healCut: STATUS.healCut.bind(STATUS), healAmount: STATUS.healAmount.bind(STATUS), respawnIfReady: respawnIfReady, afflict: STATUS.afflict.bind(STATUS), speedOf: function (E) { return E.speed(); }, stunned: function (E, t) { return E.isStunned(t); },
+      useUlt: ATTACK.useUlt.bind(ATTACK), fireBasic: ATTACK.fireBasic.bind(ATTACK), damage: DAMAGE.damage.bind(DAMAGE), healCut: STATUS.healCut.bind(STATUS), healAmount: STATUS.healAmount.bind(STATUS), respawnIfReady: RESPAWN.respawnIfReady.bind(RESPAWN), afflict: STATUS.afflict.bind(STATUS), speedOf: function (E) { return E.speed(); }, stunned: function (E, t) { return E.isStunned(t); },
       onShot: PROJECTILES.onShot.bind(PROJECTILES), onMelee: MELEE.onMelee.bind(MELEE), potionFlightMs: potionFlightMs, meteorHitAt: meteorHitAt, onEffect: onEffect, onHit: DAMAGE.onHit.bind(DAMAGE),
       multiKillCount: multiKillCount, MULTI_KILL_MS: MULTI_KILL_MS, ASSIST_MS: ASSIST_MS, onKill: DAMAGE.creditHelpAssists.bind(DAMAGE),
       hiddenFrom: hiddenFrom, visibleTo: visibleTo, storms: function () { return FIELD.storms; }, stormCenter: stormCenter, revs: function () { return FIELD.revs; }, domains: function () { return FIELD.domains; }, graceTarget: graceTarget,
