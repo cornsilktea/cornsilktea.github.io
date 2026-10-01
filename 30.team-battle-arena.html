@@ -817,28 +817,28 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var ATK_POSE_MS = 150;
   var NET_MS = 143;
   var CHARS = {
-    warrior: { name: "광전사", role: "fighter", icon: "🪓", hp: 235, speed: 220, ultSpeed: 300, cd: 1000, dmg: 30, range: 110, arc: Math.PI * 0.55,
+    warrior: { name: "광전사", role: "fighter", icon: "🪓", hp: 240, speed: 220, ultSpeed: 300, cd: 1000, dmg: 30, range: 110, arc: Math.PI * 0.55,
                rally: { hpRate: 0.5, ms: 5000, perSec: 10 }, ultName: "광폭화", heals: true },
-    duelist: { name: "결투가", role: "fighter", icon: "🤺", hp: 220, speed: 250, cd: 1000, dmg: 30, range: 100,
+    duelist: { name: "결투가", role: "fighter", icon: "🤺", hp: 235, speed: 250, cd: 1000, dmg: 30, range: 100,
                dashRange: 250, dashMs: 500, stab: true, selfHeal: 10, ultName: "르미즈", heals: true },
-    knight:  { name: "기사", role: "fighter", icon: "🛡️", hp: 350, speed: 200, cd: 1250, dmg: 25, range: 110, arc: Math.PI * 0.7, armor: 2, ultName: "방어태세", blocks: true },
+    knight:  { name: "기사", role: "fighter", icon: "🛡️", hp: 370, speed: 200, cd: 1250, dmg: 25, range: 110, arc: Math.PI * 0.7, armor: 2, ultName: "방어태세", blocks: true },
     ranger:  { name: "궁수", role: "shooter", icon: "🏹", hp: 100, speed: 200, haste: { add: 10, ms: 3000, max: 40 }, cd: 667, dmg: 15, range: 450, pSpeed: 532, pr: 12, shots: 2, gap: 70, ultName: "난사", ultAim: true },
-    mage:    { name: "화염술사", role: "caster", icon: "🔥", hp: 120, speed: 240, cd: 1000, dmg: 5, range: 350, pSpeed: 700, pr: 9, burn: { ms: 4000, maxHpRate: 0.06 }, ultName: "메테오", ultAim: true },
-    rogue:   { name: "은신자", role: "assassin", icon: "🗡️", hp: 120, speed: 250, ultSpeed: 400, cd: 833, dmg: 30, range: 110, arc: Math.PI * 0.6, hits: 2, hitGap: 160, ambushDmg: 45, throwDmg: 20, throwRange: 300, pSpeed: 900, pr: 8, ultName: "은신" },
+    mage:    { name: "화염술사", role: "caster", icon: "🔥", hp: 115, speed: 240, cd: 1000, dmg: 5, range: 350, pSpeed: 700, pr: 9, burn: { ms: 4000, maxHpRate: 0.06 }, ultName: "메테오", ultAim: true },
+    rogue:   { name: "은신자", role: "assassin", icon: "🗡️", hp: 130, speed: 250, ultSpeed: 400, cd: 833, dmg: 30, range: 110, arc: Math.PI * 0.6, hits: 2, hitGap: 160, ambushDmg: 45, throwDmg: 20, throwRange: 300, pSpeed: 900, pr: 8, ultName: "은신" },
     necro:   { name: "네크로", role: "caster", icon: "💀", hp: 120, lastStandHp: 50, lastStandHideMs: 1000, speed: 240, cd: 1000, dmg: 10, range: KEY * 4, pSpeed: 1000, pr: 9, ultName: "해골 소환", blocks: true },
-    sniper:  { name: "저격수", role: "shooter", icon: "🎯", hp: 100, speed: 200, cd: 1250, dmg: 35, range: 700, pSpeed: 840, pr: 12, farDist: 500, farBonus: 0.5, ultName: "거대 화살", ultAim: true },
+    sniper:  { name: "저격수", role: "shooter", icon: "🎯", hp: 100, speed: 200, cd: 1250, dmg: 35, range: 700, pSpeed: 1000, pr: 12, farDist: 500, farBonus: 0.5, ultName: "거대 화살", ultAim: true },
     thrower: { name: "투척병", role: "shooter", icon: "🧪", hp: 120, speed: 220, cd: 1000, dmg: 18, ticks: 3, range: KEY * 4 + 120, minRange: KEY * 1, healCut: true, ultName: "독안개", ultAim: true, heals: true },
-    lancer:  { name: "창술사", role: "fighter", icon: "🔱", hp: 330, speed: 200, cd: 1200, dmg: 30, range: 200, width: 50, respawnShield: true, ultName: "꿰뚫기", ultAim: true },
-    blacksmith: { name: "대장장이", role: "fighter", icon: "🔨", hp: 400, speed: 200, cd: 1250, dmg: 30, range: 180, width: 150, windup: 500, fx: { stunMs: 500 }, ultName: "내려찍기", ultAim: true },
+    lancer:  { name: "창술사", role: "fighter", icon: "🔱", hp: 355, speed: 200, cd: 1200, dmg: 30, range: 200, width: 50, respawnShield: true, ultName: "꿰뚫기", ultAim: true },
+    blacksmith: { name: "대장장이", role: "fighter", icon: "🔨", hp: 405, speed: 200, cd: 1250, dmg: 30, range: 180, width: 150, windup: 500, fx: { stunMs: 500 }, ultName: "내려찍기", ultAim: true },
     priest:  { name: "사제", role: "caster", icon: "📖", hp: 120, speed: 240, cd: 1000, dmg: 10, heal: 10, range: 320, width: 200, ultName: "블랙홀", ultKind: "blackhole", ultAim: true, heals: true, retired: true },
-    shaman:  { name: "주술사", role: "caster", icon: "👊", hp: 120, speed: 240, cd: 1000, dmg: 5, range: 350, width: 100, ultName: "영역전개" },
-    cleric:  { name: "클레릭", role: "caster", icon: "✝️", hp: 120, speed: 240, cd: 1000, dmg: 0, graceHeal: 25, range: 400, noAim: true, healGauge: 400, ultName: "요한계시록", heals: true },
-    hitman:  { name: "자객", role: "assassin", icon: "🔪", hp: 120, speed: 250, cd: 1250, dmg: 40, range: 100,
+    shaman:  { name: "주술사", role: "caster", icon: "👊", hp: 115, speed: 240, cd: 1000, dmg: 5, range: 350, width: 100, ultName: "영역전개" },
+    cleric:  { name: "클레릭", role: "caster", icon: "✝️", hp: 110, speed: 240, cd: 1000, dmg: 0, graceHeal: 20, range: 400, noAim: true, healGauge: 400, ultName: "요한계시록", heals: true },
+    hitman:  { name: "자객", role: "assassin", icon: "🔪", hp: 130, speed: 250, cd: 1250, dmg: 40, range: 100,
                dashRange: 200, dashWidth: 150, dashDmg: 40, dashMs: 300, finishDelay: 125, ultName: "처형", ultAim: true },
-    guardian: { name: "수문장", role: "fighter", icon: "🏰", hp: 435, speed: 200, cd: 1250, dmg: 25, range: 140, arc: Math.PI * 130 / 180,
+    guardian: { name: "수문장", role: "fighter", icon: "🏰", hp: 440, speed: 200, cd: 1250, dmg: 25, range: 140, arc: Math.PI * 130 / 180,
                 fx: { slowMs: 1000, slowMul: 0.7 }, ultName: "창벽" },
-    frost:   { name: "얼음술사", role: "caster", icon: "❄️", hp: 120, speed: 240, cd: 1000, dmg: 16, range: 350, pSpeed: 650, pr: 8, ultName: "눈보라" },
-    dancer:  { name: "검무희", role: "assassin", icon: "🌸", hp: 110, speed: 250, ultSpeed: 300, cd: 833, dmg: 20, range: 350, pSpeed: 900, pr: 8, ultName: "칼날 폭풍" },
+    frost:   { name: "얼음술사", role: "caster", icon: "❄️", hp: 115, speed: 240, cd: 1000, dmg: 10, range: 350, pSpeed: 650, pr: 8, ultName: "눈보라" },
+    dancer:  { name: "검무희", role: "assassin", icon: "🌸", hp: 115, speed: 250, ultSpeed: 300, cd: 833, dmg: 20, range: 350, pSpeed: 900, pr: 8, ultName: "칼날 폭풍" },
     stormbow: { name: "뇌전사수", role: "shooter", icon: "⚡", hp: 110, speed: 200, cd: 600, dmg: 10, range: 420, pSpeed: 750, pr: 10,
                 chain: { every: 3, r: 250, count: 2, dmg: 30 }, ultName: "과충전" },
     dummy:   { name: "연습 봇", role: "fighter", icon: "🎯", hp: 99999, speed: 200, cd: 1000, dmg: 0, range: 0, ultName: "없음", practiceBot: true },
@@ -881,7 +881,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     return code % 28 === 0 ? noFinal : withFinal;
   }
   var ULT = { mkCount: 10, mkGap: 115, mkDmg: 40, mkRefund: 1, mkSpeed: 805, mkRange: KEY * 8, mkPr: 8,
-              bzDur: 4000, bzDmgMul: 1.4, bzCdMul: 1 / 1.4, bzHeal: 15, tkDur: 4000, tkDef: 0.4, tkStunR: 120, tkStunMs: 1000,
+              bzDur: 4000, bzDmgMul: 1.45, bzCdMul: 1 / 1.45, bzHeal: 15, tkDur: 4000, tkDef: 0.4, tkStunR: 120, tkStunMs: 1000,
               mbDelay: 1000, mbR: 250, mbDmg: 120, mbDmgMin: 80, mbCast: 550, mbMin: 60, mbStunMs: 1200, mbStunMin: 600, mbSteps: 5,
               asSmokeMs: 400, asDur: 15000,
               smCount: 2, smAhead: KEY * 1, smSide: 38, smHp: 70, smSpeed: 250, smGauge: 0.5, smDmg: 12, smCd: 800, smRange: 80, smArc: Math.PI * 0.6,
@@ -892,14 +892,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               lnWind: 300, lnLen: 350, lnW: 36, lnDmg: 60, lnStunMs: 1200,
               bsLeapMinMs: 200, bsLeapMaxMs: 1000, bsR: 200, bsDmg: 40, bsStunMs: 1000, bsCast: 450, bsMin: 60, bsHop: 45,
               bhR: 200, bhDur: 3000, bhDelay: 500, bhPull: 220, bhCast: 380, bhMin: 60, bhCcRate: 0.8,
-              exRange: 500, exSpeed: 1300, exPr: 4, exDmg: 25, exStunMs: 1000,
+              exRange: 600, exSpeed: 1300, exPr: 4, exDmg: 25, exStunMs: 1000,
               gdR: 200, gdKb: 150, gdKbMs: 500, gdDmg: 20, gdSlowMul: 0.8, gdSlowMs: 1000,
-              frSlowMs: 1200, frSlowMul: 0.8, frSlowStep: 0.2, frFreezeMs: 800, frFreezeMaxHpRate: 0.07,
+              frSlowMs: 1200, frSlowMul: 0.8, frSlowStep: 0.2, frFreezeMs: 800, frFreezeMaxHpRate: 0.06,
               frBzHides: true, frBzR: 400, frBzDur: 7000, frBzDmg: 12, frBzTick: 1000, frBzDelay: 400,
               bwR: 150, bwDur: 3000, bwTick: 250, bwHurtGaugeEvery: 4, bwDmg: 18, bwKillGauge: 5, bdR: 70, bdDmg: 10, bdDelay: 300,
               rmDur: 3000, rmRate: 3, rmDashMs: 300, rmDashRange: 100,
               ocDur: 5000, ocRate: 1.5, ocSpeedBonus: 50, ocRangeBonus: 30, ocR: 200, ocDmg: 30, ocStunMs: 1000, ocRingPts: 10,
-              dmR: 450, dmGrowMs: 1500, dmDur: 6500, dmStunMs: 1000, dmBoltDmg: 20, dmStrikeMaxHpRate: 0.2, dmStrikeStunMs: 500, dmStunGraceMs: 40, cuStacks: 3, cuBoomDmg: 30, cuBoomMs: 500, cuExpireMs: 3000,
+              dmR: 450, dmGrowMs: 1500, dmDur: 6500, dmStunMs: 1000, dmBoltDmg: 20, dmStrikeMaxHpRate: 0.18, dmStrikeStunMs: 500, dmStunGraceMs: 40, cuStacks: 3, cuBoomDmg: 30, cuBoomMs: 500, cuExpireMs: 3000,
               rvDur: 3000, rvTick: 1000, rvHeal: 30, rvDmg: 30, rvCastMs: 600, grLife: 650 };
   var ASSIST_MS = 5000;
   var SNIPER_KEEP = KEY * 5;
@@ -1274,13 +1274,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       function v(speed) { return Math.round(speed / CLOCK.scale); }
       var C = CHARS;
       return [
-        [C.duelist, { cd: s(1.4), dashMs: s(0.7), speed: v(175), hp: 225 }],
-        [C.warrior, { cd: s(1.4), speed: v(155), ultSpeed: v(210), hp: 225 }],
+        [C.duelist, { cd: s(1.0), dashMs: s(0.5), speed: v(175), hp: 240 }],
+        [C.warrior, { cd: s(1.4), speed: v(155), ultSpeed: v(210), hp: 230 }],
         [C.warrior.rally, { ms: s(7), perSec: 7 }],
-        [C.knight, { cd: s(1.8), speed: v(140), hp: 345 }],
+        [C.knight, { cd: s(1.8), speed: v(140), hp: 365 }],
         [C.blacksmith, { cd: s(1.8), speed: v(140), windup: s(0.7) }],
         [C.blacksmith.fx, { stunMs: s(0.7) }],
-        [C.guardian, { cd: s(1.8), speed: v(140), hp: 440 }],
+        [C.guardian, { cd: s(1.5), speed: v(140), hp: 445 }],
         [C.guardian.fx, { slowMs: s(1.5) }],
         [C.lancer, { cd: s(1.7), speed: v(140) }],
         [C.necro, { cd: s(1.4), speed: v(170), lastStandHideMs: s(1.5), range: 350 }],
@@ -1289,10 +1289,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         [C.cleric, { cd: s(1.4), speed: v(170) }],
         [C.mage, { cd: s(1.4), speed: v(170) }],
         [C.mage.burn, { ms: s(6), maxHpRate: 0.04 }],
-        [C.ranger, { cd: s(0.9), speed: v(140), dmg: 16 }],
+        [C.ranger, { cd: s(0.8), speed: v(140), dmg: 16 }],
         [C.ranger.haste, { ms: s(4) }],
         [C.stormbow, { cd: s(0.9), speed: v(140) }],
-        [C.sniper, { cd: s(1.6), speed: v(140), dmg: 37 }],
+        [C.sniper, { cd: s(1.0), speed: v(140), dmg: 40 }],
         [C.thrower, { cd: s(1.4), speed: v(155), dmg: 15 }],
         [C.dancer, { cd: s(1.2), speed: v(175), ultSpeed: v(210) }],
         [C.rogue, { cd: s(1.1), speed: v(175), ultSpeed: v(280), dmg: 32, throwDmg: 22 }],
@@ -1301,14 +1301,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
                 bzDur: s(6), tkDur: s(6), tkStunMs: s(1.5),
                 bsLeapMinMs: s(0.3), bsLeapMaxMs: s(1.5), bsStunMs: s(1.5),
                 gdSlowMs: s(1.5), lnWind: s(0.4), lnStunMs: s(1.7),
-                smDur: s(11), smSpeed: v(180), frSlowMs: s(1.7), frFreezeMs: s(1.1), frBzDur: s(10), frBzDmg: 8, frBzTick: s(1),
-                cuExpireMs: s(4), dmGrowMs: s(2), dmDur: s(9), dmStunMs: s(1.5), dmStrikeStunMs: s(0.7),
-                rvDur: s(4), rvTick: s(1), rvHeal: 21, rvDmg: 21,
+                smDur: s(11), smSpeed: v(180), frSlowMs: s(1.7), frFreezeMs: s(1.0), frBzDur: s(10), frBzDmg: 8, frBzTick: s(1),
+                cuExpireMs: s(4), dmGrowMs: s(2), dmDur: s(8), dmStunMs: s(1.5), dmStrikeStunMs: s(0.7),
+                rvDur: s(4), rvTick: s(1), rvHeal: 20, rvDmg: 20,
                 mbDelay: s(1.5), mbStunMin: s(0.9), mbStunMs: s(1.7),
                 ocDur: s(7), ocStunMs: s(1.5),
                 fgDur: s(6), fgHeal: 5, fgDmg: 13, plTick: s(1), plDur: s(3),
                 bdDelay: s(0.4), bwDur: s(4), bwTick: s(0.3),
-                asDur: s(21), exStunMs: s(1.5), exDmg: 20 }]
+                asDur: s(21), exStunMs: s(1.5), exDmg: 25 }]
       ];
     }
     applyTimeScale(v) {
@@ -2795,7 +2795,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       E.skillDur = ULT.bzDur;
     }
     ultDesc() {
-      return SKILLTEXT.secs(ULT.bzDur) + "간 공격력·공격속도 " + SKILLTEXT.num(ULT.bzDmgMul) + "배, " + SKILLTEXT.ultSpeedUpText(CHARS.warrior) + ". 기본 공격 적중 시 체력 " + ULT.bzHeal + " 회복";
+      return SKILLTEXT.secs(ULT.bzDur) + "간 공격력·공격속도 " + SKILLTEXT.pctOf(ULT.bzDmgMul - 1) + "% 증가, " + SKILLTEXT.ultSpeedUpText(CHARS.warrior) + ". 기본 공격 적중 시 체력 " + ULT.bzHeal + " 회복";
     }
     passiveDesc() {
       var c = this.data;
