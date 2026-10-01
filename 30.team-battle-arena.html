@@ -2598,6 +2598,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
                                        r: ULT.bhR, dur: ULT.bhDur, delay: ULT.bhDelay, createdAt: t });
       revealBriefly(E.id, t);
     }
+    get hasSkillClip() { return false; }
+    launchHandOf(model) { return model.getObjectByName("muzzle"); }
+    addMarkers(v, root, body) {}
+    playSkillClip(v, E, t) {}
+    earlyPose(E, t) { return null; }
+    latePose(E, t) { return null; }
+    skillGlow(E, t) { return 0; }
     ultDesc() { return ""; }
     passiveDesc() { return ""; }
     basicDesc() {
@@ -2622,6 +2629,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class WarriorType extends ArcMeleeType {
+    addMarkers(v, root, body) { v.aura = new THREE.Mesh(GEO.aura, auraMat); v.aura.visible = false; root.add(v.aura); }
+    skillGlow(E, t) { return E.buffUntil > t ? 0x772200 : 0; }
     cast(E, ang, reach, t) {
       E.buffUntil = t + ULT.bzDur;
       E.skillDur = ULT.bzDur;
@@ -2638,6 +2647,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class DuelistType extends CharacterType {
+    addMarkers(v, root, body) {
+      v.aura = new THREE.Mesh(GEO.aura, riposteAuraMat); v.aura.visible = false; root.add(v.aura);
+      if (v.kit) v.stabHand = body.getObjectByName("handslotr");
+    }
     cast(E, ang, reach, t) {
       E.buffUntil = t + ULT.rmDur;
       E.skillDur = ULT.rmDur;
@@ -2661,6 +2674,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class KnightType extends ArcMeleeType {
+    addMarkers(v, root, body) { v.shield = FIGHTER_VIEW.makeShieldAura(); root.add(v.shield); }
+    skillGlow(E, t) { return E.buffUntil > t ? 0x2A3A66 : 0; }
+    latePose(E, t) { return E.buffUntil > t ? ["Melee_Blocking", 1] : null; }
     cast(E, ang, reach, t) {
       E.buffUntil = t + ULT.tkDur;
       E.skillDur = ULT.tkDur;
@@ -2678,6 +2694,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class RangerType extends CharacterType {
+    launchHandOf(model) { return model.getObjectByName("handslotl"); }
+    earlyPose(E, t) { return E.ultUntil > t ? ["Ranged_Bow_Release", 4.5] : null; }
     get startsSkillTimer() { return false; }
     cast(E, ang, reach, t) {
       E.angle = ang; E.burst = { until: t + (ULT.mkCount - 1) * ULT.mkGap };
@@ -2700,6 +2718,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class MageType extends MagicShooterType {
+    skillGlow(E, t) { return E.ultUntil > t ? 0x661000 : 0; }
+    playSkillClip(v, E, t) { FIGHTER_VIEW.playOnce(v, "Ranged_Magic_Spellcasting_Long", 2.6, t); }
     get shotName() { return "불꽃 구슬"; }
     get startsSkillTimer() { return false; }
     cast(E, ang, reach, t) {
@@ -2720,6 +2740,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class RogueType extends CharacterType {
+    launchHandOf(model) { return model.getObjectByName("muzzle") || model.getObjectByName("handslotr"); }
     cast(E, ang, reach, t) {
       E.ultUntil = t + ULT.asSmokeMs;
       E.stealthUntil = t + ULT.asSmokeMs + ULT.asDur;
@@ -2739,6 +2760,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class NecroType extends MagicShooterType {
+    get hasSkillClip() { return true; }
+    playSkillClip(v, E, t) { FIGHTER_VIEW.playOnce(v, "Ranged_Magic_Summon", 3.2, t); }
     get shotName() { return "마법 구슬"; }
     get startsSkillTimer() { return false; }
     cast(E, ang, reach, t) {
@@ -2755,6 +2778,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class SniperType extends CharacterType {
+    skillGlow(E, t) { return E.ultUntil > t ? 0x663300 : 0; }
     get shotName() { return "화살"; }
     cast(E, ang, reach, t) {
       E.angle = ang;
@@ -2774,6 +2798,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class ThrowerType extends CharacterType {
+    skillGlow(E, t) { return E.ultUntil > t ? 0x1E5212 : 0; }
     cast(E, ang, reach, t) {
       var fogFlightMs = throwPoison(E, ang, reach, true);
       E.ultUntil = t + 450;
@@ -2820,6 +2845,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class BlacksmithType extends CharacterType {
+    get hasSkillClip() { return true; }
+    playSkillClip(v, E, t) { FIGHTER_VIEW.playOnce(v, "Melee_1H_Attack_Jump_Chop", JUMP_CHOP_LAND_SEC * 1000 / Math.max(1, E.ultUntil - (E.leapAt || t)), t); }
     cast(E, ang, reach, t) {
       var landing = burstSpot(E, ang, reach, ULT.bsCast, ULT.bsMin);
       resolve(landing);
@@ -2847,6 +2874,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class PriestType extends CharacterType {
+    get hasSkillClip() { return true; }
+    playSkillClip(v, E, t) { FIGHTER_VIEW.playOnce(v, "Ranged_Magic_Spellcasting_Long", 2.6, t); }
     ultDesc() {
       return "지정한 곳에 " + secs(ULT.bhDelay) + " 뒤 " + secs(ULT.bhDur) + "간 유지되는 반경 " + ULT.bhR + "의 블랙홀 생성. 적은 중심으로 끌려감";
     }
@@ -2859,6 +2888,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class ShamanType extends CharacterType {
+    get hasSkillClip() { return true; }
+    playSkillClip(v, E, t) { FIGHTER_VIEW.playOnce(v, "Ranged_Magic_Summon", KIT.clips.Ranged_Magic_Summon.duration * 1000 / 900, t); }
     cast(E, ang, reach, t) {
       E.ultUntil = t + 600;
       E.skillDur = ULT.dmDur;
@@ -2883,6 +2914,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class ClericType extends CharacterType {
+    get hasSkillClip() { return true; }
+    addMarkers(v, root, body) { v.halo = FIGHTER_VIEW.makeClericHalo(v, body); root.add(v.halo); }
+    playSkillClip(v, E, t) { FIGHTER_VIEW.playOnce(v, "Ranged_Magic_Raise", KIT.clips.Ranged_Magic_Raise.duration * 1000 / ULT.rvCastMs, t); }
     cast(E, ang, reach, t) {
       E.ultUntil = t + ULT.rvCastMs;
       E.buffUntil = t + ULT.rvDur;
@@ -2909,6 +2943,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class HitmanType extends CharacterType {
+    launchHandOf(model) { return model.getObjectByName("muzzle") || model.getObjectByName("handslotr"); }
+    skillGlow(E, t) { return E.ultUntil > t ? 0x660010 : 0; }
     cast(E, ang, reach, t) {
       E.angle = ang;
       E.ultUntil = t + 300;
@@ -2955,6 +2991,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class FrostType extends MagicShooterType {
+    get hasSkillClip() { return true; }
+    playSkillClip(v, E, t) {
+      FIGHTER_VIEW.playOnce(v, "Ranged_Magic_Spellcasting", KIT.clips.Ranged_Magic_Spellcasting.duration * 1000 / ULT.frBzDelay, t);
+      v.once.next = ["Ranged_Magic_Raise", 1.8];
+    }
     get shotName() { return "얼음 구슬"; }
     cast(E, ang, reach, t) {
       E.ultUntil = t + ULT.frBzDelay + 500;
@@ -2972,6 +3013,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class DancerType extends CharacterType {
+    launchHandOf(model) { return model.getObjectByName("muzzle") || model.getObjectByName("handslotr"); }
+    addMarkers(v, root, body) { v.bladeRing = FIGHTER_VIEW.makeBladeRing(); root.add(v.bladeRing); }
     get shotName() { return "단검"; }
     cast(E, ang, reach, t) {
       E.buffUntil = t + ULT.bwDur;
@@ -2989,6 +3032,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class StormbowType extends CharacterType {
+    launchHandOf(model) { return model.getObjectByName("handslotl"); }
+    addMarkers(v, root, body) {
+      v.stormAura = FX_VIEW.makeStormAura(); root.add(v.stormAura);
+      if (v.kit) v.bowSpark = FX_VIEW.addBowSpark(body.getObjectByName("offhand"));
+    }
     get shotName() { return "번개 화살"; }
     cast(E, ang, reach, t) {
       E.buffUntil = t + ULT.ocDur;
@@ -5631,7 +5679,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (E.id === myId) v.hulls = MODELS.addMeOutline(model, v.mats);
         body.add(model);
         v.kit = true; v.mixer = new THREE.AnimationMixer(model); v.actions = {};
-        v.launchHand = E.char === "ranger" || E.char === "stormbow" ? model.getObjectByName("handslotl") : (model.getObjectByName("muzzle") || (E.char === "rogue" || E.char === "hitman" || E.char === "dancer" ? model.getObjectByName("handslotr") : null));
+        v.launchHand = CHAR_TYPES.of(E.char).launchHandOf(model);
       } else {
         var mat = new THREE.MeshLambertMaterial({ color: C_TEAM[E.team], transparent: true });
         var noseMat = new THREE.MeshLambertMaterial({ color: 0xFFF3D6, transparent: true });
@@ -5647,13 +5695,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var ring = ARENA_VIEW.flatMesh(GEO.ring, ringMat); ring.position.y = 1.2; ring.add(disc); disc.position.set(0, 0, -0.1); root.add(ring);
       v.mats.push(ringMat); v.ring = ring;
       if (E.id === myId) { var meRing = ARENA_VIEW.flatMesh(GEO.meRing, meRingMat); meRing.position.y = 1.4; root.add(meRing); v.meRing = meRing; }
-      if (E.char === "warrior") { v.aura = new THREE.Mesh(GEO.aura, auraMat); v.aura.visible = false; root.add(v.aura); }
-      if (E.char === "duelist") { v.aura = new THREE.Mesh(GEO.aura, riposteAuraMat); v.aura.visible = false; root.add(v.aura); }
-      if (E.char === "knight") { v.shield = FIGHTER_VIEW.makeShieldAura(); root.add(v.shield); }
-      if (E.char === "dancer") { v.bladeRing = FIGHTER_VIEW.makeBladeRing(); root.add(v.bladeRing); }
-      if (E.char === "cleric") { v.halo = FIGHTER_VIEW.makeClericHalo(v, body); root.add(v.halo); }
-      if (E.char === "stormbow") { v.stormAura = FX_VIEW.makeStormAura(); root.add(v.stormAura); if (v.kit) v.bowSpark = FX_VIEW.addBowSpark(body.getObjectByName("offhand")); }
-      if (E.char === "duelist" && v.kit) v.stabHand = body.getObjectByName("handslotr");
+      CHAR_TYPES.of(E.char).addMarkers(v, root, body);
       (parent || scene).add(root);
       return v;
     }
@@ -5702,18 +5744,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         v.stabSeen = E.stabAt;
         if (E.alive && t - E.stabAt < 600) FIGHTER_VIEW.playOnce(v, "Melee_1H_Attack_Stab", KIT.clips.Melee_1H_Attack_Stab.duration * 1000 / (E.isRiposting(E.stabAt) ? 320 : 520), t);
       }
-      if ((E.char === "mage" || E.char === "necro" || E.char === "blacksmith" || E.char === "priest" || E.char === "frost" || E.char === "cleric" || E.char === "shaman") && E.ultUntil !== v.ultSeen) {
+      var type = CHAR_TYPES.of(E.char);
+      if (type.hasSkillClip && E.ultUntil !== v.ultSeen) {
         v.ultSeen = E.ultUntil;
         if (E.alive && E.ultUntil > t) {
-          if (E.char === "blacksmith") FIGHTER_VIEW.playOnce(v, "Melee_1H_Attack_Jump_Chop", JUMP_CHOP_LAND_SEC * 1000 / Math.max(1, E.ultUntil - (E.leapAt || t)), t);
-          else if (E.char === "necro") FIGHTER_VIEW.playOnce(v, "Ranged_Magic_Summon", 3.2, t);
-          else if (E.char === "shaman") FIGHTER_VIEW.playOnce(v, "Ranged_Magic_Summon", KIT.clips.Ranged_Magic_Summon.duration * 1000 / 900, t);
-          else if (E.char === "cleric") FIGHTER_VIEW.playOnce(v, "Ranged_Magic_Raise", KIT.clips.Ranged_Magic_Raise.duration * 1000 / ULT.rvCastMs, t);
-          else if (E.char === "frost") {
-            FIGHTER_VIEW.playOnce(v, "Ranged_Magic_Spellcasting", KIT.clips.Ranged_Magic_Spellcasting.duration * 1000 / ULT.frBzDelay, t);
-            v.once.next = ["Ranged_Magic_Raise", 1.8];
-          }
-          else FIGHTER_VIEW.playOnce(v, "Ranged_Magic_Spellcasting_Long", 2.6, t);
+          type.playSkillClip(v, E, t);
           v.once.soft = true;
         }
       }
@@ -5730,11 +5765,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         else if (!v.curName) FIGHTER_VIEW.showClip(v, "Death_A_Pose", 1, false);
       } else {
         v.dead = false;
-        if (E.char === "ranger" && E.ultUntil > t) FIGHTER_VIEW.showClip(v, "Ranged_Bow_Release", 4.5, true);
+        var earlyPose = type.earlyPose(E, t), latePose = type.latePose(E, t);
+        if (earlyPose) FIGHTER_VIEW.showClip(v, earlyPose[0], earlyPose[1], true);
         else if (E.isBladeStorming(t)) FIGHTER_VIEW.showClip(v, "Melee_2H_Attack_Spinning", 1.2, true);
         else if (v.once) { FIGHTER_VIEW.showClip(v, v.once.name, v.once.ts, false, v.once.fresh); v.once.fresh = false; }
         else if (FIGHTER_VIEW.revelationOn(E, t)) FIGHTER_VIEW.showClip(v, "Ranged_Magic_Spellcasting", 1, true);
-        else if (E.char === "knight" && E.buffUntil > t) FIGHTER_VIEW.showClip(v, "Melee_Blocking", 1, true);
+        else if (latePose) FIGHTER_VIEW.showClip(v, latePose[0], latePose[1], true);
         else if (E.mv && v.speed > 150) FIGHTER_VIEW.showClip(v, "Running_A", clamp(v.speed / 260, 0.7, 1.6), true);
         else if (E.mv && v.speed > 15) FIGHTER_VIEW.showClip(v, "Walking_A", clamp(v.speed / 110, 0.6, 1.4), true);
         else FIGHTER_VIEW.showClip(v, idleClipOf(E.char), 1, true);
@@ -6653,12 +6689,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     glowOf(E, t) {
       if (E.flashUntil > Date.now()) return 0x999999;
-      if (E.char === "warrior" && E.buffUntil > t) return 0x772200;
-      if (E.char === "knight" && E.buffUntil > t) return 0x2A3A66;
-      if ((E.char === "mage" || E.char === "sniper") && E.ultUntil > t) return E.char === "mage" ? 0x661000 : 0x663300;
-      if (E.char === "thrower" && E.ultUntil > t) return 0x1E5212;
+      var skillGlow = CHAR_TYPES.of(E.char).skillGlow(E, t);
+      if (skillGlow) return skillGlow;
       if (E.isHammerLeaping(t)) return 0x553000;
-      if (E.char === "hitman" && E.ultUntil > t) return 0x660010;
       if (E.isRiposting(t)) return 0x9A9A9A;
       if (E.isBladeStorming(t)) return 0x551020;
       if (FIGHTER_VIEW.revelationOn(E, t)) return 0x5A4A10;
