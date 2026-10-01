@@ -1146,12 +1146,59 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       db = firebase.database();
     }
   } catch (e) { db = null; }
-  var serverOffset = 0;
-  if (db) db.ref(".info/serverTimeOffset").on("value", function (s) { serverOffset = s.val() || 0; });
   var CLOCK_PINGS = 5, CLOCK_GAP_MS = 500, CLOCK_KEEP = 10;
-  var CLOCK = { off: null, samples: [], host: null, timer: null };
-  var TEST_CLOCK = null;
-  var TS = 1;
+  class GameClock {
+    constructor(link) {
+      this.link = link;
+      this.serverOffset = 0;
+      this.scale = 1;
+      this.testTime = null;
+      this.timer = null;
+      this.resetSync(null);
+    }
+    resetSync(host) { this.host = host; this.samples = []; this.off = null; }
+    real() { return Date.now() + (this.off === null || this.link.isHost() ? this.serverOffset : this.off); }
+    now() {
+      if (this.testTime !== null) return this.testTime;
+      var real = this.real(), room = this.link.room();
+      return this.scale !== 1 && room && room.startAt && real > room.startAt ? room.startAt + (real - room.startAt) * this.scale : real;
+    }
+    stopBurst() { clearInterval(this.timer); }
+    burst() {
+      var clock = this, link = this.link;
+      this.stopBurst();
+      var left = CLOCK_PINGS;
+      function ping() {
+        if (!link.room() || link.isHost() || left-- <= 0) { clock.stopBurst(); return; }
+        link.room().ref.child("ping/" + link.myId()).set({ a: Date.now() });
+      }
+      ping();
+      this.timer = setInterval(ping, CLOCK_GAP_MS);
+    }
+    onPing(s) {
+      var v = s.val(), room = this.link.room();
+      if (!room || !this.link.isHost() || !v || !v.a) return;
+      room.ref.child("pong/" + s.key).set({ a: v.a, t: this.real(), h: this.link.myId() });
+    }
+    onPong(s) {
+      var v = s.val(), got = Date.now(), room = this.link.room();
+      if (!room || !v || v.h !== room.host || this.link.isHost()) return;
+      var rtt = got - v.a;
+      if (rtt < 0 || rtt > 5000) return;
+      this.samples.push({ rtt: rtt, off: v.t - (v.a + got) / 2 });
+      if (this.samples.length > CLOCK_KEEP) this.samples.shift();
+      var best = this.samples[0];
+      this.samples.forEach(function (x) { if (x.rtt < best.rtt) best = x; });
+      this.off = best.off;
+    }
+    hostChanged(host) {
+      if (host === this.host) return;
+      this.resetSync(host);
+      if (host) this.burst();
+    }
+  }
+  var CLOCK = new GameClock({ isHost: isHost, room: function () { return room; }, myId: function () { return myId; } });
+  if (db) db.ref(".info/serverTimeOffset").on("value", function (s) { CLOCK.serverOffset = s.val() || 0; });
   var DEFAULT_SLOW = 0.7;
   var SLOW_REQUEST = (function () {
     var m = /[?&]slow(?:=([0-9.]+))?(&|$)/.exec(location.search);
@@ -1159,16 +1206,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var v = m[1] ? parseFloat(m[1]) : DEFAULT_SLOW;
     return v >= 0.3 && v < 1 ? v : 1;
   })();
-  function realNow() { return Date.now() + (CLOCK.off === null || isHost() ? serverOffset : CLOCK.off); }
-  function now() {
-    if (TEST_CLOCK !== null) return TEST_CLOCK;
-    var real = realNow();
-    return TS !== 1 && room && room.startAt && real > room.startAt ? room.startAt + (real - room.startAt) * TS : real;
-  }
+  function now() { return CLOCK.now(); }
   var TUNE_UNDO = [];
   function slowTuning() {
-    function s(sec) { return Math.round(sec * 1000 * TS); }
-    function v(speed) { return Math.round(speed / TS); }
+    function s(sec) { return Math.round(sec * 1000 * CLOCK.scale); }
+    function v(speed) { return Math.round(speed / CLOCK.scale); }
     var C = CHARS;
     return [
       [C.duelist, { cd: s(1.4), dashMs: s(0.7), speed: v(175), hp: 225 }],
@@ -1211,43 +1253,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function applyTimeScale(v) {
     TUNE_UNDO.forEach(function (u) { u[0][u[1]] = u[2]; });
     TUNE_UNDO = [];
-    TS = v > 0 && v < 1 ? +v : 1;
-    MATCH_MS = 90000 * TS; RESPAWN_MS = 3000 * TS; RESPAWN_PROTECT_MS = 2500 * TS;
+    CLOCK.scale = v > 0 && v < 1 ? +v : 1;
+    MATCH_MS = 90000 * CLOCK.scale; RESPAWN_MS = 3000 * CLOCK.scale; RESPAWN_PROTECT_MS = 2500 * CLOCK.scale;
     BURN_TICK_MS = REGEN_TICK_MS = 1000;
-    if (TS === 1) return;
+    if (CLOCK.scale === 1) return;
     slowTuning().forEach(function (e) { keys(e[1]).forEach(function (k) { TUNE_UNDO.push([e[0], k, e[0][k]]); e[0][k] = e[1][k]; }); });
-    BURN_TICK_MS = REGEN_TICK_MS = Math.round(1000 * TS);
-  }
-  function clockBurst() {
-    clearInterval(CLOCK.timer);
-    var left = CLOCK_PINGS;
-    function ping() {
-      if (!room || isHost() || left-- <= 0) { clearInterval(CLOCK.timer); return; }
-      room.ref.child("ping/" + myId).set({ a: Date.now() });
-    }
-    ping();
-    CLOCK.timer = setInterval(ping, CLOCK_GAP_MS);
-  }
-  function onPing(s) {
-    var v = s.val();
-    if (!room || !isHost() || !v || !v.a) return;
-    room.ref.child("pong/" + s.key).set({ a: v.a, t: realNow(), h: myId });
-  }
-  function onPong(s) {
-    var v = s.val(), got = Date.now();
-    if (!room || !v || v.h !== room.host || isHost()) return;
-    var rtt = got - v.a;
-    if (rtt < 0 || rtt > 5000) return;
-    CLOCK.samples.push({ rtt: rtt, off: v.t - (v.a + got) / 2 });
-    if (CLOCK.samples.length > CLOCK_KEEP) CLOCK.samples.shift();
-    var best = CLOCK.samples[0];
-    CLOCK.samples.forEach(function (x) { if (x.rtt < best.rtt) best = x; });
-    CLOCK.off = best.off;
-  }
-  function hostChangedClock(host) {
-    if (host === CLOCK.host) return;
-    CLOCK.host = host; CLOCK.samples = []; CLOCK.off = null;
-    if (host) clockBurst();
+    BURN_TICK_MS = REGEN_TICK_MS = Math.round(1000 * CLOCK.scale);
   }
   var ROOT = "teambattle/rooms";
   var myId = "p" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
@@ -1362,14 +1373,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var ref = db.ref(ROOT + "/" + code);
     room = { code: code, ref: ref, mode: null, map: "forest", status: "lobby", host: null, startAt: 0, winner: null, endedAt: 0, final: null, roster: null, draft: null, bans: null, statsNote: null };
     clear3d();
-    P = {}; R = {}; PR = {}; MELEE = {}; FX = []; BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; STORMS = []; REVS = []; GRACES = []; DOMAINS = []; CURSES = {}; BLADE_SPINS = []; G = null; ME = null; BOTS = {}; ST = {}; SHOTS = []; hitSubs = {};
+    P = {}; R = {}; PR = {}; MELEE = {}; FX = []; FIELD.reset(); G = null; ME = null; BOTS = {}; ST = {}; SHOTS = []; hitSubs = {};
     ref.child("players/" + myId).onDisconnect().remove();
     ref.child("ping/" + myId).onDisconnect().remove();
     ref.child("pong/" + myId).onDisconnect().remove();
-    CLOCK.host = null; CLOCK.samples = []; CLOCK.off = null;
-    sub(ref.child("ping"), "child_added", onPing);
-    sub(ref.child("ping"), "child_changed", onPing);
-    sub(ref.child("pong/" + myId), "value", onPong);
+    CLOCK.resetSync(null);
+    sub(ref.child("ping"), "child_added", function (x) { CLOCK.onPing(x); });
+    sub(ref.child("ping"), "child_changed", function (x) { CLOCK.onPing(x); });
+    sub(ref.child("pong/" + myId), "value", function (x) { CLOCK.onPong(x); });
 
     var pref = ref.child("players");
     sub(pref, "child_added", function (s) { P[s.key] = s.val(); if (s.key === myId) saveResume(); playersChanged(); });
@@ -1383,12 +1394,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     sub(ref.child("mode"), "value", function (s) { room.mode = s.val(); playersChanged(); });
     sub(ref.child("map"), "value", function (s) { room.map = s.val() || "forest"; syncArena(); playersChanged(); });
     sub(ref.child("arena"), "value", function (s) { room.arena = s.val() || "forest"; syncArena(); });
-    sub(ref.child("hostPlayerId"), "value", function (s) { room.host = s.val(); room.hostLoaded = true; hostChangedClock(room.host); checkHost(); playersChanged(); });
+    sub(ref.child("hostPlayerId"), "value", function (s) { room.host = s.val(); room.hostLoaded = true; CLOCK.hostChanged(room.host); checkHost(); playersChanged(); });
     sub(ref.child("startAt"), "value", function (s) { room.startAt = s.val() || 0; });
     sub(ref.child("timeScale"), "value", function (s) {
-      var before = TS;
+      var before = CLOCK.scale;
       room.timeScale = s.val(); applyTimeScale(room.timeScale);
-      if (TS !== before) { cardHeightFor = null; playersChanged(); }
+      if (CLOCK.scale !== before) { cardHeightFor = null; playersChanged(); }
     });
     sub(ref.child("winner"), "value", function (s) { room.winner = s.val(); });
     sub(ref.child("bans"), "value", function (s) { room.bans = s.val(); });
@@ -1396,7 +1407,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     sub(ref.child("final"), "value", function (s) { room.final = s.val(); });
     sub(ref.child("roster"), "value", function (s) { room.roster = s.val(); });
     sub(ref.child("statsNote"), "value", function (s) { room.statsNote = s.val(); });
-    sub(ref.child("draft"), "value", function (s) { room.draft = s.val(); renderDraft(); });
+    sub(ref.child("draft"), "value", function (s) { room.draft = s.val(); DRAFT.renderDraft(); });
     sub(ref.child("status"), "value", function (s) {
       var st = s.val();
       if (st === null) { if (!leaving) exitToStart("방이 종료되었어요."); return; }
@@ -1404,9 +1415,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var keepSpecResult = st === "lobby" && prev === "ended" && screenNow === "game" && isSpec();
       if (!keepSpecResult) releaseSpecResult();
       if (st === "lobby") { G = null; ME = null; BOTS = {}; if (keepSpecResult) holdSpecResult(); else showScreen("lobby"); playersChanged(); }
-      else if (st === "draft") { G = null; ME = null; BOTS = {}; if (prev !== "draft") draftView = null; showScreen("draft"); renderDraft(); }
+      else if (st === "draft") { G = null; ME = null; BOTS = {}; if (prev !== "draft") DRAFT.view = null; showScreen("draft"); DRAFT.renderDraft(); }
       else showScreen("game");
-      if (st === "countdown" && prev !== "countdown") clockBurst();
+      if (st === "countdown" && prev !== "countdown") CLOCK.burst();
       if (st === "ended" && prev !== "ended") onEnded();
     });
     var stRef = ref.child("st");
@@ -1446,7 +1457,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     unsubAll();
     var myRef = r.ref.child("players/" + myId);
     try { myRef.onDisconnect().cancel(); } catch (e) {}
-    clearInterval(CLOCK.timer);
+    CLOCK.stopBurst();
     r.ref.child("ping/" + myId).remove(); r.ref.child("pong/" + myId).remove();
     myRef.remove().then(function () {
       return r.ref.child("players").once("value");
@@ -1466,7 +1477,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (room) { leaving = true; unsubAll(); try { room.ref.child("players/" + myId).onDisconnect().cancel(); } catch (e) {} }
     room = null; resetLocal(); showScreen("start"); startMsg(msg || "");
   }
-  function resetLocal() { applyTimeScale(SLOW_REQUEST); clear3d(); BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; STORMS = []; REVS = []; GRACES = []; DOMAINS = []; CURSES = {}; BLADE_SPINS = []; P = {}; R = {}; PR = {}; MELEE = {}; FX = []; G = null; ME = null; BOTS = {}; ST = {}; SHOTS = []; hitSubs = {}; joy.id = null; aim.id = null; specResultHeld = false; setText($("btnAgain"), "다시하기"); }
+  function resetLocal() { applyTimeScale(SLOW_REQUEST); clear3d(); FIELD.reset(); P = {}; R = {}; PR = {}; MELEE = {}; FX = []; G = null; ME = null; BOTS = {}; ST = {}; SHOTS = []; hitSubs = {}; joy.id = null; aim.id = null; specResultHeld = false; setText($("btnAgain"), "다시하기"); }
   window.addEventListener("pagehide", function () { saveResume(); if (room) { try { room.ref.child("players/" + myId).remove(); } catch (e) {} } });
   document.addEventListener("visibilitychange", function () { if (document.hidden) saveResume(); });
 
@@ -1683,9 +1694,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function fitCharCols() { fitCharCol($("charCardBox")); fitCharCol(document.querySelector(".dfCharCol")); }
   window.addEventListener("resize", fitCharCols);
   function num(v) { return String(Math.round(v * 10) / 10); }
-  function secs(ms) { return (Math.round(ms / TS / 10) / 100) + "초"; }
-  function shownSpeed(v) { return Math.round(v * TS); }
-  function attackText(cdMs, perSec) { return TS !== 1 ? "공격 간격 " + num(cdMs / TS / 1000) + "초" : "초당 공격 " + perSec + "회"; }
+  function secs(ms) { return (Math.round(ms / CLOCK.scale / 10) / 100) + "초"; }
+  function shownSpeed(v) { return Math.round(v * CLOCK.scale); }
+  function attackText(cdMs, perSec) { return CLOCK.scale !== 1 ? "공격 간격 " + num(cdMs / CLOCK.scale / 1000) + "초" : "초당 공격 " + perSec + "회"; }
   function pctOf(rate) { return Math.round(rate * 100); }
   function slowPct(mul) { return Math.round((1 - mul) * 100) + "% 둔화"; }
   function ultDesc(k) {
@@ -1694,13 +1705,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "knight") return secs(ULT.tkDur) + "간 받는 피해 " + num(ULT.tkDef) + "배. 끝날 때 반경 " + ULT.tkStunR + "의 적은 " + secs(ULT.tkStunMs) + "간 기절";
     if (k === "ranger") return ULT.mkDmg + "의 피해를 주는 화살 " + ULT.mkCount + "발 연사. 적중마다 게이지 " + ULT.mkRefund + " 회복";
     if (k === "mage") return "지정한 곳에 " + secs(ULT.mbDelay) + " 뒤 반경 " + ULT.mbR + "의 폭발. 적은 " + ULT.mbDmgMin + "~" + ULT.mbDmg + "의 피해, " +
-      num(ULT.mbStunMin / TS / 1000) + "~" + secs(ULT.mbStunMs) + "의 기절. 중심에 가까울수록 강함";
+      num(ULT.mbStunMin / CLOCK.scale / 1000) + "~" + secs(ULT.mbStunMs) + "의 기절. 중심에 가까울수록 강함";
     if (k === "rogue") return secs(ULT.asDur) + "간 은신 상태가 되고 " + speedUp(CHARS.rogue) + ". 공격 시 해제되며, 해제하는 공격이 베기면 한 번마다 " + CHARS.rogue.ambushDmg + "의 피해";
     if (k === "necro") return secs(ULT.smDur) + "간 유지되는 해골 병사 " + ULT.smCount + "마리 소환(최대 " + ULT.smMax + "마리). 해골은 체력 " + ULT.smHp + ", 공격 " + ULT.smDmg + ", 이동속도 " + shownSpeed(ULT.smSpeed) + ". 해골이 적을 공격할 때마다 네크로의 게이지 " + ULT.smGauge + " 회복";
     if (k === "sniper") return "사거리 " + ULT.pnRange + "의 거대한 화살 발사. 적은 " + ULT.pnDmg + "의 피해, 적중 시 게이지 " + ULT.pnRefund + " 회복";
     if (k === "thrower") return "지정한 곳에 " + secs(ULT.fgDur) + "간 유지되는 반경 " + ULT.fgR + "의 독안개 설치. 아군은 1초당 체력 " + ULT.fgHeal + " 회복, 적은 1초당 " + ULT.fgDmg + "의 피해를 입고 " + slowPct(ULT.fgSlowMul);
     if (k === "lancer") return secs(ULT.lnWind) + " 준비 후 사거리 " + ULT.lnLen + "의 창 찌르기. 맞은 적은 모두 " + ULT.lnDmg + "의 피해를 입고 " + secs(ULT.lnStunMs) + "간 기절";
-    if (k === "blacksmith") return "지정한 곳에 거리에 따라 " + num(ULT.bsLeapMinMs / TS / 1000) + "~" + secs(ULT.bsLeapMaxMs) + " 뒤 착지. 반경 " + ULT.bsR + "의 적은 " + ULT.bsDmg + "의 피해를 입고 " + secs(ULT.bsStunMs) + "간 기절";
+    if (k === "blacksmith") return "지정한 곳에 거리에 따라 " + num(ULT.bsLeapMinMs / CLOCK.scale / 1000) + "~" + secs(ULT.bsLeapMaxMs) + " 뒤 착지. 반경 " + ULT.bsR + "의 적은 " + ULT.bsDmg + "의 피해를 입고 " + secs(ULT.bsStunMs) + "간 기절";
     if (k === "hitman") return "사거리 " + ULT.exRange + "의 칼날 발사. 처음 맞은 적은 " + ULT.exDmg + "의 피해를 입고 " + secs(ULT.exStunMs) + "간 기절, 그 위치로 순간이동";
     if (k === "guardian") return "자신을 중심으로 반경 " + ULT.gdR + "의 적을 모두 " + ULT.gdKb + "만큼 밀어내며 " + ULT.gdDmg + "의 피해. 밀려난 적은 " + secs(ULT.gdSlowMs) + "간 " + slowPct(ULT.gdSlowMul);
     if (k === "shaman") return "자신을 중심으로 " + secs(ULT.dmGrowMs) + "간 반경 " + ULT.dmR + "까지 커진 뒤 " + secs(ULT.dmDur - ULT.dmGrowMs) + "간 유지되는 영역 생성. 영역이 커지는 과정에서 닿은 적은 " + secs(ULT.dmStunMs) +
@@ -1751,7 +1762,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
             : k === "dancer" ? num(c.dmg) + "+" + num(ULT.bdDmg)
             : pair(hit, c.throwDmg || (rage ? Math.round(c.dmg * ULT.bzDmgMul) : null)) + (c.heal ? "(" + c.heal + ")" : "");
     var altCd = rage ? c.cd * ULT.bzCdMul : k === "duelist" ? 1000 / ULT.rmRate : k === "stormbow" ? c.cd / ULT.ocRate : null;
-    var rateRow = TS !== 1 ? "<tr><th>공격 간격</th><td>" + pair(num(c.cd / TS / 1000), altCd == null ? null : num(altCd / TS / 1000)) + "초</td></tr>"
+    var rateRow = CLOCK.scale !== 1 ? "<tr><th>공격 간격</th><td>" + pair(num(c.cd / CLOCK.scale / 1000), altCd == null ? null : num(altCd / CLOCK.scale / 1000)) + "초</td></tr>"
                            : "<tr><th>초당 공격</th><td>" + pair(num(1000 / c.cd), altCd == null ? null : num(1000 / altCd)) + "회</td></tr>";
     return '<table class="st"><tr><th>HP</th><td>' + c.hp + "</td></tr><tr><th>공격</th><td>" + dmg + "</td></tr>" +
            rateRow +
@@ -2209,7 +2220,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function startGame() {
     if (!isHost() || room.status !== "lobby") return;
     audio();
-    if (room.mode === "cup") { startDraft(); return; }
+    if (room.mode === "cup") { DRAFT.startDraft(); return; }
     launchMatch(function (id) { return P[id].characterType; }, COUNT_MS, resolveArena(room.map));
   }
   function launchMatch(charOf, countMs, arena, bans) {
@@ -2234,302 +2245,304 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       });
     }
     u.roster = roster; u.st = st; u.arena = arena; u.draft = null; u.bans = bans && bans.length ? bans : null;
-    u.status = "countdown"; u.startAt = realNow() + countMs; u.winner = null; u.final = null; u.statsNote = null; u.endedAt = null;
+    u.status = "countdown"; u.startAt = CLOCK.real() + countMs; u.winner = null; u.final = null; u.statsNote = null; u.endedAt = null;
     u.shots = null; u.meleeHits = null; u.hits = null; u.effects = null; u.kills = null; u.projectiles = null;
     room.ref.update(u);
   }
 
   var DRAFT_STEPS = [{ keys: ["b1"], ban: true }, { keys: ["r1"], ban: true }, { keys: ["b1"] }, { keys: ["r1", "r2"] }, { keys: ["b2", "b3"] }, { keys: ["r3"] }];
   var DRAFT_SHOWN_MS = 15000, DRAFT_STEP_MS = 16000, DRAFT_AI_MS = 2500, DRAFT_AI_TRADE_MS = 1200, TRADE_DENIED_SHOW_MS = 2000, NO_BAN = "-";
-  var draftView = null, draftBusy = false, draftLaunched = 0;
-  function stepSide(step) { return DRAFT_STEPS[step].keys[0].charAt(0); }
-  function draftStepIds(d, step) {
-    return ((DRAFT_STEPS[step] || {}).keys || []).map(function (k) { return d.seq && d.seq[k]; }).filter(function (id) { return !!id; });
-  }
-  function draftWaiting(d, step) {
-    var S = DRAFT_STEPS[step];
-    if (!S) return [];
-    if (S.ban) return d.bans && d.bans[stepSide(step)] ? [] : draftStepIds(d, step).filter(function (id) { return P[id]; });
-    var picks = d.picks || {};
-    return draftStepIds(d, step).filter(function (id) { return P[id] && !picks[id]; });
-  }
-  function draftBanned(d) {
-    var bans = d.bans || {};
-    return ["b", "r"].map(function (k) { return bans[k]; }).filter(function (c) { return c && c !== NO_BAN; });
-  }
-  function draftTaken(d) {
-    var picks = d.picks || {};
-    return keys(picks).map(function (id) { return picks[id]; });
-  }
-  function draftLeft(d) {
-    var gone = draftTaken(d).concat(draftBanned(d));
-    return CHAR_LIST.filter(function (c) { return gone.indexOf(c) < 0; });
-  }
-  function draftDone(d) { return d.step >= DRAFT_STEPS.length; }
-  function draftSideOf(d, id) {
-    var k = keys(d.seq || {}).filter(function (s) { return d.seq[s] === id; })[0];
-    return k ? k.charAt(0) : null;
-  }
-  function draftHumans(d) {
-    return keys(d.seq || {}).map(function (k) { return d.seq[k]; }).filter(function (id) { return P[id] && !P[id].isAI; });
-  }
-  function draftReadyCount(d) {
-    var ready = d.ready || {};
-    return draftHumans(d).filter(function (id) { return ready[id]; }).length;
-  }
-  function canTradeWith(d, id) {
-    var ready = d.ready || {}, picks = d.picks || {};
-    return draftDone(d) && !d.trade && id !== myId && P[id] && P[myId] && !ready[id] && !ready[myId] &&
-      draftSideOf(d, id) && draftSideOf(d, id) === draftSideOf(d, myId) && !!picks[id] && !!picks[myId];
-  }
-  function draftSettle(d, t) {
-    while (d.step < DRAFT_STEPS.length && !draftWaiting(d, d.step).length) { d.step++; d.stepAt = t; }
-    return d;
-  }
-  function startDraft() {
-    var seq = {}, t = now();
-    ["blue", "red"].forEach(function (team) {
-      teamIds(team).slice(0, 3).forEach(function (id, i) { seq[(team === "blue" ? "b" : "r") + (i + 1)] = id; });
-    });
-    var d = draftSettle({ seq: seq, step: 0, stepAt: t }, t);
-    room.ref.update({ draft: d, arena: resolveArena(room.map), status: "draft", roster: null, st: null, winner: null, final: null, statsNote: null, endedAt: null, startAt: null,
-                      shots: null, meleeHits: null, hits: null, effects: null, kills: null, projectiles: null });
-  }
-  function applyDraftChoice(cur, id, c) {
-    if (DRAFT_STEPS[cur.step].ban) { cur.bans = cur.bans || {}; cur.bans[stepSide(cur.step)] = c; }
-    else { cur.picks = cur.picks || {}; cur.picks[id] = c; }
-    if (cur.hover) delete cur.hover[id];
-  }
-  function draftPick(c) {
-    var d = room && room.draft;
-    if (!d || room.status !== "draft" || draftWaiting(d, d.step).indexOf(myId) < 0 || draftLeft(d).indexOf(c) < 0) return;
-    room.ref.child("draft").transaction(function (cur) {
-      if (!cur || draftWaiting(cur, cur.step).indexOf(myId) < 0 || draftLeft(cur).indexOf(c) < 0) return;
-      applyDraftChoice(cur, myId, c);
-      return draftSettle(cur, now());
-    }).then(function (res) { if (res.committed) sfx("confirm"); });
-  }
-  function draftHover(c) {
-    var d = room && room.draft;
-    if (!d || draftWaiting(d, d.step).indexOf(myId) < 0) return;
-    room.ref.child("draft/hover/" + myId).set(c);
-  }
-  function draftReady() {
-    room.ref.child("draft").transaction(function (cur) {
-      if (!cur || !draftDone(cur) || !P[myId] || !draftSideOf(cur, myId)) return;
-      if (cur.trade && (cur.trade.from === myId || cur.trade.to === myId)) return;
-      cur.ready = cur.ready || {};
-      cur.ready[myId] = !cur.ready[myId];
-      return cur;
-    }).then(function (res) { if (res.committed) sfx("confirm"); });
-  }
-  function draftTradeAsk(id) {
-    var d = room && room.draft;
-    if (!d || !canTradeWith(d, id)) return;
-    room.ref.child("draft").transaction(function (cur) {
-      if (!cur || !canTradeWith(cur, id)) return;
-      cur.trade = { from: myId, to: id, at: now() };
-      return cur;
-    });
-  }
-  function swapTradePicks(cur) {
-    var tr = cur.trade, mine = cur.picks[tr.from];
-    cur.picks[tr.from] = cur.picks[tr.to];
-    cur.picks[tr.to] = mine;
-    cur.trade = null;
-  }
-  function draftTradeAnswer(accept) {
-    room.ref.child("draft").transaction(function (cur) {
-      if (!cur || !cur.trade || cur.trade.to !== myId) return;
-      if (accept) swapTradePicks(cur);
-      else { cur.denied = { to: cur.trade.from, at: now() }; cur.trade = null; }
-      return cur;
-    }).then(function (res) { if (res.committed && accept) sfx("confirm"); });
-  }
-  function draftTradeCancel() {
-    room.ref.child("draft").transaction(function (cur) {
-      if (!cur || !cur.trade || cur.trade.from !== myId) return;
-      cur.trade = null;
-      return cur;
-    });
-  }
-  function hostDraftFinish(d, t) {
-    var tr = d.trade, ready = d.ready || {};
-    var tradeGone = tr && (!P[tr.from] || !P[tr.to] || ready[tr.from] || ready[tr.to]);
-    var aiAccepts = tr && !tradeGone && P[tr.to].isAI && t >= tr.at + DRAFT_AI_TRADE_MS;
-    if (tradeGone || aiAccepts) {
-      draftBusy = true;
-      room.ref.child("draft").transaction(function (cur) {
-        if (!cur || !cur.trade || cur.trade.at !== tr.at) return;
-        if (aiAccepts) swapTradePicks(cur); else cur.trade = null;
-        return cur;
-      }).then(function () { draftBusy = false; }, function () { draftBusy = false; });
-      return;
+  class Draft {
+    constructor() { this.view = null; this.busy = false; this.launched = 0; }
+    stepSide(step) { return DRAFT_STEPS[step].keys[0].charAt(0); }
+    draftStepIds(d, step) {
+      return ((DRAFT_STEPS[step] || {}).keys || []).map(function (k) { return d.seq && d.seq[k]; }).filter(function (id) { return !!id; });
     }
-    if (tr || draftReadyCount(d) < draftHumans(d).length || draftLaunched === d.stepAt) return;
-    draftLaunched = d.stepAt;
-    var picks = d.picks || {}, spare = draftLeft(d);
-    launchMatch(function (id) { return picks[id] || spare.splice(Math.floor(Math.random() * spare.length), 1)[0]; }, COUNT_MS, ARENA, draftBanned(d));
-  }
-  function hostDraftTick() {
-    var d = room.draft, t = now();
-    if (!d || draftBusy) return;
-    if (draftDone(d)) { hostDraftFinish(d, t); return; }
-    var step = d.step, banStep = DRAFT_STEPS[step].ban, timeUp = t >= d.stepAt + DRAFT_STEP_MS, aiDue = t >= d.stepAt + DRAFT_AI_MS;
-    var waiting = draftWaiting(d, step);
-    var auto = waiting.filter(function (id) { return timeUp || (aiDue && P[id].isAI); });
-    if (waiting.length && !auto.length) return;
-    draftBusy = true;
-    room.ref.child("draft").transaction(function (cur) {
-      if (!cur || cur.step !== step) return;
-      auto.forEach(function (id) {
-        if (draftWaiting(cur, step).indexOf(id) < 0) return;
-        var left = draftLeft(cur), hover = cur.hover && cur.hover[id], chosen = left.indexOf(hover) >= 0 ? hover : null;
-        if (banStep) applyDraftChoice(cur, id, chosen || (P[id].isAI && left.length ? pick(left) : NO_BAN));
-        else if (left.length) applyDraftChoice(cur, id, chosen || pick(left));
+    draftWaiting(d, step) {
+      var S = DRAFT_STEPS[step];
+      if (!S) return [];
+      if (S.ban) return d.bans && d.bans[DRAFT.stepSide(step)] ? [] : DRAFT.draftStepIds(d, step).filter(function (id) { return P[id]; });
+      var picks = d.picks || {};
+      return DRAFT.draftStepIds(d, step).filter(function (id) { return P[id] && !picks[id]; });
+    }
+    draftBanned(d) {
+      var bans = d.bans || {};
+      return ["b", "r"].map(function (k) { return bans[k]; }).filter(function (c) { return c && c !== NO_BAN; });
+    }
+    draftTaken(d) {
+      var picks = d.picks || {};
+      return keys(picks).map(function (id) { return picks[id]; });
+    }
+    draftLeft(d) {
+      var gone = DRAFT.draftTaken(d).concat(DRAFT.draftBanned(d));
+      return CHAR_LIST.filter(function (c) { return gone.indexOf(c) < 0; });
+    }
+    draftDone(d) { return d.step >= DRAFT_STEPS.length; }
+    draftSideOf(d, id) {
+      var k = keys(d.seq || {}).filter(function (s) { return d.seq[s] === id; })[0];
+      return k ? k.charAt(0) : null;
+    }
+    draftHumans(d) {
+      return keys(d.seq || {}).map(function (k) { return d.seq[k]; }).filter(function (id) { return P[id] && !P[id].isAI; });
+    }
+    draftReadyCount(d) {
+      var ready = d.ready || {};
+      return DRAFT.draftHumans(d).filter(function (id) { return ready[id]; }).length;
+    }
+    canTradeWith(d, id) {
+      var ready = d.ready || {}, picks = d.picks || {};
+      return DRAFT.draftDone(d) && !d.trade && id !== myId && P[id] && P[myId] && !ready[id] && !ready[myId] &&
+        DRAFT.draftSideOf(d, id) && DRAFT.draftSideOf(d, id) === DRAFT.draftSideOf(d, myId) && !!picks[id] && !!picks[myId];
+    }
+    draftSettle(d, t) {
+      while (d.step < DRAFT_STEPS.length && !DRAFT.draftWaiting(d, d.step).length) { d.step++; d.stepAt = t; }
+      return d;
+    }
+    startDraft() {
+      var seq = {}, t = now();
+      ["blue", "red"].forEach(function (team) {
+        teamIds(team).slice(0, 3).forEach(function (id, i) { seq[(team === "blue" ? "b" : "r") + (i + 1)] = id; });
       });
-      return draftSettle(cur, now());
-    }).then(function () { draftBusy = false; }, function () { draftBusy = false; });
+      var d = DRAFT.draftSettle({ seq: seq, step: 0, stepAt: t }, t);
+      room.ref.update({ draft: d, arena: resolveArena(room.map), status: "draft", roster: null, st: null, winner: null, final: null, statsNote: null, endedAt: null, startAt: null,
+                        shots: null, meleeHits: null, hits: null, effects: null, kills: null, projectiles: null });
+    }
+    applyDraftChoice(cur, id, c) {
+      if (DRAFT_STEPS[cur.step].ban) { cur.bans = cur.bans || {}; cur.bans[DRAFT.stepSide(cur.step)] = c; }
+      else { cur.picks = cur.picks || {}; cur.picks[id] = c; }
+      if (cur.hover) delete cur.hover[id];
+    }
+    draftPick(c) {
+      var d = room && room.draft;
+      if (!d || room.status !== "draft" || DRAFT.draftWaiting(d, d.step).indexOf(myId) < 0 || DRAFT.draftLeft(d).indexOf(c) < 0) return;
+      room.ref.child("draft").transaction(function (cur) {
+        if (!cur || DRAFT.draftWaiting(cur, cur.step).indexOf(myId) < 0 || DRAFT.draftLeft(cur).indexOf(c) < 0) return;
+        DRAFT.applyDraftChoice(cur, myId, c);
+        return DRAFT.draftSettle(cur, now());
+      }).then(function (res) { if (res.committed) sfx("confirm"); });
+    }
+    draftHover(c) {
+      var d = room && room.draft;
+      if (!d || DRAFT.draftWaiting(d, d.step).indexOf(myId) < 0) return;
+      room.ref.child("draft/hover/" + myId).set(c);
+    }
+    draftReady() {
+      room.ref.child("draft").transaction(function (cur) {
+        if (!cur || !DRAFT.draftDone(cur) || !P[myId] || !DRAFT.draftSideOf(cur, myId)) return;
+        if (cur.trade && (cur.trade.from === myId || cur.trade.to === myId)) return;
+        cur.ready = cur.ready || {};
+        cur.ready[myId] = !cur.ready[myId];
+        return cur;
+      }).then(function (res) { if (res.committed) sfx("confirm"); });
+    }
+    draftTradeAsk(id) {
+      var d = room && room.draft;
+      if (!d || !DRAFT.canTradeWith(d, id)) return;
+      room.ref.child("draft").transaction(function (cur) {
+        if (!cur || !DRAFT.canTradeWith(cur, id)) return;
+        cur.trade = { from: myId, to: id, at: now() };
+        return cur;
+      });
+    }
+    swapTradePicks(cur) {
+      var tr = cur.trade, mine = cur.picks[tr.from];
+      cur.picks[tr.from] = cur.picks[tr.to];
+      cur.picks[tr.to] = mine;
+      cur.trade = null;
+    }
+    draftTradeAnswer(accept) {
+      room.ref.child("draft").transaction(function (cur) {
+        if (!cur || !cur.trade || cur.trade.to !== myId) return;
+        if (accept) DRAFT.swapTradePicks(cur);
+        else { cur.denied = { to: cur.trade.from, at: now() }; cur.trade = null; }
+        return cur;
+      }).then(function (res) { if (res.committed && accept) sfx("confirm"); });
+    }
+    draftTradeCancel() {
+      room.ref.child("draft").transaction(function (cur) {
+        if (!cur || !cur.trade || cur.trade.from !== myId) return;
+        cur.trade = null;
+        return cur;
+      });
+    }
+    hostDraftFinish(d, t) {
+      var tr = d.trade, ready = d.ready || {};
+      var tradeGone = tr && (!P[tr.from] || !P[tr.to] || ready[tr.from] || ready[tr.to]);
+      var aiAccepts = tr && !tradeGone && P[tr.to].isAI && t >= tr.at + DRAFT_AI_TRADE_MS;
+      if (tradeGone || aiAccepts) {
+        DRAFT.busy = true;
+        room.ref.child("draft").transaction(function (cur) {
+          if (!cur || !cur.trade || cur.trade.at !== tr.at) return;
+          if (aiAccepts) DRAFT.swapTradePicks(cur); else cur.trade = null;
+          return cur;
+        }).then(function () { DRAFT.busy = false; }, function () { DRAFT.busy = false; });
+        return;
+      }
+      if (tr || DRAFT.draftReadyCount(d) < DRAFT.draftHumans(d).length || DRAFT.launched === d.stepAt) return;
+      DRAFT.launched = d.stepAt;
+      var picks = d.picks || {}, spare = DRAFT.draftLeft(d);
+      launchMatch(function (id) { return picks[id] || spare.splice(Math.floor(Math.random() * spare.length), 1)[0]; }, COUNT_MS, ARENA, DRAFT.draftBanned(d));
+    }
+    hostDraftTick() {
+      var d = room.draft, t = now();
+      if (!d || DRAFT.busy) return;
+      if (DRAFT.draftDone(d)) { DRAFT.hostDraftFinish(d, t); return; }
+      var step = d.step, banStep = DRAFT_STEPS[step].ban, timeUp = t >= d.stepAt + DRAFT_STEP_MS, aiDue = t >= d.stepAt + DRAFT_AI_MS;
+      var waiting = DRAFT.draftWaiting(d, step);
+      var auto = waiting.filter(function (id) { return timeUp || (aiDue && P[id].isAI); });
+      if (waiting.length && !auto.length) return;
+      DRAFT.busy = true;
+      room.ref.child("draft").transaction(function (cur) {
+        if (!cur || cur.step !== step) return;
+        auto.forEach(function (id) {
+          if (DRAFT.draftWaiting(cur, step).indexOf(id) < 0) return;
+          var left = DRAFT.draftLeft(cur), hover = cur.hover && cur.hover[id], chosen = left.indexOf(hover) >= 0 ? hover : null;
+          if (banStep) DRAFT.applyDraftChoice(cur, id, chosen || (P[id].isAI && left.length ? pick(left) : NO_BAN));
+          else if (left.length) DRAFT.applyDraftChoice(cur, id, chosen || pick(left));
+        });
+        return DRAFT.draftSettle(cur, now());
+      }).then(function () { DRAFT.busy = false; }, function () { DRAFT.busy = false; });
+    }
+    draftTeamName(team) { return team === "blue" ? "블루팀" : "레드팀"; }
+    draftStepLabel(step) {
+      var S = DRAFT_STEPS[step], side = DRAFT.stepSide(step) === "b" ? "블루 " : "레드 ";
+      return side + (S.ban ? "밴" : S.keys.map(function (k) { return k.charAt(1); }).join("·"));
+    }
+    draftTradeBoxHtml(d) {
+      var tr = d.trade, t = now(), picks = d.picks || {};
+      if (tr && tr.from === myId && P[tr.to]) {
+        return "<b>교환 대기 중입니다...</b><small>" + esc(P[tr.to].nickname) + "의 " + CHARS[picks[tr.to]].name + josa(CHARS[picks[tr.to]].name, "와", "과") + " 내 " + CHARS[picks[myId]].name + "</small>" +
+          '<div class="row"><button type="button" class="cancel" data-trade-act="cancel">신청 취소</button></div>';
+      }
+      if (tr && tr.to === myId && P[tr.from]) {
+        return "<b>교환 신청. (" + CHARS[picks[tr.from]].name + ")</b><small>" + esc(P[tr.from].nickname) + "의 " + CHARS[picks[tr.from]].name + josa(CHARS[picks[tr.from]].name, "와", "과") + " 내 " + CHARS[picks[myId]].name + josa(CHARS[picks[myId]].name, "를", "을") + " 바꿔요</small>" +
+          '<div class="row"><button type="button" class="ok" data-trade-act="yes">수락</button><button type="button" class="no" data-trade-act="no">거절</button></div>';
+      }
+      if (d.denied && d.denied.to === myId && t < d.denied.at + TRADE_DENIED_SHOW_MS) return "<b>교환 신청이 거절되었습니다.</b>";
+      return "";
+    }
+    renderDraft() {
+      if (!room || screenNow !== "draft") return;
+      var d = room.draft; if (!d) return;
+      var t = now(), done = DRAFT.draftDone(d), picks = d.picks || {}, hover = d.hover || {}, ready = d.ready || {}, bans = d.bans || {};
+      var waiting = done ? [] : DRAFT.draftWaiting(d, d.step), myTurn = waiting.indexOf(myId) >= 0, banTurn = !done && DRAFT_STEPS[d.step].ban;
+      var me = P[myId], myTeam = me ? me.team : null, mySide = DRAFT.draftSideOf(d, myId);
+      var left = Math.max(0, d.stepAt + DRAFT_SHOWN_MS - t), humans = DRAFT.draftHumans(d).length, readyN = DRAFT.draftReadyCount(d);
+      var arena = MAPS[room.arena] || MAPS[ARENA];
+      setHtml($("dfMap"), arena ? "🗺️ " + esc(arena.name) + "<small>맵</small>" : "");
+      var arenaId = MAPS[room.arena] ? room.arena : ARENA, mapImg = $("dfMapImg");
+      setText($("dfMapName"), arena ? "🗺️ " + arena.name : "");
+      if (mapImg.getAttribute("src") !== mapShotSrc(arenaId, true)) mapImg.setAttribute("src", mapShotSrc(arenaId, true));
+      var timer = $("dfTimer");
+      if (done) {
+        setHtml(timer, readyN + "/" + humans + "<small>준비 완료</small>");
+        timer.className = "dfTimer";
+        $("dfBarFill").style.width = Math.round(readyN / Math.max(1, humans) * 100) + "%";
+      } else {
+        setHtml(timer, String(Math.ceil(left / 1000)) + "<small>남은 시간</small>");
+        timer.className = "dfTimer" + (left < 5000 ? " low" : "");
+        $("dfBarFill").style.width = Math.round(left / DRAFT_SHOWN_MS * 100) + "%";
+      }
+      var turn = "", doing = banTurn ? "밴하는" : "고르는";
+      if (done) turn = mySide ? (ready[myId] ? "준비 완료! 다른 선수를 기다리는 중…" : "선택 완료! 준비가 되면 준비 완료를 눌러 주세요.") : "선수들이 준비하는 중…";
+      else if (myTurn) turn = banTurn ? "내 차례예요! 밴할 캐릭터를 골라 주세요." : "내 차례예요! 캐릭터를 골라 주세요.";
+      else if (!banTurn && picks[myId] && DRAFT.draftStepIds(d, d.step).indexOf(myId) >= 0) turn = "선택 완료 — 다른 선수를 기다리는 중…";
+      else turn = DRAFT.draftTeamName(DRAFT.stepSide(d.step) === "b" ? "blue" : "red") + " " + DRAFT_STEPS[d.step].keys.map(function (k) { return k.charAt(1); }).join("·") + "번 선수가 " + doing + " 중…";
+      setText($("dfTurn"), turn);
+      $("dfTurn").className = "dfTurn" + (myTurn ? " mine" : "");
+      var charCol = document.querySelector(".dfCharCol");
+      charCol.classList.toggle("myTurn", myTurn && left >= 5000);
+      charCol.classList.toggle("myTurnLow", myTurn && left < 5000);
+      setHtml($("dfSteps"), DRAFT_STEPS.map(function (S, i) {
+        return '<span class="' + (DRAFT.stepSide(i) === "b" ? "b" : "r") + (S.ban ? " ban" : "") + (i === d.step ? " now" : (i < d.step ? " done" : "")) + '">' + (i + 1) + ". " + DRAFT.draftStepLabel(i) + "</span>";
+      }).join(""));
+
+      function slots(team) {
+        var pre = team === "blue" ? "b" : "r", ban = bans[pre], banStepNow = banTurn && DRAFT.stepSide(d.step) === pre;
+        var h = "";
+        if (ban && ban !== NO_BAN && CHARS[ban]) h = '<span class="dfBan"><span class="banX"><svg viewBox="0 0 10 10"><path d="M2.2 2.2L7.8 7.8M7.8 2.2L2.2 7.8" stroke="#FF4A3D" stroke-width="1.6" stroke-linecap="round"/></svg></span>' +
+          '<span class="pface" style="background-image:url(\'' + charImgSrc(ban) + '\')"></span>' + CHARS[ban].name + "</span>";
+        else h = '<span class="dfBan ' + (banStepNow ? "now" : "wait") + '">' + (ban === NO_BAN ? "밴 없음" : (banStepNow ? "밴 고르는 중…" : "밴 대기")) + "</span>";
+        setHtml($(team === "blue" ? "dfBanB" : "dfBanR"), h);
+        h = "";
+        for (var i = 1; i <= 3; i++) {
+          var id = d.seq && d.seq[pre + i], p = id && P[id];
+          if (!p) { h += '<div class="slot empty">' + i + "번 · " + (id ? "나감" : "빈 자리") + "</div>"; continue; }
+          var c = picks[id], isTurn = waiting.indexOf(id) >= 0, pk, tradable = DRAFT.canTradeWith(d, id);
+          if (c) pk = '<span class="pk picked"><b>' + CHARS[c].name + '</b><span class="pface' + (tradable ? " canTrade" : "") + '"' + (tradable ? ' data-trade="' + id + '" title="캐릭터 교환 신청"' : "") +
+                      ' style="background-image:url(\'' + charImgSrc(c) + '\')"></span></span>';
+          else if (isTurn && hover[id] && myTeam === team && CHARS[hover[id]]) pk = '<span class="pk think">' + CHARS[hover[id]].name + " 고민 중…</span>";
+          else pk = '<span class="pk wait">' + (isTurn ? (banTurn ? "밴하는 중…" : "고르는 중…") : "대기") + "</span>";
+          h += '<div class="slot' + (id === myId ? " mine" : "") + (isTurn ? " turn" : "") + (p.isAI ? " ai" : "") + (done && ready[id] ? " ready" : "") + '">' + i + "번 " + (p.isAI ? "🤖 " : "") + esc(p.nickname) +
+               (id === myId ? ' <span class="me">나</span>' : "") + pk + "</div>";
+        }
+        return h;
+      }
+      setHtml($("dfBlue"), slots("blue"));
+      setHtml($("dfRed"), slots("red"));
+
+      var readyBar = $("dfReadyBar");
+      show(readyBar, done && !!mySide);
+      if (done && mySide) {
+        var busyTrade = d.trade && (d.trade.from === myId || d.trade.to === myId);
+        var btn = $("btnDraftReady");
+        btn.className = "dfReadyBtn" + (ready[myId] ? " on" : "");
+        btn.disabled = !!busyTrade;
+        setText(btn, ready[myId] ? "✔ 준비 완료 (누르면 취소)" : "준비 완료");
+        setText($("dfReadyHint"), ready[myId] ? "모두 준비 완료를 누르면 게임이 시작돼요." : "같은 팀의 초상화를 누르면 캐릭터 교환을 신청할 수 있어요.");
+      }
+      var tradeHtml = DRAFT.draftTradeBoxHtml(d), tradeBox = $("dfTradeBox");
+      show(tradeBox, !!tradeHtml);
+      if (tradeBox.getAttribute("data-html") !== tradeHtml) { tradeBox.setAttribute("data-html", tradeHtml); setHtml(tradeBox, tradeHtml); }
+
+      var owner = {}, banned = DRAFT.draftBanned(d);
+      keys(picks).forEach(function (id) { owner[picks[id]] = id; });
+      var myHover = myTurn ? hover[myId] : null;
+      if (!DRAFT.view && myHover) DRAFT.view = myHover;
+      setHtmlKeepScroll($("dfChars"), roleRowsHtml(function (k) {
+        var o = owner[k], op = o && P[o], oSide = o && DRAFT.draftSideOf(d, o), isBanned = banned.indexOf(k) >= 0;
+        var tag = isBanned ? '<span class="tag ban">밴</span>' : (o ? '<span class="tag ' + (oSide === "b" ? "b" : "r") + '">' + esc(op ? op.nickname : "") + "</span>" : "");
+        return '<button type="button" class="dfCard' + (o || isBanned ? " taken" : "") + (isBanned ? " banned" : "") + (myHover === k ? " on" : (DRAFT.view === k ? " view" : "")) + '" data-c="' + k + '">' + tag +
+               '<img alt="" src="' + charImgSrc(k) + '"><div class="nm">' + CHARS[k].name + "</div></button>";
+      }));
+      fitCharCol(document.querySelector(".dfCharCol"));
+      var v = DRAFT.view && playable(DRAFT.view) ? DRAFT.view : null, canPick = v && myTurn && DRAFT.draftLeft(d).indexOf(v) >= 0;
+      var pickBtn = !canPick ? "" : banTurn ? '<button type="button" class="big danger" data-pick="' + v + '">🚫 ' + CHARS[v].name + " 밴</button>" :
+        '<button type="button" class="big primary" data-pick="' + v + '">✔ ' + CHARS[v].name + roParticle(CHARS[v].name) + " 결정</button>";
+      setHtml($("dfDetail"), v ? '<div class="dfName">' + CHARS[v].icon + " " + CHARS[v].name + '<small>' + roleOf(v).icon + " " + roleOf(v).name + "</small></div>" +
+        '<div class="dfRole">' + roleGaugeText(roleOf(v)) + "</div>" + statTable(v) + skillBlocks(v) + pickBtn : "");
+    }
   }
+  var DRAFT = new Draft();
   setInterval(function () {
     if (!room || room.status !== "draft") return;
-    renderDraft();
-    if (isHost()) hostDraftTick();
+    DRAFT.renderDraft();
+    if (isHost()) DRAFT.hostDraftTick();
   }, 200);
-
-  function draftTeamName(team) { return team === "blue" ? "블루팀" : "레드팀"; }
-  function draftStepLabel(step) {
-    var S = DRAFT_STEPS[step], side = stepSide(step) === "b" ? "블루 " : "레드 ";
-    return side + (S.ban ? "밴" : S.keys.map(function (k) { return k.charAt(1); }).join("·"));
-  }
-  function draftTradeBoxHtml(d) {
-    var tr = d.trade, t = now(), picks = d.picks || {};
-    if (tr && tr.from === myId && P[tr.to]) {
-      return "<b>교환 대기 중입니다...</b><small>" + esc(P[tr.to].nickname) + "의 " + CHARS[picks[tr.to]].name + josa(CHARS[picks[tr.to]].name, "와", "과") + " 내 " + CHARS[picks[myId]].name + "</small>" +
-        '<div class="row"><button type="button" class="cancel" data-trade-act="cancel">신청 취소</button></div>';
-    }
-    if (tr && tr.to === myId && P[tr.from]) {
-      return "<b>교환 신청. (" + CHARS[picks[tr.from]].name + ")</b><small>" + esc(P[tr.from].nickname) + "의 " + CHARS[picks[tr.from]].name + josa(CHARS[picks[tr.from]].name, "와", "과") + " 내 " + CHARS[picks[myId]].name + josa(CHARS[picks[myId]].name, "를", "을") + " 바꿔요</small>" +
-        '<div class="row"><button type="button" class="ok" data-trade-act="yes">수락</button><button type="button" class="no" data-trade-act="no">거절</button></div>';
-    }
-    if (d.denied && d.denied.to === myId && t < d.denied.at + TRADE_DENIED_SHOW_MS) return "<b>교환 신청이 거절되었습니다.</b>";
-    return "";
-  }
-  function renderDraft() {
-    if (!room || screenNow !== "draft") return;
-    var d = room.draft; if (!d) return;
-    var t = now(), done = draftDone(d), picks = d.picks || {}, hover = d.hover || {}, ready = d.ready || {}, bans = d.bans || {};
-    var waiting = done ? [] : draftWaiting(d, d.step), myTurn = waiting.indexOf(myId) >= 0, banTurn = !done && DRAFT_STEPS[d.step].ban;
-    var me = P[myId], myTeam = me ? me.team : null, mySide = draftSideOf(d, myId);
-    var left = Math.max(0, d.stepAt + DRAFT_SHOWN_MS - t), humans = draftHumans(d).length, readyN = draftReadyCount(d);
-    var arena = MAPS[room.arena] || MAPS[ARENA];
-    setHtml($("dfMap"), arena ? "🗺️ " + esc(arena.name) + "<small>맵</small>" : "");
-    var arenaId = MAPS[room.arena] ? room.arena : ARENA, mapImg = $("dfMapImg");
-    setText($("dfMapName"), arena ? "🗺️ " + arena.name : "");
-    if (mapImg.getAttribute("src") !== mapShotSrc(arenaId, true)) mapImg.setAttribute("src", mapShotSrc(arenaId, true));
-    var timer = $("dfTimer");
-    if (done) {
-      setHtml(timer, readyN + "/" + humans + "<small>준비 완료</small>");
-      timer.className = "dfTimer";
-      $("dfBarFill").style.width = Math.round(readyN / Math.max(1, humans) * 100) + "%";
-    } else {
-      setHtml(timer, String(Math.ceil(left / 1000)) + "<small>남은 시간</small>");
-      timer.className = "dfTimer" + (left < 5000 ? " low" : "");
-      $("dfBarFill").style.width = Math.round(left / DRAFT_SHOWN_MS * 100) + "%";
-    }
-    var turn = "", doing = banTurn ? "밴하는" : "고르는";
-    if (done) turn = mySide ? (ready[myId] ? "준비 완료! 다른 선수를 기다리는 중…" : "선택 완료! 준비가 되면 준비 완료를 눌러 주세요.") : "선수들이 준비하는 중…";
-    else if (myTurn) turn = banTurn ? "내 차례예요! 밴할 캐릭터를 골라 주세요." : "내 차례예요! 캐릭터를 골라 주세요.";
-    else if (!banTurn && picks[myId] && draftStepIds(d, d.step).indexOf(myId) >= 0) turn = "선택 완료 — 다른 선수를 기다리는 중…";
-    else turn = draftTeamName(stepSide(d.step) === "b" ? "blue" : "red") + " " + DRAFT_STEPS[d.step].keys.map(function (k) { return k.charAt(1); }).join("·") + "번 선수가 " + doing + " 중…";
-    setText($("dfTurn"), turn);
-    $("dfTurn").className = "dfTurn" + (myTurn ? " mine" : "");
-    var charCol = document.querySelector(".dfCharCol");
-    charCol.classList.toggle("myTurn", myTurn && left >= 5000);
-    charCol.classList.toggle("myTurnLow", myTurn && left < 5000);
-    setHtml($("dfSteps"), DRAFT_STEPS.map(function (S, i) {
-      return '<span class="' + (stepSide(i) === "b" ? "b" : "r") + (S.ban ? " ban" : "") + (i === d.step ? " now" : (i < d.step ? " done" : "")) + '">' + (i + 1) + ". " + draftStepLabel(i) + "</span>";
-    }).join(""));
-
-    function slots(team) {
-      var pre = team === "blue" ? "b" : "r", ban = bans[pre], banStepNow = banTurn && stepSide(d.step) === pre;
-      var h = "";
-      if (ban && ban !== NO_BAN && CHARS[ban]) h = '<span class="dfBan"><span class="banX"><svg viewBox="0 0 10 10"><path d="M2.2 2.2L7.8 7.8M7.8 2.2L2.2 7.8" stroke="#FF4A3D" stroke-width="1.6" stroke-linecap="round"/></svg></span>' +
-        '<span class="pface" style="background-image:url(\'' + charImgSrc(ban) + '\')"></span>' + CHARS[ban].name + "</span>";
-      else h = '<span class="dfBan ' + (banStepNow ? "now" : "wait") + '">' + (ban === NO_BAN ? "밴 없음" : (banStepNow ? "밴 고르는 중…" : "밴 대기")) + "</span>";
-      setHtml($(team === "blue" ? "dfBanB" : "dfBanR"), h);
-      h = "";
-      for (var i = 1; i <= 3; i++) {
-        var id = d.seq && d.seq[pre + i], p = id && P[id];
-        if (!p) { h += '<div class="slot empty">' + i + "번 · " + (id ? "나감" : "빈 자리") + "</div>"; continue; }
-        var c = picks[id], isTurn = waiting.indexOf(id) >= 0, pk, tradable = canTradeWith(d, id);
-        if (c) pk = '<span class="pk picked"><b>' + CHARS[c].name + '</b><span class="pface' + (tradable ? " canTrade" : "") + '"' + (tradable ? ' data-trade="' + id + '" title="캐릭터 교환 신청"' : "") +
-                    ' style="background-image:url(\'' + charImgSrc(c) + '\')"></span></span>';
-        else if (isTurn && hover[id] && myTeam === team && CHARS[hover[id]]) pk = '<span class="pk think">' + CHARS[hover[id]].name + " 고민 중…</span>";
-        else pk = '<span class="pk wait">' + (isTurn ? (banTurn ? "밴하는 중…" : "고르는 중…") : "대기") + "</span>";
-        h += '<div class="slot' + (id === myId ? " mine" : "") + (isTurn ? " turn" : "") + (p.isAI ? " ai" : "") + (done && ready[id] ? " ready" : "") + '">' + i + "번 " + (p.isAI ? "🤖 " : "") + esc(p.nickname) +
-             (id === myId ? ' <span class="me">나</span>' : "") + pk + "</div>";
-      }
-      return h;
-    }
-    setHtml($("dfBlue"), slots("blue"));
-    setHtml($("dfRed"), slots("red"));
-
-    var readyBar = $("dfReadyBar");
-    show(readyBar, done && !!mySide);
-    if (done && mySide) {
-      var busyTrade = d.trade && (d.trade.from === myId || d.trade.to === myId);
-      var btn = $("btnDraftReady");
-      btn.className = "dfReadyBtn" + (ready[myId] ? " on" : "");
-      btn.disabled = !!busyTrade;
-      setText(btn, ready[myId] ? "✔ 준비 완료 (누르면 취소)" : "준비 완료");
-      setText($("dfReadyHint"), ready[myId] ? "모두 준비 완료를 누르면 게임이 시작돼요." : "같은 팀의 초상화를 누르면 캐릭터 교환을 신청할 수 있어요.");
-    }
-    var tradeHtml = draftTradeBoxHtml(d), tradeBox = $("dfTradeBox");
-    show(tradeBox, !!tradeHtml);
-    if (tradeBox.getAttribute("data-html") !== tradeHtml) { tradeBox.setAttribute("data-html", tradeHtml); setHtml(tradeBox, tradeHtml); }
-
-    var owner = {}, banned = draftBanned(d);
-    keys(picks).forEach(function (id) { owner[picks[id]] = id; });
-    var myHover = myTurn ? hover[myId] : null;
-    if (!draftView && myHover) draftView = myHover;
-    setHtmlKeepScroll($("dfChars"), roleRowsHtml(function (k) {
-      var o = owner[k], op = o && P[o], oSide = o && draftSideOf(d, o), isBanned = banned.indexOf(k) >= 0;
-      var tag = isBanned ? '<span class="tag ban">밴</span>' : (o ? '<span class="tag ' + (oSide === "b" ? "b" : "r") + '">' + esc(op ? op.nickname : "") + "</span>" : "");
-      return '<button type="button" class="dfCard' + (o || isBanned ? " taken" : "") + (isBanned ? " banned" : "") + (myHover === k ? " on" : (draftView === k ? " view" : "")) + '" data-c="' + k + '">' + tag +
-             '<img alt="" src="' + charImgSrc(k) + '"><div class="nm">' + CHARS[k].name + "</div></button>";
-    }));
-    fitCharCol(document.querySelector(".dfCharCol"));
-    var v = draftView && playable(draftView) ? draftView : null, canPick = v && myTurn && draftLeft(d).indexOf(v) >= 0;
-    var pickBtn = !canPick ? "" : banTurn ? '<button type="button" class="big danger" data-pick="' + v + '">🚫 ' + CHARS[v].name + " 밴</button>" :
-      '<button type="button" class="big primary" data-pick="' + v + '">✔ ' + CHARS[v].name + roParticle(CHARS[v].name) + " 결정</button>";
-    setHtml($("dfDetail"), v ? '<div class="dfName">' + CHARS[v].icon + " " + CHARS[v].name + '<small>' + roleOf(v).icon + " " + roleOf(v).name + "</small></div>" +
-      '<div class="dfRole">' + roleGaugeText(roleOf(v)) + "</div>" + statTable(v) + skillBlocks(v) + pickBtn : "");
-  }
   $("dfChars").onclick = function (e) {
     var b = e.target.closest ? e.target.closest(".dfCard") : null;
     if (!b || !room || !room.draft) return;
     var c = b.getAttribute("data-c");
-    draftView = c;
-    if (draftLeft(room.draft).indexOf(c) >= 0) draftHover(c);
+    DRAFT.view = c;
+    if (DRAFT.draftLeft(room.draft).indexOf(c) >= 0) DRAFT.draftHover(c);
     renderDraft();
     var detail = $("dfDetail");
     if (detail.scrollIntoView) detail.scrollIntoView({ block: "nearest", behavior: "smooth" });
   };
   $("dfDetail").onclick = function (e) {
     var b = e.target.closest ? e.target.closest("[data-pick]") : null;
-    if (b) draftPick(b.getAttribute("data-pick"));
+    if (b) DRAFT.draftPick(b.getAttribute("data-pick"));
   };
   $("dfBlue").onclick = $("dfRed").onclick = function (e) {
     var f = e.target.closest ? e.target.closest("[data-trade]") : null;
-    if (f) draftTradeAsk(f.getAttribute("data-trade"));
+    if (f) DRAFT.draftTradeAsk(f.getAttribute("data-trade"));
   };
-  $("btnDraftReady").onclick = draftReady;
+  $("btnDraftReady").onclick = function () { DRAFT.draftReady(); };
   $("dfTradeBox").onclick = function (e) {
     var b = e.target.closest ? e.target.closest("[data-trade-act]") : null;
     if (!b) return;
     var act = b.getAttribute("data-trade-act");
-    if (act === "cancel") draftTradeCancel(); else draftTradeAnswer(act === "yes");
+    if (act === "cancel") DRAFT.draftTradeCancel(); else DRAFT.draftTradeAnswer(act === "yes");
   };
   $("btnLeaveDraft").onclick = function () { if (confirm("방을 나갈까요?")) leaveRoom(); };
 
@@ -2590,7 +2603,34 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var PR = {};
   var MELEE = {};
   var FX = [];
-  var BURSTS = [], POOLS = [], POOL_HIT = {}, LUNGES = [], WAVES = [], HOLES = [], STORMS = [], REVS = [], GRACES = [], DOMAINS = [], CURSES = {};
+  class BattleField {
+    constructor() { this.reset(); }
+    reset() {
+      this.bursts = []; this.pools = []; this.poolHit = {}; this.lunges = []; this.waves = [];
+      this.holes = []; this.storms = []; this.revs = []; this.graces = []; this.domains = [];
+      this.curses = {}; this.bladeSpins = [];
+    }
+    addLingering(e, t) {
+      if (e.type === "pool") { if (t < e.createdAt + e.delay + e.dur) this.pools.push({ e: e, vis: null, bottle: null }); return true; }
+      if (e.type === "hole") { if (t < e.createdAt + e.delay + e.dur) this.holes.push({ e: e, vis: null }); return true; }
+      if (e.type === "storm") { if (t < e.createdAt + e.delay + e.dur) this.storms.push({ e: e, vis: null }); return true; }
+      if (e.type === "rev") { if (t < e.createdAt + e.dur) this.revs.push({ e: e, vis: null, ticked: {} }); return true; }
+      if (e.type === "domain") { if (t < e.createdAt + e.dur) this.domains.push({ e: e, vis: null, touched: {} }); return true; }
+      return false;
+    }
+    dropAllVis() {
+      this.bursts.forEach(dropBurstVis); this.pools.forEach(dropPoolVis); this.lunges.forEach(dropLungeVis); this.holes.forEach(dropHoleVis);
+      this.storms.forEach(dropStormVis); this.revs.forEach(dropRevVis); this.graces.forEach(dropGraceVis); this.domains.forEach(dropDomainVis);
+    }
+    renderLingering(t, nowMs, dt) {
+      this.pools.forEach(function (pl) { renderPool(pl, t, nowMs); });
+      this.holes.forEach(function (h) { renderHole(h, t, nowMs); });
+      this.storms.forEach(function (st) { renderStorm(st, t, dt); });
+      this.revs.forEach(function (r) { renderRev(r, t, nowMs); });
+      this.domains.forEach(function (dm) { renderDomain(dm, t, nowMs); });
+    }
+  }
+  var FIELD = new BattleField();
   var handled = {};
 
   class Unit {
@@ -2668,7 +2708,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     clear3d();
     G = { startAt: room.startAt, endSent: false, playingSent: false, lastNet: 0, sent: {}, finalSent: false, beeped: -1 };
     ME = isSpec() ? null : makeEnt(myId, P[myId]);
-    BOTS = {}; R = {}; FX = []; CC_PENDING = {}; hudMeShown = { k: -1, d: -1, a: -1, dmg: -1 }; BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; STORMS = []; REVS = []; GRACES = []; DOMAINS = []; CURSES = {}; BLADE_SPINS = []; handled = {};
+    BOTS = {}; R = {}; FX = []; CC_PENDING = {}; hudMeShown = { k: -1, d: -1, a: -1, dmg: -1 }; FIELD.reset(); handled = {};
     lastHp = {};
     clearKillFeed();
     show($("endOv"), false);
@@ -2969,15 +3009,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     E.skillUntil = Math.min(E.skillUntil || 0, t);
     G.forceNet = true;
   }
-  var BLADE_SPINS = [];
   function bladeSpin(p, x, y) {
     if (p.spun) return;
     p.spun = true;
-    BLADE_SPINS.push({ d: p.d, x: x, y: y, at: now() + ULT.bdDelay });
-    FX.push({ k: "bladeZone", x: x, y: y, r: ULT.bdR, t: Date.now(), delay: ULT.bdDelay / TS, life: (ULT.bdDelay + 260) / TS });
+    FIELD.bladeSpins.push({ d: p.d, x: x, y: y, at: now() + ULT.bdDelay });
+    FX.push({ k: "bladeZone", x: x, y: y, r: ULT.bdR, t: Date.now(), delay: ULT.bdDelay / CLOCK.scale, life: (ULT.bdDelay + 260) / CLOCK.scale });
   }
   function stepBladeSpins(t) {
-    BLADE_SPINS = BLADE_SPINS.filter(function (s) {
+    FIELD.bladeSpins = FIELD.bladeSpins.filter(function (s) {
       if (t < s.at) return true;
       var d = s.d;
       FX.push({ k: "boom", x: s.x, y: s.y, r: ULT.bdR / 1.1, c: 0xDCE3EC, t: Date.now(), life: 260 });
@@ -3102,7 +3141,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function pruneLocal(t) {
     keys(PR).forEach(function (id) { if (t - PR[id].d.createdAt > PR[id].life + 1000) delete PR[id]; });
     var ms = Date.now();
-    keys(MELEE).forEach(function (id) { if ((ms - MELEE[id].at) * TS > 1000) delete MELEE[id]; });
+    keys(MELEE).forEach(function (id) { if ((ms - MELEE[id].at) * CLOCK.scale > 1000) delete MELEE[id]; });
   }
   function hear(E) { return ME && hyp(E.x - ME.x, E.y - ME.y) < 700; }
 
@@ -3261,7 +3300,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (E === ME) sfx("heal");
   }
   function inEnemyPoison(T, t) {
-    return POOLS.some(function (pl) {
+    return FIELD.pools.some(function (pl) {
       var e = pl.e, start = poolStart(e);
       return e.team !== T.team && !pl.cut && t >= start && t < start + e.dur && CHARS[P[e.owner] ? P[e.owner].characterType : "thrower"].healCut &&
              hyp(T.x - e.x, T.y - e.y) <= e.r + BODY_R * 0.5;
@@ -3400,18 +3439,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function onEffect(s) {
     var e = s.val(); if (!e || !G || handled[s.key]) return;
     handled[s.key] = 1;
-    if (e.type === "pool") { if (now() < e.createdAt + e.delay + e.dur) POOLS.push({ e: e, vis: null, bottle: null }); return; }
-    if (e.type === "hole") { if (now() < e.createdAt + e.delay + e.dur) HOLES.push({ e: e, vis: null }); return; }
-    if (e.type === "storm") { if (now() < e.createdAt + e.delay + e.dur) STORMS.push({ e: e, vis: null }); return; }
-    if (e.type === "rev") { if (now() < e.createdAt + e.dur) REVS.push({ e: e, vis: null, ticked: {} }); return; }
+    if (FIELD.addLingering(e, now())) return;
     if (e.type === "grace") { onGrace(e); return; }
-    if (e.type === "domain") { if (now() < e.createdAt + e.dur) DOMAINS.push({ e: e, vis: null, touched: {} }); return; }
     if (e.type === "strike") { onDomainStrike(e); return; }
     if (e.type === "zap") { onZap(e); return; }
-    if (e.type === "curse") { CURSES[e.tgt] = { n: e.n, at: e.createdAt }; return; }
-    if (e.type === "revCut") { REVS.forEach(function (r) { if (r.e.owner === e.owner && r.e.createdAt <= e.createdAt) r.cut = true; }); return; }
+    if (e.type === "curse") { FIELD.curses[e.tgt] = { n: e.n, at: e.createdAt }; return; }
+    if (e.type === "revCut") { FIELD.revs.forEach(function (r) { if (r.e.owner === e.owner && r.e.createdAt <= e.createdAt) r.cut = true; }); return; }
     if (e.type !== "burst" || now() > e.createdAt + e.delay + 1500) return;
-    BURSTS.push({ e: e, vis: null });
+    FIELD.bursts.push({ e: e, vis: null });
   }
   function poolStart(e) { return e.createdAt + e.delay; }
   function slowWhileInside(T, t, owner, mul, ms) {
@@ -3423,8 +3458,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   function healInFog(T, e, t) {
     var key = e.owner + "+" + T.id;
-    if (POOL_HIT[key] && t - POOL_HIT[key] < ULT.plTick) return;
-    POOL_HIT[key] = t;
+    if (FIELD.poolHit[key] && t - FIELD.poolHit[key] < ULT.plTick) return;
+    FIELD.poolHit[key] = t;
     var healed = healAmount(T, ULT.fgHeal, t);
     if (healed <= 0) return;
     T.hp += healed;
@@ -3434,12 +3469,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (T === ME) sfx("heal");
   }
   function stepPools(t) {
-    POOLS = POOLS.filter(function (pl) {
+    FIELD.pools = FIELD.pools.filter(function (pl) {
       var e = pl.e, start = poolStart(e), end = start + e.dur;
       if (t >= end || pl.cut) { dropPoolVis(pl); return false; }
       if (t < start) return true;
       if (!pl.landed && !e.u) {
-        var olderPools = POOLS.filter(function (q) { return q !== pl && q.landed && !q.cut && !q.e.u && q.e.owner === e.owner; })
+        var olderPools = FIELD.pools.filter(function (q) { return q !== pl && q.landed && !q.cut && !q.e.u && q.e.owner === e.owner; })
                               .sort(function (a, b) { return a.e.createdAt - b.e.createdAt; });
         while (olderPools.length >= ULT.plMax) olderPools.shift().cut = true;
       }
@@ -3451,8 +3486,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (T.isProtected(t)) return;
         if (e.u && !T.minion) slowWhileInside(T, t, e.owner, ULT.fgSlowMul, ULT.fgSlowMs);
         var key = e.owner + ">" + T.id;
-        if (POOL_HIT[key] && t - POOL_HIT[key] < ULT.plTick) return;
-        POOL_HIT[key] = t;
+        if (FIELD.poolHit[key] && t - FIELD.poolHit[key] < ULT.plTick) return;
+        FIELD.poolHit[key] = t;
         if (e.u) damage(T, e.dmg, e.owner, false, "fog");
         else damage(T, e.dmg, e.owner, e.createdAt + Math.floor((t - start) / ULT.plTick), null, null, ULT.plGauge);
       });
@@ -3466,7 +3501,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     creditCC(owner, 0, already > 0 ? 0 : dt * 1000, dt * 1000 * extra);
   }
   function stepHoles(t, dt) {
-    HOLES = HOLES.filter(function (h) {
+    FIELD.holes = FIELD.holes.filter(function (h) {
       var e = h.e, start = e.createdAt + e.delay, end = start + e.dur;
       if (t >= end) { dropHoleVis(h); return false; }
       if (t < start) return true;
@@ -3502,8 +3537,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function inFriendlyStorm(E, t) {
     if (!ULT.frBzHides) return false;
     t = t || now();
-    for (var i = 0; i < STORMS.length; i++) {
-      var s = STORMS[i];
+    for (var i = 0; i < FIELD.storms.length; i++) {
+      var s = FIELD.storms[i];
       if (s.e.team !== E.team || !stormActive(s, t)) continue;
       var c = stormCenter(s);
       if (hyp(E.x - c.x, E.y - c.y) <= s.e.r) return true;
@@ -3511,7 +3546,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     return false;
   }
   function stepStorms(t) {
-    STORMS = STORMS.filter(function (s) {
+    FIELD.storms = FIELD.storms.filter(function (s) {
       var e = s.e;
       if (t >= e.createdAt + e.delay + e.dur || stormOwnerFell(s)) { dropStormVis(s); return false; }
       if (t < e.createdAt + e.delay) return true;
@@ -3551,7 +3586,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function onGrace(e) {
     var t = now();
     if (t - e.createdAt > 1500) return;
-    GRACES.push({ e: e, vis: null });
+    FIELD.graces.push({ e: e, vis: null });
     if (room.status !== "playing") return;
     localTargets().forEach(function (T) {
       if (T.minion || T.id !== e.tgt || !T.alive || T.team !== e.team || T.isProtected(t)) return;
@@ -3569,7 +3604,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   function revTickIndex(e, t) { return Math.floor((t - e.createdAt) / e.tick); }
   function stepRevs(t) {
-    REVS = REVS.filter(function (r) {
+    FIELD.revs = FIELD.revs.filter(function (r) {
       var e = r.e;
       if (r.cut || t >= e.createdAt + e.dur) { dropRevVis(r); return false; }
       if (t < e.createdAt || room.status !== "playing") return true;
@@ -3598,7 +3633,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     return !!dm.ownerFell;
   }
   function stepDomains(t) {
-    DOMAINS = DOMAINS.filter(function (dm) {
+    FIELD.domains = FIELD.domains.filter(function (dm) {
       var e = dm.e;
       if (t >= e.createdAt + e.dur || domainOwnerFell(dm)) { dropDomainVis(dm); return false; }
       var c = domainCenter(dm);
@@ -3643,7 +3678,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   function domainStrikeTarget(E, t) {
     var zone = null;
-    DOMAINS.forEach(function (dm) { if (dm.e.owner === E.id && domainActive(dm.e, t) && !domainOwnerFell(dm)) zone = dm; });
+    FIELD.domains.forEach(function (dm) { if (dm.e.owner === E.id && domainActive(dm.e, t) && !domainOwnerFell(dm)) zone = dm; });
     if (!zone) return null;
     var c = domainCenter(zone), reach = domainRadius(zone.e, t) + BODY_R * 0.5, best = null, bd = Infinity;
     participants().map(ent).concat(allMinions().filter(function (m) { return minionReady(m, t); })).forEach(function (o) {
@@ -3692,7 +3727,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     return { dmg: Math.round(ULT.mbDmg - (ULT.mbDmg - ULT.mbDmgMin) * fall), stunMs: Math.round(ULT.mbStunMs - (ULT.mbStunMs - ULT.mbStunMin) * fall) };
   }
   function stepBursts(t) {
-    BURSTS = BURSTS.filter(function (b) {
+    FIELD.bursts = FIELD.bursts.filter(function (b) {
       var e = b.e;
       if (t < e.createdAt + e.delay) return true;
       if (room.status === "playing") localTargets().forEach(function (T) {
@@ -3731,7 +3766,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (!G || handled[key]) { if (!d.wind) MELEE[key] = { d: d, at: Date.now() }; return; }
     handled[key] = 1;
     if (now() - d.createdAt > (d.wind || 0) + 1500) return;
-    if (d.wind) { LUNGES.push({ key: key, d: d, vis: null }); return; }
+    if (d.wind) { FIELD.lunges.push({ key: key, d: d, vis: null }); return; }
     meleeStrike(key, d);
   }
   var LANCE_SLIP = 3, LANCE_VIS_SLIP = 60;
@@ -3756,7 +3791,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     G.forceNet = true;
   }
   function stepLunges(t) {
-    LUNGES = LUNGES.filter(function (l) {
+    FIELD.lunges = FIELD.lunges.filter(function (l) {
       var d = l.d, A = ent(d.owner);
       if (A && (!A.alive || A.isStunned(t) || hyp(A.x - d.x, A.y - d.y) > LANCE_VIS_SLIP)) { dropLungeVis(l); return false; }
       if (t < d.createdAt + d.wind) return true;
@@ -3810,8 +3845,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function meleeStrike(key, d) {
     var who = P[d.owner] ? P[d.owner].characterType : "";
     if (WAVE[who] && d.len) {
-      MELEE[key] = { d: d, at: Date.now() - Math.max(0, now() - d.createdAt) / TS };
-      WAVES.push({ d: d, who: who, sparked: [], struck: [] });
+      MELEE[key] = { d: d, at: Date.now() - Math.max(0, now() - d.createdAt) / CLOCK.scale };
+      FIELD.waves.push({ d: d, who: who, sparked: [], struck: [] });
       return;
     }
     MELEE[key] = { d: d, at: Date.now() };
@@ -3825,7 +3860,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function waveFront(d, t, travelMs) { return Math.min(1, (t - d.createdAt) / travelMs) * (d.len + BODY_R); }
   function reachedBy(T, d, front) { return T && (T.x - d.x) * Math.cos(d.angle) + (T.y - d.y) * Math.sin(d.angle) <= front; }
   function stepWaves(t) {
-    WAVES = WAVES.filter(function (w) {
+    FIELD.waves = FIELD.waves.filter(function (w) {
       var d = w.d, travelMs = WAVE[w.who].travel, front = waveFront(d, t, travelMs);
       participants().map(ent).concat(allMinions()).forEach(function (T) {
         if (!reachedBy(T, d, front) || w.sparked.indexOf(T) >= 0) return;
@@ -4170,199 +4205,199 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     return T ? Math.atan2(T.y - E.y, T.x - E.x) : E.angle;
   }
 
-  function pickWanderPoint(B, t) {
-    var k = B.bot, spot;
-    if (Math.random() < 0.5) {
-      var b = BUSH[Math.floor(Math.random() * BUSH.length)], bt = b.tiles[Math.floor(Math.random() * b.tiles.length)];
-      spot = { x: tileX(bt[0]), y: tileY(bt[1]) };
-    } else {
-      spot = { x: BOUND.l + 60 + Math.random() * (BOUND.r - BOUND.l - 120), y: BOUND.t + 180 + Math.random() * (BOUND.b - BOUND.t - 360) };
-    }
-    resolve(spot);
-    k.wx = spot.x; k.wy = spot.y; k.wanderUntil = t + 4000 + Math.random() * 3000;
-  }
-
-  function waterBlocks(ax, ay, bx, by) {
-    var d = hyp(bx - ax, by - ay); if (d < 1) return false;
-    for (var i = 0; i < WATER.length; i++) if (rayRect(ax, ay, (bx - ax) / d, (by - ay) / d, WATER[i], BODY_R - 6) < d) return true;
-    return false;
-  }
-  function bridgeWaypoint(B, tx, ty) {
-    if (!BRIDGES.length || !waterBlocks(B.x, B.y, tx, ty)) return null;
-    var best = null, bd = Infinity;
-    BRIDGES.forEach(function (br) {
-      var cost = hyp(br.x - B.x, br.y - B.y) + hyp(tx - br.x, ty - br.y);
-      if (cost < bd) { bd = cost; best = br; }
-    });
-    var reach = best.h / 2 + 34, onDeck = Math.abs(B.x - best.x) < best.w / 2 - BODY_R + 8 && Math.abs(B.y - best.y) < reach + 12;
-    if (onDeck) return { x: best.x, y: best.y + (ty > best.y ? reach + 20 : -reach - 20) };
-    return { x: best.x, y: best.y + (B.y < best.y ? -reach : reach) };
-  }
-  function stepPracticeBot(B, dt) {
-    var t = now(), foe = ME;
-    B.mv = false;
-    if (!B.home) {
-      var d = P[B.id] || {};
-      B.home = d.homeX != null ? { x: d.homeX, y: d.homeY } : { x: B.x, y: B.y };
-      B.x = B.home.x; B.y = B.home.y;
-    }
-    if (!B.alive) return;
-    if (B.hpSeen !== undefined && B.hp < B.hpSeen) B.backAt = t + PRACTICE_BOT_RETURN_MS;
-    if (B.hpSeen !== undefined && B.hp > B.hpSeen) B.healedAt = t;
-    B.hpSeen = B.hp;
-    var low = Math.round(B.maxHp * PRACTICE_ALLY_LOW);
-    if (B.char === "dummyAlly" && B.hp > low && t - (B.healedAt || 0) > PRACTICE_ALLY_RESET_MS) { B.hp = B.hpSeen = low; lastHp[B.id] = low; G.forceNet = true; }
-    var dx = B.home.x - B.x, dy = B.home.y - B.y, away = hyp(dx, dy);
-    if (away < 6) { B.backAt = 0; if (foe && foe.alive) B.angle = Math.atan2(foe.y - B.y, foe.x - B.x); return; }
-    if (!B.backAt) B.backAt = t + PRACTICE_BOT_RETURN_MS;
-    if (t < B.backAt || B.isStunned(t)) return;
-    var ox = B.x, oy = B.y;
-    moveEnt(B, dx / away * Math.min(1, away / 40), dy / away * Math.min(1, away / 40), dt);
-    B.mv = hyp(B.x - ox, B.y - oy) > 0.2;
-    if (B.mv) { B.moveAng = Math.atan2(B.y - oy, B.x - ox); B.moveAt = t; B.angle = B.moveAng; }
-  }
-  function stepBot(B, dt) {
-    if (B.practiceBot) { stepPracticeBot(B, dt); return; }
-    if (!B.alive || B.isStunned()) { B.mv = false; return; }
-    var t = now(), c = CHARS[B.char], k = B.bot, melee = isMelee(B.char);
-    var enemies = [];
-    participants().forEach(function (id) {
-      var o = ent(id); if (!o || !o.alive || id === B.id) return;
-      if (o.team !== B.team) enemies.push(o);
-    });
-    var target = null, td = Infinity, bestScore = Infinity, sniper = B.char === "sniper", view = sniper ? c.range : BOT_VIEW;
-    enemies.forEach(function (o) {
-      var d = hyp(o.x - B.x, o.y - B.y);
-      if (d > view) return;
-      if (!visibleTo(o, B, t)) return;
-      var score = d * (BOT_WEAK_FOCUS + (1 - BOT_WEAK_FOCUS) * o.hp / o.maxHp);
-      if (score < bestScore) { bestScore = score; td = d; target = o; }
-    });
-    if (target !== k.target) { k.target = target; k.seenAt = t; }
-
-    var mx = 0, my = 0;
-    if (target) {
-      var dx = target.x - B.x, dy = target.y - B.y, d = hyp(dx, dy) || 1, ux = dx / d, uy = dy / d;
-      var kiter = B.char !== "sniper" && (CHARS[B.char].role === "caster" || CHARS[B.char].role === "shooter");
-      var want = B.isBladeStorming(t) ? BODY_R * 2 : c.dashRange ?c.dashRange * 0.7 : c.width ? c.range * 0.75 : (melee ? c.range * 0.6 : c.range * 0.72);
-      var los = losClear(B.x, B.y, target.x, target.y);
-      if (!los) k.chaseUntil = t + BOT_LOS_HOLD_MS;
-      var clearView = los && t >= (k.chaseUntil || 0);
-      var via = bridgeWaypoint(B, target.x, target.y), gx = ux, gy = uy;
-      if (via) { var vd = hyp(via.x - B.x, via.y - B.y) || 1; gx = (via.x - B.x) / vd; gy = (via.y - B.y) / vd; }
-      if (sniper) {
-        if (d < SNIPER_KEEP + 30) { mx -= ux; my -= uy; }
-        else if (!clearView || d > c.range * 0.85) { mx += gx; my += gy; }
+  class BotBrain {
+    pickWanderPoint(B, t) {
+      var k = B.bot, spot;
+      if (Math.random() < 0.5) {
+        var b = BUSH[Math.floor(Math.random() * BUSH.length)], bt = b.tiles[Math.floor(Math.random() * b.tiles.length)];
+        spot = { x: tileX(bt[0]), y: tileY(bt[1]) };
+      } else {
+        spot = { x: BOUND.l + 60 + Math.random() * (BOUND.r - BOUND.l - 120), y: BOUND.t + 180 + Math.random() * (BOUND.b - BOUND.t - 360) };
       }
-      else if (!clearView || d > want + 40) { mx += gx; my += gy; }
-      else if (d < want - (kiter ? BOT_KITE_GAP : 90)) { var back = kiter ? 1 : 0.8; mx -= ux * back; my -= uy * back; }
-      var s = Math.sin(t / 900 + k.seed) * 0.7;
-      mx += -uy * s; my += ux * s;
-    } else {
-      if (!k.wanderUntil || t > k.wanderUntil || hyp(k.wx - B.x, k.wy - B.y) < 50) pickWanderPoint(B, t);
-      var goal = bridgeWaypoint(B, k.wx, k.wy) || { x: k.wx, y: k.wy };
-      var ddx = goal.x - B.x, ddy = goal.y - B.y, dd = hyp(ddx, ddy) || 1;
-      mx = ddx / dd * 0.7; my = ddy / dd * 0.7;
+      resolve(spot);
+      k.wx = spot.x; k.wy = spot.y; k.wanderUntil = t + 4000 + Math.random() * 3000;
     }
-    if (k.detour > t) { var rx = -my * k.detourDir, ry = mx * k.detourDir; mx = rx; my = ry; }
-    var steer = Math.min(1, dt * BOT_STEER_RATE);
-    k.vx = (k.vx || 0) + (mx - (k.vx || 0)) * steer; k.vy = (k.vy || 0) + (my - (k.vy || 0)) * steer;
-    mx = k.vx; my = k.vy;
-    var ox = B.x, oy = B.y, want2 = hyp(mx, my);
-    if (want2 > 0.05) {
-      moveEnt(B, mx, my, dt);
-      var moved = hyp(B.x - ox, B.y - oy), expect = B.speed() * dt * Math.min(1, want2);
-      if (expect > 0 && moved < expect * 0.3) { k.stuck += dt; if (k.stuck > 0.4) { if (t - (k.detourAt || 0) > BOT_DETOUR_KEEP_MS) k.detourDir = Math.random() < 0.5 ? -1 : 1; k.detourAt = t; k.detour = t + 700; k.stuck = 0; } }
-      else k.stuck = 0;
-      B.mv = moved > 0.2;
-      if (B.mv) { B.moveAng = Math.atan2(B.y - oy, B.x - ox); B.moveAt = t; }
-    } else B.mv = false;
-
-    var aimAt = target;
-    if (B.isLancerWinding(t) || B.isHammerWinding(t) || B.isHammerLeaping(t) || B.dash) return;
-    if (aimAt) B.angle = Math.atan2(aimAt.y - B.y, aimAt.x - B.x);
-    else if (B.mv) B.angle = Math.atan2(my, mx);
-    if (B.burst) return;
-    if (B.char === "thrower") { botThrow(B, target, enemies, t); return; }
-    if (B.char === "cleric") { botCleric(B, enemies, t); return; }
-    if (B.char === "lancer") { botLance(B, target, t); return; }
-    if (target && B.gauge >= GAUGE_MAX && t - k.seenAt > 500 && losClear(B.x, B.y, target.x, target.y) && (B.char !== "mage" || td <= ULT.mbCast) && (B.char !== "blacksmith" || td <= ULT.bsCast) && (CHARS[B.char].ultKind !== "blackhole" || td <= ULT.bhCast) && (B.char !== "shaman" || td <= ULT.dmR * 0.7) && (B.char !== "hitman" || td <= ULT.exRange) && (B.char !== "guardian" || td <= ULT.gdR) && (B.char !== "frost" || td <= ULT.frBzR * 0.8) && (B.char !== "dancer" || td <= ULT.bwR * 2) && (B.char !== "duelist" || td <= c.dashRange + c.range) && (B.char !== "stormbow" || td <= c.range)) {
-      if (B.char === "blacksmith") {
-        var drop = leadSpot(target, hammerLeapMs(td) / 1000, t);
-        useUlt(B, Math.atan2(drop.y - B.y, drop.x - B.x), hyp(drop.x - B.x, drop.y - B.y)); return;
+    waterBlocks(ax, ay, bx, by) {
+      var d = hyp(bx - ax, by - ay); if (d < 1) return false;
+      for (var i = 0; i < WATER.length; i++) if (rayRect(ax, ay, (bx - ax) / d, (by - ay) / d, WATER[i], BODY_R - 6) < d) return true;
+      return false;
+    }
+    bridgeWaypoint(B, tx, ty) {
+      if (!BRIDGES.length || !BRAIN.waterBlocks(B.x, B.y, tx, ty)) return null;
+      var best = null, bd = Infinity;
+      BRIDGES.forEach(function (br) {
+        var cost = hyp(br.x - B.x, br.y - B.y) + hyp(tx - br.x, ty - br.y);
+        if (cost < bd) { bd = cost; best = br; }
+      });
+      var reach = best.h / 2 + 34, onDeck = Math.abs(B.x - best.x) < best.w / 2 - BODY_R + 8 && Math.abs(B.y - best.y) < reach + 12;
+      if (onDeck) return { x: best.x, y: best.y + (ty > best.y ? reach + 20 : -reach - 20) };
+      return { x: best.x, y: best.y + (B.y < best.y ? -reach : reach) };
+    }
+    stepPractice(B, dt) {
+      var t = now(), foe = ME;
+      B.mv = false;
+      if (!B.home) {
+        var d = P[B.id] || {};
+        B.home = d.homeX != null ? { x: d.homeX, y: d.homeY } : { x: B.x, y: B.y };
+        B.x = B.home.x; B.y = B.home.y;
       }
-      var ultSpot = ultAimSpot(B, target, td, t);
-      useUlt(B, Math.atan2(ultSpot.y - B.y, ultSpot.x - B.x), hyp(ultSpot.x - B.x, ultSpot.y - B.y)); return;
+      if (!B.alive) return;
+      if (B.hpSeen !== undefined && B.hp < B.hpSeen) B.backAt = t + PRACTICE_BOT_RETURN_MS;
+      if (B.hpSeen !== undefined && B.hp > B.hpSeen) B.healedAt = t;
+      B.hpSeen = B.hp;
+      var low = Math.round(B.maxHp * PRACTICE_ALLY_LOW);
+      if (B.char === "dummyAlly" && B.hp > low && t - (B.healedAt || 0) > PRACTICE_ALLY_RESET_MS) { B.hp = B.hpSeen = low; lastHp[B.id] = low; G.forceNet = true; }
+      var dx = B.home.x - B.x, dy = B.home.y - B.y, away = hyp(dx, dy);
+      if (away < 6) { B.backAt = 0; if (foe && foe.alive) B.angle = Math.atan2(foe.y - B.y, foe.x - B.x); return; }
+      if (!B.backAt) B.backAt = t + PRACTICE_BOT_RETURN_MS;
+      if (t < B.backAt || B.isStunned(t)) return;
+      var ox = B.x, oy = B.y;
+      moveEnt(B, dx / away * Math.min(1, away / 40), dy / away * Math.min(1, away / 40), dt);
+      B.mv = hyp(B.x - ox, B.y - oy) > 0.2;
+      if (B.mv) { B.moveAng = Math.atan2(B.y - oy, B.x - ox); B.moveAt = t; B.angle = B.moveAng; }
     }
-    if (B.char === "shaman" && t >= B.cdUntil && domainStrikeTarget(B, t)) { fireBasic(B, B.angle); return; }
-    if (aimAt && t >= B.cdUntil && t - k.seenAt > BOT_REACT_MS) {
-      var ad = hyp(aimAt.x - B.x, aimAt.y - B.y);
-      var rng = c.stab ? lungeRange(B, t) + c.range : c.throwRange || c.dashRange || (melee ? c.range + BODY_R - 4 : c.range + (overcharged(B, t) ? ULT.ocRangeBonus : 0));
-      if (ad <= rng && losClear(B.x, B.y, aimAt.x, aimAt.y)) {
-        var shotAim = c.pSpeed && !melee ? leadSpot(aimAt, ad / c.pSpeed, t) : aimAt;
-        fireBasic(B, Math.atan2(shotAim.y - B.y, shotAim.x - B.x) + (Math.random() - 0.5) * 2 * BOT_AIM_ERR);
+    step(B, dt) {
+      if (B.practiceBot) { BRAIN.stepPractice(B, dt); return; }
+      if (!B.alive || B.isStunned()) { B.mv = false; return; }
+      var t = now(), c = CHARS[B.char], k = B.bot, melee = isMelee(B.char);
+      var enemies = [];
+      participants().forEach(function (id) {
+        var o = ent(id); if (!o || !o.alive || id === B.id) return;
+        if (o.team !== B.team) enemies.push(o);
+      });
+      var target = null, td = Infinity, bestScore = Infinity, sniper = B.char === "sniper", view = sniper ? c.range : BOT_VIEW;
+      enemies.forEach(function (o) {
+        var d = hyp(o.x - B.x, o.y - B.y);
+        if (d > view) return;
+        if (!visibleTo(o, B, t)) return;
+        var score = d * (BOT_WEAK_FOCUS + (1 - BOT_WEAK_FOCUS) * o.hp / o.maxHp);
+        if (score < bestScore) { bestScore = score; td = d; target = o; }
+      });
+      if (target !== k.target) { k.target = target; k.seenAt = t; }
+
+      var mx = 0, my = 0;
+      if (target) {
+        var dx = target.x - B.x, dy = target.y - B.y, d = hyp(dx, dy) || 1, ux = dx / d, uy = dy / d;
+        var kiter = B.char !== "sniper" && (CHARS[B.char].role === "caster" || CHARS[B.char].role === "shooter");
+        var want = B.isBladeStorming(t) ? BODY_R * 2 : c.dashRange ?c.dashRange * 0.7 : c.width ? c.range * 0.75 : (melee ? c.range * 0.6 : c.range * 0.72);
+        var los = losClear(B.x, B.y, target.x, target.y);
+        if (!los) k.chaseUntil = t + BOT_LOS_HOLD_MS;
+        var clearView = los && t >= (k.chaseUntil || 0);
+        var via = BRAIN.bridgeWaypoint(B, target.x, target.y), gx = ux, gy = uy;
+        if (via) { var vd = hyp(via.x - B.x, via.y - B.y) || 1; gx = (via.x - B.x) / vd; gy = (via.y - B.y) / vd; }
+        if (sniper) {
+          if (d < SNIPER_KEEP + 30) { mx -= ux; my -= uy; }
+          else if (!clearView || d > c.range * 0.85) { mx += gx; my += gy; }
+        }
+        else if (!clearView || d > want + 40) { mx += gx; my += gy; }
+        else if (d < want - (kiter ? BOT_KITE_GAP : 90)) { var back = kiter ? 1 : 0.8; mx -= ux * back; my -= uy * back; }
+        var s = Math.sin(t / 900 + k.seed) * 0.7;
+        mx += -uy * s; my += ux * s;
+      } else {
+        if (!k.wanderUntil || t > k.wanderUntil || hyp(k.wx - B.x, k.wy - B.y) < 50) BRAIN.pickWanderPoint(B, t);
+        var goal = BRAIN.bridgeWaypoint(B, k.wx, k.wy) || { x: k.wx, y: k.wy };
+        var ddx = goal.x - B.x, ddy = goal.y - B.y, dd = hyp(ddx, ddy) || 1;
+        mx = ddx / dd * 0.7; my = ddy / dd * 0.7;
       }
-    }
-  }
+      if (k.detour > t) { var rx = -my * k.detourDir, ry = mx * k.detourDir; mx = rx; my = ry; }
+      var steer = Math.min(1, dt * BOT_STEER_RATE);
+      k.vx = (k.vx || 0) + (mx - (k.vx || 0)) * steer; k.vy = (k.vy || 0) + (my - (k.vy || 0)) * steer;
+      mx = k.vx; my = k.vy;
+      var ox = B.x, oy = B.y, want2 = hyp(mx, my);
+      if (want2 > 0.05) {
+        moveEnt(B, mx, my, dt);
+        var moved = hyp(B.x - ox, B.y - oy), expect = B.speed() * dt * Math.min(1, want2);
+        if (expect > 0 && moved < expect * 0.3) { k.stuck += dt; if (k.stuck > 0.4) { if (t - (k.detourAt || 0) > BOT_DETOUR_KEEP_MS) k.detourDir = Math.random() < 0.5 ? -1 : 1; k.detourAt = t; k.detour = t + 700; k.stuck = 0; } }
+        else k.stuck = 0;
+        B.mv = moved > 0.2;
+        if (B.mv) { B.moveAng = Math.atan2(B.y - oy, B.x - ox); B.moveAt = t; }
+      } else B.mv = false;
 
-  function ultAimSpot(B, target, dist, t) {
-    var sec = 0;
-    if (B.char === "mage") sec = ULT.mbDelay / 1000;
-    else if (B.char === "sniper") sec = dist / ULT.pnSpeed;
-    else if (B.char === "ranger") sec = dist / ULT.mkSpeed;
-    if (!sec) return target;
-    var spot = leadSpot(target, sec, t), reach = hyp(spot.x - B.x, spot.y - B.y);
-    if (B.char === "mage" && reach > ULT.mbCast) return target;
-    return spot;
-  }
-  function leadSpot(o, sec, t) {
-    var moving = o.mv && o.moveAng != null && t - (o.moveAt || 0) < 400, lead = moving ? o.speed() * sec * 0.8 : 0;
-    return { x: o.x + (moving ? Math.cos(o.moveAng) * lead : 0), y: o.y + (moving ? Math.sin(o.moveAng) * lead : 0) };
-  }
-  function fogClusterSpot(B, enemies, t) {
-    var seen = enemies.filter(function (o) { return visibleTo(o, B, t); }), best = null, bestN = 1;
-    seen.forEach(function (o) {
-      if (hyp(o.x - B.x, o.y - B.y) > ULT.fgCast + ULT.fgR * 0.5) return;
-      var sx = 0, sy = 0, n = 0;
-      seen.forEach(function (q) { if (hyp(q.x - o.x, q.y - o.y) <= ULT.fgR * 1.3) { var s = leadSpot(q, potionFlightMs(hyp(q.x - B.x, q.y - B.y)) / 1000, t); sx += s.x; sy += s.y; n++; } });
-      if (n > bestN) { bestN = n; best = { x: sx / n, y: sy / n }; }
-    });
-    return best;
-  }
-  function botThrow(B, target, enemies, t) {
-    var c = CHARS.thrower, k = B.bot, spot;
-    if (B.gauge >= GAUGE_MAX) {
-      if (!k.fullAt) k.fullAt = t;
-      spot = fogClusterSpot(B, enemies, t);
-      if (!spot && target && t - k.fullAt > 5000 && t - k.seenAt > 500) spot = leadSpot(target, potionFlightMs(hyp(target.x - B.x, target.y - B.y)) / 1000, t);
-      if (spot) { k.fullAt = 0; useUlt(B, Math.atan2(spot.y - B.y, spot.x - B.x), hyp(spot.x - B.x, spot.y - B.y)); return; }
-    } else k.fullAt = 0;
-    if (!target || t < B.cdUntil || t - k.seenAt <= BOT_REACT_MS) return;
-    spot = leadSpot(target, potionFlightMs(hyp(target.x - B.x, target.y - B.y)) / 1000, t);
-    var d =hyp(spot.x - B.x, spot.y - B.y);
-    if (d > c.range + ULT.plR * 0.5) return;
-    fireBasic(B, Math.atan2(spot.y - B.y, spot.x - B.x) + (Math.random() - 0.5) * BOT_AIM_ERR, d + (Math.random() - 0.5) * 40);
-  }
-
-  function botCleric(B, enemies, t) {
-    if (B.gauge >= GAUGE_MAX && enemies.length) { useUlt(B, B.angle); return; }
-    if (t < B.cdUntil) return;
-    var A = graceTarget(B);
-    if (A && A.hp < A.maxHp) fireBasic(B, B.angle);
-  }
-  function botLance(B, target, t) {
-    var c = CHARS.lancer, k = B.bot;
-    if (!target || B.isLancerWinding(t) || t - k.seenAt <= BOT_REACT_MS) return;
-    if (B.gauge >= GAUGE_MAX) {
-      var ahead = leadSpot(target, ULT.lnWind / 1000, t), ud = hyp(ahead.x - B.x, ahead.y - B.y);
-      if (ud <= ULT.lnLen && losClear(B.x, B.y, ahead.x, ahead.y) && losClear(B.x, B.y, target.x, target.y)) {
-        useUlt(B, Math.atan2(ahead.y - B.y, ahead.x - B.x)); return;
+      var aimAt = target;
+      if (B.isLancerWinding(t) || B.isHammerWinding(t) || B.isHammerLeaping(t) || B.dash) return;
+      if (aimAt) B.angle = Math.atan2(aimAt.y - B.y, aimAt.x - B.x);
+      else if (B.mv) B.angle = Math.atan2(my, mx);
+      if (B.burst) return;
+      if (B.char === "thrower") { BRAIN.botThrow(B, target, enemies, t); return; }
+      if (B.char === "cleric") { BRAIN.botCleric(B, enemies, t); return; }
+      if (B.char === "lancer") { BRAIN.botLance(B, target, t); return; }
+      if (target && B.gauge >= GAUGE_MAX && t - k.seenAt > 500 && losClear(B.x, B.y, target.x, target.y) && (B.char !== "mage" || td <= ULT.mbCast) && (B.char !== "blacksmith" || td <= ULT.bsCast) && (CHARS[B.char].ultKind !== "blackhole" || td <= ULT.bhCast) && (B.char !== "shaman" || td <= ULT.dmR * 0.7) && (B.char !== "hitman" || td <= ULT.exRange) && (B.char !== "guardian" || td <= ULT.gdR) && (B.char !== "frost" || td <= ULT.frBzR * 0.8) && (B.char !== "dancer" || td <= ULT.bwR * 2) && (B.char !== "duelist" || td <= c.dashRange + c.range) && (B.char !== "stormbow" || td <= c.range)) {
+        if (B.char === "blacksmith") {
+          var drop = BRAIN.leadSpot(target, hammerLeapMs(td) / 1000, t);
+          useUlt(B, Math.atan2(drop.y - B.y, drop.x - B.x), hyp(drop.x - B.x, drop.y - B.y)); return;
+        }
+        var ultSpot = BRAIN.ultAimSpot(B, target, td, t);
+        useUlt(B, Math.atan2(ultSpot.y - B.y, ultSpot.x - B.x), hyp(ultSpot.x - B.x, ultSpot.y - B.y)); return;
+      }
+      if (B.char === "shaman" && t >= B.cdUntil && domainStrikeTarget(B, t)) { fireBasic(B, B.angle); return; }
+      if (aimAt && t >= B.cdUntil && t - k.seenAt > BOT_REACT_MS) {
+        var ad = hyp(aimAt.x - B.x, aimAt.y - B.y);
+        var rng = c.stab ? lungeRange(B, t) + c.range : c.throwRange || c.dashRange || (melee ? c.range + BODY_R - 4 : c.range + (overcharged(B, t) ? ULT.ocRangeBonus : 0));
+        if (ad <= rng && losClear(B.x, B.y, aimAt.x, aimAt.y)) {
+          var shotAim = c.pSpeed && !melee ? BRAIN.leadSpot(aimAt, ad / c.pSpeed, t) : aimAt;
+          fireBasic(B, Math.atan2(shotAim.y - B.y, shotAim.x - B.x) + (Math.random() - 0.5) * 2 * BOT_AIM_ERR);
+        }
       }
     }
-    if (t < B.cdUntil) return;
-    var d = hyp(target.x - B.x, target.y - B.y);
-    if (d <= c.range + (overcharged(B, t) ? ULT.ocRangeBonus : 0) && losClear(B.x, B.y, target.x, target.y)) fireBasic(B, B.angle + (Math.random() - 0.5) * 2 * BOT_AIM_ERR);
+    ultAimSpot(B, target, dist, t) {
+      var sec = 0;
+      if (B.char === "mage") sec = ULT.mbDelay / 1000;
+      else if (B.char === "sniper") sec = dist / ULT.pnSpeed;
+      else if (B.char === "ranger") sec = dist / ULT.mkSpeed;
+      if (!sec) return target;
+      var spot = BRAIN.leadSpot(target, sec, t), reach = hyp(spot.x - B.x, spot.y - B.y);
+      if (B.char === "mage" && reach > ULT.mbCast) return target;
+      return spot;
+    }
+    leadSpot(o, sec, t) {
+      var moving = o.mv && o.moveAng != null && t - (o.moveAt || 0) < 400, lead = moving ? o.speed() * sec * 0.8 : 0;
+      return { x: o.x + (moving ? Math.cos(o.moveAng) * lead : 0), y: o.y + (moving ? Math.sin(o.moveAng) * lead : 0) };
+    }
+    fogClusterSpot(B, enemies, t) {
+      var seen = enemies.filter(function (o) { return visibleTo(o, B, t); }), best = null, bestN = 1;
+      seen.forEach(function (o) {
+        if (hyp(o.x - B.x, o.y - B.y) > ULT.fgCast + ULT.fgR * 0.5) return;
+        var sx = 0, sy = 0, n = 0;
+        seen.forEach(function (q) { if (hyp(q.x - o.x, q.y - o.y) <= ULT.fgR * 1.3) { var s = BRAIN.leadSpot(q, potionFlightMs(hyp(q.x - B.x, q.y - B.y)) / 1000, t); sx += s.x; sy += s.y; n++; } });
+        if (n > bestN) { bestN = n; best = { x: sx / n, y: sy / n }; }
+      });
+      return best;
+    }
+    botThrow(B, target, enemies, t) {
+      var c = CHARS.thrower, k = B.bot, spot;
+      if (B.gauge >= GAUGE_MAX) {
+        if (!k.fullAt) k.fullAt = t;
+        spot = BRAIN.fogClusterSpot(B, enemies, t);
+        if (!spot && target && t - k.fullAt > 5000 && t - k.seenAt > 500) spot = BRAIN.leadSpot(target, potionFlightMs(hyp(target.x - B.x, target.y - B.y)) / 1000, t);
+        if (spot) { k.fullAt = 0; useUlt(B, Math.atan2(spot.y - B.y, spot.x - B.x), hyp(spot.x - B.x, spot.y - B.y)); return; }
+      } else k.fullAt = 0;
+      if (!target || t < B.cdUntil || t - k.seenAt <= BOT_REACT_MS) return;
+      spot = BRAIN.leadSpot(target, potionFlightMs(hyp(target.x - B.x, target.y - B.y)) / 1000, t);
+      var d =hyp(spot.x - B.x, spot.y - B.y);
+      if (d > c.range + ULT.plR * 0.5) return;
+      fireBasic(B, Math.atan2(spot.y - B.y, spot.x - B.x) + (Math.random() - 0.5) * BOT_AIM_ERR, d + (Math.random() - 0.5) * 40);
+    }
+    botCleric(B, enemies, t) {
+      if (B.gauge >= GAUGE_MAX && enemies.length) { useUlt(B, B.angle); return; }
+      if (t < B.cdUntil) return;
+      var A = graceTarget(B);
+      if (A && A.hp < A.maxHp) fireBasic(B, B.angle);
+    }
+    botLance(B, target, t) {
+      var c = CHARS.lancer, k = B.bot;
+      if (!target || B.isLancerWinding(t) || t - k.seenAt <= BOT_REACT_MS) return;
+      if (B.gauge >= GAUGE_MAX) {
+        var ahead = BRAIN.leadSpot(target, ULT.lnWind / 1000, t), ud = hyp(ahead.x - B.x, ahead.y - B.y);
+        if (ud <= ULT.lnLen && losClear(B.x, B.y, ahead.x, ahead.y) && losClear(B.x, B.y, target.x, target.y)) {
+          useUlt(B, Math.atan2(ahead.y - B.y, ahead.x - B.x)); return;
+        }
+      }
+      if (t < B.cdUntil) return;
+      var d = hyp(target.x - B.x, target.y - B.y);
+      if (d <= c.range + (overcharged(B, t) ? ULT.ocRangeBonus : 0) && losClear(B.x, B.y, target.x, target.y)) fireBasic(B, B.angle + (Math.random() - 0.5) * 2 * BOT_AIM_ERR);
+    }
   }
+  var BRAIN = new BotBrain();
 
   function entFields(u, E) {
     var d = P[E.id];
@@ -4413,119 +4448,122 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     G.endSent = true;
     netWrite(true);
     var statsMode = room.mode === "pvp" || room.mode === "cup";
-    var skipReason = quitTeam ? "상대팀이 모두 나가서 통계에서 제외됐어요" : statsSkipReason(room.mode, room.roster, P);
+    var skipReason = quitTeam ? "상대팀이 모두 나가서 통계에서 제외됐어요" : STATS.skipReason(room.mode, room.roster, P);
     var ended = { status: "ended", winner: winner, endedAt: t,
       final: { blue: s.blueKills, red: s.redKills, reason: quitTeam ? "상대팀이 모두 나가서 승리" : "시간 종료 — 킬 스코어로 판정" } };
     if (statsMode) ended.statsNote = skipReason || STATS_PENDING;
     room.ref.update(ended);
-    if (!skipReason) watchStatsDone(t);
+    if (!skipReason) STATS.watchDone(t);
   }
 
   var STATS_PATH = "teambattle/modestats/";
   var STATS_SETTLE_MS = 8000, STATS_HOLD_MAX_MS = 11000;
   var STATS_PENDING = "통계를 저장하는 중이에요";
   var isTestLink = !!(window.PORTAL_CLASS && window.PORTAL_CLASS.test);
-  function statsSkipReason(mode, roster, ps) {
-    if (mode !== "pvp" && mode !== "cup") return "이 모드는 통계를 모으지 않아요";
-    if (!roster) return "참가자 정보를 못 받아서 통계에서 제외됐어요";
-    if (isTestLink) return "배포용(테스트) 링크로 열어서 통계에서 제외됐어요";
-    if (TS !== DEFAULT_SLOW) return "옛 속도(시험용) 경기라 통계에서 제외됐어요";
-    var count = { blue: 0, red: 0 }, ids = keys(roster);
-    for (var i = 0; i < ids.length; i++) {
-      var id = ids[i], r = roster[id], d = ps[id];
-      if (!r) return "참가자 정보가 맞지 않아 통계에서 제외됐어요";
-      if (r.ai || (d && d.isAI)) return "AI가 함께해서 통계에서 제외됐어요";
-      if (!d || !d.slot || d.team !== r.team || d.characterType !== r.c || !(r.team in count) || !CHARS[r.c]) return "참가자 정보가 맞지 않아 통계에서 제외됐어요";
-      count[r.team]++;
+  class MatchStats {
+    skipReason(mode, roster, ps) {
+      if (mode !== "pvp" && mode !== "cup") return "이 모드는 통계를 모으지 않아요";
+      if (!roster) return "참가자 정보를 못 받아서 통계에서 제외됐어요";
+      if (isTestLink) return "배포용(테스트) 링크로 열어서 통계에서 제외됐어요";
+      if (CLOCK.scale !== DEFAULT_SLOW) return "옛 속도(시험용) 경기라 통계에서 제외됐어요";
+      var count = { blue: 0, red: 0 }, ids = keys(roster);
+      for (var i = 0; i < ids.length; i++) {
+        var id = ids[i], r = roster[id], d = ps[id];
+        if (!r) return "참가자 정보가 맞지 않아 통계에서 제외됐어요";
+        if (r.ai || (d && d.isAI)) return "AI가 함께해서 통계에서 제외됐어요";
+        if (!d || !d.slot || d.team !== r.team || d.characterType !== r.c || !(r.team in count) || !CHARS[r.c]) return "참가자 정보가 맞지 않아 통계에서 제외됐어요";
+        count[r.team]++;
+      }
+      return count.blue === 3 && count.red === 3 ? "" : "양 팀이 3명씩이 아니어서 통계에서 제외됐어요";
     }
-    return count.blue === 3 && count.red === 3 ? "" : "양 팀이 3명씩이 아니어서 통계에서 제외됐어요";
-  }
-  function isStudentFullTeamMatch(mode, roster, ps) { return !statsSkipReason(mode, roster, ps); }
-  function setStatsNote(r, text) { r.ref.update({ statsNote: text }).catch(function () {}); }
-  function watchStatsDone(endedAt) {
-    if (!db || !room) return;
-    var r = room, ref = r.ref.child("done"), settled = false, timer = 0;
-    function everyoneStayed(done) { return !!r.roster && keys(r.roster).every(function (id) { return done[id] === endedAt; }); }
-    function settle(done, timedOut) {
-      if (settled || (!everyoneStayed(done) && !timedOut)) return;
-      settled = true; clearTimeout(timer); ref.off("value", onDone);
-      recordClassStats(r, endedAt, everyoneStayed(done));
+    isFullStudentMatch(mode, roster, ps) { return !STATS.skipReason(mode, roster, ps); }
+    setNote(r, text) { r.ref.update({ statsNote: text }).catch(function () {}); }
+    watchDone(endedAt) {
+      if (!db || !room) return;
+      var r = room, ref = r.ref.child("done"), settled = false, timer = 0;
+      function everyoneStayed(done) { return !!r.roster && keys(r.roster).every(function (id) { return done[id] === endedAt; }); }
+      function settle(done, timedOut) {
+        if (settled || (!everyoneStayed(done) && !timedOut)) return;
+        settled = true; clearTimeout(timer); ref.off("value", onDone);
+        record(r, endedAt, everyoneStayed(done));
+      }
+      function onDone(s) { settle(s.val() || {}, false); }
+      function failed() { if (settled) return; settled = true; clearTimeout(timer); ref.off("value", onDone); STATS.setNote(r, "통계 확인에 실패해서 저장하지 못했어요"); }
+      ref.on("value", onDone, failed);
+      timer = setTimeout(function () { ref.once("value").then(function (s) { settle(s.val() || {}, true); }).catch(failed); }, STATS_SETTLE_MS);
     }
-    function onDone(s) { settle(s.val() || {}, false); }
-    function failed() { if (settled) return; settled = true; clearTimeout(timer); ref.off("value", onDone); setStatsNote(r, "통계 확인에 실패해서 저장하지 못했어요"); }
-    ref.on("value", onDone, failed);
-    timer = setTimeout(function () { ref.once("value").then(function (s) { settle(s.val() || {}, true); }).catch(failed); }, STATS_SETTLE_MS);
-  }
-  function recordClassStats(r, endedAt, stayed) {
-    var ps = P;
-    if (room !== r || r.status !== "ended" || r.endedAt !== endedAt || r.winner == null) return;
-    if (!stayed) { setStatsNote(r, "결과 창까지 남지 않은 사람이 있어 통계에서 제외됐어요"); return; }
-    if (!isStudentFullTeamMatch(r.mode, r.roster, ps)) { setStatsNote(r, "참가자 정보가 맞지 않아 통계에서 제외됐어요"); return; }
-    saveClassStats(r, ps);
-  }
-  function statsHoldActive() { return !!room && room.status === "ended" && room.statsNote === STATS_PENDING && now() - (room.endedAt || 0) < STATS_HOLD_MAX_MS; }
-  function markStayedToEnd() {
-    var r = room;
-    if (!r || !P[myId] || !r.roster || !r.roster[myId]) return;
-    if (r.endedAt) { r.ref.child("done/" + myId).set(r.endedAt).catch(function () {}); return; }
-    r.ref.child("endedAt").once("value").then(function (s) {
-      var endedAt = s.val();
-      if (endedAt && room === r && P[myId]) r.ref.child("done/" + myId).set(endedAt);
-    }).catch(function () {});
-  }
-  function saveClassStats(r, ps) {
-    var rows = keys(r.roster).map(function (id) {
-      var e = ent(id) || stateOf(ps[id]);
-      return { c: r.roster[id].c, win: r.winner === r.roster[id].team, dmg: +e.dmg || 0, heal: +e.heal || 0,
-               blocked: +e.blocked || 0, stun: +e.stunDealt || 0, slow: +e.slowDealt || 0, assists: +e.assists || 0, kills: +e.kills || 0, deaths: +e.deaths || 0 };
-    });
-    var banned = (r.bans || []).filter(function (c) { return CHARS[c]; });
-    function addStats(countSelectableGames) {
-      return db.ref(STATS_PATH + r.mode).transaction(function (cur) {
-        cur = cur || {};
-        var matchesBefore = +cur.matches || 0;
-        cur.matches = matchesBefore + 1;
-        if (countSelectableGames) CHAR_LIST.forEach(function (k) {
-          var st = cur[k] || { picks: 0, wins: 0, dmg: 0, heal: 0 };
-          st.games = (st.games != null ? +st.games : (cur[k] ? matchesBefore : 0)) + 1;
-          cur[k] = st;
+    record(r, endedAt, stayed) {
+      var ps = P;
+      if (room !== r || r.status !== "ended" || r.endedAt !== endedAt || r.winner == null) return;
+      if (!stayed) { STATS.setNote(r, "결과 창까지 남지 않은 사람이 있어 통계에서 제외됐어요"); return; }
+      if (!STATS.isFullStudentMatch(r.mode, r.roster, ps)) { STATS.setNote(r, "참가자 정보가 맞지 않아 통계에서 제외됐어요"); return; }
+      save(r, ps);
+    }
+    holdActive() { return !!room && room.status === "ended" && room.statsNote === STATS_PENDING && now() - (room.endedAt || 0) < STATS_HOLD_MAX_MS; }
+    markStayed() {
+      var r = room;
+      if (!r || !P[myId] || !r.roster || !r.roster[myId]) return;
+      if (r.endedAt) { r.ref.child("done/" + myId).set(r.endedAt).catch(function () {}); return; }
+      r.ref.child("endedAt").once("value").then(function (s) {
+        var endedAt = s.val();
+        if (endedAt && room === r && P[myId]) r.ref.child("done/" + myId).set(endedAt);
+      }).catch(function () {});
+    }
+    save(r, ps) {
+      var rows = keys(r.roster).map(function (id) {
+        var e = ent(id) || stateOf(ps[id]);
+        return { c: r.roster[id].c, win: r.winner === r.roster[id].team, dmg: +e.dmg || 0, heal: +e.heal || 0,
+                 blocked: +e.blocked || 0, stun: +e.stunDealt || 0, slow: +e.slowDealt || 0, assists: +e.assists || 0, kills: +e.kills || 0, deaths: +e.deaths || 0 };
+      });
+      var banned = (r.bans || []).filter(function (c) { return CHARS[c]; });
+      function addStats(countSelectableGames) {
+        return db.ref(STATS_PATH + r.mode).transaction(function (cur) {
+          cur = cur || {};
+          var matchesBefore = +cur.matches || 0;
+          cur.matches = matchesBefore + 1;
+          if (countSelectableGames) CHAR_LIST.forEach(function (k) {
+            var st = cur[k] || { picks: 0, wins: 0, dmg: 0, heal: 0 };
+            st.games = (st.games != null ? +st.games : (cur[k] ? matchesBefore : 0)) + 1;
+            cur[k] = st;
+          });
+          cur.red = (+cur.red || 0) + (r.winner === "red" ? 1 : 0);
+          cur.blue = (+cur.blue || 0) + (r.winner === "blue" ? 1 : 0);
+          rows.forEach(function (w) {
+            var st = cur[w.c] || {}, n = +st.picks || 0;
+            st.dmg = r1(((+st.dmg || 0) * n + w.dmg) / (n + 1));
+            st.heal = r1(((+st.heal || 0) * n + w.heal) / (n + 1));
+            var ccN = +st.ccPicks || 0;
+            st.block = r1(((+st.block || 0) * ccN + w.blocked) / (ccN + 1));
+            st.stun = r1(((+st.stun || 0) * ccN + w.stun) / (ccN + 1));
+            st.slow = r1(((+st.slow || 0) * ccN + w.slow) / (ccN + 1));
+            st.ccPicks = ccN + 1;
+            var asN = +st.asPicks || 0;
+            st.assist = r1(((+st.assist || 0) * asN + w.assists) / (asN + 1));
+            st.asPicks = asN + 1;
+            var kdN = +st.kdPicks || 0;
+            st.kills = r1(((+st.kills || 0) * kdN + w.kills) / (kdN + 1));
+            st.deaths = r1(((+st.deaths || 0) * kdN + w.deaths) / (kdN + 1));
+            st.kdPicks = kdN + 1;
+            st.picks = n + 1;
+            st.wins = (+st.wins || 0) + (w.win ? 1 : 0);
+            cur[w.c] = st;
+          });
+          banned.forEach(function (c) {
+            var st = cur[c] || { picks: 0, wins: 0, dmg: 0, heal: 0 };
+            st.bans = (+st.bans || 0) + 1;
+            cur[c] = st;
+          });
+          return cur;
         });
-        cur.red = (+cur.red || 0) + (r.winner === "red" ? 1 : 0);
-        cur.blue = (+cur.blue || 0) + (r.winner === "blue" ? 1 : 0);
-        rows.forEach(function (w) {
-          var st = cur[w.c] || {}, n = +st.picks || 0;
-          st.dmg = r1(((+st.dmg || 0) * n + w.dmg) / (n + 1));
-          st.heal = r1(((+st.heal || 0) * n + w.heal) / (n + 1));
-          var ccN = +st.ccPicks || 0;
-          st.block = r1(((+st.block || 0) * ccN + w.blocked) / (ccN + 1));
-          st.stun = r1(((+st.stun || 0) * ccN + w.stun) / (ccN + 1));
-          st.slow = r1(((+st.slow || 0) * ccN + w.slow) / (ccN + 1));
-          st.ccPicks = ccN + 1;
-          var asN = +st.asPicks || 0;
-          st.assist = r1(((+st.assist || 0) * asN + w.assists) / (asN + 1));
-          st.asPicks = asN + 1;
-          var kdN = +st.kdPicks || 0;
-          st.kills = r1(((+st.kills || 0) * kdN + w.kills) / (kdN + 1));
-          st.deaths = r1(((+st.deaths || 0) * kdN + w.deaths) / (kdN + 1));
-          st.kdPicks = kdN + 1;
-          st.picks = n + 1;
-          st.wins = (+st.wins || 0) + (w.win ? 1 : 0);
-          cur[w.c] = st;
-        });
-        banned.forEach(function (c) {
-          var st = cur[c] || { picks: 0, wins: 0, dmg: 0, heal: 0 };
-          st.bans = (+st.bans || 0) + 1;
-          cur[c] = st;
-        });
-        return cur;
+      }
+      addStats(true).catch(function () { return addStats(false); }).then(function (res) {
+        setNote(r, res && res.committed ? "이 경기는 통계에 반영됐어요" : "통계 저장이 취소됐어요. 다시 경기하면 반영돼요");
+      }).catch(function (err) {
+        setNote(r, "통계 저장에 실패했어요(" + ((err && err.code) || err) + "). 데이터베이스 규칙 게시를 확인해 주세요");
       });
     }
-    addStats(true).catch(function () { return addStats(false); }).then(function (res) {
-      setStatsNote(r, res && res.committed ? "이 경기는 통계에 반영됐어요" : "통계 저장이 취소됐어요. 다시 경기하면 반영돼요");
-    }).catch(function (err) {
-      setStatsNote(r, "통계 저장에 실패했어요(" + ((err && err.code) || err) + "). 데이터베이스 규칙 게시를 확인해 주세요");
-    });
   }
+  var STATS = new MatchStats();
   function hostCleanup() {
     var t = now();
     if (room.status === "ended" && room.endedAt && t - room.endedAt > 300000) room.ref.remove();
@@ -4534,7 +4572,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (!G) return;
     G.forceNet = true;
     try { netWrite(true); } catch (e) {}
-    markStayedToEnd();
+    STATS.markStayed();
     setTimeout(function () {
       var mine = ME ? ME.team : null;
       if (mine && room && room.winner && room.winner !== "draw") sfx(room.winner === mine ? "win" : "lose");
@@ -4542,7 +4580,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   function restart() {
     if (!room || room.status !== "ended") return;
-    if (statsHoldActive() || (room.endedAt && now() - room.endedAt < 1500)) return;
+    if (STATS.holdActive() || (room.endedAt && now() - room.endedAt < 1500)) return;
     backToLobby();
   }
   function backToLobby() {
@@ -5607,7 +5645,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
    if (hurt && E.alive && (!v.once || v.once.name === "Hit_A")) playOnce(v, "Hit_A", 1.6, t);
     v.wasStealth = E.isStealthed(t);
-    var gameDt = dt * TS;
+    var gameDt = dt * CLOCK.scale;
     var moved = hyp(E.x - v.px, E.y - v.py) / Math.max(gameDt, 0.001);
     v.px = E.x; v.py = E.y;
     v.speed += (moved - v.speed) * Math.min(1, dt * 10);
@@ -5642,7 +5680,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       else if (M.mv) showClip(v, "Skeletons_Walking", 1.4, true);
       else showClip(v, "Skeletons_Idle", 1, true);
     }
-    v.mixer.update(dt * TS);
+    v.mixer.update(dt * CLOCK.scale);
   }
   function dropMinionVis(id, vanish) {
     var v = MVIS[id]; if (!v) return;
@@ -5802,7 +5840,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     return g;
   }
   function renderCurse(v, E, t, nowMs) {
-    var c = CURSES[E.id], n = c && E.alive && c.at > (E.diedAt || 0) ? c.n : 0;
+    var c = FIELD.curses[E.id], n = c && E.alive && c.at > (E.diedAt || 0) ? c.n : 0;
     var boomAt = c ? c.at + ULT.cuBoomMs : 0, full = n >= ULT.cuStacks;
     if (full && t > boomAt + CURSE_BLAST_MS) n = 0;
     if (!n) { if (v.curse) v.curse.visible = false; return; }
@@ -6099,7 +6137,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   function dropGraceVis(g) { if (!g.vis) return; dropSkyBeam(g.vis); g.vis = null; }
   function renderGraces(t, nowMs) {
-    GRACES = GRACES.filter(function (g) {
+    FIELD.graces = FIELD.graces.filter(function (g) {
       var e = g.e, age = t - e.createdAt, v = VIS[e.tgt];
       if (age >= ULT.grLife || !v) { dropGraceVis(g); return false; }
       if (age < 0) return true;
@@ -6260,7 +6298,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (ME && hyp(x - ME.x, y - ME.y) < 700) sfx("boom");
   }
   var NECRO_SMOKE_COLOR = 0x8A2A48;
-  function smoke(x, y, color) { FX.push({ k: "smoke", x: x, y: y, c: color || 0xC8C8CD, t: Date.now(), life: (ULT.asSmokeMs + 150) / TS }); }
+  function smoke(x, y, color) { FX.push({ k: "smoke", x: x, y: y, c: color || 0xC8C8CD, t: Date.now(), life: (ULT.asSmokeMs + 150) / CLOCK.scale }); }
   function boom(x, y, r, team) { FX.push({ k: "boom", x: x, y: y, r: r, c: C_FX[team] || 0xffffff, t: Date.now(), life: 450 }); }
   function floatText(x, y, text, color) { FX.push({ k: "txt", x: x, y: y, s: text, c: color, t: Date.now(), life: 800 }); }
   function orbHitColor(d) { return d.ownerCharacterType === "necro" || d.ownerCharacterType === "frost" || d.ownerCharacterType === "mage" || d.ownerCharacterType === "stormbow" ? hitColor(d) : (d.team === "blue" ? "#5FA2FF" : "#FF6A5F"); }
@@ -6450,7 +6488,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     keys(VIS).forEach(dropVis); keys(PRV).forEach(dropProjVis); keys(MLV).forEach(dropMelee);
     keys(MVIS).forEach(function (id) { dropMinionVis(id, false); });
     FX.forEach(dropFxMesh);
-    BURSTS.forEach(dropBurstVis); POOLS.forEach(dropPoolVis); LUNGES.forEach(dropLungeVis); HOLES.forEach(dropHoleVis); STORMS.forEach(dropStormVis); REVS.forEach(dropRevVis); GRACES.forEach(dropGraceVis); DOMAINS.forEach(dropDomainVis); clericRange.visible = false;
+    FIELD.dropAllVis(); clericRange.visible = false;
     aimGrp.visible = false; CAM.snap = true;
   }
 
@@ -6764,7 +6802,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     keys(PRV).forEach(function (id) { if (!PR[id]) dropProjVis(id); });
 
     keys(MELEE).forEach(function (k) {
-      var m = MELEE[k], age = (nowMs - m.at) * TS, g = MLV[k], wave = m.d.len && !m.d.stab ? WAVE[P[m.d.owner] ? P[m.d.owner].characterType : ""] : null, life = wave ? wave.life : m.d.stab ? STAB_VIS_MS : 240;
+      var m = MELEE[k], age = (nowMs - m.at) * CLOCK.scale, g = MLV[k], wave = m.d.len && !m.d.stab ? WAVE[P[m.d.owner] ? P[m.d.owner].characterType : ""] : null, life = wave ? wave.life : m.d.stab ? STAB_VIS_MS : 240;
       if (age > life) { if (g) dropMelee(k); return; }
       if (!g) g = MLV[k] = makeMeleeVis(m.d);
       var f = age / life;
@@ -6783,24 +6821,20 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       } else if (g.userData.line) g.userData.edgeMesh.scale.x = g.userData.line * (0.55 + 0.45 * Math.min(1, f * 3));
       else g.userData.edgeMesh.scale.setScalar(0.85 + 0.2 * f);
     });
-    LUNGES.forEach(function (l) {
+    FIELD.lunges.forEach(function (l) {
       if (!l.vis) l.vis = makeLungeVis(l.d);
       l.vis.userData.mat.opacity = (l.d.zone ? 0.3 : 0.75) + 0.2 * Math.sin(nowMs / 45);
     });
     keys(MLV).forEach(function (k) { if (!MELEE[k]) dropMelee(k); });
 
-    BURSTS.forEach(function (b) {
+    FIELD.bursts.forEach(function (b) {
       if (!b.vis) b.vis = makeBurstVis(b.e);
       var k = clamp((t - b.e.createdAt) / b.e.delay, 0, 1);
       b.vis.userData.fill.scale.setScalar(Math.max(0.01, k) * b.e.r);
       b.vis.userData.edge.material.opacity = 0.55 + 0.4 * Math.sin(nowMs / 60);
       placeMeteor(b.vis, k, nowMs);
     });
-    POOLS.forEach(function (pl) { renderPool(pl, t, nowMs); });
-    HOLES.forEach(function (h) { renderHole(h, t, nowMs); });
-    STORMS.forEach(function (s) { renderStorm(s, t, dt); });
-    REVS.forEach(function (r) { renderRev(r, t, nowMs); });
-    DOMAINS.forEach(function (dm) { renderDomain(dm, t, nowMs); });
+    FIELD.renderLingering(t, nowMs, dt);
     renderClericRange();
     renderGraces(t, nowMs);
 
@@ -6933,9 +6967,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       h += '<div class="spCard' + (E.alive ? "" : " dead") + '"><img alt="" src="' + charImgSrc(E.char, team) + '">' +
         '<div class="spInfo"><div class="spName">' + (E.isAI ? "🤖 " : "") + esc(E.nickname) + '<span class="spK">' + (E.kills || 0) + "킬</span><small>" + CHARS[E.char].name + "</small></div>" +
         '<div class="spBar hp' + (ratio < 0.3 ? " low" : "") + '"><i style="width:' + Math.round(ratio * 100) + '%"></i><span>' +
-          (E.alive ? "HP " + hp + " / " + E.maxHp : "부활까지 " + Math.max(1, Math.ceil((E.diedAt + RESPAWN_MS - now()) / TS / 1000)) + "초") + "</span></div>" +
+          (E.alive ? "HP " + hp + " / " + E.maxHp : "부활까지 " + Math.max(1, Math.ceil((E.diedAt + RESPAWN_MS - now()) / CLOCK.scale / 1000)) + "초") + "</span></div>" +
         (act ? '<div class="spBar ult act"><i style="width:' + Math.round(skillLeft(E, tn) * 100) + '%"></i><span>' +
-                 CHARS[E.char].ultName + " " + Math.ceil((E.skillUntil - tn) / TS / 1000) + "초</span></div>"
+                 CHARS[E.char].ultName + " " + Math.ceil((E.skillUntil - tn) / CLOCK.scale / 1000) + "초</span></div>"
              : '<div class="spBar ult' + (full ? " full" : "") + '"><i style="width:' + g * 10 + '%"></i><span>' +
                  (full ? "스킬 준비 완료!" : "스킬 " + g + " / " + GAUGE_MAX) + "</span></div>") + "</div></div>";
     });
@@ -7028,9 +7062,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var st = room.status;
     var left = st === "countdown" || t < room.startAt ? MATCH_MS : room.startAt + MATCH_MS - t;
     if (st === "ended") left = Math.max(0, Math.min(MATCH_MS, room.startAt + MATCH_MS - (room.endedAt || t)));
-    left /= TS;
+    left /= CLOCK.scale;
     var practice = room.mode === "practice";
-    setText($("hudTimer"), practice ? fmtTime(Math.floor(Math.max(0, t - room.startAt) / TS / 1000) * 1000) : fmtTime(left));
+    setText($("hudTimer"), practice ? fmtTime(Math.floor(Math.max(0, t - room.startAt) / CLOCK.scale / 1000) * 1000) : fmtTime(left));
     finalCountdown($("hudTimer"), st === "playing" && !practice ? left : 0);
     $("scrGame").classList.toggle("practice", practice);
     show($("practiceBar"), practice && !!ME && st !== "ended");
@@ -7055,8 +7089,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     show($("deadMsg"), ME && !ME.alive && st === "playing");
     var prot = ME && ME.isProtected(t) && st === "playing";
     show($("protBadge"), prot);
-    if (prot) setText($("protBadge"), "🛡 보호 중 " + ((ME.protectUntil - t) / TS / 1000).toFixed(1) + "초");
-    if (ME && !ME.alive) setText($("deadMsg"), "쓰러졌어요 — " + Math.max(1, Math.ceil((ME.diedAt + RESPAWN_MS - t) / TS / 1000)) + "초 뒤 부활");
+    if (prot) setText($("protBadge"), "🛡 보호 중 " + ((ME.protectUntil - t) / CLOCK.scale / 1000).toFixed(1) + "초");
+    if (ME && !ME.alive) setText($("deadMsg"), "쓰러졌어요 — " + Math.max(1, Math.ceil((ME.diedAt + RESPAWN_MS - t) / CLOCK.scale / 1000)) + "초 뒤 부활");
     if (ME) {
       setHtml($("btnAtk").lastChild, '<i class="ic">' + CHARS[ME.char].icon + "</i>공격");
       var cdLeft = Math.max(0, ME.cdUntil - t) / (ME.cdDur || CHARS[ME.char].cd);
@@ -7064,11 +7098,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var full = ME.gauge >= GAUGE_MAX, act = ME.hasSkillActive(t);
       $("btnUlt").className = "actBtn" + (act ? " act" : (full && !ME.burst ? " ready" : ""));
       $("btnUlt").firstChild.style.height = Math.round((act ? skillLeft(ME, t) : clamp(ME.gauge / GAUGE_MAX, 0, 1)) * 100) + "%";
-      setHtml($("btnUlt").lastChild, act ? CHARS[ME.char].ultName + "<br>" + Math.ceil((ME.skillUntil - t) / TS / 1000) + "초"
+      setHtml($("btnUlt").lastChild, act ? CHARS[ME.char].ultName + "<br>" + Math.ceil((ME.skillUntil - t) / CLOCK.scale / 1000) + "초"
                                          : (full ? "스킬!" : "스킬<br>" + Math.floor(ME.gauge) + "/10"));
     }
     var cd = room.startAt - t;
-    var counting = (st === "countdown" || st === "playing") && cd > -700 * TS;
+    var counting = (st === "countdown" || st === "playing") && cd > -700 * CLOCK.scale;
     show($("countOv"), counting);
     if (counting) {
       var n = cd > 0 ? String(Math.ceil(cd / 1000)) : "시작!";
@@ -7087,8 +7121,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (quitWin) setText($("endReason"), "상대팀이 모두 나가서 " + (w === "blue" ? "블루팀" : "레드팀") + "이 승리했어요.");
       show($("endStats"), !!room.statsNote);
       if (room.statsNote) setText($("endStats"), room.statsNote);
-      var holdForStats = statsHoldActive() && !!room.roster && !!room.roster[myId];
-      $("btnAgain").disabled = statsHoldActive();
+      var holdForStats = STATS.holdActive() && !!room.roster && !!room.roster[myId];
+      $("btnAgain").disabled = STATS.holdActive();
       $("btnLeaveEnd").disabled = holdForStats;
       setText($("endBlue"), String(f.blue != null ? f.blue : s.blueKills));
       setText($("endRed"), String(f.red != null ? f.red : s.redKills));
@@ -7109,7 +7143,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     if (!G) return;
     var t = now();
-    stepWorld(t, dt * TS, true, dt);
+    stepWorld(t, dt * CLOCK.scale, true, dt);
     if (st === "countdown" || st === "playing") netWrite(false);
     if (isHost()) { hostJudge(); hostCleanup(); }
     render(t, dt);
@@ -7151,7 +7185,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (KEY_ON.atk && t >= ME.cdUntil && !ME.volley && !ME.slash) fireBasic(ME, autoAimAngle(ME));
         stepCombat(ME, dt);
       } else if (ME) ME.mv = false;
-      if (isHost()) keys(BOTS).forEach(function (id) { var B = BOTS[id]; if (driveBots) stepBot(B, dt); if (B.alive) stepCombat(B, dt); stepKnightSlam(B); stepHammerLeap(B); stepLance(B); stepDash(B); stepMinions(B, dt, t); payKillGaugeOwed(B, t); });
+      if (isHost()) keys(BOTS).forEach(function (id) { var B = BOTS[id]; if (driveBots) BRAIN.step(B, dt); if (B.alive) stepCombat(B, dt); stepKnightSlam(B); stepHammerLeap(B); stepLance(B); stepDash(B); stepMinions(B, dt, t); payKillGaugeOwed(B, t); });
       if (ME) { stepKnightSlam(ME); stepHammerLeap(ME); stepLance(ME); stepDash(ME); stepMinions(ME, dt, t); payKillGaugeOwed(ME, t); }
       localTargets().forEach(function (T) { stepShove(T, t); if (!T.minion) { stepBurn(T, t); stepRally(T, t); stepDomainBolt(T, t); stepCurse(T, t); } });
       checkProjectiles(t);
@@ -7182,20 +7216,20 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       useUlt: useUlt, fireBasic: fireBasic, damage: damage, healCut: healCut, healAmount: healAmount, respawnIfReady: respawnIfReady, afflict: afflict, speedOf: function (E) { return E.speed(); }, stunned: function (E, t) { return E.isStunned(t); },
       onShot: onShot, onMelee: onMelee, potionFlightMs: potionFlightMs, meteorHitAt: meteorHitAt, onEffect: onEffect, onHit: onHit,
       multiKillCount: multiKillCount, MULTI_KILL_MS: MULTI_KILL_MS, ASSIST_MS: ASSIST_MS, onKill: creditHelpAssists,
-      hiddenFrom: hiddenFrom, visibleTo: visibleTo, storms: function () { return STORMS; }, stormCenter: stormCenter, revs: function () { return REVS; }, domains: function () { return DOMAINS; }, graceTarget: graceTarget,
+      hiddenFrom: hiddenFrom, visibleTo: visibleTo, storms: function () { return FIELD.storms; }, stormCenter: stormCenter, revs: function () { return FIELD.revs; }, domains: function () { return FIELD.domains; }, graceTarget: graceTarget,
       bushTiles: function () { return BUSH.map(function (b) { return b.tiles.map(function (tl) { return { x: tileX(tl[0]), y: tileY(tl[1]) }; }); }); },
       isIdle: function () { return !room; },
-      timeScale: function () { return TS; },
+      timeScale: function () { return CLOCK.scale; },
       begin: function (fakeRoom, players, bots, clockMs) {
-        TEST_CLOCK = clockMs; room = fakeRoom; P = players; BOTS = bots; ME = null; R = {};
+        CLOCK.testTime = clockMs; room = fakeRoom; P = players; BOTS = bots; ME = null; R = {};
         G = { startAt: fakeRoom.startAt, endSent: false, playingSent: false, lastNet: 0, sent: {}, finalSent: false, beeped: -1 };
-        PR = {}; SHOTS = []; BURSTS = []; POOLS = []; POOL_HIT = {}; LUNGES = []; WAVES = []; HOLES = []; STORMS = []; REVS = []; GRACES = []; DOMAINS = []; CURSES = {}; BLADE_SPINS = []; MELEE = {}; FX = []; handled = {}; CC_PENDING = {};
+        PR = {}; SHOTS = []; FIELD.reset(); MELEE = {}; FX = []; handled = {}; CC_PENDING = {};
       },
       ccPending: function () { return CC_PENDING; },
       mvpScore: mvpScore,
-      setClock: function (ms) { TEST_CLOCK = ms; },
+      setClock: function (ms) { CLOCK.testTime = ms; },
       currentMap: function () { return ARENA; },
-      finish: function (mapId) { TEST_CLOCK = null; room = null; resetLocal(); loadMapData(mapId); }
+      finish: function (mapId) { CLOCK.testTime = null; room = null; resetLocal(); loadMapData(mapId); }
     };
   }
   if (/[?&]test(&|$)/.test(location.search)) import("./30.team-battle-tests.js?t=" + Date.now()).then(function (m) { m.runTeamBattleTests(testHooks()); });
