@@ -2374,7 +2374,7 @@ function collectResults(api) {
   });
   run(FLOWG, "드래프트 → 카운트다운: 방 상태가 countdown 이 되고 6명의 시작 상태(st)·로스터가 만들어지며 드래프트·지난 결과는 지워지는가", function (done) {
     tradeScenario(["b3"], function (S) {
-      var bad = [], before = Date.now();
+      var bad = [], before = api.CLOCK.real();
       POSITIONS.forEach(function (k) { if (k !== "b3") { S.as(k); DR.draftReady(); } });
       finish(S);
       var u = (launchUpdate(S) || {}).u;
@@ -2382,7 +2382,7 @@ function collectResults(api) {
       if (u.status !== "countdown" || S.room.status !== "countdown") bad.push("상태 " + u.status);
       if (Object.keys(u.st).sort().join() !== "b1,b2,b3,r1,r2,r3") bad.push("시작 상태 칸 " + Object.keys(u.st).join());
       if (u.draft !== null) bad.push("드래프트가 남음");
-      if (!(u.startAt >= before + 2900 && u.startAt <= Date.now() + 3100)) bad.push("카운트다운 3초가 아님: " + (u.startAt - before));
+      if (!(u.startAt >= before + 2900 && u.startAt <= api.CLOCK.real() + 3100)) bad.push("카운트다운 3초가 아님: " + (u.startAt - before));
       ["winner", "final", "statsNote", "endedAt", "shots", "meleeHits", "hits", "effects", "kills", "projectiles"].forEach(function (k) { if (u[k] !== null) bad.push(k + " 가 안 지워짐"); });
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "countdown, 시작 상태 6칸, 약 3초 뒤 시작");
     });
@@ -2801,7 +2801,7 @@ function collectResults(api) {
 
   function fakeFirebase(initial) {
     var store = initial ? JSON.parse(JSON.stringify(initial)) : {}, listeners = [], counter = 0;
-    var fb = { disconnects: [], cancelled: [], writes: [], failTransactions: false, failSets: null };
+    var fb = { disconnects: [], cancelled: [], writes: [], failTransactions: false, failSets: null, failOnce: false, delays: {} };
     function clone(v) { return v === undefined || v === null ? null : JSON.parse(JSON.stringify(v)); }
     function lastSeg(path) { var p = path.split("/"); return p[p.length - 1]; }
     function getAt(path) {
@@ -2847,7 +2847,11 @@ function collectResults(api) {
       return {
         key: lastSeg(path), path: path, parent: { key: seg.length > 1 ? seg[seg.length - 2] : null },
         child: function (p) { return refAt(path ? path + "/" + p : p); },
-        once: function () { return Promise.resolve(snapOf(path)); },
+        once: function () {
+          if (fb.failOnce) { fb.failOnce = false; return Promise.reject({ code: "NETWORK" }); }
+          if (fb.delays[path]) return new Promise(function (resolve) { setTimeout(function () { resolve(snapOf(path)); }, fb.delays[path]); });
+          return Promise.resolve(snapOf(path));
+        },
         on: function (ev, fn) { listeners.push({ path: path, ev: ev, fn: fn, started: false, lastJson: null, lastObj: {} }); fire(); },
         off: function (ev, fn) { listeners = listeners.filter(function (l) { return !(l.path === path && l.ev === ev && (!fn || l.fn === fn)); }); },
         set: function (v) { if (!write(path, v)) return Promise.reject({ code: "PERMISSION_DENIED" }); fire(); return Promise.resolve(); },
@@ -3479,6 +3483,568 @@ function collectResults(api) {
     if (full.join("|") !== "aa|bc|de|cb|aa") bad.push("합친 결과 " + full.join("|"));
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "숲속 공터로 대체, 합치기 aa|bc|de|cb|aa");
   });
+
+  var NETG = "상태 주고받기", JUDGEG = "경기 진행·판정", CATG = "캐릭터 정보·설명", TIMEG = "시간 배율", SCRG = "화면 전환", STATSVG = "통계 창", SOUNDG = "소리", NICKG = "닉네임";
+
+  function recordRef(W) {
+    var cap = { updates: [], sets: [], removes: [], pushes: [] };
+    function node(path) {
+      return {
+        child: function (p) { return node(path ? path + "/" + p : p); },
+        update: function (u) { cap.updates.push({ path: path, u: JSON.parse(JSON.stringify(u)) }); return Promise.resolve(); },
+        set: function (v) { cap.sets.push({ path: path, v: v }); return Promise.resolve(); },
+        remove: function () { cap.removes.push(path); return Promise.resolve(); },
+        push: function (v) { cap.pushes.push({ path: path, v: v }); return { key: "k" + cap.pushes.length }; },
+        on: function () {}, off: function () {},
+        once: function () { return Promise.resolve({ val: function () { return null; } }); },
+        transaction: function () { return Promise.resolve({ committed: false }); }
+      };
+    }
+    W.room.ref = node("");
+    return cap;
+  }
+  function updateWith(cap, key) { return cap.updates.filter(function (x) { return key in x.u; }); }
+
+  run(NETG, "상태 문자열: packState → stateOf 로 위치·체력·게이지·시간값·해골·보호막까지 같은 값으로 풀리는가", function (done) {
+    var y = OPEN_Y.forest; api.MATCH.stateByKey = {};
+    var W = world("forest", [{ id: "a", team: "blue", char: "necro", x: 333.4, y: y + 10.6, angle: 1.1 }, { id: "b", team: "red", char: "knight", x: 700, y: y }]);
+    var a = W.ent("a"), start = W.room.startAt, bad = [];
+    Object.assign(a, { mv: true, hp: 77.2, alive: true, gauge: 6.37, dmg: 123.46, deaths: 2, kills: 3, heal: 17.4, skillDur: 3000, stunDealt: 2.34, slowDealt: 1.25, slowWeight: 0.456, blocked: 44.6, frostStacks: 2, shield: true, assists: 4 });
+    api.STATE_TIMES.forEach(function (k, i) { a[k] = start + 1000.4 + i * 100; });
+    a.slowUntil = start + 5000; a.slows = [{ mul: 0.6, until: start + 5000 }];
+    a.minions = [{ x: 10.2, y: 20.7, angle: 0.5, hp: 41.2, atkAt: start + 500, born: start + 100, n: 1 }, { x: 99.5, y: 5, angle: 3, hp: 0, atkAt: 0, born: start + 200, n: 2 }];
+    api.MATCH.stateByKey[api.stKey("blue", api.players().a.slot)] = api.packState(a);
+    var o = api.stateOf(api.players().a);
+    var check = function (name, got, want) { if (got !== want) bad.push(name + " " + got + " (기대 " + want + ")"); };
+    check("x", o.x, Math.round(a.x)); check("y", o.y, Math.round(a.y)); check("mv", o.mv, true); check("full", o.full, true);
+    if (Math.abs(o.angle - a.angle) > 0.03) bad.push("angle " + o.angle);
+    check("hp", o.hp, Math.ceil(a.hp)); check("alive", o.alive, true); check("gauge", o.gauge, 6.4); check("dmg", o.dmg, 123.5); check("deaths", o.deaths, 2); check("kills", o.kills, 3);
+    check("heal", o.heal, 17); check("skillDur", o.skillDur, 3000);
+    api.STATE_TIMES.forEach(function (k) { check(k, o[k], Math.round(a[k] - start) + start); });
+    check("slowMul", o.slowMul, 0.6); check("stunDealt", o.stunDealt, 2.3); check("slowDealt", o.slowDealt, 1.3); check("slowWeight", o.slowWeight, 0.46);
+    check("blocked", o.blocked, 45); check("frostStacks", o.frostStacks, 2); check("shield", o.shield, true); check("assists", o.assists, 4);
+    check("해골 수", o.minions.length, 2);
+    var m = o.minions[0];
+    if (m.x !== 10 || m.y !== 21 || m.hp !== 42 || m.n !== 1 || m.atkAt !== start + 500 || m.born !== start + 100 || Math.abs(m.angle - 0.5) > 0.03) bad.push("해골 0 " + JSON.stringify(m));
+    if (o.minions[1].hp !== 0 || o.minions[1].atkAt !== 0) bad.push("해골 1 " + JSON.stringify(o.minions[1]));
+    done(bad.length ? "fail" : "pass", bad.length ? bad.slice(0, 5).join(" / ") : "위치·체력·게이지·시간 " + api.STATE_TIMES.length + "개·해골 2마리·보호막·통계값 모두 일치");
+  });
+  run(NETG, "상태 문자열: 막 만든 캐릭터는 체력 가득·시간값 0·해골 없음으로, 상태가 없거나 짧으면 출발 자리·위치만으로 풀리는가", function (done) {
+    var y = OPEN_Y.forest; api.MATCH.stateByKey = {};
+    var W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "necro", x: 500, y: y }]), bad = [];
+    var a = W.ent("a");
+    api.MATCH.stateByKey[api.stKey("blue", api.players().a.slot)] = api.packState(a);
+    var o = api.stateOf(api.players().a);
+    if (!o.full || o.hp !== api.CHARS.knight.hp || !o.alive || o.minions.length || o.shield || api.STATE_TIMES.some(function (k) { return o[k] !== 0; }) || o.slowMul !== 1) bad.push("새 캐릭터 " + JSON.stringify(o).slice(0, 120));
+    var sp = api.spawnOf("red", api.players().b.slot), none = api.stateOf(api.players().b);
+    if (none.full || none.x !== sp.x || none.y !== sp.y || none.mv !== false) bad.push("상태 없음 → 출발 자리 " + JSON.stringify(none));
+    api.MATCH.stateByKey[api.stKey("red", api.players().b.slot)] = "10,20,90,1";
+    var shortOne = api.stateOf(api.players().b);
+    if (shortOne.full || shortOne.x !== 10 || shortOne.y !== 20 || shortOne.mv !== true || Math.abs(shortOne.angle - Math.PI / 2) > 1e-9) bad.push("짧은 상태 " + JSON.stringify(shortOne));
+    var nobody = api.stateOf(undefined), spec = api.stateOf({ team: "spec", slot: 1 });
+    if (nobody.x !== 0 || nobody.full || spec.x !== 0 || spec.y !== 0) bad.push("참가자 아님 → 0");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "새 캐릭터·상태 없음·짧은 상태·참가자 아님 4가지 처리");
+  });
+  run(NETG, "각도(angDeg)·시간(relTime/absTime)·해골 문자열(packMinions/unpackMinions) 변환이 맞는가", function (done) {
+    var W = world("forest", []), start = W.room.startAt, bad = [], D = 180 / Math.PI;
+    [[0, 0], [Math.PI / 2, 90], [-Math.PI / 2, 270], [Math.PI, 180], [2 * Math.PI, 0], [1.4 / D, 0], [1.6 / D, 3], [-1.6 / D, 357], [10 / D, 9]].forEach(function (c) { if (api.angDeg(c[0]) !== c[1]) bad.push("angDeg(" + Math.round(c[0] * D * 10) / 10 + "°) = " + api.angDeg(c[0]) + " (기대 " + c[1] + ")"); });
+    if (api.relTime(0) !== "" || api.relTime(undefined) !== "" || api.relTime(start + 1234.6) !== 1235 || api.relTime(start - 50) !== -50) bad.push("relTime");
+    if (api.absTime("") !== 0 || api.absTime(null) !== 0 || api.absTime(undefined) !== 0 || api.absTime(1235) !== start + 1235 || api.absTime("-50") !== start - 50 || api.absTime("zzz") !== start) bad.push("absTime");
+    if (api.packMinions({}) !== "" || api.packMinions({ minions: [] }) !== "" || api.unpackMinions("").length || api.unpackMinions(null).length) bad.push("해골 없음");
+    var mini = { minions: [{ x: 1.4, y: 2.6, angle: Math.PI, hp: 0.2, atkAt: start + 10, born: 0, n: 3 }] }, text = api.packMinions(mini), back = api.unpackMinions(text)[0];
+    if (text !== "1:3:180:1:10::3" || back.x !== 1 || back.y !== 3 || back.hp !== 1 || back.n !== 3 || back.born !== 0 || back.atkAt !== start + 10) bad.push("해골 문자열 '" + text + "' " + JSON.stringify(back));
+    var garbage = api.unpackMinions("a:b;::");
+    if (garbage.length !== 2 || garbage[0].x !== 0 || garbage[0].hp !== 0 || garbage[0].atkAt !== 0) bad.push("깨진 해골 문자열 " + JSON.stringify(garbage));
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "각도 9가지·시간·해골 문자열 확인");
+  });
+  run(NETG, "네트워크 쓰기(netWrite): 내 캐릭터·호스트의 AI 상태를 바뀐 것만 보내고, 짧은 간격엔 건너뛰며 강제로 보내도 같은 값은 다시 안 보내는가", function (done) {
+    var y = OPEN_Y.forest; api.MATCH.stateByKey = {};
+    var W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]), cap = recordRef(W), bad = [];
+    api.MATCH.game.lastNet = 0;
+    api.netWrite(false);
+    var first = cap.updates.length ? cap.updates[0].u : {}, keys1 = Object.keys(first).sort().join();
+    if (keys1 !== "st/b1,st/r2") bad.push("처음 쓰기 경로 " + keys1);
+    api.netWrite(false);
+    if (cap.updates.length !== 1) bad.push("간격(" + api.NET_MS + "ms) 안에 또 씀 " + cap.updates.length);
+    api.netWrite(true);
+    if (cap.updates.length !== 1) bad.push("같은 값을 강제로 또 보냄 " + cap.updates.length);
+    W.ent("a").hp -= 10;
+    api.netWrite(true);
+    var third = cap.updates[1] && cap.updates[1].u;
+    if (cap.updates.length !== 2 || Object.keys(third).join() !== "st/b1") bad.push("바뀐 것만 보내야 함: " + JSON.stringify(Object.keys(third || {})));
+    api.MATCH.game.forceNet = true; W.ent("b").gauge = 5;
+    api.netWrite(false);
+    if (cap.updates.length !== 3 || api.MATCH.game.forceNet) bad.push("forceNet 는 간격을 무시하고 한 번 쓴 뒤 꺼져야 함");
+    W.room.host = "다른호스트"; W.ent("a").hp -= 5;
+    api.netWrite(true);
+    if (cap.updates.length !== 3) bad.push("호스트가 아닌데 AI 상태를 씀");
+    var s = first["st/b1"].split(",");
+    if (+s[4] !== api.CHARS.knight.hp || s[5] !== "1") bad.push("보낸 값 체력 " + s[4]);
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "첫 쓰기·간격 건너뜀·같은 값 생략·바뀐 것만·forceNet·비호스트 확인");
+  });
+
+  run(JUDGEG, "팀 합계(teamTotals): 팀별 피해·인원·생존·킬(상대 팀 죽음 수)을 세는가", function (done) {
+    var y = OPEN_Y.forest, W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "blue", char: "knight", x: 350, y: y }, { id: "c", team: "red", char: "knight", x: 700, y: y }, { id: "d", team: "red", char: "knight", x: 750, y: y }]);
+    var a = W.ent("a"), b = W.ent("b"), c = W.ent("c"), d = W.ent("d");
+    a.dmg = 100; b.dmg = 50.5; c.dmg = 30; d.dmg = 0; a.deaths = 2; b.deaths = 1; c.deaths = 4; d.deaths = 0; b.alive = false; d.alive = false;
+    var s = api.teamTotals(), bad = [];
+    if (s.blue !== 150.5 || s.red !== 30 || s.blueN !== 2 || s.redN !== 2) bad.push("피해·인원 " + JSON.stringify(s));
+    if (s.blueAlive !== 1 || s.redAlive !== 1) bad.push("생존 " + s.blueAlive + "·" + s.redAlive);
+    if (s.blueKills !== 4 || s.redKills !== 3) bad.push("킬 " + s.blueKills + "·" + s.redKills + " (기대 4·3)");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "피해 150.5/30, 생존 1/1, 킬 4/3");
+  });
+  run(JUDGEG, "한 팀이 모두 나갔는지(teamAllQuit): 시작할 때 양 팀에 사람이 있었고 지금 한 팀에만 남았을 때만 알려 주는가", function (done) {
+    var y = OPEN_Y.forest, W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]), bad = [];
+    var P = api.players(); P.a.isAI = false; P.b.isAI = false;
+    W.room.roster = { a: { team: "blue", c: "knight", ai: false }, b: { team: "red", c: "knight", ai: false } };
+    if (api.teamAllQuit() !== null) bad.push("둘 다 남았는데 " + api.teamAllQuit());
+    delete P.b;
+    if (api.teamAllQuit() !== "red") bad.push("레드가 나갔는데 " + api.teamAllQuit());
+    P.b = { nickname: "b", isAI: false, team: "red", slot: 1, characterType: "knight", joinedAt: 2 }; delete P.a;
+    if (api.teamAllQuit() !== "blue") bad.push("블루가 나갔는데 " + api.teamAllQuit());
+    delete P.b;
+    if (api.teamAllQuit() !== null) bad.push("둘 다 나갔으면 null");
+    P.a = { nickname: "a", isAI: false, team: "blue", slot: 1, characterType: "knight", joinedAt: 1 };
+    W.room.roster = { a: { team: "blue", c: "knight", ai: false }, b: { team: "red", c: "knight", ai: true } };
+    if (api.teamAllQuit() !== null) bad.push("레드가 처음부터 AI 뿐이면 null");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "5가지 경우가 모두 맞음");
+  });
+  run(JUDGEG, "호스트 판정(hostJudge): 카운트다운이 끝나면 playing 으로 한 번만 바꾸고, 시간이 다 되면 킬 수로 승패(무승부 포함)를 한 번만 적으며 연습모드는 끝내지 않는가", function (done) {
+    var y = OPEN_Y.forest, bad = [];
+    function setup(mode) {
+      var W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]);
+      W.room.mode = mode || "pvp"; return { W: W, cap: recordRef(W), start: W.room.startAt };
+    }
+    var s = setup();
+    s.W.room.status = "countdown"; api.setClock(s.start + 100);
+    api.hostJudge(); api.hostJudge();
+    if (updateWith(s.cap, "status").length !== 1 || s.cap.updates[0].u.status !== "playing") bad.push("playing 전환 " + JSON.stringify(s.cap.updates));
+    s.W.room.status = "playing"; s.cap.updates.length = 0;
+    api.setClock(s.start + api.matchMs() - 1); api.hostJudge();
+    if (s.cap.updates.length) bad.push("시간이 남았는데 끝남");
+    s.W.ent("b").deaths = 2; s.W.ent("a").deaths = 1;
+    api.setClock(s.start + api.matchMs()); api.hostJudge(); api.hostJudge();
+    var ended = updateWith(s.cap, "winner");
+    if (ended.length !== 1 || ended[0].u.status !== "ended" || ended[0].u.winner !== "blue" || ended[0].u.final.blue !== 2 || ended[0].u.final.red !== 1 || ended[0].u.final.reason.indexOf("시간 종료") < 0 || ended[0].u.endedAt !== s.start + api.matchMs()) bad.push("시간 종료 판정 " + JSON.stringify(ended));
+    if (!ended[0] || !ended[0].u.statsNote) bad.push("일반모드는 통계 안내가 있어야 함");
+    var d = setup(); d.W.room.status = "playing"; d.W.ent("a").deaths = 1; d.W.ent("b").deaths = 1;
+    api.setClock(d.start + api.matchMs()); api.hostJudge();
+    var draw = updateWith(d.cap, "winner")[0];
+    if (!draw || draw.u.winner !== "draw") bad.push("무승부");
+    var red = setup(); red.W.room.status = "playing"; red.W.ent("a").deaths = 3;
+    api.setClock(red.start + api.matchMs()); api.hostJudge();
+    if (updateWith(red.cap, "winner")[0].u.winner !== "red") bad.push("레드 승리");
+    var pr = setup("practice"); pr.W.room.status = "playing";
+    api.setClock(pr.start + api.matchMs() * 3); api.hostJudge();
+    if (updateWith(pr.cap, "winner").length) bad.push("연습모드가 끝남");
+    var normal = setup("3v3"); normal.W.room.status = "playing";
+    api.setClock(normal.start + api.matchMs()); api.hostJudge();
+    if (updateWith(normal.cap, "winner")[0].u.statsNote !== undefined) bad.push("통계 안 모으는 모드에 통계 안내가 붙음");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "playing 전환 1번·시간 종료 판정 1번·무승부·레드 승·연습 제외·통계 안내");
+  });
+  run(JUDGEG, "호스트 판정: 한 팀이 모두 나가면 시간이 남아도 상대 팀 승리로 끝내고 통계에서 제외하는가", function (done) {
+    var y = OPEN_Y.forest, W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]), bad = [];
+    var cap = recordRef(W), P = api.players();
+    P.a.isAI = false; P.b.isAI = false; W.room.mode = "pvp"; W.room.status = "playing";
+    W.room.roster = { a: { team: "blue", c: "knight", ai: false }, b: { team: "red", c: "knight", ai: false } };
+    delete P.b;
+    api.setClock(W.room.startAt + 5000); api.hostJudge();
+    var ended = updateWith(cap, "winner")[0];
+    if (!ended || ended.u.winner !== "blue" || ended.u.final.reason.indexOf("상대팀이 모두 나가서") < 0 || ended.u.statsNote.indexOf("상대팀이 모두 나가서 통계에서 제외") < 0) bad.push("나간 팀 처리 " + JSON.stringify(ended));
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "레드가 모두 나가 블루 승리·통계 제외 안내");
+  });
+  run(JUDGEG, "끝난 방 정리(hostCleanup)·결과 뒤 처리(onEnded)·다시하기(restart)가 조건대로 동작하는가", function (done) {
+    var y = OPEN_Y.forest, bad = [];
+    var W = world("forest", [{ id: api.myId, team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]), cap = recordRef(W), start = W.room.startAt;
+    delete api.MATCH.bots[api.myId];
+    W.room.status = "ended"; W.room.endedAt = start;
+    api.setClock(start + 300000); api.hostCleanup(); if (cap.removes.length) bad.push("5분이 안 됐는데 방을 지움");
+    api.setClock(start + 300001); api.hostCleanup(); if (cap.removes.length !== 1) bad.push("5분 지난 방을 안 지움");
+    W.room.status = "playing"; cap.removes.length = 0; api.hostCleanup(); if (cap.removes.length) bad.push("진행 중인 방을 지움");
+    W.room.status = "ended"; W.room.endedAt = start; W.room.roster = {}; W.room.roster[api.myId] = { team: "blue", c: "knight", ai: false };
+    api.MATCH.game.forceNet = false;
+    api.onEnded();
+    if (!cap.updates.length) bad.push("끝났을 때 상태를 강제로 쓰지 않음");
+    var done1 = cap.sets.filter(function (x) { return x.path === "done/" + api.myId; })[0];
+    if (!done1 || done1.v !== start) bad.push("결과 창 도착 기록 " + JSON.stringify(cap.sets));
+    var saved = api.MATCH.game; api.MATCH.game = null; cap.sets.length = 0; api.onEnded(); if (cap.sets.length) bad.push("경기 정보가 없는데 기록함"); api.MATCH.game = saved;
+    cap.updates.length = 0;
+    api.setClock(start + 1499); api.restart(); if (cap.updates.length) bad.push("1.5초 안에 다시하기가 됨");
+    W.room.statsNote = "통계를 저장하는 중이에요"; api.setClock(start + 1600); api.restart(); if (cap.updates.length) bad.push("통계 저장 중에 다시하기가 됨");
+    W.room.statsNote = "끝"; api.restart();
+    if (cap.updates.length !== 1 || cap.updates[0].u.status !== "lobby") bad.push("다시하기 결과 " + JSON.stringify(cap.updates));
+    cap.updates.length = 0; W.room.status = "playing"; api.restart(); if (cap.updates.length) bad.push("끝나지 않았는데 다시하기");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "5분 정리·결과 도착 기록·1.5초/통계 저장 중 잠금·다시하기");
+  });
+  run(JUDGEG, "관전자 결과 유지: 결과 창을 붙잡고 있으면 버튼이 '대기실로'가 되고, 놓으면 원래대로 돌아오며 대기실 화면으로 가는가", function (done) {
+    var W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: 600 }]), bad = [], btn = document.getElementById("btnAgain");
+    W.room.status = "lobby"; var cap = recordRef(W);
+    api.holdSpecResult();
+    if (!api.specResultHeld() || btn.textContent !== "대기실로") bad.push("붙잡기 " + btn.textContent);
+    api.againOrBackToLobby();
+    if (api.specResultHeld() || btn.textContent !== "다시하기" || cap.updates.length) bad.push("대기실로 버튼 동작 " + btn.textContent + " " + cap.updates.length);
+    if (api.screen() !== "lobby") bad.push("대기실 화면으로 안 감: " + api.screen());
+    api.releaseSpecResult(); if (btn.textContent !== "다시하기") bad.push("붙잡지 않았는데 놓기가 바꿈");
+    W.room.status = "ended"; W.room.endedAt = 0;
+    api.setClock(W.room.startAt + 99999); api.againOrBackToLobby();
+    if (cap.updates.length !== 1 || cap.updates[0].u.status !== "lobby") bad.push("붙잡지 않았으면 다시하기 " + JSON.stringify(cap.updates));
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "붙잡기·놓기·대기실 화면·일반 다시하기");
+  });
+  run(JUDGEG, "경기 준비: makeEnt 는 체력 가득·보호막(해당 캐릭터)·없는 캐릭터는 기본 캐릭터로, initGame 은 내 캐릭터(관전은 없음)와 경기 정보를 새로 만드는가", function (done) {
+    var y = OPEN_Y.forest, bad = []; api.MATCH.stateByKey = {};
+    var W = world("forest", [{ id: api.myId, team: "red", char: "ranger", x: 300, y: y }, { id: "s", team: "blue", char: "knight", x: 300, y: y }]);
+    var shielded = api.CHAR_LIST.filter(function (c) { return api.CHARS[c].respawnShield; })[0], plain = api.CHAR_LIST.filter(function (c) { return !api.CHARS[c].respawnShield; })[0];
+    var P = api.players(), E1 = api.makeEnt("x1", { team: "blue", characterType: plain, nickname: "엑스", slot: 1 }), E2 = api.makeEnt("x2", { team: "blue", characterType: shielded, nickname: "방패", slot: 2 }), E3 = api.makeEnt("x3", { team: "red", characterType: "없는캐릭터", nickname: "?", slot: 3 });
+    if (E1.hp !== api.CHARS[plain].hp || E1.maxHp !== E1.hp || !E1.alive || E1.shield || E1.gauge !== 0 || E1.nickname !== "엑스" || E1.isAI) bad.push("기본값 " + JSON.stringify([E1.hp, E1.maxHp, E1.alive, E1.shield]));
+    if (shielded && !E2.shield) bad.push("보호막 캐릭터");
+    if (E3.char !== api.FALLBACK_CHAR) bad.push("없는 캐릭터 → " + E3.char);
+    api.MATCH.me = null; api.MATCH.bots = {};
+    api.initGame();
+    if (!api.MATCH.me || api.MATCH.me.id !== api.myId || api.MATCH.game.startAt !== W.room.startAt || api.MATCH.game.endSent !== false || Object.keys(api.MATCH.bots).length) bad.push("initGame 결과");
+    P[api.myId].team = "spec";
+    if (!api.isSpec()) bad.push("관전 판정");
+    api.initGame(); if (api.MATCH.me !== null) bad.push("관전은 내 캐릭터가 없어야 함");
+    P[api.myId].team = "red"; if (api.isSpec()) bad.push("선수가 관전으로 판정됨");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "기본값·보호막·없는 캐릭터·initGame·관전 판정");
+  });
+  run(JUDGEG, "다른 기기 캐릭터 동기화(syncRemote): 상태 문자열을 받으면 체력·게이지·피해·기절 등이 따라오고, 위치는 부드럽게 다가가다 250 넘게 떨어지면 바로 이동하는가", function (done) {
+    var y = OPEN_Y.forest, W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "necro", x: 700, y: y }]), bad = [];
+    var a = W.ent("a"), start = W.room.startAt, P = api.players();
+    function publish() { ["a", "b"].forEach(function (id) { api.MATCH.stateByKey[api.stKey(P[id].team, P[id].slot)] = api.packState(W.ent(id)); }); }
+    Object.assign(a, { hp: 211, gauge: 4.5, dmg: 60, kills: 2, deaths: 1, assists: 1, stunUntil: start + 9000, protectUntil: start + 8000, slowMul: 1 });
+    publish();
+    W.room.host = "다른호스트"; api.MATCH.bots = {}; api.MATCH.remotes = {};
+    api.syncRemote(0.1);
+    var ra = api.MATCH.remotes.a, rb = api.MATCH.remotes.b;
+    if (!ra || !rb) { done("fail", "원격 캐릭터가 안 만들어짐"); return; }
+    if (ra.x !== 300 || ra.y !== y || ra.team !== "blue" || ra.char !== "knight") bad.push("처음 위치·팀·캐릭터 " + JSON.stringify([ra.x, ra.y, ra.team, ra.char]));
+    if (ra.hp !== 211 || ra.gauge !== 4.5 || ra.dmg !== 60 || ra.kills !== 2 || ra.deaths !== 1 || ra.assists !== 1 || ra.stunUntil !== start + 9000 || ra.protectUntil !== start + 8000) bad.push("값 동기화 " + JSON.stringify([ra.hp, ra.gauge, ra.dmg, ra.kills, ra.stunUntil]));
+    a.x = 300 + 120; publish(); api.syncRemote(0.05);
+    if (!(ra.x > 300 && ra.x < 420)) bad.push("가까운 이동은 부드럽게 따라가야 함 " + ra.x);
+    var mid = ra.x; api.syncRemote(0.05);
+    if (!(ra.x > mid && ra.x <= 420)) bad.push("계속 다가가야 함");
+    a.x = 300 + 600; publish(); api.syncRemote(0.01);
+    if (ra.x !== 900) bad.push("250 넘게 떨어지면 바로 이동 " + ra.x);
+    a.alive = false; a.hp = 0; a.diedAt = start + 100; publish(); api.syncRemote(0.1);
+    if (ra.alive || ra.hp !== 0 || ra.diedAt !== start + 100) bad.push("쓰러짐 동기화");
+    api.MATCH.remotes = {}; W.room.host = api.myId; api.MATCH.bots = {};
+    api.syncRemote(0.1);
+    if (Object.keys(api.MATCH.bots).length !== 2 || Object.keys(api.MATCH.remotes).length) bad.push("호스트는 AI 를 직접 돌리는 캐릭터로 만들어야 함 " + Object.keys(api.MATCH.bots));
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "값 동기화·부드러운 이동·순간이동·쓰러짐·호스트 AI 생성");
+  });
+
+  run(CATG, "캐릭터 조회: 은퇴·연습 봇은 고를 수 없고, 직업군별 목록 합이 전체이며 근접 판정·조사(을/를·로/으로)가 맞는가", function (done) {
+    var bad = [], C = api.CHARS;
+    if (!api.playable("ranger") || api.playable("zzz") || api.pickable("zzz") || !api.pickable("ranger")) bad.push("playable/pickable 기본");
+    var bot = Object.keys(C).filter(function (c) { return C[c].practiceBot; })[0];
+    if (bot && (!api.playable(bot) || api.pickable(bot))) bad.push("연습 봇은 playable 이지만 pickable 아님");
+    var total = 0; api.ROLE_LIST.forEach(function (r) { var list = api.charsInRole(r); total += list.length; list.forEach(function (c) { if (api.roleOf(c) !== api.ROLES[r]) bad.push(c + " 직업군"); }); });
+    if (total !== api.CHAR_LIST.length) bad.push("직업군 합 " + total + " / " + api.CHAR_LIST.length);
+    if (api.CHAR_LIST.some(function (c, i, a) { return i && api.ROLE_LIST.indexOf(C[a[i - 1]].role) > api.ROLE_LIST.indexOf(C[c].role); })) bad.push("목록이 직업군 순서가 아님");
+    if (!api.isMelee("warrior") || !api.isMelee("duelist") || !api.isMelee("lancer") || api.isMelee("ranger") || api.isMelee("mage")) bad.push("근접 판정");
+    if (api.josa("검", "를", "을") !== "을" || api.josa("마", "를", "을") !== "를" || api.josa("A", "를", "을") !== "를(을)") bad.push("조사 josa");
+    if (api.roParticle("검") !== "으로" || api.roParticle("마") !== "로" || api.roParticle("물") !== "로" || api.roParticle("A") !== "(으)로") bad.push("조사 roParticle");
+    if (api.teamHitColor("blue") !== "#5FA2FF" || api.teamHitColor("red") !== "#FF6A5F") bad.push("팀 색");
+    api.CHAR_LIST.forEach(function (c) { var src = api.charImgSrc(c); if (src.indexOf("data:image/svg+xml") !== 0 || decodeURIComponent(src).indexOf(C[c].icon) < 0) bad.push(c + " 그림"); });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : api.CHAR_LIST.length + "명 목록·직업군·근접·조사·팀 색·그림 확인");
+  });
+  run(CATG, "설명 글: 모든 캐릭터의 기본 공격·패시브·스킬·능력치 표가 비어 있지 않고 undefined·NaN 이 안 섞이며 숫자 표기 도구가 맞는가", function (done) {
+    var bad = [], C = api.CHARS, scale = api.CLOCK.scale;
+    api.CHAR_LIST.forEach(function (c) {
+      var parts = { 기본: api.basicDesc(c), 패시브: api.passiveDesc(c), 스킬: api.ultDesc(c), 표: api.statTable(c), 블록: api.skillBlocks(c) };
+      Object.keys(parts).forEach(function (k) {
+        var t = String(parts[k]);
+        if (!t || t === "undefined") bad.push(C[c].name + " " + k + " 비어 있음");
+        else if (/undefined|NaN|\[object|null/.test(t)) bad.push(C[c].name + " " + k + " 에 이상한 글자: " + (t.match(/.{0,12}(undefined|NaN|\[object|null).{0,8}/) || [""])[0]);
+      });
+      if (api.statTable(c).indexOf(String(C[c].hp)) < 0) bad.push(C[c].name + " 표에 체력");
+      if (api.statTable(c).indexOf(C[c].ultName) < 0) bad.push(C[c].name + " 표에 스킬 이름");
+    });
+    if (api.num(1.26) !== "1.3" || api.num(5) !== "5" || api.pctOf(0.456) !== 46 || api.slowPct(0.6) !== "40% 둔화" || api.healCutPct() !== "50%") bad.push("숫자 도구");
+    if (api.secs(1000) !== "1초" || api.secs(250) !== "0.25초" || api.shownSpeed(200) !== 200 * scale || api.roleGaugeText(api.ROLES.fighter).indexOf("+2") < 0) bad.push("초·속도·게이지 문구");
+    if (api.ultSpeedUpText({ ultSpeed: 300, speed: 200 }).indexOf("100") < 0) bad.push("스킬 이동속도 문구");
+    var attackWant = api.CLOCK.scale !== 1 ? "공격 간격 1초" : "초당 공격 2회";
+    if (api.attackText(1000, 2) !== attackWant) bad.push("공격 간격 문구 '" + api.attackText(1000, 2) + "' (기대 '" + attackWant + "')");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.slice(0, 5).join(" / ") : api.CHAR_LIST.length + "명 × 5가지 글과 숫자 도구 확인");
+  });
+  run(TIMEG, "시간 배율(applyTimeScale): 0.7 이면 캐릭터·스킬 수치가 느린 모드 값으로 바뀌고 1 로 돌리면 원래 값으로 정확히 돌아오며 거듭 적용해도 쌓이지 않는가", function (done) {
+    var before = JSON.stringify([api.CHARS, api.ULT]), bad = [], scale = api.CLOCK.scale, ms = api.matchMs();
+    try {
+      api.applyTimeScale(0.7);
+      if (api.CLOCK.scale !== 0.7 || api.matchMs() !== 90000 * 0.7) bad.push("배율·경기 시간 " + api.CLOCK.scale + " " + api.matchMs());
+      if (api.CHARS.knight.cd !== Math.round(1.8 * 1000 * 0.7) || api.CHARS.knight.speed !== Math.round(140 / 0.7) || api.CHARS.knight.hp !== 345) bad.push("기사 수치 " + JSON.stringify([api.CHARS.knight.cd, api.CHARS.knight.speed, api.CHARS.knight.hp]));
+      if (api.ULT.rmDur !== Math.round(4 * 1000 * 0.7)) bad.push("스킬 수치");
+      var once = JSON.stringify([api.CHARS, api.ULT]);
+      api.applyTimeScale(0.7);
+      if (JSON.stringify([api.CHARS, api.ULT]) !== once) bad.push("거듭 적용하면 값이 달라짐");
+      api.applyTimeScale(0.5);
+      if (api.CHARS.knight.cd !== 900 || api.CLOCK.scale !== 0.5) bad.push("0.5 배율");
+      [1, 2, 0, -1, NaN].forEach(function (v) { api.applyTimeScale(v); if (api.CLOCK.scale !== 1 || JSON.stringify([api.CHARS, api.ULT]) !== before) bad.push("배율 " + v + " 는 원래 값으로 돌아와야 함"); });
+    } finally { api.applyTimeScale(scale); }
+    if (JSON.stringify([api.CHARS, api.ULT]) !== before || api.matchMs() !== ms) bad.push("끝난 뒤 원상 복구 안 됨");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "0.7·0.5 적용, 1·잘못된 값은 원상 복구, 거듭 적용 불변");
+  });
+
+  run(SOUNDG, "소리: 모든 효과음 이름과 연속 처치음을 불러도 오류가 없고, 검사·시뮬레이션 주소에서는 소리 엔진을 만들지 않는가", function (done) {
+    var bad = [];
+    try {
+      ["shoot", "orb", "hit", "confirm", "boom", "heal", "ult", "swing", "splash", "star", "zap", "beep", "go", "count", "down", "win", "lose", "없는소리"].forEach(function (k) { api.sfx(k); });
+      [1, 2, 3, 5, 9].forEach(function (n) { api.killSound(n); });
+    } catch (e) { bad.push("오류 " + e.message); }
+    if (api.audio() !== null) bad.push("검사 주소인데 소리 엔진이 만들어짐");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "효과음 17종+알 수 없는 이름·연속 처치음 5단계 오류 없음");
+  });
+
+  run(SCRG, "화면 전환(showScreen): 해당 화면만 보이고, 경기·드래프트 화면에서는 목록 버튼을 숨기며, 창은 화면에 맞게 닫히는가", function (done) {
+    var bad = [], guard = document.createElement("a"); guard.setAttribute("data-guard-home", ""); document.body.appendChild(guard);
+    var vis = function () { return ["scrStart", "scrLobby", "scrDraft", "scrGame"].filter(function (id) { return !document.getElementById(id).hidden; }).join(); };
+    var before = api.screen();
+    try {
+      [["start", "scrStart"], ["lobby", "scrLobby"], ["draft", "scrDraft"], ["game", "scrGame"]].forEach(function (c) {
+        api.showScreen(c[0]);
+        if (vis() !== c[1] || api.screen() !== c[0]) bad.push(c[0] + " 화면 " + vis());
+        var hiddenGuard = guard.style.display === "none";
+        if (hiddenGuard !== (c[0] === "game" || c[0] === "draft")) bad.push(c[0] + " 에서 목록 버튼 " + guard.style.display);
+      });
+      ["statsModal", "mapViewModal", "pcModal"].forEach(function (id) { document.getElementById(id).hidden = false; });
+      api.showScreen("game");
+      if (!document.getElementById("statsModal").hidden || !document.getElementById("mapViewModal").hidden || document.getElementById("pcModal").hidden) bad.push("게임 화면에서 창 상태");
+      api.showScreen("lobby");
+      if (!document.getElementById("pcModal").hidden) bad.push("로비에서 연습 창이 안 닫힘");
+      document.getElementById("statsModal").hidden = false; document.getElementById("mapViewModal").hidden = false;
+      api.showScreen("lobby");
+      if (document.getElementById("statsModal").hidden || document.getElementById("mapViewModal").hidden) bad.push("로비에서는 통계·맵 창이 유지돼야 함");
+      api.showScreen("draft");
+      if (!document.getElementById("statsModal").hidden || !document.getElementById("mapViewModal").hidden) bad.push("드래프트에서 통계·맵 창이 안 닫힘");
+    } finally { guard.remove(); ["statsModal", "mapViewModal", "pcModal"].forEach(function (id) { document.getElementById(id).hidden = true; }); api.showScreen(before); }
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "4개 화면·목록 버튼 숨김·창 닫힘 규칙");
+  });
+
+  run(STATSVG, "통계 표 만들기: 비율·밴/픽·K/D/A 문구와 캐릭터별 한 줄이 직업군 제목과 함께 맞게 나오는가", function (done) {
+    var bad = [], C = api.CHARS, L = api.CHAR_LIST;
+    if (api.statsPct(1, 4) !== "25.0%" || api.statsPct(0, 0) !== "-" || api.statsPct(1, 3) !== "33.3%") bad.push("비율");
+    if (api.statsRateCell(3, 12).indexOf("25.0%") < 0 || api.statsRateCell(3, 12).indexOf("(3 / 12)") < 0) bad.push("승률 칸");
+    if (api.banPickCell(1, 2, 10).indexOf("30.0%") < 0 || api.banPickCell(1, 2, 10).indexOf("밴 1 + 픽 2 / 10") < 0) bad.push("밴픽 칸");
+    if (api.kdaText({}, 0, 0) !== "-" || api.kdaText({ kills: 3.25, deaths: 1, assist: 2 }, 4, 4) !== "3.3 / 1.0 / 2.0" || api.kdaText({ assist: 2 }, 0, 4) !== "- / - / 2.0" || api.kdaText({ kills: 1, deaths: 2 }, 3, 0) !== "1.0 / 2.0 / -") bad.push("K/D/A");
+    var empty = api.statsRowsHtml({}), rows = (empty.match(/<tr><td class="nm">/g) || []).length, groups = (empty.match(/class="grp"/g) || []).length;
+    if (rows !== L.length || groups !== api.ROLE_LIST.length) bad.push("빈 통계 " + rows + "줄 " + groups + "제목");
+    var s = { matches: 10 }; s[L[0]] = { picks: 4, wins: 3, games: 8, bans: 1, dmg: 123.6, heal: 5, block: 7, stun: 1.25, slow: 0.5, ccPicks: 4, asPicks: 4, kdPicks: 4, kills: 2, deaths: 1, assist: 3 };
+    var one = api.statsRowsHtml(s);
+    if (one.indexOf("75.0%") < 0 || one.indexOf("124") < 0 || one.indexOf("1.3초") < 0 || one.indexOf("2.0 / 1.0 / 3.0") < 0 || one.indexOf("(밴 1 + 픽 4 / 8)") < 0) bad.push("한 캐릭터 줄");
+    if (api.mapShotSrc("river") !== "img/teambattle/maps/river.webp" || api.mapShotSrc("river", true) !== "img/teambattle/maps/river-wide.webp") bad.push("맵 그림 주소");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "비율·밴픽·K/D/A·" + L.length + "줄+직업군 제목·맵 그림 주소");
+  });
+
+  run(NICKG, "닉네임 창: 필수면 취소 버튼이 없고, 공백을 정리해 최대 글자 수로 자르며 저장하고, 비면 안내하고, 취소는 필수가 아닐 때만 되는가", function (done) {
+    var bad = [], input = document.getElementById("nickInput"), modal = document.getElementById("nickModal"), cancel = document.getElementById("btnNickCancel"), msg = document.getElementById("nickMsg");
+    var oldNick = api.setNick(""), stored = null;
+    try { stored = localStorage.getItem("tba_nickname"); } catch (e) {}
+    try {
+      api.openNick(true);
+      if (modal.hidden || !cancel.hidden || input.value !== "") bad.push("필수 열기");
+      cancel.click(); if (modal.hidden) bad.push("필수인데 취소로 닫힘");
+      input.value = "   "; document.getElementById("btnNickSave").click();
+      if (msg.textContent.indexOf("닉네임을 입력") < 0 || modal.hidden) bad.push("빈 닉네임 안내 '" + msg.textContent + "'");
+      input.value = "  가   나다라마  "; document.getElementById("btnNickSave").click();
+      var expected = "가 나".slice(0, api.NICK_MAX);
+      if (api.nickNow() !== expected || !modal.hidden || document.getElementById("helloNick").textContent !== expected || document.getElementById("lobbyNick").textContent !== expected) bad.push("저장 결과 '" + api.nickNow() + "'");
+      if (localStorage.getItem("tba_nickname") !== expected) bad.push("기기에 저장");
+      document.getElementById("btnNickEdit").click();
+      if (modal.hidden || cancel.hidden || input.value !== expected) bad.push("수정 열기");
+      cancel.click(); if (!modal.hidden) bad.push("취소로 안 닫힘");
+      document.getElementById("btnNickEdit2").click(); input.value = "엔터"; input.onkeydown({ key: "Enter" });
+      if (api.nickNow() !== "엔터".slice(0, api.NICK_MAX)) bad.push("엔터로 저장");
+    } finally {
+      api.setNick(oldNick); modal.hidden = true; input.value = "";
+      try { if (stored === null) localStorage.removeItem("tba_nickname"); else localStorage.setItem("tba_nickname", stored); } catch (e) {}
+      api.refreshNick();
+    }
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "필수·빈 값·공백 정리·글자 수·저장·수정·취소·엔터");
+  });
+
+  var LAUNCHG = "경기 시작", PRACG = "연습모드";
+  var BASE = ROOMS + "/";
+
+  runAsync(LAUNCHG, "경기 시작(startGame): 방장이 로비에서 누르면 카운트다운 3초·출발 자리·로스터·시작 상태가 만들어지고, 방장이 아니거나 로비가 아니면 무시하는가", async function (done) {
+    var code = "13131", bad = [];
+    await withNet({}, async function (fake) {
+      var others = { b2: person("블2", "blue", 1, 1), r1: person("레드1", "red", 2, 2), r2: person("레드2", "red", 4, 3), b4: person("블넷", "blue", 6, 4), b5: person("블다섯", "blue", 7, 5) };
+      var base = await lobbyOf(fake, code, others, person("나", "blue", 3, 0));
+      fake.put(base + "players/r1/characterType", "priest-없음");
+      var before = api.CLOCK.real();
+      api.startGame(); await sleep(10);
+      var node = fake.get(ROOMS + "/" + code), ps = node.players, roster = node.roster || {};
+      if (node.status !== "countdown" || !(node.startAt >= before + 2900 && node.startAt <= api.CLOCK.real() + 3100)) bad.push("상태·시작 시각 " + node.status + " " + (node.startAt - before));
+      if (Object.keys(roster).sort().join() !== ["b2", me(), "b4", "r1", "r2"].sort().join()) bad.push("로스터 " + Object.keys(roster).join());
+      if (ps.b2.slot !== 1 || ps[me()].slot !== 2 || ps.b4.slot !== 3 || ps.b5.slot !== undefined) bad.push("블루 자리 순서 " + [ps.b2.slot, ps[me()].slot, ps.b4.slot, ps.b5.slot]);
+      if (roster.b5) bad.push("블루 4번째가 로스터에 들어감");
+      if (roster.r1.c !== api.FALLBACK_CHAR || ps.r1.characterType !== api.FALLBACK_CHAR) bad.push("고를 수 없는 캐릭터는 기본 캐릭터로: " + roster.r1.c);
+      if (roster[me()].team !== "blue" || roster[me()].c !== HUMAN_CHARS[0] || roster[me()].ai !== false) bad.push("내 로스터 " + JSON.stringify(roster[me()]));
+      var st = node.st || {}, sp = api.spawnOf("blue", 2, node.arena), mine = (st.b2 || "").split(",");
+      if (Object.keys(st).sort().join() !== "b1,b2,b3,r1,r2") bad.push("시작 상태 칸 " + Object.keys(st).join());
+      if (+mine[0] !== Math.round(sp.x) || +mine[1] !== Math.round(sp.y) || +mine[4] !== api.CHARS[HUMAN_CHARS[0]].hp) bad.push("내 시작 상태 " + st.b2);
+      if (node.draft !== undefined || node.winner !== undefined || node.statsNote !== undefined) bad.push("지난 판 정보가 남음");
+      if (api.MAP_IDS.indexOf(node.arena) < 0) bad.push("경기장 " + node.arena);
+      fake.put(base + "status", "lobby"); fake.put(base + "hostPlayerId", "b2"); fake.put(base + "roster", null); await sleep(5);
+      api.startGame(); await sleep(5);
+      if (fake.get(base + "status") !== "lobby") bad.push("방장이 아닌데 시작됨");
+      fake.put(base + "hostPlayerId", me()); fake.put(base + "status", "playing"); await sleep(5);
+      api.startGame(); await sleep(5);
+      if (fake.get(base + "status") !== "playing" || fake.get(base + "roster")) bad.push("로비가 아닌데 시작됨");
+    });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "카운트다운·자리 순서·로스터(3명 제한)·시작 상태·기본 캐릭터 대체·권한 확인");
+  });
+  runAsync(LAUNCHG, "경기 시작: 맵 선택(고른 맵·무작위)이 경기장으로 정해지고, 대회모드는 경기 대신 드래프트로 가는가", async function (done) {
+    var bad = [], realRandom = Math.random;
+    await withNet({}, async function (fake) {
+      var base = await lobbyOf(fake, "14141", { r1: person("레드", "red", 2, 1) }, person("나", "blue", 3, 0), { map: "river", arena: "river" });
+      api.startGame(); await sleep(5);
+      if (fake.get(base + "arena") !== "river") bad.push("고른 맵 " + fake.get(base + "arena"));
+      fake.put(base + "status", "lobby"); fake.put(base + "map", "random"); await sleep(5);
+      Math.random = function () { return 0; };
+      try { api.startGame(); } finally { Math.random = realRandom; }
+      await sleep(5);
+      if (fake.get(base + "arena") !== api.MAP_IDS[0]) bad.push("무작위 맵 " + fake.get(base + "arena"));
+      fake.put(base + "status", "lobby"); fake.put(base + "roster", null); fake.put(base + "mode", "cup"); await sleep(5);
+      api.startGame(); await sleep(5);
+      var d = fake.get(base + "draft");
+      if (fake.get(base + "status") !== "draft" || !d || d.step !== 0 || fake.get(base + "roster")) bad.push("대회모드 → 드래프트 " + fake.get(base + "status"));
+    });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "고른 맵·무작위·대회모드 드래프트");
+  });
+  runAsync(LAUNCHG, "연습장 봇 자리(practiceSpots): 봇 3자리가 맵 안·벽 밖이고 서로 떨어져 있으며 연습장은 정해진 자리를 쓰는가", async function (done) {
+    var bad = [];
+    ["forest", "river", "dungeon", "windhill"].forEach(function (id) {
+      api.loadMapData(id);
+      var spots = api.practiceSpots(id, "blue");
+      if (spots.length !== api.PRACTICE_BOTS.length) bad.push(id + " 자리 수 " + spots.length);
+      spots.forEach(function (p, i) { var why = blockedAt(p.x, p.y); if (why) bad.push(id + " 봇 " + i + " 자리가 " + why); });
+      for (var i = 0; i < spots.length; i++) for (var j = i + 1; j < spots.length; j++) if (hyp(spots[i].x - spots[j].x, spots[i].y - spots[j].y) < 220) bad.push(id + " 봇끼리 너무 가까움");
+    });
+    api.loadMapData("practice");
+    var fixed = api.practiceSpots("practice", "red");
+    if (fixed.some(function (p) { return p.x < api.BOUND.l || p.x > api.BOUND.r; }) || fixed.length !== 3) bad.push("연습장 자리");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.slice(0, 4).join(" / ") : "일반 맵 4개 × 3자리 + 연습장");
+  });
+  runAsync(LAUNCHG, "연습모드 시작: 연습 봇 3기(상대 2·아군 1)가 방에 들어오고 시작 상태에 체력·자리가 맞게 적히며, 로비로 돌아오면 봇이 사라지는가", async function (done) {
+    var bad = [];
+    await withNet({}, async function (fake) {
+      var base = await lobbyOf(fake, "15151", {}, person("나", "blue", 3, 0), { mode: "practice", map: "practice", arena: "practice" });
+      api.startGame(); await sleep(10);
+      var node = fake.get(ROOMS + "/15151"), ps = node.players, bots = api.PRACTICE_BOTS;
+      if (node.status !== "countdown" || node.arena !== "practice") bad.push("상태·경기장 " + node.status + " " + node.arena);
+      bots.forEach(function (b) {
+        var p = ps[b.id], C = api.CHARS[b.c];
+        if (!p || !p.isAI || !p.practiceBot || p.team !== (b.foe ? "red" : "blue") || p.characterType !== b.c || p.slot !== b.slot || !Number.isInteger(p.homeX) || !Number.isInteger(p.homeY)) { bad.push(b.id + " 기록 " + JSON.stringify(p)); return; }
+        var roster = node.roster[b.id], st = (node.st[(p.team === "blue" ? "b" : "r") + b.slot] || "").split(",");
+        if (!roster || roster.ai !== true || roster.c !== b.c) bad.push(b.id + " 로스터");
+        var hp = b.foe ? C.hp : Math.round(C.hp * 0.3);
+        if (+st[4] !== hp) bad.push(b.id + " 체력 " + st[4] + " (기대 " + hp + ")");
+      });
+      if (!node.roster[me()] || node.roster[me()].ai !== false || Object.keys(node.roster).length !== 4) bad.push("로스터 구성 " + Object.keys(node.roster).join());
+      var again = ["blue", "red"].map(function (t) { return Object.keys(ps).filter(function (id) { return ps[id].team === t; }).length; });
+      if (again.join() !== "2,2") bad.push("팀별 인원(나·아군 / 봇 2) " + again.join());
+      api.backToLobby(); await sleep(10);
+      var after = fake.get(ROOMS + "/15151/players") || {};
+      if (bots.some(function (b) { return after[b.id]; }) || fake.get(ROOMS + "/15151/status") !== "lobby" || fake.get(ROOMS + "/15151/roster")) bad.push("로비로 돌아왔는데 봇·로스터가 남음");
+    });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "봇 3기 기록·로스터·체력(아군 30%)·로비 복귀 시 정리");
+  });
+
+  async function practiceRoom(fake, code) {
+    var players = {}; players[me()] = person("나", "blue", 3, 0);
+    fake.put(ROOMS + "/" + code, roomTree(code, players, { hostPlayerId: me(), mode: "practice", map: "practice", arena: "practice", status: "playing", startAt: Date.now() - 5000 }).teambattle.rooms[code]);
+    api.enterRoom(code);
+    await waitFor(function () { return api.players()[me()] && api.room().hostLoaded && api.room().status === "playing"; });
+    var base = ROOMS + "/" + code + "/";
+    api.MATCH.game = { startAt: api.room().startAt, endSent: false, playingSent: false, lastNet: 0, sent: {}, finalSent: false, beeped: -1 };
+    api.MATCH.me = api.makeEnt(me(), api.players()[me()]);
+    return base;
+  }
+  runAsync(PRACG, "연습모드 도구: 스킬 게이지 채우기는 연습·생존·스킬 사용 중이 아닐 때만, 나가기는 방장이 경기 중일 때만 되고 로비로 돌아가는가", async function (done) {
+    var bad = [];
+    await withNet({}, async function (fake) {
+      var base = await practiceRoom(fake, "16161"), E = api.MATCH.me, now0 = Date.now();
+      E.gauge = 0; api.fillPracticeGauge();
+      if (E.gauge !== api.GAUGE_MAX || !api.MATCH.game.forceNet) bad.push("게이지 채우기");
+      E.gauge = 0; E.skillUntil = Date.now() + 5000; api.fillPracticeGauge();
+      if (E.gauge !== 0) bad.push("스킬 사용 중에 채워짐");
+      E.skillUntil = 0; E.alive = false; api.fillPracticeGauge();
+      if (E.gauge !== 0) bad.push("쓰러졌는데 채워짐");
+      E.alive = true; fake.put(base + "mode", "pvp"); await sleep(5); api.fillPracticeGauge();
+      if (E.gauge !== 0) bad.push("연습모드가 아닌데 채워짐");
+      fake.put(base + "mode", "practice"); await sleep(5);
+      document.getElementById("pcModal").hidden = false;
+      api.leavePractice(); await sleep(10);
+      if (!document.getElementById("pcModal").hidden || fake.get(base + "status") !== "lobby") bad.push("나가기 결과 " + fake.get(base + "status"));
+      fake.put(base + "status", "playing"); fake.put(base + "players/h2", person("방장2", "red", 9, 3)); fake.put(base + "hostPlayerId", "h2"); await sleep(5);
+      api.leavePractice(); await sleep(5);
+      if (fake.get(base + "status") !== "playing") bad.push("방장이 아닌데 나감");
+    });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "게이지 채우기 조건 4가지·나가기 조건");
+  });
+  runAsync(PRACG, "연습모드 캐릭터 창·바꾸기: 창에 모든 캐릭터 카드가 뜨고, 고르면 위치·통계는 이어 가며 체력 가득·게이지 0 의 새 캐릭터가 되고 방 기록도 바뀌는가", async function (done) {
+    var bad = [], L = HUMAN_CHARS;
+    await withNet({}, async function (fake) {
+      var base = await practiceRoom(fake, "17171"), old = api.MATCH.me;
+      fake.put(base + "roster/" + me(), { team: "blue", c: L[0], ai: false }); await sleep(5);
+      api.openPracticeChars();
+      var modal = document.getElementById("pcModal"), cards = document.querySelectorAll("#pcChars .dfCard");
+      if (modal.hidden || cards.length !== L.length || document.querySelector("#pcChars .dfCard.on").getAttribute("data-c") !== L[0]) bad.push("창 열기 카드 " + cards.length);
+      Object.assign(old, { x: 321, y: 654, angle: 1.2, dmg: 77, kills: 2, deaths: 1, assists: 3, heal: 9, gauge: 5, hp: 1 });
+      document.querySelector('#pcChars .dfCard[data-c="' + L[3] + '"]').click(); await sleep(10);
+      var E = api.MATCH.me;
+      if (E === old || E.char !== L[3] || E.hp !== api.CHARS[L[3]].hp || E.maxHp !== E.hp || E.gauge !== 0 || E.x !== 321 || E.y !== 654 || E.dmg !== 77 || E.kills !== 2 || E.deaths !== 1 || E.assists !== 3 || E.heal !== 9 || !E.alive) bad.push("새 캐릭터 " + JSON.stringify([E.char, E.hp, E.gauge, E.x, E.dmg]));
+      if (fake.get(base + "players/" + me() + "/characterType") !== L[3] || fake.get(base + "roster/" + me() + "/c") !== L[3]) bad.push("방 기록");
+      if (api.players()[me()].characterType !== L[3]) bad.push("내 참가자 기록");
+      if (document.querySelector("#pcChars .dfCard.on").getAttribute("data-c") !== L[3]) bad.push("창이 새 캐릭터로 갱신 안 됨");
+      var same = api.MATCH.me; api.changePracticeChar(L[3]); if (api.MATCH.me !== same) bad.push("같은 캐릭터를 또 바꿈");
+      api.changePracticeChar("없는캐릭터"); if (api.MATCH.me !== same) bad.push("없는 캐릭터로 바뀜");
+      fake.put(base + "mode", "pvp"); await sleep(5); api.changePracticeChar(L[4]); if (api.MATCH.me !== same) bad.push("연습모드가 아닌데 바뀜");
+      document.getElementById("btnPcClose").click(); if (!modal.hidden) bad.push("닫기 버튼");
+      modal.hidden = false; modal.dispatchEvent(new MouseEvent("click", { bubbles: true })); if (!modal.hidden) bad.push("바깥을 누르면 닫혀야 함");
+    });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "카드 " + L.length + "장·캐릭터 교체(위치·통계 유지)·방 기록·잘못된 요청 무시·닫기");
+  });
+
+  runAsync(STATSVG, "통계 창 불러오기: 모드별 통계를 받아 집계 문구와 표로 보여 주고, 모드 버튼으로 바꾸며, 연결이 없거나 실패하면 안내하는가", async function (done) {
+    var bad = [], L = HUMAN_CHARS, tree = { teambattle: { modestats: { pvp: { matches: 10, blue: 6, red: 3 }, cup: { matches: 4, blue: 1, red: 3 } } } };
+    tree.teambattle.modestats.pvp[L[0]] = { picks: 4, wins: 3, games: 8, bans: 1, dmg: 100 };
+    await withNet(tree, async function (fake) {
+      document.getElementById("btnStats").click();
+      var modal = document.getElementById("statsModal"), msg = document.getElementById("statsMsg"), body = document.getElementById("statsBody");
+      if (modal.hidden) bad.push("창이 안 열림");
+      await waitFor(function () { return msg.textContent.indexOf("집계된 경기") === 0; }, 400);
+      if (msg.textContent.indexOf("집계된 경기 10판") !== 0 || msg.textContent.indexOf("블루 60.0%") < 0 || msg.textContent.indexOf("레드 30.0%") < 0 || msg.textContent.indexOf("무승부 10.0%") < 0) bad.push("집계 문구 '" + msg.textContent + "'");
+      if (body.querySelectorAll("tr").length < L.length || body.innerHTML.indexOf("75.0%") < 0) bad.push("표 " + body.querySelectorAll("tr").length);
+      var buttons = document.querySelectorAll("#statsModes .modeBtn");
+      if (buttons.length !== 2 || document.querySelector("#statsModes .on").getAttribute("data-id") !== "pvp") bad.push("모드 버튼 " + buttons.length);
+      document.querySelector('#statsModes [data-id="cup"]').click();
+      await waitFor(function () { return msg.textContent.indexOf("집계된 경기 4판") === 0; }, 400);
+      if (api.statsModeNow() !== "cup" || msg.textContent.indexOf("집계된 경기 4판") !== 0 || document.querySelector("#statsModes .on").getAttribute("data-id") !== "cup") bad.push("대회 통계 전환 '" + msg.textContent + "'");
+      fake.failOnce = true;
+      document.querySelector('#statsModes [data-id="pvp"]').click();
+      await waitFor(function () { return msg.textContent.indexOf("불러오지 못했어요") >= 0; }, 400);
+      if (msg.textContent.indexOf("통계를 불러오지 못했어요") < 0) bad.push("실패 안내 '" + msg.textContent + "'");
+      fake.delays["teambattle/modestats/cup"] = 60;
+      document.querySelector('#statsModes [data-id="cup"]').click();
+      document.querySelector('#statsModes [data-id="pvp"]').click();
+      await sleep(140);
+      if (api.statsModeNow() !== "pvp" || msg.textContent.indexOf("집계된 경기 10판") !== 0) bad.push("늦게 도착한 옛 요청이 화면을 덮어씀 '" + msg.textContent + "'");
+      fake.delays = {};
+      api.setDb(null); api.loadStats();
+      if (msg.textContent.indexOf("온라인 연결을 준비하지 못해") < 0 || body.innerHTML !== "") bad.push("연결 없음 안내 '" + msg.textContent + "'");
+      api.setDb(fake);
+      document.getElementById("btnStatsClose").click(); if (!modal.hidden) bad.push("닫기 버튼");
+      modal.hidden = false; modal.dispatchEvent(new MouseEvent("click", { bubbles: true })); if (!modal.hidden) bad.push("바깥을 누르면 닫혀야 함");
+      document.getElementById("btnMapView").click();
+      var grid = document.getElementById("mapViewGrid");
+      if (document.getElementById("mapViewModal").hidden || grid.querySelectorAll("figure").length !== api.MAP_IDS.length || grid.innerHTML.indexOf("img/teambattle/maps/forest.webp") < 0) bad.push("맵 보기 창");
+      document.getElementById("btnMapViewClose").click();
+    });
+    ["statsModal", "mapViewModal"].forEach(function (id) { document.getElementById(id).hidden = true; });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "불러오기·집계 문구·표·모드 전환·실패·연결 없음·닫기·맵 보기");
+  });
   results.pending = Promise.resolve().then(function () { api.finish(api.currentMap()); }).then(drainAsync);
   return results;
 }
@@ -3530,10 +4096,11 @@ function renderPanel(results, ms, rerun) {
 export function runTeamBattleTests(api) {
   function once() {
     if (!api.isIdle()) { alert("방에 들어가 있지 않은 첫 화면에서만 검사할 수 있어요."); return; }
-    var mapBefore = api.currentMap(), started = performance.now(), results;
+    var mapBefore = api.currentMap(), started = performance.now(), results, offsetBefore = api.CLOCK.serverOffset;
+    api.CLOCK.serverOffset = 0;
     var retired = Object.keys(api.CHARS).filter(function (c) { return api.CHARS[c].retired; });
     retired.forEach(function (c) { api.CHARS[c].retired = false; });
-    function restore() { retired.forEach(function (c) { api.CHARS[c].retired = true; }); api.finish(mapBefore); }
+    function restore() { retired.forEach(function (c) { api.CHARS[c].retired = true; }); api.CLOCK.serverOffset = offsetBefore; api.finish(mapBefore); }
     try { results = collectResults(api); }
     catch (err) { restore(); throw err; }
     results.pending.then(function () { restore(); renderPanel(results, performance.now() - started, once); }, function (err) { restore(); throw err; });
