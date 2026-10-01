@@ -988,60 +988,73 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   };
   var MAP_IDS = ["forest", "river", "dungeon", "windhill"];
   var BLOCK_TILES = "#xo", WATER_TILES = "~", ROCK_TILES = "#x";
-  var ARENA = "", MAP = [], MAP_COLS = 16, MAP_ROWS = 25, SPAWN_ROWS = 3;
-  var OBST = [], WATER = [], BRIDGES = [], BUSH_ID = [], BUSH = [];
-  function tileX(c) { return MAP_X0 + (c + 0.5) * TILE; }
-  function tileY(r) { return MAP_Y0 + (r + 0.5) * TILE; }
-  function fullMap(half) {
-    return half.concat(half.slice(0, half.length - 1).reverse().map(function (row) { return row.split("").reverse().join(""); }));
-  }
-  function tileRects(kinds) {
-    var rects = [], open = {};
-    MAP.forEach(function (row, r) {
-      var next = {};
-      for (var c = 0; c < MAP_COLS; c++) {
-        if (kinds.indexOf(row.charAt(c)) < 0) continue;
-        var c0 = c; while (c + 1 < MAP_COLS && kinds.indexOf(row.charAt(c + 1)) >= 0) c++;
-        var key = c0 + ":" + c, rect = open[key];
-        if (rect) rect.r1 = r; else { rect = { c0: c0, c1: c, r0: r, r1: r }; rects.push(rect); }
-        next[key] = rect;
-      }
-      open = next;
-    });
-    return rects.map(function (q) {
-      return { x: MAP_X0 + (q.c0 + q.c1 + 1) * TILE / 2, y: MAP_Y0 + (q.r0 + q.r1 + 1) * TILE / 2,
-               w: (q.c1 - q.c0 + 1) * TILE, h: (q.r1 - q.r0 + 1) * TILE };
-    });
-  }
-  function bushGroups() {
-    BUSH_ID = []; BUSH = [];
-    MAP.forEach(function (row, r) {
-      for (var c = 0; c < MAP_COLS; c++) {
-        if (row.charAt(c) !== '"' || BUSH_ID[r * MAP_COLS + c] !== undefined) continue;
-        var id = BUSH.length, tiles = [], queue = [[c, r]], sx = 0, sy = 0;
-        BUSH_ID[r * MAP_COLS + c] = id;
-        while (queue.length) {
-          var q = queue.pop(); tiles.push(q); sx += tileX(q[0]); sy += tileY(q[1]);
-          [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(function (d) {
-            var nc = q[0] + d[0], nr = q[1] + d[1];
-            if (nc < 0 || nr < 0 || nc >= MAP_COLS || nr >= MAP_ROWS || MAP[nr].charAt(nc) !== '"' || BUSH_ID[nr * MAP_COLS + nc] !== undefined) return;
-            BUSH_ID[nr * MAP_COLS + nc] = id; queue.push([nc, nr]);
-          });
+  var SPAWN_ROWS = 3;
+  class ArenaMap {
+    constructor() {
+      this.id = ""; this.rows = []; this.cols = 16; this.rowCount = 25;
+      this.obstacles = []; this.water = []; this.bridges = []; this.bushId = []; this.bushes = [];
+    }
+    tileX(c) { return MAP_X0 + (c + 0.5) * TILE; }
+    tileY(r) { return MAP_Y0 + (r + 0.5) * TILE; }
+    fullMap(half) {
+      return half.concat(half.slice(0, half.length - 1).reverse().map(function (row) { return row.split("").reverse().join(""); }));
+    }
+    tileRects(kinds) {
+      var rects = [], open = {};
+      ARENA_MAP.rows.forEach(function (row, r) {
+        var next = {};
+        for (var c = 0; c < ARENA_MAP.cols; c++) {
+          if (kinds.indexOf(row.charAt(c)) < 0) continue;
+          var c0 = c; while (c + 1 < ARENA_MAP.cols && kinds.indexOf(row.charAt(c + 1)) >= 0) c++;
+          var key = c0 + ":" + c, rect = open[key];
+          if (rect) rect.r1 = r; else { rect = { c0: c0, c1: c, r0: r, r1: r }; rects.push(rect); }
+          next[key] = rect;
         }
-        BUSH.push({ x: sx / tiles.length, y: sy / tiles.length, tiles: tiles });
-      }
-    });
+        open = next;
+      });
+      return rects.map(function (q) {
+        return { x: MAP_X0 + (q.c0 + q.c1 + 1) * TILE / 2, y: MAP_Y0 + (q.r0 + q.r1 + 1) * TILE / 2,
+                 w: (q.c1 - q.c0 + 1) * TILE, h: (q.r1 - q.r0 + 1) * TILE };
+      });
+    }
+    bushGroups() {
+      ARENA_MAP.bushId = []; ARENA_MAP.bushes = [];
+      ARENA_MAP.rows.forEach(function (row, r) {
+        for (var c = 0; c < ARENA_MAP.cols; c++) {
+          if (row.charAt(c) !== '"' || ARENA_MAP.bushId[r * ARENA_MAP.cols + c] !== undefined) continue;
+          var id = ARENA_MAP.bushes.length, tiles = [], queue = [[c, r]], sx = 0, sy = 0;
+          ARENA_MAP.bushId[r * ARENA_MAP.cols + c] = id;
+          while (queue.length) {
+            var q = queue.pop(); tiles.push(q); sx += ARENA_MAP.tileX(q[0]); sy += ARENA_MAP.tileY(q[1]);
+            [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(function (d) {
+              var nc = q[0] + d[0], nr = q[1] + d[1];
+              if (nc < 0 || nr < 0 || nc >= ARENA_MAP.cols || nr >= ARENA_MAP.rowCount || ARENA_MAP.rows[nr].charAt(nc) !== '"' || ARENA_MAP.bushId[nr * ARENA_MAP.cols + nc] !== undefined) return;
+              ARENA_MAP.bushId[nr * ARENA_MAP.cols + nc] = id; queue.push([nc, nr]);
+            });
+          }
+          ARENA_MAP.bushes.push({ x: sx / tiles.length, y: sy / tiles.length, tiles: tiles });
+        }
+      });
+    }
+    load(id) {
+      ARENA_MAP.id = MAPS[id] ? id : "forest";
+      ARENA_MAP.rows = ARENA_MAP.fullMap(MAPS[ARENA_MAP.id].blueHalf);
+      ARENA_MAP.cols = ARENA_MAP.rows[0].length; ARENA_MAP.rowCount = ARENA_MAP.rows.length;
+      ARENA_MAP.obstacles = ARENA_MAP.tileRects(BLOCK_TILES);
+      ARENA_MAP.water = ARENA_MAP.tileRects(WATER_TILES);
+      ARENA_MAP.bridges = ARENA_MAP.tileRects("=");
+      ARENA_MAP.bushGroups();
+    }
+    resolveArena(choice) {
+      return MAPS[choice] ? choice : MAP_IDS[Math.floor(Math.random() * MAP_IDS.length)];
+    }
+    spawnOf(team, slot, arena) {
+      var x = SPAWN_X[slot - 1], map = MAPS[arena || ARENA_MAP.id], sy = (map && map.spawnY) || SPAWN_Y;
+      return { x: team === "blue" ? MW - x : x, y: sy[team], angle: team === "blue" ? Math.PI / 2 : -Math.PI / 2 };
+    }
   }
-  function loadMapData(id) {
-    ARENA = MAPS[id] ? id : "forest";
-    MAP = fullMap(MAPS[ARENA].blueHalf);
-    MAP_COLS = MAP[0].length; MAP_ROWS = MAP.length;
-    OBST = tileRects(BLOCK_TILES);
-    WATER = tileRects(WATER_TILES);
-    BRIDGES = tileRects("=");
-    bushGroups();
-  }
-  loadMapData("forest");
+  var ARENA_MAP = new ArenaMap();
+  ARENA_MAP.load("forest");
   var FONT = '"Nanum Gothic", "Malgun Gothic", sans-serif';
 
   var FACE_BY_MOVE = true;
@@ -1647,9 +1660,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (!isHost() || room.status !== "lobby" || room.map === map) return;
     room.ref.update({ map: map });
   }
-  function resolveArena(choice) {
-    return MAPS[choice] ? choice : MAP_IDS[Math.floor(Math.random() * MAP_IDS.length)];
-  }
   function choiceButtons(list, current, cls) {
     return list.map(function (m) {
       return '<button type="button" class="mini modeBtn ' + cls + (m.id === current ? " on" : "") + '" data-id="' + m.id + '"' + (isHost() ? "" : " disabled") + ">" + m.name + "</button>";
@@ -2140,10 +2150,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   $("joinCode").onkeydown = function (e) { if (e.key === "Enter") joinRoom(); };
   $("btnStart").onclick = startGame;
 
-  function spawnOf(team, slot, arena) {
-    var x = SPAWN_X[slot - 1], map = MAPS[arena || ARENA], sy = (map && map.spawnY) || SPAWN_Y;
-    return { x: team === "blue" ? MW - x : x, y: sy[team], angle: team === "blue" ? Math.PI / 2 : -Math.PI / 2 };
-  }
   var PRACTICE_BOTS = [
     { id: "aiPracticeBot", c: "dummy", foe: true, slot: 1, dx: -PRACTICE_BOT_GAP / 2, dy: 0 },
     { id: "aiPracticeBot2", c: "dummy", foe: true, slot: 2, dx: PRACTICE_BOT_GAP / 2, dy: 0 },
@@ -2151,11 +2157,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   ];
   function practiceSpots(arena, playerTeam) {
     var toward = playerTeam === "blue" ? 1 : -1, taken = [];
-    var map = fullMap(MAPS[arena].blueHalf), open = [];
+    var map = ARENA_MAP.fullMap(MAPS[arena].blueHalf), open = [];
     for (var r = 1; r < map.length - 1; r++) for (var c = 1; c < map[0].length - 1; c++) {
       var clear = true;
       for (var dr = -1; dr <= 1 && clear; dr++) for (var dc = -1; dc <= 1; dc++) if (map[r + dr].charAt(c + dc) !== ".") { clear = false; break; }
-      if (clear) open.push({ x: tileX(c), y: tileY(r) });
+      if (clear) open.push({ x: ARENA_MAP.tileX(c), y: ARENA_MAP.tileY(r) });
     }
     return PRACTICE_BOTS.map(function (b) {
       var want = { x: MW / 2 + b.dx, y: MH / 2 + b.dy * toward }, best = null, bestD = Infinity;
@@ -2174,21 +2180,21 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (!isHost() || room.status !== "lobby") return;
     audio();
     if (room.mode === "cup") { DRAFT.startDraft(); return; }
-    launchMatch(function (id) { return P[id].characterType; }, COUNT_MS, resolveArena(room.map));
+    launchMatch(function (id) { return P[id].characterType; }, COUNT_MS, ARENA_MAP.resolveArena(room.map));
   }
   function launchMatch(charOf, countMs, arena, bans) {
     var u = {}, roster = {}, st = {};
     ["blue", "red"].forEach(function (team) {
       teamIds(team).filter(function (id) { return !practiceMode() || id === myId; }).slice(0, 3).forEach(function (id, i) {
         var p = P[id], want = charOf(id), c = pickable(want) ? want : FALLBACK_CHAR;
-        var sp = spawnOf(team, i + 1, arena), base = "players/" + id + "/";
+        var sp = ARENA_MAP.spawnOf(team, i + 1, arena), base = "players/" + id + "/";
         u[base + "slot"] = i + 1; u[base + "characterType"] = c;
         st[stKey(team, i + 1)] = packState({ x: sp.x, y: sp.y, angle: sp.angle, mv: false, hp: CHARS[c].hp, alive: true, shield: !!CHARS[c].respawnShield });
         roster[id] = { team: team, c: c, ai: !!p.isAI };
       });
     });
     if (practiceMode() && P[myId]) {
-      var myTeam = P[myId].team, spots = practiceSpots(arena, myTeam), mine = spawnOf(myTeam, 1, arena);
+      var myTeam = P[myId].team, spots = practiceSpots(arena, myTeam), mine = ARENA_MAP.spawnOf(myTeam, 1, arena);
       PRACTICE_BOTS.forEach(function (b, i) {
         var team = b.foe ? SWAPPED_TEAM[myTeam] : myTeam, spot = spots[i], C = CHARS[b.c];
         var hp = b.foe ? C.hp : Math.round(C.hp * PRACTICE_ALLY_LOW);
@@ -2257,7 +2263,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         teamIds(team).slice(0, 3).forEach(function (id, i) { seq[(team === "blue" ? "b" : "r") + (i + 1)] = id; });
       });
       var d = DRAFT.draftSettle({ seq: seq, step: 0, stepAt: t }, t);
-      room.ref.update({ draft: d, arena: resolveArena(room.map), status: "draft", roster: null, st: null, winner: null, final: null, statsNote: null, endedAt: null, startAt: null,
+      room.ref.update({ draft: d, arena: ARENA_MAP.resolveArena(room.map), status: "draft", roster: null, st: null, winner: null, final: null, statsNote: null, endedAt: null, startAt: null,
                         shots: null, meleeHits: null, hits: null, effects: null, kills: null, projectiles: null });
     }
     applyDraftChoice(cur, id, c) {
@@ -2334,7 +2340,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (tr || DRAFT.draftReadyCount(d) < DRAFT.draftHumans(d).length || DRAFT.launched === d.stepAt) return;
       DRAFT.launched = d.stepAt;
       var picks = d.picks || {}, spare = DRAFT.draftLeft(d);
-      launchMatch(function (id) { return picks[id] || spare.splice(Math.floor(Math.random() * spare.length), 1)[0]; }, COUNT_MS, ARENA, DRAFT.draftBanned(d));
+      launchMatch(function (id) { return picks[id] || spare.splice(Math.floor(Math.random() * spare.length), 1)[0]; }, COUNT_MS, ARENA_MAP.id, DRAFT.draftBanned(d));
     }
     hostDraftTick() {
       var d = room.draft, t = now();
@@ -2381,9 +2387,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var waiting = done ? [] : DRAFT.draftWaiting(d, d.step), myTurn = waiting.indexOf(myId) >= 0, banTurn = !done && DRAFT_STEPS[d.step].ban;
       var me = P[myId], myTeam = me ? me.team : null, mySide = DRAFT.draftSideOf(d, myId);
       var left = Math.max(0, d.stepAt + DRAFT_SHOWN_MS - t), humans = DRAFT.draftHumans(d).length, readyN = DRAFT.draftReadyCount(d);
-      var arena = MAPS[room.arena] || MAPS[ARENA];
+      var arena = MAPS[room.arena] || MAPS[ARENA_MAP.id];
       setHtml($("dfMap"), arena ? "🗺️ " + esc(arena.name) + "<small>맵</small>" : "");
-      var arenaId = MAPS[room.arena] ? room.arena : ARENA, mapImg = $("dfMapImg");
+      var arenaId = MAPS[room.arena] ? room.arena : ARENA_MAP.id, mapImg = $("dfMapImg");
       setText($("dfMapName"), arena ? "🗺️ " + arena.name : "");
       if (mapImg.getAttribute("src") !== mapShotSrc(arenaId, true)) mapImg.setAttribute("src", mapShotSrc(arenaId, true));
       var timer = $("dfTimer");
@@ -2544,7 +2550,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }
       return o;
     }
-    var sp = d && d.slot && (d.team === "blue" || d.team === "red") ? spawnOf(d.team, d.slot) : { x: 0, y: 0, angle: 0 };
+    var sp = d && d.slot && (d.team === "blue" || d.team === "red") ? ARENA_MAP.spawnOf(d.team, d.slot) : { x: 0, y: 0, angle: 0 };
     return { x: sp.x, y: sp.y, angle: sp.angle, mv: false, full: false };
   }
 
@@ -3617,8 +3623,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     hiddenFrom(E, t) { return VISION.inBush(E.x, E.y) || E.isStealthed(t) || FIELD_FX.inFriendlyStorm(E, t); }
     bushIndexAt(x, y) {
       var c = Math.floor((x - MAP_X0) / TILE), r = Math.floor((y - MAP_Y0) / TILE);
-      if (c < 0 || r < 0 || c >= MAP_COLS || r >= MAP_ROWS) return -1;
-      var id = BUSH_ID[r * MAP_COLS + c];
+      if (c < 0 || r < 0 || c >= ARENA_MAP.cols || r >= ARENA_MAP.rowCount) return -1;
+      var id = ARENA_MAP.bushId[r * ARENA_MAP.cols + c];
       return id === undefined ? -1 : id;
     }
     revealedTo(E, viewer, t) {
@@ -3653,13 +3659,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     centerBlocked(x, y) {
       function inRect(o) { return Math.abs(x - o.x) < o.w / 2 && Math.abs(y - o.y) < o.h / 2; }
-      return OBST.some(inRect) || WATER.some(inRect);
+      return ARENA_MAP.obstacles.some(inRect) || ARENA_MAP.water.some(inRect);
     }
     insideBound(x, y) { return x >= BOUND.l + BODY_R && x <= BOUND.r - BODY_R && y >= BOUND.t + BODY_R && y <= BOUND.b - BODY_R; }
     resolve(E) {
       for (var pass = 0; pass < 2; pass++) {
-        for (var i = 0; i < OBST.length; i++) PHYSICS.pushOutOfRect(E, OBST[i]);
-        for (var j = 0; j < WATER.length; j++) PHYSICS.pushOutOfRect(E, WATER[j]);
+        for (var i = 0; i < ARENA_MAP.obstacles.length; i++) PHYSICS.pushOutOfRect(E, ARENA_MAP.obstacles[i]);
+        for (var j = 0; j < ARENA_MAP.water.length; j++) PHYSICS.pushOutOfRect(E, ARENA_MAP.water[j]);
         E.x = clamp(E.x, BOUND.l + BODY_R, BOUND.r - BODY_R);
         E.y = clamp(E.y, BOUND.t + BODY_R, BOUND.b - BODY_R);
       }
@@ -3683,7 +3689,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     rayObst(x, y, dx, dy, pad) {
       var best = Infinity;
-      for (var i = 0; i < OBST.length; i++) best = Math.min(best, PHYSICS.rayRect(x, y, dx, dy, OBST[i], pad));
+      for (var i = 0; i < ARENA_MAP.obstacles.length; i++) best = Math.min(best, PHYSICS.rayRect(x, y, dx, dy, ARENA_MAP.obstacles[i], pad));
       return best;
     }
     rayCast(x, y, dx, dy, maxD, pad) {
@@ -4615,7 +4621,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     dashReach(E, ang, len) {
       var dx = Math.cos(ang), dy = Math.sin(ang), pad = BODY_R - 1, best = PHYSICS.rayObst(E.x, E.y, dx, dy, pad);
-      for (var i = 0; i < WATER.length; i++) best = Math.min(best, PHYSICS.rayRect(E.x, E.y, dx, dy, WATER[i], pad));
+      for (var i = 0; i < ARENA_MAP.water.length; i++) best = Math.min(best, PHYSICS.rayRect(E.x, E.y, dx, dy, ARENA_MAP.water[i], pad));
       if (dx > 1e-9) best = Math.min(best, (BOUND.r - BODY_R - E.x) / dx);
       if (dx < -1e-9) best = Math.min(best, (BOUND.l + BODY_R - E.x) / dx);
       if (dy > 1e-9) best = Math.min(best, (BOUND.b - BODY_R - E.y) / dy);
@@ -4728,7 +4734,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   class RespawnSystem {
     respawnIfReady(E, t) {
       if (E.alive || !E.diedAt || t < E.diedAt + RESPAWN_MS || !P[E.id] || !P[E.id].slot) return;
-      var sp = E.practiceBot && E.home ? { x: E.home.x, y: E.home.y, angle: E.angle } : spawnOf(E.team, P[E.id].slot);
+      var sp = E.practiceBot && E.home ? { x: E.home.x, y: E.home.y, angle: E.angle } : ARENA_MAP.spawnOf(E.team, P[E.id].slot);
       E.x = sp.x; E.y = sp.y; E.angle = sp.angle; E.mv = false;
       E.hp = E.maxHp; E.alive = true; E.protectUntil = t + RESPAWN_PROTECT_MS;
       E.cdUntil = 0; E.pending = null; E.burst = null; E.volley = null; E.slash = null;
@@ -4818,8 +4824,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     pickWanderPoint(B, t) {
       var k = B.bot, spot;
       if (Math.random() < 0.5) {
-        var b = BUSH[Math.floor(Math.random() * BUSH.length)], bt = b.tiles[Math.floor(Math.random() * b.tiles.length)];
-        spot = { x: tileX(bt[0]), y: tileY(bt[1]) };
+        var b = ARENA_MAP.bushes[Math.floor(Math.random() * ARENA_MAP.bushes.length)], bt = b.tiles[Math.floor(Math.random() * b.tiles.length)];
+        spot = { x: ARENA_MAP.tileX(bt[0]), y: ARENA_MAP.tileY(bt[1]) };
       } else {
         spot = { x: BOUND.l + 60 + Math.random() * (BOUND.r - BOUND.l - 120), y: BOUND.t + 180 + Math.random() * (BOUND.b - BOUND.t - 360) };
       }
@@ -4828,13 +4834,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     waterBlocks(ax, ay, bx, by) {
       var d = hyp(bx - ax, by - ay); if (d < 1) return false;
-      for (var i = 0; i < WATER.length; i++) if (PHYSICS.rayRect(ax, ay, (bx - ax) / d, (by - ay) / d, WATER[i], BODY_R - 6) < d) return true;
+      for (var i = 0; i < ARENA_MAP.water.length; i++) if (PHYSICS.rayRect(ax, ay, (bx - ax) / d, (by - ay) / d, ARENA_MAP.water[i], BODY_R - 6) < d) return true;
       return false;
     }
     bridgeWaypoint(B, tx, ty) {
-      if (!BRIDGES.length || !BRAIN.waterBlocks(B.x, B.y, tx, ty)) return null;
+      if (!ARENA_MAP.bridges.length || !BRAIN.waterBlocks(B.x, B.y, tx, ty)) return null;
       var best = null, bd = Infinity;
-      BRIDGES.forEach(function (br) {
+      ARENA_MAP.bridges.forEach(function (br) {
         var cost = hyp(br.x - B.x, br.y - B.y) + hyp(tx - br.x, ty - br.y);
         if (cost < bd) { bd = cost; best = br; }
       });
@@ -5368,8 +5374,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var PIX = Math.min(window.devicePixelRatio || 1, TOUCH ? 1.5 : 1.75), PIX_MIN = 0.75, PIX_START = PIX;
   class ArenaBuilder {
     flatMesh(geo, mat) { var m = new THREE.Mesh(geo, mat); m.rotation.x = -Math.PI / 2; return m; }
-    zoneOfRow(r) { return MAPS[ARENA].practice ? "" : r < SPAWN_ROWS ? "blue" : (r >= MAP_ROWS - SPAWN_ROWS ? "red" : ""); }
-    tileAt(c, r) { return c < 0 || r < 0 || c >= MAP_COLS || r >= MAP_ROWS ? "#" : MAP[r].charAt(c); }
+    zoneOfRow(r) { return MAPS[ARENA_MAP.id].practice ? "" : r < SPAWN_ROWS ? "blue" : (r >= ARENA_MAP.rowCount - SPAWN_ROWS ? "red" : ""); }
+    tileAt(c, r) { return c < 0 || r < 0 || c >= ARENA_MAP.cols || r >= ARENA_MAP.rowCount ? "#" : ARENA_MAP.rows[r].charAt(c); }
     paintFloor(th) {
       var c2 = document.createElement("canvas"), S = FLOOR_TEX_SCALE;
       c2.width = Math.round(MW * S); c2.height = Math.round(MH * S);
@@ -5377,8 +5383,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       function noise() { rnd = (rnd * 16807) % 2147483647; return rnd / 2147483647; }
       g2.scale(S, S);
       g2.fillStyle = "#" + new THREE.Color(th.outer).getHexString(); g2.fillRect(0, 0, MW, MH);
-      for (var r = 0; r < MAP_ROWS; r++) for (var c = 0; c < MAP_COLS; c++) {
-        var x = MAP_X0 + c * TILE, y = MAP_Y0 + r * TILE, ch = MAP[r].charAt(c), odd = (r + c) % 2, zone = ARENA_VIEW.zoneOfRow(r);
+      for (var r = 0; r < ARENA_MAP.rowCount; r++) for (var c = 0; c < ARENA_MAP.cols; c++) {
+        var x = MAP_X0 + c * TILE, y = MAP_Y0 + r * TILE, ch = ARENA_MAP.rows[r].charAt(c), odd = (r + c) % 2, zone = ARENA_VIEW.zoneOfRow(r);
         if (ch === "o") continue;
         g2.fillStyle = ROCK_TILES.indexOf(ch) >= 0 ? (th.rockShade ? th.floor[odd] : th.wallFloor) : ch === '"' ? th.hideFloor : ch === "~" ? th.water : ch === "=" ? th.bridgeFloor :
                        zone ? ZONE_FLOOR[zone][odd] : th.floor[odd];
@@ -5412,11 +5418,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         }
       }
       if (th.rockShade) ARENA_VIEW.paintRockShade(g2, th.rockShade);
-      var practice = !!MAPS[ARENA].practice;
+      var practice = !!MAPS[ARENA_MAP.id].practice;
       g2.strokeStyle = th.line; g2.lineWidth = 1;
       if (!practice) {
-        for (var gx = 0; gx <= MAP_COLS; gx++) { g2.beginPath(); g2.moveTo(MAP_X0 + gx * TILE, MAP_Y0); g2.lineTo(MAP_X0 + gx * TILE, BOUND.b); g2.stroke(); }
-        for (var gy = 0; gy <= MAP_ROWS; gy++) { g2.beginPath(); g2.moveTo(MAP_X0, MAP_Y0 + gy * TILE); g2.lineTo(BOUND.r, MAP_Y0 + gy * TILE); g2.stroke(); }
+        for (var gx = 0; gx <= ARENA_MAP.cols; gx++) { g2.beginPath(); g2.moveTo(MAP_X0 + gx * TILE, MAP_Y0); g2.lineTo(MAP_X0 + gx * TILE, BOUND.b); g2.stroke(); }
+        for (var gy = 0; gy <= ARENA_MAP.rowCount; gy++) { g2.beginPath(); g2.moveTo(MAP_X0, MAP_Y0 + gy * TILE); g2.lineTo(BOUND.r, MAP_Y0 + gy * TILE); g2.stroke(); }
         var zoneH = TILE * SPAWN_ROWS;
         g2.lineWidth = 4;
         g2.strokeStyle = "rgba(95,162,255,.8)"; g2.beginPath(); g2.moveTo(MAP_X0, MAP_Y0 + zoneH); g2.lineTo(BOUND.r, MAP_Y0 + zoneH); g2.stroke();
@@ -5433,8 +5439,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return tx;
     }
     paintRockShade(g2, rgb) {
-      for (var r = 0; r < MAP_ROWS; r++) for (var c = 0; c < MAP_COLS; c++) {
-        if (BLOCK_TILES.indexOf(MAP[r].charAt(c)) < 0) continue;
+      for (var r = 0; r < ARENA_MAP.rowCount; r++) for (var c = 0; c < ARENA_MAP.cols; c++) {
+        if (BLOCK_TILES.indexOf(ARENA_MAP.rows[r].charAt(c)) < 0) continue;
         var cx = MAP_X0 + c * TILE + TILE / 2 + 4, cy = MAP_Y0 + r * TILE + TILE / 2 - 3, rad = TILE * 0.66;
         var shade = g2.createRadialGradient(cx, cy, TILE * 0.2, cx, cy, rad);
         shade.addColorStop(0, "rgba(" + rgb + ",.42)");
@@ -5446,24 +5452,24 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     tilesOf(kinds) {
       var list = [];
-      MAP.forEach(function (row, r) { for (var c = 0; c < MAP_COLS; c++) if (kinds.indexOf(row.charAt(c)) >= 0) list.push([c, r]); });
+      ARENA_MAP.rows.forEach(function (row, r) { for (var c = 0; c < ARENA_MAP.cols; c++) if (kinds.indexOf(row.charAt(c)) >= 0) list.push([c, r]); });
       return list;
     }
     borderTiles() {
       var list = [];
-      if (MAPS[ARENA].practice) return list;
-      for (var c = -1; c <= MAP_COLS; c++) { list.push([c, -1]); list.push([c, MAP_ROWS]); }
-      for (var r = 0; r < MAP_ROWS; r++) { list.push([-1, r]); list.push([MAP_COLS, r]); }
+      if (MAPS[ARENA_MAP.id].practice) return list;
+      for (var c = -1; c <= ARENA_MAP.cols; c++) { list.push([c, -1]); list.push([c, ARENA_MAP.rowCount]); }
+      for (var r = 0; r < ARENA_MAP.rowCount; r++) { list.push([-1, r]); list.push([ARENA_MAP.cols, r]); }
       return list;
     }
     boxField(tiles, h, mat) {
       var im = new THREE.InstancedMesh(UNIT_BOX, mat, tiles.length), m4 = new THREE.Matrix4();
-      tiles.forEach(function (tl, i) { im.setMatrixAt(i, m4.makeScale(TILE, h, TILE).setPosition(tileX(tl[0]), 0, tileY(tl[1]))); });
+      tiles.forEach(function (tl, i) { im.setMatrixAt(i, m4.makeScale(TILE, h, TILE).setPosition(ARENA_MAP.tileX(tl[0]), 0, ARENA_MAP.tileY(tl[1]))); });
       im.computeBoundingSphere();
       return im;
     }
     hideVolumes(th, makeGroup) {
-      BUSH.forEach(function (b, i) {
+      ARENA_MAP.bushes.forEach(function (b, i) {
         var built = makeGroup(b, i);
         built.mesh.renderOrder = 2;
         arenaGroup.add(built.mesh);
@@ -5488,9 +5494,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return im;
     }
     buildBridgeRails() {
-      if (!BRIDGES.length) return;
+      if (!ARENA_MAP.bridges.length) return;
       var rails = [], posts = [];
-      BRIDGES.forEach(function (s) {
+      ARENA_MAP.bridges.forEach(function (s) {
         [-1, 1].forEach(function (side) {
           var x = s.x + side * (s.w / 2 + 4), len = s.h + 16;
           rails.push({ x: x, z: s.y, w: 6, h: 5, d: len, y: 14 });
@@ -5510,7 +5516,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     buildArena() {
       ARENA_VIEW.clearArena();
-      var th = THEMES[ARENA];
+      var th = THEMES[ARENA_MAP.id];
       scene.background.setHex(th.sky); scene.fog.color.setHex(th.sky);
       outerGround.material.color.setHex(th.outer);
       ambient.intensity = th.ambient; sun.color.setHex(th.sun); sun.intensity = th.sunI;
@@ -5520,12 +5526,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       ground.visible = !(KIT.propsReady && th.dungeon);
       if (KIT.propsReady) PROPS.buildArenaProps(th); else ARENA_VIEW.buildSimpleArena(th);
       ARENA_VIEW.buildBridgeRails();
-      builtArena = ARENA + (KIT.propsReady ? ":kit" : "");
+      builtArena = ARENA_MAP.id + (KIT.propsReady ? ":kit" : "");
     }
     useArena(id) {
       if (!MAPS[id]) id = "forest";
       if (builtArena === id + (KIT.propsReady ? ":kit" : "")) return;
-      loadMapData(id);
+      ARENA_MAP.load(id);
       ARENA_VIEW.buildArena();
       if (TOUR) TOUR.dirty = true;
     }
@@ -5668,7 +5674,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }).catch(function () { KIT.failed = true; });
       Promise.all(keys(PROP_FILES).map(function (k) {
         return load(KIT_DIR + PROP_FILES[k]).then(function (g) { KIT.props[k] = MODELS.lambertize(g.scene); });
-      })).then(function () { KIT.propsReady = true; ARENA_VIEW.useArena(ARENA); }).catch(function () {});
+      })).then(function () { KIT.propsReady = true; ARENA_VIEW.useArena(ARENA_MAP.id); }).catch(function () {});
     }
     plantHeldUpright(m) {
       var held = m.getObjectByName("mainhand"); if (!held) return;
@@ -5768,7 +5774,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (th.windy) { PROPS.buildWindhillProps(th); return; }
       var P3 = KIT.props, g = arenaGroup, blocks = [[], []];
       function rockTile(c, r, hMin, hRange) {
-        blocks[PROPS.seeded() < 0.5 ? 0 : 1].push({ w: TILE * 1.08, h: hMin + PROPS.seeded() * hRange, d: TILE * 1.08, x: tileX(c), z: tileY(r), yaw: PROPS.quarterTurn() });
+        blocks[PROPS.seeded() < 0.5 ? 0 : 1].push({ w: TILE * 1.08, h: hMin + PROPS.seeded() * hRange, d: TILE * 1.08, x: ARENA_MAP.tileX(c), z: ARENA_MAP.tileY(r), yaw: PROPS.quarterTurn() });
       }
       ARENA_VIEW.tilesOf(ROCK_TILES).forEach(function (tl) { rockTile(tl[0], tl[1], 56, 14); });
       ARENA_VIEW.borderTiles().forEach(function (tl) { rockTile(tl[0], tl[1], 44, 24); });
@@ -5791,18 +5797,18 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         mat.transparent = true;
         var list = b.tiles.map(function (tl) {
           var sz = TILE * (1.35 + PROPS.seeded() * 0.15);
-          return { w: sz, h: 60 + PROPS.seeded() * 12, d: sz, x: tileX(tl[0]) + (PROPS.seeded() - 0.5) * 8, z: tileY(tl[1]) + (PROPS.seeded() - 0.5) * 8, yaw: PROPS.seeded() * 6.28 };
+          return { w: sz, h: 60 + PROPS.seeded() * 12, d: sz, x: ARENA_MAP.tileX(tl[0]) + (PROPS.seeded() - 0.5) * 8, z: ARENA_MAP.tileY(tl[1]) + (PROPS.seeded() - 0.5) * 8, yaw: PROPS.seeded() * 6.28 };
         });
         return { mesh: PROPS.instancedProp(P3.bushBig, list, mat), mat: mat, full: 1 };
       });
     }
     tuftProps(chance) {
       var tufts = [];
-      MAP.forEach(function (row, r) {
-        for (var c = 0; c < MAP_COLS; c++) {
+      ARENA_MAP.rows.forEach(function (row, r) {
+        for (var c = 0; c < ARENA_MAP.cols; c++) {
           if (row.charAt(c) !== "." || ARENA_VIEW.zoneOfRow(r) || PROPS.seeded() > chance) continue;
           var sz = 16 + PROPS.seeded() * 10;
-          tufts.push({ w: sz, h: sz * 0.8, d: sz, x: tileX(c) + (PROPS.seeded() - 0.5) * TILE * 0.7, z: tileY(r) + (PROPS.seeded() - 0.5) * TILE * 0.7, yaw: PROPS.seeded() * 6.28 });
+          tufts.push({ w: sz, h: sz * 0.8, d: sz, x: ARENA_MAP.tileX(c) + (PROPS.seeded() - 0.5) * TILE * 0.7, z: ARENA_MAP.tileY(r) + (PROPS.seeded() - 0.5) * TILE * 0.7, yaw: PROPS.seeded() * 6.28 });
         }
       });
       if (tufts.length) arenaGroup.add(PROPS.instancedProp(KIT.props.tuft, tufts));
@@ -5810,7 +5816,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     wallPiece(c, r) {
       var alongY = ARENA_VIEW.tileAt(c, r - 1) === "#" || ARENA_VIEW.tileAt(c, r + 1) === "#";
       var yaw = (alongY ? Math.PI / 2 : 0) + (PROPS.seeded() - 0.5) * 0.3;
-      return { w: TILE * 0.98, h: 26 + PROPS.seeded() * 16, d: TILE * 0.62, x: tileX(c), z: tileY(r), yaw: yaw };
+      return { w: TILE * 0.98, h: 26 + PROPS.seeded() * 16, d: TILE * 0.62, x: ARENA_MAP.tileX(c), z: ARENA_MAP.tileY(r), yaw: yaw };
     }
     sceneryWanted() { return !TOUR_LOW_END && !SCENERY.droppedForFps; }
     dropSceneryForFps() {
@@ -5827,7 +5833,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var P3 = KIT.props, g = arenaGroup, blocks = [[], []];
       ARENA_VIEW.tilesOf("#").forEach(function (tl) { blocks[PROPS.seeded() < 0.5 ? 0 : 1].push(PROPS.wallPiece(tl[0], tl[1])); });
       ARENA_VIEW.borderTiles().forEach(function (tl) {
-        blocks[PROPS.seeded() < 0.5 ? 0 : 1].push({ w: TILE * 1.04, h: 20 + PROPS.seeded() * 14, d: TILE * 1.04, x: tileX(tl[0]), z: tileY(tl[1]), yaw: PROPS.quarterTurn() });
+        blocks[PROPS.seeded() < 0.5 ? 0 : 1].push({ w: TILE * 1.04, h: 20 + PROPS.seeded() * 14, d: TILE * 1.04, x: ARENA_MAP.tileX(tl[0]), z: ARENA_MAP.tileY(tl[1]), yaw: PROPS.quarterTurn() });
       });
       g.add(PROPS.instancedProp(P3.blockA, blocks[0]));
       g.add(PROPS.instancedProp(P3.blockB, blocks[1]));
@@ -5869,16 +5875,16 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     buildDungeonProps() {
       var P3 = KIT.props, g = arenaGroup, floors = [[], []], blocks = [], boxes = [], barrels = [];
-      MAP.forEach(function (row, r) {
-        for (var c = 0; c < MAP_COLS; c++) {
+      ARENA_MAP.rows.forEach(function (row, r) {
+        for (var c = 0; c < ARENA_MAP.cols; c++) {
           var ch = row.charAt(c), zone = ARENA_VIEW.zoneOfRow(r);
-          if (ch === "#") { blocks.push({ w: TILE * 1.02, h: 62, d: TILE * 1.02, x: tileX(c), z: tileY(r), yaw: PROPS.quarterTurn() }); continue; }
+          if (ch === "#") { blocks.push({ w: TILE * 1.02, h: 62, d: TILE * 1.02, x: ARENA_MAP.tileX(c), z: ARENA_MAP.tileY(r), yaw: PROPS.quarterTurn() }); continue; }
           var shade = ch === '"' ? 0x6A6272 : zone === "blue" ? 0xB4CCFF : zone === "red" ? 0xFFBDB2 : 0xF2F0EC - Math.floor(PROPS.seeded() * 3) * 0x0A0A0A;
-          floors[!zone && ch === "." && PROPS.seeded() < 0.12 ? 1 : 0].push({ w: TILE, h: DUNGEON_TILE_H, d: TILE, y: 0.2 - DUNGEON_TILE_H, x: tileX(c), z: tileY(r), yaw: PROPS.quarterTurn(), color: shade });
-          if (ch === "x") (PROPS.seeded() < 0.5 ? boxes : barrels).push({ x: tileX(c), z: tileY(r), yaw: PROPS.seeded() * 6.28 });
+          floors[!zone && ch === "." && PROPS.seeded() < 0.12 ? 1 : 0].push({ w: TILE, h: DUNGEON_TILE_H, d: TILE, y: 0.2 - DUNGEON_TILE_H, x: ARENA_MAP.tileX(c), z: ARENA_MAP.tileY(r), yaw: PROPS.quarterTurn(), color: shade });
+          if (ch === "x") (PROPS.seeded() < 0.5 ? boxes : barrels).push({ x: ARENA_MAP.tileX(c), z: ARENA_MAP.tileY(r), yaw: PROPS.seeded() * 6.28 });
         }
       });
-      ARENA_VIEW.borderTiles().forEach(function (tl) { blocks.push({ w: TILE * 1.02, h: 78, d: TILE * 1.02, x: tileX(tl[0]), z: tileY(tl[1]), yaw: PROPS.quarterTurn() }); });
+      ARENA_VIEW.borderTiles().forEach(function (tl) { blocks.push({ w: TILE * 1.02, h: 78, d: TILE * 1.02, x: ARENA_MAP.tileX(tl[0]), z: ARENA_MAP.tileY(tl[1]), yaw: PROPS.quarterTurn() }); });
       g.add(PROPS.instancedProp(P3.dgFloor, floors[0]));
       if (floors[1].length) g.add(PROPS.instancedProp(P3.dgFloorWeeds, floors[1]));
       g.add(PROPS.instancedProp(P3.dgBlock, blocks));
@@ -5886,11 +5892,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (barrels.length) g.add(PROPS.instancedProp(P3.dgBarrel, barrels.map(function (o) { return { w: 44, h: 50, d: 44, x: o.x, z: o.z, yaw: o.yaw }; })));
       ARENA_VIEW.hideVolumes(THEMES.dungeon, ARENA_VIEW.shadowVolume.bind(ARENA_VIEW));
       var torches = [];
-      for (var r = 2; r < MAP_ROWS; r += 5) [-1, MAP_COLS].forEach(function (c) { torches.push({ w: 16, h: 34, d: 16, x: tileX(c), z: tileY(r), yaw: 0 }); });
+      for (var r = 2; r < ARENA_MAP.rowCount; r += 5) [-1, ARENA_MAP.cols].forEach(function (c) { torches.push({ w: 16, h: 34, d: 16, x: ARENA_MAP.tileX(c), z: ARENA_MAP.tileY(r), yaw: 0 }); });
       var torchMesh = PROPS.instancedProp(P3.dgTorch, torches); torchMesh.position.y = 78; g.add(torchMesh);
       [3, 8, 12].forEach(function (c) {
-        var top = PROPS.fitProp(P3.dgBannerBlue, 40, 84, 8, tileX(c) - (c === 8 ? TILE / 2 : 0), MAP_Y0 - TILE / 2 + 18, 0); top.position.y += 78; g.add(top);
-        var bottom = PROPS.fitProp(P3.dgBannerRed, 40, 84, 8, tileX(MAP_COLS - 1 - c) + (c === 8 ? TILE / 2 : 0), BOUND.b + TILE / 2 - 18, Math.PI); bottom.position.y += 78; g.add(bottom);
+        var top = PROPS.fitProp(P3.dgBannerBlue, 40, 84, 8, ARENA_MAP.tileX(c) - (c === 8 ? TILE / 2 : 0), MAP_Y0 - TILE / 2 + 18, 0); top.position.y += 78; g.add(top);
+        var bottom = PROPS.fitProp(P3.dgBannerRed, 40, 84, 8, ARENA_MAP.tileX(ARENA_MAP.cols - 1 - c) + (c === 8 ? TILE / 2 : 0), BOUND.b + TILE / 2 - 18, Math.PI); bottom.position.y += 78; g.add(bottom);
       });
     }
   }
@@ -6297,20 +6303,20 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       ud.fill.scale.setScalar(ud.r * (0.9 + 0.1 * Math.sin(nowMs / 180)));
     }
     stormMask() {
-      if (STORM_MASK.arena === ARENA && STORM_MASK.tex) return STORM_MASK.tex;
+      if (STORM_MASK.arena === ARENA_MAP.id && STORM_MASK.tex) return STORM_MASK.tex;
       var px = 8, cv = document.createElement("canvas");
-      cv.width = MAP_COLS * px; cv.height = MAP_ROWS * px;
+      cv.width = ARENA_MAP.cols * px; cv.height = ARENA_MAP.rowCount * px;
       var g2 = cv.getContext("2d");
       g2.fillStyle = "#FFFFFF"; g2.fillRect(0, 0, cv.width, cv.height);
       g2.fillStyle = "#000000";
-      for (var r = 0; r < MAP_ROWS; r++) for (var c = 0; c < MAP_COLS; c++) {
-        var ch = MAP[r].charAt(c);
+      for (var r = 0; r < ARENA_MAP.rowCount; r++) for (var c = 0; c < ARENA_MAP.cols; c++) {
+        var ch = ARENA_MAP.rows[r].charAt(c);
         if (ch === "~" || ch === "=") g2.fillRect(c * px, r * px, px, px);
       }
       if (STORM_MASK.tex) STORM_MASK.tex.dispose();
       var tex = new THREE.CanvasTexture(cv);
       tex.flipY = false;
-      STORM_MASK.tex = tex; STORM_MASK.arena = ARENA;
+      STORM_MASK.tex = tex; STORM_MASK.arena = ARENA_MAP.id;
       return tex;
     }
     makeStormVis(e) {
@@ -6318,7 +6324,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var floorMat = new THREE.ShaderMaterial({
         uniforms: { center: { value: new THREE.Vector2(e.x, e.y) }, radius: { value: e.r }, time: { value: 0 }, fade: { value: 0 },
                     teamCol: { value: new THREE.Color(C_FX[e.team]) }, mask: { value: EFFECT_VIEW.stormMask() },
-                    maskRect: { value: new THREE.Vector4(MAP_X0, MAP_Y0, MAP_COLS * TILE, MAP_ROWS * TILE) } },
+                    maskRect: { value: new THREE.Vector4(MAP_X0, MAP_Y0, ARENA_MAP.cols * TILE, ARENA_MAP.rowCount * TILE) } },
         vertexShader: STORM_VERT, fragmentShader: STORM_FRAG, transparent: true, depthWrite: false
       });
       var floor = ARENA_VIEW.flatMesh(GEO.stormPlane, floorMat); floor.scale.set(e.r * 2, e.r * 2, 1); floor.position.y = 1; floor.renderOrder = -1;
@@ -6821,7 +6827,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     tourStill() { return TOUR_LOW_END || PIX < PIX_START; }
     bushShot(shot) {
       var ideal = shot.lookFrom, best = null, bestD = Infinity;
-      BUSH.forEach(function (b) { var d = hyp(b.x - ideal[0], b.y - ideal[2]); if (d < bestD) { bestD = d; best = b; } });
+      ARENA_MAP.bushes.forEach(function (b) { var d = hyp(b.x - ideal[0], b.y - ideal[2]); if (d < bestD) { bestD = d; best = b; } });
       if (!best) return shot;
       var dx = best.x - ideal[0], dz = best.y - ideal[2];
       function shift(p) { return [p[0] + dx, p[1], p[2] + dz]; }
@@ -6844,9 +6850,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (!renderer) return;
       if (!TOUR.on) TOUR_VIEW.startTour(nowMs);
       var still = TOUR_VIEW.tourStill();
-      if (TOUR.mapShown !== ARENA) {
+      if (TOUR.mapShown !== ARENA_MAP.id) {
         if (TOUR.mapShown) { TOUR.index = 0; TOUR.start = nowMs; }
-        TOUR.mapShown = ARENA; TOUR.dirty = true;
+        TOUR.mapShown = ARENA_MAP.id; TOUR.dirty = true;
       }
       if (still) {
         if (!TOUR.dirty && nowMs - TOUR.drawnAt < TOUR_STILL_REDRAW_MS) return;
@@ -6869,7 +6875,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       camera.updateMatrixWorld();
       $("tourFade").style.opacity = still ? "0" : Math.max(0, 1 - Math.min(elapsed, TOUR_MS - elapsed) / TOUR_FADE).toFixed(3);
       var camNo = still ? 1 : TOUR.index + 1;
-      var cap = "CAM " + (camNo < 10 ? "0" : "") + camNo + " · " + MAPS[ARENA].name + " · " + shot.name;
+      var cap = "CAM " + (camNo < 10 ? "0" : "") + camNo + " · " + MAPS[ARENA_MAP.id].name + " · " + shot.name;
       if (cap !== TOUR.caption) { TOUR.caption = cap; setText($("tourCam"), cap); }
       var t = now();
       SHOWCASE.forEach(function (s) {
@@ -7749,8 +7755,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
   function testHooks() {
     return {
-      CHARS: CHARS, CHAR_LIST: CHAR_LIST, ULT: ULT, ROLES: ROLES, ROLE_LIST: ROLE_LIST, MAPS: MAPS, roleGauge: function (c) { return roleOf(c).gaugeOnHit; }, spawnOf: spawnOf, BODY_R: BODY_R, GAUGE_MAX: GAUGE_MAX, BOUND: BOUND, MAP_IDS: MAP_IDS, RESPAWN_MS: RESPAWN_MS, RESPAWN_PROTECT_MS: RESPAWN_PROTECT_MS, myId: myId,
-      obstacles: function () { return { walls: OBST, water: WATER }; },
+      CHARS: CHARS, CHAR_LIST: CHAR_LIST, ULT: ULT, ROLES: ROLES, ROLE_LIST: ROLE_LIST, MAPS: MAPS, roleGauge: function (c) { return roleOf(c).gaugeOnHit; }, spawnOf: ARENA_MAP.spawnOf.bind(ARENA_MAP), BODY_R: BODY_R, GAUGE_MAX: GAUGE_MAX, BOUND: BOUND, MAP_IDS: MAP_IDS, RESPAWN_MS: RESPAWN_MS, RESPAWN_PROTECT_MS: RESPAWN_PROTECT_MS, myId: myId,
+      obstacles: function () { return { walls: ARENA_MAP.obstacles, water: ARENA_MAP.water }; },
       mapTopShot: function (id, pxW, pxH) {
         if (!renderer || !KIT.propsReady) return null;
         ARENA_VIEW.useArena(id);
@@ -7764,12 +7770,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         renderer.render(scene, camera);
         return renderer.domElement.toDataURL("image/png");
       },
-      loadMapData: loadMapData, makeEnt: makeEnt, resolve: PHYSICS.resolve.bind(PHYSICS), stepWorld: WORLD.stepWorld.bind(WORLD),
+      loadMapData: ARENA_MAP.load.bind(ARENA_MAP), makeEnt: makeEnt, resolve: PHYSICS.resolve.bind(PHYSICS), stepWorld: WORLD.stepWorld.bind(WORLD),
       useUlt: ATTACK.useUlt.bind(ATTACK), fireBasic: ATTACK.fireBasic.bind(ATTACK), damage: DAMAGE.damage.bind(DAMAGE), healCut: STATUS.healCut.bind(STATUS), healAmount: STATUS.healAmount.bind(STATUS), respawnIfReady: RESPAWN.respawnIfReady.bind(RESPAWN), afflict: STATUS.afflict.bind(STATUS), speedOf: function (E) { return E.speed(); }, stunned: function (E, t) { return E.isStunned(t); },
       onShot: PROJECTILES.onShot.bind(PROJECTILES), onMelee: MELEE.onMelee.bind(MELEE), potionFlightMs: FIELD_FX.potionFlightMs.bind(FIELD_FX), meteorHitAt: FIELD_FX.meteorHitAt.bind(FIELD_FX), onEffect: FIELD_FX.onEffect.bind(FIELD_FX), onHit: DAMAGE.onHit.bind(DAMAGE),
       multiKillCount: KILLFEED.multiKillCount.bind(KILLFEED), MULTI_KILL_MS: MULTI_KILL_MS, ASSIST_MS: ASSIST_MS, onKill: DAMAGE.creditHelpAssists.bind(DAMAGE),
       hiddenFrom: VISION.hiddenFrom.bind(VISION), visibleTo: VISION.visibleTo.bind(VISION), storms: function () { return FIELD.storms; }, stormCenter: FIELD_FX.stormCenter.bind(FIELD_FX), revs: function () { return FIELD.revs; }, domains: function () { return FIELD.domains; }, graceTarget: FIELD_FX.graceTarget.bind(FIELD_FX),
-      bushTiles: function () { return BUSH.map(function (b) { return b.tiles.map(function (tl) { return { x: tileX(tl[0]), y: tileY(tl[1]) }; }); }); },
+      bushTiles: function () { return ARENA_MAP.bushes.map(function (b) { return b.tiles.map(function (tl) { return { x: ARENA_MAP.tileX(tl[0]), y: ARENA_MAP.tileY(tl[1]) }; }); }); },
       isIdle: function () { return !room; },
       timeScale: function () { return CLOCK.scale; },
       begin: function (fakeRoom, players, bots, clockMs) {
@@ -7795,14 +7801,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       room: function () { return room; }, players: function () { return P; }, screen: function () { return screenNow; },
       setConf: function (conf) { var before = CONF; CONF = conf; return before; }, setNick: function (n) { var before = nick; nick = n; return before; },
       capOf: capOf, countIn: countIn, isPlayingTeam: isPlayingTeam, takenInMatch: takenInMatch, freeCharOn: freeCharOn, onlyOneMsg: onlyOneMsg, canMoveTo: canMoveTo,
-      pickTeam: pickTeam, pickChar: pickChar, setMode: setMode, setMapChoice: setMapChoice, addAi: addAi, removeAi: removeAi, mapChoices: mapChoices, resolveArena: resolveArena, modeName: modeName,
+      pickTeam: pickTeam, pickChar: pickChar, setMode: setMode, setMapChoice: setMapChoice, addAi: addAi, removeAi: removeAi, mapChoices: mapChoices, resolveArena: ARENA_MAP.resolveArena.bind(ARENA_MAP), modeName: modeName,
       renderLobby: renderLobby, flashHint: flashHint, clearHint: function () { hintUntil = 0; hintText = ""; }, practiceMode: practiceMode, TEAM_MAX: TEAM_MAX, SPEC_MAX: SPEC_MAX, FALLBACK_CHAR: FALLBACK_CHAR, MODES: MODES,
-      tileX: tileX, tileY: tileY, fullMap: fullMap, mapRows: function () { return MAP; }, bushIds: function () { return BUSH_ID; }, bridges: function () { return BRIDGES; }, MW: MW, MH: MH, TILE: TILE, SPAWN_X: SPAWN_X,
+      tileX: ARENA_MAP.tileX.bind(ARENA_MAP), tileY: ARENA_MAP.tileY.bind(ARENA_MAP), fullMap: ARENA_MAP.fullMap.bind(ARENA_MAP), mapRows: function () { return ARENA_MAP.rows; }, bushIds: function () { return ARENA_MAP.bushId; }, bridges: function () { return ARENA_MAP.bridges; }, MW: MW, MH: MH, TILE: TILE, SPAWN_X: SPAWN_X,
       onKillFeed: KILLFEED.onKillFeed.bind(KILLFEED), multiKillTag: KILLFEED.multiKillTag.bind(KILLFEED), KILL_FEED_MAX: KILL_FEED_MAX, KILL_FEED_MS: KILL_FEED_MS,
       mvpScore: HUD.mvpScore.bind(HUD),
       setClock: function (ms) { CLOCK.testTime = ms; },
-      currentMap: function () { return ARENA; },
-      finish: function (mapId) { CLOCK.testTime = null; room = null; resetLocal(); loadMapData(mapId); }
+      currentMap: function () { return ARENA_MAP.id; },
+      finish: function (mapId) { CLOCK.testTime = null; room = null; resetLocal(); ARENA_MAP.load(mapId); }
     };
   }
   if (/[?&]test(&|$)/.test(location.search)) import("./30.team-battle-tests.js?t=" + Date.now()).then(function (m) { m.runTeamBattleTests(testHooks()); });

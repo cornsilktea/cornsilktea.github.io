@@ -2927,7 +2927,7 @@ function collectResults(api) {
       if (api.screen() !== "lobby" || el("lobbyCode").textContent !== room.code) bad.push("화면 " + api.screen() + " / 코드 표시 " + el("lobbyCode").textContent);
       if (el("btnCreate").disabled) bad.push("방을 만든 뒤에도 버튼이 잠겨 있음");
       if (room.host !== me() || room.status !== "lobby" || room.mode !== "pvp" || !api.players()[me()]) bad.push("방 상태가 구독으로 채워지지 않음: " + JSON.stringify([room.host, room.status, room.mode]));
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "코드 " + room.code + ", 일반모드·숲속 공터, 방장 나, 끊김 정리 3종 등록");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "5자리 코드, 일반모드·숲속 공터, 방장 나, 끊김 정리 3종 등록");
     });
   });
   runAsync(CONNG, "방 만들기: 이미 있는 코드와 겹치면 다른 코드로 다시 시도하고 기존 방은 건드리지 않는가", async function (done) {
@@ -3038,7 +3038,8 @@ function collectResults(api) {
       fake.put(ROOMS + "/" + code + "/players/" + me(), person("나", "red", 5, 1));
       api.enterRoom(code);
       await waitFor(function () { return fake.get(ROOMS + "/" + code + "/hostPlayerId") === me(); }, 400);
-      done(fake.get(ROOMS + "/" + code + "/hostPlayerId") === me() ? "pass" : "fail", "hostPlayerId = " + fake.get(ROOMS + "/" + code + "/hostPlayerId"));
+      var mineIsHost = fake.get(ROOMS + "/" + code + "/hostPlayerId") === me();
+      done(mineIsHost ? "pass" : "fail", mineIsHost ? "AI 방장 → 내가 방장" : "방장이 내가 아님: " + fake.get(ROOMS + "/" + code + "/hostPlayerId"));
     });
   });
 
