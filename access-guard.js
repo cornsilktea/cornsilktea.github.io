@@ -119,6 +119,24 @@
     : klass.contest ? "contest.html"
     : "index.html?c=" + klass.id;
 
+  /* 버튼이 화면 배경에서 튀지 않게, 뒤 배경이 밝으면 옅은 어두운 판·어두운 글씨,
+     어두우면 옅은 밝은 판·밝은 글씨로 칠합니다. 배경을 못 알아내면 어두운 쪽으로 봅니다. */
+  function pageBackgroundIsLight() {
+    var els = [document.body, document.documentElement];
+    for (var i = 0; i < els.length; i++) {
+      var m = /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?\)/.exec(getComputedStyle(els[i]).backgroundColor || "");
+      if (!m || (m[4] !== undefined && +m[4] < 0.5)) continue;
+      return (0.299 * m[1] + 0.587 * m[2] + 0.114 * m[3]) / 255 > 0.6;
+    }
+    return false;
+  }
+  function paintHomeButton(home) {
+    var light = pageBackgroundIsLight();
+    home.style.background = light ? "rgba(0,0,0,0.07)" : "rgba(255,255,255,0.14)";
+    home.style.color = light ? "rgba(27,43,32,0.78)" : "rgba(255,255,255,0.86)";
+    home.style.border = "1px solid " + (light ? "rgba(0,0,0,0.10)" : "rgba(255,255,255,0.18)");
+  }
+
   /* ---------- 목록으로 돌아가는 버튼 ----------
      학생 기기는 전체화면으로 열려 있어 브라우저 뒤로가기가 없습니다.
      그래서 모든 수업 자료 화면 왼쪽 위에 목록으로 가는 버튼을 띄웁니다. */
@@ -142,20 +160,20 @@
       "z-index:2147483000",
       "display:inline-flex",
       "align-items:center",
+      "justify-content:center",
       "height:32px",
-      "padding:0 12px",
-      "background:#ffffff",
-      "border:1.5px solid #24402F",
-      "border-radius:4px",
-      "color:#1B2B20",
+      "padding:2px 12px 0",
+      "box-sizing:border-box",
+      "border-radius:6px",
       "font-size:13px",
       "font-weight:600",
       "line-height:1",
       "text-decoration:none",
-      "box-shadow:0 1px 3px rgba(0,0,0,0.08)",
       "-webkit-tap-highlight-color:transparent",
       "font-family:'Nanum Gothic','Malgun Gothic','맑은 고딕',sans-serif"
     ].join(";");
+    paintHomeButton(home);
+    window.addEventListener("load", function () { paintHomeButton(home); setTimeout(function () { paintHomeButton(home); }, 1200); });
     document.body.appendChild(home);
   }
 

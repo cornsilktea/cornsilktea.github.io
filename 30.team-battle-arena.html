@@ -3,6 +3,7 @@
 <head>
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="teambattle"></script>
+<script charset="utf-8" src="fullscreen-keeper.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>3v3 팀 배틀 아레나</title>
@@ -5560,24 +5561,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   var INPUT = new InputController();
-  var FULLSCREEN_MAX_FAILS = 3;
-  class FullscreenKeeper {
-    constructor(doc) { this.doc = doc; this.fails = 0; }
-    supported() { return !!this.doc.documentElement.requestFullscreen && this.fails < FULLSCREEN_MAX_FAILS; }
-    isOn() { return !!this.doc.fullscreenElement; }
-    enter() {
-      var keeper = this;
-      if (keeper.isOn() || !keeper.supported()) return;
-      try {
-        var asked = keeper.doc.documentElement.requestFullscreen({ navigationUI: "hide" });
-        if (asked && asked.catch) asked.catch(function () { keeper.fails++; });
-      } catch (err) { keeper.fails++; }
-    }
-    onTouchRelease(e) { if (e.pointerType === "touch") this.enter(); }
-    watch() {
-      this.doc.addEventListener("pointerup", this.onTouchRelease.bind(this), true);
-    }
-  }
   INPUT.bind(cv, $("btnAtk"), $("btnUlt"));
 
   var TOUCH = !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
