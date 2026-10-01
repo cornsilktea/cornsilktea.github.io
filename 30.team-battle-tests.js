@@ -2773,6 +2773,713 @@ function collectResults(api) {
     });
   });
 
+
+  var CONNG = "방 연결", ROSTERG = "로비 규칙", LOBBYG = "로비 화면", MAPG = "맵 데이터";
+  var ROOMS = "teambattle/rooms";
+
+  var asyncQueue = [];
+  function runAsync(group, name, fn) { asyncQueue.push({ group: group, name: name, fn: fn }); }
+  function drainAsync() {
+    return asyncQueue.reduce(function (chain, t) {
+      return chain.then(function () {
+        return new Promise(function (resolve) {
+          var finished = false, timer = setTimeout(function () { finish("fail", "5초 안에 끝나지 않음"); }, 5000);
+          function finish(status, detail) { if (finished) return; finished = true; clearTimeout(timer); report(t.group, t.name, status, detail); resolve(); }
+          try {
+            var ret = t.fn(finish);
+            if (ret && ret.then) ret.then(function () { if (!finished) finish("fail", "검사가 결과를 내지 않고 끝남"); }, function (err) { finish("fail", "시험 코드 오류: " + (err && err.message)); });
+          } catch (err) { finish("fail", "시험 코드 오류: " + (err && err.message)); }
+        });
+      });
+    }, Promise.resolve());
+  }
+  function sleep(ms) { return new Promise(function (resolve) { setTimeout(resolve, ms); }); }
+  function waitFor(cond, ms) {
+    var end = Date.now() + (ms || 1500);
+    return new Promise(function (resolve) { (function poll() { if (cond()) { resolve(true); return; } if (Date.now() > end) { resolve(false); return; } setTimeout(poll, 4); })(); });
+  }
+
+  function fakeFirebase(initial) {
+    var store = initial ? JSON.parse(JSON.stringify(initial)) : {}, listeners = [], counter = 0;
+    var fb = { disconnects: [], cancelled: [], writes: [], failTransactions: false, failSets: null };
+    function clone(v) { return v === undefined || v === null ? null : JSON.parse(JSON.stringify(v)); }
+    function lastSeg(path) { var p = path.split("/"); return p[p.length - 1]; }
+    function getAt(path) {
+      var cur = store;
+      if (path) path.split("/").forEach(function (k) { cur = cur !== null && typeof cur === "object" ? cur[k] : null; if (cur === undefined) cur = null; });
+      return cur === undefined ? null : cur;
+    }
+    function setAt(path, value) {
+      var parts = path.split("/"), chain = [store], cur = store;
+      for (var i = 0; i < parts.length - 1; i++) {
+        if (cur[parts[i]] === undefined || cur[parts[i]] === null || typeof cur[parts[i]] !== "object") { if (value === null) return; cur[parts[i]] = {}; }
+        cur = cur[parts[i]]; chain.push(cur);
+      }
+      var last = parts[parts.length - 1];
+      if (value === null) delete cur[last]; else cur[last] = clone(value);
+      for (var j = chain.length - 1; j > 0; j--) if (!Object.keys(chain[j]).length) delete chain[j - 1][parts[j - 1]];
+    }
+    function snapOf(path, key, value) {
+      var v = value === undefined ? getAt(path) : value;
+      return { key: key === undefined ? lastSeg(path) : key, val: function () { return clone(v); }, exists: function () { return v !== null; }, ref: refAt(path) };
+    }
+    function fire() {
+      listeners.slice().forEach(function (l) {
+        var now = getAt(l.path), nowJson = JSON.stringify(now === undefined ? null : now);
+        if (nowJson === l.lastJson && l.started) return;
+        var started = l.started; l.started = true;
+        var before = l.lastObj, after = now !== null && typeof now === "object" ? now : {};
+        l.lastJson = nowJson; l.lastObj = clone(after) || {};
+        if (l.ev === "value") { l.fn(snapOf(l.path, undefined, now)); return; }
+        var childPath = function (k) { return l.path ? l.path + "/" + k : k; };
+        if (l.ev === "child_added") Object.keys(after).forEach(function (k) { if (!started || !(k in before)) l.fn(snapOf(childPath(k), k, after[k])); });
+        if (!started) return;
+        if (l.ev === "child_changed") Object.keys(after).forEach(function (k) { if (k in before && JSON.stringify(before[k]) !== JSON.stringify(after[k])) l.fn(snapOf(childPath(k), k, after[k])); });
+        if (l.ev === "child_removed") Object.keys(before).forEach(function (k) { if (!(k in after)) l.fn(snapOf(childPath(k), k, before[k])); });
+      });
+    }
+    function write(path, value) {
+      if (fb.failSets && fb.failSets.test(path) && value !== null) return false;
+      fb.writes.push(path); setAt(path, value === undefined ? null : value); return true;
+    }
+    function refAt(path) {
+      var seg = path.split("/");
+      return {
+        key: lastSeg(path), path: path, parent: { key: seg.length > 1 ? seg[seg.length - 2] : null },
+        child: function (p) { return refAt(path ? path + "/" + p : p); },
+        once: function () { return Promise.resolve(snapOf(path)); },
+        on: function (ev, fn) { listeners.push({ path: path, ev: ev, fn: fn, started: false, lastJson: null, lastObj: {} }); fire(); },
+        off: function (ev, fn) { listeners = listeners.filter(function (l) { return !(l.path === path && l.ev === ev && (!fn || l.fn === fn)); }); },
+        set: function (v) { if (!write(path, v)) return Promise.reject({ code: "PERMISSION_DENIED" }); fire(); return Promise.resolve(); },
+        update: function (u) {
+          var ok = true;
+          Object.keys(u).forEach(function (k) { if (!write(path ? path + "/" + k : k, u[k])) ok = false; });
+          fire();
+          return ok ? Promise.resolve() : Promise.reject({ code: "PERMISSION_DENIED" });
+        },
+        remove: function () { write(path, null); fire(); return Promise.resolve(); },
+        push: function (v) { var key = "pk" + (++counter); write(path + "/" + key, v); fire(); return { key: key }; },
+        transaction: function (fn) {
+          if (fb.failTransactions) return Promise.reject({ code: "PERMISSION_DENIED" });
+          var out = fn(clone(getAt(path)));
+          if (out === undefined) return Promise.resolve({ committed: false, snapshot: snapOf(path) });
+          write(path, out); fire();
+          return Promise.resolve({ committed: true, snapshot: snapOf(path) });
+        },
+        onDisconnect: function () {
+          return {
+            remove: function () { fb.disconnects.push(path); },
+            cancel: function () { fb.cancelled.push(path); fb.disconnects = fb.disconnects.filter(function (p) { return p !== path; }); },
+            set: function () {}
+          };
+        }
+      };
+    }
+    fb.ref = refAt;
+    fb.get = function (path) { return clone(getAt(path)); };
+    fb.put = function (path, value) { write(path, value); fire(); };
+    fb.drop = function () { fb.disconnects.slice().forEach(function (p) { write(p, null); }); fb.disconnects = []; fire(); };
+    fb.listenerCount = function () { return listeners.length; };
+    setAt(".info/connected", true);
+    return fb;
+  }
+
+  var HUMAN_CHARS = api.CHAR_LIST;
+  function person(nickname, team, joinedAt, charIndex, isAI) { return { nickname: nickname, isAI: !!isAI, team: team, characterType: HUMAN_CHARS[charIndex], joinedAt: joinedAt }; }
+  function roomTree(code, players, over) {
+    var first = Object.keys(players).filter(function (id) { return !players[id].isAI; })[0];
+    var node = { mode: "pvp", map: "forest", arena: "forest", status: "lobby", hostPlayerId: first || null, createdAt: Date.now(), timeScale: 1, players: players };
+    Object.keys(over || {}).forEach(function (k) { node[k] = over[k]; });
+    var tree = { teambattle: { rooms: {} } };
+    tree.teambattle.rooms[code] = node;
+    return tree;
+  }
+  function startMessage() { return document.getElementById("startMsg").textContent; }
+  function el(id) { return document.getElementById(id); }
+
+  async function withNet(tree, fn) {
+    var fake = fakeFirebase(tree), dbBefore = api.setDb(fake), confBefore = api.setConf({}), nickBefore = api.setNick("나"), idBefore = api.myId, timeBefore = api.CLOCK.testTime;
+    api.CLOCK.testTime = null; api.clearHint();
+    try { sessionStorage.removeItem(api.RESUME_KEY); } catch (e) {}
+    try { return await fn(fake); }
+    finally {
+      if (api.room()) api.leaveRoom();
+      api.setDb(dbBefore); api.setConf(confBefore); api.setNick(nickBefore); api.setMyId(idBefore); api.CLOCK.testTime = timeBefore;
+      try { sessionStorage.removeItem(api.RESUME_KEY); } catch (e) {}
+      el("joinCode").value = ""; el("btnCreate").disabled = false; el("btnJoin").disabled = false;
+    }
+  }
+  function me() { return api.myId; }
+  function playersIn(fake, code) { return fake.get(ROOMS + "/" + code + "/players") || {}; }
+
+  runAsync(CONNG, "방 만들기: 5자리 코드로 방이 만들어지고 나는 방장·블루팀이며 접속이 끊기면 지워지도록 등록되는가", async function (done) {
+    await withNet({}, async function (fake) {
+      var bad = [];
+      el("btnCreate").disabled = false;
+      api.createRoom();
+      if (!await waitFor(function () { return !!api.room(); })) { done("fail", "방이 안 만들어짐: " + startMessage()); return; }
+      var room = api.room(), node = fake.get(ROOMS + "/" + room.code) || {}, mine = (node.players || {})[me()] || {};
+      if (!/^\d{5}$/.test(room.code)) bad.push("코드 모양 " + room.code);
+      if (node.mode !== "pvp" || node.map !== "forest" || node.arena !== "forest" || node.status !== "lobby") bad.push("기본 설정 " + JSON.stringify([node.mode, node.map, node.arena, node.status]));
+      if (node.hostPlayerId !== me() || typeof node.createdAt !== "number" || typeof node.timeScale !== "number") bad.push("방장·시각·시간 배율 기록");
+      if (mine.team !== "blue" || mine.isAI !== false || mine.nickname !== "나" || mine.characterType !== api.FALLBACK_CHAR || typeof mine.joinedAt !== "number") bad.push("내 기록 " + JSON.stringify(mine));
+      ["players/", "ping/", "pong/"].forEach(function (k) { if (fake.disconnects.indexOf(ROOMS + "/" + room.code + "/" + k + me()) < 0) bad.push(k + " 끊김 정리가 등록 안 됨"); });
+      if (api.screen() !== "lobby" || el("lobbyCode").textContent !== room.code) bad.push("화면 " + api.screen() + " / 코드 표시 " + el("lobbyCode").textContent);
+      if (el("btnCreate").disabled) bad.push("방을 만든 뒤에도 버튼이 잠겨 있음");
+      if (room.host !== me() || room.status !== "lobby" || room.mode !== "pvp" || !api.players()[me()]) bad.push("방 상태가 구독으로 채워지지 않음: " + JSON.stringify([room.host, room.status, room.mode]));
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "5자리 코드, 일반모드·숲속 공터, 방장 나, 끊김 정리 3종 등록");
+    });
+  });
+  runAsync(CONNG, "방 만들기: 이미 있는 코드와 겹치면 다른 코드로 다시 시도하고 기존 방은 건드리지 않는가", async function (done) {
+    var taken = "23456", fresh = "34567", seq = [(23456 - 10000) / 90000 + 1e-9, (34567 - 10000) / 90000 + 1e-9], realRandom = Math.random;
+    await withNet(roomTree(taken, { other: person("남", "blue", 1, 0) }), async function (fake) {
+      Math.random = function () { return seq.length ? seq.shift() : realRandom(); };
+      try { api.createRoom(); if (!await waitFor(function () { return !!api.room(); })) { done("fail", "방이 안 만들어짐: " + startMessage()); return; } }
+      finally { Math.random = realRandom; }
+      var bad = [];
+      if (api.room().code !== fresh) bad.push("새 코드 " + api.room().code + " (기대 " + fresh + ")");
+      if (fake.get(ROOMS + "/" + taken + "/hostPlayerId") !== "other" || Object.keys(playersIn(fake, taken)).join() !== "other") bad.push("기존 방이 바뀜");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "겹친 " + taken + " 을 건너뛰고 " + fresh + " 로 만듦");
+    });
+  });
+  runAsync(CONNG, "방 만들기 실패: 연결이 없으면 안내, 데이터베이스가 거절하면 안내하고 버튼을 다시 풀어 주는가", async function (done) {
+    var bad = [];
+    await withNet({}, async function (fake) {
+      api.setDb(null);
+      api.createRoom();
+      if (startMessage().indexOf("온라인 연결을 할 수 없어요") < 0 || api.room()) bad.push("연결 없음 안내: '" + startMessage() + "'");
+      api.setDb(fake); fake.failTransactions = true;
+      api.createRoom();
+      await waitFor(function () { return startMessage().indexOf("방을 만들지 못했어요") >= 0; });
+      if (startMessage().indexOf("데이터베이스 규칙") < 0 || api.room() || el("btnCreate").disabled) bad.push("거절 안내: '" + startMessage() + "', 버튼 잠김 " + el("btnCreate").disabled);
+    });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "연결 없음·데이터베이스 거절 안내, 버튼 복구");
+  });
+
+  var JOIN_CASES = [
+    ["블루 1명 → 인원이 적은 레드", { b1: person("가", "blue", 1, 0) }, {}, "red"],
+    ["블루 1·레드 1 → 같으면 블루", { b1: person("가", "blue", 1, 0), r1: person("나", "red", 2, 1) }, {}, "blue"],
+    ["3대3 가득, 관전 비어 있음 → 관전", { b1: person("a", "blue", 1, 0), b2: person("b", "blue", 2, 1), b3: person("c", "blue", 3, 2), r1: person("d", "red", 4, 3), r2: person("e", "red", 5, 4), r3: person("f", "red", 6, 5) }, {}, "spec"],
+    ["3대3 가득·관전도 참 → 가득 찼어요", { b1: person("a", "blue", 1, 0), b2: person("b", "blue", 2, 1), b3: person("c", "blue", 3, 2), r1: person("d", "red", 4, 3), r2: person("e", "red", 5, 4), r3: person("f", "red", 6, 5), s1: person("g", "spec", 7, 6) }, {}, "방이 가득 찼어요."],
+    ["게임 중 → 관전", { b1: person("가", "blue", 1, 0), r1: person("나", "red", 2, 1) }, { status: "playing" }, "spec"],
+    ["게임 중·관전도 참", { b1: person("가", "blue", 1, 0), s1: person("관", "spec", 2, 1) }, { status: "playing" }, "게임 중이고 관전자 자리(1명)도 찼어요."],
+    ["연습모드 방", { b1: person("가", "blue", 1, 0) }, { mode: "practice" }, "혼자 연습 중인 방이라 들어갈 수 없어요."],
+    ["AI 만 있는 방", { ai1: person("AI1", "blue", 1, 0, true) }, {}, "그런 방이 없어요. 코드를 확인해 주세요."]
+  ];
+  runAsync(CONNG, "방 입장: 인원이 적은 팀 → 같으면 블루 → 가득 차면 관전 순으로 배정하고, 연습방·없는 방·가득 찬 방은 이유를 안내하는가", async function (done) {
+    var bad = [], code = "45678";
+    for (var i = 0; i < JOIN_CASES.length; i++) {
+      var c = JOIN_CASES[i];
+      await withNet(roomTree(code, c[1], c[2]), async function (fake) {
+        el("joinCode").value = "45-678 ";
+        api.joinRoom();
+        await waitFor(function () { return api.room() || startMessage(); }, 400);
+        await sleep(10);
+        var want = c[3], joined = !!api.room();
+        if (want.length <= 5 && /^(red|blue|spec)$/.test(want)) {
+          var rec = playersIn(fake, code)[me()];
+          if (!joined || !rec || rec.team !== want) bad.push(c[0] + ": 배정 " + (rec && rec.team) + " (기대 " + want + ") " + startMessage());
+          else if (rec.nickname !== "나" || rec.isAI !== false || (want !== "spec" && api.takenInMatch(playersIn(fake, code), want, rec.characterType, me()))) bad.push(c[0] + ": 기록 " + JSON.stringify(rec));
+        } else if (joined || startMessage().indexOf(want) < 0) bad.push(c[0] + ": 안내 '" + startMessage() + "' (기대 '" + want + "')");
+      });
+    }
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : JOIN_CASES.length + "가지 입장 규칙이 모두 맞음");
+  });
+
+  runAsync(CONNG, "방 입장 입력 검사: 5자리가 아니거나 연결이 없으면 입장하지 않고 안내하는가", async function (done) {
+    var bad = [];
+    await withNet(roomTree("56789", { b1: person("가", "blue", 1, 0) }), async function (fake) {
+      el("joinCode").value = "1234"; api.joinRoom();
+      if (startMessage().indexOf("방 코드 5자리") < 0 || api.room()) bad.push("4자리 안내 '" + startMessage() + "'");
+      el("joinCode").value = "abcde"; api.joinRoom();
+      if (startMessage().indexOf("방 코드 5자리") < 0) bad.push("숫자가 아닌 코드 안내 '" + startMessage() + "'");
+      el("joinCode").value = "56789"; api.setDb(null); api.joinRoom();
+      if (startMessage().indexOf("온라인 연결을 할 수 없어요") < 0 || api.room()) bad.push("연결 없음 안내 '" + startMessage() + "'");
+      api.setDb(fake);
+      el("joinCode").value = "99999"; api.joinRoom();
+      await waitFor(function () { return startMessage().indexOf("그런 방이 없어요") >= 0; }, 400);
+      if (startMessage().indexOf("그런 방이 없어요") < 0 || el("btnJoin").disabled) bad.push("없는 방 안내 '" + startMessage() + "' 버튼 잠김 " + el("btnJoin").disabled);
+    });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "자리수·숫자·연결·없는 방 안내와 버튼 복구");
+  });
+
+  runAsync(CONNG, "방장 순서(nextHost): 사람만, 블루 → 레드 → 관전 순으로, 같은 팀이면 먼저 들어온 사람인가", async function (done) {
+    var bad = [], ps = { a: person("a", "blue", 5, 0), b: person("b", "blue", 2, 1), c: person("c", "red", 1, 2), d: person("d", "spec", 0, 3), e: person("e", "blue", 0, 4, true) };
+    if (api.nextHost(ps) !== "b") bad.push("블루 먼저 " + api.nextHost(ps));
+    delete ps.a; delete ps.b;
+    if (api.nextHost(ps) !== "c") bad.push("블루가 없으면 레드 " + api.nextHost(ps));
+    delete ps.c;
+    if (api.nextHost(ps) !== "d") bad.push("관전뿐이면 관전 " + api.nextHost(ps));
+    delete ps.d;
+    if (api.nextHost(ps) !== undefined) bad.push("AI 만 있으면 없음 " + api.nextHost(ps));
+    if (api.nextHost({ x: { nickname: "x", isAI: false, team: "zzz", joinedAt: 1 }, y: person("y", "spec", 9, 0) }) !== "y") bad.push("알 수 없는 팀은 맨 뒤");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "블루 > 레드 > 관전 > 기타, 같은 팀은 입장 순, AI 제외");
+  });
+  runAsync(CONNG, "방장 이어받기: 방장이 나가도 더 우선인 사람이 있으면 그대로 두고, 내가 다음 차례일 때만 방장을 이어받는가", async function (done) {
+    var code = "11111", players = { H: person("방장", "blue", 1, 0), O: person("다른블루", "blue", 3, 1) };
+    await withNet(roomTree(code, players), async function (fake) {
+      var bad = [], mineRec = person("나", "red", 5, 2);
+      fake.put(ROOMS + "/" + code + "/players/" + me(), mineRec);
+      api.enterRoom(code);
+      await waitFor(function () { return api.players()[me()] && api.room().hostLoaded; });
+      if (api.room().host !== "H") bad.push("처음 방장 " + api.room().host);
+      fake.put(ROOMS + "/" + code + "/players/H", null);
+      await sleep(10);
+      if (fake.get(ROOMS + "/" + code + "/hostPlayerId") !== "H") bad.push("블루 O 가 먼저인데 내가 방장을 가져감");
+      fake.put(ROOMS + "/" + code + "/players/O", null);
+      await waitFor(function () { return fake.get(ROOMS + "/" + code + "/hostPlayerId") === me(); }, 400);
+      if (fake.get(ROOMS + "/" + code + "/hostPlayerId") !== me() || api.room().host !== me()) bad.push("마지막 사람인 내가 방장이 안 됨");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "H 이탈 → O 가 다음(변화 없음) → O 이탈 → 내가 방장");
+    });
+  });
+  runAsync(CONNG, "방장이 AI 로 남은 방에 들어가면 사람인 내가 방장을 이어받는가", async function (done) {
+    var code = "22222";
+    await withNet(roomTree(code, { ai1: person("AI1", "blue", 1, 0, true) }, { hostPlayerId: "ai1" }), async function (fake) {
+      fake.put(ROOMS + "/" + code + "/players/" + me(), person("나", "red", 5, 1));
+      api.enterRoom(code);
+      await waitFor(function () { return fake.get(ROOMS + "/" + code + "/hostPlayerId") === me(); }, 400);
+      var mineIsHost = fake.get(ROOMS + "/" + code + "/hostPlayerId") === me();
+      done(mineIsHost ? "pass" : "fail", mineIsHost ? "AI 방장 → 내가 방장" : "방장이 내가 아님: " + fake.get(ROOMS + "/" + code + "/hostPlayerId"));
+    });
+  });
+
+  runAsync(CONNG, "방 나가기: 마지막 사람이면 방을 지우고, 아니면 방장이 나갈 때 다음 사람에게 넘기며, 화면·상태를 처음으로 되돌리는가", async function (done) {
+    var bad = [];
+    await withNet({}, async function (fake) {
+      api.createRoom(); await waitFor(function () { return !!api.room(); });
+      var code = api.room().code;
+      api.leaveRoom();
+      await waitFor(function () { return !fake.get(ROOMS + "/" + code); }, 400);
+      if (fake.get(ROOMS + "/" + code)) bad.push("마지막 사람이 나갔는데 방이 남음");
+      if (api.room() || api.screen() !== "start" || Object.keys(api.players()).length) bad.push("나간 뒤 상태 " + api.screen());
+      if (fake.cancelled.map(String).filter(function (p) { return p.indexOf("players/" + me()) >= 0; }).length !== 1) bad.push("끊김 정리 취소가 안 됨");
+      if (sessionStorage.getItem(api.RESUME_KEY)) bad.push("이어하기 기록이 남음");
+    });
+    await withNet(roomTree("33333", { H: person("방장", "blue", 1, 0), O: person("다음", "red", 2, 1) }), async function (fake) {
+      fake.put(ROOMS + "/33333/players/" + me(), person("나", "blue", 3, 2));
+      fake.put(ROOMS + "/33333/hostPlayerId", me());
+      api.enterRoom("33333"); await waitFor(function () { return api.players()[me()]; });
+      api.leaveRoom();
+      await waitFor(function () { return fake.get(ROOMS + "/33333/hostPlayerId") === "H"; }, 400);
+      if (fake.get(ROOMS + "/33333/hostPlayerId") !== "H" || playersIn(fake, "33333")[me()]) bad.push("방장이 나갔는데 다음 사람(블루 H)에게 안 넘어감: " + fake.get(ROOMS + "/33333/hostPlayerId"));
+    });
+    await withNet(roomTree("44444", { H: person("방장", "blue", 1, 0) }), async function (fake) {
+      fake.put(ROOMS + "/44444/players/" + me(), person("나", "red", 3, 1));
+      api.enterRoom("44444"); await waitFor(function () { return api.players()[me()]; });
+      api.leaveRoom(); await sleep(20);
+      if (fake.get(ROOMS + "/44444/hostPlayerId") !== "H" || playersIn(fake, "44444")[me()]) bad.push("방장이 아닌 내가 나갔는데 방장이 바뀜");
+    });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "마지막 사람 → 방 삭제, 방장 이탈 → 다음 사람, 일반 이탈 → 방장 유지");
+  });
+  runAsync(CONNG, "방이 사라지면(방장이 지움) '방이 종료되었어요' 안내와 함께 첫 화면으로 돌아오는가", async function (done) {
+    await withNet(roomTree("55555", { H: person("방장", "blue", 1, 0) }), async function (fake) {
+      fake.put(ROOMS + "/55555/players/" + me(), person("나", "red", 3, 1));
+      api.enterRoom("55555"); await waitFor(function () { return api.players()[me()]; });
+      fake.put(ROOMS + "/55555", null);
+      await waitFor(function () { return !api.room(); }, 400);
+      var bad = [];
+      if (api.room() || api.screen() !== "start" || startMessage().indexOf("방이 종료되었어요") < 0) bad.push("화면 " + api.screen() + " 안내 '" + startMessage() + "'");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "종료 안내 + 첫 화면");
+    });
+  });
+  runAsync(CONNG, "연결이 잠깐 끊겨 내 기록이 지워지면 같은 기록으로 다시 들어가고 끊김 정리를 다시 등록하는가", async function (done) {
+    await withNet(roomTree("66666", { H: person("방장", "blue", 1, 0) }), async function (fake) {
+      var mine = person("나", "red", 3, 1), bad = [];
+      fake.put(ROOMS + "/66666/players/" + me(), mine);
+      api.enterRoom("66666"); await waitFor(function () { return api.players()[me()]; });
+      var armed = fake.disconnects.length;
+      fake.put(ROOMS + "/66666/players/" + me(), null);
+      await waitFor(function () { return playersIn(fake, "66666")[me()]; }, 600);
+      var back = playersIn(fake, "66666")[me()];
+      if (!back || JSON.stringify(back) !== JSON.stringify(mine)) bad.push("다시 들어가지 못함: " + JSON.stringify(back));
+      if (!api.room() || api.screen() !== "lobby") bad.push("방에서 쫓겨남 " + api.screen());
+      await sleep(10);
+      if (fake.disconnects.length <= armed) bad.push("끊김 정리가 다시 등록되지 않음 (" + fake.disconnects.length + " < " + armed + ")");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "같은 기록으로 복귀, 방 유지");
+    });
+  });
+
+  runAsync(CONNG, "방 상태 구독: 방 설정·방장·참가자 변화가 반영되고 상태에 따라 화면(로비·드래프트·게임)이 바뀌는가", async function (done) {
+    var code = "77777";
+    await withNet(roomTree(code, { H: person("방장", "blue", 1, 0) }), async function (fake) {
+      var bad = [], base = ROOMS + "/" + code + "/";
+      fake.put(base + "players/" + me(), person("나", "red", 3, 1));
+      api.enterRoom(code); await waitFor(function () { return api.players()[me()]; });
+      var room = api.room();
+      fake.put(base + "mode", "cup"); if (room.mode !== "cup") bad.push("모드 반영 " + room.mode);
+      fake.put(base + "map", "river"); if (room.map !== "river") bad.push("맵 반영 " + room.map);
+      fake.put(base + "hostPlayerId", me()); if (room.host !== me()) bad.push("방장 반영 " + room.host);
+      fake.put(base + "players/X", person("새", "blue", 9, 3)); if (!api.players().X) bad.push("참가자 추가 반영");
+      fake.put(base + "players/X/team", "red"); if (api.players().X.team !== "red") bad.push("참가자 변경 반영");
+      fake.put(base + "players/X", null); if (api.players().X) bad.push("참가자 삭제 반영");
+      var seen = [];
+      ["draft", "lobby", "countdown", "playing", "ended"].forEach(function (st) { fake.put(base + "status", st); seen.push(st + ":" + api.screen()); });
+      var want = "draft:draft lobby:lobby countdown:game playing:game ended:game";
+      if (seen.join(" ") !== want) bad.push("화면 전이 " + seen.join(" ") + " (기대 " + want + ")");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "모드·맵·방장·참가자 반영, 상태별 화면 " + seen.join(" "));
+    });
+  });
+
+  runAsync(CONNG, "이어하기 저장: 방에 있을 때만 코드·내 아이디·내 기록을 저장하고, 3분이 지나거나 깨진 기록은 읽지 않는가", async function (done) {
+    await withNet(roomTree("88888", { H: person("방장", "blue", 1, 0) }), async function (fake) {
+      var bad = [];
+      api.saveResume();
+      if (sessionStorage.getItem(api.RESUME_KEY)) bad.push("방 밖에서 저장됨");
+      fake.put(ROOMS + "/88888/players/" + me(), person("나", "red", 3, 1));
+      api.enterRoom("88888"); await waitFor(function () { return api.players()[me()]; });
+      api.saveResume();
+      var saved = api.readResume();
+      if (!saved || saved.code !== "88888" || saved.id !== me() || saved.me.team !== "red" || Math.abs(saved.at - Date.now()) > 2000) bad.push("저장 내용 " + JSON.stringify(saved));
+      var raw = JSON.parse(sessionStorage.getItem(api.RESUME_KEY));
+      raw.at = Date.now() - api.RESUME_MS - 1; sessionStorage.setItem(api.RESUME_KEY, JSON.stringify(raw));
+      if (api.readResume()) bad.push("오래된 기록을 읽음");
+      sessionStorage.setItem(api.RESUME_KEY, "{깨짐"); if (api.readResume()) bad.push("깨진 기록을 읽음");
+      sessionStorage.setItem(api.RESUME_KEY, JSON.stringify({ code: "1", at: Date.now() })); if (api.readResume()) bad.push("필드가 빠진 기록을 읽음");
+      api.clearResume(); if (sessionStorage.getItem(api.RESUME_KEY)) bad.push("지우기");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "방 안에서만 저장, 만료·깨짐·누락 거부, 지우기");
+    });
+  });
+  runAsync(CONNG, "이어하기 팀 정하기(resumeTeam): 로비가 아니면 그대로, 팀이 안 찼으면 그대로, 찼으면 관전, 관전도 차면 못 들어가는가", async function (done) {
+    var bad = [], mineRed = person("나", "red", 5, 0), ps = {};
+    ps[me()] = mineRed;
+    var teamFull = function (team, n) { for (var i = 0; i < n; i++) ps[team + i] = person(team + i, team, i, i + 1); };
+    if (api.resumeTeam(mineRed, ps, "playing") !== "red") bad.push("게임 중에는 그대로");
+    if (api.resumeTeam(person("관", "spec", 1, 0), ps, "lobby") !== "spec") bad.push("관전은 그대로");
+    teamFull("red", 2);
+    if (api.resumeTeam(mineRed, ps, "lobby") !== "red") bad.push("레드 2명 + 나 → 그대로");
+    teamFull("red", 3);
+    if (api.resumeTeam(mineRed, ps, "lobby") !== "spec") bad.push("레드가 찼으면 관전으로");
+    ps.spec0 = person("관", "spec", 9, 9);
+    if (api.resumeTeam(mineRed, ps, "lobby") !== null) bad.push("관전도 차면 null");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "5가지 경우가 모두 맞음");
+  });
+  runAsync(CONNG, "이어하기 입장(tryResume): 저장된 방이 있으면 같은 아이디·팀으로 다시 들어가고, 방이 없거나 가득 차면 기록을 지우고 안내하는가", async function (done) {
+    var bad = [], mine = person("나", "red", 5, 1);
+    function save(code) { sessionStorage.setItem(api.RESUME_KEY, JSON.stringify({ code: code, id: "resumeMe", me: mine, at: Date.now() })); }
+    await withNet(roomTree("90001", { H: person("방장", "blue", 1, 0) }), async function (fake) {
+      save("90001"); api.tryResume();
+      await waitFor(function () { return api.room(); }, 500);
+      var rec = playersIn(fake, "90001").resumeMe;
+      if (!api.room() || api.room().code !== "90001" || !rec || rec.team !== "red" || !api.players().resumeMe) bad.push("다시 들어가지 못함 " + JSON.stringify(rec));
+      api.leaveRoom();
+    });
+    await withNet({}, async function () {
+      save("90002"); api.tryResume();
+      await waitFor(function () { return !sessionStorage.getItem(api.RESUME_KEY); }, 500);
+      if (api.room() || sessionStorage.getItem(api.RESUME_KEY)) bad.push("없는 방인데 기록이 남음");
+    });
+    var full = { b0: person("a", "blue", 1, 0), b1: person("b", "blue", 2, 1), b2: person("c", "blue", 3, 2), r0: person("d", "red", 4, 3), r1: person("e", "red", 5, 4), r2: person("f", "red", 6, 5), s0: person("g", "spec", 7, 6) };
+    await withNet(roomTree("90003", full), async function () {
+      save("90003"); api.tryResume();
+      await waitFor(function () { return startMessage().indexOf("가득 차서") >= 0; }, 500);
+      if (api.room() || startMessage().indexOf("이전 방이 가득 차서") < 0 || sessionStorage.getItem(api.RESUME_KEY)) bad.push("가득 찬 방 안내 '" + startMessage() + "'");
+    });
+    await withNet({}, async function () {
+      api.setDb(null); save("90004"); api.tryResume();
+      if (sessionStorage.getItem(api.RESUME_KEY)) bad.push("연결이 없는데 기록이 남음");
+    });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "복귀·없는 방·가득 참·연결 없음 4가지 처리");
+  });
+
+  async function lobbyOf(fake, code, others, me0, over) {
+    var players = Object.assign({}, others), mineKey = api.myId;
+    players[mineKey] = me0;
+    fake.put(ROOMS + "/" + code, roomTree(code, players, Object.assign({ hostPlayerId: me() }, over || {})).teambattle.rooms[code]);
+    api.enterRoom(code);
+    await waitFor(function () { return api.players()[mineKey] && api.room().hostLoaded && api.screen() === "lobby"; });
+    await sleep(5);
+    return ROOMS + "/" + code + "/";
+  }
+
+  runAsync(ROSTERG, "자리 규칙 함수: 정원·인원 세기·같은 캐릭터 금지(관전 제외)·비어 있는 캐릭터 고르기·이동 가능 판정이 맞는가", async function (done) {
+    var bad = [], L = HUMAN_CHARS, ps = { a: person("a", "blue", 1, 0), b: person("b", "red", 2, 1), s: person("s", "spec", 3, 2) };
+    if (api.capOf("blue") !== api.TEAM_MAX || api.capOf("red") !== 3 || api.capOf("spec") !== api.SPEC_MAX) bad.push("정원");
+    if (api.countIn(ps, "blue") !== 1 || api.countIn(ps, "blue", "a") !== 0 || api.countIn(ps, "none") !== 0) bad.push("인원 세기");
+    if (!api.isPlayingTeam("blue") || !api.isPlayingTeam("red") || api.isPlayingTeam("spec") || api.isPlayingTeam(undefined)) bad.push("경기 팀 판정");
+    if (!api.takenInMatch(ps, "blue", L[1], "a")) bad.push("레드가 고른 캐릭터는 블루도 못 고름");
+    if (api.takenInMatch(ps, "blue", L[1], "b")) bad.push("본인 제외");
+    if (api.takenInMatch(ps, "blue", L[2], "a")) bad.push("관전이 고른 캐릭터는 막지 않음");
+    if (api.takenInMatch(ps, "spec", L[0], "x")) bad.push("관전 팀은 아무 캐릭터나");
+    if (api.freeCharOn({}, "blue", "x") !== api.FALLBACK_CHAR) bad.push("비었으면 기본 캐릭터");
+    var taken = {}; taken.t1 = { team: "blue", characterType: api.FALLBACK_CHAR };
+    var next = api.freeCharOn(taken, "red", "x");
+    if (next === api.FALLBACK_CHAR || next !== L.filter(function (c) { return c !== api.FALLBACK_CHAR; })[0]) bad.push("기본 캐릭터가 있으면 목록 순서 첫 번째 " + next);
+    var all = {}; L.forEach(function (c, i) { all["z" + i] = { team: i % 2 ? "red" : "blue", characterType: c }; });
+    if (api.freeCharOn(all, "blue", "x") !== api.FALLBACK_CHAR) bad.push("모두 찼으면 기본 캐릭터");
+    if (api.onlyOneMsg(L[0]).indexOf(api.CHARS[L[0]].name) < 0) bad.push("안내문에 캐릭터 이름");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "정원·세기·경기 팀·중복 금지·빈 캐릭터 11가지 확인");
+  });
+  runAsync(ROSTERG, "팀 이동(pickTeam): 자리가 있고 로비일 때만 옮기고, 이미 다른 팀이 고른 캐릭터면 비어 있는 캐릭터로 바꾸며 안내하는가", async function (done) {
+    var bad = [], code = "10101";
+    await withNet({}, async function (fake) {
+      var others = { r1: person("레드", "red", 1, 0), r2: person("레드2", "red", 2, 3) };
+      var base = await lobbyOf(fake, code, others, person("나", "blue", 3, 0));
+      if (api.canMoveTo("blue")) bad.push("같은 팀으로는 이동 불가");
+      api.pickTeam("red"); await sleep(20);
+      var rec = playersIn(fake, code)[me()];
+      if (rec.team !== "red") bad.push("레드로 안 옮겨짐");
+      if (rec.characterType === HUMAN_CHARS[0] || api.takenInMatch(playersIn(fake, code), "red", rec.characterType, me())) bad.push("겹친 캐릭터를 안 바꿈: " + rec.characterType);
+      if (el("startHint").textContent.indexOf("바꿨어요") < 0) bad.push("바꿈 안내 '" + el("startHint").textContent + "'");
+      fake.put(base + "players/b1", person("블1", "blue", 5, 6)); fake.put(base + "players/b2", person("블2", "blue", 6, 7)); fake.put(base + "players/b3", person("블3", "blue", 7, 8));
+      await sleep(5);
+      if (api.canMoveTo("blue")) bad.push("블루가 가득인데 이동 가능");
+      api.pickTeam("blue"); await sleep(10);
+      if (playersIn(fake, code)[me()].team !== "red") bad.push("가득 찬 팀으로 옮겨짐");
+      fake.put(base + "players/s1", person("관", "spec", 8, 9));
+      await sleep(5);
+      if (api.canMoveTo("spec")) bad.push("관전이 찼는데 이동 가능");
+      fake.put(base + "status", "playing"); await sleep(5);
+      fake.put(base + "players/b3", null); await sleep(5);
+      if (api.canMoveTo("blue")) bad.push("게임 중에는 이동 불가");
+    });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "이동·캐릭터 교체 안내·가득 참·관전 정원·게임 중 잠금");
+  });
+  runAsync(ROSTERG, "캐릭터 고르기(pickChar): 이미 다른 사람이 고른 캐릭터는 못 고르고 안내하며, 빈 캐릭터와 관전 중에는 고를 수 있는가", async function (done) {
+    var bad = [], code = "20202";
+    await withNet({}, async function (fake) {
+      var L = HUMAN_CHARS, base = await lobbyOf(fake, code, { r1: person("레드", "red", 1, 1) }, person("나", "blue", 3, 0));
+      api.pickChar(L[1]); await sleep(10);
+      if (playersIn(fake, code)[me()].characterType !== L[0]) bad.push("남이 고른 캐릭터로 바뀜");
+      if (el("startHint").textContent.indexOf("이미 다른 사람이 고른 캐릭터") < 0) bad.push("안내 '" + el("startHint").textContent + "'");
+      api.pickChar(L[2]); await sleep(10);
+      if (playersIn(fake, code)[me()].characterType !== L[2]) bad.push("빈 캐릭터를 못 고름");
+      fake.put(base + "players/" + me() + "/team", "spec"); await sleep(5);
+      api.pickChar(L[1]); await sleep(10);
+      if (playersIn(fake, code)[me()].characterType !== L[1]) bad.push("관전은 겹쳐도 고를 수 있어야 함");
+    });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "겹침 거부+안내, 빈 캐릭터 선택, 관전 예외");
+  });
+  runAsync(ROSTERG, "게임 방식·맵 고르기: 방장·로비에서만 바뀌고, 연습모드는 혼자일 때만 되며 AI 를 치우고 맵을 연습장으로 바꾸는가", async function (done) {
+    var bad = [], code = "30303";
+    await withNet({}, async function (fake) {
+      var base = await lobbyOf(fake, code, { r1: person("레드", "red", 1, 1) }, person("나", "blue", 3, 0));
+      var mode = function () { return fake.get(base + "mode"); }, map = function () { return fake.get(base + "map"); };
+      api.setMode("cup"); await sleep(5);
+      if (mode() !== "cup") bad.push("대회모드로 안 바뀜");
+      var writes = fake.writes.length; api.setMode("cup"); if (fake.writes.length !== writes) bad.push("같은 모드를 또 씀");
+      api.setMapChoice("river"); await sleep(5); if (map() !== "river") bad.push("맵 안 바뀜");
+      writes = fake.writes.length; api.setMapChoice("river"); if (fake.writes.length !== writes) bad.push("같은 맵을 또 씀");
+      api.setMode("practice"); await sleep(5);
+      if (mode() === "practice" || el("startHint").textContent.indexOf("혼자 있을 때만") < 0) bad.push("둘이 있는데 연습모드가 됨 / 안내 '" + el("startHint").textContent + "'");
+      fake.put(base + "players/r1", null); fake.put(base + "players/ai1", person("AI1", "red", 4, 2, true)); fake.put(base + "players/" + me() + "/team", "spec"); await sleep(5);
+      api.setMode("practice"); await sleep(10);
+      var ps = playersIn(fake, code);
+      if (mode() !== "practice" || map() !== "practice" || ps.ai1 || ps[me()].team !== "blue") bad.push("연습모드 전환 결과 " + JSON.stringify([mode(), map(), !!ps.ai1, ps[me()].team]));
+      api.setMode("pvp"); await sleep(5);
+      if (mode() !== "pvp" || map() !== "forest") bad.push("연습모드를 나오면 맵이 숲속으로 돌아와야 함 " + map());
+      fake.put(base + "players/h2", person("방장2", "red", 9, 3)); fake.put(base + "hostPlayerId", "h2"); await sleep(5);
+      api.setMode("cup"); api.setMapChoice("dungeon"); await sleep(5);
+      if (mode() !== "pvp" || map() !== "forest") bad.push("방장이 아닌데 바뀜");
+      fake.put(base + "hostPlayerId", me()); fake.put(base + "status", "playing"); await sleep(5);
+      api.setMode("cup"); api.setMapChoice("dungeon"); await sleep(5);
+      if (mode() !== "pvp" || map() !== "forest") bad.push("게임 중에 바뀜");
+    });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "모드·맵 변경, 연습모드 조건·정리, 방장·로비 제한");
+  });
+  runAsync(ROSTERG, "AI 추가·삭제: 방장이 팀 정원까지만 추가하고, 이름은 비어 있는 AI번호를, 캐릭터는 겹치지 않게 고르며, 사람은 삭제되지 않는가", async function (done) {
+    var bad = [], code = "40404";
+    await withNet({}, async function (fake) {
+      var base = await lobbyOf(fake, code, { r1: person("레드", "red", 1, 0) }, person("나", "blue", 3, 1));
+      for (var i = 0; i < 4; i++) { api.addAi("red"); await sleep(3); }
+      var ai = function () { var ps = playersIn(fake, code); return Object.keys(ps).filter(function (id) { return ps[id].isAI; }); };
+      if (ai().length !== 2) bad.push("레드 정원(사람 1 + AI " + ai().length + ")을 못 지킴");
+      var ps = playersIn(fake, code), names = ai().map(function (id) { return ps[id].nickname; }).sort().join();
+      if (names !== "AI1,AI2") bad.push("이름 " + names);
+      var dup = ai().some(function (id) { return api.takenInMatch(ps, "red", ps[id].characterType, id); });
+      if (dup) bad.push("AI 캐릭터가 겹침");
+      var first = ai().filter(function (id) { return ps[id].nickname === "AI1"; })[0];
+      api.removeAi(first); await sleep(5);
+      api.addAi("red"); await sleep(5);
+      ps = playersIn(fake, code);
+      if (ai().map(function (id) { return ps[id].nickname; }).sort().join() !== "AI1,AI2") bad.push("지운 번호 AI1 을 다시 쓰지 않음");
+      api.removeAi("r1"); await sleep(5);
+      if (!playersIn(fake, code).r1) bad.push("사람이 삭제됨");
+      fake.put(base + "hostPlayerId", "r1"); await sleep(5);
+      var count = ai().length; api.addAi("blue"); await sleep(5);
+      if (ai().length !== count) bad.push("방장이 아닌데 AI 추가");
+      api.removeAi(ai()[0]); await sleep(5);
+      if (ai().length !== count) bad.push("방장이 아닌데 AI 삭제");
+    });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "정원·이름·중복 없음·번호 재사용·사람 보호·방장 제한");
+  });
+  runAsync(ROSTERG, "팀 바꾸기 버튼: 방장이 누르면 블루·레드 전원이 서로 바뀌고 관전은 그대로이며 안내가 뜨는가", async function (done) {
+    var bad = [], code = "50505";
+    await withNet({}, async function (fake) {
+      var base = await lobbyOf(fake, code, { r1: person("레드", "red", 1, 1), s1: person("관", "spec", 2, 2) }, person("나", "blue", 3, 0));
+      el("btnSwapTeams").click(); await sleep(15);
+      var ps = playersIn(fake, code);
+      if (ps[me()].team !== "red" || ps.r1.team !== "blue" || ps.s1.team !== "spec") bad.push("바꾼 결과 " + [ps[me()].team, ps.r1.team, ps.s1.team].join());
+      if (el("startHint").textContent.indexOf("블루팀과 레드팀을 바꿨어요") < 0) bad.push("안내 '" + el("startHint").textContent + "'");
+      fake.put(base + "hostPlayerId", "r1"); await sleep(5);
+      el("btnSwapTeams").click(); await sleep(10);
+      if (playersIn(fake, code)[me()].team !== "red") bad.push("방장이 아닌데 바뀜");
+    });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "전원 교체·관전 유지·안내·방장 제한");
+  });
+  runAsync(ROSTERG, "맵 고르기 목록(mapChoices)·무작위 맵(resolveArena)·모드 이름이 맞는가", async function (done) {
+    var bad = [], ids = function (l) { return l.map(function (m) { return m.id; }).join(); }, real = Math.random;
+    if (ids(api.mapChoices("pvp")) !== api.MAP_IDS.concat(["random"]).join()) bad.push("일반모드 목록 " + ids(api.mapChoices("pvp")));
+    if (ids(api.mapChoices("practice")) !== api.MAP_IDS.concat(["practice"]).join()) bad.push("연습모드 목록");
+    if (api.resolveArena("river") !== "river" || api.resolveArena("practice") !== "practice") bad.push("정해진 맵은 그대로");
+    try {
+      Math.random = function () { return 0.99; }; if (api.resolveArena("random") !== api.MAP_IDS[api.MAP_IDS.length - 1]) bad.push("무작위 끝");
+      Math.random = function () { return 0; }; if (api.resolveArena("random") !== api.MAP_IDS[0] || api.resolveArena(undefined) !== api.MAP_IDS[0]) bad.push("무작위 처음");
+    } finally { Math.random = real; }
+    if (api.modeName("pvp") !== "일반모드" || api.modeName("practice") !== "연습모드" || api.modeName("cup") !== "대회모드" || api.modeName(null) !== "모드 선택 중") bad.push("모드 이름");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "목록·무작위·모드 이름 확인");
+  });
+
+  runAsync(LOBBYG, "로비 화면(방장): 시작 버튼은 양 팀에 사람이 있어야 켜지고, 인원 안내·자리 버튼·모드 버튼이 방장 기준으로 보이는가", async function (done) {
+    var bad = [], code = "60606";
+    await withNet({}, async function (fake) {
+      var base = await lobbyOf(fake, code, {}, person("나", "blue", 3, 0));
+      api.renderLobby();
+      if (el("btnStart").hidden || !el("btnStart").disabled || el("startHint").textContent.indexOf("양 팀에 1명 이상") < 0) bad.push("혼자일 때 시작 버튼 " + el("btnStart").hidden + el("btnStart").disabled + " '" + el("startHint").textContent + "'");
+      if (el("listBlue").textContent.indexOf("나") < 0 || el("listBlue").innerHTML.indexOf("👑") < 0) bad.push("블루 목록에 내 이름·방장 표시");
+      if (el("listRed").querySelectorAll("[data-ai-add=red]").length !== 3) bad.push("레드 빈 자리 AI 추가 버튼 " + el("listRed").querySelectorAll("[data-ai-add=red]").length);
+      if (!el("btnJoinBlue").hidden || el("btnJoinRed").hidden || el("btnJoinRed").disabled || el("btnSpec").hidden) bad.push("팀 이동 버튼 표시");
+      var modeOn = el("modeBtns").querySelector(".on");
+      if (!modeOn || modeOn.getAttribute("data-id") !== "pvp" || el("modeBtns").querySelector("[disabled]")) bad.push("모드 버튼 표시");
+      if (el("lobbyMode").textContent !== "일반모드 · 숲속 공터") bad.push("방식 표시 '" + el("lobbyMode").textContent + "'");
+      api.addAi("red"); await sleep(10); api.renderLobby();
+      if (el("btnStart").disabled || el("startHint").textContent !== "블루 1 vs 레드 1") bad.push("양 팀 1명씩 '" + el("startHint").textContent + "' 잠김 " + el("btnStart").disabled);
+      api.addAi("red"); await sleep(10); api.renderLobby();
+      if (el("btnStart").disabled || el("startHint").textContent.indexOf("인원이 달라요 (블루 1 vs 레드 2)") < 0) bad.push("인원 다름 안내 '" + el("startHint").textContent + "'");
+      if (el("listRed").innerHTML.indexOf("data-ai-del") < 0) bad.push("AI 빼기 버튼");
+      fake.put(base + "players/" + me() + "/team", "spec"); await sleep(10); api.renderLobby();
+      if (el("btnJoinBlue").hidden || el("btnJoinRed").hidden || !el("btnSpec").hidden) bad.push("관전일 때 버튼");
+    });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "시작 조건·인원 안내·AI 버튼·이동 버튼·모드 버튼");
+  });
+  runAsync(LOBBYG, "로비 화면(방장이 아닐 때): 시작 버튼 숨김, 모드·AI 버튼 잠김, 시작을 기다린다는 안내가 붙는가", async function (done) {
+    var bad = [], code = "70707";
+    await withNet({}, async function (fake) {
+      await lobbyOf(fake, code, { H: person("방장", "blue", 1, 1), r1: person("레드", "red", 2, 2) }, person("나", "blue", 3, 0), { hostPlayerId: "H" });
+      api.renderLobby();
+      if (!el("btnStart").hidden) bad.push("방장이 아닌데 시작 버튼 보임");
+      if (el("startHint").textContent.indexOf("방장이 시작하기를 기다리는 중… ") !== 0) bad.push("안내 '" + el("startHint").textContent + "'");
+      if (el("modeBtns").querySelectorAll(".modeBtn:not([disabled])").length) bad.push("모드 버튼이 안 잠김");
+      if (el("listBlue").querySelector("[data-ai-add]") || el("listRed").querySelector("[data-ai-add]")) bad.push("AI 추가 버튼이 보임");
+      if (!el("btnSwapTeams").hidden) bad.push("팀 바꾸기 버튼이 보임");
+      if (el("listBlue").innerHTML.indexOf("👑") < 0 || el("listBlue").innerHTML.indexOf("방장") < 0) bad.push("방장 표시");
+    });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "시작·AI·팀 바꾸기 버튼 숨김/잠김, 안내, 방장 표시");
+  });
+  runAsync(LOBBYG, "로비 화면: 같은 캐릭터를 사람이 겹쳐 고르면(AI 끼리는 제외) 시작을 막고 안내, 연습·대회모드는 모드에 맞게 표시하는가", async function (done) {
+    var bad = [], code = "80808";
+    await withNet({}, async function (fake) {
+      var base = await lobbyOf(fake, code, { r1: person("레드", "red", 2, 0) }, person("나", "blue", 3, 0));
+      api.renderLobby();
+      if (!el("btnStart").disabled || el("startHint").textContent.indexOf("같은 캐릭터(") < 0) bad.push("겹침 안내 '" + el("startHint").textContent + "'");
+      fake.put(base + "players/r1", person("AI", "red", 2, 0, true)); await sleep(10); api.renderLobby();
+      if (!el("btnStart").disabled) bad.push("사람과 AI 가 겹치면 사람 쪽이 막혀야 함");
+      fake.put(base + "players/" + me() + "/characterType", HUMAN_CHARS[5]); fake.put(base + "players/ai2", person("AI2", "red", 3, 0, true)); await sleep(10); api.renderLobby();
+      if (el("btnStart").disabled) bad.push("AI 끼리 겹치는 건 막으면 안 됨: '" + el("startHint").textContent + "'");
+      fake.put(base + "mode", "cup"); fake.put(base + "players/r1/isAI", false); await sleep(10); api.renderLobby();
+      if (el("btnStart").disabled || el("listBlue").innerHTML.indexOf('class="ch"') >= 0 || el("charHint").textContent.indexOf("대회모드에서는") < 0) bad.push("대회모드 표시(캐릭터 이름 숨김·안내) 시작 잠김 " + el("btnStart").disabled);
+      fake.put(base + "mode", "practice"); fake.put(base + "map", "practice"); await sleep(10); api.renderLobby();
+      if (el("btnStart").disabled || el("startHint").textContent.indexOf("연습 봇을 상대로") < 0 || el("listSpec").textContent.indexOf("(0/0)") < 0 || !el("btnSpec").disabled) bad.push("연습모드 표시 '" + el("startHint").textContent + "' " + el("listSpec").textContent);
+      fake.put(base + "players/" + me() + "/team", "spec"); await sleep(10); api.renderLobby();
+      if (!el("btnStart").disabled || el("startHint").textContent.indexOf("블루팀이나 레드팀으로") < 0) bad.push("연습모드에서 관전이면 안내 '" + el("startHint").textContent + "'");
+      fake.put(base + "mode", null); await sleep(10); api.renderLobby();
+      if (!el("btnStart").disabled || el("startHint").textContent.indexOf("게임 방식을 먼저") < 0) bad.push("모드 없음 안내 '" + el("startHint").textContent + "'");
+    });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "겹침·AI 예외·대회·연습·모드 없음 표시");
+  });
+  runAsync(LOBBYG, "로비 화면: 팀·관전 정원이 차면 이동 버튼이 잠기고, 관전자 목록과 일시 안내(flashHint)가 표시되는가", async function (done) {
+    var bad = [], code = "91919";
+    await withNet({}, async function (fake) {
+      var others = { b1: person("블1", "blue", 1, 1), b2: person("블2", "blue", 2, 2), b3: person("블3", "blue", 3, 3), s1: person("관전러", "spec", 4, 4) };
+      await lobbyOf(fake, code, others, person("나", "red", 5, 0), { hostPlayerId: "b1" });
+      api.renderLobby();
+      if (!el("btnJoinBlue").disabled || el("btnJoinRed").hidden === false || !el("btnSpec").disabled) bad.push("가득 찬 팀·관전 버튼 잠금 " + el("btnJoinBlue").disabled + el("btnSpec").disabled);
+      if (el("listSpec").textContent.indexOf("관전러") < 0 || el("listSpec").textContent.indexOf("(1/1)") < 0) bad.push("관전자 목록 '" + el("listSpec").textContent + "'");
+      api.flashHint("임시 안내입니다");
+      if (el("startHint").textContent !== "임시 안내입니다") bad.push("일시 안내 '" + el("startHint").textContent + "'");
+    });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "정원 잠금·관전자 목록·일시 안내");
+  });
+
+  runAsync(LOBBYG, "캐릭터 카드: 내 카드는 누르면 뒤집히고 다른 카드는 골라지며(남이 고른 카드는 잠김), 대회모드는 보기 전용이고, 모두 뒤집기·확대·Esc 가 동작하는가", async function (done) {
+    var bad = [], code = "12121";
+    await withNet({}, async function (fake) {
+      var L = HUMAN_CHARS, base = await lobbyOf(fake, code, { r1: person("레드", "red", 1, 1) }, person("나", "blue", 3, 0));
+      await sleep(10);
+      var cards = function () { return [].slice.call(el("chars").querySelectorAll(".charCard")); };
+      var card = function (c) { return cards().filter(function (b) { return b.getAttribute("data-c") === c; })[0]; };
+      var flippedCount = function () { return cards().filter(function (b) { return b.classList.contains("flip"); }).length; };
+      var myChar = function () { return playersIn(fake, code)[me()].characterType; };
+      if (cards().length !== L.length) bad.push("카드 수 " + cards().length + " (기대 " + L.length + ")");
+      if (!card(L[0]) || card(L[0]).className.indexOf(" on") < 0) bad.push("내 카드 표시");
+      card(L[0]).click();
+      if (!card(L[0]).classList.contains("flip") || myChar() !== L[0]) bad.push("내 카드를 누르면 뒤집히기만 해야 함");
+      card(L[0]).click();
+      if (card(L[0]).classList.contains("flip")) bad.push("다시 누르면 앞면");
+      card(L[2]).click(); await sleep(15);
+      if (myChar() !== L[2]) bad.push("다른 카드를 눌러도 캐릭터가 안 바뀜");
+      card(L[1]).click(); await sleep(10);
+      if (myChar() !== L[2] || !card(L[1]).disabled) bad.push("남이 고른 카드는 잠겨 있어 눌러도 안 바뀌어야 함: 캐릭터 " + myChar() + ", 잠김 " + card(L[1]).disabled);
+      el("btnFlipAll").click();
+      if (flippedCount() !== cards().length) bad.push("모두 뒤집기 " + flippedCount());
+      el("btnFlipAll").click();
+      if (flippedCount() !== 0) bad.push("다시 누르면 모두 앞면 " + flippedCount());
+      var box = el("charCardBox");
+      el("btnZoomChars").click();
+      if (!box.classList.contains("zoomed")) bad.push("확대가 안 됨");
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
+      if (box.classList.contains("zoomed")) bad.push("Esc 로 확대가 안 풀림");
+      fake.put(base + "mode", "cup"); await sleep(10); api.renderLobby();
+      card(L[3]).click(); await sleep(10);
+      if (myChar() !== L[2] || !card(L[3]).classList.contains("flip")) bad.push("대회모드는 캐릭터를 고르지 않고 뒤집기만 해야 함");
+      card(L[3]).click();
+    });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "내 카드 뒤집기·선택·남이 고른 카드 잠김·모두 뒤집기·확대·Esc·대회모드 보기 전용");
+  });
+
+  var MAP_CASES = api.MAP_IDS.concat(["practice"]);
+  MAP_CASES.forEach(function (id) {
+    run(MAPG, "맵 데이터 '" + id + "': 가로 16×세로 25 대칭, 장애물·물·다리·덤불 목록이 맵 글자와 맞고 출발 자리가 비어 있는가", function (done) {
+      api.loadMapData(id);
+      var bad = [], rows = api.mapRows(), cols = rows[0].length, half = api.MAPS[id].blueHalf;
+      if (cols !== 16 || rows.length !== half.length * 2 - 1) bad.push("크기 " + cols + "×" + rows.length);
+      rows.forEach(function (row, r) {
+        if (row.length !== cols) bad.push((r + 1) + "행 길이 " + row.length);
+        if (row !== rows[rows.length - 1 - r].split("").reverse().join("")) bad.push((r + 1) + "행이 점대칭이 아님");
+      });
+      var o = api.obstacles();
+      var blocking = 0; rows.forEach(function (row) { for (var c = 0; c < row.length; c++) if ("#xo".indexOf(row.charAt(c)) >= 0) blocking++; });
+      var areaOf = function (list) { return list.reduce(function (s, q) { return s + q.w * q.h; }, 0); };
+      if (areaOf(o.walls) !== blocking * api.TILE * api.TILE) bad.push("벽 면적이 글자 수와 다름 " + areaOf(o.walls) + " vs " + blocking * api.TILE * api.TILE);
+      var water = 0; rows.forEach(function (row) { for (var c = 0; c < row.length; c++) if (row.charAt(c) === "~") water++; });
+      if (areaOf(o.water) !== water * api.TILE * api.TILE) bad.push("물 면적");
+      var bridge = 0; rows.forEach(function (row) { for (var c = 0; c < row.length; c++) if (row.charAt(c) === "=") bridge++; });
+      if (areaOf(api.bridges()) !== bridge * api.TILE * api.TILE) bad.push("다리 면적");
+      var bush = 0; rows.forEach(function (row) { for (var c = 0; c < row.length; c++) if (row.charAt(c) === '"') bush++; });
+      var ids = api.bushIds(), tagged = 0; for (var i = 0; i < ids.length; i++) if (ids[i] !== undefined) tagged++;
+      var tiles = [].concat.apply([], api.bushTiles()).length;
+      if (tagged !== bush || tiles !== bush) bad.push("덤불 칸 수 글자 " + bush + " / 표시 " + tagged + " / 묶음 " + tiles);
+      var team;
+      ["blue", "red"].forEach(function (t) {
+        [1, 2, 3].forEach(function (slot) {
+          var sp = api.spawnOf(t, slot, id), why = blockedAt(sp.x, sp.y);
+          if (why) bad.push(t + " " + slot + "번 출발 자리가 " + why);
+        });
+      });
+      if (api.tileX(0) !== api.BOUND.l + api.TILE / 2 || api.tileY(2) !== api.BOUND.t + 2.5 * api.TILE) bad.push("칸 좌표 공식");
+      var again = JSON.stringify(api.obstacles()); api.loadMapData(id);
+      if (JSON.stringify(api.obstacles()) !== again) bad.push("같은 맵을 다시 읽으면 결과가 달라짐");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.slice(0, 4).join(" / ") : "벽 " + o.walls.length + "·물 " + o.water.length + "·덤불 " + bush + "칸, 출발 자리 6곳 비어 있음");
+    });
+  });
+  run(MAPG, "맵 데이터: 없는 맵 이름은 숲속 공터로 읽고, 반쪽 지도 합치기(fullMap)는 가운데 줄을 한 번만 쓰는가", function (done) {
+    api.loadMapData("없는맵");
+    var bad = [];
+    if (api.currentMap() !== "forest") bad.push("없는 맵 → " + api.currentMap());
+    var full = api.fullMap(["aa", "bc", "de"]);
+    if (full.join("|") !== "aa|bc|de|cb|aa") bad.push("합친 결과 " + full.join("|"));
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "숲속 공터로 대체, 합치기 aa|bc|de|cb|aa");
+  });
+  results.pending = Promise.resolve().then(function () { api.finish(api.currentMap()); }).then(drainAsync);
   return results;
 }
 
@@ -2826,9 +3533,10 @@ export function runTeamBattleTests(api) {
     var mapBefore = api.currentMap(), started = performance.now(), results;
     var retired = Object.keys(api.CHARS).filter(function (c) { return api.CHARS[c].retired; });
     retired.forEach(function (c) { api.CHARS[c].retired = false; });
+    function restore() { retired.forEach(function (c) { api.CHARS[c].retired = true; }); api.finish(mapBefore); }
     try { results = collectResults(api); }
-    finally { retired.forEach(function (c) { api.CHARS[c].retired = true; }); api.finish(mapBefore); }
-    renderPanel(results, performance.now() - started, once);
+    catch (err) { restore(); throw err; }
+    results.pending.then(function () { restore(); renderPanel(results, performance.now() - started, once); }, function (err) { restore(); throw err; });
   }
   once();
 }
