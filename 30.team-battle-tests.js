@@ -1692,6 +1692,714 @@ function collectResults(api) {
     });
   });
 
+  var DRAFTG = "드래프트", STATSG = "경기 통계 저장", CLOCKG = "시계 맞추기", FLOWG = "방 상태 전이";
+
+  function pathParts(path) { return path ? path.split("/") : []; }
+  function getPath(obj, path) {
+    var cur = obj;
+    pathParts(path).forEach(function (k) { cur = cur == null ? cur : cur[k]; });
+    return cur;
+  }
+  function setPath(obj, path, value) {
+    var parts = pathParts(path), cur = obj;
+    parts.slice(0, -1).forEach(function (k) { if (cur[k] == null || typeof cur[k] !== "object") cur[k] = {}; cur = cur[k]; });
+    var last = parts[parts.length - 1];
+    if (value === null || value === undefined) delete cur[last]; else cur[last] = JSON.parse(JSON.stringify(value));
+  }
+  function recordingRoom(over) {
+    var room = { code: "TEST", mode: "cup", map: "forest", status: "lobby", host: "pb1", startAt: null, winner: null, endedAt: null,
+                 roster: null, draft: null, arena: null, bans: null, statsNote: null, updates: [], sets: [], listeners: {} };
+    Object.keys(over || {}).forEach(function (k) { room[k] = over[k]; });
+    function node(path) {
+      return {
+        child: function (p) { return node(path ? path + "/" + p : p); },
+        update: function (u) {
+          room.updates.push({ path: path, u: JSON.parse(JSON.stringify(u)) });
+          Object.keys(u).forEach(function (k) { setPath(room, path ? path + "/" + k : k, u[k]); });
+          return Promise.resolve();
+        },
+        set: function (v) { room.sets.push({ path: path, v: v }); setPath(room, path, v); return Promise.resolve(); },
+        transaction: function (fn) {
+          var cur = getPath(room, path), out = fn(cur == null ? cur : JSON.parse(JSON.stringify(cur)));
+          if (out === undefined) return Promise.resolve({ committed: false });
+          setPath(room, path, out);
+          return Promise.resolve({ committed: true });
+        },
+        on: function (ev, fn) { room.listeners[path] = fn; }, off: function () { delete room.listeners[path]; },
+        once: function () { return Promise.resolve({ val: function () { return null; } }); }, remove: function () {}
+      };
+    }
+    room.ref = node("");
+    return room;
+  }
+  function withSeed(seed, fn) {
+    var real = Math.random, rnd = seededRandom(seed);
+    Math.random = rnd;
+    try { return fn(); } finally { Math.random = real; }
+  }
+
+  var DR = api.DRAFT, STEPS = api.DRAFT_STEPS, POSITIONS = ["b1", "b2", "b3", "r1", "r2", "r3"], DRAFT_BANS_AND_PICKS = 6;
+  function withDraft(aiPositions, fn) {
+    var players = {};
+    POSITIONS.forEach(function (k, i) {
+      players["p" + k] = { nickname: "선수" + k, isAI: (aiPositions || []).indexOf(k) >= 0, team: k.charAt(0) === "b" ? "blue" : "red", joinedAt: i + 1 };
+    });
+    var room = recordingRoom({ mode: "cup", status: "lobby" }), previousId = api.myId;
+    var S = { room: room, players: players, as: function (k) { api.setMyId("p" + k); } };
+    api.bindRoom(room, players); api.setClock(T0); S.as("b1");
+    try { return fn(S); }
+    finally { api.unbindRoom(); api.setMyId(previousId); DR.busy = false; DR.launched = 0; DR.view = null; }
+  }
+  function startDraft(S) { S.as("b1"); DR.startDraft(); S.room.status = "draft"; return S.room.draft; }
+  function tick() { DR.hostDraftTick(); DR.busy = false; }
+  function finish(S, draft) { DR.hostDraftFinish(draft || S.room.draft, api.CLOCK.now()); DR.busy = false; }
+  function playOut(S) {
+    var guard = 0, order = [];
+    while (!DR.draftDone(S.room.draft) && guard++ < 20) {
+      var d = S.room.draft, waiting = DR.draftWaiting(d, d.step);
+      order.push(d.step + ":" + waiting.join("+"));
+      waiting.forEach(function (id) { S.as(id.slice(1)); DR.draftPick(DR.draftLeft(S.room.draft)[0]); });
+    }
+    return order;
+  }
+  function launchUpdate(S) { return S.room.updates.filter(function (x) { return x.u.status === "countdown"; })[0]; }
+  function updatedCount(S) { return S.room.updates.length; }
+
+  run(DRAFTG, "진행 순서: 밴 2단계 뒤 픽 4단계(블루 1 → 레드 1·2 → 블루 2·3 → 레드 3), 단계 이름이 맞는가", function (done) {
+    var kinds = STEPS.map(function (s) { return s.ban ? "밴" : "픽"; }).join(","), sides = STEPS.map(function (s, i) { return DR.stepSide(i); }).join("");
+    var labels = STEPS.map(function (s, i) { return DR.draftStepLabel(i); }).join(" / ");
+    var ok = kinds === "밴,밴,픽,픽,픽,픽" && sides === "brbrbr" && labels === "블루 밴 / 레드 밴 / 블루 1 / 레드 1·2 / 블루 2·3 / 레드 3";
+    done(ok ? "pass" : "fail", kinds + " · 진영 " + sides + " · " + labels);
+  });
+
+  run(DRAFTG, "드래프트 시작: 팀마다 먼저 들어온 3명이 1·2·3번이 되고 0단계에서 시작하는가", function (done) {
+    withDraft([], function (S) {
+      S.players.pr1.joinedAt = 9; S.players.pr2.joinedAt = 3; S.players.pr3.joinedAt = 5;
+      var extra = { nickname: "넷째", isAI: false, team: "red", joinedAt: 99 };
+      S.players.pr4 = extra;
+      var d = startDraft(S), u = S.room.updates[0].u;
+      var seq = ["b1", "b2", "b3", "r1", "r2", "r3"].map(function (k) { return d.seq[k]; }).join(",");
+      var ok = seq === "pb1,pb2,pb3,pr2,pr3,pr1" && d.step === 0 && u.status === "draft" && u.roster === null && !!u.arena;
+      done(ok ? "pass" : "fail", "자리 순서 " + seq + ", 단계 " + d.step + ", 방 상태 " + u.status);
+    });
+  });
+
+  run(DRAFTG, "한 판 끝까지: 차례가 아닌 선수·이미 밴·고른 캐릭터·없는 캐릭터는 거부되고 결과 6픽 2밴이 겹치지 않는가", function (done) {
+    withDraft([], function (S) {
+      var L = api.CHAR_LIST, bad = [];
+      startDraft(S);
+      S.as("r2"); DR.draftPick(L[0]);
+      if (S.room.draft.bans) bad.push("차례가 아닌 선수의 밴이 들어감");
+      S.as("b1"); DR.draftPick("없는캐릭터");
+      if (S.room.draft.bans) bad.push("없는 캐릭터가 들어감");
+      DR.draftPick(L[0]);
+      if (S.room.draft.step !== 1 || S.room.draft.bans.b !== L[0]) bad.push("블루 밴이 안 들어감");
+      S.as("r1"); DR.draftPick(L[0]);
+      if (S.room.draft.bans.r) bad.push("이미 밴한 캐릭터를 또 밴함");
+      DR.draftPick(L[1]);
+      S.as("b1"); DR.draftPick(L[0]); DR.draftPick(L[1]);
+      if (S.room.draft.picks) bad.push("밴된 캐릭터를 고름");
+      DR.draftPick(L[2]);
+      S.as("r1"); DR.draftPick(L[2]);
+      if (S.room.draft.picks.pr1) bad.push("이미 고른 캐릭터를 또 고름");
+      DR.draftPick(L[3]);
+      S.as("r2"); DR.draftPick(L[3]);
+      if (S.room.draft.picks.pr2) bad.push("같은 단계 동료가 고른 캐릭터를 또 고름");
+      DR.draftPick(L[4]);
+      if (S.room.draft.step !== 4) bad.push("레드 1·2 가 끝났는데 다음 단계로 안 넘어감(" + S.room.draft.step + ")");
+      var order = playOut(S), d = S.room.draft, picked = POSITIONS.map(function (k) { return d.picks["p" + k]; });
+      var all = picked.concat([d.bans.b, d.bans.r]);
+      if (!DR.draftDone(d)) bad.push("끝나지 않음");
+      if (all.filter(function (c, i) { return all.indexOf(c) !== i; }).length) bad.push("겹치는 캐릭터 있음: " + all.join(","));
+      if (all.some(function (c) { return L.indexOf(c) < 0; })) bad.push("고를 수 없는 캐릭터가 들어감");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "밴 " + d.bans.b + "·" + d.bans.r + ", 픽 " + picked.join(",") + ", 남은 단계 " + order.join(" ") + " 까지 거부 규칙 모두 지킴");
+    });
+  });
+
+  run(DRAFTG, "차례 순서: 한 단계의 선수가 모두 골라야 다음 단계 대기자가 바뀌는가", function (done) {
+    withDraft([], function (S) {
+      startDraft(S);
+      var order = playOut(S).join(" ");
+      done(order === "0:pb1 1:pr1 2:pb1 3:pr1+pr2 4:pb2+pb3 5:pr3" ? "pass" : "fail", order);
+    });
+  });
+
+  run(DRAFTG, "나간 선수의 차례(혼자 맡은 단계, 둘 다 나간 단계)는 건너뛰는가", function (done) {
+    withDraft([], function (S) {
+      startDraft(S);
+      delete S.players.pr1;
+      S.as("b1"); DR.draftPick(api.CHAR_LIST[0]);
+      var afterBan = S.room.draft.step, skippedBan = !S.room.draft.bans.r;
+      S.as("b1"); DR.draftPick(api.CHAR_LIST[1]);
+      var afterBluePick = S.room.draft.step;
+      delete S.players.pr2;
+      DR.draftSettle(S.room.draft, T0 + 1);
+      var ok = afterBan === 2 && skippedBan && afterBluePick === 3 && S.room.draft.step === 4;
+      done(ok ? "pass" : "fail", "레드 1이 나간 뒤 블루 밴 끝나고 단계 " + afterBan + "(기대 2), 블루 픽 뒤 " + afterBluePick + "(기대 3), 레드 2도 나가면 " + S.room.draft.step + "(기대 4)");
+    });
+  });
+
+  run(DRAFTG, "시간 초과: 고민 중이던(hover) 캐릭터가 밴·픽되고, 아무것도 안 골랐으면 밴 없음·무작위 픽인가", function (done) {
+    withDraft([], function (S) {
+      var L = api.CHAR_LIST, bad = [], d = startDraft(S);
+      S.as("b1"); DR.draftHover(L[5]);
+      api.setClock(T0 + api.DRAFT_STEP_MS - 1); tick();
+      if (S.room.draft.step !== 0) bad.push("시간이 남았는데 자동으로 골라짐");
+      api.setClock(T0 + api.DRAFT_STEP_MS); tick();
+      if (S.room.draft.bans.b !== L[5]) bad.push("시간 초과 밴이 hover 가 아님: " + S.room.draft.bans.b);
+      if (S.room.draft.step !== 1) bad.push("다음 단계로 안 넘어감");
+      api.setClock(T0 + 2 * api.DRAFT_STEP_MS); tick();
+      if (S.room.draft.bans.r !== api.NO_BAN) bad.push("고민한 캐릭터 없이 시간 초과면 '밴 없음' 이어야 함: " + S.room.draft.bans.r);
+      if (DR.draftBanned(S.room.draft).length !== 1) bad.push("밴 없음이 밴 목록에 들어감");
+      api.setClock(T0 + 3 * api.DRAFT_STEP_MS); withSeed(11, tick);
+      var pick1 = S.room.draft.picks && S.room.draft.picks.pb1;
+      if (!pick1 || L.indexOf(pick1) < 0 || pick1 === L[5]) bad.push("무작위 픽이 올바르지 않음: " + pick1);
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "밴 " + L[5] + " → 밴 없음 → 무작위 픽 " + pick1);
+    });
+  });
+
+  run(DRAFTG, "AI 자동 선택: 2.5초가 지나야 움직이고, AI 는 밴 없음 없이 남은 캐릭터 중에서 고르는가", function (done) {
+    withDraft(["b1", "r1"], function (S) {
+      var bad = [];
+      startDraft(S);
+      api.setClock(T0 + api.DRAFT_AI_MS - 1); tick();
+      if (S.room.draft.bans) bad.push("AI 가 너무 일찍 고름");
+      api.setClock(T0 + api.DRAFT_AI_MS); withSeed(5, tick);
+      var banB = S.room.draft.bans && S.room.draft.bans.b;
+      if (!banB || banB === api.NO_BAN || api.CHAR_LIST.indexOf(banB) < 0) bad.push("AI 밴이 올바르지 않음: " + banB);
+      api.setClock(T0 + 2 * api.DRAFT_AI_MS); withSeed(6, tick);
+      var banR = S.room.draft.bans.r;
+      if (!banR || banR === api.NO_BAN || banR === banB) bad.push("레드 AI 밴이 올바르지 않음: " + banR);
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "AI 밴 " + banB + "·" + banR);
+    });
+  });
+
+  run(DRAFTG, "AI 만 있는 드래프트 50판: 6픽 2밴이 항상 서로 다르고 고를 수 있는 캐릭터뿐인가", function (done) {
+    var bad = [];
+    for (var seed = 1; seed <= 50 && bad.length < 3; seed++) {
+      withDraft(POSITIONS, function (S) {
+        withSeed(seed, function () {
+          startDraft(S);
+          var clock = T0, guard = 0;
+          while (!DR.draftDone(S.room.draft) && guard++ < 30) { clock += api.DRAFT_AI_MS; api.setClock(clock); tick(); }
+          var d = S.room.draft, all = POSITIONS.map(function (k) { return d.picks["p" + k]; }).concat([d.bans.b, d.bans.r]);
+          if (!DR.draftDone(d)) bad.push("시드 " + seed + ": 끝나지 않음");
+          else if (all.filter(function (c, i) { return all.indexOf(c) !== i; }).length || all.some(function (c) { return api.CHAR_LIST.indexOf(c) < 0; })) bad.push("시드 " + seed + ": " + all.join(","));
+        });
+      });
+    }
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "50판 모두 겹침·잘못된 캐릭터 없음");
+  });
+
+  function tradeScenario(aiPositions, fn) {
+    withDraft(aiPositions, function (S) { startDraft(S); playOut(S); fn(S); });
+  }
+  run(DRAFTG, "교환 자격: 같은 팀·둘 다 고른 뒤·둘 다 준비 전·진행 중인 교환 없을 때만 신청되는가", function (done) {
+    tradeScenario([], function (S) {
+      var bad = [], d = S.room.draft;
+      S.as("b2");
+      if (!DR.canTradeWith(d, "pb3")) bad.push("같은 팀 동료인데 안 됨");
+      if (DR.canTradeWith(d, "pr1")) bad.push("상대 팀과 교환됨");
+      if (DR.canTradeWith(d, "pb2")) bad.push("자기 자신과 교환됨");
+      S.as("b3"); DR.draftReady(); S.as("b2");
+      if (DR.canTradeWith(S.room.draft, "pb3")) bad.push("준비 완료한 동료와 교환됨");
+      S.as("b3"); DR.draftReady(); S.as("b2");
+      if (!DR.canTradeWith(S.room.draft, "pb3")) bad.push("준비를 취소했는데 교환이 안 됨");
+      DR.draftTradeAsk("pb3");
+      if (!S.room.draft.trade || S.room.draft.trade.from !== "pb2" || S.room.draft.trade.to !== "pb3") bad.push("교환 신청이 안 들어감");
+      S.as("b1");
+      if (DR.canTradeWith(S.room.draft, "pb2")) bad.push("이미 교환 중인 선수와 또 신청됨");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "동료만, 준비 전에만, 한 번에 하나만 신청됨");
+    });
+  });
+  run(DRAFTG, "교환 수락·거절·취소: 받은 사람만 답하고 신청한 사람만 취소하며, 수락하면 두 선수의 캐릭터가 서로 바뀌는가", function (done) {
+    tradeScenario([], function (S) {
+      var bad = [], before = JSON.parse(JSON.stringify(S.room.draft.picks));
+      S.as("b2"); DR.draftTradeAsk("pb3");
+      S.as("b1"); DR.draftTradeAnswer(true);
+      if (!S.room.draft.trade) bad.push("제3자의 수락이 먹힘");
+      S.as("b3"); DR.draftTradeCancel();
+      if (!S.room.draft.trade) bad.push("받은 사람이 취소가 됨");
+      S.as("b2"); DR.draftTradeCancel();
+      if (S.room.draft.trade) bad.push("신청한 사람이 취소 못 함");
+      DR.draftTradeAsk("pb3");
+      S.as("b3"); DR.draftTradeAnswer(false);
+      var d = S.room.draft;
+      if (d.trade || !d.denied || d.denied.to !== "pb2") bad.push("거절 기록이 없음");
+      if (JSON.stringify(d.picks) !== JSON.stringify(before)) bad.push("거절했는데 캐릭터가 바뀜");
+      S.as("b2");
+      if (DR.draftTradeBoxHtml(d).indexOf("거절") < 0) bad.push("거절 안내가 안 보임");
+      api.setClock(T0 + api.DRAFT_STEP_MS * 3);
+      if (DR.draftTradeBoxHtml(d) !== "") bad.push("거절 안내가 안 사라짐");
+      api.setClock(T0);
+      DR.draftTradeAsk("pb3");
+      S.as("b3"); DR.draftTradeAnswer(true);
+      d = S.room.draft;
+      if (d.trade || d.picks.pb2 !== before.pb3 || d.picks.pb3 !== before.pb2) bad.push("수락했는데 캐릭터가 안 바뀜");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : before.pb2 + " ↔ " + before.pb3 + " 교환 완료, 거절·취소·제3자 규칙 지킴");
+    });
+  });
+  run(DRAFTG, "준비 완료: 시작 전·팀 밖·교환 중인 선수는 못 누르고, 누르면 켜졌다 꺼지며 준비 수가 맞는가", function (done) {
+    withDraft([], function (S) {
+      var bad = [];
+      startDraft(S);
+      S.as("b1"); DR.draftReady();
+      if (S.room.draft.ready) bad.push("드래프트 중에 준비가 됨");
+      playOut(S);
+      S.players.pspec = { nickname: "구경꾼", isAI: false, team: "spec", joinedAt: 50 };
+      S.as("spec"); DR.draftReady();
+      if (S.room.draft.ready) bad.push("선수가 아닌 사람이 준비함");
+      S.as("b1"); DR.draftReady(); S.as("r2"); DR.draftReady();
+      if (DR.draftReadyCount(S.room.draft) !== 2) bad.push("준비 수 " + DR.draftReadyCount(S.room.draft));
+      DR.draftReady();
+      if (DR.draftReadyCount(S.room.draft) !== 1) bad.push("다시 눌러도 안 꺼짐");
+      S.as("b2"); DR.draftTradeAsk("pb3"); DR.draftReady();
+      if (S.room.draft.ready.pb2) bad.push("교환 중인데 준비됨");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "준비 켜기·끄기·제한 모두 맞음, 사람 수 " + DR.draftHumans(S.room.draft).length);
+    });
+  });
+  run(DRAFTG, "AI 와 교환: 신청 후 1.2초가 지나야 AI 가 수락하고, 신청 중 선수가 나가면 교환이 사라지는가", function (done) {
+    tradeScenario(["b3"], function (S) {
+      var bad = [], before = JSON.parse(JSON.stringify(S.room.draft.picks)), t = T0;
+      S.as("b2"); api.setClock(t); DR.draftTradeAsk("pb3");
+      api.setClock(t + api.DRAFT_AI_TRADE_MS - 1); finish(S);
+      if (!S.room.draft.trade) bad.push("AI 가 너무 일찍 수락함");
+      api.setClock(t + api.DRAFT_AI_TRADE_MS); finish(S);
+      var d = S.room.draft;
+      if (d.trade || d.picks.pb2 !== before.pb3 || d.picks.pb3 !== before.pb2) bad.push("AI 가 수락해서 캐릭터가 안 바뀜");
+      S.as("b1"); DR.draftTradeAsk("pb2");
+      if (!S.room.draft.trade) bad.push("두 번째 교환 신청이 안 됨");
+      delete S.players.pb2;
+      finish(S);
+      if (S.room.draft.trade) bad.push("선수가 나갔는데 교환이 남음");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "AI 수락 1.2초 뒤, 이탈 시 교환 취소");
+    });
+  });
+  run(DRAFTG, "게임 시작: 사람이 모두 준비해야 한 번만 시작하고 로스터·밴이 맞게 들어가는가", function (done) {
+    tradeScenario(["b3", "r3"], function (S) {
+      var bad = [], humans = DR.draftHumans(S.room.draft), picks = JSON.parse(JSON.stringify(S.room.draft.picks)), banned = DR.draftBanned(S.room.draft);
+      finish(S);
+      if (launchUpdate(S)) bad.push("아무도 준비 안 했는데 시작함");
+      humans.slice(0, humans.length - 1).forEach(function (id) { S.as(id.slice(1)); DR.draftReady(); });
+      finish(S);
+      if (launchUpdate(S)) bad.push("한 명이 준비 안 했는데 시작함");
+      S.as(humans[humans.length - 1].slice(1)); DR.draftReady();
+      var lastDraft = JSON.parse(JSON.stringify(S.room.draft));
+      finish(S);
+      var launched = launchUpdate(S), count = updatedCount(S);
+      if (!launched) { done("fail", "모두 준비했는데 시작 안 함 / " + bad.join(" / ")); return; }
+      finish(S, lastDraft);
+      if (updatedCount(S) !== count) bad.push("시작을 두 번 보냄");
+      var u = launched.u;
+      if (u.draft !== null && u.draft !== undefined) bad.push("시작할 때 드래프트가 지워지지 않음");
+      POSITIONS.forEach(function (k) { var r = u.roster["p" + k]; if (!r || r.c !== picks["p" + k] || r.team !== (k.charAt(0) === "b" ? "blue" : "red")) bad.push(k + " 로스터가 픽과 다름"); });
+      if (JSON.stringify(u.bans) !== JSON.stringify(banned)) bad.push("밴 목록이 다름");
+      if (!(u.startAt > 0)) bad.push("시작 시각이 없음");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "사람 " + humans.length + "명 모두 준비 후 한 번만 시작, 로스터 6명·밴 " + banned.length + "개, 상태 " + u.status);
+    });
+  });
+
+  var STATS = api.STATS;
+  function statsFixture() {
+    var roster = {}, players = {};
+    POSITIONS.forEach(function (k, i) {
+      var team = k.charAt(0) === "b" ? "blue" : "red", id = "p" + k;
+      players[id] = { nickname: "선수" + k, isAI: false, team: team, slot: (i % 3) + 1, characterType: api.CHAR_LIST[i], joinedAt: i + 1 };
+      roster[id] = { team: team, c: api.CHAR_LIST[i], ai: false };
+    });
+    return { roster: roster, players: players };
+  }
+  function withStatsEnv(fn) {
+    var scale = api.CLOCK.scale, link = api.setTestLink(false), db = api.setDb(null), previousId = api.myId;
+    api.MATCH.bots = {}; api.MATCH.remotes = {}; api.MATCH.me = null; api.MATCH.stateByKey = {};
+    api.CLOCK.scale = api.DEFAULT_SLOW;
+    try { return fn(); }
+    finally {
+      api.CLOCK.scale = scale; api.setTestLink(link); api.setDb(db); api.setMyId(previousId); api.unbindRoom();
+      api.MATCH.remotes = {}; api.MATCH.me = null; api.MATCH.stateByKey = {};
+    }
+  }
+  function fakeDb(initial) {
+    var db = { store: initial || {}, paths: [] };
+    db.ref = function (path) {
+      return { transaction: function (fn) {
+        db.paths.push(path);
+        var cur = db.store[path] === undefined ? null : JSON.parse(JSON.stringify(db.store[path])), out = fn(cur);
+        if (out === undefined) return Promise.resolve({ committed: false });
+        db.store[path] = out;
+        return Promise.resolve({ committed: true });
+      } };
+    };
+    return db;
+  }
+  function round1(v) { return Math.round(v * 10) / 10; }
+
+  var SKIP_CASES = [
+    ["일반 3대3 방(pvp·cup 아님)", "이 모드는", function (F, a) { a.mode = "3v3"; }],
+    ["연습 모드", "이 모드는", function (F, a) { a.mode = "practice"; }],
+    ["참가자 정보(roster) 없음", "참가자 정보를 못 받아서", function (F, a) { a.roster = null; }],
+    ["배포용(테스트) 링크", "배포용(테스트) 링크", function (F, a, env) { env.testLink = true; }],
+    ["옛 속도(시간 배율 1) 경기", "옛 속도", function (F, a, env) { env.scale = 1; }],
+    ["로스터에 AI 표시", "AI가 함께해서", function (F) { F.roster.pr2.ai = true; }],
+    ["참가자 목록에 AI", "AI가 함께해서", function (F) { F.players.pb3.isAI = true; }],
+    ["로스터 선수가 참가자 목록에 없음(나감)", "참가자 정보가 맞지", function (F) { delete F.players.pr1; }],
+    ["팀이 다름", "참가자 정보가 맞지", function (F) { F.players.pb1.team = "red"; }],
+    ["캐릭터가 다름", "참가자 정보가 맞지", function (F) { F.players.pb2.characterType = "zzz"; }],
+    ["존재하지 않는 캐릭터", "참가자 정보가 맞지", function (F) { F.roster.pb2.c = "zzz"; F.players.pb2.characterType = "zzz"; }],
+    ["슬롯이 없음", "참가자 정보가 맞지", function (F) { delete F.players.pr3.slot; }],
+    ["관전 팀이 섞임", "참가자 정보가 맞지", function (F) { F.roster.pr3.team = "spec"; F.players.pr3.team = "spec"; }],
+    ["블루 2명·레드 3명", "3명씩", function (F) { delete F.roster.pb3; }],
+    ["4대3", "3명씩", function (F) { F.roster.pb4 = { team: "blue", c: api.CHAR_LIST[7], ai: false }; F.players.pb4 = { team: "blue", slot: 1, characterType: api.CHAR_LIST[7], isAI: false }; }]
+  ];
+  run(STATSG, "저장 제외 판정: 모드·참가자·AI·인원·테스트 링크·옛 속도 " + SKIP_CASES.length + "가지가 정확한 사유로 걸러지는가", function (done) {
+    withStatsEnv(function () {
+      var bad = [], base = STATS.skipReason("cup", statsFixture().roster, statsFixture().players);
+      if (base !== "") bad.push("정상 6명 경기(cup)가 제외됨: " + base);
+      if (STATS.skipReason("pvp", statsFixture().roster, statsFixture().players) !== "") bad.push("정상 6명 경기(pvp)가 제외됨");
+      if (!STATS.isFullStudentMatch("cup", statsFixture().roster, statsFixture().players)) bad.push("isFullStudentMatch 가 정상 경기를 거름");
+      SKIP_CASES.forEach(function (c) {
+        var F = statsFixture(), arg = { mode: "cup", roster: F.roster }, env = { testLink: false, scale: api.DEFAULT_SLOW };
+        c[2](F, arg, env);
+        api.setTestLink(env.testLink); api.CLOCK.scale = env.scale;
+        var why = STATS.skipReason(arg.mode, arg.roster, F.players);
+        if (why.indexOf(c[1]) < 0) bad.push(c[0] + ": '" + why + "' (기대 '" + c[1] + "')");
+        if (STATS.isFullStudentMatch(arg.mode, arg.roster, F.players)) bad.push(c[0] + ": isFullStudentMatch 가 통과시킴");
+        api.setTestLink(false); api.CLOCK.scale = api.DEFAULT_SLOW;
+      });
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "정상 경기만 통과하고 " + SKIP_CASES.length + "가지 사유가 모두 제외됨");
+    });
+  });
+
+  function endedRoom(F, over) {
+    var room = recordingRoom({ mode: "cup", status: "ended", winner: "blue", endedAt: T0 + 5000, roster: F.roster });
+    Object.keys(over || {}).forEach(function (k) { room[k] = over[k]; });
+    return room;
+  }
+  function battleStats(n) { return { dmg: 100 * n + 3.3, heal: 10 * n, blocked: 5 * n + 0.04, stunDealt: 2 * n, slowDealt: n, assists: n, kills: n + 1, deaths: n }; }
+  run(STATSG, "저장 시도 조건: 방이 바뀌었거나 끝나지 않았거나 승패가 없거나 남지 않은 사람이 있으면 저장 안 하고 사유를 남기는가", function (done) {
+    withStatsEnv(function () {
+      var bad = [], F = statsFixture(), db = fakeDb();
+      api.setDb(db);
+      var room = endedRoom(F); api.bindRoom(room, F.players);
+      STATS.record(recordingRoom({ mode: "cup", status: "ended", winner: "blue", endedAt: T0 + 5000, roster: F.roster }), T0 + 5000, true);
+      if (db.paths.length) bad.push("다른 방 결과가 저장됨");
+      room.status = "playing"; STATS.record(room, T0 + 5000, true);
+      room.status = "ended"; STATS.record(room, T0 + 1, true);
+      room.winner = null; STATS.record(room, T0 + 5000, true);
+      room.winner = "blue";
+      if (db.paths.length) bad.push("끝나지 않았거나 시각·승패가 안 맞는데 저장됨");
+      STATS.record(room, T0 + 5000, false);
+      var note = room.updates.filter(function (x) { return x.u.statsNote; }).pop();
+      if (db.paths.length || !note || note.u.statsNote.indexOf("결과 창까지 남지 않은") < 0) bad.push("남지 않은 사람이 있는데 사유가 안 남음: " + (note && note.u.statsNote));
+      F.players.pb1.isAI = true;
+      STATS.record(room, T0 + 5000, true);
+      note = room.updates.filter(function (x) { return x.u.statsNote; }).pop();
+      if (db.paths.length || note.u.statsNote.indexOf("참가자 정보가 맞지") < 0) bad.push("AI 가 있는데 저장되거나 사유가 안 남음");
+      F.players.pb1.isAI = false;
+      STATS.record(room, T0 + 5000, true);
+      if (db.paths.join() !== "teambattle/modestats/cup") bad.push("정상 경기가 저장 경로 teambattle/modestats/cup 에 안 들어감: " + db.paths.join());
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "조건이 어긋나면 저장하지 않고, 정상 경기만 " + db.paths[0] + " 에 저장함");
+    });
+  });
+  run(STATSG, "통계 행 만들기와 평균 갱신: 두 경기를 저장하면 픽·승·피해·회복·막은 피해·기절·둔화·어시스트·킬·죽음이 평균으로 쌓이는가", function (done) {
+    withStatsEnv(function () {
+      var bad = [], F = statsFixture(), L = api.CHAR_LIST, db = fakeDb(), key = "teambattle/modestats/cup";
+      api.setDb(db);
+      var room = endedRoom(F, { bans: [L[8], "없는캐릭터"] }); api.bindRoom(room, F.players);
+      POSITIONS.forEach(function (k, i) { if (k !== "r3") api.MATCH.remotes["p" + k] = battleStats(i + 1); });
+      STATS.save(room, F.players);
+      var first = db.store[key];
+      room.winner = "red"; room.bans = [L[8]];
+      POSITIONS.forEach(function (k, i) { if (k !== "r3") api.MATCH.remotes["p" + k] = battleStats(i + 3); });
+      STATS.save(room, F.players);
+      var s = db.store[key], c0 = s[L[0]], c5 = s[L[5]];
+      if (first.matches !== 1 || s.matches !== 2) bad.push("경기 수 " + first.matches + "→" + s.matches);
+      if (s.blue !== 1 || s.red !== 1) bad.push("승패 블루 " + s.blue + "·레드 " + s.red);
+      if (c0.picks !== 2 || c0.wins !== 1) bad.push("블루 선수 픽·승 " + c0.picks + "·" + c0.wins);
+      if (s[L[3]].picks !== 2 || s[L[3]].wins !== 1) bad.push("레드 선수 픽·승 " + s[L[3]].picks + "·" + s[L[3]].wins);
+      var a = battleStats(1), b = battleStats(3);
+      var want = { dmg: round1((a.dmg + b.dmg) / 2), heal: round1((a.heal + b.heal) / 2), block: round1((a.blocked + b.blocked) / 2), stun: round1((a.stunDealt + b.stunDealt) / 2),
+                   slow: round1((a.slowDealt + b.slowDealt) / 2), assist: round1((a.assists + b.assists) / 2), kills: round1((a.kills + b.kills) / 2), deaths: round1((a.deaths + b.deaths) / 2) };
+      Object.keys(want).forEach(function (k) { if (c0[k] !== want[k]) bad.push(L[0] + " " + k + " " + c0[k] + " (기대 " + want[k] + ")"); });
+      if (c0.ccPicks !== 2 || c0.asPicks !== 2 || c0.kdPicks !== 2) bad.push("평균 분모 ccPicks·asPicks·kdPicks " + c0.ccPicks + "·" + c0.asPicks + "·" + c0.kdPicks);
+      if (c5.picks !== 2 || c5.dmg !== 0 || c5.kills !== 0) bad.push("전투 기록이 없는 선수(레드 3)는 0 으로 쌓여야 함: " + JSON.stringify(c5));
+      if (s[L[8]].bans !== 2 || s[L[8]].picks !== 0) bad.push("밴 횟수 " + s[L[8]].bans + " (기대 2, 없는 캐릭터 밴은 무시)");
+      if (s["없는캐릭터"]) bad.push("없는 캐릭터가 통계에 들어감");
+      var gamesBad = L.filter(function (k) { return s[k].games !== 2; });
+      if (gamesBad.length) bad.push("선택 가능 판수(games) 가 2가 아닌 캐릭터 " + gamesBad.length + "명");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "2경기 평균·승수·밴·판수가 모두 계산과 같음 (" + L[0] + " 피해 " + c0.dmg + ")");
+    });
+  });
+  run(STATSG, "옛 통계(games 칸 없음)는 지금까지 판수 + 1 로 이어 세고, 새 캐릭터는 1판째로 시작하는가", function (done) {
+    withStatsEnv(function () {
+      var bad = [], F = statsFixture(), L = api.CHAR_LIST, key = "teambattle/modestats/cup";
+      var old = {}; old.matches = 4; old[L[0]] = { picks: 4, wins: 2, dmg: 50, heal: 0 };
+      var db = fakeDb(); db.store[key] = old;
+      api.setDb(db);
+      var room = endedRoom(F); api.bindRoom(room, F.players);
+      STATS.save(room, F.players);
+      var s = db.store[key];
+      if (s[L[0]].games !== 5) bad.push("옛 칸의 판수 " + s[L[0]].games + " (기대 5)");
+      if (s[L[1]].games !== 1) bad.push("새 캐릭터 판수 " + s[L[1]].games + " (기대 1)");
+      if (s[L[0]].picks !== 5) bad.push("픽 " + s[L[0]].picks);
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "옛 4경기 뒤 5판째, 새 캐릭터는 1판째");
+    });
+  });
+  run(STATSG, "결과 창 도착 확인(watchDone): 사람이 모두 같은 종료 시각을 쓸 때만 저장하고 구독을 끊는가", function (done) {
+    withStatsEnv(function () {
+      var bad = [], F = statsFixture(), db = fakeDb();
+      var room = endedRoom(F); api.bindRoom(room, F.players);
+      api.setDb(null); STATS.watchDone(T0 + 5000);
+      if (room.listeners.done) bad.push("db 가 없는데 구독함");
+      api.setDb(db); STATS.watchDone(T0 + 5000);
+      if (!room.listeners.done) { done("fail", "구독이 안 걸림"); return; }
+      var doneMap = {};
+      POSITIONS.slice(0, 5).forEach(function (k) { doneMap["p" + k] = T0 + 5000; });
+      doneMap.pr3 = T0 + 4000;
+      room.listeners.done({ val: function () { return doneMap; } });
+      if (db.paths.length) bad.push("한 명이 다른 시각인데 저장됨");
+      doneMap.pr3 = T0 + 5000;
+      room.listeners.done({ val: function () { return doneMap; } });
+      if (db.paths.length !== 1) bad.push("모두 도착했는데 저장 횟수 " + db.paths.length);
+      if (room.listeners.done) bad.push("저장 뒤 구독을 안 끊음");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "5명 도착·1명 지연 → 대기, 6명 도착 → 저장 1번 후 구독 해제");
+    });
+  });
+  run(STATSG, "저장 중 잠금(holdActive)·결과 창 도착 기록(markStayed)이 조건대로 동작하는가", function (done) {
+    withStatsEnv(function () {
+      var bad = [], F = statsFixture();
+      var room = endedRoom(F, { statsNote: api.STATS_PENDING }); api.bindRoom(room, F.players); api.setMyId("pb2");
+      api.setClock(T0 + 5000 + api.STATS_HOLD_MAX_MS - 1);
+      if (!STATS.holdActive()) bad.push("저장 중인데 잠기지 않음");
+      api.setClock(T0 + 5000 + api.STATS_HOLD_MAX_MS);
+      if (STATS.holdActive()) bad.push("최대 시간이 지났는데 계속 잠김");
+      api.setClock(T0 + 5001); room.statsNote = "이 경기는 통계에 반영됐어요";
+      if (STATS.holdActive()) bad.push("저장이 끝났는데 잠김");
+      room.statsNote = api.STATS_PENDING; room.status = "playing";
+      if (STATS.holdActive()) bad.push("끝나지 않은 방이 잠김");
+      api.unbindRoom();
+      if (STATS.holdActive()) bad.push("방이 없는데 잠김");
+      api.bindRoom(room, F.players); room.status = "ended";
+      STATS.markStayed();
+      var mine = room.sets.filter(function (x) { return x.path === "done/pb2"; })[0];
+      if (!mine || mine.v !== T0 + 5000) bad.push("결과 창 도착 기록이 안 남음");
+      var count = room.sets.length;
+      api.setMyId("pspec"); F.players.pspec = { team: "spec", isAI: false, joinedAt: 80 };
+      STATS.markStayed();
+      delete F.roster.pb3; api.setMyId("pb3"); STATS.markStayed();
+      if (room.sets.length !== count) bad.push("선수가 아닌 사람이 도착 기록을 남김");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "잠금 " + api.STATS_HOLD_MAX_MS + "ms, 선수만 도착 기록");
+    });
+  });
+
+  function clockLink(isHostNow, roomObj) {
+    var link = { hostFlag: isHostNow, roomObj: roomObj || null, id: "me" };
+    link.isHost = function () { return link.hostFlag; }; link.room = function () { return link.roomObj; }; link.myId = function () { return link.id; };
+    return link;
+  }
+  function withDateNow(clockMs, fn) {
+    var real = Date.now, box = { t: clockMs };
+    Date.now = function () { return box.t; };
+    try { return fn(box); } finally { Date.now = real; }
+  }
+  function pong(room, a, t, host) { return { key: "me", val: function () { return { a: a, t: t, h: host || room.host }; } }; }
+
+  run(CLOCKG, "서버 시각: 호스트는 서버 오프셋, 참가자는 호스트와 맞춘 값(없으면 서버 오프셋)을 쓰는가", function (done) {
+    withDateNow(1e12, function () {
+      var bad = [], room = recordingRoom({ host: "H" }), guest = new api.GameClock(clockLink(false, room)), host = new api.GameClock(clockLink(true, room));
+      guest.serverOffset = 40; host.serverOffset = 40;
+      if (guest.real() !== 1e12 + 40) bad.push("맞추기 전 참가자 " + (guest.real() - 1e12));
+      guest.off = 250;
+      if (guest.real() !== 1e12 + 250) bad.push("맞춘 뒤 참가자 " + (guest.real() - 1e12));
+      host.off = 250;
+      if (host.real() !== 1e12 + 40) bad.push("호스트는 맞춘 값을 무시해야 함 " + (host.real() - 1e12));
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "참가자 40 → 250, 호스트 40 그대로");
+    });
+  });
+  run(CLOCKG, "왕복이 가장 짧은 표본으로 맞추는가 (onPong: 오프셋 = 호스트 시각 − (보낸 시각+받은 시각)/2)", function (done) {
+    withDateNow(0, function (box) {
+      var bad = [], room = recordingRoom({ host: "H" }), c = new api.GameClock(clockLink(false, room));
+      function receive(a, got, t) { box.t = got; c.onPong(pong(room, a, t)); }
+      receive(1000, 1300, 2000);
+      if (c.off !== 850) bad.push("첫 표본 " + c.off + " (기대 850)");
+      receive(5000, 5100, 5500);
+      if (c.off !== 450) bad.push("더 빠른 표본 " + c.off + " (기대 450)");
+      receive(9000, 9200, 9900);
+      if (c.off !== 450) bad.push("더 느린 표본이 덮어씀 " + c.off);
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "왕복 300→100→200ms 중 100ms 표본(450)을 유지");
+    });
+  });
+  run(CLOCKG, "잘못된 응답은 무시하는가 (방 없음·다른 호스트·내가 호스트·왕복 5초 초과·음수)", function (done) {
+    withDateNow(0, function (box) {
+      var bad = [], room = recordingRoom({ host: "H" }), c = new api.GameClock(clockLink(false, room));
+      box.t = 1000; c.onPong(pong(room, 900, 5000, "다른사람"));
+      box.t = 7000; c.onPong(pong(room, 1000, 5000));
+      box.t = 500; c.onPong(pong(room, 1000, 5000));
+      var asHost = new api.GameClock(clockLink(true, room)); box.t = 1100; asHost.onPong(pong(room, 1000, 5000));
+      var noRoom = new api.GameClock(clockLink(false, null)); noRoom.onPong(pong(room, 1000, 5000));
+      var empty = new api.GameClock(clockLink(false, room)); empty.onPong({ key: "me", val: function () { return null; } });
+      [["다른 호스트·5초 초과·음수", c], ["내가 호스트", asHost], ["방 없음", noRoom], ["빈 응답", empty]].forEach(function (x) { if (x[1].samples.length || x[1].off !== null) bad.push(x[0] + " 표본이 들어감"); });
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "6가지 잘못된 응답 모두 표본에 안 들어감");
+    });
+  });
+  run(CLOCKG, "표본은 최근 " + api.CLOCK_KEEP + "개만 보관해서, 가장 빨랐던 옛 표본이 밀려나면 다음 표본으로 바뀌는가", function (done) {
+    withDateNow(0, function (box) {
+      var bad = [], room = recordingRoom({ host: "H" }), c = new api.GameClock(clockLink(false, room));
+      box.t = 150; c.onPong(pong(room, 50, 1100));
+      var fastOff = c.off;
+      for (var i = 0; i < api.CLOCK_KEEP - 1; i++) { box.t = 1000 + i; c.onPong(pong(room, 600 + i, 5000)); }
+      if (c.samples.length !== api.CLOCK_KEEP || c.off !== fastOff) bad.push("꽉 찼는데 빠른 표본이 사라짐 (" + c.samples.length + "개, " + c.off + ")");
+      box.t = 2000; c.onPong(pong(room, 1500, 5000));
+      var best = c.samples.reduce(function (m, s) { return s.rtt < m.rtt ? s : m; });
+      if (c.samples.length !== api.CLOCK_KEEP || c.off !== best.off || c.off === fastOff) bad.push("옛 표본이 안 밀려남 (" + c.samples.length + "개, " + c.off + ")");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "빠른 표본 " + fastOff + " → 밀려난 뒤 " + c.off);
+    });
+  });
+  run(CLOCKG, "ping 응답: 호스트만 pong 에 자기 시각(real)과 호스트 아이디를 적고, 참가자·빈 ping 은 무시하는가", function (done) {
+    withDateNow(5000, function () {
+      var bad = [], room = recordingRoom({ host: "H" }), host = new api.GameClock(clockLink(true, room)), guest = new api.GameClock(clockLink(false, room));
+      host.serverOffset = 30; host.link.id = "H";
+      host.onPing({ key: "pX", val: function () { return { a: 4000 }; } });
+      var w = room.sets[0];
+      if (!w || w.path !== "pong/pX" || w.v.a !== 4000 || w.v.t !== 5030 || w.v.h !== "H") bad.push("pong 내용 " + JSON.stringify(w));
+      var n = room.sets.length;
+      host.onPing({ key: "pY", val: function () { return {}; } });
+      guest.onPing({ key: "pZ", val: function () { return { a: 1 }; } });
+      if (room.sets.length !== n) bad.push("무시해야 할 ping 에 답함");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "pong " + JSON.stringify(w.v));
+    });
+  });
+  run(CLOCKG, "방장이 바뀌면 표본을 지우고 새 호스트와 다시 맞추기 시작하는가 (같은 호스트면 유지, 내가 호스트면 ping 안 보냄)", function (done) {
+    withDateNow(0, function (box) {
+      var bad = [], room = recordingRoom({ host: "A" }), c = new api.GameClock(clockLink(false, room));
+      try {
+        c.resetSync("A"); box.t = 150; c.onPong(pong(room, 50, 1100, "A"));
+        c.hostChanged("A");
+        if (c.samples.length !== 1 || c.off === null) bad.push("같은 호스트인데 표본이 지워짐");
+        if (room.sets.length) bad.push("같은 호스트인데 ping 보냄");
+        c.hostChanged("B");
+        if (c.samples.length || c.off !== null || c.host !== "B") bad.push("호스트가 바뀌었는데 표본이 남음");
+        var pings = room.sets.filter(function (x) { return x.path === "ping/me"; });
+        if (pings.length !== 1) bad.push("새 호스트에게 첫 ping " + pings.length + "번");
+        c.stopBurst();
+        c.hostChanged(null);
+        if (room.sets.length !== 1) bad.push("호스트가 없는데 ping 보냄");
+        var self = new api.GameClock(clockLink(true, room)); self.hostChanged("me"); self.stopBurst();
+        if (room.sets.length !== 1) bad.push("내가 호스트인데 ping 보냄");
+      } finally { c.stopBurst(); }
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "A 유지 → B 로 바뀌면 초기화하고 ping 1번 → 없음·내가 호스트는 ping 없음");
+    });
+  });
+  run(CLOCKG, "느린 모드(배율 0.7): 경기 시작 전엔 실제 시각 그대로, 시작 뒤에만 0.7배로 흐르고 검사용 시계가 우선하는가", function (done) {
+    withDateNow(0, function (box) {
+      var bad = [], S = 1e12, room = recordingRoom({ host: "H", startAt: S }), c = new api.GameClock(clockLink(false, room));
+      c.scale = 0.7;
+      box.t = S - 500; if (c.now() !== S - 500) bad.push("시작 전 " + (c.now() - S));
+      box.t = S + 1000; var a = c.now();
+      box.t = S + 3000; var b = c.now();
+      if (a !== S + 700 || Math.round(b - a) !== 1400) bad.push("시작 뒤 0.7배 아님: " + (a - S) + ", 2초 동안 " + Math.round(b - a));
+      c.scale = 1;
+      if (c.now() !== S + 3000) bad.push("배율 1 인데 시각이 달라짐");
+      c.scale = 0.7; room.startAt = null;
+      if (c.now() !== S + 3000) bad.push("시작 시각이 없는데 배율 적용");
+      c.testTime = 77;
+      if (c.now() !== 77) bad.push("검사용 시계가 우선하지 않음");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "시작 전 그대로 · 시작 뒤 1초→0.7초 · 배율 1/시작 없음/검사 시계 처리 맞음");
+    });
+  });
+
+  function filledMatch() {
+    var m = api.MATCH, f = api.FIELD, mark = { marker: true };
+    m.game = { mark: 1 }; m.me = mark; m.bots = { a: mark }; m.remotes = { b: mark }; m.remoteShots = { c: 1 }; m.shots = [mark]; m.melee = { d: 1 }; m.fx = [mark];
+    m.handled = { e: 1 }; m.ccPending = { f: 1 }; m.stateByKey = { g: "s" }; m.hitSubs = { h: 1 }; m.lastHp = { i: 5 }; m.hudShown = { k: 9, d: 9, a: 9, dmg: 9 };
+    f.storms.push(mark); f.pools.push(mark); f.holes.push(mark); f.revs.push(mark); f.graces.push(mark); f.domains.push(mark); f.bursts.push(mark); f.lunges.push(mark); f.waves.push(mark); f.bladeSpins.push(mark);
+    f.curses.x = mark; f.poolHit.y = 1;
+  }
+  function fieldEmpty() {
+    var f = api.FIELD;
+    return ["storms", "pools", "holes", "revs", "graces", "domains", "bursts", "lunges", "waves", "bladeSpins"].every(function (k) { return f[k].length === 0; }) && !Object.keys(f.curses).length && !Object.keys(f.poolHit).length;
+  }
+  function isEmpty(v) { return Array.isArray(v) ? v.length === 0 : !Object.keys(v).length; }
+  run(FLOWG, "방을 나갈 때(MATCH.leave): 경기 중 목록·내 캐릭터·지속 효과는 비우고 처치 크레딧·HUD 기록은 남기는가", function (done) {
+    var bad = [];
+    try {
+      filledMatch(); api.MATCH.leave();
+      var m = api.MATCH;
+      if (m.game !== null || m.me !== null) bad.push("game·me 가 안 비워짐");
+      ["bots", "remotes", "remoteShots", "shots", "melee", "fx", "stateByKey", "hitSubs"].forEach(function (k) { if (!isEmpty(m[k])) bad.push(k + " 가 안 비워짐"); });
+      if (!fieldEmpty()) bad.push("지속 효과(FIELD)가 안 비워짐");
+      ["handled", "ccPending", "lastHp"].forEach(function (k) { if (isEmpty(m[k])) bad.push(k + " 는 남아 있어야 하는데 비워짐(현재 동작)"); });
+    } finally { api.MATCH.reset(); api.FIELD.reset(); }
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "8개 목록 비움, game·me null, FIELD 비움, handled·ccPending·lastHp 유지");
+  });
+  run(FLOWG, "라운드를 시작할 때(MATCH.startRound): 봇·원격·연출·처리 기록·지속 효과·HUD 기록을 비우고 game·me·투사체는 유지하는가", function (done) {
+    var bad = [];
+    try {
+      filledMatch(); api.MATCH.startRound();
+      var m = api.MATCH;
+      ["bots", "remotes", "fx", "ccPending", "handled"].forEach(function (k) { if (!isEmpty(m[k])) bad.push(k + " 가 안 비워짐"); });
+      if (JSON.stringify(m.hudShown) !== JSON.stringify({ k: -1, d: -1, a: -1, dmg: -1 })) bad.push("hudShown " + JSON.stringify(m.hudShown));
+      if (!fieldEmpty()) bad.push("지속 효과(FIELD)가 안 비워짐");
+      if (!m.game || !m.me) bad.push("game·me 가 지워짐");
+      ["shots", "remoteShots", "melee", "stateByKey", "hitSubs", "lastHp"].forEach(function (k) { if (isEmpty(m[k])) bad.push(k + " 는 유지돼야 하는데 비워짐(현재 동작)"); });
+    } finally { api.MATCH.reset(); api.FIELD.reset(); }
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "5개 목록·hudShown·FIELD 비움, game·me·shots·melee·stateByKey·hitSubs·lastHp 유지");
+  });
+  run(FLOWG, "MATCH.reset(): 모든 칸이 처음 상태로 돌아오고 처치 크레딧·HUD 기록도 초기값인가", function (done) {
+    var bad = [];
+    try {
+      filledMatch(); api.MATCH.reset();
+      var m = api.MATCH;
+      if (m.game !== null || m.me !== null) bad.push("game·me");
+      ["bots", "remotes", "remoteShots", "shots", "melee", "fx", "handled", "ccPending", "stateByKey", "hitSubs", "lastHp"].forEach(function (k) { if (!isEmpty(m[k])) bad.push(k); });
+      if (m.hudShown.k !== -1) bad.push("hudShown");
+    } finally { api.FIELD.reset(); }
+    done(bad.length ? "fail" : "pass", bad.length ? "안 비워진 칸: " + bad.join(", ") : "13개 칸이 모두 초기값");
+  });
+  run(FLOWG, "로비 → 드래프트: 지난 판 결과(로스터·승패·통계 메모·투사체)를 지우고 방 상태가 draft 로 바뀌는가", function (done) {
+    withDraft([], function (S) {
+      var bad = [];
+      S.room.roster = { x: 1 }; S.room.winner = "red"; S.room.final = { blue: 1 }; S.room.statsNote = "지난 판"; S.room.endedAt = 5; S.room.startAt = 9; S.room.shots = { z: 1 };
+      startDraft(S);
+      var u = S.room.updates[0].u;
+      if (u.status !== "draft" || S.room.status !== "draft") bad.push("상태 " + u.status);
+      ["roster", "st", "winner", "final", "statsNote", "endedAt", "startAt", "shots", "meleeHits", "hits", "effects", "kills", "projectiles"].forEach(function (k) {
+        if (!(k in u) || u[k] !== null) bad.push(k + " 가 안 지워짐");
+        if (S.room[k] != null) bad.push("방의 " + k + " 가 남음");
+      });
+      if (!u.draft || u.draft.step !== 0) bad.push("드래프트 초기값");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "13칸을 지우고 draft 상태, 단계 0");
+    });
+  });
+  run(FLOWG, "드래프트 → 카운트다운: 방 상태가 countdown 이 되고 6명의 시작 상태(st)·로스터가 만들어지며 드래프트·지난 결과는 지워지는가", function (done) {
+    tradeScenario(["b3"], function (S) {
+      var bad = [], before = Date.now();
+      POSITIONS.forEach(function (k) { if (k !== "b3") { S.as(k); DR.draftReady(); } });
+      finish(S);
+      var u = (launchUpdate(S) || {}).u;
+      if (!u) { done("fail", "시작하지 않음"); return; }
+      if (u.status !== "countdown" || S.room.status !== "countdown") bad.push("상태 " + u.status);
+      if (Object.keys(u.st).sort().join() !== "b1,b2,b3,r1,r2,r3") bad.push("시작 상태 칸 " + Object.keys(u.st).join());
+      if (u.draft !== null) bad.push("드래프트가 남음");
+      if (!(u.startAt >= before + 2900 && u.startAt <= Date.now() + 3100)) bad.push("카운트다운 3초가 아님: " + (u.startAt - before));
+      ["winner", "final", "statsNote", "endedAt", "shots", "meleeHits", "hits", "effects", "kills", "projectiles"].forEach(function (k) { if (u[k] !== null) bad.push(k + " 가 안 지워짐"); });
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "countdown, 시작 상태 6칸, 약 3초 뒤 시작");
+    });
+  });
+  run(FLOWG, "결과 → 로비(backToLobby): 방이 lobby 로 돌아가고 판 기록·연습 AI 가 지워지는가", function (done) {
+    withDraft([], function (S) {
+      var bad = [];
+      S.room.status = "ended";
+      S.players.aiPracticeBot = { team: "red", isAI: true, practiceBot: true, joinedAt: 90 };
+      api.backToLobby();
+      var u = S.room.updates[0].u;
+      if (u.status !== "lobby" || S.room.status !== "lobby") bad.push("상태 " + u.status);
+      ["winner", "final", "statsNote", "startAt", "endedAt", "roster", "draft", "bans", "st", "done", "shots", "meleeHits", "hits", "effects", "kills", "projectiles"].forEach(function (k) { if (!(k in u) || u[k] !== null) bad.push(k + " 가 안 지워짐"); });
+      if (!("players/aiPracticeBot" in u) || u["players/aiPracticeBot"] !== null) bad.push("연습 AI 가 안 지워짐");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "lobby, 16칸 + 연습 AI 삭제");
+    });
+  });
+
   return results;
 }
 
