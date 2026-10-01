@@ -33,7 +33,9 @@
   /* 대회서버: contest.html (자료 링크는 ?c=contest)
      반과 상관없이 모든 학생이 함께 들어오는 열두 번째 "반"입니다. 잠금은 portal/classes/contest 를 보고,
      제어판에서도 다른 반처럼 켜고 끄지만 CONTEST_GAMES 에 적힌 자료만 나옵니다(대회서버 화면도 마찬가지).
-     여러 반이 섞여 있으므로 반 신기록은 두지 않고 세계 신기록만 등록합니다(학년·반은 입력 창에서 고름). */
+     여러 반이 섞여 있으므로 반 신기록은 두지 않고 세계 신기록만 등록합니다(학년·반은 입력 창에서 고름).
+     진입은 반 고르기 화면 맨 아래 버튼 → contest.html, 제어판에서는 "대회서버" 버튼.
+     대회용 게임을 늘리거나 빼려면 아래 CONTEST_GAMES 한 줄만 고칩니다. */
   var CONTEST_CLASS = { id: "contest", grade: 0, cls: 0, label: "대회서버", contest: true };
   var CONTEST_GAMES = ["turbolap", "fpssurvival", "teambattle", "zombieoutbreak"];
   var ALL_CLASSES = CLASSES.concat([TEST_CLASS, CONTEST_CLASS]);

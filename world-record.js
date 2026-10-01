@@ -20,6 +20,14 @@
      · 배포용 링크(?c=test)로 들어오면 WR.noRecord 가 true: 기록은 보여 주지만 beats/beatsClass 는 항상 false,
        prompt 는 창을 띄우지 않고 null 을 돌려주므로 세계·반 신기록이 등록되지 않는다(WR.cls 도 null).
 
+   우리 반 신기록
+     · 반별 링크(?c=)로 들어오면 WorldRecord() 가 WR.cls 를 알아서 만든다(같은 모양: rec·loaded·text()·who()·beats()).
+       WR.prompt(값) 은 세계 신기록이면 학년·반·이름 창을, 우리 반 신기록만이면 이름 창을 띄운다(둘 다 등록).
+     · 저장 경로는 records/<게임>/<key>cls<학년글자><반글자> (1학년→a·2학년→b, 1반→a…5반→e. 예: allclsbc = 2학년 3반).
+       데이터베이스 규칙이 소문자 영문만 받아 숫자 대신 글자를 쓴다.
+     · 화면에는 세계 신기록 옆에 "우리 반 신기록" 칸을 hidden 으로 두고 WR.cls 가 있을 때만 보이게 한다
+       ([hidden]{display:none !important} 필요). wrBeat 로 prompt 를 가리는 게임은 WR.beatsClass(값) 도 함께 본다.
+
    옵션: lower(작을수록 좋음), format(값→문자열), key(기본 "all" — 곡별 기록처럼 여러 개면 지정)
    경로는 records/<게임>/<key> . 규칙(데이터베이스규칙.json)은 기존보다 큰 score 만 받으므로
    시간처럼 작을수록 좋은 기록은 score = LOWER_BASE - 값 으로 저장한다(lower:true. 규칙이 score >= 0 만 받으므로 음수 대신).
