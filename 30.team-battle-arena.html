@@ -2559,7 +2559,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     return [Math.round(E.x), Math.round(E.y), angDeg(E.angle), E.mv ? 1 : 0, Math.ceil(E.hp), E.alive ? 1 : 0,
       oneDecimal(E.gauge), oneDecimal(E.dmg), E.deaths || 0, E.kills || 0, Math.round(E.heal || 0), E.skillDur || ""]
       .concat(STATE_TIMES.map(function (k) { return relTime(E[k]); }))
-      .concat([E.slowUntil ? Math.round(slowMulAt(E, now()) * 100) : "", packMinions(E),
+      .concat([E.slowUntil ? Math.round(E.slowMulAt(now()) * 100) : "", packMinions(E),
                oneDecimal(E.stunDealt), oneDecimal(E.slowDealt), twoDecimals(E.slowWeight), Math.round(E.blocked || 0), E.frostStacks || "", E.shield ? 1 : "", E.assists || ""]).join(",");
   }
   function stateOf(d) {
@@ -2593,25 +2593,77 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var BURSTS = [], POOLS = [], POOL_HIT = {}, LUNGES = [], WAVES = [], HOLES = [], STORMS = [], REVS = [], GRACES = [], DOMAINS = [], CURSES = {};
   var handled = {};
 
-  function makeEnt(id, d) {
-    var c = playable(d.characterType) ? d.characterType : "ranger", pos = stateOf(d), s = pos.full ? pos : {};
-    var E = { id: id, team: d.team, char: c, nickname: d.nickname, isAI: !!d.isAI, practiceBot: !!CHARS[c].practiceBot,
-             x: pos.x, y: pos.y, angle: pos.angle, hp: s.hp == null ? CHARS[c].hp : s.hp, maxHp: CHARS[c].hp,
-             alive: s.alive !== false, gauge: s.gauge || 0, dmg: s.dmg || 0, deaths: s.deaths || 0, diedAt: s.diedAt || 0,
-             cdUntil: 0, cdDur: 0, atkAt: 0, ultUntil: 0, buffUntil: 0, stealthUntil: s.stealthUntil || 0, regenUntil: 0,
-             skillUntil: s.skillUntil || 0, skillDur: s.skillDur || 0,
-             kills: s.kills || 0, assists: s.assists || 0, heal: s.heal || 0, protectUntil: s.protectUntil || 0, hurtBy: {}, helpedBy: {},
-             stunDealt: s.stunDealt || 0, slowDealt: s.slowDealt || 0, slowWeight: s.slowWeight || 0, blocked: s.blocked || 0,
-             slowUntil: s.slowUntil || 0, slowMul: s.slowMul || 1, stunUntil: s.stunUntil || 0,
-             summonAt: s.summonAt || 0, minions: [], revealUntil: s.revealUntil || 0, frostStacks: s.frostStacks || 0, frostStackAt: s.frostStackAt || 0,
-             lastStandUsed: !!(CHARS[c].lastStandHp && s.hp != null && s.hp <= CHARS[c].lastStandHp),
-             rallyUsed: !!(CHARS[c].rally && s.hp != null && s.hp < CHARS[c].hp * CHARS[c].rally.hpRate),
-             burnUntil: s.burnUntil || 0, burnNext: 0, regenNext: 0, shield: s.hp == null ? !!CHARS[c].respawnShield : !!s.shield,
-             burst: null, volley: null, mv: false, pending: null };
-    E.maxHp = CHARS[E.char].hp;
-    if (s.minions) adoptMinions(E, s.minions, null);
-    return E;
+  class Unit {
+    isStunned(t) { return this.stunUntil > (t || now()); }
+    isSlowed(t) { return this.slowUntil > (t || now()); }
+    isProtected(t) { return this.alive && this.protectUntil > (t || now()); }
+    isStealthed(t) { t = t || now(); return this.stealthUntil > t && t >= this.stealthUntil - ULT.asDur; }
+    hasSkillActive(t) { return this.skillUntil > (t || now()); }
+    isGaugeLocked(t) { return this.hasSkillActive(t); }
+    isLancerWinding(t) { return this.char === "lancer" && this.ultUntil > (t || now()); }
+    isHammerWinding(t) { return !!this.lance && this.windUntil > (t || now()); }
+    isHammerLeaping(t) { return this.char === "blacksmith" && this.ultUntil > (t || now()); }
+    isBerserk(t) { return this.char === "warrior" && this.buffUntil > (t || now()); }
+    isRiposting(t) { return this.char === "duelist" && this.buffUntil > (t || now()); }
+    isBladeStorming(t) { return this.char === "dancer" && this.buffUntil > (t || now()); }
+    isFrostFrozen(t) { return this.isStunned(t) && this.frostStackAt > 0 && this.stunUntil - this.frostStackAt <= ULT.frFreezeMs + 20; }
+    frostStacksNow(t) { return this.frostStacks && t - this.frostStackAt <= ULT.frSlowMs ? this.frostStacks : 0; }
+    slowMulAt(t) {
+      if (!this.slows) return this.isSlowed(t) ? (this.slowMul || 1) : 1;
+      var mul = 1;
+      this.slows.forEach(function (s) { if (s.until > t && s.mul < mul) mul = s.mul; });
+      return mul;
+    }
+    hasteBonus(t) {
+      if (!(this.hasteUntil > t)) this.hasteStacks = 0;
+      return Math.min(CHARS[this.char].haste.max, (this.hasteStacks || 0) * CHARS[this.char].haste.add);
+    }
+    addHaste(t) {
+      var h = CHARS[this.char].haste;
+      this.hasteStacks = Math.min(Math.floor(h.max / h.add), (this.hasteUntil > t ? this.hasteStacks || 0 : 0) + 1);
+      this.hasteUntil = t + h.ms;
+    }
+    speed() {
+      var t = now(), c = CHARS[this.char], sp = c.speed;
+      if (this.isStunned(t) || this.isLancerWinding(t) || this.isHammerWinding(t) || this.isHammerLeaping(t) || this.dash || shoved(this) || revelationOn(this, t)) return 0;
+      if (this.char === "warrior" && this.buffUntil > t) sp = c.ultSpeed;
+      if (this.char === "rogue" && this.stealthUntil > t) sp = c.ultSpeed;
+      if (this.isBladeStorming(t)) sp = c.ultSpeed;
+      if (c.haste) sp += this.hasteBonus(t);
+      if (overcharged(this, t)) sp += ULT.ocSpeedBonus;
+      return sp * this.slowMulAt(t);
+    }
   }
+  class Fighter extends Unit {
+    constructor(id, d) {
+      super();
+      var c = playable(d.characterType) ? d.characterType : "ranger", pos = stateOf(d), s = pos.full ? pos : {};
+      var E = this; Object.assign(E, { id: id, team: d.team, char: c, nickname: d.nickname, isAI: !!d.isAI, practiceBot: !!CHARS[c].practiceBot,
+               x: pos.x, y: pos.y, angle: pos.angle, hp: s.hp == null ? CHARS[c].hp : s.hp, maxHp: CHARS[c].hp,
+               alive: s.alive !== false, gauge: s.gauge || 0, dmg: s.dmg || 0, deaths: s.deaths || 0, diedAt: s.diedAt || 0,
+               cdUntil: 0, cdDur: 0, atkAt: 0, ultUntil: 0, buffUntil: 0, stealthUntil: s.stealthUntil || 0, regenUntil: 0,
+               skillUntil: s.skillUntil || 0, skillDur: s.skillDur || 0,
+               kills: s.kills || 0, assists: s.assists || 0, heal: s.heal || 0, protectUntil: s.protectUntil || 0, hurtBy: {}, helpedBy: {},
+               stunDealt: s.stunDealt || 0, slowDealt: s.slowDealt || 0, slowWeight: s.slowWeight || 0, blocked: s.blocked || 0,
+               slowUntil: s.slowUntil || 0, slowMul: s.slowMul || 1, stunUntil: s.stunUntil || 0,
+               summonAt: s.summonAt || 0, minions: [], revealUntil: s.revealUntil || 0, frostStacks: s.frostStacks || 0, frostStackAt: s.frostStackAt || 0,
+               lastStandUsed: !!(CHARS[c].lastStandHp && s.hp != null && s.hp <= CHARS[c].lastStandHp),
+               rallyUsed: !!(CHARS[c].rally && s.hp != null && s.hp < CHARS[c].hp * CHARS[c].rally.hpRate),
+               burnUntil: s.burnUntil || 0, burnNext: 0, regenNext: 0, shield: s.hp == null ? !!CHARS[c].respawnShield : !!s.shield,
+               burst: null, volley: null, mv: false, pending: null });
+      E.maxHp = CHARS[E.char].hp;
+      if (s.minions) adoptMinions(E, s.minions, null);
+    }
+  }
+  class Minion extends Unit {
+    constructor(owner, key, born, n, x, y, angle) {
+      super();
+      Object.assign(this, { id: key, key: key, minion: true, owner: owner.id, team: owner.team, born: born, n: n, x: x, y: y, angle: angle,
+                            hp: ULT.smHp, maxHp: ULT.smHp, alive: true, atkAt: 0, cdUntil: 0, diedAt: 0, mv: false,
+                            rise: born + ULT.smRiseMs, stuck: 0, detour: 0, detourDir: 1 });
+    }
+  }
+  function makeEnt(id, d) { return new Fighter(id, d); }
   function initGame() {
     clear3d();
     G = { startAt: room.startAt, endSent: false, playingSent: false, lastNet: 0, sent: {}, finalSent: false, beeped: -1 };
@@ -2671,10 +2723,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
   function minionKey(E, born, n) { return E.id + "_" + born + "_" + n; }
   function newMinion(E, born, n, x, y, angle) {
-    var key = minionKey(E, born, n);
-    return { id: key, key: key, minion: true, owner: E.id, team: E.team, born: born, n: n, x: x, y: y, angle: angle,
-             hp: ULT.smHp, maxHp: ULT.smHp, alive: true, atkAt: 0, cdUntil: 0, diedAt: 0, mv: false,
-             rise: born + ULT.smRiseMs, stuck: 0, detour: 0, detourDir: 1 };
+    return new Minion(E, minionKey(E, born, n), born, n, x, y, angle);
   }
   function adoptMinions(E, list, k) {
     var byKey = {}, t = now();
@@ -2758,11 +2807,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
 
   function inBush(x, y) { return bushIndexAt(x, y) >= 0; }
-  function stealthed(E, t) { t = t || now(); return E.stealthUntil > t && t >= E.stealthUntil - ULT.asDur; }
-  function skillActive(E, t) { return E.skillUntil > (t || now()); }
-  function gaugeLocked(E, t) { return skillActive(E, t); }
   function skillLeft(E, t) { return E.skillDur ? clamp((E.skillUntil - t) / E.skillDur, 0, 1) : 0; }
-  function hiddenFrom(E, t) { return inBush(E.x, E.y) || stealthed(E, t) || inFriendlyStorm(E, t); }
+  function hiddenFrom(E, t) { return inBush(E.x, E.y) || E.isStealthed(t) || inFriendlyStorm(E, t); }
   function bushIndexAt(x, y) {
     var c = Math.floor((x - MAP_X0) / TILE), r = Math.floor((y - MAP_Y0) / TILE);
     if (c < 0 || r < 0 || c >= MAP_COLS || r >= MAP_ROWS) return -1;
@@ -2774,7 +2820,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (E.revealUntil > (t || now())) return true;
     var bush = bushIndexAt(E.x, E.y);
     if (bush >= 0 && bushIndexAt(viewer.x, viewer.y) !== bush) return false;
-    if ((stealthed(E, t) || inFriendlyStorm(E, t)) && hyp(E.x - viewer.x, E.y - viewer.y) > STEALTH_REVEAL_DIST) return false;
+    if ((E.isStealthed(t) || inFriendlyStorm(E, t)) && hyp(E.x - viewer.x, E.y - viewer.y) > STEALTH_REVEAL_DIST) return false;
     return true;
   }
   function visibleTo(E, viewer, t) { return !hiddenFrom(E, t) || revealedTo(E, viewer, t); }
@@ -2802,14 +2848,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       E.x = clamp(E.x, BOUND.l + BODY_R, BOUND.r - BODY_R);
       E.y = clamp(E.y, BOUND.t + BODY_R, BOUND.b - BODY_R);
     }
-  }
-  function stunned(E, t) { return E.stunUntil > (t || now()); }
-  function slowed(E, t) { return E.slowUntil > (t || now()); }
-  function slowMulAt(E, t) {
-    if (!E.slows) return slowed(E, t) ? (E.slowMul || 1) : 1;
-    var mul = 1;
-    E.slows.forEach(function (s) { if (s.until > t && s.mul < mul) mul = s.mul; });
-    return mul;
   }
   function activeSlows(T, t) {
     var list = (T.slows || []).filter(function (s) { return s.until > t; });
@@ -2862,34 +2900,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (same) same.until = Math.max(same.until, t + ms); else list.push({ mul: mul, until: t + ms });
     T.slows = list;
     T.slowUntil = Math.max.apply(null, list.map(function (s) { return s.until; }));
-    T.slowMul = slowMulAt(T, t);
-  }
-  function lancerWinding(E, t) { return E.char === "lancer" && E.ultUntil > (t || now()); }
-  function hammerWinding(E, t) { return !!E.lance && E.windUntil > (t || now()); }
-  function hammerLeaping(E, t) { return E.char === "blacksmith" && E.ultUntil > (t || now()); }
-  function speedOf(E) {
-    var t = now(), c = CHARS[E.char], sp = c.speed;
-    if (stunned(E, t) || lancerWinding(E, t) || hammerWinding(E, t) || hammerLeaping(E, t) || E.dash || shoved(E) || revelationOn(E, t)) return 0;
-    if (E.char === "warrior" && E.buffUntil > t) sp = c.ultSpeed;
-    if (E.char === "rogue" && E.stealthUntil > t) sp = c.ultSpeed;
-    if (bladeStorm(E, t)) sp = c.ultSpeed;
-    if (c.haste) sp += hasteBonus(E, t);
-    if (overcharged(E, t)) sp += ULT.ocSpeedBonus;
-    return sp * slowMulAt(E, t);
-  }
-  function hasteBonus(E, t) {
-    if (!(E.hasteUntil > t)) E.hasteStacks = 0;
-    return Math.min(CHARS[E.char].haste.max, (E.hasteStacks || 0) * CHARS[E.char].haste.add);
-  }
-  function addHaste(E, t) {
-    var h = CHARS[E.char].haste;
-    E.hasteStacks = Math.min(Math.floor(h.max / h.add), (E.hasteUntil > t ? E.hasteStacks || 0 : 0) + 1);
-    E.hasteUntil = t + h.ms;
+    T.slowMul = T.slowMulAt(t);
   }
   function afflict(T, fx, owner) {
     if (!fx || !T.alive || T.minion) return;
     var t = now();
-    if (protectedNow(T, t)) return;
+    if (T.isProtected(t)) return;
     if (fx.slowMs) addSlowCredited(T, fx.slowMul || 0.6, fx.slowMs, t, owner);
     if (fx.stunMs) {
       creditCC(owner, Math.max(0, t + fx.stunMs - Math.max(T.stunUntil || 0, t)), 0, 0);
@@ -2909,21 +2925,16 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     return { slowMs: ULT.frSlowMs, slowMul: ULT.frSlowMul - (T.frostStacks - 1) * ULT.frSlowStep };
   }
-  function frostFrozen(E, t) { return stunned(E, t) && E.frostStackAt > 0 && E.stunUntil - E.frostStackAt <= ULT.frFreezeMs + 20; }
-  function frostStacksNow(E, t) { return E.frostStacks && t - E.frostStackAt <= ULT.frSlowMs ? E.frostStacks : 0; }
   function revealBriefly(ownerId, t) {
     var A = ent(ownerId);
     if (!A || (A !== ME && !A.bot) || !hiddenFrom(A, t)) return;
     A.revealUntil = t + REVEAL_BREAK_MS;
   }
-  function berserk(E, t) { return E.char === "warrior" && E.buffUntil > (t || now()); }
-  function riposte(E, t) { return E.char === "duelist" && E.buffUntil > (t || now()); }
-  function bladeStorm(E, t) { return E.char === "dancer" && E.buffUntil > (t || now()); }
   var BLADE_STORM_TICK = {};
   function stepBladeStorms(t) {
     participants().forEach(function (id) {
       var E = ent(id);
-      if (!E || !E.alive || !bladeStorm(E, t)) { delete BLADE_STORM_TICK[id]; return; }
+      if (!E || !E.alive || !E.isBladeStorming(t)) { delete BLADE_STORM_TICK[id]; return; }
       var tick = BLADE_STORM_TICK[id];
       if (!tick || tick.until !== E.buffUntil) tick = BLADE_STORM_TICK[id] = { until: E.buffUntil, next: E.buffUntil - ULT.bwDur };
       if (t < tick.next) return;
@@ -2940,7 +2951,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     });
   }
   function payKillGaugeOwed(E, t) {
-    if (!E.killGaugeOwed || gaugeLocked(E, t)) return;
+    if (!E.killGaugeOwed || E.isGaugeLocked(t)) return;
     E.gauge = Math.min(GAUGE_MAX, E.gauge + E.killGaugeOwed);
     E.killGaugeOwed = 0;
     G.forceNet = true;
@@ -2953,7 +2964,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     room.ref.child("effects").push({ type: "revCut", owner: E.id, createdAt: t });
   }
   function breakBladeStorm(E, t) {
-    if (!bladeStorm(E, t)) return;
+    if (!E.isBladeStorming(t)) return;
     E.buffUntil = t;
     E.skillUntil = Math.min(E.skillUntil || 0, t);
     G.forceNet = true;
@@ -2997,7 +3008,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   function moveEnt(E, vx, vy, dt) {
     var m = hyp(vx, vy); if (m > 1) { vx /= m; vy /= m; }
-    var sp = speedOf(E);
+    var sp = E.speed();
     E.x += vx * sp * dt; E.y += vy * sp * dt;
     resolve(E);
   }
@@ -3078,7 +3089,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   function spawnShot(v, i) {
     var E = ent(v.ev.o);
-    if (i > 0 && E && (!E.alive || stunned(E))) return false;
+    if (i > 0 && E && (!E.alive || E.isStunned())) return false;
     var sv = v.spec, sp = sv.sp, a = v.ev.a, dx = Math.cos(a), dy = Math.sin(a);
     var ox = i > 0 && E ? E.x : v.ev.x, oy = i > 0 && E ? E.y : v.ev.y;
     addProj(v.key + "_" + i, { team: v.team, owner: v.ev.o, ownerCharacterType: v.char, x: ox + dx * 20, y: oy + dy * 20,
@@ -3122,7 +3133,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function projHit(id, p, T) {
     var d = p.d;
     p.dead = true;
-    var immune = protectedNow(T), fx = d.fx, seen = !ME || ME.team === T.team || visibleTo(T, ME);
+    var immune = T.isProtected(), fx = d.fx, seen = !ME || ME.team === T.team || visibleTo(T, ME);
     if (d.ownerCharacterType === "frost" && !d.isSkill && !immune && !T.minion) fx = frostStackFx(T);
     var dancer = d.ownerCharacterType === "dancer";
     damage(T, Math.round(d.dmg * (1 + damageBonusSum(d, T))), d.owner, dancer ? d.createdAt : !d.isSkill, d.isSkill ? d.ultKey : (d.countsAsSkill ? "skill" : null), fx);
@@ -3156,7 +3167,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }
     }
   }
-  function protectedNow(E, t) { return E.alive && E.protectUntil > (t || now()); }
   function damageMinion(M, amount, owner, basic, ultKey, gaugeGain) {
     if (!minionReady(M)) return;
     var dm = Math.min(amount, M.hp);
@@ -3169,7 +3179,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   function damage(T, amount, owner, basic, ultKey, fx, gaugeGain, noHurtGauge) {
     if (T.minion) { damageMinion(T, amount, owner, basic, ultKey, gaugeGain); return; }
-    if (protectedNow(T)) return;
+    if (T.isProtected()) return;
     var t = now(), unguarded = amount, C = CHARS[T.char];
     if (T.shield && amount > 0) { amount = 0; T.shield = false; spark(T.x, T.y, SHIELD_SPARK, 1.5); }
     if (T.char === "knight" && T.buffUntil > t) amount = Math.round(amount * ULT.tkDef);
@@ -3186,7 +3196,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (amount > 0) noteHurt(T, owner, t);
     var dm = Math.min(amount, T.hp), killed = false;
     T.taken = (T.taken || 0) + dm;
-    T.hp -= dm; if (!noHurtGauge && !gaugeLocked(T)) T.gauge = Math.min(GAUGE_MAX, T.gauge + roleOf(T.char).gaugeOnHurt);
+    T.hp -= dm; if (!noHurtGauge && !T.isGaugeLocked()) T.gauge = Math.min(GAUGE_MAX, T.gauge + roleOf(T.char).gaugeOnHurt);
     if (T.hp <= 0) { killed = true; T.hp = 0; T.alive = false; T.deaths++; T.diedAt = now(); T.burst = null; T.volley = null; T.slash = null; T.regenUntil = 0; T.skillUntil = 0; T.slowUntil = 0; T.slows = null; T.stunUntil = 0; T.lance = null; T.frostStacks = 0; T.hasteUntil = 0; T.hasteStacks = 0; T.burnUntil = 0; T.burnNext = 0; T.regenNext = 0; if (T === ME) { sfx("down"); aim.id = null; joy.id = null; } }
     else {
       if (T === ME) sfx("hit");
@@ -3327,29 +3337,29 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (h.as) owner.assists = (owner.assists || 0) + 1;
       if (h.zap && owner.char === "stormbow") stormZap(owner, h.zap, h.t);
       if (h.k && owner.char === "dancer") {
-        if (gaugeLocked(owner)) owner.killGaugeOwed = (owner.killGaugeOwed || 0) + ULT.bwKillGauge;
+        if (owner.isGaugeLocked()) owner.killGaugeOwed = (owner.killGaugeOwed || 0) + ULT.bwKillGauge;
         else owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.bwKillGauge);
       }
       if (h.hl) owner.heal += h.hl;
-      if (h.hl && CHARS[owner.char].healGauge && !gaugeLocked(owner)) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + h.hl * GAUGE_MAX / CHARS[owner.char].healGauge);
+      if (h.hl && CHARS[owner.char].healGauge && !owner.isGaugeLocked()) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + h.hl * GAUGE_MAX / CHARS[owner.char].healGauge);
       if (h.cs) owner.stunDealt = (owner.stunDealt || 0) + h.cs / 1000;
       if (h.ss) owner.slowDealt = (owner.slowDealt || 0) + h.ss / 1000;
       if (h.sw) owner.slowWeight = (owner.slowWeight || 0) + h.sw / 1000;
-      if (h.b && owner.alive && CHARS[owner.char].haste) addHaste(owner, now());
+      if (h.b && owner.alive && CHARS[owner.char].haste) owner.addHaste(now());
       if (h.u === "volley" && owner.char === "ranger") owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.mkRefund);
       if (h.tp && owner.char === "hitman" && owner.alive) {
         owner.x = h.tp.x; owner.y = h.tp.y; owner.dash = null; resolve(owner);
       }
       if (h.u === "giant" && owner.char === "sniper") owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.pnRefund);
-      if (h.u === "fog" && owner.char === "thrower" && !gaugeLocked(owner)) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.fgRefund);
+      if (h.u === "fog" && owner.char === "thrower" && !owner.isGaugeLocked()) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.fgRefund);
       var sameSwing = h.s && owner.gaugeSwing === h.s;
       if (h.s) owner.gaugeSwing = h.s;
-      if (h.b && !sameSwing && !gaugeLocked(owner)) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + (h.g != null ? h.g : roleOf(owner.char).gaugeOnHit));
+      if (h.b && !sameSwing && !owner.isGaugeLocked()) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + (h.g != null ? h.g : roleOf(owner.char).gaugeOnHit));
       if (h.b && !sameSwing && owner.alive && CHARS[owner.char].selfHeal) {
         var stabHeal = healAmount(owner, CHARS[owner.char].selfHeal, now());
         owner.hp += stabHeal; owner.heal += stabHeal;
       }
-      if (h.b && !sameSwing && owner.alive && berserk(owner, h.t)) {
+      if (h.b && !sameSwing && owner.alive && owner.isBerserk(h.t)) {
         var rageHeal = healAmount(owner, ULT.bzHeal, now());
         owner.hp += rageHeal; owner.heal += rageHeal;
       }
@@ -3373,7 +3383,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function chainTargets(E, hit, t) {
     var chain = CHARS.stormbow.chain;
     return participants().map(ent).concat(allMinions().filter(function (m) { return minionReady(m, t); })).filter(function (o) {
-      return o && o.alive && o.team !== E.team && o.id !== hit.v && !protectedNow(o, t) && !hiddenFrom(o, t) && hyp(o.x - hit.x, o.y - hit.y) <= chain.r;
+      return o && o.alive && o.team !== E.team && o.id !== hit.v && !o.isProtected(t) && !hiddenFrom(o, t) && hyp(o.x - hit.x, o.y - hit.y) <= chain.r;
     }).sort(function (a, b) { return hyp(a.x - hit.x, a.y - hit.y) - hyp(b.x - hit.x, b.y - hit.y); }).slice(0, chain.count);
   }
   function onZap(e) {
@@ -3407,7 +3417,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function slowWhileInside(T, t, owner, mul, ms) {
     var fresh = (T.slows || []).some(function (s) { return s.mul === mul && s.until - t > ms / 2; });
     if (fresh) return;
-    var was = slowed(T, t);
+    var was = T.isSlowed(t);
     addSlowCredited(T, mul, ms, t, owner);
     if (!was) G.forceNet = true;
   }
@@ -3438,7 +3448,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       localTargets().forEach(function (T) {
         if (!T.alive || hyp(T.x - e.x, T.y - e.y) > e.r + BODY_R * 0.5) return;
         if (T.team === e.team) { if (e.u && !T.minion) healInFog(T, e, t); return; }
-        if (protectedNow(T, t)) return;
+        if (T.isProtected(t)) return;
         if (e.u && !T.minion) slowWhileInside(T, t, e.owner, ULT.fgSlowMul, ULT.fgSlowMs);
         var key = e.owner + ">" + T.id;
         if (POOL_HIT[key] && t - POOL_HIT[key] < ULT.plTick) return;
@@ -3450,8 +3460,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     });
   }
   function creditHolePull(T, owner, t, dt) {
-    if (stunned(T, t)) return;
-    var already = 1 - slowMulAt(T, t), extra = ULT.bhCcRate - already;
+    if (T.isStunned(t)) return;
+    var already = 1 - T.slowMulAt(t), extra = ULT.bhCcRate - already;
     if (extra <= 0) return;
     creditCC(owner, 0, already > 0 ? 0 : dt * 1000, dt * 1000 * extra);
   }
@@ -3463,7 +3473,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (!h.landed) { h.landed = true; if (!ME || hyp(e.x - ME.x, e.y - ME.y) < 700) sfx("orb"); }
       if (room.status !== "playing") return true;
       localTargets().forEach(function (T) {
-        if (!T.alive || T.team === e.team || T.minion || protectedNow(T, t)) return;
+        if (!T.alive || T.team === e.team || T.minion || T.isProtected(t)) return;
         var dx = e.x - T.x, dy = e.y - T.y, d = hyp(dx, dy);
         if (d > e.r + BODY_R * 0.5 || d < 6) return;
         var pull = Math.min(d - 6, ULT.bhPull * dt);
@@ -3513,7 +3523,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (s.nextTick && t < s.nextTick) return true;
       s.nextTick = (s.nextTick || t) + ULT.frBzTick;
       foesInside.forEach(function (T) {
-        var stack = !T.minion && !protectedNow(T, t) && !frostFrozen(T, t) ? frostStackFx(T) : null;
+        var stack = !T.minion && !T.isProtected(t) && !T.isFrostFrozen(t) ? frostStackFx(T) : null;
         damage(T, ULT.frBzDmg, e.owner, false, "blizzard", stack);
       });
       return true;
@@ -3523,7 +3533,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var reach = CHARS.cleric.range, best = null, t = now();
     participants().forEach(function (id) {
       var A = ent(id);
-      if (!A || id === E.id || A.team !== E.team || !A.alive || protectedNow(A, t) || hyp(A.x - E.x, A.y - E.y) > reach) return;
+      if (!A || id === E.id || A.team !== E.team || !A.alive || A.isProtected(t) || hyp(A.x - E.x, A.y - E.y) > reach) return;
       if (!best || A.hp / A.maxHp < best.hp / best.maxHp) best = A;
     });
     return best;
@@ -3544,7 +3554,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     GRACES.push({ e: e, vis: null });
     if (room.status !== "playing") return;
     localTargets().forEach(function (T) {
-      if (T.minion || T.id !== e.tgt || !T.alive || T.team !== e.team || protectedNow(T, t)) return;
+      if (T.minion || T.id !== e.tgt || !T.alive || T.team !== e.team || T.isProtected(t)) return;
       healByCleric(T, e.owner, e.heal, t);
     });
   }
@@ -3567,7 +3577,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       localTargets().forEach(function (T) {
         if (T.minion || T.id === e.owner || r.ticked[T.id] >= tick) return;
         r.ticked[T.id] = tick;
-        if (!T.alive || protectedNow(T, t)) return;
+        if (!T.alive || T.isProtected(t)) return;
         if (T.team === e.team) healByCleric(T, e.owner, e.heal, t);
         else damage(T, e.dmg, e.owner, false, "revelation");
       });
@@ -3595,7 +3605,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (t < e.createdAt || room.status !== "playing" || t > e.createdAt + e.grow + ULT.dmStunGraceMs) return true;
       var reach = domainRadius(e, t);
       localTargets().forEach(function (T) {
-        if (T.minion || !T.alive || T.team === e.team || dm.touched[T.id] || protectedNow(T, t)) return;
+        if (T.minion || !T.alive || T.team === e.team || dm.touched[T.id] || T.isProtected(t)) return;
         if (hyp(T.x - c.x, T.y - c.y) > reach + BODY_R * 0.5) return;
         dm.touched[T.id] = 1;
         afflict(T, { stunMs: e.stun }, e.owner);
@@ -3619,14 +3629,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     if (!B || t < B.at) return;
     T.curse = 0; T.curseBoom = null;
-    if (!T.alive || protectedNow(T, t)) return;
+    if (!T.alive || T.isProtected(t)) return;
     damage(T, ULT.cuBoomDmg, B.owner, false, "curse");
   }
   function stepDomainBolt(T, t) {
     var B = T.domainBolt;
-    if (!B || t < B.at || stunned(T, t)) return;
+    if (!B || t < B.at || T.isStunned(t)) return;
     T.domainBolt = null;
-    if (!T.alive || protectedNow(T, t)) return;
+    if (!T.alive || T.isProtected(t)) return;
     room.ref.child("effects").push({ type: "strike", owner: B.owner, tgt: T.id, createdAt: t });
     damage(T, B.dmg, B.owner, false, "domainbolt");
     applyCurse(T, B.owner, t);
@@ -3637,7 +3647,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (!zone) return null;
     var c = domainCenter(zone), reach = domainRadius(zone.e, t) + BODY_R * 0.5, best = null, bd = Infinity;
     participants().map(ent).concat(allMinions().filter(function (m) { return minionReady(m, t); })).forEach(function (o) {
-      if (!o || !o.alive || o.team === E.team || protectedNow(o, t) || hyp(o.x - c.x, o.y - c.y) > reach || (!o.minion && !visibleTo(o, E, t))) return;
+      if (!o || !o.alive || o.team === E.team || o.isProtected(t) || hyp(o.x - c.x, o.y - c.y) > reach || (!o.minion && !visibleTo(o, E, t))) return;
       var d = hyp(o.x - E.x, o.y - E.y);
       if (d < bd) { bd = d; best = o; }
     });
@@ -3729,7 +3739,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var L = E.lance; if (!L) return;
     var t = now(), d = L.d;
     if (!E.alive) { E.lance = null; return; }
-    if (stunned(E, t) || hyp(E.x - d.x, E.y - d.y) > LANCE_SLIP) { E.lance = null; E.windUntil = 0; E.ultUntil = Math.min(E.ultUntil, t); G.forceNet = true; return; }
+    if (E.isStunned(t) || hyp(E.x - d.x, E.y - d.y) > LANCE_SLIP) { E.lance = null; E.windUntil = 0; E.ultUntil = Math.min(E.ultUntil, t); G.forceNet = true; return; }
     if (t < d.createdAt + d.wind) return;
     E.lance = null;
     if (L.basic) {
@@ -3748,7 +3758,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function stepLunges(t) {
     LUNGES = LUNGES.filter(function (l) {
       var d = l.d, A = ent(d.owner);
-      if (A && (!A.alive || stunned(A, t) || hyp(A.x - d.x, A.y - d.y) > LANCE_VIS_SLIP)) { dropLungeVis(l); return false; }
+      if (A && (!A.alive || A.isStunned(t) || hyp(A.x - d.x, A.y - d.y) > LANCE_VIS_SLIP)) { dropLungeVis(l); return false; }
       if (t < d.createdAt + d.wind) return true;
       dropLungeVis(l);
       return false;
@@ -3764,7 +3774,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function strikeHit(T, d) {
     if (T.team === d.team || !T.alive || !inStrike(T, d)) return;
     var dx = T.x - d.x, dy = T.y - d.y;
-    if (protectedNow(T)) return;
+    if (T.isProtected()) return;
     if (d.slam && !d.dmg) afflict(T, d.fx, d.owner);
     else damage(T, d.dmg, d.owner, (d.m || !d.u) && d.createdAt + (d.mi || 0) / 1000, d.hammer ? d.createdAt : (d.u || d.m || d.countsAsSkill ? "skill" : null), d.fx, d.m ? ULT.smGauge : null, !!d.m);
     if (P[d.owner] && P[d.owner].characterType === "shaman") applyCurse(T, d.owner, now());
@@ -3870,8 +3880,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     E.atkAt = t;
     if (hear(E)) sfx("swing");
   }
-  function lungeDashMs(E, t) { return riposte(E, t) ? ULT.rmDashMs : CHARS[E.char].dashMs; }
-  function lungeRange(E, t) { return riposte(E, t) ? ULT.rmDashRange : CHARS[E.char].dashRange; }
+  function lungeDashMs(E, t) { return E.isRiposting(t) ? ULT.rmDashMs : CHARS[E.char].dashMs; }
+  function lungeRange(E, t) { return E.isRiposting(t) ? ULT.rmDashRange : CHARS[E.char].dashRange; }
   function lunge(E, ang) {
     var t = now(), full = lungeRange(E, t), reach = dashReach(E, ang, full);
     var tx = clamp(E.x + Math.cos(ang) * reach, BOUND.l + BODY_R, BOUND.r - BODY_R), ty = clamp(E.y + Math.sin(ang) * reach, BOUND.t + BODY_R, BOUND.b - BODY_R);
@@ -3884,7 +3894,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function stabTarget(E, t) {
     var reach = CHARS[E.char].range + BODY_R, best = null, bd = Infinity;
     participants().map(ent).concat(allMinions().filter(function (m) { return minionReady(m, t); })).forEach(function (o) {
-      if (!o || !o.alive || o.team === E.team || protectedNow(o, t) || !visibleTo(o, E)) return;
+      if (!o || !o.alive || o.team === E.team || o.isProtected(t) || !visibleTo(o, E)) return;
       var d = hyp(o.x - E.x, o.y - E.y);
       if (d <= reach && d < bd && losClear(E.x, E.y, o.x, o.y)) { bd = d; best = o; }
     });
@@ -3897,7 +3907,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     G.forceNet = true;
     if (hear(E)) sfx("swing");
     var d = { team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(E.angle), stab: 1, radius: c.range, dmg: c.dmg, createdAt: t };
-    if (riposte(E, t)) d.countsAsSkill = 1;
+    if (E.isRiposting(t)) d.countsAsSkill = 1;
     if (T) {
       E.angle = d.angle = r1(Math.atan2(T.y - E.y, T.x - E.x));
       d.tgt = T.id; d.len = Math.max(1, Math.round(hyp(T.x - E.x, T.y - E.y) - BODY_R)); d.width = 14;
@@ -3915,7 +3925,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       D.landed = true;
       resolve(E);
     }
-    if (stunned(E, t)) { E.dash = null; return; }
+    if (E.isStunned(t)) { E.dash = null; return; }
     if (t < D.at + dashMs + (c.finishDelay || 0)) return;
     E.dash = null;
     if (c.stab) { stabNearest(E, t); return; }
@@ -3938,11 +3948,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (E === ME) CAM.snap = true;
     G.forceNet = true;
   }
-  function canAct() { return G && room.status === "playing" && now() >= room.startAt && ME && ME.alive && !stunned(ME); }
+  function canAct() { return G && room.status === "playing" && now() >= room.startAt && ME && ME.alive && !ME.isStunned(); }
   function fireBasic(E, ang, reach) {
-    var c = CHARS[E.char], t = now(), rage = berserk(E, t);
-    if (stunned(E, t)) return;
-    E.cdDur = riposte(E, t) ? 1000 / ULT.rmRate : c.cd * (rage ? ULT.bzCdMul : 1) / (overcharged(E, t) ? ULT.ocRate : 1); E.cdUntil = t + E.cdDur; E.angle = ang;
+    var c = CHARS[E.char], t = now(), rage = E.isBerserk(t);
+    if (E.isStunned(t)) return;
+    E.cdDur = E.isRiposting(t) ? 1000 / ULT.rmRate : c.cd * (rage ? ULT.bzCdMul : 1) / (overcharged(E, t) ? ULT.ocRate : 1); E.cdUntil = t + E.cdDur; E.angle = ang;
     if (E.char === "thrower") { throwPoison(E, ang, reach, false); return; }
     if (E.char === "cleric") { graceStrike(E, t); return; }
     if (E.char === "shaman") { var struck = domainStrikeTarget(E, t); if (struck) { domainStrike(E, struck, t); return; } }
@@ -3976,7 +3986,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     return { x: clamp(E.x + Math.cos(ang) * reach, BOUND.l, BOUND.r), y: clamp(E.y + Math.sin(ang) * reach, BOUND.t, BOUND.b) };
   }
   function useUlt(E, ang, reach) {
-    if (E.gauge < GAUGE_MAX || !E.alive || stunned(E)) return;
+    if (E.gauge < GAUGE_MAX || !E.alive || E.isStunned()) return;
     E.gauge = 0;
     var t = now();
     if (E.char === "ranger") {
@@ -4139,7 +4149,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (E.volley && t >= E.volley.until) E.volley = null;
     if (E.slash && t >= E.slash.at) {
       var sl = E.slash;
-      swing(E, sl.ang, berserk(E, t), sl.dmg);
+      swing(E, sl.ang, E.isBerserk(t), sl.dmg);
       sl.left--; sl.at += CHARS[E.char].hitGap;
       if (sl.left <= 0) E.slash = null;
     }
@@ -4205,7 +4215,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var dx = B.home.x - B.x, dy = B.home.y - B.y, away = hyp(dx, dy);
     if (away < 6) { B.backAt = 0; if (foe && foe.alive) B.angle = Math.atan2(foe.y - B.y, foe.x - B.x); return; }
     if (!B.backAt) B.backAt = t + PRACTICE_BOT_RETURN_MS;
-    if (t < B.backAt || stunned(B, t)) return;
+    if (t < B.backAt || B.isStunned(t)) return;
     var ox = B.x, oy = B.y;
     moveEnt(B, dx / away * Math.min(1, away / 40), dy / away * Math.min(1, away / 40), dt);
     B.mv = hyp(B.x - ox, B.y - oy) > 0.2;
@@ -4213,7 +4223,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   function stepBot(B, dt) {
     if (B.practiceBot) { stepPracticeBot(B, dt); return; }
-    if (!B.alive || stunned(B)) { B.mv = false; return; }
+    if (!B.alive || B.isStunned()) { B.mv = false; return; }
     var t = now(), c = CHARS[B.char], k = B.bot, melee = isMelee(B.char);
     var enemies = [];
     participants().forEach(function (id) {
@@ -4234,7 +4244,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (target) {
       var dx = target.x - B.x, dy = target.y - B.y, d = hyp(dx, dy) || 1, ux = dx / d, uy = dy / d;
       var kiter = B.char !== "sniper" && (CHARS[B.char].role === "caster" || CHARS[B.char].role === "shooter");
-      var want = bladeStorm(B, t) ? BODY_R * 2 : c.dashRange ?c.dashRange * 0.7 : c.width ? c.range * 0.75 : (melee ? c.range * 0.6 : c.range * 0.72);
+      var want = B.isBladeStorming(t) ? BODY_R * 2 : c.dashRange ?c.dashRange * 0.7 : c.width ? c.range * 0.75 : (melee ? c.range * 0.6 : c.range * 0.72);
       var los = losClear(B.x, B.y, target.x, target.y);
       if (!los) k.chaseUntil = t + BOT_LOS_HOLD_MS;
       var clearView = los && t >= (k.chaseUntil || 0);
@@ -4261,7 +4271,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var ox = B.x, oy = B.y, want2 = hyp(mx, my);
     if (want2 > 0.05) {
       moveEnt(B, mx, my, dt);
-      var moved = hyp(B.x - ox, B.y - oy), expect = speedOf(B) * dt * Math.min(1, want2);
+      var moved = hyp(B.x - ox, B.y - oy), expect = B.speed() * dt * Math.min(1, want2);
       if (expect > 0 && moved < expect * 0.3) { k.stuck += dt; if (k.stuck > 0.4) { if (t - (k.detourAt || 0) > BOT_DETOUR_KEEP_MS) k.detourDir = Math.random() < 0.5 ? -1 : 1; k.detourAt = t; k.detour = t + 700; k.stuck = 0; } }
       else k.stuck = 0;
       B.mv = moved > 0.2;
@@ -4269,7 +4279,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     } else B.mv = false;
 
     var aimAt = target;
-    if (lancerWinding(B, t) || hammerWinding(B, t) || hammerLeaping(B, t) || B.dash) return;
+    if (B.isLancerWinding(t) || B.isHammerWinding(t) || B.isHammerLeaping(t) || B.dash) return;
     if (aimAt) B.angle = Math.atan2(aimAt.y - B.y, aimAt.x - B.x);
     else if (B.mv) B.angle = Math.atan2(my, mx);
     if (B.burst) return;
@@ -4306,7 +4316,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     return spot;
   }
   function leadSpot(o, sec, t) {
-    var moving = o.mv && o.moveAng != null && t - (o.moveAt || 0) < 400, lead = moving ? speedOf(o) * sec * 0.8 : 0;
+    var moving = o.mv && o.moveAng != null && t - (o.moveAt || 0) < 400, lead = moving ? o.speed() * sec * 0.8 : 0;
     return { x: o.x + (moving ? Math.cos(o.moveAng) * lead : 0), y: o.y + (moving ? Math.sin(o.moveAng) * lead : 0) };
   }
   function fogClusterSpot(B, enemies, t) {
@@ -4342,7 +4352,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   function botLance(B, target, t) {
     var c = CHARS.lancer, k = B.bot;
-    if (!target || lancerWinding(B, t) || t - k.seenAt <= BOT_REACT_MS) return;
+    if (!target || B.isLancerWinding(t) || t - k.seenAt <= BOT_REACT_MS) return;
     if (B.gauge >= GAUGE_MAX) {
       var ahead = leadSpot(target, ULT.lnWind / 1000, t), ud = hyp(ahead.x - B.x, ahead.y - B.y);
       if (ud <= ULT.lnLen && losClear(B.x, B.y, ahead.x, ahead.y) && losClear(B.x, B.y, target.x, target.y)) {
@@ -4547,7 +4557,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     backToLobby();
   }
   function fillPracticeGauge() {
-    if (!practiceMode() || !ME || !ME.alive || skillActive(ME, now())) return;
+    if (!practiceMode() || !ME || !ME.alive || ME.hasSkillActive(now())) return;
     ME.gauge = GAUGE_MAX; G.forceNet = true;
   }
   function practiceCharsHtml() {
@@ -5537,12 +5547,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var ROGUE_COMBO = ["Melee_Dualwield_Attack_Chop", "Melee_Dualwield_Attack_Slice"];
   var JUMP_CHOP_LAND_SEC = 0.75;
   function leapHeight(E, t) {
-    if (!E.alive || !hammerLeaping(E, t)) return 0;
+    if (!E.alive || !E.isHammerLeaping(t)) return 0;
     var k = leapProgress(t, E.leapAt, E.ultUntil);
     return 4 * ULT.bsHop * k * (1 - k);
   }
   function attackClip(v, E, t) {
-    if (E.char === "warrior") return ["Melee_1H_Attack_Slice_Diagonal", berserk(E, t) ? 1.9 : 1.3];
+    if (E.char === "warrior") return ["Melee_1H_Attack_Slice_Diagonal", E.isBerserk(t) ? 1.9 : 1.3];
     if (E.char === "knight") return E.ultUntil > E.atkAt ? ["Melee_1H_Attack_Chop", 1.6] : ["Melee_1H_Attack_Slice_Horizontal", 1.5];
     if (E.char === "ranger") return ["Ranged_Bow_Release", 3];
     if (E.char === "mage" || E.char === "necro" || E.char === "frost") return ["Ranged_Magic_Shoot", 1.8];
@@ -5578,7 +5588,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     if (E.stabAt !== v.stabSeen) {
       v.stabSeen = E.stabAt;
-      if (E.alive && t - E.stabAt < 600) playOnce(v, "Melee_1H_Attack_Stab", KIT.clips.Melee_1H_Attack_Stab.duration * 1000 / (riposte(E, E.stabAt) ? 320 : 520), t);
+      if (E.alive && t - E.stabAt < 600) playOnce(v, "Melee_1H_Attack_Stab", KIT.clips.Melee_1H_Attack_Stab.duration * 1000 / (E.isRiposting(E.stabAt) ? 320 : 520), t);
     }
     if ((E.char === "mage" || E.char === "necro" || E.char === "blacksmith" || E.char === "priest" || E.char === "frost" || E.char === "cleric" || E.char === "shaman") && E.ultUntil !== v.ultSeen) {
       v.ultSeen = E.ultUntil;
@@ -5596,7 +5606,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }
     }
    if (hurt && E.alive && (!v.once || v.once.name === "Hit_A")) playOnce(v, "Hit_A", 1.6, t);
-    v.wasStealth = stealthed(E, t);
+    v.wasStealth = E.isStealthed(t);
     var gameDt = dt * TS;
     var moved = hyp(E.x - v.px, E.y - v.py) / Math.max(gameDt, 0.001);
     v.px = E.x; v.py = E.y;
@@ -5609,7 +5619,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     } else {
       v.dead = false;
       if (E.char === "ranger" && E.ultUntil > t) showClip(v, "Ranged_Bow_Release", 4.5, true);
-      else if (bladeStorm(E, t)) showClip(v, "Melee_2H_Attack_Spinning", 1.2, true);
+      else if (E.isBladeStorming(t)) showClip(v, "Melee_2H_Attack_Spinning", 1.2, true);
       else if (v.once) { showClip(v, v.once.name, v.once.ts, false, v.once.fresh); v.once.fresh = false; }
       else if (revelationOn(E, t)) showClip(v, "Ranged_Magic_Spellcasting", 1, true);
       else if (E.char === "knight" && E.buffUntil > t) showClip(v, "Melee_Blocking", 1, true);
@@ -5617,7 +5627,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       else if (E.mv && v.speed > 15) showClip(v, "Walking_A", clamp(v.speed / 110, 0.6, 1.4), true);
       else showClip(v, idleClipOf(E.char), 1, true);
     }
-    v.mixer.update(E.alive && frostFrozen(E, t) ? 0 : gameDt);
+    v.mixer.update(E.alive && E.isFrostFrozen(t) ? 0 : gameDt);
   }
   function animateMinion(v, M, t, dt) {
     if (!v.kit) return;
@@ -5641,7 +5651,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     delete lastHp[id];
   }
   function makeMinionVis(M) {
-    var v = makeVis({ id: M.key, team: M.team, char: "minion", angle: M.angle, atkAt: M.atkAt, ultUntil: 0, alive: true, x: M.x, y: M.y });
+    var v = makeVis(Object.assign(new Unit(), { id: M.key, team: M.team, char: "minion", angle: M.angle, atkAt: M.atkAt, ultUntil: 0, alive: true, x: M.x, y: M.y }));
     v.body.scale.setScalar(MINION_MODEL.scale); v.ring.scale.setScalar(0.8);
     return v;
   }
@@ -6527,8 +6537,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
                         ["knight", "red", 330, 765], ["rogue", "red", 450, 795], ["sniper", "red", 570, 765]];
   function buildShowcase() {
     SHOWCASE_SPOTS.forEach(function (s, i) {
-      var E = { id: "tour" + i, team: s[1], char: s[0], x: s[2], y: s[3], angle: s[1] === "blue" ? Math.PI / 2 : -Math.PI / 2,
-                atkAt: 0, ultUntil: 0, buffUntil: 0, stealthUntil: 0, alive: true, mv: false, nextAtk: 1200 + i * 700 + Math.random() * 1500 };
+      var E = Object.assign(new Unit(), { id: "tour" + i, team: s[1], char: s[0], x: s[2], y: s[3], angle: s[1] === "blue" ? Math.PI / 2 : -Math.PI / 2,
+                atkAt: 0, ultUntil: 0, buffUntil: 0, stealthUntil: 0, alive: true, mv: false, nextAtk: 1200 + i * 700 + Math.random() * 1500 });
       var v = makeVis(E, tourGroup);
       v.root.position.set(E.x, 0, E.y); v.body.rotation.y = -E.angle;      SHOWCASE.push({ E: E, v: v });
     });
@@ -6621,16 +6631,16 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (E.char === "knight" && E.buffUntil > t) return 0x2A3A66;
     if ((E.char === "mage" || E.char === "sniper") && E.ultUntil > t) return E.char === "mage" ? 0x661000 : 0x663300;
     if (E.char === "thrower" && E.ultUntil > t) return 0x1E5212;
-    if (hammerLeaping(E, t)) return 0x553000;
+    if (E.isHammerLeaping(t)) return 0x553000;
     if (E.char === "hitman" && E.ultUntil > t) return 0x660010;
-    if (riposte(E, t)) return 0x9A9A9A;
-    if (bladeStorm(E, t)) return 0x551020;
+    if (E.isRiposting(t)) return 0x9A9A9A;
+    if (E.isBladeStorming(t)) return 0x551020;
     if (revelationOn(E, t)) return 0x5A4A10;
     if (overcharged(E, t)) return 0x1E3A8A;
-    var frostStacks = frostStacksNow(E, t);
+    var frostStacks = E.frostStacksNow(t);
     if (frostStacks === 1) return 0x3A6E99;
     if (frostStacks === 2) return 0x2E8FD9;
-    if (frostFrozen(E, t)) return 0x6FB8E0;
+    if (E.isFrostFrozen(t)) return 0x6FB8E0;
     if (E.burnUntil > t) return 0x7A2A00;
     if (E.shield) return 0x4A3A00;
     return 0x000000;
@@ -6654,7 +6664,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var bi = bushIndexAt(E.x, E.y); if (bi >= 0) bushSeen[bi] = 1;
       var revealedByAttack = E.revealUntil > t;
       var alpha = !E.alive ? (v.kit ? 0.6 : 0.35) : (hid && !revealedByAttack ? (spec ? 0.55 : STEALTH_ALPHA) : 1), hurt = false;
-      if (protectedNow(E, t)) alpha = Math.min(alpha, 0.5 + 0.3 * Math.sin(nowMs / 70));
+      if (E.isProtected(t)) alpha = Math.min(alpha, 0.5 + 0.3 * Math.sin(nowMs / 70));
       if (lastHp[id] !== undefined && Math.abs(E.hp - lastHp[id]) >= 1) {
         var d = Math.round(E.hp - lastHp[id]);
         if (d < 0) { floatText(E.x, E.y, String(d), "#FF4B3E"); E.flashUntil = nowMs + 90; hurt = true; }
@@ -6678,7 +6688,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       v.mats.forEach(function (m) { m.opacity = alpha; });
       var glow = glowOf(E, t);
       v.glowMats.forEach(function (m) { m.emissive.setHex(glow); });
-      if (v.aura) { v.aura.visible = E.alive && (berserk(E, t) || riposte(E, t)); v.aura.scale.y = 0.9 + 0.15 * Math.sin(nowMs / 90); }
+      if (v.aura) { v.aura.visible = E.alive && (E.isBerserk(t) || E.isRiposting(t)); v.aura.scale.y = 0.9 + 0.15 * Math.sin(nowMs / 90); }
       if (v.shield) {
         v.shield.visible = E.alive && E.buffUntil > t;
         if (v.shield.visible) {
@@ -6691,7 +6701,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (v.stormAura) renderStormAura(v, E, t, nowMs);
       renderCurse(v, E, t, nowMs);
       if (v.bladeRing) {
-        v.bladeRing.visible = E.alive && bladeStorm(E, t);
+        v.bladeRing.visible = E.alive && E.isBladeStorming(t);
         if (v.bladeRing.visible) v.bladeRing.userData.spin.rotation.y = -nowMs / 90;
       }
       v.ring.visible = E.alive;
@@ -6820,11 +6830,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     octx.restore();
   }
   function drawStatus(E, x, y) {
-    var t = now(), label = stunned(E, t) ? "💫 기절" : (slowed(E, t) ? "느려짐" : "");
+    var t = now(), label = E.isStunned(t) ? "💫 기절" : (E.isSlowed(t) ? "느려짐" : "");
     if (!label) return;
     octx.font = "800 13px " + FONT; octx.textAlign = "center"; octx.textBaseline = "middle";
     octx.lineWidth = 3; octx.strokeStyle = "rgba(14,20,17,.85)";
-    octx.strokeText(label, x, y); octx.fillStyle = stunned(E, t) ? "#FFE066" : "#8CD3FF"; octx.fillText(label, x, y);
+    octx.strokeText(label, x, y); octx.fillStyle = E.isStunned(t) ? "#FFE066" : "#8CD3FF"; octx.fillText(label, x, y);
   }
   function drawBars(E, alpha, ally) {
     var p = toScreen(E.x, HEAD_Y, E.y); if (!p) return;
@@ -6847,7 +6857,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     octx.fillStyle = "rgba(10,14,12,.6)";
     if (E.maxHp <= 1000) for (var hp = 50; hp < E.maxHp; hp += 50) octx.fillRect(x0 + bw * hp / E.maxHp, top, 1, bh);
     if (ally) {
-      var gy = top + bh + 3, full = E.gauge >= GAUGE_MAX, t = now(), act = skillActive(E, t);
+      var gy = top + bh + 3, full = E.gauge >= GAUGE_MAX, t = now(), act = E.hasSkillActive(t);
       octx.fillStyle = "rgba(10,14,12,.8)"; octx.fillRect(x0 - 1, gy - 1, bw + 2, 6);
       octx.fillStyle = act ? "#F06BB5" : (full ? "#FF5A4E" : "#F2C230");
       octx.fillRect(x0, gy, bw * (act ? skillLeft(E, t) : clamp(E.gauge / GAUGE_MAX, 0, 1)), 4);
@@ -6919,7 +6929,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     ids.forEach(function (id) {
       var E = ent(id); if (!E) return;
       var hp = Math.max(0, Math.round(E.hp)), ratio = clamp(E.hp / E.maxHp, 0, 1);
-      var g = Math.min(GAUGE_MAX, Math.floor(E.gauge)), full = g >= GAUGE_MAX, tn = now(), act = E.alive && skillActive(E, tn);
+      var g = Math.min(GAUGE_MAX, Math.floor(E.gauge)), full = g >= GAUGE_MAX, tn = now(), act = E.alive && E.hasSkillActive(tn);
       h += '<div class="spCard' + (E.alive ? "" : " dead") + '"><img alt="" src="' + charImgSrc(E.char, team) + '">' +
         '<div class="spInfo"><div class="spName">' + (E.isAI ? "🤖 " : "") + esc(E.nickname) + '<span class="spK">' + (E.kills || 0) + "킬</span><small>" + CHARS[E.char].name + "</small></div>" +
         '<div class="spBar hp' + (ratio < 0.3 ? " low" : "") + '"><i style="width:' + Math.round(ratio * 100) + '%"></i><span>' +
@@ -7043,7 +7053,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var alive = ME && ME.alive, playing = st === "playing" && t >= room.startAt;
     show($("btnAtk"), alive && st !== "ended"); show($("btnUlt"), alive && st !== "ended");
     show($("deadMsg"), ME && !ME.alive && st === "playing");
-    var prot = ME && protectedNow(ME, t) && st === "playing";
+    var prot = ME && ME.isProtected(t) && st === "playing";
     show($("protBadge"), prot);
     if (prot) setText($("protBadge"), "🛡 보호 중 " + ((ME.protectUntil - t) / TS / 1000).toFixed(1) + "초");
     if (ME && !ME.alive) setText($("deadMsg"), "쓰러졌어요 — " + Math.max(1, Math.ceil((ME.diedAt + RESPAWN_MS - t) / TS / 1000)) + "초 뒤 부활");
@@ -7051,7 +7061,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       setHtml($("btnAtk").lastChild, '<i class="ic">' + CHARS[ME.char].icon + "</i>공격");
       var cdLeft = Math.max(0, ME.cdUntil - t) / (ME.cdDur || CHARS[ME.char].cd);
       $("btnAtk").firstChild.style.height = Math.round(cdLeft * 100) + "%";
-      var full = ME.gauge >= GAUGE_MAX, act = skillActive(ME, t);
+      var full = ME.gauge >= GAUGE_MAX, act = ME.hasSkillActive(t);
       $("btnUlt").className = "actBtn" + (act ? " act" : (full && !ME.burst ? " ready" : ""));
       $("btnUlt").firstChild.style.height = Math.round((act ? skillLeft(ME, t) : clamp(ME.gauge / GAUGE_MAX, 0, 1)) * 100) + "%";
       setHtml($("btnUlt").lastChild, act ? CHARS[ME.char].ultName + "<br>" + Math.ceil((ME.skillUntil - t) / TS / 1000) + "초"
@@ -7169,7 +7179,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         return renderer.domElement.toDataURL("image/png");
       },
       loadMapData: loadMapData, makeEnt: makeEnt, resolve: resolve, stepWorld: stepWorld,
-      useUlt: useUlt, fireBasic: fireBasic, damage: damage, healCut: healCut, healAmount: healAmount, respawnIfReady: respawnIfReady, afflict: afflict, speedOf: speedOf, stunned: stunned,
+      useUlt: useUlt, fireBasic: fireBasic, damage: damage, healCut: healCut, healAmount: healAmount, respawnIfReady: respawnIfReady, afflict: afflict, speedOf: function (E) { return E.speed(); }, stunned: function (E, t) { return E.isStunned(t); },
       onShot: onShot, onMelee: onMelee, potionFlightMs: potionFlightMs, meteorHitAt: meteorHitAt, onEffect: onEffect, onHit: onHit,
       multiKillCount: multiKillCount, MULTI_KILL_MS: MULTI_KILL_MS, ASSIST_MS: ASSIST_MS, onKill: creditHelpAssists,
       hiddenFrom: hiddenFrom, visibleTo: visibleTo, storms: function () { return STORMS; }, stormCenter: stormCenter, revs: function () { return REVS; }, domains: function () { return DOMAINS; }, graceTarget: graceTarget,
