@@ -1438,13 +1438,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var st = s.val();
         if (st === null) { if (!SESSION.leaving) SESSION.exitToStart("방이 종료되었어요."); return; }
         var prev = SESSION.room.status; SESSION.room.status = st; ARENA_VIEW.syncArena();
-        var keepSpecResult = st === "lobby" && prev === "ended" && screenNow === "game" && isSpec();
-        if (!keepSpecResult) releaseSpecResult();
-        if (st === "lobby") { MATCH.game = null; MATCH.me = null; MATCH.bots = {}; if (keepSpecResult) holdSpecResult(); else showScreen("lobby"); LOBBY.playersChanged(); }
+        var keepSpecResult = st === "lobby" && prev === "ended" && screenNow === "game" && FLOW.isSpec();
+        if (!keepSpecResult) FLOW.releaseSpecResult();
+        if (st === "lobby") { MATCH.game = null; MATCH.me = null; MATCH.bots = {}; if (keepSpecResult) FLOW.holdSpecResult(); else showScreen("lobby"); LOBBY.playersChanged(); }
         else if (st === "draft") { MATCH.game = null; MATCH.me = null; MATCH.bots = {}; if (prev !== "draft") DRAFT.view = null; showScreen("draft"); DRAFT.renderDraft(); }
         else showScreen("game");
         if (st === "countdown" && prev !== "countdown") CLOCK.burst();
-        if (st === "ended" && prev !== "ended") onEnded();
+        if (st === "ended" && prev !== "ended") FLOW.onEnded();
       });
       var stRef = ref.child("st");
       SESSION.sub(stRef, "child_added", function (s) { MATCH.stateByKey[s.key] = s.val(); });
@@ -1500,7 +1500,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (SESSION.room) { SESSION.leaving = true; SESSION.unsubAll(); try { SESSION.room.ref.child("players/" + SESSION.myId).onDisconnect().cancel(); } catch (e) {} }
       SESSION.room = null; SESSION.resetLocal(); showScreen("start"); LOBBY.startMsg(msg || "");
     }
-    resetLocal() { applyTimeScale(SLOW_REQUEST); FX_VIEW.clear3d(); SESSION.players = {}; MATCH.leave(); INPUT.reset(); specResultHeld = false; setText($("btnAgain"), "다시하기"); }
+    resetLocal() { applyTimeScale(SLOW_REQUEST); FX_VIEW.clear3d(); SESSION.players = {}; MATCH.leave(); INPUT.reset(); FLOW.specHeld = false; setText($("btnAgain"), "다시하기"); }
     saveResume() {
       if (!SESSION.room || SESSION.leaving || !SESSION.players[SESSION.myId]) return;
       try { sessionStorage.setItem(RESUME_KEY, JSON.stringify({ code: SESSION.room.code, id: SESSION.myId, me: SESSION.players[SESSION.myId], at: Date.now() })); } catch (e) {}
@@ -2160,66 +2160,69 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   $("btnJoinOpen").onclick = function () { audio(); show($("joinBox"), true); try { $("joinCode").focus(); } catch (e) {} };
   $("btnJoin").onclick = SESSION.joinRoom.bind(SESSION);
   $("joinCode").onkeydown = function (e) { if (e.key === "Enter") SESSION.joinRoom(); };
-  $("btnStart").onclick = startGame;
+  $("btnStart").onclick = function () { LAUNCHER.startGame(); };
 
   var PRACTICE_BOTS = [
     { id: "aiPracticeBot", c: "dummy", foe: true, slot: 1, dx: -PRACTICE_BOT_GAP / 2, dy: 0 },
     { id: "aiPracticeBot2", c: "dummy", foe: true, slot: 2, dx: PRACTICE_BOT_GAP / 2, dy: 0 },
     { id: "aiPracticeAlly", c: "dummyAlly", foe: false, slot: 2, dx: 0, dy: -PRACTICE_ALLY_AHEAD }
   ];
-  function practiceSpots(arena, playerTeam) {
-    var toward = playerTeam === "blue" ? 1 : -1, taken = [];
-    var map = ARENA_MAP.fullMap(MAPS[arena].blueHalf), open = [];
-    for (var r = 1; r < map.length - 1; r++) for (var c = 1; c < map[0].length - 1; c++) {
-      var clear = true;
-      for (var dr = -1; dr <= 1 && clear; dr++) for (var dc = -1; dc <= 1; dc++) if (map[r + dr].charAt(c + dc) !== ".") { clear = false; break; }
-      if (clear) open.push({ x: ARENA_MAP.tileX(c), y: ARENA_MAP.tileY(r) });
-    }
-    return PRACTICE_BOTS.map(function (b) {
-      var want = { x: MW / 2 + b.dx, y: MH / 2 + b.dy * toward }, best = null, bestD = Infinity;
-      if (MAPS[arena].practice) best = want;
-      else open.forEach(function (o) {
-        if (taken.some(function (q) { return hyp(q.x - o.x, q.y - o.y) < PRACTICE_BOT_MIN_GAP; })) return;
-        var d = hyp(o.x - want.x, o.y - want.y) + (o.y - MH / 2) * toward * 0.05;
-        if (d < bestD) { bestD = d; best = o; }
-      });
-      best = best || want;
-      taken.push(best);
-      return best;
-    });
-  }
-  function startGame() {
-    if (!SESSION.isHost() || SESSION.room.status !== "lobby") return;
-    audio();
-    if (SESSION.room.mode === "cup") { DRAFT.startDraft(); return; }
-    launchMatch(function (id) { return SESSION.players[id].characterType; }, COUNT_MS, ARENA_MAP.resolveArena(SESSION.room.map));
-  }
-  function launchMatch(charOf, countMs, arena, bans) {
-    var u = {}, roster = {}, st = {};
-    ["blue", "red"].forEach(function (team) {
-      SESSION.teamIds(team).filter(function (id) { return !SESSION.practiceMode() || id === SESSION.myId; }).slice(0, 3).forEach(function (id, i) {
-        var p = SESSION.players[id], want = charOf(id), c = pickable(want) ? want : FALLBACK_CHAR;
-        var sp = ARENA_MAP.spawnOf(team, i + 1, arena), base = "players/" + id + "/";
-        u[base + "slot"] = i + 1; u[base + "characterType"] = c;
-        st[stKey(team, i + 1)] = packState({ x: sp.x, y: sp.y, angle: sp.angle, mv: false, hp: CHARS[c].hp, alive: true, shield: !!CHARS[c].respawnShield });
-        roster[id] = { team: team, c: c, ai: !!p.isAI };
-      });
-    });
-    if (SESSION.practiceMode() && SESSION.players[SESSION.myId]) {
-      var myTeam = SESSION.players[SESSION.myId].team, spots = practiceSpots(arena, myTeam), mine = ARENA_MAP.spawnOf(myTeam, 1, arena);
-      PRACTICE_BOTS.forEach(function (b, i) {
-        var team = b.foe ? SWAPPED_TEAM[myTeam] : myTeam, spot = spots[i], C = CHARS[b.c];
-        var hp = b.foe ? C.hp : Math.round(C.hp * PRACTICE_ALLY_LOW);
-        u["players/" + b.id] = { nickname: C.name, isAI: true, practiceBot: true, team: team, characterType: b.c, joinedAt: now(), slot: b.slot, homeX: Math.round(spot.x), homeY: Math.round(spot.y) };
-        st[stKey(team, b.slot)] = packState({ x: spot.x, y: spot.y, angle: Math.atan2(mine.y - spot.y, mine.x - spot.x), mv: false, hp: hp, alive: true });
-        roster[b.id] = { team: team, c: b.c, ai: true };
+  class MatchLauncher {
+    practiceSpots(arena, playerTeam) {
+      var toward = playerTeam === "blue" ? 1 : -1, taken = [];
+      var map = ARENA_MAP.fullMap(MAPS[arena].blueHalf), open = [];
+      for (var r = 1; r < map.length - 1; r++) for (var c = 1; c < map[0].length - 1; c++) {
+        var clear = true;
+        for (var dr = -1; dr <= 1 && clear; dr++) for (var dc = -1; dc <= 1; dc++) if (map[r + dr].charAt(c + dc) !== ".") { clear = false; break; }
+        if (clear) open.push({ x: ARENA_MAP.tileX(c), y: ARENA_MAP.tileY(r) });
+      }
+      return PRACTICE_BOTS.map(function (b) {
+        var want = { x: MW / 2 + b.dx, y: MH / 2 + b.dy * toward }, best = null, bestD = Infinity;
+        if (MAPS[arena].practice) best = want;
+        else open.forEach(function (o) {
+          if (taken.some(function (q) { return hyp(q.x - o.x, q.y - o.y) < PRACTICE_BOT_MIN_GAP; })) return;
+          var d = hyp(o.x - want.x, o.y - want.y) + (o.y - MH / 2) * toward * 0.05;
+          if (d < bestD) { bestD = d; best = o; }
+        });
+        best = best || want;
+        taken.push(best);
+        return best;
       });
     }
-    u.roster = roster; u.st = st; u.arena = arena; u.draft = null; u.bans = bans && bans.length ? bans : null;
-    u.status = "countdown"; u.startAt = CLOCK.real() + countMs; u.winner = null; u.final = null; u.statsNote = null; u.endedAt = null;
-    u.shots = null; u.meleeHits = null; u.hits = null; u.effects = null; u.kills = null; u.projectiles = null;
-    SESSION.room.ref.update(u);
+    startGame() {
+      if (!SESSION.isHost() || SESSION.room.status !== "lobby") return;
+      audio();
+      if (SESSION.room.mode === "cup") { DRAFT.startDraft(); return; }
+      LAUNCHER.launchMatch(function (id) { return SESSION.players[id].characterType; }, COUNT_MS, ARENA_MAP.resolveArena(SESSION.room.map));
+    }
+    launchMatch(charOf, countMs, arena, bans) {
+      var u = {}, roster = {}, st = {};
+      ["blue", "red"].forEach(function (team) {
+        SESSION.teamIds(team).filter(function (id) { return !SESSION.practiceMode() || id === SESSION.myId; }).slice(0, 3).forEach(function (id, i) {
+          var p = SESSION.players[id], want = charOf(id), c = pickable(want) ? want : FALLBACK_CHAR;
+          var sp = ARENA_MAP.spawnOf(team, i + 1, arena), base = "players/" + id + "/";
+          u[base + "slot"] = i + 1; u[base + "characterType"] = c;
+          st[NETSTATE.stKey(team, i + 1)] = NETSTATE.packState({ x: sp.x, y: sp.y, angle: sp.angle, mv: false, hp: CHARS[c].hp, alive: true, shield: !!CHARS[c].respawnShield });
+          roster[id] = { team: team, c: c, ai: !!p.isAI };
+        });
+      });
+      if (SESSION.practiceMode() && SESSION.players[SESSION.myId]) {
+        var myTeam = SESSION.players[SESSION.myId].team, spots = LAUNCHER.practiceSpots(arena, myTeam), mine = ARENA_MAP.spawnOf(myTeam, 1, arena);
+        PRACTICE_BOTS.forEach(function (b, i) {
+          var team = b.foe ? SWAPPED_TEAM[myTeam] : myTeam, spot = spots[i], C = CHARS[b.c];
+          var hp = b.foe ? C.hp : Math.round(C.hp * PRACTICE_ALLY_LOW);
+          u["players/" + b.id] = { nickname: C.name, isAI: true, practiceBot: true, team: team, characterType: b.c, joinedAt: now(), slot: b.slot, homeX: Math.round(spot.x), homeY: Math.round(spot.y) };
+          st[NETSTATE.stKey(team, b.slot)] = NETSTATE.packState({ x: spot.x, y: spot.y, angle: Math.atan2(mine.y - spot.y, mine.x - spot.x), mv: false, hp: hp, alive: true });
+          roster[b.id] = { team: team, c: b.c, ai: true };
+        });
+      }
+      u.roster = roster; u.st = st; u.arena = arena; u.draft = null; u.bans = bans && bans.length ? bans : null;
+      u.status = "countdown"; u.startAt = CLOCK.real() + countMs; u.winner = null; u.final = null; u.statsNote = null; u.endedAt = null;
+      u.shots = null; u.meleeHits = null; u.hits = null; u.effects = null; u.kills = null; u.projectiles = null;
+      SESSION.room.ref.update(u);
+    }
   }
+  var LAUNCHER = new MatchLauncher();
 
   var DRAFT_STEPS = [{ keys: ["b1"], ban: true }, { keys: ["r1"], ban: true }, { keys: ["b1"] }, { keys: ["r1", "r2"] }, { keys: ["b2", "b3"] }, { keys: ["r3"] }];
   var DRAFT_SHOWN_MS = 15000, DRAFT_STEP_MS = 16000, DRAFT_AI_MS = 2500, DRAFT_AI_TRADE_MS = 1200, TRADE_DENIED_SHOW_MS = 2000, NO_BAN = "-";
@@ -2352,7 +2355,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (tr || DRAFT.draftReadyCount(d) < DRAFT.draftHumans(d).length || DRAFT.launched === d.stepAt) return;
       DRAFT.launched = d.stepAt;
       var picks = d.picks || {}, spare = DRAFT.draftLeft(d);
-      launchMatch(function (id) { return picks[id] || spare.splice(Math.floor(Math.random() * spare.length), 1)[0]; }, COUNT_MS, ARENA_MAP.id, DRAFT.draftBanned(d));
+      LAUNCHER.launchMatch(function (id) { return picks[id] || spare.splice(Math.floor(Math.random() * spare.length), 1)[0]; }, COUNT_MS, ARENA_MAP.id, DRAFT.draftBanned(d));
     }
     hostDraftTick() {
       var d = SESSION.room.draft, t = now();
@@ -2517,54 +2520,73 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   };
   $("btnLeaveDraft").onclick = function () { if (confirm("방을 나갈까요?")) SESSION.leaveRoom(); };
 
-  function stKey(team, slot) { return (team === "blue" ? "b" : "r") + slot; }
-  function angDeg(a) { var d = Math.round(a * 180 / Math.PI / 3) * 3; return ((d % 360) + 360) % 360; }
+  class NetState {
+    stKey(team, slot) { return (team === "blue" ? "b" : "r") + slot; }
+    angDeg(a) { var d = Math.round(a * 180 / Math.PI / 3) * 3; return ((d % 360) + 360) % 360; }
+    oneDecimal(v) { return Math.round((+v || 0) * 10) / 10; }
+    twoDecimals(v) { return Math.round((+v || 0) * 100) / 100; }
+    relTime(t) { return t ? Math.round(t - SESSION.room.startAt) : ""; }
+    absTime(v) { return v === "" || v == null ? 0 : SESSION.room.startAt + (+v || 0); }
+    packMinions(E) {
+      return (E.minions || []).map(function (m) {
+        return [Math.round(m.x), Math.round(m.y), NETSTATE.angDeg(m.angle), Math.max(0, Math.ceil(m.hp)), NETSTATE.relTime(m.atkAt), NETSTATE.relTime(m.born), m.n].join(":");
+      }).join(";");
+    }
+    unpackMinions(v) {
+      if (!v) return [];
+      return v.split(";").map(function (s) {
+        var f = s.split(":");
+        return { x: +f[0] || 0, y: +f[1] || 0, angle: (+f[2] || 0) * Math.PI / 180, hp: +f[3] || 0, atkAt: NETSTATE.absTime(f[4]), born: NETSTATE.absTime(f[5]), n: +f[6] || 0 };
+      });
+    }
+    packState(E) {
+      return [Math.round(E.x), Math.round(E.y), NETSTATE.angDeg(E.angle), E.mv ? 1 : 0, Math.ceil(E.hp), E.alive ? 1 : 0,
+        NETSTATE.oneDecimal(E.gauge), NETSTATE.oneDecimal(E.dmg), E.deaths || 0, E.kills || 0, Math.round(E.heal || 0), E.skillDur || ""]
+        .concat(STATE_TIMES.map(function (k) { return NETSTATE.relTime(E[k]); }))
+        .concat([E.slowUntil ? Math.round(E.slowMulAt(now()) * 100) : "", NETSTATE.packMinions(E),
+                 NETSTATE.oneDecimal(E.stunDealt), NETSTATE.oneDecimal(E.slowDealt), NETSTATE.twoDecimals(E.slowWeight), Math.round(E.blocked || 0), E.frostStacks || "", E.shield ? 1 : "", E.assists || ""]).join(",");
+    }
+    stateOf(d) {
+      var s = d && d.slot ? MATCH.stateByKey[NETSTATE.stKey(d.team, d.slot)] : null;
+      if (typeof s === "string") {
+        var f = s.split(",");
+        var o = { x: +f[0] || 0, y: +f[1] || 0, angle: (+f[2] || 0) * Math.PI / 180, mv: f[3] === "1", full: f.length > STATE_TIMES_AT };
+        if (o.full) {
+          o.hp = +f[4]; o.alive = f[5] !== "0"; o.gauge = +f[6] || 0; o.dmg = +f[7] || 0; o.deaths = +f[8] || 0; o.kills = +f[9] || 0; o.heal = +f[10] || 0; o.skillDur = +f[11] || 0;
+          STATE_TIMES.forEach(function (k, i) { o[k] = NETSTATE.absTime(f[STATE_TIMES_AT + i]); });
+          o.slowMul = f[STATE_EXTRA_AT] ? +f[STATE_EXTRA_AT] / 100 : 1;
+          o.minions = NETSTATE.unpackMinions(f[STATE_EXTRA_AT + 1]);
+          o.stunDealt = +f[STATE_EXTRA_AT + 2] || 0; o.slowDealt = +f[STATE_EXTRA_AT + 3] || 0;
+          o.slowWeight = +f[STATE_EXTRA_AT + 4] || 0; o.blocked = +f[STATE_EXTRA_AT + 5] || 0; o.frostStacks = +f[STATE_EXTRA_AT + 6] || 0;
+          o.shield = f[STATE_EXTRA_AT + 7] === "1";
+          o.assists = +f[STATE_EXTRA_AT + 8] || 0;
+        }
+        return o;
+      }
+      var sp = d && d.slot && (d.team === "blue" || d.team === "red") ? ARENA_MAP.spawnOf(d.team, d.slot) : { x: 0, y: 0, angle: 0 };
+      return { x: sp.x, y: sp.y, angle: sp.angle, mv: false, full: false };
+    }
+    entFields(u, E) {
+      var d = SESSION.players[E.id];
+      if (!d || !d.slot) return;
+      var path = "st/" + NETSTATE.stKey(d.team, d.slot), v = NETSTATE.packState(E);
+      if (MATCH.game.sent[path] !== v) { MATCH.game.sent[path] = v; u[path] = v; }
+    }
+    netWrite(force) {
+      var t = Date.now();
+      if (!force && !MATCH.game.forceNet && t - MATCH.game.lastNet < NET_MS) return;
+      MATCH.game.lastNet = t; MATCH.game.forceNet = false;
+      if (!MATCH.game.sent) MATCH.game.sent = {};
+      var u = {};
+      if (MATCH.me && SESSION.players[SESSION.myId]) NETSTATE.entFields(u, MATCH.me);
+      if (SESSION.isHost()) keys(MATCH.bots).forEach(function (id) { if (SESSION.players[id]) NETSTATE.entFields(u, MATCH.bots[id]); });
+      if (keys(u).length) SESSION.room.ref.update(u);
+    }
+  }
+  var NETSTATE = new NetState();
   var STATE_TIMES = ["diedAt", "atkAt", "ultUntil", "buffUntil", "stealthUntil", "regenUntil", "skillUntil", "protectUntil", "slowUntil", "stunUntil", "summonAt", "revealUntil", "frostStackAt", "leapAt", "stabAt", "burnUntil"];
   var STATE_TIMES_AT = 12;
   var STATE_EXTRA_AT = STATE_TIMES_AT + STATE_TIMES.length;
-  function oneDecimal(v) { return Math.round((+v || 0) * 10) / 10; }
-  function twoDecimals(v) { return Math.round((+v || 0) * 100) / 100; }
-  function relTime(t) { return t ? Math.round(t - SESSION.room.startAt) : ""; }
-  function absTime(v) { return v === "" || v == null ? 0 : SESSION.room.startAt + (+v || 0); }
-  function packMinions(E) {
-    return (E.minions || []).map(function (m) {
-      return [Math.round(m.x), Math.round(m.y), angDeg(m.angle), Math.max(0, Math.ceil(m.hp)), relTime(m.atkAt), relTime(m.born), m.n].join(":");
-    }).join(";");
-  }
-  function unpackMinions(v) {
-    if (!v) return [];
-    return v.split(";").map(function (s) {
-      var f = s.split(":");
-      return { x: +f[0] || 0, y: +f[1] || 0, angle: (+f[2] || 0) * Math.PI / 180, hp: +f[3] || 0, atkAt: absTime(f[4]), born: absTime(f[5]), n: +f[6] || 0 };
-    });
-  }
-  function packState(E) {
-    return [Math.round(E.x), Math.round(E.y), angDeg(E.angle), E.mv ? 1 : 0, Math.ceil(E.hp), E.alive ? 1 : 0,
-      oneDecimal(E.gauge), oneDecimal(E.dmg), E.deaths || 0, E.kills || 0, Math.round(E.heal || 0), E.skillDur || ""]
-      .concat(STATE_TIMES.map(function (k) { return relTime(E[k]); }))
-      .concat([E.slowUntil ? Math.round(E.slowMulAt(now()) * 100) : "", packMinions(E),
-               oneDecimal(E.stunDealt), oneDecimal(E.slowDealt), twoDecimals(E.slowWeight), Math.round(E.blocked || 0), E.frostStacks || "", E.shield ? 1 : "", E.assists || ""]).join(",");
-  }
-  function stateOf(d) {
-    var s = d && d.slot ? MATCH.stateByKey[stKey(d.team, d.slot)] : null;
-    if (typeof s === "string") {
-      var f = s.split(",");
-      var o = { x: +f[0] || 0, y: +f[1] || 0, angle: (+f[2] || 0) * Math.PI / 180, mv: f[3] === "1", full: f.length > STATE_TIMES_AT };
-      if (o.full) {
-        o.hp = +f[4]; o.alive = f[5] !== "0"; o.gauge = +f[6] || 0; o.dmg = +f[7] || 0; o.deaths = +f[8] || 0; o.kills = +f[9] || 0; o.heal = +f[10] || 0; o.skillDur = +f[11] || 0;
-        STATE_TIMES.forEach(function (k, i) { o[k] = absTime(f[STATE_TIMES_AT + i]); });
-        o.slowMul = f[STATE_EXTRA_AT] ? +f[STATE_EXTRA_AT] / 100 : 1;
-        o.minions = unpackMinions(f[STATE_EXTRA_AT + 1]);
-        o.stunDealt = +f[STATE_EXTRA_AT + 2] || 0; o.slowDealt = +f[STATE_EXTRA_AT + 3] || 0;
-        o.slowWeight = +f[STATE_EXTRA_AT + 4] || 0; o.blocked = +f[STATE_EXTRA_AT + 5] || 0; o.frostStacks = +f[STATE_EXTRA_AT + 6] || 0;
-        o.shield = f[STATE_EXTRA_AT + 7] === "1";
-        o.assists = +f[STATE_EXTRA_AT + 8] || 0;
-      }
-      return o;
-    }
-    var sp = d && d.slot && (d.team === "blue" || d.team === "red") ? ARENA_MAP.spawnOf(d.team, d.slot) : { x: 0, y: 0, angle: 0 };
-    return { x: sp.x, y: sp.y, angle: sp.angle, mv: false, full: false };
-  }
 
   class BattleField {
     constructor() { this.reset(); }
@@ -3402,7 +3424,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   class Fighter extends Unit {
     constructor(id, d) {
       super();
-      var c = playable(d.characterType) ? d.characterType : FALLBACK_CHAR, pos = stateOf(d), s = pos.full ? pos : {};
+      var c = playable(d.characterType) ? d.characterType : FALLBACK_CHAR, pos = NETSTATE.stateOf(d), s = pos.full ? pos : {};
       var E = this; Object.assign(E, { id: id, team: d.team, char: c, nickname: d.nickname, isAI: !!d.isAI, practiceBot: !!CHARS[c].practiceBot,
                x: pos.x, y: pos.y, angle: pos.angle, hp: s.hp == null ? CHARS[c].hp : s.hp, maxHp: CHARS[c].hp,
                alive: s.alive !== false, gauge: s.gauge || 0, dmg: s.dmg || 0, deaths: s.deaths || 0, diedAt: s.diedAt || 0,
@@ -3428,16 +3450,125 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
                             rise: born + ULT.smRiseMs, stuck: 0, detour: 0, detourDir: 1 });
     }
   }
-  function makeEnt(id, d) { return new Fighter(id, d); }
-  function initGame() {
-    FX_VIEW.clear3d();
-    MATCH.game = { startAt: SESSION.room.startAt, endSent: false, playingSent: false, lastNet: 0, sent: {}, finalSent: false, beeped: -1 };
-    MATCH.me = isSpec() ? null : makeEnt(SESSION.myId, SESSION.players[SESSION.myId]);
-    MATCH.startRound();
-    MATCH.lastHp = {};
-    KILLFEED.clear();
-    show($("endOv"), false);
+  class MatchFlow {
+    constructor() { this.specHeld = false; }
+    makeEnt(id, d) { return new Fighter(id, d); }
+    initGame() {
+      FX_VIEW.clear3d();
+      MATCH.game = { startAt: SESSION.room.startAt, endSent: false, playingSent: false, lastNet: 0, sent: {}, finalSent: false, beeped: -1 };
+      MATCH.me = FLOW.isSpec() ? null : FLOW.makeEnt(SESSION.myId, SESSION.players[SESSION.myId]);
+      MATCH.startRound();
+      MATCH.lastHp = {};
+      KILLFEED.clear();
+      show($("endOv"), false);
+    }
+    isSpec() { return !!SESSION.players[SESSION.myId] && SESSION.players[SESSION.myId].team === "spec"; }
+    syncRemote(dt) {
+      var host = SESSION.isHost();
+      TARGETS.participants().forEach(function (id) {
+        if (id === SESSION.myId) return;
+        var d = SESSION.players[id];
+        if (d.isAI && host) {
+          if (!MATCH.bots[id]) { MATCH.bots[id] = FLOW.makeEnt(id, d); MATCH.bots[id].bot = { seed: Math.random() * 10, seenAt: 0, target: null, stuck: 0, detour: 0, detourDir: 1 }; delete MATCH.remotes[id]; DAMAGE.listenHits(id); }
+          return;
+        }
+        var r = MATCH.remotes[id];
+        if (!r) { r = MATCH.remotes[id] = FLOW.makeEnt(id, d); }
+        var k = Math.min(1, dt * 12), pos = NETSTATE.stateOf(d);
+        var tx = pos.x, ty = pos.y, revived = pos.full && !r.alive && pos.alive;
+        if (pos.mv && hyp(tx - r.x, ty - r.y) > 3) { r.moveAng = Math.atan2(ty - r.y, tx - r.x); r.moveAt = now(); }
+        if (revived || hyp(tx - r.x, ty - r.y) > 250) { r.x = tx; r.y = ty; } else { r.x += (tx - r.x) * k; r.y += (ty - r.y) * k; }
+        r.angle = lerpAng(r.angle, pos.angle, Math.min(1, dt * 15));
+        r.team = d.team; r.char = playable(d.characterType) ? d.characterType : FALLBACK_CHAR; r.maxHp = CHARS[r.char].hp;
+        r.mv = pos.mv; r.nickname = d.nickname; r.isAI = !!d.isAI;
+        if (!pos.full) return;
+        r.deaths = pos.deaths; r.diedAt = pos.diedAt; r.kills = pos.kills; r.assists = pos.assists; r.heal = pos.heal; r.protectUntil = pos.protectUntil;
+        r.stunDealt = pos.stunDealt; r.slowDealt = pos.slowDealt; r.slowWeight = pos.slowWeight; r.blocked = pos.blocked;
+        r.hp = pos.hp; r.alive = pos.alive; r.gauge = pos.gauge; r.dmg = pos.dmg;
+        r.atkAt = pos.atkAt; r.stabAt = pos.stabAt; r.ultUntil = pos.ultUntil; r.leapAt = pos.leapAt; r.buffUntil = pos.buffUntil;
+        r.regenUntil = pos.regenUntil; r.skillUntil = pos.skillUntil; r.skillDur = pos.skillDur;
+        if (pos.stealthUntil > r.stealthUntil && pos.stealthUntil > now()) FX_VIEW.smoke(r.x, r.y, CHAR_TYPES.of(r.char).smokeColor);
+        r.stealthUntil = pos.stealthUntil;
+        r.slowUntil = pos.slowUntil; r.slowMul = pos.slowMul; r.stunUntil = pos.stunUntil;
+        r.summonAt = pos.summonAt;
+        r.revealUntil = pos.revealUntil; r.frostStacks = pos.frostStacks; r.frostStackAt = pos.frostStackAt;
+        r.burnUntil = pos.burnUntil; r.shield = pos.shield;
+        MINIONS.adoptMinions(r, pos.minions, k);
+      });
+    }
+    teamTotals() {
+      var s = { blue: 0, red: 0, blueAlive: 0, redAlive: 0, blueN: 0, redN: 0, blueKills: 0, redKills: 0 };
+      TARGETS.participants().forEach(function (id) {
+        var d = SESSION.players[id], e = TARGETS.ent(id) || NETSTATE.stateOf(d); var tm = d.team;
+        var dmg = +e.dmg || 0, alive = e.alive !== false;
+        var deaths = +e.deaths || 0;
+        s[tm] += dmg; s[tm + "N"]++; if (alive) s[tm + "Alive"]++;
+        s[(tm === "blue" ? "red" : "blue") + "Kills"] += deaths;
+      });
+      return s;
+    }
+    teamAllQuit() {
+      var started = { blue: 0, red: 0 }, left = { blue: 0, red: 0 };
+      keys(SESSION.room.roster).forEach(function (id) { var r = SESSION.room.roster[id]; if (!r.ai && started[r.team] != null) started[r.team]++; });
+      if (!started.blue || !started.red) return null;
+      TARGETS.participants().forEach(function (id) { var d = SESSION.players[id]; if (!d.isAI) left[d.team]++; });
+      if (!left.red && left.blue) return "red";
+      if (!left.blue && left.red) return "blue";
+      return null;
+    }
+    hostJudge() {
+      var t = now();
+      if (SESSION.room.status === "countdown" && t >= SESSION.room.startAt && !MATCH.game.playingSent) { MATCH.game.playingSent = true; SESSION.room.ref.update({ status: "playing" }); }
+      if (SESSION.room.status !== "playing" || MATCH.game.endSent || t < SESSION.room.startAt || SESSION.room.mode === "practice") return;
+      var s = FLOW.teamTotals();
+      var quitTeam = FLOW.teamAllQuit();
+      if (!quitTeam && t < SESSION.room.startAt + MATCH_MS) return;
+      var winner = quitTeam ? (quitTeam === "blue" ? "red" : "blue")
+        : (s.blueKills > s.redKills ? "blue" : (s.redKills > s.blueKills ? "red" : "draw"));
+      MATCH.game.endSent = true;
+      NETSTATE.netWrite(true);
+      var statsMode = SESSION.room.mode === "pvp" || SESSION.room.mode === "cup";
+      var skipReason = quitTeam ? "상대팀이 모두 나가서 통계에서 제외됐어요" : STATS.skipReason(SESSION.room.mode, SESSION.room.roster, SESSION.players);
+      var ended = { status: "ended", winner: winner, endedAt: t,
+        final: { blue: s.blueKills, red: s.redKills, reason: quitTeam ? "상대팀이 모두 나가서 승리" : "시간 종료 — 킬 스코어로 판정" } };
+      if (statsMode) ended.statsNote = skipReason || STATS_PENDING;
+      SESSION.room.ref.update(ended);
+      if (!skipReason) STATS.watchDone(t);
+    }
+    hostCleanup() {
+      var t = now();
+      if (SESSION.room.status === "ended" && SESSION.room.endedAt && t - SESSION.room.endedAt > 300000) SESSION.room.ref.remove();
+    }
+    onEnded() {
+      if (!MATCH.game) return;
+      MATCH.game.forceNet = true;
+      try { NETSTATE.netWrite(true); } catch (e) {}
+      STATS.markStayed();
+      setTimeout(function () {
+        var mine = MATCH.me ? MATCH.me.team : null;
+        if (mine && SESSION.room && SESSION.room.winner && SESSION.room.winner !== "draw") sfx(SESSION.room.winner === mine ? "win" : "lose");
+      }, 200);
+    }
+    restart() {
+      if (!SESSION.room || SESSION.room.status !== "ended") return;
+      if (STATS.holdActive() || (SESSION.room.endedAt && now() - SESSION.room.endedAt < 1500)) return;
+      FLOW.backToLobby();
+    }
+    backToLobby() {
+      var u = { status: "lobby", winner: null, final: null, statsNote: null, startAt: null, endedAt: null, roster: null, draft: null, bans: null,
+                st: null, done: null, shots: null, meleeHits: null, hits: null, effects: null, kills: null, projectiles: null };
+      PRACTICE_BOTS.forEach(function (b) { if (SESSION.players[b.id]) u["players/" + b.id] = null; });
+      SESSION.room.ref.update(u);
+    }
+    holdSpecResult() { FLOW.specHeld = true; setText($("btnAgain"), "대기실로"); }
+    releaseSpecResult() {
+      if (!FLOW.specHeld) return;
+      FLOW.specHeld = false; setText($("btnAgain"), "다시하기"); show($("endOv"), false);
+      if (SESSION.room && SESSION.room.status === "lobby") { showScreen("lobby"); LOBBY.playersChanged(); }
+    }
+    againOrBackToLobby() { show($("scoreHelpModal"), false); if (FLOW.specHeld) FLOW.releaseSpecResult(); else FLOW.restart(); }
   }
+  var FLOW = new MatchFlow();
   class KillFeed {
     clear() {
       $("killFeed").innerHTML = "";
@@ -3485,7 +3616,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   var KILLFEED = new KillFeed();
-  function isSpec() { return !!SESSION.players[SESSION.myId] && SESSION.players[SESSION.myId].team === "spec"; }
   class TargetQuery {
     participants() {
       return keys(SESSION.players).filter(function (id) { var d = SESSION.players[id]; return d && d.slot && (d.team === "blue" || d.team === "red"); });
@@ -3508,39 +3638,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   var TARGETS = new TargetQuery();
-  function syncRemote(dt) {
-    var host = SESSION.isHost();
-    TARGETS.participants().forEach(function (id) {
-      if (id === SESSION.myId) return;
-      var d = SESSION.players[id];
-      if (d.isAI && host) {
-        if (!MATCH.bots[id]) { MATCH.bots[id] = makeEnt(id, d); MATCH.bots[id].bot = { seed: Math.random() * 10, seenAt: 0, target: null, stuck: 0, detour: 0, detourDir: 1 }; delete MATCH.remotes[id]; DAMAGE.listenHits(id); }
-        return;
-      }
-      var r = MATCH.remotes[id];
-      if (!r) { r = MATCH.remotes[id] = makeEnt(id, d); }
-      var k = Math.min(1, dt * 12), pos = stateOf(d);
-      var tx = pos.x, ty = pos.y, revived = pos.full && !r.alive && pos.alive;
-      if (pos.mv && hyp(tx - r.x, ty - r.y) > 3) { r.moveAng = Math.atan2(ty - r.y, tx - r.x); r.moveAt = now(); }
-      if (revived || hyp(tx - r.x, ty - r.y) > 250) { r.x = tx; r.y = ty; } else { r.x += (tx - r.x) * k; r.y += (ty - r.y) * k; }
-      r.angle = lerpAng(r.angle, pos.angle, Math.min(1, dt * 15));
-      r.team = d.team; r.char = playable(d.characterType) ? d.characterType : FALLBACK_CHAR; r.maxHp = CHARS[r.char].hp;
-      r.mv = pos.mv; r.nickname = d.nickname; r.isAI = !!d.isAI;
-      if (!pos.full) return;
-      r.deaths = pos.deaths; r.diedAt = pos.diedAt; r.kills = pos.kills; r.assists = pos.assists; r.heal = pos.heal; r.protectUntil = pos.protectUntil;
-      r.stunDealt = pos.stunDealt; r.slowDealt = pos.slowDealt; r.slowWeight = pos.slowWeight; r.blocked = pos.blocked;
-      r.hp = pos.hp; r.alive = pos.alive; r.gauge = pos.gauge; r.dmg = pos.dmg;
-      r.atkAt = pos.atkAt; r.stabAt = pos.stabAt; r.ultUntil = pos.ultUntil; r.leapAt = pos.leapAt; r.buffUntil = pos.buffUntil;
-      r.regenUntil = pos.regenUntil; r.skillUntil = pos.skillUntil; r.skillDur = pos.skillDur;
-      if (pos.stealthUntil > r.stealthUntil && pos.stealthUntil > now()) FX_VIEW.smoke(r.x, r.y, CHAR_TYPES.of(r.char).smokeColor);
-      r.stealthUntil = pos.stealthUntil;
-      r.slowUntil = pos.slowUntil; r.slowMul = pos.slowMul; r.stunUntil = pos.stunUntil;
-      r.summonAt = pos.summonAt;
-      r.revealUntil = pos.revealUntil; r.frostStacks = pos.frostStacks; r.frostStackAt = pos.frostStackAt;
-      r.burnUntil = pos.burnUntil; r.shield = pos.shield;
-      MINIONS.adoptMinions(r, pos.minions, k);
-    });
-  }
 
   class MinionSystem {
     minionKey(E, born, n) { return E.id + "_" + born + "_" + n; }
@@ -5017,62 +5114,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   var BRAIN = new BotBrain();
 
-  function entFields(u, E) {
-    var d = SESSION.players[E.id];
-    if (!d || !d.slot) return;
-    var path = "st/" + stKey(d.team, d.slot), v = packState(E);
-    if (MATCH.game.sent[path] !== v) { MATCH.game.sent[path] = v; u[path] = v; }
-  }
-  function netWrite(force) {
-    var t = Date.now();
-    if (!force && !MATCH.game.forceNet && t - MATCH.game.lastNet < NET_MS) return;
-    MATCH.game.lastNet = t; MATCH.game.forceNet = false;
-    if (!MATCH.game.sent) MATCH.game.sent = {};
-    var u = {};
-    if (MATCH.me && SESSION.players[SESSION.myId]) entFields(u, MATCH.me);
-    if (SESSION.isHost()) keys(MATCH.bots).forEach(function (id) { if (SESSION.players[id]) entFields(u, MATCH.bots[id]); });
-    if (keys(u).length) SESSION.room.ref.update(u);
-  }
 
-  function teamTotals() {
-    var s = { blue: 0, red: 0, blueAlive: 0, redAlive: 0, blueN: 0, redN: 0, blueKills: 0, redKills: 0 };
-    TARGETS.participants().forEach(function (id) {
-      var d = SESSION.players[id], e = TARGETS.ent(id) || stateOf(d); var tm = d.team;
-      var dmg = +e.dmg || 0, alive = e.alive !== false;
-      var deaths = +e.deaths || 0;
-      s[tm] += dmg; s[tm + "N"]++; if (alive) s[tm + "Alive"]++;
-      s[(tm === "blue" ? "red" : "blue") + "Kills"] += deaths;
-    });
-    return s;
-  }
-  function teamAllQuit() {
-    var started = { blue: 0, red: 0 }, left = { blue: 0, red: 0 };
-    keys(SESSION.room.roster).forEach(function (id) { var r = SESSION.room.roster[id]; if (!r.ai && started[r.team] != null) started[r.team]++; });
-    if (!started.blue || !started.red) return null;
-    TARGETS.participants().forEach(function (id) { var d = SESSION.players[id]; if (!d.isAI) left[d.team]++; });
-    if (!left.red && left.blue) return "red";
-    if (!left.blue && left.red) return "blue";
-    return null;
-  }
-  function hostJudge() {
-    var t = now();
-    if (SESSION.room.status === "countdown" && t >= SESSION.room.startAt && !MATCH.game.playingSent) { MATCH.game.playingSent = true; SESSION.room.ref.update({ status: "playing" }); }
-    if (SESSION.room.status !== "playing" || MATCH.game.endSent || t < SESSION.room.startAt || SESSION.room.mode === "practice") return;
-    var s = teamTotals();
-    var quitTeam = teamAllQuit();
-    if (!quitTeam && t < SESSION.room.startAt + MATCH_MS) return;
-    var winner = quitTeam ? (quitTeam === "blue" ? "red" : "blue")
-      : (s.blueKills > s.redKills ? "blue" : (s.redKills > s.blueKills ? "red" : "draw"));
-    MATCH.game.endSent = true;
-    netWrite(true);
-    var statsMode = SESSION.room.mode === "pvp" || SESSION.room.mode === "cup";
-    var skipReason = quitTeam ? "상대팀이 모두 나가서 통계에서 제외됐어요" : STATS.skipReason(SESSION.room.mode, SESSION.room.roster, SESSION.players);
-    var ended = { status: "ended", winner: winner, endedAt: t,
-      final: { blue: s.blueKills, red: s.redKills, reason: quitTeam ? "상대팀이 모두 나가서 승리" : "시간 종료 — 킬 스코어로 판정" } };
-    if (statsMode) ended.statsNote = skipReason || STATS_PENDING;
-    SESSION.room.ref.update(ended);
-    if (!skipReason) STATS.watchDone(t);
-  }
 
   var STATS_PATH = "teambattle/modestats/";
   var STATS_SETTLE_MS = 8000, STATS_HOLD_MAX_MS = 11000;
@@ -5129,7 +5171,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     save(r, ps) {
       var rows = keys(r.roster).map(function (id) {
-        var e = TARGETS.ent(id) || stateOf(ps[id]);
+        var e = TARGETS.ent(id) || NETSTATE.stateOf(ps[id]);
         return { c: r.roster[id].c, win: r.winner === r.roster[id].team, dmg: +e.dmg || 0, heal: +e.heal || 0,
                  blocked: +e.blocked || 0, stun: +e.stunDealt || 0, slow: +e.slowDealt || 0, assists: +e.assists || 0, kills: +e.kills || 0, deaths: +e.deaths || 0 };
       });
@@ -5182,97 +5224,67 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   var STATS = new MatchStats();
-  function hostCleanup() {
-    var t = now();
-    if (SESSION.room.status === "ended" && SESSION.room.endedAt && t - SESSION.room.endedAt > 300000) SESSION.room.ref.remove();
+  class PracticeMode {
+    constructor() { this.infoShown = null; }
+    leavePractice() {
+      if (!SESSION.room || !SESSION.practiceMode() || !SESSION.isHost() || SESSION.room.status === "lobby") return;
+      show($("pcModal"), false);
+      FLOW.backToLobby();
+    }
+    fillPracticeGauge() {
+      if (!SESSION.practiceMode() || !MATCH.me || !MATCH.me.alive || MATCH.me.hasSkillActive(now())) return;
+      MATCH.me.gauge = GAUGE_MAX; MATCH.game.forceNet = true;
+    }
+    practiceCharsHtml() {
+      return CARDS.roleRowsHtml(function (k) {
+        return '<button type="button" class="dfCard' + (MATCH.me && MATCH.me.char === k ? " on" : "") + '" data-c="' + k + '"><img alt="" src="' + charImgSrc(k) + '"><div class="nm">' + CHARS[k].name + "</div></button>";
+      });
+    }
+    practiceInfoHtml() {
+      var k = MATCH.me.char;
+      return '<div class="dfName">' + CHARS[k].icon + " " + CHARS[k].name + '<small>' + roleOf(k).icon + " " + roleOf(k).name + "</small></div>" +
+        '<div class="dfRole">' + roleGaugeText(roleOf(k)) + "</div>" + statTable(k) + skillBlocks(k);
+    }
+    renderPracticeModal() {
+      setHtmlKeepScroll($("pcChars"), PRACTICE.practiceCharsHtml());
+      $("pcInfo").firstChild.innerHTML = PRACTICE.practiceInfoHtml();
+    }
+    openPracticeChars() {
+      if (!SESSION.practiceMode() || !MATCH.me) return;
+      PRACTICE.renderPracticeModal();
+      show($("pcModal"), true);
+    }
+    changePracticeChar(c) {
+      if (!SESSION.practiceMode() || !MATCH.me || !MATCH.game || !pickable(c)) return;
+      var old = MATCH.me, d = Object.assign({}, SESSION.players[SESSION.myId], { characterType: c });
+      if (old.char === c) return;
+      SESSION.players[SESSION.myId] = d;
+      SESSION.room.ref.child("players/" + SESSION.myId + "/characterType").set(c);
+      if (SESSION.room.roster && SESSION.room.roster[SESSION.myId]) SESSION.room.ref.child("roster/" + SESSION.myId + "/c").set(c);
+      var E = FLOW.makeEnt(SESSION.myId, d);
+      Object.assign(E, { x: old.x, y: old.y, angle: old.angle, alive: true, diedAt: 0, gauge: 0, minions: [], protectUntil: 0,
+                         stealthUntil: 0, skillUntil: 0, skillDur: 0, stunUntil: 0, slowUntil: 0, slowMul: 1, revealUntil: 0, burnUntil: 0,
+                         frostStacks: 0, frostStackAt: 0, lastStandUsed: false, rallyUsed: false, shield: !!CHARS[c].respawnShield,
+                         dmg: old.dmg, kills: old.kills, deaths: old.deaths, assists: old.assists, heal: old.heal });
+      E.maxHp = CHARS[E.char].hp; E.hp = E.maxHp;
+      MATCH.me = E; MATCH.lastHp[SESSION.myId] = E.hp;
+      INPUT.aim.id = null;
+      MATCH.game.forceNet = true;
+      sfx("confirm");
+      PRACTICE.renderPracticeModal();
+    }
   }
-  function onEnded() {
-    if (!MATCH.game) return;
-    MATCH.game.forceNet = true;
-    try { netWrite(true); } catch (e) {}
-    STATS.markStayed();
-    setTimeout(function () {
-      var mine = MATCH.me ? MATCH.me.team : null;
-      if (mine && SESSION.room && SESSION.room.winner && SESSION.room.winner !== "draw") sfx(SESSION.room.winner === mine ? "win" : "lose");
-    }, 200);
-  }
-  function restart() {
-    if (!SESSION.room || SESSION.room.status !== "ended") return;
-    if (STATS.holdActive() || (SESSION.room.endedAt && now() - SESSION.room.endedAt < 1500)) return;
-    backToLobby();
-  }
-  function backToLobby() {
-    var u = { status: "lobby", winner: null, final: null, statsNote: null, startAt: null, endedAt: null, roster: null, draft: null, bans: null,
-              st: null, done: null, shots: null, meleeHits: null, hits: null, effects: null, kills: null, projectiles: null };
-    PRACTICE_BOTS.forEach(function (b) { if (SESSION.players[b.id]) u["players/" + b.id] = null; });
-    SESSION.room.ref.update(u);
-  }
-  function leavePractice() {
-    if (!SESSION.room || !SESSION.practiceMode() || !SESSION.isHost() || SESSION.room.status === "lobby") return;
-    show($("pcModal"), false);
-    backToLobby();
-  }
-  function fillPracticeGauge() {
-    if (!SESSION.practiceMode() || !MATCH.me || !MATCH.me.alive || MATCH.me.hasSkillActive(now())) return;
-    MATCH.me.gauge = GAUGE_MAX; MATCH.game.forceNet = true;
-  }
-  function practiceCharsHtml() {
-    return CARDS.roleRowsHtml(function (k) {
-      return '<button type="button" class="dfCard' + (MATCH.me && MATCH.me.char === k ? " on" : "") + '" data-c="' + k + '"><img alt="" src="' + charImgSrc(k) + '"><div class="nm">' + CHARS[k].name + "</div></button>";
-    });
-  }
-  var practiceInfoShown = null;
-  function practiceInfoHtml() {
-    var k = MATCH.me.char;
-    return '<div class="dfName">' + CHARS[k].icon + " " + CHARS[k].name + '<small>' + roleOf(k).icon + " " + roleOf(k).name + "</small></div>" +
-      '<div class="dfRole">' + roleGaugeText(roleOf(k)) + "</div>" + statTable(k) + skillBlocks(k);
-  }
-  function renderPracticeModal() {
-    setHtmlKeepScroll($("pcChars"), practiceCharsHtml());
-    $("pcInfo").firstChild.innerHTML = practiceInfoHtml();
-  }
-  function openPracticeChars() {
-    if (!SESSION.practiceMode() || !MATCH.me) return;
-    renderPracticeModal();
-    show($("pcModal"), true);
-  }
-  function changePracticeChar(c) {
-    if (!SESSION.practiceMode() || !MATCH.me || !MATCH.game || !pickable(c)) return;
-    var old = MATCH.me, d = Object.assign({}, SESSION.players[SESSION.myId], { characterType: c });
-    if (old.char === c) return;
-    SESSION.players[SESSION.myId] = d;
-    SESSION.room.ref.child("players/" + SESSION.myId + "/characterType").set(c);
-    if (SESSION.room.roster && SESSION.room.roster[SESSION.myId]) SESSION.room.ref.child("roster/" + SESSION.myId + "/c").set(c);
-    var E = makeEnt(SESSION.myId, d);
-    Object.assign(E, { x: old.x, y: old.y, angle: old.angle, alive: true, diedAt: 0, gauge: 0, minions: [], protectUntil: 0,
-                       stealthUntil: 0, skillUntil: 0, skillDur: 0, stunUntil: 0, slowUntil: 0, slowMul: 1, revealUntil: 0, burnUntil: 0,
-                       frostStacks: 0, frostStackAt: 0, lastStandUsed: false, rallyUsed: false, shield: !!CHARS[c].respawnShield,
-                       dmg: old.dmg, kills: old.kills, deaths: old.deaths, assists: old.assists, heal: old.heal });
-    E.maxHp = CHARS[E.char].hp; E.hp = E.maxHp;
-    MATCH.me = E; MATCH.lastHp[SESSION.myId] = E.hp;
-    INPUT.aim.id = null;
-    MATCH.game.forceNet = true;
-    sfx("confirm");
-    renderPracticeModal();
-  }
-  $("btnPracChar").onclick = openPracticeChars;
-  $("btnPracGauge").onclick = fillPracticeGauge;
-  $("btnPracExit").onclick = leavePractice;
+  var PRACTICE = new PracticeMode();
+  $("btnPracChar").onclick = function () { PRACTICE.openPracticeChars(); };
+  $("btnPracGauge").onclick = function () { PRACTICE.fillPracticeGauge(); };
+  $("btnPracExit").onclick = function () { PRACTICE.leavePractice(); };
   $("btnPcClose").onclick = function () { show($("pcModal"), false); };
   $("pcModal").addEventListener("click", function (e) { if (e.target === $("pcModal")) show($("pcModal"), false); });
   $("pcChars").onclick = function (e) {
     var b = e.target.closest ? e.target.closest(".dfCard") : null;
-    if (b) changePracticeChar(b.getAttribute("data-c"));
+    if (b) PRACTICE.changePracticeChar(b.getAttribute("data-c"));
   };
-  var specResultHeld = false;
-  function holdSpecResult() { specResultHeld = true; setText($("btnAgain"), "대기실로"); }
-  function releaseSpecResult() {
-    if (!specResultHeld) return;
-    specResultHeld = false; setText($("btnAgain"), "다시하기"); show($("endOv"), false);
-    if (SESSION.room && SESSION.room.status === "lobby") { showScreen("lobby"); LOBBY.playersChanged(); }
-  }
-  function againOrBackToLobby() { show($("scoreHelpModal"), false); if (specResultHeld) releaseSpecResult(); else restart(); }
-  $("btnAgain").onclick = againOrBackToLobby;
+  $("btnAgain").onclick = function () { FLOW.againOrBackToLobby(); };
   var cv = $("cv"), ov = $("ov"), octx = ov.getContext("2d");
   class InputController {
     constructor() {
@@ -5299,7 +5311,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     releaseKeys() { for (var k in INPUT.keys) INPUT.keys[k] = false; }
     onKeyDown(e) {
       if (!$("scoreHelpModal").hidden && (e.code === "Space" || e.key === " " || e.key === "Escape")) { e.preventDefault(); show($("scoreHelpModal"), false); return; }
-      if ((e.code === "Space"|| e.key === " ") && SESSION.room && (SESSION.room.status === "ended" || specResultHeld) && screenNow === "game") { e.preventDefault(); againOrBackToLobby(); return; }
+      if ((e.code === "Space"|| e.key === " ") && SESSION.room && (SESSION.room.status === "ended" || FLOW.specHeld) && screenNow === "game") { e.preventDefault(); FLOW.againOrBackToLobby(); return; }
       if (screenNow !== "game" || (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName))) return;
       var k = INPUT.keyName(e);
       if (k) { INPUT.keys[k] = true; e.preventDefault(); audio(); return; }
@@ -7230,10 +7242,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       });
       return rows;
     }
-    secText(v) { return v > 0 ? oneDecimal(v) + "초" : "-"; }
+    secText(v) { return v > 0 ? NETSTATE.oneDecimal(v) + "초" : "-"; }
     mvpScore(E) {
       return E.kills * 100 + (E.assists || 0) * MVP_ASSIST + Math.round(E.dmg) + Math.round(E.heal || 0) + Math.round(E.blocked || 0)
-        + Math.round(oneDecimal(E.stunDealt) * MVP_STUN_PER_SEC) + Math.round(twoDecimals(E.slowWeight) * MVP_SLOW_PER_SEC) - E.deaths * 100;
+        + Math.round(NETSTATE.oneDecimal(E.stunDealt) * MVP_STUN_PER_SEC) + Math.round(NETSTATE.twoDecimals(E.slowWeight) * MVP_SLOW_PER_SEC) - E.deaths * 100;
     }
     mvpHtml() {
       var best = [];
@@ -7297,9 +7309,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       $("scrGame").classList.toggle("practice", practice);
       show($("practiceBar"), practice && !!MATCH.me && st !== "ended");
       show($("practiceInfo"), practice && !!MATCH.me && st !== "ended");
-      if (practice && MATCH.me && practiceInfoShown !== MATCH.me.char) { practiceInfoShown = MATCH.me.char; setHtml($("practiceInfo"), practiceInfoHtml()); }
+      if (practice && MATCH.me && PRACTICE.infoShown !== MATCH.me.char) { PRACTICE.infoShown = MATCH.me.char; setHtml($("practiceInfo"), PRACTICE.practiceInfoHtml()); }
       show($("btnLeaveGame"), !practice);
-      var s = teamTotals();
+      var s = FLOW.teamTotals();
       setHtml($("hudCount"), '<span class="b">🔵 ' + s.blueAlive + '</span> vs <span class="r">🔴 ' + s.redAlive + "</span>");
       setText($("hudKillB"), String(s.blueKills)); setText($("hudKillR"), String(s.redKills));
       var spec = !MATCH.me;
@@ -7689,20 +7701,20 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (!SESSION.room || screenNow !== "game") { if (!vidOpen) { TOUR_VIEW.renderTour(nowMs, dt); HUD.adaptQuality(frameMs); } return; }
     var st = SESSION.room.status;
     if ((st === "countdown" || st === "playing" || st === "ended") && SESSION.room.startAt && (!MATCH.game || MATCH.game.startAt !== SESSION.room.startAt)) {
-      if (SESSION.players[SESSION.myId] && (SESSION.players[SESSION.myId].slot || isSpec())) initGame(); else return;
+      if (SESSION.players[SESSION.myId] && (SESSION.players[SESSION.myId].slot || FLOW.isSpec())) FLOW.initGame(); else return;
     }
     if (!MATCH.game) return;
     var t = now();
     WORLD.stepWorld(t, dt * CLOCK.scale, true, dt);
-    if (st === "countdown" || st === "playing") netWrite(false);
-    if (SESSION.isHost()) { hostJudge(); hostCleanup(); }
+    if (st === "countdown" || st === "playing") NETSTATE.netWrite(false);
+    if (SESSION.isHost()) { FLOW.hostJudge(); FLOW.hostCleanup(); }
     FRAME_RENDERER.render(t, dt);
     HUD.updateHud(t);
     HUD.adaptQuality(frameMs);
   }
   class WorldStepper {
     stepWorld(t, dt, driveBots, viewDt) {
-      syncRemote(viewDt == null ? dt : viewDt);
+      FLOW.syncRemote(viewDt == null ? dt : viewDt);
       WORLD.stepFlightsAndFields(t, dt);
       if (SESSION.room.status === "playing" && t >= SESSION.room.startAt) WORLD.stepPlaying(t, dt, driveBots);
     }
@@ -7782,7 +7794,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         renderer.render(scene, camera);
         return renderer.domElement.toDataURL("image/png");
       },
-      loadMapData: ARENA_MAP.load.bind(ARENA_MAP), makeEnt: makeEnt, resolve: PHYSICS.resolve.bind(PHYSICS), stepWorld: WORLD.stepWorld.bind(WORLD),
+      loadMapData: ARENA_MAP.load.bind(ARENA_MAP), makeEnt: FLOW.makeEnt.bind(FLOW), resolve: PHYSICS.resolve.bind(PHYSICS), stepWorld: WORLD.stepWorld.bind(WORLD),
       useUlt: ATTACK.useUlt.bind(ATTACK), fireBasic: ATTACK.fireBasic.bind(ATTACK), damage: DAMAGE.damage.bind(DAMAGE), healCut: STATUS.healCut.bind(STATUS), healAmount: STATUS.healAmount.bind(STATUS), respawnIfReady: RESPAWN.respawnIfReady.bind(RESPAWN), afflict: STATUS.afflict.bind(STATUS), speedOf: function (E) { return E.speed(); }, stunned: function (E, t) { return E.isStunned(t); },
       onShot: PROJECTILES.onShot.bind(PROJECTILES), onMelee: MELEE.onMelee.bind(MELEE), potionFlightMs: FIELD_FX.potionFlightMs.bind(FIELD_FX), meteorHitAt: FIELD_FX.meteorHitAt.bind(FIELD_FX), onEffect: FIELD_FX.onEffect.bind(FIELD_FX), onHit: DAMAGE.onHit.bind(DAMAGE),
       multiKillCount: KILLFEED.multiKillCount.bind(KILLFEED), MULTI_KILL_MS: MULTI_KILL_MS, ASSIST_MS: ASSIST_MS, onKill: DAMAGE.creditHelpAssists.bind(DAMAGE),
@@ -7804,7 +7816,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       DRAFT: DRAFT, DRAFT_STEPS: DRAFT_STEPS, DRAFT_STEP_MS: DRAFT_STEP_MS, DRAFT_AI_MS: DRAFT_AI_MS, DRAFT_AI_TRADE_MS: DRAFT_AI_TRADE_MS, NO_BAN: NO_BAN,
       STATS: STATS, STATS_PATH: STATS_PATH, STATS_PENDING: STATS_PENDING, STATS_SETTLE_MS: STATS_SETTLE_MS, STATS_HOLD_MAX_MS: STATS_HOLD_MAX_MS, DEFAULT_SLOW: DEFAULT_SLOW,
       CLOCK: CLOCK, GameClock: GameClock, CLOCK_KEEP: CLOCK_KEEP, CLOCK_PINGS: CLOCK_PINGS,
-      MATCH: MATCH, FIELD: FIELD, resetLocal: SESSION.resetLocal.bind(SESSION), backToLobby: backToLobby, stKey: stKey,
+      MATCH: MATCH, FIELD: FIELD, resetLocal: SESSION.resetLocal.bind(SESSION), backToLobby: FLOW.backToLobby.bind(FLOW), stKey: NETSTATE.stKey.bind(NETSTATE),
       KEY_ON: INPUT.keys, joy: INPUT.joy, aim: INPUT.aim, keyName: INPUT.keyName.bind(INPUT), joyBase: INPUT.joyBase.bind(INPUT), joyRadius: function () { return INPUT.joyR; }, DRAG_MIN: INPUT.dragMin, canAct: INPUT.canAct.bind(INPUT), flip: INPUT.flip.bind(INPUT),
       localTargets: TARGETS.localTargets.bind(TARGETS), hear: TARGETS.hear.bind(TARGETS), pruneLocal: WORLD.pruneLocal.bind(WORLD), revealedTo: VISION.revealedTo.bind(VISION), inBush: VISION.inBush.bind(VISION), STEALTH_REVEAL_DIST: STEALTH_REVEAL_DIST,
       rayRect: PHYSICS.rayRect.bind(PHYSICS), rayObst: PHYSICS.rayObst.bind(PHYSICS), rayCast: PHYSICS.rayCast.bind(PHYSICS), losClear: PHYSICS.losClear.bind(PHYSICS), segHit: PROJECTILES.segHit.bind(PROJECTILES),
@@ -7816,11 +7828,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       pickTeam: ROSTER.pickTeam.bind(ROSTER), pickChar: ROSTER.pickChar.bind(ROSTER), setMode: ROSTER.setMode.bind(ROSTER), setMapChoice: ROSTER.setMapChoice.bind(ROSTER), addAi: ROSTER.addAi.bind(ROSTER), removeAi: ROSTER.removeAi.bind(ROSTER), mapChoices: LOBBY.mapChoices.bind(LOBBY), resolveArena: ARENA_MAP.resolveArena.bind(ARENA_MAP), modeName: LOBBY.modeName.bind(LOBBY),
       renderLobby: LOBBY.renderLobby.bind(LOBBY), flashHint: LOBBY.flashHint.bind(LOBBY), clearHint: function () { LOBBY.hintUntil = 0; LOBBY.hintText = ""; }, practiceMode: SESSION.practiceMode.bind(SESSION), TEAM_MAX: TEAM_MAX, SPEC_MAX: SPEC_MAX, FALLBACK_CHAR: FALLBACK_CHAR, MODES: MODES,
       tileX: ARENA_MAP.tileX.bind(ARENA_MAP), tileY: ARENA_MAP.tileY.bind(ARENA_MAP), fullMap: ARENA_MAP.fullMap.bind(ARENA_MAP), mapRows: function () { return ARENA_MAP.rows; }, bushIds: function () { return ARENA_MAP.bushId; }, bridges: function () { return ARENA_MAP.bridges; }, MW: MW, MH: MH, TILE: TILE, SPAWN_X: SPAWN_X,
-      packState: packState, stateOf: stateOf, packMinions: packMinions, unpackMinions: unpackMinions, relTime: relTime, absTime: absTime, angDeg: angDeg, netWrite: netWrite, NET_MS: NET_MS, STATE_TIMES: STATE_TIMES,
-      teamTotals: teamTotals, teamAllQuit: teamAllQuit, hostJudge: hostJudge, hostCleanup: hostCleanup, onEnded: onEnded, restart: restart, holdSpecResult: holdSpecResult, releaseSpecResult: releaseSpecResult,
-      againOrBackToLobby: againOrBackToLobby, initGame: initGame, isSpec: isSpec, syncRemote: syncRemote, specResultHeld: function () { return specResultHeld; }, matchMs: function () { return MATCH_MS; },
-      startGame: startGame, launchMatch: launchMatch, practiceSpots: practiceSpots, PRACTICE_BOTS: PRACTICE_BOTS, leavePractice: leavePractice, fillPracticeGauge: fillPracticeGauge,
-      openPracticeChars: openPracticeChars, changePracticeChar: changePracticeChar, renderPracticeModal: renderPracticeModal, showScreen: showScreen,
+      packState: NETSTATE.packState.bind(NETSTATE), stateOf: NETSTATE.stateOf.bind(NETSTATE), packMinions: NETSTATE.packMinions.bind(NETSTATE), unpackMinions: NETSTATE.unpackMinions.bind(NETSTATE), relTime: NETSTATE.relTime.bind(NETSTATE), absTime: NETSTATE.absTime.bind(NETSTATE), angDeg: NETSTATE.angDeg.bind(NETSTATE), netWrite: NETSTATE.netWrite.bind(NETSTATE), NET_MS: NET_MS, STATE_TIMES: STATE_TIMES,
+      teamTotals: FLOW.teamTotals.bind(FLOW), teamAllQuit: FLOW.teamAllQuit.bind(FLOW), hostJudge: FLOW.hostJudge.bind(FLOW), hostCleanup: FLOW.hostCleanup.bind(FLOW), onEnded: FLOW.onEnded.bind(FLOW), restart: FLOW.restart.bind(FLOW), holdSpecResult: FLOW.holdSpecResult.bind(FLOW), releaseSpecResult: FLOW.releaseSpecResult.bind(FLOW),
+      againOrBackToLobby: FLOW.againOrBackToLobby.bind(FLOW), initGame: FLOW.initGame.bind(FLOW), isSpec: FLOW.isSpec.bind(FLOW), syncRemote: FLOW.syncRemote.bind(FLOW), specResultHeld: function () { return FLOW.specHeld; }, matchMs: function () { return MATCH_MS; },
+      startGame: LAUNCHER.startGame.bind(LAUNCHER), launchMatch: LAUNCHER.launchMatch.bind(LAUNCHER), practiceSpots: LAUNCHER.practiceSpots.bind(LAUNCHER), PRACTICE_BOTS: PRACTICE_BOTS, leavePractice: PRACTICE.leavePractice.bind(PRACTICE), fillPracticeGauge: PRACTICE.fillPracticeGauge.bind(PRACTICE),
+      openPracticeChars: PRACTICE.openPracticeChars.bind(PRACTICE), changePracticeChar: PRACTICE.changePracticeChar.bind(PRACTICE), renderPracticeModal: PRACTICE.renderPracticeModal.bind(PRACTICE), showScreen: showScreen,
       statsPct: statsPct, statsRateCell: statsRateCell, banPickCell: banPickCell, kdaText: kdaText, statsRowsHtml: statsRowsHtml, loadStats: loadStats, mapShotSrc: mapShotSrc, statsModeNow: function () { return statsMode; },
       sfx: sfx, killSound: killSound, audio: audio, openNick: openNick, saveNick: saveNick, refreshNick: refreshNick, nickNow: function () { return nick; }, NICK_MAX: NICK_MAX,
       applyTimeScale: applyTimeScale, playable: playable, pickable: pickable, roleOf: roleOf, roParticle: roParticle, josa: josa, charsInRole: charsInRole, isMelee: isMelee, charImgSrc: charImgSrc,
