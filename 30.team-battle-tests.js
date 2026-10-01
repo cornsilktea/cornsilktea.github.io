@@ -556,7 +556,7 @@ function collectResults(api) {
     W.step(stunAt);
     api.afflict(W.ent("rg"), { stunMs: 1000 });
     W.step(1000);
-    var hits = Math.round((W.ent("foe").maxHp - W.ent("foe").hp) / api.ULT.mkDmg);
+    var hits = Math.round((W.ent("foe").maxHp - W.ent("foe").hp) / (api.ULT.mkDmg - api.CHARS.knight.armor));
     done(hits <= firedBefore ? "pass" : "fail", "기절 전에 쏜 " + firedBefore + "발 중 " + hits + "발 적중" + (hits > firedBefore ? " — 기절 뒤에도 " + (hits - firedBefore) + "발 더 나감" : ", 기절 뒤로는 안 나감"));
   });
 
@@ -583,7 +583,7 @@ function collectResults(api) {
     W.ent("foe").maxHp = W.ent("foe").hp = 1000;
     api.useUlt(W.ent("rg"), 0);
     W.step(api.ULT.mkCount * api.ULT.mkGap + 500);
-    var g = W.ent("rg").gauge, hits = Math.round((W.ent("foe").maxHp - W.ent("foe").hp) / api.ULT.mkDmg);
+    var g = W.ent("rg").gauge, hits = Math.round((W.ent("foe").maxHp - W.ent("foe").hp) / (api.ULT.mkDmg - api.CHARS.knight.armor));
     done(g === api.GAUGE_MAX && hits === api.ULT.mkCount ? "pass" : "fail", hits + "발 적중 → 게이지 " + g + "/" + api.GAUGE_MAX);
   });
 
@@ -818,7 +818,7 @@ function collectResults(api) {
     seen.push(api.stunned(foe, W.t()) ? "빙결 지속" : foe.frostStacks);
     W.step(api.ULT.frBzTick - api.ULT.frFreezeMs);
     seen.push(foe.frostStacks);
-    var want = [1, 2, "빙결", 0, 1];
+    var want = [1, 2, "빙결", api.ULT.frFreezeMs < api.ULT.frBzTick ? 0 : 1, 1];
     if (seen.join() !== want.join()) bad.push("중첩 " + seen.join(" → ") + " (기대 " + want.join(" → ") + ")");
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "중첩 " + seen.join(" → "));
   });
@@ -939,7 +939,7 @@ function collectResults(api) {
       done(!r.storming && !r.extra && !r.gaugeLocked ? "pass" : "fail", (r.storming ? "폭풍 계속됨" : "폭풍 끊김") + ", 끊긴 뒤 피해 " + r.extra + (r.gaugeLocked ? ", 게이지 잠김 남음" : ""));
     });
   });
-  run(DANCER, "칼날 폭풍: " + api.ULT.bwDur / 1000 + "초간 이동속도 " + api.CHARS.dancer.ultSpeed + ", 반경 " + api.ULT.bwR + " 안 적에게 " + api.ULT.bwTick / 1000 + "초마다 " + api.ULT.bwDmg + " 피해, 따라다니고 끝나면 멈추는가", function (done) {
+  run(DANCER, "칼날 폭풍: " + api.secs(api.ULT.bwDur) + "간 이동속도 " + api.shownSpeed(api.CHARS.dancer.ultSpeed) + ", 반경 " + api.ULT.bwR + " 안 적에게 " + api.secs(api.ULT.bwTick) + "마다 " + api.ULT.bwDmg + " 피해, 따라다니고 끝나면 멈추는가", function (done) {
     var y = OPEN_Y.forest;
     var W = dancerDuel([
       { id: "foe", team: "red", char: "guardian", x: 350, y: y },
@@ -953,7 +953,7 @@ function collectResults(api) {
     W.step(1000);
     dn.x += 80; foe.x += 80;
     W.step(api.ULT.bwDur - 1000 + 50);
-    var lost = foe.maxHp - foe.hp, ticks = api.ULT.bwDur / api.ULT.bwTick;
+    var lost = foe.maxHp - foe.hp, ticks = Math.ceil(api.ULT.bwDur / api.ULT.bwTick);
     if (lost !== ticks * api.ULT.bwDmg) bad.push("피해 " + lost + " (기대 " + ticks * api.ULT.bwDmg + ")");
     if (out.hp !== out.maxHp) bad.push("범위 밖 적이 " + (out.maxHp - out.hp) + " 피해");
     var after = foe.hp; W.step(1000);
@@ -1046,7 +1046,7 @@ function collectResults(api) {
     } finally { Math.random = realRandom; }
   }
   var PASSIVE2 = "주술사·투척병·기사·창술사·광전사 패시브";
-  run(PASSIVE2, "주술사: 적중한 적이 " + api.CHARS.mage.burn.ms / 1000 + "초간 불타며 1초당 최대 체력의 " + api.CHARS.mage.burn.maxHpRate * 100 + "%의 피해를 입고, 그동안 회복이 절반인가", function (done) {
+  run(PASSIVE2, "주술사: 적중한 적이 " + api.secs(api.CHARS.mage.burn.ms) + "간 불타며 1초당 최대 체력의 " + api.CHARS.mage.burn.maxHpRate * 100 + "%의 피해를 입고, 그동안 회복이 절반인가", function (done) {
     var y = OPEN_Y.forest, burn = api.CHARS.mage.burn;
     var W = world("forest", [
       { id: "mg", team: "blue", char: "mage", x: 250, y: y },
@@ -1057,7 +1057,7 @@ function collectResults(api) {
     if (!api.healCut(foe, W.t())) bad.push("불타는 중 회복 감소 없음");
     if (api.healAmount(foe, 10, W.t()) !== 5) bad.push("회복 10 → " + api.healAmount(foe, 10, W.t()));
     W.step(burn.ms + 500);
-    var want = api.CHARS.mage.dmg + Math.round(foe.maxHp * burn.maxHpRate) * burn.ms / 1000, lost = foe.maxHp - foe.hp;
+    var want = api.CHARS.mage.dmg + Math.round(foe.maxHp * burn.maxHpRate) * Math.round(burn.ms / api.TIMESCALE.burnTickMs), lost = foe.maxHp - foe.hp;
     if (lost !== want) bad.push("받은 피해 " + lost + " (기대 " + want + ")");
     if (api.healCut(foe, W.t())) bad.push("화상이 끝나도 회복 감소 남음");
     var mageDmg = W.log.filter(function (p) { return p.path === "hits/mg"; }).reduce(function (a, p) { return a + (p.v.d || 0); }, 0);
@@ -1137,13 +1137,13 @@ function collectResults(api) {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "시작·부활 시 보호막, 피해 30 막고 기절은 적용, 다음 피해는 그대로");
   });
 
-  run(PASSIVE2, "광전사: 체력 " + api.CHARS.warrior.rally.hpRate * 100 + "% 미만이 되면 " + api.CHARS.warrior.rally.ms / 1000 + "초간 1초당 " + api.CHARS.warrior.rally.perSec + " 회복하고, 죽기 전까지 다시 발동하지 않는가", function (done) {
+  run(PASSIVE2, "광전사: 체력 " + api.CHARS.warrior.rally.hpRate * 100 + "% 미만이 되면 " + api.secs(api.CHARS.warrior.rally.ms) + "간 1초당 " + api.CHARS.warrior.rally.perSec + " 회복하고, 죽기 전까지 다시 발동하지 않는가", function (done) {
     var y = OPEN_Y.forest, R = api.CHARS.warrior.rally;
     var W = world("forest", [
       { id: "kn", team: "blue", char: "knight", x: 250, y: y },
       { id: "wr", team: "red", char: "warrior", x: 450, y: y }
     ]);
-    var wr = W.ent("wr"), bad = [], full = R.perSec * R.ms / 1000;
+    var wr = W.ent("wr"), bad = [], full = R.perSec * Math.round(R.ms / api.TIMESCALE.regenTickMs);
     api.damage(wr, wr.maxHp - (wr.maxHp * R.hpRate - 5), "kn", false, null);
     var h0 = wr.hp, heal0 = wr.heal || 0;
     W.step(R.ms + 500);
@@ -1159,7 +1159,7 @@ function collectResults(api) {
     var h2 = wr.hp;
     W.step(1500);
     if (wr.hp <= h2) bad.push("부활 뒤 재충전 안 됨");
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : R.ms / 1000 + "초간 " + full + " 회복, 한 목숨에 한 번, 부활 시 재충전");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : api.secs(R.ms) + "간 " + full + " 회복, 한 목숨에 한 번, 부활 시 재충전");
   });
 
   run(MISC, "연속 킬: 마지막 킬부터 3초 안이면 더블→트리플→쿼드라→펜타, 한 번에 2킬도 이어서 셈", function (done) {
@@ -1475,7 +1475,8 @@ function collectResults(api) {
     var ok = got[0] === want0 && got[1] === api.GAUGE_MAX && got[2] === want2;
     done(ok ? "pass" : "fail", n + "번 회복(" + n * heal + ") → " + got[0] + ", " + (n + 1) + "번째 → " + got[1] + ", 6만 회복 → " + got[2] + " (기대 " + want0 + "·" + api.GAUGE_MAX + "·" + want2 + ")");
   });
-  run(CLERIC, "요한계시록: " + api.ULT.rvDur / 1000 + "초간 아군은 1초당 " + api.ULT.rvHeal + " 회복, 적은 1초당 " + api.ULT.rvDmg + " 피해를 사용 순간·1초·2초에 3번 받고 거리와 상관없으며, 클레릭은 사용 순간 체력이 모두 차는가", function (done) {
+  var RV_TICKS = Math.ceil(api.ULT.rvDur / api.ULT.rvTick);
+  run(CLERIC, "요한계시록: " + api.secs(api.ULT.rvDur) + "간 아군은 1초당 " + api.ULT.rvHeal + " 회복, 적은 1초당 " + api.ULT.rvDmg + " 피해를 사용 순간부터 1초마다 " + Math.ceil(api.ULT.rvDur / api.ULT.rvTick) + "번 받고 거리와 상관없으며, 클레릭은 사용 순간 체력이 모두 차는가", function (done) {
     var W = clericTeam(), cl = W.ent("cl"), kn = W.ent("kn"), foe = W.ent("foe"), foe2 = W.ent("foe2"), bad = [], times = [];
     kn.hp = 100; cl.hp = 50; foe.hp = foe.maxHp = 1000; foe2.x = 750; foe2.y = 1250; foe2.hp = foe2.maxHp = 1000;
     cl.gauge = api.GAUGE_MAX;
@@ -1484,13 +1485,13 @@ function collectResults(api) {
     api.useUlt(cl, 0);
     W.frame(1); mark(W.t());
     W.step(api.ULT.rvDur + 500, FRAME, mark);
-    if (1000 - foe.hp !== api.ULT.rvDmg * 3) bad.push("가까운 적 피해 " + (1000 - foe.hp));
-    if (1000 - foe2.hp !== api.ULT.rvDmg * 3) bad.push("먼 적 피해 " + (1000 - foe2.hp));
-    if (kn.hp !== 100 + api.ULT.rvHeal * 3) bad.push("아군 회복 " + (kn.hp - 100));
+    if (1000 - foe.hp !== api.ULT.rvDmg * RV_TICKS) bad.push("가까운 적 피해 " + (1000 - foe.hp));
+    if (1000 - foe2.hp !== api.ULT.rvDmg * RV_TICKS) bad.push("먼 적 피해 " + (1000 - foe2.hp));
+    if (kn.hp !== 100 + api.ULT.rvHeal * RV_TICKS) bad.push("아군 회복 " + (kn.hp - 100));
     if (cl.hp !== cl.maxHp) bad.push("사용 시 자신의 체력이 모두 회복되지 않음(" + cl.hp + ")");
     if (times[0] !== 0) bad.push("사용 순간 피해 없음");
     if (cl.gauge !== 0) bad.push("스킬 중 회복으로 게이지가 참(" + cl.gauge + ")");
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "적 " + api.ULT.rvDmg * 3 + " 피해·아군 " + api.ULT.rvHeal * 3 + " 회복(" + times.join("초·") + "초), 먼 적도 같음, 자신은 사용 순간 체력 모두 회복");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "적 " + api.ULT.rvDmg * RV_TICKS + " 피해·아군 " + api.ULT.rvHeal * RV_TICKS + " 회복(" + times.join("초·") + "초), 먼 적도 같음, 자신은 사용 순간 체력 모두 회복");
   });
   run(CLERIC, "요한계시록: 쓰러진 적·아군과 부활 보호 중인 적·아군에게는 피해·회복이 들어가지 않는가", function (done) {
     var W = clericTeam(), cl = W.ent("cl"), kn = W.ent("kn"), rg = W.ent("rg"), foe = W.ent("foe"), foe2 = W.ent("foe2"), bad = [];
@@ -1504,8 +1505,8 @@ function collectResults(api) {
     if (kn.hp !== 100) bad.push("보호 중 아군 회복 " + (kn.hp - 100));
     if (foe.hp !== 1000) bad.push("보호 중 적 피해 " + (1000 - foe.hp));
     if (hitDead) bad.push("쓰러진 적(또는 보호 중 적)에게 스킬 피해 " + hitDead + "번");
-    if (rg.hp !== 50 + api.ULT.rvHeal * 3) bad.push("보통 아군 회복 " + (rg.hp - 50));
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "보호 중·쓰러진 대상은 그대로, 보통 아군은 " + api.ULT.rvHeal * 3 + " 회복");
+    if (rg.hp !== 50 + api.ULT.rvHeal * RV_TICKS) bad.push("보통 아군 회복 " + (rg.hp - 50));
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "보호 중·쓰러진 대상은 그대로, 보통 아군은 " + api.ULT.rvHeal * RV_TICKS + " 회복");
   });
 
   run(CLERIC, "요한계시록: 사용 중에는 움직일 수 없고, 끝나면 다시 움직이는가", function (done) {
@@ -2011,22 +2012,20 @@ function collectResults(api) {
     return { roster: roster, players: players };
   }
   function withStatsEnv(fn) {
-    var scale = api.CLOCK.scale, link = api.setTestLink(false), db = api.setDb(null), previousId = api.myId;
+    var link = api.setTestLink(false), db = api.setDb(null), previousId = api.myId;
     api.MATCH.bots = {}; api.MATCH.remotes = {}; api.MATCH.me = null; api.MATCH.stateByKey = {};
-    api.CLOCK.scale = api.DEFAULT_SLOW;
     try { return fn(); }
     finally {
-      api.CLOCK.scale = scale; api.setTestLink(link); api.setDb(db); api.setMyId(previousId); api.unbindRoom();
+      api.setTestLink(link); api.setDb(db); api.setMyId(previousId); api.unbindRoom();
       api.MATCH.remotes = {}; api.MATCH.me = null; api.MATCH.stateByKey = {};
     }
   }
   async function withStatsEnvAsync(fn) {
-    var scale = api.CLOCK.scale, link = api.setTestLink(false), db = api.setDb(null), previousId = api.myId;
+    var link = api.setTestLink(false), db = api.setDb(null), previousId = api.myId;
     api.MATCH.bots = {}; api.MATCH.remotes = {}; api.MATCH.me = null; api.MATCH.stateByKey = {};
-    api.CLOCK.scale = api.DEFAULT_SLOW;
     try { return await fn(); }
     finally {
-      api.CLOCK.scale = scale; api.setTestLink(link); api.setDb(db); api.setMyId(previousId); api.unbindRoom();
+      api.setTestLink(link); api.setDb(db); api.setMyId(previousId); api.unbindRoom();
       api.MATCH.remotes = {}; api.MATCH.me = null; api.MATCH.stateByKey = {};
     }
   }
@@ -2051,7 +2050,6 @@ function collectResults(api) {
     ["연습 모드", "이 모드는", function (F, a) { a.mode = "practice"; }],
     ["참가자 정보(roster) 없음", "참가자 정보를 못 받아서", function (F, a) { a.roster = null; }],
     ["배포용(테스트) 링크", "배포용(테스트) 링크", function (F, a, env) { env.testLink = true; }],
-    ["옛 속도(시간 배율 1) 경기", "옛 속도", function (F, a, env) { env.scale = 1; }],
     ["로스터에 AI 표시", "AI가 함께해서", function (F) { F.roster.pr2.ai = true; }],
     ["참가자 목록에 AI", "AI가 함께해서", function (F) { F.players.pb3.isAI = true; }],
     ["로스터 선수가 참가자 목록에 없음(나감)", "참가자 정보가 맞지", function (F) { delete F.players.pr1; }],
@@ -2063,20 +2061,20 @@ function collectResults(api) {
     ["블루 2명·레드 3명", "3명씩", function (F) { delete F.roster.pb3; }],
     ["4대3", "3명씩", function (F) { F.roster.pb4 = { team: "blue", c: api.CHAR_LIST[7], ai: false }; F.players.pb4 = { team: "blue", slot: 1, characterType: api.CHAR_LIST[7], isAI: false }; }]
   ];
-  run(STATSG, "저장 제외 판정: 모드·참가자·AI·인원·테스트 링크·옛 속도 " + SKIP_CASES.length + "가지가 정확한 사유로 걸러지는가", function (done) {
+  run(STATSG, "저장 제외 판정: 모드·참가자·AI·인원·테스트 링크 " + SKIP_CASES.length + "가지가 정확한 사유로 걸러지는가", function (done) {
     withStatsEnv(function () {
       var bad = [], base = STATS.skipReason("cup", statsFixture().roster, statsFixture().players);
       if (base !== "") bad.push("정상 6명 경기(cup)가 제외됨: " + base);
       if (STATS.skipReason("pvp", statsFixture().roster, statsFixture().players) !== "") bad.push("정상 6명 경기(pvp)가 제외됨");
       if (!STATS.isFullStudentMatch("cup", statsFixture().roster, statsFixture().players)) bad.push("isFullStudentMatch 가 정상 경기를 거름");
       SKIP_CASES.forEach(function (c) {
-        var F = statsFixture(), arg = { mode: "cup", roster: F.roster }, env = { testLink: false, scale: api.DEFAULT_SLOW };
+        var F = statsFixture(), arg = { mode: "cup", roster: F.roster }, env = { testLink: false };
         c[2](F, arg, env);
-        api.setTestLink(env.testLink); api.CLOCK.scale = env.scale;
+        api.setTestLink(env.testLink);
         var why = STATS.skipReason(arg.mode, arg.roster, F.players);
         if (why.indexOf(c[1]) < 0) bad.push(c[0] + ": '" + why + "' (기대 '" + c[1] + "')");
         if (STATS.isFullStudentMatch(arg.mode, arg.roster, F.players)) bad.push(c[0] + ": isFullStudentMatch 가 통과시킴");
-        api.setTestLink(false); api.CLOCK.scale = api.DEFAULT_SLOW;
+        api.setTestLink(false);
       });
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "정상 경기만 통과하고 " + SKIP_CASES.length + "가지 사유가 모두 제외됨");
     });
@@ -3120,7 +3118,7 @@ function collectResults(api) {
   function person(nickname, team, joinedAt, charIndex, isAI) { return { nickname: nickname, isAI: !!isAI, team: team, characterType: HUMAN_CHARS[charIndex], joinedAt: joinedAt }; }
   function roomTree(code, players, over) {
     var first = Object.keys(players).filter(function (id) { return !players[id].isAI; })[0];
-    var node = { mode: "pvp", map: "forest", arena: "forest", status: "lobby", hostPlayerId: first || null, createdAt: Date.now(), timeScale: 1, players: players };
+    var node = { mode: "pvp", map: "forest", arena: "forest", status: "lobby", hostPlayerId: first || null, createdAt: Date.now(), players: players };
     Object.keys(over || {}).forEach(function (k) { node[k] = over[k]; });
     var tree = { teambattle: { rooms: {} } };
     tree.teambattle.rooms[code] = node;
@@ -3153,7 +3151,7 @@ function collectResults(api) {
       var room = api.room(), node = fake.get(ROOMS + "/" + room.code) || {}, mine = (node.players || {})[me()] || {};
       if (!/^\d{5}$/.test(room.code)) bad.push("코드 모양 " + room.code);
       if (node.mode !== "pvp" || node.map !== "forest" || node.arena !== "forest" || node.status !== "lobby") bad.push("기본 설정 " + JSON.stringify([node.mode, node.map, node.arena, node.status]));
-      if (node.hostPlayerId !== me() || typeof node.createdAt !== "number" || typeof node.timeScale !== "number") bad.push("방장·시각·시간 배율 기록");
+      if (node.hostPlayerId !== me() || typeof node.createdAt !== "number" || node.timeScale !== undefined) bad.push("방장·시각 기록(시간 배율은 더 이상 방에 저장하지 않음)");
       if (mine.team !== "blue" || mine.isAI !== false || mine.nickname !== "나" || mine.characterType !== api.FALLBACK_CHAR || typeof mine.joinedAt !== "number") bad.push("내 기록 " + JSON.stringify(mine));
       ["players/", "ping/", "pong/"].forEach(function (k) { if (fake.disconnects.indexOf(ROOMS + "/" + room.code + "/" + k + me()) < 0) bad.push(k + " 끊김 정리가 등록 안 됨"); });
       if (api.screen() !== "lobby" || el("lobbyCode").textContent !== room.code) bad.push("화면 " + api.screen() + " / 코드 표시 " + el("lobbyCode").textContent);
@@ -3990,39 +3988,22 @@ function collectResults(api) {
       if (api.statTable(c).indexOf(C[c].ultName) < 0) bad.push(C[c].name + " 표에 스킬 이름");
     });
     if (api.num(1.26) !== "1.3" || api.num(5) !== "5" || api.pctOf(0.456) !== 46 || api.slowPct(0.6) !== "40% 둔화" || api.healCutPct() !== "50%") bad.push("숫자 도구");
-    if (api.secs(1000) !== "1초" || api.secs(250) !== "0.25초" || api.shownSpeed(200) !== 200 * scale || api.roleGaugeText(api.ROLES.fighter).indexOf("+2") < 0) bad.push("초·속도·게이지 문구");
-    if (api.ultSpeedUpText({ ultSpeed: 300, speed: 200 }).indexOf("100") < 0) bad.push("스킬 이동속도 문구");
-    var attackWant = api.CLOCK.scale !== 1 ? "공격 간격 1초" : "초당 공격 2회";
-    if (api.attackText(1000, 2) !== attackWant) bad.push("공격 간격 문구 '" + api.attackText(1000, 2) + "' (기대 '" + attackWant + "')");
+    if (api.secs(700) !== "1초" || api.secs(175) !== "0.25초" || api.shownSpeed(200) !== 200 * scale || api.roleGaugeText(api.ROLES.fighter).indexOf("+2") < 0) bad.push("초·속도·게이지 문구");
+    if (api.ultSpeedUpText({ ultSpeed: 300, speed: 200 }).indexOf(String(api.shownSpeed(100))) < 0) bad.push("스킬 이동속도 문구");
+    var attackWant = "공격 간격 1초";
+    if (api.attackText(700, 2) !== attackWant) bad.push("공격 간격 문구 '" + api.attackText(700, 2) + "' (기대 '" + attackWant + "')");
     done(bad.length ? "fail" : "pass", bad.length ? bad.slice(0, 5).join(" / ") : api.CHAR_LIST.length + "명 × 5가지 글과 숫자 도구 확인");
   });
-  run(TIMEG, "시간 배율(applyTimeScale): 0.7 이면 캐릭터·스킬 수치가 느린 모드 값으로 바뀌고 1 로 돌리면 원래 값으로 정확히 돌아오며 거듭 적용해도 쌓이지 않는가", function (done) {
-    var before = JSON.stringify([api.CHARS, api.ULT]), bad = [], scale = api.CLOCK.scale, ms = api.matchMs();
-    try {
-      api.applyTimeScale(0.7);
-      if (api.CLOCK.scale !== 0.7 || api.matchMs() !== 90000 * 0.7) bad.push("배율·경기 시간 " + api.CLOCK.scale + " " + api.matchMs());
-      if (api.CHARS.knight.cd !== Math.round(1.8 * 1000 * 0.7) || api.CHARS.knight.speed !== Math.round(140 / 0.7) || api.CHARS.knight.hp !== 370) bad.push("기사 수치 " + JSON.stringify([api.CHARS.knight.cd, api.CHARS.knight.speed, api.CHARS.knight.hp]));
-      if (api.ULT.rmDur !== Math.round(4 * 1000 * 0.7)) bad.push("스킬 수치");
-      var once = JSON.stringify([api.CHARS, api.ULT]);
-      api.applyTimeScale(0.7);
-      if (JSON.stringify([api.CHARS, api.ULT]) !== once) bad.push("거듭 적용하면 값이 달라짐");
-      api.applyTimeScale(0.5);
-      if (api.CHARS.knight.cd !== 900 || api.CLOCK.scale !== 0.5) bad.push("0.5 배율");
-      var T = api.TIMESCALE;
-      api.applyTimeScale(0.7);
-      if (T.matchMs !== 90000 * 0.7 || T.respawnMs !== 3000 * 0.7 || T.respawnProtectMs !== 2500 * 0.7 || T.burnTickMs !== 700 || T.regenTickMs !== 700) bad.push("0.7 배율 시간 필드 " + JSON.stringify([T.matchMs, T.respawnMs, T.respawnProtectMs, T.burnTickMs, T.regenTickMs]));
-      api.applyTimeScale(0.7);
-      if (T.burnTickMs !== 700 || T.matchMs !== 90000 * 0.7) bad.push("거듭 적용하면 시간 필드가 달라짐");
-      api.applyTimeScale(1);
-      if (T.matchMs !== 90000 || T.respawnMs !== 3000 || T.respawnProtectMs !== 2500 || T.burnTickMs !== 1000 || T.regenTickMs !== 1000) bad.push("1 배율 시간 필드 " + JSON.stringify([T.matchMs, T.respawnMs, T.respawnProtectMs, T.burnTickMs, T.regenTickMs]));
-      api.applyTimeScale(0.5);
-      if (T.respawnMs !== 1500 || T.burnTickMs !== 500) bad.push("0.5 배율 시간 필드");
-      [1, 2, 0, -1, NaN].forEach(function (v) { api.applyTimeScale(v); if (api.CLOCK.scale !== 1 || JSON.stringify([api.CHARS, api.ULT]) !== before) bad.push("배율 " + v + " 는 원래 값으로 돌아와야 함"); });
-    } finally { api.applyTimeScale(scale); }
-    if (JSON.stringify([api.CHARS, api.ULT]) !== before || api.matchMs() !== ms) bad.push("끝난 뒤 원상 복구 안 됨");
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "0.7·0.5 적용, 1·잘못된 값은 원상 복구, 거듭 적용 불변");
+  run(TIMEG, "게임 속도(0.7배 고정): 시계 배율·경기 시간·부활·화상 간격이 0.7배로 정해져 있고 수치에 이미 반영돼 있는가", function (done) {
+    var bad = [], T = api.TIMESCALE, K = api.CHARS.knight;
+    if (api.CLOCK.scale !== 0.7) bad.push("시계 배율 " + api.CLOCK.scale);
+    if (api.matchMs() !== 90000 * 0.7) bad.push("경기 시간 " + api.matchMs());
+    if (T.matchMs !== 90000 * 0.7 || T.respawnMs !== 3000 * 0.7 || T.respawnProtectMs !== 2500 * 0.7 || T.burnTickMs !== 700 || T.regenTickMs !== 700) bad.push("시간 필드 " + JSON.stringify([T.matchMs, T.respawnMs, T.respawnProtectMs, T.burnTickMs, T.regenTickMs]));
+    if (K.cd !== Math.round(1.8 * 1000 * 0.7) || K.speed !== Math.round(140 / 0.7) || K.hp !== 370) bad.push("기사 수치 " + JSON.stringify([K.cd, K.speed, K.hp]));
+    if (api.ULT.rmDur !== Math.round(4 * 1000 * 0.7)) bad.push("스킬 수치 rmDur " + api.ULT.rmDur);
+    if (api.secs(K.cd) !== "1.8초" || api.shownSpeed(K.speed) !== 140) bad.push("카드 표기 " + api.secs(K.cd) + " " + api.shownSpeed(K.speed));
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "배율 0.7·경기 63초·기사 공격 간격 1.8초 이동속도 140 표기");
   });
-
   run(CONNG, "연결 설정(BACKEND): 설정이 준비되면 주소 끝 슬래시를 뗀 채 연결하고, 준비 안 됐으면 건드리지 않으며, 연결이 던지면 db 를 비우는가", function (done) {
     var B = api.BACKEND, bad = [], saved = { conf: B.conf, db: B.db }, firebaseBefore = window.firebase, calls = [], fakeDb = { name: "가짜" };
     try {
