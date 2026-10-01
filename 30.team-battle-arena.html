@@ -1449,7 +1449,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     sub(ref.child("meleeHits"), "child_added", function (s) { MELEE.onMelee(s.key, s.val()); });
     DAMAGE.listenHits(myId);
     sub(ref.child("effects"), "child_added", FIELD_FX.onEffect.bind(FIELD_FX));
-    sub(ref.child("kills"), "child_added", onKillFeed);
+    sub(ref.child("kills"), "child_added", KILLFEED.onKillFeed.bind(KILLFEED));
 
     setText($("lobbyCode"), code);
     showScreen("lobby");
@@ -1498,7 +1498,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (room) { leaving = true; unsubAll(); try { room.ref.child("players/" + myId).onDisconnect().cancel(); } catch (e) {} }
     room = null; resetLocal(); showScreen("start"); startMsg(msg || "");
   }
-  function resetLocal() { applyTimeScale(SLOW_REQUEST); FX_VIEW.clear3d(); P = {}; MATCH.leave(); joy.id = null; aim.id = null; specResultHeld = false; setText($("btnAgain"), "다시하기"); }
+  function resetLocal() { applyTimeScale(SLOW_REQUEST); FX_VIEW.clear3d(); P = {}; MATCH.leave(); INPUT.reset(); specResultHeld = false; setText($("btnAgain"), "다시하기"); }
   window.addEventListener("pagehide", function () { saveResume(); if (room) { try { room.ref.child("players/" + myId).remove(); } catch (e) {} } });
   document.addEventListener("visibilitychange", function () { if (document.hidden) saveResume(); });
 
@@ -2650,7 +2650,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     get showsHealRange() { return false; }
     showAimGuide(E, ult, c) {
       if (!ult || this.data.ultKind !== "blackhole") return false;
-      AIM_GUIDE.showAimCircle(aimReach(E, "ult"), ULT.bhR);
+      AIM_GUIDE.showAimCircle(INPUT.aimReach(E, "ult"), ULT.bhR);
       return true;
     }
     ultAimShot() { return { len: ULT.mkRange, halfWidth: 12 }; }
@@ -2795,7 +2795,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   class MageType extends MagicShooterType {
     showAimGuide(E, ult, c) {
       if (!ult) return false;
-      AIM_GUIDE.showAimCircle(aimReach(E, "ult"), ULT.mbR);
+      AIM_GUIDE.showAimCircle(INPUT.aimReach(E, "ult"), ULT.mbR);
       return true;
     }
     afterDealtDamage(T, owner, ultKey, t) { if (ultKey !== "burn") STATUS.igniteBurn(T, owner, t); }
@@ -2931,7 +2931,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class ThrowerType extends CharacterType {
-    showAimGuide(E, ult, c) { AIM_GUIDE.showAimCircle(aimReach(E, aim.btn), ult ? ULT.fgR : ULT.plR); return true; }
+    showAimGuide(E, ult, c) { AIM_GUIDE.showAimCircle(INPUT.aimReach(E, INPUT.aim.btn), ult ? ULT.fgR : ULT.plR); return true; }
     aimRange(btn) { return [CHARS.thrower.minRange, btn === "ult" ? ULT.fgCast : CHARS.thrower.range]; }
     overrideBasic(E, ang, reach, t) { FIELD_FX.throwPoison(E, ang, reach, false); return true; }
     onHitLate(owner, h) { if (h.u === "fog" && !owner.isGaugeLocked()) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.fgRefund); }
@@ -2992,7 +2992,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     isRooted(E, t) { return this.isHammerLeaping(E, t); }
     showAimGuide(E, ult, c) {
       if (!ult) return false;
-      AIM_GUIDE.showAimCircle(aimReach(E, "ult"), ULT.bsR);
+      AIM_GUIDE.showAimCircle(INPUT.aimReach(E, "ult"), ULT.bsR);
       return true;
     }
     aimRange(btn) { return [ULT.bsMin, ULT.bsCast]; }
@@ -3417,14 +3417,56 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     MATCH.me = isSpec() ? null : makeEnt(myId, P[myId]);
     MATCH.startRound();
     MATCH.lastHp = {};
-    clearKillFeed();
+    KILLFEED.clear();
     show($("endOv"), false);
   }
-  function clearKillFeed() {
-    $("killFeed").innerHTML = "";
-    var banner = $("killBanner");
-    banner.className = ""; banner.innerHTML = ""; banner._h = "";
+  class KillFeed {
+    clear() {
+      $("killFeed").innerHTML = "";
+      var banner = $("killBanner");
+      banner.className = ""; banner.innerHTML = ""; banner._h = "";
+    }
+    multiKillCount(chainByKiller, k) {
+      var chain = chainByKiller[k.k];
+      var continuesChain = chain && Math.abs(k.t - chain.lastAt) <= MULTI_KILL_MS;
+      chain = continuesChain ? { count: chain.count + 1, lastAt: Math.max(chain.lastAt, k.t) } : { count: 1, lastAt: k.t };
+      chainByKiller[k.k] = chain;
+      return chain.count;
+    }
+    multiKillTag(streak) {
+      var tag = MULTI_KILL_TAGS[Math.min(streak, 5)];
+      return tag ? '<span class="kfStreak ' + tag[0] + '">' + tag[1] + "</span>" : "";
+    }
+    onKillFeed(s) {
+      var k = s.val(); if (!k || !MATCH.game || MATCH.handled[s.key]) return;
+      MATCH.handled[s.key] = 1;
+      DAMAGE.creditHelpAssists(k);
+      var streak = KILLFEED.multiKillCount(MATCH.game.killChains || (MATCH.game.killChains = {}), k);
+      if (!(k.t > now() - KILL_FEED_MS)) return;
+      var killer = P[k.k] || {}, victim = P[k.v] || {}, feed = $("killFeed");
+      var nameTag = function (d, E) {
+        var team = d.team || (E && E.team), c = E && CHARS[E.char] ? " <small>" + CHARS[E.char].name + "</small>" : "";
+        return '<b class="' + (team === "blue" ? "b" : "r") + '">' + (d.isAI ? "🤖 " : "") + esc(d.nickname || (E && E.nickname) || "?") + c + "</b>";
+      };
+      var row = document.createElement("div");
+      row.className = "kf" + (k.k === myId || k.v === myId ? " mine" : "");
+      setHtml(row, nameTag(killer, TARGETS.ent(k.k)) + '<span class="kfArrow">▶</span>' + nameTag(victim, TARGETS.ent(k.v))
+        + KILLFEED.multiKillTag(streak));
+      feed.appendChild(row);
+      if (k.k === myId && k.v !== myId) KILLFEED.showKillBanner(nameTag(victim, TARGETS.ent(k.v)), streak);
+      while (feed.children.length > KILL_FEED_MAX) feed.firstChild.remove();
+      setTimeout(function () { row.remove(); }, KILL_FEED_MS);
+    }
+    showKillBanner(victimTag, streak) {
+      var tag = MULTI_KILL_TAGS[Math.min(streak, 5)], banner = $("killBanner");
+      setHtml(banner, '<span class="kbHead">' + (tag ? tag[1] + "!" : "처치!") + "</span>" + victimTag);
+      banner.className = "";
+      void banner.offsetWidth;
+      banner.className = "show" + (tag ? " multi" : "");
+      killSound(streak);
+    }
   }
+  var KILLFEED = new KillFeed();
   function isSpec() { return !!P[myId] && P[myId].team === "spec"; }
   class TargetQuery {
     participants() {
@@ -3436,6 +3478,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return MATCH.remotes[id] || null;
     }
     hear(E) { return MATCH.me && hyp(E.x - MATCH.me.x, E.y - MATCH.me.y) < 700; }
+    fighters() { return TARGETS.participants().map(TARGETS.ent); }
+    fightersAndMinions() { return TARGETS.fighters().concat(MINIONS.allMinions()); }
+    everyone(t) { return TARGETS.fighters().concat(MINIONS.allMinions().filter(function (m) { return MINIONS.minionReady(m, t); })); }
     localTargets() {
       var list = [], t = now();
       function addMinions(E) { (E.minions || []).forEach(function (m) { if (MINIONS.minionReady(m, t)) list.push(m); }); }
@@ -3837,7 +3882,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     chainTargets(E, hit, t) {
       var chain = CHARS.stormbow.chain;
-      return TARGETS.participants().map(TARGETS.ent).concat(MINIONS.allMinions().filter(function (m) { return MINIONS.minionReady(m, t); })).filter(function (o) {
+      return TARGETS.everyone(t).filter(function (o) {
         return o && o.alive && o.team !== E.team && o.id !== hit.v && !o.isProtected(t) && !VISION.hiddenFrom(o, t) && hyp(o.x - hit.x, o.y - hit.y) <= chain.r;
       }).sort(function (a, b) { return hyp(a.x - hit.x, a.y - hit.y) - hyp(b.x - hit.x, b.y - hit.y); }).slice(0, chain.count);
     }
@@ -4084,7 +4129,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       FIELD.domains.forEach(function (dm) { if (dm.e.owner === E.id && FIELD_FX.domainActive(dm.e, t) && !FIELD_FX.domainOwnerFell(dm)) zone = dm; });
       if (!zone) return null;
       var c = FIELD_FX.domainCenter(zone), reach = FIELD_FX.domainRadius(zone.e, t) + BODY_R * 0.5, best = null, bd = Infinity;
-      TARGETS.participants().map(TARGETS.ent).concat(MINIONS.allMinions().filter(function (m) { return MINIONS.minionReady(m, t); })).forEach(function (o) {
+      TARGETS.everyone(t).forEach(function (o) {
         if (!o || !o.alive || o.team === E.team || o.isProtected(t) || hyp(o.x - c.x, o.y - c.y) > reach || (!o.minion && !VISION.visibleTo(o, E, t))) return;
         var d = hyp(o.x - E.x, o.y - E.y);
         if (d < bd) { bd = d; best = o; }
@@ -4184,7 +4229,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var dm = Math.min(amount, T.hp), killed = false;
       T.taken = (T.taken || 0) + dm;
       T.hp -= dm; if (!noHurtGauge && !T.isGaugeLocked()) T.gauge = Math.min(GAUGE_MAX, T.gauge + roleOf(T.char).gaugeOnHurt);
-      if (T.hp <= 0) { killed = true; T.hp = 0; T.alive = false; T.deaths++; T.diedAt = now(); T.burst = null; T.volley = null; T.slash = null; T.regenUntil = 0; T.skillUntil = 0; T.slowUntil = 0; T.slows = null; T.stunUntil = 0; T.lance = null; T.frostStacks = 0; T.hasteUntil = 0; T.hasteStacks = 0; T.burnUntil = 0; T.burnNext = 0; T.regenNext = 0; if (T === MATCH.me) { sfx("down"); aim.id = null; joy.id = null; } }
+      if (T.hp <= 0) { killed = true; T.hp = 0; T.alive = false; T.deaths++; T.diedAt = now(); T.burst = null; T.volley = null; T.slash = null; T.regenUntil = 0; T.skillUntil = 0; T.slowUntil = 0; T.slows = null; T.stunUntil = 0; T.lance = null; T.frostStacks = 0; T.hasteUntil = 0; T.hasteStacks = 0; T.burnUntil = 0; T.burnNext = 0; T.regenNext = 0; if (T === MATCH.me) { sfx("down"); INPUT.reset(); } }
       else {
         if (T === MATCH.me) sfx("hit");
         STATUS.afflict(T, fx, owner);
@@ -4301,7 +4346,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var e = clamp(t - d.createdAt, 0, p.life), pe = p.se === undefined ? 0 : p.se;
         p.se = e;
         var a = PROJECTILES.projAt(p, pe), b = PROJECTILES.projAt(p, e);
-        foes = foes || TARGETS.participants().map(TARGETS.ent).concat(MINIONS.allMinions().filter(function (m) { return MINIONS.minionReady(m, t); }));
+        foes = foes || TARGETS.everyone(t);
         for (var i = 0; i < foes.length; i++) {
           var T = foes[i];
           if (!T || !T.alive || T.id === d.owner || T.team === d.team) continue;
@@ -4409,7 +4454,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var d = p.d, e = clamp(t - d.createdAt, 0, p.life), pe = p.ve === undefined ? 0 : p.ve;
       p.ve = e;
       var a = PROJECTILES.projAt(p, pe), b = PROJECTILES.projAt(p, e);
-      var list = TARGETS.participants().map(TARGETS.ent).concat(MINIONS.allMinions().filter(function (m) { return MINIONS.minionReady(m, t); }));
+      var list = TARGETS.everyone(t);
       for (var i = 0; i < list.length; i++) {
         var T = list[i];
         if (!T || !T.alive || T.id === d.owner || T.team === d.team) continue;
@@ -4426,46 +4471,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
 
   var KILL_FEED_MS = 4000, KILL_FEED_MAX = 4, MULTI_KILL_MS = 3000;
-  function multiKillCount(chainByKiller, k) {
-    var chain = chainByKiller[k.k];
-    var continuesChain = chain && Math.abs(k.t - chain.lastAt) <= MULTI_KILL_MS;
-    chain = continuesChain ? { count: chain.count + 1, lastAt: Math.max(chain.lastAt, k.t) } : { count: 1, lastAt: k.t };
-    chainByKiller[k.k] = chain;
-    return chain.count;
-  }
   var MULTI_KILL_TAGS = [null, null, ["", "더블 킬"], ["triple", "트리플 킬"], ["quadra", "쿼드라 킬"], ["penta", "펜타 킬"]];
-  function multiKillTag(streak) {
-    var tag = MULTI_KILL_TAGS[Math.min(streak, 5)];
-    return tag ? '<span class="kfStreak ' + tag[0] + '">' + tag[1] + "</span>" : "";
-  }
-  function onKillFeed(s) {
-    var k = s.val(); if (!k || !MATCH.game || MATCH.handled[s.key]) return;
-    MATCH.handled[s.key] = 1;
-    DAMAGE.creditHelpAssists(k);
-    var streak = multiKillCount(MATCH.game.killChains || (MATCH.game.killChains = {}), k);
-    if (!(k.t > now() - KILL_FEED_MS)) return;
-    var killer = P[k.k] || {}, victim = P[k.v] || {}, feed = $("killFeed");
-    var nameTag = function (d, E) {
-      var team = d.team || (E && E.team), c = E && CHARS[E.char] ? " <small>" + CHARS[E.char].name + "</small>" : "";
-      return '<b class="' + (team === "blue" ? "b" : "r") + '">' + (d.isAI ? "🤖 " : "") + esc(d.nickname || (E && E.nickname) || "?") + c + "</b>";
-    };
-    var row = document.createElement("div");
-    row.className = "kf" + (k.k === myId || k.v === myId ? " mine" : "");
-    setHtml(row, nameTag(killer, TARGETS.ent(k.k)) + '<span class="kfArrow">▶</span>' + nameTag(victim, TARGETS.ent(k.v))
-      + multiKillTag(streak));
-    feed.appendChild(row);
-    if (k.k === myId && k.v !== myId) showKillBanner(nameTag(victim, TARGETS.ent(k.v)), streak);
-    while (feed.children.length > KILL_FEED_MAX) feed.firstChild.remove();
-    setTimeout(function () { row.remove(); }, KILL_FEED_MS);
-  }
-  function showKillBanner(victimTag, streak) {
-    var tag = MULTI_KILL_TAGS[Math.min(streak, 5)], banner = $("killBanner");
-    setHtml(banner, '<span class="kbHead">' + (tag ? tag[1] + "!" : "처치!") + "</span>" + victimTag);
-    banner.className = "";
-    void banner.offsetWidth;
-    banner.className = "show" + (tag ? " multi" : "");
-    killSound(streak);
-  }
 
   class MeleeSystem {
     enemyInMelee(E) {
@@ -4566,7 +4572,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (d.slam) FX_VIEW.boom(d.x, d.y, d.radius + BODY_R, d.team);
       if (d.hammer) FX_VIEW.thunder(d.x, d.y);
       if (d.zap) FX_VIEW.zapBarrier(d.x, d.y, d.radius + BODY_R);
-      TARGETS.participants().map(TARGETS.ent).concat(MINIONS.allMinions()).forEach(function (T) { MELEE.strikeSpark(T, d, who); });
+      TARGETS.fightersAndMinions().forEach(function (T) { MELEE.strikeSpark(T, d, who); });
       TARGETS.localTargets().forEach(function (T) { MELEE.strikeHit(T, d); MELEE.strikeHeal(T, d); });
     }
     waveFront(d, t, travelMs) { return Math.min(1, (t - d.createdAt) / travelMs) * (d.len + BODY_R); }
@@ -4574,7 +4580,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     stepWaves(t) {
       FIELD.waves = FIELD.waves.filter(function (w) {
         var d = w.d, travelMs = WAVE[w.who].travel, front = MELEE.waveFront(d, t, travelMs);
-        TARGETS.participants().map(TARGETS.ent).concat(MINIONS.allMinions()).forEach(function (T) {
+        TARGETS.fightersAndMinions().forEach(function (T) {
           if (!MELEE.reachedBy(T, d, front) || w.sparked.indexOf(T) >= 0) return;
           w.sparked.push(T); MELEE.strikeSpark(T, d, w.who);
         });
@@ -4640,7 +4646,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     stabTarget(E, t) {
       var reach = CHARS[E.char].range + BODY_R, best = null, bd = Infinity;
-      TARGETS.participants().map(TARGETS.ent).concat(MINIONS.allMinions().filter(function (m) { return MINIONS.minionReady(m, t); })).forEach(function (o) {
+      TARGETS.everyone(t).forEach(function (o) {
         if (!o || !o.alive || o.team === E.team || o.isProtected(t) || !VISION.visibleTo(o, E)) return;
         var d = hyp(o.x - E.x, o.y - E.y);
         if (d <= reach && d < bd && PHYSICS.losClear(E.x, E.y, o.x, o.y)) { bd = d; best = o; }
@@ -4734,7 +4740,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   var RESPAWN = new RespawnSystem();
-  function canAct() { return MATCH.game && room.status === "playing" && now() >= room.startAt && MATCH.me && MATCH.me.alive && !MATCH.me.isStunned(); }
   class AttackController {
     fireBasic(E, ang, reach) {
       var c = CHARS[E.char], t = now(), rage = E.isBerserk(t);
@@ -4793,7 +4798,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     autoAimTarget(E) {
       var best = null, bd = Infinity, open = null, od = Infinity, t = now();
-      TARGETS.participants().map(TARGETS.ent).concat(MINIONS.allMinions().filter(function (m) { return MINIONS.minionReady(m, t); })).forEach(function (o) {
+      TARGETS.everyone(t).forEach(function (o) {
         if (!o || !o.alive || o.team === E.team) return;
         if (!VISION.visibleTo(o, E)) return;
         var d = hyp(o.x - E.x, o.y - E.y);
@@ -5227,7 +5232,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
                        dmg: old.dmg, kills: old.kills, deaths: old.deaths, assists: old.assists, heal: old.heal });
     E.maxHp = CHARS[E.char].hp; E.hp = E.maxHp;
     MATCH.me = E; MATCH.lastHp[myId] = E.hp;
-    aim.id = null;
+    INPUT.aim.id = null;
     MATCH.game.forceNet = true;
     sfx("confirm");
     renderPracticeModal();
@@ -5250,86 +5255,113 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   function againOrBackToLobby() { show($("scoreHelpModal"), false); if (specResultHeld) releaseSpecResult(); else restart(); }
   $("btnAgain").onclick = againOrBackToLobby;
-  var KEY_ON = { up: false, down: false, left: false, right: false, atk: false };
-  var KEY_MAP = { KeyW: "up", KeyS: "down", KeyA: "left", KeyD: "right", KeyK: "atk",
-                  ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right" };
-  function keyName(e) { return KEY_MAP[e.code] || KEY_MAP[e.key] || null; }
-  window.addEventListener("keydown", function (e) {
-    if (!$("scoreHelpModal").hidden && (e.code === "Space" || e.key === " " || e.key === "Escape")) { e.preventDefault(); show($("scoreHelpModal"), false); return; }
-    if ((e.code === "Space"|| e.key === " ") && room && (room.status === "ended" || specResultHeld) && screenNow === "game") { e.preventDefault(); againOrBackToLobby(); return; }
-    if (screenNow !== "game" || (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName))) return;
-    var k = keyName(e);
-    if (k) { KEY_ON[k] = true; e.preventDefault(); audio(); return; }
-    if (e.code === "KeyJ" && !e.repeat && canAct() && MATCH.me.gauge >= GAUGE_MAX && !MATCH.me.burst) {
-      e.preventDefault(); var ua = ATTACK.autoAimAngle(MATCH.me); MATCH.me.angle = ua; ATTACK.useUlt(MATCH.me, ua);
-    }
-  });
-  window.addEventListener("keyup", function (e) { var k = keyName(e); if (k) KEY_ON[k] = false; });
-  window.addEventListener("blur", function () { for (var k in KEY_ON) KEY_ON[k] = false; });
-
   var cv = $("cv"), ov = $("ov"), octx = ov.getContext("2d");
-  var joy = { id: null, ox: 0, oy: 0, x: 0, y: 0 };
-  var aim = { id: null, btn: null, ox: 0, oy: 0, dx: 0, dy: 0, drag: false };
-  var JOY_R = 60, DRAG_MIN = 14;
-  function flip() { return MATCH.me && MATCH.me.team === "blue"; }
-  function screenToWorldAngle(a) { return flip() ? a + Math.PI : a; }
-  function joyBase() {
-    var small = W <= 560;
-    JOY_R = small ? 54 : 64;
-    return { x: (small ? 16 : 26) + JOY_R + 8, y: H - (small ? 88 : 100) };
-  }
-
-  cv.addEventListener("pointerdown", function (e) {
-    audio();
-    if (!canAct() || joy.id !== null) return;
-    var jb = joyBase();
-    if (hyp(e.clientX - jb.x, e.clientY - jb.y) > JOY_R * 2.5) return;
-    joy.id = e.pointerId; joy.ox = jb.x; joy.oy = jb.y; joy.x = e.clientX; joy.y = e.clientY;
-    try { cv.setPointerCapture(e.pointerId); } catch (er) {}
-    e.preventDefault();
-  });
-  cv.addEventListener("pointermove", function (e) { if (e.pointerId === joy.id) { joy.x = e.clientX; joy.y = e.clientY; } });
-  function joyEnd(e) { if (e.pointerId === joy.id) joy.id = null; }
-  cv.addEventListener("pointerup", joyEnd); cv.addEventListener("pointercancel", joyEnd);
-
-  function aimRange(E, btn) {
-    return CHAR_TYPES.of(E.char).aimRange(btn);
-  }
-  function aimReach(E, btn) { var rg = aimRange(E, btn); return rg[0] + clamp((hyp(aim.dx, aim.dy) - DRAG_MIN) / 130, 0, 1) * (rg[1] - rg[0]); }
-  function bindAimButton(el, which) {
-    el.addEventListener("pointerdown", function (e) {
-      audio(); e.preventDefault();
-      if (!canAct() || aim.id !== null) return;
-      if (which === "atk" && CHARS[MATCH.me.char].noAim) { ATTACK.tryFire(MATCH.me, MATCH.me.angle); return; }
-      if (which === "ult") {
-        if (MATCH.me.gauge < GAUGE_MAX || MATCH.me.burst) return;
-        if (!CHARS[MATCH.me.char].ultAim) {
-          var ua = ATTACK.autoAimAngle(MATCH.me); MATCH.me.angle = ua; ATTACK.useUlt(MATCH.me, ua); return;
-        }
-      }
-      aim.id = e.pointerId; aim.btn = which; aim.ox = e.clientX; aim.oy = e.clientY; aim.dx = 0; aim.dy = 0; aim.drag = false;
-      try { el.setPointerCapture(e.pointerId); } catch (er) {}
-    });
-    el.addEventListener("pointermove", function (e) {
-      if (e.pointerId !== aim.id) return;
-      aim.dx = e.clientX - aim.ox; aim.dy = e.clientY - aim.oy;
-      if (hyp(aim.dx, aim.dy) > DRAG_MIN) { aim.drag = true; if (MATCH.me) MATCH.me.angle = screenToWorldAngle(Math.atan2(aim.dy, aim.dx)); }
-    });
-    function up(e) {
-      if (e.pointerId !== aim.id) return;
-      var btn = aim.btn, drag = aim.drag && hyp(aim.dx, aim.dy) > DRAG_MIN, reach = drag && MATCH.me ? aimReach(MATCH.me, btn) : null;
-      aim.id = null;
-      if (!canAct() || e.type === "pointercancel") return;
-      var ang = drag ? screenToWorldAngle(Math.atan2(aim.dy, aim.dx)) : ATTACK.autoAimAngle(MATCH.me);
-      MATCH.me.angle = ang;
-      if (btn === "atk") ATTACK.tryFire(MATCH.me, ang, reach);
-      else if (btn === "ult") ATTACK.useUlt(MATCH.me, ang, reach);
+  class InputController {
+    constructor() {
+      this.keys = { up: false, down: false, left: false, right: false, atk: false };
+      this.keyMap = { KeyW: "up", KeyS: "down", KeyA: "left", KeyD: "right", KeyK: "atk",
+                      ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right" };
+      this.joy = { id: null, ox: 0, oy: 0, x: 0, y: 0 };
+      this.aim = { id: null, btn: null, ox: 0, oy: 0, dx: 0, dy: 0, drag: false };
+      this.joyR = 60; this.dragMin = 14;
+      this.moveX = 0; this.moveY = 0;
     }
-    el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up);
-    el.addEventListener("touchstart", function (e) { e.preventDefault(); }, { passive: false });
+    bind(cv, atkButton, ultButton) {
+      window.addEventListener("keydown", function (e) { INPUT.onKeyDown(e); });
+      window.addEventListener("keyup", function (e) { INPUT.onKeyUp(e); });
+      window.addEventListener("blur", function () { INPUT.releaseKeys(); });
+      cv.addEventListener("pointerdown", function (e) { INPUT.onJoyDown(cv, e); });
+      cv.addEventListener("pointermove", function (e) { INPUT.onJoyMove(e); });
+      cv.addEventListener("pointerup", function (e) { INPUT.onJoyEnd(e); });
+      cv.addEventListener("pointercancel", function (e) { INPUT.onJoyEnd(e); });
+      INPUT.bindAimButton(atkButton, "atk");
+      INPUT.bindAimButton(ultButton, "ult");
+    }
+    reset() { INPUT.joy.id = null; INPUT.aim.id = null; }
+    releaseKeys() { for (var k in INPUT.keys) INPUT.keys[k] = false; }
+    onKeyDown(e) {
+      if (!$("scoreHelpModal").hidden && (e.code === "Space" || e.key === " " || e.key === "Escape")) { e.preventDefault(); show($("scoreHelpModal"), false); return; }
+      if ((e.code === "Space"|| e.key === " ") && room && (room.status === "ended" || specResultHeld) && screenNow === "game") { e.preventDefault(); againOrBackToLobby(); return; }
+      if (screenNow !== "game" || (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName))) return;
+      var k = INPUT.keyName(e);
+      if (k) { INPUT.keys[k] = true; e.preventDefault(); audio(); return; }
+      if (e.code === "KeyJ" && !e.repeat && INPUT.canAct() && MATCH.me.gauge >= GAUGE_MAX && !MATCH.me.burst) {
+        e.preventDefault(); var ua = ATTACK.autoAimAngle(MATCH.me); MATCH.me.angle = ua; ATTACK.useUlt(MATCH.me, ua);
+      }
+    }
+    onKeyUp(e) { var k = INPUT.keyName(e); if (k) INPUT.keys[k] = false; }
+    onJoyDown(cv, e) {
+      audio();
+      if (!INPUT.canAct() || INPUT.joy.id !== null) return;
+      var jb = INPUT.joyBase();
+      if (hyp(e.clientX - jb.x, e.clientY - jb.y) > INPUT.joyR * 2.5) return;
+      INPUT.joy.id = e.pointerId; INPUT.joy.ox = jb.x; INPUT.joy.oy = jb.y; INPUT.joy.x = e.clientX; INPUT.joy.y = e.clientY;
+      try { cv.setPointerCapture(e.pointerId); } catch (er) {}
+      e.preventDefault();
+    }
+    onJoyMove(e) { if (e.pointerId === INPUT.joy.id) { INPUT.joy.x = e.clientX; INPUT.joy.y = e.clientY; } }
+    onJoyEnd(e) { if (e.pointerId === INPUT.joy.id) INPUT.joy.id = null; }
+    readMove() {
+      var held = INPUT.keys, joy = INPUT.joy;
+      var kx = (held.right ? 1 : 0) - (held.left ? 1 : 0), ky = (held.down ? 1 : 0) - (held.up ? 1 : 0), vx, vy;
+      if (joy.id === null && !kx && !ky) return false;
+      if (joy.id !== null) {
+        var dx = joy.x - joy.ox, dy = joy.y - joy.oy, d = hyp(dx, dy);
+        var m = d < 8 ? 0 : Math.min(1, d / INPUT.joyR);
+        vx = d ? dx / d * m : 0; vy = d ? dy / d * m : 0;
+      } else { var kd = hyp(kx, ky); vx = kx / kd; vy = ky / kd; }
+      if (INPUT.flip()) { vx = -vx; vy = -vy; }
+      INPUT.moveX = vx; INPUT.moveY = vy;
+      return true;
+    }
+    canAct() { return MATCH.game && room.status === "playing" && now() >= room.startAt && MATCH.me && MATCH.me.alive && !MATCH.me.isStunned(); }
+    keyName(e) { return INPUT.keyMap[e.code] || INPUT.keyMap[e.key] || null; }
+    flip() { return MATCH.me && MATCH.me.team === "blue"; }
+    screenToWorldAngle(a) { return INPUT.flip() ? a + Math.PI : a; }
+    joyBase() {
+      var small = W <= 560;
+      INPUT.joyR = small ? 54 : 64;
+      return { x: (small ? 16 : 26) + INPUT.joyR + 8, y: H - (small ? 88 : 100) };
+    }
+    aimRange(E, btn) {
+      return CHAR_TYPES.of(E.char).aimRange(btn);
+    }
+    aimReach(E, btn) { var rg = INPUT.aimRange(E, btn); return rg[0] + clamp((hyp(INPUT.aim.dx, INPUT.aim.dy) - INPUT.dragMin) / 130, 0, 1) * (rg[1] - rg[0]); }
+    bindAimButton(el, which) {
+      el.addEventListener("pointerdown", function (e) {
+        audio(); e.preventDefault();
+        if (!INPUT.canAct() || INPUT.aim.id !== null) return;
+        if (which === "atk" && CHARS[MATCH.me.char].noAim) { ATTACK.tryFire(MATCH.me, MATCH.me.angle); return; }
+        if (which === "ult") {
+          if (MATCH.me.gauge < GAUGE_MAX || MATCH.me.burst) return;
+          if (!CHARS[MATCH.me.char].ultAim) {
+            var ua = ATTACK.autoAimAngle(MATCH.me); MATCH.me.angle = ua; ATTACK.useUlt(MATCH.me, ua); return;
+          }
+        }
+        INPUT.aim.id = e.pointerId; INPUT.aim.btn = which; INPUT.aim.ox = e.clientX; INPUT.aim.oy = e.clientY; INPUT.aim.dx = 0; INPUT.aim.dy = 0; INPUT.aim.drag = false;
+        try { el.setPointerCapture(e.pointerId); } catch (er) {}
+      });
+      el.addEventListener("pointermove", function (e) {
+        if (e.pointerId !== INPUT.aim.id) return;
+        INPUT.aim.dx = e.clientX - INPUT.aim.ox; INPUT.aim.dy = e.clientY - INPUT.aim.oy;
+        if (hyp(INPUT.aim.dx, INPUT.aim.dy) > INPUT.dragMin) { INPUT.aim.drag = true; if (MATCH.me) MATCH.me.angle = INPUT.screenToWorldAngle(Math.atan2(INPUT.aim.dy, INPUT.aim.dx)); }
+      });
+      function up(e) {
+        if (e.pointerId !== INPUT.aim.id) return;
+        var btn = INPUT.aim.btn, drag = INPUT.aim.drag && hyp(INPUT.aim.dx, INPUT.aim.dy) > INPUT.dragMin, reach = drag && MATCH.me ? INPUT.aimReach(MATCH.me, btn) : null;
+        INPUT.aim.id = null;
+        if (!INPUT.canAct() || e.type === "pointercancel") return;
+        var ang = drag ? INPUT.screenToWorldAngle(Math.atan2(INPUT.aim.dy, INPUT.aim.dx)) : ATTACK.autoAimAngle(MATCH.me);
+        MATCH.me.angle = ang;
+        if (btn === "atk") ATTACK.tryFire(MATCH.me, ang, reach);
+        else if (btn === "ult") ATTACK.useUlt(MATCH.me, ang, reach);
+      }
+      el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up);
+      el.addEventListener("touchstart", function (e) { e.preventDefault(); }, { passive: false });
+    }
   }
-  bindAimButton($("btnAtk"), "atk");
-  bindAimButton($("btnUlt"), "ult");
+  var INPUT = new InputController();
+  INPUT.bind(cv, $("btnAtk"), $("btnUlt"));
 
   var W = 0, H = 0, DPR = 1;
   var TOUCH = !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
@@ -6464,10 +6496,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       aimCircle.front.scale.setScalar(radius); aimCircle.back.scale.setScalar(radius + AIM_BACK_PAD);
     }
     updateAimGuide() {
-      var on = aim.id !== null && aim.drag && MATCH.me && MATCH.me.alive;
+      var on = INPUT.aim.id !== null && INPUT.aim.drag && MATCH.me && MATCH.me.alive;
       aimGrp.visible = !!on;
       if (!on) return;
-      var ult = aim.btn === "ult", c = CHARS[MATCH.me.char];
+      var ult = INPUT.aim.btn === "ult", c = CHARS[MATCH.me.char];
       aimGrp.position.set(MATCH.me.x, 0, MATCH.me.y); aimGrp.rotation.y = -MATCH.me.angle;
       aimMat.color.set(ult ? 0xFF503C : 0xffffff);
       [aimStrip, aimSector, aimCircle].forEach(function (p) { p.front.visible = p.back.visible = false; });
@@ -6729,7 +6761,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return camera.position.z + tmpV.z * k;
     }
     updateCamera(dt) {
-      var spec = !MATCH.me, fl = !spec && flip(), b = CAMERA_RIG.camBasis(fl);
+      var spec = !MATCH.me, fl = !spec && INPUT.flip(), b = CAMERA_RIG.camBasis(fl);
       var key = W + "x" + H + (spec ? "s" + HUD.specPanelW() : "p") + (fl ? "f" : "");
       if (CAM.fitKey !== key) {
         CAM.fitKey = key; CAM.snap = true;
@@ -6756,7 +6788,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }
       if (CAM.snap) { CAM.look.set(lx, 0, lz); CAM.snap = false; }
       else { var k = 1 - Math.exp(-dt * 7); CAM.look.x += (lx - CAM.look.x) * k; CAM.look.z += (lz - CAM.look.z) * k; }
-      var scoping = !spec && MATCH.me.alive && CHAR_TYPES.of(MATCH.me.char).scopesWhileAiming && aim.id !== null && aim.drag;
+      var scoping = !spec && MATCH.me.alive && CHAR_TYPES.of(MATCH.me.char).scopesWhileAiming && INPUT.aim.id !== null && INPUT.aim.drag;
       var sk = 1 - Math.exp(-dt * 6), aimX = 0, aimZ = 0, endX = 0, endZ = 0;
       if (scoping) {
         var wx = Math.cos(MATCH.me.angle), wz = Math.sin(MATCH.me.angle), len = PHYSICS.rayCast(MATCH.me.x + wx * 20, MATCH.me.y + wz * 20, wx, wz, CHARS[MATCH.me.char].range, 6) + 20;
@@ -6853,7 +6885,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   class FrameRenderer {
     faceAngle(E, t) {
       var lastAtk = Math.max(E.atkAt, E.stabAt || 0), attacking = (t >= lastAtk && t - lastAtk < 350) || E.ultUntil > t;
-      var useMove = FACE_BY_MOVE && !attacking && E.moveAng != null && E.moveAt > lastAtk && !(E === MATCH.me && aim.id !== null && aim.drag);
+      var useMove = FACE_BY_MOVE && !attacking && E.moveAng != null && E.moveAt > lastAtk && !(E === MATCH.me && INPUT.aim.id !== null && INPUT.aim.drag);
       return useMove ? E.moveAng : E.angle;
     }
     glowOf(E, t) {
@@ -7097,17 +7129,17 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     drawJoystick() {
       if (!MATCH.me || !MATCH.me.alive || !room || room.status === "ended") return;
-      var jb = joyBase(), on = joy.id !== null, dx = 0, dy = 0;
+      var jb = INPUT.joyBase(), on = INPUT.joy.id !== null, dx = 0, dy = 0;
       if (on) {
-        dx = joy.x - jb.x; dy = joy.y - jb.y; var d = hyp(dx, dy);
-        if (d > JOY_R) { dx = dx / d * JOY_R; dy = dy / d * JOY_R; }
+        dx = INPUT.joy.x - jb.x; dy = INPUT.joy.y - jb.y; var d = hyp(dx, dy);
+        if (d > INPUT.joyR) { dx = dx / d * INPUT.joyR; dy = dy / d * INPUT.joyR; }
       }
       octx.save();
       octx.fillStyle = on ? "rgba(14,20,17,.45)" : "rgba(14,20,17,.3)";
       octx.strokeStyle = on ? "rgba(255,255,255,.85)" : "rgba(255,255,255,.5)"; octx.lineWidth = 3;
-      octx.beginPath(); octx.arc(jb.x, jb.y, JOY_R, 0, Math.PI * 2); octx.fill(); octx.stroke();
+      octx.beginPath(); octx.arc(jb.x, jb.y, INPUT.joyR, 0, Math.PI * 2); octx.fill(); octx.stroke();
       octx.fillStyle = on ? "rgba(255,255,255,.92)" : "rgba(255,255,255,.65)";
-      octx.beginPath(); octx.arc(jb.x + dx, jb.y + dy, JOY_R * 0.42, 0, Math.PI * 2); octx.fill();
+      octx.beginPath(); octx.arc(jb.x + dx, jb.y + dy, INPUT.joyR * 0.42, 0, Math.PI * 2); octx.fill();
       octx.restore();
     }
     drawOverlay(nowMs) {
@@ -7691,21 +7723,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     stepMyFighter(t, dt) {
       if (MATCH.me && MATCH.me.alive) {
-        var kx = (KEY_ON.right ? 1 : 0) - (KEY_ON.left ? 1 : 0), ky = (KEY_ON.down ? 1 : 0) - (KEY_ON.up ? 1 : 0);
-        if (joy.id !== null || kx || ky) {
-          var vx, vy;
-          if (joy.id !== null) {
-            var dx = joy.x - joy.ox, dy = joy.y - joy.oy, d = hyp(dx, dy);
-            var m = d < 8 ? 0 : Math.min(1, d / JOY_R);
-            vx = d ? dx / d * m : 0; vy = d ? dy / d * m : 0;
-          } else { var kd = hyp(kx, ky); vx = kx / kd; vy = ky / kd; }
-          if (flip()) { vx = -vx; vy = -vy; }
+        if (INPUT.readMove()) {
           var ox = MATCH.me.x, oy = MATCH.me.y;
-          PHYSICS.moveEnt(MATCH.me, vx, vy, dt);
+          PHYSICS.moveEnt(MATCH.me, INPUT.moveX, INPUT.moveY, dt);
           MATCH.me.mv = hyp(MATCH.me.x - ox, MATCH.me.y - oy) > 0.2;
           if (MATCH.me.mv) { MATCH.me.moveAng = Math.atan2(MATCH.me.y - oy, MATCH.me.x - ox); MATCH.me.moveAt = now(); }
         } else MATCH.me.mv = false;
-        if (KEY_ON.atk && t >= MATCH.me.cdUntil && !MATCH.me.volley && !MATCH.me.slash) ATTACK.fireBasic(MATCH.me, ATTACK.autoAimAngle(MATCH.me));
+        if (INPUT.keys.atk && t >= MATCH.me.cdUntil && !MATCH.me.volley && !MATCH.me.slash) ATTACK.fireBasic(MATCH.me, ATTACK.autoAimAngle(MATCH.me));
         ATTACK.stepCombat(MATCH.me, dt);
       } else if (MATCH.me) MATCH.me.mv = false;
     }
@@ -7743,7 +7767,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       loadMapData: loadMapData, makeEnt: makeEnt, resolve: PHYSICS.resolve.bind(PHYSICS), stepWorld: WORLD.stepWorld.bind(WORLD),
       useUlt: ATTACK.useUlt.bind(ATTACK), fireBasic: ATTACK.fireBasic.bind(ATTACK), damage: DAMAGE.damage.bind(DAMAGE), healCut: STATUS.healCut.bind(STATUS), healAmount: STATUS.healAmount.bind(STATUS), respawnIfReady: RESPAWN.respawnIfReady.bind(RESPAWN), afflict: STATUS.afflict.bind(STATUS), speedOf: function (E) { return E.speed(); }, stunned: function (E, t) { return E.isStunned(t); },
       onShot: PROJECTILES.onShot.bind(PROJECTILES), onMelee: MELEE.onMelee.bind(MELEE), potionFlightMs: FIELD_FX.potionFlightMs.bind(FIELD_FX), meteorHitAt: FIELD_FX.meteorHitAt.bind(FIELD_FX), onEffect: FIELD_FX.onEffect.bind(FIELD_FX), onHit: DAMAGE.onHit.bind(DAMAGE),
-      multiKillCount: multiKillCount, MULTI_KILL_MS: MULTI_KILL_MS, ASSIST_MS: ASSIST_MS, onKill: DAMAGE.creditHelpAssists.bind(DAMAGE),
+      multiKillCount: KILLFEED.multiKillCount.bind(KILLFEED), MULTI_KILL_MS: MULTI_KILL_MS, ASSIST_MS: ASSIST_MS, onKill: DAMAGE.creditHelpAssists.bind(DAMAGE),
       hiddenFrom: VISION.hiddenFrom.bind(VISION), visibleTo: VISION.visibleTo.bind(VISION), storms: function () { return FIELD.storms; }, stormCenter: FIELD_FX.stormCenter.bind(FIELD_FX), revs: function () { return FIELD.revs; }, domains: function () { return FIELD.domains; }, graceTarget: FIELD_FX.graceTarget.bind(FIELD_FX),
       bushTiles: function () { return BUSH.map(function (b) { return b.tiles.map(function (tl) { return { x: tileX(tl[0]), y: tileY(tl[1]) }; }); }); },
       isIdle: function () { return !room; },
@@ -7763,10 +7787,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       STATS: STATS, STATS_PATH: STATS_PATH, STATS_PENDING: STATS_PENDING, STATS_SETTLE_MS: STATS_SETTLE_MS, STATS_HOLD_MAX_MS: STATS_HOLD_MAX_MS, DEFAULT_SLOW: DEFAULT_SLOW,
       CLOCK: CLOCK, GameClock: GameClock, CLOCK_KEEP: CLOCK_KEEP, CLOCK_PINGS: CLOCK_PINGS,
       MATCH: MATCH, FIELD: FIELD, resetLocal: resetLocal, backToLobby: backToLobby, stKey: stKey,
-      KEY_ON: KEY_ON, joy: joy, aim: aim, keyName: keyName, joyBase: joyBase, joyRadius: function () { return JOY_R; }, DRAG_MIN: DRAG_MIN, canAct: canAct, flip: flip,
+      KEY_ON: INPUT.keys, joy: INPUT.joy, aim: INPUT.aim, keyName: INPUT.keyName.bind(INPUT), joyBase: INPUT.joyBase.bind(INPUT), joyRadius: function () { return INPUT.joyR; }, DRAG_MIN: INPUT.dragMin, canAct: INPUT.canAct.bind(INPUT), flip: INPUT.flip.bind(INPUT),
       localTargets: TARGETS.localTargets.bind(TARGETS), hear: TARGETS.hear.bind(TARGETS), pruneLocal: WORLD.pruneLocal.bind(WORLD), revealedTo: VISION.revealedTo.bind(VISION), inBush: VISION.inBush.bind(VISION), STEALTH_REVEAL_DIST: STEALTH_REVEAL_DIST,
       rayRect: PHYSICS.rayRect.bind(PHYSICS), rayObst: PHYSICS.rayObst.bind(PHYSICS), rayCast: PHYSICS.rayCast.bind(PHYSICS), losClear: PHYSICS.losClear.bind(PHYSICS), segHit: PROJECTILES.segHit.bind(PROJECTILES),
-      onKillFeed: onKillFeed, multiKillTag: multiKillTag, KILL_FEED_MAX: KILL_FEED_MAX, KILL_FEED_MS: KILL_FEED_MS,
+      onKillFeed: KILLFEED.onKillFeed.bind(KILLFEED), multiKillTag: KILLFEED.multiKillTag.bind(KILLFEED), KILL_FEED_MAX: KILL_FEED_MAX, KILL_FEED_MS: KILL_FEED_MS,
       mvpScore: HUD.mvpScore.bind(HUD),
       setClock: function (ms) { CLOCK.testTime = ms; },
       currentMap: function () { return ARENA; },
