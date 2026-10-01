@@ -3829,6 +3829,74 @@ function collectResults(api) {
     } finally { api.SOUND.sfx = sfxBefore; H.lastCountSec = 0; }
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "초마다 한 번, 밖·끝에서 초기화");
   });
+  var RENDERG = "화면 크기·화질·장면 상태";
+  run(RENDERG, "화면 크기(CameraRig.resize): 창 크기·화면 배율대로 가로·세로·배율·그림판 크기·카메라 비율·그리기 장치 크기를 정하는가", function (done) {
+    var R = api.CAMERA_RIG, bad = [], saved = { w: R.w, h: R.h, dpr: R.dpr, pix: R.pix }, descs = {};
+    ["innerWidth", "innerHeight", "devicePixelRatio"].forEach(function (k) { descs[k] = Object.getOwnPropertyDescriptor(window, k); });
+    function setWindow(w, h, ratio) {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: w });
+      Object.defineProperty(window, "innerHeight", { configurable: true, value: h });
+      Object.defineProperty(window, "devicePixelRatio", { configurable: true, value: ratio });
+    }
+    try {
+      R.pix = 1.25;
+      [[800, 600, 1, 1], [1280, 720, 3, 2], [375, 0, 1.5, 1.5], [1920, 1080, 0, 1]].forEach(function (c) {
+        setWindow(c[0], c[1], c[2]); R.resize();
+        var tag = c.join("x");
+        if (R.w !== c[0] || R.h !== c[1] || R.dpr !== c[3]) bad.push(tag + " 값 " + [R.w, R.h, R.dpr]);
+        if (api.overlay.width !== Math.round(c[0] * c[3]) || api.overlay.height !== Math.round(c[1] * c[3])) bad.push(tag + " 그림판 " + [api.overlay.width, api.overlay.height]);
+        if (Math.abs(api.camera.aspect - c[0] / Math.max(1, c[1])) > 1e-9) bad.push(tag + " 비율 " + api.camera.aspect);
+        if (R.renderer) {
+          var size = R.renderer.getSize(new api.THREE.Vector2());
+          if (size.x !== c[0] || size.y !== c[1] || R.renderer.getPixelRatio() !== 1.25) bad.push(tag + " 장치 " + [size.x, size.y, R.renderer.getPixelRatio()]);
+        }
+      });
+    } finally {
+      Object.keys(descs).forEach(function (k) { if (descs[k]) Object.defineProperty(window, k, descs[k]); else delete window[k]; });
+      R.pix = saved.pix; R.resize(); R.pix = saved.pix;
+    }
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "창 4가지 크기(세로 0·배율 3·배율 0 포함)에서 값·그림판·카메라·장치 크기 일치");
+  });
+  run(RENDERG, "화질 자동 조절(adaptQuality): 느린 프레임이 3초 이어지면 0.25씩 최저 0.75 까지 내리고, 빠르거나 멈춘 프레임은 세지 않는가", function (done) {
+    var R = api.CAMERA_RIG, Q = api.QA, H = api.HUD, bad = [], saved = { pix: R.pix, qa: JSON.stringify(Q), dropped: api.SCENERY.droppedForFps };
+    function frames(ms, count) { for (var i = 0; i < count; i++) H.adaptQuality(ms); }
+    try {
+      api.SCENERY.droppedForFps = true;
+      R.pix = 1.5; Q.acc = 0; Q.frames = 0; Q.slow = 0;
+      frames(100, 20);
+      if (R.pix !== 1.5 || Q.slow !== 2) bad.push("2초째 pix " + R.pix + " slow " + Q.slow);
+      frames(16, 130);
+      if (R.pix !== 1.5 || Q.slow !== 0) bad.push("빠른 프레임이면 느림 횟수 초기화 pix " + R.pix + " slow " + Q.slow);
+      Q.acc = 0; Q.frames = 0;
+      frames(300, 20);
+      if (R.pix !== 1.5 || Q.acc !== 0) bad.push("멈춘 프레임(250ms 초과)은 무시 pix " + R.pix + " acc " + Q.acc);
+      frames(100, 30);
+      if (R.pix !== 1.25 || Q.slow !== 0) bad.push("3초 느림 → 1.25 pix " + R.pix + " slow " + Q.slow);
+      if (R.renderer && R.renderer.getPixelRatio() !== 1.25) bad.push("장치 배율 " + R.renderer.getPixelRatio());
+      frames(100, 30 * 6);
+      if (R.pix !== api.PIX_MIN) bad.push("최저 배율 " + R.pix);
+      frames(100, 60);
+      if (R.pix !== api.PIX_MIN) bad.push("최저 아래로 내려감 " + R.pix);
+    } finally { R.pix = saved.pix; Object.assign(Q, JSON.parse(saved.qa)); api.SCENERY.droppedForFps = saved.dropped; if (R.renderer) R.renderer.setPixelRatio(R.pix); }
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "느림 3초마다 0.25 하향, 0.75 에서 멈춤, 빠른·멈춘 프레임 무시");
+  });
+  run(RENDERG, "장면 상태(ARENA_VIEW·PROPS): 소품 난수가 씨앗대로 같은 수열을 내고, 풍차 날개가 돌며, 바닥 판이 장면에 있는가", function (done) {
+    var P = api.PROPS, A = api.ARENA_VIEW, bad = [], savedSeed = P.seed, savedBlades = P.millBlades;
+    try {
+      function expected(seed, n) { var out = []; for (var i = 0; i < n; i++) { seed = (seed * 1664525 + 1013904223) % 4294967296; out.push(seed / 4294967296); } return out; }
+      P.seed = 20260926;
+      var got = [P.seeded(), P.seeded(), P.seeded()], want = expected(20260926, 3);
+      if (JSON.stringify(got) !== JSON.stringify(want)) bad.push("난수 수열 " + JSON.stringify(got));
+      P.seed = 20260926; var again = [P.seeded(), P.seeded(), P.seeded()];
+      if (JSON.stringify(again) !== JSON.stringify(got)) bad.push("같은 씨앗인데 다른 수열");
+      var blade = { rotation: { z: 1 } };
+      P.millBlades = [blade]; P.spinMillBlades(0.5);
+      if (Math.abs(blade.rotation.z - 1.35) > 1e-9) bad.push("날개 회전 " + blade.rotation.z);
+      P.millBlades = []; P.spinMillBlades(1);
+      if (!A.ground || A.ground.position.x !== 450 || A.ground.position.z !== 675 || !Array.isArray(A.bushVis) || typeof A.builtArena !== "string") bad.push("바닥·풀 상태 " + (A.ground ? A.ground.position.x + "," + A.ground.position.z : "없음"));
+    } finally { P.seed = savedSeed; P.millBlades = savedBlades; }
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "씨앗 수열 재현, 날개 회전, 바닥 위치·풀 목록 확인");
+  });
   run(SOUNDG, "소리: 모든 효과음 이름과 연속 처치음을 불러도 오류가 없고, 검사·시뮬레이션 주소에서는 소리 엔진을 만들지 않는가", function (done) {
     var bad = [];
     try {
