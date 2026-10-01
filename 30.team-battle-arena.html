@@ -2582,6 +2582,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   var FIELD = new BattleField();
 
+  function teamHitColor(team) { return team === "blue" ? "#5FA2FF" : "#FF6A5F"; }
   function ultSpeedUpText(c) { return "이동속도 " + shownSpeed(c.ultSpeed - c.speed) + " 증가"; }
   class CharacterType {
     constructor(id) { this.id = id; }
@@ -2597,6 +2598,44 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       room.ref.child("effects").push({ type: "hole", team: E.team, owner: E.id, x: Math.round(holeSpot.x), y: Math.round(holeSpot.y),
                                        r: ULT.bhR, dur: ULT.bhDur, delay: ULT.bhDelay, createdAt: t });
       revealBriefly(E.id, t);
+    }
+    overrideBasic(E, ang, reach, t) { return false; }
+    ambush(E, t) { return null; }
+    onHitEarly(owner, h) {}
+    onHitLate(owner, h) {}
+    projectileEffect(d, T, immune, fx) { return fx; }
+    get isBladeThrower() { return false; }
+    afterProjectileHit(d, T, immune) {}
+    skillGuard(T, amount, t) { return amount; }
+    tallyBlocked(T, unguarded, amount) {}
+    afterDealtDamage(T, owner, ultKey, t) {}
+    afterStrike(T, d) {}
+    skillShotFx(ox, oy, dx, dy) {}
+    get shotSound() { return "shoot"; }
+    get smokeColor() { return null; }
+    get tintsHit() { return false; }
+    get isOrbShooter() { return false; }
+    hitColor(d) { return teamHitColor(d.team); }
+    aimRange(btn) {
+      if (this.data.ultKind === "blackhole") return [ULT.bhMin, ULT.bhCast];
+      return [ULT.mbMin, ULT.mbCast];
+    }
+    ultLeadSeconds(dist) { return 0; }
+    ultSpotTooFar(reach) { return false; }
+    get holdsFullRange() { return false; }
+    botAct(B, target, enemies, t) { return false; }
+    botUltRange() { return this.data.ultKind === "blackhole" ? ULT.bhCast : Infinity; }
+    botUltSpot(B, target, td, t) { return BRAIN.ultAimSpot(B, target, td, t); }
+    wantsBasicNow(B, t) { return false; }
+    projectileMesh(g, d) {
+      var volley = d.isSkill, col = volley ? 0xFF8A3D : C_FX[d.team];
+      if (KIT.weapons.arrow_bow) {
+        var arrow = KIT.weapons.arrow_bow.clone(); arrow.rotation.y = Math.PI / 2; arrow.scale.setScalar(volley ? 38 : 32); g.add(arrow);
+      } else {
+        var shaft = new THREE.Mesh(GEO.shaft, MODELS.basicMat("shaft", 0xEADFC4, 1)); if (volley) shaft.scale.set(1.2, 1.4, 1.4); g.add(shaft);
+        g.add(new THREE.Mesh(GEO.head, MODELS.basicMat("head-" + (volley ? "v" : d.team), col, 1)));
+      }
+      var trail = new THREE.Mesh(GEO.trail, MODELS.glowMat("trail-" + (volley ? "v" : d.team), col, 0.45)); trail.position.x = -15; trail.scale.set(volley ? 70 : 50, volley ? 1.8 : 1.3, volley ? 1.8 : 1.3); g.add(trail);
     }
     get hasSkillClip() { return false; }
     launchHandOf(model) { return model.getObjectByName("muzzle"); }
@@ -2624,6 +2663,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class MagicShooterType extends CharacterType {
+    get isOrbShooter() { return true; }
+    get shotSound() { return "orb"; }
     attackClip(v, E, t) {
       return ["Ranged_Magic_Shoot", 1.8];
     }
@@ -2647,6 +2688,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class DuelistType extends CharacterType {
+    botUltRange() { return this.data.dashRange + this.data.range; }
     addMarkers(v, root, body) {
       v.aura = new THREE.Mesh(GEO.aura, riposteAuraMat); v.aura.visible = false; root.add(v.aura);
       if (v.kit) v.stabHand = body.getObjectByName("handslotr");
@@ -2674,6 +2716,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class KnightType extends ArcMeleeType {
+    skillGuard(T, amount, t) { return T.buffUntil > t ? Math.round(amount * ULT.tkDef) : amount; }
+    tallyBlocked(T, unguarded, amount) { T.blocked = (T.blocked || 0) + Math.min(unguarded, T.hp) - Math.min(amount, T.hp); }
     addMarkers(v, root, body) { v.shield = FIGHTER_VIEW.makeShieldAura(); root.add(v.shield); }
     skillGlow(E, t) { return E.buffUntil > t ? 0x2A3A66 : 0; }
     latePose(E, t) { return E.buffUntil > t ? ["Melee_Blocking", 1] : null; }
@@ -2694,6 +2738,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class RangerType extends CharacterType {
+    onHitLate(owner, h) { if (h.u === "volley") owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.mkRefund); }
+    ultLeadSeconds(dist) { return dist / ULT.mkSpeed; }
     launchHandOf(model) { return model.getObjectByName("handslotl"); }
     earlyPose(E, t) { return E.ultUntil > t ? ["Ranged_Bow_Release", 4.5] : null; }
     get startsSkillTimer() { return false; }
@@ -2718,6 +2764,19 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class MageType extends MagicShooterType {
+    afterDealtDamage(T, owner, ultKey, t) { if (ultKey !== "burn") igniteBurn(T, owner, t); }
+    ultLeadSeconds(dist) { return ULT.mbDelay / 1000; }
+    ultSpotTooFar(reach) { return reach > ULT.mbCast; }
+    botUltRange() { return ULT.mbCast; }
+    hitColor(d) { return "#FF5A24"; }
+    get tintsHit() { return true; }
+    projectileMesh(g, d) {
+      var halo = new THREE.Mesh(GEO.ball, MODELS.glowMat("fireGlow", 0xFF4A14, 0.45)); halo.scale.setScalar(20); g.add(halo);
+      var orb = new THREE.Mesh(GEO.ball, MODELS.basicMat("fireOrb", 0xE8260E, 0.92)); orb.scale.setScalar(10); g.add(orb);
+      var core = new THREE.Mesh(GEO.ball, MODELS.basicMat("fireCore", 0xFFE08A, 1)); core.scale.setScalar(5); g.add(core);
+      var fireTail = new THREE.Mesh(GEO.trail, MODELS.glowMat("trail-fire", 0xFF5A1E, 0.45)); fireTail.position.x = -6; fireTail.scale.set(44, 3.4, 3.4); g.add(fireTail);
+      g.userData.pulse = orb;
+    }
     skillGlow(E, t) { return E.ultUntil > t ? 0x661000 : 0; }
     playSkillClip(v, E, t) { FIGHTER_VIEW.playOnce(v, "Ranged_Magic_Spellcasting_Long", 2.6, t); }
     get shotName() { return "불꽃 구슬"; }
@@ -2740,6 +2799,18 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class RogueType extends CharacterType {
+    ambush(E, t) {
+      if (E.stealthUntil <= t) return null;
+      E.stealthUntil = E.skillUntil = t; MATCH.game.forceNet = true;
+      return this.data.ambushDmg;
+    }
+    get shotSound() { return "star"; }
+    projectileMesh(g, d) {
+      if (KIT.weapons.dagger) {
+        var knife = KIT.weapons.dagger.clone(); knife.rotation.z = -Math.PI / 2; knife.scale.setScalar(MODEL_SCALE); knife.position.x = -22; g.add(knife);
+      } else g.add(new THREE.Mesh(GEO.shaft, MODELS.basicMat("blade", 0xDCE3EC, 1)));
+      var streak = new THREE.Mesh(GEO.trail, MODELS.glowMat("trail-rogue", 0xDCE3EC, 0.35)); streak.position.x = -10; streak.scale.set(40, 1.3, 1.3); g.add(streak);
+    }
     launchHandOf(model) { return model.getObjectByName("muzzle") || model.getObjectByName("handslotr"); }
     cast(E, ang, reach, t) {
       E.ultUntil = t + ULT.asSmokeMs;
@@ -2760,6 +2831,16 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class NecroType extends MagicShooterType {
+    get smokeColor() { return NECRO_SMOKE_COLOR; }
+    hitColor(d) { return "#B07CFF"; }
+    get tintsHit() { return true; }
+    projectileMesh(g, d) {
+      var aura = new THREE.Mesh(GEO.ball, MODELS.glowMat("necroGlow", 0x8E4DFF, 0.4)); aura.scale.setScalar(18); g.add(aura);
+      var sphere = new THREE.Mesh(GEO.ball, MODELS.basicMat("necroOrb", 0x7A3BE0, 0.95)); sphere.scale.setScalar(9); g.add(sphere);
+      var heart = new THREE.Mesh(GEO.ball, MODELS.basicMat("necroCore", 0xE6D2FF, 1)); heart.scale.setScalar(4); g.add(heart);
+      var tail = new THREE.Mesh(GEO.trail, MODELS.glowMat("trail-necro", 0x9B5CFF, 0.4)); tail.position.x = -6; tail.scale.set(42, 3.2, 3.2); g.add(tail);
+      g.userData.pulse = sphere;
+    }
     get hasSkillClip() { return true; }
     playSkillClip(v, E, t) { FIGHTER_VIEW.playOnce(v, "Ranged_Magic_Summon", 3.2, t); }
     get shotName() { return "마법 구슬"; }
@@ -2778,6 +2859,19 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class SniperType extends CharacterType {
+    onHitLate(owner, h) { if (h.u === "giant") owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.pnRefund); }
+    ultLeadSeconds(dist) { return dist / ULT.pnSpeed; }
+    get holdsFullRange() { return true; }
+    projectileMesh(g, d) {
+      var big = d.isSkill ? ULT.pnScale : 1, boltCol = d.isSkill ? 0xFFB347 : C_FX[d.team];
+      if (KIT.weapons.arrow_crossbow) {
+        var bolt = KIT.weapons.arrow_crossbow.clone(); bolt.rotation.y = Math.PI / 2; bolt.scale.setScalar(34 * big); g.add(bolt);
+      } else {
+        var boltShaft = new THREE.Mesh(GEO.shaft, MODELS.basicMat("shaft", 0xEADFC4, 1)); boltShaft.scale.setScalar(big); g.add(boltShaft);
+      }
+      var boltTrail = new THREE.Mesh(GEO.trail, MODELS.glowMat("trail-sniper-" + (d.isSkill ? "u" : d.team), boltCol, d.isSkill ? 0.55 : 0.45));
+      boltTrail.position.x = -15 * big; boltTrail.scale.set(d.isSkill ? 150 : 70, 1.4 * big, 1.4 * big); g.add(boltTrail);
+    }
     skillGlow(E, t) { return E.ultUntil > t ? 0x663300 : 0; }
     get shotName() { return "화살"; }
     cast(E, ang, reach, t) {
@@ -2798,6 +2892,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class ThrowerType extends CharacterType {
+    aimRange(btn) { return [CHARS.thrower.minRange, btn === "ult" ? ULT.fgCast : CHARS.thrower.range]; }
+    overrideBasic(E, ang, reach, t) { throwPoison(E, ang, reach, false); return true; }
+    onHitLate(owner, h) { if (h.u === "fog" && !owner.isGaugeLocked()) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.fgRefund); }
+    botAct(B, target, enemies, t) { BRAIN.botThrow(B, target, enemies, t); return true; }
     skillGlow(E, t) { return E.ultUntil > t ? 0x1E5212 : 0; }
     cast(E, ang, reach, t) {
       var fogFlightMs = throwPoison(E, ang, reach, true);
@@ -2820,6 +2918,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class LancerType extends CharacterType {
+    botAct(B, target, enemies, t) { BRAIN.botLance(B, target, t); return true; }
     cast(E, ang, reach, t) {
       E.angle = ang; E.atkAt = t;
       E.ultUntil = t + ULT.lnWind;
@@ -2845,6 +2944,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class BlacksmithType extends CharacterType {
+    aimRange(btn) { return [ULT.bsMin, ULT.bsCast]; }
+    botUltRange() { return ULT.bsCast; }
+    botUltSpot(B, target, td, t) { return BRAIN.leadSpot(target, hammerLeapMs(td) / 1000, t); }
     get hasSkillClip() { return true; }
     playSkillClip(v, E, t) { FIGHTER_VIEW.playOnce(v, "Melee_1H_Attack_Jump_Chop", JUMP_CHOP_LAND_SEC * 1000 / Math.max(1, E.ultUntil - (E.leapAt || t)), t); }
     cast(E, ang, reach, t) {
@@ -2888,6 +2990,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class ShamanType extends CharacterType {
+    overrideBasic(E, ang, reach, t) {
+      var struck = domainStrikeTarget(E, t);
+      if (!struck) return false;
+      domainStrike(E, struck, t);
+      return true;
+    }
+    afterStrike(T, d) { applyCurse(T, d.owner, now()); }
+    botUltRange() { return ULT.dmR * 0.7; }
+    wantsBasicNow(B, t) { return t >= B.cdUntil && !!domainStrikeTarget(B, t); }
     get hasSkillClip() { return true; }
     playSkillClip(v, E, t) { FIGHTER_VIEW.playOnce(v, "Ranged_Magic_Summon", KIT.clips.Ranged_Magic_Summon.duration * 1000 / 900, t); }
     cast(E, ang, reach, t) {
@@ -2914,6 +3025,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class ClericType extends CharacterType {
+    overrideBasic(E, ang, reach, t) { graceStrike(E, t); return true; }
+    botAct(B, target, enemies, t) { BRAIN.botCleric(B, enemies, t); return true; }
     get hasSkillClip() { return true; }
     addMarkers(v, root, body) { v.halo = FIGHTER_VIEW.makeClericHalo(v, body); root.add(v.halo); }
     playSkillClip(v, E, t) { FIGHTER_VIEW.playOnce(v, "Ranged_Magic_Raise", KIT.clips.Ranged_Magic_Raise.duration * 1000 / ULT.rvCastMs, t); }
@@ -2943,6 +3056,28 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class HitmanType extends CharacterType {
+    overrideBasic(E, ang, reach, t) { dashStrike(E, ang); return true; }
+    onHitLate(owner, h) {
+      if (h.tp && owner.alive) { owner.x = h.tp.x; owner.y = h.tp.y; owner.dash = null; resolve(owner); }
+    }
+    skillShotFx(ox, oy, dx, dy) { FX_VIEW.spark(ox + dx * 30, oy + dy * 30, "#FF3A4A", 2); }
+    botUltRange() { return ULT.exRange; }
+    projectileMesh(g, d) {
+      var bladeProp = KIT.weapons[MODEL.hitman.right], execBlade = d.isSkill;
+      if (bladeProp) {
+        var blade = bladeProp.clone(); blade.rotation.z = -Math.PI / 2; blade.scale.setScalar(MODEL_SCALE * (execBlade ? 3 : 1.2)); blade.position.x = execBlade ? -24 : -10;
+        var spinner = new THREE.Group(); spinner.add(blade); g.add(spinner);
+        if (execBlade) g.userData.spin = spinner;
+      } else g.add(new THREE.Mesh(GEO.shaft, MODELS.basicMat("blade", 0xDCE3EC, 1)));
+      if (execBlade) {
+        var bloodHalo = new THREE.Mesh(GEO.ball, MODELS.basicMat("execHalo", 0xE0142E, 0.3)); bloodHalo.scale.setScalar(34); g.add(bloodHalo);
+        var bloodCore = new THREE.Mesh(GEO.ball, MODELS.basicMat("execCore", 0x9A0018, 0.8)); bloodCore.scale.setScalar(14); g.add(bloodCore);
+        var execTrail = new THREE.Mesh(GEO.trail, MODELS.basicMat("trail-exec", 0xC8102E, 0.75)); execTrail.position.x = -40; execTrail.scale.set(220, 5, 5); g.add(execTrail);
+        var execEdge = new THREE.Mesh(GEO.trail, MODELS.glowMat("trail-exec-core", 0xFFFFFF, 0.7)); execEdge.position.x = -25; execEdge.scale.set(140, 1.4, 1.4); g.add(execEdge);
+      } else {
+        var cut = new THREE.Mesh(GEO.trail, MODELS.glowMat("trail-hitman", 0xFF4A5A, 0.55)); cut.position.x = -20; cut.scale.set(90, 1.1, 1.1); g.add(cut);
+      }
+    }
     launchHandOf(model) { return model.getObjectByName("muzzle") || model.getObjectByName("handslotr"); }
     skillGlow(E, t) { return E.ultUntil > t ? 0x660010 : 0; }
     cast(E, ang, reach, t) {
@@ -2972,6 +3107,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class GuardianType extends ArcMeleeType {
+    botUltRange() { return ULT.gdR; }
     cast(E, ang, reach, t) {
       E.atkAt = t;
       E.ultUntil = t + 500;
@@ -2991,6 +3127,16 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class FrostType extends MagicShooterType {
+    projectileEffect(d, T, immune, fx) { return !d.isSkill && !immune && !T.minion ? frostStackFx(T) : fx; }
+    hitColor(d) { return "#BFEFFF"; }
+    get tintsHit() { return true; }
+    botUltRange() { return ULT.frBzR * 0.8; }
+    projectileMesh(g, d) {
+      var frostHalo = new THREE.Mesh(GEO.ball, MODELS.glowMat("frostGlow", 0x8FD8F0, 0.4)); frostHalo.scale.setScalar(16); g.add(frostHalo);
+      var shard = new THREE.Mesh(GEO.ball, MODELS.basicMat("frostOrb", 0xBFEFFF, 0.95)); shard.scale.set(12, 5, 5); g.add(shard);
+      var frostCore = new THREE.Mesh(GEO.ball, MODELS.basicMat("orbCore", 0xffffff, 1)); frostCore.scale.setScalar(4); g.add(frostCore);
+      var frostTail = new THREE.Mesh(GEO.trail, MODELS.glowMat("trail-frost", 0xBFEFFF, 0.45)); frostTail.position.x = -6; frostTail.scale.set(46, 2.6, 2.6); g.add(frostTail);
+    }
     get hasSkillClip() { return true; }
     playSkillClip(v, E, t) {
       FIGHTER_VIEW.playOnce(v, "Ranged_Magic_Spellcasting", KIT.clips.Ranged_Magic_Spellcasting.duration * 1000 / ULT.frBzDelay, t);
@@ -3013,6 +3159,24 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class DancerType extends CharacterType {
+    onHitEarly(owner, h) {
+      if (!h.k) return;
+      if (owner.isGaugeLocked()) owner.killGaugeOwed = (owner.killGaugeOwed || 0) + ULT.bwKillGauge;
+      else owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.bwKillGauge);
+    }
+    get isBladeThrower() { return true; }
+    get shotSound() { return "star"; }
+    botUltRange() { return ULT.bwR * 2; }
+    projectileMesh(g, d) {
+      var curved = KIT.weapons[MODEL.dancer.right];
+      if (curved) {
+        var whirl = new THREE.Group(), dancerBlade = curved.clone();
+        dancerBlade.rotation.z = -Math.PI / 2; dancerBlade.scale.setScalar(MODEL_SCALE * MODEL.dancer.rightScale); dancerBlade.position.x = -24;
+        whirl.add(dancerBlade); g.add(whirl);
+        g.userData.whirl = whirl;
+      } else g.add(new THREE.Mesh(GEO.shaft, MODELS.basicMat("blade", 0xDCE3EC, 1)));
+      var dancerTrail = new THREE.Mesh(GEO.trail, MODELS.glowMat("trail-dancer", 0xFFD9C8, 0.35)); dancerTrail.position.x = -10; dancerTrail.scale.set(40, 1.3, 1.3); g.add(dancerTrail);
+    }
     launchHandOf(model) { return model.getObjectByName("muzzle") || model.getObjectByName("handslotr"); }
     addMarkers(v, root, body) { v.bladeRing = FIGHTER_VIEW.makeBladeRing(); root.add(v.bladeRing); }
     get shotName() { return "단검"; }
@@ -3032,6 +3196,23 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class StormbowType extends CharacterType {
+    onHitEarly(owner, h) { if (h.zap) stormZap(owner, h.zap, h.t); }
+    afterProjectileHit(d, T, immune) {
+      if (!immune) room.ref.child("hits/" + d.owner).push({ d: 0, b: 0, t: now(), zap: { v: T.id, x: r1(T.x), y: r1(T.y) } });
+    }
+    get tintsHit() { return true; }
+    hitColor(d) { return "#FFE45C"; }
+    botUltRange() { return this.data.range; }
+    projectileMesh(g, d) {
+      if (KIT.weapons.arrow_bow) {
+        var zapArrow = KIT.weapons.arrow_bow.clone(); zapArrow.rotation.y = Math.PI / 2; zapArrow.scale.setScalar(32); g.add(zapArrow);
+      } else g.add(new THREE.Mesh(GEO.shaft, MODELS.basicMat("shaft", 0xEADFC4, 1)));
+      var zapHalo = new THREE.Mesh(GEO.ball, MODELS.glowMat("zapGlow", 0x3F8CFF, 0.55)); zapHalo.position.x = 12; zapHalo.scale.setScalar(9); g.add(zapHalo);
+      var zapCore = new THREE.Mesh(GEO.ball, MODELS.basicMat("zapCore", 0xFFF27A, 1)); zapCore.position.x = 12; zapCore.scale.setScalar(3.5); g.add(zapCore);
+      var zapTrail = new THREE.Mesh(GEO.trail, MODELS.glowMat("trail-zap", 0x6FC8FF, 0.55)); zapTrail.position.x = -15; zapTrail.scale.set(60, 1.8, 1.8); g.add(zapTrail);
+      var zapSpark = new THREE.Mesh(GEO.trail, MODELS.glowMat("trail-zap-core", 0xFFF27A, 0.7)); zapSpark.position.x = -8; zapSpark.scale.set(34, 0.7, 0.7); g.add(zapSpark);
+      g.userData.pulse = zapHalo;
+    }
     launchHandOf(model) { return model.getObjectByName("handslotl"); }
     addMarkers(v, root, body) {
       v.stormAura = FX_VIEW.makeStormAura(); root.add(v.stormAura);
@@ -3204,7 +3385,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       r.hp = pos.hp; r.alive = pos.alive; r.gauge = pos.gauge; r.dmg = pos.dmg;
       r.atkAt = pos.atkAt; r.stabAt = pos.stabAt; r.ultUntil = pos.ultUntil; r.leapAt = pos.leapAt; r.buffUntil = pos.buffUntil;
       r.regenUntil = pos.regenUntil; r.skillUntil = pos.skillUntil; r.skillDur = pos.skillDur;
-      if (pos.stealthUntil > r.stealthUntil && pos.stealthUntil > now()) FX_VIEW.smoke(r.x, r.y, r.char === "necro" ? NECRO_SMOKE_COLOR : null);
+      if (pos.stealthUntil > r.stealthUntil && pos.stealthUntil > now()) FX_VIEW.smoke(r.x, r.y, CHAR_TYPES.of(r.char).smokeColor);
       r.stealthUntil = pos.stealthUntil;
       r.slowUntil = pos.slowUntil; r.slowMul = pos.slowMul; r.stunUntil = pos.stunUntil;
       r.summonAt = pos.summonAt;
@@ -3586,8 +3767,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     addProj(v.key + "_" + i, { team: v.team, owner: v.ev.o, ownerCharacterType: v.char, x: ox + dx * 20, y: oy + dy * 20,
       vx: dx * sp, vy: dy * sp, isSkill: v.skill, countsAsSkill: !!v.ev.sk, dmg: sv.dmg, ultKey: sv.ultKey, fx: sv.fx,
       pr: sv.pr, range: sv.range + (!v.skill && E && overcharged(E, v.ev.t) ? ULT.ocRangeBonus : 0), createdAt: v.ev.t + i * v.gap });
-    if (v.char === "hitman" && v.skill) FX_VIEW.spark(ox + dx * 30, oy + dy * 30, "#FF3A4A", 2);
-    if (E && (E === MATCH.me || MATCH.bots[E.id]) && hear(E)) sfx(v.char === "mage" || v.char === "necro" || v.char === "frost" ? "orb" : (v.char === "rogue" || v.char === "dancer" ? "star" : "shoot"));
+    var shooterType = CHAR_TYPES.of(v.char);
+    if (v.skill) shooterType.skillShotFx(ox, oy, dx, dy);
+    if (E && (E === MATCH.me || MATCH.bots[E.id]) && hear(E)) sfx(shooterType.shotSound);
     return true;
   }
   function pruneLocal(t) {
@@ -3625,12 +3807,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var d = p.d;
     p.dead = true;
     var immune = T.isProtected(), fx = d.fx, seen = !MATCH.me || MATCH.me.team === T.team || visibleTo(T, MATCH.me);
-    if (d.ownerCharacterType === "frost" && !d.isSkill && !immune && !T.minion) fx = frostStackFx(T);
-    var dancer = d.ownerCharacterType === "dancer";
+    var ownerType = CHAR_TYPES.of(d.ownerCharacterType);
+    fx = ownerType.projectileEffect(d, T, immune, fx);
+    var dancer = ownerType.isBladeThrower;
     damage(T, Math.round(d.dmg * (1 + damageBonusSum(d, T))), d.owner, dancer ? d.createdAt : !d.isSkill, d.isSkill ? d.ultKey : (d.countsAsSkill ? "skill" : null), fx);
     if (dancer) bladeSpin(p, T.x, T.y);
     if (d.ultKey === "execute" && !immune) { room.ref.child("hits/" + d.owner).push({ d: 0, b: 0, t: now(), tp: { x: r1(T.x), y: r1(T.y) } }); FX_VIEW.executeFx(T.x, T.y); }
-    if (d.ownerCharacterType === "stormbow" && !immune) room.ref.child("hits/" + d.owner).push({ d: 0, b: 0, t: now(), zap: { v: T.id, x: r1(T.x), y: r1(T.y) } });
+    ownerType.afterProjectileHit(d, T, immune);
     if (seen) FX_VIEW.spark(T.x, T.y, FX_VIEW.orbHitColor(d), d.ultKey === "giant" ? 2.2 : 1);
   }
   function damageBonusSum(d, T) {
@@ -3673,9 +3856,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (T.isProtected()) return;
     var t = now(), unguarded = amount, C = CHARS[T.char];
     if (T.shield && amount > 0) { amount = 0; T.shield = false; FX_VIEW.spark(T.x, T.y, SHIELD_SPARK, 1.5); }
-    if (T.char === "knight" && T.buffUntil > t) amount = Math.round(amount * ULT.tkDef);
+    var targetType = CHAR_TYPES.of(T.char);
+    amount = targetType.skillGuard(T, amount, t);
     if (C.armor) amount = Math.max(0, amount - C.armor);
-    if (T.char === "knight") T.blocked = (T.blocked || 0) + Math.min(unguarded, T.hp) - Math.min(amount, T.hp);
+    targetType.tallyBlocked(T, unguarded, amount);
     var floorHp = CHARS[T.char].lastStandHp;
     if (floorHp && !T.lastStandUsed && T.hp - amount < floorHp) {
       amount = Math.max(0, T.hp - floorHp);
@@ -3693,7 +3877,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (T === MATCH.me) sfx("hit");
       afflict(T, fx, owner);
       if (fx && fx.maxHpRate) damage(T, Math.round(T.maxHp * fx.maxHpRate), owner, false, ultKey);
-      if (ultKey !== "burn" && P[owner] && P[owner].characterType === "mage") igniteBurn(T, owner, t);
+      if (P[owner]) CHAR_TYPES.of(P[owner].characterType).afterDealtDamage(T, owner, ultKey, t);
       if (C.rally && !T.rallyUsed && T.hp < T.maxHp * C.rally.hpRate) { T.rallyUsed = true; T.regenUntil = t + C.rally.ms; T.regenNext = t + REGEN_TICK_MS; }
     }
     pushHit(owner, dm, basic, ultKey, killed, gaugeGain);
@@ -3825,23 +4009,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (h.d && !h.mn) owner.dmg += h.d;
       if (h.k) owner.kills++;
       if (h.as) owner.assists = (owner.assists || 0) + 1;
-      if (h.zap && owner.char === "stormbow") stormZap(owner, h.zap, h.t);
-      if (h.k && owner.char === "dancer") {
-        if (owner.isGaugeLocked()) owner.killGaugeOwed = (owner.killGaugeOwed || 0) + ULT.bwKillGauge;
-        else owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.bwKillGauge);
-      }
+      CHAR_TYPES.of(owner.char).onHitEarly(owner, h);
       if (h.hl) owner.heal += h.hl;
       if (h.hl && CHARS[owner.char].healGauge && !owner.isGaugeLocked()) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + h.hl * GAUGE_MAX / CHARS[owner.char].healGauge);
       if (h.cs) owner.stunDealt = (owner.stunDealt || 0) + h.cs / 1000;
       if (h.ss) owner.slowDealt = (owner.slowDealt || 0) + h.ss / 1000;
       if (h.sw) owner.slowWeight = (owner.slowWeight || 0) + h.sw / 1000;
       if (h.b && owner.alive && CHARS[owner.char].haste) owner.addHaste(now());
-      if (h.u === "volley" && owner.char === "ranger") owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.mkRefund);
-      if (h.tp && owner.char === "hitman" && owner.alive) {
-        owner.x = h.tp.x; owner.y = h.tp.y; owner.dash = null; resolve(owner);
-      }
-      if (h.u === "giant" && owner.char === "sniper") owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.pnRefund);
-      if (h.u === "fog" && owner.char === "thrower" && !owner.isGaugeLocked()) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.fgRefund);
+      CHAR_TYPES.of(owner.char).onHitLate(owner, h);
       var sameSwing = h.s && owner.gaugeSwing === h.s;
       if (h.s) owner.gaugeSwing = h.s;
       if (h.b && !sameSwing && !owner.isGaugeLocked()) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + (h.g != null ? h.g : roleOf(owner.char).gaugeOnHit));
@@ -4263,7 +4438,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (T.isProtected()) return;
     if (d.slam && !d.dmg) afflict(T, d.fx, d.owner);
     else damage(T, d.dmg, d.owner, (d.m || !d.u) && d.createdAt + (d.mi || 0) / 1000, d.hammer ? d.createdAt : (d.u || d.m || d.countsAsSkill ? "skill" : null), d.fx, d.m ? ULT.smGauge : null, !!d.m);
-    if (P[d.owner] && P[d.owner].characterType === "shaman") applyCurse(T, d.owner, now());
+    if (P[d.owner]) CHAR_TYPES.of(P[d.owner].characterType).afterStrike(T, d);
     if (d.kb && T.alive) {
       var dd = hyp(dx, dy) || 1, kbAt = now(), shoveEnd = T.shove ? T.shove.at + ULT.gdKbMs : 0;
       if (!T.minion) { creditCC(d.owner, Math.max(0, kbAt + ULT.gdKbMs - Math.max(T.stunUntil || 0, shoveEnd, kbAt)), 0, 0); noteHurt(T, d.owner, kbAt); }
@@ -4439,16 +4614,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var c = CHARS[E.char], t = now(), rage = E.isBerserk(t);
     if (E.isStunned(t)) return;
     E.cdDur = E.isRiposting(t) ? 1000 / ULT.rmRate : c.cd * (rage ? ULT.bzCdMul : 1) / (overcharged(E, t) ? ULT.ocRate : 1); E.cdUntil = t + E.cdDur; E.angle = ang;
-    if (E.char === "thrower") { throwPoison(E, ang, reach, false); return; }
-    if (E.char === "cleric") { graceStrike(E, t); return; }
-    if (E.char === "shaman") { var struck = domainStrikeTarget(E, t); if (struck) { domainStrike(E, struck, t); return; } }
-    if (E.char === "hitman") { dashStrike(E, ang); return; }
+    var type = CHAR_TYPES.of(E.char);
+    if (type.overrideBasic(E, ang, reach, t)) return;
     if (c.stab) { lunge(E, ang); return; }
-    var ambushDmg = null;
-    if (E.char === "rogue" && E.stealthUntil > t) {
-      E.stealthUntil = E.skillUntil = t; MATCH.game.forceNet = true;
-      ambushDmg = c.ambushDmg;
-    }
+    var ambushDmg = type.ambush(E, t);
     if (isMelee(E.char) && (!c.throwRange || enemyInMelee(E))) {
       swing(E, ang, rage, ambushDmg);
       if (c.hits > 1) E.slash = { left: c.hits - 1, at: t + c.hitGap, ang: ang, dmg: ambushDmg };
@@ -4602,7 +4771,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var o = ent(id); if (!o || !o.alive || id === B.id) return;
         if (o.team !== B.team) enemies.push(o);
       });
-      var target = null, td = Infinity, bestScore = Infinity, sniper = B.char === "sniper", view = sniper ? c.range : BOT_VIEW;
+      var botType = CHAR_TYPES.of(B.char), target = null, td = Infinity, bestScore = Infinity, sniper = botType.holdsFullRange, view = sniper ? c.range : BOT_VIEW;
       enemies.forEach(function (o) {
         var d = hyp(o.x - B.x, o.y - B.y);
         if (d > view) return;
@@ -4615,7 +4784,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var mx = 0, my = 0;
       if (target) {
         var dx = target.x - B.x, dy = target.y - B.y, d = hyp(dx, dy) || 1, ux = dx / d, uy = dy / d;
-        var kiter = B.char !== "sniper" && (CHARS[B.char].role === "caster" || CHARS[B.char].role === "shooter");
+        var kiter = !sniper && (CHARS[B.char].role === "caster" || CHARS[B.char].role === "shooter");
         var want = B.isBladeStorming(t) ? BODY_R * 2 : c.dashRange ?c.dashRange * 0.7 : c.width ? c.range * 0.75 : (melee ? c.range * 0.6 : c.range * 0.72);
         var los = losClear(B.x, B.y, target.x, target.y);
         if (!los) k.chaseUntil = t + BOT_LOS_HOLD_MS;
@@ -4655,18 +4824,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (aimAt) B.angle = Math.atan2(aimAt.y - B.y, aimAt.x - B.x);
       else if (B.mv) B.angle = Math.atan2(my, mx);
       if (B.burst) return;
-      if (B.char === "thrower") { BRAIN.botThrow(B, target, enemies, t); return; }
-      if (B.char === "cleric") { BRAIN.botCleric(B, enemies, t); return; }
-      if (B.char === "lancer") { BRAIN.botLance(B, target, t); return; }
-      if (target && B.gauge >= GAUGE_MAX && t - k.seenAt > 500 && losClear(B.x, B.y, target.x, target.y) && (B.char !== "mage" || td <= ULT.mbCast) && (B.char !== "blacksmith" || td <= ULT.bsCast) && (CHARS[B.char].ultKind !== "blackhole" || td <= ULT.bhCast) && (B.char !== "shaman" || td <= ULT.dmR * 0.7) && (B.char !== "hitman" || td <= ULT.exRange) && (B.char !== "guardian" || td <= ULT.gdR) && (B.char !== "frost" || td <= ULT.frBzR * 0.8) && (B.char !== "dancer" || td <= ULT.bwR * 2) && (B.char !== "duelist" || td <= c.dashRange + c.range) && (B.char !== "stormbow" || td <= c.range)) {
-        if (B.char === "blacksmith") {
-          var drop = BRAIN.leadSpot(target, hammerLeapMs(td) / 1000, t);
-          useUlt(B, Math.atan2(drop.y - B.y, drop.x - B.x), hyp(drop.x - B.x, drop.y - B.y)); return;
-        }
-        var ultSpot = BRAIN.ultAimSpot(B, target, td, t);
+      if (botType.botAct(B, target, enemies, t)) return;
+      if (target && B.gauge >= GAUGE_MAX && t - k.seenAt > 500 && losClear(B.x, B.y, target.x, target.y) && td <= botType.botUltRange()) {
+        var ultSpot = botType.botUltSpot(B, target, td, t);
         useUlt(B, Math.atan2(ultSpot.y - B.y, ultSpot.x - B.x), hyp(ultSpot.x - B.x, ultSpot.y - B.y)); return;
       }
-      if (B.char === "shaman" && t >= B.cdUntil && domainStrikeTarget(B, t)) { fireBasic(B, B.angle); return; }
+      if (botType.wantsBasicNow(B, t)) { fireBasic(B, B.angle); return; }
       if (aimAt && t >= B.cdUntil && t - k.seenAt > BOT_REACT_MS) {
         var ad = hyp(aimAt.x - B.x, aimAt.y - B.y);
         var rng = c.stab ? lungeRange(B, t) + c.range : c.throwRange || c.dashRange || (melee ? c.range + BODY_R - 4 : c.range + (overcharged(B, t) ? ULT.ocRangeBonus : 0));
@@ -4677,13 +4840,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }
     }
     ultAimSpot(B, target, dist, t) {
-      var sec = 0;
-      if (B.char === "mage") sec = ULT.mbDelay / 1000;
-      else if (B.char === "sniper") sec = dist / ULT.pnSpeed;
-      else if (B.char === "ranger") sec = dist / ULT.mkSpeed;
+      var type = CHAR_TYPES.of(B.char), sec = type.ultLeadSeconds(dist);
       if (!sec) return target;
       var spot = BRAIN.leadSpot(target, sec, t), reach = hyp(spot.x - B.x, spot.y - B.y);
-      if (B.char === "mage" && reach > ULT.mbCast) return target;
+      if (type.ultSpotTooFar(reach)) return target;
       return spot;
     }
     leadSpot(o, sec, t) {
@@ -5035,10 +5195,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   cv.addEventListener("pointerup", joyEnd); cv.addEventListener("pointercancel", joyEnd);
 
   function aimRange(E, btn) {
-    if (E.char === "thrower") return [CHARS.thrower.minRange, btn === "ult" ? ULT.fgCast : CHARS.thrower.range];
-    if (E.char === "blacksmith") return [ULT.bsMin, ULT.bsCast];
-    if (CHARS[E.char].ultKind === "blackhole") return [ULT.bhMin, ULT.bhCast];
-    return [ULT.mbMin, ULT.mbCast];
+    return CHAR_TYPES.of(E.char).aimRange(btn);
   }
   function aimReach(E, btn) { var rg = aimRange(E, btn); return rg[0] + clamp((hyp(aim.dx, aim.dy) - DRAG_MIN) / 130, 0, 1) * (rg[1] - rg[0]); }
   function bindAimButton(el, which) {
@@ -5809,80 +5966,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   class EffectView {
     makeProjVis(p) {
       var d = p.d, g = new THREE.Group();
-      if (d.ownerCharacterType === "mage") {
-        var halo = new THREE.Mesh(GEO.ball, MODELS.glowMat("fireGlow", 0xFF4A14, 0.45)); halo.scale.setScalar(20); g.add(halo);
-        var orb = new THREE.Mesh(GEO.ball, MODELS.basicMat("fireOrb", 0xE8260E, 0.92)); orb.scale.setScalar(10); g.add(orb);
-        var core = new THREE.Mesh(GEO.ball, MODELS.basicMat("fireCore", 0xFFE08A, 1)); core.scale.setScalar(5); g.add(core);
-        var fireTail = new THREE.Mesh(GEO.trail, MODELS.glowMat("trail-fire", 0xFF5A1E, 0.45)); fireTail.position.x = -6; fireTail.scale.set(44, 3.4, 3.4); g.add(fireTail);
-        g.userData.pulse = orb;
-      } else if (d.ownerCharacterType === "frost") {
-        var frostHalo = new THREE.Mesh(GEO.ball, MODELS.glowMat("frostGlow", 0x8FD8F0, 0.4)); frostHalo.scale.setScalar(16); g.add(frostHalo);
-        var shard = new THREE.Mesh(GEO.ball, MODELS.basicMat("frostOrb", 0xBFEFFF, 0.95)); shard.scale.set(12, 5, 5); g.add(shard);
-        var frostCore = new THREE.Mesh(GEO.ball, MODELS.basicMat("orbCore", 0xffffff, 1)); frostCore.scale.setScalar(4); g.add(frostCore);
-        var frostTail = new THREE.Mesh(GEO.trail, MODELS.glowMat("trail-frost", 0xBFEFFF, 0.45)); frostTail.position.x = -6; frostTail.scale.set(46, 2.6, 2.6); g.add(frostTail);
-      } else if (d.ownerCharacterType === "necro") {
-        var aura = new THREE.Mesh(GEO.ball, MODELS.glowMat("necroGlow", 0x8E4DFF, 0.4)); aura.scale.setScalar(18); g.add(aura);
-        var sphere = new THREE.Mesh(GEO.ball, MODELS.basicMat("necroOrb", 0x7A3BE0, 0.95)); sphere.scale.setScalar(9); g.add(sphere);
-        var heart = new THREE.Mesh(GEO.ball, MODELS.basicMat("necroCore", 0xE6D2FF, 1)); heart.scale.setScalar(4); g.add(heart);
-        var tail = new THREE.Mesh(GEO.trail, MODELS.glowMat("trail-necro", 0x9B5CFF, 0.4)); tail.position.x = -6; tail.scale.set(42, 3.2, 3.2); g.add(tail);
-        g.userData.pulse = sphere;
-      } else if (d.ownerCharacterType === "rogue") {
-        if (KIT.weapons.dagger) {
-          var knife = KIT.weapons.dagger.clone(); knife.rotation.z = -Math.PI / 2; knife.scale.setScalar(MODEL_SCALE); knife.position.x = -22; g.add(knife);
-        } else g.add(new THREE.Mesh(GEO.shaft, MODELS.basicMat("blade", 0xDCE3EC, 1)));
-        var streak = new THREE.Mesh(GEO.trail, MODELS.glowMat("trail-rogue", 0xDCE3EC, 0.35)); streak.position.x = -10; streak.scale.set(40, 1.3, 1.3); g.add(streak);
-      } else if (d.ownerCharacterType === "hitman") {
-        var bladeProp = KIT.weapons[MODEL.hitman.right], execBlade = d.isSkill;
-        if (bladeProp) {
-          var blade = bladeProp.clone(); blade.rotation.z = -Math.PI / 2; blade.scale.setScalar(MODEL_SCALE * (execBlade ? 3 : 1.2)); blade.position.x = execBlade ? -24 : -10;
-          var spinner = new THREE.Group(); spinner.add(blade); g.add(spinner);
-          if (execBlade) g.userData.spin = spinner;
-        } else g.add(new THREE.Mesh(GEO.shaft, MODELS.basicMat("blade", 0xDCE3EC, 1)));
-        if (execBlade) {
-          var bloodHalo = new THREE.Mesh(GEO.ball, MODELS.basicMat("execHalo", 0xE0142E, 0.3)); bloodHalo.scale.setScalar(34); g.add(bloodHalo);
-          var bloodCore = new THREE.Mesh(GEO.ball, MODELS.basicMat("execCore", 0x9A0018, 0.8)); bloodCore.scale.setScalar(14); g.add(bloodCore);
-          var execTrail = new THREE.Mesh(GEO.trail, MODELS.basicMat("trail-exec", 0xC8102E, 0.75)); execTrail.position.x = -40; execTrail.scale.set(220, 5, 5); g.add(execTrail);
-          var execEdge = new THREE.Mesh(GEO.trail, MODELS.glowMat("trail-exec-core", 0xFFFFFF, 0.7)); execEdge.position.x = -25; execEdge.scale.set(140, 1.4, 1.4); g.add(execEdge);
-        } else {
-          var cut = new THREE.Mesh(GEO.trail, MODELS.glowMat("trail-hitman", 0xFF4A5A, 0.55)); cut.position.x = -20; cut.scale.set(90, 1.1, 1.1); g.add(cut);
-        }
-      } else if (d.ownerCharacterType === "dancer") {
-        var curved = KIT.weapons[MODEL.dancer.right];
-        if (curved) {
-          var whirl = new THREE.Group(), dancerBlade = curved.clone();
-          dancerBlade.rotation.z = -Math.PI / 2; dancerBlade.scale.setScalar(MODEL_SCALE * MODEL.dancer.rightScale); dancerBlade.position.x = -24;
-          whirl.add(dancerBlade); g.add(whirl);
-          g.userData.whirl = whirl;
-        } else g.add(new THREE.Mesh(GEO.shaft, MODELS.basicMat("blade", 0xDCE3EC, 1)));
-        var dancerTrail = new THREE.Mesh(GEO.trail, MODELS.glowMat("trail-dancer", 0xFFD9C8, 0.35)); dancerTrail.position.x = -10; dancerTrail.scale.set(40, 1.3, 1.3); g.add(dancerTrail);
-      } else if (d.ownerCharacterType === "stormbow") {
-        if (KIT.weapons.arrow_bow) {
-          var zapArrow = KIT.weapons.arrow_bow.clone(); zapArrow.rotation.y = Math.PI / 2; zapArrow.scale.setScalar(32); g.add(zapArrow);
-        } else g.add(new THREE.Mesh(GEO.shaft, MODELS.basicMat("shaft", 0xEADFC4, 1)));
-        var zapHalo = new THREE.Mesh(GEO.ball, MODELS.glowMat("zapGlow", 0x3F8CFF, 0.55)); zapHalo.position.x = 12; zapHalo.scale.setScalar(9); g.add(zapHalo);
-        var zapCore = new THREE.Mesh(GEO.ball, MODELS.basicMat("zapCore", 0xFFF27A, 1)); zapCore.position.x = 12; zapCore.scale.setScalar(3.5); g.add(zapCore);
-        var zapTrail = new THREE.Mesh(GEO.trail, MODELS.glowMat("trail-zap", 0x6FC8FF, 0.55)); zapTrail.position.x = -15; zapTrail.scale.set(60, 1.8, 1.8); g.add(zapTrail);
-        var zapSpark = new THREE.Mesh(GEO.trail, MODELS.glowMat("trail-zap-core", 0xFFF27A, 0.7)); zapSpark.position.x = -8; zapSpark.scale.set(34, 0.7, 0.7); g.add(zapSpark);
-        g.userData.pulse = zapHalo;
-      } else if (d.ownerCharacterType === "sniper") {
-        var big = d.isSkill ? ULT.pnScale : 1, boltCol = d.isSkill ? 0xFFB347 : C_FX[d.team];
-        if (KIT.weapons.arrow_crossbow) {
-          var bolt = KIT.weapons.arrow_crossbow.clone(); bolt.rotation.y = Math.PI / 2; bolt.scale.setScalar(34 * big); g.add(bolt);
-        } else {
-          var boltShaft = new THREE.Mesh(GEO.shaft, MODELS.basicMat("shaft", 0xEADFC4, 1)); boltShaft.scale.setScalar(big); g.add(boltShaft);
-        }
-        var boltTrail = new THREE.Mesh(GEO.trail, MODELS.glowMat("trail-sniper-" + (d.isSkill ? "u" : d.team), boltCol, d.isSkill ? 0.55 : 0.45));
-        boltTrail.position.x = -15 * big; boltTrail.scale.set(d.isSkill ? 150 : 70, 1.4 * big, 1.4 * big); g.add(boltTrail);
-      } else {
-        var volley = d.isSkill, col = volley ? 0xFF8A3D : C_FX[d.team];
-        if (KIT.weapons.arrow_bow) {
-          var arrow = KIT.weapons.arrow_bow.clone(); arrow.rotation.y = Math.PI / 2; arrow.scale.setScalar(volley ? 38 : 32); g.add(arrow);
-        } else {
-          var shaft = new THREE.Mesh(GEO.shaft, MODELS.basicMat("shaft", 0xEADFC4, 1)); if (volley) shaft.scale.set(1.2, 1.4, 1.4); g.add(shaft);
-          g.add(new THREE.Mesh(GEO.head, MODELS.basicMat("head-" + (volley ? "v" : d.team), col, 1)));
-        }
-        var trail = new THREE.Mesh(GEO.trail, MODELS.glowMat("trail-" + (volley ? "v" : d.team), col, 0.45)); trail.position.x = -15; trail.scale.set(volley ? 70 : 50, volley ? 1.8 : 1.3, volley ? 1.8 : 1.3); g.add(trail);
-      }
+      CHAR_TYPES.of(d.ownerCharacterType).projectileMesh(g, d);
       var shooter = VIS[d.owner];
       if (shooter && shooter.launchHand && shooter.root.visible) {
         var aimed = KIT.muzzle[d.ownerCharacterType];
@@ -6338,12 +6422,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     smoke(x, y, color) { MATCH.fx.push({ k: "smoke", x: x, y: y, c: color || 0xC8C8CD, t: Date.now(), life: (ULT.asSmokeMs + 150) / CLOCK.scale }); }
     boom(x, y, r, team) { MATCH.fx.push({ k: "boom", x: x, y: y, r: r, c: C_FX[team] || 0xffffff, t: Date.now(), life: 450 }); }
     floatText(x, y, text, color) { MATCH.fx.push({ k: "txt", x: x, y: y, s: text, c: color, t: Date.now(), life: 800 }); }
-    orbHitColor(d) { return d.ownerCharacterType === "necro" || d.ownerCharacterType === "frost" || d.ownerCharacterType === "mage" || d.ownerCharacterType === "stormbow" ? FX_VIEW.hitColor(d) : (d.team === "blue" ? "#5FA2FF" : "#FF6A5F"); }
-    hitColor(d) {
-      if (d.ownerCharacterType === "necro") return "#B07CFF";
-      if (d.ownerCharacterType === "stormbow") return "#FFE45C";
-      if (d.ownerCharacterType === "frost") return "#BFEFFF";
-      return d.ownerCharacterType === "mage" ? "#FF5A24" : (d.team === "blue" ? "#5FA2FF" : "#FF6A5F"); }
+    orbHitColor(d) {
+      var type = CHAR_TYPES.of(d.ownerCharacterType);
+      return type.tintsHit ? type.hitColor(d) : teamHitColor(d.team);
+    }
+    hitColor(d) { return CHAR_TYPES.of(d.ownerCharacterType).hitColor(d); }
     thunder(x, y) {
       if (PIX < PIX_START) return;
       MATCH.fx.push({ k: "bolt", x: x, y: y, t: Date.now(), life: 380 });
@@ -6807,7 +6890,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         projVisualHit(p, t);
         if (e > p.life && !p.sparked && p.dist < (p.d.range || 500) - 1) {
           p.sparked = true; var q = projAt(p, p.life);
-          var orbShot = p.d.ownerCharacterType === "mage" || p.d.ownerCharacterType === "necro" || p.d.ownerCharacterType === "frost";
+          var orbShot = CHAR_TYPES.of(p.d.ownerCharacterType).isOrbShooter;
           FX_VIEW.spark(q.x, q.y, orbShot ? FX_VIEW.hitColor(p.d) : "#FFFFFF", orbShot ? 1.8 : 1);
         }
         if (p.dead || p.gone || e > p.life) { if (g) EFFECT_VIEW.dropProjVis(id); return; }
