@@ -1407,7 +1407,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     sub(ref.child("final"), "value", function (s) { room.final = s.val(); });
     sub(ref.child("roster"), "value", function (s) { room.roster = s.val(); });
     sub(ref.child("statsNote"), "value", function (s) { room.statsNote = s.val(); });
-    sub(ref.child("draft"), "value", function (s) { room.draft = s.val(); renderDraft(); });
+    sub(ref.child("draft"), "value", function (s) { room.draft = s.val(); DRAFT.renderDraft(); });
     sub(ref.child("status"), "value", function (s) {
       var st = s.val();
       if (st === null) { if (!leaving) exitToStart("방이 종료되었어요."); return; }
@@ -1415,7 +1415,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var keepSpecResult = st === "lobby" && prev === "ended" && screenNow === "game" && isSpec();
       if (!keepSpecResult) releaseSpecResult();
       if (st === "lobby") { G = null; ME = null; BOTS = {}; if (keepSpecResult) holdSpecResult(); else showScreen("lobby"); playersChanged(); }
-      else if (st === "draft") { G = null; ME = null; BOTS = {}; if (prev !== "draft") draftView = null; showScreen("draft"); renderDraft(); }
+      else if (st === "draft") { G = null; ME = null; BOTS = {}; if (prev !== "draft") DRAFT.view = null; showScreen("draft"); DRAFT.renderDraft(); }
       else showScreen("game");
       if (st === "countdown" && prev !== "countdown") CLOCK.burst();
       if (st === "ended" && prev !== "ended") onEnded();
@@ -2220,7 +2220,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function startGame() {
     if (!isHost() || room.status !== "lobby") return;
     audio();
-    if (room.mode === "cup") { startDraft(); return; }
+    if (room.mode === "cup") { DRAFT.startDraft(); return; }
     launchMatch(function (id) { return P[id].characterType; }, COUNT_MS, resolveArena(room.map));
   }
   function launchMatch(charOf, countMs, arena, bans) {
@@ -2252,295 +2252,297 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
   var DRAFT_STEPS = [{ keys: ["b1"], ban: true }, { keys: ["r1"], ban: true }, { keys: ["b1"] }, { keys: ["r1", "r2"] }, { keys: ["b2", "b3"] }, { keys: ["r3"] }];
   var DRAFT_SHOWN_MS = 15000, DRAFT_STEP_MS = 16000, DRAFT_AI_MS = 2500, DRAFT_AI_TRADE_MS = 1200, TRADE_DENIED_SHOW_MS = 2000, NO_BAN = "-";
-  var draftView = null, draftBusy = false, draftLaunched = 0;
-  function stepSide(step) { return DRAFT_STEPS[step].keys[0].charAt(0); }
-  function draftStepIds(d, step) {
-    return ((DRAFT_STEPS[step] || {}).keys || []).map(function (k) { return d.seq && d.seq[k]; }).filter(function (id) { return !!id; });
-  }
-  function draftWaiting(d, step) {
-    var S = DRAFT_STEPS[step];
-    if (!S) return [];
-    if (S.ban) return d.bans && d.bans[stepSide(step)] ? [] : draftStepIds(d, step).filter(function (id) { return P[id]; });
-    var picks = d.picks || {};
-    return draftStepIds(d, step).filter(function (id) { return P[id] && !picks[id]; });
-  }
-  function draftBanned(d) {
-    var bans = d.bans || {};
-    return ["b", "r"].map(function (k) { return bans[k]; }).filter(function (c) { return c && c !== NO_BAN; });
-  }
-  function draftTaken(d) {
-    var picks = d.picks || {};
-    return keys(picks).map(function (id) { return picks[id]; });
-  }
-  function draftLeft(d) {
-    var gone = draftTaken(d).concat(draftBanned(d));
-    return CHAR_LIST.filter(function (c) { return gone.indexOf(c) < 0; });
-  }
-  function draftDone(d) { return d.step >= DRAFT_STEPS.length; }
-  function draftSideOf(d, id) {
-    var k = keys(d.seq || {}).filter(function (s) { return d.seq[s] === id; })[0];
-    return k ? k.charAt(0) : null;
-  }
-  function draftHumans(d) {
-    return keys(d.seq || {}).map(function (k) { return d.seq[k]; }).filter(function (id) { return P[id] && !P[id].isAI; });
-  }
-  function draftReadyCount(d) {
-    var ready = d.ready || {};
-    return draftHumans(d).filter(function (id) { return ready[id]; }).length;
-  }
-  function canTradeWith(d, id) {
-    var ready = d.ready || {}, picks = d.picks || {};
-    return draftDone(d) && !d.trade && id !== myId && P[id] && P[myId] && !ready[id] && !ready[myId] &&
-      draftSideOf(d, id) && draftSideOf(d, id) === draftSideOf(d, myId) && !!picks[id] && !!picks[myId];
-  }
-  function draftSettle(d, t) {
-    while (d.step < DRAFT_STEPS.length && !draftWaiting(d, d.step).length) { d.step++; d.stepAt = t; }
-    return d;
-  }
-  function startDraft() {
-    var seq = {}, t = now();
-    ["blue", "red"].forEach(function (team) {
-      teamIds(team).slice(0, 3).forEach(function (id, i) { seq[(team === "blue" ? "b" : "r") + (i + 1)] = id; });
-    });
-    var d = draftSettle({ seq: seq, step: 0, stepAt: t }, t);
-    room.ref.update({ draft: d, arena: resolveArena(room.map), status: "draft", roster: null, st: null, winner: null, final: null, statsNote: null, endedAt: null, startAt: null,
-                      shots: null, meleeHits: null, hits: null, effects: null, kills: null, projectiles: null });
-  }
-  function applyDraftChoice(cur, id, c) {
-    if (DRAFT_STEPS[cur.step].ban) { cur.bans = cur.bans || {}; cur.bans[stepSide(cur.step)] = c; }
-    else { cur.picks = cur.picks || {}; cur.picks[id] = c; }
-    if (cur.hover) delete cur.hover[id];
-  }
-  function draftPick(c) {
-    var d = room && room.draft;
-    if (!d || room.status !== "draft" || draftWaiting(d, d.step).indexOf(myId) < 0 || draftLeft(d).indexOf(c) < 0) return;
-    room.ref.child("draft").transaction(function (cur) {
-      if (!cur || draftWaiting(cur, cur.step).indexOf(myId) < 0 || draftLeft(cur).indexOf(c) < 0) return;
-      applyDraftChoice(cur, myId, c);
-      return draftSettle(cur, now());
-    }).then(function (res) { if (res.committed) sfx("confirm"); });
-  }
-  function draftHover(c) {
-    var d = room && room.draft;
-    if (!d || draftWaiting(d, d.step).indexOf(myId) < 0) return;
-    room.ref.child("draft/hover/" + myId).set(c);
-  }
-  function draftReady() {
-    room.ref.child("draft").transaction(function (cur) {
-      if (!cur || !draftDone(cur) || !P[myId] || !draftSideOf(cur, myId)) return;
-      if (cur.trade && (cur.trade.from === myId || cur.trade.to === myId)) return;
-      cur.ready = cur.ready || {};
-      cur.ready[myId] = !cur.ready[myId];
-      return cur;
-    }).then(function (res) { if (res.committed) sfx("confirm"); });
-  }
-  function draftTradeAsk(id) {
-    var d = room && room.draft;
-    if (!d || !canTradeWith(d, id)) return;
-    room.ref.child("draft").transaction(function (cur) {
-      if (!cur || !canTradeWith(cur, id)) return;
-      cur.trade = { from: myId, to: id, at: now() };
-      return cur;
-    });
-  }
-  function swapTradePicks(cur) {
-    var tr = cur.trade, mine = cur.picks[tr.from];
-    cur.picks[tr.from] = cur.picks[tr.to];
-    cur.picks[tr.to] = mine;
-    cur.trade = null;
-  }
-  function draftTradeAnswer(accept) {
-    room.ref.child("draft").transaction(function (cur) {
-      if (!cur || !cur.trade || cur.trade.to !== myId) return;
-      if (accept) swapTradePicks(cur);
-      else { cur.denied = { to: cur.trade.from, at: now() }; cur.trade = null; }
-      return cur;
-    }).then(function (res) { if (res.committed && accept) sfx("confirm"); });
-  }
-  function draftTradeCancel() {
-    room.ref.child("draft").transaction(function (cur) {
-      if (!cur || !cur.trade || cur.trade.from !== myId) return;
-      cur.trade = null;
-      return cur;
-    });
-  }
-  function hostDraftFinish(d, t) {
-    var tr = d.trade, ready = d.ready || {};
-    var tradeGone = tr && (!P[tr.from] || !P[tr.to] || ready[tr.from] || ready[tr.to]);
-    var aiAccepts = tr && !tradeGone && P[tr.to].isAI && t >= tr.at + DRAFT_AI_TRADE_MS;
-    if (tradeGone || aiAccepts) {
-      draftBusy = true;
-      room.ref.child("draft").transaction(function (cur) {
-        if (!cur || !cur.trade || cur.trade.at !== tr.at) return;
-        if (aiAccepts) swapTradePicks(cur); else cur.trade = null;
-        return cur;
-      }).then(function () { draftBusy = false; }, function () { draftBusy = false; });
-      return;
+  class Draft {
+    constructor() { this.view = null; this.busy = false; this.launched = 0; }
+    stepSide(step) { return DRAFT_STEPS[step].keys[0].charAt(0); }
+    draftStepIds(d, step) {
+      return ((DRAFT_STEPS[step] || {}).keys || []).map(function (k) { return d.seq && d.seq[k]; }).filter(function (id) { return !!id; });
     }
-    if (tr || draftReadyCount(d) < draftHumans(d).length || draftLaunched === d.stepAt) return;
-    draftLaunched = d.stepAt;
-    var picks = d.picks || {}, spare = draftLeft(d);
-    launchMatch(function (id) { return picks[id] || spare.splice(Math.floor(Math.random() * spare.length), 1)[0]; }, COUNT_MS, ARENA, draftBanned(d));
-  }
-  function hostDraftTick() {
-    var d = room.draft, t = now();
-    if (!d || draftBusy) return;
-    if (draftDone(d)) { hostDraftFinish(d, t); return; }
-    var step = d.step, banStep = DRAFT_STEPS[step].ban, timeUp = t >= d.stepAt + DRAFT_STEP_MS, aiDue = t >= d.stepAt + DRAFT_AI_MS;
-    var waiting = draftWaiting(d, step);
-    var auto = waiting.filter(function (id) { return timeUp || (aiDue && P[id].isAI); });
-    if (waiting.length && !auto.length) return;
-    draftBusy = true;
-    room.ref.child("draft").transaction(function (cur) {
-      if (!cur || cur.step !== step) return;
-      auto.forEach(function (id) {
-        if (draftWaiting(cur, step).indexOf(id) < 0) return;
-        var left = draftLeft(cur), hover = cur.hover && cur.hover[id], chosen = left.indexOf(hover) >= 0 ? hover : null;
-        if (banStep) applyDraftChoice(cur, id, chosen || (P[id].isAI && left.length ? pick(left) : NO_BAN));
-        else if (left.length) applyDraftChoice(cur, id, chosen || pick(left));
+    draftWaiting(d, step) {
+      var S = DRAFT_STEPS[step];
+      if (!S) return [];
+      if (S.ban) return d.bans && d.bans[DRAFT.stepSide(step)] ? [] : DRAFT.draftStepIds(d, step).filter(function (id) { return P[id]; });
+      var picks = d.picks || {};
+      return DRAFT.draftStepIds(d, step).filter(function (id) { return P[id] && !picks[id]; });
+    }
+    draftBanned(d) {
+      var bans = d.bans || {};
+      return ["b", "r"].map(function (k) { return bans[k]; }).filter(function (c) { return c && c !== NO_BAN; });
+    }
+    draftTaken(d) {
+      var picks = d.picks || {};
+      return keys(picks).map(function (id) { return picks[id]; });
+    }
+    draftLeft(d) {
+      var gone = DRAFT.draftTaken(d).concat(DRAFT.draftBanned(d));
+      return CHAR_LIST.filter(function (c) { return gone.indexOf(c) < 0; });
+    }
+    draftDone(d) { return d.step >= DRAFT_STEPS.length; }
+    draftSideOf(d, id) {
+      var k = keys(d.seq || {}).filter(function (s) { return d.seq[s] === id; })[0];
+      return k ? k.charAt(0) : null;
+    }
+    draftHumans(d) {
+      return keys(d.seq || {}).map(function (k) { return d.seq[k]; }).filter(function (id) { return P[id] && !P[id].isAI; });
+    }
+    draftReadyCount(d) {
+      var ready = d.ready || {};
+      return DRAFT.draftHumans(d).filter(function (id) { return ready[id]; }).length;
+    }
+    canTradeWith(d, id) {
+      var ready = d.ready || {}, picks = d.picks || {};
+      return DRAFT.draftDone(d) && !d.trade && id !== myId && P[id] && P[myId] && !ready[id] && !ready[myId] &&
+        DRAFT.draftSideOf(d, id) && DRAFT.draftSideOf(d, id) === DRAFT.draftSideOf(d, myId) && !!picks[id] && !!picks[myId];
+    }
+    draftSettle(d, t) {
+      while (d.step < DRAFT_STEPS.length && !DRAFT.draftWaiting(d, d.step).length) { d.step++; d.stepAt = t; }
+      return d;
+    }
+    startDraft() {
+      var seq = {}, t = now();
+      ["blue", "red"].forEach(function (team) {
+        teamIds(team).slice(0, 3).forEach(function (id, i) { seq[(team === "blue" ? "b" : "r") + (i + 1)] = id; });
       });
-      return draftSettle(cur, now());
-    }).then(function () { draftBusy = false; }, function () { draftBusy = false; });
+      var d = DRAFT.draftSettle({ seq: seq, step: 0, stepAt: t }, t);
+      room.ref.update({ draft: d, arena: resolveArena(room.map), status: "draft", roster: null, st: null, winner: null, final: null, statsNote: null, endedAt: null, startAt: null,
+                        shots: null, meleeHits: null, hits: null, effects: null, kills: null, projectiles: null });
+    }
+    applyDraftChoice(cur, id, c) {
+      if (DRAFT_STEPS[cur.step].ban) { cur.bans = cur.bans || {}; cur.bans[DRAFT.stepSide(cur.step)] = c; }
+      else { cur.picks = cur.picks || {}; cur.picks[id] = c; }
+      if (cur.hover) delete cur.hover[id];
+    }
+    draftPick(c) {
+      var d = room && room.draft;
+      if (!d || room.status !== "draft" || DRAFT.draftWaiting(d, d.step).indexOf(myId) < 0 || DRAFT.draftLeft(d).indexOf(c) < 0) return;
+      room.ref.child("draft").transaction(function (cur) {
+        if (!cur || DRAFT.draftWaiting(cur, cur.step).indexOf(myId) < 0 || DRAFT.draftLeft(cur).indexOf(c) < 0) return;
+        DRAFT.applyDraftChoice(cur, myId, c);
+        return DRAFT.draftSettle(cur, now());
+      }).then(function (res) { if (res.committed) sfx("confirm"); });
+    }
+    draftHover(c) {
+      var d = room && room.draft;
+      if (!d || DRAFT.draftWaiting(d, d.step).indexOf(myId) < 0) return;
+      room.ref.child("draft/hover/" + myId).set(c);
+    }
+    draftReady() {
+      room.ref.child("draft").transaction(function (cur) {
+        if (!cur || !DRAFT.draftDone(cur) || !P[myId] || !DRAFT.draftSideOf(cur, myId)) return;
+        if (cur.trade && (cur.trade.from === myId || cur.trade.to === myId)) return;
+        cur.ready = cur.ready || {};
+        cur.ready[myId] = !cur.ready[myId];
+        return cur;
+      }).then(function (res) { if (res.committed) sfx("confirm"); });
+    }
+    draftTradeAsk(id) {
+      var d = room && room.draft;
+      if (!d || !DRAFT.canTradeWith(d, id)) return;
+      room.ref.child("draft").transaction(function (cur) {
+        if (!cur || !DRAFT.canTradeWith(cur, id)) return;
+        cur.trade = { from: myId, to: id, at: now() };
+        return cur;
+      });
+    }
+    swapTradePicks(cur) {
+      var tr = cur.trade, mine = cur.picks[tr.from];
+      cur.picks[tr.from] = cur.picks[tr.to];
+      cur.picks[tr.to] = mine;
+      cur.trade = null;
+    }
+    draftTradeAnswer(accept) {
+      room.ref.child("draft").transaction(function (cur) {
+        if (!cur || !cur.trade || cur.trade.to !== myId) return;
+        if (accept) DRAFT.swapTradePicks(cur);
+        else { cur.denied = { to: cur.trade.from, at: now() }; cur.trade = null; }
+        return cur;
+      }).then(function (res) { if (res.committed && accept) sfx("confirm"); });
+    }
+    draftTradeCancel() {
+      room.ref.child("draft").transaction(function (cur) {
+        if (!cur || !cur.trade || cur.trade.from !== myId) return;
+        cur.trade = null;
+        return cur;
+      });
+    }
+    hostDraftFinish(d, t) {
+      var tr = d.trade, ready = d.ready || {};
+      var tradeGone = tr && (!P[tr.from] || !P[tr.to] || ready[tr.from] || ready[tr.to]);
+      var aiAccepts = tr && !tradeGone && P[tr.to].isAI && t >= tr.at + DRAFT_AI_TRADE_MS;
+      if (tradeGone || aiAccepts) {
+        DRAFT.busy = true;
+        room.ref.child("draft").transaction(function (cur) {
+          if (!cur || !cur.trade || cur.trade.at !== tr.at) return;
+          if (aiAccepts) DRAFT.swapTradePicks(cur); else cur.trade = null;
+          return cur;
+        }).then(function () { DRAFT.busy = false; }, function () { DRAFT.busy = false; });
+        return;
+      }
+      if (tr || DRAFT.draftReadyCount(d) < DRAFT.draftHumans(d).length || DRAFT.launched === d.stepAt) return;
+      DRAFT.launched = d.stepAt;
+      var picks = d.picks || {}, spare = DRAFT.draftLeft(d);
+      launchMatch(function (id) { return picks[id] || spare.splice(Math.floor(Math.random() * spare.length), 1)[0]; }, COUNT_MS, ARENA, DRAFT.draftBanned(d));
+    }
+    hostDraftTick() {
+      var d = room.draft, t = now();
+      if (!d || DRAFT.busy) return;
+      if (DRAFT.draftDone(d)) { DRAFT.hostDraftFinish(d, t); return; }
+      var step = d.step, banStep = DRAFT_STEPS[step].ban, timeUp = t >= d.stepAt + DRAFT_STEP_MS, aiDue = t >= d.stepAt + DRAFT_AI_MS;
+      var waiting = DRAFT.draftWaiting(d, step);
+      var auto = waiting.filter(function (id) { return timeUp || (aiDue && P[id].isAI); });
+      if (waiting.length && !auto.length) return;
+      DRAFT.busy = true;
+      room.ref.child("draft").transaction(function (cur) {
+        if (!cur || cur.step !== step) return;
+        auto.forEach(function (id) {
+          if (DRAFT.draftWaiting(cur, step).indexOf(id) < 0) return;
+          var left = DRAFT.draftLeft(cur), hover = cur.hover && cur.hover[id], chosen = left.indexOf(hover) >= 0 ? hover : null;
+          if (banStep) DRAFT.applyDraftChoice(cur, id, chosen || (P[id].isAI && left.length ? pick(left) : NO_BAN));
+          else if (left.length) DRAFT.applyDraftChoice(cur, id, chosen || pick(left));
+        });
+        return DRAFT.draftSettle(cur, now());
+      }).then(function () { DRAFT.busy = false; }, function () { DRAFT.busy = false; });
+    }
+    draftTeamName(team) { return team === "blue" ? "블루팀" : "레드팀"; }
+    draftStepLabel(step) {
+      var S = DRAFT_STEPS[step], side = DRAFT.stepSide(step) === "b" ? "블루 " : "레드 ";
+      return side + (S.ban ? "밴" : S.keys.map(function (k) { return k.charAt(1); }).join("·"));
+    }
+    draftTradeBoxHtml(d) {
+      var tr = d.trade, t = now(), picks = d.picks || {};
+      if (tr && tr.from === myId && P[tr.to]) {
+        return "<b>교환 대기 중입니다...</b><small>" + esc(P[tr.to].nickname) + "의 " + CHARS[picks[tr.to]].name + josa(CHARS[picks[tr.to]].name, "와", "과") + " 내 " + CHARS[picks[myId]].name + "</small>" +
+          '<div class="row"><button type="button" class="cancel" data-trade-act="cancel">신청 취소</button></div>';
+      }
+      if (tr && tr.to === myId && P[tr.from]) {
+        return "<b>교환 신청. (" + CHARS[picks[tr.from]].name + ")</b><small>" + esc(P[tr.from].nickname) + "의 " + CHARS[picks[tr.from]].name + josa(CHARS[picks[tr.from]].name, "와", "과") + " 내 " + CHARS[picks[myId]].name + josa(CHARS[picks[myId]].name, "를", "을") + " 바꿔요</small>" +
+          '<div class="row"><button type="button" class="ok" data-trade-act="yes">수락</button><button type="button" class="no" data-trade-act="no">거절</button></div>';
+      }
+      if (d.denied && d.denied.to === myId && t < d.denied.at + TRADE_DENIED_SHOW_MS) return "<b>교환 신청이 거절되었습니다.</b>";
+      return "";
+    }
+    renderDraft() {
+      if (!room || screenNow !== "draft") return;
+      var d = room.draft; if (!d) return;
+      var t = now(), done = DRAFT.draftDone(d), picks = d.picks || {}, hover = d.hover || {}, ready = d.ready || {}, bans = d.bans || {};
+      var waiting = done ? [] : DRAFT.draftWaiting(d, d.step), myTurn = waiting.indexOf(myId) >= 0, banTurn = !done && DRAFT_STEPS[d.step].ban;
+      var me = P[myId], myTeam = me ? me.team : null, mySide = DRAFT.draftSideOf(d, myId);
+      var left = Math.max(0, d.stepAt + DRAFT_SHOWN_MS - t), humans = DRAFT.draftHumans(d).length, readyN = DRAFT.draftReadyCount(d);
+      var arena = MAPS[room.arena] || MAPS[ARENA];
+      setHtml($("dfMap"), arena ? "🗺️ " + esc(arena.name) + "<small>맵</small>" : "");
+      var arenaId = MAPS[room.arena] ? room.arena : ARENA, mapImg = $("dfMapImg");
+      setText($("dfMapName"), arena ? "🗺️ " + arena.name : "");
+      if (mapImg.getAttribute("src") !== mapShotSrc(arenaId, true)) mapImg.setAttribute("src", mapShotSrc(arenaId, true));
+      var timer = $("dfTimer");
+      if (done) {
+        setHtml(timer, readyN + "/" + humans + "<small>준비 완료</small>");
+        timer.className = "dfTimer";
+        $("dfBarFill").style.width = Math.round(readyN / Math.max(1, humans) * 100) + "%";
+      } else {
+        setHtml(timer, String(Math.ceil(left / 1000)) + "<small>남은 시간</small>");
+        timer.className = "dfTimer" + (left < 5000 ? " low" : "");
+        $("dfBarFill").style.width = Math.round(left / DRAFT_SHOWN_MS * 100) + "%";
+      }
+      var turn = "", doing = banTurn ? "밴하는" : "고르는";
+      if (done) turn = mySide ? (ready[myId] ? "준비 완료! 다른 선수를 기다리는 중…" : "선택 완료! 준비가 되면 준비 완료를 눌러 주세요.") : "선수들이 준비하는 중…";
+      else if (myTurn) turn = banTurn ? "내 차례예요! 밴할 캐릭터를 골라 주세요." : "내 차례예요! 캐릭터를 골라 주세요.";
+      else if (!banTurn && picks[myId] && DRAFT.draftStepIds(d, d.step).indexOf(myId) >= 0) turn = "선택 완료 — 다른 선수를 기다리는 중…";
+      else turn = DRAFT.draftTeamName(DRAFT.stepSide(d.step) === "b" ? "blue" : "red") + " " + DRAFT_STEPS[d.step].keys.map(function (k) { return k.charAt(1); }).join("·") + "번 선수가 " + doing + " 중…";
+      setText($("dfTurn"), turn);
+      $("dfTurn").className = "dfTurn" + (myTurn ? " mine" : "");
+      var charCol = document.querySelector(".dfCharCol");
+      charCol.classList.toggle("myTurn", myTurn && left >= 5000);
+      charCol.classList.toggle("myTurnLow", myTurn && left < 5000);
+      setHtml($("dfSteps"), DRAFT_STEPS.map(function (S, i) {
+        return '<span class="' + (DRAFT.stepSide(i) === "b" ? "b" : "r") + (S.ban ? " ban" : "") + (i === d.step ? " now" : (i < d.step ? " done" : "")) + '">' + (i + 1) + ". " + DRAFT.draftStepLabel(i) + "</span>";
+      }).join(""));
+
+      function slots(team) {
+        var pre = team === "blue" ? "b" : "r", ban = bans[pre], banStepNow = banTurn && DRAFT.stepSide(d.step) === pre;
+        var h = "";
+        if (ban && ban !== NO_BAN && CHARS[ban]) h = '<span class="dfBan"><span class="banX"><svg viewBox="0 0 10 10"><path d="M2.2 2.2L7.8 7.8M7.8 2.2L2.2 7.8" stroke="#FF4A3D" stroke-width="1.6" stroke-linecap="round"/></svg></span>' +
+          '<span class="pface" style="background-image:url(\'' + charImgSrc(ban) + '\')"></span>' + CHARS[ban].name + "</span>";
+        else h = '<span class="dfBan ' + (banStepNow ? "now" : "wait") + '">' + (ban === NO_BAN ? "밴 없음" : (banStepNow ? "밴 고르는 중…" : "밴 대기")) + "</span>";
+        setHtml($(team === "blue" ? "dfBanB" : "dfBanR"), h);
+        h = "";
+        for (var i = 1; i <= 3; i++) {
+          var id = d.seq && d.seq[pre + i], p = id && P[id];
+          if (!p) { h += '<div class="slot empty">' + i + "번 · " + (id ? "나감" : "빈 자리") + "</div>"; continue; }
+          var c = picks[id], isTurn = waiting.indexOf(id) >= 0, pk, tradable = DRAFT.canTradeWith(d, id);
+          if (c) pk = '<span class="pk picked"><b>' + CHARS[c].name + '</b><span class="pface' + (tradable ? " canTrade" : "") + '"' + (tradable ? ' data-trade="' + id + '" title="캐릭터 교환 신청"' : "") +
+                      ' style="background-image:url(\'' + charImgSrc(c) + '\')"></span></span>';
+          else if (isTurn && hover[id] && myTeam === team && CHARS[hover[id]]) pk = '<span class="pk think">' + CHARS[hover[id]].name + " 고민 중…</span>";
+          else pk = '<span class="pk wait">' + (isTurn ? (banTurn ? "밴하는 중…" : "고르는 중…") : "대기") + "</span>";
+          h += '<div class="slot' + (id === myId ? " mine" : "") + (isTurn ? " turn" : "") + (p.isAI ? " ai" : "") + (done && ready[id] ? " ready" : "") + '">' + i + "번 " + (p.isAI ? "🤖 " : "") + esc(p.nickname) +
+               (id === myId ? ' <span class="me">나</span>' : "") + pk + "</div>";
+        }
+        return h;
+      }
+      setHtml($("dfBlue"), slots("blue"));
+      setHtml($("dfRed"), slots("red"));
+
+      var readyBar = $("dfReadyBar");
+      show(readyBar, done && !!mySide);
+      if (done && mySide) {
+        var busyTrade = d.trade && (d.trade.from === myId || d.trade.to === myId);
+        var btn = $("btnDraftReady");
+        btn.className = "dfReadyBtn" + (ready[myId] ? " on" : "");
+        btn.disabled = !!busyTrade;
+        setText(btn, ready[myId] ? "✔ 준비 완료 (누르면 취소)" : "준비 완료");
+        setText($("dfReadyHint"), ready[myId] ? "모두 준비 완료를 누르면 게임이 시작돼요." : "같은 팀의 초상화를 누르면 캐릭터 교환을 신청할 수 있어요.");
+      }
+      var tradeHtml = DRAFT.draftTradeBoxHtml(d), tradeBox = $("dfTradeBox");
+      show(tradeBox, !!tradeHtml);
+      if (tradeBox.getAttribute("data-html") !== tradeHtml) { tradeBox.setAttribute("data-html", tradeHtml); setHtml(tradeBox, tradeHtml); }
+
+      var owner = {}, banned = DRAFT.draftBanned(d);
+      keys(picks).forEach(function (id) { owner[picks[id]] = id; });
+      var myHover = myTurn ? hover[myId] : null;
+      if (!DRAFT.view && myHover) DRAFT.view = myHover;
+      setHtmlKeepScroll($("dfChars"), roleRowsHtml(function (k) {
+        var o = owner[k], op = o && P[o], oSide = o && DRAFT.draftSideOf(d, o), isBanned = banned.indexOf(k) >= 0;
+        var tag = isBanned ? '<span class="tag ban">밴</span>' : (o ? '<span class="tag ' + (oSide === "b" ? "b" : "r") + '">' + esc(op ? op.nickname : "") + "</span>" : "");
+        return '<button type="button" class="dfCard' + (o || isBanned ? " taken" : "") + (isBanned ? " banned" : "") + (myHover === k ? " on" : (DRAFT.view === k ? " view" : "")) + '" data-c="' + k + '">' + tag +
+               '<img alt="" src="' + charImgSrc(k) + '"><div class="nm">' + CHARS[k].name + "</div></button>";
+      }));
+      fitCharCol(document.querySelector(".dfCharCol"));
+      var v = DRAFT.view && playable(DRAFT.view) ? DRAFT.view : null, canPick = v && myTurn && DRAFT.draftLeft(d).indexOf(v) >= 0;
+      var pickBtn = !canPick ? "" : banTurn ? '<button type="button" class="big danger" data-pick="' + v + '">🚫 ' + CHARS[v].name + " 밴</button>" :
+        '<button type="button" class="big primary" data-pick="' + v + '">✔ ' + CHARS[v].name + roParticle(CHARS[v].name) + " 결정</button>";
+      setHtml($("dfDetail"), v ? '<div class="dfName">' + CHARS[v].icon + " " + CHARS[v].name + '<small>' + roleOf(v).icon + " " + roleOf(v).name + "</small></div>" +
+        '<div class="dfRole">' + roleGaugeText(roleOf(v)) + "</div>" + statTable(v) + skillBlocks(v) + pickBtn : "");
+    }
   }
+  var DRAFT = new Draft();
   setInterval(function () {
     if (!room || room.status !== "draft") return;
-    renderDraft();
-    if (isHost()) hostDraftTick();
+    DRAFT.renderDraft();
+    if (isHost()) DRAFT.hostDraftTick();
   }, 200);
-
-  function draftTeamName(team) { return team === "blue" ? "블루팀" : "레드팀"; }
-  function draftStepLabel(step) {
-    var S = DRAFT_STEPS[step], side = stepSide(step) === "b" ? "블루 " : "레드 ";
-    return side + (S.ban ? "밴" : S.keys.map(function (k) { return k.charAt(1); }).join("·"));
-  }
-  function draftTradeBoxHtml(d) {
-    var tr = d.trade, t = now(), picks = d.picks || {};
-    if (tr && tr.from === myId && P[tr.to]) {
-      return "<b>교환 대기 중입니다...</b><small>" + esc(P[tr.to].nickname) + "의 " + CHARS[picks[tr.to]].name + josa(CHARS[picks[tr.to]].name, "와", "과") + " 내 " + CHARS[picks[myId]].name + "</small>" +
-        '<div class="row"><button type="button" class="cancel" data-trade-act="cancel">신청 취소</button></div>';
-    }
-    if (tr && tr.to === myId && P[tr.from]) {
-      return "<b>교환 신청. (" + CHARS[picks[tr.from]].name + ")</b><small>" + esc(P[tr.from].nickname) + "의 " + CHARS[picks[tr.from]].name + josa(CHARS[picks[tr.from]].name, "와", "과") + " 내 " + CHARS[picks[myId]].name + josa(CHARS[picks[myId]].name, "를", "을") + " 바꿔요</small>" +
-        '<div class="row"><button type="button" class="ok" data-trade-act="yes">수락</button><button type="button" class="no" data-trade-act="no">거절</button></div>';
-    }
-    if (d.denied && d.denied.to === myId && t < d.denied.at + TRADE_DENIED_SHOW_MS) return "<b>교환 신청이 거절되었습니다.</b>";
-    return "";
-  }
-  function renderDraft() {
-    if (!room || screenNow !== "draft") return;
-    var d = room.draft; if (!d) return;
-    var t = now(), done = draftDone(d), picks = d.picks || {}, hover = d.hover || {}, ready = d.ready || {}, bans = d.bans || {};
-    var waiting = done ? [] : draftWaiting(d, d.step), myTurn = waiting.indexOf(myId) >= 0, banTurn = !done && DRAFT_STEPS[d.step].ban;
-    var me = P[myId], myTeam = me ? me.team : null, mySide = draftSideOf(d, myId);
-    var left = Math.max(0, d.stepAt + DRAFT_SHOWN_MS - t), humans = draftHumans(d).length, readyN = draftReadyCount(d);
-    var arena = MAPS[room.arena] || MAPS[ARENA];
-    setHtml($("dfMap"), arena ? "🗺️ " + esc(arena.name) + "<small>맵</small>" : "");
-    var arenaId = MAPS[room.arena] ? room.arena : ARENA, mapImg = $("dfMapImg");
-    setText($("dfMapName"), arena ? "🗺️ " + arena.name : "");
-    if (mapImg.getAttribute("src") !== mapShotSrc(arenaId, true)) mapImg.setAttribute("src", mapShotSrc(arenaId, true));
-    var timer = $("dfTimer");
-    if (done) {
-      setHtml(timer, readyN + "/" + humans + "<small>준비 완료</small>");
-      timer.className = "dfTimer";
-      $("dfBarFill").style.width = Math.round(readyN / Math.max(1, humans) * 100) + "%";
-    } else {
-      setHtml(timer, String(Math.ceil(left / 1000)) + "<small>남은 시간</small>");
-      timer.className = "dfTimer" + (left < 5000 ? " low" : "");
-      $("dfBarFill").style.width = Math.round(left / DRAFT_SHOWN_MS * 100) + "%";
-    }
-    var turn = "", doing = banTurn ? "밴하는" : "고르는";
-    if (done) turn = mySide ? (ready[myId] ? "준비 완료! 다른 선수를 기다리는 중…" : "선택 완료! 준비가 되면 준비 완료를 눌러 주세요.") : "선수들이 준비하는 중…";
-    else if (myTurn) turn = banTurn ? "내 차례예요! 밴할 캐릭터를 골라 주세요." : "내 차례예요! 캐릭터를 골라 주세요.";
-    else if (!banTurn && picks[myId] && draftStepIds(d, d.step).indexOf(myId) >= 0) turn = "선택 완료 — 다른 선수를 기다리는 중…";
-    else turn = draftTeamName(stepSide(d.step) === "b" ? "blue" : "red") + " " + DRAFT_STEPS[d.step].keys.map(function (k) { return k.charAt(1); }).join("·") + "번 선수가 " + doing + " 중…";
-    setText($("dfTurn"), turn);
-    $("dfTurn").className = "dfTurn" + (myTurn ? " mine" : "");
-    var charCol = document.querySelector(".dfCharCol");
-    charCol.classList.toggle("myTurn", myTurn && left >= 5000);
-    charCol.classList.toggle("myTurnLow", myTurn && left < 5000);
-    setHtml($("dfSteps"), DRAFT_STEPS.map(function (S, i) {
-      return '<span class="' + (stepSide(i) === "b" ? "b" : "r") + (S.ban ? " ban" : "") + (i === d.step ? " now" : (i < d.step ? " done" : "")) + '">' + (i + 1) + ". " + draftStepLabel(i) + "</span>";
-    }).join(""));
-
-    function slots(team) {
-      var pre = team === "blue" ? "b" : "r", ban = bans[pre], banStepNow = banTurn && stepSide(d.step) === pre;
-      var h = "";
-      if (ban && ban !== NO_BAN && CHARS[ban]) h = '<span class="dfBan"><span class="banX"><svg viewBox="0 0 10 10"><path d="M2.2 2.2L7.8 7.8M7.8 2.2L2.2 7.8" stroke="#FF4A3D" stroke-width="1.6" stroke-linecap="round"/></svg></span>' +
-        '<span class="pface" style="background-image:url(\'' + charImgSrc(ban) + '\')"></span>' + CHARS[ban].name + "</span>";
-      else h = '<span class="dfBan ' + (banStepNow ? "now" : "wait") + '">' + (ban === NO_BAN ? "밴 없음" : (banStepNow ? "밴 고르는 중…" : "밴 대기")) + "</span>";
-      setHtml($(team === "blue" ? "dfBanB" : "dfBanR"), h);
-      h = "";
-      for (var i = 1; i <= 3; i++) {
-        var id = d.seq && d.seq[pre + i], p = id && P[id];
-        if (!p) { h += '<div class="slot empty">' + i + "번 · " + (id ? "나감" : "빈 자리") + "</div>"; continue; }
-        var c = picks[id], isTurn = waiting.indexOf(id) >= 0, pk, tradable = canTradeWith(d, id);
-        if (c) pk = '<span class="pk picked"><b>' + CHARS[c].name + '</b><span class="pface' + (tradable ? " canTrade" : "") + '"' + (tradable ? ' data-trade="' + id + '" title="캐릭터 교환 신청"' : "") +
-                    ' style="background-image:url(\'' + charImgSrc(c) + '\')"></span></span>';
-        else if (isTurn && hover[id] && myTeam === team && CHARS[hover[id]]) pk = '<span class="pk think">' + CHARS[hover[id]].name + " 고민 중…</span>";
-        else pk = '<span class="pk wait">' + (isTurn ? (banTurn ? "밴하는 중…" : "고르는 중…") : "대기") + "</span>";
-        h += '<div class="slot' + (id === myId ? " mine" : "") + (isTurn ? " turn" : "") + (p.isAI ? " ai" : "") + (done && ready[id] ? " ready" : "") + '">' + i + "번 " + (p.isAI ? "🤖 " : "") + esc(p.nickname) +
-             (id === myId ? ' <span class="me">나</span>' : "") + pk + "</div>";
-      }
-      return h;
-    }
-    setHtml($("dfBlue"), slots("blue"));
-    setHtml($("dfRed"), slots("red"));
-
-    var readyBar = $("dfReadyBar");
-    show(readyBar, done && !!mySide);
-    if (done && mySide) {
-      var busyTrade = d.trade && (d.trade.from === myId || d.trade.to === myId);
-      var btn = $("btnDraftReady");
-      btn.className = "dfReadyBtn" + (ready[myId] ? " on" : "");
-      btn.disabled = !!busyTrade;
-      setText(btn, ready[myId] ? "✔ 준비 완료 (누르면 취소)" : "준비 완료");
-      setText($("dfReadyHint"), ready[myId] ? "모두 준비 완료를 누르면 게임이 시작돼요." : "같은 팀의 초상화를 누르면 캐릭터 교환을 신청할 수 있어요.");
-    }
-    var tradeHtml = draftTradeBoxHtml(d), tradeBox = $("dfTradeBox");
-    show(tradeBox, !!tradeHtml);
-    if (tradeBox.getAttribute("data-html") !== tradeHtml) { tradeBox.setAttribute("data-html", tradeHtml); setHtml(tradeBox, tradeHtml); }
-
-    var owner = {}, banned = draftBanned(d);
-    keys(picks).forEach(function (id) { owner[picks[id]] = id; });
-    var myHover = myTurn ? hover[myId] : null;
-    if (!draftView && myHover) draftView = myHover;
-    setHtmlKeepScroll($("dfChars"), roleRowsHtml(function (k) {
-      var o = owner[k], op = o && P[o], oSide = o && draftSideOf(d, o), isBanned = banned.indexOf(k) >= 0;
-      var tag = isBanned ? '<span class="tag ban">밴</span>' : (o ? '<span class="tag ' + (oSide === "b" ? "b" : "r") + '">' + esc(op ? op.nickname : "") + "</span>" : "");
-      return '<button type="button" class="dfCard' + (o || isBanned ? " taken" : "") + (isBanned ? " banned" : "") + (myHover === k ? " on" : (draftView === k ? " view" : "")) + '" data-c="' + k + '">' + tag +
-             '<img alt="" src="' + charImgSrc(k) + '"><div class="nm">' + CHARS[k].name + "</div></button>";
-    }));
-    fitCharCol(document.querySelector(".dfCharCol"));
-    var v = draftView && playable(draftView) ? draftView : null, canPick = v && myTurn && draftLeft(d).indexOf(v) >= 0;
-    var pickBtn = !canPick ? "" : banTurn ? '<button type="button" class="big danger" data-pick="' + v + '">🚫 ' + CHARS[v].name + " 밴</button>" :
-      '<button type="button" class="big primary" data-pick="' + v + '">✔ ' + CHARS[v].name + roParticle(CHARS[v].name) + " 결정</button>";
-    setHtml($("dfDetail"), v ? '<div class="dfName">' + CHARS[v].icon + " " + CHARS[v].name + '<small>' + roleOf(v).icon + " " + roleOf(v).name + "</small></div>" +
-      '<div class="dfRole">' + roleGaugeText(roleOf(v)) + "</div>" + statTable(v) + skillBlocks(v) + pickBtn : "");
-  }
   $("dfChars").onclick = function (e) {
     var b = e.target.closest ? e.target.closest(".dfCard") : null;
     if (!b || !room || !room.draft) return;
     var c = b.getAttribute("data-c");
-    draftView = c;
-    if (draftLeft(room.draft).indexOf(c) >= 0) draftHover(c);
+    DRAFT.view = c;
+    if (DRAFT.draftLeft(room.draft).indexOf(c) >= 0) DRAFT.draftHover(c);
     renderDraft();
     var detail = $("dfDetail");
     if (detail.scrollIntoView) detail.scrollIntoView({ block: "nearest", behavior: "smooth" });
   };
   $("dfDetail").onclick = function (e) {
     var b = e.target.closest ? e.target.closest("[data-pick]") : null;
-    if (b) draftPick(b.getAttribute("data-pick"));
+    if (b) DRAFT.draftPick(b.getAttribute("data-pick"));
   };
   $("dfBlue").onclick = $("dfRed").onclick = function (e) {
     var f = e.target.closest ? e.target.closest("[data-trade]") : null;
-    if (f) draftTradeAsk(f.getAttribute("data-trade"));
+    if (f) DRAFT.draftTradeAsk(f.getAttribute("data-trade"));
   };
-  $("btnDraftReady").onclick = draftReady;
+  $("btnDraftReady").onclick = function () { DRAFT.draftReady(); };
   $("dfTradeBox").onclick = function (e) {
     var b = e.target.closest ? e.target.closest("[data-trade-act]") : null;
     if (!b) return;
     var act = b.getAttribute("data-trade-act");
-    if (act === "cancel") draftTradeCancel(); else draftTradeAnswer(act === "yes");
+    if (act === "cancel") DRAFT.draftTradeCancel(); else DRAFT.draftTradeAnswer(act === "yes");
   };
   $("btnLeaveDraft").onclick = function () { if (confirm("방을 나갈까요?")) leaveRoom(); };
 
@@ -4203,199 +4205,199 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     return T ? Math.atan2(T.y - E.y, T.x - E.x) : E.angle;
   }
 
-  function pickWanderPoint(B, t) {
-    var k = B.bot, spot;
-    if (Math.random() < 0.5) {
-      var b = BUSH[Math.floor(Math.random() * BUSH.length)], bt = b.tiles[Math.floor(Math.random() * b.tiles.length)];
-      spot = { x: tileX(bt[0]), y: tileY(bt[1]) };
-    } else {
-      spot = { x: BOUND.l + 60 + Math.random() * (BOUND.r - BOUND.l - 120), y: BOUND.t + 180 + Math.random() * (BOUND.b - BOUND.t - 360) };
-    }
-    resolve(spot);
-    k.wx = spot.x; k.wy = spot.y; k.wanderUntil = t + 4000 + Math.random() * 3000;
-  }
-
-  function waterBlocks(ax, ay, bx, by) {
-    var d = hyp(bx - ax, by - ay); if (d < 1) return false;
-    for (var i = 0; i < WATER.length; i++) if (rayRect(ax, ay, (bx - ax) / d, (by - ay) / d, WATER[i], BODY_R - 6) < d) return true;
-    return false;
-  }
-  function bridgeWaypoint(B, tx, ty) {
-    if (!BRIDGES.length || !waterBlocks(B.x, B.y, tx, ty)) return null;
-    var best = null, bd = Infinity;
-    BRIDGES.forEach(function (br) {
-      var cost = hyp(br.x - B.x, br.y - B.y) + hyp(tx - br.x, ty - br.y);
-      if (cost < bd) { bd = cost; best = br; }
-    });
-    var reach = best.h / 2 + 34, onDeck = Math.abs(B.x - best.x) < best.w / 2 - BODY_R + 8 && Math.abs(B.y - best.y) < reach + 12;
-    if (onDeck) return { x: best.x, y: best.y + (ty > best.y ? reach + 20 : -reach - 20) };
-    return { x: best.x, y: best.y + (B.y < best.y ? -reach : reach) };
-  }
-  function stepPracticeBot(B, dt) {
-    var t = now(), foe = ME;
-    B.mv = false;
-    if (!B.home) {
-      var d = P[B.id] || {};
-      B.home = d.homeX != null ? { x: d.homeX, y: d.homeY } : { x: B.x, y: B.y };
-      B.x = B.home.x; B.y = B.home.y;
-    }
-    if (!B.alive) return;
-    if (B.hpSeen !== undefined && B.hp < B.hpSeen) B.backAt = t + PRACTICE_BOT_RETURN_MS;
-    if (B.hpSeen !== undefined && B.hp > B.hpSeen) B.healedAt = t;
-    B.hpSeen = B.hp;
-    var low = Math.round(B.maxHp * PRACTICE_ALLY_LOW);
-    if (B.char === "dummyAlly" && B.hp > low && t - (B.healedAt || 0) > PRACTICE_ALLY_RESET_MS) { B.hp = B.hpSeen = low; lastHp[B.id] = low; G.forceNet = true; }
-    var dx = B.home.x - B.x, dy = B.home.y - B.y, away = hyp(dx, dy);
-    if (away < 6) { B.backAt = 0; if (foe && foe.alive) B.angle = Math.atan2(foe.y - B.y, foe.x - B.x); return; }
-    if (!B.backAt) B.backAt = t + PRACTICE_BOT_RETURN_MS;
-    if (t < B.backAt || B.isStunned(t)) return;
-    var ox = B.x, oy = B.y;
-    moveEnt(B, dx / away * Math.min(1, away / 40), dy / away * Math.min(1, away / 40), dt);
-    B.mv = hyp(B.x - ox, B.y - oy) > 0.2;
-    if (B.mv) { B.moveAng = Math.atan2(B.y - oy, B.x - ox); B.moveAt = t; B.angle = B.moveAng; }
-  }
-  function stepBot(B, dt) {
-    if (B.practiceBot) { stepPracticeBot(B, dt); return; }
-    if (!B.alive || B.isStunned()) { B.mv = false; return; }
-    var t = now(), c = CHARS[B.char], k = B.bot, melee = isMelee(B.char);
-    var enemies = [];
-    participants().forEach(function (id) {
-      var o = ent(id); if (!o || !o.alive || id === B.id) return;
-      if (o.team !== B.team) enemies.push(o);
-    });
-    var target = null, td = Infinity, bestScore = Infinity, sniper = B.char === "sniper", view = sniper ? c.range : BOT_VIEW;
-    enemies.forEach(function (o) {
-      var d = hyp(o.x - B.x, o.y - B.y);
-      if (d > view) return;
-      if (!visibleTo(o, B, t)) return;
-      var score = d * (BOT_WEAK_FOCUS + (1 - BOT_WEAK_FOCUS) * o.hp / o.maxHp);
-      if (score < bestScore) { bestScore = score; td = d; target = o; }
-    });
-    if (target !== k.target) { k.target = target; k.seenAt = t; }
-
-    var mx = 0, my = 0;
-    if (target) {
-      var dx = target.x - B.x, dy = target.y - B.y, d = hyp(dx, dy) || 1, ux = dx / d, uy = dy / d;
-      var kiter = B.char !== "sniper" && (CHARS[B.char].role === "caster" || CHARS[B.char].role === "shooter");
-      var want = B.isBladeStorming(t) ? BODY_R * 2 : c.dashRange ?c.dashRange * 0.7 : c.width ? c.range * 0.75 : (melee ? c.range * 0.6 : c.range * 0.72);
-      var los = losClear(B.x, B.y, target.x, target.y);
-      if (!los) k.chaseUntil = t + BOT_LOS_HOLD_MS;
-      var clearView = los && t >= (k.chaseUntil || 0);
-      var via = bridgeWaypoint(B, target.x, target.y), gx = ux, gy = uy;
-      if (via) { var vd = hyp(via.x - B.x, via.y - B.y) || 1; gx = (via.x - B.x) / vd; gy = (via.y - B.y) / vd; }
-      if (sniper) {
-        if (d < SNIPER_KEEP + 30) { mx -= ux; my -= uy; }
-        else if (!clearView || d > c.range * 0.85) { mx += gx; my += gy; }
+  class BotBrain {
+    pickWanderPoint(B, t) {
+      var k = B.bot, spot;
+      if (Math.random() < 0.5) {
+        var b = BUSH[Math.floor(Math.random() * BUSH.length)], bt = b.tiles[Math.floor(Math.random() * b.tiles.length)];
+        spot = { x: tileX(bt[0]), y: tileY(bt[1]) };
+      } else {
+        spot = { x: BOUND.l + 60 + Math.random() * (BOUND.r - BOUND.l - 120), y: BOUND.t + 180 + Math.random() * (BOUND.b - BOUND.t - 360) };
       }
-      else if (!clearView || d > want + 40) { mx += gx; my += gy; }
-      else if (d < want - (kiter ? BOT_KITE_GAP : 90)) { var back = kiter ? 1 : 0.8; mx -= ux * back; my -= uy * back; }
-      var s = Math.sin(t / 900 + k.seed) * 0.7;
-      mx += -uy * s; my += ux * s;
-    } else {
-      if (!k.wanderUntil || t > k.wanderUntil || hyp(k.wx - B.x, k.wy - B.y) < 50) pickWanderPoint(B, t);
-      var goal = bridgeWaypoint(B, k.wx, k.wy) || { x: k.wx, y: k.wy };
-      var ddx = goal.x - B.x, ddy = goal.y - B.y, dd = hyp(ddx, ddy) || 1;
-      mx = ddx / dd * 0.7; my = ddy / dd * 0.7;
+      resolve(spot);
+      k.wx = spot.x; k.wy = spot.y; k.wanderUntil = t + 4000 + Math.random() * 3000;
     }
-    if (k.detour > t) { var rx = -my * k.detourDir, ry = mx * k.detourDir; mx = rx; my = ry; }
-    var steer = Math.min(1, dt * BOT_STEER_RATE);
-    k.vx = (k.vx || 0) + (mx - (k.vx || 0)) * steer; k.vy = (k.vy || 0) + (my - (k.vy || 0)) * steer;
-    mx = k.vx; my = k.vy;
-    var ox = B.x, oy = B.y, want2 = hyp(mx, my);
-    if (want2 > 0.05) {
-      moveEnt(B, mx, my, dt);
-      var moved = hyp(B.x - ox, B.y - oy), expect = B.speed() * dt * Math.min(1, want2);
-      if (expect > 0 && moved < expect * 0.3) { k.stuck += dt; if (k.stuck > 0.4) { if (t - (k.detourAt || 0) > BOT_DETOUR_KEEP_MS) k.detourDir = Math.random() < 0.5 ? -1 : 1; k.detourAt = t; k.detour = t + 700; k.stuck = 0; } }
-      else k.stuck = 0;
-      B.mv = moved > 0.2;
-      if (B.mv) { B.moveAng = Math.atan2(B.y - oy, B.x - ox); B.moveAt = t; }
-    } else B.mv = false;
-
-    var aimAt = target;
-    if (B.isLancerWinding(t) || B.isHammerWinding(t) || B.isHammerLeaping(t) || B.dash) return;
-    if (aimAt) B.angle = Math.atan2(aimAt.y - B.y, aimAt.x - B.x);
-    else if (B.mv) B.angle = Math.atan2(my, mx);
-    if (B.burst) return;
-    if (B.char === "thrower") { botThrow(B, target, enemies, t); return; }
-    if (B.char === "cleric") { botCleric(B, enemies, t); return; }
-    if (B.char === "lancer") { botLance(B, target, t); return; }
-    if (target && B.gauge >= GAUGE_MAX && t - k.seenAt > 500 && losClear(B.x, B.y, target.x, target.y) && (B.char !== "mage" || td <= ULT.mbCast) && (B.char !== "blacksmith" || td <= ULT.bsCast) && (CHARS[B.char].ultKind !== "blackhole" || td <= ULT.bhCast) && (B.char !== "shaman" || td <= ULT.dmR * 0.7) && (B.char !== "hitman" || td <= ULT.exRange) && (B.char !== "guardian" || td <= ULT.gdR) && (B.char !== "frost" || td <= ULT.frBzR * 0.8) && (B.char !== "dancer" || td <= ULT.bwR * 2) && (B.char !== "duelist" || td <= c.dashRange + c.range) && (B.char !== "stormbow" || td <= c.range)) {
-      if (B.char === "blacksmith") {
-        var drop = leadSpot(target, hammerLeapMs(td) / 1000, t);
-        useUlt(B, Math.atan2(drop.y - B.y, drop.x - B.x), hyp(drop.x - B.x, drop.y - B.y)); return;
+    waterBlocks(ax, ay, bx, by) {
+      var d = hyp(bx - ax, by - ay); if (d < 1) return false;
+      for (var i = 0; i < WATER.length; i++) if (rayRect(ax, ay, (bx - ax) / d, (by - ay) / d, WATER[i], BODY_R - 6) < d) return true;
+      return false;
+    }
+    bridgeWaypoint(B, tx, ty) {
+      if (!BRIDGES.length || !BRAIN.waterBlocks(B.x, B.y, tx, ty)) return null;
+      var best = null, bd = Infinity;
+      BRIDGES.forEach(function (br) {
+        var cost = hyp(br.x - B.x, br.y - B.y) + hyp(tx - br.x, ty - br.y);
+        if (cost < bd) { bd = cost; best = br; }
+      });
+      var reach = best.h / 2 + 34, onDeck = Math.abs(B.x - best.x) < best.w / 2 - BODY_R + 8 && Math.abs(B.y - best.y) < reach + 12;
+      if (onDeck) return { x: best.x, y: best.y + (ty > best.y ? reach + 20 : -reach - 20) };
+      return { x: best.x, y: best.y + (B.y < best.y ? -reach : reach) };
+    }
+    stepPractice(B, dt) {
+      var t = now(), foe = ME;
+      B.mv = false;
+      if (!B.home) {
+        var d = P[B.id] || {};
+        B.home = d.homeX != null ? { x: d.homeX, y: d.homeY } : { x: B.x, y: B.y };
+        B.x = B.home.x; B.y = B.home.y;
       }
-      var ultSpot = ultAimSpot(B, target, td, t);
-      useUlt(B, Math.atan2(ultSpot.y - B.y, ultSpot.x - B.x), hyp(ultSpot.x - B.x, ultSpot.y - B.y)); return;
+      if (!B.alive) return;
+      if (B.hpSeen !== undefined && B.hp < B.hpSeen) B.backAt = t + PRACTICE_BOT_RETURN_MS;
+      if (B.hpSeen !== undefined && B.hp > B.hpSeen) B.healedAt = t;
+      B.hpSeen = B.hp;
+      var low = Math.round(B.maxHp * PRACTICE_ALLY_LOW);
+      if (B.char === "dummyAlly" && B.hp > low && t - (B.healedAt || 0) > PRACTICE_ALLY_RESET_MS) { B.hp = B.hpSeen = low; lastHp[B.id] = low; G.forceNet = true; }
+      var dx = B.home.x - B.x, dy = B.home.y - B.y, away = hyp(dx, dy);
+      if (away < 6) { B.backAt = 0; if (foe && foe.alive) B.angle = Math.atan2(foe.y - B.y, foe.x - B.x); return; }
+      if (!B.backAt) B.backAt = t + PRACTICE_BOT_RETURN_MS;
+      if (t < B.backAt || B.isStunned(t)) return;
+      var ox = B.x, oy = B.y;
+      moveEnt(B, dx / away * Math.min(1, away / 40), dy / away * Math.min(1, away / 40), dt);
+      B.mv = hyp(B.x - ox, B.y - oy) > 0.2;
+      if (B.mv) { B.moveAng = Math.atan2(B.y - oy, B.x - ox); B.moveAt = t; B.angle = B.moveAng; }
     }
-    if (B.char === "shaman" && t >= B.cdUntil && domainStrikeTarget(B, t)) { fireBasic(B, B.angle); return; }
-    if (aimAt && t >= B.cdUntil && t - k.seenAt > BOT_REACT_MS) {
-      var ad = hyp(aimAt.x - B.x, aimAt.y - B.y);
-      var rng = c.stab ? lungeRange(B, t) + c.range : c.throwRange || c.dashRange || (melee ? c.range + BODY_R - 4 : c.range + (overcharged(B, t) ? ULT.ocRangeBonus : 0));
-      if (ad <= rng && losClear(B.x, B.y, aimAt.x, aimAt.y)) {
-        var shotAim = c.pSpeed && !melee ? leadSpot(aimAt, ad / c.pSpeed, t) : aimAt;
-        fireBasic(B, Math.atan2(shotAim.y - B.y, shotAim.x - B.x) + (Math.random() - 0.5) * 2 * BOT_AIM_ERR);
+    step(B, dt) {
+      if (B.practiceBot) { BRAIN.stepPractice(B, dt); return; }
+      if (!B.alive || B.isStunned()) { B.mv = false; return; }
+      var t = now(), c = CHARS[B.char], k = B.bot, melee = isMelee(B.char);
+      var enemies = [];
+      participants().forEach(function (id) {
+        var o = ent(id); if (!o || !o.alive || id === B.id) return;
+        if (o.team !== B.team) enemies.push(o);
+      });
+      var target = null, td = Infinity, bestScore = Infinity, sniper = B.char === "sniper", view = sniper ? c.range : BOT_VIEW;
+      enemies.forEach(function (o) {
+        var d = hyp(o.x - B.x, o.y - B.y);
+        if (d > view) return;
+        if (!visibleTo(o, B, t)) return;
+        var score = d * (BOT_WEAK_FOCUS + (1 - BOT_WEAK_FOCUS) * o.hp / o.maxHp);
+        if (score < bestScore) { bestScore = score; td = d; target = o; }
+      });
+      if (target !== k.target) { k.target = target; k.seenAt = t; }
+
+      var mx = 0, my = 0;
+      if (target) {
+        var dx = target.x - B.x, dy = target.y - B.y, d = hyp(dx, dy) || 1, ux = dx / d, uy = dy / d;
+        var kiter = B.char !== "sniper" && (CHARS[B.char].role === "caster" || CHARS[B.char].role === "shooter");
+        var want = B.isBladeStorming(t) ? BODY_R * 2 : c.dashRange ?c.dashRange * 0.7 : c.width ? c.range * 0.75 : (melee ? c.range * 0.6 : c.range * 0.72);
+        var los = losClear(B.x, B.y, target.x, target.y);
+        if (!los) k.chaseUntil = t + BOT_LOS_HOLD_MS;
+        var clearView = los && t >= (k.chaseUntil || 0);
+        var via = BRAIN.bridgeWaypoint(B, target.x, target.y), gx = ux, gy = uy;
+        if (via) { var vd = hyp(via.x - B.x, via.y - B.y) || 1; gx = (via.x - B.x) / vd; gy = (via.y - B.y) / vd; }
+        if (sniper) {
+          if (d < SNIPER_KEEP + 30) { mx -= ux; my -= uy; }
+          else if (!clearView || d > c.range * 0.85) { mx += gx; my += gy; }
+        }
+        else if (!clearView || d > want + 40) { mx += gx; my += gy; }
+        else if (d < want - (kiter ? BOT_KITE_GAP : 90)) { var back = kiter ? 1 : 0.8; mx -= ux * back; my -= uy * back; }
+        var s = Math.sin(t / 900 + k.seed) * 0.7;
+        mx += -uy * s; my += ux * s;
+      } else {
+        if (!k.wanderUntil || t > k.wanderUntil || hyp(k.wx - B.x, k.wy - B.y) < 50) BRAIN.pickWanderPoint(B, t);
+        var goal = BRAIN.bridgeWaypoint(B, k.wx, k.wy) || { x: k.wx, y: k.wy };
+        var ddx = goal.x - B.x, ddy = goal.y - B.y, dd = hyp(ddx, ddy) || 1;
+        mx = ddx / dd * 0.7; my = ddy / dd * 0.7;
       }
-    }
-  }
+      if (k.detour > t) { var rx = -my * k.detourDir, ry = mx * k.detourDir; mx = rx; my = ry; }
+      var steer = Math.min(1, dt * BOT_STEER_RATE);
+      k.vx = (k.vx || 0) + (mx - (k.vx || 0)) * steer; k.vy = (k.vy || 0) + (my - (k.vy || 0)) * steer;
+      mx = k.vx; my = k.vy;
+      var ox = B.x, oy = B.y, want2 = hyp(mx, my);
+      if (want2 > 0.05) {
+        moveEnt(B, mx, my, dt);
+        var moved = hyp(B.x - ox, B.y - oy), expect = B.speed() * dt * Math.min(1, want2);
+        if (expect > 0 && moved < expect * 0.3) { k.stuck += dt; if (k.stuck > 0.4) { if (t - (k.detourAt || 0) > BOT_DETOUR_KEEP_MS) k.detourDir = Math.random() < 0.5 ? -1 : 1; k.detourAt = t; k.detour = t + 700; k.stuck = 0; } }
+        else k.stuck = 0;
+        B.mv = moved > 0.2;
+        if (B.mv) { B.moveAng = Math.atan2(B.y - oy, B.x - ox); B.moveAt = t; }
+      } else B.mv = false;
 
-  function ultAimSpot(B, target, dist, t) {
-    var sec = 0;
-    if (B.char === "mage") sec = ULT.mbDelay / 1000;
-    else if (B.char === "sniper") sec = dist / ULT.pnSpeed;
-    else if (B.char === "ranger") sec = dist / ULT.mkSpeed;
-    if (!sec) return target;
-    var spot = leadSpot(target, sec, t), reach = hyp(spot.x - B.x, spot.y - B.y);
-    if (B.char === "mage" && reach > ULT.mbCast) return target;
-    return spot;
-  }
-  function leadSpot(o, sec, t) {
-    var moving = o.mv && o.moveAng != null && t - (o.moveAt || 0) < 400, lead = moving ? o.speed() * sec * 0.8 : 0;
-    return { x: o.x + (moving ? Math.cos(o.moveAng) * lead : 0), y: o.y + (moving ? Math.sin(o.moveAng) * lead : 0) };
-  }
-  function fogClusterSpot(B, enemies, t) {
-    var seen = enemies.filter(function (o) { return visibleTo(o, B, t); }), best = null, bestN = 1;
-    seen.forEach(function (o) {
-      if (hyp(o.x - B.x, o.y - B.y) > ULT.fgCast + ULT.fgR * 0.5) return;
-      var sx = 0, sy = 0, n = 0;
-      seen.forEach(function (q) { if (hyp(q.x - o.x, q.y - o.y) <= ULT.fgR * 1.3) { var s = leadSpot(q, potionFlightMs(hyp(q.x - B.x, q.y - B.y)) / 1000, t); sx += s.x; sy += s.y; n++; } });
-      if (n > bestN) { bestN = n; best = { x: sx / n, y: sy / n }; }
-    });
-    return best;
-  }
-  function botThrow(B, target, enemies, t) {
-    var c = CHARS.thrower, k = B.bot, spot;
-    if (B.gauge >= GAUGE_MAX) {
-      if (!k.fullAt) k.fullAt = t;
-      spot = fogClusterSpot(B, enemies, t);
-      if (!spot && target && t - k.fullAt > 5000 && t - k.seenAt > 500) spot = leadSpot(target, potionFlightMs(hyp(target.x - B.x, target.y - B.y)) / 1000, t);
-      if (spot) { k.fullAt = 0; useUlt(B, Math.atan2(spot.y - B.y, spot.x - B.x), hyp(spot.x - B.x, spot.y - B.y)); return; }
-    } else k.fullAt = 0;
-    if (!target || t < B.cdUntil || t - k.seenAt <= BOT_REACT_MS) return;
-    spot = leadSpot(target, potionFlightMs(hyp(target.x - B.x, target.y - B.y)) / 1000, t);
-    var d =hyp(spot.x - B.x, spot.y - B.y);
-    if (d > c.range + ULT.plR * 0.5) return;
-    fireBasic(B, Math.atan2(spot.y - B.y, spot.x - B.x) + (Math.random() - 0.5) * BOT_AIM_ERR, d + (Math.random() - 0.5) * 40);
-  }
-
-  function botCleric(B, enemies, t) {
-    if (B.gauge >= GAUGE_MAX && enemies.length) { useUlt(B, B.angle); return; }
-    if (t < B.cdUntil) return;
-    var A = graceTarget(B);
-    if (A && A.hp < A.maxHp) fireBasic(B, B.angle);
-  }
-  function botLance(B, target, t) {
-    var c = CHARS.lancer, k = B.bot;
-    if (!target || B.isLancerWinding(t) || t - k.seenAt <= BOT_REACT_MS) return;
-    if (B.gauge >= GAUGE_MAX) {
-      var ahead = leadSpot(target, ULT.lnWind / 1000, t), ud = hyp(ahead.x - B.x, ahead.y - B.y);
-      if (ud <= ULT.lnLen && losClear(B.x, B.y, ahead.x, ahead.y) && losClear(B.x, B.y, target.x, target.y)) {
-        useUlt(B, Math.atan2(ahead.y - B.y, ahead.x - B.x)); return;
+      var aimAt = target;
+      if (B.isLancerWinding(t) || B.isHammerWinding(t) || B.isHammerLeaping(t) || B.dash) return;
+      if (aimAt) B.angle = Math.atan2(aimAt.y - B.y, aimAt.x - B.x);
+      else if (B.mv) B.angle = Math.atan2(my, mx);
+      if (B.burst) return;
+      if (B.char === "thrower") { BRAIN.botThrow(B, target, enemies, t); return; }
+      if (B.char === "cleric") { BRAIN.botCleric(B, enemies, t); return; }
+      if (B.char === "lancer") { BRAIN.botLance(B, target, t); return; }
+      if (target && B.gauge >= GAUGE_MAX && t - k.seenAt > 500 && losClear(B.x, B.y, target.x, target.y) && (B.char !== "mage" || td <= ULT.mbCast) && (B.char !== "blacksmith" || td <= ULT.bsCast) && (CHARS[B.char].ultKind !== "blackhole" || td <= ULT.bhCast) && (B.char !== "shaman" || td <= ULT.dmR * 0.7) && (B.char !== "hitman" || td <= ULT.exRange) && (B.char !== "guardian" || td <= ULT.gdR) && (B.char !== "frost" || td <= ULT.frBzR * 0.8) && (B.char !== "dancer" || td <= ULT.bwR * 2) && (B.char !== "duelist" || td <= c.dashRange + c.range) && (B.char !== "stormbow" || td <= c.range)) {
+        if (B.char === "blacksmith") {
+          var drop = BRAIN.leadSpot(target, hammerLeapMs(td) / 1000, t);
+          useUlt(B, Math.atan2(drop.y - B.y, drop.x - B.x), hyp(drop.x - B.x, drop.y - B.y)); return;
+        }
+        var ultSpot = BRAIN.ultAimSpot(B, target, td, t);
+        useUlt(B, Math.atan2(ultSpot.y - B.y, ultSpot.x - B.x), hyp(ultSpot.x - B.x, ultSpot.y - B.y)); return;
+      }
+      if (B.char === "shaman" && t >= B.cdUntil && domainStrikeTarget(B, t)) { fireBasic(B, B.angle); return; }
+      if (aimAt && t >= B.cdUntil && t - k.seenAt > BOT_REACT_MS) {
+        var ad = hyp(aimAt.x - B.x, aimAt.y - B.y);
+        var rng = c.stab ? lungeRange(B, t) + c.range : c.throwRange || c.dashRange || (melee ? c.range + BODY_R - 4 : c.range + (overcharged(B, t) ? ULT.ocRangeBonus : 0));
+        if (ad <= rng && losClear(B.x, B.y, aimAt.x, aimAt.y)) {
+          var shotAim = c.pSpeed && !melee ? BRAIN.leadSpot(aimAt, ad / c.pSpeed, t) : aimAt;
+          fireBasic(B, Math.atan2(shotAim.y - B.y, shotAim.x - B.x) + (Math.random() - 0.5) * 2 * BOT_AIM_ERR);
+        }
       }
     }
-    if (t < B.cdUntil) return;
-    var d = hyp(target.x - B.x, target.y - B.y);
-    if (d <= c.range + (overcharged(B, t) ? ULT.ocRangeBonus : 0) && losClear(B.x, B.y, target.x, target.y)) fireBasic(B, B.angle + (Math.random() - 0.5) * 2 * BOT_AIM_ERR);
+    ultAimSpot(B, target, dist, t) {
+      var sec = 0;
+      if (B.char === "mage") sec = ULT.mbDelay / 1000;
+      else if (B.char === "sniper") sec = dist / ULT.pnSpeed;
+      else if (B.char === "ranger") sec = dist / ULT.mkSpeed;
+      if (!sec) return target;
+      var spot = BRAIN.leadSpot(target, sec, t), reach = hyp(spot.x - B.x, spot.y - B.y);
+      if (B.char === "mage" && reach > ULT.mbCast) return target;
+      return spot;
+    }
+    leadSpot(o, sec, t) {
+      var moving = o.mv && o.moveAng != null && t - (o.moveAt || 0) < 400, lead = moving ? o.speed() * sec * 0.8 : 0;
+      return { x: o.x + (moving ? Math.cos(o.moveAng) * lead : 0), y: o.y + (moving ? Math.sin(o.moveAng) * lead : 0) };
+    }
+    fogClusterSpot(B, enemies, t) {
+      var seen = enemies.filter(function (o) { return visibleTo(o, B, t); }), best = null, bestN = 1;
+      seen.forEach(function (o) {
+        if (hyp(o.x - B.x, o.y - B.y) > ULT.fgCast + ULT.fgR * 0.5) return;
+        var sx = 0, sy = 0, n = 0;
+        seen.forEach(function (q) { if (hyp(q.x - o.x, q.y - o.y) <= ULT.fgR * 1.3) { var s = BRAIN.leadSpot(q, potionFlightMs(hyp(q.x - B.x, q.y - B.y)) / 1000, t); sx += s.x; sy += s.y; n++; } });
+        if (n > bestN) { bestN = n; best = { x: sx / n, y: sy / n }; }
+      });
+      return best;
+    }
+    botThrow(B, target, enemies, t) {
+      var c = CHARS.thrower, k = B.bot, spot;
+      if (B.gauge >= GAUGE_MAX) {
+        if (!k.fullAt) k.fullAt = t;
+        spot = BRAIN.fogClusterSpot(B, enemies, t);
+        if (!spot && target && t - k.fullAt > 5000 && t - k.seenAt > 500) spot = BRAIN.leadSpot(target, potionFlightMs(hyp(target.x - B.x, target.y - B.y)) / 1000, t);
+        if (spot) { k.fullAt = 0; useUlt(B, Math.atan2(spot.y - B.y, spot.x - B.x), hyp(spot.x - B.x, spot.y - B.y)); return; }
+      } else k.fullAt = 0;
+      if (!target || t < B.cdUntil || t - k.seenAt <= BOT_REACT_MS) return;
+      spot = BRAIN.leadSpot(target, potionFlightMs(hyp(target.x - B.x, target.y - B.y)) / 1000, t);
+      var d =hyp(spot.x - B.x, spot.y - B.y);
+      if (d > c.range + ULT.plR * 0.5) return;
+      fireBasic(B, Math.atan2(spot.y - B.y, spot.x - B.x) + (Math.random() - 0.5) * BOT_AIM_ERR, d + (Math.random() - 0.5) * 40);
+    }
+    botCleric(B, enemies, t) {
+      if (B.gauge >= GAUGE_MAX && enemies.length) { useUlt(B, B.angle); return; }
+      if (t < B.cdUntil) return;
+      var A = graceTarget(B);
+      if (A && A.hp < A.maxHp) fireBasic(B, B.angle);
+    }
+    botLance(B, target, t) {
+      var c = CHARS.lancer, k = B.bot;
+      if (!target || B.isLancerWinding(t) || t - k.seenAt <= BOT_REACT_MS) return;
+      if (B.gauge >= GAUGE_MAX) {
+        var ahead = BRAIN.leadSpot(target, ULT.lnWind / 1000, t), ud = hyp(ahead.x - B.x, ahead.y - B.y);
+        if (ud <= ULT.lnLen && losClear(B.x, B.y, ahead.x, ahead.y) && losClear(B.x, B.y, target.x, target.y)) {
+          useUlt(B, Math.atan2(ahead.y - B.y, ahead.x - B.x)); return;
+        }
+      }
+      if (t < B.cdUntil) return;
+      var d = hyp(target.x - B.x, target.y - B.y);
+      if (d <= c.range + (overcharged(B, t) ? ULT.ocRangeBonus : 0) && losClear(B.x, B.y, target.x, target.y)) fireBasic(B, B.angle + (Math.random() - 0.5) * 2 * BOT_AIM_ERR);
+    }
   }
+  var BRAIN = new BotBrain();
 
   function entFields(u, E) {
     var d = P[E.id];
@@ -7183,7 +7185,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (KEY_ON.atk && t >= ME.cdUntil && !ME.volley && !ME.slash) fireBasic(ME, autoAimAngle(ME));
         stepCombat(ME, dt);
       } else if (ME) ME.mv = false;
-      if (isHost()) keys(BOTS).forEach(function (id) { var B = BOTS[id]; if (driveBots) stepBot(B, dt); if (B.alive) stepCombat(B, dt); stepKnightSlam(B); stepHammerLeap(B); stepLance(B); stepDash(B); stepMinions(B, dt, t); payKillGaugeOwed(B, t); });
+      if (isHost()) keys(BOTS).forEach(function (id) { var B = BOTS[id]; if (driveBots) BRAIN.step(B, dt); if (B.alive) stepCombat(B, dt); stepKnightSlam(B); stepHammerLeap(B); stepLance(B); stepDash(B); stepMinions(B, dt, t); payKillGaugeOwed(B, t); });
       if (ME) { stepKnightSlam(ME); stepHammerLeap(ME); stepLance(ME); stepDash(ME); stepMinions(ME, dt, t); payKillGaugeOwed(ME, t); }
       localTargets().forEach(function (T) { stepShove(T, t); if (!T.minion) { stepBurn(T, t); stepRally(T, t); stepDomainBolt(T, t); stepCurse(T, t); } });
       checkProjectiles(t);
