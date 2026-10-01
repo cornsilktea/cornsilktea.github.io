@@ -1447,7 +1447,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     sub(stRef, "child_removed", function (s) { delete MATCH.stateByKey[s.key]; });
     sub(ref.child("shots"), "child_added", onShot);
     sub(ref.child("meleeHits"), "child_added", function (s) { onMelee(s.key, s.val()); });
-    listenHits(myId);
+    DAMAGE.listenHits(myId);
     sub(ref.child("effects"), "child_added", onEffect);
     sub(ref.child("kills"), "child_added", onKillFeed);
 
@@ -3440,7 +3440,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (id === myId) return;
       var d = P[id];
       if (d.isAI && host) {
-        if (!MATCH.bots[id]) { MATCH.bots[id] = makeEnt(id, d); MATCH.bots[id].bot = { seed: Math.random() * 10, seenAt: 0, target: null, stuck: 0, detour: 0, detourDir: 1 }; delete MATCH.remotes[id]; listenHits(id); }
+        if (!MATCH.bots[id]) { MATCH.bots[id] = makeEnt(id, d); MATCH.bots[id].bot = { seed: Math.random() * 10, seenAt: 0, target: null, stuck: 0, detour: 0, detourDir: 1 }; delete MATCH.remotes[id]; DAMAGE.listenHits(id); }
         return;
       }
       var r = MATCH.remotes[id];
@@ -3637,7 +3637,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     addSlowCredited(T, mul, ms, t, owner) {
       var before = STATUS.activeSlows(T, t), loadBefore = STATUS.slowLoadMs(before, t), endBefore = STATUS.slowEndOf(before, t);
       STATUS.addSlow(T, mul, ms, t);
-      noteHurt(T, owner, t);
+      DAMAGE.noteHurt(T, owner, t);
       var after = STATUS.activeSlows(T, t);
       STATUS.creditCC(owner, 0, STATUS.slowEndOf(after, t) - endBefore, STATUS.slowLoadMs(after, t) - loadBefore);
     }
@@ -3656,7 +3656,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (fx.slowMs) STATUS.addSlowCredited(T, fx.slowMul || 0.6, fx.slowMs, t, owner);
       if (fx.stunMs) {
         STATUS.creditCC(owner, Math.max(0, t + fx.stunMs - Math.max(T.stunUntil || 0, t)), 0, 0);
-        noteHurt(T, owner, t);
+        DAMAGE.noteHurt(T, owner, t);
         T.stunUntil = Math.max(T.stunUntil || 0, t + fx.stunMs); T.pending = null; T.burst = null; T.volley = null; T.slash = null;
         STATUS.breakBladeStorm(T, t); STATUS.breakRevelation(T, t); }
       MATCH.game.forceNet = true;
@@ -3695,7 +3695,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (E.burnNext > E.burnUntil + 1) { E.burnNext = 0; return; }
       if (t < E.burnNext) return;
       E.burnNext += BURN_TICK_MS;
-      damage(E, Math.round(E.maxHp * CHARS.mage.burn.maxHpRate), E.burnOwner, false, "burn");
+      DAMAGE.damage(E, Math.round(E.maxHp * CHARS.mage.burn.maxHpRate), E.burnOwner, false, "burn");
     }
     stepRally(E, t) {
       if (!E.regenNext || !E.alive) return;
@@ -3765,16 +3765,137 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       tick.hurtGaugeGroup = hurtGaugeGroup;
       localTargets().forEach(function (T) {
         if (!T.alive || T.team === E.team || hyp(T.x - E.x, T.y - E.y) > ULT.bwR + BODY_R * 0.5) return;
-        damage(T, ULT.bwDmg, E.id, false, "bladestorm", null, null, !givesHurtGauge);
+        DAMAGE.damage(T, ULT.bwDmg, E.id, false, "bladestorm", null, null, !givesHurtGauge);
       });
     });
   }
-  function payKillGaugeOwed(E, t) {
-    if (!E.killGaugeOwed || E.isGaugeLocked(t)) return;
-    E.gauge = Math.min(GAUGE_MAX, E.gauge + E.killGaugeOwed);
-    E.killGaugeOwed = 0;
-    MATCH.game.forceNet = true;
+  class DamageResolver {
+    payKillGaugeOwed(E, t) {
+      if (!E.killGaugeOwed || E.isGaugeLocked(t)) return;
+      E.gauge = Math.min(GAUGE_MAX, E.gauge + E.killGaugeOwed);
+      E.killGaugeOwed = 0;
+      MATCH.game.forceNet = true;
+    }
+    damageMinion(M, amount, owner, basic, ultKey, gaugeGain) {
+      if (!minionReady(M)) return;
+      var dm = Math.min(amount, M.hp);
+      M.hp -= dm;
+      var summoner = ent(M.owner);
+      if (summoner) summoner.blocked = (summoner.blocked || 0) + dm;
+      if (M.hp <= 0) { M.hp = 0; M.alive = false; M.diedAt = now(); }
+      DAMAGE.pushHit(owner, dm, basic, ultKey, false, gaugeGain, true);
+      MATCH.game.forceNet = true;
+    }
+    damage(T, amount, owner, basic, ultKey, fx, gaugeGain, noHurtGauge) {
+      if (T.minion) { DAMAGE.damageMinion(T, amount, owner, basic, ultKey, gaugeGain); return; }
+      if (T.isProtected()) return;
+      var t = now(), unguarded = amount, C = CHARS[T.char];
+      if (T.shield && amount > 0) { amount = 0; T.shield = false; FX_VIEW.spark(T.x, T.y, SHIELD_SPARK, 1.5); }
+      var targetType = CHAR_TYPES.of(T.char);
+      amount = targetType.skillGuard(T, amount, t);
+      if (C.armor) amount = Math.max(0, amount - C.armor);
+      targetType.tallyBlocked(T, unguarded, amount);
+      var floorHp = CHARS[T.char].lastStandHp;
+      if (floorHp && !T.lastStandUsed && T.hp - amount < floorHp) {
+        amount = Math.max(0, T.hp - floorHp);
+        T.lastStandUsed = true;
+        T.stealthUntil = Math.max(T.stealthUntil || 0, now() + CHARS[T.char].lastStandHideMs);
+        T.revealUntil = 0;
+        FX_VIEW.smoke(T.x, T.y, NECRO_SMOKE_COLOR);
+      }
+      if (amount > 0) DAMAGE.noteHurt(T, owner, t);
+      var dm = Math.min(amount, T.hp), killed = false;
+      T.taken = (T.taken || 0) + dm;
+      T.hp -= dm; if (!noHurtGauge && !T.isGaugeLocked()) T.gauge = Math.min(GAUGE_MAX, T.gauge + roleOf(T.char).gaugeOnHurt);
+      if (T.hp <= 0) { killed = true; T.hp = 0; T.alive = false; T.deaths++; T.diedAt = now(); T.burst = null; T.volley = null; T.slash = null; T.regenUntil = 0; T.skillUntil = 0; T.slowUntil = 0; T.slows = null; T.stunUntil = 0; T.lance = null; T.frostStacks = 0; T.hasteUntil = 0; T.hasteStacks = 0; T.burnUntil = 0; T.burnNext = 0; T.regenNext = 0; if (T === MATCH.me) { sfx("down"); aim.id = null; joy.id = null; } }
+      else {
+        if (T === MATCH.me) sfx("hit");
+        STATUS.afflict(T, fx, owner);
+        if (fx && fx.maxHpRate) DAMAGE.damage(T, Math.round(T.maxHp * fx.maxHpRate), owner, false, ultKey);
+        if (P[owner]) CHAR_TYPES.of(P[owner].characterType).afterDealtDamage(T, owner, ultKey, t);
+        if (C.rally && !T.rallyUsed && T.hp < T.maxHp * C.rally.hpRate) { T.rallyUsed = true; T.regenUntil = t + C.rally.ms; T.regenNext = t + REGEN_TICK_MS; }
+      }
+      DAMAGE.pushHit(owner, dm, basic, ultKey, killed, gaugeGain);
+      if (killed) { T.domainBolt = null; T.curse = 0; T.curseBoom = null; STATUS.breakRevelation(T, t); DAMAGE.reportKill(T, owner, t); T.hurtBy = {}; T.helpedBy = {}; }
+      if (T === MATCH.me || T.bot) MATCH.game.forceNet = true;
+    }
+    noteHurt(T, owner, t) {
+      if (owner && owner !== T.id && P[owner] && P[owner].team !== T.team) (T.hurtBy || (T.hurtBy = {}))[owner] = t;
+    }
+    noteHelp(T, helper, t) {
+      if (helper && helper !== T.id && P[helper] && P[helper].team === T.team) (T.helpedBy || (T.helpedBy = {}))[helper] = t;
+    }
+    listOf(v) { return v ? keys(v).map(function (i) { return v[i]; }) : []; }
+    damageAssisters(T, killer, t) {
+      var by = T.hurtBy || {};
+      return keys(by).filter(function (id) { return id !== killer && t - by[id] <= ASSIST_MS && P[id] && P[id].team !== T.team; });
+    }
+    creditAssist(id, t) { room.ref.child("hits/" + id).push({ d: 0, b: 0, t: t, as: 1 }); }
+    reportKill(T, killer, t) {
+      var assisters = DAMAGE.damageAssisters(T, killer, t), k = { k: killer, v: T.id, t: t };
+      if (assisters.length) k.a = assisters;
+      room.ref.child("kills").push(k);
+      assisters.forEach(function (id) { DAMAGE.creditAssist(id, t); });
+    }
+    creditHelpAssists(k) {
+      var K = k.k === myId ? MATCH.me : (isHost() ? MATCH.bots[k.k] : null);
+      if (!K || !K.helpedBy || !(k.t >= MATCH.game.startAt)) return;
+      var already = DAMAGE.listOf(k.a);
+      keys(K.helpedBy).forEach(function (id) {
+        var at = K.helpedBy[id];
+        if (id === k.k || id === k.v || already.indexOf(id) >= 0 || !P[id] || P[id].team !== K.team) return;
+        if (k.t - at <= ASSIST_MS && at - k.t < 500) DAMAGE.creditAssist(id, k.t);
+      });
+    }
+    pushHit(owner, dmg, basic, ultKey, killed, gaugeGain, onMinion) {
+      var h = { d: dmg, b: basic ? 1 : 0, t: now() };
+      if (onMinion) h.mn = 1;
+      if (gaugeGain != null) h.g = gaugeGain;
+      if (ultKey) h.u = ultKey;
+      if (typeof basic === "number") h.s = basic;
+      if (killed) h.k = 1;
+      room.ref.child("hits/" + owner).push(STATUS.attachCC(owner, h));
+    }
+    listenHits(ownerId) {
+      if (MATCH.hitSubs[ownerId]) return;
+      MATCH.hitSubs[ownerId] = 1;
+      sub(room.ref.child("hits/" + ownerId), "child_added", DAMAGE.onHit.bind(DAMAGE));
+    }
+    onHit(s) {
+      var h = s.val(), ownerId = s.ref.parent.key; if (!h || !MATCH.game || MATCH.handled[s.key]) return;
+      var owner = ownerId === myId ? MATCH.me : (isHost() ? MATCH.bots[ownerId] : null);
+      if (!owner) return;
+      MATCH.handled[s.key] = 1;
+      if (h.t >= MATCH.game.startAt - 1000) {
+        if (h.d && !h.mn) owner.dmg += h.d;
+        if (h.k) owner.kills++;
+        if (h.as) owner.assists = (owner.assists || 0) + 1;
+        CHAR_TYPES.of(owner.char).onHitEarly(owner, h);
+        if (h.hl) owner.heal += h.hl;
+        if (h.hl && CHARS[owner.char].healGauge && !owner.isGaugeLocked()) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + h.hl * GAUGE_MAX / CHARS[owner.char].healGauge);
+        if (h.cs) owner.stunDealt = (owner.stunDealt || 0) + h.cs / 1000;
+        if (h.ss) owner.slowDealt = (owner.slowDealt || 0) + h.ss / 1000;
+        if (h.sw) owner.slowWeight = (owner.slowWeight || 0) + h.sw / 1000;
+        if (h.b && owner.alive && CHARS[owner.char].haste) owner.addHaste(now());
+        CHAR_TYPES.of(owner.char).onHitLate(owner, h);
+        var sameSwing = h.s && owner.gaugeSwing === h.s;
+        if (h.s) owner.gaugeSwing = h.s;
+        if (h.b && !sameSwing && !owner.isGaugeLocked()) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + (h.g != null ? h.g : roleOf(owner.char).gaugeOnHit));
+        if (h.b && !sameSwing && owner.alive && CHARS[owner.char].selfHeal) {
+          var stabHeal = STATUS.healAmount(owner, CHARS[owner.char].selfHeal, now());
+          owner.hp += stabHeal; owner.heal += stabHeal;
+        }
+        if (h.b && !sameSwing && owner.alive && owner.isBerserk(h.t)) {
+          var rageHeal = STATUS.healAmount(owner, ULT.bzHeal, now());
+          owner.hp += rageHeal; owner.heal += rageHeal;
+        }
+        if (owner === MATCH.me && h.d) sfx("confirm");
+        MATCH.game.forceNet = true;
+      }
+      s.ref.remove();
+    }
   }
+  var DAMAGE = new DamageResolver();
   function bladeSpin(p, x, y) {
     if (p.spun) return;
     p.spun = true;
@@ -3789,7 +3910,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       FX_VIEW.spark(s.x, s.y, "#FFFFFF", 1.4);
       localTargets().forEach(function (T) {
         if (!T.alive || T.team === d.team || T.id === d.owner || hyp(T.x - s.x, T.y - s.y) > ULT.bdR + BODY_R * 0.5) return;
-        damage(T, ULT.bdDmg, d.owner, d.createdAt, null);
+        DAMAGE.damage(T, ULT.bdDmg, d.owner, d.createdAt, null);
       });
       return false;
     });
@@ -3940,7 +4061,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var ownerType = CHAR_TYPES.of(d.ownerCharacterType);
     fx = ownerType.projectileEffect(d, T, immune, fx);
     var dancer = ownerType.isBladeThrower;
-    damage(T, Math.round(d.dmg * (1 + damageBonusSum(d, T))), d.owner, dancer ? d.createdAt : !d.isSkill, d.isSkill ? d.ultKey : (d.countsAsSkill ? "skill" : null), fx);
+    DAMAGE.damage(T, Math.round(d.dmg * (1 + damageBonusSum(d, T))), d.owner, dancer ? d.createdAt : !d.isSkill, d.isSkill ? d.ultKey : (d.countsAsSkill ? "skill" : null), fx);
     if (dancer) bladeSpin(p, T.x, T.y);
     if (d.ultKey === "execute" && !immune) { room.ref.child("hits/" + d.owner).push({ d: 0, b: 0, t: now(), tp: { x: r1(T.x), y: r1(T.y) } }); FX_VIEW.executeFx(T.x, T.y); }
     ownerType.afterProjectileHit(d, T, immune);
@@ -3971,77 +4092,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }
     }
   }
-  function damageMinion(M, amount, owner, basic, ultKey, gaugeGain) {
-    if (!minionReady(M)) return;
-    var dm = Math.min(amount, M.hp);
-    M.hp -= dm;
-    var summoner = ent(M.owner);
-    if (summoner) summoner.blocked = (summoner.blocked || 0) + dm;
-    if (M.hp <= 0) { M.hp = 0; M.alive = false; M.diedAt = now(); }
-    pushHit(owner, dm, basic, ultKey, false, gaugeGain, true);
-    MATCH.game.forceNet = true;
-  }
-  function damage(T, amount, owner, basic, ultKey, fx, gaugeGain, noHurtGauge) {
-    if (T.minion) { damageMinion(T, amount, owner, basic, ultKey, gaugeGain); return; }
-    if (T.isProtected()) return;
-    var t = now(), unguarded = amount, C = CHARS[T.char];
-    if (T.shield && amount > 0) { amount = 0; T.shield = false; FX_VIEW.spark(T.x, T.y, SHIELD_SPARK, 1.5); }
-    var targetType = CHAR_TYPES.of(T.char);
-    amount = targetType.skillGuard(T, amount, t);
-    if (C.armor) amount = Math.max(0, amount - C.armor);
-    targetType.tallyBlocked(T, unguarded, amount);
-    var floorHp = CHARS[T.char].lastStandHp;
-    if (floorHp && !T.lastStandUsed && T.hp - amount < floorHp) {
-      amount = Math.max(0, T.hp - floorHp);
-      T.lastStandUsed = true;
-      T.stealthUntil = Math.max(T.stealthUntil || 0, now() + CHARS[T.char].lastStandHideMs);
-      T.revealUntil = 0;
-      FX_VIEW.smoke(T.x, T.y, NECRO_SMOKE_COLOR);
-    }
-    if (amount > 0) noteHurt(T, owner, t);
-    var dm = Math.min(amount, T.hp), killed = false;
-    T.taken = (T.taken || 0) + dm;
-    T.hp -= dm; if (!noHurtGauge && !T.isGaugeLocked()) T.gauge = Math.min(GAUGE_MAX, T.gauge + roleOf(T.char).gaugeOnHurt);
-    if (T.hp <= 0) { killed = true; T.hp = 0; T.alive = false; T.deaths++; T.diedAt = now(); T.burst = null; T.volley = null; T.slash = null; T.regenUntil = 0; T.skillUntil = 0; T.slowUntil = 0; T.slows = null; T.stunUntil = 0; T.lance = null; T.frostStacks = 0; T.hasteUntil = 0; T.hasteStacks = 0; T.burnUntil = 0; T.burnNext = 0; T.regenNext = 0; if (T === MATCH.me) { sfx("down"); aim.id = null; joy.id = null; } }
-    else {
-      if (T === MATCH.me) sfx("hit");
-      STATUS.afflict(T, fx, owner);
-      if (fx && fx.maxHpRate) damage(T, Math.round(T.maxHp * fx.maxHpRate), owner, false, ultKey);
-      if (P[owner]) CHAR_TYPES.of(P[owner].characterType).afterDealtDamage(T, owner, ultKey, t);
-      if (C.rally && !T.rallyUsed && T.hp < T.maxHp * C.rally.hpRate) { T.rallyUsed = true; T.regenUntil = t + C.rally.ms; T.regenNext = t + REGEN_TICK_MS; }
-    }
-    pushHit(owner, dm, basic, ultKey, killed, gaugeGain);
-    if (killed) { T.domainBolt = null; T.curse = 0; T.curseBoom = null; STATUS.breakRevelation(T, t); reportKill(T, owner, t); T.hurtBy = {}; T.helpedBy = {}; }
-    if (T === MATCH.me || T.bot) MATCH.game.forceNet = true;
-  }
-  function noteHurt(T, owner, t) {
-    if (owner && owner !== T.id && P[owner] && P[owner].team !== T.team) (T.hurtBy || (T.hurtBy = {}))[owner] = t;
-  }
-  function noteHelp(T, helper, t) {
-    if (helper && helper !== T.id && P[helper] && P[helper].team === T.team) (T.helpedBy || (T.helpedBy = {}))[helper] = t;
-  }
-  function listOf(v) { return v ? keys(v).map(function (i) { return v[i]; }) : []; }
-  function damageAssisters(T, killer, t) {
-    var by = T.hurtBy || {};
-    return keys(by).filter(function (id) { return id !== killer && t - by[id] <= ASSIST_MS && P[id] && P[id].team !== T.team; });
-  }
-  function creditAssist(id, t) { room.ref.child("hits/" + id).push({ d: 0, b: 0, t: t, as: 1 }); }
-  function reportKill(T, killer, t) {
-    var assisters = damageAssisters(T, killer, t), k = { k: killer, v: T.id, t: t };
-    if (assisters.length) k.a = assisters;
-    room.ref.child("kills").push(k);
-    assisters.forEach(function (id) { creditAssist(id, t); });
-  }
-  function creditHelpAssists(k) {
-    var K = k.k === myId ? MATCH.me : (isHost() ? MATCH.bots[k.k] : null);
-    if (!K || !K.helpedBy || !(k.t >= MATCH.game.startAt)) return;
-    var already = listOf(k.a);
-    keys(K.helpedBy).forEach(function (id) {
-      var at = K.helpedBy[id];
-      if (id === k.k || id === k.v || already.indexOf(id) >= 0 || !P[id] || P[id].team !== K.team) return;
-      if (k.t - at <= ASSIST_MS && at - k.t < 500) creditAssist(id, k.t);
-    });
-  }
   var KILL_FEED_MS = 4000, KILL_FEED_MAX = 4, MULTI_KILL_MS = 3000;
   function multiKillCount(chainByKiller, k) {
     var chain = chainByKiller[k.k];
@@ -4058,7 +4108,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function onKillFeed(s) {
     var k = s.val(); if (!k || !MATCH.game || MATCH.handled[s.key]) return;
     MATCH.handled[s.key] = 1;
-    creditHelpAssists(k);
+    DAMAGE.creditHelpAssists(k);
     var streak = multiKillCount(MATCH.game.killChains || (MATCH.game.killChains = {}), k);
     if (!(k.t > now() - KILL_FEED_MS)) return;
     var killer = P[k.k] || {}, victim = P[k.v] || {}, feed = $("killFeed");
@@ -4083,54 +4133,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     banner.className = "show" + (tag ? " multi" : "");
     killSound(streak);
   }
-  function pushHit(owner, dmg, basic, ultKey, killed, gaugeGain, onMinion) {
-    var h = { d: dmg, b: basic ? 1 : 0, t: now() };
-    if (onMinion) h.mn = 1;
-    if (gaugeGain != null) h.g = gaugeGain;
-    if (ultKey) h.u = ultKey;
-    if (typeof basic === "number") h.s = basic;
-    if (killed) h.k = 1;
-    room.ref.child("hits/" + owner).push(STATUS.attachCC(owner, h));
-  }
-  function listenHits(ownerId) {
-    if (MATCH.hitSubs[ownerId]) return;
-    MATCH.hitSubs[ownerId] = 1;
-    sub(room.ref.child("hits/" + ownerId), "child_added", onHit);
-  }
 
-  function onHit(s) {
-    var h = s.val(), ownerId = s.ref.parent.key; if (!h || !MATCH.game || MATCH.handled[s.key]) return;
-    var owner = ownerId === myId ? MATCH.me : (isHost() ? MATCH.bots[ownerId] : null);
-    if (!owner) return;
-    MATCH.handled[s.key] = 1;
-    if (h.t >= MATCH.game.startAt - 1000) {
-      if (h.d && !h.mn) owner.dmg += h.d;
-      if (h.k) owner.kills++;
-      if (h.as) owner.assists = (owner.assists || 0) + 1;
-      CHAR_TYPES.of(owner.char).onHitEarly(owner, h);
-      if (h.hl) owner.heal += h.hl;
-      if (h.hl && CHARS[owner.char].healGauge && !owner.isGaugeLocked()) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + h.hl * GAUGE_MAX / CHARS[owner.char].healGauge);
-      if (h.cs) owner.stunDealt = (owner.stunDealt || 0) + h.cs / 1000;
-      if (h.ss) owner.slowDealt = (owner.slowDealt || 0) + h.ss / 1000;
-      if (h.sw) owner.slowWeight = (owner.slowWeight || 0) + h.sw / 1000;
-      if (h.b && owner.alive && CHARS[owner.char].haste) owner.addHaste(now());
-      CHAR_TYPES.of(owner.char).onHitLate(owner, h);
-      var sameSwing = h.s && owner.gaugeSwing === h.s;
-      if (h.s) owner.gaugeSwing = h.s;
-      if (h.b && !sameSwing && !owner.isGaugeLocked()) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + (h.g != null ? h.g : roleOf(owner.char).gaugeOnHit));
-      if (h.b && !sameSwing && owner.alive && CHARS[owner.char].selfHeal) {
-        var stabHeal = STATUS.healAmount(owner, CHARS[owner.char].selfHeal, now());
-        owner.hp += stabHeal; owner.heal += stabHeal;
-      }
-      if (h.b && !sameSwing && owner.alive && owner.isBerserk(h.t)) {
-        var rageHeal = STATUS.healAmount(owner, ULT.bzHeal, now());
-        owner.hp += rageHeal; owner.heal += rageHeal;
-      }
-      if (owner === MATCH.me && h.d) sfx("confirm");
-      MATCH.game.forceNet = true;
-    }
-    s.ref.remove();
-  }
   function stormZap(E, hit, t) {
     var chain = CHARS.stormbow.chain, over = E.isOvercharged(t);
     if (!over) {
@@ -4156,7 +4159,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (!e.tgt || room.status !== "playing") return;
     localTargets().forEach(function (T) {
       if (e.tgt.indexOf(T.id) < 0 || !T.alive || T.team === e.team) return;
-      damage(T, e.dmg, e.owner, true, e.over ? "overcharge" : null, null, T.minion ? 0 : undefined);
+      DAMAGE.damage(T, e.dmg, e.owner, true, e.over ? "overcharge" : null, null, T.minion ? 0 : undefined);
     });
   }
   function onEffect(s) {
@@ -4179,7 +4182,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var healed = STATUS.healAmount(T, ULT.fgHeal, t);
     if (healed <= 0) return;
     T.hp += healed;
-    noteHelp(T, e.owner, t);
+    DAMAGE.noteHelp(T, e.owner, t);
     room.ref.child("hits/" + e.owner).push({ d: 0, b: 0, t: now(), hl: healed });
     MATCH.game.forceNet = true;
     if (T === MATCH.me) sfx("heal");
@@ -4204,8 +4207,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var key = e.owner + ">" + T.id;
         if (FIELD.poolHit[key] && t - FIELD.poolHit[key] < ULT.plTick) return;
         FIELD.poolHit[key] = t;
-        if (e.u) damage(T, e.dmg, e.owner, false, "fog");
-        else damage(T, e.dmg, e.owner, e.createdAt + Math.floor((t - start) / ULT.plTick), null, null, ULT.plGauge);
+        if (e.u) DAMAGE.damage(T, e.dmg, e.owner, false, "fog");
+        else DAMAGE.damage(T, e.dmg, e.owner, e.createdAt + Math.floor((t - start) / ULT.plTick), null, null, ULT.plGauge);
       });
       return true;
     });
@@ -4226,7 +4229,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         T.x += dx / d * pull; T.y += dy / d * pull;
         resolve(T);
         STATUS.creditHolePull(T, e.owner, t, dt);
-        noteHurt(T, e.owner, t);
+        DAMAGE.noteHurt(T, e.owner, t);
         MATCH.game.forceNet = true;
       });
       return true;
@@ -4264,12 +4267,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (!s.landed) { s.landed = true; if (!MATCH.me || hyp(c.x - MATCH.me.x, c.y - MATCH.me.y) < 700) sfx("orb"); }
       if (room.status !== "playing") return true;
       var foesInside = localTargets().filter(function (T) { return T.alive && T.team !== e.team && hyp(T.x - c.x, T.y - c.y) <= e.r; });
-      localTargets().forEach(function (T) { if (!T.minion && T.alive && T.team === e.team && hyp(T.x - c.x, T.y - c.y) <= e.r) noteHelp(T, e.owner, t); });
+      localTargets().forEach(function (T) { if (!T.minion && T.alive && T.team === e.team && hyp(T.x - c.x, T.y - c.y) <= e.r) DAMAGE.noteHelp(T, e.owner, t); });
       if (s.nextTick && t < s.nextTick) return true;
       s.nextTick = (s.nextTick || t) + ULT.frBzTick;
       foesInside.forEach(function (T) {
         var stack = !T.minion && !T.isProtected(t) && !T.isFrostFrozen(t) ? STATUS.frostStackFx(T) : null;
-        damage(T, ULT.frBzDmg, e.owner, false, "blizzard", stack);
+        DAMAGE.damage(T, ULT.frBzDmg, e.owner, false, "blizzard", stack);
       });
       return true;
     });
@@ -4307,7 +4310,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var healed = STATUS.healAmount(T, amount, t);
     if (healed <= 0) return;
     T.hp += healed;
-    noteHelp(T, owner, t);
+    DAMAGE.noteHelp(T, owner, t);
     room.ref.child("hits/" + owner).push({ d: 0, b: 0, t: t, hl: healed });
     MATCH.game.forceNet = true;
     if (T === MATCH.me) sfx("heal");
@@ -4324,7 +4327,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         r.ticked[T.id] = tick;
         if (!T.alive || T.isProtected(t)) return;
         if (T.team === e.team) healByCleric(T, e.owner, e.heal, t);
-        else damage(T, e.dmg, e.owner, false, "revelation");
+        else DAMAGE.damage(T, e.dmg, e.owner, false, "revelation");
       });
       return true;
     });
@@ -4375,7 +4378,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (!B || t < B.at) return;
     T.curse = 0; T.curseBoom = null;
     if (!T.alive || T.isProtected(t)) return;
-    damage(T, ULT.cuBoomDmg, B.owner, false, "curse");
+    DAMAGE.damage(T, ULT.cuBoomDmg, B.owner, false, "curse");
   }
   function stepDomainBolt(T, t) {
     var B = T.domainBolt;
@@ -4383,7 +4386,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     T.domainBolt = null;
     if (!T.alive || T.isProtected(t)) return;
     room.ref.child("effects").push({ type: "strike", owner: B.owner, tgt: T.id, createdAt: t });
-    damage(T, B.dmg, B.owner, false, "domainbolt");
+    DAMAGE.damage(T, B.dmg, B.owner, false, "domainbolt");
     applyCurse(T, B.owner, t);
   }
   function domainStrikeTarget(E, t) {
@@ -4414,7 +4417,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (!e.dmg || room.status !== "playing") return;
     localTargets().forEach(function (T) {
       if (T.id !== e.tgt || !T.alive || T.team === e.team) return;
-      damage(T, e.dmg, e.owner, e.createdAt, null, e.stun ? { stunMs: e.stun } : null);
+      DAMAGE.damage(T, e.dmg, e.owner, e.createdAt, null, e.stun ? { stunMs: e.stun } : null);
       applyCurse(T, e.owner, now());
     });
   }
@@ -4442,7 +4445,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (t < e.createdAt + e.delay) return true;
       if (room.status === "playing") localTargets().forEach(function (T) {
         if (!T.alive || hyp(T.x - e.x, T.y - e.y) > e.r + BODY_R) return;
-        if (T.team !== e.team) { var hit = meteorHitAt(hyp(T.x - e.x, T.y - e.y), e.r); damage(T, hit.dmg, e.owner, false, e.createdAt, { stunMs: hit.stunMs }); }
+        if (T.team !== e.team) { var hit = meteorHitAt(hyp(T.x - e.x, T.y - e.y), e.r); DAMAGE.damage(T, hit.dmg, e.owner, false, e.createdAt, { stunMs: hit.stunMs }); }
       });
       FX_VIEW.boom(e.x, e.y, e.r, e.team);
       if (PIX >= PIX_START) { FX_VIEW.smoke(e.x, e.y, 0x8A6A52); FX_VIEW.spark(e.x, e.y, "#FFB45A", 2.2); }
@@ -4521,11 +4524,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var dx = T.x - d.x, dy = T.y - d.y;
     if (T.isProtected()) return;
     if (d.slam && !d.dmg) STATUS.afflict(T, d.fx, d.owner);
-    else damage(T, d.dmg, d.owner, (d.m || !d.u) && d.createdAt + (d.mi || 0) / 1000, d.hammer ? d.createdAt : (d.u || d.m || d.countsAsSkill ? "skill" : null), d.fx, d.m ? ULT.smGauge : null, !!d.m);
+    else DAMAGE.damage(T, d.dmg, d.owner, (d.m || !d.u) && d.createdAt + (d.mi || 0) / 1000, d.hammer ? d.createdAt : (d.u || d.m || d.countsAsSkill ? "skill" : null), d.fx, d.m ? ULT.smGauge : null, !!d.m);
     if (P[d.owner]) CHAR_TYPES.of(P[d.owner].characterType).afterStrike(T, d);
     if (d.kb && T.alive) {
       var dd = hyp(dx, dy) || 1, kbAt = now(), shoveEnd = T.shove ? T.shove.at + ULT.gdKbMs : 0;
-      if (!T.minion) { STATUS.creditCC(d.owner, Math.max(0, kbAt + ULT.gdKbMs - Math.max(T.stunUntil || 0, shoveEnd, kbAt)), 0, 0); noteHurt(T, d.owner, kbAt); }
+      if (!T.minion) { STATUS.creditCC(d.owner, Math.max(0, kbAt + ULT.gdKbMs - Math.max(T.stunUntil || 0, shoveEnd, kbAt)), 0, 0); DAMAGE.noteHurt(T, d.owner, kbAt); }
       T.shove = { ux: dx / dd, uy: dy / dd, dist: d.kb, at: now(), done: 0 };
       STATUS.breakBladeStorm(T, kbAt); STATUS.breakRevelation(T, kbAt);
     }
@@ -4536,7 +4539,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var healed = STATUS.healAmount(T, d.heal, now());
     if (healed <= 0) return;
     T.hp += healed;
-    noteHelp(T, d.owner, now());
+    DAMAGE.noteHelp(T, d.owner, now());
     room.ref.child("hits/" + d.owner).push({ d: 0, b: 0, t: now(), hl: healed });
     MATCH.game.forceNet = true;
     if (T === MATCH.me) sfx("heal");
@@ -7660,8 +7663,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (KEY_ON.atk && t >= MATCH.me.cdUntil && !MATCH.me.volley && !MATCH.me.slash) fireBasic(MATCH.me, autoAimAngle(MATCH.me));
         stepCombat(MATCH.me, dt);
       } else if (MATCH.me) MATCH.me.mv = false;
-      if (isHost()) keys(MATCH.bots).forEach(function (id) { var B = MATCH.bots[id]; if (driveBots) BRAIN.step(B, dt); if (B.alive) stepCombat(B, dt); stepKnightSlam(B); stepHammerLeap(B); stepLance(B); stepDash(B); stepMinions(B, dt, t); payKillGaugeOwed(B, t); });
-      if (MATCH.me) { stepKnightSlam(MATCH.me); stepHammerLeap(MATCH.me); stepLance(MATCH.me); stepDash(MATCH.me); stepMinions(MATCH.me, dt, t); payKillGaugeOwed(MATCH.me, t); }
+      if (isHost()) keys(MATCH.bots).forEach(function (id) { var B = MATCH.bots[id]; if (driveBots) BRAIN.step(B, dt); if (B.alive) stepCombat(B, dt); stepKnightSlam(B); stepHammerLeap(B); stepLance(B); stepDash(B); stepMinions(B, dt, t); DAMAGE.payKillGaugeOwed(B, t); });
+      if (MATCH.me) { stepKnightSlam(MATCH.me); stepHammerLeap(MATCH.me); stepLance(MATCH.me); stepDash(MATCH.me); stepMinions(MATCH.me, dt, t); DAMAGE.payKillGaugeOwed(MATCH.me, t); }
       localTargets().forEach(function (T) { STATUS.stepShove(T, t); if (!T.minion) { STATUS.stepBurn(T, t); STATUS.stepRally(T, t); stepDomainBolt(T, t); stepCurse(T, t); } });
       checkProjectiles(t);
       stepBladeDaggers(t);
@@ -7688,9 +7691,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         return renderer.domElement.toDataURL("image/png");
       },
       loadMapData: loadMapData, makeEnt: makeEnt, resolve: resolve, stepWorld: stepWorld,
-      useUlt: useUlt, fireBasic: fireBasic, damage: damage, healCut: STATUS.healCut.bind(STATUS), healAmount: STATUS.healAmount.bind(STATUS), respawnIfReady: respawnIfReady, afflict: STATUS.afflict.bind(STATUS), speedOf: function (E) { return E.speed(); }, stunned: function (E, t) { return E.isStunned(t); },
-      onShot: onShot, onMelee: onMelee, potionFlightMs: potionFlightMs, meteorHitAt: meteorHitAt, onEffect: onEffect, onHit: onHit,
-      multiKillCount: multiKillCount, MULTI_KILL_MS: MULTI_KILL_MS, ASSIST_MS: ASSIST_MS, onKill: creditHelpAssists,
+      useUlt: useUlt, fireBasic: fireBasic, damage: DAMAGE.damage.bind(DAMAGE), healCut: STATUS.healCut.bind(STATUS), healAmount: STATUS.healAmount.bind(STATUS), respawnIfReady: respawnIfReady, afflict: STATUS.afflict.bind(STATUS), speedOf: function (E) { return E.speed(); }, stunned: function (E, t) { return E.isStunned(t); },
+      onShot: onShot, onMelee: onMelee, potionFlightMs: potionFlightMs, meteorHitAt: meteorHitAt, onEffect: onEffect, onHit: DAMAGE.onHit.bind(DAMAGE),
+      multiKillCount: multiKillCount, MULTI_KILL_MS: MULTI_KILL_MS, ASSIST_MS: ASSIST_MS, onKill: DAMAGE.creditHelpAssists.bind(DAMAGE),
       hiddenFrom: hiddenFrom, visibleTo: visibleTo, storms: function () { return FIELD.storms; }, stormCenter: stormCenter, revs: function () { return FIELD.revs; }, domains: function () { return FIELD.domains; }, graceTarget: graceTarget,
       bushTiles: function () { return BUSH.map(function (b) { return b.tiles.map(function (tl) { return { x: tileX(tl[0]), y: tileY(tl[1]) }; }); }); },
       isIdle: function () { return !room; },
