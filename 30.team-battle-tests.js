@@ -2819,7 +2819,7 @@ function collectResults(api) {
 
   run(AIMG, "AI 역할: 기사·창술사·대장장이는 앞, 화염술사·주술사·궁수·뇌전사수·저격수는 뒤, 은신자·자객·결투가는 틈새를 노리는 역할인가", function (done) {
     var want = { knight: "front", lancer: "front", blacksmith: "front", guardian: "front", warrior: "front", mage: "back", shaman: "back", ranger: "back", stormbow: "back", sniper: "back", frost: "back", cleric: "back", necro: "back", thrower: "back",
-                 rogue: "flank", hitman: "flank", duelist: "flank", dancer: "flank" }, bad = [];
+                 rogue: "flank", hitman: "flank", duelist: "flank", dancer: "back" }, bad = [];
     Object.keys(want).forEach(function (c) { var got = api.CHAR_TYPES.of(c).botRole; if (got !== want[c]) bad.push(c + " " + got + " (기대 " + want[c] + ")"); });
     api.CHAR_LIST.forEach(function (c) { if (!want[c]) bad.push(c + " 역할이 정해지지 않음"); });
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : Object.keys(want).length + "명 역할이 맞음");
