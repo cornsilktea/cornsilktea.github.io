@@ -77,7 +77,8 @@ function collectResults(api) {
     list.forEach(function (e, i) {
       players[e.id] = { nickname: e.id, isAI: true, team: e.team, characterType: e.char, slot: e.slot || (i % 3) + 1, joinedAt: i };
     });
-    api.begin(fakeRoom(mapId, log), players, bots, t);
+    var room = fakeRoom(mapId, log);
+    api.begin(room, players, bots, t);
     list.forEach(function (e) {
       var E = api.makeEnt(e.id, players[e.id]);
       if (e.x != null) { E.x = e.x; E.y = e.y; }
@@ -87,7 +88,7 @@ function collectResults(api) {
       bots[e.id] = E;
     });
     var w = {
-      log: log,
+      log: log, room: room,
       ent: function (id) { return bots[id]; },
       t: function () { return t; },
       frame: function (ms, driveBots) { t += ms; api.setClock(t); api.stepWorld(t, Math.min(0.05, ms / 1000), !!driveBots); },
@@ -2397,6 +2398,378 @@ function collectResults(api) {
       ["winner", "final", "statsNote", "startAt", "endedAt", "roster", "draft", "bans", "st", "done", "shots", "meleeHits", "hits", "effects", "kills", "projectiles"].forEach(function (k) { if (!(k in u) || u[k] !== null) bad.push(k + " 가 안 지워짐"); });
       if (!("players/aiPracticeBot" in u) || u["players/aiPracticeBot"] !== null) bad.push("연습 AI 가 안 지워짐");
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "lobby, 16칸 + 연습 AI 삭제");
+    });
+  });
+
+
+  var INPUTG = "내 캐릭터 조작", VISG = "표적·시야·광선", KILLG = "킬 피드";
+
+  function releaseInput() {
+    Object.keys(api.KEY_ON).forEach(function (k) { api.KEY_ON[k] = false; });
+    api.joy.id = null; api.aim.id = null;
+  }
+  function withMe(list, fn) {
+    var W = world("forest", list), me = W.ent(api.myId);
+    delete me.bot; delete api.MATCH.bots[api.myId]; api.MATCH.me = me;
+    releaseInput();
+    try { return fn(W, me); }
+    finally { releaseInput(); api.MATCH.me = null; }
+  }
+  function meEntry(char, team, x, y, extra) {
+    var e = { id: api.myId, team: team, char: char, x: x, y: y };
+    Object.keys(extra || {}).forEach(function (k) { e[k] = extra[k]; });
+    return e;
+  }
+  function moveOf(W, me, ms) {
+    var x0 = me.x, y0 = me.y;
+    W.step(ms);
+    return { dx: me.x - x0, dy: me.y - y0, dist: hyp(me.x - x0, me.y - y0) };
+  }
+  function pointer(target, type, id, x, y) {
+    target.dispatchEvent(new PointerEvent(type, { pointerId: id, clientX: x, clientY: y, bubbles: true, cancelable: true }));
+  }
+  function shotsBy(W, id) { return W.log.filter(function (p) { return p.path === "shots" && p.v.o === id; }); }
+
+  run(INPUTG, "방향키·WASD 이동: 빨강은 키 방향 그대로, 파랑은 화면이 뒤집혀 반대로, 대각선도 같은 속도인가", function (done) {
+    var bad = [], speed = api.CHARS.ranger.speed, want = speed * 0.2, y = OPEN_Y.forest;
+    [["right", "red", 1, 0], ["left", "red", -1, 0], ["down", "red", 0, 1], ["up", "red", 0, -1], ["right", "blue", -1, 0], ["up", "blue", 0, 1]].forEach(function (c) {
+      withMe([meEntry("ranger", c[1], 600, y)], function (W, me) {
+        api.KEY_ON[c[0]] = true;
+        var m = moveOf(W, me, 200);
+        if (Math.abs(m.dx - c[2] * want) > 3 || Math.abs(m.dy - c[3] * want) > 3 || !me.mv) bad.push(c[1] + " " + c[0] + " → 이동 (" + Math.round(m.dx) + ", " + Math.round(m.dy) + "), 기대 (" + c[2] * want + ", " + c[3] * want + "), mv " + me.mv);
+      });
+    });
+    withMe([meEntry("ranger", "red", 600, y)], function (W, me) {
+      api.KEY_ON.right = true; api.KEY_ON.down = true;
+      var m = moveOf(W, me, 200);
+      if (Math.abs(m.dist - want) > 3) bad.push("대각선 이동 거리 " + Math.round(m.dist) + " (기대 " + want + ")");
+    });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "6방향과 대각선이 0.2초에 " + want + " 만큼(속도 " + speed + ")");
+  });
+
+  run(INPUTG, "키를 떼면 멈추고, 반대 키를 함께 누르면 제자리인가", function (done) {
+    withMe([meEntry("ranger", "red", 600, OPEN_Y.forest)], function (W, me) {
+      var bad = [];
+      api.KEY_ON.left = true; api.KEY_ON.right = true;
+      var both = moveOf(W, me, 300);
+      if (both.dist > 0.5 || me.mv) bad.push("반대 키 동시 입력에 움직임 " + Math.round(both.dist));
+      api.KEY_ON.left = false;
+      moveOf(W, me, 100);
+      api.KEY_ON.right = false;
+      var after = moveOf(W, me, 200);
+      if (after.dist > 0.5 || me.mv) bad.push("키를 뗐는데 계속 움직임 " + Math.round(after.dist));
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "반대 키 동시 입력은 제자리, 키를 떼면 바로 멈춤");
+    });
+  });
+
+  run(INPUTG, "조이스틱 이동: 가운데 8px 이하는 무시, 거리에 비례해 빨라지고 반지름 이상이면 최고 속도, 파랑은 뒤집히는가", function (done) {
+    var bad = [], speed = api.CHARS.ranger.speed, y = OPEN_Y.forest, R = api.joyRadius();
+    [["빨강 가운데", "red", 5, 0, 0], ["빨강 반", "red", R / 2, 0, 0.5], ["빨강 최대", "red", R * 2, 0, 1], ["파랑 최대", "blue", R * 2, 0, -1], ["빨강 아래", "red", 0, R, 1]].forEach(function (c) {
+      withMe([meEntry("ranger", c[1], 600, y)], function (W, me) {
+        var joy = api.joy;
+        joy.id = 1; joy.ox = 100; joy.oy = 100; joy.x = 100 + c[2]; joy.y = 100 + c[3];
+        var m = moveOf(W, me, 500), along = c[3] ? m.dy : m.dx, want = c[4] * speed * 0.5;
+        if (Math.abs(along - want) > 3 || (c[4] === 0 && me.mv)) bad.push(c[0] + ": " + Math.round(along) + " (기대 " + want + ")");
+      });
+    });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "반지름 " + R + " 기준 비례 속도, 가운데 무시, 파랑 반전");
+  });
+
+  run(INPUTG, "벽을 향해 계속 걸어도 벽을 뚫지 않고, 기절 중에는 키를 눌러도 못 움직이는가", function (done) {
+    world("forest", []);
+    var q = singleRowWall(), bad = [], y = OPEN_Y.forest;
+    withMe([meEntry("ranger", "red", q.x - 25, q.y + q.h / 2 + 130)], function (W, me) {
+      api.KEY_ON.up = true;
+      var worst = null;
+      W.step(1500, FRAME, function () { var why = blockedAt(me.x, me.y); if (why && !worst) worst = why; });
+      if (worst || me.y < q.y) bad.push("벽을 뚫거나 끼임: " + (worst || "y=" + Math.round(me.y)));
+    });
+    withMe([meEntry("ranger", "red", 600, y), { id: "foe", team: "blue", char: "knight", x: 900, y: y }], function (W, me) {
+      W.frame(FRAME);
+      api.afflict(me, { stunMs: 400 }, "foe");
+      api.KEY_ON.right = true;
+      var stunned = moveOf(W, me, 300);
+      if (stunned.dist > 0.5 || me.mv) bad.push("기절 중 이동 " + Math.round(stunned.dist));
+      var later = moveOf(W, me, 500);
+      if (later.dist < 20) bad.push("기절이 끝나도 못 움직임");
+    });
+    withMe([meEntry("ranger", "red", 600, y)], function (W, me) {
+      api.KEY_ON.right = true; me.alive = false; me.diedAt = W.t();
+      var dead = moveOf(W, me, 300);
+      if (dead.dist > 0.5 || me.mv) bad.push("쓰러졌는데 이동");
+    });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "벽 앞에서 멈춤, 기절·쓰러짐 중 이동 불가");
+  });
+
+  run(INPUTG, "공격 키(K): 가장 가까운 적을 자동 조준해 쿨타임마다 한 번씩만 쏘는가", function (done) {
+    withMe([meEntry("ranger", "red", 200, OPEN_Y.forest), { id: "foe", team: "blue", char: "knight", x: 500, y: OPEN_Y.forest }, { id: "far", team: "blue", char: "knight", x: 900, y: OPEN_Y.forest }], function (W, me) {
+      var bad = [], cd = api.CHARS.ranger.cd;
+      api.KEY_ON.atk = true;
+      W.frame(FRAME);
+      var first = shotsBy(W, api.myId);
+      if (first.length !== 1 || Math.abs(first[0].v.a) > 0.02) bad.push("첫 프레임 발사 " + first.length + "번, 각도 " + (first[0] && first[0].v.a));
+      W.step(cd - 150);
+      if (shotsBy(W, api.myId).length !== 1) bad.push("쿨타임 중에 또 쏨 (" + shotsBy(W, api.myId).length + "번)");
+      W.step(300);
+      if (shotsBy(W, api.myId).length !== 2) bad.push("쿨타임이 지났는데 안 쏨 (" + shotsBy(W, api.myId).length + "번)");
+      api.KEY_ON.atk = false;
+      W.step(cd * 2);
+      if (shotsBy(W, api.myId).length !== 2) bad.push("키를 뗐는데 계속 쏨");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "쿨타임 " + cd + "ms 마다 1번, 가까운 적 방향(0 라디안), 키 떼면 중단");
+    });
+  });
+
+  run(INPUTG, "키 이름 변환: WASD·방향키·K 는 동작으로, 한글 자판이어도 물리 키(code)로 알아보는가", function (done) {
+    var bad = [], table = [[{ code: "KeyW" }, "up"], [{ code: "KeyS" }, "down"], [{ code: "KeyA" }, "left"], [{ code: "KeyD" }, "right"], [{ code: "KeyK" }, "atk"],
+      [{ key: "ArrowUp" }, "up"], [{ key: "ArrowDown" }, "down"], [{ code: "ArrowLeft", key: "ArrowLeft" }, "left"], [{ key: "ArrowRight" }, "right"],
+      [{ code: "KeyA", key: "ㅁ" }, "left"], [{ code: "KeyQ", key: "q" }, null], [{ code: "Space", key: " " }, null]];
+    table.forEach(function (c) { var got = api.keyName(c[0]); if (got !== c[1]) bad.push(JSON.stringify(c[0]) + " → " + got + " (기대 " + c[1] + ")"); });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : table.length + "가지 입력이 모두 맞게 변환됨");
+  });
+
+  run(INPUTG, "키보드 이벤트: 경기 화면이 아니면 눌러도 무시하고, 키를 떼거나 창이 포커스를 잃으면 모든 키가 풀리는가", function (done) {
+    var bad = [];
+    releaseInput();
+    try {
+      window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyD", key: "d", bubbles: true, cancelable: true }));
+      if (api.KEY_ON.right) bad.push("경기 화면이 아닌데 키가 눌림");
+      api.KEY_ON.right = true; api.KEY_ON.atk = true;
+      window.dispatchEvent(new KeyboardEvent("keyup", { code: "KeyD", key: "d", bubbles: true }));
+      if (api.KEY_ON.right || !api.KEY_ON.atk) bad.push("keyup 이 해당 키만 풀어야 함");
+      api.KEY_ON.up = true; api.KEY_ON.left = true;
+      window.dispatchEvent(new Event("blur"));
+      if (Object.keys(api.KEY_ON).some(function (k) { return api.KEY_ON[k]; })) bad.push("포커스를 잃어도 키가 남음");
+    } finally { releaseInput(); }
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "화면 확인·keyup·blur 처리 맞음");
+  });
+
+  run(INPUTG, "화면 조이스틱(포인터): 조이스틱 근처에서만 시작하고, 다른 손가락·멀리 누르기·기절 중에는 무시하며 떼면 끝나는가", function (done) {
+    var cv = document.getElementById("cv"), y = OPEN_Y.forest;
+    withMe([meEntry("ranger", "red", 600, y), { id: "foe", team: "blue", char: "knight", x: 900, y: y }], function (W, me) {
+      var bad = [], jb = api.joyBase(), R = api.joyRadius();
+      pointer(cv, "pointerdown", 7, jb.x + R * 3, jb.y);
+      if (api.joy.id !== null) bad.push("조이스틱에서 먼 곳을 눌렀는데 시작됨");
+      pointer(cv, "pointerdown", 7, jb.x, jb.y);
+      if (api.joy.id !== 7) bad.push("조이스틱 위치를 눌렀는데 시작 안 됨");
+      pointer(cv, "pointerdown", 8, jb.x, jb.y);
+      if (api.joy.id !== 7) bad.push("두 번째 손가락이 조이스틱을 가로챔");
+      pointer(cv, "pointermove", 8, jb.x + 500, jb.y);
+      if (api.joy.x !== jb.x) bad.push("다른 손가락의 움직임이 반영됨");
+      pointer(cv, "pointermove", 7, jb.x + R, jb.y);
+      var m = moveOf(W, me, 500);
+      if (Math.abs(m.dx - api.CHARS.ranger.speed * 0.5) > 3) bad.push("조이스틱 이동 " + Math.round(m.dx));
+      pointer(cv, "pointerup", 7, jb.x, jb.y);
+      if (api.joy.id !== null) bad.push("손을 뗐는데 조이스틱이 남음");
+      api.afflict(me, { stunMs: 800 }, "foe");
+      pointer(cv, "pointerdown", 9, jb.x, jb.y);
+      if (api.joy.id !== null) bad.push("기절 중인데 조이스틱 시작됨");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "시작·다른 손가락·떼기·기절 규칙 모두 맞음");
+    });
+  });
+
+  run(INPUTG, "공격 버튼: 짧게 누르면 가장 가까운 적을 자동 조준하고, 끌어서 뗀 방향으로 쏘며 파랑은 방향이 뒤집히는가", function (done) {
+    var btn = document.getElementById("btnAtk"), y = OPEN_Y.forest, bad = [];
+    withMe([meEntry("ranger", "red", 600, y), { id: "foe", team: "blue", char: "knight", x: 600, y: y - 300 }], function (W, me) {
+      pointer(btn, "pointerdown", 3, 100, 100);
+      if (api.aim.id !== 3 || api.aim.btn !== "atk") bad.push("공격 버튼이 눌리지 않음");
+      pointer(btn, "pointerup", 3, 100, 100);
+      var tap = shotsBy(W, api.myId);
+      if (tap.length !== 1 || Math.abs(tap[0].v.a - (-Math.PI / 2)) > 0.02 || api.aim.id !== null) bad.push("짧게 누르면 위쪽 적을 향해 쏴야 함: " + JSON.stringify(tap.map(function (p) { return p.v.a; })));
+      me.cdUntil = 0;
+      pointer(btn, "pointerdown", 4, 100, 100);
+      pointer(btn, "pointermove", 4, 100 + api.DRAG_MIN + 40, 100);
+      if (!api.aim.drag || Math.abs(me.angle) > 0.02) bad.push("끌었는데 조준 각도가 안 바뀜: " + me.angle);
+      pointer(btn, "pointerup", 4, 100 + api.DRAG_MIN + 40, 100);
+      var drag = shotsBy(W, api.myId);
+      if (drag.length !== 2 || Math.abs(drag[1].v.a) > 0.02) bad.push("끌어서 떼면 오른쪽(0)으로 쏴야 함: " + JSON.stringify(drag.map(function (p) { return p.v.a; })));
+    });
+    withMe([meEntry("ranger", "blue", 600, y), { id: "foe", team: "red", char: "knight", x: 600, y: y + 300 }], function (W, me) {
+      pointer(btn, "pointerdown", 5, 100, 100);
+      pointer(btn, "pointermove", 5, 100 + api.DRAG_MIN + 40, 100);
+      pointer(btn, "pointerup", 5, 100 + api.DRAG_MIN + 40, 100);
+      var shots = shotsBy(W, api.myId);
+      if (shots.length !== 1 || Math.abs(Math.abs(shots[0].v.a) - Math.PI) > 0.03) bad.push("파랑은 화면 오른쪽 끌기가 월드 왼쪽(π)이어야 함: " + JSON.stringify(shots.map(function (p) { return p.v.a; })));
+    });
+    withMe([meEntry("ranger", "red", 600, y), { id: "foe", team: "blue", char: "knight", x: 600, y: y - 300 }], function (W, me) {
+      pointer(btn, "pointerdown", 6, 100, 100);
+      pointer(btn, "pointermove", 6, 100 + api.DRAG_MIN + 40, 100);
+      pointer(btn, "pointercancel", 6, 100, 100);
+      if (shotsBy(W, api.myId).length) bad.push("취소(pointercancel)인데 쏨");
+      if (api.aim.id !== null) bad.push("취소 뒤에도 조준이 남음");
+    });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "자동 조준·끌어서 조준·파랑 반전·취소 모두 맞음");
+  });
+
+  run(INPUTG, "스킬 버튼: 조준이 필요 없는 스킬은 누르는 즉시, 조준 스킬은 손을 뗄 때 쓰고 게이지가 비는가 (게이지 부족·기절이면 안 씀)", function (done) {
+    var btn = document.getElementById("btnUlt"), y = OPEN_Y.forest, bad = [], C = api.CHARS;
+    var instant = api.CHAR_LIST.filter(function (c) { return !C[c].ultAim && !C[c].noAim; })[0], aimed = api.CHAR_LIST.filter(function (c) { return C[c].ultAim; })[0];
+    function foe() { return { id: "foe", team: "blue", char: "knight", x: 900, y: y }; }
+    withMe([meEntry(instant, "red", 600, y, { gauge: api.GAUGE_MAX }), foe()], function (W, me) {
+      pointer(btn, "pointerdown", 2, 100, 100);
+      if (me.gauge !== 0 || api.aim.id !== null) bad.push(instant + ": 누르는 즉시 써야 함 (게이지 " + me.gauge + ")");
+    });
+    withMe([meEntry(aimed, "red", 600, y, { gauge: api.GAUGE_MAX }), foe()], function (W, me) {
+      pointer(btn, "pointerdown", 2, 100, 100);
+      if (me.gauge !== api.GAUGE_MAX || api.aim.id !== 2) bad.push(aimed + ": 누르는 동안은 조준만 해야 함");
+      pointer(btn, "pointerup", 2, 100, 100);
+      if (me.gauge !== 0) bad.push(aimed + ": 손을 뗐는데 안 씀 (게이지 " + me.gauge + ")");
+    });
+    withMe([meEntry(instant, "red", 600, y, { gauge: api.GAUGE_MAX - 1 }), foe()], function (W, me) {
+      pointer(btn, "pointerdown", 2, 100, 100);
+      if (me.gauge !== api.GAUGE_MAX - 1) bad.push("게이지가 모자란데 씀");
+    });
+    withMe([meEntry(instant, "red", 600, y, { gauge: api.GAUGE_MAX }), foe()], function (W, me) {
+      W.frame(FRAME); api.afflict(me, { stunMs: 800 }, "foe");
+      pointer(btn, "pointerdown", 2, 100, 100);
+      if (me.gauge !== api.GAUGE_MAX) bad.push("기절 중인데 스킬을 씀");
+    });
+    var quiet = api.CHAR_LIST.filter(function (c) { return C[c].noAim; })[0];
+    if (quiet) withMe([meEntry(quiet, "red", 600, y), foe()], function (W, me) {
+      pointer(document.getElementById("btnAtk"), "pointerdown", 2, 100, 100);
+      if (me.cdUntil <= W.t() || api.aim.id !== null) bad.push(quiet + ": 조준이 필요 없는 공격은 누르는 즉시 나가야 함");
+    });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "즉시형(" + instant + ")·조준형(" + aimed + ")·게이지 부족·기절 규칙 맞음");
+  });
+
+  run(VISG, "시야: 은신은 100 안에서만 보이고, 은신이 끝나거나 드러난 동안(revealUntil)에는 멀어도 보이는가", function (done) {
+    var y = OPEN_Y.forest, W = world("forest", [{ id: "h", team: "blue", char: "rogue", x: 300, y: y }, { id: "v", team: "red", char: "knight", x: 300, y: y }]);
+    var h = W.ent("h"), v = W.ent("v"), t = W.t(), bad = [], near = api.STEALTH_REVEAL_DIST;
+    h.stealthUntil = t + api.ULT.asDur;
+    v.x = 300 + near - 1; if (!api.visibleTo(h, v, t)) bad.push("가까이(" + (near - 1) + ") 있는데 안 보임");
+    v.x = 300 + near + 1; if (api.visibleTo(h, v, t) || !api.hiddenFrom(h, t)) bad.push("멀리(" + (near + 1) + ") 있는데 보임");
+    h.revealUntil = t + 500; if (!api.visibleTo(h, v, t)) bad.push("드러난 동안인데 안 보임");
+    if (api.visibleTo(h, v, t + 501)) bad.push("드러남이 끝났는데 보임");
+    h.revealUntil = 0;
+    if (api.revealedTo(h, null, t)) bad.push("보는 사람이 없으면 드러나지 않아야 함");
+    if (api.hiddenFrom(h, t + api.ULT.asDur + 1)) bad.push("은신이 끝났는데 숨겨짐");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "은신 거리 " + near + " 경계, 드러남 시간, 은신 종료 모두 맞음");
+  });
+  run(VISG, "덤불: 덤불 안의 캐릭터는 같은 덤불 안의 상대에게만 보이고 다른 덤불·바깥에서는 안 보이는가", function (done) {
+    var y = OPEN_Y.forest, bushes;
+    world("forest", []);
+    bushes = api.bushTiles();
+    if (bushes.length < 2) { done("fail", "시험 준비 실패: 덤불이 2개 미만"); return; }
+    var a = bushes[0][0], b = bushes[1][0], bad = [];
+    var W = world("forest", [{ id: "h", team: "blue", char: "knight", x: a.x, y: a.y }, { id: "same", team: "red", char: "knight", x: bushes[0][bushes[0].length - 1].x, y: bushes[0][bushes[0].length - 1].y }, { id: "other", team: "red", char: "knight", x: b.x, y: b.y }, { id: "out", team: "red", char: "knight", x: 200, y: y }]);
+    var h = W.ent("h"), t = W.t();
+    if (!api.inBush(h.x, h.y) || !api.hiddenFrom(h, t)) bad.push("덤불 안인데 숨겨지지 않음");
+    if (!api.visibleTo(h, W.ent("same"), t)) bad.push("같은 덤불 안 상대에게 안 보임");
+    if (api.visibleTo(h, W.ent("other"), t)) bad.push("다른 덤불 안 상대에게 보임");
+    W.ent("out").x = 200; W.ent("out").y = y;
+    if (api.inBush(200, y)) { done("fail", "시험 준비 실패: 바깥 위치가 덤불임"); return; }
+    if (api.visibleTo(h, W.ent("out"), t)) bad.push("덤불 바깥 상대에게 보임");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "덤불 " + bushes.length + "곳 중 같은 덤불만 서로 보임");
+  });
+
+  run(VISG, "표적 목록(localTargets): 살아 있는 내 캐릭터·호스트의 AI 와 준비된 해골만 들어가고, 호스트가 아니면 AI 는 빠지는가", function (done) {
+    var y = OPEN_Y.forest;
+    withMe([meEntry("ranger", "red", 300, y), { id: "ally", team: "red", char: "knight", x: 400, y: y }, { id: "nc", team: "blue", char: "necro", x: 600, y: y, gauge: api.GAUGE_MAX }, { id: "dead", team: "blue", char: "knight", x: 700, y: y }], function (W, me) {
+      var bad = [], ids = function () { return api.localTargets().map(function (T) { return T.id; }).sort().join(","); };
+      W.ent("dead").alive = false;
+      if (ids() !== ["ally", "nc", api.myId].sort().join(",")) bad.push("기본 목록 " + ids());
+      api.useUlt(W.ent("nc"), Math.PI);
+      W.step(api.ULT.smRiseMs - 150);
+      var minions = api.localTargets().filter(function (T) { return T.minion; }).length;
+      if (minions) bad.push("올라오는 중인 해골이 표적에 들어감 " + minions);
+      W.step(300);
+      var ready = api.localTargets().filter(function (T) { return T.minion; }).length;
+      if (ready !== api.ULT.smCount) bad.push("준비된 해골 " + ready + "개 (기대 " + api.ULT.smCount + ")");
+      me.alive = false;
+      if (api.localTargets().some(function (T) { return T.id === api.myId; })) bad.push("쓰러진 내 캐릭터가 들어감");
+      me.alive = true;
+      W.room.host = "다른호스트";
+      var guest = ids();
+      if (guest !== api.myId) bad.push("호스트가 아니면 내 캐릭터만 남아야 함: " + guest);
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "내 캐릭터·AI(호스트)·준비된 해골 " + ready + "개, 쓰러짐 제외, 비호스트는 나만");
+    });
+  });
+  run(VISG, "소리 범위(hear)는 700 미만만 들리고, 지난 투사체·근접 기록(pruneLocal)은 시간이 지나면 지워지는가", function (done) {
+    var y = OPEN_Y.forest;
+    withMe([meEntry("ranger", "red", 300, y)], function (W, me) {
+      var bad = [], t = W.t();
+      if (!api.hear({ x: me.x + 699, y: me.y }) || api.hear({ x: me.x + 700, y: me.y }) || !api.hear({ x: me.x, y: me.y + 100 })) bad.push("소리 범위 경계");
+      api.MATCH.me = null;
+      if (api.hear({ x: me.x, y: me.y })) bad.push("내 캐릭터가 없는데 들림");
+      api.MATCH.me = me;
+      api.MATCH.remoteShots = { old: { d: { createdAt: t - 5000 }, life: 100 }, fresh: { d: { createdAt: t }, life: 100 }, edge: { d: { createdAt: t - 1100 }, life: 100 } };
+      api.MATCH.melee = { stale: { d: {}, at: Date.now() - 2000 }, now: { d: {}, at: Date.now() } };
+      api.pruneLocal(t);
+      var shots = Object.keys(api.MATCH.remoteShots).sort().join(","), melee = Object.keys(api.MATCH.melee).join(",");
+      if (shots !== "edge,fresh") bad.push("투사체 남은 것 " + shots + " (기대 edge,fresh)");
+      if (melee !== "now") bad.push("근접 기록 남은 것 " + melee + " (기대 now)");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "700 경계, 오래된 투사체(수명+1초 초과)·근접(1초 초과)만 삭제");
+    });
+  });
+  run(VISG, "광선·시선: 벽 앞에서 멈추고 맵 가장자리에서 끊기며, 벽을 사이에 둔 두 점은 시선이 막히고 선분-원 충돌이 맞는가", function (done) {
+    var bad = [], y = OPEN_Y.forest, q;
+    world("forest", []);
+    q = singleRowWall();
+    var wallBottom = q.y + q.h / 2, startY = wallBottom + api.BODY_R + 52, gap = startY - wallBottom;
+    var hit = api.rayCast(q.x, startY, 0, -1, 1000, 0);
+    if (Math.abs(hit - gap) > 0.5) bad.push("벽까지 거리 " + hit + " (기대 " + gap + ")");
+    if (api.rayCast(q.x, startY, 0, -1, 50, 0) !== 50) bad.push("최대 거리 제한이 안 먹음");
+    if (Math.abs(api.rayCast(q.x, startY, 0, -1, 1000, 10) - (gap - 10)) > 0.5) bad.push("여유(pad) 10 이면 " + (gap - 10) + " 이어야 함");
+    var edge = api.rayCast(api.BOUND.r - 100, y, 1, 0, 1e6, 10);
+    if (Math.abs(edge - 90) > 0.01) bad.push("맵 가장자리까지 " + edge + " (기대 90)");
+    if (api.losClear(q.x, startY, q.x, q.y - q.h / 2 - 100)) bad.push("벽 너머가 보임");
+    if (!api.losClear(q.x, startY, q.x, startY + 40)) bad.push("벽 반대쪽(열린 곳)이 안 보임");
+    if (!api.losClear(300, y, 300.5, y)) bad.push("거의 같은 점은 항상 보여야 함");
+    if (api.rayRect(0, 0, 1, 0, { x: 100, y: 0, w: 20, h: 20 }, 0) !== 90) bad.push("사각형 광선 거리");
+    if (api.rayRect(0, 100, 1, 0, { x: 100, y: 0, w: 20, h: 20 }, 0) !== Infinity) bad.push("빗나간 광선은 Infinity");
+    if (api.rayRect(100, 0, 1, 0, { x: 100, y: 0, w: 20, h: 20 }, 0) !== 0) bad.push("안에서 쏘면 0");
+    if (!api.segHit(0, 0, 10, 0, 5, 3, 3) || api.segHit(0, 0, 10, 0, 5, 3, 2.9) || !api.segHit(0, 0, 10, 0, 13, 0, 3) || api.segHit(0, 0, 10, 0, 13.1, 0, 3)) bad.push("선분-원 충돌 경계");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "벽·가장자리·시선·사각형·선분-원 12가지 확인");
+  });
+
+  function killRow(W, k, killer, victim, t) { return { key: k, val: function () { return { k: killer, v: victim, t: t }; } }; }
+  function clearKillFeed() {
+    var feed = document.getElementById("killFeed"), banner = document.getElementById("killBanner");
+    feed.innerHTML = ""; banner.className = ""; banner.innerHTML = "";
+  }
+  run(KILLG, "킬 피드: 처치마다 한 줄이 생기고 같은 기록은 한 번만, 너무 오래된 기록은 안 보이며 최대 줄 수를 넘기지 않는가", function (done) {
+    var y = OPEN_Y.forest, list = [];
+    ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot"].forEach(function (id, i) { list.push({ id: id, team: i % 2 ? "red" : "blue", char: "knight", x: 300 + i * 50, y: y }); });
+    var W = world("forest", list), t = W.t(), bad = [], feed = document.getElementById("killFeed");
+    clearKillFeed();
+    try {
+      api.onKillFeed(killRow(W, "k1", "alpha", "bravo", t));
+      if (feed.children.length !== 1 || feed.textContent.indexOf("alpha") < 0 || feed.textContent.indexOf("bravo") < 0) bad.push("한 줄이 안 생김: " + feed.textContent);
+      api.onKillFeed(killRow(W, "k1", "alpha", "bravo", t));
+      if (feed.children.length !== 1) bad.push("같은 기록이 두 번 들어감");
+      api.onKillFeed(killRow(W, "k2", "charlie", "delta", t - api.KILL_FEED_MS - 1));
+      if (feed.children.length !== 1) bad.push("너무 오래된 기록이 보임");
+      for (var i = 0; i < 4 + 2; i++) api.onKillFeed(killRow(W, "x" + i, ["charlie", "echo"][i % 2], ["bravo", "delta"][i % 2], t));
+      if (feed.children.length !== 4) bad.push("최대 줄 수 " + feed.children.length + " (기대 " + 4 + ")");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "한 줄·중복 무시·오래된 기록 무시·최대 " + 4 + "줄");
+    } finally { clearKillFeed(); }
+  });
+  run(KILLG, "연속 처치 표시: 3초 안의 두 번째 처치에 '더블 킬', 단계가 오르면 이름이 바뀌고 5번째부터는 '펜타 킬'인가", function (done) {
+    var y = OPEN_Y.forest, W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 400, y: y }]), t = W.t(), bad = [], feed = document.getElementById("killFeed");
+    clearKillFeed();
+    try {
+      for (var i = 0; i < 6; i++) api.onKillFeed(killRow(W, "m" + i, "a", "b", t + i * 500));
+      var tags = ["", "더블 킬", "트리플 킬", "쿼드라 킬", "펜타 킬", "펜타 킬"];
+      var all = [];
+      for (var s = 1; s <= 6; s++) all.push(api.multiKillTag(s));
+      tags.forEach(function (tag, i) { if (tag === "" ? all[i] !== "" : all[i].indexOf(tag) < 0) bad.push((i + 1) + "연속 표시 '" + all[i] + "' (기대 '" + tag + "')"); });
+      var last = feed.children[feed.children.length - 1].textContent;
+      if (last.indexOf("펜타 킬") < 0) bad.push("여섯 번 연속 처치의 마지막 줄에 펜타 킬이 없음: " + last);
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "1연속 표시 없음 → 더블 → 트리플 → 쿼드라 → 펜타(5·6연속)");
+    } finally { clearKillFeed(); }
+  });
+  run(KILLG, "내 처치 배너: 내가 잡으면 '처치!' 배너가 뜨고 줄이 내 것으로 표시되며, 남이 잡은 건 배너가 안 뜨는가", function (done) {
+    var y = OPEN_Y.forest;
+    withMe([meEntry("ranger", "red", 300, y), { id: "foe", team: "blue", char: "knight", x: 500, y: y }], function (W, me) {
+      var bad = [], banner = document.getElementById("killBanner"), feed = document.getElementById("killFeed"), t = W.t();
+      clearKillFeed();
+      try {
+        api.onKillFeed(killRow(W, "o1", "foe", api.myId, t));
+        if (banner.className.indexOf("show") >= 0) bad.push("남이 나를 잡았는데 처치 배너가 뜸");
+        if (feed.children[0].className.indexOf("mine") < 0) bad.push("내가 관련된 줄이 강조되지 않음");
+        api.onKillFeed(killRow(W, "o2", api.myId, "foe", t + 1));
+        if (banner.className.indexOf("show") < 0 || banner.textContent.indexOf("처치") < 0) bad.push("내가 잡았는데 배너가 안 뜸: '" + banner.className + "' " + banner.textContent);
+        done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "내가 잡으면 배너(show), 잡힌 줄은 mine 표시");
+      } finally { clearKillFeed(); }
     });
   });
 
