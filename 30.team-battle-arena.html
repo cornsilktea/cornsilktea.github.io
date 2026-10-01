@@ -1656,6 +1656,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       $("btnStart").disabled = !ok;
       setText($("startHint"), hint);
     }
+    choiceClick(apply) {
+      return function (e) {
+        var b = e.target.closest ? e.target.closest(".modeBtn") : null;
+        if (b && !b.disabled) apply(b.getAttribute("data-id"));
+      };
+    }
   }
   var LOBBY = new LobbyView();
 
@@ -2168,14 +2174,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   $("btnSpec").onclick = function () { ROSTER.pickTeam("spec"); };
   var SWAPPED_TEAM = { blue: "red", red: "blue" };
   $("btnSwapTeams").onclick = function () { ROSTER.swapTeams(); };
-  function choiceClick(apply) {
-    return function (e) {
-      var b = e.target.closest ? e.target.closest(".modeBtn") : null;
-      if (b && !b.disabled) apply(b.getAttribute("data-id"));
-    };
-  }
-  $("modeBtns").onclick = choiceClick(ROSTER.setMode.bind(ROSTER));
-  $("mapBtns").onclick = choiceClick(ROSTER.setMapChoice.bind(ROSTER));
+  $("modeBtns").onclick = LOBBY.choiceClick(ROSTER.setMode.bind(ROSTER));
+  $("mapBtns").onclick = LOBBY.choiceClick(ROSTER.setMapChoice.bind(ROSTER));
   $("btnLeaveLobby").onclick = SESSION.leaveRoom.bind(SESSION);
   $("btnLeaveGame").onclick = function () { if (confirm("방을 나갈까요?")) SESSION.leaveRoom(); };
   $("btnLeaveEnd").onclick = SESSION.leaveRoom.bind(SESSION);
@@ -3433,6 +3433,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.hasteStacks = Math.min(Math.floor(h.max / h.add), (this.hasteUntil > t ? this.hasteStacks || 0 : 0) + 1);
       this.hasteUntil = t + h.ms;
     }
+    skillLeft(t) { return this.skillDur ? clamp((this.skillUntil - t) / this.skillDur, 0, 1) : 0; }
     speed() {
       var t = now(), c = CHARS[this.char], sp = c.speed;
       if (this.isStunned(t) || this.isHammerWinding(t) || this.dash || STATUS.shoved(this) || this.type.isRooted(this, t)) return 0;
@@ -3774,7 +3775,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   var VISION = new VisionRules();
-  function skillLeft(E, t) { return E.skillDur ? clamp((E.skillUntil - t) / E.skillDur, 0, 1) : 0; }
   class ArenaPhysics {
     pushOutOfRect(E, o) {
       var cx = clamp(E.x, o.x - o.w / 2, o.x + o.w / 2), cy = clamp(E.y, o.y - o.h / 2, o.y + o.h / 2);
@@ -7169,7 +7169,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var gy = top + bh + 3, full = E.gauge >= GAUGE_MAX, t = now(), act = E.hasSkillActive(t);
         octx.fillStyle = "rgba(10,14,12,.8)"; octx.fillRect(x0 - 1, gy - 1, bw + 2, 6);
         octx.fillStyle = act ? "#F06BB5" : (full ? "#FF5A4E" : "#F2C230");
-        octx.fillRect(x0, gy, bw * (act ? skillLeft(E, t) : clamp(E.gauge / GAUGE_MAX, 0, 1)), 4);
+        octx.fillRect(x0, gy, bw * (act ? E.skillLeft(t) : clamp(E.gauge / GAUGE_MAX, 0, 1)), 4);
       }
       octx.restore();
     }
@@ -7237,7 +7237,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           '<div class="spInfo"><div class="spName">' + (E.isAI ? "🤖 " : "") + esc(E.nickname) + '<span class="spK">' + (E.kills || 0) + "킬</span><small>" + CHARS[E.char].name + "</small></div>" +
           '<div class="spBar hp' + (ratio < 0.3 ? " low" : "") + '"><i style="width:' + Math.round(ratio * 100) + '%"></i><span>' +
             (E.alive ? "HP " + hp + " / " + E.maxHp : "부활까지 " + Math.max(1, Math.ceil((E.diedAt + RESPAWN_MS - now()) / CLOCK.scale / 1000)) + "초") + "</span></div>" +
-          (act ? '<div class="spBar ult act"><i style="width:' + Math.round(skillLeft(E, tn) * 100) + '%"></i><span>' +
+          (act ? '<div class="spBar ult act"><i style="width:' + Math.round(E.skillLeft(tn) * 100) + '%"></i><span>' +
                    CHARS[E.char].ultName + " " + Math.ceil((E.skillUntil - tn) / CLOCK.scale / 1000) + "초</span></div>"
                : '<div class="spBar ult' + (full ? " full" : "") + '"><i style="width:' + g * 10 + '%"></i><span>' +
                    (full ? "스킬 준비 완료!" : "스킬 " + g + " / " + GAUGE_MAX) + "</span></div>") + "</div></div>";
@@ -7359,7 +7359,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         $("btnAtk").firstChild.style.height = Math.round(cdLeft * 100) + "%";
         var full = MATCH.me.gauge >= GAUGE_MAX, act = MATCH.me.hasSkillActive(t);
         $("btnUlt").className = "actBtn" + (act ? " act" : (full && !MATCH.me.burst ? " ready" : ""));
-        $("btnUlt").firstChild.style.height = Math.round((act ? skillLeft(MATCH.me, t) : clamp(MATCH.me.gauge / GAUGE_MAX, 0, 1)) * 100) + "%";
+        $("btnUlt").firstChild.style.height = Math.round((act ? MATCH.me.skillLeft(t) : clamp(MATCH.me.gauge / GAUGE_MAX, 0, 1)) * 100) + "%";
         setHtml($("btnUlt").lastChild, act ? CHARS[MATCH.me.char].ultName + "<br>" + Math.ceil((MATCH.me.skillUntil - t) / CLOCK.scale / 1000) + "초"
                                            : (full ? "스킬!" : "스킬<br>" + Math.floor(MATCH.me.gauge) + "/10"));
       }
@@ -7715,25 +7715,29 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   $("scoreHelpModal").onclick = function (e) { if (e.target === $("scoreHelpModal")) show($("scoreHelpModal"), false); };
   var FINAL_COUNT_MS = 10000, lastCountSec = 0;
 
-  var lastFrame = Date.now();
-  function loop() {
-    requestAnimationFrame(loop);
-    var nowMs = Date.now(), frameMs = nowMs - lastFrame, dt = Math.min(0.05, frameMs / 1000); lastFrame = nowMs;
-    PROPS.spinMillBlades(dt);
-    if (!SESSION.room || SCREENS.now !== "game") { if (!vidOpen) { TOUR_VIEW.renderTour(nowMs, dt); HUD.adaptQuality(frameMs); } return; }
-    var st = SESSION.room.status;
-    if ((st === "countdown" || st === "playing" || st === "ended") && SESSION.room.startAt && (!MATCH.game || MATCH.game.startAt !== SESSION.room.startAt)) {
-      if (SESSION.players[SESSION.myId] && (SESSION.players[SESSION.myId].slot || FLOW.isSpec())) FLOW.initGame(); else return;
+  class GameLoop {
+    constructor() { this.lastFrame = Date.now(); }
+    start() { requestAnimationFrame(function () { LOOP.frame(); }); }
+    frame() {
+      requestAnimationFrame(function () { LOOP.frame(); });
+      var nowMs = Date.now(), frameMs = nowMs - LOOP.lastFrame, dt = Math.min(0.05, frameMs / 1000); LOOP.lastFrame = nowMs;
+      PROPS.spinMillBlades(dt);
+      if (!SESSION.room || SCREENS.now !== "game") { if (!vidOpen) { TOUR_VIEW.renderTour(nowMs, dt); HUD.adaptQuality(frameMs); } return; }
+      var st = SESSION.room.status;
+      if ((st === "countdown" || st === "playing" || st === "ended") && SESSION.room.startAt && (!MATCH.game || MATCH.game.startAt !== SESSION.room.startAt)) {
+        if (SESSION.players[SESSION.myId] && (SESSION.players[SESSION.myId].slot || FLOW.isSpec())) FLOW.initGame(); else return;
+      }
+      if (!MATCH.game) return;
+      var t = now();
+      WORLD.stepWorld(t, dt * CLOCK.scale, true, dt);
+      if (st === "countdown" || st === "playing") NETSTATE.netWrite(false);
+      if (SESSION.isHost()) { FLOW.hostJudge(); FLOW.hostCleanup(); }
+      FRAME_RENDERER.render(t, dt);
+      HUD.updateHud(t);
+      HUD.adaptQuality(frameMs);
     }
-    if (!MATCH.game) return;
-    var t = now();
-    WORLD.stepWorld(t, dt * CLOCK.scale, true, dt);
-    if (st === "countdown" || st === "playing") NETSTATE.netWrite(false);
-    if (SESSION.isHost()) { FLOW.hostJudge(); FLOW.hostCleanup(); }
-    FRAME_RENDERER.render(t, dt);
-    HUD.updateHud(t);
-    HUD.adaptQuality(frameMs);
   }
+  var LOOP = new GameLoop();
   class WorldStepper {
     stepWorld(t, dt, driveBots, viewDt) {
       FLOW.syncRemote(viewDt == null ? dt : viewDt);
@@ -7876,7 +7880,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   if (!db) LOBBY.startMsg("온라인 연결을 준비하지 못했어요. 인터넷 연결을 확인해 주세요.");
   if (!NICK.name) NICK.openNick(true);
   if (!/[?&](test|sim)(&|$)/.test(location.search)) SESSION.tryResume();
-  requestAnimationFrame(loop);
+  LOOP.start();
   window.TEAM_BATTLE_READY = true;
 })();
 </script>
