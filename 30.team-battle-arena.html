@@ -1445,10 +1445,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     sub(stRef, "child_added", function (s) { MATCH.stateByKey[s.key] = s.val(); });
     sub(stRef, "child_changed", function (s) { MATCH.stateByKey[s.key] = s.val(); });
     sub(stRef, "child_removed", function (s) { delete MATCH.stateByKey[s.key]; });
-    sub(ref.child("shots"), "child_added", onShot);
-    sub(ref.child("meleeHits"), "child_added", function (s) { onMelee(s.key, s.val()); });
-    listenHits(myId);
-    sub(ref.child("effects"), "child_added", onEffect);
+    sub(ref.child("shots"), "child_added", PROJECTILES.onShot.bind(PROJECTILES));
+    sub(ref.child("meleeHits"), "child_added", function (s) { MELEE.onMelee(s.key, s.val()); });
+    DAMAGE.listenHits(myId);
+    sub(ref.child("effects"), "child_added", FIELD_FX.onEffect.bind(FIELD_FX));
     sub(ref.child("kills"), "child_added", onKillFeed);
 
     setText($("lobbyCode"), code);
@@ -2586,7 +2586,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     get startsSkillTimer() { return true; }
     cast(E, ang, reach, t) {
       if (this.data.ultKind !== "blackhole") return;
-      var holeSpot = burstSpot(E, ang, reach, ULT.bhCast, ULT.bhMin);
+      var holeSpot = ATTACK.burstSpot(E, ang, reach, ULT.bhCast, ULT.bhMin);
       E.angle = Math.atan2(holeSpot.y - E.y, holeSpot.x - E.x);
       E.ultUntil = t + 450;
       E.skillDur = ULT.bhDelay + ULT.bhDur;
@@ -2672,7 +2672,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return "사거리 " + c.range + "의 " + this.shotName + " 발사. 맞은 적은 " + c.dmg + "의 피해";
     }
     attackClip(v, E, t) {
-      if (!enemyInMelee(E)) return ["Throw", 2.2];
+      if (!MELEE.enemyInMelee(E)) return ["Throw", 2.2];
       if (v.wasStealth) { v.combo = 1; return ["Melee_Dualwield_Attack_Stab", 2.2]; }
       return [ROGUE_COMBO[v.combo++ % 2], 2.4];
     }
@@ -2739,7 +2739,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return "앞으로 " + c.dashRange + " 돌진한 뒤 반경 " + c.range + " 안의 가장 가까운 적 1명을 찔러 " + c.dmg + "의 피해";
     }
     attackClip(v, E, t) {
-      return ["Running_A", KIT.clips.Running_A.duration * 1000 / lungeDashMs(E, E.atkAt)];
+      return ["Running_A", KIT.clips.Running_A.duration * 1000 / MELEE.lungeDashMs(E, E.atkAt)];
     }
   }
   class KnightType extends ArcMeleeType {
@@ -2775,7 +2775,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     cast(E, ang, reach, t) {
       E.angle = ang; E.burst = { until: t + (ULT.mkCount - 1) * ULT.mkGap };
       E.ultUntil = t + ULT.mkCount * ULT.mkGap + 200;
-      emitShots(E, ang, true);
+      PROJECTILES.emitShots(E, ang, true);
     }
     ultDesc() {
       return ULT.mkDmg + "의 피해를 주는 화살 " + ULT.mkCount + "발 연사. 적중마다 게이지 " + ULT.mkRefund + " 회복";
@@ -2798,7 +2798,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       AIM_GUIDE.showAimCircle(aimReach(E, "ult"), ULT.mbR);
       return true;
     }
-    afterDealtDamage(T, owner, ultKey, t) { if (ultKey !== "burn") igniteBurn(T, owner, t); }
+    afterDealtDamage(T, owner, ultKey, t) { if (ultKey !== "burn") STATUS.igniteBurn(T, owner, t); }
     ultLeadSeconds(dist) { return ULT.mbDelay / 1000; }
     ultSpotTooFar(reach) { return reach > ULT.mbCast; }
     botUltRange() { return ULT.mbCast; }
@@ -2816,7 +2816,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     get shotName() { return "불꽃 구슬"; }
     get startsSkillTimer() { return false; }
     cast(E, ang, reach, t) {
-      var spot = burstSpot(E, ang, reach);
+      var spot = ATTACK.burstSpot(E, ang, reach);
       E.angle = Math.atan2(spot.y - E.y, spot.x - E.x);
       E.ultUntil = t + 450;
       room.ref.child("effects").push({ type: "burst", team: E.team, owner: E.id, x: Math.round(spot.x), y: Math.round(spot.y),
@@ -2883,7 +2883,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     cast(E, ang, reach, t) {
       E.angle = ang;
       E.ultUntil = t + 450;
-      summonMinions(E, ang, t);
+      MINIONS.summonMinions(E, ang, t);
     }
     ultDesc() {
       return secs(ULT.smDur) + "간 유지되는 해골 병사 " + ULT.smCount + "마리 소환(최대 " + ULT.smMax + "마리). 해골은 체력 " + ULT.smHp + ", 공격 " + ULT.smDmg + ", 이동속도 " + shownSpeed(ULT.smSpeed) + ". 해골이 적을 공격할 때마다 네크로의 게이지 " + ULT.smGauge + " 회복";
@@ -2917,7 +2917,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       E.angle = ang;
       E.ultUntil = t + 450;
       E.cdUntil = Math.max(E.cdUntil, t + 450);
-      emitShots(E, ang, true);
+      PROJECTILES.emitShots(E, ang, true);
     }
     ultDesc() {
       return "사거리 " + ULT.pnRange + "의 거대한 화살 발사. 적은 " + ULT.pnDmg + "의 피해, 적중 시 게이지 " + ULT.pnRefund + " 회복";
@@ -2933,12 +2933,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   class ThrowerType extends CharacterType {
     showAimGuide(E, ult, c) { AIM_GUIDE.showAimCircle(aimReach(E, aim.btn), ult ? ULT.fgR : ULT.plR); return true; }
     aimRange(btn) { return [CHARS.thrower.minRange, btn === "ult" ? ULT.fgCast : CHARS.thrower.range]; }
-    overrideBasic(E, ang, reach, t) { throwPoison(E, ang, reach, false); return true; }
+    overrideBasic(E, ang, reach, t) { FIELD_FX.throwPoison(E, ang, reach, false); return true; }
     onHitLate(owner, h) { if (h.u === "fog" && !owner.isGaugeLocked()) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.fgRefund); }
     botAct(B, target, enemies, t) { BRAIN.botThrow(B, target, enemies, t); return true; }
     skillGlow(E, t) { return E.ultUntil > t ? 0x1E5212 : 0; }
     cast(E, ang, reach, t) {
-      var fogFlightMs = throwPoison(E, ang, reach, true);
+      var fogFlightMs = FIELD_FX.throwPoison(E, ang, reach, true);
       E.ultUntil = t + 450;
       E.cdUntil = Math.max(E.cdUntil, t + 450);
       E.skillDur = fogFlightMs + ULT.fgDur;
@@ -2967,7 +2967,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       E.ultUntil = t + ULT.lnWind;
       E.cdUntil = Math.max(E.cdUntil, t + ULT.lnWind + 250);
       E.pending = null;
-      var lanceCast = { team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(ang), len: Math.round(lineReach(E.x, E.y, ang, ULT.lnLen)),
+      var lanceCast = { team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(ang), len: Math.round(MELEE.lineReach(E.x, E.y, ang, ULT.lnLen)),
                         width: ULT.lnW, dmg: 0, u: 1, wind: ULT.lnWind, createdAt: t };
       E.lance = { d: lanceCast };
       room.ref.child("meleeHits").push(lanceCast);
@@ -2997,14 +2997,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     aimRange(btn) { return [ULT.bsMin, ULT.bsCast]; }
     botUltRange() { return ULT.bsCast; }
-    botUltSpot(B, target, td, t) { return BRAIN.leadSpot(target, hammerLeapMs(td) / 1000, t); }
+    botUltSpot(B, target, td, t) { return BRAIN.leadSpot(target, MELEE.hammerLeapMs(td) / 1000, t); }
     get hasSkillClip() { return true; }
     playSkillClip(v, E, t) { FIGHTER_VIEW.playOnce(v, "Melee_1H_Attack_Jump_Chop", JUMP_CHOP_LAND_SEC * 1000 / Math.max(1, E.ultUntil - (E.leapAt || t)), t); }
     cast(E, ang, reach, t) {
-      var landing = burstSpot(E, ang, reach, ULT.bsCast, ULT.bsMin);
+      var landing = ATTACK.burstSpot(E, ang, reach, ULT.bsCast, ULT.bsMin);
       resolve(landing);
       E.angle = Math.atan2(landing.y - E.y, landing.x - E.x);
-      var leapMs = hammerLeapMs(hyp(landing.x - E.x, landing.y - E.y));
+      var leapMs = MELEE.hammerLeapMs(hyp(landing.x - E.x, landing.y - E.y));
       E.leapAt = t;
       E.ultUntil = t + leapMs;
       E.cdUntil = Math.max(E.cdUntil, t + leapMs + 250);
@@ -3043,14 +3043,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   class ShamanType extends CharacterType {
     get hasDarkWave() { return true; }
     overrideBasic(E, ang, reach, t) {
-      var struck = domainStrikeTarget(E, t);
+      var struck = FIELD_FX.domainStrikeTarget(E, t);
       if (!struck) return false;
-      domainStrike(E, struck, t);
+      FIELD_FX.domainStrike(E, struck, t);
       return true;
     }
-    afterStrike(T, d) { applyCurse(T, d.owner, now()); }
+    afterStrike(T, d) { FIELD_FX.applyCurse(T, d.owner, now()); }
     botUltRange() { return ULT.dmR * 0.7; }
-    wantsBasicNow(B, t) { return t >= B.cdUntil && !!domainStrikeTarget(B, t); }
+    wantsBasicNow(B, t) { return t >= B.cdUntil && !!FIELD_FX.domainStrikeTarget(B, t); }
     get hasSkillClip() { return true; }
     playSkillClip(v, E, t) { FIGHTER_VIEW.playOnce(v, "Ranged_Magic_Summon", KIT.clips.Ranged_Magic_Summon.duration * 1000 / 900, t); }
     cast(E, ang, reach, t) {
@@ -3080,7 +3080,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     isRevealing(E, t) { return E.buffUntil > t; }
     isRooted(E, t) { return this.isRevealing(E, t); }
     get showsHealRange() { return true; }
-    overrideBasic(E, ang, reach, t) { graceStrike(E, t); return true; }
+    overrideBasic(E, ang, reach, t) { FIELD_FX.graceStrike(E, t); return true; }
     botAct(B, target, enemies, t) { BRAIN.botCleric(B, enemies, t); return true; }
     get hasSkillClip() { return true; }
     addMarkers(v, root, body) { v.halo = FIGHTER_VIEW.makeClericHalo(v, body); root.add(v.halo); }
@@ -3115,11 +3115,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (ult) {
         var ex = Math.cos(E.angle), ey = Math.sin(E.angle), el = rayCast(E.x + ex * 20, E.y + ey * 20, ex, ey, ULT.exRange, ULT.exPr) + 20;
         AIM_GUIDE.showAimStrip(18, Math.max(1, el - 18), 18);
-      } else AIM_GUIDE.showAimStrip(0, dashReach(E, E.angle, c.dashRange) + BODY_R, c.dashWidth);
+      } else AIM_GUIDE.showAimStrip(0, MELEE.dashReach(E, E.angle, c.dashRange) + BODY_R, c.dashWidth);
       return true;
     }
     skillShotSpec() { return { count: 1, gap: 0, sp: ULT.exSpeed, dmg: ULT.exDmg, pr: ULT.exPr, range: ULT.exRange, ultKey: "execute", fx: { stunMs: ULT.exStunMs } }; }
-    overrideBasic(E, ang, reach, t) { dashStrike(E, ang); return true; }
+    overrideBasic(E, ang, reach, t) { MELEE.dashStrike(E, ang); return true; }
     onHitLate(owner, h) {
       if (h.tp && owner.alive) { owner.x = h.tp.x; owner.y = h.tp.y; owner.dash = null; resolve(owner); }
     }
@@ -3148,7 +3148,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       E.ultUntil = t + 300;
       E.cdUntil = Math.max(E.cdUntil, t + 300);
       E.pending = null;
-      emitShots(E, ang, true);
+      PROJECTILES.emitShots(E, ang, true);
     }
     ultDesc() {
       return "사거리 " + ULT.exRange + "의 칼날 발사. 처음 맞은 적은 " + ULT.exDmg + "의 피해를 입고 " + secs(ULT.exStunMs) + "간 기절, 그 위치로 순간이동";
@@ -3191,7 +3191,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class FrostType extends MagicShooterType {
-    projectileEffect(d, T, immune, fx) { return !d.isSkill && !immune && !T.minion ? frostStackFx(T) : fx; }
+    projectileEffect(d, T, immune, fx) { return !d.isSkill && !immune && !T.minion ? STATUS.frostStackFx(T) : fx; }
     hitColor(d) { return "#BFEFFF"; }
     get tintsHit() { return true; }
     botUltRange() { return ULT.frBzR * 0.8; }
@@ -3267,7 +3267,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     speedBonus(E, t) { return this.isOvercharged(E, t) ? ULT.ocSpeedBonus : 0; }
     get idleClip() { return "Ranged_Bow_Idle"; }
     statAltCooldown(c) { return c.cd / ULT.ocRate; }
-    onHitEarly(owner, h) { if (h.zap) stormZap(owner, h.zap, h.t); }
+    onHitEarly(owner, h) { if (h.zap) FIELD_FX.stormZap(owner, h.zap, h.t); }
     afterProjectileHit(d, T, immune) {
       if (!immune) room.ref.child("hits/" + d.owner).push({ d: 0, b: 0, t: now(), zap: { v: T.id, x: r1(T.x), y: r1(T.y) } });
     }
@@ -3373,7 +3373,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     speed() {
       var t = now(), c = CHARS[this.char], sp = c.speed;
-      if (this.isStunned(t) || this.isHammerWinding(t) || this.dash || shoved(this) || this.type.isRooted(this, t)) return 0;
+      if (this.isStunned(t) || this.isHammerWinding(t) || this.dash || STATUS.shoved(this) || this.type.isRooted(this, t)) return 0;
       var skillSpeed = this.type.skillSpeed(this, t);
       if (skillSpeed != null) sp = skillSpeed;
       if (c.haste) sp += this.hasteBonus(t);
@@ -3399,7 +3399,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
                burnUntil: s.burnUntil || 0, burnNext: 0, regenNext: 0, shield: s.hp == null ? !!CHARS[c].respawnShield : !!s.shield,
                burst: null, volley: null, mv: false, pending: null });
       E.maxHp = CHARS[E.char].hp;
-      if (s.minions) adoptMinions(E, s.minions, null);
+      if (s.minions) MINIONS.adoptMinions(E, s.minions, null);
     }
   }
   class Minion extends Unit {
@@ -3440,7 +3440,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (id === myId) return;
       var d = P[id];
       if (d.isAI && host) {
-        if (!MATCH.bots[id]) { MATCH.bots[id] = makeEnt(id, d); MATCH.bots[id].bot = { seed: Math.random() * 10, seenAt: 0, target: null, stuck: 0, detour: 0, detourDir: 1 }; delete MATCH.remotes[id]; listenHits(id); }
+        if (!MATCH.bots[id]) { MATCH.bots[id] = makeEnt(id, d); MATCH.bots[id].bot = { seed: Math.random() * 10, seenAt: 0, target: null, stuck: 0, detour: 0, detourDir: 1 }; delete MATCH.remotes[id]; DAMAGE.listenHits(id); }
         return;
       }
       var r = MATCH.remotes[id];
@@ -3464,98 +3464,101 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       r.summonAt = pos.summonAt;
       r.revealUntil = pos.revealUntil; r.frostStacks = pos.frostStacks; r.frostStackAt = pos.frostStackAt;
       r.burnUntil = pos.burnUntil; r.shield = pos.shield;
-      adoptMinions(r, pos.minions, k);
+      MINIONS.adoptMinions(r, pos.minions, k);
     });
   }
 
-  function minionKey(E, born, n) { return E.id + "_" + born + "_" + n; }
-  function newMinion(E, born, n, x, y, angle) {
-    return new Minion(E, minionKey(E, born, n), born, n, x, y, angle);
-  }
-  function adoptMinions(E, list, k) {
-    var byKey = {}, t = now();
-    (E.minions || []).forEach(function (m) { byKey[m.key] = m; });
-    E.minions = list.map(function (s) {
-      var m = byKey[minionKey(E, s.born, s.n)] || newMinion(E, s.born, s.n, s.x, s.y, s.angle);
-      var gap = hyp(s.x - m.x, s.y - m.y);
-      if (m.sx != null && hyp(s.x - m.sx, s.y - m.sy) > 1) m.mvAt = t;
-      m.sx = s.x; m.sy = s.y;
-      m.mv = t - (m.mvAt || 0) < 350;
-      if (k == null || gap > 250) { m.x = s.x; m.y = s.y; } else { m.x += (s.x - m.x) * k; m.y += (s.y - m.y) * k; }
-      m.angle = k == null ? s.angle : lerpAng(m.angle, s.angle, Math.min(1, k * 1.25));
-      if (m.alive && s.hp <= 0) m.diedAt = t;
-      m.hp = s.hp; m.alive = s.hp > 0; m.atkAt = s.atkAt; m.team = E.team;
-      return m;
-    });
-  }
-  function allMinions() {
-    var out = [];
-    participants().forEach(function (id) { var E = ent(id); if (E && E.minions) out.push.apply(out, E.minions); });
-    return out;
-  }
-  function minionReady(m, t) { return m.alive && (t || now()) >= m.rise; }
-  function summonMinions(E, ang, t) {
-    var born = Math.round(t);
-    E.summonAt = born;
-    var fx = Math.cos(ang), fy = Math.sin(ang), list = (E.minions || []).filter(function (m) { return m.alive; });
-    for (var i = 0; i < ULT.smCount; i++) {
-      var side = (i - (ULT.smCount - 1) / 2) * 2 * ULT.smSide;
-      var m = newMinion(E, born, i, E.x + fx * ULT.smAhead - fy * side, E.y + fy * ULT.smAhead + fx * side, ang);
-      resolve(m);
-      list.push(m);
+  class MinionSystem {
+    minionKey(E, born, n) { return E.id + "_" + born + "_" + n; }
+    newMinion(E, born, n, x, y, angle) {
+      return new Minion(E, MINIONS.minionKey(E, born, n), born, n, x, y, angle);
     }
-    E.minions = list.slice(-ULT.smMax);
-  }
-  function minionFoe(M, t) {
-    var best = null, bd = BOT_VIEW;
-    function consider(o) {
-      if (!o || !o.alive || o.team === M.team || !visibleTo(o, M, t)) return;
-      var d = hyp(o.x - M.x, o.y - M.y);
-      if (d < bd) { bd = d; best = o; }
+    adoptMinions(E, list, k) {
+      var byKey = {}, t = now();
+      (E.minions || []).forEach(function (m) { byKey[m.key] = m; });
+      E.minions = list.map(function (s) {
+        var m = byKey[MINIONS.minionKey(E, s.born, s.n)] || MINIONS.newMinion(E, s.born, s.n, s.x, s.y, s.angle);
+        var gap = hyp(s.x - m.x, s.y - m.y);
+        if (m.sx != null && hyp(s.x - m.sx, s.y - m.sy) > 1) m.mvAt = t;
+        m.sx = s.x; m.sy = s.y;
+        m.mv = t - (m.mvAt || 0) < 350;
+        if (k == null || gap > 250) { m.x = s.x; m.y = s.y; } else { m.x += (s.x - m.x) * k; m.y += (s.y - m.y) * k; }
+        m.angle = k == null ? s.angle : lerpAng(m.angle, s.angle, Math.min(1, k * 1.25));
+        if (m.alive && s.hp <= 0) m.diedAt = t;
+        m.hp = s.hp; m.alive = s.hp > 0; m.atkAt = s.atkAt; m.team = E.team;
+        return m;
+      });
     }
-    participants().forEach(function (id) { consider(ent(id)); });
-    allMinions().forEach(function (o) { if (minionReady(o, t)) consider(o); });
-    return best;
-  }
-  function walkMinion(m, dx, dy, d, dt, t) {
-    var mx = dx / d, my = dy / d;
-    if (m.detour > t) { var rx = -my * m.detourDir; my = mx * m.detourDir; mx = rx; }
-    var ox = m.x, oy = m.y, step = ULT.smSpeed * dt;
-    m.x += mx * step; m.y += my * step; resolve(m);
-    var moved = hyp(m.x - ox, m.y - oy);
-    if (moved < step * 0.3) { m.stuck += dt; if (m.stuck > 0.4) { m.detour = t + 600; m.detourDir = Math.random() < 0.5 ? -1 : 1; m.stuck = 0; } }
-    else m.stuck = 0;
-    m.mv = moved > 0.2;
-  }
-  function stepMinions(E, dt, t) {
-    if (!E.minions || !E.minions.length) return;
-    var before = E.minions.length;
-    E.minions = E.minions.filter(function (m) { return t < m.born + ULT.smDur && (m.alive || t - m.diedAt < ULT.smCorpseMs); });
-    if (E.minions.length !== before) MATCH.game.forceNet = true;
-    E.minions.forEach(function (m) {
-      m.mv = false;
-      if (!minionReady(m, t)) return;
-      var foe = minionFoe(m, t);
-      if (!foe) {
-        var home = hyp(E.x - m.x, E.y - m.y);
-        if (E.alive && home > ULT.smFollow) { m.angle = Math.atan2(E.y - m.y, E.x - m.x); walkMinion(m, E.x - m.x, E.y - m.y, home, dt, t); }
-        return;
+    allMinions() {
+      var out = [];
+      participants().forEach(function (id) { var E = ent(id); if (E && E.minions) out.push.apply(out, E.minions); });
+      return out;
+    }
+    minionReady(m, t) { return m.alive && (t || now()) >= m.rise; }
+    summonMinions(E, ang, t) {
+      var born = Math.round(t);
+      E.summonAt = born;
+      var fx = Math.cos(ang), fy = Math.sin(ang), list = (E.minions || []).filter(function (m) { return m.alive; });
+      for (var i = 0; i < ULT.smCount; i++) {
+        var side = (i - (ULT.smCount - 1) / 2) * 2 * ULT.smSide;
+        var m = MINIONS.newMinion(E, born, i, E.x + fx * ULT.smAhead - fy * side, E.y + fy * ULT.smAhead + fx * side, ang);
+        resolve(m);
+        list.push(m);
       }
-      var dx = foe.x - m.x, dy = foe.y - m.y, d = hyp(dx, dy) || 1, reach = ULT.smRange + BODY_R - 6;
-      m.angle = Math.atan2(dy, dx);
-      if (d > reach - 12) walkMinion(m, dx, dy, d, dt, t);
-      if (d <= reach && t >= m.cdUntil && losClear(m.x, m.y, foe.x, foe.y)) {
-        m.cdUntil = t + ULT.smCd; m.atkAt = t;
-        room.ref.child("meleeHits").push({ team: m.team, owner: E.id, m: 1, mi: m.n, x: r1(m.x), y: r1(m.y), radius: ULT.smRange, angle: r1(m.angle),
-                                          arc: ULT.smArc, dmg: ULT.smDmg, createdAt: t });
-        if (hear(m)) sfx("swing");
+      E.minions = list.slice(-ULT.smMax);
+    }
+    minionFoe(M, t) {
+      var best = null, bd = BOT_VIEW;
+      function consider(o) {
+        if (!o || !o.alive || o.team === M.team || !visibleTo(o, M, t)) return;
+        var d = hyp(o.x - M.x, o.y - M.y);
+        if (d < bd) { bd = d; best = o; }
       }
-    });
+      participants().forEach(function (id) { consider(ent(id)); });
+      MINIONS.allMinions().forEach(function (o) { if (MINIONS.minionReady(o, t)) consider(o); });
+      return best;
+    }
+    walkMinion(m, dx, dy, d, dt, t) {
+      var mx = dx / d, my = dy / d;
+      if (m.detour > t) { var rx = -my * m.detourDir; my = mx * m.detourDir; mx = rx; }
+      var ox = m.x, oy = m.y, step = ULT.smSpeed * dt;
+      m.x += mx * step; m.y += my * step; resolve(m);
+      var moved = hyp(m.x - ox, m.y - oy);
+      if (moved < step * 0.3) { m.stuck += dt; if (m.stuck > 0.4) { m.detour = t + 600; m.detourDir = Math.random() < 0.5 ? -1 : 1; m.stuck = 0; } }
+      else m.stuck = 0;
+      m.mv = moved > 0.2;
+    }
+    stepMinions(E, dt, t) {
+      if (!E.minions || !E.minions.length) return;
+      var before = E.minions.length;
+      E.minions = E.minions.filter(function (m) { return t < m.born + ULT.smDur && (m.alive || t - m.diedAt < ULT.smCorpseMs); });
+      if (E.minions.length !== before) MATCH.game.forceNet = true;
+      E.minions.forEach(function (m) {
+        m.mv = false;
+        if (!MINIONS.minionReady(m, t)) return;
+        var foe = MINIONS.minionFoe(m, t);
+        if (!foe) {
+          var home = hyp(E.x - m.x, E.y - m.y);
+          if (E.alive && home > ULT.smFollow) { m.angle = Math.atan2(E.y - m.y, E.x - m.x); MINIONS.walkMinion(m, E.x - m.x, E.y - m.y, home, dt, t); }
+          return;
+        }
+        var dx = foe.x - m.x, dy = foe.y - m.y, d = hyp(dx, dy) || 1, reach = ULT.smRange + BODY_R - 6;
+        m.angle = Math.atan2(dy, dx);
+        if (d > reach - 12) MINIONS.walkMinion(m, dx, dy, d, dt, t);
+        if (d <= reach && t >= m.cdUntil && losClear(m.x, m.y, foe.x, foe.y)) {
+          m.cdUntil = t + ULT.smCd; m.atkAt = t;
+          room.ref.child("meleeHits").push({ team: m.team, owner: E.id, m: 1, mi: m.n, x: r1(m.x), y: r1(m.y), radius: ULT.smRange, angle: r1(m.angle),
+                                            arc: ULT.smArc, dmg: ULT.smDmg, createdAt: t });
+          if (hear(m)) sfx("swing");
+        }
+      });
+    }
   }
+  var MINIONS = new MinionSystem();
 
   function inBush(x, y) { return bushIndexAt(x, y) >= 0; }
   function skillLeft(E, t) { return E.skillDur ? clamp((E.skillUntil - t) / E.skillDur, 0, 1) : 0; }
-  function hiddenFrom(E, t) { return inBush(E.x, E.y) || E.isStealthed(t) || inFriendlyStorm(E, t); }
+  function hiddenFrom(E, t) { return inBush(E.x, E.y) || E.isStealthed(t) || FIELD_FX.inFriendlyStorm(E, t); }
   function bushIndexAt(x, y) {
     var c = Math.floor((x - MAP_X0) / TILE), r = Math.floor((y - MAP_Y0) / TILE);
     if (c < 0 || r < 0 || c >= MAP_COLS || r >= MAP_ROWS) return -1;
@@ -3567,7 +3570,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (E.revealUntil > (t || now())) return true;
     var bush = bushIndexAt(E.x, E.y);
     if (bush >= 0 && bushIndexAt(viewer.x, viewer.y) !== bush) return false;
-    if ((E.isStealthed(t) || inFriendlyStorm(E, t)) && hyp(E.x - viewer.x, E.y - viewer.y) > STEALTH_REVEAL_DIST) return false;
+    if ((E.isStealthed(t) || FIELD_FX.inFriendlyStorm(E, t)) && hyp(E.x - viewer.x, E.y - viewer.y) > STEALTH_REVEAL_DIST) return false;
     return true;
   }
   function visibleTo(E, viewer, t) { return !hiddenFrom(E, t) || revealedTo(E, viewer, t); }
@@ -3596,162 +3599,779 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       E.y = clamp(E.y, BOUND.t + BODY_R, BOUND.b - BODY_R);
     }
   }
-  function activeSlows(T, t) {
-    var list = (T.slows || []).filter(function (s) { return s.until > t; });
-    if (!T.slows && T.slowUntil > t) list.push({ mul: T.slowMul || 1, until: T.slowUntil });
-    return list;
-  }
-  function slowLoadMs(list, t) {
-    var ends = list.map(function (s) { return s.until; }).sort(function (a, b) { return a - b; });
-    var load = 0, from = t;
-    ends.forEach(function (end) {
-      if (end <= from) return;
-      var mul = 1;
-      list.forEach(function (s) { if (s.until >= end && s.mul < mul) mul = s.mul; });
-      load += (end - from) * (1 - mul);
-      from = end;
-    });
-    return load;
-  }
-  function slowEndOf(list, t) { return list.reduce(function (m, s) { return Math.max(m, s.until); }, t); }
-  var CC_FLUSH_MS = 500;
-  function creditCC(owner, stunMs, slowMs, slowWeightMs) {
-    if (!owner || !(stunMs > 0 || slowMs > 0 || slowWeightMs > 0)) return;
-    var pend = MATCH.ccPending[owner] || (MATCH.ccPending[owner] = { stun: 0, slow: 0, weight: 0, since: now() });
-    pend.stun += stunMs || 0; pend.slow += slowMs || 0; pend.weight += slowWeightMs || 0;
-  }
-  function attachCC(owner, h) {
-    var pend = MATCH.ccPending[owner]; if (!pend) return h;
-    delete MATCH.ccPending[owner];
-    if (pend.stun) h.cs = Math.round(pend.stun);
-    if (pend.slow) h.ss = Math.round(pend.slow);
-    if (pend.weight) h.sw = Math.round(pend.weight);
-    return h;
-  }
-  function flushCC(t) {
-    keys(MATCH.ccPending).forEach(function (owner) {
-      if (t - MATCH.ccPending[owner].since < CC_FLUSH_MS || !room) return;
-      room.ref.child("hits/" + owner).push(attachCC(owner, { d: 0, b: 0, t: now() }));
-    });
-  }
-  function addSlowCredited(T, mul, ms, t, owner) {
-    var before = activeSlows(T, t), loadBefore = slowLoadMs(before, t), endBefore = slowEndOf(before, t);
-    addSlow(T, mul, ms, t);
-    noteHurt(T, owner, t);
-    var after = activeSlows(T, t);
-    creditCC(owner, 0, slowEndOf(after, t) - endBefore, slowLoadMs(after, t) - loadBefore);
-  }
-  function addSlow(T, mul, ms, t) {
-    var list = (T.slows || []).filter(function (s) { return s.until > t; }), same = null;
-    list.forEach(function (s) { if (s.mul === mul) same = s; });
-    if (same) same.until = Math.max(same.until, t + ms); else list.push({ mul: mul, until: t + ms });
-    T.slows = list;
-    T.slowUntil = Math.max.apply(null, list.map(function (s) { return s.until; }));
-    T.slowMul = T.slowMulAt(t);
-  }
-  function afflict(T, fx, owner) {
-    if (!fx || !T.alive || T.minion) return;
-    var t = now();
-    if (T.isProtected(t)) return;
-    if (fx.slowMs) addSlowCredited(T, fx.slowMul || 0.6, fx.slowMs, t, owner);
-    if (fx.stunMs) {
-      creditCC(owner, Math.max(0, t + fx.stunMs - Math.max(T.stunUntil || 0, t)), 0, 0);
-      noteHurt(T, owner, t);
-      T.stunUntil = Math.max(T.stunUntil || 0, t + fx.stunMs); T.pending = null; T.burst = null; T.volley = null; T.slash = null;
-      breakBladeStorm(T, t); breakRevelation(T, t); }
-    MATCH.game.forceNet = true;
-  }
-  function frostStackFx(T) {
-    var t = now();
-    if (!T.frostStackAt || t - T.frostStackAt > ULT.frSlowMs) T.frostStacks = 0;
-    T.frostStacks = (T.frostStacks || 0) + 1;
-    T.frostStackAt = t;
-    if (T.frostStacks >= 3) {
-      T.frostStacks = 0;
-      return { stunMs: ULT.frFreezeMs, maxHpRate: ULT.frFreezeMaxHpRate };
+  class StatusEffects {
+    activeSlows(T, t) {
+      var list = (T.slows || []).filter(function (s) { return s.until > t; });
+      if (!T.slows && T.slowUntil > t) list.push({ mul: T.slowMul || 1, until: T.slowUntil });
+      return list;
     }
-    return { slowMs: ULT.frSlowMs, slowMul: ULT.frSlowMul - (T.frostStacks - 1) * ULT.frSlowStep };
+    slowLoadMs(list, t) {
+      var ends = list.map(function (s) { return s.until; }).sort(function (a, b) { return a - b; });
+      var load = 0, from = t;
+      ends.forEach(function (end) {
+        if (end <= from) return;
+        var mul = 1;
+        list.forEach(function (s) { if (s.until >= end && s.mul < mul) mul = s.mul; });
+        load += (end - from) * (1 - mul);
+        from = end;
+      });
+      return load;
+    }
+    slowEndOf(list, t) { return list.reduce(function (m, s) { return Math.max(m, s.until); }, t); }
+    creditCC(owner, stunMs, slowMs, slowWeightMs) {
+      if (!owner || !(stunMs > 0 || slowMs > 0 || slowWeightMs > 0)) return;
+      var pend = MATCH.ccPending[owner] || (MATCH.ccPending[owner] = { stun: 0, slow: 0, weight: 0, since: now() });
+      pend.stun += stunMs || 0; pend.slow += slowMs || 0; pend.weight += slowWeightMs || 0;
+    }
+    attachCC(owner, h) {
+      var pend = MATCH.ccPending[owner]; if (!pend) return h;
+      delete MATCH.ccPending[owner];
+      if (pend.stun) h.cs = Math.round(pend.stun);
+      if (pend.slow) h.ss = Math.round(pend.slow);
+      if (pend.weight) h.sw = Math.round(pend.weight);
+      return h;
+    }
+    flushCC(t) {
+      keys(MATCH.ccPending).forEach(function (owner) {
+        if (t - MATCH.ccPending[owner].since < CC_FLUSH_MS || !room) return;
+        room.ref.child("hits/" + owner).push(STATUS.attachCC(owner, { d: 0, b: 0, t: now() }));
+      });
+    }
+    addSlowCredited(T, mul, ms, t, owner) {
+      var before = STATUS.activeSlows(T, t), loadBefore = STATUS.slowLoadMs(before, t), endBefore = STATUS.slowEndOf(before, t);
+      STATUS.addSlow(T, mul, ms, t);
+      DAMAGE.noteHurt(T, owner, t);
+      var after = STATUS.activeSlows(T, t);
+      STATUS.creditCC(owner, 0, STATUS.slowEndOf(after, t) - endBefore, STATUS.slowLoadMs(after, t) - loadBefore);
+    }
+    addSlow(T, mul, ms, t) {
+      var list = (T.slows || []).filter(function (s) { return s.until > t; }), same = null;
+      list.forEach(function (s) { if (s.mul === mul) same = s; });
+      if (same) same.until = Math.max(same.until, t + ms); else list.push({ mul: mul, until: t + ms });
+      T.slows = list;
+      T.slowUntil = Math.max.apply(null, list.map(function (s) { return s.until; }));
+      T.slowMul = T.slowMulAt(t);
+    }
+    afflict(T, fx, owner) {
+      if (!fx || !T.alive || T.minion) return;
+      var t = now();
+      if (T.isProtected(t)) return;
+      if (fx.slowMs) STATUS.addSlowCredited(T, fx.slowMul || 0.6, fx.slowMs, t, owner);
+      if (fx.stunMs) {
+        STATUS.creditCC(owner, Math.max(0, t + fx.stunMs - Math.max(T.stunUntil || 0, t)), 0, 0);
+        DAMAGE.noteHurt(T, owner, t);
+        T.stunUntil = Math.max(T.stunUntil || 0, t + fx.stunMs); T.pending = null; T.burst = null; T.volley = null; T.slash = null;
+        STATUS.breakBladeStorm(T, t); STATUS.breakRevelation(T, t); }
+      MATCH.game.forceNet = true;
+    }
+    frostStackFx(T) {
+      var t = now();
+      if (!T.frostStackAt || t - T.frostStackAt > ULT.frSlowMs) T.frostStacks = 0;
+      T.frostStacks = (T.frostStacks || 0) + 1;
+      T.frostStackAt = t;
+      if (T.frostStacks >= 3) {
+        T.frostStacks = 0;
+        return { stunMs: ULT.frFreezeMs, maxHpRate: ULT.frFreezeMaxHpRate };
+      }
+      return { slowMs: ULT.frSlowMs, slowMul: ULT.frSlowMul - (T.frostStacks - 1) * ULT.frSlowStep };
+    }
+    breakRevelation(E, t) {
+      if (!E.isRevealing(t)) return;
+      E.buffUntil = t;
+      E.skillUntil = Math.min(E.skillUntil || 0, t);
+      MATCH.game.forceNet = true;
+      room.ref.child("effects").push({ type: "revCut", owner: E.id, createdAt: t });
+    }
+    breakBladeStorm(E, t) {
+      if (!E.isBladeStorming(t)) return;
+      E.buffUntil = t;
+      E.skillUntil = Math.min(E.skillUntil || 0, t);
+      MATCH.game.forceNet = true;
+    }
+    igniteBurn(T, owner, t) {
+      if (!(T.burnUntil > t)) T.burnNext = t + BURN_TICK_MS;
+      T.burnUntil = t + CHARS.mage.burn.ms; T.burnOwner = owner;
+      MATCH.game.forceNet = true;
+    }
+    stepBurn(E, t) {
+      if (!E.burnNext || !E.alive) return;
+      if (E.burnNext > E.burnUntil + 1) { E.burnNext = 0; return; }
+      if (t < E.burnNext) return;
+      E.burnNext += BURN_TICK_MS;
+      DAMAGE.damage(E, Math.round(E.maxHp * CHARS.mage.burn.maxHpRate), E.burnOwner, false, "burn");
+    }
+    stepRally(E, t) {
+      if (!E.regenNext || !E.alive) return;
+      if (E.regenNext > E.regenUntil + 1) { E.regenNext = 0; return; }
+      if (t < E.regenNext) return;
+      E.regenNext += REGEN_TICK_MS;
+      var healed = STATUS.healAmount(E, CHARS[E.char].rally.perSec, t);
+      if (healed <= 0) return;
+      E.hp += healed; E.heal = (E.heal || 0) + healed;
+      MATCH.game.forceNet = true;
+      if (E === MATCH.me) sfx("heal");
+    }
+    inEnemyPoison(T, t) {
+      return FIELD.pools.some(function (pl) {
+        var e = pl.e, start = FIELD_FX.poolStart(e);
+        return e.team !== T.team && !pl.cut && t >= start && t < start + e.dur && CHARS[P[e.owner] ? P[e.owner].characterType : "thrower"].healCut &&
+               hyp(T.x - e.x, T.y - e.y) <= e.r + BODY_R * 0.5;
+      });
+    }
+    healCut(T, t) { t = t || now(); return T.burnUntil > t || STATUS.inEnemyPoison(T, t); }
+    healAmount(T, amount, t) { return Math.max(0, Math.min(T.maxHp - T.hp, STATUS.healCut(T, t) ? Math.round(amount * HEAL_CUT_MUL) : amount)); }
+    slowWhileInside(T, t, owner, mul, ms) {
+      var fresh = (T.slows || []).some(function (s) { return s.mul === mul && s.until - t > ms / 2; });
+      if (fresh) return;
+      var was = T.isSlowed(t);
+      STATUS.addSlowCredited(T, mul, ms, t, owner);
+      if (!was) MATCH.game.forceNet = true;
+    }
+    creditHolePull(T, owner, t, dt) {
+      if (T.isStunned(t)) return;
+      var already = 1 - T.slowMulAt(t), extra = ULT.bhCcRate - already;
+      if (extra <= 0) return;
+      STATUS.creditCC(owner, 0, already > 0 ? 0 : dt * 1000, dt * 1000 * extra);
+    }
+    shoved(E) { return !!E.shove; }
+    stepShove(E, t) {
+      var S = E.shove; if (!S) return;
+      if (!E.alive) { E.shove = null; return; }
+      var k = clamp((t - S.at) / ULT.gdKbMs, 0, 1), eased = 1 - Math.pow(1 - k, 3), step = (eased - S.done) * S.dist;
+      var parts = Math.max(1, Math.ceil(step / SHOVE_SUBSTEP));
+      S.done = eased;
+      for (var i = 0; i < parts; i++) { E.x += S.ux * step / parts; E.y += S.uy * step / parts; resolve(E); }
+      E.mv = false;
+      if (k >= 1) E.shove = null;
+    }
   }
+  var STATUS = new StatusEffects();
+  var CC_FLUSH_MS = 500;
   function revealBriefly(ownerId, t) {
     var A = ent(ownerId);
     if (!A || (A !== MATCH.me && !A.bot) || !hiddenFrom(A, t)) return;
     A.revealUntil = t + REVEAL_BREAK_MS;
   }
-  var BLADE_STORM_TICK = {};
-  function stepBladeStorms(t) {
-    participants().forEach(function (id) {
-      var E = ent(id);
-      if (!E || !E.alive || !E.isBladeStorming(t)) { delete BLADE_STORM_TICK[id]; return; }
-      var tick = BLADE_STORM_TICK[id];
-      if (!tick || tick.until !== E.buffUntil) tick = BLADE_STORM_TICK[id] = { until: E.buffUntil, next: E.buffUntil - ULT.bwDur };
-      if (t < tick.next) return;
-      tick.next = Math.max(tick.next + ULT.bwTick, t + ULT.bwTick / 2);
-      revealBriefly(E.id, t);
-      var tickIndex = Math.floor((t - (E.buffUntil - ULT.bwDur)) / ULT.bwTick);
-      var hurtGaugeGroup = Math.floor(tickIndex / ULT.bwHurtGaugeEvery);
-      var givesHurtGauge = hurtGaugeGroup !== tick.hurtGaugeGroup;
-      tick.hurtGaugeGroup = hurtGaugeGroup;
-      localTargets().forEach(function (T) {
-        if (!T.alive || T.team === E.team || hyp(T.x - E.x, T.y - E.y) > ULT.bwR + BODY_R * 0.5) return;
-        damage(T, ULT.bwDmg, E.id, false, "bladestorm", null, null, !givesHurtGauge);
+  class FieldEffects {
+    constructor() { this.bladeStormTick = {}; }
+    stepBladeStorms(t) {
+      participants().forEach(function (id) {
+        var E = ent(id);
+        if (!E || !E.alive || !E.isBladeStorming(t)) { delete FIELD_FX.bladeStormTick[id]; return; }
+        var tick = FIELD_FX.bladeStormTick[id];
+        if (!tick || tick.until !== E.buffUntil) tick = FIELD_FX.bladeStormTick[id] = { until: E.buffUntil, next: E.buffUntil - ULT.bwDur };
+        if (t < tick.next) return;
+        tick.next = Math.max(tick.next + ULT.bwTick, t + ULT.bwTick / 2);
+        revealBriefly(E.id, t);
+        var tickIndex = Math.floor((t - (E.buffUntil - ULT.bwDur)) / ULT.bwTick);
+        var hurtGaugeGroup = Math.floor(tickIndex / ULT.bwHurtGaugeEvery);
+        var givesHurtGauge = hurtGaugeGroup !== tick.hurtGaugeGroup;
+        tick.hurtGaugeGroup = hurtGaugeGroup;
+        localTargets().forEach(function (T) {
+          if (!T.alive || T.team === E.team || hyp(T.x - E.x, T.y - E.y) > ULT.bwR + BODY_R * 0.5) return;
+          DAMAGE.damage(T, ULT.bwDmg, E.id, false, "bladestorm", null, null, !givesHurtGauge);
+        });
       });
-    });
-  }
-  function payKillGaugeOwed(E, t) {
-    if (!E.killGaugeOwed || E.isGaugeLocked(t)) return;
-    E.gauge = Math.min(GAUGE_MAX, E.gauge + E.killGaugeOwed);
-    E.killGaugeOwed = 0;
-    MATCH.game.forceNet = true;
-  }
-  function breakRevelation(E, t) {
-    if (!E.isRevealing(t)) return;
-    E.buffUntil = t;
-    E.skillUntil = Math.min(E.skillUntil || 0, t);
-    MATCH.game.forceNet = true;
-    room.ref.child("effects").push({ type: "revCut", owner: E.id, createdAt: t });
-  }
-  function breakBladeStorm(E, t) {
-    if (!E.isBladeStorming(t)) return;
-    E.buffUntil = t;
-    E.skillUntil = Math.min(E.skillUntil || 0, t);
-    MATCH.game.forceNet = true;
-  }
-  function bladeSpin(p, x, y) {
-    if (p.spun) return;
-    p.spun = true;
-    FIELD.bladeSpins.push({ d: p.d, x: x, y: y, at: now() + ULT.bdDelay });
-    MATCH.fx.push({ k: "bladeZone", x: x, y: y, r: ULT.bdR, t: Date.now(), delay: ULT.bdDelay / CLOCK.scale, life: (ULT.bdDelay + 260) / CLOCK.scale });
-  }
-  function stepBladeSpins(t) {
-    FIELD.bladeSpins = FIELD.bladeSpins.filter(function (s) {
-      if (t < s.at) return true;
-      var d = s.d;
-      MATCH.fx.push({ k: "boom", x: s.x, y: s.y, r: ULT.bdR / 1.1, c: 0xDCE3EC, t: Date.now(), life: 260 });
-      FX_VIEW.spark(s.x, s.y, "#FFFFFF", 1.4);
-      localTargets().forEach(function (T) {
-        if (!T.alive || T.team === d.team || T.id === d.owner || hyp(T.x - s.x, T.y - s.y) > ULT.bdR + BODY_R * 0.5) return;
-        damage(T, ULT.bdDmg, d.owner, d.createdAt, null);
-      });
-      return false;
-    });
-  }
-  function stepBladeDaggers(t) {
-    var foes = null;
-    keys(MATCH.remoteShots).forEach(function (id) {
-      var p = MATCH.remoteShots[id], d = p.d;
-      if (!CHAR_TYPES.of(d.ownerCharacterType).isBladeThrower || p.spun) return;
-      var e = clamp(t - d.createdAt, 0, p.life), pe = p.se === undefined ? 0 : p.se;
-      p.se = e;
-      var a = projAt(p, pe), b = projAt(p, e);
-      foes = foes || participants().map(ent).concat(allMinions().filter(function (m) { return minionReady(m, t); }));
-      for (var i = 0; i < foes.length; i++) {
-        var T = foes[i];
-        if (!T || !T.alive || T.id === d.owner || T.team === d.team) continue;
-        if (segHit(a.x, a.y, b.x, b.y, T.x, T.y, BODY_R + (d.pr || 6))) { p.gone = true; bladeSpin(p, T.x, T.y); return; }
+    }
+    stormZap(E, hit, t) {
+      var chain = CHARS.stormbow.chain, over = E.isOvercharged(t);
+      if (!over) {
+        E.zapHits = (E.zapHits || 0) + 1;
+        if (E.zapHits < chain.every) return;
+        E.zapHits = 0;
       }
-      if (e >= p.life) { p.dead = true; bladeSpin(p, b.x, b.y); }
-    });
+      var links = FIELD_FX.chainTargets(E, hit, now()), pts = [[hit.x, hit.y]];
+      links.forEach(function (o) { pts.push([r1(o.x), r1(o.y)]); });
+      room.ref.child("effects").push({ type: "zap", team: E.team, owner: E.id, pts: pts, tgt: [hit.v].concat(links.map(function (o) { return o.id; })), dmg: chain.dmg, over: over ? 1 : 0, createdAt: now() });
+    }
+    chainTargets(E, hit, t) {
+      var chain = CHARS.stormbow.chain;
+      return participants().map(ent).concat(MINIONS.allMinions().filter(function (m) { return MINIONS.minionReady(m, t); })).filter(function (o) {
+        return o && o.alive && o.team !== E.team && o.id !== hit.v && !o.isProtected(t) && !hiddenFrom(o, t) && hyp(o.x - hit.x, o.y - hit.y) <= chain.r;
+      }).sort(function (a, b) { return hyp(a.x - hit.x, a.y - hit.y) - hyp(b.x - hit.x, b.y - hit.y); }).slice(0, chain.count);
+    }
+    onZap(e) {
+      var t = now();
+      if (t - e.createdAt > 1500) return;
+      FX_VIEW.chainFx(e.pts, e.over);
+      if (MATCH.me && hyp(e.pts[0][0] - MATCH.me.x, e.pts[0][1] - MATCH.me.y) < 700) sfx("zap");
+      if (!e.tgt || room.status !== "playing") return;
+      localTargets().forEach(function (T) {
+        if (e.tgt.indexOf(T.id) < 0 || !T.alive || T.team === e.team) return;
+        DAMAGE.damage(T, e.dmg, e.owner, true, e.over ? "overcharge" : null, null, T.minion ? 0 : undefined);
+      });
+    }
+    onEffect(s) {
+      var e = s.val(); if (!e || !MATCH.game || MATCH.handled[s.key]) return;
+      MATCH.handled[s.key] = 1;
+      if (FIELD.addLingering(e, now())) return;
+      if (e.type === "grace") { FIELD_FX.onGrace(e); return; }
+      if (e.type === "strike") { FIELD_FX.onDomainStrike(e); return; }
+      if (e.type === "zap") { FIELD_FX.onZap(e); return; }
+      if (e.type === "curse") { FIELD.curses[e.tgt] = { n: e.n, at: e.createdAt }; return; }
+      if (e.type === "revCut") { FIELD.revs.forEach(function (r) { if (r.e.owner === e.owner && r.e.createdAt <= e.createdAt) r.cut = true; }); return; }
+      if (e.type !== "burst" || now() > e.createdAt + e.delay + 1500) return;
+      FIELD.bursts.push({ e: e, vis: null });
+    }
+    poolStart(e) { return e.createdAt + e.delay; }
+    healInFog(T, e, t) {
+      var key = e.owner + "+" + T.id;
+      if (FIELD.poolHit[key] && t - FIELD.poolHit[key] < ULT.plTick) return;
+      FIELD.poolHit[key] = t;
+      var healed = STATUS.healAmount(T, ULT.fgHeal, t);
+      if (healed <= 0) return;
+      T.hp += healed;
+      DAMAGE.noteHelp(T, e.owner, t);
+      room.ref.child("hits/" + e.owner).push({ d: 0, b: 0, t: now(), hl: healed });
+      MATCH.game.forceNet = true;
+      if (T === MATCH.me) sfx("heal");
+    }
+    stepPools(t) {
+      FIELD.pools = FIELD.pools.filter(function (pl) {
+        var e = pl.e, start = FIELD_FX.poolStart(e), end = start + e.dur;
+        if (t >= end || pl.cut) { EFFECT_VIEW.dropPoolVis(pl); return false; }
+        if (t < start) return true;
+        if (!pl.landed && !e.u) {
+          var olderPools = FIELD.pools.filter(function (q) { return q !== pl && q.landed && !q.cut && !q.e.u && q.e.owner === e.owner; })
+                                .sort(function (a, b) { return a.e.createdAt - b.e.createdAt; });
+          while (olderPools.length >= ULT.plMax) olderPools.shift().cut = true;
+        }
+        if (!pl.landed) { pl.landed = true; if (!MATCH.me || hyp(e.x - MATCH.me.x, e.y - MATCH.me.y) < 700) sfx("splash"); }
+        if (room.status !== "playing") return true;
+        localTargets().forEach(function (T) {
+          if (!T.alive || hyp(T.x - e.x, T.y - e.y) > e.r + BODY_R * 0.5) return;
+          if (T.team === e.team) { if (e.u && !T.minion) FIELD_FX.healInFog(T, e, t); return; }
+          if (T.isProtected(t)) return;
+          if (e.u && !T.minion) STATUS.slowWhileInside(T, t, e.owner, ULT.fgSlowMul, ULT.fgSlowMs);
+          var key = e.owner + ">" + T.id;
+          if (FIELD.poolHit[key] && t - FIELD.poolHit[key] < ULT.plTick) return;
+          FIELD.poolHit[key] = t;
+          if (e.u) DAMAGE.damage(T, e.dmg, e.owner, false, "fog");
+          else DAMAGE.damage(T, e.dmg, e.owner, e.createdAt + Math.floor((t - start) / ULT.plTick), null, null, ULT.plGauge);
+        });
+        return true;
+      });
+    }
+    stepHoles(t, dt) {
+      FIELD.holes = FIELD.holes.filter(function (h) {
+        var e = h.e, start = e.createdAt + e.delay, end = start + e.dur;
+        if (t >= end) { EFFECT_VIEW.dropHoleVis(h); return false; }
+        if (t < start) return true;
+        if (!h.landed) { h.landed = true; if (!MATCH.me || hyp(e.x - MATCH.me.x, e.y - MATCH.me.y) < 700) sfx("orb"); }
+        if (room.status !== "playing") return true;
+        localTargets().forEach(function (T) {
+          if (!T.alive || T.team === e.team || T.minion || T.isProtected(t)) return;
+          var dx = e.x - T.x, dy = e.y - T.y, d = hyp(dx, dy);
+          if (d > e.r + BODY_R * 0.5 || d < 6) return;
+          var pull = Math.min(d - 6, ULT.bhPull * dt);
+          STATUS.breakRevelation(T, t);
+          T.x += dx / d * pull; T.y += dy / d * pull;
+          resolve(T);
+          STATUS.creditHolePull(T, e.owner, t, dt);
+          DAMAGE.noteHurt(T, e.owner, t);
+          MATCH.game.forceNet = true;
+        });
+        return true;
+      });
+    }
+    stormCenter(s) {
+      var A = ent(s.e.owner);
+      if (A && A.alive) { s.lastX = A.x; s.lastY = A.y; }
+      else if (s.lastX == null) { s.lastX = s.e.x; s.lastY = s.e.y; }
+      return { x: s.lastX, y: s.lastY };
+    }
+    stormOwnerFell(s) {
+      var A = ent(s.e.owner);
+      if (A && !A.alive) s.ownerFell = true;
+      return !!s.ownerFell;
+    }
+    stormActive(s, t) { return !s.ownerFell && t >= s.e.createdAt + s.e.delay && t < s.e.createdAt + s.e.delay + s.e.dur; }
+    inFriendlyStorm(E, t) {
+      if (!ULT.frBzHides) return false;
+      t = t || now();
+      for (var i = 0; i < FIELD.storms.length; i++) {
+        var s = FIELD.storms[i];
+        if (s.e.team !== E.team || !FIELD_FX.stormActive(s, t)) continue;
+        var c = FIELD_FX.stormCenter(s);
+        if (hyp(E.x - c.x, E.y - c.y) <= s.e.r) return true;
+      }
+      return false;
+    }
+    stepStorms(t) {
+      FIELD.storms = FIELD.storms.filter(function (s) {
+        var e = s.e;
+        if (t >= e.createdAt + e.delay + e.dur || FIELD_FX.stormOwnerFell(s)) { EFFECT_VIEW.dropStormVis(s); return false; }
+        if (t < e.createdAt + e.delay) return true;
+        var c = FIELD_FX.stormCenter(s);
+        if (!s.landed) { s.landed = true; if (!MATCH.me || hyp(c.x - MATCH.me.x, c.y - MATCH.me.y) < 700) sfx("orb"); }
+        if (room.status !== "playing") return true;
+        var foesInside = localTargets().filter(function (T) { return T.alive && T.team !== e.team && hyp(T.x - c.x, T.y - c.y) <= e.r; });
+        localTargets().forEach(function (T) { if (!T.minion && T.alive && T.team === e.team && hyp(T.x - c.x, T.y - c.y) <= e.r) DAMAGE.noteHelp(T, e.owner, t); });
+        if (s.nextTick && t < s.nextTick) return true;
+        s.nextTick = (s.nextTick || t) + ULT.frBzTick;
+        foesInside.forEach(function (T) {
+          var stack = !T.minion && !T.isProtected(t) && !T.isFrostFrozen(t) ? STATUS.frostStackFx(T) : null;
+          DAMAGE.damage(T, ULT.frBzDmg, e.owner, false, "blizzard", stack);
+        });
+        return true;
+      });
+    }
+    graceTarget(E) {
+      var reach = CHARS.cleric.range, best = null, t = now();
+      participants().forEach(function (id) {
+        var A = ent(id);
+        if (!A || id === E.id || A.team !== E.team || !A.alive || A.isProtected(t) || hyp(A.x - E.x, A.y - E.y) > reach) return;
+        if (!best || A.hp / A.maxHp < best.hp / best.maxHp) best = A;
+      });
+      return best;
+    }
+    graceStrike(E, t) {
+      E.atkAt = t;
+      revealBriefly(E.id, t);
+      var A = FIELD_FX.graceTarget(E);
+      if (hear(E)) sfx("orb");
+      MATCH.game.forceNet = true;
+      if (!A) return;
+      E.angle = Math.atan2(A.y - E.y, A.x - E.x);
+      room.ref.child("effects").push({ type: "grace", team: E.team, owner: E.id, tgt: A.id, heal: CHARS.cleric.graceHeal, createdAt: t });
+    }
+    onGrace(e) {
+      var t = now();
+      if (t - e.createdAt > 1500) return;
+      FIELD.graces.push({ e: e, vis: null });
+      if (room.status !== "playing") return;
+      localTargets().forEach(function (T) {
+        if (T.minion || T.id !== e.tgt || !T.alive || T.team !== e.team || T.isProtected(t)) return;
+        FIELD_FX.healByCleric(T, e.owner, e.heal, t);
+      });
+    }
+    healByCleric(T, owner, amount, t) {
+      var healed = STATUS.healAmount(T, amount, t);
+      if (healed <= 0) return;
+      T.hp += healed;
+      DAMAGE.noteHelp(T, owner, t);
+      room.ref.child("hits/" + owner).push({ d: 0, b: 0, t: t, hl: healed });
+      MATCH.game.forceNet = true;
+      if (T === MATCH.me) sfx("heal");
+    }
+    revTickIndex(e, t) { return Math.floor((t - e.createdAt) / e.tick); }
+    stepRevs(t) {
+      FIELD.revs = FIELD.revs.filter(function (r) {
+        var e = r.e;
+        if (r.cut || t >= e.createdAt + e.dur) { EFFECT_VIEW.dropRevVis(r); return false; }
+        if (t < e.createdAt || room.status !== "playing") return true;
+        var tick = FIELD_FX.revTickIndex(e, t);
+        localTargets().forEach(function (T) {
+          if (T.minion || T.id === e.owner || r.ticked[T.id] >= tick) return;
+          r.ticked[T.id] = tick;
+          if (!T.alive || T.isProtected(t)) return;
+          if (T.team === e.team) FIELD_FX.healByCleric(T, e.owner, e.heal, t);
+          else DAMAGE.damage(T, e.dmg, e.owner, false, "revelation");
+        });
+        return true;
+      });
+    }
+    domainRadius(e, t) { return e.r * clamp((t - e.createdAt) / e.grow, 0, 1); }
+    domainActive(e, t) { return t >= e.createdAt && t < e.createdAt + e.dur; }
+    domainCenter(dm) {
+      var A = ent(dm.e.owner);
+      if (A && A.alive) { dm.cx = A.x; dm.cy = A.y; }
+      else if (dm.cx == null) { dm.cx = dm.e.x; dm.cy = dm.e.y; }
+      return { x: dm.cx, y: dm.cy };
+    }
+    domainOwnerFell(dm) {
+      var A = ent(dm.e.owner);
+      if (A && !A.alive) dm.ownerFell = true;
+      return !!dm.ownerFell;
+    }
+    stepDomains(t) {
+      FIELD.domains = FIELD.domains.filter(function (dm) {
+        var e = dm.e;
+        if (t >= e.createdAt + e.dur || FIELD_FX.domainOwnerFell(dm)) { EFFECT_VIEW.dropDomainVis(dm); return false; }
+        var c = FIELD_FX.domainCenter(dm);
+        if (t < e.createdAt || room.status !== "playing" || t > e.createdAt + e.grow + ULT.dmStunGraceMs) return true;
+        var reach = FIELD_FX.domainRadius(e, t);
+        localTargets().forEach(function (T) {
+          if (T.minion || !T.alive || T.team === e.team || dm.touched[T.id] || T.isProtected(t)) return;
+          if (hyp(T.x - c.x, T.y - c.y) > reach + BODY_R * 0.5) return;
+          dm.touched[T.id] = 1;
+          STATUS.afflict(T, { stunMs: e.stun }, e.owner);
+          T.domainBolt = { owner: e.owner, at: t + e.stun, dmg: e.bolt };
+        });
+        return true;
+      });
+    }
+    applyCurse(T, owner, t) {
+      if (T.minion || !T.alive || T.curseBoom) return;
+      T.curse = (T.curse || 0) + 1; T.curseAt = t;
+      if (T.curse >= ULT.cuStacks) T.curseBoom = { at: t + ULT.cuBoomMs, owner: owner };
+      room.ref.child("effects").push({ type: "curse", tgt: T.id, owner: owner, n: T.curse, createdAt: t });
+    }
+    stepCurse(T, t) {
+      var B = T.curseBoom;
+      if (!B && T.curse && t - T.curseAt >= ULT.cuExpireMs) {
+        T.curse = 0;
+        room.ref.child("effects").push({ type: "curse", tgt: T.id, owner: T.id, n: 0, createdAt: t });
+        return;
+      }
+      if (!B || t < B.at) return;
+      T.curse = 0; T.curseBoom = null;
+      if (!T.alive || T.isProtected(t)) return;
+      DAMAGE.damage(T, ULT.cuBoomDmg, B.owner, false, "curse");
+    }
+    stepDomainBolt(T, t) {
+      var B = T.domainBolt;
+      if (!B || t < B.at || T.isStunned(t)) return;
+      T.domainBolt = null;
+      if (!T.alive || T.isProtected(t)) return;
+      room.ref.child("effects").push({ type: "strike", owner: B.owner, tgt: T.id, createdAt: t });
+      DAMAGE.damage(T, B.dmg, B.owner, false, "domainbolt");
+      FIELD_FX.applyCurse(T, B.owner, t);
+    }
+    domainStrikeTarget(E, t) {
+      var zone = null;
+      FIELD.domains.forEach(function (dm) { if (dm.e.owner === E.id && FIELD_FX.domainActive(dm.e, t) && !FIELD_FX.domainOwnerFell(dm)) zone = dm; });
+      if (!zone) return null;
+      var c = FIELD_FX.domainCenter(zone), reach = FIELD_FX.domainRadius(zone.e, t) + BODY_R * 0.5, best = null, bd = Infinity;
+      participants().map(ent).concat(MINIONS.allMinions().filter(function (m) { return MINIONS.minionReady(m, t); })).forEach(function (o) {
+        if (!o || !o.alive || o.team === E.team || o.isProtected(t) || hyp(o.x - c.x, o.y - c.y) > reach || (!o.minion && !visibleTo(o, E, t))) return;
+        var d = hyp(o.x - E.x, o.y - E.y);
+        if (d < bd) { bd = d; best = o; }
+      });
+      return best;
+    }
+    domainStrike(E, T, t) {
+      E.atkAt = t;
+      E.angle = Math.atan2(T.y - E.y, T.x - E.x);
+      revealBriefly(E.id, t);
+      MATCH.game.forceNet = true;
+      room.ref.child("effects").push({ type: "strike", team: E.team, owner: E.id, tgt: T.id, dmg: Math.round(T.maxHp * ULT.dmStrikeMaxHpRate), stun: ULT.dmStrikeStunMs, createdAt: t });
+    }
+    onDomainStrike(e) {
+      var t = now();
+      if (t - e.createdAt > 1500) return;
+      var V = VIS[e.tgt] || MVIS[e.tgt], A = ent(e.tgt) || MINIONS.allMinions().filter(function (m) { return m.id === e.tgt; })[0];
+      if (A && (!MATCH.me || MATCH.me.team === A.team || visibleTo(A, MATCH.me, t))) { FX_VIEW.bloodBolt(V ? V.root.position.x : A.x, V ? V.root.position.z : A.y); FX_VIEW.spark(A.x, A.y, "#FF2A36", 1.6); }
+      if (A && (!MATCH.me || hyp(A.x - MATCH.me.x, A.y - MATCH.me.y) < 700)) sfx("boom");
+      if (!e.dmg || room.status !== "playing") return;
+      localTargets().forEach(function (T) {
+        if (T.id !== e.tgt || !T.alive || T.team === e.team) return;
+        DAMAGE.damage(T, e.dmg, e.owner, e.createdAt, null, e.stun ? { stunMs: e.stun } : null);
+        FIELD_FX.applyCurse(T, e.owner, now());
+      });
+    }
+    potionFlightMs(dist) {
+      var c = CHARS.thrower, far = Math.min(1, Math.max(0, (dist - c.minRange) / (c.range - c.minRange)));
+      return Math.round(ULT.plFlightMin + (ULT.plFlight - ULT.plFlightMin) * far);
+    }
+    throwPoison(E, ang, reach, ult) {
+      var t = now(), c = CHARS.thrower, spot = ATTACK.burstSpot(E, ang, reach, ult ? ULT.fgCast : c.range, c.minRange);
+      var flightMs = FIELD_FX.potionFlightMs(hyp(spot.x - E.x, spot.y - E.y));
+      E.angle = Math.atan2(spot.y - E.y, spot.x - E.x); E.atkAt = t;
+      revealBriefly(E.id, t);
+      room.ref.child("effects").push({ type: "pool", team: E.team, owner: E.id, x: Math.round(spot.x), y: Math.round(spot.y), ox: Math.round(E.x), oy: Math.round(E.y),
+                                       r: ult ? ULT.fgR : ULT.plR, dmg: ult ? ULT.fgDmg : c.dmg, dur: ult ? ULT.fgDur : ULT.plDur, delay: flightMs, createdAt: t, u: ult ? 1 : 0 });
+      if (hear(E)) sfx("swing");
+      return flightMs;
+    }
+    meteorHitAt(dist, r) {
+      var step = Math.min(ULT.mbSteps - 1, Math.floor(dist / (r + BODY_R) * ULT.mbSteps)), fall = step / (ULT.mbSteps - 1);
+      return { dmg: Math.round(ULT.mbDmg - (ULT.mbDmg - ULT.mbDmgMin) * fall), stunMs: Math.round(ULT.mbStunMs - (ULT.mbStunMs - ULT.mbStunMin) * fall) };
+    }
+    stepBursts(t) {
+      FIELD.bursts = FIELD.bursts.filter(function (b) {
+        var e = b.e;
+        if (t < e.createdAt + e.delay) return true;
+        if (room.status === "playing") localTargets().forEach(function (T) {
+          if (!T.alive || hyp(T.x - e.x, T.y - e.y) > e.r + BODY_R) return;
+          if (T.team !== e.team) { var hit = FIELD_FX.meteorHitAt(hyp(T.x - e.x, T.y - e.y), e.r); DAMAGE.damage(T, hit.dmg, e.owner, false, e.createdAt, { stunMs: hit.stunMs }); }
+        });
+        FX_VIEW.boom(e.x, e.y, e.r, e.team);
+        if (PIX >= PIX_START) { FX_VIEW.smoke(e.x, e.y, 0x8A6A52); FX_VIEW.spark(e.x, e.y, "#FFB45A", 2.2); }
+        if (!MATCH.me || hyp(e.x - MATCH.me.x, e.y - MATCH.me.y) < 700) sfx("boom");
+        EFFECT_VIEW.dropBurstVis(b);
+        return false;
+      });
+    }
   }
+  var FIELD_FX = new FieldEffects();
+  class DamageResolver {
+    payKillGaugeOwed(E, t) {
+      if (!E.killGaugeOwed || E.isGaugeLocked(t)) return;
+      E.gauge = Math.min(GAUGE_MAX, E.gauge + E.killGaugeOwed);
+      E.killGaugeOwed = 0;
+      MATCH.game.forceNet = true;
+    }
+    damageMinion(M, amount, owner, basic, ultKey, gaugeGain) {
+      if (!MINIONS.minionReady(M)) return;
+      var dm = Math.min(amount, M.hp);
+      M.hp -= dm;
+      var summoner = ent(M.owner);
+      if (summoner) summoner.blocked = (summoner.blocked || 0) + dm;
+      if (M.hp <= 0) { M.hp = 0; M.alive = false; M.diedAt = now(); }
+      DAMAGE.pushHit(owner, dm, basic, ultKey, false, gaugeGain, true);
+      MATCH.game.forceNet = true;
+    }
+    damage(T, amount, owner, basic, ultKey, fx, gaugeGain, noHurtGauge) {
+      if (T.minion) { DAMAGE.damageMinion(T, amount, owner, basic, ultKey, gaugeGain); return; }
+      if (T.isProtected()) return;
+      var t = now(), unguarded = amount, C = CHARS[T.char];
+      if (T.shield && amount > 0) { amount = 0; T.shield = false; FX_VIEW.spark(T.x, T.y, SHIELD_SPARK, 1.5); }
+      var targetType = CHAR_TYPES.of(T.char);
+      amount = targetType.skillGuard(T, amount, t);
+      if (C.armor) amount = Math.max(0, amount - C.armor);
+      targetType.tallyBlocked(T, unguarded, amount);
+      var floorHp = CHARS[T.char].lastStandHp;
+      if (floorHp && !T.lastStandUsed && T.hp - amount < floorHp) {
+        amount = Math.max(0, T.hp - floorHp);
+        T.lastStandUsed = true;
+        T.stealthUntil = Math.max(T.stealthUntil || 0, now() + CHARS[T.char].lastStandHideMs);
+        T.revealUntil = 0;
+        FX_VIEW.smoke(T.x, T.y, NECRO_SMOKE_COLOR);
+      }
+      if (amount > 0) DAMAGE.noteHurt(T, owner, t);
+      var dm = Math.min(amount, T.hp), killed = false;
+      T.taken = (T.taken || 0) + dm;
+      T.hp -= dm; if (!noHurtGauge && !T.isGaugeLocked()) T.gauge = Math.min(GAUGE_MAX, T.gauge + roleOf(T.char).gaugeOnHurt);
+      if (T.hp <= 0) { killed = true; T.hp = 0; T.alive = false; T.deaths++; T.diedAt = now(); T.burst = null; T.volley = null; T.slash = null; T.regenUntil = 0; T.skillUntil = 0; T.slowUntil = 0; T.slows = null; T.stunUntil = 0; T.lance = null; T.frostStacks = 0; T.hasteUntil = 0; T.hasteStacks = 0; T.burnUntil = 0; T.burnNext = 0; T.regenNext = 0; if (T === MATCH.me) { sfx("down"); aim.id = null; joy.id = null; } }
+      else {
+        if (T === MATCH.me) sfx("hit");
+        STATUS.afflict(T, fx, owner);
+        if (fx && fx.maxHpRate) DAMAGE.damage(T, Math.round(T.maxHp * fx.maxHpRate), owner, false, ultKey);
+        if (P[owner]) CHAR_TYPES.of(P[owner].characterType).afterDealtDamage(T, owner, ultKey, t);
+        if (C.rally && !T.rallyUsed && T.hp < T.maxHp * C.rally.hpRate) { T.rallyUsed = true; T.regenUntil = t + C.rally.ms; T.regenNext = t + REGEN_TICK_MS; }
+      }
+      DAMAGE.pushHit(owner, dm, basic, ultKey, killed, gaugeGain);
+      if (killed) { T.domainBolt = null; T.curse = 0; T.curseBoom = null; STATUS.breakRevelation(T, t); DAMAGE.reportKill(T, owner, t); T.hurtBy = {}; T.helpedBy = {}; }
+      if (T === MATCH.me || T.bot) MATCH.game.forceNet = true;
+    }
+    noteHurt(T, owner, t) {
+      if (owner && owner !== T.id && P[owner] && P[owner].team !== T.team) (T.hurtBy || (T.hurtBy = {}))[owner] = t;
+    }
+    noteHelp(T, helper, t) {
+      if (helper && helper !== T.id && P[helper] && P[helper].team === T.team) (T.helpedBy || (T.helpedBy = {}))[helper] = t;
+    }
+    listOf(v) { return v ? keys(v).map(function (i) { return v[i]; }) : []; }
+    damageAssisters(T, killer, t) {
+      var by = T.hurtBy || {};
+      return keys(by).filter(function (id) { return id !== killer && t - by[id] <= ASSIST_MS && P[id] && P[id].team !== T.team; });
+    }
+    creditAssist(id, t) { room.ref.child("hits/" + id).push({ d: 0, b: 0, t: t, as: 1 }); }
+    reportKill(T, killer, t) {
+      var assisters = DAMAGE.damageAssisters(T, killer, t), k = { k: killer, v: T.id, t: t };
+      if (assisters.length) k.a = assisters;
+      room.ref.child("kills").push(k);
+      assisters.forEach(function (id) { DAMAGE.creditAssist(id, t); });
+    }
+    creditHelpAssists(k) {
+      var K = k.k === myId ? MATCH.me : (isHost() ? MATCH.bots[k.k] : null);
+      if (!K || !K.helpedBy || !(k.t >= MATCH.game.startAt)) return;
+      var already = DAMAGE.listOf(k.a);
+      keys(K.helpedBy).forEach(function (id) {
+        var at = K.helpedBy[id];
+        if (id === k.k || id === k.v || already.indexOf(id) >= 0 || !P[id] || P[id].team !== K.team) return;
+        if (k.t - at <= ASSIST_MS && at - k.t < 500) DAMAGE.creditAssist(id, k.t);
+      });
+    }
+    pushHit(owner, dmg, basic, ultKey, killed, gaugeGain, onMinion) {
+      var h = { d: dmg, b: basic ? 1 : 0, t: now() };
+      if (onMinion) h.mn = 1;
+      if (gaugeGain != null) h.g = gaugeGain;
+      if (ultKey) h.u = ultKey;
+      if (typeof basic === "number") h.s = basic;
+      if (killed) h.k = 1;
+      room.ref.child("hits/" + owner).push(STATUS.attachCC(owner, h));
+    }
+    listenHits(ownerId) {
+      if (MATCH.hitSubs[ownerId]) return;
+      MATCH.hitSubs[ownerId] = 1;
+      sub(room.ref.child("hits/" + ownerId), "child_added", DAMAGE.onHit.bind(DAMAGE));
+    }
+    onHit(s) {
+      var h = s.val(), ownerId = s.ref.parent.key; if (!h || !MATCH.game || MATCH.handled[s.key]) return;
+      var owner = ownerId === myId ? MATCH.me : (isHost() ? MATCH.bots[ownerId] : null);
+      if (!owner) return;
+      MATCH.handled[s.key] = 1;
+      if (h.t >= MATCH.game.startAt - 1000) {
+        if (h.d && !h.mn) owner.dmg += h.d;
+        if (h.k) owner.kills++;
+        if (h.as) owner.assists = (owner.assists || 0) + 1;
+        CHAR_TYPES.of(owner.char).onHitEarly(owner, h);
+        if (h.hl) owner.heal += h.hl;
+        if (h.hl && CHARS[owner.char].healGauge && !owner.isGaugeLocked()) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + h.hl * GAUGE_MAX / CHARS[owner.char].healGauge);
+        if (h.cs) owner.stunDealt = (owner.stunDealt || 0) + h.cs / 1000;
+        if (h.ss) owner.slowDealt = (owner.slowDealt || 0) + h.ss / 1000;
+        if (h.sw) owner.slowWeight = (owner.slowWeight || 0) + h.sw / 1000;
+        if (h.b && owner.alive && CHARS[owner.char].haste) owner.addHaste(now());
+        CHAR_TYPES.of(owner.char).onHitLate(owner, h);
+        var sameSwing = h.s && owner.gaugeSwing === h.s;
+        if (h.s) owner.gaugeSwing = h.s;
+        if (h.b && !sameSwing && !owner.isGaugeLocked()) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + (h.g != null ? h.g : roleOf(owner.char).gaugeOnHit));
+        if (h.b && !sameSwing && owner.alive && CHARS[owner.char].selfHeal) {
+          var stabHeal = STATUS.healAmount(owner, CHARS[owner.char].selfHeal, now());
+          owner.hp += stabHeal; owner.heal += stabHeal;
+        }
+        if (h.b && !sameSwing && owner.alive && owner.isBerserk(h.t)) {
+          var rageHeal = STATUS.healAmount(owner, ULT.bzHeal, now());
+          owner.hp += rageHeal; owner.heal += rageHeal;
+        }
+        if (owner === MATCH.me && h.d) sfx("confirm");
+        MATCH.game.forceNet = true;
+      }
+      s.ref.remove();
+    }
+  }
+  var DAMAGE = new DamageResolver();
+  class ProjectileSystem {
+    bladeSpin(p, x, y) {
+      if (p.spun) return;
+      p.spun = true;
+      FIELD.bladeSpins.push({ d: p.d, x: x, y: y, at: now() + ULT.bdDelay });
+      MATCH.fx.push({ k: "bladeZone", x: x, y: y, r: ULT.bdR, t: Date.now(), delay: ULT.bdDelay / CLOCK.scale, life: (ULT.bdDelay + 260) / CLOCK.scale });
+    }
+    stepBladeSpins(t) {
+      FIELD.bladeSpins = FIELD.bladeSpins.filter(function (s) {
+        if (t < s.at) return true;
+        var d = s.d;
+        MATCH.fx.push({ k: "boom", x: s.x, y: s.y, r: ULT.bdR / 1.1, c: 0xDCE3EC, t: Date.now(), life: 260 });
+        FX_VIEW.spark(s.x, s.y, "#FFFFFF", 1.4);
+        localTargets().forEach(function (T) {
+          if (!T.alive || T.team === d.team || T.id === d.owner || hyp(T.x - s.x, T.y - s.y) > ULT.bdR + BODY_R * 0.5) return;
+          DAMAGE.damage(T, ULT.bdDmg, d.owner, d.createdAt, null);
+        });
+        return false;
+      });
+    }
+    stepBladeDaggers(t) {
+      var foes = null;
+      keys(MATCH.remoteShots).forEach(function (id) {
+        var p = MATCH.remoteShots[id], d = p.d;
+        if (!CHAR_TYPES.of(d.ownerCharacterType).isBladeThrower || p.spun) return;
+        var e = clamp(t - d.createdAt, 0, p.life), pe = p.se === undefined ? 0 : p.se;
+        p.se = e;
+        var a = PROJECTILES.projAt(p, pe), b = PROJECTILES.projAt(p, e);
+        foes = foes || participants().map(ent).concat(MINIONS.allMinions().filter(function (m) { return MINIONS.minionReady(m, t); }));
+        for (var i = 0; i < foes.length; i++) {
+          var T = foes[i];
+          if (!T || !T.alive || T.id === d.owner || T.team === d.team) continue;
+          if (PROJECTILES.segHit(a.x, a.y, b.x, b.y, T.x, T.y, BODY_R + (d.pr || 6))) { p.gone = true; PROJECTILES.bladeSpin(p, T.x, T.y); return; }
+        }
+        if (e >= p.life) { p.dead = true; PROJECTILES.bladeSpin(p, b.x, b.y); }
+      });
+    }
+    addProj(id, d) {
+      if (!d) return;
+      var sp = hyp(d.vx, d.vy) || 1, dx = d.vx / sp, dy = d.vy / sp;
+      var dist = rayCast(d.x, d.y, dx, dy, d.range || 500, d.pr || 6);
+      MATCH.remoteShots[id] = { id: id, d: d, dx: dx, dy: dy, sp: sp, dist: dist, life: dist / sp * 1000, lt: {}, dead: false, sparked: false };
+    }
+    projAt(p, e) { e = clamp(e, 0, p.life); return { x: p.d.x + p.dx * p.sp * e / 1000, y: p.d.y + p.dy * p.sp * e / 1000 }; }
+    segHit(ax, ay, bx, by, cx, cy, r) {
+      var vx = bx - ax, vy = by - ay, L = vx * vx + vy * vy, t = 0;
+      if (L > 0) t = clamp(((cx - ax) * vx + (cy - ay) * vy) / L, 0, 1);
+      return hyp(ax + vx * t - cx, ay + vy * t - cy) <= r;
+    }
+    emitShots(E, ang, skill, statSkill) {
+      var t = now(), ev = { o: E.id, x: Math.round(E.x), y: Math.round(E.y), a: Math.round(ang * 100) / 100, t: t };
+      if (skill) ev.s = 1;
+      if (statSkill) ev.sk = 1;
+      E.atkAt = t;
+      room.ref.child("shots").push(ev);
+      revealBriefly(E.id, t);
+    }
+    onShot(s) {
+      var ev = s.val(); if (!ev || !MATCH.game || MATCH.handled[s.key]) return;
+      MATCH.handled[s.key] = 1;
+      var info = P[ev.o]; if (!info || (info.team !== "blue" && info.team !== "red")) return;
+      var c = playable(info.characterType) ? info.characterType : FALLBACK_CHAR, skill = !!ev.s, spec = PROJECTILES.shotSpec(c, skill);
+      if (now() - ev.t > spec.count * spec.gap + 3000) return;
+      MATCH.shots.push({ key: s.key, ev: ev, team: info.team, char: c, skill: skill, spec: spec, count: spec.count, gap: spec.gap, next: 0 });
+      PROJECTILES.stepShots(now());
+    }
+    shotSpec(c, skill) {
+      var C = CHARS[c];
+      if (skill) return CHAR_TYPES.of(c).skillShotSpec();
+      return { count: C.shots || 1, gap: C.gap || 0, sp: C.pSpeed, dmg: C.throwDmg || C.dmg, pr: C.pr, range: C.throwRange || C.range };
+    }
+    stepShots(t) {
+      MATCH.shots = MATCH.shots.filter(function (v) {
+        while (v.next < v.count && t >= v.ev.t + v.next * v.gap) {
+          if (!PROJECTILES.spawnShot(v, v.next)) return false;
+          v.next++;
+        }
+        return v.next < v.count;
+      });
+    }
+    spawnShot(v, i) {
+      var E = ent(v.ev.o);
+      if (i > 0 && E && (!E.alive || E.isStunned())) return false;
+      var sv = v.spec, sp = sv.sp, a = v.ev.a, dx = Math.cos(a), dy = Math.sin(a);
+      var ox = i > 0 && E ? E.x : v.ev.x, oy = i > 0 && E ? E.y : v.ev.y;
+      PROJECTILES.addProj(v.key + "_" + i, { team: v.team, owner: v.ev.o, ownerCharacterType: v.char, x: ox + dx * 20, y: oy + dy * 20,
+        vx: dx * sp, vy: dy * sp, isSkill: v.skill, countsAsSkill: !!v.ev.sk, dmg: sv.dmg, ultKey: sv.ultKey, fx: sv.fx,
+        pr: sv.pr, range: sv.range + (!v.skill && E && E.isOvercharged(v.ev.t) ? ULT.ocRangeBonus : 0), createdAt: v.ev.t + i * v.gap });
+      var shooterType = CHAR_TYPES.of(v.char);
+      if (v.skill) shooterType.skillShotFx(ox, oy, dx, dy);
+      if (E && (E === MATCH.me || MATCH.bots[E.id]) && hear(E)) sfx(shooterType.shotSound);
+      return true;
+    }
+    checkProjectiles(t) {
+      var targets = localTargets(); if (!targets.length) return;
+      keys(MATCH.remoteShots).forEach(function (id) {
+        var p = MATCH.remoteShots[id]; if (p.dead || p.gone) return;
+        var d = p.d, e = t - d.createdAt;
+        if (e < 0) e = 0;
+        if (e > p.life + 40) return;
+        for (var i = 0; i < targets.length; i++) {
+          var T = targets[i];
+          if (d.owner === T.id || !T.alive || d.team === T.team) continue;
+          var pe = p.lt[T.id]; if (pe === undefined) pe = 0;
+          p.lt[T.id] = e;
+          var a = PROJECTILES.projAt(p, pe), b = PROJECTILES.projAt(p, e);
+          if (PROJECTILES.segHit(a.x, a.y, b.x, b.y, T.x, T.y, BODY_R + (d.pr || 6))) { PROJECTILES.projHit(id, p, T); break; }
+        }
+      });
+    }
+    projHit(id, p, T) {
+      var d = p.d;
+      p.dead = true;
+      var immune = T.isProtected(), fx = d.fx, seen = !MATCH.me || MATCH.me.team === T.team || visibleTo(T, MATCH.me);
+      var ownerType = CHAR_TYPES.of(d.ownerCharacterType);
+      fx = ownerType.projectileEffect(d, T, immune, fx);
+      var dancer = ownerType.isBladeThrower;
+      DAMAGE.damage(T, Math.round(d.dmg * (1 + PROJECTILES.damageBonusSum(d, T))), d.owner, dancer ? d.createdAt : !d.isSkill, d.isSkill ? d.ultKey : (d.countsAsSkill ? "skill" : null), fx);
+      if (dancer) PROJECTILES.bladeSpin(p, T.x, T.y);
+      if (d.ultKey === "execute" && !immune) { room.ref.child("hits/" + d.owner).push({ d: 0, b: 0, t: now(), tp: { x: r1(T.x), y: r1(T.y) } }); FX_VIEW.executeFx(T.x, T.y); }
+      ownerType.afterProjectileHit(d, T, immune);
+      if (seen) FX_VIEW.spark(T.x, T.y, FX_VIEW.orbHitColor(d), d.ultKey === "giant" ? 2.2 : 1);
+    }
+    damageBonusSum(d, T) {
+      var bonus = 0, C = CHARS[d.ownerCharacterType], A = ent(d.owner);
+      if (C && C.farBonus) {
+        var fromX = A && A.alive ? A.x : d.x, fromY = A && A.alive ? A.y : d.y;
+        if (hyp(T.x - fromX, T.y - fromY) > C.farDist) bonus += C.farBonus;
+      }
+      return bonus;
+    }
+    projVisualHit(p, t) {
+      if (p.dead || p.gone) return;
+      var d = p.d, e = clamp(t - d.createdAt, 0, p.life), pe = p.ve === undefined ? 0 : p.ve;
+      p.ve = e;
+      var a = PROJECTILES.projAt(p, pe), b = PROJECTILES.projAt(p, e);
+      var list = participants().map(ent).concat(MINIONS.allMinions().filter(function (m) { return MINIONS.minionReady(m, t); }));
+      for (var i = 0; i < list.length; i++) {
+        var T = list[i];
+        if (!T || !T.alive || T.id === d.owner || T.team === d.team) continue;
+        if (PROJECTILES.segHit(a.x, a.y, b.x, b.y, T.x, T.y, BODY_R + (d.pr || 6))) {
+          p.gone = true;
+          if (d.ultKey === "execute") FX_VIEW.executeFx(T.x, T.y);
+          if (!MATCH.me || MATCH.me.team === T.team || visibleTo(T, MATCH.me, t)) FX_VIEW.spark(T.x, T.y, FX_VIEW.orbHitColor(d), d.ultKey === "giant" ? 2.2 : 1);
+          return;
+        }
+      }
+    }
+  }
+  var PROJECTILES = new ProjectileSystem();
   function moveEnt(E, vx, vy, dt) {
     var m = hyp(vx, vy); if (m > 1) { vx /= m; vy /= m; }
     var sp = E.speed();
@@ -3787,62 +4407,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     return rayObst(ax, ay, (bx - ax) / d, (by - ay) / d, 4) >= d;
   }
 
-  function addProj(id, d) {
-    if (!d) return;
-    var sp = hyp(d.vx, d.vy) || 1, dx = d.vx / sp, dy = d.vy / sp;
-    var dist = rayCast(d.x, d.y, dx, dy, d.range || 500, d.pr || 6);
-    MATCH.remoteShots[id] = { id: id, d: d, dx: dx, dy: dy, sp: sp, dist: dist, life: dist / sp * 1000, lt: {}, dead: false, sparked: false };
-  }
-  function projAt(p, e) { e = clamp(e, 0, p.life); return { x: p.d.x + p.dx * p.sp * e / 1000, y: p.d.y + p.dy * p.sp * e / 1000 }; }
-  function segHit(ax, ay, bx, by, cx, cy, r) {
-    var vx = bx - ax, vy = by - ay, L = vx * vx + vy * vy, t = 0;
-    if (L > 0) t = clamp(((cx - ax) * vx + (cy - ay) * vy) / L, 0, 1);
-    return hyp(ax + vx * t - cx, ay + vy * t - cy) <= r;
-  }
-  function emitShots(E, ang, skill, statSkill) {
-    var t = now(), ev = { o: E.id, x: Math.round(E.x), y: Math.round(E.y), a: Math.round(ang * 100) / 100, t: t };
-    if (skill) ev.s = 1;
-    if (statSkill) ev.sk = 1;
-    E.atkAt = t;
-    room.ref.child("shots").push(ev);
-    revealBriefly(E.id, t);
-  }
-  function onShot(s) {
-    var ev = s.val(); if (!ev || !MATCH.game || MATCH.handled[s.key]) return;
-    MATCH.handled[s.key] = 1;
-    var info = P[ev.o]; if (!info || (info.team !== "blue" && info.team !== "red")) return;
-    var c = playable(info.characterType) ? info.characterType : FALLBACK_CHAR, skill = !!ev.s, spec = shotSpec(c, skill);
-    if (now() - ev.t > spec.count * spec.gap + 3000) return;
-    MATCH.shots.push({ key: s.key, ev: ev, team: info.team, char: c, skill: skill, spec: spec, count: spec.count, gap: spec.gap, next: 0 });
-    stepShots(now());
-  }
-  function shotSpec(c, skill) {
-    var C = CHARS[c];
-    if (skill) return CHAR_TYPES.of(c).skillShotSpec();
-    return { count: C.shots || 1, gap: C.gap || 0, sp: C.pSpeed, dmg: C.throwDmg || C.dmg, pr: C.pr, range: C.throwRange || C.range };
-  }
-  function stepShots(t) {
-    MATCH.shots = MATCH.shots.filter(function (v) {
-      while (v.next < v.count && t >= v.ev.t + v.next * v.gap) {
-        if (!spawnShot(v, v.next)) return false;
-        v.next++;
-      }
-      return v.next < v.count;
-    });
-  }
-  function spawnShot(v, i) {
-    var E = ent(v.ev.o);
-    if (i > 0 && E && (!E.alive || E.isStunned())) return false;
-    var sv = v.spec, sp = sv.sp, a = v.ev.a, dx = Math.cos(a), dy = Math.sin(a);
-    var ox = i > 0 && E ? E.x : v.ev.x, oy = i > 0 && E ? E.y : v.ev.y;
-    addProj(v.key + "_" + i, { team: v.team, owner: v.ev.o, ownerCharacterType: v.char, x: ox + dx * 20, y: oy + dy * 20,
-      vx: dx * sp, vy: dy * sp, isSkill: v.skill, countsAsSkill: !!v.ev.sk, dmg: sv.dmg, ultKey: sv.ultKey, fx: sv.fx,
-      pr: sv.pr, range: sv.range + (!v.skill && E && E.isOvercharged(v.ev.t) ? ULT.ocRangeBonus : 0), createdAt: v.ev.t + i * v.gap });
-    var shooterType = CHAR_TYPES.of(v.char);
-    if (v.skill) shooterType.skillShotFx(ox, oy, dx, dy);
-    if (E && (E === MATCH.me || MATCH.bots[E.id]) && hear(E)) sfx(shooterType.shotSound);
-    return true;
-  }
   function pruneLocal(t) {
     keys(MATCH.remoteShots).forEach(function (id) { if (t - MATCH.remoteShots[id].d.createdAt > MATCH.remoteShots[id].life + 1000) delete MATCH.remoteShots[id]; });
     var ms = Date.now();
@@ -3852,169 +4416,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
   function localTargets() {
     var list = [], t = now();
-    function addMinions(E) { (E.minions || []).forEach(function (m) { if (minionReady(m, t)) list.push(m); }); }
+    function addMinions(E) { (E.minions || []).forEach(function (m) { if (MINIONS.minionReady(m, t)) list.push(m); }); }
     if (MATCH.me) { if (MATCH.me.alive) list.push(MATCH.me); addMinions(MATCH.me); }
     if (isHost()) keys(MATCH.bots).forEach(function (id) { if (MATCH.bots[id].alive) list.push(MATCH.bots[id]); addMinions(MATCH.bots[id]); });
     return list;
   }
-  function checkProjectiles(t) {
-    var targets = localTargets(); if (!targets.length) return;
-    keys(MATCH.remoteShots).forEach(function (id) {
-      var p = MATCH.remoteShots[id]; if (p.dead || p.gone) return;
-      var d = p.d, e = t - d.createdAt;
-      if (e < 0) e = 0;
-      if (e > p.life + 40) return;
-      for (var i = 0; i < targets.length; i++) {
-        var T = targets[i];
-        if (d.owner === T.id || !T.alive || d.team === T.team) continue;
-        var pe = p.lt[T.id]; if (pe === undefined) pe = 0;
-        p.lt[T.id] = e;
-        var a = projAt(p, pe), b = projAt(p, e);
-        if (segHit(a.x, a.y, b.x, b.y, T.x, T.y, BODY_R + (d.pr || 6))) { projHit(id, p, T); break; }
-      }
-    });
-  }
-  function projHit(id, p, T) {
-    var d = p.d;
-    p.dead = true;
-    var immune = T.isProtected(), fx = d.fx, seen = !MATCH.me || MATCH.me.team === T.team || visibleTo(T, MATCH.me);
-    var ownerType = CHAR_TYPES.of(d.ownerCharacterType);
-    fx = ownerType.projectileEffect(d, T, immune, fx);
-    var dancer = ownerType.isBladeThrower;
-    damage(T, Math.round(d.dmg * (1 + damageBonusSum(d, T))), d.owner, dancer ? d.createdAt : !d.isSkill, d.isSkill ? d.ultKey : (d.countsAsSkill ? "skill" : null), fx);
-    if (dancer) bladeSpin(p, T.x, T.y);
-    if (d.ultKey === "execute" && !immune) { room.ref.child("hits/" + d.owner).push({ d: 0, b: 0, t: now(), tp: { x: r1(T.x), y: r1(T.y) } }); FX_VIEW.executeFx(T.x, T.y); }
-    ownerType.afterProjectileHit(d, T, immune);
-    if (seen) FX_VIEW.spark(T.x, T.y, FX_VIEW.orbHitColor(d), d.ultKey === "giant" ? 2.2 : 1);
-  }
-  function damageBonusSum(d, T) {
-    var bonus = 0, C = CHARS[d.ownerCharacterType], A = ent(d.owner);
-    if (C && C.farBonus) {
-      var fromX = A && A.alive ? A.x : d.x, fromY = A && A.alive ? A.y : d.y;
-      if (hyp(T.x - fromX, T.y - fromY) > C.farDist) bonus += C.farBonus;
-    }
-    return bonus;
-  }
-  function projVisualHit(p, t) {
-    if (p.dead || p.gone) return;
-    var d = p.d, e = clamp(t - d.createdAt, 0, p.life), pe = p.ve === undefined ? 0 : p.ve;
-    p.ve = e;
-    var a = projAt(p, pe), b = projAt(p, e);
-    var list = participants().map(ent).concat(allMinions().filter(function (m) { return minionReady(m, t); }));
-    for (var i = 0; i < list.length; i++) {
-      var T = list[i];
-      if (!T || !T.alive || T.id === d.owner || T.team === d.team) continue;
-      if (segHit(a.x, a.y, b.x, b.y, T.x, T.y, BODY_R + (d.pr || 6))) {
-        p.gone = true;
-        if (d.ultKey === "execute") FX_VIEW.executeFx(T.x, T.y);
-        if (!MATCH.me || MATCH.me.team === T.team || visibleTo(T, MATCH.me, t)) FX_VIEW.spark(T.x, T.y, FX_VIEW.orbHitColor(d), d.ultKey === "giant" ? 2.2 : 1);
-        return;
-      }
-    }
-  }
-  function damageMinion(M, amount, owner, basic, ultKey, gaugeGain) {
-    if (!minionReady(M)) return;
-    var dm = Math.min(amount, M.hp);
-    M.hp -= dm;
-    var summoner = ent(M.owner);
-    if (summoner) summoner.blocked = (summoner.blocked || 0) + dm;
-    if (M.hp <= 0) { M.hp = 0; M.alive = false; M.diedAt = now(); }
-    pushHit(owner, dm, basic, ultKey, false, gaugeGain, true);
-    MATCH.game.forceNet = true;
-  }
-  function damage(T, amount, owner, basic, ultKey, fx, gaugeGain, noHurtGauge) {
-    if (T.minion) { damageMinion(T, amount, owner, basic, ultKey, gaugeGain); return; }
-    if (T.isProtected()) return;
-    var t = now(), unguarded = amount, C = CHARS[T.char];
-    if (T.shield && amount > 0) { amount = 0; T.shield = false; FX_VIEW.spark(T.x, T.y, SHIELD_SPARK, 1.5); }
-    var targetType = CHAR_TYPES.of(T.char);
-    amount = targetType.skillGuard(T, amount, t);
-    if (C.armor) amount = Math.max(0, amount - C.armor);
-    targetType.tallyBlocked(T, unguarded, amount);
-    var floorHp = CHARS[T.char].lastStandHp;
-    if (floorHp && !T.lastStandUsed && T.hp - amount < floorHp) {
-      amount = Math.max(0, T.hp - floorHp);
-      T.lastStandUsed = true;
-      T.stealthUntil = Math.max(T.stealthUntil || 0, now() + CHARS[T.char].lastStandHideMs);
-      T.revealUntil = 0;
-      FX_VIEW.smoke(T.x, T.y, NECRO_SMOKE_COLOR);
-    }
-    if (amount > 0) noteHurt(T, owner, t);
-    var dm = Math.min(amount, T.hp), killed = false;
-    T.taken = (T.taken || 0) + dm;
-    T.hp -= dm; if (!noHurtGauge && !T.isGaugeLocked()) T.gauge = Math.min(GAUGE_MAX, T.gauge + roleOf(T.char).gaugeOnHurt);
-    if (T.hp <= 0) { killed = true; T.hp = 0; T.alive = false; T.deaths++; T.diedAt = now(); T.burst = null; T.volley = null; T.slash = null; T.regenUntil = 0; T.skillUntil = 0; T.slowUntil = 0; T.slows = null; T.stunUntil = 0; T.lance = null; T.frostStacks = 0; T.hasteUntil = 0; T.hasteStacks = 0; T.burnUntil = 0; T.burnNext = 0; T.regenNext = 0; if (T === MATCH.me) { sfx("down"); aim.id = null; joy.id = null; } }
-    else {
-      if (T === MATCH.me) sfx("hit");
-      afflict(T, fx, owner);
-      if (fx && fx.maxHpRate) damage(T, Math.round(T.maxHp * fx.maxHpRate), owner, false, ultKey);
-      if (P[owner]) CHAR_TYPES.of(P[owner].characterType).afterDealtDamage(T, owner, ultKey, t);
-      if (C.rally && !T.rallyUsed && T.hp < T.maxHp * C.rally.hpRate) { T.rallyUsed = true; T.regenUntil = t + C.rally.ms; T.regenNext = t + REGEN_TICK_MS; }
-    }
-    pushHit(owner, dm, basic, ultKey, killed, gaugeGain);
-    if (killed) { T.domainBolt = null; T.curse = 0; T.curseBoom = null; breakRevelation(T, t); reportKill(T, owner, t); T.hurtBy = {}; T.helpedBy = {}; }
-    if (T === MATCH.me || T.bot) MATCH.game.forceNet = true;
-  }
-  function noteHurt(T, owner, t) {
-    if (owner && owner !== T.id && P[owner] && P[owner].team !== T.team) (T.hurtBy || (T.hurtBy = {}))[owner] = t;
-  }
-  function noteHelp(T, helper, t) {
-    if (helper && helper !== T.id && P[helper] && P[helper].team === T.team) (T.helpedBy || (T.helpedBy = {}))[helper] = t;
-  }
-  function listOf(v) { return v ? keys(v).map(function (i) { return v[i]; }) : []; }
-  function damageAssisters(T, killer, t) {
-    var by = T.hurtBy || {};
-    return keys(by).filter(function (id) { return id !== killer && t - by[id] <= ASSIST_MS && P[id] && P[id].team !== T.team; });
-  }
-  function creditAssist(id, t) { room.ref.child("hits/" + id).push({ d: 0, b: 0, t: t, as: 1 }); }
-  function reportKill(T, killer, t) {
-    var assisters = damageAssisters(T, killer, t), k = { k: killer, v: T.id, t: t };
-    if (assisters.length) k.a = assisters;
-    room.ref.child("kills").push(k);
-    assisters.forEach(function (id) { creditAssist(id, t); });
-  }
-  function creditHelpAssists(k) {
-    var K = k.k === myId ? MATCH.me : (isHost() ? MATCH.bots[k.k] : null);
-    if (!K || !K.helpedBy || !(k.t >= MATCH.game.startAt)) return;
-    var already = listOf(k.a);
-    keys(K.helpedBy).forEach(function (id) {
-      var at = K.helpedBy[id];
-      if (id === k.k || id === k.v || already.indexOf(id) >= 0 || !P[id] || P[id].team !== K.team) return;
-      if (k.t - at <= ASSIST_MS && at - k.t < 500) creditAssist(id, k.t);
-    });
-  }
-  function igniteBurn(T, owner, t) {
-    if (!(T.burnUntil > t)) T.burnNext = t + BURN_TICK_MS;
-    T.burnUntil = t + CHARS.mage.burn.ms; T.burnOwner = owner;
-    MATCH.game.forceNet = true;
-  }
-  function stepBurn(E, t) {
-    if (!E.burnNext || !E.alive) return;
-    if (E.burnNext > E.burnUntil + 1) { E.burnNext = 0; return; }
-    if (t < E.burnNext) return;
-    E.burnNext += BURN_TICK_MS;
-    damage(E, Math.round(E.maxHp * CHARS.mage.burn.maxHpRate), E.burnOwner, false, "burn");
-  }
-  function stepRally(E, t) {
-    if (!E.regenNext || !E.alive) return;
-    if (E.regenNext > E.regenUntil + 1) { E.regenNext = 0; return; }
-    if (t < E.regenNext) return;
-    E.regenNext += REGEN_TICK_MS;
-    var healed = healAmount(E, CHARS[E.char].rally.perSec, t);
-    if (healed <= 0) return;
-    E.hp += healed; E.heal = (E.heal || 0) + healed;
-    MATCH.game.forceNet = true;
-    if (E === MATCH.me) sfx("heal");
-  }
-  function inEnemyPoison(T, t) {
-    return FIELD.pools.some(function (pl) {
-      var e = pl.e, start = poolStart(e);
-      return e.team !== T.team && !pl.cut && t >= start && t < start + e.dur && CHARS[P[e.owner] ? P[e.owner].characterType : "thrower"].healCut &&
-             hyp(T.x - e.x, T.y - e.y) <= e.r + BODY_R * 0.5;
-    });
-  }
-  function healCut(T, t) { t = t || now(); return T.burnUntil > t || inEnemyPoison(T, t); }
-  function healAmount(T, amount, t) { return Math.max(0, Math.min(T.maxHp - T.hp, healCut(T, t) ? Math.round(amount * HEAL_CUT_MUL) : amount)); }
   var KILL_FEED_MS = 4000, KILL_FEED_MAX = 4, MULTI_KILL_MS = 3000;
   function multiKillCount(chainByKiller, k) {
     var chain = chainByKiller[k.k];
@@ -4031,7 +4437,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function onKillFeed(s) {
     var k = s.val(); if (!k || !MATCH.game || MATCH.handled[s.key]) return;
     MATCH.handled[s.key] = 1;
-    creditHelpAssists(k);
+    DAMAGE.creditHelpAssists(k);
     var streak = multiKillCount(MATCH.game.killChains || (MATCH.game.killChains = {}), k);
     if (!(k.t > now() - KILL_FEED_MS)) return;
     var killer = P[k.k] || {}, victim = P[k.v] || {}, feed = $("killFeed");
@@ -4056,730 +4462,348 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     banner.className = "show" + (tag ? " multi" : "");
     killSound(streak);
   }
-  function pushHit(owner, dmg, basic, ultKey, killed, gaugeGain, onMinion) {
-    var h = { d: dmg, b: basic ? 1 : 0, t: now() };
-    if (onMinion) h.mn = 1;
-    if (gaugeGain != null) h.g = gaugeGain;
-    if (ultKey) h.u = ultKey;
-    if (typeof basic === "number") h.s = basic;
-    if (killed) h.k = 1;
-    room.ref.child("hits/" + owner).push(attachCC(owner, h));
-  }
-  function listenHits(ownerId) {
-    if (MATCH.hitSubs[ownerId]) return;
-    MATCH.hitSubs[ownerId] = 1;
-    sub(room.ref.child("hits/" + ownerId), "child_added", onHit);
-  }
 
-  function onHit(s) {
-    var h = s.val(), ownerId = s.ref.parent.key; if (!h || !MATCH.game || MATCH.handled[s.key]) return;
-    var owner = ownerId === myId ? MATCH.me : (isHost() ? MATCH.bots[ownerId] : null);
-    if (!owner) return;
-    MATCH.handled[s.key] = 1;
-    if (h.t >= MATCH.game.startAt - 1000) {
-      if (h.d && !h.mn) owner.dmg += h.d;
-      if (h.k) owner.kills++;
-      if (h.as) owner.assists = (owner.assists || 0) + 1;
-      CHAR_TYPES.of(owner.char).onHitEarly(owner, h);
-      if (h.hl) owner.heal += h.hl;
-      if (h.hl && CHARS[owner.char].healGauge && !owner.isGaugeLocked()) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + h.hl * GAUGE_MAX / CHARS[owner.char].healGauge);
-      if (h.cs) owner.stunDealt = (owner.stunDealt || 0) + h.cs / 1000;
-      if (h.ss) owner.slowDealt = (owner.slowDealt || 0) + h.ss / 1000;
-      if (h.sw) owner.slowWeight = (owner.slowWeight || 0) + h.sw / 1000;
-      if (h.b && owner.alive && CHARS[owner.char].haste) owner.addHaste(now());
-      CHAR_TYPES.of(owner.char).onHitLate(owner, h);
-      var sameSwing = h.s && owner.gaugeSwing === h.s;
-      if (h.s) owner.gaugeSwing = h.s;
-      if (h.b && !sameSwing && !owner.isGaugeLocked()) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + (h.g != null ? h.g : roleOf(owner.char).gaugeOnHit));
-      if (h.b && !sameSwing && owner.alive && CHARS[owner.char].selfHeal) {
-        var stabHeal = healAmount(owner, CHARS[owner.char].selfHeal, now());
-        owner.hp += stabHeal; owner.heal += stabHeal;
-      }
-      if (h.b && !sameSwing && owner.alive && owner.isBerserk(h.t)) {
-        var rageHeal = healAmount(owner, ULT.bzHeal, now());
-        owner.hp += rageHeal; owner.heal += rageHeal;
-      }
-      if (owner === MATCH.me && h.d) sfx("confirm");
-      MATCH.game.forceNet = true;
-    }
-    s.ref.remove();
-  }
-  function stormZap(E, hit, t) {
-    var chain = CHARS.stormbow.chain, over = E.isOvercharged(t);
-    if (!over) {
-      E.zapHits = (E.zapHits || 0) + 1;
-      if (E.zapHits < chain.every) return;
-      E.zapHits = 0;
-    }
-    var links = chainTargets(E, hit, now()), pts = [[hit.x, hit.y]];
-    links.forEach(function (o) { pts.push([r1(o.x), r1(o.y)]); });
-    room.ref.child("effects").push({ type: "zap", team: E.team, owner: E.id, pts: pts, tgt: [hit.v].concat(links.map(function (o) { return o.id; })), dmg: chain.dmg, over: over ? 1 : 0, createdAt: now() });
-  }
-  function chainTargets(E, hit, t) {
-    var chain = CHARS.stormbow.chain;
-    return participants().map(ent).concat(allMinions().filter(function (m) { return minionReady(m, t); })).filter(function (o) {
-      return o && o.alive && o.team !== E.team && o.id !== hit.v && !o.isProtected(t) && !hiddenFrom(o, t) && hyp(o.x - hit.x, o.y - hit.y) <= chain.r;
-    }).sort(function (a, b) { return hyp(a.x - hit.x, a.y - hit.y) - hyp(b.x - hit.x, b.y - hit.y); }).slice(0, chain.count);
-  }
-  function onZap(e) {
-    var t = now();
-    if (t - e.createdAt > 1500) return;
-    FX_VIEW.chainFx(e.pts, e.over);
-    if (MATCH.me && hyp(e.pts[0][0] - MATCH.me.x, e.pts[0][1] - MATCH.me.y) < 700) sfx("zap");
-    if (!e.tgt || room.status !== "playing") return;
-    localTargets().forEach(function (T) {
-      if (e.tgt.indexOf(T.id) < 0 || !T.alive || T.team === e.team) return;
-      damage(T, e.dmg, e.owner, true, e.over ? "overcharge" : null, null, T.minion ? 0 : undefined);
-    });
-  }
-  function onEffect(s) {
-    var e = s.val(); if (!e || !MATCH.game || MATCH.handled[s.key]) return;
-    MATCH.handled[s.key] = 1;
-    if (FIELD.addLingering(e, now())) return;
-    if (e.type === "grace") { onGrace(e); return; }
-    if (e.type === "strike") { onDomainStrike(e); return; }
-    if (e.type === "zap") { onZap(e); return; }
-    if (e.type === "curse") { FIELD.curses[e.tgt] = { n: e.n, at: e.createdAt }; return; }
-    if (e.type === "revCut") { FIELD.revs.forEach(function (r) { if (r.e.owner === e.owner && r.e.createdAt <= e.createdAt) r.cut = true; }); return; }
-    if (e.type !== "burst" || now() > e.createdAt + e.delay + 1500) return;
-    FIELD.bursts.push({ e: e, vis: null });
-  }
-  function poolStart(e) { return e.createdAt + e.delay; }
-  function slowWhileInside(T, t, owner, mul, ms) {
-    var fresh = (T.slows || []).some(function (s) { return s.mul === mul && s.until - t > ms / 2; });
-    if (fresh) return;
-    var was = T.isSlowed(t);
-    addSlowCredited(T, mul, ms, t, owner);
-    if (!was) MATCH.game.forceNet = true;
-  }
-  function healInFog(T, e, t) {
-    var key = e.owner + "+" + T.id;
-    if (FIELD.poolHit[key] && t - FIELD.poolHit[key] < ULT.plTick) return;
-    FIELD.poolHit[key] = t;
-    var healed = healAmount(T, ULT.fgHeal, t);
-    if (healed <= 0) return;
-    T.hp += healed;
-    noteHelp(T, e.owner, t);
-    room.ref.child("hits/" + e.owner).push({ d: 0, b: 0, t: now(), hl: healed });
-    MATCH.game.forceNet = true;
-    if (T === MATCH.me) sfx("heal");
-  }
-  function stepPools(t) {
-    FIELD.pools = FIELD.pools.filter(function (pl) {
-      var e = pl.e, start = poolStart(e), end = start + e.dur;
-      if (t >= end || pl.cut) { EFFECT_VIEW.dropPoolVis(pl); return false; }
-      if (t < start) return true;
-      if (!pl.landed && !e.u) {
-        var olderPools = FIELD.pools.filter(function (q) { return q !== pl && q.landed && !q.cut && !q.e.u && q.e.owner === e.owner; })
-                              .sort(function (a, b) { return a.e.createdAt - b.e.createdAt; });
-        while (olderPools.length >= ULT.plMax) olderPools.shift().cut = true;
-      }
-      if (!pl.landed) { pl.landed = true; if (!MATCH.me || hyp(e.x - MATCH.me.x, e.y - MATCH.me.y) < 700) sfx("splash"); }
-      if (room.status !== "playing") return true;
-      localTargets().forEach(function (T) {
-        if (!T.alive || hyp(T.x - e.x, T.y - e.y) > e.r + BODY_R * 0.5) return;
-        if (T.team === e.team) { if (e.u && !T.minion) healInFog(T, e, t); return; }
-        if (T.isProtected(t)) return;
-        if (e.u && !T.minion) slowWhileInside(T, t, e.owner, ULT.fgSlowMul, ULT.fgSlowMs);
-        var key = e.owner + ">" + T.id;
-        if (FIELD.poolHit[key] && t - FIELD.poolHit[key] < ULT.plTick) return;
-        FIELD.poolHit[key] = t;
-        if (e.u) damage(T, e.dmg, e.owner, false, "fog");
-        else damage(T, e.dmg, e.owner, e.createdAt + Math.floor((t - start) / ULT.plTick), null, null, ULT.plGauge);
+  class MeleeSystem {
+    enemyInMelee(E) {
+      var reach = CHARS[E.char].range + BODY_R;
+      return participants().some(function (id) {
+        var o = ent(id);
+        return o && o.alive && o.team !== E.team && visibleTo(o, E) && hyp(o.x - E.x, o.y - E.y) <= reach;
       });
-      return true;
-    });
-  }
-  function creditHolePull(T, owner, t, dt) {
-    if (T.isStunned(t)) return;
-    var already = 1 - T.slowMulAt(t), extra = ULT.bhCcRate - already;
-    if (extra <= 0) return;
-    creditCC(owner, 0, already > 0 ? 0 : dt * 1000, dt * 1000 * extra);
-  }
-  function stepHoles(t, dt) {
-    FIELD.holes = FIELD.holes.filter(function (h) {
-      var e = h.e, start = e.createdAt + e.delay, end = start + e.dur;
-      if (t >= end) { EFFECT_VIEW.dropHoleVis(h); return false; }
-      if (t < start) return true;
-      if (!h.landed) { h.landed = true; if (!MATCH.me || hyp(e.x - MATCH.me.x, e.y - MATCH.me.y) < 700) sfx("orb"); }
-      if (room.status !== "playing") return true;
-      localTargets().forEach(function (T) {
-        if (!T.alive || T.team === e.team || T.minion || T.isProtected(t)) return;
-        var dx = e.x - T.x, dy = e.y - T.y, d = hyp(dx, dy);
-        if (d > e.r + BODY_R * 0.5 || d < 6) return;
-        var pull = Math.min(d - 6, ULT.bhPull * dt);
-        breakRevelation(T, t);
-        T.x += dx / d * pull; T.y += dy / d * pull;
-        resolve(T);
-        creditHolePull(T, e.owner, t, dt);
-        noteHurt(T, e.owner, t);
+    }
+    inArc(T, d) {
+      var dx = T.x - d.x, dy = T.y - d.y;
+      return hyp(dx, dy) <= d.radius + BODY_R && Math.abs(angDiff(Math.atan2(dy, dx), d.angle)) <= d.arc / 2 + 0.25;
+    }
+    inLine(T, d) {
+      var dx = T.x - d.x, dy = T.y - d.y, ca = Math.cos(d.angle), sa = Math.sin(d.angle);
+      var along = dx * ca + dy * sa, side = -dx * sa + dy * ca;
+      return along >= -BODY_R && along <= d.len + BODY_R && Math.abs(side) <= d.width / 2 + BODY_R;
+    }
+    inStrike(T, d) { return d.stab ? !!d.tgt && T.id === d.tgt : d.len ? MELEE.inLine(T, d) : MELEE.inArc(T, d) && losClear(d.x, d.y, T.x, T.y); }
+    lineReach(x, y, ang, len) { return Math.min(len, rayObst(x, y, Math.cos(ang), Math.sin(ang), 2) + BODY_R); }
+    onMelee(key, d) {
+      if (!d) return;
+      if (!MATCH.game || MATCH.handled[key]) { if (!d.wind) MATCH.melee[key] = { d: d, at: Date.now() }; return; }
+      MATCH.handled[key] = 1;
+      if (now() - d.createdAt > (d.wind || 0) + 1500) return;
+      if (d.wind) { FIELD.lunges.push({ key: key, d: d, vis: null }); return; }
+      MELEE.meleeStrike(key, d);
+    }
+    stepLance(E) {
+      var L = E.lance; if (!L) return;
+      var t = now(), d = L.d;
+      if (!E.alive) { E.lance = null; return; }
+      if (E.isStunned(t) || hyp(E.x - d.x, E.y - d.y) > LANCE_SLIP) { E.lance = null; E.windUntil = 0; E.ultUntil = Math.min(E.ultUntil, t); MATCH.game.forceNet = true; return; }
+      if (t < d.createdAt + d.wind) return;
+      E.lance = null;
+      if (L.basic) {
+        E.windUntil = 0;
+        room.ref.child("meleeHits").push(Object.assign({}, L.basic, { createdAt: t }));
+        if (hear(E)) sfx("swing");
+        revealBriefly(d.owner, t);
         MATCH.game.forceNet = true;
-      });
-      return true;
-    });
-  }
-  function stormCenter(s) {
-    var A = ent(s.e.owner);
-    if (A && A.alive) { s.lastX = A.x; s.lastY = A.y; }
-    else if (s.lastX == null) { s.lastX = s.e.x; s.lastY = s.e.y; }
-    return { x: s.lastX, y: s.lastY };
-  }
-  function stormOwnerFell(s) {
-    var A = ent(s.e.owner);
-    if (A && !A.alive) s.ownerFell = true;
-    return !!s.ownerFell;
-  }
-  function stormActive(s, t) { return !s.ownerFell && t >= s.e.createdAt + s.e.delay && t < s.e.createdAt + s.e.delay + s.e.dur; }
-  function inFriendlyStorm(E, t) {
-    if (!ULT.frBzHides) return false;
-    t = t || now();
-    for (var i = 0; i < FIELD.storms.length; i++) {
-      var s = FIELD.storms[i];
-      if (s.e.team !== E.team || !stormActive(s, t)) continue;
-      var c = stormCenter(s);
-      if (hyp(E.x - c.x, E.y - c.y) <= s.e.r) return true;
-    }
-    return false;
-  }
-  function stepStorms(t) {
-    FIELD.storms = FIELD.storms.filter(function (s) {
-      var e = s.e;
-      if (t >= e.createdAt + e.delay + e.dur || stormOwnerFell(s)) { EFFECT_VIEW.dropStormVis(s); return false; }
-      if (t < e.createdAt + e.delay) return true;
-      var c = stormCenter(s);
-      if (!s.landed) { s.landed = true; if (!MATCH.me || hyp(c.x - MATCH.me.x, c.y - MATCH.me.y) < 700) sfx("orb"); }
-      if (room.status !== "playing") return true;
-      var foesInside = localTargets().filter(function (T) { return T.alive && T.team !== e.team && hyp(T.x - c.x, T.y - c.y) <= e.r; });
-      localTargets().forEach(function (T) { if (!T.minion && T.alive && T.team === e.team && hyp(T.x - c.x, T.y - c.y) <= e.r) noteHelp(T, e.owner, t); });
-      if (s.nextTick && t < s.nextTick) return true;
-      s.nextTick = (s.nextTick || t) + ULT.frBzTick;
-      foesInside.forEach(function (T) {
-        var stack = !T.minion && !T.isProtected(t) && !T.isFrostFrozen(t) ? frostStackFx(T) : null;
-        damage(T, ULT.frBzDmg, e.owner, false, "blizzard", stack);
-      });
-      return true;
-    });
-  }
-  function graceTarget(E) {
-    var reach = CHARS.cleric.range, best = null, t = now();
-    participants().forEach(function (id) {
-      var A = ent(id);
-      if (!A || id === E.id || A.team !== E.team || !A.alive || A.isProtected(t) || hyp(A.x - E.x, A.y - E.y) > reach) return;
-      if (!best || A.hp / A.maxHp < best.hp / best.maxHp) best = A;
-    });
-    return best;
-  }
-  function graceStrike(E, t) {
-    E.atkAt = t;
-    revealBriefly(E.id, t);
-    var A = graceTarget(E);
-    if (hear(E)) sfx("orb");
-    MATCH.game.forceNet = true;
-    if (!A) return;
-    E.angle = Math.atan2(A.y - E.y, A.x - E.x);
-    room.ref.child("effects").push({ type: "grace", team: E.team, owner: E.id, tgt: A.id, heal: CHARS.cleric.graceHeal, createdAt: t });
-  }
-  function onGrace(e) {
-    var t = now();
-    if (t - e.createdAt > 1500) return;
-    FIELD.graces.push({ e: e, vis: null });
-    if (room.status !== "playing") return;
-    localTargets().forEach(function (T) {
-      if (T.minion || T.id !== e.tgt || !T.alive || T.team !== e.team || T.isProtected(t)) return;
-      healByCleric(T, e.owner, e.heal, t);
-    });
-  }
-  function healByCleric(T, owner, amount, t) {
-    var healed = healAmount(T, amount, t);
-    if (healed <= 0) return;
-    T.hp += healed;
-    noteHelp(T, owner, t);
-    room.ref.child("hits/" + owner).push({ d: 0, b: 0, t: t, hl: healed });
-    MATCH.game.forceNet = true;
-    if (T === MATCH.me) sfx("heal");
-  }
-  function revTickIndex(e, t) { return Math.floor((t - e.createdAt) / e.tick); }
-  function stepRevs(t) {
-    FIELD.revs = FIELD.revs.filter(function (r) {
-      var e = r.e;
-      if (r.cut || t >= e.createdAt + e.dur) { EFFECT_VIEW.dropRevVis(r); return false; }
-      if (t < e.createdAt || room.status !== "playing") return true;
-      var tick = revTickIndex(e, t);
-      localTargets().forEach(function (T) {
-        if (T.minion || T.id === e.owner || r.ticked[T.id] >= tick) return;
-        r.ticked[T.id] = tick;
-        if (!T.alive || T.isProtected(t)) return;
-        if (T.team === e.team) healByCleric(T, e.owner, e.heal, t);
-        else damage(T, e.dmg, e.owner, false, "revelation");
-      });
-      return true;
-    });
-  }
-  function domainRadius(e, t) { return e.r * clamp((t - e.createdAt) / e.grow, 0, 1); }
-  function domainActive(e, t) { return t >= e.createdAt && t < e.createdAt + e.dur; }
-  function domainCenter(dm) {
-    var A = ent(dm.e.owner);
-    if (A && A.alive) { dm.cx = A.x; dm.cy = A.y; }
-    else if (dm.cx == null) { dm.cx = dm.e.x; dm.cy = dm.e.y; }
-    return { x: dm.cx, y: dm.cy };
-  }
-  function domainOwnerFell(dm) {
-    var A = ent(dm.e.owner);
-    if (A && !A.alive) dm.ownerFell = true;
-    return !!dm.ownerFell;
-  }
-  function stepDomains(t) {
-    FIELD.domains = FIELD.domains.filter(function (dm) {
-      var e = dm.e;
-      if (t >= e.createdAt + e.dur || domainOwnerFell(dm)) { EFFECT_VIEW.dropDomainVis(dm); return false; }
-      var c = domainCenter(dm);
-      if (t < e.createdAt || room.status !== "playing" || t > e.createdAt + e.grow + ULT.dmStunGraceMs) return true;
-      var reach = domainRadius(e, t);
-      localTargets().forEach(function (T) {
-        if (T.minion || !T.alive || T.team === e.team || dm.touched[T.id] || T.isProtected(t)) return;
-        if (hyp(T.x - c.x, T.y - c.y) > reach + BODY_R * 0.5) return;
-        dm.touched[T.id] = 1;
-        afflict(T, { stunMs: e.stun }, e.owner);
-        T.domainBolt = { owner: e.owner, at: t + e.stun, dmg: e.bolt };
-      });
-      return true;
-    });
-  }
-  function applyCurse(T, owner, t) {
-    if (T.minion || !T.alive || T.curseBoom) return;
-    T.curse = (T.curse || 0) + 1; T.curseAt = t;
-    if (T.curse >= ULT.cuStacks) T.curseBoom = { at: t + ULT.cuBoomMs, owner: owner };
-    room.ref.child("effects").push({ type: "curse", tgt: T.id, owner: owner, n: T.curse, createdAt: t });
-  }
-  function stepCurse(T, t) {
-    var B = T.curseBoom;
-    if (!B && T.curse && t - T.curseAt >= ULT.cuExpireMs) {
-      T.curse = 0;
-      room.ref.child("effects").push({ type: "curse", tgt: T.id, owner: T.id, n: 0, createdAt: t });
-      return;
-    }
-    if (!B || t < B.at) return;
-    T.curse = 0; T.curseBoom = null;
-    if (!T.alive || T.isProtected(t)) return;
-    damage(T, ULT.cuBoomDmg, B.owner, false, "curse");
-  }
-  function stepDomainBolt(T, t) {
-    var B = T.domainBolt;
-    if (!B || t < B.at || T.isStunned(t)) return;
-    T.domainBolt = null;
-    if (!T.alive || T.isProtected(t)) return;
-    room.ref.child("effects").push({ type: "strike", owner: B.owner, tgt: T.id, createdAt: t });
-    damage(T, B.dmg, B.owner, false, "domainbolt");
-    applyCurse(T, B.owner, t);
-  }
-  function domainStrikeTarget(E, t) {
-    var zone = null;
-    FIELD.domains.forEach(function (dm) { if (dm.e.owner === E.id && domainActive(dm.e, t) && !domainOwnerFell(dm)) zone = dm; });
-    if (!zone) return null;
-    var c = domainCenter(zone), reach = domainRadius(zone.e, t) + BODY_R * 0.5, best = null, bd = Infinity;
-    participants().map(ent).concat(allMinions().filter(function (m) { return minionReady(m, t); })).forEach(function (o) {
-      if (!o || !o.alive || o.team === E.team || o.isProtected(t) || hyp(o.x - c.x, o.y - c.y) > reach || (!o.minion && !visibleTo(o, E, t))) return;
-      var d = hyp(o.x - E.x, o.y - E.y);
-      if (d < bd) { bd = d; best = o; }
-    });
-    return best;
-  }
-  function domainStrike(E, T, t) {
-    E.atkAt = t;
-    E.angle = Math.atan2(T.y - E.y, T.x - E.x);
-    revealBriefly(E.id, t);
-    MATCH.game.forceNet = true;
-    room.ref.child("effects").push({ type: "strike", team: E.team, owner: E.id, tgt: T.id, dmg: Math.round(T.maxHp * ULT.dmStrikeMaxHpRate), stun: ULT.dmStrikeStunMs, createdAt: t });
-  }
-  function onDomainStrike(e) {
-    var t = now();
-    if (t - e.createdAt > 1500) return;
-    var V = VIS[e.tgt] || MVIS[e.tgt], A = ent(e.tgt) || allMinions().filter(function (m) { return m.id === e.tgt; })[0];
-    if (A && (!MATCH.me || MATCH.me.team === A.team || visibleTo(A, MATCH.me, t))) { FX_VIEW.bloodBolt(V ? V.root.position.x : A.x, V ? V.root.position.z : A.y); FX_VIEW.spark(A.x, A.y, "#FF2A36", 1.6); }
-    if (A && (!MATCH.me || hyp(A.x - MATCH.me.x, A.y - MATCH.me.y) < 700)) sfx("boom");
-    if (!e.dmg || room.status !== "playing") return;
-    localTargets().forEach(function (T) {
-      if (T.id !== e.tgt || !T.alive || T.team === e.team) return;
-      damage(T, e.dmg, e.owner, e.createdAt, null, e.stun ? { stunMs: e.stun } : null);
-      applyCurse(T, e.owner, now());
-    });
-  }
-  function potionFlightMs(dist) {
-    var c = CHARS.thrower, far = Math.min(1, Math.max(0, (dist - c.minRange) / (c.range - c.minRange)));
-    return Math.round(ULT.plFlightMin + (ULT.plFlight - ULT.plFlightMin) * far);
-  }
-  function throwPoison(E, ang, reach, ult) {
-    var t = now(), c = CHARS.thrower, spot = burstSpot(E, ang, reach, ult ? ULT.fgCast : c.range, c.minRange);
-    var flightMs = potionFlightMs(hyp(spot.x - E.x, spot.y - E.y));
-    E.angle = Math.atan2(spot.y - E.y, spot.x - E.x); E.atkAt = t;
-    revealBriefly(E.id, t);
-    room.ref.child("effects").push({ type: "pool", team: E.team, owner: E.id, x: Math.round(spot.x), y: Math.round(spot.y), ox: Math.round(E.x), oy: Math.round(E.y),
-                                     r: ult ? ULT.fgR : ULT.plR, dmg: ult ? ULT.fgDmg : c.dmg, dur: ult ? ULT.fgDur : ULT.plDur, delay: flightMs, createdAt: t, u: ult ? 1 : 0 });
-    if (hear(E)) sfx("swing");
-    return flightMs;
-  }
-  function meteorHitAt(dist, r) {
-    var step = Math.min(ULT.mbSteps - 1, Math.floor(dist / (r + BODY_R) * ULT.mbSteps)), fall = step / (ULT.mbSteps - 1);
-    return { dmg: Math.round(ULT.mbDmg - (ULT.mbDmg - ULT.mbDmgMin) * fall), stunMs: Math.round(ULT.mbStunMs - (ULT.mbStunMs - ULT.mbStunMin) * fall) };
-  }
-  function stepBursts(t) {
-    FIELD.bursts = FIELD.bursts.filter(function (b) {
-      var e = b.e;
-      if (t < e.createdAt + e.delay) return true;
-      if (room.status === "playing") localTargets().forEach(function (T) {
-        if (!T.alive || hyp(T.x - e.x, T.y - e.y) > e.r + BODY_R) return;
-        if (T.team !== e.team) { var hit = meteorHitAt(hyp(T.x - e.x, T.y - e.y), e.r); damage(T, hit.dmg, e.owner, false, e.createdAt, { stunMs: hit.stunMs }); }
-      });
-      FX_VIEW.boom(e.x, e.y, e.r, e.team);
-      if (PIX >= PIX_START) { FX_VIEW.smoke(e.x, e.y, 0x8A6A52); FX_VIEW.spark(e.x, e.y, "#FFB45A", 2.2); }
-      if (!MATCH.me || hyp(e.x - MATCH.me.x, e.y - MATCH.me.y) < 700) sfx("boom");
-      EFFECT_VIEW.dropBurstVis(b);
-      return false;
-    });
-  }
-  function enemyInMelee(E) {
-    var reach = CHARS[E.char].range + BODY_R;
-    return participants().some(function (id) {
-      var o = ent(id);
-      return o && o.alive && o.team !== E.team && visibleTo(o, E) && hyp(o.x - E.x, o.y - E.y) <= reach;
-    });
-  }
-  var MELEE_SPARK = { warrior: "#FF9A3C", knight: "#FFFFFF", duelist: "#FF3B3B", rogue: "#DCE3EC", necro: "#C9A6FF", lancer: "#FFD27A", blacksmith: "#FFB45A", priest: "#C9A6FF", shaman: "#8A1420", hitman: "#FF4A5A", guardian: "#8FD9A8", stormbow: "#FFE45C" };
-  var HEAL_SPARK = "#7CFFB2";
-  function inArc(T, d) {
-    var dx = T.x - d.x, dy = T.y - d.y;
-    return hyp(dx, dy) <= d.radius + BODY_R && Math.abs(angDiff(Math.atan2(dy, dx), d.angle)) <= d.arc / 2 + 0.25;
-  }
-  function inLine(T, d) {
-    var dx = T.x - d.x, dy = T.y - d.y, ca = Math.cos(d.angle), sa = Math.sin(d.angle);
-    var along = dx * ca + dy * sa, side = -dx * sa + dy * ca;
-    return along >= -BODY_R && along <= d.len + BODY_R && Math.abs(side) <= d.width / 2 + BODY_R;
-  }
-  function inStrike(T, d) { return d.stab ? !!d.tgt && T.id === d.tgt : d.len ? inLine(T, d) : inArc(T, d) && losClear(d.x, d.y, T.x, T.y); }
-  function lineReach(x, y, ang, len) { return Math.min(len, rayObst(x, y, Math.cos(ang), Math.sin(ang), 2) + BODY_R); }
-  function onMelee(key, d) {
-    if (!d) return;
-    if (!MATCH.game || MATCH.handled[key]) { if (!d.wind) MATCH.melee[key] = { d: d, at: Date.now() }; return; }
-    MATCH.handled[key] = 1;
-    if (now() - d.createdAt > (d.wind || 0) + 1500) return;
-    if (d.wind) { FIELD.lunges.push({ key: key, d: d, vis: null }); return; }
-    meleeStrike(key, d);
-  }
-  var LANCE_SLIP = 3, LANCE_VIS_SLIP = 60;
-  function stepLance(E) {
-    var L = E.lance; if (!L) return;
-    var t = now(), d = L.d;
-    if (!E.alive) { E.lance = null; return; }
-    if (E.isStunned(t) || hyp(E.x - d.x, E.y - d.y) > LANCE_SLIP) { E.lance = null; E.windUntil = 0; E.ultUntil = Math.min(E.ultUntil, t); MATCH.game.forceNet = true; return; }
-    if (t < d.createdAt + d.wind) return;
-    E.lance = null;
-    if (L.basic) {
-      E.windUntil = 0;
-      room.ref.child("meleeHits").push(Object.assign({}, L.basic, { createdAt: t }));
-      if (hear(E)) sfx("swing");
+        return;
+      }
+      room.ref.child("meleeHits").push({ team: d.team, owner: d.owner, x: d.x, y: d.y, angle: d.angle, len: d.len, width: d.width,
+                                        dmg: ULT.lnDmg, u: 1, fx: { stunMs: ULT.lnStunMs }, createdAt: t });
       revealBriefly(d.owner, t);
       MATCH.game.forceNet = true;
-      return;
     }
-    room.ref.child("meleeHits").push({ team: d.team, owner: d.owner, x: d.x, y: d.y, angle: d.angle, len: d.len, width: d.width,
-                                      dmg: ULT.lnDmg, u: 1, fx: { stunMs: ULT.lnStunMs }, createdAt: t });
-    revealBriefly(d.owner, t);
-    MATCH.game.forceNet = true;
-  }
-  function stepLunges(t) {
-    FIELD.lunges = FIELD.lunges.filter(function (l) {
-      var d = l.d, A = ent(d.owner);
-      if (A && (!A.alive || A.isStunned(t) || hyp(A.x - d.x, A.y - d.y) > LANCE_VIS_SLIP)) { EFFECT_VIEW.dropLungeVis(l); return false; }
-      if (t < d.createdAt + d.wind) return true;
-      EFFECT_VIEW.dropLungeVis(l);
-      return false;
-    });
-  }
-  function strikeSpark(T, d, who) {
-    if (!T || !T.alive || !inStrike(T, d)) return;
-    var ally = T.team === d.team;
-    if (ally && (!d.heal || T.minion || T.id === d.owner)) return;
-    if (!ally && d.kb && !T.minion) T.knockedAt = Date.now();
-    if (!MATCH.me || MATCH.me.team === T.team || visibleTo(T, MATCH.me)) FX_VIEW.spark(T.x, T.y, ally ? HEAL_SPARK : (MELEE_SPARK[who] || "#FFFFFF"), CHAR_TYPES.of(who).heavyStrikeSpark || d.u ? 1.5 : 1);
-  }
-  function strikeHit(T, d) {
-    if (T.team === d.team || !T.alive || !inStrike(T, d)) return;
-    var dx = T.x - d.x, dy = T.y - d.y;
-    if (T.isProtected()) return;
-    if (d.slam && !d.dmg) afflict(T, d.fx, d.owner);
-    else damage(T, d.dmg, d.owner, (d.m || !d.u) && d.createdAt + (d.mi || 0) / 1000, d.hammer ? d.createdAt : (d.u || d.m || d.countsAsSkill ? "skill" : null), d.fx, d.m ? ULT.smGauge : null, !!d.m);
-    if (P[d.owner]) CHAR_TYPES.of(P[d.owner].characterType).afterStrike(T, d);
-    if (d.kb && T.alive) {
-      var dd = hyp(dx, dy) || 1, kbAt = now(), shoveEnd = T.shove ? T.shove.at + ULT.gdKbMs : 0;
-      if (!T.minion) { creditCC(d.owner, Math.max(0, kbAt + ULT.gdKbMs - Math.max(T.stunUntil || 0, shoveEnd, kbAt)), 0, 0); noteHurt(T, d.owner, kbAt); }
-      T.shove = { ux: dx / dd, uy: dy / dd, dist: d.kb, at: now(), done: 0 };
-      breakBladeStorm(T, kbAt); breakRevelation(T, kbAt);
-    }
-  }
-  var SHOVE_SUBSTEP = BODY_R / 2;
-  function shoved(E) { return !!E.shove; }
-  function stepShove(E, t) {
-    var S = E.shove; if (!S) return;
-    if (!E.alive) { E.shove = null; return; }
-    var k = clamp((t - S.at) / ULT.gdKbMs, 0, 1), eased = 1 - Math.pow(1 - k, 3), step = (eased - S.done) * S.dist;
-    var parts = Math.max(1, Math.ceil(step / SHOVE_SUBSTEP));
-    S.done = eased;
-    for (var i = 0; i < parts; i++) { E.x += S.ux * step / parts; E.y += S.uy * step / parts; resolve(E); }
-    E.mv = false;
-    if (k >= 1) E.shove = null;
-  }
-  function strikeHeal(T, d) {
-    if (!d.heal || T.team !== d.team || T.minion || T.id === d.owner || !T.alive || !inStrike(T, d)) return;
-    var healed = healAmount(T, d.heal, now());
-    if (healed <= 0) return;
-    T.hp += healed;
-    noteHelp(T, d.owner, now());
-    room.ref.child("hits/" + d.owner).push({ d: 0, b: 0, t: now(), hl: healed });
-    MATCH.game.forceNet = true;
-    if (T === MATCH.me) sfx("heal");
-  }
-  function meleeStrike(key, d) {
-    var who = P[d.owner] ? P[d.owner].characterType : "";
-    if (WAVE[who] && d.len) {
-      MATCH.melee[key] = { d: d, at: Date.now() - Math.max(0, now() - d.createdAt) / CLOCK.scale };
-      FIELD.waves.push({ d: d, who: who, sparked: [], struck: [] });
-      return;
-    }
-    MATCH.melee[key] = { d: d, at: Date.now() };
-    if (d.u && hear(d)) sfx("boom");
-    if (d.slam) FX_VIEW.boom(d.x, d.y, d.radius + BODY_R, d.team);
-    if (d.hammer) FX_VIEW.thunder(d.x, d.y);
-    if (d.zap) FX_VIEW.zapBarrier(d.x, d.y, d.radius + BODY_R);
-    participants().map(ent).concat(allMinions()).forEach(function (T) { strikeSpark(T, d, who); });
-    localTargets().forEach(function (T) { strikeHit(T, d); strikeHeal(T, d); });
-  }
-  function waveFront(d, t, travelMs) { return Math.min(1, (t - d.createdAt) / travelMs) * (d.len + BODY_R); }
-  function reachedBy(T, d, front) { return T && (T.x - d.x) * Math.cos(d.angle) + (T.y - d.y) * Math.sin(d.angle) <= front; }
-  function stepWaves(t) {
-    FIELD.waves = FIELD.waves.filter(function (w) {
-      var d = w.d, travelMs = WAVE[w.who].travel, front = waveFront(d, t, travelMs);
-      participants().map(ent).concat(allMinions()).forEach(function (T) {
-        if (!reachedBy(T, d, front) || w.sparked.indexOf(T) >= 0) return;
-        w.sparked.push(T); strikeSpark(T, d, w.who);
+    stepLunges(t) {
+      FIELD.lunges = FIELD.lunges.filter(function (l) {
+        var d = l.d, A = ent(d.owner);
+        if (A && (!A.alive || A.isStunned(t) || hyp(A.x - d.x, A.y - d.y) > LANCE_VIS_SLIP)) { EFFECT_VIEW.dropLungeVis(l); return false; }
+        if (t < d.createdAt + d.wind) return true;
+        EFFECT_VIEW.dropLungeVis(l);
+        return false;
       });
-      localTargets().forEach(function (T) {
-        if (!reachedBy(T, d, front) || w.struck.indexOf(T) >= 0) return;
-        w.struck.push(T); strikeHit(T, d); strikeHeal(T, d);
+    }
+    strikeSpark(T, d, who) {
+      if (!T || !T.alive || !MELEE.inStrike(T, d)) return;
+      var ally = T.team === d.team;
+      if (ally && (!d.heal || T.minion || T.id === d.owner)) return;
+      if (!ally && d.kb && !T.minion) T.knockedAt = Date.now();
+      if (!MATCH.me || MATCH.me.team === T.team || visibleTo(T, MATCH.me)) FX_VIEW.spark(T.x, T.y, ally ? HEAL_SPARK : (MELEE_SPARK[who] || "#FFFFFF"), CHAR_TYPES.of(who).heavyStrikeSpark || d.u ? 1.5 : 1);
+    }
+    strikeHit(T, d) {
+      if (T.team === d.team || !T.alive || !MELEE.inStrike(T, d)) return;
+      var dx = T.x - d.x, dy = T.y - d.y;
+      if (T.isProtected()) return;
+      if (d.slam && !d.dmg) STATUS.afflict(T, d.fx, d.owner);
+      else DAMAGE.damage(T, d.dmg, d.owner, (d.m || !d.u) && d.createdAt + (d.mi || 0) / 1000, d.hammer ? d.createdAt : (d.u || d.m || d.countsAsSkill ? "skill" : null), d.fx, d.m ? ULT.smGauge : null, !!d.m);
+      if (P[d.owner]) CHAR_TYPES.of(P[d.owner].characterType).afterStrike(T, d);
+      if (d.kb && T.alive) {
+        var dd = hyp(dx, dy) || 1, kbAt = now(), shoveEnd = T.shove ? T.shove.at + ULT.gdKbMs : 0;
+        if (!T.minion) { STATUS.creditCC(d.owner, Math.max(0, kbAt + ULT.gdKbMs - Math.max(T.stunUntil || 0, shoveEnd, kbAt)), 0, 0); DAMAGE.noteHurt(T, d.owner, kbAt); }
+        T.shove = { ux: dx / dd, uy: dy / dd, dist: d.kb, at: now(), done: 0 };
+        STATUS.breakBladeStorm(T, kbAt); STATUS.breakRevelation(T, kbAt);
+      }
+    }
+    strikeHeal(T, d) {
+      if (!d.heal || T.team !== d.team || T.minion || T.id === d.owner || !T.alive || !MELEE.inStrike(T, d)) return;
+      var healed = STATUS.healAmount(T, d.heal, now());
+      if (healed <= 0) return;
+      T.hp += healed;
+      DAMAGE.noteHelp(T, d.owner, now());
+      room.ref.child("hits/" + d.owner).push({ d: 0, b: 0, t: now(), hl: healed });
+      MATCH.game.forceNet = true;
+      if (T === MATCH.me) sfx("heal");
+    }
+    meleeStrike(key, d) {
+      var who = P[d.owner] ? P[d.owner].characterType : "";
+      if (WAVE[who] && d.len) {
+        MATCH.melee[key] = { d: d, at: Date.now() - Math.max(0, now() - d.createdAt) / CLOCK.scale };
+        FIELD.waves.push({ d: d, who: who, sparked: [], struck: [] });
+        return;
+      }
+      MATCH.melee[key] = { d: d, at: Date.now() };
+      if (d.u && hear(d)) sfx("boom");
+      if (d.slam) FX_VIEW.boom(d.x, d.y, d.radius + BODY_R, d.team);
+      if (d.hammer) FX_VIEW.thunder(d.x, d.y);
+      if (d.zap) FX_VIEW.zapBarrier(d.x, d.y, d.radius + BODY_R);
+      participants().map(ent).concat(MINIONS.allMinions()).forEach(function (T) { MELEE.strikeSpark(T, d, who); });
+      localTargets().forEach(function (T) { MELEE.strikeHit(T, d); MELEE.strikeHeal(T, d); });
+    }
+    waveFront(d, t, travelMs) { return Math.min(1, (t - d.createdAt) / travelMs) * (d.len + BODY_R); }
+    reachedBy(T, d, front) { return T && (T.x - d.x) * Math.cos(d.angle) + (T.y - d.y) * Math.sin(d.angle) <= front; }
+    stepWaves(t) {
+      FIELD.waves = FIELD.waves.filter(function (w) {
+        var d = w.d, travelMs = WAVE[w.who].travel, front = MELEE.waveFront(d, t, travelMs);
+        participants().map(ent).concat(MINIONS.allMinions()).forEach(function (T) {
+          if (!MELEE.reachedBy(T, d, front) || w.sparked.indexOf(T) >= 0) return;
+          w.sparked.push(T); MELEE.strikeSpark(T, d, w.who);
+        });
+        localTargets().forEach(function (T) {
+          if (!MELEE.reachedBy(T, d, front) || w.struck.indexOf(T) >= 0) return;
+          w.struck.push(T); MELEE.strikeHit(T, d); MELEE.strikeHeal(T, d);
+        });
+        return t < d.createdAt + travelMs;
       });
-      return t < d.createdAt + travelMs;
-    });
-  }
-  function swing(E, ang, rage, dmgOverride) {
-    var c = CHARS[E.char];
-    var d = { team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(ang), dmg: dmgOverride || Math.round(c.dmg * (rage ? ULT.bzDmgMul : 1)), createdAt: now() };
-    if (c.width) { d.len = Math.round(lineReach(E.x, E.y, ang, c.range)); d.width = c.width; }
-    if (rage || dmgOverride) d.countsAsSkill = 1;
-    d.radius = c.range;
-    if (c.arc) d.arc = c.arc;
-    if (c.heal) d.heal = c.heal;
-    if (c.fx) d.fx = c.fx;
-    E.atkAt = now();
-    revealBriefly(E.id, E.atkAt);
-    if (c.windup) {
-      var zone = Object.assign({}, d, { dmg: 0, wind: c.windup, zone: 1 });
-      E.lance = { d: zone, basic: d };
-      E.windUntil = d.createdAt + c.windup;
-      E.pending = null;
-      room.ref.child("meleeHits").push(zone);
-      return;
     }
-    room.ref.child("meleeHits").push(d);
-    if (hear(E)) sfx("swing");
-  }
-  function dashReach(E, ang, len) {
-    var dx = Math.cos(ang), dy = Math.sin(ang), pad = BODY_R - 1, best = rayObst(E.x, E.y, dx, dy, pad);
-    for (var i = 0; i < WATER.length; i++) best = Math.min(best, rayRect(E.x, E.y, dx, dy, WATER[i], pad));
-    if (dx > 1e-9) best = Math.min(best, (BOUND.r - BODY_R - E.x) / dx);
-    if (dx < -1e-9) best = Math.min(best, (BOUND.l + BODY_R - E.x) / dx);
-    if (dy > 1e-9) best = Math.min(best, (BOUND.b - BODY_R - E.y) / dy);
-    if (dy < -1e-9) best = Math.min(best, (BOUND.t + BODY_R - E.y) / dy);
-    return clamp(Math.min(len, best), 0, len);
-  }
-  function dashStrike(E, ang) {
-    var c = CHARS[E.char], t = now(), reach = dashReach(E, ang, c.dashRange);
-    var tx = clamp(E.x + Math.cos(ang) * reach, BOUND.l + BODY_R, BOUND.r - BODY_R), ty = clamp(E.y + Math.sin(ang) * reach, BOUND.t + BODY_R, BOUND.b - BODY_R);
-    reach = hyp(tx - E.x, ty - E.y);
-    room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(ang), len: Math.max(1, Math.round(reach)), width: c.dashWidth, dmg: c.dashDmg, createdAt: t });
-    revealBriefly(E.id, t);
-    E.dash = { sx: E.x, sy: E.y, tx: tx, ty: ty, at: t, ang: ang, swingId: t };
-    E.slash = null;
-    E.atkAt = t;
-    if (hear(E)) sfx("swing");
-  }
-  function lungeDashMs(E, t) { return E.isRiposting(t) ? ULT.rmDashMs : CHARS[E.char].dashMs; }
-  function lungeRange(E, t) { return E.isRiposting(t) ? ULT.rmDashRange : CHARS[E.char].dashRange; }
-  function lunge(E, ang) {
-    var t = now(), full = lungeRange(E, t), reach = dashReach(E, ang, full);
-    var tx = clamp(E.x + Math.cos(ang) * reach, BOUND.l + BODY_R, BOUND.r - BODY_R), ty = clamp(E.y + Math.sin(ang) * reach, BOUND.t + BODY_R, BOUND.b - BODY_R);
-    reach = hyp(tx - E.x, ty - E.y);
-    revealBriefly(E.id, t);
-    E.dash = { sx: E.x, sy: E.y, tx: tx, ty: ty, at: t, ang: ang, ms: Math.max(1, Math.round(lungeDashMs(E, t) * reach / full)) };
-    E.atkAt = t;
-    MATCH.game.forceNet = true;
-  }
-  function stabTarget(E, t) {
-    var reach = CHARS[E.char].range + BODY_R, best = null, bd = Infinity;
-    participants().map(ent).concat(allMinions().filter(function (m) { return minionReady(m, t); })).forEach(function (o) {
-      if (!o || !o.alive || o.team === E.team || o.isProtected(t) || !visibleTo(o, E)) return;
-      var d = hyp(o.x - E.x, o.y - E.y);
-      if (d <= reach && d < bd && losClear(E.x, E.y, o.x, o.y)) { bd = d; best = o; }
-    });
-    return best;
-  }
-  function stabNearest(E, t) {
-    var c = CHARS[E.char], T = stabTarget(E, t);
-    E.stabAt = t;
-    revealBriefly(E.id, t);
-    MATCH.game.forceNet = true;
-    if (hear(E)) sfx("swing");
-    var d = { team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(E.angle), stab: 1, radius: c.range, dmg: c.dmg, createdAt: t };
-    if (E.isRiposting(t)) d.countsAsSkill = 1;
-    if (T) {
-      E.angle = d.angle = r1(Math.atan2(T.y - E.y, T.x - E.x));
-      d.tgt = T.id; d.len = Math.max(1, Math.round(hyp(T.x - E.x, T.y - E.y) - BODY_R)); d.width = 14;
+    swing(E, ang, rage, dmgOverride) {
+      var c = CHARS[E.char];
+      var d = { team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(ang), dmg: dmgOverride || Math.round(c.dmg * (rage ? ULT.bzDmgMul : 1)), createdAt: now() };
+      if (c.width) { d.len = Math.round(MELEE.lineReach(E.x, E.y, ang, c.range)); d.width = c.width; }
+      if (rage || dmgOverride) d.countsAsSkill = 1;
+      d.radius = c.range;
+      if (c.arc) d.arc = c.arc;
+      if (c.heal) d.heal = c.heal;
+      if (c.fx) d.fx = c.fx;
+      E.atkAt = now();
+      revealBriefly(E.id, E.atkAt);
+      if (c.windup) {
+        var zone = Object.assign({}, d, { dmg: 0, wind: c.windup, zone: 1 });
+        E.lance = { d: zone, basic: d };
+        E.windUntil = d.createdAt + c.windup;
+        E.pending = null;
+        room.ref.child("meleeHits").push(zone);
+        return;
+      }
+      room.ref.child("meleeHits").push(d);
+      if (hear(E)) sfx("swing");
     }
-    room.ref.child("meleeHits").push(d);
-  }
-  function stepDash(E) {
-    var D = E.dash; if (!D) return;
-    if (!E.alive) { E.dash = null; return; }
-    var t = now(), c = CHARS[E.char], dashMs = D.ms || c.dashMs, k = clamp((t - D.at) / dashMs, 0, 1);
-    E.mv = false;
-    if (!D.landed) {
-      E.x = D.sx + (D.tx - D.sx) * k; E.y = D.sy + (D.ty - D.sy) * k;
+    dashReach(E, ang, len) {
+      var dx = Math.cos(ang), dy = Math.sin(ang), pad = BODY_R - 1, best = rayObst(E.x, E.y, dx, dy, pad);
+      for (var i = 0; i < WATER.length; i++) best = Math.min(best, rayRect(E.x, E.y, dx, dy, WATER[i], pad));
+      if (dx > 1e-9) best = Math.min(best, (BOUND.r - BODY_R - E.x) / dx);
+      if (dx < -1e-9) best = Math.min(best, (BOUND.l + BODY_R - E.x) / dx);
+      if (dy > 1e-9) best = Math.min(best, (BOUND.b - BODY_R - E.y) / dy);
+      if (dy < -1e-9) best = Math.min(best, (BOUND.t + BODY_R - E.y) / dy);
+      return clamp(Math.min(len, best), 0, len);
+    }
+    dashStrike(E, ang) {
+      var c = CHARS[E.char], t = now(), reach = MELEE.dashReach(E, ang, c.dashRange);
+      var tx = clamp(E.x + Math.cos(ang) * reach, BOUND.l + BODY_R, BOUND.r - BODY_R), ty = clamp(E.y + Math.sin(ang) * reach, BOUND.t + BODY_R, BOUND.b - BODY_R);
+      reach = hyp(tx - E.x, ty - E.y);
+      room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(ang), len: Math.max(1, Math.round(reach)), width: c.dashWidth, dmg: c.dashDmg, createdAt: t });
+      revealBriefly(E.id, t);
+      E.dash = { sx: E.x, sy: E.y, tx: tx, ty: ty, at: t, ang: ang, swingId: t };
+      E.slash = null;
+      E.atkAt = t;
+      if (hear(E)) sfx("swing");
+    }
+    lungeDashMs(E, t) { return E.isRiposting(t) ? ULT.rmDashMs : CHARS[E.char].dashMs; }
+    lungeRange(E, t) { return E.isRiposting(t) ? ULT.rmDashRange : CHARS[E.char].dashRange; }
+    lunge(E, ang) {
+      var t = now(), full = MELEE.lungeRange(E, t), reach = MELEE.dashReach(E, ang, full);
+      var tx = clamp(E.x + Math.cos(ang) * reach, BOUND.l + BODY_R, BOUND.r - BODY_R), ty = clamp(E.y + Math.sin(ang) * reach, BOUND.t + BODY_R, BOUND.b - BODY_R);
+      reach = hyp(tx - E.x, ty - E.y);
+      revealBriefly(E.id, t);
+      E.dash = { sx: E.x, sy: E.y, tx: tx, ty: ty, at: t, ang: ang, ms: Math.max(1, Math.round(MELEE.lungeDashMs(E, t) * reach / full)) };
+      E.atkAt = t;
+      MATCH.game.forceNet = true;
+    }
+    stabTarget(E, t) {
+      var reach = CHARS[E.char].range + BODY_R, best = null, bd = Infinity;
+      participants().map(ent).concat(MINIONS.allMinions().filter(function (m) { return MINIONS.minionReady(m, t); })).forEach(function (o) {
+        if (!o || !o.alive || o.team === E.team || o.isProtected(t) || !visibleTo(o, E)) return;
+        var d = hyp(o.x - E.x, o.y - E.y);
+        if (d <= reach && d < bd && losClear(E.x, E.y, o.x, o.y)) { bd = d; best = o; }
+      });
+      return best;
+    }
+    stabNearest(E, t) {
+      var c = CHARS[E.char], T = MELEE.stabTarget(E, t);
+      E.stabAt = t;
+      revealBriefly(E.id, t);
+      MATCH.game.forceNet = true;
+      if (hear(E)) sfx("swing");
+      var d = { team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(E.angle), stab: 1, radius: c.range, dmg: c.dmg, createdAt: t };
+      if (E.isRiposting(t)) d.countsAsSkill = 1;
+      if (T) {
+        E.angle = d.angle = r1(Math.atan2(T.y - E.y, T.x - E.x));
+        d.tgt = T.id; d.len = Math.max(1, Math.round(hyp(T.x - E.x, T.y - E.y) - BODY_R)); d.width = 14;
+      }
+      room.ref.child("meleeHits").push(d);
+    }
+    stepDash(E) {
+      var D = E.dash; if (!D) return;
+      if (!E.alive) { E.dash = null; return; }
+      var t = now(), c = CHARS[E.char], dashMs = D.ms || c.dashMs, k = clamp((t - D.at) / dashMs, 0, 1);
+      E.mv = false;
+      if (!D.landed) {
+        E.x = D.sx + (D.tx - D.sx) * k; E.y = D.sy + (D.ty - D.sy) * k;
+        if (k < 1) return;
+        D.landed = true;
+        resolve(E);
+      }
+      if (E.isStunned(t)) { E.dash = null; return; }
+      if (t < D.at + dashMs + (c.finishDelay || 0)) return;
+      E.dash = null;
+      if (c.stab) { MELEE.stabNearest(E, t); return; }
+      E.atkAt = t;
+      if (hear(E)) sfx("swing");
+      room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(D.ang), radius: c.range, arc: Math.PI * 2, dmg: c.dmg, createdAt: D.swingId });
+      revealBriefly(E.id, t);
+      MATCH.game.forceNet = true;
+    }
+    stepKnightSlam(E) {
+      var t = now();
+      if (!E.slamAt || t < E.slamAt) return;
+      E.slamAt = 0;
+      if (!E.alive) return;
+      E.atkAt = t; E.ultUntil = t + 500;
+      room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(E.angle), radius: ULT.tkStunR, arc: Math.PI * 2,
+                                        dmg: 0, u: 1, slam: 1, fx: { stunMs: ULT.tkStunMs }, createdAt: t });
+      revealBriefly(E.id, t);
+      MATCH.game.forceNet = true;
+    }
+    hammerLeapMs(dist) {
+      var k = clamp((dist - ULT.bsMin) / (ULT.bsCast - ULT.bsMin), 0, 1);
+      return Math.round(ULT.bsLeapMinMs + (ULT.bsLeapMaxMs - ULT.bsLeapMinMs) * k);
+    }
+    leapProgress(t, leapAt, landAt) { return landAt > leapAt ? clamp((t - leapAt) / (landAt - leapAt), 0, 1) : 1; }
+    stepHammerLeap(E) {
+      var L = E.leap; if (!L) return;
+      if (!E.alive) { E.leap = null; return; }
+      var t = now(), k = MELEE.leapProgress(t, L.at, L.until), ease = k * k * (3 - 2 * k);
+      E.x = L.sx + (L.tx - L.sx) * ease; E.y = L.sy + (L.ty - L.sy) * ease;
+      E.mv = false;
       if (k < 1) return;
-      D.landed = true;
+      E.leap = null;
       resolve(E);
+      room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(E.angle), radius: ULT.bsR, arc: Math.PI * 2,
+                                        dmg: ULT.bsDmg, u: 1, slam: 1, hammer: 1, fx: { stunMs: ULT.bsStunMs }, createdAt: t });
+      revealBriefly(E.id, t);
+      MATCH.game.forceNet = true;
     }
-    if (E.isStunned(t)) { E.dash = null; return; }
-    if (t < D.at + dashMs + (c.finishDelay || 0)) return;
-    E.dash = null;
-    if (c.stab) { stabNearest(E, t); return; }
-    E.atkAt = t;
-    if (hear(E)) sfx("swing");
-    room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(D.ang), radius: c.range, arc: Math.PI * 2, dmg: c.dmg, createdAt: D.swingId });
-    revealBriefly(E.id, t);
-    MATCH.game.forceNet = true;
   }
+  var MELEE = new MeleeSystem();
+  var MELEE_SPARK = { warrior: "#FF9A3C", knight: "#FFFFFF", duelist: "#FF3B3B", rogue: "#DCE3EC", necro: "#C9A6FF", lancer: "#FFD27A", blacksmith: "#FFB45A", priest: "#C9A6FF", shaman: "#8A1420", hitman: "#FF4A5A", guardian: "#8FD9A8", stormbow: "#FFE45C" };
+  var HEAL_SPARK = "#7CFFB2";
+  var LANCE_SLIP = 3, LANCE_VIS_SLIP = 60;
+  var SHOVE_SUBSTEP = BODY_R / 2;
 
-  function respawnIfReady(E, t) {
-    if (E.alive || !E.diedAt || t < E.diedAt + RESPAWN_MS || !P[E.id] || !P[E.id].slot) return;
-    var sp = E.practiceBot && E.home ? { x: E.home.x, y: E.home.y, angle: E.angle } : spawnOf(E.team, P[E.id].slot);
-    E.x = sp.x; E.y = sp.y; E.angle = sp.angle; E.mv = false;
-    E.hp = E.maxHp; E.alive = true; E.protectUntil = t + RESPAWN_PROTECT_MS;
-    E.cdUntil = 0; E.pending = null; E.burst = null; E.volley = null; E.slash = null;
-    E.buffUntil = 0; E.slamAt = 0; E.leap = null; E.dash = null; E.shove = null; E.stealthUntil = 0; E.ultUntil = 0; E.skillUntil = 0; E.regenUntil = 0; E.slowUntil = 0; E.slows = null; E.stunUntil = 0; E.lance = null; E.windUntil = 0;
-    E.frostStacks = 0; E.frostStackAt = 0; E.revealUntil = 0; E.lastStandUsed = false; E.hasteUntil = 0; E.hasteStacks = 0;
-    E.burnUntil = 0; E.burnNext = 0; E.rallyUsed = false; E.regenNext = 0; E.shield = !!CHARS[E.char].respawnShield;
-    if (E === MATCH.me) CAM.snap = true;
-    MATCH.game.forceNet = true;
+  class RespawnSystem {
+    respawnIfReady(E, t) {
+      if (E.alive || !E.diedAt || t < E.diedAt + RESPAWN_MS || !P[E.id] || !P[E.id].slot) return;
+      var sp = E.practiceBot && E.home ? { x: E.home.x, y: E.home.y, angle: E.angle } : spawnOf(E.team, P[E.id].slot);
+      E.x = sp.x; E.y = sp.y; E.angle = sp.angle; E.mv = false;
+      E.hp = E.maxHp; E.alive = true; E.protectUntil = t + RESPAWN_PROTECT_MS;
+      E.cdUntil = 0; E.pending = null; E.burst = null; E.volley = null; E.slash = null;
+      E.buffUntil = 0; E.slamAt = 0; E.leap = null; E.dash = null; E.shove = null; E.stealthUntil = 0; E.ultUntil = 0; E.skillUntil = 0; E.regenUntil = 0; E.slowUntil = 0; E.slows = null; E.stunUntil = 0; E.lance = null; E.windUntil = 0;
+      E.frostStacks = 0; E.frostStackAt = 0; E.revealUntil = 0; E.lastStandUsed = false; E.hasteUntil = 0; E.hasteStacks = 0;
+      E.burnUntil = 0; E.burnNext = 0; E.rallyUsed = false; E.regenNext = 0; E.shield = !!CHARS[E.char].respawnShield;
+      if (E === MATCH.me) CAM.snap = true;
+      MATCH.game.forceNet = true;
+    }
   }
+  var RESPAWN = new RespawnSystem();
   function canAct() { return MATCH.game && room.status === "playing" && now() >= room.startAt && MATCH.me && MATCH.me.alive && !MATCH.me.isStunned(); }
-  function fireBasic(E, ang, reach) {
-    var c = CHARS[E.char], t = now(), rage = E.isBerserk(t);
-    if (E.isStunned(t)) return;
-    E.cdDur = E.isRiposting(t) ? 1000 / ULT.rmRate : c.cd * (rage ? ULT.bzCdMul : 1) / (E.isOvercharged(t) ? ULT.ocRate : 1); E.cdUntil = t + E.cdDur; E.angle = ang;
-    var type = CHAR_TYPES.of(E.char);
-    if (type.overrideBasic(E, ang, reach, t)) return;
-    if (c.stab) { lunge(E, ang); return; }
-    var ambushDmg = type.ambush(E, t);
-    if (isMelee(E.char) && (!c.throwRange || enemyInMelee(E))) {
-      swing(E, ang, rage, ambushDmg);
-      if (c.hits > 1) E.slash = { left: c.hits - 1, at: t + c.hitGap, ang: ang, dmg: ambushDmg };
-      return;
+  class AttackController {
+    fireBasic(E, ang, reach) {
+      var c = CHARS[E.char], t = now(), rage = E.isBerserk(t);
+      if (E.isStunned(t)) return;
+      E.cdDur = E.isRiposting(t) ? 1000 / ULT.rmRate : c.cd * (rage ? ULT.bzCdMul : 1) / (E.isOvercharged(t) ? ULT.ocRate : 1); E.cdUntil = t + E.cdDur; E.angle = ang;
+      var type = CHAR_TYPES.of(E.char);
+      if (type.overrideBasic(E, ang, reach, t)) return;
+      if (c.stab) { MELEE.lunge(E, ang); return; }
+      var ambushDmg = type.ambush(E, t);
+      if (isMelee(E.char) && (!c.throwRange || MELEE.enemyInMelee(E))) {
+        MELEE.swing(E, ang, rage, ambushDmg);
+        if (c.hits > 1) E.slash = { left: c.hits - 1, at: t + c.hitGap, ang: ang, dmg: ambushDmg };
+        return;
+      }
+      PROJECTILES.emitShots(E, ang, false, !!ambushDmg);
+      if (c.shots > 1) E.volley = { until: t + (c.shots - 1) * c.gap };
     }
-    emitShots(E, ang, false, !!ambushDmg);
-    if (c.shots > 1) E.volley = { until: t + (c.shots - 1) * c.gap };
-  }
-  function tryFire(E, ang, reach) {
-    if (now() >= E.cdUntil) { fireBasic(E, ang, reach); E.pending = null; }
-    else E.pending = { ang: ang, reach: reach, until: now() + 350 };
-  }
-  function burstSpot(E, ang, reach, maxR, minR) {
-    maxR = maxR || ULT.mbCast; minR = minR || ULT.mbMin;
-    if (reach == null) {
-      var T = autoAimTarget(E);
-      if (T && hyp(T.x - E.x, T.y - E.y) <= maxR) return { x: T.x, y: T.y };
-      reach = maxR * 0.6;
+    tryFire(E, ang, reach) {
+      if (now() >= E.cdUntil) { ATTACK.fireBasic(E, ang, reach); E.pending = null; }
+      else E.pending = { ang: ang, reach: reach, until: now() + 350 };
     }
-    reach = clamp(reach, minR, maxR);
-    return { x: clamp(E.x + Math.cos(ang) * reach, BOUND.l, BOUND.r), y: clamp(E.y + Math.sin(ang) * reach, BOUND.t, BOUND.b) };
-  }
-  function useUlt(E, ang, reach) {
-    if (E.gauge < GAUGE_MAX || !E.alive || E.isStunned()) return;
-    E.gauge = 0;
-    var t = now();
-    var type = CHAR_TYPES.of(E.char);
-    type.cast(E, ang, reach, t);
-    if (E.skillDur && type.startsSkillTimer) E.skillUntil = t + E.skillDur;
-    if (hear(E)) sfx("ult");
-    MATCH.game.forceNet = true;
-  }
-  function stepKnightSlam(E) {
-    var t = now();
-    if (!E.slamAt || t < E.slamAt) return;
-    E.slamAt = 0;
-    if (!E.alive) return;
-    E.atkAt = t; E.ultUntil = t + 500;
-    room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(E.angle), radius: ULT.tkStunR, arc: Math.PI * 2,
-                                      dmg: 0, u: 1, slam: 1, fx: { stunMs: ULT.tkStunMs }, createdAt: t });
-    revealBriefly(E.id, t);
-    MATCH.game.forceNet = true;
-  }
-  function hammerLeapMs(dist) {
-    var k = clamp((dist - ULT.bsMin) / (ULT.bsCast - ULT.bsMin), 0, 1);
-    return Math.round(ULT.bsLeapMinMs + (ULT.bsLeapMaxMs - ULT.bsLeapMinMs) * k);
-  }
-  function leapProgress(t, leapAt, landAt) { return landAt > leapAt ? clamp((t - leapAt) / (landAt - leapAt), 0, 1) : 1; }
-  function stepHammerLeap(E) {
-    var L = E.leap; if (!L) return;
-    if (!E.alive) { E.leap = null; return; }
-    var t = now(), k = leapProgress(t, L.at, L.until), ease = k * k * (3 - 2 * k);
-    E.x = L.sx + (L.tx - L.sx) * ease; E.y = L.sy + (L.ty - L.sy) * ease;
-    E.mv = false;
-    if (k < 1) return;
-    E.leap = null;
-    resolve(E);
-    room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(E.angle), radius: ULT.bsR, arc: Math.PI * 2,
-                                      dmg: ULT.bsDmg, u: 1, slam: 1, hammer: 1, fx: { stunMs: ULT.bsStunMs }, createdAt: t });
-    revealBriefly(E.id, t);
-    MATCH.game.forceNet = true;
-  }
-  function stepCombat(E, dt) {
-    var t = now();
-    if (E.pending) {
-      if (t > E.pending.until) E.pending = null;
-      else if (t >= E.cdUntil) { fireBasic(E, E.pending.ang, E.pending.reach); E.pending = null; }
+    burstSpot(E, ang, reach, maxR, minR) {
+      maxR = maxR || ULT.mbCast; minR = minR || ULT.mbMin;
+      if (reach == null) {
+        var T = ATTACK.autoAimTarget(E);
+        if (T && hyp(T.x - E.x, T.y - E.y) <= maxR) return { x: T.x, y: T.y };
+        reach = maxR * 0.6;
+      }
+      reach = clamp(reach, minR, maxR);
+      return { x: clamp(E.x + Math.cos(ang) * reach, BOUND.l, BOUND.r), y: clamp(E.y + Math.sin(ang) * reach, BOUND.t, BOUND.b) };
     }
-    if (E.burst && t >= E.burst.until) E.burst = null;
-    if (E.volley && t >= E.volley.until) E.volley = null;
-    if (E.slash && t >= E.slash.at) {
-      var sl = E.slash;
-      swing(E, sl.ang, E.isBerserk(t), sl.dmg);
-      sl.left--; sl.at += CHARS[E.char].hitGap;
-      if (sl.left <= 0) E.slash = null;
+    useUlt(E, ang, reach) {
+      if (E.gauge < GAUGE_MAX || !E.alive || E.isStunned()) return;
+      E.gauge = 0;
+      var t = now();
+      var type = CHAR_TYPES.of(E.char);
+      type.cast(E, ang, reach, t);
+      if (E.skillDur && type.startsSkillTimer) E.skillUntil = t + E.skillDur;
+      if (hear(E)) sfx("ult");
+      MATCH.game.forceNet = true;
+    }
+    stepCombat(E, dt) {
+      var t = now();
+      if (E.pending) {
+        if (t > E.pending.until) E.pending = null;
+        else if (t >= E.cdUntil) { ATTACK.fireBasic(E, E.pending.ang, E.pending.reach); E.pending = null; }
+      }
+      if (E.burst && t >= E.burst.until) E.burst = null;
+      if (E.volley && t >= E.volley.until) E.volley = null;
+      if (E.slash && t >= E.slash.at) {
+        var sl = E.slash;
+        MELEE.swing(E, sl.ang, E.isBerserk(t), sl.dmg);
+        sl.left--; sl.at += CHARS[E.char].hitGap;
+        if (sl.left <= 0) E.slash = null;
+      }
+    }
+    autoAimTarget(E) {
+      var best = null, bd = Infinity, open = null, od = Infinity, t = now();
+      participants().map(ent).concat(MINIONS.allMinions().filter(function (m) { return MINIONS.minionReady(m, t); })).forEach(function (o) {
+        if (!o || !o.alive || o.team === E.team) return;
+        if (!visibleTo(o, E)) return;
+        var d = hyp(o.x - E.x, o.y - E.y);
+        if (d < bd) { bd = d; best = o; }
+        if (d < od && losClear(E.x, E.y, o.x, o.y)) { od = d; open = o; }
+      });
+      return open || best;
+    }
+    autoAimAngle(E) {
+      var T = ATTACK.autoAimTarget(E);
+      return T ? Math.atan2(T.y - E.y, T.x - E.x) : E.angle;
     }
   }
-  function autoAimTarget(E) {
-    var best = null, bd = Infinity, open = null, od = Infinity, t = now();
-    participants().map(ent).concat(allMinions().filter(function (m) { return minionReady(m, t); })).forEach(function (o) {
-      if (!o || !o.alive || o.team === E.team) return;
-      if (!visibleTo(o, E)) return;
-      var d = hyp(o.x - E.x, o.y - E.y);
-      if (d < bd) { bd = d; best = o; }
-      if (d < od && losClear(E.x, E.y, o.x, o.y)) { od = d; open = o; }
-    });
-    return open || best;
-  }
-  function autoAimAngle(E) {
-    var T = autoAimTarget(E);
-    return T ? Math.atan2(T.y - E.y, T.x - E.x) : E.angle;
-  }
+  var ATTACK = new AttackController();
 
   class BotBrain {
     pickWanderPoint(B, t) {
@@ -4897,15 +4921,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (botType.botAct(B, target, enemies, t)) return;
       if (target && B.gauge >= GAUGE_MAX && t - k.seenAt > 500 && losClear(B.x, B.y, target.x, target.y) && td <= botType.botUltRange()) {
         var ultSpot = botType.botUltSpot(B, target, td, t);
-        useUlt(B, Math.atan2(ultSpot.y - B.y, ultSpot.x - B.x), hyp(ultSpot.x - B.x, ultSpot.y - B.y)); return;
+        ATTACK.useUlt(B, Math.atan2(ultSpot.y - B.y, ultSpot.x - B.x), hyp(ultSpot.x - B.x, ultSpot.y - B.y)); return;
       }
-      if (botType.wantsBasicNow(B, t)) { fireBasic(B, B.angle); return; }
+      if (botType.wantsBasicNow(B, t)) { ATTACK.fireBasic(B, B.angle); return; }
       if (aimAt && t >= B.cdUntil && t - k.seenAt > BOT_REACT_MS) {
         var ad = hyp(aimAt.x - B.x, aimAt.y - B.y);
-        var rng = c.stab ? lungeRange(B, t) + c.range : c.throwRange || c.dashRange || (melee ? c.range + BODY_R - 4 : c.range + (B.isOvercharged(t) ? ULT.ocRangeBonus : 0));
+        var rng = c.stab ? MELEE.lungeRange(B, t) + c.range : c.throwRange || c.dashRange || (melee ? c.range + BODY_R - 4 : c.range + (B.isOvercharged(t) ? ULT.ocRangeBonus : 0));
         if (ad <= rng && losClear(B.x, B.y, aimAt.x, aimAt.y)) {
           var shotAim = c.pSpeed && !melee ? BRAIN.leadSpot(aimAt, ad / c.pSpeed, t) : aimAt;
-          fireBasic(B, Math.atan2(shotAim.y - B.y, shotAim.x - B.x) + (Math.random() - 0.5) * 2 * BOT_AIM_ERR);
+          ATTACK.fireBasic(B, Math.atan2(shotAim.y - B.y, shotAim.x - B.x) + (Math.random() - 0.5) * 2 * BOT_AIM_ERR);
         }
       }
     }
@@ -4925,7 +4949,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       seen.forEach(function (o) {
         if (hyp(o.x - B.x, o.y - B.y) > ULT.fgCast + ULT.fgR * 0.5) return;
         var sx = 0, sy = 0, n = 0;
-        seen.forEach(function (q) { if (hyp(q.x - o.x, q.y - o.y) <= ULT.fgR * 1.3) { var s = BRAIN.leadSpot(q, potionFlightMs(hyp(q.x - B.x, q.y - B.y)) / 1000, t); sx += s.x; sy += s.y; n++; } });
+        seen.forEach(function (q) { if (hyp(q.x - o.x, q.y - o.y) <= ULT.fgR * 1.3) { var s = BRAIN.leadSpot(q, FIELD_FX.potionFlightMs(hyp(q.x - B.x, q.y - B.y)) / 1000, t); sx += s.x; sy += s.y; n++; } });
         if (n > bestN) { bestN = n; best = { x: sx / n, y: sy / n }; }
       });
       return best;
@@ -4935,20 +4959,20 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (B.gauge >= GAUGE_MAX) {
         if (!k.fullAt) k.fullAt = t;
         spot = BRAIN.fogClusterSpot(B, enemies, t);
-        if (!spot && target && t - k.fullAt > 5000 && t - k.seenAt > 500) spot = BRAIN.leadSpot(target, potionFlightMs(hyp(target.x - B.x, target.y - B.y)) / 1000, t);
-        if (spot) { k.fullAt = 0; useUlt(B, Math.atan2(spot.y - B.y, spot.x - B.x), hyp(spot.x - B.x, spot.y - B.y)); return; }
+        if (!spot && target && t - k.fullAt > 5000 && t - k.seenAt > 500) spot = BRAIN.leadSpot(target, FIELD_FX.potionFlightMs(hyp(target.x - B.x, target.y - B.y)) / 1000, t);
+        if (spot) { k.fullAt = 0; ATTACK.useUlt(B, Math.atan2(spot.y - B.y, spot.x - B.x), hyp(spot.x - B.x, spot.y - B.y)); return; }
       } else k.fullAt = 0;
       if (!target || t < B.cdUntil || t - k.seenAt <= BOT_REACT_MS) return;
-      spot = BRAIN.leadSpot(target, potionFlightMs(hyp(target.x - B.x, target.y - B.y)) / 1000, t);
+      spot = BRAIN.leadSpot(target, FIELD_FX.potionFlightMs(hyp(target.x - B.x, target.y - B.y)) / 1000, t);
       var d =hyp(spot.x - B.x, spot.y - B.y);
       if (d > c.range + ULT.plR * 0.5) return;
-      fireBasic(B, Math.atan2(spot.y - B.y, spot.x - B.x) + (Math.random() - 0.5) * BOT_AIM_ERR, d + (Math.random() - 0.5) * 40);
+      ATTACK.fireBasic(B, Math.atan2(spot.y - B.y, spot.x - B.x) + (Math.random() - 0.5) * BOT_AIM_ERR, d + (Math.random() - 0.5) * 40);
     }
     botCleric(B, enemies, t) {
-      if (B.gauge >= GAUGE_MAX && enemies.length) { useUlt(B, B.angle); return; }
+      if (B.gauge >= GAUGE_MAX && enemies.length) { ATTACK.useUlt(B, B.angle); return; }
       if (t < B.cdUntil) return;
-      var A = graceTarget(B);
-      if (A && A.hp < A.maxHp) fireBasic(B, B.angle);
+      var A = FIELD_FX.graceTarget(B);
+      if (A && A.hp < A.maxHp) ATTACK.fireBasic(B, B.angle);
     }
     botLance(B, target, t) {
       var c = CHARS.lancer, k = B.bot;
@@ -4956,12 +4980,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (B.gauge >= GAUGE_MAX) {
         var ahead = BRAIN.leadSpot(target, ULT.lnWind / 1000, t), ud = hyp(ahead.x - B.x, ahead.y - B.y);
         if (ud <= ULT.lnLen && losClear(B.x, B.y, ahead.x, ahead.y) && losClear(B.x, B.y, target.x, target.y)) {
-          useUlt(B, Math.atan2(ahead.y - B.y, ahead.x - B.x)); return;
+          ATTACK.useUlt(B, Math.atan2(ahead.y - B.y, ahead.x - B.x)); return;
         }
       }
       if (t < B.cdUntil) return;
       var d = hyp(target.x - B.x, target.y - B.y);
-      if (d <= c.range + (B.isOvercharged(t) ? ULT.ocRangeBonus : 0) && losClear(B.x, B.y, target.x, target.y)) fireBasic(B, B.angle + (Math.random() - 0.5) * 2 * BOT_AIM_ERR);
+      if (d <= c.range + (B.isOvercharged(t) ? ULT.ocRangeBonus : 0) && losClear(B.x, B.y, target.x, target.y)) ATTACK.fireBasic(B, B.angle + (Math.random() - 0.5) * 2 * BOT_AIM_ERR);
     }
   }
   var BRAIN = new BotBrain();
@@ -5233,7 +5257,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var k = keyName(e);
     if (k) { KEY_ON[k] = true; e.preventDefault(); audio(); return; }
     if (e.code === "KeyJ" && !e.repeat && canAct() && MATCH.me.gauge >= GAUGE_MAX && !MATCH.me.burst) {
-      e.preventDefault(); var ua = autoAimAngle(MATCH.me); MATCH.me.angle = ua; useUlt(MATCH.me, ua);
+      e.preventDefault(); var ua = ATTACK.autoAimAngle(MATCH.me); MATCH.me.angle = ua; ATTACK.useUlt(MATCH.me, ua);
     }
   });
   window.addEventListener("keyup", function (e) { var k = keyName(e); if (k) KEY_ON[k] = false; });
@@ -5272,11 +5296,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     el.addEventListener("pointerdown", function (e) {
       audio(); e.preventDefault();
       if (!canAct() || aim.id !== null) return;
-      if (which === "atk" && CHARS[MATCH.me.char].noAim) { tryFire(MATCH.me, MATCH.me.angle); return; }
+      if (which === "atk" && CHARS[MATCH.me.char].noAim) { ATTACK.tryFire(MATCH.me, MATCH.me.angle); return; }
       if (which === "ult") {
         if (MATCH.me.gauge < GAUGE_MAX || MATCH.me.burst) return;
         if (!CHARS[MATCH.me.char].ultAim) {
-          var ua = autoAimAngle(MATCH.me); MATCH.me.angle = ua; useUlt(MATCH.me, ua); return;
+          var ua = ATTACK.autoAimAngle(MATCH.me); MATCH.me.angle = ua; ATTACK.useUlt(MATCH.me, ua); return;
         }
       }
       aim.id = e.pointerId; aim.btn = which; aim.ox = e.clientX; aim.oy = e.clientY; aim.dx = 0; aim.dy = 0; aim.drag = false;
@@ -5292,10 +5316,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var btn = aim.btn, drag = aim.drag && hyp(aim.dx, aim.dy) > DRAG_MIN, reach = drag && MATCH.me ? aimReach(MATCH.me, btn) : null;
       aim.id = null;
       if (!canAct() || e.type === "pointercancel") return;
-      var ang = drag ? screenToWorldAngle(Math.atan2(aim.dy, aim.dx)) : autoAimAngle(MATCH.me);
+      var ang = drag ? screenToWorldAngle(Math.atan2(aim.dy, aim.dx)) : ATTACK.autoAimAngle(MATCH.me);
       MATCH.me.angle = ang;
-      if (btn === "atk") tryFire(MATCH.me, ang, reach);
-      else if (btn === "ult") useUlt(MATCH.me, ang, reach);
+      if (btn === "atk") ATTACK.tryFire(MATCH.me, ang, reach);
+      else if (btn === "ult") ATTACK.useUlt(MATCH.me, ang, reach);
     }
     el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up);
     el.addEventListener("touchstart", function (e) { e.preventDefault(); }, { passive: false });
@@ -5951,7 +5975,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     leapHeight(E, t) {
       if (!E.alive || !E.isHammerLeaping(t)) return 0;
-      var k = leapProgress(t, E.leapAt, E.ultUntil);
+      var k = MELEE.leapProgress(t, E.leapAt, E.ultUntil);
       return 4 * ULT.bsHop * k * (1 - k);
     }
     attackClip(v, E, t) {
@@ -6282,7 +6306,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var e = s.e, start = e.createdAt + e.delay, end = start + e.dur;
       if (t < start || t >= end) return;
       if (!s.vis) s.vis = EFFECT_VIEW.makeStormVis(e);
-      var ud = s.vis.userData, c = stormCenter(s), grow = clamp((t - start) / 300, 0, 1);
+      var ud = s.vis.userData, c = FIELD_FX.stormCenter(s), grow = clamp((t - start) / 300, 0, 1);
       var fade = Math.max(0.01, grow) * clamp((end - t) / 400, 0, 1);
       s.vis.position.set(c.x, 0, c.y);
       ud.floor.uniforms.center.value.set(c.x, c.y);
@@ -6361,10 +6385,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     dropDomainVis(dm) { if (!dm.vis) return; scene.remove(dm.vis); dm.vis.userData.mats.forEach(function (m) { m.dispose(); }); dm.vis = null; }
     renderDomain(dm, t, nowMs) {
       var e = dm.e;
-      if (!domainActive(e, t)) return;
+      if (!FIELD_FX.domainActive(e, t)) return;
       if (!dm.vis) dm.vis = EFFECT_VIEW.makeDomainVis();
-      var ud = dm.vis.userData, r = Math.max(1, domainRadius(e, t)), fade = clamp((e.createdAt + e.dur - t) / 400, 0, 1);
-      var c = domainCenter(dm);
+      var ud = dm.vis.userData, r = Math.max(1, FIELD_FX.domainRadius(e, t)), fade = clamp((e.createdAt + e.dur - t) / 400, 0, 1);
+      var c = FIELD_FX.domainCenter(dm);
       dm.vis.position.set(c.x, 0, c.y);
       dm.vis.scale.setScalar(r);
       ud.shards.rotation.y = nowMs / 4000;
@@ -6389,7 +6413,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       pl.vis = null;
     }
     renderPool(pl, t, nowMs) {
-      var e = pl.e, start = poolStart(e), end = start + e.dur;
+      var e = pl.e, start = FIELD_FX.poolStart(e), end = start + e.dur;
       if (t < start) {
         if (!pl.bottle) pl.bottle = EFFECT_VIEW.makeBottleVis();
         var k = clamp((t - e.createdAt) / e.delay, 0, 1), ox = e.ox == null ? e.x : e.ox, oy = e.oy == null ? e.y : e.oy;
@@ -6446,15 +6470,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var aimType = CHAR_TYPES.of(MATCH.me.char);
       if (aimType.showAimGuide(MATCH.me, ult, c)) {
       } else if (c.stab && !ult) {
-        var lungeLen = dashReach(MATCH.me, MATCH.me.angle, lungeRange(MATCH.me, now()));
+        var lungeLen = MELEE.dashReach(MATCH.me, MATCH.me.angle, MELEE.lungeRange(MATCH.me, now()));
         AIM_GUIDE.showAimStrip(0, lungeLen, BODY_R * 2);
         AIM_GUIDE.showAimCircle(lungeLen, c.range + BODY_R);
       } else if (c.width) {
-        AIM_GUIDE.showAimStrip(0, lineReach(MATCH.me.x, MATCH.me.y, MATCH.me.angle, ult ? ULT.lnLen : c.range) + BODY_R, ult ? ULT.lnW : c.width);
+        AIM_GUIDE.showAimStrip(0, MELEE.lineReach(MATCH.me.x, MATCH.me.y, MATCH.me.angle, ult ? ULT.lnLen : c.range) + BODY_R, ult ? ULT.lnW : c.width);
       } else if (c.arc && !ult && !c.throwRange) {
         AIM_GUIDE.showAimSector(c.range + BODY_R, c.arc);
       } else if (c.throwRange && !ult) {
-        if (enemyInMelee(MATCH.me)) AIM_GUIDE.showAimSector(c.range + BODY_R, c.arc);
+        if (MELEE.enemyInMelee(MATCH.me)) AIM_GUIDE.showAimSector(c.range + BODY_R, c.arc);
         else {
           var tx = Math.cos(MATCH.me.angle), ty = Math.sin(MATCH.me.angle), tl = rayCast(MATCH.me.x + tx * 20, MATCH.me.y + ty * 20, tx, ty, c.throwRange, 6) + 20;
           AIM_GUIDE.showAimStrip(18, Math.max(1, tl - 18), 12);
@@ -6909,7 +6933,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (E.alive) LABELS.push({ e: E, alpha: alpha, ally: ally });
       });
       keys(VIS).forEach(function (id) { if (!shown[id]) FIGHTER_VIEW.dropVis(id); });
-      allMinions().forEach(function (M) {
+      MINIONS.allMinions().forEach(function (M) {
         var id = M.key, v = MVIS[id];
         shown[id] = 1;
         if (v && KIT.ready && !v.kit) { FIGHTER_VIEW.dropMinionVis(id, false); v = null; }
@@ -6945,15 +6969,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
       keys(MATCH.remoteShots).forEach(function (id) {
         var p = MATCH.remoteShots[id], g = PRV[id], e = t - p.d.createdAt;
-        projVisualHit(p, t);
+        PROJECTILES.projVisualHit(p, t);
         if (e > p.life && !p.sparked && p.dist < (p.d.range || 500) - 1) {
-          p.sparked = true; var q = projAt(p, p.life);
+          p.sparked = true; var q = PROJECTILES.projAt(p, p.life);
           var orbShot = CHAR_TYPES.of(p.d.ownerCharacterType).isOrbShooter;
           FX_VIEW.spark(q.x, q.y, orbShot ? FX_VIEW.hitColor(p.d) : "#FFFFFF", orbShot ? 1.8 : 1);
         }
         if (p.dead || p.gone || e > p.life) { if (g) EFFECT_VIEW.dropProjVis(id); return; }
         if (!g) g = PRV[id] = EFFECT_VIEW.makeProjVis(p);
-        var pos = projAt(p, Math.max(0, e)), from = g.userData.from, kk = from ? 1 - clamp(p.sp * Math.max(0, e) / 1000 / BOW_BLEND, 0, 1) : 0;
+        var pos = PROJECTILES.projAt(p, Math.max(0, e)), from = g.userData.from, kk = from ? 1 - clamp(p.sp * Math.max(0, e) / 1000 / BOW_BLEND, 0, 1) : 0;
         if (from) g.position.set(pos.x + from.x * kk, PROJ_Y + from.y * kk, pos.y + from.z * kk);
         else g.position.set(pos.x, PROJ_Y, pos.y);
        if (g.userData.pulse) g.userData.pulse.scale.setScalar(9 + 2 * Math.sin(nowMs / 50));
@@ -7615,30 +7639,48 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     if (!MATCH.game) return;
     var t = now();
-    stepWorld(t, dt * CLOCK.scale, true, dt);
+    WORLD.stepWorld(t, dt * CLOCK.scale, true, dt);
     if (st === "countdown" || st === "playing") netWrite(false);
     if (isHost()) { hostJudge(); hostCleanup(); }
     FRAME_RENDERER.render(t, dt);
     HUD.updateHud(t);
     HUD.adaptQuality(frameMs);
   }
-  function stepWorld(t, dt, driveBots, viewDt) {
-    syncRemote(viewDt == null ? dt : viewDt);
-    stepShots(t);
-    stepBursts(t);
-    stepPools(t);
-    flushCC(t);
-    stepHoles(t, dt);
-    stepStorms(t);
-    stepRevs(t);
-    stepDomains(t);
-    stepLunges(t);
-    stepWaves(t);
-    pruneLocal(t);
-    var active = room.status === "playing" && t >= room.startAt;
-    if (active) {
-      if (MATCH.me) respawnIfReady(MATCH.me, t);
-      if (isHost()) keys(MATCH.bots).forEach(function (id) { respawnIfReady(MATCH.bots[id], t); });
+  class WorldStepper {
+    stepWorld(t, dt, driveBots, viewDt) {
+      syncRemote(viewDt == null ? dt : viewDt);
+      WORLD.stepFlightsAndFields(t, dt);
+      if (room.status === "playing" && t >= room.startAt) WORLD.stepPlaying(t, dt, driveBots);
+    }
+    stepFlightsAndFields(t, dt) {
+      PROJECTILES.stepShots(t);
+      FIELD_FX.stepBursts(t);
+      FIELD_FX.stepPools(t);
+      STATUS.flushCC(t);
+      FIELD_FX.stepHoles(t, dt);
+      FIELD_FX.stepStorms(t);
+      FIELD_FX.stepRevs(t);
+      FIELD_FX.stepDomains(t);
+      MELEE.stepLunges(t);
+      MELEE.stepWaves(t);
+      pruneLocal(t);
+    }
+    stepPlaying(t, dt, driveBots) {
+      WORLD.stepRespawns(t);
+      WORLD.stepMyFighter(t, dt);
+      if (isHost()) keys(MATCH.bots).forEach(function (id) { var B = MATCH.bots[id]; if (driveBots) BRAIN.step(B, dt); if (B.alive) ATTACK.stepCombat(B, dt); WORLD.stepSkillMotion(B, t, dt); });
+      if (MATCH.me) WORLD.stepSkillMotion(MATCH.me, t, dt);
+      WORLD.stepStatusTicks(t);
+      PROJECTILES.checkProjectiles(t);
+      PROJECTILES.stepBladeDaggers(t);
+      PROJECTILES.stepBladeSpins(t);
+      FIELD_FX.stepBladeStorms(t);
+    }
+    stepRespawns(t) {
+      if (MATCH.me) RESPAWN.respawnIfReady(MATCH.me, t);
+      if (isHost()) keys(MATCH.bots).forEach(function (id) { RESPAWN.respawnIfReady(MATCH.bots[id], t); });
+    }
+    stepMyFighter(t, dt) {
       if (MATCH.me && MATCH.me.alive) {
         var kx = (KEY_ON.right ? 1 : 0) - (KEY_ON.left ? 1 : 0), ky = (KEY_ON.down ? 1 : 0) - (KEY_ON.up ? 1 : 0);
         if (joy.id !== null || kx || ky) {
@@ -7654,18 +7696,23 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           MATCH.me.mv = hyp(MATCH.me.x - ox, MATCH.me.y - oy) > 0.2;
           if (MATCH.me.mv) { MATCH.me.moveAng = Math.atan2(MATCH.me.y - oy, MATCH.me.x - ox); MATCH.me.moveAt = now(); }
         } else MATCH.me.mv = false;
-        if (KEY_ON.atk && t >= MATCH.me.cdUntil && !MATCH.me.volley && !MATCH.me.slash) fireBasic(MATCH.me, autoAimAngle(MATCH.me));
-        stepCombat(MATCH.me, dt);
+        if (KEY_ON.atk && t >= MATCH.me.cdUntil && !MATCH.me.volley && !MATCH.me.slash) ATTACK.fireBasic(MATCH.me, ATTACK.autoAimAngle(MATCH.me));
+        ATTACK.stepCombat(MATCH.me, dt);
       } else if (MATCH.me) MATCH.me.mv = false;
-      if (isHost()) keys(MATCH.bots).forEach(function (id) { var B = MATCH.bots[id]; if (driveBots) BRAIN.step(B, dt); if (B.alive) stepCombat(B, dt); stepKnightSlam(B); stepHammerLeap(B); stepLance(B); stepDash(B); stepMinions(B, dt, t); payKillGaugeOwed(B, t); });
-      if (MATCH.me) { stepKnightSlam(MATCH.me); stepHammerLeap(MATCH.me); stepLance(MATCH.me); stepDash(MATCH.me); stepMinions(MATCH.me, dt, t); payKillGaugeOwed(MATCH.me, t); }
-      localTargets().forEach(function (T) { stepShove(T, t); if (!T.minion) { stepBurn(T, t); stepRally(T, t); stepDomainBolt(T, t); stepCurse(T, t); } });
-      checkProjectiles(t);
-      stepBladeDaggers(t);
-      stepBladeSpins(t);
-      stepBladeStorms(t);
+    }
+    stepSkillMotion(E, t, dt) {
+      MELEE.stepKnightSlam(E);
+      MELEE.stepHammerLeap(E);
+      MELEE.stepLance(E);
+      MELEE.stepDash(E);
+      MINIONS.stepMinions(E, dt, t);
+      DAMAGE.payKillGaugeOwed(E, t);
+    }
+    stepStatusTicks(t) {
+      localTargets().forEach(function (T) { STATUS.stepShove(T, t); if (!T.minion) { STATUS.stepBurn(T, t); STATUS.stepRally(T, t); FIELD_FX.stepDomainBolt(T, t); FIELD_FX.stepCurse(T, t); } });
     }
   }
+  var WORLD = new WorldStepper();
 
   function testHooks() {
     return {
@@ -7684,11 +7731,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         renderer.render(scene, camera);
         return renderer.domElement.toDataURL("image/png");
       },
-      loadMapData: loadMapData, makeEnt: makeEnt, resolve: resolve, stepWorld: stepWorld,
-      useUlt: useUlt, fireBasic: fireBasic, damage: damage, healCut: healCut, healAmount: healAmount, respawnIfReady: respawnIfReady, afflict: afflict, speedOf: function (E) { return E.speed(); }, stunned: function (E, t) { return E.isStunned(t); },
-      onShot: onShot, onMelee: onMelee, potionFlightMs: potionFlightMs, meteorHitAt: meteorHitAt, onEffect: onEffect, onHit: onHit,
-      multiKillCount: multiKillCount, MULTI_KILL_MS: MULTI_KILL_MS, ASSIST_MS: ASSIST_MS, onKill: creditHelpAssists,
-      hiddenFrom: hiddenFrom, visibleTo: visibleTo, storms: function () { return FIELD.storms; }, stormCenter: stormCenter, revs: function () { return FIELD.revs; }, domains: function () { return FIELD.domains; }, graceTarget: graceTarget,
+      loadMapData: loadMapData, makeEnt: makeEnt, resolve: resolve, stepWorld: WORLD.stepWorld.bind(WORLD),
+      useUlt: ATTACK.useUlt.bind(ATTACK), fireBasic: ATTACK.fireBasic.bind(ATTACK), damage: DAMAGE.damage.bind(DAMAGE), healCut: STATUS.healCut.bind(STATUS), healAmount: STATUS.healAmount.bind(STATUS), respawnIfReady: RESPAWN.respawnIfReady.bind(RESPAWN), afflict: STATUS.afflict.bind(STATUS), speedOf: function (E) { return E.speed(); }, stunned: function (E, t) { return E.isStunned(t); },
+      onShot: PROJECTILES.onShot.bind(PROJECTILES), onMelee: MELEE.onMelee.bind(MELEE), potionFlightMs: FIELD_FX.potionFlightMs.bind(FIELD_FX), meteorHitAt: FIELD_FX.meteorHitAt.bind(FIELD_FX), onEffect: FIELD_FX.onEffect.bind(FIELD_FX), onHit: DAMAGE.onHit.bind(DAMAGE),
+      multiKillCount: multiKillCount, MULTI_KILL_MS: MULTI_KILL_MS, ASSIST_MS: ASSIST_MS, onKill: DAMAGE.creditHelpAssists.bind(DAMAGE),
+      hiddenFrom: hiddenFrom, visibleTo: visibleTo, storms: function () { return FIELD.storms; }, stormCenter: FIELD_FX.stormCenter.bind(FIELD_FX), revs: function () { return FIELD.revs; }, domains: function () { return FIELD.domains; }, graceTarget: FIELD_FX.graceTarget.bind(FIELD_FX),
       bushTiles: function () { return BUSH.map(function (b) { return b.tiles.map(function (tl) { return { x: tileX(tl[0]), y: tileY(tl[1]) }; }); }); },
       isIdle: function () { return !room; },
       timeScale: function () { return CLOCK.scale; },
@@ -7698,6 +7745,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         MATCH.remoteShots = {}; MATCH.shots = []; MATCH.melee = {};
       },
       ccPending: function () { return MATCH.ccPending; },
+      bindRoom: function (fakeRoom, players) { room = fakeRoom; P = players; },
+      unbindRoom: function () { room = null; P = {}; },
+      setMyId: function (id) { var before = myId; myId = id; return before; },
+      setDb: function (fake) { var before = db; db = fake; return before; },
+      setTestLink: function (flag) { var before = isTestLink; isTestLink = flag; return before; },
+      DRAFT: DRAFT, DRAFT_STEPS: DRAFT_STEPS, DRAFT_STEP_MS: DRAFT_STEP_MS, DRAFT_AI_MS: DRAFT_AI_MS, DRAFT_AI_TRADE_MS: DRAFT_AI_TRADE_MS, NO_BAN: NO_BAN,
+      STATS: STATS, STATS_PATH: STATS_PATH, STATS_PENDING: STATS_PENDING, STATS_SETTLE_MS: STATS_SETTLE_MS, STATS_HOLD_MAX_MS: STATS_HOLD_MAX_MS, DEFAULT_SLOW: DEFAULT_SLOW,
+      CLOCK: CLOCK, GameClock: GameClock, CLOCK_KEEP: CLOCK_KEEP, CLOCK_PINGS: CLOCK_PINGS,
+      MATCH: MATCH, FIELD: FIELD, resetLocal: resetLocal, backToLobby: backToLobby, stKey: stKey,
       mvpScore: HUD.mvpScore.bind(HUD),
       setClock: function (ms) { CLOCK.testTime = ms; },
       currentMap: function () { return ARENA; },
