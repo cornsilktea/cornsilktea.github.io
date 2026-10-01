@@ -1727,13 +1727,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
            '<div class="ultDesc skDesc"><b>스킬 설명</b>' + ultDesc(k) + "</div>";
   }
   function statTable(k) {
-    var c = CHARS[k], rage = k === "warrior";
+    var c = CHARS[k], type = CHAR_TYPES.of(k);
     function pair(a, b) { return b == null ? String(a) : a + " / " + b; }
     var times = c.shots || c.hits || c.ticks || 1, hit = num(c.dmg) + (times > 1 ? "*" + times : "");
     var dmg = !c.dmg ? "-" : c.dashDmg ? num(c.dashDmg) + "(" + num(c.dmg) + ")"
-            : k === "dancer" ? num(c.dmg) + "+" + num(ULT.bdDmg)
-            : pair(hit, c.throwDmg || (rage ? Math.round(c.dmg * ULT.bzDmgMul) : null)) + (c.heal ? "(" + c.heal + ")" : "");
-    var altCd = rage ? c.cd * ULT.bzCdMul : k === "duelist" ? 1000 / ULT.rmRate : k === "stormbow" ? c.cd / ULT.ocRate : null;
+            : type.statDamageText(c) || pair(hit, c.throwDmg || type.statSkillDamage(c)) + (c.heal ? "(" + c.heal + ")" : "");
+    var altCd = type.statAltCooldown(c);
     var rateRow = CLOCK.scale !== 1 ? "<tr><th>공격 간격</th><td>" + pair(num(c.cd / CLOCK.scale / 1000), altCd == null ? null : num(altCd / CLOCK.scale / 1000)) + "초</td></tr>"
                            : "<tr><th>초당 공격</th><td>" + pair(num(1000 / c.cd), altCd == null ? null : num(1000 / altCd)) + "회</td></tr>";
     return '<table class="st"><tr><th>HP</th><td>' + c.hp + "</td></tr><tr><th>공격</th><td>" + dmg + "</td></tr>" +
@@ -1970,12 +1969,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       '" title="캐릭터 영상" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>';
   }
   var INGAME_SRC = {}, INGAME_W = 360, INGAME_H = 360;
-  function idleClipOf(c) {
-    if (c === "ranger" || c === "stormbow") return "Ranged_Bow_Idle";
-    if (c === "sniper") return "Ranged_2H_Aiming";
-    if (c === "lancer" || c === "guardian") return "Melee_2H_Idle";
-    return "Idle_A";
-  }
+  function idleClipOf(c) { return CHAR_TYPES.of(c).idleClip; }
   function ingameShot(c) {
     if (INGAME_SRC[c] || !renderer || !KIT.ready) return INGAME_SRC[c] || "";
     var rt = new THREE.WebGLRenderTarget(INGAME_W, INGAME_H);
@@ -2637,6 +2631,21 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }
       var trail = new THREE.Mesh(GEO.trail, MODELS.glowMat("trail-" + (volley ? "v" : d.team), col, 0.45)); trail.position.x = -15; trail.scale.set(volley ? 70 : 50, volley ? 1.8 : 1.3, volley ? 1.8 : 1.3); g.add(trail);
     }
+    get idleClip() { return "Idle_A"; }
+    get hasDarkWave() { return false; }
+    get heavyStrikeSpark() { return false; }
+    get scopesWhileAiming() { return false; }
+    get showsHealRange() { return false; }
+    showAimGuide(E, ult, c) {
+      if (!ult || this.data.ultKind !== "blackhole") return false;
+      AIM_GUIDE.showAimCircle(aimReach(E, "ult"), ULT.bhR);
+      return true;
+    }
+    ultAimShot() { return { len: ULT.mkRange, halfWidth: 12 }; }
+    skillShotSpec() { return { count: ULT.mkCount, gap: ULT.mkGap, sp: ULT.mkSpeed, dmg: ULT.mkDmg, pr: ULT.mkPr, range: ULT.mkRange, ultKey: "volley" }; }
+    statDamageText(c) { return null; }
+    statSkillDamage(c) { return null; }
+    statAltCooldown(c) { return null; }
     get hasSkillClip() { return false; }
     launchHandOf(model) { return model.getObjectByName("muzzle"); }
     addMarkers(v, root, body) {}
@@ -2670,6 +2679,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class WarriorType extends ArcMeleeType {
+    statSkillDamage(c) { return Math.round(c.dmg * ULT.bzDmgMul); }
+    statAltCooldown(c) { return c.cd * ULT.bzCdMul; }
     addMarkers(v, root, body) { v.aura = new THREE.Mesh(GEO.aura, auraMat); v.aura.visible = false; root.add(v.aura); }
     skillGlow(E, t) { return E.buffUntil > t ? 0x772200 : 0; }
     cast(E, ang, reach, t) {
@@ -2688,6 +2699,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class DuelistType extends CharacterType {
+    statAltCooldown(c) { return 1000 / ULT.rmRate; }
     botUltRange() { return this.data.dashRange + this.data.range; }
     addMarkers(v, root, body) {
       v.aura = new THREE.Mesh(GEO.aura, riposteAuraMat); v.aura.visible = false; root.add(v.aura);
@@ -2716,6 +2728,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class KnightType extends ArcMeleeType {
+    get heavyStrikeSpark() { return true; }
     skillGuard(T, amount, t) { return T.buffUntil > t ? Math.round(amount * ULT.tkDef) : amount; }
     tallyBlocked(T, unguarded, amount) { T.blocked = (T.blocked || 0) + Math.min(unguarded, T.hp) - Math.min(amount, T.hp); }
     addMarkers(v, root, body) { v.shield = FIGHTER_VIEW.makeShieldAura(); root.add(v.shield); }
@@ -2738,6 +2751,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class RangerType extends CharacterType {
+    get idleClip() { return "Ranged_Bow_Idle"; }
     onHitLate(owner, h) { if (h.u === "volley") owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.mkRefund); }
     ultLeadSeconds(dist) { return dist / ULT.mkSpeed; }
     launchHandOf(model) { return model.getObjectByName("handslotl"); }
@@ -2764,6 +2778,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class MageType extends MagicShooterType {
+    showAimGuide(E, ult, c) {
+      if (!ult) return false;
+      AIM_GUIDE.showAimCircle(aimReach(E, "ult"), ULT.mbR);
+      return true;
+    }
     afterDealtDamage(T, owner, ultKey, t) { if (ultKey !== "burn") igniteBurn(T, owner, t); }
     ultLeadSeconds(dist) { return ULT.mbDelay / 1000; }
     ultSpotTooFar(reach) { return reach > ULT.mbCast; }
@@ -2859,6 +2878,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class SniperType extends CharacterType {
+    get idleClip() { return "Ranged_2H_Aiming"; }
+    get scopesWhileAiming() { return true; }
+    ultAimShot() { return { len: ULT.pnRange, halfWidth: 22 }; }
+    skillShotSpec() { return { count: 1, gap: 0, sp: ULT.pnSpeed, dmg: ULT.pnDmg, pr: ULT.pnPr, range: ULT.pnRange, ultKey: "giant" }; }
     onHitLate(owner, h) { if (h.u === "giant") owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.pnRefund); }
     ultLeadSeconds(dist) { return dist / ULT.pnSpeed; }
     get holdsFullRange() { return true; }
@@ -2892,6 +2915,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class ThrowerType extends CharacterType {
+    showAimGuide(E, ult, c) { AIM_GUIDE.showAimCircle(aimReach(E, aim.btn), ult ? ULT.fgR : ULT.plR); return true; }
     aimRange(btn) { return [CHARS.thrower.minRange, btn === "ult" ? ULT.fgCast : CHARS.thrower.range]; }
     overrideBasic(E, ang, reach, t) { throwPoison(E, ang, reach, false); return true; }
     onHitLate(owner, h) { if (h.u === "fog" && !owner.isGaugeLocked()) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.fgRefund); }
@@ -2918,6 +2942,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class LancerType extends CharacterType {
+    get idleClip() { return "Melee_2H_Idle"; }
     botAct(B, target, enemies, t) { BRAIN.botLance(B, target, t); return true; }
     cast(E, ang, reach, t) {
       E.angle = ang; E.atkAt = t;
@@ -2944,6 +2969,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class BlacksmithType extends CharacterType {
+    showAimGuide(E, ult, c) {
+      if (!ult) return false;
+      AIM_GUIDE.showAimCircle(aimReach(E, "ult"), ULT.bsR);
+      return true;
+    }
     aimRange(btn) { return [ULT.bsMin, ULT.bsCast]; }
     botUltRange() { return ULT.bsCast; }
     botUltSpot(B, target, td, t) { return BRAIN.leadSpot(target, hammerLeapMs(td) / 1000, t); }
@@ -2990,6 +3020,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class ShamanType extends CharacterType {
+    get hasDarkWave() { return true; }
     overrideBasic(E, ang, reach, t) {
       var struck = domainStrikeTarget(E, t);
       if (!struck) return false;
@@ -3025,6 +3056,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class ClericType extends CharacterType {
+    get showsHealRange() { return true; }
     overrideBasic(E, ang, reach, t) { graceStrike(E, t); return true; }
     botAct(B, target, enemies, t) { BRAIN.botCleric(B, enemies, t); return true; }
     get hasSkillClip() { return true; }
@@ -3056,6 +3088,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class HitmanType extends CharacterType {
+    showAimGuide(E, ult, c) {
+      if (ult) {
+        var ex = Math.cos(E.angle), ey = Math.sin(E.angle), el = rayCast(E.x + ex * 20, E.y + ey * 20, ex, ey, ULT.exRange, ULT.exPr) + 20;
+        AIM_GUIDE.showAimStrip(18, Math.max(1, el - 18), 18);
+      } else AIM_GUIDE.showAimStrip(0, dashReach(E, E.angle, c.dashRange) + BODY_R, c.dashWidth);
+      return true;
+    }
+    skillShotSpec() { return { count: 1, gap: 0, sp: ULT.exSpeed, dmg: ULT.exDmg, pr: ULT.exPr, range: ULT.exRange, ultKey: "execute", fx: { stunMs: ULT.exStunMs } }; }
     overrideBasic(E, ang, reach, t) { dashStrike(E, ang); return true; }
     onHitLate(owner, h) {
       if (h.tp && owner.alive) { owner.x = h.tp.x; owner.y = h.tp.y; owner.dash = null; resolve(owner); }
@@ -3107,6 +3147,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class GuardianType extends ArcMeleeType {
+    get idleClip() { return "Melee_2H_Idle"; }
     botUltRange() { return ULT.gdR; }
     cast(E, ang, reach, t) {
       E.atkAt = t;
@@ -3159,6 +3200,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class DancerType extends CharacterType {
+    statDamageText(c) { return num(c.dmg) + "+" + num(ULT.bdDmg); }
     onHitEarly(owner, h) {
       if (!h.k) return;
       if (owner.isGaugeLocked()) owner.killGaugeOwed = (owner.killGaugeOwed || 0) + ULT.bwKillGauge;
@@ -3196,6 +3238,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class StormbowType extends CharacterType {
+    get idleClip() { return "Ranged_Bow_Idle"; }
+    statAltCooldown(c) { return c.cd / ULT.ocRate; }
     onHitEarly(owner, h) { if (h.zap) stormZap(owner, h.zap, h.t); }
     afterProjectileHit(d, T, immune) {
       if (!immune) room.ref.child("hits/" + d.owner).push({ d: 0, b: 0, t: now(), zap: { v: T.id, x: r1(T.x), y: r1(T.y) } });
@@ -3666,7 +3710,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var foes = null;
     keys(MATCH.remoteShots).forEach(function (id) {
       var p = MATCH.remoteShots[id], d = p.d;
-      if (d.ownerCharacterType !== "dancer" || p.spun) return;
+      if (!CHAR_TYPES.of(d.ownerCharacterType).isBladeThrower || p.spun) return;
       var e = clamp(t - d.createdAt, 0, p.life), pe = p.se === undefined ? 0 : p.se;
       p.se = e;
       var a = projAt(p, pe), b = projAt(p, e);
@@ -3745,9 +3789,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   function shotSpec(c, skill) {
     var C = CHARS[c];
-    if (skill && c === "hitman") return { count: 1, gap: 0, sp: ULT.exSpeed, dmg: ULT.exDmg, pr: ULT.exPr, range: ULT.exRange, ultKey: "execute", fx: { stunMs: ULT.exStunMs } };
-    if (skill && c === "sniper") return { count: 1, gap: 0, sp: ULT.pnSpeed, dmg: ULT.pnDmg, pr: ULT.pnPr, range: ULT.pnRange, ultKey: "giant" };
-    if (skill) return { count: ULT.mkCount, gap: ULT.mkGap, sp: ULT.mkSpeed, dmg: ULT.mkDmg, pr: ULT.mkPr, range: ULT.mkRange, ultKey: "volley" };
+    if (skill) return CHAR_TYPES.of(c).skillShotSpec();
     return { count: C.shots || 1, gap: C.gap || 0, sp: C.pSpeed, dmg: C.throwDmg || C.dmg, pr: C.pr, range: C.throwRange || C.range };
   }
   function stepShots(t) {
@@ -4430,7 +4472,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var ally = T.team === d.team;
     if (ally && (!d.heal || T.minion || T.id === d.owner)) return;
     if (!ally && d.kb && !T.minion) T.knockedAt = Date.now();
-    if (!MATCH.me || MATCH.me.team === T.team || visibleTo(T, MATCH.me)) FX_VIEW.spark(T.x, T.y, ally ? HEAL_SPARK : (MELEE_SPARK[who] || "#FFFFFF"), who === "knight" || d.u ? 1.5 : 1);
+    if (!MATCH.me || MATCH.me.team === T.team || visibleTo(T, MATCH.me)) FX_VIEW.spark(T.x, T.y, ally ? HEAL_SPARK : (MELEE_SPARK[who] || "#FFFFFF"), CHAR_TYPES.of(who).heavyStrikeSpark || d.u ? 1.5 : 1);
   }
   function strikeHit(T, d) {
     if (T.team === d.team || !T.alive || !inStrike(T, d)) return;
@@ -5803,7 +5845,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return g;
     }
     renderClericRange() {
-      clericRange.visible = !!(MATCH.me && MATCH.me.alive && MATCH.me.char === "cleric");
+      clericRange.visible = !!(MATCH.me && MATCH.me.alive && CHAR_TYPES.of(MATCH.me.char).showsHealRange);
       if (clericRange.visible) clericRange.position.set(MATCH.me.x, 0, MATCH.me.y);
     }
     revelationOn(E, t) { return E.char === "cleric" && E.buffUntil > t; }
@@ -6053,7 +6095,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (d.stab) return EFFECT_VIEW.makeStabVis(d);
       var g = new THREE.Group(), who = P[d.owner] ? P[d.owner].characterType : "", col = d.zap ? ZAP_GLOW : d.u ? 0xFF6A3D : (MELEE_COLOR[who] || 0xFFFFFF);
       var fillM = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.2, depthWrite: false });
-      var darkWave = who === "shaman" && !d.u;
+      var darkWave = CHAR_TYPES.of(who).hasDarkWave && !d.u;
       if (darkWave) fillM.opacity = 0.35;
       var edgeM = new THREE.MeshBasicMaterial({ color: darkWave ? 0x0E0A14 : col, transparent: true, opacity: 0.9, depthWrite: false, blending: darkWave ? THREE.NormalBlending : THREE.AdditiveBlending });
       var fill, edge, puffs = [];
@@ -6374,24 +6416,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       aimGrp.position.set(MATCH.me.x, 0, MATCH.me.y); aimGrp.rotation.y = -MATCH.me.angle;
       aimMat.color.set(ult ? 0xFF503C : 0xffffff);
       [aimStrip, aimSector, aimCircle].forEach(function (p) { p.front.visible = p.back.visible = false; });
-      if (MATCH.me.char === "thrower") {
-        AIM_GUIDE.showAimCircle(aimReach(MATCH.me, aim.btn), ult ? ULT.fgR : ULT.plR);
-      } else if (ult && MATCH.me.char === "mage") {
-        AIM_GUIDE.showAimCircle(aimReach(MATCH.me, "ult"), ULT.mbR);
-      } else if (ult && MATCH.me.char === "blacksmith") {
-        AIM_GUIDE.showAimCircle(aimReach(MATCH.me, "ult"), ULT.bsR);
-      } else if (ult && CHARS[MATCH.me.char].ultKind === "blackhole") {
-        AIM_GUIDE.showAimCircle(aimReach(MATCH.me, "ult"), ULT.bhR);
-      } else if (MATCH.me.char === "hitman") {
-        if (ult) {
-          var ex = Math.cos(MATCH.me.angle), ey = Math.sin(MATCH.me.angle), el = rayCast(MATCH.me.x + ex * 20, MATCH.me.y + ey * 20, ex, ey, ULT.exRange, ULT.exPr) + 20;
-          AIM_GUIDE.showAimStrip(18, Math.max(1, el - 18), 18);
-        } else AIM_GUIDE.showAimStrip(0, dashReach(MATCH.me, MATCH.me.angle, c.dashRange) + BODY_R, c.dashWidth);
+      var aimType = CHAR_TYPES.of(MATCH.me.char);
+      if (aimType.showAimGuide(MATCH.me, ult, c)) {
       } else if (c.stab && !ult) {
         var lungeLen = dashReach(MATCH.me, MATCH.me.angle, lungeRange(MATCH.me, now()));
         AIM_GUIDE.showAimStrip(0, lungeLen, BODY_R * 2);
         AIM_GUIDE.showAimCircle(lungeLen, c.range + BODY_R);
-      } else if (MATCH.me.char === "lancer" || c.width) {
+      } else if (c.width) {
         AIM_GUIDE.showAimStrip(0, lineReach(MATCH.me.x, MATCH.me.y, MATCH.me.angle, ult ? ULT.lnLen : c.range) + BODY_R, ult ? ULT.lnW : c.width);
       } else if (c.arc && !ult && !c.throwRange) {
         AIM_GUIDE.showAimSector(c.range + BODY_R, c.arc);
@@ -6402,8 +6433,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           AIM_GUIDE.showAimStrip(18, Math.max(1, tl - 18), 12);
         }
       } else {
-        var sniperUlt = ult && MATCH.me.char === "sniper";
-        var len = sniperUlt ? ULT.pnRange : (ult ? ULT.mkRange : c.range + (overcharged(MATCH.me, now()) ? ULT.ocRangeBonus : 0)), wx = Math.cos(MATCH.me.angle), wy = Math.sin(MATCH.me.angle), hw = sniperUlt ? 22 : (ult ? 12 : 8);
+        var ultShot = ult ? aimType.ultAimShot() : null;
+        var len = ult ? ultShot.len : c.range + (overcharged(MATCH.me, now()) ? ULT.ocRangeBonus : 0), wx = Math.cos(MATCH.me.angle), wy = Math.sin(MATCH.me.angle), hw = ult ? ultShot.halfWidth : 8;
         len = rayCast(MATCH.me.x + wx * 20, MATCH.me.y + wy * 20, wx, wy, len, 6) + 20;
         AIM_GUIDE.showAimStrip(18, Math.max(1, len - 18), hw * 2);
       }
@@ -6670,10 +6701,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }
       if (CAM.snap) { CAM.look.set(lx, 0, lz); CAM.snap = false; }
       else { var k = 1 - Math.exp(-dt * 7); CAM.look.x += (lx - CAM.look.x) * k; CAM.look.z += (lz - CAM.look.z) * k; }
-      var scoping = !spec && MATCH.me.alive && MATCH.me.char === "sniper" && aim.id !== null && aim.drag;
+      var scoping = !spec && MATCH.me.alive && CHAR_TYPES.of(MATCH.me.char).scopesWhileAiming && aim.id !== null && aim.drag;
       var sk = 1 - Math.exp(-dt * 6), aimX = 0, aimZ = 0, endX = 0, endZ = 0;
       if (scoping) {
-        var wx = Math.cos(MATCH.me.angle), wz = Math.sin(MATCH.me.angle), len = rayCast(MATCH.me.x + wx * 20, MATCH.me.y + wz * 20, wx, wz, CHARS.sniper.range, 6) + 20;
+        var wx = Math.cos(MATCH.me.angle), wz = Math.sin(MATCH.me.angle), len = rayCast(MATCH.me.x + wx * 20, MATCH.me.y + wz * 20, wx, wz, CHARS[MATCH.me.char].range, 6) + 20;
         endX = MATCH.me.x + wx * len; endZ = MATCH.me.y + wz * len;
         aimX = (MATCH.me.x + endX) / 2 - CAM.look.x; aimZ = (MATCH.me.y + endZ) / 2 - CAM.look.z;
         CAMERA_RIG.placeCamera(CAM.look.x + aimX, CAM.look.z + aimZ, CAM.dist * CAM.zoomGoal, pitch, b);
