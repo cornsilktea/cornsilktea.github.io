@@ -1789,8 +1789,8 @@ function buildInterior() {
     }
   }
   const barricadeX = 20;
-  for (let k = 0; k < 5; k++) schoolDesk(barricadeX + randIn(-0.8, 0.8), FLOOR_H, -2.2 + k * 0.6 + (k > 2 ? 1.6 : 0), randIn(0, 6), chance(0.5) ? "knocked" : "up");
-  for (let k = 0; k < 2; k++) schoolChair(barricadeX + randIn(-1.5, 1.5), FLOOR_H, randIn(-2.5, 2.5), randIn(0, 6), true);
+  for (const side of [-1, 1]) schoolDesk(barricadeX + randIn(-0.8, 0.8), FLOOR_H, side * 2.1, randIn(0, 6), chance(0.5) ? "knocked" : "up");
+  for (const side of [-1, 1]) schoolChair(barricadeX + randIn(-1.5, 1.5), FLOOR_H, side * randIn(1.9, 2.5), randIn(0, 6), true);
   box(-BUILDING_X - 0.15, BUILDING_X + 0.15, ROOF_Y - 0.2, ROOF_Y - 0.05, -BUILDING_Z - 0.15, BUILDING_Z + 0.15, C.ceiling, "ceil", false, { bottom: true, noTop: true });
   box(-BUILDING_X - 0.15, BUILDING_X + 0.15, ROOF_Y - 0.05, ROOF_Y + 0.2, -BUILDING_Z - 0.15, BUILDING_Z + 0.15, C.roof, "plaster", false);
   box(-BUILDING_X - 0.2, BUILDING_X + 0.2, GROUND_Y, -0.05, -BUILDING_Z - 0.2, BUILDING_Z + 0.2, C.concrete, "ground", false);
