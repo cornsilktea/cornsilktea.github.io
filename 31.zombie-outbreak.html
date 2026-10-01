@@ -1788,7 +1788,7 @@ function buildInterior() {
       box(px - 0.3, px + 0.3, y + FLOOR_H - 0.205, y + FLOOR_H - 0.2, pz - 0.3, pz + 0.3, 0x0c0e10, "plain", false, { bottom: true });
     }
   }
-  const barricadeX = 20;
+  const barricadeX = 24;
   for (const side of [-1, 1]) schoolDesk(barricadeX + randIn(-0.8, 0.8), FLOOR_H, side * 2.1, randIn(0, 6), chance(0.5) ? "knocked" : "up");
   for (const side of [-1, 1]) schoolChair(barricadeX + randIn(-1.5, 1.5), FLOOR_H, side * randIn(1.9, 2.5), randIn(0, 6), true);
   box(-BUILDING_X - 0.15, BUILDING_X + 0.15, ROOF_Y - 0.2, ROOF_Y - 0.05, -BUILDING_Z - 0.15, BUILDING_Z + 0.15, C.ceiling, "ceil", false, { bottom: true, noTop: true });
