@@ -1,4 +1,8 @@
-function collectResults(api) {
+class ResultCollector {
+  constructor(api) { this.api = api; }
+
+  collect() {
+  var api = this.api;
   var T0 = 1700000000000;
   var FRAME = 1000 / 60;
   var OPEN_Y = { forest: 575, river: 575, dungeon: 525, windhill: 575 };
@@ -4385,10 +4389,12 @@ function collectResults(api) {
   });
   results.pending = Promise.resolve().then(function () { api.finish(api.currentMap()); }).then(drainAsync);
   return results;
+  }
 }
 
-var STATUS_LABEL = { pass: "통과", fail: "문제", info: "확인 필요" };
-var PANEL_CSS =
+class TestPanel {
+  static STATUS_LABEL = { pass: "통과", fail: "문제", info: "확인 필요" };
+  static PANEL_CSS =
   "#tbTest{position:fixed;inset:0;z-index:2147482000;overflow-y:auto;background:rgba(8,14,11,.96);color:#EEF2EE;font-family:var(--sg-font);padding:54px 16px 32px}" +
   "#tbTest .box{max-width:1000px;margin:0 auto}" +
   "#tbTest h2{font-size:24px;font-weight:800;margin-bottom:6px}" +
@@ -4405,12 +4411,12 @@ var PANEL_CSS =
   "#tbTest .dt{grid-column:2;font-size:14px;line-height:1.5;color:#CFD8D0;word-break:keep-all}" +
   "@media (max-width:560px){#tbTest .row{grid-template-columns:1fr}#tbTest .dt{grid-column:1}}";
 
-function escHtml(t) { return String(t).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  static escape(t) { return String(t).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
 
-function renderPanel(results, ms, rerun) {
+  static render(results, ms, rerun) {
   var el = document.getElementById("tbTest");
   if (!el) {
-    var st = document.createElement("style"); st.textContent = PANEL_CSS; document.head.appendChild(st);
+    var st = document.createElement("style"); st.textContent = TestPanel.PANEL_CSS; document.head.appendChild(st);
     el = document.createElement("div"); el.id = "tbTest"; document.body.appendChild(el);
   }
   var count = { pass: 0, fail: 0, info: 0 }, groups = [];
@@ -4419,8 +4425,8 @@ function renderPanel(results, ms, rerun) {
     '<div class="sum">통과 ' + count.pass + " · 문제 " + count.fail + " · 확인 필요 " + count.info + " — " + (ms / 1000).toFixed(1) + "초 걸림</div>" +
     '<div class="btns"><button type="button" data-act="rerun">다시 검사</button><button type="button" data-act="close">닫기</button></div>' +
     groups.map(function (g) {
-      return "<h3>" + escHtml(g) + "</h3>" + results.filter(function (r) { return r.group === g; }).map(function (r) {
-        return '<div class="row ' + r.status + '"><span class="tag">' + STATUS_LABEL[r.status] + '</span><div class="nm">' + escHtml(r.name) + '</div><div class="dt">' + escHtml(r.detail) + "</div></div>";
+      return "<h3>" + TestPanel.escape(g) + "</h3>" + results.filter(function (r) { return r.group === g; }).map(function (r) {
+        return '<div class="row ' + r.status + '"><span class="tag">' + TestPanel.STATUS_LABEL[r.status] + '</span><div class="nm">' + TestPanel.escape(r.name) + '</div><div class="dt">' + TestPanel.escape(r.detail) + "</div></div>";
       }).join("");
     }).join("") + "</div>";
   el.onclick = function (e) {
@@ -4429,6 +4435,7 @@ function renderPanel(results, ms, rerun) {
     if (act === "rerun") rerun();
   };
   window.TB_TEST_RESULTS = results;
+  }
 }
 
 export function runTeamBattleTests(api) {
@@ -4439,9 +4446,9 @@ export function runTeamBattleTests(api) {
     var retired = Object.keys(api.CHARS).filter(function (c) { return api.CHARS[c].retired; });
     retired.forEach(function (c) { api.CHARS[c].retired = false; });
     function restore() { retired.forEach(function (c) { api.CHARS[c].retired = true; }); api.CLOCK.serverOffset = offsetBefore; api.finish(mapBefore); }
-    try { results = collectResults(api); }
+    try { results = new ResultCollector(api).collect(); }
     catch (err) { restore(); throw err; }
-    results.pending.then(function () { restore(); renderPanel(results, performance.now() - started, once); }, function (err) { restore(); throw err; });
+    results.pending.then(function () { restore(); TestPanel.render(results, performance.now() - started, once); }, function (err) { restore(); throw err; });
   }
   once();
 }

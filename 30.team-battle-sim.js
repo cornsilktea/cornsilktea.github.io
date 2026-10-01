@@ -1,10 +1,27 @@
-var T0 = 1700000000000;
-var FRAME_MS = 33;
-var MATCH_END_MS = 89000;
+class SimSettings {
+  static T0 = 1700000000000;
+  static FRAME_MS = 33;
+  static MATCH_END_MS = 89000;
+  static AVOID_MAX_TRIES = 200;
+  static DEFAULT_AVOID = ["ACF", "AAF", "AFF"];
+  static WEAK_COMBO_MAX_WIN = 0.35;
+  static WEAK_COMBO_MIN_TEAMS = 100;
+  static ROLE_CODE = { fighter: "F", caster: "C", shooter: "S", assassin: "A" };
+}
 
-function seededRandom(seed) {
-  var s = seed >>> 0;
-  return function () { s = (s + 0x6D2B79F5) >>> 0; var q = Math.imul(s ^ (s >>> 15), 1 | s); q = (q + Math.imul(q ^ (q >>> 7), 61 | q)) ^ q; return ((q ^ (q >>> 14)) >>> 0) / 4294967296; };
+class SeededRandom {
+  constructor(seed) { this.state = seed >>> 0; }
+  next() {
+    this.state = (this.state + 0x6D2B79F5) >>> 0;
+    var q = Math.imul(this.state ^ (this.state >>> 15), 1 | this.state);
+    q = (q + Math.imul(q ^ (q >>> 7), 61 | q)) ^ q;
+    return ((q ^ (q >>> 14)) >>> 0) / 4294967296;
+  }
+  asFunction() { return () => this.next(); }
+}
+
+class HtmlText {
+  static escape(s) { return String(s).replace(/[&<>"]/g, function (ch) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[ch]; }); }
 }
 
 export function createSim(api) {
@@ -30,11 +47,11 @@ export function createSim(api) {
         once: function () { return Promise.resolve({ val: function () { return null; } }); }
       };
     }
-    return { code: "SIM", ref: node(""), mode: "3v3", map: mapId, status: "playing", host: api.myId, startAt: T0 - 1000,
+    return { code: "SIM", ref: node(""), mode: "3v3", map: mapId, status: "playing", host: api.myId, startAt: SimSettings.T0 - 1000,
              winner: null, endedAt: 0, final: null, roster: null, draft: null };
   }
 
-  function teamCode(chars) { return chars.map(function (c) { return ROLE_CODE[api.CHARS[c].role]; }).sort().join(""); }
+  function teamCode(chars) { return chars.map(function (c) { return SimSettings.ROLE_CODE[api.CHARS[c].role]; }).sort().join(""); }
   function pickTeamsOnce(rnd) {
     var all = api.CHAR_LIST.slice();
     var fighters = all.filter(function (c) { return api.CHARS[c].role === "fighter"; });
@@ -49,7 +66,7 @@ export function createSim(api) {
   }
   function pickMatchupTeams(rnd, matchup, swapSides) {
     var pools = {};
-    api.CHAR_LIST.forEach(function (c) { var code = ROLE_CODE[api.CHARS[c].role]; (pools[code] = pools[code] || []).push(c); });
+    api.CHAR_LIST.forEach(function (c) { var code = SimSettings.ROLE_CODE[api.CHARS[c].role]; (pools[code] = pools[code] || []).push(c); });
     function take(code) { var list = pools[code]; return list.splice(Math.floor(rnd() * list.length), 1)[0]; }
     var firstTeam = matchup[0].split("").map(take), secondTeam = matchup[1].split("").map(take);
     return swapSides ? { blue: secondTeam, red: firstTeam } : { blue: firstTeam, red: secondTeam };
@@ -58,7 +75,7 @@ export function createSim(api) {
     if (matchup) return pickMatchupTeams(rnd, matchup, swapSides);
     var teams = pickTeamsOnce(rnd);
     if (!avoid || !avoid.length) return teams;
-    for (var tries = 0; tries < AVOID_MAX_TRIES; tries++) {
+    for (var tries = 0; tries < SimSettings.AVOID_MAX_TRIES; tries++) {
       if (avoid.indexOf(teamCode(teams.blue)) < 0 && avoid.indexOf(teamCode(teams.red)) < 0) return teams;
       teams = pickTeamsOnce(rnd);
     }
@@ -66,7 +83,7 @@ export function createSim(api) {
   }
 
   function playOne(mapId, seed, avoid, matchup) {
-    var rnd = seededRandom(seed), realRandom = Math.random;
+    var rnd = new SeededRandom(seed).asFunction(), realRandom = Math.random;
     Math.random = rnd;
     try {
       var teams = pickTeams(rnd, avoid, matchup, seed % 2 === 1), list = [];
@@ -74,7 +91,7 @@ export function createSim(api) {
         teams[team].forEach(function (c, i) { list.push({ id: team + (i + 1), team: team, char: c, slot: i + 1 }); });
       });
       api.loadMapData(mapId);
-      var log = [], players = {}, bots = {}, t = T0;
+      var log = [], players = {}, bots = {}, t = SimSettings.T0;
       list.forEach(function (e, i) {
         players[e.id] = { nickname: e.id, isAI: true, team: e.team, characterType: e.char, slot: e.slot, joinedAt: i };
       });
@@ -88,9 +105,9 @@ export function createSim(api) {
       var sampled = {};
       list.forEach(function (e) { sampled[e.id] = { aliveN: 0, nearSum: 0, nearN: 0, fullN: 0, movedSum: 0, lastX: bots[e.id].x, lastY: bots[e.id].y, inRangeN: 0, sampleN: 0 }; });
       var frameNo = 0;
-      var endMs = MATCH_END_MS * (api.timeScale ? api.timeScale() : 1);
-      while (t < T0 + endMs) {
-        t += FRAME_MS; api.setClock(t); api.stepWorld(t, FRAME_MS / 1000, true);
+      var endMs = SimSettings.MATCH_END_MS * (api.timeScale ? api.timeScale() : 1);
+      while (t < SimSettings.T0 + endMs) {
+        t += SimSettings.FRAME_MS; api.setClock(t); api.stepWorld(t, SimSettings.FRAME_MS / 1000, true);
         if (++frameNo % 15) continue;
         list.forEach(function (e) {
           var E = bots[e.id], S = sampled[e.id];
@@ -168,7 +185,7 @@ export function createSim(api) {
 
   function simOptions(games, seedBase, options) {
     var matchup = options && options.matchup ? options.matchup.map(function (code) { return code.toUpperCase(); }) : null;
-    return { games: games, seedBase: seedBase || 5000, avoid: matchup ? [] : (options && options.avoid ? options.avoid : DEFAULT_AVOID.slice()), matchup: matchup };
+    return { games: games, seedBase: seedBase || 5000, avoid: matchup ? [] : (options && options.avoid ? options.avoid : SimSettings.DEFAULT_AVOID.slice()), matchup: matchup };
   }
   var sim = { results: [], done: false, error: null, startedAt: 0, options: {} };
   sim.run = function (games, seedBase, options) {
@@ -212,7 +229,7 @@ export function createSim(api) {
   };
   sim.comboRates = function (results) { return comboRates(results || sim.results); };
   sim.weakCombos = function (maxWin, minTeams, results) {
-    maxWin = maxWin == null ? WEAK_COMBO_MAX_WIN : maxWin; minTeams = minTeams || WEAK_COMBO_MIN_TEAMS;
+    maxWin = maxWin == null ? SimSettings.WEAK_COMBO_MAX_WIN : maxWin; minTeams = minTeams || SimSettings.WEAK_COMBO_MIN_TEAMS;
     return comboRates(results || sim.results).filter(function (c) { return c.n >= minTeams && c.win < maxWin; }).map(function (c) { return c.code; });
   };
   sim.summary = function (title, note) {
@@ -225,10 +242,7 @@ export function createSim(api) {
              totals: gameTotals(r), rows: statRows(r), combos: comboRates(r), mapOrder: api.MAP_IDS, maps: byMap };
   };
   sim.reportHtml = function (title, note) {
-    var data = sim.summary(title, note);
-    return "<!doctype html><html lang=\"ko\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">" +
-      "<title>" + escapeHtml(data.title) + "</title><style>" + REPORT_CSS + "</style></head><body><div id=\"app\"></div><script>var DATA=" +
-      JSON.stringify(data).replace(/</g, "\\u003c") + ";(" + renderReport.toString() + ")();</script></body></html>";
+    return SimReportPage.build(sim.summary(title, note));
   };
   sim.saveReport = function (fileName, title, note) {
     return fetch("/__save-report?name=" + encodeURIComponent(fileName), { method: "POST", body: sim.reportHtml(title, note) })
@@ -286,71 +300,87 @@ export class SimLauncher {
     return true;
   }
 }
-var AVOID_MAX_TRIES = 200;
-var DEFAULT_AVOID = ["ACF", "AAF", "AFF"];
-var WEAK_COMBO_MAX_WIN = 0.35;
-var WEAK_COMBO_MIN_TEAMS = 100;
-var ROLE_CODE = { fighter: "F", caster: "C", shooter: "S", assassin: "A" };
+class SimReportPage {
+  static CSS = [
+    "body{margin:0;background:#F4F1E8;color:#23302A;font-family:'Nanum Gothic','Malgun Gothic',sans-serif}",
+    "#app{max-width:1280px;margin:0 auto;padding:20px 16px 48px}",
+    "h1{font-size:22px;margin:0 0 4px}.sub{color:#5B6B62;font-size:13px;margin-bottom:14px}",
+    ".tabs{display:flex;gap:6px;border-bottom:2px solid #2F5D46;margin-bottom:16px;flex-wrap:wrap}",
+    ".tabs button{font:inherit;font-weight:700;padding:9px 16px;border:0;border-radius:8px 8px 0 0;background:#DCE5DD;color:#2F5D46;cursor:pointer}",
+    ".tabs button.on{background:#2F5D46;color:#fff}",
+    ".cards{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px}.card{background:#fff;border-radius:10px;padding:10px 14px;min-width:120px;box-shadow:0 1px 3px rgba(0,0,0,.08)}",
+    ".card b{display:block;font-size:20px}.card span{font-size:12px;color:#5B6B62}",
+    "h2{font-size:17px;margin:22px 0 8px}.wrap{overflow-x:auto;background:#fff;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.08)}",
+    "table{border-collapse:collapse;width:100%;font-size:13px;white-space:nowrap}",
+    "th,td{padding:7px 9px;text-align:right;border-bottom:1px solid #E6E1D3}th{background:#EEF2EC;cursor:pointer;user-select:none;position:sticky;top:0}",
+    "th:first-child,td:first-child{text-align:left}th.sorted{color:#D97B4F}td.win{font-weight:700}",
+    ".hi{background:#DDF1E2}.lo{background:#F8DDD3}.muted{color:#9AA59F}",
+    ".grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(560px,1fr));gap:0 18px}",
+    ".note{font-size:12px;color:#5B6B62;margin-top:8px;line-height:1.6}",
+    "@media (max-width:640px){.grid2{grid-template-columns:1fr}}"
+  ].join("");
 
-function escapeHtml(s) { return String(s).replace(/[&<>"]/g, function (ch) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[ch]; }); }
+  static build(data) {
+    return "<!doctype html><html lang=\"ko\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">" +
+      "<title>" + HtmlText.escape(data.title) + "</title><style>" + SimReportPage.CSS + "</style></head><body><div id=\"app\"></div><script>" +
+      ReportRenderer.toString() + ";new ReportRenderer(" + JSON.stringify(data).replace(/</g, "\\u003c") + ").render();</script></body></html>";
+  }
+}
 
-var REPORT_CSS = [
-  "body{margin:0;background:#F4F1E8;color:#23302A;font-family:'Nanum Gothic','Malgun Gothic',sans-serif}",
-  "#app{max-width:1280px;margin:0 auto;padding:20px 16px 48px}",
-  "h1{font-size:22px;margin:0 0 4px}.sub{color:#5B6B62;font-size:13px;margin-bottom:14px}",
-  ".tabs{display:flex;gap:6px;border-bottom:2px solid #2F5D46;margin-bottom:16px;flex-wrap:wrap}",
-  ".tabs button{font:inherit;font-weight:700;padding:9px 16px;border:0;border-radius:8px 8px 0 0;background:#DCE5DD;color:#2F5D46;cursor:pointer}",
-  ".tabs button.on{background:#2F5D46;color:#fff}",
-  ".cards{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px}.card{background:#fff;border-radius:10px;padding:10px 14px;min-width:120px;box-shadow:0 1px 3px rgba(0,0,0,.08)}",
-  ".card b{display:block;font-size:20px}.card span{font-size:12px;color:#5B6B62}",
-  "h2{font-size:17px;margin:22px 0 8px}.wrap{overflow-x:auto;background:#fff;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.08)}",
-  "table{border-collapse:collapse;width:100%;font-size:13px;white-space:nowrap}",
-  "th,td{padding:7px 9px;text-align:right;border-bottom:1px solid #E6E1D3}th{background:#EEF2EC;cursor:pointer;user-select:none;position:sticky;top:0}",
-  "th:first-child,td:first-child{text-align:left}th.sorted{color:#D97B4F}td.win{font-weight:700}",
-  ".hi{background:#DDF1E2}.lo{background:#F8DDD3}.muted{color:#9AA59F}",
-  ".grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(560px,1fr));gap:0 18px}",
-  ".note{font-size:12px;color:#5B6B62;margin-top:8px;line-height:1.6}",
-  "@media (max-width:640px){.grid2{grid-template-columns:1fr}}"
-].join("");
+class ReportRenderer {
+  constructor(data) {
+    this.data = data;
+    this.app = document.getElementById("app");
+    this.tables = [];
+    this.icon = { F: data.roles.fighter.icon, C: data.roles.caster.icon, S: data.roles.shooter.icon, A: data.roles.assassin.icon };
+    this.columns = ReportRenderer.makeColumns();
+  }
 
-function renderReport() {
-  var D = DATA, app = document.getElementById("app");
-  var ICON = { F: D.roles.fighter.icon, C: D.roles.caster.icon, S: D.roles.shooter.icon, A: D.roles.assassin.icon };
-  function fixed(v, d) { return (+v).toFixed(d); }
-  var COLS = [
-    ["win", "승률(무승부 제외)", function (v) { return fixed(v * 100, 1) + "%"; }],
-    ["n", "판 수", function (v) { return Math.round(v); }],
-    ["dmg", "피해량", function (v) { return Math.round(v); }],
-    ["skill", "스킬 피해(비중)", function (v, r) { return v > 0 ? Math.round(v) + " (" + Math.round(v / Math.max(1, r.dmg) * 100) + "%)" : "–"; }],
-    ["heal", "회복량", function (v) { return Math.round(v); }],
-    ["blk", "막은 피해", function (v) { return Math.round(v); }],
-    ["taken", "받은 피해", function (v) { return Math.round(v); }],
-    ["stun", "기절(초)", function (v) { return fixed(v, 1); }],
-    ["slow", "둔화(초)", function (v) { return fixed(v, 1); }],
-    ["k", "처치", function (v) { return fixed(v, 2); }],
-    ["de", "죽음", function (v) { return fixed(v, 2); }],
-    ["as", "어시스트", function (v) { return fixed(v, 2); }],
-    ["mvp", "MVP", function (v) { return Math.round(v); }]
-  ];
-  var tables = [];
-  function statTable(rows) {
-    var id = tables.length;
-    tables.push({ rows: rows.slice(), key: "win", desc: true });
+  static fixed(v, d) { return (+v).toFixed(d); }
+
+  static makeColumns() {
+    var fixed = ReportRenderer.fixed;
+    return [
+      ["win", "승률(무승부 제외)", function (v) { return fixed(v * 100, 1) + "%"; }],
+      ["n", "판 수", function (v) { return Math.round(v); }],
+      ["dmg", "피해량", function (v) { return Math.round(v); }],
+      ["skill", "스킬 피해(비중)", function (v, r) { return v > 0 ? Math.round(v) + " (" + Math.round(v / Math.max(1, r.dmg) * 100) + "%)" : "–"; }],
+      ["heal", "회복량", function (v) { return Math.round(v); }],
+      ["blk", "막은 피해", function (v) { return Math.round(v); }],
+      ["taken", "받은 피해", function (v) { return Math.round(v); }],
+      ["stun", "기절(초)", function (v) { return fixed(v, 1); }],
+      ["slow", "둔화(초)", function (v) { return fixed(v, 1); }],
+      ["k", "처치", function (v) { return fixed(v, 2); }],
+      ["de", "죽음", function (v) { return fixed(v, 2); }],
+      ["as", "어시스트", function (v) { return fixed(v, 2); }],
+      ["mvp", "MVP", function (v) { return Math.round(v); }]
+    ];
+  }
+
+  winTint(win) { return win >= 0.55 ? " hi" : (win < 0.40 ? " lo" : ""); }
+
+  statTable(rows) {
+    var id = this.tables.length;
+    this.tables.push({ rows: rows.slice(), key: "win", desc: true });
     return "<div class=\"wrap\"><table data-t=\"" + id + "\"></table></div>";
   }
-  function drawTable(id) {
-    var T = tables[id], el = document.querySelector("table[data-t=\"" + id + "\"]");
+
+  drawTable(id) {
+    var D = this.data, COLS = this.columns;
+    var T = this.tables[id], el = document.querySelector("table[data-t=\"" + id + "\"]");
     T.rows.sort(function (a, b) { return T.key === "name" ? a.name.localeCompare(b.name, "ko") * (T.desc ? -1 : 1) : (T.desc ? b[T.key] - a[T.key] : a[T.key] - b[T.key]); });
     var head = "<tr><th data-k=\"name\"" + (T.key === "name" ? " class=\"sorted\"" : "") + ">직업명</th>" +
       COLS.map(function (c) { return "<th data-k=\"" + c[0] + "\"" + (T.key === c[0] ? " class=\"sorted\"" : "") + ">" + c[1] + "</th>"; }).join("") + "</tr>";
     el.innerHTML = "<thead>" + head + "</thead><tbody>" + T.rows.map(function (r) {
-      var tint = r.win >= 0.55 ? " hi" : (r.win < 0.40 ? " lo" : "");
+      var tint = this.winTint(r.win);
       return "<tr><td>" + D.roles[r.role].icon + " " + r.name + "</td>" + COLS.map(function (c) {
         return "<td class=\"" + (c[0] === "win" ? "win" + tint : "") + "\">" + c[2](r[c[0]], r) + "</td>";
       }).join("") + "</tr>";
-    }).join("") + "</tbody>";
+    }, this).join("") + "</tbody>";
   }
-  function totalsCards(t, extra) {
+
+  totalsCards(t, extra) {
+    var fixed = ReportRenderer.fixed;
     function pct(v) { return t.games ? fixed(v / t.games * 100, 1) + "%" : "-"; }
     function winPct(v) { var decided = t.games - t.draws; return decided ? fixed(v / decided * 100, 1) + "%" : "-"; }
     return "<div class=\"cards\"><div class=\"card\"><b>" + t.games.toLocaleString() + "</b><span>경기 수</span></div>" +
@@ -359,34 +389,42 @@ function renderReport() {
       "<div class=\"card\"><b>" + winPct(t.red) + "</b><span>레드팀 승률(무승부 제외)</span></div>" +
       "<div class=\"card\"><b>" + (t.games ? fixed(t.kills / t.games, 1) : "-") + "</b><span>경기당 킬(양 팀 합)</span></div>" + (extra || "") + "</div>";
   }
-  function comboName(code) { return code.split("").map(function (ch) { return ICON[ch]; }).join(""); }
-  var avoid = D.options.avoid || [];
-  var optCard = D.options.matchup
-    ? "<div class=\"card\"><b>" + D.options.matchup.map(comboName).join(" vs ") + "</b><span>고정 대결(판마다 진영 바꿈)</span></div>"
-    : "<div class=\"card\"><b>" + (avoid.length ? avoid.map(comboName).join(" ") : "없음") + "</b><span>AI가 피한 조합</span></div>";
-  var comboRows = D.combos.map(function (c) {
-    var tint = c.win >= 0.55 ? " hi" : (c.win < 0.40 ? " lo" : "");
-    return "<tr><td>" + comboName(c.code) + "</td><td>" + c.n + "</td><td class=\"win" + tint + "\">" + fixed(c.win * 100, 1) + "%</td></tr>";
-  }).join("");
-  var tab1 = totalsCards(D.totals, optCard) + "<h2>캐릭터별 메인 통계</h2>" + statTable(D.rows) +
+  comboName(code) { return code.split("").map(function (ch) { return this.icon[ch]; }, this).join(""); }
+
+  render() {
+    var D = this.data, app = this.app, tables = this.tables, fixed = ReportRenderer.fixed;
+    var comboName = this.comboName.bind(this);
+    var avoid = D.options.avoid || [];
+    var optCard = D.options.matchup
+      ? "<div class=\"card\"><b>" + D.options.matchup.map(comboName).join(" vs ") + "</b><span>고정 대결(판마다 진영 바꿈)</span></div>"
+      : "<div class=\"card\"><b>" + (avoid.length ? avoid.map(comboName).join(" ") : "없음") + "</b><span>AI가 피한 조합</span></div>";
+    var comboRows = D.combos.map(function (c) {
+      var tint = this.winTint(c.win);
+      return "<tr><td>" + comboName(c.code) + "</td><td>" + c.n + "</td><td class=\"win" + tint + "\">" + fixed(c.win * 100, 1) + "%</td></tr>";
+    }, this).join("");
+    var tab1 = this.totalsCards(D.totals, optCard) + "<h2>캐릭터별 메인 통계</h2>" + this.statTable(D.rows) +
     "<h2>팀 구성별 승률</h2><div class=\"wrap\" style=\"max-width:420px\"><table><thead><tr><th>팀 구성</th><th>팀 수</th><th>승률(무승부 제외)</th></tr></thead><tbody>" + comboRows + "</tbody></table></div>" +
     "<p class=\"note\">숫자는 모두 무승부 판을 포함한 한 판(90초) 평균입니다. 승률만 무승부 판을 분모에서 뺍니다(승리 ÷ (판 수 - 무승부 판)). 기절·둔화는 적에게 건 시간. " +
     "스킬 피해(비중)은 입힌 피해 중 스킬로 준 피해와 그 비율. 네크로 해골 병사의 공격, 광전사 광폭화 중 기본 공격, 결투가 스킬 중 공격, 은신자 스킬 뒤 첫 공격도 스킬 피해로 셉니다. 받은 피해는 방어·보호막 등을 뺀 뒤 실제로 줄어든 체력의 양이고(해골 병사가 맞은 피해는 네크로의 막은 피해). 제목을 누르면 정렬됩니다.</p>";
-  var tab2 = D.roleOrder.map(function (role) {
-    var rows = D.rows.filter(function (r) { return r.role === role; });
-    return "<h2>" + D.roles[role].icon + " " + D.roles[role].name + "</h2>" + statTable(rows);
-  }).join("");
-  var tab3 = D.mapOrder.map(function (m) {
-    var M = D.maps[m];
-    return "<h2>" + M.name + "</h2>" + totalsCards(M.totals) + statTable(M.rows);
-  }).join("");
-  var when = new Date(D.createdAt);
-  app.innerHTML = "<h1>" + D.title + "</h1><div class=\"sub\">" + when.toLocaleString("ko-KR") + " · " + D.totals.games.toLocaleString() + "판 · 시드 " + D.options.seedBase +
+    var tab2 = D.roleOrder.map(function (role) {
+      var rows = D.rows.filter(function (r) { return r.role === role; });
+      return "<h2>" + D.roles[role].icon + " " + D.roles[role].name + "</h2>" + this.statTable(rows);
+    }, this).join("");
+    var tab3 = D.mapOrder.map(function (m) {
+      var M = D.maps[m];
+      return "<h2>" + M.name + "</h2>" + this.totalsCards(M.totals) + this.statTable(M.rows);
+    }, this).join("");
+    var when = new Date(D.createdAt);
+    app.innerHTML ="<h1>" + D.title + "</h1><div class=\"sub\">" + when.toLocaleString("ko-KR") + " · " + D.totals.games.toLocaleString() + "판 · 시드 " + D.options.seedBase +
     " · 약 " + Math.round(D.seconds / 60) + "분" + (D.note ? " · " + D.note : "") + "</div>" +
     "<div class=\"tabs\"><button data-tab=\"0\" class=\"on\">1. 전체 통계</button><button data-tab=\"1\">2. 직업군별</button><button data-tab=\"2\">3. 맵별</button></div>" +
     "<section>" + tab1 + "</section><section hidden>" + tab2 + "</section><section hidden>" + tab3 + "</section>";
-  tables.forEach(function (T, i) { drawTable(i); });
-  app.addEventListener("click", function (e) {
+    tables.forEach(function (T, i) { this.drawTable(i); }, this);
+    app.addEventListener("click", this.onClick.bind(this));
+  }
+
+  onClick(e) {
+    var app = this.app;
     var tab = e.target.closest("[data-tab]");
     if (tab) {
       [].forEach.call(app.querySelectorAll("[data-tab]"), function (b) { b.classList.toggle("on", b === tab); });
@@ -395,8 +433,8 @@ function renderReport() {
     }
     var th = e.target.closest("th[data-k]"), table = th && th.closest("table[data-t]");
     if (!table) return;
-    var T = tables[+table.getAttribute("data-t")], key = th.getAttribute("data-k");
+    var T = this.tables[+table.getAttribute("data-t")], key = th.getAttribute("data-k");
     T.desc = T.key === key ? !T.desc : key !== "name"; T.key = key;
-    drawTable(+table.getAttribute("data-t"));
-  });
+    this.drawTable(+table.getAttribute("data-t"));
+  }
 }
