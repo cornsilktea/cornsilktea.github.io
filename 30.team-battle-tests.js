@@ -3400,6 +3400,42 @@ function collectResults(api) {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "정원 잠금·관전자 목록·일시 안내");
   });
 
+  runAsync(LOBBYG, "캐릭터 카드: 내 카드는 누르면 뒤집히고 다른 카드는 골라지며(남이 고른 카드는 잠김), 대회모드는 보기 전용이고, 모두 뒤집기·확대·Esc 가 동작하는가", async function (done) {
+    var bad = [], code = "12121";
+    await withNet({}, async function (fake) {
+      var L = HUMAN_CHARS, base = await lobbyOf(fake, code, { r1: person("레드", "red", 1, 1) }, person("나", "blue", 3, 0));
+      await sleep(10);
+      var cards = function () { return [].slice.call(el("chars").querySelectorAll(".charCard")); };
+      var card = function (c) { return cards().filter(function (b) { return b.getAttribute("data-c") === c; })[0]; };
+      var flippedCount = function () { return cards().filter(function (b) { return b.classList.contains("flip"); }).length; };
+      var myChar = function () { return playersIn(fake, code)[me()].characterType; };
+      if (cards().length !== L.length) bad.push("카드 수 " + cards().length + " (기대 " + L.length + ")");
+      if (!card(L[0]) || card(L[0]).className.indexOf(" on") < 0) bad.push("내 카드 표시");
+      card(L[0]).click();
+      if (!card(L[0]).classList.contains("flip") || myChar() !== L[0]) bad.push("내 카드를 누르면 뒤집히기만 해야 함");
+      card(L[0]).click();
+      if (card(L[0]).classList.contains("flip")) bad.push("다시 누르면 앞면");
+      card(L[2]).click(); await sleep(15);
+      if (myChar() !== L[2]) bad.push("다른 카드를 눌러도 캐릭터가 안 바뀜");
+      card(L[1]).click(); await sleep(10);
+      if (myChar() !== L[2] || !card(L[1]).disabled) bad.push("남이 고른 카드는 잠겨 있어 눌러도 안 바뀌어야 함: 캐릭터 " + myChar() + ", 잠김 " + card(L[1]).disabled);
+      el("btnFlipAll").click();
+      if (flippedCount() !== cards().length) bad.push("모두 뒤집기 " + flippedCount());
+      el("btnFlipAll").click();
+      if (flippedCount() !== 0) bad.push("다시 누르면 모두 앞면 " + flippedCount());
+      var box = el("charCardBox");
+      el("btnZoomChars").click();
+      if (!box.classList.contains("zoomed")) bad.push("확대가 안 됨");
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
+      if (box.classList.contains("zoomed")) bad.push("Esc 로 확대가 안 풀림");
+      fake.put(base + "mode", "cup"); await sleep(10); api.renderLobby();
+      card(L[3]).click(); await sleep(10);
+      if (myChar() !== L[2] || !card(L[3]).classList.contains("flip")) bad.push("대회모드는 캐릭터를 고르지 않고 뒤집기만 해야 함");
+      card(L[3]).click();
+    });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "내 카드 뒤집기·선택·남이 고른 카드 잠김·모두 뒤집기·확대·Esc·대회모드 보기 전용");
+  });
+
   var MAP_CASES = api.MAP_IDS.concat(["practice"]);
   MAP_CASES.forEach(function (id) {
     run(MAPG, "맵 데이터 '" + id + "': 가로 16×세로 25 대칭, 장애물·물·다리·덤불 목록이 맵 글자와 맞고 출발 자리가 비어 있는가", function (done) {

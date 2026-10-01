@@ -1309,7 +1309,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     teamIds(team) { return keys(SESSION.players).filter(function (id) { return SESSION.players[id] && SESSION.players[id].team === team; }).sort(SESSION.byJoin(SESSION.players)); }
     isHost() { return !!SESSION.room && SESSION.room.host === SESSION.myId; }
     newPlayer(team, joinedAt, ps) {
-      return { nickname: nick, isAI: false, team: team, characterType: freeCharOn(ps, team, SESSION.myId), joinedAt: joinedAt };
+      return { nickname: nick, isAI: false, team: team, characterType: ROSTER.freeCharOn(ps, team, SESSION.myId), joinedAt: joinedAt };
     }
     roomCodes() {
       var base = String(CONF.DB_URL || "").replace(/\/+$/, "");
@@ -1336,8 +1336,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }).catch(function () {});
     }
     createRoom() {
-      if (!db) { startMsg("온라인 연결을 할 수 없어요. (firebase-config.js·인터넷 확인)"); return; }
-      $("btnCreate").disabled = true; startMsg("");
+      if (!db) { LOBBY.startMsg("온라인 연결을 할 수 없어요. (firebase-config.js·인터넷 확인)"); return; }
+      $("btnCreate").disabled = true; LOBBY.startMsg("");
       SESSION.sweep().then(function () { tryCode(0); });
       function tryCode(n) {
         var code = String(10000 + Math.floor(Math.random() * 90000));
@@ -1351,21 +1351,21 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         }).then(function (res) {
           if (res.committed) { $("btnCreate").disabled = false; SESSION.enterRoom(code); }
           else if (n < 8) tryCode(n + 1);
-          else { $("btnCreate").disabled = false; startMsg("방을 만들지 못했어요. 다시 눌러 주세요."); }
-        }).catch(function () { $("btnCreate").disabled = false; startMsg("방을 만들지 못했어요. (데이터베이스 규칙을 확인해 주세요)"); });
+          else { $("btnCreate").disabled = false; LOBBY.startMsg("방을 만들지 못했어요. 다시 눌러 주세요."); }
+        }).catch(function () { $("btnCreate").disabled = false; LOBBY.startMsg("방을 만들지 못했어요. (데이터베이스 규칙을 확인해 주세요)"); });
       }
     }
     joinRoom() {
       var code = $("joinCode").value.replace(/\D/g, "");
-      if (code.length !== 5) { startMsg("방 코드 5자리를 입력해 주세요."); return; }
-      if (!db) { startMsg("온라인 연결을 할 수 없어요."); return; }
-      $("btnJoin").disabled = true; startMsg("");
+      if (code.length !== 5) { LOBBY.startMsg("방 코드 5자리를 입력해 주세요."); return; }
+      if (!db) { LOBBY.startMsg("온라인 연결을 할 수 없어요."); return; }
+      $("btnJoin").disabled = true; LOBBY.startMsg("");
       var ref = db.ref(ROOT + "/" + code);
       Promise.all(["players", "status", "mode"].map(function (k) { return ref.child(k).once("value"); })).then(function (a) {
         $("btnJoin").disabled = false;
         var r = { players: a[0].val(), status: a[1].val(), mode: a[2].val() };
-        if (!r.players || !SESSION.humans(r.players).length) { startMsg("그런 방이 없어요. 코드를 확인해 주세요."); return; }
-        if (r.mode === "practice") { startMsg("혼자 연습 중인 방이라 들어갈 수 없어요."); return; }
+        if (!r.players || !SESSION.humans(r.players).length) { LOBBY.startMsg("그런 방이 없어요. 코드를 확인해 주세요."); return; }
+        if (r.mode === "practice") { LOBBY.startMsg("혼자 연습 중인 방이라 들어갈 수 없어요."); return; }
         var cnt = function (tm) { return keys(r.players).filter(function (id) { return r.players[id] && r.players[id].team === tm; }).length; };
         var team = null;
         if (r.status === "lobby") {
@@ -1373,11 +1373,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           if (nb < TEAM_MAX || nr < TEAM_MAX) team = nr < nb ? "red" : "blue";
         }
         if (!team && cnt("spec") < SPEC_MAX) team = "spec";
-        if (!team) { startMsg(r.status === "lobby" ? "방이 가득 찼어요." : "게임 중이고 관전자 자리(" + SPEC_MAX + "명)도 찼어요."); return; }
+        if (!team) { LOBBY.startMsg(r.status === "lobby" ? "방이 가득 찼어요." : "게임 중이고 관전자 자리(" + SPEC_MAX + "명)도 찼어요."); return; }
         var me = SESSION.newPlayer(team, now(), r.players);
         ref.child("players/" + SESSION.myId).set(me).then(function () { SESSION.enterRoom(code); })
-          .catch(function () { startMsg("입장하지 못했어요."); });
-      }).catch(function () { $("btnJoin").disabled = false; startMsg("방을 불러오지 못했어요."); });
+          .catch(function () { LOBBY.startMsg("입장하지 못했어요."); });
+      }).catch(function () { $("btnJoin").disabled = false; LOBBY.startMsg("방을 불러오지 못했어요."); });
     }
     armDisconnect(ref) {
       ref.child("players/" + SESSION.myId).onDisconnect().remove();
@@ -1409,23 +1409,23 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       SESSION.sub(ref.child("pong/" + SESSION.myId), "value", function (x) { CLOCK.onPong(x); });
 
       var pref = ref.child("players");
-      SESSION.sub(pref, "child_added", function (s) { SESSION.players[s.key] = s.val(); if (s.key === SESSION.myId) SESSION.saveResume(); playersChanged(); });
-      SESSION.sub(pref, "child_changed", function (s) { SESSION.players[s.key] = s.val(); if (s.key === SESSION.myId) SESSION.saveResume(); if (!MATCH.game || SESSION.room.status === "lobby") playersChanged(); });
+      SESSION.sub(pref, "child_added", function (s) { SESSION.players[s.key] = s.val(); if (s.key === SESSION.myId) SESSION.saveResume(); LOBBY.playersChanged(); });
+      SESSION.sub(pref, "child_changed", function (s) { SESSION.players[s.key] = s.val(); if (s.key === SESSION.myId) SESSION.saveResume(); if (!MATCH.game || SESSION.room.status === "lobby") LOBBY.playersChanged(); });
       SESSION.sub(pref, "child_removed", function (s) {
         if (s.key === SESSION.myId && !SESSION.leaving) { SESSION.rejoinAfterDrop(s.val() || SESSION.players[SESSION.myId]); return; }
         delete SESSION.players[s.key]; delete MATCH.remotes[s.key]; delete MATCH.bots[s.key];
-        SESSION.checkHost(); playersChanged();
+        SESSION.checkHost(); LOBBY.playersChanged();
       });
       SESSION.sub(db.ref(".info/connected"), "value", function (s) { if (s.val() === true && SESSION.room && SESSION.room.ref === ref && !SESSION.leaving) SESSION.armDisconnect(ref); });
-      SESSION.sub(ref.child("mode"), "value", function (s) { SESSION.room.mode = s.val(); playersChanged(); });
-      SESSION.sub(ref.child("map"), "value", function (s) { SESSION.room.map = s.val() || "forest"; ARENA_VIEW.syncArena(); playersChanged(); });
+      SESSION.sub(ref.child("mode"), "value", function (s) { SESSION.room.mode = s.val(); LOBBY.playersChanged(); });
+      SESSION.sub(ref.child("map"), "value", function (s) { SESSION.room.map = s.val() || "forest"; ARENA_VIEW.syncArena(); LOBBY.playersChanged(); });
       SESSION.sub(ref.child("arena"), "value", function (s) { SESSION.room.arena = s.val() || "forest"; ARENA_VIEW.syncArena(); });
-      SESSION.sub(ref.child("hostPlayerId"), "value", function (s) { SESSION.room.host = s.val(); SESSION.room.hostLoaded = true; CLOCK.hostChanged(SESSION.room.host); SESSION.checkHost(); playersChanged(); });
+      SESSION.sub(ref.child("hostPlayerId"), "value", function (s) { SESSION.room.host = s.val(); SESSION.room.hostLoaded = true; CLOCK.hostChanged(SESSION.room.host); SESSION.checkHost(); LOBBY.playersChanged(); });
       SESSION.sub(ref.child("startAt"), "value", function (s) { SESSION.room.startAt = s.val() || 0; });
       SESSION.sub(ref.child("timeScale"), "value", function (s) {
         var before = CLOCK.scale;
         SESSION.room.timeScale = s.val(); applyTimeScale(SESSION.room.timeScale);
-        if (CLOCK.scale !== before) { cardHeightFor = null; playersChanged(); }
+        if (CLOCK.scale !== before) { CARDS.cardHeightFor = null; LOBBY.playersChanged(); }
       });
       SESSION.sub(ref.child("winner"), "value", function (s) { SESSION.room.winner = s.val(); });
       SESSION.sub(ref.child("bans"), "value", function (s) { SESSION.room.bans = s.val(); });
@@ -1440,7 +1440,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var prev = SESSION.room.status; SESSION.room.status = st; ARENA_VIEW.syncArena();
         var keepSpecResult = st === "lobby" && prev === "ended" && screenNow === "game" && isSpec();
         if (!keepSpecResult) releaseSpecResult();
-        if (st === "lobby") { MATCH.game = null; MATCH.me = null; MATCH.bots = {}; if (keepSpecResult) holdSpecResult(); else showScreen("lobby"); playersChanged(); }
+        if (st === "lobby") { MATCH.game = null; MATCH.me = null; MATCH.bots = {}; if (keepSpecResult) holdSpecResult(); else showScreen("lobby"); LOBBY.playersChanged(); }
         else if (st === "draft") { MATCH.game = null; MATCH.me = null; MATCH.bots = {}; if (prev !== "draft") DRAFT.view = null; showScreen("draft"); DRAFT.renderDraft(); }
         else showScreen("game");
         if (st === "countdown" && prev !== "countdown") CLOCK.burst();
@@ -1493,12 +1493,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         });
       }).catch(function () {});
       SESSION.clearResume();
-      SESSION.room = null; SESSION.resetLocal(); showScreen("start"); startMsg("");
+      SESSION.room = null; SESSION.resetLocal(); showScreen("start"); LOBBY.startMsg("");
     }
     exitToStart(msg) {
       SESSION.clearResume();
       if (SESSION.room) { SESSION.leaving = true; SESSION.unsubAll(); try { SESSION.room.ref.child("players/" + SESSION.myId).onDisconnect().cancel(); } catch (e) {} }
-      SESSION.room = null; SESSION.resetLocal(); showScreen("start"); startMsg(msg || "");
+      SESSION.room = null; SESSION.resetLocal(); showScreen("start"); LOBBY.startMsg(msg || "");
     }
     resetLocal() { applyTimeScale(SLOW_REQUEST); FX_VIEW.clear3d(); SESSION.players = {}; MATCH.leave(); INPUT.reset(); specResultHeld = false; setText($("btnAgain"), "다시하기"); }
     saveResume() {
@@ -1513,25 +1513,25 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     resumeTeam(me, ps, status) {
       if (status !== "lobby" || me.team === "spec") return me.team;
-      if (countIn(ps, me.team, SESSION.myId) < TEAM_MAX) return me.team;
-      return countIn(ps, "spec", SESSION.myId) < SPEC_MAX ? "spec" : null;
+      if (ROSTER.countIn(ps, me.team, SESSION.myId) < TEAM_MAX) return me.team;
+      return ROSTER.countIn(ps, "spec", SESSION.myId) < SPEC_MAX ? "spec" : null;
     }
     tryResume() {
       var s = SESSION.readResume();
       if (!s || !db) { SESSION.clearResume(); return; }
       var ref = db.ref(ROOT + "/" + s.code);
-      startMsg("이전 방(" + s.code + ")으로 다시 들어가는 중…");
+      LOBBY.startMsg("이전 방(" + s.code + ")으로 다시 들어가는 중…");
       Promise.all(["status", "players"].map(function (k) { return ref.child(k).once("value"); })).then(function (a) {
         var status = a[0].val(), ps = a[1].val() || {};
         if (SESSION.room) return;
-        if (status === null) { SESSION.clearResume(); startMsg(""); return; }
+        if (status === null) { SESSION.clearResume(); LOBBY.startMsg(""); return; }
         SESSION.myId = s.id;
         var me = ps[SESSION.myId] || Object.assign({}, s.me, { nickname: nick || s.me.nickname });
         var team = SESSION.resumeTeam(me, ps, status);
-        if (!team) { SESSION.clearResume(); startMsg("이전 방이 가득 차서 다시 들어가지 못했어요."); return; }
+        if (!team) { SESSION.clearResume(); LOBBY.startMsg("이전 방이 가득 차서 다시 들어가지 못했어요."); return; }
         me.team = team;
-        return ref.child("players/" + SESSION.myId).set(me).then(function () { startMsg(""); SESSION.enterRoom(s.code); });
-      }).catch(function () { SESSION.clearResume(); startMsg(""); });
+        return ref.child("players/" + SESSION.myId).set(me).then(function () { LOBBY.startMsg(""); SESSION.enterRoom(s.code); });
+      }).catch(function () { SESSION.clearResume(); LOBBY.startMsg(""); });
     }
     practiceMode() { return !!SESSION.room && SESSION.room.mode === "practice"; }
   }
@@ -1539,7 +1539,105 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
 
 
-  function startMsg(t) { setText($("startMsg"), t || ""); }
+  class LobbyView {
+    constructor() { this.queued = false; this.hintUntil = 0; this.hintText = ""; }
+    startMsg(t) { setText($("startMsg"), t || ""); }
+    placeCharBox(k) {
+      var cols = $(k === "start" ? "startCols" : "lobbyCols"), box = $("charCardBox");
+      if (box.parentNode !== cols) cols.appendChild(box);
+      if (k === "start") LOBBY.renderStartChars();
+    }
+    charsViewOnly() { return screenNow === "start" || !!(SESSION.room && SESSION.room.mode === "cup"); }
+    renderStartChars() {
+      show($("charCardBox"), true);
+      setText($("charHint"), "카드를 누르면 자세한 설명이 나와요.");
+      setHtmlKeepScroll($("chars"), CARDS.cardsHtml({}, true)); CARDS.fitCardHeight(); CARDS.fitCharCol($("charCardBox"));
+    }
+    playersChanged() {
+      if (LOBBY.queued) return; LOBBY.queued = true;
+      setTimeout(function () { LOBBY.queued = false; LOBBY.renderLobby(); }, 0);
+    }
+    flashHint(t) { LOBBY.hintText = t; LOBBY.hintUntil = Date.now() + 2500; LOBBY.renderLobby(); setTimeout(function () { LOBBY.renderLobby(); }, 2600); }
+    mapChoices(mode) {
+      return MAP_IDS.map(function (id) { return { id: id, name: MAPS[id].name }; })
+        .concat([mode === "practice" ? { id: "practice", name: MAPS.practice.name } : { id: "random", name: "랜덤" }]);
+    }
+    nameIn(list, id, fallback) { for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i].name; return fallback; }
+    modeName(id) { return LOBBY.nameIn(MODES, id, "모드 선택 중"); }
+    choiceButtons(list, current, cls) {
+      return list.map(function (m) {
+        return '<button type="button" class="mini modeBtn ' + cls + (m.id === current ? " on" : "") + '" data-id="' + m.id + '"' + (SESSION.isHost() ? "" : " disabled") + ">" + m.name + "</button>";
+      }).join("");
+    }
+    renderLobby() {
+      if (!SESSION.room || screenNow !== "lobby") return;
+      var me = SESSION.players[SESSION.myId]; if (!me) return;
+      var mode = SESSION.room.mode;
+      var practice = mode === "practice", maps = LOBBY.mapChoices(mode);
+      setText($("lobbyMode"), LOBBY.modeName(mode) + " · " + LOBBY.nameIn(maps, SESSION.room.map, MAPS.forest.name));
+      setHtml($("modeBtns"), LOBBY.choiceButtons(MODES, mode, "modeOpt"));
+      setHtml($("mapBtns"), LOBBY.choiceButtons(maps, SESSION.room.map || "forest", "mapOpt"));
+
+      var hostCanFill = SESSION.isHost() && SESSION.room.status === "lobby" && !practice;
+      function list(team) {
+        var ids = SESSION.teamIds(team), h = "";
+        for (var i = 0; i < 3; i++) {
+          var id = ids[i];
+          if (practice && id !== SESSION.myId) id = null;
+          if (!id && practice) { h += '<div class="slot empty">없음</div>'; continue; }
+          if (!id) {
+            h += hostCanFill ? '<button type="button" class="slot empty addAi" data-ai-add="' + team + '">빈 자리<span class="aiAdd">🤖 AI 추가</span></button>'
+                             : '<div class="slot empty">빈 자리</div>';
+            continue;
+          }
+          var p = SESSION.players[id];
+          h += '<div class="slot' + (id === SESSION.myId ? " mine" : "") + (p.isAI ? " ai" : "") + '">' + (SESSION.room.host === id ? '<span class="host">👑</span>' : "") + (p.isAI ? "🤖 " : "") + esc(p.nickname) +
+               (id === SESSION.myId ? ' <span class="me">나</span>' : "") + (SESSION.room.mode === "cup" ? "" : '<span class="ch">' + esc((CHARS[p.characterType] || CHARS.ranger).name) + "</span>") +
+               (p.isAI && hostCanFill ? '<button type="button" class="aiDel" data-ai-del="' + id + '" aria-label="AI 빼기">빼기</button>' : "") + "</div>";
+        }
+        return h;
+      }
+      setHtml($("listBlue"), list("blue"));
+      setHtml($("listRed"), list("red"));
+      var nb = SESSION.teamIds("blue").length, nr = SESSION.teamIds("red").length;
+      var imSpec = me.team === "spec";
+      show($("btnJoinBlue"), me.team !== "blue"); $("btnJoinBlue").disabled = !ROSTER.canMoveTo("blue");
+      show($("btnJoinRed"), me.team !== "red");   $("btnJoinRed").disabled = !ROSTER.canMoveTo("red");
+      var specs = practice ? [] : SESSION.teamIds("spec");
+      setHtml($("listSpec"), (specs.length ? specs.map(function (id) { return (SESSION.room.host === id ? "👑" : "") + esc(SESSION.players[id].nickname) + (id === SESSION.myId ? "(나)" : ""); }).join(", ") : '<span class="none">없음</span>') +
+              " (" + specs.length + "/" + (practice ? 0 : SPEC_MAX) + ")");
+      show($("btnSpec"), !imSpec); $("btnSpec").disabled = practice || !ROSTER.canMoveTo("spec");
+      var cup = mode === "cup";
+      show($("charCardBox"), cup || !imSpec);
+      if (!cup && imSpec) CARDS.setCharZoom(false);
+      setText($("charHint"), cup ? "대회모드에서는 게임 시작 후 캐릭터를 골라요. 카드를 누르면 자세한 설명이 나와요." : "선택한 캐릭터를 한 번 더 누르면 자세한 설명이 나와요.");
+      show($("btnSwapTeams"), SESSION.isHost() && SESSION.room.status === "lobby");
+
+      setHtmlKeepScroll($("chars"), CARDS.cardsHtml(me, cup)); CARDS.fitCardHeight(); CARDS.fitCharCol($("charCardBox"));
+
+      var host = SESSION.isHost(), ok = false, hint = "";
+      if (!mode) hint = "게임 방식을 먼저 골라 주세요.";
+      else if (practice) {
+        ok = ROSTER.isPlayingTeam(me.team);
+        hint = ok ? "연습 봇을 상대로 혼자 연습해요. 게임 시작을 누르면 연습장에 들어가요." : "블루팀이나 레드팀으로 이동해 주세요.";
+      } else {
+        if (nb < 1 || nr < 1) hint = "양 팀에 1명 이상 있어야 시작할 수 있어요.";
+        else { ok = true; hint = nb !== nr ? "인원이 달라요 (블루 " + nb + " vs 레드 " + nr + ") — 그래도 시작할 수 있어요." : "블루 " + nb + " vs 레드 " + nr; }
+      }
+      if (!cup && !practice) ["blue", "red"].forEach(function (team) {
+        SESSION.teamIds(team).forEach(function (id) {
+          var c = SESSION.players[id].characterType;
+          if (ok && !SESSION.players[id].isAI && ROSTER.takenInMatch(SESSION.players, team, c, id)) { ok = false; hint = "같은 캐릭터(" + CHARS[c].name + ")를 2명 이상 골랐어요. 한 경기에서 같은 캐릭터는 1명만 고를 수 있어요."; }
+        });
+      });
+      if (!host) hint = (ok ? "방장이 시작하기를 기다리는 중… " : "") + hint;
+      if (Date.now() < LOBBY.hintUntil) hint = LOBBY.hintText;
+      show($("btnStart"), host);
+      $("btnStart").disabled = !ok;
+      setText($("startHint"), hint);
+    }
+  }
+  var LOBBY = new LobbyView();
 
 
 
@@ -1561,79 +1659,100 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var guardHome = document.querySelector("[data-guard-home]");
     if (guardHome) guardHome.style.display = k === "game" || k === "draft" ? "none" : "";
     if (k === "game") CAMERA_RIG.resize();
-    if (k !== prev || (k !== "lobby" && k !== "start")) setCharZoom(false);
-    if (k === "start" || k === "lobby") placeCharBox(k);
+    if (k !== prev || (k !== "lobby" && k !== "start")) CARDS.setCharZoom(false);
+    if (k === "start" || k === "lobby") LOBBY.placeCharBox(k);
     if (k !== "start" && k !== "lobby") { show($("statsModal"), false); closeVideos(); }
     if (k !== "lobby") show($("mapViewModal"), false);
     if (k !== "game") show($("pcModal"), false);
   }
-  function placeCharBox(k) {
-    var cols = $(k === "start" ? "startCols" : "lobbyCols"), box = $("charCardBox");
-    if (box.parentNode !== cols) cols.appendChild(box);
-    if (k === "start") renderStartChars();
-  }
-  function charsViewOnly() { return screenNow === "start" || !!(SESSION.room && SESSION.room.mode === "cup"); }
-  function renderStartChars() {
-    show($("charCardBox"), true);
-    setText($("charHint"), "카드를 누르면 자세한 설명이 나와요.");
-    setHtmlKeepScroll($("chars"), cardsHtml({}, true)); fitCardHeight(); fitCharCol($("charCardBox"));
-  }
 
-  var lobbyQueued = false;
-  function playersChanged() {
-    if (lobbyQueued) return; lobbyQueued = true;
-    setTimeout(function () { lobbyQueued = false; renderLobby(); }, 0);
-  }
 
-  function capOf(team) { return team === "spec" ? SPEC_MAX : TEAM_MAX; }
-  function countIn(ps, team, except) { return keys(ps).filter(function (id) { return id !== except && ps[id] && ps[id].team === team; }).length; }
-  function canMoveTo(team) {
-    var me = SESSION.players[SESSION.myId];
-    if (!SESSION.room || SESSION.room.status !== "lobby" || !me || me.team === team) return false;
-    return countIn(SESSION.players, team, SESSION.myId) < capOf(team);
+  class RoomRoster {
+    capOf(team) { return team === "spec" ? SPEC_MAX : TEAM_MAX; }
+    countIn(ps, team, except) { return keys(ps).filter(function (id) { return id !== except && ps[id] && ps[id].team === team; }).length; }
+    canMoveTo(team) {
+      var me = SESSION.players[SESSION.myId];
+      if (!SESSION.room || SESSION.room.status !== "lobby" || !me || me.team === team) return false;
+      return ROSTER.countIn(SESSION.players, team, SESSION.myId) < ROSTER.capOf(team);
+    }
+    isPlayingTeam(team) { return team === "blue" || team === "red"; }
+    takenInMatch(ps, team, c, except) {
+      if (!ROSTER.isPlayingTeam(team)) return false;
+      return keys(ps || {}).some(function (id) { return id !== except && ps[id] && ROSTER.isPlayingTeam(ps[id].team) && ps[id].characterType === c; });
+    }
+    freeCharOn(ps, team, except) {
+      var order = [FALLBACK_CHAR].concat(CHAR_LIST.filter(function (c) { return c !== FALLBACK_CHAR; }));
+      for (var i = 0; i < order.length; i++) if (!ROSTER.takenInMatch(ps, team, order[i], except)) return order[i];
+      return FALLBACK_CHAR;
+    }
+    onlyOneMsg(c) { return "이미 다른 사람이 고른 캐릭터예요(" + CHARS[c].name + "). 한 경기에서 같은 캐릭터는 1명만 고를 수 있어요."; }
+    pickTeam(team) {
+      if (!ROSTER.canMoveTo(team)) return;
+      var swapped = null;
+      SESSION.room.ref.child("players").transaction(function (ps) {
+        if (!ps || !ps[SESSION.myId]) return ps;
+        if (ROSTER.countIn(ps, team, SESSION.myId) >= ROSTER.capOf(team)) return;
+        ps[SESSION.myId].team = team;
+        swapped = null;
+        if (ROSTER.takenInMatch(ps, team, ps[SESSION.myId].characterType, SESSION.myId)) {
+          swapped = { from: ps[SESSION.myId].characterType, to: ROSTER.freeCharOn(ps, team, SESSION.myId) };
+          ps[SESSION.myId].characterType = swapped.to;
+        }
+        return ps;
+      }).then(function (res) {
+        if (!res.committed) LOBBY.flashHint("자리가 다 찼어요. 자리가 나면 다시 눌러 주세요.");
+        else if (swapped) LOBBY.flashHint("이미 다른 사람이 고른 캐릭터(" + CHARS[swapped.from].name + ")라서 " + CHARS[swapped.to].name + " 캐릭터로 바꿨어요.");
+      });
+    }
+    pickChar(c) {
+      var me = SESSION.players[SESSION.myId];
+      if (ROSTER.takenInMatch(SESSION.players, me.team, c, SESSION.myId)) { LOBBY.flashHint(ROSTER.onlyOneMsg(c)); return; }
+      var blocked = false;
+      SESSION.room.ref.child("players").transaction(function (ps) {
+        if (!ps || !ps[SESSION.myId]) return ps;
+        blocked = ROSTER.takenInMatch(ps, ps[SESSION.myId].team, c, SESSION.myId);
+        if (blocked) return;
+        ps[SESSION.myId].characterType = c; return ps;
+      }).then(function (res) { if (!res.committed && blocked) LOBBY.flashHint(ROSTER.onlyOneMsg(c)); });
+    }
+    setMode(mode) {
+      if (!SESSION.isHost() || SESSION.room.status !== "lobby" || SESSION.room.mode === mode) return;
+      if (mode !== "practice") { SESSION.room.ref.update(SESSION.room.map === "practice" ? { mode: mode, map: "forest" } : { mode: mode }); return; }
+      if (SESSION.humans(SESSION.players).length > 1) { LOBBY.flashHint("연습모드는 방에 혼자 있을 때만 고를 수 있어요."); return; }
+      var u = { mode: "practice", map: "practice" };
+      keys(SESSION.players).forEach(function (id) { if (SESSION.players[id] && SESSION.players[id].isAI) u["players/" + id] = null; });
+      if (SESSION.players[SESSION.myId] && !ROSTER.isPlayingTeam(SESSION.players[SESSION.myId].team)) u["players/" + SESSION.myId + "/team"] = "blue";
+      SESSION.room.ref.update(u);
+    }
+    setMapChoice(map) {
+      if (!SESSION.isHost() || SESSION.room.status !== "lobby" || SESSION.room.map === map) return;
+      SESSION.room.ref.update({ map: map });
+    }
+    freeAiName(ps) {
+      var used = keys(ps).map(function (id) { return ps[id] && ps[id].nickname; }), n = 1;
+      while (used.indexOf("AI" + n) >= 0) n++;
+      return "AI" + n;
+    }
+    addAi(team) {
+      if (!SESSION.isHost() || SESSION.room.status !== "lobby" || ROSTER.countIn(SESSION.players, team) >= TEAM_MAX) return;
+      var free = CHAR_LIST.filter(function (c) { return !ROSTER.takenInMatch(SESSION.players, team, c); });
+      var id = "ai" + Math.random().toString(36).slice(2, 10);
+      SESSION.room.ref.child("players/" + id).set({ nickname: ROSTER.freeAiName(SESSION.players), isAI: true, team: team, characterType: pick(free.length ? free : CHAR_LIST), joinedAt: now() });
+    }
+    removeAi(id) {
+      if (!SESSION.isHost() || SESSION.room.status !== "lobby" || !SESSION.players[id] || !SESSION.players[id].isAI) return;
+      SESSION.room.ref.child("players/" + id).remove();
+    }
+    swapTeams() {
+      if (!SESSION.isHost() || SESSION.room.status !== "lobby") return;
+      SESSION.room.ref.child("players").transaction(function (ps) {
+        if (!ps) return ps;
+        keys(ps).forEach(function (id) { if (ps[id] && SWAPPED_TEAM[ps[id].team]) ps[id].team = SWAPPED_TEAM[ps[id].team]; });
+        return ps;
+      }).then(function (res) { if (res.committed) LOBBY.flashHint("블루팀과 레드팀을 바꿨어요."); });
+    }
   }
-  function isPlayingTeam(team) { return team === "blue" || team === "red"; }
-  function takenInMatch(ps, team, c, except) {
-    if (!isPlayingTeam(team)) return false;
-    return keys(ps || {}).some(function (id) { return id !== except && ps[id] && isPlayingTeam(ps[id].team) && ps[id].characterType === c; });
-  }
-  function freeCharOn(ps, team, except) {
-    var order = [FALLBACK_CHAR].concat(CHAR_LIST.filter(function (c) { return c !== FALLBACK_CHAR; }));
-    for (var i = 0; i < order.length; i++) if (!takenInMatch(ps, team, order[i], except)) return order[i];
-    return FALLBACK_CHAR;
-  }
-  function onlyOneMsg(c) { return "이미 다른 사람이 고른 캐릭터예요(" + CHARS[c].name + "). 한 경기에서 같은 캐릭터는 1명만 고를 수 있어요."; }
-  function pickTeam(team) {
-    if (!canMoveTo(team)) return;
-    var swapped = null;
-    SESSION.room.ref.child("players").transaction(function (ps) {
-      if (!ps || !ps[SESSION.myId]) return ps;
-      if (countIn(ps, team, SESSION.myId) >= capOf(team)) return;
-      ps[SESSION.myId].team = team;
-      swapped = null;
-      if (takenInMatch(ps, team, ps[SESSION.myId].characterType, SESSION.myId)) {
-        swapped = { from: ps[SESSION.myId].characterType, to: freeCharOn(ps, team, SESSION.myId) };
-        ps[SESSION.myId].characterType = swapped.to;
-      }
-      return ps;
-    }).then(function (res) {
-      if (!res.committed) flashHint("자리가 다 찼어요. 자리가 나면 다시 눌러 주세요.");
-      else if (swapped) flashHint("이미 다른 사람이 고른 캐릭터(" + CHARS[swapped.from].name + ")라서 " + CHARS[swapped.to].name + " 캐릭터로 바꿨어요.");
-    });
-  }
-  function pickChar(c) {
-    var me = SESSION.players[SESSION.myId];
-    if (takenInMatch(SESSION.players, me.team, c, SESSION.myId)) { flashHint(onlyOneMsg(c)); return; }
-    var blocked = false;
-    SESSION.room.ref.child("players").transaction(function (ps) {
-      if (!ps || !ps[SESSION.myId]) return ps;
-      blocked = takenInMatch(ps, ps[SESSION.myId].team, c, SESSION.myId);
-      if (blocked) return;
-      ps[SESSION.myId].characterType = c; return ps;
-    }).then(function (res) { if (!res.committed && blocked) flashHint(onlyOneMsg(c)); });
-  }
-  var hintUntil = 0, hintText = "";
-  function flashHint(t) { hintText = t; hintUntil = Date.now() + 2500; renderLobby(); setTimeout(renderLobby, 2600); }
+  var ROSTER = new RoomRoster();
 
   var MODES = [
     { id: "pvp", name: "일반모드" },
@@ -1643,30 +1762,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var STATS_MODES = MODES.filter(function (m) { return m.id !== "practice"; });
   var PRACTICE_BOT_RETURN_MS = 2500, PRACTICE_BOT_GAP = 340, PRACTICE_BOT_MIN_GAP = 220, PRACTICE_ALLY_AHEAD = 200;
   var PRACTICE_ALLY_LOW = 0.3, PRACTICE_ALLY_RESET_MS = 3000;
-  function mapChoices(mode) {
-    return MAP_IDS.map(function (id) { return { id: id, name: MAPS[id].name }; })
-      .concat([mode === "practice" ? { id: "practice", name: MAPS.practice.name } : { id: "random", name: "랜덤" }]);
-  }
-  function nameIn(list, id, fallback) { for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i].name; return fallback; }
-  function modeName(id) { return nameIn(MODES, id, "모드 선택 중"); }
-  function setMode(mode) {
-    if (!SESSION.isHost() || SESSION.room.status !== "lobby" || SESSION.room.mode === mode) return;
-    if (mode !== "practice") { SESSION.room.ref.update(SESSION.room.map === "practice" ? { mode: mode, map: "forest" } : { mode: mode }); return; }
-    if (SESSION.humans(SESSION.players).length > 1) { flashHint("연습모드는 방에 혼자 있을 때만 고를 수 있어요."); return; }
-    var u = { mode: "practice", map: "practice" };
-    keys(SESSION.players).forEach(function (id) { if (SESSION.players[id] && SESSION.players[id].isAI) u["players/" + id] = null; });
-    if (SESSION.players[SESSION.myId] && !isPlayingTeam(SESSION.players[SESSION.myId].team)) u["players/" + SESSION.myId + "/team"] = "blue";
-    SESSION.room.ref.update(u);
-  }
-  function setMapChoice(map) {
-    if (!SESSION.isHost() || SESSION.room.status !== "lobby" || SESSION.room.map === map) return;
-    SESSION.room.ref.update({ map: map });
-  }
-  function choiceButtons(list, current, cls) {
-    return list.map(function (m) {
-      return '<button type="button" class="mini modeBtn ' + cls + (m.id === current ? " on" : "") + '" data-id="' + m.id + '"' + (SESSION.isHost() ? "" : " disabled") + ">" + m.name + "</button>";
-    }).join("");
-  }
 
   function pick(list) { return list[Math.floor(Math.random() * list.length)]; }
   var ICON_SRC = {};
@@ -1676,56 +1771,112 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     return ICON_SRC[c];
   }
 
-  var flipped = {};
   var CHAR_CARD_W = 132, CHAR_CARD_FLIP_W = 320, ROLE_ROW_GAP = 8, ROLE_CARDS_PAD = 8, TWO_COLUMN_MIN_W = 1000;
-  function cardTargetW(card) {
-    if (!card.classList.contains("charCard")) return card.offsetWidth;
-    return card.classList.contains("flip") ? CHAR_CARD_FLIP_W : CHAR_CARD_W;
-  }
-  function fitCharCol(box) {
-    if (!box) return;
-    if (window.innerWidth < TWO_COLUMN_MIN_W) { box.style.width = ""; return; }
-    var need = 0;
-    [].forEach.call(box.querySelectorAll(".roleRow"), function (row) {
-      var tag = row.querySelector(".roleTag"), cards = row.querySelectorAll(".charCard, .dfCard");
-      var w = (tag ? tag.offsetWidth : 0) + ROLE_ROW_GAP + ROLE_CARDS_PAD + ROLE_ROW_GAP * Math.max(0, cards.length - 1);
-      [].forEach.call(cards, function (c) { w += cardTargetW(c); });
-      need = Math.max(need, w);
-    });
-    if (!need) return;
-    var cs = getComputedStyle(box), frame = 0;
-    if (cs.boxSizing === "border-box") frame = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth);
-    box.style.width = Math.ceil(need + frame + 2) + "px";
-  }
-  var cardHeightFor = null;
-  function fitCardHeight() {
-    var box = $("chars"), narrow = window.innerWidth <= 560;
-    if (!box || cardHeightFor === narrow || !box.offsetParent || !box.querySelector(".charCard")) return;
-    var probe = document.createElement("div");
-    probe.className = "roleCards cardMeasure";
-    probe.innerHTML = box.innerHTML;
-    [].forEach.call(probe.querySelectorAll(".charCard"), function (c) { c.classList.add("flip"); });
-    box.appendChild(probe);
-    probe.style.setProperty("--pas-h", "0px");
-    probe.style.setProperty("--sk-h", "0px");
-    function tallestOf(sel, floor) {
-      [].forEach.call(probe.querySelectorAll(sel), function (el) { floor = Math.max(floor, Math.ceil(el.offsetHeight)); });
-      return floor;
+  class CharCardView {
+    constructor() { this.flipped = {}; this.cardHeightFor = null; }
+    cardTargetW(card) {
+      if (!card.classList.contains("charCard")) return card.offsetWidth;
+      return card.classList.contains("flip") ? CHAR_CARD_FLIP_W : CHAR_CARD_W;
     }
-    var pasH = tallestOf(".pasDesc", 0), skH = tallestOf(".skDesc", 0);
-    probe.style.setProperty("--pas-h", pasH + "px");
-    probe.style.setProperty("--sk-h", skH + "px");
-    var tallest = tallestOf(".face.back", narrow ? 176 : 184);
-    box.removeChild(probe);
-    box.style.setProperty("--pas-h", pasH + "px");
-    box.style.setProperty("--sk-h", skH + "px");
-    box.style.setProperty("--card-h", tallest + "px");
-    cardHeightFor = narrow;
+    fitCharCol(box) {
+      if (!box) return;
+      if (window.innerWidth < TWO_COLUMN_MIN_W) { box.style.width = ""; return; }
+      var need = 0;
+      [].forEach.call(box.querySelectorAll(".roleRow"), function (row) {
+        var tag = row.querySelector(".roleTag"), cards = row.querySelectorAll(".charCard, .dfCard");
+        var w = (tag ? tag.offsetWidth : 0) + ROLE_ROW_GAP + ROLE_CARDS_PAD + ROLE_ROW_GAP * Math.max(0, cards.length - 1);
+        [].forEach.call(cards, function (c) { w += CARDS.cardTargetW(c); });
+        need = Math.max(need, w);
+      });
+      if (!need) return;
+      var cs = getComputedStyle(box), frame = 0;
+      if (cs.boxSizing === "border-box") frame = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth);
+      box.style.width = Math.ceil(need + frame + 2) + "px";
+    }
+    fitCardHeight() {
+      var box = $("chars"), narrow = window.innerWidth <= 560;
+      if (!box || CARDS.cardHeightFor === narrow || !box.offsetParent || !box.querySelector(".charCard")) return;
+      var probe = document.createElement("div");
+      probe.className = "roleCards cardMeasure";
+      probe.innerHTML = box.innerHTML;
+      [].forEach.call(probe.querySelectorAll(".charCard"), function (c) { c.classList.add("flip"); });
+      box.appendChild(probe);
+      probe.style.setProperty("--pas-h", "0px");
+      probe.style.setProperty("--sk-h", "0px");
+      function tallestOf(sel, floor) {
+        [].forEach.call(probe.querySelectorAll(sel), function (el) { floor = Math.max(floor, Math.ceil(el.offsetHeight)); });
+        return floor;
+      }
+      var pasH = tallestOf(".pasDesc", 0), skH = tallestOf(".skDesc", 0);
+      probe.style.setProperty("--pas-h", pasH + "px");
+      probe.style.setProperty("--sk-h", skH + "px");
+      var tallest = tallestOf(".face.back", narrow ? 176 : 184);
+      box.removeChild(probe);
+      box.style.setProperty("--pas-h", pasH + "px");
+      box.style.setProperty("--sk-h", skH + "px");
+      box.style.setProperty("--card-h", tallest + "px");
+      CARDS.cardHeightFor = narrow;
+    }
+    fitCharCols() { CARDS.fitCharCol($("charCardBox")); CARDS.fitCharCol(document.querySelector(".dfCharCol")); }
+    roleRowsHtml(cardOf) {
+      return ROLE_LIST.map(function (r) {
+        var roleInfo = ROLES[r], list = charsInRole(r);
+        if (!list.length) return "";
+        return '<div class="roleRow"><div class="roleTag"><i>' + roleInfo.icon + "</i><b>" + roleInfo.name + "</b><small>게이지<br>적중 +" + roleInfo.gaugeOnHit +
+               (roleInfo.gaugeOnHurt ? "<br>피격 +" + roleInfo.gaugeOnHurt : "") + '</small></div><div class="roleCards">' + list.map(cardOf).join("") + "</div></div>";
+      }).join("");
+    }
+    cardsHtml(me, viewOnly) {
+      return CARDS.roleRowsHtml(function (k) {
+        var c = CHARS[k], taken = !viewOnly && me.characterType !== k && ROSTER.takenInMatch(SESSION.players, me.team, k, SESSION.myId);
+        return '<button type="button" class="charCard' + (!viewOnly && me.characterType === k ? " on" : "") + (CARDS.flipped[k] ? " flip" : "") +
+          '" data-c="' + k + '"' + (taken ? " disabled" : "") + '><div class="cardIn">' +
+          '<div class="face front">' + (taken ? '<span class="soon">선택됨</span>' : "") + '<img alt="" src="' + charImgSrc(k) + '">' +
+            '<div class="nm">' + c.name + "</div></div>" +
+          '<div class="face back"><div class="nm">' + c.name + "</div>" + statTable(k) +
+            skillBlocks(k) + "</div>" +
+          "</div></button>";
+      });
+    }
+    setCharZoom(on) {
+      var box = $("charCardBox"), btn = $("btnZoomChars");
+      if (box.classList.contains("zoomed") === on) return;
+      box.classList.toggle("zoomed", on);
+      btn.classList.toggle("on", on);
+      btn.textContent = on ? "접기" : "확대";
+      box.scrollTop = 0;
+      if (!on) CARDS.fitCharCol(box);
+    }
+    onCardClick(e) {
+      var b = e.target.closest ? e.target.closest(".charCard") : null;
+      var onStart = screenNow === "start";
+      if (!b || b.disabled || (!onStart && (!SESSION.room || SESSION.room.status !== "lobby"))) return;
+      var c = b.getAttribute("data-c");
+      var me = onStart ? {} : SESSION.players[SESSION.myId]; if (!me) return;
+      var viewOnly = LOBBY.charsViewOnly();
+      if (viewOnly || me.characterType === c) {
+        CARDS.flipped[c] = !CARDS.flipped[c];
+        b.classList.toggle("flip", CARDS.flipped[c]);
+        $("chars")._h = CARDS.cardsHtml(me, viewOnly);
+        CARDS.fitCharCol($("charCardBox"));
+        return;
+      }
+      ROSTER.pickChar(c);
+    }
+    flipAll() {
+      var backCount = CHAR_LIST.filter(function (k) { return CARDS.flipped[k]; }).length;
+      var showBack = backCount <= CHAR_LIST.length - backCount;
+      CHAR_LIST.forEach(function (k) { CARDS.flipped[k] = showBack; });
+      var me = screenNow === "start" ? {} : SESSION.players[SESSION.myId];
+      [].forEach.call($("chars").querySelectorAll(".charCard"), function (b) { b.classList.toggle("flip", showBack); });
+      if (me) $("chars")._h = CARDS.cardsHtml(me, LOBBY.charsViewOnly());
+      CARDS.fitCharCol($("charCardBox"));
+    }
   }
-  window.addEventListener("resize", fitCardHeight);
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { cardHeightFor = null; fitCardHeight(); });
-  function fitCharCols() { fitCharCol($("charCardBox")); fitCharCol(document.querySelector(".dfCharCol")); }
-  window.addEventListener("resize", fitCharCols);
+  var CARDS = new CharCardView();
+  window.addEventListener("resize", function () { CARDS.fitCardHeight(); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { CARDS.cardHeightFor = null; CARDS.fitCardHeight(); });
+  window.addEventListener("resize", function () { CARDS.fitCharCols(); });
   function num(v) { return String(Math.round(v * 10) / 10); }
   function secs(ms) { return (Math.round(ms / CLOCK.scale / 10) / 100) + "초"; }
   function shownSpeed(v) { return Math.round(v * CLOCK.scale); }
@@ -1754,137 +1905,18 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
            "<tr><th>사거리</th><td>" + pair(Math.round(c.stab ? c.range : c.dashRange || c.range), c.throwRange) + "</td></tr><tr><th>스킬</th><td>" + c.ultName + "</td></tr></table>";
   }
   function roleGaugeText(role) { return "기본 공격 적중 시 게이지 +" + role.gaugeOnHit + (role.gaugeOnHurt ? ", 피격 시 +" + role.gaugeOnHurt : ""); }
-  function roleRowsHtml(cardOf) {
-    return ROLE_LIST.map(function (r) {
-      var roleInfo = ROLES[r], list = charsInRole(r);
-      if (!list.length) return "";
-      return '<div class="roleRow"><div class="roleTag"><i>' + roleInfo.icon + "</i><b>" + roleInfo.name + "</b><small>게이지<br>적중 +" + roleInfo.gaugeOnHit +
-             (roleInfo.gaugeOnHurt ? "<br>피격 +" + roleInfo.gaugeOnHurt : "") + '</small></div><div class="roleCards">' + list.map(cardOf).join("") + "</div></div>";
-    }).join("");
-  }
-  function cardsHtml(me, viewOnly) {
-    return roleRowsHtml(function (k) {
-      var c = CHARS[k], taken = !viewOnly && me.characterType !== k && takenInMatch(SESSION.players, me.team, k, SESSION.myId);
-      return '<button type="button" class="charCard' + (!viewOnly && me.characterType === k ? " on" : "") + (flipped[k] ? " flip" : "") +
-        '" data-c="' + k + '"' + (taken ? " disabled" : "") + '><div class="cardIn">' +
-        '<div class="face front">' + (taken ? '<span class="soon">선택됨</span>' : "") + '<img alt="" src="' + charImgSrc(k) + '">' +
-          '<div class="nm">' + c.name + "</div></div>" +
-        '<div class="face back"><div class="nm">' + c.name + "</div>" + statTable(k) +
-          skillBlocks(k) + "</div>" +
-        "</div></button>";
-    });
-  }
-  function renderLobby() {
-    if (!SESSION.room || screenNow !== "lobby") return;
-    var me = SESSION.players[SESSION.myId]; if (!me) return;
-    var mode = SESSION.room.mode;
-    var practice = mode === "practice", maps = mapChoices(mode);
-    setText($("lobbyMode"), modeName(mode) + " · " + nameIn(maps, SESSION.room.map, MAPS.forest.name));
-    setHtml($("modeBtns"), choiceButtons(MODES, mode, "modeOpt"));
-    setHtml($("mapBtns"), choiceButtons(maps, SESSION.room.map || "forest", "mapOpt"));
-
-    var hostCanFill = SESSION.isHost() && SESSION.room.status === "lobby" && !practice;
-    function list(team) {
-      var ids = SESSION.teamIds(team), h = "";
-      for (var i = 0; i < 3; i++) {
-        var id = ids[i];
-        if (practice && id !== SESSION.myId) id = null;
-        if (!id && practice) { h += '<div class="slot empty">없음</div>'; continue; }
-        if (!id) {
-          h += hostCanFill ? '<button type="button" class="slot empty addAi" data-ai-add="' + team + '">빈 자리<span class="aiAdd">🤖 AI 추가</span></button>'
-                           : '<div class="slot empty">빈 자리</div>';
-          continue;
-        }
-        var p = SESSION.players[id];
-        h += '<div class="slot' + (id === SESSION.myId ? " mine" : "") + (p.isAI ? " ai" : "") + '">' + (SESSION.room.host === id ? '<span class="host">👑</span>' : "") + (p.isAI ? "🤖 " : "") + esc(p.nickname) +
-             (id === SESSION.myId ? ' <span class="me">나</span>' : "") + (SESSION.room.mode === "cup" ? "" : '<span class="ch">' + esc((CHARS[p.characterType] || CHARS.ranger).name) + "</span>") +
-             (p.isAI && hostCanFill ? '<button type="button" class="aiDel" data-ai-del="' + id + '" aria-label="AI 빼기">빼기</button>' : "") + "</div>";
-      }
-      return h;
-    }
-    setHtml($("listBlue"), list("blue"));
-    setHtml($("listRed"), list("red"));
-    var nb = SESSION.teamIds("blue").length, nr = SESSION.teamIds("red").length;
-    var imSpec = me.team === "spec";
-    show($("btnJoinBlue"), me.team !== "blue"); $("btnJoinBlue").disabled = !canMoveTo("blue");
-    show($("btnJoinRed"), me.team !== "red");   $("btnJoinRed").disabled = !canMoveTo("red");
-    var specs = practice ? [] : SESSION.teamIds("spec");
-    setHtml($("listSpec"), (specs.length ? specs.map(function (id) { return (SESSION.room.host === id ? "👑" : "") + esc(SESSION.players[id].nickname) + (id === SESSION.myId ? "(나)" : ""); }).join(", ") : '<span class="none">없음</span>') +
-            " (" + specs.length + "/" + (practice ? 0 : SPEC_MAX) + ")");
-    show($("btnSpec"), !imSpec); $("btnSpec").disabled = practice || !canMoveTo("spec");
-    var cup = mode === "cup";
-    show($("charCardBox"), cup || !imSpec);
-    if (!cup && imSpec) setCharZoom(false);
-    setText($("charHint"), cup ? "대회모드에서는 게임 시작 후 캐릭터를 골라요. 카드를 누르면 자세한 설명이 나와요." : "선택한 캐릭터를 한 번 더 누르면 자세한 설명이 나와요.");
-    show($("btnSwapTeams"), SESSION.isHost() && SESSION.room.status === "lobby");
-
-    setHtmlKeepScroll($("chars"), cardsHtml(me, cup)); fitCardHeight(); fitCharCol($("charCardBox"));
-
-    var host = SESSION.isHost(), ok = false, hint = "";
-    if (!mode) hint = "게임 방식을 먼저 골라 주세요.";
-    else if (practice) {
-      ok = isPlayingTeam(me.team);
-      hint = ok ? "연습 봇을 상대로 혼자 연습해요. 게임 시작을 누르면 연습장에 들어가요." : "블루팀이나 레드팀으로 이동해 주세요.";
-    } else {
-      if (nb < 1 || nr < 1) hint = "양 팀에 1명 이상 있어야 시작할 수 있어요.";
-      else { ok = true; hint = nb !== nr ? "인원이 달라요 (블루 " + nb + " vs 레드 " + nr + ") — 그래도 시작할 수 있어요." : "블루 " + nb + " vs 레드 " + nr; }
-    }
-    if (!cup && !practice) ["blue", "red"].forEach(function (team) {
-      SESSION.teamIds(team).forEach(function (id) {
-        var c = SESSION.players[id].characterType;
-        if (ok && !SESSION.players[id].isAI && takenInMatch(SESSION.players, team, c, id)) { ok = false; hint = "같은 캐릭터(" + CHARS[c].name + ")를 2명 이상 골랐어요. 한 경기에서 같은 캐릭터는 1명만 고를 수 있어요."; }
-      });
-    });
-    if (!host) hint = (ok ? "방장이 시작하기를 기다리는 중… " : "") + hint;
-    if (Date.now() < hintUntil) hint = hintText;
-    show($("btnStart"), host);
-    $("btnStart").disabled = !ok;
-    setText($("startHint"), hint);
-  }
-  $("chars").onclick = function (e) {
-    var b = e.target.closest ? e.target.closest(".charCard") : null;
-    var onStart = screenNow === "start";
-    if (!b || b.disabled || (!onStart && (!SESSION.room || SESSION.room.status !== "lobby"))) return;
-    var c = b.getAttribute("data-c");
-    var me = onStart ? {} : SESSION.players[SESSION.myId]; if (!me) return;
-    var viewOnly = charsViewOnly();
-    if (viewOnly || me.characterType === c) {
-      flipped[c] = !flipped[c];
-      b.classList.toggle("flip", flipped[c]);
-      $("chars")._h = cardsHtml(me, viewOnly);
-      fitCharCol($("charCardBox"));
-      return;
-    }
-    pickChar(c);
-  };
-  $("btnFlipAll").onclick = function () {
-    var backCount = CHAR_LIST.filter(function (k) { return flipped[k]; }).length;
-    var showBack = backCount <= CHAR_LIST.length - backCount;
-    CHAR_LIST.forEach(function (k) { flipped[k] = showBack; });
-    var me = screenNow === "start" ? {} : SESSION.players[SESSION.myId];
-    [].forEach.call($("chars").querySelectorAll(".charCard"), function (b) { b.classList.toggle("flip", showBack); });
-    if (me) $("chars")._h = cardsHtml(me, charsViewOnly());
-    fitCharCol($("charCardBox"));
-  };
+  $("chars").onclick = function (e) { CARDS.onCardClick(e); };
+  $("btnFlipAll").onclick = function () { CARDS.flipAll(); };
   var LITE_MOTION = !!(window.matchMedia && matchMedia("(pointer: coarse)").matches);
   if (LITE_MOTION) document.documentElement.classList.add("liteMotion");
-  function setCharZoom(on) {
-    var box = $("charCardBox"), btn = $("btnZoomChars");
-    if (box.classList.contains("zoomed") === on) return;
-    box.classList.toggle("zoomed", on);
-    btn.classList.toggle("on", on);
-    btn.textContent = on ? "접기" : "확대";
-    box.scrollTop = 0;
-    if (!on) fitCharCol(box);
-  }
-  $("btnZoomChars").onclick = function () { setCharZoom(!$("charCardBox").classList.contains("zoomed")); };
+  $("btnZoomChars").onclick = function () { CARDS.setCharZoom(!$("charCardBox").classList.contains("zoomed")); };
   window.addEventListener("keydown", function (e) {
     if (e.key !== "Escape") return;
     if (!$("pcModal").hidden) show($("pcModal"), false);
     else if (vidOpen) { if (vidChar) showVideoList(); else closeVideos(); }
     else if (!$("statsModal").hidden) show($("statsModal"), false);
     else if (!$("mapViewModal").hidden) show($("mapViewModal"), false);
-    else if ($("charCardBox").classList.contains("zoomed")) setCharZoom(false);
+    else if ($("charCardBox").classList.contains("zoomed")) CARDS.setCharZoom(false);
   });
   var statsMode = "pvp", statsLoadSeq = 0;
   function statsPct(a, b) { return b ? (a / b * 100).toFixed(1) + "%" : "-"; }
@@ -2103,46 +2135,24 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (to === "list") showVideoList(); else { stopVideos(); showVideoChar(to); }
   };
   $("vpDetail").addEventListener("play", function (e) { if (e.target.tagName === "VIDEO") stopVideos(e.target.parentNode); }, true);
-  function freeAiName(ps) {
-    var used = keys(ps).map(function (id) { return ps[id] && ps[id].nickname; }), n = 1;
-    while (used.indexOf("AI" + n) >= 0) n++;
-    return "AI" + n;
-  }
-  function addAi(team) {
-    if (!SESSION.isHost() || SESSION.room.status !== "lobby" || countIn(SESSION.players, team) >= TEAM_MAX) return;
-    var free = CHAR_LIST.filter(function (c) { return !takenInMatch(SESSION.players, team, c); });
-    var id = "ai" + Math.random().toString(36).slice(2, 10);
-    SESSION.room.ref.child("players/" + id).set({ nickname: freeAiName(SESSION.players), isAI: true, team: team, characterType: pick(free.length ? free : CHAR_LIST), joinedAt: now() });
-  }
-  function removeAi(id) {
-    if (!SESSION.isHost() || SESSION.room.status !== "lobby" || !SESSION.players[id] || !SESSION.players[id].isAI) return;
-    SESSION.room.ref.child("players/" + id).remove();
-  }
   $("teamCard").addEventListener("click", function (e) {
     var add = e.target.closest ? e.target.closest("[data-ai-add]") : null, del = e.target.closest ? e.target.closest("[data-ai-del]") : null;
-    if (del) removeAi(del.getAttribute("data-ai-del"));
-    else if (add) addAi(add.getAttribute("data-ai-add"));
+    if (del) ROSTER.removeAi(del.getAttribute("data-ai-del"));
+    else if (add) ROSTER.addAi(add.getAttribute("data-ai-add"));
   });
-  $("btnJoinBlue").onclick = function () { pickTeam("blue"); };
-  $("btnJoinRed").onclick = function () { pickTeam("red"); };
-  $("btnSpec").onclick = function () { pickTeam("spec"); };
+  $("btnJoinBlue").onclick = function () { ROSTER.pickTeam("blue"); };
+  $("btnJoinRed").onclick = function () { ROSTER.pickTeam("red"); };
+  $("btnSpec").onclick = function () { ROSTER.pickTeam("spec"); };
   var SWAPPED_TEAM = { blue: "red", red: "blue" };
-  $("btnSwapTeams").onclick = function () {
-    if (!SESSION.isHost() || SESSION.room.status !== "lobby") return;
-    SESSION.room.ref.child("players").transaction(function (ps) {
-      if (!ps) return ps;
-      keys(ps).forEach(function (id) { if (ps[id] && SWAPPED_TEAM[ps[id].team]) ps[id].team = SWAPPED_TEAM[ps[id].team]; });
-      return ps;
-    }).then(function (res) { if (res.committed) flashHint("블루팀과 레드팀을 바꿨어요."); });
-  };
+  $("btnSwapTeams").onclick = function () { ROSTER.swapTeams(); };
   function choiceClick(apply) {
     return function (e) {
       var b = e.target.closest ? e.target.closest(".modeBtn") : null;
       if (b && !b.disabled) apply(b.getAttribute("data-id"));
     };
   }
-  $("modeBtns").onclick = choiceClick(setMode);
-  $("mapBtns").onclick = choiceClick(setMapChoice);
+  $("modeBtns").onclick = choiceClick(ROSTER.setMode.bind(ROSTER));
+  $("mapBtns").onclick = choiceClick(ROSTER.setMapChoice.bind(ROSTER));
   $("btnLeaveLobby").onclick = SESSION.leaveRoom.bind(SESSION);
   $("btnLeaveGame").onclick = function () { if (confirm("방을 나갈까요?")) SESSION.leaveRoom(); };
   $("btnLeaveEnd").onclick = SESSION.leaveRoom.bind(SESSION);
@@ -2460,13 +2470,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       keys(picks).forEach(function (id) { owner[picks[id]] = id; });
       var myHover = myTurn ? hover[SESSION.myId] : null;
       if (!DRAFT.view && myHover) DRAFT.view = myHover;
-      setHtmlKeepScroll($("dfChars"), roleRowsHtml(function (k) {
+      setHtmlKeepScroll($("dfChars"), CARDS.roleRowsHtml(function (k) {
         var o = owner[k], op = o && SESSION.players[o], oSide = o && DRAFT.draftSideOf(d, o), isBanned = banned.indexOf(k) >= 0;
         var tag = isBanned ? '<span class="tag ban">밴</span>' : (o ? '<span class="tag ' + (oSide === "b" ? "b" : "r") + '">' + esc(op ? op.nickname : "") + "</span>" : "");
         return '<button type="button" class="dfCard' + (o || isBanned ? " taken" : "") + (isBanned ? " banned" : "") + (myHover === k ? " on" : (DRAFT.view === k ? " view" : "")) + '" data-c="' + k + '">' + tag +
                '<img alt="" src="' + charImgSrc(k) + '"><div class="nm">' + CHARS[k].name + "</div></button>";
       }));
-      fitCharCol(document.querySelector(".dfCharCol"));
+      CARDS.fitCharCol(document.querySelector(".dfCharCol"));
       var v = DRAFT.view && playable(DRAFT.view) ? DRAFT.view : null, canPick = v && myTurn && DRAFT.draftLeft(d).indexOf(v) >= 0;
       var pickBtn = !canPick ? "" : banTurn ? '<button type="button" class="big danger" data-pick="' + v + '">🚫 ' + CHARS[v].name + " 밴</button>" :
         '<button type="button" class="big primary" data-pick="' + v + '">✔ ' + CHARS[v].name + roParticle(CHARS[v].name) + " 결정</button>";
@@ -5207,7 +5217,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     MATCH.me.gauge = GAUGE_MAX; MATCH.game.forceNet = true;
   }
   function practiceCharsHtml() {
-    return roleRowsHtml(function (k) {
+    return CARDS.roleRowsHtml(function (k) {
       return '<button type="button" class="dfCard' + (MATCH.me && MATCH.me.char === k ? " on" : "") + '" data-c="' + k + '"><img alt="" src="' + charImgSrc(k) + '"><div class="nm">' + CHARS[k].name + "</div></button>";
     });
   }
@@ -5259,7 +5269,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function releaseSpecResult() {
     if (!specResultHeld) return;
     specResultHeld = false; setText($("btnAgain"), "다시하기"); show($("endOv"), false);
-    if (SESSION.room && SESSION.room.status === "lobby") { showScreen("lobby"); playersChanged(); }
+    if (SESSION.room && SESSION.room.status === "lobby") { showScreen("lobby"); LOBBY.playersChanged(); }
   }
   function againOrBackToLobby() { show($("scoreHelpModal"), false); if (specResultHeld) releaseSpecResult(); else restart(); }
   $("btnAgain").onclick = againOrBackToLobby;
@@ -5730,8 +5740,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       renderer.setRenderTarget(null);
       renderer.setClearColor(oldClear, oldAlpha);
       rt.dispose();
-      playersChanged();
-      if (screenNow === "start") { $("chars")._h = null; renderStartChars(); }
+      LOBBY.playersChanged();
+      if (screenNow === "start") { $("chars")._h = null; LOBBY.renderStartChars(); }
     }
   }
   var MODELS = new ModelKit();
@@ -7802,9 +7812,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       tryResume: SESSION.tryResume.bind(SESSION), saveResume: SESSION.saveResume.bind(SESSION), readResume: SESSION.readResume.bind(SESSION), clearResume: SESSION.clearResume.bind(SESSION), resumeTeam: SESSION.resumeTeam.bind(SESSION), RESUME_KEY: RESUME_KEY, RESUME_MS: RESUME_MS,
       room: function () { return SESSION.room; }, players: function () { return SESSION.players; }, screen: function () { return screenNow; },
       setConf: function (conf) { var before = CONF; CONF = conf; return before; }, setNick: function (n) { var before = nick; nick = n; return before; },
-      capOf: capOf, countIn: countIn, isPlayingTeam: isPlayingTeam, takenInMatch: takenInMatch, freeCharOn: freeCharOn, onlyOneMsg: onlyOneMsg, canMoveTo: canMoveTo,
-      pickTeam: pickTeam, pickChar: pickChar, setMode: setMode, setMapChoice: setMapChoice, addAi: addAi, removeAi: removeAi, mapChoices: mapChoices, resolveArena: ARENA_MAP.resolveArena.bind(ARENA_MAP), modeName: modeName,
-      renderLobby: renderLobby, flashHint: flashHint, clearHint: function () { hintUntil = 0; hintText = ""; }, practiceMode: SESSION.practiceMode.bind(SESSION), TEAM_MAX: TEAM_MAX, SPEC_MAX: SPEC_MAX, FALLBACK_CHAR: FALLBACK_CHAR, MODES: MODES,
+      capOf: ROSTER.capOf.bind(ROSTER), countIn: ROSTER.countIn.bind(ROSTER), isPlayingTeam: ROSTER.isPlayingTeam.bind(ROSTER), takenInMatch: ROSTER.takenInMatch.bind(ROSTER), freeCharOn: ROSTER.freeCharOn.bind(ROSTER), onlyOneMsg: ROSTER.onlyOneMsg.bind(ROSTER), canMoveTo: ROSTER.canMoveTo.bind(ROSTER),
+      pickTeam: ROSTER.pickTeam.bind(ROSTER), pickChar: ROSTER.pickChar.bind(ROSTER), setMode: ROSTER.setMode.bind(ROSTER), setMapChoice: ROSTER.setMapChoice.bind(ROSTER), addAi: ROSTER.addAi.bind(ROSTER), removeAi: ROSTER.removeAi.bind(ROSTER), mapChoices: LOBBY.mapChoices.bind(LOBBY), resolveArena: ARENA_MAP.resolveArena.bind(ARENA_MAP), modeName: LOBBY.modeName.bind(LOBBY),
+      renderLobby: LOBBY.renderLobby.bind(LOBBY), flashHint: LOBBY.flashHint.bind(LOBBY), clearHint: function () { LOBBY.hintUntil = 0; LOBBY.hintText = ""; }, practiceMode: SESSION.practiceMode.bind(SESSION), TEAM_MAX: TEAM_MAX, SPEC_MAX: SPEC_MAX, FALLBACK_CHAR: FALLBACK_CHAR, MODES: MODES,
       tileX: ARENA_MAP.tileX.bind(ARENA_MAP), tileY: ARENA_MAP.tileY.bind(ARENA_MAP), fullMap: ARENA_MAP.fullMap.bind(ARENA_MAP), mapRows: function () { return ARENA_MAP.rows; }, bushIds: function () { return ARENA_MAP.bushId; }, bridges: function () { return ARENA_MAP.bridges; }, MW: MW, MH: MH, TILE: TILE, SPAWN_X: SPAWN_X,
       onKillFeed: KILLFEED.onKillFeed.bind(KILLFEED), multiKillTag: KILLFEED.multiKillTag.bind(KILLFEED), KILL_FEED_MAX: KILL_FEED_MAX, KILL_FEED_MS: KILL_FEED_MS,
       mvpScore: HUD.mvpScore.bind(HUD),
@@ -7819,7 +7829,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   applyTimeScale(SLOW_REQUEST);
   refreshNick();
   showScreen("start");
-  if (!db) startMsg("온라인 연결을 준비하지 못했어요. 인터넷 연결을 확인해 주세요.");
+  if (!db) LOBBY.startMsg("온라인 연결을 준비하지 못했어요. 인터넷 연결을 확인해 주세요.");
   if (!nick) openNick(true);
   if (!/[?&](test|sim)(&|$)/.test(location.search)) SESSION.tryResume();
   requestAnimationFrame(loop);
