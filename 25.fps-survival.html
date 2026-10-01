@@ -31,6 +31,7 @@
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="fpssurvival"></script>
 <script charset="utf-8" src="world-record.js"></script>
+<script charset="utf-8" src="quality-governor.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>FPS 서바이벌</title>
@@ -3295,20 +3296,20 @@ $("btnBackLobby").onclick = e => { e.currentTarget.blur(); hostBackToLobby(); };
 $("btnOverLeave").onclick = e => { e.currentTarget.blur(); leaveRoom(); teamScreen("start"); };
 $("btnGameLeave").onclick = e => { e.currentTarget.blur(); if (confirm("방을 나갈까요?")) { leaveRoom(); teamScreen("start"); } };
 
-let adaptSlowFrames = 0;
-function adaptQuality(frameSec) {
-  const playing = state === "play" || (state === "team" && T.screen === "game");
-  if (!playing || frameSec > 0.25) return;
-  if (frameSec > 0.022) adaptSlowFrames++; else if (adaptSlowFrames > 0) adaptSlowFrames--;
-  if (adaptSlowFrames <= 90) return;
-  adaptSlowFrames = 0;
-  const pr = renderer.getPixelRatio();
-  if (pr > MIN_PIXEL_RATIO) { renderer.setPixelRatio(Math.max(MIN_PIXEL_RATIO, pr - 0.25)); resize(); }
-}
+const QG = QualityGovernor({
+  isPlaying: () => state === "play" || (state === "team" && T.screen === "game"),
+  slowSec: 0.022, slowLimit: 90,
+  steps: [() => {
+    const pr = renderer.getPixelRatio();
+    if (pr <= MIN_PIXEL_RATIO) return false;
+    renderer.setPixelRatio(Math.max(MIN_PIXEL_RATIO, pr - 0.25)); resize();
+    return true;
+  }]
+});
 function loop(now) {
   requestAnimationFrame(loop);
   syncTouchPad();
-  adaptQuality((now - lastT) / 1000);
+  QG.update((now - lastT) / 1000);
   animateSoldierLooks(now);
   updateLamps(now);
   updateVisualShots(Math.min(0.05, (now - lastT) / 1000));

@@ -4,6 +4,7 @@
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="conditionrun"></script>
 <script charset="utf-8" src="world-record.js"></script>
+<script charset="utf-8" src="quality-governor.js"></script>
 <meta charset="utf-8">
 <link rel="stylesheet" href="theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -1288,24 +1289,29 @@
     updateBillboards();
   }
 
-  var curPR = 0, slowFrames = 0;
-  function adaptQuality(dt){
-    if (dt > 0.022) slowFrames++; else if (slowFrames > 0) slowFrames--;
-    if (slowFrames <= 90) return;
-    slowFrames = 0;
-    if (curPR > MIN_PIXEL_RATIO) {
-      curPR = Math.max(MIN_PIXEL_RATIO, curPR - 0.25);
-      renderer.setPixelRatio(curPR);
-      resize();
-    } else if (bloomOn) {
-      bloomOn = false;
-    }
-  }
+  var curPR = 0;
+  var qualityGovernor = QualityGovernor({
+    slowSec: 0.022, slowLimit: 90,
+    steps: [
+      function () {
+        if (curPR <= MIN_PIXEL_RATIO) return false;
+        curPR = Math.max(MIN_PIXEL_RATIO, curPR - 0.25);
+        renderer.setPixelRatio(curPR);
+        resize();
+        return true;
+      },
+      function () {
+        if (!bloomOn) return false;
+        bloomOn = false;
+        return true;
+      }
+    ]
+  });
 
   function loop(){
     requestAnimationFrame(loop);
     var dt = Math.min(0.05, clock.getDelta());
-    adaptQuality(dt);
+    qualityGovernor.update(dt);
     update(dt);
     if (composer && bloomOn) composer.render(dt);
     else renderer.render(scene, camera);
