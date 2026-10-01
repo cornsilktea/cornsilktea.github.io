@@ -2507,7 +2507,7 @@ function collectResults(api) {
       api.KEY_ON.atk = true;
       W.frame(FRAME);
       var first = shotsBy(W, api.myId);
-      if (first.length !== 1 || Math.abs(first[0].v.a) > 0.02) bad.push("첫 프레임 발사 " + first.length + "번, 각도 " + (first[0] && first[0].v.a));
+      if (first.length !== 1 || Math.abs(first[0].v.a) > api.AUTO_AIM_ERR + 0.01) bad.push("첫 프레임 발사 " + first.length + "번, 각도 " + (first[0] && first[0].v.a));
       W.step(cd - 150);
       if (shotsBy(W, api.myId).length !== 1) bad.push("쿨타임 중에 또 쏨 (" + shotsBy(W, api.myId).length + "번)");
       W.step(300);
@@ -2574,7 +2574,7 @@ function collectResults(api) {
       if (api.aim.id !== 3 || api.aim.btn !== "atk") bad.push("공격 버튼이 눌리지 않음");
       pointer(btn, "pointerup", 3, 100, 100);
       var tap = shotsBy(W, api.myId);
-      if (tap.length !== 1 || Math.abs(tap[0].v.a - (-Math.PI / 2)) > 0.02 || api.aim.id !== null) bad.push("짧게 누르면 위쪽 적을 향해 쏴야 함: " + JSON.stringify(tap.map(function (p) { return p.v.a; })));
+      if (tap.length !== 1 || Math.abs(tap[0].v.a - (-Math.PI / 2)) > api.AUTO_AIM_ERR + 0.01 || api.aim.id !== null) bad.push("짧게 누르면 위쪽 적을 향해 쏴야 함: " + JSON.stringify(tap.map(function (p) { return p.v.a; })));
       me.cdUntil = 0;
       pointer(btn, "pointerdown", 4, 100, 100);
       pointer(btn, "pointermove", 4, 100 + api.DRAG_MIN + 40, 100);
@@ -2773,6 +2773,204 @@ function collectResults(api) {
     });
   });
 
+
+  var AIMG = "자동 조준·AI 역할·드래프트 전사", AIM_N = 400;
+  function aimSamples(char, foeChar, moving) {
+    var out = [];
+    withMe([meEntry(char, "red", 200, OPEN_Y.forest), { id: "foe", team: "blue", char: foeChar, x: 500, y: OPEN_Y.forest }], function (W, me) {
+      var foe = W.ent("foe");
+      if (moving) { foe.mv = true; foe.moveAng = -Math.PI / 2; foe.moveAt = api.CLOCK.now(); }
+      withSeed(3, function () { for (var i = 0; i < AIM_N; i++) out.push(api.AUTO_AIM.angle(me)); });
+    });
+    return out;
+  }
+  function meanOf(list) { return list.reduce(function (a, b) { return a + b; }, 0) / list.length; }
+
+  run(AIMG, "자동 조준: 서 있는 적은 오차 범위 안에서 맞히고, 매번 조금씩 다르게 겨냥하는가", function (done) {
+    var angles = aimSamples("ranger", "knight", false), bad = [], err = api.AUTO_AIM_ERR;
+    if (angles.some(function (a) { return Math.abs(a) > err + 1e-6; })) bad.push("오차 범위 " + err + " 를 넘는 각도가 있음");
+    if (Math.max.apply(null, angles) - Math.min.apply(null, angles) < err) bad.push("각도가 거의 안 퍼짐");
+    if (Math.abs(meanOf(angles)) > err / 4) bad.push("한쪽으로 치우침 " + meanOf(angles).toFixed(3));
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "400번 모두 ±" + err + " 라디안 안, 평균 " + meanOf(angles).toFixed(3));
+  });
+
+  run(AIMG, "자동 조준: 움직이는 적은 가는 쪽을 어느 정도 앞서 겨냥하되, 완벽한 선행 조준보다는 부족한가", function (done) {
+    var angles = aimSamples("ranger", "knight", true), bad = [], c = api.CHARS, d = 300;
+    var perfect = Math.atan2(-c.knight.speed * d / c.ranger.pSpeed, d), partial = Math.atan2(-c.knight.speed * d / c.ranger.pSpeed * api.AUTO_AIM_LEAD, d), mean = meanOf(angles);
+    if (Math.abs(mean - partial) > 0.01) bad.push("평균 " + mean.toFixed(3) + " (기대 " + partial.toFixed(3) + ")");
+    if (!(mean < 0 && mean > perfect + 0.05)) bad.push("완벽 조준(" + perfect.toFixed(3) + ")과 정지 조준(0) 사이가 아님: " + mean.toFixed(3));
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "평균 " + mean.toFixed(3) + " — 정지 0, 완벽 " + perfect.toFixed(3));
+  });
+
+  run(AIMG, "자동 조준: 근접 캐릭터는 적이 움직여도 앞서 겨냥하지 않는가", function (done) {
+    var angles = aimSamples("knight", "knight", true), mean = meanOf(angles);
+    done(Math.abs(mean) > 0.01 ? "fail" : "pass", "평균 각도 " + mean.toFixed(3));
+  });
+
+  run(AIMG, "자동 조준: 움직이는 적에게 맞는 비율이 앞서 겨냥 없는 것보다 높고 완벽 조준(100%)보다 낮은가", function (done) {
+    var c = api.CHARS, hitR = api.BODY_R + c.ranger.pr, d = 300, vy = c.knight.speed, flight = d / c.ranger.pSpeed;
+    function hitRate(angles, leadFactor) {
+      var y = vy * flight * -1, hits = angles.filter(function (a) { return Math.abs(Math.sin(a - Math.atan2(y, d)) * hyp(d, y)) <= hitR; }).length;
+      return hits / angles.length;
+    }
+    var auto = hitRate(aimSamples("ranger", "knight", true)), still = hitRate(aimSamples("ranger", "knight", false));
+        done(auto > still && auto < 0.7 && auto > 0.15 ? "pass" : "fail", "움직이는 적 자동 조준 적중 " + Math.round(auto * 100) + "% / 앞서 겨냥 없음 " + Math.round(still * 100) + "% / 수동 완벽 조준 100%");
+  });
+
+  run(AIMG, "AI 역할: 기사·창술사·대장장이는 앞, 화염술사·주술사·궁수·뇌전사수·저격수는 뒤, 은신자·자객·결투가는 틈새를 노리는 역할인가", function (done) {
+    var want = { knight: "front", lancer: "front", blacksmith: "front", guardian: "front", warrior: "front", mage: "back", shaman: "back", ranger: "back", stormbow: "back", sniper: "back", frost: "back", cleric: "back", necro: "back", thrower: "back",
+                 rogue: "flank", hitman: "flank", duelist: "flank", dancer: "flank" }, bad = [];
+    Object.keys(want).forEach(function (c) { var got = api.CHAR_TYPES.of(c).botRole; if (got !== want[c]) bad.push(c + " " + got + " (기대 " + want[c] + ")"); });
+    api.CHAR_LIST.forEach(function (c) { if (!want[c]) bad.push(c + " 역할이 정해지지 않음"); });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : Object.keys(want).length + "명 역할이 맞음");
+  });
+
+  function driveBots(W, ms, each) { for (var left = ms; left > 0; left -= 33) { W.frame(33, true); each(); } }
+  function forwardAxis(blueX, blueY, redX, redY) { var d = hyp(redX - blueX, redY - blueY); return { x: (redX - blueX) / d, y: (redY - blueY) / d }; }
+
+  run(AIMG, "AI 후방: 앞 라인 아군이 살아 있으면 마법사·궁수가 그 아군보다 앞으로 나가지 않는가", function (done) {
+    var y = OPEN_Y.forest, bad = [], rows = [];
+    ["mage", "ranger", "stormbow", "sniper"].forEach(function (back) {
+      withSeed(21, function () {
+        withMe([meEntry("knight", "red", 700, y + 520), { id: "k", team: "blue", char: "knight", x: 700, y: y - 40 }, { id: "bk", team: "blue", char: back, x: 700, y: y - 140 }], function (W, me) {
+          var k = W.ent("k"), b = W.ent("bk"), ahead = 0, n = 0, axis = forwardAxis(k.x, k.y, me.x, me.y);
+          driveBots(W, 9000, function () { 
+            me.hp = me.maxHp;
+           
+            if (!k.alive || !b.alive) return;
+            n++;
+            if ((b.x - k.x) * axis.x + (b.y - k.y) * axis.y > 40) ahead++;
+          });
+          rows.push(back + " " + ahead + "/" + n);
+          if (n < 100 || ahead > n * 0.1) bad.push(back + " 앞으로 나간 프레임 " + ahead + "/" + n);
+        });
+      });
+    });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "모두 앞 라인 뒤 유지 (" + rows.join(", ") + ")");
+  });
+
+  run(AIMG, "AI 후방: 앞 라인 아군이 모두 쓰러지면 제 거리까지 나와서 싸우는가", function (done) {
+    var y = OPEN_Y.forest;
+    withSeed(21, function () {
+      withMe([meEntry("knight", "red", 700, y + 520), { id: "k", team: "blue", char: "knight", x: 700, y: y - 40 }, { id: "bk", team: "blue", char: "mage", x: 700, y: y - 140 }], function (W, me) {
+        var k = W.ent("k"), b = W.ent("bk"), nearest = Infinity;
+        k.alive = false; k.hp = 0;
+        driveBots(W, 7000, function () { me.hp = me.maxHp; nearest = Math.min(nearest, hyp(b.x - me.x, b.y - me.y)); });
+        done(nearest < api.CHARS.mage.range ? "pass" : "fail", "가장 가까웠던 거리 " + Math.round(nearest) + " (사거리 " + api.CHARS.mage.range + ")");
+      });
+    });
+  });
+
+  run(AIMG, "AI 틈새: 호위가 붙은 적은 기다리고, 쓰러지기 직전이거나 호위 없는 후방 적이 보이면 달려드는가", function (done) {
+    var y = OPEN_Y.forest, bad = [], info = [];
+    function trial(label, redChar, tweak) {
+      var closest = Infinity;
+      withSeed(5, function () {
+        withMe([meEntry(redChar, "red", 700, y + 560), { id: "k", team: "blue", char: "knight", x: 640, y: y }, { id: "rg", team: "blue", char: "rogue", x: 700, y: y }], function (W, me) {
+          var rg = W.ent("rg");
+          if (tweak) tweak(me);
+          driveBots(W, 2500, function () { closest = Math.min(closest, hyp(rg.x - me.x, rg.y - me.y)); });
+        });
+      });
+      info.push(label + " " + Math.round(closest));
+      return closest;
+    }
+    var wait = trial("기사", "knight", null), weak = trial("약한 기사", "knight", function (me) { me.hp = Math.round(me.maxHp * 0.3); });
+    var squish = trial("무방비 마법사", "mage", null);
+    if (wait < 230) bad.push("호위 있는 건강한 적에게 너무 일찍 달려듦 " + Math.round(wait));
+    if (weak > 180) bad.push("쓰러지기 직전인 적을 못 노림 " + Math.round(weak));
+    if (squish > 180) bad.push("무방비 후방 적을 못 노림 " + Math.round(squish));
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "가장 가까웠던 거리: " + info.join(", "));
+  });
+
+  run(AIMG, "AI 틈새: 오래 기다리면 기회가 없어도 공격에 나서는가", function (done) {
+    var y = OPEN_Y.forest, closest = Infinity;
+    withSeed(5, function () {
+      withMe([meEntry("knight", "red", 700, y + 450), { id: "k", team: "blue", char: "knight", x: 640, y: y }, { id: "rg", team: "blue", char: "rogue", x: 700, y: y }], function (W, me) {
+        var rg = W.ent("rg");
+        driveBots(W, 14000, function () { me.hp = me.maxHp; closest = Math.min(closest, hyp(rg.x - me.x, rg.y - me.y)); });
+      });
+    });
+    done(closest < 200 ? "pass" : "fail", "14초 동안 가장 가까웠던 거리 " + Math.round(closest));
+  });
+
+  function draftTeamFighters(d, side) {
+    return POSITIONS.filter(function (k) { return k.charAt(0) === side; }).filter(function (k) { return api.CHARS[d.picks["p" + k]].role === "fighter"; }).length;
+  }
+  function autoPlay(S) {
+    var clock = T0, guard = 0;
+    while (!DR.draftDone(S.room.draft) && guard++ < 40) { clock += api.DRAFT_AI_MS; api.setClock(clock); tick(); }
+  }
+
+  run(AIMG, "AI 드래프트: AI 만 있는 100판에서 양 팀 모두 전사가 1명 이상인가", function (done) {
+    var bad = [], none = 0;
+    for (var seed = 1; seed <= 100 && bad.length < 3; seed++) {
+      withDraft(POSITIONS, function (S) {
+        withSeed(seed, function () {
+          startDraft(S); autoPlay(S);
+          var d = S.room.draft;
+          if (!DR.draftDone(d)) { bad.push("시드 " + seed + ": 끝나지 않음"); return; }
+          ["b", "r"].forEach(function (side) { if (!draftTeamFighters(d, side)) { none++; bad.push("시드 " + seed + ": " + side + " 팀에 전사 없음"); } });
+        });
+      });
+    }
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "100판 × 양 팀 모두 전사 1명 이상");
+  });
+
+  run(AIMG, "AI 드래프트: 사람 1명 + AI 2명 팀에서 사람이 전사가 아닌 캐릭터를 고르면 AI 중 한 명이 전사를 고르는가", function (done) {
+    var bad = [];
+    for (var seed = 1; seed <= 60 && bad.length < 3; seed++) {
+      withDraft(["b2", "b3", "r1", "r2", "r3"], function (S) {
+        withSeed(seed, function () {
+          startDraft(S);
+          S.as("b1"); DR.draftPick(DR.draftLeft(S.room.draft)[DR.draftLeft(S.room.draft).length - 1]);
+          var clock = T0, guard = 0;
+          while (S.room.draft.step < 2 && guard++ < 8) { clock += api.DRAFT_AI_MS; api.setClock(clock); tick(); }
+          var mine = DR.draftLeft(S.room.draft).filter(function (c) { return api.CHARS[c].role === "caster"; })[0];
+          S.as("b1"); DR.draftPick(mine);
+          while (!DR.draftDone(S.room.draft) && guard++ < 40) { clock += api.DRAFT_AI_MS; api.setClock(clock); tick(); }
+          var d = S.room.draft;
+          if (!DR.draftDone(d)) bad.push("시드 " + seed + ": 끝나지 않음");
+          else if (d.picks.pb1 !== mine) bad.push("시드 " + seed + ": 사람 선택이 바뀜");
+          else if (!draftTeamFighters(d, "b")) bad.push("시드 " + seed + ": 아군에 전사 없음");
+          else if (!draftTeamFighters(d, "r")) bad.push("시드 " + seed + ": 적 팀에 전사 없음");
+        });
+      });
+    }
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "60판 모두 아군·적 팀에 전사 있음, 사람의 선택은 그대로");
+  });
+
+  run(AIMG, "AI 드래프트: 이미 전사가 있는 팀의 AI 는 마음대로(전사 아님도) 고를 수 있는가", function (done) {
+    var seen = {}, bad = [];
+    for (var seed = 1; seed <= 40; seed++) {
+      withDraft(POSITIONS, function (S) {
+        withSeed(seed, function () {
+          startDraft(S); autoPlay(S);
+          POSITIONS.forEach(function (k) { seen[api.CHARS[S.room.draft.picks["p" + k]].role] = true; });
+        });
+      });
+    }
+    ["fighter", "caster", "shooter", "assassin"].forEach(function (r) { if (!seen[r]) bad.push(r + " 직업군이 한 번도 안 뽑힘"); });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "네 직업군 모두 뽑힘");
+  });
+
+  run(AIMG, "전체화면: 터치로 손을 뗄 때만 전체화면을 요청하고, 이미 전체화면이거나 실패가 거듭되면 그만 요청하는가", function (done) {
+    var asked = 0, rejected = false, onFlag = false, bad = [];
+    var doc = { documentElement: { requestFullscreen: function () { asked++; return rejected ? Promise.reject(new Error("no")) : Promise.resolve(); } }, get fullscreenElement() { return onFlag ? {} : null; } };
+    var keeper = new api.FullscreenKeeper(doc);
+    keeper.onTouchRelease({ pointerType: "mouse" });
+    if (asked) bad.push("마우스인데 요청함");
+    keeper.onTouchRelease({ pointerType: "touch" });
+    if (asked !== 1) bad.push("터치인데 요청 안 함");
+    onFlag = true; keeper.onTouchRelease({ pointerType: "touch" });
+    if (asked !== 1) bad.push("이미 전체화면인데 또 요청함");
+    onFlag = false; rejected = true;
+    var thrown = new api.FullscreenKeeper({ documentElement: { requestFullscreen: function () { throw new Error("no"); } }, fullscreenElement: null });
+    for (var i = 0; i < 6; i++) thrown.onTouchRelease({ pointerType: "touch" });
+    if (thrown.supported()) bad.push("실패가 거듭돼도 계속 요청함");
+    if (new api.FullscreenKeeper({ documentElement: {}, fullscreenElement: null }).supported()) bad.push("전체화면을 모르는 기기인데 된다고 함");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "터치만 요청·이미 켜졌으면 안 함·3번 실패하면 포기");
+  });
 
   var CONNG = "방 연결", ROSTERG = "로비 규칙", LOBBYG = "로비 화면", MAPG = "맵 데이터";
   var ROOMS = "teambattle/rooms";

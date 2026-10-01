@@ -912,6 +912,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var BOT_WEAK_FOCUS = 0.6;
   var BOT_KITE_GAP = 40;
   var BOT_LOS_HOLD_MS = 450, BOT_STEER_RATE = 9, BOT_DETOUR_KEEP_MS = 1500;
+  var BOT_BACK_GAP = 170, BOT_FRONT_LEASH = 520, BOT_FLANK_AHEAD = 250, BOT_FLANK_SIDE = 380, BOT_FLANK_WAIT_MS = 7000, BOT_FLANK_COMMIT_MS = 3000;
+  var BOT_FLANK_GUARD_R = 260, BOT_FLANK_WEAK_HP = 0.4, BOT_FLANK_CLOSE = 220;
   var SPAWN_X = [250, 450, 650];
   var SPAWN_Y = { blue: 118, red: MH - 118 };
   var TILE = 50, MAP_X0 = BOUND.l, MAP_Y0 = BOUND.t;
@@ -2255,6 +2257,27 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
   var DRAFT_STEPS = [{ keys: ["b1"], ban: true }, { keys: ["r1"], ban: true }, { keys: ["b1"] }, { keys: ["r1", "r2"] }, { keys: ["b2", "b3"] }, { keys: ["r3"] }];
   var DRAFT_SHOWN_MS = 15000, DRAFT_STEP_MS = 16000, DRAFT_AI_MS = 2500, DRAFT_AI_TRADE_MS = 1200, TRADE_DENIED_SHOW_MS = 2000, NO_BAN = "-";
+  var DRAFT_AI_FIGHTER_FIRST = 0.5;
+  class DraftAiPicker {
+    sideIds(d, side) {
+      return keys(d.seq || {}).filter(function (k) { return k.charAt(0) === side; }).map(function (k) { return d.seq[k]; }).filter(function (id) { return SESSION.players[id]; });
+    }
+    sideHasFighter(d, side) {
+      var picks = d.picks || {};
+      return DRAFT_AI.sideIds(d, side).some(function (id) { return picks[id] && CHARS[picks[id]] && CHARS[picks[id]].role === "fighter"; });
+    }
+    otherAiWaiting(d, side, id) {
+      var picks = d.picks || {};
+      return DRAFT_AI.sideIds(d, side).some(function (o) { return o !== id && !picks[o] && SESSION.players[o].isAI; });
+    }
+    choose(d, id, left) {
+      var side = DRAFT.draftSideOf(d, id), fighters = left.filter(function (c) { return CHARS[c].role === "fighter"; });
+      if (!side || !fighters.length || DRAFT_AI.sideHasFighter(d, side)) return pick(left);
+      if (!DRAFT_AI.otherAiWaiting(d, side, id) || Math.random() < DRAFT_AI_FIGHTER_FIRST) return pick(fighters);
+      return pick(left);
+    }
+  }
+  var DRAFT_AI = new DraftAiPicker();
   class Draft {
     constructor() { this.view = null; this.busy = false; this.launched = 0; }
     stepSide(step) { return DRAFT_STEPS[step].keys[0].charAt(0); }
@@ -2401,7 +2424,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           if (DRAFT.draftWaiting(cur, step).indexOf(id) < 0) return;
           var left = DRAFT.draftLeft(cur), hover = cur.hover && cur.hover[id], chosen = left.indexOf(hover) >= 0 ? hover : null;
           if (banStep) DRAFT.applyDraftChoice(cur, id, chosen || (SESSION.players[id].isAI && left.length ? pick(left) : NO_BAN));
-          else if (left.length) DRAFT.applyDraftChoice(cur, id, chosen || pick(left));
+          else if (left.length) DRAFT.applyDraftChoice(cur, id, chosen || (SESSION.players[id].isAI ? DRAFT_AI.choose(cur, id, left) : pick(left)));
         });
         return DRAFT.draftSettle(cur, now());
       }).then(function () { DRAFT.busy = false; }, function () { DRAFT.busy = false; });
@@ -2686,6 +2709,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     ultLeadSeconds(dist) { return 0; }
     ultSpotTooFar(reach) { return false; }
     get holdsFullRange() { return false; }
+    get botRole() { return BOT_ROLE_OF_CLASS[this.data.role] || "front"; }
     botAct(B, target, enemies, t) { return false; }
     botUltRange() { return this.data.ultKind === "blackhole" ? ULT.bhCast : Infinity; }
     botUltSpot(B, target, td, t) { return BRAIN.ultAimSpot(B, target, td, t); }
@@ -2781,6 +2805,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class DuelistType extends CharacterType {
+    get botRole() { return "flank"; }
     isRiposting(E, t) { return E.buffUntil > t; }
     statAltCooldown(c) { return 1000 / ULT.rmRate; }
     botUltRange() { return this.data.dashRange + this.data.range; }
@@ -3291,6 +3316,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class DancerType extends CharacterType {
+    get botRole() { return "back"; }
     isBladeStorming(E, t) { return E.buffUntil > t; }
     skillSpeed(E, t) { return E.buffUntil > t ? this.data.ultSpeed : null; }
     statDamageText(c) { return SKILLTEXT.num(c.dmg) + "+" + SKILLTEXT.num(ULT.bdDmg); }
@@ -3406,6 +3432,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     of(id) { return this.byId[id] || (this.byId[id] = new CharacterType(id)); }
   }
   var CHAR_TYPES = new CharacterRegistry();
+  var BOT_ROLE_OF_CLASS = { fighter: "front", caster: "back", shooter: "back", assassin: "flank" };
   class Unit {
     isStunned(t) { return this.stunUntil > (t || now()); }
     isSlowed(t) { return this.slowUntil > (t || now()); }
@@ -4907,7 +4934,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     burstSpot(E, ang, reach, maxR, minR) {
       maxR = maxR || ULT.mbCast; minR = minR || ULT.mbMin;
       if (reach == null) {
-        var T = ATTACK.autoAimTarget(E);
+        var T = AUTO_AIM.target(E);
         if (T && hyp(T.x - E.x, T.y - E.y) <= maxR) return { x: T.x, y: T.y };
         reach = maxR * 0.6;
       }
@@ -4939,7 +4966,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (sl.left <= 0) E.slash = null;
       }
     }
-    autoAimTarget(E) {
+  }
+  var ATTACK = new AttackController();
+  var AUTO_AIM_LEAD = 0.6, AUTO_AIM_ERR = 0.08, AUTO_AIM_MOVE_MS = 400;
+  class AutoAim {
+    target(E) {
       var best = null, bd = Infinity, open = null, od = Infinity, t = now();
       TARGETS.everyone(t).forEach(function (o) {
         if (!o || !o.alive || o.team === E.team) return;
@@ -4950,12 +4981,113 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       });
       return open || best;
     }
-    autoAimAngle(E) {
-      var T = ATTACK.autoAimTarget(E);
-      return T ? Math.atan2(T.y - E.y, T.x - E.x) : E.angle;
+    leadedSpot(E, T) {
+      var speed = CHARS[E.char].pSpeed, t = now();
+      if (!speed || !T.mv || T.moveAng == null || t - (T.moveAt || 0) > AUTO_AIM_MOVE_MS) return T;
+      var lead = T.speed() * hyp(T.x - E.x, T.y - E.y) / speed * AUTO_AIM_LEAD;
+      return { x: T.x + Math.cos(T.moveAng) * lead, y: T.y + Math.sin(T.moveAng) * lead };
+    }
+    angle(E) {
+      var T = AUTO_AIM.target(E);
+      if (!T) return E.angle;
+      var spot = AUTO_AIM.leadedSpot(E, T);
+      return Math.atan2(spot.y - E.y, spot.x - E.x) + (Math.random() - 0.5) * 2 * AUTO_AIM_ERR;
     }
   }
-  var ATTACK = new AttackController();
+  var AUTO_AIM = new AutoAim();
+
+  class Squad {
+    constructor(B, allies, enemies) {
+      var ax = B.x, ay = B.y, ex = 0, ey = 0, self = this;
+      allies.forEach(function (a) { ax += a.x; ay += a.y; });
+      ax /= allies.length + 1; ay /= allies.length + 1;
+      enemies.forEach(function (e) { ex += e.x; ey += e.y; });
+      if (enemies.length) { ex /= enemies.length; ey /= enemies.length; } else { ex = ax; ey = ay + (B.team === "blue" ? 1000 : -1000); }
+      var d = hyp(ex - ax, ey - ay) || 1;
+      this.ax = (ex - ax) / d; this.ay = (ey - ay) / d;
+      this.allyCenter = { x: ax, y: ay }; this.enemyCenter = { x: ex, y: ey };
+      this.allies = allies; this.enemies = enemies;
+      this.frontAlly = null; this.frontProj = null; this.backProj = null;
+      allies.forEach(function (a) {
+        var role = CHAR_TYPES.of(a.char).botRole, p = self.proj(a);
+        if (role === "front" && (self.frontProj === null || p > self.frontProj)) { self.frontProj = p; self.frontAlly = a; }
+        if (role === "back" && (self.backProj === null || p < self.backProj)) self.backProj = p;
+      });
+    }
+    proj(o) { return o.x * this.ax + o.y * this.ay; }
+    spotAt(base, along, side) {
+      var spot = { x: clamp(base.x + this.ax * along - this.ay * side, BOUND.l + 60, BOUND.r - 60), y: clamp(base.y + this.ay * along + this.ax * side, BOUND.t + 60, BOUND.b - 60) };
+      PHYSICS.resolve(spot);
+      return spot;
+    }
+    guardedBy(target, radius) {
+      return this.enemies.some(function (e) { return e !== target && CHAR_TYPES.of(e.char).botRole === "front" && hyp(e.x - target.x, e.y - target.y) < radius; });
+    }
+    stripForward(mx, my) {
+      var f = mx * this.ax + my * this.ay;
+      return f > 0 ? { x: mx - f * this.ax, y: my - f * this.ay } : { x: mx, y: my };
+    }
+  }
+
+  class BotRole {
+    targetScore(B, o, d, score, squad) { return score; }
+    shapeMove(B, squad, target, d, mx, my, t) { return { x: mx, y: my }; }
+    idleGoal(B, squad, t) { return null; }
+  }
+  class VanguardRole extends BotRole {
+    overLeash(B, squad) { return squad.backProj !== null && squad.proj(B) > squad.backProj + BOT_FRONT_LEASH; }
+    shapeMove(B, squad, target, d, mx, my, t) {
+      if (d > 380 && VANGUARD.overLeash(B, squad)) return squad.stripForward(mx, my);
+      return { x: mx, y: my };
+    }
+    idleGoal(B, squad, t) { return VANGUARD.overLeash(B, squad) ? { x: B.x, y: B.y } : squad.enemyCenter; }
+  }
+  var VANGUARD = new VanguardRole();
+  class BacklineRole extends BotRole {
+    shapeMove(B, squad, target, d, mx, my, t) {
+      if (squad.frontProj === null) return { x: mx, y: my };
+      var over = squad.proj(B) - (squad.frontProj - BOT_BACK_GAP);
+      if (over >= 0) { var v = squad.stripForward(mx, my); mx = v.x; my = v.y; }
+      if (over > 50) { mx -= squad.ax * 0.9; my -= squad.ay * 0.9; }
+      return { x: mx, y: my };
+    }
+    idleGoal(B, squad, t) {
+      if (squad.frontAlly) return squad.spotAt(squad.frontAlly, -BOT_BACK_GAP * 1.1, Math.sin(B.bot.seed) * 120);
+      return squad.allies.length ? squad.allyCenter : null;
+    }
+  }
+  class FlankerRole extends BotRole {
+    sideOf(B) { return Math.sin(B.bot.seed * 7) >= 0 ? 1 : -1; }
+    waitSpot(B, squad) { return squad.spotAt(squad.allyCenter, BOT_FLANK_AHEAD, FLANKER.sideOf(B) * BOT_FLANK_SIDE); }
+    targetScore(B, o, d, score, squad) { return CHAR_TYPES.of(o.char).botRole === "front" ? score : score * 0.55; }
+    seesOpening(B, squad, target, d, t) {
+      if (!squad.allies.length || d < BOT_FLANK_CLOSE || B.gauge >= GAUGE_MAX) return true;
+      if (target.hp < target.maxHp * BOT_FLANK_WEAK_HP || target.isStunned(t) || target.isSlowed(t)) return true;
+      return CHAR_TYPES.of(target.char).botRole !== "front" && !squad.guardedBy(target, BOT_FLANK_GUARD_R);
+    }
+    strikes(B, squad, target, d, t) {
+      var k = B.bot;
+      if (!k.flankWaitFrom) k.flankWaitFrom = t;
+      if (t < (k.flankCommitUntil || 0)) return true;
+      if (FLANKER.seesOpening(B, squad, target, d, t) || t - k.flankWaitFrom > BOT_FLANK_WAIT_MS) {
+        k.flankCommitUntil = t + BOT_FLANK_COMMIT_MS; k.flankWaitFrom = k.flankCommitUntil;
+        return true;
+      }
+      return false;
+    }
+    shapeMove(B, squad, target, d, mx, my, t) {
+      if (FLANKER.strikes(B, squad, target, d, t)) return { x: mx, y: my };
+      var spot = FLANKER.waitSpot(B, squad), gx = spot.x - B.x, gy = spot.y - B.y, gd = hyp(gx, gy) || 1, pace = Math.min(0.9, gd / 120);
+      return gd < 40 ? { x: 0, y: 0 } : { x: gx / gd * pace, y: gy / gd * pace };
+    }
+    idleGoal(B, squad, t) { return squad.allies.length ? FLANKER.waitSpot(B, squad) : squad.enemyCenter; }
+  }
+  var FLANKER = new FlankerRole();
+  class BotRoleRegistry {
+    constructor() { this.byId = { front: VANGUARD, back: new BacklineRole(), flank: FLANKER }; }
+    of(id) { return this.byId[id] || VANGUARD; }
+  }
+  var BOT_ROLES = new BotRoleRegistry();
 
   class BotBrain {
     pickWanderPoint(B, t) {
@@ -5012,17 +5144,18 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (B.practiceBot) { BRAIN.stepPractice(B, dt); return; }
       if (!B.alive || B.isStunned()) { B.mv = false; return; }
       var t = now(), c = CHARS[B.char], k = B.bot, melee = CATALOG.isMelee(B.char);
-      var enemies = [];
+      var enemies = [], allies = [];
       TARGETS.participants().forEach(function (id) {
         var o = TARGETS.ent(id); if (!o || !o.alive || id === B.id) return;
-        if (o.team !== B.team) enemies.push(o);
+        (o.team !== B.team ? enemies : allies).push(o);
       });
-      var botType = CHAR_TYPES.of(B.char), target = null, td = Infinity, bestScore = Infinity, sniper = botType.holdsFullRange, view = sniper ? c.range : BOT_VIEW;
+      var squad = new Squad(B, allies, enemies);
+      var botType = CHAR_TYPES.of(B.char), role = BOT_ROLES.of(botType.botRole), target = null, td = Infinity, bestScore = Infinity, sniper = botType.holdsFullRange, view = sniper ? c.range : BOT_VIEW;
       enemies.forEach(function (o) {
         var d = hyp(o.x - B.x, o.y - B.y);
         if (d > view) return;
         if (!VISION.visibleTo(o, B, t)) return;
-        var score = d * (BOT_WEAK_FOCUS + (1 - BOT_WEAK_FOCUS) * o.hp / o.maxHp);
+        var score = role.targetScore(B, o, d, d * (BOT_WEAK_FOCUS + (1 - BOT_WEAK_FOCUS) * o.hp / o.maxHp), squad);
         if (score < bestScore) { bestScore = score; td = d; target = o; }
       });
       if (target !== k.target) { k.target = target; k.seenAt = t; }
@@ -5045,11 +5178,20 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         else if (d < want - (kiter ? BOT_KITE_GAP : 90)) { var back = kiter ? 1 : 0.8; mx -= ux * back; my -= uy * back; }
         var s = Math.sin(t / 900 + k.seed) * 0.7;
         mx += -uy * s; my += ux * s;
+        var shaped = role.shapeMove(B, squad, target, d, mx, my, t); mx = shaped.x; my = shaped.y;
       } else {
-        if (!k.wanderUntil || t > k.wanderUntil || hyp(k.wx - B.x, k.wy - B.y) < 50) BRAIN.pickWanderPoint(B, t);
-        var goal = BRAIN.bridgeWaypoint(B, k.wx, k.wy) || { x: k.wx, y: k.wy };
-        var ddx = goal.x - B.x, ddy = goal.y - B.y, dd = hyp(ddx, ddy) || 1;
-        mx = ddx / dd * 0.7; my = ddy / dd * 0.7;
+        var post = role.idleGoal(B, squad, t), pace = 0.7;
+        if (post) {
+          post = BRAIN.bridgeWaypoint(B, post.x, post.y) || post;
+          var pdx = post.x - B.x, pdy = post.y - B.y, pd = hyp(pdx, pdy) || 1;
+          pace = pd < 40 ? 0 : Math.min(0.9, pd / 120);
+          mx = pdx / pd * pace; my = pdy / pd * pace;
+        } else {
+          if (!k.wanderUntil || t > k.wanderUntil || hyp(k.wx - B.x, k.wy - B.y) < 50) BRAIN.pickWanderPoint(B, t);
+          var goal = BRAIN.bridgeWaypoint(B, k.wx, k.wy) || { x: k.wx, y: k.wy };
+          var ddx = goal.x - B.x, ddy = goal.y - B.y, dd = hyp(ddx, ddy) || 1;
+          mx = ddx / dd * 0.7; my = ddy / dd * 0.7;
+        }
       }
       if (k.detour > t) { var rx = -my * k.detourDir, ry = mx * k.detourDir; mx = rx; my = ry; }
       var steer = Math.min(1, dt * BOT_STEER_RATE);
@@ -5343,7 +5485,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var k = INPUT.keyName(e);
       if (k) { INPUT.keys[k] = true; e.preventDefault(); SOUND.audio(); return; }
       if (e.code === "KeyJ" && !e.repeat && INPUT.canAct() && MATCH.me.gauge >= GAUGE_MAX && !MATCH.me.burst) {
-        e.preventDefault(); var ua = ATTACK.autoAimAngle(MATCH.me); MATCH.me.angle = ua; ATTACK.useUlt(MATCH.me, ua);
+        e.preventDefault(); var ua = AUTO_AIM.angle(MATCH.me); MATCH.me.angle = ua; ATTACK.useUlt(MATCH.me, ua);
       }
     }
     onKeyUp(e) { var k = INPUT.keyName(e); if (k) INPUT.keys[k] = false; }
@@ -5392,7 +5534,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (which === "ult") {
           if (MATCH.me.gauge < GAUGE_MAX || MATCH.me.burst) return;
           if (!CHARS[MATCH.me.char].ultAim) {
-            var ua = ATTACK.autoAimAngle(MATCH.me); MATCH.me.angle = ua; ATTACK.useUlt(MATCH.me, ua); return;
+            var ua = AUTO_AIM.angle(MATCH.me); MATCH.me.angle = ua; ATTACK.useUlt(MATCH.me, ua); return;
           }
         }
         INPUT.aim.id = e.pointerId; INPUT.aim.btn = which; INPUT.aim.ox = e.clientX; INPUT.aim.oy = e.clientY; INPUT.aim.dx = 0; INPUT.aim.dy = 0; INPUT.aim.drag = false;
@@ -5408,7 +5550,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var btn = INPUT.aim.btn, drag = INPUT.aim.drag && hyp(INPUT.aim.dx, INPUT.aim.dy) > INPUT.dragMin, reach = drag && MATCH.me ? INPUT.aimReach(MATCH.me, btn) : null;
         INPUT.aim.id = null;
         if (!INPUT.canAct() || e.type === "pointercancel") return;
-        var ang = drag ? INPUT.screenToWorldAngle(Math.atan2(INPUT.aim.dy, INPUT.aim.dx)) : ATTACK.autoAimAngle(MATCH.me);
+        var ang = drag ? INPUT.screenToWorldAngle(Math.atan2(INPUT.aim.dy, INPUT.aim.dx)) : AUTO_AIM.angle(MATCH.me);
         MATCH.me.angle = ang;
         if (btn === "atk") ATTACK.tryFire(MATCH.me, ang, reach);
         else if (btn === "ult") ATTACK.useUlt(MATCH.me, ang, reach);
@@ -5418,6 +5560,24 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   var INPUT = new InputController();
+  var FULLSCREEN_MAX_FAILS = 3;
+  class FullscreenKeeper {
+    constructor(doc) { this.doc = doc; this.fails = 0; }
+    supported() { return !!this.doc.documentElement.requestFullscreen && this.fails < FULLSCREEN_MAX_FAILS; }
+    isOn() { return !!this.doc.fullscreenElement; }
+    enter() {
+      var keeper = this;
+      if (keeper.isOn() || !keeper.supported()) return;
+      try {
+        var asked = keeper.doc.documentElement.requestFullscreen({ navigationUI: "hide" });
+        if (asked && asked.catch) asked.catch(function () { keeper.fails++; });
+      } catch (err) { keeper.fails++; }
+    }
+    onTouchRelease(e) { if (e.pointerType === "touch") this.enter(); }
+    watch() {
+      this.doc.addEventListener("pointerup", this.onTouchRelease.bind(this), true);
+    }
+  }
   INPUT.bind(cv, $("btnAtk"), $("btnUlt"));
 
   var TOUCH = !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
@@ -7789,7 +7949,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           MATCH.me.mv = hyp(MATCH.me.x - ox, MATCH.me.y - oy) > 0.2;
           if (MATCH.me.mv) { MATCH.me.moveAng = Math.atan2(MATCH.me.y - oy, MATCH.me.x - ox); MATCH.me.moveAt = now(); }
         } else MATCH.me.mv = false;
-        if (INPUT.keys.atk && t >= MATCH.me.cdUntil && !MATCH.me.volley && !MATCH.me.slash) ATTACK.fireBasic(MATCH.me, ATTACK.autoAimAngle(MATCH.me));
+        if (INPUT.keys.atk && t >= MATCH.me.cdUntil && !MATCH.me.volley && !MATCH.me.slash) ATTACK.fireBasic(MATCH.me, AUTO_AIM.angle(MATCH.me));
         ATTACK.stepCombat(MATCH.me, dt);
       } else if (MATCH.me) MATCH.me.mv = false;
     }
@@ -7844,6 +8004,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       HUD: HUD, SOUND: SOUND, BACKEND: BACKEND, TIMESCALE: TIMESCALE, THREE: THREE, CAMERA_RIG: CAMERA_RIG, ARENA_VIEW: ARENA_VIEW, PROPS: PROPS, camera: camera, overlay: ov, QA: QA, PIX_MIN: PIX_MIN, PIX_START: PIX_START, SCENERY: SCENERY,
       setDb: function (fake) { var before = BACKEND.db; BACKEND.db = fake; return before; },
       setTestLink: function (flag) { var before = BACKEND.isTestLink; BACKEND.isTestLink = flag; return before; },
+      CHAR_TYPES: CHAR_TYPES, AUTO_AIM: AUTO_AIM, AUTO_AIM_ERR: AUTO_AIM_ERR, AUTO_AIM_LEAD: AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: DRAFT_AI,
       DRAFT: DRAFT, DRAFT_STEPS: DRAFT_STEPS, DRAFT_STEP_MS: DRAFT_STEP_MS, DRAFT_AI_MS: DRAFT_AI_MS, DRAFT_AI_TRADE_MS: DRAFT_AI_TRADE_MS, NO_BAN: NO_BAN,
       STATS: STATS, STATS_PATH: STATS_PATH, STATS_PENDING: STATS_PENDING, STATS_SETTLE_MS: STATS_SETTLE_MS, STATS_HOLD_MAX_MS: STATS_HOLD_MAX_MS, DEFAULT_SLOW: DEFAULT_SLOW,
       CLOCK: CLOCK, GameClock: GameClock, CLOCK_KEEP: CLOCK_KEEP, CLOCK_PINGS: CLOCK_PINGS,
@@ -7885,6 +8046,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   if (!BACKEND.db) LOBBY.startMsg("온라인 연결을 준비하지 못했어요. 인터넷 연결을 확인해 주세요.");
   if (!NICK.name) NICK.openNick(true);
   if (!/[?&](test|sim)(&|$)/.test(location.search)) SESSION.tryResume();
+  if (!SILENT_RUN) new FullscreenKeeper(document).watch();
   LOOP.start();
   window.TEAM_BATTLE_READY = true;
 })();
