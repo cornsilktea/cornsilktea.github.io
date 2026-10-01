@@ -1445,7 +1445,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     sub(stRef, "child_added", function (s) { MATCH.stateByKey[s.key] = s.val(); });
     sub(stRef, "child_changed", function (s) { MATCH.stateByKey[s.key] = s.val(); });
     sub(stRef, "child_removed", function (s) { delete MATCH.stateByKey[s.key]; });
-    sub(ref.child("shots"), "child_added", onShot);
+    sub(ref.child("shots"), "child_added", PROJECTILES.onShot.bind(PROJECTILES));
     sub(ref.child("meleeHits"), "child_added", function (s) { onMelee(s.key, s.val()); });
     DAMAGE.listenHits(myId);
     sub(ref.child("effects"), "child_added", onEffect);
@@ -2775,7 +2775,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     cast(E, ang, reach, t) {
       E.angle = ang; E.burst = { until: t + (ULT.mkCount - 1) * ULT.mkGap };
       E.ultUntil = t + ULT.mkCount * ULT.mkGap + 200;
-      emitShots(E, ang, true);
+      PROJECTILES.emitShots(E, ang, true);
     }
     ultDesc() {
       return ULT.mkDmg + "의 피해를 주는 화살 " + ULT.mkCount + "발 연사. 적중마다 게이지 " + ULT.mkRefund + " 회복";
@@ -2917,7 +2917,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       E.angle = ang;
       E.ultUntil = t + 450;
       E.cdUntil = Math.max(E.cdUntil, t + 450);
-      emitShots(E, ang, true);
+      PROJECTILES.emitShots(E, ang, true);
     }
     ultDesc() {
       return "사거리 " + ULT.pnRange + "의 거대한 화살 발사. 적은 " + ULT.pnDmg + "의 피해, 적중 시 게이지 " + ULT.pnRefund + " 회복";
@@ -3148,7 +3148,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       E.ultUntil = t + 300;
       E.cdUntil = Math.max(E.cdUntil, t + 300);
       E.pending = null;
-      emitShots(E, ang, true);
+      PROJECTILES.emitShots(E, ang, true);
     }
     ultDesc() {
       return "사거리 " + ULT.exRange + "의 칼날 발사. 처음 맞은 적은 " + ULT.exDmg + "의 피해를 입고 " + secs(ULT.exStunMs) + "간 기절, 그 위치로 순간이동";
@@ -3896,42 +3896,156 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   var DAMAGE = new DamageResolver();
-  function bladeSpin(p, x, y) {
-    if (p.spun) return;
-    p.spun = true;
-    FIELD.bladeSpins.push({ d: p.d, x: x, y: y, at: now() + ULT.bdDelay });
-    MATCH.fx.push({ k: "bladeZone", x: x, y: y, r: ULT.bdR, t: Date.now(), delay: ULT.bdDelay / CLOCK.scale, life: (ULT.bdDelay + 260) / CLOCK.scale });
-  }
-  function stepBladeSpins(t) {
-    FIELD.bladeSpins = FIELD.bladeSpins.filter(function (s) {
-      if (t < s.at) return true;
-      var d = s.d;
-      MATCH.fx.push({ k: "boom", x: s.x, y: s.y, r: ULT.bdR / 1.1, c: 0xDCE3EC, t: Date.now(), life: 260 });
-      FX_VIEW.spark(s.x, s.y, "#FFFFFF", 1.4);
-      localTargets().forEach(function (T) {
-        if (!T.alive || T.team === d.team || T.id === d.owner || hyp(T.x - s.x, T.y - s.y) > ULT.bdR + BODY_R * 0.5) return;
-        DAMAGE.damage(T, ULT.bdDmg, d.owner, d.createdAt, null);
+  class ProjectileSystem {
+    bladeSpin(p, x, y) {
+      if (p.spun) return;
+      p.spun = true;
+      FIELD.bladeSpins.push({ d: p.d, x: x, y: y, at: now() + ULT.bdDelay });
+      MATCH.fx.push({ k: "bladeZone", x: x, y: y, r: ULT.bdR, t: Date.now(), delay: ULT.bdDelay / CLOCK.scale, life: (ULT.bdDelay + 260) / CLOCK.scale });
+    }
+    stepBladeSpins(t) {
+      FIELD.bladeSpins = FIELD.bladeSpins.filter(function (s) {
+        if (t < s.at) return true;
+        var d = s.d;
+        MATCH.fx.push({ k: "boom", x: s.x, y: s.y, r: ULT.bdR / 1.1, c: 0xDCE3EC, t: Date.now(), life: 260 });
+        FX_VIEW.spark(s.x, s.y, "#FFFFFF", 1.4);
+        localTargets().forEach(function (T) {
+          if (!T.alive || T.team === d.team || T.id === d.owner || hyp(T.x - s.x, T.y - s.y) > ULT.bdR + BODY_R * 0.5) return;
+          DAMAGE.damage(T, ULT.bdDmg, d.owner, d.createdAt, null);
+        });
+        return false;
       });
-      return false;
-    });
-  }
-  function stepBladeDaggers(t) {
-    var foes = null;
-    keys(MATCH.remoteShots).forEach(function (id) {
-      var p = MATCH.remoteShots[id], d = p.d;
-      if (!CHAR_TYPES.of(d.ownerCharacterType).isBladeThrower || p.spun) return;
-      var e = clamp(t - d.createdAt, 0, p.life), pe = p.se === undefined ? 0 : p.se;
-      p.se = e;
-      var a = projAt(p, pe), b = projAt(p, e);
-      foes = foes || participants().map(ent).concat(allMinions().filter(function (m) { return minionReady(m, t); }));
-      for (var i = 0; i < foes.length; i++) {
-        var T = foes[i];
-        if (!T || !T.alive || T.id === d.owner || T.team === d.team) continue;
-        if (segHit(a.x, a.y, b.x, b.y, T.x, T.y, BODY_R + (d.pr || 6))) { p.gone = true; bladeSpin(p, T.x, T.y); return; }
+    }
+    stepBladeDaggers(t) {
+      var foes = null;
+      keys(MATCH.remoteShots).forEach(function (id) {
+        var p = MATCH.remoteShots[id], d = p.d;
+        if (!CHAR_TYPES.of(d.ownerCharacterType).isBladeThrower || p.spun) return;
+        var e = clamp(t - d.createdAt, 0, p.life), pe = p.se === undefined ? 0 : p.se;
+        p.se = e;
+        var a = PROJECTILES.projAt(p, pe), b = PROJECTILES.projAt(p, e);
+        foes = foes || participants().map(ent).concat(allMinions().filter(function (m) { return minionReady(m, t); }));
+        for (var i = 0; i < foes.length; i++) {
+          var T = foes[i];
+          if (!T || !T.alive || T.id === d.owner || T.team === d.team) continue;
+          if (PROJECTILES.segHit(a.x, a.y, b.x, b.y, T.x, T.y, BODY_R + (d.pr || 6))) { p.gone = true; PROJECTILES.bladeSpin(p, T.x, T.y); return; }
+        }
+        if (e >= p.life) { p.dead = true; PROJECTILES.bladeSpin(p, b.x, b.y); }
+      });
+    }
+    addProj(id, d) {
+      if (!d) return;
+      var sp = hyp(d.vx, d.vy) || 1, dx = d.vx / sp, dy = d.vy / sp;
+      var dist = rayCast(d.x, d.y, dx, dy, d.range || 500, d.pr || 6);
+      MATCH.remoteShots[id] = { id: id, d: d, dx: dx, dy: dy, sp: sp, dist: dist, life: dist / sp * 1000, lt: {}, dead: false, sparked: false };
+    }
+    projAt(p, e) { e = clamp(e, 0, p.life); return { x: p.d.x + p.dx * p.sp * e / 1000, y: p.d.y + p.dy * p.sp * e / 1000 }; }
+    segHit(ax, ay, bx, by, cx, cy, r) {
+      var vx = bx - ax, vy = by - ay, L = vx * vx + vy * vy, t = 0;
+      if (L > 0) t = clamp(((cx - ax) * vx + (cy - ay) * vy) / L, 0, 1);
+      return hyp(ax + vx * t - cx, ay + vy * t - cy) <= r;
+    }
+    emitShots(E, ang, skill, statSkill) {
+      var t = now(), ev = { o: E.id, x: Math.round(E.x), y: Math.round(E.y), a: Math.round(ang * 100) / 100, t: t };
+      if (skill) ev.s = 1;
+      if (statSkill) ev.sk = 1;
+      E.atkAt = t;
+      room.ref.child("shots").push(ev);
+      revealBriefly(E.id, t);
+    }
+    onShot(s) {
+      var ev = s.val(); if (!ev || !MATCH.game || MATCH.handled[s.key]) return;
+      MATCH.handled[s.key] = 1;
+      var info = P[ev.o]; if (!info || (info.team !== "blue" && info.team !== "red")) return;
+      var c = playable(info.characterType) ? info.characterType : FALLBACK_CHAR, skill = !!ev.s, spec = PROJECTILES.shotSpec(c, skill);
+      if (now() - ev.t > spec.count * spec.gap + 3000) return;
+      MATCH.shots.push({ key: s.key, ev: ev, team: info.team, char: c, skill: skill, spec: spec, count: spec.count, gap: spec.gap, next: 0 });
+      PROJECTILES.stepShots(now());
+    }
+    shotSpec(c, skill) {
+      var C = CHARS[c];
+      if (skill) return CHAR_TYPES.of(c).skillShotSpec();
+      return { count: C.shots || 1, gap: C.gap || 0, sp: C.pSpeed, dmg: C.throwDmg || C.dmg, pr: C.pr, range: C.throwRange || C.range };
+    }
+    stepShots(t) {
+      MATCH.shots = MATCH.shots.filter(function (v) {
+        while (v.next < v.count && t >= v.ev.t + v.next * v.gap) {
+          if (!PROJECTILES.spawnShot(v, v.next)) return false;
+          v.next++;
+        }
+        return v.next < v.count;
+      });
+    }
+    spawnShot(v, i) {
+      var E = ent(v.ev.o);
+      if (i > 0 && E && (!E.alive || E.isStunned())) return false;
+      var sv = v.spec, sp = sv.sp, a = v.ev.a, dx = Math.cos(a), dy = Math.sin(a);
+      var ox = i > 0 && E ? E.x : v.ev.x, oy = i > 0 && E ? E.y : v.ev.y;
+      PROJECTILES.addProj(v.key + "_" + i, { team: v.team, owner: v.ev.o, ownerCharacterType: v.char, x: ox + dx * 20, y: oy + dy * 20,
+        vx: dx * sp, vy: dy * sp, isSkill: v.skill, countsAsSkill: !!v.ev.sk, dmg: sv.dmg, ultKey: sv.ultKey, fx: sv.fx,
+        pr: sv.pr, range: sv.range + (!v.skill && E && E.isOvercharged(v.ev.t) ? ULT.ocRangeBonus : 0), createdAt: v.ev.t + i * v.gap });
+      var shooterType = CHAR_TYPES.of(v.char);
+      if (v.skill) shooterType.skillShotFx(ox, oy, dx, dy);
+      if (E && (E === MATCH.me || MATCH.bots[E.id]) && hear(E)) sfx(shooterType.shotSound);
+      return true;
+    }
+    checkProjectiles(t) {
+      var targets = localTargets(); if (!targets.length) return;
+      keys(MATCH.remoteShots).forEach(function (id) {
+        var p = MATCH.remoteShots[id]; if (p.dead || p.gone) return;
+        var d = p.d, e = t - d.createdAt;
+        if (e < 0) e = 0;
+        if (e > p.life + 40) return;
+        for (var i = 0; i < targets.length; i++) {
+          var T = targets[i];
+          if (d.owner === T.id || !T.alive || d.team === T.team) continue;
+          var pe = p.lt[T.id]; if (pe === undefined) pe = 0;
+          p.lt[T.id] = e;
+          var a = PROJECTILES.projAt(p, pe), b = PROJECTILES.projAt(p, e);
+          if (PROJECTILES.segHit(a.x, a.y, b.x, b.y, T.x, T.y, BODY_R + (d.pr || 6))) { PROJECTILES.projHit(id, p, T); break; }
+        }
+      });
+    }
+    projHit(id, p, T) {
+      var d = p.d;
+      p.dead = true;
+      var immune = T.isProtected(), fx = d.fx, seen = !MATCH.me || MATCH.me.team === T.team || visibleTo(T, MATCH.me);
+      var ownerType = CHAR_TYPES.of(d.ownerCharacterType);
+      fx = ownerType.projectileEffect(d, T, immune, fx);
+      var dancer = ownerType.isBladeThrower;
+      DAMAGE.damage(T, Math.round(d.dmg * (1 + PROJECTILES.damageBonusSum(d, T))), d.owner, dancer ? d.createdAt : !d.isSkill, d.isSkill ? d.ultKey : (d.countsAsSkill ? "skill" : null), fx);
+      if (dancer) PROJECTILES.bladeSpin(p, T.x, T.y);
+      if (d.ultKey === "execute" && !immune) { room.ref.child("hits/" + d.owner).push({ d: 0, b: 0, t: now(), tp: { x: r1(T.x), y: r1(T.y) } }); FX_VIEW.executeFx(T.x, T.y); }
+      ownerType.afterProjectileHit(d, T, immune);
+      if (seen) FX_VIEW.spark(T.x, T.y, FX_VIEW.orbHitColor(d), d.ultKey === "giant" ? 2.2 : 1);
+    }
+    damageBonusSum(d, T) {
+      var bonus = 0, C = CHARS[d.ownerCharacterType], A = ent(d.owner);
+      if (C && C.farBonus) {
+        var fromX = A && A.alive ? A.x : d.x, fromY = A && A.alive ? A.y : d.y;
+        if (hyp(T.x - fromX, T.y - fromY) > C.farDist) bonus += C.farBonus;
       }
-      if (e >= p.life) { p.dead = true; bladeSpin(p, b.x, b.y); }
-    });
+      return bonus;
+    }
+    projVisualHit(p, t) {
+      if (p.dead || p.gone) return;
+      var d = p.d, e = clamp(t - d.createdAt, 0, p.life), pe = p.ve === undefined ? 0 : p.ve;
+      p.ve = e;
+      var a = PROJECTILES.projAt(p, pe), b = PROJECTILES.projAt(p, e);
+      var list = participants().map(ent).concat(allMinions().filter(function (m) { return minionReady(m, t); }));
+      for (var i = 0; i < list.length; i++) {
+        var T = list[i];
+        if (!T || !T.alive || T.id === d.owner || T.team === d.team) continue;
+        if (PROJECTILES.segHit(a.x, a.y, b.x, b.y, T.x, T.y, BODY_R + (d.pr || 6))) {
+          p.gone = true;
+          if (d.ultKey === "execute") FX_VIEW.executeFx(T.x, T.y);
+          if (!MATCH.me || MATCH.me.team === T.team || visibleTo(T, MATCH.me, t)) FX_VIEW.spark(T.x, T.y, FX_VIEW.orbHitColor(d), d.ultKey === "giant" ? 2.2 : 1);
+          return;
+        }
+      }
+    }
   }
+  var PROJECTILES = new ProjectileSystem();
   function moveEnt(E, vx, vy, dt) {
     var m = hyp(vx, vy); if (m > 1) { vx /= m; vy /= m; }
     var sp = E.speed();
@@ -3967,62 +4081,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     return rayObst(ax, ay, (bx - ax) / d, (by - ay) / d, 4) >= d;
   }
 
-  function addProj(id, d) {
-    if (!d) return;
-    var sp = hyp(d.vx, d.vy) || 1, dx = d.vx / sp, dy = d.vy / sp;
-    var dist = rayCast(d.x, d.y, dx, dy, d.range || 500, d.pr || 6);
-    MATCH.remoteShots[id] = { id: id, d: d, dx: dx, dy: dy, sp: sp, dist: dist, life: dist / sp * 1000, lt: {}, dead: false, sparked: false };
-  }
-  function projAt(p, e) { e = clamp(e, 0, p.life); return { x: p.d.x + p.dx * p.sp * e / 1000, y: p.d.y + p.dy * p.sp * e / 1000 }; }
-  function segHit(ax, ay, bx, by, cx, cy, r) {
-    var vx = bx - ax, vy = by - ay, L = vx * vx + vy * vy, t = 0;
-    if (L > 0) t = clamp(((cx - ax) * vx + (cy - ay) * vy) / L, 0, 1);
-    return hyp(ax + vx * t - cx, ay + vy * t - cy) <= r;
-  }
-  function emitShots(E, ang, skill, statSkill) {
-    var t = now(), ev = { o: E.id, x: Math.round(E.x), y: Math.round(E.y), a: Math.round(ang * 100) / 100, t: t };
-    if (skill) ev.s = 1;
-    if (statSkill) ev.sk = 1;
-    E.atkAt = t;
-    room.ref.child("shots").push(ev);
-    revealBriefly(E.id, t);
-  }
-  function onShot(s) {
-    var ev = s.val(); if (!ev || !MATCH.game || MATCH.handled[s.key]) return;
-    MATCH.handled[s.key] = 1;
-    var info = P[ev.o]; if (!info || (info.team !== "blue" && info.team !== "red")) return;
-    var c = playable(info.characterType) ? info.characterType : FALLBACK_CHAR, skill = !!ev.s, spec = shotSpec(c, skill);
-    if (now() - ev.t > spec.count * spec.gap + 3000) return;
-    MATCH.shots.push({ key: s.key, ev: ev, team: info.team, char: c, skill: skill, spec: spec, count: spec.count, gap: spec.gap, next: 0 });
-    stepShots(now());
-  }
-  function shotSpec(c, skill) {
-    var C = CHARS[c];
-    if (skill) return CHAR_TYPES.of(c).skillShotSpec();
-    return { count: C.shots || 1, gap: C.gap || 0, sp: C.pSpeed, dmg: C.throwDmg || C.dmg, pr: C.pr, range: C.throwRange || C.range };
-  }
-  function stepShots(t) {
-    MATCH.shots = MATCH.shots.filter(function (v) {
-      while (v.next < v.count && t >= v.ev.t + v.next * v.gap) {
-        if (!spawnShot(v, v.next)) return false;
-        v.next++;
-      }
-      return v.next < v.count;
-    });
-  }
-  function spawnShot(v, i) {
-    var E = ent(v.ev.o);
-    if (i > 0 && E && (!E.alive || E.isStunned())) return false;
-    var sv = v.spec, sp = sv.sp, a = v.ev.a, dx = Math.cos(a), dy = Math.sin(a);
-    var ox = i > 0 && E ? E.x : v.ev.x, oy = i > 0 && E ? E.y : v.ev.y;
-    addProj(v.key + "_" + i, { team: v.team, owner: v.ev.o, ownerCharacterType: v.char, x: ox + dx * 20, y: oy + dy * 20,
-      vx: dx * sp, vy: dy * sp, isSkill: v.skill, countsAsSkill: !!v.ev.sk, dmg: sv.dmg, ultKey: sv.ultKey, fx: sv.fx,
-      pr: sv.pr, range: sv.range + (!v.skill && E && E.isOvercharged(v.ev.t) ? ULT.ocRangeBonus : 0), createdAt: v.ev.t + i * v.gap });
-    var shooterType = CHAR_TYPES.of(v.char);
-    if (v.skill) shooterType.skillShotFx(ox, oy, dx, dy);
-    if (E && (E === MATCH.me || MATCH.bots[E.id]) && hear(E)) sfx(shooterType.shotSound);
-    return true;
-  }
   function pruneLocal(t) {
     keys(MATCH.remoteShots).forEach(function (id) { if (t - MATCH.remoteShots[id].d.createdAt > MATCH.remoteShots[id].life + 1000) delete MATCH.remoteShots[id]; });
     var ms = Date.now();
@@ -4036,61 +4094,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (MATCH.me) { if (MATCH.me.alive) list.push(MATCH.me); addMinions(MATCH.me); }
     if (isHost()) keys(MATCH.bots).forEach(function (id) { if (MATCH.bots[id].alive) list.push(MATCH.bots[id]); addMinions(MATCH.bots[id]); });
     return list;
-  }
-  function checkProjectiles(t) {
-    var targets = localTargets(); if (!targets.length) return;
-    keys(MATCH.remoteShots).forEach(function (id) {
-      var p = MATCH.remoteShots[id]; if (p.dead || p.gone) return;
-      var d = p.d, e = t - d.createdAt;
-      if (e < 0) e = 0;
-      if (e > p.life + 40) return;
-      for (var i = 0; i < targets.length; i++) {
-        var T = targets[i];
-        if (d.owner === T.id || !T.alive || d.team === T.team) continue;
-        var pe = p.lt[T.id]; if (pe === undefined) pe = 0;
-        p.lt[T.id] = e;
-        var a = projAt(p, pe), b = projAt(p, e);
-        if (segHit(a.x, a.y, b.x, b.y, T.x, T.y, BODY_R + (d.pr || 6))) { projHit(id, p, T); break; }
-      }
-    });
-  }
-  function projHit(id, p, T) {
-    var d = p.d;
-    p.dead = true;
-    var immune = T.isProtected(), fx = d.fx, seen = !MATCH.me || MATCH.me.team === T.team || visibleTo(T, MATCH.me);
-    var ownerType = CHAR_TYPES.of(d.ownerCharacterType);
-    fx = ownerType.projectileEffect(d, T, immune, fx);
-    var dancer = ownerType.isBladeThrower;
-    DAMAGE.damage(T, Math.round(d.dmg * (1 + damageBonusSum(d, T))), d.owner, dancer ? d.createdAt : !d.isSkill, d.isSkill ? d.ultKey : (d.countsAsSkill ? "skill" : null), fx);
-    if (dancer) bladeSpin(p, T.x, T.y);
-    if (d.ultKey === "execute" && !immune) { room.ref.child("hits/" + d.owner).push({ d: 0, b: 0, t: now(), tp: { x: r1(T.x), y: r1(T.y) } }); FX_VIEW.executeFx(T.x, T.y); }
-    ownerType.afterProjectileHit(d, T, immune);
-    if (seen) FX_VIEW.spark(T.x, T.y, FX_VIEW.orbHitColor(d), d.ultKey === "giant" ? 2.2 : 1);
-  }
-  function damageBonusSum(d, T) {
-    var bonus = 0, C = CHARS[d.ownerCharacterType], A = ent(d.owner);
-    if (C && C.farBonus) {
-      var fromX = A && A.alive ? A.x : d.x, fromY = A && A.alive ? A.y : d.y;
-      if (hyp(T.x - fromX, T.y - fromY) > C.farDist) bonus += C.farBonus;
-    }
-    return bonus;
-  }
-  function projVisualHit(p, t) {
-    if (p.dead || p.gone) return;
-    var d = p.d, e = clamp(t - d.createdAt, 0, p.life), pe = p.ve === undefined ? 0 : p.ve;
-    p.ve = e;
-    var a = projAt(p, pe), b = projAt(p, e);
-    var list = participants().map(ent).concat(allMinions().filter(function (m) { return minionReady(m, t); }));
-    for (var i = 0; i < list.length; i++) {
-      var T = list[i];
-      if (!T || !T.alive || T.id === d.owner || T.team === d.team) continue;
-      if (segHit(a.x, a.y, b.x, b.y, T.x, T.y, BODY_R + (d.pr || 6))) {
-        p.gone = true;
-        if (d.ultKey === "execute") FX_VIEW.executeFx(T.x, T.y);
-        if (!MATCH.me || MATCH.me.team === T.team || visibleTo(T, MATCH.me, t)) FX_VIEW.spark(T.x, T.y, FX_VIEW.orbHitColor(d), d.ultKey === "giant" ? 2.2 : 1);
-        return;
-      }
-    }
   }
   var KILL_FEED_MS = 4000, KILL_FEED_MAX = 4, MULTI_KILL_MS = 3000;
   function multiKillCount(chainByKiller, k) {
@@ -4699,7 +4702,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (c.hits > 1) E.slash = { left: c.hits - 1, at: t + c.hitGap, ang: ang, dmg: ambushDmg };
       return;
     }
-    emitShots(E, ang, false, !!ambushDmg);
+    PROJECTILES.emitShots(E, ang, false, !!ambushDmg);
     if (c.shots > 1) E.volley = { until: t + (c.shots - 1) * c.gap };
   }
   function tryFire(E, ang, reach) {
@@ -6951,15 +6954,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
       keys(MATCH.remoteShots).forEach(function (id) {
         var p = MATCH.remoteShots[id], g = PRV[id], e = t - p.d.createdAt;
-        projVisualHit(p, t);
+        PROJECTILES.projVisualHit(p, t);
         if (e > p.life && !p.sparked && p.dist < (p.d.range || 500) - 1) {
-          p.sparked = true; var q = projAt(p, p.life);
+          p.sparked = true; var q = PROJECTILES.projAt(p, p.life);
           var orbShot = CHAR_TYPES.of(p.d.ownerCharacterType).isOrbShooter;
           FX_VIEW.spark(q.x, q.y, orbShot ? FX_VIEW.hitColor(p.d) : "#FFFFFF", orbShot ? 1.8 : 1);
         }
         if (p.dead || p.gone || e > p.life) { if (g) EFFECT_VIEW.dropProjVis(id); return; }
         if (!g) g = PRV[id] = EFFECT_VIEW.makeProjVis(p);
-        var pos = projAt(p, Math.max(0, e)), from = g.userData.from, kk = from ? 1 - clamp(p.sp * Math.max(0, e) / 1000 / BOW_BLEND, 0, 1) : 0;
+        var pos = PROJECTILES.projAt(p, Math.max(0, e)), from = g.userData.from, kk = from ? 1 - clamp(p.sp * Math.max(0, e) / 1000 / BOW_BLEND, 0, 1) : 0;
         if (from) g.position.set(pos.x + from.x * kk, PROJ_Y + from.y * kk, pos.y + from.z * kk);
         else g.position.set(pos.x, PROJ_Y, pos.y);
        if (g.userData.pulse) g.userData.pulse.scale.setScalar(9 + 2 * Math.sin(nowMs / 50));
@@ -7630,7 +7633,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   function stepWorld(t, dt, driveBots, viewDt) {
     syncRemote(viewDt == null ? dt : viewDt);
-    stepShots(t);
+    PROJECTILES.stepShots(t);
     stepBursts(t);
     stepPools(t);
     STATUS.flushCC(t);
@@ -7666,9 +7669,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (isHost()) keys(MATCH.bots).forEach(function (id) { var B = MATCH.bots[id]; if (driveBots) BRAIN.step(B, dt); if (B.alive) stepCombat(B, dt); stepKnightSlam(B); stepHammerLeap(B); stepLance(B); stepDash(B); stepMinions(B, dt, t); DAMAGE.payKillGaugeOwed(B, t); });
       if (MATCH.me) { stepKnightSlam(MATCH.me); stepHammerLeap(MATCH.me); stepLance(MATCH.me); stepDash(MATCH.me); stepMinions(MATCH.me, dt, t); DAMAGE.payKillGaugeOwed(MATCH.me, t); }
       localTargets().forEach(function (T) { STATUS.stepShove(T, t); if (!T.minion) { STATUS.stepBurn(T, t); STATUS.stepRally(T, t); stepDomainBolt(T, t); stepCurse(T, t); } });
-      checkProjectiles(t);
-      stepBladeDaggers(t);
-      stepBladeSpins(t);
+      PROJECTILES.checkProjectiles(t);
+      PROJECTILES.stepBladeDaggers(t);
+      PROJECTILES.stepBladeSpins(t);
       stepBladeStorms(t);
     }
   }
@@ -7692,7 +7695,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       },
       loadMapData: loadMapData, makeEnt: makeEnt, resolve: resolve, stepWorld: stepWorld,
       useUlt: useUlt, fireBasic: fireBasic, damage: DAMAGE.damage.bind(DAMAGE), healCut: STATUS.healCut.bind(STATUS), healAmount: STATUS.healAmount.bind(STATUS), respawnIfReady: respawnIfReady, afflict: STATUS.afflict.bind(STATUS), speedOf: function (E) { return E.speed(); }, stunned: function (E, t) { return E.isStunned(t); },
-      onShot: onShot, onMelee: onMelee, potionFlightMs: potionFlightMs, meteorHitAt: meteorHitAt, onEffect: onEffect, onHit: DAMAGE.onHit.bind(DAMAGE),
+      onShot: PROJECTILES.onShot.bind(PROJECTILES), onMelee: onMelee, potionFlightMs: potionFlightMs, meteorHitAt: meteorHitAt, onEffect: onEffect, onHit: DAMAGE.onHit.bind(DAMAGE),
       multiKillCount: multiKillCount, MULTI_KILL_MS: MULTI_KILL_MS, ASSIST_MS: ASSIST_MS, onKill: DAMAGE.creditHelpAssists.bind(DAMAGE),
       hiddenFrom: hiddenFrom, visibleTo: visibleTo, storms: function () { return FIELD.storms; }, stormCenter: stormCenter, revs: function () { return FIELD.revs; }, domains: function () { return FIELD.domains; }, graceTarget: graceTarget,
       bushTiles: function () { return BUSH.map(function (b) { return b.tiles.map(function (tl) { return { x: tileX(tl[0]), y: tileY(tl[1]) }; }); }); },
