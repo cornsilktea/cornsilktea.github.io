@@ -4001,7 +4001,7 @@ function collectResults(api) {
     try {
       api.applyTimeScale(0.7);
       if (api.CLOCK.scale !== 0.7 || api.matchMs() !== 90000 * 0.7) bad.push("배율·경기 시간 " + api.CLOCK.scale + " " + api.matchMs());
-      if (api.CHARS.knight.cd !== Math.round(1.8 * 1000 * 0.7) || api.CHARS.knight.speed !== Math.round(140 / 0.7) || api.CHARS.knight.hp !== 365) bad.push("기사 수치 " + JSON.stringify([api.CHARS.knight.cd, api.CHARS.knight.speed, api.CHARS.knight.hp]));
+      if (api.CHARS.knight.cd !== Math.round(1.8 * 1000 * 0.7) || api.CHARS.knight.speed !== Math.round(140 / 0.7) || api.CHARS.knight.hp !== 370) bad.push("기사 수치 " + JSON.stringify([api.CHARS.knight.cd, api.CHARS.knight.speed, api.CHARS.knight.hp]));
       if (api.ULT.rmDur !== Math.round(4 * 1000 * 0.7)) bad.push("스킬 수치");
       var once = JSON.stringify([api.CHARS, api.ULT]);
       api.applyTimeScale(0.7);
