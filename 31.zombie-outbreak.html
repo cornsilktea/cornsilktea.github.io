@@ -44,7 +44,6 @@
     text-shadow: 0 0 18px rgba(200, 30, 45, .75), 0 0 2px rgba(255, 90, 90, .9), 0 4px 0 rgba(60, 0, 8, .8); animation: titleFlicker 6s infinite; }
   .titleMain span { display: block; color: #E0293D; }
   .titleCard .sub { text-align: left; margin-top: 12px; color: #C9CED6; }
-  .titleCard .bestLine { text-align: left; }
   @keyframes titleFlicker { 0%, 92%, 100% { opacity: 1; } 93% { opacity: .35; } 94% { opacity: 1; } 96% { opacity: .55; } 97% { opacity: 1; } }
   .field input { background: rgba(255, 255, 255, .06) !important; color: #fff !important; }
   .field input::placeholder { color: #7d8590; }
@@ -72,7 +71,6 @@
   .keys { display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; font-size: 16px; line-height: 1.5; align-items: center; }
   kbd { display: inline-block; min-width: 30px; padding: 2px 8px; border: 1px solid var(--sg-line-strong); border-bottom-width: 3px; border-radius: 4px; background: var(--sg-panel-alt); font-family: inherit; font-size: 14px; font-weight: 800; text-align: center; }
   .rules { font-size: 16px; line-height: 1.7; color: var(--sg-ink-mid); padding-left: 20px; }
-  .bestLine { text-align: center; font-size: 16px; font-weight: 700; color: var(--sg-warn); margin-top: 8px; }
 
   .codeBar { display: flex; align-items: baseline; justify-content: center; gap: 14px; flex-wrap: wrap; }
   .codeLab { font-size: 16px; font-weight: 700; color: var(--sg-ink-soft); }
@@ -97,7 +95,6 @@
   table.res tr.me td { background: var(--sg-primary-soft); }
   table.res td.num { font-variant-numeric: tabular-nums; text-align: right; }
   table.res th.num { text-align: right; }
-  .newBest { text-align: center; margin-top: 14px; font-size: 20px; font-weight: 800; color: #D97B4F; }
   .myRec { text-align: center; margin-top: 10px; font-size: 16px; font-weight: 700; color: var(--sg-ink-mid); }
 
   #loading { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; padding: 10px 16px; text-align: center; font-size: 15px; font-weight: 700; background: var(--sg-primary); color: #fff; }
@@ -135,29 +132,25 @@
   #timer.tick { animation: timerTick 1s ease-out; text-shadow: 0 0 10px rgba(255, 80, 80, .7); }
   @keyframes timerTick { 0% { transform: scale(1); } 18% { transform: scale(1.3); } 100% { transform: scale(1); } }
   #aliveLine { font-size: 13px; font-weight: 700; color: #E4E9F2; }
-  #bestBox { text-align: right; margin-top: 40px; }
-  #hBest { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
   #centerMsg { position: absolute; left: 50%; top: 30%; transform: translate(-50%, -50%); width: 92vw; text-align: center; font-size: clamp(24px, 4.2vw, 44px); font-weight: 800; line-height: 1.3; }
   #centerMsg small { display: block; font-size: .5em; font-weight: 700; margin-top: 6px; color: #F1F4FA; }
   #centerMsg.red { color: #FF6B6B; }
-  #feed { position: absolute; right: 12px; top: calc(env(safe-area-inset-top, 0px) + 104px); display: flex; flex-direction: column; align-items: flex-end; gap: 6px; max-width: 60vw; }
-  #feed div { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 4px; border-left: 3px solid #C8323C; background: rgba(8, 10, 16, .72); font-size: 14px; font-weight: 800; text-shadow: none; animation: feedIn .25s ease-out; }
+  #feed { position: absolute; left: 50%; transform: translateX(-50%); top: calc(env(safe-area-inset-top, 0px) + 100px); display: flex; flex-direction: column; align-items: center; gap: 6px; width: max-content; max-width: 56vw; }
+  #feed div { display: flex; align-items: center; gap: 10px; padding: 8px 18px; border-radius: 4px; border-left: 4px solid #C8323C; background: rgba(8, 10, 16, .72); font-size: 20px; font-weight: 800; text-shadow: none; animation: feedIn .25s ease-out; }
   #feed div.mine { background: rgba(120, 18, 28, .78); }
-  #feed .killIcon { font-size: 15px; }
-  @keyframes feedIn { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+  #feed .killIcon { font-size: 22px; }
+  @keyframes feedIn { from { opacity: 0; transform: translateY(-14px); } to { opacity: 1; transform: none; } }
   #dashBox { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 26px); transform: translateX(-50%); width: min(300px, 70vw); text-align: center; }
   #dashLab { font-size: 14px; font-weight: 800; margin-bottom: 5px; }
   #dashBar { height: 14px; border-radius: 7px; background: rgba(255, 255, 255, .22); overflow: hidden; box-shadow: 0 1px 3px rgba(0, 0, 0, .4); }
   #dashFill { height: 100%; width: 100%; border-radius: 7px; background: #D97B4F; }
   #dashFill.ready { background: #FF5A5A; }
   #keyHint { position: absolute; left: 12px; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); font-size: 12px; font-weight: 700; color: #D5DCEA; line-height: 1.6; }
-  #btnGameLeave { pointer-events: auto; position: absolute; right: 12px; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); height: 36px; padding: 0 14px; font-size: 14px; font-weight: 800; border-radius: 4px; border: 1px solid rgba(255, 255, 255, .5); background: rgba(8, 10, 22, .55); color: #fff; }
+  #btnGameLeave { pointer-events: auto; position: absolute; right: 12px; top: calc(env(safe-area-inset-top, 0px) + 8px); height: 36px; padding: 0 14px; font-size: 14px; font-weight: 800; border-radius: 4px; border: 1px solid rgba(255, 255, 255, .5); background: rgba(8, 10, 22, .55); color: #fff; }
   #specBox, #specList { display: none; }
   #hud.spec #specBox { display: block; margin-top: 40px; min-width: 130px; }
   #hud.spec #specList { display: flex; }
-  #hud.spec #roleBox, #hud.spec #bestBox, #hud.spec #keyHint, #hud.spec #dashBox { display: none; }
-  #hud.spec #btnGameLeave { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: auto; }
-  #hud.spec #feed { top: calc(env(safe-area-inset-top, 0px) + 54px); }
+  #hud.spec #roleBox, #hud.spec #keyHint, #hud.spec #dashBox { display: none; }
   #specBox .rec { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #E0293D; margin-right: 6px; vertical-align: 1px; animation: recBlink 1.2s steps(1) infinite; }
   #specTitle { font-size: 22px; font-weight: 800; margin-top: 3px; }
   #specHint { font-size: 12px; font-weight: 700; color: #C9D3E6; margin-top: 2px; }
@@ -231,10 +224,6 @@
       <div id="roleLine"><div id="roleIcon">🧑</div><div id="roleText">인간</div></div>
       <div id="roleSub"></div>
     </div>
-    <div id="bestBox">
-      <div class="hudLab">개인 최고 기록</div>
-      <div id="hBest">-</div>
-    </div>
   </div>
   <div id="timerBox">
     <div class="hudLab">남은 시간</div>
@@ -258,7 +247,6 @@
     <div class="card titleCard">
       <h1 class="titleMain">미드나잇<span>좀비 아웃브레이크</span></h1>
       <p class="sub">불 꺼진 학교에 무언가 돌아다닙니다. 달빛만 비치는 교실과 복도에서 3분 동안 살아남으세요.</p>
-      <p class="bestLine" id="startBest"></p>
     </div>
     <div class="card">
       <label class="label" for="nickInput">닉네임</label>
@@ -329,7 +317,6 @@
         <thead><tr><th>닉네임</th><th>결과</th><th class="num">생존 시간</th></tr></thead>
         <tbody id="resBody"></tbody>
       </table>
-      <div class="newBest" id="resNewBest" hidden>개인 최고 기록 갱신!</div>
       <div class="myRec" id="resMine"></div>
     </div>
     <div class="card">
@@ -365,7 +352,7 @@ const TURN_SPEED = Math.PI, PITCH_SPEED = 1.75, TURN_RAMP_SEC = 0.25, TURN_RAMP_
 const NET_MS = 100, BOT_NET_MS = 143, REMOTE_LERP_MS = 150;
 const MAX_PLAYERS = 5, MIN_PLAYERS = 2, MAX_SPECTATORS = 1;
 const ROOM_ROOT = "zombieoutbreak/rooms";
-const NICK_KEY = "zombieoutbreak_nick", BEST_KEY = "zombieoutbreak_best_v1";
+const NICK_KEY = "zombieoutbreak_nick";
 const MODEL_DIR = "img/zombie/";
 const FLOOR_H = 4, PLAYER_RADIUS = 0.35, STEP_UP = 0.55, BODY_H = 1.75, GRAVITY = 22;
 const SPAWN = { x: 0, z: -9 }, HOLD_RADIUS = 6;
@@ -401,12 +388,6 @@ try {
   return;
 }
 
-let bestSeconds = 0;
-try { bestSeconds = +localStorage.getItem(BEST_KEY) || 0; } catch (e) {}
-function saveBest(v) { bestSeconds = v; try { localStorage.setItem(BEST_KEY, String(v)); } catch (e) {} }
-function bestText() { return bestSeconds > 0 ? bestSeconds + "초" : "기록 없음"; }
-function renderStartBest() { setText($("startBest"), "개인 최고 생존 기록: " + bestText()); }
-renderStartBest();
 
 let audioCtx = null, masterGain = null, noiseBuffer = null;
 function audioInit() {
@@ -449,11 +430,12 @@ function playNoise(delay, dur, filterType, freqFrom, freqTo, peak, out) {
   src.loopStart = 0; src.loop = dur > 0.9;
   src.start(start); src.stop(start + dur + 0.05);
 }
-function strikeBell(delay) {
+function strikeBell(delay, volume = 1) {
   const base = 1175;
-  [[1, 0.42, 1.5], [2.32, 0.22, 0.9], [4.25, 0.12, 0.55], [6.63, 0.06, 0.3], [0.5, 0.1, 1.2]].forEach(([ratio, peak, dur]) => playTone(base * ratio, delay, dur, "sine", peak));
-  playNoise(delay, 0.04, "highpass", 4000, 6000, 0.25);
+  [[1, 0.42, 1.5], [2.32, 0.22, 0.9], [4.25, 0.12, 0.55], [6.63, 0.06, 0.3], [0.5, 0.1, 1.2]].forEach(([ratio, peak, dur]) => playTone(base * ratio, delay, dur, "sine", peak * volume));
+  playNoise(delay, 0.04, "highpass", 4000, 6000, 0.25 * volume);
 }
+function playKillBell(involvesMe) { strikeBell(0, involvesMe ? 1 : 0.5); }
 function ringSchoolBell() { for (let i = 0; i < 5; i++) strikeBell(i * 0.36); }
 function playCountBeep(isGo) { playTone(isGo ? 1320 : 880, 0, isGo ? 0.45 : 0.18, "square", 0.12); }
 function playCountTick() { playTone(880, 0, 0.1, "sine", 0.07); }
@@ -1409,6 +1391,7 @@ function drawBoard(variant) {
   const rows = [3.4, 5.6, 7.8];
   for (const rx of rows) for (let c = 0; c < 5; c++) {
     if (chance(0.13)) continue;
+    if (rx === rows[2] && c === 0) continue;
     const dx = x0 + rx + randIn(-0.15, 0.15), dz = zIn + dir * (2.6 + c * 2.8) + randIn(-0.2, 0.2);
     const state = chance(0.12) ? "knocked" : "up";
     const yaw = state === "up" ? randIn(-0.25, 0.25) : randIn(0, 6.28);
@@ -1807,7 +1790,7 @@ function buildInterior() {
   }
   const barricadeX = 20;
   for (let k = 0; k < 5; k++) schoolDesk(barricadeX + randIn(-0.8, 0.8), FLOOR_H, -2.2 + k * 0.6 + (k > 2 ? 1.6 : 0), randIn(0, 6), chance(0.5) ? "knocked" : "up");
-  for (let k = 0; k < 4; k++) schoolChair(barricadeX + randIn(-1.5, 1.5), FLOOR_H, randIn(-2.5, 2.5), randIn(0, 6), true);
+  for (let k = 0; k < 2; k++) schoolChair(barricadeX + randIn(-1.5, 1.5), FLOOR_H, randIn(-2.5, 2.5), randIn(0, 6), true);
   box(-BUILDING_X - 0.15, BUILDING_X + 0.15, ROOF_Y - 0.2, ROOF_Y - 0.05, -BUILDING_Z - 0.15, BUILDING_Z + 0.15, C.ceiling, "ceil", false, { bottom: true, noTop: true });
   box(-BUILDING_X - 0.15, BUILDING_X + 0.15, ROOF_Y - 0.05, ROOF_Y + 0.2, -BUILDING_Z - 0.15, BUILDING_Z + 0.15, C.roof, "plaster", false);
   box(-BUILDING_X - 0.2, BUILDING_X + 0.2, GROUND_Y, -0.05, -BUILDING_Z - 0.2, BUILDING_Z + 0.2, C.concrete, "ground", false);
@@ -2628,7 +2611,6 @@ function showScreen(name) {
   if (name !== "game") { $("vignette").className = ""; $("speedLines").style.opacity = "0"; }
   if (name === "lobby") renderLobby();
   if (name === "result") renderResult();
-  if (name === "start") renderStartBest();
 }
 
 function onStatus(st) {
@@ -2980,7 +2962,9 @@ function pushKillFeed(zombieId, victimId) {
   const text = zombieId && room.players[zombieId]
     ? withJosa(nickOf(zombieId), "이", "가") + " " + withJosa(nickOf(victimId), "을", "를") + " 감염시켰습니다."
     : withJosa(nickOf(victimId), "이", "가") + " 감염되었습니다.";
-  pushFeed(text, victimId === myId || zombieId === myId);
+  const involvesMe = victimId === myId || zombieId === myId;
+  pushFeed(text, involvesMe);
+  playKillBell(involvesMe);
 }
 function becomeInfected(t, byId) {
   if (round.infectSent || round.myInfectedAt) return;
@@ -3477,7 +3461,6 @@ function updateHud(t, nowMs) {
   }
   const alive = humansLeft().length, total = roundIds().length;
   setText($("aliveLine"), "생존자 " + alive + " / " + total + "명");
-  setText($("hBest"), bestText());
   const vignette = $("vignette"), hud = $("hud");
   if (hud.classList.contains("spec") === round.iAmIn) hud.classList.toggle("spec", !round.iAmIn);
   if (!round.iAmIn) {
@@ -3593,7 +3576,7 @@ function renderResult() {
   const winnerEl = $("resWinner");
   if (!ids.length) {
     winnerEl.className = "winner"; setText(winnerEl, "결과를 정리하는 중입니다…"); setText($("resSub"), "");
-    $("resBody").innerHTML = ""; show($("resNewBest"), false); setText($("resMine"), "");
+    $("resBody").innerHTML = ""; setText($("resMine"), "");
     return;
   }
   const humansWon = room.winner === "human";
@@ -3611,13 +3594,10 @@ function renderResult() {
   const mine = final[myId];
   if (mine && round.resultSaved !== room.startAt) {
     round.resultSaved = room.startAt;
-    round.newBest = false;
-    if (mine.r !== "origin" && mine.s > bestSeconds) { saveBest(mine.s); round.newBest = true; }
     playEndSting(humansWon);
   }
-  show($("resNewBest"), !!(mine && round.newBest));
-  if (mine) setText($("resMine"), (mine.r === "origin" ? "이번 판에는 숙주 좀비였습니다." : "이번 생존 시간 " + mine.s + "초") + " · 개인 최고 기록 " + bestText());
-  else setText($("resMine"), (isSpectator(myId) ? "이번 판은 관전했습니다." : "이번 판에는 참가하지 않았습니다.") + " · 개인 최고 기록 " + bestText());
+  if (mine) setText($("resMine"), (mine.r === "origin" ? "이번 판에는 숙주 좀비였습니다." : "이번 생존 시간 " + mine.s + "초"));
+  else setText($("resMine"), (isSpectator(myId) ? "이번 판은 관전했습니다." : "이번 판에는 참가하지 않았습니다."));
 }
 function playAgain() {
   if (!room.ref) { showScreen("start"); return; }
