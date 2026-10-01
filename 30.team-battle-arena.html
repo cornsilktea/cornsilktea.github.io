@@ -1146,12 +1146,59 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       db = firebase.database();
     }
   } catch (e) { db = null; }
-  var serverOffset = 0;
-  if (db) db.ref(".info/serverTimeOffset").on("value", function (s) { serverOffset = s.val() || 0; });
   var CLOCK_PINGS = 5, CLOCK_GAP_MS = 500, CLOCK_KEEP = 10;
-  var CLOCK = { off: null, samples: [], host: null, timer: null };
-  var TEST_CLOCK = null;
-  var TS = 1;
+  class GameClock {
+    constructor(link) {
+      this.link = link;
+      this.serverOffset = 0;
+      this.scale = 1;
+      this.testTime = null;
+      this.timer = null;
+      this.resetSync(null);
+    }
+    resetSync(host) { this.host = host; this.samples = []; this.off = null; }
+    real() { return Date.now() + (this.off === null || this.link.isHost() ? this.serverOffset : this.off); }
+    now() {
+      if (this.testTime !== null) return this.testTime;
+      var real = this.real(), room = this.link.room();
+      return this.scale !== 1 && room && room.startAt && real > room.startAt ? room.startAt + (real - room.startAt) * this.scale : real;
+    }
+    stopBurst() { clearInterval(this.timer); }
+    burst() {
+      var clock = this, link = this.link;
+      this.stopBurst();
+      var left = CLOCK_PINGS;
+      function ping() {
+        if (!link.room() || link.isHost() || left-- <= 0) { clock.stopBurst(); return; }
+        link.room().ref.child("ping/" + link.myId()).set({ a: Date.now() });
+      }
+      ping();
+      this.timer = setInterval(ping, CLOCK_GAP_MS);
+    }
+    onPing(s) {
+      var v = s.val(), room = this.link.room();
+      if (!room || !this.link.isHost() || !v || !v.a) return;
+      room.ref.child("pong/" + s.key).set({ a: v.a, t: this.real(), h: this.link.myId() });
+    }
+    onPong(s) {
+      var v = s.val(), got = Date.now(), room = this.link.room();
+      if (!room || !v || v.h !== room.host || this.link.isHost()) return;
+      var rtt = got - v.a;
+      if (rtt < 0 || rtt > 5000) return;
+      this.samples.push({ rtt: rtt, off: v.t - (v.a + got) / 2 });
+      if (this.samples.length > CLOCK_KEEP) this.samples.shift();
+      var best = this.samples[0];
+      this.samples.forEach(function (x) { if (x.rtt < best.rtt) best = x; });
+      this.off = best.off;
+    }
+    hostChanged(host) {
+      if (host === this.host) return;
+      this.resetSync(host);
+      if (host) this.burst();
+    }
+  }
+  var CLOCK = new GameClock({ isHost: isHost, room: function () { return room; }, myId: function () { return myId; } });
+  if (db) db.ref(".info/serverTimeOffset").on("value", function (s) { CLOCK.serverOffset = s.val() || 0; });
   var DEFAULT_SLOW = 0.7;
   var SLOW_REQUEST = (function () {
     var m = /[?&]slow(?:=([0-9.]+))?(&|$)/.exec(location.search);
@@ -1159,16 +1206,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var v = m[1] ? parseFloat(m[1]) : DEFAULT_SLOW;
     return v >= 0.3 && v < 1 ? v : 1;
   })();
-  function realNow() { return Date.now() + (CLOCK.off === null || isHost() ? serverOffset : CLOCK.off); }
-  function now() {
-    if (TEST_CLOCK !== null) return TEST_CLOCK;
-    var real = realNow();
-    return TS !== 1 && room && room.startAt && real > room.startAt ? room.startAt + (real - room.startAt) * TS : real;
-  }
+  function now() { return CLOCK.now(); }
   var TUNE_UNDO = [];
   function slowTuning() {
-    function s(sec) { return Math.round(sec * 1000 * TS); }
-    function v(speed) { return Math.round(speed / TS); }
+    function s(sec) { return Math.round(sec * 1000 * CLOCK.scale); }
+    function v(speed) { return Math.round(speed / CLOCK.scale); }
     var C = CHARS;
     return [
       [C.duelist, { cd: s(1.4), dashMs: s(0.7), speed: v(175), hp: 225 }],
@@ -1211,43 +1253,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function applyTimeScale(v) {
     TUNE_UNDO.forEach(function (u) { u[0][u[1]] = u[2]; });
     TUNE_UNDO = [];
-    TS = v > 0 && v < 1 ? +v : 1;
-    MATCH_MS = 90000 * TS; RESPAWN_MS = 3000 * TS; RESPAWN_PROTECT_MS = 2500 * TS;
+    CLOCK.scale = v > 0 && v < 1 ? +v : 1;
+    MATCH_MS = 90000 * CLOCK.scale; RESPAWN_MS = 3000 * CLOCK.scale; RESPAWN_PROTECT_MS = 2500 * CLOCK.scale;
     BURN_TICK_MS = REGEN_TICK_MS = 1000;
-    if (TS === 1) return;
+    if (CLOCK.scale === 1) return;
     slowTuning().forEach(function (e) { keys(e[1]).forEach(function (k) { TUNE_UNDO.push([e[0], k, e[0][k]]); e[0][k] = e[1][k]; }); });
-    BURN_TICK_MS = REGEN_TICK_MS = Math.round(1000 * TS);
-  }
-  function clockBurst() {
-    clearInterval(CLOCK.timer);
-    var left = CLOCK_PINGS;
-    function ping() {
-      if (!room || isHost() || left-- <= 0) { clearInterval(CLOCK.timer); return; }
-      room.ref.child("ping/" + myId).set({ a: Date.now() });
-    }
-    ping();
-    CLOCK.timer = setInterval(ping, CLOCK_GAP_MS);
-  }
-  function onPing(s) {
-    var v = s.val();
-    if (!room || !isHost() || !v || !v.a) return;
-    room.ref.child("pong/" + s.key).set({ a: v.a, t: realNow(), h: myId });
-  }
-  function onPong(s) {
-    var v = s.val(), got = Date.now();
-    if (!room || !v || v.h !== room.host || isHost()) return;
-    var rtt = got - v.a;
-    if (rtt < 0 || rtt > 5000) return;
-    CLOCK.samples.push({ rtt: rtt, off: v.t - (v.a + got) / 2 });
-    if (CLOCK.samples.length > CLOCK_KEEP) CLOCK.samples.shift();
-    var best = CLOCK.samples[0];
-    CLOCK.samples.forEach(function (x) { if (x.rtt < best.rtt) best = x; });
-    CLOCK.off = best.off;
-  }
-  function hostChangedClock(host) {
-    if (host === CLOCK.host) return;
-    CLOCK.host = host; CLOCK.samples = []; CLOCK.off = null;
-    if (host) clockBurst();
+    BURN_TICK_MS = REGEN_TICK_MS = Math.round(1000 * CLOCK.scale);
   }
   var ROOT = "teambattle/rooms";
   var myId = "p" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
@@ -1366,10 +1377,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     ref.child("players/" + myId).onDisconnect().remove();
     ref.child("ping/" + myId).onDisconnect().remove();
     ref.child("pong/" + myId).onDisconnect().remove();
-    CLOCK.host = null; CLOCK.samples = []; CLOCK.off = null;
-    sub(ref.child("ping"), "child_added", onPing);
-    sub(ref.child("ping"), "child_changed", onPing);
-    sub(ref.child("pong/" + myId), "value", onPong);
+    CLOCK.resetSync(null);
+    sub(ref.child("ping"), "child_added", function (x) { CLOCK.onPing(x); });
+    sub(ref.child("ping"), "child_changed", function (x) { CLOCK.onPing(x); });
+    sub(ref.child("pong/" + myId), "value", function (x) { CLOCK.onPong(x); });
 
     var pref = ref.child("players");
     sub(pref, "child_added", function (s) { P[s.key] = s.val(); if (s.key === myId) saveResume(); playersChanged(); });
@@ -1383,12 +1394,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     sub(ref.child("mode"), "value", function (s) { room.mode = s.val(); playersChanged(); });
     sub(ref.child("map"), "value", function (s) { room.map = s.val() || "forest"; syncArena(); playersChanged(); });
     sub(ref.child("arena"), "value", function (s) { room.arena = s.val() || "forest"; syncArena(); });
-    sub(ref.child("hostPlayerId"), "value", function (s) { room.host = s.val(); room.hostLoaded = true; hostChangedClock(room.host); checkHost(); playersChanged(); });
+    sub(ref.child("hostPlayerId"), "value", function (s) { room.host = s.val(); room.hostLoaded = true; CLOCK.hostChanged(room.host); checkHost(); playersChanged(); });
     sub(ref.child("startAt"), "value", function (s) { room.startAt = s.val() || 0; });
     sub(ref.child("timeScale"), "value", function (s) {
-      var before = TS;
+      var before = CLOCK.scale;
       room.timeScale = s.val(); applyTimeScale(room.timeScale);
-      if (TS !== before) { cardHeightFor = null; playersChanged(); }
+      if (CLOCK.scale !== before) { cardHeightFor = null; playersChanged(); }
     });
     sub(ref.child("winner"), "value", function (s) { room.winner = s.val(); });
     sub(ref.child("bans"), "value", function (s) { room.bans = s.val(); });
@@ -1406,7 +1417,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (st === "lobby") { G = null; ME = null; BOTS = {}; if (keepSpecResult) holdSpecResult(); else showScreen("lobby"); playersChanged(); }
       else if (st === "draft") { G = null; ME = null; BOTS = {}; if (prev !== "draft") draftView = null; showScreen("draft"); renderDraft(); }
       else showScreen("game");
-      if (st === "countdown" && prev !== "countdown") clockBurst();
+      if (st === "countdown" && prev !== "countdown") CLOCK.burst();
       if (st === "ended" && prev !== "ended") onEnded();
     });
     var stRef = ref.child("st");
@@ -1446,7 +1457,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     unsubAll();
     var myRef = r.ref.child("players/" + myId);
     try { myRef.onDisconnect().cancel(); } catch (e) {}
-    clearInterval(CLOCK.timer);
+    CLOCK.stopBurst();
     r.ref.child("ping/" + myId).remove(); r.ref.child("pong/" + myId).remove();
     myRef.remove().then(function () {
       return r.ref.child("players").once("value");
@@ -1683,9 +1694,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function fitCharCols() { fitCharCol($("charCardBox")); fitCharCol(document.querySelector(".dfCharCol")); }
   window.addEventListener("resize", fitCharCols);
   function num(v) { return String(Math.round(v * 10) / 10); }
-  function secs(ms) { return (Math.round(ms / TS / 10) / 100) + "초"; }
-  function shownSpeed(v) { return Math.round(v * TS); }
-  function attackText(cdMs, perSec) { return TS !== 1 ? "공격 간격 " + num(cdMs / TS / 1000) + "초" : "초당 공격 " + perSec + "회"; }
+  function secs(ms) { return (Math.round(ms / CLOCK.scale / 10) / 100) + "초"; }
+  function shownSpeed(v) { return Math.round(v * CLOCK.scale); }
+  function attackText(cdMs, perSec) { return CLOCK.scale !== 1 ? "공격 간격 " + num(cdMs / CLOCK.scale / 1000) + "초" : "초당 공격 " + perSec + "회"; }
   function pctOf(rate) { return Math.round(rate * 100); }
   function slowPct(mul) { return Math.round((1 - mul) * 100) + "% 둔화"; }
   function ultDesc(k) {
@@ -1694,13 +1705,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (k === "knight") return secs(ULT.tkDur) + "간 받는 피해 " + num(ULT.tkDef) + "배. 끝날 때 반경 " + ULT.tkStunR + "의 적은 " + secs(ULT.tkStunMs) + "간 기절";
     if (k === "ranger") return ULT.mkDmg + "의 피해를 주는 화살 " + ULT.mkCount + "발 연사. 적중마다 게이지 " + ULT.mkRefund + " 회복";
     if (k === "mage") return "지정한 곳에 " + secs(ULT.mbDelay) + " 뒤 반경 " + ULT.mbR + "의 폭발. 적은 " + ULT.mbDmgMin + "~" + ULT.mbDmg + "의 피해, " +
-      num(ULT.mbStunMin / TS / 1000) + "~" + secs(ULT.mbStunMs) + "의 기절. 중심에 가까울수록 강함";
+      num(ULT.mbStunMin / CLOCK.scale / 1000) + "~" + secs(ULT.mbStunMs) + "의 기절. 중심에 가까울수록 강함";
     if (k === "rogue") return secs(ULT.asDur) + "간 은신 상태가 되고 " + speedUp(CHARS.rogue) + ". 공격 시 해제되며, 해제하는 공격이 베기면 한 번마다 " + CHARS.rogue.ambushDmg + "의 피해";
     if (k === "necro") return secs(ULT.smDur) + "간 유지되는 해골 병사 " + ULT.smCount + "마리 소환(최대 " + ULT.smMax + "마리). 해골은 체력 " + ULT.smHp + ", 공격 " + ULT.smDmg + ", 이동속도 " + shownSpeed(ULT.smSpeed) + ". 해골이 적을 공격할 때마다 네크로의 게이지 " + ULT.smGauge + " 회복";
     if (k === "sniper") return "사거리 " + ULT.pnRange + "의 거대한 화살 발사. 적은 " + ULT.pnDmg + "의 피해, 적중 시 게이지 " + ULT.pnRefund + " 회복";
     if (k === "thrower") return "지정한 곳에 " + secs(ULT.fgDur) + "간 유지되는 반경 " + ULT.fgR + "의 독안개 설치. 아군은 1초당 체력 " + ULT.fgHeal + " 회복, 적은 1초당 " + ULT.fgDmg + "의 피해를 입고 " + slowPct(ULT.fgSlowMul);
     if (k === "lancer") return secs(ULT.lnWind) + " 준비 후 사거리 " + ULT.lnLen + "의 창 찌르기. 맞은 적은 모두 " + ULT.lnDmg + "의 피해를 입고 " + secs(ULT.lnStunMs) + "간 기절";
-    if (k === "blacksmith") return "지정한 곳에 거리에 따라 " + num(ULT.bsLeapMinMs / TS / 1000) + "~" + secs(ULT.bsLeapMaxMs) + " 뒤 착지. 반경 " + ULT.bsR + "의 적은 " + ULT.bsDmg + "의 피해를 입고 " + secs(ULT.bsStunMs) + "간 기절";
+    if (k === "blacksmith") return "지정한 곳에 거리에 따라 " + num(ULT.bsLeapMinMs / CLOCK.scale / 1000) + "~" + secs(ULT.bsLeapMaxMs) + " 뒤 착지. 반경 " + ULT.bsR + "의 적은 " + ULT.bsDmg + "의 피해를 입고 " + secs(ULT.bsStunMs) + "간 기절";
     if (k === "hitman") return "사거리 " + ULT.exRange + "의 칼날 발사. 처음 맞은 적은 " + ULT.exDmg + "의 피해를 입고 " + secs(ULT.exStunMs) + "간 기절, 그 위치로 순간이동";
     if (k === "guardian") return "자신을 중심으로 반경 " + ULT.gdR + "의 적을 모두 " + ULT.gdKb + "만큼 밀어내며 " + ULT.gdDmg + "의 피해. 밀려난 적은 " + secs(ULT.gdSlowMs) + "간 " + slowPct(ULT.gdSlowMul);
     if (k === "shaman") return "자신을 중심으로 " + secs(ULT.dmGrowMs) + "간 반경 " + ULT.dmR + "까지 커진 뒤 " + secs(ULT.dmDur - ULT.dmGrowMs) + "간 유지되는 영역 생성. 영역이 커지는 과정에서 닿은 적은 " + secs(ULT.dmStunMs) +
@@ -1751,7 +1762,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
             : k === "dancer" ? num(c.dmg) + "+" + num(ULT.bdDmg)
             : pair(hit, c.throwDmg || (rage ? Math.round(c.dmg * ULT.bzDmgMul) : null)) + (c.heal ? "(" + c.heal + ")" : "");
     var altCd = rage ? c.cd * ULT.bzCdMul : k === "duelist" ? 1000 / ULT.rmRate : k === "stormbow" ? c.cd / ULT.ocRate : null;
-    var rateRow = TS !== 1 ? "<tr><th>공격 간격</th><td>" + pair(num(c.cd / TS / 1000), altCd == null ? null : num(altCd / TS / 1000)) + "초</td></tr>"
+    var rateRow = CLOCK.scale !== 1 ? "<tr><th>공격 간격</th><td>" + pair(num(c.cd / CLOCK.scale / 1000), altCd == null ? null : num(altCd / CLOCK.scale / 1000)) + "초</td></tr>"
                            : "<tr><th>초당 공격</th><td>" + pair(num(1000 / c.cd), altCd == null ? null : num(1000 / altCd)) + "회</td></tr>";
     return '<table class="st"><tr><th>HP</th><td>' + c.hp + "</td></tr><tr><th>공격</th><td>" + dmg + "</td></tr>" +
            rateRow +
@@ -2234,7 +2245,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       });
     }
     u.roster = roster; u.st = st; u.arena = arena; u.draft = null; u.bans = bans && bans.length ? bans : null;
-    u.status = "countdown"; u.startAt = realNow() + countMs; u.winner = null; u.final = null; u.statsNote = null; u.endedAt = null;
+    u.status = "countdown"; u.startAt = CLOCK.real() + countMs; u.winner = null; u.final = null; u.statsNote = null; u.endedAt = null;
     u.shots = null; u.meleeHits = null; u.hits = null; u.effects = null; u.kills = null; u.projectiles = null;
     room.ref.update(u);
   }
@@ -3000,7 +3011,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (p.spun) return;
     p.spun = true;
     FIELD.bladeSpins.push({ d: p.d, x: x, y: y, at: now() + ULT.bdDelay });
-    FX.push({ k: "bladeZone", x: x, y: y, r: ULT.bdR, t: Date.now(), delay: ULT.bdDelay / TS, life: (ULT.bdDelay + 260) / TS });
+    FX.push({ k: "bladeZone", x: x, y: y, r: ULT.bdR, t: Date.now(), delay: ULT.bdDelay / CLOCK.scale, life: (ULT.bdDelay + 260) / CLOCK.scale });
   }
   function stepBladeSpins(t) {
     FIELD.bladeSpins = FIELD.bladeSpins.filter(function (s) {
@@ -3128,7 +3139,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function pruneLocal(t) {
     keys(PR).forEach(function (id) { if (t - PR[id].d.createdAt > PR[id].life + 1000) delete PR[id]; });
     var ms = Date.now();
-    keys(MELEE).forEach(function (id) { if ((ms - MELEE[id].at) * TS > 1000) delete MELEE[id]; });
+    keys(MELEE).forEach(function (id) { if ((ms - MELEE[id].at) * CLOCK.scale > 1000) delete MELEE[id]; });
   }
   function hear(E) { return ME && hyp(E.x - ME.x, E.y - ME.y) < 700; }
 
@@ -3832,7 +3843,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   function meleeStrike(key, d) {
     var who = P[d.owner] ? P[d.owner].characterType : "";
     if (WAVE[who] && d.len) {
-      MELEE[key] = { d: d, at: Date.now() - Math.max(0, now() - d.createdAt) / TS };
+      MELEE[key] = { d: d, at: Date.now() - Math.max(0, now() - d.createdAt) / CLOCK.scale };
       FIELD.waves.push({ d: d, who: who, sparked: [], struck: [] });
       return;
     }
@@ -4451,7 +4462,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (mode !== "pvp" && mode !== "cup") return "이 모드는 통계를 모으지 않아요";
     if (!roster) return "참가자 정보를 못 받아서 통계에서 제외됐어요";
     if (isTestLink) return "배포용(테스트) 링크로 열어서 통계에서 제외됐어요";
-    if (TS !== DEFAULT_SLOW) return "옛 속도(시험용) 경기라 통계에서 제외됐어요";
+    if (CLOCK.scale !== DEFAULT_SLOW) return "옛 속도(시험용) 경기라 통계에서 제외됐어요";
     var count = { blue: 0, red: 0 }, ids = keys(roster);
     for (var i = 0; i < ids.length; i++) {
       var id = ids[i], r = roster[id], d = ps[id];
@@ -5629,7 +5640,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
    if (hurt && E.alive && (!v.once || v.once.name === "Hit_A")) playOnce(v, "Hit_A", 1.6, t);
     v.wasStealth = E.isStealthed(t);
-    var gameDt = dt * TS;
+    var gameDt = dt * CLOCK.scale;
     var moved = hyp(E.x - v.px, E.y - v.py) / Math.max(gameDt, 0.001);
     v.px = E.x; v.py = E.y;
     v.speed += (moved - v.speed) * Math.min(1, dt * 10);
@@ -5664,7 +5675,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       else if (M.mv) showClip(v, "Skeletons_Walking", 1.4, true);
       else showClip(v, "Skeletons_Idle", 1, true);
     }
-    v.mixer.update(dt * TS);
+    v.mixer.update(dt * CLOCK.scale);
   }
   function dropMinionVis(id, vanish) {
     var v = MVIS[id]; if (!v) return;
@@ -6282,7 +6293,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (ME && hyp(x - ME.x, y - ME.y) < 700) sfx("boom");
   }
   var NECRO_SMOKE_COLOR = 0x8A2A48;
-  function smoke(x, y, color) { FX.push({ k: "smoke", x: x, y: y, c: color || 0xC8C8CD, t: Date.now(), life: (ULT.asSmokeMs + 150) / TS }); }
+  function smoke(x, y, color) { FX.push({ k: "smoke", x: x, y: y, c: color || 0xC8C8CD, t: Date.now(), life: (ULT.asSmokeMs + 150) / CLOCK.scale }); }
   function boom(x, y, r, team) { FX.push({ k: "boom", x: x, y: y, r: r, c: C_FX[team] || 0xffffff, t: Date.now(), life: 450 }); }
   function floatText(x, y, text, color) { FX.push({ k: "txt", x: x, y: y, s: text, c: color, t: Date.now(), life: 800 }); }
   function orbHitColor(d) { return d.ownerCharacterType === "necro" || d.ownerCharacterType === "frost" || d.ownerCharacterType === "mage" || d.ownerCharacterType === "stormbow" ? hitColor(d) : (d.team === "blue" ? "#5FA2FF" : "#FF6A5F"); }
@@ -6786,7 +6797,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     keys(PRV).forEach(function (id) { if (!PR[id]) dropProjVis(id); });
 
     keys(MELEE).forEach(function (k) {
-      var m = MELEE[k], age = (nowMs - m.at) * TS, g = MLV[k], wave = m.d.len && !m.d.stab ? WAVE[P[m.d.owner] ? P[m.d.owner].characterType : ""] : null, life = wave ? wave.life : m.d.stab ? STAB_VIS_MS : 240;
+      var m = MELEE[k], age = (nowMs - m.at) * CLOCK.scale, g = MLV[k], wave = m.d.len && !m.d.stab ? WAVE[P[m.d.owner] ? P[m.d.owner].characterType : ""] : null, life = wave ? wave.life : m.d.stab ? STAB_VIS_MS : 240;
       if (age > life) { if (g) dropMelee(k); return; }
       if (!g) g = MLV[k] = makeMeleeVis(m.d);
       var f = age / life;
@@ -6951,9 +6962,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       h += '<div class="spCard' + (E.alive ? "" : " dead") + '"><img alt="" src="' + charImgSrc(E.char, team) + '">' +
         '<div class="spInfo"><div class="spName">' + (E.isAI ? "🤖 " : "") + esc(E.nickname) + '<span class="spK">' + (E.kills || 0) + "킬</span><small>" + CHARS[E.char].name + "</small></div>" +
         '<div class="spBar hp' + (ratio < 0.3 ? " low" : "") + '"><i style="width:' + Math.round(ratio * 100) + '%"></i><span>' +
-          (E.alive ? "HP " + hp + " / " + E.maxHp : "부활까지 " + Math.max(1, Math.ceil((E.diedAt + RESPAWN_MS - now()) / TS / 1000)) + "초") + "</span></div>" +
+          (E.alive ? "HP " + hp + " / " + E.maxHp : "부활까지 " + Math.max(1, Math.ceil((E.diedAt + RESPAWN_MS - now()) / CLOCK.scale / 1000)) + "초") + "</span></div>" +
         (act ? '<div class="spBar ult act"><i style="width:' + Math.round(skillLeft(E, tn) * 100) + '%"></i><span>' +
-                 CHARS[E.char].ultName + " " + Math.ceil((E.skillUntil - tn) / TS / 1000) + "초</span></div>"
+                 CHARS[E.char].ultName + " " + Math.ceil((E.skillUntil - tn) / CLOCK.scale / 1000) + "초</span></div>"
              : '<div class="spBar ult' + (full ? " full" : "") + '"><i style="width:' + g * 10 + '%"></i><span>' +
                  (full ? "스킬 준비 완료!" : "스킬 " + g + " / " + GAUGE_MAX) + "</span></div>") + "</div></div>";
     });
@@ -7046,9 +7057,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var st = room.status;
     var left = st === "countdown" || t < room.startAt ? MATCH_MS : room.startAt + MATCH_MS - t;
     if (st === "ended") left = Math.max(0, Math.min(MATCH_MS, room.startAt + MATCH_MS - (room.endedAt || t)));
-    left /= TS;
+    left /= CLOCK.scale;
     var practice = room.mode === "practice";
-    setText($("hudTimer"), practice ? fmtTime(Math.floor(Math.max(0, t - room.startAt) / TS / 1000) * 1000) : fmtTime(left));
+    setText($("hudTimer"), practice ? fmtTime(Math.floor(Math.max(0, t - room.startAt) / CLOCK.scale / 1000) * 1000) : fmtTime(left));
     finalCountdown($("hudTimer"), st === "playing" && !practice ? left : 0);
     $("scrGame").classList.toggle("practice", practice);
     show($("practiceBar"), practice && !!ME && st !== "ended");
@@ -7073,8 +7084,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     show($("deadMsg"), ME && !ME.alive && st === "playing");
     var prot = ME && ME.isProtected(t) && st === "playing";
     show($("protBadge"), prot);
-    if (prot) setText($("protBadge"), "🛡 보호 중 " + ((ME.protectUntil - t) / TS / 1000).toFixed(1) + "초");
-    if (ME && !ME.alive) setText($("deadMsg"), "쓰러졌어요 — " + Math.max(1, Math.ceil((ME.diedAt + RESPAWN_MS - t) / TS / 1000)) + "초 뒤 부활");
+    if (prot) setText($("protBadge"), "🛡 보호 중 " + ((ME.protectUntil - t) / CLOCK.scale / 1000).toFixed(1) + "초");
+    if (ME && !ME.alive) setText($("deadMsg"), "쓰러졌어요 — " + Math.max(1, Math.ceil((ME.diedAt + RESPAWN_MS - t) / CLOCK.scale / 1000)) + "초 뒤 부활");
     if (ME) {
       setHtml($("btnAtk").lastChild, '<i class="ic">' + CHARS[ME.char].icon + "</i>공격");
       var cdLeft = Math.max(0, ME.cdUntil - t) / (ME.cdDur || CHARS[ME.char].cd);
@@ -7082,11 +7093,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var full = ME.gauge >= GAUGE_MAX, act = ME.hasSkillActive(t);
       $("btnUlt").className = "actBtn" + (act ? " act" : (full && !ME.burst ? " ready" : ""));
       $("btnUlt").firstChild.style.height = Math.round((act ? skillLeft(ME, t) : clamp(ME.gauge / GAUGE_MAX, 0, 1)) * 100) + "%";
-      setHtml($("btnUlt").lastChild, act ? CHARS[ME.char].ultName + "<br>" + Math.ceil((ME.skillUntil - t) / TS / 1000) + "초"
+      setHtml($("btnUlt").lastChild, act ? CHARS[ME.char].ultName + "<br>" + Math.ceil((ME.skillUntil - t) / CLOCK.scale / 1000) + "초"
                                          : (full ? "스킬!" : "스킬<br>" + Math.floor(ME.gauge) + "/10"));
     }
     var cd = room.startAt - t;
-    var counting = (st === "countdown" || st === "playing") && cd > -700 * TS;
+    var counting = (st === "countdown" || st === "playing") && cd > -700 * CLOCK.scale;
     show($("countOv"), counting);
     if (counting) {
       var n = cd > 0 ? String(Math.ceil(cd / 1000)) : "시작!";
@@ -7127,7 +7138,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     if (!G) return;
     var t = now();
-    stepWorld(t, dt * TS, true, dt);
+    stepWorld(t, dt * CLOCK.scale, true, dt);
     if (st === "countdown" || st === "playing") netWrite(false);
     if (isHost()) { hostJudge(); hostCleanup(); }
     render(t, dt);
@@ -7203,17 +7214,17 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       hiddenFrom: hiddenFrom, visibleTo: visibleTo, storms: function () { return FIELD.storms; }, stormCenter: stormCenter, revs: function () { return FIELD.revs; }, domains: function () { return FIELD.domains; }, graceTarget: graceTarget,
       bushTiles: function () { return BUSH.map(function (b) { return b.tiles.map(function (tl) { return { x: tileX(tl[0]), y: tileY(tl[1]) }; }); }); },
       isIdle: function () { return !room; },
-      timeScale: function () { return TS; },
+      timeScale: function () { return CLOCK.scale; },
       begin: function (fakeRoom, players, bots, clockMs) {
-        TEST_CLOCK = clockMs; room = fakeRoom; P = players; BOTS = bots; ME = null; R = {};
+        CLOCK.testTime = clockMs; room = fakeRoom; P = players; BOTS = bots; ME = null; R = {};
         G = { startAt: fakeRoom.startAt, endSent: false, playingSent: false, lastNet: 0, sent: {}, finalSent: false, beeped: -1 };
         PR = {}; SHOTS = []; FIELD.reset(); MELEE = {}; FX = []; handled = {}; CC_PENDING = {};
       },
       ccPending: function () { return CC_PENDING; },
       mvpScore: mvpScore,
-      setClock: function (ms) { TEST_CLOCK = ms; },
+      setClock: function (ms) { CLOCK.testTime = ms; },
       currentMap: function () { return ARENA; },
-      finish: function (mapId) { TEST_CLOCK = null; room = null; resetLocal(); loadMapData(mapId); }
+      finish: function (mapId) { CLOCK.testTime = null; room = null; resetLocal(); loadMapData(mapId); }
     };
   }
   if (/[?&]test(&|$)/.test(location.search)) import("./30.team-battle-tests.js?t=" + Date.now()).then(function (m) { m.runTeamBattleTests(testHooks()); });
