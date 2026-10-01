@@ -2529,6 +2529,7 @@ function collectResults(api) {
 
   run(INPUTG, "키보드 이벤트: 경기 화면이 아니면 눌러도 무시하고, 키를 떼거나 창이 포커스를 잃으면 모든 키가 풀리는가", function (done) {
     var bad = [];
+    if (document.querySelector("[data-guard]")) { done("info", "접속 잠금 화면이 키보드 입력을 막고 있어 검사하지 못함(잠금을 풀거나 access-guard 없이 실행)"); return; }
     releaseInput();
     try {
       window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyD", key: "d", bubbles: true, cancelable: true }));
@@ -3603,7 +3604,7 @@ function collectResults(api) {
   });
 
   runAsync(LOBBYG, "캐릭터 카드: 내 카드는 누르면 뒤집히고 다른 카드는 골라지며(남이 고른 카드는 잠김), 대회모드는 보기 전용이고, 모두 뒤집기·확대·Esc 가 동작하는가", async function (done) {
-    var bad = [], code = "12121";
+    var bad = [], code = "12121", lockedByGuard = !!document.querySelector("[data-guard]");
     await withNet({}, async function (fake) {
       var L = HUMAN_CHARS, base = await lobbyOf(fake, code, { r1: person("레드", "red", 1, 1) }, person("나", "blue", 3, 0));
       await sleep(10);
@@ -3629,7 +3630,8 @@ function collectResults(api) {
       el("btnZoomChars").click();
       if (!box.classList.contains("zoomed")) bad.push("확대가 안 됨");
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
-      if (box.classList.contains("zoomed")) bad.push("Esc 로 확대가 안 풀림");
+      if (box.classList.contains("zoomed") && !lockedByGuard) bad.push("Esc 로 확대가 안 풀림");
+      if (lockedByGuard && box.classList.contains("zoomed")) el("btnZoomChars").click();
       fake.put(base + "mode", "cup"); await sleep(10); api.renderLobby();
       card(L[3]).click(); await sleep(10);
       if (myChar() !== L[2] || !card(L[3]).classList.contains("flip")) bad.push("대회모드는 캐릭터를 고르지 않고 뒤집기만 해야 함");
@@ -4106,7 +4108,9 @@ function collectResults(api) {
   });
 
   run(SCRG, "화면 전환(showScreen): 해당 화면만 보이고, 경기·드래프트 화면에서는 목록 버튼을 숨기며, 창은 화면에 맞게 닫히는가", function (done) {
-    var bad = [], guard = document.createElement("a"); guard.setAttribute("data-guard-home", ""); document.body.appendChild(guard);
+    var bad = [], realGuard = document.querySelector("[data-guard-home]"), guard = realGuard || document.createElement("a");
+    if (!realGuard) { guard.setAttribute("data-guard-home", ""); document.body.appendChild(guard); }
+    var guardDisplayBefore = guard.style.display;
     var vis = function () { return ["scrStart", "scrLobby", "scrDraft", "scrGame"].filter(function (id) { return !document.getElementById(id).hidden; }).join(); };
     var before = api.screen();
     try {
@@ -4126,7 +4130,7 @@ function collectResults(api) {
       if (document.getElementById("statsModal").hidden || document.getElementById("mapViewModal").hidden) bad.push("로비에서는 통계·맵 창이 유지돼야 함");
       api.showScreen("draft");
       if (!document.getElementById("statsModal").hidden || !document.getElementById("mapViewModal").hidden) bad.push("드래프트에서 통계·맵 창이 안 닫힘");
-    } finally { guard.remove(); ["statsModal", "mapViewModal", "pcModal"].forEach(function (id) { document.getElementById(id).hidden = true; }); api.showScreen(before); }
+    } finally { if (realGuard) guard.style.display = guardDisplayBefore; else guard.remove(); ["statsModal", "mapViewModal", "pcModal"].forEach(function (id) { document.getElementById(id).hidden = true; }); api.showScreen(before); }
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "4개 화면·목록 버튼 숨김·창 닫힘 규칙");
   });
 
