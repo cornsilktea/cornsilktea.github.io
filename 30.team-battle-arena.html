@@ -5090,7 +5090,78 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   var BOT_ROLES = new BotRoleRegistry();
 
+  class BotPathfinder {
+    walkable(c, r) {
+      if (c < 0 || r < 0 || c >= ARENA_MAP.cols || r >= ARENA_MAP.rowCount) return false;
+      var ch = ARENA_MAP.rows[r].charAt(c);
+      return BLOCK_TILES.indexOf(ch) < 0 && WATER_TILES.indexOf(ch) < 0;
+    }
+    tileOf(x, y) {
+      return { c: clamp(Math.floor((x - MAP_X0) / TILE), 0, ARENA_MAP.cols - 1), r: clamp(Math.floor((y - MAP_Y0) / TILE), 0, ARENA_MAP.rowCount - 1) };
+    }
+    centerOf(cell) { return { x: ARENA_MAP.tileX(cell.c), y: ARENA_MAP.tileY(cell.r) }; }
+    nearestWalkable(cell) {
+      for (var ring = 0; ring <= 3; ring++) {
+        for (var dr = -ring; dr <= ring; dr++) for (var dc = -ring; dc <= ring; dc++) {
+          if (Math.max(Math.abs(dr), Math.abs(dc)) === ring && BOT_PATH.walkable(cell.c + dc, cell.r + dr)) return { c: cell.c + dc, r: cell.r + dr };
+        }
+      }
+      return null;
+    }
+    clearLine(ax, ay, bx, by) {
+      var d = hyp(bx - ax, by - ay); if (d < 1) return true;
+      return PHYSICS.rayObst(ax, ay, (bx - ax) / d, (by - ay) / d, BODY_R) >= d;
+    }
+    squeezed(c, r, dc, dr) {
+      var side = dc ? [[0, -1], [0, 1]] : [[-1, 0], [1, 0]], closed = side.map(function (s) {
+        return !BOT_PATH.walkable(c + s[0], r + s[1]) || !BOT_PATH.walkable(c + dc + s[0], r + dr + s[1]);
+      });
+      return closed[0] && closed[1];
+    }
+    canStep(c, r, dc, dr) {
+      if (!BOT_PATH.walkable(c + dc, r + dr)) return false;
+      if (!dc || !dr) return !BOT_PATH.squeezed(c, r, dc, dr);
+      return BOT_PATH.canStep(c, r, dc, 0) && BOT_PATH.canStep(c + dc, r, 0, dr) && BOT_PATH.canStep(c, r, 0, dr) && BOT_PATH.canStep(c, r + dr, dc, 0);
+    }
+    route(from, to) {
+      var cols = ARENA_MAP.cols, prev = {}, queue = [from], head = 0, startKey = from.r * cols + from.c, goalKey = to.r * cols + to.c;
+      prev[startKey] = -1;
+      while (head < queue.length) {
+        var cur = queue[head++], curKey = cur.r * cols + cur.c;
+        if (curKey === goalKey) break;
+        for (var n = 0; n < BOT_PATH_STEPS.length; n++) {
+          var step = BOT_PATH_STEPS[n], nc = cur.c + step[0], nr = cur.r + step[1], key = nr * cols + nc;
+          if (prev[key] !== undefined || !BOT_PATH.canStep(cur.c, cur.r, step[0], step[1])) continue;
+          prev[key] = curKey; queue.push({ c: nc, r: nr });
+        }
+      }
+      if (prev[goalKey] === undefined) return null;
+      var path = [];
+      for (var k = goalKey; k !== -1; k = prev[k]) path.push({ c: k % cols, r: Math.floor(k / cols) });
+      return path.reverse();
+    }
+    waypoint(B, tx, ty) {
+      if (BOT_PATH.clearLine(B.x, B.y, tx, ty)) return null;
+      var from = BOT_PATH.nearestWalkable(BOT_PATH.tileOf(B.x, B.y)), to = BOT_PATH.nearestWalkable(BOT_PATH.tileOf(tx, ty));
+      if (!from || !to) return null;
+      var path = BOT_PATH.route(from, to);
+      if (!path || path.length < 2) return null;
+      for (var i = path.length - 1; i >= 1; i--) {
+        var spot = i === path.length - 1 ? { x: tx, y: ty } : BOT_PATH.centerOf(path[i]);
+        if (BOT_PATH.clearLine(B.x, B.y, spot.x, spot.y)) return spot;
+      }
+      return BOT_PATH.centerOf(path[1]);
+    }
+  }
+  var BOT_PATH_STEPS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+  var BOT_PATH = new BotPathfinder();
+
   class BotBrain {
+    routeWaypoint(B, tx, ty) {
+      var bridge = BRAIN.bridgeWaypoint(B, tx, ty);
+      if (bridge) return BOT_PATH.waypoint(B, bridge.x, bridge.y) || bridge;
+      return BOT_PATH.waypoint(B, tx, ty);
+    }
     pickWanderPoint(B, t) {
       var k = B.bot, spot;
       if (Math.random() < 0.5) {
@@ -5169,7 +5240,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var los = PHYSICS.losClear(B.x, B.y, target.x, target.y);
         if (!los) k.chaseUntil = t + BOT_LOS_HOLD_MS;
         var clearView = los && t >= (k.chaseUntil || 0);
-        var via = BRAIN.bridgeWaypoint(B, target.x, target.y), gx = ux, gy = uy;
+        var via = BRAIN.routeWaypoint(B, target.x, target.y), gx = ux, gy = uy;
         if (via) { var vd = hyp(via.x - B.x, via.y - B.y) || 1; gx = (via.x - B.x) / vd; gy = (via.y - B.y) / vd; }
         if (sniper) {
           if (d < SNIPER_KEEP + 30) { mx -= ux; my -= uy; }
@@ -5183,13 +5254,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       } else {
         var post = role.idleGoal(B, squad, t), pace = 0.7;
         if (post) {
-          post = BRAIN.bridgeWaypoint(B, post.x, post.y) || post;
+          var postDist = hyp(post.x - B.x, post.y - B.y);
+          post = BRAIN.routeWaypoint(B, post.x, post.y) || post;
           var pdx = post.x - B.x, pdy = post.y - B.y, pd = hyp(pdx, pdy) || 1;
-          pace = pd < 40 ? 0 : Math.min(0.9, pd / 120);
+          pace = postDist < 40 ? 0 : Math.min(0.9, postDist / 120);
           mx = pdx / pd * pace; my = pdy / pd * pace;
         } else {
           if (!k.wanderUntil || t > k.wanderUntil || hyp(k.wx - B.x, k.wy - B.y) < 50) BRAIN.pickWanderPoint(B, t);
-          var goal = BRAIN.bridgeWaypoint(B, k.wx, k.wy) || { x: k.wx, y: k.wy };
+          var goal = BRAIN.routeWaypoint(B, k.wx, k.wy) || { x: k.wx, y: k.wy };
           var ddx = goal.x - B.x, ddy = goal.y - B.y, dd = hyp(ddx, ddy) || 1;
           mx = ddx / dd * 0.7; my = ddy / dd * 0.7;
         }

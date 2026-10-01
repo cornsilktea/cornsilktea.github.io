@@ -2853,7 +2853,7 @@ function collectResults(api) {
   run(AIMG, "AI 후방: 앞 라인 아군이 모두 쓰러지면 제 거리까지 나와서 싸우는가", function (done) {
     var y = OPEN_Y.forest;
     withSeed(21, function () {
-      withMe([meEntry("knight", "red", 700, y + 520), { id: "k", team: "blue", char: "knight", x: 700, y: y - 40 }, { id: "bk", team: "blue", char: "mage", x: 700, y: y - 140 }], function (W, me) {
+      withMe([meEntry("knight", "red", 700, y + 440), { id: "k", team: "blue", char: "knight", x: 700, y: y - 40 }, { id: "bk", team: "blue", char: "mage", x: 700, y: y - 140 }], function (W, me) {
         var k = W.ent("k"), b = W.ent("bk"), nearest = Infinity;
         k.alive = false; k.hp = 0;
         driveBots(W, 7000, function () { me.hp = me.maxHp; nearest = Math.min(nearest, hyp(b.x - me.x, b.y - me.y)); });
