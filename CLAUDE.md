@@ -28,7 +28,7 @@
 - Node 와 TypeScript 는 `package.json` 의 개발 의존성이다. 새 컴퓨터에서는 `npm install` 한 번이면 된다(`node_modules/` 는 gitignore). Node 자체가 없으면 `winget install OpenJS.NodeJS.LTS`.
   three 타입은 `@types/three`(개발 의존성)이고 `tsconfig.json` 은 `moduleResolution: bundler`·`skipLibCheck` 를 쓴다. 3D 자료는 HTML 의 `<script type="module">` 에서 three 를 가져와 `new 게임클래스({THREE, GLTFLoader, SkeletonUtils})` 로 넘긴다(`ThreeLibs`, 33번 참고).
 - **공용 캐릭터 만들기는 `ts/character-kit.ts`**(2026-10-02 선생님 요청, 33번이 첫 사용). 닉네임·외형(`PlayerProfile`, 기기 저장 `portal_profile_v1`)과 6종 캐릭터 꾸미기 화면(`ProfileEditor`)·3D 모델 만들기(`CharacterModelFactory`)를 클래스로 묶었다.
-  앞으로 모든 게임이 같은 외형을 쓰고, 게임 선택 화면에서 닉네임·캐릭터를 정하게 할 계획이다(아직 안 함). 새 3D 게임은 이 모듈로 캐릭터를 만든다. 사용법·클래스 표는 `33.castle-spy-notes.md` 2절. 32번은 옛 코드 그대로 둔다.
+  앞으로 모든 게임이 같은 외형을 쓰고, 게임 선택 화면에서 닉네임·캐릭터를 정하게 할 계획이다(아직 안 함). 새 3D 게임은 이 모듈로 캐릭터를 만든다. 사용법·클래스 표는 `33.castle-spy-notes.md` 2절.
 
 # 수업 자료 저장소 작업 지침
 
@@ -109,7 +109,7 @@
 - **30번(팀 배틀) 작업은 시작 전에 반드시 `30.team-battle-notes.md` 를 읽는다.** 구조·규칙·캐릭터 추가 순서(`admin.html` 통계표·`데이터베이스규칙.json` 포함)·클래스 구조(9·10절)·검사 방법이 모두 거기 있고, 30번 규칙을 새로 정하거나 바꾸면 이 파일이 아니라 그 노트에 적는다.
   끝나면 `&test`·`&sim` 해시로 확인한다.
 - **33번(성 안의 스파이) 작업은 시작 전에 `33.castle-spy-notes.md` 를 읽는다.** 규칙·클래스 지도·Firebase 구조·검사 방법이 거기 있다.
-- **35번(미니게임 모음) 작업은 시작 전에 `35.minigames-notes.md` 를 읽는다.** 34번 컴파일 `.js` 를 그대로 불러다 쓰는 구조라 34번을 고치면 모음도 바뀐다. 종목 추가 방법·클래스 지도·Firebase 구조·검사 방법이 거기 있다.
+- **32번(미니게임 모음) 작업은 시작 전에 `32.minigames-notes.md` 를 읽는다.** `34.last-tile-v2/` 폴더(옛 마지막 발판 코드, HTML 은 지움)의 컴파일 `.js` 를 그대로 불러다 쓰는 구조라 그 폴더를 고치면 모음도 바뀐다. 종목 추가 방법·클래스 지도·Firebase 구조·검사 방법이 거기 있다.
 
 ## 환경
 

@@ -1,337 +1,319 @@
 {
-  "portal": {
-    "games": {
-      "aiethicscourt": {
-        "memo": "",
-        "open": true,
-        "order": 12,
-        "title": "AI판사 체험하기",
-        "units": [
-          "g2s1-5-2",
-          "g1s2-5"
+  oportalo: {
+    ogameso: {
+      oaiethicscourto: {
+        omemoo: oo,
+        oopeno: true,
+        oordero: 12,
+        otitleo: oAI판사 체험하기o,
+        ounitso: [
+          og2s1-5-2o,
+          og1s2-5o
         ],
-        "unitsSet": true,
-        "url": "13.ai-ethics-court.html"
+        ounitsSeto: true,
+        ourlo: o13.ai-ethics-court.htmlo
       },
-      "aiorhuman": {
-        "memo": "",
-        "open": true,
-        "order": 10,
-        "title": "AI와 인간이 쓴 글 구분하기",
-        "units": [
-          "g1s2-5",
-          "g2s1-4-1"
+      oaiorhumano: {
+        omemoo: oo,
+        oopeno: true,
+        oordero: 10,
+        otitleo: oAI와 인간이 쓴 글 구분하기o,
+        ounitso: [
+          og1s2-5o,
+          og2s1-4-1o
         ],
-        "unitsSet": true,
-        "url": "10.ai-or-human-game.html"
+        ounitsSeto: true,
+        ourlo: o10.ai-or-human-game.htmlo
       },
-      "alkkagi": {
-        "memo": "AI 대전(하·중·상) / 2인 대전",
-        "open": true,
-        "order": 16,
-        "title": "AI와 알까기",
-        "units": [
-          "g2s1-4-2"
+      oalkkagio: {
+        omemoo: oAI 대전(하·중·상) / 2인 대전o,
+        oopeno: true,
+        oordero: 16,
+        otitleo: oAI와 알까기o,
+        ounitso: [
+          og2s1-4-2o
         ],
-        "unitsSet": true,
-        "url": "17.alkkagi.html"
+        ounitsSeto: true,
+        ourlo: o17.alkkagi.htmlo
       },
-      "baseball": {
-        "memo": "타이밍 판정 · 구종별 궤적 / 20구 개인전",
-        "open": true,
-        "order": 19,
-        "title": "야구 타격",
-        "units": [],
-        "unitsSet": false,
-        "url": "20.baseball.html"
+      obaseballo: {
+        omemoo: o타이밍 판정 · 구종별 궤적 / 20구 개인전o,
+        oopeno: true,
+        oordero: 19,
+        otitleo: o야구 타격o,
+        ounitso: [],
+        ounitsSeto: false,
+        ourlo: o20.baseball.htmlo
       },
-      "hanokroofrun": {
-        "memo": "점프·와이어 타이밍 / 10단계 연속 코스(9단계부터 벽) 개인전",
-        "open": true,
-        "order": 21,
-        "title": "고양이 달리기",
-        "units": [],
-        "unitsSet": false,
-        "url": "22.hanokroofrun.html"
+      ohanokroofruno: {
+        omemoo: o점프·와이어 타이밍 / 10단계 연속 코스(9단계부터 벽) 개인전o,
+        oopeno: true,
+        oordero: 21,
+        otitleo: o고양이 달리기o,
+        ounitso: [],
+        ounitsSeto: false,
+        ourlo: o22.hanokroofrun.htmlo
       },
-      "bitmapquiz": {
-        "memo": "",
-        "open": true,
-        "order": 14,
-        "title": "비트맵 퀴즈",
-        "units": [
-          "g2s2-2-1"
+      obitmapquizo: {
+        omemoo: oo,
+        oopeno: true,
+        oordero: 14,
+        otitleo: o비트맵 퀴즈o,
+        ounitso: [
+          og2s2-2-1o
         ],
-        "unitsSet": true,
-        "url": "15.bitmap-quiz.html"
+        ounitsSeto: true,
+        ourlo: o15.bitmap-quiz.htmlo
       },
-      "brickbreak": {
-        "memo": "",
-        "open": true,
-        "order": 2,
-        "title": "벽돌깨기",
-        "url": "3.brickbreak.html"
+      obrickbreako: {
+        omemoo: oo,
+        oopeno: true,
+        oordero: 2,
+        otitleo: o벽돌깨기o,
+        ourlo: o3.brickbreak.htmlo
       },
-      "cardauction": {
-        "memo": "",
-        "open": true,
-        "order": 4,
-        "title": "경매",
-        "url": "5.cardauction.html"
+      ocardauctiono: {
+        omemoo: oo,
+        oopeno: true,
+        oordero: 4,
+        otitleo: o경매o,
+        ourlo: o5.cardauction.htmlo
       },
-      "conditionrun": {
-        "memo": "",
-        "open": true,
-        "order": 13,
-        "title": "조건문 러너",
-        "units": [
-          "g2s2-3-2"
+      oconditionruno: {
+        omemoo: oo,
+        oopeno: true,
+        oordero: 13,
+        otitleo: o조건문 러너o,
+        ounitso: [
+          og2s2-3-2o
         ],
-        "unitsSet": true,
-        "url": "14.conditional_statement_run.html"
+        ounitsSeto: true,
+        ourlo: o14.conditional_statement_run.htmlo
       },
-      "datasorting": {
-        "memo": "",
-        "open": true,
-        "order": 7,
-        "title": "자료 정렬하기",
-        "units": [
-          "g2s2-2-2"
+      odatasortingo: {
+        omemoo: oo,
+        oopeno: true,
+        oordero: 7,
+        otitleo: o자료 정렬하기o,
+        ounitso: [
+          og2s2-2-2o
         ],
-        "unitsSet": true,
-        "url": "8.data-sorting-game.html"
+        ounitsSeto: true,
+        ourlo: o8.data-sorting-game.htmlo
       },
-      "drawing": {
-        "memo": "",
-        "open": true,
-        "order": 6,
-        "title": "추상화",
-        "units": [
-          "g2s2-3-1"
+      odrawingo: {
+        omemoo: oo,
+        oopeno: true,
+        oordero: 6,
+        otitleo: o추상화o,
+        ounitso: [
+          og2s2-3-1o
         ],
-        "unitsSet": true,
-        "url": "7.drawing.html"
+        ounitsSeto: true,
+        ourlo: o7.drawing.htmlo
       },
-      "function": {
-        "memo": "",
-        "open": true,
-        "order": 3,
-        "title": "코딩 미로",
-        "url": "4.function.html"
+      ofunctiono: {
+        omemoo: oo,
+        oopeno: true,
+        oordero: 3,
+        otitleo: o코딩 미로o,
+        ourlo: o4.function.htmlo
       },
-      "gomoku": {
-        "memo": "AI 대전(하·중·상) / 2인 대전",
-        "open": true,
-        "order": 15,
-        "title": "AI와 오목대전",
-        "units": [
-          "g1s2-3"
+      ogomokuo: {
+        omemoo: oAI 대전(하·중·상) / 2인 대전o,
+        oopeno: true,
+        oordero: 15,
+        otitleo: oAI와 오목대전o,
+        ounitso: [
+          og1s2-3o
         ],
-        "unitsSet": true,
-        "url": "16.gomoku.html"
+        ounitsSeto: true,
+        ourlo: o16.gomoku.htmlo
       },
-      "graphreading": {
-        "memo": "",
-        "open": true,
-        "order": 8,
-        "title": "그래프 읽기",
-        "units": [
-          "g2s2-2-1"
+      ographreadingo: {
+        omemoo: oo,
+        oopeno: true,
+        oordero: 8,
+        otitleo: o그래프 읽기o,
+        ounitso: [
+          og2s2-2-1o
         ],
-        "unitsSet": true,
-        "url": "9.graph-reading-game.html"
+        ounitsSeto: true,
+        ourlo: o9.graph-reading-game.htmlo
       },
-      "greedytd": {
-        "memo": "그리디 알고리즘 · 자원 최적화 / 40웨이브 개인전",
-        "open": true,
-        "order": 17,
-        "title": "풍선 디펜스",
-        "units": [
-          "g2s2-3-1"
+      ogreedytdo: {
+        omemoo: o그리디 알고리즘 · 자원 최적화 / 40웨이브 개인전o,
+        oopeno: true,
+        oordero: 17,
+        otitleo: o풍선 디펜스o,
+        ounitso: [
+          og2s2-3-1o
         ],
-        "unitsSet": true,
-        "url": "18.greedy-tower-defense.html"
+        ounitsSeto: true,
+        ourlo: o18.greedy-tower-defense.htmlo
       },
-      "privacyescape": {
-        "memo": "",
-        "open": true,
-        "order": 11,
-        "title": "개인정보 보호하기",
-        "units": [
-          "g1s2-5",
-          "g2s1-5-2"
+      oprivacyescapeo: {
+        omemoo: oo,
+        oopeno: true,
+        oordero: 11,
+        otitleo: o개인정보 보호하기o,
+        ounitso: [
+          og1s2-5o,
+          og2s1-5-2o
         ],
-        "unitsSet": true,
-        "url": "12.privacy-escape-game.html"
+        ounitsSeto: true,
+        ourlo: o12.privacy-escape-game.htmlo
       },
-      "ramentiming": {
-        "memo": "순차 처리 · 우선순위 판단 / 60초 개인전",
-        "open": true,
-        "order": 18,
-        "title": "라면 끓이기",
-        "units": [
-          "g2s2-3-1"
+      oramentimingo: {
+        omemoo: o순차 처리 · 우선순위 판단 / 60초 개인전o,
+        oopeno: true,
+        oordero: 18,
+        otitleo: o라면 끓이기o,
+        ounitso: [
+          og2s2-3-1o
         ],
-        "unitsSet": true,
-        "url": "19.ramen-timing-game.html"
+        ounitsSeto: true,
+        ourlo: o19.ramen-timing-game.htmlo
       },
-      "robotmaze": {
-        "memo": "",
-        "open": true,
-        "order": 1,
-        "title": "미로 찾기",
-        "url": "2.robotmaze.html"
+      orobotmazeo: {
+        omemoo: oo,
+        oopeno: true,
+        oordero: 1,
+        otitleo: o미로 찾기o,
+        ourlo: o2.robotmaze.htmlo
       },
-      "slidecard": {
-        "memo": "",
-        "open": true,
-        "order": 0,
-        "title": "카드 옮기기",
-        "url": "1.slidecard.html"
+      oslidecardo: {
+        omemoo: oo,
+        oopeno: true,
+        oordero: 0,
+        otitleo: o카드 옮기기o,
+        ourlo: o1.slidecard.htmlo
       },
-      "snakegame": {
-        "memo": "",
-        "open": true,
-        "order": 5,
-        "title": "스네이크",
-        "url": "6.snakegame.html"
+      osnakegameo: {
+        omemoo: oo,
+        oopeno: true,
+        oordero: 5,
+        otitleo: o스네이크o,
+        ourlo: o6.snakegame.htmlo
       },
-      "timeguess": {
-        "memo": "시간 감각 워밍업 / 1회 개인전",
-        "open": true,
-        "order": 20,
-        "title": "5초 타이머 맞히기",
-        "units": [],
-        "unitsSet": false,
-        "url": "21.timeguess.html"
+      otimeguesso: {
+        omemoo: o시간 감각 워밍업 / 1회 개인전o,
+        oopeno: true,
+        oordero: 20,
+        otitleo: o5초 타이머 맞히기o,
+        ounitso: [],
+        ounitsSeto: false,
+        ourlo: o21.timeguess.htmlo
       },
-      "tablereading": {
-        "memo": "",
-        "open": true,
-        "order": 9,
-        "title": "표 분석하기",
-        "units": [
-          "g2s2-2-2"
+      otablereadingo: {
+        omemoo: oo,
+        oopeno: true,
+        oordero: 9,
+        otitleo: o표 분석하기o,
+        ounitso: [
+          og2s2-2-2o
         ],
-        "unitsSet": true,
-        "url": "11.table-reading-game.html"
+        ounitsSeto: true,
+        ourlo: o11.table-reading-game.htmlo
       },
-      "pianotiles": {
-        "memo": "타이밍·이벤트 입력 판정(±50ms/±120ms) / 쉬움 3곡·보통 3곡·어려움 2곡·매우 어려움 1곡 개인전",
-        "open": false,
-        "order": 22,
-        "title": "피아노 타일",
-        "units": [],
-        "unitsSet": false,
-        "url": "23.piano-tiles-rhythm.html"
+      opianotileso: {
+        omemoo: o타이밍·이벤트 입력 판정(±50ms/±120ms) / 쉬움 3곡·보통 3곡·어려움 2곡·매우 어려움 1곡 개인전o,
+        oopeno: false,
+        oordero: 22,
+        otitleo: o피아노 타일o,
+        ounitso: [],
+        ounitsSeto: false,
+        ourlo: o23.piano-tiles-rhythm.htmlo
       },
-      "turbolap": {
-        "memo": "3D 실사 레이싱 / 타임어택(홍콩 편도·싱가포르 3바퀴·서울 2바퀴 완주 시간 개인전·고스트) + 대전모드(방 코드 1대1 실시간 레이스·충돌·관전) (WASD·방향키)",
-        "open": true,
-        "order": 23,
-        "title": "터보 랩",
-        "units": [],
-        "unitsSet": false,
-        "url": "24.turbo-lap.html"
+      oturbolapo: {
+        omemoo: o3D 실사 레이싱 / 타임어택(홍콩 편도·싱가포르 3바퀴·서울 2바퀴 완주 시간 개인전·고스트) + 대전모드(방 코드 1대1 실시간 레이스·충돌·관전) (WASD·방향키)o,
+        oopeno: true,
+        oordero: 23,
+        otitleo: o터보 랩o,
+        ounitso: [],
+        ounitsSeto: false,
+        ourlo: o24.turbo-lap.htmlo
       },
-      "fpssurvival": {
-        "memo": "1인칭 3D 서바이벌 슈팅 / AI 대전(처치 수·생존 시간 개인전) + 팀 대전(최대 2대2·1분 킬 대결·관전) (방향키 시점·WASD 이동·스페이스 발사)",
-        "open": true,
-        "order": 24,
-        "title": "FPS 서바이벌",
-        "units": [],
-        "unitsSet": false,
-        "url": "25.fps-survival.html"
+      ofpssurvivalo: {
+        omemoo: o1인칭 3D 서바이벌 슈팅 / AI 대전(처치 수·생존 시간 개인전) + 팀 대전(최대 2대2·1분 킬 대결·관전) (방향키 시점·WASD 이동·스페이스 발사)o,
+        oopeno: true,
+        oordero: 24,
+        otitleo: oFPS 서바이벌o,
+        ounitso: [],
+        ounitsSeto: false,
+        ourlo: o25.fps-survival.htmlo
       },
-      "blockblast": {
-        "memo": "8×8 보드 블록 퍼즐 / 줄 동시 제거 10×n² 점수(탐욕 vs 전체 최적화) · 2차원 배열 · 개인전",
-        "open": true,
-        "order": 25,
-        "title": "블록 블라스트",
-        "units": [],
-        "unitsSet": false,
-        "url": "26.block-blast.html"
+      oblockblasto: {
+        omemoo: o8×8 보드 블록 퍼즐 / 줄 동시 제거 10×n² 점수(탐욕 vs 전체 최적화) · 2차원 배열 · 개인전o,
+        oopeno: true,
+        oordero: 25,
+        otitleo: o블록 블라스트o,
+        ounitso: [],
+        ounitsSeto: false,
+        ourlo: o26.block-blast.htmlo
       },
-      "freekick": {
-        "memo": "3D 축구 프리킥 10단계(18~25m 실제 규격 구장) / 조준·킥 종류·파워로 수비벽과 골키퍼를 뚫는 개인전 (방향키·WASD 조준, 1·2·3 킥, 스페이스 파워)",
-        "open": true,
-        "order": 26,
-        "title": "프리킥 챌린지",
-        "units": [],
-        "unitsSet": false,
-        "url": "27.freekick-challenge.html"
+      ofreekicko: {
+        omemoo: o3D 축구 프리킥 10단계(18~25m 실제 규격 구장) / 조준·킥 종류·파워로 수비벽과 골키퍼를 뚫는 개인전 (방향키·WASD 조준, 1·2·3 킥, 스페이스 파워)o,
+        oopeno: true,
+        oordero: 26,
+        otitleo: o프리킥 챌린지o,
+        ounitso: [],
+        ounitsSeto: false,
+        ourlo: o27.freekick-challenge.htmlo
       },
-      "basketball": {
-        "memo": "드래그로 던지는 농구 자유투 라운드제 개인전 / 40초 라운드·마지막 15초 피버 2배·3라운드부터 움직이는 골대 / 클린 슛 3점·뱅크 슛 2점 누적 점수로 통과 기준 넘기기",
-        "open": true,
-        "order": 27,
-        "title": "농구 자유투 챌린지",
-        "units": [],
-        "unitsSet": false,
-        "url": "28.basketball-freethrow.html"
+      obasketballo: {
+        omemoo: o드래그로 던지는 농구 자유투 라운드제 개인전 / 40초 라운드·마지막 15초 피버 2배·3라운드부터 움직이는 골대 / 클린 슛 3점·뱅크 슛 2점 누적 점수로 통과 기준 넘기기o,
+        oopeno: true,
+        oordero: 27,
+        otitleo: o농구 자유투 챌린지o,
+        ounitso: [],
+        ounitsSeto: false,
+        ourlo: o28.basketball-freethrow.htmlo
       },
-      "powerarrow": {
-        "memo": "누르면 장전, 놓으면 발사하는 1인칭 타이밍 양궁 개인전 / 흘러가는 나무 과녁 12라운드·라운드당 5발, 라운드마다 과녁이 빨라짐 / 라운드 합계가 통과 기준 아래면 탈락, 총점으로 기록",
-        "open": true,
-        "order": 28,
-        "title": "파워 애로우 챌린지",
-        "units": [],
-        "unitsSet": false,
-        "url": "29.power-arrow.html"
+      opowerarrowo: {
+        omemoo: o누르면 장전, 놓으면 발사하는 1인칭 타이밍 양궁 개인전 / 흘러가는 나무 과녁 12라운드·라운드당 5발, 라운드마다 과녁이 빨라짐 / 라운드 합계가 통과 기준 아래면 탈락, 총점으로 기록o,
+        oopeno: true,
+        oordero: 28,
+        otitleo: o파워 애로우 챌린지o,
+        ounitso: [],
+        ounitsSeto: false,
+        ourlo: o29.power-arrow.htmlo
       },
-      "teambattle": {
-        "memo": "방 코드로 모여 블루 vs 레드로 싸우는 3D 3v3 실시간 팀 대전(숲속 공터·강 건너기·던전 회랑·바람의 언덕 맵 선택) / 역할군별 캐릭터(전사: 광전사·기사·창술사 / 마법사: 주술사·네크로 / 원거리 딜러: 궁수·저격수·투척병 / 암살자: 은신자·자객) 중 선택, 역할군별 스킬 게이지·풀숲 숨기 / 쓰러지면 3초 뒤 부활, 1분 30초 뒤 킬 스코어가 높은 팀 승리",
-        "open": false,
-        "order": 29,
-        "title": "3v3 팀 배틀 아레나",
-        "units": [],
-        "unitsSet": false,
-        "url": "30.team-battle-arena.html"
+      oteambattleo: {
+        omemoo: o방 코드로 모여 블루 vs 레드로 싸우는 3D 3v3 실시간 팀 대전(숲속 공터·강 건너기·던전 회랑·바람의 언덕 맵 선택) / 역할군별 캐릭터(전사: 광전사·기사·창술사 / 마법사: 주술사·네크로 / 원거리 딜러: 궁수·저격수·투척병 / 암살자: 은신자·자객) 중 선택, 역할군별 스킬 게이지·풀숲 숨기 / 쓰러지면 3초 뒤 부활, 1분 30초 뒤 킬 스코어가 높은 팀 승리o,
+        oopeno: false,
+        oordero: 29,
+        otitleo: o3v3 팀 배틀 아레나o,
+        ounitso: [],
+        ounitsSeto: false,
+        ourlo: o30.team-battle-arena.htmlo
       },
-      "zombieoutbreak": {
-        "memo": "한밤중 2층 학교에서 2~5명이 방 코드로 모여 하는 3D 좀비 술래잡기 / 좀비 1명이 15초 뒤 출발, 닿으면 감염되어 좀비로 변신 / 3분 동안 살아남으면 인간 승리 (WASD 이동·방향키 시점·Q 뒤돌기·스페이스 대쉬)",
-        "open": false,
-        "order": 30,
-        "title": "미드나잇 좀비 아웃브레이크",
-        "units": [],
-        "unitsSet": false,
-        "url": "31.zombie-outbreak.html"
+      ozombieoutbreako: {
+        omemoo: o한밤중 2층 학교에서 2~5명이 방 코드로 모여 하는 3D 좀비 술래잡기 / 좀비 1명이 15초 뒤 출발, 닿으면 감염되어 좀비로 변신 / 3분 동안 살아남으면 인간 승리 (WASD 이동·방향키 시점·Q 뒤돌기·스페이스 대쉬)o,
+        oopeno: false,
+        oordero: 30,
+        otitleo: o미드나잇 좀비 아웃브레이크o,
+        ounitso: [],
+        ounitsSeto: false,
+        ourlo: o31.zombie-outbreak.htmlo
       },
-      "lasttile": {
-        "memo": "방 코드로 모여 2~6명이 겨루는 3D 발판 서바이벌 / 밟으면 무너지는 6×6 발판 3층, 밀치기·대시로 상대를 떨어뜨리고 끝까지 남기 / 달리던 관성 그대로 아래층에 착지, 맨 아래층에서 떨어지면 탈락 / 3판 누적 점수제, 혼자면 AI 1명과 시작",
-        "open": false,
-        "order": 31,
-        "title": "마지막 발판",
-        "units": [],
-        "unitsSet": false,
-        "url": "32.last-tile.html"
+      ocastlespyo: {
+        omemoo: o방 코드로 모여 4~6명이 즐기는 3D 추리 게임 / 용사는 성 안의 할 일을 끝내고 숨은 스파이는 몰래 처치 / 시체 신고·긴급 회의에서 토론 후 투표로 추방 / 내 캐릭터 꾸미기, AI를 추가해 연습 가능o,
+        oopeno: false,
+        oordero: 32,
+        otitleo: o성 안의 스파이o,
+        ounitso: [],
+        ounitsSeto: false,
+        ourlo: o33.castle-spy.htmlo
       },
-      "castlespy": {
-        "memo": "방 코드로 모여 4~6명이 즐기는 3D 추리 게임 / 용사는 성 안의 할 일을 끝내고 숨은 스파이는 몰래 처치 / 시체 신고·긴급 회의에서 토론 후 투표로 추방 / 내 캐릭터 꾸미기, AI를 추가해 연습 가능",
-        "open": false,
-        "order": 32,
-        "title": "성 안의 스파이",
-        "units": [],
-        "unitsSet": false,
-        "url": "33.castle-spy.html"
-      },
-      "lasttilev2": {
-        "memo": "방 코드로 모여 2~6명이 겨루는 3D 발판 서바이벌 (객체지향 TypeScript 로 새로 만든 버전) / 밟으면 무너지는 8×8 발판 3층, 밀치기·대시로 상대를 떨어뜨리고 끝까지 남기 / 달리던 관성 그대로 아래층에 착지, 맨 아래층에서 떨어지면 탈락 / 3판 누적 점수제, 혼자면 AI 1명과 시작",
-        "open": false,
-        "order": 33,
-        "title": "마지막 발판 (새 버전)",
-        "units": [],
-        "unitsSet": false,
-        "url": "34.last-tile-v2.html"
-      },
-      "minigames": {
-        "memo": "방 코드로 모여 2~6명이 여러 미니게임을 차례로 겨루는 3D 게임 모음 / 종목마다 순위 점수(5·3·2·1점)를 합산해 최종 우승자를 정함 / 중간에 들어오거나 탈락하면 진행 중인 판을 관전 / 혼자면 AI 1명과 시작 / 지금은 마지막 발판 1종목",
-        "open": false,
-        "order": 34,
-        "title": "미니게임 모음",
-        "units": [],
-        "unitsSet": false,
-        "url": "35.minigames.html"
+      ominigameso: {
+        omemoo: o방 코드로 모여 2~6명이 여러 미니게임을 차례로 겨루는 3D 게임 모음 / 종목마다 순위 점수(5·3·2·1점)를 합산해 최종 우승자를 정함 / 중간에 들어오거나 탈락하면 진행 중인 판을 관전 / 혼자면 AI 1명과 시작 / 지금은 마지막 발판 1종목o,
+        oopeno: false,
+        oordero: 34,
+        otitleo: o미니게임 모음o,
+        ounitso: [],
+        ounitsSeto: false,
+        ourlo: o32.minigames.htmlo
       }
     }
   }
