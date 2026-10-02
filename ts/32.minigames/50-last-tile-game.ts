@@ -84,6 +84,7 @@ class LastTileGame extends MiniGame {
     this.board = new BoardView(context.libs, this.stage.scene, scenery);
     this.board.build();
     this.floors = new FloorPresenter(this.board, context.page.byId("fade"), context.env);
+    this.floors.showTop();
     this.rig = new CameraRig(this.stage.camera, context.env);
     this.cursor = new SpectatorCursor(context.localId);
     const labels = new NameTagFactory(context.libs, context.page);
