@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<script charset="utf-8" src="firebase-config.js"></script>
+<script charset="utf-8" src="access-guard.js" data-game="castlespy"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>성 안의 스파이</title>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="정보 수업용 링크 모음">
+<meta property="og:title" content="성 안의 스파이">
+<meta property="og:description" content="방 코드로 모여 4~6명이 즐기는 3D 추리 게임 / 용사는 할 일을 끝내고, 숨은 스파이는 몰래 처치 / 시체 신고·긴급 회의에서 토론하고 투표로 스파이를 추방 / 내 캐릭터를 직접 꾸며서 참여 · AI를 추가해 연습 가능">
+<meta property="og:url" content="https://cornsilktea.github.io/33.castle-spy.html">
+<meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="theme.css">
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1.10.1/dist/es-module-shims.js"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  [hidden] { display: none !important; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #1A2236; font-family: var(--sg-font); color: #EEF0F4; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  button { font-family: inherit; cursor: pointer; }
+  input { font-family: inherit; }
+  #view { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+  .st-screen { --st-bg: 20, 18, 34; --st-panel: rgba(26, 22, 42, .86); --st-accent: #D97B4F; --st-title2: #F2C879; --st-glow: rgba(217, 123, 79, .6); }
+  .st-screen .st-title { font-style: italic; letter-spacing: -.5px; }
+  .st-card { margin-bottom: 14px; }
+  .st-screen input[type=text] { width: 100%; min-height: 48px; padding: 6px 12px; font-size: 18px; font-weight: 800; border-radius: 6px; border: 2px solid rgba(255, 255, 255, .3); background: rgba(255, 255, 255, .06); color: #fff; outline: 0; -webkit-user-select: text; user-select: text; }
+  .st-screen input[type=text]:focus { border-color: #D97B4F; }
+  .st-joinrow { display: flex; gap: 10px; margin-top: 10px; }
+  .st-joinrow input { flex: 1 1 auto; min-width: 0; text-align: center; letter-spacing: .3em; }
+  .st-joinrow .st-btn { flex: 0 0 34%; margin: 0; }
+  .st-msg { margin-top: 10px; min-height: 0; font-size: 14px; font-weight: 700; color: #FF9A8A; }
+  .st-msg:empty { display: none; }
+  .st-btn.sub { background: rgba(255, 255, 255, .06); border-color: rgba(255, 255, 255, .3); color: #EEF0F4; }
+  .st-btn.blue { background: #4C8DFF; border-color: #4C8DFF; color: #fff; }
+  .st-btn.slim { min-height: 42px; font-size: 16px; }
+  .codeBig { font-size: 34px; font-weight: 800; letter-spacing: .18em; color: #FFB08C; font-variant-numeric: tabular-nums; }
+  .plRow { display: flex; align-items: center; gap: 10px; padding: 8px 10px; margin-top: 6px; border-radius: 6px; background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .1); font-size: 16px; font-weight: 800; }
+  .plRow.me { border-color: #D97B4F; box-shadow: inset 0 0 0 1px #D97B4F; }
+  .plRow i { width: 14px; height: 14px; border-radius: 50%; flex: 0 0 auto; border: 2px solid rgba(255, 255, 255, .6); }
+  .plRow b { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .plRow small { color: #A9AFC2; font-size: 13px; font-weight: 700; white-space: nowrap; }
+  .rankDot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; border: 2px solid rgba(255, 255, 255, .6); }
+  .st-table tr.meRow td { background: rgba(217, 123, 79, .14); }
+  .endReason { margin-bottom: 12px; font-size: 17px; font-weight: 800; color: #FFD2B8; }
+
+  .hud-box { background: linear-gradient(135deg, rgba(16, 18, 28, .82), rgba(38, 42, 58, .72)); border: 1.5px solid rgba(255, 255, 255, .22); border-top: 3px solid #D97B4F; border-radius: 10px; padding: 6px 12px; color: #fff; font-weight: 800; font-variant-numeric: tabular-nums; text-shadow: 0 1px 3px rgba(0, 0, 0, .6); box-shadow: 0 4px 14px rgba(0, 0, 0, .3); }
+  .hud-box .lab { font-size: 11px; color: #DCE6D6; font-weight: 700; display: block; }
+  #gameUi { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 20; pointer-events: none; }
+  #gameUi button { pointer-events: auto; }
+  #hudRole { position: absolute; left: 10px; top: 54px; font-size: 15px; }
+  #hudRole.role-spy { border-top-color: #E5484D; color: #FFD2CC; }
+  #hudRole.role-hero { border-top-color: #4C8DFF; }
+  #hudTaskList { position: absolute; left: 10px; top: 102px; width: 230px; }
+  #hudTaskList .task { padding: 3px 0; font-size: 13px; }
+  #hudTaskList .task.done { color: #8E93A0; text-decoration: line-through; }
+  #hudProgress { position: absolute; left: 50%; top: 54px; transform: translateX(-50%); width: min(300px, 42vw); }
+  #hudProgress .bar { height: 10px; margin-top: 4px; border-radius: 5px; background: rgba(255, 255, 255, .16); overflow: hidden; }
+  #hudProgress .bar i { display: block; height: 100%; width: 0; background: #5DBB63; transition: width .3s; }
+  #banner { position: absolute; left: 50%; top: 112px; transform: translateX(-50%); max-width: 70vw; text-align: center; }
+  #banner .hud-box { display: inline-block; font-size: 16px; border-top-color: #FF6B5A; }
+  #roleReveal { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: rgba(8, 10, 18, .78); text-align: center; padding: 20px; }
+  #roleReveal h1 { font-size: clamp(40px, 9vw, 76px); font-style: italic; text-shadow: 0 4px 0 rgba(0, 0, 0, .5); }
+  #roleReveal h1.spy { color: #FF6B5A; }
+  #roleReveal h1.hero { color: #7FB2FF; }
+  #roleReveal p { font-size: 20px; font-weight: 800; color: #EEF0F4; }
+  .actBtn { position: absolute; width: 88px; height: 88px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, .55); background: rgba(20, 20, 36, .78); color: #fff; font-size: 17px; font-weight: 800; touch-action: none; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+  .actBtn i { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: rgba(0, 0, 0, .6); }
+  .actBtn span { position: relative; }
+  #btnUse { right: 18px; bottom: calc(env(safe-area-inset-bottom, 0px) + 96px); background: rgba(76, 141, 255, .85); }
+  #btnReport { right: 112px; bottom: calc(env(safe-area-inset-bottom, 0px) + 28px); background: rgba(240, 194, 46, .88); color: #1A1A1A; }
+  #btnKill { right: 18px; bottom: calc(env(safe-area-inset-bottom, 0px) + 200px); background: rgba(150, 40, 48, .85); }
+  #btnKill.ready { border-color: #FFD2CC; box-shadow: 0 0 18px rgba(255, 90, 90, .8); background: rgba(229, 72, 77, .95); }
+  #joyZone { position: fixed; left: 0; bottom: 0; width: 46%; height: 58%; z-index: 18; touch-action: none; }
+  #joyBase { position: fixed; width: 110px; height: 110px; margin: -55px 0 0 -55px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, .32); background: rgba(255, 255, 255, .08); z-index: 19; pointer-events: none; }
+  #joyKnob { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; background: rgba(217, 123, 79, .85); border: 2px solid #fff; }
+
+  #taskOverlay { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 30; display: flex; align-items: center; justify-content: center; background: rgba(8, 10, 18, .7); padding: 16px; }
+  .task-card { width: min(420px, 100%); padding: 20px; border-radius: 10px; background: rgba(26, 22, 42, .96); border: 1.5px solid rgba(255, 255, 255, .22); border-top: 4px solid #F2C879; text-align: center; }
+  .task-card h2 { margin-bottom: 12px; font-size: 22px; color: #F2C879; }
+  .task-tip { margin-bottom: 14px; font-size: 16px; font-weight: 800; color: #CDD2DC; }
+  .task-hold { width: 100%; min-height: 96px; font-size: 24px; font-weight: 800; border-radius: 10px; border: 3px solid rgba(255, 255, 255, .5); background: #D97B4F; color: #fff; touch-action: none; }
+  .task-hold:active { filter: brightness(.88); }
+  .task-bar { height: 14px; margin-top: 14px; border-radius: 7px; background: rgba(255, 255, 255, .16); overflow: hidden; }
+  .task-bar i { display: block; height: 100%; width: 0; background: #5DBB63; }
+  .task-seq { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .task-seq button { min-height: 76px; font-size: 30px; font-weight: 800; border-radius: 10px; border: 3px solid rgba(255, 255, 255, .4); background: rgba(255, 255, 255, .08); color: #fff; }
+  .task-seq button.on { background: #5DBB63; border-color: #5DBB63; color: #0E1A10; }
+  .task-seq button.wrong { background: #E5484D; border-color: #E5484D; }
+  .task-track { position: relative; height: 44px; margin-bottom: 16px; border-radius: 8px; background: rgba(255, 255, 255, .12); overflow: hidden; }
+  .task-zone { position: absolute; top: 0; bottom: 0; background: rgba(93, 187, 99, .75); }
+  .task-cursor { position: absolute; top: 0; bottom: 0; width: 8px; margin-left: -4px; background: #fff; box-shadow: 0 0 8px rgba(255, 255, 255, .9); }
+  .task-msg { min-height: 24px; margin-top: 10px; font-size: 16px; font-weight: 800; color: #FFD2B8; }
+  .task-done { padding: 30px 0; font-size: 34px; font-weight: 800; color: #7BE08A; }
+  .task-close { margin-top: 16px; }
+
+  #meetingScreen { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 35; overflow-y: auto; padding: 54px 16px 24px; background: rgba(12, 10, 24, .93); }
+  #meetingScreen .wrap { max-width: 640px; margin: 0 auto; text-align: center; }
+  #meetingTitle { font-size: clamp(22px, 4.6vw, 32px); font-weight: 800; color: #FFB08C; }
+  #meetingPhase { margin: 6px 0 16px; font-size: 18px; font-weight: 800; color: #F2C879; }
+  #meetingCards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .mv-card { position: relative; display: flex; align-items: center; gap: 10px; padding: 12px; min-height: 64px; border-radius: 8px; text-align: left; background: rgba(255, 255, 255, .07); border: 2px solid rgba(255, 255, 255, .16); font-size: 18px; font-weight: 800; cursor: pointer; }
+  .mv-card i { width: 18px; height: 18px; flex: 0 0 auto; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .7); }
+  .mv-card b { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mv-card small { color: #E5484D; font-size: 12px; }
+  .mv-card em { font-style: normal; font-size: 13px; padding: 2px 8px; border-radius: 999px; background: rgba(255, 255, 255, .16); color: #FFE9B8; }
+  .mv-card.locked { cursor: default; }
+  .mv-card.dead { opacity: .45; }
+  .mv-card.picked { border-color: #D97B4F; background: rgba(217, 123, 79, .26); }
+  #btnSkipVote { margin-top: 14px; }
+  #btnSkipVote.picked { border-color: #D97B4F; }
+  #meetingResult { margin-top: 18px; padding: 14px; border-radius: 8px; background: rgba(217, 123, 79, .2); border: 2px solid #D97B4F; font-size: 22px; font-weight: 800; color: #FFD2B8; }
+  @media (max-width: 760px) {
+    #hudTaskList { width: 170px; top: 96px; }
+    #hudProgress { top: 54px; width: 40vw; }
+    #banner { top: 108px; max-width: 54vw; }
+    #meetingCards { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+
+<div id="gameUi" hidden>
+  <div id="hudRole" class="hud-box" hidden></div>
+  <div id="hudTaskList" class="hud-box"></div>
+  <div id="hudProgress" class="hud-box"><span class="lab" id="hudProgressText">할 일 0 / 0</span><div class="bar"><i id="hudProgressFill"></i></div></div>
+  <div id="banner" hidden><div class="hud-box" id="bannerBox"></div></div>
+  <div id="roleReveal" hidden></div>
+  <button type="button" class="actBtn" id="btnUse" hidden><span>할 일</span></button>
+  <button type="button" class="actBtn" id="btnReport" hidden><span>신고</span></button>
+  <button type="button" class="actBtn" id="btnKill" hidden><i id="btnKillCooldown"></i><span>처치</span></button>
+</div>
+<div id="joyZone" hidden></div>
+<div id="joyBase" hidden><div id="joyKnob"></div></div>
+<div id="taskOverlay" hidden></div>
+
+<div id="meetingScreen" hidden>
+  <div class="wrap">
+    <div id="meetingTitle"></div>
+    <div id="meetingPhase"></div>
+    <div id="meetingCards"></div>
+    <button type="button" class="st-btn sub slim" id="btnSkipVote">건너뛰기</button>
+    <div id="meetingResult" hidden></div>
+  </div>
+</div>
+
+<div id="startScreen" class="st-screen">
+  <div class="st-wrap">
+    <div class="st-hero"><h1 class="st-title">성 안의 스파이</h1></div>
+    <div class="st-card">
+      <button type="button" class="st-btn primary" id="btnCreate">방 만들기</button>
+      <div class="st-joinrow">
+        <input type="text" id="joinCode" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="방 코드 5자리">
+        <button type="button" class="st-btn blue" id="btnJoin">참여하기</button>
+      </div>
+      <div class="st-msg" id="startMsg"></div>
+      <div class="st-hint" id="loadNote">캐릭터를 불러오는 중…</div>
+    </div>
+    <div class="st-card">
+      <h2>내 캐릭터</h2>
+      <div id="profileHost"></div>
+    </div>
+    <div class="st-card">
+      <h2>조작 방법</h2>
+      <div class="st-keys">
+        <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd></span><span>이동</span>
+        <span><kbd>E</kbd> <kbd>스페이스</kbd></span><span>할 일 하기 · 회의 탁자에서 긴급 회의</span>
+        <span><kbd>R</kbd></span><span>시체 신고</span>
+        <span><kbd>Q</kbd></span><span>(스파이) 가까운 용사 처치 · 쿨타임 20초</span>
+        <span><kbd>태블릿</kbd></span><span>왼쪽 화면을 눌러 끌면 조이스틱, 오른쪽 아래 버튼으로 행동</span>
+      </div>
+    </div>
+    <div class="st-card">
+      <h2>규칙</h2>
+      <ul class="st-rules">
+        <li>4~6명이 한 방에 모여요. 한 명은 몰래 <b>스파이</b>, 나머지는 <b>용사</b>가 됩니다. 역할은 시작할 때 나만 알아요.</li>
+        <li><b>용사</b>는 성 안을 돌아다니며 내 <b>할 일 3개</b>를 끝내요. 모두의 할 일이 다 끝나면 용사 승리!</li>
+        <li><b>스파이</b>는 아무도 안 볼 때 용사를 <b>처치</b>해요. 살아남은 용사 수와 스파이 수가 같아지면 스파이 승리!</li>
+        <li><b>시체를 발견해 신고</b>하거나 <b>회의 탁자</b>에서 긴급 회의를 열 수 있어요. 말로 토론한 뒤 한 명을 투표로 <b>추방</b>해요.</li>
+        <li>처치당하거나 추방된 사람은 <b>유령</b>이 되어 벽을 통과하며 남은 할 일을 도울 수 있어요. 내 주변만 보여요.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div id="lobbyScreen" class="st-screen" hidden>
+  <div class="st-wrap">
+    <div class="st-hero"><h1 class="st-title">성 안의 스파이</h1></div>
+    <div class="st-card">
+      <h2>대기실 <span class="codeBig" id="lobbyCode">00000</span></h2>
+      <div id="lobbyPlayers"></div>
+      <div id="botRow" class="st-row" hidden style="margin-top:12px">
+        <button type="button" class="st-btn sub slim" id="btnAddBot">AI 추가</button>
+        <button type="button" class="st-btn sub slim" id="btnRemoveBot">AI 빼기</button>
+      </div>
+      <div id="mapRow" hidden style="margin-top:12px"><label class="st-label">맵</label><div class="st-opts" id="mapOpts"></div></div>
+      <button type="button" class="st-btn primary" id="btnStart" style="margin-top:14px">게임 시작</button>
+      <div class="st-hint" id="lobbyHint"></div>
+      <div class="st-row" style="margin-top:10px"><button type="button" class="st-btn sub slim" id="btnLeave">방 나가기</button></div>
+    </div>
+    <div class="st-card">
+      <h2>내 캐릭터</h2>
+      <div id="lobbyProfileHost"></div>
+    </div>
+  </div>
+</div>
+
+<div id="endScreen" class="st-screen" hidden>
+  <div class="st-wrap">
+    <div class="st-hero"><h1 class="st-title" id="endTitle">결과</h1></div>
+    <div class="st-card">
+      <div class="endReason" id="endReason"></div>
+      <table class="st-table"><thead><tr><th>이름</th><th>역할</th><th>결과</th></tr></thead><tbody id="endRows"></tbody></table>
+      <button type="button" class="st-btn primary" id="btnToLobby" style="margin-top:14px" hidden>대기실로</button>
+      <div class="st-hint" id="endHint"></div>
+      <button type="button" class="st-btn sub slim" id="btnEndLeave" style="margin-top:10px">방 나가기</button>
+    </div>
+  </div>
+</div>
+
+<script charset="utf-8" src="character-kit.js"></script>
+<script charset="utf-8" src="33.castle-spy.js"></script>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
+new CastleSpyGame({ THREE, GLTFLoader, SkeletonUtils });
+</script>
+</body>
+</html>

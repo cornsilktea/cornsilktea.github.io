@@ -25,7 +25,10 @@
 - `.ts` 파일은 `import`/`export` 를 쓰지 않는 스크립트 모양이다(`module: es2020`, 모듈 감지는 자동). 공용 모듈을 나누려면 선생님께 먼저 묻는다.
 - 기존 인라인 스크립트 자료를 TS 로 옮기는 것은 선생님이 요청할 때만 한다. 옮길 때는 동작이 같은지 브라우저에서 먼저 확인한다(1번 전환 때처럼).
 - 새 파일에는 "주석 없이 이름으로 설명" 규칙이 그대로 적용된다. 객체지향 규칙(위)도 함께 지킨다.
-- Node 와 TypeScript 는 `package.json` 의 개발 의존성이다. 새 컴퓨터에서는 `npm install` 한 번이면 된다(`node_modules/` 는 gitignore).
+- Node 와 TypeScript 는 `package.json` 의 개발 의존성이다. 새 컴퓨터에서는 `npm install` 한 번이면 된다(`node_modules/` 는 gitignore). Node 자체가 없으면 `winget install OpenJS.NodeJS.LTS`.
+  three 타입은 `@types/three`(개발 의존성)이고 `tsconfig.json` 은 `moduleResolution: bundler`·`skipLibCheck` 를 쓴다. 3D 자료는 HTML 의 `<script type="module">` 에서 three 를 가져와 `new 게임클래스({THREE, GLTFLoader, SkeletonUtils})` 로 넘긴다(`ThreeLibs`, 33번 참고).
+- **공용 캐릭터 만들기는 `ts/character-kit.ts`**(2026-10-02 선생님 요청, 33번이 첫 사용). 닉네임·외형(`PlayerProfile`, 기기 저장 `portal_profile_v1`)과 6종 캐릭터 꾸미기 화면(`ProfileEditor`)·3D 모델 만들기(`CharacterModelFactory`)를 클래스로 묶었다.
+  앞으로 모든 게임이 같은 외형을 쓰고, 게임 선택 화면에서 닉네임·캐릭터를 정하게 할 계획이다(아직 안 함). 새 3D 게임은 이 모듈로 캐릭터를 만든다. 사용법·클래스 표는 `33.castle-spy-notes.md` 2절. 32번은 옛 코드 그대로 둔다.
 
 # 수업 자료 저장소 작업 지침
 
@@ -105,6 +108,7 @@
 
 - **30번(팀 배틀) 작업은 시작 전에 반드시 `30.team-battle-notes.md` 를 읽는다.** 구조·규칙·캐릭터 추가 순서(`admin.html` 통계표·`데이터베이스규칙.json` 포함)·클래스 구조(9·10절)·검사 방법이 모두 거기 있고, 30번 규칙을 새로 정하거나 바꾸면 이 파일이 아니라 그 노트에 적는다.
   끝나면 `&test`·`&sim` 해시로 확인한다.
+- **33번(성 안의 스파이) 작업은 시작 전에 `33.castle-spy-notes.md` 를 읽는다.** 규칙·클래스 지도·Firebase 구조·검사 방법이 거기 있다.
 
 ## 환경
 

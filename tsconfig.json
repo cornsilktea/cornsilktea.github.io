@@ -1,10 +1,12 @@
-﻿{
+{
   "compilerOptions": {
     "target": "ES2020",
     "module": "es2020",
+    "moduleResolution": "bundler",
     "lib": ["ES2020", "DOM"],
     "strict": true,
     "noEmitOnError": true,
+    "skipLibCheck": true,
     "rootDir": "ts",
     "outDir": ".",
     "types": []
@@ -12,4 +14,3 @@
   "include": ["ts/**/*.ts"],
   "exclude": ["node_modules"]
 }
-

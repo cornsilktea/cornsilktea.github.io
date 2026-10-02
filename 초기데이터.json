@@ -219,7 +219,7 @@
       "pianotiles": {
         "memo": "타이밍·이벤트 입력 판정(±50ms/±120ms) / 쉬움 3곡·보통 3곡·어려움 2곡·매우 어려움 1곡 개인전",
         "open": false,
-        "order": 22.0,
+        "order": 22,
         "title": "피아노 타일",
         "units": [],
         "unitsSet": false,
@@ -305,6 +305,15 @@
         "units": [],
         "unitsSet": false,
         "url": "32.last-tile.html"
+      },
+      "castlespy": {
+        "memo": "방 코드로 모여 4~6명이 즐기는 3D 추리 게임 / 용사는 성 안의 할 일을 끝내고 숨은 스파이는 몰래 처치 / 시체 신고·긴급 회의에서 토론 후 투표로 추방 / 내 캐릭터 꾸미기, AI를 추가해 연습 가능",
+        "open": false,
+        "order": 32,
+        "title": "성 안의 스파이",
+        "units": [],
+        "unitsSet": false,
+        "url": "33.castle-spy.html"
       }
     }
   }
