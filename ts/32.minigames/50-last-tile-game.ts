@@ -274,6 +274,34 @@ class LastTileGame extends MiniGame {
   }
 }
 
+class LastTileBackdrop extends GameBackdrop {
+  private static readonly TOP_FLOOR = LastTileRules.FLOOR_COUNT - 1;
+
+  private readonly stage: LastTileScene;
+  private readonly board: BoardView;
+  private readonly rig: CameraRig;
+  private readonly emptyBoard = TileBoard.inactive();
+
+  constructor(private readonly context: BackdropContext, scenery: SceneryKit) {
+    super();
+    this.stage = new LastTileScene(context.libs);
+    this.board = new BoardView(context.libs, this.stage.scene, scenery);
+    this.board.build();
+    this.board.showUpTo(LastTileBackdrop.TOP_FLOOR);
+    this.rig = new CameraRig(this.stage.camera, context.env);
+  }
+
+  render(dt: number): void {
+    this.board.render(this.emptyBoard, this.context.clock.now(), LastTileBackdrop.TOP_FLOOR);
+    this.rig.showcase();
+    this.context.render.render(this.stage.scene, this.stage.camera);
+  }
+
+  dispose(): void {
+    this.stage.releaseMaterials();
+  }
+}
+
 class LastTileDefinition extends GameDefinition {
   readonly id = "lasttile";
   readonly title = "마지막 발판";
@@ -305,5 +333,9 @@ class LastTileDefinition extends GameDefinition {
 
   create(context: MiniGameContext): MiniGame {
     return new LastTileGame(context, this.scenery);
+  }
+
+  createBackdrop(context: BackdropContext): GameBackdrop {
+    return new LastTileBackdrop(context, this.scenery);
   }
 }

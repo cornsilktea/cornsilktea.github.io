@@ -72,6 +72,31 @@ class GameRuntime implements ActionSink {
   }
 }
 
+class MenuBackdropDirector {
+  private current: GameBackdrop | null = null;
+  private ready = false;
+
+  constructor(private readonly catalog: GameCatalog, private readonly context: BackdropContext, private readonly random: RandomSource) {}
+
+  markReady(): void {
+    this.ready = true;
+  }
+
+  render(dt: number): void {
+    if (!this.current && this.ready) {
+      const definition = this.catalog.pickRandom(this.random);
+      this.current = definition ? definition.createBackdrop(this.context) : null;
+    }
+    if (this.current) this.current.render(dt);
+    else this.context.render.clear();
+  }
+
+  release(): void {
+    if (this.current) this.current.dispose();
+    this.current = null;
+  }
+}
+
 interface CollectionSessionAccess {
   session(): CollectionSession | null;
 }
@@ -84,6 +109,7 @@ interface CollectionServices extends CollectionSessionAccess {
   readonly messages: MessageView;
   readonly hub: ActionHub;
   readonly render: RenderHost;
+  readonly backdrops: MenuBackdropDirector;
   readonly catalog: GameCatalog;
   readonly lobbyView: CollectionLobbyView;
   readonly resultView: CollectionResultView;
@@ -129,7 +155,7 @@ class CollectionPhaseMachine {
 
 abstract class MenuScreenPhase extends CollectionPhase {
   update(dt: number, draw: boolean): void {
-    if (draw) this.services.render.clear();
+    if (draw) this.services.backdrops.render(dt);
   }
 
   protected showMenu(screen: CollectionScreenName, profileHost: HTMLElement): void {
@@ -162,6 +188,7 @@ class PlayScreenPhase extends CollectionPhase {
   private rosterClock = 0;
 
   enter(): void {
+    this.services.backdrops.release();
     this.services.screens.show("game");
     this.services.profilePanel.setActive(false);
     this.rosterClock = PlayScreenPhase.ROSTER_REFRESH_SECONDS;

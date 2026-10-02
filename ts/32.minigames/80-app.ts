@@ -19,6 +19,7 @@ class MiniGamesApp {
   private readonly startView = new StartView(this.page);
   private readonly editor: ProfileEditor;
   private readonly profilePanel: ProfilePanel;
+  private readonly backdrops: MenuBackdropDirector;
   private readonly phases = new CollectionPhaseMachine();
   private readonly flow: CollectionFlow;
   private readonly startPhase: CollectionPhase;
@@ -31,6 +32,7 @@ class MiniGamesApp {
     this.factory = new CharacterModelFactory(libs, this.assets);
     this.catalog = new GameCatalog([new LastTileDefinition(libs)]);
     this.render = new RenderHost(libs, this.page.byId<HTMLCanvasElement>("view"), this.env);
+    this.backdrops = new MenuBackdropDirector(this.catalog, { libs, env: this.env, clock: this.backend.clock, render: this.render }, this.randomSource);
     this.editor = new ProfileEditor(libs, this.factory, this.assets, this.profile);
     this.profilePanel = new ProfilePanel(this.editor);
     const wiring = this.wire();
@@ -64,7 +66,7 @@ class MiniGamesApp {
     const lobbyView = new CollectionLobbyView(this.page, this.catalog);
     const resultView = new CollectionResultView(this.page, this.catalog);
     const services: CollectionServices = {
-      clock: this.backend.clock, screens, runtime, hud: new CollectionHud(this.page), messages, hub, render: this.render, catalog: this.catalog,
+      clock: this.backend.clock, screens, runtime, hud: new CollectionHud(this.page), messages, hub, render: this.render, backdrops: this.backdrops, catalog: this.catalog,
       lobbyView, resultView, profilePanel: this.profilePanel,
       startProfileHost: this.page.byId("profileHost"), lobbyProfileHost: this.page.byId("lobbyProfileHost"),
       localId: this.localId, session: () => this.flow.session(), directory: { lookup: (id) => this.flow.lookup(id) }
@@ -84,6 +86,7 @@ class MiniGamesApp {
     try {
       await Promise.all([this.assets.load(), this.catalog.preloadAll()]);
       this.assetsReady = true;
+      this.backdrops.markReady();
       this.startView.showLoadNote("");
       this.profilePanel.markReady();
       this.updateStartButtons();

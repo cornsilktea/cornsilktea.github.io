@@ -240,6 +240,27 @@ class LastTileGame extends MiniGame {
 }
 LastTileGame.SUDDEN_DEATH_MESSAGE = "서든데스! 위층 바깥부터 무너집니다";
 LastTileGame.SPECTATOR_MESSAGE = "관전 중 · 다음 종목부터 함께해요";
+class LastTileBackdrop extends GameBackdrop {
+    constructor(context, scenery) {
+        super();
+        this.context = context;
+        this.emptyBoard = TileBoard.inactive();
+        this.stage = new LastTileScene(context.libs);
+        this.board = new BoardView(context.libs, this.stage.scene, scenery);
+        this.board.build();
+        this.board.showUpTo(LastTileBackdrop.TOP_FLOOR);
+        this.rig = new CameraRig(this.stage.camera, context.env);
+    }
+    render(dt) {
+        this.board.render(this.emptyBoard, this.context.clock.now(), LastTileBackdrop.TOP_FLOOR);
+        this.rig.showcase();
+        this.context.render.render(this.stage.scene, this.stage.camera);
+    }
+    dispose() {
+        this.stage.releaseMaterials();
+    }
+}
+LastTileBackdrop.TOP_FLOOR = LastTileRules.FLOOR_COUNT - 1;
 class LastTileDefinition extends GameDefinition {
     constructor(libs) {
         super();
@@ -266,5 +287,8 @@ class LastTileDefinition extends GameDefinition {
     }
     create(context) {
         return new LastTileGame(context, this.scenery);
+    }
+    createBackdrop(context) {
+        return new LastTileBackdrop(context, this.scenery);
     }
 }

@@ -63,6 +63,33 @@ class GameRuntime {
         this.shell.render.clear();
     }
 }
+class MenuBackdropDirector {
+    constructor(catalog, context, random) {
+        this.catalog = catalog;
+        this.context = context;
+        this.random = random;
+        this.current = null;
+        this.ready = false;
+    }
+    markReady() {
+        this.ready = true;
+    }
+    render(dt) {
+        if (!this.current && this.ready) {
+            const definition = this.catalog.pickRandom(this.random);
+            this.current = definition ? definition.createBackdrop(this.context) : null;
+        }
+        if (this.current)
+            this.current.render(dt);
+        else
+            this.context.render.clear();
+    }
+    release() {
+        if (this.current)
+            this.current.dispose();
+        this.current = null;
+    }
+}
 class CollectionPhase {
     constructor(services) {
         this.services = services;
@@ -96,7 +123,7 @@ class CollectionPhaseMachine {
 class MenuScreenPhase extends CollectionPhase {
     update(dt, draw) {
         if (draw)
-            this.services.render.clear();
+            this.services.backdrops.render(dt);
     }
     showMenu(screen, profileHost) {
         this.services.screens.show(screen);
@@ -126,6 +153,7 @@ class PlayScreenPhase extends CollectionPhase {
         this.rosterClock = 0;
     }
     enter() {
+        this.services.backdrops.release();
         this.services.screens.show("game");
         this.services.profilePanel.setActive(false);
         this.rosterClock = PlayScreenPhase.ROSTER_REFRESH_SECONDS;

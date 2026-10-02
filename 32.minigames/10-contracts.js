@@ -10,6 +10,8 @@ class MiniGame {
         return this.context.participants.some((participant) => participant.id === this.context.localId);
     }
 }
+class GameBackdrop {
+}
 class GameDefinition {
 }
 class GameCatalog {
@@ -24,6 +26,11 @@ class GameCatalog {
     }
     find(id) {
         return this.definitions.find((definition) => definition.id === id) || null;
+    }
+    pickRandom(random) {
+        if (this.definitions.length === 0)
+            return null;
+        return this.definitions[Math.min(this.definitions.length - 1, Math.floor(random.next() * this.definitions.length))];
     }
     preloadAll() {
         return Promise.all(this.definitions.map((definition) => definition.preload())).then(() => undefined);

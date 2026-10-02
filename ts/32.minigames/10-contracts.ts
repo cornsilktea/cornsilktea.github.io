@@ -109,6 +109,18 @@ abstract class MiniGame {
   }
 }
 
+interface BackdropContext {
+  readonly libs: ThreeLibs;
+  readonly env: BrowserEnv;
+  readonly clock: Clock;
+  readonly render: RenderHost;
+}
+
+abstract class GameBackdrop {
+  abstract render(dt: number): void;
+  abstract dispose(): void;
+}
+
 abstract class GameDefinition {
   abstract readonly id: string;
   abstract readonly title: string;
@@ -118,6 +130,7 @@ abstract class GameDefinition {
 
   abstract preload(): Promise<void>;
   abstract create(context: MiniGameContext): MiniGame;
+  abstract createBackdrop(context: BackdropContext): GameBackdrop;
 }
 
 class GameCatalog {
@@ -133,6 +146,11 @@ class GameCatalog {
 
   find(id: string): GameDefinition | null {
     return this.definitions.find((definition) => definition.id === id) || null;
+  }
+
+  pickRandom(random: RandomSource): GameDefinition | null {
+    if (this.definitions.length === 0) return null;
+    return this.definitions[Math.min(this.definitions.length - 1, Math.floor(random.next() * this.definitions.length))];
   }
 
   preloadAll(): Promise<void> {
