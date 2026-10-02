@@ -314,6 +314,15 @@
         "units": [],
         "unitsSet": false,
         "url": "33.castle-spy.html"
+      },
+      "lasttilev2": {
+        "memo": "방 코드로 모여 2~6명이 겨루는 3D 발판 서바이벌 (객체지향 TypeScript 로 새로 만든 버전) / 밟으면 무너지는 8×8 발판 3층, 밀치기·대시로 상대를 떨어뜨리고 끝까지 남기 / 달리던 관성 그대로 아래층에 착지, 맨 아래층에서 떨어지면 탈락 / 3판 누적 점수제, 혼자면 AI 1명과 시작",
+        "open": false,
+        "order": 33,
+        "title": "마지막 발판 (새 버전)",
+        "units": [],
+        "unitsSet": false,
+        "url": "34.last-tile-v2.html"
       }
     }
   }

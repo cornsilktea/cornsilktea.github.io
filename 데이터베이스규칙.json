@@ -16,6 +16,12 @@
         "$room": { ".write": "$room.matches(/^[0-9]{5}$/)" }
       }
     },
+    "lasttilev2": {
+      ".read": true,
+      "rooms": {
+        "$room": { ".write": "$room.matches(/^[0-9]{5}$/)" }
+      }
+    },
     "teambattle": {
       ".read": true,
       "rooms": {

@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<script charset="utf-8" src="firebase-config.js"></script>
+<script charset="utf-8" src="access-guard.js" data-game="lasttilev2"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>마지막 발판 (새 버전)</title>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="정보 수업용 링크 모음">
+<meta property="og:title" content="마지막 발판 (새 버전)">
+<meta property="og:description" content="방 코드로 모여 2~6명이 겨루는 3D 발판 서바이벌 / 밟으면 무너지는 8×8 발판 3층, 밀치기와 대시로 상대를 떨어뜨리고 끝까지 남기 / 낙하 관성으로 아래층에 착지 / 3판 누적 점수제 · 혼자면 AI 1명과 시작 / 객체지향 TypeScript 로 새로 만든 버전">
+<meta property="og:url" content="https://cornsilktea.github.io/34.last-tile-v2.html">
+<meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="theme.css">
+<script src="quality-governor.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1.10.1/dist/es-module-shims.js"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  [hidden] { display: none !important; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #141826; font-family: var(--sg-font); color: #EEF0F4; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  button { font-family: inherit; cursor: pointer; }
+  input { font-family: inherit; }
+  #view { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #fade { position: fixed; top: 0; right: 0; bottom: 0; left: 0; background: #0C0F18; opacity: 0; pointer-events: none; z-index: 15; transition: opacity .15s linear; }
+
+  .st-screen { --st-bg: 14, 14, 28; --st-panel: rgba(20, 20, 36, .84); --st-accent: #D97B4F; --st-title2: #F2C879; --st-glow: rgba(217, 123, 79, .6); }
+  .st-screen .st-title { font-style: italic; letter-spacing: -.5px; }
+  .st-card { margin-bottom: 14px; }
+  .st-screen input[type=text] { width: 100%; min-height: 48px; padding: 6px 12px; font-size: 18px; font-weight: 800; border-radius: 6px; border: 2px solid rgba(255, 255, 255, .3); background: rgba(255, 255, 255, .06); color: #fff; outline: 0; -webkit-user-select: text; user-select: text; }
+  .st-screen input[type=text]:focus { border-color: #D97B4F; }
+  .st-joinrow { display: flex; gap: 10px; margin-top: 10px; }
+  .st-joinrow input { flex: 1 1 auto; min-width: 0; text-align: center; letter-spacing: .3em; }
+  .st-joinrow .st-btn { flex: 0 0 34%; margin: 0; }
+  .st-msg { margin-top: 10px; min-height: 0; font-size: 14px; font-weight: 700; color: #FF9A8A; }
+  .st-msg:empty { display: none; }
+  .st-btn.sub { background: rgba(255, 255, 255, .06); border-color: rgba(255, 255, 255, .3); color: #EEF0F4; }
+  .st-btn.blue { background: #4C8DFF; border-color: #4C8DFF; color: #fff; }
+  .st-btn.slim { min-height: 42px; font-size: 16px; }
+  .codeBig { font-size: 34px; font-weight: 800; letter-spacing: .18em; color: #FFB08C; font-variant-numeric: tabular-nums; }
+  .plRow { display: flex; align-items: center; gap: 10px; padding: 8px 10px; margin-top: 6px; border-radius: 6px; background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .1); font-size: 16px; font-weight: 800; }
+  .plRow.me { border-color: #D97B4F; box-shadow: inset 0 0 0 1px #D97B4F; }
+  .plRow i { width: 14px; height: 14px; border-radius: 50%; flex: 0 0 auto; border: 2px solid rgba(255, 255, 255, .6); }
+  .plRow b { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .plRow small { color: #A9AFC2; font-size: 13px; font-weight: 700; white-space: nowrap; }
+  .aiNote { margin-top: 10px; padding: 8px 10px; border-radius: 6px; background: rgba(217, 123, 79, .16); border: 1px solid rgba(217, 123, 79, .5); color: #FFD2B8; font-size: 14px; font-weight: 700; }
+  .rankDot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; border: 2px solid rgba(255, 255, 255, .6); }
+  .st-table td.n, .st-table th.n { text-align: right; }
+  .st-table tr.meRow td { background: rgba(217, 123, 79, .14); }
+  .nextIn { margin-top: 12px; text-align: center; font-size: 15px; font-weight: 800; color: #FFB08C; }
+
+  .hud-box { background: linear-gradient(135deg, rgba(16, 18, 28, .82), rgba(38, 42, 58, .72)); border: 1.5px solid rgba(255, 255, 255, .22); border-top: 3px solid #D97B4F; border-radius: 10px; padding: 6px 12px; color: #fff; font-weight: 800; font-variant-numeric: tabular-nums; text-shadow: 0 1px 3px rgba(0, 0, 0, .6); box-shadow: 0 4px 14px rgba(0, 0, 0, .3); }
+  .hud-box .lab { font-size: 11px; color: #DCE6D6; font-weight: 700; display: block; }
+  #hudList { position: fixed; left: 10px; top: 54px; z-index: 20; width: 200px; pointer-events: none; }
+  #hudList .pl { display: flex; align-items: center; gap: 6px; padding: 3px 0; font-size: 13px; }
+  #hudList .pl i { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; border: 1.5px solid rgba(255, 255, 255, .7); }
+  #hudList .pl b { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 800; }
+  #hudList .pl span { font-size: 12px; color: #DCE6D6; white-space: nowrap; }
+  #hudList .pl.me { border-left: 3px solid #D97B4F; padding-left: 5px; margin-left: -8px; }
+  #hudList .pl.dead { color: #8E93A0; }
+  #hudList .pl.dead b { text-decoration: line-through; }
+  #hudList .pl.dead span { color: #8E93A0; }
+  #hudFloors { margin-top: 6px; padding-top: 5px; border-top: 1px solid rgba(255, 255, 255, .18); font-size: 11px; color: #DCE6D6; font-weight: 700; }
+  #hudRight { position: fixed; right: 10px; top: 54px; z-index: 20; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; pointer-events: none; }
+  #hudRight .hud-box { min-width: 132px; }
+  #hudRight .big { font-size: 22px; line-height: 1.1; }
+  .cdRow { display: flex; align-items: center; gap: 8px; margin-top: 4px; font-size: 13px; }
+  .cdRow span { flex: 0 0 auto; width: 54px; }
+  .cdBar { flex: 1 1 auto; height: 8px; border-radius: 4px; background: rgba(255, 255, 255, .16); overflow: hidden; }
+  .cdBar i { display: block; height: 100%; width: 100%; background: #D97B4F; transform-origin: left; }
+  #banner { position: fixed; left: 50%; top: 54px; transform: translateX(-50%); z-index: 20; pointer-events: none; text-align: center; max-width: 60vw; }
+  #banner .hud-box { display: inline-block; font-size: 16px; }
+  #banner .hud-box.warn { border-top-color: #FF6B5A; color: #FFD2CC; }
+  #centerMsg { position: fixed; left: 0; right: 0; top: 30%; z-index: 20; pointer-events: none; text-align: center; font-size: clamp(56px, 14vw, 120px); font-weight: 800; color: #F4F1E8; text-shadow: 0 5px 0 rgba(0, 0, 0, .45), 0 0 26px rgba(217, 123, 79, .7); font-style: italic; }
+  #centerMsg small { display: block; font-size: 22px; font-style: normal; text-shadow: 0 2px 4px rgba(0, 0, 0, .6); }
+  #specBox { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 18px); transform: translateX(-50%); z-index: 22; text-align: center; }
+  #specBox button { min-height: 42px; padding: 6px 18px; font-size: 16px; font-weight: 800; border-radius: 8px; border: 2px solid rgba(255, 255, 255, .4); background: rgba(20, 20, 36, .84); color: #fff; }
+  #joyZone { position: fixed; left: 0; bottom: 0; width: 46%; height: 58%; z-index: 18; touch-action: none; }
+  #joyBase { position: fixed; width: 110px; height: 110px; margin: -55px 0 0 -55px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, .32); background: rgba(255, 255, 255, .08); z-index: 19; pointer-events: none; }
+  #joyKnob { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; background: rgba(217, 123, 79, .85); border: 2px solid #fff; }
+  .actBtn { position: fixed; z-index: 19; width: 88px; height: 88px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, .55); background: rgba(20, 20, 36, .72); color: #fff; font-size: 18px; font-weight: 800; touch-action: none; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+  .actBtn i { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: rgba(0, 0, 0, .55); }
+  .actBtn span { position: relative; }
+  #btnPush { right: 18px; bottom: calc(env(safe-area-inset-bottom, 0px) + 96px); background: rgba(217, 123, 79, .82); }
+  #btnDash { right: 112px; bottom: calc(env(safe-area-inset-bottom, 0px) + 28px); background: rgba(76, 141, 255, .8); }
+  @media (max-width: 760px) {
+    #hudList { width: 150px; }
+    #hudList .pl { font-size: 12px; }
+    #hudRight .hud-box { min-width: 104px; padding: 5px 9px; }
+    #hudRight .cdRow span { width: 44px; }
+    #banner { max-width: 44vw; top: 96px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div id="fade"></div>
+
+<div id="hudList" class="hud-box" hidden><div id="hudPlayers"></div><div id="hudFloors"></div></div>
+<div id="hudRight" hidden>
+  <div class="hud-box"><span class="lab" id="hudRound">1 / 3 판</span><span class="big" id="hudTime">0:00</span><span class="lab" id="hudAlive">남은 인원 0</span></div>
+  <div class="hud-box">
+    <div class="cdRow"><span>밀치기</span><div class="cdBar"><i id="cdPush"></i></div></div>
+    <div class="cdRow"><span>대시</span><div class="cdBar"><i id="cdDash"></i></div></div>
+  </div>
+</div>
+<div id="banner" hidden><div class="hud-box" id="bannerBox"></div></div>
+<div id="centerMsg" hidden></div>
+<div id="specBox" hidden><button type="button" id="btnSpec">다음 관전 대상</button></div>
+
+<div id="joyZone" hidden></div>
+<div id="joyBase" hidden><div id="joyKnob"></div></div>
+<button type="button" class="actBtn" id="btnPush" hidden><i id="btnPushCd"></i><span>밀치기</span></button>
+<button type="button" class="actBtn" id="btnDash" hidden><i id="btnDashCd"></i><span>대시</span></button>
+
+<div id="startScreen" class="st-screen">
+  <div class="st-wrap">
+    <div class="st-hero"><h1 class="st-title">마지막 발판</h1></div>
+    <div class="st-card">
+      <button type="button" class="st-btn primary" id="btnCreate">방 만들기</button>
+      <div class="st-joinrow">
+        <input type="text" id="joinCode" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="방 코드 5자리">
+        <button type="button" class="st-btn blue" id="btnJoin">참여하기</button>
+      </div>
+      <div class="st-msg" id="startMsg"></div>
+      <div class="st-hint" id="loadNote">캐릭터를 불러오는 중…</div>
+    </div>
+    <div class="st-card">
+      <h2>내 캐릭터</h2>
+      <div id="profileHost"></div>
+    </div>
+    <div class="st-card">
+      <h2>조작 방법</h2>
+      <div class="st-keys">
+        <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd></span><span>이동 (관성이 있어 바로 서지 못해요)</span>
+        <span><kbd>J</kbd></span><span>밀치기 · 쿨타임 1초</span>
+        <span><kbd>K</kbd> <kbd>스페이스</kbd></span><span>대시 · 쿨타임 1.5초</span>
+        <span><kbd>Tab</kbd></span><span>탈락 후 다음 사람 관전</span>
+        <span><kbd>태블릿</kbd></span><span>왼쪽 화면을 눌러 끌면 조이스틱, 오른쪽 아래 버튼으로 밀치기·대시</span>
+      </div>
+    </div>
+    <div class="st-card">
+      <h2>규칙</h2>
+      <ul class="st-rules">
+        <li>8×8 발판이 <b>3층</b>으로 쌓여 있어요. 발판은 <b>밟으면 곧 무너지고</b> 되살아나지 않아요.</li>
+        <li><b>밀치기</b>로 같은 층의 상대를 밀어 떨어뜨리고, <b>대시</b>로 빈 곳을 건너요. 대시 중에는 밀리지 않지만 도착한 곳에 발판이 없으면 떨어져요.</li>
+        <li>발판 밖으로 나가면 <b>달리던 속도 그대로</b> 날아가 아래층 발판에 착지해요. 맨 아래층에서 떨어지면 탈락!</li>
+        <li>오래 끌면 위층 바깥 줄부터 무너져요(서든데스). 끝까지 남은 사람이 1등, 탈락한 순서대로 순위가 정해져요.</li>
+        <li><b>3판 누적 점수</b>: 1등 5점 · 2등 3점 · 3등 2점 · 나머지 1점. 혼자 시작하면 AI 1명이 함께해요.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div id="lobbyScreen" class="st-screen" hidden>
+  <div class="st-wrap">
+    <div class="st-hero"><h1 class="st-title">마지막 발판</h1></div>
+    <div class="st-card">
+      <h2>대기실 <span class="codeBig" id="lobbyCode">00000</span></h2>
+      <div id="lobbyPlayers"></div>
+      <div class="aiNote" id="aiNote" hidden>혼자면 AI 1명과 시작해요. 2명 이상 모이면 AI 없이 시작합니다.</div>
+      <button type="button" class="st-btn primary" id="btnStart" style="margin-top:14px">게임 시작</button>
+      <div class="st-hint" id="lobbyHint"></div>
+      <div class="st-row" style="margin-top:10px"><button type="button" class="st-btn sub slim" id="btnLeave">방 나가기</button></div>
+    </div>
+    <div class="st-card">
+      <h2>내 캐릭터</h2>
+      <div id="lobbyProfileHost"></div>
+    </div>
+    <div class="st-card" id="recCard" hidden>
+      <h2>이 방 누적 승수</h2>
+      <div class="st-recs" id="lobbyRecs" style="flex-wrap:wrap"></div>
+    </div>
+  </div>
+</div>
+
+<div id="resultScreen" class="st-screen" hidden>
+  <div class="st-wrap">
+    <div class="st-hero"><h1 class="st-title" id="resultTitle">1판 결과</h1></div>
+    <div class="st-card">
+      <table class="st-table"><thead id="resultHead"></thead><tbody id="resultBody"></tbody></table>
+      <div class="nextIn" id="nextIn"></div>
+      <button type="button" class="st-btn primary" id="btnToLobby" style="margin-top:14px" hidden>대기실로</button>
+      <button type="button" class="st-btn sub slim" id="btnResultLeave" style="margin-top:10px" hidden>방 나가기</button>
+    </div>
+  </div>
+</div>
+
+<script charset="utf-8" src="character-kit.js"></script>
+<script charset="utf-8" src="34.last-tile-v2/10-foundation.js"></script>
+<script charset="utf-8" src="34.last-tile-v2/15-browser-env.js"></script>
+<script charset="utf-8" src="34.last-tile-v2/20-rules.js"></script>
+<script charset="utf-8" src="34.last-tile-v2/30-board.js"></script>
+<script charset="utf-8" src="34.last-tile-v2/40-fighter-parts.js"></script>
+<script charset="utf-8" src="34.last-tile-v2/50-snapshots.js"></script>
+<script charset="utf-8" src="34.last-tile-v2/55-fall-trajectory.js"></script>
+<script charset="utf-8" src="34.last-tile-v2/60-fighter-phases.js"></script>
+<script charset="utf-8" src="34.last-tile-v2/65-fighter.js"></script>
+<script charset="utf-8" src="34.last-tile-v2/70-ai-brain.js"></script>
+<script charset="utf-8" src="34.last-tile-v2/75-controllers.js"></script>
+<script charset="utf-8" src="34.last-tile-v2/80-match.js"></script>
+<script charset="utf-8" src="34.last-tile-v2/85-input.js"></script>
+<script charset="utf-8" src="34.last-tile-v2/90-scenery.js"></script>
+<script charset="utf-8" src="34.last-tile-v2/92-board-view.js"></script>
+<script charset="utf-8" src="34.last-tile-v2/94-fighter-view.js"></script>
+<script charset="utf-8" src="34.last-tile-v2/95-world-view.js"></script>
+<script charset="utf-8" src="34.last-tile-v2/98-scores.js"></script>
+<script charset="utf-8" src="34.last-tile-v2/100-hud-views.js"></script>
+<script charset="utf-8" src="34.last-tile-v2/105-screen-views.js"></script>
+<script charset="utf-8" src="34.last-tile-v2/110-network.js"></script>
+<script charset="utf-8" src="34.last-tile-v2/120-host-director.js"></script>
+<script charset="utf-8" src="34.last-tile-v2/125-match-runtime.js"></script>
+<script charset="utf-8" src="34.last-tile-v2/130-phases.js"></script>
+<script charset="utf-8" src="34.last-tile-v2/140-room-flow.js"></script>
+<script charset="utf-8" src="34.last-tile-v2/150-app.js"></script>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
+new LastTileApp({ THREE, GLTFLoader, SkeletonUtils }).start();
+</script>
+</body>
+</html>

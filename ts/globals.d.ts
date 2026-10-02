@@ -50,6 +50,7 @@ interface FirebaseRef {
   set(value: unknown): Promise<void>;
   update(values: Record<string, unknown>): Promise<void>;
   remove(): Promise<void>;
+  push(value: unknown): Promise<unknown>;
   once(event: "value"): Promise<FirebaseSnapshot>;
   on(event: FirebaseEvent, listener: (snapshot: FirebaseSnapshot) => void): (snapshot: FirebaseSnapshot) => void;
   off(event: FirebaseEvent, listener: (snapshot: FirebaseSnapshot) => void): void;
@@ -85,3 +86,22 @@ interface Window {
 }
 
 type TileGeometry = import("three").BufferGeometry<import("three").NormalBufferAttributes>;
+
+interface QualityGovernorOptions {
+  steps: Array<() => boolean>;
+  storageKey?: string;
+  isPlaying?: () => boolean;
+  slowSec: number;
+  slowLimit: number;
+}
+
+interface QualityGovernorHandle {
+  update(frameSec: number): void;
+  lower(): boolean;
+  restore(minimumSteps?: number): void;
+  readonly stepsTaken: number;
+}
+
+interface Window {
+  QualityGovernor?: (options: QualityGovernorOptions) => QualityGovernorHandle;
+}
