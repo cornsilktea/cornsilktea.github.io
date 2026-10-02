@@ -368,7 +368,7 @@
         <li><b>타임어택</b>: 코스(서울 2바퀴 · 싱가포르 3바퀴 · 홍콩 편도)와 차를 고르고 가장 빠른 완주 시간에 도전합니다.</li>
         <li><b>고스트</b>를 켜면 나의 최고 기록이나 세계신기록 주행이 반투명 차로 같이 달립니다.</li>
         <li>트랙을 벗어나면 느려지고, 울타리에 부딪히면 크게 감속합니다.</li>
-        <li><b>대전모드</b>: 방 코드로 모여 1대1로 달리고, 관전자는 두 차의 시점을 번갈아 봅니다.</li>
+        <li><b>대전모드</b>: 방 코드로 모여 1대1로 달리고, 관전자는 처음 3초는 왼쪽 자리를, 이후에는 2위 차를 자동으로 따라가고(전환 후 2초 유지) 버튼으로 직접 고를 수도 있습니다.</li>
       </ul>
       <div class="credits creditText"></div>
     </div>
@@ -4523,6 +4523,7 @@ function startMatchLocal() {
   BT.match = { startAt: BT.startAt, firstFinAt: 0, humansAtStart: { left: humansOnSide("left"), right: humansOnSide("right") } };
   BT.statusSent = ""; BT.sent = ""; BT.lastNet = 0; BT.forceNet = true;
   BT.viewId = racerOf("left") || racerOf("right");
+  specDirector.reset();
   BT.match.goPerf = performance.now() + goDelayMs();
   const late = msToGo() < -1000;
   state = late ? "race" : "countdown"; cdTime = 0; cdShown = -1; goTimer = 0; elapsed = 0; finalMs = 0; shake = 0;
@@ -5029,6 +5030,27 @@ function renderRankBox(st) {
   });
   okeys(BT.rankRows).forEach(id => { if (!live[id]) { BT.rankRows[id].remove(); delete BT.rankRows[id]; } });
 }
+class SpectatorViewDirector {
+  static OPENING_LEFT_SEC = 3;
+  static HOLD_MS = 2000;
+  constructor() { this.reset(); }
+  reset() { this.lastSwitchMs = -Infinity; this.manualOrderKey = null; }
+  pickManually(standingsList) { this.manualOrderKey = this.orderKeyOf(standingsList); }
+  orderKeyOf(standingsList) { return standingsList.map(r => r.id).join(","); }
+  update(standingsList, raceSec, nowMs) {
+    if (this.manualOrderKey !== null) {
+      if (raceSec < SpectatorViewDirector.OPENING_LEFT_SEC || this.orderKeyOf(standingsList) === this.manualOrderKey) return;
+      this.manualOrderKey = null;
+    }
+    const wanted = raceSec < SpectatorViewDirector.OPENING_LEFT_SEC ? racerOf("left") : (standingsList[1] || standingsList[0] || {}).id;
+    if (!wanted || wanted === BT.viewId) return;
+    if (nowMs - this.lastSwitchMs < SpectatorViewDirector.HOLD_MS) return;
+    this.lastSwitchMs = nowMs;
+    BT.viewId = wanted; BT.viewKey = "";
+    snapCamera();
+  }
+}
+const specDirector = new SpectatorViewDirector();
 function renderViewBtns() {
   const ids = racerIds();
   if (ids.indexOf(BT.viewId) < 0) BT.viewId = ids[0] || null;
@@ -5044,6 +5066,7 @@ function renderBattleHud() {
   const st = standings(), t = tnow();
   if (st.some(r => r.fin) && !BT.match.firstFinAt) BT.match.firstFinAt = t;
   if (BT.spec) {
+    specDirector.update(st, state === "race" || state === "done" ? elapsed : 0, performance.now());
     renderRankBox(st); renderViewBtns();
     setText($("rkTime"), "⏱ " + fmtTime(state === "race" ? elapsed : 0));
     return;
@@ -5096,7 +5119,7 @@ $("mapBtns").onclick = e => {
 $("viewBtns").onclick = e => {
   const b = e.target.closest ? e.target.closest("button") : null;
   if (!b) return;
-  b.blur(); BT.viewId = b.getAttribute("data-id"); BT.viewKey = ""; renderViewBtns(); snapCamera();
+  b.blur(); BT.viewId = b.getAttribute("data-id"); BT.viewKey = ""; specDirector.pickManually(standings()); renderViewBtns(); snapCamera();
 };
 
 window.TL = { keys, P, CFG, camera, scene, renderer, tick, makeCar, CAR_MODELS, BT, get S() { return S; }, setTrack: k => { course = k; buildTrack(TRACKS[k]); resetCar(); } };
