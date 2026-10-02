@@ -767,6 +767,10 @@ class WorldView {
     snapCamera() {
         this.focusReady = false;
     }
+    orbit(centerX, centerZ, radius, height, angle) {
+        this.camera.position.set(centerX + Math.sin(angle) * radius, height, centerZ + Math.cos(angle) * radius);
+        this.camera.lookAt(centerX, 0, centerZ);
+    }
     render(deltaSeconds) {
         this.renderer.render(this.scene, this.camera);
         this.adaptQuality(deltaSeconds);
@@ -2474,6 +2478,40 @@ class EndView {
         Dom.setText(this.hint, session.isHost() ? "" : "방장이 대기실로 보내면 함께 돌아가요.");
     }
 }
+class MenuBackdrop {
+    constructor(services) {
+        this.services = services;
+        this.view = null;
+        this.map = null;
+        this.seconds = 0;
+    }
+    prepare() {
+        if (this.view)
+            return;
+        this.map = new GameMap(MapCatalog.ALL[0]);
+        this.view = new MapView(this.services.libs, this.services.scenery, this.services.labels, this.map);
+        this.view.showTasks(new Set());
+        this.services.world.world.add(this.view.group);
+    }
+    render(deltaSeconds) {
+        const map = this.map;
+        if (!this.view || !map)
+            return;
+        this.seconds += deltaSeconds;
+        this.view.group.visible = true;
+        this.view.update(this.seconds);
+        const angle = this.seconds / MenuBackdrop.ORBIT_SECONDS * Math.PI * 2;
+        this.services.world.orbit(map.columns * map.cell / 2, map.rowCount * map.cell / 2, MenuBackdrop.RADIUS, MenuBackdrop.HEIGHT, angle);
+        this.services.world.render(deltaSeconds);
+    }
+    hide() {
+        if (this.view)
+            this.view.group.visible = false;
+    }
+}
+MenuBackdrop.ORBIT_SECONDS = 80;
+MenuBackdrop.RADIUS = 34;
+MenuBackdrop.HEIGHT = 30;
 class CastleSpyGame {
     constructor(libs) {
         this.libs = libs;
@@ -2512,6 +2550,7 @@ class CastleSpyGame {
             backend: this.backend,
             taskOverlay: Dom.byId("taskOverlay")
         };
+        this.backdrop = new MenuBackdrop(this.services);
         this.bindMenus();
         this.screens.show("start");
         this.updateStartButtons();
@@ -2528,6 +2567,7 @@ class CastleSpyGame {
         try {
             await Promise.all([this.assets.load(), this.scenery.load(Array.from(modelNames))]);
             this.assetsReady = true;
+            this.backdrop.prepare();
             Dom.setText(Dom.byId("loadNote"), "");
             this.editor.mount(Dom.byId("profileHost"));
             this.editor.setActive(true);
@@ -2737,7 +2777,12 @@ class CastleSpyGame {
     step(timeMs) {
         const deltaSeconds = Math.min(0.1, Math.max(0, (timeMs - this.lastFrameMs) / 1000));
         this.lastFrameMs = timeMs;
-        if (this.match)
+        if (this.match) {
+            this.backdrop.hide();
             this.match.update(deltaSeconds);
+        }
+        else {
+            this.backdrop.render(deltaSeconds);
+        }
     }
 }

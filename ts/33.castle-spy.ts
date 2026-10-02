@@ -872,6 +872,11 @@ class WorldView {
     this.focusReady = false;
   }
 
+  orbit(centerX: number, centerZ: number, radius: number, height: number, angle: number): void {
+    this.camera.position.set(centerX + Math.sin(angle) * radius, height, centerZ + Math.cos(angle) * radius);
+    this.camera.lookAt(centerX, 0, centerZ);
+  }
+
   render(deltaSeconds: number): void {
     this.renderer.render(this.scene, this.camera);
     this.adaptQuality(deltaSeconds);
@@ -2632,7 +2637,43 @@ class EndView {
   }
 }
 
+class MenuBackdrop {
+  private static readonly ORBIT_SECONDS = 80;
+  private static readonly RADIUS = 34;
+  private static readonly HEIGHT = 30;
+
+  private view: MapView | null = null;
+  private map: GameMap | null = null;
+  private seconds = 0;
+
+  constructor(private readonly services: MatchServices) {}
+
+  prepare(): void {
+    if (this.view) return;
+    this.map = new GameMap(MapCatalog.ALL[0]);
+    this.view = new MapView(this.services.libs, this.services.scenery, this.services.labels, this.map);
+    this.view.showTasks(new Set<number>());
+    this.services.world.world.add(this.view.group);
+  }
+
+  render(deltaSeconds: number): void {
+    const map = this.map;
+    if (!this.view || !map) return;
+    this.seconds += deltaSeconds;
+    this.view.group.visible = true;
+    this.view.update(this.seconds);
+    const angle = this.seconds / MenuBackdrop.ORBIT_SECONDS * Math.PI * 2;
+    this.services.world.orbit(map.columns * map.cell / 2, map.rowCount * map.cell / 2, MenuBackdrop.RADIUS, MenuBackdrop.HEIGHT, angle);
+    this.services.world.render(deltaSeconds);
+  }
+
+  hide(): void {
+    if (this.view) this.view.group.visible = false;
+  }
+}
+
 class CastleSpyGame {
+  private readonly backdrop: MenuBackdrop;
   private readonly touchDevice = "ontouchstart" in window || (navigator.maxTouchPoints || 0) > 0;
   private readonly profile = new PlayerProfile();
   private readonly backend = new Backend();
@@ -2673,6 +2714,7 @@ class CastleSpyGame {
       backend: this.backend,
       taskOverlay: Dom.byId("taskOverlay")
     };
+    this.backdrop = new MenuBackdrop(this.services);
     this.bindMenus();
     this.screens.show("start");
     this.updateStartButtons();
@@ -2688,6 +2730,7 @@ class CastleSpyGame {
     try {
       await Promise.all([this.assets.load(), this.scenery.load(Array.from(modelNames))]);
       this.assetsReady = true;
+      this.backdrop.prepare();
       Dom.setText(Dom.byId("loadNote"), "");
       this.editor.mount(Dom.byId("profileHost"));
       this.editor.setActive(true);
@@ -2888,6 +2931,11 @@ class CastleSpyGame {
   private step(timeMs: number): void {
     const deltaSeconds = Math.min(0.1, Math.max(0, (timeMs - this.lastFrameMs) / 1000));
     this.lastFrameMs = timeMs;
-    if (this.match) this.match.update(deltaSeconds);
+    if (this.match) {
+      this.backdrop.hide();
+      this.match.update(deltaSeconds);
+    } else {
+      this.backdrop.render(deltaSeconds);
+    }
   }
 }
