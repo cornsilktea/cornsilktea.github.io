@@ -197,9 +197,12 @@
     border-color: var(--sg-primary); background: var(--sg-primary-soft); box-shadow: inset 0 0 0 1px var(--sg-primary);
   }
   #copyTestLink { font-size: var(--sg-fs-sm); }
-  /* 배포용 줄: 배포용 버튼 + 오른쪽에 링크 복사 버튼(반 버튼과 같은 크기, 나머지 칸은 비움) */
-  .class-grid-test #copyTestLink, .class-grid-test #copyContestLink { order: 1; font-size: var(--sg-fs-sm); }
+  /* 배포용 줄: 일반배포용 · 일반배포용 링크 복사 · 학생배포용 · 학생배포용 링크 복사 순(반 버튼과 같은 크기, 나머지 칸은 비움) */
+  .class-grid-test #copyTestLink, .class-grid-test #copyStudentLink, .class-grid-test #copyContestLink { font-size: var(--sg-fs-sm); }
   .class-grid-test #cls-test, .class-grid-test #cls-contest { order: 0; }
+  .class-grid-test #copyTestLink, .class-grid-test #copyContestLink { order: 1; }
+  .class-grid-test #cls-student { order: 2; }
+  .class-grid-test #copyStudentLink { order: 3; }
   .class-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sg-s3); margin-bottom: var(--sg-s4); flex-wrap: wrap; }
   .class-head h2 { margin: 0; }
   .class-tools { display: flex; align-items: center; gap: var(--sg-s4); flex: none; }
@@ -295,7 +298,7 @@
       <h2>지금 상태</h2>
       <div class="summary"><span class="dot" id="dot"></span><span id="summaryText">불러오는 중…</span></div>
       <div class="actions">
-        <button id="allOff" type="button">전체 끄기 (10개 반·배포용·대회서버 모두)</button>
+        <button id="allOff" type="button">전체 끄기 (10개 반·일반배포용·학생배포용·대회서버 모두)</button>
         <button id="reload" type="button">새로고침</button>
         <button id="logout" type="button">로그아웃</button>
       </div>
@@ -310,10 +313,11 @@
       <div class="class-grid" id="classGrid1"></div>
       <p class="class-grade">2학년</p>
       <div class="class-grid" id="classGrid2"></div>
-      <!-- 배포용: 선생님·지인 테스트용 링크(index.html?c=test). 학생 첫 화면에는 안 나오고 신기록도 등록되지 않습니다 -->
-      <p class="class-grade">배포용 (선생님·지인 테스트용 — 학생 화면에는 나오지 않음)</p>
+      <!-- 일반배포용·학생배포용: 학생 첫 화면에는 안 나오고 신기록도 등록되지 않습니다. 잠금은 각각 따로(classes/test, classes/student) -->
+      <p class="class-grade">배포용 (선생님·지인·학생 배포용 — 학생 첫 화면에는 나오지 않음)</p>
       <div class="class-grid class-grid-test" id="classGridTest">
-        <button id="copyTestLink" type="button" title="배포용 목록 링크를 클립보드에 복사합니다">배포용 링크 복사</button>
+        <button id="copyTestLink" type="button" title="일반배포용 목록 링크를 클립보드에 복사합니다">일반배포용 링크 복사</button>
+        <button id="copyStudentLink" type="button" title="학생배포용 목록 링크를 클립보드에 복사합니다">학생배포용 링크 복사</button>
       </div>
       <!-- 대회서버: 반 고르기 화면 맨 아래의 '대회서버'(contest.html). 대회용 자료(data.js 의 CONTEST_GAMES)만 나옵니다 -->
       <p class="class-grade">대회서버 (반 고르기 화면 맨 아래 — 터보 랩·FPS 서바이벌·팀 배틀·좀비만)</p>
@@ -322,7 +326,7 @@
       </div>
       <p class="msg" id="pickMsg"></p>
       <p class="hint">반마다 링크가 다릅니다(목록 화면에서 반을 고르면 그 반의 QR 이 나옵니다). 스위치도 반마다 따로 켜고 끕니다.
-        배포용 링크로 들어온 사람은 세계·반 신기록을 등록할 수 없습니다.
+        일반·학생배포용 링크로 들어온 사람은 세계·반 신기록을 등록할 수 없습니다.
         대회서버는 여러 반이 섞이므로 반 신기록 없이 세계 신기록만 등록합니다.</p>
     </div>
 
@@ -331,9 +335,8 @@
       <div class="class-head">
         <h2 id="classTitle"></h2>
         <div class="class-tools">
-          <label class="switch" title="이 반의 자료를 모두 켜거나 끕니다">
-            <input type="checkbox" id="classAll"><span class="track"></span><span class="switch-text" style="width:auto">모두 켜기</span>
-          </label>
+          <button id="classAllOn" type="button" title="이 반의 자료를 모두 켭니다">모두 켜기</button>
+          <button id="classAllOff" type="button" title="이 반의 자료를 모두 끕니다">모두 끄기</button>
           <button id="classClose" type="button">닫기</button>
         </div>
       </div>
@@ -699,7 +702,7 @@ function renderClassRecords() {
   const box = $("crecList");
   $("crecTitle").textContent = "학급 신기록 관리" + (current ? " — " + D.classById(current).label : "");
   if (!current) { box.innerHTML = ""; box.appendChild(el("p", "hint", "위 '반 고르기'에서 반을 먼저 누르세요.")); return; }
-  if (D.classById(current).test) { box.innerHTML = ""; box.appendChild(el("p", "hint", "배포용 링크로 들어온 사람은 신기록을 등록하지 않으므로 기록이 없습니다.")); return; }
+  if (D.classById(current).test) { box.innerHTML = ""; box.appendChild(el("p", "hint", "일반·학생배포용 링크로 들어온 사람은 신기록을 등록하지 않으므로 기록이 없습니다.")); return; }
   if (D.classById(current).contest) { box.innerHTML = ""; box.appendChild(el("p", "hint", "대회서버는 여러 반이 섞여 있어 반 신기록이 따로 없습니다. 세계 신기록 관리에서 보세요.")); return; }
   const suffix = classSuffix(current);
   renderRecordList(box, records.filter((r) => r.key.endsWith(suffix)), "crecMsg",
@@ -840,7 +843,7 @@ function renderSummary() {
   $("dot").className = "dot" + (opened.length === 0 ? "" : " some");
   $("summaryText").textContent =
     games.length === 0 ? "등록된 수업 자료가 없습니다."
-    : opened.length === 0 ? "전체 잠금 (10개 반·배포용·대회서버 모두 닫힘)"
+    : opened.length === 0 ? "전체 잠금 (10개 반·일반배포용·학생배포용·대회서버 모두 닫힘)"
     : "열린 반: " + opened.map((c) => c.label + " " + openCount(c.id) + "개").join(" · ");
 }
 
@@ -854,7 +857,7 @@ function renderClassGrid() {
       b.id = "cls-" + c.id;
       b.append(el("span", null, c.label), el("small", null, ""));
       b.addEventListener("click", () => selectClass(current === c.id ? null : c.id));
-      /* 배포용·대회서버는 2학년 아랫줄에 한 줄씩(링크 복사 버튼 왼쪽) */
+      /* 일반배포용·학생배포용은 같은 줄, 대회서버는 그 아랫줄(각각 링크 복사 버튼 왼쪽) */
       $(c.test ? "classGridTest" : c.contest ? "classGridContest" : "classGrid" + c.grade).appendChild(b);
     }
     const n = openCount(c.id);
@@ -880,11 +883,11 @@ function selectClass(cid) {
   if (cid && !$("crecBody").hidden && records.length === 0) loadRecords();
 }
 
-/* 모두 켜기 토글: 이 반의 등록된 자료가 전부 열려 있을 때만 켜진 모양 */
+/* 모두 켜기·모두 끄기 버튼: 자료가 없으면 둘 다 막습니다(이미 전부 같은 상태여도 눌러서 다시 맞출 수 있게 둡니다) */
 function syncClassAll() {
-  const cb = $("classAll");
-  const list = current ? gamesOf(current) : [];
-  cb.checked = list.length > 0 && list.every((g) => isOpen(current, g.slug));
+  const none = !current || gamesOf(current).length === 0;
+  $("classAllOn").disabled = none;
+  $("classAllOff").disabled = none;
 }
 
 function el(tag, cls, text) {
@@ -1352,14 +1355,14 @@ async function move(i, dir) {
   } catch (e) { busy = false; say("classMsg", e.message); }
 }
 
-/* 자료 하나의 값을 10개 반·배포용·대회서버 모두에 한 번에 쓰기 위한 묶음(classes 에 PATCH). null 이면 지움 */
+/* 자료 하나의 값을 10개 반·일반배포용·학생배포용·대회서버 모두에 한 번에 쓰기 위한 묶음(classes 에 PATCH). null 이면 지움 */
 function classPatch(slug, value) {
   const patch = {};
   D.ALL_CLASSES.forEach((c) => { patch[c.id + "/" + slug] = value; });
   return patch;
 }
 
-/* 전체 끄기: 10개 반·배포용·대회서버의 모든 자료를 한 번에 닫습니다 */
+/* 전체 끄기: 10개 반·일반배포용·학생배포용·대회서버의 모든 자료를 한 번에 닫습니다 */
 async function allOff() {
   if (games.length === 0) return;
   const patch = {};
@@ -1367,7 +1370,7 @@ async function allOff() {
   try {
     await write("classes", patch);
     await load();
-    say("mainMsg", "10개 반·배포용·대회서버의 자료를 모두 닫았습니다.");
+    say("mainMsg", "10개 반·일반배포용·학생배포용·대회서버의 자료를 모두 닫았습니다.");
   } catch (e) { say("mainMsg", e.message); }
 }
 
@@ -1502,7 +1505,7 @@ function seedCard(g) {
         unitsSet: true,
         removed: null            /* 예전에 지운 표시가 있으면 함께 지웁니다 */
       });
-      /* 새 자료는 초기데이터.json 의 open 값과 상관없이 10개 반·배포용·대회서버 모두 잠긴 채로 시작합니다.
+      /* 새 자료는 초기데이터.json 의 open 값과 상관없이 10개 반·일반배포용·학생배포용·대회서버 모두 잠긴 채로 시작합니다.
          (열기는 반별 열기·잠그기에서 선생님이 직접) */
       await write("classes", classPatch(g.slug, false));
       busy = false;
@@ -1542,9 +1545,9 @@ $("loginBtn").addEventListener("click", login);
 $("allOff").addEventListener("click", allOff);
 $("classClose").addEventListener("click", () => selectClass(null));
 
-/* 배포용 링크 복사: 이 제어판이 있는 자리의 index.html?c=test 를 클립보드에 넣습니다 */
-function testLink() {
-  return location.origin + location.pathname.replace(/[^/]*$/, "") + "index.html?c=" + D.TEST_CLASS.id;
+/* 일반·학생배포용 링크 복사: 이 제어판이 있는 자리의 index.html?c=test / ?c=student 를 클립보드에 넣습니다 */
+function classLink(klass) {
+  return location.origin + location.pathname.replace(/[^/]*$/, "") + "index.html?c=" + klass.id;
 }
 async function copyText(text) {
   try {
@@ -1559,10 +1562,12 @@ async function copyText(text) {
   ta.remove();
   return ok;
 }
-$("copyTestLink").addEventListener("click", async () => {
-  const link = testLink();
-  const ok = await copyText(link);
-  say("pickMsg", ok ? "배포용 링크를 복사했습니다: " + link : "복사하지 못했습니다. 직접 복사하세요: " + link);
+[["copyTestLink", D.TEST_CLASS], ["copyStudentLink", D.STUDENT_CLASS]].forEach(([buttonId, klass]) => {
+  $(buttonId).addEventListener("click", async () => {
+    const link = classLink(klass);
+    const ok = await copyText(link);
+    say("pickMsg", ok ? klass.label + " 링크를 복사했습니다: " + link : "복사하지 못했습니다. 직접 복사하세요: " + link);
+  });
 });
 /* 대회서버 링크 복사: contest.html (QR 도 이 주소를 그립니다) */
 $("copyContestLink").addEventListener("click", async () => {
@@ -1570,13 +1575,14 @@ $("copyContestLink").addEventListener("click", async () => {
   const ok = await copyText(link);
   say("pickMsg", ok ? "대회서버 링크를 복사했습니다: " + link : "복사하지 못했습니다. 직접 복사하세요: " + link);
 });
-/* 모두 켜기: 이 반의 자료를 한 번에 켜거나 끕니다 */
-$("classAll").addEventListener("change", async () => {
-  const cb = $("classAll"), cid = current, next = cb.checked;
-  if (!cid || gamesOf(cid).length === 0) { cb.checked = false; return; }
+/* 모두 켜기 / 모두 끄기: 이 반의 자료를 한 번에 켜거나 끕니다 */
+async function setClassAll(next) {
+  const cid = current;
+  if (!cid || gamesOf(cid).length === 0) return;
   const patch = {};
   gamesOf(cid).forEach((g) => { patch[g.slug] = next; });
-  cb.disabled = true;
+  $("classAllOn").disabled = true;
+  $("classAllOff").disabled = true;
   try {
     await write("classes/" + cid, patch);
     classes[cid] = Object.assign(classes[cid] || {}, patch);
@@ -1584,11 +1590,12 @@ $("classAll").addEventListener("change", async () => {
     renderList(); renderSummary(); renderClassGrid();
     say("classMsg", D.classById(cid).label + " 자료를 모두 " + (next ? "열었습니다." : "닫았습니다."));
   } catch (e) {
-    cb.checked = !next;
     say("classMsg", e.message);
   }
-  cb.disabled = false;
-});
+  syncClassAll();
+}
+$("classAllOn").addEventListener("click", () => setClassAll(true));
+$("classAllOff").addEventListener("click", () => setClassAll(false));
 $("crecReload").addEventListener("click", loadRecords);
 $("crecToggle").addEventListener("click", () => {
   const open = $("crecBody").hidden;

@@ -29,7 +29,12 @@
      선생님·지인에게 미리 보여 줄 때 쓰는 열한 번째 "반"입니다. 제어판에서 다른 반처럼 잠금을
      켜고 끌 수 있지만, 학생용 첫 화면(반 고르기)에는 나오지 않고 세계·반 신기록도 등록하지 않습니다.
      CLASSES 에는 넣지 않으므로(학생 화면이 CLASSES 를 그림) 모든 반이 필요한 곳은 ALL_CLASSES 를 씁니다. */
-  var TEST_CLASS = { id: "test", grade: 0, cls: 0, label: "배포용", test: true };
+  var TEST_CLASS = { id: "test", grade: 0, cls: 0, label: "일반배포용", test: true };
+  /* 학생배포용 링크: index.html?c=student
+     일반배포용과 똑같이 동작하는(신기록 등록 안 함) 열두 번째 "반"입니다. 잠금은 portal/classes/student 를
+     따로 보므로 일반배포용과 별개로 켜고 끕니다. 학생 화면(반 고르기)에는 나오지 않습니다.
+     신기록·통계 제외 판정은 test:true 를 보므로 같이 붙입니다. */
+  var STUDENT_CLASS = { id: "student", grade: 0, cls: 0, label: "학생배포용", test: true, student: true };
   /* 대회서버: contest.html (자료 링크는 ?c=contest)
      반과 상관없이 모든 학생이 함께 들어오는 열두 번째 "반"입니다. 잠금은 portal/classes/contest 를 보고,
      제어판에서도 다른 반처럼 켜고 끄지만 CONTEST_GAMES 에 적힌 자료만 나옵니다(대회서버 화면도 마찬가지).
@@ -38,7 +43,7 @@
      대회용 게임을 늘리거나 빼려면 아래 CONTEST_GAMES 한 줄만 고칩니다. */
   var CONTEST_CLASS = { id: "contest", grade: 0, cls: 0, label: "대회서버", contest: true };
   var CONTEST_GAMES = ["turbolap", "fpssurvival", "teambattle", "zombieoutbreak"];
-  var ALL_CLASSES = CLASSES.concat([TEST_CLASS, CONTEST_CLASS]);
+  var ALL_CLASSES = CLASSES.concat([TEST_CLASS, STUDENT_CLASS, CONTEST_CLASS]);
   var classIndex = {};
   ALL_CLASSES.forEach(function (c) { classIndex[c.id] = c; });
   function classById(id) { return classIndex[id] || null; }
@@ -46,9 +51,9 @@
   function classHasGame(cls, slug) {
     return !cls || !cls.contest || CONTEST_GAMES.indexOf(slug) !== -1;
   }
-  /* 주소의 ?c=1-1 (또는 ?c=test·?c=contest) 을 읽어 학급을 돌려줍니다(없거나 틀리면 null) */
+  /* 주소의 ?c=1-1 (또는 ?c=test·?c=student·?c=contest) 을 읽어 학급을 돌려줍니다(없거나 틀리면 null) */
   function classFromSearch(search) {
-    var m = /[?&]c=([12]-[1-5]|test|contest)(?:&|$)/.exec(search || "");
+    var m = /[?&]c=([12]-[1-5]|test|student|contest)(?:&|$)/.exec(search || "");
     return m ? classById(m[1]) : null;
   }
 
@@ -206,6 +211,7 @@
   window.PORTAL_DATA = {
     CLASSES: CLASSES,
     TEST_CLASS: TEST_CLASS,
+    STUDENT_CLASS: STUDENT_CLASS,
     CONTEST_CLASS: CONTEST_CLASS,
     CONTEST_GAMES: CONTEST_GAMES,
     classHasGame: classHasGame,
