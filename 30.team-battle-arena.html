@@ -4284,7 +4284,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (!e.dmg || SESSION.room.status !== "playing") return;
       TARGETS.localTargets().forEach(function (T) {
         if (T.id !== e.tgt || !T.alive || T.team === e.team) return;
-        DAMAGE.damage(T, e.dmg, e.owner, e.createdAt, null, e.stun ? { stunMs: e.stun } : null);
+        DAMAGE.damage(T, e.dmg, e.owner, e.createdAt, "skill", e.stun ? { stunMs: e.stun } : null);
         FIELD_FX.applyCurse(T, e.owner, now());
       });
     }
