@@ -22,6 +22,12 @@
         "$room": { ".write": "$room.matches(/^[0-9]{5}$/)" }
       }
     },
+    "minigames": {
+      ".read": true,
+      "rooms": {
+        "$room": { ".write": "$room.matches(/^[0-9]{5}$/)" }
+      }
+    },
     "teambattle": {
       ".read": true,
       "rooms": {
