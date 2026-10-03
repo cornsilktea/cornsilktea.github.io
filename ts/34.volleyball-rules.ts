@@ -64,7 +64,7 @@ class VbConfig {
   static readonly INTENT_WINDOW_MS = 700;
   static readonly SPIKE_LEAD_MS = 220;
   static readonly SPIKE_LEAD_WINDOW_MS = 450;
-  static readonly JUMP_MS = 700;
+  static readonly JUMP_MS = 520;
   static readonly JUMP_HEIGHT = 0.9;
   static readonly BLOCK_REACH = 2.4;
   static readonly BLOCK_RADIUS = 0.9;
@@ -360,7 +360,7 @@ class VbBotTuning {
   static readonly BLOCK_THREAT_DISTANCE = 2.2;
   static readonly SPIKE_CHANCE_VS_BLOCK = 0.35;
   static readonly BLOCK_NOISE = 0.4;
-  static readonly BLOCK_LEAD_MS = 200;
+  static readonly BLOCK_LEAD_MS = 150;
 }
 
 class VolleyballBot extends VbPlayerController {

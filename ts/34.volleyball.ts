@@ -663,8 +663,7 @@ class VbMarkerView {
 class VbPlayerView {
   private static readonly CLIP_IDLE = "Idle_A";
   private static readonly CLIP_RUN = "Running_A";
-  private static readonly JUMP_MS = 700;
-  private static readonly JUMP_HEIGHT = 0.9;
+  private static readonly JUMP_HEIGHT = VbConfig.JUMP_HEIGHT;
 
   readonly group: Three<"Group">;
   private readonly model: Three<"Object3D">;
@@ -711,7 +710,7 @@ class VbPlayerView {
 
   render(x: number, z: number, yaw: number, moving: boolean, deltaSeconds: number, nowMs: number): void {
     this.shownYaw += VbMath.angleDifference(yaw, this.shownYaw) * Math.min(1, deltaSeconds * 14);
-    const jumpProgress = (nowMs - this.jumpStartMs) / VbPlayerView.JUMP_MS;
+    const jumpProgress = (nowMs - this.jumpStartMs) / VbConfig.JUMP_MS;
     const lift = jumpProgress >= 0 && jumpProgress <= 1 ? Math.sin(jumpProgress * Math.PI) * this.jumpHeight : 0;
     this.group.position.set(x, lift, z);
     this.group.rotation.y = this.shownYaw;
@@ -1052,8 +1051,13 @@ class VbHostDirector {
     const last = this.lastPressSeq.get(id) || 0;
     if (record.n <= last) return;
     this.lastPressSeq.set(id, record.n);
-    if (record.j) controller.jumpStartMs = record.t;
-    else controller.registerPress(record.t, record.ax, record.az);
+    if (record.j) {
+      controller.jumpStartMs = record.t;
+      if (controller instanceof VbRemoteController) {
+        controller.teleport(record.ax, record.az);
+        controller.jumpStartMs = record.t;
+      }
+    } else controller.registerPress(record.t, record.ax, record.az);
   }
 }
 
@@ -1251,15 +1255,18 @@ class VolleyballMatch {
     const now = this.services.backend.now();
     const jump = this.isJumpPress(local, now);
     if (jump) {
-      if (local.isJumping(now) || now < local.jumpStartMs + VbConfig.JUMP_MS + 250) return;
+      if (local.isJumping(now)) return;
       local.jumpStartMs = now;
+      this.lastSentMs = 0;
     }
     if (this.isHost()) {
       if (!jump) local.registerPress(now, local.aimX, local.aimZ);
       return;
     }
     this.pressCounter++;
-    this.session.writePress({ n: this.pressCounter, t: now, ax: local.aimX, az: local.aimZ, j: jump ? 1 : 0 });
+    this.session.writePress(jump
+      ? { n: this.pressCounter, t: now, ax: local.x, az: local.z, j: 1 }
+      : { n: this.pressCounter, t: now, ax: local.aimX, az: local.aimZ, j: 0 });
   }
 
   private isJumpPress(local: VbLocalController, now: number): boolean {

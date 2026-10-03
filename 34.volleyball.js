@@ -653,7 +653,7 @@ class VbPlayerView {
     }
     render(x, z, yaw, moving, deltaSeconds, nowMs) {
         this.shownYaw += VbMath.angleDifference(yaw, this.shownYaw) * Math.min(1, deltaSeconds * 14);
-        const jumpProgress = (nowMs - this.jumpStartMs) / VbPlayerView.JUMP_MS;
+        const jumpProgress = (nowMs - this.jumpStartMs) / VbConfig.JUMP_MS;
         const lift = jumpProgress >= 0 && jumpProgress <= 1 ? Math.sin(jumpProgress * Math.PI) * this.jumpHeight : 0;
         this.group.position.set(x, lift, z);
         this.group.rotation.y = this.shownYaw;
@@ -668,8 +668,7 @@ class VbPlayerView {
 }
 VbPlayerView.CLIP_IDLE = "Idle_A";
 VbPlayerView.CLIP_RUN = "Running_A";
-VbPlayerView.JUMP_MS = 700;
-VbPlayerView.JUMP_HEIGHT = 0.9;
+VbPlayerView.JUMP_HEIGHT = VbConfig.JUMP_HEIGHT;
 class VbCameraRig {
     constructor(libs) {
         this.focusX = 0;
@@ -948,8 +947,13 @@ class VbHostDirector {
         if (record.n <= last)
             return;
         this.lastPressSeq.set(id, record.n);
-        if (record.j)
+        if (record.j) {
             controller.jumpStartMs = record.t;
+            if (controller instanceof VbRemoteController) {
+                controller.teleport(record.ax, record.az);
+                controller.jumpStartMs = record.t;
+            }
+        }
         else
             controller.registerPress(record.t, record.ax, record.az);
     }
@@ -1147,9 +1151,10 @@ class VolleyballMatch {
         const now = this.services.backend.now();
         const jump = this.isJumpPress(local, now);
         if (jump) {
-            if (local.isJumping(now) || now < local.jumpStartMs + VbConfig.JUMP_MS + 250)
+            if (local.isJumping(now))
                 return;
             local.jumpStartMs = now;
+            this.lastSentMs = 0;
         }
         if (this.isHost()) {
             if (!jump)
@@ -1157,7 +1162,9 @@ class VolleyballMatch {
             return;
         }
         this.pressCounter++;
-        this.session.writePress({ n: this.pressCounter, t: now, ax: local.aimX, az: local.aimZ, j: jump ? 1 : 0 });
+        this.session.writePress(jump
+            ? { n: this.pressCounter, t: now, ax: local.x, az: local.z, j: 1 }
+            : { n: this.pressCounter, t: now, ax: local.aimX, az: local.aimZ, j: 0 });
     }
     isJumpPress(local, now) {
         const rally = this.rally, ball = this.ball;
