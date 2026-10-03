@@ -32,6 +32,12 @@ VbConfig.SERVE_TIMING_WINDOW_MS = 450;
 VbConfig.INTENT_WINDOW_MS = 700;
 VbConfig.SPIKE_LEAD_MS = 220;
 VbConfig.SPIKE_LEAD_WINDOW_MS = 450;
+VbConfig.JUMP_MS = 700;
+VbConfig.JUMP_HEIGHT = 0.9;
+VbConfig.BLOCK_REACH = 2.4;
+VbConfig.BLOCK_RADIUS = 0.95;
+VbConfig.BLOCK_DISTANCE = 2.6;
+VbConfig.BLOCK_FLIGHT = 0.8;
 VbConfig.NET_MS = 143;
 VbConfig.BOT_THINK_MS = 100;
 VbConfig.SUB_STEP = 1 / 90;
@@ -110,16 +116,10 @@ class ShotAimer {
             seconds += 0.05;
         return seconds;
     }
-    static chooseTarget(team, playerX, playerZ, stickX, stickZ, opponents, assist, fine = false) {
+    static emptySpot(team, opponents, depths, fine = true) {
         const side = VbConfig.sideOf(team);
-        const forward = -stickZ * side;
-        const kind = forward < -0.45 ? "tip" : forward > 0.45 ? "drive" : "mid";
-        const depths = kind === "tip" ? [ShotAimer.TIP_DEPTH] : kind === "drive" ? ShotAimer.DEEP_DEPTHS : ShotAimer.MID_DEPTHS;
-        const forcedX = Math.abs(stickX) > 0.3 ? VbMath.clamp(stickX * 3.8, -3.8, 3.8) : null;
-        const columns = forcedX !== null ? [forcedX] : fine ? ShotAimer.FINE_X : ShotAimer.COARSE_X;
-        if (!assist)
-            return { x: forcedX !== null ? forcedX : 0, z: -side * (kind === "tip" ? ShotAimer.TIP_DEPTH : kind === "drive" ? 7 : 4.5), kind };
-        let best = { x: columns[0], z: -side * depths[0], kind };
+        const columns = fine ? ShotAimer.FINE_X : ShotAimer.COARSE_X;
+        let best = { x: columns[0], z: -side * depths[0] };
         let bestScore = -1;
         for (const x of columns) {
             for (const depth of depths) {
@@ -127,10 +127,9 @@ class ShotAimer {
                 let score = opponents.length ? Infinity : 10;
                 for (const opponent of opponents)
                     score = Math.min(score, Math.hypot(x - opponent.x, z - opponent.z));
-                score -= Math.abs(x - playerX) * 0.02;
                 if (score > bestScore) {
                     bestScore = score;
-                    best = { x, z, kind };
+                    best = { x, z };
                 }
             }
         }
@@ -139,9 +138,10 @@ class ShotAimer {
 }
 ShotAimer.COARSE_X = [-3.4, -1.7, 0, 1.7, 3.4];
 ShotAimer.FINE_X = [-3.6, -2.7, -1.8, -0.9, 0, 0.9, 1.8, 2.7, 3.6];
-ShotAimer.MID_DEPTHS = [2.5, 4.5, 6.5];
-ShotAimer.DEEP_DEPTHS = [6.5, 7.8];
-ShotAimer.TIP_DEPTH = 1.6;
+ShotAimer.SPIKE_DEPTHS = [5.5, 7.0, 8.0];
+ShotAimer.QUICK_DEPTHS = [3.5, 5.0, 6.5];
+ShotAimer.LOB_DEPTHS = [2.5, 4.5, 6.5];
+ShotAimer.SERVE_DEPTHS = [3.5, 5.5, 7.5];
 class VbCourtLayout {
     static homeSpot(slot, serveTeam, serverSlot) {
         const team = VbConfig.teamOfSlot(slot);
@@ -175,7 +175,7 @@ class VbPlayerController {
         this.aimX = 0;
         this.aimZ = 0;
         this.locked = false;
-        this.botTarget = null;
+        this.jumpStartMs = -1e9;
         this.pressMs = -1;
         this.pressSeq = 0;
         this.consumedSeq = 0;
@@ -185,8 +185,11 @@ class VbPlayerController {
     get team() {
         return VbConfig.teamOfSlot(this.slot);
     }
-    step(dtSec) {
-        if (this.locked) {
+    isJumping(nowMs) {
+        return nowMs >= this.jumpStartMs && nowMs < this.jumpStartMs + VbConfig.JUMP_MS;
+    }
+    step(dtSec, nowMs = 0) {
+        if (this.locked || this.isJumping(nowMs)) {
             this.moving = false;
             return;
         }
@@ -248,7 +251,9 @@ class VbRemoteController extends VbPlayerController {
         this.z = VbMath.lerp(this.z, this.targetZ, follow);
     }
     step() { }
-    receive(x, z, yaw, moving, ix, iz, aimX, aimZ) {
+    receive(x, z, yaw, moving, ix, iz, aimX, aimZ, jumpStartMs) {
+        if (jumpStartMs > this.jumpStartMs)
+            this.jumpStartMs = jumpStartMs;
         this.targetX = x;
         this.targetZ = z;
         this.yaw = yaw;
@@ -272,12 +277,9 @@ VbBotTuning.TIMING_ERROR_MS = 40;
 VbBotTuning.SPIKE_CHANCE = 1;
 VbBotTuning.MISS_CHANCE = 0.03;
 VbBotTuning.URGENT_PARTNER_DISTANCE = 5.5;
-class VbBotAimer {
-    static choose(bot, opponents) {
-        const choice = ShotAimer.chooseTarget(bot.team, bot.x, bot.z, 0, -VbConfig.sideOf(bot.team) * 0.6, opponents, true, true);
-        return { x: choice.x, z: choice.z };
-    }
-}
+VbBotTuning.BLOCK_CHANCE = 0.4;
+VbBotTuning.BLOCK_NOISE = 0.4;
+VbBotTuning.BLOCK_LEAD_MS = 200;
 class VolleyballBot extends VbPlayerController {
     constructor(slot, random) {
         super(slot);
@@ -295,6 +297,10 @@ class VolleyballBot extends VbPlayerController {
         this.tossReadyMs = 0;
         this.tossed = false;
         this.hitOffsetMs = 0;
+        this.blockPlanSeq = -1;
+        this.blocks = false;
+        this.blockNoise = 0;
+        this.blockLeadMs = VbBotTuning.BLOCK_LEAD_MS;
     }
     poll(engine, dtSec, nowMs) {
         if (!engine)
@@ -306,7 +312,7 @@ class VolleyballBot extends VbPlayerController {
         if (engine.phase === "toss" && engine.serverSlot() === this.slot)
             this.finishServe(engine, nowMs);
         this.steer();
-        this.step(dtSec);
+        this.step(dtSec, nowMs);
     }
     think(engine, nowMs) {
         if (engine.phase === "serve" || engine.phase === "toss") {
@@ -322,6 +328,8 @@ class VolleyballBot extends VbPlayerController {
             return;
         }
         const incoming = engine.incoming;
+        if (incoming && incoming.team !== this.team && engine.possTouches === 2 && engine.touchTeam === incoming.team && this.thinkBlock(engine, incoming, nowMs))
+            return;
         if (!incoming || incoming.team !== this.team) {
             this.goal = VbCourtLayout.defendSpot(this.slot);
             return;
@@ -354,11 +362,41 @@ class VolleyballBot extends VbPlayerController {
         const partner = engine.partnerOf(this.slot);
         return !!partner && Math.hypot(partner.x - engine.ball.x, partner.z - engine.ball.z) > VbBotTuning.URGENT_PARTNER_DISTANCE;
     }
+    thinkBlock(engine, incoming, nowMs) {
+        if (engine.ballSeq !== this.blockPlanSeq) {
+            this.blockPlanSeq = engine.ballSeq;
+            this.blocks = this.random() < VbBotTuning.BLOCK_CHANCE;
+            this.blockNoise = VbMath.gaussian(this.random) * VbBotTuning.BLOCK_NOISE;
+            this.blockLeadMs = VbBotTuning.BLOCK_LEAD_MS + VbMath.gaussian(this.random) * VbBotTuning.TIMING_ERROR_MS;
+        }
+        if (!this.blocks || !this.isNearestBlocker(engine, incoming, nowMs))
+            return false;
+        const side = VbConfig.sideOf(this.team);
+        this.goal = { x: VbMath.clamp(incoming.x + this.blockNoise, -3.8, 3.8), z: side * 1.3 };
+        const ready = Math.hypot(this.goal.x - this.x, this.goal.z - this.z) < 0.5;
+        if (ready && !this.isJumping(nowMs) && incoming.atMs - nowMs <= this.blockLeadMs)
+            this.jumpStartMs = nowMs;
+        return true;
+    }
+    isNearestBlocker(engine, incoming, nowMs) {
+        let nearest = -1;
+        let nearestDistance = Infinity;
+        for (const other of engine.players) {
+            if (!(other instanceof VolleyballBot) || other.team !== this.team || other.isJumping(nowMs))
+                continue;
+            const distance = Math.abs(other.x - incoming.x) + Math.abs(Math.abs(other.z) - 1.3) * 0.5;
+            if (distance < nearestDistance - 1e-6) {
+                nearestDistance = distance;
+                nearest = other.slot;
+            }
+        }
+        return nearest === this.slot;
+    }
     isDesignatedReceiver(engine, incoming) {
         let nearest = -1;
         let nearestDistance = Infinity;
         for (const other of engine.players) {
-            if (!(other instanceof VolleyballBot) || !engine.canTouch(other.slot))
+            if (!(other instanceof VolleyballBot) || !engine.canTouch(other.slot) || other.isJumping(incoming.atMs - 400))
                 continue;
             const distance = Math.hypot(other.x - incoming.x, other.z - incoming.z);
             if (distance < nearestDistance - 1e-6) {
@@ -374,8 +412,7 @@ class VolleyballBot extends VbPlayerController {
         if (incoming.atMs - nowMs > this.pressLeadMs)
             return;
         this.pressedForSeq = engine.ballSeq;
-        this.botTarget = VbBotAimer.choose(this, engine.opponentsOf(this.team));
-        this.registerPress(nowMs, this.botTarget.x, this.botTarget.z);
+        this.registerPress(nowMs, 0, 0);
     }
     thinkServe(engine, nowMs) {
         this.goal = null;
@@ -393,8 +430,8 @@ class VolleyballBot extends VbPlayerController {
     finishServe(engine, nowMs) {
         if (this.pressSeq > this.consumedSeq || nowMs < engine.tossApexMs + this.hitOffsetMs)
             return;
-        this.botTarget = VbBotAimer.choose(this, engine.opponentsOf(this.team));
-        this.registerPress(nowMs, this.botTarget.x, this.botTarget.z);
+        const aim = ShotAimer.emptySpot(this.team, engine.opponentsOf(this.team), ShotAimer.SERVE_DEPTHS);
+        this.registerPress(nowMs, aim.x, aim.z);
     }
     steer() {
         if (this.locked || !this.goal) {
@@ -503,7 +540,7 @@ class VbRallyEngine {
             const spot = VbCourtLayout.homeSpot(player.slot, this.serveTeam, server);
             player.teleport(spot.x, spot.z);
             player.locked = player.slot === server;
-            player.botTarget = null;
+            player.jumpStartMs = -1e9;
             player.discardOldPress();
         }
         const hand = this.players[server];
@@ -559,13 +596,11 @@ class VbRallyEngine {
         const side = VbConfig.sideOf(team);
         const start = VbBallPhysics.positionAt(this.tossBall, Math.max(0, (atMs - this.tossStartMs) / 1000));
         start.y = Math.max(start.y, 0.9);
-        let aim = server.botTarget;
-        if (!aim && -side * server.pressAimZ > 0.5 && Math.abs(server.pressAimX) < 6)
+        let aim = null;
+        if (-side * server.pressAimZ > 0.5 && Math.abs(server.pressAimX) < 6)
             aim = { x: server.pressAimX, z: server.pressAimZ };
-        if (!aim) {
-            const choice = ShotAimer.chooseTarget(team, server.x, server.z, 0, 0, this.opponentsOf(team), true);
-            aim = { x: choice.x, z: choice.z };
-        }
+        if (!aim)
+            aim = ShotAimer.emptySpot(team, this.opponentsOf(team), ShotAimer.SERVE_DEPTHS);
         const scatter = VbMath.discOffset((1 - quality) * VbConfig.SERVE_SCATTER, this.random);
         const target = {
             x: VbMath.clamp(aim.x + scatter.x, -VbConfig.HALF_W - 1.5, VbConfig.HALF_W + 1.5),
@@ -587,7 +622,6 @@ class VbRallyEngine {
         this.touchTeam = 1 - team;
         this.possTouches = 0;
         server.locked = false;
-        server.botTarget = null;
         this.phase = "play";
         this.events.push({ type: "rally", rally: this.rallyRecord("play", atMs, -1, "", 0, 0) });
         this.emitBall("serve", server.slot, 0, this.touchTeam, VbConfig.REACH[0], -1, atMs, 0);
@@ -634,6 +668,8 @@ class VbRallyEngine {
         const fraction = previousZ / (previousZ - ball.z);
         const crossingX = previousX + (ball.x - previousX) * fraction;
         const crossingY = previousY + (ball.y - previousY) * fraction;
+        if (this.tryBlock(crossingX, crossingY, ms))
+            return;
         if (Math.abs(crossingX) > VbConfig.HALF_W + 0.6)
             return;
         if (crossingY - VbConfig.BALL_R >= VbConfig.NET_TOP)
@@ -649,6 +685,43 @@ class VbRallyEngine {
         ball.vy = Math.min(ball.vy, 0);
         this.incoming = null;
         this.emitBall("net", this.lastBy, this.possTouches, -1, 0, -1, ms, 0);
+    }
+    tryBlock(crossingX, crossingY, ms) {
+        if (this.ballKind !== "over" && this.ballKind !== "quick" && this.ballKind !== "spike")
+            return false;
+        const defender = this.touchTeam;
+        if (defender < 0)
+            return false;
+        for (const player of this.players) {
+            if (player.team !== defender)
+                continue;
+            const progress = (ms - player.jumpStartMs) / VbConfig.JUMP_MS;
+            if (progress < 0.05 || progress > 0.95)
+                continue;
+            if (Math.abs(player.z) > VbConfig.BLOCK_DISTANCE || Math.abs(player.x - crossingX) > VbConfig.BLOCK_RADIUS)
+                continue;
+            const reach = VbConfig.BLOCK_REACH + VbConfig.JUMP_HEIGHT * Math.sin(Math.PI * progress);
+            if (crossingY - VbConfig.BALL_R > reach)
+                continue;
+            this.deflect(player, crossingX, crossingY, ms);
+            return true;
+        }
+        return false;
+    }
+    deflect(blocker, crossingX, crossingY, ms) {
+        const attacker = 1 - blocker.team;
+        const side = VbConfig.sideOf(attacker);
+        const spread = VbMath.discOffset(1.4, this.random);
+        const from = { x: crossingX, y: Math.max(crossingY, 0.8), z: side * 0.05 };
+        const target = { x: VbMath.clamp(crossingX + spread.x, -3.8, 3.8), y: VbConfig.BALL_R, z: side * (1.2 + this.random() * 3) };
+        const velocity = ShotAimer.velocity(from, target, VbConfig.BLOCK_FLIGHT);
+        this.setBall({ x: from.x, y: from.y, z: from.z, vx: velocity.x, vy: velocity.y, vz: velocity.z });
+        this.lastBy = blocker.slot;
+        this.lastTouchTeam = blocker.team;
+        this.touchTeam = attacker;
+        this.possTouches = 0;
+        this.emitBall("block", blocker.slot, 0, attacker, VbConfig.REACH[0], -1, ms, 0);
+        this.recomputeIncoming(ms);
     }
     land(ms) {
         const ball = this.ball;
@@ -729,10 +802,12 @@ class VbRallyEngine {
             return;
         }
         const opponents = this.opponentsOf(team);
-        if (count === 2 && intent)
+        if (count === 1)
+            this.sendShot(player, from, opponents, ShotAimer.LOB_DEPTHS, quality, 1.65, "over", ms);
+        else if (intent)
             this.attack(player, from, opponents, quality, lead, ms);
         else
-            this.sendOver(player, from, opponents, quality, ms, "over");
+            this.sendShot(player, from, opponents, ShotAimer.QUICK_DEPTHS, quality, 0.75, "quick", ms);
     }
     passToPartner(player, partner, from, count, quality, ms) {
         const side = VbConfig.sideOf(player.team);
@@ -746,29 +821,17 @@ class VbRallyEngine {
         const flight = count === 0 ? 1.35 : 1.25;
         this.release(player, from, target, flight, count === 0 ? "dig" : "set", player.team, VbConfig.REACH[count + 1], partner.slot, ms);
     }
-    aimFor(player, opponents) {
-        if (player.botTarget)
-            return { x: player.botTarget.x, z: player.botTarget.z, kind: "mid" };
-        return ShotAimer.chooseTarget(player.team, player.x, player.z, player.ix, player.iz, opponents, true);
-    }
-    sendOver(player, from, opponents, quality, ms, kind) {
-        const aim = this.aimFor(player, opponents);
+    sendShot(player, from, opponents, depths, quality, minimumFlight, kind, ms) {
+        const aim = ShotAimer.emptySpot(player.team, opponents, depths);
         const spread = VbMath.discOffset(0.3 + (1 - quality) * 1.4, this.random);
         const target = { x: aim.x + spread.x, y: VbConfig.BALL_R, z: aim.z + spread.z };
-        const flight = ShotAimer.clearingFlight(from, target, 1.65);
+        const flight = ShotAimer.clearingFlight(from, target, minimumFlight);
         this.release(player, from, target, flight, kind, 1 - player.team, VbConfig.REACH[0], -1, ms);
     }
     attack(player, from, opponents, quality, lead, ms) {
-        const aim = this.aimFor(player, opponents);
+        const aim = ShotAimer.emptySpot(player.team, opponents, ShotAimer.SPIKE_DEPTHS);
         const timing = VbMath.clamp(1 - Math.abs(lead - VbConfig.SPIKE_LEAD_MS) / VbConfig.SPIKE_LEAD_WINDOW_MS, 0, 1);
         const finalQuality = timing * (0.6 + 0.4 * quality);
-        if (aim.kind === "tip" && !player.botTarget) {
-            const spread = VbMath.discOffset(0.3 + (1 - finalQuality) * 0.8, this.random);
-            const target = { x: aim.x + spread.x, y: VbConfig.BALL_R, z: aim.z + spread.z };
-            const flight = ShotAimer.clearingFlight(from, target, 1.0);
-            this.release(player, from, target, flight, "tip", 1 - player.team, VbConfig.REACH[0], -1, ms);
-            return;
-        }
         const spread = VbMath.discOffset(0.2 + (1 - finalQuality) * 2.2, this.random);
         const target = { x: aim.x + spread.x, y: VbConfig.BALL_R, z: aim.z + spread.z };
         const minimum = 0.52 + (1 - finalQuality) * 0.3;
@@ -785,7 +848,6 @@ class VbRallyEngine {
         this.lastTouchTeam = player.team;
         this.touchTeam = to;
         this.possTouches = to === player.team ? count : 0;
-        player.botTarget = null;
         this.emitBall(kind, player.slot, count, to, reachHeight, next, ms, 0);
         this.recomputeIncoming(ms);
     }

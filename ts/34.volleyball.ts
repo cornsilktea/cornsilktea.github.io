@@ -13,8 +13,8 @@ interface VbPlayerRecord {
 
 interface VbMatchRecord { id: number; startAt: number; seats: Record<string, string> }
 interface VbEndRecord { winner: number; sa: number; sb: number; at: number }
-interface VbPressRecord { n: number; t: number; ax: number; az: number }
-interface VbRemoteState { x: number; z: number; yaw: number; moving: boolean; ix: number; iz: number; ax: number; az: number }
+interface VbPressRecord { n: number; t: number; ax: number; az: number; j: number }
+interface VbRemoteState { x: number; z: number; yaw: number; moving: boolean; ix: number; iz: number; ax: number; az: number; js: number }
 interface VbJoinOutcome { ok: boolean; message: string }
 interface VbAxis { x: number; z: number }
 
@@ -41,14 +41,14 @@ class VbStateCodec {
   static encode(controller: VbPlayerController): string {
     const round2 = (value: number) => Math.round(value * 100) / 100;
     const round1 = (value: number) => Math.round(value * 10) / 10;
-    return [round2(controller.x), round2(controller.z), round2(controller.yaw), controller.moving ? 1 : 0, round1(controller.ix), round1(controller.iz), round1(controller.aimX), round1(controller.aimZ)].join(",");
+    return [round2(controller.x), round2(controller.z), round2(controller.yaw), controller.moving ? 1 : 0, round1(controller.ix), round1(controller.iz), round1(controller.aimX), round1(controller.aimZ), controller.jumpStartMs > 0 ? Math.round(controller.jumpStartMs) : 0].join(",");
   }
 
   static decode(raw: unknown): VbRemoteState | null {
     if (typeof raw !== "string") return null;
     const parts = raw.split(",").map(Number);
-    if (parts.length < 8 || parts.some((part) => isNaN(part))) return null;
-    return { x: parts[0], z: parts[1], yaw: parts[2], moving: parts[3] === 1, ix: parts[4], iz: parts[5], ax: parts[6], az: parts[7] };
+    if (parts.length < 9 || parts.some((part) => isNaN(part))) return null;
+    return { x: parts[0], z: parts[1], yaw: parts[2], moving: parts[3] === 1, ix: parts[4], iz: parts[5], ax: parts[6], az: parts[7], js: parts[8] };
   }
 }
 
@@ -953,7 +953,7 @@ class VbLocalController extends VbPlayerController {
     this.aimZ = -side * 4.5;
   }
 
-  poll(engine: VbRallyEngine | null, dtSec: number): void {
+  poll(engine: VbRallyEngine | null, dtSec: number, nowMs: number): void {
     const axis = this.input.axis();
     const side = VbConfig.sideOf(this.team);
     this.ix = axis.x * side;
@@ -962,7 +962,7 @@ class VbLocalController extends VbPlayerController {
       this.aimX = VbMath.clamp(this.aimX + this.ix * VbLocalController.AIM_SPEED * dtSec, -4.2, 4.2);
       this.aimZ = VbMath.clamp(this.aimZ + this.iz * VbLocalController.AIM_SPEED * dtSec, side > 0 ? -8.6 : 0.8, side > 0 ? -0.8 : 8.6);
     }
-    this.step(dtSec);
+    this.step(dtSec, nowMs);
   }
 }
 
@@ -1006,6 +1006,7 @@ interface VbHudModel {
 
 interface VbSeatActor {
   id: string;
+  seenJump: number;
   controller: VbPlayerController;
   view: VbPlayerView;
 }
@@ -1054,7 +1055,8 @@ class VbHostDirector {
     const last = this.lastPressSeq.get(id) || 0;
     if (record.n <= last) return;
     this.lastPressSeq.set(id, record.n);
-    controller.registerPress(record.t, record.ax, record.az);
+    if (record.j) controller.jumpStartMs = record.t;
+    else controller.registerPress(record.t, record.ax, record.az);
   }
 }
 
@@ -1062,7 +1064,7 @@ class VolleyballMatch {
   private static readonly STATE_KEEPALIVE_MS = 1000;
   private static readonly CLIPS: Record<string, string> = {
     toss: "Throw", serve: "Melee_1H_Attack_Chop", dig: "Melee_Block", set: "Ranged_Magic_Raise",
-    over: "Throw", spike: "Melee_1H_Attack_Jump_Chop", tip: "Melee_1H_Attack_Chop"
+    over: "Throw", spike: "Melee_1H_Attack_Jump_Chop", quick: "Melee_1H_Attack_Chop", block: "Melee_Block"
   };
   private static readonly JUMP_KINDS: readonly string[] = ["serve", "spike"];
   private static readonly TOSS_COLORS: readonly string[] = ["#5DBB63", "#4C8DFF"];
@@ -1122,7 +1124,7 @@ class VolleyballMatch {
 
   receiveRemote(id: string, state: VbRemoteState): void {
     const seat = this.seats.find((actor) => !!actor && actor.id === id);
-    if (seat && seat.controller instanceof VbRemoteController) seat.controller.receive(state.x, state.z, state.yaw, state.moving, state.ix, state.iz, state.ax, state.az);
+    if (seat && seat.controller instanceof VbRemoteController) seat.controller.receive(state.x, state.z, state.yaw, state.moving, state.ix, state.iz, state.ax, state.az, state.js);
   }
 
   receivePress(id: string, record: VbPressRecord): void {
@@ -1182,7 +1184,7 @@ class VolleyballMatch {
       if (current) current.view.dispose();
       const controller = this.makeController(slot, id, record, previous);
       const view = new VbPlayerView(this.services.libs, this.services.factory, this.services.assets, this.services.labels, this.group, slot, record);
-      this.seats[slot] = { id, controller, view };
+      this.seats[slot] = { id, seenJump: 0, controller, view };
       this.controllers[slot] = controller;
     }
     this.seatsDirty = !complete;
@@ -1247,14 +1249,27 @@ class VolleyballMatch {
   }
 
   pressAction(): void {
-    if (!this.local || this.ended) return;
+    const local = this.local;
+    if (!local || this.ended) return;
     const now = this.services.backend.now();
+    const jump = this.isJumpPress(local, now);
+    if (jump) {
+      if (local.isJumping(now) || now < local.jumpStartMs + VbConfig.JUMP_MS + 250) return;
+      local.jumpStartMs = now;
+    }
     if (this.isHost()) {
-      this.local.registerPress(now, this.local.aimX, this.local.aimZ);
+      if (!jump) local.registerPress(now, local.aimX, local.aimZ);
       return;
     }
     this.pressCounter++;
-    this.session.writePress({ n: this.pressCounter, t: now, ax: this.local.aimX, az: this.local.aimZ });
+    this.session.writePress({ n: this.pressCounter, t: now, ax: local.aimX, az: local.aimZ, j: jump ? 1 : 0 });
+  }
+
+  private isJumpPress(local: VbLocalController, now: number): boolean {
+    const rally = this.rally, ball = this.ball;
+    if (!rally || rally.phase !== "play" || !ball) return false;
+    const onMySide = this.ballPosition(now).z * VbConfig.sideOf(local.team) > 0;
+    return !(ball.to === local.team && onMySide);
   }
 
   private applyEvents(events: VbEvent[]): void {
@@ -1313,6 +1328,10 @@ class VolleyballMatch {
     this.seats.forEach((actor) => {
       if (!actor) return;
       const controller = actor.controller;
+      if (controller.jumpStartMs > actor.seenJump) {
+        actor.seenJump = controller.jumpStartMs;
+        if (now - controller.jumpStartMs < VbConfig.JUMP_MS) actor.view.playAction("Melee_Block", controller.jumpStartMs, true);
+      }
       actor.view.render(controller.x, controller.z, controller.yaw, controller.moving, deltaSeconds, now);
     });
     this.updateMarkers(now);
@@ -1368,15 +1387,14 @@ class VolleyballMatch {
       return;
     }
     const controller = actor.controller;
-    const target = rally && rally.phase === "serve" ? { x: controller.aimX, z: controller.aimZ } : this.spikeAimOf(controller, this.session.players.get(actor.id));
+    const target = rally && rally.phase === "serve" ? { x: controller.aimX, z: controller.aimZ } : this.spikeAimOf(controller);
     this.aimMarker.show(target.x, target.z, VolleyballMatch.AIM_COLOR, 1, 0.9);
   }
 
-  private spikeAimOf(controller: VbPlayerController, record: VbPlayerRecord | undefined): VbPoint {
+  private spikeAimOf(controller: VbPlayerController): VbPoint {
     const opponents = this.controllers.filter((other) => other.team !== controller.team).map((other) => ({ x: other.x, z: other.z }));
-    const bot = !!record && record.isBot;
-    const choice = ShotAimer.chooseTarget(controller.team, controller.x, controller.z, bot ? 0 : controller.ix, bot ? 0 : controller.iz, opponents, true);
-    return { x: choice.x, z: choice.z };
+    const depths = this.ball && this.ball.n >= 2 ? ShotAimer.SPIKE_DEPTHS : ShotAimer.LOB_DEPTHS;
+    return ShotAimer.emptySpot(controller.team, opponents, depths);
   }
 
   private hudModel(now: number): VbHudModel {
@@ -1419,7 +1437,14 @@ class VolleyballMatch {
       }
       return;
     }
-    if (rally.phase !== "play" || ball.to !== local.team) return;
+    if (rally.phase !== "play") return;
+    if (ball.to >= 0 && ball.to !== local.team && ball.kind === "set" && ball.n === 2) {
+      model.actionLabel = "블로킹";
+      model.actionReady = true;
+      model.hint = "상대가 공격해요 · 네트 앞에서 스파이크 방향을 읽고 제자리 점프(버튼)로 블로킹!";
+      return;
+    }
+    if (ball.to !== local.team) return;
     if (ball.kind !== "dig" && ball.kind !== "set") {
       model.hint = "표식 위로 달려가면 자동으로 받아요";
       return;
@@ -1432,10 +1457,10 @@ class VolleyballMatch {
     model.actionReady = true;
     if (ball.n === 1) {
       model.actionLabel = "넘기기";
-      model.hint = "누르지 않으면 동료에게 토스 · 누르면 상대 코트로 넘겨요";
+      model.hint = "누르지 않으면 동료에게 토스 · 누르면 상대 코트로 높게 넘겨요";
     } else {
       model.actionLabel = "스파이크";
-      model.hint = "공이 닿기 직전에 눌러 스파이크! · 스틱 방향이 곧 목표 (뒤로 당기면 살짝 넘기기)";
+      model.hint = "공이 닿기 직전에 누르면 점프 스파이크(빈 곳으로 자동) · 안 누르면 낮고 빠르게 넘겨요";
     }
   }
 }
@@ -1534,29 +1559,64 @@ class VbMenuBackdrop {
   private static readonly ORBIT_SECONDS = 70;
   private static readonly RADIUS = 17;
   private static readonly HEIGHT = 7.5;
+  private static readonly HOP_SECONDS = 1.8;
+  private static readonly PEAK = 3.4;
 
   private readonly ballView: VbBallView;
+  private readonly views: VbPlayerView[] = [];
   private seconds = 0;
+  private hopIndex = -1;
 
-  constructor(private readonly world: VbWorldView, libs: ThreeLibs, textures: VbCourtTextures) {
+  constructor(private readonly world: VbWorldView, private readonly libs: ThreeLibs, textures: VbCourtTextures) {
     this.ballView = new VbBallView(libs, textures);
     world.scene.add(this.ballView.group);
   }
 
+  prepare(factory: CharacterModelFactory, assets: CharacterAssets, labels: VbLabelFactory): void {
+    if (this.views.length) return;
+    for (let slot = 0; slot < VbConfig.SEAT_COUNT; slot++) {
+      const record: VbPlayerRecord = { nick: VbConfig.BOT_NAMES[slot], isBot: true, joinedAt: 0, slot, look: VbBotLooks.create(VbConfig.teamOfSlot(slot)) };
+      const view = new VbPlayerView(this.libs, factory, assets, labels, this.world.scene, slot, record);
+      this.views.push(view);
+    }
+  }
+
   render(deltaSeconds: number): void {
     this.seconds += deltaSeconds;
+    const nowMs = this.seconds * 1000;
     this.ballView.group.visible = true;
-    const phase = (this.seconds * 0.55) % 2;
-    const progress = phase % 1;
-    const direction = phase < 1 ? 1 : -1;
-    const height = VbConfig.BALL_R + 4 * progress * (1 - progress) * 3.4;
-    this.ballView.place(direction * (progress - 0.5) * 9, height, direction * (progress - 0.5) * 12, 3, deltaSeconds);
+    const hops = this.seconds / VbMenuBackdrop.HOP_SECONDS;
+    const hop = Math.floor(hops);
+    const progress = hops - hop;
+    const fromTeam = hop % 2;
+    const direction = VbConfig.sideOf(fromTeam);
+    const ballZ = direction * (5.2 - 10.4 * progress);
+    const ballX = Math.sin(hops * 1.3) * 2;
+    const height = VbConfig.BALL_R + 4 * progress * (1 - progress) * VbMenuBackdrop.PEAK + 0.8 * (1 - progress);
+    this.ballView.place(ballX, height, ballZ, 4, deltaSeconds);
+    if (hop !== this.hopIndex) {
+      this.hopIndex = hop;
+      const sender = this.views[fromTeam * 2 + (Math.floor(hop / 2) % 2)];
+      if (sender) sender.playAction("Melee_1H_Attack_Jump_Chop", nowMs, true);
+    }
+    this.views.forEach((view, slot) => {
+      const spot = VbCourtLayout.defendSpot(slot);
+      const team = VbConfig.teamOfSlot(slot);
+      const approach = VbConfig.sideOf(team) * direction > 0 ? 0 : 1;
+      const x = spot.x + Math.sin(this.seconds * 0.8 + slot) * 0.7 + (slot % 2 === 0 ? -1 : 1) * 0.3 * approach;
+      view.render(x, spot.z, VbCourtLayout.facingYaw(team), false, deltaSeconds, nowMs);
+    });
     this.world.rig.orbit(VbMenuBackdrop.RADIUS, VbMenuBackdrop.HEIGHT, (this.seconds / VbMenuBackdrop.ORBIT_SECONDS) * Math.PI * 2);
     this.world.render(deltaSeconds);
   }
 
   hide(): void {
     this.ballView.group.visible = false;
+    this.views.forEach((view) => { view.group.visible = false; });
+  }
+
+  show(): void {
+    this.views.forEach((view) => { view.group.visible = true; });
   }
 }
 
@@ -1610,6 +1670,7 @@ class VolleyballGame {
     try {
       await Promise.all([this.assets.load(), this.court.loadDecor()]);
       this.assetsReady = true;
+      this.backdrop.prepare(this.factory, this.assets, this.services.labels);
       VbDom.setText(VbDom.byId("loadNote"), "");
       this.editor.mount(VbDom.byId("profileHost"));
       this.editor.setActive(true);
@@ -1832,6 +1893,7 @@ class VolleyballGame {
       this.backdrop.hide();
       this.match.update(deltaSeconds);
     } else {
+      this.backdrop.show();
       this.backdrop.render(deltaSeconds);
     }
   }
