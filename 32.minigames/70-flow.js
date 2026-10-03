@@ -51,6 +51,10 @@ class GameRuntime {
         if (this.active)
             this.active.spectateNext();
     }
+    onSpectateTo(id) {
+        if (this.active)
+            this.active.spectateTo(id);
+    }
     dispose() {
         if (this.activeSession)
             this.activeSession.closeGame();
@@ -147,6 +151,11 @@ class LobbyScreenPhase extends MenuScreenPhase {
             this.services.lobbyView.render(session);
     }
 }
+class PracticeScreenPhase extends MenuScreenPhase {
+    enter() {
+        this.showMenu("practice", this.services.practiceProfileHost);
+    }
+}
 class PlayScreenPhase extends CollectionPhase {
     constructor() {
         super(...arguments);
@@ -157,6 +166,9 @@ class PlayScreenPhase extends CollectionPhase {
         this.services.screens.show("game");
         this.services.profilePanel.setActive(false);
         this.rosterClock = PlayScreenPhase.ROSTER_REFRESH_SECONDS;
+    }
+    exit() {
+        this.services.spectatorBar.hide();
     }
     update(dt, draw) {
         const game = this.services.runtime.game;
@@ -174,7 +186,7 @@ class PlayScreenPhase extends CollectionPhase {
         model.cooldowns.forEach((cooldown) => this.services.hub.setCooldown(cooldown.action, cooldown.left));
         this.services.messages.showBanner(model.bannerHtml, model.bannerWarning);
         this.services.messages.showCenter(model.centerText);
-        this.services.messages.showSpectateButton(model.spectateButton);
+        this.services.spectatorBar.render(model);
     }
     roundLabel(session, round) {
         const definition = this.services.catalog.find(round.kind);
@@ -215,6 +227,10 @@ class ResultScreenPhase extends CollectionPhase {
             return;
         const left = Math.max(0, Math.ceil((session.nextAt - session.now()) / 1000));
         const next = this.services.catalog.find(session.plan[session.round.n] || "");
+        if (session.practice) {
+            this.services.resultView.showCountdown("연습 끝 · " + left + "초 후 종목 선택으로 돌아가요");
+            return;
+        }
         this.services.resultView.showCountdown(next ? "다음 종목 · " + next.title + " · " + left + "초 후 시작" : "최종 결과 " + left + "초 후");
     }
 }
@@ -229,7 +245,13 @@ class CollectionFlow {
             roundEnd: () => this.services.phases.goTo(this.services.resultPhase),
             final: () => this.services.phases.goTo(this.services.resultPhase)
         };
-        services.startView.onCreate(() => this.createRoom());
+        services.startView.onCreate(() => this.createRoom(false));
+        services.practiceEntry.onClick(() => this.createRoom(true));
+        services.practiceMenu.onPick((gameId) => { if (this.director)
+            this.director.startPractice(gameId); });
+        services.practiceMenu.onLeave(() => this.leaveRoom());
+        services.lobbyView.onSwitchSeat(() => { if (this.current)
+            this.current.switchSeat(); });
         services.startView.onJoin(() => this.joinRoom());
         services.startView.onEnterInCode(() => this.joinRoom());
         services.lobbyView.onStart(() => { if (this.director)
@@ -288,27 +310,34 @@ class CollectionFlow {
             return;
         round.roster.filter((id) => !session.hasPlayer(id)).forEach((id) => this.services.runtime.playerDeparted(id));
     }
-    myRecord(slot) {
+    myRecord(slot, spectator) {
         const profile = this.services.profile;
-        return { nick: PlayerProfile.cleanNick(profile.nick) || profile.nickOrDefault(), isAI: false, joinedAt: this.services.backend.clock.now(), slot, look: profile.look };
+        const record = { nick: PlayerProfile.cleanNick(profile.nick) || profile.nickOrDefault(), isAI: false, joinedAt: this.services.backend.clock.now(), slot, look: profile.look };
+        if (spectator)
+            record.spectator = true;
+        return record;
     }
-    async createRoom() {
+    setCreateBusy(busy) {
+        this.services.startView.setCreateEnabled(!busy);
+        this.services.practiceEntry.setEnabled(!busy);
+    }
+    async createRoom(practice) {
         const view = this.services.startView;
         if (!this.services.backend.isOnline())
             return;
-        view.setCreateEnabled(false);
+        this.setCreateBusy(true);
         view.showMessage("");
         try {
-            const code = await this.services.directory.create(this.services.localId, this.myRecord(0));
+            const code = await this.services.directory.create(this.services.localId, this.myRecord(0, false), practice);
             if (code)
-                this.enterRoom(code);
+                this.enterRoom(code, practice);
             else
                 view.showMessage("방을 만들지 못했어요. 다시 눌러 주세요.");
         }
         catch (error) {
             view.showMessage("방을 만들지 못했어요. (데이터베이스 규칙을 확인해 주세요)");
         }
-        view.setCreateEnabled(true);
+        this.setCreateBusy(false);
     }
     async joinRoom() {
         const view = this.services.startView;
@@ -322,10 +351,10 @@ class CollectionFlow {
         view.setJoinEnabled(false);
         view.showMessage("");
         try {
-            const outcome = await this.services.directory.join(code, this.services.localId, (existing) => this.myRecord(SlotAllocator.freeSlot(existing.values())));
+            const outcome = await this.services.directory.join(code, this.services.localId, (existing, spectator) => this.myRecord(spectator ? CollectionRules.SPECTATOR_SLOT : SlotAllocator.freeSlot(existing.values()), spectator));
             view.setJoinEnabled(true);
             if (outcome.ok)
-                this.enterRoom(code);
+                this.enterRoom(code, false);
             else
                 view.showMessage(outcome.message);
         }
@@ -334,14 +363,14 @@ class CollectionFlow {
             view.showMessage("방을 불러오지 못했어요.");
         }
     }
-    enterRoom(code) {
+    enterRoom(code, practice) {
         this.services.runtime.dispose();
-        const session = new CollectionSession(this.services.backend, this.services.env, code, this.services.localId, this);
+        const session = new CollectionSession(this.services.backend, this.services.env, code, this.services.localId, practice, this);
         this.current = session;
         this.director = new CollectionDirector(session, this.services.catalog, this.services.random);
         session.connect();
         this.services.lobbyView.showCode(code);
-        this.services.phases.goTo(this.services.lobbyPhase);
+        this.services.phases.goTo(practice ? this.services.practicePhase : this.services.lobbyPhase);
     }
     leaveRoom() {
         if (this.current)
@@ -367,7 +396,8 @@ class CollectionFlow {
     }
     openLobby() {
         this.services.runtime.dispose();
-        this.services.phases.goTo(this.services.lobbyPhase);
+        const practice = !!this.current && this.current.practice;
+        this.services.phases.goTo(practice ? this.services.practicePhase : this.services.lobbyPhase);
     }
     openRound() {
         const session = this.current;

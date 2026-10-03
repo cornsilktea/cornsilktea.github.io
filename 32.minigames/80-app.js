@@ -10,6 +10,8 @@ class MiniGamesApp {
         this.tokens = new TokenSource(new RandomRange(this.randomSource));
         this.localId = "p" + this.tokens.token(8) + new SystemClock().now().toString(36).slice(-4);
         this.startView = new StartView(this.page);
+        this.practiceEntry = new PracticeEntryView(this.page);
+        this.practiceMenu = new PracticeMenuView(this.page);
         this.phases = new CollectionPhaseMachine();
         this.lastFrameMs = 0;
         this.lastTickMs = 0;
@@ -37,6 +39,7 @@ class MiniGamesApp {
         this.lastFrameMs = this.env.nowMs();
         this.lastTickMs = this.lastFrameMs;
         new CatalogView(this.page).render(this.catalog);
+        this.practiceMenu.render(this.catalog);
         this.updateStartButtons();
         this.env.requestFrame(this.frame);
         this.env.everyMs(MiniGamesApp.BACKUP_TICK_MS, () => this.backupTick());
@@ -53,20 +56,21 @@ class MiniGamesApp {
             libs: this.libs, page: this.page, env: this.env, clock: this.backend.clock, render: this.render,
             characters: { assets: this.assets, factory: this.factory }, localId: this.localId, host
         }, hub);
-        messages.onSpectateNext(() => runtime.onSpectateNext());
+        const spectatorBar = new SpectatorViewBar(this.page);
+        spectatorBar.onPick((id) => runtime.onSpectateTo(id));
         const lobbyView = new CollectionLobbyView(this.page, this.catalog);
         const resultView = new CollectionResultView(this.page, this.catalog);
         const services = {
-            clock: this.backend.clock, screens, runtime, hud: new CollectionHud(this.page), messages, hub, render: this.render, backdrops: this.backdrops, catalog: this.catalog,
+            clock: this.backend.clock, screens, runtime, hud: new CollectionHud(this.page), spectatorBar, messages, hub, render: this.render, backdrops: this.backdrops, catalog: this.catalog,
             lobbyView, resultView, profilePanel: this.profilePanel,
-            startProfileHost: this.page.byId("profileHost"), lobbyProfileHost: this.page.byId("lobbyProfileHost"),
+            startProfileHost: this.page.byId("profileHost"), lobbyProfileHost: this.page.byId("lobbyProfileHost"), practiceProfileHost: this.page.byId("practiceProfileHost"),
             localId: this.localId, session: () => this.flow.session(), directory: { lookup: (id) => this.flow.lookup(id) }
         };
         const startPhase = new StartScreenPhase(services);
         const flow = new CollectionFlow({
             env: this.env, backend: this.backend, directory: new CollectionDirectory(this.backend, this.env, this.tokens), catalog: this.catalog, profile: this.profile,
-            startView: this.startView, lobbyView, resultView, runtime, hub, phases: this.phases,
-            startPhase, lobbyPhase: new LobbyScreenPhase(services), playPhase: new PlayScreenPhase(services), resultPhase: new ResultScreenPhase(services),
+            startView: this.startView, practiceEntry: this.practiceEntry, practiceMenu: this.practiceMenu, lobbyView, resultView, runtime, hub, phases: this.phases,
+            startPhase, lobbyPhase: new LobbyScreenPhase(services), practicePhase: new PracticeScreenPhase(services), playPhase: new PlayScreenPhase(services), resultPhase: new ResultScreenPhase(services),
             random: new RandomRange(this.randomSource), localId: this.localId
         });
         return { flow, startPhase };
@@ -88,6 +92,7 @@ class MiniGamesApp {
     updateStartButtons() {
         const ready = this.backend.isOnline() && this.assetsReady;
         this.startView.setOnlineReady(ready);
+        this.practiceEntry.setEnabled(ready);
         if (!this.backend.isOnline())
             this.startView.showMessage("온라인 연결을 할 수 없어요. (firebase-config.js·인터넷 확인)");
     }

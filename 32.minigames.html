@@ -9,7 +9,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
 <meta property="og:title" content="미니게임 모음">
-<meta property="og:description" content="방 코드로 모여 2~6명이 여러 미니게임을 차례로 겨루는 3D 게임 모음 / 종목마다 순위 점수(5·3·2·1점)를 합산해 최종 우승자를 정해요 / 중간에 들어오거나 탈락하면 진행 중인 판을 관전 / 혼자면 AI 1명과 시작">
+<meta property="og:description" content="방 코드로 모여 최대 6명(+관전 1명)이 여러 미니게임을 차례로 겨루는 3D 게임 모음 / 종목마다 순위 점수(5·3·2·1점)를 합산해 최종 우승자를 정해요 / 4명보다 적으면 AI가 채워요 / 혼자 AI와 종목을 고르는 연습모드">
 <meta property="og:url" content="https://cornsilktea.github.io/32.minigames.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
@@ -85,6 +85,13 @@
   #centerMsg { position: fixed; left: 0; right: 0; top: 30%; z-index: 20; pointer-events: none; text-align: center; font-size: clamp(56px, 14vw, 120px); font-weight: 800; color: #F4F1E8; text-shadow: 0 5px 0 rgba(0, 0, 0, .45), 0 0 26px rgba(217, 123, 79, .7); font-style: italic; }
   #specBox { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 18px); transform: translateX(-50%); z-index: 22; text-align: center; }
   #specBox button { min-height: 42px; padding: 6px 18px; font-size: 16px; font-weight: 800; border-radius: 8px; border: 2px solid rgba(255, 255, 255, .4); background: rgba(20, 20, 36, .84); color: #fff; }
+  #viewBtns { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 14px); transform: translateX(-50%); z-index: 22; display: flex; gap: 8px; max-width: 62vw; overflow-x: auto; padding: 6px 8px; border-radius: 12px; background: rgba(20, 20, 36, .72); }
+  #viewBtns button { flex: 0 0 auto; min-height: 44px; padding: 4px 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 15px; font-weight: 800; border-radius: 8px; border: 3px solid rgba(255, 255, 255, .4); background: rgba(20, 20, 36, .9); color: #fff; }
+  #viewBtns button small { font-size: 10px; font-weight: 700; color: #A9AFC2; }
+  #viewBtns button.on { background: #D97B4F; }
+  #viewBtns button.on small { color: #FFE3D2; }
+  #viewBtns button:disabled { opacity: .4; text-decoration: line-through; cursor: default; }
+  .plRow.empty { color: #8E93A0; font-weight: 700; font-size: 14px; }
   #joyZone { position: fixed; left: 0; bottom: 0; width: 46%; height: 58%; z-index: 18; touch-action: none; }
   #joyZone.swipeArea { width: 100%; height: calc(100% - 56px); }
   #joyBase { position: fixed; width: 110px; height: 110px; margin: -55px 0 0 -55px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, .32); background: rgba(255, 255, 255, .08); z-index: 19; pointer-events: none; }
@@ -125,6 +132,7 @@
 <div id="banner" hidden><div class="hud-box" id="bannerBox"></div></div>
 <div id="centerMsg" hidden></div>
 <div id="specBox" hidden><button type="button" id="btnSpec">다음 관전 대상</button></div>
+<div id="viewBtns" hidden></div>
 
 <div id="nunchiHand" hidden></div>
 
@@ -136,6 +144,7 @@
   <div class="st-wrap">
     <div class="st-hero"><h1 class="st-title">미니게임 모음</h1></div>
     <div class="st-card">
+      <button type="button" class="st-btn sub" id="btnPractice" style="margin-bottom:10px">연습모드</button>
       <button type="button" class="st-btn primary" id="btnCreate">방 만들기</button>
       <div class="st-joinrow">
         <input type="text" id="joinCode" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="방 코드 5자리">
@@ -152,9 +161,10 @@
     <div class="st-card">
       <h2>모음 규칙</h2>
       <ul class="st-rules">
-        <li>방 하나에 2~6명이 모여 <b>종목을 차례로</b> 한 판씩 겨뤄요. 혼자 시작하면 AI 1명이 함께해요.</li>
+        <li>방 하나에 참가자 최대 6명 + 관전자 1명이 들어와요. <b>종목을 차례로</b> 한 판씩 겨루고, 참가자가 4명보다 적으면 4명이 될 때까지 AI가 채워져요.</li>
+        <li><b>연습모드</b>는 혼자 AI 3명과 원하는 종목을 골라 연습해요. 한 판이 끝나면 다시 종목 고르는 화면으로 돌아와요.</li>
         <li>종목마다 순위 점수를 합산해요: <b>1등 5점 · 2등 3점 · 3등 2점 · 나머지 1점</b>. 점수가 가장 높은 사람이 최종 우승!</li>
-        <li>탈락했거나 중간에 들어온 사람은 진행 중인 판을 <b>관전</b>하고, 다음 종목부터 함께해요. 방은 최대 6명이에요.</li>
+        <li>탈락했거나 중간에 들어온 사람은 진행 중인 판을 <b>관전</b>하고, 다음 종목부터 함께해요. 관전자는 화면 아래 버튼으로 <b>보는 사람을 바꿀 수 있어요</b>.</li>
       </ul>
     </div>
   </div>
@@ -165,8 +175,12 @@
     <div class="st-hero"><h1 class="st-title">미니게임 모음</h1></div>
     <div class="st-card">
       <h2>대기실 <span class="codeBig" id="lobbyCode">00000</span></h2>
+      <h3 class="subHead" id="lobbyPlayerHead">참가자</h3>
       <div id="lobbyPlayers"></div>
-      <div class="aiNote" id="aiNote" hidden>혼자면 AI 1명과 시작해요. 2명 이상 모이면 AI 없이 시작합니다.</div>
+      <h3 class="subHead" id="lobbySpectatorHead">📺 관전자</h3>
+      <div id="lobbySpectators"></div>
+      <button type="button" class="st-btn sub slim" id="btnRole" style="margin-top:10px">📺 관전자로 보기</button>
+      <div class="aiNote" id="aiNote" hidden></div>
       <button type="button" class="st-btn primary" id="btnStart" style="margin-top:14px">게임 시작</button>
       <div class="st-hint" id="lobbyHint"></div>
       <div class="st-row" style="margin-top:10px"><button type="button" class="st-btn sub slim" id="btnLeave">방 나가기</button></div>
@@ -182,6 +196,21 @@
     <div class="st-card" id="recCard" hidden>
       <h2>이 방 누적 승수</h2>
       <div class="st-recs" id="lobbyRecs" style="flex-wrap:wrap"></div>
+    </div>
+  </div>
+</div>
+
+<div id="practiceScreen" class="st-screen" hidden>
+  <div class="st-wrap">
+    <div class="st-hero"><h1 class="st-title">연습모드</h1></div>
+    <div class="st-card">
+      <div class="st-hint">연습할 종목을 고르세요. AI 3명과 한 판 하고, 끝나면 이 화면으로 돌아와요.</div>
+      <button type="button" class="st-btn sub slim" id="btnPracticeLeave" style="margin-top:10px">나가기</button>
+    </div>
+    <div id="practiceGames"></div>
+    <div class="st-card st-fold">
+      <h2>캐릭터 만들기</h2>
+      <div id="practiceProfileHost"></div>
     </div>
   </div>
 </div>

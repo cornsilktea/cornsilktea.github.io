@@ -3,6 +3,9 @@ class MiniGame {
     constructor(context) {
         this.context = context;
     }
+    spectateTo(id) {
+        return;
+    }
     participants() {
         return this.context.participants;
     }
@@ -41,7 +44,10 @@ class CollectionRules {
 CollectionRules.ROOM_ROOT = "minigames/rooms";
 CollectionRules.ROOM_CODE_LENGTH = 5;
 CollectionRules.MAX_PLAYERS = 6;
+CollectionRules.MAX_SPECTATORS = 1;
 CollectionRules.MIN_PLAYERS = 2;
+CollectionRules.MIN_FIELD_SIZE = 4;
+CollectionRules.SPECTATOR_SLOT = 6;
 CollectionRules.ROUNDS_PER_GAME = 1;
 CollectionRules.COUNTDOWN_MS = 3000;
 CollectionRules.COUNTDOWN_LEAD_MS = 500;
@@ -81,6 +87,10 @@ class SpectatorCursor {
             return alive[0];
         }
         return null;
+    }
+    select(id, alive) {
+        if (alive.indexOf(id) >= 0)
+            this.spectated = id;
     }
     cycle(alive) {
         const others = alive.filter((id) => id !== this.localId);

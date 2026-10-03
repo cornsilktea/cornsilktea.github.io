@@ -1142,6 +1142,8 @@ class BombPassHudBuilder {
       summary: holder ? "폭탄: " + holder.runner.participant.nick : "폭탄 준비 중",
       clock: started ? Math.floor(elapsed / 60) + ":" + ("0" + Math.floor(elapsed % 60)).slice(-2) : "0:00",
       footer: "남은 인원 " + this.standings.survivors() + "명",
+      viewTargets: [],
+      viewingId: null,
       cooldowns: mine && !mine.runner.isOut() ? [{ action: "dash", label: "대시", left: mine.runner.dashCooldownLeft(now) }] : [],
       bannerHtml: message.banner,
       bannerWarning: message.warning,

@@ -61,6 +61,10 @@ class GameRuntime implements ActionSink {
     if (this.active) this.active.spectateNext();
   }
 
+  onSpectateTo(id: string): void {
+    if (this.active) this.active.spectateTo(id);
+  }
+
   dispose(): void {
     if (this.activeSession) this.activeSession.closeGame();
     if (this.active) this.active.dispose();
@@ -106,6 +110,7 @@ interface CollectionServices extends CollectionSessionAccess {
   readonly screens: CollectionScreens;
   readonly runtime: GameRuntime;
   readonly hud: CollectionHud;
+  readonly spectatorBar: SpectatorViewBar;
   readonly messages: MessageView;
   readonly hub: ActionHub;
   readonly render: RenderHost;
@@ -116,6 +121,7 @@ interface CollectionServices extends CollectionSessionAccess {
   readonly profilePanel: ProfilePanel;
   readonly startProfileHost: HTMLElement;
   readonly lobbyProfileHost: HTMLElement;
+  readonly practiceProfileHost: HTMLElement;
   readonly localId: string;
   readonly directory: ParticipantDirectory;
 }
@@ -183,6 +189,12 @@ class LobbyScreenPhase extends MenuScreenPhase {
   }
 }
 
+class PracticeScreenPhase extends MenuScreenPhase {
+  enter(): void {
+    this.showMenu("practice", this.services.practiceProfileHost);
+  }
+}
+
 class PlayScreenPhase extends CollectionPhase {
   private static readonly ROSTER_REFRESH_SECONDS = 0.2;
   private rosterClock = 0;
@@ -192,6 +204,10 @@ class PlayScreenPhase extends CollectionPhase {
     this.services.screens.show("game");
     this.services.profilePanel.setActive(false);
     this.rosterClock = PlayScreenPhase.ROSTER_REFRESH_SECONDS;
+  }
+
+  exit(): void {
+    this.services.spectatorBar.hide();
   }
 
   update(dt: number, draw: boolean): void {
@@ -209,7 +225,7 @@ class PlayScreenPhase extends CollectionPhase {
     model.cooldowns.forEach((cooldown) => this.services.hub.setCooldown(cooldown.action, cooldown.left));
     this.services.messages.showBanner(model.bannerHtml, model.bannerWarning);
     this.services.messages.showCenter(model.centerText);
-    this.services.messages.showSpectateButton(model.spectateButton);
+    this.services.spectatorBar.render(model);
   }
 
   private roundLabel(session: CollectionSession, round: CollectionRound): string {
@@ -251,7 +267,11 @@ class ResultScreenPhase extends CollectionPhase {
     if (!session || session.status !== "roundEnd" || !session.round) return;
     const left = Math.max(0, Math.ceil((session.nextAt - session.now()) / 1000));
     const next = this.services.catalog.find(session.plan[session.round.n] || "");
-    this.services.resultView.showCountdown(next ? "다음 종목 · " + next.title + " · " + left + "초 후 시작" : "최종 결과 " + left + "초 후");
+    if (session.practice) {
+      this.services.resultView.showCountdown("연습 끝 · " + left + "초 후 종목 선택으로 돌아가요");
+      return;
+    }
+    this.services.resultView.showCountdown(next ?"다음 종목 · " + next.title + " · " + left + "초 후 시작" : "최종 결과 " + left + "초 후");
   }
 }
 
@@ -262,6 +282,8 @@ interface CollectionFlowServices {
   readonly catalog: GameCatalog;
   readonly profile: PlayerProfile;
   readonly startView: StartView;
+  readonly practiceEntry: PracticeEntryView;
+  readonly practiceMenu: PracticeMenuView;
   readonly lobbyView: CollectionLobbyView;
   readonly resultView: CollectionResultView;
   readonly runtime: GameRuntime;
@@ -269,6 +291,7 @@ interface CollectionFlowServices {
   readonly phases: CollectionPhaseMachine;
   readonly startPhase: CollectionPhase;
   readonly lobbyPhase: CollectionPhase;
+  readonly practicePhase: CollectionPhase;
   readonly playPhase: CollectionPhase;
   readonly resultPhase: CollectionPhase;
   readonly random: RandomRange;
@@ -287,7 +310,11 @@ class CollectionFlow implements CollectionListener, HostGate, CollectionSessionA
       roundEnd: () => this.services.phases.goTo(this.services.resultPhase),
       final: () => this.services.phases.goTo(this.services.resultPhase)
     };
-    services.startView.onCreate(() => this.createRoom());
+    services.startView.onCreate(() => this.createRoom(false));
+    services.practiceEntry.onClick(() => this.createRoom(true));
+    services.practiceMenu.onPick((gameId) => { if (this.director) this.director.startPractice(gameId); });
+    services.practiceMenu.onLeave(() => this.leaveRoom());
+    services.lobbyView.onSwitchSeat(() => { if (this.current) this.current.switchSeat(); });
     services.startView.onJoin(() => this.joinRoom());
     services.startView.onEnterInCode(() => this.joinRoom());
     services.lobbyView.onStart(() => { if (this.director) this.director.startCollection(); });
@@ -348,24 +375,31 @@ class CollectionFlow implements CollectionListener, HostGate, CollectionSessionA
     round.roster.filter((id) => !session.hasPlayer(id)).forEach((id) => this.services.runtime.playerDeparted(id));
   }
 
-  private myRecord(slot: number): CollectionPlayerRecord {
+  private myRecord(slot: number, spectator: boolean): CollectionPlayerRecord {
     const profile = this.services.profile;
-    return { nick: PlayerProfile.cleanNick(profile.nick) || profile.nickOrDefault(), isAI: false, joinedAt: this.services.backend.clock.now(), slot, look: profile.look };
+    const record: CollectionPlayerRecord = { nick: PlayerProfile.cleanNick(profile.nick) || profile.nickOrDefault(), isAI: false, joinedAt: this.services.backend.clock.now(), slot, look: profile.look };
+    if (spectator) record.spectator = true;
+    return record;
   }
 
-  private async createRoom(): Promise<void> {
+  private setCreateBusy(busy: boolean): void {
+    this.services.startView.setCreateEnabled(!busy);
+    this.services.practiceEntry.setEnabled(!busy);
+  }
+
+  private async createRoom(practice: boolean): Promise<void> {
     const view = this.services.startView;
     if (!this.services.backend.isOnline()) return;
-    view.setCreateEnabled(false);
+    this.setCreateBusy(true);
     view.showMessage("");
     try {
-      const code = await this.services.directory.create(this.services.localId, this.myRecord(0));
-      if (code) this.enterRoom(code);
+      const code = await this.services.directory.create(this.services.localId, this.myRecord(0, false), practice);
+      if (code) this.enterRoom(code, practice);
       else view.showMessage("방을 만들지 못했어요. 다시 눌러 주세요.");
     } catch (error) {
       view.showMessage("방을 만들지 못했어요. (데이터베이스 규칙을 확인해 주세요)");
     }
-    view.setCreateEnabled(true);
+    this.setCreateBusy(false);
   }
 
   private async joinRoom(): Promise<void> {
@@ -379,9 +413,9 @@ class CollectionFlow implements CollectionListener, HostGate, CollectionSessionA
     view.setJoinEnabled(false);
     view.showMessage("");
     try {
-      const outcome = await this.services.directory.join(code, this.services.localId, (existing) => this.myRecord(SlotAllocator.freeSlot(existing.values())));
+      const outcome = await this.services.directory.join(code, this.services.localId, (existing, spectator) => this.myRecord(spectator ? CollectionRules.SPECTATOR_SLOT : SlotAllocator.freeSlot(existing.values()), spectator));
       view.setJoinEnabled(true);
-      if (outcome.ok) this.enterRoom(code);
+      if (outcome.ok) this.enterRoom(code, false);
       else view.showMessage(outcome.message);
     } catch (error) {
       view.setJoinEnabled(true);
@@ -389,14 +423,14 @@ class CollectionFlow implements CollectionListener, HostGate, CollectionSessionA
     }
   }
 
-  private enterRoom(code: string): void {
+  private enterRoom(code: string, practice: boolean): void {
     this.services.runtime.dispose();
-    const session = new CollectionSession(this.services.backend, this.services.env, code, this.services.localId, this);
+    const session = new CollectionSession(this.services.backend, this.services.env, code, this.services.localId, practice, this);
     this.current = session;
     this.director = new CollectionDirector(session, this.services.catalog, this.services.random);
     session.connect();
     this.services.lobbyView.showCode(code);
-    this.services.phases.goTo(this.services.lobbyPhase);
+    this.services.phases.goTo(practice ? this.services.practicePhase : this.services.lobbyPhase);
   }
 
   private leaveRoom(): void {
@@ -424,7 +458,8 @@ class CollectionFlow implements CollectionListener, HostGate, CollectionSessionA
 
   private openLobby(): void {
     this.services.runtime.dispose();
-    this.services.phases.goTo(this.services.lobbyPhase);
+    const practice = !!this.current && this.current.practice;
+    this.services.phases.goTo(practice ? this.services.practicePhase : this.services.lobbyPhase);
   }
 
   private openRound(): void {

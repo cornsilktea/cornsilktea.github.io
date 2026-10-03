@@ -7,6 +7,49 @@ interface CollectionPlayerRecord {
   joinedAt: number;
   slot: number;
   look: CharacterLook;
+  spectator?: boolean;
+}
+
+class RoomSeats {
+  static isPlayer(record: CollectionPlayerRecord): boolean {
+    return !record.isAI && !record.spectator;
+  }
+
+  static playerCount(records: Iterable<CollectionPlayerRecord>): number {
+    return RoomSeats.count(records, (record) => RoomSeats.isPlayer(record));
+  }
+
+  static spectatorCount(records: Iterable<CollectionPlayerRecord>): number {
+    return RoomSeats.count(records, (record) => !record.isAI && !!record.spectator);
+  }
+
+  static hasSeat(records: Iterable<CollectionPlayerRecord>, spectator: boolean): boolean {
+    return spectator
+      ? RoomSeats.spectatorCount(records) < CollectionRules.MAX_SPECTATORS
+      : RoomSeats.playerCount(records) < CollectionRules.MAX_PLAYERS;
+  }
+
+  static roleForJoin(records: readonly CollectionPlayerRecord[]): "player" | "spectator" | null {
+    if (RoomSeats.hasSeat(records, false)) return "player";
+    return RoomSeats.hasSeat(records, true) ? "spectator" : null;
+  }
+
+  static hostOrder(records: ReadonlyMap<string, CollectionPlayerRecord>): string[] {
+    return Array.from(records.keys())
+      .filter((id) => !(records.get(id) as CollectionPlayerRecord).isAI)
+      .sort((a, b) => RoomSeats.hostRank(records.get(a) as CollectionPlayerRecord) - RoomSeats.hostRank(records.get(b) as CollectionPlayerRecord)
+        || ((records.get(a) as CollectionPlayerRecord).joinedAt || 0) - ((records.get(b) as CollectionPlayerRecord).joinedAt || 0));
+  }
+
+  private static hostRank(record: CollectionPlayerRecord): number {
+    return record.spectator ? 1 : 0;
+  }
+
+  private static count(records: Iterable<CollectionPlayerRecord>, matches: (record: CollectionPlayerRecord) => boolean): number {
+    let total = 0;
+    for (const record of records) if (matches(record)) total++;
+    return total;
+  }
 }
 
 interface CollectionRound {
@@ -97,7 +140,7 @@ class CollectionSession {
   private readonly roomSubscriptions = new SubscriptionSet();
   private readonly gameSubscriptions = new SubscriptionSet();
 
-  constructor(private readonly backend: RoomBackend, private readonly env: BrowserEnv, readonly code: string, readonly myId: string, private readonly listener: CollectionListener) {
+  constructor(private readonly backend: RoomBackend, private readonly env: BrowserEnv, readonly code: string, readonly myId: string, readonly practice: boolean, private readonly listener: CollectionListener) {
     this.ref = backend.ref(CollectionRules.ROOM_ROOT + "/" + code);
   }
 
@@ -132,7 +175,37 @@ class CollectionSession {
   }
 
   humanIds(): string[] {
-    return this.playerIds().filter((id) => !this.player(id).isAI);
+    return RoomSeats.hostOrder(this.players);
+  }
+
+  seatedIds(): string[] {
+    return this.playerIds().filter((id) => !this.player(id).spectator);
+  }
+
+  spectatorIds(): string[] {
+    return this.playerIds().filter((id) => !!this.player(id).spectator && !this.player(id).isAI);
+  }
+
+  playingHumanCount(): number {
+    return RoomSeats.playerCount(this.players.values());
+  }
+
+  isSpectator(): boolean {
+    return this.players.has(this.myId) && !!this.player(this.myId).spectator;
+  }
+
+  canSwitchSeat(): boolean {
+    if (this.roomStatus !== "lobby" || !this.players.has(this.myId)) return false;
+    const others = Array.from(this.players.keys()).filter((id) => id !== this.myId).map((id) => this.player(id));
+    return RoomSeats.hasSeat(others, !this.isSpectator());
+  }
+
+  switchSeat(): void {
+    if (!this.canSwitchSeat()) return;
+    const toSpectator = !this.isSpectator();
+    const others = Array.from(this.players.keys()).filter((id) => id !== this.myId).map((id) => this.player(id));
+    const slot = toSpectator ? CollectionRules.SPECTATOR_SLOT : SlotAllocator.freeSlot(others);
+    this.ref.child("players/" + this.myId).update({ spectator: toSpectator ? true : null, slot });
   }
 
   winsOf(id: string): number {
@@ -222,7 +295,7 @@ class CollectionSession {
   }
 
   private handOverHostOrClose(players: Record<string, CollectionPlayerRecord>): Promise<void> | undefined {
-    const humans = Object.keys(players).filter((id) => !players[id].isAI).sort((a, b) => (players[a].joinedAt || 0) - (players[b].joinedAt || 0));
+    const humans = RoomSeats.hostOrder(new Map(Object.keys(players).map((id) => [id, players[id]] as [string, CollectionPlayerRecord])));
     if (!humans.length) return this.ref.remove();
     return this.ref.child("hostPlayerId").once("value").then((host) => {
       const hostId = host.val<string>();
@@ -297,25 +370,28 @@ class CollectionDirectory {
 
   constructor(private readonly backend: RoomBackend, private readonly env: BrowserEnv, private readonly tokens: TokenSource) {}
 
-  async create(myId: string, record: CollectionPlayerRecord): Promise<string | null> {
+  async create(myId: string, record: CollectionPlayerRecord, practice: boolean): Promise<string | null> {
     await this.sweep();
     for (let attempt = 0; attempt < CollectionDirectory.CREATE_ATTEMPTS; attempt++) {
       const code = this.tokens.digits(CollectionRules.ROOM_CODE_LENGTH);
-      const room = { status: "lobby", hostPlayerId: myId, createdAt: this.backend.clock.now(), players: { [myId]: record } };
+      const room: Record<string, unknown> = { status: "lobby", hostPlayerId: myId, createdAt: this.backend.clock.now(), players: { [myId]: record } };
+      if (practice) room.practice = true;
       const result = await this.backend.ref(CollectionRules.ROOM_ROOT + "/" + code).transaction((current) => (current !== null ? undefined : room));
       if (result.committed) return code;
     }
     return null;
   }
 
-  async join(code: string, myId: string, makeRecord: (existing: Map<string, CollectionPlayerRecord>) => CollectionPlayerRecord): Promise<CollectionJoinOutcome> {
+  async join(code: string, myId: string, makeRecord: (existing: Map<string, CollectionPlayerRecord>, spectator: boolean) => CollectionPlayerRecord): Promise<CollectionJoinOutcome> {
     const room = this.backend.ref(CollectionRules.ROOM_ROOT + "/" + code);
-    const playersSnapshot = await room.child("players").once("value");
+    const [playersSnapshot, practiceSnapshot] = await Promise.all([room.child("players").once("value"), room.child("practice").once("value")]);
     const players = playersSnapshot.val<Record<string, CollectionPlayerRecord>>();
     if (!players || !Object.keys(players).some((id) => !players[id].isAI)) return { ok: false, message: "그런 방이 없어요. 코드를 확인해 주세요." };
-    if (Object.keys(players).length >= CollectionRules.MAX_PLAYERS) return { ok: false, message: "방이 가득 찼어요. (최대 " + CollectionRules.MAX_PLAYERS + "명)" };
+    if (practiceSnapshot.val<boolean>() === true) return { ok: false, message: "연습 방은 혼자만 쓸 수 있어요." };
+    const role = RoomSeats.roleForJoin(Object.keys(players).map((id) => players[id]));
+    if (!role) return { ok: false, message: "방이 가득 찼어요. (참가 " + CollectionRules.MAX_PLAYERS + "명 · 관전 " + CollectionRules.MAX_SPECTATORS + "명)" };
     try {
-      await room.child("players/" + myId).set(makeRecord(new Map(Object.keys(players).map((id) => [id, players[id]] as [string, CollectionPlayerRecord]))));
+      await room.child("players/" + myId).set(makeRecord(new Map(Object.keys(players).map((id) => [id, players[id]] as [string, CollectionPlayerRecord])), role === "spectator"));
     } catch (error) {
       return { ok: false, message: "입장하지 못했어요." };
     }
@@ -359,15 +435,17 @@ class CollectionDirector {
   }
 
   startCollection(): void {
-    if (!this.session.isHost() || this.session.status !== "lobby") return;
-    const players = this.session.playerRecords();
-    const updates: Record<string, unknown> = {};
-    const humanCount = Array.from(players.values()).filter((record) => !record.isAI).length;
-    if (humanCount === 1) this.ensureOneAi(players, updates);
-    else this.removeAllAi(players, updates);
-    updates.results = null;
-    updates.plan = PlanBuilder.build(this.catalog.ids(), CollectionRules.ROUNDS_PER_GAME);
-    this.session.updateRoom(updates).then(() => this.startRound(1, players));
+    this.startPlan(PlanBuilder.build(this.catalog.ids(), CollectionRules.ROUNDS_PER_GAME));
+  }
+
+  startPractice(gameId: string): void {
+    if (!this.session.practice || !this.catalog.find(gameId)) return;
+    this.startPlan([gameId]);
+  }
+
+  private startPlan(plan: string[]): void {
+    if (!this.session.isHost() || this.session.status !== "lobby" || this.session.playingHumanCount() < 1) return;
+    this.session.updateRoom({ results: null, plan }).then(() => this.startRound(1, plan));
   }
 
   backToLobby(): void {
@@ -390,31 +468,39 @@ class CollectionDirector {
     }
   }
 
-  private startRound(roundNumber: number, known?: Map<string, CollectionPlayerRecord>): void {
-    const source = known || this.session.playerRecords();
-    const ids = Array.from(source.keys()).sort((a, b) => ((source.get(a) as CollectionPlayerRecord).slot || 0) - ((source.get(b) as CollectionPlayerRecord).slot || 0));
+  private startRound(roundNumber: number, plan: readonly string[]): void {
+    const source = this.session.playerRecords();
+    const updates: Record<string, unknown> = {};
+    this.balanceAi(source, updates);
+    const ids = Array.from(source.keys())
+      .filter((id) => !(source.get(id) as CollectionPlayerRecord).spectator)
+      .sort((a, b) => ((source.get(a) as CollectionPlayerRecord).slot || 0) - ((source.get(b) as CollectionPlayerRecord).slot || 0));
     this.roundEnding = false;
     this.advancing = false;
-    const plan = this.session.plan.length ? this.session.plan : PlanBuilder.build(this.catalog.ids(), CollectionRules.ROUNDS_PER_GAME);
     if (ids.length < CollectionRules.MIN_PLAYERS || !plan[roundNumber - 1]) {
       this.session.updateRoom({ status: "lobby" });
       return;
     }
     const startAt = this.session.now() + CollectionRules.COUNTDOWN_MS + CollectionRules.COUNTDOWN_LEAD_MS;
-    this.session.updateRoom({
-      status: "play", games: null, nextAt: 0,
-      round: { n: roundNumber, kind: plan[roundNumber - 1], seed: Math.floor(this.random.next() * 1e9), startAt, roster: ids }
-    });
+    updates.status = "play";
+    updates.games = null;
+    updates.nextAt = 0;
+    updates.round = { n: roundNumber, kind: plan[roundNumber - 1], seed: Math.floor(this.random.next() * 1e9), startAt, roster: ids };
+    this.session.updateRoom(updates);
   }
 
   private advanceAfterResult(finishedRound: number): void {
+    if (this.session.practice) {
+      this.backToLobby();
+      return;
+    }
     if (finishedRound >= this.session.plan.length) {
       this.finishCollection();
       return;
     }
     if (this.advancing) return;
     this.advancing = true;
-    this.startRound(finishedRound + 1);
+    this.startRound(finishedRound + 1, this.session.plan);
   }
 
   private finishRound(game: MiniGame): void {
@@ -445,8 +531,18 @@ class CollectionDirector {
     this.session.updateRoom(updates);
   }
 
-  private ensureOneAi(players: Map<string, CollectionPlayerRecord>, updates: Record<string, unknown>): void {
-    if (Array.from(players.values()).some((record) => record.isAI)) return;
+  private balanceAi(players: Map<string, CollectionPlayerRecord>, updates: Record<string, unknown>): void {
+    const needed = Math.max(0, CollectionRules.MIN_FIELD_SIZE - RoomSeats.playerCount(players.values()));
+    const present = Array.from(players.keys()).filter((id) => (players.get(id) as CollectionPlayerRecord).isAI)
+      .sort((a, b) => ((players.get(a) as CollectionPlayerRecord).joinedAt || 0) - ((players.get(b) as CollectionPlayerRecord).joinedAt || 0));
+    present.slice(needed).forEach((id) => {
+      updates["players/" + id] = null;
+      players.delete(id);
+    });
+    for (let count = Math.min(present.length, needed); count < needed; count++) this.addAi(players, updates);
+  }
+
+  private addAi(players: Map<string, CollectionPlayerRecord>, updates: Record<string, unknown>): void {
     const used = new Set<string>();
     players.forEach((record) => used.add(record.nick));
     const nick = CollectionRules.AI_NAMES.filter((name) => !used.has(name))[0] || CollectionRules.AI_FALLBACK_NAME;
@@ -454,13 +550,5 @@ class CollectionDirector {
     const record: CollectionPlayerRecord = { nick, isAI: true, ai: true, joinedAt: this.session.now() + 1, slot: SlotAllocator.freeSlot(players.values()), look: CharacterLooks.random() };
     updates["players/" + id] = record;
     players.set(id, record);
-  }
-
-  private removeAllAi(players: Map<string, CollectionPlayerRecord>, updates: Record<string, unknown>): void {
-    Array.from(players.keys()).forEach((id) => {
-      if (!(players.get(id) as CollectionPlayerRecord).isAI) return;
-      updates["players/" + id] = null;
-      players.delete(id);
-    });
   }
 }

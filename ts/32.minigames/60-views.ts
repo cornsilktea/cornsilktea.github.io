@@ -1,8 +1,9 @@
-type CollectionScreenName = "start" | "lobby" | "game" | "result";
+type CollectionScreenName = "start" | "lobby" | "practice" | "game" | "result";
 
 class CollectionScreens {
   private readonly start: HTMLElement;
   private readonly lobby: HTMLElement;
+  private readonly practice: HTMLElement;
   private readonly result: HTMLElement;
   private readonly hudList: HTMLElement;
   private readonly hudRight: HTMLElement;
@@ -11,6 +12,7 @@ class CollectionScreens {
   constructor(private readonly page: Page, private readonly touchDevice: boolean, private readonly messages: MessageView, private readonly hub: ActionHub) {
     this.start = page.byId("startScreen");
     this.lobby = page.byId("lobbyScreen");
+    this.practice = page.byId("practiceScreen");
     this.result = page.byId("resultScreen");
     this.hudList = page.byId("hudList");
     this.hudRight = page.byId("hudRight");
@@ -22,6 +24,7 @@ class CollectionScreens {
     this.shown = name;
     this.page.show(this.start, name === "start");
     this.page.show(this.lobby, name === "lobby");
+    this.page.show(this.practice, name === "practice");
     this.page.show(this.result, name === "result");
     const playing = name === "game";
     this.page.show(this.hudList, playing);
@@ -84,6 +87,18 @@ class CollectionHud {
   }
 }
 
+class GameCardHtml {
+  static summary(definition: GameDefinition): string {
+    return "<div class='st-hint'>" + Html.escape(definition.summary) + "</div>";
+  }
+
+  static details(definition: GameDefinition): string {
+    const keys = definition.keyHelp.map((help) => "<span>" + help.keys.map((key) => "<kbd>" + Html.escape(key) + "</kbd>").join(" ") + "</span><span>" + Html.escape(help.text) + "</span>").join("");
+    const rules = definition.rules.map((rule) => "<li>" + rule + "</li>").join("");
+    return "<h3 class='subHead'>조작 방법</h3><div class='st-keys'>" + keys + "</div><h3 class='subHead'>규칙</h3><ul class='st-rules'>" + rules + "</ul>";
+  }
+}
+
 class CatalogView {
   constructor(private readonly page: Page) {}
 
@@ -94,15 +109,89 @@ class CatalogView {
   }
 
   private card(definition: GameDefinition, order: number): string {
-    const keys = definition.keyHelp.map((help) => "<span>" + help.keys.map((key) => "<kbd>" + Html.escape(key) + "</kbd>").join(" ") + "</span><span>" + Html.escape(help.text) + "</span>").join("");
-    const rules = definition.rules.map((rule) => "<li>" + rule + "</li>").join("");
-    return "<div class='st-card st-fold'><h2>종목 " + order + " · " + Html.escape(definition.title) + "</h2><div class='st-hint'>" + Html.escape(definition.summary) + "</div><h3 class='subHead'>조작 방법</h3><div class='st-keys'>" + keys + "</div><h3 class='subHead'>규칙</h3><ul class='st-rules'>" + rules + "</ul></div>";
+    return "<div class='st-card st-fold'><h2>종목 " + order + " · " + Html.escape(definition.title) + "</h2>" + GameCardHtml.summary(definition) + GameCardHtml.details(definition) + "</div>";
+  }
+}
+
+class PracticeEntryView {
+  private readonly button: HTMLButtonElement;
+
+  constructor(page: Page) {
+    this.button = page.byId<HTMLButtonElement>("btnPractice");
+  }
+
+  onClick(handler: () => void): void { this.button.onclick = handler; }
+  setEnabled(enabled: boolean): void { this.button.disabled = !enabled; }
+}
+
+class PracticeMenuView {
+  constructor(private readonly page: Page) {}
+
+  render(catalog: GameCatalog): void {
+    const host = this.page.byId("practiceGames");
+    host.innerHTML = catalog.all().map((definition) => this.card(definition)).join("");
+    FoldCard.bindAll(host);
+  }
+
+  onPick(handler: (gameId: string) => void): void {
+    this.page.byId("practiceGames").onclick = (event) => {
+      const button = (event.target as HTMLElement).closest<HTMLElement>("button[data-game]");
+      if (button && button.dataset.game) handler(button.dataset.game);
+    };
+  }
+
+  onLeave(handler: () => void): void { this.page.byId("btnPracticeLeave").onclick = handler; }
+
+  private card(definition: GameDefinition): string {
+    return "<div class='st-card'><h2>" + Html.escape(definition.title) + "</h2>" + GameCardHtml.summary(definition)
+      + "<button type='button' class='st-btn primary' data-game='" + definition.id + "' style='margin-top:10px'>연습 시작</button>"
+      + "<div class='st-fold' style='margin-top:10px'><h2 style='font-size:15px'>조작 방법 · 규칙</h2>" + GameCardHtml.details(definition) + "</div></div>";
+  }
+}
+
+class SpectatorViewBar {
+  private readonly bar: HTMLElement;
+  private signature = "";
+  private pickHandler: (id: string) => void = () => undefined;
+
+  constructor(private readonly page: Page) {
+    this.bar = page.byId("viewBtns");
+    this.bar.addEventListener("touchstart", (event) => event.stopPropagation(), { passive: true });
+    this.bar.onclick = (event) => {
+      const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button[data-id]");
+      if (button && !button.disabled && button.dataset.id) this.pickHandler(button.dataset.id);
+    };
+  }
+
+  onPick(handler: (id: string) => void): void { this.pickHandler = handler; }
+
+  render(model: HudModel): void {
+    const visible = model.spectateButton && model.viewTargets.length > 0;
+    this.page.show(this.bar, visible);
+    if (!visible) return;
+    const signature = model.viewTargets.map((target) => target.id + ":" + target.nick + (target.out ? "x" : "") + (target.id === model.viewingId ? "*" : "")).join("|");
+    if (signature === this.signature) return;
+    this.signature = signature;
+    this.bar.innerHTML = model.viewTargets.map((target) => this.button(target, target.id === model.viewingId)).join("");
+  }
+
+  hide(): void {
+    this.signature = "";
+    this.page.show(this.bar, false);
+  }
+
+  private button(target: ViewTarget, viewing: boolean): string {
+    return "<button type='button' data-id='" + Html.escape(target.id) + "' class='" + (viewing ? "on" : "") + "'" + (target.out ? " disabled" : "") + " style='border-color:" + Palette.slotColor(target.slot) + "'><small>" + (target.ai ? "AI" : "시점") + "</small>" + Html.escape(target.nick) + "</button>";
   }
 }
 
 class CollectionLobbyView {
   private readonly code: HTMLElement;
   private readonly playerBox: HTMLElement;
+  private readonly spectatorBox: HTMLElement;
+  private readonly playerHead: HTMLElement;
+  private readonly spectatorHead: HTMLElement;
+  private readonly roleButton: HTMLButtonElement;
   private readonly aiNote: HTMLElement;
   private readonly startButton: HTMLButtonElement;
   private readonly hint: HTMLElement;
@@ -113,6 +202,10 @@ class CollectionLobbyView {
   constructor(private readonly page: Page, private readonly catalog: GameCatalog) {
     this.code = page.byId("lobbyCode");
     this.playerBox = page.byId("lobbyPlayers");
+    this.spectatorBox = page.byId("lobbySpectators");
+    this.playerHead = page.byId("lobbyPlayerHead");
+    this.spectatorHead = page.byId("lobbySpectatorHead");
+    this.roleButton = page.byId<HTMLButtonElement>("btnRole");
     this.aiNote = page.byId("aiNote");
     this.startButton = page.byId<HTMLButtonElement>("btnStart");
     this.hint = page.byId("lobbyHint");
@@ -123,20 +216,29 @@ class CollectionLobbyView {
 
   onStart(handler: () => void): void { this.startButton.onclick = handler; }
   onLeave(handler: () => void): void { this.page.byId("btnLeave").onclick = handler; }
+  onSwitchSeat(handler: () => void): void { this.roleButton.onclick = handler; }
 
   showCode(code: string): void {
     this.page.setText(this.code, code);
   }
 
   render(session: CollectionSession): void {
-    const order = session.playerIds();
-    this.playerBox.innerHTML = order.map((id) => this.playerRow(session, id)).join("");
-    const humanCount = session.humanIds().length;
-    this.page.show(this.aiNote, humanCount === 1);
+    const seated = session.seatedIds();
+    const spectators = session.spectatorIds();
+    this.playerBox.innerHTML = seated.map((id) => this.playerRow(session, id)).join("");
+    this.spectatorBox.innerHTML = spectators.length ? spectators.map((id) => this.playerRow(session, id)).join("") : "<div class='plRow empty'>비어 있어요</div>";
+    this.page.setText(this.playerHead, "참가자 " + session.playingHumanCount() + " / " + CollectionRules.MAX_PLAYERS);
+    this.page.setText(this.spectatorHead, "📺 관전자 " + spectators.length + " / " + CollectionRules.MAX_SPECTATORS);
+    const playing = session.playingHumanCount();
+    this.page.show(this.aiNote, playing < CollectionRules.MIN_FIELD_SIZE);
+    this.page.setText(this.aiNote, "참가자가 " + CollectionRules.MIN_FIELD_SIZE + "명보다 적으면 " + CollectionRules.MIN_FIELD_SIZE + "명이 될 때까지 AI가 채워져요.");
+    this.page.setText(this.roleButton, session.isSpectator() ? "참가자로 바꾸기" : "📺 관전자로 보기");
+    this.roleButton.disabled = !session.canSwitchSeat();
     const host = session.isHost();
-    this.startButton.disabled = !host;
-    this.page.setText(this.startButton, host ? (humanCount === 1 ? "AI와 게임 시작" : "게임 시작") : "방장이 시작하기를 기다리는 중");
-    this.page.setText(this.hint, host ? "참가자 " + order.length + "명 · 최대 " + CollectionRules.MAX_PLAYERS + "명" : "");
+    this.startButton.disabled = !host || playing < 1;
+    this.page.setText(this.startButton, host ? (playing < CollectionRules.MIN_FIELD_SIZE ? "AI와 게임 시작" : "게임 시작") : "방장이 시작하기를 기다리는 중");
+    this.page.setText(this.hint, host ? "참가자 " + playing + "명 · 최대 " + CollectionRules.MAX_PLAYERS + "명 (관전 " + spectators.length + " / " + CollectionRules.MAX_SPECTATORS + ")" : "");
+    const order = session.playerIds();
     this.planBox.innerHTML = PlanBuilder.build(this.catalog.ids(), CollectionRules.ROUNDS_PER_GAME)
       .map((id, index) => "<div class='plRow'><b>" + (index + 1) + ". " + Html.escape((this.catalog.find(id) as GameDefinition).title) + "</b></div>").join("");
     const winners = order.filter((id) => session.winsOf(id));
@@ -147,7 +249,8 @@ class CollectionLobbyView {
   private playerRow(session: CollectionSession, id: string): string {
     const record = session.player(id);
     const tag = id === session.hostId ? "방장" : "";
-    return "<div class='plRow" + (id === session.myId ? " me" : "") + "'><i style='background:" + Palette.slotColor(record.slot || 0) + "'></i><b>" + Html.escape(record.nick) + (record.isAI ? " (AI)" : "") + "</b><small>" + tag + "</small></div>";
+    const dotColor = record.spectator ? "#8E93A0" : Palette.slotColor(record.slot || 0);
+    return "<div class='plRow" + (id === session.myId ? " me" : "") + "'><i style='background:" + dotColor + "'></i><b>" + Html.escape(record.nick) + (record.isAI ? " (AI)" : "") + "</b><small>" + tag + "</small></div>";
   }
 }
 

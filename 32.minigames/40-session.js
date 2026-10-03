@@ -1,4 +1,41 @@
 "use strict";
+class RoomSeats {
+    static isPlayer(record) {
+        return !record.isAI && !record.spectator;
+    }
+    static playerCount(records) {
+        return RoomSeats.count(records, (record) => RoomSeats.isPlayer(record));
+    }
+    static spectatorCount(records) {
+        return RoomSeats.count(records, (record) => !record.isAI && !!record.spectator);
+    }
+    static hasSeat(records, spectator) {
+        return spectator
+            ? RoomSeats.spectatorCount(records) < CollectionRules.MAX_SPECTATORS
+            : RoomSeats.playerCount(records) < CollectionRules.MAX_PLAYERS;
+    }
+    static roleForJoin(records) {
+        if (RoomSeats.hasSeat(records, false))
+            return "player";
+        return RoomSeats.hasSeat(records, true) ? "spectator" : null;
+    }
+    static hostOrder(records) {
+        return Array.from(records.keys())
+            .filter((id) => !records.get(id).isAI)
+            .sort((a, b) => RoomSeats.hostRank(records.get(a)) - RoomSeats.hostRank(records.get(b))
+            || (records.get(a).joinedAt || 0) - (records.get(b).joinedAt || 0));
+    }
+    static hostRank(record) {
+        return record.spectator ? 1 : 0;
+    }
+    static count(records, matches) {
+        let total = 0;
+        for (const record of records)
+            if (matches(record))
+                total++;
+        return total;
+    }
+}
 class SubscriptionSet {
     constructor() {
         this.entries = [];
@@ -37,11 +74,12 @@ class SessionWire {
     }
 }
 class CollectionSession {
-    constructor(backend, env, code, myId, listener) {
+    constructor(backend, env, code, myId, practice, listener) {
         this.backend = backend;
         this.env = env;
         this.code = code;
         this.myId = myId;
+        this.practice = practice;
         this.listener = listener;
         this.hostPlayerId = null;
         this.roomStatus = "lobby";
@@ -81,7 +119,33 @@ class CollectionSession {
         return Array.from(this.players.keys()).sort((a, b) => (this.player(a).joinedAt || 0) - (this.player(b).joinedAt || 0));
     }
     humanIds() {
-        return this.playerIds().filter((id) => !this.player(id).isAI);
+        return RoomSeats.hostOrder(this.players);
+    }
+    seatedIds() {
+        return this.playerIds().filter((id) => !this.player(id).spectator);
+    }
+    spectatorIds() {
+        return this.playerIds().filter((id) => !!this.player(id).spectator && !this.player(id).isAI);
+    }
+    playingHumanCount() {
+        return RoomSeats.playerCount(this.players.values());
+    }
+    isSpectator() {
+        return this.players.has(this.myId) && !!this.player(this.myId).spectator;
+    }
+    canSwitchSeat() {
+        if (this.roomStatus !== "lobby" || !this.players.has(this.myId))
+            return false;
+        const others = Array.from(this.players.keys()).filter((id) => id !== this.myId).map((id) => this.player(id));
+        return RoomSeats.hasSeat(others, !this.isSpectator());
+    }
+    switchSeat() {
+        if (!this.canSwitchSeat())
+            return;
+        const toSpectator = !this.isSpectator();
+        const others = Array.from(this.players.keys()).filter((id) => id !== this.myId).map((id) => this.player(id));
+        const slot = toSpectator ? CollectionRules.SPECTATOR_SLOT : SlotAllocator.freeSlot(others);
+        this.ref.child("players/" + this.myId).update({ spectator: toSpectator ? true : null, slot });
     }
     winsOf(id) {
         return this.wins[id] || 0;
@@ -176,7 +240,7 @@ class CollectionSession {
         this.gameSubscriptions.closeAll();
     }
     handOverHostOrClose(players) {
-        const humans = Object.keys(players).filter((id) => !players[id].isAI).sort((a, b) => (players[a].joinedAt || 0) - (players[b].joinedAt || 0));
+        const humans = RoomSeats.hostOrder(new Map(Object.keys(players).map((id) => [id, players[id]])));
         if (!humans.length)
             return this.ref.remove();
         return this.ref.child("hostPlayerId").once("value").then((host) => {
@@ -254,11 +318,13 @@ class CollectionDirectory {
         this.env = env;
         this.tokens = tokens;
     }
-    async create(myId, record) {
+    async create(myId, record, practice) {
         await this.sweep();
         for (let attempt = 0; attempt < CollectionDirectory.CREATE_ATTEMPTS; attempt++) {
             const code = this.tokens.digits(CollectionRules.ROOM_CODE_LENGTH);
             const room = { status: "lobby", hostPlayerId: myId, createdAt: this.backend.clock.now(), players: { [myId]: record } };
+            if (practice)
+                room.practice = true;
             const result = await this.backend.ref(CollectionRules.ROOM_ROOT + "/" + code).transaction((current) => (current !== null ? undefined : room));
             if (result.committed)
                 return code;
@@ -267,14 +333,17 @@ class CollectionDirectory {
     }
     async join(code, myId, makeRecord) {
         const room = this.backend.ref(CollectionRules.ROOM_ROOT + "/" + code);
-        const playersSnapshot = await room.child("players").once("value");
+        const [playersSnapshot, practiceSnapshot] = await Promise.all([room.child("players").once("value"), room.child("practice").once("value")]);
         const players = playersSnapshot.val();
         if (!players || !Object.keys(players).some((id) => !players[id].isAI))
             return { ok: false, message: "그런 방이 없어요. 코드를 확인해 주세요." };
-        if (Object.keys(players).length >= CollectionRules.MAX_PLAYERS)
-            return { ok: false, message: "방이 가득 찼어요. (최대 " + CollectionRules.MAX_PLAYERS + "명)" };
+        if (practiceSnapshot.val() === true)
+            return { ok: false, message: "연습 방은 혼자만 쓸 수 있어요." };
+        const role = RoomSeats.roleForJoin(Object.keys(players).map((id) => players[id]));
+        if (!role)
+            return { ok: false, message: "방이 가득 찼어요. (참가 " + CollectionRules.MAX_PLAYERS + "명 · 관전 " + CollectionRules.MAX_SPECTATORS + "명)" };
         try {
-            await room.child("players/" + myId).set(makeRecord(new Map(Object.keys(players).map((id) => [id, players[id]]))));
+            await room.child("players/" + myId).set(makeRecord(new Map(Object.keys(players).map((id) => [id, players[id]])), role === "spectator"));
         }
         catch (error) {
             return { ok: false, message: "입장하지 못했어요." };
@@ -321,18 +390,17 @@ class CollectionDirector {
         this.tokens = new TokenSource(random);
     }
     startCollection() {
-        if (!this.session.isHost() || this.session.status !== "lobby")
+        this.startPlan(PlanBuilder.build(this.catalog.ids(), CollectionRules.ROUNDS_PER_GAME));
+    }
+    startPractice(gameId) {
+        if (!this.session.practice || !this.catalog.find(gameId))
             return;
-        const players = this.session.playerRecords();
-        const updates = {};
-        const humanCount = Array.from(players.values()).filter((record) => !record.isAI).length;
-        if (humanCount === 1)
-            this.ensureOneAi(players, updates);
-        else
-            this.removeAllAi(players, updates);
-        updates.results = null;
-        updates.plan = PlanBuilder.build(this.catalog.ids(), CollectionRules.ROUNDS_PER_GAME);
-        this.session.updateRoom(updates).then(() => this.startRound(1, players));
+        this.startPlan([gameId]);
+    }
+    startPlan(plan) {
+        if (!this.session.isHost() || this.session.status !== "lobby" || this.session.playingHumanCount() < 1)
+            return;
+        this.session.updateRoom({ results: null, plan }).then(() => this.startRound(1, plan));
     }
     backToLobby() {
         if (!this.session.isHost())
@@ -357,23 +425,31 @@ class CollectionDirector {
             this.advanceAfterResult(this.session.round.n);
         }
     }
-    startRound(roundNumber, known) {
-        const source = known || this.session.playerRecords();
-        const ids = Array.from(source.keys()).sort((a, b) => (source.get(a).slot || 0) - (source.get(b).slot || 0));
+    startRound(roundNumber, plan) {
+        const source = this.session.playerRecords();
+        const updates = {};
+        this.balanceAi(source, updates);
+        const ids = Array.from(source.keys())
+            .filter((id) => !source.get(id).spectator)
+            .sort((a, b) => (source.get(a).slot || 0) - (source.get(b).slot || 0));
         this.roundEnding = false;
         this.advancing = false;
-        const plan = this.session.plan.length ? this.session.plan : PlanBuilder.build(this.catalog.ids(), CollectionRules.ROUNDS_PER_GAME);
         if (ids.length < CollectionRules.MIN_PLAYERS || !plan[roundNumber - 1]) {
             this.session.updateRoom({ status: "lobby" });
             return;
         }
         const startAt = this.session.now() + CollectionRules.COUNTDOWN_MS + CollectionRules.COUNTDOWN_LEAD_MS;
-        this.session.updateRoom({
-            status: "play", games: null, nextAt: 0,
-            round: { n: roundNumber, kind: plan[roundNumber - 1], seed: Math.floor(this.random.next() * 1e9), startAt, roster: ids }
-        });
+        updates.status = "play";
+        updates.games = null;
+        updates.nextAt = 0;
+        updates.round = { n: roundNumber, kind: plan[roundNumber - 1], seed: Math.floor(this.random.next() * 1e9), startAt, roster: ids };
+        this.session.updateRoom(updates);
     }
     advanceAfterResult(finishedRound) {
+        if (this.session.practice) {
+            this.backToLobby();
+            return;
+        }
         if (finishedRound >= this.session.plan.length) {
             this.finishCollection();
             return;
@@ -381,7 +457,7 @@ class CollectionDirector {
         if (this.advancing)
             return;
         this.advancing = true;
-        this.startRound(finishedRound + 1);
+        this.startRound(finishedRound + 1, this.session.plan);
     }
     finishRound(game) {
         const round = this.session.round;
@@ -412,9 +488,18 @@ class CollectionDirector {
         });
         this.session.updateRoom(updates);
     }
-    ensureOneAi(players, updates) {
-        if (Array.from(players.values()).some((record) => record.isAI))
-            return;
+    balanceAi(players, updates) {
+        const needed = Math.max(0, CollectionRules.MIN_FIELD_SIZE - RoomSeats.playerCount(players.values()));
+        const present = Array.from(players.keys()).filter((id) => players.get(id).isAI)
+            .sort((a, b) => (players.get(a).joinedAt || 0) - (players.get(b).joinedAt || 0));
+        present.slice(needed).forEach((id) => {
+            updates["players/" + id] = null;
+            players.delete(id);
+        });
+        for (let count = Math.min(present.length, needed); count < needed; count++)
+            this.addAi(players, updates);
+    }
+    addAi(players, updates) {
         const used = new Set();
         players.forEach((record) => used.add(record.nick));
         const nick = CollectionRules.AI_NAMES.filter((name) => !used.has(name))[0] || CollectionRules.AI_FALLBACK_NAME;
@@ -422,13 +507,5 @@ class CollectionDirector {
         const record = { nick, isAI: true, ai: true, joinedAt: this.session.now() + 1, slot: SlotAllocator.freeSlot(players.values()), look: CharacterLooks.random() };
         updates["players/" + id] = record;
         players.set(id, record);
-    }
-    removeAllAi(players, updates) {
-        Array.from(players.keys()).forEach((id) => {
-            if (!players.get(id).isAI)
-                return;
-            updates["players/" + id] = null;
-            players.delete(id);
-        });
     }
 }

@@ -153,6 +153,10 @@ class LastTileGame extends MiniGame {
     this.cursor.cycle(this.aliveIds());
   }
 
+  spectateTo(id: string): void {
+    this.cursor.select(id, this.aliveIds());
+  }
+
   receive(stream: string, key: string, value: unknown): void {
     const handler = this.handlers[stream];
     if (handler) handler(key, value);
@@ -196,6 +200,8 @@ class LastTileGame extends MiniGame {
     const message = this.messageFor(now, started, mine);
     return {
       rows: contestants.map((contestant) => this.rowOf(contestant)),
+      viewTargets: contestants.map((contestant) => ({ id: contestant.id, nick: contestant.participant.nick, slot: contestant.participant.slot, ai: contestant.participant.ai, out: contestant.fighter.isOut() })),
+      viewingId: this.subject ? this.subject.id : null,
       summary: census.summary(),
       clock: started ? Math.floor(elapsed / 60) + ":" + ("0" + Math.floor(elapsed % 60)).slice(-2) : "0:00",
       footer: "남은 인원 " + this.aliveIds().length + "명",

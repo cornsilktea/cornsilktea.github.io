@@ -42,8 +42,18 @@ interface HudCooldown {
   readonly left: number;
 }
 
+interface ViewTarget {
+  readonly id: string;
+  readonly nick: string;
+  readonly slot: number;
+  readonly ai: boolean;
+  readonly out: boolean;
+}
+
 interface HudModel {
   readonly rows: readonly HudRow[];
+  readonly viewTargets: readonly ViewTarget[];
+  readonly viewingId: string | null;
   readonly summary: string;
   readonly clock: string;
   readonly footer: string;
@@ -93,6 +103,9 @@ abstract class MiniGame {
   abstract tick(dt: number, draw: boolean): void;
   abstract perform(action: string): void;
   abstract spectateNext(): void;
+  spectateTo(id: string): void {
+    return;
+  }
   abstract receive(stream: string, key: string, value: unknown): void;
   abstract playerDeparted(id: string): void;
   abstract isOver(): boolean;
@@ -163,7 +176,10 @@ class CollectionRules {
   static readonly ROOM_ROOT = "minigames/rooms";
   static readonly ROOM_CODE_LENGTH = 5;
   static readonly MAX_PLAYERS = 6;
+  static readonly MAX_SPECTATORS = 1;
   static readonly MIN_PLAYERS = 2;
+  static readonly MIN_FIELD_SIZE = 4;
+  static readonly SPECTATOR_SLOT = 6;
   static readonly ROUNDS_PER_GAME = 1;
   static readonly COUNTDOWN_MS = 3000;
   static readonly COUNTDOWN_LEAD_MS = 500;
@@ -205,6 +221,10 @@ class SpectatorCursor {
       return alive[0];
     }
     return null;
+  }
+
+  select(id: string, alive: readonly string[]): void {
+    if (alive.indexOf(id) >= 0) this.spectated = id;
   }
 
   cycle(alive: readonly string[]): void {

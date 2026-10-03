@@ -187,6 +187,8 @@ class NunchiHudBuilder {
       summary: started ? "라운드 " + (input.moment.round + 1) + "/" + NunchiRules.ROUNDS + " · 상품 " + this.prizeText(input) : "곧 시작해요",
       clock: this.clockText(input),
       footer: input.pot > 0 ? "이월 상금 " + input.pot + "점" : "이월 없음",
+      viewTargets: [],
+      viewingId: null,
       cooldowns: [],
       bannerHtml: message.banner,
       bannerWarning: message.warning,
