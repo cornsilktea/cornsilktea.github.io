@@ -1384,13 +1384,16 @@ class VolleyballMatch {
       return;
     }
     const controller = actor.controller;
-    const target = rally && rally.phase === "serve" ? { x: controller.aimX, z: controller.aimZ } : this.spikeAimOf(controller);
+    const target = rally && rally.phase === "serve" ? { x: controller.aimX, z: controller.aimZ } : this.spikeAimOf(controller, this.session.players.get(actor.id));
     this.aimMarker.show(target.x, target.z, VolleyballMatch.AIM_COLOR, 1, 0.9);
   }
 
-  private spikeAimOf(controller: VbPlayerController): VbPoint {
+  private spikeAimOf(controller: VbPlayerController, record: VbPlayerRecord | undefined): VbPoint {
     const opponents = this.controllers.filter((other) => other.team !== controller.team).map((other) => ({ x: other.x, z: other.z }));
-    const depths = this.ball && this.ball.n >= 2 ? ShotAimer.SPIKE_DEPTHS : ShotAimer.LOB_DEPTHS;
+    const spike = !!this.ball && this.ball.n >= 2;
+    const human = !!record && !record.isBot;
+    const near = spike && human && -controller.iz * VbConfig.sideOf(controller.team) < -0.45;
+    const depths = spike ? (near ? ShotAimer.NEAR_SPIKE_DEPTHS : ShotAimer.SPIKE_DEPTHS) : ShotAimer.LOB_DEPTHS;
     return ShotAimer.emptySpot(controller.team, opponents, depths);
   }
 
@@ -1457,7 +1460,7 @@ class VolleyballMatch {
       model.hint = "누르지 않으면 동료에게 토스 · 누르면 상대 코트로 높게 넘겨요";
     } else {
       model.actionLabel = "스파이크";
-      model.hint = "공이 닿기 직전에 누르면 점프 스파이크(빈 곳으로 자동) · 안 누르면 낮고 빠르게 넘겨요";
+      model.hint = "누르면 점프 스파이크(스틱 그대로=멀리 강하게, 뒤로 당기면 가까이) · 안 누르면 블로킹 위로 안전하게 넘겨요";
     }
   }
 }

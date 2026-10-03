@@ -35,9 +35,14 @@ VbConfig.SPIKE_LEAD_WINDOW_MS = 450;
 VbConfig.JUMP_MS = 700;
 VbConfig.JUMP_HEIGHT = 0.9;
 VbConfig.BLOCK_REACH = 2.4;
-VbConfig.BLOCK_RADIUS = 0.95;
+VbConfig.BLOCK_RADIUS = 0.9;
 VbConfig.BLOCK_DISTANCE = 2.6;
 VbConfig.BLOCK_FLIGHT = 0.8;
+VbConfig.BLOCK_WINDOW_FROM = 0.2;
+VbConfig.BLOCK_WINDOW_TO = 0.8;
+VbConfig.QUICK_NET_CLEARANCE = 1.1;
+VbConfig.BLOCKER_AVOID_WEIGHT = 2.2;
+VbConfig.BLOCKER_AVOID_CHANCE = 0.15;
 VbConfig.NET_MS = 143;
 VbConfig.BOT_THINK_MS = 100;
 VbConfig.SUB_STEP = 1 / 90;
@@ -101,6 +106,16 @@ class ShotAimer {
             z: (target.z - start.z) / seconds
         };
     }
+    static blockerGap(from, targetX, targetZ, opponents) {
+        const fraction = Math.abs(from.z) / Math.max(0.1, Math.abs(from.z) + Math.abs(targetZ));
+        const crossingX = from.x + (targetX - from.x) * fraction;
+        let gap = Infinity;
+        for (const opponent of opponents) {
+            if (Math.abs(opponent.z) < VbConfig.BLOCK_DISTANCE)
+                gap = Math.min(gap, Math.abs(opponent.x - crossingX) * VbConfig.BLOCKER_AVOID_WEIGHT);
+        }
+        return gap;
+    }
     static clearance(start, velocity) {
         if (Math.abs(velocity.z) < 1e-6)
             return Infinity;
@@ -110,13 +125,13 @@ class ShotAimer {
         const height = start.y + velocity.y * seconds - 0.5 * VbConfig.GRAVITY * seconds * seconds;
         return height - (VbConfig.NET_TOP + VbConfig.BALL_R);
     }
-    static clearingFlight(start, target, minSeconds) {
+    static clearingFlight(start, target, minSeconds, requiredClearance = 0.12) {
         let seconds = minSeconds;
-        while (seconds < 1.7 && ShotAimer.clearance(start, ShotAimer.velocity(start, target, seconds)) < 0.12)
+        while (seconds < 2 && ShotAimer.clearance(start, ShotAimer.velocity(start, target, seconds)) < requiredClearance)
             seconds += 0.05;
         return seconds;
     }
-    static emptySpot(team, opponents, depths, fine = true) {
+    static emptySpot(team, opponents, depths, fine = true, from = null) {
         const side = VbConfig.sideOf(team);
         const columns = fine ? ShotAimer.FINE_X : ShotAimer.COARSE_X;
         let best = { x: columns[0], z: -side * depths[0] };
@@ -127,6 +142,8 @@ class ShotAimer {
                 let score = opponents.length ? Infinity : 10;
                 for (const opponent of opponents)
                     score = Math.min(score, Math.hypot(x - opponent.x, z - opponent.z));
+                if (from)
+                    score = Math.min(score, ShotAimer.blockerGap(from, x, z, opponents));
                 if (score > bestScore) {
                     bestScore = score;
                     best = { x, z };
@@ -139,6 +156,7 @@ class ShotAimer {
 ShotAimer.COARSE_X = [-3.4, -1.7, 0, 1.7, 3.4];
 ShotAimer.FINE_X = [-3.6, -2.7, -1.8, -0.9, 0, 0.9, 1.8, 2.7, 3.6];
 ShotAimer.SPIKE_DEPTHS = [5.5, 7.0, 8.0];
+ShotAimer.NEAR_SPIKE_DEPTHS = [2.0, 3.0, 4.0];
 ShotAimer.QUICK_DEPTHS = [3.5, 5.0, 6.5];
 ShotAimer.LOB_DEPTHS = [2.5, 4.5, 6.5];
 ShotAimer.SERVE_DEPTHS = [3.5, 5.5, 7.5];
@@ -278,6 +296,8 @@ VbBotTuning.SPIKE_CHANCE = 1;
 VbBotTuning.MISS_CHANCE = 0.03;
 VbBotTuning.URGENT_PARTNER_DISTANCE = 5.5;
 VbBotTuning.BLOCK_CHANCE = 0.4;
+VbBotTuning.BLOCK_THREAT_DISTANCE = 2.2;
+VbBotTuning.SPIKE_CHANCE_VS_BLOCK = 0.35;
 VbBotTuning.BLOCK_NOISE = 0.4;
 VbBotTuning.BLOCK_LEAD_MS = 200;
 class VolleyballBot extends VbPlayerController {
@@ -358,6 +378,9 @@ class VolleyballBot extends VbPlayerController {
         this.wantsPress = done === 2 ? this.random() < VbBotTuning.SPIKE_CHANCE : done === 1 ? this.wantsOver(engine) : false;
         this.pressLeadMs = VbConfig.SPIKE_LEAD_MS + VbMath.gaussian(this.random) * VbBotTuning.TIMING_ERROR_MS;
     }
+    blockThreatened(engine, nowMs) {
+        return engine.players.some((other) => other.team !== this.team && (other.isJumping(nowMs) || Math.abs(other.z) < VbBotTuning.BLOCK_THREAT_DISTANCE));
+    }
     wantsOver(engine) {
         const partner = engine.partnerOf(this.slot);
         return !!partner && Math.hypot(partner.x - engine.ball.x, partner.z - engine.ball.z) > VbBotTuning.URGENT_PARTNER_DISTANCE;
@@ -412,6 +435,8 @@ class VolleyballBot extends VbPlayerController {
         if (incoming.atMs - nowMs > this.pressLeadMs)
             return;
         this.pressedForSeq = engine.ballSeq;
+        if (engine.possTouches === 2 && this.blockThreatened(engine, nowMs) && this.random() > VbBotTuning.SPIKE_CHANCE_VS_BLOCK)
+            return;
         this.registerPress(nowMs, 0, 0);
     }
     thinkServe(engine, nowMs) {
@@ -687,7 +712,7 @@ class VbRallyEngine {
         this.emitBall("net", this.lastBy, this.possTouches, -1, 0, -1, ms, 0);
     }
     tryBlock(crossingX, crossingY, ms) {
-        if (this.ballKind !== "over" && this.ballKind !== "quick" && this.ballKind !== "spike")
+        if (this.ballKind !== "spike")
             return false;
         const defender = this.touchTeam;
         if (defender < 0)
@@ -696,7 +721,7 @@ class VbRallyEngine {
             if (player.team !== defender)
                 continue;
             const progress = (ms - player.jumpStartMs) / VbConfig.JUMP_MS;
-            if (progress < 0.05 || progress > 0.95)
+            if (progress < VbConfig.BLOCK_WINDOW_FROM || progress > VbConfig.BLOCK_WINDOW_TO)
                 continue;
             if (Math.abs(player.z) > VbConfig.BLOCK_DISTANCE || Math.abs(player.x - crossingX) > VbConfig.BLOCK_RADIUS)
                 continue;
@@ -807,7 +832,7 @@ class VbRallyEngine {
         else if (intent)
             this.attack(player, from, opponents, quality, lead, ms);
         else
-            this.sendShot(player, from, opponents, ShotAimer.QUICK_DEPTHS, quality, 0.75, "quick", ms);
+            this.sendShot(player, from, opponents, ShotAimer.QUICK_DEPTHS, quality, 0.75, "quick", ms, VbConfig.QUICK_NET_CLEARANCE);
     }
     passToPartner(player, partner, from, count, quality, ms) {
         const side = VbConfig.sideOf(player.team);
@@ -821,20 +846,21 @@ class VbRallyEngine {
         const flight = count === 0 ? 1.35 : 1.25;
         this.release(player, from, target, flight, count === 0 ? "dig" : "set", player.team, VbConfig.REACH[count + 1], partner.slot, ms);
     }
-    sendShot(player, from, opponents, depths, quality, minimumFlight, kind, ms) {
+    sendShot(player, from, opponents, depths, quality, minimumFlight, kind, ms, requiredClearance = 0.12) {
         const aim = ShotAimer.emptySpot(player.team, opponents, depths);
         const spread = VbMath.discOffset(0.3 + (1 - quality) * 1.4, this.random);
         const target = { x: aim.x + spread.x, y: VbConfig.BALL_R, z: aim.z + spread.z };
-        const flight = ShotAimer.clearingFlight(from, target, minimumFlight);
+        const flight = ShotAimer.clearingFlight(from, target, minimumFlight, requiredClearance);
         this.release(player, from, target, flight, kind, 1 - player.team, VbConfig.REACH[0], -1, ms);
     }
     attack(player, from, opponents, quality, lead, ms) {
-        const aim = ShotAimer.emptySpot(player.team, opponents, ShotAimer.SPIKE_DEPTHS);
+        const near = -player.iz * VbConfig.sideOf(player.team) < -0.45;
+        const aim = ShotAimer.emptySpot(player.team, opponents, near ? ShotAimer.NEAR_SPIKE_DEPTHS : ShotAimer.SPIKE_DEPTHS, true, this.random() < VbConfig.BLOCKER_AVOID_CHANCE ? { x: player.x, z: player.z } : null);
         const timing = VbMath.clamp(1 - Math.abs(lead - VbConfig.SPIKE_LEAD_MS) / VbConfig.SPIKE_LEAD_WINDOW_MS, 0, 1);
         const finalQuality = timing * (0.6 + 0.4 * quality);
         const spread = VbMath.discOffset(0.2 + (1 - finalQuality) * 2.2, this.random);
         const target = { x: aim.x + spread.x, y: VbConfig.BALL_R, z: aim.z + spread.z };
-        const minimum = 0.52 + (1 - finalQuality) * 0.3;
+        const minimum = (near ? 0.42 : 0.52) + (1 - finalQuality) * 0.3;
         const flight = finalQuality < 0.2 ? minimum : ShotAimer.clearingFlight(from, target, minimum);
         this.release(player, from, target, flight, "spike", 1 - player.team, VbConfig.REACH[0], -1, ms);
     }
