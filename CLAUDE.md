@@ -28,7 +28,8 @@
 - Node 와 TypeScript 는 `package.json` 의 개발 의존성이다. 새 컴퓨터에서는 `npm install` 한 번이면 된다(`node_modules/` 는 gitignore). Node 자체가 없으면 `winget install OpenJS.NodeJS.LTS`.
   three 타입은 `@types/three`(개발 의존성)이고 `tsconfig.json` 은 `moduleResolution: bundler`·`skipLibCheck` 를 쓴다. 3D 자료는 HTML 의 `<script type="module">` 에서 three 를 가져와 `new 게임클래스({THREE, GLTFLoader, SkeletonUtils})` 로 넘긴다(`ThreeLibs`, 33번 참고).
 - **공용 캐릭터 만들기는 `ts/character-kit.ts`**(2026-10-02 선생님 요청, 33번이 첫 사용). 닉네임·외형(`PlayerProfile`, 기기 저장 `portal_profile_v1`)과 6종 캐릭터 꾸미기 화면(`ProfileEditor`)·3D 모델 만들기(`CharacterModelFactory`)를 클래스로 묶었다.
-  앞으로 모든 게임이 같은 외형을 쓰고, 게임 선택 화면에서 닉네임·캐릭터를 정하게 할 계획이다(아직 안 함). 새 3D 게임은 이 모듈로 캐릭터를 만든다. 사용법·클래스 표는 `33.castle-spy-notes.md` 2절.
+  **캐릭터 만들기는 학급 화면(`index.html?c=…`)의 QR 위 `캐릭터 만들기` 버튼이 같은 화면 위 창으로 띄운다**(2026-10-03 선생님 요청, `ts/character-maker.ts` 의 `CharacterMakerPage`, three 는 버튼을 누를 때 늦게 불러옴).
+  게임(32·33)의 캐릭터 만들기 카드는 접힌 한 줄(`.st-fold`, `ts/fold-card.ts` 의 `FoldCard`)이고 오른쪽 삼각형으로 펼친다. 32번 종목 규칙 카드도 같은 접이식. 새 게임도 같은 방식으로 둔다. 닉네임·외형은 기기 `localStorage`(`portal_profile_v1`)에 남는다. 새 3D 게임은 이 모듈로 캐릭터를 만든다. 사용법·클래스 표는 `33.castle-spy-notes.md` 2절.
 
 # 수업 자료 저장소 작업 지침
 

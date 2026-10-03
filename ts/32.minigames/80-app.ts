@@ -34,6 +34,7 @@ class MiniGamesApp {
     this.render = new RenderHost(libs, this.page.byId<HTMLCanvasElement>("view"), this.env);
     this.backdrops = new MenuBackdropDirector(this.catalog, { libs, env: this.env, clock: this.backend.clock, render: this.render }, this.randomSource);
     this.editor = new ProfileEditor(libs, this.factory, this.assets, this.profile);
+    FoldCard.bindAll(document);
     this.profilePanel = new ProfilePanel(this.editor);
     const wiring = this.wire();
     this.flow = wiring.flow;

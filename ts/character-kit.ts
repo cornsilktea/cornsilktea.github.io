@@ -464,6 +464,10 @@ class CharacterPreview {
 
   private frame(): void {
     if (!this.running) return;
+    if (!this.canvas.clientWidth) {
+      requestAnimationFrame(() => this.frame());
+      return;
+    }
     this.fitToCanvas();
     const delta = Math.min(this.clock.getDelta(), 0.1);
     if (this.animator) this.animator.update(delta);

@@ -2701,6 +2701,7 @@ class CastleSpyGame {
     this.labels = new LabelFactory(libs);
     this.world = new WorldView(libs, Dom.byId<HTMLCanvasElement>("view"), this.touchDevice);
     this.editor = new ProfileEditor(libs, this.factory, this.assets, this.profile);
+    FoldCard.bindAll(document);
     this.services = {
       libs,
       assets: this.assets,

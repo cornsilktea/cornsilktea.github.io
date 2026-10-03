@@ -74,11 +74,12 @@ class CatalogView {
     render(catalog) {
         const host = this.page.byId("catalogHost");
         host.innerHTML = catalog.all().map((definition, index) => this.card(definition, index + 1)).join("");
+        FoldCard.bindAll(host);
     }
     card(definition, order) {
         const keys = definition.keyHelp.map((help) => "<span>" + help.keys.map((key) => "<kbd>" + Html.escape(key) + "</kbd>").join(" ") + "</span><span>" + Html.escape(help.text) + "</span>").join("");
         const rules = definition.rules.map((rule) => "<li>" + rule + "</li>").join("");
-        return "<div class='st-card'><h2>종목 " + order + " · " + Html.escape(definition.title) + "</h2><div class='st-hint'>" + Html.escape(definition.summary) + "</div><h3 class='subHead'>조작 방법</h3><div class='st-keys'>" + keys + "</div><h3 class='subHead'>규칙</h3><ul class='st-rules'>" + rules + "</ul></div>";
+        return "<div class='st-card st-fold'><h2>종목 " + order + " · " + Html.escape(definition.title) + "</h2><div class='st-hint'>" + Html.escape(definition.summary) + "</div><h3 class='subHead'>조작 방법</h3><div class='st-keys'>" + keys + "</div><h3 class='subHead'>규칙</h3><ul class='st-rules'>" + rules + "</ul></div>";
     }
 }
 class CollectionLobbyView {
