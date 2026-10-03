@@ -609,11 +609,10 @@
       <p class="sub">1분 30초 동안 상대를 더 많이 쓰러뜨린 팀이 승리!<br>쓰러지면 3초 뒤 처음 자리에서 부활하고, 부활 후 2.5초 동안은 피해를 받지 않아요. 킬 스코어가 같으면 무승부.</p>
       <div class="hello">안녕하세요, <b id="helloNick"></b>님 👋 <button id="btnNickEdit" class="mini" type="button">✏️ 변경</button></div>
       <button id="btnCreate" class="big primary" type="button">방 만들기</button>
-      <button id="btnJoinOpen" class="big" type="button">방 코드로 입장하기</button>
-      <div id="joinBox" hidden>
+      <div id="joinBox">
         <div class="row">
-          <input id="joinCode" inputmode="numeric" pattern="[0-9]*" maxlength="5" placeholder="5자리 코드" autocomplete="off">
-          <button id="btnJoin" class="primary" type="button">입장</button>
+          <input id="joinCode" inputmode="numeric" pattern="[0-9]*" maxlength="5" placeholder="방 코드 5자리" autocomplete="off">
+          <button id="btnJoin" class="primary" type="button">입장하기</button>
         </div>
       </div>
       <div id="startMsg" class="msg"></div>
@@ -2149,8 +2148,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   $("btnLeaveGame").onclick = function () { if (confirm("방을 나갈까요?")) SESSION.leaveRoom(); };
   $("btnLeaveEnd").onclick = SESSION.leaveRoom.bind(SESSION);
   $("btnCreate").onclick = function () { SOUND.audio(); SESSION.createRoom(); };
-  $("btnJoinOpen").onclick = function () { SOUND.audio(); show($("joinBox"), true); try { $("joinCode").focus(); } catch (e) {} };
-  $("btnJoin").onclick = SESSION.joinRoom.bind(SESSION);
+  $("btnJoin").onclick = function () { SOUND.audio(); SESSION.joinRoom(); };
   $("joinCode").onkeydown = function (e) { if (e.key === "Enter") SESSION.joinRoom(); };
   $("btnStart").onclick = function () { LAUNCHER.startGame(); };
 

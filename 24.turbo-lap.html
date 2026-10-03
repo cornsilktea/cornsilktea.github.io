@@ -101,7 +101,13 @@
   #overlay.st-screen .card .logo small { color: #FFB08C; font-style: normal; }
   #overlay.st-screen .card .btn { box-shadow: none; border: 2px solid rgba(255, 255, 255, .3); border-radius: 6px; background: rgba(255, 255, 255, .06); color: #F4F1E8; }
   #overlay.st-screen .card .btn:not(.sub) { background: #D97B4F; border-color: #D97B4F; color: #fff; }
-  #overlay.st-screen .card #btnJoinOpen, #overlay.st-screen .card #btnJoin { background: #4C8DFF; border-color: #4C8DFF; color: #fff; }
+  .st-screen input[type=text] { width: 100%; min-height: 56px; padding: 6px 12px; font-size: 20px; font-weight: 800; border-radius: 6px; border: 2px solid rgba(255, 255, 255, .3); background: rgba(255, 255, 255, .06); color: #fff; outline: 0; -webkit-user-select: text; user-select: text; }
+  .st-screen input[type=text]:focus { border-color: #D97B4F; }
+  .st-joinrow { display: flex; gap: 10px; margin-top: 10px; }
+  .st-joinrow input { flex: 1 1 auto; min-width: 0; text-align: center; letter-spacing: .3em; }
+  .st-joinrow .st-btn { flex: 0 0 34%; margin: 0; }
+  .st-btn.blue { background: #4C8DFF; border-color: #4C8DFF; color: #fff; }
+  #overlay.st-screen .st-msg { color: #FFB08C; min-height: 20px; margin: 6px 0 0; font-weight: 800; }
   #overlay.st-screen .card .btn:active { transform: none; filter: brightness(.9); }
   #overlay.st-screen .card .btns { justify-content: flex-start; }
   #overlay.st-screen .card .hint, #overlay.st-screen .card .wipe, #overlay.st-screen .card .sect, #overlay.st-screen .codeLab { color: #A9AFC2; text-align: left; }
@@ -348,7 +354,13 @@
     </div>
     <div class="st-card">
       <button type="button" class="st-btn primary" id="btnModeTA">⏱ 타임어택<small>혼자 달려 완주 최단 시간 도전 · 고스트</small></button>
-      <button type="button" class="st-btn" id="btnModeBattle">⚔️ 대전모드<small>방 코드로 모여 1대1 실시간 레이스</small></button>
+      <button type="button" class="st-btn" id="btnCreate">⚔️ 대전모드 방 만들기<small>1대1 실시간 레이스</small></button>
+      <div class="st-joinrow">
+        <input type="text" id="joinCode" inputmode="numeric" pattern="[0-9]*" maxlength="5" autocomplete="off" placeholder="방 코드 5자리">
+        <button type="button" class="st-btn blue" id="btnJoin">참여하기</button>
+      </div>
+      <div class="hello">대전 닉네임: <b id="helloNick"></b> <button type="button" class="mini" id="btnNickEdit">✏️ 변경</button></div>
+      <div class="st-msg msg" id="bStartMsg"></div>
       <div id="loadNote"></div>
     </div>
     <div class="st-card">
@@ -385,20 +397,6 @@
     <div class="hint">트랙을 벗어나면 느려지고, 울타리에 부딪히면 크게 감속합니다. R 키: 처음부터 다시</div>
     <div class="btns" style="margin-top:12px"><button type="button" class="btn sub" id="btnCourseBack">← 처음 화면</button></div>
     <div class="wipe"><button type="button" id="btnWipe">이 기기의 나의 최고 기록·고스트 지우기</button></div>
-  </div>
-
-  <div class="card" id="cardBStart" style="display:none">
-    <div class="logo" style="font-size:36px">⚔️ 대전모드<small></small></div>
-    <div class="hello">안녕하세요, <b id="helloNick"></b>님 <button type="button" class="mini" id="btnNickEdit">✏️ 닉네임 변경</button></div>
-    <div class="modeBtns">
-      <button type="button" class="btn" id="btnCreate">1대1 방 만들기</button>
-      <button type="button" class="btn mid" id="btnJoinOpen">방 참여하기</button>
-    </div>
-    <div id="joinBox" hidden>
-      <div class="joinRow"><input id="joinCode" inputmode="numeric" pattern="[0-9]*" maxlength="5" placeholder="5자리 코드" autocomplete="off"><button type="button" class="btn" id="btnJoin">입장</button></div>
-    </div>
-    <div class="msg" id="bStartMsg"></div>
-    <div class="btns" style="margin-top:8px"><button type="button" class="btn sub" id="btnBBack">← 처음 화면</button></div>
   </div>
 
   <div class="card wide" id="cardLobby" style="display:none">
@@ -792,7 +790,7 @@ function warmUpGpu() {
 }
 function renderLoadGate() {
   const myModel = CAR_MODELS[parseCar(carKey).model], ok = HQ_LOAD.ready && !!myModel.tpl;
-  ["btnModeTA", "btnModeBattle", "btnHongkong", "btnSingapore", "btnSeoul"].forEach(id => { $(id).disabled = !ok; });
+  ["btnModeTA", "btnCreate", "btnJoin", "btnHongkong", "btnSingapore", "btnSeoul"].forEach(id => { $(id).disabled = !ok; });
   $("btnGo").disabled = !ok;
   markCarButtons();
   const note = $("loadNote");
@@ -3557,7 +3555,7 @@ function placeAt(i, lat) {
 function startLat() { return (playMode === "battle" && myTeam() === "right" ? -1 : 1) * gridLat(); }
 function resetCar() { placeAt(START_I, startLat()); clearGroundFx(); P.gfxT = newGroundTrack(); P.off = false; P.wallT = 0; P.steerVis = 0; P.rollVis = 0; P.fin = 0; resetBoost(P); }
 function resetBoost(r) { r.chase = 0; r.chaseKmh = 0; r.tailLostT = 0; r.surgeVis = 0; r.surgeFlash = 0; r.tailT = 0; r.offLine = false; r.boostOn = false; r.boostT = 0; r.boostCap = 0; r.boostGain = 0; r.boostCool = 0; }
-const CARDS = { start: "cardStart", course: "cardCourse", car: "cardCar", done: "cardDone", bstart: "cardBStart", lobby: "cardLobby", bdone: "cardBDone" };
+const CARDS = { start: "cardStart", course: "cardCourse", car: "cardCar", done: "cardDone", lobby: "cardLobby", bdone: "cardBDone" };
 let cardNow = "start";
 function showCard(which) {
   cardNow = which;
@@ -4143,7 +4141,6 @@ $("btnSingapore").onclick = e => { e.currentTarget.blur(); pickCourse("singapore
 $("btnSeoul").onclick = e => { e.currentTarget.blur(); pickCourse("seoul"); };
 $("btnCarBack").onclick = e => { e.currentTarget.blur(); showCard("course"); };
 $("btnModeTA").onclick = e => { e.currentTarget.blur(); audioInit(); showCard("course"); renderRecords(); };
-$("btnModeBattle").onclick = e => { e.currentTarget.blur(); audioInit(); enterBattleMenu(); };
 $("btnCourseBack").onclick = e => { e.currentTarget.blur(); showCard("start"); };
 document.querySelectorAll(".ghostbtn").forEach(b => b.onclick = e => {
   e.currentTarget.blur(); ghostPick = b.getAttribute("data-ghost");
@@ -4200,6 +4197,7 @@ const BT = {
   viewId: null, viewKey: "", serverOffset: 0, hitSeq: 0, rankRows: {}, rankNums: 0, lobbyCarSig: "", queued: false
 };
 try { BT.nick = localStorage.getItem(NICK_KEY) || ""; } catch (e) {}
+refreshNick();
 const BOT = { max: 1, topRatio: 0.9, grip: 0.86, brake: 24, lookSamples: 45, leadEaseM: 60, leadEase: 0.88, laneRatio: 0.35, latRate: 1.8, latPerSpeed: 0.25, dodgeAheadM: 14, dodgeGap: 2.4, edgeGap: 1.6 };
 const BOTS = {};
 let botCornerV = null, botCornerFor = null;
@@ -4253,10 +4251,6 @@ function saveNick() {
 function cancelNick() {
   $("nickModal").hidden = true;
   if (BT.nickRequired && !BT.nick) showCard("start");
-}
-function enterBattleMenu() {
-  bMsg(""); $("joinBox").hidden = true; refreshNick(); showCard("bstart");
-  if (!BT.nick) openNick(true);
 }
 function bMsg(t) { $("bStartMsg").textContent = t || ""; }
 function newPlayer(team, t) { return { nickname: BT.nick, team, car: carKey, joinedAt: t }; }
@@ -4398,7 +4392,7 @@ function closeRoomLocal(msg) {
   resetMatchLocal();
   playMode = "ta"; setBattleHud(false);
   scene.remove(car); car = makeCar(carKey); scene.add(car); resetCar(); updateCar(0);
-  refreshNick(); showCard("bstart"); bMsg(msg);
+  refreshNick(); showCard("start"); bMsg(msg);
 }
 window.addEventListener("pagehide", () => { if (BT.ref) { try { BT.ref.child("players/" + BT.myId).remove(); BT.ref.child("st/" + BT.myId).remove(); } catch (e) {} } });
 
@@ -5083,10 +5077,8 @@ $("nickInput").onkeydown = e => { if (e.key === "Enter") saveNick(); };
 $("btnNickCancel").onclick = cancelNick;
 $("btnNickEdit").onclick = e => { e.currentTarget.blur(); openNick(false); };
 $("btnNickEdit2").onclick = e => { e.currentTarget.blur(); openNick(false); };
-$("btnBBack").onclick = e => { e.currentTarget.blur(); showCard("start"); };
 $("btnCreate").onclick = e => { e.currentTarget.blur(); audioInit(); createRoom(); };
-$("btnJoinOpen").onclick = e => { e.currentTarget.blur(); audioInit(); $("joinBox").hidden = false; try { $("joinCode").focus(); } catch (err) {} };
-$("btnJoin").onclick = joinRoom;
+$("btnJoin").onclick = e => { e.currentTarget.blur(); audioInit(); joinRoom(); };
 $("joinCode").onkeydown = e => { if (e.key === "Enter") joinRoom(); };
 $("btnLeaveLobby").onclick = e => { e.currentTarget.blur(); leaveRoom(); };
 $("btnLeaveEnd").onclick = e => { e.currentTarget.blur(); leaveRoom(); };
