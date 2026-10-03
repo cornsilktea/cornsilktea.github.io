@@ -1,10 +1,10 @@
 # KayKit 에셋 도감 (새 게임 만들 때 어느 에셋을 쓸지 찾는 곳)
 
-원본 폴더: `C:\Users\user\Downloads\allkaykit` (21개 팩, 파일 11,487개). 저장소에는 게임에 쓴 것만 `assets/kaykit/` 로 복사해 둔다.
-조사한 날: 2026-10-03. 팩을 더 받으면 아래 명령으로 다시 만든다.
+에셋 보관 폴더: `C:\Users\user\Downloads\allkaykit\organized` (21개 팩의 glTF 를 용도별로 정리한 것. FBX·OBJ 원본 팩 폴더는 2026-10-03 에 지웠다 — 필요하면 KayKit 에서 다시 받는다). 저장소에는 게임에 쓰는 것만 `assets/kaykit/` 에 둔다(172개).
+조사한 날: 2026-10-03. `organized` 에 팩을 더 넣으면 아래 명령으로 도감을 다시 만든다.
 
 ```bash
-node tools/kaykit-catalog.js "C:\Users\user\Downloads\allkaykit" assets\kaykit kaykit-catalog
+node tools/kaykit-catalog.js "C:\Users\user\Downloads\allkaykit\organized" assets\kaykit kaykit-catalog
 ```
 
 ## 찾는 법 (3단계)
@@ -25,7 +25,7 @@ node tools/kaykit-catalog.js "C:\Users\user\Downloads\allkaykit" assets\kaykit k
 
 | 팩 (원본 폴더 이름) | 모델 | 내용 | 이럴 때 쓴다 |
 |---|---|---|---|
-| **KayKit_Adventurers_2.0_FREE** | 31 + 캐릭터 6 | 모험가 6종(Barbarian·Knight·Mage·Ranger·Rogue·Rogue_Hooded)과 그들의 무기·방패·화살·마법책·지팡이·술잔 | 3D 액션·배틀·RPG 의 주인공/아군/적. **원본에는 캐릭터가 FBX 뿐이고 glb 는 저장소 `assets/kaykit/characters/` 에 변환해 둠** |
+| **KayKit_Adventurers_2.0_FREE** | 31 + 캐릭터 6 | 모험가 6종(Barbarian·Knight·Mage·Ranger·Rogue·Rogue_Hooded)과 그들의 무기·방패·화살·마법책·지팡이·술잔 | 3D 액션·배틀·RPG 의 주인공/아군/적. **glb 는 `organized/characters/adventurers/` 와 저장소 `assets/kaykit/characters/` 에 있음(FBX 원본은 삭제)** |
 | **KayKit_Skeletons_1.1_FREE** | 17 + 캐릭터 4 | 스켈레톤 4종(Warrior·Mage·Rogue·Minion)과 전용 무기·방패·화살·석궁 | 몬스터·적·좀비류. 모험가와 **같은 뼈대(Rig_Medium)** 라 애니메이션을 그대로 공유 |
 | **KayKit Character Animations 1.2** | 3 + 애니 30 | Prototype Pete(마네킹 캐릭터)·연필·케이스, 그리고 **그 캐릭터 전용 애니메이션 30개** | 단순한 마네킹 주인공. 뼈대가 달라 Rig_Medium 캐릭터와는 호환 안 됨 |
 | **Fantasy Props MegaKit (Quaternius)** | 93 | 판타지 소품: 상자·통·책·촛대·양초·물약·열쇠·침대·책상·탁자·모루·허수아비·노점 등. **PBR(법선·ORM) 텍스처** 사용, Chest_Wood 는 열고 닫는 애니메이션 | 실내(방·여관·상점)를 꾸밀 때. KayKit 보다 사실적이라 분위기가 다름 |
@@ -51,15 +51,15 @@ node tools/kaykit-catalog.js "C:\Users\user\Downloads\allkaykit" assets\kaykit k
 
 | 캐릭터 | 파일 | 삼각형 | 비고 |
 |---|---|---|---|
-| Barbarian / Knight / Mage / Ranger / Rogue / Rogue_Hooded | 저장소 `assets/kaykit/characters/*.glb` (원본은 `Characters/fbx`) | 5.8k~8.9k | 뼈 23개 Rig_Medium. 텍스처는 `*_texture.png` 8열×4행 색 칸이라 `recolor` 로 팀 색 변경(30번 방식) |
-| Skeleton_Warrior / Mage / Rogue / Minion | `KayKit_Skeletons_1.1_FREE/.../characters/gltf/*.glb` (저장소에도 있음) | 4.6k~5.9k | 뼈 23개 Rig_Medium. `Rig_Medium_Special` 에 스켈레톤 전용 클립 |
-| PrototypePete | 원본 `KayKit Character Animations 1.2/Models/gltf/PrototypePete.gltf` | 약 4.9k | 몸/머리/팔 조각이 분리된 마네킹. 전용 애니 30개 |
+| Barbarian / Knight / Mage / Ranger / Rogue / Rogue_Hooded | `organized/characters/adventurers/*.glb` (저장소 `assets/kaykit/characters/` 에도 있음) | 5.8k~8.9k | 뼈 23개 Rig_Medium. 텍스처는 `*_texture.png` 8열×4행 색 칸이라 `recolor` 로 팀 색 변경(30번 방식) |
+| Skeleton_Warrior / Mage / Rogue / Minion | `organized/characters/skeletons/*.glb` (저장소에는 Warrior 만 없음) | 4.6k~5.9k | 뼈 23개 Rig_Medium. `Rig_Medium_Special` 에 스켈레톤 전용 클립 |
+| PrototypePete | `organized/characters/prototype-pete/PrototypePete.gltf` | 약 4.9k | 몸/머리/팔 조각이 분리된 마네킹. 전용 애니 30개 |
 
 모든 Rig_Medium 캐릭터는 같은 뼈대이므로 **어느 캐릭터든 아래 Rig_Medium 애니메이션을 그대로 재생**할 수 있다(클립 이름으로 `AnimationMixer` 에 연결).
 
 ## 4. 애니메이션 — 클립이 들어 있는 파일
 
-Rig_Medium 계열 8개 파일은 `assets/kaykit/animations/` 에 모두 있다(원본 allkaykit 에는 General·MovementBasic 두 개뿐). 클립 이름·길이 전체는 [names.md](names.md) 맨 위.
+Rig_Medium 계열 8개 파일은 `organized/animations/rig-medium/` 에 있다(저장소 `assets/kaykit/animations/` 에는 게임이 쓰는 `teambattle_anims.glb` 만 둠). 클립 이름·길이 전체는 [names.md](names.md) 맨 위.
 
 | 파일 | 클립 수 | 들어 있는 동작 |
 |---|---|---|
@@ -71,8 +71,8 @@ Rig_Medium 계열 8개 파일은 `assets/kaykit/animations/` 에 모두 있다(�
 | `Rig_Medium_Simulation` | 14 | 환호(Cheering)·손 흔들기·앉기/일어나기(의자·바닥)·눕기·팔굽혀펴기·윗몸일으키기 |
 | `Rig_Medium_Tools` | 29 | 도끼질·삽질·곡괭이·망치질·톱질·**낚시 7단계**·자물쇠 따기·작업(Work_A~C)·물건 들기(Holding_A~C) |
 | `Rig_Medium_Special` | 15 | 스켈레톤 전용(깨어남·죽음·부활·배회·도발)과 실험용 변신 |
-| `teambattle_anims.glb` (저장소) | 약 40 | 30번 팀 배틀이 위 파일에서 골라 합친 것 |
-| `KayKit_AnimatedCharacter_v1.2.glb` (원본) | 30 | PrototypePete 전용: Idle·Walk·Run·Jump·Roll·Dash 4방향·Attack 계열·Block·Shoot·Dance·Cheer·Wave·Climbing·PickUp·Throw·Defeat 등 |
+| `teambattle_anims.glb` (`organized/animations/combined/`) | 약 40 | 30번 팀 배틀이 위 파일에서 골라 합친 것 |
+| `organized/animations/prototype-pete/KayKit_AnimatedCharacter_v1.2.glb` | 30 | PrototypePete 전용: Idle·Walk·Run·Jump·Roll·Dash 4방향·Attack 계열·Block·Shoot·Dance·Cheer·Wave·Climbing·PickUp·Throw·Defeat 등 |
 
 고를 때 참고: 이름 끝이 `_Pose` 인 것은 길이 0초짜리 정지 자세, `T-Pose` 는 기준 자세. `Attack` 류는 1~2초, 죽음 B·소환(Summon)·낚시·곡괭이처럼 긴 것은 2.5~6초.
 
@@ -97,8 +97,8 @@ Rig_Medium 계열 8개 파일은 `assets/kaykit/animations/` 에 모두 있다(�
 
 ## 6. 주의할 점
 
-- **저장소에 없는 것은 먼저 복사**한다: 원본 `.gltf` 를 쓰려면 `.bin`·텍스처 PNG 도 함께. 복사 위치는 기존 구조(`assets/kaykit/dungeon|medieval|props|characters|animations|textures`)를 따른다.
+- **저장소에 없는 것은 `organized` 에서 복사**한다: `.gltf` 는 `.bin`·텍스처 PNG 도 함께(폴더째). 복사 위치는 기존 구조(`assets/kaykit/dungeon|medieval|props|characters|animations|textures`)를 따른다.
 - `assets/kaykit/props/` 는 여러 팩의 소품을 섞어 둔 곳이라 같은 이름이 다른 팩에도 있을 수 있다(예: `wall`, `coin`, `table_medium`). names.md 의 `*` 는 이름만 비교한 표시다.
 - `Fantasy Props MegaKit[Standard]` 폴더 이름에 대괄호가 있어 PowerShell 에서는 `-LiteralPath` 로 읽어야 한다.
-- FBX 는 이 도감에서 읽지 않았다(웹에서는 glTF 사용). 원본 FBX 만 있는 것: Adventurers 캐릭터 6종, Character Animations 의 낱개 애니 30개(`Single Animations/*.fbx`, 같은 내용이 glb 한 파일에 합쳐져 있음).
+- FBX·OBJ·DAE 는 지웠다(웹에서는 glTF 만 씀). 블렌더 등에서 원본이 필요하면 KayKit 에서 팩을 다시 받는다.
 - 3D 게임 성능·화질 자동 조절·메뉴 배경 규칙은 `CLAUDE.md` 의 3D 항목을 따른다.

@@ -92,7 +92,7 @@ class FbxModelNames {
 }
 
 class PackScanner {
-  static SKIP_DIRECTORIES = new Set(["KayKit Brand Resouces", "Documentation", "Samples", "samples", "texture", "Textures", "obj", "dae"]);
+  static SKIP_DIRECTORIES = new Set(["KayKit Brand Resouces", "Documentation", "Samples", "samples", "texture", "Textures", "obj", "dae", "previews", "licenses"]);
   static MODEL_EXTENSIONS = new Set([".gltf", ".glb"]);
 
   constructor(rootDirectory) {
@@ -187,7 +187,7 @@ class RepoUsage {
   }
 
   has(packName, modelName) {
-    return this.foldersOf(packName).some((folder) => this.namesByFolder.get(folder)?.has(modelName.toLowerCase()));
+    return [...this.namesByFolder.values()].some((names) => names.has(modelName.toLowerCase()));
   }
 }
 class NamesMarkdown {
@@ -239,12 +239,6 @@ class NamesMarkdown {
 class CatalogCommand {
   run(sourceRoot, repoKayKitRoot, outputDirectory) {
     const catalog = new PackScanner(sourceRoot).scanAll();
-    const repoCatalog = new PackScanner(repoKayKitRoot).scanAll().filter((pack) => pack.pack === "animations");
-    for (const pack of repoCatalog) {
-      pack.pack = "(저장소 assets/kaykit/animations)";
-      pack.models = pack.models.filter((model) => model.name !== "teambattle_anims");
-      catalog.push(pack);
-    }
     fs.mkdirSync(outputDirectory, { recursive: true });
     fs.writeFileSync(path.join(outputDirectory, "catalog.json"), JSON.stringify(catalog));
     fs.writeFileSync(path.join(outputDirectory, "names.md"), new NamesMarkdown(catalog, new RepoUsage(repoKayKitRoot)).render());
