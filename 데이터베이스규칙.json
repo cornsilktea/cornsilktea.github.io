@@ -16,6 +16,12 @@
         "$room": { ".write": "$room.matches(/^[0-9]{5}$/)" }
       }
     },
+    "soccer": {
+      ".read": true,
+      "rooms": {
+        "$room": { ".write": "$room.matches(/^[0-9]{5}$/)" }
+      }
+    },
     "lasttile": {
       ".read": true,
       "rooms": {

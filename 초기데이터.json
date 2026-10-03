@@ -315,6 +315,15 @@
         "unitsSet": false,
         "url": "34.volleyball.html"
       },
+      "soccer": {
+        "memo": "방 코드로 모여 2대2로 즐기는 3D 미니 축구 / 2분 시간제, 동점이면 연장 골든골 / J·K 두 키로 패스·슛·태클·슬라이딩 / 사람이 모자라면 AI가 채우고 관전도 가능",
+        "open": false,
+        "order": 34,
+        "title": "2대2 3D 미니 축구",
+        "units": [],
+        "unitsSet": false,
+        "url": "35.soccer.html"
+      },
       "minigames": {
         "memo": "방 코드로 모여 2~6명이 여러 미니게임을 차례로 겨루는 3D 게임 모음 / 종목마다 순위 점수(5·3·2·1점)를 합산해 최종 우승자를 정함 / 중간에 들어오거나 탈락하면 진행 중인 판을 관전 / 혼자면 AI 1명과 시작 / 지금은 마지막 발판 1종목",
         "open": false,
