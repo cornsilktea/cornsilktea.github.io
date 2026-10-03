@@ -91,6 +91,18 @@
   .actBtn { position: fixed; z-index: 19; width: 88px; height: 88px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, .55); background: rgba(20, 20, 36, .72); color: #fff; font-size: 18px; font-weight: 800; touch-action: none; overflow: hidden; -webkit-tap-highlight-color: transparent; }
   .actBtn i { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: rgba(0, 0, 0, .55); }
   .actBtn span { position: relative; }
+  #nunchiHand { position: fixed; left: 0; right: 0; bottom: 0; z-index: 21; display: flex; flex-direction: column; align-items: center; gap: 4px; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px); pointer-events: none; }
+  #nunchiHand > * { pointer-events: auto; }
+  .nhHint { padding: 4px 14px; border-radius: 999px; background: rgba(20, 20, 36, .84); border: 1.5px solid rgba(255, 255, 255, .25); font-size: 14px; font-weight: 800; color: #F2C879; }
+  .nhFan { position: relative; display: flex; justify-content: center; align-items: flex-end; height: 128px; width: min(96vw, 520px); }
+  .nhCard { flex: 0 0 auto; width: clamp(54px, 15vw, 82px); height: clamp(78px, 21vw, 116px); margin: 0 clamp(-14px, -2.4vw, -8px); border-radius: 10px; border: 3px solid #3A3A4A; background: #FBF6E9; color: #3A3A4A; font-size: clamp(30px, 8vw, 46px); font-weight: 800; transform: translateY(var(--sink)) rotate(var(--tilt)); transform-origin: 50% 140%; transition: transform .14s ease-out, filter .14s; box-shadow: 0 4px 10px rgba(0, 0, 0, .45); touch-action: manipulation; }
+  .nhCard:nth-child(1) { color: #E5484D; } .nhCard:nth-child(2) { color: #F08A24; } .nhCard:nth-child(3) { color: #C99A00; }
+  .nhCard:nth-child(4) { color: #2FA561; } .nhCard:nth-child(5) { color: #3E8EF0; } .nhCard:nth-child(6) { color: #8A55D6; }
+  .nhCard.up { transform: translateY(-30px) rotate(0deg); border-color: #D97B4F; box-shadow: 0 0 0 3px rgba(217, 123, 79, .6), 0 8px 16px rgba(0, 0, 0, .5); z-index: 2; }
+  .nhCard.sealed { transform: translateY(-14px) rotate(0deg); border-color: #F2C879; filter: brightness(.82); }
+  .nhCard.used { filter: brightness(.3); box-shadow: none; }
+  .nhSubmit { min-width: 120px; min-height: 44px; padding: 6px 22px; font-size: 18px; font-weight: 800; border-radius: 10px; border: 2px solid #D97B4F; background: #D97B4F; color: #fff; }
+  .nhSubmit:disabled { background: rgba(20, 20, 36, .84); border-color: rgba(255, 255, 255, .3); color: #8E93A0; }
   @media (max-width: 760px) {
     #hudList { width: 150px; }
     #hudList .pl { font-size: 12px; }
@@ -112,6 +124,8 @@
 <div id="banner" hidden><div class="hud-box" id="bannerBox"></div></div>
 <div id="centerMsg" hidden></div>
 <div id="specBox" hidden><button type="button" id="btnSpec">다음 관전 대상</button></div>
+
+<div id="nunchiHand" hidden></div>
 
 <div id="joyZone" hidden></div>
 <div id="joyBase" hidden><div id="joyKnob"></div></div>
@@ -212,6 +226,10 @@
 <script charset="utf-8" src="32.minigames/40-session.js"></script>
 <script charset="utf-8" src="32.minigames/50-last-tile-game.js"></script>
 <script charset="utf-8" src="32.minigames/55-bomb-pass-game.js"></script>
+<script charset="utf-8" src="32.minigames/56-nunchi-rules.js"></script>
+<script charset="utf-8" src="32.minigames/57-nunchi-network.js"></script>
+<script charset="utf-8" src="32.minigames/58-nunchi-table.js"></script>
+<script charset="utf-8" src="32.minigames/59-nunchi-card-game.js"></script>
 <script charset="utf-8" src="32.minigames/60-views.js"></script>
 <script charset="utf-8" src="32.minigames/70-flow.js"></script>
 <script charset="utf-8" src="32.minigames/80-app.js"></script>
