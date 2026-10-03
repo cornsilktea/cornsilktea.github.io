@@ -38,6 +38,15 @@ class SocBotLooks {
     look.p.top = SocConfig.TEAM_TOP_COLOR_INDEX[team] + 1;
     return look;
   }
+
+  static keeper(team: number): CharacterLook {
+    const look = CharacterLooks.createDefault();
+    look.c = team === 0 ? 1 : 2;
+    look.p.top = SocConfig.TEAM_TOP_COLOR_INDEX[team] + 1;
+    look.hat = 0;
+    look.cape = 0;
+    return look;
+  }
 }
 
 class SocInput {
@@ -211,6 +220,10 @@ class SocBallSmoother {
     this.pending = true;
   }
 
+  shown(): SocPoint {
+    return { x: this.lastX, z: this.lastZ };
+  }
+
   smooth(target: SocVec3, deltaSeconds: number): SocVec3 {
     if (this.pending) {
       this.pending = false;
@@ -234,6 +247,7 @@ class SocBallSmoother {
 class SocBallTracker {
   readonly physics = new SocBallPhysics();
   readonly smoother = new SocBallSmoother();
+  readonly follower = new SocDribbleFollower();
   ownerSlot = -1;
   ownerSince = 0;
   kind: SocBallKind = "kickoff";
@@ -245,7 +259,10 @@ class SocBallTracker {
     this.ownerSince = record.at;
     this.kind = record.kind;
     this.smoother.markChange();
-    if (record.owner >= 0) return;
+    if (record.owner >= 0) {
+      this.follower.reset();
+      return;
+    }
     this.physics.load(record);
     this.physics.advance(SocMath.clamp((nowMs - record.at) / 1000, 0, 6));
     this.physics.impacts.length = 0;
@@ -365,8 +382,9 @@ class SoccerMatch {
   private static readonly HIT_VIEW_MS = 520;
 
   private readonly group: Three<"Group">;
-  private readonly seats: Array<SocSeatActor | null> = [null, null, null, null];
+  private readonly seats: Array<SocSeatActor | null> = [null, null, null, null, null, null];
   private readonly controllers: SocPlayerController[] = [];
+  private readonly bodies: SocPlayerController[] = [];
   private readonly ballView: SocBallView;
   private readonly tracker = new SocBallTracker();
   private readonly charge = new SocChargeTracker();
@@ -406,6 +424,26 @@ class SoccerMatch {
       this.engine = new SocEngine(this.controllers, Math.random);
       this.director = new SocHostDirector(this.engine, (events) => this.applyEvents(events));
     }
+    this.createKeepers();
+  }
+
+  private createKeepers(): void {
+    for (let index = 0; index < 2; index++) {
+      const slot = SocConfig.SEAT_COUNT + index;
+      const team = SocConfig.teamOfSlot(slot);
+      const controller: SocPlayerController = this.engine ? this.engine.keepers[index] : new SocRemoteController(slot);
+      const home = SocCourtLayout.keeperHome(slot);
+      controller.teleport(home.x, home.z);
+      this.bodies[slot] = controller;
+      controller.obstacles = this.bodies;
+      const record: SocPlayerRecord = { nick: SocConfig.KEEPER_NAME, isBot: true, joinedAt: 0, slot, look: SocBotLooks.keeper(team) };
+      const view = new SocPlayerView(this.services.libs, this.services.factory, this.services.assets, this.services.labels, this.group, slot, record, false);
+      this.seats[slot] = { id: "gk" + index, seenActionSeq: controller.actionSeq, controller, view };
+    }
+  }
+
+  private isHostAi(actor: SocSeatActor): boolean {
+    return this.isHost() && actor.id !== this.session.myId && !(actor.controller instanceof SocRemoteController);
   }
 
   applyChange(kind: string): void {
@@ -482,6 +520,8 @@ class SoccerMatch {
       const view = new SocPlayerView(this.services.libs, this.services.factory, this.services.assets, this.services.labels, this.group, slot, record, id === this.session.myId);
       this.seats[slot] = { id, seenActionSeq: controller.actionSeq, controller, view };
       this.controllers[slot] = controller;
+      this.bodies[slot] = controller;
+      controller.obstacles = this.bodies;
     }
     this.seatsDirty = !complete;
   }
@@ -517,7 +557,7 @@ class SoccerMatch {
       this.local.frozen = !this.game || this.game.phase !== "play";
       this.local.carrying = this.tracker.ownerSlot === this.local.slot;
     }
-    this.controllers.forEach((controller) => controller.poll(null, deltaSeconds, now));
+    this.seats.forEach((actor) => { if (actor) actor.controller.poll(null, deltaSeconds, now); });
     if (!this.isHost()) this.tracker.advance(deltaSeconds);
   }
 
@@ -527,7 +567,7 @@ class SoccerMatch {
     if (this.local) this.sendIfNeeded(this.localSent, SocStateCodec.encode(this.local, now), now, this.session.myId);
     if (!this.isHost()) return;
     this.seats.forEach((actor) => {
-      if (!actor || !(actor.controller instanceof SocBot)) return;
+      if (!actor || !this.isHostAi(actor)) return;
       let sent = this.botSent.get(actor.id);
       if (!sent) {
         sent = { text: "", at: 0 };
@@ -649,7 +689,7 @@ class SoccerMatch {
       this.charge.cancel();
       if (!this.isHost()) this.seats.forEach((actor) => {
         if (!actor) return;
-        const spot = SocCourtLayout.kickoffSpot(actor.controller.slot, record.kickoff);
+        const spot = SocCourtLayout.spotFor(actor.controller.slot, record.kickoff);
         actor.controller.teleport(spot.x, spot.z);
       });
     }
@@ -670,7 +710,7 @@ class SoccerMatch {
     const ownerSlot = this.tracker.ownerSlot;
     const owner = ownerSlot >= 0 ? this.seats[ownerSlot] : null;
     if (owner) {
-      const point = SocDribble.position(owner.controller.x, owner.controller.z, owner.controller.yaw, owner.controller.moving, this.tracker.ownerSince, now);
+      const point = this.tracker.follower.position(owner.controller.x, owner.controller.z, owner.controller.yaw, owner.controller.moving, this.tracker.ownerSince, now, this.tracker.smoother.shown());
       return { x: point.x, y: SocConfig.BALL_R, z: point.z };
     }
     return { x: this.tracker.physics.x, y: this.tracker.physics.y, z: this.tracker.physics.z };
