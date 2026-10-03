@@ -114,6 +114,8 @@
 - **34번(2대2 3D 배구) 작업은 시작 전에 `34.volleyball-notes.md` 를 읽는다.** 규칙·표식 규칙·클래스 지도·Firebase 구조·검사 방법이 거기 있다. 규칙 코드(`ts/34.volleyball-rules.ts`)는 화면을 몰라서 `node .claude/volley-sim.js` 로 검사한다.
 - **32번(미니게임 모음) 작업은 시작 전에 `32.minigames-notes.md` 를 읽는다.** `32.minigames/last-tile/`(옛 마지막 발판 규칙 코드, 설명은 `32.minigames-last-tile-notes.md`)도 같은 모음 안의 코드다. 종목 추가 방법·클래스 지도·Firebase 구조·검사 방법이 거기 있다.
 
+- **새 게임에 쓸 3D 에셋(캐릭터·애니메이션·건물·소품)을 고를 때는 먼저 `kaykit-catalog/README.md` 를 읽는다**(2026-10-03 선생님 요청). `allkaykit` 21개 팩의 용도·캐릭터·애니메이션 클립을 정리해 두었고, `node tools/kaykit-find.js 단어` 로 모델·클립을 바로 검색한다. 전체 이름표는 `kaykit-catalog/names.md`. 팩을 더 받으면 README 맨 위 명령으로 다시 만든다.
+
 ## 환경
 
 - 로컬 미리보기: `.claude/launch.json` 의 `static`(정적 서버, 포트는 launch.json 참고). `.claude/` 는 gitignore 되어 있다.
