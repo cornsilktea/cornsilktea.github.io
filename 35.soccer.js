@@ -619,7 +619,7 @@ class SoccerMatch {
         }
     }
     finishMatch(game) {
-        this.session.ref.update({ end: { winner: game.winner, sa: game.sa, sb: game.sb, overtime: game.overtime, at: this.services.backend.now() }, status: "end" });
+        this.session.ref.update({ end: { winner: game.winner, sa: game.sa, sb: game.sb, overtime: game.overtime, goals: game.goals, at: this.services.backend.now() }, status: "end" });
     }
     applyBall(record) {
         if (!record || record.seq === this.tracker.seq)
@@ -861,7 +861,7 @@ class SocEndView {
             const team = SocConfig.teamOfSlot(slot);
             const name = record ? record.nick + (record.isBot ? " (AI)" : "") : "(나감)";
             const result = team === end.winner ? "승리" : "패배";
-            return "<tr" + (id === session.myId ? " class='meRow'" : "") + "><td><span class='rankDot' style='background:" + SocConfig.TEAM_COLORS[team] + "'></span>" + RkDom.escape(name) + "</td><td>" + SocConfig.TEAM_NAMES[team] + "</td><td>" + result + "</td></tr>";
+            return "<tr" + (id === session.myId ? " class='meRow'" : "") + "><td><span class='rankDot' style='background:" + SocConfig.TEAM_COLORS[team] + "'></span>" + RkDom.escape(name) + "</td><td>" + SocConfig.TEAM_NAMES[team] + "</td><td>" + result + "</td><td>" + (end.goals ? end.goals[slot] || 0 : 0) + "</td></tr>";
         }).join("");
     }
 }

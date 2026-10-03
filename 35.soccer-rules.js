@@ -874,6 +874,7 @@ class SocEngine {
         this.scorer = -1;
         this.ownGoal = false;
         this.winner = -1;
+        this.goalsBySlot = [0, 0, 0, 0];
         this.concedingTeam = 0;
         this.ownerSinceMs = 0;
         this.ballSeq = 0;
@@ -1023,6 +1024,8 @@ class SocEngine {
         this.score[team]++;
         this.scorer = this.lastToucher;
         this.ownGoal = this.scorer >= 0 && SocConfig.teamOfSlot(this.scorer) !== team;
+        if (this.scorer >= 0 && this.scorer < SocConfig.SEAT_COUNT && !this.ownGoal)
+            this.goalsBySlot[this.scorer]++;
         this.concedingTeam = 1 - team;
         this.phase = "goal";
         this.phaseEndMs = nowMs + SocConfig.GOAL_MS;
@@ -1310,7 +1313,7 @@ class SocEngine {
             type: "game",
             game: {
                 n: this.gameNo, phase: this.phase === "idle" ? "ready" : this.phase, at: Math.round(nowMs), leftMs: Math.round(this.leftMs), overtime: this.overtime,
-                sa: this.score[0], sb: this.score[1], kickoff: this.kickoffTeam, scorer: this.scorer, own: this.ownGoal, winner: this.winner
+                sa: this.score[0], sb: this.score[1], kickoff: this.kickoffTeam, scorer: this.scorer, own: this.ownGoal, winner: this.winner, goals: this.goalsBySlot.slice()
             }
         });
     }

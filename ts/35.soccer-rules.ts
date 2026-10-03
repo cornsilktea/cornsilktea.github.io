@@ -29,6 +29,7 @@ interface SocGameRecord {
   scorer: number;
   own: boolean;
   winner: number;
+  goals: number[];
 }
 
 interface SocNetImpact { surface: "back" | "side" | "roof"; x: number; y: number; z: number; strength: number }
@@ -944,6 +945,7 @@ class SocEngine {
   scorer = -1;
   ownGoal = false;
   winner = -1;
+  goalsBySlot: number[] = [0, 0, 0, 0];
   private concedingTeam = 0;
   private ownerSinceMs = 0;
   private ballSeq = 0;
@@ -1103,6 +1105,7 @@ class SocEngine {
     this.score[team]++;
     this.scorer = this.lastToucher;
     this.ownGoal = this.scorer >= 0 && SocConfig.teamOfSlot(this.scorer) !== team;
+    if (this.scorer >= 0 && this.scorer < SocConfig.SEAT_COUNT && !this.ownGoal) this.goalsBySlot[this.scorer]++;
     this.concedingTeam = 1 - team;
     this.phase = "goal";
     this.phaseEndMs = nowMs + SocConfig.GOAL_MS;
@@ -1382,7 +1385,7 @@ class SocEngine {
       type: "game",
       game: {
         n: this.gameNo, phase: this.phase === "idle" ? "ready" : this.phase, at: Math.round(nowMs), leftMs: Math.round(this.leftMs), overtime: this.overtime,
-        sa: this.score[0], sb: this.score[1], kickoff: this.kickoffTeam, scorer: this.scorer, own: this.ownGoal, winner: this.winner
+        sa: this.score[0], sb: this.score[1], kickoff: this.kickoffTeam, scorer: this.scorer, own: this.ownGoal, winner: this.winner, goals: this.goalsBySlot.slice()
       }
     });
   }

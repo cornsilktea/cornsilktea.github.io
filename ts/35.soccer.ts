@@ -3,7 +3,7 @@ type SocButtonKey = "J" | "K";
 
 interface SocPlayerRecord extends RkPlayerRecord {}
 interface SocMatchRecord { id: number; startAt: number; seats: Record<string, string> }
-interface SocEndRecord { winner: number; sa: number; sb: number; overtime: boolean; at: number }
+interface SocEndRecord { winner: number; sa: number; sb: number; overtime: boolean; at: number; goals?: number[] }
 interface SocPressRecord { n: number; t: number; k: number; p: number; dx: number; dz: number }
 interface SocRemoteState { x: number; z: number; yaw: number; moving: boolean; ix: number; iz: number; kind: SocBodyAction; seq: number; age: number }
 interface SocAxis { x: number; z: number }
@@ -662,7 +662,7 @@ class SoccerMatch {
   }
 
   private finishMatch(game: SocGameRecord): void {
-    this.session.ref.update({ end: { winner: game.winner, sa: game.sa, sb: game.sb, overtime: game.overtime, at: this.services.backend.now() }, status: "end" });
+    this.session.ref.update({ end: { winner: game.winner, sa: game.sa, sb: game.sb, overtime: game.overtime, goals: game.goals, at: this.services.backend.now() }, status: "end" });
   }
 
   private applyBall(record: SocBallRecord | null): void {
@@ -895,7 +895,7 @@ class SocEndView {
       const team = SocConfig.teamOfSlot(slot);
       const name = record ? record.nick + (record.isBot ? " (AI)" : "") : "(나감)";
       const result = team === end.winner ? "승리" : "패배";
-      return "<tr" + (id === session.myId ? " class='meRow'" : "") + "><td><span class='rankDot' style='background:" + SocConfig.TEAM_COLORS[team] + "'></span>" + RkDom.escape(name) + "</td><td>" + SocConfig.TEAM_NAMES[team] + "</td><td>" + result + "</td></tr>";
+      return "<tr" + (id === session.myId ? " class='meRow'" : "") + "><td><span class='rankDot' style='background:" + SocConfig.TEAM_COLORS[team] + "'></span>" + RkDom.escape(name) + "</td><td>" + SocConfig.TEAM_NAMES[team] + "</td><td>" + result + "</td><td>" + (end.goals ? end.goals[slot] || 0 : 0) + "</td></tr>";
     }).join("");
   }
 }
