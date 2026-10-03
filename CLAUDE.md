@@ -110,6 +110,7 @@
 - **30번(팀 배틀) 작업은 시작 전에 반드시 `30.team-battle-notes.md` 를 읽는다.** 구조·규칙·캐릭터 추가 순서(`admin.html` 통계표·`데이터베이스규칙.json` 포함)·클래스 구조(9·10절)·검사 방법이 모두 거기 있고, 30번 규칙을 새로 정하거나 바꾸면 이 파일이 아니라 그 노트에 적는다.
   끝나면 `&test`·`&sim` 해시로 확인한다.
 - **33번(성 안의 스파이) 작업은 시작 전에 `33.castle-spy-notes.md` 를 읽는다.** 규칙·클래스 지도·Firebase 구조·검사 방법이 거기 있다.
+- **34번(2대2 3D 배구) 작업은 시작 전에 `34.volleyball-notes.md` 를 읽는다.** 규칙·표식 규칙·클래스 지도·Firebase 구조·검사 방법이 거기 있다. 규칙 코드(`ts/34.volleyball-rules.ts`)는 화면을 몰라서 `node .claude/volley-sim.js` 로 검사한다.
 - **32번(미니게임 모음) 작업은 시작 전에 `32.minigames-notes.md` 를 읽는다.** `32.minigames/last-tile/`(옛 마지막 발판 규칙 코드, 설명은 `32.minigames-last-tile-notes.md`)도 같은 모음 안의 코드다. 종목 추가 방법·클래스 지도·Firebase 구조·검사 방법이 거기 있다.
 
 ## 환경

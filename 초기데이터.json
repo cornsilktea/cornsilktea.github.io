@@ -306,6 +306,15 @@
         "unitsSet": false,
         "url": "33.castle-spy.html"
       },
+      "volleyball": {
+        "memo": "방 코드로 모여 2대2로 즐기는 3D 배구 / 먼저 11점 / 서브는 조준 후 타이밍, 받기는 자동, 셋째 터치에서 점프 스파이크 / 사람이 모자라면 AI가 채우고 관전도 가능",
+        "open": false,
+        "order": 33,
+        "title": "2대2 3D 배구",
+        "units": [],
+        "unitsSet": false,
+        "url": "34.volleyball.html"
+      },
       "minigames": {
         "memo": "방 코드로 모여 2~6명이 여러 미니게임을 차례로 겨루는 3D 게임 모음 / 종목마다 순위 점수(5·3·2·1점)를 합산해 최종 우승자를 정함 / 중간에 들어오거나 탈락하면 진행 중인 판을 관전 / 혼자면 AI 1명과 시작 / 지금은 마지막 발판 1종목",
         "open": false,

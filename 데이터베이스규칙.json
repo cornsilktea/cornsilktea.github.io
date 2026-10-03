@@ -10,6 +10,12 @@
         "$room": { ".write": "$room.matches(/^[0-9]{5}$/)" }
       }
     },
+    "volleyball": {
+      ".read": true,
+      "rooms": {
+        "$room": { ".write": "$room.matches(/^[0-9]{5}$/)" }
+      }
+    },
     "lasttile": {
       ".read": true,
       "rooms": {
