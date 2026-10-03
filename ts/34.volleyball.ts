@@ -1026,7 +1026,10 @@ interface VbMatchServices {
 }
 
 class VbHostDirector {
+  private static readonly MAX_TICK_SEC = 0.5;
+
   private started = false;
+  private lastTickMs = 0;
   private readonly lastPressSeq = new Map<string, number>();
 
   constructor(private readonly engine: VbRallyEngine, private readonly onEvents: (events: VbEvent[]) => void) {}
@@ -1037,13 +1040,16 @@ class VbHostDirector {
 
   begin(nowMs: number): void {
     this.started = true;
+    this.lastTickMs = nowMs;
     this.onEvents(this.engine.begin(nowMs));
   }
 
   tick(dtSec: number, nowMs: number): void {
     if (!this.started) return;
-    this.engine.players.forEach((controller) => controller.poll(this.engine, dtSec, nowMs));
-    this.onEvents(this.engine.update(dtSec, nowMs));
+    const elapsed = Math.min(VbHostDirector.MAX_TICK_SEC, Math.max(0, (nowMs - this.lastTickMs) / 1000));
+    this.lastTickMs = nowMs;
+    this.engine.players.forEach((controller) => controller.poll(this.engine, elapsed, nowMs));
+    this.onEvents(this.engine.update(elapsed, nowMs));
   }
 
   receivePress(controller: VbPlayerController, id: string, record: VbPressRecord): void {

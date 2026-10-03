@@ -929,6 +929,7 @@ class VbHostDirector {
         this.engine = engine;
         this.onEvents = onEvents;
         this.started = false;
+        this.lastTickMs = 0;
         this.lastPressSeq = new Map();
     }
     get hasStarted() {
@@ -936,13 +937,16 @@ class VbHostDirector {
     }
     begin(nowMs) {
         this.started = true;
+        this.lastTickMs = nowMs;
         this.onEvents(this.engine.begin(nowMs));
     }
     tick(dtSec, nowMs) {
         if (!this.started)
             return;
-        this.engine.players.forEach((controller) => controller.poll(this.engine, dtSec, nowMs));
-        this.onEvents(this.engine.update(dtSec, nowMs));
+        const elapsed = Math.min(VbHostDirector.MAX_TICK_SEC, Math.max(0, (nowMs - this.lastTickMs) / 1000));
+        this.lastTickMs = nowMs;
+        this.engine.players.forEach((controller) => controller.poll(this.engine, elapsed, nowMs));
+        this.onEvents(this.engine.update(elapsed, nowMs));
     }
     receivePress(controller, id, record) {
         const last = this.lastPressSeq.get(id) || 0;
@@ -952,6 +956,7 @@ class VbHostDirector {
         controller.registerPress(record.t, record.ax, record.az);
     }
 }
+VbHostDirector.MAX_TICK_SEC = 0.5;
 class VolleyballMatch {
     constructor(services, session) {
         this.services = services;
