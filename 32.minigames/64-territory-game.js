@@ -6,7 +6,7 @@ class TerritoryHudBuilder {
         this.participants = participants;
         this.board = board;
     }
-    build(now, viewingId) {
+    build(now) {
         const mine = this.board.playerById(this.localId);
         const order = TerritoryStandings.order(this.board);
         const myPercent = mine ? TerritoryStandings.percent(this.board.grid, mine.index) : 0;
@@ -17,13 +17,13 @@ class TerritoryHudBuilder {
             summary: mine ? "내 순위 " + myRank + "위" : "",
             clock: this.clockText(now),
             footer: mine ? "내 땅 " + myPercent.toFixed(1) + "%" : "",
-            viewTargets: this.participants.map((participant) => ({ id: participant.id, nick: participant.nick, slot: participant.slot, ai: participant.ai, out: false })),
-            viewingId,
+            viewTargets: [],
+            viewingId: null,
             cooldowns: [],
             bannerHtml: message.banner,
             bannerWarning: message.warning,
             centerText: message.center,
-            spectateButton: !mine
+            spectateButton: false
         };
     }
     rowOf(player) {
@@ -85,7 +85,6 @@ class TerritoryGame extends MiniGame {
         this.pilots = new TerritoryPilots(context.participants, new MathRandomSource());
         this.referee = new TerritoryReferee(context.host, context.startAt, this.board, this.pilots, this);
         this.hudBuilder = new TerritoryHudBuilder(context.localId, context.startAt, context.participants, this.board);
-        this.cursor = new SpectatorCursor(context.localId);
         this.handlers = TerritoryWire.handlers(this);
     }
     streams() {
@@ -115,10 +114,7 @@ class TerritoryGame extends MiniGame {
             this.sender.send(direction);
     }
     spectateNext() {
-        this.cursor.cycle(this.participantIds());
-    }
-    spectateTo(id) {
-        this.cursor.select(id, this.participantIds());
+        return;
     }
     receive(stream, key, value) {
         const handler = this.handlers[stream];
@@ -160,7 +156,7 @@ class TerritoryGame extends MiniGame {
         return TerritoryStandings.ranking(this.board);
     }
     hud(now) {
-        return this.hudBuilder.build(now, this.cursor.watched());
+        return this.hudBuilder.build(now);
     }
     conclude() {
         this.concluded = true;
@@ -171,9 +167,6 @@ class TerritoryGame extends MiniGame {
         this.bursts.clear();
         this.tiles.dispose();
         this.stage.releaseMaterials();
-    }
-    participantIds() {
-        return this.context.participants.map((participant) => participant.id);
     }
     flushIfDue(now) {
         if (!this.context.host.isHost() || this.concluded || now - this.lastFlushAt < TerritoryRules.NET_MS)
@@ -189,7 +182,10 @@ class TerritoryGame extends MiniGame {
         this.views.update(this.board, progress, now, dt);
         this.bursts.update(now);
         this.tiles.update(now);
-        this.camera.follow(dt, this.views.focusOf(this.cursor.choose(this.participantIds()) || this.context.localId));
+        if (this.localParticipates())
+            this.camera.follow(dt, this.views.focusOf(this.context.localId));
+        else
+            this.camera.overhead();
         this.context.render.render(this.stage.scene, this.stage.camera);
     }
 }

@@ -285,6 +285,7 @@ class TerritoryScene {
 }
 
 class TerritoryCamera {
+  private static readonly OVERHEAD_FIT = 1.08;
   private static readonly SPIN_SPEED = 0.25;
   private static readonly SHOWCASE_FIT = 1.22;
   private static readonly SHOWCASE_SHIFT = -7;
@@ -305,6 +306,13 @@ class TerritoryCamera {
     const tilt = TerritoryLook.CAMERA_TILT;
     this.camera.position.set(this.focus.x, Math.cos(tilt) * distance, this.focus.z + Math.sin(tilt) * distance);
     this.camera.lookAt(this.focus.x, 0, this.focus.z);
+  }
+
+  overhead(): void {
+    const distance = this.fitDistance() * TerritoryCamera.OVERHEAD_FIT;
+    this.camera.up.set(0, 0, -1);
+    this.camera.position.set(0, distance, 0);
+    this.camera.lookAt(0, 0, 0);
   }
 
   showcase(dt: number): void {

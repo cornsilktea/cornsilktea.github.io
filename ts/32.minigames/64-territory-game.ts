@@ -12,7 +12,7 @@ class TerritoryHudBuilder {
     private readonly board: TerritoryBoard
   ) {}
 
-  build(now: number, viewingId: string | null): HudModel {
+  build(now: number): HudModel {
     const mine = this.board.playerById(this.localId);
     const order = TerritoryStandings.order(this.board);
     const myPercent = mine ? TerritoryStandings.percent(this.board.grid, mine.index) : 0;
@@ -23,13 +23,13 @@ class TerritoryHudBuilder {
       summary: mine ? "내 순위 " + myRank + "위" : "",
       clock: this.clockText(now),
       footer: mine ? "내 땅 " + myPercent.toFixed(1) + "%" : "",
-      viewTargets: this.participants.map((participant) => ({ id: participant.id, nick: participant.nick, slot: participant.slot, ai: participant.ai, out: false })),
-      viewingId,
+      viewTargets: [],
+      viewingId: null,
       cooldowns: [],
       bannerHtml: message.banner,
       bannerWarning: message.warning,
       centerText: message.center,
-      spectateButton: !mine
+      spectateButton: false
     };
   }
 
@@ -78,7 +78,6 @@ class TerritoryGame extends MiniGame implements TerritoryWireTarget, TerritoryRe
   private readonly pilots: TerritoryPilots;
   private readonly referee: TerritoryReferee;
   private readonly hudBuilder: TerritoryHudBuilder;
-  private readonly cursor: SpectatorCursor;
   private readonly handlers: Readonly<Record<string, (key: string, value: unknown) => void>>;
   private lastFlushAt = 0;
   private lastSequence = 0;
@@ -100,7 +99,6 @@ class TerritoryGame extends MiniGame implements TerritoryWireTarget, TerritoryRe
     this.pilots = new TerritoryPilots(context.participants, new MathRandomSource());
     this.referee = new TerritoryReferee(context.host, context.startAt, this.board, this.pilots, this);
     this.hudBuilder = new TerritoryHudBuilder(context.localId, context.startAt, context.participants, this.board);
-    this.cursor = new SpectatorCursor(context.localId);
     this.handlers = TerritoryWire.handlers(this);
   }
 
@@ -132,11 +130,7 @@ class TerritoryGame extends MiniGame implements TerritoryWireTarget, TerritoryRe
   }
 
   spectateNext(): void {
-    this.cursor.cycle(this.participantIds());
-  }
-
-  spectateTo(id: string): void {
-    this.cursor.select(id, this.participantIds());
+    return;
   }
 
   receive(stream: string, key: string, value: unknown): void {
@@ -181,7 +175,7 @@ class TerritoryGame extends MiniGame implements TerritoryWireTarget, TerritoryRe
   }
 
   hud(now: number): HudModel {
-    return this.hudBuilder.build(now, this.cursor.watched());
+    return this.hudBuilder.build(now);
   }
 
   conclude(): void {
@@ -194,10 +188,6 @@ class TerritoryGame extends MiniGame implements TerritoryWireTarget, TerritoryRe
     this.bursts.clear();
     this.tiles.dispose();
     this.stage.releaseMaterials();
-  }
-
-  private participantIds(): string[] {
-    return this.context.participants.map((participant) => participant.id);
   }
 
   private flushIfDue(now: number): void {
@@ -213,7 +203,8 @@ class TerritoryGame extends MiniGame implements TerritoryWireTarget, TerritoryRe
     this.views.update(this.board, progress, now, dt);
     this.bursts.update(now);
     this.tiles.update(now);
-    this.camera.follow(dt, this.views.focusOf(this.cursor.choose(this.participantIds()) || this.context.localId));
+    if (this.localParticipates()) this.camera.follow(dt, this.views.focusOf(this.context.localId));
+    else this.camera.overhead();
     this.context.render.render(this.stage.scene, this.stage.camera);
   }
 }

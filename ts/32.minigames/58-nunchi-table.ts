@@ -48,6 +48,36 @@ class NunchiLayout {
   }
 }
 
+abstract class NunchiViewStyle {
+  abstract readonly cardScale: number;
+  abstract cardYaw(spot: NunchiSeatSpot): number;
+  abstract place(camera: NunchiCamera): void;
+}
+
+class NunchiSeatedViewStyle extends NunchiViewStyle {
+  readonly cardScale = 1;
+
+  cardYaw(spot: NunchiSeatSpot): number {
+    return spot.cardYaw;
+  }
+
+  place(camera: NunchiCamera): void {
+    camera.placeSeated();
+  }
+}
+
+class NunchiOverheadViewStyle extends NunchiViewStyle {
+  readonly cardScale = 1.5;
+
+  cardYaw(): number {
+    return 0;
+  }
+
+  place(camera: NunchiCamera): void {
+    camera.placeOverhead();
+  }
+}
+
 class NunchiShowTimeline {
   static readonly FLIP_MS = 600;
   static readonly CLASH_AT = 700;
@@ -312,7 +342,8 @@ class NunchiSeatView {
     private readonly world: Three<"Group">,
     participant: MatchParticipant,
     look: CharacterLook,
-    relative: number
+    relative: number,
+    private readonly style: NunchiViewStyle
   ) {
     const THREE = viewKit.libs.THREE;
     this.spot = NunchiLayout.seat(relative);
@@ -360,7 +391,7 @@ class NunchiSeatView {
     }
     const drop = 1 - NunchiShowTimeline.progress(now - this.placedAt, 0, NunchiSeatView.DROP_MS);
     this.card.paint(1, 1, 1, 1);
-    this.card.pose(this.spot.cardX, NunchiLayout.CARD_Y + drop * NunchiSeatView.DROP_HEIGHT, this.spot.cardZ, this.spot.cardYaw, 0, 1);
+    this.card.pose(this.spot.cardX, NunchiLayout.CARD_Y + drop * NunchiSeatView.DROP_HEIGHT, this.spot.cardZ, this.style.cardYaw(this.spot), 0, this.style.cardScale);
   }
 
   drawShown(play: NunchiPlay, elapsedMs: number, winner: boolean): void {
@@ -386,7 +417,7 @@ class NunchiSeatView {
       scale = 1.08 + 0.1 * pulse;
       lift += 0.12;
     }
-    this.card.pose(this.spot.cardX, NunchiLayout.CARD_Y + lift, this.spot.cardZ, this.spot.cardYaw, flip, scale);
+    this.card.pose(this.spot.cardX, NunchiLayout.CARD_Y + lift, this.spot.cardZ, this.style.cardYaw(this.spot), flip, scale * this.style.cardScale);
   }
 
   dispose(): void {
@@ -405,7 +436,7 @@ class NunchiTableScene {
   readonly camera: Three<"PerspectiveCamera">;
   readonly world: Three<"Group">;
 
-  constructor(libs: ThreeLibs) {
+  constructor(libs: ThreeLibs, private readonly style: NunchiViewStyle) {
     const THREE = libs.THREE;
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(Palette.SKY);
@@ -452,7 +483,8 @@ class NunchiTableScene {
       const slot = new THREE.Mesh(slotGeometry, slotMaterial);
       slot.rotation.set(-Math.PI / 2, 0, 0);
       slot.rotation.order = "YXZ";
-      slot.rotation.y = spot.cardYaw;
+      slot.rotation.y = this.style.cardYaw(spot);
+      slot.scale.setScalar(this.style.cardScale);
       slot.position.set(spot.cardX, NunchiLayout.SURFACE_Y + 0.005, spot.cardZ);
       this.world.add(slot);
     }
@@ -470,16 +502,26 @@ class NunchiCamera {
   private static readonly ORBIT_RADIUS = 13;
   private static readonly ORBIT_HEIGHT = 8;
   private static readonly ORBIT_SPEED = 0.15;
+  private static readonly OVERHEAD_REACH = 7.4;
 
   private orbit = 0;
 
   constructor(private readonly camera: Three<"PerspectiveCamera">, private readonly env: BrowserEnv) {}
 
-  place(): void {
+  placeSeated(): void {
     const size = this.env.viewport();
     const zoom = Math.pow(MathUtil.clamp(1.6 / (size.width / size.height), 1, 2), 0.8);
     this.camera.position.set(0, NunchiCamera.HEIGHT * zoom, NunchiCamera.DEPTH * zoom);
     this.camera.lookAt(0, 0.3, NunchiCamera.LOOK_Z);
+  }
+
+  placeOverhead(): void {
+    const size = this.env.viewport();
+    const reach = Math.tan(this.camera.fov * Math.PI / 360);
+    const distance = NunchiCamera.OVERHEAD_REACH * Math.max(1 / reach, 1 / (reach * (size.width / size.height)));
+    this.camera.up.set(0, 0, -1);
+    this.camera.position.set(0, distance, 0);
+    this.camera.lookAt(0, 0, 0);
   }
 
   showcase(dt: number): void {
@@ -511,7 +553,7 @@ class NunchiPrizeView {
   private readonly card: NunchiCardMesh;
   private readonly pot: NunchiChipStack;
 
-  constructor(private readonly kit: NunchiCardKit, world: Three<"Group">) {
+  constructor(private readonly kit: NunchiCardKit, world: Three<"Group">, private readonly style: NunchiViewStyle) {
     this.card = new NunchiCardMesh(kit, world);
     this.pot = new NunchiChipStack(kit.libs, world, "#E8C45A", { x: NunchiLayout.POT_X, z: NunchiLayout.POT_Z }, { x: 0, z: NunchiLayout.CHIP_COLUMN_GAP });
   }
@@ -534,7 +576,7 @@ class NunchiPrizeView {
       MathUtil.lerp(0, targetZ, slide),
       0,
       flip,
-      1 - slide * 0.5
+      (1 - slide * 0.5) * this.style.cardScale
     );
   }
 
@@ -556,13 +598,14 @@ class NunchiTableStage {
     world: Three<"Group">,
     participants: readonly MatchParticipant[],
     looks: ReadonlyMap<string, CharacterLook>,
-    mySlot: number
+    mySlot: number,
+    style: NunchiViewStyle
   ) {
     participants.forEach((participant) => {
       const look = looks.get(participant.id) || CharacterLooks.createDefault();
-      this.seats.set(participant.id, new NunchiSeatView(viewKit, factory, assets.clips, cards, world, participant, look, NunchiLayout.relative(participant.slot, mySlot)));
+      this.seats.set(participant.id, new NunchiSeatView(viewKit, factory, assets.clips, cards, world, participant, look, NunchiLayout.relative(participant.slot, mySlot), style));
     });
-    this.prizeView = new NunchiPrizeView(cards, world);
+    this.prizeView = new NunchiPrizeView(cards, world, style);
   }
 
   update(frame: NunchiStageFrame, now: number, dt: number): void {

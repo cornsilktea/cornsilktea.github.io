@@ -33,6 +33,32 @@ NunchiLayout.CHIP_SIDE = 1.65;
 NunchiLayout.CHIP_COLUMN_GAP = 0.45;
 NunchiLayout.POT_X = 1.7;
 NunchiLayout.POT_Z = 0.2;
+class NunchiViewStyle {
+}
+class NunchiSeatedViewStyle extends NunchiViewStyle {
+    constructor() {
+        super(...arguments);
+        this.cardScale = 1;
+    }
+    cardYaw(spot) {
+        return spot.cardYaw;
+    }
+    place(camera) {
+        camera.placeSeated();
+    }
+}
+class NunchiOverheadViewStyle extends NunchiViewStyle {
+    constructor() {
+        super(...arguments);
+        this.cardScale = 1.5;
+    }
+    cardYaw() {
+        return 0;
+    }
+    place(camera) {
+        camera.placeOverhead();
+    }
+}
 class NunchiShowTimeline {
     static progress(elapsedMs, startMs, lengthMs) {
         return MathUtil.clamp((elapsedMs - startMs) / lengthMs, 0, 1);
@@ -236,11 +262,12 @@ NunchiChipStack.MAX_CHIPS = 30;
 NunchiChipStack.PER_COLUMN = 10;
 NunchiChipStack.CHIP_HEIGHT = 0.07;
 class NunchiSeatView {
-    constructor(viewKit, factory, clips, cards, world, participant, look, relative) {
+    constructor(viewKit, factory, clips, cards, world, participant, look, relative, style) {
         this.viewKit = viewKit;
         this.factory = factory;
         this.cards = cards;
         this.world = world;
+        this.style = style;
         this.placedAt = -1;
         this.gestureUntil = 0;
         const THREE = viewKit.libs.THREE;
@@ -286,7 +313,7 @@ class NunchiSeatView {
         }
         const drop = 1 - NunchiShowTimeline.progress(now - this.placedAt, 0, NunchiSeatView.DROP_MS);
         this.card.paint(1, 1, 1, 1);
-        this.card.pose(this.spot.cardX, NunchiLayout.CARD_Y + drop * NunchiSeatView.DROP_HEIGHT, this.spot.cardZ, this.spot.cardYaw, 0, 1);
+        this.card.pose(this.spot.cardX, NunchiLayout.CARD_Y + drop * NunchiSeatView.DROP_HEIGHT, this.spot.cardZ, this.style.cardYaw(this.spot), 0, this.style.cardScale);
     }
     drawShown(play, elapsedMs, winner) {
         this.placedAt = Number.MAX_SAFE_INTEGER;
@@ -312,7 +339,7 @@ class NunchiSeatView {
             scale = 1.08 + 0.1 * pulse;
             lift += 0.12;
         }
-        this.card.pose(this.spot.cardX, NunchiLayout.CARD_Y + lift, this.spot.cardZ, this.spot.cardYaw, flip, scale);
+        this.card.pose(this.spot.cardX, NunchiLayout.CARD_Y + lift, this.spot.cardZ, this.style.cardYaw(this.spot), flip, scale * this.style.cardScale);
     }
     dispose() {
         this.world.remove(this.group, this.label, this.blob);
@@ -331,7 +358,8 @@ NunchiSeatView.DROP_HEIGHT = 1.1;
 NunchiSeatView.LABEL_SCALE = 0.62;
 NunchiSeatView.LABEL_HEIGHT = 2.35;
 class NunchiTableScene {
-    constructor(libs) {
+    constructor(libs, style) {
+        this.style = style;
         const THREE = libs.THREE;
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(Palette.SKY);
@@ -377,7 +405,8 @@ class NunchiTableScene {
             const slot = new THREE.Mesh(slotGeometry, slotMaterial);
             slot.rotation.set(-Math.PI / 2, 0, 0);
             slot.rotation.order = "YXZ";
-            slot.rotation.y = spot.cardYaw;
+            slot.rotation.y = this.style.cardYaw(spot);
+            slot.scale.setScalar(this.style.cardScale);
             slot.position.set(spot.cardX, NunchiLayout.SURFACE_Y + 0.005, spot.cardZ);
             this.world.add(slot);
         }
@@ -393,11 +422,19 @@ class NunchiCamera {
         this.env = env;
         this.orbit = 0;
     }
-    place() {
+    placeSeated() {
         const size = this.env.viewport();
         const zoom = Math.pow(MathUtil.clamp(1.6 / (size.width / size.height), 1, 2), 0.8);
         this.camera.position.set(0, NunchiCamera.HEIGHT * zoom, NunchiCamera.DEPTH * zoom);
         this.camera.lookAt(0, 0.3, NunchiCamera.LOOK_Z);
+    }
+    placeOverhead() {
+        const size = this.env.viewport();
+        const reach = Math.tan(this.camera.fov * Math.PI / 360);
+        const distance = NunchiCamera.OVERHEAD_REACH * Math.max(1 / reach, 1 / (reach * (size.width / size.height)));
+        this.camera.up.set(0, 0, -1);
+        this.camera.position.set(0, distance, 0);
+        this.camera.lookAt(0, 0, 0);
     }
     showcase(dt) {
         this.orbit += dt * NunchiCamera.ORBIT_SPEED;
@@ -411,9 +448,11 @@ NunchiCamera.LOOK_Z = 0.6;
 NunchiCamera.ORBIT_RADIUS = 13;
 NunchiCamera.ORBIT_HEIGHT = 8;
 NunchiCamera.ORBIT_SPEED = 0.15;
+NunchiCamera.OVERHEAD_REACH = 7.4;
 class NunchiPrizeView {
-    constructor(kit, world) {
+    constructor(kit, world, style) {
         this.kit = kit;
+        this.style = style;
         this.card = new NunchiCardMesh(kit, world);
         this.pot = new NunchiChipStack(kit.libs, world, "#E8C45A", { x: NunchiLayout.POT_X, z: NunchiLayout.POT_Z }, { x: 0, z: NunchiLayout.CHIP_COLUMN_GAP });
     }
@@ -429,7 +468,7 @@ class NunchiPrizeView {
         }
         const targetX = winnerSpot ? winnerSpot.chipX : 0, targetZ = winnerSpot ? winnerSpot.chipZ : 0;
         this.card.paint(1, 1, 1, 1);
-        this.card.pose(MathUtil.lerp(0, targetX, slide), NunchiLayout.CARD_Y + lift + Math.sin(slide * Math.PI) * NunchiPrizeView.ARC_HEIGHT, MathUtil.lerp(0, targetZ, slide), 0, flip, 1 - slide * 0.5);
+        this.card.pose(MathUtil.lerp(0, targetX, slide), NunchiLayout.CARD_Y + lift + Math.sin(slide * Math.PI) * NunchiPrizeView.ARC_HEIGHT, MathUtil.lerp(0, targetZ, slide), 0, flip, (1 - slide * 0.5) * this.style.cardScale);
     }
     dispose() {
         this.card.dispose();
@@ -439,14 +478,14 @@ class NunchiPrizeView {
 NunchiPrizeView.FLIP_MS = 600;
 NunchiPrizeView.ARC_HEIGHT = 1.3;
 class NunchiTableStage {
-    constructor(viewKit, factory, assets, cards, world, participants, looks, mySlot) {
+    constructor(viewKit, factory, assets, cards, world, participants, looks, mySlot, style) {
         this.cards = cards;
         this.seats = new Map();
         participants.forEach((participant) => {
             const look = looks.get(participant.id) || CharacterLooks.createDefault();
-            this.seats.set(participant.id, new NunchiSeatView(viewKit, factory, assets.clips, cards, world, participant, look, NunchiLayout.relative(participant.slot, mySlot)));
+            this.seats.set(participant.id, new NunchiSeatView(viewKit, factory, assets.clips, cards, world, participant, look, NunchiLayout.relative(participant.slot, mySlot), style));
         });
-        this.prizeView = new NunchiPrizeView(cards, world);
+        this.prizeView = new NunchiPrizeView(cards, world, style);
     }
     update(frame, now, dt) {
         this.seats.forEach((seat, id) => {

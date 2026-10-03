@@ -252,6 +252,7 @@ class NunchiCardGame extends MiniGame implements NunchiWireTarget, NunchiReferee
   private readonly ledger = new NunchiLedger();
   private readonly wire: NunchiWire;
   private readonly stage: NunchiTableScene;
+  private readonly viewStyle: NunchiViewStyle;
   private readonly camera: NunchiCamera;
   private readonly table: NunchiTableStage;
   private readonly referee: NunchiReferee;
@@ -269,12 +270,13 @@ class NunchiCardGame extends MiniGame implements NunchiWireTarget, NunchiReferee
     this.schedule = new NunchiSchedule(context.startAt);
     this.state = new NunchiMatchState(context.seed, ids);
     this.wire = new NunchiWire(context.wire);
-    this.stage = new NunchiTableScene(context.libs);
+    this.viewStyle = mine ? new NunchiSeatedViewStyle() : new NunchiOverheadViewStyle();
+    this.stage = new NunchiTableScene(context.libs, this.viewStyle);
     this.camera = new NunchiCamera(this.stage.camera, context.env);
     const viewKit = new FighterViewKit(context.libs, context.page, new NameTagFactory(context.libs, context.page));
     this.table = new NunchiTableStage(
       viewKit, context.characters.factory, context.characters.assets, new NunchiCardKit(context.libs, context.page),
-      this.stage.world, context.participants, context.looks, mine ? mine.slot : 0
+      this.stage.world, context.participants, context.looks, mine ? mine.slot : 0, this.viewStyle
     );
     this.referee = new NunchiReferee(context.host, context.seed, context.participants, this.schedule, this.state, this.ledger, new NunchiAiPicker(context.seed, ids), this);
     const vault = new NunchiVault(context.seed, context.localId, new TokenSource(new RandomRange(new MathRandomSource())));
@@ -477,7 +479,7 @@ class NunchiCardGame extends MiniGame implements NunchiWireTarget, NunchiReferee
       scores: input.scores
     }, now, dt);
     this.handView.render(this.handModel(input.moment, now));
-    this.camera.place();
+    this.viewStyle.place(this.camera);
     this.context.render.render(this.stage.scene, this.stage.camera);
   }
 }
@@ -495,7 +497,7 @@ class NunchiCardBackdrop extends GameBackdrop {
 
   constructor(private readonly context: BackdropContext) {
     super();
-    this.stage = new NunchiTableScene(context.libs);
+    this.stage = new NunchiTableScene(context.libs, new NunchiSeatedViewStyle());
     this.camera = new NunchiCamera(this.stage.camera, context.env);
     this.kit = new NunchiCardKit(context.libs, new Page());
     this.prize = new NunchiCardMesh(this.kit, this.stage.world);

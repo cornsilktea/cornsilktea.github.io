@@ -287,6 +287,12 @@ class TerritoryCamera {
         this.camera.position.set(this.focus.x, Math.cos(tilt) * distance, this.focus.z + Math.sin(tilt) * distance);
         this.camera.lookAt(this.focus.x, 0, this.focus.z);
     }
+    overhead() {
+        const distance = this.fitDistance() * TerritoryCamera.OVERHEAD_FIT;
+        this.camera.up.set(0, 0, -1);
+        this.camera.position.set(0, distance, 0);
+        this.camera.lookAt(0, 0, 0);
+    }
     showcase(dt) {
         this.spin += dt * TerritoryCamera.SPIN_SPEED;
         const distance = this.fitDistance() * TerritoryCamera.SHOWCASE_FIT;
@@ -303,6 +309,7 @@ class TerritoryCamera {
         return Math.max(half / reach, half / (reach * aspect));
     }
 }
+TerritoryCamera.OVERHEAD_FIT = 1.08;
 TerritoryCamera.SPIN_SPEED = 0.25;
 TerritoryCamera.SHOWCASE_FIT = 1.22;
 TerritoryCamera.SHOWCASE_SHIFT = -7;
