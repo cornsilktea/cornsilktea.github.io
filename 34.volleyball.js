@@ -694,6 +694,10 @@ class VbCameraRig {
     snap() {
         this.ready = false;
     }
+    orbit(radius, height, angle) {
+        this.camera.position.set(Math.sin(angle) * radius, height, Math.cos(angle) * radius);
+        this.camera.lookAt(0, 1.2, 0);
+    }
     followPlayer(team, playerX, deltaSeconds) {
         const side = VbConfig.sideOf(team);
         this.smooth(playerX, deltaSeconds);
@@ -971,7 +975,6 @@ class VolleyballMatch {
         const THREE = services.libs.THREE;
         this.group = new THREE.Group();
         services.world.matchGroup.add(this.group);
-        this.group.add(services.court.group);
         this.ballView = new VbBallView(services.libs, services.textures);
         this.group.add(this.ballView.group);
         this.receiveMarker = new VbMarkerView(services.libs, this.group, false);
@@ -1440,6 +1443,31 @@ class VbEndView {
         }).join("");
     }
 }
+class VbMenuBackdrop {
+    constructor(world, libs, textures) {
+        this.world = world;
+        this.seconds = 0;
+        this.ballView = new VbBallView(libs, textures);
+        world.scene.add(this.ballView.group);
+    }
+    render(deltaSeconds) {
+        this.seconds += deltaSeconds;
+        this.ballView.group.visible = true;
+        const phase = (this.seconds * 0.55) % 2;
+        const progress = phase % 1;
+        const direction = phase < 1 ? 1 : -1;
+        const height = VbConfig.BALL_R + 4 * progress * (1 - progress) * 3.4;
+        this.ballView.place(direction * (progress - 0.5) * 9, height, direction * (progress - 0.5) * 12, 3, deltaSeconds);
+        this.world.rig.orbit(VbMenuBackdrop.RADIUS, VbMenuBackdrop.HEIGHT, (this.seconds / VbMenuBackdrop.ORBIT_SECONDS) * Math.PI * 2);
+        this.world.render(deltaSeconds);
+    }
+    hide() {
+        this.ballView.group.visible = false;
+    }
+}
+VbMenuBackdrop.ORBIT_SECONDS = 70;
+VbMenuBackdrop.RADIUS = 17;
+VbMenuBackdrop.HEIGHT = 7.5;
 class VolleyballGame {
     constructor(libs) {
         this.libs = libs;
@@ -1473,6 +1501,8 @@ class VolleyballGame {
             world: new VbWorldView(libs, VbDom.byId("view"), this.touchDevice),
             hud: new VbHud(), input, backend: this.backend, court: this.court, textures: this.textures
         };
+        this.services.world.scene.add(this.court.group);
+        this.backdrop = new VbMenuBackdrop(this.services.world, libs, this.textures);
         this.bindMenus();
         this.screens.show("start");
         this.updateStartButtons();
@@ -1722,7 +1752,12 @@ class VolleyballGame {
     step(timeMs) {
         const deltaSeconds = Math.min(0.1, Math.max(0, (timeMs - this.lastFrameMs) / 1000));
         this.lastFrameMs = timeMs;
-        if (this.match)
+        if (this.match) {
+            this.backdrop.hide();
             this.match.update(deltaSeconds);
+        }
+        else {
+            this.backdrop.render(deltaSeconds);
+        }
     }
 }

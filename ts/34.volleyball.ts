@@ -757,6 +757,11 @@ class VbCameraRig {
     this.ready = false;
   }
 
+  orbit(radius: number, height: number, angle: number): void {
+    this.camera.position.set(Math.sin(angle) * radius, height, Math.cos(angle) * radius);
+    this.camera.lookAt(0, 1.2, 0);
+  }
+
   followPlayer(team: number, playerX: number, deltaSeconds: number): void {
     const side = VbConfig.sideOf(team);
     this.smooth(playerX, deltaSeconds);
@@ -1086,7 +1091,6 @@ class VolleyballMatch {
     const THREE = services.libs.THREE;
     this.group = new THREE.Group();
     services.world.matchGroup.add(this.group);
-    this.group.add(services.court.group);
     this.ballView = new VbBallView(services.libs, services.textures);
     this.group.add(this.ballView.group);
     this.receiveMarker = new VbMarkerView(services.libs, this.group, false);
@@ -1534,7 +1538,38 @@ class VbEndView {
   }
 }
 
+class VbMenuBackdrop {
+  private static readonly ORBIT_SECONDS = 70;
+  private static readonly RADIUS = 17;
+  private static readonly HEIGHT = 7.5;
+
+  private readonly ballView: VbBallView;
+  private seconds = 0;
+
+  constructor(private readonly world: VbWorldView, libs: ThreeLibs, textures: VbCourtTextures) {
+    this.ballView = new VbBallView(libs, textures);
+    world.scene.add(this.ballView.group);
+  }
+
+  render(deltaSeconds: number): void {
+    this.seconds += deltaSeconds;
+    this.ballView.group.visible = true;
+    const phase = (this.seconds * 0.55) % 2;
+    const progress = phase % 1;
+    const direction = phase < 1 ? 1 : -1;
+    const height = VbConfig.BALL_R + 4 * progress * (1 - progress) * 3.4;
+    this.ballView.place(direction * (progress - 0.5) * 9, height, direction * (progress - 0.5) * 12, 3, deltaSeconds);
+    this.world.rig.orbit(VbMenuBackdrop.RADIUS, VbMenuBackdrop.HEIGHT, (this.seconds / VbMenuBackdrop.ORBIT_SECONDS) * Math.PI * 2);
+    this.world.render(deltaSeconds);
+  }
+
+  hide(): void {
+    this.ballView.group.visible = false;
+  }
+}
+
 class VolleyballGame {
+  private readonly backdrop: VbMenuBackdrop;
   private readonly touchDevice = "ontouchstart" in window || (navigator.maxTouchPoints || 0) > 0;
   private readonly profile = new PlayerProfile();
   private readonly backend = new VbBackend();
@@ -1568,6 +1603,8 @@ class VolleyballGame {
       world: new VbWorldView(libs, VbDom.byId<HTMLCanvasElement>("view"), this.touchDevice),
       hud: new VbHud(), input, backend: this.backend, court: this.court, textures: this.textures
     };
+    this.services.world.scene.add(this.court.group);
+    this.backdrop = new VbMenuBackdrop(this.services.world, libs, this.textures);
     this.bindMenus();
     this.screens.show("start");
     this.updateStartButtons();
@@ -1800,6 +1837,11 @@ class VolleyballGame {
   private step(timeMs: number): void {
     const deltaSeconds = Math.min(0.1, Math.max(0, (timeMs - this.lastFrameMs) / 1000));
     this.lastFrameMs = timeMs;
-    if (this.match) this.match.update(deltaSeconds);
+    if (this.match) {
+      this.backdrop.hide();
+      this.match.update(deltaSeconds);
+    } else {
+      this.backdrop.render(deltaSeconds);
+    }
   }
 }
