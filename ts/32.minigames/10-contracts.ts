@@ -23,6 +23,7 @@ interface ControlButton {
 
 interface ControlSpec {
   readonly stick: boolean;
+  readonly turnActions?: boolean;
   readonly buttons: readonly ControlButton[];
 }
 

@@ -14,6 +14,14 @@ interface StickReading {
   z: number;
 }
 
+class TurnActions {
+  private static readonly PREFIX = "turn:";
+
+  static nameOf(direction: string): string {
+    return TurnActions.PREFIX + direction;
+  }
+}
+
 abstract class ControlSurface {
   protected spec: ControlSpec = { stick: false, buttons: [] };
   protected sink: ActionSink | null = null;
@@ -72,6 +80,7 @@ class KeyboardSurface extends ControlSurface {
     if (direction) {
       this.held.add(direction);
       key.preventDefault();
+      if (this.spec.turnActions && !key.repeat) this.sink.onAction(TurnActions.nameOf(direction));
       return;
     }
     if (key.repeat) return;
@@ -94,6 +103,7 @@ class KeyboardSurface extends ControlSurface {
 class TouchSurface extends ControlSurface {
   private static readonly JOYSTICK_RADIUS = 50;
   private static readonly DEAD_ZONE = 0.18;
+  private static readonly SWIPE_DISTANCE = 26;
 
   private readonly zone: HTMLElement;
   private readonly base: HTMLElement;
@@ -128,7 +138,8 @@ class TouchSurface extends ControlSurface {
 
   setActive(active: boolean): void {
     this.active = active;
-    this.page.show(this.zone, active && this.spec.stick);
+    this.zone.classList.toggle("swipeArea", !!this.spec.turnActions);
+    this.page.show(this.zone, active && (this.spec.stick || !!this.spec.turnActions));
     this.page.show(this.buttonBox, active);
     if (!active) this.release();
   }
@@ -166,6 +177,14 @@ class TouchSurface extends ControlSurface {
     this.overlays.set(button.action, overlay);
   }
 
+  private swipe(event: PointerEvent, dx: number, dy: number, length: number): void {
+    if (length < TouchSurface.SWIPE_DISTANCE || !this.sink) return;
+    const direction = Math.abs(dx) >= Math.abs(dy) ? (dx >= 0 ? "right" : "left") : (dy >= 0 ? "down" : "up");
+    this.sink.onAction(TurnActions.nameOf(direction));
+    this.originX = event.clientX;
+    this.originY = event.clientY;
+  }
+
   private bindStick(): void {
     this.zone.addEventListener("pointerdown", (event) => {
       if (this.pointerId !== null) return;
@@ -175,13 +194,17 @@ class TouchSurface extends ControlSurface {
       this.base.style.left = this.originX + "px";
       this.base.style.top = this.originY + "px";
       this.knob.style.transform = "translate(0,0)";
-      this.page.show(this.base, true);
+      this.page.show(this.base, !this.spec.turnActions);
       try { this.zone.setPointerCapture(event.pointerId); } catch (error) { return; }
       event.preventDefault();
     });
     this.zone.addEventListener("pointermove", (event) => {
       if (event.pointerId !== this.pointerId) return;
       const dx = event.clientX - this.originX, dy = event.clientY - this.originY, length = Math.hypot(dx, dy);
+      if (this.spec.turnActions) {
+        this.swipe(event, dx, dy, length);
+        return;
+      }
       const reach = length > TouchSurface.JOYSTICK_RADIUS ? TouchSurface.JOYSTICK_RADIUS / length : 1;
       this.knob.style.transform = "translate(" + dx * reach + "px," + dy * reach + "px)";
       const strength = Math.min(1, length / TouchSurface.JOYSTICK_RADIUS);

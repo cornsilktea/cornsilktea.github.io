@@ -30,7 +30,7 @@ class MiniGamesApp {
   constructor(private readonly libs: ThreeLibs) {
     this.assets = new CharacterAssets(libs);
     this.factory = new CharacterModelFactory(libs, this.assets);
-    this.catalog = new GameCatalog([new LastTileDefinition(libs), new BombPassDefinition(), new NunchiCardDefinition()]);
+    this.catalog = new GameCatalog([new LastTileDefinition(libs), new BombPassDefinition(), new NunchiCardDefinition(), new TerritoryDefinition()]);
     this.render = new RenderHost(libs, this.page.byId<HTMLCanvasElement>("view"), this.env);
     this.backdrops = new MenuBackdropDirector(this.catalog, { libs, env: this.env, clock: this.backend.clock, render: this.render }, this.randomSource);
     this.editor = new ProfileEditor(libs, this.factory, this.assets, this.profile);
