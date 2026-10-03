@@ -50,7 +50,7 @@ class VbConfig {
   static readonly WIN_SCORE = 11;
   static readonly MOVE_SPEED = 5.6;
   static readonly RECEIVE_RADIUS = 1.6;
-  static readonly REACH: readonly number[] = [1.0, 1.9, 2.4];
+  static readonly REACH: readonly number[] = [1.0, 1.9, 3.0];
   static readonly MAX_TOUCHES = 3;
   static readonly SEAT_COUNT = 4;
   static readonly SPECTATOR_SLOT = 4;
@@ -328,36 +328,18 @@ class VbRemoteController extends VbPlayerController {
   }
 }
 
-class VbBotDifficulty {
-  static readonly LEVELS: readonly VbBotDifficulty[] = [
-    new VbBotDifficulty("쉬움", 0.35, 0.8, 160, 0.55, 0, 0.1, "random"),
-    new VbBotDifficulty("보통", 0.2, 0.5, 90, 0.8, 0.1, 0.12, "gap"),
-    new VbBotDifficulty("어려움", 0.1, 0.3, 40, 1, 0.35, 0.09, "weakness")
-  ];
-
-  constructor(
-    readonly name: string,
-    readonly reactionSec: number,
-    readonly predictError: number,
-    readonly timingErrorMs: number,
-    readonly spikeChance: number,
-    readonly overChance: number,
-    readonly missChance: number,
-    readonly aimMode: VbAimMode
-  ) {}
-
-  static byIndex(index: number): VbBotDifficulty {
-    return VbBotDifficulty.LEVELS[VbMath.clamp(Math.floor(index) || 0, 0, VbBotDifficulty.LEVELS.length - 1)];
-  }
+class VbBotTuning {
+  static readonly REACTION_SEC = 0.1;
+  static readonly PREDICT_ERROR = 0.3;
+  static readonly TIMING_ERROR_MS = 40;
+  static readonly SPIKE_CHANCE = 1;
+  static readonly MISS_CHANCE = 0.03;
+  static readonly URGENT_PARTNER_DISTANCE = 5.5;
 }
 
 class VbBotAimer {
-  static choose(bot: VbPlayerController, difficulty: VbBotDifficulty, opponents: readonly VbPoint[], random: () => number): VbPoint {
-    if (difficulty.aimMode === "random") {
-      const side = VbConfig.sideOf(bot.team);
-      return { x: (random() * 2 - 1) * 3.6, z: -side * (2 + random() * 5.5) };
-    }
-    const choice = ShotAimer.chooseTarget(bot.team, bot.x, bot.z, 0, 0, opponents, true, difficulty.aimMode === "weakness");
+  static choose(bot: VbPlayerController, opponents: readonly VbPoint[]): VbPoint {
+    const choice = ShotAimer.chooseTarget(bot.team, bot.x, bot.z, 0, -VbConfig.sideOf(bot.team) * 0.6, opponents, true, true);
     return { x: choice.x, z: choice.z };
   }
 }
@@ -377,7 +359,7 @@ class VolleyballBot extends VbPlayerController {
   private tossed = false;
   private hitOffsetMs = 0;
 
-  constructor(slot: number, readonly difficulty: VbBotDifficulty, private readonly random: () => number) {
+  constructor(slot: number, private readonly random: () => number) {
     super(slot);
   }
 
@@ -420,32 +402,29 @@ class VolleyballBot extends VbPlayerController {
   }
 
   private onNewBall(engine: VbRallyEngine, nowMs: number): void {
-    const level = this.difficulty;
     this.seenBallSeq = engine.ballSeq;
-    this.readyAtMs = nowMs + level.reactionSec * 1000 * (0.8 + this.random() * 0.4);
-    this.noiseX = VbMath.gaussian(this.random) * level.predictError;
-    this.noiseZ = VbMath.gaussian(this.random) * level.predictError;
-    if (this.random() < level.missChance) {
+    this.readyAtMs = nowMs + VbBotTuning.REACTION_SEC * 1000 * (0.8 + this.random() * 0.4);
+    this.noiseX = VbMath.gaussian(this.random) * VbBotTuning.PREDICT_ERROR;
+    this.noiseZ = VbMath.gaussian(this.random) * VbBotTuning.PREDICT_ERROR;
+    if (this.random() < VbBotTuning.MISS_CHANCE) {
       this.noiseX += (this.random() < 0.5 ? -1 : 1) * (2.2 + this.random());
       this.noiseZ += (this.random() < 0.5 ? -1 : 1) * (1.5 + this.random());
     }
     const done = engine.possTouches;
-    this.wantsPress = done === 2 ? this.random() < level.spikeChance : done === 1 ? this.wantsOver(engine, level) : false;
-    this.pressLeadMs = VbConfig.SPIKE_LEAD_MS + VbMath.gaussian(this.random) * level.timingErrorMs;
+    this.wantsPress = done === 2 ? this.random() < VbBotTuning.SPIKE_CHANCE : done === 1 ? this.wantsOver(engine) : false;
+    this.pressLeadMs = VbConfig.SPIKE_LEAD_MS + VbMath.gaussian(this.random) * VbBotTuning.TIMING_ERROR_MS;
   }
 
-  private wantsOver(engine: VbRallyEngine, level: VbBotDifficulty): boolean {
-    if (level.overChance <= 0) return false;
-    if (level.aimMode !== "weakness") return this.random() < level.overChance;
+  private wantsOver(engine: VbRallyEngine): boolean {
     const partner = engine.partnerOf(this.slot);
-    return !!partner && Math.hypot(partner.x - engine.ball.x, partner.z - engine.ball.z) > 5.5;
+    return !!partner && Math.hypot(partner.x - engine.ball.x, partner.z - engine.ball.z) > VbBotTuning.URGENT_PARTNER_DISTANCE;
   }
 
   private isDesignatedReceiver(engine: VbRallyEngine, incoming: VbIncoming): boolean {
     let nearest = -1;
     let nearestDistance = Infinity;
     for (const other of engine.players) {
-      if (!engine.canTouch(other.slot)) continue;
+      if (!(other instanceof VolleyballBot) || !engine.canTouch(other.slot)) continue;
       const distance = Math.hypot(other.x - incoming.x, other.z - incoming.z);
       if (distance < nearestDistance - 1e-6) {
         nearestDistance = distance;
@@ -459,7 +438,7 @@ class VolleyballBot extends VbPlayerController {
     if (!this.wantsPress || this.pressedForSeq === engine.ballSeq) return;
     if (incoming.atMs - nowMs > this.pressLeadMs) return;
     this.pressedForSeq = engine.ballSeq;
-    this.botTarget = VbBotAimer.choose(this, this.difficulty, engine.opponentsOf(this.team), this.random);
+    this.botTarget = VbBotAimer.choose(this, engine.opponentsOf(this.team));
     this.registerPress(nowMs, this.botTarget.x, this.botTarget.z);
   }
 
@@ -469,7 +448,7 @@ class VolleyballBot extends VbPlayerController {
       this.serveRally = engine.rallyNo;
       this.tossed = false;
       this.tossReadyMs = engine.serveReadyMs + 600 + this.random() * 800;
-      this.hitOffsetMs = VbMath.gaussian(this.random) * this.difficulty.timingErrorMs;
+      this.hitOffsetMs = VbMath.gaussian(this.random) * VbBotTuning.TIMING_ERROR_MS;
     }
     if (engine.phase === "serve" && !this.tossed && nowMs >= this.tossReadyMs) {
       this.tossed = true;
@@ -479,7 +458,7 @@ class VolleyballBot extends VbPlayerController {
 
   private finishServe(engine: VbRallyEngine, nowMs: number): void {
     if (this.pressSeq > this.consumedSeq || nowMs < engine.tossApexMs + this.hitOffsetMs) return;
-    this.botTarget = VbBotAimer.choose(this, this.difficulty, engine.opponentsOf(this.team), this.random);
+    this.botTarget = VbBotAimer.choose(this, engine.opponentsOf(this.team));
     this.registerPress(nowMs, this.botTarget.x, this.botTarget.z);
   }
 
@@ -781,7 +760,7 @@ class VbRallyEngine {
     if ((ball.z > 0 ? 0 : 1) !== this.touchTeam) return;
     if (ball.y > VbConfig.REACH[this.possTouches] || ball.y < 0.35) return;
     const speed = Math.hypot(ball.vx, ball.vy, ball.vz);
-    const radius = VbConfig.RECEIVE_RADIUS * (1 - 0.6 * VbMath.clamp((speed - 8) / 8, 0, 1));
+    const radius = VbConfig.RECEIVE_RADIUS * (1 - 0.5 * VbMath.clamp((speed - 8) / 7, 0, 1));
     let best: VbPlayerController | null = null;
     let bestDistance = Infinity;
     for (const player of this.players) {
@@ -851,7 +830,7 @@ class VbRallyEngine {
     }
     const spread = VbMath.discOffset(0.2 + (1 - finalQuality) * 2.2, this.random);
     const target: VbVec = { x: aim.x + spread.x, y: VbConfig.BALL_R, z: aim.z + spread.z };
-    const minimum = 0.4 + (1 - finalQuality) * 0.35;
+    const minimum = 0.52 + (1 - finalQuality) * 0.3;
     const flight = finalQuality < 0.2 ? minimum : ShotAimer.clearingFlight(from, target, minimum);
     this.release(player, from, target, flight, "spike", 1 - player.team, VbConfig.REACH[0], -1, ms);
   }

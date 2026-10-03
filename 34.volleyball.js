@@ -110,7 +110,6 @@ class VbRoomSession {
         this.hostId = null;
         this.hostLoaded = false;
         this.status = "lobby";
-        this.aiLevel = 0;
         this.match = null;
         this.ball = null;
         this.rally = null;
@@ -156,7 +155,6 @@ class VbRoomSession {
             this.status = value;
             this.onChange("status");
         });
-        this.watchValue("aiLevel", (value) => { this.aiLevel = Number(value) || 0; this.onChange("ai"); });
         this.watchValue("match", (value) => { this.match = value; this.onChange("match"); });
         this.watchValue("ball", (value) => { this.ball = value; this.onChange("ball"); });
         this.watchValue("rally", (value) => { this.rally = value; this.onChange("rally"); });
@@ -296,7 +294,7 @@ class VbRoomDirectory {
         const database = this.backend.database;
         for (let attempt = 0; attempt < 9; attempt++) {
             const code = String(10000 + Math.floor(Math.random() * 90000));
-            const room = { status: "lobby", hostPlayerId: myId, createdAt: this.backend.now(), aiLevel: 0, players: { [myId]: record } };
+            const room = { status: "lobby", hostPlayerId: myId, createdAt: this.backend.now(), players: { [myId]: record } };
             const result = await database.ref(VbConfig.ROOT + "/" + code).transaction((current) => (current !== null ? undefined : room));
             if (result.committed)
                 return code;
@@ -1081,7 +1079,7 @@ class VolleyballMatch {
         if (id === this.session.myId && this.local)
             controller = this.local;
         else if (this.isHost() && record.isBot)
-            controller = new VolleyballBot(slot, VbBotDifficulty.byIndex(this.session.aiLevel), Math.random);
+            controller = new VolleyballBot(slot, Math.random);
         else
             controller = new VbRemoteController(slot);
         if (previous) {
@@ -1375,52 +1373,41 @@ class VbLobbyView {
         this.code = VbDom.byId("lobbyCode");
         this.seatBoard = VbDom.byId("seatBoard");
         this.spectatorLine = VbDom.byId("spectatorLine");
-        this.aiRow = VbDom.byId("aiRow");
-        this.aiOptions = VbDom.byId("aiOpts");
         this.startButton = VbDom.byId("btnStart");
         this.modeButton = VbDom.byId("btnSeatMode");
         this.hint = VbDom.byId("lobbyHint");
         this.onSeatClick = () => undefined;
-        this.onPickLevel = () => undefined;
         this.selectedSlot = -1;
         this.seatBoard.addEventListener("click", (event) => {
             const seat = event.target.closest("[data-slot]");
             if (seat)
                 this.onSeatClick(Number(seat.dataset.slot));
         });
-        this.aiOptions.addEventListener("click", (event) => {
-            const button = event.target.closest("button[data-level]");
-            if (button)
-                this.onPickLevel(Number(button.dataset.level));
-        });
     }
     render(session) {
         const isHost = session.isHost();
         const seats = VbSeatPlan.humanSeats(session.players);
-        const level = VbBotDifficulty.byIndex(session.aiLevel);
         VbDom.setText(this.code, session.code);
         const teamHtml = [0, 1].map((team) => {
-            const rows = [team * 2, team * 2 + 1].map((slot) => this.seatHtml(session, seats[slot], slot, level.name)).join("");
+            const rows = [team * 2, team * 2 + 1].map((slot) => this.seatHtml(session, seats[slot], slot)).join("");
             return "<div class='vbTeam' style='--team:" + VbConfig.TEAM_COLORS[team] + "'><h3>" + VbConfig.TEAM_NAMES[team] + "</h3>" + rows + "</div>";
         }).join("");
         this.seatBoard.innerHTML = teamHtml;
         const spectatorNames = VbSeatPlan.spectators(session.players).map((id) => session.players.get(id).nick + (id === session.myId ? " (나)" : ""));
         VbDom.setText(this.spectatorLine, "관전: " + (spectatorNames.length ? spectatorNames.join(", ") : "없음"));
-        VbDom.show(this.aiRow, isHost);
-        this.aiOptions.innerHTML = VbBotDifficulty.LEVELS.map((entry, index) => "<button type='button' data-level='" + index + "' class='" + (index === session.aiLevel ? "on" : "") + "'>" + entry.name + "</button>").join("");
         const humans = seats.filter((id) => !!id).length;
         VbDom.show(this.startButton, isHost);
         const spectating = session.isSpectator();
         this.modeButton.textContent = spectating ? "선수로 참가하기" : "관전자로 바꾸기";
         this.modeButton.disabled = spectating ? VbSeatPlan.freeSeat(session.players) < 0 : VbSeatPlan.spectators(session.players).length > 0;
         VbDom.setText(this.hint, isHost
-            ? "사람 " + humans + "명 · 빈 자리 " + (VbConfig.SEAT_COUNT - humans) + "곳은 AI(" + level.name + ")가 채워요. 자리를 눌러 두 칸을 바꿀 수 있어요."
+            ? "사람 " + humans + "명 · 빈 자리 " + (VbConfig.SEAT_COUNT - humans) + "곳은 AI가 채워요. 자리를 눌러 두 칸을 바꿀 수 있어요."
             : "방장이 시작하길 기다리는 중이에요… 빈 자리를 누르면 옮길 수 있어요.");
     }
-    seatHtml(session, id, slot, levelName) {
+    seatHtml(session, id, slot) {
         const selected = this.selectedSlot === slot ? " selected" : "";
         if (!id)
-            return "<button type='button' class='vbSeat empty" + selected + "' data-slot='" + slot + "'><b>AI</b><small>" + levelName + " · 빈 자리</small></button>";
+            return "<button type='button' class='vbSeat empty" + selected + "' data-slot='" + slot + "'><b>AI</b><small>빈 자리</small></button>";
         const record = session.players.get(id);
         const tag = id === session.hostId ? "방장" : "";
         const mine = id === session.myId ? " me" : "";
@@ -1545,8 +1532,6 @@ class VolleyballGame {
         VbDom.byId("btnToLobby").addEventListener("click", () => this.returnToLobby());
         VbDom.byId("btnSeatMode").addEventListener("click", () => this.toggleSeatMode());
         this.lobbyView.onSeatClick = (slot) => this.clickSeat(slot);
-        this.lobbyView.onPickLevel = (level) => { if (this.session && this.session.isHost())
-            this.session.ref.update({ aiLevel: level }); };
     }
     updateStartButtons() {
         const ok = !!this.backend.database && this.assetsReady;
@@ -1635,7 +1620,7 @@ class VolleyballGame {
         const session = this.session;
         if (!session)
             return;
-        if (this.screens.current === "lobby" && (kind === "players" || kind === "host" || kind === "ai" || kind === "status"))
+        if (this.screens.current === "lobby" && (kind === "players" || kind === "host" || kind === "status"))
             this.lobbyView.render(session);
         if (kind === "status" || kind === "match" || kind === "end" || (kind === "players" && session.status === "play" && !this.match))
             this.syncPhase();
