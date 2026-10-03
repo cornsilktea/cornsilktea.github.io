@@ -106,6 +106,9 @@ abstract class MiniGame {
   spectateTo(id: string): void {
     return;
   }
+  resultNotes(): Record<string, string> {
+    return {};
+  }
   abstract receive(stream: string, key: string, value: unknown): void;
   abstract playerDeparted(id: string): void;
   abstract isOver(): boolean;

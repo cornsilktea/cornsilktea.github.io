@@ -6,6 +6,9 @@ class MiniGame {
     spectateTo(id) {
         return;
     }
+    resultNotes() {
+        return {};
+    }
     participants() {
         return this.context.participants;
     }

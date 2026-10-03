@@ -62,6 +62,7 @@ interface CollectionRound {
 
 interface CollectionRoundResult extends RoundResult {
   kind?: string;
+  notes?: Record<string, string>;
 }
 
 interface CollectionJoinOutcome {
@@ -516,7 +517,10 @@ class CollectionDirector {
       names[id] = (this.session.hasPlayer(id) && this.session.player(id).nick) || known.get(id) || "?";
     });
     const updates: Record<string, unknown> = { status: "roundEnd", nextAt: this.session.now() + CollectionRules.RESULT_MS };
-    updates["results/" + round.n] = { kind: round.kind, ranks, names };
+    const record: CollectionRoundResult = { kind: round.kind, ranks, names };
+    const notes = game.resultNotes();
+    if (Object.keys(notes).length) record.notes = notes;
+    updates["results/" + round.n] = record;
     this.session.updateRoom(updates);
   }
 

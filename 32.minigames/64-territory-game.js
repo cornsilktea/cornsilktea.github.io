@@ -155,6 +155,13 @@ class TerritoryGame extends MiniGame {
     ranking() {
         return TerritoryStandings.ranking(this.board);
     }
+    resultNotes() {
+        const notes = {};
+        this.board.players.forEach((player) => {
+            notes[player.id] = this.board.grid.ownedCount(player.index) + " / " + TerritoryRules.CELL_COUNT + "칸 (" + TerritoryStandings.percent(this.board.grid, player.index).toFixed(1) + "%)";
+        });
+        return notes;
+    }
     hud(now) {
         return this.hudBuilder.build(now);
     }

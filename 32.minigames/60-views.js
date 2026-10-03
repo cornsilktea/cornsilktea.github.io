@@ -226,8 +226,9 @@ class CollectionResultView {
         const definition = this.catalog.find(round.kind);
         this.page.setText(this.title, (definition ? definition.title : "") + " 결과 (" + round.n + " / " + totalRounds + ")");
         const ids = Object.keys(ranks).sort((a, b) => ranks[a] - ranks[b]);
-        this.head.innerHTML = "<tr><th>순위</th><th>이름</th><th class='n'>이번 종목</th><th class='n'>누적 점수</th></tr>";
-        this.body.innerHTML = ids.map((id) => "<tr class='" + (id === localId ? "meRow" : "") + "'><td><b>" + ranks[id] + "</b></td><td>" + this.nameCell(id, names[id], directory) + "</td><td class='n'>+" + ScoreTable.pointsFor(ranks[id]) + "</td><td class='n'><b>" + scores.total(id) + "</b>점</td></tr>").join("");
+        const notes = result.notes || null;
+        this.head.innerHTML = "<tr><th>순위</th><th>이름</th>" + (notes ? "<th class='n'>기록</th>" : "") + "<th class='n'>이번 종목</th><th class='n'>누적 점수</th></tr>";
+        this.body.innerHTML = ids.map((id) => "<tr class='" + (id === localId ? "meRow" : "") + "'><td><b>" + ranks[id] + "</b></td><td>" + this.nameCell(id, names[id], directory) + "</td>" + (notes ? "<td class='n'>" + Html.escape(notes[id] || "") + "</td>" : "") + "<td class='n'>+" + ScoreTable.pointsFor(ranks[id]) + "</td><td class='n'><b>" + scores.total(id) + "</b>점</td></tr>").join("");
     }
     renderFinal(scores, localId, directory) {
         this.page.setText(this.title, "최종 결과");

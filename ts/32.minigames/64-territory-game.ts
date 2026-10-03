@@ -174,6 +174,14 @@ class TerritoryGame extends MiniGame implements TerritoryWireTarget, TerritoryRe
     return TerritoryStandings.ranking(this.board);
   }
 
+  resultNotes(): Record<string, string> {
+    const notes: Record<string, string> = {};
+    this.board.players.forEach((player) => {
+      notes[player.id] = this.board.grid.ownedCount(player.index) + " / " + TerritoryRules.CELL_COUNT + "칸 (" + TerritoryStandings.percent(this.board.grid, player.index).toFixed(1) + "%)";
+    });
+    return notes;
+  }
+
   hud(now: number): HudModel {
     return this.hudBuilder.build(now);
   }
