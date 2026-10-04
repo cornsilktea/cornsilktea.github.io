@@ -575,6 +575,10 @@ SocBotTuning.SHOT_POWER_SPAN = 0.55;
 SocBotTuning.SHOT_SPOT_DEPTH = 5;
 SocBotTuning.SHOT_MIN_ANGLE_RATIO = 0.6;
 SocBotTuning.PASS_CHANCE = 0.92;
+SocBotTuning.RUN_BEHIND_GAP = 2.6;
+SocBotTuning.RUN_BEHIND_BONUS = 2.8;
+SocBotTuning.RUNNER_MIN_SPEED = 1.5;
+SocBotTuning.RUNNER_PASS_CHANCE = 0.97;
 SocBotTuning.BREAKAWAY_WIDTH = 3.5;
 SocBotTuning.BACKWARD_PASS_LIMIT = 1.5;
 SocBotTuning.PASS_PRESSURED_CHANCE = 0.85;
@@ -684,7 +688,8 @@ class SocBot extends SocPlayerController {
             }
         }
         const breakaway = scoring && this.isBreakaway(engine, me, attack);
-        if (ready && !breakaway && this.wantsPass(mate, me, opponents, attack, pressured)) {
+        const runner = this.isRunningBehind(engine, mate, attack);
+        if (ready && !breakaway && this.wantsPass(mate, me, opponents, attack, pressured, runner)) {
             this.queueAction({ kind: "pass", power: SocBotTuning.PASS_POWER, atMs: nowMs, dirX: 0, dirZ: 0 });
             return;
         }
@@ -695,10 +700,21 @@ class SocBot extends SocPlayerController {
         }
         this.goal = this.dribbleGoal(me, goalCenter, attack, opponents);
     }
-    wantsPass(mate, me, opponents, attack, pressured) {
+    isRunningBehind(engine, mate, attack) {
+        const velocity = mate.velocity();
+        if (velocity.vz * attack < SocBotTuning.RUNNER_MIN_SPEED)
+            return false;
+        return engine.opponentsOf(this.team).some((opponent) => opponent.slot < SocConfig.SEAT_COUNT && (mate.z - opponent.z) * attack > 0.3);
+    }
+    wantsPass(mate, me, opponents, attack, pressured, runner) {
         const distance = SocMath.distance(me, mate);
         if (distance < SocBotTuning.PASS_MIN_DISTANCE)
             return false;
+        if (runner) {
+            const through = SocPlanner.pass(me, mate.velocity(), 0, 0);
+            if (SocPlanner.laneClear(me, through.target, opponents, SocBotTuning.LANE_RADIUS * 0.8))
+                return this.random() < SocBotTuning.RUNNER_PASS_CHANCE;
+        }
         const advance = (mate.z - me.z) * attack;
         if (!pressured && advance < -SocBotTuning.BACKWARD_PASS_LIMIT)
             return false;
@@ -766,6 +782,21 @@ class SocBot extends SocPlayerController {
         const limit = attack * (SocConfig.HALF_L - 3.5);
         let best = null;
         let bestScore = -Infinity;
+        const defenders = engine.opponentsOf(this.team).filter((opponent) => opponent.slot < SocConfig.SEAT_COUNT && (opponent.z - holder.z) * attack > 0);
+        const lineProgress = defenders.reduce((deepest, opponent) => Math.max(deepest, opponent.z * attack), -Infinity);
+        if (defenders.length > 0) {
+            const behindRaw = (lineProgress + SocBotTuning.RUN_BEHIND_GAP) * attack;
+            const behindZ = attack > 0 ? Math.min(behindRaw, limit) : Math.max(behindRaw, limit);
+            [-5.5, -3.5, -1.5, 1.5, 3.5, 5.5].forEach((x) => {
+                const spot = SocPlanner.clampToField({ x, z: behindZ });
+                const lane = opponents.reduce((least, opponent) => Math.min(least, SocMath.segmentDistance(opponent, holder, spot)), 9);
+                const score = this.supportScore(spot, holder, opponents, 7) + (lane > 1.1 ? SocBotTuning.RUN_BEHIND_BONUS : 0);
+                if (score > bestScore) {
+                    bestScore = score;
+                    best = spot;
+                }
+            });
+        }
         [-5, -2.5, 0, 2.5, 5].forEach((x) => {
             [3, 5, 7].forEach((depth) => {
                 const rawZ = holder.z + attack * depth;
