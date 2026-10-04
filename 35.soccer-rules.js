@@ -27,7 +27,8 @@ SocConfig.SEAT_COUNT = 4;
 SocConfig.SPECTATOR_SLOT = 4;
 SocConfig.NET_MS = 143;
 SocConfig.THINK_MS = 100;
-SocConfig.MATCH_MS = 120000;
+SocConfig.MATCH_MS = 90000;
+SocConfig.PASSES_TO_SCORE = 2;
 SocConfig.READY_MS = 3200;
 SocConfig.OVERTIME_READY_MS = 3600;
 SocConfig.GOAL_MS = 4200;
@@ -673,7 +674,8 @@ class SocBot extends SocPlayerController {
         const nearest = opponents.reduce((best, opponent) => Math.min(best, SocMath.distance(me, opponent)), 99);
         const pressured = nearest < SocBotTuning.PRESSURE_RADIUS;
         const ready = nowMs >= this.reactUntilMs && !this.isBusy(nowMs);
-        if (ready && goalDistance <= SocBotTuning.SHOT_RANGE && this.random() < SocBotTuning.SHOT_CHANCE) {
+        const scoring = engine.canScore(this.team);
+        if (ready && scoring && goalDistance <= SocBotTuning.SHOT_RANGE && this.random() < SocBotTuning.SHOT_CHANCE) {
             const target = SocPlanner.shotTarget(me, this.team, opponents);
             const openAngle = Math.abs(target.z - me.z) >= Math.abs(target.x - me.x) * SocBotTuning.SHOT_MIN_ANGLE_RATIO;
             if (openAngle && SocPlanner.laneClear(me, target, opponents, 0.9)) {
@@ -681,7 +683,7 @@ class SocBot extends SocPlayerController {
                 return;
             }
         }
-        const breakaway = this.isBreakaway(engine, me, attack);
+        const breakaway = scoring && this.isBreakaway(engine, me, attack);
         if (ready && !breakaway && this.wantsPass(mate, me, opponents, attack, pressured)) {
             this.queueAction({ kind: "pass", power: SocBotTuning.PASS_POWER, atMs: nowMs, dirX: 0, dirZ: 0 });
             return;
@@ -937,6 +939,9 @@ class SocEngine {
         this.lastKickerSlot = -1;
         this.lastKickMs = 0;
         this.teamOnly = -1;
+        this.passChain = 0;
+        this.chainTeam = -1;
+        this.deniedAtMs = 0;
         this.teamOnlyUntilMs = 0;
         this.passSafeUntilMs = 0;
         this.passTeam = -1;
@@ -961,6 +966,9 @@ class SocEngine {
         this.keepers = [new SocKeeper(SocConfig.SEAT_COUNT, random), new SocKeeper(SocConfig.SEAT_COUNT + 1, random)];
         this.bodyCache = players.concat(this.keepers);
         this.bodyCache.forEach((body) => { body.obstacles = this.bodyCache; });
+    }
+    canScore(team) {
+        return this.chainTeam === team && this.passChain >= SocConfig.PASSES_TO_SCORE;
     }
     get bodies() {
         for (let index = 0; index < SocConfig.SEAT_COUNT; index++) {
@@ -1030,6 +1038,8 @@ class SocEngine {
         this.physics.scoredTeam = -1;
         this.physics.impacts.length = 0;
         this.ownerSlot = SocCourtLayout.takerSlot(this.kickoffTeam);
+        this.chainTeam = this.kickoffTeam;
+        this.passChain = 0;
         this.ownerSinceMs = nowMs;
         this.dribble.reset();
         this.ballKind = "kickoff";
@@ -1096,9 +1106,14 @@ class SocEngine {
         if (team < 0)
             return;
         this.physics.scoredTeam = -1;
+        const ownGoal = this.lastToucher >= 0 && SocConfig.teamOfSlot(this.lastToucher) !== team;
+        if (!ownGoal && !this.canScore(team)) {
+            this.denyGoal(team, nowMs);
+            return;
+        }
         this.score[team]++;
         this.scorer = this.lastToucher;
-        this.ownGoal = this.scorer >= 0 && SocConfig.teamOfSlot(this.scorer) !== team;
+        this.ownGoal = ownGoal;
         if (this.scorer >= 0 && this.scorer < SocConfig.SEAT_COUNT && !this.ownGoal)
             this.goalsBySlot[this.scorer]++;
         this.concedingTeam = 1 - team;
@@ -1108,6 +1123,15 @@ class SocEngine {
         this.bodies.forEach((body) => { body.frozen = true; });
         this.emitGame(nowMs);
         this.emitBall(nowMs, "loose", -1, -1);
+    }
+    denyGoal(team, nowMs) {
+        const keeper = this.keepers[1 - team];
+        this.physics.load({ x: keeper.x, y: SocConfig.BALL_R, z: keeper.z, vx: 0, vy: 0, vz: 0 });
+        this.ballKind = "loose";
+        this.lastKickerSlot = -1;
+        this.capture(keeper, nowMs);
+        this.deniedAtMs = nowMs;
+        this.emitGame(nowMs);
     }
     processRequests(nowMs) {
         this.bodies.forEach((player) => {
@@ -1274,6 +1298,13 @@ class SocEngine {
         return Math.abs(this.physics.x) > SocConfig.HALF_W - margin || Math.abs(this.physics.z) > SocConfig.HALF_L - margin;
     }
     capture(player, nowMs) {
+        if (player.team !== this.chainTeam) {
+            this.chainTeam = player.team;
+            this.passChain = 0;
+        }
+        else if (this.ballKind === "pass" && this.lastKickerSlot >= 0 && this.lastKickerSlot < SocConfig.SEAT_COUNT && this.lastKickerSlot !== player.slot && SocConfig.teamOfSlot(this.lastKickerSlot) === player.team) {
+            this.passChain++;
+        }
         this.ownerSlot = player.slot;
         this.teamOnly = -1;
         this.ownerSinceMs = nowMs;
@@ -1407,7 +1438,7 @@ class SocEngine {
         const ball = {
             x: Math.round(state.x * 100) / 100, y: Math.round(state.y * 100) / 100, z: Math.round(state.z * 100) / 100,
             vx: Math.round(state.vx * 100) / 100, vy: Math.round(state.vy * 100) / 100, vz: Math.round(state.vz * 100) / 100,
-            at: Math.round(nowMs), seq: this.ballSeq, kind, by, owner: this.ownerSlot, victim
+            at: Math.round(nowMs), seq: this.ballSeq, kind, by, owner: this.ownerSlot, victim, ch: this.passChain, ct: this.chainTeam
         };
         this.events.push({ type: "ball", ball });
     }
@@ -1416,7 +1447,7 @@ class SocEngine {
             type: "game",
             game: {
                 n: this.gameNo, phase: this.phase === "idle" ? "ready" : this.phase, at: Math.round(nowMs), leftMs: Math.round(this.leftMs), overtime: this.overtime,
-                sa: this.score[0], sb: this.score[1], kickoff: this.kickoffTeam, scorer: this.scorer, own: this.ownGoal, winner: this.winner, goals: this.goalsBySlot.slice()
+                sa: this.score[0], sb: this.score[1], kickoff: this.kickoffTeam, scorer: this.scorer, own: this.ownGoal, winner: this.winner, goals: this.goalsBySlot.slice(), deniedAt: Math.round(this.deniedAtMs)
             }
         });
     }

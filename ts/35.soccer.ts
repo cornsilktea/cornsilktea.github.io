@@ -252,12 +252,16 @@ class SocBallTracker {
   ownerSince = 0;
   kind: SocBallKind = "kickoff";
   seq = -1;
+  chain = 0;
+  chainTeam = -1;
 
   apply(record: SocBallRecord, nowMs: number): void {
     this.seq = record.seq;
     this.ownerSlot = record.owner;
     this.ownerSince = record.at;
     this.kind = record.kind;
+    this.chain = record.ch || 0;
+    this.chainTeam = record.ct === undefined ? -1 : record.ct;
     this.smoother.markChange();
     if (record.owner >= 0) {
       this.follower.reset();
@@ -761,10 +765,18 @@ class SoccerMatch {
 
   private timeText(now: number): string {
     const game = this.game;
-    if (!game) return "2:00";
+    if (!game) return this.formatTime(SocConfig.MATCH_MS);
     const left = game.phase === "play" && !game.overtime ? game.leftMs - (now - game.at) : game.leftMs;
-    const seconds = Math.max(0, Math.ceil(left / 1000));
+    return this.formatTime(left);
+  }
+
+  private formatTime(milliseconds: number): string {
+    const seconds = Math.max(0, Math.ceil(milliseconds / 1000));
     return Math.floor(seconds / 60) + ":" + (seconds % 60 < 10 ? "0" : "") + (seconds % 60);
+  }
+
+  private passChain(): { count: number; team: number } {
+    return this.engine ? { count: this.engine.passChain, team: this.engine.chainTeam } : { count: this.tracker.chain, team: this.tracker.chainTeam };
   }
 
   private hudModel(now: number): SocHudModel {
@@ -782,7 +794,12 @@ class SoccerMatch {
     }
     model.banner = this.bannerText(game, now);
     if (!this.local) model.hint = "관전 중";
-    else if (game.phase === "play") model.hint = holding ? "J 패스 · K 슛 (꾹 누르면 더 세게)" : "J 태클 · K 슬라이딩";
+    else if (game.phase === "play") {
+      const chain = this.passChain();
+      const mine = chain.team === this.local.team;
+      const progress = mine ? (chain.count >= SocConfig.PASSES_TO_SCORE ? "골 가능! " : "패스 " + chain.count + "/" + SocConfig.PASSES_TO_SCORE + " · ") : "패스 0/" + SocConfig.PASSES_TO_SCORE + " · ";
+      model.hint = progress + (holding ? "J 패스 · K 슛" : "J 태클 · K 슬라이딩");
+    }
     return model;
   }
 
@@ -792,6 +809,7 @@ class SoccerMatch {
   }
 
   private bannerText(game: SocGameRecord, now: number): string {
+    if (game.phase === "play" && game.deniedAt > 0 && now - game.deniedAt < 2800) return "골 취소! 패스 " + SocConfig.PASSES_TO_SCORE + "번이 성공해야 골이 인정돼요";
     if (game.phase === "goal") {
       const name = this.nickOfSlot(game.scorer);
       const suffix = game.own ? " (자책골)" : "";
