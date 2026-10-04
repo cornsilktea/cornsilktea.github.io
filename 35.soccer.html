@@ -79,6 +79,7 @@
   #banner .hud-box { display: inline-block; font-size: 24px; border-top-color: #F2C879; }
   #hudHint { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 14px); transform: translateX(-50%); max-width: min(560px, 54vw); text-align: center; font-size: 14px; }
   #chargeBox { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 66px); transform: translateX(-50%); width: min(240px, 40vw); height: 18px; padding: 2px; border-radius: 9px; }
+  #chargeBox::after { content: ""; position: absolute; left: 60%; top: 1px; bottom: 1px; width: 2px; background: rgba(255, 255, 255, .9); }
   #chargeFill { height: 100%; width: 0; border-radius: 6px; background: linear-gradient(90deg, #F2C879, #D97B4F); }
   #btnGameLeave { position: absolute; right: 10px; top: 10px; min-height: 34px; padding: 4px 12px; font-size: 14px; font-weight: 800; border-radius: 8px; border: 1.5px solid rgba(255, 255, 255, .4); background: rgba(16, 18, 28, .7); color: #fff; }
   .actBtn { position: absolute; width: 104px; height: 104px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, .55); background: rgba(20, 20, 36, .78); color: #fff; font-size: 17px; font-weight: 800; touch-action: none; -webkit-tap-highlight-color: transparent; }
@@ -146,7 +147,7 @@
         <li>2명씩 두 팀이 겨뤄요. 골키퍼는 없어요. 사람이 모자라면 빈 자리는 AI가 채워요.</li>
         <li><b>제한 시간은 1분 30초</b>예요. 끝났을 때 점수가 같으면 <b>연장 골든골</b>(시간 제한 없음)로 먼저 넣는 팀이 바로 이겨요.</li>
         <li>항상 달리는 상태예요. 공을 가지면 공을 발 앞에서 조금씩 굴리며 달리는데, 공이 없을 때보다 조금 느려요.</li>
-        <li>공을 가졌을 때 <b>J는 패스</b>(동료가 가는 방향 앞으로 낮게), <b>K는 슛</b>(골대 구석으로 자동)이에요. 버튼을 오래 누를수록 세게 나가요. 눌렀다 바로 떼도 동료·골대 구석까지는 가요.</li>
+        <li>공을 가졌을 때 <b>J는 패스</b>(동료가 가는 방향 앞으로 낮게), <b>K는 슛</b>(골대 구석으로 자동)이에요. 버튼을 오래 누를수록 세게 나가요. 눌렀다 바로 떼도 동료·골대 구석까지는 가요. <b>게이지가 60%(흰 줄)를 넘기면 패스가 공중으로 떠서</b> 수비 머리 위를 넘어가고, 길게 누를수록 동료보다 앞쪽에 떨어져요(받는 사람이 달려가서 받아요).</li>
         <li>공이 없을 때 <b>J는 스탠딩 태클</b>(앞쪽 가까운 상대의 공을 떼어 내요. 실패하면 잠깐 멈춰요), <b>K는 슬라이딩</b>(멀리 미끄러지지만 실패하면 오래 멈춰요)이에요.</li>
         <li>골대에서 멀수록 슛이 느려지고 구석을 벗어나 잘 빗나가요. 패스로 골대 가까이에서 기회를 만들어요. 선수 몸에 슛이 맞으면 튕겨 나가고, 패스 길에 서 있으면 공을 가로챌 수 있어요.</li>
         <li><b>패스가 2번 성공한 뒤</b> 넣은 골만 인정돼요(골키퍼가 한 패스는 세지 않고, 자책골은 예외). 패스가 모자라면 골이 취소되고 상대 골키퍼가 공을 가져요. 상대에게 공을 빼앗기면 패스 횟수가 0으로 돌아가요.</li>

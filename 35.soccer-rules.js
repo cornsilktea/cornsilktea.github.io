@@ -29,6 +29,13 @@ SocConfig.NET_MS = 143;
 SocConfig.THINK_MS = 100;
 SocConfig.MATCH_MS = 90000;
 SocConfig.PASSES_TO_SCORE = 2;
+SocConfig.LOFT_POWER = 0.6;
+SocConfig.LOFT_STRETCH = 1;
+SocConfig.LOFT_BASE_S = 1;
+SocConfig.LOFT_PER_M = 0.04;
+SocConfig.LOFT_MIN_S = 1.1;
+SocConfig.LOFT_MAX_S = 1.8;
+SocConfig.LOFT_CATCH_H = 0.9;
 SocConfig.READY_MS = 3200;
 SocConfig.OVERTIME_READY_MS = 3600;
 SocConfig.GOAL_MS = 4200;
@@ -317,6 +324,24 @@ class SocPlanner {
         const angle = Math.atan2(target.x - from.x, target.z - from.z) + errorAngle;
         return { vx: Math.sin(angle) * speed, vy: 0, vz: Math.cos(angle) * speed, startX: from.x, startZ: from.z, target };
     }
+    static loftPass(from, mate, power, errorAngle) {
+        const stretch = 1 + Math.max(0, power - SocConfig.LOFT_POWER) * SocConfig.LOFT_STRETCH;
+        let target = { x: mate.x, z: mate.z };
+        let seconds = SocConfig.LOFT_MIN_S;
+        for (let round = 0; round < 3; round++) {
+            const distance = Math.max(0.5, SocMath.distance(from, target));
+            seconds = SocMath.clamp(SocConfig.LOFT_BASE_S + SocConfig.LOFT_PER_M * distance, SocConfig.LOFT_MIN_S, SocConfig.LOFT_MAX_S);
+            const lead = seconds * SocConfig.PASS_LEAD_FACTOR;
+            const raw = { x: mate.x + mate.vx * lead, z: mate.z + mate.vz * lead };
+            target = SocPlanner.clampToField({ x: from.x + (raw.x - from.x) * stretch, z: from.z + (raw.z - from.z) * stretch });
+        }
+        const distance = Math.max(0.5, SocMath.distance(from, target));
+        const drag = SocConfig.AIR_DRAG;
+        const speed = (distance * drag) / (1 - Math.exp(-drag * seconds));
+        const angle = Math.atan2(target.x - from.x, target.z - from.z) + errorAngle;
+        const lift = (SocConfig.LOFT_CATCH_H - SocConfig.BALL_R + 0.5 * SocConfig.GRAVITY * seconds * seconds) / seconds;
+        return { vx: Math.sin(angle) * speed, vy: lift, vz: Math.cos(angle) * speed, startX: from.x, startZ: from.z, target };
+    }
     static shotTarget(from, team, opponents) {
         const attack = SocConfig.attackOf(team);
         const goalZ = attack * (SocConfig.HALF_L + 0.6);
@@ -579,6 +604,9 @@ SocBotTuning.RUN_BEHIND_GAP = 2.6;
 SocBotTuning.RUN_BEHIND_BONUS = 2.8;
 SocBotTuning.RUNNER_MIN_SPEED = 1.5;
 SocBotTuning.RUNNER_PASS_CHANCE = 0.97;
+SocBotTuning.LOFT_BOT_POWER = 0.75;
+SocBotTuning.LOFT_BOT_CHANCE = 0.75;
+SocBotTuning.LOFT_MIN_DISTANCE = 4;
 SocBotTuning.BREAKAWAY_WIDTH = 3.5;
 SocBotTuning.BACKWARD_PASS_LIMIT = 1.5;
 SocBotTuning.PASS_PRESSURED_CHANCE = 0.85;
@@ -689,8 +717,9 @@ class SocBot extends SocPlayerController {
         }
         const breakaway = scoring && this.isBreakaway(engine, me, attack);
         const runner = this.isRunningBehind(engine, mate, attack);
-        if (ready && !breakaway && this.wantsPass(mate, me, opponents, attack, pressured, runner)) {
-            this.queueAction({ kind: "pass", power: SocBotTuning.PASS_POWER, atMs: nowMs, dirX: 0, dirZ: 0 });
+        const passPower = ready && !breakaway ? this.passPower(mate, me, opponents, attack, pressured, runner) : -1;
+        if (passPower >= 0) {
+            this.queueAction({ kind: "pass", power: passPower, atMs: nowMs, dirX: 0, dirZ: 0 });
             return;
         }
         const keeper = engine.keepers[this.team];
@@ -706,24 +735,28 @@ class SocBot extends SocPlayerController {
             return false;
         return engine.opponentsOf(this.team).some((opponent) => opponent.slot < SocConfig.SEAT_COUNT && (mate.z - opponent.z) * attack > 0.3);
     }
-    wantsPass(mate, me, opponents, attack, pressured, runner) {
+    passPower(mate, me, opponents, attack, pressured, runner) {
         const distance = SocMath.distance(me, mate);
         if (distance < SocBotTuning.PASS_MIN_DISTANCE)
-            return false;
-        if (runner) {
-            const through = SocPlanner.pass(me, mate.velocity(), 0, 0);
-            if (SocPlanner.laneClear(me, through.target, opponents, SocBotTuning.LANE_RADIUS * 0.8))
-                return this.random() < SocBotTuning.RUNNER_PASS_CHANCE;
-        }
+            return -1;
+        const ground = SocPlanner.pass(me, mate.velocity(), 0, 0);
+        const lane = SocPlanner.laneClear(me, ground.target, opponents, runner ? SocBotTuning.LANE_RADIUS * 0.8 : SocBotTuning.LANE_RADIUS);
+        if (runner && lane)
+            return this.random() < SocBotTuning.RUNNER_PASS_CHANCE ? SocBotTuning.PASS_POWER : -1;
         const advance = (mate.z - me.z) * attack;
-        if (!pressured && advance < -SocBotTuning.BACKWARD_PASS_LIMIT)
-            return false;
-        const launch = SocPlanner.pass(me, mate.velocity(), 0, 0);
-        if (!SocPlanner.laneClear(me, launch.target, opponents, SocBotTuning.LANE_RADIUS))
-            return false;
-        if (opponents.some((opponent) => SocMath.distance(opponent, launch.target) < SocBotTuning.MARKED_RADIUS))
-            return false;
-        return this.random() < (pressured ? SocBotTuning.PASS_PRESSURED_CHANCE : SocBotTuning.PASS_CHANCE);
+        if (!runner && !pressured && advance < -SocBotTuning.BACKWARD_PASS_LIMIT)
+            return -1;
+        if (lane) {
+            if (opponents.some((opponent) => SocMath.distance(opponent, ground.target) < SocBotTuning.MARKED_RADIUS))
+                return -1;
+            return this.random() < (pressured ? SocBotTuning.PASS_PRESSURED_CHANCE : SocBotTuning.PASS_CHANCE) ? SocBotTuning.PASS_POWER : -1;
+        }
+        if (distance < SocBotTuning.LOFT_MIN_DISTANCE)
+            return -1;
+        const landing = SocPlanner.loftPass(me, mate.velocity(), SocBotTuning.LOFT_BOT_POWER, 0).target;
+        if (opponents.some((opponent) => SocMath.distance(opponent, landing) < SocBotTuning.MARKED_RADIUS))
+            return -1;
+        return this.random() < SocBotTuning.LOFT_BOT_CHANCE ? SocBotTuning.LOFT_BOT_POWER : -1;
     }
     isBreakaway(engine, me, attack) {
         return !engine.opponentsOf(this.team).some((opponent) => opponent.slot < SocConfig.SEAT_COUNT && (opponent.z - me.z) * attack > -0.8 && Math.abs(opponent.x - me.x) < SocBotTuning.BREAKAWAY_WIDTH);
@@ -1193,7 +1226,8 @@ class SocEngine {
         const mate = this.passTarget(player, request);
         const from = this.dribblePoint(nowMs);
         const error = player instanceof SocBot ? SocMath.gaussian(this.random) * SocBotTuning.PASS_ERROR : 0;
-        const launch = SocPlanner.pass(from, mate.velocity(), request.power, error);
+        const lofted = request.power >= SocConfig.LOFT_POWER;
+        const launch = lofted ? SocPlanner.loftPass(from, mate.velocity(), request.power, error) : SocPlanner.pass(from, mate.velocity(), request.power, error);
         this.kick(player, launch, "pass", nowMs);
     }
     passTarget(player, request) {
@@ -1350,7 +1384,8 @@ class SocEngine {
         const reach = SocConfig.BODY_R + SocConfig.BALL_R;
         const dx = ball.x - player.x, dz = ball.z - player.z;
         const distance = Math.hypot(dx, dz);
-        if (distance >= reach || ball.y > SocConfig.BODY_H + SocConfig.BALL_R)
+        const top = this.ballKind === "pass" ? SocConfig.PICKUP_HEIGHT : SocConfig.BODY_H + SocConfig.BALL_R;
+        if (distance >= reach || ball.y > top)
             return;
         let normalX = 1, normalZ = 0;
         if (distance > 1e-4) {

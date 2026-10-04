@@ -798,7 +798,7 @@ class SoccerMatch {
       const chain = this.passChain();
       const mine = chain.team === this.local.team;
       const progress = mine ? (chain.count >= SocConfig.PASSES_TO_SCORE ? "골 가능! " : "패스 " + chain.count + "/" + SocConfig.PASSES_TO_SCORE + " · ") : "패스 0/" + SocConfig.PASSES_TO_SCORE + " · ";
-      model.hint = progress + (holding ? "J 패스 · K 슛" : "J 태클 · K 슬라이딩");
+      model.hint = progress + (holding ? "J 패스(60%↑ 띄우기) · K 슛" : "J 태클 · K 슬라이딩");
     }
     return model;
   }
