@@ -585,7 +585,9 @@ SocBotTuning.SLIDE_CHANCE = 0.05;
 SocBotTuning.SLIDE_MIN = 2.3;
 SocBotTuning.SLIDE_MAX = 3.7;
 SocBotTuning.MISS_CHANCE = 0.15;
-SocBotTuning.COVER_RATIO = 0.5;
+SocBotTuning.COVER_RATIO = 0.9;
+SocBotTuning.COVER_GOALSIDE = 1.3;
+SocBotTuning.PASS_REACTION_MS = 450;
 class SocBot extends SocPlayerController {
     constructor(slot, random) {
         super(slot);
@@ -594,6 +596,7 @@ class SocBot extends SocPlayerController {
         this.reactUntilMs = 0;
         this.seenOwner = -2;
         this.goal = null;
+        this.supportSpot = null;
     }
     poll(engine, dtSec, nowMs) {
         if (!engine)
@@ -718,18 +721,40 @@ class SocBot extends SocPlayerController {
         const attack = SocConfig.attackOf(this.team);
         this.goal = SocPlanner.clampToField({ x: (this.slot % 2 === 0 ? 2.8 : -2.8) * attack, z: -attack * 3 });
     }
+    supportScore(spot, holder, opponents, depth) {
+        let lane = 9, near = 9;
+        opponents.forEach((opponent) => {
+            lane = Math.min(lane, SocMath.segmentDistance(opponent, holder, spot));
+            near = Math.min(near, SocMath.distance(opponent, spot));
+        });
+        return Math.min(lane, 3) * 1.5 + Math.min(near, 4) + 0.12 * depth - 0.08 * SocMath.distance(this, spot);
+    }
     thinkSupport(engine, mate) {
         const attack = SocConfig.attackOf(this.team);
-        const lateral = mate.x > 0.5 ? -3.6 : mate.x < -0.5 ? 3.6 : (this.slot % 2 === 0 ? 3.6 : -3.6) * attack;
+        const holder = { x: mate.x, z: mate.z };
+        const opponents = this.opponentPoints(engine);
         const limit = attack * (SocConfig.HALF_L - 3.5);
-        const z = attack > 0 ? Math.min(mate.z + attack * 4.8, limit) : Math.max(mate.z + attack * 4.8, limit);
-        let spot = SocPlanner.clampToField({ x: lateral, z });
-        this.opponentPoints(engine).forEach((opponent) => {
-            const distance = SocMath.distance(spot, opponent);
-            if (distance < 2 && distance > 0.01)
-                spot = SocPlanner.clampToField({ x: spot.x + ((spot.x - opponent.x) / distance) * 2, z: spot.z + ((spot.z - opponent.z) / distance) * 2 });
+        let best = null;
+        let bestScore = -Infinity;
+        [-5, -2.5, 0, 2.5, 5].forEach((x) => {
+            [3, 5, 7].forEach((depth) => {
+                const rawZ = holder.z + attack * depth;
+                const z = attack > 0 ? Math.min(rawZ, limit) : Math.max(rawZ, limit);
+                const spot = SocPlanner.clampToField({ x, z });
+                if (SocMath.distance(spot, holder) < SocBotTuning.PASS_MIN_DISTANCE)
+                    return;
+                const score = this.supportScore(spot, holder, opponents, depth);
+                if (score > bestScore) {
+                    bestScore = score;
+                    best = spot;
+                }
+            });
         });
-        this.goal = spot;
+        const keep = this.supportSpot;
+        if (keep && best && this.supportScore(keep, holder, opponents, 5) >= bestScore - 0.4)
+            best = keep;
+        this.supportSpot = best;
+        this.goal = best;
     }
     thinkDefend(engine, nowMs, ball, mate, owner) {
         const myDistance = SocMath.distance(this, ball);
@@ -737,7 +762,8 @@ class SocBot extends SocPlayerController {
         const chaser = myDistance < mateDistance || (myDistance === mateDistance && this.slot < mate.slot);
         if (!chaser) {
             const partner = engine.players[owner.slot ^ 1];
-            const lane = { x: SocMath.lerp(owner.x, partner.x, SocBotTuning.COVER_RATIO), z: SocMath.lerp(owner.z, partner.z, SocBotTuning.COVER_RATIO) };
+            const goalSide = -SocConfig.attackOf(this.team) * SocBotTuning.COVER_GOALSIDE;
+            const lane = { x: SocMath.lerp(owner.x, partner.x, SocBotTuning.COVER_RATIO), z: SocMath.lerp(owner.z, partner.z, SocBotTuning.COVER_RATIO) + goalSide };
             const ownGoalZ = -SocConfig.attackOf(this.team) * SocConfig.HALF_L;
             const nearGoal = Math.abs(lane.z - ownGoalZ) < 3;
             this.goal = SocPlanner.clampToField(nearGoal ? { x: lane.x, z: ownGoalZ + SocConfig.attackOf(this.team) * 3.2 } : lane);
@@ -759,6 +785,9 @@ class SocBot extends SocPlayerController {
         }
     }
     thinkLoose(engine, nowMs, ball, mate) {
+        const rivalPass = engine.ballKind === "pass" && engine.lastKickerSlot >= 0 && SocConfig.teamOfSlot(engine.lastKickerSlot) !== this.team;
+        if (rivalPass && nowMs - engine.lastKickMs < SocBotTuning.PASS_REACTION_MS)
+            return;
         const velocity = engine.ballVelocity();
         const myDistance = SocMath.distance(this, ball);
         const seconds = SocMath.clamp(myDistance / SocConfig.MOVE_SPEED, 0, 1.2);
@@ -867,6 +896,7 @@ class SocEngine {
         this.ballKind = "kickoff";
         this.lastToucher = -1;
         this.lastKickerSlot = -1;
+        this.lastKickMs = 0;
         this.leftMs = SocConfig.MATCH_MS;
         this.overtime = false;
         this.kickoffTeam = 0;
@@ -1090,6 +1120,7 @@ class SocEngine {
         this.ballKind = kind;
         this.lastToucher = player.slot;
         this.lastKickerSlot = player.slot;
+        this.lastKickMs = nowMs;
         this.kickerImmuneUntilMs = nowMs + SocConfig.KICK_IMMUNE_MS;
         player.yaw = Math.atan2(launch.vx, launch.vz);
         this.emitBall(nowMs, kind, player.slot, -1);
