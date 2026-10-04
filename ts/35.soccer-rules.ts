@@ -33,7 +33,7 @@ interface SocGameRecord {
 }
 
 interface SocNetImpact { surface: "back" | "side" | "roof"; x: number; y: number; z: number; strength: number }
-interface SocActionRequest { kind: SocActionKind; power: number; atMs: number; dirX: number; dirZ: number }
+interface SocActionRequest { kind: SocActionKind; power: number; atMs: number; dirX: number; dirZ: number; toSlot?: number }
 interface SocLaunch { vx: number; vy: number; vz: number; startX: number; startZ: number; target: SocPoint }
 
 type SocEvent = { type: "ball"; ball: SocBallRecord } | { type: "game"; game: SocGameRecord };
@@ -73,7 +73,10 @@ class SocConfig {
   static readonly KEEPER_THINK_MS = 140;
   static readonly KEEPER_REACH = 1.2;
   static readonly KEEPER_CATCH_SPEED = 11;
-  static readonly KEEPER_HOLD_MS = 1300;
+  static readonly KEEPER_HOLD_MS = 900;
+  static readonly PASS_SAFE_MS = 320;
+  static readonly PASS_SAFE_RADIUS = 2.4;
+  static readonly TEAM_ONLY_MAX_MS = 4000;
   static readonly KEEPER_KICK_POWER = 0.8;
   static readonly KEEPER_COME_OUT_DISTANCE = 3.2;
   static readonly PICKUP_RADIUS = 0.92;
@@ -644,18 +647,26 @@ class SocBotTuning {
   static readonly SHOT_POWER_SPAN = 0.55;
   static readonly SHOT_SPOT_DEPTH = 5;
   static readonly SHOT_MIN_ANGLE_RATIO = 0.6;
-  static readonly PASS_CHANCE = 0.7;
+  static readonly PASS_CHANCE = 0.92;
+  static readonly BREAKAWAY_WIDTH = 3.5;
+  static readonly BACKWARD_PASS_LIMIT = 1.5;
   static readonly PASS_PRESSURED_CHANCE = 0.85;
   static readonly PASS_ERROR = 0.05;
   static readonly PASS_POWER = 0.2;
-  static readonly PASS_MIN_DISTANCE = 2.8;
+  static readonly PASS_MIN_DISTANCE = 2.2;
   static readonly PASS_ADVANCE = 1.6;
   static readonly LANE_RADIUS = 1.1;
-  static readonly MARKED_RADIUS = 2;
+  static readonly MARKED_RADIUS = 1.4;
   static readonly PRESSURE_RADIUS = 2.8;
   static readonly AVOID_RADIUS = 3.2;
   static readonly TACKLE_CHANCE = 0.16;
-  static readonly SLIDE_CHANCE = 0.05;
+  static readonly SLIDE_CHANCE = 0.02;
+  static readonly JOCKEY_DISTANCE = 2.1;
+  static readonly PRESS_LINE = 2;
+  static readonly BACK_PASS_CHANCE = 0.55;
+  static readonly BACK_PASS_MIN = 3;
+  static readonly BACK_PASS_MAX = 11;
+  static readonly BACK_PASS_PRESSURE = 2.3;
   static readonly SLIDE_MIN = 2.3;
   static readonly SLIDE_MAX = 3.7;
   static readonly MISS_CHANCE = 0.15;
@@ -743,8 +754,14 @@ class SocBot extends SocPlayerController {
         return;
       }
     }
-    if (ready && this.wantsPass(mate, me, opponents, attack, pressured)) {
+    const breakaway = this.isBreakaway(engine, me, attack);
+    if (ready && !breakaway && this.wantsPass(mate, me, opponents, attack, pressured)) {
       this.queueAction({ kind: "pass", power: SocBotTuning.PASS_POWER, atMs: nowMs, dirX: 0, dirZ: 0 });
+      return;
+    }
+    const keeper = engine.keepers[this.team];
+    if (ready && !breakaway && nearest < SocBotTuning.BACK_PASS_PRESSURE && this.wantsBackPass(keeper, me, opponents)) {
+      this.queueAction({ kind: "pass", power: SocBotTuning.PASS_POWER, atMs: nowMs, dirX: 0, dirZ: 0, toSlot: keeper.slot });
       return;
     }
     this.goal = this.dribbleGoal(me, goalCenter, attack, opponents);
@@ -754,11 +771,22 @@ class SocBot extends SocPlayerController {
     const distance = SocMath.distance(me, mate);
     if (distance < SocBotTuning.PASS_MIN_DISTANCE) return false;
     const advance = (mate.z - me.z) * attack;
-    if (!pressured && advance < SocBotTuning.PASS_ADVANCE) return false;
+    if (!pressured && advance < -SocBotTuning.BACKWARD_PASS_LIMIT) return false;
     const launch = SocPlanner.pass(me, mate.velocity(), 0, 0);
     if (!SocPlanner.laneClear(me, launch.target, opponents, SocBotTuning.LANE_RADIUS)) return false;
     if (opponents.some((opponent) => SocMath.distance(opponent, launch.target) < SocBotTuning.MARKED_RADIUS)) return false;
     return this.random() < (pressured ? SocBotTuning.PASS_PRESSURED_CHANCE : SocBotTuning.PASS_CHANCE);
+  }
+
+  private isBreakaway(engine: SocEngine, me: SocPoint, attack: number): boolean {
+    return !engine.opponentsOf(this.team).some((opponent) => opponent.slot < SocConfig.SEAT_COUNT && (opponent.z - me.z) * attack > -0.8 && Math.abs(opponent.x - me.x) < SocBotTuning.BREAKAWAY_WIDTH);
+  }
+
+  private wantsBackPass(keeper: SocPlayerController, me: SocPoint, opponents: readonly SocPoint[]): boolean {
+    const distance = SocMath.distance(me, keeper);
+    if (distance < SocBotTuning.BACK_PASS_MIN || distance > SocBotTuning.BACK_PASS_MAX) return false;
+    if (!SocPlanner.laneClear(me, keeper, opponents, SocBotTuning.LANE_RADIUS)) return false;
+    return this.random() < SocBotTuning.BACK_PASS_CHANCE;
   }
 
   private dribbleGoal(me: SocPoint, goalCenter: SocPoint, attack: number, opponents: readonly SocPoint[]): SocPoint {
@@ -837,11 +865,21 @@ class SocBot extends SocPlayerController {
       const lane = { x: SocMath.lerp(owner.x, partner.x, SocBotTuning.COVER_RATIO), z: SocMath.lerp(owner.z, partner.z, SocBotTuning.COVER_RATIO) + goalSide };
       const ownGoalZ = -SocConfig.attackOf(this.team) * SocConfig.HALF_L;
       const nearGoal = Math.abs(lane.z - ownGoalZ) < 3;
-      this.goal = SocPlanner.clampToField(nearGoal ? { x: lane.x, z: ownGoalZ + SocConfig.attackOf(this.team) * 3.2 } : lane);
+      const coverLine = SocConfig.attackOf(this.team) * SocBotTuning.PRESS_LINE;
+      const coverZ = SocConfig.attackOf(this.team) > 0 ? Math.min(lane.z, coverLine) : Math.max(lane.z, coverLine);
+      this.goal = SocPlanner.clampToField(nearGoal ? { x: lane.x, z: ownGoalZ + SocConfig.attackOf(this.team) * 3.2 } : { x: lane.x, z: coverZ });
       return;
     }
-    const velocity = owner.velocity();
-    this.goal = SocPlanner.clampToField({ x: ball.x + velocity.vx * 0.25, z: ball.z + velocity.vz * 0.25 });
+    const attackDir = SocConfig.attackOf(this.team);
+    const ownGoalZ = -attackDir * SocConfig.HALF_L;
+    const toGoalX = 0 - owner.x, toGoalZ = ownGoalZ - owner.z;
+    const toGoalLength = Math.hypot(toGoalX, toGoalZ) || 1;
+    const jockeyX = owner.x + (toGoalX / toGoalLength) * SocBotTuning.JOCKEY_DISTANCE;
+    const jockeyZ = owner.z + (toGoalZ / toGoalLength) * SocBotTuning.JOCKEY_DISTANCE;
+    const line = attackDir * SocBotTuning.PRESS_LINE;
+    const heldZ = attackDir > 0 ? Math.min(jockeyZ, line) : Math.max(jockeyZ, line);
+    this.goal = SocPlanner.clampToField({ x: jockeyX, z: heldZ });
+    if (SocMath.distance(this, ball) > SocConfig.TACKLE_RANGE + 0.6 && SocMath.distance(this, owner) > 2.6) return;
     if (nowMs < this.reactUntilMs || this.isBusy(nowMs)) return;
     if (this.random() < SocBotTuning.MISS_CHANCE) return;
     const distance = SocMath.distance(this, ball);
@@ -966,6 +1004,12 @@ class SocEngine {
   lastToucher = -1;
   lastKickerSlot = -1;
   lastKickMs = 0;
+  teamOnly = -1;
+  private teamOnlyUntilMs = 0;
+  private passSafeUntilMs = 0;
+  private passTeam = -1;
+  private passStartX = 0;
+  private passStartZ = 0;
   leftMs = SocConfig.MATCH_MS;
   overtime = false;
   kickoffTeam = 0;
@@ -1166,20 +1210,29 @@ class SocEngine {
 
   private executePass(player: SocPlayerController, request: SocActionRequest, nowMs: number): void {
     if (this.ownerSlot !== player.slot) return;
-    const mate = this.passTarget(player);
+    const mate = this.passTarget(player, request);
     const from = this.dribblePoint(nowMs);
     const error = player instanceof SocBot ? SocMath.gaussian(this.random) * SocBotTuning.PASS_ERROR : 0;
     const launch = SocPlanner.pass(from, mate.velocity(), request.power, error);
     this.kick(player, launch, "pass", nowMs);
   }
 
-  private passTarget(player: SocPlayerController): SocPlayerController {
-    if (player.slot < SocConfig.SEAT_COUNT) return this.players[player.slot ^ 1];
-    const attack = SocConfig.attackOf(player.team);
-    const mates = this.players.filter((candidate) => candidate.team === player.team);
-    return mates.reduce((best, candidate) => (candidate.z * attack > best.z * attack ? candidate : best), mates[0]);
+  private passTarget(player: SocPlayerController, request: SocActionRequest): SocPlayerController {
+    if (request.toSlot !== undefined && request.toSlot >= 0 && this.bodies[request.toSlot] && this.bodies[request.toSlot].team === player.team) return this.bodies[request.toSlot];
+    if (player.slot >= SocConfig.SEAT_COUNT) {
+      const mates = this.players.filter((candidate) => candidate.team === player.team);
+      return mates.reduce((best, candidate) => (SocMath.distance(player, candidate) < SocMath.distance(player, best) ? candidate : best), mates[0]);
+    }
+    const mate = this.players[player.slot ^ 1];
+    const keeper = this.keepers[player.team];
+    const length = Math.hypot(player.ix, player.iz);
+    if (length < 0.3 || player instanceof SocBot) return mate;
+    const alignment = (target: SocPlayerController) => {
+      const dx = target.x - player.x, dz = target.z - player.z;
+      return (dx * player.ix + dz * player.iz) / ((Math.hypot(dx, dz) || 1) * length);
+    };
+    return alignment(keeper) > 0.8 && alignment(keeper) > alignment(mate) + 0.2 ? keeper : mate;
   }
-
   private executeShot(player: SocPlayerController, request: SocActionRequest, nowMs: number): void {
     if (this.ownerSlot !== player.slot) return;
     const from = this.dribblePoint(nowMs);
@@ -1198,6 +1251,12 @@ class SocEngine {
     this.lastToucher = player.slot;
     this.lastKickerSlot = player.slot;
     this.lastKickMs = nowMs;
+    this.teamOnly = player.slot >= SocConfig.SEAT_COUNT && kind === "pass" ? player.team : -1;
+    this.teamOnlyUntilMs = nowMs + SocConfig.TEAM_ONLY_MAX_MS;
+    this.passSafeUntilMs = kind === "pass" ? nowMs + SocConfig.PASS_SAFE_MS : 0;
+    this.passTeam = player.team;
+    this.passStartX = startX;
+    this.passStartZ = startZ;
     this.kickerImmuneUntilMs = nowMs + SocConfig.KICK_IMMUNE_MS;
     player.yaw = Math.atan2(launch.vx, launch.vz);
     this.emitBall(nowMs, kind, player.slot, -1);
@@ -1231,7 +1290,7 @@ class SocEngine {
     let taker: SocPlayerController | null = null;
     let takerDistance = Infinity;
     for (const player of this.bodies) {
-      if (player.slot === this.lastKickerSlot && nowMs < this.kickerImmuneUntilMs) continue;
+      if (this.ignoresBall(player, nowMs)) continue;
       const distance = Math.hypot(ball.x - player.x, ball.z - player.z);
       const keeper = player.slot >= SocConfig.SEAT_COUNT;
       const canTake = this.ballKind === "pass" || speed <= (keeper ? SocConfig.KEEPER_CATCH_SPEED : SocConfig.CAPTURE_MAX_SPEED);
@@ -1250,11 +1309,18 @@ class SocEngine {
     }
     for (let pass = 0; pass < 2; pass++) {
       for (const player of this.bodies) {
-        if (player.slot === this.lastKickerSlot && nowMs < this.kickerImmuneUntilMs) continue;
+        if (this.ignoresBall(player, nowMs)) continue;
         this.bounceOffBody(player, nowMs);
       }
     }
     this.captureTrappedBall(nowMs);
+  }
+
+  private ignoresBall(player: SocPlayerController, nowMs: number): boolean {
+    if (player.slot === this.lastKickerSlot && nowMs < this.kickerImmuneUntilMs) return true;
+    if (this.teamOnly >= 0 && nowMs < this.teamOnlyUntilMs && player.team !== this.teamOnly) return true;
+    if (nowMs < this.passSafeUntilMs && player.team !== this.passTeam && Math.hypot(player.x - this.passStartX, player.z - this.passStartZ) < SocConfig.PASS_SAFE_RADIUS) return true;
+    return false;
   }
 
   private captureTrappedBall(nowMs: number): void {
@@ -1262,7 +1328,7 @@ class SocEngine {
     let taker: SocPlayerController | null = null;
     let takerDistance = Infinity;
     for (const player of this.bodies) {
-      if (player.slot === this.lastKickerSlot && nowMs < this.kickerImmuneUntilMs) continue;
+      if (this.ignoresBall(player, nowMs)) continue;
       const distance = Math.hypot(this.physics.x - player.x, this.physics.z - player.z);
       if (nowMs < player.noPickupUntilMs || this.physics.y > SocConfig.BODY_H) continue;
       if (distance < reach && distance < takerDistance) {
@@ -1280,6 +1346,7 @@ class SocEngine {
 
   private capture(player: SocPlayerController, nowMs: number): void {
     this.ownerSlot = player.slot;
+    this.teamOnly = -1;
     this.ownerSinceMs = nowMs;
     this.dribble.reset();
     this.ballKind = "dribble";
