@@ -81,6 +81,7 @@
   #fzSignal.stop { border-top-color: #FF4B3E; background: linear-gradient(135deg, rgba(90, 10, 10, .92), rgba(120, 18, 14, .86)); }
   #fzSignal.stop b { color: #FF8A7C; }
   #fzEdge { position: fixed; left: 0; top: 0; right: 0; bottom: 0; z-index: 17; pointer-events: none; }
+#moleFlash { position: fixed; left: 0; top: 0; right: 0; bottom: 0; z-index: 17; pointer-events: none; background: radial-gradient(ellipse at center, rgba(255, 40, 30, .12) 30%, rgba(255, 40, 30, .5) 100%); }
   #fzEdge.pulse { animation: fzPulse .7s ease-in-out infinite alternate; }
   @keyframes fzPulse { from { box-shadow: inset 0 0 40px 6px rgba(255, 40, 30, .35); } to { box-shadow: inset 0 0 90px 24px rgba(255, 40, 30, .8); } }
   #hudList .pl.me { border-left: 3px solid #D97B4F; padding-left: 5px; margin-left: -8px; }
@@ -151,6 +152,7 @@
 <div id="banner" hidden><div class="hud-box" id="bannerBox"></div></div>
 <div id="centerMsg" hidden></div>
 <div id="fzEdge" hidden></div>
+<div id="moleFlash" hidden></div>
 <div id="fzSignal" hidden></div>
 <div id="specBox" hidden><button type="button" id="btnSpec">다음 관전 대상</button></div>
 <div id="viewBtns" hidden></div>
@@ -290,6 +292,10 @@
 <script charset="utf-8" src="32.minigames/66-freeze-play.js"></script>
 <script charset="utf-8" src="32.minigames/67-freeze-view.js"></script>
 <script charset="utf-8" src="32.minigames/68-freeze-game.js"></script>
+<script charset="utf-8" src="32.minigames/75-mole-rules.js"></script>
+<script charset="utf-8" src="32.minigames/76-mole-play.js"></script>
+<script charset="utf-8" src="32.minigames/77-mole-view.js"></script>
+<script charset="utf-8" src="32.minigames/78-mole-game.js"></script>
 <script charset="utf-8" src="32.minigames/60-views.js"></script>
 <script charset="utf-8" src="32.minigames/70-flow.js"></script>
 <script charset="utf-8" src="32.minigames/80-app.js"></script>

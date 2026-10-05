@@ -38,6 +38,7 @@ class KeyboardSurface extends ControlSurface {
         this.held = new Set();
         this.actionByCode = new Map();
         this.holdByCode = new Map();
+        this.keyOnlyByCode = new Map();
         this.heldHoldCodes = new Map();
         env.onKeyDown((key) => this.handleDown(key));
         env.onKeyUp((key) => this.handleUp(key));
@@ -62,8 +63,11 @@ class KeyboardSurface extends ControlSurface {
     rebuild() {
         this.actionByCode = new Map();
         this.holdByCode = new Map();
+        this.keyOnlyByCode = new Map();
         this.spec.buttons.forEach((button) => button.codes.forEach((code) => {
-            if (button.hold)
+            if (button.keyOnly)
+                this.keyOnlyByCode.set(code, button.action);
+            else if (button.hold)
                 this.holdByCode.set(code, button.action);
             else
                 this.actionByCode.set(code, button.action);
@@ -95,6 +99,13 @@ class KeyboardSurface extends ControlSurface {
         if (hold) {
             key.preventDefault();
             this.holdDown(hold, key.code, this.sink);
+            return;
+        }
+        const keyOnlyAction = this.keyOnlyByCode.get(key.code);
+        if (keyOnlyAction) {
+            key.preventDefault();
+            if (!key.repeat)
+                this.sink.onAction(keyOnlyAction);
             return;
         }
         const direction = this.directionOf(key);
@@ -175,7 +186,7 @@ class TouchSurface extends ControlSurface {
     rebuild() {
         this.buttonBox.innerHTML = "";
         this.overlays.clear();
-        this.spec.buttons.forEach((button) => this.buildButton(button));
+        this.spec.buttons.filter((button) => !button.keyOnly).forEach((button) => this.buildButton(button));
         this.setActive(this.active);
     }
     releaseHeldButtons() {

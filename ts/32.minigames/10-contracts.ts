@@ -21,6 +21,7 @@ interface ControlButton {
   readonly bottomPx: number;
   readonly hold?: boolean;
   readonly wide?: boolean;
+  readonly keyOnly?: boolean;
 }
 
 interface ControlSpec {
