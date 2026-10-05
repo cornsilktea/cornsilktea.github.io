@@ -22,6 +22,19 @@ class TurnActions {
   }
 }
 
+class HoldActions {
+  private static readonly DOWN = ":down";
+  private static readonly UP = ":up";
+
+  static down(action: string): string {
+    return action + HoldActions.DOWN;
+  }
+
+  static up(action: string): string {
+    return action + HoldActions.UP;
+  }
+}
+
 abstract class ControlSurface {
   protected spec: ControlSpec = { stick: false, buttons: [] };
   protected sink: ActionSink | null = null;
@@ -45,6 +58,8 @@ class KeyboardSurface extends ControlSurface {
 
   private held = new Set<string>();
   private actionByCode = new Map<string, string>();
+  private holdByCode = new Map<string, string>();
+  private heldHoldCodes = new Map<string, Set<string>>();
 
   constructor(env: BrowserEnv) {
     super();
@@ -63,11 +78,34 @@ class KeyboardSurface extends ControlSurface {
 
   release(): void {
     this.held = new Set<string>();
+    const sink = this.sink;
+    const actions = Array.from(this.heldHoldCodes.keys());
+    this.heldHoldCodes = new Map<string, Set<string>>();
+    if (sink) actions.forEach((action) => sink.onAction(HoldActions.up(action)));
   }
 
   protected rebuild(): void {
     this.actionByCode = new Map<string, string>();
-    this.spec.buttons.forEach((button) => button.codes.forEach((code) => this.actionByCode.set(code, button.action)));
+    this.holdByCode = new Map<string, string>();
+    this.spec.buttons.forEach((button) => button.codes.forEach((code) => {
+      if (button.hold) this.holdByCode.set(code, button.action);
+      else this.actionByCode.set(code, button.action);
+    }));
+  }
+
+  private holdDown(action: string, code: string, sink: ActionSink): void {
+    const codes = this.heldHoldCodes.get(action) || new Set<string>();
+    const wasIdle = codes.size === 0;
+    codes.add(code);
+    this.heldHoldCodes.set(action, codes);
+    if (wasIdle) sink.onAction(HoldActions.down(action));
+  }
+
+  private holdUp(action: string, code: string): void {
+    const codes = this.heldHoldCodes.get(action);
+    if (!codes || !codes.delete(code) || codes.size > 0) return;
+    this.heldHoldCodes.delete(action);
+    if (this.sink) this.sink.onAction(HoldActions.up(action));
   }
 
   private directionOf(key: KeyPress): string | undefined {
@@ -76,6 +114,12 @@ class KeyboardSurface extends ControlSurface {
 
   private handleDown(key: KeyPress): void {
     if (key.inTextField || !this.sink) return;
+    const hold = this.holdByCode.get(key.code);
+    if (hold) {
+      key.preventDefault();
+      this.holdDown(hold, key.code, this.sink);
+      return;
+    }
     const direction = this.directionOf(key);
     if (direction) {
       this.held.add(direction);
@@ -95,6 +139,11 @@ class KeyboardSurface extends ControlSurface {
   }
 
   private handleUp(key: KeyPress): void {
+    const hold = this.holdByCode.get(key.code);
+    if (hold) {
+      this.holdUp(hold, key.code);
+      return;
+    }
     const direction = this.directionOf(key);
     if (direction) this.held.delete(direction);
   }
@@ -110,6 +159,7 @@ class TouchSurface extends ControlSurface {
   private readonly knob: HTMLElement;
   private readonly buttonBox: HTMLElement;
   private readonly overlays = new Map<string, HTMLElement>();
+  private readonly heldButtons = new Map<string, HTMLElement>();
   private pointerId: number | null = null;
   private originX = 0;
   private originY = 0;
@@ -134,6 +184,7 @@ class TouchSurface extends ControlSurface {
     this.pointerId = null;
     this.stickX = this.stickZ = 0;
     this.page.show(this.base, false);
+    this.releaseHeldButtons();
   }
 
   setActive(active: boolean): void {
@@ -156,10 +207,42 @@ class TouchSurface extends ControlSurface {
     this.setActive(this.active);
   }
 
+  private releaseHeldButtons(): void {
+    const sink = this.sink;
+    const actions = Array.from(this.heldButtons.keys());
+    this.heldButtons.forEach((element) => element.classList.remove("held"));
+    this.heldButtons.clear();
+    if (sink) actions.forEach((action) => sink.onAction(HoldActions.up(action)));
+  }
+
+  private capture(element: HTMLElement, pointerId: number): void {
+    try { element.setPointerCapture(pointerId); } catch (error) { return; }
+  }
+
+  private bindHold(element: HTMLElement, action: string): void {
+    const end = (): void => {
+      if (!this.heldButtons.delete(action)) return;
+      element.classList.remove("held");
+      if (this.sink) this.sink.onAction(HoldActions.up(action));
+    };
+    element.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      if (!this.sink || this.heldButtons.has(action)) return;
+      this.capture(element, event.pointerId);
+      this.heldButtons.set(action, element);
+      element.classList.add("held");
+      this.sink.onAction(HoldActions.down(action));
+    });
+    element.addEventListener("pointerup", end);
+    element.addEventListener("pointercancel", end);
+    element.addEventListener("lostpointercapture", end);
+    element.addEventListener("pointerleave", end);
+  }
+
   private buildButton(button: ControlButton): void {
     const element = this.elements.create<HTMLButtonElement>("button");
     element.type = "button";
-    element.className = "actBtn";
+    element.className = "actBtn" + (button.wide ? " wide" : "");
     element.style.background = button.color;
     element.style.right = button.rightPx + "px";
     element.style.bottom = "calc(env(safe-area-inset-bottom, 0px) + " + button.bottomPx + "px)";
@@ -169,10 +252,14 @@ class TouchSurface extends ControlSurface {
     element.appendChild(overlay);
     element.appendChild(label);
     element.addEventListener("touchstart", (event) => event.preventDefault(), { passive: false });
-    element.addEventListener("pointerdown", (event) => {
-      event.preventDefault();
-      if (this.sink) this.sink.onAction(button.action);
-    });
+    if (button.hold) {
+      this.bindHold(element, button.action);
+    } else {
+      element.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        if (this.sink) this.sink.onAction(button.action);
+      });
+    }
     this.buttonBox.appendChild(element);
     this.overlays.set(button.action, overlay);
   }

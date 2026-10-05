@@ -19,6 +19,8 @@ interface ControlButton {
   readonly color: string;
   readonly rightPx: number;
   readonly bottomPx: number;
+  readonly hold?: boolean;
+  readonly wide?: boolean;
 }
 
 interface ControlSpec {
@@ -34,6 +36,7 @@ interface HudRow {
   readonly ai: boolean;
   readonly dead: boolean;
   readonly detail: string;
+  readonly progress?: number;
 }
 
 interface HudCooldown {

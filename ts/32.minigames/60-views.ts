@@ -83,7 +83,8 @@ class CollectionHud {
 
   private rosterRow(row: HudRow, localId: string): string {
     const classes = "pl" + (row.id === localId ? " me" : "") + (row.dead ? " dead" : "");
-    return "<div class='" + classes + "'><i style='background:" + Palette.slotColor(row.slot) + "'></i><b>" + Html.escape(row.nick) + (row.ai ? " (AI)" : "") + "</b><span>" + Html.escape(row.detail) + "</span></div>";
+    const bar = row.progress === undefined ? "" : "<u style='width:" + Math.round(MathUtil.clamp(row.progress, 0, 1) * 100) + "%;background:" + Palette.slotColor(row.slot) + "'></u>";
+    return "<div class='" + classes + "'><i style='background:" + Palette.slotColor(row.slot) + "'></i><b>" + Html.escape(row.nick) + (row.ai ? " (AI)" : "") + "</b><span>" + Html.escape(row.detail) + "</span>" + bar + "</div>";
   }
 }
 
