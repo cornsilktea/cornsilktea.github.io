@@ -879,8 +879,8 @@ class MoleCamera {
         this.camera.lookAt(this.focus.x, 0, this.focus.z);
     }
 }
-MoleCamera.EYE_Y = 12.5;
-MoleCamera.EYE_Z = 17.5;
+MoleCamera.EYE_Y = 17;
+MoleCamera.EYE_Z = 16.5;
 MoleCamera.LOOK_Z = 1.5;
 MoleCamera.OVERVIEW_Y = 17;
 MoleCamera.OVERVIEW_Z = 22;
@@ -936,44 +936,54 @@ class MoleStage {
     }
 }
 class MoleBoardPicker {
-    constructor(libs, canvas, camera, world, place, onCell) {
+    constructor(libs, canvas, camera, place, onCell) {
         this.libs = libs;
         this.canvas = canvas;
         this.camera = camera;
-        this.world = world;
+        this.place = place;
         this.onCell = onCell;
-        this.boxes = [];
         this.handler = (event) => this.pick(event);
         const THREE = libs.THREE;
         this.raycaster = new THREE.Raycaster();
-        this.material = new THREE.MeshBasicMaterial({ visible: false });
-        this.geometry = new THREE.BoxGeometry(1.8, 2.4, 1.8);
-        for (let cell = 0; cell < MoleRules.CELL_COUNT; cell++) {
-            const box = new THREE.Mesh(this.geometry, this.material);
-            box.scale.setScalar(place.scale);
-            box.position.set(place.cellX(cell), 1.2 * place.scale, place.cellZ(cell));
-            world.add(box);
-            this.boxes.push(box);
-        }
+        this.plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -MoleBoardPicker.PLANE_HEIGHT * place.scale);
+        this.spot = new THREE.Vector3();
         canvas.addEventListener("pointerdown", this.handler);
     }
     dispose() {
         this.canvas.removeEventListener("pointerdown", this.handler);
-        this.boxes.forEach((box) => this.world.remove(box));
-        this.material.dispose();
-        this.geometry.dispose();
     }
     pick(event) {
         const bounds = this.canvas.getBoundingClientRect();
         const ndc = new this.libs.THREE.Vector2(((event.clientX - bounds.left) / bounds.width) * 2 - 1, -((event.clientY - bounds.top) / bounds.height) * 2 + 1);
         this.raycaster.setFromCamera(ndc, this.camera);
-        const hits = this.raycaster.intersectObjects(this.boxes, false);
-        if (hits.length === 0)
+        if (!this.raycaster.ray.intersectPlane(this.plane, this.spot))
+            return;
+        const cell = this.nearestCell(this.spot.x, this.spot.z);
+        if (cell < 0)
             return;
         event.preventDefault();
-        this.onCell(this.boxes.indexOf(hits[0].object));
+        this.onCell(cell);
+    }
+    nearestCell(x, z) {
+        const place = this.place;
+        const reach = (MoleBoardPlace.SPACING * 1.5 + MoleBoardPicker.EDGE_MARGIN) * place.scale;
+        if (Math.abs(x - place.x) > reach || Math.abs(z - place.z) > reach)
+            return -1;
+        let best = -1;
+        let bestDistance = Infinity;
+        for (let cell = 0; cell < MoleRules.CELL_COUNT; cell++) {
+            const distance = MathUtil.distance(x, z, place.cellX(cell), place.cellZ(cell) + MoleBoardPicker.FRONT_SHIFT * place.scale);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                best = cell;
+            }
+        }
+        return best;
     }
 }
+MoleBoardPicker.PLANE_HEIGHT = 1.0;
+MoleBoardPicker.FRONT_SHIFT = 0.2;
+MoleBoardPicker.EDGE_MARGIN = 0.9;
 class MoleScreenFlash {
     constructor(page, env) {
         this.page = page;

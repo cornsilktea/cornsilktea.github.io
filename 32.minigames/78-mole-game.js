@@ -59,7 +59,7 @@ class MoleGame extends MiniGame {
         this.handlers = MoleWire.handlers(this);
         const place = this.stage.localPlace();
         this.picker = place && this.localParticipates()
-            ? new MoleBoardPicker(context.libs, context.page.byId("view"), this.stage.scenery.camera, this.stage.scenery.world, place, (cell) => this.tapCell(cell))
+            ? new MoleBoardPicker(context.libs, context.page.byId("view"), this.stage.scenery.camera, place, (cell) => this.tapCell(cell))
             : null;
         assets.loadClips();
     }

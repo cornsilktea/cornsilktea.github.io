@@ -936,8 +936,8 @@ class MoleHammerer {
 }
 
 class MoleCamera {
-  private static readonly EYE_Y = 12.5;
-  private static readonly EYE_Z = 17.5;
+  private static readonly EYE_Y = 17;
+  private static readonly EYE_Z = 16.5;
   private static readonly LOOK_Z = 1.5;
   private static readonly OVERVIEW_Y = 17;
   private static readonly OVERVIEW_Z = 22;
@@ -1054,49 +1054,58 @@ class MoleStage {
 }
 
 class MoleBoardPicker {
+  private static readonly PLANE_HEIGHT = 1.0;
+  private static readonly FRONT_SHIFT = 0.2;
+  private static readonly EDGE_MARGIN = 0.9;
+
   private readonly raycaster: Three<"Raycaster">;
-  private readonly boxes: Array<Three<"Mesh">> = [];
-  private readonly material: Three<"MeshBasicMaterial">;
-  private readonly geometry: Three<"BoxGeometry">;
+  private readonly plane: Three<"Plane">;
+  private readonly spot: Three<"Vector3">;
   private readonly handler = (event: PointerEvent): void => this.pick(event);
 
   constructor(
     private readonly libs: ThreeLibs,
     private readonly canvas: HTMLCanvasElement,
     private readonly camera: Three<"PerspectiveCamera">,
-    private readonly world: Three<"Group">,
-    place: MoleBoardPlace,
+    private readonly place: MoleBoardPlace,
     private readonly onCell: (cell: number) => void
   ) {
     const THREE = libs.THREE;
     this.raycaster = new THREE.Raycaster();
-    this.material = new THREE.MeshBasicMaterial({ visible: false });
-    this.geometry = new THREE.BoxGeometry(1.8, 2.4, 1.8);
-    for (let cell = 0; cell < MoleRules.CELL_COUNT; cell++) {
-      const box = new THREE.Mesh(this.geometry, this.material);
-      box.scale.setScalar(place.scale);
-      box.position.set(place.cellX(cell), 1.2 * place.scale, place.cellZ(cell));
-      world.add(box);
-      this.boxes.push(box);
-    }
+    this.plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -MoleBoardPicker.PLANE_HEIGHT * place.scale);
+    this.spot = new THREE.Vector3();
     canvas.addEventListener("pointerdown", this.handler);
   }
 
   dispose(): void {
     this.canvas.removeEventListener("pointerdown", this.handler);
-    this.boxes.forEach((box) => this.world.remove(box));
-    this.material.dispose();
-    this.geometry.dispose();
   }
 
   private pick(event: PointerEvent): void {
     const bounds = this.canvas.getBoundingClientRect();
     const ndc = new this.libs.THREE.Vector2(((event.clientX - bounds.left) / bounds.width) * 2 - 1, -((event.clientY - bounds.top) / bounds.height) * 2 + 1);
     this.raycaster.setFromCamera(ndc, this.camera);
-    const hits = this.raycaster.intersectObjects(this.boxes, false);
-    if (hits.length === 0) return;
+    if (!this.raycaster.ray.intersectPlane(this.plane, this.spot)) return;
+    const cell = this.nearestCell(this.spot.x, this.spot.z);
+    if (cell < 0) return;
     event.preventDefault();
-    this.onCell(this.boxes.indexOf(hits[0].object as Three<"Mesh">));
+    this.onCell(cell);
+  }
+
+  private nearestCell(x: number, z: number): number {
+    const place = this.place;
+    const reach = (MoleBoardPlace.SPACING * 1.5 + MoleBoardPicker.EDGE_MARGIN) * place.scale;
+    if (Math.abs(x - place.x) > reach || Math.abs(z - place.z) > reach) return -1;
+    let best = -1;
+    let bestDistance = Infinity;
+    for (let cell = 0; cell < MoleRules.CELL_COUNT; cell++) {
+      const distance = MathUtil.distance(x, z, place.cellX(cell), place.cellZ(cell) + MoleBoardPicker.FRONT_SHIFT * place.scale);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = cell;
+      }
+    }
+    return best;
   }
 }
 
