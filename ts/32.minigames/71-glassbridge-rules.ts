@@ -7,28 +7,29 @@ class GlassBridgeClipLengths {
 }
 
 class GlassBridgeRules {
-  static readonly ROW_COUNT = 10;
+  static readonly ROW_COUNT = 15;
   static readonly SIDE_COUNT = 2;
-  static readonly PLAY_MS = 120000;
+  static readonly PLAY_MS = 150000;
   static readonly END_GRACE_MS = 600;
   static readonly ALL_ARRIVED_DELAY_MS = 2500;
   static readonly LOTTERY_MS = 8000;
   static readonly LINEUP_MS = 1800;
-  static readonly CHOICE_MS = 4000;
+  static readonly CHOICE_MS = 6000;
   static readonly HOST_GRACE_MS = 350;
   static readonly ENTER_MS = 600;
-  static readonly AUTO_ROW_MS = 350;
+  static readonly AUTO_ROW_MS = 250;
+  static readonly FOLLOW_DELAY_MS = 150;
+  static readonly TIMEOUT_FOLLOW_MS = 300;
+  static readonly WALK_MIN_MS = 500;
   static readonly JUMP_PLAYBACK_SPEED = 1.3;
   static readonly JUMP_MS = Math.round(GlassBridgeClipLengths.JUMP_FULL_SHORT_MS / GlassBridgeRules.JUMP_PLAYBACK_SPEED);
   static readonly CONTACT_MS = Math.round(GlassBridgeRules.JUMP_MS * 0.55);
   static readonly FALL_MS = 900;
-  static readonly LAVA_HOLD_MS = 900;
-  static readonly FALL_NEXT_MS = GlassBridgeRules.CONTACT_MS + 600;
-  static readonly TIMEOUT_NEXT_MS = 1100;
+  static readonly LAVA_HOLD_MS = 700;
   static readonly AI_LOTTERY_MIN_MS = 600;
   static readonly AI_LOTTERY_MAX_MS = 4500;
-  static readonly AI_CHOICE_MIN_MS = 1000;
-  static readonly AI_CHOICE_MAX_MS = 3500;
+  static readonly AI_CHOICE_MIN_MS = 1200;
+  static readonly AI_CHOICE_MAX_MS = 4500;
   static readonly MAX_STEPS_PER_TICK = 24;
 }
 
@@ -222,85 +223,6 @@ class GlassBridgeLottery {
   }
 }
 
-class GlassBridgeTurnQueue {
-  private readonly line: string[];
-
-  constructor(order: readonly string[]) {
-    this.line = order.slice();
-  }
-
-  next(): string | null {
-    return this.line.length ? (this.line.shift() as string) : null;
-  }
-
-  sendBack(id: string): void {
-    this.line.push(id);
-  }
-
-  snapshot(): readonly string[] {
-    return this.line;
-  }
-
-  isEmpty(): boolean {
-    return this.line.length === 0;
-  }
-}
-
-type GlassTurnOutcome = "running" | "fell" | "arrived";
-
-class GlassBridgeTurn {
-  readonly steps: GlassStepRecord[] = [];
-  outcome: GlassTurnOutcome = "running";
-  endAt = 0;
-  fallStartAt = 0;
-  arrivalIndex = -1;
-
-  constructor(readonly id: string, readonly attempt: number, readonly startAt: number, readonly knownRows: number, readonly rows: number) {}
-
-  nextRow(): number {
-    return this.knownRows + this.steps.length;
-  }
-
-  autoEndAt(): number {
-    return this.startAt + GlassBridgeRules.ENTER_MS + this.knownRows * GlassBridgeRules.AUTO_ROW_MS;
-  }
-
-  nextOpensAt(): number {
-    return this.steps.length === 0 ? this.autoEndAt() : this.steps[this.steps.length - 1].t + GlassBridgeRules.JUMP_MS;
-  }
-
-  nextOpensAtFor(stepIndex: number): number {
-    return stepIndex === 0 ? this.autoEndAt() : this.steps[stepIndex - 1].t + GlassBridgeRules.JUMP_MS;
-  }
-
-  nextClosesAt(): number {
-    return this.nextOpensAt() + GlassBridgeRules.CHOICE_MS;
-  }
-
-  fallEndAt(): number {
-    return this.fallStartAt + GlassBridgeRules.FALL_MS + GlassBridgeRules.LAVA_HOLD_MS;
-  }
-
-  rowsReachedBy(time: number): number {
-    let rows = 0;
-    for (let row = 1; row <= this.knownRows; row++) {
-      if (this.startAt + GlassBridgeRules.ENTER_MS + row * GlassBridgeRules.AUTO_ROW_MS <= time) rows = row;
-    }
-    this.steps.forEach((step) => {
-      if (step.s >= 0 && step.s !== step.b && step.t + GlassBridgeRules.JUMP_MS <= time) rows = Math.max(rows, step.r + 1);
-    });
-    return rows;
-  }
-
-  rowsReachedAt(rows: number): number {
-    for (let row = 1; row <= this.knownRows; row++) {
-      if (row >= rows) return this.startAt + GlassBridgeRules.ENTER_MS + row * GlassBridgeRules.AUTO_ROW_MS;
-    }
-    const step = this.steps.find((entry) => entry.s >= 0 && entry.s !== entry.b && entry.r + 1 >= rows);
-    return step ? step.t + GlassBridgeRules.JUMP_MS : Infinity;
-  }
-}
-
 interface GlassChoiceWindow {
   readonly id: string;
   readonly attempt: number;
@@ -309,34 +231,108 @@ interface GlassChoiceWindow {
   readonly closesAt: number;
 }
 
+interface GlassPoint {
+  readonly x: number;
+  readonly z: number;
+}
+
+type GlassSegmentKind = "walk" | "run" | "jump" | "drop" | "spawn";
+
+interface GlassSegment {
+  readonly kind: GlassSegmentKind;
+  readonly start: number;
+  readonly duration: number;
+  readonly from: GlassPoint;
+  readonly to: GlassPoint;
+  readonly arrives: boolean;
+}
+
+interface GlassLanding {
+  readonly rows: number;
+  readonly at: number;
+}
+
+class GlassBridgeTrack {
+  private readonly segments: GlassSegment[] = [];
+  private readonly landings: GlassLanding[] = [];
+  private readonly dropTimes: number[] = [];
+  arrivalAt = -1;
+  arrivalNumber = 0;
+
+  constructor(readonly home: GlassPoint) {}
+
+  restPoint(): GlassPoint {
+    const last = this.segments[this.segments.length - 1];
+    return last ? last.to : this.home;
+  }
+
+  add(segment: GlassSegment): void {
+    this.segments.push(segment);
+    if (segment.kind === "drop") this.dropTimes.push(segment.start);
+    if (segment.arrives) this.arrivalAt = segment.start + segment.duration;
+  }
+
+  land(rows: number, at: number): void {
+    this.landings.push({ rows, at });
+  }
+
+  activeAt(now: number): GlassSegment | null {
+    for (let index = this.segments.length - 1; index >= 0; index--) {
+      if (this.segments[index].start <= now) return this.segments[index];
+    }
+    return null;
+  }
+
+  bestBy(time: number): GlassLanding {
+    let best: GlassLanding = { rows: 0, at: Infinity };
+    this.landings.forEach((landing) => {
+      if (landing.at <= time && landing.rows > best.rows) best = landing;
+    });
+    return best;
+  }
+
+  fallsBy(time: number): number {
+    return this.dropTimes.filter((at) => at <= time).length;
+  }
+
+  hasArrived(now: number): boolean {
+    return this.arrivalAt >= 0 && now >= this.arrivalAt;
+  }
+}
+
 class GlassBridgeTimeline {
-  private readonly queue: GlassBridgeTurnQueue;
-  private readonly allTurns: GlassBridgeTurn[] = [];
-  private readonly latestByPlayer = new Map<string, GlassBridgeTurn>();
-  private active: GlassBridgeTurn | null = null;
-  private arrivalCount = 0;
+  private readonly tracks = new Map<string, GlassBridgeTrack>();
+  private readonly line: string[];
+  private readonly pending: Array<{ id: string; at: number }> = [];
+  private readonly playerCount: number;
+  private leaderId: string | null = null;
+  private leaderSlot = -2;
+  private clock: number;
+  private readyAt: number;
+  private attempt = -1;
   private attemptCount = 0;
+  private arrivalCount = 0;
   private lastArrivalAt = 0;
 
   constructor(lineup: readonly string[], readonly startAt: number, readonly rows: number, readonly panels: GlassBridgePanels = new GlassBridgePanels(rows)) {
-    this.queue = new GlassBridgeTurnQueue(lineup);
-    this.beginTurn(startAt);
+    this.playerCount = lineup.length;
+    this.line = lineup.slice();
+    lineup.forEach((id, index) => this.tracks.set(id, new GlassBridgeTrack(this.pointOf(-2 - index, 0))));
+    this.clock = startAt;
+    this.readyAt = startAt;
+    this.settle();
   }
 
-  turns(): readonly GlassBridgeTurn[] {
-    return this.allTurns;
+  trackOf(id: string): GlassBridgeTrack {
+    return this.tracks.get(id) as GlassBridgeTrack;
   }
 
-  current(): GlassBridgeTurn | null {
-    return this.active;
+  leader(): string | null {
+    return this.leaderId;
   }
 
-  latestTurn(id: string): GlassBridgeTurn | null {
-    return this.latestByPlayer.get(id) || null;
-  }
-
-  waiting(): readonly string[] {
-    return this.queue.snapshot();
+  leaderReadyAt(): number {
+    return this.readyAt;
   }
 
   arrivals(): number {
@@ -348,65 +344,131 @@ class GlassBridgeTimeline {
   }
 
   isFinished(): boolean {
-    return this.active === null;
+    return this.leaderId === null && this.line.length === 0 && this.pending.length === 0;
   }
 
   openWindow(): GlassChoiceWindow | null {
-    const turn = this.active;
-    if (!turn || turn.outcome !== "running") return null;
-    return { id: turn.id, attempt: turn.attempt, row: turn.nextRow(), opensAt: turn.nextOpensAt(), closesAt: turn.nextClosesAt() };
+    if (this.leaderId === null) return null;
+    return { id: this.leaderId, attempt: this.attempt, row: this.panels.knownCount(), opensAt: this.readyAt, closesAt: this.readyAt + GlassBridgeRules.CHOICE_MS };
+  }
+
+  respawnPoint(id: string): GlassPoint | null {
+    const rank = this.pending.findIndex((entry) => entry.id === id);
+    if (rank < 0) return null;
+    const slot = this.line.length === 0 ? -2 - rank : this.leaderSlot - this.line.length - rank;
+    return this.pointOf(slot, 0);
   }
 
   apply(record: GlassStepRecord): boolean {
-    const turn = this.active;
-    if (!turn || record.id !== turn.id || record.a !== turn.attempt || record.r !== turn.nextRow()) return false;
+    const window = this.openWindow();
+    if (!window || record.id !== window.id || record.a !== window.attempt || record.r !== window.row) return false;
     if (record.s < -1 || record.s > 1 || (record.s >= 0 && (record.b < 0 || record.b > 1))) return false;
-    const opensAt = turn.nextOpensAt();
-    const t = MathUtil.clamp(record.t, opensAt, turn.nextClosesAt());
-    turn.steps.push({ id: record.id, a: record.a, r: record.r, s: record.s, b: record.b, t });
-    if (record.s < 0) this.settleFall(turn, t, t, GlassBridgeRules.TIMEOUT_NEXT_MS);
-    else {
-      this.panels.reveal(record.r, record.b, t);
-      if (record.s === record.b) this.settleFall(turn, t, t + GlassBridgeRules.CONTACT_MS, GlassBridgeRules.FALL_NEXT_MS);
-      else if (record.r === this.rows - 1) this.settleArrival(turn, t + GlassBridgeRules.JUMP_MS + GlassBridgeRules.AUTO_ROW_MS);
+    const t = MathUtil.clamp(record.t, window.opensAt, window.closesAt);
+    this.clock = t;
+    this.releaseRespawns(t);
+    const leaderTrack = this.trackOf(window.id);
+    const standing = leaderTrack.restPoint();
+    if (record.s < 0) {
+      this.dropLeader(t, standing, t + GlassBridgeRules.TIMEOUT_FOLLOW_MS);
+      return true;
     }
+    const target = this.pointOf(record.r, 0, record.s);
+    this.panels.reveal(record.r, record.b, t);
+    if (record.s === record.b) {
+      leaderTrack.add({ kind: "jump", start: t, duration: GlassBridgeRules.CONTACT_MS, from: standing, to: target, arrives: false });
+      this.dropLeader(t + GlassBridgeRules.CONTACT_MS, target, t + GlassBridgeRules.CONTACT_MS + GlassBridgeRules.FOLLOW_DELAY_MS);
+      return true;
+    }
+    this.stepLine(t, GlassBridgeRules.JUMP_MS, target);
+    this.clock = t + GlassBridgeRules.JUMP_MS;
+    this.settle();
     return true;
   }
 
-  private settleFall(turn: GlassBridgeTurn, at: number, fallStart: number, nextDelay: number): void {
-    turn.outcome = "fell";
-    turn.endAt = at + nextDelay;
-    turn.fallStartAt = fallStart;
-    this.queue.sendBack(turn.id);
-    this.beginTurn(turn.endAt);
+  private frontierSlot(): number {
+    const known = this.panels.knownCount();
+    return known >= this.rows ? this.rows : known - 1;
   }
 
-  private settleArrival(turn: GlassBridgeTurn, at: number): void {
-    turn.outcome = "arrived";
-    turn.endAt = at;
-    turn.arrivalIndex = this.arrivalCount++;
-    this.lastArrivalAt = at;
-    this.beginTurn(at);
+  private pointOf(slot: number, arrivalIndex: number, sideOverride = -1): GlassPoint {
+    if (slot >= this.rows) return { x: GlassBridgeLayout.platformSlotX(arrivalIndex, this.playerCount), z: GlassBridgeLayout.platformZ(this.rows) };
+    if (slot >= 0) return { x: GlassBridgeLayout.sideX(sideOverride >= 0 ? sideOverride : this.panels.safeSide(slot)), z: GlassBridgeLayout.rowZ(slot) };
+    if (slot === -1) return { x: 0, z: GlassBridgeLayout.ENTRANCE_Z };
+    return { x: 0, z: GlassBridgeLayout.queueZ(-2 - slot) };
   }
 
-  private beginTurn(startAt: number): void {
-    let at = startAt;
-    for (;;) {
-      const id = this.queue.next();
-      if (id === null) {
-        this.active = null;
+  private dropLeader(at: number, point: GlassPoint, followAt: number): void {
+    const id = this.line.shift() as string;
+    const duration = GlassBridgeRules.FALL_MS + GlassBridgeRules.LAVA_HOLD_MS;
+    this.trackOf(id).add({ kind: "drop", start: at, duration, from: point, to: point, arrives: false });
+    this.pending.push({ id, at: at + duration });
+    this.pending.sort((a, b) => a.at - b.at);
+    this.leaderSlot--;
+    this.leaderId = null;
+    this.clock = followAt;
+    this.settle();
+  }
+
+  private releaseRespawns(time: number): void {
+    while (this.pending.length && this.pending[0].at <= time) {
+      const entry = this.pending.shift() as { id: string; at: number };
+      const wasEmpty = this.line.length === 0;
+      if (wasEmpty) this.leaderSlot = -2;
+      const point = this.pointOf(this.leaderSlot - this.line.length, 0);
+      this.trackOf(entry.id).add({ kind: "spawn", start: entry.at, duration: GlassBridgeClipLengths.SPAWN_AIR_MS, from: point, to: point, arrives: false });
+      this.line.push(entry.id);
+      if (wasEmpty) this.clock = Math.max(this.clock, entry.at + GlassBridgeClipLengths.SPAWN_AIR_MS);
+    }
+  }
+
+  private settle(): void {
+    for (let guard = 0; guard < 400; guard++) {
+      this.releaseRespawns(this.clock);
+      if (this.line.length === 0) {
+        if (this.pending.length === 0) {
+          this.leaderId = null;
+          this.readyAt = this.clock;
+          return;
+        }
+        this.clock = Math.max(this.clock, this.pending[0].at);
+        continue;
+      }
+      if (this.leaderId !== this.line[0]) {
+        this.leaderId = this.line[0];
+        this.attempt = this.attemptCount++;
+      }
+      if (this.leaderSlot >= this.frontierSlot()) {
+        this.readyAt = this.clock;
         return;
       }
-      const turn = new GlassBridgeTurn(id, this.attemptCount++, at, this.panels.knownCount(), this.rows);
-      this.allTurns.push(turn);
-      this.latestByPlayer.set(id, turn);
-      this.active = turn;
-      if (turn.knownRows < this.rows) return;
-      at = turn.autoEndAt() + GlassBridgeRules.AUTO_ROW_MS;
-      turn.outcome = "arrived";
-      turn.endAt = at;
-      turn.arrivalIndex = this.arrivalCount++;
-      this.lastArrivalAt = at;
+      const duration = this.leaderSlot < -1 ? GlassBridgeRules.ENTER_MS : GlassBridgeRules.AUTO_ROW_MS;
+      this.stepLine(this.clock, duration, null);
+      this.clock += duration;
+    }
+  }
+
+  private stepLine(at: number, duration: number, leaderTarget: GlassPoint | null): void {
+    let arrived = false;
+    this.line.forEach((id, index) => {
+      const track = this.trackOf(id);
+      const toSlot = this.leaderSlot - index + 1;
+      const from = track.restPoint();
+      const arrives = toSlot >= this.rows;
+      const to = index === 0 && leaderTarget ? leaderTarget : this.pointOf(toSlot, this.arrivalCount);
+      const kind: GlassSegmentKind = index === 0 && leaderTarget ? "jump" : duration >= GlassBridgeRules.WALK_MIN_MS ? "walk" : "run";
+      track.add({ kind, start: at, duration, from, to, arrives });
+      if (toSlot >= 0) track.land(Math.min(toSlot, this.rows - 1) + 1, at + duration);
+      if (arrives) {
+        track.arrivalNumber = ++this.arrivalCount;
+        this.lastArrivalAt = at + duration;
+        arrived = true;
+      }
+    });
+    this.leaderSlot++;
+    if (arrived) {
+      this.line.shift();
+      this.leaderSlot--;
+      this.leaderId = null;
     }
   }
 }
@@ -437,23 +499,11 @@ class GlassBridgeStandings {
   }
 
   private standingOf(id: string): GlassStanding {
-    let rows = 0;
-    let at = Infinity;
-    let falls = 0;
     const timeline = this.timeline;
-    if (timeline) {
-      timeline.turns().forEach((turn) => {
-        if (turn.id !== id) return;
-        if (turn.outcome === "fell" && turn.fallStartAt <= this.endAt) falls++;
-        const reached = turn.rowsReachedBy(this.endAt);
-        if (reached > rows) {
-          rows = reached;
-          at = turn.rowsReachedAt(reached);
-        }
-      });
-    }
-    const total = timeline ? timeline.rows : 0;
-    return { id, rows, at, arrived: total > 0 && rows >= total, falls };
+    if (!timeline) return { id, rows: 0, at: Infinity, arrived: false, falls: 0 };
+    const track = timeline.trackOf(id);
+    const best = track.bestBy(this.endAt);
+    return { id, rows: best.rows, at: best.at, arrived: best.rows >= timeline.rows, falls: track.fallsBy(this.endAt) };
   }
 
   private compare(a: GlassStanding, b: GlassStanding): number {
@@ -490,24 +540,14 @@ class GlassBridgeChoreography {
 
   poseOf(timeline: GlassBridgeTimeline | null, id: string, now: number): GlassPose {
     if (!timeline) return this.lotteryPose(id, now);
-    const turn = timeline.latestTurn(id);
-    if (!turn) return this.queuedPose(timeline, id, now, Infinity);
-    if (turn.outcome === "arrived" && now >= turn.endAt) return this.arrivedPose(turn, now);
-    if (turn.outcome === "fell" && now >= turn.fallEndAt()) return this.queuedPose(timeline, id, now, now - turn.fallEndAt());
-    if (now < turn.startAt) return this.queuedPose(timeline, id, now, Infinity);
-    return this.turnPose(timeline, turn, now);
-  }
-
-  displayQueue(timeline: GlassBridgeTimeline, now: number): string[] {
-    const list: string[] = [];
-    const active = timeline.current();
-    if (active && now < active.startAt) list.push(active.id);
-    timeline.waiting().forEach((id) => {
-      const turn = timeline.latestTurn(id);
-      const falling = turn !== null && turn.outcome === "fell" && now < turn.fallEndAt();
-      if (!falling) list.push(id);
-    });
-    return list;
+    const track = timeline.trackOf(id);
+    const segment = track.activeAt(now);
+    if (!segment) return this.restPose(timeline, id, track.home, now);
+    const since = now - segment.start;
+    if (segment.kind === "drop") return since < segment.duration ? this.fallPose(segment.from, since) : this.respawnPose(timeline, id, segment, now);
+    if (segment.kind === "spawn") return since < segment.duration ? GlassPoseBuilder.make("spawn", segment.to.x, segment.to.z, since) : this.restPose(timeline, id, segment.to, now);
+    if (since < segment.duration) return this.between(segment.kind, segment.from, segment.to, since / segment.duration, since);
+    return this.restPose(timeline, id, segment.to, now);
   }
 
   lotteryPose(id: string, now: number): GlassPose {
@@ -519,62 +559,27 @@ class GlassBridgeChoreography {
     return GlassPoseBuilder.make(kind, x, GlassBridgeLayout.LOTTERY_STAND_Z, Math.max(0, since), 0, GlassPoseBuilder.FORWARD);
   }
 
-  private queuedPose(timeline: GlassBridgeTimeline, id: string, now: number, sinceRespawnMs: number): GlassPose {
-    const queue = this.displayQueue(timeline, now);
-    const index = Math.max(0, queue.indexOf(id));
-    const kind: GlassPoseKind = sinceRespawnMs < GlassBridgeClipLengths.SPAWN_AIR_MS ? "spawn" : "queued";
-    return GlassPoseBuilder.make(kind, 0, GlassBridgeLayout.queueZ(index), kind === "spawn" ? sinceRespawnMs : 0);
+  private restPose(timeline: GlassBridgeTimeline, id: string, point: GlassPoint, now: number): GlassPose {
+    const track = timeline.trackOf(id);
+    if (track.hasArrived(now)) return GlassPoseBuilder.make("arrived", point.x, point.z, now - track.arrivalAt, 0, GlassPoseBuilder.BACKWARD);
+    if (timeline.leader() === id && now >= timeline.leaderReadyAt()) return GlassPoseBuilder.make("wait", point.x, point.z, now - timeline.leaderReadyAt());
+    return GlassPoseBuilder.make("queued", point.x, point.z, 0);
   }
 
-  private arrivedPose(turn: GlassBridgeTurn, now: number): GlassPose {
-    return GlassPoseBuilder.make("arrived", GlassBridgeLayout.platformSlotX(turn.arrivalIndex, this.ids.length), GlassBridgeLayout.platformZ(this.rows), now - turn.endAt, 0, GlassPoseBuilder.BACKWARD);
+  private respawnPose(timeline: GlassBridgeTimeline, id: string, drop: GlassSegment, now: number): GlassPose {
+    const point = timeline.respawnPoint(id);
+    if (!point) return this.fallPose(drop.from, drop.duration);
+    const since = now - (drop.start + drop.duration);
+    return since < GlassBridgeClipLengths.SPAWN_AIR_MS ? GlassPoseBuilder.make("spawn", point.x, point.z, since) : GlassPoseBuilder.make("queued", point.x, point.z, 0);
   }
 
-  private turnPose(timeline: GlassBridgeTimeline, turn: GlassBridgeTurn, now: number): GlassPose {
-    const panels = timeline.panels;
-    const spot = (row: number, side: number): { x: number; z: number } => ({ x: GlassBridgeLayout.sideX(side), z: GlassBridgeLayout.rowZ(row) });
-    const entrance = { x: 0, z: GlassBridgeLayout.ENTRANCE_Z };
-    const head = { x: 0, z: GlassBridgeLayout.queueZ(0) };
-    const t = now - turn.startAt;
-    if (t < GlassBridgeRules.ENTER_MS) return this.between("walk", head, entrance, t / GlassBridgeRules.ENTER_MS, t);
-    let from = entrance;
-    for (let row = 0; row < turn.knownRows; row++) {
-      const target = spot(row, panels.safeSide(row));
-      const segmentStart = GlassBridgeRules.ENTER_MS + row * GlassBridgeRules.AUTO_ROW_MS;
-      if (t < segmentStart + GlassBridgeRules.AUTO_ROW_MS) return this.between("run", from, target, (t - segmentStart) / GlassBridgeRules.AUTO_ROW_MS, t - segmentStart);
-      from = target;
-    }
-    if (turn.knownRows >= this.rows) return this.runToPlatform(from, turn, t - (GlassBridgeRules.ENTER_MS + turn.knownRows * GlassBridgeRules.AUTO_ROW_MS));
-    let standing = from;
-    for (let index = 0; index < turn.steps.length; index++) {
-      const step = turn.steps[index];
-      const since = now - step.t;
-      if (since < 0) return GlassPoseBuilder.make("wait", standing.x, standing.z, now - turn.nextOpensAtFor(index), 0, GlassPoseBuilder.FORWARD);
-      if (step.s < 0) return this.fallPose(standing, since);
-      const target = spot(step.r, step.s);
-      if (step.s === step.b) {
-        if (since < GlassBridgeRules.CONTACT_MS) return this.between("jump", standing, target, since / GlassBridgeRules.CONTACT_MS, since);
-        return this.fallPose(target, since - GlassBridgeRules.CONTACT_MS);
-      }
-      if (since < GlassBridgeRules.JUMP_MS) return this.between("jump", standing, target, since / GlassBridgeRules.JUMP_MS, since);
-      standing = target;
-      if (step.r === this.rows - 1) return this.runToPlatform(standing, turn, since - GlassBridgeRules.JUMP_MS);
-    }
-    return GlassPoseBuilder.make("wait", standing.x, standing.z, now - turn.nextOpensAt(), 0, GlassPoseBuilder.FORWARD);
-  }
-
-  private runToPlatform(from: { x: number; z: number }, turn: GlassBridgeTurn, sinceMs: number): GlassPose {
-    const slot = { x: GlassBridgeLayout.platformSlotX(Math.max(0, turn.arrivalIndex), this.ids.length), z: GlassBridgeLayout.platformZ(this.rows) };
-    return this.between("run", from, slot, MathUtil.clamp(sinceMs / GlassBridgeRules.AUTO_ROW_MS, 0, 1), sinceMs);
-  }
-
-  private fallPose(from: { x: number; z: number }, sinceMs: number): GlassPose {
+  private fallPose(from: GlassPoint, sinceMs: number): GlassPose {
     if (sinceMs >= GlassBridgeRules.FALL_MS) return GlassPoseBuilder.make("lava", from.x, from.z, sinceMs - GlassBridgeRules.FALL_MS, GlassBridgeLayout.LAVA_Y);
     const ratio = sinceMs / GlassBridgeRules.FALL_MS;
     return GlassPoseBuilder.make("fall", from.x, from.z, sinceMs, GlassBridgeLayout.LAVA_Y * ratio * ratio, GlassPoseBuilder.FORWARD, ratio);
   }
 
-  private between(kind: GlassPoseKind, from: { x: number; z: number }, to: { x: number; z: number }, ratio: number, sinceMs: number): GlassPose {
+  private between(kind: GlassPoseKind, from: GlassPoint, to: GlassPoint, ratio: number, sinceMs: number): GlassPose {
     const clamped = MathUtil.clamp(ratio, 0, 1);
     const lift = kind === "jump" ? Math.sin(clamped * Math.PI) * 0.9 : 0;
     const dx = to.x - from.x, dz = to.z - from.z;

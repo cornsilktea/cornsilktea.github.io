@@ -10,8 +10,16 @@ GlassBridgeLook.GLOW = 0xDFFAFF;
 GlassBridgeLook.SHARD = 0xBDEBFF;
 GlassBridgeLook.LAVA = 0xFF6A1F;
 GlassBridgeLook.LAVA_SPARK = 0xFFC247;
-GlassBridgeLook.CLIFF = 0x1D2A31;
+GlassBridgeLook.CLIFF = 0x3A2B26;
+GlassBridgeLook.ROCK_TINT = 0xC9B8AE;
+GlassBridgeLook.WALL_LAYERS = 5;
+GlassBridgeLook.WALL_LAYER_HEIGHT = 5.5;
+GlassBridgeLook.WALL_STEP = 5.5;
+GlassBridgeLook.WALL_ROCK_MIN = 4.2;
+GlassBridgeLook.WALL_ROCK_RANGE = 2.6;
+GlassBridgeLook.GLOW_HEIGHT = 14;
 GlassBridgeLook.ACCENT = "#D97B4F";
+GlassBridgeLook.MARK = 0xFFA45C;
 GlassBridgeLook.TILE_SIZE = 2;
 GlassBridgeLook.TILE_THICKNESS = 0.15;
 GlassBridgeLook.LABEL_HEIGHT = 2.75;
@@ -287,13 +295,14 @@ class GlassBridgeLavaFloor extends GlassBridgeHazardFloor {
     }
 }
 class GlassBridgeScenery {
-    constructor(libs, world, assets, rows) {
+    constructor(libs, page, world, assets, rows) {
         this.world = world;
         this.disposables = [];
         this.buildPlatform(libs, assets, GlassBridgeLayout.QUEUE_START_Z + 4.2, 0);
         this.buildPlatform(libs, assets, GlassBridgeLayout.platformZ(rows) - 2.2, 1);
         this.buildCliffs(libs, rows);
-        this.buildRocks(libs, assets, rows);
+        this.buildRockWall(libs, assets, rows);
+        this.buildLavaGlow(libs, page, rows);
         this.placeEach(libs, assets, GlassBridgeAssets.COLUMN, [[-7, 0.2], [7, 0.2], [-7, 11.5], [7, 11.5]], 1.4);
         this.placeEach(libs, assets, GlassBridgeAssets.TORCH, [[-3.5, -0.4], [3.5, -0.4]], 1.6);
         this.placeEach(libs, assets, GlassBridgeAssets.BANNER, [[-5, GlassBridgeLayout.platformZ(rows) - 7.5], [5, GlassBridgeLayout.platformZ(rows) - 7.5]], 1.8);
@@ -330,41 +339,70 @@ class GlassBridgeScenery {
         const THREE = libs.THREE;
         const length = Math.abs(GlassBridgeLayout.platformZ(rows)) + 30;
         const material = new THREE.MeshLambertMaterial({ color: GlassBridgeLook.CLIFF });
-        const geometry = new THREE.BoxGeometry(10, 24, length);
+        const geometry = new THREE.BoxGeometry(10, 36, length);
         [-1, 1].forEach((side) => {
             const wall = new THREE.Mesh(geometry, material);
-            wall.position.set(side * (GlassBridgeLook.CLIFF_X + 5), GlassBridgeLayout.LAVA_Y + 12, GlassBridgeLayout.midZ(rows));
+            wall.position.set(side * (GlassBridgeLook.CLIFF_X + 8), GlassBridgeLayout.LAVA_Y + 18, GlassBridgeLayout.midZ(rows));
             this.world.add(wall);
         });
         this.disposables.push(material, geometry);
     }
-    buildRocks(libs, assets, rows) {
+    buildRockWall(libs, assets, rows) {
         const THREE = libs.THREE;
-        const random = new SeededRandom(4417);
+        const random = new SeededRandom(2291);
         const dummy = new THREE.Object3D();
-        const centerZ = GlassBridgeLayout.midZ(rows);
-        const reach = Math.abs(GlassBridgeLayout.platformZ(rows)) / 2 + 12;
-        GlassBridgeAssets.ROCKS.forEach((file) => {
-            const source = assets.firstMesh(file);
-            if (!source)
-                return;
-            const original = source.material;
-            const material = new THREE.MeshLambertMaterial({ map: original.map });
-            const perSide = 5;
-            const mesh = new THREE.InstancedMesh(assets.geometryOf(file), material, perSide * 2);
-            for (let index = 0; index < perSide * 2; index++) {
-                const side = index % 2 === 0 ? -1 : 1;
-                dummy.position.set(side * (GlassBridgeLook.CLIFF_X - 0.5 + random.next() * 1.4), GlassBridgeLayout.LAVA_Y + 2 + random.next() * 16, centerZ + (random.next() * 2 - 1) * reach);
-                dummy.rotation.set(0, random.next() * Math.PI * 2, 0);
-                dummy.scale.setScalar(2.2 + random.next() * 2.4);
-                dummy.updateMatrix();
-                mesh.setMatrixAt(index, dummy.matrix);
+        const length = Math.abs(GlassBridgeLayout.platformZ(rows)) + 30;
+        const startZ = GlassBridgeLayout.midZ(rows) - length / 2;
+        const files = GlassBridgeAssets.ROCKS.filter((file) => assets.firstMesh(file) !== null);
+        if (!files.length)
+            return;
+        const matrices = files.map(() => []);
+        let counter = 0;
+        [-1, 1].forEach((side) => {
+            for (let layer = 0; layer < GlassBridgeLook.WALL_LAYERS; layer++) {
+                for (let z = startZ; z < startZ + length; z += GlassBridgeLook.WALL_STEP) {
+                    dummy.position.set(side * (GlassBridgeLook.CLIFF_X + 1.5 + layer * 1.6 + random.next() * 1.6), GlassBridgeLayout.LAVA_Y + 1 + layer * GlassBridgeLook.WALL_LAYER_HEIGHT + random.next() * 1.5, z + random.next() * 2);
+                    dummy.rotation.set((random.next() - 0.5) * 0.3, random.next() * Math.PI * 2, (random.next() - 0.5) * 0.3);
+                    dummy.scale.setScalar(GlassBridgeLook.WALL_ROCK_MIN + random.next() * GlassBridgeLook.WALL_ROCK_RANGE);
+                    dummy.updateMatrix();
+                    matrices[counter++ % files.length].push(dummy.matrix.clone());
+                }
             }
+        });
+        files.forEach((file, index) => {
+            const source = assets.firstMesh(file);
+            const original = source.material;
+            const material = new THREE.MeshLambertMaterial({ map: original.map, color: GlassBridgeLook.ROCK_TINT });
+            const mesh = new THREE.InstancedMesh(assets.geometryOf(file), material, matrices[index].length);
+            matrices[index].forEach((matrix, slot) => mesh.setMatrixAt(slot, matrix));
             mesh.instanceMatrix.needsUpdate = true;
             mesh.computeBoundingSphere();
             this.world.add(mesh);
             this.disposables.push(material, mesh);
         });
+    }
+    buildLavaGlow(libs, page, rows) {
+        const THREE = libs.THREE;
+        const canvas = page.createCanvas(8, 128);
+        const context = canvas.getContext("2d");
+        const gradient = context.createLinearGradient(0, 128, 0, 0);
+        gradient.addColorStop(0, "rgba(255,120,40,0.85)");
+        gradient.addColorStop(0.45, "rgba(255,90,30,0.28)");
+        gradient.addColorStop(1, "rgba(255,90,30,0)");
+        context.fillStyle = gradient;
+        context.fillRect(0, 0, 8, 128);
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+        const length = Math.abs(GlassBridgeLayout.platformZ(rows)) + 30;
+        const geometry = new THREE.PlaneGeometry(length, GlassBridgeLook.GLOW_HEIGHT);
+        [-1, 1].forEach((side) => {
+            const glow = new THREE.Mesh(geometry, material);
+            glow.rotation.y = Math.PI / 2;
+            glow.position.set(side * (GlassBridgeLook.CLIFF_X - 0.5), GlassBridgeLayout.LAVA_Y + GlassBridgeLook.GLOW_HEIGHT / 2, GlassBridgeLayout.midZ(rows));
+            this.world.add(glow);
+        });
+        this.disposables.push(texture, material, geometry);
     }
     placeEach(libs, assets, file, spots, scale) {
         const model = assets.model(file);
@@ -461,8 +499,8 @@ GlassBridgePoseClips.BY_KIND = {
     draw: { clip: GlassBridgeClips.INTERACT, once: true, speed: 1 },
     queued: { clip: GlassBridgeClips.IDLE, once: false, speed: 1 },
     spawn: { clip: GlassBridgeClips.SPAWN, once: true, speed: 1 },
-    walk: { clip: GlassBridgeClips.WALK, once: false, speed: 1 },
-    run: { clip: GlassBridgeClips.RUN, once: false, speed: 1.15 },
+    walk: { clip: GlassBridgeClips.WALK, once: false, speed: 1.25 },
+    run: { clip: GlassBridgeClips.RUN, once: false, speed: 1.5 },
     wait: { clip: GlassBridgeClips.IDLE_ALT, once: false, speed: 1.2 },
     jump: { clip: GlassBridgeClips.JUMP, once: true, speed: GlassBridgeRules.JUMP_PLAYBACK_SPEED },
     fall: { clip: GlassBridgeClips.AIR, once: false, speed: 1 },
@@ -590,6 +628,9 @@ class GlassBridgeBagView {
             this.bags.push({ group, sprite, canvas, texture, signature: "" });
         }
     }
+    groups() {
+        return this.bags.map((bag) => bag.group);
+    }
     update(match, now) {
         const crossStart = match.crossStartAt();
         const visible = crossStart === null || now < crossStart + GlassBridgeRules.ENTER_MS;
@@ -649,8 +690,7 @@ class GlassBridgeCamera {
     }
     follow(dt, x, z) {
         const zoom = this.zoom();
-        const lean = x * 0.3;
-        this.approach(dt, lean, GlassBridgeCamera.HEIGHT * zoom, z + GlassBridgeCamera.BEHIND * zoom, lean, 0, z - GlassBridgeCamera.LOOK_AHEAD);
+        this.approach(dt, GlassBridgeCamera.SIDE * zoom, GlassBridgeCamera.HEIGHT * zoom, z + GlassBridgeCamera.BEHIND * zoom, 0, 0, z - GlassBridgeCamera.LOOK_AHEAD);
     }
     overview(dt) {
         const zoom = this.zoom();
@@ -687,15 +727,51 @@ class GlassBridgeCamera {
         this.camera.lookAt(this.focus.x, this.focus.y, this.focus.z);
     }
 }
-GlassBridgeCamera.BEHIND = 11;
-GlassBridgeCamera.HEIGHT = 8.8;
-GlassBridgeCamera.LOOK_AHEAD = 8;
+GlassBridgeCamera.SIDE = 3.4;
+GlassBridgeCamera.BEHIND = 10;
+GlassBridgeCamera.HEIGHT = 10.5;
+GlassBridgeCamera.LOOK_AHEAD = 4;
 GlassBridgeCamera.OVERVIEW_X = 8;
 GlassBridgeCamera.OVERVIEW_Y = 19;
 GlassBridgeCamera.OVERVIEW_BACK = 17;
 GlassBridgeCamera.OVERVIEW_LOOK_SHIFT = 3;
 GlassBridgeCamera.SMOOTHING = 4.5;
 GlassBridgeCamera.SWAY_SPEED = 0.14;
+class GlassBridgeChoiceMarker {
+    constructor(libs, world) {
+        this.world = world;
+        this.marks = [];
+        const THREE = libs.THREE;
+        this.material = new THREE.MeshBasicMaterial({ color: GlassBridgeLook.MARK, transparent: true, opacity: 0.4, depthWrite: false });
+        this.geometry = new THREE.PlaneGeometry(GlassBridgeChoiceMarker.SIZE, GlassBridgeChoiceMarker.SIZE);
+        for (let side = 0; side < GlassBridgeRules.SIDE_COUNT; side++) {
+            const mark = new THREE.Mesh(this.geometry, this.material);
+            mark.rotation.x = -Math.PI / 2;
+            mark.position.set(GlassBridgeLayout.sideX(side), GlassBridgeChoiceMarker.HEIGHT, 0);
+            mark.visible = false;
+            world.add(mark);
+            this.marks.push(mark);
+        }
+    }
+    update(choiceWindow, now) {
+        const open = choiceWindow !== null && now >= choiceWindow.opensAt && now <= choiceWindow.closesAt;
+        this.marks.forEach((mark) => {
+            mark.visible = open;
+            if (open && choiceWindow)
+                mark.position.z = GlassBridgeLayout.rowZ(choiceWindow.row);
+        });
+        if (open)
+            this.material.opacity = 0.4 + 0.3 * (0.5 + 0.5 * Math.sin(now / 1000 * GlassBridgeChoiceMarker.PULSE_SPEED));
+    }
+    dispose() {
+        this.marks.forEach((mark) => this.world.remove(mark));
+        this.geometry.dispose();
+        this.material.dispose();
+    }
+}
+GlassBridgeChoiceMarker.SIZE = 1.9;
+GlassBridgeChoiceMarker.HEIGHT = 0.34;
+GlassBridgeChoiceMarker.PULSE_SPEED = 5;
 class GlassBridgeStage {
     constructor(libs, page, env, assets, characters, match, looks, localId, showLabels) {
         const THREE = libs.THREE;
@@ -710,10 +786,11 @@ class GlassBridgeStage {
         this.scene.add(sun);
         this.world = new THREE.Group();
         this.scene.add(this.world);
-        this.scenery = new GlassBridgeScenery(libs, this.world, assets, match.rows);
+        this.scenery = new GlassBridgeScenery(libs, page, this.world, assets, match.rows);
         this.hazard = new GlassBridgeLavaFloor(libs, page, this.world, match.rows);
         this.panels = new GlassBridgePanelViews(libs, this.world, assets, match.rows);
         this.bags = new GlassBridgeBagView(libs, page, this.world, match.ids().length);
+        this.marker = new GlassBridgeChoiceMarker(libs, this.world);
         const kit = new FighterViewKit(libs, page, new NameTagFactory(libs, page));
         this.contestants = new GlassBridgeContestantViews(kit, characters.factory, characters.assets.clips, this.world, this.hazard);
         this.contestants.build(match.participants, looks, localId, showLabels);
@@ -723,10 +800,15 @@ class GlassBridgeStage {
         this.hazard.update(dt);
         this.panels.update(timeline ? timeline.panels : null, now, dt);
         this.bags.update(match, now);
+        this.marker.update(timeline ? timeline.openWindow() : null, now);
         this.contestants.update(match, now, dt);
+    }
+    bagGroups() {
+        return this.bags.groups();
     }
     dispose() {
         this.contestants.clear();
+        this.marker.dispose();
         this.bags.dispose();
         this.panels.dispose();
         this.hazard.dispose();

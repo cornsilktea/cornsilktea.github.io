@@ -10,8 +10,16 @@ class GlassBridgeLook {
   static readonly SHARD = 0xBDEBFF;
   static readonly LAVA = 0xFF6A1F;
   static readonly LAVA_SPARK = 0xFFC247;
-  static readonly CLIFF = 0x1D2A31;
+  static readonly CLIFF = 0x3A2B26;
+  static readonly ROCK_TINT = 0xC9B8AE;
+  static readonly WALL_LAYERS = 5;
+  static readonly WALL_LAYER_HEIGHT = 5.5;
+  static readonly WALL_STEP = 5.5;
+  static readonly WALL_ROCK_MIN = 4.2;
+  static readonly WALL_ROCK_RANGE = 2.6;
+  static readonly GLOW_HEIGHT = 14;
   static readonly ACCENT = "#D97B4F";
+  static readonly MARK = 0xFFA45C;
   static readonly TILE_SIZE = 2;
   static readonly TILE_THICKNESS = 0.15;
   static readonly LABEL_HEIGHT = 2.75;
@@ -314,11 +322,12 @@ class GlassBridgeLavaFloor extends GlassBridgeHazardFloor {
 class GlassBridgeScenery {
   private readonly disposables: Array<{ dispose(): void }> = [];
 
-  constructor(libs: ThreeLibs, private readonly world: Three<"Group">, assets: GlassBridgeAssets, rows: number) {
+  constructor(libs: ThreeLibs, page: Page, private readonly world: Three<"Group">, assets: GlassBridgeAssets, rows: number) {
     this.buildPlatform(libs, assets, GlassBridgeLayout.QUEUE_START_Z + 4.2, 0);
     this.buildPlatform(libs, assets, GlassBridgeLayout.platformZ(rows) - 2.2, 1);
     this.buildCliffs(libs, rows);
-    this.buildRocks(libs, assets, rows);
+    this.buildRockWall(libs, assets, rows);
+    this.buildLavaGlow(libs, page, rows);
     this.placeEach(libs, assets, GlassBridgeAssets.COLUMN, [[-7, 0.2], [7, 0.2], [-7, 11.5], [7, 11.5]], 1.4);
     this.placeEach(libs, assets, GlassBridgeAssets.TORCH, [[-3.5, -0.4], [3.5, -0.4]], 1.6);
     this.placeEach(libs, assets, GlassBridgeAssets.BANNER, [[-5, GlassBridgeLayout.platformZ(rows) - 7.5], [5, GlassBridgeLayout.platformZ(rows) - 7.5]], 1.8);
@@ -357,41 +366,71 @@ class GlassBridgeScenery {
     const THREE = libs.THREE;
     const length = Math.abs(GlassBridgeLayout.platformZ(rows)) + 30;
     const material = new THREE.MeshLambertMaterial({ color: GlassBridgeLook.CLIFF });
-    const geometry = new THREE.BoxGeometry(10, 24, length);
+    const geometry = new THREE.BoxGeometry(10, 36, length);
     [-1, 1].forEach((side) => {
       const wall = new THREE.Mesh(geometry, material);
-      wall.position.set(side * (GlassBridgeLook.CLIFF_X + 5), GlassBridgeLayout.LAVA_Y + 12, GlassBridgeLayout.midZ(rows));
+      wall.position.set(side * (GlassBridgeLook.CLIFF_X + 8), GlassBridgeLayout.LAVA_Y + 18, GlassBridgeLayout.midZ(rows));
       this.world.add(wall);
     });
     this.disposables.push(material, geometry);
   }
 
-  private buildRocks(libs: ThreeLibs, assets: GlassBridgeAssets, rows: number): void {
+  private buildRockWall(libs: ThreeLibs, assets: GlassBridgeAssets, rows: number): void {
     const THREE = libs.THREE;
-    const random = new SeededRandom(4417);
+    const random = new SeededRandom(2291);
     const dummy = new THREE.Object3D();
-    const centerZ = GlassBridgeLayout.midZ(rows);
-    const reach = Math.abs(GlassBridgeLayout.platformZ(rows)) / 2 + 12;
-    GlassBridgeAssets.ROCKS.forEach((file) => {
-      const source = assets.firstMesh(file);
-      if (!source) return;
-      const original = source.material as Three<"MeshStandardMaterial">;
-      const material = new THREE.MeshLambertMaterial({ map: original.map });
-      const perSide = 5;
-      const mesh = new THREE.InstancedMesh(assets.geometryOf(file) as GlassGeometry, material, perSide * 2);
-      for (let index = 0; index < perSide * 2; index++) {
-        const side = index % 2 === 0 ? -1 : 1;
-        dummy.position.set(side * (GlassBridgeLook.CLIFF_X - 0.5 + random.next() * 1.4), GlassBridgeLayout.LAVA_Y + 2 + random.next() * 16, centerZ + (random.next() * 2 - 1) * reach);
-        dummy.rotation.set(0, random.next() * Math.PI * 2, 0);
-        dummy.scale.setScalar(2.2 + random.next() * 2.4);
-        dummy.updateMatrix();
-        mesh.setMatrixAt(index, dummy.matrix);
+    const length = Math.abs(GlassBridgeLayout.platformZ(rows)) + 30;
+    const startZ = GlassBridgeLayout.midZ(rows) - length / 2;
+    const files = GlassBridgeAssets.ROCKS.filter((file) => assets.firstMesh(file) !== null);
+    if (!files.length) return;
+    const matrices = files.map(() => [] as Array<Three<"Matrix4">>);
+    let counter = 0;
+    [-1, 1].forEach((side) => {
+      for (let layer = 0; layer < GlassBridgeLook.WALL_LAYERS; layer++) {
+        for (let z = startZ; z < startZ + length; z += GlassBridgeLook.WALL_STEP) {
+          dummy.position.set(side * (GlassBridgeLook.CLIFF_X + 1.5 + layer * 1.6 + random.next() * 1.6), GlassBridgeLayout.LAVA_Y + 1 + layer * GlassBridgeLook.WALL_LAYER_HEIGHT + random.next() * 1.5, z + random.next() * 2);
+          dummy.rotation.set((random.next() - 0.5) * 0.3, random.next() * Math.PI * 2, (random.next() - 0.5) * 0.3);
+          dummy.scale.setScalar(GlassBridgeLook.WALL_ROCK_MIN + random.next() * GlassBridgeLook.WALL_ROCK_RANGE);
+          dummy.updateMatrix();
+          matrices[counter++ % files.length].push(dummy.matrix.clone());
+        }
       }
+    });
+    files.forEach((file, index) => {
+      const source = assets.firstMesh(file) as Three<"Mesh">;
+      const original = source.material as Three<"MeshStandardMaterial">;
+      const material = new THREE.MeshLambertMaterial({ map: original.map, color: GlassBridgeLook.ROCK_TINT });
+      const mesh = new THREE.InstancedMesh(assets.geometryOf(file) as GlassGeometry, material, matrices[index].length);
+      matrices[index].forEach((matrix, slot) => mesh.setMatrixAt(slot, matrix));
       mesh.instanceMatrix.needsUpdate = true;
       mesh.computeBoundingSphere();
       this.world.add(mesh);
       this.disposables.push(material, mesh);
     });
+  }
+
+  private buildLavaGlow(libs: ThreeLibs, page: Page, rows: number): void {
+    const THREE = libs.THREE;
+    const canvas = page.createCanvas(8, 128);
+    const context = canvas.getContext("2d") as CanvasRenderingContext2D;
+    const gradient = context.createLinearGradient(0, 128, 0, 0);
+    gradient.addColorStop(0, "rgba(255,120,40,0.85)");
+    gradient.addColorStop(0.45, "rgba(255,90,30,0.28)");
+    gradient.addColorStop(1, "rgba(255,90,30,0)");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, 8, 128);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+    const length = Math.abs(GlassBridgeLayout.platformZ(rows)) + 30;
+    const geometry = new THREE.PlaneGeometry(length, GlassBridgeLook.GLOW_HEIGHT);
+    [-1, 1].forEach((side) => {
+      const glow = new THREE.Mesh(geometry, material);
+      glow.rotation.y = Math.PI / 2;
+      glow.position.set(side * (GlassBridgeLook.CLIFF_X - 0.5), GlassBridgeLayout.LAVA_Y + GlassBridgeLook.GLOW_HEIGHT / 2, GlassBridgeLayout.midZ(rows));
+      this.world.add(glow);
+    });
+    this.disposables.push(texture, material, geometry);
   }
 
   private placeEach(libs: ThreeLibs, assets: GlassBridgeAssets, file: string, spots: ReadonlyArray<readonly [number, number]>, scale: number): void {
@@ -498,8 +537,8 @@ class GlassBridgePoseClips {
     draw: { clip: GlassBridgeClips.INTERACT, once: true, speed: 1 },
     queued: { clip: GlassBridgeClips.IDLE, once: false, speed: 1 },
     spawn: { clip: GlassBridgeClips.SPAWN, once: true, speed: 1 },
-    walk: { clip: GlassBridgeClips.WALK, once: false, speed: 1 },
-    run: { clip: GlassBridgeClips.RUN, once: false, speed: 1.15 },
+    walk: { clip: GlassBridgeClips.WALK, once: false, speed: 1.25 },
+    run: { clip: GlassBridgeClips.RUN, once: false, speed: 1.5 },
     wait: { clip: GlassBridgeClips.IDLE_ALT, once: false, speed: 1.2 },
     jump: { clip: GlassBridgeClips.JUMP, once: true, speed: GlassBridgeRules.JUMP_PLAYBACK_SPEED },
     fall: { clip: GlassBridgeClips.AIR, once: false, speed: 1 },
@@ -650,6 +689,10 @@ class GlassBridgeBagView {
     }
   }
 
+  groups(): readonly Three<"Group">[] {
+    return this.bags.map((bag) => bag.group);
+  }
+
   update(match: GlassBridgeMatch, now: number): void {
     const crossStart = match.crossStartAt();
     const visible = crossStart === null || now < crossStart + GlassBridgeRules.ENTER_MS;
@@ -701,9 +744,10 @@ class GlassBridgeBagView {
 }
 
 class GlassBridgeCamera {
-  private static readonly BEHIND = 11;
-  private static readonly HEIGHT = 8.8;
-  private static readonly LOOK_AHEAD = 8;
+  private static readonly SIDE = 3.4;
+  private static readonly BEHIND = 10;
+  private static readonly HEIGHT = 10.5;
+  private static readonly LOOK_AHEAD = 4;
   private static readonly OVERVIEW_X = 8;
   private static readonly OVERVIEW_Y = 19;
   private static readonly OVERVIEW_BACK = 17;
@@ -720,8 +764,7 @@ class GlassBridgeCamera {
 
   follow(dt: number, x: number, z: number): void {
     const zoom = this.zoom();
-    const lean = x * 0.3;
-    this.approach(dt, lean, GlassBridgeCamera.HEIGHT * zoom, z + GlassBridgeCamera.BEHIND * zoom, lean, 0, z - GlassBridgeCamera.LOOK_AHEAD);
+    this.approach(dt, GlassBridgeCamera.SIDE * zoom, GlassBridgeCamera.HEIGHT * zoom, z + GlassBridgeCamera.BEHIND * zoom, 0, 0, z - GlassBridgeCamera.LOOK_AHEAD);
   }
 
   overview(dt: number): void {
@@ -763,6 +806,45 @@ class GlassBridgeCamera {
   }
 }
 
+class GlassBridgeChoiceMarker {
+  private static readonly SIZE = 1.9;
+  private static readonly HEIGHT = 0.34;
+  private static readonly PULSE_SPEED = 5;
+
+  private readonly marks: Array<Three<"Mesh">> = [];
+  private readonly material: Three<"MeshBasicMaterial">;
+  private readonly geometry: Three<"PlaneGeometry">;
+
+  constructor(libs: ThreeLibs, private readonly world: Three<"Group">) {
+    const THREE = libs.THREE;
+    this.material = new THREE.MeshBasicMaterial({ color: GlassBridgeLook.MARK, transparent: true, opacity: 0.4, depthWrite: false });
+    this.geometry = new THREE.PlaneGeometry(GlassBridgeChoiceMarker.SIZE, GlassBridgeChoiceMarker.SIZE);
+    for (let side = 0; side < GlassBridgeRules.SIDE_COUNT; side++) {
+      const mark = new THREE.Mesh(this.geometry, this.material);
+      mark.rotation.x = -Math.PI / 2;
+      mark.position.set(GlassBridgeLayout.sideX(side), GlassBridgeChoiceMarker.HEIGHT, 0);
+      mark.visible = false;
+      world.add(mark);
+      this.marks.push(mark);
+    }
+  }
+
+  update(choiceWindow: GlassChoiceWindow | null, now: number): void {
+    const open = choiceWindow !== null && now >= choiceWindow.opensAt && now <= choiceWindow.closesAt;
+    this.marks.forEach((mark) => {
+      mark.visible = open;
+      if (open && choiceWindow) mark.position.z = GlassBridgeLayout.rowZ(choiceWindow.row);
+    });
+    if (open) this.material.opacity = 0.4 + 0.3 * (0.5 + 0.5 * Math.sin(now / 1000 * GlassBridgeChoiceMarker.PULSE_SPEED));
+  }
+
+  dispose(): void {
+    this.marks.forEach((mark) => this.world.remove(mark));
+    this.geometry.dispose();
+    this.material.dispose();
+  }
+}
+
 class GlassBridgeStage {
   readonly scene: Three<"Scene">;
   readonly camera: Three<"PerspectiveCamera">;
@@ -773,6 +855,7 @@ class GlassBridgeStage {
   private readonly panels: GlassBridgePanelViews;
   private readonly hazard: GlassBridgeHazardFloor;
   private readonly bags: GlassBridgeBagView;
+  private readonly marker: GlassBridgeChoiceMarker;
 
   constructor(libs: ThreeLibs, page: Page, env: BrowserEnv, assets: GlassBridgeAssets, characters: CharacterSet, match: GlassBridgeMatch, looks: ReadonlyMap<string, CharacterLook>, localId: string, showLabels: boolean) {
     const THREE = libs.THREE;
@@ -787,10 +870,11 @@ class GlassBridgeStage {
     this.scene.add(sun);
     this.world = new THREE.Group();
     this.scene.add(this.world);
-    this.scenery = new GlassBridgeScenery(libs, this.world, assets, match.rows);
+    this.scenery = new GlassBridgeScenery(libs, page, this.world, assets, match.rows);
     this.hazard = new GlassBridgeLavaFloor(libs, page, this.world, match.rows);
     this.panels = new GlassBridgePanelViews(libs, this.world, assets, match.rows);
     this.bags = new GlassBridgeBagView(libs, page, this.world, match.ids().length);
+    this.marker = new GlassBridgeChoiceMarker(libs, this.world);
     const kit = new FighterViewKit(libs, page, new NameTagFactory(libs, page));
     this.contestants = new GlassBridgeContestantViews(kit, characters.factory, characters.assets.clips, this.world, this.hazard);
     this.contestants.build(match.participants, looks, localId, showLabels);
@@ -801,11 +885,17 @@ class GlassBridgeStage {
     this.hazard.update(dt);
     this.panels.update(timeline ? timeline.panels : null, now, dt);
     this.bags.update(match, now);
+    this.marker.update(timeline ? timeline.openWindow() : null, now);
     this.contestants.update(match, now, dt);
+  }
+
+  bagGroups(): readonly Three<"Group">[] {
+    return this.bags.groups();
   }
 
   dispose(): void {
     this.contestants.clear();
+    this.marker.dispose();
     this.bags.dispose();
     this.panels.dispose();
     this.hazard.dispose();
