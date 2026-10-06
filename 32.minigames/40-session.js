@@ -390,7 +390,7 @@ class CollectionDirector {
         this.tokens = new TokenSource(random);
     }
     startCollection() {
-        this.startPlan(PlanBuilder.build(this.catalog.ids(), CollectionRules.ROUNDS_PER_GAME));
+        this.startPlan(PlanBuilder.draw(this.catalog.ids(), CollectionRules.ROUNDS_PER_GAME, CollectionRules.GAMES_PER_COLLECTION, Math.floor(this.random.next() * 1e9)));
     }
     startPractice(gameId) {
         if (!this.session.practice || !this.catalog.find(gameId))

@@ -3,12 +3,20 @@ const path = require("path");
 
 const SOURCE_DIRECTORY = process.argv[2] || "C:\\Users\\user\\Downloads\\allkaykit\\organized\\animations\\rig-medium";
 const OUTPUT_FILE = process.argv[3] || "assets/kaykit/animations/soccer_anims.glb";
-const WANTED = [
-  { file: "Rig_Medium_MovementAdvanced.glb", clips: ["Dodge_Forward"] },
-  { file: "Rig_Medium_Simulation.glb", clips: ["Cheering"] },
-  { file: "Rig_Medium_CombatMelee.glb", clips: ["Melee_Unarmed_Attack_Kick"] },
-  { file: "Rig_Medium_General.glb", clips: ["Hit_B"] }
-];
+const PACKS = {
+  soccer: [
+    { file: "Rig_Medium_MovementAdvanced.glb", clips: ["Dodge_Forward"] },
+    { file: "Rig_Medium_Simulation.glb", clips: ["Cheering"] },
+    { file: "Rig_Medium_CombatMelee.glb", clips: ["Melee_Unarmed_Attack_Kick"] },
+    { file: "Rig_Medium_General.glb", clips: ["Hit_B"] }
+  ],
+  glassbridge: [
+    { file: "Rig_Medium_MovementBasic.glb", clips: ["Jump_Full_Short", "Jump_Idle", "Jump_Land"] },
+    { file: "Rig_Medium_General.glb", clips: ["Idle_B", "Interact", "PickUp", "Spawn_Air", "Death_B", "Hit_B"] },
+    { file: "Rig_Medium_Simulation.glb", clips: ["Cheering"] }
+  ]
+};
+const WANTED = PACKS[process.argv[4] || "soccer"];
 const COMPONENT_BYTES = { 5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4 };
 const TYPE_COUNTS = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
 

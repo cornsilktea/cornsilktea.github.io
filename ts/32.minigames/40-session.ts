@@ -436,7 +436,7 @@ class CollectionDirector {
   }
 
   startCollection(): void {
-    this.startPlan(PlanBuilder.build(this.catalog.ids(), CollectionRules.ROUNDS_PER_GAME));
+    this.startPlan(PlanBuilder.draw(this.catalog.ids(), CollectionRules.ROUNDS_PER_GAME, CollectionRules.GAMES_PER_COLLECTION, Math.floor(this.random.next() * 1e9)));
   }
 
   startPractice(gameId: string): void {

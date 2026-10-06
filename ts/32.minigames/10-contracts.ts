@@ -187,6 +187,7 @@ class CollectionRules {
   static readonly MIN_PLAYERS = 2;
   static readonly MIN_FIELD_SIZE = 4;
   static readonly SPECTATOR_SLOT = 6;
+  static readonly GAMES_PER_COLLECTION = 5;
   static readonly ROUNDS_PER_GAME = 1;
   static readonly COUNTDOWN_MS = 3000;
   static readonly COUNTDOWN_LEAD_MS = 500;
@@ -198,12 +199,24 @@ class CollectionRules {
 }
 
 class PlanBuilder {
-  static build(gameIds: readonly string[], roundsPerGame: number): string[] {
+  static draw(gameIds: readonly string[], roundsPerGame: number, gameCount: number, seed: number): string[] {
+    const random = new SeededRandom(seed);
+    const shuffled = gameIds.slice();
+    for (let last = shuffled.length - 1; last > 0; last--) {
+      const other = Math.floor(random.next() * (last + 1));
+      const kept = shuffled[last];
+      shuffled[last] = shuffled[other];
+      shuffled[other] = kept;
+    }
     const plan: string[] = [];
-    gameIds.forEach((id) => {
+    shuffled.slice(0, gameCount).forEach((id) => {
       for (let round = 0; round < roundsPerGame; round++) plan.push(id);
     });
     return plan;
+  }
+
+  static drawnCount(registeredCount: number, gameCount: number): number {
+    return Math.min(registeredCount, gameCount);
   }
 }
 

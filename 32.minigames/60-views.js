@@ -86,7 +86,7 @@ class CatalogView {
     }
     render(catalog) {
         const host = this.page.byId("catalogHost");
-        host.innerHTML = catalog.all().map((definition, index) => this.card(definition, index + 1)).join("");
+        host.innerHTML = "<div class='st-hint'>이 중 " + PlanBuilder.drawnCount(catalog.all().length, CollectionRules.GAMES_PER_COLLECTION) + "개를 무작위로 골라 무작위 순서로 해요</div>" + catalog.all().map((definition, index) => this.card(definition, index + 1)).join("");
         FoldCard.bindAll(host);
     }
     card(definition, order) {
@@ -196,11 +196,18 @@ class CollectionLobbyView {
         this.page.setText(this.startButton, host ? (playing < CollectionRules.MIN_FIELD_SIZE ? "AI와 게임 시작" : "게임 시작") : "방장이 시작하기를 기다리는 중");
         this.page.setText(this.hint, host ? "참가자 " + playing + "명 · 최대 " + CollectionRules.MAX_PLAYERS + "명 (관전 " + spectators.length + " / " + CollectionRules.MAX_SPECTATORS + ")" : "");
         const order = session.playerIds();
-        this.planBox.innerHTML = PlanBuilder.build(this.catalog.ids(), CollectionRules.ROUNDS_PER_GAME)
-            .map((id, index) => "<div class='plRow'><b>" + (index + 1) + ". " + Html.escape(this.catalog.find(id).title) + "</b></div>").join("");
+        this.planBox.innerHTML = this.planHtml(session);
         const winners = order.filter((id) => session.winsOf(id));
         this.page.show(this.recordCard, winners.length > 0);
         this.records.innerHTML = winners.map((id) => "<div class='st-rec'><span>" + Html.escape(session.player(id).nick) + "</span><b>" + session.winsOf(id) + "승</b></div>").join("");
+    }
+    planHtml(session) {
+        if (session.plan.length === 0) {
+            const registered = this.catalog.ids().length;
+            return "<div class='plRow'><b>등록된 " + registered + "개 중 " + PlanBuilder.drawnCount(registered, CollectionRules.GAMES_PER_COLLECTION) + "개가 무작위 순서로 진행돼요</b></div>";
+        }
+        return session.plan
+            .map((id, index) => "<div class='plRow'><b>" + (index + 1) + ". " + Html.escape(this.catalog.find(id).title) + "</b></div>").join("");
     }
     playerRow(session, id) {
         const record = session.player(id);

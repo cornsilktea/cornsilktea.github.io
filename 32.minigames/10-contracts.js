@@ -51,6 +51,7 @@ CollectionRules.MAX_SPECTATORS = 1;
 CollectionRules.MIN_PLAYERS = 2;
 CollectionRules.MIN_FIELD_SIZE = 4;
 CollectionRules.SPECTATOR_SLOT = 6;
+CollectionRules.GAMES_PER_COLLECTION = 5;
 CollectionRules.ROUNDS_PER_GAME = 1;
 CollectionRules.COUNTDOWN_MS = 3000;
 CollectionRules.COUNTDOWN_LEAD_MS = 500;
@@ -60,13 +61,24 @@ CollectionRules.STALE_OLD_ROOM_MS = 6 * 3600000;
 CollectionRules.AI_NAMES = ["코코", "모모", "보리", "두부", "별이", "구름"];
 CollectionRules.AI_FALLBACK_NAME = "봇";
 class PlanBuilder {
-    static build(gameIds, roundsPerGame) {
+    static draw(gameIds, roundsPerGame, gameCount, seed) {
+        const random = new SeededRandom(seed);
+        const shuffled = gameIds.slice();
+        for (let last = shuffled.length - 1; last > 0; last--) {
+            const other = Math.floor(random.next() * (last + 1));
+            const kept = shuffled[last];
+            shuffled[last] = shuffled[other];
+            shuffled[other] = kept;
+        }
         const plan = [];
-        gameIds.forEach((id) => {
+        shuffled.slice(0, gameCount).forEach((id) => {
             for (let round = 0; round < roundsPerGame; round++)
                 plan.push(id);
         });
         return plan;
+    }
+    static drawnCount(registeredCount, gameCount) {
+        return Math.min(registeredCount, gameCount);
     }
 }
 class SpectatorCursor {

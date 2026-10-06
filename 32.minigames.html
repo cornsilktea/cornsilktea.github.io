@@ -129,6 +129,18 @@
   .nhCard.used { filter: brightness(.3); box-shadow: none; }
   .nhSubmit { min-width: 120px; min-height: 44px; padding: 6px 22px; font-size: 18px; font-weight: 800; border-radius: 10px; border: 2px solid #D97B4F; background: #D97B4F; color: #fff; }
   .nhSubmit:disabled { background: rgba(20, 20, 36, .84); border-color: rgba(255, 255, 255, .3); color: #8E93A0; }
+  #gbPanel { position: fixed; left: 0; right: 0; bottom: 0; z-index: 21; display: flex; flex-direction: column; align-items: center; gap: 6px; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); pointer-events: none; }
+  #gbPanel > * { pointer-events: auto; }
+  .gbHint { padding: 4px 14px; border-radius: 999px; background: rgba(20, 20, 36, .84); border: 1.5px solid rgba(255, 255, 255, .25); font-size: 14px; font-weight: 800; color: #F2C879; }
+  .gbHint:empty { display: none; }
+  .gbBags { display: flex; gap: clamp(6px, 2vw, 14px); justify-content: center; flex-wrap: wrap; padding: 8px 12px; border-radius: 14px; background: rgba(12, 28, 34, .8); border: 2px solid rgba(217, 123, 79, .55); }
+  .gbBag { width: clamp(52px, 13vw, 76px); height: clamp(58px, 15vw, 84px); border-radius: 46% 46% 38% 38%; border: 3px solid #E0C27A; background: radial-gradient(circle at 35% 30%, #B98250, #7A4F2A); color: #FFF6DC; font-size: clamp(18px, 4.6vw, 26px); touch-action: manipulation; box-shadow: 0 4px 10px rgba(0, 0, 0, .45); }
+  .gbBag.taken { filter: brightness(.45); }
+  .gbBag:disabled { cursor: default; }
+  .gbSides { display: flex; gap: clamp(10px, 4vw, 28px); }
+  .gbSide { min-width: clamp(130px, 34vw, 210px); min-height: 64px; padding: 6px 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: clamp(20px, 5vw, 28px); font-weight: 800; border-radius: 14px; border: 3px solid #D97B4F; background: rgba(12, 28, 34, .88); color: #fff; touch-action: manipulation; }
+  .gbSide kbd { font-size: 12px; font-weight: 700; color: #A9D8F2; }
+  .gbSide:disabled { opacity: .35; border-color: rgba(255, 255, 255, .25); text-decoration: line-through; }
   @media (max-width: 760px) {
     #hudList { width: 150px; }
     #hudList .pl { font-size: 12px; }
@@ -158,6 +170,7 @@
 <div id="viewBtns" hidden></div>
 
 <div id="nunchiHand" hidden></div>
+<div id="gbPanel" hidden></div>
 
 <div id="joyZone" hidden></div>
 <div id="joyBase" hidden><div id="joyKnob"></div></div>
@@ -292,6 +305,10 @@
 <script charset="utf-8" src="32.minigames/66-freeze-play.js"></script>
 <script charset="utf-8" src="32.minigames/67-freeze-view.js"></script>
 <script charset="utf-8" src="32.minigames/68-freeze-game.js"></script>
+<script charset="utf-8" src="32.minigames/71-glassbridge-rules.js"></script>
+<script charset="utf-8" src="32.minigames/72-glassbridge-play.js"></script>
+<script charset="utf-8" src="32.minigames/73-glassbridge-view.js"></script>
+<script charset="utf-8" src="32.minigames/74-glassbridge-game.js"></script>
 <script charset="utf-8" src="32.minigames/75-mole-rules.js"></script>
 <script charset="utf-8" src="32.minigames/76-mole-play.js"></script>
 <script charset="utf-8" src="32.minigames/77-mole-view.js"></script>
