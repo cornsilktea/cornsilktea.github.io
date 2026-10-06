@@ -324,7 +324,7 @@ class GlassBridgeScenery {
 
   constructor(libs: ThreeLibs, page: Page, private readonly world: Three<"Group">, assets: GlassBridgeAssets, rows: number) {
     this.buildPlatform(libs, assets, GlassBridgeLayout.QUEUE_START_Z + 4.2, 0);
-    this.buildPlatform(libs, assets, GlassBridgeLayout.platformZ(rows) - 2.2, 1);
+    this.buildPlatform(libs, assets, GlassBridgeLayout.platformZ(rows) - 3.8, 1);
     this.buildCliffs(libs, rows);
     this.buildRockWall(libs, assets, rows);
     this.buildLavaGlow(libs, page, rows);
