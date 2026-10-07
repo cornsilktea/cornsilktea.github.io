@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script charset="utf-8" src="firebase-config.js"></script>
+<script charset="utf-8" src="access-guard.js"></script>
+<title>자리 배치</title>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="정보 수업용 링크 모음">
+<meta property="og:title" content="자리 배치">
+<meta property="og:description" content="정보 수업용 링크 모음">
+<meta property="og:url" content="https://cornsilktea.github.io/seat-picker.html">
+<meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F4F6F1;
+  --panel:#FFFFFF;
+  --panel-alt:#EAF0E6;
+  --line:#C9D2C3;
+  --strong:#24402F;
+  --ink:#1B2B20;
+  --soft:#5B6B5E;
+  --primary:#24402F;
+  --primary-soft:#DCE6D6;
+  --accent:#D97B4F;
+  --ok:#2F7D4F;
+  --font:"Nanum Gothic","NanumGothic","나눔고딕","Malgun Gothic","맑은 고딕",sans-serif;
+}
+*{box-sizing:border-box;}
+[hidden]{display:none !important;}
+html,body{margin:0;}
+body{
+  height:100dvh;overflow:hidden;
+  background:var(--bg);color:var(--ink);font-family:var(--font);
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+  touch-action:manipulation;
+}
+button,input{font-family:inherit;}
+button{
+  min-height:48px;min-width:48px;padding:0 16px;
+  font-size:17px;font-weight:700;color:var(--primary);
+  background:var(--panel);border:2px solid var(--strong);border-radius:6px;cursor:pointer;
+}
+button:active{background:var(--primary-soft);}
+button:disabled{opacity:.4;cursor:default;}
+button.primary{background:var(--primary);color:#fff;}
+button.primary:disabled{opacity:.4;}
+
+#app{display:flex;flex-direction:column;height:100%;padding:0 12px 10px;gap:10px;}
+.controls{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:flex-end;}
+.field{display:flex;flex-direction:column;gap:2px;font-size:13px;font-weight:700;color:var(--soft);}
+.field input{
+  height:48px;padding:0 10px;font-size:20px;font-weight:700;color:var(--ink);
+  background:var(--panel);border:2px solid var(--line);border-radius:6px;
+  -webkit-user-select:text;user-select:text;
+}
+.field input:focus{outline:none;border-color:var(--strong);}
+.field.number input{width:84px;text-align:center;}
+.field.absent input{width:190px;}
+
+.status{
+  position:fixed;top:calc(10px + env(safe-area-inset-top, 0px));right:12px;z-index:5;
+  font-size:13px;font-weight:700;color:var(--soft);
+}
+.status.short{color:var(--accent);}
+
+.stage-host{flex:1 1 0;min-height:0;width:100%;max-width:1500px;margin:0 auto;touch-action:none;}
+.stage{display:flex;flex-direction:column;gap:clamp(6px,1.4vh,16px);height:100%;}
+.stage.chalk-bottom{flex-direction:column-reverse;}
+.chalk{
+  flex:0 0 auto;height:clamp(36px,6vh,60px);display:flex;align-items:center;justify-content:center;
+  background:var(--primary);color:#fff;border:3px solid var(--primary);border-radius:6px;
+  font-size:clamp(18px,3vh,28px);font-weight:800;letter-spacing:.6em;text-indent:.6em;
+}
+.board{flex:1 1 0;min-height:0;display:flex;flex-direction:column;gap:clamp(6px,1.4vh,16px);}
+.row{flex:1 1 0;min-height:0;display:flex;}
+.cell{
+  flex:1 1 0;min-width:0;min-height:48px;container-type:size;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--panel);border:3px solid var(--strong);border-radius:8px;
+  position:relative;
+}
+.cell.gap-joined{margin-right:-3px;}
+.cell.gap-aisle{margin-right:clamp(24px,5vw,80px);}
+.cell.gap-even{margin-right:clamp(8px,1.6vw,26px);}
+.cell .num{font-size:min(55cqh,34cqw);font-weight:800;line-height:1;pointer-events:none;}
+.cell.blocked{
+  background:
+    linear-gradient(to top right, transparent calc(50% - 2px), var(--strong) calc(50% - 2px), var(--strong) calc(50% + 2px), transparent calc(50% + 2px)),
+    linear-gradient(to bottom right, transparent calc(50% - 2px), var(--strong) calc(50% - 2px), var(--strong) calc(50% + 2px), transparent calc(50% + 2px)),
+    var(--panel-alt);
+}
+.cell.selected{outline:5px solid var(--accent);outline-offset:-2px;z-index:2;}
+.cell.drag-source{opacity:.35;}
+.cell.drop-target{background:var(--primary-soft);outline:5px solid var(--accent);outline-offset:-2px;z-index:2;}
+.cell.pop .num{animation:pop .3s ease-out both;}
+@keyframes pop{from{transform:scale(.55);opacity:0;}to{transform:scale(1);opacity:1;}}
+.drag-ghost{
+  position:fixed;z-index:3000;pointer-events:none;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--panel);border:3px solid var(--accent);border-radius:8px;
+  font-weight:800;color:var(--ink);box-shadow:0 8px 24px rgba(0,0,0,.3);opacity:.92;
+}
+
+.footer{display:flex;align-items:center;gap:10px;}
+.message{flex:1;text-align:center;font-size:16px;font-weight:700;color:var(--soft);min-height:24px;}
+.message.ok{color:var(--ok);}
+.message.warn{color:var(--accent);}
+
+.overlay{position:fixed;inset:0;z-index:100;background:rgba(16,24,19,.78);display:flex;align-items:center;justify-content:center;padding:16px;}
+.dialog{width:min(440px,100%);background:var(--panel);border:2px solid var(--strong);border-radius:10px;padding:20px;display:flex;flex-direction:column;gap:14px;}
+.dialog h2{margin:0;font-size:22px;}
+.dialog p{margin:0;font-size:15px;color:var(--soft);}
+.dialog-actions{display:flex;justify-content:flex-end;gap:10px;}
+.choice-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
+.choice{min-width:64px;font-size:18px;}
+.choice.on{background:var(--primary);color:#fff;}
+
+.overlay.saved{
+  align-items:stretch;justify-content:stretch;padding:calc(52px + env(safe-area-inset-top, 0px)) 14px 14px;
+  background:var(--bg);flex-direction:column;gap:10px;
+}
+.saved-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;}
+.saved-controls .choice-group{flex:1 1 auto;}
+.saved-controls .choice-group .choice-row{display:inline-flex;margin:0 14px 0 0;}
+.saved-actions{display:flex;gap:8px;}
+.saved-body{flex:1;min-height:0;display:flex;gap:14px;}
+.saved-list-pane{flex:0 0 250px;overflow-y:auto;}
+.saved-list{display:flex;flex-direction:column;gap:8px;}
+.saved-item{width:100%;text-align:left;font-size:15px;}
+.saved-item.on{background:var(--primary);color:#fff;}
+.saved-main{flex:1;min-width:0;display:flex;flex-direction:column;}
+.saved-hint{margin:auto;font-size:18px;font-weight:700;color:var(--soft);}
+.saved-detail{flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;}
+.print-head{display:flex;flex-direction:column;gap:2px;}
+.print-title{font-size:24px;font-weight:800;}
+.print-meta{font-size:15px;color:var(--soft);}
+.saved-detail .stage-host{max-width:1100px;margin:0 auto;}
+
+@media (max-width:820px){
+  .saved-body{flex-direction:column;}
+  .saved-list-pane{flex:0 0 auto;max-height:28vh;}
+  .field.absent input{width:160px;}
+}
+
+@page{size:A4 landscape;margin:12mm;}
+@media print{
+  html body{padding:0 !important;height:auto;overflow:visible;background:#fff;color:#000;}
+  [data-guard-home]{display:none !important;}
+  body.saved-open #app,
+  body.saved-open #saveDialog,
+  body.saved-open .saved-controls,
+  body.saved-open .saved-list-pane{display:none !important;}
+  body.saved-open .overlay.saved{position:static;display:block;padding:0;background:#fff;}
+  body.saved-open .saved-body,body.saved-open .saved-main,body.saved-open .saved-detail{display:block;}
+  .print-title{font-size:22pt;color:#000;}
+  .print-meta{font-size:12pt;color:#000;margin-bottom:6mm;}
+  .saved-detail .stage-host{height:150mm;max-width:none;}
+  .chalk{background:#fff;color:#000;border:3px solid #000;}
+  .cell{background:#fff;border:3px solid #000;color:#000;}
+  .cell.blocked{
+    background:
+      linear-gradient(to top right, transparent calc(50% - 2px), #000 calc(50% - 2px), #000 calc(50% + 2px), transparent calc(50% + 2px)),
+      linear-gradient(to bottom right, transparent calc(50% - 2px), #000 calc(50% - 2px), #000 calc(50% + 2px), transparent calc(50% + 2px)),
+      #fff;
+  }
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="controls">
+    <button type="button" id="modeToggle"></button>
+    <button type="button" id="perspectiveToggle"></button>
+    <label class="field number"><span>시작 번호</span><input id="startNumber" type="text" inputmode="numeric" maxlength="3" autocomplete="off"></label>
+    <label class="field number"><span>끝 번호</span><input id="endNumber" type="text" inputmode="numeric" maxlength="3" autocomplete="off"></label>
+    <label class="field absent"><span>결번 (예: 5, 12, 20-22)</span><input id="absentNumbers" type="text" inputmode="text" autocomplete="off"></label>
+    <button type="button" id="placeButton" class="primary">배치</button>
+    <button type="button" id="clearButton">배치 지우기</button>
+    <button type="button" id="savedButton">저장된 배치</button>
+  </header>
+  <div class="status" id="status"></div>
+  <main class="stage-host" id="stageHost"></main>
+  <footer class="footer">
+    <button type="button" id="undoButton" disabled>되돌리기</button>
+    <p class="message" id="message"></p>
+    <button type="button" id="saveButton" class="primary" disabled>저장</button>
+  </footer>
+</div>
+
+<div class="overlay" id="saveDialog" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="saveTitle">
+    <h2 id="saveTitle">자리 배치 저장</h2>
+    <p>학년과 반을 골라 주세요.</p>
+    <div id="saveClassChoice"></div>
+    <div class="dialog-actions">
+      <button type="button" id="saveCancel">취소</button>
+      <button type="button" id="saveConfirm" class="primary" disabled>저장</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay saved" id="savedView" hidden>
+  <div class="saved-controls">
+    <div class="choice-group" id="savedClassChoice"></div>
+    <div class="saved-actions">
+      <button type="button" id="savedPerspective"></button>
+      <button type="button" id="savedPrint" class="primary" disabled>출력</button>
+      <button type="button" id="savedClose">닫기</button>
+    </div>
+  </div>
+  <div class="saved-body">
+    <div class="saved-list-pane"><div class="saved-list" id="savedList"></div></div>
+    <div class="saved-main">
+      <p class="saved-hint" id="savedHint"></p>
+      <div class="saved-detail" id="savedDetail" hidden>
+        <div class="print-head"><span class="print-title" id="savedTitle"></span><span class="print-meta" id="savedMeta"></span></div>
+        <div class="stage-host" id="savedStageHost"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="seat-picker.js"></script>
+</body>
+</html>
