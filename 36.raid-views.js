@@ -1677,6 +1677,18 @@ class RdZoneView {
         this.zones.forEach((zone) => { zone.discMaterial.opacity = 0.18 + pulse * 0.16; });
     }
 }
+class RdDamageStyle {
+    static of(event, isHero, localSlot) {
+        if (event.heal)
+            return "heal";
+        if (isHero)
+            return "hero";
+        if (localSlot >= 0 && event.by === localSlot + 1)
+            return "mine";
+        return event.v >= RdDamageStyle.BIG_HIT ? "big" : "foe";
+    }
+}
+RdDamageStyle.BIG_HIT = 60;
 class RdDamageNumbers {
     constructor(world, container) {
         this.world = world;
@@ -1903,7 +1915,7 @@ class RdSceneView {
                 if (!point)
                     return;
                 const isHero = event.id >= 1 && event.id <= RdRules.SEATS;
-                this.kit.numbers.show(point.x, point.z, (event.heal ? "+" : "") + event.v, event.heal ? "heal" : isHero ? "hero" : event.v >= 60 ? "big" : "foe");
+                this.kit.numbers.show(point.x, point.z, (event.heal ? "+" : "") + event.v, RdDamageStyle.of(event, isHero, localSlot));
                 if (event.heal)
                     return;
                 if (isHero) {

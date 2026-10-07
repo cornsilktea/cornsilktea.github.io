@@ -150,7 +150,8 @@
   #rewardBox.sent { opacity: .55; pointer-events: none; }
   #numberLayer { position: fixed; inset: 0; z-index: 16; pointer-events: none; overflow: hidden; }
   .rd-num { position: absolute; left: 0; top: 0; font-weight: 800; font-size: 17px; color: #FFFFFF; text-shadow: 0 0 3px #000, 0 2px 2px #000; white-space: nowrap; will-change: transform, opacity; }
-  .rd-num.hero { color: #FF7A6A; }
+  .rd-num.hero { color: #FFB8A8; font-size: 15px; }
+  .rd-num.mine { color: #FF2E2E; font-size: 28px; text-shadow: 0 0 3px #000, 0 2px 2px #000, 0 0 10px rgba(255, 40, 40, .55); z-index: 1; }
   .rd-num.heal { color: #7CFFB0; }
   .rd-num.big { color: #FFD27A; font-size: 22px; }
   .rd-net { position: fixed; left: 10px; bottom: 10px; z-index: 40; padding: 3px 8px; border-radius: 6px; background: rgba(0, 0, 0, .65); color: #9CF59C; font: 12px monospace; pointer-events: none; }
@@ -280,7 +281,7 @@
         <div class="st-rec" id="clsBoxEnd" hidden><span>우리 반 신기록</span><b id="clsValueEnd">아직 기록이 없습니다</b><small id="clsWhoEnd"></small></div>
       </div>
       <table class="st-table" style="margin-top:12px"><thead><tr><th>구간</th><th>걸린 시간</th></tr></thead><tbody id="endTimes"></tbody></table>
-      <table class="st-table"><thead><tr><th>이름</th><th>직업</th><th>피해량</th><th>치유량</th><th>쓰러짐</th></tr></thead><tbody id="endRows"></tbody></table>
+      <table class="st-table"><thead><tr><th>이름</th><th>직업</th><th>준 피해</th><th>받은 피해</th><th>치유량</th><th>쓰러짐</th></tr></thead><tbody id="endRows"></tbody></table>
       <div id="endNote"></div>
       <button type="button" class="st-btn primary" id="btnToLobby" style="margin-top:14px" hidden>대기실로</button>
       <div class="st-hint" id="endHint"></div>

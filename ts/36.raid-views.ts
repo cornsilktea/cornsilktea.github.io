@@ -1836,6 +1836,19 @@ class RdZoneView {
   }
 }
 
+type RdDamageKind = "foe" | "hero" | "heal" | "big" | "mine";
+
+class RdDamageStyle {
+  static readonly BIG_HIT = 60;
+
+  static of(event: Extract<RdEvent, { t: "dmg" }>, isHero: boolean, localSlot: number): RdDamageKind {
+    if (event.heal) return "heal";
+    if (isHero) return "hero";
+    if (localSlot >= 0 && event.by === localSlot + 1) return "mine";
+    return event.v >= RdDamageStyle.BIG_HIT ? "big" : "foe";
+  }
+}
+
 class RdDamageNumbers {
   private static readonly POOL = 36;
   private readonly items: Array<{ element: HTMLDivElement; x: number; y: number; z: number; age: number; life: number; busy: boolean }> = [];
@@ -1850,7 +1863,7 @@ class RdDamageNumbers {
     }
   }
 
-  show(x: number, z: number, text: string, kind: "foe" | "hero" | "heal" | "big"): void {
+  show(x: number, z: number, text: string, kind: RdDamageKind): void {
     let item = this.items.filter((entry) => !entry.busy)[0];
     if (!item) item = this.items.reduce((oldest, entry) => (entry.age > oldest.age ? entry : oldest), this.items[0]);
     item.busy = true;
@@ -2028,7 +2041,7 @@ class RdSceneView {
         const point = this.unitWorld(event.id);
         if (!point) return;
         const isHero = event.id >= 1 && event.id <= RdRules.SEATS;
-        this.kit.numbers.show(point.x, point.z, (event.heal ? "+" : "") + event.v, event.heal ? "heal" : isHero ? "hero" : event.v >= 60 ? "big" : "foe");
+        this.kit.numbers.show(point.x, point.z, (event.heal ? "+" : "") + event.v, RdDamageStyle.of(event, isHero, localSlot));
         if (event.heal) return;
         if (isHero) {
           const actor = this.heroes[event.id - 1];

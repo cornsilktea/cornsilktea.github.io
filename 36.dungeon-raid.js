@@ -122,7 +122,7 @@ class RdInputController {
         return this.enabled && (this.attackKey || this.attackMouse || this.attackTouch);
     }
     pointer() {
-        return performance.now() - this.pointerAt < 4000 ? { x: this.pointerX, y: this.pointerY } : null;
+        return this.pointerAt > 0 ? { x: this.pointerX, y: this.pointerY } : null;
     }
     setTouchAttack(down) {
         this.attackTouch = down;
@@ -429,7 +429,7 @@ class RdHud {
         const flow = state.flow;
         const floorSpec = RdFloorPlan.spec(flow.floor);
         RkDom.setText(this.floorLine, flow.stage === "reward" ? flow.floor + "층 보상방" : floorSpec.startTitle);
-        const record = flow.rs >= 0 ? (flow.re >= 0 ? flow.re - flow.rs : time - flow.rs) : 0;
+        const record = RdRecordClock.ofFlow(flow, time);
         RkDom.setText(this.timeLine, "이 층 " + RdTimeText.short(time - flow.fs) + " · 기록 " + RdTimeText.short(record));
         let wave = "";
         if (flow.stage === "wave")
@@ -722,7 +722,7 @@ class RdResultView {
             const entry = roster.filter((item) => item.slot === shot.slot)[0];
             const spec = RdBalance.heroSpec(shot.slot);
             const name = entry ? entry.nick + (entry.isBot ? " (AI)" : "") : "(나감)";
-            return "<tr" + (shot.slot === mySlot ? " class='meRow'" : "") + "><td><span class='rankDot' style='background:" + spec.color + "'></span>" + RkDom.escape(name) + "</td><td>" + spec.name + "</td><td>" + shot.dmg + "</td><td>" + shot.heal + "</td><td>" + shot.downs + "</td></tr>";
+            return "<tr" + (shot.slot === mySlot ? " class='meRow'" : "") + "><td><span class='rankDot' style='background:" + spec.color + "'></span>" + RkDom.escape(name) + "</td><td>" + spec.name + "</td><td>" + shot.dmg + "</td><td>" + (shot.hurt || 0) + "</td><td>" + shot.heal + "</td><td>" + shot.downs + "</td></tr>";
         }).join("");
         const notes = [];
         if (!end.humans)
@@ -899,7 +899,7 @@ class RdMirror {
         if (!this.state) {
             this.state = {
                 snap: { t: 0, heroes: [], foes: [], tele: [], areas: [] },
-                flow: { n: 0, floor: 1, stage: "ready", phase: "intro", phaseAt: 0, wave: 0, waves: 0, left: 0, vault: false, zone: null, inZone: [], readyEnd: -1, rs: -1, re: -1, fs: 0, boss: null, mech: null, hint: "", out: "running", times: [], banner: null, picking: 0 },
+                flow: { n: 0, floor: 1, stage: "ready", phase: "intro", phaseAt: 0, wave: 0, waves: 0, left: 0, vault: false, zone: null, inZone: [], readyEnd: -1, rs: -1, re: -1, rp: 0, rq: -1, fs: 0, boss: null, mech: null, hint: "", out: "running", times: [], banner: null, picking: 0 },
                 party: [], offers: []
             };
         }
@@ -932,6 +932,7 @@ class RdLocalBody {
         this.lastSentText = "";
         this.lastSentAt = 0;
         this.targets = [];
+        this.dashAim = null;
         this.hero = new RdHero(slot, pilot);
     }
     cooldowns() {
@@ -945,11 +946,15 @@ class RdLocalBody {
         if (now < this.readyAt[index])
             return false;
         const intent = this.pilot.intent();
+        intent.aimX = this.hero.intent.aimX;
+        intent.aimZ = this.hero.intent.aimZ;
         const skill = this.hero.heroClass.skills[index];
         this.pilot.press(index);
         this.pressedAt[index] = now;
         this.readyAt[index] = now + (party ? party.cdMax[index] || skill.spec.cooldown : skill.spec.cooldown);
-        this.hero.dash = skill.motion(this.hero, intent, this.targets);
+        const dash = skill.motion(this.hero, intent, this.targets);
+        this.hero.dash = dash;
+        this.dashAim = dash && dash.kind === "charge" ? { x: dash.dirX, z: dash.dirZ } : null;
         return true;
     }
     knock(dir, distance) {
@@ -1016,8 +1021,11 @@ class RdLocalBody {
         bodies.push(this.hero);
         this.world.bodies = bodies;
         const intent = this.pilot.intent();
-        intent.aimX = aim.x;
-        intent.aimZ = aim.z;
+        if (!this.hero.dash)
+            this.dashAim = null;
+        const steer = this.dashAim || aim;
+        intent.aimX = steer.x;
+        intent.aimZ = steer.z;
         this.hero.intent = intent;
         const now = this.clock.local();
         if (intent.attack)
@@ -1200,7 +1208,7 @@ class RdMatch {
     }
     showBanner(kind, floor) {
         const state = this.currentState();
-        const record = state && state.flow.rs >= 0 ? (state.flow.re >= 0 ? state.flow.re : this.time()) - state.flow.rs : 0;
+        const record = state ? RdRecordClock.ofFlow(state.flow, this.time()) : 0;
         if (kind === "start")
             this.services.banner.showStart(floor, this.matchId);
         else

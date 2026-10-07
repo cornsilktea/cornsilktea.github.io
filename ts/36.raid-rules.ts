@@ -64,7 +64,7 @@ interface RdArea { id: number; shape: RdShape; start: number; end: number; dps: 
 interface RdOffer { slot: number; floor: number; tier: number; phase: RdOfferPhase; deadline: number; stats: RdStatKey[]; gear: RdGearCard[] }
 
 type RdEvent =
-  | { t: "dmg"; id: number; v: number; heal: boolean }
+  | { t: "dmg"; id: number; v: number; heal: boolean; by?: number }
   | { t: "act"; id: number; a: RdAnimKey }
   | { t: "proj"; p: number; s: RdProjStyle; from: number; to: number; x: number; z: number; tx: number; tz: number; v: number }
   | { t: "hitp"; p: number }
@@ -698,6 +698,7 @@ class RdHero extends RdUnit {
   intent: RdHeroIntent = RdIntents.idle();
   damageDone = 0;
   healingDone = 0;
+  damageTaken = 0;
   downs = 0;
 
   constructor(readonly slot: number, public pilot: RdHeroPilot) {
@@ -859,7 +860,8 @@ class RdMeleeAim {
     if (!inReach.length) return facing;
     const offOf = (target: RdBody) => Math.abs(RdMath.angleDiff(RdMath.yawOf(target.x - hero.x, target.z - hero.z), facingYaw));
     const ahead = inReach.filter((target) => offOf(target) <= RdMeleeAim.CONE).sort((a, b) => offOf(a) - offOf(b) || hero.distanceTo(a) - hero.distanceTo(b));
-    const chosen = ahead[0] || inReach.slice().sort((a, b) => hero.distanceTo(a) - hero.distanceTo(b))[0];
+    const chosen = ahead[0];
+    if (!chosen) return facing;
     const direction = RdMath.normalize(chosen.x - hero.x, chosen.z - hero.z);
     return direction.x || direction.z ? direction : facing;
   }
@@ -1561,8 +1563,8 @@ class RdLeapSlam extends RdAttackPattern {
   }
 
   shapes(engine: RdEngine, boss: RdBoss): RdShape[] {
-    const victim = engine.random.pick(engine.livingHeroes());
-    return [{ kind: "circle", x: victim.x, z: victim.z, r: this.spec.radius }];
+    const landing = RdBossArena.clamp(engine.random.pick(engine.livingHeroes()));
+    return [{ kind: "circle", x: landing.x, z: landing.z, r: this.spec.radius }];
   }
 
   resolve(engine: RdEngine, boss: RdBoss, cast: RdCast): void {
@@ -1771,6 +1773,23 @@ class RdBarrierLines extends RdAttackPattern {
 
 interface RdRush { dirX: number; dirZ: number; left: number; speed: number; stun: number; bonus: number }
 
+class RdBossArena {
+  static readonly HALF_X = 1100;
+  static readonly HALF_Z = 800;
+  static readonly SETTLE = 30;
+
+  static inside(point: RdPoint): boolean {
+    return Math.abs(point.x - RdMapData.CENTER.x) <= RdBossArena.HALF_X && Math.abs(point.z - RdMapData.CENTER.z) <= RdBossArena.HALF_Z;
+  }
+
+  static clamp(point: RdPoint): RdPoint {
+    return {
+      x: RdMath.clamp(point.x, RdMapData.CENTER.x - RdBossArena.HALF_X, RdMapData.CENTER.x + RdBossArena.HALF_X),
+      z: RdMath.clamp(point.z, RdMapData.CENTER.z - RdBossArena.HALF_Z, RdMapData.CENTER.z + RdBossArena.HALF_Z)
+    };
+  }
+}
+
 abstract class RdBoss extends RdEnemy {
   cast: RdCast | null = null;
   rush: RdRush | null = null;
@@ -1875,7 +1894,16 @@ abstract class RdBoss extends RdEnemy {
       this.faceToward(target.x, target.z);
       return;
     }
-    this.walkToward(engine, target.x, target.z, dt);
+    this.walkWithinArena(engine, RdBossArena.clamp(target), target, dt);
+  }
+
+  protected walkWithinArena(engine: RdEngine, goal: RdPoint, target: RdHero, dt: number): void {
+    if (Math.hypot(goal.x - this.x, goal.z - this.z) < RdBossArena.SETTLE) {
+      this.moving = false;
+      this.faceToward(target.x, target.z);
+      return;
+    }
+    this.walkToward(engine, goal.x, goal.z, dt);
   }
 
   walkToward(engine: RdEngine, x: number, z: number, dt: number): void {
@@ -1987,6 +2015,8 @@ class RdGiantWarrior extends RdBoss {
 class RdArchMage extends RdBoss {
   static readonly KEEP_MIN = 800;
   static readonly KEEP_MAX = 1150;
+  static readonly STAND_STEPS = 16;
+  static readonly CENTER_PULL = 0.6;
   readonly bossKind: RdBossKind = "archmage";
   readonly displayName = RdBalance.ARCHMAGE.name;
   protected readonly patterns: RdAttackPattern[];
@@ -2004,23 +2034,28 @@ class RdArchMage extends RdBoss {
 
   protected approach(engine: RdEngine, target: RdHero, dt: number): void {
     const distance = this.distanceTo(target);
-    if (distance >= RdArchMage.KEEP_MIN && distance <= RdArchMage.KEEP_MAX) {
+    if (distance >= RdArchMage.KEEP_MIN && distance <= RdArchMage.KEEP_MAX && RdBossArena.inside(this)) {
       this.moving = false;
       this.faceToward(target.x, target.z);
       return;
     }
-    const away = RdMath.normalize(this.x - target.x, this.z - target.z);
-    const want = RdMath.clamp(distance, RdArchMage.KEEP_MIN + 50, RdArchMage.KEEP_MAX - 50);
-    let goalX = target.x + away.x * want, goalZ = target.z + away.z * want;
-    if (!engine.world.regionContains(goalX, goalZ, this.radius)) {
-      goalX = RdMath.clamp(goalX, RdMapData.HALL.minX + this.radius + 40, RdMapData.HALL.maxX - this.radius - 40);
-      goalZ = RdMath.clamp(goalZ, RdMapData.HALL.minZ + this.radius + 40, RdMapData.HALL.maxZ - this.radius - 40);
-      if (Math.hypot(goalX - this.x, goalZ - this.z) < 60) {
-        goalX = this.x - away.z * 300;
-        goalZ = this.z + away.x * 300;
+    this.walkWithinArena(engine, this.standPoint(target), target, dt);
+  }
+
+  private standPoint(target: RdHero): RdPoint {
+    const want = (RdArchMage.KEEP_MIN + RdArchMage.KEEP_MAX) / 2;
+    let best: RdPoint | null = null, bestScore = Infinity;
+    for (let step = 0; step < RdArchMage.STAND_STEPS; step++) {
+      const angle = (step / RdArchMage.STAND_STEPS) * Math.PI * 2;
+      const point = { x: target.x + Math.sin(angle) * want, z: target.z + Math.cos(angle) * want };
+      if (!RdBossArena.inside(point)) continue;
+      const score = Math.hypot(point.x - this.x, point.z - this.z) + Math.hypot(point.x - RdMapData.CENTER.x, point.z - RdMapData.CENTER.z) * RdArchMage.CENTER_PULL;
+      if (score < bestScore) {
+        best = point;
+        bestScore = score;
       }
     }
-    this.walkToward(engine, goalX, goalZ, dt);
+    return best || RdBossArena.clamp(target);
   }
 }
 
@@ -2613,6 +2648,8 @@ class RdFlow {
   transition = 0;
   recordStart = -1;
   recordEnd = -1;
+  pausedSeconds = 0;
+  pauseFrom = -1;
   outcome: RdOutcome = "running";
   readonly times: Array<[string, number]> = [];
 
@@ -2648,11 +2685,16 @@ class RdFlow {
     this.times.push([this.stage.label, Math.round((engine.time - this.stage.enteredAt) * 10) / 10]);
     this.stage.exit(engine);
     if (this.index === 0) this.recordStart = engine.time;
+    if (this.stage.kind === "reward" && this.pauseFrom >= 0) {
+      this.pausedSeconds += engine.time - this.pauseFrom;
+      this.pauseFrom = -1;
+    }
     if (this.index >= this.stages.length - 1) {
       this.outcome = "success";
       return;
     }
     this.index++;
+    if (this.stage.kind === "reward") this.pauseFrom = engine.time;
     this.stage.enter(engine);
   }
 
@@ -2663,8 +2705,20 @@ class RdFlow {
   }
 
   recordSeconds(engine: RdEngine): number {
-    if (this.recordStart < 0) return 0;
-    return (this.recordEnd >= 0 ? this.recordEnd : engine.time) - this.recordStart;
+    return RdRecordClock.seconds(this.recordStart, this.recordEnd, this.pausedSeconds, this.pauseFrom, engine.time);
+  }
+}
+
+class RdRecordClock {
+  static seconds(start: number, end: number, paused: number, pauseFrom: number, now: number): number {
+    if (start < 0) return 0;
+    const stop = end >= 0 ? end : now;
+    const running = pauseFrom >= 0 && end < 0 ? Math.max(0, now - pauseFrom) : 0;
+    return Math.max(0, stop - start - paused - running);
+  }
+
+  static ofFlow(flow: RdFlowShot, now: number): number {
+    return RdRecordClock.seconds(flow.rs, flow.re, flow.rp || 0, flow.rq === undefined ? -1 : flow.rq, now);
   }
 }
 
@@ -2816,7 +2870,7 @@ class RdEngine {
     const scaled = Math.max(1, Math.round(amount * foe.damageFactor(this.time)));
     const dealt = foe.absorb(this, scaled);
     if (hero && foe.creditsDamage) hero.damageDone += dealt;
-    this.emit({ t: "dmg", id: foe.id, v: scaled, heal: false });
+    this.emit(hero ? { t: "dmg", id: foe.id, v: scaled, heal: false, by: hero.id } : { t: "dmg", id: foe.id, v: scaled, heal: false });
     if (foe.hp <= 0 && !(foe instanceof RdManaPillar)) {
       this.emit({ t: "die", id: foe.id });
       foe.onDeath(this);
@@ -2828,6 +2882,7 @@ class RdEngine {
   damageHero(hero: RdHero, amount: number, unavoidable: boolean = false): number {
     if (!hero.alive || (!unavoidable && this.time < hero.invulnerableUntil)) return 0;
     const value = Math.max(1, Math.round(amount));
+    hero.damageTaken += Math.min(value, Math.max(0, hero.hp));
     hero.hp -= value;
     this.emit({ t: "dmg", id: hero.id, v: value, heal: false });
     if (hero.hp <= 0) this.knockDown(hero);
@@ -3750,11 +3805,11 @@ interface RdMechShot { kind: RdMechKind; text: string; end: number; window: numb
 interface RdBossShot { id: number; kind: RdBossKind; name: string }
 interface RdFlowShot {
   n: number; floor: number; stage: RdStageKind; phase: RdStagePhase; phaseAt: number; wave: number; waves: number; left: number;
-  vault: boolean; zone: RdCircle | null; inZone: number[]; readyEnd: number; rs: number; re: number; fs: number;
+  vault: boolean; zone: RdCircle | null; inZone: number[]; readyEnd: number; rs: number; re: number; rp: number; rq: number; fs: number;
   boss: RdBossShot | null; mech: RdMechShot | null; hint: string; out: RdOutcome; times: Array<[string, number]>;
   banner: { k: "start" | "clear"; f: number; at: number } | null; picking: number;
 }
-interface RdPartyShot { slot: number; max: number; atk: number; spd: number; gap: number; cdMax: number[]; gear: number[]; cards: Record<RdStatKey, number>; dmg: number; heal: number; downs: number }
+interface RdPartyShot { slot: number; max: number; atk: number; spd: number; gap: number; cdMax: number[]; gear: number[]; cards: Record<RdStatKey, number>; dmg: number; heal: number; hurt: number; downs: number }
 interface RdMatchState { snap: RdSnapshot; flow: RdFlowShot; party: RdPartyShot[]; offers: RdOffer[] }
 
 class RdHeroFlags {
@@ -3861,7 +3916,8 @@ class RdSnapshotCodec {
       wave: stage.wave(), waves: stage.waves(), left: engine.countedFoes(), vault: engine.world.vaultOpen,
       zone: zone ? { x: zone.circle.x, z: zone.circle.z, r: zone.circle.r } : null, inZone: zone ? zone.inside(engine) : [],
       readyEnd: zone ? Math.round(zone.countdownEnd * 100) / 100 : -1,
-      rs: Math.round(engine.flow.recordStart * 100) / 100, re: Math.round(engine.flow.recordEnd * 100) / 100, fs: Math.round(stage.enteredAt * 100) / 100,
+      rs: Math.round(engine.flow.recordStart * 100) / 100, re: Math.round(engine.flow.recordEnd * 100) / 100,
+      rp: Math.round(engine.flow.pausedSeconds * 100) / 100, rq: Math.round(engine.flow.pauseFrom * 100) / 100, fs: Math.round(stage.enteredAt * 100) / 100,
       boss: boss ? { id: boss.id, kind: boss.bossKind, name: boss.displayName } : null,
       mech: mechanic ? {
         kind: mechanic.kind, text: mechanic.instruction, end: Math.round(mechanic.endsAt() * 100) / 100, window: Math.round(mechanic.windowEndsAt() * 100) / 100,
@@ -3878,7 +3934,7 @@ class RdSnapshotCodec {
       slot: hero.slot, max: hero.maxHp, atk: Math.round(hero.stats.attack() * 10) / 10, spd: Math.round(hero.stats.speed()), gap: Math.round(hero.stats.interval() * 100) / 100,
       cdMax: hero.heroClass.skills.map((skill, index) => Math.round(hero.skillCooldown(index) * 10) / 10), gear: hero.stats.gear.slice(),
       cards: { atk: Math.round(hero.stats.cards.atk * 100) / 100, hp: Math.round(hero.stats.cards.hp * 100) / 100, aspd: Math.round(hero.stats.cards.aspd * 100) / 100, move: Math.round(hero.stats.cards.move * 100) / 100, cdr: Math.round(hero.stats.cards.cdr * 100) / 100 },
-      dmg: Math.round(hero.damageDone), heal: Math.round(hero.healingDone), downs: hero.downs
+      dmg: Math.round(hero.damageDone), heal: Math.round(hero.healingDone), hurt: Math.round(hero.damageTaken), downs: hero.downs
     }));
   }
 
