@@ -5,11 +5,21 @@ interface RecordSlot {
   who(): string;
 }
 
+interface WorldRecordNameAsk { value: number; seconds: number; fallback: string; needClass: boolean; title?: string }
+interface WorldRecordNameAnswer { name: string; grade: number; cls: number }
+interface WorldRecordParty { party: string[]; grade: number; cls: number }
+
 interface WorldRecordHandle extends RecordSlot {
-  cls?: RecordSlot;
+  cls?: RecordSlot | null;
+  klass?: PortalClass | null;
+  noRecord?: boolean;
   onChange(listener: () => void): void;
-  load(): void;
+  load(): Promise<unknown> | void;
   prompt(value: number): void;
+  beats(value: number): boolean;
+  beatsClass(value: number): boolean;
+  askName?(options: WorldRecordNameAsk): Promise<WorldRecordNameAnswer>;
+  submitParty?(value: number, party: WorldRecordParty): Promise<unknown>;
 }
 
 interface Window {

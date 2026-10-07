@@ -28,6 +28,11 @@
      · 화면에는 세계 신기록 옆에 "우리 반 신기록" 칸을 hidden 으로 두고 WR.cls 가 있을 때만 보이게 한다
        ([hidden]{display:none !important} 필요). wrBeat 로 prompt 를 가리는 게임은 WR.beatsClass(값) 도 함께 본다.
 
+   파티 기록(여러 명이 함께 세운 기록, 36번 던전 레이드)
+     · WR.askName({value, seconds, fallback, needClass, title}) → 각자 자기 기기에서 이름만 적는 창(시간이 지나면 fallback).
+     · WR.submitParty(값, {party: [이름…], grade, cls}) → 넘었으면 party 를 붙여 세계·그 반 신기록에 등록.
+     · party 가 있는 기록은 who() 가 "1학년 3반 이름 이름 …" 으로 보인다. party 를 안 쓰는 게임은 예전과 완전히 같다.
+
    옵션: lower(작을수록 좋음), format(값→문자열), key(기본 "all" — 곡별 기록처럼 여러 개면 지정)
    경로는 records/<게임>/<key> . 규칙(데이터베이스규칙.json)은 기존보다 큰 score 만 받으므로
    시간처럼 작을수록 좋은 기록은 score = LOWER_BASE - 값 으로 저장한다(lower:true. 규칙이 score >= 0 만 받으므로 음수 대신).
@@ -78,14 +83,28 @@
     });
   }
 
-  /* 기록 → "1학년 3반 홍길동" (학년·반이 없는 옛 기록은 이름만) */
+  /* 기록 → "1학년 3반 홍길동" (학년·반이 없는 옛 기록은 이름만).
+     파티 기록(36번 던전 레이드처럼 여러 명이 함께 세운 기록)은 party 배열이 있으면 이름 대신 파티 이름들을 잇는다. */
+  function partyOf(rec) {
+    if (!rec || !rec.party) return null;
+    var list = Array.isArray(rec.party) ? rec.party : Object.keys(rec.party).sort().map(function (k) { return rec.party[k]; });
+    return list.filter(function (n) { return typeof n === "string" && n; });
+  }
   function whoOf(rec) {
     if (!rec) return "";
     var p = [];
     if (rec.grade) p.push(rec.grade + "학년");
     if (rec.cls) p.push(rec.cls + "반");
-    p.push(rec.name);
+    var party = partyOf(rec);
+    if (party && party.length) p.push(party.join(" "));
+    else p.push(rec.name);
     return p.join(" ");
+  }
+
+  /* 반 신기록 칸처럼 학년·반 없이 이름만 보일 때 */
+  function nameOnly(rec) {
+    var party = partyOf(rec);
+    return party && party.length ? party.join(" ") : rec.name;
   }
 
   function pickRow(list, unit) {
@@ -134,11 +153,13 @@
         return lower ? v < LOWER_BASE - s.rec.score : v > s.rec.score;
       },
       /* 규칙이 "기존보다 큰 score 만" 받으므로, 그 사이 누가 앞질렀으면 401 로 거부된다 */
-      submit: function (v, name, grade, cls) {
+      submit: function (v, name, grade, cls, party) {
         var u = s.url();
         if (!u) return Promise.reject(new Error("no-db"));
         /* at 은 서버 시각(.sv) — 학생 기기의 시계가 틀려도 규칙의 시각 검사에 걸리지 않게 */
         var rec = { score: lower ? LOWER_BASE - v : v, name: name, grade: grade, cls: cls, at: { ".sv": "timestamp" } };
+        /* party 는 파티 기록일 때만 붙인다(없으면 예전과 똑같은 모양으로 저장) */
+        if (party) rec.party = party;
         return fetch(u, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(rec) })
           .then(function (r) {
             if (!r.ok) throw new Error(String(r.status));
@@ -173,7 +194,7 @@
     if (pc && pc.contest) pc = null;
     var world = Store(game, key, lower, format);
     var cls = pc ? Store(game, classKey(key, pc), lower, format) : null;
-    if (cls) cls.who = function () { return cls.rec ? cls.rec.name : ""; };   /* 반 안에서는 이름만 */
+    if (cls) cls.who = function () { return cls.rec ? nameOnly(cls.rec) : ""; };   /* 반 안에서는 이름만(파티 기록이면 파티 이름들) */
 
     var api = {
       game: game,
@@ -304,7 +325,7 @@
                   })
                   .then(function () {
                     if (target !== cls) {   /* 게임이 결과 화면에 그 반 신기록을 보여 줄 수 있게 붙여 둔다 */
-                      target.who = function () { return target.rec ? target.rec.name : ""; };
+                      target.who = function () { return target.rec ? nameOnly(target.rec) : ""; };
                       api.cls = cls = target;
                       api.klass = { id: grade + "-" + cls_, grade: grade, cls: cls_, label: grade + "학년 " + cls_ + "반" };
                     }
@@ -329,6 +350,95 @@
           input.addEventListener("keydown", function (e) { if (e.key === "Enter") ok.click(); });
         });
     }
+
+    /* ---------- 파티 기록(여러 명이 함께 세운 기록, 36번 던전 레이드) ----------
+       api.askName({value, seconds, fallback, needClass, title}) → Promise<{name, grade, cls}>
+         각 학생이 자기 기기에서 이름만 적는 창. seconds 초가 지나면 적은 이름(없으면 fallback)으로 닫힌다.
+         needClass 면 학년·반도 고르게 한다(방장 기기에서 반 링크 없이 들어왔을 때). 반 링크면 미리 골라 둔다.
+       api.submitParty(value, {party, grade, cls}) → 세계 신기록·그 반 신기록을 넘으면 party(이름 배열)를 붙여 등록한다.
+         name 칸은 예전 화면이 읽을 수 있게 파티 이름을 이어 20자로 자른 것. 배포용 링크(?c=test)면 거부.
+       기존 prompt/submit 의 동작과 저장 모양은 바뀌지 않는다(party 를 넘기지 않으면 예전과 같음). */
+    api.askName = function (o) {
+      o = o || {};
+      ensureStyle();
+      return new Promise(function (resolve) {
+        var needClass = !!o.needClass;
+        var back = document.createElement("div");
+        back.className = "wr-back";
+        back.innerHTML =
+          '<div class="wr-box" role="dialog" aria-modal="true">' +
+            "<h3>🏆 " + escapeHtml(o.title || "신기록 달성!") + "</h3>" +
+            '<div class="wr-val">기록 <b>' + escapeHtml(format(o.value)) + "</b></div>" +
+            (needClass ? '<div class="wr-lab">학년</div>' + pickRow(GRADES, "학년") + '<div class="wr-lab">반</div>' + pickRow(CLASSES, "반") : "") +
+            '<div class="wr-lab">내 이름</div>' +
+            '<div class="wr-row">' +
+              '<input type="text" maxlength="8" placeholder="이름 (8자 이내)" autocomplete="off">' +
+              '<button type="button" class="wr-ok">확인</button>' +
+            "</div>" +
+            '<div class="wr-warn">자신의 이름을 제대로 입력하지 않으면<br>데이터베이스에서 기록이 삭제됩니다.</div>' +
+            '<div class="wr-msg"></div>' +
+          "</div>";
+        document.body.appendChild(back);
+        var input = back.querySelector("input"), ok = back.querySelector(".wr-ok"), msg = back.querySelector(".wr-msg");
+        var picks = back.querySelectorAll(".wr-pick");
+        var grade = pc ? pc.grade : 0, cls_ = pc ? pc.cls : 0;
+        if (needClass) {
+          [[picks[0], function (n) { grade = n; }, grade], [picks[1], function (n) { cls_ = n; }, cls_]].forEach(function (entry) {
+            var row = entry[0], setter = entry[1];
+            row.addEventListener("click", function (e) {
+              var b = e.target.closest("button"); if (!b) return;
+              row.querySelectorAll("button").forEach(function (x) { x.classList.toggle("on", x === b); });
+              setter(parseInt(b.getAttribute("data-v"), 10));
+            });
+            var pre = row.querySelector('button[data-v="' + entry[2] + '"]');
+            if (pre) pre.classList.add("on");
+          });
+        }
+        var left = Math.max(1, Math.round(o.seconds || 30));
+        var done = false;
+        function finish() {
+          if (done) return;
+          done = true;
+          clearInterval(timer);
+          back.remove();
+          resolve({ name: input.value.trim() || String(o.fallback || ""), grade: grade, cls: cls_ });
+        }
+        function tick() {
+          msg.textContent = left + "초 뒤에 자동으로 닫혀요" + (o.fallback ? " (비우면 \"" + o.fallback + "\")" : "");
+          if (left-- <= 0) finish();
+        }
+        var timer = setInterval(tick, 1000);
+        tick();
+        function stop(e) { e.stopPropagation(); }
+        back.addEventListener("keydown", stop); back.addEventListener("keyup", stop); back.addEventListener("keypress", stop);
+        ok.onclick = finish;
+        input.addEventListener("keydown", function (e) { if (e.key === "Enter") finish(); });
+        setTimeout(function () { try { input.focus(); } catch (e) {} }, 50);
+      });
+    };
+
+    api.submitParty = function (v, o) {
+      if (noRecord) return Promise.reject(new Error("test-link"));
+      var party = (o.party || []).map(function (n) { return String(n).slice(0, 8); });
+      var name = party.join(" ").slice(0, 20) || "파티";
+      var grade = o.grade, cls_ = o.cls;
+      var target = (cls && pc && pc.grade === grade && pc.cls === cls_) ? cls : Store(game, classKey(key, { grade: grade, cls: cls_ }), lower, format);
+      return api.load()
+        .then(function () { return target === cls ? null : target.load(); })
+        .then(function () { return world.beats(v) ? world.submit(v, name, grade, cls_, party) : null; })
+        .then(function (rec) {
+          var classJob = (!target.loaded || target.beats(v)) ? target.submit(v, name, grade, cls_, party).catch(function () { return null; }) : null;
+          return Promise.resolve(classJob).then(function () {
+            if (target !== cls) {
+              target.who = function () { return target.rec ? nameOnly(target.rec) : ""; };
+              api.cls = cls = target;
+              api.klass = { id: grade + "-" + cls_, grade: grade, cls: cls_, label: grade + "학년 " + cls_ + "반" };
+            }
+            emit();
+            return rec;
+          });
+        });
+    };
 
     function emit() { listeners.forEach(function (fn) { try { fn(api); } catch (e) {} }); }
     return api;

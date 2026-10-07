@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<script charset="utf-8" src="firebase-config.js"></script>
+<script charset="utf-8" src="access-guard.js" data-game="dungeonraid"></script>
+<script charset="utf-8" src="quality-governor.js"></script>
+<script charset="utf-8" src="world-record.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
+<title>던전 레이드</title>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="정보 수업용 링크 모음">
+<meta property="og:title" content="던전 레이드">
+<meta property="og:description" content="방 코드로 모여 5명이 직업(탱커·바바리안·메이지·레인저·힐러)을 하나씩 맡는 3D 협동 던전 / 병사 웨이브·중간 보스 2마리·최종 보스 해골 군주 / 층마다 보상방에서 능력치·장비 카드 / 5층 팀 합 맞추기 패턴 / 빈 직업은 AI가 채움, 5명 모두 사람이면 파티 신기록 등록">
+<meta property="og:url" content="https://cornsilktea.github.io/36.dungeon-raid.html">
+<meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
+<meta name="twitter:card" content="summary">
+<!-- 링크 미리보기 끝 -->
+<link rel="stylesheet" href="theme.css">
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1.10.1/dist/es-module-shims.js"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  [hidden] { display: none !important; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #14101C; font-family: var(--sg-font); color: #EEF0F4; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  button { font-family: inherit; cursor: pointer; }
+  input { font-family: inherit; }
+  #view { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+  .st-screen { --st-bg: 18, 12, 28; --st-panel: rgba(26, 18, 40, .88); --st-accent: #D97B4F; --st-title2: #C9A0FF; --st-glow: rgba(160, 100, 255, .55); overflow-y: auto; }
+  .st-screen .st-title { letter-spacing: -.5px; }
+  .st-card { margin-bottom: 14px; }
+  .st-screen input[type=text] { width: 100%; min-height: 48px; padding: 6px 12px; font-size: 18px; font-weight: 800; border-radius: 6px; border: 2px solid rgba(255, 255, 255, .3); background: rgba(255, 255, 255, .06); color: #fff; outline: 0; -webkit-user-select: text; user-select: text; }
+  .st-screen input[type=text]:focus { border-color: #D97B4F; }
+  .st-joinrow { display: flex; gap: 10px; margin-top: 10px; }
+  .st-joinrow input { flex: 1 1 auto; min-width: 0; text-align: center; letter-spacing: .3em; }
+  .st-joinrow .st-btn { flex: 0 0 26%; margin: 0; font-size: 16px; }
+  .st-msg { margin-top: 10px; font-size: 14px; font-weight: 700; color: #FF9A8A; }
+  .st-msg:empty { display: none; }
+  .st-btn.sub { background: rgba(255, 255, 255, .06); border-color: rgba(255, 255, 255, .3); color: #EEF0F4; }
+  .st-btn.blue { background: #7B5CD6; border-color: #7B5CD6; color: #fff; }
+  .st-btn.slim { min-height: 42px; font-size: 16px; }
+  .codeBig { font-size: 34px; font-weight: 800; letter-spacing: .18em; color: #FFB08C; font-variant-numeric: tabular-nums; }
+  .rankDot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; border: 2px solid rgba(255, 255, 255, .6); }
+  .st-table tr.meRow td { background: rgba(217, 123, 79, .14); }
+  .endReason { margin-bottom: 12px; font-size: 24px; font-weight: 800; color: #FFD2B8; text-align: center; font-variant-numeric: tabular-nums; }
+  #endNote { margin-top: 10px; font-size: 14px; font-weight: 700; color: #C9B8E8; text-align: center; line-height: 1.6; }
+  #endNote:empty { display: none; }
+  .st-table + .st-table { margin-top: 12px; }
+
+  #jobBoard { display: grid; gap: 8px; margin-top: 10px; }
+  .rd-job { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; border-radius: 8px; border: 2px solid rgba(255, 255, 255, .16); border-left: 6px solid var(--job); background: rgba(255, 255, 255, .05); color: #fff; text-align: left; }
+  .rd-job i { flex: 0 0 44px; height: 44px; border-radius: 50%; background: var(--job); color: #14101C; font-style: normal; font-size: 20px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+  .rd-job b { display: block; font-size: 18px; }
+  .rd-job small { display: block; font-size: 13px; font-weight: 700; color: #C9C2D8; }
+  .rd-job small.skill { color: #E8D2FF; }
+  .rd-job span { display: block; margin-top: 3px; font-size: 14px; font-weight: 800; color: #FFD2B8; }
+  .rd-job.empty span { color: #9C93AE; font-weight: 700; }
+  .rd-job.me { border-color: #D97B4F; border-left-color: var(--job); background: rgba(217, 123, 79, .16); }
+  #spectatorLine, #lobbyNotice { margin-top: 8px; font-size: 14px; font-weight: 700; color: #C9C2D8; text-align: center; }
+  #spectatorLine:empty, #lobbyNotice:empty { display: none; }
+
+  .hud-box { background: linear-gradient(135deg, rgba(16, 14, 26, .84), rgba(40, 32, 58, .74)); border: 1.5px solid rgba(255, 255, 255, .2); border-top: 3px solid #D97B4F; border-radius: 10px; padding: 6px 12px; color: #fff; font-weight: 800; font-variant-numeric: tabular-nums; text-shadow: 0 1px 3px rgba(0, 0, 0, .6); box-shadow: 0 4px 14px rgba(0, 0, 0, .3); }
+  #gameUi { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 20; pointer-events: none; }
+  #gameUi button { pointer-events: auto; }
+  #hudTeam { position: absolute; left: 10px; top: 50px; width: 210px; padding: 6px 8px; }
+  .rd-row { display: grid; grid-template-columns: 26px 1fr; grid-template-rows: auto 6px; column-gap: 7px; align-items: center; padding: 3px 0; font-size: 13px; }
+  .rd-row i { grid-row: span 2; width: 26px; height: 26px; border-radius: 50%; color: #14101C; font-style: normal; font-size: 13px; display: flex; align-items: center; justify-content: center; }
+  .rd-row span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .rd-row small { font-size: 10px; color: #B8AECB; }
+  .rd-row b { display: block; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .15); overflow: hidden; }
+  .rd-row em { display: block; height: 100%; width: 100%; background: #6EE08F; }
+  .rd-row.me span { color: #FFD2B8; }
+  .rd-row.down { opacity: .45; }
+  .rd-row.down em { background: #888; }
+  .rd-row.gone span::after { content: " (연결 끊김)"; font-size: 10px; color: #FF9A8A; }
+  #hudTop { position: absolute; left: 50%; top: 50px; transform: translateX(-50%); text-align: center; min-width: 260px; max-width: 52vw; }
+  #hudFloor { font-size: 17px; }
+  #hudTime { font-size: 13px; color: #F2C879; }
+  #hudWave { font-size: 13px; color: #D9CCF2; }
+  #hudBoss { position: absolute; left: 50%; top: 122px; transform: translateX(-50%); width: min(560px, 56vw); padding: 5px 10px 7px; border-top-color: #E25B4B; }
+  #hudBoss .rd-boss-head { display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+  #hudBossTag { padding: 0 8px; border-radius: 999px; background: #6B5CD6; font-size: 12px; }
+  #hudBoss .rd-boss-bar { margin-top: 4px; height: 12px; border-radius: 6px; background: rgba(255, 255, 255, .14); overflow: hidden; }
+  #hudBossFill { height: 100%; width: 100%; background: linear-gradient(90deg, #E25B4B, #FF8A5C); transition: width .15s; }
+  #hudBoss.invuln #hudBossFill { background: linear-gradient(90deg, #8B7BC8, #B8A8F0); }
+  #hudMech { position: absolute; left: 50%; top: 172px; transform: translateX(-50%); max-width: 80vw; font-size: 18px; text-align: center; border-top-color: #4C9BFF; color: #DCEBFF; }
+  #hudCount { position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%); font-size: 96px; font-weight: 800; color: #FFFFFF; text-shadow: 0 4px 0 rgba(0, 0, 0, .45), 0 0 28px rgba(217, 123, 79, .8); }
+  #hudHint { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 92px); transform: translateX(-50%); max-width: min(620px, 70vw); text-align: center; font-size: 15px; }
+  #hudSide { position: absolute; right: 10px; top: 50px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  #minimap { display: block; width: 168px; height: 112px; border-radius: 8px; background: rgba(16, 14, 26, .7); border: 1.5px solid rgba(255, 255, 255, .2); }
+  #hudGear { display: flex; gap: 5px; }
+  .rd-gear { display: flex; flex-direction: column; align-items: center; width: 52px; padding: 3px 0; border-radius: 6px; border: 2px solid var(--tier); background: rgba(16, 14, 26, .75); font-size: 18px; line-height: 1.1; }
+  .rd-gear small { font-size: 10px; color: #D9CCF2; }
+  #btnGameLeave { position: absolute; right: 186px; top: 8px; min-height: 32px; padding: 4px 12px; font-size: 14px; font-weight: 800; border-radius: 8px; border: 1.5px solid rgba(255, 255, 255, .4); background: rgba(16, 14, 26, .7); color: #fff; }
+  #hudSelf { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 18px); transform: translateX(-50%); width: min(380px, 44vw); padding: 6px 10px; }
+  #hudSelf .rd-self-bar { position: relative; height: 18px; border-radius: 9px; background: rgba(255, 255, 255, .14); overflow: hidden; }
+  #hudSelfFill { height: 100%; width: 100%; background: linear-gradient(90deg, #4CC97A, #8BEA9F); }
+  #hudSelfText { position: absolute; inset: 0; text-align: center; font-size: 12px; line-height: 18px; }
+  #hudSkills { display: flex; gap: 6px; justify-content: center; margin-top: 6px; }
+  .rd-skill { position: relative; display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 8px; background: rgba(217, 123, 79, .85); font-size: 14px; overflow: hidden; }
+  .rd-skill kbd { padding: 0 6px; border-radius: 4px; background: rgba(0, 0, 0, .35); font-family: inherit; font-size: 12px; }
+  .rd-skill.cool { background: rgba(80, 70, 96, .9); color: #C9C2D8; }
+  .rd-skill b { min-width: 26px; text-align: right; }
+  .rd-skill::after { content: ""; position: absolute; left: 0; bottom: 0; height: 3px; width: calc(var(--cd, 0) * 100%); background: #FFD27A; }
+  #btnAttack { position: absolute; right: 26px; bottom: calc(env(safe-area-inset-bottom, 0px) + 30px); width: 108px; height: 108px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, .6); background: rgba(217, 123, 79, .78); color: #fff; font-size: 18px; font-weight: 800; touch-action: none; -webkit-tap-highlight-color: transparent; }
+  #touchSkills { position: absolute; right: 0; bottom: 0; width: 0; height: 0; }
+  .rd-tskill { position: absolute; right: calc(150px + var(--slot) * 18px); bottom: calc(env(safe-area-inset-bottom, 0px) + 40px + var(--slot) * 96px); width: 84px; height: 84px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, .55); background: rgba(123, 92, 214, .8); color: #fff; font-size: 15px; font-weight: 800; touch-action: none; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+  .rd-tskill b { display: block; font-size: 14px; color: #FFD27A; }
+  .rd-tskill.cool { background: rgba(60, 52, 76, .85); color: #B8AECB; }
+  .rd-tskill::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--cd, 0) * 100%); background: rgba(0, 0, 0, .35); }
+  #downCover { position: fixed; inset: 0; z-index: 15; pointer-events: none; background: rgba(40, 40, 48, .45); backdrop-filter: grayscale(1); -webkit-backdrop-filter: grayscale(1); display: flex; align-items: flex-end; justify-content: center; padding-bottom: 22vh; }
+  #downCover .hud-box { font-size: 20px; }
+  #floorBanner { position: absolute; left: 50%; top: max(46px, 13vh); transform: translateX(-50%); z-index: 3; width: max-content; max-width: 92vw; text-align: center; padding: 14px 30px 16px; opacity: 0; transition: opacity .5s; border-top-width: 3px; }
+  #floorBanner.on { opacity: 1; transition: opacity .4s; }
+  #floorBanner.clear { box-shadow: 0 0 36px rgba(217, 123, 79, .7), 0 4px 14px rgba(0, 0, 0, .3); }
+  #bannerTitle { display: block; font-size: clamp(28px, 4.4vw, 44px); line-height: 1.2; padding-bottom: 8px; border-bottom: 3px solid #D97B4F; word-break: keep-all; }
+  #floorBanner.clear #bannerTitle { color: #FFC08F; }
+  #bannerSub { display: block; margin-top: 8px; font-size: clamp(16px, 2.2vw, 21px); color: #E6DDF5; opacity: 0; transition: opacity .4s .3s; word-break: keep-all; }
+  #floorBanner.on #bannerSub { opacity: 1; }
+  #bannerRecord { display: block; margin-top: 10px; font-size: clamp(30px, 4.6vw, 48px); color: #FFD27A; }
+  #rewardBox { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 25; width: min(720px, 94vw); padding: 14px 16px 16px; pointer-events: auto; border-top-color: #F2C14E; }
+  #rewardBox .rd-reward-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+  #rewardTitle { font-size: 22px; }
+  #rewardTimer { font-size: 20px; color: #FFD27A; }
+  #rewardOthers { font-size: 13px; color: #C9C2D8; }
+  #rewardCards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .rd-card { display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 150px; padding: 12px 8px; border-radius: 10px; border: 3px solid var(--tier, #F2C14E); background: rgba(255, 255, 255, .07); color: #fff; font-weight: 800; }
+  .rd-card:hover:not(:disabled) { background: rgba(255, 255, 255, .15); }
+  .rd-card-icon { font-size: 34px; color: var(--tier, #F2C14E); }
+  .rd-card b { font-size: 18px; }
+  .rd-card small { font-size: 14px; color: var(--tier, #F2C14E); }
+  .rd-card em { font-style: normal; font-size: 15px; color: #FFE6C8; text-align: center; word-break: keep-all; }
+  .rd-card i { font-style: normal; font-size: 12px; color: #FF9A8A; text-align: center; word-break: keep-all; }
+  .rd-card:disabled { opacity: .45; cursor: default; }
+  #rewardSkip { display: block; width: 100%; margin-top: 10px; min-height: 44px; border-radius: 8px; border: 2px solid rgba(255, 255, 255, .3); background: rgba(255, 255, 255, .08); color: #fff; font-size: 16px; font-weight: 800; }
+  #rewardBox.sent { opacity: .55; pointer-events: none; }
+  #numberLayer { position: fixed; inset: 0; z-index: 16; pointer-events: none; overflow: hidden; }
+  .rd-num { position: absolute; left: 0; top: 0; font-weight: 800; font-size: 17px; color: #FFFFFF; text-shadow: 0 0 3px #000, 0 2px 2px #000; white-space: nowrap; will-change: transform, opacity; }
+  .rd-num.hero { color: #FF7A6A; }
+  .rd-num.heal { color: #7CFFB0; }
+  .rd-num.big { color: #FFD27A; font-size: 22px; }
+  .rd-net { position: fixed; left: 10px; bottom: 10px; z-index: 40; padding: 3px 8px; border-radius: 6px; background: rgba(0, 0, 0, .65); color: #9CF59C; font: 12px monospace; pointer-events: none; }
+  #joyZone { position: fixed; left: 0; bottom: 0; width: 46%; height: 62%; z-index: 18; touch-action: none; }
+  #joyBase { position: fixed; width: 110px; height: 110px; margin: -55px 0 0 -55px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, .32); background: rgba(255, 255, 255, .08); z-index: 19; pointer-events: none; }
+  #joyKnob { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; background: rgba(217, 123, 79, .85); border: 2px solid #fff; }
+  @media (max-width: 860px) {
+    #hudTeam { width: 168px; }
+    #hudTop { max-width: 40vw; min-width: 0; }
+    #minimap { width: 126px; height: 84px; }
+    #btnGameLeave { right: 144px; }
+    #hudSelf { width: 40vw; }
+  }
+  @media (max-height: 560px) {
+    #hudBoss { top: 108px; }
+    #hudMech { top: 152px; font-size: 15px; }
+    #hudCount { font-size: 72px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div id="numberLayer"></div>
+
+<div id="gameUi" hidden>
+  <div id="hudTeam" class="hud-box"></div>
+  <div id="hudTop" class="hud-box"><div id="hudFloor"></div><div id="hudTime"></div><div id="hudWave"></div></div>
+  <div id="hudBoss" class="hud-box" hidden><div class="rd-boss-head"><span id="hudBossName"></span><span id="hudBossTag" hidden></span></div><div class="rd-boss-bar"><div id="hudBossFill"></div></div></div>
+  <div id="hudMech" class="hud-box" hidden></div>
+  <div id="hudCount" hidden></div>
+  <div id="floorBanner" class="hud-box" hidden><span id="bannerTitle"></span><span id="bannerSub"></span><span id="bannerRecord" hidden></span></div>
+  <div id="hudSide"><canvas id="minimap"></canvas><div id="hudGear"></div></div>
+  <div id="hudHint" class="hud-box" hidden></div>
+  <div id="hudSelf" class="hud-box"><div class="rd-self-bar"><div id="hudSelfFill"></div><div id="hudSelfText"></div></div><div id="hudSkills"></div></div>
+  <button type="button" id="btnGameLeave">나가기</button>
+  <button type="button" id="btnAttack" hidden>공격</button>
+  <div id="touchSkills"></div>
+  <div id="rewardBox" class="hud-box" hidden>
+    <div class="rd-reward-head"><span id="rewardTitle"></span><span id="rewardTimer"></span></div>
+    <div id="rewardCards"></div>
+    <button type="button" id="rewardSkip" hidden>선택 안 함</button>
+    <div id="rewardOthers"></div>
+  </div>
+</div>
+<div id="downCover" hidden><div class="hud-box">쓰러졌어요 · 층을 클리어하면 다시 살아납니다</div></div>
+<div id="joyZone" hidden></div>
+<div id="joyBase" hidden><div id="joyKnob"></div></div>
+
+<div id="startScreen" class="st-screen">
+  <div class="st-wrap">
+    <div class="st-hero"><h1 class="st-title">던전 레이드</h1></div>
+    <div class="st-card">
+      <button type="button" class="st-btn primary" id="btnCreate">방 만들기</button>
+      <div class="st-joinrow">
+        <input type="text" id="joinCode" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="방 코드 5자리">
+        <button type="button" class="st-btn blue" id="btnJoin">참여하기</button>
+        <button type="button" class="st-btn sub" id="btnWatch">관전하기</button>
+      </div>
+      <div class="st-msg" id="startMsg"></div>
+      <div class="st-hint" id="loadNote">캐릭터를 불러오는 중…</div>
+    </div>
+    <div class="st-card">
+      <div class="st-recs">
+        <div class="st-rec"><span>세계 신기록</span><b id="wrValue">아직 기록이 없습니다</b><small id="wrWho"></small></div>
+        <div class="st-rec" id="clsBox" hidden><span>우리 반 신기록</span><b id="clsValue">아직 기록이 없습니다</b><small id="clsWho"></small></div>
+      </div>
+    </div>
+    <div class="st-card st-fold">
+      <h2>캐릭터 만들기</h2>
+      <div id="profileHost"></div>
+    </div>
+    <div class="st-card">
+      <h2>조작 방법</h2>
+      <div class="st-keys">
+        <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd></span><span>이동</span>
+        <span><kbd>마우스</kbd></span><span>바라보는 방향(마우스 쪽 적을 먼저 노려요)</span>
+        <span><kbd>J</kbd> <kbd>클릭</kbd></span><span>기본 공격 (누르고 있으면 계속 공격, 사거리 안의 적을 자동으로 노려요)</span>
+        <span><kbd>K</kbd></span><span>직업 스킬</span>
+        <span><kbd>태블릿</kbd></span><span>왼쪽 화면을 끌면 조이스틱, 오른쪽 아래 공격·스킬 버튼</span>
+      </div>
+    </div>
+    <div class="st-card">
+      <h2>규칙</h2>
+      <ul class="st-rules">
+        <li><b>5명이 직업 5개</b>(탱커·바바리안·메이지·레인저·힐러)를 하나씩 맡아요. 같은 직업은 고를 수 없고, 사람이 모자라면 빈 직업은 AI가 맡아요. 캐릭터 모양은 직업이 정하고 색은 내 꾸미기를 따라요.</li>
+        <li>1층에서 스킬을 연습하고 <b>준비 구역</b>에 모두 들어가면 출발해요. 2층은 해골 병사 웨이브, 3·4층은 중간 보스, 5층은 최종 보스 해골 군주예요.</li>
+        <li>바닥의 <b>붉은 범위</b>는 곧 공격이 떨어지는 곳이에요. 빨리 피하세요. 탱커는 도발로 적을 끌고, 딜러는 처치하고, 힐러는 동료를 살려요.</li>
+        <li>쓰러지면 그 층이 끝날 때까지 관전해요. <b>층을 클리어하면 모두 체력 100%로 다시 일어나요.</b> 모두 쓰러지면 실패예요.</li>
+        <li>층을 깨면 <b>보상방</b>(빛나는 방)에서 내 이름이 적힌 상자를 부수고 능력치 카드 1장과 장비 카드 1장(선택 안 함 가능)을 골라요. 장비는 무기·방어구·신발이 있고, 낀 칸은 더 높은 등급만 바꿀 수 있어요.</li>
+        <li>5층 팀 패턴: <b>안전구역</b>은 각자 다른 구역에 1명씩(파랑) 서야 하고, <b>마력 기둥</b>은 첫 기둥이 부서진 뒤 8초 안에 나머지를 모두 부숴야 해요.</li>
+        <li>기록은 2층에 들어간 순간부터 해골 군주를 쓰러뜨린 순간까지예요. <b>5명 모두 사람일 때만</b> 세계·우리 반 신기록에 등록돼요.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div id="lobbyScreen" class="st-screen" hidden>
+  <div class="st-wrap">
+    <div class="st-hero"><h1 class="st-title">던전 레이드</h1></div>
+    <div class="st-card">
+      <h2>대기실 <span class="codeBig" id="lobbyCode">00000</span></h2>
+      <div id="jobBoard"></div>
+      <div id="spectatorLine"></div>
+      <div id="lobbyNotice"></div>
+      <button type="button" class="st-btn primary" id="btnStart" style="margin-top:14px">게임 시작</button>
+      <div class="st-hint" id="lobbyHint"></div>
+      <div class="st-row" style="margin-top:10px">
+        <button type="button" class="st-btn sub slim" id="btnSeatMode">관전자로 바꾸기</button>
+        <button type="button" class="st-btn sub slim" id="btnLeave">방 나가기</button>
+      </div>
+    </div>
+    <div class="st-card st-fold">
+      <h2>캐릭터 만들기</h2>
+      <div id="lobbyProfileHost"></div>
+    </div>
+  </div>
+</div>
+
+<div id="endScreen" class="st-screen" hidden>
+  <div class="st-wrap">
+    <div class="st-hero"><h1 class="st-title" id="endTitle">결과</h1></div>
+    <div class="st-card">
+      <div class="endReason" id="endReason"></div>
+      <div class="st-recs">
+        <div class="st-rec"><span>세계 신기록</span><b id="wrValueEnd">아직 기록이 없습니다</b><small id="wrWhoEnd"></small></div>
+        <div class="st-rec" id="clsBoxEnd" hidden><span>우리 반 신기록</span><b id="clsValueEnd">아직 기록이 없습니다</b><small id="clsWhoEnd"></small></div>
+      </div>
+      <table class="st-table" style="margin-top:12px"><thead><tr><th>구간</th><th>걸린 시간</th></tr></thead><tbody id="endTimes"></tbody></table>
+      <table class="st-table"><thead><tr><th>이름</th><th>직업</th><th>피해량</th><th>치유량</th><th>쓰러짐</th></tr></thead><tbody id="endRows"></tbody></table>
+      <div id="endNote"></div>
+      <button type="button" class="st-btn primary" id="btnToLobby" style="margin-top:14px" hidden>대기실로</button>
+      <div class="st-hint" id="endHint"></div>
+      <button type="button" class="st-btn sub slim" id="btnEndLeave" style="margin-top:10px">방 나가기</button>
+    </div>
+  </div>
+</div>
+
+<script charset="utf-8" src="character-kit.js"></script>
+<script charset="utf-8" src="fold-card.js"></script>
+<script charset="utf-8" src="room-kit.js"></script>
+<script charset="utf-8" src="36.raid-rules.js"></script>
+<script charset="utf-8" src="36.raid-views.js"></script>
+<script charset="utf-8" src="36.dungeon-raid.js"></script>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
+new RdGame({ THREE, GLTFLoader, SkeletonUtils });
+</script>
+</body>
+</html>

@@ -284,17 +284,17 @@ class RdBalance {
 
 class RdMapData {
   static readonly HALL: RdRect = { minX: -1800, maxX: 1800, minZ: -1400, maxZ: 1400 };
-  static readonly VAULT: RdRect = { minX: 1800, maxX: 3000, minZ: -700, maxZ: 700 };
-  static readonly VAULT_PASSAGE: RdRect = { minX: 1700, maxX: 1900, minZ: -250, maxZ: 250 };
+  static readonly VAULT: RdRect = { minX: 1800, maxX: 3000, minZ: -800, maxZ: 800 };
+  static readonly VAULT_PASSAGE: RdRect = { minX: 1700, maxX: 1900, minZ: -200, maxZ: 200 };
   static readonly CENTER: RdPoint = { x: 0, z: 0 };
   static readonly BOSS_GATE: RdDoorSpec = { x: 0, z: -1400, inX: 0, inZ: 1 };
   static readonly BOSS_GATE_WALK = 500;
   static readonly DOOR_WALK = 300;
   static readonly DOORS: readonly RdDoorSpec[] = [
-    { x: -1800, z: -600, inX: 1, inZ: 0 }, { x: -1800, z: 600, inX: 1, inZ: 0 },
-    { x: 1800, z: -950, inX: -1, inZ: 0 }, { x: 1800, z: 950, inX: -1, inZ: 0 },
-    { x: -1100, z: -1400, inX: 0, inZ: 1 }, { x: 1100, z: -1400, inX: 0, inZ: 1 },
-    { x: -1000, z: 1400, inX: 0, inZ: -1 }, { x: 1000, z: 1400, inX: 0, inZ: -1 }
+    { x: -1800, z: -800, inX: 1, inZ: 0 }, { x: -1800, z: 800, inX: 1, inZ: 0 },
+    { x: 1800, z: -1200, inX: -1, inZ: 0 }, { x: 1800, z: 1200, inX: -1, inZ: 0 },
+    { x: -1200, z: -1400, inX: 0, inZ: 1 }, { x: 1200, z: -1400, inX: 0, inZ: 1 },
+    { x: -800, z: 1400, inX: 0, inZ: -1 }, { x: 800, z: 1400, inX: 0, inZ: -1 }
   ];
   static readonly GROUND_SPOTS: readonly RdPoint[] = [
     { x: -1200, z: -800 }, { x: 400, z: -900 }, { x: 1300, z: 0 }, { x: -300, z: 500 },
@@ -2436,10 +2436,14 @@ class RdFlow {
     });
   }
 
+  static readonly STAGE_BUILDERS: Readonly<Record<RdFloorSpec["kind"], (floor: RdFloorSpec) => RdStage>> = {
+    ready: (floor) => new RdReadyStage(floor),
+    wave: (floor) => new RdWaveStage(floor),
+    boss: (floor) => new RdBossStage(floor)
+  };
+
   static stageFor(floor: RdFloorSpec): RdStage {
-    if (floor.kind === "ready") return new RdReadyStage(floor);
-    if (floor.kind === "wave") return new RdWaveStage(floor);
-    return new RdBossStage(floor);
+    return RdFlow.STAGE_BUILDERS[floor.kind](floor);
   }
 
   get stage(): RdStage {
@@ -3001,7 +3005,7 @@ class RdBotRoute {
     const heroInVault = hero.x > RdMapData.HALL.maxX - 20;
     const goalInVault = goal.x > RdMapData.HALL.maxX;
     if (heroInVault === goalInVault) return goal;
-    const laneZ = lane * 60;
+    const laneZ = lane * 45;
     const lined = Math.abs(hero.z - laneZ) < 90 && hero.x > 1500 && hero.x < 2000;
     const inside = { x: RdBotRoute.PASSAGE_IN.x, z: laneZ }, outside = { x: RdBotRoute.PASSAGE_OUT.x, z: laneZ };
     if (lined) return goalInVault ? outside : inside;
@@ -3559,6 +3563,14 @@ class RdFoeFlags {
   static readonly INVULNERABLE = 16;
   static readonly BROKEN = 32;
   static readonly VULNERABLE = 64;
+}
+
+class RdFoeRadius {
+  static readonly OF: Readonly<Record<RdFoeKind, number>> = {
+    minion: RdBalance.MOBS.minion.radius, warrior: RdBalance.MOBS.warrior.radius, rogue: RdBalance.MOBS.rogue.radius, mage: RdBalance.MOBS.mage.radius,
+    giant: RdBalance.GIANT.radius, archmage: RdBalance.ARCHMAGE.radius, lord: RdBalance.LORD.radius,
+    pillar: RdBalance.PILLARS.radius, dummy: RdBalance.DUMMY_RADIUS, chest: RdBalance.CHEST_RADIUS
+  };
 }
 
 class RdSnapshotCodec {
