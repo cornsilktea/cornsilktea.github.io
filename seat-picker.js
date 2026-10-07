@@ -108,8 +108,12 @@ class TeacherPerspective extends ViewPerspective {
         super(...arguments);
         this.label = "선생님 기준";
         this.chalkboardClass = "chalk-bottom";
-        this.rowsTopToBottom = SequenceBuilder.between(SeatBoard.ROWS, 1);
-        this.columnsLeftToRight = SequenceBuilder.between(1, SeatBoard.COLUMNS);
+    }
+    rowsTopToBottom(depth) {
+        return SequenceBuilder.between(depth, 1);
+    }
+    columnsLeftToRight(width) {
+        return SequenceBuilder.between(1, width);
     }
 }
 class StudentPerspective extends ViewPerspective {
@@ -117,8 +121,12 @@ class StudentPerspective extends ViewPerspective {
         super(...arguments);
         this.label = "학생 기준";
         this.chalkboardClass = "chalk-top";
-        this.rowsTopToBottom = SequenceBuilder.between(1, SeatBoard.ROWS);
-        this.columnsLeftToRight = SequenceBuilder.between(SeatBoard.COLUMNS, 1);
+    }
+    rowsTopToBottom(depth) {
+        return SequenceBuilder.between(1, depth);
+    }
+    columnsLeftToRight(width) {
+        return SequenceBuilder.between(width, 1);
     }
 }
 class Perspectives {
@@ -131,7 +139,7 @@ Perspectives.teacher = new TeacherPerspective();
 Perspectives.all = [Perspectives.student, Perspectives.teacher];
 class LayoutMode {
     gapClassAfter(visualIndex) {
-        return visualIndex === SeatBoard.COLUMNS - 1 ? "" : this.gapBetween(visualIndex);
+        return visualIndex === this.width - 1 ? "" : this.gapBetween(visualIndex);
     }
 }
 class PairLayoutMode extends LayoutMode {
@@ -139,6 +147,11 @@ class PairLayoutMode extends LayoutMode {
         super(...arguments);
         this.key = "pair";
         this.label = "짝꿍 모드";
+        this.depth = SeatBoard.ROWS;
+        this.width = SeatBoard.COLUMNS;
+    }
+    seatAt(gridRow, gridColumn) {
+        return new SeatPosition(gridRow, gridColumn);
     }
     gapBetween(visualIndex) {
         return visualIndex % 2 === 0 ? "gap-joined" : "gap-aisle";
@@ -149,6 +162,11 @@ class ExamLayoutMode extends LayoutMode {
         super(...arguments);
         this.key = "exam";
         this.label = "시험대형 모드";
+        this.depth = SeatBoard.COLUMNS;
+        this.width = SeatBoard.ROWS;
+    }
+    seatAt(gridRow, gridColumn) {
+        return new SeatPosition(gridColumn, gridRow);
     }
     gapBetween() {
         return "gap-even";
@@ -344,10 +362,10 @@ class SeatStageView {
     }
     render(board, mode, perspective, selected, animate) {
         this.root.className = `stage ${perspective.chalkboardClass}`;
-        const rows = perspective.rowsTopToBottom.map((row) => {
+        const rows = perspective.rowsTopToBottom(mode.depth).map((row) => {
             const rowElement = SeatDom.create("div", "row");
-            const cells = perspective.columnsLeftToRight.map((column, visualIndex) => {
-                const position = new SeatPosition(row, column);
+            const cells = perspective.columnsLeftToRight(mode.width).map((column, visualIndex) => {
+                const position = mode.seatAt(row, column);
                 return this.buildCell(board.seatAt(position), mode.gapClassAfter(visualIndex), selected, animate);
             });
             rowElement.append(...cells);

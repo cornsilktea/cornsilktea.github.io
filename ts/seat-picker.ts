@@ -124,22 +124,34 @@ class SequenceBuilder {
 abstract class ViewPerspective {
   abstract readonly label: string;
   abstract readonly chalkboardClass: string;
-  abstract readonly rowsTopToBottom: readonly number[];
-  abstract readonly columnsLeftToRight: readonly number[];
+  abstract rowsTopToBottom(depth: number): number[];
+  abstract columnsLeftToRight(width: number): number[];
 }
 
 class TeacherPerspective extends ViewPerspective {
   readonly label = "선생님 기준";
   readonly chalkboardClass = "chalk-bottom";
-  readonly rowsTopToBottom = SequenceBuilder.between(SeatBoard.ROWS, 1);
-  readonly columnsLeftToRight = SequenceBuilder.between(1, SeatBoard.COLUMNS);
+
+  rowsTopToBottom(depth: number): number[] {
+    return SequenceBuilder.between(depth, 1);
+  }
+
+  columnsLeftToRight(width: number): number[] {
+    return SequenceBuilder.between(1, width);
+  }
 }
 
 class StudentPerspective extends ViewPerspective {
   readonly label = "학생 기준";
   readonly chalkboardClass = "chalk-top";
-  readonly rowsTopToBottom = SequenceBuilder.between(1, SeatBoard.ROWS);
-  readonly columnsLeftToRight = SequenceBuilder.between(SeatBoard.COLUMNS, 1);
+
+  rowsTopToBottom(depth: number): number[] {
+    return SequenceBuilder.between(1, depth);
+  }
+
+  columnsLeftToRight(width: number): number[] {
+    return SequenceBuilder.between(width, 1);
+  }
 }
 
 class Perspectives {
@@ -155,17 +167,27 @@ class Perspectives {
 abstract class LayoutMode {
   abstract readonly key: string;
   abstract readonly label: string;
+  abstract readonly depth: number;
+  abstract readonly width: number;
 
   protected abstract gapBetween(visualIndex: number): string;
 
+  abstract seatAt(gridRow: number, gridColumn: number): SeatPosition;
+
   gapClassAfter(visualIndex: number): string {
-    return visualIndex === SeatBoard.COLUMNS - 1 ? "" : this.gapBetween(visualIndex);
+    return visualIndex === this.width - 1 ? "" : this.gapBetween(visualIndex);
   }
 }
 
 class PairLayoutMode extends LayoutMode {
   readonly key = "pair";
   readonly label = "짝꿍 모드";
+  readonly depth = SeatBoard.ROWS;
+  readonly width = SeatBoard.COLUMNS;
+
+  seatAt(gridRow: number, gridColumn: number): SeatPosition {
+    return new SeatPosition(gridRow, gridColumn);
+  }
 
   protected gapBetween(visualIndex: number): string {
     return visualIndex % 2 === 0 ? "gap-joined" : "gap-aisle";
@@ -175,6 +197,12 @@ class PairLayoutMode extends LayoutMode {
 class ExamLayoutMode extends LayoutMode {
   readonly key = "exam";
   readonly label = "시험대형 모드";
+  readonly depth = SeatBoard.COLUMNS;
+  readonly width = SeatBoard.ROWS;
+
+  seatAt(gridRow: number, gridColumn: number): SeatPosition {
+    return new SeatPosition(gridColumn, gridRow);
+  }
 
   protected gapBetween(): string {
     return "gap-even";
@@ -392,10 +420,10 @@ class SeatStageView {
 
   render(board: SeatBoard, mode: LayoutMode, perspective: ViewPerspective, selected: SeatPosition | null, animate: boolean): void {
     this.root.className = `stage ${perspective.chalkboardClass}`;
-    const rows = perspective.rowsTopToBottom.map((row) => {
+    const rows = perspective.rowsTopToBottom(mode.depth).map((row) => {
       const rowElement = SeatDom.create("div", "row");
-      const cells = perspective.columnsLeftToRight.map((column, visualIndex) => {
-        const position = new SeatPosition(row, column);
+      const cells = perspective.columnsLeftToRight(mode.width).map((column, visualIndex) => {
+        const position = mode.seatAt(row, column);
         return this.buildCell(board.seatAt(position), mode.gapClassAfter(visualIndex), selected, animate);
       });
       rowElement.append(...cells);
