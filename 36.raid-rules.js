@@ -161,6 +161,7 @@ RdBalance.SKELETON_BOLT_SPEED = 900;
 RdBalance.ORB_SPEED = 1500;
 RdBalance.ARROW_SPEED = 2400;
 RdBalance.CHEST_HP = 60;
+RdBalance.CHEST_HITS = 2;
 RdBalance.CHEST_RADIUS = 60;
 RdBalance.DUMMY_RADIUS = 55;
 RdBalance.SPAR_DAMAGE = 5;
@@ -1904,6 +1905,11 @@ class RdRewardChest extends RdFoe {
     }
     get creditsDamage() {
         return false;
+    }
+    absorb(engine, amount) {
+        const perHit = this.maxHp / RdBalance.CHEST_HITS;
+        this.hp -= perHit;
+        return perHit;
     }
     canBeHitBy(hero) {
         return hero.slot === this.owner;

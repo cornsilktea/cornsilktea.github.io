@@ -240,6 +240,7 @@ class RdBalance {
   static readonly ORB_SPEED = 1500;
   static readonly ARROW_SPEED = 2400;
   static readonly CHEST_HP = 60;
+  static readonly CHEST_HITS = 2;
   static readonly CHEST_RADIUS = 60;
   static readonly DUMMY_RADIUS = 55;
   static readonly SPAR_DAMAGE = 5;
@@ -2185,6 +2186,12 @@ class RdRewardChest extends RdFoe {
 
   get creditsDamage(): boolean {
     return false;
+  }
+
+  absorb(engine: RdEngine, amount: number): number {
+    const perHit = this.maxHp / RdBalance.CHEST_HITS;
+    this.hp -= perHit;
+    return perHit;
   }
 
   canBeHitBy(hero: RdHero): boolean {
