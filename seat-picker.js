@@ -183,81 +183,44 @@ class LayoutModes {
 LayoutModes.pair = new PairLayoutMode();
 LayoutModes.exam = new ExamLayoutMode();
 LayoutModes.all = [LayoutModes.pair, LayoutModes.exam];
-class ValidationResult {
-    constructor(ok, numbers, message, notice) {
-        this.ok = ok;
-        this.numbers = numbers;
-        this.message = message;
-        this.notice = notice;
-    }
-    static success(numbers, notice = "") {
-        return new ValidationResult(true, numbers, "", notice);
-    }
-    static failure(message) {
-        return new ValidationResult(false, [], message, "");
-    }
-}
-class AbsentNumberParser {
-    parse(text) {
-        const tokens = text.split(/[,\s]+/).filter((token) => token !== "");
-        const absent = new Set();
-        for (const token of tokens) {
-            const match = AbsentNumberParser.TOKEN.exec(token);
-            if (!match)
-                return ValidationResult.failure(AbsentNumberParser.ERROR);
-            const first = Number(match[1]);
-            const last = match[2] === undefined ? first : Number(match[2]);
-            if (first < 1 || last > NumberRangeInput.MAX_NUMBER || first > last) {
-                return ValidationResult.failure(AbsentNumberParser.ERROR);
-            }
-            SequenceBuilder.between(first, last).forEach((number) => absent.add(number));
-        }
-        return ValidationResult.success([...absent]);
-    }
-}
-AbsentNumberParser.TOKEN = /^(\d+)(?:-(\d+))?$/;
-AbsentNumberParser.ERROR = "결번은 5, 12 또는 20-22 처럼 입력해 주세요";
-class NumberRoster {
-    static build(start, end, absent) {
-        return SequenceBuilder.between(start, end).filter((number) => !absent.has(number));
-    }
-}
-class NumberRangeInput {
-    constructor(startField, endField, absentField) {
-        this.startField = startField;
-        this.endField = endField;
-        this.absentField = absentField;
-        this.absentParser = new AbsentNumberParser();
+class NumberPicker {
+    constructor(container) {
+        this.excluded = new Set();
+        this.changeListener = () => undefined;
+        this.buttons = SequenceBuilder.between(1, NumberPicker.COUNT).map((number) => this.buildButton(number));
+        const rows = [0, 1].map((rowIndex) => {
+            const row = SeatDom.create("div", "number-row");
+            row.append(...this.buttons.slice(rowIndex * NumberPicker.PER_ROW, (rowIndex + 1) * NumberPicker.PER_ROW));
+            return row;
+        });
+        container.replaceChildren(...rows);
     }
     onChange(listener) {
-        [this.startField, this.endField, this.absentField].forEach((field) => field.addEventListener("input", listener));
+        this.changeListener = listener;
     }
-    read() {
-        const startText = this.startField.value.trim();
-        const endText = this.endField.value.trim();
-        if (!NumberRangeInput.DIGITS.test(startText) || !NumberRangeInput.DIGITS.test(endText)) {
-            return ValidationResult.failure("시작 번호와 끝 번호를 숫자로 입력해 주세요");
-        }
-        const start = Number(startText);
-        const end = Number(endText);
-        if (start < 1 || end < 1 || start > NumberRangeInput.MAX_NUMBER || end > NumberRangeInput.MAX_NUMBER) {
-            return ValidationResult.failure("번호는 1부터 999까지만 쓸 수 있어요");
-        }
-        if (start > end)
-            return ValidationResult.failure("시작 번호가 끝 번호보다 커요");
-        const absentResult = this.absentParser.parse(this.absentField.value);
-        if (!absentResult.ok)
-            return absentResult;
-        const outside = absentResult.numbers.filter((number) => number < start || number > end);
-        const roster = NumberRoster.build(start, end, new Set(absentResult.numbers));
-        if (roster.length === 0)
-            return ValidationResult.failure("배치할 번호가 하나도 없어요");
-        const notice = outside.length > 0 ? `범위 밖 결번(${outside.join(", ")})은 무시했어요` : "";
-        return ValidationResult.success(roster, notice);
+    selectedNumbers() {
+        return SequenceBuilder.between(1, NumberPicker.COUNT).filter((number) => !this.excluded.has(number));
+    }
+    buildButton(number) {
+        const button = SeatDom.create("button", "number-button", String(number));
+        button.type = "button";
+        button.setAttribute("aria-pressed", "false");
+        button.addEventListener("click", () => this.toggle(number, button));
+        return button;
+    }
+    toggle(number, button) {
+        const nowExcluded = !this.excluded.has(number);
+        if (nowExcluded)
+            this.excluded.add(number);
+        else
+            this.excluded.delete(number);
+        button.classList.toggle("off", nowExcluded);
+        button.setAttribute("aria-pressed", String(nowExcluded));
+        this.changeListener();
     }
 }
-NumberRangeInput.MAX_NUMBER = 999;
-NumberRangeInput.DIGITS = /^\d+$/;
+NumberPicker.COUNT = SeatBoard.ROWS * SeatBoard.COLUMNS;
+NumberPicker.PER_ROW = 15;
 class SeatMathRandomSource {
     next() {
         return Math.random();
@@ -440,7 +403,7 @@ class ControlPanel {
         this.savedButton = SeatDom.byId("savedButton");
         this.undoButton = SeatDom.byId("undoButton");
         this.saveButton = SeatDom.byId("saveButton");
-        this.input = new NumberRangeInput(SeatDom.byId("startNumber"), SeatDom.byId("endNumber"), SeatDom.byId("absentNumbers"));
+        this.numbers = new NumberPicker(SeatDom.byId("numberPicker"));
         this.modeButton.addEventListener("click", () => actions.toggleMode());
         this.perspectiveButton.addEventListener("click", () => actions.togglePerspective());
         this.placeButton.addEventListener("click", () => actions.place());
@@ -448,7 +411,7 @@ class ControlPanel {
         this.savedButton.addEventListener("click", () => actions.openSaved());
         this.undoButton.addEventListener("click", () => actions.undo());
         this.saveButton.addEventListener("click", () => actions.save());
-        this.input.onChange(() => actions.inputsChanged());
+        this.numbers.onChange(() => actions.inputsChanged());
     }
     showMode(mode) {
         this.modeButton.textContent = `배치 모양: ${mode.label}`;
@@ -928,22 +891,21 @@ class SeatPickerApp {
         this.refresh(false);
     }
     place() {
-        const result = this.controls.input.read();
-        if (!result.ok) {
-            this.messages.show(result.message, "warn");
+        const numbers = this.controls.numbers.selectedNumbers();
+        if (numbers.length === 0) {
+            this.messages.show("배치할 번호가 하나도 없어요", "warn");
             return;
         }
         const available = this.board.availableCount();
-        if (result.numbers.length > available) {
-            this.messages.show(`번호 ${result.numbers.length}개인데 쓸 수 있는 자리는 ${available}칸이에요`, "warn");
+        if (numbers.length > available) {
+            this.messages.show(`번호 ${numbers.length}개인데 쓸 수 있는 자리는 ${available}칸이에요`, "warn");
             return;
         }
         this.history.clear();
         this.selection.clear();
-        this.assigner.assign(this.board, result.numbers);
+        this.assigner.assign(this.board, numbers);
         this.refresh(true);
-        const notice = result.notice === "" ? "" : ` (${result.notice})`;
-        this.messages.show(`번호 ${result.numbers.length}개를 배치했어요${notice}`, "ok");
+        this.messages.show(`번호 ${numbers.length}개를 배치했어요`, "ok");
     }
     clearPlacement() {
         this.board.clearAssignments();
@@ -986,8 +948,7 @@ class SeatPickerApp {
         this.refreshStatus();
     }
     refreshStatus() {
-        const result = this.controls.input.read();
-        this.status.show(result.ok ? result.numbers.length : 0, this.board.availableCount());
+        this.status.show(this.controls.numbers.selectedNumbers().length, this.board.availableCount());
     }
 }
 new SeatPickerApp();

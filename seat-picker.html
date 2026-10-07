@@ -54,18 +54,9 @@ button:disabled{opacity:.4;cursor:default;}
 button.primary{background:var(--primary);color:#fff;}
 button.primary:disabled{opacity:.4;}
 
-#app{display:flex;flex-direction:column;height:100%;padding:0 12px 10px;gap:10px;}
-.controls{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:flex-end;}
-.field{display:flex;flex-direction:column;gap:2px;font-size:13px;font-weight:700;color:var(--soft);}
-.field input{
-  height:48px;padding:0 10px;font-size:20px;font-weight:700;color:var(--ink);
-  background:var(--panel);border:2px solid var(--line);border-radius:6px;
-  -webkit-user-select:text;user-select:text;
-}
-.field input:focus{outline:none;border-color:var(--strong);}
-.field.number input{width:84px;text-align:center;}
-.field.absent input{width:190px;}
-
+#app{display:flex;flex-direction:column;height:calc(100% + 46px);margin-top:-46px;padding:6px 12px 10px;gap:10px;}
+.controls{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;padding-right:200px;}
+.guard-gap{flex:none;width:96px;height:1px;}
 .status{
   position:fixed;top:calc(10px + env(safe-area-inset-top, 0px));right:12px;z-index:5;
   font-size:13px;font-weight:700;color:var(--soft);
@@ -110,6 +101,20 @@ button.primary:disabled{opacity:.4;}
   font-weight:800;color:var(--ink);box-shadow:0 8px 24px rgba(0,0,0,.3);opacity:.92;
 }
 
+.number-picker{display:flex;flex-direction:column;gap:6px;}
+.number-row{display:flex;gap:6px;}
+.number-button{
+  flex:1 1 0;min-width:0;padding:0;font-size:18px;position:relative;
+  background:var(--panel);border:2px solid var(--strong);border-radius:6px;
+}
+.number-button.off{
+  color:var(--soft);
+  background:
+    linear-gradient(to top right, transparent calc(50% - 1.5px), var(--strong) calc(50% - 1.5px), var(--strong) calc(50% + 1.5px), transparent calc(50% + 1.5px)),
+    linear-gradient(to bottom right, transparent calc(50% - 1.5px), var(--strong) calc(50% - 1.5px), var(--strong) calc(50% + 1.5px), transparent calc(50% + 1.5px)),
+    var(--panel-alt);
+}
+
 .footer{display:flex;align-items:center;gap:10px;}
 .message{flex:1;text-align:center;font-size:16px;font-weight:700;color:var(--soft);min-height:24px;}
 .message.ok{color:var(--ok);}
@@ -148,7 +153,6 @@ button.primary:disabled{opacity:.4;}
 @media (max-width:820px){
   .saved-body{flex-direction:column;}
   .saved-list-pane{flex:0 0 auto;max-height:28vh;}
-  .field.absent input{width:160px;}
 }
 
 @page{size:A4 landscape;margin:0;}
@@ -181,17 +185,16 @@ button.primary:disabled{opacity:.4;}
 <body>
 <div id="app">
   <header class="controls">
+    <span class="guard-gap"></span>
     <button type="button" id="modeToggle"></button>
     <button type="button" id="perspectiveToggle"></button>
-    <label class="field number"><span>시작 번호</span><input id="startNumber" type="text" inputmode="numeric" maxlength="3" autocomplete="off"></label>
-    <label class="field number"><span>끝 번호</span><input id="endNumber" type="text" inputmode="numeric" maxlength="3" autocomplete="off"></label>
-    <label class="field absent"><span>결번 (예: 5, 12, 20-22)</span><input id="absentNumbers" type="text" inputmode="text" autocomplete="off"></label>
     <button type="button" id="placeButton" class="primary">배치</button>
     <button type="button" id="clearButton">배치 지우기</button>
     <button type="button" id="savedButton">저장된 배치</button>
   </header>
   <div class="status" id="status"></div>
   <main class="stage-host" id="stageHost"></main>
+  <section class="number-picker" id="numberPicker" aria-label="번호 고르기"></section>
   <footer class="footer">
     <button type="button" id="undoButton" disabled>되돌리기</button>
     <p class="message" id="message"></p>

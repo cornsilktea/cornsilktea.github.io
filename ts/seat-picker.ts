@@ -223,87 +223,47 @@ class LayoutModes {
   }
 }
 
-class ValidationResult {
-  private constructor(
-    readonly ok: boolean,
-    readonly numbers: number[],
-    readonly message: string,
-    readonly notice: string,
-  ) {}
+class NumberPicker {
+  static readonly COUNT = SeatBoard.ROWS * SeatBoard.COLUMNS;
+  private static readonly PER_ROW = 15;
 
-  static success(numbers: number[], notice = ""): ValidationResult {
-    return new ValidationResult(true, numbers, "", notice);
+  private readonly excluded = new Set<number>();
+  private readonly buttons: HTMLButtonElement[];
+  private changeListener: () => void = () => undefined;
+
+  constructor(container: HTMLElement) {
+    this.buttons = SequenceBuilder.between(1, NumberPicker.COUNT).map((number) => this.buildButton(number));
+    const rows = [0, 1].map((rowIndex) => {
+      const row = SeatDom.create("div", "number-row");
+      row.append(...this.buttons.slice(rowIndex * NumberPicker.PER_ROW, (rowIndex + 1) * NumberPicker.PER_ROW));
+      return row;
+    });
+    container.replaceChildren(...rows);
   }
-
-  static failure(message: string): ValidationResult {
-    return new ValidationResult(false, [], message, "");
-  }
-}
-
-class AbsentNumberParser {
-  private static readonly TOKEN = /^(\d+)(?:-(\d+))?$/;
-  private static readonly ERROR = "결번은 5, 12 또는 20-22 처럼 입력해 주세요";
-
-  parse(text: string): ValidationResult {
-    const tokens = text.split(/[,\s]+/).filter((token) => token !== "");
-    const absent = new Set<number>();
-    for (const token of tokens) {
-      const match = AbsentNumberParser.TOKEN.exec(token);
-      if (!match) return ValidationResult.failure(AbsentNumberParser.ERROR);
-      const first = Number(match[1]);
-      const last = match[2] === undefined ? first : Number(match[2]);
-      if (first < 1 || last > NumberRangeInput.MAX_NUMBER || first > last) {
-        return ValidationResult.failure(AbsentNumberParser.ERROR);
-      }
-      SequenceBuilder.between(first, last).forEach((number) => absent.add(number));
-    }
-    return ValidationResult.success([...absent]);
-  }
-}
-
-class NumberRoster {
-  static build(start: number, end: number, absent: ReadonlySet<number>): number[] {
-    return SequenceBuilder.between(start, end).filter((number) => !absent.has(number));
-  }
-}
-
-class NumberRangeInput {
-  static readonly MAX_NUMBER = 999;
-  private static readonly DIGITS = /^\d+$/;
-
-  private readonly absentParser = new AbsentNumberParser();
-
-  constructor(
-    private readonly startField: HTMLInputElement,
-    private readonly endField: HTMLInputElement,
-    private readonly absentField: HTMLInputElement,
-  ) {}
 
   onChange(listener: () => void): void {
-    [this.startField, this.endField, this.absentField].forEach((field) => field.addEventListener("input", listener));
+    this.changeListener = listener;
   }
 
-  read(): ValidationResult {
-    const startText = this.startField.value.trim();
-    const endText = this.endField.value.trim();
-    if (!NumberRangeInput.DIGITS.test(startText) || !NumberRangeInput.DIGITS.test(endText)) {
-      return ValidationResult.failure("시작 번호와 끝 번호를 숫자로 입력해 주세요");
-    }
-    const start = Number(startText);
-    const end = Number(endText);
-    if (start < 1 || end < 1 || start > NumberRangeInput.MAX_NUMBER || end > NumberRangeInput.MAX_NUMBER) {
-      return ValidationResult.failure("번호는 1부터 999까지만 쓸 수 있어요");
-    }
-    if (start > end) return ValidationResult.failure("시작 번호가 끝 번호보다 커요");
+  selectedNumbers(): number[] {
+    return SequenceBuilder.between(1, NumberPicker.COUNT).filter((number) => !this.excluded.has(number));
+  }
 
-    const absentResult = this.absentParser.parse(this.absentField.value);
-    if (!absentResult.ok) return absentResult;
+  private buildButton(number: number): HTMLButtonElement {
+    const button = SeatDom.create("button", "number-button", String(number));
+    button.type = "button";
+    button.setAttribute("aria-pressed", "false");
+    button.addEventListener("click", () => this.toggle(number, button));
+    return button;
+  }
 
-    const outside = absentResult.numbers.filter((number) => number < start || number > end);
-    const roster = NumberRoster.build(start, end, new Set(absentResult.numbers));
-    if (roster.length === 0) return ValidationResult.failure("배치할 번호가 하나도 없어요");
-    const notice = outside.length > 0 ? `범위 밖 결번(${outside.join(", ")})은 무시했어요` : "";
-    return ValidationResult.success(roster, notice);
+  private toggle(number: number, button: HTMLButtonElement): void {
+    const nowExcluded = !this.excluded.has(number);
+    if (nowExcluded) this.excluded.add(number);
+    else this.excluded.delete(number);
+    button.classList.toggle("off", nowExcluded);
+    button.setAttribute("aria-pressed", String(nowExcluded));
+    this.changeListener();
   }
 }
 
@@ -508,11 +468,7 @@ class ControlPanel {
   private readonly savedButton = SeatDom.byId<HTMLButtonElement>("savedButton");
   private readonly undoButton = SeatDom.byId<HTMLButtonElement>("undoButton");
   private readonly saveButton = SeatDom.byId<HTMLButtonElement>("saveButton");
-  readonly input = new NumberRangeInput(
-    SeatDom.byId<HTMLInputElement>("startNumber"),
-    SeatDom.byId<HTMLInputElement>("endNumber"),
-    SeatDom.byId<HTMLInputElement>("absentNumbers"),
-  );
+  readonly numbers = new NumberPicker(SeatDom.byId("numberPicker"));
 
   constructor(actions: ControlActions) {
     this.modeButton.addEventListener("click", () => actions.toggleMode());
@@ -522,7 +478,7 @@ class ControlPanel {
     this.savedButton.addEventListener("click", () => actions.openSaved());
     this.undoButton.addEventListener("click", () => actions.undo());
     this.saveButton.addEventListener("click", () => actions.save());
-    this.input.onChange(() => actions.inputsChanged());
+    this.numbers.onChange(() => actions.inputsChanged());
   }
 
   showMode(mode: LayoutMode): void {
@@ -1060,22 +1016,21 @@ class SeatPickerApp {
   }
 
   private place(): void {
-    const result = this.controls.input.read();
-    if (!result.ok) {
-      this.messages.show(result.message, "warn");
+    const numbers = this.controls.numbers.selectedNumbers();
+    if (numbers.length === 0) {
+      this.messages.show("배치할 번호가 하나도 없어요", "warn");
       return;
     }
     const available = this.board.availableCount();
-    if (result.numbers.length > available) {
-      this.messages.show(`번호 ${result.numbers.length}개인데 쓸 수 있는 자리는 ${available}칸이에요`, "warn");
+    if (numbers.length > available) {
+      this.messages.show(`번호 ${numbers.length}개인데 쓸 수 있는 자리는 ${available}칸이에요`, "warn");
       return;
     }
     this.history.clear();
     this.selection.clear();
-    this.assigner.assign(this.board, result.numbers);
+    this.assigner.assign(this.board, numbers);
     this.refresh(true);
-    const notice = result.notice === "" ? "" : ` (${result.notice})`;
-    this.messages.show(`번호 ${result.numbers.length}개를 배치했어요${notice}`, "ok");
+    this.messages.show(`번호 ${numbers.length}개를 배치했어요`, "ok");
   }
 
   private clearPlacement(): void {
@@ -1119,8 +1074,7 @@ class SeatPickerApp {
   }
 
   private refreshStatus(): void {
-    const result = this.controls.input.read();
-    this.status.show(result.ok ? result.numbers.length : 0, this.board.availableCount());
+    this.status.show(this.controls.numbers.selectedNumbers().length, this.board.availableCount());
   }
 }
 
