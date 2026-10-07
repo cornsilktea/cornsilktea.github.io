@@ -235,6 +235,14 @@ button.primary:disabled{opacity:.4;}
   </div>
 </div>
 
+<script>
+window.addEventListener("error", function (event) {
+  var box = document.createElement("div");
+  box.style.cssText = "position:fixed;left:8px;right:8px;bottom:8px;z-index:99999;padding:10px;background:#B33951;color:#fff;font-size:14px;border-radius:6px;-webkit-user-select:text;user-select:text;";
+  box.textContent = "오류: " + event.message + " (" + String(event.filename).split("/").pop() + ":" + event.lineno + ")";
+  document.body.appendChild(box);
+});
+</script>
 <script src="seat-picker.js"></script>
 </body>
 </html>

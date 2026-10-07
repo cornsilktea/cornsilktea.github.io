@@ -181,7 +181,7 @@ class Perspectives {
   private static readonly all: readonly ViewPerspective[] = [Perspectives.student, Perspectives.teacher];
 
   static other(current: ViewPerspective): ViewPerspective {
-    return Perspectives.all.find((perspective) => perspective !== current) ?? current;
+    return Perspectives.all.find((perspective) => perspective !== current) || current;
   }
 }
 
@@ -236,11 +236,11 @@ class LayoutModes {
   private static readonly all: readonly LayoutMode[] = [LayoutModes.pair, LayoutModes.exam];
 
   static other(current: LayoutMode): LayoutMode {
-    return LayoutModes.all.find((mode) => mode !== current) ?? current;
+    return LayoutModes.all.find((mode) => mode !== current) || current;
   }
 
   static byKey(key: string): LayoutMode {
-    return LayoutModes.all.find((mode) => mode.key === key) ?? LayoutModes.pair;
+    return LayoutModes.all.find((mode) => mode.key === key) || LayoutModes.pair;
   }
 }
 
@@ -693,14 +693,14 @@ class SeatPlanRepository {
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), SeatPlanRepository.TIMEOUT_MS);
     try {
-      return await fetch(url, { ...init, signal: controller.signal });
+      return await fetch(url, Object.assign({}, init, { signal: controller.signal }));
     } finally {
       window.clearTimeout(timer);
     }
   }
 
   private urlFor(classId: string): string {
-    const base = (window.PORTAL_CONFIG?.DB_URL ?? "").replace(/\/+$/, "");
+    const base = (window.PORTAL_CONFIG ? window.PORTAL_CONFIG.DB_URL : "").replace(/\/+$/, "");
     if (base === "") throw new Error("데이터베이스 주소가 없어요");
     return `${base}/seatplans/${classId}.json`;
   }
@@ -786,7 +786,7 @@ class SavedPlansView {
       this.records = records;
       this.showHint(records.length === 0 ? "저장된 배치가 없어요" : "목록에서 배치를 골라 주세요");
       this.list.show(records, "", (record) => this.pick(record));
-    } catch {
+    } catch (error) {
       if (ticket !== this.loadCount) return;
       this.showHint("불러오지 못했어요. 인터넷을 확인해 주세요");
     }
@@ -919,7 +919,7 @@ class SeatDragController {
     const source = pressed.source;
     if (source === null) return;
     const box = source.getBoundingClientRect();
-    this.ghost = SeatDom.create("div", "drag-ghost", source.textContent ?? "");
+    this.ghost = SeatDom.create("div", "drag-ghost", source.textContent || "");
     this.ghost.style.width = `${box.width}px`;
     this.ghost.style.height = `${box.height}px`;
     this.ghost.style.fontSize = `${box.height * 0.5}px`;
@@ -935,14 +935,14 @@ class SeatDragController {
 
   private dropTargetAt(x: number, y: number): HTMLElement | null {
     const cell = this.cellAt(document.elementFromPoint(x, y));
-    if (cell === null || cell === this.pressed?.source || cell.classList.contains("blocked")) return null;
+    if (cell === null || this.pressed !== null && cell === this.pressed.source || cell.classList.contains("blocked")) return null;
     return cell;
   }
 
   private markHovered(cell: HTMLElement | null): void {
     if (cell === this.hovered) return;
-    this.hovered?.classList.remove("drop-target");
-    cell?.classList.add("drop-target");
+    if (this.hovered !== null) this.hovered.classList.remove("drop-target");
+    if (cell !== null) cell.classList.add("drop-target");
     this.hovered = cell;
   }
 
@@ -951,9 +951,9 @@ class SeatDragController {
   }
 
   private finishPress(): void {
-    this.pressed?.source?.classList.remove("drag-source");
+    if (this.pressed !== null && this.pressed.source !== null) this.pressed.source.classList.remove("drag-source");
     this.markHovered(null);
-    this.ghost?.remove();
+    if (this.ghost !== null) this.ghost.remove();
     this.ghost = null;
     if (this.pressed !== null && this.surface.hasPointerCapture(this.pressed.pointerId)) {
       this.surface.releasePointerCapture(this.pressed.pointerId);
@@ -1099,7 +1099,7 @@ class SeatPickerApp {
     try {
       await this.repository.save(classId, SeatPlanRecord.fromBoard(this.board, this.mode));
       this.messages.show(`${ClassChoice.label(classId)} 자리 배치를 저장했어요`, "ok");
-    } catch {
+    } catch (error) {
       this.messages.show("저장하지 못했어요. 인터넷을 확인해 주세요", "warn");
     } finally {
       this.saving = false;
