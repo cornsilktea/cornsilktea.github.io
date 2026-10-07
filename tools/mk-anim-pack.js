@@ -14,6 +14,12 @@ const PACKS = {
     { file: "Rig_Medium_MovementBasic.glb", clips: ["Jump_Full_Short", "Jump_Idle", "Jump_Land"] },
     { file: "Rig_Medium_General.glb", clips: ["Idle_B", "Interact", "PickUp", "Spawn_Air", "Death_B", "Hit_B"] },
     { file: "Rig_Medium_Simulation.glb", clips: ["Cheering"] }
+  ],
+  raid: [
+    { file: "Rig_Medium_MovementAdvanced.glb", clips: ["Dodge_Forward"] },
+    { file: "Rig_Medium_Special.glb", clips: ["Skeletons_Spawn_Ground", "Skeletons_Awaken_Standing"] },
+    { file: "Rig_Medium_General.glb", clips: ["Hit_B", "Spawn_Ground"] },
+    { file: "Rig_Medium_Simulation.glb", clips: ["Cheering"] }
   ]
 };
 const WANTED = PACKS[process.argv[4] || "soccer"];
