@@ -49,6 +49,12 @@ class Seat {
     toggleBlocked() {
         this.blocked = !this.blocked;
     }
+    block() {
+        this.blocked = true;
+    }
+    unblock() {
+        this.blocked = false;
+    }
     assign(number) {
         this.number = number;
     }
@@ -76,6 +82,12 @@ class SeatBoard {
     }
     availableCount() {
         return this.availableSeats().length;
+    }
+    blockedCount() {
+        return this.seats.length - this.availableCount();
+    }
+    unblockAll() {
+        this.seats.forEach((seat) => seat.unblock());
     }
     hasAssignments() {
         return this.seats.some((seat) => seat.isFilled);
@@ -187,6 +199,17 @@ class LayoutModes {
 LayoutModes.pair = new PairLayoutMode();
 LayoutModes.exam = new ExamLayoutMode();
 LayoutModes.all = [LayoutModes.pair, LayoutModes.exam];
+class BlockedSeatRelocator {
+    relocate(board, to) {
+        const count = board.blockedCount();
+        board.unblockAll();
+        this.positionsFarthestFirst(to).slice(0, count).forEach((position) => board.seatAt(position).block());
+    }
+    positionsFarthestFirst(mode) {
+        const columns = SequenceBuilder.between(1, mode.width);
+        return SequenceBuilder.between(mode.depth, 1).flatMap((row) => columns.map((column) => mode.seatAt(row, column)));
+    }
+}
 class NumberPicker {
     constructor(container) {
         this.excluded = new Set();
@@ -871,6 +894,7 @@ class SeatPickerApp {
         this.swapper = new SeatSwapper(this.board, this.history);
         this.assigner = new SeatAssigner(new SeatShuffler(new SeatMathRandomSource()));
         this.repository = new SeatPlanRepository();
+        this.relocator = new BlockedSeatRelocator();
         this.stage = new SeatStageView(SeatDom.byId("stageHost"));
         this.status = new StatusView(SeatDom.byId("status"));
         this.messages = new MessageBar(SeatDom.byId("message"));
@@ -895,6 +919,8 @@ class SeatPickerApp {
     }
     toggleMode() {
         this.mode = LayoutModes.other(this.mode);
+        if (!this.board.hasAssignments())
+            this.relocator.relocate(this.board, this.mode);
         this.refresh(false);
     }
     togglePerspective() {

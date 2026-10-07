@@ -58,6 +58,14 @@ class Seat {
     this.blocked = !this.blocked;
   }
 
+  block(): void {
+    this.blocked = true;
+  }
+
+  unblock(): void {
+    this.blocked = false;
+  }
+
   assign(number: number): void {
     this.number = number;
   }
@@ -96,6 +104,14 @@ class SeatBoard {
 
   availableCount(): number {
     return this.availableSeats().length;
+  }
+
+  blockedCount(): number {
+    return this.seats.length - this.availableCount();
+  }
+
+  unblockAll(): void {
+    this.seats.forEach((seat) => seat.unblock());
   }
 
   hasAssignments(): boolean {
@@ -225,6 +241,19 @@ class LayoutModes {
 
   static byKey(key: string): LayoutMode {
     return LayoutModes.all.find((mode) => mode.key === key) ?? LayoutModes.pair;
+  }
+}
+
+class BlockedSeatRelocator {
+  relocate(board: SeatBoard, to: LayoutMode): void {
+    const count = board.blockedCount();
+    board.unblockAll();
+    this.positionsFarthestFirst(to).slice(0, count).forEach((position) => board.seatAt(position).block());
+  }
+
+  private positionsFarthestFirst(mode: LayoutMode): SeatPosition[] {
+    const columns = SequenceBuilder.between(1, mode.width);
+    return SequenceBuilder.between(mode.depth, 1).flatMap((row) => columns.map((column) => mode.seatAt(row, column)));
   }
 }
 
@@ -992,6 +1021,7 @@ class SeatPickerApp {
   private readonly swapper = new SeatSwapper(this.board, this.history);
   private readonly assigner = new SeatAssigner(new SeatShuffler(new SeatMathRandomSource()));
   private readonly repository = new SeatPlanRepository();
+  private readonly relocator = new BlockedSeatRelocator();
   private readonly stage = new SeatStageView(SeatDom.byId("stageHost"));
   private readonly status = new StatusView(SeatDom.byId("status"));
   private readonly messages = new MessageBar(SeatDom.byId("message"));
@@ -1019,6 +1049,7 @@ class SeatPickerApp {
 
   private toggleMode(): void {
     this.mode = LayoutModes.other(this.mode);
+    if (!this.board.hasAssignments()) this.relocator.relocate(this.board, this.mode);
     this.refresh(false);
   }
 
