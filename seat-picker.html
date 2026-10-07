@@ -151,9 +151,9 @@ button.primary:disabled{opacity:.4;}
   .field.absent input{width:160px;}
 }
 
-@page{size:A4 landscape;margin:12mm;}
+@page{size:A4 landscape;margin:0;}
 @media print{
-  html body{padding:0 !important;height:auto;overflow:visible;background:#fff;color:#000;}
+  html body{padding:12mm !important;height:auto;overflow:visible;background:#fff;color:#000;}
   [data-guard-home]{display:none !important;}
   body.saved-open #app,
   body.saved-open #saveDialog,
@@ -162,7 +162,8 @@ button.primary:disabled{opacity:.4;}
   body.saved-open .overlay.saved{position:static;display:block;padding:0;background:#fff;}
   body.saved-open .saved-body,body.saved-open .saved-main,body.saved-open .saved-detail{display:block;}
   .print-title{font-size:22pt;color:#000;}
-  .print-meta{font-size:12pt;color:#000;margin-bottom:6mm;}
+  .print-meta{display:none;}
+  .print-title{margin-bottom:6mm;}
   .saved-detail .stage-host{height:150mm;max-width:none;}
   .chalk{background:#fff;color:#000;border:3px solid #000;}
   .cell{background:#fff;border:3px solid #000;color:#000;}
