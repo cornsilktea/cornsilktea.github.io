@@ -1071,8 +1071,13 @@ class RdLocalBody {
         intent.aimZ = steer.z;
         this.hero.intent = intent;
         const now = this.clock.local();
-        if (intent.attack)
+        if (intent.attack) {
             this.hero.faceUntil = now + 0.5;
+            const target = RdTargeting.choose(this.hero, intent, this.targets, this.hero.spec.range);
+            this.hero.faceLocked = !!target;
+            if (target)
+                this.hero.faceYaw = RdMath.yawOf(target.x - this.hero.x, target.z - this.hero.z);
+        }
         RdHeroMover.step(this.hero, intent, Math.min(0.1, dt), this.world, now);
     }
     stateText(transition) {

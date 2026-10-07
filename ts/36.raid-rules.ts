@@ -691,6 +691,8 @@ class RdHero extends RdUnit {
   dash: RdDash | null = null;
   attackReadyAt = 0;
   faceUntil = 0;
+  faceYaw = 0;
+  faceLocked = false;
   empoweredUntil = 0;
   slowUntil = 0;
   airborneUntil = 0;
@@ -766,7 +768,9 @@ class RdHeroMover {
       world.move(hero, direction.x * speed * dt, direction.z * speed * dt);
     }
     const aimLength = Math.hypot(intent.aimX, intent.aimZ);
-    if (time < hero.faceUntil && aimLength > 0.05) hero.yaw = RdMath.yawOf(intent.aimX, intent.aimZ);
+    if (time >= hero.faceUntil) hero.faceLocked = false;
+    if (time < hero.faceUntil && hero.faceLocked) hero.yaw = hero.faceYaw;
+    else if (time < hero.faceUntil && aimLength > 0.05) hero.yaw = RdMath.yawOf(intent.aimX, intent.aimZ);
     else if (hero.moving) hero.yaw = RdMath.yawOf(direction.x, direction.z);
   }
 
@@ -781,6 +785,24 @@ class RdHeroMover {
 }
 
 class RdTargeting {
+  static choose<T extends { id: number; x: number; z: number; radius: number }>(hero: RdPoint, intent: RdHeroIntent, foes: readonly T[], reach: number): T | null {
+    const distance = (point: RdPoint) => Math.hypot(point.x - hero.x, point.z - hero.z);
+    const candidates = foes.filter((foe) => distance(foe) - foe.radius <= reach);
+    if (!candidates.length) return null;
+    const focused = candidates.filter((foe) => foe.id === intent.focus)[0];
+    if (focused) return focused;
+    const aimLength = Math.hypot(intent.aimX, intent.aimZ);
+    if (aimLength > 0.1) {
+      const aimYaw = RdMath.yawOf(intent.aimX, intent.aimZ);
+      const inCone = candidates
+        .map((foe) => ({ foe, off: Math.abs(RdMath.angleDiff(RdMath.yawOf(foe.x - hero.x, foe.z - hero.z), aimYaw)) }))
+        .filter((entry) => entry.off <= Math.PI / 4)
+        .sort((a, b) => a.off - b.off || distance(a.foe) - distance(b.foe));
+      if (inCone.length) return inCone[0].foe;
+    }
+    return candidates.sort((a, b) => distance(a) - distance(b))[0];
+  }
+
   static bestBlast(points: readonly RdPoint[], fromX: number, fromZ: number, range: number, radius: number): RdPoint | null {
     let best: RdPoint | null = null;
     let bestCount = 0;
@@ -3019,20 +3041,7 @@ class RdEngine {
   }
 
   pickTarget(hero: RdHero, intent: RdHeroIntent, reach: number): RdFoe | null {
-    const candidates = this.hittableFoes(hero).filter((foe) => hero.distanceTo(foe) - foe.radius <= reach);
-    if (!candidates.length) return null;
-    const focused = candidates.filter((foe) => foe.id === intent.focus)[0];
-    if (focused) return focused;
-    const aimLength = Math.hypot(intent.aimX, intent.aimZ);
-    if (aimLength > 0.1) {
-      const aimYaw = RdMath.yawOf(intent.aimX, intent.aimZ);
-      const inCone = candidates
-        .map((foe) => ({ foe, off: Math.abs(RdMath.angleDiff(RdMath.yawOf(foe.x - hero.x, foe.z - hero.z), aimYaw)) }))
-        .filter((entry) => entry.off <= Math.PI / 4)
-        .sort((a, b) => a.off - b.off || hero.distanceTo(a.foe) - hero.distanceTo(b.foe));
-      if (inCone.length) return inCone[0].foe;
-    }
-    return candidates.sort((a, b) => hero.distanceTo(a) - hero.distanceTo(b))[0];
+    return RdTargeting.choose(hero, intent, this.hittableFoes(hero), reach);
   }
 
   begin(): void {
@@ -3102,7 +3111,11 @@ class RdEngine {
     if (!target) return;
     hero.attackReadyAt = this.time + hero.stats.interval();
     hero.faceUntil = this.time + 0.6;
-    if (!hero.pilot.external) hero.faceToward(target.x, target.z);
+    if (!hero.pilot.external) {
+      hero.faceToward(target.x, target.z);
+      hero.faceYaw = hero.yaw;
+      hero.faceLocked = true;
+    }
     let damage = hero.stats.attack();
     if (this.time < hero.empoweredUntil) {
       damage *= RdBalance.DASH.factor;
