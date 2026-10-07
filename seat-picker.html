@@ -35,7 +35,7 @@
 [hidden]{display:none !important;}
 html,body{margin:0;}
 body{
-  height:100dvh;overflow:hidden;
+  height:100vh;height:100dvh;overflow:hidden;
   background:var(--bg);color:var(--ink);font-family:var(--font);
   -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
   touch-action:manipulation;
@@ -82,7 +82,7 @@ button.primary:disabled{opacity:.4;}
 .cell.gap-joined{margin-right:-3px;}
 .cell.gap-aisle{margin-right:clamp(24px,5vw,80px);}
 .cell.gap-even{margin-right:clamp(8px,1.6vw,26px);}
-.cell .num{font-size:min(55cqh,34cqw);font-weight:800;line-height:1;pointer-events:none;}
+.cell .num{font-size:clamp(20px,6vh,56px);font-size:min(55cqh,34cqw);font-weight:800;line-height:1;pointer-events:none;}
 .cell.blocked{
   background:
     linear-gradient(to top right, transparent calc(50% - 2px), var(--strong) calc(50% - 2px), var(--strong) calc(50% + 2px), transparent calc(50% + 2px)),
@@ -120,7 +120,7 @@ button.primary:disabled{opacity:.4;}
 .message.ok{color:var(--ok);}
 .message.warn{color:var(--accent);}
 
-.overlay{position:fixed;inset:0;z-index:100;background:rgba(16,24,19,.78);display:flex;align-items:center;justify-content:center;padding:16px;}
+.overlay{position:fixed;top:0;right:0;bottom:0;left:0;z-index:100;background:rgba(16,24,19,.78);display:flex;align-items:center;justify-content:center;padding:16px;}
 .dialog{width:min(440px,100%);background:var(--panel);border:2px solid var(--strong);border-radius:10px;padding:20px;display:flex;flex-direction:column;gap:14px;}
 .dialog h2{margin:0;font-size:22px;}
 .dialog p{margin:0;font-size:15px;color:var(--soft);}

@@ -6,6 +6,10 @@ class SeatDom {
             throw new Error(`#${id} 요소가 없어요`);
         return element;
     }
+    static fill(parent, children) {
+        parent.textContent = "";
+        children.forEach((child) => parent.appendChild(child));
+    }
     static create(tag, className, text = "") {
         const element = document.createElement(tag);
         element.className = className;
@@ -193,7 +197,7 @@ class NumberPicker {
             row.append(...this.buttons.slice(rowIndex * NumberPicker.PER_ROW, (rowIndex + 1) * NumberPicker.PER_ROW));
             return row;
         });
-        container.replaceChildren(...rows);
+        SeatDom.fill(container, rows);
     }
     onChange(listener) {
         this.changeListener = listener;
@@ -321,7 +325,7 @@ class SeatStageView {
         this.chalkboard = new ChalkboardLabelView();
         this.boardElement = SeatDom.create("div", "board");
         this.root.append(this.chalkboard.element, this.boardElement);
-        host.replaceChildren(this.root);
+        SeatDom.fill(host, [this.root]);
     }
     render(board, mode, perspective, selected, animate) {
         this.root.className = `stage ${perspective.chalkboardClass}`;
@@ -335,7 +339,7 @@ class SeatStageView {
             rowElement.append(...cells);
             return rowElement;
         });
-        this.boardElement.replaceChildren(...rows);
+        SeatDom.fill(this.boardElement, rows);
     }
     blockedBackRows(board, mode) {
         const rows = new Set();
@@ -437,7 +441,7 @@ class ClassChoice {
         const classRow = SeatDom.create("div", "choice-row");
         gradeRow.append(...this.gradeButtons);
         classRow.append(...this.classButtons);
-        container.replaceChildren(gradeRow, classRow);
+        SeatDom.fill(container, [gradeRow, classRow]);
     }
     get value() {
         return this.grade > 0 && this.classNumber > 0 ? `${this.grade}-${this.classNumber}` : null;
@@ -538,19 +542,16 @@ class SeatPlanRecord {
 }
 class SeatPlanRepository {
     async save(classId, record) {
-        const response = await fetch(this.urlFor(classId), {
+        const response = await this.fetchWithTimeout(this.urlFor(classId), {
             method: "POST",
             body: JSON.stringify(record.toPayload()),
-            signal: AbortSignal.timeout(SeatPlanRepository.TIMEOUT_MS),
         });
         if (!response.ok)
             throw new Error(`저장 실패 ${response.status}`);
     }
     async list(classId) {
         const query = `?orderBy=%22at%22&limitToLast=${SeatPlanRepository.LIST_LIMIT}`;
-        const response = await fetch(this.urlFor(classId) + query, {
-            signal: AbortSignal.timeout(SeatPlanRepository.TIMEOUT_MS),
-        });
+        const response = await this.fetchWithTimeout(this.urlFor(classId) + query, {});
         if (!response.ok)
             throw new Error(`불러오기 실패 ${response.status}`);
         const body = await response.json();
@@ -560,6 +561,16 @@ class SeatPlanRepository {
             .map(([id, raw]) => SeatPlanRecord.fromStored(id, raw))
             .filter((record) => record !== null)
             .sort((a, b) => b.savedAt - a.savedAt);
+    }
+    async fetchWithTimeout(url, init) {
+        const controller = new AbortController();
+        const timer = window.setTimeout(() => controller.abort(), SeatPlanRepository.TIMEOUT_MS);
+        try {
+            return await fetch(url, { ...init, signal: controller.signal });
+        }
+        finally {
+            window.clearTimeout(timer);
+        }
     }
     urlFor(classId) {
         const base = (window.PORTAL_CONFIG?.DB_URL ?? "").replace(/\/+$/, "");
@@ -596,10 +607,10 @@ class SavedPlanList {
             button.addEventListener("click", () => onPick(record));
             return button;
         });
-        this.element.replaceChildren(...buttons);
+        SeatDom.fill(this.element, buttons);
     }
     clear() {
-        this.element.replaceChildren();
+        SeatDom.fill(this.element, []);
     }
 }
 class SavedPlansView {

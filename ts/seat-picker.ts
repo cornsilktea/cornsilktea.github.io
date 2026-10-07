@@ -7,6 +7,11 @@ class SeatDom {
     return element as T;
   }
 
+  static fill(parent: HTMLElement, children: readonly Node[]): void {
+    parent.textContent = "";
+    children.forEach((child) => parent.appendChild(child));
+  }
+
   static create<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text = ""): HTMLElementTagNameMap[K] {
     const element = document.createElement(tag);
     element.className = className;
@@ -238,7 +243,7 @@ class NumberPicker {
       row.append(...this.buttons.slice(rowIndex * NumberPicker.PER_ROW, (rowIndex + 1) * NumberPicker.PER_ROW));
       return row;
     });
-    container.replaceChildren(...rows);
+    SeatDom.fill(container, rows);
   }
 
   onChange(listener: () => void): void {
@@ -375,7 +380,7 @@ class SeatStageView {
 
   constructor(host: HTMLElement) {
     this.root.append(this.chalkboard.element, this.boardElement);
-    host.replaceChildren(this.root);
+    SeatDom.fill(host, [this.root]);
   }
 
   render(board: SeatBoard, mode: LayoutMode, perspective: ViewPerspective, selected: SeatPosition | null, animate: boolean): void {
@@ -390,7 +395,7 @@ class SeatStageView {
       rowElement.append(...cells);
       return rowElement;
     });
-    this.boardElement.replaceChildren(...rows);
+    SeatDom.fill(this.boardElement, rows);
   }
 
   private blockedBackRows(board: SeatBoard, mode: LayoutMode): Set<number> {
@@ -514,7 +519,7 @@ class ClassChoice {
     const classRow = SeatDom.create("div", "choice-row");
     gradeRow.append(...this.gradeButtons);
     classRow.append(...this.classButtons);
-    container.replaceChildren(gradeRow, classRow);
+    SeatDom.fill(container, [gradeRow, classRow]);
   }
 
   get value(): string | null {
@@ -636,19 +641,16 @@ class SeatPlanRepository {
   private static readonly LIST_LIMIT = 30;
 
   async save(classId: string, record: SeatPlanRecord): Promise<void> {
-    const response = await fetch(this.urlFor(classId), {
+    const response = await this.fetchWithTimeout(this.urlFor(classId), {
       method: "POST",
       body: JSON.stringify(record.toPayload()),
-      signal: AbortSignal.timeout(SeatPlanRepository.TIMEOUT_MS),
     });
     if (!response.ok) throw new Error(`저장 실패 ${response.status}`);
   }
 
   async list(classId: string): Promise<SeatPlanRecord[]> {
     const query = `?orderBy=%22at%22&limitToLast=${SeatPlanRepository.LIST_LIMIT}`;
-    const response = await fetch(this.urlFor(classId) + query, {
-      signal: AbortSignal.timeout(SeatPlanRepository.TIMEOUT_MS),
-    });
+    const response = await this.fetchWithTimeout(this.urlFor(classId) + query, {});
     if (!response.ok) throw new Error(`불러오기 실패 ${response.status}`);
     const body: unknown = await response.json();
     if (typeof body !== "object" || body === null) return [];
@@ -656,6 +658,16 @@ class SeatPlanRepository {
       .map(([id, raw]) => SeatPlanRecord.fromStored(id, raw))
       .filter((record): record is SeatPlanRecord => record !== null)
       .sort((a, b) => b.savedAt - a.savedAt);
+  }
+
+  private async fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), SeatPlanRepository.TIMEOUT_MS);
+    try {
+      return await fetch(url, { ...init, signal: controller.signal });
+    } finally {
+      window.clearTimeout(timer);
+    }
   }
 
   private urlFor(classId: string): string {
@@ -690,11 +702,11 @@ class SavedPlanList {
       button.addEventListener("click", () => onPick(record));
       return button;
     });
-    this.element.replaceChildren(...buttons);
+    SeatDom.fill(this.element, buttons);
   }
 
   clear(): void {
-    this.element.replaceChildren();
+    SeatDom.fill(this.element, []);
   }
 }
 
