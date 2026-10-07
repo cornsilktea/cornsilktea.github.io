@@ -71,25 +71,77 @@ class RdRandom {
 }
 class RdShapes {
     static contains(shape, x, z, radius) {
-        const dx = x - shape.x, dz = z - shape.z;
-        if (shape.kind === "circle")
-            return Math.hypot(dx, dz) <= shape.r + radius;
-        if (shape.kind === "cone") {
-            const distance = Math.hypot(dx, dz);
-            if (distance > shape.r + radius)
-                return false;
-            if (distance <= radius)
-                return true;
-            const offset = Math.abs(RdMath.angleDiff(RdMath.yawOf(dx, dz), shape.dir));
-            const slack = Math.asin(Math.min(1, radius / distance));
-            return offset <= shape.arc / 2 + slack;
+        return RdShapes.TESTS[shape.kind](shape, x, z, radius);
+    }
+    static checkerCellRed(shape, x, z) {
+        if (x < shape.x || z < shape.z || x > shape.x + shape.w || z > shape.z + shape.h)
+            return false;
+        const column = Math.floor((x - shape.x) / shape.cell), row = Math.floor((z - shape.z) / shape.cell);
+        return (column + row) % 2 === shape.parity;
+    }
+    static checkerCells(shape) {
+        const cells = [];
+        const columns = Math.round(shape.w / shape.cell), rows = Math.round(shape.h / shape.cell);
+        for (let column = 0; column < columns; column++) {
+            for (let row = 0; row < rows; row++) {
+                if ((column + row) % 2 !== shape.parity)
+                    continue;
+                const minX = shape.x + column * shape.cell, minZ = shape.z + row * shape.cell;
+                cells.push({ minX, maxX: minX + shape.cell, minZ, maxZ: minZ + shape.cell });
+            }
         }
+        return cells;
+    }
+    static chordThrough(rect, point, dir, width) {
+        const sx = Math.sin(dir), sz = Math.cos(dir);
+        const exit = (dirX, dirZ) => {
+            let best = Infinity;
+            if (dirX > 1e-6)
+                best = Math.min(best, (rect.maxX - point.x) / dirX);
+            if (dirX < -1e-6)
+                best = Math.min(best, (rect.minX - point.x) / dirX);
+            if (dirZ > 1e-6)
+                best = Math.min(best, (rect.maxZ - point.z) / dirZ);
+            if (dirZ < -1e-6)
+                best = Math.min(best, (rect.minZ - point.z) / dirZ);
+            return isFinite(best) ? Math.max(0, best) : 0;
+        };
+        const back = exit(-sx, -sz), forward = exit(sx, sz);
+        return { kind: "line", x: point.x - sx * back, z: point.z - sz * back, dir, length: back + forward, width };
+    }
+}
+RdShapes.TESTS = {
+    circle: (shape, x, z, radius) => Math.hypot(x - shape.x, z - shape.z) <= shape.r + radius,
+    cone: (shape, x, z, radius) => {
+        const dx = x - shape.x, dz = z - shape.z;
+        const distance = Math.hypot(dx, dz);
+        if (distance > shape.r + radius)
+            return false;
+        if (distance <= radius)
+            return true;
+        const offset = Math.abs(RdMath.angleDiff(RdMath.yawOf(dx, dz), shape.dir));
+        const slack = Math.asin(Math.min(1, radius / distance));
+        return offset <= shape.arc / 2 + slack;
+    },
+    line: (shape, x, z, radius) => {
+        const dx = x - shape.x, dz = z - shape.z;
         const sx = Math.sin(shape.dir), sz = Math.cos(shape.dir);
         const along = dx * sx + dz * sz;
         const across = Math.abs(dx * sz - dz * sx);
         return along >= -radius && along <= shape.length + radius && across <= shape.width / 2 + radius;
+    },
+    checker: (shape, x, z, radius) => [[0, 0], [radius, 0], [-radius, 0], [0, radius], [0, -radius]].some((offset) => RdShapes.checkerCellRed(shape, x + offset[0], z + offset[1])),
+    quadrants: (shape, x, z, radius) => {
+        const dx = x - shape.x, dz = z - shape.z;
+        if (Math.hypot(dx, dz) > shape.r + radius)
+            return false;
+        const sx = Math.sin(shape.dir), sz = Math.cos(shape.dir);
+        const along = Math.abs(dx * sx + dz * sz);
+        const across = Math.abs(dx * sz - dz * sx);
+        const half = shape.gap / 2;
+        return along > half - radius && across > half - radius;
     }
-}
+};
 class RdBalance {
     static heroSpec(slot) {
         return RdBalance.HEROES[slot];
@@ -122,20 +174,20 @@ RdBalance.HEROES = [
     { job: "knight", name: "탱커", model: "Knight", lookType: 0, hp: 360, attack: 14, interval: 1.0, range: 200, arc: Math.PI / 2, speed: 450, style: "slash", skills: ["taunt"], color: "#5B8DEF", icon: "탱", role: "적을 끌어모아 동료를 지켜요" },
     { job: "barbarian", name: "바바리안", model: "Barbarian", lookType: 1, hp: 240, attack: 30, interval: 1.1, range: 240, arc: Math.PI * 2 / 3, speed: 500, style: "cleave", skills: ["charge"], color: "#E5604D", icon: "바", role: "몰린 적을 한 번에 베어요" },
     { job: "mage", name: "메이지", model: "Mage", lookType: 2, hp: 150, attack: 24, interval: 1.2, range: 900, arc: 0, speed: 460, style: "orb", skills: ["fireball"], color: "#A46BE8", icon: "마", role: "멀리서 큰 폭발을 터뜨려요" },
-    { job: "ranger", name: "레인저", model: "Ranger", lookType: 3, hp: 170, attack: 20, interval: 0.8, range: 1100, arc: 0, speed: 500, style: "arrow", skills: ["roll"], color: "#4FBF7A", icon: "레", role: "빠르게 활을 쏘고 굴러 피해요" },
+    { job: "ranger", name: "레인저", model: "Ranger", lookType: 3, hp: 170, attack: 20, interval: 0.8, range: 1100, arc: 0, speed: 500, style: "arrow", skills: ["dash"], color: "#4FBF7A", icon: "레", role: "빠르게 활을 쏘고 대쉬로 피해요" },
     { job: "priest", name: "힐러", model: "Rogue_Hooded", lookType: 5, hp: 190, attack: 12, interval: 1.0, range: 800, arc: 0, speed: 480, style: "beam", skills: ["heal"], color: "#F2C14E", icon: "힐", role: "다친 동료를 회복해요" }
 ];
 RdBalance.SKILLS = {
     taunt: { key: "taunt", name: "도발", cooldown: 10, summary: "주변 적이 나를 공격" },
     charge: { key: "charge", name: "돌진", cooldown: 8, summary: "앞으로 돌진해 기절" },
     fireball: { key: "fireball", name: "화염 폭발", cooldown: 7, summary: "적이 몰린 곳에 폭발" },
-    roll: { key: "roll", name: "구르기", cooldown: 6, summary: "무적 구르기, 다음 화살 강화" },
+    dash: { key: "dash", name: "대쉬", cooldown: 6, summary: "무적 순간 대쉬, 다음 화살 강화" },
     heal: { key: "heal", name: "치유", cooldown: 8, summary: "가장 다친 동료 회복" }
 };
 RdBalance.TAUNT = { radius: 800, mobSeconds: 4, bossSeconds: 2 };
 RdBalance.CHARGE = { distance: 600, seconds: 0.3, factor: 1.2, stunSeconds: 1.5, splash: 200 };
 RdBalance.FIREBALL = { range: 1000, radius: 300, delay: 0.8, factor: 3.0 };
-RdBalance.ROLL = { distance: 400, seconds: 0.4, empowerSeconds: 6, factor: 1.5 };
+RdBalance.DASH = { distance: 520, seconds: 0.14, invulnerableSeconds: 0.3, empowerSeconds: 6, factor: 1.5 };
 RdBalance.HEAL = { range: 1000, ratio: 0.35 };
 RdBalance.MOBS = {
     minion: { kind: "minion", name: "미니언", model: "Skeleton_Minion", hp: 40, attack: 6, interval: 1.0, range: 150, speed: 420, radius: 40, ranged: false, spawn: "ground" },
@@ -145,21 +197,25 @@ RdBalance.MOBS = {
 };
 RdBalance.GIANT = {
     name: "거대 워리어", hp: 8000, speed: 300, radius: 160,
-    slam: { radius: 400, arc: Math.PI / 2, telegraph: 0.8, damage: 75, cooldown: 3 },
-    leap: { radius: 300, telegraph: 1.4, damage: 115, cooldown: 12 },
-    rush: { length: 1200, width: 250, telegraph: 1.2, damage: 95, cooldown: 18, wallStun: 2, wallBonus: 0.25, speed: 2400 },
+    slam: { radius: 460, arc: Math.PI * 0.53, telegraph: 0.8, damage: 75, cooldown: 3 },
+    leap: { radius: 360, telegraph: 1.4, damage: 115, cooldown: 12 },
+    rush: { length: 1300, width: 300, telegraph: 1.2, damage: 95, cooldown: 18, wallStun: 2, wallBonus: 0.25, speed: 2400 },
+    quake: { radius: 950, gap: 260, telegraph: 1.6, damage: 70, push: 420, cooldown: 20, firstDelay: 12 },
     summons: [0.7, 0.4]
 };
 RdBalance.ARCHMAGE = {
     name: "해골 대마법사", hp: 10000, speed: 260, radius: 160, range: 1400,
     bolt: { damage: 40, cooldown: 2, speed: 1100 },
-    circles: { cooldown: 10, radius: 250, telegraph: 2, active: 6, dps: 40 },
-    meteor: { cooldown: 16, enragedCooldown: 12, radius: 450, cast: 3.0, damage: 150, stun: 2, spread: 900 }
+    circles: { cooldown: 10, radius: 340, telegraph: 2, active: 6, dps: 40 },
+    meteor: { cooldown: 16, enragedCooldown: 12, radius: 560, cast: 3.0, damage: 150, stun: 2, spread: 900 },
+    barrier: { lines: 4, width: 130, telegraph: 1.8, damage: 70, cooldown: 13, firstDelay: 10 }
 };
 RdBalance.LORD = {
     name: "해골 군주", hp: 16000, speed: 300, radius: 200,
-    sweep: { radius: 500, arc: Math.PI * 2 / 3, telegraph: 0.8, damage: 120, cooldown: 3.2 },
-    leap: { radius: 350, telegraph: 1.6, damage: 150, cooldown: 14 },
+    sweep: { radius: 570, arc: Math.PI * 0.7, telegraph: 0.8, damage: 90, cooldown: 3.2 },
+    leap: { radius: 400, telegraph: 1.6, damage: 150, cooldown: 14 },
+    quake: { radius: 1050, gap: 260, telegraph: 1.6, damage: 60, push: 450, cooldown: 20, firstDelay: 12 },
+    stomp: { ratio: 0.75, cell: 400, telegraph: 2.6, damage: 70, airborne: 1.1, cooldown: 22 },
     summons: [0.85, 0.6, 0.35],
     mechanics: [
         { ratio: 0.75, kinds: ["zones"] },
@@ -188,6 +244,16 @@ RdBalance.TIER_WEIGHTS = [0.5, 0.4, 0.1];
 RdBalance.TIER_NAMES = ["일반", "희귀", "전설"];
 RdBalance.TIER_COLORS = ["#B8BEC9", "#5B9BFF", "#F08A3E"];
 class RdMapData {
+    static obstacleOverlaps(obstacle, x, z, radius) {
+        const dx = x - obstacle.x, dz = z - obstacle.z;
+        const cos = Math.cos(obstacle.turn), sin = Math.sin(obstacle.turn);
+        const localX = dx * cos - dz * sin, localZ = dx * sin + dz * cos;
+        const nearX = RdMath.clamp(localX, -obstacle.halfX, obstacle.halfX), nearZ = RdMath.clamp(localZ, -obstacle.halfZ, obstacle.halfZ);
+        return Math.hypot(localX - nearX, localZ - nearZ) < radius;
+    }
+    static blocked(x, z, radius) {
+        return RdMapData.OBSTACLES.some((obstacle) => RdMapData.obstacleOverlaps(obstacle, x, z, radius));
+    }
     static doorStart(door, radius) {
         return { x: door.x + door.inX * (radius + 2), z: door.z + door.inZ * (radius + 2) };
     }
@@ -220,6 +286,14 @@ RdMapData.CHEST_SPOTS = [
 ];
 RdMapData.DUMMY_SPOTS = [{ x: -700, z: -350 }, { x: 0, z: -550 }, { x: 700, z: -350 }];
 RdMapData.BOSS_HOME = { x: 0, z: -700 };
+RdMapData.OBSTACLES = [
+    { prop: "rubble", x: -1640, z: -1250, turn: 0.4, scale: 0.6, halfX: 210, halfZ: 85 },
+    { prop: "rubble", x: 1690, z: 650, turn: Math.PI / 2, scale: 0.6, halfX: 210, halfZ: 85 },
+    { prop: "barrel", x: -1680, z: 1250, turn: 0, scale: 1, halfX: 80, halfZ: 80 },
+    { prop: "box", x: 1690, z: -950, turn: 0.3, scale: 1, halfX: 72, halfZ: 72 },
+    { prop: "barrel", x: 2900, z: 700, turn: 0.7, scale: 1, halfX: 80, halfZ: 80 },
+    { prop: "box", x: 2900, z: -700, turn: 0.2, scale: 1, halfX: 72, halfZ: 72 }
+];
 class RdFloorPlan {
     static spec(floor) {
         return RdFloorPlan.FLOORS[RdMath.clamp(floor, 1, RdFloorPlan.LAST_FLOOR) - 1];
@@ -355,6 +429,8 @@ class RdCollisionWorld {
     }
     regionContains(x, z, radius) {
         if (!RdMath.finite(x) || !RdMath.finite(z))
+            return false;
+        if (RdMapData.blocked(x, z, radius))
             return false;
         if (RdCollisionWorld.inside(RdMapData.HALL, x, z, radius))
             return true;
@@ -493,6 +569,7 @@ class RdHero extends RdUnit {
         this.faceUntil = 0;
         this.empoweredUntil = 0;
         this.slowUntil = 0;
+        this.airborneUntil = 0;
         this.intent = RdIntents.idle();
         this.damageDone = 0;
         this.healingDone = 0;
@@ -529,6 +606,7 @@ class RdHero extends RdUnit {
         this.hp = this.maxHp;
         this.stunUntil = 0;
         this.slowUntil = 0;
+        this.airborneUntil = 0;
         this.dash = null;
     }
 }
@@ -565,7 +643,8 @@ class RdHeroMover {
         const result = world.move(hero, dash.dirX * step, dash.dirZ * step);
         dash.left -= step;
         hero.moving = true;
-        hero.yaw = dash.kind === "roll" && hero.yaw !== 0 ? hero.yaw : RdMath.yawOf(dash.dirX, dash.dirZ);
+        if (dash.kind !== "knock")
+            hero.yaw = RdMath.yawOf(dash.dirX, dash.dirZ);
         if (!result.moved || dash.left <= 0.5)
             hero.dash = null;
     }
@@ -631,10 +710,27 @@ class RdSkill {
     get spec() {
         return RdBalance.SKILLS[this.key];
     }
-    motion(hero, intent) {
+    motion(hero, intent, targets) {
         return null;
     }
 }
+class RdMeleeAim {
+    static direction(hero, intent, targets, reach) {
+        const aim = RdMath.normalize(intent.aimX, intent.aimZ);
+        const facing = aim.x || aim.z ? aim : { x: Math.sin(hero.yaw), z: Math.cos(hero.yaw) };
+        const facingYaw = RdMath.yawOf(facing.x, facing.z);
+        const inReach = targets.filter((target) => hero.distanceTo(target) - target.radius <= reach + RdMeleeAim.REACH_BONUS);
+        if (!inReach.length)
+            return facing;
+        const offOf = (target) => Math.abs(RdMath.angleDiff(RdMath.yawOf(target.x - hero.x, target.z - hero.z), facingYaw));
+        const ahead = inReach.filter((target) => offOf(target) <= RdMeleeAim.CONE).sort((a, b) => offOf(a) - offOf(b) || hero.distanceTo(a) - hero.distanceTo(b));
+        const chosen = ahead[0] || inReach.slice().sort((a, b) => hero.distanceTo(a) - hero.distanceTo(b))[0];
+        const direction = RdMath.normalize(chosen.x - hero.x, chosen.z - hero.z);
+        return direction.x || direction.z ? direction : facing;
+    }
+}
+RdMeleeAim.CONE = Math.PI / 3;
+RdMeleeAim.REACH_BONUS = 200;
 class RdTauntSkill extends RdSkill {
     constructor() {
         super("taunt");
@@ -652,16 +748,15 @@ class RdChargeSkill extends RdSkill {
     constructor() {
         super("charge");
     }
-    static direction(hero, intent) {
-        const aim = RdMath.normalize(intent.aimX, intent.aimZ);
-        return aim.x || aim.z ? aim : { x: Math.sin(hero.yaw), z: Math.cos(hero.yaw) };
+    static direction(hero, intent, targets) {
+        return RdMeleeAim.direction(hero, intent, targets, RdBalance.CHARGE.distance);
     }
-    motion(hero, intent) {
-        const direction = RdChargeSkill.direction(hero, intent);
+    motion(hero, intent, targets) {
+        const direction = RdChargeSkill.direction(hero, intent, targets);
         return { dirX: direction.x, dirZ: direction.z, speed: RdBalance.CHARGE.distance / RdBalance.CHARGE.seconds, left: RdBalance.CHARGE.distance, kind: "charge" };
     }
     cast(engine, hero, intent) {
-        const direction = RdChargeSkill.direction(hero, intent);
+        const direction = RdChargeSkill.direction(hero, intent, engine.hittableFoes(hero));
         const spec = RdBalance.CHARGE;
         const wall = engine.world.wallDistance(hero.x, hero.z, direction.x, direction.z, spec.distance, hero.radius);
         let hitFoe = null;
@@ -727,23 +822,24 @@ class RdFireballSkill extends RdSkill {
         return true;
     }
 }
-class RdRollSkill extends RdSkill {
+class RdDashSkill extends RdSkill {
     constructor() {
-        super("roll");
+        super("dash");
     }
     static direction(hero, intent) {
         const move = RdMath.normalize(intent.moveX, intent.moveZ);
         return move.x || move.z ? move : { x: -Math.sin(hero.yaw), z: -Math.cos(hero.yaw) };
     }
     motion(hero, intent) {
-        const direction = RdRollSkill.direction(hero, intent);
-        return { dirX: direction.x, dirZ: direction.z, speed: RdBalance.ROLL.distance / RdBalance.ROLL.seconds, left: RdBalance.ROLL.distance, kind: "roll" };
+        const direction = RdDashSkill.direction(hero, intent);
+        return { dirX: direction.x, dirZ: direction.z, speed: RdBalance.DASH.distance / RdBalance.DASH.seconds, left: RdBalance.DASH.distance, kind: "dash" };
     }
     cast(engine, hero, intent) {
-        const direction = RdRollSkill.direction(hero, intent);
-        hero.invulnerableUntil = engine.time + RdBalance.ROLL.seconds;
-        hero.empoweredUntil = engine.time + RdBalance.ROLL.empowerSeconds;
-        engine.emit({ t: "fx", k: "roll", x: hero.x, z: hero.z, r: 0, id: hero.id, d: RdMath.yawOf(direction.x, direction.z) });
+        const direction = RdDashSkill.direction(hero, intent);
+        hero.invulnerableUntil = engine.time + RdBalance.DASH.invulnerableSeconds;
+        hero.empoweredUntil = engine.time + RdBalance.DASH.empowerSeconds;
+        const reach = engine.world.wallDistance(hero.x, hero.z, direction.x, direction.z, RdBalance.DASH.distance, hero.radius);
+        engine.emit({ t: "fx", k: "dash", x: hero.x, z: hero.z, r: Math.round(reach), id: hero.id, d: RdMath.yawOf(direction.x, direction.z) });
         return true;
     }
 }
@@ -770,7 +866,7 @@ RdSkills.BUILDERS = {
     taunt: () => new RdTauntSkill(),
     charge: () => new RdChargeSkill(),
     fireball: () => new RdFireballSkill(),
-    roll: () => new RdRollSkill(),
+    dash: () => new RdDashSkill(),
     heal: () => new RdHealSkill()
 };
 class RdHeroClass {
@@ -1207,7 +1303,7 @@ class RdAttackPattern {
         const telegraphIds = this.telegraph > 0 ? shapes.map((shape) => engine.addTelegraph(shape, resolveAt)) : [];
         const first = shapes[0];
         const point = first ? { x: first.x, z: first.z } : { x: target.x, z: target.z };
-        const dir = first && first.kind !== "circle" ? first.dir : RdMath.yawOf(target.x - boss.x, target.z - boss.z);
+        const dir = first && "dir" in first ? first.dir : RdMath.yawOf(target.x - boss.x, target.z - boss.z);
         engine.emit({ t: "act", id: boss.id, a: this.animation });
         return { pattern: this, start: engine.time, resolveAt, endAt: resolveAt + this.recovery, resolved: false, shapes, point, dir, telegraphIds };
     }
@@ -1221,6 +1317,9 @@ class RdAttackPattern {
             hit.push(hero);
         });
         return hit;
+    }
+    damagedHeroes(engine, shapes, damage) {
+        return engine.heroes.filter((hero) => hero.alive && shapes.some((shape) => RdShapes.contains(shape, hero.x, hero.z, hero.radius * 0.6)) && engine.damageHero(hero, damage) > 0);
     }
 }
 class RdConeStrike extends RdAttackPattern {
@@ -1360,6 +1459,78 @@ class RdMeteorPattern extends RdAttackPattern {
     resolve(engine, boss, cast) {
         cast.shapes.forEach((shape) => engine.emit({ t: "fx", k: "meteor", x: shape.x, z: shape.z, r: this.spec.radius, id: boss.id, d: 0 }));
         this.hitHeroes(engine, cast.shapes, this.spec.damage, this.spec.stun);
+    }
+}
+class RdQuadrantQuake extends RdAttackPattern {
+    constructor(spec) {
+        super(spec.cooldown, spec.telegraph, 0.5, spec.firstDelay);
+        this.spec = spec;
+    }
+    get animation() {
+        return "channel";
+    }
+    canStart(engine, boss) {
+        return engine.livingHeroes().some((hero) => hero.distanceTo(boss) <= this.spec.radius);
+    }
+    shapes(engine, boss) {
+        const dir = engine.random.next() < 0.5 ? 0 : Math.PI / 4;
+        return [{ kind: "quadrants", x: boss.x, z: boss.z, r: this.spec.radius, gap: this.spec.gap, dir }];
+    }
+    resolve(engine, boss, cast) {
+        engine.emit({ t: "act", id: boss.id, a: "slam" });
+        engine.emit({ t: "fx", k: "quake", x: cast.point.x, z: cast.point.z, r: this.spec.radius, id: boss.id, d: 0 });
+        this.damagedHeroes(engine, cast.shapes, this.spec.damage).forEach((hero) => engine.knockHero(hero, cast.point.x, cast.point.z, this.spec.push));
+    }
+}
+class RdCheckerStomp extends RdAttackPattern {
+    constructor(spec) {
+        super(spec.cooldown, spec.telegraph, 0.6);
+        this.spec = spec;
+    }
+    get animation() {
+        return "channel";
+    }
+    canStart(engine, boss) {
+        return boss.hp <= boss.maxHp * this.spec.ratio && engine.livingHeroes().length > 0;
+    }
+    shapes(engine, boss) {
+        const hall = RdMapData.HALL;
+        return [{ kind: "checker", x: hall.minX, z: hall.minZ, w: hall.maxX - hall.minX, h: hall.maxZ - hall.minZ, cell: this.spec.cell, parity: engine.random.int(2), ox: Math.round(boss.x), oz: Math.round(boss.z) }];
+    }
+    resolve(engine, boss, cast) {
+        engine.emit({ t: "act", id: boss.id, a: "slam" });
+        engine.emit({ t: "fx", k: "stomp", x: boss.x, z: boss.z, r: this.spec.cell, id: boss.id, d: 0 });
+        this.damagedHeroes(engine, cast.shapes, this.spec.damage).forEach((hero) => engine.launchHero(hero, this.spec.airborne));
+    }
+}
+class RdBarrierLines extends RdAttackPattern {
+    constructor(spec) {
+        super(spec.cooldown, spec.telegraph, 0.4, spec.firstDelay);
+        this.spec = spec;
+    }
+    get animation() {
+        return "summon";
+    }
+    canStart(engine) {
+        return engine.livingHeroes().length > 0;
+    }
+    shapes(engine) {
+        const hall = RdMapData.HALL;
+        const living = engine.livingHeroes();
+        const lines = [];
+        for (let index = 0; index < this.spec.lines; index++) {
+            const anchor = index < living.length && index < 2 ? engine.random.pick(living) : { x: engine.random.range(hall.minX + 300, hall.maxX - 300), z: engine.random.range(hall.minZ + 300, hall.maxZ - 300) };
+            const dir = engine.random.range(0, Math.PI);
+            lines.push(RdShapes.chordThrough(hall, { x: anchor.x, z: anchor.z }, dir, this.spec.width));
+        }
+        return lines;
+    }
+    resolve(engine, boss, cast) {
+        cast.shapes.forEach((shape) => {
+            if (shape.kind === "line")
+                engine.emit({ t: "fx", k: "barrier", x: Math.round(shape.x), z: Math.round(shape.z), r: Math.round(shape.length), id: boss.id, d: shape.dir });
+        });
+        this.damagedHeroes(engine, cast.shapes, this.spec.damage);
     }
 }
 class RdBoss extends RdEnemy {
@@ -1547,7 +1718,7 @@ class RdGiantWarrior extends RdBoss {
         this.bossKind = "giant";
         this.displayName = RdBalance.GIANT.name;
         this.summonRatios = RdBalance.GIANT.summons;
-        this.patterns = [new RdRushPattern(RdBalance.GIANT.rush), new RdLeapSlam(RdBalance.GIANT.leap)];
+        this.patterns = [new RdQuadrantQuake(RdBalance.GIANT.quake), new RdRushPattern(RdBalance.GIANT.rush), new RdLeapSlam(RdBalance.GIANT.leap)];
         this.basic = new RdConeStrike(RdBalance.GIANT.slam);
     }
 }
@@ -1556,7 +1727,7 @@ class RdArchMage extends RdBoss {
         super(id, RdBalance.ARCHMAGE.speed, RdBalance.ARCHMAGE.radius, RdBalance.ARCHMAGE.hp);
         this.bossKind = "archmage";
         this.displayName = RdBalance.ARCHMAGE.name;
-        this.patterns = [new RdMeteorPattern(RdBalance.ARCHMAGE.meteor, RdBalance.ARCHMAGE.range), new RdArcaneCircles(RdBalance.ARCHMAGE.circles, RdBalance.ARCHMAGE.range)];
+        this.patterns = [new RdMeteorPattern(RdBalance.ARCHMAGE.meteor, RdBalance.ARCHMAGE.range), new RdBarrierLines(RdBalance.ARCHMAGE.barrier), new RdArcaneCircles(RdBalance.ARCHMAGE.circles, RdBalance.ARCHMAGE.range)];
         this.basic = new RdMagicBolt(RdBalance.ARCHMAGE.bolt, RdBalance.ARCHMAGE.range);
     }
     summonWave(engine) {
@@ -1592,7 +1763,7 @@ class RdSkeletonLord extends RdBoss {
         this.displayName = RdBalance.LORD.name;
         this.summonRatios = RdBalance.LORD.summons;
         this.mechanicSteps = RdBalance.LORD.mechanics;
-        this.patterns = [new RdLeapSlam(RdBalance.LORD.leap)];
+        this.patterns = [new RdCheckerStomp(RdBalance.LORD.stomp), new RdQuadrantQuake(RdBalance.LORD.quake), new RdLeapSlam(RdBalance.LORD.leap)];
         this.basic = new RdConeStrike(RdBalance.LORD.sweep);
     }
     summonWave(engine) {
@@ -2318,6 +2489,24 @@ class RdEngine {
             this.knockDown(hero);
         return value;
     }
+    knockHero(hero, fromX, fromZ, distance) {
+        if (!hero.alive)
+            return;
+        const away = RdMath.normalize(hero.x - fromX, hero.z - fromZ);
+        const direction = away.x || away.z ? away : { x: Math.sin(hero.yaw + Math.PI), z: Math.cos(hero.yaw + Math.PI) };
+        const knock = RdKnockback.dash(direction, distance);
+        if (!hero.pilot.external)
+            hero.dash = knock;
+        hero.stunUntil = Math.max(hero.stunUntil, this.time + RdKnockback.SECONDS);
+        this.emit({ t: "fx", k: "knock", x: Math.round(hero.x), z: Math.round(hero.z), r: distance, id: hero.id, d: RdMath.yawOf(direction.x, direction.z) });
+    }
+    launchHero(hero, seconds) {
+        if (!hero.alive)
+            return;
+        hero.dash = null;
+        hero.airborneUntil = this.time + seconds;
+        hero.stunUntil = Math.max(hero.stunUntil, this.time + seconds);
+    }
     knockDown(hero) {
         if (hero.down)
             return;
@@ -2516,7 +2705,7 @@ class RdEngine {
             hero.skillReadyAt[index] = this.time + hero.skillCooldown(index);
             this.emit({ t: "act", id: hero.id, a: RdHeroAnimations.SKILL[skill.key] });
             if (!hero.pilot.external)
-                hero.dash = skill.motion(hero, intent);
+                hero.dash = skill.motion(hero, intent, this.hittableFoes(hero));
         });
     }
     tryBasicAttack(hero, intent) {
@@ -2531,7 +2720,7 @@ class RdEngine {
             hero.faceToward(target.x, target.z);
         let damage = hero.stats.attack();
         if (this.time < hero.empoweredUntil) {
-            damage *= RdBalance.ROLL.factor;
+            damage *= RdBalance.DASH.factor;
             hero.empoweredUntil = 0;
         }
         hero.heroClass.strike(this, hero, target, damage);
@@ -2637,7 +2826,13 @@ class RdEngine {
 }
 class RdHeroAnimations {
 }
-RdHeroAnimations.SKILL = { taunt: "taunt", charge: "charge", fireball: "fireball", roll: "roll", heal: "heal" };
+RdHeroAnimations.SKILL = { taunt: "taunt", charge: "charge", fireball: "fireball", dash: "dash", heal: "heal" };
+class RdKnockback {
+    static dash(direction, distance) {
+        return { dirX: direction.x, dirZ: direction.z, speed: distance / RdKnockback.SECONDS, left: distance, kind: "knock" };
+    }
+}
+RdKnockback.SECONDS = 0.28;
 class RdZonePlanner {
     static assign(zones, heroes) {
         const result = new Map();
@@ -2881,7 +3076,7 @@ class RdHeroBotBrain {
         const origin = stage.kind === "reward" ? RdBotRoute.PASSAGE_OUT : RdMapData.CENTER;
         const spots = RdZoneSpots.around(zone.circle);
         const others = engine.livingHeroes().filter((other) => other !== hero);
-        const free = spots.filter((spot) => others.every((other) => Math.hypot(other.x - spot.x, other.z - spot.z) >= RdZoneSpots.OCCUPIED));
+        const free = spots.filter((spot) => engine.world.regionContains(spot.x, spot.z, hero.radius) && others.every((other) => Math.hypot(other.x - spot.x, other.z - spot.z) >= RdZoneSpots.OCCUPIED));
         if (!free.length)
             return inside ? null : { x: zone.circle.x, z: zone.circle.z };
         const depth = (spot) => Math.hypot(spot.x - origin.x, spot.z - origin.z);
@@ -3026,8 +3221,8 @@ class RdHeroBotBrain {
     }
 }
 RdHeroBotBrain.THINK_SECONDS = 0.12;
-RdHeroBotBrain.PICK_DELAY_MIN = 6;
-RdHeroBotBrain.PICK_DELAY_MAX = 10;
+RdHeroBotBrain.PICK_DELAY_MIN = 1;
+RdHeroBotBrain.PICK_DELAY_MAX = 2;
 RdHeroBotBrain.PRACTICE_SECONDS = 4;
 RdHeroBotBrain.DANGER_LOOKAHEAD = 2.2;
 RdHeroBotBrain.DANGER_MARGIN = 30;
@@ -3165,7 +3360,7 @@ class RdRangerBot extends RdRangedBot {
             return;
         if (threat && hero.distanceTo(threat) < 230) {
             const away = RdMath.normalize(hero.x - threat.x, hero.z - threat.z);
-            if (engine.world.regionContains(hero.x + away.x * RdBalance.ROLL.distance, hero.z + away.z * RdBalance.ROLL.distance, hero.radius)) {
+            if (engine.world.regionContains(hero.x + away.x * RdBalance.DASH.distance, hero.z + away.z * RdBalance.DASH.distance, hero.radius)) {
                 this.moveOverride = away;
                 this.press(0);
             }
@@ -3176,7 +3371,7 @@ class RdRangerBot extends RdRangedBot {
             const toBoss = RdMath.normalize(boss.x - hero.x, boss.z - hero.z);
             const side = this.random.next() < 0.5 ? 1 : -1;
             const sideways = { x: -toBoss.z * side, z: toBoss.x * side };
-            if (engine.world.regionContains(hero.x + sideways.x * RdBalance.ROLL.distance, hero.z + sideways.z * RdBalance.ROLL.distance, hero.radius)) {
+            if (engine.world.regionContains(hero.x + sideways.x * RdBalance.DASH.distance, hero.z + sideways.z * RdBalance.DASH.distance, hero.radius)) {
                 this.moveOverride = sideways;
                 this.press(0);
             }
@@ -3227,6 +3422,7 @@ RdHeroFlags.INVULNERABLE = 16;
 RdHeroFlags.STUNNED = 32;
 RdHeroFlags.SLOWED = 64;
 RdHeroFlags.EMPOWERED = 128;
+RdHeroFlags.AIRBORNE = 256;
 class RdFoeFlags {
 }
 RdFoeFlags.MOVING = 1;
@@ -3243,6 +3439,29 @@ RdFoeRadius.OF = {
     giant: RdBalance.GIANT.radius, archmage: RdBalance.ARCHMAGE.radius, lord: RdBalance.LORD.radius,
     pillar: RdBalance.PILLARS.radius, dummy: RdBalance.DUMMY_RADIUS, chest: RdBalance.CHEST_RADIUS
 };
+class RdShapeCodec {
+    static encode(shape) {
+        return RdShapeCodec.ENCODERS[shape.kind](shape);
+    }
+    static decode(data) {
+        const decoder = RdShapeCodec.DECODERS[data[0]] || RdShapeCodec.DECODERS[2];
+        return decoder(data);
+    }
+}
+RdShapeCodec.ENCODERS = {
+    circle: (shape) => [0, Math.round(shape.x), Math.round(shape.z), Math.round(shape.r)],
+    cone: (shape) => [1, Math.round(shape.x), Math.round(shape.z), Math.round(shape.r), Math.round(shape.dir * 100), Math.round(shape.arc * 100)],
+    line: (shape) => [2, Math.round(shape.x), Math.round(shape.z), Math.round(shape.dir * 100), Math.round(shape.length), Math.round(shape.width)],
+    checker: (shape) => [3, Math.round(shape.x), Math.round(shape.z), Math.round(shape.w), Math.round(shape.h), Math.round(shape.cell), shape.parity, Math.round(shape.ox), Math.round(shape.oz)],
+    quadrants: (shape) => [4, Math.round(shape.x), Math.round(shape.z), Math.round(shape.r), Math.round(shape.gap), Math.round(shape.dir * 100)]
+};
+RdShapeCodec.DECODERS = [
+    (data) => ({ kind: "circle", x: data[1], z: data[2], r: data[3] }),
+    (data) => ({ kind: "cone", x: data[1], z: data[2], r: data[3], dir: data[4] / 100, arc: data[5] / 100 }),
+    (data) => ({ kind: "line", x: data[1], z: data[2], dir: data[3] / 100, length: data[4], width: data[5] }),
+    (data) => ({ kind: "checker", x: data[1], z: data[2], w: data[3], h: data[4], cell: data[5], parity: data[6], ox: data[7], oz: data[8] }),
+    (data) => ({ kind: "quadrants", x: data[1], z: data[2], r: data[3], gap: data[4], dir: data[5] / 100 })
+];
 class RdSnapshotCodec {
     static capture(engine) {
         return { snap: RdSnapshotCodec.snapshot(engine), flow: RdSnapshotCodec.flow(engine), party: RdSnapshotCodec.party(engine), offers: Array.from(engine.offers.values()).map((offer) => ({ ...offer, stats: offer.stats.slice(), gear: offer.gear.map((card) => ({ ...card })) })) };
@@ -3267,6 +3486,8 @@ class RdSnapshotCodec {
                 flags |= RdHeroFlags.SLOWED;
             if (time < hero.empoweredUntil)
                 flags |= RdHeroFlags.EMPOWERED;
+            if (time < hero.airborneUntil)
+                flags |= RdHeroFlags.AIRBORNE;
             return { slot: hero.slot, x: Math.round(hero.x), z: Math.round(hero.z), yaw: Math.round(hero.yaw * 100) / 100, hp: Math.max(0, Math.round(hero.hp)), max: hero.maxHp, flags, cd: hero.skillReadyAt.map((at) => Math.max(0, Math.round((at - time) * 10) / 10)) };
         });
         const foes = engine.foes.filter((foe) => !foe.removed).map((foe) => {
@@ -3321,18 +3542,10 @@ class RdSnapshotCodec {
         }));
     }
     static shapeToArray(shape) {
-        if (shape.kind === "circle")
-            return [0, Math.round(shape.x), Math.round(shape.z), Math.round(shape.r)];
-        if (shape.kind === "cone")
-            return [1, Math.round(shape.x), Math.round(shape.z), Math.round(shape.r), Math.round(shape.dir * 100), Math.round(shape.arc * 100)];
-        return [2, Math.round(shape.x), Math.round(shape.z), Math.round(shape.dir * 100), Math.round(shape.length), Math.round(shape.width)];
+        return RdShapeCodec.encode(shape);
     }
     static shapeFromArray(data) {
-        if (data[0] === 0)
-            return { kind: "circle", x: data[1], z: data[2], r: data[3] };
-        if (data[0] === 1)
-            return { kind: "cone", x: data[1], z: data[2], r: data[3], dir: data[4] / 100, arc: data[5] / 100 };
-        return { kind: "line", x: data[1], z: data[2], dir: data[3] / 100, length: data[4], width: data[5] };
+        return RdShapeCodec.decode(data);
     }
     static encodeSnap(snap) {
         const timed = (list) => list.map((entry) => [entry.id, RdSnapshotCodec.shapeToArray(entry.shape), Math.round(entry.start * 100), Math.round(entry.end * 100)]);
@@ -3375,7 +3588,6 @@ class RdSnapshotCodec {
     }
 }
 RdSnapshotCodec.FOE_KINDS = ["minion", "warrior", "rogue", "mage", "giant", "archmage", "lord", "pillar", "dummy", "chest"];
-RdSnapshotCodec.SHAPE_KINDS = ["circle", "cone", "line"];
 class RdHeroStateCodec {
     static encode(hero, transition) {
         const intent = hero.intent;

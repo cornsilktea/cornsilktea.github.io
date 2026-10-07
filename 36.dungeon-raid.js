@@ -374,7 +374,8 @@ class RdHud {
         this.selfFill = RkDom.byId("hudSelfFill");
         this.selfText = RkDom.byId("hudSelfText");
         this.skillBar = RkDom.byId("hudSkills");
-        this.gearBox = RkDom.byId("hudGear");
+        this.gearPanel = new RdGearPanel(RkDom.byId("hudGear"));
+        this.statPanel = new RdStatPanel(RkDom.byId("hudStats"));
         this.downCover = RkDom.byId("downCover");
         this.touchSkills = RkDom.byId("touchSkills");
         this.attackButton = RkDom.byId("btnAttack");
@@ -383,7 +384,6 @@ class RdHud {
         this.skillCells = [];
         this.touchCells = [];
         this.builtFor = -2;
-        this.lastGear = "";
         this.attackButton.addEventListener("touchstart", (event) => event.preventDefault(), { passive: false });
         this.attackButton.addEventListener("pointerdown", (event) => {
             event.preventDefault();
@@ -418,7 +418,8 @@ class RdHud {
         RkDom.show(this.skillBar, mySlot >= 0 && !this.touchDevice);
         RkDom.show(this.touchSkills, mySlot >= 0 && this.touchDevice);
         RkDom.show(this.attackButton, mySlot >= 0 && this.touchDevice);
-        this.lastGear = "";
+        this.gearPanel.reset(mySlot >= 0);
+        this.statPanel.reset(mySlot >= 0);
     }
     get builtSlot() {
         return this.builtFor;
@@ -503,15 +504,8 @@ class RdHud {
             });
         });
         if (party) {
-            const key = party.gear.join(",");
-            if (key !== this.lastGear) {
-                this.lastGear = key;
-                this.gearBox.innerHTML = RdBalance.GEAR_SLOTS.map((slot, index) => {
-                    const tier = party.gear[index];
-                    const color = tier >= 0 ? RdBalance.TIER_COLORS[tier] : "rgba(255,255,255,.18)";
-                    return "<span class='rd-gear' style='--tier:" + color + "' title='" + RdBalance.GEAR_NAMES[slot] + "'>" + RdGearIcons.ICONS[slot] + "<small>" + (tier >= 0 ? RdBalance.TIER_NAMES[tier] : "없음") + "</small></span>";
-                }).join("");
-            }
+            this.gearPanel.render(party.gear);
+            this.statPanel.render(party, RdBalance.heroSpec(mySlot));
         }
     }
     updateMechanic(state, time) {
@@ -539,6 +533,56 @@ class RdHud {
 class RdGearIcons {
 }
 RdGearIcons.ICONS = { weapon: "⚔", armor: "◆", boots: "▲" };
+class RdGearPanel {
+    constructor(box) {
+        this.box = box;
+        this.shown = "";
+    }
+    reset(visible) {
+        this.shown = "";
+        RkDom.show(this.box, visible);
+    }
+    render(gear) {
+        const key = gear.join(",");
+        if (key === this.shown)
+            return;
+        this.shown = key;
+        this.box.innerHTML = RdBalance.GEAR_SLOTS.map((slot, index) => {
+            const tier = gear[index];
+            const color = tier >= 0 ? RdBalance.TIER_COLORS[tier] : "rgba(255,255,255,.18)";
+            return "<span class='rd-gear' style='--tier:" + color + "' title='" + RdBalance.GEAR_NAMES[slot] + "'>" + RdGearIcons.ICONS[slot] + "<small>" + (tier >= 0 ? RdBalance.TIER_NAMES[tier] : "없음") + "</small></span>";
+        }).join("");
+    }
+}
+class RdStatPanel {
+    constructor(box) {
+        this.box = box;
+        this.shown = "";
+    }
+    reset(visible) {
+        this.shown = "";
+        RkDom.show(this.box, visible);
+    }
+    static bonus(ratio) {
+        const percent = Math.round((ratio - 1) * 100);
+        return percent > 0 ? "<small>+" + percent + "%</small>" : "";
+    }
+    render(party, spec) {
+        const baseCooldown = RdBalance.SKILLS[spec.skills[0]].cooldown;
+        const cooldown = party.cdMax[0] || baseCooldown;
+        const rows = [
+            ["공격력", String(Math.round(party.atk)), RdStatPanel.bonus(party.atk / spec.attack)],
+            ["공격 속도", (1 / Math.max(0.05, party.gap)).toFixed(2) + "/초", RdStatPanel.bonus(spec.interval / Math.max(0.05, party.gap))],
+            ["이동 속도", (party.spd / RdUnits.PER_METER).toFixed(1) + "m/s", RdStatPanel.bonus(party.spd / spec.speed)],
+            ["스킬 쿨타임", cooldown.toFixed(1) + "초", baseCooldown - cooldown > 0.05 ? "<small>-" + (baseCooldown - cooldown).toFixed(1) + "초</small>" : ""]
+        ];
+        const key = rows.map((row) => row.join("|")).join(";");
+        if (key === this.shown)
+            return;
+        this.shown = key;
+        this.box.innerHTML = rows.map((row) => "<div class='rd-stat'><span>" + row[0] + "</span><b>" + row[1] + row[2] + "</b></div>").join("");
+    }
+}
 class RdRewardView {
     constructor() {
         this.box = RkDom.byId("rewardBox");
@@ -673,7 +717,7 @@ class RdResultView {
         const cleared = end.out === "success";
         RkDom.setText(this.title, cleared ? "던전 클리어!" : "파티 전멸…");
         RkDom.setText(this.reason, cleared ? "기록 " + RdTimeText.clock(end.ms / 1000) : end.floor + "층에서 쓰러졌어요");
-        this.times.innerHTML = end.times.filter((entry) => entry[0].indexOf("1층") !== 0).map((entry) => "<tr><td>" + RkDom.escape(entry[0]) + "</td><td>" + RdTimeText.short(entry[1]) + "</td></tr>").join("");
+        this.times.innerHTML = end.times.filter((entry) => entry[0].indexOf("1층") !== 0 && entry[0].indexOf("보상방") < 0).map((entry) => "<tr><td>" + RkDom.escape(entry[0]) + "</td><td>" + RdTimeText.short(entry[1]) + "</td></tr>").join("");
         this.rows.innerHTML = end.party.map((shot) => {
             const entry = roster.filter((item) => item.slot === shot.slot)[0];
             const spec = RdBalance.heroSpec(shot.slot);
@@ -887,6 +931,7 @@ class RdLocalBody {
         this.pressedAt = [-9, -9, -9];
         this.lastSentText = "";
         this.lastSentAt = 0;
+        this.targets = [];
         this.hero = new RdHero(slot, pilot);
     }
     cooldowns() {
@@ -904,8 +949,13 @@ class RdLocalBody {
         this.pilot.press(index);
         this.pressedAt[index] = now;
         this.readyAt[index] = now + (party ? party.cdMax[index] || skill.spec.cooldown : skill.spec.cooldown);
-        this.hero.dash = skill.motion(this.hero, intent);
+        this.hero.dash = skill.motion(this.hero, intent, this.targets);
         return true;
+    }
+    knock(dir, distance) {
+        if (!this.hero.alive)
+            return;
+        this.hero.dash = RdKnockback.dash({ x: Math.sin(dir), z: Math.cos(dir) }, distance);
     }
     sync(state) {
         const flow = state.flow;
@@ -946,12 +996,17 @@ class RdLocalBody {
     }
     step(state, others, dt, aim) {
         const bodies = [];
+        const targets = [];
+        const untouchable = RdFoeFlags.HIDDEN | RdFoeFlags.SPAWNING | RdFoeFlags.INVULNERABLE | RdFoeFlags.BROKEN;
         state.snap.foes.forEach((foe) => {
             if (foe.flags & RdFoeFlags.HIDDEN)
                 return;
-            const radius = RdLocalBody.radiusOf(foe.kind);
-            bodies.push({ id: foe.id, x: foe.x, z: foe.z, radius });
+            const body = { id: foe.id, x: foe.x, z: foe.z, radius: RdLocalBody.radiusOf(foe.kind) };
+            bodies.push(body);
+            if (!(foe.flags & untouchable) && foe.hp > 0 && (foe.kind !== "chest" || foe.owner === this.slot))
+                targets.push(body);
         });
+        this.targets = targets;
         state.snap.heroes.forEach((shot) => {
             if (shot.slot === this.slot || shot.flags & RdHeroFlags.DOWN)
                 return;
@@ -1138,6 +1193,8 @@ class RdMatch {
         events.forEach((event) => {
             if (event.t === "floor")
                 this.showBanner(event.k, event.f);
+            if (event.t === "fx" && event.k === "knock" && event.id === this.mySlot + 1 && this.local && !this.director)
+                this.local.knock(event.d, event.r);
         });
         return events;
     }

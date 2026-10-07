@@ -97,11 +97,16 @@
   #hudHint { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 92px); transform: translateX(-50%); max-width: min(620px, 70vw); text-align: center; font-size: 15px; }
   #hudSide { position: absolute; right: 10px; top: 50px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
   #minimap { display: block; width: 168px; height: 112px; border-radius: 8px; background: rgba(16, 14, 26, .7); border: 1.5px solid rgba(255, 255, 255, .2); }
-  #hudGear { display: flex; gap: 5px; }
-  .rd-gear { display: flex; flex-direction: column; align-items: center; width: 52px; padding: 3px 0; border-radius: 6px; border: 2px solid var(--tier); background: rgba(16, 14, 26, .75); font-size: 18px; line-height: 1.1; }
+  #hudDock { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 18px); transform: translateX(-50%); display: flex; align-items: flex-end; gap: 6px; }
+  #hudGear { display: flex; flex-direction: column; gap: 4px; }
+  .rd-gear { display: flex; flex-direction: column; align-items: center; width: 48px; padding: 2px 0; border-radius: 6px; border: 2px solid var(--tier); background: rgba(16, 14, 26, .75); font-size: 16px; line-height: 1.1; }
+  #hudStats { min-width: 132px; padding: 5px 10px; font-size: 12px; }
+  .rd-stat { display: flex; justify-content: space-between; gap: 10px; line-height: 1.5; }
+  .rd-stat span { color: #C9C2D8; }
+  .rd-stat small { margin-left: 4px; font-size: 10px; color: #7CFFB0; }
   .rd-gear small { font-size: 10px; color: #D9CCF2; }
   #btnGameLeave { position: absolute; right: 186px; top: 8px; min-height: 32px; padding: 4px 12px; font-size: 14px; font-weight: 800; border-radius: 8px; border: 1.5px solid rgba(255, 255, 255, .4); background: rgba(16, 14, 26, .7); color: #fff; }
-  #hudSelf { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 18px); transform: translateX(-50%); width: min(380px, 44vw); padding: 6px 10px; }
+  #hudSelf { width: min(380px, 36vw); padding: 6px 10px; }
   #hudSelf .rd-self-bar { position: relative; height: 18px; border-radius: 9px; background: rgba(255, 255, 255, .14); overflow: hidden; }
   #hudSelfFill { height: 100%; width: 100%; background: linear-gradient(90deg, #4CC97A, #8BEA9F); }
   #hudSelfText { position: absolute; inset: 0; text-align: center; font-size: 12px; line-height: 18px; }
@@ -157,7 +162,8 @@
     #hudTop { max-width: 40vw; min-width: 0; }
     #minimap { width: 126px; height: 84px; }
     #btnGameLeave { right: 144px; }
-    #hudSelf { width: 40vw; }
+    #hudSelf { width: 30vw; }
+    #hudStats { min-width: 112px; font-size: 11px; }
   }
   @media (max-height: 560px) {
     #hudBoss { top: 108px; }
@@ -177,9 +183,9 @@
   <div id="hudMech" class="hud-box" hidden></div>
   <div id="hudCount" hidden></div>
   <div id="floorBanner" class="hud-box" hidden><span id="bannerTitle"></span><span id="bannerSub"></span><span id="bannerRecord" hidden></span></div>
-  <div id="hudSide"><canvas id="minimap"></canvas><div id="hudGear"></div></div>
+  <div id="hudSide"><canvas id="minimap"></canvas></div>
   <div id="hudHint" class="hud-box" hidden></div>
-  <div id="hudSelf" class="hud-box"><div class="rd-self-bar"><div id="hudSelfFill"></div><div id="hudSelfText"></div></div><div id="hudSkills"></div></div>
+  <div id="hudDock"><div id="hudGear"></div><div id="hudStats" class="hud-box"></div><div id="hudSelf" class="hud-box"><div class="rd-self-bar"><div id="hudSelfFill"></div><div id="hudSelfText"></div></div><div id="hudSkills"></div></div></div>
   <button type="button" id="btnGameLeave">나가기</button>
   <button type="button" id="btnAttack" hidden>공격</button>
   <div id="touchSkills"></div>

@@ -13,6 +13,39 @@ class RdViewMath {
   static approachAngle(current: number, target: number, rate: number): number {
     return current + RdMath.angleDiff(target, current) * Math.min(1, rate);
   }
+
+  static planeAngle(yaw: number): number {
+    return yaw - Math.PI / 2;
+  }
+}
+
+class RdGroundLayer {
+  static readonly FLOOR_TOP = 0.05;
+  static readonly MARKER = 0.085;
+  static readonly ZONE = 0.1;
+  static readonly AREA = 0.11;
+  static readonly TELEGRAPH = 0.12;
+  static readonly TELEGRAPH_EDGE = 0.13;
+  static readonly EFFECT = 0.14;
+
+  static decal<T extends Three<"Material">>(material: T, lift: number = 1): T {
+    material.depthWrite = false;
+    material.polygonOffset = true;
+    material.polygonOffsetFactor = -1 - lift;
+    material.polygonOffsetUnits = -4 * lift;
+    return material;
+  }
+}
+
+class RdShadowCaster {
+  static enable(root: Three<"Object3D">, receive: boolean = false): void {
+    root.traverse((node) => {
+      const mesh = node as Three<"Mesh">;
+      if (!mesh.isMesh) return;
+      mesh.castShadow = true;
+      if (receive) mesh.receiveShadow = true;
+    });
+  }
 }
 
 class RdModelLibrary {
@@ -108,8 +141,8 @@ class RdCameraRig {
   static readonly MAX_DISTANCE = 34;
 
   readonly camera: Three<"PerspectiveCamera">;
-  private focusX = 0;
-  private focusZ = 6;
+  focusX = 0;
+  focusZ = 6;
   private distance = 20;
   private ready = false;
   private shakeLeft = 0;
@@ -161,6 +194,8 @@ class RdCameraRig {
   orbit(radius: number, height: number, angle: number, lookX: number, lookZ: number): void {
     this.camera.position.set(lookX + Math.sin(angle) * radius, height, lookZ + Math.cos(angle) * radius);
     this.camera.lookAt(lookX, 0.8, lookZ);
+    this.focusX = lookX;
+    this.focusZ = lookZ;
   }
 
   private place(dt: number): void {
@@ -184,6 +219,7 @@ class RdWorldView {
   private readonly renderer: Three<"WebGLRenderer">;
   private pixelRatio: number;
   private readonly governor: QualityGovernorHandle | null;
+  private readonly sun: RdSunShadow;
 
   constructor(private readonly libs: ThreeLibs, readonly canvas: HTMLCanvasElement, touchDevice: boolean) {
     const THREE = libs.THREE;
@@ -194,15 +230,15 @@ class RdWorldView {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color("#14101C");
     this.scene.fog = new THREE.Fog("#14101C", 34, 70);
-    this.scene.add(new THREE.HemisphereLight(0xC8C2FF, 0x2A2030, 1.35));
-    const sun = new THREE.DirectionalLight(0xFFD9A8, 1.15);
-    sun.position.set(-8, 20, 12);
-    this.scene.add(sun);
+    this.scene.add(new THREE.HemisphereLight(0xC8C2FF, 0x2A2030, 1.2));
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.sun = new RdSunShadow(libs, this.scene, touchDevice ? 1024 : 2048);
     this.matchGroup = new THREE.Group();
     this.scene.add(this.matchGroup);
     this.rig = new RdCameraRig(libs);
     this.governor = window.QualityGovernor
-      ? window.QualityGovernor({ steps: [() => this.lowerPixelRatio()], storageKey: "dungeonraid_quality_v1", isPlaying: () => this.playing, slowSec: 0.022, slowLimit: 90 })
+      ? window.QualityGovernor({ steps: [() => this.lowerPixelRatio(), () => this.sun.disable()], storageKey: "dungeonraid_quality_v1", isPlaying: () => this.playing, slowSec: 0.022, slowLimit: 90 })
       : null;
     if (this.governor) this.governor.restore();
     window.addEventListener("resize", () => this.resize());
@@ -220,6 +256,7 @@ class RdWorldView {
   }
 
   render(dt: number): void {
+    this.sun.follow(this.rig.focusX, this.rig.focusZ);
     this.renderer.render(this.scene, this.rig.camera);
     if (this.governor) this.governor.update(dt);
   }
@@ -244,6 +281,43 @@ class RdWorldView {
     this.pixelRatio = Math.max(1, this.pixelRatio - 0.25);
     this.renderer.setPixelRatio(this.pixelRatio);
     this.resize();
+    return true;
+  }
+}
+
+class RdSunShadow {
+  static readonly OFFSET = { x: -8, y: 20, z: 12 };
+  static readonly HALF_SPAN = 21;
+  private readonly light: Three<"DirectionalLight">;
+
+  constructor(libs: ThreeLibs, scene: Three<"Scene">, mapSize: number) {
+    this.light = new libs.THREE.DirectionalLight(0xFFD9A8, 1.3);
+    this.light.castShadow = true;
+    const shadow = this.light.shadow;
+    shadow.mapSize.set(mapSize, mapSize);
+    const camera = shadow.camera;
+    camera.left = camera.bottom = -RdSunShadow.HALF_SPAN;
+    camera.right = camera.top = RdSunShadow.HALF_SPAN;
+    camera.near = 2;
+    camera.far = 60;
+    camera.updateProjectionMatrix();
+    shadow.bias = -0.0006;
+    shadow.normalBias = 0.03;
+    shadow.radius = 3;
+    scene.add(this.light, this.light.target);
+    this.follow(0, 0);
+  }
+
+  follow(x: number, z: number): void {
+    const snapStep = (RdSunShadow.HALF_SPAN * 2) / this.light.shadow.mapSize.x;
+    const sx = Math.round(x / snapStep) * snapStep, sz = Math.round(z / snapStep) * snapStep;
+    this.light.position.set(sx + RdSunShadow.OFFSET.x, RdSunShadow.OFFSET.y, sz + RdSunShadow.OFFSET.z);
+    this.light.target.position.set(sx, 0, sz);
+  }
+
+  disable(): boolean {
+    if (!this.light.castShadow) return false;
+    this.light.castShadow = false;
     return true;
   }
 }
@@ -299,7 +373,7 @@ class RdMapView {
     this.group = new THREE.Group();
     this.bannerMaterial = new THREE.MeshLambertMaterial({ color: "#C04848" });
     this.beamMaterial = new THREE.MeshBasicMaterial({ color: "#FFD27A", transparent: true, opacity: 0.18, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
-    this.stripMaterial = new THREE.MeshBasicMaterial({ color: "#FFC85A", transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending });
+    this.stripMaterial = RdGroundLayer.decal(new THREE.MeshBasicMaterial({ color: "#FFC85A", transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending }));
     this.arrowTexture = this.makeArrowTexture();
     this.portcullis = new THREE.Group();
     this.vaultGlow = new THREE.Group();
@@ -317,7 +391,9 @@ class RdMapView {
     tile(RdMapData.HALL);
     tile(RdMapData.VAULT);
     floorSpots.push(this.library.placement(w(1800), 0, 0, 0));
-    this.group.add(this.library.instanced("floor", floorSpots));
+    const floor = this.library.instanced("floor", floorSpots);
+    floor.traverse((node) => { (node as Three<"Mesh">).receiveShadow = true; });
+    this.group.add(floor);
     const under = new THREE.Mesh(new THREE.PlaneGeometry(140, 140), new THREE.MeshBasicMaterial({ color: "#0B0910" }));
     under.rotation.x = -Math.PI / 2;
     under.position.y = -0.12;
@@ -332,11 +408,15 @@ class RdMapView {
       else if (piece.kind === "door" || piece.kind === "gate") this.addDoor(piece, x, z, piece.near ? nearMaterial : null);
       else this.addPassage(x, z, piece.turn);
     });
-    this.group.add(this.library.instanced("wall", far));
+    const farWalls = this.library.instanced("wall", far);
+    RdShadowCaster.enable(farWalls);
+    this.group.add(farWalls);
     this.group.add(this.library.instanced("wall", near, nearMaterial));
     const corners: Three<"Matrix4">[] = [];
     [[RdMapData.HALL.minX, RdMapData.HALL.minZ], [RdMapData.HALL.maxX, RdMapData.HALL.minZ], [RdMapData.VAULT.maxX, RdMapData.VAULT.minZ]].forEach((corner) => corners.push(this.library.placement(w(corner[0]), 0, w(corner[1]), 0, 0.7, 1.05, 0.7)));
-    this.group.add(this.library.instanced("pillar", corners));
+    const cornerPillars = this.library.instanced("pillar", corners);
+    RdShadowCaster.enable(cornerPillars);
+    this.group.add(cornerPillars);
     this.addDecor();
     this.buildVaultGlow();
   }
@@ -410,13 +490,13 @@ class RdMapView {
       banner.position.set(w(x), 0.2, w(RdMapData.HALL.minZ));
       this.group.add(banner);
     });
-    const props: Array<[RdPropKey, number, number, number, number]> = [["rubble", -1650, -1250, 0.4, 1], ["rubble", 1650, 1250, 2.1, 1], ["barrel", -1680, 1250, 0, 1], ["box", 1680, -1260, 0.3, 1], ["barrel", 2900, 700, 0.7, 1], ["box", 2900, -700, 0.2, 1]];
-    props.forEach((entry) => {
-      if (!this.library.has(entry[0])) return;
-      const prop = this.library.clone(entry[0]);
-      prop.position.set(w(entry[1]), 0, w(entry[2]));
-      prop.rotation.y = entry[3];
-      prop.scale.setScalar(entry[4]);
+    RdMapData.OBSTACLES.forEach((obstacle) => {
+      if (!this.library.has(obstacle.prop)) return;
+      const prop = this.library.clone(obstacle.prop);
+      prop.position.set(w(obstacle.x), 0, w(obstacle.z));
+      prop.rotation.y = obstacle.turn;
+      prop.scale.setScalar(obstacle.scale);
+      RdShadowCaster.enable(prop);
       this.group.add(prop);
     });
   }
@@ -451,17 +531,17 @@ class RdMapView {
     inner.position.set(centerX, 9, 0);
     const strip = new THREE.Mesh(new THREE.PlaneGeometry(w(RdMapData.VAULT.maxX - RdMapData.VAULT.minX) - 0.6, 0.35), this.stripMaterial);
     strip.rotation.x = -Math.PI / 2;
-    strip.position.set(centerX, 0.07, w(RdMapData.VAULT.minZ) + 0.35);
+    strip.position.set(centerX, RdGroundLayer.MARKER, w(RdMapData.VAULT.minZ) + 0.35);
     const strip2 = strip.clone();
     strip2.position.z = w(RdMapData.VAULT.maxZ) - 0.35;
     const doorGlow = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 4), this.stripMaterial);
     doorGlow.rotation.x = -Math.PI / 2;
-    doorGlow.position.set(w(RdMapData.HALL.maxX), 0.07, 0);
-    const arrowMaterial = new THREE.MeshBasicMaterial({ map: this.arrowTexture, transparent: true, depthWrite: false, opacity: 0.85 });
+    doorGlow.position.set(w(RdMapData.HALL.maxX), RdGroundLayer.MARKER, 0);
+    const arrowMaterial = RdGroundLayer.decal(new THREE.MeshBasicMaterial({ map: this.arrowTexture, transparent: true, opacity: 0.85 }), 2);
     this.arrowTexture.repeat.set(4, 1);
     const arrows = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.1), arrowMaterial);
     arrows.rotation.x = -Math.PI / 2;
-    arrows.position.set(w(RdMapData.HALL.maxX) - 3.3, 0.08, 0);
+    arrows.position.set(w(RdMapData.HALL.maxX) - 3.3, RdGroundLayer.ZONE, 0);
     this.vaultGlow.add(beam, inner, strip, strip2, doorGlow, arrows);
     this.vaultGlow.visible = false;
     this.group.add(this.vaultGlow);
@@ -598,8 +678,9 @@ class RdHeroActor extends RdActor {
     attack0: ["Melee_1H_Attack_Chop"], attack1: ["Melee_2H_Attack_Slice", "Melee_1H_Attack_Slice_Horizontal"],
     shoot2: ["Ranged_Magic_Shoot"], shoot3: ["Ranged_Bow_Release", "Ranged_2H_Shoot"], shoot4: ["Ranged_Magic_Spellcasting", "Ranged_Magic_Shoot"],
     taunt: ["Melee_Block", "Cheering"], charge: ["Melee_2H_Attack_Spinning", "Running_A"], fireball: ["Ranged_Magic_Spellcasting", "Ranged_Magic_Shoot"],
-    roll: ["Dodge_Forward", "Running_A"], heal: ["Ranged_Magic_Raise", "Ranged_Magic_Spellcasting"], cheer: ["Cheering"]
+    dash: ["Running_A"], heal: ["Ranged_Magic_Raise", "Ranged_Magic_Spellcasting"], cheer: ["Cheering"]
   };
+  static readonly AIR_HEIGHT = 1.7;
 
   private readonly model: Three<"Object3D">;
   private readonly animator: CharacterAnimator;
@@ -610,6 +691,8 @@ class RdHeroActor extends RdActor {
   private moving = false;
   private seconds = 0;
   private ghost = false;
+  private airStart = -1;
+  private dashLean = 0;
 
   constructor(libs: ThreeLibs, parent: Three<"Object3D">, factory: CharacterModelFactory, private readonly clips: Map<string, Three<"AnimationClip">>, labels: RkLabelFactory, readonly entry: RdRosterEntry) {
     super(libs, parent, 0.9, RdBalance.heroSpec(entry.slot).color, 2.35);
@@ -618,10 +701,11 @@ class RdHeroActor extends RdActor {
     const look = CharacterLooks.clean(entry.look);
     look.c = spec.lookType;
     this.model = factory.build(look);
+    RdShadowCaster.enable(this.model);
     this.group.add(this.model);
-    this.ring = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.56, 28), new THREE.MeshBasicMaterial({ color: spec.color, transparent: true, opacity: 0.9, depthWrite: false }));
+    this.ring = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.56, 28), RdGroundLayer.decal(new THREE.MeshBasicMaterial({ color: spec.color, transparent: true, opacity: 0.9 })));
     this.ring.rotation.x = -Math.PI / 2;
-    this.ring.position.y = 0.05;
+    this.ring.position.y = RdGroundLayer.MARKER;
     const label = labels.create(entry.nick, spec.color);
     label.position.y = 2.75;
     label.scale.multiplyScalar(0.8);
@@ -649,12 +733,24 @@ class RdHeroActor extends RdActor {
     if (this.down) return;
     const clip = this.pick(key);
     if (!clip) return;
-    this.animator.play(clip, { once: true, speed: key === "heal" ? 1.8 : key === "roll" ? 1 : 1.25 });
+    this.animator.play(clip, { once: true, speed: key === "heal" ? 1.8 : key === "dash" ? 2.6 : 1.25 });
     this.actionUntil = nowMs + seconds * 1000;
+    if (key === "dash") this.dashLean = 1;
+  }
+
+  setAirborne(airborne: boolean, nowMs: number): void {
+    if (airborne && this.airStart < 0) this.airStart = nowMs;
+    if (!airborne && this.airStart >= 0 && nowMs - this.airStart > RdBalance.LORD.stomp.airborne * 1000) this.airStart = -1;
+  }
+
+  private airProgress(nowMs: number): number {
+    if (this.airStart < 0) return -1;
+    const progress = (nowMs - this.airStart) / (RdBalance.LORD.stomp.airborne * 1000);
+    return progress >= 1 ? -1 : progress;
   }
 
   setPose(pose: RdPose, downed: boolean, hpRatio: number, dt: number, nowMs: number): void {
-    this.moveTo(pose.x, pose.z, pose.yaw, dt, 3);
+    this.moveTo(pose.x, pose.z, pose.yaw, dt, pose.dash ? 8 : 3);
     this.bar.set(hpRatio);
     this.bar.group.visible = !downed;
     this.moving = pose.moving;
@@ -685,7 +781,12 @@ class RdHeroActor extends RdActor {
     this.animator.update(dt);
     if (this.marker) this.marker.position.y = 3.25 + Math.sin(this.seconds * 5) * 0.1;
     this.ring.rotation.z += dt * 0.6;
-    this.model.position.y = this.hitFlash > 0 ? Math.sin(this.hitFlash * 40) * 0.03 : 0;
+    const air = this.airProgress(nowMs);
+    const lift = air >= 0 ? Math.sin(air * Math.PI) * RdHeroActor.AIR_HEIGHT : 0;
+    this.model.position.y = lift + (this.hitFlash > 0 ? Math.sin(this.hitFlash * 40) * 0.03 : 0);
+    this.model.rotation.y = air >= 0 ? air * Math.PI * 2 : 0;
+    this.dashLean = Math.max(0, this.dashLean - dt * 4);
+    this.model.rotation.x = this.dashLean * 0.45;
     this.hitFlash = Math.max(0, this.hitFlash - dt);
   }
 
@@ -748,6 +849,7 @@ class RdFoeActor extends RdActor {
       });
     }
     this.model.traverse((node) => { (node as Three<"Mesh">).frustumCulled = false; });
+    RdShadowCaster.enable(this.model);
     this.group.add(this.model);
     this.stars = new THREE.Mesh(new THREE.TorusGeometry(0.35 * look.scale, 0.05, 6, 18), new THREE.MeshBasicMaterial({ color: "#FFE066" }));
     this.stars.rotation.x = Math.PI / 2;
@@ -870,9 +972,9 @@ class RdPropActor extends RdActor {
       const label = labels.create(ownerName, color);
       label.position.y = 1.25;
       label.scale.multiplyScalar(0.7);
-      const ring = new THREE.Mesh(new THREE.RingGeometry(0.62, 0.74, 30), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85, depthWrite: false }));
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.62, 0.74, 30), RdGroundLayer.decal(new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85 })));
       ring.rotation.x = -Math.PI / 2;
-      ring.position.y = 0.05;
+      ring.position.y = RdGroundLayer.MARKER;
       this.group.add(label, ring);
     } else if (kind === "dummy") {
       this.body = library.clone("dummy");
@@ -904,6 +1006,7 @@ class RdPropActor extends RdActor {
       this.timer = sprite;
       this.timerCanvas = canvas;
     }
+    RdShadowCaster.enable(this.body);
     this.group.add(this.body);
   }
 
@@ -978,11 +1081,20 @@ class RdEffectManager {
   private readonly sphereGeometry: Three<"SphereGeometry">;
   private readonly beamGeometry: Three<"CylinderGeometry">;
   private readonly crackTexture: Three<"CanvasTexture">;
+  private readonly streakGeometry: TileGeometry;
+  private readonly wallGeometry: TileGeometry;
+  private readonly barrierTexture: Three<"CanvasTexture">;
   private seconds = 0;
 
   constructor(private readonly libs: ThreeLibs) {
     const THREE = libs.THREE;
     this.group = new THREE.Group();
+    this.streakGeometry = new THREE.PlaneGeometry(1, 1) as TileGeometry;
+    this.streakGeometry.translate(0, 0.5, 0);
+    this.streakGeometry.rotateX(-Math.PI / 2);
+    this.wallGeometry = new THREE.PlaneGeometry(1, 1) as TileGeometry;
+    this.wallGeometry.translate(0.5, 0.5, 0);
+    this.barrierTexture = this.makeBarrierTexture();
     this.ringGeometry = new THREE.RingGeometry(0.86, 1, 40);
     this.ringGeometry.rotateX(-Math.PI / 2);
     this.discGeometry = new THREE.CircleGeometry(1, 40);
@@ -1020,11 +1132,28 @@ class RdEffectManager {
     return texture;
   }
 
+  private makeBarrierTexture(): Three<"CanvasTexture"> {
+    const THREE = this.libs.THREE;
+    const canvas = document.createElement("canvas");
+    canvas.width = 16;
+    canvas.height = 128;
+    const context = canvas.getContext("2d") as CanvasRenderingContext2D;
+    const gradient = context.createLinearGradient(0, 128, 0, 0);
+    gradient.addColorStop(0, "rgba(255,255,255,1)");
+    gradient.addColorStop(0.35, "rgba(255,160,170,.7)");
+    gradient.addColorStop(1, "rgba(255,80,100,0)");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, 16, 128);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
+  }
+
   private acquire(kind: string, geometry: TileGeometry, additive: boolean, map: Three<"Texture"> | null = null): RdPooled {
     const THREE = this.libs.THREE;
     let entry = this.pool.filter((item) => !item.busy && item.kind === kind)[0];
     if (!entry) {
-      const material = new THREE.MeshBasicMaterial({ color: "#FFFFFF", transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending, map });
+      const material = RdGroundLayer.decal(new THREE.MeshBasicMaterial({ color: "#FFFFFF", transparent: true, side: THREE.DoubleSide, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending, map }), 3);
       const mesh = new THREE.Mesh(geometry, material);
       this.group.add(mesh);
       entry = { mesh, until: 0, start: 0, busy: false, kind, update: () => undefined };
@@ -1044,7 +1173,7 @@ class RdEffectManager {
     update(0);
   }
 
-  ring(x: number, z: number, radius: number, color: string, seconds: number, grow: boolean = true, height: number = 0.08): void {
+  ring(x: number, z: number, radius: number, color: string, seconds: number, grow: boolean = true, height: number = RdGroundLayer.EFFECT): void {
     const entry = this.acquire("ring", this.ringGeometry, true);
     const material = entry.mesh.material as Three<"MeshBasicMaterial">;
     material.color.set(color);
@@ -1060,7 +1189,7 @@ class RdEffectManager {
     const entry = this.acquire("disc", this.discGeometry, true);
     const material = entry.mesh.material as Three<"MeshBasicMaterial">;
     material.color.set(color);
-    entry.mesh.position.set(x, 0.06, z);
+    entry.mesh.position.set(x, RdGroundLayer.EFFECT, z);
     this.play(entry, seconds, (progress) => {
       entry.mesh.scale.set(radius * progress, 1, radius * progress);
       material.opacity = opacity * (progress < 0.85 ? 1 : (1 - progress) / 0.15);
@@ -1083,7 +1212,7 @@ class RdEffectManager {
     const entry = this.acquire("crack", this.discGeometry, false, this.crackTexture);
     const material = entry.mesh.material as Three<"MeshBasicMaterial">;
     material.color.set("#FFFFFF");
-    entry.mesh.position.set(x, 0.07, z);
+    entry.mesh.position.set(x, RdGroundLayer.EFFECT, z);
     this.play(entry, seconds, (progress) => {
       const scale = radius * Math.min(1, 0.4 + progress * 1.2);
       entry.mesh.scale.set(scale, 1, scale);
@@ -1107,7 +1236,7 @@ class RdEffectManager {
 
   swing(x: number, z: number, dir: number, radius: number, arc: number, color: string): void {
     const THREE = this.libs.THREE;
-    const geometry = new THREE.RingGeometry(radius * 0.55, radius, 18, 1, Math.PI / 2 - dir - arc / 2, arc);
+    const geometry = new THREE.RingGeometry(radius * 0.55, radius, 18, 1, RdViewMath.planeAngle(dir) - arc / 2, arc);
     geometry.rotateX(-Math.PI / 2);
     const entry = this.acquire("swing-" + Math.round(radius * 10) + "-" + Math.round(arc * 10), geometry as TileGeometry, true);
     const material = entry.mesh.material as Three<"MeshBasicMaterial">;
@@ -1118,6 +1247,38 @@ class RdEffectManager {
     mesh.geometry.dispose();
     mesh.geometry = geometry;
     this.play(entry, 0.18, (progress) => { material.opacity = 0.7 * (1 - progress); });
+  }
+
+  streak(x: number, z: number, dir: number, length: number, width: number, color: string, seconds: number): void {
+    const entry = this.acquire("streak", this.streakGeometry, true);
+    const material = entry.mesh.material as Three<"MeshBasicMaterial">;
+    material.color.set(color);
+    entry.mesh.position.set(x, RdGroundLayer.EFFECT, z);
+    entry.mesh.rotation.y = dir + Math.PI;
+    this.play(entry, seconds, (progress) => {
+      entry.mesh.scale.set(width * (1 - progress * 0.6), 1, length);
+      material.opacity = 0.85 * (1 - progress);
+    });
+  }
+
+  barrier(x: number, z: number, dir: number, length: number): void {
+    const entry = this.acquire("barrier", this.wallGeometry, true, this.barrierTexture);
+    const material = entry.mesh.material as Three<"MeshBasicMaterial">;
+    material.color.set("#FF4A5E");
+    entry.mesh.position.set(x, 0, z);
+    entry.mesh.rotation.y = RdViewMath.planeAngle(dir);
+    this.play(entry, 0.7, (progress) => {
+      const rise = Math.min(1, progress * 5);
+      entry.mesh.scale.set(length, 2.6 * rise, 1);
+      material.opacity = progress < 0.3 ? 1 : (1 - progress) / 0.7;
+    });
+    this.streak(x, z, dir, length, 0.5, "#FF6A6A", 0.6);
+  }
+
+  shockwave(x: number, z: number, radius: number, color: string): void {
+    this.ring(x, z, radius, color, 0.55);
+    this.ring(x, z, radius * 0.7, "#FFFFFF", 0.4);
+    this.burst(x, z, Math.min(3, radius * 0.3), color, 0.45);
   }
 
   meteor(x: number, z: number, radius: number): void {
@@ -1189,123 +1350,415 @@ class RdEffectManager {
   }
 }
 
-interface RdShapeView { group: Three<"Group">; fill: Three<"Mesh">; edge: Three<"Mesh">; id: number; meteor: Three<"Mesh"> | null }
-
-class RdTelegraphView {
-  readonly group: Three<"Group">;
-  private readonly shapes = new Map<number, RdShapeView>();
-  private readonly areas = new Map<number, RdShapeView>();
-  private readonly fillMaterial: Three<"MeshBasicMaterial">;
-  private readonly edgeMaterial: Three<"MeshBasicMaterial">;
-  private readonly areaMaterial: Three<"MeshBasicMaterial">;
-  private readonly areaEdgeMaterial: Three<"MeshBasicMaterial">;
-  private readonly meteorMaterial: Three<"MeshBasicMaterial">;
+class RdTelegraphPalette {
+  readonly edge: Three<"MeshBasicMaterial">;
+  readonly meteor: Three<"MeshBasicMaterial">;
+  readonly hazardFill: Three<"MeshBasicMaterial">;
+  readonly hazardRing: Three<"MeshBasicMaterial">;
+  readonly hazardRunes: Three<"MeshBasicMaterial">;
+  readonly tileTexture: Three<"CanvasTexture">;
   private seconds = 0;
 
   constructor(private readonly libs: ThreeLibs) {
     const THREE = libs.THREE;
-    this.group = new THREE.Group();
-    this.fillMaterial = new THREE.MeshBasicMaterial({ color: "#FF3B30", transparent: true, opacity: 0.32, depthWrite: false, side: THREE.DoubleSide });
-    this.edgeMaterial = new THREE.MeshBasicMaterial({ color: "#FF5A4A", transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide });
-    this.areaMaterial = new THREE.MeshBasicMaterial({ color: "#8E3BFF", transparent: true, opacity: 0.38, depthWrite: false, side: THREE.DoubleSide });
-    this.areaEdgeMaterial = new THREE.MeshBasicMaterial({ color: "#D6A8FF", transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide });
-    this.meteorMaterial = new THREE.MeshBasicMaterial({ color: "#FF8A3C" });
+    this.edge = RdGroundLayer.decal(new THREE.MeshBasicMaterial({ color: "#FF5A4A", transparent: true, opacity: 0.9, side: THREE.DoubleSide }), 2);
+    this.meteor = new THREE.MeshBasicMaterial({ color: "#FF8A3C" });
+    this.hazardFill = RdGroundLayer.decal(new THREE.MeshBasicMaterial({ map: this.makeHazardTexture(), transparent: true, opacity: 0.85, side: THREE.DoubleSide }), 1);
+    this.hazardRing = RdGroundLayer.decal(new THREE.MeshBasicMaterial({ color: "#FF2A1A", transparent: true, opacity: 0.95, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }), 2);
+    this.hazardRunes = RdGroundLayer.decal(new THREE.MeshBasicMaterial({ map: this.makeRuneTexture(), transparent: true, opacity: 0.9, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }), 2);
+    this.tileTexture = this.makeTileTexture();
   }
 
-  private build(shape: RdShape, fillMaterial: Three<"MeshBasicMaterial">, edgeMaterial: Three<"MeshBasicMaterial">): { fill: Three<"Mesh">; edge: Three<"Mesh"> } {
+  fill(): Three<"MeshBasicMaterial"> {
     const THREE = this.libs.THREE;
+    return RdGroundLayer.decal(new THREE.MeshBasicMaterial({ color: "#FF3B30", transparent: true, opacity: 0.3, side: THREE.DoubleSide }), 1);
+  }
+
+  tile(): Three<"MeshBasicMaterial"> {
+    const THREE = this.libs.THREE;
+    return RdGroundLayer.decal(new THREE.MeshBasicMaterial({ map: this.tileTexture, transparent: true, opacity: 0.3, side: THREE.DoubleSide }), 1);
+  }
+
+  update(dt: number): void {
+    this.seconds += dt;
+    const pulse = 0.5 + 0.5 * Math.sin(this.seconds * 7);
+    this.hazardFill.opacity = 0.62 + pulse * 0.3;
+    this.hazardRing.opacity = 0.65 + pulse * 0.35;
+    this.hazardRunes.opacity = 0.45 + (1 - pulse) * 0.4;
+  }
+
+  private canvas(size: number): { canvas: HTMLCanvasElement; context: CanvasRenderingContext2D } {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = size;
+    return { canvas, context: canvas.getContext("2d") as CanvasRenderingContext2D };
+  }
+
+  private texture(canvas: HTMLCanvasElement): Three<"CanvasTexture"> {
+    const texture = new this.libs.THREE.CanvasTexture(canvas);
+    texture.colorSpace = this.libs.THREE.SRGBColorSpace;
+    return texture;
+  }
+
+  private makeHazardTexture(): Three<"CanvasTexture"> {
+    const { canvas, context } = this.canvas(256);
+    const gradient = context.createRadialGradient(128, 128, 10, 128, 128, 128);
+    gradient.addColorStop(0, "rgba(255,40,20,.55)");
+    gradient.addColorStop(0.7, "rgba(200,10,10,.6)");
+    gradient.addColorStop(0.93, "rgba(255,60,40,.9)");
+    gradient.addColorStop(1, "rgba(255,60,40,0)");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, 256, 256);
+    context.strokeStyle = "rgba(40,0,0,.55)";
+    context.lineWidth = 9;
+    for (let stripe = -256; stripe < 512; stripe += 34) {
+      context.beginPath();
+      context.moveTo(stripe, 0);
+      context.lineTo(stripe + 256, 256);
+      context.stroke();
+    }
+    context.globalCompositeOperation = "destination-in";
+    context.beginPath();
+    context.arc(128, 128, 127, 0, Math.PI * 2);
+    context.fill();
+    return this.texture(canvas);
+  }
+
+  private makeRuneTexture(): Three<"CanvasTexture"> {
+    const { canvas, context } = this.canvas(256);
+    context.translate(128, 128);
+    context.fillStyle = "rgba(255,120,90,.95)";
+    for (let index = 0; index < 12; index++) {
+      context.rotate((Math.PI * 2) / 12);
+      context.beginPath();
+      context.moveTo(-9, -96);
+      context.lineTo(0, -122);
+      context.lineTo(9, -96);
+      context.closePath();
+      context.fill();
+    }
+    context.strokeStyle = "rgba(255,150,120,.9)";
+    context.lineWidth = 4;
+    context.setLineDash([14, 10]);
+    context.beginPath();
+    context.arc(0, 0, 86, 0, Math.PI * 2);
+    context.stroke();
+    return this.texture(canvas);
+  }
+
+  private makeTileTexture(): Three<"CanvasTexture"> {
+    const { canvas, context } = this.canvas(128);
+    context.fillStyle = "rgba(255,40,30,.75)";
+    context.fillRect(0, 0, 128, 128);
+    context.strokeStyle = "rgba(255,200,180,1)";
+    context.lineWidth = 8;
+    context.strokeRect(4, 4, 120, 120);
+    context.strokeStyle = "rgba(90,0,0,.45)";
+    context.lineWidth = 6;
+    for (let stripe = -128; stripe < 256; stripe += 26) {
+      context.beginPath();
+      context.moveTo(stripe, 0);
+      context.lineTo(stripe + 128, 128);
+      context.stroke();
+    }
+    return this.texture(canvas);
+  }
+}
+
+abstract class RdTelegraphFigure {
+  readonly group: Three<"Group">;
+  protected readonly owned: Array<Three<"BufferGeometry"> | Three<"Material">> = [];
+
+  constructor(protected readonly libs: ThreeLibs, protected readonly palette: RdTelegraphPalette) {
+    this.group = new libs.THREE.Group();
+  }
+
+  protected flat(geometry: TileGeometry, material: Three<"Material">, height: number): Three<"Mesh"> {
+    const mesh = new this.libs.THREE.Mesh(geometry, material);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.y = height;
+    this.owned.push(geometry);
+    this.group.add(mesh);
+    return mesh;
+  }
+
+  abstract update(progress: number, left: number): void;
+
+  dispose(): void {
+    this.owned.forEach((item) => item.dispose());
+  }
+}
+
+abstract class RdGrowingFigure extends RdTelegraphFigure {
+  protected readonly fillMaterial: Three<"MeshBasicMaterial">;
+  protected fill: Three<"Mesh"> | null = null;
+
+  constructor(libs: ThreeLibs, palette: RdTelegraphPalette) {
+    super(libs, palette);
+    this.fillMaterial = palette.fill();
+    this.owned.push(this.fillMaterial);
+  }
+
+  update(progress: number, left: number): void {
+    this.fillMaterial.opacity = 0.18 + 0.35 * progress;
+    this.grow(0.15 + 0.85 * progress);
+  }
+
+  protected abstract grow(amount: number): void;
+}
+
+class RdCircleFigure extends RdGrowingFigure {
+  private readonly radius: number;
+  private readonly meteor: Three<"Mesh"> | null;
+
+  constructor(libs: ThreeLibs, palette: RdTelegraphPalette, shape: RdShapeOf<"circle">, duration: number) {
+    super(libs, palette);
+    const THREE = libs.THREE;
+    this.radius = RdViewMath.w(shape.r);
+    this.group.position.set(RdViewMath.w(shape.x), 0, RdViewMath.w(shape.z));
+    this.fill = this.flat(new THREE.CircleGeometry(1, 44) as TileGeometry, this.fillMaterial, RdGroundLayer.TELEGRAPH);
+    const edge = this.flat(new THREE.RingGeometry(0.94, 1, 44) as TileGeometry, palette.edge, RdGroundLayer.TELEGRAPH_EDGE);
+    edge.scale.set(this.radius, this.radius, 1);
+    this.meteor = null;
+    if (duration >= 2.9) {
+      const geometry = new THREE.DodecahedronGeometry(0.9, 0);
+      this.owned.push(geometry);
+      this.meteor = new THREE.Mesh(geometry, palette.meteor);
+      this.meteor.visible = false;
+      this.group.add(this.meteor);
+    }
+  }
+
+  protected grow(amount: number): void {
+    if (this.fill) this.fill.scale.set(this.radius * amount, this.radius * amount, 1);
+  }
+
+  update(progress: number, left: number): void {
+    super.update(progress, left);
+    if (!this.meteor) return;
+    this.meteor.visible = left < 0.7;
+    this.meteor.position.set(0, 0.5 + left * 14, 0);
+    this.meteor.rotation.x += 0.2;
+  }
+}
+
+class RdConeFigure extends RdGrowingFigure {
+  private readonly radius: number;
+
+  constructor(libs: ThreeLibs, palette: RdTelegraphPalette, shape: RdShapeOf<"cone">) {
+    super(libs, palette);
+    const THREE = libs.THREE;
+    this.radius = RdViewMath.w(shape.r);
+    this.group.position.set(RdViewMath.w(shape.x), 0, RdViewMath.w(shape.z));
+    const start = RdViewMath.planeAngle(shape.dir) - shape.arc / 2;
+    this.fill = this.flat(new THREE.CircleGeometry(1, 30, start, shape.arc) as TileGeometry, this.fillMaterial, RdGroundLayer.TELEGRAPH);
+    const edge = this.flat(new THREE.RingGeometry(0.94, 1, 30, 1, start, shape.arc) as TileGeometry, palette.edge, RdGroundLayer.TELEGRAPH_EDGE);
+    edge.scale.set(this.radius, this.radius, 1);
+  }
+
+  protected grow(amount: number): void {
+    if (this.fill) this.fill.scale.set(this.radius * amount, this.radius * amount, 1);
+  }
+}
+
+class RdLineFigure extends RdGrowingFigure {
+  private readonly length: number;
+  private readonly width: number;
+
+  constructor(libs: ThreeLibs, palette: RdTelegraphPalette, shape: RdShapeOf<"line">) {
+    super(libs, palette);
+    const THREE = libs.THREE;
+    this.length = RdViewMath.w(shape.length);
+    this.width = RdViewMath.w(shape.width);
+    this.group.position.set(RdViewMath.w(shape.x), 0, RdViewMath.w(shape.z));
+    const fillGeometry = new THREE.PlaneGeometry(1, 1) as TileGeometry;
+    fillGeometry.translate(0, 0.5, 0);
+    const edgeGeometry = new THREE.PlaneGeometry(1, 1) as TileGeometry;
+    edgeGeometry.translate(0, 0.5, 0);
+    this.fill = this.flat(fillGeometry, this.fillMaterial, RdGroundLayer.TELEGRAPH);
+    const edge = this.flat(edgeGeometry, palette.edge, RdGroundLayer.TELEGRAPH_EDGE);
+    edge.material = this.edgeOutline();
+    [this.fill, edge].forEach((mesh) => { mesh.rotation.z = shape.dir + Math.PI; });
+    edge.scale.set(this.width + 0.1, this.length + 0.1, 1);
+    this.fill.scale.set(this.width, this.length, 1);
+  }
+
+  private edgeOutline(): Three<"MeshBasicMaterial"> {
+    const material = this.palette.edge.clone();
+    material.opacity = 0.35;
+    this.owned.push(material);
+    return material;
+  }
+
+  protected grow(amount: number): void {
+    if (this.fill) this.fill.scale.y = this.length * amount;
+  }
+}
+
+class RdCheckerFigure extends RdTelegraphFigure {
+  private readonly tiles: Three<"InstancedMesh">;
+  private readonly material: Three<"MeshBasicMaterial">;
+  private readonly cells: Array<{ x: number; z: number; order: number }>;
+  private readonly size: number;
+  private readonly matrix: Three<"Matrix4">;
+
+  constructor(libs: ThreeLibs, palette: RdTelegraphPalette, shape: RdShapeOf<"checker">) {
+    super(libs, palette);
+    const THREE = libs.THREE;
     const w = RdViewMath.w;
-    let fillGeometry: TileGeometry, edgeGeometry: TileGeometry;
-    if (shape.kind === "circle") {
-      fillGeometry = new THREE.CircleGeometry(1, 44) as TileGeometry;
-      edgeGeometry = new THREE.RingGeometry(0.94, 1, 44) as TileGeometry;
-    } else if (shape.kind === "cone") {
-      const start = Math.PI / 2 - shape.dir - shape.arc / 2;
-      fillGeometry = new THREE.CircleGeometry(1, 30, start, shape.arc) as TileGeometry;
-      edgeGeometry = new THREE.RingGeometry(0.94, 1, 30, 1, start, shape.arc) as TileGeometry;
-    } else {
-      fillGeometry = new THREE.PlaneGeometry(1, 1) as TileGeometry;
-      fillGeometry.translate(0, 0.5, 0);
-      edgeGeometry = new THREE.PlaneGeometry(1, 1) as TileGeometry;
-      edgeGeometry.translate(0, 0.5, 0);
-    }
-    const fill = new THREE.Mesh(fillGeometry, fillMaterial);
-    const edge = new THREE.Mesh(edgeGeometry, edgeMaterial);
-    [fill, edge].forEach((mesh) => {
-      mesh.rotation.x = -Math.PI / 2;
-      mesh.position.set(w(shape.x), 0.09, w(shape.z));
+    this.size = w(shape.cell);
+    const rects = RdShapes.checkerCells(shape);
+    const farthest = rects.reduce((best, rect) => Math.max(best, Math.hypot((rect.minX + rect.maxX) / 2 - shape.ox, (rect.minZ + rect.maxZ) / 2 - shape.oz)), 1);
+    this.cells = rects.map((rect) => {
+      const cx = (rect.minX + rect.maxX) / 2, cz = (rect.minZ + rect.maxZ) / 2;
+      return { x: w(cx), z: w(cz), order: Math.hypot(cx - shape.ox, cz - shape.oz) / farthest };
     });
-    if (shape.kind === "line") {
-      fill.rotation.z = shape.dir + Math.PI;
-      edge.rotation.z = shape.dir + Math.PI;
-      fill.scale.set(w(shape.width), w(shape.length), 1);
-      edge.scale.set(w(shape.width) + 0.1, w(shape.length) + 0.1, 1);
-      fill.rotation.order = edge.rotation.order = "XYZ";
-    } else {
-      const radius = w(shape.r);
-      fill.scale.set(radius, radius, 1);
-      edge.scale.set(radius, radius, 1);
+    const geometry = new THREE.PlaneGeometry(1, 1) as TileGeometry;
+    geometry.rotateX(-Math.PI / 2);
+    this.owned.push(geometry);
+    this.material = palette.tile();
+    this.owned.push(this.material);
+    this.tiles = new THREE.InstancedMesh(geometry, this.material, Math.max(1, this.cells.length));
+    this.tiles.frustumCulled = false;
+    this.tiles.position.y = RdGroundLayer.TELEGRAPH;
+    this.matrix = new THREE.Matrix4();
+    this.group.add(this.tiles);
+    this.update(0);
+  }
+
+  update(progress: number): void {
+    const spread = progress * 1.6;
+    this.cells.forEach((cell, index) => {
+      const shown = RdMath.clamp((spread - cell.order) / 0.25, 0, 1);
+      const scale = Math.max(0.001, this.size * shown * 0.97);
+      this.matrix.makeScale(scale, 1, scale).setPosition(cell.x, 0, cell.z);
+      this.tiles.setMatrixAt(index, this.matrix);
+    });
+    this.tiles.instanceMatrix.needsUpdate = true;
+    const blink = progress > 0.75 ? 0.5 + 0.5 * Math.sin(progress * 90) : 1;
+    this.material.opacity = (0.35 + 0.5 * progress) * (0.7 + 0.3 * blink);
+  }
+}
+
+class RdQuadrantFigure extends RdTelegraphFigure {
+  private readonly fillMaterial: Three<"MeshBasicMaterial">;
+
+  constructor(libs: ThreeLibs, palette: RdTelegraphPalette, shape: RdShapeOf<"quadrants">) {
+    super(libs, palette);
+    const THREE = libs.THREE;
+    const radius = RdViewMath.w(shape.r), gap = RdViewMath.w(shape.gap) / 2, line = 0.12;
+    this.group.position.set(RdViewMath.w(shape.x), 0, RdViewMath.w(shape.z));
+    this.group.rotation.y = shape.dir;
+    this.fillMaterial = palette.fill();
+    this.owned.push(this.fillMaterial);
+    const fills: Three<"Shape">[] = [], edges: Three<"Shape">[] = [];
+    [[1, 1], [-1, 1], [-1, -1], [1, -1]].forEach((signs) => {
+      fills.push(this.quadrant(signs[0], signs[1], gap, radius));
+      const outline = this.quadrant(signs[0], signs[1], gap, radius);
+      outline.holes.push(new THREE.Path(this.quadrant(signs[0], signs[1], gap + line, radius - line).getPoints()));
+      edges.push(outline);
+    });
+    this.flat(new THREE.ShapeGeometry(fills, 16) as TileGeometry, this.fillMaterial, RdGroundLayer.TELEGRAPH);
+    this.flat(new THREE.ShapeGeometry(edges, 16) as TileGeometry, palette.edge, RdGroundLayer.TELEGRAPH_EDGE);
+  }
+
+  private quadrant(signX: number, signY: number, gap: number, radius: number): Three<"Shape"> {
+    const THREE = this.libs.THREE;
+    const reach = Math.sqrt(Math.max(0, radius * radius - gap * gap));
+    const from = Math.atan2(reach, gap), to = Math.atan2(gap, reach);
+    const points: Three<"Vector2">[] = [new THREE.Vector2(gap * signX, gap * signY)];
+    const steps = 16;
+    for (let step = 0; step <= steps; step++) {
+      const angle = from + (to - from) * (step / steps);
+      points.push(new THREE.Vector2(Math.cos(angle) * radius * signX, Math.sin(angle) * radius * signY));
     }
-    edge.position.y = 0.1;
-    return { fill, edge };
+    return new THREE.Shape(points);
+  }
+
+  update(progress: number): void {
+    const blink = progress > 0.7 ? 0.5 + 0.5 * Math.sin(progress * 80) : 1;
+    this.fillMaterial.opacity = (0.2 + 0.4 * progress) * (0.75 + 0.25 * blink);
+  }
+}
+
+class RdHazardFigure extends RdTelegraphFigure {
+  private readonly runes: Three<"Mesh">;
+
+  constructor(libs: ThreeLibs, palette: RdTelegraphPalette, shape: RdShape) {
+    super(libs, palette);
+    const THREE = libs.THREE;
+    const radius = shape.kind === "circle" ? RdViewMath.w(shape.r) : 2;
+    this.group.position.set(RdViewMath.w(shape.x), 0, RdViewMath.w(shape.z));
+    this.flat(new THREE.CircleGeometry(radius, 40) as TileGeometry, palette.hazardFill, RdGroundLayer.AREA);
+    this.flat(new THREE.RingGeometry(radius * 0.93, radius, 40) as TileGeometry, palette.hazardRing, RdGroundLayer.TELEGRAPH_EDGE);
+    this.runes = this.flat(new THREE.PlaneGeometry(radius * 2, radius * 2) as TileGeometry, palette.hazardRunes, RdGroundLayer.TELEGRAPH);
+  }
+
+  update(progress: number): void {
+    this.runes.rotation.z = progress * 6;
+  }
+}
+
+class RdTelegraphFigures {
+  static readonly BUILDERS: { [K in RdShape["kind"]]: (libs: ThreeLibs, palette: RdTelegraphPalette, shape: RdShapeOf<K>, duration: number) => RdTelegraphFigure } = {
+    circle: (libs, palette, shape, duration) => new RdCircleFigure(libs, palette, shape, duration),
+    cone: (libs, palette, shape) => new RdConeFigure(libs, palette, shape),
+    line: (libs, palette, shape) => new RdLineFigure(libs, palette, shape),
+    checker: (libs, palette, shape) => new RdCheckerFigure(libs, palette, shape),
+    quadrants: (libs, palette, shape) => new RdQuadrantFigure(libs, palette, shape)
+  };
+
+  static warning(libs: ThreeLibs, palette: RdTelegraphPalette, entry: RdTimedShape): RdTelegraphFigure {
+    const builder = RdTelegraphFigures.BUILDERS[entry.shape.kind] as (libs: ThreeLibs, palette: RdTelegraphPalette, shape: RdShape, duration: number) => RdTelegraphFigure;
+    return builder(libs, palette, entry.shape, entry.end - entry.start);
+  }
+
+  static hazard(libs: ThreeLibs, palette: RdTelegraphPalette, entry: RdTimedShape): RdTelegraphFigure {
+    return new RdHazardFigure(libs, palette, entry.shape);
+  }
+}
+
+class RdTelegraphView {
+  readonly group: Three<"Group">;
+  private readonly warnings = new Map<number, RdTelegraphFigure>();
+  private readonly hazards = new Map<number, RdTelegraphFigure>();
+  private readonly palette: RdTelegraphPalette;
+  private seconds = 0;
+
+  constructor(private readonly libs: ThreeLibs) {
+    this.group = new libs.THREE.Group();
+    this.palette = new RdTelegraphPalette(libs);
   }
 
   sync(tele: readonly RdTimedShape[], areas: readonly RdTimedShape[], now: number): void {
-    this.reconcile(this.shapes, tele, now, false);
-    this.reconcile(this.areas, areas, now, true);
+    this.reconcile(this.warnings, tele, now, RdTelegraphFigures.warning);
+    this.reconcile(this.hazards, areas, now, RdTelegraphFigures.hazard);
   }
 
-  private reconcile(store: Map<number, RdShapeView>, list: readonly RdTimedShape[], now: number, area: boolean): void {
-    const THREE = this.libs.THREE;
+  private reconcile(store: Map<number, RdTelegraphFigure>, list: readonly RdTimedShape[], now: number, make: (libs: ThreeLibs, palette: RdTelegraphPalette, entry: RdTimedShape) => RdTelegraphFigure): void {
     const keep = new Set<number>();
     list.forEach((entry) => {
       if (entry.end <= now) return;
       keep.add(entry.id);
-      let view = store.get(entry.id);
-      if (!view) {
-        const meshes = this.build(entry.shape, area ? this.areaMaterial : this.fillMaterial.clone(), area ? this.areaEdgeMaterial : this.edgeMaterial);
-        const group = new THREE.Group();
-        group.add(meshes.fill, meshes.edge);
-        let meteor: Three<"Mesh"> | null = null;
-        if (!area && entry.shape.kind === "circle" && entry.end - entry.start >= 2.9) {
-          meteor = new THREE.Mesh(new THREE.DodecahedronGeometry(0.9, 0), this.meteorMaterial);
-          meteor.visible = false;
-          group.add(meteor);
-        }
-        this.group.add(group);
-        view = { group, fill: meshes.fill, edge: meshes.edge, id: entry.id, meteor };
-        store.set(entry.id, view);
+      let figure = store.get(entry.id);
+      if (!figure) {
+        figure = make(this.libs, this.palette, entry);
+        this.group.add(figure.group);
+        store.set(entry.id, figure);
       }
-      if (area) return;
       const progress = RdMath.clamp((now - entry.start) / Math.max(0.05, entry.end - entry.start), 0, 1);
-      const material = view.fill.material as Three<"MeshBasicMaterial">;
-      material.opacity = 0.18 + 0.35 * progress;
-      if (entry.shape.kind !== "line") {
-        const radius = RdViewMath.w(entry.shape.r) * (0.15 + 0.85 * progress);
-        view.fill.scale.set(radius, radius, 1);
-      } else {
-        view.fill.scale.y = RdViewMath.w(entry.shape.length) * progress;
-      }
-      if (view.meteor) {
-        const left = entry.end - now;
-        view.meteor.visible = left < 0.7;
-        view.meteor.position.set(RdViewMath.w(entry.shape.x), 0.5 + left * 14, RdViewMath.w(entry.shape.z));
-        view.meteor.rotation.x += 0.2;
-      }
+      figure.update(store === this.hazards ? this.seconds * 0.15 : progress, entry.end - now);
     });
-    store.forEach((view, id) => {
+    store.forEach((figure, id) => {
       if (keep.has(id)) return;
-      this.group.remove(view.group);
-      view.fill.geometry.dispose();
-      view.edge.geometry.dispose();
+      this.group.remove(figure.group);
+      figure.dispose();
       store.delete(id);
     });
   }
 
   update(dt: number): void {
     this.seconds += dt;
-    this.areaMaterial.opacity = 0.3 + Math.sin(this.seconds * 5) * 0.08;
-    this.areas.forEach((view) => { view.edge.rotation.z += dt * 0.8; });
+    this.palette.update(dt);
   }
 
   clear(): void {
@@ -1325,8 +1778,8 @@ class RdZoneView {
   constructor(private readonly libs: ThreeLibs) {
     const THREE = libs.THREE;
     this.group = new THREE.Group();
-    this.readyMaterial = new THREE.MeshBasicMaterial({ color: "#FFD23F", transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending });
-    this.readyDiscMaterial = new THREE.MeshBasicMaterial({ color: "#FFD23F", transparent: true, opacity: 0.18, depthWrite: false, blending: THREE.AdditiveBlending });
+    this.readyMaterial = RdGroundLayer.decal(new THREE.MeshBasicMaterial({ color: "#FFD23F", transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending }), 2);
+    this.readyDiscMaterial = RdGroundLayer.decal(new THREE.MeshBasicMaterial({ color: "#FFD23F", transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending }), 1);
     const ringGeometry = new THREE.RingGeometry(0.9, 1, 48);
     ringGeometry.rotateX(-Math.PI / 2);
     const discGeometry = new THREE.CircleGeometry(1, 48);
@@ -1336,8 +1789,8 @@ class RdZoneView {
     this.readyRing.visible = this.readyDisc.visible = false;
     this.group.add(this.readyRing, this.readyDisc);
     for (let index = 0; index < RdRules.SEATS; index++) {
-      const material = new THREE.MeshBasicMaterial({ color: "#FFD23F", transparent: true, opacity: 0.95, depthWrite: false, blending: THREE.AdditiveBlending });
-      const discMaterial = new THREE.MeshBasicMaterial({ color: "#FFD23F", transparent: true, opacity: 0.25, depthWrite: false, blending: THREE.AdditiveBlending });
+      const material = RdGroundLayer.decal(new THREE.MeshBasicMaterial({ color: "#FFD23F", transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending }), 2);
+      const discMaterial = RdGroundLayer.decal(new THREE.MeshBasicMaterial({ color: "#FFD23F", transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending }), 1);
       const ring = new THREE.Mesh(ringGeometry, material);
       const disc = new THREE.Mesh(discGeometry, discMaterial);
       ring.visible = disc.visible = false;
@@ -1354,7 +1807,7 @@ class RdZoneView {
     this.readyDiscMaterial.color.set(color);
     const radius = RdViewMath.w(zone.r);
     [this.readyRing, this.readyDisc].forEach((mesh) => {
-      mesh.position.set(RdViewMath.w(zone.x), 0.08, RdViewMath.w(zone.z));
+      mesh.position.set(RdViewMath.w(zone.x), RdGroundLayer.ZONE, RdViewMath.w(zone.z));
       mesh.scale.set(radius, 1, radius);
     });
   }
@@ -1369,7 +1822,7 @@ class RdZoneView {
       zone.discMaterial.color.set(color);
       const radius = RdViewMath.w(RdBalance.SAFE_ZONE.radius);
       [zone.ring, zone.disc].forEach((mesh) => {
-        mesh.position.set(RdViewMath.w(data[0]), 0.1, RdViewMath.w(data[1]));
+        mesh.position.set(RdViewMath.w(data[0]), RdGroundLayer.ZONE, RdViewMath.w(data[1]));
         mesh.scale.set(radius, 1, radius);
       });
     });
@@ -1528,6 +1981,7 @@ class RdSceneView {
       const pose = poses(shot.slot);
       const downed = (shot.flags & RdHeroFlags.DOWN) !== 0;
       actor.setPose(pose, downed, shot.max > 0 ? shot.hp / shot.max : 0, dt, this.nowMs);
+      actor.setAirborne((shot.flags & RdHeroFlags.AIRBORNE) !== 0, this.nowMs);
       actor.setGhost((shot.flags & RdHeroFlags.GONE) !== 0);
     });
     const seen = new Set<number>();
@@ -1610,7 +2064,7 @@ class RdSceneView {
       if (!actor) return;
       const slot = id - 1;
       const key = action === "attack" ? "attack" + slot : action === "shoot" ? "shoot" + slot : action;
-      actor.playAction(key, action === "roll" ? RdBalance.ROLL.seconds : action === "heal" ? 0.8 : 0.55, this.nowMs);
+      actor.playAction(key, action === "dash" ? RdBalance.DASH.seconds + 0.15 : action === "heal" ? 0.8 : 0.55, this.nowMs);
       return;
     }
     const actor = this.foes.get(id);
@@ -1634,7 +2088,17 @@ class RdSceneView {
     charge: (x, z) => this.effects.ring(x, z, 1.4, "#E5604D", 0.35),
     "blast-mark": (x, z, event) => this.effects.disc(x, z, RdViewMath.w(event.r), "#FF8A3C", event.d, 0.35),
     blast: (x, z, event) => { this.effects.burst(x, z, RdViewMath.w(event.r), "#FF7A2E", 0.55); this.effects.ring(x, z, RdViewMath.w(event.r), "#FFC266", 0.45); },
-    roll: (x, z) => this.effects.ring(x, z, 0.8, "#4FBF7A", 0.35),
+    dash: (x, z, event) => {
+      this.effects.streak(x, z, event.d, RdViewMath.w(event.r), 0.9, "#7CFFB0", 0.35);
+      this.effects.ring(x, z, 0.9, "#4FBF7A", 0.3);
+    },
+    knock: (x, z, event) => {
+      this.effects.streak(x, z, event.d, RdViewMath.w(event.r), 0.7, "#FFB27A", 0.4);
+      this.effects.burst(x, z, 0.8, "#FF7A5A", 0.3);
+    },
+    quake: (x, z, event) => { this.effects.shockwave(x, z, RdViewMath.w(event.r), "#FF5A3C"); this.kit.world.rig.shake(0.45, 0.45); },
+    stomp: (x, z) => { this.effects.shockwave(x, z, 9, "#FF5A3C"); this.effects.burst(x, z, 3.2, "#FFB27A", 0.6); this.kit.world.rig.shake(0.6, 0.6); },
+    barrier: (x, z, event) => { this.effects.barrier(x, z, event.d, RdViewMath.w(event.r)); this.kit.world.rig.shake(0.2, 0.25); },
     heal: (x, z, event) => {
       this.effects.ring(x, z, 1.1, "#7CFFB0", 0.7);
       this.effects.burst(x, z, 0.9, "#7CFFB0", 0.5);
