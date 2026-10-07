@@ -9,7 +9,7 @@ type RdGearSlot = "weapon" | "armor" | "boots";
 type RdStageKind = "ready" | "wave" | "boss" | "reward";
 type RdStagePhase = "intro" | "brief" | "fight" | "clear" | "loot";
 type RdProjStyle = "orb" | "arrow" | "bolt";
-type RdAnimKey = "attack" | "shoot" | "cast" | "taunt" | "charge" | "dash" | "heal" | "fireball" | "roar" | "leap" | "rush" | "slam" | "summon" | "channel";
+type RdAnimKey = "attack" | "shoot" | "cast" | "taunt" | "charge" | "dash" | "heal" | "fireball" | "roar" | "leap" | "rush" | "slam" | "summon" | "channel" | "stomp";
 type RdFxKind = "taunt" | "charge" | "blast-mark" | "blast" | "dash" | "heal" | "beam" | "stun" | "meteor" | "slam" | "leap" | "rush" | "zone-ok" | "zone-fail" | "pillar-break" | "pillar-restore" | "pillars-fail" | "revive" | "boss-enter" | "boss-down" | "crack" | "swing" | "wall-stun" | "knock" | "quake" | "stomp" | "barrier";
 type RdOfferPhase = "stat" | "gear";
 type RdMechKind = "zones" | "pillars";
@@ -1719,7 +1719,7 @@ class RdCheckerStomp extends RdAttackPattern {
   }
 
   get animation(): RdAnimKey {
-    return "channel";
+    return "stomp";
   }
 
   canStart(engine: RdEngine, boss: RdBoss): boolean {
@@ -1732,7 +1732,6 @@ class RdCheckerStomp extends RdAttackPattern {
   }
 
   resolve(engine: RdEngine, boss: RdBoss, cast: RdCast): void {
-    engine.emit({ t: "act", id: boss.id, a: "slam" });
     engine.emit({ t: "fx", k: "stomp", x: boss.x, z: boss.z, r: this.spec.cell, id: boss.id, d: 0 });
     this.damagedHeroes(engine, cast.shapes, this.spec.damage).forEach((hero) => engine.launchHero(hero, this.spec.airborne));
   }
@@ -4038,6 +4037,6 @@ class RdBannerLedger {
 
   static lines(kind: "start" | "clear", floor: number): { title: string; sub: string } {
     const spec = RdFloorPlan.spec(floor);
-    return kind === "start" ? { title: spec.startTitle, sub: spec.startSub } : { title: spec.clearTitle, sub: RdFloorPlan.clearSubtitle(floor) };
+    return { title: kind === "start" ? spec.startTitle : spec.clearTitle, sub: "" };
   }
 }

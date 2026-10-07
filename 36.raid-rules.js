@@ -1491,7 +1491,7 @@ class RdCheckerStomp extends RdAttackPattern {
         this.spec = spec;
     }
     get animation() {
-        return "channel";
+        return "stomp";
     }
     canStart(engine, boss) {
         return boss.hp <= boss.maxHp * this.spec.ratio && engine.livingHeroes().length > 0;
@@ -1501,7 +1501,6 @@ class RdCheckerStomp extends RdAttackPattern {
         return [{ kind: "checker", x: hall.minX, z: hall.minZ, w: hall.maxX - hall.minX, h: hall.maxZ - hall.minZ, cell: this.spec.cell, parity: engine.random.int(2), ox: Math.round(boss.x), oz: Math.round(boss.z) }];
     }
     resolve(engine, boss, cast) {
-        engine.emit({ t: "act", id: boss.id, a: "slam" });
         engine.emit({ t: "fx", k: "stomp", x: boss.x, z: boss.z, r: this.spec.cell, id: boss.id, d: 0 });
         this.damagedHeroes(engine, cast.shapes, this.spec.damage).forEach((hero) => engine.launchHero(hero, this.spec.airborne));
     }
@@ -3690,6 +3689,6 @@ class RdBannerLedger {
     }
     static lines(kind, floor) {
         const spec = RdFloorPlan.spec(floor);
-        return kind === "start" ? { title: spec.startTitle, sub: spec.startSub } : { title: spec.clearTitle, sub: RdFloorPlan.clearSubtitle(floor) };
+        return { title: kind === "start" ? spec.startTitle : spec.clearTitle, sub: "" };
     }
 }

@@ -813,7 +813,7 @@ class RdFoeLooks {
     mage: ["Ranged_Magic_Shoot"], giant: ["Melee_2H_Attack_Slice", "Melee_1H_Attack_Chop"], archmage: ["Ranged_Magic_Shoot"], lord: ["Melee_2H_Attack_Spin", "Melee_2H_Attack_Slice"]
   };
   static readonly ACTIONS: Readonly<Record<string, readonly string[]>> = {
-    slam: ["Melee_2H_Attack_Slice", "Melee_1H_Attack_Chop"], leap: ["Melee_1H_Attack_Jump_Chop"], rush: ["Running_A"], roar: ["Skeletons_Taunt"],
+    slam: ["Melee_2H_Attack_Slice", "Melee_1H_Attack_Chop"], leap: ["Melee_1H_Attack_Jump_Chop"], stomp: ["Melee_1H_Attack_Jump_Chop"], rush: ["Running_A"], roar: ["Skeletons_Taunt"],
     channel: ["Ranged_Magic_Spellcasting_Long", "Ranged_Magic_Spellcasting"], summon: ["Ranged_Magic_Summon", "Ranged_Magic_Raise"], cast: ["Ranged_Magic_Shoot"]
   };
 }
@@ -828,6 +828,10 @@ class RdFoeActor extends RdActor {
   private moving = false;
   private seconds = 0;
   private stunned = false;
+  private stompStart = -1;
+  private stompMs = 1;
+  private static readonly STOMP_JUMP_FROM = 0.55;
+  private static readonly STOMP_HOP_HEIGHT = 2.2;
   readonly boss: boolean;
 
   constructor(libs: ThreeLibs, parent: Three<"Object3D">, library: RdModelLibrary, private readonly clips: Map<string, Three<"AnimationClip">>, readonly kind: RdMobKind | RdBossKind, readonly id: number) {
@@ -880,8 +884,24 @@ class RdFoeActor extends RdActor {
     const clip = this.first(RdFoeLooks.ACTIONS[key]);
     if (!clip || this.dying >= 0) return;
     const loop = key === "channel";
-    this.animator.play(clip, { once: !loop, speed: key === "summon" ? 2.6 : 1 });
+    const stomp = key === "stomp";
+    const clipSeconds = (this.clips.get(clip) as Three<"AnimationClip">).duration;
+    this.animator.play(clip, { once: !loop, speed: key === "summon" ? 2.6 : stomp ? clipSeconds / seconds : 1 });
     this.actionUntil = nowMs + seconds * 1000;
+    this.stompStart = stomp ? nowMs : -1;
+    this.stompMs = seconds * 1000;
+  }
+
+  private stompHop(nowMs: number): number {
+    if (this.stompStart < 0) return 0;
+    const progress = (nowMs - this.stompStart) / this.stompMs;
+    if (progress >= 1) {
+      this.stompStart = -1;
+      return 0;
+    }
+    if (progress < RdFoeActor.STOMP_JUMP_FROM) return 0;
+    const air = (progress - RdFoeActor.STOMP_JUMP_FROM) / (1 - RdFoeActor.STOMP_JUMP_FROM);
+    return 4 * air * (1 - air) * RdFoeActor.STOMP_HOP_HEIGHT;
   }
 
   beginRise(nowMs: number): void {
@@ -932,6 +952,7 @@ class RdFoeActor extends RdActor {
     this.stars.visible = this.stunned && this.dying < 0;
     if (this.stars.visible) this.stars.rotation.z += dt * 4;
     this.animator.update(dt);
+    this.model.position.y = this.stompHop(nowMs);
     if (this.hitFlash > 0) {
       this.model.position.x = Math.sin(this.hitFlash * 60) * 0.04;
       this.hitFlash = Math.max(0, this.hitFlash - dt);
@@ -2086,7 +2107,7 @@ class RdSceneView {
       return;
     }
     if (action === "attack" || action === "cast" && !actor.boss) actor.playAttack(this.nowMs);
-    else actor.playAction(action, this.nowMs, action === "channel" ? 30 : action === "roar" ? 1.1 : action === "rush" ? 0.8 : 0.9);
+    else actor.playAction(action, this.nowMs, action === "channel" ? 30 : action === "stomp" ? RdBalance.LORD.stomp.telegraph : action === "roar" ? 1.1 : action === "rush" ? 0.8 : 0.9);
   }
 
   private effect(event: Extract<RdEvent, { t: "fx" }>): void {

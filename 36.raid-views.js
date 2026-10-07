@@ -757,7 +757,7 @@ RdFoeLooks.ATTACKS = {
     mage: ["Ranged_Magic_Shoot"], giant: ["Melee_2H_Attack_Slice", "Melee_1H_Attack_Chop"], archmage: ["Ranged_Magic_Shoot"], lord: ["Melee_2H_Attack_Spin", "Melee_2H_Attack_Slice"]
 };
 RdFoeLooks.ACTIONS = {
-    slam: ["Melee_2H_Attack_Slice", "Melee_1H_Attack_Chop"], leap: ["Melee_1H_Attack_Jump_Chop"], rush: ["Running_A"], roar: ["Skeletons_Taunt"],
+    slam: ["Melee_2H_Attack_Slice", "Melee_1H_Attack_Chop"], leap: ["Melee_1H_Attack_Jump_Chop"], stomp: ["Melee_1H_Attack_Jump_Chop"], rush: ["Running_A"], roar: ["Skeletons_Taunt"],
     channel: ["Ranged_Magic_Spellcasting_Long", "Ranged_Magic_Spellcasting"], summon: ["Ranged_Magic_Summon", "Ranged_Magic_Raise"], cast: ["Ranged_Magic_Shoot"]
 };
 class RdFoeActor extends RdActor {
@@ -772,6 +772,8 @@ class RdFoeActor extends RdActor {
         this.moving = false;
         this.seconds = 0;
         this.stunned = false;
+        this.stompStart = -1;
+        this.stompMs = 1;
         const THREE = libs.THREE;
         const look = RdFoeLooks.LOOKS[kind];
         this.boss = kind === "giant" || kind === "archmage" || kind === "lord";
@@ -822,8 +824,25 @@ class RdFoeActor extends RdActor {
         if (!clip || this.dying >= 0)
             return;
         const loop = key === "channel";
-        this.animator.play(clip, { once: !loop, speed: key === "summon" ? 2.6 : 1 });
+        const stomp = key === "stomp";
+        const clipSeconds = this.clips.get(clip).duration;
+        this.animator.play(clip, { once: !loop, speed: key === "summon" ? 2.6 : stomp ? clipSeconds / seconds : 1 });
         this.actionUntil = nowMs + seconds * 1000;
+        this.stompStart = stomp ? nowMs : -1;
+        this.stompMs = seconds * 1000;
+    }
+    stompHop(nowMs) {
+        if (this.stompStart < 0)
+            return 0;
+        const progress = (nowMs - this.stompStart) / this.stompMs;
+        if (progress >= 1) {
+            this.stompStart = -1;
+            return 0;
+        }
+        if (progress < RdFoeActor.STOMP_JUMP_FROM)
+            return 0;
+        const air = (progress - RdFoeActor.STOMP_JUMP_FROM) / (1 - RdFoeActor.STOMP_JUMP_FROM);
+        return 4 * air * (1 - air) * RdFoeActor.STOMP_HOP_HEIGHT;
     }
     beginRise(nowMs) {
         const clip = this.first(["Skeletons_Spawn_Ground", "Skeletons_Awaken_Floor", "Spawn_Ground"]);
@@ -874,6 +893,7 @@ class RdFoeActor extends RdActor {
         if (this.stars.visible)
             this.stars.rotation.z += dt * 4;
         this.animator.update(dt);
+        this.model.position.y = this.stompHop(nowMs);
         if (this.hitFlash > 0) {
             this.model.position.x = Math.sin(this.hitFlash * 60) * 0.04;
             this.hitFlash = Math.max(0, this.hitFlash - dt);
@@ -883,6 +903,8 @@ class RdFoeActor extends RdActor {
         }
     }
 }
+RdFoeActor.STOMP_JUMP_FROM = 0.55;
+RdFoeActor.STOMP_HOP_HEIGHT = 2.2;
 class RdPropActor extends RdActor {
     constructor(libs, parent, library, labels, kind, id, owner, ownerName) {
         super(libs, parent, kind === "chest" ? 0.9 : 1.0, kind === "pillar" ? "#B07CFF" : "#F2C14E", kind === "pillar" ? 4.2 : kind === "chest" ? 1.6 : 2.4);
@@ -1978,7 +2000,7 @@ class RdSceneView {
         if (action === "attack" || action === "cast" && !actor.boss)
             actor.playAttack(this.nowMs);
         else
-            actor.playAction(action, this.nowMs, action === "channel" ? 30 : action === "roar" ? 1.1 : action === "rush" ? 0.8 : 0.9);
+            actor.playAction(action, this.nowMs, action === "channel" ? 30 : action === "stomp" ? RdBalance.LORD.stomp.telegraph : action === "roar" ? 1.1 : action === "rush" ? 0.8 : 0.9);
     }
     effect(event) {
         const handler = this.fxHandlers[event.k];

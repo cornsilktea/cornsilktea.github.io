@@ -265,6 +265,8 @@ class RdFloorBanner {
         if (!this.ledger.accept("clear", floor, match))
             return;
         const lines = RdBannerLedger.lines("clear", floor);
+        if (lines.title === "")
+            return;
         const final = floor === RdFloorPlan.LAST_FLOOR;
         this.present(lines.title, lines.sub, final ? "기록 " + RdTimeText.clock(recordSeconds) : "", true, final ? RdFloorBanner.FINAL_HOLD : RdFloorBanner.CLEAR_HOLD);
     }
@@ -459,8 +461,9 @@ class RdHud {
         RkDom.show(this.bossBox, !!boss && !!shot);
         if (!boss || !shot)
             return;
-        RkDom.setText(this.bossName, boss.name);
-        this.bossFill.style.width = (shot.hp / 10).toFixed(1) + "%";
+        const percent = (shot.hp / 10).toFixed(1) + "%";
+        RkDom.setText(this.bossName, boss.name + " " + percent);
+        this.bossFill.style.width = percent;
         const invulnerable = (shot.flags & RdFoeFlags.INVULNERABLE) !== 0;
         const vulnerable = (shot.flags & RdFoeFlags.VULNERABLE) !== 0;
         const stunned = (shot.flags & RdFoeFlags.STUNNED) !== 0;
