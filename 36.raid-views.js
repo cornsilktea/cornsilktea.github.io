@@ -483,8 +483,7 @@ class RdHealthBar {
         back.renderOrder = 10;
         this.fillMaterial = new THREE.SpriteMaterial({ color, depthTest: false });
         this.fill = new THREE.Sprite(this.fillMaterial);
-        this.fill.center.set(0, 0.5);
-        this.fill.position.x = -width / 2;
+        this.fill.center.set(0.5, 0.5);
         this.fill.scale.set(width, 0.1, 1);
         this.fill.renderOrder = 11;
         this.group.add(back, this.fill);
@@ -495,6 +494,7 @@ class RdHealthBar {
             return;
         this.shown = clamped;
         this.fill.scale.x = Math.max(0.001, this.width * clamped);
+        this.fill.center.x = this.width / 2 / this.fill.scale.x;
     }
     setColor(color) {
         this.fillMaterial.color.set(color);
