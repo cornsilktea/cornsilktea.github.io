@@ -668,8 +668,44 @@ class RdScreens {
         document.body.classList.toggle("in-game", name === "game");
     }
 }
+class RdJobDetailPanel {
+    constructor(box) {
+        this.box = box;
+    }
+    render(slot) {
+        if (slot < 0) {
+            this.box.innerHTML = "<h3>직업 능력치</h3><p class='empty'>직업 카드를 누르면 능력치가 여기에 보여요.</p>";
+            return;
+        }
+        const spec = RdBalance.heroSpec(slot);
+        const rows = [
+            ["체력", String(spec.hp)],
+            ["공격력", String(spec.attack)],
+            ["공격 속도", (1 / spec.interval).toFixed(2) + "회/초"],
+            ["사거리", spec.range / 100 + "m"],
+            ["이동 속도", spec.speed / 100 + "m/초"]
+        ];
+        const skills = spec.skills.map((key) => {
+            const skill = RdBalance.SKILLS[key];
+            return "<div class='skill'><b>" + skill.name + " <small>쿨타임 " + skill.cooldown + "초</small></b><p>" + skill.summary + "</p>" +
+                RdJobDetailPanel.SKILL_DETAILS[key].map((line) => "<p>" + line + "</p>").join("") + "</div>";
+        }).join("");
+        this.box.style.setProperty("--job", spec.color);
+        this.box.innerHTML = "<h3>" + spec.name + " <small>" + spec.role + "</small></h3>" +
+            "<table>" + rows.map((row) => "<tr><td>" + row[0] + "</td><td>" + row[1] + "</td></tr>").join("") + "</table>" + skills;
+    }
+}
+RdJobDetailPanel.SKILL_DETAILS = {
+    taunt: ["범위 " + RdBalance.TAUNT.radius / 100 + "m 안의 적이 나를 공격", "일반 적 " + RdBalance.TAUNT.mobSeconds + "초 · 보스 " + RdBalance.TAUNT.bossSeconds + "초"],
+    charge: ["앞으로 " + RdBalance.CHARGE.distance / 100 + "m 돌진 · 공격력 " + RdBalance.CHARGE.factor + "배", "맞은 적 " + RdBalance.CHARGE.stunSeconds + "초 기절"],
+    fireball: ["사거리 " + RdBalance.FIREBALL.range / 100 + "m · 폭발 반경 " + RdBalance.FIREBALL.radius / 100 + "m", "공격력 " + RdBalance.FIREBALL.factor + "배 · 적이 가장 몰린 곳"],
+    dash: [RdBalance.DASH.distance / 100 + "m 대쉬 · 무적 " + RdBalance.DASH.invulnerableSeconds + "초", "다음 화살 " + RdBalance.DASH.factor + "배 (" + RdBalance.DASH.empowerSeconds + "초 안)"],
+    heal: ["사거리 " + RdBalance.HEAL.range / 100 + "m · 가장 다친 동료", "최대 체력의 " + Math.round(RdBalance.HEAL.ratio * 100) + "% 회복"]
+};
 class RdLobbyView {
     constructor() {
+        this.detail = new RdJobDetailPanel(RkDom.byId("jobDetail"));
+        this.inspected = -1;
         this.code = RkDom.byId("lobbyCode");
         this.seatBoard = RkDom.byId("jobBoard");
         this.spectatorLine = RkDom.byId("spectatorLine");
@@ -680,9 +716,13 @@ class RdLobbyView {
         this.onSeatClick = () => undefined;
         this.seatBoard.addEventListener("click", (event) => {
             const seat = event.target.closest("[data-slot]");
-            if (seat)
-                this.onSeatClick(Number(seat.dataset.slot));
+            if (!seat)
+                return;
+            this.inspected = Number(seat.dataset.slot);
+            this.detail.render(this.inspected);
+            this.onSeatClick(this.inspected);
         });
+        this.detail.render(-1);
     }
     render(session) {
         const seats = this.seatPlan.humanSeats(session.players);

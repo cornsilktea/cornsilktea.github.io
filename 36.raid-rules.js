@@ -208,12 +208,13 @@ RdBalance.ARCHMAGE = {
     bolt: { damage: 40, cooldown: 2, speed: 1100 },
     circles: { cooldown: 10, radius: 340, telegraph: 2, active: 6, dps: 40 },
     meteor: { cooldown: 16, enragedCooldown: 12, radius: 560, cast: 3.0, damage: 150, stun: 2, spread: 900 },
-    barrier: { lines: 4, width: 130, telegraph: 1.8, damage: 70, cooldown: 13, firstDelay: 10 }
+    barrier: { lines: 6, width: 130, telegraph: 1.8, damage: 70, cooldown: 13, firstDelay: 10 }
 };
 RdBalance.LORD = {
-    name: "해골 군주", hp: 16000, speed: 300, radius: 200,
+    name: "해골 군주", hp: 16000, speed: 300, radius: 240,
     sweep: { radius: 570, arc: Math.PI * 0.7, telegraph: 0.8, damage: 90, cooldown: 3.2 },
     leap: { radius: 400, telegraph: 1.6, damage: 150, cooldown: 14 },
+    barrier: { lines: 6, width: 130, telegraph: 1.8, damage: 60, cooldown: 14, firstDelay: 3, belowRatio: 0.5 },
     quake: { radius: 1050, gap: 260, telegraph: 1.6, damage: 60, push: 450, cooldown: 20, firstDelay: 12 },
     stomp: { ratio: 0.75, cell: 400, telegraph: 2.6, damage: 70, airborne: 1.1, cooldown: 22 },
     summons: [0.85, 0.6, 0.35],
@@ -326,8 +327,6 @@ RdWavePlan.WAVES = [
     { minionPairs: 1, warriors: 1, rogues: 1, mages: 1 },
     { minionPairs: 3, warriors: 1, rogues: 1, mages: 1 }
 ];
-RdWavePlan.ROLE_HINT = "탱커는 도발로 적을 끌고, 딜러는 처치하고, 힐러는 동료를 살려요!";
-RdWavePlan.ROLE_HINT_SECONDS = 2;
 class RdHeroStats {
     constructor(spec) {
         this.spec = spec;
@@ -1506,15 +1505,16 @@ class RdCheckerStomp extends RdAttackPattern {
     }
 }
 class RdBarrierLines extends RdAttackPattern {
-    constructor(spec) {
+    constructor(spec, belowRatio = 1.01) {
         super(spec.cooldown, spec.telegraph, 0.4, spec.firstDelay);
         this.spec = spec;
+        this.belowRatio = belowRatio;
     }
     get animation() {
         return "summon";
     }
-    canStart(engine) {
-        return engine.livingHeroes().length > 0;
+    canStart(engine, boss) {
+        return boss.hp < boss.maxHp * this.belowRatio && engine.livingHeroes().length > 0;
     }
     shapes(engine) {
         const hall = RdMapData.HALL;
@@ -1794,7 +1794,7 @@ class RdSkeletonLord extends RdBoss {
         this.displayName = RdBalance.LORD.name;
         this.summonRatios = RdBalance.LORD.summons;
         this.mechanicSteps = RdBalance.LORD.mechanics;
-        this.patterns = [new RdCheckerStomp(RdBalance.LORD.stomp), new RdQuadrantQuake(RdBalance.LORD.quake), new RdLeapSlam(RdBalance.LORD.leap)];
+        this.patterns = [new RdCheckerStomp(RdBalance.LORD.stomp), new RdQuadrantQuake(RdBalance.LORD.quake), new RdBarrierLines(RdBalance.LORD.barrier, RdBalance.LORD.barrier.belowRatio), new RdLeapSlam(RdBalance.LORD.leap)];
         this.basic = new RdConeStrike(RdBalance.LORD.sweep);
     }
     summonWave(engine) {
@@ -2217,8 +2217,7 @@ class RdWaveStage extends RdCombatStage {
         return RdWavePlan.WAVES.length;
     }
     hint(engine) {
-        const brief = this.phase === "brief" || (this.phase === "fight" && engine.time - this.fightStart < RdWavePlan.ROLE_HINT_SECONDS);
-        return brief ? RdWavePlan.ROLE_HINT : "";
+        return "";
     }
     beginFight(engine) {
         this.fightStart = engine.time;

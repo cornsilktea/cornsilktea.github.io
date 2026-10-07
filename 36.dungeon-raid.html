@@ -65,6 +65,18 @@
   .rd-job span { display: block; margin-top: 3px; font-size: 14px; font-weight: 800; color: #FFD2B8; }
   .rd-job.empty span { color: #9C93AE; font-weight: 700; }
   .rd-job.me { border-color: #D97B4F; border-left-color: var(--job); background: rgba(217, 123, 79, .16); }
+  #jobDetail { position: fixed; z-index: 3; right: 24px; top: 96px; width: min(300px, 26vw); margin: 0; padding: 14px 16px; border-left: 6px solid var(--job, #5B8DEF); }
+  #jobDetail h3 { margin: 0 0 8px; font-size: 20px; }
+  #jobDetail h3 small { display: block; margin-top: 2px; font-size: 13px; color: #C9C2D8; }
+  #jobDetail table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  #jobDetail td { padding: 4px 0; border-bottom: 1px solid rgba(255, 255, 255, .1); }
+  #jobDetail td:last-child { text-align: right; font-weight: 800; color: #FFD2B8; }
+  #jobDetail .skill { margin-top: 12px; }
+  #jobDetail .skill b { font-size: 16px; color: #E8D2FF; }
+  #jobDetail .skill small { font-size: 13px; color: #FFD27A; }
+  #jobDetail p { margin: 3px 0 0; font-size: 13px; color: #C9C2D8; }
+  #jobDetail p.empty { font-size: 14px; }
+  @media (max-width: 900px) { #jobDetail { position: static; width: auto; margin: 10px 16px; } }
   #spectatorLine, #lobbyNotice { margin-top: 8px; font-size: 14px; font-weight: 700; color: #C9C2D8; text-align: center; }
   #spectatorLine:empty, #lobbyNotice:empty { display: none; }
 
@@ -250,6 +262,7 @@
 </div>
 
 <div id="lobbyScreen" class="st-screen" hidden>
+  <div id="jobDetail" class="st-card"></div>
   <div class="st-wrap">
     <div class="st-hero"><h1 class="st-title">던전 레이드</h1></div>
     <div class="st-card">

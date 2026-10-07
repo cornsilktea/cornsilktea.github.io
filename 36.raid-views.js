@@ -205,8 +205,9 @@ class RdWorldView {
         this.matchGroup = new THREE.Group();
         this.scene.add(this.matchGroup);
         this.rig = new RdCameraRig(libs);
+        const steps = touchDevice ? [() => this.lowerPixelRatio(), () => this.sun.disable()] : [() => this.lowerPixelRatio()];
         this.governor = window.QualityGovernor
-            ? window.QualityGovernor({ steps: [() => this.lowerPixelRatio(), () => this.sun.disable()], storageKey: "dungeonraid_quality_v1", isPlaying: () => this.playing, slowSec: 0.022, slowLimit: 90 })
+            ? window.QualityGovernor({ steps, storageKey: "dungeonraid_quality_v2", isPlaying: () => this.playing, slowSec: 0.022, slowLimit: 90 })
             : null;
         if (this.governor)
             this.governor.restore();
@@ -750,7 +751,7 @@ RdFoeLooks.LOOKS = {
     mage: { model: "Skeleton_Mage", scale: 0.8, tint: null, emissive: null, barWidth: 0.85, barHeight: 2.15, barColor: "#E25B4B" },
     giant: { model: "Skeleton_Warrior", scale: 1.6, tint: "#FF6A5C", emissive: "#3A0804", barWidth: 0, barHeight: 0, barColor: "#E25B4B" },
     archmage: { model: "Skeleton_Mage", scale: 1.44, tint: "#B58BFF", emissive: "#1E0838", barWidth: 0, barHeight: 0, barColor: "#E25B4B" },
-    lord: { model: "Skeleton_Warrior", scale: 1.92, tint: "#5A4E40", emissive: "#3A2A06", barWidth: 0, barHeight: 0, barColor: "#E25B4B" }
+    lord: { model: "Skeleton_Rogue", scale: 2.3, tint: "#8C7A3C", emissive: "#3A2A06", barWidth: 0, barHeight: 0, barColor: "#E25B4B" }
 };
 RdFoeLooks.ATTACKS = {
     minion: ["Melee_Unarmed_Attack_Punch_A", "Melee_1H_Attack_Chop"], warrior: ["Melee_1H_Attack_Chop"], rogue: ["Melee_Dualwield_Attack_Slice", "Melee_1H_Attack_Slice_Diagonal"],
