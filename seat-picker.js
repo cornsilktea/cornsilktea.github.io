@@ -362,8 +362,9 @@ class SeatStageView {
     }
     render(board, mode, perspective, selected, animate) {
         this.root.className = `stage ${perspective.chalkboardClass}`;
+        const blockedBackRows = this.blockedBackRows(board, mode);
         const rows = perspective.rowsTopToBottom(mode.depth).map((row) => {
-            const rowElement = SeatDom.create("div", "row");
+            const rowElement = SeatDom.create("div", blockedBackRows.has(row) ? "row blocked-back" : "row");
             const cells = perspective.columnsLeftToRight(mode.width).map((column, visualIndex) => {
                 const position = mode.seatAt(row, column);
                 return this.buildCell(board.seatAt(position), mode.gapClassAfter(visualIndex), selected, animate);
@@ -372,6 +373,16 @@ class SeatStageView {
             return rowElement;
         });
         this.boardElement.replaceChildren(...rows);
+    }
+    blockedBackRows(board, mode) {
+        const rows = new Set();
+        for (let row = mode.depth; row >= 1; row--) {
+            const columns = SequenceBuilder.between(1, mode.width);
+            if (!columns.every((column) => board.seatAt(mode.seatAt(row, column)).blocked))
+                break;
+            rows.add(row);
+        }
+        return rows;
     }
     buildCell(seat, gapClass, selected, animate) {
         const classes = ["cell", gapClass];
