@@ -288,7 +288,7 @@ class WarGameApp {
     const selection = this.selection;
     if (selection.kind === "squad") {
       this.sendCommand(new WarAttackPathCommand(this.viewer, selection.index, [point]));
-      this.notice.show("부대 " + (selection.index + 1) + "이(가) 이동해요.");
+      this.notice.show(WarSquadNames.of(selection.index) + "이(가) 이동해요.");
     } else if (selection.kind === "unit") {
       this.sendCommand(new WarMoveUnitCommand(this.viewer, selection.id, point));
     }

@@ -61,6 +61,12 @@ class WarNotice {
   }
 }
 
+class WarSquadNames {
+  static of(index: number): string {
+    return index === WarBalance.FLEET_SQUAD ? "비행단" : "부대 " + (index + 1);
+  }
+}
+
 class WarSquadPanel {
   onSelect: (index: number) => void = () => undefined;
   private readonly workerText = WarDom.byId("workerCount");
@@ -87,7 +93,7 @@ class WarSquadPanel {
   update(player: WarPlayer, selection: WarSelection): void {
     this.workerText.textContent = "광석 " + player.economy.oreWorkers + " · 결정 " + player.economy.crystalWorkers;
     player.squads.forEach((squad, index) => {
-      const order: WarUnitKind[] = ["melee", "ranged", "elite"];
+      const order: WarUnitKind[] = ["melee", "ranged", "elite", "air"];
       const colors: string[] = [];
       for (const kind of order) {
         for (const unit of squad.members) if (unit.def.kind === kind) colors.push(WarPalette.KIND_COLORS[kind]);
@@ -150,7 +156,7 @@ class WarCommandCard {
       if (!building.complete) return WarCommandCard.note("짓는 중", "다 지어지면 병력을 만들 수 있어요.");
       const items = building.def.type === "hq"
         ? [WarProductionItem.from("worker_ore"), WarProductionItem.from("worker_crystal")]
-        : WarUnitCatalog.producedBy(player.faction, building.def.producesKind as WarUnitKind).map((def) => WarProductionItem.from(def.id));
+        : WarUnitCatalog.producedBy(player.faction, building.def.type).map((def) => WarProductionItem.from(def.id));
       return items.map((item) => ({
         label: item.name,
         sub: WarCommandCard.costText(item.ore, item.crystal) + (item.pop > 1 ? " · 인구 " + item.pop : ""),
@@ -203,7 +209,7 @@ class WarInfoPanel {
     if (selection.kind === "unit") {
       const unit = engine.entityById(selection.id);
       if (unit instanceof WarUnit) {
-        const squad = unit.team === team && unit.squadIndex >= 0 ? " · 부대 " + (unit.squadIndex + 1) : "";
+        const squad = unit.team === team && unit.squadIndex >= 0 ? " · " + WarSquadNames.of(unit.squadIndex) : "";
         return {
           title: unit.def.name + (unit.team === team ? "" : " (적)"),
           hpRatio: unit.hp / unit.maxHp,
@@ -224,9 +230,9 @@ class WarInfoPanel {
       const squad = player.squads[selection.index];
       const count = (kind: WarUnitKind): number => squad.members.filter((u) => u.def.kind === kind).length;
       return {
-        title: "부대 " + (selection.index + 1),
+        title: WarSquadNames.of(selection.index),
         hpRatio: -1,
-        rows: ["근접 " + count("melee") + " · 원거리 " + count("ranged") + " · 고급 " + count("elite") + " (" + squad.members.length + "/" + WarBalance.SQUAD_CAP + ")", squad.mode === "home" ? "입구에서 수비 중" : squad.mode === "away" ? "공격 이동 중" : "귀환 중"],
+        rows: ["근접 " + count("melee") + " · 원거리 " + count("ranged") + " · 고급 " + count("elite") + " · 비행 " + count("air") + " (" + squad.members.length + "/" + WarBalance.SQUAD_CAP + ")", squad.mode === "home" ? "입구에서 수비 중" : squad.mode === "away" ? "공격 이동 중" : "귀환 중"],
       };
     }
     if (selection.kind === "slot") {
@@ -445,7 +451,7 @@ class WarAttackMapOverlay {
     }
     this.squadButtons.forEach((button, index) => {
       const size = engine.players[this.teamOf()].squads[index].members.length;
-      button.textContent = "부대 " + (index + 1) + " (" + size + ")";
+      button.textContent = WarSquadNames.of(index) + " (" + size + ")";
       button.classList.toggle("selected", index === this.chosenSquad);
     });
   }

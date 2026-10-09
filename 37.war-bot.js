@@ -62,9 +62,9 @@ class WarBotBrain {
         if (this.wantsNextBuilding(player) && player.economy.ore < WarBotBrain.SAVE_FOR_BUILDING_ORE)
             return;
         for (const building of player.buildings()) {
-            if (building.def.type === "hq" || !building.complete || building.queue.length >= this.profile.queueDepth || building.def.producesKind === null)
+            if (building.def.type === "hq" || !building.complete || building.queue.length >= this.profile.queueDepth)
                 continue;
-            const choices = WarUnitCatalog.producedBy(player.faction, building.def.producesKind);
+            const choices = WarUnitCatalog.producedBy(player.faction, building.def.type);
             const pick = choices[this.unitCycle++ % choices.length];
             engine.submit(new WarProduceCommand(this.team, building.id, pick.id));
         }
@@ -79,12 +79,12 @@ class WarBotBrain {
             { x: WarMapData.LANE_X, y: WarMapData.LANE_Y * sign },
         ];
         const threatened = this.profile.defends && this.baseThreatened(engine);
-        const ready = player.squads.filter((squad) => squad.mode === "home" && squad.members.length >= this.profile.minSquadToSend);
+        const ready = player.squads.filter((squad) => squad.mode === "home" && squad.members.length >= (squad.isFleet ? WarBotBrain.MIN_FLEET : this.profile.minSquadToSend));
         const readyPop = ready.reduce((sum, squad) => sum + squad.members.reduce((inner, unit) => inner + unit.def.pop, 0), 0);
         if (readyPop >= this.profile.launchArmyPop && !threatened) {
             const lane = lanes[this.random.below(lanes.length)];
             for (const squad of ready)
-                engine.submit(new WarAttackPathCommand(this.team, squad.index, [lane, target]));
+                engine.submit(new WarAttackPathCommand(this.team, squad.index, squad.isFleet ? [target] : [lane, target]));
         }
         for (const squad of player.squads) {
             const weak = squad.mode === "away" && squad.attachedMembers().length <= this.profile.retreatSquadSize;
@@ -104,19 +104,20 @@ class WarBotBrain {
 WarBotBrain.SAVE_FOR_BUILDING_ORE = 150;
 WarBotBrain.RETREAT_PATIENCE_TICKS = 60;
 WarBotBrain.THREAT_RADIUS = 4200;
+WarBotBrain.MIN_FLEET = 2;
 class WarEasyBot extends WarBotBrain {
     constructor(team, seed) {
-        super(team, seed, { thinkTicks: 40, oreWorkerTarget: 8, crystalWorkerTarget: 2, buildingTarget: 4, launchArmyPop: 28, minSquadToSend: 8, retreatSquadSize: 3, queueDepth: 2, defends: false, buildOrder: ["barracks", "range", "barracks", "range"] });
+        super(team, seed, { thinkTicks: 40, oreWorkerTarget: 8, crystalWorkerTarget: 2, buildingTarget: 4, launchArmyPop: 28, minSquadToSend: 8, retreatSquadSize: 3, queueDepth: 2, defends: false, buildOrder: ["barracks", "barracks", "factory", "airport"] });
     }
 }
 class WarNormalBot extends WarBotBrain {
     constructor(team, seed) {
-        super(team, seed, { thinkTicks: 20, oreWorkerTarget: 10, crystalWorkerTarget: 5, buildingTarget: 5, launchArmyPop: 24, minSquadToSend: 6, retreatSquadSize: 3, queueDepth: 2, defends: false, buildOrder: ["barracks", "range", "barracks", "lab", "range"] });
+        super(team, seed, { thinkTicks: 20, oreWorkerTarget: 10, crystalWorkerTarget: 5, buildingTarget: 5, launchArmyPop: 24, minSquadToSend: 6, retreatSquadSize: 3, queueDepth: 2, defends: false, buildOrder: ["barracks", "factory", "airport", "barracks", "factory"] });
     }
 }
 class WarHardBot extends WarBotBrain {
     constructor(team, seed) {
-        super(team, seed, { thinkTicks: 10, oreWorkerTarget: 10, crystalWorkerTarget: 5, buildingTarget: 5, launchArmyPop: 24, minSquadToSend: 6, retreatSquadSize: 3, queueDepth: 3, defends: true, buildOrder: ["barracks", "range", "barracks", "lab", "range"] });
+        super(team, seed, { thinkTicks: 10, oreWorkerTarget: 10, crystalWorkerTarget: 5, buildingTarget: 5, launchArmyPop: 24, minSquadToSend: 6, retreatSquadSize: 3, queueDepth: 3, defends: true, buildOrder: ["barracks", "factory", "airport", "barracks", "factory"] });
     }
 }
 class WarBotFactory {

@@ -1,11 +1,11 @@
 "use strict";
 class WarPalette {
 }
-WarPalette.SQUAD_COLORS = ["#4FC3F7", "#B388FF", "#FFD54F"];
+WarPalette.SQUAD_COLORS = ["#4FC3F7", "#B388FF", "#FFD54F", "#FF8A80"];
 WarPalette.ENEMY = "#E5484D";
 WarPalette.MINE = "#7CE0A8";
 WarPalette.ACCENT = "#D97B4F";
-WarPalette.KIND_COLORS = { melee: "#6BCB77", ranged: "#F2994A", elite: "#E5484D" };
+WarPalette.KIND_COLORS = { melee: "#6BCB77", ranged: "#F2994A", elite: "#E5484D", air: "#6FD8FF" };
 class WarViewTransform {
     constructor(team) {
         this.team = team;
@@ -38,29 +38,45 @@ class WarViewTransform {
         return { x: Math.round(u * WarMapData.HALF_W * 2 - WarMapData.HALF_W), y: Math.round(v * WarMapData.HALF_H * 2 - WarMapData.HALF_H) };
     }
 }
+class WarFlight {
+}
+WarFlight.ALTITUDE = 6;
 class WarUnitLooks {
     static of(unitId) {
         return WarUnitLooks.LOOKS[unitId];
     }
     static files() {
-        return Object.keys(WarUnitLooks.LOOKS).map((key) => WarUnitLooks.LOOKS[key].file);
+        const files = [];
+        for (const key of Object.keys(WarUnitLooks.LOOKS)) {
+            files.push(WarUnitLooks.LOOKS[key].file);
+            for (const part of WarUnitLooks.LOOKS[key].parts)
+                files.push(part.file);
+        }
+        return files;
     }
 }
-WarUnitLooks.HUMAN = { shared: false, animated: true, idleClip: "Idle", runClip: "Run", shootsFar: false };
-WarUnitLooks.SKELETON = { shared: true, animated: true, idleClip: "Idle_A", runClip: "Running_A", shootsFar: false };
+WarUnitLooks.BASE = { altitude: 0, turn: 0, parts: [] };
+WarUnitLooks.HUMAN = { ...WarUnitLooks.BASE, shared: false, animated: true, idleClip: "Idle", runClip: "Run", shootsFar: false };
+WarUnitLooks.SKELETON = { ...WarUnitLooks.BASE, shared: true, animated: true, idleClip: "Idle_A", runClip: "Running_A", shootsFar: false };
+WarUnitLooks.SHIP = { ...WarUnitLooks.BASE, shared: false, animated: false, idleClip: "", runClip: "", attackClip: "", shootsFar: true, altitude: WarFlight.ALTITUDE };
 WarUnitLooks.LOOKS = {
     shieldbearer: { ...WarUnitLooks.HUMAN, file: "quaternius/Knight_Male.gltf", height: 3.4, attackClip: "SwordSlash" },
-    charger: { ...WarUnitLooks.HUMAN, file: "quaternius/Soldier_Male.gltf", height: 3.3, attackClip: "Punch" },
     archer: { ...WarUnitLooks.HUMAN, file: "quaternius/BlueSoldier_Female.gltf", height: 3.2, attackClip: "Shoot_OneHanded", shootsFar: true },
-    energymage: { shared: false, animated: true, file: "quaternius/Astronaut_BarbaraTheBee.gltf", height: 3.2, idleClip: "Idle_Gun", runClip: "Run_Gun", attackClip: "Run_Gun_Shoot", shootsFar: true },
-    guardknight: { shared: false, animated: true, file: "quaternius/Mech_FinnTheFrog.gltf", height: 4.5, idleClip: "Idle", runClip: "Run", attackClip: "Kick", shootsFar: false },
-    artillerytruck: { shared: false, animated: false, file: "quaternius/Rover_Round.gltf", height: 4.2, idleClip: "", runClip: "", attackClip: "", shootsFar: true },
-    minion: { ...WarUnitLooks.SKELETON, file: "characters/Skeleton_Minion.glb", height: 2.3, attackClip: "Melee_1H_Attack_Chop" },
+    guardknight: { ...WarUnitLooks.BASE, shared: false, animated: true, file: "quaternius/Mech_FinnTheFrog.gltf", height: 4.5, idleClip: "Idle", runClip: "Run", attackClip: "Kick", shootsFar: false },
+    artillerytruck: { ...WarUnitLooks.BASE, shared: false, animated: false, file: "quaternius/Rover_Round.gltf", height: 4.2, idleClip: "", runClip: "", attackClip: "", shootsFar: true },
+    striker: { ...WarUnitLooks.SHIP, file: "air/Striker.gltf", height: 1.4 },
+    executioner: { ...WarUnitLooks.SHIP, file: "air/Executioner.gltf", height: 1.6 },
+    minion: { ...WarUnitLooks.SKELETON, file: "characters/Skeleton_Minion.glb", height: 2.1, attackClip: "Melee_1H_Attack_Chop" },
+    dropminion: { ...WarUnitLooks.SKELETON, file: "characters/Skeleton_Minion.glb", height: 2.4, attackClip: "Melee_1H_Attack_Chop" },
     skelwarrior: { ...WarUnitLooks.SKELETON, file: "characters/Skeleton_Warrior.glb", height: 2.9, attackClip: "Melee_1H_Attack_Slice_Horizontal" },
     skelarcher: { ...WarUnitLooks.SKELETON, file: "characters/Skeleton_Rogue.glb", height: 2.7, attackClip: "Ranged_Bow_Release", shootsFar: true },
-    skelmage: { ...WarUnitLooks.SKELETON, file: "characters/Skeleton_Mage.glb", height: 2.8, attackClip: "Ranged_Magic_Shoot", shootsFar: true },
     bonegiant: { ...WarUnitLooks.SKELETON, file: "characters/Skeleton_Warrior.glb", height: 5.0, attackClip: "Melee_2H_Attack_Chop" },
-    necromancer: { ...WarUnitLooks.SKELETON, file: "characters/Skeleton_Mage.glb", height: 3.6, attackClip: "Ranged_Magic_Spellcasting", shootsFar: true },
+    stormwitch: { ...WarUnitLooks.HUMAN, file: "quaternius/Witch.gltf", height: 3.8, attackClip: "Shoot_OneHanded", shootsFar: true },
+    coffinship: {
+        ...WarUnitLooks.SHIP, file: "halloween/coffin_decorated.gltf", height: 1.4, shootsFar: false,
+        parts: [{ file: "halloween/ribcage.gltf", x: 0, y: 0.7, z: -0.2, scale: 1.5 }, { file: "halloween/skull_candle.gltf", x: 0, y: 0.5, z: 1.0, scale: 0.9 }],
+    },
+    cursedeye: { ...WarUnitLooks.BASE, shared: false, animated: true, file: "air/Enemy_EyeDrone.gltf", height: 2.0, idleClip: "Idle", runClip: "Idle", attackClip: "Attack", shootsFar: true, altitude: WarFlight.ALTITUDE },
 };
 class WarBuildingLooks {
     static decorOf(type, faction) {
@@ -85,17 +101,21 @@ WarBuildingLooks.MODELS = {
     pioneer: {
         hq: { file: "quaternius/Base_Large.gltf", scale: 0.8 },
         barracks: { file: "quaternius/House_Single.gltf", scale: 0.9 },
-        range: { file: "quaternius/House_Open.gltf", scale: 0.9 },
-        lab: { file: "quaternius/GeodesicDome.gltf", scale: 0.42 },
+        factory: { file: "quaternius/GeodesicDome.gltf", scale: 0.42 },
+        airport: { file: "space/landingpad_large.gltf", scale: 1.7 },
     },
     grave: {
         hq: { file: "halloween/crypt.gltf", scale: 1.35, top: 9.5 },
         barracks: { file: "halloween/coffin_decorated.gltf", scale: 1.2 },
-        range: { file: "halloween/arch_gate.gltf", scale: 0.8 },
-        lab: { file: "halloween/shrine_candles.gltf", scale: 1.7 },
+        factory: { file: "halloween/shrine_candles.gltf", scale: 1.7 },
+        airport: { file: "halloween/arch_gate.gltf", scale: 1.1 },
     },
 };
 WarBuildingLooks.DECOR = {
+    "grave:airport": [
+        { file: "halloween/lantern_standing.gltf", x: -2.6, z: 0.8, scale: 1.6 }, { file: "halloween/lantern_standing.gltf", x: 2.6, z: 0.8, scale: 1.6 },
+        { file: "halloween/skull_candle.gltf", x: -1.6, z: 1.8, scale: 1.4 }, { file: "halloween/skull_candle.gltf", x: 1.6, z: 1.8, scale: 1.4 },
+    ],
     "grave:hq": [
         { file: "halloween/pillar.gltf", x: -4.2, z: -3, scale: 1.8 }, { file: "halloween/pillar.gltf", x: 4.2, z: -3, scale: 1.8 },
         { file: "halloween/pillar.gltf", x: -4.2, z: 3, scale: 1.8 }, { file: "halloween/pillar.gltf", x: 4.2, z: 3, scale: 1.8 },
@@ -224,6 +244,12 @@ class WarUnitView {
         this.group = new THREE.Group();
         const actor = assets.actor(this.look.file, this.look.shared);
         this.model = actor.model;
+        for (const part of this.look.parts) {
+            const piece = assets.grounded(part.file);
+            piece.position.set(part.x, part.y ?? 0, part.z);
+            piece.scale.setScalar(part.scale);
+            this.model.add(piece);
+        }
         this.model.scale.setScalar(this.look.height / assets.heightOf(this.look.file));
         WarShadows.cast(this.model);
         this.group.add(this.model);
@@ -233,7 +259,7 @@ class WarUnitView {
         this.ring.position.y = 0.05;
         this.ring.scale.setScalar(unit.collisionRadius() / 52);
         this.bar = new WarHealthBar(libs, materials, 1.1, 0.14, mine);
-        this.bar.group.position.y = this.look.height * 0.65 + 0.6;
+        this.bar.group.position.y = this.look.height * 0.65 + 0.6 + this.look.altitude;
         this.group.add(this.ring, this.bar.group);
         this.from = { x: start.x, z: start.z };
         this.to = { x: start.x, z: start.z };
@@ -241,6 +267,10 @@ class WarUnitView {
         this.yaw = mine ? Math.PI : 0;
         if (this.animator)
             this.animator.play(this.look.idleClip);
+        this.model.position.y = this.look.altitude;
+    }
+    get altitude() {
+        return this.look.altitude;
     }
     onTick(unit, target, facing, squadColor) {
         this.from.x = this.to.x;
@@ -264,14 +294,17 @@ class WarUnitView {
         const x = this.from.x + (this.to.x - this.from.x) * alpha;
         const z = this.from.z + (this.to.z - this.from.z) * alpha;
         this.group.position.set(x, 0, z);
-        const turn = Math.atan2(Math.sin(this.yaw - this.model.rotation.y), Math.cos(this.yaw - this.model.rotation.y));
+        const aim = this.yaw + this.look.turn;
+        const turn = Math.atan2(Math.sin(aim - this.model.rotation.y), Math.cos(aim - this.model.rotation.y));
         this.model.rotation.y += turn * Math.min(1, deltaSeconds * 14);
         this.bar.group.quaternion.copy(cameraQuaternion);
         this.bobSeconds += deltaSeconds;
         if (!this.animator) {
-            this.model.position.y = this.moving ? Math.abs(Math.sin(this.bobSeconds * 9)) * 0.06 : 0;
+            this.model.position.y = this.look.altitude > 0 ? this.look.altitude + Math.sin(this.bobSeconds * 2 + this.yaw) * 0.25 : this.moving ? Math.abs(Math.sin(this.bobSeconds * 9)) * 0.06 : 0;
             return;
         }
+        if (this.look.altitude > 0)
+            this.model.position.y = this.look.altitude + Math.sin(this.bobSeconds * 2 + this.yaw) * 0.25;
         if (!this.animate)
             return;
         if (this.attackHold > 0) {
@@ -306,7 +339,7 @@ class WarBuildingView {
         this.group.add(this.disc, this.model, this.bar.group);
         for (const decor of WarBuildingLooks.decorOf(building.def.type, faction)) {
             const piece = assets.grounded(decor.file);
-            piece.position.set(decor.x, 0, decor.z);
+            piece.position.set(decor.x, decor.y ?? 0, decor.z);
             piece.scale.setScalar(decor.scale);
             WarShadows.cast(piece);
             this.group.add(piece);
@@ -685,23 +718,24 @@ class WarSlotMarkers {
 }
 class WarEffectStyles {
     static of(unitId) {
-        return WarEffectStyles.STYLES[unitId] ?? WarEffectStyles.DEFAULT;
+        return { ...WarEffectStyles.DEFAULT, ...(WarEffectStyles.STYLES[unitId] ?? {}) };
     }
 }
-WarEffectStyles.DEFAULT = { projectile: false, color: "#FFE9B0", size: 0.12, speed: 20, arc: 0, hit: 0.9 };
+WarEffectStyles.DEFAULT = { projectile: false, color: "#FFE9B0", size: 0.12, speed: 20, arc: 0, hit: 0.9, beam: 0, lightning: false, ring: 0 };
 WarEffectStyles.STYLES = {
-    shieldbearer: { projectile: false, color: "#FFE9B0", size: 0, speed: 0, arc: 0, hit: 0.9 },
-    charger: { projectile: false, color: "#FFB070", size: 0, speed: 0, arc: 0, hit: 1 },
+    shieldbearer: { color: "#FFE9B0", size: 0, hit: 0.9 },
     archer: { projectile: true, color: "#FFF27A", size: 0.11, speed: 30, arc: 0.4, hit: 0.55 },
-    energymage: { projectile: true, color: "#6FE7FF", size: 0.26, speed: 20, arc: 0, hit: 1.5 },
-    guardknight: { projectile: false, color: "#FFD070", size: 0, speed: 0, arc: 0, hit: 1.4 },
-    artillerytruck: { projectile: true, color: "#FF9A3C", size: 0.34, speed: 15, arc: 3.2, hit: 2.8 },
-    minion: { projectile: false, color: "#E8E8D0", size: 0, speed: 0, arc: 0, hit: 0.75 },
-    skelwarrior: { projectile: false, color: "#E8E8D0", size: 0, speed: 0, arc: 0, hit: 0.9 },
+    guardknight: { color: "#FFD070", size: 0, hit: 1.4 },
+    artillerytruck: { projectile: true, color: "#FF9A3C", size: 0.4, speed: 15, arc: 3.2, hit: 3.2, ring: 2.5 },
+    striker: { projectile: true, color: "#FFE066", size: 0.16, speed: 48, arc: 0, hit: 0.9 },
+    executioner: { projectile: true, color: "#FF7A2E", size: 0.5, speed: 38, arc: 0, hit: 2.6, ring: 0 },
+    minion: { color: "#E8E8D0", size: 0, hit: 0.75 },
+    dropminion: { color: "#E8E8D0", size: 0, hit: 0.75 },
+    skelwarrior: { color: "#E8E8D0", size: 0, hit: 0.9 },
     skelarcher: { projectile: true, color: "#C8FFB0", size: 0.11, speed: 30, arc: 0.4, hit: 0.55 },
-    skelmage: { projectile: true, color: "#C77DFF", size: 0.24, speed: 22, arc: 0, hit: 1.1 },
-    bonegiant: { projectile: false, color: "#D8C8A0", size: 0, speed: 0, arc: 0, hit: 2.1 },
-    necromancer: { projectile: true, color: "#A0FF9A", size: 0.22, speed: 22, arc: 0, hit: 1 },
+    bonegiant: { color: "#D8C8A0", size: 0, hit: 2.1, ring: 2.5 },
+    stormwitch: { color: "#C9B8FF", size: 0, hit: 1.6, lightning: true, ring: 3 },
+    cursedeye: { color: "#FF3B6B", size: 0, hit: 1.5, beam: 0.16 },
 };
 class WarEffects {
     constructor(libs, transform, isVisible) {
@@ -710,6 +744,9 @@ class WarEffects {
         this.isVisible = isVisible;
         this.shots = [];
         this.bursts = [];
+        this.rings = [];
+        this.beams = [];
+        this.bolts = [];
         const THREE = libs.THREE;
         this.group = new THREE.Group();
         const shotGeometry = new THREE.SphereGeometry(1, 8, 6);
@@ -718,12 +755,61 @@ class WarEffects {
             const shot = new THREE.Mesh(shotGeometry, new THREE.MeshBasicMaterial({ color: "#FFFFFF" }));
             shot.visible = false;
             this.group.add(shot);
-            this.shots.push({ mesh: shot, active: false, from: { x: 0, z: 0 }, to: { x: 0, z: 0 }, age: 0, duration: 1, arc: 0, style: WarEffectStyles.of("") });
+            this.shots.push({ mesh: shot, active: false, from: { x: 0, z: 0 }, to: { x: 0, z: 0 }, fromY: 1.5, toY: 1.1, age: 0, duration: 1, arc: 0, style: WarEffectStyles.of("") });
             const burst = new THREE.Mesh(burstGeometry, new THREE.MeshBasicMaterial({ color: "#FFFFFF", transparent: true, opacity: 0.9, depthWrite: false }));
             burst.visible = false;
             this.group.add(burst);
             this.bursts.push({ mesh: burst, active: false, age: 0, life: 1, size: 1 });
         }
+        this.buildRings();
+        this.buildBeams();
+        this.buildBolts();
+    }
+    buildRings() {
+        const THREE = this.libs.THREE;
+        const ringGeometry = new THREE.RingGeometry(0.82, 1, 40);
+        const discGeometry = new THREE.CircleGeometry(1, 40);
+        for (let i = 0; i < WarEffects.RING_POOL; i++) {
+            const ring = new THREE.Mesh(ringGeometry, new THREE.MeshBasicMaterial({ color: "#FFFFFF", transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide }));
+            const disc = new THREE.Mesh(discGeometry, new THREE.MeshBasicMaterial({ color: "#FFFFFF", transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide }));
+            for (const mesh of [ring, disc]) {
+                mesh.rotation.x = -Math.PI / 2;
+                mesh.position.y = 0.16;
+                mesh.visible = false;
+                this.group.add(mesh);
+            }
+            this.rings.push({ ring, disc, active: false, age: 0, life: 0.55, radius: 1 });
+        }
+    }
+    buildBeams() {
+        const THREE = this.libs.THREE;
+        const geometry = new THREE.CylinderGeometry(1, 1, 1, 8);
+        geometry.rotateX(Math.PI / 2);
+        for (let i = 0; i < WarEffects.BEAM_POOL; i++) {
+            const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: "#FFFFFF", transparent: true, opacity: 0.95, depthWrite: false }));
+            mesh.visible = false;
+            this.group.add(mesh);
+            this.beams.push({ mesh, active: false, age: 0, life: 0.22 });
+        }
+    }
+    buildBolts() {
+        const THREE = this.libs.THREE;
+        for (let i = 0; i < WarEffects.BOLT_POOL; i++) {
+            const lines = [];
+            for (let k = 0; k < 3; k++) {
+                const geometry = new THREE.BufferGeometry();
+                geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(WarEffects.BOLT_POINTS * 3), 3));
+                const line = new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: "#FFFFFF", transparent: true, opacity: 1 }));
+                line.frustumCulled = false;
+                line.visible = false;
+                this.group.add(line);
+                lines.push(line);
+            }
+            this.bolts.push({ lines, active: false, age: 0, life: 0.3 });
+        }
+    }
+    static heightOf(air, ground) {
+        return air ? WarFlight.ALTITUDE : ground;
     }
     handle(event) {
         if (event.x === undefined || event.y === undefined)
@@ -731,10 +817,15 @@ class WarEffects {
         if (event.kind === "strike" && event.tx !== undefined && event.ty !== undefined) {
             if (!this.isVisible(event.x, event.y) && !this.isVisible(event.tx, event.ty))
                 return;
-            this.strike(WarEffectStyles.of(event.text), this.transform.toScene({ x: event.x, y: event.y }), this.transform.toScene({ x: event.tx, y: event.ty }));
+            this.strike(WarEffectStyles.of(event.text), this.transform.toScene({ x: event.x, y: event.y }), this.transform.toScene({ x: event.tx, y: event.ty }), WarEffects.heightOf(event.air, 1.5), WarEffects.heightOf(event.toAir, 1.1));
+        }
+        else if (event.kind === "splash") {
+            if (this.isVisible(event.x, event.y))
+                this.burst(this.transform.toScene({ x: event.x, y: event.y }), "#FFD27A", 1.4, 0.4, WarEffects.heightOf(event.toAir, 1.1));
         }
         else if (event.kind === "unitDied" && this.isVisible(event.x, event.y)) {
-            this.burst(this.transform.toScene({ x: event.x, y: event.y }), "#B9B2A6", 1.6, 0.5, 0.8);
+            const air = event.air === true;
+            this.burst(this.transform.toScene({ x: event.x, y: event.y }), air ? "#FF9A5A" : "#B9B2A6", air ? 3.2 : 1.6, air ? 0.8 : 0.5, WarEffects.heightOf(air, 0.8));
         }
         else if (event.kind === "buildingDestroyed") {
             const at = this.transform.toScene({ x: event.x, y: event.y });
@@ -743,7 +834,7 @@ class WarEffects {
         }
         else if (event.kind === "revived" || event.kind === "raised") {
             if (this.isVisible(event.x, event.y))
-                this.burst(this.transform.toScene({ x: event.x, y: event.y }), "#9CFF9A", 2.2, 0.7, 0.2);
+                this.burst(this.transform.toScene({ x: event.x, y: event.y }), "#9CFF9A", 2.2, 0.7, WarEffects.heightOf(event.air, 0.2));
         }
     }
     update(deltaSeconds) {
@@ -754,13 +845,15 @@ class WarEffects {
             const t = Math.min(1, shot.age / shot.duration);
             const x = shot.from.x + (shot.to.x - shot.from.x) * t;
             const z = shot.from.z + (shot.to.z - shot.from.z) * t;
-            const y = 1.5 + (1.1 - 1.5) * t + shot.arc * 4 * t * (1 - t);
+            const y = shot.fromY + (shot.toY - shot.fromY) * t + shot.arc * 4 * t * (1 - t);
             shot.mesh.position.set(x, y, z);
-            shot.mesh.lookAt(shot.to.x, 1.1, shot.to.z);
+            shot.mesh.lookAt(shot.to.x, shot.toY, shot.to.z);
             if (t >= 1) {
                 shot.active = false;
                 shot.mesh.visible = false;
-                this.burst(shot.to, shot.style.color, shot.style.hit, WarEffects.BURST_LIFE, 1.1);
+                this.burst(shot.to, shot.style.color, shot.style.hit, WarEffects.BURST_LIFE, shot.toY);
+                if (shot.style.ring > 0)
+                    this.ring(shot.to, shot.style.color, shot.style.ring);
             }
         }
         for (const burst of this.bursts) {
@@ -776,10 +869,73 @@ class WarEffects {
             burst.mesh.scale.setScalar(burst.size * (0.35 + 0.65 * t));
             burst.mesh.material.opacity = 0.85 * (1 - t);
         }
+        this.updateRings(deltaSeconds);
+        this.updateBeams(deltaSeconds);
+        this.updateBolts(deltaSeconds);
     }
-    strike(style, from, to) {
+    updateRings(deltaSeconds) {
+        for (const entry of this.rings) {
+            if (!entry.active)
+                continue;
+            entry.age += deltaSeconds;
+            const t = entry.age / entry.life;
+            if (t >= 1) {
+                entry.active = false;
+                entry.ring.visible = false;
+                entry.disc.visible = false;
+                continue;
+            }
+            const grow = 0.25 + 0.75 * (1 - (1 - t) * (1 - t));
+            entry.ring.scale.setScalar(entry.radius * grow);
+            entry.disc.scale.setScalar(entry.radius * grow);
+            entry.ring.material.opacity = 0.9 * (1 - t);
+            entry.disc.material.opacity = 0.42 * (1 - t);
+        }
+    }
+    updateBeams(deltaSeconds) {
+        for (const beam of this.beams) {
+            if (!beam.active)
+                continue;
+            beam.age += deltaSeconds;
+            const t = beam.age / beam.life;
+            if (t >= 1) {
+                beam.active = false;
+                beam.mesh.visible = false;
+                continue;
+            }
+            beam.mesh.material.opacity = 0.95 * (1 - t);
+        }
+    }
+    updateBolts(deltaSeconds) {
+        for (const bolt of this.bolts) {
+            if (!bolt.active)
+                continue;
+            bolt.age += deltaSeconds;
+            const t = bolt.age / bolt.life;
+            if (t >= 1) {
+                bolt.active = false;
+                bolt.lines.forEach((line) => { line.visible = false; });
+                continue;
+            }
+            bolt.lines.forEach((line) => { line.material.opacity = 1 - t; });
+        }
+    }
+    strike(style, from, to, fromY, toY) {
+        if (style.lightning) {
+            this.lightning(to, toY, style.color);
+            this.ring(to, style.color, style.ring);
+            this.burst(to, style.color, style.hit, WarEffects.BURST_LIFE, toY);
+            return;
+        }
+        if (style.beam > 0) {
+            this.beam(from, fromY, to, toY, style.color, style.beam);
+            this.burst(to, style.color, style.hit, WarEffects.BURST_LIFE, toY);
+            return;
+        }
         if (!style.projectile) {
-            this.burst(to, style.color, style.hit, WarEffects.BURST_LIFE, 1.1);
+            this.burst(to, style.color, style.hit, WarEffects.BURST_LIFE, toY);
+            if (style.ring > 0)
+                this.ring(to, style.color, style.ring);
             return;
         }
         const shot = this.shots.find((candidate) => !candidate.active);
@@ -791,12 +947,62 @@ class WarEffects {
         shot.duration = Math.max(0.08, distance / style.speed);
         shot.from = from;
         shot.to = to;
+        shot.fromY = fromY;
+        shot.toY = toY;
         shot.arc = style.arc;
         shot.style = style;
         shot.mesh.material.color.set(style.color);
         shot.mesh.scale.set(style.size, style.size, style.size * (style.arc > 1 ? 1 : 3.2));
-        shot.mesh.position.set(from.x, 1.5, from.z);
+        shot.mesh.position.set(from.x, fromY, from.z);
         shot.mesh.visible = true;
+    }
+    ring(at, color, radius) {
+        const entry = this.rings.find((candidate) => !candidate.active);
+        if (!entry)
+            return;
+        entry.active = true;
+        entry.age = 0;
+        entry.radius = radius;
+        for (const mesh of [entry.ring, entry.disc]) {
+            mesh.material.color.set(color);
+            mesh.position.set(at.x, 0.16, at.z);
+            mesh.scale.setScalar(radius * 0.25);
+            mesh.visible = true;
+        }
+    }
+    beam(from, fromY, to, toY, color, width) {
+        const beam = this.beams.find((candidate) => !candidate.active);
+        if (!beam)
+            return;
+        const THREE = this.libs.THREE;
+        const start = new THREE.Vector3(from.x, fromY, from.z);
+        const end = new THREE.Vector3(to.x, toY, to.z);
+        beam.active = true;
+        beam.age = 0;
+        beam.mesh.position.copy(start).add(end).multiplyScalar(0.5);
+        beam.mesh.lookAt(end);
+        beam.mesh.scale.set(width, width, start.distanceTo(end));
+        beam.mesh.material.color.set(color);
+        beam.mesh.visible = true;
+    }
+    lightning(at, toY, color) {
+        const bolt = this.bolts.find((candidate) => !candidate.active);
+        if (!bolt)
+            return;
+        bolt.active = true;
+        bolt.age = 0;
+        bolt.lines.forEach((line, k) => {
+            const position = line.geometry.getAttribute("position");
+            const spread = k === 0 ? 0 : 0.18;
+            for (let i = 0; i < WarEffects.BOLT_POINTS; i++) {
+                const t = i / (WarEffects.BOLT_POINTS - 1);
+                const jitter = i === 0 || i === WarEffects.BOLT_POINTS - 1 ? 0 : 0.9;
+                position.setXYZ(i, at.x + (Math.random() - 0.5) * jitter + (k - 1) * spread, WarEffects.SKY + (toY - WarEffects.SKY) * t, at.z + (Math.random() - 0.5) * jitter);
+            }
+            position.needsUpdate = true;
+            line.material.color.set(k === 0 ? "#FFFFFF" : color);
+            line.visible = true;
+        });
     }
     burst(at, color, size, life, height) {
         const burst = this.bursts.find((candidate) => !candidate.active);
@@ -814,6 +1020,11 @@ class WarEffects {
 }
 WarEffects.POOL = 90;
 WarEffects.BURST_LIFE = 0.3;
+WarEffects.RING_POOL = 10;
+WarEffects.BEAM_POOL = 10;
+WarEffects.BOLT_POOL = 8;
+WarEffects.BOLT_POINTS = 9;
+WarEffects.SKY = 18;
 class WarMatchView {
     constructor(libs, assets, world, engine, viewer) {
         this.libs = libs;
@@ -886,7 +1097,8 @@ class WarMatchView {
                 continue;
             const isUnit = entity instanceof WarUnit;
             const scene = this.transform.toScene(entity);
-            vector.set(scene.x, isUnit ? 1 : 1.6, scene.z).project(camera);
+            const flightHeight = isUnit ? (this.units.get(entity.id)?.altitude ?? 0) : 0;
+            vector.set(scene.x, (isUnit ? 1 : 1.6) + flightHeight, scene.z).project(camera);
             const dx = ((vector.x + 1) / 2) * window.innerWidth - clientX;
             const dy = ((1 - vector.y) / 2) * window.innerHeight - clientY;
             const reach = isUnit ? WarMatchView.UNIT_PICK_PIXELS : WarMatchView.BUILDING_PICK_PIXELS * (entity.bodyRadius() / 200 + 0.5);
@@ -1046,8 +1258,8 @@ class WarMenuBackdrop {
         this.root.add(this.crowd.group);
         const engine = new WarEngine({ seed: 1, factions: ["pioneer", "pioneer"] });
         const player = engine.players[0];
-        ["barracks", "range", "lab", "barracks"].forEach((type, i) => {
-            engine.build(0, [1, 3, 5, 7][i], type);
+        ["barracks", "factory", "airport", "barracks"].forEach((type, i) => {
+            engine.build(0, [0, 2, 4, 1][i], type);
         });
         const hq = player.hq;
         const buildings = [hq, ...player.buildings().filter((b) => b !== hq)];
@@ -1057,13 +1269,13 @@ class WarMenuBackdrop {
             view.onTick(building);
             this.root.add(view.group);
         }
-        const roster = ["shieldbearer", "charger", "archer", "energymage", "guardknight", "shieldbearer", "archer"];
+        const roster = ["shieldbearer", "archer", "guardknight", "shieldbearer", "archer", "artillerytruck", "striker"];
         const post = WarMapData.post(0, 1);
         roster.forEach((id, i) => {
             const def = WarUnitCatalog.byId(id);
             const unit = new WarUnit(100 + i, 0, post.x + (i - 3) * 260, post.y - (def.kind === "ranged" ? -300 : 150), def);
             const view = new WarUnitView(this.libs, this.assets, materials, unit, transform.toScene(unit), true);
-            view.onTick(unit, transform.toScene(unit), { x: 0, z: -40 }, WarPalette.SQUAD_COLORS[i % 3]);
+            view.onTick(unit, transform.toScene(unit), { x: 0, z: -40 }, WarPalette.SQUAD_COLORS[i % 4]);
             view.onTick(unit, transform.toScene(unit), { x: 0, z: -40 }, null);
             this.units.push(view);
             this.root.add(view.group);

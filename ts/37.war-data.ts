@@ -1,14 +1,14 @@
 type WarTeam = 0 | 1;
 type WarFactionId = "pioneer" | "grave";
-type WarUnitKind = "melee" | "ranged" | "elite";
+type WarUnitKind = "melee" | "ranged" | "elite" | "air";
 type WarRole = "front" | "mid" | "rear";
-type WarBuildingType = "hq" | "barracks" | "range" | "lab";
+type WarBuildingType = "hq" | "barracks" | "factory" | "airport";
 type WarSlotKind = "normal" | "entrance";
 type WarWorkerKind = "ore" | "crystal";
 
 interface WarPoint { x: number; y: number }
 
-type WarAbilityId = "none" | "raise";
+type WarAbilityId = "none" | "dropMinion";
 
 interface WarUnitDef {
   id: string;
@@ -34,9 +34,16 @@ interface WarUnitDef {
   slowPct: number;
   slowTicks: number;
   ability: WarAbilityId;
+  flying: boolean;
+  hitsAir: boolean;
+  producedAt: WarBuildingType | null;
+  deathSpawnId: string;
+  deathSpawnCount: number;
+  abilityTicks: number;
 }
 
-type WarUnitSpec = Omit<WarUnitDef, "spawnCount" | "reviveChancePct" | "slowPct" | "slowTicks" | "ability"> & Partial<Pick<WarUnitDef, "spawnCount" | "reviveChancePct" | "slowPct" | "slowTicks" | "ability">>;
+type WarUnitOptional = "spawnCount" | "reviveChancePct" | "slowPct" | "slowTicks" | "ability" | "flying" | "hitsAir" | "producedAt" | "deathSpawnId" | "deathSpawnCount" | "abilityTicks";
+type WarUnitSpec = Omit<WarUnitDef, WarUnitOptional> & Partial<Pick<WarUnitDef, WarUnitOptional>>;
 
 interface WarBuildingDef {
   type: WarBuildingType;
@@ -46,7 +53,6 @@ interface WarBuildingDef {
   buildTicks: number;
   hp: number;
   radius: number;
-  producesKind: WarUnitKind | null;
 }
 
 interface WarSlotDef { index: number; kind: WarSlotKind; enabled: boolean; x: number; y: number }
@@ -62,7 +68,8 @@ class WarBalance {
 
   static readonly TICK_MS = 100;
   static readonly POP_CAP = 70;
-  static readonly SQUAD_COUNT = 3;
+  static readonly SQUAD_COUNT = 4;
+  static readonly FLEET_SQUAD = 3;
   static readonly SQUAD_CAP = 20;
   static readonly MATCH_TICKS = 9000;
   static readonly QUEUE_LIMIT = 5;
@@ -84,6 +91,7 @@ class WarBalance {
   static readonly BATCH_MELEE = 10;
   static readonly BATCH_RANGED = 5;
   static readonly BATCH_ELITE = 5;
+  static readonly MINION_CAP = 40;
   static readonly SIGHT_UNIT = 1800;
   static readonly SIGHT_BUILDING = 1700;
   static readonly ACQUIRE_RANGE = 1500;
@@ -114,25 +122,26 @@ class WarBalance {
 
 class WarUnitCatalog {
   private static readonly SPECS: WarUnitSpec[] = [
-    { id: "shieldbearer", name: "방패병", faction: "pioneer", kind: "melee", role: "front", hp: 425, damage: 12, armorPct: 30, speed: 300, range: 150, cooldownTicks: 10, ore: 60, crystal: 0, pop: 1, buildTicks: 40, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0 },
-    { id: "charger", name: "돌격병", faction: "pioneer", kind: "melee", role: "mid", hp: 265, damage: 23, armorPct: 0, speed: 360, range: 150, cooldownTicks: 8, ore: 80, crystal: 0, pop: 1, buildTicks: 40, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 100 },
-    { id: "archer", name: "사수", faction: "pioneer", kind: "ranged", role: "rear", hp: 127, damage: 14, armorPct: 0, speed: 340, range: 700, cooldownTicks: 6, ore: 70, crystal: 0, pop: 1, buildTicks: 50, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0 },
-    { id: "energymage", name: "에너지술사", faction: "pioneer", kind: "ranged", role: "rear", hp: 106, damage: 21, armorPct: 0, speed: 320, range: 650, cooldownTicks: 12, ore: 90, crystal: 10, pop: 1, buildTicks: 50, splashRadius: 200, buildingDamagePct: 100, chargeBonusPct: 0 },
-    { id: "guardknight", name: "근위 기사", faction: "pioneer", kind: "elite", role: "front", hp: 955, damage: 29, armorPct: 40, speed: 260, range: 180, cooldownTicks: 10, ore: 160, crystal: 60, pop: 2, buildTicks: 100, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0 },
-    { id: "artillerytruck", name: "포격 트럭", faction: "pioneer", kind: "elite", role: "rear", hp: 233, damage: 42, armorPct: 0, speed: 280, range: 1100, cooldownTicks: 20, ore: 180, crystal: 80, pop: 2, buildTicks: 100, splashRadius: 250, buildingDamagePct: 200, chargeBonusPct: 0 },
-    { id: "minion", name: "해골 미니언", faction: "grave", kind: "melee", role: "mid", hp: 115, damage: 10, armorPct: 0, speed: 380, range: 150, cooldownTicks: 8, ore: 22, crystal: 0, pop: 1, buildTicks: 30, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, spawnCount: 2 },
-    { id: "skelwarrior", name: "해골 전사", faction: "grave", kind: "melee", role: "front", hp: 360, damage: 15, armorPct: 22, speed: 300, range: 150, cooldownTicks: 10, ore: 40, crystal: 0, pop: 1, buildTicks: 40, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, reviveChancePct: 30 },
-    { id: "skelarcher", name: "해골 궁수", faction: "grave", kind: "ranged", role: "rear", hp: 115, damage: 14, armorPct: 0, speed: 340, range: 750, cooldownTicks: 6, ore: 47, crystal: 0, pop: 1, buildTicks: 50, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0 },
-    { id: "skelmage", name: "해골 마법사", faction: "grave", kind: "ranged", role: "rear", hp: 105, damage: 17, armorPct: 0, speed: 320, range: 650, cooldownTicks: 12, ore: 61, crystal: 10, pop: 1, buildTicks: 50, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, slowPct: 30, slowTicks: 30 },
-    { id: "bonegiant", name: "뼈 거인", faction: "grave", kind: "elite", role: "front", hp: 1300, damage: 40, armorPct: 25, speed: 240, range: 220, cooldownTicks: 12, ore: 122, crystal: 70, pop: 2, buildTicks: 100, splashRadius: 250, buildingDamagePct: 100, chargeBonusPct: 0 },
-    { id: "necromancer", name: "사령술사", faction: "grave", kind: "elite", role: "rear", hp: 190, damage: 20, armorPct: 0, speed: 300, range: 700, cooldownTicks: 12, ore: 108, crystal: 90, pop: 2, buildTicks: 100, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, ability: "raise" },
+    { id: "shieldbearer", name: "방패병", faction: "pioneer", kind: "melee", role: "front", hp: 425, damage: 12, armorPct: 30, speed: 300, range: 150, cooldownTicks: 10, ore: 60, crystal: 0, pop: 1, buildTicks: 40, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, producedAt: "barracks", hitsAir: false },
+    { id: "archer", name: "사수", faction: "pioneer", kind: "ranged", role: "rear", hp: 127, damage: 14, armorPct: 0, speed: 340, range: 700, cooldownTicks: 6, ore: 70, crystal: 0, pop: 1, buildTicks: 50, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, producedAt: "barracks" },
+    { id: "guardknight", name: "근위 기사", faction: "pioneer", kind: "elite", role: "front", hp: 955, damage: 29, armorPct: 40, speed: 260, range: 180, cooldownTicks: 10, ore: 160, crystal: 60, pop: 2, buildTicks: 100, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, producedAt: "factory", hitsAir: false },
+    { id: "artillerytruck", name: "포격 트럭", faction: "pioneer", kind: "elite", role: "rear", hp: 233, damage: 42, armorPct: 0, speed: 280, range: 1100, cooldownTicks: 20, ore: 180, crystal: 80, pop: 2, buildTicks: 100, splashRadius: 250, buildingDamagePct: 200, chargeBonusPct: 0, producedAt: "factory", hitsAir: false },
+    { id: "striker", name: "스트라이커", faction: "pioneer", kind: "air", role: "mid", hp: 300, damage: 28, armorPct: 0, speed: 520, range: 800, cooldownTicks: 6, ore: 150, crystal: 40, pop: 2, buildTicks: 80, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, producedAt: "airport", flying: true },
+    { id: "executioner", name: "집행자", faction: "pioneer", kind: "air", role: "rear", hp: 900, damage: 180, armorPct: 10, speed: 220, range: 1000, cooldownTicks: 30, ore: 220, crystal: 100, pop: 3, buildTicks: 130, splashRadius: 0, buildingDamagePct: 150, chargeBonusPct: 0, producedAt: "airport", flying: true },
+    { id: "skelwarrior", name: "해골 전사", faction: "grave", kind: "melee", role: "front", hp: 360, damage: 15, armorPct: 22, speed: 300, range: 150, cooldownTicks: 10, ore: 40, crystal: 0, pop: 1, buildTicks: 40, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, producedAt: "barracks", hitsAir: false, deathSpawnId: "minion", deathSpawnCount: 2 },
+    { id: "skelarcher", name: "해골 궁수", faction: "grave", kind: "ranged", role: "rear", hp: 115, damage: 14, armorPct: 0, speed: 340, range: 750, cooldownTicks: 6, ore: 47, crystal: 0, pop: 1, buildTicks: 50, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, producedAt: "barracks" },
+    { id: "bonegiant", name: "뼈 거인", faction: "grave", kind: "elite", role: "front", hp: 1300, damage: 40, armorPct: 25, speed: 240, range: 220, cooldownTicks: 12, ore: 122, crystal: 70, pop: 2, buildTicks: 100, splashRadius: 250, buildingDamagePct: 100, chargeBonusPct: 0, producedAt: "factory", hitsAir: false },
+    { id: "stormwitch", name: "번개 마녀", faction: "grave", kind: "elite", role: "rear", hp: 190, damage: 34, armorPct: 0, speed: 300, range: 900, cooldownTicks: 16, ore: 108, crystal: 90, pop: 2, buildTicks: 100, splashRadius: 300, buildingDamagePct: 100, chargeBonusPct: 0, producedAt: "factory" },
+    { id: "coffinship", name: "관 배", faction: "grave", kind: "air", role: "mid", hp: 1400, damage: 0, armorPct: 10, speed: 240, range: 0, cooldownTicks: 10, ore: 160, crystal: 40, pop: 2, buildTicks: 100, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, producedAt: "airport", flying: true, hitsAir: false, ability: "dropMinion", abilityTicks: 80, deathSpawnId: "dropminion", deathSpawnCount: 6 },
+    { id: "cursedeye", name: "저주의 눈", faction: "grave", kind: "air", role: "rear", hp: 450, damage: 90, armorPct: 0, speed: 300, range: 1000, cooldownTicks: 20, ore: 200, crystal: 90, pop: 3, buildTicks: 120, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, producedAt: "airport", flying: true },
+    { id: "minion", name: "해골 미니언", faction: "grave", kind: "melee", role: "mid", hp: 12, damage: 10, armorPct: 0, speed: 380, range: 150, cooldownTicks: 8, ore: 0, crystal: 0, pop: 0, buildTicks: 30, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, hitsAir: false },
+    { id: "dropminion", name: "해골 미니언", faction: "grave", kind: "melee", role: "mid", hp: 360, damage: 10, armorPct: 0, speed: 380, range: 150, cooldownTicks: 8, ore: 0, crystal: 0, pop: 0, buildTicks: 30, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, hitsAir: false },
   ];
-
-  private static readonly DEFS: WarUnitDef[] = WarUnitCatalog.SPECS.map((spec) => ({ spawnCount: 1, reviveChancePct: 0, slowPct: 0, slowTicks: 0, ability: "none" as WarAbilityId, ...spec }));
+  private static readonly DEFS: WarUnitDef[] = WarUnitCatalog.SPECS.map((spec) => ({ spawnCount: 1, reviveChancePct: 0, slowPct: 0, slowTicks: 0, ability: "none" as WarAbilityId, flying: false, hitsAir: true, producedAt: null, deathSpawnId: "", deathSpawnCount: 0, abilityTicks: 0, ...spec }));
 
   private static readonly COLLISION_RADIUS: Record<string, number> = {
-    shieldbearer: 62, charger: 58, archer: 55, energymage: 58, guardknight: 85, artillerytruck: 105,
-    minion: 48, skelwarrior: 62, skelarcher: 55, skelmage: 55, bonegiant: 110, necromancer: 70,
+    shieldbearer: 62, archer: 55, guardknight: 85, artillerytruck: 105, striker: 110, executioner: 215,
+    minion: 40, dropminion: 48, skelwarrior: 62, skelarcher: 55, bonegiant: 110, stormwitch: 62, coffinship: 125, cursedeye: 85,
   };
 
   static collisionRadius(id: string): number {
@@ -149,26 +158,25 @@ class WarUnitCatalog {
     return WarUnitCatalog.DEFS.filter((def) => def.faction === faction);
   }
 
-  static producedBy(faction: WarFactionId, kind: WarUnitKind): WarUnitDef[] {
-    return WarUnitCatalog.ofFaction(faction).filter((def) => def.kind === kind);
+  static producedBy(faction: WarFactionId, building: WarBuildingType): WarUnitDef[] {
+    return WarUnitCatalog.ofFaction(faction).filter((def) => def.producedAt === building);
   }
 }
 
 class WarBuildingCatalog {
   private static readonly DEFS: WarBuildingDef[] = [
-    { type: "hq", name: "사령부", ore: 0, crystal: 0, buildTicks: 0, hp: 5000, radius: 320, producesKind: null },
-    { type: "barracks", name: "병영", ore: 100, crystal: 0, buildTicks: 80, hp: 800, radius: 160, producesKind: "melee" },
-    { type: "range", name: "사격장", ore: 100, crystal: 0, buildTicks: 80, hp: 700, radius: 160, producesKind: "ranged" },
-    { type: "lab", name: "연구소", ore: 150, crystal: 50, buildTicks: 120, hp: 900, radius: 170, producesKind: "elite" },
+    { type: "hq", name: "사령부", ore: 0, crystal: 0, buildTicks: 0, hp: 5000, radius: 320 },
+    { type: "barracks", name: "병영", ore: 100, crystal: 0, buildTicks: 80, hp: 800, radius: 160 },
+    { type: "factory", name: "공장", ore: 150, crystal: 50, buildTicks: 120, hp: 900, radius: 170 },
+    { type: "airport", name: "공항", ore: 150, crystal: 50, buildTicks: 120, hp: 900, radius: 200 },
   ];
-
   static byType(type: WarBuildingType): WarBuildingDef {
     const found = WarBuildingCatalog.DEFS.find((def) => def.type === type);
     if (!found) throw new Error("unknown building " + type);
     return found;
   }
 
-  private static readonly GRAVE_NAMES: Record<WarBuildingType, string> = { hq: "어둠의 성소", barracks: "납골당", range: "관 보관소", lab: "저주 제단" };
+  private static readonly GRAVE_NAMES: Record<WarBuildingType, string> = { hq: "어둠의 성소", barracks: "납골당", factory: "뼈 공방", airport: "관 선착장" };
 
   static displayName(type: WarBuildingType, faction: WarFactionId): string {
     return faction === "grave" ? WarBuildingCatalog.GRAVE_NAMES[type] : WarBuildingCatalog.byType(type).name;
@@ -182,29 +190,28 @@ class WarBuildingCatalog {
 
 class WarBlurbs {
   private static readonly UNITS: Record<string, string> = {
-    shieldbearer: "큰 방패로 앞에서 버티는 튼튼한 병사",
-    charger: "빠르게 달려가 첫 공격이 두 배로 아픈 병사",
-    archer: "멀리서 화살을 쏘는 기본 원거리 병사",
-    energymage: "빛 구슬로 주변 여럿을 한꺼번에 맞히는 술사",
-    guardknight: "느리지만 가장 단단한 최전선 기사",
-    artillerytruck: "멀리서 포탄을 쏘며 건물을 크게 부수는 트럭",
-    minion: "한 번에 둘이 나오는 값싼 해골 졸병",
-    skelwarrior: "단단하고, 쓰러지면 가끔 다시 일어나는 전사",
-    skelarcher: "멀리서 화살을 쏘는 해골 궁수",
-    skelmage: "맞은 적의 움직임을 느리게 하는 마법사",
-    bonegiant: "주변을 함께 내려치는 거대한 해골",
-    necromancer: "쓰러진 해골을 되살려 일으키는 사령술사",
+    shieldbearer: "큰 방패로 앞에서 버티는 병사. 공중은 공격 못 해요",
+    archer: "멀리서 화살을 쏘는 병사. 공중도 쏠 수 있어요",
+    guardknight: "느리지만 가장 단단한 기사. 공중은 공격 못 해요",
+    artillerytruck: "멀리서 포탄을 쏴 범위 안 적을 모두 다치게 해요. 공중은 못 맞혀요",
+    striker: "빠른 전투 비행선. 공중과 지상 모두 사수 둘 몫으로 쏴요",
+    executioner: "느리지만 한 방이 아주 센 대형 비행선. 공중·지상 모두 공격해요",
+    skelwarrior: "단단한 해골 전사. 쓰러지면 작은 미니언 둘로 흩어져요",
+    skelarcher: "멀리서 화살을 쏘는 해골 궁수. 공중도 쏠 수 있어요",
+    bonegiant: "주변을 함께 내려치는 거대한 해골. 공중은 공격 못 해요",
+    stormwitch: "번개를 내려 범위 안 적을 모두 감전시키는 마녀. 공중도 맞혀요",
+    coffinship: "튼튼한 비행 관. 공격은 못 하지만 해골 미니언을 떨어뜨리고, 부서지면 여섯 마리가 쏟아져요",
+    cursedeye: "레이저로 한 대상을 강하게 쏘는 눈. 공중·지상 모두 공격해요",
     worker_ore: "광석을 캐요. 많을수록 느리게 늘어요 (최대 10)",
     worker_crystal: "결정을 캐요. 고급 병력에 필요해요 (최대 6)",
   };
 
   private static readonly BUILDINGS: Record<WarBuildingType, string> = {
     hq: "일꾼을 만드는 중심 건물",
-    barracks: "방패로 버티거나 달려드는 근접 병력을 만들어요",
-    range: "뒤에서 멀리 쏘는 원거리 병력을 만들어요",
-    lab: "강력한 고급 병력을 만들어요. 결정이 필요해요",
+    barracks: "기본 근접·원거리 병력을 만들어요",
+    factory: "단단한 고급 근접과 강력한 고급 원거리를 만들어요",
+    airport: "하늘을 나는 비행 병력을 만들어요. 결정이 필요해요",
   };
-
   static unit(id: string): string {
     return WarBlurbs.UNITS[id] ?? "";
   }
@@ -223,7 +230,7 @@ class WarMapData {
   static readonly LANE_HALF_WIDTH = 650;
   static readonly PLAZA_RADIUS = 2600;
   static readonly BASE_RADIUS = 2600;
-  static readonly POST_SPREAD = 1800;
+  static readonly POST_SPREAD = 1300;
   static readonly POST_BACKOFF = -400;
   static readonly SLOT_OFFSETS: WarPoint[] = [
     { x: -1250, y: -350 }, { x: -800, y: -1000 }, { x: 0, y: -1300 }, { x: 800, y: -1000 }, { x: 1250, y: -350 },
@@ -272,7 +279,7 @@ class WarMapData {
   static post(team: WarTeam, squad: number): WarPoint {
     const gate = WarMapData.entrance(team);
     const sign = WarMapData.sign(team);
-    const lateral = (squad - 1) * WarMapData.POST_SPREAD;
+    const lateral = Math.trunc((squad - 1.5) * WarMapData.POST_SPREAD);
     return { x: gate.x + lateral, y: gate.y + WarMapData.POST_BACKOFF * sign };
   }
 

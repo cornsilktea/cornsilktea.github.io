@@ -11,7 +11,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
 <meta property="og:title" content="우주전쟁">
-<meta property="og:description" content="인구 60 안에서 일꾼과 병력을 고르고 부대를 보내 상대 사령부를 부수는 전략 게임">
+<meta property="og:description" content="인구 70 안에서 일꾼과 병력을 고르고 부대를 보내 상대 사령부를 부수는 전략 게임">
 <meta property="og:url" content="https://cornsilktea.github.io/37.space-war.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
@@ -115,6 +115,7 @@
     <div class="squadRow" id="squadRow0"><span class="name">부대 1</span><div class="gauge"></div></div>
     <div class="squadRow" id="squadRow1"><span class="name">부대 2</span><div class="gauge"></div></div>
     <div class="squadRow" id="squadRow2"><span class="name">부대 3</span><div class="gauge"></div></div>
+    <div class="squadRow" id="squadRow3"><span class="name">비행단</span><div class="gauge"></div></div>
   </div>
 
   <div id="bottomBar">
@@ -134,6 +135,7 @@
     <button type="button" id="sqBtn0">부대 1</button>
     <button type="button" id="sqBtn1">부대 2</button>
     <button type="button" id="sqBtn2">부대 3</button>
+    <button type="button" id="sqBtn3">비행단</button>
     <button type="button" id="btnRecall">귀환</button>
     <button type="button" id="btnCloseMap">닫기</button>
   </div>
@@ -168,22 +170,22 @@
       <h2>조작 방법</h2>
       <div class="st-keys">
         <span><kbd>화면 끌기</kbd></span><span>지도를 옮겨요 (<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · 방향키도 돼요)</span>
-        <span><kbd>빈 터</kbd></span><span>눌러서 지을 건물 고르기 (병영·사격장·연구소)</span>
+        <span><kbd>빈 터</kbd></span><span>눌러서 지을 건물 고르기 (병영·공장·공항)</span>
         <span><kbd>건물</kbd></span><span>눌러서 병력 만들기 · 사령부는 일꾼 만들기</span>
-        <span><kbd>공격</kbd></span><span>부대를 고르고 지도에 길을 그리면 출발해요 (<kbd>Space</kbd>)</span>
-        <span><kbd>미니맵</kbd></span><span>눌러서 그 자리로 이동</span>
+        <span><kbd>부대·병력</kbd></span><span>위쪽 부대를 누르거나 병력을 고른 뒤 화면을 누르면 그곳으로 이동해요</span>
+        <span><kbd>미니맵</kbd></span><span>눌러서 공격 지도를 열고 길을 그려 출발해요 (<kbd>Space</kbd>)</span>
       </div>
     </div>
     <div class="st-card">
       <h2>규칙</h2>
       <ul class="st-rules">
-        <li><b>개척단</b>은 방패병·돌격병·사수·에너지술사·근위 기사·포격 트럭의 소수 정예, <b>무덤 군단</b>은 싸고 많이 뽑는 해골 병력이에요. 해골 전사는 쓰러져도 한 번 일어나려 하고, 해골 미니언은 두 마리씩 나와요. 해골 마법사의 저주는 적을 느리게 하고, 사령술사는 쓰러진 해골을 미니언으로 되살려요.</li>
-        <li>일꾼과 병력을 합쳐 <b>인구 60</b>까지 만들 수 있어요. 일꾼이 많을수록 자원이 늘지만 증가폭은 점점 줄어들고, 그만큼 병력 자리는 줄어요.</li>
-        <li>일꾼은 <b>광석</b>과 <b>결정</b>을 알아서 캐 와요. 결정은 고급 유닛과 연구소에 써요.</li>
-        <li>사령부 둘레의 빈 터 9곳에 건물을 지어요. 같은 건물을 여러 개 지어도 되고, 건물 하나가 생산 줄 하나예요.</li>
-        <li>병력은 알아서 <b>부대 1·2·3</b>으로 나뉘어 입구에서 지켜요. 근접은 10명, 원거리와 고급은 5명씩 부대를 돌아가며 채워요. 부대는 최대 20명이에요.</li>
-        <li><b>공격</b> 버튼으로 지도를 열고 부대를 골라 길을 그리면 그 길로 가면서 적을 공격해요. <b>귀환</b>을 누르면 입구로 돌아와요.</li>
-        <li>유닛 주변만 보여요. 세 갈래 길 한가운데는 양쪽이 항상 볼 수 있어요.</li>
+        <li><b>개척단</b>은 방패병·사수와 근위 기사·포격 트럭, 비행선 스트라이커·집행자를 쓰는 소수 정예, <b>무덤 군단</b>은 싸고 많이 뽑는 해골 병력과 관 배·저주의 눈이에요. 해골 전사는 쓰러지면 작은 미니언 둘로 흩어지고, 번개 마녀는 번개로 범위 안 적을 모두 감전시켜요.</li>
+        <li>일꾼과 병력을 합쳐 <b>인구 70</b>까지 만들 수 있어요. 광석 일꾼은 10명, 결정 일꾼은 6명까지예요. 일꾼이 많을수록 자원이 늘지만 증가폭은 점점 줄어요.</li>
+        <li>일꾼은 <b>광석</b>과 <b>결정</b>을 알아서 캐 와요. 결정은 고급 유닛과 공장·공항에 써요.</li>
+        <li>사령부 앞쪽 빈 터 5곳에 건물을 지어요. <b>병영·공장·공항</b>은 종류마다 2개까지예요.</li>
+        <li>병력은 알아서 <b>부대 1·2·3</b>으로 나뉘어 입구에서 지켜요. 번호가 낮은 부대부터 근접 10명, 원거리와 고급 5명씩 채워요. 비행선은 따로 <b>비행단</b>으로 모여요. 한 부대는 최대 20명이에요.</li>
+        <li>근접 병력(방패병·근위 기사·해골 전사·뼈 거인)과 포격 트럭은 공중을 공격하지 못해요. 사수·해골 궁수·번개 마녀와 비행선은 공중도 공격해요.</li>
+        <li><b>미니맵</b>을 눌러 공격 지도를 열고 부대를 골라 길을 그리면 그 길로 가면서 적을 공격해요. <b>귀환</b>을 누르면 입구로 돌아와요. 비행단은 길과 상관없이 곧장 날아가요.</li>        <li>유닛 주변만 보여요. 세 갈래 길 한가운데는 양쪽이 항상 볼 수 있어요.</li>
         <li>상대 <b>사령부를 부수면 승리</b>예요. 15분이 지나면 사령부 체력이 더 많은 쪽이 이겨요.</li>
       </ul>
     </div>
