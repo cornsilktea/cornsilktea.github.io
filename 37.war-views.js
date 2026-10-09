@@ -49,18 +49,18 @@ class WarUnitLooks {
 WarUnitLooks.HUMAN = { shared: false, animated: true, idleClip: "Idle", runClip: "Run", shootsFar: false };
 WarUnitLooks.SKELETON = { shared: true, animated: true, idleClip: "Idle_A", runClip: "Running_A", shootsFar: false };
 WarUnitLooks.LOOKS = {
-    shieldbearer: { ...WarUnitLooks.HUMAN, file: "quaternius/Knight_Male.gltf", scale: 1, attackClip: "SwordSlash" },
-    charger: { ...WarUnitLooks.HUMAN, file: "quaternius/Soldier_Male.gltf", scale: 1, attackClip: "Punch" },
-    archer: { ...WarUnitLooks.HUMAN, file: "quaternius/BlueSoldier_Female.gltf", scale: 1, attackClip: "Shoot_OneHanded", shootsFar: true },
-    energymage: { shared: false, animated: true, file: "quaternius/Astronaut_BarbaraTheBee.gltf", scale: 0.5, idleClip: "Idle_Gun", runClip: "Run_Gun", attackClip: "Run_Gun_Shoot", shootsFar: true },
-    guardknight: { shared: false, animated: true, file: "quaternius/Mech_FinnTheFrog.gltf", scale: 0.8, idleClip: "Idle", runClip: "Run", attackClip: "Kick", shootsFar: false },
-    artillerytruck: { shared: false, animated: false, file: "quaternius/Rover_Round.gltf", scale: 1.65, idleClip: "", runClip: "", attackClip: "", shootsFar: true },
-    minion: { ...WarUnitLooks.SKELETON, file: "characters/Skeleton_Minion.glb", scale: 0.7, attackClip: "Melee_1H_Attack_Chop" },
-    skelwarrior: { ...WarUnitLooks.SKELETON, file: "characters/Skeleton_Warrior.glb", scale: 0.85, attackClip: "Melee_1H_Attack_Slice_Horizontal" },
-    skelarcher: { ...WarUnitLooks.SKELETON, file: "characters/Skeleton_Rogue.glb", scale: 0.8, attackClip: "Ranged_Bow_Release", shootsFar: true },
-    skelmage: { ...WarUnitLooks.SKELETON, file: "characters/Skeleton_Mage.glb", scale: 0.8, attackClip: "Ranged_Magic_Shoot", shootsFar: true },
-    bonegiant: { ...WarUnitLooks.SKELETON, file: "characters/Skeleton_Warrior.glb", scale: 1.7, attackClip: "Melee_2H_Attack_Chop" },
-    necromancer: { ...WarUnitLooks.SKELETON, file: "characters/Skeleton_Mage.glb", scale: 1.15, attackClip: "Ranged_Magic_Spellcasting", shootsFar: true },
+    shieldbearer: { ...WarUnitLooks.HUMAN, file: "quaternius/Knight_Male.gltf", height: 3.4, attackClip: "SwordSlash" },
+    charger: { ...WarUnitLooks.HUMAN, file: "quaternius/Soldier_Male.gltf", height: 3.3, attackClip: "Punch" },
+    archer: { ...WarUnitLooks.HUMAN, file: "quaternius/BlueSoldier_Female.gltf", height: 3.2, attackClip: "Shoot_OneHanded", shootsFar: true },
+    energymage: { shared: false, animated: true, file: "quaternius/Astronaut_BarbaraTheBee.gltf", height: 3.2, idleClip: "Idle_Gun", runClip: "Run_Gun", attackClip: "Run_Gun_Shoot", shootsFar: true },
+    guardknight: { shared: false, animated: true, file: "quaternius/Mech_FinnTheFrog.gltf", height: 4.5, idleClip: "Idle", runClip: "Run", attackClip: "Kick", shootsFar: false },
+    artillerytruck: { shared: false, animated: false, file: "quaternius/Rover_Round.gltf", height: 4.2, idleClip: "", runClip: "", attackClip: "", shootsFar: true },
+    minion: { ...WarUnitLooks.SKELETON, file: "characters/Skeleton_Minion.glb", height: 2.3, attackClip: "Melee_1H_Attack_Chop" },
+    skelwarrior: { ...WarUnitLooks.SKELETON, file: "characters/Skeleton_Warrior.glb", height: 2.9, attackClip: "Melee_1H_Attack_Slice_Horizontal" },
+    skelarcher: { ...WarUnitLooks.SKELETON, file: "characters/Skeleton_Rogue.glb", height: 2.7, attackClip: "Ranged_Bow_Release", shootsFar: true },
+    skelmage: { ...WarUnitLooks.SKELETON, file: "characters/Skeleton_Mage.glb", height: 2.8, attackClip: "Ranged_Magic_Shoot", shootsFar: true },
+    bonegiant: { ...WarUnitLooks.SKELETON, file: "characters/Skeleton_Warrior.glb", height: 5.0, attackClip: "Melee_2H_Attack_Chop" },
+    necromancer: { ...WarUnitLooks.SKELETON, file: "characters/Skeleton_Mage.glb", height: 3.6, attackClip: "Ranged_Magic_Spellcasting", shootsFar: true },
 };
 class WarBuildingLooks {
     static of(type, faction) {
@@ -94,6 +94,7 @@ class WarAssetLibrary {
         this.libs = libs;
         this.assets = new Map();
         this.rigClips = new Map();
+        this.heights = new Map();
         this.loading = null;
     }
     load() {
@@ -107,6 +108,27 @@ class WarAssetLibrary {
     }
     model(file) {
         return this.assetOf(file).scene.clone(true);
+    }
+    grounded(file) {
+        const THREE = this.libs.THREE;
+        const model = this.model(file);
+        model.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(model);
+        model.position.set(-(box.min.x + box.max.x) / 2, -box.min.y, -(box.min.z + box.max.z) / 2);
+        const holder = new THREE.Group();
+        holder.add(model);
+        return holder;
+    }
+    heightOf(file) {
+        const cached = this.heights.get(file);
+        if (cached !== undefined)
+            return cached;
+        const THREE = this.libs.THREE;
+        const template = this.template(file);
+        template.updateMatrixWorld(true);
+        const height = Math.max(0.01, new THREE.Box3().setFromObject(template).getSize(new THREE.Vector3()).y);
+        this.heights.set(file, height);
+        return height;
     }
     template(file) {
         return this.assetOf(file).scene;
@@ -187,15 +209,16 @@ class WarUnitView {
         this.group = new THREE.Group();
         const actor = assets.actor(this.look.file, this.look.shared);
         this.model = actor.model;
-        this.model.scale.setScalar(this.look.scale);
+        this.model.scale.setScalar(this.look.height / assets.heightOf(this.look.file));
+        WarShadows.cast(this.model);
         this.group.add(this.model);
         this.animator = this.look.animated ? new CharacterAnimator(libs, this.model, actor.clips) : null;
         this.ring = new THREE.Mesh(materials.ringGeometry, materials.ring(mine ? WarPalette.SQUAD_COLORS[Math.max(0, unit.squadIndex)] : WarPalette.ENEMY));
         this.ring.rotation.x = -Math.PI / 2;
         this.ring.position.y = 0.05;
-        this.ring.scale.setScalar(this.look.scale > 1 ? 1.5 : 1);
+        this.ring.scale.setScalar(unit.collisionRadius() / 52);
         this.bar = new WarHealthBar(libs, materials, 1.1, 0.14, mine);
-        this.bar.group.position.y = 2.7 * Math.max(1, this.look.scale * 0.8);
+        this.bar.group.position.y = this.look.height * 0.65 + 0.6;
         this.group.add(this.ring, this.bar.group);
         this.from = { x: start.x, z: start.z };
         this.to = { x: start.x, z: start.z };
@@ -258,6 +281,7 @@ class WarBuildingView {
         this.group = new THREE.Group();
         this.model = assets.model(look.file);
         this.model.scale.setScalar(look.scale);
+        WarShadows.cast(this.model);
         this.disc = new THREE.Mesh(new THREE.CircleGeometry((building.def.radius / 100) * 1.05, 28), materials.ring(mine ? "#2E8F6B" : "#A02A30"));
         this.disc.rotation.x = -Math.PI / 2;
         this.disc.position.y = 0.03;
@@ -296,6 +320,7 @@ class WarGroundView {
         const widthM = (WarMapData.HALF_W * 2) / 100, heightM = (WarMapData.HALF_H * 2) / 100;
         const plane = new THREE.Mesh(new THREE.PlaneGeometry(widthM, heightM), new THREE.MeshLambertMaterial({ map: texture }));
         plane.rotation.x = -Math.PI / 2;
+        plane.receiveShadow = true;
         const holder = new THREE.Group();
         holder.rotation.y = transform.team === 1 ? Math.PI : 0;
         holder.add(plane);
@@ -305,6 +330,18 @@ class WarGroundView {
         this.group.add(scenery.core, scenery.detail);
         this.placeResources(assets);
     }
+    glow(holder) {
+        holder.traverse((node) => {
+            const mesh = node;
+            if (!mesh.isMesh)
+                return;
+            const material = mesh.material.clone();
+            material.color.set("#8FEFFF");
+            material.emissive.set("#1E9ACB");
+            material.emissiveIntensity = 0.9;
+            mesh.material = material;
+        });
+    }
     placeResources(assets) {
         for (const team of [0, 1]) {
             for (const point of WarMapData.orePoints(team)) {
@@ -313,13 +350,16 @@ class WarGroundView {
                 node.position.set(scene.x, 0, scene.z);
                 node.scale.setScalar(5.2);
                 node.rotation.y = point.x * 0.01;
+                WarShadows.cast(node);
                 this.group.add(node);
             }
             for (const point of WarMapData.crystalPoints(team)) {
-                const crystal = assets.model("scenery/rock_crystalsLargeA.glb");
+                const crystal = assets.grounded("scenery/rock_crystalsLargeA.glb");
                 const scene = this.transform.toScene(point);
                 crystal.position.set(scene.x, 0, scene.z);
-                crystal.scale.setScalar(4.2);
+                crystal.scale.setScalar(4.6);
+                this.glow(crystal);
+                WarShadows.cast(crystal);
                 crystal.rotation.y = point.y * 0.013;
                 this.group.add(crystal);
             }
@@ -460,9 +500,19 @@ WarCameraRig.DISTANCE = 24;
 WarCameraRig.HEIGHT = 30;
 WarCameraRig.LIMIT_X = 58;
 WarCameraRig.LIMIT_Z = 92;
+class WarShadows {
+    static cast(object) {
+        object.traverse((node) => {
+            const mesh = node;
+            if (mesh.isMesh)
+                mesh.castShadow = true;
+        });
+    }
+}
 class WarWorldView {
     constructor(libs, canvas, touchDevice) {
         this.libs = libs;
+        this.shadowsOn = true;
         this.playing = false;
         this.detailGroups = [];
         this.detailHidden = false;
@@ -477,14 +527,27 @@ class WarWorldView {
         this.scene.background = new THREE.Color("#150E1F");
         this.scene.fog = new THREE.Fog(0x150E1F, 85, 230);
         this.scene.add(new THREE.HemisphereLight(0xFFE9D2, 0x4A3A66, 1.75));
-        const sun = new THREE.DirectionalLight(0xFFD9A8, 1.45);
-        sun.position.set(-20, 40, 15);
-        this.scene.add(sun);
+        this.sun = new THREE.DirectionalLight(0xFFD9A8, 1.45);
+        this.sun.position.set(WarWorldView.SUN_OFFSET.x, WarWorldView.SUN_OFFSET.y, WarWorldView.SUN_OFFSET.z);
+        this.sun.castShadow = true;
+        const half = WarWorldView.SHADOW_HALF_SIZE;
+        this.sun.shadow.mapSize.set(touchDevice ? 1024 : 2048, touchDevice ? 1024 : 2048);
+        this.sun.shadow.camera.left = -half;
+        this.sun.shadow.camera.right = half;
+        this.sun.shadow.camera.top = half;
+        this.sun.shadow.camera.bottom = -half;
+        this.sun.shadow.camera.near = 5;
+        this.sun.shadow.camera.far = 140;
+        this.sun.shadow.bias = -0.0004;
+        this.sun.shadow.normalBias = 0.04;
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        this.scene.add(this.sun, this.sun.target);
         this.rig = new WarCameraRig(libs);
         this.raycaster = new THREE.Raycaster();
         this.ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
         this.governor = window.QualityGovernor
-            ? window.QualityGovernor({ steps: [() => this.lowerPixelRatio(), () => this.hideDetail()], storageKey: "spacewar_quality_v1", isPlaying: () => this.playing, slowSec: 0.022, slowLimit: 90 })
+            ? window.QualityGovernor({ steps: [() => this.disableShadows(), () => this.lowerPixelRatio(), () => this.hideDetail()], storageKey: "spacewar_quality_v1", isPlaying: () => this.playing, slowSec: 0.022, slowLimit: 90 })
             : null;
         if (this.governor)
             this.governor.restore();
@@ -505,7 +568,21 @@ class WarWorldView {
         this.renderer.setSize(width, height, false);
         this.rig.resize(width / height);
     }
+    disableShadows() {
+        if (!this.shadowsOn)
+            return false;
+        this.shadowsOn = false;
+        this.sun.castShadow = false;
+        return true;
+    }
+    followSun() {
+        const focus = this.rig.focus;
+        const offset = WarWorldView.SUN_OFFSET;
+        this.sun.target.position.set(focus.x, 0, focus.z);
+        this.sun.position.set(focus.x + offset.x, offset.y, focus.z + offset.z);
+    }
     render(deltaSeconds) {
+        this.followSun();
         this.renderer.render(this.scene, this.rig.perspective);
         if (this.governor)
             this.governor.update(deltaSeconds);
@@ -540,6 +617,8 @@ class WarWorldView {
         return true;
     }
 }
+WarWorldView.SUN_OFFSET = { x: -20, y: 40, z: 15 };
+WarWorldView.SHADOW_HALF_SIZE = 42;
 class WarSelectionMarker {
     constructor(libs) {
         const THREE = libs.THREE;
@@ -770,6 +849,10 @@ class WarMatchView {
                 return { kind: "slot", index: slot.index };
         }
         return { kind: "none" };
+    }
+    groundWorld(clientX, clientY) {
+        const hit = this.world.groundPoint(clientX, clientY);
+        return hit ? this.transform.sceneToWorld(hit.x, hit.z) : null;
     }
     pickEntity(clientX, clientY) {
         const camera = this.world.rig.perspective;

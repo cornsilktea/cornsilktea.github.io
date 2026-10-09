@@ -2,6 +2,7 @@ type WarDifficulty = "easy" | "normal" | "hard";
 
 interface WarInputHandlers {
   tap: (clientX: number, clientY: number) => void;
+  command: (clientX: number, clientY: number) => void;
 }
 
 class WarInputController {
@@ -12,6 +13,7 @@ class WarInputController {
   private pointerStart: WarPoint | null = null;
   private pointerLast: WarPoint | null = null;
   private dragging = false;
+  private button = 0;
 
   constructor(private readonly canvas: HTMLCanvasElement, private readonly world: WarWorldView, private readonly handlers: WarInputHandlers, private readonly isActive: () => boolean) {
     canvas.addEventListener("pointerdown", (event) => this.onDown(event));
@@ -43,6 +45,7 @@ class WarInputController {
   private onDown(event: PointerEvent): void {
     if (!this.isActive()) return;
     this.canvas.setPointerCapture(event.pointerId);
+    this.button = event.button;
     this.pointerStart = { x: event.clientX, y: event.clientY };
     this.pointerLast = { x: event.clientX, y: event.clientY };
     this.dragging = false;
@@ -60,8 +63,11 @@ class WarInputController {
 
   private onUp(event: PointerEvent): void {
     const wasTap = this.pointerStart !== null && !this.dragging;
+    const button = this.button;
     this.reset();
-    if (wasTap && this.isActive()) this.handlers.tap(event.clientX, event.clientY);
+    if (!wasTap || !this.isActive()) return;
+    if (button === 2) this.handlers.command(event.clientX, event.clientY);
+    else this.handlers.tap(event.clientX, event.clientY);
   }
 
   private onWheel(event: WheelEvent): void {
@@ -147,7 +153,7 @@ class WarGameApp {
     this.world = new WarWorldView(libs, this.canvas, touchDevice);
     this.assets = new WarAssetLibrary(libs);
     this.backdrop = new WarMenuBackdrop(libs, this.assets, this.world);
-    this.input = new WarInputController(this.canvas, this.world, { tap: (x, y) => this.onTap(x, y) }, () => this.match !== null && !this.attackMap.isOpen);
+    this.input = new WarInputController(this.canvas, this.world, { tap: (x, y) => this.onTap(x, y), command: (x, y) => this.onCommandClick(x, y) }, () => this.match !== null && !this.attackMap.isOpen);
     this.attackMap = new WarAttackMapOverlay((command) => this.sendCommand(command), () => this.viewer, () => (this.match as WarLocalMatch).view.transform, this.alertPulses);
     this.bindUi();
     this.loadAssets();
@@ -186,9 +192,8 @@ class WarGameApp {
     WarDom.byId("btnSurrender").addEventListener("click", () => {
       if (this.match && window.confirm("항복할까요?")) this.sendCommand(new WarSurrenderCommand(this.viewer));
     });
-    WarDom.byId("btnAttack").addEventListener("click", () => this.attackMap.open());
     this.squadPanel.onSelect = (index) => this.select({ kind: "squad", index });
-    this.minimap.onJump = (point) => this.jumpTo(point);
+    this.minimap.onJump = (point, fresh) => this.onMinimap(point, fresh);
     window.addEventListener("contextmenu", (event) => event.preventDefault());
     window.addEventListener("keydown", (event) => {
       if (event.key === "Escape") this.attackMap.close();
@@ -245,15 +250,50 @@ class WarGameApp {
     if (this.match) this.match.view.setSelection(selection);
   }
 
-  private jumpTo(point: WarPoint): void {
-    if (!this.match) return;
-    const scene = this.match.view.transform.toScene(point);
-    this.world.rig.focusOn(scene.x, scene.z);
-  }
-
   private onTap(clientX: number, clientY: number): void {
     if (!this.match) return;
-    this.select(this.match.view.pick(clientX, clientY));
+    const picked = this.match.view.pick(clientX, clientY);
+    if (this.canOrder() && !this.isOwnPick(picked, this.match)) {
+      this.onCommandClick(clientX, clientY);
+      return;
+    }
+    this.select(picked);
+  }
+
+  private onCommandClick(clientX: number, clientY: number): void {
+    if (!this.match || !this.canOrder()) return;
+    const point = this.match.view.groundWorld(clientX, clientY);
+    if (point) this.orderTo(point);
+  }
+
+  private onMinimap(point: WarPoint, fresh: boolean): void {
+    if (fresh && this.selection.kind === "unit" && this.canOrder()) this.orderTo(point);
+    else this.attackMap.open(this.selection.kind === "squad" ? this.selection.index : -1);
+  }
+
+  private isOwnPick(picked: WarSelection, match: WarLocalMatch): boolean {
+    if (picked.kind === "slot") return true;
+    if (picked.kind !== "unit" && picked.kind !== "building") return false;
+    const entity = match.engine.entityById(picked.id);
+    return !!entity && entity.team === match.viewer;
+  }
+
+  private canOrder(): boolean {
+    if (!this.match) return false;
+    if (this.selection.kind === "squad") return true;
+    if (this.selection.kind !== "unit") return false;
+    const entity = this.match.engine.entityById(this.selection.id);
+    return entity instanceof WarUnit && entity.team === this.match.viewer && entity.alive;
+  }
+
+  private orderTo(point: WarPoint): void {
+    const selection = this.selection;
+    if (selection.kind === "squad") {
+      this.sendCommand(new WarAttackPathCommand(this.viewer, selection.index, [point]));
+      this.notice.show("부대 " + (selection.index + 1) + "이(가) 이동해요.");
+    } else if (selection.kind === "unit") {
+      this.sendCommand(new WarMoveUnitCommand(this.viewer, selection.id, point));
+    }
   }
 
   private onEvent(event: WarEvent): void {

@@ -111,12 +111,12 @@ class WarEasyBot extends WarBotBrain {
 }
 class WarNormalBot extends WarBotBrain {
     constructor(team, seed) {
-        super(team, seed, { thinkTicks: 20, oreWorkerTarget: 12, crystalWorkerTarget: 5, buildingTarget: 7, launchArmyPop: 24, minSquadToSend: 6, retreatSquadSize: 3, queueDepth: 2, defends: false, buildOrder: ["barracks", "range", "barracks", "lab", "range", "barracks", "lab"] });
+        super(team, seed, { thinkTicks: 20, oreWorkerTarget: 10, crystalWorkerTarget: 5, buildingTarget: 5, launchArmyPop: 24, minSquadToSend: 6, retreatSquadSize: 3, queueDepth: 2, defends: false, buildOrder: ["barracks", "range", "barracks", "lab", "range"] });
     }
 }
 class WarHardBot extends WarBotBrain {
     constructor(team, seed) {
-        super(team, seed, { thinkTicks: 10, oreWorkerTarget: 12, crystalWorkerTarget: 5, buildingTarget: 7, launchArmyPop: 24, minSquadToSend: 6, retreatSquadSize: 3, queueDepth: 3, defends: true, buildOrder: ["barracks", "range", "barracks", "lab", "range", "barracks", "lab"] });
+        super(team, seed, { thinkTicks: 10, oreWorkerTarget: 10, crystalWorkerTarget: 5, buildingTarget: 5, launchArmyPop: 24, minSquadToSend: 6, retreatSquadSize: 3, queueDepth: 3, defends: true, buildOrder: ["barracks", "range", "barracks", "lab", "range"] });
     }
 }
 class WarBotFactory {

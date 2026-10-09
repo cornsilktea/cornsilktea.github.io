@@ -56,17 +56,24 @@ interface WarVisionZone { x: number; y: number; radius: number }
 
 class WarBalance {
   static readonly TICKS_PER_SEC = 10;
+  static workerLimit(kind: WarWorkerKind): number {
+    return kind === "ore" ? WarBalance.ORE_WORKER_LIMIT : WarBalance.CRYSTAL_WORKER_LIMIT;
+  }
+
   static readonly TICK_MS = 100;
-  static readonly POP_CAP = 60;
+  static readonly POP_CAP = 70;
   static readonly SQUAD_COUNT = 3;
   static readonly SQUAD_CAP = 20;
   static readonly MATCH_TICKS = 9000;
   static readonly QUEUE_LIMIT = 5;
+  static readonly BUILDINGS_PER_TYPE = 2;
   static readonly START_ORE = 300;
   static readonly START_CRYSTAL = 0;
   static readonly START_ORE_WORKERS = 4;
   static readonly START_CRYSTAL_WORKERS = 0;
   static readonly WORKER_CAP_PER_RESOURCE = 24;
+  static readonly ORE_WORKER_LIMIT = 10;
+  static readonly CRYSTAL_WORKER_LIMIT = 6;
   static readonly WORKER_ORE = 50;
   static readonly WORKER_CRYSTAL_ORE = 50;
   static readonly WORKER_CRYSTAL_CRYSTAL = 0;
@@ -77,9 +84,9 @@ class WarBalance {
   static readonly BATCH_MELEE = 10;
   static readonly BATCH_RANGED = 5;
   static readonly BATCH_ELITE = 5;
-  static readonly SIGHT_UNIT = 1200;
-  static readonly SIGHT_BUILDING = 1300;
-  static readonly ACQUIRE_RANGE = 1200;
+  static readonly SIGHT_UNIT = 1800;
+  static readonly SIGHT_BUILDING = 1700;
+  static readonly ACQUIRE_RANGE = 1500;
   static readonly LEASH_RANGE = 2200;
   static readonly FORMATION_LAG = 900;
   static readonly LAG_PATIENCE_TICKS = 15;
@@ -89,7 +96,8 @@ class WarBalance {
   static readonly HOME_VISION_EXTRA = 600;
   static readonly ASSIST_RANGE = 2000;
   static readonly ASSIST_MEMORY_TICKS = 20;
-  static readonly SEPARATION_RADIUS = 120;
+  static readonly SEPARATION_CELL = 300;
+  static readonly SEPARATION_GAP = 30;
   static readonly SEPARATION_PASSES = 2;
   static readonly BUILDING_PADDING = 70;
   static readonly KITE_MIN_RANGE = 500;
@@ -111,15 +119,24 @@ class WarUnitCatalog {
     { id: "energymage", name: "에너지술사", faction: "pioneer", kind: "ranged", role: "rear", hp: 106, damage: 21, armorPct: 0, speed: 320, range: 650, cooldownTicks: 12, ore: 90, crystal: 10, pop: 1, buildTicks: 50, splashRadius: 200, buildingDamagePct: 100, chargeBonusPct: 0 },
     { id: "guardknight", name: "근위 기사", faction: "pioneer", kind: "elite", role: "front", hp: 955, damage: 29, armorPct: 40, speed: 260, range: 180, cooldownTicks: 10, ore: 160, crystal: 60, pop: 2, buildTicks: 100, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0 },
     { id: "artillerytruck", name: "포격 트럭", faction: "pioneer", kind: "elite", role: "rear", hp: 233, damage: 42, armorPct: 0, speed: 280, range: 1100, cooldownTicks: 20, ore: 180, crystal: 80, pop: 2, buildTicks: 100, splashRadius: 250, buildingDamagePct: 200, chargeBonusPct: 0 },
-    { id: "minion", name: "해골 미니언", faction: "grave", kind: "melee", role: "mid", hp: 115, damage: 10, armorPct: 0, speed: 380, range: 150, cooldownTicks: 8, ore: 30, crystal: 0, pop: 1, buildTicks: 30, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, spawnCount: 2 },
-    { id: "skelwarrior", name: "해골 전사", faction: "grave", kind: "melee", role: "front", hp: 360, damage: 15, armorPct: 22, speed: 300, range: 150, cooldownTicks: 10, ore: 55, crystal: 0, pop: 1, buildTicks: 40, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, reviveChancePct: 30 },
-    { id: "skelarcher", name: "해골 궁수", faction: "grave", kind: "ranged", role: "rear", hp: 115, damage: 14, armorPct: 0, speed: 340, range: 750, cooldownTicks: 6, ore: 65, crystal: 0, pop: 1, buildTicks: 50, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0 },
-    { id: "skelmage", name: "해골 마법사", faction: "grave", kind: "ranged", role: "rear", hp: 105, damage: 17, armorPct: 0, speed: 320, range: 650, cooldownTicks: 12, ore: 85, crystal: 10, pop: 1, buildTicks: 50, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, slowPct: 30, slowTicks: 30 },
-    { id: "bonegiant", name: "뼈 거인", faction: "grave", kind: "elite", role: "front", hp: 1300, damage: 40, armorPct: 25, speed: 240, range: 220, cooldownTicks: 12, ore: 170, crystal: 70, pop: 2, buildTicks: 100, splashRadius: 250, buildingDamagePct: 100, chargeBonusPct: 0 },
-    { id: "necromancer", name: "사령술사", faction: "grave", kind: "elite", role: "rear", hp: 190, damage: 20, armorPct: 0, speed: 300, range: 700, cooldownTicks: 12, ore: 150, crystal: 90, pop: 2, buildTicks: 100, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, ability: "raise" },
+    { id: "minion", name: "해골 미니언", faction: "grave", kind: "melee", role: "mid", hp: 115, damage: 10, armorPct: 0, speed: 380, range: 150, cooldownTicks: 8, ore: 22, crystal: 0, pop: 1, buildTicks: 30, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, spawnCount: 2 },
+    { id: "skelwarrior", name: "해골 전사", faction: "grave", kind: "melee", role: "front", hp: 360, damage: 15, armorPct: 22, speed: 300, range: 150, cooldownTicks: 10, ore: 40, crystal: 0, pop: 1, buildTicks: 40, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, reviveChancePct: 30 },
+    { id: "skelarcher", name: "해골 궁수", faction: "grave", kind: "ranged", role: "rear", hp: 115, damage: 14, armorPct: 0, speed: 340, range: 750, cooldownTicks: 6, ore: 47, crystal: 0, pop: 1, buildTicks: 50, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0 },
+    { id: "skelmage", name: "해골 마법사", faction: "grave", kind: "ranged", role: "rear", hp: 105, damage: 17, armorPct: 0, speed: 320, range: 650, cooldownTicks: 12, ore: 61, crystal: 10, pop: 1, buildTicks: 50, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, slowPct: 30, slowTicks: 30 },
+    { id: "bonegiant", name: "뼈 거인", faction: "grave", kind: "elite", role: "front", hp: 1300, damage: 40, armorPct: 25, speed: 240, range: 220, cooldownTicks: 12, ore: 122, crystal: 70, pop: 2, buildTicks: 100, splashRadius: 250, buildingDamagePct: 100, chargeBonusPct: 0 },
+    { id: "necromancer", name: "사령술사", faction: "grave", kind: "elite", role: "rear", hp: 190, damage: 20, armorPct: 0, speed: 300, range: 700, cooldownTicks: 12, ore: 108, crystal: 90, pop: 2, buildTicks: 100, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, ability: "raise" },
   ];
 
   private static readonly DEFS: WarUnitDef[] = WarUnitCatalog.SPECS.map((spec) => ({ spawnCount: 1, reviveChancePct: 0, slowPct: 0, slowTicks: 0, ability: "none" as WarAbilityId, ...spec }));
+
+  private static readonly COLLISION_RADIUS: Record<string, number> = {
+    shieldbearer: 62, charger: 58, archer: 55, energymage: 58, guardknight: 85, artillerytruck: 105,
+    minion: 48, skelwarrior: 62, skelarcher: 55, skelmage: 55, bonegiant: 110, necromancer: 70,
+  };
+
+  static collisionRadius(id: string): number {
+    return WarUnitCatalog.COLLISION_RADIUS[id] ?? 60;
+  }
 
   static byId(id: string): WarUnitDef {
     const found = WarUnitCatalog.DEFS.find((def) => def.id === id);
@@ -162,6 +179,39 @@ class WarBuildingCatalog {
   }
 }
 
+class WarBlurbs {
+  private static readonly UNITS: Record<string, string> = {
+    shieldbearer: "큰 방패로 앞에서 버티는 튼튼한 병사",
+    charger: "빠르게 달려가 첫 공격이 두 배로 아픈 병사",
+    archer: "멀리서 화살을 쏘는 기본 원거리 병사",
+    energymage: "빛 구슬로 주변 여럿을 한꺼번에 맞히는 술사",
+    guardknight: "느리지만 가장 단단한 최전선 기사",
+    artillerytruck: "멀리서 포탄을 쏘며 건물을 크게 부수는 트럭",
+    minion: "한 번에 둘이 나오는 값싼 해골 졸병",
+    skelwarrior: "단단하고, 쓰러지면 가끔 다시 일어나는 전사",
+    skelarcher: "멀리서 화살을 쏘는 해골 궁수",
+    skelmage: "맞은 적의 움직임을 느리게 하는 마법사",
+    bonegiant: "주변을 함께 내려치는 거대한 해골",
+    necromancer: "쓰러진 해골을 되살려 일으키는 사령술사",
+    worker_ore: "광석을 캐요. 많을수록 느리게 늘어요 (최대 10)",
+    worker_crystal: "결정을 캐요. 고급 병력에 필요해요 (최대 6)",
+  };
+
+  private static readonly BUILDINGS: Record<WarBuildingType, string> = {
+    hq: "일꾼을 만드는 중심 건물",
+    barracks: "방패로 버티거나 달려드는 근접 병력을 만들어요",
+    range: "뒤에서 멀리 쏘는 원거리 병력을 만들어요",
+    lab: "강력한 고급 병력을 만들어요. 결정이 필요해요",
+  };
+
+  static unit(id: string): string {
+    return WarBlurbs.UNITS[id] ?? "";
+  }
+
+  static building(type: WarBuildingType): string {
+    return WarBlurbs.BUILDINGS[type];
+  }
+}
 class WarMapData {
   static readonly HALF_W = 6500;
   static readonly HALF_H = 8600;
@@ -175,8 +225,7 @@ class WarMapData {
   static readonly POST_SPREAD = 1800;
   static readonly POST_BACKOFF = -400;
   static readonly SLOT_OFFSETS: WarPoint[] = [
-    { x: -1700, y: 0 }, { x: -1571, y: -651 }, { x: -1202, y: -1202 }, { x: -651, y: -1571 }, { x: 0, y: -1700 },
-    { x: 651, y: -1571 }, { x: 1202, y: -1202 }, { x: 1571, y: -651 }, { x: 1700, y: 0 },
+    { x: -1700, y: 0 }, { x: -1202, y: -1202 }, { x: 0, y: -1700 }, { x: 1202, y: -1202 }, { x: 1700, y: 0 },
   ];
   static readonly ENTRANCE_SLOT_OFFSETS: WarPoint[] = [{ x: -700, y: -1000 }, { x: 700, y: -1000 }];
   static readonly ORE_OFFSETS: WarPoint[] = [{ x: -1500, y: 250 }, { x: -1300, y: 900 }, { x: -800, y: 1350 }, { x: -250, y: 1550 }];

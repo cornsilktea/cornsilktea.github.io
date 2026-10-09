@@ -102,62 +102,74 @@ class WarCommandCard {
         this.signature = "";
     }
     update(selection, engine, team, sink, onAfter) {
-        const buttons = this.buttonsFor(selection, engine, team, sink, onAfter);
-        const signature = selection.kind + ":" + buttons.map((b) => b.label + b.sub + b.enabled).join("|");
+        const cells = this.cellsFor(selection, engine, team, sink, onAfter);
+        const signature = selection.kind + ":" + cells.map((c) => c.label + c.sub + c.enabled).join("|");
         if (signature === this.signature)
             return;
         this.signature = signature;
         WarDom.clear(this.host);
-        if (buttons.length === 0) {
-            this.host.appendChild(WarDom.make("div", "cmdHint", this.hintFor(selection)));
-            return;
-        }
-        for (const spec of buttons) {
-            const button = WarDom.make("button", "cmdBtn");
-            button.type = "button";
-            button.disabled = !spec.enabled;
-            button.appendChild(WarDom.make("b", "", spec.label));
-            button.appendChild(WarDom.make("small", "", spec.sub));
-            button.addEventListener("click", () => spec.onPress());
-            this.host.appendChild(button);
+        for (const spec of cells) {
+            const cell = WarDom.make(spec.onPress ? "button" : "div", spec.onPress ? "cmdBtn" : "cmdNote");
+            if (cell instanceof HTMLButtonElement) {
+                cell.type = "button";
+                cell.disabled = !spec.enabled;
+            }
+            cell.appendChild(WarDom.make("b", "", spec.label));
+            if (spec.sub)
+                cell.appendChild(WarDom.make("small", "", spec.sub));
+            if (spec.desc)
+                cell.appendChild(WarDom.make("span", "desc", spec.desc));
+            const press = spec.onPress;
+            if (press)
+                cell.addEventListener("click", () => press());
+            this.host.appendChild(cell);
         }
     }
-    hintFor(selection) {
-        if (selection.kind === "none")
-            return "빈 터를 누르면 건물을 지을 수 있어요. 건물을 누르면 병력을 만들어요.";
-        if (selection.kind === "building")
-            return "지금은 만들 수 있는 것이 없어요.";
-        return "";
+    static note(label, desc) {
+        return [{ label, sub: "", desc, enabled: true, onPress: null }];
     }
-    buttonsFor(selection, engine, team, sink, onAfter) {
+    cellsFor(selection, engine, team, sink, onAfter) {
         const player = engine.players[team];
         const economy = player.economy;
         if (selection.kind === "slot") {
             return WarBuildingCatalog.buildable(player.slotDefs[selection.index].kind).map((def) => ({
                 label: WarBuildingCatalog.displayName(def.type, player.faction),
-                sub: WarCommandCard.costText(def.ore, def.crystal) + " · " + def.buildTicks / WarBalance.TICKS_PER_SEC + "초",
-                enabled: economy.canAfford(def.ore, def.crystal),
+                sub: WarCommandCard.costText(def.ore, def.crystal) + " · " + def.buildTicks / WarBalance.TICKS_PER_SEC + "초 · " + player.countOf(def.type) + "/" + WarBalance.BUILDINGS_PER_TYPE,
+                desc: WarBlurbs.building(def.type),
+                enabled: economy.canAfford(def.ore, def.crystal) && player.countOf(def.type) < WarBalance.BUILDINGS_PER_TYPE,
                 onPress: () => { sink(new WarBuildCommand(team, selection.index, def.type)); onAfter(); },
             }));
         }
         if (selection.kind === "building") {
             const building = engine.entityById(selection.id);
-            if (!(building instanceof WarBuilding) || building.team !== team || !building.complete)
-                return [];
+            if (!(building instanceof WarBuilding) || building.team !== team)
+                return WarCommandCard.note("적 건물", "부수면 승리에 가까워져요.");
+            if (!building.complete)
+                return WarCommandCard.note("짓는 중", "다 지어지면 병력을 만들 수 있어요.");
             const items = building.def.type === "hq"
                 ? [WarProductionItem.from("worker_ore"), WarProductionItem.from("worker_crystal")]
                 : WarUnitCatalog.producedBy(player.faction, building.def.producesKind).map((def) => WarProductionItem.from(def.id));
             return items.map((item) => ({
                 label: item.name,
                 sub: WarCommandCard.costText(item.ore, item.crystal) + (item.pop > 1 ? " · 인구 " + item.pop : ""),
+                desc: WarBlurbs.unit(item.id),
                 enabled: economy.canAfford(item.ore, item.crystal) && economy.popFree >= item.pop && building.queue.length < WarBalance.QUEUE_LIMIT,
                 onPress: () => sink(new WarProduceCommand(team, building.id, item.id)),
             }));
         }
         if (selection.kind === "squad") {
-            return [{ label: "귀환", sub: "입구로 돌아와요", enabled: player.squads[selection.index].mode !== "home", onPress: () => sink(new WarRecallCommand(team, selection.index)) }];
+            return [
+                { label: "이동", sub: "", desc: "화면을 누르거나 오른쪽 버튼을 누르면 그곳으로 가요. 길게 그리려면 공격 지도를 쓰세요.", enabled: true, onPress: null },
+                { label: "귀환", sub: "입구로 돌아와요", desc: "", enabled: player.squads[selection.index].mode !== "home", onPress: () => sink(new WarRecallCommand(team, selection.index)) },
+            ];
         }
-        return [];
+        if (selection.kind === "unit") {
+            const unit = engine.entityById(selection.id);
+            if (unit instanceof WarUnit && unit.team === team)
+                return WarCommandCard.note("이동", "화면이나 지도를 누르면 이 병력만 그곳으로 가요. 가다가 적을 만나면 싸워요.");
+            return WarCommandCard.note("적 병력", "우리 병력을 보내 맞서 싸우세요.");
+        }
+        return WarCommandCard.note("빈 터를 눌러 보세요", "건물을 지을 수 있어요. 건물을 누르면 병력을 만들어요. 위쪽 부대를 누르면 지시를 내려요.");
     }
     static costText(ore, crystal) {
         return "광석 " + ore + (crystal > 0 ? " · 결정 " + crystal : "");
@@ -353,19 +365,19 @@ class WarMinimap {
         this.canvas = WarDom.byId("minimap");
         this.context = this.canvas.getContext("2d");
         this.pendingJump = null;
+        this.pendingFresh = false;
         const jump = (event) => {
             const rect = this.canvas.getBoundingClientRect();
             this.pendingJump = { x: ((event.clientX - rect.left) / rect.width) * this.canvas.width, y: ((event.clientY - rect.top) / rect.height) * this.canvas.height };
             event.preventDefault();
         };
-        this.canvas.addEventListener("pointerdown", (event) => { jump(event); this.canvas.setPointerCapture(event.pointerId); });
-        this.canvas.addEventListener("pointermove", (event) => { if (event.buttons)
-            jump(event); });
+        this.canvas.addEventListener("pointerdown", (event) => { jump(event); this.pendingFresh = true; this.canvas.setPointerCapture(event.pointerId); });
     }
     update(engine, transform, focus) {
         if (this.pendingJump) {
-            this.onJump(transform.mapToWorld(this.pendingJump.x, this.pendingJump.y, this.canvas.width, this.canvas.height));
+            this.onJump(transform.mapToWorld(this.pendingJump.x, this.pendingJump.y, this.canvas.width, this.canvas.height), this.pendingFresh);
             this.pendingJump = null;
+            this.pendingFresh = false;
         }
         WarMapPainter.paint(this.context, this.canvas.width, this.canvas.height, engine, transform, false, transform.sceneToWorld(focus.x, focus.z), this.pulses);
     }
@@ -401,10 +413,12 @@ class WarAttackMapOverlay {
     get isOpen() {
         return !this.overlay.hidden;
     }
-    open() {
+    open(squad = -1) {
         this.overlay.hidden = false;
         this.fitCanvas();
-        if (this.chosenSquad < 0)
+        if (squad >= 0)
+            this.choose(squad);
+        else if (this.chosenSquad < 0)
             this.choose(0);
     }
     close() {

@@ -103,6 +103,8 @@ class WarUnit extends WarEntity implements WarAttacker {
   slowPct = 0;
   marchTicks = 0;
   revived = false;
+  orderPath: WarPoint[] = [];
+  holdPoint: WarPoint | null = null;
   readonly ability: WarAbility | null;
 
   constructor(id: number, team: WarTeam, x: number, y: number, readonly def: WarUnitDef) {
@@ -113,6 +115,27 @@ class WarUnit extends WarEntity implements WarAttacker {
 
   bodyRadius(): number {
     return 40;
+  }
+
+  collisionRadius(): number {
+    return WarUnitCatalog.collisionRadius(this.def.id);
+  }
+
+  get independent(): boolean {
+    return this.orderPath.length > 0 || this.holdPoint !== null;
+  }
+
+  giveOrder(path: WarPoint[]): void {
+    if (path.length === 0) return;
+    this.orderPath = path.map((point) => ({ x: point.x, y: point.y }));
+    this.holdPoint = null;
+    this.targetId = -1;
+    this.marchTicks = 0;
+  }
+
+  clearOrder(): void {
+    this.orderPath = [];
+    this.holdPoint = null;
   }
 
   stepLength(): number {
@@ -549,7 +572,7 @@ class WarSquad {
   }
 
   attachedMembers(): WarUnit[] {
-    return this.members.filter((unit) => unit.attached);
+    return this.members.filter((unit) => unit.attached && !unit.independent);
   }
 
   speed(): number {
@@ -559,7 +582,7 @@ class WarSquad {
   }
 
   isEngaged(): boolean {
-    return this.members.some((unit) => unit.attached && unit.targetId >= 0);
+    return this.attachedMembers().some((unit) => unit.targetId >= 0);
   }
 
   sendAlong(points: WarPoint[]): void {
@@ -577,6 +600,7 @@ class WarSquad {
     this.lagTicks = WarBalance.LAG_PATIENCE_TICKS;
     this.moveFreeTicks = WarBalance.DEPART_FREE_TICKS;
     for (const unit of this.members) {
+      unit.clearOrder();
       unit.attached = true;
       unit.marchTicks = WarBalance.DEPART_FREE_TICKS;
       unit.targetId = -1;
@@ -589,6 +613,7 @@ class WarSquad {
     this.lagTicks = 0;
     this.moveFreeTicks = WarBalance.DEPART_FREE_TICKS;
     for (const unit of this.members) {
+      unit.clearOrder();
       unit.attached = true;
       unit.marchTicks = WarBalance.DEPART_FREE_TICKS;
       unit.targetId = -1;
@@ -598,7 +623,7 @@ class WarSquad {
   private chooseFocusTarget(): void {
     const votes = new Map<number, number>();
     for (const unit of this.members) {
-      if (unit.attached && unit.targetId >= 0) votes.set(unit.targetId, (votes.get(unit.targetId) ?? 0) + 1);
+      if (unit.attached && !unit.independent && unit.targetId >= 0) votes.set(unit.targetId, (votes.get(unit.targetId) ?? 0) + 1);
     }
     let best = -1;
     let bestVotes = 0;
@@ -614,7 +639,7 @@ class WarSquad {
   planSlots(): void {
     this.chooseFocusTarget();
     this.slots = WarFormation.slots(this.attachedMembers(), this.anchor, this.heading);
-    const waiting = this.members.filter((unit) => !unit.attached);
+    const waiting = this.members.filter((unit) => !unit.attached && !unit.independent);
     const home = { x: this.post.x, y: this.post.y };
     this.postSlots = WarFormation.slots(waiting, home, { x: 0, y: -1000 * WarMapData.sign(this.team) });
   }
@@ -651,7 +676,7 @@ class WarSquad {
   arriveHome(): void {
     this.mode = "home";
     this.heading = { x: 0, y: -1000 * WarMapData.sign(this.team) };
-    for (const unit of this.members) unit.attached = true;
+    for (const unit of this.members) if (!unit.independent) unit.attached = true;
   }
 
   private isStalledByLag(): boolean {
@@ -685,6 +710,10 @@ class WarPlayer {
     this.assigner = new WarSquadAssigner(this.squads);
     this.slotDefs = WarMapData.slots(team);
     this.slotBuildings = this.slotDefs.map(() => null);
+  }
+
+  countOf(type: WarBuildingType): number {
+    return this.slotBuildings.filter((b) => b !== null && b.def.type === type).length;
   }
 
   buildings(): WarBuilding[] {
@@ -778,6 +807,10 @@ class WarUnitBrain {
   static think(engine: WarEngine, unit: WarUnit, squad: WarSquad): void {
     if (unit.cooldownLeft > 0) unit.cooldownLeft--;
     if (unit.slowTicksLeft > 0) unit.slowTicksLeft--;
+    if (unit.independent) {
+      WarUnitBrain.thinkOrdered(engine, unit, squad);
+      return;
+    }
     const slot = squad.slotOf(unit);
     if (unit.marchTicks > 0) {
       unit.marchTicks--;
@@ -802,6 +835,38 @@ class WarUnitBrain {
     }
     if (unit.def.range >= WarBalance.KITE_MIN_RANGE && WarUnitBrain.keepDistance(engine, unit)) return;
     if (!inReach) unit.moveToward(target, unit.stepLength());
+  }
+
+  private static thinkOrdered(engine: WarEngine, unit: WarUnit, squad: WarSquad): void {
+    const marching = unit.orderPath.length > 0;
+    const origin: WarPoint = marching ? unit : (unit.holdPoint as WarPoint);
+    let target = unit.targetId >= 0 ? engine.entityById(unit.targetId) : null;
+    if (target && !WarUnitBrain.stillValid(engine, unit, squad, target, origin)) target = null;
+    if (!target && (engine.tick + unit.id) % WarBalance.ACQUIRE_EVERY_TICKS === 0) target = WarTargeting.pick(engine, unit, origin);
+    unit.retarget(target ? target.id : -1);
+    if (!target) {
+      WarUnitBrain.walkOrder(unit);
+      return;
+    }
+    const inReach = WarMath.dist(unit.x, unit.y, target.x, target.y) <= unit.reach(target);
+    if (inReach && unit.cooldownLeft === 0) {
+      WarCombat.strike(engine, unit, target);
+      return;
+    }
+    if (unit.def.range >= WarBalance.KITE_MIN_RANGE && WarUnitBrain.keepDistance(engine, unit)) return;
+    if (!inReach) unit.moveToward(target, unit.stepLength());
+  }
+
+  private static walkOrder(unit: WarUnit): void {
+    if (unit.orderPath.length === 0) {
+      if (unit.holdPoint) unit.moveToward(unit.holdPoint, unit.stepLength());
+      return;
+    }
+    const goal = unit.orderPath[0];
+    unit.moveToward(goal, unit.stepLength());
+    if (unit.x !== goal.x || unit.y !== goal.y) return;
+    unit.orderPath.shift();
+    if (unit.orderPath.length === 0) unit.holdPoint = { x: goal.x, y: goal.y };
   }
 
   private static squadFocus(engine: WarEngine, unit: WarUnit, squad: WarSquad): WarEntity | null {
@@ -838,7 +903,7 @@ class WarUnitBrain {
   private static stillValid(engine: WarEngine, unit: WarUnit, squad: WarSquad, target: WarEntity, origin: WarPoint): boolean {
     if (!target.alive) return false;
     if (!engine.vision.isVisible(unit.team, target.x, target.y)) return false;
-    if (target.id === squad.focusTargetId && unit.attached) return true;
+    if (target.id === squad.focusTargetId && unit.attached && !unit.independent) return true;
     return WarMath.dist(origin.x, origin.y, target.x, target.y) <= WarBalance.LEASH_RANGE;
   }
 
@@ -889,6 +954,7 @@ abstract class WarCommand {
       case "produce": return new WarProduceCommand(json.team, json.buildingId as number, json.itemId as string);
       case "build": return new WarBuildCommand(json.team, json.slotIndex as number, json.buildingType as WarBuildingType);
       case "attackPath": return new WarAttackPathCommand(json.team, json.squad as number, json.points as WarPoint[]);
+      case "moveUnit": return new WarMoveUnitCommand(json.team, json.unitId as number, json.point as WarPoint);
       case "recall": return new WarRecallCommand(json.team, json.squad as number);
       case "surrender": return new WarSurrenderCommand(json.team);
     }
@@ -935,6 +1001,23 @@ class WarAttackPathCommand extends WarCommand {
 
   toJson(): WarCommandJson {
     return { type: "attackPath", team: this.team, squad: this.squad, points: this.points };
+  }
+}
+
+class WarMoveUnitCommand extends WarCommand {
+  constructor(team: WarTeam, readonly unitId: number, readonly point: WarPoint) {
+    super(team);
+  }
+
+  apply(engine: WarEngine): void {
+    const unit = engine.entityById(this.unitId);
+    if (!(unit instanceof WarUnit) || unit.team !== this.team || !unit.alive) return;
+    const target = WarTerrain.clamp(this.point);
+    unit.giveOrder(WarNavGraph.straighten(unit, WarNavGraph.connect(unit, target)));
+  }
+
+  toJson(): WarCommandJson {
+    return { type: "moveUnit", team: this.team, unitId: this.unitId, point: this.point };
   }
 }
 
@@ -1004,6 +1087,8 @@ class WarStateHash {
         mix(entity.cooldownLeft);
         mix(entity.slowTicksLeft);
         mix(entity.revived ? 1 : 0);
+        mix(entity.orderPath.length);
+        mix(entity.holdPoint ? entity.holdPoint.x + entity.holdPoint.y : 0);
       } else if (entity instanceof WarBuilding) {
         mix(entity.buildLeft);
         for (const queued of entity.queue) mix(queued.ticksLeft);
@@ -1167,7 +1252,7 @@ class WarEngine {
     if (!building.canProduce(item) || building.queue.length >= WarBalance.QUEUE_LIMIT) return false;
     const economy = player.economy;
     if (!economy.canAfford(item.ore, item.crystal) || economy.popFree < item.pop) return false;
-    if (item.workerKind && economy.workersOf(item.workerKind) + this.queuedWorkers(player, item.workerKind) >= WarBalance.WORKER_CAP_PER_RESOURCE) return false;
+    if (item.workerKind && economy.workersOf(item.workerKind) + this.queuedWorkers(player, item.workerKind) >= WarBalance.workerLimit(item.workerKind)) return false;
     economy.spend(item.ore, item.crystal);
     economy.popUsed += item.pop;
     building.queue.push(new WarQueuedItem(item, item.ticks));
@@ -1180,6 +1265,7 @@ class WarEngine {
     if (!slot || !slot.enabled || player.slotBuildings[slotIndex]) return false;
     if (!WarBuildingCatalog.buildable(slot.kind).some((def) => def.type === type)) return false;
     const def = WarBuildingCatalog.byType(type);
+    if (player.countOf(type) >= WarBalance.BUILDINGS_PER_TYPE) return false;
     if (!player.economy.canAfford(def.ore, def.crystal)) return false;
     player.economy.spend(def.ore, def.crystal);
     const building = new WarBuilding(this.nextId++, team, slot.x, slot.y, def, slotIndex, true);
@@ -1278,7 +1364,7 @@ class WarEngine {
 
   private separateUnits(): void {
     const units = this.units();
-    const radius = WarBalance.SEPARATION_RADIUS;
+    const radius = WarBalance.SEPARATION_CELL;
     for (let pass = 0; pass < WarBalance.SEPARATION_PASSES; pass++) this.separatePass(units, radius);
     this.pushOutOfBuildings(units);
     for (const unit of units) {
@@ -1331,10 +1417,11 @@ class WarEngine {
   private pushApart(a: WarUnit, b: WarUnit, radius: number): void {
     const dx = a.x - b.x;
     const dy = a.y - b.y;
-    if (Math.abs(dx) >= radius || Math.abs(dy) >= radius) return;
+    const gap = a.collisionRadius() + b.collisionRadius() + WarBalance.SEPARATION_GAP;
+    if (Math.abs(dx) >= gap || Math.abs(dy) >= gap) return;
     const distance = WarMath.isqrt(dx * dx + dy * dy);
-    if (distance >= radius) return;
-    const push = Math.ceil((radius - distance) / 2);
+    if (distance >= gap) return;
+    const push = Math.ceil((gap - distance) / 2);
     const ux = distance === 0 ? (a.id % 2 === 0 ? 1 : -1) * 1000 : Math.trunc((dx * 1000) / distance);
     const uy = distance === 0 ? 0 : Math.trunc((dy * 1000) / distance);
     a.x += Math.trunc((ux * push) / 1000);

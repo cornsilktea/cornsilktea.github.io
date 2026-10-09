@@ -111,16 +111,14 @@ class WarTerrainPainter {
         const wobble = (noise.fbm(wx / 520, wy / 520, 3) - 0.5) * 620;
         const lane = this.field.laneDistance(wx, wy) + wobble;
         const pad = this.field.padDistance(wx, wy);
+        const open = Math.min(lane, pad + wobble);
         const grain = noise.fbm(wx / 90, wy / 90, 2);
-        const inBase = pad < 0;
-        const base = inBase || lane < 0 ? this.laneColor(wx, wy, grain) : this.highlandColor(wx, wy, grain);
-        if (inBase)
-            return this.baseGround(wx, wy, pad, base, grain);
-        const edge = Math.abs(lane) < 330 ? 1 - Math.abs(lane) / 330 : 0;
-        const shade = lane < 0 ? 1 - edge * 0.38 : 1 - edge * 0.55;
+        const base = open < 0 ? this.laneColor(wx, wy, grain) : this.highlandColor(wx, wy, grain);
+        const edge = Math.abs(open) < 330 ? 1 - Math.abs(open) / 330 : 0;
+        const shade = open < 0 ? 1 - edge * 0.38 : 1 - edge * 0.55;
         const rubble = edge > 0.2 && noise.sample(wx / 28, wy / 28) > 0.72 ? 0.7 : 1;
-        const padFade = pad < 260 ? 0.55 + (pad / 260) * 0.45 : 1;
-        const factor = shade * rubble * padFade;
+        const worn = pad < 0 ? 1 - Math.min(1, -pad / 500) * 0.1 * (0.6 + noise.fbm(wx / 210 + 5, wy / 210 + 11, 3) * 0.8) : 1;
+        const factor = shade * rubble * worn;
         return [base[0] * factor, base[1] * factor, base[2] * factor];
     }
     highlandColor(wx, wy, grain) {
@@ -144,14 +142,6 @@ class WarTerrainPainter {
         const ripple = Math.sin((wx * 0.011 + this.noise.fbm(wx / 300, wy / 300, 2) * 9) + wy * 0.004) * 0.5 + 0.5;
         const tone = 0.93 + ripple * 0.1 + (grain - 0.5) * 0.18;
         return [(a[0] + (b[0] - a[0]) * mix) * tone, (a[1] + (b[1] - a[1]) * mix) * tone, (a[2] + (b[2] - a[2]) * mix) * tone];
-    }
-    baseGround(wx, wy, pad, base, grain) {
-        const trample = this.noise.fbm(wx / 210 + 5, wy / 210 + 11, 3);
-        const crack = Math.abs(this.noise.fbm(wx / 140, wy / 140, 3) - 0.5) < 0.014 ? 0.66 : 1;
-        const dark = 0.7 + trample * 0.14;
-        const rim = pad > -220 ? 0.74 + (-pad / 220) * 0.26 : 1;
-        const tone = dark * crack * rim * (0.94 + grain * 0.12);
-        return [base[0] * tone, base[1] * tone * 0.98, base[2] * tone * 0.94];
     }
     paintCraters(context, scale) {
         const random = new WarSeededRandom(77);
