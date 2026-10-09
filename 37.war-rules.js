@@ -52,6 +52,8 @@ class WarEntity {
         this.x = x;
         this.y = y;
         this.maxHp = maxHp;
+        this.lastHitTick = -1000;
+        this.lastAttackerId = -1;
         this.hp = maxHp;
     }
     get alive() {
@@ -68,6 +70,7 @@ class WarUnit extends WarEntity {
         this.cooldownLeft = 0;
         this.slowTicksLeft = 0;
         this.slowPct = 0;
+        this.marchTicks = 0;
         this.revived = false;
         this.chargeReady = def.chargeBonusPct > 0;
         this.ability = WarAbilityFactory.forDef(def);
@@ -253,6 +256,43 @@ class WarTerrain {
 }
 WarTerrain.CORRIDORS = WarMapData.corridors();
 class WarNavGraph {
+    static isWalkable(from, to) {
+        const length = WarMath.dist(from.x, from.y, to.x, to.y);
+        const steps = Math.max(1, Math.ceil(length / WarNavGraph.WALK_SAMPLE_CM));
+        for (let i = 1; i < steps; i++) {
+            const point = { x: from.x + Math.trunc(((to.x - from.x) * i) / steps), y: from.y + Math.trunc(((to.y - from.y) * i) / steps) };
+            const fixed = WarTerrain.clamp(point);
+            if (fixed.x !== point.x || fixed.y !== point.y)
+                return false;
+        }
+        return true;
+    }
+    static connect(from, to) {
+        if (WarNavGraph.isWalkable(from, to))
+            return [{ x: to.x, y: to.y }];
+        const nodes = WarNavGraph.route(from, to);
+        while (nodes.length > 1 && WarNavGraph.isWalkable(from, nodes[1]))
+            nodes.shift();
+        return nodes;
+    }
+    static straighten(start, points) {
+        const result = [];
+        let from = start;
+        let i = 0;
+        while (i < points.length) {
+            let farthest = i;
+            for (let j = points.length - 1; j > i; j--) {
+                if (WarNavGraph.isWalkable(from, points[j])) {
+                    farthest = j;
+                    break;
+                }
+            }
+            result.push(points[farthest]);
+            from = points[farthest];
+            i = farthest + 1;
+        }
+        return result;
+    }
     static route(from, to) {
         const start = WarNavGraph.nearest(from);
         const goal = WarNavGraph.nearest(to);
@@ -308,22 +348,31 @@ class WarNavGraph {
     }
 }
 WarNavGraph.NODES = WarMapData.navNodes();
+WarNavGraph.WALK_SAMPLE_CM = 150;
 class WarVision {
     constructor() {
         this.grids = [new Uint8Array(WarVision.COLS * WarVision.ROWS), new Uint8Array(WarVision.COLS * WarVision.ROWS)];
+        this.homeLayers = [new Uint8Array(WarVision.COLS * WarVision.ROWS), new Uint8Array(WarVision.COLS * WarVision.ROWS)];
+        this.homeReady = false;
     }
     update(entities) {
-        for (const grid of this.grids)
-            grid.fill(0);
-        for (const team of [0, 1]) {
-            for (const zone of WarMapData.SHARED_VISION_ZONES)
-                this.reveal(team, zone.x, zone.y, zone.radius);
-        }
+        if (!this.homeReady)
+            this.paintHomeLayers();
+        this.grids[0].set(this.homeLayers[0]);
+        this.grids[1].set(this.homeLayers[1]);
+        const seen = new Set();
+        const cell = WarMapData.VISION_CELL;
         for (const entity of entities) {
             if (!entity.alive)
                 continue;
             const radius = entity instanceof WarUnit ? WarBalance.SIGHT_UNIT : WarBalance.SIGHT_BUILDING;
-            this.reveal(entity.team, entity.x, entity.y, radius);
+            const snapX = Math.floor((entity.x + WarMapData.HALF_W) / cell);
+            const snapY = Math.floor((entity.y + WarMapData.HALF_H) / cell);
+            const key = ((snapY * WarVision.COLS + snapX) * 2 + entity.team) * 2 + (radius === WarBalance.SIGHT_UNIT ? 0 : 1);
+            if (seen.has(key))
+                continue;
+            seen.add(key);
+            this.reveal(this.grids[entity.team], entity.x, entity.y, radius);
         }
     }
     isVisible(team, x, y) {
@@ -333,20 +382,35 @@ class WarVision {
             return false;
         return this.grids[team][row * WarVision.COLS + col] === 1;
     }
-    reveal(team, x, y, radius) {
+    paintHomeLayers() {
+        this.homeReady = true;
+        for (const team of [0, 1]) {
+            const layer = this.homeLayers[team];
+            for (const zone of WarMapData.SHARED_VISION_ZONES)
+                this.reveal(layer, zone.x, zone.y, zone.radius);
+            const hq = WarMapData.hq(team);
+            const gate = WarMapData.entrance(team);
+            this.reveal(layer, hq.x, hq.y, WarMapData.BASE_RADIUS + WarBalance.HOME_VISION_EXTRA);
+            this.reveal(layer, gate.x, gate.y, WarMapData.PLAZA_RADIUS);
+        }
+    }
+    reveal(grid, x, y, radius) {
         const cell = WarMapData.VISION_CELL;
-        const colLow = Math.max(0, Math.floor((x - radius + WarMapData.HALF_W) / cell));
-        const colHigh = Math.min(WarVision.COLS - 1, Math.floor((x + radius + WarMapData.HALF_W) / cell));
+        const half = cell / 2;
+        const limit = (radius + 1) * (radius + 1) - 1;
         const rowLow = Math.max(0, Math.floor((y - radius + WarMapData.HALF_H) / cell));
         const rowHigh = Math.min(WarVision.ROWS - 1, Math.floor((y + radius + WarMapData.HALF_H) / cell));
-        const grid = this.grids[team];
         for (let row = rowLow; row <= rowHigh; row++) {
-            for (let col = colLow; col <= colHigh; col++) {
-                const cx = col * cell + cell / 2 - WarMapData.HALF_W;
-                const cy = row * cell + cell / 2 - WarMapData.HALF_H;
-                if (WarMath.dist(cx, cy, x, y) <= radius)
-                    grid[row * WarVision.COLS + col] = 1;
-            }
+            const dy = row * cell + half - WarMapData.HALF_H - y;
+            const remaining = limit - dy * dy;
+            if (remaining < 0)
+                continue;
+            const reach = Math.floor(Math.sqrt(remaining));
+            const colLow = Math.max(0, Math.ceil((x - reach + WarMapData.HALF_W - half) / cell));
+            const colHigh = Math.min(WarVision.COLS - 1, Math.floor((x + reach + WarMapData.HALF_W - half) / cell));
+            const offset = row * WarVision.COLS;
+            for (let col = colLow; col <= colHigh; col++)
+                grid[offset + col] = 1;
         }
     }
 }
@@ -429,6 +493,7 @@ class WarSquad {
         this.mode = "home";
         this.path = [];
         this.lagTicks = 0;
+        this.moveFreeTicks = 0;
         this.slots = new Map();
         this.postSlots = new Map();
         this.anchor = WarMapData.post(team, index);
@@ -466,21 +531,31 @@ class WarSquad {
         const path = [];
         for (const point of points) {
             const target = WarTerrain.clamp(point);
-            path.push(...WarNavGraph.route(from, target));
+            if (WarMath.dist(from.x, from.y, target.x, target.y) < WarBalance.PATH_MIN_STEP)
+                continue;
+            path.push(...WarNavGraph.connect(from, target));
             from = target;
         }
-        this.path = path;
+        this.path = WarNavGraph.straighten(this.anchor, path);
         this.mode = "away";
-        this.lagTicks = 0;
-        for (const unit of this.members)
+        this.lagTicks = WarBalance.LAG_PATIENCE_TICKS;
+        this.moveFreeTicks = WarBalance.DEPART_FREE_TICKS;
+        for (const unit of this.members) {
             unit.attached = true;
+            unit.marchTicks = WarBalance.DEPART_FREE_TICKS;
+            unit.targetId = -1;
+        }
     }
     recall() {
-        this.path = WarNavGraph.route(this.anchor, this.post);
+        this.path = WarNavGraph.straighten(this.anchor, WarNavGraph.connect(this.anchor, this.post));
         this.mode = "returning";
         this.lagTicks = 0;
-        for (const unit of this.members)
+        this.moveFreeTicks = WarBalance.DEPART_FREE_TICKS;
+        for (const unit of this.members) {
             unit.attached = true;
+            unit.marchTicks = WarBalance.DEPART_FREE_TICKS;
+            unit.targetId = -1;
+        }
     }
     planSlots() {
         this.slots = WarFormation.slots(this.attachedMembers(), this.anchor, this.heading);
@@ -505,7 +580,9 @@ class WarSquad {
         }
         if (this.path.length === 0)
             return;
-        if (this.isEngaged() || this.isStalledByLag())
+        if (this.moveFreeTicks > 0)
+            this.moveFreeTicks--;
+        else if (this.isEngaged() || this.isStalledByLag())
             return;
         const step = this.speed();
         if (step === 0)
@@ -529,6 +606,8 @@ class WarSquad {
     isStalledByLag() {
         let worst = 0;
         for (const unit of this.attachedMembers()) {
+            if (WarMath.dist(unit.x, unit.y, this.anchor.x, this.anchor.y) > WarBalance.LAG_IGNORE_FAR)
+                continue;
             const slot = this.slotOf(unit);
             worst = Math.max(worst, WarMath.dist(unit.x, unit.y, slot.x, slot.y));
         }
@@ -563,7 +642,7 @@ class WarPlayer {
 class WarCombat {
     static strike(engine, attacker, target) {
         const damage = attacker.damageAgainst(target);
-        engine.damage(target, damage);
+        engine.damage(target, damage, attacker.id);
         const radius = attacker.splashRadius();
         if (radius > 0) {
             const splash = Math.max(1, Math.trunc((damage * WarCombat.SPLASH_FALLOFF_PERCENT) / 100));
@@ -571,7 +650,7 @@ class WarCombat {
                 if (other === target || !other.alive || other.team === attacker.team)
                     continue;
                 if (WarMath.dist(other.x, other.y, target.x, target.y) <= radius)
-                    engine.damage(other, splash);
+                    engine.damage(other, splash, attacker.id);
             }
         }
         attacker.cooldownLeft = attacker.cooldownTicks();
@@ -580,7 +659,36 @@ class WarCombat {
 }
 WarCombat.SPLASH_FALLOFF_PERCENT = 60;
 class WarTargeting {
+    static assistTarget(engine, unit, origin) {
+        const reachSq = WarBalance.ASSIST_RANGE * WarBalance.ASSIST_RANGE;
+        let best = null;
+        let bestSq = Number.MAX_SAFE_INTEGER;
+        for (const ally of engine.entitiesOf(unit.team)) {
+            if (ally.lastAttackerId < 0 || engine.tick - ally.lastHitTick > WarBalance.ASSIST_MEMORY_TICKS)
+                continue;
+            const dx = unit.x - ally.x;
+            const dy = unit.y - ally.y;
+            const distanceSq = dx * dx + dy * dy;
+            if (distanceSq > reachSq)
+                continue;
+            const attacker = engine.entityById(ally.lastAttackerId);
+            if (!attacker || !attacker.alive || attacker.team === unit.team)
+                continue;
+            if (!engine.vision.isVisible(unit.team, attacker.x, attacker.y))
+                continue;
+            if (WarMath.dist(origin.x, origin.y, attacker.x, attacker.y) > WarBalance.LEASH_RANGE)
+                continue;
+            if (distanceSq < bestSq) {
+                bestSq = distanceSq;
+                best = attacker;
+            }
+        }
+        return best;
+    }
     static pick(engine, unit, origin) {
+        const assisted = WarTargeting.assistTarget(engine, unit, origin);
+        if (assisted)
+            return assisted;
         const enemy = unit.team === 0 ? 1 : 0;
         const leashSq = WarBalance.LEASH_RANGE * WarBalance.LEASH_RANGE;
         let bestUnit = null;
@@ -624,6 +732,12 @@ class WarUnitBrain {
         if (unit.slowTicksLeft > 0)
             unit.slowTicksLeft--;
         const slot = squad.slotOf(unit);
+        if (unit.marchTicks > 0) {
+            unit.marchTicks--;
+            unit.retarget(-1);
+            WarUnitBrain.holdFormation(unit, squad, slot);
+            return;
+        }
         const origin = unit.attached ? slot : squad.post;
         let target = unit.targetId >= 0 ? engine.entityById(unit.targetId) : null;
         if (target && !WarUnitBrain.stillValid(engine, unit, target, origin))
@@ -945,9 +1059,13 @@ class WarEngine {
         this.result = { winner, reason, tick: this.tick };
         this.events.push({ kind: "ended", team: winner === 1 ? 1 : 0, tick: this.tick, text: reason, winner });
     }
-    damage(target, amount) {
+    damage(target, amount, attackerId = -1) {
         if (!target.alive)
             return;
+        if (attackerId >= 0) {
+            target.lastHitTick = this.tick;
+            target.lastAttackerId = attackerId;
+        }
         target.hp = Math.max(0, target.hp - amount);
         if (target instanceof WarBuilding)
             this.alerts.noteBuildingHit(target);

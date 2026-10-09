@@ -179,6 +179,7 @@ class WarGameApp {
         WarDom.byId("btnAttack").addEventListener("click", () => this.attackMap.open());
         this.squadPanel.onSelect = (index) => this.select({ kind: "squad", index });
         this.minimap.onJump = (point) => this.jumpTo(point);
+        window.addEventListener("contextmenu", (event) => event.preventDefault());
         window.addEventListener("keydown", (event) => {
             if (event.key === "Escape")
                 this.attackMap.close();

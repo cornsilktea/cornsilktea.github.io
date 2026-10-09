@@ -54,7 +54,7 @@ WarUnitLooks.LOOKS = {
     archer: { ...WarUnitLooks.HUMAN, file: "quaternius/BlueSoldier_Female.gltf", scale: 1, attackClip: "Shoot_OneHanded", shootsFar: true },
     energymage: { shared: false, animated: true, file: "quaternius/Astronaut_BarbaraTheBee.gltf", scale: 0.5, idleClip: "Idle_Gun", runClip: "Run_Gun", attackClip: "Run_Gun_Shoot", shootsFar: true },
     guardknight: { shared: false, animated: true, file: "quaternius/Mech_FinnTheFrog.gltf", scale: 0.8, idleClip: "Idle", runClip: "Run", attackClip: "Kick", shootsFar: false },
-    artillerytruck: { shared: false, animated: false, file: "quaternius/Rover_Round.gltf", scale: 0.55, idleClip: "", runClip: "", attackClip: "", shootsFar: true },
+    artillerytruck: { shared: false, animated: false, file: "quaternius/Rover_Round.gltf", scale: 1.65, idleClip: "", runClip: "", attackClip: "", shootsFar: true },
     minion: { ...WarUnitLooks.SKELETON, file: "characters/Skeleton_Minion.glb", scale: 0.7, attackClip: "Melee_1H_Attack_Chop" },
     skelwarrior: { ...WarUnitLooks.SKELETON, file: "characters/Skeleton_Warrior.glb", scale: 0.85, attackClip: "Melee_1H_Attack_Slice_Horizontal" },
     skelarcher: { ...WarUnitLooks.SKELETON, file: "characters/Skeleton_Rogue.glb", scale: 0.8, attackClip: "Ranged_Bow_Release", shootsFar: true },
@@ -311,7 +311,7 @@ class WarGroundView {
                 const node = assets.model("resources/Iron_Nuggets.gltf");
                 const scene = this.transform.toScene(point);
                 node.position.set(scene.x, 0, scene.z);
-                node.scale.setScalar(2.6);
+                node.scale.setScalar(5.2);
                 node.rotation.y = point.x * 0.01;
                 this.group.add(node);
             }
@@ -319,7 +319,7 @@ class WarGroundView {
                 const crystal = assets.model("scenery/rock_crystalsLargeA.glb");
                 const scene = this.transform.toScene(point);
                 crystal.position.set(scene.x, 0, scene.z);
-                crystal.scale.setScalar(2.2);
+                crystal.scale.setScalar(4.2);
                 crystal.rotation.y = point.y * 0.013;
                 this.group.add(crystal);
             }
@@ -338,7 +338,7 @@ class WarFogView {
         this.texture.magFilter = THREE.LinearFilter;
         this.texture.minFilter = THREE.LinearFilter;
         this.texture.generateMipmaps = false;
-        const material = new THREE.MeshBasicMaterial({ map: this.texture, transparent: true, depthWrite: false });
+        const material = new THREE.MeshBasicMaterial({ map: this.texture, transparent: true, depthWrite: false, depthTest: false });
         this.mesh = new THREE.Mesh(new THREE.PlaneGeometry((this.canvas.width * WarMapData.VISION_CELL) / 100, (this.canvas.height * WarMapData.VISION_CELL) / 100), material);
         this.mesh.rotation.x = -Math.PI / 2;
         this.mesh.position.y = 0.08;
@@ -347,7 +347,7 @@ class WarFogView {
     refresh() {
         const context = this.canvas.getContext("2d");
         context.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        context.fillStyle = "rgba(2, 5, 14, 0.5)";
+        context.fillStyle = "rgba(0, 0, 0, 0.88)";
         const cell = WarMapData.VISION_CELL;
         for (let row = 0; row < this.canvas.height; row++) {
             for (let col = 0; col < this.canvas.width; col++) {
@@ -364,6 +364,15 @@ class WarFogView {
     }
 }
 class WarWorkerCrowd {
+    static progress(phase) {
+        if (phase < WarWorkerCrowd.MINE_END)
+            return 0;
+        if (phase < WarWorkerCrowd.GO_END)
+            return (phase - WarWorkerCrowd.MINE_END) / (WarWorkerCrowd.GO_END - WarWorkerCrowd.MINE_END);
+        if (phase < WarWorkerCrowd.DROP_END)
+            return 1;
+        return 1 - (phase - WarWorkerCrowd.DROP_END) / (1 - WarWorkerCrowd.DROP_END);
+    }
     constructor(libs, assets, transform, team, color) {
         this.transform = transform;
         this.team = team;
@@ -380,18 +389,25 @@ class WarWorkerCrowd {
         for (let i = 0; i < total; i++) {
             const points = i < oreWorkers ? ore : crystal;
             const node = this.transform.toScene(points[i % points.length]);
-            const phase = (seconds * 0.2 + i * 0.173) % 1;
-            const outbound = phase < 0.5;
-            const t = outbound ? phase * 2 : (1 - phase) * 2;
-            const x = node.x + (hq.x - node.x) * t * 0.82;
-            const z = node.z + (hq.z - node.z) * t * 0.82;
-            const heading = Math.atan2(outbound ? hq.x - node.x : node.x - hq.x, outbound ? hq.z - node.z : node.z - hq.z);
-            this.instances.set(i, { x, z, yaw: heading, scale: 0.55, y: Math.abs(Math.sin(seconds * 8 + i)) * 0.08 });
+            const phase = (seconds * 0.11 + i * 0.173) % 1;
+            const along = WarWorkerCrowd.progress(phase);
+            const mining = phase < WarWorkerCrowd.MINE_END;
+            const carryingHome = phase >= WarWorkerCrowd.MINE_END && phase < WarWorkerCrowd.DROP_END;
+            const reach = 0.15 + along * 0.7;
+            const x = node.x + (hq.x - node.x) * reach;
+            const z = node.z + (hq.z - node.z) * reach;
+            const towardHq = Math.atan2(hq.x - node.x, hq.z - node.z);
+            const yaw = mining ? towardHq + Math.PI : carryingHome || phase < WarWorkerCrowd.DROP_END ? towardHq : towardHq + Math.PI;
+            const bob = mining ? Math.abs(Math.sin(seconds * 6 + i * 1.7)) * 0.22 : Math.abs(Math.sin(seconds * 9 + i)) * 0.06;
+            this.instances.set(i, { x, z, yaw, scale: 2.4, y: bob });
         }
         this.instances.finish(total);
     }
 }
 WarWorkerCrowd.MAX = 56;
+WarWorkerCrowd.MINE_END = 0.38;
+WarWorkerCrowd.GO_END = 0.62;
+WarWorkerCrowd.DROP_END = 0.72;
 class WarCameraRig {
     constructor(libs) {
         this.focusX = 0;
@@ -590,7 +606,7 @@ class WarMatchView {
         this.root.add(this.fog.mesh);
         this.slotMarkers = new WarSlotMarkers(libs, engine.players[viewer].slotDefs, this.transform);
         this.root.add(this.slotMarkers.group);
-        this.crowds = [new WarWorkerCrowd(libs, assets, this.transform, 0, viewer === 0 ? "#B8FFD8" : "#FFB0B0"), new WarWorkerCrowd(libs, assets, this.transform, 1, viewer === 1 ? "#B8FFD8" : "#FFB0B0")];
+        this.crowds = [new WarWorkerCrowd(libs, assets, this.transform, 0, viewer === 0 ? "#E4FFEE" : "#FFC4C4"), new WarWorkerCrowd(libs, assets, this.transform, 1, viewer === 1 ? "#E4FFEE" : "#FFC4C4")];
         this.crowds.forEach((crowd) => this.root.add(crowd.group));
         this.marker = new WarSelectionMarker(libs);
         this.root.add(this.marker.mesh);
@@ -732,7 +748,12 @@ class WarMatchView {
             const slot = this.engine.players[this.viewer].slotDefs[selection.index];
             this.marker.place(this.transform.toScene(slot), 1.5);
         }
-        else if (selection.kind === "building" || selection.kind === "unit") {
+        else if (selection.kind === "unit") {
+            const view = this.units.get(selection.id);
+            const entity = this.engine.entityById(selection.id);
+            this.marker.place(view && entity && entity.alive ? { x: view.group.position.x, z: view.group.position.z } : null, 0.9);
+        }
+        else if (selection.kind === "building") {
             const entity = this.engine.entityById(selection.id);
             this.marker.place(entity && entity.alive ? this.transform.toScene(entity) : null, entity ? Math.max(0.9, entity.bodyRadius() / 100 + 0.35) : 1);
         }
@@ -779,7 +800,7 @@ class WarMenuBackdrop {
         const transform = new WarViewTransform(0);
         const materials = new WarMaterials(this.libs);
         this.root.add(new WarGroundView(this.libs, this.assets, transform).group);
-        this.crowd = new WarWorkerCrowd(this.libs, this.assets, transform, 0, "#B8FFD8");
+        this.crowd = new WarWorkerCrowd(this.libs, this.assets, transform, 0, "#E4FFEE");
         this.root.add(this.crowd.group);
         const engine = new WarEngine({ seed: 1, factions: ["pioneer", "pioneer"] });
         const player = engine.players[0];

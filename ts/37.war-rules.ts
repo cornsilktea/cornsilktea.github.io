@@ -79,6 +79,8 @@ class WarRandom {
 
 abstract class WarEntity {
   hp: number;
+  lastHitTick = -1000;
+  lastAttackerId = -1;
 
   constructor(readonly id: number, readonly team: WarTeam, public x: number, public y: number, readonly maxHp: number) {
     this.hp = maxHp;
@@ -99,6 +101,7 @@ class WarUnit extends WarEntity implements WarAttacker {
   chargeReady: boolean;
   slowTicksLeft = 0;
   slowPct = 0;
+  marchTicks = 0;
   revived = false;
   readonly ability: WarAbility | null;
 
@@ -299,6 +302,44 @@ class WarTerrain {
 
 class WarNavGraph {
   private static readonly NODES: WarNavNode[] = WarMapData.navNodes();
+  private static readonly WALK_SAMPLE_CM = 150;
+
+  static isWalkable(from: WarPoint, to: WarPoint): boolean {
+    const length = WarMath.dist(from.x, from.y, to.x, to.y);
+    const steps = Math.max(1, Math.ceil(length / WarNavGraph.WALK_SAMPLE_CM));
+    for (let i = 1; i < steps; i++) {
+      const point = { x: from.x + Math.trunc(((to.x - from.x) * i) / steps), y: from.y + Math.trunc(((to.y - from.y) * i) / steps) };
+      const fixed = WarTerrain.clamp(point);
+      if (fixed.x !== point.x || fixed.y !== point.y) return false;
+    }
+    return true;
+  }
+
+  static connect(from: WarPoint, to: WarPoint): WarPoint[] {
+    if (WarNavGraph.isWalkable(from, to)) return [{ x: to.x, y: to.y }];
+    const nodes = WarNavGraph.route(from, to);
+    while (nodes.length > 1 && WarNavGraph.isWalkable(from, nodes[1])) nodes.shift();
+    return nodes;
+  }
+
+  static straighten(start: WarPoint, points: WarPoint[]): WarPoint[] {
+    const result: WarPoint[] = [];
+    let from = start;
+    let i = 0;
+    while (i < points.length) {
+      let farthest = i;
+      for (let j = points.length - 1; j > i; j--) {
+        if (WarNavGraph.isWalkable(from, points[j])) {
+          farthest = j;
+          break;
+        }
+      }
+      result.push(points[farthest]);
+      from = points[farthest];
+      i = farthest + 1;
+    }
+    return result;
+  }
 
   static route(from: WarPoint, to: WarPoint): WarPoint[] {
     const start = WarNavGraph.nearest(from);
@@ -360,16 +401,24 @@ class WarVision {
   private static readonly ROWS = Math.ceil((WarMapData.HALF_H * 2) / WarMapData.VISION_CELL);
 
   private readonly grids: Uint8Array[] = [new Uint8Array(WarVision.COLS * WarVision.ROWS), new Uint8Array(WarVision.COLS * WarVision.ROWS)];
+  private readonly homeLayers: Uint8Array[] = [new Uint8Array(WarVision.COLS * WarVision.ROWS), new Uint8Array(WarVision.COLS * WarVision.ROWS)];
+  private homeReady = false;
 
   update(entities: WarEntity[]): void {
-    for (const grid of this.grids) grid.fill(0);
-    for (const team of [0, 1] as WarTeam[]) {
-      for (const zone of WarMapData.SHARED_VISION_ZONES) this.reveal(team, zone.x, zone.y, zone.radius);
-    }
+    if (!this.homeReady) this.paintHomeLayers();
+    this.grids[0].set(this.homeLayers[0]);
+    this.grids[1].set(this.homeLayers[1]);
+    const seen = new Set<number>();
+    const cell = WarMapData.VISION_CELL;
     for (const entity of entities) {
       if (!entity.alive) continue;
       const radius = entity instanceof WarUnit ? WarBalance.SIGHT_UNIT : WarBalance.SIGHT_BUILDING;
-      this.reveal(entity.team, entity.x, entity.y, radius);
+      const snapX = Math.floor((entity.x + WarMapData.HALF_W) / cell);
+      const snapY = Math.floor((entity.y + WarMapData.HALF_H) / cell);
+      const key = ((snapY * WarVision.COLS + snapX) * 2 + entity.team) * 2 + (radius === WarBalance.SIGHT_UNIT ? 0 : 1);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      this.reveal(this.grids[entity.team], entity.x, entity.y, radius);
     }
   }
 
@@ -380,19 +429,33 @@ class WarVision {
     return this.grids[team][row * WarVision.COLS + col] === 1;
   }
 
-  private reveal(team: WarTeam, x: number, y: number, radius: number): void {
+  private paintHomeLayers(): void {
+    this.homeReady = true;
+    for (const team of [0, 1] as WarTeam[]) {
+      const layer = this.homeLayers[team];
+      for (const zone of WarMapData.SHARED_VISION_ZONES) this.reveal(layer, zone.x, zone.y, zone.radius);
+      const hq = WarMapData.hq(team);
+      const gate = WarMapData.entrance(team);
+      this.reveal(layer, hq.x, hq.y, WarMapData.BASE_RADIUS + WarBalance.HOME_VISION_EXTRA);
+      this.reveal(layer, gate.x, gate.y, WarMapData.PLAZA_RADIUS);
+    }
+  }
+
+  private reveal(grid: Uint8Array, x: number, y: number, radius: number): void {
     const cell = WarMapData.VISION_CELL;
-    const colLow = Math.max(0, Math.floor((x - radius + WarMapData.HALF_W) / cell));
-    const colHigh = Math.min(WarVision.COLS - 1, Math.floor((x + radius + WarMapData.HALF_W) / cell));
+    const half = cell / 2;
+    const limit = (radius + 1) * (radius + 1) - 1;
     const rowLow = Math.max(0, Math.floor((y - radius + WarMapData.HALF_H) / cell));
     const rowHigh = Math.min(WarVision.ROWS - 1, Math.floor((y + radius + WarMapData.HALF_H) / cell));
-    const grid = this.grids[team];
     for (let row = rowLow; row <= rowHigh; row++) {
-      for (let col = colLow; col <= colHigh; col++) {
-        const cx = col * cell + cell / 2 - WarMapData.HALF_W;
-        const cy = row * cell + cell / 2 - WarMapData.HALF_H;
-        if (WarMath.dist(cx, cy, x, y) <= radius) grid[row * WarVision.COLS + col] = 1;
-      }
+      const dy = row * cell + half - WarMapData.HALF_H - y;
+      const remaining = limit - dy * dy;
+      if (remaining < 0) continue;
+      const reach = Math.floor(Math.sqrt(remaining));
+      const colLow = Math.max(0, Math.ceil((x - reach + WarMapData.HALF_W - half) / cell));
+      const colHigh = Math.min(WarVision.COLS - 1, Math.floor((x + reach + WarMapData.HALF_W - half) / cell));
+      const offset = row * WarVision.COLS;
+      for (let col = colLow; col <= colHigh; col++) grid[offset + col] = 1;
     }
   }
 }
@@ -476,6 +539,7 @@ class WarSquad {
   heading: WarPoint;
   path: WarPoint[] = [];
   lagTicks = 0;
+  moveFreeTicks = 0;
   slots = new Map<number, WarPoint>();
   postSlots = new Map<number, WarPoint>();
 
@@ -519,20 +583,31 @@ class WarSquad {
     const path: WarPoint[] = [];
     for (const point of points) {
       const target = WarTerrain.clamp(point);
-      path.push(...WarNavGraph.route(from, target));
+      if (WarMath.dist(from.x, from.y, target.x, target.y) < WarBalance.PATH_MIN_STEP) continue;
+      path.push(...WarNavGraph.connect(from, target));
       from = target;
     }
-    this.path = path;
+    this.path = WarNavGraph.straighten(this.anchor, path);
     this.mode = "away";
-    this.lagTicks = 0;
-    for (const unit of this.members) unit.attached = true;
+    this.lagTicks = WarBalance.LAG_PATIENCE_TICKS;
+    this.moveFreeTicks = WarBalance.DEPART_FREE_TICKS;
+    for (const unit of this.members) {
+      unit.attached = true;
+      unit.marchTicks = WarBalance.DEPART_FREE_TICKS;
+      unit.targetId = -1;
+    }
   }
 
   recall(): void {
-    this.path = WarNavGraph.route(this.anchor, this.post);
+    this.path = WarNavGraph.straighten(this.anchor, WarNavGraph.connect(this.anchor, this.post));
     this.mode = "returning";
     this.lagTicks = 0;
-    for (const unit of this.members) unit.attached = true;
+    this.moveFreeTicks = WarBalance.DEPART_FREE_TICKS;
+    for (const unit of this.members) {
+      unit.attached = true;
+      unit.marchTicks = WarBalance.DEPART_FREE_TICKS;
+      unit.targetId = -1;
+    }
   }
 
   planSlots(): void {
@@ -559,7 +634,8 @@ class WarSquad {
       return;
     }
     if (this.path.length === 0) return;
-    if (this.isEngaged() || this.isStalledByLag()) return;
+    if (this.moveFreeTicks > 0) this.moveFreeTicks--;
+    else if (this.isEngaged() || this.isStalledByLag()) return;
     const step = this.speed();
     if (step === 0) return;
     const goal = this.path[0];
@@ -579,6 +655,7 @@ class WarSquad {
   private isStalledByLag(): boolean {
     let worst = 0;
     for (const unit of this.attachedMembers()) {
+      if (WarMath.dist(unit.x, unit.y, this.anchor.x, this.anchor.y) > WarBalance.LAG_IGNORE_FAR) continue;
       const slot = this.slotOf(unit);
       worst = Math.max(worst, WarMath.dist(unit.x, unit.y, slot.x, slot.y));
     }
@@ -620,13 +697,13 @@ class WarCombat {
 
   static strike(engine: WarEngine, attacker: WarAttacker, target: WarEntity): void {
     const damage = attacker.damageAgainst(target);
-    engine.damage(target, damage);
+    engine.damage(target, damage, attacker.id);
     const radius = attacker.splashRadius();
     if (radius > 0) {
       const splash = Math.max(1, Math.trunc((damage * WarCombat.SPLASH_FALLOFF_PERCENT) / 100));
       for (const other of engine.entities) {
         if (other === target || !other.alive || other.team === attacker.team) continue;
-        if (WarMath.dist(other.x, other.y, target.x, target.y) <= radius) engine.damage(other, splash);
+        if (WarMath.dist(other.x, other.y, target.x, target.y) <= radius) engine.damage(other, splash, attacker.id);
       }
     }
     attacker.cooldownLeft = attacker.cooldownTicks();
@@ -635,7 +712,31 @@ class WarCombat {
 }
 
 class WarTargeting {
+  private static assistTarget(engine: WarEngine, unit: WarUnit, origin: WarPoint): WarEntity | null {
+    const reachSq = WarBalance.ASSIST_RANGE * WarBalance.ASSIST_RANGE;
+    let best: WarEntity | null = null;
+    let bestSq = Number.MAX_SAFE_INTEGER;
+    for (const ally of engine.entitiesOf(unit.team)) {
+      if (ally.lastAttackerId < 0 || engine.tick - ally.lastHitTick > WarBalance.ASSIST_MEMORY_TICKS) continue;
+      const dx = unit.x - ally.x;
+      const dy = unit.y - ally.y;
+      const distanceSq = dx * dx + dy * dy;
+      if (distanceSq > reachSq) continue;
+      const attacker = engine.entityById(ally.lastAttackerId);
+      if (!attacker || !attacker.alive || attacker.team === unit.team) continue;
+      if (!engine.vision.isVisible(unit.team, attacker.x, attacker.y)) continue;
+      if (WarMath.dist(origin.x, origin.y, attacker.x, attacker.y) > WarBalance.LEASH_RANGE) continue;
+      if (distanceSq < bestSq) {
+        bestSq = distanceSq;
+        best = attacker;
+      }
+    }
+    return best;
+  }
+
   static pick(engine: WarEngine, unit: WarUnit, origin: WarPoint): WarEntity | null {
+    const assisted = WarTargeting.assistTarget(engine, unit, origin);
+    if (assisted) return assisted;
     const enemy: WarTeam = unit.team === 0 ? 1 : 0;
     const leashSq = WarBalance.LEASH_RANGE * WarBalance.LEASH_RANGE;
     let bestUnit: WarEntity | null = null;
@@ -675,6 +776,12 @@ class WarUnitBrain {
     if (unit.cooldownLeft > 0) unit.cooldownLeft--;
     if (unit.slowTicksLeft > 0) unit.slowTicksLeft--;
     const slot = squad.slotOf(unit);
+    if (unit.marchTicks > 0) {
+      unit.marchTicks--;
+      unit.retarget(-1);
+      WarUnitBrain.holdFormation(unit, squad, slot);
+      return;
+    }
     const origin = unit.attached ? slot : squad.post;
     let target = unit.targetId >= 0 ? engine.entityById(unit.targetId) : null;
     if (target && !WarUnitBrain.stillValid(engine, unit, target, origin)) target = null;
@@ -698,7 +805,7 @@ class WarUnitBrain {
     return WarMath.dist(origin.x, origin.y, target.x, target.y) <= WarBalance.LEASH_RANGE;
   }
 
-  private static holdFormation(unit: WarUnit, squad: WarSquad, slot: WarPoint): void {
+  static holdFormation(unit: WarUnit, squad: WarSquad, slot: WarPoint): void {
     const gap = WarMath.dist(unit.x, unit.y, slot.x, slot.y);
     const catchingUp = gap > 300 || !unit.attached || squad.mode === "home";
     const pace = catchingUp ? unit.stepLength() : Math.min(unit.stepLength(), squad.speed());
@@ -1003,8 +1110,12 @@ class WarEngine {
     this.events.push({ kind: "ended", team: winner === 1 ? 1 : 0, tick: this.tick, text: reason, winner });
   }
 
-  damage(target: WarEntity, amount: number): void {
+  damage(target: WarEntity, amount: number, attackerId = -1): void {
     if (!target.alive) return;
+    if (attackerId >= 0) {
+      target.lastHitTick = this.tick;
+      target.lastAttackerId = attackerId;
+    }
     target.hp = Math.max(0, target.hp - amount);
     if (target instanceof WarBuilding) this.alerts.noteBuildingHit(target);
     if (target instanceof WarUnit && target.hp === 0) this.tryRevive(target);

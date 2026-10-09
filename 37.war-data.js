@@ -23,15 +23,21 @@ WarBalance.DIMINISH_PERCENT = 92;
 WarBalance.BATCH_MELEE = 10;
 WarBalance.BATCH_RANGED = 5;
 WarBalance.BATCH_ELITE = 5;
-WarBalance.SIGHT_UNIT = 1000;
+WarBalance.SIGHT_UNIT = 1200;
 WarBalance.SIGHT_BUILDING = 1300;
 WarBalance.ACQUIRE_RANGE = 1200;
 WarBalance.LEASH_RANGE = 2200;
 WarBalance.FORMATION_LAG = 900;
-WarBalance.LAG_PATIENCE_TICKS = 50;
+WarBalance.LAG_PATIENCE_TICKS = 15;
+WarBalance.LAG_IGNORE_FAR = 2500;
+WarBalance.PATH_MIN_STEP = 200;
+WarBalance.DEPART_FREE_TICKS = 20;
+WarBalance.HOME_VISION_EXTRA = 600;
+WarBalance.ASSIST_RANGE = 2000;
+WarBalance.ASSIST_MEMORY_TICKS = 20;
 WarBalance.SEPARATION_RADIUS = 90;
 WarBalance.ACQUIRE_EVERY_TICKS = 3;
-WarBalance.VISION_EVERY_TICKS = 2;
+WarBalance.VISION_EVERY_TICKS = 3;
 WarBalance.ALERT_COOLDOWN_TICKS = 50;
 WarBalance.ALERT_EVERY_TICKS = 5;
 WarBalance.REVIVE_HP_PERCENT = 30;
@@ -52,12 +58,12 @@ class WarUnitCatalog {
     }
 }
 WarUnitCatalog.SPECS = [
-    { id: "shieldbearer", name: "방패병", faction: "pioneer", kind: "melee", role: "front", hp: 480, damage: 13, armorPct: 30, speed: 300, range: 150, cooldownTicks: 10, ore: 60, crystal: 0, pop: 1, buildTicks: 40, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0 },
-    { id: "charger", name: "돌격병", faction: "pioneer", kind: "melee", role: "mid", hp: 298, damage: 26, armorPct: 0, speed: 360, range: 150, cooldownTicks: 8, ore: 80, crystal: 0, pop: 1, buildTicks: 40, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 100 },
-    { id: "archer", name: "사수", faction: "pioneer", kind: "ranged", role: "rear", hp: 143, damage: 16, armorPct: 0, speed: 340, range: 700, cooldownTicks: 6, ore: 70, crystal: 0, pop: 1, buildTicks: 50, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0 },
-    { id: "energymage", name: "에너지술사", faction: "pioneer", kind: "ranged", role: "rear", hp: 120, damage: 24, armorPct: 0, speed: 320, range: 650, cooldownTicks: 12, ore: 90, crystal: 10, pop: 1, buildTicks: 50, splashRadius: 200, buildingDamagePct: 100, chargeBonusPct: 0 },
-    { id: "guardknight", name: "근위 기사", faction: "pioneer", kind: "elite", role: "front", hp: 1070, damage: 32, armorPct: 40, speed: 260, range: 180, cooldownTicks: 10, ore: 160, crystal: 60, pop: 2, buildTicks: 100, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0 },
-    { id: "artillerytruck", name: "포격 트럭", faction: "pioneer", kind: "elite", role: "rear", hp: 266, damage: 47, armorPct: 0, speed: 280, range: 1100, cooldownTicks: 20, ore: 180, crystal: 80, pop: 2, buildTicks: 100, splashRadius: 250, buildingDamagePct: 200, chargeBonusPct: 0 },
+    { id: "shieldbearer", name: "방패병", faction: "pioneer", kind: "melee", role: "front", hp: 448, damage: 12, armorPct: 30, speed: 300, range: 150, cooldownTicks: 10, ore: 60, crystal: 0, pop: 1, buildTicks: 40, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0 },
+    { id: "charger", name: "돌격병", faction: "pioneer", kind: "melee", role: "mid", hp: 280, damage: 24, armorPct: 0, speed: 360, range: 150, cooldownTicks: 8, ore: 80, crystal: 0, pop: 1, buildTicks: 40, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 100 },
+    { id: "archer", name: "사수", faction: "pioneer", kind: "ranged", role: "rear", hp: 134, damage: 15, armorPct: 0, speed: 340, range: 700, cooldownTicks: 6, ore: 70, crystal: 0, pop: 1, buildTicks: 50, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0 },
+    { id: "energymage", name: "에너지술사", faction: "pioneer", kind: "ranged", role: "rear", hp: 112, damage: 22, armorPct: 0, speed: 320, range: 650, cooldownTicks: 12, ore: 90, crystal: 10, pop: 1, buildTicks: 50, splashRadius: 200, buildingDamagePct: 100, chargeBonusPct: 0 },
+    { id: "guardknight", name: "근위 기사", faction: "pioneer", kind: "elite", role: "front", hp: 1008, damage: 30, armorPct: 40, speed: 260, range: 180, cooldownTicks: 10, ore: 160, crystal: 60, pop: 2, buildTicks: 100, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0 },
+    { id: "artillerytruck", name: "포격 트럭", faction: "pioneer", kind: "elite", role: "rear", hp: 246, damage: 44, armorPct: 0, speed: 280, range: 1100, cooldownTicks: 20, ore: 180, crystal: 80, pop: 2, buildTicks: 100, splashRadius: 250, buildingDamagePct: 200, chargeBonusPct: 0 },
     { id: "minion", name: "해골 미니언", faction: "grave", kind: "melee", role: "mid", hp: 115, damage: 10, armorPct: 0, speed: 380, range: 150, cooldownTicks: 8, ore: 30, crystal: 0, pop: 1, buildTicks: 30, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, spawnCount: 2 },
     { id: "skelwarrior", name: "해골 전사", faction: "grave", kind: "melee", role: "front", hp: 360, damage: 15, armorPct: 22, speed: 300, range: 150, cooldownTicks: 10, ore: 55, crystal: 0, pop: 1, buildTicks: 40, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, reviveChancePct: 30 },
     { id: "skelarcher", name: "해골 궁수", faction: "grave", kind: "ranged", role: "rear", hp: 115, damage: 14, armorPct: 0, speed: 340, range: 750, cooldownTicks: 6, ore: 65, crystal: 0, pop: 1, buildTicks: 50, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0 },
@@ -83,7 +89,7 @@ class WarBuildingCatalog {
     }
 }
 WarBuildingCatalog.DEFS = [
-    { type: "hq", name: "사령부", ore: 0, crystal: 0, buildTicks: 0, hp: 8000, radius: 320, producesKind: null },
+    { type: "hq", name: "사령부", ore: 0, crystal: 0, buildTicks: 0, hp: 5000, radius: 320, producesKind: null },
     { type: "barracks", name: "병영", ore: 100, crystal: 0, buildTicks: 80, hp: 800, radius: 160, producesKind: "melee" },
     { type: "range", name: "사격장", ore: 100, crystal: 0, buildTicks: 80, hp: 700, radius: 160, producesKind: "ranged" },
     { type: "lab", name: "연구소", ore: 150, crystal: 50, buildTicks: 120, hp: 900, radius: 170, producesKind: "elite" },
@@ -182,9 +188,9 @@ WarMapData.SLOT_OFFSETS = [
     { x: 651, y: -1571 }, { x: 1202, y: -1202 }, { x: 1571, y: -651 }, { x: 1700, y: 0 },
 ];
 WarMapData.ENTRANCE_SLOT_OFFSETS = [{ x: -700, y: -1000 }, { x: 700, y: -1000 }];
-WarMapData.ORE_OFFSETS = [{ x: -2200, y: 1500 }, { x: -1600, y: 1750 }, { x: -1000, y: 1900 }, { x: -400, y: 1950 }];
-WarMapData.CRYSTAL_OFFSETS = [{ x: 1100, y: 1900 }, { x: 1900, y: 1650 }];
-WarMapData.VISION_CELL = 500;
+WarMapData.ORE_OFFSETS = [{ x: -1500, y: 250 }, { x: -1300, y: 900 }, { x: -800, y: 1350 }, { x: -250, y: 1550 }];
+WarMapData.CRYSTAL_OFFSETS = [{ x: 1300, y: 900 }, { x: 750, y: 1400 }];
+WarMapData.VISION_CELL = 250;
 WarMapData.SHARED_VISION_ZONES = [
     { x: 0, y: 0, radius: 1800 },
     { x: -4500, y: 0, radius: 1800 },

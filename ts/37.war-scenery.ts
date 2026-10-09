@@ -105,7 +105,6 @@ class WarTerrainPainter {
   private static readonly LICHEN = [0x4F, 0x3A, 0x62];
   private static readonly LANE_A = [0xB8, 0x98, 0x70];
   private static readonly LANE_B = [0x92, 0x76, 0x58];
-  private static readonly PAD = [0x3E, 0x49, 0x58];
 
   constructor(private readonly noise: WarValueNoise, private readonly field: WarLaneField) {}
 
@@ -139,8 +138,9 @@ class WarTerrainPainter {
     const lane = this.field.laneDistance(wx, wy) + wobble;
     const pad = this.field.padDistance(wx, wy);
     const grain = noise.fbm(wx / 90, wy / 90, 2);
-    if (pad < 0) return this.padColor(wx, wy, pad, grain);
-    const base = lane < 0 ? this.laneColor(wx, wy, grain) : this.highlandColor(wx, wy, grain);
+    const inBase = pad < 0;
+    const base = inBase || lane < 0 ? this.laneColor(wx, wy, grain) : this.highlandColor(wx, wy, grain);
+    if (inBase) return this.baseGround(wx, wy, pad, base, grain);
     const edge = Math.abs(lane) < 330 ? 1 - Math.abs(lane) / 330 : 0;
     const shade = lane < 0 ? 1 - edge * 0.38 : 1 - edge * 0.55;
     const rubble = edge > 0.2 && noise.sample(wx / 28, wy / 28) > 0.72 ? 0.7 : 1;
@@ -173,14 +173,13 @@ class WarTerrainPainter {
     return [(a[0] + (b[0] - a[0]) * mix) * tone, (a[1] + (b[1] - a[1]) * mix) * tone, (a[2] + (b[2] - a[2]) * mix) * tone];
   }
 
-  private padColor(wx: number, wy: number, pad: number, grain: number): number[] {
-    const p = WarTerrainPainter.PAD;
-    const seamX = ((wx % 400) + 400) % 400, seamY = ((wy % 400) + 400) % 400;
-    const seam = seamX < 12 || seamY < 12 ? 0.62 : 1;
-    const rust = this.noise.fbm(wx / 160, wy / 160, 3) > 0.62 ? 0.84 : 1;
-    const rim = pad > -140 ? 0.7 + (-pad / 140) * 0.3 : 1;
-    const tone = (0.9 + grain * 0.2) * seam * rust * rim;
-    return [p[0] * tone, p[1] * tone, p[2] * tone];
+  private baseGround(wx: number, wy: number, pad: number, base: number[], grain: number): number[] {
+    const trample = this.noise.fbm(wx / 210 + 5, wy / 210 + 11, 3);
+    const crack = Math.abs(this.noise.fbm(wx / 140, wy / 140, 3) - 0.5) < 0.014 ? 0.66 : 1;
+    const dark = 0.7 + trample * 0.14;
+    const rim = pad > -220 ? 0.74 + (-pad / 220) * 0.26 : 1;
+    const tone = dark * crack * rim * (0.94 + grain * 0.12);
+    return [base[0] * tone, base[1] * tone * 0.98, base[2] * tone * 0.94];
   }
 
   private paintCraters(context: CanvasRenderingContext2D, scale: number): void {
@@ -227,6 +226,8 @@ class WarInstanceSet {
     this.scaling = new THREE.Vector3();
     this.up = new THREE.Vector3(0, 1, 0);
     template.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(template);
+    const origin = new THREE.Matrix4().makeTranslation(-(box.min.x + box.max.x) / 2, -box.min.y, -(box.min.z + box.max.z) / 2);
     template.traverse((node) => {
       const mesh = node as Three<"Mesh">;
       if (!mesh.isMesh) return;
@@ -234,7 +235,7 @@ class WarInstanceSet {
       instanced.frustumCulled = false;
       instanced.count = 0;
       this.meshes.push(instanced);
-      this.partMatrices.push(mesh.matrixWorld.clone());
+      this.partMatrices.push(origin.clone().multiply(mesh.matrixWorld));
       this.group.add(instanced);
     });
   }

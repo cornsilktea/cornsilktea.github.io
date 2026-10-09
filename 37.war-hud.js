@@ -77,7 +77,7 @@ class WarSquadPanel {
         }
     }
     update(player, selection) {
-        this.workerText.textContent = String(player.economy.oreWorkers + player.economy.crystalWorkers);
+        this.workerText.textContent = "광석 " + player.economy.oreWorkers + " · 결정 " + player.economy.crystalWorkers;
         player.squads.forEach((squad, index) => {
             const order = ["melee", "ranged", "elite"];
             const colors = [];
@@ -296,7 +296,7 @@ class WarMapPainter {
     static paintFog(context, width, height, engine, transform) {
         const cell = WarMapData.VISION_CELL;
         const cols = Math.ceil((WarMapData.HALF_W * 2) / cell), rows = Math.ceil((WarMapData.HALF_H * 2) / cell);
-        context.fillStyle = "rgba(2,5,14,.55)";
+        context.fillStyle = "rgba(0,0,0,.86)";
         for (let row = 0; row < rows; row++) {
             for (let col = 0; col < cols; col++) {
                 const world = { x: col * cell + cell / 2 - WarMapData.HALF_W, y: row * cell + cell / 2 - WarMapData.HALF_H };
