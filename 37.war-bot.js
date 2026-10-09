@@ -52,31 +52,31 @@ class WarBotBrain {
             { x: 0, y: 0 },
             { x: WarMapData.LANE_X, y: WarMapData.LANE_Y * sign },
         ];
-        for (const squad of player.squads) {
-            const size = squad.members.length;
-            if (squad.mode === "home" && size >= this.profile.attackSquadSize) {
-                const lane = lanes[this.random.below(lanes.length)];
+        const ready = player.squads.filter((squad) => squad.mode === "home" && squad.members.length >= this.profile.attackSquadSize);
+        if (ready.length >= this.profile.readySquadsToLaunch) {
+            const lane = lanes[this.random.below(lanes.length)];
+            for (const squad of ready)
                 engine.submit(new WarAttackPathCommand(this.team, squad.index, [lane, target]));
-            }
-            else if (squad.mode === "away" && size <= this.profile.retreatSquadSize && !squad.isEngaged()) {
+        }
+        for (const squad of player.squads) {
+            if (squad.mode === "away" && squad.members.length <= this.profile.retreatSquadSize && !squad.isEngaged())
                 engine.submit(new WarRecallCommand(this.team, squad.index));
-            }
         }
     }
 }
 class WarEasyBot extends WarBotBrain {
     constructor(team, seed) {
-        super(team, seed, { thinkTicks: 40, oreWorkerTarget: 8, crystalWorkerTarget: 2, buildingTarget: 4, attackSquadSize: 18, retreatSquadSize: 3, buildOrder: ["barracks", "range", "barracks", "range"] });
+        super(team, seed, { thinkTicks: 40, oreWorkerTarget: 8, crystalWorkerTarget: 2, buildingTarget: 4, attackSquadSize: 14, readySquadsToLaunch: 1, retreatSquadSize: 3, buildOrder: ["barracks", "range", "barracks", "range"] });
     }
 }
 class WarNormalBot extends WarBotBrain {
     constructor(team, seed) {
-        super(team, seed, { thinkTicks: 20, oreWorkerTarget: 12, crystalWorkerTarget: 5, buildingTarget: 7, attackSquadSize: 14, retreatSquadSize: 3, buildOrder: ["barracks", "range", "barracks", "lab", "range", "barracks", "lab"] });
+        super(team, seed, { thinkTicks: 20, oreWorkerTarget: 12, crystalWorkerTarget: 5, buildingTarget: 7, attackSquadSize: 14, readySquadsToLaunch: 1, retreatSquadSize: 3, buildOrder: ["barracks", "range", "barracks", "lab", "range", "barracks", "lab"] });
     }
 }
 class WarHardBot extends WarBotBrain {
     constructor(team, seed) {
-        super(team, seed, { thinkTicks: 10, oreWorkerTarget: 16, crystalWorkerTarget: 7, buildingTarget: 9, attackSquadSize: 11, retreatSquadSize: 4, buildOrder: ["barracks", "range", "lab", "barracks", "range", "lab", "barracks", "range", "lab"] });
+        super(team, seed, { thinkTicks: 10, oreWorkerTarget: 14, crystalWorkerTarget: 6, buildingTarget: 9, attackSquadSize: 11, readySquadsToLaunch: 2, retreatSquadSize: 4, buildOrder: ["barracks", "range", "lab", "barracks", "range", "lab", "barracks", "range", "lab"] });
     }
 }
 class WarBotFactory {

@@ -233,8 +233,37 @@ class WarInfoPanel {
         };
     }
 }
+class WarAlertPulses {
+    constructor() {
+        this.pulses = [];
+    }
+    add(point) {
+        this.pulses.push({ x: point.x, y: point.y, startedMs: performance.now() });
+    }
+    clear() {
+        this.pulses = [];
+    }
+    paint(context, width, height, transform) {
+        const now = performance.now();
+        this.pulses = this.pulses.filter((pulse) => now - pulse.startedMs < WarAlertPulses.LIFE_MS);
+        for (const pulse of this.pulses) {
+            const progress = (now - pulse.startedMs) / WarAlertPulses.LIFE_MS;
+            const center = transform.toMap(pulse, width, height);
+            context.fillStyle = "rgba(255, 70, 70, 0.95)";
+            context.beginPath();
+            context.arc(center.x, center.y, 3, 0, Math.PI * 2);
+            context.fill();
+            context.strokeStyle = "rgba(255, 70, 70, " + (1 - progress).toFixed(2) + ")";
+            context.lineWidth = 2.5;
+            context.beginPath();
+            context.arc(center.x, center.y, 4 + progress * width * 0.12, 0, Math.PI * 2);
+            context.stroke();
+        }
+    }
+}
+WarAlertPulses.LIFE_MS = 1800;
 class WarMapPainter {
-    static paint(context, width, height, engine, transform, showPaths, cameraFocus) {
+    static paint(context, width, height, engine, transform, showPaths, cameraFocus, pulses) {
         context.clearRect(0, 0, width, height);
         context.fillStyle = "#10162A";
         context.fillRect(0, 0, width, height);
@@ -243,6 +272,7 @@ class WarMapPainter {
         if (showPaths)
             WarMapPainter.paintPaths(context, width, height, engine, transform);
         WarMapPainter.paintEntities(context, width, height, engine, transform);
+        pulses.paint(context, width, height, transform);
         if (cameraFocus) {
             const p = transform.toMap(cameraFocus, width, height);
             context.strokeStyle = "rgba(255,255,255,.85)";
@@ -317,7 +347,8 @@ class WarMapPainter {
     }
 }
 class WarMinimap {
-    constructor() {
+    constructor(pulses) {
+        this.pulses = pulses;
         this.onJump = () => undefined;
         this.canvas = WarDom.byId("minimap");
         this.context = this.canvas.getContext("2d");
@@ -336,14 +367,15 @@ class WarMinimap {
             this.onJump(transform.mapToWorld(this.pendingJump.x, this.pendingJump.y, this.canvas.width, this.canvas.height));
             this.pendingJump = null;
         }
-        WarMapPainter.paint(this.context, this.canvas.width, this.canvas.height, engine, transform, false, transform.sceneToWorld(focus.x, focus.z));
+        WarMapPainter.paint(this.context, this.canvas.width, this.canvas.height, engine, transform, false, transform.sceneToWorld(focus.x, focus.z), this.pulses);
     }
 }
 class WarAttackMapOverlay {
-    constructor(sink, teamOf, transformOf) {
+    constructor(sink, teamOf, transformOf, pulses) {
         this.sink = sink;
         this.teamOf = teamOf;
         this.transformOf = transformOf;
+        this.pulses = pulses;
         this.overlay = WarDom.byId("attackMap");
         this.canvas = WarDom.byId("attackCanvas");
         this.context = this.canvas.getContext("2d");
@@ -383,7 +415,7 @@ class WarAttackMapOverlay {
         if (!this.isOpen)
             return;
         const transform = this.transformOf();
-        WarMapPainter.paint(this.context, this.canvas.width, this.canvas.height, engine, transform, true, null);
+        WarMapPainter.paint(this.context, this.canvas.width, this.canvas.height, engine, transform, true, null, this.pulses);
         if (this.drawing.length > 1 && this.chosenSquad >= 0) {
             this.context.strokeStyle = WarPalette.SQUAD_COLORS[this.chosenSquad];
             this.context.lineWidth = 4;

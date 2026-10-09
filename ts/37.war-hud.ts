@@ -237,8 +237,41 @@ class WarInfoPanel {
   }
 }
 
+interface WarPulse { x: number; y: number; startedMs: number }
+
+class WarAlertPulses {
+  private static readonly LIFE_MS = 1800;
+  private pulses: WarPulse[] = [];
+
+  add(point: WarPoint): void {
+    this.pulses.push({ x: point.x, y: point.y, startedMs: performance.now() });
+  }
+
+  clear(): void {
+    this.pulses = [];
+  }
+
+  paint(context: CanvasRenderingContext2D, width: number, height: number, transform: WarViewTransform): void {
+    const now = performance.now();
+    this.pulses = this.pulses.filter((pulse) => now - pulse.startedMs < WarAlertPulses.LIFE_MS);
+    for (const pulse of this.pulses) {
+      const progress = (now - pulse.startedMs) / WarAlertPulses.LIFE_MS;
+      const center = transform.toMap(pulse, width, height);
+      context.fillStyle = "rgba(255, 70, 70, 0.95)";
+      context.beginPath();
+      context.arc(center.x, center.y, 3, 0, Math.PI * 2);
+      context.fill();
+      context.strokeStyle = "rgba(255, 70, 70, " + (1 - progress).toFixed(2) + ")";
+      context.lineWidth = 2.5;
+      context.beginPath();
+      context.arc(center.x, center.y, 4 + progress * width * 0.12, 0, Math.PI * 2);
+      context.stroke();
+    }
+  }
+}
+
 class WarMapPainter {
-  static paint(context: CanvasRenderingContext2D, width: number, height: number, engine: WarEngine, transform: WarViewTransform, showPaths: boolean, cameraFocus: WarPoint | null): void {
+  static paint(context: CanvasRenderingContext2D, width: number, height: number, engine: WarEngine, transform: WarViewTransform, showPaths: boolean, cameraFocus: WarPoint | null, pulses: WarAlertPulses): void {
     context.clearRect(0, 0, width, height);
     context.fillStyle = "#10162A";
     context.fillRect(0, 0, width, height);
@@ -246,6 +279,7 @@ class WarMapPainter {
     WarMapPainter.paintFog(context, width, height, engine, transform);
     if (showPaths) WarMapPainter.paintPaths(context, width, height, engine, transform);
     WarMapPainter.paintEntities(context, width, height, engine, transform);
+    pulses.paint(context, width, height, transform);
     if (cameraFocus) {
       const p = transform.toMap(cameraFocus, width, height);
       context.strokeStyle = "rgba(255,255,255,.85)";
@@ -325,7 +359,9 @@ class WarMinimap {
   private readonly canvas = WarDom.byId<HTMLCanvasElement>("minimap");
   private readonly context = this.canvas.getContext("2d") as CanvasRenderingContext2D;
 
-  constructor() {
+  private pendingJump: WarPoint | null = null;
+
+  constructor(private readonly pulses: WarAlertPulses) {
     const jump = (event: PointerEvent): void => {
       const rect = this.canvas.getBoundingClientRect();
       this.pendingJump = { x: ((event.clientX - rect.left) / rect.width) * this.canvas.width, y: ((event.clientY - rect.top) / rect.height) * this.canvas.height };
@@ -335,14 +371,12 @@ class WarMinimap {
     this.canvas.addEventListener("pointermove", (event) => { if (event.buttons) jump(event); });
   }
 
-  private pendingJump: WarPoint | null = null;
-
   update(engine: WarEngine, transform: WarViewTransform, focus: WarScenePoint): void {
     if (this.pendingJump) {
       this.onJump(transform.mapToWorld(this.pendingJump.x, this.pendingJump.y, this.canvas.width, this.canvas.height));
       this.pendingJump = null;
     }
-    WarMapPainter.paint(this.context, this.canvas.width, this.canvas.height, engine, transform, false, transform.sceneToWorld(focus.x, focus.z));
+    WarMapPainter.paint(this.context, this.canvas.width, this.canvas.height, engine, transform, false, transform.sceneToWorld(focus.x, focus.z), this.pulses);
   }
 }
 
@@ -354,7 +388,7 @@ class WarAttackMapOverlay {
   private chosenSquad = -1;
   private drawing: WarPoint[] = [];
 
-  constructor(private readonly sink: WarCommandSink, private readonly teamOf: () => WarTeam, private readonly transformOf: () => WarViewTransform) {
+  constructor(private readonly sink: WarCommandSink, private readonly teamOf: () => WarTeam, private readonly transformOf: () => WarViewTransform, private readonly pulses: WarAlertPulses) {
     for (let index = 0; index < WarBalance.SQUAD_COUNT; index++) {
       const button = WarDom.byId("sqBtn" + index);
       button.style.setProperty("--squad", WarPalette.SQUAD_COLORS[index]);
@@ -389,7 +423,7 @@ class WarAttackMapOverlay {
   update(engine: WarEngine): void {
     if (!this.isOpen) return;
     const transform = this.transformOf();
-    WarMapPainter.paint(this.context, this.canvas.width, this.canvas.height, engine, transform, true, null);
+    WarMapPainter.paint(this.context, this.canvas.width, this.canvas.height, engine, transform, true, null, this.pulses);
     if (this.drawing.length > 1 && this.chosenSquad >= 0) {
       this.context.strokeStyle = WarPalette.SQUAD_COLORS[this.chosenSquad];
       this.context.lineWidth = 4;

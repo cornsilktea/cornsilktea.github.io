@@ -128,7 +128,8 @@ class WarGameApp {
   private readonly squadPanel = new WarSquadPanel();
   private readonly commandCard = new WarCommandCard();
   private readonly infoPanel = new WarInfoPanel();
-  private readonly minimap = new WarMinimap();
+  private readonly alertPulses = new WarAlertPulses();
+  private readonly minimap = new WarMinimap(this.alertPulses);
   private readonly attackMap: WarAttackMapOverlay;
   private match: WarLocalMatch | null = null;
   private selection: WarSelection = { kind: "none" };
@@ -143,7 +144,7 @@ class WarGameApp {
     this.assets = new WarAssetLibrary(libs);
     this.backdrop = new WarMenuBackdrop(libs, this.assets, this.world);
     this.input = new WarInputController(this.canvas, this.world, { tap: (x, y) => this.onTap(x, y) }, () => this.match !== null && !this.attackMap.isOpen);
-    this.attackMap = new WarAttackMapOverlay((command) => this.sendCommand(command), () => this.viewer, () => (this.match as WarLocalMatch).view.transform);
+    this.attackMap = new WarAttackMapOverlay((command) => this.sendCommand(command), () => this.viewer, () => (this.match as WarLocalMatch).view.transform, this.alertPulses);
     this.bindUi();
     this.loadAssets();
     requestAnimationFrame((now) => this.frame(now));
@@ -197,6 +198,7 @@ class WarGameApp {
     this.selection = { kind: "none" };
     this.world.playing = true;
     this.notice.reset();
+    this.alertPulses.clear();
     this.attackMap.close();
     WarDom.byId("startScreen").hidden = true;
     WarDom.byId("endScreen").hidden = true;
@@ -240,7 +242,13 @@ class WarGameApp {
     if (event.kind === "produced" && event.team === this.viewer) this.notice.show(event.text + "이(가) 생산되었습니다.");
     else if (event.kind === "built" && event.team === this.viewer) this.notice.show(event.text + " 건설이 끝났어요.");
     else if (event.kind === "buildingDestroyed") this.notice.show((event.team === this.viewer ? "우리 " : "적 ") + event.text + "이(가) 부서졌어요!");
+    else if (event.kind === "alert" && event.team === this.viewer) this.raiseAlert(event);
     else if (event.kind === "ended") this.showResult(event.winner as WarWinner);
+  }
+
+  private raiseAlert(event: WarEvent): void {
+    this.alertPulses.add({ x: event.x as number, y: event.y as number });
+    this.notice.show(event.text);
   }
 
   private showResult(winner: WarWinner): void {
@@ -278,7 +286,7 @@ class WarGameApp {
     this.squadPanel.update(engine.players[match.viewer], this.selection);
     this.commandCard.update(this.selection, engine, match.viewer, (command) => this.sendCommand(command), () => this.select({ kind: "none" }));
     this.infoPanel.update(this.selection, engine, match.viewer);
-    if (this.frameCount % 3 === 0) this.minimap.update(engine, match.view.transform, this.world.rig.focus);
+    if (this.frameCount % 2 === 0) this.minimap.update(engine, match.view.transform, this.world.rig.focus);
     this.attackMap.update(engine);
   }
 

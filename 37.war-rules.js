@@ -567,29 +567,33 @@ WarCombat.SPLASH_FALLOFF_PERCENT = 60;
 class WarTargeting {
     static pick(engine, unit, origin) {
         const enemy = unit.team === 0 ? 1 : 0;
+        const leashSq = WarBalance.LEASH_RANGE * WarBalance.LEASH_RANGE;
         let bestUnit = null;
-        let bestUnitDistance = Number.MAX_SAFE_INTEGER;
+        let bestUnitSq = Number.MAX_SAFE_INTEGER;
         let bestBuilding = null;
         let bestBuildingKey = Number.MAX_SAFE_INTEGER;
-        for (const other of engine.entities) {
-            if (other.team !== enemy || !other.alive)
+        for (const other of engine.entitiesOf(enemy)) {
+            const reach = WarBalance.ACQUIRE_RANGE + other.bodyRadius();
+            const dx = unit.x - other.x;
+            const dy = unit.y - other.y;
+            const distanceSq = dx * dx + dy * dy;
+            if (distanceSq > reach * reach)
+                continue;
+            const ox = origin.x - other.x;
+            const oy = origin.y - other.y;
+            if (ox * ox + oy * oy > leashSq)
                 continue;
             if (!engine.vision.isVisible(unit.team, other.x, other.y))
                 continue;
-            const distance = WarMath.dist(unit.x, unit.y, other.x, other.y);
-            if (distance - other.bodyRadius() > WarBalance.ACQUIRE_RANGE)
-                continue;
-            if (WarMath.dist(origin.x, origin.y, other.x, other.y) > WarBalance.LEASH_RANGE)
-                continue;
             if (other instanceof WarUnit) {
-                if (distance < bestUnitDistance) {
-                    bestUnitDistance = distance;
+                if (distanceSq < bestUnitSq) {
+                    bestUnitSq = distanceSq;
                     bestUnit = other;
                 }
                 continue;
             }
             const isHq = other instanceof WarBuilding && other.def.type === "hq";
-            const key = (isHq ? 1 : 0) * 1000000 + distance;
+            const key = (isHq ? 1 : 0) * 1000000000000 + distanceSq;
             if (key < bestBuildingKey) {
                 bestBuildingKey = key;
                 bestBuilding = other;
@@ -607,7 +611,7 @@ class WarUnitBrain {
         let target = unit.targetId >= 0 ? engine.entityById(unit.targetId) : null;
         if (target && !WarUnitBrain.stillValid(engine, unit, target, origin))
             target = null;
-        if (!target)
+        if (!target && (engine.tick + unit.id) % WarBalance.ACQUIRE_EVERY_TICKS === 0)
             target = WarTargeting.pick(engine, unit, origin);
         unit.retarget(target ? target.id : -1);
         if (!target) {
@@ -761,9 +765,49 @@ class WarStateHash {
         return hash >>> 0;
     }
 }
+class WarAlertTracker {
+    constructor(engine) {
+        this.engine = engine;
+        this.lastRaisedTick = new Map();
+    }
+    update() {
+        WarMapData.SHARED_VISION_ZONES.forEach((zone, index) => {
+            for (const team of [0, 1]) {
+                const enemy = team === 0 ? 1 : 0;
+                if (!this.hasUnitInside(enemy, zone) || this.hasUnitInside(team, zone))
+                    continue;
+                this.raise(team, "zone" + index, zone.x, zone.y, "적이 나타났어요!");
+            }
+        });
+    }
+    noteBuildingHit(building) {
+        this.raise(building.team, "base", building.x, building.y, "기지가 공격받고 있어요!");
+    }
+    hasUnitInside(team, zone) {
+        const limitSq = zone.radius * zone.radius;
+        for (const entity of this.engine.entitiesOf(team)) {
+            if (!(entity instanceof WarUnit))
+                continue;
+            const dx = entity.x - zone.x;
+            const dy = entity.y - zone.y;
+            if (dx * dx + dy * dy <= limitSq)
+                return true;
+        }
+        return false;
+    }
+    raise(team, key, x, y, text) {
+        const slot = team + key;
+        const last = this.lastRaisedTick.get(slot);
+        if (last !== undefined && this.engine.tick - last < WarBalance.ALERT_COOLDOWN_TICKS)
+            return;
+        this.lastRaisedTick.set(slot, this.engine.tick);
+        this.engine.emit({ kind: "alert", team, tick: this.engine.tick, text, x, y });
+    }
+}
 class WarEngine {
     constructor(options) {
         this.vision = new WarVision();
+        this.alerts = new WarAlertTracker(this);
         this.entities = [];
         this.tick = 0;
         this.result = null;
@@ -771,6 +815,7 @@ class WarEngine {
         this.pending = [];
         this.events = [];
         this.byId = new Map();
+        this.teamEntities = [[], []];
         this.random = new WarRandom(options.seed);
         this.players = [new WarPlayer(0, options.factions[0]), new WarPlayer(1, options.factions[1])];
         for (const player of this.players)
@@ -784,6 +829,12 @@ class WarEngine {
         const out = this.events;
         this.events = [];
         return out;
+    }
+    emit(event) {
+        this.events.push(event);
+    }
+    entitiesOf(team) {
+        return this.teamEntities[team];
     }
     entityById(id) {
         return this.byId.get(id) ?? null;
@@ -800,8 +851,12 @@ class WarEngine {
         for (const player of this.players)
             player.economy.tick();
         this.advanceBuildings();
-        this.vision.update(this.entities);
+        this.refreshTeamEntities();
+        if (this.tick % WarBalance.VISION_EVERY_TICKS === 0)
+            this.vision.update(this.entities);
         this.advanceSquads();
+        if (this.tick % WarBalance.ALERT_EVERY_TICKS === 0)
+            this.alerts.update();
         this.separateUnits();
         this.removeDead();
         this.tick++;
@@ -818,6 +873,8 @@ class WarEngine {
         if (!target.alive)
             return;
         target.hp = Math.max(0, target.hp - amount);
+        if (target instanceof WarBuilding)
+            this.alerts.noteBuildingHit(target);
     }
     produce(team, buildingId, itemId) {
         const player = this.players[team];
@@ -913,6 +970,13 @@ class WarEngine {
         if (!player.assigner.assign(unit))
             unit.hp = 0;
     }
+    refreshTeamEntities() {
+        this.teamEntities[0].length = 0;
+        this.teamEntities[1].length = 0;
+        for (const entity of this.entities)
+            if (entity.alive)
+                this.teamEntities[entity.team].push(entity);
+    }
     advanceSquads() {
         for (const player of this.players) {
             for (const squad of player.squads) {
@@ -928,24 +992,28 @@ class WarEngine {
     separateUnits() {
         const units = this.units();
         const radius = WarBalance.SEPARATION_RADIUS;
-        for (let i = 0; i < units.length; i++) {
-            for (let j = i + 1; j < units.length; j++) {
-                const a = units[i];
-                const b = units[j];
-                const dx = a.x - b.x;
-                const dy = a.y - b.y;
-                if (Math.abs(dx) >= radius || Math.abs(dy) >= radius)
-                    continue;
-                const distance = WarMath.isqrt(dx * dx + dy * dy);
-                if (distance >= radius)
-                    continue;
-                const push = Math.ceil((radius - distance) / 2);
-                const ux = distance === 0 ? (a.id % 2 === 0 ? 1 : -1) * 1000 : Math.trunc((dx * 1000) / distance);
-                const uy = distance === 0 ? 0 : Math.trunc((dy * 1000) / distance);
-                a.x += Math.trunc((ux * push) / 1000);
-                a.y += Math.trunc((uy * push) / 1000);
-                b.x -= Math.trunc((ux * push) / 1000);
-                b.y -= Math.trunc((uy * push) / 1000);
+        const cells = new Map();
+        const keyOf = (x, y) => (Math.floor(x / radius) + 200) * 1000 + (Math.floor(y / radius) + 200);
+        for (const unit of units) {
+            const key = keyOf(unit.x, unit.y);
+            const bucket = cells.get(key);
+            if (bucket)
+                bucket.push(unit);
+            else
+                cells.set(key, [unit]);
+        }
+        for (const a of units) {
+            const baseCol = Math.floor(a.x / radius) + 200;
+            const baseRow = Math.floor(a.y / radius) + 200;
+            for (let col = baseCol - 1; col <= baseCol + 1; col++) {
+                for (let row = baseRow - 1; row <= baseRow + 1; row++) {
+                    const bucket = cells.get(col * 1000 + row);
+                    if (!bucket)
+                        continue;
+                    for (const b of bucket)
+                        if (b.id > a.id)
+                            this.pushApart(a, b, radius);
+                }
             }
         }
         for (const unit of units) {
@@ -953,6 +1021,22 @@ class WarEngine {
             unit.x = fixed.x;
             unit.y = fixed.y;
         }
+    }
+    pushApart(a, b, radius) {
+        const dx = a.x - b.x;
+        const dy = a.y - b.y;
+        if (Math.abs(dx) >= radius || Math.abs(dy) >= radius)
+            return;
+        const distance = WarMath.isqrt(dx * dx + dy * dy);
+        if (distance >= radius)
+            return;
+        const push = Math.ceil((radius - distance) / 2);
+        const ux = distance === 0 ? (a.id % 2 === 0 ? 1 : -1) * 1000 : Math.trunc((dx * 1000) / distance);
+        const uy = distance === 0 ? 0 : Math.trunc((dy * 1000) / distance);
+        a.x += Math.trunc((ux * push) / 1000);
+        a.y += Math.trunc((uy * push) / 1000);
+        b.x -= Math.trunc((ux * push) / 1000);
+        b.y -= Math.trunc((uy * push) / 1000);
     }
     removeDead() {
         for (const entity of this.entities) {

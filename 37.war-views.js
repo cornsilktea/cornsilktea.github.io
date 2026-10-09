@@ -42,14 +42,18 @@ class WarUnitLooks {
     static of(unitId) {
         return WarUnitLooks.LOOKS[unitId];
     }
+    static files() {
+        return Object.keys(WarUnitLooks.LOOKS).map((key) => WarUnitLooks.LOOKS[key].file);
+    }
 }
+WarUnitLooks.HUMAN = { animated: true, idleClip: "Idle", runClip: "Run", shootsFar: false };
 WarUnitLooks.LOOKS = {
-    shieldbearer: { character: "Knight", model: null, scale: 1, attackClip: "Melee_1H_Attack_Chop" },
-    charger: { character: "Barbarian", model: null, scale: 1, attackClip: "Melee_1H_Attack_Slice_Horizontal" },
-    archer: { character: "Ranger", model: null, scale: 1, attackClip: "Ranged_Bow_Release" },
-    energymage: { character: "Mage", model: null, scale: 1, attackClip: "Ranged_Magic_Shoot" },
-    guardknight: { character: "Knight", model: null, scale: 1.3, attackClip: "Melee_2H_Attack_Chop" },
-    artillerytruck: { character: null, model: "space/spacetruck_large.gltf", scale: 2.6, attackClip: "" },
+    shieldbearer: { ...WarUnitLooks.HUMAN, file: "quaternius/Knight_Male.gltf", scale: 1, attackClip: "SwordSlash" },
+    charger: { ...WarUnitLooks.HUMAN, file: "quaternius/Soldier_Male.gltf", scale: 1, attackClip: "Punch" },
+    archer: { ...WarUnitLooks.HUMAN, file: "quaternius/BlueSoldier_Female.gltf", scale: 1, attackClip: "Shoot_OneHanded", shootsFar: true },
+    energymage: { animated: true, file: "quaternius/Astronaut_BarbaraTheBee.gltf", scale: 0.5, idleClip: "Idle_Gun", runClip: "Run_Gun", attackClip: "Run_Gun_Shoot", shootsFar: true },
+    guardknight: { animated: true, file: "quaternius/Mech_FinnTheFrog.gltf", scale: 0.8, idleClip: "Idle", runClip: "Run", attackClip: "Kick", shootsFar: false },
+    artillerytruck: { animated: false, file: "quaternius/Rover_Round.gltf", scale: 0.55, idleClip: "", runClip: "", attackClip: "", shootsFar: true },
 };
 class WarBuildingLooks {
     static of(type) {
@@ -60,17 +64,15 @@ class WarBuildingLooks {
     }
 }
 WarBuildingLooks.MODELS = {
-    hq: { file: "space/basemodule_E.gltf", scale: 2.9 },
-    barracks: { file: "space/basemodule_A.gltf", scale: 1.5 },
-    range: { file: "space/cargodepot_A.gltf", scale: 1.55 },
-    lab: { file: "space/basemodule_garage.gltf", scale: 1.65 },
+    hq: { file: "quaternius/Base_Large.gltf", scale: 0.8 },
+    barracks: { file: "quaternius/House_Single.gltf", scale: 0.9 },
+    range: { file: "quaternius/House_Open.gltf", scale: 0.9 },
+    lab: { file: "quaternius/GeodesicDome.gltf", scale: 0.42 },
 };
 class WarAssetLibrary {
     constructor(libs) {
         this.libs = libs;
-        this.clips = new Map();
-        this.characters = new Map();
-        this.models = new Map();
+        this.assets = new Map();
         this.loading = null;
     }
     load() {
@@ -78,42 +80,35 @@ class WarAssetLibrary {
             this.loading = this.loadAll();
         return this.loading;
     }
-    character(name) {
-        return this.libs.SkeletonUtils.clone(this.templateOf(this.characters, name));
+    actor(file) {
+        const asset = this.assetOf(file);
+        return { model: this.libs.SkeletonUtils.clone(asset.scene), clips: asset.clips };
     }
     model(file) {
-        return this.templateOf(this.models, file).clone(true);
+        return this.assetOf(file).scene.clone(true);
     }
     rockFiles() {
-        return Array.from(this.models.keys()).filter((key) => key.indexOf("nature/") === 0);
+        return WarAssetLibrary.ROCKS;
     }
-    templateOf(source, key) {
-        const found = source.get(key);
+    assetOf(file) {
+        const found = this.assets.get(file);
         if (!found)
-            throw new Error("모델을 아직 불러오지 못했어요: " + key);
+            throw new Error("모델을 아직 불러오지 못했어요: " + file);
         return found;
     }
     async loadAll() {
         const loader = new this.libs.GLTFLoader();
-        const jobs = [];
-        for (const name of WarAssetLibrary.CHARACTERS) {
-            jobs.push(loader.loadAsync(WarAssetLibrary.ROOT + "characters/" + name + ".glb").then((gltf) => { this.characters.set(name, gltf.scene); }));
-        }
-        for (const name of WarAssetLibrary.ANIMATIONS) {
-            jobs.push(loader.loadAsync(WarAssetLibrary.ROOT + "animations/Rig_Medium_" + name + ".glb").then((gltf) => gltf.animations.forEach((clip) => this.clips.set(clip.name, clip))));
-        }
-        const rocks = ["Rock_1_A", "Rock_1_C", "Rock_2_B", "Rock_2_E", "Rock_3_A", "Rock_3_D", "Rock_3_G"].map((name) => "nature/" + name + "_Color1.gltf");
-        const models = WarBuildingLooks.files().concat(WarAssetLibrary.EXTRA_MODELS, rocks);
-        for (const file of models) {
-            jobs.push(loader.loadAsync(WarAssetLibrary.ROOT + file).then((gltf) => { this.models.set(file, gltf.scene); }));
-        }
-        await Promise.all(jobs);
+        const files = Array.from(new Set(WarUnitLooks.files().concat(WarBuildingLooks.files(), WarAssetLibrary.EXTRA_MODELS, WarAssetLibrary.ROCKS)));
+        await Promise.all(files.map((file) => loader.loadAsync(WarAssetLibrary.ROOT + file).then((gltf) => {
+            const clips = new Map();
+            gltf.animations.forEach((clip) => clips.set(clip.name, clip));
+            this.assets.set(file, { scene: gltf.scene, clips });
+        })));
     }
 }
 WarAssetLibrary.ROOT = "assets/kaykit/war/";
-WarAssetLibrary.CHARACTERS = ["Knight", "Barbarian", "Ranger", "Mage", "Rogue_Hooded"];
-WarAssetLibrary.ANIMATIONS = ["General", "MovementBasic", "CombatMelee", "CombatRanged", "Tools", "Simulation"];
-WarAssetLibrary.EXTRA_MODELS = ["space/spacetruck_large.gltf", "space/landingpad_large.gltf", "space/solarpanel.gltf", "space/structure_tall.gltf", "space/lights.gltf", "resources/Iron_Nuggets.gltf", "resources/Parts_Pile_Large.gltf"];
+WarAssetLibrary.EXTRA_MODELS = ["space/landingpad_large.gltf", "resources/Iron_Nuggets.gltf", "resources/Parts_Pile_Large.gltf"];
+WarAssetLibrary.ROCKS = ["Rock_1_A", "Rock_1_C", "Rock_2_B", "Rock_2_E", "Rock_3_A", "Rock_3_D", "Rock_3_G"].map((name) => "nature/" + name + "_Color1.gltf");
 class WarMaterials {
     constructor(libs) {
         this.libs = libs;
@@ -168,10 +163,11 @@ class WarUnitView {
         const THREE = libs.THREE;
         this.look = WarUnitLooks.of(unit.def.id);
         this.group = new THREE.Group();
-        this.model = this.look.character ? assets.character(this.look.character) : assets.model(this.look.model);
-        this.model.scale.setScalar((this.look.character ? 0.8 : 1) * this.look.scale);
+        const actor = assets.actor(this.look.file);
+        this.model = actor.model;
+        this.model.scale.setScalar(this.look.scale);
         this.group.add(this.model);
-        this.animator = this.look.character ? new CharacterAnimator(libs, this.model, assets.clips) : null;
+        this.animator = this.look.animated ? new CharacterAnimator(libs, this.model, actor.clips) : null;
         this.ring = new THREE.Mesh(materials.ringGeometry, materials.ring(mine ? WarPalette.SQUAD_COLORS[Math.max(0, unit.squadIndex)] : WarPalette.ENEMY));
         this.ring.rotation.x = -Math.PI / 2;
         this.ring.position.y = 0.05;
@@ -184,7 +180,7 @@ class WarUnitView {
         this.group.position.set(start.x, 0, start.z);
         this.yaw = mine ? Math.PI : 0;
         if (this.animator)
-            this.animator.play(WarUnitView.CLIP_IDLE);
+            this.animator.play(this.look.idleClip);
     }
     onTick(unit, target, facing, squadColor) {
         this.from.x = this.to.x;
@@ -223,7 +219,7 @@ class WarUnitView {
             this.animator.play(this.look.attackClip, { once: true });
         }
         else {
-            this.animator.play(this.moving ? WarUnitView.CLIP_RUN : WarUnitView.CLIP_IDLE);
+            this.animator.play(this.moving ? this.look.runClip : this.look.idleClip);
         }
         this.animator.update(deltaSeconds);
     }
@@ -231,8 +227,6 @@ class WarUnitView {
         this.group.visible = visible;
     }
 }
-WarUnitView.CLIP_IDLE = "Idle_A";
-WarUnitView.CLIP_RUN = "Running_A";
 WarUnitView.ATTACK_HOLD_SECONDS = 0.7;
 class WarBuildingView {
     constructor(libs, assets, materials, building, position, mine) {
@@ -616,26 +610,13 @@ class WarMatchView {
         this.selection = selection;
     }
     pick(clientX, clientY) {
+        const best = this.pickEntity(clientX, clientY);
+        if (best.kind !== "none")
+            return best;
         const hit = this.world.groundPoint(clientX, clientY);
         if (!hit)
             return { kind: "none" };
         const point = this.transform.sceneToWorld(hit.x, hit.z);
-        let best = { kind: "none" };
-        let bestDistance = Number.MAX_SAFE_INTEGER;
-        for (const entity of this.engine.entities) {
-            if (!entity.alive)
-                continue;
-            if (!this.isShown(entity))
-                continue;
-            const reach = entity instanceof WarUnit ? 110 : entity.bodyRadius();
-            const distance = WarMath.dist(point.x, point.y, entity.x, entity.y);
-            if (distance > reach || distance >= bestDistance)
-                continue;
-            bestDistance = distance;
-            best = entity instanceof WarUnit ? { kind: "unit", id: entity.id } : { kind: "building", id: entity.id };
-        }
-        if (best.kind !== "none")
-            return best;
         for (const slot of this.engine.players[this.viewer].slotDefs) {
             if (!slot.enabled || this.engine.players[this.viewer].slotBuildings[slot.index])
                 continue;
@@ -643,6 +624,28 @@ class WarMatchView {
                 return { kind: "slot", index: slot.index };
         }
         return { kind: "none" };
+    }
+    pickEntity(clientX, clientY) {
+        const camera = this.world.rig.perspective;
+        const vector = new this.libs.THREE.Vector3();
+        let best = { kind: "none" };
+        let bestDistance = Number.MAX_SAFE_INTEGER;
+        for (const entity of this.engine.entities) {
+            if (!entity.alive || !this.isShown(entity))
+                continue;
+            const isUnit = entity instanceof WarUnit;
+            const scene = this.transform.toScene(entity);
+            vector.set(scene.x, isUnit ? 1 : 1.6, scene.z).project(camera);
+            const dx = ((vector.x + 1) / 2) * window.innerWidth - clientX;
+            const dy = ((1 - vector.y) / 2) * window.innerHeight - clientY;
+            const reach = isUnit ? WarMatchView.UNIT_PICK_PIXELS : WarMatchView.BUILDING_PICK_PIXELS * (entity.bodyRadius() / 200 + 0.5);
+            const distance = Math.hypot(dx, dy);
+            if (distance > reach || distance >= bestDistance)
+                continue;
+            bestDistance = distance;
+            best = isUnit ? { kind: "unit", id: entity.id } : { kind: "building", id: entity.id };
+        }
+        return best;
     }
     onTick() {
         const player = this.engine.players[this.viewer];
@@ -744,6 +747,8 @@ class WarMatchView {
         }
     }
 }
+WarMatchView.UNIT_PICK_PIXELS = 30;
+WarMatchView.BUILDING_PICK_PIXELS = 52;
 class WarMenuBackdrop {
     constructor(libs, assets, world) {
         this.libs = libs;

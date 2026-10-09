@@ -30,7 +30,10 @@ WarBalance.LEASH_RANGE = 2200;
 WarBalance.FORMATION_LAG = 900;
 WarBalance.LAG_PATIENCE_TICKS = 50;
 WarBalance.SEPARATION_RADIUS = 90;
-WarBalance.STRIP_DAMAGE_MIN = 1;
+WarBalance.ACQUIRE_EVERY_TICKS = 3;
+WarBalance.VISION_EVERY_TICKS = 2;
+WarBalance.ALERT_COOLDOWN_TICKS = 50;
+WarBalance.ALERT_EVERY_TICKS = 5;
 class WarUnitCatalog {
     static byId(id) {
         const found = WarUnitCatalog.DEFS.find((def) => def.id === id);
@@ -67,7 +70,7 @@ class WarBuildingCatalog {
     }
 }
 WarBuildingCatalog.DEFS = [
-    { type: "hq", name: "사령부", ore: 0, crystal: 0, buildTicks: 0, hp: 3000, radius: 320, producesKind: null },
+    { type: "hq", name: "사령부", ore: 0, crystal: 0, buildTicks: 0, hp: 12000, radius: 320, producesKind: null },
     { type: "barracks", name: "병영", ore: 100, crystal: 0, buildTicks: 80, hp: 800, radius: 160, producesKind: "melee" },
     { type: "range", name: "사격장", ore: 100, crystal: 0, buildTicks: 80, hp: 700, radius: 160, producesKind: "ranged" },
     { type: "lab", name: "연구소", ore: 150, crystal: 50, buildTicks: 120, hp: 900, radius: 170, producesKind: "elite" },
