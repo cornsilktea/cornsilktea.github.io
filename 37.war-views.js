@@ -103,12 +103,14 @@ WarBuildingLooks.MODELS = {
         barracks: { file: "quaternius/House_Single.gltf", scale: 0.9 },
         factory: { file: "quaternius/GeodesicDome.gltf", scale: 0.42 },
         airport: { file: "space/landingpad_large.gltf", scale: 1.7 },
+        turret: { file: "kenney_turret_double.glb", scale: 4.2, top: 4.6 },
     },
     grave: {
         hq: { file: "halloween/crypt.gltf", scale: 0.95, top: 6.8 },
         barracks: { file: "halloween/coffin_decorated.gltf", scale: 1.2 },
         factory: { file: "halloween/shrine_candles.gltf", scale: 1.7 },
         airport: { file: "halloween/arch_gate.gltf", scale: 1.1 },
+        turret: { file: "halloween/post_skull.gltf", scale: 2.6, top: 4.4 },
     },
 };
 WarBuildingLooks.DECOR = {
@@ -892,6 +894,7 @@ WarEffectStyles.STYLES = {
     executioner: { projectile: true, color: "#FF7A2E", size: 0.5, speed: 38, arc: 0, hit: 2.6, ring: 0 },
     minion: { color: "#E8E8D0", size: 0, hit: 0.75 },
     dropminion: { color: "#E8E8D0", size: 0, hit: 0.75 },
+    turret: { projectile: true, color: "#FFB84A", size: 0.2, speed: 42, arc: 0, hit: 1.2 },
     skelwarrior: { color: "#E8E8D0", size: 0, hit: 0.9 },
     skelarcher: { projectile: true, color: "#C8FFB0", size: 0.11, speed: 30, arc: 0.4, hit: 0.55 },
     bonegiant: { color: "#D8C8A0", size: 0, hit: 2.1, ring: 2.5 },

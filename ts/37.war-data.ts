@@ -2,7 +2,7 @@ type WarTeam = 0 | 1;
 type WarFactionId = "pioneer" | "grave";
 type WarUnitKind = "melee" | "ranged" | "elite" | "air";
 type WarRole = "front" | "mid" | "rear";
-type WarBuildingType = "hq" | "barracks" | "factory" | "airport";
+type WarBuildingType = "hq" | "barracks" | "factory" | "airport" | "turret";
 type WarSlotKind = "normal" | "entrance";
 type WarWorkerKind = "ore" | "crystal";
 
@@ -172,6 +172,7 @@ class WarBuildingCatalog {
     { type: "barracks", name: "병영", ore: 100, crystal: 0, buildTicks: 80, hp: 800, radius: 160 },
     { type: "factory", name: "공장", ore: 150, crystal: 50, buildTicks: 120, hp: 900, radius: 170 },
     { type: "airport", name: "공항", ore: 150, crystal: 50, buildTicks: 120, hp: 900, radius: 200 },
+    { type: "turret", name: "수비 포탑", ore: 0, crystal: 0, buildTicks: 0, hp: 1000, radius: 150 },
   ];
   static byType(type: WarBuildingType): WarBuildingDef {
     const found = WarBuildingCatalog.DEFS.find((def) => def.type === type);
@@ -179,7 +180,7 @@ class WarBuildingCatalog {
     return found;
   }
 
-  private static readonly GRAVE_NAMES: Record<WarBuildingType, string> = { hq: "어둠의 성소", barracks: "납골당", factory: "뼈 공방", airport: "관 선착장" };
+  private static readonly GRAVE_NAMES: Record<WarBuildingType, string> = { hq: "어둠의 성소", barracks: "납골당", factory: "뼈 공방", airport: "관 선착장", turret: "저주 말뚝" };
 
   static displayName(type: WarBuildingType, faction: WarFactionId): string {
     return faction === "grave" ? WarBuildingCatalog.GRAVE_NAMES[type] : WarBuildingCatalog.byType(type).name;
@@ -187,7 +188,7 @@ class WarBuildingCatalog {
 
   static buildable(slotKind: WarSlotKind): WarBuildingDef[] {
     if (slotKind !== "normal") return [];
-    return WarBuildingCatalog.DEFS.filter((def) => def.type !== "hq");
+    return WarBuildingCatalog.DEFS.filter((def) => def.type !== "hq" && def.type !== "turret");
   }
 }
 
@@ -214,6 +215,7 @@ class WarBlurbs {
     barracks: "기본 근접·원거리 병력을 만들어요",
     factory: "단단한 고급 근접과 강력한 고급 원거리를 만들어요",
     airport: "하늘을 나는 비행 병력을 만들어요. 결정이 필요해요",
+    turret: "기지 입구를 지키는 포탑이에요. 일반 병사에겐 약하고, 고급 지상 유닛은 세 발에 쓰러뜨려요",
   };
   static unit(id: string): string {
     return WarBlurbs.UNITS[id] ?? "";
@@ -234,6 +236,7 @@ class WarMapData {
   static readonly PLAZA_RADIUS = 2600;
   static readonly BASE_RADIUS = 2600;
   static readonly POST_SPREAD = 1300;
+  static readonly TURRET_OFFSET: WarPoint = { x: 900, y: 250 };
   static readonly POST_BACKOFF = -400;
   static readonly FLEET_BACKOFF = -1500;
   static readonly POST_LATERAL: number[] = [0, -1, 1, 0];
@@ -279,6 +282,12 @@ class WarMapData {
 
   static crystalPoints(team: WarTeam): WarPoint[] {
     return WarMapData.mirrored(team, WarMapData.CRYSTAL_OFFSETS);
+  }
+
+  static turret(team: WarTeam): WarPoint {
+    const gate = WarMapData.entrance(team);
+    const sign = WarMapData.sign(team);
+    return { x: gate.x + WarMapData.TURRET_OFFSET.x * sign, y: gate.y + WarMapData.TURRET_OFFSET.y * sign };
   }
 
   static post(team: WarTeam, squad: number): WarPoint {

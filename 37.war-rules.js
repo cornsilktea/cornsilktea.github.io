@@ -694,12 +694,64 @@ class WarSquad {
         return this.lagTicks < WarBalance.LAG_PATIENCE_TICKS;
     }
 }
+class WarTurret extends WarBuilding {
+    constructor(id, team, x, y, def) {
+        super(id, team, x, y, def, -1, false);
+        this.cooldownLeft = 0;
+    }
+    splashRadius() {
+        return 0;
+    }
+    cooldownTicks() {
+        return WarTurret.COOLDOWN_TICKS;
+    }
+    damageAgainst(target) {
+        if (target instanceof WarUnit && target.def.kind === "elite")
+            return Math.ceil(target.maxHp / WarTurret.ELITE_HITS);
+        return WarTurret.CHIP_DAMAGE;
+    }
+    afterStrike() { }
+    think(engine) {
+        if (this.cooldownLeft > 0) {
+            this.cooldownLeft--;
+            return;
+        }
+        const target = this.pickTarget(engine);
+        if (target)
+            WarCombat.strike(engine, this, target);
+    }
+    pickTarget(engine) {
+        const enemy = this.team === 0 ? 1 : 0;
+        let best = null;
+        let bestSq = Number.MAX_SAFE_INTEGER;
+        for (const other of engine.entitiesOf(enemy)) {
+            if (!(other instanceof WarUnit) || other.flying)
+                continue;
+            const dx = other.x - this.x;
+            const dy = other.y - this.y;
+            const distanceSq = dx * dx + dy * dy;
+            const reach = WarTurret.RANGE + other.bodyRadius();
+            if (distanceSq > reach * reach || distanceSq >= bestSq)
+                continue;
+            if (!engine.vision.isVisible(this.team, other.x, other.y))
+                continue;
+            bestSq = distanceSq;
+            best = other;
+        }
+        return best;
+    }
+}
+WarTurret.RANGE = 1500;
+WarTurret.COOLDOWN_TICKS = 20;
+WarTurret.CHIP_DAMAGE = 10;
+WarTurret.ELITE_HITS = 3;
 class WarPlayer {
     constructor(team, faction) {
         this.team = team;
         this.faction = faction;
         this.economy = new WarEconomy();
         this.hq = null;
+        this.turret = null;
         this.unitsProduced = 0;
         this.unitsLost = 0;
         this.squads = Array.from({ length: WarBalance.SQUAD_COUNT }, (_, index) => new WarSquad(team, index));
@@ -720,7 +772,7 @@ class WarPlayer {
 class WarCombat {
     static strike(engine, attacker, target) {
         const damage = attacker.damageAgainst(target);
-        engine.emit({ kind: "strike", team: attacker.team, tick: engine.tick, text: attacker instanceof WarUnit ? attacker.def.id : "", x: attacker.x, y: attacker.y, tx: target.x, ty: target.y, air: attacker instanceof WarUnit && attacker.flying, toAir: target instanceof WarUnit && target.flying });
+        engine.emit({ kind: "strike", team: attacker.team, tick: engine.tick, text: attacker instanceof WarUnit ? attacker.def.id : attacker instanceof WarTurret ? "turret" : "", x: attacker.x, y: attacker.y, tx: target.x, ty: target.y, air: attacker instanceof WarUnit && attacker.flying, toAir: target instanceof WarUnit && target.flying });
         engine.damage(target, damage, attacker.id);
         const radius = attacker.splashRadius();
         if (radius > 0) {
@@ -1113,6 +1165,8 @@ class WarStateHash {
             }
             else if (entity instanceof WarBuilding) {
                 mix(entity.buildLeft);
+                if (entity instanceof WarTurret)
+                    mix(entity.cooldownLeft);
                 for (const queued of entity.queue)
                     mix(queued.ticksLeft);
             }
@@ -1174,8 +1228,10 @@ class WarEngine {
         this.corpses = [];
         this.random = new WarRandom(options.seed);
         this.players = [new WarPlayer(0, options.factions[0]), new WarPlayer(1, options.factions[1])];
-        for (const player of this.players)
+        for (const player of this.players) {
             this.placeHq(player);
+            this.placeTurret(player);
+        }
         this.vision.update(this.entities);
     }
     submit(command) {
@@ -1272,6 +1328,7 @@ class WarEngine {
         this.refreshTeamEntities();
         if (this.tick % WarBalance.VISION_EVERY_TICKS === 0)
             this.vision.update(this.entities);
+        this.advanceTurrets();
         this.advanceSquads();
         if (this.tick % WarBalance.ALERT_EVERY_TICKS === 0)
             this.alerts.update();
@@ -1358,6 +1415,12 @@ class WarEngine {
         player.hq = hq;
         this.register(hq);
     }
+    placeTurret(player) {
+        const point = WarMapData.turret(player.team);
+        const turret = new WarTurret(this.nextId++, player.team, point.x, point.y, WarBuildingCatalog.byType("turret"));
+        player.turret = turret;
+        this.register(turret);
+    }
     register(entity) {
         this.entities.push(entity);
         this.byId.set(entity.id, entity);
@@ -1417,6 +1480,11 @@ class WarEngine {
         for (const entity of this.entities)
             if (entity.alive)
                 this.teamEntities[entity.team].push(entity);
+    }
+    advanceTurrets() {
+        for (const player of this.players)
+            if (player.turret && player.turret.alive)
+                player.turret.think(this);
     }
     advanceSquads() {
         for (const player of this.players) {
@@ -1567,6 +1635,7 @@ class WarEngine {
             this.finish((player.team === 0 ? 1 : 0), "hq");
             return;
         }
-        player.slotBuildings[building.slotIndex] = null;
+        if (building.slotIndex >= 0)
+            player.slotBuildings[building.slotIndex] = null;
     }
 }

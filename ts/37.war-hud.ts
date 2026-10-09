@@ -154,6 +154,7 @@ class WarCommandCard {
       const building = engine.entityById(selection.id);
       if (!(building instanceof WarBuilding) || building.team !== team) return WarCommandCard.note("적 건물", "부수면 승리에 가까워져요.");
       if (!building.complete) return WarCommandCard.note("짓는 중", "다 지어지면 병력을 만들 수 있어요.");
+      if (building.def.type === "turret") return WarCommandCard.note(WarBuildingCatalog.displayName("turret", player.faction), WarBlurbs.building("turret"));
       const items = building.def.type === "hq"
         ? [WarProductionItem.from("worker_ore"), WarProductionItem.from("worker_crystal")]
         : WarUnitCatalog.producedBy(player.faction, building.def.type).map((def) => WarProductionItem.from(def.id));
