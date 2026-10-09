@@ -341,6 +341,15 @@
         "units": [],
         "unitsSet": false,
         "url": "32.minigames.html"
+      },
+      "spacewar": {
+        "memo": "혼자 AI와 겨루는 3D 실시간 전략 / 인구 60 안에서 일꾼과 병력을 고르고 사령부 앞 빈 터 9곳에 건물을 지어 병력을 뽑음 / 병력은 자동으로 3개 부대로 나뉘어 입구를 지키고, 지도에 길을 그리면 그 길로 공격 / 개척단·무덤 군단 두 진영, 쉬움·보통·어려움 / 사령부를 먼저 부수면 승리, 15분 제한",
+        "open": false,
+        "order": 36,
+        "title": "우주전쟁",
+        "units": [],
+        "unitsSet": false,
+        "url": "37.space-war.html"
       }
     }
   }

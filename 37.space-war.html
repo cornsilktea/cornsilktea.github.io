@@ -61,7 +61,7 @@
   .gauge .cell.on { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .25); }
 
   #bottomBar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; gap: 8px; align-items: stretch; padding: 8px 8px calc(env(safe-area-inset-bottom, 0px) + 8px); background: linear-gradient(0deg, rgba(5, 8, 18, .86), rgba(5, 8, 18, 0)); pointer-events: none; }
-  #cmdCard, #infoPanel { min-height: 138px; padding: 8px 10px; background: rgba(14, 20, 38, .86); border: 1.5px solid rgba(255, 255, 255, .2); border-top: 3px solid #D97B4F; border-radius: 10px; }
+  #cmdCard, #infoPanel { min-height: 104px; max-height: 150px; overflow-y: auto; padding: 8px 10px; background: rgba(14, 20, 38, .86); border: 1.5px solid rgba(255, 255, 255, .2); border-top: 3px solid #D97B4F; border-radius: 10px; }
   #cmdCard { flex: 0 0 34%; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 6px; }
   #infoPanel { flex: 1 1 auto; min-width: 0; font-size: 14px; }
   #infoPanel h3 { margin-bottom: 6px; font-size: 17px; color: #fff; }
@@ -69,14 +69,14 @@
   .infoBarFill { height: 100%; background: linear-gradient(90deg, #6BE08A, #D6F27A); }
   .infoRow { margin-top: 3px; color: #D6DEF5; font-weight: 700; }
   .cmdHint { font-size: 13px; font-weight: 700; color: #B9C4E0; line-height: 1.5; }
-  .cmdBtn { flex: 1 1 calc(50% - 6px); min-width: 108px; min-height: 52px; padding: 5px 8px; border-radius: 8px; border: 2px solid rgba(255, 255, 255, .28); background: rgba(255, 255, 255, .08); color: #fff; text-align: left; }
+  .cmdBtn { flex: 1 1 calc(50% - 6px); min-width: 108px; min-height: 46px; padding: 5px 8px; border-radius: 8px; border: 2px solid rgba(255, 255, 255, .28); background: rgba(255, 255, 255, .08); color: #fff; text-align: left; }
   .cmdBtn b { display: block; font-size: 15px; }
   .cmdBtn small { display: block; font-size: 11px; color: #B9C4E0; }
   .cmdBtn:disabled { opacity: .4; }
   .cmdBtn:not(:disabled):active { background: #D97B4F; border-color: #FFB08C; }
   #miniWrap { flex: 0 0 auto; display: flex; flex-direction: column; gap: 6px; align-items: stretch; pointer-events: auto; }
-  #minimap { display: block; width: 148px; height: 187px; border: 2px solid rgba(255, 255, 255, .35); border-radius: 6px; background: #10162A; touch-action: none; }
-  #btnAttack { min-height: 44px; font-size: 18px; font-weight: 800; border-radius: 8px; border: 2px solid #FFB08C; background: #D97B4F; color: #fff; }
+  #minimap { display: block; width: 124px; height: 156px; border: 2px solid rgba(255, 255, 255, .35); border-radius: 6px; background: #10162A; touch-action: none; }
+  #btnAttack { min-height: 40px; font-size: 18px; font-weight: 800; border-radius: 8px; border: 2px solid #FFB08C; background: #D97B4F; color: #fff; }
 
   #attackMap { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 40; display: flex; flex-direction: column; align-items: center; background: rgba(4, 7, 16, .92); padding: 54px 12px 12px; }
   #attackHint { margin-bottom: 8px; font-size: 14px; font-weight: 700; color: #B9C4E0; text-align: center; }
@@ -91,7 +91,7 @@
   @media (max-width: 900px) {
     #squadPanel { width: 150px; }
     #cmdCard { flex-basis: 40%; }
-    #minimap { width: 118px; height: 149px; }
+    #minimap { width: 104px; height: 131px; }
   }
 </style>
 </head>
@@ -204,6 +204,7 @@
 <script charset="utf-8" src="37.war-data.js"></script>
 <script charset="utf-8" src="37.war-rules.js"></script>
 <script charset="utf-8" src="37.war-bot.js"></script>
+<script charset="utf-8" src="37.war-scenery.js"></script>
 <script charset="utf-8" src="37.war-views.js"></script>
 <script charset="utf-8" src="37.war-hud.js"></script>
 <script charset="utf-8" src="37.space-war.js"></script>

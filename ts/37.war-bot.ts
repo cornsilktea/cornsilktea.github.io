@@ -7,12 +7,14 @@ interface WarBotProfile {
   minSquadToSend: number;
   retreatSquadSize: number;
   queueDepth: number;
+  defends: boolean;
   buildOrder: WarBuildingType[];
 }
 
 abstract class WarBotBrain {
   private static readonly SAVE_FOR_BUILDING_ORE = 150;
   private static readonly RETREAT_PATIENCE_TICKS = 60;
+  private static readonly THREAT_RADIUS = 4200;
   private readonly weakSince = new Map<number, number>();
   private readonly random: WarRandom;
   private unitCycle = 0;
@@ -46,6 +48,24 @@ abstract class WarBotBrain {
     engine.submit(new WarBuildCommand(this.team, slot, this.profile.buildOrder[built % this.profile.buildOrder.length]));
   }
 
+  private baseThreatened(engine: WarEngine): boolean {
+    const hq = WarMapData.hq(this.team);
+    const limitSq = WarBotBrain.THREAT_RADIUS * WarBotBrain.THREAT_RADIUS;
+    for (const entity of engine.entitiesOf(this.team === 0 ? 1 : 0)) {
+      if (!(entity instanceof WarUnit)) continue;
+      const dx = entity.x - hq.x;
+      const dy = entity.y - hq.y;
+      if (dx * dx + dy * dy <= limitSq && engine.vision.isVisible(this.team, entity.x, entity.y)) return true;
+    }
+    return false;
+  }
+
+  private pullBackIdleSquads(engine: WarEngine, player: WarPlayer): void {
+    for (const squad of player.squads) {
+      if (squad.mode === "away" && !squad.isEngaged()) engine.submit(new WarRecallCommand(this.team, squad.index));
+    }
+  }
+
   private wantsNextBuilding(player: WarPlayer): boolean {
     const built = player.buildings().filter((b) => b.def.type !== "hq").length;
     return built < this.profile.buildingTarget && player.slotBuildings.some((b, i) => !b && player.slotDefs[i].enabled);
@@ -70,9 +90,10 @@ abstract class WarBotBrain {
       { x: 0, y: 0 },
       { x: WarMapData.LANE_X, y: WarMapData.LANE_Y * sign },
     ];
+    const threatened = this.profile.defends && this.baseThreatened(engine);
     const ready = player.squads.filter((squad) => squad.mode === "home" && squad.members.length >= this.profile.minSquadToSend);
     const readyPop = ready.reduce((sum, squad) => sum + squad.members.reduce((inner, unit) => inner + unit.def.pop, 0), 0);
-    if (readyPop >= this.profile.launchArmyPop) {
+    if (readyPop >= this.profile.launchArmyPop && !threatened) {
       const lane = lanes[this.random.below(lanes.length)];
       for (const squad of ready) engine.submit(new WarAttackPathCommand(this.team, squad.index, [lane, target]));
     }
@@ -94,19 +115,19 @@ abstract class WarBotBrain {
 
 class WarEasyBot extends WarBotBrain {
   constructor(team: WarTeam, seed: number) {
-    super(team, seed, { thinkTicks: 40, oreWorkerTarget: 8, crystalWorkerTarget: 2, buildingTarget: 4, launchArmyPop: 28, minSquadToSend: 8, retreatSquadSize: 3, queueDepth: 2, buildOrder: ["barracks", "range", "barracks", "range"] });
+    super(team, seed, { thinkTicks: 40, oreWorkerTarget: 8, crystalWorkerTarget: 2, buildingTarget: 4, launchArmyPop: 28, minSquadToSend: 8, retreatSquadSize: 3, queueDepth: 2, defends: false, buildOrder: ["barracks", "range", "barracks", "range"] });
   }
 }
 
 class WarNormalBot extends WarBotBrain {
   constructor(team: WarTeam, seed: number) {
-    super(team, seed, { thinkTicks: 20, oreWorkerTarget: 12, crystalWorkerTarget: 5, buildingTarget: 7, launchArmyPop: 24, minSquadToSend: 6, retreatSquadSize: 3, queueDepth: 2, buildOrder: ["barracks", "range", "barracks", "lab", "range", "barracks", "lab"] });
+    super(team, seed, { thinkTicks: 20, oreWorkerTarget: 12, crystalWorkerTarget: 5, buildingTarget: 7, launchArmyPop: 24, minSquadToSend: 6, retreatSquadSize: 3, queueDepth: 2, defends: false, buildOrder: ["barracks", "range", "barracks", "lab", "range", "barracks", "lab"] });
   }
 }
 
 class WarHardBot extends WarBotBrain {
   constructor(team: WarTeam, seed: number) {
-    super(team, seed, { thinkTicks: 10, oreWorkerTarget: 12, crystalWorkerTarget: 5, buildingTarget: 7, launchArmyPop: 24, minSquadToSend: 6, retreatSquadSize: 3, queueDepth: 3, buildOrder: ["barracks", "range", "barracks", "lab", "range", "barracks", "lab"] });
+    super(team, seed, { thinkTicks: 10, oreWorkerTarget: 12, crystalWorkerTarget: 5, buildingTarget: 7, launchArmyPop: 24, minSquadToSend: 6, retreatSquadSize: 3, queueDepth: 3, defends: true, buildOrder: ["barracks", "range", "barracks", "lab", "range", "barracks", "lab"] });
   }
 }
 

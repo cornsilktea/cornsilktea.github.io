@@ -114,7 +114,6 @@ interface WarLoadedAsset { scene: Three<"Object3D">; clips: Map<string, Three<"A
 class WarAssetLibrary {
   static readonly ROOT = "assets/kaykit/war/";
   private static readonly EXTRA_MODELS = ["space/landingpad_large.gltf", "resources/Iron_Nuggets.gltf", "resources/Parts_Pile_Large.gltf"];
-  private static readonly ROCKS = ["Rock_1_A", "Rock_1_C", "Rock_2_B", "Rock_2_E", "Rock_3_A", "Rock_3_D", "Rock_3_G"].map((name) => "nature/" + name + "_Color1.gltf");
 
   private static readonly RIG_ANIMATIONS = ["General", "MovementBasic", "CombatMelee", "CombatRanged"];
 
@@ -138,8 +137,8 @@ class WarAssetLibrary {
     return this.assetOf(file).scene.clone(true);
   }
 
-  rockFiles(): string[] {
-    return WarAssetLibrary.ROCKS;
+  template(file: string): Three<"Object3D"> {
+    return this.assetOf(file).scene;
   }
 
   private assetOf(file: string): WarLoadedAsset {
@@ -150,7 +149,7 @@ class WarAssetLibrary {
 
   private async loadAll(): Promise<void> {
     const loader = new this.libs.GLTFLoader();
-    const files = Array.from(new Set(WarUnitLooks.files().concat(WarBuildingLooks.files(), WarAssetLibrary.EXTRA_MODELS, WarAssetLibrary.ROCKS)));
+    const files = Array.from(new Set(WarUnitLooks.files().concat(WarBuildingLooks.files(), WarAssetLibrary.EXTRA_MODELS, WarSceneryKit.files())));
     const rig = WarAssetLibrary.RIG_ANIMATIONS.map((name) => loader.loadAsync(WarAssetLibrary.ROOT + "animations/Rig_Medium_" + name + ".glb").then((gltf) => gltf.animations.forEach((clip) => this.rigClips.set(clip.name, clip))));
     await Promise.all(rig.concat(files.map((file) => loader.loadAsync(WarAssetLibrary.ROOT + file).then((gltf) => {
       const clips = new Map<string, Three<"AnimationClip">>();
@@ -339,100 +338,46 @@ class WarBuildingView {
 }
 
 class WarGroundView {
-  private static readonly SCALE_PX_PER_M = 4;
-
   readonly group: Three<"Group">;
+  readonly detail: Three<"Group">;
 
   constructor(private readonly libs: ThreeLibs, assets: WarAssetLibrary, private readonly transform: WarViewTransform) {
     const THREE = libs.THREE;
     this.group = new THREE.Group();
+    const noise = new WarValueNoise(4242);
+    const field = new WarLaneField();
+    const texture = new THREE.CanvasTexture(new WarTerrainPainter(noise, field).paint());
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = 4;
     const widthM = (WarMapData.HALF_W * 2) / 100, heightM = (WarMapData.HALF_H * 2) / 100;
-    const plane = new THREE.Mesh(new THREE.PlaneGeometry(widthM, heightM), new THREE.MeshLambertMaterial({ map: this.paintTexture() }));
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(widthM, heightM), new THREE.MeshLambertMaterial({ map: texture }));
     plane.rotation.x = -Math.PI / 2;
     const holder = new THREE.Group();
     holder.rotation.y = transform.team === 1 ? Math.PI : 0;
     holder.add(plane);
     this.group.add(holder);
-    this.scatterRocks(assets);
+    const scenery = new WarSceneryBuilder(libs, assets, transform, noise, field).build();
+    this.detail = scenery.detail;
+    this.group.add(scenery.core, scenery.detail);
     this.placeResources(assets);
   }
 
-  private paintTexture(): Three<"CanvasTexture"> {
-    const THREE = this.libs.THREE;
-    const scale = WarGroundView.SCALE_PX_PER_M / 100;
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(WarMapData.HALF_W * 2 * scale);
-    canvas.height = Math.round(WarMapData.HALF_H * 2 * scale);
-    const context = canvas.getContext("2d") as CanvasRenderingContext2D;
-    context.fillStyle = "#273049";
-    context.fillRect(0, 0, canvas.width, canvas.height);
-    context.lineCap = "round";
-    context.strokeStyle = "#3F4E73";
-    for (const corridor of WarMapData.corridors()) {
-      const a = this.canvasPoint(corridor.ax, corridor.ay, scale), b = this.canvasPoint(corridor.bx, corridor.by, scale);
-      context.lineWidth = corridor.halfWidth * 2 * scale;
-      context.beginPath();
-      context.moveTo(a.x, a.y);
-      context.lineTo(b.x, b.y);
-      context.stroke();
-    }
-    context.strokeStyle = "#5A6A92";
-    context.setLineDash([10, 14]);
-    for (const corridor of WarMapData.corridors()) {
-      if (corridor.halfWidth > 800) continue;
-      const a = this.canvasPoint(corridor.ax, corridor.ay, scale), b = this.canvasPoint(corridor.bx, corridor.by, scale);
-      context.lineWidth = 2;
-      context.beginPath();
-      context.moveTo(a.x, a.y);
-      context.lineTo(b.x, b.y);
-      context.stroke();
-    }
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    return texture;
-  }
-
-  private canvasPoint(x: number, y: number, scale: number): WarPoint {
-    return { x: (x + WarMapData.HALF_W) * scale, y: (y + WarMapData.HALF_H) * scale };
-  }
-
-  private scatterRocks(assets: WarAssetLibrary): void {
-    const rocks = assets.rockFiles();
-    let seed = 20261009;
-    const next = (): number => {
-      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-      return seed / 4294967296;
-    };
-    let placed = 0;
-    for (let tries = 0; tries < 900 && placed < 70; tries++) {
-      const point = { x: Math.round((next() * 2 - 1) * (WarMapData.HALF_W - 200)), y: Math.round((next() * 2 - 1) * (WarMapData.HALF_H - 200)) };
-      const fixed = WarTerrain.clamp(point);
-      if (WarMath.dist(point.x, point.y, fixed.x, fixed.y) < 520) continue;
-      const rock = assets.model(rocks[Math.floor(next() * rocks.length)]);
-      const scene = this.transform.toScene(point);
-      rock.position.set(scene.x, 0, scene.z);
-      rock.rotation.y = next() * Math.PI * 2;
-      rock.scale.setScalar(2.2 + next() * 2.6);
-      this.group.add(rock);
-      placed++;
-    }
-  }
-
   private placeResources(assets: WarAssetLibrary): void {
-    const THREE = this.libs.THREE;
     for (const team of [0, 1] as WarTeam[]) {
       for (const point of WarMapData.orePoints(team)) {
         const node = assets.model("resources/Iron_Nuggets.gltf");
         const scene = this.transform.toScene(point);
         node.position.set(scene.x, 0, scene.z);
-        node.scale.setScalar(2.4);
+        node.scale.setScalar(2.6);
+        node.rotation.y = point.x * 0.01;
         this.group.add(node);
       }
       for (const point of WarMapData.crystalPoints(team)) {
-        const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.9, 0), new THREE.MeshBasicMaterial({ color: "#6FD6FF" }));
+        const crystal = assets.model("scenery/rock_crystalsLargeA.glb");
         const scene = this.transform.toScene(point);
-        crystal.position.set(scene.x, 1.1, scene.z);
-        crystal.scale.set(0.8, 1.5, 0.8);
+        crystal.position.set(scene.x, 0, scene.z);
+        crystal.scale.setScalar(2.2);
+        crystal.rotation.y = point.y * 0.013;
         this.group.add(crystal);
       }
     }
@@ -482,15 +427,14 @@ class WarFogView {
 class WarWorkerCrowd {
   private static readonly MAX = 56;
 
-  readonly mesh: Three<"InstancedMesh">;
-  private readonly dummy: Three<"Object3D">;
+  readonly group: Three<"Group">;
+  private readonly instances: WarInstanceSet;
 
-  constructor(private readonly libs: ThreeLibs, private readonly transform: WarViewTransform, private readonly team: WarTeam, color: string) {
-    const THREE = libs.THREE;
-    this.mesh = new THREE.InstancedMesh(new THREE.CapsuleGeometry(0.22, 0.5, 3, 8), new THREE.MeshLambertMaterial({ color }), WarWorkerCrowd.MAX);
-    this.mesh.frustumCulled = false;
-    this.mesh.count = 0;
-    this.dummy = new THREE.Object3D();
+  constructor(libs: ThreeLibs, assets: WarAssetLibrary, private readonly transform: WarViewTransform, private readonly team: WarTeam, color: string) {
+    this.instances = new WarInstanceSet(libs, assets.template(WarSceneryKit.WORKER), WarWorkerCrowd.MAX);
+    this.group = this.instances.group;
+    const tint = new libs.THREE.Color(color);
+    for (let i = 0; i < WarWorkerCrowd.MAX; i++) this.instances.tint(i, tint);
   }
 
   update(oreWorkers: number, crystalWorkers: number, seconds: number): void {
@@ -498,28 +442,25 @@ class WarWorkerCrowd {
     const hq = this.transform.toScene(WarMapData.hq(this.team));
     const total = Math.min(WarWorkerCrowd.MAX, oreWorkers + crystalWorkers);
     for (let i = 0; i < total; i++) {
-      const isOre = i < oreWorkers;
-      const points = isOre ? ore : crystal;
+      const points = i < oreWorkers ? ore : crystal;
       const node = this.transform.toScene(points[i % points.length]);
       const phase = (seconds * 0.2 + i * 0.173) % 1;
-      const t = phase < 0.5 ? phase * 2 : (1 - phase) * 2;
+      const outbound = phase < 0.5;
+      const t = outbound ? phase * 2 : (1 - phase) * 2;
       const x = node.x + (hq.x - node.x) * t * 0.82;
       const z = node.z + (hq.z - node.z) * t * 0.82;
-      this.dummy.position.set(x, 0.5 + Math.abs(Math.sin(seconds * 8 + i)) * 0.05, z);
-      this.dummy.rotation.set(0, 0, 0);
-      this.dummy.updateMatrix();
-      this.mesh.setMatrixAt(i, this.dummy.matrix);
+      const heading = Math.atan2(outbound ? hq.x - node.x : node.x - hq.x, outbound ? hq.z - node.z : node.z - hq.z);
+      this.instances.set(i, { x, z, yaw: heading, scale: 0.55, y: Math.abs(Math.sin(seconds * 8 + i)) * 0.08 });
     }
-    this.mesh.count = total;
-    this.mesh.instanceMatrix.needsUpdate = true;
+    this.instances.finish(total);
   }
 }
 
 class WarCameraRig {
   private static readonly DISTANCE = 24;
   private static readonly HEIGHT = 30;
-  private static readonly LIMIT_X = 50;
-  private static readonly LIMIT_Z = 70;
+  private static readonly LIMIT_X = 58;
+  private static readonly LIMIT_Z = 92;
 
   private readonly camera: Three<"PerspectiveCamera">;
   private focusX = 0;
@@ -590,6 +531,10 @@ class WarWorldView {
   private readonly ground: Three<"Plane">;
   private readonly governor: QualityGovernorHandle | null;
   private pixelRatio: number;
+  private readonly detailGroups: Three<"Group">[] = [];
+  private detailHidden = false;
+  private readonly statsWanted = window.location.search.indexOf("stats") >= 0;
+  private statsFrames = 0;
 
   constructor(private readonly libs: ThreeLibs, canvas: HTMLCanvasElement, touchDevice: boolean) {
     const THREE = libs.THREE;
@@ -598,16 +543,17 @@ class WarWorldView {
     this.renderer.setPixelRatio(this.pixelRatio);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color("#070B16");
-    this.scene.add(new THREE.HemisphereLight(0xBFD4FF, 0x2A2F45, 1.6));
-    const sun = new THREE.DirectionalLight(0xFFE7C4, 1.5);
+    this.scene.background = new THREE.Color("#150E1F");
+    this.scene.fog = new THREE.Fog(0x150E1F, 85, 230);
+    this.scene.add(new THREE.HemisphereLight(0xFFE9D2, 0x4A3A66, 1.75));
+    const sun = new THREE.DirectionalLight(0xFFD9A8, 1.45);
     sun.position.set(-20, 40, 15);
     this.scene.add(sun);
     this.rig = new WarCameraRig(libs);
     this.raycaster = new THREE.Raycaster();
     this.ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
     this.governor = window.QualityGovernor
-      ? window.QualityGovernor({ steps: [() => this.lowerPixelRatio()], storageKey: "spacewar_quality_v1", isPlaying: () => this.playing, slowSec: 0.022, slowLimit: 90 })
+      ? window.QualityGovernor({ steps: [() => this.lowerPixelRatio(), () => this.hideDetail()], storageKey: "spacewar_quality_v1", isPlaying: () => this.playing, slowSec: 0.022, slowLimit: 90 })
       : null;
     if (this.governor) this.governor.restore();
     window.addEventListener("resize", () => this.resize());
@@ -632,6 +578,27 @@ class WarWorldView {
   render(deltaSeconds: number): void {
     this.renderer.render(this.scene, this.rig.perspective);
     if (this.governor) this.governor.update(deltaSeconds);
+    this.reportStats();
+  }
+
+  private reportStats(): void {
+    if (!this.statsWanted) return;
+    this.statsFrames++;
+    if (this.statsFrames % 120 !== 0) return;
+    const info = this.renderer.info.render;
+    console.log("그리기 호출 " + info.calls + " · 삼각형 " + info.triangles + " · 화면 배율 " + this.pixelRatio);
+  }
+
+  private hideDetail(): boolean {
+    if (this.detailHidden) return false;
+    this.detailHidden = true;
+    this.detailGroups.forEach((group) => { group.visible = false; });
+    return true;
+  }
+
+  registerDetail(group: Three<"Group">): void {
+    this.detailGroups.push(group);
+    group.visible = !this.detailHidden;
   }
 
   private lowerPixelRatio(): boolean {
@@ -712,19 +679,21 @@ class WarMatchView {
     this.transform = new WarViewTransform(viewer);
     this.materials = new WarMaterials(libs);
     this.root = new THREE.Group();
-    this.root.add(new WarGroundView(libs, assets, this.transform).group);
+    const ground = new WarGroundView(libs, assets, this.transform);
+    this.root.add(ground.group);
+    world.registerDetail(ground.detail);
     this.fog = new WarFogView(libs, this.transform, engine.vision);
     this.root.add(this.fog.mesh);
     this.slotMarkers = new WarSlotMarkers(libs, engine.players[viewer].slotDefs, this.transform);
     this.root.add(this.slotMarkers.group);
-    this.crowds = [new WarWorkerCrowd(libs, this.transform, 0, viewer === 0 ? "#7CE0A8" : "#E58A8A"), new WarWorkerCrowd(libs, this.transform, 1, viewer === 1 ? "#7CE0A8" : "#E58A8A")];
-    this.crowds.forEach((crowd) => this.root.add(crowd.mesh));
+    this.crowds = [new WarWorkerCrowd(libs, assets, this.transform, 0, viewer === 0 ? "#B8FFD8" : "#FFB0B0"), new WarWorkerCrowd(libs, assets, this.transform, 1, viewer === 1 ? "#B8FFD8" : "#FFB0B0")];
+    this.crowds.forEach((crowd) => this.root.add(crowd.group));
     this.marker = new WarSelectionMarker(libs);
     this.root.add(this.marker.mesh);
     world.scene.add(this.root);
     const home = this.transform.toScene(WarMapData.hq(viewer));
-    world.rig.setZoom(1.4);
-    world.rig.focusOn(home.x, home.z + 5);
+    world.rig.setZoom(1.6);
+    world.rig.focusOn(home.x, home.z + 6);
     this.onTick();
   }
 
@@ -799,7 +768,7 @@ class WarMatchView {
       const economy = this.engine.players[team].economy;
       crowd.update(economy.oreWorkers, economy.crystalWorkers, this.seconds);
       const base = WarMapData.hq(team as WarTeam);
-      crowd.mesh.visible = team === this.viewer || this.engine.vision.isVisible(this.viewer, base.x, base.y);
+      crowd.group.visible = team === this.viewer || this.engine.vision.isVisible(this.viewer, base.x, base.y);
     }
     this.placeMarker();
   }
@@ -872,14 +841,12 @@ class WarMenuBackdrop {
 
   private readonly root: Three<"Group">;
   private readonly units: WarUnitView[] = [];
-  private readonly crowd: WarWorkerCrowd;
+  private crowd: WarWorkerCrowd | null = null;
   private seconds = 0;
   private built = false;
 
   constructor(private readonly libs: ThreeLibs, private readonly assets: WarAssetLibrary, private readonly world: WarWorldView) {
     this.root = new libs.THREE.Group();
-    this.crowd = new WarWorkerCrowd(libs, new WarViewTransform(0), 0, "#7CE0A8");
-    this.root.add(this.crowd.mesh);
   }
 
   show(): void {
@@ -897,7 +864,7 @@ class WarMenuBackdrop {
     const transform = new WarViewTransform(0);
     const hq = transform.toScene(WarMapData.hq(0));
     this.world.rig.orbit(WarMenuBackdrop.RADIUS, WarMenuBackdrop.HEIGHT, (this.seconds / WarMenuBackdrop.ORBIT_SECONDS) * Math.PI * 2, hq.x, hq.z - 2);
-    this.crowd.update(8, 3, this.seconds);
+    if (this.crowd) this.crowd.update(8, 3, this.seconds);
     for (const view of this.units) view.render(1, deltaSeconds, this.world.rig.perspective.quaternion);
   }
 
@@ -906,6 +873,8 @@ class WarMenuBackdrop {
     const transform = new WarViewTransform(0);
     const materials = new WarMaterials(this.libs);
     this.root.add(new WarGroundView(this.libs, this.assets, transform).group);
+    this.crowd = new WarWorkerCrowd(this.libs, this.assets, transform, 0, "#B8FFD8");
+    this.root.add(this.crowd.group);
     const engine = new WarEngine({ seed: 1, factions: ["pioneer", "pioneer"] });
     const player = engine.players[0];
     ["barracks", "range", "lab", "barracks"].forEach((type, i) => {

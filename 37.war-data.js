@@ -52,12 +52,12 @@ class WarUnitCatalog {
     }
 }
 WarUnitCatalog.SPECS = [
-    { id: "shieldbearer", name: "방패병", faction: "pioneer", kind: "melee", role: "front", hp: 425, damage: 12, armorPct: 30, speed: 300, range: 150, cooldownTicks: 10, ore: 60, crystal: 0, pop: 1, buildTicks: 40, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0 },
-    { id: "charger", name: "돌격병", faction: "pioneer", kind: "melee", role: "mid", hp: 265, damage: 23, armorPct: 0, speed: 360, range: 150, cooldownTicks: 8, ore: 80, crystal: 0, pop: 1, buildTicks: 40, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 100 },
-    { id: "archer", name: "사수", faction: "pioneer", kind: "ranged", role: "rear", hp: 127, damage: 14, armorPct: 0, speed: 340, range: 700, cooldownTicks: 6, ore: 70, crystal: 0, pop: 1, buildTicks: 50, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0 },
-    { id: "energymage", name: "에너지술사", faction: "pioneer", kind: "ranged", role: "rear", hp: 106, damage: 21, armorPct: 0, speed: 320, range: 650, cooldownTicks: 12, ore: 90, crystal: 10, pop: 1, buildTicks: 50, splashRadius: 200, buildingDamagePct: 100, chargeBonusPct: 0 },
-    { id: "guardknight", name: "근위 기사", faction: "pioneer", kind: "elite", role: "front", hp: 950, damage: 29, armorPct: 40, speed: 260, range: 180, cooldownTicks: 10, ore: 160, crystal: 60, pop: 2, buildTicks: 100, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0 },
-    { id: "artillerytruck", name: "포격 트럭", faction: "pioneer", kind: "elite", role: "rear", hp: 235, damage: 42, armorPct: 0, speed: 280, range: 1100, cooldownTicks: 20, ore: 180, crystal: 80, pop: 2, buildTicks: 100, splashRadius: 250, buildingDamagePct: 200, chargeBonusPct: 0 },
+    { id: "shieldbearer", name: "방패병", faction: "pioneer", kind: "melee", role: "front", hp: 480, damage: 13, armorPct: 30, speed: 300, range: 150, cooldownTicks: 10, ore: 60, crystal: 0, pop: 1, buildTicks: 40, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0 },
+    { id: "charger", name: "돌격병", faction: "pioneer", kind: "melee", role: "mid", hp: 298, damage: 26, armorPct: 0, speed: 360, range: 150, cooldownTicks: 8, ore: 80, crystal: 0, pop: 1, buildTicks: 40, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 100 },
+    { id: "archer", name: "사수", faction: "pioneer", kind: "ranged", role: "rear", hp: 143, damage: 16, armorPct: 0, speed: 340, range: 700, cooldownTicks: 6, ore: 70, crystal: 0, pop: 1, buildTicks: 50, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0 },
+    { id: "energymage", name: "에너지술사", faction: "pioneer", kind: "ranged", role: "rear", hp: 120, damage: 24, armorPct: 0, speed: 320, range: 650, cooldownTicks: 12, ore: 90, crystal: 10, pop: 1, buildTicks: 50, splashRadius: 200, buildingDamagePct: 100, chargeBonusPct: 0 },
+    { id: "guardknight", name: "근위 기사", faction: "pioneer", kind: "elite", role: "front", hp: 1070, damage: 32, armorPct: 40, speed: 260, range: 180, cooldownTicks: 10, ore: 160, crystal: 60, pop: 2, buildTicks: 100, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0 },
+    { id: "artillerytruck", name: "포격 트럭", faction: "pioneer", kind: "elite", role: "rear", hp: 266, damage: 47, armorPct: 0, speed: 280, range: 1100, cooldownTicks: 20, ore: 180, crystal: 80, pop: 2, buildTicks: 100, splashRadius: 250, buildingDamagePct: 200, chargeBonusPct: 0 },
     { id: "minion", name: "해골 미니언", faction: "grave", kind: "melee", role: "mid", hp: 115, damage: 10, armorPct: 0, speed: 380, range: 150, cooldownTicks: 8, ore: 30, crystal: 0, pop: 1, buildTicks: 30, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, spawnCount: 2 },
     { id: "skelwarrior", name: "해골 전사", faction: "grave", kind: "melee", role: "front", hp: 360, damage: 15, armorPct: 22, speed: 300, range: 150, cooldownTicks: 10, ore: 55, crystal: 0, pop: 1, buildTicks: 40, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, reviveChancePct: 30 },
     { id: "skelarcher", name: "해골 궁수", faction: "grave", kind: "ranged", role: "rear", hp: 115, damage: 14, armorPct: 0, speed: 340, range: 750, cooldownTicks: 6, ore: 65, crystal: 0, pop: 1, buildTicks: 50, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0 },
@@ -167,23 +167,23 @@ class WarMapData {
     }
 }
 WarMapData.HALF_W = 6500;
-WarMapData.HALF_H = 8200;
-WarMapData.HQ_Y = 6000;
-WarMapData.ENTRANCE_Y = 4800;
+WarMapData.HALF_H = 8600;
+WarMapData.HQ_Y = 6300;
+WarMapData.ENTRANCE_Y = 4300;
 WarMapData.LANE_X = 4500;
 WarMapData.LANE_Y = 2400;
 WarMapData.LANE_HALF_WIDTH = 650;
 WarMapData.PLAZA_RADIUS = 2600;
-WarMapData.BASE_RADIUS = 2400;
+WarMapData.BASE_RADIUS = 2600;
 WarMapData.POST_SPREAD = 1800;
-WarMapData.POST_BACKOFF = 500;
+WarMapData.POST_BACKOFF = -400;
 WarMapData.SLOT_OFFSETS = [
-    { x: -1477, y: -260 }, { x: -1449, y: 388 }, { x: -1149, y: 964 }, { x: -634, y: 1359 }, { x: 0, y: 1500 },
-    { x: 634, y: 1359 }, { x: 1149, y: 964 }, { x: 1449, y: 388 }, { x: 1477, y: -260 },
+    { x: -1700, y: 0 }, { x: -1571, y: -651 }, { x: -1202, y: -1202 }, { x: -651, y: -1571 }, { x: 0, y: -1700 },
+    { x: 651, y: -1571 }, { x: 1202, y: -1202 }, { x: 1571, y: -651 }, { x: 1700, y: 0 },
 ];
 WarMapData.ENTRANCE_SLOT_OFFSETS = [{ x: -700, y: -1000 }, { x: 700, y: -1000 }];
-WarMapData.ORE_OFFSETS = [{ x: -2100, y: 600 }, { x: -2100, y: -100 }, { x: -2100, y: 1300 }, { x: -1700, y: 1900 }];
-WarMapData.CRYSTAL_OFFSETS = [{ x: 2100, y: 600 }, { x: 2100, y: -100 }];
+WarMapData.ORE_OFFSETS = [{ x: -2200, y: 1500 }, { x: -1600, y: 1750 }, { x: -1000, y: 1900 }, { x: -400, y: 1950 }];
+WarMapData.CRYSTAL_OFFSETS = [{ x: 1100, y: 1900 }, { x: 1900, y: 1650 }];
 WarMapData.VISION_CELL = 500;
 WarMapData.SHARED_VISION_ZONES = [
     { x: 0, y: 0, radius: 1800 },
