@@ -186,7 +186,7 @@ class WarAssetLibrary {
     }
 }
 WarAssetLibrary.ROOT = "assets/kaykit/war/";
-WarAssetLibrary.EXTRA_MODELS = ["space/landingpad_large.gltf", "resources/Iron_Nuggets.gltf", "resources/Parts_Pile_Large.gltf"];
+WarAssetLibrary.EXTRA_MODELS = ["space/landingpad_large.gltf", "resources/Iron_Nuggets.gltf", "resources/Parts_Pile_Large.gltf", "resources/Iron_Nugget_Large.gltf", "gear/pickaxe.gltf", "quaternius/Worker_Male.gltf", "quaternius/Worker_Female.gltf"];
 WarAssetLibrary.RIG_ANIMATIONS = ["General", "MovementBasic", "CombatMelee", "CombatRanged"];
 class WarMaterials {
     constructor(libs) {
@@ -438,18 +438,6 @@ class WarGroundView {
         this.group.add(scenery.core, scenery.detail);
         this.placeResources(assets);
     }
-    glow(holder) {
-        holder.traverse((node) => {
-            const mesh = node;
-            if (!mesh.isMesh)
-                return;
-            const material = mesh.material.clone();
-            material.color.set("#8FEFFF");
-            material.emissive.set("#1E9ACB");
-            material.emissiveIntensity = 0.9;
-            mesh.material = material;
-        });
-    }
     placeResources(assets) {
         for (const team of [0, 1]) {
             for (const point of WarMapData.orePoints(team)) {
@@ -466,7 +454,7 @@ class WarGroundView {
                 const scene = this.transform.toScene(point);
                 crystal.position.set(scene.x, 0, scene.z);
                 crystal.scale.setScalar(4.6);
-                this.glow(crystal);
+                WarGlow.crystal(crystal);
                 WarShadows.cast(crystal);
                 crystal.rotation.y = point.y * 0.013;
                 this.group.add(crystal);
@@ -511,51 +499,157 @@ class WarFogView {
         this.texture.needsUpdate = true;
     }
 }
-class WarWorkerCrowd {
-    static progress(phase) {
-        if (phase < WarWorkerCrowd.MINE_END)
-            return 0;
-        if (phase < WarWorkerCrowd.GO_END)
-            return (phase - WarWorkerCrowd.MINE_END) / (WarWorkerCrowd.GO_END - WarWorkerCrowd.MINE_END);
-        if (phase < WarWorkerCrowd.DROP_END)
-            return 1;
-        return 1 - (phase - WarWorkerCrowd.DROP_END) / (1 - WarWorkerCrowd.DROP_END);
+class WarWorker {
+    constructor(libs, assets, index, tint) {
+        this.yaw = 0;
+        const file = index % 2 === 0 ? "quaternius/Worker_Male.gltf" : "quaternius/Worker_Female.gltf";
+        const actor = assets.actor(file, false);
+        this.model = actor.model;
+        this.model.scale.setScalar(WarWorker.HEIGHT / assets.heightOf(file));
+        this.model.traverse((node) => {
+            const mesh = node;
+            if (!mesh.isMesh)
+                return;
+            mesh.castShadow = true;
+            const material = mesh.material.clone();
+            material.color.multiply(new libs.THREE.Color(tint));
+            mesh.material = material;
+        });
+        this.group = new libs.THREE.Group();
+        this.group.add(this.model);
+        this.animator = new CharacterAnimator(libs, this.model, actor.clips);
+        this.model.updateMatrixWorld(true);
+        const hand = this.model.getObjectByName("Fist.R") ?? this.model;
+        this.oreItem = this.holdable(libs, assets, hand, "resources/Iron_Nugget_Large.gltf", WarWorker.CARRY_SIZE, 0);
+        this.crystalItem = this.holdable(libs, assets, hand, "scenery/rock_crystals.glb", WarWorker.CARRY_SIZE, 0);
+        WarGlow.crystal(this.crystalItem);
+        this.pickaxe = this.holdable(libs, assets, hand, "gear/pickaxe.gltf", WarWorker.PICK_SIZE, Math.PI / 2);
     }
-    constructor(libs, assets, transform, team, color) {
-        this.transform = transform;
-        this.team = team;
-        this.instances = new WarInstanceSet(libs, assets.template(WarSceneryKit.WORKER), WarWorkerCrowd.MAX);
-        this.group = this.instances.group;
-        const tint = new libs.THREE.Color(color);
-        for (let i = 0; i < WarWorkerCrowd.MAX; i++)
-            this.instances.tint(i, tint);
+    holdable(libs, assets, hand, file, size, tilt) {
+        const item = assets.grounded(file);
+        const world = new libs.THREE.Vector3();
+        hand.getWorldScale(world);
+        item.scale.setScalar(size / assets.heightOf(file) / Math.max(0.0001, world.x));
+        item.rotation.x = tilt;
+        item.visible = false;
+        WarShadows.cast(item);
+        hand.add(item);
+        return item;
     }
-    update(oreWorkers, crystalWorkers, seconds) {
-        const ore = WarMapData.orePoints(this.team), crystal = WarMapData.crystalPoints(this.team);
-        const hq = this.transform.toScene(WarMapData.hq(this.team));
-        const total = Math.min(WarWorkerCrowd.MAX, oreWorkers + crystalWorkers);
-        for (let i = 0; i < total; i++) {
-            const points = i < oreWorkers ? ore : crystal;
-            const node = this.transform.toScene(points[i % points.length]);
-            const phase = (seconds * 0.11 + i * 0.173) % 1;
-            const along = WarWorkerCrowd.progress(phase);
-            const mining = phase < WarWorkerCrowd.MINE_END;
-            const carryingHome = phase >= WarWorkerCrowd.MINE_END && phase < WarWorkerCrowd.DROP_END;
-            const reach = 0.15 + along * 0.7;
-            const x = node.x + (hq.x - node.x) * reach;
-            const z = node.z + (hq.z - node.z) * reach;
-            const towardHq = Math.atan2(hq.x - node.x, hq.z - node.z);
-            const yaw = mining ? towardHq + Math.PI : carryingHome || phase < WarWorkerCrowd.DROP_END ? towardHq : towardHq + Math.PI;
-            const bob = mining ? Math.abs(Math.sin(seconds * 6 + i * 1.7)) * 0.22 : Math.abs(Math.sin(seconds * 9 + i)) * 0.06;
-            this.instances.set(i, { x, z, yaw: yaw + Math.PI, scale: 2.4, y: bob });
+    show(visible) {
+        this.group.visible = visible;
+    }
+    update(route, crystal, seconds, offset, animate, deltaSeconds) {
+        const t = (seconds + offset) % route.cycleSeconds;
+        const mineEnd = WarWorkerCrowd.MINE_SECONDS;
+        const carryEnd = mineEnd + route.walkSeconds;
+        const dropEnd = carryEnd + WarWorkerCrowd.DROP_SECONDS;
+        let from = route.spot, to = route.spot, along = 0, clip = "Idle", pace = 1, facing = route.node, holdsLoad = false, holdsPick = false;
+        if (t < mineEnd) {
+            clip = "SwordSlash";
+            pace = 1.1;
+            holdsPick = true;
         }
-        this.instances.finish(total);
+        else if (t < carryEnd) {
+            from = route.spot;
+            to = route.drop;
+            along = (t - mineEnd) / route.walkSeconds;
+            clip = "Walk_Carry";
+            holdsLoad = true;
+            facing = route.drop;
+        }
+        else if (t < dropEnd) {
+            from = route.drop;
+            to = route.drop;
+            clip = "PickUp";
+            holdsLoad = t < carryEnd + WarWorkerCrowd.DROP_SECONDS * 0.55;
+            facing = route.drop;
+        }
+        else {
+            from = route.drop;
+            to = route.spot;
+            along = (t - dropEnd) / route.walkSeconds;
+            clip = "Walk";
+            holdsPick = true;
+            facing = route.spot;
+        }
+        const x = from.x + (to.x - from.x) * along;
+        const z = from.z + (to.z - from.z) * along;
+        this.group.position.set(x, 0, z);
+        const aimX = facing === route.drop && t >= carryEnd && t < dropEnd ? route.drop.x : facing.x;
+        const heading = clip === "Walk" || clip === "Walk_Carry" ? Math.atan2(to.x - from.x, to.z - from.z) : Math.atan2(aimX - x, facing.z - z);
+        this.yaw = heading;
+        const turn = Math.atan2(Math.sin(this.yaw - this.model.rotation.y), Math.cos(this.yaw - this.model.rotation.y));
+        this.model.rotation.y += turn * Math.min(1, deltaSeconds * 12);
+        this.oreItem.visible = holdsLoad && !crystal;
+        this.crystalItem.visible = holdsLoad && crystal;
+        this.pickaxe.visible = holdsPick;
+        if (!animate)
+            return;
+        this.animator.play(clip, { speed: pace });
+        this.animator.update(deltaSeconds);
     }
 }
-WarWorkerCrowd.MAX = 56;
-WarWorkerCrowd.MINE_END = 0.38;
-WarWorkerCrowd.GO_END = 0.62;
-WarWorkerCrowd.DROP_END = 0.72;
+WarWorker.HEIGHT = 3.0;
+WarWorker.CARRY_SIZE = 0.9;
+WarWorker.PICK_SIZE = 1.25;
+class WarWorkerCrowd {
+    constructor(libs, assets, transform, team, tint) {
+        this.libs = libs;
+        this.assets = assets;
+        this.transform = transform;
+        this.team = team;
+        this.tint = tint;
+        this.workers = [];
+        this.routes = new Map();
+        this.lastSeconds = 0;
+        this.group = new libs.THREE.Group();
+    }
+    routeFor(point, key) {
+        const cached = this.routes.get(key);
+        if (cached)
+            return cached;
+        const hq = this.transform.toScene(WarMapData.hq(this.team));
+        const node = this.transform.toScene(point);
+        const length = Math.hypot(node.x - hq.x, node.z - hq.z);
+        const ux = (node.x - hq.x) / length, uz = (node.z - hq.z) / length;
+        const drop = { x: hq.x + ux * WarWorkerCrowd.HQ_REACH, z: hq.z + uz * WarWorkerCrowd.HQ_REACH };
+        const spot = { x: node.x - ux * WarWorkerCrowd.NODE_GAP, z: node.z - uz * WarWorkerCrowd.NODE_GAP };
+        const walkSeconds = Math.max(1, Math.hypot(spot.x - drop.x, spot.z - drop.z) / WarWorkerCrowd.SPEED);
+        const route = { drop, spot, node, walkSeconds, cycleSeconds: WarWorkerCrowd.MINE_SECONDS + WarWorkerCrowd.DROP_SECONDS + walkSeconds * 2 };
+        this.routes.set(key, route);
+        return route;
+    }
+    update(oreWorkers, crystalWorkers, seconds, focus = null) {
+        const deltaSeconds = Math.min(0.1, Math.max(0.001, seconds - this.lastSeconds));
+        this.lastSeconds = seconds;
+        const ore = WarMapData.orePoints(this.team), crystal = WarMapData.crystalPoints(this.team);
+        const total = Math.min(WarWorkerCrowd.MAX, oreWorkers + crystalWorkers);
+        while (this.workers.length < total) {
+            const worker = new WarWorker(this.libs, this.assets, this.workers.length, this.tint);
+            this.workers.push(worker);
+            this.group.add(worker.group);
+        }
+        this.workers.forEach((worker, i) => {
+            worker.show(i < total);
+            if (i >= total)
+                return;
+            const isCrystal = i >= oreWorkers;
+            const points = isCrystal ? crystal : ore;
+            const slot = (isCrystal ? i - oreWorkers : i) % points.length;
+            const route = this.routeFor(points[slot], (isCrystal ? "c" : "o") + slot);
+            const position = worker.group.position;
+            const near = focus === null || (Math.abs(position.x - focus.x) < 45 && Math.abs(position.z - focus.z) < 45);
+            worker.update(route, isCrystal, seconds, i * 1.3, near, deltaSeconds);
+        });
+    }
+}
+WarWorkerCrowd.MINE_SECONDS = 3.2;
+WarWorkerCrowd.DROP_SECONDS = 0.9;
+WarWorkerCrowd.MAX = 16;
+WarWorkerCrowd.SPEED = 3.4;
+WarWorkerCrowd.HQ_REACH = 4.2;
+WarWorkerCrowd.NODE_GAP = 1.9;
 class WarCameraRig {
     constructor(libs) {
         this.focusX = 0;
@@ -608,6 +702,20 @@ WarCameraRig.DISTANCE = 24;
 WarCameraRig.HEIGHT = 30;
 WarCameraRig.LIMIT_X = 58;
 WarCameraRig.LIMIT_Z = 92;
+class WarGlow {
+    static crystal(holder) {
+        holder.traverse((node) => {
+            const mesh = node;
+            if (!mesh.isMesh)
+                return;
+            const material = mesh.material.clone();
+            material.color.set("#8FEFFF");
+            material.emissive.set("#1E9ACB");
+            material.emissiveIntensity = 0.9;
+            mesh.material = material;
+        });
+    }
+}
 class WarShadows {
     static cast(object) {
         object.traverse((node) => {
@@ -1205,7 +1313,7 @@ class WarMatchView {
         for (const crowd of this.crowds) {
             const team = crowd === this.crowds[0] ? 0 : 1;
             const economy = this.engine.players[team].economy;
-            crowd.update(economy.oreWorkers, economy.crystalWorkers, this.seconds);
+            crowd.update(economy.oreWorkers, economy.crystalWorkers, this.seconds, focus);
             const base = WarMapData.hq(team);
             crowd.group.visible = team === this.viewer || this.engine.vision.isVisible(this.viewer, base.x, base.y);
         }
