@@ -1,7 +1,9 @@
+interface WarCorpse { team: WarTeam; x: number; y: number; tick: number }
+
 type WarSquadMode = "home" | "away" | "returning";
 type WarWinner = 0 | 1 | 2;
 type WarEndReason = "hq" | "time" | "surrender";
-type WarEventKind = "produced" | "built" | "unitDied" | "buildingDestroyed" | "ended" | "alert";
+type WarEventKind = "revived" | "raised" | "produced" | "built" | "unitDied" | "buildingDestroyed" | "ended" | "alert";
 
 interface WarEvent { kind: WarEventKind; team: WarTeam; tick: number; text: string; winner?: WarWinner; x?: number; y?: number }
 interface WarResult { winner: WarWinner; reason: WarEndReason; tick: number }
@@ -17,7 +19,7 @@ interface WarAttacker {
   splashRadius(): number;
   cooldownTicks(): number;
   damageAgainst(target: WarEntity): number;
-  afterStrike(): void;
+  afterStrike(target: WarEntity): void;
 }
 
 class WarMath {
@@ -95,10 +97,15 @@ class WarUnit extends WarEntity implements WarAttacker {
   targetId = -1;
   cooldownLeft = 0;
   chargeReady: boolean;
+  slowTicksLeft = 0;
+  slowPct = 0;
+  revived = false;
+  readonly ability: WarAbility | null;
 
   constructor(id: number, team: WarTeam, x: number, y: number, readonly def: WarUnitDef) {
     super(id, team, x, y, def.hp);
     this.chargeReady = def.chargeBonusPct > 0;
+    this.ability = WarAbilityFactory.forDef(def);
   }
 
   bodyRadius(): number {
@@ -106,7 +113,8 @@ class WarUnit extends WarEntity implements WarAttacker {
   }
 
   stepLength(): number {
-    return Math.floor(this.def.speed / 10);
+    const base = Math.floor(this.def.speed / 10);
+    return this.slowTicksLeft > 0 ? Math.floor((base * (100 - this.slowPct)) / 100) : base;
   }
 
   splashRadius(): number {
@@ -114,7 +122,7 @@ class WarUnit extends WarEntity implements WarAttacker {
   }
 
   cooldownTicks(): number {
-    return this.def.cooldownTicks;
+    return this.slowTicksLeft > 0 ? Math.floor((this.def.cooldownTicks * (100 + this.slowPct)) / 100) : this.def.cooldownTicks;
   }
 
   damageAgainst(target: WarEntity): number {
@@ -125,8 +133,12 @@ class WarUnit extends WarEntity implements WarAttacker {
     return Math.max(1, damage);
   }
 
-  afterStrike(): void {
+  afterStrike(target: WarEntity): void {
     this.chargeReady = false;
+    if (this.def.slowPct > 0 && target instanceof WarUnit) {
+      target.slowPct = this.def.slowPct;
+      target.slowTicksLeft = this.def.slowTicks;
+    }
   }
 
   reach(target: WarEntity): number {
@@ -162,7 +174,7 @@ class WarProductionItem {
     if (id === "worker_ore") return new WarProductionItem(id, "광석 일꾼", WarBalance.WORKER_ORE, 0, 1, WarBalance.WORKER_BUILD_TICKS, "ore", null);
     if (id === "worker_crystal") return new WarProductionItem(id, "결정 일꾼", WarBalance.WORKER_CRYSTAL_ORE, WarBalance.WORKER_CRYSTAL_CRYSTAL, 1, WarBalance.WORKER_BUILD_TICKS, "crystal", null);
     const def = WarUnitCatalog.byId(id);
-    return new WarProductionItem(id, def.name, def.ore, def.crystal, def.pop, def.buildTicks, null, def);
+    return new WarProductionItem(id, def.name, def.ore, def.crystal, def.pop * def.spawnCount, def.buildTicks, null, def);
   }
 }
 
@@ -540,6 +552,12 @@ class WarSquad {
       this.anchor = this.post;
       return;
     }
+    if (this.attachedMembers().length === 0) {
+      this.arriveHome();
+      this.anchor = this.post;
+      this.path = [];
+      return;
+    }
     if (this.path.length === 0) return;
     if (this.isEngaged() || this.isStalledByLag()) return;
     const step = this.speed();
@@ -552,7 +570,7 @@ class WarSquad {
     if (this.path.length === 0 && this.mode === "returning") this.arriveHome();
   }
 
-  private arriveHome(): void {
+  arriveHome(): void {
     this.mode = "home";
     this.heading = { x: 0, y: -1000 * WarMapData.sign(this.team) };
     for (const unit of this.members) unit.attached = true;
@@ -612,7 +630,7 @@ class WarCombat {
       }
     }
     attacker.cooldownLeft = attacker.cooldownTicks();
-    attacker.afterStrike();
+    attacker.afterStrike(target);
   }
 }
 
@@ -655,6 +673,7 @@ class WarTargeting {
 class WarUnitBrain {
   static think(engine: WarEngine, unit: WarUnit, squad: WarSquad): void {
     if (unit.cooldownLeft > 0) unit.cooldownLeft--;
+    if (unit.slowTicksLeft > 0) unit.slowTicksLeft--;
     const slot = squad.slotOf(unit);
     const origin = unit.attached ? slot : squad.post;
     let target = unit.targetId >= 0 ? engine.entityById(unit.targetId) : null;
@@ -684,6 +703,34 @@ class WarUnitBrain {
     const catchingUp = gap > 300 || !unit.attached || squad.mode === "home";
     const pace = catchingUp ? unit.stepLength() : Math.min(unit.stepLength(), squad.speed());
     unit.moveToward(slot, pace);
+  }
+}
+
+abstract class WarAbility {
+  abstract update(engine: WarEngine, unit: WarUnit): void;
+}
+
+class WarRaiseDeadAbility extends WarAbility {
+  private static readonly PERIOD_TICKS = 80;
+  private static readonly RANGE = 700;
+  private static readonly CORPSE_LIFE_TICKS = 100;
+
+  private waitTicks = WarRaiseDeadAbility.PERIOD_TICKS;
+
+  update(engine: WarEngine, unit: WarUnit): void {
+    if (this.waitTicks > 0) {
+      this.waitTicks--;
+      return;
+    }
+    const corpse = engine.takeCorpse(unit.team, unit, WarRaiseDeadAbility.RANGE, WarRaiseDeadAbility.CORPSE_LIFE_TICKS);
+    if (!corpse) return;
+    if (engine.raiseMinion(unit, corpse)) this.waitTicks = WarRaiseDeadAbility.PERIOD_TICKS;
+  }
+}
+
+class WarAbilityFactory {
+  static forDef(def: WarUnitDef): WarAbility | null {
+    return def.ability === "raise" ? new WarRaiseDeadAbility() : null;
   }
 }
 
@@ -811,6 +858,8 @@ class WarStateHash {
       if (entity instanceof WarUnit) {
         mix(entity.targetId);
         mix(entity.cooldownLeft);
+        mix(entity.slowTicksLeft);
+        mix(entity.revived ? 1 : 0);
       } else if (entity instanceof WarBuilding) {
         mix(entity.buildLeft);
         for (const queued of entity.queue) mix(queued.ticksLeft);
@@ -872,6 +921,7 @@ class WarEngine {
   private events: WarEvent[] = [];
   private readonly byId = new Map<number, WarEntity>();
   private readonly teamEntities: [WarEntity[], WarEntity[]] = [[], []];
+  private corpses: WarCorpse[] = [];
 
   constructor(options: WarEngineOptions) {
     this.random = new WarRandom(options.seed);
@@ -888,6 +938,30 @@ class WarEngine {
     const out = this.events;
     this.events = [];
     return out;
+  }
+
+  takeCorpse(team: WarTeam, near: WarPoint, range: number, lifeTicks: number): WarCorpse | null {
+    for (const corpse of this.corpses) {
+      if (corpse.team !== team || this.tick - corpse.tick > lifeTicks) continue;
+      if (WarMath.dist(corpse.x, corpse.y, near.x, near.y) > range) continue;
+      this.corpses.splice(this.corpses.indexOf(corpse), 1);
+      return corpse;
+    }
+    return null;
+  }
+
+  raiseMinion(necromancer: WarUnit, corpse: WarCorpse): boolean {
+    const player = this.players[necromancer.team];
+    if (player.economy.popFree < 1) return false;
+    const unit = new WarUnit(this.nextId++, necromancer.team, corpse.x, corpse.y, WarUnitCatalog.byId("minion"));
+    const squad = player.squads[necromancer.squadIndex];
+    if (squad && squad.members.length < WarBalance.SQUAD_CAP) squad.add(unit);
+    else if (!player.assigner.assign(unit)) return false;
+    unit.attached = necromancer.attached;
+    this.register(unit);
+    player.economy.popUsed += 1;
+    this.emit({ kind: "raised", team: necromancer.team, tick: this.tick, text: unit.def.name, x: corpse.x, y: corpse.y });
+    return true;
   }
 
   emit(event: WarEvent): void {
@@ -918,6 +992,7 @@ class WarEngine {
     if (this.tick % WarBalance.ALERT_EVERY_TICKS === 0) this.alerts.update();
     this.separateUnits();
     this.removeDead();
+    if (this.tick % 10 === 0) this.corpses = this.corpses.filter((corpse) => this.tick - corpse.tick <= WarBalance.CORPSE_KEEP_TICKS);
     this.tick++;
     if (!this.result && this.tick >= WarBalance.MATCH_TICKS) this.finish(WarWinCheck.atTimeLimit(this), "time");
   }
@@ -932,6 +1007,7 @@ class WarEngine {
     if (!target.alive) return;
     target.hp = Math.max(0, target.hp - amount);
     if (target instanceof WarBuilding) this.alerts.noteBuildingHit(target);
+    if (target instanceof WarUnit && target.hp === 0) this.tryRevive(target);
   }
 
   produce(team: WarTeam, buildingId: number, itemId: string): boolean {
@@ -964,6 +1040,16 @@ class WarEngine {
     return true;
   }
 
+  private tryRevive(unit: WarUnit): void {
+    if (unit.def.reviveChancePct <= 0 || unit.revived) return;
+    if (this.random.below(100) >= unit.def.reviveChancePct) return;
+    unit.revived = true;
+    unit.hp = Math.max(1, Math.trunc((unit.maxHp * WarBalance.REVIVE_HP_PERCENT) / 100));
+    unit.targetId = -1;
+    unit.cooldownLeft = WarBalance.REVIVE_STUN_TICKS;
+    this.emit({ kind: "revived", team: unit.team, tick: this.tick, text: unit.def.name, x: unit.x, y: unit.y });
+  }
+
   private placeHq(player: WarPlayer): void {
     const point = WarMapData.hq(player.team);
     const def = WarBuildingCatalog.byType("hq");
@@ -991,7 +1077,7 @@ class WarEngine {
         if (!building.alive) continue;
         if (!building.complete) {
           building.buildLeft--;
-          if (building.complete) this.events.push({ kind: "built", team: player.team, tick: this.tick, text: building.def.name });
+          if (building.complete) this.events.push({ kind: "built", team: player.team, tick: this.tick, text: WarBuildingCatalog.displayName(building.def.type, player.faction) });
           continue;
         }
         const head = building.queue[0];
@@ -1011,13 +1097,15 @@ class WarEngine {
       return;
     }
     const def = item.unitDef as WarUnitDef;
-    const jitterX = this.random.between(-200, 200);
-    const jitterY = this.random.between(-200, 200);
-    const spawn = WarTerrain.clamp({ x: building.x + jitterX, y: building.y + jitterY });
-    const unit = new WarUnit(this.nextId++, player.team, spawn.x, spawn.y, def);
-    this.register(unit);
-    player.unitsProduced++;
-    if (!player.assigner.assign(unit)) unit.hp = 0;
+    for (let n = 0; n < def.spawnCount; n++) {
+      const jitterX = this.random.between(-200, 200);
+      const jitterY = this.random.between(-200, 200);
+      const spawn = WarTerrain.clamp({ x: building.x + jitterX, y: building.y + jitterY });
+      const unit = new WarUnit(this.nextId++, player.team, spawn.x, spawn.y, def);
+      this.register(unit);
+      player.unitsProduced++;
+      if (!player.assigner.assign(unit)) unit.hp = 0;
+    }
   }
 
   private refreshTeamEntities(): void {
@@ -1032,7 +1120,9 @@ class WarEngine {
         squad.planSlots();
         squad.advanceAnchor();
         for (const unit of squad.members.slice()) {
-          if (unit.alive) WarUnitBrain.think(this, unit, squad);
+          if (!unit.alive) continue;
+          WarUnitBrain.think(this, unit, squad);
+          if (unit.ability) unit.ability.update(this, unit);
         }
       }
     }
@@ -1097,13 +1187,14 @@ class WarEngine {
     player.economy.popUsed -= unit.def.pop;
     player.unitsLost++;
     player.squads[unit.squadIndex]?.remove(unit);
+    if (unit.def.kind !== "elite") this.corpses.push({ team: unit.team, x: unit.x, y: unit.y, tick: this.tick });
     this.events.push({ kind: "unitDied", team: player.team, tick: this.tick, text: unit.def.name });
   }
 
   private retireBuilding(player: WarPlayer, building: WarBuilding): void {
     for (const queued of building.queue) player.economy.popUsed -= queued.item.pop;
     building.queue.length = 0;
-    this.events.push({ kind: "buildingDestroyed", team: player.team, tick: this.tick, text: building.def.name });
+    this.events.push({ kind: "buildingDestroyed", team: player.team, tick: this.tick, text: WarBuildingCatalog.displayName(building.def.type, player.faction) });
     if (building.def.type === "hq") {
       this.finish((player.team === 0 ? 1 : 0) as WarWinner, "hq");
       return;

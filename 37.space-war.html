@@ -34,6 +34,7 @@
   .st-screen { --st-bg: 7, 11, 22; --st-panel: rgba(14, 20, 38, .88); --st-accent: #D97B4F; --st-title2: #8FB4FF; --st-glow: rgba(143, 180, 255, .55); }
   .st-card { margin-bottom: 14px; }
   .st-opts > button.on { border-color: #D97B4F; background: #D97B4F; color: #fff; }
+  .optLabel { margin: 4px 0 6px; font-size: 14px; font-weight: 800; color: #B9C4E0; }
   .endReason { margin-bottom: 8px; font-size: 20px; font-weight: 800; color: #FFD2B8; text-align: center; }
   .endStats { margin-bottom: 14px; font-size: 16px; font-weight: 700; color: #B9C4E0; text-align: center; }
 
@@ -141,6 +142,18 @@
     <div class="st-hero"><h1 class="st-title">우주전쟁</h1></div>
     <div class="st-card">
       <h2>AI 연습전</h2>
+      <h3 class="optLabel">내 진영</h3>
+      <div class="st-opts">
+        <button type="button" data-mine="pioneer" class="on">개척단</button>
+        <button type="button" data-mine="grave">무덤 군단</button>
+      </div>
+      <h3 class="optLabel">상대 진영</h3>
+      <div class="st-opts">
+        <button type="button" data-foe="random" class="on">무작위</button>
+        <button type="button" data-foe="pioneer">개척단</button>
+        <button type="button" data-foe="grave">무덤 군단</button>
+      </div>
+      <h3 class="optLabel">난이도</h3>
       <div class="st-opts" id="levelOpts">
         <button type="button" data-level="easy">쉬움</button>
         <button type="button" data-level="normal" class="on">보통</button>
@@ -162,6 +175,7 @@
     <div class="st-card">
       <h2>규칙</h2>
       <ul class="st-rules">
+        <li><b>개척단</b>은 방패병·돌격병·사수·에너지술사·근위 기사·포격 트럭의 소수 정예, <b>무덤 군단</b>은 싸고 많이 뽑는 해골 병력이에요. 해골 전사는 쓰러져도 한 번 일어나려 하고, 해골 미니언은 두 마리씩 나와요. 해골 마법사의 저주는 적을 느리게 하고, 사령술사는 쓰러진 해골을 미니언으로 되살려요.</li>
         <li>일꾼과 병력을 합쳐 <b>인구 60</b>까지 만들 수 있어요. 일꾼이 많을수록 자원이 늘지만 증가폭은 점점 줄어들고, 그만큼 병력 자리는 줄어요.</li>
         <li>일꾼은 <b>광석</b>과 <b>결정</b>을 알아서 캐 와요. 결정은 고급 유닛과 연구소에 써요.</li>
         <li>사령부 둘레의 빈 터 9곳에 건물을 지어요. 같은 건물을 여러 개 지어도 되고, 건물 하나가 생산 줄 하나예요.</li>

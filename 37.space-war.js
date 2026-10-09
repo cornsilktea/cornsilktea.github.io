@@ -80,12 +80,12 @@ class WarInputController {
 WarInputController.DRAG_PIXELS = 9;
 WarInputController.KEY_PAN_SPEED = 34;
 class WarLocalMatch {
-    constructor(libs, assets, world, viewer, level, onEvent) {
+    constructor(libs, assets, world, viewer, level, factions, onEvent) {
         this.viewer = viewer;
         this.onEvent = onEvent;
         this.accumulatorMs = 0;
         const seed = (Math.random() * 0x7fffffff) | 0;
-        this.engine = new WarEngine({ seed, factions: ["pioneer", "pioneer"] });
+        this.engine = new WarEngine({ seed, factions });
         this.bot = WarBotFactory.create(level, viewer === 0 ? 1 : 0, seed ^ 0x5bd1e995);
         this.view = new WarMatchView(libs, assets, world, this.engine, viewer);
     }
@@ -129,6 +129,8 @@ class WarGameApp {
         this.match = null;
         this.selection = { kind: "none" };
         this.level = "normal";
+        this.myFaction = "pioneer";
+        this.foeChoice = "random";
         this.lastFrameMs = 0;
         this.frameCount = 0;
         this.ready = false;
@@ -165,6 +167,8 @@ class WarGameApp {
                 document.querySelectorAll("[data-level]").forEach((other) => other.classList.toggle("on", other === button));
             });
         });
+        this.bindChoice("data-mine", (value) => { this.myFaction = value; });
+        this.bindChoice("data-foe", (value) => { this.foeChoice = value; });
         WarDom.byId("btnStart").addEventListener("click", () => this.startMatch());
         WarDom.byId("btnAgain").addEventListener("click", () => this.startMatch());
         WarDom.byId("btnToMenu").addEventListener("click", () => this.showMenu());
@@ -182,6 +186,15 @@ class WarGameApp {
                 this.attackMap.isOpen ? this.attackMap.close() : this.attackMap.open();
         });
     }
+    bindChoice(attribute, onChoose) {
+        const buttons = Array.from(document.querySelectorAll("[" + attribute + "]"));
+        buttons.forEach((button) => {
+            button.addEventListener("click", () => {
+                onChoose(button.getAttribute(attribute));
+                buttons.forEach((other) => other.classList.toggle("on", other === button));
+            });
+        });
+    }
     startMatch() {
         if (!this.ready)
             return;
@@ -189,7 +202,9 @@ class WarGameApp {
             this.match.dispose();
         this.backdrop.hide();
         const viewer = (Math.random() < 0.5 ? 0 : 1);
-        this.match = new WarLocalMatch(this.libs, this.assets, this.world, viewer, this.level, (event) => this.onEvent(event));
+        const foe = this.foeChoice === "random" ? (Math.random() < 0.5 ? "pioneer" : "grave") : this.foeChoice;
+        const factions = viewer === 0 ? [this.myFaction, foe] : [foe, this.myFaction];
+        this.match = new WarLocalMatch(this.libs, this.assets, this.world, viewer, this.level, factions, (event) => this.onEvent(event));
         this.selection = { kind: "none" };
         this.world.playing = true;
         this.notice.reset();

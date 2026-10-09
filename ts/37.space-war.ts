@@ -83,9 +83,9 @@ class WarLocalMatch {
   private readonly bot: WarBotBrain;
   private accumulatorMs = 0;
 
-  constructor(libs: ThreeLibs, assets: WarAssetLibrary, world: WarWorldView, readonly viewer: WarTeam, level: WarDifficulty, private readonly onEvent: (event: WarEvent) => void) {
+  constructor(libs: ThreeLibs, assets: WarAssetLibrary, world: WarWorldView, readonly viewer: WarTeam, level: WarDifficulty, factions: [WarFactionId, WarFactionId], private readonly onEvent: (event: WarEvent) => void) {
     const seed = (Math.random() * 0x7fffffff) | 0;
-    this.engine = new WarEngine({ seed, factions: ["pioneer", "pioneer"] });
+    this.engine = new WarEngine({ seed, factions });
     this.bot = WarBotFactory.create(level, viewer === 0 ? 1 : 0, seed ^ 0x5bd1e995);
     this.view = new WarMatchView(libs, assets, world, this.engine, viewer);
   }
@@ -134,6 +134,8 @@ class WarGameApp {
   private match: WarLocalMatch | null = null;
   private selection: WarSelection = { kind: "none" };
   private level: WarDifficulty = "normal";
+  private myFaction: WarFactionId = "pioneer";
+  private foeChoice: WarFactionId | "random" = "random";
   private lastFrameMs = 0;
   private frameCount = 0;
   private ready = false;
@@ -174,6 +176,8 @@ class WarGameApp {
         document.querySelectorAll<HTMLElement>("[data-level]").forEach((other) => other.classList.toggle("on", other === button));
       });
     });
+    this.bindChoice("data-mine", (value) => { this.myFaction = value as WarFactionId; });
+    this.bindChoice("data-foe", (value) => { this.foeChoice = value as WarFactionId | "random"; });
     WarDom.byId("btnStart").addEventListener("click", () => this.startMatch());
     WarDom.byId("btnAgain").addEventListener("click", () => this.startMatch());
     WarDom.byId("btnToMenu").addEventListener("click", () => this.showMenu());
@@ -189,12 +193,24 @@ class WarGameApp {
     });
   }
 
+  private bindChoice(attribute: string, onChoose: (value: string) => void): void {
+    const buttons = Array.from(document.querySelectorAll<HTMLElement>("[" + attribute + "]"));
+    buttons.forEach((button) => {
+      button.addEventListener("click", () => {
+        onChoose(button.getAttribute(attribute) as string);
+        buttons.forEach((other) => other.classList.toggle("on", other === button));
+      });
+    });
+  }
+
   private startMatch(): void {
     if (!this.ready) return;
     if (this.match) this.match.dispose();
     this.backdrop.hide();
     const viewer = (Math.random() < 0.5 ? 0 : 1) as WarTeam;
-    this.match = new WarLocalMatch(this.libs, this.assets, this.world, viewer, this.level, (event) => this.onEvent(event));
+    const foe: WarFactionId = this.foeChoice === "random" ? (Math.random() < 0.5 ? "pioneer" : "grave") : this.foeChoice;
+    const factions: [WarFactionId, WarFactionId] = viewer === 0 ? [this.myFaction, foe] : [foe, this.myFaction];
+    this.match = new WarLocalMatch(this.libs, this.assets, this.world, viewer, this.level, factions, (event) => this.onEvent(event));
     this.selection = { kind: "none" };
     this.world.playing = true;
     this.notice.reset();

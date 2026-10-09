@@ -134,7 +134,7 @@ class WarCommandCard {
         const economy = player.economy;
         if (selection.kind === "slot") {
             return WarBuildingCatalog.buildable(player.slotDefs[selection.index].kind).map((def) => ({
-                label: def.name,
+                label: WarBuildingCatalog.displayName(def.type, player.faction),
                 sub: WarCommandCard.costText(def.ore, def.crystal) + " · " + def.buildTicks / WarBalance.TICKS_PER_SEC + "초",
                 enabled: economy.canAfford(def.ore, def.crystal),
                 onPress: () => { sink(new WarBuildCommand(team, selection.index, def.type)); onAfter(); },
@@ -206,7 +206,7 @@ class WarInfoPanel {
                 if (!building.complete)
                     rows.push("건설 중 " + Math.round((1 - building.buildLeft / building.def.buildTicks) * 100) + "%");
                 building.queue.forEach((queued, i) => rows.push((i === 0 ? "생산 중 " : "대기 ") + queued.item.name + (i === 0 ? " " + Math.round((1 - queued.ticksLeft / queued.item.ticks) * 100) + "%" : "")));
-                return { title: building.def.name + (building.team === team ? "" : " (적)"), hpRatio: building.hp / building.maxHp, rows };
+                return { title: WarBuildingCatalog.displayName(building.def.type, engine.players[building.team].faction) + (building.team === team ? "" : " (적)"), hpRatio: building.hp / building.maxHp, rows };
             }
         }
         if (selection.kind === "squad") {

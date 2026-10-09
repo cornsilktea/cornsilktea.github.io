@@ -66,19 +66,24 @@ class WarUnit extends WarEntity {
         this.attached = false;
         this.targetId = -1;
         this.cooldownLeft = 0;
+        this.slowTicksLeft = 0;
+        this.slowPct = 0;
+        this.revived = false;
         this.chargeReady = def.chargeBonusPct > 0;
+        this.ability = WarAbilityFactory.forDef(def);
     }
     bodyRadius() {
         return 40;
     }
     stepLength() {
-        return Math.floor(this.def.speed / 10);
+        const base = Math.floor(this.def.speed / 10);
+        return this.slowTicksLeft > 0 ? Math.floor((base * (100 - this.slowPct)) / 100) : base;
     }
     splashRadius() {
         return this.def.splashRadius;
     }
     cooldownTicks() {
-        return this.def.cooldownTicks;
+        return this.slowTicksLeft > 0 ? Math.floor((this.def.cooldownTicks * (100 + this.slowPct)) / 100) : this.def.cooldownTicks;
     }
     damageAgainst(target) {
         let damage = this.def.damage;
@@ -90,8 +95,12 @@ class WarUnit extends WarEntity {
             damage = Math.trunc((damage * (100 - target.def.armorPct)) / 100);
         return Math.max(1, damage);
     }
-    afterStrike() {
+    afterStrike(target) {
         this.chargeReady = false;
+        if (this.def.slowPct > 0 && target instanceof WarUnit) {
+            target.slowPct = this.def.slowPct;
+            target.slowTicksLeft = this.def.slowTicks;
+        }
     }
     reach(target) {
         return this.def.range + target.bodyRadius();
@@ -125,7 +134,7 @@ class WarProductionItem {
         if (id === "worker_crystal")
             return new WarProductionItem(id, "결정 일꾼", WarBalance.WORKER_CRYSTAL_ORE, WarBalance.WORKER_CRYSTAL_CRYSTAL, 1, WarBalance.WORKER_BUILD_TICKS, "crystal", null);
         const def = WarUnitCatalog.byId(id);
-        return new WarProductionItem(id, def.name, def.ore, def.crystal, def.pop, def.buildTicks, null, def);
+        return new WarProductionItem(id, def.name, def.ore, def.crystal, def.pop * def.spawnCount, def.buildTicks, null, def);
     }
 }
 class WarQueuedItem {
@@ -488,6 +497,12 @@ class WarSquad {
             this.anchor = this.post;
             return;
         }
+        if (this.attachedMembers().length === 0) {
+            this.arriveHome();
+            this.anchor = this.post;
+            this.path = [];
+            return;
+        }
         if (this.path.length === 0)
             return;
         if (this.isEngaged() || this.isStalledByLag())
@@ -560,7 +575,7 @@ class WarCombat {
             }
         }
         attacker.cooldownLeft = attacker.cooldownTicks();
-        attacker.afterStrike();
+        attacker.afterStrike(target);
     }
 }
 WarCombat.SPLASH_FALLOFF_PERCENT = 60;
@@ -606,6 +621,8 @@ class WarUnitBrain {
     static think(engine, unit, squad) {
         if (unit.cooldownLeft > 0)
             unit.cooldownLeft--;
+        if (unit.slowTicksLeft > 0)
+            unit.slowTicksLeft--;
         const slot = squad.slotOf(unit);
         const origin = unit.attached ? slot : squad.post;
         let target = unit.targetId >= 0 ? engine.entityById(unit.targetId) : null;
@@ -638,6 +655,33 @@ class WarUnitBrain {
         const catchingUp = gap > 300 || !unit.attached || squad.mode === "home";
         const pace = catchingUp ? unit.stepLength() : Math.min(unit.stepLength(), squad.speed());
         unit.moveToward(slot, pace);
+    }
+}
+class WarAbility {
+}
+class WarRaiseDeadAbility extends WarAbility {
+    constructor() {
+        super(...arguments);
+        this.waitTicks = WarRaiseDeadAbility.PERIOD_TICKS;
+    }
+    update(engine, unit) {
+        if (this.waitTicks > 0) {
+            this.waitTicks--;
+            return;
+        }
+        const corpse = engine.takeCorpse(unit.team, unit, WarRaiseDeadAbility.RANGE, WarRaiseDeadAbility.CORPSE_LIFE_TICKS);
+        if (!corpse)
+            return;
+        if (engine.raiseMinion(unit, corpse))
+            this.waitTicks = WarRaiseDeadAbility.PERIOD_TICKS;
+    }
+}
+WarRaiseDeadAbility.PERIOD_TICKS = 80;
+WarRaiseDeadAbility.RANGE = 700;
+WarRaiseDeadAbility.CORPSE_LIFE_TICKS = 100;
+class WarAbilityFactory {
+    static forDef(def) {
+        return def.ability === "raise" ? new WarRaiseDeadAbility() : null;
     }
 }
 class WarCommand {
@@ -755,6 +799,8 @@ class WarStateHash {
             if (entity instanceof WarUnit) {
                 mix(entity.targetId);
                 mix(entity.cooldownLeft);
+                mix(entity.slowTicksLeft);
+                mix(entity.revived ? 1 : 0);
             }
             else if (entity instanceof WarBuilding) {
                 mix(entity.buildLeft);
@@ -816,6 +862,7 @@ class WarEngine {
         this.events = [];
         this.byId = new Map();
         this.teamEntities = [[], []];
+        this.corpses = [];
         this.random = new WarRandom(options.seed);
         this.players = [new WarPlayer(0, options.factions[0]), new WarPlayer(1, options.factions[1])];
         for (const player of this.players)
@@ -829,6 +876,33 @@ class WarEngine {
         const out = this.events;
         this.events = [];
         return out;
+    }
+    takeCorpse(team, near, range, lifeTicks) {
+        for (const corpse of this.corpses) {
+            if (corpse.team !== team || this.tick - corpse.tick > lifeTicks)
+                continue;
+            if (WarMath.dist(corpse.x, corpse.y, near.x, near.y) > range)
+                continue;
+            this.corpses.splice(this.corpses.indexOf(corpse), 1);
+            return corpse;
+        }
+        return null;
+    }
+    raiseMinion(necromancer, corpse) {
+        const player = this.players[necromancer.team];
+        if (player.economy.popFree < 1)
+            return false;
+        const unit = new WarUnit(this.nextId++, necromancer.team, corpse.x, corpse.y, WarUnitCatalog.byId("minion"));
+        const squad = player.squads[necromancer.squadIndex];
+        if (squad && squad.members.length < WarBalance.SQUAD_CAP)
+            squad.add(unit);
+        else if (!player.assigner.assign(unit))
+            return false;
+        unit.attached = necromancer.attached;
+        this.register(unit);
+        player.economy.popUsed += 1;
+        this.emit({ kind: "raised", team: necromancer.team, tick: this.tick, text: unit.def.name, x: corpse.x, y: corpse.y });
+        return true;
     }
     emit(event) {
         this.events.push(event);
@@ -859,6 +933,8 @@ class WarEngine {
             this.alerts.update();
         this.separateUnits();
         this.removeDead();
+        if (this.tick % 10 === 0)
+            this.corpses = this.corpses.filter((corpse) => this.tick - corpse.tick <= WarBalance.CORPSE_KEEP_TICKS);
         this.tick++;
         if (!this.result && this.tick >= WarBalance.MATCH_TICKS)
             this.finish(WarWinCheck.atTimeLimit(this), "time");
@@ -875,6 +951,8 @@ class WarEngine {
         target.hp = Math.max(0, target.hp - amount);
         if (target instanceof WarBuilding)
             this.alerts.noteBuildingHit(target);
+        if (target instanceof WarUnit && target.hp === 0)
+            this.tryRevive(target);
     }
     produce(team, buildingId, itemId) {
         const player = this.players[team];
@@ -912,6 +990,17 @@ class WarEngine {
         this.register(building);
         return true;
     }
+    tryRevive(unit) {
+        if (unit.def.reviveChancePct <= 0 || unit.revived)
+            return;
+        if (this.random.below(100) >= unit.def.reviveChancePct)
+            return;
+        unit.revived = true;
+        unit.hp = Math.max(1, Math.trunc((unit.maxHp * WarBalance.REVIVE_HP_PERCENT) / 100));
+        unit.targetId = -1;
+        unit.cooldownLeft = WarBalance.REVIVE_STUN_TICKS;
+        this.emit({ kind: "revived", team: unit.team, tick: this.tick, text: unit.def.name, x: unit.x, y: unit.y });
+    }
     placeHq(player) {
         const point = WarMapData.hq(player.team);
         const def = WarBuildingCatalog.byType("hq");
@@ -940,7 +1029,7 @@ class WarEngine {
                 if (!building.complete) {
                     building.buildLeft--;
                     if (building.complete)
-                        this.events.push({ kind: "built", team: player.team, tick: this.tick, text: building.def.name });
+                        this.events.push({ kind: "built", team: player.team, tick: this.tick, text: WarBuildingCatalog.displayName(building.def.type, player.faction) });
                     continue;
                 }
                 const head = building.queue[0];
@@ -961,14 +1050,16 @@ class WarEngine {
             return;
         }
         const def = item.unitDef;
-        const jitterX = this.random.between(-200, 200);
-        const jitterY = this.random.between(-200, 200);
-        const spawn = WarTerrain.clamp({ x: building.x + jitterX, y: building.y + jitterY });
-        const unit = new WarUnit(this.nextId++, player.team, spawn.x, spawn.y, def);
-        this.register(unit);
-        player.unitsProduced++;
-        if (!player.assigner.assign(unit))
-            unit.hp = 0;
+        for (let n = 0; n < def.spawnCount; n++) {
+            const jitterX = this.random.between(-200, 200);
+            const jitterY = this.random.between(-200, 200);
+            const spawn = WarTerrain.clamp({ x: building.x + jitterX, y: building.y + jitterY });
+            const unit = new WarUnit(this.nextId++, player.team, spawn.x, spawn.y, def);
+            this.register(unit);
+            player.unitsProduced++;
+            if (!player.assigner.assign(unit))
+                unit.hp = 0;
+        }
     }
     refreshTeamEntities() {
         this.teamEntities[0].length = 0;
@@ -983,8 +1074,11 @@ class WarEngine {
                 squad.planSlots();
                 squad.advanceAnchor();
                 for (const unit of squad.members.slice()) {
-                    if (unit.alive)
-                        WarUnitBrain.think(this, unit, squad);
+                    if (!unit.alive)
+                        continue;
+                    WarUnitBrain.think(this, unit, squad);
+                    if (unit.ability)
+                        unit.ability.update(this, unit);
                 }
             }
         }
@@ -1057,13 +1151,15 @@ class WarEngine {
         player.economy.popUsed -= unit.def.pop;
         player.unitsLost++;
         player.squads[unit.squadIndex]?.remove(unit);
+        if (unit.def.kind !== "elite")
+            this.corpses.push({ team: unit.team, x: unit.x, y: unit.y, tick: this.tick });
         this.events.push({ kind: "unitDied", team: player.team, tick: this.tick, text: unit.def.name });
     }
     retireBuilding(player, building) {
         for (const queued of building.queue)
             player.economy.popUsed -= queued.item.pop;
         building.queue.length = 0;
-        this.events.push({ kind: "buildingDestroyed", team: player.team, tick: this.tick, text: building.def.name });
+        this.events.push({ kind: "buildingDestroyed", team: player.team, tick: this.tick, text: WarBuildingCatalog.displayName(building.def.type, player.faction) });
         if (building.def.type === "hq") {
             this.finish((player.team === 0 ? 1 : 0), "hq");
             return;
