@@ -6,7 +6,7 @@ type WarSelection =
   | { kind: "squad"; index: number };
 
 interface WarScenePoint { x: number; z: number }
-interface WarUnitLook { shared: boolean; file: string; height: number; animated: boolean; idleClip: string; runClip: string; attackClip: string; shootsFar: boolean; altitude: number; turn: number; parts: WarDecor[] }
+interface WarUnitLook { shared: boolean; file: string; height: number; animated: boolean; idleClip: string; runClip: string; attackClip: string; shootsFar: boolean; altitude: number; turn: number; parts: WarDecor[]; backClip: string; backReverse: boolean; deathClip: string }
 
 class WarPalette {
   static readonly SQUAD_COLORS = ["#4FC3F7", "#B388FF", "#FFD54F", "#FF8A80"];
@@ -57,14 +57,14 @@ class WarFlight {
 }
 
 class WarUnitLooks {
-  private static readonly BASE = { altitude: 0, turn: 0, parts: [] as WarDecor[] };
-  private static readonly HUMAN = { ...WarUnitLooks.BASE, shared: false, animated: true, idleClip: "Idle", runClip: "Run", shootsFar: false };
-  private static readonly SKELETON = { ...WarUnitLooks.BASE, shared: true, animated: true, idleClip: "Idle_A", runClip: "Running_A", shootsFar: false };
+  private static readonly BASE = { altitude: 0, turn: 0, parts: [] as WarDecor[], backClip: "", backReverse: false, deathClip: "" };
+  private static readonly HUMAN = { ...WarUnitLooks.BASE, shared: false, animated: true, idleClip: "Idle", runClip: "Run", shootsFar: false, backClip: "Walk", backReverse: true, deathClip: "Death" };
+  private static readonly SKELETON = { ...WarUnitLooks.BASE, shared: true, animated: true, idleClip: "Idle_A", runClip: "Running_A", shootsFar: false, backClip: "Walking_Backwards", backReverse: false, deathClip: "Death_A" };
   private static readonly SHIP = { ...WarUnitLooks.BASE, shared: false, animated: false, idleClip: "", runClip: "", attackClip: "", shootsFar: true, altitude: WarFlight.ALTITUDE };
   private static readonly LOOKS: Record<string, WarUnitLook> = {
     shieldbearer: { ...WarUnitLooks.HUMAN, file: "quaternius/Knight_Male.gltf", height: 3.4, attackClip: "SwordSlash" },
     archer: { ...WarUnitLooks.HUMAN, file: "quaternius/BlueSoldier_Female.gltf", height: 3.2, attackClip: "Shoot_OneHanded", shootsFar: true },
-    guardknight: { ...WarUnitLooks.BASE, shared: false, animated: true, file: "quaternius/Mech_FinnTheFrog.gltf", height: 4.5, idleClip: "Idle", runClip: "Run", attackClip: "Kick", shootsFar: false },
+    guardknight: { ...WarUnitLooks.BASE, shared: false, animated: true, file: "quaternius/Mech_FinnTheFrog.gltf", height: 4.5, idleClip: "Idle", runClip: "Run", attackClip: "Kick", shootsFar: false, backClip: "Walk", backReverse: true, deathClip: "Death" },
     artillerytruck: { ...WarUnitLooks.BASE, shared: false, animated: false, file: "quaternius/Rover_Round.gltf", height: 4.2, idleClip: "", runClip: "", attackClip: "", shootsFar: true },
     striker: { ...WarUnitLooks.SHIP, file: "air/Striker.gltf", height: 1.4 },
     executioner: { ...WarUnitLooks.SHIP, file: "air/Executioner.gltf", height: 1.6 },
@@ -75,7 +75,7 @@ class WarUnitLooks {
     bonegiant: { ...WarUnitLooks.SKELETON, file: "characters/Skeleton_Warrior.glb", height: 5.0, attackClip: "Melee_2H_Attack_Chop" },
     stormwitch: { ...WarUnitLooks.HUMAN, file: "quaternius/Witch.gltf", height: 3.8, attackClip: "Shoot_OneHanded", shootsFar: true },
     coffinship: {
-      ...WarUnitLooks.SHIP, file: "halloween/coffin_decorated.gltf", height: 1.4, shootsFar: false,
+      ...WarUnitLooks.SHIP, file: "halloween/coffin_decorated.gltf", height: 1.4, turn: Math.PI, shootsFar: false,
       parts: [{ file: "halloween/ribcage.gltf", x: 0, y: 0.7, z: -0.2, scale: 1.5 }, { file: "halloween/skull_candle.gltf", x: 0, y: 0.5, z: 1.0, scale: 0.9 }],
     },
     cursedeye: { ...WarUnitLooks.BASE, shared: false, animated: true, file: "air/Enemy_EyeDrone.gltf", height: 2.0, idleClip: "Idle", runClip: "Idle", attackClip: "Attack", shootsFar: true, altitude: WarFlight.ALTITUDE },
@@ -276,6 +276,8 @@ class WarHealthBar {
 
 class WarUnitView {
   private static readonly ATTACK_HOLD_SECONDS = 0.7;
+  private static readonly RUN_REFERENCE = 4;
+  private static readonly DEATH_SECONDS = 0.9;
 
   readonly group: Three<"Group">;
   readonly bar: WarHealthBar;
@@ -291,6 +293,11 @@ class WarUnitView {
   private lastCooldown = 0;
   private attackHold = 0;
   private bobSeconds = 0;
+  private backward = false;
+  private paceRate = 1;
+  private tilt = 0;
+  private roll = 0;
+  private dyingLeft = -1;
 
   constructor(libs: ThreeLibs, assets: WarAssetLibrary, private readonly materials: WarMaterials, unit: WarUnit, start: WarScenePoint, mine: boolean) {
     const THREE = libs.THREE;
@@ -305,6 +312,7 @@ class WarUnitView {
       this.model.add(piece);
     }
     this.model.scale.setScalar(this.look.height / assets.heightOf(this.look.file));
+    if (this.look.altitude > 0) this.model.rotation.order = "YXZ";
     WarShadows.cast(this.model);
     this.group.add(this.model);
     this.animator = this.look.animated ? new CharacterAnimator(libs, this.model, actor.clips) : null;
@@ -334,6 +342,9 @@ class WarUnitView {
     this.to.z = target.z;
     const dx = this.to.x - this.from.x, dz = this.to.z - this.from.z;
     this.moving = dx * dx + dz * dz > 0.0004;
+    const stepMeters = Math.sqrt(dx * dx + dz * dz);
+    this.paceRate = Math.max(0.7, Math.min(1.7, (stepMeters * 10) / WarUnitView.RUN_REFERENCE));
+    this.backward = this.moving && facing !== null && dx * (facing.x - this.to.x) + dz * (facing.z - this.to.z) < -0.35 * stepMeters * Math.max(0.01, Math.hypot(facing.x - this.to.x, facing.z - this.to.z));
     if (facing) this.yaw = Math.atan2(facing.x - this.to.x, facing.z - this.to.z);
     else if (this.moving) this.yaw = Math.atan2(dx, dz);
     if (unit.cooldownLeft > this.lastCooldown) this.attackHold = WarUnitView.ATTACK_HOLD_SECONDS;
@@ -351,6 +362,11 @@ class WarUnitView {
     this.model.rotation.y += turn * Math.min(1, deltaSeconds * 26);
     this.bar.group.quaternion.copy(cameraQuaternion);
     this.bobSeconds += deltaSeconds;
+    if (this.dyingLeft >= 0) {
+      this.renderDeath(deltaSeconds);
+      return;
+    }
+    if (this.look.altitude > 0) this.banking(turn, deltaSeconds);
     if (!this.animator) {
       this.model.position.y = this.look.altitude > 0 ? this.look.altitude + Math.sin(this.bobSeconds * 2 + this.yaw) * 0.25 : this.moving ? Math.abs(Math.sin(this.bobSeconds * 9)) * 0.06 : 0;
       return;
@@ -360,10 +376,46 @@ class WarUnitView {
     if (this.attackHold > 0) {
       this.attackHold -= deltaSeconds;
       this.animator.play(this.look.attackClip, { once: true });
+    } else if (this.moving && this.backward && this.look.backClip !== "") {
+      this.animator.play(this.look.backClip, { speed: this.look.backReverse ? -this.paceRate : this.paceRate });
     } else {
-      this.animator.play(this.moving ? this.look.runClip : this.look.idleClip);
+      this.animator.play(this.moving ? this.look.runClip : this.look.idleClip, { speed: this.moving ? this.paceRate : 1 });
     }
     this.animator.update(deltaSeconds);
+  }
+
+  private banking(turn: number, deltaSeconds: number): void {
+    const wantTilt = this.moving ? 0.14 : 0;
+    const wantRoll = Math.max(-0.45, Math.min(0.45, -turn * 0.9)) * (this.moving ? 1 : 0.3);
+    const follow = Math.min(1, deltaSeconds * 6);
+    this.tilt += (wantTilt - this.tilt) * follow;
+    this.roll += (wantRoll - this.roll) * follow;
+    this.model.rotation.x = this.tilt;
+    this.model.rotation.z = this.roll;
+  }
+
+  beginDeath(): void {
+    this.dyingLeft = WarUnitView.DEATH_SECONDS;
+    this.bar.group.visible = false;
+    this.ring.visible = false;
+    if (this.animator && this.look.deathClip !== "") this.animator.play(this.look.deathClip, { once: true });
+  }
+
+  get finishedDying(): boolean {
+    return this.dyingLeft >= 0 && this.dyingLeft <= 0.0001;
+  }
+
+  private renderDeath(deltaSeconds: number): void {
+    this.dyingLeft = Math.max(0.00001, this.dyingLeft - deltaSeconds);
+    const t = 1 - this.dyingLeft / WarUnitView.DEATH_SECONDS;
+    if (this.animator && this.look.deathClip !== "") {
+      this.animator.update(deltaSeconds);
+      if (t > 0.7) this.model.scale.multiplyScalar(0.96);
+      return;
+    }
+    this.model.position.y = Math.max(0, this.look.altitude * (1 - t * t * 1.6));
+    this.model.rotation.z += deltaSeconds * (this.look.altitude > 0 ? 2.4 : 0);
+    this.model.scale.multiplyScalar(this.look.altitude > 0 ? 0.985 : 0.93);
   }
 
   show(visible: boolean): void {
@@ -1133,6 +1185,7 @@ class WarMatchView {
   private readonly units = new Map<number, WarUnitView>();
   private readonly buildings = new Map<number, WarBuildingView>();
   private readonly seenBuildings = new Set<number>();
+  private readonly dying: WarUnitView[] = [];
   private readonly fog: WarFogView;
   private readonly slotMarkers: WarSlotMarkers;
   private readonly crowds: WarWorkerCrowd[];
@@ -1224,7 +1277,7 @@ class WarMatchView {
       if (entity instanceof WarUnit) this.syncUnit(entity);
       else if (entity instanceof WarBuilding) this.syncBuilding(entity);
     }
-    this.dropMissing(this.units, alive);
+    this.retireUnits(alive);
     this.dropMissing(this.buildings, alive);
     player.slotDefs.forEach((slot) => this.slotMarkers.setOccupied(slot.index, !!player.slotBuildings[slot.index]));
     if (this.engine.tick - this.lastFogTick >= 3) {
@@ -1243,6 +1296,13 @@ class WarMatchView {
       view.render(alpha, deltaSeconds, camera.quaternion);
     });
     this.buildings.forEach((view) => view.faceCamera(camera.quaternion));
+    for (let i = this.dying.length - 1; i >= 0; i--) {
+      const view = this.dying[i];
+      view.render(alpha, deltaSeconds, camera.quaternion);
+      if (!view.finishedDying) continue;
+      this.root.remove(view.group);
+      this.dying.splice(i, 1);
+    }
     for (const crowd of this.crowds) {
       const team = crowd === this.crowds[0] ? 0 : 1;
       const economy = this.engine.players[team].economy;
@@ -1290,6 +1350,20 @@ class WarMatchView {
     if (this.engine.vision.isVisible(this.viewer, building.x, building.y)) this.seenBuildings.add(building.id);
     view.onTick(building);
     view.show(this.isShown(building));
+  }
+
+  private retireUnits(alive: Set<number>): void {
+    for (const id of Array.from(this.units.keys())) {
+      if (alive.has(id)) continue;
+      const view = this.units.get(id) as WarUnitView;
+      this.units.delete(id);
+      if (view.group.visible) {
+        view.beginDeath();
+        this.dying.push(view);
+      } else {
+        this.root.remove(view.group);
+      }
+    }
   }
 
   private dropMissing<T extends { group: Three<"Group"> }>(views: Map<number, T>, alive: Set<number>): void {
