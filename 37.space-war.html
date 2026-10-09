@@ -77,7 +77,6 @@
   .cmdBtn:not(:disabled):active { background: #D97B4F; border-color: #FFB08C; }
   #miniWrap { position: relative; flex: 0 0 auto; display: flex; flex-direction: column; gap: 6px; align-items: stretch; pointer-events: auto; }
   #minimap { display: block; width: 105px; height: 132px; cursor: pointer; border: 2px solid rgba(255, 255, 255, .35); border-radius: 6px; background: #10162A; touch-action: none; }
-  #miniCap { position: absolute; left: 2px; right: 2px; bottom: 2px; padding: 3px 0; border-radius: 0 0 4px 4px; background: rgba(217, 123, 79, .92); color: #fff; font-size: 12px; font-weight: 800; text-align: center; pointer-events: none; }
 
   #attackMap { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 40; display: flex; flex-direction: column; align-items: center; background: rgba(4, 7, 16, .92); padding: 54px 12px 12px; }
   #attackHint { margin-bottom: 8px; font-size: 14px; font-weight: 700; color: #B9C4E0; text-align: center; }
@@ -123,7 +122,6 @@
     <div id="infoPanel"></div>
     <div id="miniWrap">
       <canvas id="minimap" width="148" height="187"></canvas>
-      <div id="miniCap">눌러서 공격 지시</div>
     </div>
   </div>
 </div>
@@ -205,13 +203,13 @@
 </div>
 
 <script charset="utf-8" src="character-kit.js"></script>
-<script charset="utf-8" src="37.war-data.js?v=20261010a"></script>
-<script charset="utf-8" src="37.war-rules.js?v=20261010a"></script>
-<script charset="utf-8" src="37.war-bot.js?v=20261010a"></script>
-<script charset="utf-8" src="37.war-scenery.js?v=20261010a"></script>
-<script charset="utf-8" src="37.war-views.js?v=20261010a"></script>
-<script charset="utf-8" src="37.war-hud.js?v=20261010a"></script>
-<script charset="utf-8" src="37.space-war.js?v=20261010a"></script>
+<script charset="utf-8" src="37.war-data.js?v=20261010b"></script>
+<script charset="utf-8" src="37.war-rules.js?v=20261010b"></script>
+<script charset="utf-8" src="37.war-bot.js?v=20261010b"></script>
+<script charset="utf-8" src="37.war-scenery.js?v=20261010b"></script>
+<script charset="utf-8" src="37.war-views.js?v=20261010b"></script>
+<script charset="utf-8" src="37.war-hud.js?v=20261010b"></script>
+<script charset="utf-8" src="37.space-war.js?v=20261010b"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";

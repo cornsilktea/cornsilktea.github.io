@@ -269,7 +269,7 @@ class WarSceneryKit {
   static readonly PEBBLES = ["scenery/rocks_smallA.glb", "scenery/rocks_smallB.glb", "scenery/rock.glb"];
   static readonly CRATERS = ["scenery/crater.glb", "scenery/craterLarge.glb"];
   static readonly WRECKS = ["scenery/craft_cargoA.glb", "scenery/craft_cargoB.glb", "scenery/craft_miner.glb", "scenery/craft_racer.glb", "scenery/craft_speederA.glb"];
-  static readonly RELICS = ["scenery/satelliteDish_large.glb", "scenery/satelliteDish.glb", "scenery/rocket_fuelA.glb", "scenery/rocket_finsA.glb", "scenery/bones.glb", "scenery/barrels.glb", "scenery/machine_generator.glb", "scenery/machine_wireless.glb", "scenery/structure_closed.glb", "scenery/hangar_smallA.glb", "scenery/monorail_trackStraight.glb", "scenery/turret_single.glb", "scenery/alien.glb", "scenery/rover.glb", "scenery/SolarPanel_Structure.gltf", "scenery/Roof_Radar.gltf", "scenery/meteor.glb", "scenery/meteor_half.glb"];
+  static readonly RELICS = ["scenery/satelliteDish_large.glb", "scenery/satelliteDish.glb", "scenery/rocket_fuelA.glb", "scenery/rocket_finsA.glb", "scenery/bones.glb", "scenery/barrels.glb", "scenery/machine_generator.glb", "scenery/machine_wireless.glb", "scenery/structure_closed.glb", "scenery/hangar_smallA.glb", "scenery/monorail_trackStraight.glb", "scenery/barrels.glb", "scenery/alien.glb", "scenery/rover.glb", "scenery/SolarPanel_Structure.gltf", "scenery/Roof_Radar.gltf", "scenery/meteor.glb", "scenery/meteor_half.glb"];
   static readonly WORKER = "scenery/astronautA.glb";
 
   static files(): string[] {

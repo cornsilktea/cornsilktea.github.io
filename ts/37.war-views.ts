@@ -98,7 +98,7 @@ class WarUnitLooks {
     return files;
   }
 }
-interface WarBuildingModel { file: string; scale: number; top?: number }
+interface WarBuildingModel { file: string; scale: number; top?: number; grounded?: boolean }
 interface WarDecor { file: string; x: number; y?: number; z: number; scale: number }
 
 class WarBuildingLooks {
@@ -108,14 +108,14 @@ class WarBuildingLooks {
       barracks: { file: "quaternius/House_Single.gltf", scale: 0.9 },
       factory: { file: "quaternius/GeodesicDome.gltf", scale: 0.42 },
       airport: { file: "space/landingpad_large.gltf", scale: 1.7 },
-      turret: { file: "kenney_turret_double.glb", scale: 4.2, top: 4.6 },
+      turret: { file: "kenney_turret_double.glb", scale: 4.2, top: 4.6, grounded: true },
     },
     grave: {
       hq: { file: "halloween/crypt.gltf", scale: 0.95, top: 6.8 },
       barracks: { file: "halloween/coffin_decorated.gltf", scale: 1.2 },
       factory: { file: "halloween/shrine_candles.gltf", scale: 1.7 },
       airport: { file: "halloween/arch_gate.gltf", scale: 1.1 },
-      turret: { file: "halloween/post_skull.gltf", scale: 2.6, top: 4.4 },
+      turret: { file: "halloween/post_skull.gltf", scale: 2.6, top: 4.4, grounded: true },
     },
   };
 
@@ -485,7 +485,7 @@ class WarBuildingView {
     const THREE = libs.THREE;
     const look = WarBuildingLooks.of(building.def.type, faction);
     this.group = new THREE.Group();
-    this.model = assets.model(look.file);
+    this.model = look.grounded ? assets.grounded(look.file) : assets.model(look.file);
     this.model.scale.setScalar(look.scale);
     WarShadows.cast(this.model);
     this.disc = new THREE.Mesh(new THREE.CircleGeometry((building.def.radius / 100) * 1.05, 28), materials.ring(mine ? "#2E8F6B" : "#A02A30"));

@@ -197,7 +197,7 @@ class WarGameApp {
       if (this.match && window.confirm("항복할까요?")) this.sendCommand(new WarSurrenderCommand(this.viewer));
     });
     this.squadPanel.onSelect = (index) => this.select({ kind: "squad", index });
-    this.minimap.onJump = (point, fresh) => this.onMinimap(point, fresh);
+    this.minimap.onJump = () => this.onMinimap();
     window.addEventListener("contextmenu", (event) => event.preventDefault());
     window.addEventListener("keydown", (event) => {
       if (event.key === "Escape") this.attackMap.close();
@@ -270,9 +270,8 @@ class WarGameApp {
     if (point) this.orderTo(point);
   }
 
-  private onMinimap(point: WarPoint, fresh: boolean): void {
-    if (fresh && this.selection.kind === "unit" && this.canOrder()) this.orderTo(point);
-    else this.attackMap.open(this.selection.kind === "squad" ? this.selection.index : -1);
+  private onMinimap(): void {
+    this.attackMap.open(this.selection.kind === "squad" ? this.selection.index : -1);
   }
 
   private isOwnPick(picked: WarSelection, match: WarLocalMatch): boolean {

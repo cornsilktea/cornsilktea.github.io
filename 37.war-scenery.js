@@ -244,7 +244,7 @@ WarSceneryKit.PLANTS = ["scenery/Plant_1.gltf", "scenery/Plant_2.gltf", "scenery
 WarSceneryKit.PEBBLES = ["scenery/rocks_smallA.glb", "scenery/rocks_smallB.glb", "scenery/rock.glb"];
 WarSceneryKit.CRATERS = ["scenery/crater.glb", "scenery/craterLarge.glb"];
 WarSceneryKit.WRECKS = ["scenery/craft_cargoA.glb", "scenery/craft_cargoB.glb", "scenery/craft_miner.glb", "scenery/craft_racer.glb", "scenery/craft_speederA.glb"];
-WarSceneryKit.RELICS = ["scenery/satelliteDish_large.glb", "scenery/satelliteDish.glb", "scenery/rocket_fuelA.glb", "scenery/rocket_finsA.glb", "scenery/bones.glb", "scenery/barrels.glb", "scenery/machine_generator.glb", "scenery/machine_wireless.glb", "scenery/structure_closed.glb", "scenery/hangar_smallA.glb", "scenery/monorail_trackStraight.glb", "scenery/turret_single.glb", "scenery/alien.glb", "scenery/rover.glb", "scenery/SolarPanel_Structure.gltf", "scenery/Roof_Radar.gltf", "scenery/meteor.glb", "scenery/meteor_half.glb"];
+WarSceneryKit.RELICS = ["scenery/satelliteDish_large.glb", "scenery/satelliteDish.glb", "scenery/rocket_fuelA.glb", "scenery/rocket_finsA.glb", "scenery/bones.glb", "scenery/barrels.glb", "scenery/machine_generator.glb", "scenery/machine_wireless.glb", "scenery/structure_closed.glb", "scenery/hangar_smallA.glb", "scenery/monorail_trackStraight.glb", "scenery/barrels.glb", "scenery/alien.glb", "scenery/rover.glb", "scenery/SolarPanel_Structure.gltf", "scenery/Roof_Radar.gltf", "scenery/meteor.glb", "scenery/meteor_half.glb"];
 WarSceneryKit.WORKER = "scenery/astronautA.glb";
 class WarSceneryBuilder {
     constructor(libs, assets, transform, noise, field) {
