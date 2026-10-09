@@ -6,7 +6,8 @@ type WarSelection =
   | { kind: "squad"; index: number };
 
 interface WarScenePoint { x: number; z: number }
-interface WarUnitLook { shared: boolean; file: string; height: number; animated: boolean; idleClip: string; runClip: string; attackClip: string; shootsFar: boolean; altitude: number; turn: number; parts: WarDecor[]; backClip: string; backReverse: boolean; deathClip: string }
+interface WarHandGear { file: string; length: number; rx: number; ry: number; rz: number; ox: number; oy: number; oz: number }
+interface WarUnitLook { altFile: string; hand: WarHandGear | null; shared: boolean; file: string; height: number; animated: boolean; idleClip: string; runClip: string; attackClip: string; shootsFar: boolean; altitude: number; turn: number; parts: WarDecor[]; backClip: string; backReverse: boolean; deathClip: string }
 
 class WarPalette {
   static readonly SQUAD_COLORS = ["#4FC3F7", "#B388FF", "#FFD54F", "#FF8A80"];
@@ -57,13 +58,13 @@ class WarFlight {
 }
 
 class WarUnitLooks {
-  private static readonly BASE = { altitude: 0, turn: 0, parts: [] as WarDecor[], backClip: "", backReverse: false, deathClip: "" };
+  private static readonly BASE = { altFile: "", hand: null as WarHandGear | null, altitude: 0, turn: 0, parts: [] as WarDecor[], backClip: "", backReverse: false, deathClip: "" };
   private static readonly HUMAN = { ...WarUnitLooks.BASE, shared: false, animated: true, idleClip: "Idle", runClip: "Run", shootsFar: false, backClip: "Walk", backReverse: true, deathClip: "Death" };
   private static readonly SKELETON = { ...WarUnitLooks.BASE, shared: true, animated: true, idleClip: "Idle_A", runClip: "Running_A", shootsFar: false, backClip: "Walking_Backwards", backReverse: false, deathClip: "Death_A" };
   private static readonly SHIP = { ...WarUnitLooks.BASE, shared: false, animated: false, idleClip: "", runClip: "", attackClip: "", shootsFar: true, altitude: WarFlight.ALTITUDE };
   private static readonly LOOKS: Record<string, WarUnitLook> = {
     shieldbearer: { ...WarUnitLooks.HUMAN, file: "quaternius/Knight_Male.gltf", height: 3.4, attackClip: "SwordSlash" },
-    archer: { ...WarUnitLooks.HUMAN, file: "quaternius/BlueSoldier_Female.gltf", height: 3.2, attackClip: "Shoot_OneHanded", shootsFar: true },
+    archer: { ...WarUnitLooks.HUMAN, file: "quaternius/Soldier_Male.gltf", altFile: "quaternius/Soldier_Female.gltf", height: 3.2, attackClip: "Shoot_OneHanded", shootsFar: true, hand: { file: "gear/Gun_Rifle.gltf", length: 1.6, rx: 0, ry: 0, rz: 0, ox: 0, oy: 0, oz: 0 } },
     guardknight: { ...WarUnitLooks.BASE, shared: false, animated: true, file: "quaternius/Mech_FinnTheFrog.gltf", height: 4.5, idleClip: "Idle", runClip: "Run", attackClip: "Kick", shootsFar: false, backClip: "Walk", backReverse: true, deathClip: "Death" },
     artillerytruck: { ...WarUnitLooks.BASE, shared: false, animated: false, file: "quaternius/Rover_Round.gltf", height: 4.2, idleClip: "", runClip: "", attackClip: "", shootsFar: true },
     striker: { ...WarUnitLooks.SHIP, file: "air/Striker.gltf", height: 1.4 },
@@ -89,6 +90,9 @@ class WarUnitLooks {
     const files: string[] = [];
     for (const key of Object.keys(WarUnitLooks.LOOKS)) {
       files.push(WarUnitLooks.LOOKS[key].file);
+      if (WarUnitLooks.LOOKS[key].altFile) files.push(WarUnitLooks.LOOKS[key].altFile);
+      const hand = WarUnitLooks.LOOKS[key].hand;
+      if (hand) files.push(hand.file);
       for (const part of WarUnitLooks.LOOKS[key].parts) files.push(part.file);
     }
     return files;
@@ -305,7 +309,8 @@ class WarUnitView {
     const THREE = libs.THREE;
     this.look = WarUnitLooks.of(unit.def.id);
     this.group = new THREE.Group();
-    const actor = assets.actor(this.look.file, this.look.shared);
+    const file = this.look.altFile && unit.id % 2 === 1 ? this.look.altFile : this.look.file;
+    const actor = assets.actor(file, this.look.shared);
     this.model = actor.model;
     for (const part of this.look.parts) {
       const piece = assets.grounded(part.file);
@@ -313,7 +318,8 @@ class WarUnitView {
       piece.scale.setScalar(part.scale);
       this.model.add(piece);
     }
-    this.model.scale.setScalar(this.look.height / assets.heightOf(this.look.file));
+    this.model.scale.setScalar(this.look.height / assets.heightOf(file));
+    if (this.look.hand) this.attachHandGear(libs, assets, this.look.hand);
     if (this.look.altitude > 0) this.model.rotation.order = "YXZ";
     WarShadows.cast(this.model);
     this.group.add(this.model);
@@ -333,8 +339,30 @@ class WarUnitView {
     this.model.position.y = this.look.altitude;
   }
 
-  get altitude(): number {
-    return this.look.altitude;
+  private attachHandGear(libs: ThreeLibs, assets: WarAssetLibrary, gear: WarHandGear): void {
+    const THREE = libs.THREE;
+    const hand = this.model.getObjectByName("FistR");
+    if (!hand) return;
+    this.model.updateMatrixWorld(true);
+    const world = new THREE.Vector3();
+    hand.getWorldScale(world);
+    const item = assets.model(gear.file);
+    item.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(item);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    item.position.set(-center.x, -center.y, -center.z);
+    const holder = new THREE.Group();
+    holder.add(item);
+    const unit = Math.max(0.0001, world.x);
+    holder.scale.setScalar(gear.length / Math.max(size.x, size.y, size.z) / unit);
+    holder.rotation.set(gear.rx, gear.ry, gear.rz);
+    holder.position.set(gear.ox / unit, gear.oy / unit, gear.oz / unit);
+    WarShadows.cast(holder);
+    hand.add(holder);
+  }
+
+  get altitude(): number {    return this.look.altitude;
   }
 
   onTick(unit: WarUnit, target: WarScenePoint, facing: WarScenePoint | null, squadColor: string | null): void {
@@ -596,7 +624,7 @@ class WarWorker {
     this.group.add(this.model);
     this.animator = new CharacterAnimator(libs, this.model, actor.clips);
     this.model.updateMatrixWorld(true);
-    const hand = this.model.getObjectByName("Fist.R") ?? this.model;
+    const hand = this.model.getObjectByName("FistR") ?? this.model;
     this.oreItem = this.holdable(libs, assets, hand, "resources/Iron_Nugget_Large.gltf", WarWorker.CARRY_SIZE, 0);
     this.crystalItem = this.holdable(libs, assets, hand, "scenery/rock_crystals.glb", WarWorker.CARRY_SIZE, 0);
     WarGlow.crystal(this.crystalItem);
@@ -673,7 +701,7 @@ class WarWorkerCrowd {
   private static readonly MAX = 16;
   private static readonly SPEED = 3.4;
   private static readonly HQ_REACH = 4.2;
-  private static readonly NODE_GAP = 1.9;
+  private static readonly NODE_GAP = 4.8;
 
   readonly group: Three<"Group">;
   private readonly workers: WarWorker[] = [];
