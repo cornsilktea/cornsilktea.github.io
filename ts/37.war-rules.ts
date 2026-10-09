@@ -148,7 +148,7 @@ class WarUnit extends WarEntity implements WarAttacker {
   }
 
   stepLength(): number {
-    const base = Math.floor(this.def.speed / 10);
+    const base = Math.floor((this.def.speed * WarBalance.MOVE_SPEED_PERCENT) / 1000);
     return this.slowTicksLeft > 0 ? Math.floor((base * (100 - this.slowPct)) / 100) : base;
   }
 

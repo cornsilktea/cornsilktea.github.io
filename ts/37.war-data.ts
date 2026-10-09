@@ -96,11 +96,12 @@ class WarBalance {
   static readonly SIGHT_BUILDING = 1700;
   static readonly ACQUIRE_RANGE = 1500;
   static readonly LEASH_RANGE = 2200;
-  static readonly FORMATION_LAG = 900;
-  static readonly LAG_PATIENCE_TICKS = 15;
+  static readonly FORMATION_LAG = 1400;
+  static readonly MOVE_SPEED_PERCENT = 135;
+  static readonly LAG_PATIENCE_TICKS = 8;
   static readonly LAG_IGNORE_FAR = 2500;
   static readonly PATH_MIN_STEP = 200;
-  static readonly DEPART_FREE_TICKS = 20;
+  static readonly DEPART_FREE_TICKS = 10;
   static readonly HOME_VISION_EXTRA = 600;
   static readonly ASSIST_RANGE = 2000;
   static readonly ASSIST_MEMORY_TICKS = 20;

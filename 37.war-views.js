@@ -296,7 +296,7 @@ class WarUnitView {
         this.group.position.set(x, 0, z);
         const aim = this.yaw + this.look.turn;
         const turn = Math.atan2(Math.sin(aim - this.model.rotation.y), Math.cos(aim - this.model.rotation.y));
-        this.model.rotation.y += turn * Math.min(1, deltaSeconds * 14);
+        this.model.rotation.y += turn * Math.min(1, deltaSeconds * 26);
         this.bar.group.quaternion.copy(cameraQuaternion);
         this.bobSeconds += deltaSeconds;
         if (!this.animator) {

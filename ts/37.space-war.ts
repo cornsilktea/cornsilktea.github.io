@@ -1,7 +1,8 @@
 type WarDifficulty = "easy" | "normal" | "hard";
 
 interface WarInputHandlers {
-  tap: (clientX: number, clientY: number) => void;
+  tap: (clientX: number, clientY: number, touch: boolean) => void;
+  command: (clientX: number, clientY: number) => void;
 }
 
 class WarInputController {
@@ -13,6 +14,7 @@ class WarInputController {
   private pointerLast: WarPoint | null = null;
   private dragging = false;
   private button = 0;
+  private touch = false;
 
   constructor(private readonly canvas: HTMLCanvasElement, private readonly world: WarWorldView, private readonly handlers: WarInputHandlers, private readonly isActive: () => boolean) {
     canvas.addEventListener("pointerdown", (event) => this.onDown(event));
@@ -45,6 +47,7 @@ class WarInputController {
     if (!this.isActive()) return;
     this.canvas.setPointerCapture(event.pointerId);
     this.button = event.button;
+    this.touch = event.pointerType === "touch";
     this.pointerStart = { x: event.clientX, y: event.clientY };
     this.pointerLast = { x: event.clientX, y: event.clientY };
     this.dragging = false;
@@ -52,6 +55,7 @@ class WarInputController {
 
   private onMove(event: PointerEvent): void {
     if (!this.pointerStart || !this.pointerLast) return;
+    if (this.button === 2) return;
     if (!this.dragging && Math.hypot(event.clientX - this.pointerStart.x, event.clientY - this.pointerStart.y) > WarInputController.DRAG_PIXELS) this.dragging = true;
     if (!this.dragging) return;
     const before = this.world.groundPoint(this.pointerLast.x, this.pointerLast.y);
@@ -63,9 +67,11 @@ class WarInputController {
   private onUp(event: PointerEvent): void {
     const wasTap = this.pointerStart !== null && !this.dragging;
     const button = this.button;
+    const touch = this.touch;
     this.reset();
-    if (!wasTap || !this.isActive() || button !== 0) return;
-    this.handlers.tap(event.clientX, event.clientY);
+    if (!this.isActive()) return;
+    if (button === 2) this.handlers.command(event.clientX, event.clientY);
+    else if (wasTap && button === 0) this.handlers.tap(event.clientX, event.clientY, touch);
   }
 
   private onWheel(event: WheelEvent): void {
@@ -151,7 +157,7 @@ class WarGameApp {
     this.world = new WarWorldView(libs, this.canvas, touchDevice);
     this.assets = new WarAssetLibrary(libs);
     this.backdrop = new WarMenuBackdrop(libs, this.assets, this.world);
-    this.input = new WarInputController(this.canvas, this.world, { tap: (x, y) => this.onTap(x, y) }, () => this.match !== null && !this.attackMap.isOpen);
+    this.input = new WarInputController(this.canvas, this.world, { tap: (x, y, touch) => this.onTap(x, y, touch), command: (x, y) => this.onCommandClick(x, y) }, () => this.match !== null && !this.attackMap.isOpen);
     this.attackMap = new WarAttackMapOverlay((command) => this.sendCommand(command), () => this.viewer, () => (this.match as WarLocalMatch).view.transform, this.alertPulses);
     this.bindUi();
     this.loadAssets();
@@ -248,10 +254,10 @@ class WarGameApp {
     if (this.match) this.match.view.setSelection(selection);
   }
 
-  private onTap(clientX: number, clientY: number): void {
+  private onTap(clientX: number, clientY: number, touch: boolean): void {
     if (!this.match) return;
     const picked = this.match.view.pick(clientX, clientY);
-    if (this.canOrder() && !this.isOwnPick(picked, this.match)) {
+    if (touch && this.canOrder() && !this.isOwnPick(picked, this.match)) {
       this.onCommandClick(clientX, clientY);
       return;
     }

@@ -164,14 +164,14 @@ class WarCommandCard {
         }
         if (selection.kind === "squad") {
             return [
-                { label: "이동", sub: "", desc: "화면을 누르면 그곳으로 가요. 길게 그리려면 공격 지도를 쓰세요.", enabled: true, onPress: null },
+                { label: "이동", sub: "", desc: "마우스는 오른쪽 클릭, 터치는 화면을 누르면 그곳으로 가요. 길게 그리려면 공격 지도를 쓰세요.", enabled: true, onPress: null },
                 { label: "귀환", sub: "입구로 돌아와요", desc: "", enabled: player.squads[selection.index].mode !== "home", onPress: () => sink(new WarRecallCommand(team, selection.index)) },
             ];
         }
         if (selection.kind === "unit") {
             const unit = engine.entityById(selection.id);
             if (unit instanceof WarUnit && unit.team === team)
-                return WarCommandCard.note("이동", "화면이나 지도를 누르면 이 병력만 그곳으로 가요. 가다가 적을 만나면 싸워요.");
+                return WarCommandCard.note("이동", "마우스는 오른쪽 클릭, 터치는 화면을 누르면 이 병력만 그곳으로 가요. 가다가 적을 만나면 싸워요.");
             return WarCommandCard.note("적 병력", "우리 병력을 보내 맞서 싸우세요.");
         }
         return WarCommandCard.note("빈 터를 눌러 보세요", "건물을 지을 수 있어요. 건물을 누르면 병력을 만들어요. 위쪽 부대를 누르면 지시를 내려요.");
