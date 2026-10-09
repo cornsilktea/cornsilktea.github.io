@@ -265,9 +265,9 @@ class WarEconomy {
     const table = [0];
     let total = 0;
     let factor = WarBalance.FIRST_WORKER_MILLI_PER_SEC;
-    for (let n = 1; n <= WarBalance.WORKER_CAP_PER_RESOURCE; n++) {
+    for (let n = 1; n <= WarBalance.WORKER_CAP_PER_RESOURCE * WarBalance.WORKER_YIELD; n++) {
       total += factor;
-      table.push(Math.round(total));
+      if (n % WarBalance.WORKER_YIELD === 0) table.push(Math.round(total));
       factor = (factor * WarBalance.DIMINISH_PERCENT) / 100;
     }
     return table;
@@ -1526,10 +1526,22 @@ class WarEngine {
     const push = Math.ceil((gap - distance) / 2);
     const ux = distance === 0 ? (a.id % 2 === 0 ? 1 : -1) * 1000 : Math.trunc((dx * 1000) / distance);
     const uy = distance === 0 ? 0 : Math.trunc((dy * 1000) / distance);
-    a.x += Math.trunc((ux * push) / 1000);
-    a.y += Math.trunc((uy * push) / 1000);
-    b.x -= Math.trunc((ux * push) / 1000);
-    b.y -= Math.trunc((uy * push) / 1000);
+    const aSide = this.detourSide(a, b, ux, uy);
+    const bSide = this.detourSide(b, a, -ux, -uy);
+    a.x += Math.trunc((ux * push - uy * aSide * push) / 1000);
+    a.y += Math.trunc((uy * push + ux * aSide * push) / 1000);
+    b.x -= Math.trunc((ux * push + uy * bSide * push) / 1000);
+    b.y -= Math.trunc((uy * push - ux * bSide * push) / 1000);
+  }
+
+  private detourSide(mover: WarUnit, blocker: WarUnit, awayX: number, awayY: number): number {
+    if (mover.lastStep <= 0) return 0;
+    const goalX = mover.goalX - mover.x;
+    const goalY = mover.goalY - mover.y;
+    const blockedAhead = (blocker.x - mover.x) * goalX + (blocker.y - mover.y) * goalY > 0;
+    if (!blockedAhead) return 0;
+    const toward = -awayY * goalX + awayX * goalY;
+    return toward === 0 ? (mover.id % 2 === 0 ? 1 : -1) : toward > 0 ? 1 : -1;
   }
 
   private removeDead(): void {

@@ -15,13 +15,14 @@ WarBalance.QUEUE_LIMIT = 5;
 WarBalance.BUILDINGS_PER_TYPE = 2;
 WarBalance.START_ORE = 300;
 WarBalance.START_CRYSTAL = 0;
-WarBalance.START_ORE_WORKERS = 4;
+WarBalance.START_ORE_WORKERS = 2;
 WarBalance.START_CRYSTAL_WORKERS = 0;
-WarBalance.WORKER_CAP_PER_RESOURCE = 24;
-WarBalance.ORE_WORKER_LIMIT = 10;
-WarBalance.CRYSTAL_WORKER_LIMIT = 6;
-WarBalance.WORKER_ORE = 50;
-WarBalance.WORKER_CRYSTAL_ORE = 50;
+WarBalance.WORKER_CAP_PER_RESOURCE = 12;
+WarBalance.ORE_WORKER_LIMIT = 5;
+WarBalance.CRYSTAL_WORKER_LIMIT = 3;
+WarBalance.WORKER_YIELD = 2;
+WarBalance.WORKER_ORE = 100;
+WarBalance.WORKER_CRYSTAL_ORE = 100;
 WarBalance.WORKER_CRYSTAL_CRYSTAL = 0;
 WarBalance.WORKER_BUILD_TICKS = 25;
 WarBalance.FIRST_WORKER_MILLI_PER_SEC = 1200;
@@ -141,7 +142,7 @@ WarBlurbs.UNITS = {
     stormwitch: "번개를 내려 범위 안 적을 모두 감전시키는 마녀. 공중도 맞혀요",
     coffinship: "튼튼한 비행 관. 공격은 못 하지만 해골 미니언을 떨어뜨리고, 부서지면 여섯 마리가 쏟아져요",
     cursedeye: "레이저로 한 대상을 강하게 쏘는 눈. 공중·지상 모두 공격해요",
-    worker_ore: "광석을 캐요. 많을수록 느리게 늘어요 (최대 10)",
+    worker_ore: "광석을 캐요. 많을수록 느리게 늘어요 (최대 5)",
     worker_crystal: "결정을 캐요. 고급 병력에 필요해요 (최대 6)",
 };
 WarBlurbs.BUILDINGS = {
@@ -179,8 +180,9 @@ class WarMapData {
     static post(team, squad) {
         const gate = WarMapData.entrance(team);
         const sign = WarMapData.sign(team);
-        const lateral = Math.trunc((squad - 1.5) * WarMapData.POST_SPREAD);
-        return { x: gate.x + lateral, y: gate.y + WarMapData.POST_BACKOFF * sign };
+        const lateral = Math.trunc(WarMapData.POST_LATERAL[squad] * WarMapData.POST_SPREAD * sign);
+        const backoff = squad === WarBalance.FLEET_SQUAD ? WarMapData.FLEET_BACKOFF : WarMapData.POST_BACKOFF;
+        return { x: gate.x + lateral, y: gate.y + backoff * sign };
     }
     static navNodes() {
         const lx = WarMapData.LANE_X;
@@ -238,6 +240,8 @@ WarMapData.PLAZA_RADIUS = 2600;
 WarMapData.BASE_RADIUS = 2600;
 WarMapData.POST_SPREAD = 1300;
 WarMapData.POST_BACKOFF = -400;
+WarMapData.FLEET_BACKOFF = -1500;
+WarMapData.POST_LATERAL = [0, -1, 1, 0];
 WarMapData.SLOT_OFFSETS = [
     { x: -1250, y: -350 }, { x: -800, y: -1000 }, { x: 0, y: -1300 }, { x: 800, y: -1000 }, { x: 1250, y: -350 },
 ];

@@ -106,7 +106,7 @@ class WarBuildingLooks {
       airport: { file: "space/landingpad_large.gltf", scale: 1.7 },
     },
     grave: {
-      hq: { file: "halloween/crypt.gltf", scale: 1.35, top: 9.5 },
+      hq: { file: "halloween/crypt.gltf", scale: 0.95, top: 6.8 },
       barracks: { file: "halloween/coffin_decorated.gltf", scale: 1.2 },
       factory: { file: "halloween/shrine_candles.gltf", scale: 1.7 },
       airport: { file: "halloween/arch_gate.gltf", scale: 1.1 },
@@ -119,11 +119,11 @@ class WarBuildingLooks {
       { file: "halloween/skull_candle.gltf", x: -1.6, z: 1.8, scale: 1.4 }, { file: "halloween/skull_candle.gltf", x: 1.6, z: 1.8, scale: 1.4 },
     ],
     "grave:hq": [
-      { file: "halloween/pillar.gltf", x: -4.2, z: -3, scale: 1.8 }, { file: "halloween/pillar.gltf", x: 4.2, z: -3, scale: 1.8 },
-      { file: "halloween/pillar.gltf", x: -4.2, z: 3, scale: 1.8 }, { file: "halloween/pillar.gltf", x: 4.2, z: 3, scale: 1.8 },
-      { file: "halloween/gravestone.gltf", x: -5.4, z: 0.4, scale: 1.6 }, { file: "halloween/gravestone.gltf", x: 5.4, z: -0.4, scale: 1.6 },
-      { file: "halloween/lantern_standing.gltf", x: -2.4, z: 4.6, scale: 1.8 }, { file: "halloween/lantern_standing.gltf", x: 2.4, z: 4.6, scale: 1.8 },
-      { file: "halloween/skull_candle.gltf", x: -1.2, z: 5, scale: 2 }, { file: "halloween/skull_candle.gltf", x: 1.2, z: 5, scale: 2 },
+      { file: "halloween/pillar.gltf", x: -3.2, z: -2.2, scale: 1.4 }, { file: "halloween/pillar.gltf", x: 3.2, z: -2.2, scale: 1.4 },
+      { file: "halloween/pillar.gltf", x: -3.2, z: 2.2, scale: 1.4 }, { file: "halloween/pillar.gltf", x: 3.2, z: 2.2, scale: 1.4 },
+      { file: "halloween/gravestone.gltf", x: -4.2, z: 0.4, scale: 1.3 }, { file: "halloween/gravestone.gltf", x: 4.2, z: -0.4, scale: 1.3 },
+      { file: "halloween/lantern_standing.gltf", x: -1.8, z: 3.4, scale: 1.5 }, { file: "halloween/lantern_standing.gltf", x: 1.8, z: 3.4, scale: 1.5 },
+      { file: "halloween/skull_candle.gltf", x: -0.9, z: 3.8, scale: 1.6 }, { file: "halloween/skull_candle.gltf", x: 0.9, z: 3.8, scale: 1.6 },
     ],
   };
 
@@ -230,8 +230,8 @@ class WarMaterials {
   constructor(private readonly libs: ThreeLibs) {
     const THREE = libs.THREE;
     this.barBack = new THREE.MeshBasicMaterial({ color: "#0A0C14", transparent: true, opacity: 0.8, depthTest: false });
-    this.barMine = new THREE.MeshBasicMaterial({ color: "#6BE08A", depthTest: false });
-    this.barEnemy = new THREE.MeshBasicMaterial({ color: "#FF6B6B", depthTest: false });
+    this.barMine = new THREE.MeshBasicMaterial({ color: "#6BE08A", depthTest: false, toneMapped: false });
+    this.barEnemy = new THREE.MeshBasicMaterial({ color: "#FF3A3A", depthTest: false, toneMapped: false });
     this.ringGeometry = new THREE.RingGeometry(0.52, 0.72, 24);
     this.barGeometry = new THREE.PlaneGeometry(1, 1);
   }
