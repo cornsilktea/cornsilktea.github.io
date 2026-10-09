@@ -1,0 +1,85 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>우주전쟁 에셋 점검</title>
+<style>
+  body { margin: 0; background: #0f1424; color: #fff; font: 13px sans-serif; }
+  h2 { margin: 12px 10px 4px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px; }
+  .cell { width: 260px; background: #1a2138; border-radius: 6px; padding-bottom: 6px; }
+  .cell img { width: 260px; height: 200px; display: block; }
+  .cell p { margin: 2px 8px; }
+  .warn { color: #ffb36b; }
+  .bad { color: #ff7b7b; }
+</style>
+<div id="root"></div>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js"}}</script>
+<script type="module">
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js";
+import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/loaders/GLTFLoader.js";
+
+class AssetLab {
+  static ROOT = "../assets/kaykit/war/";
+  static ORIGIN_WARN = 0.5;
+
+  constructor(files) {
+    this.files = files;
+    this.loader = new GLTFLoader();
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    this.renderer.setSize(520, 400);
+    this.renderer.setClearColor(0x2a3354);
+    this.scene = new THREE.Scene();
+    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x556677, 2.2));
+    const sun = new THREE.DirectionalLight(0xffffff, 2);
+    sun.position.set(5, 10, 6);
+    this.scene.add(sun);
+    this.camera = new THREE.PerspectiveCamera(35, 520 / 400, 0.01, 1000);
+    this.root = document.getElementById("root");
+  }
+
+  async run() {
+    const row = document.createElement("div");
+    row.className = "row";
+    this.root.appendChild(row);
+    for (const file of this.files) row.appendChild(await this.cellFor(file));
+    document.title = "done";
+  }
+
+  async cellFor(file) {
+    const cell = document.createElement("div");
+    cell.className = "cell";
+    try {
+      const gltf = await this.loader.loadAsync(AssetLab.ROOT + file);
+      const model = gltf.scene;
+      this.scene.add(model);
+      model.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(model);
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      const longest = Math.max(size.x, size.y, size.z);
+      this.camera.position.set(center.x + longest * 1.1, center.y + longest * 0.8, center.z + longest * 1.4);
+      this.camera.lookAt(center);
+      this.renderer.render(this.scene, this.camera);
+      const bones = [];
+      model.traverse((node) => { if (node.isBone) bones.push(node.name); });
+      const offset = Math.hypot(center.x, center.z);
+      const floating = Math.abs(box.min.y);
+      const notes = [];
+      if (offset > AssetLab.ORIGIN_WARN) notes.push('<span class="warn">기준점이 가로로 ' + offset.toFixed(2) + ' 벗어나 있어요(바닥 맞춤 필요)</span>');
+      if (floating > AssetLab.ORIGIN_WARN) notes.push('<span class="warn">바닥이 ' + floating.toFixed(2) + ' 떠 있거나 묻혀 있어요</span>');
+      cell.innerHTML = '<img src="' + this.renderer.domElement.toDataURL() + '"><p><b>' + file + "</b></p><p>크기 " + size.x.toFixed(2) + " × " + size.y.toFixed(2) + " × " + size.z.toFixed(2) + "</p><p>중심 " + center.x.toFixed(2) + ", " + center.y.toFixed(2) + ", " + center.z.toFixed(2) + "</p>" +
+        (gltf.animations.length ? "<p>클립 " + gltf.animations.length + "개: " + gltf.animations.map((clip) => clip.name).join(", ") + "</p>" : "") +
+        (bones.length ? "<p>손·뼈: " + bones.filter((name) => /fist|hand|head|weapon|wrist/i.test(name)).join(", ") + "</p>" : "") +
+        notes.map((note) => "<p>" + note + "</p>").join("");
+      this.scene.remove(model);
+    } catch (error) {
+      cell.innerHTML = '<p class="bad"><b>' + file + "</b></p><p class=\"bad\">불러오지 못했어요: " + error.message + "</p>";
+    }
+    return cell;
+  }
+}
+
+const params = new URLSearchParams(location.search);
+const files = (params.get("files") || "").split(",").map((name) => name.trim()).filter((name) => name !== "");
+document.getElementById("root").innerHTML = files.length === 0 ? "<h2>주소 끝에 ?files=quaternius/Soldier_Male.gltf,gear/Gun_Rifle.gltf 처럼 (assets/kaykit/war/ 기준) 쉼표로 적어 주세요</h2>" : "";
+if (files.length > 0) new AssetLab(files).run();
+</script>

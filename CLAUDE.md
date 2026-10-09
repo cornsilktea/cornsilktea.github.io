@@ -115,6 +115,9 @@
 - **35번(2대2 3D 미니 축구) 작업은 시작 전에 `35.soccer-notes.md` 를 읽는다.** 규칙·네트워크 구조·클래스 지도·검사 방법이 거기 있다. 규칙 코드(`ts/35.soccer-rules.ts`)는 화면을 몰라서 `node .claude/soccer-sim.js`·`node .claude/soccer-unit.js` 로 검사한다. 방 연결은 새 공용 모듈 `ts/room-kit.ts`(`Rk*`)를 쓴다.
 - **36번(던전 레이드) 작업은 시작 전에 `36.dungeon-raid-notes.md` 를 읽는다.** 규칙·수치 조정 기록·네트워크 구조·클래스 지도·검사 방법이 거기 있다. 규칙 엔진(`ts/36.raid-rules.ts`)은 화면을 몰라서 `node .claude/raid-sim.js`·`node .claude/raid-unit.js` 로 검사한다. 파티(5명) 세계 신기록은 `world-record.js` 의 `askName`·`submitParty` 를 쓴다.
 - **37번(우주전쟁 RTS) 작업은 시작 전에 `37.space-war-notes.md` 와 확정 사양 `37.space-war-proposal.md` 를 읽는다.** 규칙 엔진(`ts/37.war-rules.ts`)은 화면을 몰라서 `node .claude/war-sim.js` 로 검사한다.
+  **37번은 푸시 전 `node tools/war-check.js`(컴파일·규칙·글자 깨짐·모델 파일·안내 문구 수치·스크립트 버전)가 모두 통과해야 하고, 푸시 뒤에는 `node tools/war-deploy-check.js` 로 Pages 빌드 성공과 사이트 파일 일치까지 확인한 다음에 보고한다**(2026-10-10, 배포가 한 시간 멈춘 사고 이후). `.js` 를 고치면 `37.space-war.html` 의 `?v=` 값을 함께 올린다.
+  화면 확인은 `node tools/war-test-page.js` 로 만드는 `.claude/war-test.html`(항상 내 팀 시점, `__t.start/spawn/look/lookAtTurret/errors`)으로 하고, 새 모델은 연결 전에 `tools/war-asset-lab.html?files=…` 로 기준점·뼈 이름·딸린 파일을 본다. 콘솔 오류(404 포함)가 있으면 보고하기 전에 처리한다.
+  한글이 든 파일은 Edit·Write 도구나 UTF-8 을 명시한 코드로만 쓴다(`Add-Content`·`Get-Content | Set-Content` 금지). 안내 문구의 숫자는 `data-balance` 속성으로 `WarBalance` 값에서 가져온다.
 - **32번(미니게임 모음) 작업은 시작 전에 `32.minigames-notes.md` 를 읽는다.** `32.minigames/last-tile/`(옛 마지막 발판 규칙 코드, 설명은 `32.minigames-last-tile-notes.md`)도 같은 모음 안의 코드다. 종목 추가 방법·클래스 지도·Firebase 구조·검사 방법이 거기 있다.
 
 - **새 게임에 쓸 3D 에셋(캐릭터·애니메이션·건물·소품)을 고를 때는 먼저 `kaykit-catalog/README.md` 를 읽는다**(2026-10-03 선생님 요청). `3d-assets` 21개 팩의 용도·캐릭터·애니메이션 클립을 정리해 두었고, `node tools/kaykit-find.js 단어` 로 모델·클립을 바로 검색한다. 전체 이름표는 `kaykit-catalog/names.md`. 팩을 더 받으면 README 맨 위 명령으로 다시 만든다.

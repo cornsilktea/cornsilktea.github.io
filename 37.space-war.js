@@ -149,6 +149,7 @@ class WarGameApp {
         this.ready = false;
         const touchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0;
         this.world = new WarWorldView(libs, this.canvas, touchDevice);
+        WarBalanceText.fill(document);
         this.assets = new WarAssetLibrary(libs);
         this.backdrop = new WarMenuBackdrop(libs, this.assets, this.world);
         this.input = new WarInputController(this.canvas, this.world, { tap: (x, y, touch) => this.onTap(x, y, touch), command: (x, y) => this.onCommandClick(x, y) }, () => this.match !== null && !this.attackMap.isOpen);

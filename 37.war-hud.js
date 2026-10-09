@@ -506,3 +506,13 @@ class WarAttackMapOverlay {
         return result;
     }
 }
+class WarBalanceText {
+    static fill(root) {
+        const values = WarBalance;
+        root.querySelectorAll("[data-balance]").forEach((node) => {
+            const key = node.dataset.balance;
+            const value = key === "MATCH_MINUTES" ? WarBalance.MATCH_TICKS / WarBalance.TICKS_PER_SEC / 60 : values[key];
+            node.textContent = String(value);
+        });
+    }
+}
