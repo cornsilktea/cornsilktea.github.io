@@ -105,6 +105,10 @@ class WarUnit extends WarEntity implements WarAttacker {
   revived = false;
   orderPath: WarPoint[] = [];
   holdPoint: WarPoint | null = null;
+  rejoin = false;
+  goalX = 0;
+  goalY = 0;
+  lastStep = 0;
   readonly ability: WarAbility | null;
 
   constructor(id: number, team: WarTeam, x: number, y: number, readonly def: WarUnitDef) {
@@ -134,8 +138,9 @@ class WarUnit extends WarEntity implements WarAttacker {
     return this.orderPath.length > 0 || this.holdPoint !== null;
   }
 
-  giveOrder(path: WarPoint[]): void {
+  giveOrder(path: WarPoint[], rejoin = false): void {
     if (path.length === 0) return;
+    this.rejoin = rejoin;
     this.orderPath = path.map((point) => ({ x: point.x, y: point.y }));
     this.holdPoint = null;
     this.targetId = -1;
@@ -143,6 +148,7 @@ class WarUnit extends WarEntity implements WarAttacker {
   }
 
   clearOrder(): void {
+    this.rejoin = false;
     this.orderPath = [];
     this.holdPoint = null;
   }
@@ -187,6 +193,9 @@ class WarUnit extends WarEntity implements WarAttacker {
   }
 
   moveToward(point: WarPoint, step: number): void {
+    this.goalX = point.x;
+    this.goalY = point.y;
+    this.lastStep = step;
     const next = WarMath.stepToward(this, point, step);
     this.x = next.x;
     this.y = next.y;
@@ -584,8 +593,15 @@ class WarSquad {
 
   add(unit: WarUnit): void {
     unit.squadIndex = this.index;
-    unit.attached = this.mode === "home";
+    unit.attached = true;
     this.members.push(unit);
+    if (this.mode === "away") unit.giveOrder(this.pathToAnchor(unit), true);
+  }
+
+  private pathToAnchor(unit: WarUnit): WarPoint[] {
+    if (unit.flying) return [WarTerrain.clampAir(this.anchor)];
+    const goal = WarTerrain.clamp(this.anchor);
+    return WarNavGraph.straighten(unit, WarNavGraph.connect(unit, goal));
   }
 
   remove(unit: WarUnit): void {
@@ -910,7 +926,9 @@ class WarUnitBrain {
     unit.moveToward(goal, unit.stepLength());
     if (unit.x !== goal.x || unit.y !== goal.y) return;
     unit.orderPath.shift();
-    if (unit.orderPath.length === 0) unit.holdPoint = { x: goal.x, y: goal.y };
+    if (unit.orderPath.length > 0) return;
+    if (unit.rejoin) unit.clearOrder();
+    else unit.holdPoint = { x: goal.x, y: goal.y };
   }
 
   private static squadFocus(engine: WarEngine, unit: WarUnit, squad: WarSquad): WarEntity | null {
@@ -1238,6 +1256,7 @@ class WarEngine {
       } else {
         unit.attached = true;
       }
+      unit.clearOrder();
       if (hold) unit.holdPoint = { x: spot.x, y: spot.y };
       this.register(unit);
       made++;
@@ -1441,6 +1460,7 @@ class WarEngine {
       const fixed = unit.flying ? WarTerrain.clampAir(unit) : WarTerrain.clamp(unit);
       unit.x = fixed.x;
       unit.y = fixed.y;
+      unit.lastStep = 0;
     }
   }
 
@@ -1457,10 +1477,20 @@ class WarEngine {
         if (distance >= keepOut) continue;
         const ux = distance === 0 ? 0 : Math.trunc((dx * 1000) / distance);
         const uy = distance === 0 ? (unit.team === 0 ? -1000 : 1000) : Math.trunc((dy * 1000) / distance);
-        unit.x = building.x + Math.trunc((ux * keepOut) / 1000);
-        unit.y = building.y + Math.trunc((uy * keepOut) / 1000);
+        const slide = this.slideAround(unit, ux, uy);
+        unit.x = building.x + Math.trunc((ux * keepOut) / 1000) + slide.x;
+        unit.y = building.y + Math.trunc((uy * keepOut) / 1000) + slide.y;
       }
     }
+  }
+
+  private slideAround(unit: WarUnit, ux: number, uy: number): WarPoint {
+    if (unit.lastStep <= 0) return { x: 0, y: 0 };
+    const tx = -uy;
+    const ty = ux;
+    const toward = tx * (unit.goalX - unit.x) + ty * (unit.goalY - unit.y);
+    const side = toward === 0 ? (unit.id % 2 === 0 ? 1 : -1) : toward > 0 ? 1 : -1;
+    return { x: Math.trunc((tx * side * unit.lastStep) / 1000), y: Math.trunc((ty * side * unit.lastStep) / 1000) };
   }
 
   private separatePass(units: WarUnit[], radius: number): void {

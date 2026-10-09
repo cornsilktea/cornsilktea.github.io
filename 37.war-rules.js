@@ -74,6 +74,10 @@ class WarUnit extends WarEntity {
         this.revived = false;
         this.orderPath = [];
         this.holdPoint = null;
+        this.rejoin = false;
+        this.goalX = 0;
+        this.goalY = 0;
+        this.lastStep = 0;
         this.chargeReady = def.chargeBonusPct > 0;
         this.ability = WarAbilityFactory.forDef(def);
     }
@@ -94,15 +98,17 @@ class WarUnit extends WarEntity {
     get independent() {
         return this.orderPath.length > 0 || this.holdPoint !== null;
     }
-    giveOrder(path) {
+    giveOrder(path, rejoin = false) {
         if (path.length === 0)
             return;
+        this.rejoin = rejoin;
         this.orderPath = path.map((point) => ({ x: point.x, y: point.y }));
         this.holdPoint = null;
         this.targetId = -1;
         this.marchTicks = 0;
     }
     clearOrder() {
+        this.rejoin = false;
         this.orderPath = [];
         this.holdPoint = null;
     }
@@ -143,6 +149,9 @@ class WarUnit extends WarEntity {
         this.chargeReady = this.def.chargeBonusPct > 0;
     }
     moveToward(point, step) {
+        this.goalX = point.x;
+        this.goalY = point.y;
+        this.lastStep = step;
         const next = WarMath.stepToward(this, point, step);
         this.x = next.x;
         this.y = next.y;
@@ -532,8 +541,16 @@ class WarSquad {
     }
     add(unit) {
         unit.squadIndex = this.index;
-        unit.attached = this.mode === "home";
+        unit.attached = true;
         this.members.push(unit);
+        if (this.mode === "away")
+            unit.giveOrder(this.pathToAnchor(unit), true);
+    }
+    pathToAnchor(unit) {
+        if (unit.flying)
+            return [WarTerrain.clampAir(this.anchor)];
+        const goal = WarTerrain.clamp(this.anchor);
+        return WarNavGraph.straighten(unit, WarNavGraph.connect(unit, goal));
     }
     remove(unit) {
         const at = this.members.indexOf(unit);
@@ -877,7 +894,11 @@ class WarUnitBrain {
         if (unit.x !== goal.x || unit.y !== goal.y)
             return;
         unit.orderPath.shift();
-        if (unit.orderPath.length === 0)
+        if (unit.orderPath.length > 0)
+            return;
+        if (unit.rejoin)
+            unit.clearOrder();
+        else
             unit.holdPoint = { x: goal.x, y: goal.y };
     }
     static squadFocus(engine, unit, squad) {
@@ -1196,6 +1217,7 @@ class WarEngine {
             else {
                 unit.attached = true;
             }
+            unit.clearOrder();
             if (hold)
                 unit.holdPoint = { x: spot.x, y: spot.y };
             this.register(unit);
@@ -1420,6 +1442,7 @@ class WarEngine {
             const fixed = unit.flying ? WarTerrain.clampAir(unit) : WarTerrain.clamp(unit);
             unit.x = fixed.x;
             unit.y = fixed.y;
+            unit.lastStep = 0;
         }
     }
     pushOutOfBuildings(units) {
@@ -1438,10 +1461,20 @@ class WarEngine {
                     continue;
                 const ux = distance === 0 ? 0 : Math.trunc((dx * 1000) / distance);
                 const uy = distance === 0 ? (unit.team === 0 ? -1000 : 1000) : Math.trunc((dy * 1000) / distance);
-                unit.x = building.x + Math.trunc((ux * keepOut) / 1000);
-                unit.y = building.y + Math.trunc((uy * keepOut) / 1000);
+                const slide = this.slideAround(unit, ux, uy);
+                unit.x = building.x + Math.trunc((ux * keepOut) / 1000) + slide.x;
+                unit.y = building.y + Math.trunc((uy * keepOut) / 1000) + slide.y;
             }
         }
+    }
+    slideAround(unit, ux, uy) {
+        if (unit.lastStep <= 0)
+            return { x: 0, y: 0 };
+        const tx = -uy;
+        const ty = ux;
+        const toward = tx * (unit.goalX - unit.x) + ty * (unit.goalY - unit.y);
+        const side = toward === 0 ? (unit.id % 2 === 0 ? 1 : -1) : toward > 0 ? 1 : -1;
+        return { x: Math.trunc((tx * side * unit.lastStep) / 1000), y: Math.trunc((ty * side * unit.lastStep) / 1000) };
     }
     separatePass(units, radius) {
         const cells = new Map();
