@@ -85,8 +85,8 @@ class EncodingCheck {
         problems.push(name + ": UTF-8 이 아닌 글자가 섞여 있어요");
         continue;
       }
-      if (text.includes("�")) problems.push(name + ": 깨진 글자(U+FFFD)가 있어요");
-      if (text.indexOf("﻿", 1) > 0) problems.push(name + ": 파일 중간에 BOM 이 끼어 있어요");
+      if (text.includes(String.fromCharCode(0xFFFD))) problems.push(name + ": 깨진 글자(U+FFFD)가 있어요");
+      if (text.indexOf(String.fromCharCode(0xFEFF), 1) > 0) problems.push(name + ": 파일 중간에 BOM 이 끼어 있어요");
     }
     return problems;
   }
