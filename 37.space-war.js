@@ -65,12 +65,9 @@ class WarInputController {
         const wasTap = this.pointerStart !== null && !this.dragging;
         const button = this.button;
         this.reset();
-        if (!wasTap || !this.isActive())
+        if (!wasTap || !this.isActive() || button !== 0)
             return;
-        if (button === 2)
-            this.handlers.command(event.clientX, event.clientY);
-        else
-            this.handlers.tap(event.clientX, event.clientY);
+        this.handlers.tap(event.clientX, event.clientY);
     }
     onWheel(event) {
         if (!this.isActive())
@@ -146,7 +143,7 @@ class WarGameApp {
         this.world = new WarWorldView(libs, this.canvas, touchDevice);
         this.assets = new WarAssetLibrary(libs);
         this.backdrop = new WarMenuBackdrop(libs, this.assets, this.world);
-        this.input = new WarInputController(this.canvas, this.world, { tap: (x, y) => this.onTap(x, y), command: (x, y) => this.onCommandClick(x, y) }, () => this.match !== null && !this.attackMap.isOpen);
+        this.input = new WarInputController(this.canvas, this.world, { tap: (x, y) => this.onTap(x, y) }, () => this.match !== null && !this.attackMap.isOpen);
         this.attackMap = new WarAttackMapOverlay((command) => this.sendCommand(command), () => this.viewer, () => this.match.view.transform, this.alertPulses);
         this.bindUi();
         this.loadAssets();

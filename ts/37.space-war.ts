@@ -2,7 +2,6 @@ type WarDifficulty = "easy" | "normal" | "hard";
 
 interface WarInputHandlers {
   tap: (clientX: number, clientY: number) => void;
-  command: (clientX: number, clientY: number) => void;
 }
 
 class WarInputController {
@@ -65,9 +64,8 @@ class WarInputController {
     const wasTap = this.pointerStart !== null && !this.dragging;
     const button = this.button;
     this.reset();
-    if (!wasTap || !this.isActive()) return;
-    if (button === 2) this.handlers.command(event.clientX, event.clientY);
-    else this.handlers.tap(event.clientX, event.clientY);
+    if (!wasTap || !this.isActive() || button !== 0) return;
+    this.handlers.tap(event.clientX, event.clientY);
   }
 
   private onWheel(event: WheelEvent): void {
@@ -153,7 +151,7 @@ class WarGameApp {
     this.world = new WarWorldView(libs, this.canvas, touchDevice);
     this.assets = new WarAssetLibrary(libs);
     this.backdrop = new WarMenuBackdrop(libs, this.assets, this.world);
-    this.input = new WarInputController(this.canvas, this.world, { tap: (x, y) => this.onTap(x, y), command: (x, y) => this.onCommandClick(x, y) }, () => this.match !== null && !this.attackMap.isOpen);
+    this.input = new WarInputController(this.canvas, this.world, { tap: (x, y) => this.onTap(x, y) }, () => this.match !== null && !this.attackMap.isOpen);
     this.attackMap = new WarAttackMapOverlay((command) => this.sendCommand(command), () => this.viewer, () => (this.match as WarLocalMatch).view.transform, this.alertPulses);
     this.bindUi();
     this.loadAssets();

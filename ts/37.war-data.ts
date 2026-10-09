@@ -103,6 +103,7 @@ class WarBalance {
   static readonly KITE_MIN_RANGE = 500;
   static readonly KITE_PERCENT = 45;
   static readonly ACQUIRE_EVERY_TICKS = 3;
+  static readonly RETARGET_MARGIN = 100;
   static readonly VISION_EVERY_TICKS = 3;
   static readonly ALERT_COOLDOWN_TICKS = 50;
   static readonly ALERT_EVERY_TICKS = 5;
@@ -225,7 +226,7 @@ class WarMapData {
   static readonly POST_SPREAD = 1800;
   static readonly POST_BACKOFF = -400;
   static readonly SLOT_OFFSETS: WarPoint[] = [
-    { x: -1700, y: 0 }, { x: -1202, y: -1202 }, { x: 0, y: -1700 }, { x: 1202, y: -1202 }, { x: 1700, y: 0 },
+    { x: -1250, y: -350 }, { x: -800, y: -1000 }, { x: 0, y: -1300 }, { x: 800, y: -1000 }, { x: 1250, y: -350 },
   ];
   static readonly ENTRANCE_SLOT_OFFSETS: WarPoint[] = [{ x: -700, y: -1000 }, { x: 700, y: -1000 }];
   static readonly ORE_OFFSETS: WarPoint[] = [{ x: -1500, y: 250 }, { x: -1300, y: 900 }, { x: -800, y: 1350 }, { x: -250, y: 1550 }];

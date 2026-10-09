@@ -159,7 +159,7 @@ class WarCommandCard {
         }
         if (selection.kind === "squad") {
             return [
-                { label: "이동", sub: "", desc: "화면을 누르거나 오른쪽 버튼을 누르면 그곳으로 가요. 길게 그리려면 공격 지도를 쓰세요.", enabled: true, onPress: null },
+                { label: "이동", sub: "", desc: "화면을 누르면 그곳으로 가요. 길게 그리려면 공격 지도를 쓰세요.", enabled: true, onPress: null },
                 { label: "귀환", sub: "입구로 돌아와요", desc: "", enabled: player.squads[selection.index].mode !== "home", onPress: () => sink(new WarRecallCommand(team, selection.index)) },
             ];
         }

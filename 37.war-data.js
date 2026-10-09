@@ -48,6 +48,7 @@ WarBalance.BUILDING_PADDING = 70;
 WarBalance.KITE_MIN_RANGE = 500;
 WarBalance.KITE_PERCENT = 45;
 WarBalance.ACQUIRE_EVERY_TICKS = 3;
+WarBalance.RETARGET_MARGIN = 100;
 WarBalance.VISION_EVERY_TICKS = 3;
 WarBalance.ALERT_COOLDOWN_TICKS = 50;
 WarBalance.ALERT_EVERY_TICKS = 5;
@@ -232,7 +233,7 @@ WarMapData.BASE_RADIUS = 2600;
 WarMapData.POST_SPREAD = 1800;
 WarMapData.POST_BACKOFF = -400;
 WarMapData.SLOT_OFFSETS = [
-    { x: -1700, y: 0 }, { x: -1202, y: -1202 }, { x: 0, y: -1700 }, { x: 1202, y: -1202 }, { x: 1700, y: 0 },
+    { x: -1250, y: -350 }, { x: -800, y: -1000 }, { x: 0, y: -1300 }, { x: 800, y: -1000 }, { x: 1250, y: -350 },
 ];
 WarMapData.ENTRANCE_SLOT_OFFSETS = [{ x: -700, y: -1000 }, { x: 700, y: -1000 }];
 WarMapData.ORE_OFFSETS = [{ x: -1500, y: 250 }, { x: -1300, y: 900 }, { x: -800, y: 1350 }, { x: -250, y: 1550 }];

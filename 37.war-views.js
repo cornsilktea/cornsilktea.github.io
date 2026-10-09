@@ -63,6 +63,9 @@ WarUnitLooks.LOOKS = {
     necromancer: { ...WarUnitLooks.SKELETON, file: "characters/Skeleton_Mage.glb", height: 3.6, attackClip: "Ranged_Magic_Spellcasting", shootsFar: true },
 };
 class WarBuildingLooks {
+    static decorOf(type, faction) {
+        return WarBuildingLooks.DECOR[faction + ":" + type] ?? [];
+    }
     static of(type, faction) {
         return WarBuildingLooks.MODELS[faction][type];
     }
@@ -72,6 +75,9 @@ class WarBuildingLooks {
             for (const type of Object.keys(WarBuildingLooks.MODELS[faction]))
                 files.push(WarBuildingLooks.MODELS[faction][type].file);
         }
+        for (const key of Object.keys(WarBuildingLooks.DECOR))
+            for (const decor of WarBuildingLooks.DECOR[key])
+                files.push(decor.file);
         return files;
     }
 }
@@ -83,11 +89,20 @@ WarBuildingLooks.MODELS = {
         lab: { file: "quaternius/GeodesicDome.gltf", scale: 0.42 },
     },
     grave: {
-        hq: { file: "halloween/crypt.gltf", scale: 0.8 },
+        hq: { file: "halloween/crypt.gltf", scale: 1.35, top: 9.5 },
         barracks: { file: "halloween/coffin_decorated.gltf", scale: 1.2 },
         range: { file: "halloween/arch_gate.gltf", scale: 0.8 },
         lab: { file: "halloween/shrine_candles.gltf", scale: 1.7 },
     },
+};
+WarBuildingLooks.DECOR = {
+    "grave:hq": [
+        { file: "halloween/pillar.gltf", x: -4.2, z: -3, scale: 1.8 }, { file: "halloween/pillar.gltf", x: 4.2, z: -3, scale: 1.8 },
+        { file: "halloween/pillar.gltf", x: -4.2, z: 3, scale: 1.8 }, { file: "halloween/pillar.gltf", x: 4.2, z: 3, scale: 1.8 },
+        { file: "halloween/gravestone.gltf", x: -5.4, z: 0.4, scale: 1.6 }, { file: "halloween/gravestone.gltf", x: 5.4, z: -0.4, scale: 1.6 },
+        { file: "halloween/lantern_standing.gltf", x: -2.4, z: 4.6, scale: 1.8 }, { file: "halloween/lantern_standing.gltf", x: 2.4, z: 4.6, scale: 1.8 },
+        { file: "halloween/skull_candle.gltf", x: -1.2, z: 5, scale: 2 }, { file: "halloween/skull_candle.gltf", x: 1.2, z: 5, scale: 2 },
+    ],
 };
 class WarAssetLibrary {
     constructor(libs) {
@@ -287,8 +302,15 @@ class WarBuildingView {
         this.disc.position.y = 0.03;
         this.disc.material.opacity = 0.55;
         this.bar = new WarHealthBar(libs, materials, building.def.type === "hq" ? 4 : 2.2, 0.22, mine);
-        this.bar.group.position.y = building.def.type === "hq" ? 6.2 : 3.4;
+        this.bar.group.position.y = look.top ?? (building.def.type === "hq" ? 6.2 : 3.4);
         this.group.add(this.disc, this.model, this.bar.group);
+        for (const decor of WarBuildingLooks.decorOf(building.def.type, faction)) {
+            const piece = assets.grounded(decor.file);
+            piece.position.set(decor.x, 0, decor.z);
+            piece.scale.setScalar(decor.scale);
+            WarShadows.cast(piece);
+            this.group.add(piece);
+        }
         this.group.position.set(position.x, 0, position.z);
         this.group.rotation.y = mine ? Math.PI : 0;
         this.bar.group.rotation.y = -this.group.rotation.y;
@@ -439,7 +461,7 @@ class WarWorkerCrowd {
             const towardHq = Math.atan2(hq.x - node.x, hq.z - node.z);
             const yaw = mining ? towardHq + Math.PI : carryingHome || phase < WarWorkerCrowd.DROP_END ? towardHq : towardHq + Math.PI;
             const bob = mining ? Math.abs(Math.sin(seconds * 6 + i * 1.7)) * 0.22 : Math.abs(Math.sin(seconds * 9 + i)) * 0.06;
-            this.instances.set(i, { x, z, yaw, scale: 2.4, y: bob });
+            this.instances.set(i, { x, z, yaw: yaw + Math.PI, scale: 2.4, y: bob });
         }
         this.instances.finish(total);
     }

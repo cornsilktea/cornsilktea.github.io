@@ -779,8 +779,7 @@ class WarUnitBrain {
         let target = unit.targetId >= 0 ? engine.entityById(unit.targetId) : null;
         if (target && !WarUnitBrain.stillValid(engine, unit, squad, target, origin))
             target = null;
-        if (!target && (engine.tick + unit.id) % WarBalance.ACQUIRE_EVERY_TICKS === 0)
-            target = WarTargeting.pick(engine, unit, origin);
+        target = WarUnitBrain.preferNearest(engine, unit, origin, target);
         if (!target && unit.attached)
             target = WarUnitBrain.squadFocus(engine, unit, squad);
         unit.retarget(target ? target.id : -1);
@@ -804,8 +803,7 @@ class WarUnitBrain {
         let target = unit.targetId >= 0 ? engine.entityById(unit.targetId) : null;
         if (target && !WarUnitBrain.stillValid(engine, unit, squad, target, origin))
             target = null;
-        if (!target && (engine.tick + unit.id) % WarBalance.ACQUIRE_EVERY_TICKS === 0)
-            target = WarTargeting.pick(engine, unit, origin);
+        target = WarUnitBrain.preferNearest(engine, unit, origin, target);
         unit.retarget(target ? target.id : -1);
         if (!target) {
             WarUnitBrain.walkOrder(unit);
@@ -820,6 +818,19 @@ class WarUnitBrain {
             return;
         if (!inReach)
             unit.moveToward(target, unit.stepLength());
+    }
+    static preferNearest(engine, unit, origin, current) {
+        if ((engine.tick + unit.id) % WarBalance.ACQUIRE_EVERY_TICKS !== 0)
+            return current;
+        const picked = WarTargeting.pick(engine, unit, origin);
+        if (!picked || !current)
+            return picked ?? current;
+        if (picked.id === current.id)
+            return current;
+        if (current instanceof WarUnit && !(picked instanceof WarUnit))
+            return current;
+        const distanceTo = (entity) => WarMath.dist(unit.x, unit.y, entity.x, entity.y);
+        return distanceTo(picked) + WarBalance.RETARGET_MARGIN < distanceTo(current) ? picked : current;
     }
     static walkOrder(unit) {
         if (unit.orderPath.length === 0) {
