@@ -1,0 +1,455 @@
+"use strict";
+class WarDom {
+    static byId(id) {
+        return document.getElementById(id);
+    }
+    static make(tag, className, text = "") {
+        const element = document.createElement(tag);
+        element.className = className;
+        if (text)
+            element.textContent = text;
+        return element;
+    }
+    static clear(element) {
+        while (element.firstChild)
+            element.removeChild(element.firstChild);
+    }
+}
+class WarTimeText {
+    static clock(ticks) {
+        const seconds = Math.floor(ticks / WarBalance.TICKS_PER_SEC);
+        return Math.floor(seconds / 60) + ":" + (seconds % 60 < 10 ? "0" : "") + (seconds % 60);
+    }
+}
+class WarTopBar {
+    constructor() {
+        this.ore = WarDom.byId("hudOre");
+        this.crystal = WarDom.byId("hudCrystal");
+        this.pop = WarDom.byId("hudPop");
+        this.time = WarDom.byId("hudTime");
+    }
+    update(engine, team) {
+        const economy = engine.players[team].economy;
+        this.ore.textContent = String(economy.ore);
+        this.crystal.textContent = String(economy.crystal);
+        this.pop.textContent = economy.popUsed + "/" + WarBalance.POP_CAP;
+        this.time.textContent = WarTimeText.clock(engine.tick) + " / " + WarTimeText.clock(WarBalance.MATCH_TICKS);
+    }
+}
+class WarNotice {
+    constructor() {
+        this.element = WarDom.byId("hudNotice");
+        this.hideAt = 0;
+    }
+    show(text) {
+        this.element.textContent = text;
+        this.element.hidden = false;
+        this.hideAt = performance.now() + WarNotice.SHOW_MS;
+    }
+    update() {
+        if (!this.element.hidden && performance.now() > this.hideAt)
+            this.element.hidden = true;
+    }
+    reset() {
+        this.element.hidden = true;
+    }
+}
+WarNotice.SHOW_MS = 3200;
+class WarSquadPanel {
+    constructor() {
+        this.onSelect = () => undefined;
+        this.workerText = WarDom.byId("workerCount");
+        this.rows = [];
+        this.cells = [];
+        for (let index = 0; index < WarBalance.SQUAD_COUNT; index++) {
+            const row = WarDom.byId("squadRow" + index);
+            row.style.setProperty("--squad", WarPalette.SQUAD_COLORS[index]);
+            const gauge = row.querySelector(".gauge");
+            const cells = [];
+            for (let i = 0; i < WarBalance.SQUAD_CAP; i++) {
+                const cell = WarDom.make("i", "cell");
+                gauge.appendChild(cell);
+                cells.push(cell);
+            }
+            row.addEventListener("click", () => this.onSelect(index));
+            this.rows.push(row);
+            this.cells.push(cells);
+        }
+    }
+    update(player, selection) {
+        this.workerText.textContent = String(player.economy.oreWorkers + player.economy.crystalWorkers);
+        player.squads.forEach((squad, index) => {
+            const order = ["melee", "ranged", "elite"];
+            const colors = [];
+            for (const kind of order) {
+                for (const unit of squad.members)
+                    if (unit.def.kind === kind)
+                        colors.push(WarPalette.KIND_COLORS[kind]);
+            }
+            this.cells[index].forEach((cell, i) => {
+                const color = colors[i];
+                cell.style.background = color ?? "";
+                cell.classList.toggle("on", color !== undefined);
+            });
+            this.rows[index].classList.toggle("selected", selection.kind === "squad" && selection.index === index);
+            this.rows[index].classList.toggle("away", squad.mode !== "home");
+        });
+    }
+}
+class WarCommandCard {
+    constructor() {
+        this.host = WarDom.byId("cmdCard");
+        this.signature = "";
+    }
+    update(selection, engine, team, sink, onAfter) {
+        const buttons = this.buttonsFor(selection, engine, team, sink, onAfter);
+        const signature = selection.kind + ":" + buttons.map((b) => b.label + b.sub + b.enabled).join("|");
+        if (signature === this.signature)
+            return;
+        this.signature = signature;
+        WarDom.clear(this.host);
+        if (buttons.length === 0) {
+            this.host.appendChild(WarDom.make("div", "cmdHint", this.hintFor(selection)));
+            return;
+        }
+        for (const spec of buttons) {
+            const button = WarDom.make("button", "cmdBtn");
+            button.type = "button";
+            button.disabled = !spec.enabled;
+            button.appendChild(WarDom.make("b", "", spec.label));
+            button.appendChild(WarDom.make("small", "", spec.sub));
+            button.addEventListener("click", () => spec.onPress());
+            this.host.appendChild(button);
+        }
+    }
+    hintFor(selection) {
+        if (selection.kind === "none")
+            return "빈 터를 누르면 건물을 지을 수 있어요. 건물을 누르면 병력을 만들어요.";
+        if (selection.kind === "building")
+            return "지금은 만들 수 있는 것이 없어요.";
+        return "";
+    }
+    buttonsFor(selection, engine, team, sink, onAfter) {
+        const player = engine.players[team];
+        const economy = player.economy;
+        if (selection.kind === "slot") {
+            return WarBuildingCatalog.buildable(player.slotDefs[selection.index].kind).map((def) => ({
+                label: def.name,
+                sub: WarCommandCard.costText(def.ore, def.crystal) + " · " + def.buildTicks / WarBalance.TICKS_PER_SEC + "초",
+                enabled: economy.canAfford(def.ore, def.crystal),
+                onPress: () => { sink(new WarBuildCommand(team, selection.index, def.type)); onAfter(); },
+            }));
+        }
+        if (selection.kind === "building") {
+            const building = engine.entityById(selection.id);
+            if (!(building instanceof WarBuilding) || building.team !== team || !building.complete)
+                return [];
+            const items = building.def.type === "hq"
+                ? [WarProductionItem.from("worker_ore"), WarProductionItem.from("worker_crystal")]
+                : WarUnitCatalog.producedBy(player.faction, building.def.producesKind).map((def) => WarProductionItem.from(def.id));
+            return items.map((item) => ({
+                label: item.name,
+                sub: WarCommandCard.costText(item.ore, item.crystal) + (item.pop > 1 ? " · 인구 " + item.pop : ""),
+                enabled: economy.canAfford(item.ore, item.crystal) && economy.popFree >= item.pop && building.queue.length < WarBalance.QUEUE_LIMIT,
+                onPress: () => sink(new WarProduceCommand(team, building.id, item.id)),
+            }));
+        }
+        if (selection.kind === "squad") {
+            return [{ label: "귀환", sub: "입구로 돌아와요", enabled: player.squads[selection.index].mode !== "home", onPress: () => sink(new WarRecallCommand(team, selection.index)) }];
+        }
+        return [];
+    }
+    static costText(ore, crystal) {
+        return "광석 " + ore + (crystal > 0 ? " · 결정 " + crystal : "");
+    }
+}
+class WarInfoPanel {
+    constructor() {
+        this.host = WarDom.byId("infoPanel");
+        this.signature = "";
+    }
+    update(selection, engine, team) {
+        const lines = this.linesFor(selection, engine, team);
+        const signature = lines.title + "|" + lines.hpRatio + "|" + lines.rows.join("|");
+        if (signature === this.signature)
+            return;
+        this.signature = signature;
+        WarDom.clear(this.host);
+        this.host.appendChild(WarDom.make("h3", "", lines.title));
+        if (lines.hpRatio >= 0) {
+            const bar = WarDom.make("div", "infoBar");
+            const fill = WarDom.make("div", "infoBarFill");
+            fill.style.width = Math.round(lines.hpRatio * 100) + "%";
+            bar.appendChild(fill);
+            this.host.appendChild(bar);
+        }
+        for (const row of lines.rows)
+            this.host.appendChild(WarDom.make("div", "infoRow", row));
+    }
+    linesFor(selection, engine, team) {
+        const player = engine.players[team];
+        if (selection.kind === "unit") {
+            const unit = engine.entityById(selection.id);
+            if (unit instanceof WarUnit) {
+                const squad = unit.team === team && unit.squadIndex >= 0 ? " · 부대 " + (unit.squadIndex + 1) : "";
+                return {
+                    title: unit.def.name + (unit.team === team ? "" : " (적)"),
+                    hpRatio: unit.hp / unit.maxHp,
+                    rows: ["체력 " + unit.hp + "/" + unit.maxHp + squad, "공격력 " + unit.def.damage + " · 사거리 " + unit.def.range / 100 + "m · 속도 " + unit.def.speed / 100 + "m/s"],
+                };
+            }
+        }
+        if (selection.kind === "building") {
+            const building = engine.entityById(selection.id);
+            if (building instanceof WarBuilding) {
+                const rows = ["체력 " + building.hp + "/" + building.maxHp];
+                if (!building.complete)
+                    rows.push("건설 중 " + Math.round((1 - building.buildLeft / building.def.buildTicks) * 100) + "%");
+                building.queue.forEach((queued, i) => rows.push((i === 0 ? "생산 중 " : "대기 ") + queued.item.name + (i === 0 ? " " + Math.round((1 - queued.ticksLeft / queued.item.ticks) * 100) + "%" : "")));
+                return { title: building.def.name + (building.team === team ? "" : " (적)"), hpRatio: building.hp / building.maxHp, rows };
+            }
+        }
+        if (selection.kind === "squad") {
+            const squad = player.squads[selection.index];
+            const count = (kind) => squad.members.filter((u) => u.def.kind === kind).length;
+            return {
+                title: "부대 " + (selection.index + 1),
+                hpRatio: -1,
+                rows: ["근접 " + count("melee") + " · 원거리 " + count("ranged") + " · 고급 " + count("elite") + " (" + squad.members.length + "/" + WarBalance.SQUAD_CAP + ")", squad.mode === "home" ? "입구에서 수비 중" : squad.mode === "away" ? "공격 이동 중" : "귀환 중"],
+            };
+        }
+        if (selection.kind === "slot") {
+            return { title: "빈 터", hpRatio: -1, rows: ["건물 슬롯 " + (selection.index + 1), "왼쪽 카드에서 지을 건물을 고르세요."] };
+        }
+        const economy = player.economy;
+        return {
+            title: "기지 현황",
+            hpRatio: -1,
+            rows: [
+                "광석 일꾼 " + economy.oreWorkers + " (초당 " + (WarEconomy.milliPerSecond(economy.oreWorkers, false) / 1000).toFixed(1) + ")",
+                "결정 일꾼 " + economy.crystalWorkers + " (초당 " + (WarEconomy.milliPerSecond(economy.crystalWorkers, true) / 1000).toFixed(1) + ")",
+                "건물 " + (player.buildings().length - 1) + "개 · 병력 " + engine.units(team).length + "기",
+            ],
+        };
+    }
+}
+class WarMapPainter {
+    static paint(context, width, height, engine, transform, showPaths, cameraFocus) {
+        context.clearRect(0, 0, width, height);
+        context.fillStyle = "#10162A";
+        context.fillRect(0, 0, width, height);
+        WarMapPainter.paintCorridors(context, width, height, transform);
+        WarMapPainter.paintFog(context, width, height, engine, transform);
+        if (showPaths)
+            WarMapPainter.paintPaths(context, width, height, engine, transform);
+        WarMapPainter.paintEntities(context, width, height, engine, transform);
+        if (cameraFocus) {
+            const p = transform.toMap(cameraFocus, width, height);
+            context.strokeStyle = "rgba(255,255,255,.85)";
+            context.lineWidth = 1.5;
+            context.strokeRect(p.x - width * 0.12, p.y - height * 0.07, width * 0.24, height * 0.14);
+        }
+    }
+    static paintCorridors(context, width, height, transform) {
+        context.lineCap = "round";
+        context.strokeStyle = "#2E3A57";
+        for (const corridor of WarMapData.corridors()) {
+            const a = transform.toMap({ x: corridor.ax, y: corridor.ay }, width, height);
+            const b = transform.toMap({ x: corridor.bx, y: corridor.by }, width, height);
+            context.lineWidth = Math.max(3, (corridor.halfWidth * 2 * width) / (WarMapData.HALF_W * 2));
+            context.beginPath();
+            context.moveTo(a.x, a.y);
+            context.lineTo(b.x, b.y);
+            context.stroke();
+        }
+    }
+    static paintFog(context, width, height, engine, transform) {
+        const cell = WarMapData.VISION_CELL;
+        const cols = Math.ceil((WarMapData.HALF_W * 2) / cell), rows = Math.ceil((WarMapData.HALF_H * 2) / cell);
+        context.fillStyle = "rgba(2,5,14,.55)";
+        for (let row = 0; row < rows; row++) {
+            for (let col = 0; col < cols; col++) {
+                const world = { x: col * cell + cell / 2 - WarMapData.HALF_W, y: row * cell + cell / 2 - WarMapData.HALF_H };
+                if (engine.vision.isVisible(transform.team, world.x, world.y))
+                    continue;
+                const p = transform.toMap({ x: col * cell - WarMapData.HALF_W, y: row * cell - WarMapData.HALF_H }, width, height);
+                const q = transform.toMap({ x: (col + 1) * cell - WarMapData.HALF_W, y: (row + 1) * cell - WarMapData.HALF_H }, width, height);
+                context.fillRect(Math.min(p.x, q.x), Math.min(p.y, q.y), Math.abs(q.x - p.x) + 0.5, Math.abs(q.y - p.y) + 0.5);
+            }
+        }
+    }
+    static paintPaths(context, width, height, engine, transform) {
+        context.lineWidth = 3;
+        engine.players[transform.team].squads.forEach((squad, index) => {
+            if (squad.path.length === 0)
+                return;
+            context.strokeStyle = WarPalette.SQUAD_COLORS[index];
+            context.beginPath();
+            const start = transform.toMap(squad.anchor, width, height);
+            context.moveTo(start.x, start.y);
+            for (const point of squad.path) {
+                const p = transform.toMap(point, width, height);
+                context.lineTo(p.x, p.y);
+            }
+            context.stroke();
+        });
+    }
+    static paintEntities(context, width, height, engine, transform) {
+        for (const entity of engine.entities) {
+            if (!entity.alive)
+                continue;
+            const mine = entity.team === transform.team;
+            if (!mine && !engine.vision.isVisible(transform.team, entity.x, entity.y))
+                continue;
+            const p = transform.toMap(entity, width, height);
+            if (entity instanceof WarBuilding) {
+                const size = entity.def.type === "hq" ? 9 : 6;
+                context.fillStyle = mine ? "#7CE0A8" : WarPalette.ENEMY;
+                context.fillRect(p.x - size / 2, p.y - size / 2, size, size);
+                continue;
+            }
+            const unit = entity;
+            context.fillStyle = mine ? WarPalette.SQUAD_COLORS[Math.max(0, unit.squadIndex)] : WarPalette.ENEMY;
+            context.beginPath();
+            context.arc(p.x, p.y, unit.def.pop > 1 ? 3.4 : 2.5, 0, Math.PI * 2);
+            context.fill();
+        }
+    }
+}
+class WarMinimap {
+    constructor() {
+        this.onJump = () => undefined;
+        this.canvas = WarDom.byId("minimap");
+        this.context = this.canvas.getContext("2d");
+        this.pendingJump = null;
+        const jump = (event) => {
+            const rect = this.canvas.getBoundingClientRect();
+            this.pendingJump = { x: ((event.clientX - rect.left) / rect.width) * this.canvas.width, y: ((event.clientY - rect.top) / rect.height) * this.canvas.height };
+            event.preventDefault();
+        };
+        this.canvas.addEventListener("pointerdown", (event) => { jump(event); this.canvas.setPointerCapture(event.pointerId); });
+        this.canvas.addEventListener("pointermove", (event) => { if (event.buttons)
+            jump(event); });
+    }
+    update(engine, transform, focus) {
+        if (this.pendingJump) {
+            this.onJump(transform.mapToWorld(this.pendingJump.x, this.pendingJump.y, this.canvas.width, this.canvas.height));
+            this.pendingJump = null;
+        }
+        WarMapPainter.paint(this.context, this.canvas.width, this.canvas.height, engine, transform, false, transform.sceneToWorld(focus.x, focus.z));
+    }
+}
+class WarAttackMapOverlay {
+    constructor(sink, teamOf, transformOf) {
+        this.sink = sink;
+        this.teamOf = teamOf;
+        this.transformOf = transformOf;
+        this.overlay = WarDom.byId("attackMap");
+        this.canvas = WarDom.byId("attackCanvas");
+        this.context = this.canvas.getContext("2d");
+        this.squadButtons = [];
+        this.chosenSquad = -1;
+        this.drawing = [];
+        for (let index = 0; index < WarBalance.SQUAD_COUNT; index++) {
+            const button = WarDom.byId("sqBtn" + index);
+            button.style.setProperty("--squad", WarPalette.SQUAD_COLORS[index]);
+            button.addEventListener("click", () => this.choose(index));
+            this.squadButtons.push(button);
+        }
+        WarDom.byId("btnRecall").addEventListener("click", () => {
+            if (this.chosenSquad >= 0)
+                this.sink(new WarRecallCommand(this.teamOf(), this.chosenSquad));
+        });
+        WarDom.byId("btnCloseMap").addEventListener("click", () => this.close());
+        this.canvas.addEventListener("pointerdown", (event) => this.startDrawing(event));
+        this.canvas.addEventListener("pointermove", (event) => this.continueDrawing(event));
+        this.canvas.addEventListener("pointerup", (event) => this.finishDrawing(event));
+        this.canvas.addEventListener("pointercancel", () => { this.drawing = []; });
+    }
+    get isOpen() {
+        return !this.overlay.hidden;
+    }
+    open() {
+        this.overlay.hidden = false;
+        this.fitCanvas();
+        if (this.chosenSquad < 0)
+            this.choose(0);
+    }
+    close() {
+        this.overlay.hidden = true;
+        this.drawing = [];
+    }
+    update(engine) {
+        if (!this.isOpen)
+            return;
+        const transform = this.transformOf();
+        WarMapPainter.paint(this.context, this.canvas.width, this.canvas.height, engine, transform, true, null);
+        if (this.drawing.length > 1 && this.chosenSquad >= 0) {
+            this.context.strokeStyle = WarPalette.SQUAD_COLORS[this.chosenSquad];
+            this.context.lineWidth = 4;
+            this.context.setLineDash([8, 6]);
+            this.context.beginPath();
+            this.drawing.forEach((p, i) => (i === 0 ? this.context.moveTo(p.x, p.y) : this.context.lineTo(p.x, p.y)));
+            this.context.stroke();
+            this.context.setLineDash([]);
+        }
+        this.squadButtons.forEach((button, index) => {
+            const size = engine.players[this.teamOf()].squads[index].members.length;
+            button.textContent = "부대 " + (index + 1) + " (" + size + ")";
+            button.classList.toggle("selected", index === this.chosenSquad);
+        });
+    }
+    choose(index) {
+        this.chosenSquad = index;
+    }
+    fitCanvas() {
+        const box = WarDom.byId("attackBox").getBoundingClientRect();
+        const ratio = (WarMapData.HALF_W * 2) / (WarMapData.HALF_H * 2);
+        const height = Math.max(240, Math.min(box.height, box.width / ratio));
+        this.canvas.height = Math.round(height);
+        this.canvas.width = Math.round(height * ratio);
+    }
+    localPoint(event) {
+        const rect = this.canvas.getBoundingClientRect();
+        return { x: ((event.clientX - rect.left) / rect.width) * this.canvas.width, y: ((event.clientY - rect.top) / rect.height) * this.canvas.height };
+    }
+    startDrawing(event) {
+        if (this.chosenSquad < 0)
+            return;
+        this.canvas.setPointerCapture(event.pointerId);
+        this.drawing = [this.localPoint(event)];
+        event.preventDefault();
+    }
+    continueDrawing(event) {
+        if (this.drawing.length === 0)
+            return;
+        const point = this.localPoint(event);
+        const last = this.drawing[this.drawing.length - 1];
+        if (Math.hypot(point.x - last.x, point.y - last.y) >= 6)
+            this.drawing.push(point);
+    }
+    finishDrawing(event) {
+        if (this.drawing.length === 0)
+            return;
+        this.drawing.push(this.localPoint(event));
+        const transform = this.transformOf();
+        const waypoints = this.simplify(this.drawing).map((p) => transform.mapToWorld(p.x, p.y, this.canvas.width, this.canvas.height));
+        this.drawing = [];
+        if (waypoints.length > 0)
+            this.sink(new WarAttackPathCommand(this.teamOf(), this.chosenSquad, waypoints));
+    }
+    simplify(points) {
+        const minGap = this.canvas.height * 0.07;
+        const result = [];
+        for (const point of points) {
+            const last = result[result.length - 1];
+            if (!last || Math.hypot(point.x - last.x, point.y - last.y) >= minGap)
+                result.push(point);
+        }
+        const end = points[points.length - 1];
+        const tail = result[result.length - 1];
+        if (tail !== end && Math.hypot(end.x - tail.x, end.y - tail.y) > 4)
+            result.push(end);
+        return result;
+    }
+}

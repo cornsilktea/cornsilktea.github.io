@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<script charset="utf-8" src="firebase-config.js"></script>
+<script charset="utf-8" src="access-guard.js" data-game="spacewar"></script>
+<script charset="utf-8" src="quality-governor.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
+<title>우주전쟁</title>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="정보 수업용 링크 모음">
+<meta property="og:title" content="우주전쟁">
+<meta property="og:description" content="인구 60 안에서 일꾼과 병력을 고르고 부대를 보내 상대 사령부를 부수는 전략 게임">
+<meta property="og:url" content="https://cornsilktea.github.io/37.space-war.html">
+<meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
+<meta name="twitter:card" content="summary">
+<!-- 링크 미리보기 끝 -->
+<link rel="stylesheet" href="theme.css">
+<script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1.10.1/dist/es-module-shims.js"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  [hidden] { display: none !important; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #070B16; font-family: var(--sg-font); color: #EEF0F4; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  button { font-family: inherit; cursor: pointer; }
+  #view { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+  .st-screen { --st-bg: 7, 11, 22; --st-panel: rgba(14, 20, 38, .88); --st-accent: #D97B4F; --st-title2: #8FB4FF; --st-glow: rgba(143, 180, 255, .55); }
+  .st-card { margin-bottom: 14px; }
+  .st-opts > button.on { border-color: #D97B4F; background: #D97B4F; color: #fff; }
+  .endReason { margin-bottom: 8px; font-size: 20px; font-weight: 800; color: #FFD2B8; text-align: center; }
+  .endStats { margin-bottom: 14px; font-size: 16px; font-weight: 700; color: #B9C4E0; text-align: center; }
+
+  .hud-box { background: linear-gradient(135deg, rgba(16, 18, 28, .82), rgba(38, 42, 58, .72)); border: 1.5px solid rgba(255, 255, 255, .22); border-top: 3px solid #D97B4F; border-radius: 10px; padding: 6px 12px; color: #fff; font-weight: 800; font-variant-numeric: tabular-nums; text-shadow: 0 1px 3px rgba(0, 0, 0, .6); box-shadow: 0 4px 14px rgba(0, 0, 0, .3); }
+  #gameUi { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 20; pointer-events: none; }
+  #gameUi button, #gameUi canvas, #gameUi .squadRow, #gameUi #cmdCard, #gameUi #infoPanel { pointer-events: auto; }
+
+  #hudTop { position: absolute; left: 50%; top: 8px; transform: translateX(-50%); display: flex; align-items: center; gap: 16px; font-size: 18px; white-space: nowrap; }
+  #hudTop i { font-style: normal; font-size: 13px; color: #B9C4E0; margin-right: 5px; }
+  #hudTop .ore b { color: #F0B35E; }
+  #hudTop .crystal b { color: #6FD6FF; }
+  #hudTime { color: #F2C879; }
+  #hudNotice { position: absolute; left: 50%; top: 58px; transform: translateX(-50%); max-width: 70vw; font-size: 17px; border-top-color: #8FB4FF; text-align: center; }
+  #btnSurrender { position: absolute; right: 10px; top: 10px; min-height: 36px; padding: 4px 12px; font-size: 14px; font-weight: 800; border-radius: 8px; border: 1.5px solid rgba(255, 255, 255, .4); background: rgba(16, 18, 28, .7); color: #fff; }
+
+  #squadPanel { position: absolute; left: 8px; top: 54px; width: 190px; padding: 8px 10px; font-size: 13px; }
+  #squadPanel .workerRow { display: flex; justify-content: space-between; margin-bottom: 6px; color: #D6DEF5; }
+  .squadRow { display: block; padding: 4px 4px 5px; margin-top: 2px; border-radius: 6px; border: 1.5px solid transparent; cursor: pointer; }
+  .squadRow.selected { border-color: var(--squad); background: rgba(255, 255, 255, .08); }
+  .squadRow.away .name::after { content: " ▶"; color: var(--squad); }
+  .squadRow .name { display: block; margin-bottom: 3px; color: var(--squad); font-size: 12px; }
+  .gauge { display: grid; grid-template-columns: repeat(20, 1fr); gap: 1px; }
+  .gauge .cell { height: 9px; background: rgba(255, 255, 255, .12); border-radius: 1px; }
+  .gauge .cell.on { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .25); }
+
+  #bottomBar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; gap: 8px; align-items: stretch; padding: 8px 8px calc(env(safe-area-inset-bottom, 0px) + 8px); background: linear-gradient(0deg, rgba(5, 8, 18, .86), rgba(5, 8, 18, 0)); pointer-events: none; }
+  #cmdCard, #infoPanel { min-height: 138px; padding: 8px 10px; background: rgba(14, 20, 38, .86); border: 1.5px solid rgba(255, 255, 255, .2); border-top: 3px solid #D97B4F; border-radius: 10px; }
+  #cmdCard { flex: 0 0 34%; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 6px; }
+  #infoPanel { flex: 1 1 auto; min-width: 0; font-size: 14px; }
+  #infoPanel h3 { margin-bottom: 6px; font-size: 17px; color: #fff; }
+  .infoBar { height: 10px; margin-bottom: 6px; background: rgba(255, 255, 255, .15); border-radius: 5px; overflow: hidden; }
+  .infoBarFill { height: 100%; background: linear-gradient(90deg, #6BE08A, #D6F27A); }
+  .infoRow { margin-top: 3px; color: #D6DEF5; font-weight: 700; }
+  .cmdHint { font-size: 13px; font-weight: 700; color: #B9C4E0; line-height: 1.5; }
+  .cmdBtn { flex: 1 1 calc(50% - 6px); min-width: 108px; min-height: 52px; padding: 5px 8px; border-radius: 8px; border: 2px solid rgba(255, 255, 255, .28); background: rgba(255, 255, 255, .08); color: #fff; text-align: left; }
+  .cmdBtn b { display: block; font-size: 15px; }
+  .cmdBtn small { display: block; font-size: 11px; color: #B9C4E0; }
+  .cmdBtn:disabled { opacity: .4; }
+  .cmdBtn:not(:disabled):active { background: #D97B4F; border-color: #FFB08C; }
+  #miniWrap { flex: 0 0 auto; display: flex; flex-direction: column; gap: 6px; align-items: stretch; pointer-events: auto; }
+  #minimap { display: block; width: 148px; height: 187px; border: 2px solid rgba(255, 255, 255, .35); border-radius: 6px; background: #10162A; touch-action: none; }
+  #btnAttack { min-height: 44px; font-size: 18px; font-weight: 800; border-radius: 8px; border: 2px solid #FFB08C; background: #D97B4F; color: #fff; }
+
+  #attackMap { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 40; display: flex; flex-direction: column; align-items: center; background: rgba(4, 7, 16, .92); padding: 54px 12px 12px; }
+  #attackHint { margin-bottom: 8px; font-size: 14px; font-weight: 700; color: #B9C4E0; text-align: center; }
+  #attackBox { flex: 1 1 auto; width: 100%; min-height: 0; display: flex; align-items: center; justify-content: center; }
+  #attackCanvas { max-width: 100%; max-height: 100%; border: 2px solid rgba(255, 255, 255, .3); border-radius: 8px; touch-action: none; }
+  #attackButtons { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; justify-content: center; }
+  #attackButtons button { min-width: 112px; min-height: 52px; padding: 6px 14px; font-size: 16px; font-weight: 800; border-radius: 8px; border: 2.5px solid var(--squad, rgba(255, 255, 255, .5)); background: rgba(255, 255, 255, .07); color: #fff; }
+  #attackButtons button.selected { background: var(--squad); color: #10162A; }
+  #attackButtons #btnRecall { --squad: #FFFFFF; }
+  #attackButtons #btnCloseMap { --squad: #8FB4FF; }
+
+  @media (max-width: 900px) {
+    #squadPanel { width: 150px; }
+    #cmdCard { flex-basis: 40%; }
+    #minimap { width: 118px; height: 149px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+
+<div id="gameUi" hidden>
+  <div id="hudTop" class="hud-box">
+    <span class="ore"><i>광석</i><b id="hudOre">0</b></span>
+    <span class="crystal"><i>결정</i><b id="hudCrystal">0</b></span>
+    <span><i>인구</i><b id="hudPop">0/60</b></span>
+    <span id="hudTime">0:00</span>
+  </div>
+  <div id="hudNotice" class="hud-box" hidden></div>
+  <button type="button" id="btnSurrender">항복</button>
+
+  <div id="squadPanel" class="hud-box">
+    <div class="workerRow"><span>일꾼</span><b id="workerCount">0</b></div>
+    <div class="squadRow" id="squadRow0"><span class="name">부대 1</span><div class="gauge"></div></div>
+    <div class="squadRow" id="squadRow1"><span class="name">부대 2</span><div class="gauge"></div></div>
+    <div class="squadRow" id="squadRow2"><span class="name">부대 3</span><div class="gauge"></div></div>
+  </div>
+
+  <div id="bottomBar">
+    <div id="cmdCard"></div>
+    <div id="infoPanel"></div>
+    <div id="miniWrap">
+      <canvas id="minimap" width="148" height="187"></canvas>
+      <button type="button" id="btnAttack">공격</button>
+    </div>
+  </div>
+</div>
+
+<div id="attackMap" hidden>
+  <div id="attackHint">부대를 고르고 지도 위에서 손가락으로 길을 그리면, 손을 떼는 순간 출발해요.</div>
+  <div id="attackBox"><canvas id="attackCanvas" width="300" height="380"></canvas></div>
+  <div id="attackButtons">
+    <button type="button" id="sqBtn0">부대 1</button>
+    <button type="button" id="sqBtn1">부대 2</button>
+    <button type="button" id="sqBtn2">부대 3</button>
+    <button type="button" id="btnRecall">귀환</button>
+    <button type="button" id="btnCloseMap">닫기</button>
+  </div>
+</div>
+
+<div id="startScreen" class="st-screen">
+  <div class="st-wrap">
+    <div class="st-hero"><h1 class="st-title">우주전쟁</h1></div>
+    <div class="st-card">
+      <h2>AI 연습전</h2>
+      <div class="st-opts" id="levelOpts">
+        <button type="button" data-level="easy">쉬움</button>
+        <button type="button" data-level="normal" class="on">보통</button>
+        <button type="button" data-level="hard">어려움</button>
+      </div>
+      <button type="button" class="st-btn primary" id="btnStart" disabled>게임 시작</button>
+      <div class="st-hint" id="loadNote">모델을 불러오는 중…</div>
+    </div>
+    <div class="st-card">
+      <h2>조작 방법</h2>
+      <div class="st-keys">
+        <span><kbd>화면 끌기</kbd></span><span>지도를 옮겨요 (<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · 방향키도 돼요)</span>
+        <span><kbd>빈 터</kbd></span><span>눌러서 지을 건물 고르기 (병영·사격장·연구소)</span>
+        <span><kbd>건물</kbd></span><span>눌러서 병력 만들기 · 사령부는 일꾼 만들기</span>
+        <span><kbd>공격</kbd></span><span>부대를 고르고 지도에 길을 그리면 출발해요 (<kbd>Space</kbd>)</span>
+        <span><kbd>미니맵</kbd></span><span>눌러서 그 자리로 이동</span>
+      </div>
+    </div>
+    <div class="st-card">
+      <h2>규칙</h2>
+      <ul class="st-rules">
+        <li>일꾼과 병력을 합쳐 <b>인구 60</b>까지 만들 수 있어요. 일꾼이 많을수록 자원이 늘지만 증가폭은 점점 줄어들고, 그만큼 병력 자리는 줄어요.</li>
+        <li>일꾼은 <b>광석</b>과 <b>결정</b>을 알아서 캐 와요. 결정은 고급 유닛과 연구소에 써요.</li>
+        <li>사령부 둘레의 빈 터 9곳에 건물을 지어요. 같은 건물을 여러 개 지어도 되고, 건물 하나가 생산 줄 하나예요.</li>
+        <li>병력은 알아서 <b>부대 1·2·3</b>으로 나뉘어 입구에서 지켜요. 근접은 10명, 원거리와 고급은 5명씩 부대를 돌아가며 채워요. 부대는 최대 20명이에요.</li>
+        <li><b>공격</b> 버튼으로 지도를 열고 부대를 골라 길을 그리면 그 길로 가면서 적을 공격해요. <b>귀환</b>을 누르면 입구로 돌아와요.</li>
+        <li>유닛 주변만 보여요. 세 갈래 길 한가운데는 양쪽이 항상 볼 수 있어요.</li>
+        <li>상대 <b>사령부를 부수면 승리</b>예요. 15분이 지나면 사령부 체력이 더 많은 쪽이 이겨요.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div id="endScreen" class="st-screen" hidden>
+  <div class="st-wrap">
+    <div class="st-hero"><h1 class="st-title" id="endTitle">결과</h1></div>
+    <div class="st-card">
+      <div class="endReason" id="endReason"></div>
+      <div class="endStats" id="endStats"></div>
+      <button type="button" class="st-btn primary" id="btnAgain">다시 하기</button>
+      <button type="button" class="st-btn sub slim" id="btnToMenu" style="margin-top:10px">처음 화면으로</button>
+    </div>
+  </div>
+</div>
+
+<script charset="utf-8" src="character-kit.js"></script>
+<script charset="utf-8" src="37.war-data.js"></script>
+<script charset="utf-8" src="37.war-rules.js"></script>
+<script charset="utf-8" src="37.war-bot.js"></script>
+<script charset="utf-8" src="37.war-views.js"></script>
+<script charset="utf-8" src="37.war-hud.js"></script>
+<script charset="utf-8" src="37.space-war.js"></script>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
+new WarGameApp({ THREE, GLTFLoader, SkeletonUtils });
+</script>
+</body>
+</html>
