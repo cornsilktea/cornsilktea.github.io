@@ -98,6 +98,7 @@ class WarBalance {
   static readonly LEASH_RANGE = 2200;
   static readonly FORMATION_LAG = 1400;
   static readonly MOVE_SPEED_PERCENT = 135;
+  static readonly BASE_THREAT_RADIUS = 4200;
   static readonly LAG_PATIENCE_TICKS = 8;
   static readonly LAG_IGNORE_FAR = 2500;
   static readonly PATH_MIN_STEP = 200;

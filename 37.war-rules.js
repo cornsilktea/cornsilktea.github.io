@@ -520,6 +520,7 @@ class WarSquad {
         this.path = [];
         this.lagTicks = 0;
         this.moveFreeTicks = 0;
+        this.keepHeading = false;
         this.focusTargetId = -1;
         this.slots = new Map();
         this.postSlots = new Map();
@@ -554,7 +555,7 @@ class WarSquad {
     get isFleet() {
         return this.index === WarBalance.FLEET_SQUAD;
     }
-    sendAlong(points) {
+    sendAlong(points, turnToPath = false) {
         if (points.length === 0)
             return;
         let from = this.anchor;
@@ -571,6 +572,7 @@ class WarSquad {
         }
         this.path = this.isFleet ? path : WarNavGraph.straighten(this.anchor, path);
         this.mode = "away";
+        this.keepHeading = !turnToPath;
         this.lagTicks = WarBalance.LAG_PATIENCE_TICKS;
         this.moveFreeTicks = WarBalance.DEPART_FREE_TICKS;
         for (const unit of this.members) {
@@ -580,7 +582,8 @@ class WarSquad {
             unit.targetId = -1;
         }
     }
-    recall() {
+    recall(turnToPath = false) {
+        this.keepHeading = !turnToPath;
         this.path = this.isFleet ? [{ x: this.post.x, y: this.post.y }] : WarNavGraph.straighten(this.anchor, WarNavGraph.connect(this.anchor, this.post));
         this.mode = "returning";
         this.lagTicks = 0;
@@ -641,7 +644,7 @@ class WarSquad {
             return;
         const goal = this.path[0];
         const turn = WarMath.headingThousandths(this.anchor, goal);
-        if (turn)
+        if (turn && !this.keepHeading)
             this.heading = turn;
         this.anchor = WarMath.stepToward(this.anchor, goal, step);
         if (this.anchor.x === goal.x && this.anchor.y === goal.y)
@@ -651,6 +654,7 @@ class WarSquad {
     }
     arriveHome() {
         this.mode = "home";
+        this.keepHeading = false;
         this.heading = { x: 0, y: -1000 * WarMapData.sign(this.team) };
         for (const unit of this.members)
             if (!unit.independent)
@@ -996,7 +1000,7 @@ class WarAttackPathCommand extends WarCommand {
         this.points = points;
     }
     apply(engine) {
-        engine.players[this.team].squads[this.squad]?.sendAlong(this.points);
+        engine.players[this.team].squads[this.squad]?.sendAlong(this.points, engine.enemySeenNearBase(this.team));
     }
     toJson() {
         return { type: "attackPath", team: this.team, squad: this.squad, points: this.points };
@@ -1025,7 +1029,7 @@ class WarRecallCommand extends WarCommand {
         this.squad = squad;
     }
     apply(engine) {
-        engine.players[this.team].squads[this.squad]?.recall();
+        engine.players[this.team].squads[this.squad]?.recall(engine.enemySeenNearBase(this.team));
     }
     toJson() {
         return { type: "recall", team: this.team, squad: this.squad };
@@ -1200,6 +1204,19 @@ class WarEngine {
         if (made > 0)
             this.emit({ kind: "raised", team: owner.team, tick: this.tick, text: def.name, x: owner.x, y: owner.y, air: owner.flying });
         return made;
+    }
+    enemySeenNearBase(team) {
+        const hq = WarMapData.hq(team);
+        const limitSq = WarBalance.BASE_THREAT_RADIUS * WarBalance.BASE_THREAT_RADIUS;
+        for (const entity of this.entitiesOf(team === 0 ? 1 : 0)) {
+            if (!(entity instanceof WarUnit))
+                continue;
+            const dx = entity.x - hq.x;
+            const dy = entity.y - hq.y;
+            if (dx * dx + dy * dy <= limitSq && this.vision.isVisible(team, entity.x, entity.y))
+                return true;
+        }
+        return false;
     }
     countOf(team, defId) {
         let count = 0;
