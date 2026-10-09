@@ -207,7 +207,7 @@ class WarBlurbs {
     coffinship: "튼튼한 비행 관. 공격은 못 하지만 해골 미니언을 떨어뜨리고, 부서지면 여섯 마리가 쏟아져요",
     cursedeye: "레이저로 한 대상을 강하게 쏘는 눈. 공중·지상 모두 공격해요",
     worker_ore: "광석을 캐요. 많을수록 느리게 늘어요 (최대 5)",
-    worker_crystal: "결정을 캐요. 고급 병력에 필요해요 (최대 6)",
+    worker_crystal: "결정을 캐요. 고급 병력에 필요해요 (최대 3)",
   };
 
   private static readonly BUILDINGS: Record<WarBuildingType, string> = {
