@@ -98,7 +98,7 @@ class WarLocalMatch {
     advance(deltaSeconds) {
         if (this.finished)
             return;
-        this.accumulatorMs += Math.min(250, deltaSeconds * 1000);
+        this.accumulatorMs += Math.min(250, deltaSeconds * 1000) * WarLocalMatch.TEST_SPEED;
         let stepped = false;
         while (this.accumulatorMs >= WarBalance.TICK_MS && !this.finished) {
             this.accumulatorMs -= WarBalance.TICK_MS;
@@ -115,6 +115,7 @@ class WarLocalMatch {
         this.view.dispose();
     }
 }
+WarLocalMatch.TEST_SPEED = Math.max(1, Math.min(8, Number(new URLSearchParams(window.location.search).get("speed")) || 1));
 class WarGameApp {
     constructor(libs) {
         this.libs = libs;
@@ -250,6 +251,7 @@ class WarGameApp {
     onEvent(event) {
         if (!this.match)
             return;
+        this.match.view.handleEvent(event);
         if (event.kind === "produced" && event.team === this.viewer)
             this.notice.show(event.text + "이(가) 생산되었습니다.");
         else if (event.kind === "built" && event.team === this.viewer)

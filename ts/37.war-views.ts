@@ -670,6 +670,139 @@ class WarSlotMarkers {
   }
 }
 
+interface WarEffectStyle { projectile: boolean; color: string; size: number; speed: number; arc: number; hit: number }
+
+class WarEffectStyles {
+  private static readonly DEFAULT: WarEffectStyle = { projectile: false, color: "#FFE9B0", size: 0.12, speed: 20, arc: 0, hit: 0.9 };
+  private static readonly STYLES: Record<string, WarEffectStyle> = {
+    shieldbearer: { projectile: false, color: "#FFE9B0", size: 0, speed: 0, arc: 0, hit: 0.9 },
+    charger: { projectile: false, color: "#FFB070", size: 0, speed: 0, arc: 0, hit: 1 },
+    archer: { projectile: true, color: "#FFF27A", size: 0.11, speed: 30, arc: 0.4, hit: 0.55 },
+    energymage: { projectile: true, color: "#6FE7FF", size: 0.26, speed: 20, arc: 0, hit: 1.5 },
+    guardknight: { projectile: false, color: "#FFD070", size: 0, speed: 0, arc: 0, hit: 1.4 },
+    artillerytruck: { projectile: true, color: "#FF9A3C", size: 0.34, speed: 15, arc: 3.2, hit: 2.8 },
+    minion: { projectile: false, color: "#E8E8D0", size: 0, speed: 0, arc: 0, hit: 0.75 },
+    skelwarrior: { projectile: false, color: "#E8E8D0", size: 0, speed: 0, arc: 0, hit: 0.9 },
+    skelarcher: { projectile: true, color: "#C8FFB0", size: 0.11, speed: 30, arc: 0.4, hit: 0.55 },
+    skelmage: { projectile: true, color: "#C77DFF", size: 0.24, speed: 22, arc: 0, hit: 1.1 },
+    bonegiant: { projectile: false, color: "#D8C8A0", size: 0, speed: 0, arc: 0, hit: 2.1 },
+    necromancer: { projectile: true, color: "#A0FF9A", size: 0.22, speed: 22, arc: 0, hit: 1 },
+  };
+
+  static of(unitId: string): WarEffectStyle {
+    return WarEffectStyles.STYLES[unitId] ?? WarEffectStyles.DEFAULT;
+  }
+}
+
+interface WarShot { mesh: Three<"Mesh">; active: boolean; from: WarScenePoint; to: WarScenePoint; age: number; duration: number; arc: number; style: WarEffectStyle }
+interface WarBurst { mesh: Three<"Mesh">; active: boolean; age: number; life: number; size: number }
+
+class WarEffects {
+  private static readonly POOL = 90;
+  private static readonly BURST_LIFE = 0.3;
+
+  readonly group: Three<"Group">;
+  private readonly shots: WarShot[] = [];
+  private readonly bursts: WarBurst[] = [];
+
+  constructor(private readonly libs: ThreeLibs, private readonly transform: WarViewTransform, private readonly isVisible: (x: number, y: number) => boolean) {
+    const THREE = libs.THREE;
+    this.group = new THREE.Group();
+    const shotGeometry = new THREE.SphereGeometry(1, 8, 6);
+    const burstGeometry = new THREE.SphereGeometry(0.5, 10, 8);
+    for (let i = 0; i < WarEffects.POOL; i++) {
+      const shot = new THREE.Mesh(shotGeometry, new THREE.MeshBasicMaterial({ color: "#FFFFFF" }));
+      shot.visible = false;
+      this.group.add(shot);
+      this.shots.push({ mesh: shot, active: false, from: { x: 0, z: 0 }, to: { x: 0, z: 0 }, age: 0, duration: 1, arc: 0, style: WarEffectStyles.of("") });
+      const burst = new THREE.Mesh(burstGeometry, new THREE.MeshBasicMaterial({ color: "#FFFFFF", transparent: true, opacity: 0.9, depthWrite: false }));
+      burst.visible = false;
+      this.group.add(burst);
+      this.bursts.push({ mesh: burst, active: false, age: 0, life: 1, size: 1 });
+    }
+  }
+
+  handle(event: WarEvent): void {
+    if (event.x === undefined || event.y === undefined) return;
+    if (event.kind === "strike" && event.tx !== undefined && event.ty !== undefined) {
+      if (!this.isVisible(event.x, event.y) && !this.isVisible(event.tx, event.ty)) return;
+      this.strike(WarEffectStyles.of(event.text), this.transform.toScene({ x: event.x, y: event.y }), this.transform.toScene({ x: event.tx, y: event.ty }));
+    } else if (event.kind === "unitDied" && this.isVisible(event.x, event.y)) {
+      this.burst(this.transform.toScene({ x: event.x, y: event.y }), "#B9B2A6", 1.6, 0.5, 0.8);
+    } else if (event.kind === "buildingDestroyed") {
+      const at = this.transform.toScene({ x: event.x, y: event.y });
+      this.burst(at, "#FF8A3C", 6, 0.9, 1.5);
+      this.burst(at, "#FFE08A", 3.4, 0.6, 2);
+    } else if (event.kind === "revived" || event.kind === "raised") {
+      if (this.isVisible(event.x, event.y)) this.burst(this.transform.toScene({ x: event.x, y: event.y }), "#9CFF9A", 2.2, 0.7, 0.2);
+    }
+  }
+
+  update(deltaSeconds: number): void {
+    for (const shot of this.shots) {
+      if (!shot.active) continue;
+      shot.age += deltaSeconds;
+      const t = Math.min(1, shot.age / shot.duration);
+      const x = shot.from.x + (shot.to.x - shot.from.x) * t;
+      const z = shot.from.z + (shot.to.z - shot.from.z) * t;
+      const y = 1.5 + (1.1 - 1.5) * t + shot.arc * 4 * t * (1 - t);
+      shot.mesh.position.set(x, y, z);
+      shot.mesh.lookAt(shot.to.x, 1.1, shot.to.z);
+      if (t >= 1) {
+        shot.active = false;
+        shot.mesh.visible = false;
+        this.burst(shot.to, shot.style.color, shot.style.hit, WarEffects.BURST_LIFE, 1.1);
+      }
+    }
+    for (const burst of this.bursts) {
+      if (!burst.active) continue;
+      burst.age += deltaSeconds;
+      const t = burst.age / burst.life;
+      if (t >= 1) {
+        burst.active = false;
+        burst.mesh.visible = false;
+        continue;
+      }
+      burst.mesh.scale.setScalar(burst.size * (0.35 + 0.65 * t));
+      (burst.mesh.material as Three<"MeshBasicMaterial">).opacity = 0.85 * (1 - t);
+    }
+  }
+
+  private strike(style: WarEffectStyle, from: WarScenePoint, to: WarScenePoint): void {
+    if (!style.projectile) {
+      this.burst(to, style.color, style.hit, WarEffects.BURST_LIFE, 1.1);
+      return;
+    }
+    const shot = this.shots.find((candidate) => !candidate.active);
+    if (!shot) return;
+    const distance = Math.hypot(to.x - from.x, to.z - from.z);
+    shot.active = true;
+    shot.age = 0;
+    shot.duration = Math.max(0.08, distance / style.speed);
+    shot.from = from;
+    shot.to = to;
+    shot.arc = style.arc;
+    shot.style = style;
+    (shot.mesh.material as Three<"MeshBasicMaterial">).color.set(style.color);
+    shot.mesh.scale.set(style.size, style.size, style.size * (style.arc > 1 ? 1 : 3.2));
+    shot.mesh.position.set(from.x, 1.5, from.z);
+    shot.mesh.visible = true;
+  }
+
+  private burst(at: WarScenePoint, color: string, size: number, life: number, height: number): void {
+    const burst = this.bursts.find((candidate) => !candidate.active);
+    if (!burst) return;
+    burst.active = true;
+    burst.age = 0;
+    burst.life = life;
+    burst.size = size;
+    (burst.mesh.material as Three<"MeshBasicMaterial">).color.set(color);
+    burst.mesh.position.set(at.x, height, at.z);
+    burst.mesh.scale.setScalar(size * 0.35);
+    burst.mesh.visible = true;
+  }
+}
+
 class WarMatchView {
   private static readonly UNIT_PICK_PIXELS = 30;
   private static readonly BUILDING_PICK_PIXELS = 52;
@@ -684,6 +817,7 @@ class WarMatchView {
   private readonly slotMarkers: WarSlotMarkers;
   private readonly crowds: WarWorkerCrowd[];
   private readonly marker: WarSelectionMarker;
+  private readonly effects: WarEffects;
   private selection: WarSelection = { kind: "none" };
   private seconds = 0;
   private lastFogTick = -99;
@@ -704,11 +838,17 @@ class WarMatchView {
     this.crowds.forEach((crowd) => this.root.add(crowd.group));
     this.marker = new WarSelectionMarker(libs);
     this.root.add(this.marker.mesh);
+    this.effects = new WarEffects(libs, this.transform, (x, y) => this.engine.vision.isVisible(this.viewer, x, y));
+    this.root.add(this.effects.group);
     world.scene.add(this.root);
     const home = this.transform.toScene(WarMapData.hq(viewer));
     world.rig.setZoom(1.6);
     world.rig.focusOn(home.x, home.z + 6);
     this.onTick();
+  }
+
+  handleEvent(event: WarEvent): void {
+    this.effects.handle(event);
   }
 
   setSelection(selection: WarSelection): void {
@@ -784,6 +924,7 @@ class WarMatchView {
       const base = WarMapData.hq(team as WarTeam);
       crowd.group.visible = team === this.viewer || this.engine.vision.isVisible(this.viewer, base.x, base.y);
     }
+    this.effects.update(deltaSeconds);
     this.placeMarker();
   }
 

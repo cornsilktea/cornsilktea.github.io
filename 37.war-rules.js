@@ -416,48 +416,36 @@ class WarVision {
 }
 WarVision.COLS = Math.ceil((WarMapData.HALF_W * 2) / WarMapData.VISION_CELL);
 WarVision.ROWS = Math.ceil((WarMapData.HALF_H * 2) / WarMapData.VISION_CELL);
-class SquadCursor {
-    constructor(batchSize) {
-        this.batchSize = batchSize;
-        this.squad = 0;
-        this.placedInBatch = 0;
-    }
-}
 class WarSquadAssigner {
     constructor(squads) {
         this.squads = squads;
-        this.cursors = {
-            melee: new SquadCursor(WarBalance.BATCH_MELEE),
-            ranged: new SquadCursor(WarBalance.BATCH_RANGED),
-            elite: new SquadCursor(WarBalance.BATCH_ELITE),
-        };
     }
     assign(unit) {
-        const cursor = this.cursors[unit.def.kind];
-        const target = this.firstWithRoomFrom(cursor.squad);
+        const target = this.firstWithKindRoom(unit.def.kind) ?? this.firstWithRoom();
         if (target === null)
             return null;
-        if (target.index !== cursor.squad) {
-            cursor.squad = target.index;
-            cursor.placedInBatch = 0;
-        }
         target.add(unit);
-        cursor.placedInBatch++;
-        if (cursor.placedInBatch >= cursor.batchSize) {
-            cursor.squad = (cursor.squad + 1) % this.squads.length;
-            cursor.placedInBatch = 0;
-        }
         return target;
     }
-    cursorOf(kind) {
-        return this.cursors[kind];
+    static kindLimit(kind) {
+        if (kind === "melee")
+            return WarBalance.BATCH_MELEE;
+        return kind === "ranged" ? WarBalance.BATCH_RANGED : WarBalance.BATCH_ELITE;
     }
-    firstWithRoomFrom(start) {
-        for (let i = 0; i < this.squads.length; i++) {
-            const squad = this.squads[(start + i) % this.squads.length];
-            if (squad.members.length < WarBalance.SQUAD_CAP)
+    firstWithKindRoom(kind) {
+        const limit = WarSquadAssigner.kindLimit(kind);
+        for (const squad of this.squads) {
+            if (squad.members.length >= WarBalance.SQUAD_CAP)
+                continue;
+            if (squad.members.filter((member) => member.def.kind === kind).length < limit)
                 return squad;
         }
+        return null;
+    }
+    firstWithRoom() {
+        for (const squad of this.squads)
+            if (squad.members.length < WarBalance.SQUAD_CAP)
+                return squad;
         return null;
     }
 }
@@ -494,6 +482,7 @@ class WarSquad {
         this.path = [];
         this.lagTicks = 0;
         this.moveFreeTicks = 0;
+        this.focusTargetId = -1;
         this.slots = new Map();
         this.postSlots = new Map();
         this.anchor = WarMapData.post(team, index);
@@ -557,7 +546,24 @@ class WarSquad {
             unit.targetId = -1;
         }
     }
+    chooseFocusTarget() {
+        const votes = new Map();
+        for (const unit of this.members) {
+            if (unit.attached && unit.targetId >= 0)
+                votes.set(unit.targetId, (votes.get(unit.targetId) ?? 0) + 1);
+        }
+        let best = -1;
+        let bestVotes = 0;
+        votes.forEach((count, id) => {
+            if (count > bestVotes || (count === bestVotes && id < best)) {
+                best = id;
+                bestVotes = count;
+            }
+        });
+        this.focusTargetId = best;
+    }
     planSlots() {
+        this.chooseFocusTarget();
         this.slots = WarFormation.slots(this.attachedMembers(), this.anchor, this.heading);
         const waiting = this.members.filter((unit) => !unit.attached);
         const home = { x: this.post.x, y: this.post.y };
@@ -642,6 +648,7 @@ class WarPlayer {
 class WarCombat {
     static strike(engine, attacker, target) {
         const damage = attacker.damageAgainst(target);
+        engine.emit({ kind: "strike", team: attacker.team, tick: engine.tick, text: attacker instanceof WarUnit ? attacker.def.id : "", x: attacker.x, y: attacker.y, tx: target.x, ty: target.y });
         engine.damage(target, damage, attacker.id);
         const radius = attacker.splashRadius();
         if (radius > 0) {
@@ -740,28 +747,67 @@ class WarUnitBrain {
         }
         const origin = unit.attached ? slot : squad.post;
         let target = unit.targetId >= 0 ? engine.entityById(unit.targetId) : null;
-        if (target && !WarUnitBrain.stillValid(engine, unit, target, origin))
+        if (target && !WarUnitBrain.stillValid(engine, unit, squad, target, origin))
             target = null;
         if (!target && (engine.tick + unit.id) % WarBalance.ACQUIRE_EVERY_TICKS === 0)
             target = WarTargeting.pick(engine, unit, origin);
+        if (!target && unit.attached)
+            target = WarUnitBrain.squadFocus(engine, unit, squad);
         unit.retarget(target ? target.id : -1);
         if (!target) {
             WarUnitBrain.holdFormation(unit, squad, slot);
             return;
         }
-        const reach = unit.reach(target);
-        if (WarMath.dist(unit.x, unit.y, target.x, target.y) <= reach) {
-            if (unit.cooldownLeft === 0)
-                WarCombat.strike(engine, unit, target);
+        const inReach = WarMath.dist(unit.x, unit.y, target.x, target.y) <= unit.reach(target);
+        if (inReach && unit.cooldownLeft === 0) {
+            WarCombat.strike(engine, unit, target);
             return;
         }
-        unit.moveToward(target, unit.stepLength());
+        if (unit.def.range >= WarBalance.KITE_MIN_RANGE && WarUnitBrain.keepDistance(engine, unit))
+            return;
+        if (!inReach)
+            unit.moveToward(target, unit.stepLength());
     }
-    static stillValid(engine, unit, target, origin) {
+    static squadFocus(engine, unit, squad) {
+        if (squad.focusTargetId < 0)
+            return null;
+        const focus = engine.entityById(squad.focusTargetId);
+        if (!focus || !focus.alive || !engine.vision.isVisible(unit.team, focus.x, focus.y))
+            return null;
+        return focus;
+    }
+    static keepDistance(engine, unit) {
+        const enemy = unit.team === 0 ? 1 : 0;
+        const limit = Math.trunc((unit.def.range * WarBalance.KITE_PERCENT) / 100);
+        const limitSq = limit * limit;
+        let threat = null;
+        let threatSq = Number.MAX_SAFE_INTEGER;
+        for (const other of engine.entitiesOf(enemy)) {
+            if (!(other instanceof WarUnit))
+                continue;
+            const dx = unit.x - other.x;
+            const dy = unit.y - other.y;
+            const distanceSq = dx * dx + dy * dy;
+            if (distanceSq < limitSq && distanceSq < threatSq) {
+                threatSq = distanceSq;
+                threat = other;
+            }
+        }
+        if (!threat)
+            return false;
+        const backward = unit.team === 0 ? 1000 : -1000;
+        const awayX = threatSq === 0 ? unit.x : unit.x + (unit.x - threat.x);
+        const awayY = threatSq === 0 ? unit.y + backward : unit.y + (unit.y - threat.y);
+        unit.moveToward({ x: awayX, y: awayY }, unit.stepLength());
+        return true;
+    }
+    static stillValid(engine, unit, squad, target, origin) {
         if (!target.alive)
             return false;
         if (!engine.vision.isVisible(unit.team, target.x, target.y))
             return false;
+        if (target.id === squad.focusTargetId && unit.attached)
+            return true;
         return WarMath.dist(origin.x, origin.y, target.x, target.y) <= WarBalance.LEASH_RANGE;
     }
     static holdFormation(unit, squad, slot) {
@@ -1204,6 +1250,35 @@ class WarEngine {
     separateUnits() {
         const units = this.units();
         const radius = WarBalance.SEPARATION_RADIUS;
+        for (let pass = 0; pass < WarBalance.SEPARATION_PASSES; pass++)
+            this.separatePass(units, radius);
+        this.pushOutOfBuildings(units);
+        for (const unit of units) {
+            const fixed = WarTerrain.clamp(unit);
+            unit.x = fixed.x;
+            unit.y = fixed.y;
+        }
+    }
+    pushOutOfBuildings(units) {
+        const buildings = this.entities.filter((entity) => entity instanceof WarBuilding && entity.alive);
+        for (const unit of units) {
+            for (const building of buildings) {
+                const keepOut = building.def.radius + WarBalance.BUILDING_PADDING;
+                const dx = unit.x - building.x;
+                const dy = unit.y - building.y;
+                if (Math.abs(dx) >= keepOut || Math.abs(dy) >= keepOut)
+                    continue;
+                const distance = WarMath.isqrt(dx * dx + dy * dy);
+                if (distance >= keepOut)
+                    continue;
+                const ux = distance === 0 ? 0 : Math.trunc((dx * 1000) / distance);
+                const uy = distance === 0 ? (unit.team === 0 ? -1000 : 1000) : Math.trunc((dy * 1000) / distance);
+                unit.x = building.x + Math.trunc((ux * keepOut) / 1000);
+                unit.y = building.y + Math.trunc((uy * keepOut) / 1000);
+            }
+        }
+    }
+    separatePass(units, radius) {
         const cells = new Map();
         const keyOf = (x, y) => (Math.floor(x / radius) + 200) * 1000 + (Math.floor(y / radius) + 200);
         for (const unit of units) {
@@ -1227,11 +1302,6 @@ class WarEngine {
                             this.pushApart(a, b, radius);
                 }
             }
-        }
-        for (const unit of units) {
-            const fixed = WarTerrain.clamp(unit);
-            unit.x = fixed.x;
-            unit.y = fixed.y;
         }
     }
     pushApart(a, b, radius) {
@@ -1271,13 +1341,13 @@ class WarEngine {
         player.squads[unit.squadIndex]?.remove(unit);
         if (unit.def.kind !== "elite")
             this.corpses.push({ team: unit.team, x: unit.x, y: unit.y, tick: this.tick });
-        this.events.push({ kind: "unitDied", team: player.team, tick: this.tick, text: unit.def.name });
+        this.events.push({ kind: "unitDied", team: player.team, tick: this.tick, text: unit.def.name, x: unit.x, y: unit.y });
     }
     retireBuilding(player, building) {
         for (const queued of building.queue)
             player.economy.popUsed -= queued.item.pop;
         building.queue.length = 0;
-        this.events.push({ kind: "buildingDestroyed", team: player.team, tick: this.tick, text: WarBuildingCatalog.displayName(building.def.type, player.faction) });
+        this.events.push({ kind: "buildingDestroyed", team: player.team, tick: this.tick, text: WarBuildingCatalog.displayName(building.def.type, player.faction), x: building.x, y: building.y });
         if (building.def.type === "hq") {
             this.finish((player.team === 0 ? 1 : 0), "hq");
             return;

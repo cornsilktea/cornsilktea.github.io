@@ -78,6 +78,8 @@ class WarInputController {
 }
 
 class WarLocalMatch {
+  private static readonly TEST_SPEED = Math.max(1, Math.min(8, Number(new URLSearchParams(window.location.search).get("speed")) || 1));
+
   readonly engine: WarEngine;
   readonly view: WarMatchView;
   private readonly bot: WarBotBrain;
@@ -100,7 +102,7 @@ class WarLocalMatch {
 
   advance(deltaSeconds: number): void {
     if (this.finished) return;
-    this.accumulatorMs += Math.min(250, deltaSeconds * 1000);
+    this.accumulatorMs += Math.min(250, deltaSeconds * 1000) * WarLocalMatch.TEST_SPEED;
     let stepped = false;
     while (this.accumulatorMs >= WarBalance.TICK_MS && !this.finished) {
       this.accumulatorMs -= WarBalance.TICK_MS;
@@ -256,6 +258,7 @@ class WarGameApp {
 
   private onEvent(event: WarEvent): void {
     if (!this.match) return;
+    this.match.view.handleEvent(event);
     if (event.kind === "produced" && event.team === this.viewer) this.notice.show(event.text + "이(가) 생산되었습니다.");
     else if (event.kind === "built" && event.team === this.viewer) this.notice.show(event.text + " 건설이 끝났어요.");
     else if (event.kind === "buildingDestroyed") this.notice.show((event.team === this.viewer ? "우리 " : "적 ") + event.text + "이(가) 부서졌어요!");

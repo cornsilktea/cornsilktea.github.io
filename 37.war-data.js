@@ -35,7 +35,11 @@ WarBalance.DEPART_FREE_TICKS = 20;
 WarBalance.HOME_VISION_EXTRA = 600;
 WarBalance.ASSIST_RANGE = 2000;
 WarBalance.ASSIST_MEMORY_TICKS = 20;
-WarBalance.SEPARATION_RADIUS = 90;
+WarBalance.SEPARATION_RADIUS = 120;
+WarBalance.SEPARATION_PASSES = 2;
+WarBalance.BUILDING_PADDING = 70;
+WarBalance.KITE_MIN_RANGE = 500;
+WarBalance.KITE_PERCENT = 45;
 WarBalance.ACQUIRE_EVERY_TICKS = 3;
 WarBalance.VISION_EVERY_TICKS = 3;
 WarBalance.ALERT_COOLDOWN_TICKS = 50;
@@ -58,12 +62,12 @@ class WarUnitCatalog {
     }
 }
 WarUnitCatalog.SPECS = [
-    { id: "shieldbearer", name: "방패병", faction: "pioneer", kind: "melee", role: "front", hp: 448, damage: 12, armorPct: 30, speed: 300, range: 150, cooldownTicks: 10, ore: 60, crystal: 0, pop: 1, buildTicks: 40, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0 },
-    { id: "charger", name: "돌격병", faction: "pioneer", kind: "melee", role: "mid", hp: 280, damage: 24, armorPct: 0, speed: 360, range: 150, cooldownTicks: 8, ore: 80, crystal: 0, pop: 1, buildTicks: 40, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 100 },
-    { id: "archer", name: "사수", faction: "pioneer", kind: "ranged", role: "rear", hp: 134, damage: 15, armorPct: 0, speed: 340, range: 700, cooldownTicks: 6, ore: 70, crystal: 0, pop: 1, buildTicks: 50, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0 },
-    { id: "energymage", name: "에너지술사", faction: "pioneer", kind: "ranged", role: "rear", hp: 112, damage: 22, armorPct: 0, speed: 320, range: 650, cooldownTicks: 12, ore: 90, crystal: 10, pop: 1, buildTicks: 50, splashRadius: 200, buildingDamagePct: 100, chargeBonusPct: 0 },
-    { id: "guardknight", name: "근위 기사", faction: "pioneer", kind: "elite", role: "front", hp: 1008, damage: 30, armorPct: 40, speed: 260, range: 180, cooldownTicks: 10, ore: 160, crystal: 60, pop: 2, buildTicks: 100, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0 },
-    { id: "artillerytruck", name: "포격 트럭", faction: "pioneer", kind: "elite", role: "rear", hp: 246, damage: 44, armorPct: 0, speed: 280, range: 1100, cooldownTicks: 20, ore: 180, crystal: 80, pop: 2, buildTicks: 100, splashRadius: 250, buildingDamagePct: 200, chargeBonusPct: 0 },
+    { id: "shieldbearer", name: "방패병", faction: "pioneer", kind: "melee", role: "front", hp: 425, damage: 12, armorPct: 30, speed: 300, range: 150, cooldownTicks: 10, ore: 60, crystal: 0, pop: 1, buildTicks: 40, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0 },
+    { id: "charger", name: "돌격병", faction: "pioneer", kind: "melee", role: "mid", hp: 265, damage: 23, armorPct: 0, speed: 360, range: 150, cooldownTicks: 8, ore: 80, crystal: 0, pop: 1, buildTicks: 40, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 100 },
+    { id: "archer", name: "사수", faction: "pioneer", kind: "ranged", role: "rear", hp: 127, damage: 14, armorPct: 0, speed: 340, range: 700, cooldownTicks: 6, ore: 70, crystal: 0, pop: 1, buildTicks: 50, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0 },
+    { id: "energymage", name: "에너지술사", faction: "pioneer", kind: "ranged", role: "rear", hp: 106, damage: 21, armorPct: 0, speed: 320, range: 650, cooldownTicks: 12, ore: 90, crystal: 10, pop: 1, buildTicks: 50, splashRadius: 200, buildingDamagePct: 100, chargeBonusPct: 0 },
+    { id: "guardknight", name: "근위 기사", faction: "pioneer", kind: "elite", role: "front", hp: 955, damage: 29, armorPct: 40, speed: 260, range: 180, cooldownTicks: 10, ore: 160, crystal: 60, pop: 2, buildTicks: 100, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0 },
+    { id: "artillerytruck", name: "포격 트럭", faction: "pioneer", kind: "elite", role: "rear", hp: 233, damage: 42, armorPct: 0, speed: 280, range: 1100, cooldownTicks: 20, ore: 180, crystal: 80, pop: 2, buildTicks: 100, splashRadius: 250, buildingDamagePct: 200, chargeBonusPct: 0 },
     { id: "minion", name: "해골 미니언", faction: "grave", kind: "melee", role: "mid", hp: 115, damage: 10, armorPct: 0, speed: 380, range: 150, cooldownTicks: 8, ore: 30, crystal: 0, pop: 1, buildTicks: 30, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, spawnCount: 2 },
     { id: "skelwarrior", name: "해골 전사", faction: "grave", kind: "melee", role: "front", hp: 360, damage: 15, armorPct: 22, speed: 300, range: 150, cooldownTicks: 10, ore: 55, crystal: 0, pop: 1, buildTicks: 40, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, reviveChancePct: 30 },
     { id: "skelarcher", name: "해골 궁수", faction: "grave", kind: "ranged", role: "rear", hp: 115, damage: 14, armorPct: 0, speed: 340, range: 750, cooldownTicks: 6, ore: 65, crystal: 0, pop: 1, buildTicks: 50, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0 },
