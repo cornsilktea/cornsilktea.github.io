@@ -131,6 +131,29 @@ WarBuildingLooks.DECOR = {
         { file: "halloween/skull_candle.gltf", x: -0.9, z: 3.8, scale: 1.6 }, { file: "halloween/skull_candle.gltf", x: 0.9, z: 3.8, scale: 1.6 },
     ],
 };
+class WarSkinTones {
+    static apply(file, scene) {
+        const tone = WarSkinTones.TONES[file];
+        if (!tone)
+            return;
+        scene.traverse((node) => {
+            const mesh = node;
+            if (!mesh.isMesh)
+                return;
+            const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+            for (const material of materials)
+                if (material.name === "Skin")
+                    material.color.set(tone);
+        });
+    }
+}
+WarSkinTones.TONES = {
+    "quaternius/Knight_Male.gltf": "#C98F68",
+    "quaternius/Soldier_Male.gltf": "#E3B08A",
+    "quaternius/Soldier_Female.gltf": "#F0C8A4",
+    "quaternius/Worker_Male.gltf": "#B97F58",
+    "quaternius/Worker_Female.gltf": "#E8B994",
+};
 class WarAssetLibrary {
     constructor(libs) {
         this.libs = libs;
@@ -188,6 +211,7 @@ class WarAssetLibrary {
         await Promise.all(rig.concat(files.map((file) => loader.loadAsync(WarAssetLibrary.ROOT + file).then((gltf) => {
             const clips = new Map();
             gltf.animations.forEach((clip) => clips.set(clip.name, clip));
+            WarSkinTones.apply(file, gltf.scene);
             this.assets.set(file, { scene: gltf.scene, clips });
         }))));
     }

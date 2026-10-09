@@ -154,6 +154,27 @@ class WarBuildingLooks {
 interface WarActor { model: Three<"Object3D">; clips: Map<string, Three<"AnimationClip">> }
 interface WarLoadedAsset { scene: Three<"Object3D">; clips: Map<string, Three<"AnimationClip">> }
 
+class WarSkinTones {
+  private static readonly TONES: Record<string, string> = {
+    "quaternius/Knight_Male.gltf": "#C98F68",
+    "quaternius/Soldier_Male.gltf": "#E3B08A",
+    "quaternius/Soldier_Female.gltf": "#F0C8A4",
+    "quaternius/Worker_Male.gltf": "#B97F58",
+    "quaternius/Worker_Female.gltf": "#E8B994",
+  };
+
+  static apply(file: string, scene: Three<"Object3D">): void {
+    const tone = WarSkinTones.TONES[file];
+    if (!tone) return;
+    scene.traverse((node) => {
+      const mesh = node as Three<"Mesh">;
+      if (!mesh.isMesh) return;
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const material of materials) if (material.name === "Skin") (material as Three<"MeshStandardMaterial">).color.set(tone);
+    });
+  }
+}
+
 class WarAssetLibrary {
   static readonly ROOT = "assets/kaykit/war/";
   private static readonly EXTRA_MODELS = ["space/landingpad_large.gltf", "resources/Iron_Nuggets.gltf", "resources/Parts_Pile_Large.gltf", "resources/Iron_Nugget_Large.gltf", "gear/pickaxe.gltf", "quaternius/Worker_Male.gltf", "quaternius/Worker_Female.gltf"];
@@ -220,6 +241,7 @@ class WarAssetLibrary {
     await Promise.all(rig.concat(files.map((file) => loader.loadAsync(WarAssetLibrary.ROOT + file).then((gltf) => {
       const clips = new Map<string, Three<"AnimationClip">>();
       gltf.animations.forEach((clip) => clips.set(clip.name, clip));
+      WarSkinTones.apply(file, gltf.scene);
       this.assets.set(file, { scene: gltf.scene, clips });
     }))));
   }
