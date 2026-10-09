@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const SOURCE_DIRECTORY = process.argv[2] || "C:\\Users\\user\\Downloads\\allkaykit\\organized\\animations\\rig-medium";
+const SOURCE_DIRECTORY = process.argv[2] || "C:\\Users\\user\\Downloads\\3d-assets\\organized\\animations\\rig-medium";
 const OUTPUT_FILE = process.argv[3] || "assets/kaykit/animations/soccer_anims.glb";
 const PACKS = {
   soccer: [

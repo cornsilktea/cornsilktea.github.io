@@ -1,10 +1,11 @@
 # KayKit 에셋 도감 (새 게임 만들 때 어느 에셋을 쓸지 찾는 곳)
 
-에셋 보관 폴더: `C:\Users\user\Downloads\allkaykit\organized` (21개 팩의 glTF 를 용도별로 정리한 것. FBX·OBJ 원본 팩 폴더는 2026-10-03 에 지웠다 — 필요하면 KayKit 에서 다시 받는다). 저장소에는 게임에 쓰는 것만 `assets/kaykit/` 에 둔다(172개).
-조사한 날: 2026-10-03. `organized` 에 팩을 더 넣으면 아래 명령으로 도감을 다시 만든다.
+에셋 보관 폴더: `C:\Users\user\Downloads\3d-assets\organized` (KayKit 21개 + Quaternius 6개 + Kenney 3개 팩의 glTF 를 용도별로 정리한 것. FBX·OBJ 원본 팩 폴더는 2026-10-03 에 지웠다 — 필요하면 각 사이트에서 다시 받는다). 저장소에는 게임에 쓰는 것만 `assets/kaykit/` 에 둔다(KayKit 172개 + 우주전쟁용 `assets/kaykit/war/`).
+조사한 날: 2026-10-03(KayKit), 2026-10-09(Quaternius·Kenney 추가). 보관 폴더 이름은 `allkaykit` 에서 `3d-assets` 로 바꿨다(2026-10-09). 옛 이름 `Downloads\allkaykit` 은 새 폴더를 가리키는 바로가기(junction)로 남겨 두었다 — 옛 경로를 쓰던 것이 없으면 지워도 된다. 도구 이름(`kaykit-*`)과 `assets/kaykit/` 는 그대로다.
+`organized` 에 팩을 더 넣으면 아래 명령으로 도감을 다시 만든다. 새 팩을 받았을 때는 `node tools/kaykit-organize-extra.js "C:\Users\user\Downloads" "C:\Users\user\Downloads\3d-assets\organized"` 의 계획표(`ExtraPackPlan`)에 줄을 더해 복사한 뒤 도감을 만든다(끊어진 텍스처 연결을 자동 검사).
 
 ```bash
-node tools/kaykit-catalog.js "C:\Users\user\Downloads\allkaykit\organized" assets\kaykit kaykit-catalog
+node tools/kaykit-catalog.js "C:\Users\user\Downloads\3d-assets\organized" assets\kaykit kaykit-catalog
 ```
 
 ## 찾는 법 (3단계)
@@ -47,6 +48,20 @@ node tools/kaykit-catalog.js "C:\Users\user\Downloads\allkaykit\organized" asset
 | **KayKit_Space_Base_Bits_1.0_FREE** | 57 | 우주 기지 모듈·착륙선·화물·우주 트럭·터널·태양광 패널·풍력 터빈·지형 | 우주 기지 건설·탐사 게임 |
 | **KayKit_Mixed_Bag_1_FREE** | 41 | 잡동사니: 기타·롤러스케이트·우산·타코·즉석카메라·퍼즐 큐브·서커스 천막·닭 인형·쇠사슬 | 이벤트·수집품·장식 |
 
+### SF·우주 추가 팩 (2026-10-09, 모두 CC0) — `models/<폴더>` 또는 `characters/<폴더>`
+
+| 폴더 | 만든 곳 | 모델 | 삼각형 | 내용 | 이럴 때 쓴다 |
+|---|---|---|---|---|---|
+| `characters/quaternius-mech` | Animated Mech Pack | 4종×(질감·단색)=8 | 2.4k~8.8k | 메카 George·Leela·Mike·Stan, **클립 18~20개**(Idle·Walk·Run·Shoot·Punch·Kick·SwordSlash·Death…). 크기 약 3~9m | 고급 병력·보스·거대 로봇 |
+| `characters/quaternius-animated-characters` | Ultimate Animated Character Pack | 52 | 2.1k~9.8k | 사람형 52종(군인·닌자·기사·의사·요리사·카우보이·해적·엘프·고블린·소·퍼그…), **클립 16개**(Idle·Walk·Run·Jump·Punch·SwordSlash·Shoot_OneHanded·Death·Roll…) | 사람 병력·NPC·일꾼 |
+| `models/quaternius-ultimate-space-kit` | Ultimate Space Kit | 92 | 96~8.6k | `characters`(우주비행사 4·메카 4·적 4, 클립 17~18개), `environment`(66: 행성 11·돔·집·기지·바위·식물·안테나), `items`(7), `vehicles`(로버 3·우주선 4) | 우주 기지·행성 탐사·병력 |
+| `models/quaternius-ultimate-spaceships` | Ultimate Spaceships | 11 | 0.7k~8.3k | 우주선 11종(Bob·Challenger·Dispatcher·Executioner·Imperial·Insurgent·Omen·Pancake·Spitfire·Striker·Zenith) + `textures/<이름>/` 색 변형 PNG | 우주선 전투·배경 연출 |
+| `models/quaternius-scifi-essentials` | Sci-Fi Essentials Kit | 37 | 0.3k~8.7k | 적 로봇 3(클립 있음)·총 6·상자·통·책상·선반·보급품·지뢰·위성 안테나 | 소품·SF 적 |
+| `models/quaternius-modular-scifi` | Modular SciFi MegaKit | 190 | 2~11k | `Walls` 84·`Platforms` 38(문·계단·경사 포함)·`Props` 28·`Decals` 29·`Columns` 8·`Aliens` 3. **PBR 텍스처는 `textures/` 에 한 벌** | SF 실내·기지 건물 조립 |
+| `models/kenney-space-kit` | Kenney Space Kit | 153 | 2~876 | 우주선(`craft_*`)·복도·로켓·기지 지붕·바위·크레이터·우주비행사 2·외계인·책상·컴퓨터. 아주 저폴리 | 대량 배치(수백 개), 저사양 기기 |
+| `models/kenney-space-station` | Kenney Space Station Kit | 97 | 12~272 | 우주정거장 내부: 바닥·벽·문·침대·의자·컴퓨터·컨테이너·난간 | 실내·기지 |
+| `models/kenney-modular-space` | Kenney Modular Space Kit | 40 | 4~10.9k | 복도·방·문·계단·템플릿 바닥/벽 모듈 | 모듈식 복도·방 조립 |
+
 ## 3. 캐릭터 (움직이는 것)
 
 | 캐릭터 | 파일 | 삼각형 | 비고 |
@@ -54,6 +69,15 @@ node tools/kaykit-catalog.js "C:\Users\user\Downloads\allkaykit\organized" asset
 | Barbarian / Knight / Mage / Ranger / Rogue / Rogue_Hooded | `organized/characters/adventurers/*.glb` (저장소 `assets/kaykit/characters/` 에도 있음) | 5.8k~8.9k | 뼈 23개 Rig_Medium. 텍스처는 `*_texture.png` 8열×4행 색 칸이라 `recolor` 로 팀 색 변경(30번 방식) |
 | Skeleton_Warrior / Mage / Rogue / Minion | `organized/characters/skeletons/*.glb` (저장소에는 Warrior 만 없음) | 4.6k~5.9k | 뼈 23개 Rig_Medium. `Rig_Medium_Special` 에 스켈레톤 전용 클립 |
 | PrototypePete | `organized/characters/prototype-pete/PrototypePete.gltf` | 약 4.9k | 몸/머리/팔 조각이 분리된 마네킹. 전용 애니 30개 |
+
+**Quaternius 캐릭터(2026-10-09 추가)** 는 뼈대가 달라 아래 Rig_Medium 애니메이션을 공유하지 못한다. 대신 **각 `.gltf` 안에 클립이 이미 들어 있다**(버퍼·텍스처도 `.gltf` 한 파일에 내장).
+
+| 캐릭터 | 폴더 | 클립(이름은 같은 팩 안에서 공통) |
+|---|---|---|
+| 메카 4종(질감·단색) | `characters/quaternius-mech` | Idle·Walk·Run·Jump·Shoot·Punch·Kick·SwordSlash·HitRecieve_1/2·Death·Dance·Hello·Yes·No·Pickup·Run_Holding·Walk_Holding·Run_Tall·Walk_Tall (Leela·Mike·Stan 은 18개) |
+| 사람형 52종 | `characters/quaternius-animated-characters` | Idle·Walk·Run·Jump·Roll·Punch·SwordSlash·Shoot_OneHanded·RecieveHit·Death·Defeat·PickUp·Walk_Carry·Run_Carry·SitDown·StandUp |
+| 우주비행사·메카·적 12종 | `models/quaternius-ultimate-space-kit/characters` | Idle·Idle_Gun·Walk·Walk_Gun·Run·Run_Gun·Run_Gun_Shoot·Jump·Jump_Idle·Jump_Land·Duck·HitReact·Death·Punch·Weapon·Wave·Yes·No |
+| 로봇 적 3·외계인 3 | `models/quaternius-scifi-essentials`, `models/quaternius-modular-scifi/Aliens` | 팩마다 다름 — `names.md` 맨 위 클립 목록 |
 
 모든 Rig_Medium 캐릭터는 같은 뼈대이므로 **어느 캐릭터든 아래 Rig_Medium 애니메이션을 그대로 재생**할 수 있다(클립 이름으로 `AnimationMixer` 에 연결).
 
@@ -90,12 +114,19 @@ Rig_Medium 계열 8개 파일은 `organized/animations/rig-medium/` 에 있다(�
 | 겨울 / 선물 / 기차 | 모험가 + Simulation(환호) | Holiday Bits |
 | 도시 / 자동차 | (자동차는 City Builder 5대) | City Builder Bits |
 | 우주 기지 | 모험가 | Space Base Bits |
+| 우주 RTS·SF 전투 (우주전쟁) | 사람형 52종·메카 4종·우주비행사/메카(Space Kit) | KayKit Space Base + Kenney Space Kit(저폴리 대량) + Quaternius Modular SciFi(건물 조립) + Ultimate Space Kit(행성·돔·기지) |
+| 우주선 전투·연출 | — | Ultimate Spaceships 11종(색 변형), Kenney `craft_*`, Space Kit `Spaceship_*` |
+| SF 복도·실내 탈출 | 사람형 52종 + SF 로봇 적 | Modular SciFi MegaKit(벽·바닥·문), Kenney Modular Space·Space Station |
 | 사격 / 활쏘기 | 모험가(Ranger) + CombatRanged | Prototype Bits(표적·벽), FantasyWeaponsBits(활·화살) |
 | 블록 샌드박스 | 모험가 | BlockBits |
 | 장애물 코스 / 프로토타입 | 모험가 + MovementBasic·Advanced | Prototype Bits(경사·계단·벽) |
 | 집 꾸미기 | 모험가 + Simulation(앉기·눕기) | Furniture Bits, Fantasy Props |
 
 ## 6. 주의할 점
+
+- **Quaternius·Kenney 팩(2026-10-09)**: 라이선스는 모두 CC0 (`licenses/` 에 팩별 사본). Quaternius 캐릭터·우주선·Space Kit 의 `.gltf` 는 버퍼·텍스처가 파일 안에 내장되어 **파일 하나만 복사**하면 된다. Essentials·Modular 는 `.bin` 과 PBR PNG(법선·ORM 포함, 느린 태블릿에는 무거움)를 쓴다. Modular 는 텍스처를 `models/quaternius-modular-scifi/textures/` 한 곳에 두고 각 `.gltf` 가 `../textures/…` 로 가리키므로 **폴더 구조째** 복사해야 한다(원본에서 경로를 고쳐 둠, 2026-10-09). Kenney 는 모델이 아주 작고 단색이라 갤럭시탭에서도 수백 개 가능하다(Space Station·Modular 의 `.glb` 는 같은 폴더의 `Textures/colormap.png` 를 쓰므로 폴더째 복사).
+- 크기가 팩마다 다르다: KayKit 캐릭터 약 2m, Quaternius 사람형 약 2m, Quaternius 메카·Space Kit 우주비행사는 3~9m, Kenney 는 1 단위 ≈ 1m 로 작음, Modular 벽은 한 칸 약 4m. 쓰기 전에 `kaykit-find.js` 가 보여 주는 크기를 확인해 배율을 정한다.
+- Quaternius 애니메이션 클립 이름은 `Run`·`Walk` 처럼 KayKit(`Running_A`)과 다르다. 두 팩 캐릭터를 섞을 때는 클립 이름 표를 따로 둔다.
 
 - **저장소에 없는 것은 `organized` 에서 복사**한다: `.gltf` 는 `.bin`·텍스처 PNG 도 함께(폴더째). 복사 위치는 기존 구조(`assets/kaykit/dungeon|medieval|props|characters|animations|textures`)를 따른다.
 - `assets/kaykit/props/` 는 여러 팩의 소품을 섞어 둔 곳이라 같은 이름이 다른 팩에도 있을 수 있다(예: `wall`, `coin`, `table_medium`). names.md 의 `*` 는 이름만 비교한 표시다.

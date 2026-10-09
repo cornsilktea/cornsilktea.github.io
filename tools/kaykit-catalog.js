@@ -202,12 +202,20 @@ class NamesMarkdown {
 
   animationSection() {
     const lines = ["## 애니메이션 클립 (glb 에서 읽은 실제 이름)", ""];
+    const groups = new Map();
     for (const pack of this.catalog) {
       for (const model of pack.models) {
         if (!model.animations) continue;
-        lines.push(`### ${pack.pack} / ${model.name}  (뼈 ${model.joints}개, 클립 ${model.animations.length}개)`);
-        lines.push(model.animations.map((clip) => `${clip.name}(${clip.seconds}s)`).join(", "), "");
+        const clips = model.animations.map((clip) => `${clip.name}(${clip.seconds}s)`).join(", ");
+        const key = `${pack.pack}|${clips}`;
+        if (!groups.has(key)) groups.set(key, { pack: pack.pack, joints: model.joints, count: model.animations.length, clips, names: [] });
+        groups.get(key).names.push(model.name);
       }
+    }
+    for (const group of groups.values()) {
+      const title = group.names.length > 3 ? `${group.names.slice(0, 3).join(", ")} 외 ${group.names.length - 3}개` : group.names.join(", ");
+      lines.push(`### ${group.pack} / ${title}  (뼈 ${group.joints}개, 클립 ${group.count}개${group.names.length > 1 ? ", 같은 클립 모델 " + group.names.length + "개" : ""})`);
+      lines.push(group.clips, "");
     }
     return lines;
   }
@@ -229,7 +237,7 @@ class NamesMarkdown {
   }
 
   render() {
-    const lines = ["# KayKit 에셋 전체 이름표 (자동 생성)", "", "`*` 표시는 이미 이 저장소 `assets/kaykit/` 에 복사해 둔 모델(이름이 같은 모델로 판단). 만든 도구: `tools/kaykit-catalog.js`", ""];
+    const lines = ["# 3D 에셋 전체 이름표 — KayKit·Quaternius·Kenney (자동 생성)", "", "`*` 표시는 이미 이 저장소 `assets/kaykit/` 에 복사해 둔 모델(이름이 같은 모델로 판단). 만든 도구: `tools/kaykit-catalog.js`", ""];
     lines.push(...this.animationSection());
     for (const pack of this.catalog) lines.push(...this.packSection(pack));
     return lines.join("\n");
