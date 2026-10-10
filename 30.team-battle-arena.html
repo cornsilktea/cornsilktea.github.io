@@ -908,8 +908,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               dmR: 400, dmGrowMs: gameMs(2), dmDur: gameMs(8), dmStunMs: gameMs(1), dmBoltDmg: 20, dmStrikeMaxHpRate: 0.18, dmStrikeStunMs: gameMs(0.7), dmStunGraceMs: 40, cuStacks: 3, cuBoomDmg: 30, cuBoomMs: 500, cuExpireMs: gameMs(4),
               rvDur: gameMs(4), rvTick: gameMs(1), rvHeal: 20, rvDmg: 20, rvCastMs: 600, grLife: 650,
               trDur: gameMs(10), trR: 340, trCd: gameMs(0.5), trScanMs: 120, trWarmMs: 300, trDmg: 8, trHeavyEvery: 3, trHeavyDmg: 28, trStunMs: gameMs(1), trMax: 2, trGauge: 1,
-              trSpeedBonus: gameSpeed(50), trCastMs: 450,
-              drR: 150, drDur: gameMs(8), drTick: gameMs(1), drHeal: 13, drCast: 450, drMin: 60, drSelfRate: 0.1, drSelfGauge: 1, drRiseMs: 350, drCastMs: 500 };
+              trSpeedBonus: gameSpeed(30), trShellSpeed: gameSpeed(1000), trHitR: 38, trCastMs: 450,
+              drR: 100, drDur: 3600000, drTick: gameMs(1), drHeal: 13, drCast: 450, drMin: 60, drSelfRate: 0.1, drSelfGauge: 1, drRiseMs: 350, drCastMs: 500 };
   var ASSIST_MS = 5000;
   var SNIPER_KEEP = KEY * 5;
   var SHIELD_SPARK = "#FFD27A", HEAL_CUT_MUL = 0.5;
@@ -2611,7 +2611,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     reset() {
       this.bursts = []; this.pools = []; this.poolHit = {}; this.lunges = []; this.waves = [];
       this.holes = []; this.storms = []; this.revs = []; this.graces = []; this.domains = [];
-      this.curses = {}; this.bladeSpins = []; this.turrets = []; this.groves = [];
+      this.curses = {}; this.bladeSpins = []; this.turrets = []; this.groves = []; this.shells = [];
     }
     addLingering(e, t) {
       if (e.type === "turret") { TURRETS.add(e, t); return true; }
@@ -2627,6 +2627,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.bursts.forEach(EFFECT_VIEW.dropBurstVis.bind(EFFECT_VIEW)); this.pools.forEach(EFFECT_VIEW.dropPoolVis.bind(EFFECT_VIEW)); this.lunges.forEach(EFFECT_VIEW.dropLungeVis.bind(EFFECT_VIEW)); this.holes.forEach(EFFECT_VIEW.dropHoleVis.bind(EFFECT_VIEW));
       this.storms.forEach(EFFECT_VIEW.dropStormVis.bind(EFFECT_VIEW)); this.revs.forEach(EFFECT_VIEW.dropRevVis.bind(EFFECT_VIEW)); this.graces.forEach(EFFECT_VIEW.dropGraceVis.bind(EFFECT_VIEW)); this.domains.forEach(EFFECT_VIEW.dropDomainVis.bind(EFFECT_VIEW));
       this.turrets.forEach(TURRETS.dropVis.bind(TURRETS)); this.groves.forEach(GROVES.dropVis.bind(GROVES));
+      this.shells.forEach(TURRETS.dropShellVis.bind(TURRETS));
     }
     renderLingering(t, nowMs, dt) {
       this.pools.forEach(function (pl) { EFFECT_VIEW.renderPool(pl, t, nowMs); });
@@ -2636,6 +2637,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.domains.forEach(function (dm) { EFFECT_VIEW.renderDomain(dm, t, nowMs); });
       this.turrets.forEach(function (s) { TURRETS.render(s, t, nowMs); });
       this.groves.forEach(function (s) { GROVES.render(s, t, nowMs); });
+      this.shells.forEach(function (s) { TURRETS.renderShell(s, t); });
     }
   }
   var FIELD = new BattleField();
@@ -3380,7 +3382,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   class EngineerType extends CharacterType {
     static WRENCH_SCALE = 0.9;
-    speedBonus(E, t) { return TURRETS.coversOwner(E, t) ? ULT.trSpeedBonus : 0; }
+    speedBonus(E, t) { return TURRETS.coveringCount(E, t) * ULT.trSpeedBonus; }
     get startsSkillTimer() { return false; }
     get shotSound() { return "star"; }
     get shotName() { return "렌치"; }
@@ -3411,7 +3413,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       ULT.trHeavyEvery + "번째 포격은 " + ULT.trHeavyDmg + "의 피해와 " + SKILLTEXT.secs(ULT.trStunMs) + "간 기절. 포탑이 적을 맞힐 때마다 게이지 " + ULT.trGauge + " 회복";
     }
     passiveDesc() {
-      return "포탑의 사거리 안에서는 이동속도 " + SKILLTEXT.shownSpeed(ULT.trSpeedBonus) + " 증가";
+      return "포탑마다 사거리 안에서 이동속도 " + SKILLTEXT.shownSpeed(ULT.trSpeedBonus) + " 증가(두 포탑 범위가 겹치면 " + SKILLTEXT.shownSpeed(ULT.trSpeedBonus * 2) + ")";
     }
     basicDesc() {
       var c = this.data;
@@ -3436,7 +3438,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     aimRange(btn) { return [ULT.drMin, ULT.drCast]; }
     showAimGuide(E, ult, c) {
       if (!ult) return false;
-      AIM_GUIDE.showAimCircle(INPUT.aimReach(E, "ult"), ULT.drR);
+      AIM_GUIDE.showAimCircle(INPUT.aimReach(E, "ult"), ULT.drR * 1.15);
       return true;
     }
     ultSpotTooFar(reach) { return reach > ULT.drCast; }
@@ -3447,15 +3449,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     skillGlow(E, t) { return E.ultUntil > t ? 0x1E4A12 : 0; }
     cast(E, ang, reach, t) {
       var spot = reach == null ? { x: E.x, y: E.y } : ATTACK.burstSpot(E, ang, reach, ULT.drCast, ULT.drMin);
+      spot = GROVES.snapToTiles(spot);
       E.angle = Math.atan2(spot.y - E.y, spot.x - E.x) || E.angle;
       E.ultUntil = t + ULT.drCastMs;
       E.pending = null;
       SESSION.room.ref.child("effects").push({ type: "grove", team: E.team, owner: E.id, x: Math.round(spot.x), y: Math.round(spot.y), r: ULT.drR, dur: ULT.drDur, heal: ULT.drHeal, createdAt: t });
       VISION.revealBriefly(E.id, t);
     }
-    inBush(T, t) { return VISION.inBush(T.x, T.y) || GROVES.insideOwn(T, t); }
     stepPassive(T, t) {
-      if (!T.alive || !this.inBush(T, t)) { T.groveNext = 0; return; }
+      if (!T.alive || !VISION.inBush(T.x, T.y)) { T.groveNext = 0; return; }
       if (!T.groveNext) T.groveNext = t + TIMESCALE.regenTickMs;
       if (t < T.groveNext) return;
       T.groveNext += TIMESCALE.regenTickMs;
@@ -3465,7 +3467,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       MATCH.game.forceNet = true;
     }
     ultDesc() {
-      return "지정한 곳에 " + SKILLTEXT.secs(ULT.drDur) + "간 유지되는 반경 " + ULT.drR + "의 부쉬 생성. 안에 있는 아군은 1초당 체력 " + ULT.drHeal + " 회복";
+      return "지정한 곳에 게임이 끝날 때까지 유지되는 4×4칸 부쉬 생성(풀숲처럼 안에서 모습이 숨겨짐). 안에 있는 아군은 1초당 체력 " + ULT.drHeal + " 회복";
     }
     passiveDesc() {
       var c = this.data;
@@ -3864,7 +3866,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var c = Math.floor((x - MAP_X0) / TILE), r = Math.floor((y - MAP_Y0) / TILE);
       if (c < 0 || r < 0 || c >= ARENA_MAP.cols || r >= ARENA_MAP.rowCount) return -1;
       var id = ARENA_MAP.bushId[r * ARENA_MAP.cols + c];
-      return id === undefined ? -1 : id;
+      return id === undefined ? GROVES.bushIdAt(x, y, now()) : id;
     }
     revealedTo(E, viewer, t) {
       if (!viewer) return false;
@@ -4456,12 +4458,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       while (mine.length >= ULT.trMax) mine.shift().cut = true;
       FIELD.turrets.push({ e: e, vis: null, nextShot: e.createdAt + ULT.trWarmMs, shotN: 0, aim: 0 });
     }
-    coversOwner(E, t) {
-      for (var i = 0; i < FIELD.turrets.length; i++) {
-        var s = FIELD.turrets[i];
-        if (s.e.owner === E.id && TURRETS.isActive(s, t) && hyp(E.x - s.e.x, E.y - s.e.y) <= s.e.r) return true;
-      }
-      return false;
+    coveringCount(E, t) {
+      var n = 0;
+      FIELD.turrets.forEach(function (s) {
+        if (s.e.owner === E.id && TURRETS.isActive(s, t) && hyp(E.x - s.e.x, E.y - s.e.y) <= s.e.r) n++;
+      });
+      return n;
     }
     pickTarget(s, t) {
       var e = s.e, owner = TARGETS.ent(e.owner), best = null, bestDist = Infinity;
@@ -4481,7 +4483,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       s.shotN++;
       var heavy = s.shotN % ULT.trHeavyEvery === 0;
       s.nextShot = t + ULT.trCd;
-      SESSION.room.ref.child("effects").push({ type: "tshot", team: e.team, owner: e.owner, x: e.x, y: e.y, tgt: T.id, heavy: heavy ? 1 : 0,
+      var fly = Math.max(40, Math.round(hyp(T.x - e.x, T.y - e.y) / ULT.trShellSpeed * 1000));
+      SESSION.room.ref.child("effects").push({ type: "tshot", team: e.team, owner: e.owner, x: e.x, y: e.y, tx: Math.round(T.x), ty: Math.round(T.y), fly: fly, tgt: T.id, heavy: heavy ? 1 : 0,
                                        dmg: heavy ? ULT.trHeavyDmg : ULT.trDmg, stun: heavy ? ULT.trStunMs : 0, createdAt: t });
     }
     step(t) {
@@ -4491,6 +4494,39 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (SESSION.room.status === "playing" && t >= s.nextShot && TURRETS.isOwnerLocal(e.owner)) TURRETS.fire(s, t);
         return true;
       });
+      FIELD.shells = FIELD.shells.filter(function (s) {
+        if (t < s.e.createdAt + s.e.fly) return true;
+        TURRETS.land(s);
+        TURRETS.dropShellVis(s);
+        return false;
+      });
+    }
+    land(s) {
+      var e = s.e;
+      FX_VIEW.spark(e.tx, e.ty, e.heavy ? "#FF9A3A" : "#FFE08A", e.heavy ? 2 : 1);
+      if (SESSION.room.status !== "playing") return;
+      TARGETS.localTargets().forEach(function (T) {
+        if (T.id !== e.tgt || !T.alive || T.team === e.team || hyp(T.x - e.tx, T.y - e.ty) > ULT.trHitR) return;
+        DAMAGE.damage(T, e.dmg, e.owner, true, "turret", e.stun ? { stunMs: e.stun } : null, T.minion ? 0 : ULT.trGauge);
+      });
+    }
+    makeShellVis(s) {
+      var e = s.e, g = new THREE.Group(), r = e.heavy ? 8 : 5;
+      var core = new THREE.Mesh(GEO.ball, MODELS.glowMat(e.heavy ? "shell-heavy" : "shell-light", e.heavy ? 0xFF7A2A : 0xFFD866, 0.95)); core.scale.setScalar(r); g.add(core);
+      var tail = new THREE.Mesh(GEO.trail, MODELS.glowMat("trail-shell", 0xFFC46A, 0.4)); tail.position.x = -r * 2.4; tail.scale.set(r * 4, r * 0.5, r * 0.5); g.add(tail);
+      g.rotation.y = -Math.atan2(e.ty - e.y, e.tx - e.x);
+      scene.add(g);
+      return g;
+    }
+    dropShellVis(s) {
+      if (!s.vis) return;
+      scene.remove(s.vis); s.vis = null;
+    }
+    renderShell(s, t) {
+      if (!s.shown) return;
+      var e = s.e, k = clamp((t - e.createdAt) / e.fly, 0, 1);
+      if (!s.vis) s.vis = TURRETS.makeShellVis(s);
+      s.vis.position.set(e.x + (e.tx - e.x) * k, TurretSystem.MUZZLE_HEIGHT + (TurretSystem.TARGET_HEIGHT - TurretSystem.MUZZLE_HEIGHT) * k, e.y + (e.ty - e.y) * k);
     }
     findTurret(e) {
       for (var i = 0; i < FIELD.turrets.length; i++) { var s = FIELD.turrets[i]; if (s.e.owner === e.owner && s.e.x === e.x && s.e.y === e.y && !s.cut) return s; }
@@ -4502,14 +4538,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var A = TARGETS.ent(e.tgt) || MINIONS.allMinions().filter(function (m) { return m.id === e.tgt; })[0], turret = TURRETS.findTurret(e);
       if (A) {
         if (turret) { turret.aim = Math.atan2(A.y - e.y, A.x - e.x); turret.kickAt = Date.now(); }
-        if (!MATCH.me || MATCH.me.team === A.team || A.minion || VISION.visibleTo(A, MATCH.me, t)) FX_VIEW.tracer(e.x, e.y, A.x, A.y, !!e.heavy);
         if (MATCH.me && hyp(e.x - MATCH.me.x, e.y - MATCH.me.y) < 700) SOUND.sfx(e.heavy ? "boom" : "shoot");
+        var shown = !MATCH.me || MATCH.me.team === A.team || A.minion || VISION.visibleTo(A, MATCH.me, t);
+        FIELD.shells.push({ e: e, vis: null, shown: shown });
       }
-      if (SESSION.room.status !== "playing") return;
-      TARGETS.localTargets().forEach(function (T) {
-        if (T.id !== e.tgt || !T.alive || T.team === e.team) return;
-        DAMAGE.damage(T, e.dmg, e.owner, true, "turret", e.stun ? { stunMs: e.stun } : null, T.minion ? 0 : ULT.trGauge);
-      });
     }
     ringGeo() { return TURRETS.rangeRing || (TURRETS.rangeRing = new THREE.RingGeometry(0.985, 1, 72)); }
     makeVis(s) {
@@ -4548,22 +4580,25 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   var TURRETS = new TurretSystem();
   class GroveSystem {
-    static BUSH_COUNT = 10;
-    static BUSH_SIZE = 72;
-    static INNER_COUNT = 4;
-    constructor() { this.rangeRing = null; }
+    static TILES_PER_SIDE = 4;
+    static ID_BASE = 100000;
+    constructor() { this.rangeRing = null; this.nextId = GroveSystem.ID_BASE; }
     isActive(s, t) { return !s.cut && t >= s.e.createdAt && t < s.e.createdAt + s.e.dur; }
+    covers(s, x, y) { return Math.max(Math.abs(x - s.e.x), Math.abs(y - s.e.y)) <= s.e.r; }
+    snapToTiles(spot) {
+      return { x: MAP_X0 + Math.round((spot.x - MAP_X0) / TILE) * TILE, y: MAP_Y0 + Math.round((spot.y - MAP_Y0) / TILE) * TILE };
+    }
+    bushIdAt(x, y, t) {
+      for (var i = 0; i < FIELD.groves.length; i++) {
+        var s = FIELD.groves[i];
+        if (GROVES.isActive(s, t) && GROVES.covers(s, x, y)) return s.id;
+      }
+      return -1;
+    }
     add(e, t) {
       if (t >= e.createdAt + e.dur) return;
       FIELD.groves.forEach(function (s) { if (s.e.owner === e.owner) s.cut = true; });
-      FIELD.groves.push({ e: e, vis: null, ticked: {} });
-    }
-    insideOwn(E, t) {
-      for (var i = 0; i < FIELD.groves.length; i++) {
-        var s = FIELD.groves[i];
-        if (s.e.owner === E.id && GROVES.isActive(s, t) && hyp(E.x - s.e.x, E.y - s.e.y) <= s.e.r) return true;
-      }
-      return false;
+      FIELD.groves.push({ e: e, id: GROVES.nextId++, vis: null, ticked: {} });
     }
     step(t) {
       FIELD.groves = FIELD.groves.filter(function (s) {
@@ -4573,7 +4608,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var tick = Math.floor((t - e.createdAt) / ULT.drTick);
         TARGETS.localTargets().forEach(function (T) {
           if (T.minion || !T.alive || T.team !== e.team || T.isProtected(t) || s.ticked[T.id] >= tick) return;
-          if (hyp(T.x - e.x, T.y - e.y) > e.r) return;
+          if (!GROVES.covers(s, T.x, T.y)) return;
           s.ticked[T.id] = tick;
           FIELD_FX.healByCleric(T, e.owner, e.heal, t);
         });
@@ -4581,26 +4616,22 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       });
     }
     makeVis(s) {
-      var e = s.e, g = new THREE.Group(), mats = [], hedge = new THREE.Group();
-      var fillMat = new THREE.MeshBasicMaterial({ color: 0x4FB04A, transparent: true, opacity: 0.2, depthWrite: false });
-      var edgeMat = new THREE.MeshBasicMaterial({ color: C_FX[e.team], transparent: true, opacity: 0.75, depthWrite: false });
-      mats.push(fillMat, edgeMat);
-      var fill = ARENA_VIEW.flatMesh(GEO.disc, fillMat); fill.scale.setScalar(e.r); fill.position.y = 1.4; g.add(fill);
-      var edge = ARENA_VIEW.flatMesh(GEO.teamEdge, edgeMat); edge.scale.setScalar(e.r); edge.position.y = 1.8; g.add(edge);
-      var tpl = KIT.props.bushBig, seed = e.x * 7 + e.y * 13;
+      var e = s.e, g = new THREE.Group(), mats = [], bushMats = [], hedge = new THREE.Group();
+      var tpl = KIT.props.bushBig, seed = e.x * 7 + e.y * 13, side = GroveSystem.TILES_PER_SIDE;
       if (tpl) {
-        for (var i = 0; i < GroveSystem.BUSH_COUNT; i++) {
-          var a = i / GroveSystem.BUSH_COUNT * Math.PI * 2, size = GroveSystem.BUSH_SIZE * (0.85 + 0.3 * ((seed + i * 0.37) % 1));
-          hedge.add(PROPS.fitProp(tpl, size, size * 0.62, size, Math.cos(a) * e.r * 0.94, Math.sin(a) * e.r * 0.94, a + i));
-        }
-        for (var j = 0; j < GroveSystem.INNER_COUNT; j++) {
-          var b = j / GroveSystem.INNER_COUNT * Math.PI * 2 + 0.7, inner = GroveSystem.BUSH_SIZE * 0.5;
-          hedge.add(PROPS.fitProp(tpl, inner, inner * 0.6, inner, Math.cos(b) * e.r * 0.45, Math.sin(b) * e.r * 0.45, b));
+        for (var i = 0; i < side * side; i++) {
+          var col = i % side, row = Math.floor(i / side), jitter = ((seed + i * 0.37) % 1) - 0.5, size = TILE * (1.35 + 0.15 * (jitter + 0.5));
+          var prop = PROPS.fitProp(tpl, size, 60 + 12 * (jitter + 0.5), size, (col - (side - 1) / 2) * TILE + jitter * 8, (row - (side - 1) / 2) * TILE - jitter * 8, i * 2.1);
+          prop.traverse(function (o) {
+            if (!o.isMesh) return;
+            o.material = o.material.clone(); o.material.transparent = true; mats.push(o.material); bushMats.push(o.material);
+          });
+          hedge.add(prop);
         }
       }
       g.add(hedge);
       g.position.set(e.x, 0, e.y);
-      g.userData = { mats: mats, hedge: hedge, fillMat: fillMat, edgeMat: edgeMat };
+      g.userData = { mats: mats, bushMats: bushMats, hedge: hedge, fade: 1 };
       scene.add(g);
       return g;
     }
@@ -4611,11 +4642,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     render(s, t, nowMs) {
       var e = s.e;
       if (!s.vis) s.vis = GROVES.makeVis(s);
-      var ud = s.vis.userData, rise = clamp((t - e.createdAt) / ULT.drRiseMs, 0.01, 1), left = e.createdAt + e.dur - t;
+      var ud = s.vis.userData, rise = clamp((t - e.createdAt) / ULT.drRiseMs, 0.01, 1);
       ud.hedge.scale.set(1, rise * rise * (3 - 2 * rise), 1);
-      var fade = left < 1500 ? clamp(left / 1500, 0.2, 1) : 1;
-      ud.fillMat.opacity = (0.16 + 0.05 * Math.sin(nowMs / 400)) * fade;
-      ud.edgeMat.opacity = 0.75 * fade;
+      var occupied = TARGETS.participants().some(function (id) {
+        var E = TARGETS.ent(id); return E && E.alive && GROVES.covers(s, E.x, E.y);
+      });
+      ud.fade += ((occupied ? 0.42 : 1) - ud.fade) * 0.2;
+      ud.bushMats.forEach(function (m) { m.opacity = ud.fade; });
     }
   }
   var GROVES = new GroveSystem();
@@ -7218,25 +7251,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       MATCH.fx.push({ k: "chain", pts: pts, over: over, t: Date.now(), life: CHAIN_LIFE });
       pts.forEach(function (p, i) { FX_VIEW.spark(p[0], p[1], i ? "#FFE45C" : "#8FD8FF", i ? 1.4 : 1.8); });
     }
-    tracer(x0, y0, x1, y1, heavy) {
-      MATCH.fx.push({ k: "tracer", x0: x0, y0: y0, x1: x1, y1: y1, heavy: heavy, t: Date.now(), life: heavy ? 240 : 150 });
-      FX_VIEW.spark(x1, y1, heavy ? "#FF9A3A" : "#FFE08A", heavy ? 2 : 1);
-    }
-    tracerMesh(f) {
-      var g = new THREE.Group(), thick = f.heavy ? 1 : 0.5;
-      var glow = new THREE.MeshBasicMaterial({ color: f.heavy ? 0xFF7A2A : 0xFFD866, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
-      var core = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, depthWrite: false });
-      var from = new THREE.Vector3(f.x0, TurretSystem.MUZZLE_HEIGHT, f.y0), to = new THREE.Vector3(f.x1, TurretSystem.TARGET_HEIGHT, f.y1);
-      var dir = new THREE.Vector3().subVectors(to, from), len = Math.max(1, dir.length());
-      var glowLine = new THREE.Mesh(GEO.stabLine, glow), coreLine = new THREE.Mesh(GEO.stabLine, core);
-      glowLine.scale.set(len, 12 * thick, 12 * thick); coreLine.scale.set(len, 4 * thick, 4 * thick);
-      g.add(glowLine); g.add(coreLine);
-      g.position.copy(from).addScaledVector(dir, 0.5);
-      g.quaternion.setFromUnitVectors(STAB_AXIS, dir.divideScalar(len));
-      g.userData.mats = [glow, core];
-      scene.add(g);
-      return g;
-    }
     zapBarrier(x, y, r) {
       var pts = [];
       for (var i = 0; i <= ULT.ocRingPts; i++) { var a = i / ULT.ocRingPts * Math.PI * 2; pts.push([x + Math.cos(a) * r, y + Math.sin(a) * r]); }
@@ -7331,7 +7345,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     fxMesh(f) {
       if (f.k === "bolt") return FX_VIEW.boltMesh(f);
       if (f.k === "chain") return FX_VIEW.chainMesh(f);
-      if (f.k === "tracer") return FX_VIEW.tracerMesh(f);
       if (f.k === "bladeZone") return FX_VIEW.bladeZoneMesh(f);
       var mat = new THREE.MeshBasicMaterial({ color: f.c, transparent: true, depthWrite: false, side: THREE.DoubleSide }), m;
       if (f.k === "spark") { m = new THREE.Mesh(GEO.ringFx, mat); m.position.set(f.x, 36, f.y); }
@@ -7354,10 +7367,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           var flicker = (1 - k) * (0.65 + 0.35 * Math.sin(nowMs / 22));
           m.userData.mats.forEach(function (mat) { mat.opacity = flicker; });
           if (m.userData.flashMat) m.userData.flashMat.opacity = flicker * BOLT_FLASH_OPACITY;
-          return;
-        }
-        if (f.k === "tracer") {
-          m.userData.mats.forEach(function (mat) { mat.opacity = 1 - k; });
           return;
         }
         if (f.k === "bladeZone") {

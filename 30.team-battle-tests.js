@@ -4445,6 +4445,8 @@ class EngineerDruidTests {
       api.useUlt(eg, 0); W.frame(FRAME);
       W.step(ULT.trWarmMs + ULT.trCd * (ULT.trHeavyEvery - 1) + 60);
       var shots = self.shotsOf(W);
+      W.step(340);
+      shots = self.shotsOf(W).slice(0, ULT.trHeavyEvery);
       if (shots.length !== ULT.trHeavyEvery) bad.push("사격 " + shots.length + "번 (기대 " + ULT.trHeavyEvery + ")");
       if (shots.some(function (p) { return p.v.tgt !== "n1"; })) bad.push("가장 가까운 적 1명이 아닌 대상을 쏨");
       if (shots.map(function (p) { return p.v.heavy; }).join() !== [0, 0, 1].join()) bad.push("강한 포격 순서 " + shots.map(function (p) { return p.v.heavy; }).join());
@@ -4471,14 +4473,32 @@ class EngineerDruidTests {
       if (Math.abs(shot - expected) > tolerance) bad.push("사격 수 " + shot + " (기대 약 " + expected + ")");
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "사거리 밖 무사격, 지속시간 뒤 사라짐, 사격 " + shot + "번");
     });
-    run(G, "공학자 패시브: 포탑 사거리 안에서만 이동속도 " + ULT.trSpeedBonus + "(게임 값) 증가하는가", function (done) {
-      var bad = [], W = self.engineerWorld([]), eg = W.ent("eg");
+    run(G, "포탑 포탄: 즉발이 아니라 날아가는 동안 시간이 걸리고, 그 사이 대상이 피하면 맞지 않는가", function (done) {
+      var bad = [], W = self.engineerWorld([{ id: "n1", x: 150 + 300 }]), eg = W.ent("eg"), n1 = W.ent("n1");
       api.useUlt(eg, 0); W.frame(FRAME);
-      var inside = api.speedOf(eg), base = C.speed;
-      if (inside !== base + ULT.trSpeedBonus) bad.push("사거리 안 이동속도 " + inside + " (기대 " + (base + ULT.trSpeedBonus) + ")");
+      W.step(ULT.trWarmMs + 30);
+      var first = self.shotsOf(W)[0];
+      if (!first || !first.v.fly || first.v.fly < 100) bad.push("비행 시간 없음 " + (first && first.v.fly));
+      if (self.lost(W, "n1")) bad.push("쏜 직후에 이미 맞음 " + self.lost(W, "n1"));
+      n1.x += 150; n1.y += 150;
+      W.step(first ? first.v.fly + 100 : 500);
+      if (self.lost(W, "n1")) bad.push("대상이 피했는데 맞음 " + self.lost(W, "n1"));
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "비행 " + (first && first.v.fly) + "ms, 피하면 빗나감");
+    });
+    run(G, "공학자 패시브: 포탑마다 사거리 안에서 이동속도 " + ULT.trSpeedBonus + "(게임 값) 증가하고, 두 포탑이 겹친 곳은 두 배인가", function (done) {
+      var bad = [], W = self.engineerWorld([]), eg = W.ent("eg"), base = C.speed;
+      api.useUlt(eg, 0); W.frame(FRAME);
+      var one = api.speedOf(eg);
+      if (one !== base + ULT.trSpeedBonus) bad.push("포탑 하나 안 이동속도 " + one + " (기대 " + (base + ULT.trSpeedBonus) + ")");
       eg.x = 150 + ULT.trR + 40; W.frame(FRAME);
       if (api.speedOf(eg) !== base) bad.push("사거리 밖 이동속도 " + api.speedOf(eg) + " (기대 " + base + ")");
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "사거리 안 " + inside + ", 밖 " + base);
+      eg.gauge = api.GAUGE_MAX; eg.ultUntil = 0; api.useUlt(eg, 0); W.frame(FRAME);
+      eg.x = 150 + ULT.trR; W.frame(FRAME);
+      var both = api.speedOf(eg);
+      if (both !== base + ULT.trSpeedBonus * 2) bad.push("겹친 곳 이동속도 " + both + " (기대 " + (base + ULT.trSpeedBonus * 2) + ")");
+      eg.x = 160; W.frame(FRAME);
+      if (api.speedOf(eg) !== base + ULT.trSpeedBonus) bad.push("포탑 하나만 닿는 곳 이동속도 " + api.speedOf(eg));
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "하나 " + one + ", 겹침 " + both + ", 밖 " + base);
     });
     this.registerDruid();
   }
@@ -4520,12 +4540,31 @@ class EngineerDruidTests {
       if (a.hp !== 300 + ULT.drHeal * 2) bad.push("두 번째 회복 " + a.hp + " (기대 " + (300 + ULT.drHeal * 2) + ")");
       if (b.hp !== 300) bad.push("부쉬 밖 아군이 회복됨 " + b.hp);
       if (foe.hp !== foe.maxHp - 200) bad.push("적이 회복됨");
-      W.step(ULT.drDur + 200);
-      var healed = a.hp;
-      if (api.FIELD.groves.length) bad.push("지속시간이 끝났는데 부쉬가 남음");
-      W.step(ULT.drTick * 2);
-      if (a.hp !== healed) bad.push("사라진 뒤에도 회복됨");
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "안의 아군만 " + ULT.drHeal + "씩 회복, 적·밖 아군 제외, 지속시간 뒤 사라짐");
+      W.step(180000);
+      if (api.FIELD.groves.length !== 1) bad.push("3분이 지났는데 부쉬가 사라짐");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "안의 아군만 " + ULT.drHeal + "씩 회복, 적·밖 아군 제외, 3분 뒤에도 유지");
+    });
+    run(G, "드루이드 스킬: 부쉬 안의 유닛은 풀숲처럼 밖의 적 눈에 안 보이고, 같은 부쉬 안의 적에게는 보이는가", function (done) {
+      var bad = [], W = self.druidWorld([
+        { id: "in", team: "blue", char: "guardian", x: 200 + 200 + 40, y: y },
+        { id: "foe", team: "red", char: "guardian", x: 200 + 200 + ULT.drR + 150, y: y },
+        { id: "foeIn", team: "red", char: "guardian", x: 200 + 200 - 40, y: y }
+      ]), dr = W.ent("dr"), a = W.ent("in"), foe = W.ent("foe"), foeIn = W.ent("foeIn");
+      dr.gauge = api.GAUGE_MAX; api.useUlt(dr, 0, 200); W.frame(FRAME);
+      if (!api.inBush(a.x, a.y)) bad.push("부쉬 안이 풀숲으로 인정되지 않음");
+      if (api.revealedTo(a, foe, W.t())) bad.push("부쉬 밖 적에게 보임");
+      if (!api.revealedTo(a, foeIn, W.t())) bad.push("같은 부쉬 안 적에게 안 보임");
+      if (!api.revealedTo(foe, a, W.t())) bad.push("밖에 선 적이 숨겨짐");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "밖에서는 숨고 안에서는 보임");
+    });
+    run(G, "드루이드 스킬: 부쉬가 4×4칸(" + 4 * 50 + "×" + 4 * 50 + ") 칸 모양이라 모서리 안쪽은 포함하고 바깥은 포함하지 않는가", function (done) {
+      var bad = [], W = self.druidWorld([]), dr = W.ent("dr");
+      dr.gauge = api.GAUGE_MAX; api.useUlt(dr, 0); W.frame(FRAME);
+      var g = api.FIELD.groves[0].e, h = ULT.drR;
+      if (!api.inBush(g.x + h - 2, g.y + h - 2)) bad.push("모서리 안쪽이 부쉬가 아님");
+      if (api.inBush(g.x + h + 4, g.y)) bad.push("가장자리 바깥이 부쉬임");
+      if (g.dur < 600000) bad.push("지속시간이 게임 끝까지가 아님");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "정사각형 한 변 " + h * 2);
     });
     run(G, "드루이드 패시브: 자신의 부쉬 안에서 1초마다 최대 체력의 " + Math.round(ULT.drSelfRate * 100) + "% 회복하고 게이지가 1 차오르며, 밖에서는 아무 일도 없는가", function (done) {
       var bad = [], W = self.druidWorld([]), dr = W.ent("dr"), tick = api.TIMESCALE.regenTickMs, self10 = Math.round(dr.maxHp * ULT.drSelfRate);
