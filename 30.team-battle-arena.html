@@ -6293,7 +6293,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       root.traverse(function (o) {
         if (!o.isMesh) return;
         var m = made.get(o.material);
-        if (!m) { m = new THREE.MeshLambertMaterial({ map: o.material.map, color: o.material.color, side: o.material.side, vertexColors: !!keepVertexColors && !!o.material.vertexColors }); made.set(o.material, m); }
+        if (!m) {
+          m = new THREE.MeshLambertMaterial({ map: o.material.map, color: o.material.color, side: o.material.side, vertexColors: !!keepVertexColors && !!o.material.vertexColors });
+          if (o.material.emissive && o.material.emissive.getHex() !== 0) { m.color.setHex(0x000000); m.emissive.copy(o.material.emissive); m.emissiveIntensity = o.material.emissiveIntensity; }
+          made.set(o.material, m);
+        }
         o.material = m;
       });
       return root;
