@@ -240,7 +240,7 @@ class PlayerProfile {
 PlayerProfile.STORAGE_KEY = "portal_profile_v1";
 PlayerProfile.CHANGE_EVENT = "portal-profile-changed";
 PlayerProfile.SETTLED_EVENT = "portal-profile-settled";
-PlayerProfile.MAX_NICK_LENGTH = 8;
+PlayerProfile.MAX_NICK_LENGTH = 4;
 PlayerProfile.REAL_NAME_NOTICE = "닉네임은 본명으로 입력합니다";
 PlayerProfile.NICK_REQUIRED_NOTICE = "닉네임(본명)을 먼저 정해 주세요.";
 class CharacterAssets {
