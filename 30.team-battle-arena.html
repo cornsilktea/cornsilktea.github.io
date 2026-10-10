@@ -837,7 +837,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     engineer: { name: "공학자", role: "shooter", icon: "🔧", hp: 105, speed: gameSpeed(150), cd: gameMs(1.1), dmg: 10, range: 350, pSpeed: 760, pr: 9, ultName: "포탑 설치" },
     druid:   { name: "드루이드", role: "caster", icon: "🌿", hp: 110, speed: gameSpeed(165), cd: gameMs(1.4), dmg: 14, range: 350, pSpeed: 728, pr: 12, lanes: 2, fx: { slowMs: gameMs(1.5), slowMul: 0.7 },
                ultName: "덩굴 부쉬", ultAim: true, heals: true },
-    giant:   { name: "거신", role: "fighter", icon: "🗿", hp: 500, speed: gameSpeed(135), cd: gameMs(1.6), dmg: 30, range: 120, arc: Math.PI * 0.6, ultName: "골렘 강림", ultAim: true, blocks: true },
+    giant:   { name: "거신", role: "fighter", icon: "🗿", hp: 500, speed: gameSpeed(135), cd: gameMs(1.6), dmg: 30, range: 120, arc: Math.PI * 0.6, bodyR: 36, ultName: "골렘 강림", ultAim: true, blocks: true },
+    gargantua: { name: "가르강튀아", role: "caster", icon: "🌀", hp: 300, speed: gameSpeed(150), cd: gameMs(1.4), dmg: 10, range: 120, arc: Math.PI * 0.6, ultName: "가르강튀아", ultAim: true, retired: true },
     dummy:  { name: "연습 봇", role: "fighter", icon: "🎯", hp: 99999, speed: 200, cd: 1000, dmg: 0, range: 0, ultName: "없음", practiceBot: true },
     dummyAlly: { name: "아군 봇", role: "fighter", icon: "💚", hp: 500, speed: 200, cd: 1000, dmg: 0, range: 0, ultName: "없음", practiceBot: true }
   };
@@ -902,7 +903,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               trDur: gameMs(10), trR: 340, trCd: gameMs(0.5), trScanMs: 120, trWarmMs: 300, trDmg: 10, trHeavyEvery: 3, trHeavyDmg: 34, trStunMs: gameMs(0.8), trMax: 2, trGauge: 1,
               trSpeedBonus: gameSpeed(30), trShellSpeed: gameSpeed(1000), trHitR: 38, trCastMs: 450,
               drR: 150, drDur: 3600000, drTick: gameMs(1), drHeal: 20, drCast: 450, drMin: 60, drSelfRate: 0.1, drSelfGauge: 1, drRiseMs: 350, drCastMs: 500,
-              gjCast: 350, gjMin: 60, gjTransformMs: gameMs(1.2), gjDur: gameMs(6), gjDef: 0.7, gjR: 350, gjPull: 260, gjGap: 70, gjBoomDmg: 30 };
+              gaCast: 350, gaMin: 60, gaTransformMs: gameMs(1.2), gaDur: gameMs(6), gaR: 350, gaPull: 260, gaGap: 70, gaBoomDmg: 30,
+              gjCast: 300, gjMin: 60, gjTransformMs: gameMs(1.2), gjDur: gameMs(6), gjDef: 0.7, gjR: 150, gjTick: gameMs(1), gjTickDmg: 30, gjMaceRange: 150, gjStunMs: gameMs(1), gjImmuneMs: gameMs(2) };
   var ASSIST_MS = 5000;
   var SNIPER_KEEP = KEY * 5;
   var SHIELD_SPARK = "#FFD27A", HEAL_CUT_MUL = 0.5;
@@ -2595,11 +2597,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     reset() {
       this.bursts = []; this.pools = []; this.poolHit = {}; this.lunges = []; this.waves = [];
       this.holes = []; this.storms = []; this.revs = []; this.graces = []; this.domains = [];
-      this.curses = {}; this.bladeSpins = []; this.turrets = []; this.groves = []; this.shells = [];
+      this.curses = {}; this.bladeSpins = []; this.turrets = []; this.groves = []; this.shells = []; this.gales = [];
     }
     addLingering(e, t) {
       if (e.type === "turret") { TURRETS.add(e, t); return true; }
       if (e.type === "grove") { GROVES.add(e, t); return true; }
+      if (e.type === "gale") { if (t < e.createdAt + e.dur) this.gales.push({ e: e, vis: null }); return true; }
       if (e.type === "pool") { if (t < e.createdAt + e.delay + e.dur) this.pools.push({ e: e, vis: null, bottle: null }); return true; }
       if (e.type === "hole") { if (t < e.createdAt + e.delay + e.dur) this.holes.push({ e: e, vis: null }); return true; }
       if (e.type === "storm") { if (t < e.createdAt + e.delay + e.dur) this.storms.push({ e: e, vis: null }); return true; }
@@ -2612,6 +2615,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.storms.forEach(EFFECT_VIEW.dropStormVis.bind(EFFECT_VIEW)); this.revs.forEach(EFFECT_VIEW.dropRevVis.bind(EFFECT_VIEW)); this.graces.forEach(EFFECT_VIEW.dropGraceVis.bind(EFFECT_VIEW)); this.domains.forEach(EFFECT_VIEW.dropDomainVis.bind(EFFECT_VIEW));
       this.turrets.forEach(TURRETS.dropVis.bind(TURRETS)); this.groves.forEach(GROVES.dropVis.bind(GROVES));
       this.shells.forEach(TURRETS.dropShellVis.bind(TURRETS));
+      this.gales.forEach(GALE_VIEW.drop.bind(GALE_VIEW));
     }
     renderLingering(t, nowMs, dt) {
       this.pools.forEach(function (pl) { EFFECT_VIEW.renderPool(pl, t, nowMs); });
@@ -2622,6 +2626,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.turrets.forEach(function (s) { TURRETS.render(s, t, nowMs); });
       this.groves.forEach(function (s) { GROVES.render(s, t, nowMs); });
       this.shells.forEach(function (s) { TURRETS.renderShell(s, t); });
+      this.gales.forEach(function (g) { GALE_VIEW.render(g, t, nowMs); });
     }
   }
   var FIELD = new BattleField();
@@ -3465,11 +3470,48 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return "사거리 " + c.range + "의 덩굴 " + c.lanes + "줄을 나란히 발사(한 번 맞으면 나머지 줄은 같은 적을 통과). 맞은 적은 " + c.dmg + "의 피해";
     }
   }
+  class GargantuaType extends CharacterType {
+    get startsSkillTimer() { return false; }
+    isSurging(E, t) { return E.buffUntil > t && t >= E.buffUntil - ULT.gaDur; }
+    isHammerLeaping(E, t) { return E.ultUntil > t && !this.isSurging(E, t); }
+    isRooted(E, t) { return this.isHammerLeaping(E, t) || this.isSurging(E, t); }
+    cannotAttack(E, t) { return this.isRooted(E, t); }
+    aimRange(btn) { return [ULT.gaMin, ULT.gaCast]; }
+    showAimGuide(E, ult, c) {
+      if (!ult) return false;
+      AIM_GUIDE.showAimCircle(INPUT.aimReach(E, "ult"), ULT.gaR);
+      return true;
+    }
+    botUltRange() { return ULT.gaCast; }
+    botUltSpot(B, target, td, t) { return BRAIN.leadSpot(target, MELEE.hammerLeapMs(td) / 1000, t); }
+    cast(E, ang, reach, t) {
+      var landing = ATTACK.burstSpot(E, ang, reach, ULT.gaCast, ULT.gaMin);
+      PHYSICS.resolve(landing);
+      E.angle = Math.atan2(landing.y - E.y, landing.x - E.x);
+      var leapMs = MELEE.hammerLeapMs(hyp(landing.x - E.x, landing.y - E.y));
+      E.leapAt = t;
+      E.ultUntil = t + leapMs;
+      E.cdUntil = Math.max(E.cdUntil, t + leapMs + 250);
+      E.pending = null; E.slash = null;
+      E.leap = { sx: E.x, sy: E.y, tx: landing.x, ty: landing.y, at: t, until: t + leapMs };
+    }
+    onLeapLand(E, t) { GARGANTUA_SYS.land(E, t); return true; }
+    get hasSkillClip() { return true; }
+    playSkillClip(v, E, t) {
+      if (!this.isSurging(E, t)) FIGHTER_VIEW.playOnce(v, "Melee_1H_Attack_Jump_Chop", JUMP_CHOP_LAND_SEC * 1000 / Math.max(1, E.ultUntil - (E.leapAt || t)), t);
+    }
+    ultDesc() {
+      return "지정한 곳(최대 " + ULT.gaCast + ")으로 점프해 " + SKILLTEXT.secs(ULT.gaDur) + "간 블랙홀 생성. 그동안 움직이거나 기본 공격을 할 수 없고, 반경 " + ULT.gaR +
+             "의 적을 계속 끌어당김. 끝나면 폭발해 반경 안의 적에게 " + ULT.gaBoomDmg + "의 피해";
+    }
+  }
   class GiantType extends ArcMeleeType {
     static HEAD_Y = 150;
     static SLAM_IMPACT_SEC = 0.92;
     static SWING_FROM_SEC = 0.55;
     static SWING_SPEED = 1.8;
+    static MACE_FROM_SEC = 0.78;
+    static MACE_SPEED = 2.0;
     get startsSkillTimer() { return false; }
     get clips() { return KIT.largeClips; }
     get altModelKey() { return "giantGolem"; }
@@ -3479,8 +3521,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     skillGuard(T, amount, t) { return this.isGolem(T, t) ? Math.round(amount * ULT.gjDef) : amount; }
     tallyBlocked(T, unguarded, amount) { T.blocked = (T.blocked || 0) + Math.min(unguarded, T.hp) - Math.min(amount, T.hp); }
     isHammerLeaping(E, t) { return E.ultUntil > t && !this.isGolem(E, t); }
-    isRooted(E, t) { return this.isHammerLeaping(E, t) || this.isGolem(E, t); }
-    cannotAttack(E, t) { return this.isRooted(E, t); }
+    isRooted(E, t) { return this.isHammerLeaping(E, t); }
+    cannotAttack(E, t) { return this.isHammerLeaping(E, t); }
     aimRange(btn) { return [ULT.gjMin, ULT.gjCast]; }
     showAimGuide(E, ult, c) {
       if (!ult) return false;
@@ -3489,6 +3531,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     botUltRange() { return ULT.gjCast; }
     botUltSpot(B, target, td, t) { return BRAIN.leadSpot(target, MELEE.hammerLeapMs(td) / 1000, t); }
+    overrideBasic(E, ang, reach, t) {
+      if (!this.isGolem(E, t)) return false;
+      var T = GIANT.maceTarget(E, t);
+      if (!T) return false;
+      GIANT.mace(E, T, t);
+      return true;
+    }
     cast(E, ang, reach, t) {
       var landing = ATTACK.burstSpot(E, ang, reach, ULT.gjCast, ULT.gjMin);
       PHYSICS.resolve(landing);
@@ -3508,13 +3557,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       FIGHTER_VIEW.playOnce(v, "Melee_2H_Slam", clamp(GiantType.SLAM_IMPACT_SEC * 1000 / leapMs, 1, 4.5), t);
     }
     ultDesc() {
-      return "지정한 곳(최대 " + ULT.gjCast + ")으로 점프해 " + SKILLTEXT.secs(ULT.gjDur) + "간 골렘으로 변신. 그동안 움직이거나 기본 공격을 할 수 없고, 반경 " + ULT.gjR +
-             "의 적을 계속 끌어당김. 끝나면 폭발해 반경 안의 적에게 " + ULT.gjBoomDmg + "의 피해";
+      return "지정한 곳(최대 " + ULT.gjCast + ")으로 점프해 " + SKILLTEXT.secs(ULT.gjDur) + "간 골렘으로 변신. 자신을 중심으로 반경 " + ULT.gjR + "에 하늘빛 폭풍이 일어 적은 1초당 " + ULT.gjTickDmg +
+             "의 피해. 변신 중 기본 공격은 반경 " + ULT.gjMaceRange + " 안의 가장 가까운 적 1명을 철퇴로 쳐 " + SKILLTEXT.secs(ULT.gjStunMs) + "간 기절(같은 적은 " + SKILLTEXT.secs(ULT.gjImmuneMs) + "간 기절 면역)";
     }
     passiveDesc() {
       return "골렘 변신 중 받는 피해 " + SKILLTEXT.pctOf(1 - ULT.gjDef) + "% 감소";
     }
     attackClip(v, E, t) {
+      if (this.isGolem(E, t)) return ["Melee_2H_Slam", GiantType.MACE_SPEED, null, GiantType.MACE_FROM_SEC];
       return ["Melee_1H_Slash", GiantType.SWING_SPEED, null, GiantType.SWING_FROM_SEC];
     }
   }
@@ -3543,7 +3593,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         stormbow: new StormbowType("stormbow"),
         engineer: new EngineerType("engineer"),
         druid: new DruidType("druid"),
-        giant: new GiantType("giant")
+        giant: new GiantType("giant"),
+        gargantua: new GargantuaType("gargantua")
       };
     }
     of(id) { return this.byId[id] || (this.byId[id] = new CharacterType(id)); }
@@ -3583,6 +3634,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.hasteStacks = Math.min(Math.floor(h.max / h.add), (this.hasteUntil > t ? this.hasteStacks || 0 : 0) + 1);
       this.hasteUntil = t + h.ms;
     }
+    get hitR() { var c = CHARS[this.char]; return c && c.bodyR || BODY_R; }
     skillLeft(t) { return this.skillDur ? clamp((this.skillUntil - t) / this.skillDur, 0, 1) : 0; }
     speed() {
       var t = now(), c = CHARS[this.char], sp = c.speed;
@@ -4104,7 +4156,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return FIELD.pools.some(function (pl) {
         var e = pl.e, start = FIELD_FX.poolStart(e);
         return e.team !== T.team && !pl.cut && t >= start && t < start + e.dur && CHARS[SESSION.players[e.owner] ? SESSION.players[e.owner].characterType : "thrower"].healCut &&
-               hyp(T.x - e.x, T.y - e.y) <= e.r + BODY_R * 0.5;
+               hyp(T.x - e.x, T.y - e.y) <= e.r + T.hitR * 0.5;
       });
     }
     healCut(T, t) { t = t || now(); return T.burnUntil > t || STATUS.inEnemyPoison(T, t); }
@@ -4152,7 +4204,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var givesHurtGauge = hurtGaugeGroup !== tick.hurtGaugeGroup;
         tick.hurtGaugeGroup = hurtGaugeGroup;
         TARGETS.localTargets().forEach(function (T) {
-          if (!T.alive || T.team === E.team || hyp(T.x - E.x, T.y - E.y) > ULT.bwR + BODY_R * 0.5) return;
+          if (!T.alive || T.team === E.team || hyp(T.x - E.x, T.y - E.y) > ULT.bwR + T.hitR * 0.5) return;
           DAMAGE.damage(T, ULT.bwDmg, E.id, false, "bladestorm", null, null, !givesHurtGauge);
         });
       });
@@ -4224,7 +4276,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (!pl.landed) { pl.landed = true; if (!MATCH.me || hyp(e.x - MATCH.me.x, e.y - MATCH.me.y) < 700) SOUND.sfx("splash"); }
         if (SESSION.room.status !== "playing") return true;
         TARGETS.localTargets().forEach(function (T) {
-          if (!T.alive || hyp(T.x - e.x, T.y - e.y) > e.r + BODY_R * 0.5) return;
+          if (!T.alive || hyp(T.x - e.x, T.y - e.y) > e.r + T.hitR * 0.5) return;
           if (T.team === e.team) { if (e.u && !T.minion) FIELD_FX.healInFog(T, e, t); return; }
           if (T.isProtected(t)) return;
           if (e.u && !T.minion) STATUS.slowWhileInside(T, t, e.owner, ULT.fgSlowMul, ULT.fgSlowMs);
@@ -4245,7 +4297,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       FIELD.holes = FIELD.holes.filter(function (h) {
         var e = h.e, start = e.createdAt + e.delay, end = start + e.dur, center = FIELD_FX.holeCenter(e);
         if (center.ownerFell) { EFFECT_VIEW.dropHoleVis(h); return false; }
-        if (t >= end) { if (e.gj) GIANT.explode(e, center, t); EFFECT_VIEW.dropHoleVis(h); return false; }
+        if (t >= end) { if (e.ga) GARGANTUA_SYS.explode(e, center, t); EFFECT_VIEW.dropHoleVis(h); return false; }
         if (t < start) return true;
         if (!h.landed) { h.landed = true; if (!MATCH.me || hyp(center.x - MATCH.me.x, center.y - MATCH.me.y) < 700) SOUND.sfx("orb"); }
         if (SESSION.room.status !== "playing") return true;
@@ -4253,7 +4305,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         TARGETS.localTargets().forEach(function (T) {
           if (!T.alive || T.team === e.team || T.minion || T.isProtected(t)) return;
           var dx = center.x - T.x, dy = center.y - T.y, d = hyp(dx, dy);
-          if (d > e.r + BODY_R * 0.5 || d < gap) return;
+          if (d > e.r + T.hitR * 0.5 || d < gap) return;
           var pull = Math.min(d - gap, pullRate * dt);
           STATUS.breakRevelation(T, t);
           T.x += dx / d * pull; T.y += dy / d * pull;
@@ -4261,6 +4313,21 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           STATUS.creditHolePull(T, e.owner, t, dt);
           DAMAGE.noteHurt(T, e.owner, t);
           MATCH.game.forceNet = true;
+        });
+        return true;
+      });
+    }
+    stepGales(t) {
+      FIELD.gales = FIELD.gales.filter(function (g) {
+        var e = g.e, center = FIELD_FX.holeCenter(e);
+        if (t >= e.createdAt + e.dur || center.ownerFell) { GALE_VIEW.drop(g); return false; }
+        if (!g.landed) { g.landed = true; if (!MATCH.me || hyp(center.x - MATCH.me.x, center.y - MATCH.me.y) < 700) SOUND.sfx("orb"); }
+        if (SESSION.room.status !== "playing") return true;
+        if (g.nextTick && t < g.nextTick) return true;
+        g.nextTick = (g.nextTick || t) + e.tick;
+        TARGETS.localTargets().forEach(function (T) {
+          if (!T.alive || T.team === e.team || T.isProtected(t) || hyp(T.x - center.x, T.y - center.y) > e.r + T.hitR * 0.5) return;
+          DAMAGE.damage(T, e.dmg, e.owner, false, "gale");
         });
         return true;
       });
@@ -4384,7 +4451,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var reach = FIELD_FX.domainRadius(e, t);
         TARGETS.localTargets().forEach(function (T) {
           if (T.minion || !T.alive || T.team === e.team || dm.touched[T.id] || T.isProtected(t)) return;
-          if (hyp(T.x - c.x, T.y - c.y) > reach + BODY_R * 0.5) return;
+          if (hyp(T.x - c.x, T.y - c.y) > reach + T.hitR * 0.5) return;
           dm.touched[T.id] = 1;
           STATUS.afflict(T, { stunMs: e.stun }, e.owner);
           T.domainBolt = { owner: e.owner, at: t + e.stun, dmg: e.bolt };
@@ -4474,7 +4541,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var e = b.e;
         if (t < e.createdAt + e.delay) return true;
         if (SESSION.room.status === "playing") TARGETS.localTargets().forEach(function (T) {
-          if (!T.alive || hyp(T.x - e.x, T.y - e.y) > e.r + BODY_R) return;
+          if (!T.alive || hyp(T.x - e.x, T.y - e.y) > e.r + T.hitR) return;
           if (T.team !== e.team) { var hit = FIELD_FX.meteorHitAt(hyp(T.x - e.x, T.y - e.y), e.r); DAMAGE.damage(T, hit.dmg, e.owner, false, e.createdAt, { stunMs: hit.stunMs }); }
         });
         FX_VIEW.boom(e.x, e.y, e.r, e.team);
@@ -4907,7 +4974,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         MATCH.fx.push({ k: "boom", x: s.x, y: s.y, r: ULT.bdR / 1.1, c: 0xDCE3EC, t: Date.now(), life: 260 });
         FX_VIEW.spark(s.x, s.y, "#FFFFFF", 1.4);
         TARGETS.localTargets().forEach(function (T) {
-          if (!T.alive || T.team === d.team || T.id === d.owner || hyp(T.x - s.x, T.y - s.y) > ULT.bdR + BODY_R * 0.5) return;
+          if (!T.alive || T.team === d.team || T.id === d.owner || hyp(T.x - s.x, T.y - s.y) > ULT.bdR + T.hitR * 0.5) return;
           DAMAGE.damage(T, ULT.bdDmg, d.owner, d.createdAt, null);
         });
         return false;
@@ -4925,7 +4992,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         for (var i = 0; i < foes.length; i++) {
           var T = foes[i];
           if (!T || !T.alive || T.id === d.owner || T.team === d.team) continue;
-          if (PROJECTILES.segHit(a.x, a.y, b.x, b.y, T.x, T.y, BODY_R + (d.pr || 6))) { p.gone = true; PROJECTILES.bladeSpin(p, T.x, T.y); return; }
+          if (PROJECTILES.segHit(a.x, a.y, b.x, b.y, T.x, T.y, T.hitR + (d.pr || 6))) { p.gone = true; PROJECTILES.bladeSpin(p, T.x, T.y); return; }
         }
         if (e >= p.life) { p.dead = true; PROJECTILES.bladeSpin(p, b.x, b.y); }
       });
@@ -5003,7 +5070,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           var pe = p.lt[T.id]; if (pe === undefined) pe = 0;
           p.lt[T.id] = e;
           var a = PROJECTILES.projAt(p, pe), b = PROJECTILES.projAt(p, e);
-          if (PROJECTILES.segHit(a.x, a.y, b.x, b.y, T.x, T.y, BODY_R + (d.pr || 6))) { PROJECTILES.projHit(id, p, T); break; }
+          if (PROJECTILES.segHit(a.x, a.y, b.x, b.y, T.x, T.y, T.hitR + (d.pr || 6))) { PROJECTILES.projHit(id, p, T); break; }
         }
       });
     }
@@ -5038,7 +5105,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       for (var i = 0; i < list.length; i++) {
         var T = list[i];
         if (!T || !T.alive || T.id === d.owner || T.team === d.team) continue;
-        if (PROJECTILES.segHit(a.x, a.y, b.x, b.y, T.x, T.y, BODY_R + (d.pr || 6))) {
+        if (PROJECTILES.segHit(a.x, a.y, b.x, b.y, T.x, T.y, T.hitR + (d.pr || 6))) {
           p.gone = true;
           if (d.ultKey === "execute") FX_VIEW.executeFx(T.x, T.y);
           if (!MATCH.me || MATCH.me.team === T.team || VISION.visibleTo(T, MATCH.me, t)) FX_VIEW.spark(T.x, T.y, FX_VIEW.orbHitColor(d), d.ultKey === "giant" ? 2.2 : 1);
@@ -5055,20 +5122,20 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
   class MeleeSystem {
     enemyInMelee(E) {
-      var reach = CHARS[E.char].range + BODY_R;
       return TARGETS.participants().some(function (id) {
         var o = TARGETS.ent(id);
-        return o && o.alive && o.team !== E.team && VISION.visibleTo(o, E) && hyp(o.x - E.x, o.y - E.y) <= reach;
+        return o && o.alive && o.team !== E.team && VISION.visibleTo(o, E) && hyp(o.x - E.x, o.y - E.y) <= CHARS[E.char].range + o.hitR;
       });
     }
     inArc(T, d) {
       var dx = T.x - d.x, dy = T.y - d.y;
-      return hyp(dx, dy) <= d.radius + BODY_R && Math.abs(angDiff(Math.atan2(dy, dx), d.angle)) <= d.arc / 2 + 0.25;
+      return hyp(dx, dy) <= d.radius + T.hitR && Math.abs(angDiff(Math.atan2(dy, dx), d.angle)) <= d.arc / 2 + 0.25;
     }
     inLine(T, d) {
       var dx = T.x - d.x, dy = T.y - d.y, ca = Math.cos(d.angle), sa = Math.sin(d.angle);
       var along = dx * ca + dy * sa, side = -dx * sa + dy * ca;
-      return along >= -BODY_R && along <= d.len + BODY_R && Math.abs(side) <= d.width / 2 + BODY_R;
+      var br = T.hitR;
+      return along >= -br && along <= d.len + br && Math.abs(side) <= d.width / 2 + br;
     }
     inStrike(T, d) { return d.stab ? !!d.tgt && T.id === d.tgt : d.len ? MELEE.inLine(T, d) : MELEE.inArc(T, d) && PHYSICS.losClear(d.x, d.y, T.x, T.y); }
     lineReach(x, y, ang, len) { return Math.min(len, PHYSICS.rayObst(x, y, Math.cos(ang), Math.sin(ang), 2) + BODY_R); }
@@ -5225,11 +5292,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       MATCH.game.forceNet = true;
     }
     stabTarget(E, t) {
-      var reach = CHARS[E.char].range + BODY_R, best = null, bd = Infinity;
+      var best = null, bd = Infinity;
       TARGETS.everyone(t).forEach(function (o) {
         if (!o || !o.alive || o.team === E.team || o.isProtected(t) || !VISION.visibleTo(o, E)) return;
         var d = hyp(o.x - E.x, o.y - E.y);
-        if (d <= reach && d < bd && PHYSICS.losClear(E.x, E.y, o.x, o.y)) { bd = d; best = o; }
+        if (d <= CHARS[E.char].range + o.hitR && d < bd && PHYSICS.losClear(E.x, E.y, o.x, o.y)) { bd = d; best = o; }
       });
       return best;
     }
@@ -5301,15 +5368,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   var MELEE = new MeleeSystem();
-  class GiantSystem {
+  class GargantuaSystem {
     land(E, t) {
-      E.buffUntil = t + ULT.gjDur;
-      E.skillDur = ULT.gjDur;
-      E.skillUntil = t + ULT.gjDur;
-      E.ultUntil = t + ULT.gjTransformMs;
+      E.buffUntil = t + ULT.gaDur;
+      E.skillDur = ULT.gaDur;
+      E.skillUntil = t + ULT.gaDur;
+      E.ultUntil = t + ULT.gaTransformMs;
       E.pending = null;
-      SESSION.room.ref.child("effects").push({ type: "hole", team: E.team, owner: E.id, x: Math.round(E.x), y: Math.round(E.y), r: ULT.gjR, dur: ULT.gjDur, delay: 0,
-                                       follow: 1, gj: 1, gap: ULT.gjGap, pull: ULT.gjPull, createdAt: t });
+      SESSION.room.ref.child("effects").push({ type: "hole", team: E.team, owner: E.id, x: Math.round(E.x), y: Math.round(E.y), r: ULT.gaR, dur: ULT.gaDur, delay: 0,
+                                       follow: 1, ga: 1, gap: ULT.gaGap, pull: ULT.gaPull, createdAt: t });
       VISION.revealBriefly(E.id, t);
       if (TARGETS.hear(E)) SOUND.sfx("boom");
       MATCH.game.forceNet = true;
@@ -5319,9 +5386,44 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (!MATCH.me || hyp(center.x - MATCH.me.x, center.y - MATCH.me.y) < 700) SOUND.sfx("boom");
       if (SESSION.room.status !== "playing") return;
       TARGETS.localTargets().forEach(function (T) {
-        if (!T.alive || T.team === e.team || T.minion || T.isProtected(t) || hyp(center.x - T.x, center.y - T.y) > e.r + BODY_R * 0.5) return;
-        DAMAGE.damage(T, ULT.gjBoomDmg, e.owner, false, "blackhole");
+        if (!T.alive || T.team === e.team || T.minion || T.isProtected(t) || hyp(center.x - T.x, center.y - T.y) > e.r + T.hitR * 0.5) return;
+        DAMAGE.damage(T, ULT.gaBoomDmg, e.owner, false, "blackhole");
       });
+    }
+  }
+  var GARGANTUA_SYS = new GargantuaSystem();
+  class GiantSystem {
+    land(E, t) {
+      E.buffUntil = t + ULT.gjDur;
+      E.skillDur = ULT.gjDur;
+      E.skillUntil = t + ULT.gjDur;
+      E.ultUntil = t + ULT.gjTransformMs;
+      E.pending = null;
+      E.stunnedByMe = {};
+      SESSION.room.ref.child("effects").push({ type: "gale", team: E.team, owner: E.id, x: Math.round(E.x), y: Math.round(E.y), r: ULT.gjR, dur: ULT.gjDur, tick: ULT.gjTick, dmg: ULT.gjTickDmg,
+                                       follow: 1, createdAt: t });
+      VISION.revealBriefly(E.id, t);
+      if (TARGETS.hear(E)) SOUND.sfx("boom");
+      MATCH.game.forceNet = true;
+    }
+    maceTarget(E, t) {
+      var locked = E.stunnedByMe || {}, best = null, bd = Infinity;
+      TARGETS.everyone(t).forEach(function (o) {
+        if (!o || !o.alive || o.team === E.team || o.isProtected(t) || !VISION.visibleTo(o, E) || (locked[o.id] || 0) > t) return;
+        var d = hyp(o.x - E.x, o.y - E.y);
+        if (d <= ULT.gjMaceRange && d < bd && PHYSICS.losClear(E.x, E.y, o.x, o.y)) { bd = d; best = o; }
+      });
+      return best;
+    }
+    mace(E, T, t) {
+      E.angle = r1(Math.atan2(T.y - E.y, T.x - E.x));
+      E.atkAt = t;
+      (E.stunnedByMe || (E.stunnedByMe = {}))[T.id] = t + ULT.gjImmuneMs;
+      VISION.revealBriefly(E.id, t);
+      MATCH.game.forceNet = true;
+      if (TARGETS.hear(E)) SOUND.sfx("swing");
+      SESSION.room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: E.angle, stab: 1, mace: 1, tgt: T.id, radius: ULT.gjMaceRange, arc: Math.PI * 2,
+                                        dmg: CHARS[E.char].dmg, u: 1, slam: 1, fx: { stunMs: ULT.gjStunMs }, createdAt: t });
     }
   }
   var GIANT = new GiantSystem();
@@ -6507,6 +6609,19 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       held.getWorldPosition(foot); foot.y -= lowest; foot.add(outward); held.parent.worldToLocal(foot); held.position.copy(foot);
       m.updateMatrixWorld(true);
     }
+    headBox(m) {
+      var box = new THREE.Box3();
+      m.traverse(function (o) { if (o.isMesh && /head/i.test(o.name) && !/hat|helm|pelt/i.test(o.name)) box.expandByObject(o); });
+      return box;
+    }
+    matchFace(m, refHead) {
+      var refSize = refHead.getSize(new THREE.Vector3()), refMid = refHead.getCenter(new THREE.Vector3());
+      m.scale.multiplyScalar(refSize.y / MODELS.headBox(m).getSize(new THREE.Vector3()).y);
+      m.updateMatrixWorld(true);
+      var mid = MODELS.headBox(m).getCenter(new THREE.Vector3());
+      m.position.x += refMid.x - mid.x; m.position.y += refMid.y - mid.y;
+      m.updateMatrixWorld(true);
+    }
     makePortraits() {
       if (!CAMERA_RIG.renderer) return;
       var bodyShot = new PortraitShot(200, 220), faceShot = new PortraitShot(128, 128);
@@ -6519,13 +6634,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var posed = CHAR_LIST.map(function (c) {
         var m = SkeletonUtils.clone(KIT.chars[c]);
         m.rotation.y = -0.45;
-        if (MODEL[c].portraitScale) m.scale.setScalar(MODEL[c].portraitScale);
         var mix = new THREE.AnimationMixer(m); mix.clipAction(CHAR_TYPES.of(c).clips.Idle_A).play(); mix.update(0.3);
         m.updateMatrixWorld(true);
         if (MODEL[c].portraitPlant) { MODELS.plantHeldUpright(m, MODEL[c].plantTurn, MODEL[c].plantTilt); MODELS.shrinkTallHeld(m, MODEL[c].plantTurn, MODEL[c].plantTilt); }
         return { c: c, m: m, box: new THREE.Box3().setFromObject(m) };
       });
-      var tallest = posed.reduce(function (h, p) { return Math.max(h, p.box.max.y); }, 0);
+      var refHead = MODELS.headBox(posed.filter(function (p) { return p.c === PORTRAIT_FACE_REF; })[0].m);
+      posed.forEach(function (p) { if (MODEL[p.c].portraitFace) { MODELS.matchFace(p.m, refHead); p.cropped = true; } });
+      var tallest = posed.reduce(function (h, p) { return p.cropped ? h : Math.max(h, p.box.max.y); }, 0);
       var frameH = tallest * 1.12, dist = frameH / 2 / Math.tan(15 * Math.PI / 180);
       pc.position.set(0, frameH * 0.46, dist); pc.lookAt(0, frameH * 0.46, 0);
       posed.forEach(function (p) {
@@ -6788,12 +6904,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         v.mats.push(mat, noseMat); v.glowMats.push(mat);
       }
       root.add(body);
-      var shadow = ARENA_VIEW.flatMesh(GEO.shadow, shadowMat); shadow.position.y = 0.6; root.add(shadow);
+      var footK = E.hitR / BODY_R;
+      var shadow = ARENA_VIEW.flatMesh(GEO.shadow, shadowMat); shadow.position.y = 0.6; shadow.scale.setScalar(footK); root.add(shadow);
       var disc = new THREE.Mesh(GEO.teamDisc, teamDiscMats[E.team] || teamDiscMats.blue);
       var ringMat = new THREE.MeshBasicMaterial({ color: C_TEAM[E.team], transparent: true, depthWrite: false });
-      var ring = ARENA_VIEW.flatMesh(GEO.ring, ringMat); ring.position.y = 1.2; ring.add(disc); disc.position.set(0, 0, -0.1); root.add(ring);
+      var ring = ARENA_VIEW.flatMesh(GEO.ring, ringMat); ring.position.y = 1.2; ring.scale.setScalar(footK); ring.add(disc); disc.position.set(0, 0, -0.1); root.add(ring);
       v.mats.push(ringMat); v.ring = ring;
-      if (E.id === SESSION.myId) { var meRing = ARENA_VIEW.flatMesh(GEO.meRing, meRingMat); meRing.position.y = 1.4; root.add(meRing); v.meRing = meRing; }
+      if (E.id === SESSION.myId) { var meRing = ARENA_VIEW.flatMesh(GEO.meRing, meRingMat); meRing.position.y = 1.4; meRing.scale.setScalar(footK); root.add(meRing); v.meRing = meRing; }
       CHAR_TYPES.of(E.char).addMarkers(v, root, body);
       (parent || scene).add(root);
       return v;
@@ -7019,7 +7136,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }
     }
     makeMeleeVis(d) {
-      if (d.stab) return EFFECT_VIEW.makeStabVis(d);
+      if (d.stab && !d.mace) return EFFECT_VIEW.makeStabVis(d);
       var g = new THREE.Group(), who = SESSION.players[d.owner] ? SESSION.players[d.owner].characterType : "", col = d.zap ? ZAP_GLOW : d.u ? 0xFF6A3D : (MELEE_COLOR[who] || 0xFFFFFF);
       var fillM = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.2, depthWrite: false });
       var darkWave = CHAR_TYPES.of(who).hasDarkWave && !d.u;
@@ -7116,7 +7233,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return g;
     }
     makeHoleVis(e) {
-      if (e.gj) return GARGANTUA.make(e);
+      if (e.ga) return GARGANTUA.make(e);
       var g = new THREE.Group();
       var fillMat = new THREE.MeshBasicMaterial({ color: 0x1A0033, transparent: true, opacity: 0.55, depthWrite: false });
       var ringMat = new THREE.MeshBasicMaterial({ color: 0xB07CFF, transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending });
@@ -7132,7 +7249,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var e = h.e, start = e.createdAt + e.delay;
       if (t < start) return;
       if (!h.vis) h.vis = EFFECT_VIEW.makeHoleVis(e);
-      if (e.gj) { GARGANTUA.render(h, t, nowMs); return; }
+      if (e.ga) { GARGANTUA.render(h, t, nowMs); return; }
       var ud = h.vis.userData, grow = clamp((t - start) / 200, 0.01, 1);
       h.vis.scale.set(grow, 1, grow);
       ud.ring.rotation.z = -nowMs / 250;
@@ -7449,6 +7566,81 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   var GARGANTUA = new GargantuaView();
+  class GolemGaleView {
+    static EYE_COLOR = 0x78FFFF;
+    static RISE_MS = 400;
+    static FALL_MS = 400;
+    static LAYERS = [[14, 0.55, 0.75, 1.4], [48, 0.7, 0.7, -1.9], [82, 0.85, 0.6, 2.4], [116, 1, 0.5, -2.9]];
+    constructor() { this.cache = null; }
+    paint(size, draw) {
+      var cv = document.createElement("canvas"); cv.width = cv.height = size;
+      draw(cv.getContext("2d"), size);
+      var tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+    paintFloor(g, s) {
+      var c = s / 2, glow = g.createRadialGradient(c, c, 0, c, c, c);
+      glow.addColorStop(0, "rgba(120,255,255,0.45)"); glow.addColorStop(0.55, "rgba(42,168,216,0.3)"); glow.addColorStop(1, "rgba(42,168,216,0)");
+      g.fillStyle = glow; g.fillRect(0, 0, s, s);
+      g.translate(c, c);
+      for (var arm = 0; arm < 4; arm++) {
+        g.save(); g.rotate(arm * Math.PI / 2);
+        g.beginPath();
+        for (var k = 0; k <= 50; k++) { var u = k / 50, r = u * c * 0.95, a = u * 2.2; if (k) g.lineTo(Math.cos(a) * r, Math.sin(a) * r); else g.moveTo(0, 0); }
+        g.strokeStyle = "rgba(160,255,255,0.55)"; g.lineWidth = 7; g.stroke();
+        g.strokeStyle = "rgba(255,255,255,0.7)"; g.lineWidth = 2; g.stroke();
+        g.restore();
+      }
+    }
+    paintWind(g, s) {
+      var c = s / 2, seed = 11;
+      function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
+      for (var i = 0; i < 90; i++) {
+        var r = (0.58 + rnd() * 0.38) * c, a0 = rnd() * Math.PI * 2, span = 0.3 + rnd() * 1.2;
+        g.strokeStyle = rnd() < 0.5 ? "rgba(140,245,255," + (0.45 + rnd() * 0.5) + ")" : "rgba(40,190,255," + (0.4 + rnd() * 0.4) + ")";
+        g.lineWidth = 1 + rnd() * 3;
+        g.beginPath(); g.arc(c, c, r, a0, a0 + span); g.stroke();
+      }
+      var fade = g.createRadialGradient(c, c, c * 0.5, c, c, c);
+      fade.addColorStop(0, "rgba(0,0,0,0)"); fade.addColorStop(0.2, "rgba(0,0,0,1)"); fade.addColorStop(0.8, "rgba(0,0,0,1)"); fade.addColorStop(1, "rgba(0,0,0,0)");
+      g.globalCompositeOperation = "destination-in"; g.fillStyle = fade; g.fillRect(0, 0, s, s);
+    }
+    textures() {
+      if (!this.cache) this.cache = { floor: this.paint(256, this.paintFloor), wind: this.paint(256, this.paintWind) };
+      return this.cache;
+    }
+    make(e) {
+      var tx = this.textures(), g = new THREE.Group(), mats = [], G = GolemGaleView;
+      function mat(opts) { var m = new THREE.MeshBasicMaterial(Object.assign({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }, opts)); mats.push(m); return m; }
+      var floor = ARENA_VIEW.flatMesh(GEO.disc, mat({ map: tx.floor, opacity: 0.85 })); floor.scale.setScalar(e.r); floor.position.y = 1.8; g.add(floor);
+      var edgeMat = mat({ color: G.EYE_COLOR, opacity: 0.8 });
+      var edge = ARENA_VIEW.flatMesh(GEO.ringFx, edgeMat); edge.scale.setScalar(e.r); edge.position.y = 2.2; g.add(edge);
+      var rings = G.LAYERS.map(function (layer) {
+        var m = mat({ map: tx.wind, opacity: layer[2] }), ring = ARENA_VIEW.flatMesh(GEO.disc, m);
+        ring.scale.setScalar(e.r * layer[1]); ring.position.y = layer[0]; ring.userData.spin = layer[3]; ring.userData.baseOpacity = layer[2]; g.add(ring);
+        return ring;
+      });
+      g.userData = { mats: mats, floor: floor, edgeMat: edgeMat, rings: rings };
+      scene.add(g);
+      return g;
+    }
+    drop(h) { if (!h.vis) return; scene.remove(h.vis); h.vis.userData.mats.forEach(function (m) { m.dispose(); }); h.vis = null; }
+    render(h, t, nowMs) {
+      var e = h.e, G = GolemGaleView, end = e.createdAt + e.dur;
+      if (!h.vis) h.vis = this.make(e);
+      var ud = h.vis.userData, rise = clamp((t - e.createdAt) / G.RISE_MS, 0.001, 1), fall = clamp((end - t) / G.FALL_MS, 0, 1), k = Math.min(rise * rise * (3 - 2 * rise), fall);
+      var shown = VIS[e.owner], center = FIELD_FX.holeCenter(e), spin = nowMs / 1000;
+      h.vis.position.set(shown ? shown.root.position.x : center.x, 0, shown ? shown.root.position.z : center.y);
+      h.vis.scale.setScalar(Math.max(0.001, k));
+      ud.floor.rotation.z = spin * 1.3;
+      ud.edgeMat.opacity = 0.6 + 0.25 * Math.sin(nowMs / 120);
+      ud.rings.forEach(function (ring, i) {
+        ring.rotation.z = spin * ring.userData.spin;
+        ring.material.opacity = ring.userData.baseOpacity * (0.8 + 0.2 * Math.sin(nowMs / 160 + i * 1.7));
+      });
+    }
+  }
+  var GALE_VIEW = new GolemGaleView();
   class AimGuide {
     aimPart(geo) {
       var back = ARENA_VIEW.flatMesh(geo, aimBackMat), front = ARENA_VIEW.flatMesh(geo, aimMat);
@@ -8457,11 +8649,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
                 leftRecolor: [[1, 6, 1, "#FFE45C", "#E0A01A"], [2, 4, 1, "#2A3A7A", "#141C40"], [3, 0, 1, "#8FE8FF", "#2A7BFF"], [2, 5, 3, "#26304E", "#10152A"]] },
     engineer: { file: "Engineer", right: "engineer_Wrench" },
     druid:   { file: "Druid", portraitPlant: true, right: "druid_staff" },
-    giant:   { file: "Barbarian_Large", right: "Skeleton_Mace_Large", scale: 0.85, portraitScale: 0.62 },
+    giant:   { file: "Barbarian_Large", right: "Skeleton_Mace_Large", scale: 0.85, portraitFace: true },
     giantGolem: { file: "Skeleton_Golem", right: "Skeleton_Mace_Large", scale: 0.85 },
     dummy:  { file: "Knight" },
     dummyAlly: { file: "Knight" }
   };
+  var PORTRAIT_FACE_REF = "warrior";
   var MODEL_CHARS = CHAR_LIST.concat(["giantGolem", "dummy", "dummyAlly"]);
   var MINION_MODEL = { file: "Skeleton_Minion", right: "Skeleton_Blade", scale: 0.9 };
   var PROP_FILES = { bushBig: "props/Bush_1_D_Color1.gltf",
@@ -8689,6 +8882,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       STATUS.flushCC(t);
       FIELD_FX.stepHoles(t, dt);
       FIELD_FX.stepStorms(t);
+      FIELD_FX.stepGales(t);
       FIELD_FX.stepRevs(t);
       FIELD_FX.stepDomains(t);
       TURRETS.step(t);

@@ -4388,6 +4388,7 @@ class ResultCollector {
   });
   new EngineerDruidTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
   new GiantTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
+  new GargantuaTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
   results.pending = Promise.resolve().then(function () { api.finish(api.currentMap()); }).then(drainAsync);
   return results;
   }
@@ -4642,20 +4643,33 @@ class GiantTests {
       if (gi.maxHp !== 500) bad.push("체력 " + gi.maxHp);
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "체력 500·피해 " + C.dmg + "(즉시)·게이지 +" + gi.gauge);
     });
+    run(G, "거신 피격 범위: 몸집(반경 " + C.bodyR + ")에 맞춰 보통 캐릭터(" + api.BODY_R + ")는 빗나가는 거리에서도 맞는가", function (done) {
+      var bad = [], gap = api.CHARS.guardian.range + (C.bodyR + api.BODY_R) / 2;
+      function lostAt(char) {
+        var y = self.kit.OPEN_Y.forest;
+        api.MATCH.stateByKey = {};
+        var W = self.kit.world("forest", [{ id: "tg", team: "blue", char: char, x: 500, y: y }, { id: "atk", team: "red", char: "guardian", x: 500 + gap, y: y }]);
+        api.fireBasic(W.ent("atk"), Math.PI); W.frame(FRAME);
+        return self.lost(W, "tg");
+      }
+      var big = lostAt("giant"), small = lostAt("guardian");
+      if (!big) bad.push("거신이 맞지 않음(거리 " + gap + ")");
+      if (small) bad.push("보통 캐릭터가 맞음 " + small);
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "거리 " + gap + ": 거신 " + big + " 피해, 보통 캐릭터 0");
+    });
     run(G, "거신 스킬: 지정한 곳으로 점프해 골렘으로 변신하고 게이지가 0이 되며, 끝나면 원래대로 돌아오는가", function (done) {
       var bad = [], W = self.giantWorld([]), gi = W.ent("gi");
-      api.useUlt(gi, 0, 300);
+      api.useUlt(gi, 0, 250);
       if (!gi.leap || !type.isHammerLeaping(gi, W.t())) bad.push("점프가 시작되지 않음");
       W.step(ULT.bsLeapMaxMs + 100);
-      if (Math.abs(gi.x - 500) > 3) bad.push("착지 위치 " + Math.round(gi.x) + " (기대 500)");
+      if (Math.abs(gi.x - 450) > 3) bad.push("착지 위치 " + Math.round(gi.x) + " (기대 450)");
       if (!type.isGolem(gi, W.t()) || !type.usesAltModel(gi, W.t())) bad.push("골렘으로 변신하지 않음");
       if (gi.gauge !== 0) bad.push("게이지 " + gi.gauge);
-      var holes = api.FIELD.holes.filter(function (h) { return h.e.gj; });
-      if (holes.length !== 1 || !holes[0].e.follow) bad.push("블랙홀 " + holes.length + "개");
+      if (api.FIELD.gales.length !== 1 || !api.FIELD.gales[0].e.follow) bad.push("하늘빛 폭풍 " + api.FIELD.gales.length + "개");
       W.step(ULT.gjDur + 200);
       if (type.isGolem(gi, W.t())) bad.push("변신이 끝나지 않음");
-      if (api.FIELD.holes.some(function (h) { return h.e.gj; })) bad.push("블랙홀이 남음");
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "점프 300 → 변신 " + (ULT.gjDur / 700) + "초 → 복귀, 블랙홀 같이 사라짐");
+      if (api.FIELD.gales.length) bad.push("폭풍이 남음");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "점프 250 → 변신 " + (ULT.gjDur / 700) + "초 → 복귀, 폭풍 같이 사라짐");
     });
     run(G, "거신 스킬: 점프 사거리는 최대 " + ULT.gjCast + "이고 대장장이(" + ULT.bsCast + ")보다 짧은가", function (done) {
       var bad = [], W = self.giantWorld([]), gi = W.ent("gi");
@@ -4666,60 +4680,57 @@ class GiantTests {
       if (Math.abs(jumped - ULT.gjCast) > 3) bad.push("멀리 겨냥했을 때 점프 거리 " + Math.round(jumped) + " (기대 " + ULT.gjCast + ")");
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "900 을 겨냥해도 " + Math.round(jumped) + " 까지만 점프");
     });
-    run(G, "거신 스킬: 점프 중과 변신 중에는 움직이거나 기본 공격을 할 수 없고, 끝나면 다시 되는가", function (done) {
-      var bad = [], W = self.giantWorld([{ id: "near", x: 200 + 300 + 100 }]), gi = W.ent("gi"), near = W.ent("near");
-      api.useUlt(gi, 0, 300); W.frame(FRAME);
+    run(G, "거신 스킬: 점프 중에는 움직이거나 기본 공격을 할 수 없고, 착지해 변신한 뒤에는 둘 다 되는가", function (done) {
+      var bad = [], W = self.giantWorld([{ id: "near", x: 200 + 250 + 100 }]), gi = W.ent("gi"), near = W.ent("near");
+      api.useUlt(gi, 0, 250); W.frame(FRAME);
       if (api.speedOf(gi) !== 0) bad.push("점프 중 이동속도 " + api.speedOf(gi));
-      W.step(ULT.bsLeapMaxMs + 100);
-      if (api.speedOf(gi) !== 0) bad.push("변신 중 이동속도 " + api.speedOf(gi));
       gi.cdUntil = 0; var shots = W.log.length; api.fireBasic(gi, 0); W.frame(FRAME);
-      if (self.lost(W, "near") || W.log.length !== shots) bad.push("변신 중 기본 공격이 나감");
-      W.step(ULT.gjDur);
-      if (api.speedOf(gi) !== C.speed) bad.push("끝난 뒤 이동속도 " + api.speedOf(gi) + " (기대 " + C.speed + ")");
-      near.hp = near.maxHp; gi.cdUntil = 0; api.fireBasic(gi, 0); W.frame(FRAME);
-      if (!self.lost(W, "near")) bad.push("끝난 뒤 기본 공격이 안 나감");
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "점프·변신 중 이동 0·공격 불가, 끝나면 복귀");
+      if (W.log.length !== shots) bad.push("점프 중 기본 공격이 나감");
+      for (var ms = 0; ms < 3000 && !type.isGolem(gi, W.t()); ms += FRAME) W.frame(FRAME);
+      if (api.speedOf(gi) !== C.speed) bad.push("변신 중 이동속도 " + api.speedOf(gi) + " (기대 " + C.speed + ")");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "점프 중 이동 0·공격 불가, 변신하면 이동 " + C.speed);
     });
-    run(G, "거신 블랙홀: 반경 " + ULT.gjR + " 안의 적만 거신 곁(" + ULT.gjGap + ")까지 끌려오고, 거신이 밀려나면 같이 따라오는가", function (done) {
-      var landX = 200, bad = [], W = self.giantWorld([{ id: "in", x: landX + 300, dy: 40 }, { id: "out", x: landX + ULT.gjR + 120 }], 500), gi = W.ent("gi"), inn = W.ent("in"), out = W.ent("out");
-      self.jump(W, Math.PI, 300);
-      var outX = out.x;
-      W.step(2000);
-      var d = Math.hypot(inn.x - gi.x, inn.y - gi.y);
-      if (Math.abs(d - ULT.gjGap) > 8) bad.push("끌려온 적과의 거리 " + Math.round(d) + " (기대 " + ULT.gjGap + ")");
-      if (Math.abs(out.x - outX) > 1) bad.push("반경 밖 적이 끌려옴");
-      gi.x -= 100; W.step(1500);
-      var d2 = Math.hypot(inn.x - gi.x, inn.y - gi.y);
-      if (Math.abs(d2 - ULT.gjGap) > 8) bad.push("거신이 밀려났는데 따라오지 않음 " + Math.round(d2));
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "반경 안 거리 " + Math.round(d) + "→" + Math.round(d2) + ", 반경 밖은 그대로");
-    });
-    run(G, "거신 폭발: 블랙홀이 끝나는 순간 반경 안의 적에게만 " + ULT.gjBoomDmg + "의 피해를 주고, 그 전에는 피해가 없는가", function (done) {
-      var landX = 200, bad = [], W = self.giantWorld([{ id: "in", x: landX + 300, dy: 40 }, { id: "out", x: landX + ULT.gjR + 120 }], 500);
-      self.jump(W, Math.PI, 300);
-      W.step(ULT.gjDur - 400);
-      if (self.lost(W, "in")) bad.push("끝나기 전에 이미 피해 " + self.lost(W, "in"));
-      W.step(600);
-      if (self.lost(W, "in") !== ULT.gjBoomDmg) bad.push("폭발 피해 " + self.lost(W, "in") + " (기대 " + ULT.gjBoomDmg + ")");
+    run(G, "거신 하늘빛 폭풍: 반경 " + ULT.gjR + " 안의 적에게 1초마다 " + ULT.gjTickDmg + "의 피해를 주고, 밖의 적은 맞지 않으며, 거신을 따라다니는가", function (done) {
+      var bad = [], W = self.giantWorld([{ id: "in", x: 450 + 100, dy: 30 }, { id: "out", x: 450 + ULT.gjR + 120 }]), gi = W.ent("gi"), tick = ULT.gjTick;
+      api.useUlt(gi, 0, 250);
+      for (var ms = 0; ms < 3000 && !type.isGolem(gi, W.t()); ms += FRAME) W.frame(FRAME);
+      W.frame(FRAME);
+      if (self.lost(W, "in") !== ULT.gjTickDmg) bad.push("첫 피해 " + self.lost(W, "in") + " (기대 " + ULT.gjTickDmg + ")");
+      W.step(tick);
+      if (self.lost(W, "in") !== ULT.gjTickDmg * 2) bad.push("1초 뒤 피해 " + self.lost(W, "in") + " (기대 " + ULT.gjTickDmg * 2 + ")");
       if (self.lost(W, "out")) bad.push("반경 밖 적이 맞음");
-      W.step(1500);
-      if (self.lost(W, "in") !== ULT.gjBoomDmg) bad.push("폭발이 한 번이 아님 " + self.lost(W, "in"));
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "끝나기 전 0, 끝난 뒤 안 " + ULT.gjBoomDmg + " 한 번, 밖 0");
+      gi.x += 190; W.step(tick * 2 + 40);
+      if (!self.lost(W, "out")) bad.push("거신이 움직였는데 폭풍이 따라오지 않음");
+      W.step(ULT.gjDur);
+      if (self.lost(W, "in") > ULT.gjTickDmg * Math.ceil(ULT.gjDur / tick)) bad.push("폭풍 틱이 너무 많음 " + self.lost(W, "in"));
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "틱마다 " + ULT.gjTickDmg + ", 밖 0, 따라다님");
     });
-    run(G, "거신 폭발: 거신이 쓰러지면 블랙홀이 사라지고 폭발하지 않는가", function (done) {
-      var landX = 200, bad = [], W = self.giantWorld([{ id: "in", x: landX + 300, dy: 40 }], 500), gi = W.ent("gi");
-      self.jump(W, Math.PI, 300);
-      api.damage(gi, 9999, "in", false, null);
-      W.step(ULT.gjDur + 200);
-      if (self.lost(W, "in")) bad.push("쓰러진 뒤에 폭발함 " + self.lost(W, "in"));
-      if (api.FIELD.holes.some(function (h) { return h.e.gj; })) bad.push("블랙홀이 남음");
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "블랙홀 소멸·폭발 없음");
+    run(G, "거신 철퇴: 변신 중 기본 공격이 반경 " + ULT.gjMaceRange + " 안의 가장 가까운 적 1명에게 " + C.dmg + "의 피해와 " + Math.round(ULT.gjStunMs / 700 * 10) / 10 + "초 기절을 주고, 그 적은 면역이라 다음엔 다른 적을 때리는가", function (done) {
+      var bad = [], W = self.giantWorld([{ id: "n1", x: 700 }, { id: "n2", x: 740, dy: 20 }, { id: "far", x: 760, dy: 60 }]), gi = W.ent("gi"), n1 = W.ent("n1"), n2 = W.ent("n2"), far = W.ent("far");
+      self.jump(W, 0, 250);
+      W.step(ULT.gjTransformMs);
+      api.FIELD.gales.length = 0;
+      n1.x = gi.x + 80; n1.y = gi.y; n2.x = gi.x + 130; n2.y = gi.y + 10; far.x = gi.x + ULT.gjMaceRange + 40; far.y = gi.y + 5;
+      gi.cdUntil = 0; api.fireBasic(gi, 0); W.frame(FRAME);
+      if (self.lost(W, "n1") !== C.dmg || !api.stunned(n1, W.t())) bad.push("가장 가까운 적: 피해 " + self.lost(W, "n1") + ", 기절 " + api.stunned(n1, W.t()));
+      if (self.lost(W, "n2") || api.stunned(n2, W.t())) bad.push("두 번째 적이 같이 맞음");
+      W.step(ULT.gjStunMs + 60);
+      if (api.stunned(n1, W.t())) bad.push("기절이 " + ULT.gjStunMs + "ms 뒤에도 안 풀림");
+      gi.cdUntil = 0; api.fireBasic(gi, 0); W.frame(FRAME);
+      if (self.lost(W, "n1") !== C.dmg) bad.push("면역인 첫 적이 또 맞음 " + self.lost(W, "n1"));
+      if (self.lost(W, "n2") !== C.dmg || !api.stunned(n2, W.t())) bad.push("면역 아닌 다음 적: 피해 " + self.lost(W, "n2") + ", 기절 " + api.stunned(n2, W.t()));
+      if (self.lost(W, "far")) bad.push("철퇴 사거리 밖 적이 맞음");
+      var before = self.lost(W, "n1");
+      gi.cdUntil = 0; api.fireBasic(gi, 0); W.frame(FRAME);
+      if (self.lost(W, "n1") !== before + C.dmg) bad.push("모두 면역일 때 일반 부채꼴 " + (self.lost(W, "n1") - before) + " (기대 " + C.dmg + ")");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "1번째 n1, 2번째 n2(면역 건너뜀), 사거리 밖 무시, 모두 면역이면 일반 부채꼴");
     });
     run(G, "거신 패시브: 변신 중에만 받는 피해가 " + Math.round((1 - ULT.gjDef) * 100) + "% 줄고 막은 피해로 쌓이는가", function (done) {
       var bad = [], W = self.giantWorld([{ id: "foe", x: 200 + 600 }]), gi = W.ent("gi");
       api.damage(gi, 100, "foe", false, null);
       if (self.lost(W, "gi") !== 100) bad.push("변신 전 피해 " + self.lost(W, "gi"));
       gi.hp = gi.maxHp; gi.blocked = 0;
-      self.jump(W, 0, 300);
+      self.jump(W, 0, 250);
       api.damage(gi, 100, "foe", false, null);
       var want = Math.round(100 * ULT.gjDef);
       if (self.lost(W, "gi") !== want) bad.push("변신 중 피해 " + self.lost(W, "gi") + " (기대 " + want + ")");
@@ -4728,6 +4739,115 @@ class GiantTests {
     });
   }
 }
+
+class GargantuaTests {
+  static GROUP = "가르강튀아(보관)";
+  constructor(api, kit) { this.api = api; this.kit = kit; }
+
+  lost(W, id) { var E = W.ent(id); return E.maxHp - E.hp; }
+
+  giantWorld(foes, startX) {
+    var y = this.kit.OPEN_Y.forest;
+    this.api.MATCH.stateByKey = {};
+    return this.kit.world("forest", [{ id: "gi", team: "blue", char: "gargantua", x: startX || 200, y: y, gauge: this.api.GAUGE_MAX }].concat(foes.map(function (f) {
+      return { id: f.id, team: "red", char: "guardian", x: f.x, y: y + (f.dy || 0) };
+    })));
+  }
+
+  jump(W, angle, reach) {
+    var gi = W.ent("gi"), type = this.api.CHAR_TYPES.of("gargantua");
+    this.api.useUlt(gi, angle, reach);
+    for (var ms = 0; ms < 3000 && !type.isSurging(gi, W.t()); ms += this.kit.FRAME) W.frame(this.kit.FRAME);
+  }
+
+  register() {
+    var self = this, api = this.api, run = this.kit.run, FRAME = this.kit.FRAME, ULT = api.ULT, G = GargantuaTests.GROUP, C = api.CHARS.gargantua, type = api.CHAR_TYPES.of("gargantua");
+    run(G, "가르강튀아 기본 공격: 앞쪽 반경 " + C.range + " 부채꼴 안의 적에게 " + C.dmg + "의 피해와 기본 게이지를 주고, 휘두르는 순간 바로 맞는가", function (done) {
+      var bad = [], W = self.giantWorld([{ id: "near", x: 200 + 100 }, { id: "far", x: 200 + C.range + 120 }]), gi = W.ent("gi");
+      gi.gauge = 0;
+      api.fireBasic(gi, 0); W.frame(FRAME);
+      if (self.lost(W, "near") !== C.dmg) bad.push("휘두른 직후 피해 " + self.lost(W, "near") + " (기대 " + C.dmg + ")");
+      W.step(1500);
+      if (self.lost(W, "far")) bad.push("멀리 있는 적이 맞음");
+      if (gi.gauge !== api.roleGauge("gargantua")) bad.push("게이지 " + gi.gauge + " (기대 " + api.roleGauge("gargantua") + ")");
+      if (gi.maxHp !== C.hp) bad.push("체력 " + gi.maxHp);
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "체력 "+ C.hp + "·피해 " + C.dmg + "(즉시)·게이지 +" + gi.gauge);
+    });
+    run(G, "가르강튀아 스킬: 지정한 곳으로 점프해 블랙홀 상태로 바뀜하고 게이지가 0이 되며, 끝나면 원래대로 돌아오는가", function (done) {
+      var bad = [], W = self.giantWorld([]), gi = W.ent("gi");
+      api.useUlt(gi, 0, 300);
+      if (!gi.leap || !type.isHammerLeaping(gi, W.t())) bad.push("점프가 시작되지 않음");
+      W.step(ULT.bsLeapMaxMs + 100);
+      if (Math.abs(gi.x - 500) > 3) bad.push("착지 위치 " + Math.round(gi.x) + " (기대 500)");
+      if (!type.isSurging(gi, W.t())) bad.push("블랙홀 상태로 바뀜하지 않음");
+      if (gi.gauge !== 0) bad.push("게이지 " + gi.gauge);
+      var holes = api.FIELD.holes.filter(function (h) { return h.e.ga; });
+      if (holes.length !== 1 || !holes[0].e.follow) bad.push("블랙홀 " + holes.length + "개");
+      W.step(ULT.gaDur + 200);
+      if (type.isSurging(gi, W.t())) bad.push("변신이 끝나지 않음");
+      if (api.FIELD.holes.some(function (h) { return h.e.ga; })) bad.push("블랙홀이 남음");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "점프 300 → 변신 " + (ULT.gaDur / 700) + "초 → 복귀, 블랙홀 같이 사라짐");
+    });
+    run(G, "가르강튀아 스킬: 점프 사거리는 최대 " + ULT.gaCast + "이고 대장장이(" + ULT.bsCast + ")보다 짧은가", function (done) {
+      var bad = [], W = self.giantWorld([]), gi = W.ent("gi");
+      if (ULT.gaCast >= ULT.bsCast) bad.push("대장장이보다 짧지 않음");
+      api.useUlt(gi, 0, 900);
+      W.step(ULT.bsLeapMaxMs + 100);
+      var jumped = gi.x - 200;
+      if (Math.abs(jumped - ULT.gaCast) > 3) bad.push("멀리 겨냥했을 때 점프 거리 " + Math.round(jumped) + " (기대 " + ULT.gaCast + ")");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "900 을 겨냥해도 " + Math.round(jumped) + " 까지만 점프");
+    });
+    run(G, "가르강튀아 스킬: 점프 중과 변신 중에는 움직이거나 기본 공격을 할 수 없고, 끝나면 다시 되는가", function (done) {
+      var bad = [], W = self.giantWorld([{ id: "near", x: 200 + 300 + 100 }]), gi = W.ent("gi"), near = W.ent("near");
+      api.useUlt(gi, 0, 300); W.frame(FRAME);
+      if (api.speedOf(gi) !== 0) bad.push("점프 중 이동속도 " + api.speedOf(gi));
+      W.step(ULT.bsLeapMaxMs + 100);
+      if (api.speedOf(gi) !== 0) bad.push("변신 중 이동속도 " + api.speedOf(gi));
+      gi.cdUntil = 0; var shots = W.log.length; api.fireBasic(gi, 0); W.frame(FRAME);
+      if (self.lost(W, "near") || W.log.length !== shots) bad.push("변신 중 기본 공격이 나감");
+      W.step(ULT.gaDur);
+      if (api.speedOf(gi) !== C.speed) bad.push("끝난 뒤 이동속도 " + api.speedOf(gi) + " (기대 " + C.speed + ")");
+      near.hp = near.maxHp; gi.cdUntil = 0; api.fireBasic(gi, 0); W.frame(FRAME);
+      if (!self.lost(W, "near")) bad.push("끝난 뒤 기본 공격이 안 나감");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "점프·변신 중 이동 0·공격 불가, 끝나면 복귀");
+    });
+    run(G, "가르강튀아 블랙홀: 반경 " + ULT.gaR + " 안의 적만 가르강튀아 곁(" + ULT.gaGap + ")까지 끌려오고, 가르강튀아이 밀려나면 같이 따라오는가", function (done) {
+      var landX = 200, bad = [], W = self.giantWorld([{ id: "in", x: landX + 300, dy: 40 }, { id: "out", x: landX + ULT.gaR + 120 }], 500), gi = W.ent("gi"), inn = W.ent("in"), out = W.ent("out");
+      self.jump(W, Math.PI, 300);
+      var outX = out.x;
+      W.step(2000);
+      var d = Math.hypot(inn.x - gi.x, inn.y - gi.y);
+      if (Math.abs(d - ULT.gaGap) > 8) bad.push("끌려온 적과의 거리 " + Math.round(d) + " (기대 " + ULT.gaGap + ")");
+      if (Math.abs(out.x - outX) > 1) bad.push("반경 밖 적이 끌려옴");
+      gi.x -= 100; W.step(1500);
+      var d2 = Math.hypot(inn.x - gi.x, inn.y - gi.y);
+      if (Math.abs(d2 - ULT.gaGap) > 8) bad.push("가르강튀아이 밀려났는데 따라오지 않음 " + Math.round(d2));
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "반경 안 거리 " + Math.round(d) + "→" + Math.round(d2) + ", 반경 밖은 그대로");
+    });
+    run(G, "가르강튀아 폭발: 블랙홀이 끝나는 순간 반경 안의 적에게만 " + ULT.gaBoomDmg + "의 피해를 주고, 그 전에는 피해가 없는가", function (done) {
+      var landX = 200, bad = [], W = self.giantWorld([{ id: "in", x: landX + 300, dy: 40 }, { id: "out", x: landX + ULT.gaR + 120 }], 500);
+      self.jump(W, Math.PI, 300);
+      W.step(ULT.gaDur - 400);
+      if (self.lost(W, "in")) bad.push("끝나기 전에 이미 피해 " + self.lost(W, "in"));
+      W.step(600);
+      if (self.lost(W, "in") !== ULT.gaBoomDmg) bad.push("폭발 피해 " + self.lost(W, "in") + " (기대 " + ULT.gaBoomDmg + ")");
+      if (self.lost(W, "out")) bad.push("반경 밖 적이 맞음");
+      W.step(1500);
+      if (self.lost(W, "in") !== ULT.gaBoomDmg) bad.push("폭발이 한 번이 아님 " + self.lost(W, "in"));
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "끝나기 전 0, 끝난 뒤 안 " + ULT.gaBoomDmg + " 한 번, 밖 0");
+    });
+    run(G, "가르강튀아 폭발: 가르강튀아이 쓰러지면 블랙홀이 사라지고 폭발하지 않는가", function (done) {
+      var landX = 200, bad = [], W = self.giantWorld([{ id: "in", x: landX + 300, dy: 40 }], 500), gi = W.ent("gi");
+      self.jump(W, Math.PI, 300);
+      api.damage(gi, 9999, "in", false, null);
+      W.step(ULT.gaDur + 200);
+      if (self.lost(W, "in")) bad.push("쓰러진 뒤에 폭발함 " + self.lost(W, "in"));
+      if (api.FIELD.holes.some(function (h) { return h.e.ga; })) bad.push("블랙홀이 남음");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "블랙홀 소멸·폭발 없음");
+    });
+  }
+}
+
 
 class TestPanel {
   static STATUS_LABEL = { pass: "통과", fail: "문제", info: "확인 필요" };
