@@ -903,7 +903,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               rvDur: gameMs(4), rvTick: gameMs(1), rvHeal: 20, rvDmg: 20, rvCastMs: 600, grLife: 650,
               trDur: gameMs(10), trR: 340, trCd: gameMs(0.5), trScanMs: 120, trWarmMs: 300, trDmg: 10, trHeavyEvery: 3, trHeavyDmg: 34, trStunMs: gameMs(0.8), trMax: 2, trGauge: 1,
               trSpeedBonus: gameSpeed(30), trShellSpeed: gameSpeed(1000), trHitR: 38, trCastMs: 450,
-              drR: 150, drDur: 3600000, drTick: gameMs(1), drHeal: 20, drCast: 450, drMin: 60, drSelfRate: 0.12, drSelfGauge: 1, drRiseMs: 350, drCastMs: 500,
+              drR: 150, drDur: 3600000, drTick: gameMs(1), drHeal: 20, drCast: 450, drMin: 60, drSelfRate: 0.1, drSelfGauge: 1, drRiseMs: 350, drCastMs: 500,
               gaCast: 350, gaMin: 60, gaTransformMs: gameMs(1.2), gaDur: gameMs(6), gaR: 350, gaPull: 260, gaGap: 70, gaBoomDmg: 30,
               sfMin: 60, sfDelay: gameMs(0.6), sfR: 70, sfStunEvery: 3, sfStunMs: gameMs(1),
               agCast: 400, agMin: 60, agDur: gameMs(3), agR: 350, agPull: 260, agGap: 70, agBoomDmg: 30,
@@ -3460,7 +3460,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (!T.groveNext) T.groveNext = t + TIMESCALE.regenTickMs;
       if (t < T.groveNext) return;
       T.groveNext += TIMESCALE.regenTickMs;
-      var healed = STATUS.healAmount(T, Math.round(T.maxHp * ULT.drSelfRate), t);
+      var selfHeal = Math.round(T.maxHp * ULT.drSelfRate), healed = STATUS.healAmount(T, GROVES.shelters(T, t) ? Math.max(selfHeal, ULT.drHeal) : selfHeal, t);
       if (healed > 0) { T.hp += healed; T.heal = (T.heal || 0) + healed; }
       if (!T.isGaugeLocked(t)) T.gauge = Math.min(GAUGE_MAX, T.gauge + ULT.drSelfGauge);
       MATCH.game.forceNet = true;
@@ -3470,7 +3470,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     passiveDesc() {
       var c = this.data;
-      return "기본 공격에 맞은 적은 " + SKILLTEXT.secs(c.fx.slowMs) + "간 " + SKILLTEXT.slowPct(c.fx.slowMul) + ". 자신이 부쉬 안에 있으면 1초당 최대 체력의 " + SKILLTEXT.pctOf(ULT.drSelfRate) + "% 회복, 게이지 " + ULT.drSelfGauge + " 회복";
+      return "기본 공격에 맞은 적은 " + SKILLTEXT.secs(c.fx.slowMs) + "간 " + SKILLTEXT.slowPct(c.fx.slowMul) + ". 자신이 부쉬 안에 있으면 1초당 최대 체력의 " + SKILLTEXT.pctOf(ULT.drSelfRate) + "% 회복(자신이 만든 부쉬 안에서는 " + ULT.drHeal + " 회복), 게이지 " + ULT.drSelfGauge + " 회복";
     }
     basicDesc() {
       var c = this.data;
@@ -4758,6 +4758,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     constructor() { this.rangeRing = null; this.nextId = GroveSystem.ID_BASE; }
     isActive(s, t) { return !s.cut && t >= s.e.createdAt && t < s.e.createdAt + s.e.dur; }
     covers(s, x, y) { return Math.max(Math.abs(x - s.e.x), Math.abs(y - s.e.y)) <= s.e.r; }
+    shelters(T, t) {
+      return FIELD.groves.some(function (s) { return s.e.owner === T.id && GROVES.isActive(s, t) && GROVES.covers(s, T.x, T.y); });
+    }
     snapToTiles(spot) {
       return { x: MAP_X0 + Math.round((spot.x - MAP_X0) / TILE) * TILE, y: MAP_Y0 + Math.round((spot.y - MAP_Y0) / TILE) * TILE };
     }

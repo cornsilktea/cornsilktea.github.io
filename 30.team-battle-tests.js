@@ -4589,13 +4589,13 @@ class EngineerDruidTests {
       if (api.FIELD.groves.length !== 1) bad.push("부쉬가 자신의 자리에 안 생김");
       dr.hp = dr.maxHp - 90; var hp0 = dr.hp;
       W.step(tick * 3 + 100);
-      var gain = dr.hp - hp0, wantGain = 3 * self10;
+      var gain = dr.hp - hp0, wantGain = 3 * Math.max(self10, ULT.drHeal);
       if (dr.gauge !== 3 * ULT.drSelfGauge) bad.push("게이지 " + dr.gauge + " (기대 " + 3 * ULT.drSelfGauge + ")");
-      if (gain !== Math.min(90, wantGain)) bad.push("회복 " + gain + " (기대 " + Math.min(90, wantGain) + ", 패시브 " + self10 + "×3, 자신의 부쉬 회복은 적용 안 함)");
+      if (gain !== Math.min(90, wantGain)) bad.push("회복 " + gain + " (기대 " + Math.min(90, wantGain) + ", 자신의 부쉬 안에서는 패시브 " + self10 + "와 부쉬 " + ULT.drHeal + " 중 큰 쪽 ×3, 겹쳐 받지 않음)");
       dr.x = 200 + ULT.drR + 80; dr.hp = dr.maxHp - 40; var g1 = dr.gauge, h1 = dr.hp;
       W.step(tick * 3 + 100);
       if (dr.hp !== h1 || dr.gauge !== g1) bad.push("부쉬 밖에서도 회복·게이지가 오름");
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "안: 초당 " + self10 + "(패시브만, 부쉬 회복과 겹치지 않음) 회복·게이지 +1, 밖: 변화 없음");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "자신의 부쉬 안: 초당 " + Math.max(self10, ULT.drHeal) + "(겹치지 않고 큰 쪽) 회복·게이지 +1, 밖: 변화 없음");
     });
     run(G, "드루이드 패시브: 맵의 부쉬(풀숲) 안에서도 1초마다 체력 회복·게이지 +1 이 되는가", function (done) {
       var bad = [], tiles = api.bushTiles(), spot = tiles.length ? tiles[0][0] : null;
