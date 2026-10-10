@@ -2930,8 +2930,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     get hasSkillClip() { return true; }
     playSkillClip(v, E, t) { FIGHTER_VIEW.playOnce(v, "Ranged_Magic_Summon", 3.2, t); }
-    get shotName() { return "마법 구슬"; }
+    get shotName() { return "에너지 구"; }
     get startsSkillTimer() { return false; }
+    attackClip(v, E, t) {
+      return ["Melee_2H_Attack_Slice", 2];
+    }
     cast(E, ang, reach, t) {
       E.angle = ang;
       E.ultUntil = t + 450;
@@ -5959,11 +5962,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         return load(KIT_DIR + PROP_FILES[k]).then(function (g) { KIT.props[k] = MODELS.lambertize(g.scene); });
       })).then(function () { KIT.propsReady = true; ARENA_VIEW.useArena(ARENA_MAP.id); }).catch(function () {});
     }
-    plantHeldUpright(m) {
+    plantHeldUpright(m, extraTurn) {
       var held = m.getObjectByName("mainhand"); if (!held) return;
       var handTurn = new THREE.Quaternion(), bodyTurn = new THREE.Quaternion(), foot = new THREE.Vector3();
       held.parent.getWorldQuaternion(handTurn); m.getWorldQuaternion(bodyTurn);
       held.quaternion.copy(handTurn.invert().multiply(bodyTurn));
+      if (extraTurn) held.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(Y_UP, extraTurn));
       m.updateMatrixWorld(true);
       var lowest = new THREE.Box3().setFromObject(held).min.y - m.position.y;
       var outward = new THREE.Vector3(-PLANT_OUTWARD, 0, PLANT_FORWARD).applyQuaternion(bodyTurn);
@@ -5989,7 +5993,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         m.rotation.y = -0.45;
         var mix = new THREE.AnimationMixer(m); mix.clipAction(KIT.clips.Idle_A).play(); mix.update(0.3);
         m.updateMatrixWorld(true);
-        if (MODEL[c].portraitPlant) MODELS.plantHeldUpright(m);
+        if (MODEL[c].portraitPlant) MODELS.plantHeldUpright(m, MODEL[c].plantTurn);
         return { c: c, m: m, box: new THREE.Box3().setFromObject(m) };
       });
       var tallest = posed.reduce(function (h, p) { return Math.max(h, p.box.max.y); }, 0);
@@ -7722,7 +7726,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     mage:    { file: "Mage", right: "staff", recolor: [[1, 0, 2, "#D8342E", "#6A0E10"], [1, 7, 1, "#4A1012", "#1E0507"], [1, 2, 1, "#FF9A3A", "#C8401A"], [2, 1, 1, "#FF9A3A", "#C8401A"]],
                rightRecolor: [[2, 6, 1, "#FFD27A", "#E0341E"]] },
     rogue:   { file: "Rogue", right: "dagger", left: "dagger" },
-    necro:   { file: "Necromancer", right: "Skeleton_Staff" },
+    necro:   { file: "Necromancer", portraitPlant: true, plantTurn: Math.PI / 2, right: "Skeleton_Scythe" },
     sniper:  { file: "Rogue_Hooded", right: "crossbow_2handed", rightTurn: Math.PI / 2, muzzle: [0, 0.12, 1.12] },
     thrower: { file: "Skeleton_Rogue", right: "Potion_1", rightScale: 2.2 },
     lancer:  { file: "Barbarian", right: "spear_A", rightScale: 1.35, hide: ["Barbarian_BearHat"], wear: { from: "knight", part: "Knight_Helmet" },
