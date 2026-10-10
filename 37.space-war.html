@@ -55,6 +55,8 @@
   .squadRow { display: block; padding: 4px 4px 5px; margin-top: 2px; border-radius: 6px; border: 1.5px solid transparent; cursor: pointer; }
   .squadRow.selected { border-color: var(--squad); background: rgba(255, 255, 255, .08); }
   .squadRow.away .name::after { content: " ▶"; color: var(--squad); }
+  #btnRegroup { display: block; width: 100%; margin-top: 6px; padding: 6px 4px; font-size: 13px; font-weight: 800; border-radius: 6px; border: 1.5px solid rgba(255, 255, 255, .5); background: rgba(255, 255, 255, .08); color: #fff; }
+  #btnRegroup:disabled { opacity: .4; }
   .squadRow .name { display: block; margin-bottom: 3px; color: var(--squad); font-size: 12px; }
   .gauge { display: grid; grid-template-columns: repeat(20, 1fr); gap: 1px; }
   .gauge .cell { height: 9px; background: rgba(255, 255, 255, .12); border-radius: 1px; }
@@ -117,6 +119,7 @@
     <div class="squadRow" id="squadRow0"><span class="name">부대 1</span><div class="gauge"></div></div>
     <div class="squadRow" id="squadRow1"><span class="name">부대 2</span><div class="gauge"></div></div>
     <div class="squadRow" id="squadRow2"><span class="name">부대 3</span><div class="gauge"></div></div>
+    <button type="button" id="btnRegroup">부대 재편성</button>
   </div>
 
   <div id="bottomBar">
@@ -204,13 +207,13 @@
 </div>
 
 <script charset="utf-8" src="character-kit.js"></script>
-<script charset="utf-8" src="37.war-data.js?v=20261010h"></script>
-<script charset="utf-8" src="37.war-rules.js?v=20261010h"></script>
-<script charset="utf-8" src="37.war-bot.js?v=20261010h"></script>
-<script charset="utf-8" src="37.war-scenery.js?v=20261010h"></script>
-<script charset="utf-8" src="37.war-views.js?v=20261010h"></script>
-<script charset="utf-8" src="37.war-hud.js?v=20261010h"></script>
-<script charset="utf-8" src="37.space-war.js?v=20261010h"></script>
+<script charset="utf-8" src="37.war-data.js?v=20261010i"></script>
+<script charset="utf-8" src="37.war-rules.js?v=20261010i"></script>
+<script charset="utf-8" src="37.war-bot.js?v=20261010i"></script>
+<script charset="utf-8" src="37.war-scenery.js?v=20261010i"></script>
+<script charset="utf-8" src="37.war-views.js?v=20261010i"></script>
+<script charset="utf-8" src="37.war-hud.js?v=20261010i"></script>
+<script charset="utf-8" src="37.space-war.js?v=20261010i"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";

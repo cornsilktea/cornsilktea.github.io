@@ -193,6 +193,12 @@ class WarGameApp {
                 this.sendCommand(new WarSurrenderCommand(this.viewer));
         });
         this.squadPanel.onSelect = (index) => this.select({ kind: "squad", index });
+        this.squadPanel.onRegroup = () => {
+            if (!this.match)
+                return;
+            this.sendCommand(new WarRegroupCommand(this.viewer));
+            this.notice.show("부대를 재편성했어요.");
+        };
         this.minimap.onJump = () => this.onMinimap();
         window.addEventListener("contextmenu", (event) => event.preventDefault());
         window.addEventListener("keydown", (event) => {

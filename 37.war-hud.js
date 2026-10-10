@@ -63,6 +63,8 @@ class WarSquadNames {
 class WarSquadPanel {
     constructor() {
         this.onSelect = () => undefined;
+        this.onRegroup = () => undefined;
+        this.regroupButton = WarDom.byId("btnRegroup");
         this.workerText = WarDom.byId("workerCount");
         this.rows = [];
         this.cells = [];
@@ -80,9 +82,11 @@ class WarSquadPanel {
             this.rows.push(row);
             this.cells.push(cells);
         }
+        this.regroupButton.addEventListener("click", () => this.onRegroup());
     }
     update(player, selection) {
         this.workerText.textContent = "광석 " + player.economy.oreWorkers + " · 결정 " + player.economy.crystalWorkers;
+        this.regroupButton.disabled = !WarRegrouper.canRegroup(player);
         player.squads.forEach((squad, index) => {
             const order = ["melee", "ranged", "elite"];
             const colors = [];

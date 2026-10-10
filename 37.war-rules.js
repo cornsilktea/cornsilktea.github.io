@@ -481,6 +481,36 @@ class WarSquadAssigner {
         return null;
     }
 }
+class WarRegrouper {
+    static homeSquads(player) {
+        return player.squads.filter((squad) => squad.mode === "home");
+    }
+    static canRegroup(player) {
+        return WarRegrouper.homeSquads(player).filter((squad) => squad.members.length > 0).length >= 2;
+    }
+    static regroup(player) {
+        const squads = WarRegrouper.homeSquads(player);
+        if (squads.length < 2)
+            return;
+        const movable = [];
+        for (const squad of squads) {
+            for (const unit of squad.members.slice()) {
+                if (unit.independent)
+                    continue;
+                squad.remove(unit);
+                movable.push(unit);
+            }
+        }
+        movable.sort((a, b) => a.id - b.id);
+        const assigner = new WarSquadAssigner(squads);
+        for (const unit of movable) {
+            unit.targetId = -1;
+            unit.restHere = false;
+            unit.marchTicks = 0;
+            assigner.assign(unit);
+        }
+    }
+}
 class WarFormation {
     static slots(members, anchor, heading) {
         const result = new Map();
@@ -1063,6 +1093,7 @@ class WarCommand {
             case "attackPath": return new WarAttackPathCommand(json.team, json.squad, json.points);
             case "moveUnit": return new WarMoveUnitCommand(json.team, json.unitId, json.point);
             case "recall": return new WarRecallCommand(json.team, json.squad);
+            case "regroup": return new WarRegroupCommand(json.team);
             case "surrender": return new WarSurrenderCommand(json.team);
         }
         throw new Error("unknown command " + json.type);
@@ -1134,6 +1165,14 @@ class WarRecallCommand extends WarCommand {
     }
     toJson() {
         return { type: "recall", team: this.team, squad: this.squad };
+    }
+}
+class WarRegroupCommand extends WarCommand {
+    apply(engine) {
+        WarRegrouper.regroup(engine.players[this.team]);
+    }
+    toJson() {
+        return { type: "regroup", team: this.team };
     }
 }
 class WarSurrenderCommand extends WarCommand {

@@ -228,7 +228,7 @@ class WarMapData {
   static readonly PLAZA_RADIUS = 2600;
   static readonly BASE_RADIUS = 2600;
   static readonly POST_SPREAD = 1300;
-  static readonly TURRET_OFFSET: WarPoint = { x: 0, y: 350 };
+  static readonly TURRET_OFFSET: WarPoint = { x: 0, y: -700 };
   static readonly POST_BACKOFF = -400;
   static readonly POST_LATERAL: number[] = [0, -1, 1];
   static readonly SLOT_OFFSETS: WarPoint[] = [

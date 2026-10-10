@@ -523,6 +523,37 @@ class WarSquadAssigner {
     return null;
   }
 }
+class WarRegrouper {
+  static homeSquads(player: WarPlayer): WarSquad[] {
+    return player.squads.filter((squad) => squad.mode === "home");
+  }
+
+  static canRegroup(player: WarPlayer): boolean {
+    return WarRegrouper.homeSquads(player).filter((squad) => squad.members.length > 0).length >= 2;
+  }
+
+  static regroup(player: WarPlayer): void {
+    const squads = WarRegrouper.homeSquads(player);
+    if (squads.length < 2) return;
+    const movable: WarUnit[] = [];
+    for (const squad of squads) {
+      for (const unit of squad.members.slice()) {
+        if (unit.independent) continue;
+        squad.remove(unit);
+        movable.push(unit);
+      }
+    }
+    movable.sort((a, b) => a.id - b.id);
+    const assigner = new WarSquadAssigner(squads);
+    for (const unit of movable) {
+      unit.targetId = -1;
+      unit.restHere = false;
+      unit.marchTicks = 0;
+      assigner.assign(unit);
+    }
+  }
+}
+
 class WarFormation {
   private static readonly FRONT_START = 260;
   private static readonly ROW_GAP = 60;
@@ -1088,6 +1119,7 @@ abstract class WarCommand {
       case "attackPath": return new WarAttackPathCommand(json.team, json.squad as number, json.points as WarPoint[]);
       case "moveUnit": return new WarMoveUnitCommand(json.team, json.unitId as number, json.point as WarPoint);
       case "recall": return new WarRecallCommand(json.team, json.squad as number);
+      case "regroup": return new WarRegroupCommand(json.team);
       case "surrender": return new WarSurrenderCommand(json.team);
     }
     throw new Error("unknown command " + json.type);
@@ -1164,6 +1196,16 @@ class WarRecallCommand extends WarCommand {
 
   toJson(): WarCommandJson {
     return { type: "recall", team: this.team, squad: this.squad };
+  }
+}
+
+class WarRegroupCommand extends WarCommand {
+  apply(engine: WarEngine): void {
+    WarRegrouper.regroup(engine.players[this.team]);
+  }
+
+  toJson(): WarCommandJson {
+    return { type: "regroup", team: this.team };
   }
 }
 
