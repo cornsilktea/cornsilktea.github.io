@@ -3433,7 +3433,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var halo = new THREE.Mesh(GEO.ball, MODELS.glowMat("thornGlow", 0x7FD14A, 0.4)); halo.scale.setScalar(13); g.add(halo);
       var thorn = new THREE.Mesh(GEO.head, MODELS.basicMat("thornTip", 0xB6E86A, 1)); thorn.scale.set(1.5, 1.5, 1.5); thorn.position.x = 2; g.add(thorn);
       var vine = new THREE.Mesh(GEO.shaft, MODELS.basicMat("thornVine", 0x3F7A22, 1)); vine.scale.set(0.8, 1.6, 1.6); vine.position.x = -8; g.add(vine);
-      var tail = new THREE.Mesh(GEO.trail, MODELS.glowMat("trail-thorn", 0x7FD14A, 0.4)); tail.position.x = -20; tail.scale.set(38, 2.6, 2.6); g.add(tail);
+      VineTrail.build(g, KIT.props.vineBlade);
     }
     aimRange(btn) { return [ULT.drMin, ULT.drCast]; }
     showAimGuide(E, ult, c) {
@@ -4652,6 +4652,38 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   var GROVES = new GroveSystem();
+  class VineTrail {
+    static SEGMENTS = 12;
+    static SPACING = 9;
+    static HEIGHT = 32;
+    static GROW_LEN = 14;
+    static THICKNESS = 2.2;
+    static build(g, tpl) {
+      var blades = [];
+      if (tpl) {
+        var box = PROPS.propSize(tpl), k = VineTrail.HEIGHT / box.getSize(new THREE.Vector3()).y;
+        for (var i = 0; i < VineTrail.SEGMENTS; i++) {
+          var blade = tpl.clone(), holder = new THREE.Group();
+          var taper = 1.15 - i * 0.04;
+          blade.scale.set(k * taper * VineTrail.THICKNESS, k * taper, k * taper * VineTrail.THICKNESS); blade.position.y = -box.min.y * k * taper;
+          holder.add(blade);
+          holder.position.set(-6 - i * VineTrail.SPACING, -PROJ_Y, ((i * 37) % 7 - 3) * 1.4);
+          holder.userData.yaw = i * 1.9;
+          g.add(holder); blades.push(holder);
+        }
+      } else {
+        var tail = new THREE.Mesh(GEO.trail, MODELS.glowMat("trail-thorn", 0x7FD14A, 0.4)); tail.position.x = -20; tail.scale.set(38, 2.6, 2.6); g.add(tail);
+      }
+      g.userData.vine = blades;
+    }
+    static animate(g, travelled, nowMs) {
+      g.userData.vine.forEach(function (holder, i) {
+        var grow = clamp((travelled - i * VineTrail.SPACING) / VineTrail.GROW_LEN, 0.02, 1);
+        holder.scale.set(1, grow, 1);
+        holder.rotation.set(Math.sin(nowMs / 110 + i) * 0.35, holder.userData.yaw, -0.55 + Math.sin(nowMs / 95 + i * 0.8) * 0.3, "YXZ");
+      });
+    }
+  }
   class DamageResolver {
     payKillGaugeOwed(E, t) {
       if (!E.killGaugeOwed || E.isGaugeLocked(t)) return;
@@ -7687,6 +7719,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
        if (g.userData.pulse) g.userData.pulse.scale.setScalar(9 + 2 * Math.sin(nowMs / 50));
         if (g.userData.spin) g.userData.spin.rotation.x = nowMs / 35;
         if (g.userData.whirl) g.userData.whirl.rotation.y = nowMs / 40;
+        if (g.userData.vine) VineTrail.animate(g, p.sp * Math.max(0, e) / 1000, nowMs);
       });
       keys(PRV).forEach(function (id) { if (!MATCH.remoteShots[id]) EFFECT_VIEW.dropProjVis(id); });
 
@@ -8149,7 +8182,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var MINION_MODEL = { file: "Skeleton_Minion", right: "Skeleton_Blade", scale: 0.9 };
   var PROP_FILES = { bushBig: "props/Bush_1_D_Color1.gltf",
                      blockA: "props/Rock_2_C_Color1.gltf", blockB: "props/Rock_2_D_Color1.gltf", treeA: "props/Tree_1_A_Color1.gltf", treeB: "props/Tree_2_B_Color1.gltf",
-                     treeC: "props/Tree_3_A_Color1.gltf", treeD: "props/Tree_4_B_Color1.gltf", tuft: "props/Grass_1_B_Color1.gltf",
+                     treeC: "props/Tree_3_A_Color1.gltf", treeD: "props/Tree_4_B_Color1.gltf", tuft: "props/Grass_1_B_Color1.gltf", vineBlade: "props/Grass_2_A_Color1.gltf",
                      dgBlock: "dungeon/floor_foundation_allsides.gltf", dgFloor: "dungeon/floor_tile_small.gltf", dgFloorWeeds: "dungeon/floor_tile_small_weeds_A.gltf",
                      dgBox: "dungeon/box_large.gltf", dgBarrel: "dungeon/barrel_large.gltf", dgTorch: "dungeon/torch_lit.gltf",
                      dgBannerBlue: "dungeon/banner_patternA_blue.gltf", dgBannerRed: "dungeon/banner_patternA_red.gltf",
