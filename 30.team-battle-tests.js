@@ -3992,7 +3992,7 @@ class ResultCollector {
       if (api.statTable(c).indexOf(String(C[c].hp)) < 0) bad.push(C[c].name + " 표에 체력");
       if (api.statTable(c).indexOf(C[c].ultName) < 0) bad.push(C[c].name + " 표에 스킬 이름");
     });
-    if (api.num(1.26) !== "1.3" || api.num(5) !== "5" || api.pctOf(0.456) !== 46 || api.slowPct(0.6) !== "40% 둔화" || api.healCutPct() !== "50%") bad.push("숫자 도구");
+    if (api.num(1.26) !== "1.3" || api.num(5) !== "5" || api.pctOf(0.456) !== 45.6 || api.pctOf(0.025) !== 2.5 || api.pctOf(0.2) !== 20 || api.slowPct(0.6) !== "40% 둔화" || api.healCutPct() !== "50%") bad.push("숫자 도구");
     if (api.secs(700) !== "1초" || api.secs(175) !== "0.25초" || api.shownSpeed(200) !== 200 * scale || api.roleGaugeText(api.ROLES.fighter).indexOf("+2") < 0) bad.push("초·속도·게이지 문구");
     if (api.ultSpeedUpText({ ultSpeed: 300, speed: 200 }).indexOf(String(api.shownSpeed(100))) < 0) bad.push("스킬 이동속도 문구");
     var attackWant = "공격 간격 1초";
