@@ -4004,10 +4004,10 @@ class ResultCollector {
     if (api.CLOCK.scale !== 0.7) bad.push("시계 배율 " + api.CLOCK.scale);
     if (api.matchMs() !== 90000 * 0.7) bad.push("경기 시간 " + api.matchMs());
     if (T.matchMs !== 90000 * 0.7 || T.respawnMs !== 3000 * 0.7 || T.respawnProtectMs !== 2500 * 0.7 || T.burnTickMs !== 700 || T.regenTickMs !== 700) bad.push("시간 필드 " + JSON.stringify([T.matchMs, T.respawnMs, T.respawnProtectMs, T.burnTickMs, T.regenTickMs]));
-    if (K.cd !== Math.round(1.6 * 1000 * 0.7) || K.speed !== Math.round(150 / 0.7) || K.hp !== 370) bad.push("기사 수치 " + JSON.stringify([K.cd, K.speed, K.hp]));
+    if (K.cd !== Math.round(1.5 * 1000 * 0.7) || K.speed !== Math.round(150 / 0.7) || K.hp !== 370) bad.push("기사 수치 " + JSON.stringify([K.cd, K.speed, K.hp]));
     if (api.ULT.rmDur !== Math.round(4 * 1000 * 0.7)) bad.push("스킬 수치 rmDur " + api.ULT.rmDur);
-    if (api.secs(K.cd) !== "1.6초" || api.shownSpeed(K.speed) !== 150) bad.push("카드 표기 " + api.secs(K.cd) + " " + api.shownSpeed(K.speed));
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "배율 0.7·경기 63초·기사 공격 간격 1.6초 이동속도 150 표기");
+    if (api.secs(K.cd) !== "1.5초" || api.shownSpeed(K.speed) !== 150) bad.push("카드 표기 " + api.secs(K.cd) + " " + api.shownSpeed(K.speed));
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "배율 0.7·경기 63초·기사 공격 간격 1.5초 이동속도 150 표기");
   });
   run(CONNG, "연결 설정(BACKEND): 설정이 준비되면 주소 끝 슬래시를 뗀 채 연결하고, 준비 안 됐으면 건드리지 않으며, 연결이 던지면 db 를 비우는가", function (done) {
     var B = api.BACKEND, bad = [], saved = { conf: B.conf, db: B.db }, firebaseBefore = window.firebase, calls = [], fakeDb = { name: "가짜" };
