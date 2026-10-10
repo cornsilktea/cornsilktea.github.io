@@ -814,21 +814,21 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
                rally: { hpRate: 0.5, ms: gameMs(7), perSec: 7 }, ultName: "광폭화", heals: true },
     duelist: { name: "결투가", role: "assassin", icon: "🤺", hp: 135, speed: gameSpeed(175), cd: gameMs(1), dmg: 40, range: 100,
                dashRange: 250, dashMs: gameMs(0.5), stab: true, selfHeal: 10, ultName: "르미즈", heals: true },
-    knight:  { name: "기사", role: "fighter", icon: "🛡️", hp: 370, speed: gameSpeed(140), cd: gameMs(1.8), dmg: 25, range: 110, arc: Math.PI * 0.7, armor: 2, ultName: "방어태세", blocks: true },
+    knight:  { name: "기사", role: "fighter", icon: "🛡️", hp: 370, speed: gameSpeed(150), cd: gameMs(1.6), dmg: 25, range: 110, arc: Math.PI * 0.7, armor: 2, ultName: "방어태세", blocks: true },
     ranger:  { name: "궁수", role: "shooter", icon: "🏹", hp: 100, speed: gameSpeed(140), haste: { add: 10, ms: gameMs(4), max: 40 }, cd: gameMs(0.8), dmg: 15, range: 450, pSpeed: 532, pr: 12, shots: 2, gap: 70, ultName: "난사", ultAim: true },
     mage:    { name: "화염술사", role: "caster", icon: "🔥", hp: 115, speed: gameSpeed(170), cd: gameMs(1.4), dmg: 5, range: 350, pSpeed: 700, pr: 9, burn: { ms: gameMs(6), maxHpRate: 0.03 }, ultName: "메테오", ultAim: true },
     rogue:   { name: "은신자", role: "assassin", icon: "🗡️", hp: 135, speed: gameSpeed(175), ultSpeed: gameSpeed(280), cd: gameMs(1.1), dmg: 32, range: 110, arc: Math.PI * 0.6, hits: 2, hitGap: 160, ambushDmg: 45, throwDmg: 25, throwRange: 350, pSpeed: 1080, pr: 8, ultName: "은신" },
     necro:   { name: "네크로", role: "caster", icon: "💀", hp: 120, lastStandHp: 50, lastStandHideMs: gameMs(1.5), speed: gameSpeed(170), cd: gameMs(1.4), dmg: 10, range: 350, pSpeed: 1000, pr: 9, ultName: "해골 소환", blocks: true },
     sniper:  { name: "저격수", role: "shooter", icon: "🎯", hp: 100, speed: gameSpeed(140), cd: gameMs(1), dmg: 37, range: 650, pSpeed: 1000, pr: 12, farDist: 500, farBonus: 0.5, ultName: "거대 화살", ultAim: true },
     thrower: { name: "투척병", role: "shooter", icon: "🧪", hp: 120, speed: gameSpeed(155), cd: gameMs(1.4), dmg: 15, ticks: 3, range: KEY * 4 + 120, minRange: KEY * 1, healCut: true, ultName: "독안개", ultAim: true, heals: true },
-    lancer:  { name: "창술사", role: "fighter", icon: "🔱", hp: 390, speed: gameSpeed(140), cd: gameMs(1.7), dmg: 30, range: 200, width: 50, respawnShield: true, ultName: "꿰뚫기", ultAim: true },
-    blacksmith: { name: "대장장이", role: "fighter", icon: "🔨", hp: 410, speed: gameSpeed(140), cd: gameMs(1.8), dmg: 30, range: 180, width: 150, windup: gameMs(0.7), fx: { stunMs: gameMs(0.7) }, ultName: "내려찍기", ultAim: true },
+    lancer:  { name: "창술사", role: "fighter", icon: "🔱", hp: 390, speed: gameSpeed(150), cd: gameMs(1.7), dmg: 30, range: 200, width: 50, respawnShield: true, ultName: "꿰뚫기", ultAim: true },
+    blacksmith: { name: "대장장이", role: "fighter", icon: "🔨", hp: 410, speed: gameSpeed(150), cd: gameMs(1.8), dmg: 30, range: 180, width: 150, windup: gameMs(0.5), fx: { stunMs: gameMs(0.7) }, ultName: "내려찍기", ultAim: true },
     priest:  { name: "사제", role: "caster", icon: "📖", hp: 120, speed: 240, cd: 1000, dmg: 10, heal: 10, range: 320, width: 200, ultName: "블랙홀", ultKind: "blackhole", ultAim: true, heals: true, retired: true },
     shaman:  { name: "주술사", role: "shooter", icon: "👊", hp: 115, speed: gameSpeed(170), cd: gameMs(1.4), dmg: 5, range: 400, width: 100, ultName: "영역전개" },
     cleric:  { name: "클레릭", role: "caster", icon: "✝️", hp: 110, speed: gameSpeed(170), cd: gameMs(1.4), dmg: 0, graceHeal: 20, range: 400, noAim: true, healGauge: 400, ultName: "요한계시록", heals: true },
     hitman:  { name: "자객", role: "assassin", icon: "🔪", hp: 130, speed: gameSpeed(175), cd: gameMs(1.3), dmg: 40, range: 100,
                dashRange: 200, dashWidth: 150, dashDmg: 40, dashMs: 300, finishDelay: 125, ultName: "처형", ultAim: true },
-    guardian: { name: "수문장", role: "fighter", icon: "🏰", hp: 430, speed: gameSpeed(140), cd: gameMs(1.5), dmg: 25, range: 140, arc: Math.PI * 130 / 180,
+    guardian: { name: "수문장", role: "fighter", icon: "🏰", hp: 460, speed: gameSpeed(150), cd: gameMs(1.5), dmg: 25, range: 140, arc: Math.PI * 130 / 180,
                 fx: { slowMs: gameMs(1.5), slowMul: 0.7 }, ultName: "창벽" },
     frost:   { name: "얼음술사", role: "caster", icon: "❄️", hp: 115, speed: gameSpeed(170), cd: gameMs(1.4), dmg: 10, range: 350, pSpeed: 650, pr: 8, ultName: "눈보라" },
     dancer:  { name: "검무희", role: "assassin", icon: "🌸", hp: 130, speed: gameSpeed(175), ultSpeed: gameSpeed(210), cd: gameMs(1.2), dmg: 20, range: 350, pSpeed: 900, pr: 8, ultName: "칼날 폭풍" },
@@ -882,14 +882,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   var ULT = { mkCount: 10, mkGap: 115, mkDmg: 36, mkRefund: 1, mkSpeed: 805, mkRange: KEY * 8, mkPr: 8,
               bzDur: gameMs(6), bzDmgMul: 1.5, bzCdMul: 1 / 1.5, bzHeal: 20, tkDur: gameMs(6), tkDef: 0.4, tkStunR: 120, tkStunMs: gameMs(1.5),
-              mbDelay: gameMs(1.5), mbR: 250, mbDmg: 110, mbDmgMin: 70, mbCast: 550, mbMin: 60, mbStunMs: gameMs(1.7), mbStunMin: gameMs(0.9), mbSteps: 5,
+              mbDelay: gameMs(1.5), mbR: 250, mbDmg: 100, mbDmgMin: 65, mbCast: 550, mbMin: 60, mbStunMs: gameMs(1.7), mbStunMin: gameMs(0.9), mbSteps: 5,
               asSmokeMs: 400, asDur: gameMs(21),
               smCount: 2, smAhead: KEY * 1, smSide: 38, smHp: 65, smSpeed: gameSpeed(180), smGauge: 0.5, smDmg: 12, smCd: 800, smRange: 80, smArc: Math.PI * 0.6,
               smDur: gameMs(10), smMax: 4, smFollow: KEY * 1.5, smRiseMs: 1100, smCorpseMs: 1400,
               pnDmg: 90, pnSpeed: 735, pnRange: 900, pnPr: 16, pnRefund: 4, pnScale: 3,
               plFlight: 700, plFlightMin: 100, plR: 60, plDur: gameMs(3), plTick: gameMs(1), plMax: 4, plFade: 500, plLob: 90, plGauge: 1,
               fgR: 150, fgDur: gameMs(6), fgDmg: 15, fgHeal: 5, fgSlowMul: 0.6, fgSlowMs: 400, fgCast: KEY * 4 + 100, fgRefund: 1,
-              lnWind: gameMs(0.5), lnLen: 350, lnW: 108, lnDmg: 60, lnStunMs: gameMs(1.7),
+              lnWind: gameMs(0.5), lnLen: 350, lnW: 108, lnDmg: 75, lnStunMs: gameMs(1.7),
               bsLeapMinMs: gameMs(0.3), bsLeapMaxMs: gameMs(1.5), bsR: 200, bsDmg: 40, bsStunMs: gameMs(1.5), bsCast: 450, bsMin: 60, bsHop: 45,
               bhR: 200, bhDur: 3000, bhDelay: 500, bhPull: 220, bhCast: 380, bhMin: 60, bhCcRate: 0.8,
               exRange: 600, exSpeed: 1300, exPr: 4, exDmg: 25, exStunMs: gameMs(1.5),
@@ -903,7 +903,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               rvDur: gameMs(4), rvTick: gameMs(1), rvHeal: 20, rvDmg: 20, rvCastMs: 600, grLife: 650,
               trDur: gameMs(10), trR: 340, trCd: gameMs(0.5), trScanMs: 120, trWarmMs: 300, trDmg: 10, trHeavyEvery: 3, trHeavyDmg: 34, trStunMs: gameMs(0.8), trMax: 2, trGauge: 1,
               trSpeedBonus: gameSpeed(30), trShellSpeed: gameSpeed(1000), trHitR: 38, trCastMs: 450,
-              drR: 150, drDur: 3600000, drTick: gameMs(1), drHeal: 20, drCast: 450, drMin: 60, drSelfRate: 0.1, drSelfGauge: 1, drRiseMs: 350, drCastMs: 500,
+              drR: 150, drDur: 3600000, drTick: gameMs(1), drHeal: 15, drCast: 450, drMin: 60, drSelfRate: 0.1, drSelfGauge: 1, drRiseMs: 350, drCastMs: 500,
               gaCast: 350, gaMin: 60, gaTransformMs: gameMs(1.2), gaDur: gameMs(6), gaR: 350, gaPull: 260, gaGap: 70, gaBoomDmg: 30,
               sfMin: 60, sfDelay: gameMs(0.6), sfR: 70, sfStunEvery: 3, sfStunMs: gameMs(1),
               agCast: 400, agMin: 60, agDur: gameMs(3), agR: 350, agPull: 260, agGap: 70, agBoomDmg: 30,
@@ -3466,7 +3466,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       MATCH.game.forceNet = true;
     }
     ultDesc() {
-      return "지정한 곳에 게임이 끝날 때까지 유지되는 " + GroveSystem.TILES_PER_SIDE + "×" + GroveSystem.TILES_PER_SIDE + "칸 부쉬 생성(풀숲처럼 안에서 모습이 숨겨짐). 안에 있는 아군은 1초당 체력 " + ULT.drHeal + " 회복";
+      return "지정한 곳에 게임이 끝날 때까지 유지되는 " + GroveSystem.TILES_PER_SIDE + "×" + GroveSystem.TILES_PER_SIDE + "칸 부쉬 생성(풀숲처럼 안에서 모습이 숨겨짐). 안에 있는 아군은 1초당 체력 " + ULT.drHeal + " 회복(드루이드 자신 제외)";
     }
     passiveDesc() {
       var c = this.data;
@@ -4780,7 +4780,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (t < e.createdAt || SESSION.room.status !== "playing") return true;
         var tick = Math.floor((t - e.createdAt) / ULT.drTick);
         TARGETS.localTargets().forEach(function (T) {
-          if (T.minion || !T.alive || T.team !== e.team || T.isProtected(t) || s.ticked[T.id] >= tick) return;
+          if (T.minion || !T.alive || T.team !== e.team || T.id === e.owner || T.isProtected(t) || s.ticked[T.id] >= tick) return;
           if (!GROVES.covers(s, T.x, T.y)) return;
           s.ticked[T.id] = tick;
           FIELD_FX.healByCleric(T, e.owner, e.heal, t);

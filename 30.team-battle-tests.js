@@ -519,7 +519,7 @@ class ResultCollector {
     var y = OPEN_Y.forest, U = api.ULT, reach = U.mbR + api.BODY_R, bad = [], tiers = [];
     for (var i = 0; i < U.mbSteps; i++) { var h = api.meteorHitAt(reach * (i + 0.5) / U.mbSteps, U.mbR); tiers.push(h.dmg + "/" + h.stunMs / 1000); }
     var want = [];
-    for (var j = 0; j < U.mbSteps; j++) want.push((U.mbDmg - (U.mbDmg - U.mbDmgMin) * j / (U.mbSteps - 1)) + "/" + (U.mbStunMs - (U.mbStunMs - U.mbStunMin) * j / (U.mbSteps - 1)) / 1000);
+    for (var j = 0; j < U.mbSteps; j++) want.push(Math.round(U.mbDmg - (U.mbDmg - U.mbDmgMin) * j / (U.mbSteps - 1)) + "/" + Math.round(U.mbStunMs - (U.mbStunMs - U.mbStunMin) * j / (U.mbSteps - 1)) / 1000);
     if (tiers.join() !== want.join()) bad.push("단계 " + tiers.join(" · ") + " (기대 " + want.join(" · ") + ")");
     var W = world("forest", [
       { id: "mg", team: "blue", char: "mage", x: 250, y: y, gauge: api.GAUGE_MAX },
@@ -4004,10 +4004,10 @@ class ResultCollector {
     if (api.CLOCK.scale !== 0.7) bad.push("시계 배율 " + api.CLOCK.scale);
     if (api.matchMs() !== 90000 * 0.7) bad.push("경기 시간 " + api.matchMs());
     if (T.matchMs !== 90000 * 0.7 || T.respawnMs !== 3000 * 0.7 || T.respawnProtectMs !== 2500 * 0.7 || T.burnTickMs !== 700 || T.regenTickMs !== 700) bad.push("시간 필드 " + JSON.stringify([T.matchMs, T.respawnMs, T.respawnProtectMs, T.burnTickMs, T.regenTickMs]));
-    if (K.cd !== Math.round(1.8 * 1000 * 0.7) || K.speed !== Math.round(140 / 0.7) || K.hp !== 370) bad.push("기사 수치 " + JSON.stringify([K.cd, K.speed, K.hp]));
+    if (K.cd !== Math.round(1.6 * 1000 * 0.7) || K.speed !== Math.round(150 / 0.7) || K.hp !== 370) bad.push("기사 수치 " + JSON.stringify([K.cd, K.speed, K.hp]));
     if (api.ULT.rmDur !== Math.round(4 * 1000 * 0.7)) bad.push("스킬 수치 rmDur " + api.ULT.rmDur);
-    if (api.secs(K.cd) !== "1.8초" || api.shownSpeed(K.speed) !== 140) bad.push("카드 표기 " + api.secs(K.cd) + " " + api.shownSpeed(K.speed));
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "배율 0.7·경기 63초·기사 공격 간격 1.8초 이동속도 140 표기");
+    if (api.secs(K.cd) !== "1.6초" || api.shownSpeed(K.speed) !== 150) bad.push("카드 표기 " + api.secs(K.cd) + " " + api.shownSpeed(K.speed));
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "배율 0.7·경기 63초·기사 공격 간격 1.6초 이동속도 150 표기");
   });
   run(CONNG, "연결 설정(BACKEND): 설정이 준비되면 주소 끝 슬래시를 뗀 채 연결하고, 준비 안 됐으면 건드리지 않으며, 연결이 던지면 db 를 비우는가", function (done) {
     var B = api.BACKEND, bad = [], saved = { conf: B.conf, db: B.db }, firebaseBefore = window.firebase, calls = [], fakeDb = { name: "가짜" };
@@ -4589,13 +4589,13 @@ class EngineerDruidTests {
       if (api.FIELD.groves.length !== 1) bad.push("부쉬가 자신의 자리에 안 생김");
       dr.hp = dr.maxHp - 90; var hp0 = dr.hp;
       W.step(tick * 3 + 100);
-      var gain = dr.hp - hp0, wantGain = 3 * self10 + 3 * ULT.drHeal;
+      var gain = dr.hp - hp0, wantGain = 3 * self10;
       if (dr.gauge !== 3 * ULT.drSelfGauge) bad.push("게이지 " + dr.gauge + " (기대 " + 3 * ULT.drSelfGauge + ")");
-      if (gain !== Math.min(90, wantGain)) bad.push("회복 " + gain + " (기대 " + Math.min(90, wantGain) + ", 패시브 " + self10 + "×3 + 부쉬 " + ULT.drHeal + "×3)");
+      if (gain !== Math.min(90, wantGain)) bad.push("회복 " + gain + " (기대 " + Math.min(90, wantGain) + ", 패시브 " + self10 + "×3, 자신의 부쉬 회복은 적용 안 함)");
       dr.x = 200 + ULT.drR + 80; dr.hp = dr.maxHp - 40; var g1 = dr.gauge, h1 = dr.hp;
       W.step(tick * 3 + 100);
       if (dr.hp !== h1 || dr.gauge !== g1) bad.push("부쉬 밖에서도 회복·게이지가 오름");
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "안: 초당 " + self10 + "+부쉬 " + ULT.drHeal + " 회복·게이지 +1, 밖: 변화 없음");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "안: 초당 " + self10 + "(패시브만, 부쉬 회복과 겹치지 않음) 회복·게이지 +1, 밖: 변화 없음");
     });
     run(G, "드루이드 패시브: 맵의 부쉬(풀숲) 안에서도 1초마다 체력 회복·게이지 +1 이 되는가", function (done) {
       var bad = [], tiles = api.bushTiles(), spot = tiles.length ? tiles[0][0] : null;
