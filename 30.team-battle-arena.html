@@ -843,7 +843,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     dancer:  { name: "검무희", role: "assassin", icon: "🌸", hp: 130, speed: gameSpeed(175), ultSpeed: gameSpeed(210), cd: gameMs(1.2), dmg: 20, range: 350, pSpeed: 900, pr: 8, ultName: "칼날 폭풍" },
     stormbow: { name: "뇌전사수", role: "shooter", icon: "⚡", hp: 100, speed: gameSpeed(140), cd: gameMs(0.9), dmg: 10, range: 420, pSpeed: 750, pr: 10,
                 chain: { every: 3, r: 250, count: 2, dmg: 27 }, ultName: "과충전" },
-    engineer: { name: "공학자", role: "shooter", icon: "🔧", hp: 105, speed: gameSpeed(150), cd: gameMs(1.1), dmg: 20, range: 350, pSpeed: 760, pr: 9, ultName: "포탑 설치" },
+    engineer: { name: "공학자", role: "shooter", icon: "🔧", hp: 105, speed: gameSpeed(150), cd: gameMs(1.1), dmg: 10, range: 350, pSpeed: 760, pr: 9, ultName: "포탑 설치" },
     druid:   { name: "드루이드", role: "caster", icon: "🌿", hp: 120, speed: gameSpeed(165), cd: gameMs(1.6), dmg: 14, range: 360, pSpeed: 560, pr: 12, fx: { slowMs: gameMs(1.5), slowMul: 0.7 },
                ultName: "덩굴 부쉬", ultAim: true, heals: true },
     dummy:   { name: "연습 봇", role: "fighter", icon: "🎯", hp: 99999, speed: 200, cd: 1000, dmg: 0, range: 0, ultName: "없음", practiceBot: true },
@@ -907,7 +907,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               ocDur: gameMs(7), ocRate: 1.5, ocSpeedBonus: 50, ocRangeBonus: 30, ocR: 200, ocDmg: 30, ocStunMs: gameMs(1.5), ocRingPts: 10,
               dmR: 400, dmGrowMs: gameMs(2), dmDur: gameMs(8), dmStunMs: gameMs(1), dmBoltDmg: 20, dmStrikeMaxHpRate: 0.18, dmStrikeStunMs: gameMs(0.7), dmStunGraceMs: 40, cuStacks: 3, cuBoomDmg: 30, cuBoomMs: 500, cuExpireMs: gameMs(4),
               rvDur: gameMs(4), rvTick: gameMs(1), rvHeal: 20, rvDmg: 20, rvCastMs: 600, grLife: 650,
-              trDur: gameMs(10), trR: 340, trCd: gameMs(0.5), trScanMs: 120, trWarmMs: 300, trDmg: 8, trHeavyEvery: 3, trHeavyDmg: 28, trStunMs: gameMs(1), trMax: 2, trGauge: 1,
+              trDur: gameMs(10), trR: 340, trCd: gameMs(0.5), trScanMs: 120, trWarmMs: 300, trDmg: 12, trHeavyEvery: 3, trHeavyDmg: 35, trStunMs: gameMs(1), trMax: 2, trGauge: 1,
               trSpeedBonus: gameSpeed(30), trShellSpeed: gameSpeed(1000), trHitR: 38, trCastMs: 450,
               drR: 150, drDur: 3600000, drTick: gameMs(1), drHeal: 13, drCast: 450, drMin: 60, drSelfRate: 0.1, drSelfGauge: 1, drRiseMs: 350, drCastMs: 500 };
   var ASSIST_MS = 5000;
