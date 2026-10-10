@@ -3114,8 +3114,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       VISION.revealBriefly(E.id, t);
     }
     ultDesc() {
-      return "자신을 중심으로 " + SKILLTEXT.secs(ULT.dmGrowMs) + "간 반경 " + ULT.dmR + "까지 커진 뒤 " + SKILLTEXT.secs(ULT.dmDur - ULT.dmGrowMs) + "간 유지되는 영역 생성. 영역이 커지는 과정에서 닿은 적은 " + SKILLTEXT.secs(ULT.dmStunMs) +
-      "간 기절하고, 기절이 풀릴 때 " + ULT.dmBoltDmg + "의 피해. 영역 안에서 주술사의 기본 공격은 영역 내 가장 가까운 적 1명에게 최대 체력의 " + SKILLTEXT.pctOf(ULT.dmStrikeMaxHpRate) + "%의 피해를 입히고 " + SKILLTEXT.secs(ULT.dmStrikeStunMs) + "간 기절";
+      return "자신을 중심으로 " + SKILLTEXT.secs(ULT.dmGrowMs) + "간 반경 " + ULT.dmR + "까지 커진 뒤 " + SKILLTEXT.secs(ULT.dmDur - ULT.dmGrowMs) + "간 유지되는 영역 생성. 커지는 동안 닿은 적은 " + SKILLTEXT.secs(ULT.dmStunMs) +
+      "간 기절하고 풀릴 때 " + ULT.dmBoltDmg + "의 피해. 영역 안에서 기본 공격은 가장 가까운 적 1명에게 최대 체력의 " + SKILLTEXT.pctOf(ULT.dmStrikeMaxHpRate) + "%의 피해를 입히고 " + SKILLTEXT.secs(ULT.dmStrikeStunMs) + "간 기절";
     }
     passiveDesc() {
       return "공격이 적중할 때마다 대상에게 저주 1회 부여. 저주가 " + ULT.cuStacks + "회 중첩되면 폭발하여 " + ULT.cuBoomDmg + "의 피해. " + SKILLTEXT.secs(ULT.cuExpireMs) + " 이상 갱신되지 않으면 저주 소멸";
@@ -3270,7 +3270,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       ULT.frBzDmg + "의 피해를 입고 패시브 1중첩";
     }
     passiveDesc() {
-      return "기본 공격에 맞은 적은 " + SKILLTEXT.secs(ULT.frSlowMs) + "간 " + SKILLTEXT.slowPct(ULT.frSlowMul) + ". " + SKILLTEXT.secs(ULT.frSlowMs) + " 안에 다시 맞을 때마다 둔화가 " + Math.round(ULT.frSlowStep * 100) + "%p씩 커지고 3중첩이 되면 " + SKILLTEXT.secs(ULT.frFreezeMs) + "간 기절하며 최대 체력의 " + SKILLTEXT.pctOf(ULT.frFreezeMaxHpRate) + "%의 피해. 기절이 끝난 뒤부터 다시 중첩";
+      return "기본 공격에 맞은 적은 " + SKILLTEXT.secs(ULT.frSlowMs) + "간 " + SKILLTEXT.slowPct(ULT.frSlowMul) + ". 다시 맞을 때마다 둔화가 " + Math.round(ULT.frSlowStep * 100) + "%p씩 커지고 3중첩이 되면 " + SKILLTEXT.secs(ULT.frFreezeMs) + "간 기절하며 최대 체력의 " + SKILLTEXT.pctOf(ULT.frFreezeMaxHpRate) + "%의 피해(끝난 뒤 다시 중첩)";
     }
   }
   class DancerType extends CharacterType {
@@ -3308,7 +3308,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return SKILLTEXT.secs(ULT.bwDur) + "간 회전하며 " + SKILLTEXT.ultSpeedUpText(CHARS.dancer) + ". 반경 " + ULT.bwR + "의 적은 " + SKILLTEXT.secs(ULT.bwTick) + "마다 " + ULT.bwDmg + "의 피해. 기절·넉백을 당하면 취소";
     }
     passiveDesc() {
-      return "던진 단검이 적에게 맞거나 사거리 끝에 닿은 곳에서 " + SKILLTEXT.secs(ULT.bdDelay) + " 뒤 회전해 반경 " + ULT.bdR + "의 적에게 " + ULT.bdDmg + "의 피해. 적을 처치하면 게이지 " + ULT.bwKillGauge + " 회복, 스킬 중 처치는 스킬이 끝난 뒤 회복";
+      return "단검이 적에게 맞거나 사거리 끝에 닿으면 " + SKILLTEXT.secs(ULT.bdDelay) + " 뒤 회전해 반경 " + ULT.bdR + "의 적에게 " + ULT.bdDmg + "의 피해. 처치 시 게이지 " + ULT.bwKillGauge + " 회복(스킬 중 처치는 종료 후)";
     }
     attackClip(v, E, t) {
       return ["Throw", 2.2];
