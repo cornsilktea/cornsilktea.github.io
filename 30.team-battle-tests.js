@@ -4391,6 +4391,7 @@ class ResultCollector {
   new GargantuaTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
   new SkillResetTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
   new AstrologerTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
+  new MinionSkillTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
   results.pending = Promise.resolve().then(function () { api.finish(api.currentMap()); }).then(drainAsync);
   return results;
   }
@@ -5079,4 +5080,67 @@ export function runTeamBattleTests(api) {
     results.pending.then(function () { restore(); TestPanel.render(results, performance.now() - started, once); }, function (err) { restore(); throw err; });
   }
   once();
+}
+
+class MinionSkillTests {
+  static GROUP = "해골 병사와 스킬";
+  constructor(api, kit) { this.api = api; this.kit = kit; }
+
+  holeWorld(withHole) {
+    var api = this.api, y = this.kit.OPEN_Y.forest;
+    api.MATCH.stateByKey = {};
+    var W = this.kit.world("forest", [
+      { id: "as", team: "blue", char: "astrologer", x: 200, y: y, gauge: api.GAUGE_MAX },
+      { id: "nc", team: "red", char: "necro", x: 750, y: y + 600, gauge: api.GAUGE_MAX }
+    ]);
+    var nc = W.ent("nc"), as = W.ent("as");
+    api.useUlt(nc, Math.PI / 2);
+    W.step(api.ULT.smRiseMs + 100);
+    nc.minions.forEach(function (m, i) { m.x = 330; m.y = y + i * 40; m.cdUntil = Infinity; });
+    if (withHole) api.useUlt(as, 0, 300);
+    return W;
+  }
+
+  register() {
+    var self = this, api = this.api, run = this.kit.run, ULT = api.ULT, G = MinionSkillTests.GROUP, y = this.kit.OPEN_Y.forest;
+    run(G, "점성술사 블랙홀: 해골 병사도 중심으로 끌려오고, 끝나는 순간 폭발 피해 " + ULT.agBoomDmg + "을 받는가", function (done) {
+      var bad = [], control = self.holeWorld(false);
+      control.step(700);
+      var dc = Math.min.apply(null, control.ent("nc").minions.map(function (m) { return Math.hypot(m.x - 500, m.y - y); }));
+      var pulled = self.holeWorld(true);
+      pulled.step(700);
+      var dp = Math.min.apply(null, pulled.ent("nc").minions.map(function (m) { return Math.hypot(m.x - 500, m.y - y); }));
+      if (!(dp < dc - 20)) bad.push("끌려오지 않음: 블랙홀 있음 " + Math.round(dp) + " / 없음 " + Math.round(dc));
+      pulled.step(ULT.agDur + 400);
+      var hp = pulled.ent("nc").minions.map(function (m) { return m.hp; });
+      if (!hp.every(function (h) { return h === ULT.smHp - ULT.agBoomDmg; })) bad.push("폭발 피해 " + hp.join("·") + " (기대 " + (ULT.smHp - ULT.agBoomDmg) + ")");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "끌려옴(중심까지 " + Math.round(dp) + " < " + Math.round(dc) + "), 폭발로 체력 " + ULT.smHp + " → " + (ULT.smHp - ULT.agBoomDmg));
+    });
+    run(G, "클레릭 요한계시록: 적 해골 병사는 피해를 받고, 아군 해골 병사는 회복되지 않는가", function (done) {
+      api.MATCH.stateByKey = {};
+      var W = self.kit.world("forest", [
+        { id: "cl", team: "blue", char: "cleric", x: 200, y: y, gauge: api.GAUGE_MAX },
+        { id: "ea", team: "red", char: "necro", x: 750, y: y + 600, gauge: api.GAUGE_MAX },
+        { id: "al", team: "blue", char: "necro", x: 150, y: y + 600, gauge: api.GAUGE_MAX }
+      ]);
+      var cl = W.ent("cl"), ea = W.ent("ea"), al = W.ent("al"), bad = [];
+      api.useUlt(ea, Math.PI / 2); api.useUlt(al, Math.PI / 2);
+      W.step(ULT.smRiseMs + 100);
+      ea.minions.forEach(function (m) { m.cdUntil = Infinity; });
+      var enemy = ea.minions[0], ally = al.minions[0];
+      ally.hp = ULT.smHp - 30;
+      var enemyBefore = enemy.hp, allyBefore = ally.hp;
+      cl.gauge = api.GAUGE_MAX;
+      api.useUlt(cl, 0);
+      W.frame(1);
+      if (enemy.hp !== enemyBefore - ULT.rvDmg) bad.push("적 해골 체력 " + enemyBefore + " → " + enemy.hp + " (기대 " + ULT.rvDmg + " 감소)");
+      W.step(ULT.rvDur + 500);
+      if (ally.hp !== allyBefore) bad.push("아군 해골 체력이 바뀜 " + allyBefore + " → " + ally.hp);
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "적 해골 -" + ULT.rvDmg + "(틱마다), 아군 해골 회복 없음");
+    });
+    run(G, "결투가 능력치 표: 사거리에 돌진 거리 " + api.CHARS.duelist.dashRange + " 가 적히는가", function (done) {
+      var html = api.statTable("duelist"), want = "<th>사거리</th><td>" + api.CHARS.duelist.dashRange + "</td>";
+      done(html.indexOf(want) < 0 ? "fail" : "pass", html.indexOf(want) < 0 ? "표에 " + want + " 없음" : "사거리 " + api.CHARS.duelist.dashRange);
+    });
+  }
 }
