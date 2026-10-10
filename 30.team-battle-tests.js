@@ -1556,7 +1556,7 @@ class ResultCollector {
       { id: "sh", team: "blue", char: "shaman", x: 300, y: y, gauge: api.GAUGE_MAX },
       { id: "al", team: "blue", char: "knight", x: 420, y: y + 20 },
       { id: "near", team: "red", char: "guardian", x: 420, y: y },
-      { id: "far", team: "red", char: "guardian", x: 700, y: y }
+      { id: "far", team: "red", char: "guardian", x: 800, y: y }
     ].concat(extra || []));
     W.list = ["near", "far"].concat((extra || []).filter(function (e) { return e.team === "red"; }).map(function (e) { return e.id; }));
     W.list.forEach(function (id) { var E = W.ent(id); E.hp = E.maxHp = 1000; });
@@ -1593,7 +1593,7 @@ class ResultCollector {
   });
   run(SHAMAN, "패시브: 저주가 " + api.ULT.cuExpireMs / 1000 + "초 갱신되지 않으면 사라지고, 그 안에 다시 맞으면 유지되는가", function (done) {
     var W = shamanTeam(), sh = W.ent("sh"), near = W.ent("near"), far = W.ent("far"), bad = [];
-    far.x = 700;
+    far.x = 800;
     sh.cdUntil = 0; api.fireBasic(sh, 0);
     W.step(600);
     if (near.curse !== 1) bad.push("첫 저주 " + near.curse);
