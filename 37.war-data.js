@@ -6,7 +6,7 @@ class WarBalance {
 }
 WarBalance.TICKS_PER_SEC = 10;
 WarBalance.TICK_MS = 100;
-WarBalance.POP_CAP = 100;
+WarBalance.POP_CAP = 70;
 WarBalance.SQUAD_COUNT = 3;
 WarBalance.SQUAD_CAP = 20;
 WarBalance.MATCH_TICKS = 9000;

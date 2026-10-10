@@ -64,7 +64,7 @@ class WarBalance {
   }
 
   static readonly TICK_MS = 100;
-  static readonly POP_CAP = 100;
+  static readonly POP_CAP = 70;
   static readonly SQUAD_COUNT = 3;
   static readonly SQUAD_CAP = 20;
   static readonly MATCH_TICKS = 9000;
