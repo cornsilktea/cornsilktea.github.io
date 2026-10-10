@@ -844,7 +844,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     stormbow: { name: "뇌전사수", role: "shooter", icon: "⚡", hp: 100, speed: gameSpeed(140), cd: gameMs(0.9), dmg: 10, range: 420, pSpeed: 750, pr: 10,
                 chain: { every: 3, r: 250, count: 2, dmg: 27 }, ultName: "과충전" },
     engineer: { name: "공학자", role: "shooter", icon: "🔧", hp: 105, speed: gameSpeed(150), cd: gameMs(1.1), dmg: 20, range: 350, pSpeed: 760, pr: 9, ultName: "포탑 설치" },
-    druid:   { name: "드루이드", role: "caster", icon: "🌿", hp: 120, speed: gameSpeed(165), cd: gameMs(1.6), dmg: 14, range: 360, pSpeed: 420, pr: 12, fx: { slowMs: gameMs(1.5), slowMul: 0.7 },
+    druid:   { name: "드루이드", role: "caster", icon: "🌿", hp: 120, speed: gameSpeed(165), cd: gameMs(1.6), dmg: 14, range: 360, pSpeed: 560, pr: 12, fx: { slowMs: gameMs(1.5), slowMul: 0.7 },
                ultName: "덩굴 부쉬", ultAim: true, heals: true },
     dummy:   { name: "연습 봇", role: "fighter", icon: "🎯", hp: 99999, speed: 200, cd: 1000, dmg: 0, range: 0, ultName: "없음", practiceBot: true },
     dummyAlly: { name: "아군 봇", role: "fighter", icon: "💚", hp: 500, speed: 200, cd: 1000, dmg: 0, range: 0, ultName: "없음", practiceBot: true }
@@ -4443,7 +4443,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static MODEL_HEIGHT = 46;
     static MODEL_YAW = Math.PI / 2;
     static RISE_MS = 260;
-    static BLINK_MS = 1500;
+    static TIMER_R = 36;
+    static TIMER_INNER = 0.8;
+    static TIMER_SEGMENTS = 72;
+    static TIMER_BLINK_FROM = 0.75;
     static MUZZLE_HEIGHT = 34;
     static TARGET_HEIGHT = 34;
     constructor() { this.rangeRing = null; }
@@ -4551,6 +4554,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       mats.push(rangeMat, baseMat);
       var rangeEdge = ARENA_VIEW.flatMesh(TURRETS.ringGeo(), rangeMat); rangeEdge.scale.setScalar(e.r); rangeEdge.position.y = 1.4; g.add(rangeEdge);
       var base = ARENA_VIEW.flatMesh(GEO.ring, baseMat); base.position.y = 1.6; g.add(base);
+      var timerGeo = new THREE.RingGeometry(TurretSystem.TIMER_INNER, 1, TurretSystem.TIMER_SEGMENTS, 1, Math.PI / 2, -Math.PI * 2);
+      var timerMat = new THREE.MeshBasicMaterial({ color: C_FX[e.team], transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide });
+      mats.push(timerMat);
+      var timer = ARENA_VIEW.flatMesh(timerGeo, timerMat); timer.scale.setScalar(TurretSystem.TIMER_R); timer.position.y = 1.9; g.add(timer);
       var tpl = KIT.props.turret;
       if (tpl) {
         var box = PROPS.propSize(tpl), k = TurretSystem.MODEL_HEIGHT / box.getSize(new THREE.Vector3()).y, body = tpl.clone();
@@ -4558,23 +4565,24 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }
       g.add(model);
       g.position.set(e.x, 0, e.y);
-      g.userData = { mats: mats, model: model, rangeMat: rangeMat, baseMat: baseMat, yaw: 0 };
+      g.userData = { mats: mats, model: model, rangeMat: rangeMat, baseMat: baseMat, timerGeo: timerGeo, timerMat: timerMat, yaw: 0 };
       scene.add(g);
       return g;
     }
     dropVis(s) {
       if (!s.vis) return;
-      scene.remove(s.vis); s.vis.userData.mats.forEach(function (m) { m.dispose(); }); s.vis = null;
+      scene.remove(s.vis); s.vis.userData.mats.forEach(function (m) { m.dispose(); }); s.vis.userData.timerGeo.dispose(); s.vis = null;
     }
     render(s, t, nowMs) {
       var e = s.e;
       if (!s.vis) s.vis = TURRETS.makeVis(s);
-      var ud = s.vis.userData, rise = clamp((t - e.createdAt) / TurretSystem.RISE_MS, 0.01, 1), left = e.createdAt + e.dur - t;
+      var ud = s.vis.userData, rise = clamp((t - e.createdAt) / TurretSystem.RISE_MS, 0.01, 1);
       ud.model.scale.setScalar(rise * rise * (3 - 2 * rise));
       ud.yaw += angDiff(-s.aim + TurretSystem.MODEL_YAW, ud.yaw) * 0.35;
       ud.model.rotation.y = ud.yaw;
-      var blink = left < TurretSystem.BLINK_MS && nowMs % 260 > 150;
-      ud.model.visible = !blink;
+      var elapsed = clamp((t - e.createdAt) / e.dur, 0, 1), gone = Math.ceil(elapsed * TurretSystem.TIMER_SEGMENTS);
+      ud.timerGeo.setDrawRange(gone * 6, (TurretSystem.TIMER_SEGMENTS - gone) * 6);
+      ud.timerMat.opacity = elapsed >= TurretSystem.TIMER_BLINK_FROM && nowMs % 260 > 150 ? 0.15 : 0.9;
       ud.rangeMat.opacity = 0.3 + 0.1 * Math.sin(nowMs / 300);
     }
   }
@@ -4658,8 +4666,22 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static HEIGHT = 32;
     static GROW_LEN = 14;
     static THICKNESS = 2.2;
-    static build(g, tpl) {
-      var blades = [];
+    static TINT = 0x4F8A3C;
+    static tinted = new Map();
+    static tintedTemplate(tpl) {
+      var cached = VineTrail.tinted.get(tpl);
+      if (cached) return cached;
+      cached = tpl.clone();
+      cached.traverse(function (o) {
+        if (!o.isMesh) return;
+        o.material = o.material.clone();
+        o.material.color.setHex(VineTrail.TINT);
+      });
+      VineTrail.tinted.set(tpl, cached);
+      return cached;
+    }
+    static build(g, rawTpl) {
+      var blades = [], tpl = rawTpl && VineTrail.tintedTemplate(rawTpl);
       if (tpl) {
         var box = PROPS.propSize(tpl), k = VineTrail.HEIGHT / box.getSize(new THREE.Vector3()).y;
         for (var i = 0; i < VineTrail.SEGMENTS; i++) {
