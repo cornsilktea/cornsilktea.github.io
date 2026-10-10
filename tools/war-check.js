@@ -95,11 +95,10 @@ class EncodingCheck {
 class AssetCheck {
   static SOURCES = ["ts/37.war-views.ts", "ts/37.war-scenery.ts", "ts/37.war-hud.ts", "ts/37.space-war.ts"];
   static ROOT = "assets/kaykit/war";
-  static RIG_ANIMATIONS = ["General", "MovementBasic", "CombatMelee", "CombatRanged"];
 
   run(root) {
     const problems = [];
-    const wanted = new Set(AssetCheck.RIG_ANIMATIONS.map((name) => "animations/Rig_Medium_" + name + ".glb"));
+    const wanted = new Set();
     for (const source of AssetCheck.SOURCES) {
       const text = fs.readFileSync(path.join(root, source), "utf8");
       for (const match of text.matchAll(/"([A-Za-z0-9_\-./]+\.(?:gltf|glb))"/g)) wanted.add(match[1]);

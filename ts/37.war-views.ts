@@ -6,15 +6,16 @@ type WarSelection =
   | { kind: "squad"; index: number };
 
 interface WarScenePoint { x: number; z: number }
-interface WarHandGear { file: string; length: number; rx: number; ry: number; rz: number; ox: number; oy: number; oz: number }
-interface WarUnitLook { altFile: string; hand: WarHandGear | null; shared: boolean; file: string; height: number; animated: boolean; idleClip: string; runClip: string; attackClip: string; shootsFar: boolean; altitude: number; turn: number; parts: WarDecor[]; backClip: string; backReverse: boolean; deathClip: string }
+type WarRigId = "medium" | "large";
+interface WarSlotGear { file: string; rx: number; ry: number; rz: number }
+interface WarUnitLook { file: string; rig: WarRigId; height: number; idleClip: string; runClip: string; attackClip: string; backClip: string; deathClip: string; shootsFar: boolean; right: WarSlotGear | null; left: WarSlotGear | null }
 
 class WarPalette {
   static readonly SQUAD_COLORS = ["#4FC3F7", "#B388FF", "#FFD54F", "#FF8A80"];
   static readonly ENEMY = "#E5484D";
   static readonly MINE = "#7CE0A8";
   static readonly ACCENT = "#D97B4F";
-  static readonly KIND_COLORS: Record<WarUnitKind, string> = { melee: "#6BCB77", ranged: "#F2994A", elite: "#E5484D", air: "#6FD8FF" };
+  static readonly KIND_COLORS: Record<WarUnitKind, string> = { melee: "#6BCB77", ranged: "#F2994A", elite: "#E5484D" };
 }
 
 class WarViewTransform {
@@ -53,33 +54,27 @@ class WarViewTransform {
   }
 }
 
-class WarFlight {
-  static readonly ALTITUDE = 6;
-}
-
 class WarUnitLooks {
-  private static readonly BASE = { altFile: "", hand: null as WarHandGear | null, altitude: 0, turn: 0, parts: [] as WarDecor[], backClip: "", backReverse: false, deathClip: "" };
-  private static readonly HUMAN = { ...WarUnitLooks.BASE, shared: false, animated: true, idleClip: "Idle", runClip: "Run", shootsFar: false, backClip: "Walk", backReverse: true, deathClip: "Death" };
-  private static readonly SKELETON = { ...WarUnitLooks.BASE, shared: true, animated: true, idleClip: "Idle_A", runClip: "Running_A", shootsFar: false, backClip: "Walking_Backwards", backReverse: false, deathClip: "Death_A" };
-  private static readonly SHIP = { ...WarUnitLooks.BASE, shared: false, animated: false, idleClip: "", runClip: "", attackClip: "", shootsFar: true, altitude: WarFlight.ALTITUDE };
+  private static readonly MEDIUM = { rig: "medium" as WarRigId, idleClip: "Idle_A", runClip: "Running_A", backClip: "Walking_Backwards", deathClip: "Death_A", shootsFar: false, right: null as WarSlotGear | null, left: null as WarSlotGear | null };
+  private static readonly LARGE = { ...WarUnitLooks.MEDIUM, rig: "large" as WarRigId, backClip: "" };
+
+  private static gear(file: string, rx = 0, ry = 0, rz = 0): WarSlotGear {
+    return { file, rx, ry, rz };
+  }
+
   private static readonly LOOKS: Record<string, WarUnitLook> = {
-    shieldbearer: { ...WarUnitLooks.HUMAN, file: "quaternius/Knight_Male.gltf", height: 3.4, attackClip: "SwordSlash" },
-    archer: { ...WarUnitLooks.HUMAN, file: "quaternius/Soldier_Male.gltf", altFile: "quaternius/Soldier_Female.gltf", height: 3.2, attackClip: "Shoot_OneHanded", shootsFar: true, hand: { file: "gear/Gun_Rifle.gltf", length: 1.6, rx: 0, ry: 0, rz: 0, ox: 0, oy: 0, oz: 0 } },
-    guardknight: { ...WarUnitLooks.BASE, shared: false, animated: true, file: "quaternius/Mech_FinnTheFrog.gltf", height: 4.5, idleClip: "Idle", runClip: "Run", attackClip: "Kick", shootsFar: false, backClip: "Walk", backReverse: true, deathClip: "Death" },
-    artillerytruck: { ...WarUnitLooks.BASE, shared: false, animated: false, file: "quaternius/Rover_Round.gltf", height: 4.2, idleClip: "", runClip: "", attackClip: "", shootsFar: true },
-    striker: { ...WarUnitLooks.SHIP, file: "air/Striker.gltf", height: 1.4 },
-    executioner: { ...WarUnitLooks.SHIP, file: "air/Executioner.gltf", height: 1.6 },
-    minion: { ...WarUnitLooks.SKELETON, file: "characters/Skeleton_Minion.glb", height: 2.1, attackClip: "Melee_1H_Attack_Chop" },
-    dropminion: { ...WarUnitLooks.SKELETON, file: "characters/Skeleton_Minion.glb", height: 2.4, attackClip: "Melee_1H_Attack_Chop" },
-    skelwarrior: { ...WarUnitLooks.SKELETON, file: "characters/Skeleton_Warrior.glb", height: 2.9, attackClip: "Melee_1H_Attack_Slice_Horizontal" },
-    skelarcher: { ...WarUnitLooks.SKELETON, file: "characters/Skeleton_Rogue.glb", height: 2.7, attackClip: "Ranged_Bow_Release", shootsFar: true },
-    bonegiant: { ...WarUnitLooks.SKELETON, file: "characters/Skeleton_Warrior.glb", height: 5.0, attackClip: "Melee_2H_Attack_Chop" },
-    stormwitch: { ...WarUnitLooks.HUMAN, file: "quaternius/Witch.gltf", height: 3.8, attackClip: "Shoot_OneHanded", shootsFar: true },
-    coffinship: {
-      ...WarUnitLooks.SHIP, file: "halloween/coffin_decorated.gltf", height: 1.4, turn: Math.PI, shootsFar: false,
-      parts: [{ file: "halloween/ribcage.gltf", x: 0, y: 0.7, z: -0.2, scale: 1.5 }, { file: "halloween/skull_candle.gltf", x: 0, y: 0.5, z: 1.0, scale: 0.9 }],
-    },
-    cursedeye: { ...WarUnitLooks.BASE, shared: false, animated: true, file: "air/Enemy_EyeDrone.gltf", height: 2.0, idleClip: "Idle", runClip: "Idle", attackClip: "Attack", shootsFar: true, altitude: WarFlight.ALTITUDE },
+    knight: { ...WarUnitLooks.MEDIUM, file: "characters/Knight.glb", height: 3.2, attackClip: "Melee_1H_Attack_Slice_Horizontal", right: WarUnitLooks.gear("gear/sword_1handed.gltf"), left: WarUnitLooks.gear("gear/shield_square.gltf") },
+    ranger: { ...WarUnitLooks.MEDIUM, file: "characters/Ranger.glb", height: 3.0, attackClip: "Ranged_Bow_Release", shootsFar: true, left: WarUnitLooks.gear("gear/bow_withString.gltf") },
+    druid: { ...WarUnitLooks.MEDIUM, file: "characters/Druid.glb", height: 3.2, attackClip: "Ranged_Magic_Spellcasting", right: WarUnitLooks.gear("gear/druid_staff.gltf") },
+    mage: { ...WarUnitLooks.MEDIUM, file: "characters/Mage.glb", height: 3.2, attackClip: "Ranged_Magic_Shoot", shootsFar: true, right: WarUnitLooks.gear("gear/staff.gltf") },
+    barbarian: { ...WarUnitLooks.LARGE, file: "characters/Barbarian_Large.glb", height: 5.2, attackClip: "Melee_2H_Attack", right: WarUnitLooks.gear("gear/axe_2handed_Large.gltf") },
+    engineer: { ...WarUnitLooks.MEDIUM, file: "characters/Engineer.glb", height: 3.0, attackClip: "Throw", shootsFar: true, right: WarUnitLooks.gear("gear/smokebomb.gltf") },
+    skelwarrior: { ...WarUnitLooks.MEDIUM, file: "characters/Skeleton_Warrior.glb", height: 2.9, attackClip: "Melee_1H_Attack_Slice_Horizontal", right: WarUnitLooks.gear("gear-skeleton/Skeleton_Blade.gltf"), left: WarUnitLooks.gear("gear-skeleton/Skeleton_Shield_Small_A.gltf") },
+    skelarcher: { ...WarUnitLooks.MEDIUM, file: "characters/Skeleton_Rogue.glb", height: 2.7, attackClip: "Ranged_2H_Shoot", shootsFar: true, right: WarUnitLooks.gear("gear-skeleton/Skeleton_Crossbow.gltf") },
+    minion: { ...WarUnitLooks.MEDIUM, file: "characters/Skeleton_Minion.glb", height: 2.1, attackClip: "Melee_1H_Attack_Chop", right: WarUnitLooks.gear("gear-skeleton/Skeleton_Dagger.gltf") },
+    skelmage: { ...WarUnitLooks.MEDIUM, file: "characters/Skeleton_Mage.glb", height: 3.0, attackClip: "Ranged_Magic_Shoot", shootsFar: true, right: WarUnitLooks.gear("gear-skeleton/Skeleton_Staff.gltf") },
+    necromancer: { ...WarUnitLooks.MEDIUM, file: "characters/Necromancer.glb", height: 3.2, attackClip: "Ranged_Magic_Spellcasting", shootsFar: true, right: WarUnitLooks.gear("gear-skeleton/Skeleton_Scythe.gltf") },
+    golem: { ...WarUnitLooks.LARGE, file: "characters/Skeleton_Golem.glb", height: 5.2, attackClip: "Melee_2H_Attack", right: WarUnitLooks.gear("gear-skeleton/Skeleton_Golem_Axe_Large.gltf") },
   };
 
   static of(unitId: string): WarUnitLook {
@@ -89,41 +84,43 @@ class WarUnitLooks {
   static files(): string[] {
     const files: string[] = [];
     for (const key of Object.keys(WarUnitLooks.LOOKS)) {
-      files.push(WarUnitLooks.LOOKS[key].file);
-      if (WarUnitLooks.LOOKS[key].altFile) files.push(WarUnitLooks.LOOKS[key].altFile);
-      const hand = WarUnitLooks.LOOKS[key].hand;
-      if (hand) files.push(hand.file);
-      for (const part of WarUnitLooks.LOOKS[key].parts) files.push(part.file);
+      const look = WarUnitLooks.LOOKS[key];
+      files.push(look.file);
+      if (look.right) files.push(look.right.file);
+      if (look.left) files.push(look.left.file);
     }
     return files;
   }
 }
 interface WarBuildingModel { file: string; scale: number; top?: number; grounded?: boolean }
-interface WarDecor { file: string; x: number; y?: number; z: number; scale: number }
+interface WarDecor { file: string; x: number; y?: number; z: number; scale: number; yaw?: number }
 
 class WarBuildingLooks {
   private static readonly MODELS: Record<WarFactionId, Record<WarBuildingType, WarBuildingModel>> = {
-    pioneer: {
-      hq: { file: "quaternius/Base_Large.gltf", scale: 0.8 },
-      barracks: { file: "quaternius/House_Single.gltf", scale: 0.9 },
-      factory: { file: "quaternius/GeodesicDome.gltf", scale: 0.42 },
-      airport: { file: "space/landingpad_large.gltf", scale: 1.7 },
-      turret: { file: "kenney_turret_double.glb", scale: 4.2, top: 4.6, grounded: true },
+    adventurer: {
+      hq: { file: "hex/building_castle_blue.gltf", scale: 2.4, top: 10.6 },
+      barracks: { file: "hex/building_barracks_blue.gltf", scale: 2.8, top: 5.6 },
+      citadel: { file: "hex/building_tower_catapult_blue.gltf", scale: 3.1, top: 6.6 },
+      turret: { file: "hex/building_tower_A_blue.gltf", scale: 2.6, top: 5.8 },
     },
     grave: {
       hq: { file: "halloween/crypt.gltf", scale: 0.95, top: 6.8 },
       barracks: { file: "halloween/coffin_decorated.gltf", scale: 1.2 },
-      factory: { file: "halloween/shrine_candles.gltf", scale: 1.7 },
-      airport: { file: "halloween/arch_gate.gltf", scale: 1.1 },
+      citadel: { file: "halloween/shrine_candles.gltf", scale: 1.7 },
       turret: { file: "halloween/post_skull.gltf", scale: 2.6, top: 4.4, grounded: true },
     },
   };
 
   private static readonly DECOR: Record<string, WarDecor[]> = {
-    "grave:airport": [
-      { file: "halloween/lantern_standing.gltf", x: -2.6, z: 0.8, scale: 1.6 }, { file: "halloween/lantern_standing.gltf", x: 2.6, z: 0.8, scale: 1.6 },
-      { file: "halloween/skull_candle.gltf", x: -1.6, z: 1.8, scale: 1.4 }, { file: "halloween/skull_candle.gltf", x: 1.6, z: 1.8, scale: 1.4 },
+    "adventurer:hq": [
+      { file: "hex/tent.gltf", x: -4.4, z: 1.4, scale: 4.6, yaw: 0.6 }, { file: "hex/flag_blue.gltf", x: 3.6, z: -3.2, scale: 5 },
+      { file: "hex/crate_A_big.gltf", x: 4.3, z: 2.4, scale: 4.6 }, { file: "hex/barrel.gltf", x: -3.5, z: -3.3, scale: 4.6 },
+      { file: "hex/sack.gltf", x: 3.4, z: 4.0, scale: 4.6 }, { file: "hex/wheelbarrow.gltf", x: -4.8, z: -1.0, scale: 4.2, yaw: 1.2 },
     ],
+    "adventurer:barracks": [{ file: "hex/weaponrack.gltf", x: 3.4, z: 1.4, scale: 4.6, yaw: -0.6 }, { file: "hex/target.gltf", x: -3.3, z: 1.8, scale: 4.4, yaw: 0.4 }],
+    "adventurer:citadel": [{ file: "hex/bucket_arrows.gltf", x: 2.6, z: 2.0, scale: 4.6 }, { file: "hex/crate_long_A.gltf", x: -2.8, z: 1.9, scale: 4.6, yaw: 0.5 }],
+    "grave:barracks": [{ file: "halloween/bone_A.gltf", x: 2.0, z: 1.6, scale: 1.8 }, { file: "halloween/skull_candle.gltf", x: -1.8, z: 1.7, scale: 1.4 }],
+    "grave:citadel": [{ file: "halloween/lantern_standing.gltf", x: -1.9, z: 1.2, scale: 1.5 }, { file: "halloween/lantern_standing.gltf", x: 1.9, z: 1.2, scale: 1.5 }, { file: "halloween/skull_candle.gltf", x: 0, z: 2.1, scale: 1.4 }],
     "grave:hq": [
       { file: "halloween/pillar.gltf", x: -3.2, z: -2.2, scale: 1.4 }, { file: "halloween/pillar.gltf", x: 3.2, z: -2.2, scale: 1.4 },
       { file: "halloween/pillar.gltf", x: -3.2, z: 2.2, scale: 1.4 }, { file: "halloween/pillar.gltf", x: 3.2, z: 2.2, scale: 1.4 },
@@ -154,35 +151,14 @@ class WarBuildingLooks {
 interface WarActor { model: Three<"Object3D">; clips: Map<string, Three<"AnimationClip">> }
 interface WarLoadedAsset { scene: Three<"Object3D">; clips: Map<string, Three<"AnimationClip">> }
 
-class WarSkinTones {
-  private static readonly TONES: Record<string, string> = {
-    "quaternius/Knight_Male.gltf": "#C98F68",
-    "quaternius/Soldier_Male.gltf": "#E3B08A",
-    "quaternius/Soldier_Female.gltf": "#F0C8A4",
-    "quaternius/Worker_Male.gltf": "#B97F58",
-    "quaternius/Worker_Female.gltf": "#E8B994",
-  };
-
-  static apply(file: string, scene: Three<"Object3D">): void {
-    const tone = WarSkinTones.TONES[file];
-    if (!tone) return;
-    scene.traverse((node) => {
-      const mesh = node as Three<"Mesh">;
-      if (!mesh.isMesh) return;
-      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-      for (const material of materials) if (material.name === "Skin") (material as Three<"MeshStandardMaterial">).color.set(tone);
-    });
-  }
-}
-
 class WarAssetLibrary {
   static readonly ROOT = "assets/kaykit/war/";
-  private static readonly EXTRA_MODELS = ["space/landingpad_large.gltf", "resources/Iron_Nuggets.gltf", "resources/Parts_Pile_Large.gltf", "resources/Iron_Nugget_Large.gltf", "gear/pickaxe.gltf", "quaternius/Worker_Male.gltf", "quaternius/Worker_Female.gltf"];
+  private static readonly EXTRA_MODELS = ["resources/Iron_Nuggets.gltf", "resources/Iron_Nugget_Large.gltf", "resources/Silver_Nuggets.gltf", "resources/Silver_Nugget_Large.gltf", "gear/pickaxe.gltf", "characters/Rogue_Hooded.glb", "characters/Skeleton_Minion.glb"];
 
-  private static readonly RIG_ANIMATIONS = ["General", "MovementBasic", "CombatMelee", "CombatRanged"];
+  private static readonly RIG_ANIMATIONS: Record<WarRigId, string> = { medium: "animations/war_medium.glb", large: "animations/war_large.glb" };
 
   private readonly assets = new Map<string, WarLoadedAsset>();
-  private readonly rigClips = new Map<string, Three<"AnimationClip">>();
+  private readonly rigClips: Record<WarRigId, Map<string, Three<"AnimationClip">>> = { medium: new Map(), large: new Map() };
   private readonly heights = new Map<string, number>();
   private loading: Promise<void> | null = null;
 
@@ -193,9 +169,9 @@ class WarAssetLibrary {
     return this.loading;
   }
 
-  actor(file: string, shared: boolean): WarActor {
+  actor(file: string, rig: WarRigId): WarActor {
     const asset = this.assetOf(file);
-    return { model: this.libs.SkeletonUtils.clone(asset.scene), clips: shared ? this.rigClips : asset.clips };
+    return { model: this.libs.SkeletonUtils.clone(asset.scene), clips: this.rigClips[rig] };
   }
 
   model(file: string): Three<"Object3D"> {
@@ -234,16 +210,19 @@ class WarAssetLibrary {
     return found;
   }
 
+  private rigLoads(loader: InstanceType<GLTFLoaderClass>): Promise<void>[] {
+    return (Object.keys(WarAssetLibrary.RIG_ANIMATIONS) as WarRigId[]).map((rig) => loader.loadAsync(WarAssetLibrary.ROOT + WarAssetLibrary.RIG_ANIMATIONS[rig]).then((gltf) => gltf.animations.forEach((clip) => this.rigClips[rig].set(clip.name, clip))));
+  }
+
   private async loadAll(): Promise<void> {
     const loader = new this.libs.GLTFLoader();
     const files = Array.from(new Set(WarUnitLooks.files().concat(WarBuildingLooks.files(), WarAssetLibrary.EXTRA_MODELS, WarSceneryKit.files())));
-    const rig = WarAssetLibrary.RIG_ANIMATIONS.map((name) => loader.loadAsync(WarAssetLibrary.ROOT + "animations/Rig_Medium_" + name + ".glb").then((gltf) => gltf.animations.forEach((clip) => this.rigClips.set(clip.name, clip))));
-    await Promise.all(rig.concat(files.map((file) => loader.loadAsync(WarAssetLibrary.ROOT + file).then((gltf) => {
+    const models = files.map((file) => loader.loadAsync(WarAssetLibrary.ROOT + file).then((gltf) => {
       const clips = new Map<string, Three<"AnimationClip">>();
       gltf.animations.forEach((clip) => clips.set(clip.name, clip));
-      WarSkinTones.apply(file, gltf.scene);
       this.assets.set(file, { scene: gltf.scene, clips });
-    }))));
+    }));
+    await Promise.all(this.rigLoads(loader).concat(models));
   }
 }
 
@@ -312,7 +291,7 @@ class WarUnitView {
   animate = true;
   private readonly look: WarUnitLook;
   private readonly model: Three<"Object3D">;
-  private readonly animator: CharacterAnimator | null;
+  private readonly animator: CharacterAnimator;
   private readonly ring: Three<"Mesh">;
   private readonly from: WarScenePoint;
   private readonly to: WarScenePoint;
@@ -320,71 +299,44 @@ class WarUnitView {
   private moving = false;
   private lastCooldown = 0;
   private attackHold = 0;
-  private bobSeconds = 0;
   private backward = false;
   private paceRate = 1;
-  private tilt = 0;
-  private roll = 0;
   private dyingLeft = -1;
 
   constructor(libs: ThreeLibs, assets: WarAssetLibrary, private readonly materials: WarMaterials, unit: WarUnit, start: WarScenePoint, mine: boolean) {
     const THREE = libs.THREE;
     this.look = WarUnitLooks.of(unit.def.id);
     this.group = new THREE.Group();
-    const file = this.look.altFile && unit.id % 2 === 1 ? this.look.altFile : this.look.file;
-    const actor = assets.actor(file, this.look.shared);
+    const actor = assets.actor(this.look.file, this.look.rig);
     this.model = actor.model;
-    for (const part of this.look.parts) {
-      const piece = assets.grounded(part.file);
-      piece.position.set(part.x, part.y ?? 0, part.z);
-      piece.scale.setScalar(part.scale);
-      this.model.add(piece);
-    }
-    this.model.scale.setScalar(this.look.height / assets.heightOf(file));
-    if (this.look.hand) this.attachHandGear(libs, assets, this.look.hand);
-    if (this.look.altitude > 0) this.model.rotation.order = "YXZ";
+    this.model.scale.setScalar(this.look.height / assets.heightOf(this.look.file));
+    this.attachGear(assets, "handslotr", this.look.right);
+    this.attachGear(assets, "handslotl", this.look.left);
     WarShadows.cast(this.model);
     this.group.add(this.model);
-    this.animator = this.look.animated ? new CharacterAnimator(libs, this.model, actor.clips) : null;
+    this.animator = new CharacterAnimator(libs, this.model, actor.clips);
     this.ring = new THREE.Mesh(materials.ringGeometry, materials.ring(mine ? WarPalette.SQUAD_COLORS[Math.max(0, unit.squadIndex)] : WarPalette.ENEMY));
     this.ring.rotation.x = -Math.PI / 2;
     this.ring.position.y = 0.05;
     this.ring.scale.setScalar(unit.collisionRadius() / 52);
     this.bar = new WarHealthBar(libs, materials, 1.1, 0.14, mine);
-    this.bar.group.position.y = this.look.height * 0.65 + 0.6 + this.look.altitude;
+    this.bar.group.position.y = this.look.height * 0.65 + 0.6;
     this.group.add(this.ring, this.bar.group);
     this.from = { x: start.x, z: start.z };
     this.to = { x: start.x, z: start.z };
     this.group.position.set(start.x, 0, start.z);
     this.yaw = mine ? Math.PI : 0;
-    if (this.animator) this.animator.play(this.look.idleClip);
-    this.model.position.y = this.look.altitude;
+    this.animator.play(this.look.idleClip);
   }
 
-  private attachHandGear(libs: ThreeLibs, assets: WarAssetLibrary, gear: WarHandGear): void {
-    const THREE = libs.THREE;
-    const hand = this.model.getObjectByName("FistR");
-    if (!hand) return;
-    this.model.updateMatrixWorld(true);
-    const world = new THREE.Vector3();
-    hand.getWorldScale(world);
+  private attachGear(assets: WarAssetLibrary, slotName: string, gear: WarSlotGear | null): void {
+    if (!gear) return;
+    const slot = this.model.getObjectByName(slotName);
+    if (!slot) return;
     const item = assets.model(gear.file);
-    item.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(item);
-    const center = box.getCenter(new THREE.Vector3());
-    const size = box.getSize(new THREE.Vector3());
-    item.position.set(-center.x, -center.y, -center.z);
-    const holder = new THREE.Group();
-    holder.add(item);
-    const unit = Math.max(0.0001, world.x);
-    holder.scale.setScalar(gear.length / Math.max(size.x, size.y, size.z) / unit);
-    holder.rotation.set(gear.rx, gear.ry, gear.rz);
-    holder.position.set(gear.ox / unit, gear.oy / unit, gear.oz / unit);
-    WarShadows.cast(holder);
-    hand.add(holder);
-  }
-
-  get altitude(): number {    return this.look.altitude;
+    item.rotation.set(gear.rx, gear.ry, gear.rz);
+    WarShadows.cast(item);
+    slot.add(item);
   }
 
   onTick(unit: WarUnit, target: WarScenePoint, facing: WarScenePoint | null, squadColor: string | null): void {
@@ -409,48 +361,30 @@ class WarUnitView {
     const x = this.from.x + (this.to.x - this.from.x) * alpha;
     const z = this.from.z + (this.to.z - this.from.z) * alpha;
     this.group.position.set(x, 0, z);
-    const aim = this.yaw + this.look.turn;
-    const turn = Math.atan2(Math.sin(aim - this.model.rotation.y), Math.cos(aim - this.model.rotation.y));
+    const turn = Math.atan2(Math.sin(this.yaw - this.model.rotation.y), Math.cos(this.yaw - this.model.rotation.y));
     this.model.rotation.y += turn * Math.min(1, deltaSeconds * 26);
     this.bar.group.quaternion.copy(cameraQuaternion);
-    this.bobSeconds += deltaSeconds;
     if (this.dyingLeft >= 0) {
       this.renderDeath(deltaSeconds);
       return;
     }
-    if (this.look.altitude > 0) this.banking(turn, deltaSeconds);
-    if (!this.animator) {
-      this.model.position.y = this.look.altitude > 0 ? this.look.altitude + Math.sin(this.bobSeconds * 2 + this.yaw) * 0.25 : this.moving ? Math.abs(Math.sin(this.bobSeconds * 9)) * 0.06 : 0;
-      return;
-    }
-    if (this.look.altitude > 0) this.model.position.y = this.look.altitude + Math.sin(this.bobSeconds * 2 + this.yaw) * 0.25;
     if (!this.animate) return;
     if (this.attackHold > 0) {
       this.attackHold -= deltaSeconds;
       this.animator.play(this.look.attackClip, { once: true });
     } else if (this.moving && this.backward && this.look.backClip !== "") {
-      this.animator.play(this.look.backClip, { speed: this.look.backReverse ? -this.paceRate : this.paceRate });
+      this.animator.play(this.look.backClip, { speed: this.paceRate });
     } else {
       this.animator.play(this.moving ? this.look.runClip : this.look.idleClip, { speed: this.moving ? this.paceRate : 1 });
     }
     this.animator.update(deltaSeconds);
   }
 
-  private banking(turn: number, deltaSeconds: number): void {
-    const wantTilt = this.moving ? 0.14 : 0;
-    const wantRoll = Math.max(-0.45, Math.min(0.45, -turn * 0.9)) * (this.moving ? 1 : 0.3);
-    const follow = Math.min(1, deltaSeconds * 6);
-    this.tilt += (wantTilt - this.tilt) * follow;
-    this.roll += (wantRoll - this.roll) * follow;
-    this.model.rotation.x = this.tilt;
-    this.model.rotation.z = this.roll;
-  }
-
   beginDeath(): void {
     this.dyingLeft = WarUnitView.DEATH_SECONDS;
     this.bar.group.visible = false;
     this.ring.visible = false;
-    if (this.animator && this.look.deathClip !== "") this.animator.play(this.look.deathClip, { once: true });
+    this.animator.play(this.look.deathClip, { once: true });
   }
 
   get finishedDying(): boolean {
@@ -460,14 +394,8 @@ class WarUnitView {
   private renderDeath(deltaSeconds: number): void {
     this.dyingLeft = Math.max(0.00001, this.dyingLeft - deltaSeconds);
     const t = 1 - this.dyingLeft / WarUnitView.DEATH_SECONDS;
-    if (this.animator && this.look.deathClip !== "") {
-      this.animator.update(deltaSeconds);
-      if (t > 0.7) this.model.scale.multiplyScalar(0.96);
-      return;
-    }
-    this.model.position.y = Math.max(0, this.look.altitude * (1 - t * t * 1.6));
-    this.model.rotation.z += deltaSeconds * (this.look.altitude > 0 ? 2.4 : 0);
-    this.model.scale.multiplyScalar(this.look.altitude > 0 ? 0.985 : 0.93);
+    this.animator.update(deltaSeconds);
+    if (t > 0.7) this.model.scale.multiplyScalar(0.96);
   }
 
   show(visible: boolean): void {
@@ -527,12 +455,12 @@ class WarGroundView {
   readonly group: Three<"Group">;
   readonly detail: Three<"Group">;
 
-  constructor(private readonly libs: ThreeLibs, assets: WarAssetLibrary, private readonly transform: WarViewTransform) {
+  constructor(private readonly libs: ThreeLibs, assets: WarAssetLibrary, private readonly transform: WarViewTransform, factions: WarFactionId[]) {
     const THREE = libs.THREE;
     this.group = new THREE.Group();
     const noise = new WarValueNoise(4242);
     const field = new WarLaneField();
-    const texture = new THREE.CanvasTexture(new WarTerrainPainter(noise, field).paint());
+    const texture = new THREE.CanvasTexture(new WarTerrainPainter(noise, field, factions).paint());
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.anisotropy = 4;
     const widthM = (WarMapData.HALF_W * 2) / 100, heightM = (WarMapData.HALF_H * 2) / 100;
@@ -543,7 +471,7 @@ class WarGroundView {
     holder.rotation.y = transform.team === 1 ? Math.PI : 0;
     holder.add(plane);
     this.group.add(holder);
-    const scenery = new WarSceneryBuilder(libs, assets, transform, noise, field).build();
+    const scenery = new WarSceneryBuilder(libs, assets, transform, noise, field, factions).build();
     this.detail = scenery.detail;
     this.group.add(scenery.core, scenery.detail);
     this.placeResources(assets);
@@ -552,7 +480,7 @@ class WarGroundView {
   private placeResources(assets: WarAssetLibrary): void {
     for (const team of [0, 1] as WarTeam[]) {
       for (const point of WarMapData.orePoints(team)) {
-        const node = assets.model("resources/Iron_Nuggets.gltf");
+        const node = assets.grounded("resources/Iron_Nuggets.gltf");
         const scene = this.transform.toScene(point);
         node.position.set(scene.x, 0, scene.z);
         node.scale.setScalar(5.2);
@@ -561,7 +489,7 @@ class WarGroundView {
         this.group.add(node);
       }
       for (const point of WarMapData.crystalPoints(team)) {
-        const crystal = assets.grounded("scenery/rock_crystalsLargeA.glb");
+        const crystal = assets.grounded("resources/Silver_Nuggets.gltf");
         const scene = this.transform.toScene(point);
         crystal.position.set(scene.x, 0, scene.z);
         crystal.scale.setScalar(4.6);
@@ -617,7 +545,7 @@ class WarFogView {
 interface WarWorkerRoute { drop: WarScenePoint; spot: WarScenePoint; node: WarScenePoint; walkSeconds: number; cycleSeconds: number }
 
 class WarWorker {
-  private static readonly HEIGHT = 3.0;
+  private static readonly LOOKS: Record<WarFactionId, { file: string; height: number }> = { adventurer: { file: "characters/Rogue_Hooded.glb", height: 3.0 }, grave: { file: "characters/Skeleton_Minion.glb", height: 2.4 } };
   private static readonly CARRY_SIZE = 0.9;
   private static readonly PICK_SIZE = 1.25;
 
@@ -629,11 +557,11 @@ class WarWorker {
   private readonly pickaxe: Three<"Object3D">;
   private yaw = 0;
 
-  constructor(libs: ThreeLibs, assets: WarAssetLibrary, index: number, tint: string) {
-    const file = index % 2 === 0 ? "quaternius/Worker_Male.gltf" : "quaternius/Worker_Female.gltf";
-    const actor = assets.actor(file, false);
+  constructor(libs: ThreeLibs, assets: WarAssetLibrary, tint: string, faction: WarFactionId) {
+    const look = WarWorker.LOOKS[faction];
+    const actor = assets.actor(look.file, "medium");
     this.model = actor.model;
-    this.model.scale.setScalar(WarWorker.HEIGHT / assets.heightOf(file));
+    this.model.scale.setScalar(look.height / assets.heightOf(look.file));
     this.model.traverse((node) => {
       const mesh = node as Three<"Mesh">;
       if (!mesh.isMesh) return;
@@ -646,9 +574,9 @@ class WarWorker {
     this.group.add(this.model);
     this.animator = new CharacterAnimator(libs, this.model, actor.clips);
     this.model.updateMatrixWorld(true);
-    const hand = this.model.getObjectByName("FistR") ?? this.model;
+    const hand = this.model.getObjectByName("handslotr") ?? this.model;
     this.oreItem = this.holdable(libs, assets, hand, "resources/Iron_Nugget_Large.gltf", WarWorker.CARRY_SIZE, 0);
-    this.crystalItem = this.holdable(libs, assets, hand, "scenery/rock_crystals.glb", WarWorker.CARRY_SIZE, 0);
+    this.crystalItem = this.holdable(libs, assets, hand, "resources/Silver_Nugget_Large.gltf", WarWorker.CARRY_SIZE, 0);
     WarGlow.crystal(this.crystalItem);
     this.pickaxe = this.holdable(libs, assets, hand, "gear/pickaxe.gltf", WarWorker.PICK_SIZE, Math.PI / 2);
   }
@@ -674,16 +602,16 @@ class WarWorker {
     const mineEnd = WarWorkerCrowd.MINE_SECONDS;
     const carryEnd = mineEnd + route.walkSeconds;
     const dropEnd = carryEnd + WarWorkerCrowd.DROP_SECONDS;
-    let from = route.spot, to = route.spot, along = 0, clip = "Idle", pace = 1, facing = route.node, holdsLoad = false, holdsPick = false;
+    let from = route.spot, to = route.spot, along = 0, clip = "Idle_A", pace = 1, facing = route.node, holdsLoad = false, holdsPick = false;
     if (t < mineEnd) {
-      clip = "SwordSlash";
+      clip = "Pickaxing";
       pace = 1.1;
       holdsPick = true;
     } else if (t < carryEnd) {
       from = route.spot;
       to = route.drop;
       along = (t - mineEnd) / route.walkSeconds;
-      clip = "Walk_Carry";
+      clip = "Walking_A";
       holdsLoad = true;
       facing = route.drop;
     } else if (t < dropEnd) {
@@ -696,7 +624,7 @@ class WarWorker {
       from = route.drop;
       to = route.spot;
       along = (t - dropEnd) / route.walkSeconds;
-      clip = "Walk";
+      clip = "Walking_A";
       holdsPick = true;
       facing = route.spot;
     }
@@ -704,7 +632,8 @@ class WarWorker {
     const z = from.z + (to.z - from.z) * along;
     this.group.position.set(x, 0, z);
     const aimX = facing === route.drop && t >= carryEnd && t < dropEnd ? route.drop.x : facing.x;
-    const heading = clip === "Walk" || clip === "Walk_Carry" ? Math.atan2(to.x - from.x, to.z - from.z) : Math.atan2(aimX - x, facing.z - z);
+    const walking = (t >= mineEnd && t < carryEnd) || t >= dropEnd;
+    const heading = walking ? Math.atan2(to.x - from.x, to.z - from.z) : Math.atan2(aimX - x, facing.z - z);
     this.yaw = heading;
     const turn = Math.atan2(Math.sin(this.yaw - this.model.rotation.y), Math.cos(this.yaw - this.model.rotation.y));
     this.model.rotation.y += turn * Math.min(1, deltaSeconds * 12);
@@ -730,7 +659,7 @@ class WarWorkerCrowd {
   private readonly routes = new Map<string, WarWorkerRoute>();
   private lastSeconds = 0;
 
-  constructor(private readonly libs: ThreeLibs, private readonly assets: WarAssetLibrary, private readonly transform: WarViewTransform, private readonly team: WarTeam, private readonly tint: string) {
+  constructor(private readonly libs: ThreeLibs, private readonly assets: WarAssetLibrary, private readonly transform: WarViewTransform, private readonly team: WarTeam, private readonly tint: string, private readonly faction: WarFactionId) {
     this.group = new libs.THREE.Group();
   }
 
@@ -755,7 +684,7 @@ class WarWorkerCrowd {
     const ore = WarMapData.orePoints(this.team), crystal = WarMapData.crystalPoints(this.team);
     const total = Math.min(WarWorkerCrowd.MAX, oreWorkers + crystalWorkers);
     while (this.workers.length < total) {
-      const worker = new WarWorker(this.libs, this.assets, this.workers.length, this.tint);
+      const worker = new WarWorker(this.libs, this.assets, this.tint, this.faction);
       this.workers.push(worker);
       this.group.add(worker.group);
     }
@@ -887,10 +816,10 @@ class WarWorldView {
     this.renderer.setPixelRatio(this.pixelRatio);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color("#150E1F");
-    this.scene.fog = new THREE.Fog(0x150E1F, 85, 230);
-    this.scene.add(new THREE.HemisphereLight(0xFFE9D2, 0x4A3A66, 1.75));
-    this.sun = new THREE.DirectionalLight(0xFFD9A8, 1.45);
+    this.scene.background = new THREE.Color("#8FB4CE");
+    this.scene.fog = new THREE.Fog(0x8FB4CE, 95, 250);
+    this.scene.add(new THREE.HemisphereLight(0xFFF6E4, 0x6E7C58, 1.25));
+    this.sun = new THREE.DirectionalLight(0xFFEBC8, 1.1);
     this.sun.position.set(WarWorldView.SUN_OFFSET.x, WarWorldView.SUN_OFFSET.y, WarWorldView.SUN_OFFSET.z);
     this.sun.castShadow = true;
     const half = WarWorldView.SHADOW_HALF_SIZE;
@@ -1033,20 +962,19 @@ interface WarEffectStyle { projectile: boolean; color: string; size: number; spe
 class WarEffectStyles {
   private static readonly DEFAULT: WarEffectStyle = { projectile: false, color: "#FFE9B0", size: 0.12, speed: 20, arc: 0, hit: 0.9, beam: 0, lightning: false, ring: 0 };
   private static readonly STYLES: Record<string, Partial<WarEffectStyle>> = {
-    shieldbearer: { color: "#FFE9B0", size: 0, hit: 0.9 },
-    archer: { projectile: true, color: "#FFF27A", size: 0.11, speed: 30, arc: 0.4, hit: 0.55 },
-    guardknight: { color: "#FFD070", size: 0, hit: 1.4 },
-    artillerytruck: { projectile: true, color: "#FF9A3C", size: 0.4, speed: 15, arc: 3.2, hit: 3.2, ring: 2.5 },
-    striker: { projectile: true, color: "#FFE066", size: 0.16, speed: 48, arc: 0, hit: 0.9 },
-    executioner: { projectile: true, color: "#FF7A2E", size: 0.5, speed: 38, arc: 0, hit: 2.6, ring: 0 },
-    minion: { color: "#E8E8D0", size: 0, hit: 0.75 },
-    dropminion: { color: "#E8E8D0", size: 0, hit: 0.75 },
+    knight: { color: "#FFE9B0", size: 0, hit: 0.9 },
+    ranger: { projectile: true, color: "#FFF27A", size: 0.11, speed: 30, arc: 0.4, hit: 0.55 },
+    druid: { color: "#7CFF9A", size: 0, hit: 0.9 },
+    mage: { projectile: true, color: "#FF8A3C", size: 0.3, speed: 26, arc: 0.6, hit: 2.0, ring: 2.8 },
+    barbarian: { color: "#FFD070", size: 0, hit: 2.0, ring: 2.4 },
+    engineer: { projectile: true, color: "#FFB84A", size: 0.4, speed: 15, arc: 3.2, hit: 3.2, ring: 2.5 },
     turret: { projectile: true, color: "#FFB84A", size: 0.2, speed: 42, arc: 0, hit: 1.2 },
     skelwarrior: { color: "#E8E8D0", size: 0, hit: 0.9 },
     skelarcher: { projectile: true, color: "#C8FFB0", size: 0.11, speed: 30, arc: 0.4, hit: 0.55 },
-    bonegiant: { color: "#D8C8A0", size: 0, hit: 2.1, ring: 2.5 },
-    stormwitch: { color: "#C9B8FF", size: 0, hit: 1.6, lightning: true, ring: 3 },
-    cursedeye: { color: "#FF3B6B", size: 0, hit: 1.5, beam: 0.16 },
+    minion: { color: "#E8E8D0", size: 0, hit: 0.75 },
+    skelmage: { color: "#C9B8FF", size: 0, hit: 1.6, lightning: true, ring: 3 },
+    necromancer: { projectile: true, color: "#B06BFF", size: 0.22, speed: 24, arc: 0.3, hit: 1.4 },
+    golem: { color: "#D8C8A0", size: 0, hit: 2.4, ring: 2.8 },
   };
 
   static of(unitId: string): WarEffectStyle {
@@ -1142,26 +1070,24 @@ class WarEffects {
     }
   }
 
-  private static heightOf(air: boolean | undefined, ground: number): number {
-    return air ? WarFlight.ALTITUDE : ground;
-  }
-
   handle(event: WarEvent): void {
     if (event.x === undefined || event.y === undefined) return;
     if (event.kind === "strike" && event.tx !== undefined && event.ty !== undefined) {
       if (!this.isVisible(event.x, event.y) && !this.isVisible(event.tx, event.ty)) return;
-      this.strike(WarEffectStyles.of(event.text), this.transform.toScene({ x: event.x, y: event.y }), this.transform.toScene({ x: event.tx, y: event.ty }), WarEffects.heightOf(event.air, 1.5), WarEffects.heightOf(event.toAir, 1.1));
+      this.strike(WarEffectStyles.of(event.text), this.transform.toScene({ x: event.x, y: event.y }), this.transform.toScene({ x: event.tx, y: event.ty }), 1.5, 1.1);
     } else if (event.kind === "splash") {
-      if (this.isVisible(event.x, event.y)) this.burst(this.transform.toScene({ x: event.x, y: event.y }), "#FFD27A", 1.4, 0.4, WarEffects.heightOf(event.toAir, 1.1));
+      if (this.isVisible(event.x, event.y)) this.burst(this.transform.toScene({ x: event.x, y: event.y }), "#FFD27A", 1.4, 0.4, 1.1);
     } else if (event.kind === "unitDied" && this.isVisible(event.x, event.y)) {
-      const air = event.air === true;
-      this.burst(this.transform.toScene({ x: event.x, y: event.y }), air ? "#FF9A5A" : "#B9B2A6", air ? 3.2 : 1.6, air ? 0.8 : 0.5, WarEffects.heightOf(air, 0.8));
+      this.burst(this.transform.toScene({ x: event.x, y: event.y }), "#B9B2A6", 1.6, 0.5, 0.8);
     } else if (event.kind === "buildingDestroyed") {
       const at = this.transform.toScene({ x: event.x, y: event.y });
       this.burst(at, "#FF8A3C", 6, 0.9, 1.5);
       this.burst(at, "#FFE08A", 3.4, 0.6, 2);
-    } else if (event.kind === "revived" || event.kind === "raised") {
-      if (this.isVisible(event.x, event.y)) this.burst(this.transform.toScene({ x: event.x, y: event.y }), "#9CFF9A", 2.2, 0.7, WarEffects.heightOf(event.air, 0.2));
+    } else if (event.kind === "heal" && event.tx !== undefined && event.ty !== undefined) {
+      if (!this.isVisible(event.tx, event.ty)) return;
+      const patient = this.transform.toScene({ x: event.tx, y: event.ty });
+      this.burst(patient, "#7CFF9A", 1.8, 0.7, 1.4);
+      this.ring(patient, "#7CFF9A", 1.5);
     }
   }
 
@@ -1367,14 +1293,14 @@ class WarMatchView {
     this.transform = new WarViewTransform(viewer);
     this.materials = new WarMaterials(libs);
     this.root = new THREE.Group();
-    const ground = new WarGroundView(libs, assets, this.transform);
+    const ground = new WarGroundView(libs, assets, this.transform, [engine.players[0].faction, engine.players[1].faction]);
     this.root.add(ground.group);
     world.registerDetail(ground.detail);
     this.fog = new WarFogView(libs, this.transform, engine.vision);
     this.root.add(this.fog.mesh);
     this.slotMarkers = new WarSlotMarkers(libs, engine.players[viewer].slotDefs, this.transform);
     this.root.add(this.slotMarkers.group);
-    this.crowds = [new WarWorkerCrowd(libs, assets, this.transform, 0, viewer === 0 ? "#E4FFEE" : "#FFC4C4"), new WarWorkerCrowd(libs, assets, this.transform, 1, viewer === 1 ? "#E4FFEE" : "#FFC4C4")];
+    this.crowds = [new WarWorkerCrowd(libs, assets, this.transform, 0, viewer === 0 ? "#F2FFF6" : "#FFD8D8", engine.players[0].faction), new WarWorkerCrowd(libs, assets, this.transform, 1, viewer === 1 ? "#F2FFF6" : "#FFD8D8", engine.players[1].faction)];
     this.crowds.forEach((crowd) => this.root.add(crowd.group));
     this.marker = new WarSelectionMarker(libs);
     this.root.add(this.marker.mesh);
@@ -1422,8 +1348,7 @@ class WarMatchView {
       if (!entity.alive || !this.isShown(entity)) continue;
       const isUnit = entity instanceof WarUnit;
       const scene = this.transform.toScene(entity);
-      const flightHeight = isUnit ? (this.units.get(entity.id)?.altitude ?? 0) : 0;
-      vector.set(scene.x, (isUnit ? 1 : 1.6) + flightHeight, scene.z).project(camera);
+      vector.set(scene.x, isUnit ? 1 : 1.6, scene.z).project(camera);
       const dx = ((vector.x + 1) / 2) * window.innerWidth - clientX;
       const dy = ((1 - vector.y) / 2) * window.innerHeight - clientY;
       const reach = isUnit ? WarMatchView.UNIT_PICK_PIXELS : WarMatchView.BUILDING_PICK_PIXELS * (entity.bodyRadius() / 200 + 0.5);
@@ -1598,23 +1523,23 @@ class WarMenuBackdrop {
     this.built = true;
     const transform = new WarViewTransform(0);
     const materials = new WarMaterials(this.libs);
-    this.root.add(new WarGroundView(this.libs, this.assets, transform).group);
-    this.crowd = new WarWorkerCrowd(this.libs, this.assets, transform, 0, "#E4FFEE");
+    this.root.add(new WarGroundView(this.libs, this.assets, transform, ["adventurer", "grave"]).group);
+    this.crowd = new WarWorkerCrowd(this.libs, this.assets, transform, 0, "#F2FFF6", "adventurer");
     this.root.add(this.crowd.group);
-    const engine = new WarEngine({ seed: 1, factions: ["pioneer", "pioneer"] });
+    const engine = new WarEngine({ seed: 1, factions: ["adventurer", "adventurer"] });
     const player = engine.players[0];
-    ["barracks", "factory", "airport", "barracks"].forEach((type, i) => {
+    ["barracks", "citadel", "citadel", "barracks"].forEach((type, i) => {
       engine.build(0, [0, 2, 4, 1][i], type as WarBuildingType);
     });
     const hq = player.hq as WarBuilding;
     const buildings: WarBuilding[] = [hq, ...player.buildings().filter((b) => b !== hq)];
     for (const building of buildings) {
       building.buildLeft = 0;
-      const view = new WarBuildingView(this.libs, this.assets, materials, building, transform.toScene(building), true, "pioneer");
+      const view = new WarBuildingView(this.libs, this.assets, materials, building, transform.toScene(building), true, "adventurer");
       view.onTick(building);
       this.root.add(view.group);
     }
-    const roster = ["shieldbearer", "archer", "guardknight", "shieldbearer", "archer", "artillerytruck", "striker"];
+    const roster = ["knight", "ranger", "druid", "barbarian", "mage", "knight", "engineer"];
     const post = WarMapData.post(0, 1);
     roster.forEach((id, i) => {
       const def = WarUnitCatalog.byId(id);

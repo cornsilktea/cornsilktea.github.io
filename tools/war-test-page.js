@@ -8,15 +8,18 @@ class WarDebug {
   get engine() { return this.app.match.engine; }
   start(faction) {
     const button = document.querySelector("#startBtn") || [...document.querySelectorAll("button")].find((b) => b.textContent.includes("게임 시작"));
-    if (faction === "grave") [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "무덤 군단").click();
+    if (faction === "grave") [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "해골 군단").click();
+    const original = Math.random;
+    Math.random = function () { return 0.1; };
     button.click();
+    Math.random = original;
   }
   spawn(team, unitId, count, buildingType) {
     const engine = this.engine;
     const player = engine.players[team];
     player.economy.ore = 5000;
     player.economy.crystal = 2000;
-    const type = buildingType || "barracks";
+    const type = buildingType || WarUnitCatalog.byId(unitId).producedAt;
     let slot = player.slotBuildings.findIndex((b) => b && b.def.type === type);
     if (slot < 0) {
       slot = player.slotBuildings.findIndex((b, i) => !b && player.slotDefs[i].enabled);
@@ -45,7 +48,6 @@ window.addEventListener("error", (e) => window.__consoleErrors.push(String(e.mes
 window.addEventListener("unhandledrejection", (e) => window.__consoleErrors.push(String(e.reason)));
 const originalError = console.error;
 console.error = function () { window.__consoleErrors.push([...arguments].join(" ")); originalError.apply(console, arguments); };
-Math.random = function () { return 0.1; };
 `;
 }
 

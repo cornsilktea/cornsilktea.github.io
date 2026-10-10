@@ -1,11 +1,9 @@
-interface WarCorpse { team: WarTeam; x: number; y: number; tick: number }
-
 type WarSquadMode = "home" | "away" | "returning";
 type WarWinner = 0 | 1 | 2;
 type WarEndReason = "hq" | "time" | "surrender";
-type WarEventKind = "strike" | "splash" | "revived" | "raised" | "produced" | "built" | "unitDied" | "buildingDestroyed" | "ended" | "alert";
+type WarEventKind = "strike" | "splash" | "heal" | "produced" | "built" | "unitDied" | "buildingDestroyed" | "ended" | "alert";
 
-interface WarEvent { kind: WarEventKind; team: WarTeam; tick: number; text: string; winner?: WarWinner; x?: number; y?: number; tx?: number; ty?: number; air?: boolean; toAir?: boolean }
+interface WarEvent { kind: WarEventKind; team: WarTeam; tick: number; text: string; winner?: WarWinner; x?: number; y?: number; tx?: number; ty?: number }
 interface WarResult { winner: WarWinner; reason: WarEndReason; tick: number }
 interface WarEngineOptions { seed: number; factions: [WarFactionId, WarFactionId] }
 interface WarCommandJson { type: string; team: WarTeam; [field: string]: unknown }
@@ -102,7 +100,6 @@ class WarUnit extends WarEntity implements WarAttacker {
   slowTicksLeft = 0;
   slowPct = 0;
   marchTicks = 0;
-  revived = false;
   orderPath: WarPoint[] = [];
   holdPoint: WarPoint | null = null;
   rejoin = false;
@@ -125,13 +122,8 @@ class WarUnit extends WarEntity implements WarAttacker {
     return WarUnitCatalog.collisionRadius(this.def.id);
   }
 
-  get flying(): boolean {
-    return this.def.flying;
-  }
-
   canTarget(target: WarEntity): boolean {
-    if (this.def.damage <= 0 || !target.alive) return false;
-    return !(target instanceof WarUnit && target.def.flying && !this.def.hitsAir);
+    return this.def.damage > 0 && target.alive;
   }
 
   get independent(): boolean {
@@ -329,10 +321,6 @@ class WarTerrain {
     return best as WarPoint;
   }
 
-  static clampAir(point: WarPoint): WarPoint {
-    return { x: WarMath.clamp(point.x, -WarMapData.HALF_W, WarMapData.HALF_W), y: WarMath.clamp(point.y, -WarMapData.HALF_H, WarMapData.HALF_H) };
-  }
-
   private static nearestOnSegment(point: WarPoint, corridor: WarCorridor): WarPoint {
     const dx = corridor.bx - corridor.ax;
     const dy = corridor.by - corridor.ay;
@@ -509,15 +497,10 @@ class WarSquadAssigner {
   constructor(private readonly squads: WarSquad[]) {}
 
   assign(unit: WarUnit): WarSquad | null {
-    const target = unit.flying ? this.fleetWithRoom() : this.firstWithKindRoom(unit.def.kind) ?? this.firstWithRoom();
+    const target = this.firstWithKindRoom(unit.def.kind) ?? this.firstWithRoom();
     if (target === null) return null;
     target.add(unit);
     return target;
-  }
-
-  private fleetWithRoom(): WarSquad | null {
-    const fleet = this.squads[WarBalance.FLEET_SQUAD];
-    return fleet.members.length < WarBalance.SQUAD_CAP ? fleet : null;
   }
 
   private static kindLimit(kind: WarUnitKind): number {
@@ -525,13 +508,9 @@ class WarSquadAssigner {
     return kind === "ranged" ? WarBalance.BATCH_RANGED : WarBalance.BATCH_ELITE;
   }
 
-  private groundSquads(): WarSquad[] {
-    return this.squads.filter((squad) => squad.index !== WarBalance.FLEET_SQUAD);
-  }
-
   private firstWithKindRoom(kind: WarUnitKind): WarSquad | null {
     const limit = WarSquadAssigner.kindLimit(kind);
-    for (const squad of this.groundSquads()) {
+    for (const squad of this.squads) {
       if (squad.members.length >= WarBalance.SQUAD_CAP) continue;
       if (squad.members.filter((member) => member.def.kind === kind).length < limit) return squad;
     }
@@ -539,7 +518,7 @@ class WarSquadAssigner {
   }
 
   private firstWithRoom(): WarSquad | null {
-    for (const squad of this.groundSquads()) if (squad.members.length < WarBalance.SQUAD_CAP) return squad;
+    for (const squad of this.squads) if (squad.members.length < WarBalance.SQUAD_CAP) return squad;
     return null;
   }
 }
@@ -599,7 +578,6 @@ class WarSquad {
   }
 
   private pathToAnchor(unit: WarUnit): WarPoint[] {
-    if (unit.flying) return [WarTerrain.clampAir(this.anchor)];
     const goal = WarTerrain.clamp(this.anchor);
     return WarNavGraph.straighten(unit, WarNavGraph.connect(unit, goal));
   }
@@ -623,22 +601,17 @@ class WarSquad {
     return this.attachedMembers().some((unit) => unit.targetId >= 0);
   }
 
-  get isFleet(): boolean {
-    return this.index === WarBalance.FLEET_SQUAD;
-  }
-
   sendAlong(points: WarPoint[], turnToPath = false): void {
     if (points.length === 0) return;
     let from = this.anchor;
     const path: WarPoint[] = [];
     for (const point of points) {
-      const target = this.isFleet ? WarTerrain.clampAir(point) : WarTerrain.clamp(point);
+      const target = WarTerrain.clamp(point);
       if (WarMath.dist(from.x, from.y, target.x, target.y) < WarBalance.PATH_MIN_STEP) continue;
-      if (this.isFleet) path.push(target);
-      else path.push(...WarNavGraph.connect(from, target));
+      path.push(...WarNavGraph.connect(from, target));
       from = target;
     }
-    this.path = this.isFleet ? path : WarNavGraph.straighten(this.anchor, path);
+    this.path = WarNavGraph.straighten(this.anchor, path);
     this.mode = "away";
     this.keepHeading = !turnToPath;
     this.lagTicks = WarBalance.LAG_PATIENCE_TICKS;
@@ -653,7 +626,7 @@ class WarSquad {
 
   recall(turnToPath = false): void {
     this.keepHeading = !turnToPath;
-    this.path = this.isFleet ? [{ x: this.post.x, y: this.post.y }] : WarNavGraph.straighten(this.anchor, WarNavGraph.connect(this.anchor, this.post));
+    this.path = WarNavGraph.straighten(this.anchor, WarNavGraph.connect(this.anchor, this.post));
     this.mode = "returning";
     this.lagTicks = 0;
     this.moveFreeTicks = WarBalance.DEPART_FREE_TICKS;
@@ -782,7 +755,7 @@ class WarTurret extends WarBuilding implements WarAttacker {
     let best: WarUnit | null = null;
     let bestSq = Number.MAX_SAFE_INTEGER;
     for (const other of engine.entitiesOf(enemy)) {
-      if (!(other instanceof WarUnit) || other.flying) continue;
+      if (!(other instanceof WarUnit)) continue;
       const dx = other.x - this.x;
       const dy = other.y - this.y;
       const distanceSq = dx * dx + dy * dy;
@@ -830,7 +803,7 @@ class WarCombat {
 
   static strike(engine: WarEngine, attacker: WarAttacker, target: WarEntity): void {
     const damage = attacker.damageAgainst(target);
-    engine.emit({ kind: "strike", team: attacker.team, tick: engine.tick, text: attacker instanceof WarUnit ? attacker.def.id : attacker instanceof WarTurret ? "turret" : "", x: attacker.x, y: attacker.y, tx: target.x, ty: target.y, air: attacker instanceof WarUnit && attacker.flying, toAir: target instanceof WarUnit && target.flying });
+    engine.emit({ kind: "strike", team: attacker.team, tick: engine.tick, text: attacker instanceof WarUnit ? attacker.def.id : attacker instanceof WarTurret ? "turret" : "", x: attacker.x, y: attacker.y, tx: target.x, ty: target.y });
     engine.damage(target, damage, attacker.id);
     const radius = attacker.splashRadius();
     if (radius > 0) {
@@ -840,7 +813,7 @@ class WarCombat {
         if (attacker instanceof WarUnit && !attacker.canTarget(other)) continue;
         if (WarMath.dist(other.x, other.y, target.x, target.y) > radius) continue;
         engine.damage(other, splash, attacker.id);
-        engine.emit({ kind: "splash", team: attacker.team, tick: engine.tick, text: "", x: other.x, y: other.y, toAir: other instanceof WarUnit && other.flying });
+        engine.emit({ kind: "splash", team: attacker.team, tick: engine.tick, text: "", x: other.x, y: other.y });
       }
     }
     attacker.cooldownLeft = attacker.cooldownTicks();
@@ -1037,12 +1010,11 @@ abstract class WarAbility {
   abstract update(engine: WarEngine, unit: WarUnit): void;
 }
 
-class WarDropMinionAbility extends WarAbility {
-  private waitTicks: number;
+class WarHealAbility extends WarAbility {
+  private waitTicks = 0;
 
-  constructor(private readonly periodTicks: number) {
+  constructor(private readonly periodTicks: number, private readonly amount: number, private readonly range: number) {
     super();
-    this.waitTicks = periodTicks;
   }
 
   update(engine: WarEngine, unit: WarUnit): void {
@@ -1050,13 +1022,34 @@ class WarDropMinionAbility extends WarAbility {
       this.waitTicks--;
       return;
     }
-    if (engine.spawnMinions(unit, "dropminion", 1, true, true) > 0) this.waitTicks = this.periodTicks;
+    const patient = this.weakestAlly(engine, unit);
+    if (!patient) return;
+    patient.hp = Math.min(patient.maxHp, patient.hp + this.amount);
+    this.waitTicks = this.periodTicks - 1;
+    engine.emit({ kind: "heal", team: unit.team, tick: engine.tick, text: unit.def.id, x: unit.x, y: unit.y, tx: patient.x, ty: patient.y });
+  }
+
+  private weakestAlly(engine: WarEngine, healer: WarUnit): WarUnit | null {
+    const reachSq = this.range * this.range;
+    let best: WarUnit | null = null;
+    let bestRatio = 1000;
+    for (const ally of engine.entitiesOf(healer.team)) {
+      if (!(ally instanceof WarUnit) || ally === healer) continue;
+      const ratio = Math.trunc((ally.hp * 1000) / ally.maxHp);
+      if (ratio >= bestRatio) continue;
+      const dx = ally.x - healer.x;
+      const dy = ally.y - healer.y;
+      if (dx * dx + dy * dy > reachSq) continue;
+      bestRatio = ratio;
+      best = ally;
+    }
+    return best;
   }
 }
 
 class WarAbilityFactory {
   static forDef(def: WarUnitDef): WarAbility | null {
-    return def.ability === "dropMinion" ? new WarDropMinionAbility(def.abilityTicks) : null;
+    return def.ability === "heal" ? new WarHealAbility(def.abilityTicks, def.abilityPower, def.abilityRange) : null;
   }
 }
 abstract class WarCommand {
@@ -1202,7 +1195,6 @@ class WarStateHash {
         mix(entity.targetId);
         mix(entity.cooldownLeft);
         mix(entity.slowTicksLeft);
-        mix(entity.revived ? 1 : 0);
         mix(entity.orderPath.length);
         mix(entity.holdPoint ? entity.holdPoint.x + entity.holdPoint.y : 0);
       } else if (entity instanceof WarBuilding) {
@@ -1267,7 +1259,6 @@ class WarEngine {
   private events: WarEvent[] = [];
   private readonly byId = new Map<number, WarEntity>();
   private readonly teamEntities: [WarEntity[], WarEntity[]] = [[], []];
-  private corpses: WarCorpse[] = [];
 
   constructor(options: WarEngineOptions) {
     this.random = new WarRandom(options.seed);
@@ -1287,42 +1278,6 @@ class WarEngine {
     const out = this.events;
     this.events = [];
     return out;
-  }
-
-  takeCorpse(team: WarTeam, near: WarPoint, range: number, lifeTicks: number): WarCorpse | null {
-    for (const corpse of this.corpses) {
-      if (corpse.team !== team || this.tick - corpse.tick > lifeTicks) continue;
-      if (WarMath.dist(corpse.x, corpse.y, near.x, near.y) > range) continue;
-      this.corpses.splice(this.corpses.indexOf(corpse), 1);
-      return corpse;
-    }
-    return null;
-  }
-
-  spawnMinions(owner: WarUnit, defId: string, count: number, hold: boolean, respectCap: boolean): number {
-    const player = this.players[owner.team];
-    const def = WarUnitCatalog.byId(defId);
-    let made = 0;
-    for (let n = 0; n < count; n++) {
-      if (respectCap && this.countOf(owner.team, defId) >= WarBalance.MINION_CAP) break;
-      const spot = WarTerrain.clamp({ x: owner.x + this.random.between(-200, 200), y: owner.y + this.random.between(-200, 200) });
-      const unit = new WarUnit(this.nextId++, owner.team, spot.x, spot.y, def);
-      const ownSquad = player.squads[owner.squadIndex];
-      const joined = !owner.flying && ownSquad && ownSquad.members.length < WarBalance.SQUAD_CAP ? ownSquad : player.assigner.assign(unit);
-      if (!joined) break;
-      if (joined === ownSquad) {
-        if (!ownSquad.members.includes(unit)) ownSquad.add(unit);
-        unit.attached = owner.attached;
-      } else {
-        unit.attached = true;
-      }
-      unit.clearOrder();
-      if (hold) unit.holdPoint = { x: spot.x, y: spot.y };
-      this.register(unit);
-      made++;
-    }
-    if (made > 0) this.emit({ kind: "raised", team: owner.team, tick: this.tick, text: def.name, x: owner.x, y: owner.y, air: owner.flying });
-    return made;
   }
 
   enemySeenNearBase(team: WarTeam): boolean {
@@ -1371,7 +1326,6 @@ class WarEngine {
     if (this.tick % WarBalance.ALERT_EVERY_TICKS === 0) this.alerts.update();
     this.separateUnits();
     this.removeDead();
-    if (this.tick % 10 === 0) this.corpses = this.corpses.filter((corpse) => this.tick - corpse.tick <= WarBalance.CORPSE_KEEP_TICKS);
     this.tick++;
     if (!this.result && this.tick >= WarBalance.MATCH_TICKS) this.finish(WarWinCheck.atTimeLimit(this), "time");
   }
@@ -1390,7 +1344,6 @@ class WarEngine {
     }
     target.hp = Math.max(0, target.hp - amount);
     if (target instanceof WarBuilding) this.alerts.noteBuildingHit(target);
-    if (target instanceof WarUnit && target.hp === 0) this.tryRevive(target);
   }
 
   produce(team: WarTeam, buildingId: number, itemId: string): boolean {
@@ -1422,16 +1375,6 @@ class WarEngine {
     player.slotBuildings[slotIndex] = building;
     this.register(building);
     return true;
-  }
-
-  private tryRevive(unit: WarUnit): void {
-    if (unit.def.reviveChancePct <= 0 || unit.revived) return;
-    if (this.random.below(100) >= unit.def.reviveChancePct) return;
-    unit.revived = true;
-    unit.hp = Math.max(1, Math.trunc((unit.maxHp * WarBalance.REVIVE_HP_PERCENT) / 100));
-    unit.targetId = -1;
-    unit.cooldownLeft = WarBalance.REVIVE_STUN_TICKS;
-    this.emit({ kind: "revived", team: unit.team, tick: this.tick, text: unit.def.name, x: unit.x, y: unit.y });
   }
 
   private placeHq(player: WarPlayer): void {
@@ -1529,7 +1472,7 @@ class WarEngine {
     for (let pass = 0; pass < WarBalance.SEPARATION_PASSES; pass++) this.separatePass(units, radius);
     this.pushOutOfBuildings(units);
     for (const unit of units) {
-      const fixed = unit.flying ? WarTerrain.clampAir(unit) : WarTerrain.clamp(unit);
+      const fixed = WarTerrain.clamp(unit);
       unit.x = fixed.x;
       unit.y = fixed.y;
       unit.lastStep = 0;
@@ -1539,7 +1482,6 @@ class WarEngine {
   private pushOutOfBuildings(units: WarUnit[]): void {
     const buildings = this.entities.filter((entity): entity is WarBuilding => entity instanceof WarBuilding && entity.alive);
     for (const unit of units) {
-      if (unit.flying) continue;
       for (const building of buildings) {
         const keepOut = building.def.radius + WarBalance.BUILDING_PADDING;
         const dx = unit.x - building.x;
@@ -1588,7 +1530,6 @@ class WarEngine {
   }
 
   private pushApart(a: WarUnit, b: WarUnit, radius: number): void {
-    if (a.flying !== b.flying) return;
     const dx = a.x - b.x;
     const dy = a.y - b.y;
     const gap = a.collisionRadius() + b.collisionRadius() + WarBalance.SEPARATION_GAP;
@@ -1631,8 +1572,7 @@ class WarEngine {
     player.economy.popUsed -= unit.def.pop;
     player.unitsLost++;
     player.squads[unit.squadIndex]?.remove(unit);
-    if (unit.def.deathSpawnCount > 0) this.spawnMinions(unit, unit.def.deathSpawnId, unit.def.deathSpawnCount, false, false);
-    this.events.push({ kind: "unitDied", team: player.team, tick: this.tick, text: unit.def.name, x: unit.x, y: unit.y, air: unit.flying });
+    this.events.push({ kind: "unitDied", team: player.team, tick: this.tick, text: unit.def.name, x: unit.x, y: unit.y });
   }
 
   private retireBuilding(player: WarPlayer, building: WarBuilding): void {

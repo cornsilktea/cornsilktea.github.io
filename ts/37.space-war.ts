@@ -146,7 +146,7 @@ class WarGameApp {
   private match: WarLocalMatch | null = null;
   private selection: WarSelection = { kind: "none" };
   private level: WarDifficulty = "normal";
-  private myFaction: WarFactionId = "pioneer";
+  private myFaction: WarFactionId = "adventurer";
   private foeChoice: WarFactionId | "random" = "random";
   private lastFrameMs = 0;
   private frameCount = 0;
@@ -221,7 +221,7 @@ class WarGameApp {
     if (this.match) this.match.dispose();
     this.backdrop.hide();
     const viewer = (Math.random() < 0.5 ? 0 : 1) as WarTeam;
-    const foe: WarFactionId = this.foeChoice === "random" ? (Math.random() < 0.5 ? "pioneer" : "grave") : this.foeChoice;
+    const foe: WarFactionId = this.foeChoice === "random" ? (Math.random() < 0.5 ? "adventurer" : "grave") : this.foeChoice;
     const factions: [WarFactionId, WarFactionId] = viewer === 0 ? [this.myFaction, foe] : [foe, this.myFaction];
     this.match = new WarLocalMatch(this.libs, this.assets, this.world, viewer, this.level, factions, (event) => this.onEvent(event));
     this.selection = { kind: "none" };
@@ -322,7 +322,7 @@ class WarGameApp {
     const mine = engine.players[match.viewer];
     const title = winner === 2 ? "무승부" : winner === match.viewer ? "승리!" : "패배";
     WarDom.byId("endTitle").textContent = title;
-    const reasons: Record<WarEndReason, string> = { hq: "사령부가 부서졌어요.", time: "15분이 지나 사령부 체력으로 정했어요.", surrender: "항복으로 끝났어요." };
+    const reasons: Record<WarEndReason, string> = { hq: "본부가 부서졌어요.", time: "15분이 지나 본부 체력으로 정했어요.", surrender: "항복으로 끝났어요." };
     WarDom.byId("endReason").textContent = reasons[result.reason];
     WarDom.byId("endStats").textContent = "걸린 시간 " + WarTimeText.clock(result.tick) + " · 만든 병력 " + mine.unitsProduced + " · 잃은 병력 " + mine.unitsLost;
     WarDom.byId("endScreen").hidden = false;

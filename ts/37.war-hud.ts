@@ -63,7 +63,7 @@ class WarNotice {
 
 class WarSquadNames {
   static of(index: number): string {
-    return index === WarBalance.FLEET_SQUAD ? "비행단" : "부대 " + (index + 1);
+    return "부대 " + (index + 1);
   }
 }
 
@@ -93,7 +93,7 @@ class WarSquadPanel {
   update(player: WarPlayer, selection: WarSelection): void {
     this.workerText.textContent = "광석 " + player.economy.oreWorkers + " · 결정 " + player.economy.crystalWorkers;
     player.squads.forEach((squad, index) => {
-      const order: WarUnitKind[] = ["melee", "ranged", "elite", "air"];
+      const order: WarUnitKind[] = ["melee", "ranged", "elite"];
       const colors: string[] = [];
       for (const kind of order) {
         for (const unit of squad.members) if (unit.def.kind === kind) colors.push(WarPalette.KIND_COLORS[kind]);
@@ -233,7 +233,7 @@ class WarInfoPanel {
       return {
         title: WarSquadNames.of(selection.index),
         hpRatio: -1,
-        rows: ["근접 " + count("melee") + " · 원거리 " + count("ranged") + " · 고급 " + count("elite") + " · 비행 " + count("air") + " (" + squad.members.length + "/" + WarBalance.SQUAD_CAP + ")", squad.mode === "home" ? "입구에서 수비 중" : squad.mode === "away" ? "공격 이동 중" : "귀환 중"],
+        rows: ["근접 " + count("melee") + " · 원거리 " + count("ranged") + " · 고급 " + count("elite") + " (" + squad.members.length + "/" + WarBalance.SQUAD_CAP + ")", squad.mode === "home" ? "입구에서 수비 중" : squad.mode === "away" ? "공격 이동 중" : "귀환 중"],
       };
     }
     if (selection.kind === "slot") {

@@ -15,6 +15,19 @@ const PACKS = {
     { file: "Rig_Medium_General.glb", clips: ["Idle_B", "Interact", "PickUp", "Spawn_Air", "Death_B", "Hit_B"] },
     { file: "Rig_Medium_Simulation.glb", clips: ["Cheering"] }
   ],
+  war: [
+    { file: "Rig_Medium_General.glb", clips: ["Idle_A", "Death_A", "PickUp", "Throw"] },
+    { file: "Rig_Medium_MovementBasic.glb", clips: ["Running_A", "Walking_A"] },
+    { file: "Rig_Medium_MovementAdvanced.glb", clips: ["Walking_Backwards"] },
+    { file: "Rig_Medium_CombatMelee.glb", clips: ["Melee_1H_Attack_Slice_Horizontal", "Melee_1H_Attack_Chop"] },
+    { file: "Rig_Medium_CombatRanged.glb", clips: ["Ranged_Bow_Release", "Ranged_2H_Shoot", "Ranged_Magic_Shoot", "Ranged_Magic_Spellcasting"] },
+    { file: "Rig_Medium_Tools.glb", clips: ["Pickaxing"] }
+  ],
+  warlarge: [
+    { file: "Rig_Large_General.glb", clips: ["Idle_A", "Death_A"] },
+    { file: "Rig_Large_MovementBasic.glb", clips: ["Running_A", "Walking_A"] },
+    { file: "Rig_Large_CombatMelee.glb", clips: ["Melee_2H_Attack"] }
+  ],
   raid: [
     { file: "Rig_Medium_MovementAdvanced.glb", clips: ["Dodge_Forward"] },
     { file: "Rig_Medium_Special.glb", clips: ["Skeletons_Spawn_Ground", "Skeletons_Awaken_Standing"] },

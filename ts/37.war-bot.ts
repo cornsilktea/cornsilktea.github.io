@@ -15,10 +15,10 @@ abstract class WarBotBrain {
   private static readonly SAVE_FOR_BUILDING_ORE = 150;
   private static readonly RETREAT_PATIENCE_TICKS = 60;
   private static readonly THREAT_RADIUS = 4200;
-  private static readonly MIN_FLEET = 2;
+  private static readonly FIGHTERS_PER_SUPPORT = 5;
   private readonly weakSince = new Map<number, number>();
   private readonly random: WarRandom;
-  private unitCycle = 0;
+  private readonly turns = new Map<number, number>();
 
   constructor(protected readonly team: WarTeam, seed: number, private readonly profile: WarBotProfile) {
     this.random = new WarRandom(seed);
@@ -74,12 +74,33 @@ abstract class WarBotBrain {
 
   private trainUnits(engine: WarEngine, player: WarPlayer): void {
     if (this.wantsNextBuilding(player) && player.economy.ore < WarBotBrain.SAVE_FOR_BUILDING_ORE) return;
-    for (const building of player.buildings()) {
-      if (building.def.type === "hq" || !building.complete || building.queue.length >= this.profile.queueDepth) continue;
-      const choices = WarUnitCatalog.producedBy(player.faction, building.def.type);
-      const pick = choices[this.unitCycle++ % choices.length];
+    const factories = player.buildings().filter((b) => b.def.type !== "hq" && b.complete && b.queue.length < this.profile.queueDepth);
+    factories.sort((a, b) => b.def.crystal - a.def.crystal);
+    const economy = player.economy;
+    let ore = economy.ore;
+    let crystal = economy.crystal;
+    for (const building of factories) {
+      const choices = this.affordableKinds(engine, player, WarUnitCatalog.producedBy(player.faction, building.def.type)).filter((def) => def.crystal <= crystal);
+      if (choices.length === 0) continue;
+      const turn = this.turns.get(building.id) ?? 0;
+      const pick = choices[turn % choices.length];
+      if (pick.ore > ore) {
+        if (pick.crystal > 0) return;
+        continue;
+      }
+      this.turns.set(building.id, turn + 1);
+      ore -= pick.ore;
+      crystal -= pick.crystal;
       engine.submit(new WarProduceCommand(this.team, building.id, pick.id));
     }
+  }
+
+  private affordableKinds(engine: WarEngine, player: WarPlayer, choices: WarUnitDef[]): WarUnitDef[] {
+    const mine = engine.units(this.team);
+    const supports = mine.filter((unit) => unit.def.damage <= 0).length;
+    const fighters = mine.length - supports;
+    const allowed = choices.filter((def) => def.damage > 0 || supports * WarBotBrain.FIGHTERS_PER_SUPPORT < fighters);
+    return allowed.length > 0 ? allowed : choices;
   }
 
   private commandSquads(engine: WarEngine, player: WarPlayer): void {
@@ -92,11 +113,11 @@ abstract class WarBotBrain {
       { x: WarMapData.LANE_X, y: WarMapData.LANE_Y * sign },
     ];
     const threatened = this.profile.defends && this.baseThreatened(engine);
-    const ready = player.squads.filter((squad) => squad.mode === "home" && squad.members.length >= (squad.isFleet ? WarBotBrain.MIN_FLEET : this.profile.minSquadToSend));
+    const ready = player.squads.filter((squad) => squad.mode === "home" && squad.members.length >= this.profile.minSquadToSend);
     const readyPop = ready.reduce((sum, squad) => sum + squad.members.reduce((inner, unit) => inner + unit.def.pop, 0), 0);
     if (readyPop >= this.profile.launchArmyPop && !threatened) {
       const lane = lanes[this.random.below(lanes.length)];
-      for (const squad of ready) engine.submit(new WarAttackPathCommand(this.team, squad.index, squad.isFleet ? [target] : [lane, target]));
+      for (const squad of ready) engine.submit(new WarAttackPathCommand(this.team, squad.index, [lane, target]));
     }
     for (const squad of player.squads) {
       const weak = squad.mode === "away" && squad.attachedMembers().length <= this.profile.retreatSquadSize;
@@ -116,19 +137,19 @@ abstract class WarBotBrain {
 
 class WarEasyBot extends WarBotBrain {
   constructor(team: WarTeam, seed: number) {
-    super(team, seed, { thinkTicks: 40, oreWorkerTarget: 4, crystalWorkerTarget: 1, buildingTarget: 4, launchArmyPop: 28, minSquadToSend: 8, retreatSquadSize: 3, queueDepth: 2, defends: false, buildOrder: ["barracks", "barracks", "factory", "airport"] });
+    super(team, seed, { thinkTicks: 40, oreWorkerTarget: 4, crystalWorkerTarget: 1, buildingTarget: 4, launchArmyPop: 28, minSquadToSend: 8, retreatSquadSize: 3, queueDepth: 2, defends: false, buildOrder: ["barracks", "barracks", "citadel", "citadel"] });
   }
 }
 
 class WarNormalBot extends WarBotBrain {
   constructor(team: WarTeam, seed: number) {
-    super(team, seed, { thinkTicks: 20, oreWorkerTarget: 5, crystalWorkerTarget: 3, buildingTarget: 5, launchArmyPop: 24, minSquadToSend: 6, retreatSquadSize: 3, queueDepth: 2, defends: false, buildOrder: ["barracks", "factory", "airport", "barracks", "factory"] });
+    super(team, seed, { thinkTicks: 20, oreWorkerTarget: 5, crystalWorkerTarget: 3, buildingTarget: 4, launchArmyPop: 24, minSquadToSend: 6, retreatSquadSize: 3, queueDepth: 2, defends: false, buildOrder: ["barracks", "citadel", "barracks", "citadel"] });
   }
 }
 
 class WarHardBot extends WarBotBrain {
   constructor(team: WarTeam, seed: number) {
-    super(team, seed, { thinkTicks: 10, oreWorkerTarget: 5, crystalWorkerTarget: 3, buildingTarget: 5, launchArmyPop: 24, minSquadToSend: 6, retreatSquadSize: 3, queueDepth: 3, defends: true, buildOrder: ["barracks", "factory", "airport", "barracks", "factory"] });
+    super(team, seed, { thinkTicks: 10, oreWorkerTarget: 5, crystalWorkerTarget: 3, buildingTarget: 4, launchArmyPop: 24, minSquadToSend: 6, retreatSquadSize: 3, queueDepth: 3, defends: true, buildOrder: ["barracks", "citadel", "barracks", "citadel"] });
   }
 }
 
