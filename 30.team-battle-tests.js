@@ -4449,7 +4449,7 @@ class EngineerDruidTests {
       shots = self.shotsOf(W).slice(0, ULT.trHeavyEvery);
       if (shots.length !== ULT.trHeavyEvery) bad.push("사격 " + shots.length + "번 (기대 " + ULT.trHeavyEvery + ")");
       if (shots.some(function (p) { return p.v.tgt !== "n1"; })) bad.push("가장 가까운 적 1명이 아닌 대상을 쏨");
-      if (shots.map(function (p) { return p.v.heavy; }).join() !== [0, 0, 1].join()) bad.push("강한 포격 순서 " + shots.map(function (p) { return p.v.heavy; }).join());
+      if (shots.map(function (p) { return p.v.heavy; }).join() !== Array.apply(null, Array(ULT.trHeavyEvery)).map(function (_, i) { return i === ULT.trHeavyEvery - 1 ? 1 : 0; }).join()) bad.push("강한 포격 순서 " + shots.map(function (p) { return p.v.heavy; }).join());
       var want = ULT.trDmg * (ULT.trHeavyEvery - 1) + ULT.trHeavyDmg;
       if (self.lost(W, "n1") !== want) bad.push("n1 피해 " + self.lost(W, "n1") + " (기대 " + want + ")");
       if (self.lost(W, "n2")) bad.push("두 번째 적이 맞음 " + self.lost(W, "n2"));
