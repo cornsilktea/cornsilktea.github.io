@@ -4863,7 +4863,7 @@ class SkillResetTests {
       if (wr.cdUntil > W.t()) bad.push("스킬을 써도 대기시간이 남음 " + Math.round(wr.cdUntil - W.t()) + "ms");
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "스킬 사용 즉시 기본 공격 가능");
     });
-    run(G, "투척병 독병·독안개가 한 적 위에 겹칠 때 피해가 어떻게 쌓이는지(버그 점검, 적용 방침은 선생님 판단)", function (done) {
+    run(G, "투척병 독병·독안개가 한 적 위에 겹쳐도 피해는 1초에 한 번만 들어가는가(2026-10-10 선생님 결정: 지금 방식 유지)", function (done) {
       function measure(basics, fog) {
         api.MATCH.stateByKey = {};
         var W = kit.world("forest", [{ id: "th", team: "blue", char: "thrower", x: 200, y: y, gauge: api.GAUGE_MAX }, { id: "foe", team: "red", char: "guardian", x: 500, y: y }]), th = W.ent("th"), foe = W.ent("foe");
@@ -4874,7 +4874,7 @@ class SkillResetTests {
       }
       var one = measure(1, false), fog = measure(0, true), both = measure(1, true), two = measure(2, false);
       var stacks = both >= one + fog - 1, stacks2 = two >= one * 2 - 1;
-      done("info", "독병 1개 " + one + " · 독안개 " + fog + " · 둘이 겹침 " + both + " (합 " + (one + fog) + "이면 겹쳐 쌓임, 아니면 한 번만) · 독병 2개 겹침 " + two + " (두 배 " + one * 2 + "면 쌓임). 겹침 판정: 독안개+독병 " + (stacks ? "쌓임" : "한 번만") + ", 독병끼리 " + (stacks2 ? "쌓임" : "한 번만"));
+      done(!stacks && !stacks2 ? "pass" : "fail", "독병 1개 " + one + " · 독안개 " + fog + " · 둘이 겹침 " + both + " (합 " + (one + fog) + "이면 겹쳐 쌓임, 아니면 한 번만) · 독병 2개 겹침 " + two + " (두 배 " + one * 2 + "면 쌓임). 겹침 판정: 독안개+독병 " + (stacks ? "쌓임" : "한 번만") + ", 독병끼리 " + (stacks2 ? "쌓임" : "한 번만"));
     });
   }
 }
