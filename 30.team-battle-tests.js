@@ -4389,6 +4389,7 @@ class ResultCollector {
   new EngineerDruidTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
   new GiantTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
   new GargantuaTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
+  new SkillResetTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
   results.pending = Promise.resolve().then(function () { api.finish(api.currentMap()); }).then(drainAsync);
   return results;
   }
@@ -4705,25 +4706,22 @@ class GiantTests {
       if (self.lost(W, "in") > ULT.gjTickDmg * Math.ceil(ULT.gjDur / tick)) bad.push("폭풍 틱이 너무 많음 " + self.lost(W, "in"));
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "틱마다 " + ULT.gjTickDmg + ", 밖 0, 따라다님");
     });
-    run(G, "거신 철퇴: 변신 중 기본 공격이 반경 " + ULT.gjMaceRange + " 안의 가장 가까운 적 1명에게 " + C.dmg + "의 피해와 " + Math.round(ULT.gjStunMs / 700 * 10) / 10 + "초 기절을 주고, 그 적은 면역이라 다음엔 다른 적을 때리는가", function (done) {
+    run(G, "거신 철퇴: 변신 중 기본 공격이 반경 " + ULT.gjMaceRange + " 안의 가장 가까운 적 1명에게만 " + C.dmg + "의 피해를 주고 기절은 없는가", function (done) {
       var bad = [], W = self.giantWorld([{ id: "n1", x: 700 }, { id: "n2", x: 740, dy: 20 }, { id: "far", x: 760, dy: 60 }]), gi = W.ent("gi"), n1 = W.ent("n1"), n2 = W.ent("n2"), far = W.ent("far");
       self.jump(W, 0, 250);
       W.step(ULT.gjTransformMs);
       api.FIELD.gales.length = 0;
       n1.x = gi.x + 80; n1.y = gi.y; n2.x = gi.x + 130; n2.y = gi.y + 10; far.x = gi.x + ULT.gjMaceRange + 40; far.y = gi.y + 5;
       gi.cdUntil = 0; api.fireBasic(gi, 0); W.frame(FRAME);
-      if (self.lost(W, "n1") !== C.dmg || !api.stunned(n1, W.t())) bad.push("가장 가까운 적: 피해 " + self.lost(W, "n1") + ", 기절 " + api.stunned(n1, W.t()));
-      if (self.lost(W, "n2") || api.stunned(n2, W.t())) bad.push("두 번째 적이 같이 맞음");
-      W.step(ULT.gjStunMs + 60);
-      if (api.stunned(n1, W.t())) bad.push("기절이 " + ULT.gjStunMs + "ms 뒤에도 안 풀림");
+      if (self.lost(W, "n1") !== C.dmg) bad.push("가장 가까운 적 피해 " + self.lost(W, "n1") + " (기대 " + C.dmg + ")");
+      if (api.stunned(n1, W.t())) bad.push("철퇴에 기절이 걸림");
+      if (self.lost(W, "n2") || self.lost(W, "far")) bad.push("다른 적이 같이 맞음");
       gi.cdUntil = 0; api.fireBasic(gi, 0); W.frame(FRAME);
-      if (self.lost(W, "n1") !== C.dmg) bad.push("면역인 첫 적이 또 맞음 " + self.lost(W, "n1"));
-      if (self.lost(W, "n2") !== C.dmg || !api.stunned(n2, W.t())) bad.push("면역 아닌 다음 적: 피해 " + self.lost(W, "n2") + ", 기절 " + api.stunned(n2, W.t()));
-      if (self.lost(W, "far")) bad.push("철퇴 사거리 밖 적이 맞음");
-      var before = self.lost(W, "n1");
+      if (self.lost(W, "n1") !== C.dmg * 2) bad.push("두 번째 휘두름도 가장 가까운 적 " + self.lost(W, "n1") + " (기대 " + C.dmg * 2 + ")");
+      n1.x = gi.x + 400;
       gi.cdUntil = 0; api.fireBasic(gi, 0); W.frame(FRAME);
-      if (self.lost(W, "n1") !== before + C.dmg) bad.push("모두 면역일 때 일반 부채꼴 " + (self.lost(W, "n1") - before) + " (기대 " + C.dmg + ")");
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "1번째 n1, 2번째 n2(면역 건너뜀), 사거리 밖 무시, 모두 면역이면 일반 부채꼴");
+      if (self.lost(W, "n2") !== C.dmg) bad.push("가까운 적이 바뀌면 그 적: " + self.lost(W, "n2") + " (기대 " + C.dmg + ")");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "가장 가까운 1명만 " + C.dmg + "·기절 없음, 대상이 바뀌면 다음 적");
     });
     run(G, "거신 패시브: 변신 중에만 받는 피해가 " + Math.round((1 - ULT.gjDef) * 100) + "% 줄고 막은 피해로 쌓이는가", function (done) {
       var bad = [], W = self.giantWorld([{ id: "foe", x: 200 + 600 }]), gi = W.ent("gi");
@@ -4848,6 +4846,37 @@ class GargantuaTests {
   }
 }
 
+
+class SkillResetTests {
+  static GROUP = "광전사·투척병 확인";
+  constructor(api, kit) { this.api = api; this.kit = kit; }
+
+  register() {
+    var api = this.api, kit = this.kit, run = kit.run, ULT = api.ULT, G = SkillResetTests.GROUP, y = kit.OPEN_Y.forest;
+    run(G, "광전사 스킬: 쓰는 순간 기본 공격 대기시간이 초기화되는가", function (done) {
+      api.MATCH.stateByKey = {};
+      var W = kit.world("forest", [{ id: "wr", team: "blue", char: "warrior", x: 200, y: y, gauge: api.GAUGE_MAX }]), wr = W.ent("wr"), bad = [];
+      api.fireBasic(wr, 0); W.frame(kit.FRAME);
+      if (wr.cdUntil <= W.t()) bad.push("시험 준비 실패: 기본 공격 대기 중이 아님");
+      api.useUlt(wr, 0);
+      if (wr.cdUntil > W.t()) bad.push("스킬을 써도 대기시간이 남음 " + Math.round(wr.cdUntil - W.t()) + "ms");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "스킬 사용 즉시 기본 공격 가능");
+    });
+    run(G, "투척병 독병·독안개가 한 적 위에 겹칠 때 피해가 어떻게 쌓이는지(버그 점검, 적용 방침은 선생님 판단)", function (done) {
+      function measure(basics, fog) {
+        api.MATCH.stateByKey = {};
+        var W = kit.world("forest", [{ id: "th", team: "blue", char: "thrower", x: 200, y: y, gauge: api.GAUGE_MAX }, { id: "foe", team: "red", char: "guardian", x: 500, y: y }]), th = W.ent("th"), foe = W.ent("foe");
+        for (var i = 0; i < basics; i++) api.fireBasic(th, 0, 300);
+        if (fog) api.useUlt(th, 0, 300);
+        W.step(ULT.fgDur + 2000);
+        return foe.maxHp - foe.hp;
+      }
+      var one = measure(1, false), fog = measure(0, true), both = measure(1, true), two = measure(2, false);
+      var stacks = both >= one + fog - 1, stacks2 = two >= one * 2 - 1;
+      done("info", "독병 1개 " + one + " · 독안개 " + fog + " · 둘이 겹침 " + both + " (합 " + (one + fog) + "이면 겹쳐 쌓임, 아니면 한 번만) · 독병 2개 겹침 " + two + " (두 배 " + one * 2 + "면 쌓임). 겹침 판정: 독안개+독병 " + (stacks ? "쌓임" : "한 번만") + ", 독병끼리 " + (stacks2 ? "쌓임" : "한 번만"));
+    });
+  }
+}
 
 class TestPanel {
   static STATUS_LABEL = { pass: "통과", fail: "문제", info: "확인 필요" };
