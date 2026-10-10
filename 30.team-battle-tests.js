@@ -2852,7 +2852,7 @@ class ResultCollector {
 
   run(AIMG, "AI 역할: 기사·창술사·대장장이는 앞, 화염술사·주술사·궁수·뇌전사수·저격수는 뒤, 은신자·자객·결투가는 틈새를 노리는 역할인가", function (done) {
     var want = { knight: "front", lancer: "front", blacksmith: "front", guardian: "front", warrior: "front", mage: "back", shaman: "back", ranger: "back", stormbow: "back", sniper: "back", frost: "back", cleric: "back", necro: "back", thrower: "back",
-                 rogue: "flank", hitman: "flank", duelist: "flank", dancer: "back", engineer: "back", druid: "back" }, bad = [];
+                 rogue: "flank", hitman: "flank", duelist: "flank", dancer: "back", engineer: "back", druid: "back", giant: "front" }, bad = [];
     Object.keys(want).forEach(function (c) { var got = api.CHAR_TYPES.of(c).botRole; if (got !== want[c]) bad.push(c + " " + got + " (기대 " + want[c] + ")"); });
     api.CHAR_LIST.forEach(function (c) { if (!want[c]) bad.push(c + " 역할이 정해지지 않음"); });
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : Object.keys(want).length + "명 역할이 맞음");
@@ -4387,6 +4387,7 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "불러오기·집계 문구·표·모드 전환·실패·연결 없음·닫기·맵 보기");
   });
   new EngineerDruidTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
+  new GiantTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
   results.pending = Promise.resolve().then(function () { api.finish(api.currentMap()); }).then(drainAsync);
   return results;
   }
@@ -4604,6 +4605,107 @@ class EngineerDruidTests {
       if (dr.hp - hp0 !== 2 * self10) bad.push("회복 " + (dr.hp - hp0) + " (기대 " + 2 * self10 + ")");
       if (dr.gauge !== 2 * ULT.drSelfGauge) bad.push("게이지 " + dr.gauge + " (기대 " + 2 * ULT.drSelfGauge + ")");
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "풀숲 안 초당 " + self10 + " 회복·게이지 +1");
+    });
+  }
+}
+
+class GiantTests {
+  static GROUP = "거신·골렘";
+  constructor(api, kit) { this.api = api; this.kit = kit; }
+
+  lost(W, id) { var E = W.ent(id); return E.maxHp - E.hp; }
+
+  giantWorld(foes, startX) {
+    var y = this.kit.OPEN_Y.forest;
+    this.api.MATCH.stateByKey = {};
+    return this.kit.world("forest", [{ id: "gi", team: "blue", char: "giant", x: startX || 200, y: y, gauge: this.api.GAUGE_MAX }].concat(foes.map(function (f) {
+      return { id: f.id, team: "red", char: "guardian", x: f.x, y: y + (f.dy || 0) };
+    })));
+  }
+
+  transform(W, angle) {
+    this.api.useUlt(W.ent("gi"), angle, 200);
+    W.step(this.api.ULT.gjDashMs + 80);
+  }
+
+  register() {
+    var self = this, api = this.api, run = this.kit.run, FRAME = this.kit.FRAME, ULT = api.ULT, G = GiantTests.GROUP, C = api.CHARS.giant, type = api.CHAR_TYPES.of("giant");
+    run(G, "거신 기본 공격: 앞쪽 반경 " + C.range + " 부채꼴 안의 적에게 " + C.dmg + "의 피해와 기본 게이지를 주는가", function (done) {
+      var bad = [], W = self.giantWorld([{ id: "near", x: 200 + 100 }, { id: "far", x: 200 + C.range + 120 }]), gi = W.ent("gi");
+      gi.gauge = 0;
+      api.fireBasic(gi, 0); W.step(1500);
+      if (self.lost(W, "near") !== C.dmg) bad.push("가까운 적 피해 " + self.lost(W, "near") + " (기대 " + C.dmg + ")");
+      if (self.lost(W, "far")) bad.push("멀리 있는 적이 맞음");
+      if (gi.gauge !== api.roleGauge("giant")) bad.push("게이지 " + gi.gauge + " (기대 " + api.roleGauge("giant") + ")");
+      if (gi.maxHp !== 500) bad.push("체력 " + gi.maxHp);
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "체력 500·피해 " + C.dmg + "·게이지 +" + gi.gauge);
+    });
+    run(G, "거신 스킬: " + ULT.gjDashRange + " 돌진한 뒤 골렘으로 변신하고 게이지가 0이 되며, 변신이 끝나면 원래대로 돌아오는가", function (done) {
+      var bad = [], W = self.giantWorld([]), gi = W.ent("gi");
+      api.useUlt(gi, 0, 200);
+      if (!gi.dash) bad.push("돌진이 시작되지 않음");
+      W.step(ULT.gjDashMs + 80);
+      if (Math.abs(gi.x - (200 + ULT.gjDashRange)) > 3) bad.push("돌진 거리 " + Math.round(gi.x - 200) + " (기대 " + ULT.gjDashRange + ")");
+      if (!type.isGolem(gi, W.t())) bad.push("골렘으로 변신하지 않음");
+      if (!type.usesAltModel(gi, W.t())) bad.push("골렘 모습으로 바뀌지 않음");
+      if (gi.gauge !== 0) bad.push("게이지 " + gi.gauge);
+      var holes = api.FIELD.holes.filter(function (h) { return h.e.gj; });
+      if (holes.length !== 1 || !holes[0].e.follow) bad.push("따라다니는 블랙홀 " + holes.length + "개");
+      W.step(ULT.gjDur + 200);
+      if (type.isGolem(gi, W.t())) bad.push("변신이 끝나지 않음");
+      if (api.FIELD.holes.some(function (h) { return h.e.gj; })) bad.push("블랙홀이 남음");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "돌진 " + ULT.gjDashRange + " → 변신 " + (ULT.gjDur / 700) + "초 → 복귀, 블랙홀 같이 사라짐");
+    });
+    run(G, "거신 스킬: 벽 앞에서는 돌진이 벽 앞에서 멈추고도 변신이 되는가", function (done) {
+      var bad = [], W = self.giantWorld([], 120), gi = W.ent("gi");
+      api.useUlt(gi, Math.PI, 200);
+      W.step(ULT.gjDashMs + 80);
+      if (gi.x > 120 || gi.x < 50) bad.push("경계 밖 위치 x=" + Math.round(gi.x));
+      if (!type.isGolem(gi, W.t())) bad.push("짧게 돌진했는데 변신하지 않음");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "경계 앞 x=" + Math.round(gi.x) + " 에서 변신");
+    });
+    run(G, "거신 블랙홀: 반경 " + ULT.gjR + " 안의 적만 거신 곁(" + ULT.gjGap + ")까지 끌려오고, 거신이 움직이면 같이 따라오는가", function (done) {
+      var landX = 500 - ULT.gjDashRange, bad = [], W = self.giantWorld([{ id: "in", x: landX + 300, dy: 40 }, { id: "out", x: landX + ULT.gjR + 120 }], 500), gi = W.ent("gi"), inn = W.ent("in"), out = W.ent("out");
+      self.transform(W, Math.PI);
+      var outX = out.x;
+      W.step(2000);
+      var d = Math.hypot(inn.x - gi.x, inn.y - gi.y);
+      if (Math.abs(d - ULT.gjGap) > 8) bad.push("끌려온 적과의 거리 " + Math.round(d) + " (기대 " + ULT.gjGap + ")");
+      if (Math.abs(out.x - outX) > 1) bad.push("반경 밖 적이 끌려옴");
+      gi.x -= 100; W.step(1500);
+      var d2 = Math.hypot(inn.x - gi.x, inn.y - gi.y);
+      if (Math.abs(d2 - ULT.gjGap) > 8) bad.push("거신이 움직였는데 따라오지 않음 " + Math.round(d2));
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "반경 안 거리 " + Math.round(d) + "→" + Math.round(d2) + ", 반경 밖은 그대로");
+    });
+    run(G, "거신 패시브: 변신 중에만 받는 피해가 " + Math.round((1 - ULT.gjDef) * 100) + "% 줄고 막은 피해로 쌓이는가", function (done) {
+      var bad = [], W = self.giantWorld([{ id: "foe", x: 200 + 600 }]), gi = W.ent("gi");
+      api.damage(gi, 100, "foe", false, null);
+      if (self.lost(W, "gi") !== 100) bad.push("변신 전 피해 " + self.lost(W, "gi"));
+      gi.hp = gi.maxHp; gi.blocked = 0;
+      self.transform(W, 0);
+      api.damage(gi, 100, "foe", false, null);
+      var want = Math.round(100 * ULT.gjDef);
+      if (self.lost(W, "gi") !== want) bad.push("변신 중 피해 " + self.lost(W, "gi") + " (기대 " + want + ")");
+      if (Math.round(gi.blocked) !== 100 - want) bad.push("막은 피해 " + Math.round(gi.blocked) + " (기대 " + (100 - want) + ")");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "변신 전 100 → 변신 중 " + want + ", 막은 피해 " + (100 - want));
+    });
+    run(G, "거신 철퇴: 변신 중 기본 공격이 가장 가까운 적 1명에게 " + ULT.gjMaceDmg + "의 피해와 기절을 주고, 그 적은 면역이라 다음엔 다른 적을 때리는가", function (done) {
+      var bad = [], W = self.giantWorld([{ id: "n1", x: 700 }, { id: "n2", x: 740, dy: 20 }]), gi = W.ent("gi"), n1 = W.ent("n1"), n2 = W.ent("n2");
+      self.transform(W, 0);
+      W.step(ULT.gjTransformMs);
+      n1.x = gi.x + 80; n1.y = gi.y; n2.x = gi.x + 110; n2.y = gi.y + 10;
+      gi.cdUntil = 0; api.fireBasic(gi, 0); W.frame(FRAME);
+      if (self.lost(W, "n1") !== ULT.gjMaceDmg || !api.stunned(n1, W.t())) bad.push("가장 가까운 적: 피해 " + self.lost(W, "n1") + ", 기절 " + api.stunned(n1, W.t()));
+      if (self.lost(W, "n2") || api.stunned(n2, W.t())) bad.push("두 번째 적이 같이 맞음");
+      W.step(ULT.gjMaceCd + 40);
+      api.fireBasic(gi, 0); W.frame(FRAME);
+      if (self.lost(W, "n1") !== ULT.gjMaceDmg) bad.push("면역인 첫 적이 또 맞음 " + self.lost(W, "n1"));
+      if (self.lost(W, "n2") !== ULT.gjMaceDmg || !api.stunned(n2, W.t())) bad.push("면역 아닌 다음 적: 피해 " + self.lost(W, "n2") + ", 기절 " + api.stunned(n2, W.t()));
+      var before = self.lost(W, "n1");
+      gi.cdUntil = 0; api.fireBasic(gi, 0); W.frame(FRAME);
+      if (self.lost(W, "n1") !== before + C.dmg) bad.push("모두 면역일 때 일반 부채꼴 " + (self.lost(W, "n1") - before) + " (기대 " + C.dmg + ")");
+      W.step(ULT.gjStunMs + 60);
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "1번째 n1, 2번째 n2(면역 건너뜀), 모두 면역이면 일반 부채꼴");
     });
   }
 }

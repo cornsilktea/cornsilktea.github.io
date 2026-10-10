@@ -28,6 +28,13 @@ const PACKS = {
     { file: "Rig_Large_MovementBasic.glb", clips: ["Running_A", "Walking_A"] },
     { file: "Rig_Large_CombatMelee.glb", clips: ["Melee_2H_Attack"] }
   ],
+  teamlarge: [
+    { file: "Rig_Large_General.glb", clips: ["Idle_A", "Death_A", "Death_A_Pose", "Hit_A"] },
+    { file: "Rig_Large_MovementBasic.glb", clips: ["Running_A", "Walking_A"] },
+    { file: "Rig_Large_MovementAdvanced.glb", clips: ["Dodge_Forward"] },
+    { file: "Rig_Large_CombatMelee.glb", clips: ["Melee_1H_Slash", "Melee_2H_Slam"] },
+    { file: "Rig_Large_Special.glb", clips: ["EXPERIMENTAL_Large_Transform"] }
+  ],
   raid: [
     { file: "Rig_Medium_MovementAdvanced.glb", clips: ["Dodge_Forward"] },
     { file: "Rig_Medium_Special.glb", clips: ["Skeletons_Spawn_Ground", "Skeletons_Awaken_Standing"] },
