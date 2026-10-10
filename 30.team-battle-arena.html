@@ -3430,7 +3430,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     hitColor(d) { return "#8FD14F"; }
     projectileEffect(d, T, immune, fx) { return !d.isSkill && !immune && !T.minion ? { slowMs: this.data.fx.slowMs, slowMul: this.data.fx.slowMul } : fx; }
     projectileMesh(g, d) {
-      var thorn = new THREE.Mesh(GEO.head, MODELS.basicMat("thornTip", 0xB6E86A, 1)); thorn.scale.set(1.5, 1.5, 1.5); thorn.position.x = 2; g.add(thorn);
       VineTrail.build(g, KIT.props.vineBlade);
     }
     aimRange(btn) { return [ULT.drMin, ULT.drCast]; }
@@ -4587,7 +4586,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var TURRETS = new TurretSystem();
   class GroveSystem {
     static TILES_PER_SIDE = 6;
-    static PROPS_PER_TILE = 2;
     static ID_BASE = 100000;
     constructor() { this.rangeRing = null; this.nextId = GroveSystem.ID_BASE; }
     isActive(s, t) { return !s.cut && t >= s.e.createdAt && t < s.e.createdAt + s.e.dur; }
@@ -4626,10 +4624,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var e = s.e, g = new THREE.Group(), mats = [], bushMats = [], hedge = new THREE.Group();
       var tpl = KIT.props.bushBig, seed = e.x * 7 + e.y * 13, side = GroveSystem.TILES_PER_SIDE;
       if (tpl) {
-        for (var i = 0; i < side * side * GroveSystem.PROPS_PER_TILE; i++) {
-          var cell = Math.floor(i / GroveSystem.PROPS_PER_TILE), col = cell % side, row = Math.floor(cell / side);
-          var jitter = ((seed + i * 0.37) % 1) - 0.5, jitterB = ((seed * 0.7 + i * 0.61) % 1) - 0.5, size = TILE * (1.35 + 0.15 * (jitter + 0.5));
-          var prop = PROPS.fitProp(tpl, size, 60 + 12 * (jitter + 0.5), size, (col - (side - 1) / 2) * TILE + jitter * TILE * 0.9, (row - (side - 1) / 2) * TILE + jitterB * TILE * 0.9, i * 2.1);
+        for (var i = 0; i < side * side; i++) {
+          var col = i % side, row = Math.floor(i / side), jitter = ((seed + i * 0.37) % 1) - 0.5, size = TILE * (1.35 + 0.15 * (jitter + 0.5));
+          var prop = PROPS.fitProp(tpl, size, 60 + 12 * (jitter + 0.5), size, (col - (side - 1) / 2) * TILE + jitter * 8, (row - (side - 1) / 2) * TILE - jitter * 8, i * 2.1);
           prop.traverse(function (o) {
             if (!o.isMesh) return;
             o.material = o.material.clone(); o.material.transparent = true; mats.push(o.material); bushMats.push(o.material);
@@ -4661,8 +4658,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   var GROVES = new GroveSystem();
   class VineTrail {
-    static SEGMENTS = 12;
-    static SPACING = 9;
+    static SEGMENTS = 22;
+    static SPACING = 5;
     static HEIGHT = 32;
     static GROW_LEN = 14;
     static THICKNESS = 2.2;
