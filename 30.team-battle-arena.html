@@ -844,7 +844,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     stormbow: { name: "뇌전사수", role: "shooter", icon: "⚡", hp: 100, speed: gameSpeed(140), cd: gameMs(0.9), dmg: 10, range: 420, pSpeed: 750, pr: 10,
                 chain: { every: 3, r: 250, count: 2, dmg: 27 }, ultName: "과충전" },
     engineer: { name: "공학자", role: "shooter", icon: "🔧", hp: 105, speed: gameSpeed(150), cd: gameMs(1.1), dmg: 10, range: 350, pSpeed: 760, pr: 9, ultName: "포탑 설치" },
-    druid:   { name: "드루이드", role: "caster", icon: "🌿", hp: 120, speed: gameSpeed(165), cd: gameMs(1.6), dmg: 14, range: 510, pSpeed: 728, pr: 12, fx: { slowMs: gameMs(1.5), slowMul: 0.7 },
+    druid:   { name: "드루이드", role: "caster", icon: "🌿", hp: 120, speed: gameSpeed(165), cd: gameMs(1.6), dmg: 14, range: 510, pSpeed: 728, pr: 12, lanes: 2, fx: { slowMs: gameMs(1.5), slowMul: 0.7 },
                ultName: "덩굴 부쉬", ultAim: true, heals: true },
     dummy:   { name: "연습 봇", role: "fighter", icon: "🎯", hp: 99999, speed: 200, cd: 1000, dmg: 0, range: 0, ultName: "없음", practiceBot: true },
     dummyAlly: { name: "아군 봇", role: "fighter", icon: "💚", hp: 500, speed: 200, cd: 1000, dmg: 0, range: 0, ultName: "없음", practiceBot: true }
@@ -909,7 +909,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               rvDur: gameMs(4), rvTick: gameMs(1), rvHeal: 20, rvDmg: 20, rvCastMs: 600, grLife: 650,
               trDur: gameMs(10), trR: 340, trCd: gameMs(0.5), trScanMs: 120, trWarmMs: 300, trDmg: 10, trHeavyEvery: 3, trHeavyDmg: 34, trStunMs: gameMs(0.8), trMax: 2, trGauge: 1,
               trSpeedBonus: gameSpeed(30), trShellSpeed: gameSpeed(1000), trHitR: 38, trCastMs: 450,
-              drR: 150, drDur: 3600000, drTick: gameMs(1), drHeal: 25, drCast: 450, drMin: 60, drSelfRate: 0.1, drSelfGauge: 1, drRiseMs: 350, drCastMs: 500 };
+              drR: 150, drDur: 3600000, drTick: gameMs(1), drHeal: 20, drCast: 450, drMin: 60, drSelfRate: 0.1, drSelfGauge: 1, drRiseMs: 350, drCastMs: 500 };
   var ASSIST_MS = 5000;
   var SNIPER_KEEP = KEY * 5;
   var SHIELD_SPARK = "#FFD27A", HEAL_CUT_MUL = 0.5;
@@ -3472,7 +3472,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     basicDesc() {
       var c = this.data;
-      return "사거리 " + c.range + "의 느린 덩굴 가시 발사. 맞은 적은 " + c.dmg + "의 피해";
+      return "사거리 " + c.range + "의 덩굴 " + c.lanes + "줄을 나란히 발사(한 번 맞으면 나머지 줄은 같은 적을 통과). 맞은 적은 " + c.dmg + "의 피해";
     }
   }
   class CharacterRegistry {
@@ -4831,6 +4831,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   var DAMAGE = new DamageResolver();
   class ProjectileSystem {
+    static LANE_FILL = 0.9;
     bladeSpin(p, x, y) {
       if (p.spun) return;
       p.spun = true;
@@ -4899,7 +4900,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     shotSpec(c, skill) {
       var C = CHARS[c];
       if (skill) return CHAR_TYPES.of(c).skillShotSpec();
-      return { count: C.shots || 1, gap: C.gap || 0, sp: C.pSpeed, dmg: C.throwDmg || C.dmg, pr: C.pr, range: C.throwRange || C.range };
+      return { count: C.shots || 1, gap: C.gap || 0, sp: C.pSpeed, dmg: C.throwDmg || C.dmg, pr: C.pr, range: C.throwRange || C.range, lanes: C.lanes || 1 };
     }
     stepShots(t) {
       MATCH.shots = MATCH.shots.filter(function (v) {
@@ -4915,9 +4916,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (i > 0 && E && (!E.alive || E.isStunned())) return false;
       var sv = v.spec, sp = sv.sp, a = v.ev.a, dx = Math.cos(a), dy = Math.sin(a);
       var ox = i > 0 && E ? E.x : v.ev.x, oy = i > 0 && E ? E.y : v.ev.y;
-      PROJECTILES.addProj(v.key + "_" + i, { team: v.team, owner: v.ev.o, ownerCharacterType: v.char, x: ox + dx * 20, y: oy + dy * 20,
-        vx: dx * sp, vy: dy * sp, isSkill: v.skill, countsAsSkill: !!v.ev.sk, dmg: sv.dmg, ultKey: sv.ultKey, fx: sv.fx,
-        pr: sv.pr, range: sv.range + (!v.skill && E && E.isOvercharged(v.ev.t) ? ULT.ocRangeBonus : 0), createdAt: v.ev.t + i * v.gap });
+      var lanes = sv.lanes || 1, laneStep = (BODY_R + (sv.pr || 6)) * ProjectileSystem.LANE_FILL, laneHit = lanes > 1 ? {} : null;
+      for (var lane = 0; lane < lanes; lane++) {
+        var side = (lane - (lanes - 1) / 2) * 2 * laneStep;
+        PROJECTILES.addProj(v.key + "_" + i + (lanes > 1 ? "_" + lane : ""), { team: v.team, owner: v.ev.o, ownerCharacterType: v.char, x: ox + dx * 20 - dy * side, y: oy + dy * 20 + dx * side,
+          vx: dx * sp, vy: dy * sp, isSkill: v.skill, countsAsSkill: !!v.ev.sk, dmg: sv.dmg, ultKey: sv.ultKey, fx: sv.fx, laneHit: laneHit,
+          pr: sv.pr, range: sv.range + (!v.skill && E && E.isOvercharged(v.ev.t) ? ULT.ocRangeBonus : 0), createdAt: v.ev.t + i * v.gap });
+      }
       var shooterType = CHAR_TYPES.of(v.char);
       if (v.skill) shooterType.skillShotFx(ox, oy, dx, dy);
       if (E && (E === MATCH.me || MATCH.bots[E.id]) && TARGETS.hear(E)) SOUND.sfx(shooterType.shotSound);
@@ -4932,7 +4937,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (e > p.life + 40) return;
         for (var i = 0; i < targets.length; i++) {
           var T = targets[i];
-          if (d.owner === T.id || !T.alive || d.team === T.team) continue;
+          if (d.owner === T.id || !T.alive || d.team === T.team || (d.laneHit && d.laneHit[T.id])) continue;
           var pe = p.lt[T.id]; if (pe === undefined) pe = 0;
           p.lt[T.id] = e;
           var a = PROJECTILES.projAt(p, pe), b = PROJECTILES.projAt(p, e);
@@ -4943,6 +4948,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     projHit(id, p, T) {
       var d = p.d;
       p.dead = true;
+      if (d.laneHit) d.laneHit[T.id] = 1;
       var immune = T.isProtected(), fx = d.fx, seen = !MATCH.me || MATCH.me.team === T.team || VISION.visibleTo(T, MATCH.me);
       var ownerType = CHAR_TYPES.of(d.ownerCharacterType);
       fx = ownerType.projectileEffect(d, T, immune, fx);

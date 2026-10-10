@@ -4524,6 +4524,20 @@ class EngineerDruidTests {
       if (dr.gauge !== api.roleGauge("druid")) bad.push("게이지 " + dr.gauge + " (기대 " + api.roleGauge("druid") + ")");
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "피해 " + C.dmg + "·둔화·게이지 " + dr.gauge);
     });
+    run(G, "드루이드 기본 공격: 덩굴이 " + C.lanes + "줄 나란히 나가 맞는 폭이 넓어지고, 한 적에게 두 줄이 맞아도 피해는 한 번뿐인가", function (done) {
+      var bad = [], reach = api.BODY_R + C.pr;
+      function lostWith(dy) {
+        var W = self.druidWorld([{ id: "foe", team: "red", char: "guardian", x: 200 + 280, y: y + dy }]);
+        api.fireBasic(W.ent("dr"), 0);
+        for (var ms = 0; ms < 2500 && !self.lost(W, "foe"); ms += FRAME) W.frame(FRAME);
+        return self.lost(W, "foe");
+      }
+      if (lostWith(0) !== C.dmg) bad.push("정면 피해 " + lostWith(0) + " (기대 " + C.dmg + ", 두 줄 피해가 겹치면 안 됨)");
+      var wide = Math.round(reach * 1.6);
+      if (lostWith(-wide) !== C.dmg) bad.push("옆으로 " + wide + " 벗어난 적이 안 맞음 (한 줄이었다면 " + reach + " 까지만 맞음)");
+      if (lostWith(-Math.round(reach * 2.3))) bad.push("너무 멀리 벗어난 적이 맞음");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "정면 " + C.dmg + " 한 번, 옆 " + wide + " 까지 명중, " + Math.round(reach * 2.3) + " 밖은 빗나감");
+    });
     run(G, "드루이드 스킬: 지정한 곳에 부쉬가 생겨 안의 아군만 1초당 " + ULT.drHeal + " 회복하고, 지속시간이 끝나면 사라지는가", function (done) {
       var bad = [], W = self.druidWorld([
         { id: "in", team: "blue", char: "guardian", x: 200 + 200 + 40, y: y },
