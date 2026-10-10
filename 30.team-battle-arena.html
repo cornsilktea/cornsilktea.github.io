@@ -837,7 +837,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     engineer: { name: "공학자", role: "shooter", icon: "🔧", hp: 105, speed: gameSpeed(150), cd: gameMs(1.1), dmg: 10, range: 350, pSpeed: 760, pr: 9, ultName: "포탑 설치" },
     druid:   { name: "드루이드", role: "caster", icon: "🌿", hp: 110, speed: gameSpeed(165), cd: gameMs(1.4), dmg: 14, range: 350, pSpeed: 728, pr: 12, lanes: 2, fx: { slowMs: gameMs(1.5), slowMul: 0.7 },
                ultName: "덩굴 부쉬", ultAim: true, heals: true },
-    giant:   { name: "거신", role: "fighter", icon: "🗿", hp: 500, speed: gameSpeed(135), cd: gameMs(1.6), dmg: 30, range: 120, arc: Math.PI * 0.6, bodyR: 36, ultName: "골렘 강림", ultAim: true, blocks: true },
+    giant:   { name: "거신", role: "fighter", icon: "🗿", hp: 500, speed: gameSpeed(135), cd: gameMs(1.6), dmg: 20, range: 120, arc: Math.PI * 0.6, bodyR: 36, ultName: "골렘 강림", ultAim: true, blocks: true },
     gargantua: { name: "가르강튀아", role: "caster", icon: "🌀", hp: 300, speed: gameSpeed(150), cd: gameMs(1.4), dmg: 10, range: 120, arc: Math.PI * 0.6, ultName: "가르강튀아", ultAim: true, retired: true },
     astrologer: { name: "점성술사", role: "caster", icon: "🌠", hp: 115, speed: gameSpeed(170), cd: gameMs(1.4), dmg: 15, range: 380, ultName: "가르강튀아", ultAim: true },
     dummy:  { name: "연습 봇", role: "fighter", icon: "🎯", hp: 99999, speed: 200, cd: 1000, dmg: 0, range: 0, ultName: "없음", practiceBot: true },
@@ -907,7 +907,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               gaCast: 350, gaMin: 60, gaTransformMs: gameMs(1.2), gaDur: gameMs(6), gaR: 350, gaPull: 260, gaGap: 70, gaBoomDmg: 30,
               sfMin: 60, sfDelay: gameMs(0.6), sfR: 70, sfStunEvery: 3, sfStunMs: gameMs(1),
               agCast: 400, agMin: 60, agDur: gameMs(3), agR: 350, agPull: 260, agGap: 70, agBoomDmg: 30,
-              gjCast: 300, gjMin: 60, gjTransformMs: gameMs(1.2), gjDur: gameMs(6), gjDef: 0.7, gjR: 150, gjTick: gameMs(1), gjTickDmg: 30, gjMaceRange: 150 };
+              gjCast: 300, gjMin: 60, gjTransformMs: gameMs(1.2), gjDur: gameMs(6), gjDef: 0.8, gjR: 150, gjTick: gameMs(1), gjTickDmg: 20, gjMaceRange: 150 };
   var ASSIST_MS = 5000;
   var SNIPER_KEEP = KEY * 5;
   var SHIELD_SPARK = "#FFD27A", HEAL_CUT_MUL = 0.5;
