@@ -4995,9 +4995,26 @@ class AstrologerTests {
     run(G, "점성술사: 마법사 직업군이고 체력·패시브 설정이 맞는가", function (done) {
       var bad = [];
       if (C.role !== "caster") bad.push("직업군 " + C.role);
-      if (type.passiveDesc() !== "없음") bad.push("패시브가 있음: " + type.passiveDesc());
+      if (!/기절/.test(type.passiveDesc())) bad.push("패시브 설명: " + type.passiveDesc());
       if (!/별똥별/.test(type.basicDesc()) || !/블랙홀/.test(type.ultDesc())) bad.push("설명 문장");
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "마법사·패시브 없음·체력 " + C.hp);
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "마법사·체력 " + C.hp + "·" + type.passiveDesc());
+    });
+    run(G, "점성술사 패시브: " + ULT.sfStunEvery + "번째 기본 공격(적중이 아니라 사용 횟수)마다 별똥별에 맞은 모든 적이 " + ULT.sfStunMs / 700 + "초 기절하는가", function (done) {
+      var bad = [], W = self.astroWorld([{ id: "a", x: 500 }, { id: "b", x: 500 + 40 }]), as = W.ent("as"), a = W.ent("a"), b = W.ent("b"), stunned = [];
+      function shoot(reach) {
+        as.cdUntil = 0; api.fireBasic(as, 0, reach);
+        W.step(ULT.sfDelay + 100);
+        var hit = api.stunned(a, W.t()) && api.stunned(b, W.t());
+        var left = a.stunUntil - W.t();
+        W.step(ULT.sfStunMs + 200);
+        return { stun: hit, left: left };
+      }
+      var shots = [shoot(100), shoot(100), shoot(300), shoot(300), shoot(300), shoot(300)];
+      shots.forEach(function (s, i) { stunned.push(s.stun ? "O" : "-"); });
+      if (stunned.join("") !== "--O--O") bad.push("기절 순서 " + stunned.join("") + " (기대 --O--O: 처음 두 번은 빈 곳을 쏴서 적중 0이어도 사용 횟수로 셈)");
+      var third = shots[2].left;
+      if (Math.abs(third - ULT.sfStunMs) > 120) bad.push("기절 길이 " + Math.round(third) + "ms (기대 " + ULT.sfStunMs + ")");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "사용 3·6번째에만 기절 " + Math.round(third) + "ms, 두 적 모두");
     });
   }
 }

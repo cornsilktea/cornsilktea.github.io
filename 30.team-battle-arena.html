@@ -905,7 +905,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               trSpeedBonus: gameSpeed(30), trShellSpeed: gameSpeed(1000), trHitR: 38, trCastMs: 450,
               drR: 150, drDur: 3600000, drTick: gameMs(1), drHeal: 20, drCast: 450, drMin: 60, drSelfRate: 0.1, drSelfGauge: 1, drRiseMs: 350, drCastMs: 500,
               gaCast: 350, gaMin: 60, gaTransformMs: gameMs(1.2), gaDur: gameMs(6), gaR: 350, gaPull: 260, gaGap: 70, gaBoomDmg: 30,
-              sfMin: 60, sfDelay: gameMs(0.6), sfR: 70,
+              sfMin: 60, sfDelay: gameMs(0.6), sfR: 70, sfStunEvery: 3, sfStunMs: gameMs(1),
               agCast: 400, agMin: 60, agDur: gameMs(3), agR: 350, agPull: 260, agGap: 70, agBoomDmg: 30,
               gjCast: 300, gjMin: 60, gjTransformMs: gameMs(1.2), gjDur: gameMs(6), gjDef: 0.7, gjR: 150, gjTick: gameMs(1), gjTickDmg: 30, gjMaceRange: 150 };
   var ASSIST_MS = 5000;
@@ -3535,7 +3535,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     skillGlow(E, t) { return E.ultUntil > t ? 0x2A1060 : 0; }
     playSkillClip(v, E, t) { FIGHTER_VIEW.playOnce(v, "Ranged_Magic_Spellcasting_Long", 2.6, t); }
     attackClip(v, E, t) { return ["Ranged_Magic_Shoot", 1.8]; }
-    passiveDesc() { return "없음"; }
+    passiveDesc() { return ULT.sfStunEvery + "번째 기본 공격마다 별똥별에 맞은 적을 " + SKILLTEXT.secs(ULT.sfStunMs) + " 기절"; }
     basicDesc() {
       return "사거리 " + this.data.range + "의 지정한 곳에 별똥별을 떨어뜨려 " + SKILLTEXT.secs(ULT.sfDelay) + " 뒤 반경 " + ULT.sfR + " 안의 적에게 " + this.data.dmg + "의 피해";
     }
@@ -5443,7 +5443,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var spot = ATTACK.burstSpot(E, ang, reach, CHARS.astrologer.range, ULT.sfMin);
       E.angle = Math.atan2(spot.y - E.y, spot.x - E.x); E.atkAt = t;
       VISION.revealBriefly(E.id, t);
-      SESSION.room.ref.child("effects").push({ type: "star", team: E.team, owner: E.id, x: Math.round(spot.x), y: Math.round(spot.y), r: ULT.sfR, dmg: CHARS.astrologer.dmg, delay: ULT.sfDelay, createdAt: t });
+      E.starShots = (E.starShots || 0) + 1;
+      var stunMs = E.starShots % ULT.sfStunEvery === 0 ? ULT.sfStunMs : 0;
+      SESSION.room.ref.child("effects").push({ type: "star", team: E.team, owner: E.id, x: Math.round(spot.x), y: Math.round(spot.y), r: ULT.sfR, dmg: CHARS.astrologer.dmg, stun: stunMs, delay: ULT.sfDelay, createdAt: t });
       if (TARGETS.hear(E)) SOUND.sfx("swing");
     }
     add(e, t) { if (t < e.createdAt + e.delay + 1500) FIELD.stars.push({ e: e, vis: null }); }
@@ -5453,10 +5455,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (t < e.createdAt + e.delay) return true;
         if (SESSION.room.status === "playing") TARGETS.localTargets().forEach(function (T) {
           if (!T.alive || T.team === e.team || T.isProtected(t) || hyp(T.x - e.x, T.y - e.y) > e.r + T.hitR * 0.5) return;
-          DAMAGE.damage(T, e.dmg, e.owner, e.createdAt);
+          DAMAGE.damage(T, e.dmg, e.owner, e.createdAt, null, e.stun ? { stunMs: e.stun } : null);
         });
         FX_VIEW.boom(e.x, e.y, e.r, e.team);
-        FX_VIEW.spark(e.x, e.y, "#D9A8FF", 1.8);
+        FX_VIEW.spark(e.x, e.y, e.stun ? "#FFD35A" : "#D9A8FF", 1.8);
         if (!MATCH.me || hyp(e.x - MATCH.me.x, e.y - MATCH.me.y) < 700) SOUND.sfx("boom");
         STARFALL_VIEW.drop(s);
         return false;
@@ -7721,18 +7723,19 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static STAR_R = 13;
     static TAIL = 190;
     static GLOW_COLOR = 0xB07CFF;
+    static STUN_COLOR = 0xFFD35A;
     make(e) {
-      var g = new THREE.Group(), mats = [], G = StarfallView;
+      var g = new THREE.Group(), mats = [], G = StarfallView, tint = e.stun ? G.STUN_COLOR : G.GLOW_COLOR;
       function mat(opts) { var m = new THREE.MeshBasicMaterial(Object.assign({ transparent: true, depthWrite: false }, opts)); mats.push(m); return m; }
-      var base = ARENA_VIEW.flatMesh(GEO.disc, mat({ color: G.GLOW_COLOR, opacity: 0.16 })); base.scale.setScalar(e.r); base.position.y = 2;
-      var fill = ARENA_VIEW.flatMesh(GEO.disc, mat({ color: G.GLOW_COLOR, opacity: 0.34 })); fill.scale.setScalar(0.01); fill.position.y = 2.2;
+      var base = ARENA_VIEW.flatMesh(GEO.disc, mat({ color: tint, opacity: 0.16 })); base.scale.setScalar(e.r); base.position.y = 2;
+      var fill = ARENA_VIEW.flatMesh(GEO.disc, mat({ color: tint, opacity: 0.34 })); fill.scale.setScalar(0.01); fill.position.y = 2.2;
       var edgeMat = mat({ color: C_FX[e.team], opacity: 0.8 });
       var edge = ARENA_VIEW.flatMesh(GEO.ringFx, edgeMat); edge.scale.setScalar(e.r); edge.position.y = 2.4;
       g.add(base); g.add(fill); g.add(edge);
       var star = new THREE.Group();
-      var core = new THREE.Mesh(GEO.ball, mat({ color: 0xF6EEFF, opacity: 1 })); core.scale.setScalar(G.STAR_R);
-      var glow = new THREE.Mesh(GEO.ball, mat({ color: G.GLOW_COLOR, opacity: 0.5, blending: THREE.AdditiveBlending })); glow.scale.setScalar(G.STAR_R * 2.1);
-      var tail = new THREE.Mesh(GEO.meteorTail, mat({ color: G.GLOW_COLOR, opacity: 0.5, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+      var core = new THREE.Mesh(GEO.ball, mat({ color: e.stun ? 0xFFF3C4 : 0xF6EEFF, opacity: 1 })); core.scale.setScalar(G.STAR_R);
+      var glow = new THREE.Mesh(GEO.ball, mat({ color: tint, opacity: 0.5, blending: THREE.AdditiveBlending })); glow.scale.setScalar(G.STAR_R * 2.1);
+      var tail = new THREE.Mesh(GEO.meteorTail, mat({ color: tint, opacity: 0.5, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
       tail.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), METEOR_DIR); tail.scale.set(G.STAR_R * 0.9, G.TAIL, G.STAR_R * 0.9);
       star.add(tail); star.add(glow); star.add(core);
       g.add(star);
