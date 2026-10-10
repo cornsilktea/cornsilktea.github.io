@@ -837,7 +837,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     engineer: { name: "공학자", role: "shooter", icon: "🔧", hp: 105, speed: gameSpeed(150), cd: gameMs(1.1), dmg: 10, range: 350, pSpeed: 760, pr: 9, ultName: "포탑 설치" },
     druid:   { name: "드루이드", role: "caster", icon: "🌿", hp: 110, speed: gameSpeed(165), cd: gameMs(1.4), dmg: 14, range: 350, pSpeed: 728, pr: 12, lanes: 2, fx: { slowMs: gameMs(1.5), slowMul: 0.7 },
                ultName: "덩굴 부쉬", ultAim: true, heals: true },
-    giant:   { name: "거신", role: "fighter", icon: "🗿", hp: 500, speed: gameSpeed(135), cd: gameMs(1.6), dmg: 30, range: 120, arc: Math.PI * 0.6, ultName: "골렘 강림", blocks: true },
+    giant:   { name: "거신", role: "fighter", icon: "🗿", hp: 500, speed: gameSpeed(135), cd: gameMs(1.6), dmg: 30, range: 120, arc: Math.PI * 0.6, ultName: "골렘 강림", ultAim: true, blocks: true },
     dummy:  { name: "연습 봇", role: "fighter", icon: "🎯", hp: 99999, speed: 200, cd: 1000, dmg: 0, range: 0, ultName: "없음", practiceBot: true },
     dummyAlly: { name: "아군 봇", role: "fighter", icon: "💚", hp: 500, speed: 200, cd: 1000, dmg: 0, range: 0, ultName: "없음", practiceBot: true }
   };
@@ -902,8 +902,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               trDur: gameMs(10), trR: 340, trCd: gameMs(0.5), trScanMs: 120, trWarmMs: 300, trDmg: 10, trHeavyEvery: 3, trHeavyDmg: 34, trStunMs: gameMs(0.8), trMax: 2, trGauge: 1,
               trSpeedBonus: gameSpeed(30), trShellSpeed: gameSpeed(1000), trHitR: 38, trCastMs: 450,
               drR: 150, drDur: 3600000, drTick: gameMs(1), drHeal: 20, drCast: 450, drMin: 60, drSelfRate: 0.1, drSelfGauge: 1, drRiseMs: 350, drCastMs: 500,
-              gjDashRange: 300, gjDashMs: gameMs(0.4), gjTransformMs: gameMs(1.2), gjDur: gameMs(6), gjDef: 0.7, gjR: 350, gjPull: 260, gjGap: 70,
-              gjMaceRange: 140, gjMaceDmg: 35, gjMaceCd: gameMs(1.5), gjStunMs: gameMs(0.8), gjImmuneMs: gameMs(2) };
+              gjCast: 350, gjMin: 60, gjTransformMs: gameMs(1.2), gjDur: gameMs(6), gjDef: 0.7, gjR: 350, gjPull: 260, gjGap: 70, gjBoomDmg: 30 };
   var ASSIST_MS = 5000;
   var SNIPER_KEEP = KEY * 5;
   var SHIELD_SPARK = "#FFD27A", HEAL_CUT_MUL = 0.5;
@@ -2637,7 +2636,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     get altModelKey() { return null; }
     usesAltModel(E, t) { return false; }
     get headY() { return HEAD_Y; }
-    afterSkillDash(E, t) {}
+    onLeapLand(E, t) { return false; }
+    cannotAttack(E, t) { return false; }
     cast(E, ang, reach, t) {
       if (this.data.ultKind !== "blackhole") return;
       var holeSpot = ATTACK.burstSpot(E, ang, reach, ULT.bhCast, ULT.bhMin);
@@ -3467,6 +3467,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   class GiantType extends ArcMeleeType {
     static HEAD_Y = 150;
+    static SLAM_IMPACT_SEC = 0.92;
+    static SWING_FROM_SEC = 0.55;
+    static SWING_SPEED = 1.8;
     get startsSkillTimer() { return false; }
     get clips() { return KIT.largeClips; }
     get altModelKey() { return "giantGolem"; }
@@ -3475,35 +3478,44 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     usesAltModel(E, t) { return this.isGolem(E, t); }
     skillGuard(T, amount, t) { return this.isGolem(T, t) ? Math.round(amount * ULT.gjDef) : amount; }
     tallyBlocked(T, unguarded, amount) { T.blocked = (T.blocked || 0) + Math.min(unguarded, T.hp) - Math.min(amount, T.hp); }
-    botUltRange() { return ULT.gjDashRange; }
-    overrideBasic(E, ang, reach, t) {
-      if (!this.isGolem(E, t)) return false;
-      var T = GIANT.maceTarget(E, t);
-      if (!T) return false;
-      GIANT.mace(E, T, t);
+    isHammerLeaping(E, t) { return E.ultUntil > t && !this.isGolem(E, t); }
+    isRooted(E, t) { return this.isHammerLeaping(E, t) || this.isGolem(E, t); }
+    cannotAttack(E, t) { return this.isRooted(E, t); }
+    aimRange(btn) { return [ULT.gjMin, ULT.gjCast]; }
+    showAimGuide(E, ult, c) {
+      if (!ult) return false;
+      AIM_GUIDE.showAimCircle(INPUT.aimReach(E, "ult"), ULT.gjR);
       return true;
     }
+    botUltRange() { return ULT.gjCast; }
+    botUltSpot(B, target, td, t) { return BRAIN.leadSpot(target, MELEE.hammerLeapMs(td) / 1000, t); }
     cast(E, ang, reach, t) {
-      E.angle = ang;
+      var landing = ATTACK.burstSpot(E, ang, reach, ULT.gjCast, ULT.gjMin);
+      PHYSICS.resolve(landing);
+      E.angle = Math.atan2(landing.y - E.y, landing.x - E.x);
+      var leapMs = MELEE.hammerLeapMs(hyp(landing.x - E.x, landing.y - E.y));
+      E.leapAt = t;
+      E.ultUntil = t + leapMs;
+      E.cdUntil = Math.max(E.cdUntil, t + leapMs + 250);
       E.pending = null; E.slash = null;
-      GIANT.dash(E, ang, t);
-      VISION.revealBriefly(E.id, t);
+      E.leap = { sx: E.x, sy: E.y, tx: landing.x, ty: landing.y, at: t, until: t + leapMs };
     }
-    afterSkillDash(E, t) { GIANT.land(E, t); }
+    onLeapLand(E, t) { GIANT.land(E, t); return true; }
     get hasSkillClip() { return true; }
     playSkillClip(v, E, t) {
       if (this.isGolem(E, t)) { FIGHTER_VIEW.playOnce(v, "EXPERIMENTAL_Large_Transform", v.clips.EXPERIMENTAL_Large_Transform.duration * 1000 / ULT.gjTransformMs, t); return; }
-      FIGHTER_VIEW.playOnce(v, "Dodge_Forward", v.clips.Dodge_Forward.duration * 1000 / ULT.gjDashMs, t);
+      var leapMs = Math.max(1, E.ultUntil - E.leapAt);
+      FIGHTER_VIEW.playOnce(v, "Melee_2H_Slam", clamp(GiantType.SLAM_IMPACT_SEC * 1000 / leapMs, 1, 4.5), t);
     }
     ultDesc() {
-      return "앞으로 " + ULT.gjDashRange + " 돌진한 뒤 " + SKILLTEXT.secs(ULT.gjDur) + "간 골렘으로 변신. 반경 " + ULT.gjR + "의 적을 계속 끌어당기고, 기본 공격이 가장 가까운 적 1명에게 " + ULT.gjMaceDmg +
-             "의 피해와 " + SKILLTEXT.secs(ULT.gjStunMs) + " 기절(같은 적은 " + SKILLTEXT.secs(ULT.gjImmuneMs) + "간 기절 면역)";
+      return "지정한 곳(최대 " + ULT.gjCast + ")으로 점프해 " + SKILLTEXT.secs(ULT.gjDur) + "간 골렘으로 변신. 그동안 움직이거나 기본 공격을 할 수 없고, 반경 " + ULT.gjR +
+             "의 적을 계속 끌어당김. 끝나면 폭발해 반경 안의 적에게 " + ULT.gjBoomDmg + "의 피해";
     }
     passiveDesc() {
       return "골렘 변신 중 받는 피해 " + SKILLTEXT.pctOf(1 - ULT.gjDef) + "% 감소";
     }
     attackClip(v, E, t) {
-      return this.isGolem(E, t) ? ["Melee_2H_Slam", 2.8] : ["Melee_1H_Slash", 1.5];
+      return ["Melee_1H_Slash", GiantType.SWING_SPEED, null, GiantType.SWING_FROM_SEC];
     }
   }
   class CharacterRegistry {
@@ -4232,7 +4244,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     stepHoles(t, dt) {
       FIELD.holes = FIELD.holes.filter(function (h) {
         var e = h.e, start = e.createdAt + e.delay, end = start + e.dur, center = FIELD_FX.holeCenter(e);
-        if (t >= end || center.ownerFell) { EFFECT_VIEW.dropHoleVis(h); return false; }
+        if (center.ownerFell) { EFFECT_VIEW.dropHoleVis(h); return false; }
+        if (t >= end) { if (e.gj) GIANT.explode(e, center, t); EFFECT_VIEW.dropHoleVis(h); return false; }
         if (t < start) return true;
         if (!h.landed) { h.landed = true; if (!MATCH.me || hyp(center.x - MATCH.me.x, center.y - MATCH.me.y) < 700) SOUND.sfx("orb"); }
         if (SESSION.room.status !== "playing") return true;
@@ -5246,7 +5259,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         PHYSICS.resolve(E);
       }
       if (E.isStunned(t)) { E.dash = null; return; }
-      if (D.skill) { E.dash = null; E.type.afterSkillDash(E, t); return; }
       if (t < D.at + dashMs + (c.finishDelay || 0)) return;
       E.dash = null;
       if (c.stab) { MELEE.stabNearest(E, t); return; }
@@ -5281,6 +5293,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (k < 1) return;
       E.leap = null;
       PHYSICS.resolve(E);
+      if (E.type.onLeapLand(E, t)) return;
       SESSION.room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(E.angle), radius: ULT.bsR, arc: Math.PI * 2,
                                         dmg: ULT.bsDmg, u: 1, slam: 1, hammer: 1, fx: { stunMs: ULT.bsStunMs }, createdAt: t });
       VISION.revealBriefly(E.id, t);
@@ -5289,50 +5302,30 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   var MELEE = new MeleeSystem();
   class GiantSystem {
-    dash(E, ang, t) {
-      var full = ULT.gjDashRange, reach = MELEE.dashReach(E, ang, full);
-      var tx = clamp(E.x + Math.cos(ang) * reach, BOUND.l + BODY_R, BOUND.r - BODY_R), ty = clamp(E.y + Math.sin(ang) * reach, BOUND.t + BODY_R, BOUND.b - BODY_R);
-      reach = hyp(tx - E.x, ty - E.y);
-      E.dash = { sx: E.x, sy: E.y, tx: tx, ty: ty, at: t, ang: ang, ms: Math.max(1, Math.round(ULT.gjDashMs * reach / full)), skill: 1 };
-      E.ultUntil = t + ULT.gjDashMs;
-    }
     land(E, t) {
       E.buffUntil = t + ULT.gjDur;
       E.skillDur = ULT.gjDur;
       E.skillUntil = t + ULT.gjDur;
       E.ultUntil = t + ULT.gjTransformMs;
-      E.cdUntil = Math.max(E.cdUntil, t + ULT.gjTransformMs * 0.5);
       E.pending = null;
-      E.stunnedByMe = {};
       SESSION.room.ref.child("effects").push({ type: "hole", team: E.team, owner: E.id, x: Math.round(E.x), y: Math.round(E.y), r: ULT.gjR, dur: ULT.gjDur, delay: 0,
                                        follow: 1, gj: 1, gap: ULT.gjGap, pull: ULT.gjPull, createdAt: t });
       VISION.revealBriefly(E.id, t);
       if (TARGETS.hear(E)) SOUND.sfx("boom");
       MATCH.game.forceNet = true;
     }
-    maceTarget(E, t) {
-      var locked = E.stunnedByMe || {}, best = null, bd = Infinity;
-      TARGETS.everyone(t).forEach(function (o) {
-        if (!o || !o.alive || o.team === E.team || o.isProtected(t) || !VISION.visibleTo(o, E) || (locked[o.id] || 0) > t) return;
-        var d = hyp(o.x - E.x, o.y - E.y);
-        if (d <= ULT.gjMaceRange && d < bd && PHYSICS.losClear(E.x, E.y, o.x, o.y)) { bd = d; best = o; }
+    explode(e, center, t) {
+      FX_VIEW.holeBurst(center.x, center.y, e.r);
+      if (!MATCH.me || hyp(center.x - MATCH.me.x, center.y - MATCH.me.y) < 700) SOUND.sfx("boom");
+      if (SESSION.room.status !== "playing") return;
+      TARGETS.localTargets().forEach(function (T) {
+        if (!T.alive || T.team === e.team || T.minion || T.isProtected(t) || hyp(center.x - T.x, center.y - T.y) > e.r + BODY_R * 0.5) return;
+        DAMAGE.damage(T, ULT.gjBoomDmg, e.owner, false, "blackhole");
       });
-      return best;
-    }
-    mace(E, T, t) {
-      E.cdDur = ULT.gjMaceCd; E.cdUntil = t + E.cdDur;
-      E.angle = r1(Math.atan2(T.y - E.y, T.x - E.x));
-      E.atkAt = t;
-      (E.stunnedByMe || (E.stunnedByMe = {}))[T.id] = t + ULT.gjImmuneMs;
-      VISION.revealBriefly(E.id, t);
-      MATCH.game.forceNet = true;
-      if (TARGETS.hear(E)) SOUND.sfx("swing");
-      SESSION.room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: E.angle, stab: 1, mace: 1, tgt: T.id, radius: ULT.gjMaceRange, arc: Math.PI * 2,
-                                        dmg: ULT.gjMaceDmg, u: 1, slam: 1, fx: { stunMs: ULT.gjStunMs }, createdAt: t });
     }
   }
   var GIANT = new GiantSystem();
-  var MELEE_SPARK = { warrior: "#FF9A3C", knight: "#FFFFFF", duelist: "#FF3B3B", rogue: "#DCE3EC", necro: "#C9A6FF", lancer: "#FFD27A", blacksmith: "#FFB45A", priest: "#C9A6FF", shaman: "#8A1420", hitman: "#FF4A5A", guardian: "#8FD9A8", stormbow: "#FFE45C", giant: "#FFB070" };
+  var MELEE_SPARK = { warrior: "#FF9A3C", knight: "#FFFFFF", duelist: "#FF3B3B", rogue: "#DCE3EC", necro: "#C9A6FF", lancer: "#FFD27A", blacksmith: "#FFB45A", priest: "#C9A6FF", shaman: "#8A1420", hitman: "#FF4A5A", guardian: "#8FD9A8", stormbow: "#FFE45C" };
   var HEAL_SPARK = "#7CFFB2";
   var LANCE_SLIP = 3, LANCE_VIS_SLIP = 60;
   var SHOVE_SUBSTEP = BODY_R / 2;
@@ -5355,7 +5348,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   class AttackController {
     fireBasic(E, ang, reach) {
       var c = CHARS[E.char], t = now(), rage = E.isBerserk(t);
-      if (E.isStunned(t)) return;
+      if (E.isStunned(t) || CHAR_TYPES.of(E.char).cannotAttack(E, t)) return;
       E.cdDur = E.isRiposting(t) ? 1000 / ULT.rmRate : c.cd * (rage ? ULT.bzCdMul : 1) / (E.isOvercharged(t) ? ULT.ocRate : 1); E.cdUntil = t + E.cdDur; E.angle = ang;
       var type = CHAR_TYPES.of(E.char);
       if (type.overrideBasic(E, ang, reach, t)) return;
@@ -6832,11 +6825,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     clipAction(v, name) {
       return v.actions[name] || (v.actions[name] = v.mixer.clipAction((v.clips || KIT.clips)[name]));
     }
-    showClip(v, name, ts, loop, restart) {
+    showClip(v, name, ts, loop, restart, from) {
       var a = FIGHTER_VIEW.clipAction(v, name);
       a.timeScale = ts;
       if (name === v.curName && !restart) return;
       a.reset();
+      if (from) a.time = from;
       if (loop) a.setLoop(THREE.LoopRepeat, Infinity);
       else { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; }
       var fade = v.cur ? (restart && name === v.curName ? 0 : 0.14) : 0;
@@ -6846,8 +6840,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       a.play();
       v.cur = a; v.curName = name;
     }
-    playOnce(v, name, ts, t, next) {
-      v.once = { name: name, ts: ts, until: t + (v.clips || KIT.clips)[name].duration / ts * 1000 - 90, fresh: true, next: next || null };
+    playOnce(v, name, ts, t, next, from) {
+      v.once = { name: name, ts: ts, from: from || 0, until: t + ((v.clips || KIT.clips)[name].duration - (from || 0)) / ts * 1000 - 90, fresh: true, next: next || null };
     }
     sniperShotClip(E) {
       var shootMs = E.ultUntil > E.atkAt ? 520 : 330, reloadMs = CHARS.sniper.cd - shootMs - 60;
@@ -6868,7 +6862,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         v.atkSeen = E.atkAt;
         if (E.alive && t - E.atkAt < 600) {
           var ac = FIGHTER_VIEW.attackClip(v, E, t);
-          FIGHTER_VIEW.playOnce(v, ac[0], ac[1], t, ac[2]);
+          FIGHTER_VIEW.playOnce(v, ac[0], ac[1], t, ac[2], ac[3]);
        }
       }
       if (E.stabAt !== v.stabSeen) {
@@ -6899,7 +6893,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var earlyPose = type.earlyPose(E, t), latePose = type.latePose(E, t);
         if (earlyPose) FIGHTER_VIEW.showClip(v, earlyPose[0], earlyPose[1], true);
         else if (E.isBladeStorming(t)) FIGHTER_VIEW.showClip(v, "Melee_2H_Attack_Spinning", 1.2, true);
-        else if (v.once) { FIGHTER_VIEW.showClip(v, v.once.name, v.once.ts, false, v.once.fresh); v.once.fresh = false; }
+        else if (v.once) { FIGHTER_VIEW.showClip(v, v.once.name, v.once.ts, false, v.once.fresh, v.once.from); v.once.fresh = false; }
         else if (E.isRevealing(t)) FIGHTER_VIEW.showClip(v, "Ranged_Magic_Spellcasting", 1, true);
         else if (latePose) FIGHTER_VIEW.showClip(v, latePose[0], latePose[1], true);
         else if (E.mv && v.speed > 150) FIGHTER_VIEW.showClip(v, "Running_A", clamp(v.speed / 260, 0.7, 1.6), true);
@@ -7025,7 +7019,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }
     }
     makeMeleeVis(d) {
-      if (d.stab && !d.mace) return EFFECT_VIEW.makeStabVis(d);
+      if (d.stab) return EFFECT_VIEW.makeStabVis(d);
       var g = new THREE.Group(), who = SESSION.players[d.owner] ? SESSION.players[d.owner].characterType : "", col = d.zap ? ZAP_GLOW : d.u ? 0xFF6A3D : (MELEE_COLOR[who] || 0xFFFFFF);
       var fillM = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.2, depthWrite: false });
       var darkWave = CHAR_TYPES.of(who).hasDarkWave && !d.u;
@@ -7329,7 +7323,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static DISC_R = 175;
     static BEHIND = 46;
     static RISE_MS = 420;
-    static FALL_MS = 500;
+    static CHARGE_MS = 450;
     constructor() { this.cache = null; this.facing = new THREE.Vector3(); }
     paint(size, draw) {
       var cv = document.createElement("canvas"); cv.width = cv.height = size;
@@ -7414,14 +7408,37 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       scene.add(g);
       return g;
     }
+    makeBurst(f) {
+      var tx = this.textures(), g = new THREE.Group(), mats = [], G = GargantuaView;
+      function mat(opts) { var m = new THREE.MeshBasicMaterial(opts); mats.push(m); return m; }
+      var add = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide };
+      var ring1 = ARENA_VIEW.flatMesh(GEO.ringFx, mat(Object.assign({ color: 0xFFF1D0 }, add))); ring1.position.y = 3;
+      var ring2 = ARENA_VIEW.flatMesh(GEO.ringFx, mat(Object.assign({ color: 0xFF8A3D }, add))); ring2.position.y = 2.6;
+      var flash = ARENA_VIEW.flatMesh(GEO.disc, mat(Object.assign({ color: 0xFFE2A8 }, add))); flash.position.y = 2.2;
+      var dome = new THREE.Mesh(GEO.ball, mat(Object.assign({ color: 0xFFB060 }, add))); dome.position.y = 40;
+      var disc = ARENA_VIEW.flatMesh(GEO.disc, mat(Object.assign({ map: tx.disc }, add))); disc.position.y = G.DISC_Y;
+      [ring1, ring2, flash, dome, disc].forEach(function (m) { g.add(m); });
+      g.position.set(f.x, 0, f.y);
+      g.userData = { mats: mats, r: f.r, ring1: ring1, ring2: ring2, flash: flash, dome: dome, disc: disc };
+      scene.add(g);
+      return g;
+    }
+    stepBurst(g, k) {
+      var ud = g.userData, r = ud.r, G = GargantuaView, out = 1 - Math.pow(1 - k, 3), k2 = clamp((k - 0.15) / 0.85, 0, 1), out2 = 1 - Math.pow(1 - k2, 3), fade = 1 - k;
+      ud.ring1.scale.setScalar(40 + (r * 1.05 - 40) * out); ud.ring1.material.opacity = 0.95 * fade;
+      ud.ring2.scale.setScalar(20 + r * 0.8 * out2); ud.ring2.material.opacity = k < 0.15 ? 0 : 0.7 * (1 - k2);
+      ud.flash.scale.setScalar(r * (0.2 + 0.45 * out)); ud.flash.material.opacity = 0.9 * fade * fade;
+      ud.dome.scale.setScalar(30 + r * 0.4 * out); ud.dome.material.opacity = 0.55 * fade * fade;
+      ud.disc.scale.setScalar(G.DISC_R * (1 + 0.9 * out)); ud.disc.material.opacity = 0.75 * fade; ud.disc.rotation.z = -k * 5;
+    }
     render(h, t, nowMs) {
       var e = h.e, ud = h.vis.userData, start = e.createdAt + e.delay, end = start + e.dur, G = GargantuaView;
-      var rise = clamp((t - start) / G.RISE_MS, 0.001, 1), fall = clamp((end - t) / G.FALL_MS, 0, 1), k = Math.min(rise * rise * (3 - 2 * rise), fall);
-      var shown = VIS[e.owner], center = FIELD_FX.holeCenter(e), spin = nowMs / 1000;
+      var rise = clamp((t - start) / G.RISE_MS, 0.001, 1), charge = clamp((t - (end - G.CHARGE_MS)) / G.CHARGE_MS, 0, 1), k = rise * rise * (3 - 2 * rise) * (1 + 0.1 * charge);
+      var shown = VIS[e.owner], center = FIELD_FX.holeCenter(e), spin = nowMs / 1000 * (1 + 2 * charge);
       h.vis.position.set(shown ? shown.root.position.x : center.x, 0, shown ? shown.root.position.z : center.y);
       h.vis.scale.setScalar(Math.max(0.001, k));
       ud.vortex.rotation.z = spin * 1.1;
-      ud.edgeMat.opacity = 0.55 + 0.25 * Math.sin(nowMs / 140);
+      ud.edgeMat.opacity = 0.55 + 0.25 * Math.sin(nowMs / (140 - 90 * charge));
       ud.disc.rotation.z = -spin * 2.6; ud.disc2.rotation.z = spin * 1.7;
       ud.tilt.rotation.z = Math.sin(spin * 0.5) * 0.05;
       camera.getWorldDirection(this.facing);
@@ -7498,6 +7515,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     smoke(x, y, color) { MATCH.fx.push({ k: "smoke", x: x, y: y, c: color || 0xC8C8CD, t: Date.now(), life: (ULT.asSmokeMs + 150) / CLOCK.scale }); }
     boom(x, y, r, team) { MATCH.fx.push({ k: "boom", x: x, y: y, r: r, c: C_FX[team] || 0xffffff, t: Date.now(), life: 450 }); }
+    holeBurst(x, y, r) { MATCH.fx.push({ k: "holeBurst", x: x, y: y, r: r, t: Date.now(), life: 750 }); }
     floatText(x, y, text, color) { MATCH.fx.push({ k: "txt", x: x, y: y, s: text, c: color, t: Date.now(), life: 800 }); }
     orbHitColor(d) {
       var type = CHAR_TYPES.of(d.ownerCharacterType);
@@ -7638,6 +7656,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (f.k === "bolt") return FX_VIEW.boltMesh(f);
       if (f.k === "chain") return FX_VIEW.chainMesh(f);
       if (f.k === "bladeZone") return FX_VIEW.bladeZoneMesh(f);
+      if (f.k === "holeBurst") return GARGANTUA.makeBurst(f);
       var mat = new THREE.MeshBasicMaterial({ color: f.c, transparent: true, depthWrite: false, side: THREE.DoubleSide }), m;
       if (f.k === "spark") { m = new THREE.Mesh(GEO.ringFx, mat); m.position.set(f.x, 36, f.y); }
       else if (f.k === "smoke") { m = new THREE.Mesh(GEO.ball, mat); m.position.set(f.x, 30, f.y); }
@@ -7661,6 +7680,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           if (m.userData.flashMat) m.userData.flashMat.opacity = flicker * BOLT_FLASH_OPACITY;
           return;
         }
+        if (f.k === "holeBurst") { GARGANTUA.stepBurst(m, k); return; }
         if (f.k === "bladeZone") {
           var age = nowMs - f.t, charged = Math.min(1, age / f.delay), fade = age <= f.delay ? 1 : 1 - (age - f.delay) / (f.life - f.delay);
           m.userData.charge.scale.setScalar(Math.max(0.01, f.r * charged));
