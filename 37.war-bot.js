@@ -128,17 +128,17 @@ WarBotBrain.THREAT_RADIUS = 4200;
 WarBotBrain.FIGHTERS_PER_SUPPORT = 5;
 class WarEasyBot extends WarBotBrain {
     constructor(team, seed) {
-        super(team, seed, { thinkTicks: 40, oreWorkerTarget: 4, crystalWorkerTarget: 1, buildingTarget: 4, launchArmyPop: 28, minSquadToSend: 8, retreatSquadSize: 3, queueDepth: 2, defends: false, buildOrder: ["barracks", "barracks", "citadel", "citadel"] });
+        super(team, seed, { thinkTicks: 40, oreWorkerTarget: 5, crystalWorkerTarget: 2, buildingTarget: 4, launchArmyPop: 28, minSquadToSend: 8, retreatSquadSize: 3, queueDepth: 2, defends: false, buildOrder: ["barracks", "barracks", "citadel", "citadel"] });
     }
 }
 class WarNormalBot extends WarBotBrain {
     constructor(team, seed) {
-        super(team, seed, { thinkTicks: 20, oreWorkerTarget: 5, crystalWorkerTarget: 3, buildingTarget: 4, launchArmyPop: 24, minSquadToSend: 6, retreatSquadSize: 3, queueDepth: 2, defends: false, buildOrder: ["barracks", "citadel", "barracks", "citadel"] });
+        super(team, seed, { thinkTicks: 20, oreWorkerTarget: 6, crystalWorkerTarget: 4, buildingTarget: 4, launchArmyPop: 24, minSquadToSend: 6, retreatSquadSize: 3, queueDepth: 2, defends: false, buildOrder: ["barracks", "citadel", "barracks", "citadel"] });
     }
 }
 class WarHardBot extends WarBotBrain {
     constructor(team, seed) {
-        super(team, seed, { thinkTicks: 10, oreWorkerTarget: 5, crystalWorkerTarget: 3, buildingTarget: 4, launchArmyPop: 24, minSquadToSend: 6, retreatSquadSize: 3, queueDepth: 3, defends: true, buildOrder: ["barracks", "citadel", "barracks", "citadel"] });
+        super(team, seed, { thinkTicks: 10, oreWorkerTarget: 6, crystalWorkerTarget: 4, buildingTarget: 4, launchArmyPop: 24, minSquadToSend: 6, retreatSquadSize: 3, queueDepth: 3, defends: true, buildOrder: ["barracks", "citadel", "barracks", "citadel"] });
     }
 }
 class WarBotFactory {

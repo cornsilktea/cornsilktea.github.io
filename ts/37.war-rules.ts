@@ -3,7 +3,7 @@ type WarWinner = 0 | 1 | 2;
 type WarEndReason = "hq" | "time" | "surrender";
 type WarEventKind = "strike" | "splash" | "heal" | "produced" | "built" | "unitDied" | "buildingDestroyed" | "ended" | "alert";
 
-interface WarEvent { kind: WarEventKind; team: WarTeam; tick: number; text: string; winner?: WarWinner; x?: number; y?: number; tx?: number; ty?: number }
+interface WarEvent { kind: WarEventKind; team: WarTeam; tick: number; text: string; winner?: WarWinner; x?: number; y?: number; tx?: number; ty?: number; source?: number }
 interface WarResult { winner: WarWinner; reason: WarEndReason; tick: number }
 interface WarEngineOptions { seed: number; factions: [WarFactionId, WarFactionId] }
 interface WarCommandJson { type: string; team: WarTeam; [field: string]: unknown }
@@ -100,6 +100,7 @@ class WarUnit extends WarEntity implements WarAttacker {
   slowTicksLeft = 0;
   slowPct = 0;
   marchTicks = 0;
+  restHere = false;
   orderPath: WarPoint[] = [];
   holdPoint: WarPoint | null = null;
   rejoin = false;
@@ -503,16 +504,16 @@ class WarSquadAssigner {
     return target;
   }
 
-  private static kindLimit(kind: WarUnitKind): number {
-    if (kind === "melee") return WarBalance.BATCH_MELEE;
-    return kind === "ranged" ? WarBalance.BATCH_RANGED : WarBalance.BATCH_ELITE;
+  private static isHigh(kind: WarUnitKind): boolean {
+    return kind === "elite";
   }
 
   private firstWithKindRoom(kind: WarUnitKind): WarSquad | null {
-    const limit = WarSquadAssigner.kindLimit(kind);
+    const high = WarSquadAssigner.isHigh(kind);
+    const limit = high ? WarBalance.BATCH_ELITE : WarBalance.BATCH_LOW;
     for (const squad of this.squads) {
       if (squad.members.length >= WarBalance.SQUAD_CAP) continue;
-      if (squad.members.filter((member) => member.def.kind === kind).length < limit) return squad;
+      if (squad.members.filter((member) => WarSquadAssigner.isHigh(member.def.kind) === high).length < limit) return squad;
     }
     return null;
   }
@@ -523,26 +524,31 @@ class WarSquadAssigner {
   }
 }
 class WarFormation {
-  private static readonly ROW_FORWARD: Record<WarRole, number> = { front: 260, mid: 0, rear: -420 };
-  private static readonly LATERAL_SPACING = 130;
-  private static readonly SUBROW_SIZE = 10;
-  private static readonly SUBROW_BACK = 160;
+  private static readonly FRONT_START = 260;
+  private static readonly ROW_GAP = 60;
+  private static readonly PITCH_EXTRA = 30;
+  private static readonly MAX_WIDTH = 1200;
 
   static slots(members: WarUnit[], anchor: WarPoint, heading: WarPoint): Map<number, WarPoint> {
     const result = new Map<number, WarPoint>();
+    let cursor = WarFormation.FRONT_START;
     for (const role of ["front", "mid", "rear"] as WarRole[]) {
       const row = members.filter((unit) => unit.def.role === role).sort((a, b) => a.id - b.id);
+      if (row.length === 0) continue;
+      const pitch = Math.max(...row.map((unit) => unit.collisionRadius() * 2)) + WarBalance.SEPARATION_GAP + WarFormation.PITCH_EXTRA;
+      const perRow = Math.max(1, Math.floor(WarFormation.MAX_WIDTH / pitch));
       row.forEach((unit, i) => {
-        const subRow = Math.floor(i / WarFormation.SUBROW_SIZE);
-        const inRow = Math.min(WarFormation.SUBROW_SIZE, row.length - subRow * WarFormation.SUBROW_SIZE);
-        const index = i - subRow * WarFormation.SUBROW_SIZE;
-        const forward = WarFormation.ROW_FORWARD[role] - subRow * WarFormation.SUBROW_BACK;
-        const lateral = Math.trunc(((2 * index - (inRow - 1)) * WarFormation.LATERAL_SPACING) / 2);
+        const subRow = Math.floor(i / perRow);
+        const inRow = Math.min(perRow, row.length - subRow * perRow);
+        const index = i - subRow * perRow;
+        const forward = cursor - subRow * pitch;
+        const lateral = Math.trunc(((2 * index - (inRow - 1)) * pitch) / 2);
         result.set(unit.id, {
           x: anchor.x + Math.trunc((heading.x * forward - heading.y * lateral) / 1000),
           y: anchor.y + Math.trunc((heading.y * forward + heading.x * lateral) / 1000),
         });
       });
+      cursor -= Math.ceil(row.length / perRow) * pitch + WarFormation.ROW_GAP;
     }
     return result;
   }
@@ -591,6 +597,10 @@ class WarSquad {
     return this.members.filter((unit) => unit.attached && !unit.independent);
   }
 
+  get settled(): boolean {
+    return this.mode === "home" || this.path.length === 0;
+  }
+
   speed(): number {
     const attached = this.attachedMembers();
     if (attached.length === 0) return 0;
@@ -619,6 +629,7 @@ class WarSquad {
     for (const unit of this.members) {
       unit.clearOrder();
       unit.attached = true;
+      unit.restHere = false;
       unit.marchTicks = WarBalance.DEPART_FREE_TICKS;
       unit.targetId = -1;
     }
@@ -633,6 +644,7 @@ class WarSquad {
     for (const unit of this.members) {
       unit.clearOrder();
       unit.attached = true;
+      unit.restHere = false;
       unit.marchTicks = WarBalance.DEPART_FREE_TICKS;
       unit.targetId = -1;
     }
@@ -897,12 +909,14 @@ class WarUnitBrain {
       WarUnitBrain.holdFormation(unit, squad, slot);
       return;
     }
+    if (unit.def.ability === "heal" && WarUnitBrain.thinkHealer(engine, unit)) return;
     const origin = unit.attached ? slot : squad.post;
     let target = unit.targetId >= 0 ? engine.entityById(unit.targetId) : null;
     if (target && !WarUnitBrain.stillValid(engine, unit, squad, target, origin)) target = null;
     target = WarUnitBrain.preferNearest(engine, unit, origin, target);
     if (!target && unit.attached) target = WarUnitBrain.squadFocus(engine, unit, squad);
     unit.retarget(target ? target.id : -1);
+    if (target) unit.restHere = false;
     if (!target) {
       WarUnitBrain.holdFormation(unit, squad, slot);
       return;
@@ -914,6 +928,14 @@ class WarUnitBrain {
     }
     if (unit.def.range >= WarBalance.KITE_MIN_RANGE && WarUnitBrain.keepDistance(engine, unit)) return;
     if (!inReach) unit.moveToward(target, unit.stepLength());
+  }
+
+  private static thinkHealer(engine: WarEngine, unit: WarUnit): boolean {
+    const patient = WarHealAbility.findPatient(engine, unit, WarBalance.HEALER_SEEK_RANGE);
+    if (!patient) return false;
+    unit.restHere = false;
+    if (WarMath.dist(unit.x, unit.y, patient.x, patient.y) > Math.trunc((unit.def.abilityRange * WarBalance.HEALER_CLOSE_PERCENT) / 100)) unit.moveToward(patient, unit.stepLength());
+    return true;
   }
 
   private static thinkOrdered(engine: WarEngine, unit: WarUnit, squad: WarSquad): void {
@@ -1000,6 +1022,7 @@ class WarUnitBrain {
 
   static holdFormation(unit: WarUnit, squad: WarSquad, slot: WarPoint): void {
     const gap = WarMath.dist(unit.x, unit.y, slot.x, slot.y);
+    if (squad.settled && (unit.restHere || gap <= WarBalance.SLOT_TOLERANCE)) return;
     const catchingUp = gap > 300 || !unit.attached || squad.mode === "home";
     const pace = catchingUp ? unit.stepLength() : Math.min(unit.stepLength(), squad.speed());
     unit.moveToward(slot, pace);
@@ -1022,15 +1045,15 @@ class WarHealAbility extends WarAbility {
       this.waitTicks--;
       return;
     }
-    const patient = this.weakestAlly(engine, unit);
+    const patient = WarHealAbility.findPatient(engine, unit, this.range);
     if (!patient) return;
     patient.hp = Math.min(patient.maxHp, patient.hp + this.amount);
     this.waitTicks = this.periodTicks - 1;
-    engine.emit({ kind: "heal", team: unit.team, tick: engine.tick, text: unit.def.id, x: unit.x, y: unit.y, tx: patient.x, ty: patient.y });
+    engine.emit({ kind: "heal", team: unit.team, tick: engine.tick, text: unit.def.id, source: unit.id, x: unit.x, y: unit.y, tx: patient.x, ty: patient.y });
   }
 
-  private weakestAlly(engine: WarEngine, healer: WarUnit): WarUnit | null {
-    const reachSq = this.range * this.range;
+  static findPatient(engine: WarEngine, healer: WarUnit, range: number): WarUnit | null {
+    const reachSq = range * range;
     let best: WarUnit | null = null;
     let bestRatio = 1000;
     for (const ally of engine.entitiesOf(healer.team)) {
@@ -1529,10 +1552,18 @@ class WarEngine {
     }
   }
 
+  private noteResting(unit: WarUnit): void {
+    const squad = this.players[unit.team].squads[unit.squadIndex];
+    if (!squad || !squad.settled || unit.targetId >= 0) return;
+    const slot = squad.slotOf(unit);
+    if (WarMath.dist(unit.x, unit.y, slot.x, slot.y) <= WarBalance.REST_MAX_GAP) unit.restHere = true;
+  }
+
   private pushApart(a: WarUnit, b: WarUnit, radius: number): void {
     const dx = a.x - b.x;
     const dy = a.y - b.y;
-    const gap = a.collisionRadius() + b.collisionRadius() + WarBalance.SEPARATION_GAP;
+    const rivals = a.team !== b.team;
+    const gap = rivals ? Math.trunc(((a.collisionRadius() + b.collisionRadius()) * WarBalance.ENEMY_OVERLAP_PERCENT) / 100) : a.collisionRadius() + b.collisionRadius() + WarBalance.SEPARATION_GAP;
     if (Math.abs(dx) >= gap || Math.abs(dy) >= gap) return;
     const distance = WarMath.isqrt(dx * dx + dy * dy);
     if (distance >= gap) return;
@@ -1541,6 +1572,10 @@ class WarEngine {
     const uy = distance === 0 ? 0 : Math.trunc((dy * 1000) / distance);
     const aSide = this.detourSide(a, b, ux, uy);
     const bSide = this.detourSide(b, a, -ux, -uy);
+    if (!rivals) {
+      this.noteResting(a);
+      this.noteResting(b);
+    }
     a.x += Math.trunc((ux * push - uy * aSide * push) / 1000);
     a.y += Math.trunc((uy * push + ux * aSide * push) / 1000);
     b.x -= Math.trunc((ux * push + uy * bSide * push) / 1000);

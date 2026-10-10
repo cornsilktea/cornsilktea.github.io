@@ -1,6 +1,6 @@
 type WarCommandSink = (command: WarCommand) => void;
 
-interface WarCardButton { label: string; sub: string; desc: string; enabled: boolean; onPress: (() => void) | null }
+interface WarCardButton { label: string; sub: string; desc: string; art: string; enabled: boolean; onPress: (() => void) | null }
 
 class WarDom {
   static byId<T extends HTMLElement = HTMLElement>(id: string): T {
@@ -110,12 +110,13 @@ class WarSquadPanel {
 }
 
 class WarCommandCard {
+  portraits: WarPortraits | null = null;
   private readonly host = WarDom.byId("cmdCard");
   private signature = "";
 
   update(selection: WarSelection, engine: WarEngine, team: WarTeam, sink: WarCommandSink, onAfter: () => void): void {
     const cells = this.cellsFor(selection, engine, team, sink, onAfter);
-    const signature = selection.kind + ":" + cells.map((c) => c.label + c.sub + c.enabled).join("|");
+    const signature = selection.kind + ":" + cells.map((c) => c.label + c.sub + c.enabled + c.art).join("|");
     if (signature === this.signature) return;
     this.signature = signature;
     WarDom.clear(this.host);
@@ -125,9 +126,19 @@ class WarCommandCard {
         cell.type = "button";
         cell.disabled = !spec.enabled;
       }
-      cell.appendChild(WarDom.make("b", "", spec.label));
-      if (spec.sub) cell.appendChild(WarDom.make("small", "", spec.sub));
-      if (spec.desc) cell.appendChild(WarDom.make("span", "desc", spec.desc));
+      const text = WarDom.make("div", "cmdText");
+      text.appendChild(WarDom.make("b", "", spec.label));
+      if (spec.sub) text.appendChild(WarDom.make("small", "", spec.sub));
+      if (spec.desc) text.appendChild(WarDom.make("span", "desc", spec.desc));
+      cell.appendChild(text);
+      const url = spec.art && this.portraits ? this.portraits.urlFor(spec.art) : "";
+      if (url) {
+        const picture = document.createElement("img");
+        picture.className = "art";
+        picture.alt = "";
+        picture.src = url;
+        cell.appendChild(picture);
+      }
       const press = spec.onPress;
       if (press) cell.addEventListener("click", () => press());
       this.host.appendChild(cell);
@@ -135,7 +146,7 @@ class WarCommandCard {
   }
 
   private static note(label: string, desc: string): WarCardButton[] {
-    return [{ label, sub: "", desc, enabled: true, onPress: null }];
+    return [{ label, sub: "", desc, art: "", enabled: true, onPress: null }];
   }
 
   private cellsFor(selection: WarSelection, engine: WarEngine, team: WarTeam, sink: WarCommandSink, onAfter: () => void): WarCardButton[] {
@@ -145,7 +156,8 @@ class WarCommandCard {
       return WarBuildingCatalog.buildable(player.slotDefs[selection.index].kind).map((def) => ({
         label: WarBuildingCatalog.displayName(def.type, player.faction),
         sub: WarCommandCard.costText(def.ore, def.crystal) + " · " + def.buildTicks / WarBalance.TICKS_PER_SEC + "초 · " + player.countOf(def.type) + "/" + WarBalance.BUILDINGS_PER_TYPE,
-        desc: WarBlurbs.building(def.type),
+        desc: "",
+        art: WarPortraits.buildingKey(player.faction, def.type),
         enabled: economy.canAfford(def.ore, def.crystal) && player.countOf(def.type) < WarBalance.BUILDINGS_PER_TYPE,
         onPress: () => { sink(new WarBuildCommand(team, selection.index, def.type)); onAfter(); },
       }));
@@ -161,15 +173,16 @@ class WarCommandCard {
       return items.map((item) => ({
         label: item.name,
         sub: WarCommandCard.costText(item.ore, item.crystal) + (item.pop > 1 ? " · 인구 " + item.pop : ""),
-        desc: WarBlurbs.unit(item.id),
+        desc: "",
+        art: item.unitDef ? WarPortraits.unitKey(player.faction, item.id) : WarPortraits.workerKey(player.faction),
         enabled: economy.canAfford(item.ore, item.crystal) && economy.popFree >= item.pop && building.queue.length < WarBalance.QUEUE_LIMIT,
         onPress: () => sink(new WarProduceCommand(team, building.id, item.id)),
       }));
     }
     if (selection.kind === "squad") {
       return [
-        { label: "이동", sub: "", desc: "마우스는 오른쪽 클릭, 터치는 화면을 누르면 그곳으로 가요. 길게 그리려면 공격 지도를 쓰세요.", enabled: true, onPress: null },
-        { label: "귀환", sub: "입구로 돌아와요", desc: "", enabled: player.squads[selection.index].mode !== "home", onPress: () => sink(new WarRecallCommand(team, selection.index)) },
+        { label: "이동", sub: "", desc: "마우스는 오른쪽 클릭, 터치는 화면을 누르면 그곳으로 가요. 길게 그리려면 공격 지도를 쓰세요.", art: "", enabled: true, onPress: null },
+        { label: "귀환", sub: "입구로 돌아와요", desc: "", art: "", enabled: player.squads[selection.index].mode !== "home", onPress: () => sink(new WarRecallCommand(team, selection.index)) },
       ];
     }
     if (selection.kind === "unit") {

@@ -62,15 +62,17 @@
 
   #bottomBar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; gap: 8px; align-items: stretch; padding: 8px 8px calc(env(safe-area-inset-bottom, 0px) + 8px); background: linear-gradient(0deg, rgba(5, 8, 18, .86), rgba(5, 8, 18, 0)); pointer-events: none; }
   #cmdCard, #infoPanel { height: 132px; overflow-y: auto; padding: 8px 10px; background: rgba(14, 20, 38, .86); border: 1.5px solid rgba(255, 255, 255, .2); border-top: 3px solid #D97B4F; border-radius: 10px; }
-  #cmdCard { flex: 0 0 46%; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; padding: 6px; overflow: hidden; }
+  #cmdCard { flex: 0 0 54%; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; padding: 6px; overflow: hidden; }
   #infoPanel { flex: 1 1 auto; min-width: 0; font-size: 14px; }
   #infoPanel h3 { margin-bottom: 6px; font-size: 17px; color: #fff; }
   .infoBar { height: 10px; margin-bottom: 6px; background: rgba(255, 255, 255, .15); border-radius: 5px; overflow: hidden; }
   .infoBarFill { height: 100%; background: linear-gradient(90deg, #6BE08A, #D6F27A); }
   .infoRow { margin-top: 3px; color: #D6DEF5; font-weight: 700; }
-  .cmdBtn, .cmdNote { min-width: 0; min-height: 0; padding: 6px 8px; border-radius: 8px; border: 2px solid rgba(255, 255, 255, .28); background: rgba(255, 255, 255, .08); color: #fff; text-align: left; display: flex; flex-direction: column; justify-content: center; gap: 3px; overflow: hidden; }
+  .cmdBtn, .cmdNote { min-width: 0; min-height: 0; padding: 6px 8px; border-radius: 8px; border: 2px solid rgba(255, 255, 255, .28); background: rgba(255, 255, 255, .08); color: #fff; text-align: left; display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 4px; overflow: hidden; }
+  .cmdText { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .cmdBtn .art { flex: 0 0 auto; width: 76px; height: 76px; object-fit: contain; pointer-events: none; }
   .cmdNote { border-color: rgba(255, 255, 255, .14); background: rgba(255, 255, 255, .04); }
-  .cmdBtn b, .cmdNote b { display: block; font-size: 16px; }
+  .cmdBtn b, .cmdNote b { display: block; font-size: 15px; }
   .cmdBtn small { display: block; font-size: 12px; font-weight: 700; color: #FFD9A8; }
   .cmdBtn .desc, .cmdNote .desc { display: block; font-size: 12px; line-height: 1.35; font-weight: 600; color: #C9D3EC; }
   .cmdBtn:disabled { opacity: .4; }
@@ -90,9 +92,10 @@
 
   @media (max-width: 900px) {
     #squadPanel { width: 150px; }
-    #cmdCard { flex-basis: 50%; }
+    #cmdCard { flex-basis: 56%; }
     .cmdBtn .desc, .cmdNote .desc { font-size: 11px; }
     #minimap { width: 105px; height: 132px; }
+    .cmdBtn .art { width: 48px; height: 48px; }
   }
 </style>
 </head>
@@ -179,7 +182,7 @@
         <li>일꾼과 병력을 합쳐 <b>인구 <span data-balance="POP_CAP">70</span></b>까지 만들 수 있어요. 광석 일꾼은 <span data-balance="ORE_WORKER_LIMIT">5</span>명, 결정 일꾼은 <span data-balance="CRYSTAL_WORKER_LIMIT">3</span>명까지예요. 일꾼 한 명은 광석 <span data-balance="WORKER_ORE">100</span>이 들지만 캐는 양이 두 배라서, 많을수록 자원이 늘되 증가폭은 점점 줄어요.</li>
         <li>일꾼은 <b>광석</b>과 <b>결정</b>을 알아서 캐 와요. 낮은 등급 병력은 광석만, 높은 등급 병력과 성채·사령 제단은 결정도 써요.</li>
         <li>본부 앞쪽 빈 터 5곳에 건물을 지어요. 낮은 등급 건물(병영·납골당)과 높은 등급 건물(성채·사령 제단)은 종류마다 <span data-balance="BUILDINGS_PER_TYPE">2</span>개까지예요. 공성 병사는 높은 등급 건물에서 만들어요.</li>
-        <li>병력은 알아서 <b>부대 1·2·3</b>으로 나뉘어 입구에서 지켜요. 번호가 낮은 부대부터 근접 <span data-balance="BATCH_MELEE">10</span>명, 원거리와 고급 <span data-balance="BATCH_RANGED">5</span>명씩 채워요. 한 부대는 최대 <span data-balance="SQUAD_CAP">20</span>명이에요.</li>
+        <li>병력은 알아서 <b>부대 1·2·3</b>으로 나뉘어 입구에서 지켜요. 번호가 낮은 부대부터 하급 병력 <span data-balance="BATCH_LOW">15</span>명, 고급 병력 <span data-balance="BATCH_ELITE">5</span>명씩 채워요. 한 부대는 최대 <span data-balance="SQUAD_CAP">20</span>명이에요.</li>
         <li><b>미니맵</b>을 눌러 공격 지도를 열고 부대를 골라 길을 그리면 그 길로 가면서 적을 공격해요. <b>귀환</b>을 누르면 입구로 돌아와요.</li>
 <li>유닛 주변만 보여요. 세 갈래 길 한가운데는 양쪽이 항상 볼 수 있어요.</li>
         <li>상대 <b>본부를 부수면 승리</b>예요. <span data-balance="MATCH_MINUTES">15</span>분이 지나면 본부 체력이 더 많은 쪽이 이겨요.</li>
@@ -201,13 +204,13 @@
 </div>
 
 <script charset="utf-8" src="character-kit.js"></script>
-<script charset="utf-8" src="37.war-data.js?v=20261010e"></script>
-<script charset="utf-8" src="37.war-rules.js?v=20261010e"></script>
-<script charset="utf-8" src="37.war-bot.js?v=20261010e"></script>
-<script charset="utf-8" src="37.war-scenery.js?v=20261010e"></script>
-<script charset="utf-8" src="37.war-views.js?v=20261010e"></script>
-<script charset="utf-8" src="37.war-hud.js?v=20261010e"></script>
-<script charset="utf-8" src="37.space-war.js?v=20261010e"></script>
+<script charset="utf-8" src="37.war-data.js?v=20261010f"></script>
+<script charset="utf-8" src="37.war-rules.js?v=20261010f"></script>
+<script charset="utf-8" src="37.war-bot.js?v=20261010f"></script>
+<script charset="utf-8" src="37.war-scenery.js?v=20261010f"></script>
+<script charset="utf-8" src="37.war-views.js?v=20261010f"></script>
+<script charset="utf-8" src="37.war-hud.js?v=20261010f"></script>
+<script charset="utf-8" src="37.space-war.js?v=20261010f"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";

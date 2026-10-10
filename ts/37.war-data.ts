@@ -64,7 +64,7 @@ class WarBalance {
   }
 
   static readonly TICK_MS = 100;
-  static readonly POP_CAP = 70;
+  static readonly POP_CAP = 100;
   static readonly SQUAD_COUNT = 3;
   static readonly SQUAD_CAP = 20;
   static readonly MATCH_TICKS = 9000;
@@ -75,18 +75,17 @@ class WarBalance {
   static readonly START_ORE_WORKERS = 2;
   static readonly START_CRYSTAL_WORKERS = 0;
   static readonly WORKER_CAP_PER_RESOURCE = 12;
-  static readonly ORE_WORKER_LIMIT = 5;
-  static readonly CRYSTAL_WORKER_LIMIT = 3;
-  static readonly WORKER_YIELD = 2;
+  static readonly ORE_WORKER_LIMIT = 6;
+  static readonly CRYSTAL_WORKER_LIMIT = 4;
+  static readonly WORKER_YIELD = 3;
   static readonly WORKER_ORE = 100;
   static readonly WORKER_CRYSTAL_ORE = 100;
   static readonly WORKER_CRYSTAL_CRYSTAL = 0;
   static readonly WORKER_BUILD_TICKS = 25;
-  static readonly FIRST_WORKER_MILLI_PER_SEC = 1200;
+  static readonly FIRST_WORKER_MILLI_PER_SEC = 1300;
   static readonly CRYSTAL_SPEED_PERCENT = 50;
   static readonly DIMINISH_PERCENT = 92;
-  static readonly BATCH_MELEE = 10;
-  static readonly BATCH_RANGED = 5;
+  static readonly BATCH_LOW = 15;
   static readonly BATCH_ELITE = 5;
   static readonly SIGHT_UNIT = 1800;
   static readonly SIGHT_BUILDING = 1700;
@@ -105,6 +104,11 @@ class WarBalance {
   static readonly SEPARATION_CELL = 300;
   static readonly SEPARATION_GAP = 30;
   static readonly SEPARATION_PASSES = 2;
+  static readonly ENEMY_OVERLAP_PERCENT = 55;
+  static readonly SLOT_TOLERANCE = 120;
+  static readonly REST_MAX_GAP = 500;
+  static readonly HEALER_SEEK_RANGE = 1800;
+  static readonly HEALER_CLOSE_PERCENT = 70;
   static readonly BUILDING_PADDING = 70;
   static readonly KITE_MIN_RANGE = 500;
   static readonly KITE_PERCENT = 45;
@@ -119,7 +123,7 @@ class WarUnitCatalog {
   private static readonly SPECS: WarUnitSpec[] = [
     { id: "knight", name: "기사", faction: "adventurer", kind: "melee", role: "front", hp: 425, damage: 12, armorPct: 30, speed: 300, range: 150, cooldownTicks: 10, ore: 60, crystal: 0, pop: 1, buildTicks: 40, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, producedAt: "barracks" },
     { id: "ranger", name: "레인저", faction: "adventurer", kind: "ranged", role: "rear", hp: 127, damage: 14, armorPct: 0, speed: 340, range: 700, cooldownTicks: 6, ore: 70, crystal: 0, pop: 1, buildTicks: 50, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, producedAt: "barracks" },
-    { id: "druid", name: "드루이드", faction: "adventurer", kind: "ranged", role: "rear", hp: 170, damage: 0, armorPct: 0, speed: 320, range: 0, cooldownTicks: 10, ore: 100, crystal: 0, pop: 1, buildTicks: 50, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, producedAt: "barracks", ability: "heal", abilityTicks: 15, abilityPower: 20, abilityRange: 900 },
+    { id: "druid", name: "드루이드", faction: "adventurer", kind: "ranged", role: "mid", hp: 170, damage: 0, armorPct: 0, speed: 320, range: 0, cooldownTicks: 10, ore: 100, crystal: 0, pop: 1, buildTicks: 50, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, producedAt: "barracks", ability: "heal", abilityTicks: 15, abilityPower: 20, abilityRange: 1000 },
     { id: "mage", name: "마법사", faction: "adventurer", kind: "elite", role: "rear", hp: 195, damage: 35, armorPct: 0, speed: 300, range: 900, cooldownTicks: 16, ore: 135, crystal: 85, pop: 2, buildTicks: 100, splashRadius: 300, buildingDamagePct: 100, chargeBonusPct: 0, producedAt: "citadel" },
     { id: "barbarian", name: "거대 바바리안", faction: "adventurer", kind: "elite", role: "front", hp: 1250, damage: 40, armorPct: 22, speed: 250, range: 220, cooldownTicks: 12, ore: 150, crystal: 70, pop: 2, buildTicks: 100, splashRadius: 250, buildingDamagePct: 100, chargeBonusPct: 0, producedAt: "citadel" },
     { id: "engineer", name: "엔지니어", faction: "adventurer", kind: "elite", role: "rear", hp: 190, damage: 26, armorPct: 0, speed: 280, range: 1000, cooldownTicks: 20, ore: 180, crystal: 80, pop: 2, buildTicks: 100, splashRadius: 250, buildingDamagePct: 280, chargeBonusPct: 0, producedAt: "citadel" },
@@ -224,7 +228,7 @@ class WarMapData {
   static readonly PLAZA_RADIUS = 2600;
   static readonly BASE_RADIUS = 2600;
   static readonly POST_SPREAD = 1300;
-  static readonly TURRET_OFFSET: WarPoint = { x: 900, y: 250 };
+  static readonly TURRET_OFFSET: WarPoint = { x: 0, y: 350 };
   static readonly POST_BACKOFF = -400;
   static readonly POST_LATERAL: number[] = [0, -1, 1];
   static readonly SLOT_OFFSETS: WarPoint[] = [

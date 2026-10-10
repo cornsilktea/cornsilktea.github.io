@@ -6,7 +6,7 @@ class WarBalance {
 }
 WarBalance.TICKS_PER_SEC = 10;
 WarBalance.TICK_MS = 100;
-WarBalance.POP_CAP = 70;
+WarBalance.POP_CAP = 100;
 WarBalance.SQUAD_COUNT = 3;
 WarBalance.SQUAD_CAP = 20;
 WarBalance.MATCH_TICKS = 9000;
@@ -17,18 +17,17 @@ WarBalance.START_CRYSTAL = 0;
 WarBalance.START_ORE_WORKERS = 2;
 WarBalance.START_CRYSTAL_WORKERS = 0;
 WarBalance.WORKER_CAP_PER_RESOURCE = 12;
-WarBalance.ORE_WORKER_LIMIT = 5;
-WarBalance.CRYSTAL_WORKER_LIMIT = 3;
-WarBalance.WORKER_YIELD = 2;
+WarBalance.ORE_WORKER_LIMIT = 6;
+WarBalance.CRYSTAL_WORKER_LIMIT = 4;
+WarBalance.WORKER_YIELD = 3;
 WarBalance.WORKER_ORE = 100;
 WarBalance.WORKER_CRYSTAL_ORE = 100;
 WarBalance.WORKER_CRYSTAL_CRYSTAL = 0;
 WarBalance.WORKER_BUILD_TICKS = 25;
-WarBalance.FIRST_WORKER_MILLI_PER_SEC = 1200;
+WarBalance.FIRST_WORKER_MILLI_PER_SEC = 1300;
 WarBalance.CRYSTAL_SPEED_PERCENT = 50;
 WarBalance.DIMINISH_PERCENT = 92;
-WarBalance.BATCH_MELEE = 10;
-WarBalance.BATCH_RANGED = 5;
+WarBalance.BATCH_LOW = 15;
 WarBalance.BATCH_ELITE = 5;
 WarBalance.SIGHT_UNIT = 1800;
 WarBalance.SIGHT_BUILDING = 1700;
@@ -47,6 +46,11 @@ WarBalance.ASSIST_MEMORY_TICKS = 20;
 WarBalance.SEPARATION_CELL = 300;
 WarBalance.SEPARATION_GAP = 30;
 WarBalance.SEPARATION_PASSES = 2;
+WarBalance.ENEMY_OVERLAP_PERCENT = 55;
+WarBalance.SLOT_TOLERANCE = 120;
+WarBalance.REST_MAX_GAP = 500;
+WarBalance.HEALER_SEEK_RANGE = 1800;
+WarBalance.HEALER_CLOSE_PERCENT = 70;
 WarBalance.BUILDING_PADDING = 70;
 WarBalance.KITE_MIN_RANGE = 500;
 WarBalance.KITE_PERCENT = 45;
@@ -75,7 +79,7 @@ class WarUnitCatalog {
 WarUnitCatalog.SPECS = [
     { id: "knight", name: "기사", faction: "adventurer", kind: "melee", role: "front", hp: 425, damage: 12, armorPct: 30, speed: 300, range: 150, cooldownTicks: 10, ore: 60, crystal: 0, pop: 1, buildTicks: 40, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, producedAt: "barracks" },
     { id: "ranger", name: "레인저", faction: "adventurer", kind: "ranged", role: "rear", hp: 127, damage: 14, armorPct: 0, speed: 340, range: 700, cooldownTicks: 6, ore: 70, crystal: 0, pop: 1, buildTicks: 50, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, producedAt: "barracks" },
-    { id: "druid", name: "드루이드", faction: "adventurer", kind: "ranged", role: "rear", hp: 170, damage: 0, armorPct: 0, speed: 320, range: 0, cooldownTicks: 10, ore: 100, crystal: 0, pop: 1, buildTicks: 50, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, producedAt: "barracks", ability: "heal", abilityTicks: 15, abilityPower: 20, abilityRange: 900 },
+    { id: "druid", name: "드루이드", faction: "adventurer", kind: "ranged", role: "mid", hp: 170, damage: 0, armorPct: 0, speed: 320, range: 0, cooldownTicks: 10, ore: 100, crystal: 0, pop: 1, buildTicks: 50, splashRadius: 0, buildingDamagePct: 100, chargeBonusPct: 0, producedAt: "barracks", ability: "heal", abilityTicks: 15, abilityPower: 20, abilityRange: 1000 },
     { id: "mage", name: "마법사", faction: "adventurer", kind: "elite", role: "rear", hp: 195, damage: 35, armorPct: 0, speed: 300, range: 900, cooldownTicks: 16, ore: 135, crystal: 85, pop: 2, buildTicks: 100, splashRadius: 300, buildingDamagePct: 100, chargeBonusPct: 0, producedAt: "citadel" },
     { id: "barbarian", name: "거대 바바리안", faction: "adventurer", kind: "elite", role: "front", hp: 1250, damage: 40, armorPct: 22, speed: 250, range: 220, cooldownTicks: 12, ore: 150, crystal: 70, pop: 2, buildTicks: 100, splashRadius: 250, buildingDamagePct: 100, chargeBonusPct: 0, producedAt: "citadel" },
     { id: "engineer", name: "엔지니어", faction: "adventurer", kind: "elite", role: "rear", hp: 190, damage: 26, armorPct: 0, speed: 280, range: 1000, cooldownTicks: 20, ore: 180, crystal: 80, pop: 2, buildTicks: 100, splashRadius: 250, buildingDamagePct: 280, chargeBonusPct: 0, producedAt: "citadel" },
@@ -236,7 +240,7 @@ WarMapData.LANE_HALF_WIDTH = 650;
 WarMapData.PLAZA_RADIUS = 2600;
 WarMapData.BASE_RADIUS = 2600;
 WarMapData.POST_SPREAD = 1300;
-WarMapData.TURRET_OFFSET = { x: 900, y: 250 };
+WarMapData.TURRET_OFFSET = { x: 0, y: 350 };
 WarMapData.POST_BACKOFF = -400;
 WarMapData.POST_LATERAL = [0, -1, 1];
 WarMapData.SLOT_OFFSETS = [

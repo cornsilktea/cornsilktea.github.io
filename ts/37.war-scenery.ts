@@ -136,6 +136,8 @@ class WarTerrainPainter {
   private static readonly ROAD_A = [0xC2, 0xA3, 0x72];
   private static readonly ROAD_B = [0xA3, 0x84, 0x5A];
   private static readonly DEAD_ROAD = [0x7C, 0x6C, 0x5C];
+  private static readonly PAD_DIRT_INSET = 650;
+  private static readonly PAD_FEATHER = 800;
 
   private readonly cursed: WarCursedGround;
 
@@ -167,21 +169,25 @@ class WarTerrainPainter {
     return canvas;
   }
 
+  private static soft(distance: number, feather: number): number {
+    const t = Math.max(0, Math.min(1, 0.5 - distance / feather));
+    return t * t * (3 - 2 * t);
+  }
+
   private colorAt(wx: number, wy: number): number[] {
     const noise = this.noise;
     const wobble = (noise.fbm(wx / 520, wy / 520, 3) - 0.5) * 620;
     const lane = this.field.laneDistance(wx, wy) + wobble;
-    const pad = this.field.padDistance(wx, wy);
-    const open = Math.min(lane, pad + wobble);
+    const pad = this.field.padDistance(wx, wy) + wobble;
     const grain = noise.fbm(wx / 90, wy / 90, 2);
     const curse = this.cursed.influence(wx, wy);
-    const courtyard = open < 0 && pad + wobble < lane;
-    const base = courtyard ? this.courtyardColor(wx, wy, grain, curse) : open < 0 ? this.roadColor(wx, wy, grain, curse) : this.meadowColor(wx, wy, grain, curse);
-    const edge = Math.abs(open) < 300 ? 1 - Math.abs(open) / 300 : 0;
-    const shade = open < 0 ? 1 - edge * 0.22 : 1 - edge * 0.3;
-    const worn = pad < 0 ? 1 - Math.min(1, -pad / 500) * 0.08 * (0.6 + noise.fbm(wx / 210 + 5, wy / 210 + 11, 3) * 0.8) : 1;
-    const factor = shade * worn;
-    return [base[0] * factor, base[1] * factor, base[2] * factor];
+    const road = Math.max(WarTerrainPainter.soft(lane, 560), WarTerrainPainter.soft(pad + WarTerrainPainter.PAD_DIRT_INSET, WarTerrainPainter.PAD_FEATHER));
+    const meadow = this.meadowColor(wx, wy, grain, curse);
+    const dirt = this.roadColor(wx, wy, grain, curse);
+    const seam = 1 - 0.1 * 4 * road * (1 - road);
+    const worn = 1 - Math.min(1, Math.max(0, -pad) / 500) * 0.06 * (0.6 + noise.fbm(wx / 210 + 5, wy / 210 + 11, 3) * 0.8);
+    const factor = seam * worn;
+    return [(meadow[0] + (dirt[0] - meadow[0]) * road) * factor, (meadow[1] + (dirt[1] - meadow[1]) * road) * factor, (meadow[2] + (dirt[2] - meadow[2]) * road) * factor];
   }
 
   private meadowColor(wx: number, wy: number, grain: number, curse: number): number[] {
@@ -200,14 +206,6 @@ class WarTerrainPainter {
     }
     const speck = 0.92 + grain * 0.16;
     return [color[0] * speck, color[1] * speck, color[2] * speck];
-  }
-
-  private courtyardColor(wx: number, wy: number, grain: number, curse: number): number[] {
-    const mow = this.noise.fbm(wx / 260, wy / 260, 3);
-    const lawn = [0x8E + mow * 24, 0xB4 + mow * 18, 0x5A + mow * 16];
-    const d = WarTerrainPainter.DEAD_ROAD;
-    const tone = 0.96 + (grain - 0.5) * 0.14;
-    return [(lawn[0] + (d[0] - lawn[0]) * curse) * tone, (lawn[1] + (d[1] - lawn[1]) * curse) * tone, (lawn[2] + (d[2] - lawn[2]) * curse) * tone];
   }
 
   private roadColor(wx: number, wy: number, grain: number, curse: number): number[] {
@@ -312,12 +310,12 @@ class WarSceneryKit {
   static readonly ROCKS_SMALL = ["forest/Rock_1_A_Color1.gltf", "forest/Rock_1_E_Color1.gltf", "forest/Rock_2_A_Color1.gltf", "forest/Rock_2_E_Color1.gltf"];
   static readonly ROCKS_LARGE = ["forest/Rock_3_A_Color1.gltf", "forest/Rock_3_F_Color1.gltf", "forest/Rock_3_J_Color1.gltf"];
   static readonly MOUNTAINS = ["hex/mountain_A_grass_trees.gltf", "hex/hills_A_trees.gltf"];
-  static readonly CAMP = ["hex/tent.gltf", "hex/building_home_A_blue.gltf", "hex/crate_A_big.gltf", "hex/barrel.gltf", "hex/flag_blue.gltf", "hex/fence_wood_straight.gltf", "hex/sack.gltf", "hex/weaponrack.gltf", "hex/target.gltf", "hex/resource_lumber.gltf", "hex/resource_stone.gltf"];
-  static readonly RUINS = ["hex/building_destroyed.gltf", "hex/building_tower_base_blue.gltf", "hex/wall_straight.gltf", "hex/building_scaffolding.gltf", "hex/fence_stone_straight.gltf"];
+  static readonly TENT = "hex/tent.gltf";
+  static readonly CAMP = ["hex/crate_A_big.gltf", "hex/barrel.gltf", "hex/flag_blue.gltf", "hex/fence_wood_straight.gltf", "hex/sack.gltf", "hex/weaponrack.gltf", "hex/target.gltf", "hex/resource_lumber.gltf", "hex/resource_stone.gltf"];
   static readonly GRAVEYARD = ["halloween/gravestone.gltf", "halloween/gravemarker_A.gltf", "halloween/gravemarker_B.gltf", "halloween/grave_A.gltf", "halloween/grave_B.gltf", "halloween/bone_A.gltf", "halloween/skull.gltf", "halloween/fence_broken.gltf", "halloween/fence.gltf", "halloween/pumpkin_orange.gltf", "halloween/ribcage.gltf", "halloween/arch.gltf"];
 
   static files(): string[] {
-    const groups = [WarSceneryKit.TREES, WarSceneryKit.DEAD_TREES, WarSceneryKit.BUSHES, WarSceneryKit.GRASS, WarSceneryKit.ROCKS_SMALL, WarSceneryKit.ROCKS_LARGE, WarSceneryKit.MOUNTAINS, WarSceneryKit.CAMP, WarSceneryKit.RUINS, WarSceneryKit.GRAVEYARD];
+    const groups = [WarSceneryKit.TREES, WarSceneryKit.DEAD_TREES, WarSceneryKit.BUSHES, WarSceneryKit.GRASS, WarSceneryKit.ROCKS_SMALL, WarSceneryKit.ROCKS_LARGE, WarSceneryKit.MOUNTAINS, [WarSceneryKit.TENT], WarSceneryKit.CAMP, WarSceneryKit.GRAVEYARD];
     return Array.from(new Set(groups.reduce((all, group) => all.concat(group), [] as string[])));
   }
 }
@@ -391,16 +389,16 @@ class WarSceneryBuilder {
         const cx = corridor.ax + (corridor.bx - corridor.ax) * t, cy = corridor.ay + (corridor.by - corridor.ay) * t;
         const nx = -(corridor.by - corridor.ay) / length, ny = (corridor.bx - corridor.ax) / length;
         for (const side of [-1, 1]) {
-          const near = half + this.random.between(120, 420) + (this.noise.sample(cx / 400, cy / 400) - 0.5) * 300;
+          const near = half + this.random.between(420, 700) + (this.noise.sample(cx / 400, cy / 400) - 0.5) * 300;
           const point = { x: cx + nx * side * near, y: cy + ny * side * near };
-          if (!this.freeOfLaneAndPad(point, 120, 200)) continue;
+          if (!this.freeOfLaneAndPad(point, 380, 200)) continue;
           const roll = this.random.next();
           if (roll < 0.4) this.add(this.random.pick(WarSceneryKit.BUSHES), point, this.random.between(1.6, 2.6), this.random.between(0, 6.28));
           else if (roll < 0.72) this.add(this.treeAt(point), point, this.random.between(1.2, 1.9), this.random.between(0, 6.28));
           else if (roll < 0.9) this.add(this.random.pick(WarSceneryKit.ROCKS_LARGE), point, this.random.between(1.8, 3), this.random.between(0, 6.28));
           else this.add(this.random.pick(WarSceneryKit.ROCKS_SMALL), point, this.random.between(2, 3.4), this.random.between(0, 6.28));
           const back = { x: cx + nx * side * (near + this.random.between(500, 900)), y: cy + ny * side * (near + this.random.between(500, 900)) };
-          if (this.random.next() < 0.6 && this.freeOfLaneAndPad(back, 300, 300)) this.add(this.treeAt(back), back, this.random.between(1.5, 2.3), this.random.between(0, 6.28));
+          if (this.random.next() < 0.6 && this.freeOfLaneAndPad(back, 500, 300)) this.add(this.treeAt(back), back, this.random.between(1.5, 2.3), this.random.between(0, 6.28));
         }
       }
     }
@@ -413,12 +411,11 @@ class WarSceneryBuilder {
       const count = Math.floor(length / 240);
       for (let i = 0; i < count; i++) {
         const t = this.random.next();
-        const lateral = this.random.between(-1, 1) * (corridor.halfWidth + 90);
+        const side = this.random.next() < 0.5 ? -1 : 1;
+        const lateral = side * (corridor.halfWidth + this.random.between(60, 360));
         const point = { x: corridor.ax + (corridor.bx - corridor.ax) * t + nx * lateral, y: corridor.ay + (corridor.by - corridor.ay) * t + ny * lateral };
         if (this.field.padDistance(point.x, point.y) < 250) continue;
-        const edge = Math.abs(lateral) >= corridor.halfWidth * 0.55;
-        if (edge) this.add(this.random.pick(WarSceneryKit.GRASS), point, this.random.between(1.8, 3), this.random.between(0, 6.28));
-        else this.add(this.random.pick(WarSceneryKit.ROCKS_SMALL), point, this.random.between(0.7, 1.3), this.random.between(0, 6.28));
+        this.add(this.random.pick(WarSceneryKit.GRASS), point, this.random.between(1.8, 3), this.random.between(0, 6.28));
       }
     }
   }
@@ -442,21 +439,14 @@ class WarSceneryBuilder {
   }
 
   private placeLandmarks(): void {
+    const rocks: WarPoint[] = [{ x: 1900, y: 1100 }, { x: -2100, y: 1500 }, { x: 2500, y: -700 }, { x: -3300, y: 3300 }, { x: 3300, y: 3500 }, { x: -1300, y: 2700 }];
     for (const sign of [1, -1]) {
-      const ruinAt = { x: 1250 * sign, y: 700 * sign };
-      this.add(WarSceneryKit.RUINS[0], ruinAt, 3.4, this.random.between(0, 6.28));
-      this.add(WarSceneryKit.RUINS[2], { x: ruinAt.x + 420 * sign, y: ruinAt.y + 160 * sign }, 3, 0.4);
-      this.add(WarSceneryKit.RUINS[4], { x: ruinAt.x - 420 * sign, y: ruinAt.y - 260 * sign }, 3, 1.1);
-      this.add(WarSceneryKit.ROCKS_LARGE[1], { x: ruinAt.x - 260 * sign, y: ruinAt.y + 420 * sign }, 2.6, this.random.between(0, 6.28));
-      const towerAt = { x: -5700 * sign, y: 600 * sign };
-      this.add(WarSceneryKit.RUINS[1], towerAt, 3.6, this.random.between(0, 6.28));
-      this.add(WarSceneryKit.RUINS[3], { x: towerAt.x + 380 * sign, y: towerAt.y - 300 * sign }, 3.2, 0.8);
-      this.add(WarSceneryKit.ROCKS_LARGE[0], { x: towerAt.x - 320 * sign, y: towerAt.y + 380 * sign }, 2.8, this.random.between(0, 6.28));
+      rocks.forEach((rock, i) => {
+        const point = { x: rock.x * sign, y: rock.y * sign };
+        if (this.freeOfLaneAndPad(point, 450, 350)) this.add(WarSceneryKit.ROCKS_LARGE[i % WarSceneryKit.ROCKS_LARGE.length], point, this.random.between(2.2, 3.2), this.random.between(0, 6.28));
+      });
       this.add(WarSceneryKit.TREES[2], { x: 5600 * sign, y: -1500 * sign }, 2.2, 0.7);
       this.add(WarSceneryKit.TREES[5], { x: 5800 * sign, y: -1300 * sign }, 2, 2.1);
-      this.add(WarSceneryKit.CAMP[0], { x: -1700 * sign, y: -400 * sign }, 6, 0.9);
-      this.add(WarSceneryKit.CAMP[2], { x: -1450 * sign, y: -300 * sign }, 5, 0.2);
-      this.add(WarSceneryKit.CAMP[1], { x: -3300 * sign, y: 3000 * sign }, 5.2, 1);
     }
   }
 
@@ -470,18 +460,17 @@ class WarSceneryBuilder {
 
   private placeCamp(at: (dx: number, dy: number) => WarPoint): void {
     const camp = WarSceneryKit.CAMP;
-    this.add(camp[0], at(-3000, 600), 6, 0.5);
-    this.add(camp[0], at(-3150, 1500), 5.6, 1.1);
-    this.add(camp[1], at(2950, 1100), 5.4, 3.4);
-    this.add(camp[2], at(2300, 2150), 5, 1);
-    this.add(camp[3], at(2000, 2350), 5, 0.4);
-    this.add(camp[4], at(-2850, 2000), 5.6, 0);
-    this.add(camp[6], at(3050, -300), 5, 0.5);
-    this.add(camp[7], at(-2300, 2250), 5.2, 0.8);
-    this.add(camp[8], at(-1500, 2650), 5, 3.2);
-    this.add(camp[9], at(1500, 2650), 5.2, 0.6);
-    this.add(camp[10], at(1000, 2750), 5, 1.3);
-    for (let i = -3; i <= 3; i++) this.add(camp[5], at(i * 520, 2900), 5, 0);
+    this.add(WarSceneryKit.TENT, at(-3000, 600), 6, 0.5);
+    this.add(WarSceneryKit.TENT, at(-3150, 1500), 5.6, 1.1);
+    this.add(camp[0], at(2300, 2150), 5, 1);
+    this.add(camp[1], at(2000, 2350), 5, 0.4);
+    this.add(camp[2], at(-2850, 2000), 5.6, 0);
+    this.add(camp[4], at(3050, -300), 5, 0.5);
+    this.add(camp[5], at(-2300, 2250), 5.2, 0.8);
+    this.add(camp[6], at(-1500, 2650), 5, 3.2);
+    this.add(camp[7], at(1500, 2650), 5.2, 0.6);
+    this.add(camp[8], at(1000, 2750), 5, 1.3);
+    for (let i = -3; i <= 3; i++) this.add(camp[3], at(i * 520, 2900), 5, 0);
   }
 
   private placeGraveyard(at: (dx: number, dy: number) => WarPoint): void {

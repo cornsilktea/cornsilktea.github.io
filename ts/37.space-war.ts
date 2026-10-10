@@ -134,6 +134,7 @@ class WarGameApp {
   private readonly world: WarWorldView;
   private readonly assets: WarAssetLibrary;
   private readonly backdrop: WarMenuBackdrop;
+  private readonly portraits: WarPortraits;
   private readonly input: WarInputController;
   private readonly topBar = new WarTopBar();
   private readonly notice = new WarNotice();
@@ -158,6 +159,8 @@ class WarGameApp {
     WarBalanceText.fill(document);
     this.assets = new WarAssetLibrary(libs);
     this.backdrop = new WarMenuBackdrop(libs, this.assets, this.world);
+    this.portraits = new WarPortraits(libs, this.assets);
+    this.commandCard.portraits = this.portraits;
     this.input = new WarInputController(this.canvas, this.world, { tap: (x, y, touch) => this.onTap(x, y, touch), command: (x, y) => this.onCommandClick(x, y) }, () => this.match !== null && !this.attackMap.isOpen);
     this.attackMap = new WarAttackMapOverlay((command) => this.sendCommand(command), () => this.viewer, () => (this.match as WarLocalMatch).view.transform, this.alertPulses);
     this.bindUi();
@@ -223,6 +226,7 @@ class WarGameApp {
     const viewer = (Math.random() < 0.5 ? 0 : 1) as WarTeam;
     const foe: WarFactionId = this.foeChoice === "random" ? (Math.random() < 0.5 ? "adventurer" : "grave") : this.foeChoice;
     const factions: [WarFactionId, WarFactionId] = viewer === 0 ? [this.myFaction, foe] : [foe, this.myFaction];
+    this.portraits.warm(this.myFaction);
     this.match = new WarLocalMatch(this.libs, this.assets, this.world, viewer, this.level, factions, (event) => this.onEvent(event));
     this.selection = { kind: "none" };
     this.world.playing = true;

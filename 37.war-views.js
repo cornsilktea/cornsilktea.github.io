@@ -234,6 +234,110 @@ class WarHealthBar {
         this.fill.position.x = -(this.width * (1 - ratio)) / 2;
     }
 }
+class WarUnitModel {
+    static build(libs, assets, look) {
+        const actor = assets.actor(look.file, look.rig);
+        actor.model.scale.setScalar(look.height / assets.heightOf(look.file));
+        WarUnitModel.attach(assets, actor.model, "handslotr", look.right);
+        WarUnitModel.attach(assets, actor.model, "handslotl", look.left);
+        return actor;
+    }
+    static attach(assets, model, slotName, gear) {
+        if (!gear)
+            return;
+        const slot = model.getObjectByName(slotName);
+        if (!slot)
+            return;
+        const item = assets.model(gear.file);
+        item.rotation.set(gear.rx, gear.ry, gear.rz);
+        WarShadows.cast(item);
+        slot.add(item);
+    }
+}
+class WarPortraits {
+    constructor(libs, assets) {
+        this.libs = libs;
+        this.assets = assets;
+        this.cache = new Map();
+        this.warmed = new Set();
+    }
+    static unitKey(faction, unitId) {
+        return faction + ":u:" + unitId;
+    }
+    static buildingKey(faction, type) {
+        return faction + ":b:" + type;
+    }
+    static workerKey(faction) {
+        return faction + ":w";
+    }
+    urlFor(key) {
+        return this.cache.get(key) ?? "";
+    }
+    warm(faction) {
+        if (this.warmed.has(faction))
+            return;
+        this.warmed.add(faction);
+        const THREE = this.libs.THREE;
+        const canvas = document.createElement("canvas");
+        canvas.width = WarPortraits.SIZE;
+        canvas.height = WarPortraits.SIZE;
+        const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true });
+        renderer.setClearColor(0x000000, 0);
+        renderer.setSize(WarPortraits.SIZE, WarPortraits.SIZE, false);
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        const scene = new THREE.Scene();
+        scene.add(new THREE.HemisphereLight(0xFFF6E4, 0x6E7C58, 1.3));
+        const sun = new THREE.DirectionalLight(0xFFEBC8, 1.2);
+        sun.position.set(-3, 6, 5);
+        scene.add(sun);
+        const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 200);
+        for (const def of WarUnitCatalog.ofFaction(faction))
+            this.shoot(renderer, scene, camera, WarPortraits.unitKey(faction, def.id), this.unitObject(def.id), 0.12);
+        for (const type of ["hq", "barracks", "citadel"])
+            this.shoot(renderer, scene, camera, WarPortraits.buildingKey(faction, type), this.buildingObject(type, faction), 0.35);
+        this.shoot(renderer, scene, camera, WarPortraits.workerKey(faction), this.workerObject(faction), 0.12);
+        renderer.dispose();
+        renderer.forceContextLoss();
+    }
+    unitObject(unitId) {
+        const look = WarUnitLooks.of(unitId);
+        const actor = WarUnitModel.build(this.libs, this.assets, look);
+        const animator = new CharacterAnimator(this.libs, actor.model, actor.clips);
+        animator.play(look.idleClip);
+        animator.update(0.35);
+        return actor.model;
+    }
+    workerObject(faction) {
+        const look = WarWorker.LOOKS[faction];
+        const actor = this.assets.actor(look.file, "medium");
+        actor.model.scale.setScalar(look.height / this.assets.heightOf(look.file));
+        const animator = new CharacterAnimator(this.libs, actor.model, actor.clips);
+        animator.play("Idle_A");
+        animator.update(0.35);
+        return actor.model;
+    }
+    buildingObject(type, faction) {
+        const look = WarBuildingLooks.of(type, faction);
+        const model = this.assets.model(look.file);
+        model.scale.setScalar(look.scale);
+        return model;
+    }
+    shoot(renderer, scene, camera, key, object, lift) {
+        const THREE = this.libs.THREE;
+        scene.add(object);
+        object.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(object);
+        const size = box.getSize(new THREE.Vector3());
+        const center = box.getCenter(new THREE.Vector3());
+        const distance = (Math.max(size.y, size.x * 0.9) * 0.5) / Math.tan(Math.PI / 12) * 1.2 + size.z * 0.5;
+        camera.position.set(center.x + distance * 0.3, center.y + size.y * lift + distance * 0.12, center.z + distance);
+        camera.lookAt(center);
+        renderer.render(scene, camera);
+        this.cache.set(key, renderer.domElement.toDataURL("image/png"));
+        scene.remove(object);
+    }
+}
+WarPortraits.SIZE = 144;
 class WarUnitView {
     constructor(libs, assets, materials, unit, start, mine) {
         this.materials = materials;
@@ -248,11 +352,8 @@ class WarUnitView {
         const THREE = libs.THREE;
         this.look = WarUnitLooks.of(unit.def.id);
         this.group = new THREE.Group();
-        const actor = assets.actor(this.look.file, this.look.rig);
+        const actor = WarUnitModel.build(libs, assets, this.look);
         this.model = actor.model;
-        this.model.scale.setScalar(this.look.height / assets.heightOf(this.look.file));
-        this.attachGear(assets, "handslotr", this.look.right);
-        this.attachGear(assets, "handslotl", this.look.left);
         WarShadows.cast(this.model);
         this.group.add(this.model);
         this.animator = new CharacterAnimator(libs, this.model, actor.clips);
@@ -269,16 +370,8 @@ class WarUnitView {
         this.yaw = mine ? Math.PI : 0;
         this.animator.play(this.look.idleClip);
     }
-    attachGear(assets, slotName, gear) {
-        if (!gear)
-            return;
-        const slot = this.model.getObjectByName(slotName);
-        if (!slot)
-            return;
-        const item = assets.model(gear.file);
-        item.rotation.set(gear.rx, gear.ry, gear.rz);
-        WarShadows.cast(item);
-        slot.add(item);
+    castNow() {
+        this.attackHold = WarUnitView.ATTACK_HOLD_SECONDS;
     }
     onTick(unit, target, facing, squadColor) {
         this.from.x = this.to.x;
@@ -970,8 +1063,12 @@ class WarEffects {
             if (!this.isVisible(event.tx, event.ty))
                 return;
             const patient = this.transform.toScene({ x: event.tx, y: event.ty });
-            this.burst(patient, "#7CFF9A", 1.8, 0.7, 1.4);
-            this.ring(patient, "#7CFF9A", 1.5);
+            const healer = this.transform.toScene({ x: event.x, y: event.y });
+            this.beam(healer, 2.0, patient, 1.5, "#9CFFB4", 0.14);
+            this.burst(patient, "#7CFF9A", 2.4, 0.8, 1.5);
+            this.burst(patient, "#E8FFEF", 1.2, 0.6, 2.4);
+            this.ring(patient, "#7CFF9A", 1.8);
+            this.ring(healer, "#7CFF9A", 1.3);
         }
     }
     update(deltaSeconds) {
@@ -1200,6 +1297,8 @@ class WarMatchView {
         this.onTick();
     }
     handleEvent(event) {
+        if (event.kind === "heal" && event.source !== undefined)
+            this.units.get(event.source)?.castNow();
         this.effects.handle(event);
     }
     setSelection(selection) {
