@@ -4557,7 +4557,7 @@ class EngineerDruidTests {
       if (!api.revealedTo(foe, a, W.t())) bad.push("밖에 선 적이 숨겨짐");
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "밖에서는 숨고 안에서는 보임");
     });
-    run(G, "드루이드 스킬: 부쉬가 4×4칸(" + 4 * 50 + "×" + 4 * 50 + ") 칸 모양이라 모서리 안쪽은 포함하고 바깥은 포함하지 않는가", function (done) {
+    run(G, "드루이드 스킬: 부쉬가 정사각형(" + ULT.drR * 2 + "×" + ULT.drR * 2 + ")이라 모서리 안쪽은 포함하고 바깥은 포함하지 않는가", function (done) {
       var bad = [], W = self.druidWorld([]), dr = W.ent("dr");
       dr.gauge = api.GAUGE_MAX; api.useUlt(dr, 0); W.frame(FRAME);
       var g = api.FIELD.groves[0].e, h = ULT.drR;

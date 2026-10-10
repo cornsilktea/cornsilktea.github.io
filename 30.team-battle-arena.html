@@ -909,7 +909,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               rvDur: gameMs(4), rvTick: gameMs(1), rvHeal: 20, rvDmg: 20, rvCastMs: 600, grLife: 650,
               trDur: gameMs(10), trR: 340, trCd: gameMs(0.5), trScanMs: 120, trWarmMs: 300, trDmg: 8, trHeavyEvery: 3, trHeavyDmg: 28, trStunMs: gameMs(1), trMax: 2, trGauge: 1,
               trSpeedBonus: gameSpeed(30), trShellSpeed: gameSpeed(1000), trHitR: 38, trCastMs: 450,
-              drR: 100, drDur: 3600000, drTick: gameMs(1), drHeal: 13, drCast: 450, drMin: 60, drSelfRate: 0.1, drSelfGauge: 1, drRiseMs: 350, drCastMs: 500 };
+              drR: 150, drDur: 3600000, drTick: gameMs(1), drHeal: 13, drCast: 450, drMin: 60, drSelfRate: 0.1, drSelfGauge: 1, drRiseMs: 350, drCastMs: 500 };
   var ASSIST_MS = 5000;
   var SNIPER_KEEP = KEY * 5;
   var SHIELD_SPARK = "#FFD27A", HEAL_CUT_MUL = 0.5;
@@ -3430,9 +3430,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     hitColor(d) { return "#8FD14F"; }
     projectileEffect(d, T, immune, fx) { return !d.isSkill && !immune && !T.minion ? { slowMs: this.data.fx.slowMs, slowMul: this.data.fx.slowMul } : fx; }
     projectileMesh(g, d) {
-      var halo = new THREE.Mesh(GEO.ball, MODELS.glowMat("thornGlow", 0x7FD14A, 0.4)); halo.scale.setScalar(13); g.add(halo);
       var thorn = new THREE.Mesh(GEO.head, MODELS.basicMat("thornTip", 0xB6E86A, 1)); thorn.scale.set(1.5, 1.5, 1.5); thorn.position.x = 2; g.add(thorn);
-      var vine = new THREE.Mesh(GEO.shaft, MODELS.basicMat("thornVine", 0x3F7A22, 1)); vine.scale.set(0.8, 1.6, 1.6); vine.position.x = -8; g.add(vine);
       VineTrail.build(g, KIT.props.vineBlade);
     }
     aimRange(btn) { return [ULT.drMin, ULT.drCast]; }
@@ -3467,7 +3465,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       MATCH.game.forceNet = true;
     }
     ultDesc() {
-      return "지정한 곳에 게임이 끝날 때까지 유지되는 4×4칸 부쉬 생성(풀숲처럼 안에서 모습이 숨겨짐). 안에 있는 아군은 1초당 체력 " + ULT.drHeal + " 회복";
+      return "지정한 곳에 게임이 끝날 때까지 유지되는 " + GroveSystem.TILES_PER_SIDE + "×" + GroveSystem.TILES_PER_SIDE + "칸 부쉬 생성(풀숲처럼 안에서 모습이 숨겨짐). 안에 있는 아군은 1초당 체력 " + ULT.drHeal + " 회복";
     }
     passiveDesc() {
       var c = this.data;
@@ -4588,7 +4586,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   var TURRETS = new TurretSystem();
   class GroveSystem {
-    static TILES_PER_SIDE = 4;
+    static TILES_PER_SIDE = 6;
+    static PROPS_PER_TILE = 2;
     static ID_BASE = 100000;
     constructor() { this.rangeRing = null; this.nextId = GroveSystem.ID_BASE; }
     isActive(s, t) { return !s.cut && t >= s.e.createdAt && t < s.e.createdAt + s.e.dur; }
@@ -4627,9 +4626,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var e = s.e, g = new THREE.Group(), mats = [], bushMats = [], hedge = new THREE.Group();
       var tpl = KIT.props.bushBig, seed = e.x * 7 + e.y * 13, side = GroveSystem.TILES_PER_SIDE;
       if (tpl) {
-        for (var i = 0; i < side * side; i++) {
-          var col = i % side, row = Math.floor(i / side), jitter = ((seed + i * 0.37) % 1) - 0.5, size = TILE * (1.35 + 0.15 * (jitter + 0.5));
-          var prop = PROPS.fitProp(tpl, size, 60 + 12 * (jitter + 0.5), size, (col - (side - 1) / 2) * TILE + jitter * 8, (row - (side - 1) / 2) * TILE - jitter * 8, i * 2.1);
+        for (var i = 0; i < side * side * GroveSystem.PROPS_PER_TILE; i++) {
+          var cell = Math.floor(i / GroveSystem.PROPS_PER_TILE), col = cell % side, row = Math.floor(cell / side);
+          var jitter = ((seed + i * 0.37) % 1) - 0.5, jitterB = ((seed * 0.7 + i * 0.61) % 1) - 0.5, size = TILE * (1.35 + 0.15 * (jitter + 0.5));
+          var prop = PROPS.fitProp(tpl, size, 60 + 12 * (jitter + 0.5), size, (col - (side - 1) / 2) * TILE + jitter * TILE * 0.9, (row - (side - 1) / 2) * TILE + jitterB * TILE * 0.9, i * 2.1);
           prop.traverse(function (o) {
             if (!o.isMesh) return;
             o.material = o.material.clone(); o.material.transparent = true; mats.push(o.material); bushMats.push(o.material);
