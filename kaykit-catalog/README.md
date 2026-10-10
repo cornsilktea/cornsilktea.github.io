@@ -1,7 +1,7 @@
 # KayKit 에셋 도감 (새 게임 만들 때 어느 에셋을 쓸지 찾는 곳)
 
 에셋 보관 폴더: `C:\Users\user\Downloads\3d-assets\organized` (KayKit 21개 + Quaternius 6개 + Kenney 3개 팩의 glTF 를 용도별로 정리한 것. FBX·OBJ 원본 팩 폴더는 2026-10-03 에 지웠다 — 필요하면 각 사이트에서 다시 받는다). 저장소에는 게임에 쓰는 것만 `assets/kaykit/` 에 둔다(KayKit 172개 + 우주전쟁용 `assets/kaykit/war/`).
-조사한 날: 2026-10-03(KayKit), 2026-10-09(Quaternius·Kenney 추가). 보관 폴더 이름은 `allkaykit` 에서 `3d-assets` 로 바꿨다(2026-10-09). 옛 이름 `Downloads\allkaykit` 은 새 폴더를 가리키는 바로가기(junction)로 남겨 두었다 — 옛 경로를 쓰던 것이 없으면 지워도 된다. 도구 이름(`kaykit-*`)과 `assets/kaykit/` 는 그대로다.
+조사한 날: 2026-10-03(KayKit), 2026-10-09(Quaternius·Kenney 추가), 2026-10-10(KayKit Adventurers EXTRA·Skeletons EXTRA·Character Animations 1.1 의 Rig_Large 추가). 보관 폴더 이름은 `allkaykit` 에서 `3d-assets` 로 바꿨다(2026-10-09). 옛 이름 `Downloads\allkaykit` 은 새 폴더를 가리키는 바로가기(junction)로 남겨 두었다 — 옛 경로를 쓰던 것이 없으면 지워도 된다. 도구 이름(`kaykit-*`)과 `assets/kaykit/` 는 그대로다.
 `organized` 에 팩을 더 넣으면 아래 명령으로 도감을 다시 만든다. 새 팩을 받았을 때는 `node tools/kaykit-organize-extra.js "C:\Users\user\Downloads" "C:\Users\user\Downloads\3d-assets\organized"` 의 계획표(`ExtraPackPlan`)에 줄을 더해 복사한 뒤 도감을 만든다(끊어진 텍스처 연결을 자동 검사).
 
 ```bash
@@ -28,6 +28,9 @@ node tools/kaykit-catalog.js "C:\Users\user\Downloads\3d-assets\organized" asset
 |---|---|---|---|
 | **KayKit_Adventurers_2.0_FREE** | 31 + 캐릭터 6 | 모험가 6종(Barbarian·Knight·Mage·Ranger·Rogue·Rogue_Hooded)과 그들의 무기·방패·화살·마법책·지팡이·술잔 | 3D 액션·배틀·RPG 의 주인공/아군/적. **glb 는 `organized/characters/adventurers/` 와 저장소 `assets/kaykit/characters/` 에 있음(FBX 원본은 삭제)** |
 | **KayKit_Skeletons_1.1_FREE** | 17 + 캐릭터 4 | 스켈레톤 4종(Warrior·Mage·Rogue·Minion)과 전용 무기·방패·화살·석궁 | 몬스터·적·좀비류. 모험가와 **같은 뼈대(Rig_Medium)** 라 애니메이션을 그대로 공유 |
+| **KayKit_Adventurers_2.0_EXTRA** (2026-10-10) | 캐릭터 +3, 소품 여러 개 | 새 캐릭터 **Engineer(공학자)·Druid(드루이드)·Barbarian_Large(대형 바바리안)**, 새 소품 `turret_base`(포탑 받침)·`engineer_Wrench`·`druid_staff`·`*_Large` 무기(도끼·방패·술잔)·큰 물약. 모든 캐릭터에 **색 변형 텍스처 `_alt_A/B/C` 3벌**(총 28장) | 모험가 편 병력. FREE 6종에 3종이 더해져 9종. 텍스처 한 장이 glb 안에 내장되어 있어 색 변형은 `characters/adventurers/textures/*_alt_*.png` 로 갈아 끼운다 |
+| **KayKit_Skeletons_1.1_EXTRA** (2026-10-10) | 캐릭터 +2, 소품 여러 개 | **Skeleton_Golem(골렘, 키 약 4.2m)·Necromancer(사령술사, 왕관)**, 소품: 골렘 도끼(보통·`_Large`)·철퇴(보통·`_Large`)·낫(Scythe)·단검·큰 방패 A/B·작은 방패 A/B. 텍스처 `skeleton_texture_A/B` | 해골 편 병력 |
+| **KayKit Character Animations 1.1** (2026-10-10) | 애니 Rig_Medium 8 + **Rig_Large 6**, 마네킹 2 | 같은 동작 묶음을 **두 뼈대용으로** 제공. `Mannequin_Medium/Large` 는 뼈대 시험용 | 대형 캐릭터(골렘·대형 바바리안)에 쓸 **Rig_Large 동작** |
 | **KayKit Character Animations 1.2** | 3 + 애니 30 | Prototype Pete(마네킹 캐릭터)·연필·케이스, 그리고 **그 캐릭터 전용 애니메이션 30개** | 단순한 마네킹 주인공. 뼈대가 달라 Rig_Medium 캐릭터와는 호환 안 됨 |
 | **Fantasy Props MegaKit (Quaternius)** | 93 | 판타지 소품: 상자·통·책·촛대·양초·물약·열쇠·침대·책상·탁자·모루·허수아비·노점 등. **PBR(법선·ORM) 텍스처** 사용, Chest_Wood 는 열고 닫는 애니메이션 | 실내(방·여관·상점)를 꾸밀 때. KayKit 보다 사실적이라 분위기가 다름 |
 | **KayKit_Dungeon_Pack_1.1_FREE** | 211 | 벽·바닥·계단·기둥·문틀·횃불·배너·상자·통·침대·탁자·열쇠·금화·선반 | 던전·성 내부·미로·방 탈출. 벽/바닥 모듈형 조립 |
@@ -69,6 +72,20 @@ node tools/kaykit-catalog.js "C:\Users\user\Downloads\3d-assets\organized" asset
 | Barbarian / Knight / Mage / Ranger / Rogue / Rogue_Hooded | `organized/characters/adventurers/*.glb` (저장소 `assets/kaykit/characters/` 에도 있음) | 5.8k~8.9k | 뼈 23개 Rig_Medium. 텍스처는 `*_texture.png` 8열×4행 색 칸이라 `recolor` 로 팀 색 변경(30번 방식) |
 | Skeleton_Warrior / Mage / Rogue / Minion | `organized/characters/skeletons/*.glb` (저장소에는 Warrior 만 없음) | 4.6k~5.9k | 뼈 23개 Rig_Medium. `Rig_Medium_Special` 에 스켈레톤 전용 클립 |
 | PrototypePete | `organized/characters/prototype-pete/PrototypePete.gltf` | 약 4.9k | 몸/머리/팔 조각이 분리된 마네킹. 전용 애니 30개 |
+| Mannequin_Medium / Large | `organized/characters/mannequin/*.glb` | 6.9k / 9.1k | 동작 시험용 마네킹. **Large 는 뼈 23개 Rig_Large(Rig_Large 동작 파일에 들어 있는 몸과 같음)**, Medium 은 뼈 21개로 Rig_Medium 캐릭터와 다름 |
+
+### EXTRA 추가 캐릭터 도감 (2026-10-10, 뼈 23개·같은 뼈 이름)
+
+| 캐릭터 | 파일 | 키(대략) | 삼각형 | 맞는 동작 묶음 | 특징·손에 쥐는 소품 | 쓸 곳(모험가 vs 해골 군단 안) |
+|---|---|---|---|---|---|---|
+| Druid | `characters/adventurers/Druid.glb` | 2.8m | 7.8k | Rig_Medium | 배낭, `druid_staff`, 마법 동작(Raise·Shoot·Spellcasting·Summon) | 회복 담당 |
+| Engineer | `characters/adventurers/Engineer.glb` | 2.3m | 7.5k | Rig_Medium | 고글·배낭, `engineer_Wrench`, 도구 동작(망치질·Work), 전용 소품 `turret_base` | 공성·포탑 설치 |
+| Barbarian_Large | `characters/adventurers/Barbarian_Large.glb` | 4.1m | 11.7k | **Rig_Large** | 곰 모자·모피·어깨 보호대, `axe_2handed_Large`·`axe_1handed_Large`·`shield_round_barbarian_Large` | 대형 근접 |
+| Necromancer | `characters/skeletons/Necromancer.glb` | 2.4m | 6.0k | Rig_Medium | 왕관, `Skeleton_Staff`, 마법 동작 | 저주 시전 |
+| Skeleton_Golem | `characters/skeletons/Skeleton_Golem.glb` | 4.2m | 5.8k | **Rig_Large** | 눈·턱 따로, `Skeleton_Golem_Axe(_Large)`·`Skeleton_Mace(_Large)` | 공성 |
+
+**뼈대 판별 결과(2026-10-10, glb 를 직접 읽어 확인)**: 새 캐릭터 5종을 포함해 모든 KayKit 캐릭터와 Rig_Medium·Rig_Large 동작 파일의 **뼈가 23개이고 이름이 전부 같다.** 그래서 어떤 동작 파일이든 이름으로는 연결된다. **뼈 길이를 비교해 어느 몸에 맞는 동작인지도 확인했다**: Skeleton_Golem·Barbarian_Large 는 위팔 1.015·아래팔 0.581·엉덩이 1.041 로 **Rig_Large 동작의 뼈 길이와 소수점 셋째 자리까지 같고**, Knight·Druid·Necromancer 는 위팔 0.251·아래팔 0.242·엉덩이 0.406 으로 Rig_Medium 동작과 같다(Engineer·Rogue 등 나머지 Medium 키도 같은 뼈대). 그러니 **골렘·대형 바바리안에 Rig_Large 동작을 쓰는 것이 맞고, Medium 동작을 입히면 팔다리 길이가 4배 가까이 어긋난다.**
+**쓰는 규칙**: 골렘·대형 바바리안 = `animations/rig-large/`, 나머지(Medium 키) = `animations/rig-medium/`. 사진은 `previews/kaykit-*.png`.
 
 **Quaternius 캐릭터(2026-10-09 추가)** 는 뼈대가 달라 아래 Rig_Medium 애니메이션을 공유하지 못한다. 대신 **각 `.gltf` 안에 클립이 이미 들어 있다**(버퍼·텍스처도 `.gltf` 한 파일에 내장).
 
@@ -98,6 +115,20 @@ Rig_Medium 계열 8개 파일은 `organized/animations/rig-medium/` 에 있다(�
 | `teambattle_anims.glb` (`organized/animations/combined/`) | 약 40 | 30번 팀 배틀이 위 파일에서 골라 합친 것 |
 | `organized/animations/prototype-pete/KayKit_AnimatedCharacter_v1.2.glb` | 30 | PrototypePete 전용: Idle·Walk·Run·Jump·Roll·Dash 4방향·Attack 계열·Block·Shoot·Dance·Cheer·Wave·Climbing·PickUp·Throw·Defeat 등 |
 
+### Rig_Large (2026-10-10 추가, `organized/animations/rig-large/`) — 골렘·대형 바바리안용
+
+| 파일 | 클립 수 | 들어 있는 동작 |
+|---|---|---|
+| `Rig_Large_General` | 6 | 대기(Idle_A·Idle_B 6초)·피격(Hit_A)·죽음(Death_A) |
+| `Rig_Large_MovementBasic` | 3 | 걷기(Walking_A)·달리기(Running_A) |
+| `Rig_Large_MovementAdvanced` | 5 | 구르기/회피 4방향(Dodge) |
+| `Rig_Large_CombatMelee` | 16 | 한손 베기·찌르기, 양손 공격·**내려치기(Melee_2H_Slam 2.8초)**·양손 대기, 막기 5종, 쌍검, 맨손 대기·펀치·발차기·**강타(Melee_Unarmed_Smash 3.5초)** |
+| `Rig_Large_Simulation` | 2 | 근육 자랑(Flexing 4.3초) |
+| `Rig_Large_Special` | 2 | 변신 시험(EXPERIMENTAL_Large_Transform) |
+
+**Medium 에는 있고 Large 에는 없는 것**: 원거리 전투(활·총·마법), 도구(Tools), 상호작용·줍기, 등장(Spawn), 죽음 B·피격 B, 걷기 B/C·달리기 B, 구르기 외 이동(웅크리기·옆걸음). 큰 병사는 근접 전투·이동·피격·죽음만 쓰면 되므로 부족하지 않지만, **대형 캐릭터에게 원거리·시전 동작은 줄 수 없다.**
+EXTRA 팩 두 개 안의 `Animations/` 는 Rig_Medium·Rig_Large 의 General·MovementBasic 두 파일만 든 사본이라 따로 쓸 필요 없다(Character Animations 1.1 에 전부 들어 있음, 같은 크기로 확인).
+
 고를 때 참고: 이름 끝이 `_Pose` 인 것은 길이 0초짜리 정지 자세, `T-Pose` 는 기준 자세. `Attack` 류는 1~2초, 죽음 B·소환(Summon)·낚시·곡괭이처럼 긴 것은 2.5~6초.
 
 ## 5. 게임 아이디어 → 에셋 바로 찾기
@@ -114,6 +145,7 @@ Rig_Medium 계열 8개 파일은 `organized/animations/rig-medium/` 에 있다(�
 | 겨울 / 선물 / 기차 | 모험가 + Simulation(환호) | Holiday Bits |
 | 도시 / 자동차 | (자동차는 City Builder 5대) | City Builder Bits |
 | 우주 기지 | 모험가 | Space Base Bits |
+| 모험가 vs 해골 군단 RTS (우주전쟁 컨셉 변경안) | 모험가 9종(Knight·Ranger·Druid·Mage·Barbarian_Large·Engineer) + 해골 6종(Warrior·Rogue·Minion·Mage·Necromancer·Golem), 대형은 Rig_Large | Dungeon Pack·Halloween Bits(납골당·묘비)·Medieval Hexagon(색별 건물)·Forest Nature, 포탑은 `turret_base` |
 | 우주 RTS·SF 전투 (우주전쟁) | 사람형 52종·메카 4종·우주비행사/메카(Space Kit) | KayKit Space Base + Kenney Space Kit(저폴리 대량) + Quaternius Modular SciFi(건물 조립) + Ultimate Space Kit(행성·돔·기지) |
 | 우주선 전투·연출 | — | Ultimate Spaceships 11종(색 변형), Kenney `craft_*`, Space Kit `Spaceship_*` |
 | SF 복도·실내 탈출 | 사람형 52종 + SF 로봇 적 | Modular SciFi MegaKit(벽·바닥·문), Kenney Modular Space·Space Station |
@@ -128,6 +160,8 @@ Rig_Medium 계열 8개 파일은 `organized/animations/rig-medium/` 에 있다(�
 - 크기가 팩마다 다르다: KayKit 캐릭터 약 2m, Quaternius 사람형 약 2m, Quaternius 메카·Space Kit 우주비행사는 3~9m, Kenney 는 1 단위 ≈ 1m 로 작음, Modular 벽은 한 칸 약 4m. 쓰기 전에 `kaykit-find.js` 가 보여 주는 크기를 확인해 배율을 정한다.
 - Quaternius 애니메이션 클립 이름은 `Run`·`Walk` 처럼 KayKit(`Running_A`)과 다르다. 두 팩 캐릭터를 섞을 때는 클립 이름 표를 따로 둔다.
 
+- **EXTRA·Rig_Large (2026-10-10)**: 정리본에는 들어왔지만 **저장소 `assets/kaykit/` 에는 아직 복사하지 않았다**(적용은 컨셉 변경 세션에서). 새 캐릭터 glb 는 텍스처가 내장이라 `.glb` 한 파일만 복사하면 되고, 색 변형은 `characters/adventurers/textures/*_alt_*.png`(모험가)·`characters/skeletons/textures/skeleton_texture_A/B.png` 로 갈아 끼운다. 소품 `.gltf` 는 `.bin`·PNG 와 함께 복사한다. 새로 받은 팩은 `node tools/kaykit-organize-extra.js "C:\Users\user\Downloads" "C:\Users\user\Downloads\3d-assets\organized"` 의 계획표에 줄을 더해 복사한다(이미 있는 파일은 건너뛰는 `onlyNew` 옵션).
+- Necromancer 가 어떤 손 소품을 쥐는지는 파일에 정해져 있지 않다(소품은 따로 붙이는 방식) — 어울리는 `Skeleton_Staff`·`Skeleton_Scythe` 를 붙여 보고 정한다.
 - **저장소에 없는 것은 `organized` 에서 복사**한다: `.gltf` 는 `.bin`·텍스처 PNG 도 함께(폴더째). 복사 위치는 기존 구조(`assets/kaykit/dungeon|medieval|props|characters|animations|textures`)를 따른다.
 - `assets/kaykit/props/` 는 여러 팩의 소품을 섞어 둔 곳이라 같은 이름이 다른 팩에도 있을 수 있다(예: `wall`, `coin`, `table_medium`). names.md 의 `*` 는 이름만 비교한 표시다.
 - `Fantasy Props MegaKit[Standard]` 폴더 이름에 대괄호가 있어 PowerShell 에서는 `-LiteralPath` 로 읽어야 한다.

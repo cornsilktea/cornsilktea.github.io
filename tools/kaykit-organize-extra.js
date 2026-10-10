@@ -2,10 +2,11 @@ const fs = require("fs");
 const path = require("path");
 
 class ExtraPackJob {
-  constructor(sourceRelative, destinationRelative, includePattern) {
+  constructor(sourceRelative, destinationRelative, includePattern, onlyNew) {
     this.sourceRelative = sourceRelative;
     this.destinationRelative = destinationRelative;
     this.includePattern = includePattern || /./;
+    this.onlyNew = onlyNew === true;
   }
 }
 
@@ -17,6 +18,9 @@ class ExtraPackPlan {
   static MODULAR = "Modular SciFi MegaKit[Standard]/Modular SciFi MegaKit[Standard]";
   static ESSENTIALS = "Sci-Fi Essentials Kit[Standard]";
   static GLTF_ONLY = /\.(gltf|glb|bin|png|jpg)$/i;
+  static ADVENTURERS_EXTRA = "KayKit_Adventurers_2.0_EXTRA/KayKit_Adventurers_2.0_EXTRA";
+  static SKELETONS_EXTRA = "KayKit_Skeletons_1.1_EXTRA/KayKit_Skeletons_1.1_EXTRA";
+  static ANIMATIONS = "KayKit_Character_Animations_1.1/KayKit_Character_Animations_1.1";
   static SHIPS = ["Bob", "Challenger", "Dispatcher", "Executioner", "Imperial", "Insurgent", "Omen", "Pancake", "Spitfire", "Striker", "Zenith"];
 
   static jobs() {
@@ -35,6 +39,16 @@ class ExtraPackPlan {
       new ExtraPackJob("kenney_space-station-kit/Models/GLB format", "models/kenney-space-station", /\.(glb|png)$/i),
       new ExtraPackJob("kenney_modular-space-kit_1.0/Models/GLB format", "models/kenney-modular-space", /\.(glb|png)$/i),
     ];
+    jobs.push(
+      new ExtraPackJob(`${ExtraPackPlan.ADVENTURERS_EXTRA}/Characters/gltf`, "characters/adventurers", /\.glb$/i, true),
+      new ExtraPackJob(`${ExtraPackPlan.ADVENTURERS_EXTRA}/Textures`, "characters/adventurers/textures", /\.png$/i, true),
+      new ExtraPackJob(`${ExtraPackPlan.ADVENTURERS_EXTRA}/Assets/gltf`, "models/adventurer-gear", ExtraPackPlan.GLTF_ONLY, true),
+      new ExtraPackJob(`${ExtraPackPlan.SKELETONS_EXTRA}/characters/gltf`, "characters/skeletons", /\.glb$/i, true),
+      new ExtraPackJob(`${ExtraPackPlan.SKELETONS_EXTRA}/textures`, "characters/skeletons/textures", /\.png$/i, true),
+      new ExtraPackJob(`${ExtraPackPlan.SKELETONS_EXTRA}/assets/gltf`, "models/skeleton-gear", ExtraPackPlan.GLTF_ONLY, true),
+      new ExtraPackJob(`${ExtraPackPlan.ANIMATIONS}/Animations/gltf/Rig_Large`, "animations/rig-large", /\.glb$/i),
+      new ExtraPackJob(`${ExtraPackPlan.ANIMATIONS}/Mannequin Character/characters`, "characters/mannequin", /\.glb$/i),
+    );
     for (const ship of ExtraPackPlan.SHIPS) {
       jobs.push(new ExtraPackJob(`${ExtraPackPlan.SPACESHIPS}/${ship}/glTF`, "models/quaternius-ultimate-spaceships", /\.gltf$/i));
       jobs.push(new ExtraPackJob(`${ExtraPackPlan.SPACESHIPS}/${ship}/Textures`, `models/quaternius-ultimate-spaceships/textures/${ship}`, /\.png$/i));
@@ -50,6 +64,9 @@ class ExtraPackPlan {
       [`${ExtraPackPlan.SPACESHIPS}/License.txt`, "Quaternius-UltimateSpaceships.txt"],
       [`${ExtraPackPlan.MODULAR}/License_Standard.txt`, "Quaternius-ModularSciFiMegaKit.txt"],
       [`${ExtraPackPlan.ESSENTIALS}/License_Standard.txt`, "Quaternius-SciFiEssentialsKit.txt"],
+      [`${ExtraPackPlan.ADVENTURERS_EXTRA}/License.txt`, "KayKit-Adventurers-EXTRA.txt"],
+      [`${ExtraPackPlan.SKELETONS_EXTRA}/License.txt`, "KayKit-Skeletons-EXTRA.txt"],
+      [`${ExtraPackPlan.ANIMATIONS}/License.txt`, "KayKit-CharacterAnimations.txt"],
       ["kenney_space-kit/License.txt", "Kenney-SpaceKit.txt"],
       ["kenney_space-station-kit/License.txt", "Kenney-SpaceStationKit.txt"],
       ["kenney_modular-space-kit_1.0/License.txt", "Kenney-ModularSpaceKit.txt"],
@@ -62,6 +79,14 @@ class ExtraPackPlan {
       [`${ExtraPackPlan.CHARACTERS}/Preview.png`, "quaternius-animated-characters.png"],
       [`${ExtraPackPlan.SPACE_KIT}/Preview.jpg`, "quaternius-ultimate-space-kit.jpg"],
       [`${ExtraPackPlan.ESSENTIALS}/Preview_1.jpg`, "quaternius-scifi-essentials.jpg"],
+      [`${ExtraPackPlan.ADVENTURERS_EXTRA}/contents.png`, "kaykit-adventurers-extra.png"],
+      [`${ExtraPackPlan.ADVENTURERS_EXTRA}/Samples/alternative_textures.png`, "kaykit-adventurers-alt-textures.png"],
+      [`${ExtraPackPlan.ADVENTURERS_EXTRA}/Samples/barbarian_Large.png`, "kaykit-barbarian-large.png"],
+      [`${ExtraPackPlan.ADVENTURERS_EXTRA}/Samples/druid.png`, "kaykit-druid.png"],
+      [`${ExtraPackPlan.ADVENTURERS_EXTRA}/Samples/engineer.png`, "kaykit-engineer.png"],
+      [`${ExtraPackPlan.SKELETONS_EXTRA}/contents.png`, "kaykit-skeletons-extra.png"],
+      [`${ExtraPackPlan.SKELETONS_EXTRA}/Samples/golem.png`, "kaykit-skeleton-golem.png"],
+      [`${ExtraPackPlan.SKELETONS_EXTRA}/Samples/necromancer.png`, "kaykit-necromancer.png"],
       ["kenney_space-kit/Preview.png", "kenney-space-kit.png"],
       ["kenney_space-station-kit/Preview.png", "kenney-space-station.png"],
       ["kenney_modular-space-kit_1.0/Preview.png", "kenney-modular-space.png"],
@@ -83,12 +108,12 @@ class ExtraPackOrganizer {
     this.copied++;
   }
 
-  copyTree(source, destination, include) {
+  copyTree(source, destination, include, onlyNew) {
     for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
       const from = path.join(source, entry.name);
       const to = path.join(destination, entry.name);
-      if (entry.isDirectory()) this.copyTree(from, to, include);
-      else if (include.test(entry.name)) this.copyFile(from, to);
+      if (entry.isDirectory()) this.copyTree(from, to, include, onlyNew);
+      else if (include.test(entry.name) && !(onlyNew && fs.existsSync(to))) this.copyFile(from, to);
     }
   }
 
@@ -108,7 +133,7 @@ class ExtraPackOrganizer {
         this.missing.push(job.sourceRelative);
         continue;
       }
-      this.copyTree(source, path.join(this.outputRoot, job.destinationRelative), job.includePattern);
+      this.copyTree(source, path.join(this.outputRoot, job.destinationRelative), job.includePattern, job.onlyNew);
     }
     for (const [source, name] of ExtraPackPlan.licenses()) this.copyOptional(source, path.join("licenses", name));
     for (const [source, name] of ExtraPackPlan.previews()) this.copyOptional(source, path.join("previews", name));
