@@ -16,6 +16,7 @@ window.TEAM_BATTLE_VIDEOS = {
   engineer:   { name: "공학자",   basic: "", passive: "", skill: "" },
   druid:      { name: "드루이드", basic: "", passive: "", skill: "" },
   giant:      { name: "거신", basic: "", passive: "", skill: "" },
+  astrologer: { name: "점성술사", basic: "", passive: "", skill: "" },
   thrower:    { name: "투척병",   basic: "", passive: "", skill: "" },
   dancer:     { name: "검무희",   basic: "", passive: "", skill: "" },
   rogue:      { name: "은신자",   basic: "", passive: "", skill: "" },

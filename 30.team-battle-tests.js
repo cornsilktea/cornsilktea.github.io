@@ -2852,7 +2852,7 @@ class ResultCollector {
 
   run(AIMG, "AI 역할: 기사·창술사·대장장이는 앞, 화염술사·주술사·궁수·뇌전사수·저격수는 뒤, 은신자·자객·결투가는 틈새를 노리는 역할인가", function (done) {
     var want = { knight: "front", lancer: "front", blacksmith: "front", guardian: "front", warrior: "front", mage: "back", shaman: "back", ranger: "back", stormbow: "back", sniper: "back", frost: "back", cleric: "back", necro: "back", thrower: "back",
-                 rogue: "flank", hitman: "flank", duelist: "flank", dancer: "back", engineer: "back", druid: "back", giant: "front" }, bad = [];
+                 rogue: "flank", hitman: "flank", duelist: "flank", dancer: "back", engineer: "back", druid: "back", giant: "front", astrologer: "back" }, bad = [];
     Object.keys(want).forEach(function (c) { var got = api.CHAR_TYPES.of(c).botRole; if (got !== want[c]) bad.push(c + " " + got + " (기대 " + want[c] + ")"); });
     api.CHAR_LIST.forEach(function (c) { if (!want[c]) bad.push(c + " 역할이 정해지지 않음"); });
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : Object.keys(want).length + "명 역할이 맞음");
@@ -4390,6 +4390,7 @@ class ResultCollector {
   new GiantTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
   new GargantuaTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
   new SkillResetTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
+  new AstrologerTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
   results.pending = Promise.resolve().then(function () { api.finish(api.currentMap()); }).then(drainAsync);
   return results;
   }
@@ -4877,6 +4878,130 @@ class SkillResetTests {
     });
   }
 }
+
+class AstrologerTests {
+  static GROUP = "점성술사";
+  constructor(api, kit) { this.api = api; this.kit = kit; }
+
+  lost(W, id) { var E = W.ent(id); return E.maxHp - E.hp; }
+
+  astroWorld(foes, allies) {
+    var y = this.kit.OPEN_Y.forest;
+    this.api.MATCH.stateByKey = {};
+    var list = [{ id: "as", team: "blue", char: "astrologer", x: 200, y: y, gauge: this.api.GAUGE_MAX }]
+      .concat((allies || []).map(function (a) { return { id: a.id, team: "blue", char: "knight", x: a.x, y: y + (a.dy || 0) }; }))
+      .concat(foes.map(function (f) { return { id: f.id, team: "red", char: "guardian", x: f.x, y: y + (f.dy || 0) }; }));
+    return this.kit.world("forest", list);
+  }
+
+  register() {
+    var self = this, api = this.api, run = this.kit.run, FRAME = this.kit.FRAME, ULT = api.ULT, G = AstrologerTests.GROUP, C = api.CHARS.astrologer, type = api.CHAR_TYPES.of("astrologer");
+    run(G, "점성술사 기본 공격: 지정한 곳에 별똥별이 떨어져 " + ULT.sfDelay / 1000 + "초 뒤 반경 " + ULT.sfR + " 안의 적에게만 " + C.dmg + "의 피해를 주는가", function (done) {
+      var bad = [], W = self.astroWorld([{ id: "mid", x: 500 }, { id: "edge", x: 500 + ULT.sfR - 4 }, { id: "out", x: 500 + ULT.sfR + api.BODY_R + 30 }], [{ id: "ally", x: 500, dy: 10 }]), as = W.ent("as");
+      as.gauge = 0;
+      api.fireBasic(as, 0, 300);
+      W.step(ULT.sfDelay - 150);
+      if (self.lost(W, "mid")) bad.push("떨어지기 전에 이미 피해 " + self.lost(W, "mid"));
+      if (!api.FIELD.stars.length) bad.push("별똥별 효과가 없음");
+      W.step(300);
+      if (self.lost(W, "mid") !== C.dmg) bad.push("가운데 적 피해 " + self.lost(W, "mid") + " (기대 " + C.dmg + ")");
+      if (self.lost(W, "edge") !== C.dmg) bad.push("가장자리 적 피해 " + self.lost(W, "edge"));
+      if (self.lost(W, "out")) bad.push("반경 밖 적이 맞음");
+      if (self.lost(W, "ally")) bad.push("아군이 맞음");
+      if (api.FIELD.stars.length) bad.push("떨어진 뒤에도 효과가 남음");
+      W.step(1500);
+      if (self.lost(W, "mid") !== C.dmg) bad.push("한 번이 아님 " + self.lost(W, "mid"));
+      if (as.gauge !== api.roleGauge("astrologer")) bad.push("여럿이 맞아도 게이지는 한 번만 +" + api.roleGauge("astrologer") + " (지금 " + as.gauge + ")");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : ULT.sfDelay / 1000 + "초 뒤 반경 " + ULT.sfR + " 안에 " + C.dmg + " 한 번, 밖·아군 0, 게이지 +" + as.gauge);
+    });
+    run(G, "점성술사 기본 공격: 사거리 " + C.range + " 밖을 겨냥해도 " + C.range + " 까지만 떨어지는가", function (done) {
+      var bad = [], W = self.astroWorld([{ id: "reach", x: 200 + C.range }, { id: "beyond", x: 200 + C.range + 200 }]), as = W.ent("as");
+      api.fireBasic(as, 0, 900);
+      W.step(ULT.sfDelay + 300);
+      if (self.lost(W, "reach") !== C.dmg) bad.push("사거리 끝 적 피해 " + self.lost(W, "reach"));
+      if (self.lost(W, "beyond")) bad.push("사거리 밖 적이 맞음");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "900 을 겨냥해도 " + C.range + " 에 떨어짐");
+    });
+    run(G, "점성술사 기본 공격: 조준 없이 쓰면 가장 가까운 적 위치에 떨어지는가", function (done) {
+      var bad = [], W = self.astroWorld([{ id: "near", x: 200 + 250 }, { id: "far", x: 200 + 360 }]), as = W.ent("as");
+      api.fireBasic(as, 0);
+      W.step(ULT.sfDelay + 300);
+      if (self.lost(W, "near") !== C.dmg) bad.push("가까운 적 피해 " + self.lost(W, "near"));
+      if (self.lost(W, "far")) bad.push("먼 적이 맞음");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "가장 가까운 적 위치에 떨어짐");
+    });
+    run(G, "점성술사 스킬: 지정한 곳(최대 " + ULT.agCast + ")에 " + ULT.agDur / 700 + "초짜리 블랙홀이 생기고 게이지가 0이 되며, 시전자는 움직이고 공격할 수 있는가", function (done) {
+      var bad = [], W = self.astroWorld([{ id: "near", x: 200 + 600 }]), as = W.ent("as");
+      api.useUlt(as, 0, 300);
+      var holes = api.FIELD.holes.filter(function (h) { return h.e.ga; });
+      if (holes.length !== 1) bad.push("블랙홀 " + holes.length + "개");
+      else {
+        var e = holes[0].e;
+        if (Math.abs(e.x - 500) > 2) bad.push("놓인 위치 " + e.x + " (기대 500)");
+        if (e.follow) bad.push("시전자를 따라다님");
+        if (e.dur !== ULT.agDur || e.r !== ULT.agR || e.boom !== ULT.agBoomDmg) bad.push("수치 " + e.dur + "·" + e.r + "·" + e.boom);
+      }
+      if (as.gauge !== 0) bad.push("게이지 " + as.gauge);
+      W.frame(FRAME);
+      if (api.speedOf(as) !== C.speed) bad.push("시전 뒤 이동속도 " + api.speedOf(as) + " (기대 " + C.speed + ")");
+      if (type.isRooted(as, W.t()) || type.cannotAttack(as, W.t())) bad.push("움직임·공격이 막힘");
+      as.cdUntil = 0; api.fireBasic(as, 0, 300);
+      if (!api.FIELD.stars.length) bad.push("블랙홀 중에 기본 공격이 안 나감");
+      W.step(ULT.agDur + 400);
+      if (api.FIELD.holes.some(function (h) { return h.e.ga; })) bad.push("끝난 뒤에도 블랙홀이 남음");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "300 앞에 설치·게이지 0·이동 " + api.speedOf(as) + "·기본 공격 가능·끝나면 사라짐");
+    });
+    run(G, "점성술사 스킬: 사거리는 최대 " + ULT.agCast + "이고, 자동 조준이면 가장 가까운 적 위치에 생기는가", function (done) {
+      var bad = [], W = self.astroWorld([{ id: "near", x: 200 + 250, dy: 120 }]), as = W.ent("as"), near = W.ent("near");
+      api.useUlt(as, 0, 900);
+      var far = api.FIELD.holes.filter(function (h) { return h.e.ga; })[0];
+      if (!far || Math.abs(far.e.x - (200 + ULT.agCast)) > 2) bad.push("멀리 겨냥했을 때 위치 " + (far && far.e.x) + " (기대 " + (200 + ULT.agCast) + ")");
+      api.FIELD.holes.length = 0;
+      as.gauge = api.GAUGE_MAX; as.skillUntil = 0;
+      api.useUlt(as, 0);
+      var auto = api.FIELD.holes.filter(function (h) { return h.e.ga; })[0];
+      if (!auto || Math.hypot(auto.e.x - near.x, auto.e.y - near.y) > 2) bad.push("자동 조준 위치 " + (auto && auto.e.x + "," + auto.e.y) + " (적 " + Math.round(near.x) + "," + Math.round(near.y) + ")");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "900 을 겨냥해도 " + ULT.agCast + " 까지만, 자동 조준은 가장 가까운 적 위치");
+    });
+    run(G, "점성술사 블랙홀: 반경 " + ULT.agR + " 안의 적만 중심(" + ULT.agGap + ")까지 끌려오고, 시전자가 움직여도 제자리에 있는가", function (done) {
+      var bad = [], W = self.astroWorld([{ id: "in", x: 300 + 250, dy: 30 }, { id: "out", x: 300 + ULT.agR + 120 }], [{ id: "ally", x: 300 + 200 }]), as = W.ent("as"), inn = W.ent("in"), out = W.ent("out"), ally = W.ent("ally");
+      var outX = out.x, allyX = ally.x;
+      api.useUlt(as, 0, 100);
+      var hole = api.FIELD.holes.filter(function (h) { return h.e.ga; })[0];
+      as.x -= 120;
+      W.step(ULT.agDur - 600);
+      var d = Math.hypot(inn.x - hole.e.x, inn.y - hole.e.y);
+      if (Math.abs(d - ULT.agGap) > 8) bad.push("끌려온 적과 중심의 거리 " + Math.round(d) + " (기대 " + ULT.agGap + ")");
+      if (Math.abs(out.x - outX) > 1) bad.push("반경 밖 적이 끌려옴");
+      if (Math.abs(ally.x - allyX) > 1) bad.push("아군이 끌려감");
+      if (hole.e.x !== 300) bad.push("블랙홀이 움직임 " + hole.e.x);
+      if (self.lost(W, "in")) bad.push("끌려오는 동안 피해 " + self.lost(W, "in"));
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "반경 안 거리 " + Math.round(d) + ", 밖·아군 제자리, 블랙홀 고정");
+    });
+    run(G, "점성술사 폭발: 블랙홀이 끝나는 순간 반경 안의 적에게만 " + ULT.agBoomDmg + "의 피해를 주고, 시전자가 쓰러져도 폭발하는가", function (done) {
+      var bad = [], W = self.astroWorld([{ id: "in", x: 300 + 250, dy: 30 }, { id: "out", x: 300 + ULT.agR + 120 }]), as = W.ent("as");
+      api.useUlt(as, 0, 100);
+      W.step(1000);
+      api.damage(as, 9999, "in", false, null);
+      W.step(ULT.agDur - 1400);
+      if (self.lost(W, "in")) bad.push("끝나기 전에 이미 피해 " + self.lost(W, "in"));
+      W.step(700);
+      if (self.lost(W, "in") !== ULT.agBoomDmg) bad.push("폭발 피해 " + self.lost(W, "in") + " (기대 " + ULT.agBoomDmg + ")");
+      if (self.lost(W, "out")) bad.push("반경 밖 적이 맞음");
+      W.step(1500);
+      if (self.lost(W, "in") !== ULT.agBoomDmg) bad.push("폭발이 한 번이 아님 " + self.lost(W, "in"));
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "끝나기 전 0, 시전자가 쓰러져도 끝나는 순간 " + ULT.agBoomDmg + " 한 번, 밖 0");
+    });
+    run(G, "점성술사: 마법사 직업군이고 체력·패시브 설정이 맞는가", function (done) {
+      var bad = [];
+      if (C.role !== "caster") bad.push("직업군 " + C.role);
+      if (type.passiveDesc() !== "없음") bad.push("패시브가 있음: " + type.passiveDesc());
+      if (!/별똥별/.test(type.basicDesc()) || !/블랙홀/.test(type.ultDesc())) bad.push("설명 문장");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "마법사·패시브 없음·체력 " + C.hp);
+    });
+  }
+}
+
 
 class TestPanel {
   static STATUS_LABEL = { pass: "통과", fail: "문제", info: "확인 필요" };

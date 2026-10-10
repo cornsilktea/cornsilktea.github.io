@@ -839,6 +839,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
                ultName: "덩굴 부쉬", ultAim: true, heals: true },
     giant:   { name: "거신", role: "fighter", icon: "🗿", hp: 500, speed: gameSpeed(135), cd: gameMs(1.6), dmg: 30, range: 120, arc: Math.PI * 0.6, bodyR: 36, ultName: "골렘 강림", ultAim: true, blocks: true },
     gargantua: { name: "가르강튀아", role: "caster", icon: "🌀", hp: 300, speed: gameSpeed(150), cd: gameMs(1.4), dmg: 10, range: 120, arc: Math.PI * 0.6, ultName: "가르강튀아", ultAim: true, retired: true },
+    astrologer: { name: "점성술사", role: "caster", icon: "🌠", hp: 115, speed: gameSpeed(170), cd: gameMs(1.4), dmg: 15, range: 380, ultName: "가르강튀아", ultAim: true },
     dummy:  { name: "연습 봇", role: "fighter", icon: "🎯", hp: 99999, speed: 200, cd: 1000, dmg: 0, range: 0, ultName: "없음", practiceBot: true },
     dummyAlly: { name: "아군 봇", role: "fighter", icon: "💚", hp: 500, speed: 200, cd: 1000, dmg: 0, range: 0, ultName: "없음", practiceBot: true }
   };
@@ -904,6 +905,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               trSpeedBonus: gameSpeed(30), trShellSpeed: gameSpeed(1000), trHitR: 38, trCastMs: 450,
               drR: 150, drDur: 3600000, drTick: gameMs(1), drHeal: 20, drCast: 450, drMin: 60, drSelfRate: 0.1, drSelfGauge: 1, drRiseMs: 350, drCastMs: 500,
               gaCast: 350, gaMin: 60, gaTransformMs: gameMs(1.2), gaDur: gameMs(6), gaR: 350, gaPull: 260, gaGap: 70, gaBoomDmg: 30,
+              sfMin: 60, sfDelay: gameMs(0.6), sfR: 70,
+              agCast: 400, agMin: 60, agDur: gameMs(3), agR: 350, agPull: 260, agGap: 70, agBoomDmg: 30,
               gjCast: 300, gjMin: 60, gjTransformMs: gameMs(1.2), gjDur: gameMs(6), gjDef: 0.7, gjR: 150, gjTick: gameMs(1), gjTickDmg: 30, gjMaceRange: 150 };
   var ASSIST_MS = 5000;
   var SNIPER_KEEP = KEY * 5;
@@ -2597,12 +2600,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     reset() {
       this.bursts = []; this.pools = []; this.poolHit = {}; this.lunges = []; this.waves = [];
       this.holes = []; this.storms = []; this.revs = []; this.graces = []; this.domains = [];
-      this.curses = {}; this.bladeSpins = []; this.turrets = []; this.groves = []; this.shells = []; this.gales = [];
+      this.curses = {}; this.bladeSpins = []; this.turrets = []; this.groves = []; this.shells = []; this.gales = []; this.stars = [];
     }
     addLingering(e, t) {
       if (e.type === "turret") { TURRETS.add(e, t); return true; }
       if (e.type === "grove") { GROVES.add(e, t); return true; }
       if (e.type === "gale") { if (t < e.createdAt + e.dur) this.gales.push({ e: e, vis: null }); return true; }
+      if (e.type === "star") { STARFALL.add(e, t); return true; }
       if (e.type === "pool") { if (t < e.createdAt + e.delay + e.dur) this.pools.push({ e: e, vis: null, bottle: null }); return true; }
       if (e.type === "hole") { if (t < e.createdAt + e.delay + e.dur) this.holes.push({ e: e, vis: null }); return true; }
       if (e.type === "storm") { if (t < e.createdAt + e.delay + e.dur) this.storms.push({ e: e, vis: null }); return true; }
@@ -2616,6 +2620,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.turrets.forEach(TURRETS.dropVis.bind(TURRETS)); this.groves.forEach(GROVES.dropVis.bind(GROVES));
       this.shells.forEach(TURRETS.dropShellVis.bind(TURRETS));
       this.gales.forEach(GALE_VIEW.drop.bind(GALE_VIEW));
+      this.stars.forEach(STARFALL_VIEW.drop.bind(STARFALL_VIEW));
     }
     renderLingering(t, nowMs, dt) {
       this.pools.forEach(function (pl) { EFFECT_VIEW.renderPool(pl, t, nowMs); });
@@ -2627,6 +2632,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.groves.forEach(function (s) { GROVES.render(s, t, nowMs); });
       this.shells.forEach(function (s) { TURRETS.renderShell(s, t); });
       this.gales.forEach(function (g) { GALE_VIEW.render(g, t, nowMs); });
+      this.stars.forEach(function (s) { STARFALL_VIEW.render(s, t, nowMs); });
     }
   }
   var FIELD = new BattleField();
@@ -3506,6 +3512,37 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
              "의 적을 계속 끌어당김. 끝나면 폭발해 반경 안의 적에게 " + ULT.gaBoomDmg + "의 피해";
     }
   }
+  class AstrologerType extends GargantuaType {
+    get startsSkillTimer() { return true; }
+    isHammerLeaping(E, t) { return false; }
+    isRooted(E, t) { return false; }
+    cannotAttack(E, t) { return false; }
+    aimRange(btn) { return btn === "ult" ? [ULT.agMin, ULT.agCast] : [ULT.sfMin, this.data.range]; }
+    showAimGuide(E, ult, c) {
+      AIM_GUIDE.showAimCircle(INPUT.aimReach(E, INPUT.aim.btn), ult ? ULT.agR : ULT.sfR);
+      return true;
+    }
+    botUltRange() { return ULT.agCast; }
+    botUltSpot(B, target, td, t) { return BRAIN.ultAimSpot(B, target, td, t); }
+    overrideBasic(E, ang, reach, t) { STARFALL.fall(E, ang, reach, t); return true; }
+    cast(E, ang, reach, t) {
+      var spot = ATTACK.burstSpot(E, ang, reach, ULT.agCast, ULT.agMin);
+      E.angle = Math.atan2(spot.y - E.y, spot.x - E.x);
+      E.ultUntil = t + 450;
+      E.skillDur = ULT.agDur;
+      GARGANTUA_SYS.summon(E, spot, t);
+    }
+    skillGlow(E, t) { return E.ultUntil > t ? 0x2A1060 : 0; }
+    playSkillClip(v, E, t) { FIGHTER_VIEW.playOnce(v, "Ranged_Magic_Spellcasting_Long", 2.6, t); }
+    attackClip(v, E, t) { return ["Ranged_Magic_Shoot", 1.8]; }
+    passiveDesc() { return "없음"; }
+    basicDesc() {
+      return "사거리 " + this.data.range + "의 지정한 곳에 별똥별을 떨어뜨려 " + SKILLTEXT.secs(ULT.sfDelay) + " 뒤 반경 " + ULT.sfR + " 안의 적에게 " + this.data.dmg + "의 피해";
+    }
+    ultDesc() {
+      return "지정한 곳(최대 " + ULT.agCast + ")에 " + SKILLTEXT.secs(ULT.agDur) + "간 유지되는 반경 " + ULT.agR + "의 블랙홀 생성. 안의 적을 계속 끌어당기고, 끝나면 폭발해 반경 안의 적에게 " + ULT.agBoomDmg + "의 피해";
+    }
+  }
   class GiantType extends ArcMeleeType {
     static HEAD_Y = 150;
     static SLAM_IMPACT_SEC = 0.92;
@@ -3595,7 +3632,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         engineer: new EngineerType("engineer"),
         druid: new DruidType("druid"),
         giant: new GiantType("giant"),
-        gargantua: new GargantuaType("gargantua")
+        gargantua: new GargantuaType("gargantua"),
+        astrologer: new AstrologerType("astrologer")
       };
     }
     of(id) { return this.byId[id] || (this.byId[id] = new CharacterType(id)); }
@@ -5382,17 +5420,50 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (TARGETS.hear(E)) SOUND.sfx("boom");
       MATCH.game.forceNet = true;
     }
+    summon(E, spot, t) {
+      SESSION.room.ref.child("effects").push({ type: "hole", team: E.team, owner: E.id, x: Math.round(spot.x), y: Math.round(spot.y), r: ULT.agR, dur: ULT.agDur, delay: 0,
+                                       ga: 1, gap: ULT.agGap, pull: ULT.agPull, boom: ULT.agBoomDmg, createdAt: t });
+      VISION.revealBriefly(E.id, t);
+      if (TARGETS.hear(E)) SOUND.sfx("boom");
+      MATCH.game.forceNet = true;
+    }
     explode(e, center, t) {
       FX_VIEW.holeBurst(center.x, center.y, e.r);
       if (!MATCH.me || hyp(center.x - MATCH.me.x, center.y - MATCH.me.y) < 700) SOUND.sfx("boom");
       if (SESSION.room.status !== "playing") return;
       TARGETS.localTargets().forEach(function (T) {
         if (!T.alive || T.team === e.team || T.minion || T.isProtected(t) || hyp(center.x - T.x, center.y - T.y) > e.r + T.hitR * 0.5) return;
-        DAMAGE.damage(T, ULT.gaBoomDmg, e.owner, false, "blackhole");
+        DAMAGE.damage(T, e.boom || ULT.gaBoomDmg, e.owner, false, "blackhole");
       });
     }
   }
   var GARGANTUA_SYS = new GargantuaSystem();
+  class StarfallSystem {
+    fall(E, ang, reach, t) {
+      var spot = ATTACK.burstSpot(E, ang, reach, CHARS.astrologer.range, ULT.sfMin);
+      E.angle = Math.atan2(spot.y - E.y, spot.x - E.x); E.atkAt = t;
+      VISION.revealBriefly(E.id, t);
+      SESSION.room.ref.child("effects").push({ type: "star", team: E.team, owner: E.id, x: Math.round(spot.x), y: Math.round(spot.y), r: ULT.sfR, dmg: CHARS.astrologer.dmg, delay: ULT.sfDelay, createdAt: t });
+      if (TARGETS.hear(E)) SOUND.sfx("swing");
+    }
+    add(e, t) { if (t < e.createdAt + e.delay + 1500) FIELD.stars.push({ e: e, vis: null }); }
+    step(t) {
+      FIELD.stars = FIELD.stars.filter(function (s) {
+        var e = s.e;
+        if (t < e.createdAt + e.delay) return true;
+        if (SESSION.room.status === "playing") TARGETS.localTargets().forEach(function (T) {
+          if (!T.alive || T.team === e.team || T.isProtected(t) || hyp(T.x - e.x, T.y - e.y) > e.r + T.hitR * 0.5) return;
+          DAMAGE.damage(T, e.dmg, e.owner, e.createdAt);
+        });
+        FX_VIEW.boom(e.x, e.y, e.r, e.team);
+        FX_VIEW.spark(e.x, e.y, "#D9A8FF", 1.8);
+        if (!MATCH.me || hyp(e.x - MATCH.me.x, e.y - MATCH.me.y) < 700) SOUND.sfx("boom");
+        STARFALL_VIEW.drop(s);
+        return false;
+      });
+    }
+  }
+  var STARFALL = new StarfallSystem();
   class GiantSystem {
     land(E, t) {
       E.buffUntil = t + ULT.gjDur;
@@ -6521,6 +6592,21 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       part.visible = true;
       root.getObjectByProperty("isSkinnedMesh", true).parent.add(part);
     }
+    attachHalo(root, spec) {
+      root.updateMatrixWorld(true);
+      var head = root.getObjectByName("head"), box = new THREE.Box3().setFromObject(root.getObjectByName(spec.on), true);
+      var group = new THREE.Group(), ring = new THREE.Mesh(new THREE.TorusGeometry(spec.r, spec.tube, 8, 40), new THREE.MeshLambertMaterial({ color: spec.color }));
+      ring.rotation.x = Math.PI / 2; group.add(ring);
+      for (var k = 0; k < spec.stars; k++) {
+        var a = k * Math.PI * 2 / spec.stars + 0.4, star = new THREE.Mesh(new THREE.OctahedronGeometry(spec.starSize), new THREE.MeshLambertMaterial({ color: 0xFFFFFF }));
+        star.position.set(Math.cos(a) * spec.r, 0, Math.sin(a) * spec.r); group.add(star);
+      }
+      var headTurn = new THREE.Quaternion(); head.getWorldQuaternion(headTurn);
+      group.quaternion.copy(headTurn.invert()); group.rotateX(spec.tilt);
+      var at = new THREE.Vector3((box.min.x + box.max.x) / 2, box.max.y + spec.rise, (box.min.z + box.max.z) / 2 - 0.04);
+      head.worldToLocal(at); group.position.copy(at);
+      head.add(group);
+    }
     attachPonytail(root, spec) {
       var head = root.getObjectByName("head"); if (!head) return;
       var hairMat = new THREE.MeshLambertMaterial({ color: spec.hair }), tieMat = new THREE.MeshLambertMaterial({ color: spec.tie });
@@ -6555,6 +6641,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           }
           if (spec.left) { var offhand = KIT.weapons[spec.left].clone(); offhand.name = "offhand"; if (spec.leftRecolor) MODELS.recolorProp(offhand, spec.leftRecolor); if (spec.leftTurn) offhand.rotation.y = spec.leftTurn; if (spec.leftRot) offhand.rotation.set(spec.leftRot[0], spec.leftRot[1], spec.leftRot[2]); if (spec.leftScale) offhand.scale.setScalar(spec.leftScale); m.getObjectByName("handslotl").add(offhand); }
           if (spec.ponytail) MODELS.attachPonytail(m, spec.ponytail);
+          if (spec.halo) MODELS.attachHalo(m, spec.halo);
           (spec.hide || []).forEach(function (part) { var o = m.getObjectByName(part); if (o) o.visible = false; });
         });
         CHAR_LIST.forEach(function (c) { if (MODEL[c].muzzle) KIT.muzzle[c] = MODELS.aimedMuzzle(c); });
@@ -7429,7 +7516,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static DISC_R = 175;
     static BEHIND = 46;
     static RISE_MS = 420;
-    static CHARGE_MS = 450;
+    static CHARGE_MS = 800;
     constructor() { this.cache = null; this.facing = new THREE.Vector3(); }
     paint(size, draw) {
       var cv = document.createElement("canvas"); cv.width = cv.height = size;
@@ -7540,7 +7627,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     render(h, t, nowMs) {
       var e = h.e, ud = h.vis.userData, start = e.createdAt + e.delay, end = start + e.dur, G = GargantuaView;
       var rise = clamp((t - start) / G.RISE_MS, 0.001, 1), charge = clamp((t - (end - G.CHARGE_MS)) / G.CHARGE_MS, 0, 1), k = rise * rise * (3 - 2 * rise) * (1 + 0.1 * charge);
-      var shown = VIS[e.owner], center = FIELD_FX.holeCenter(e), spin = nowMs / 1000 * (1 + 2 * charge);
+      var shown = e.follow ? VIS[e.owner] : null, center = FIELD_FX.holeCenter(e), spin = nowMs / 1000 * (1 + 2 * charge);
       h.vis.position.set(shown ? shown.root.position.x : center.x, 0, shown ? shown.root.position.z : center.y);
       h.vis.scale.setScalar(Math.max(0.001, k));
       ud.vortex.rotation.z = spin * 1.1;
@@ -7630,6 +7717,42 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   var GALE_VIEW = new GolemGaleView();
+  class StarfallView {
+    static STAR_R = 13;
+    static TAIL = 190;
+    static GLOW_COLOR = 0xB07CFF;
+    make(e) {
+      var g = new THREE.Group(), mats = [], G = StarfallView;
+      function mat(opts) { var m = new THREE.MeshBasicMaterial(Object.assign({ transparent: true, depthWrite: false }, opts)); mats.push(m); return m; }
+      var base = ARENA_VIEW.flatMesh(GEO.disc, mat({ color: G.GLOW_COLOR, opacity: 0.16 })); base.scale.setScalar(e.r); base.position.y = 2;
+      var fill = ARENA_VIEW.flatMesh(GEO.disc, mat({ color: G.GLOW_COLOR, opacity: 0.34 })); fill.scale.setScalar(0.01); fill.position.y = 2.2;
+      var edgeMat = mat({ color: C_FX[e.team], opacity: 0.8 });
+      var edge = ARENA_VIEW.flatMesh(GEO.ringFx, edgeMat); edge.scale.setScalar(e.r); edge.position.y = 2.4;
+      g.add(base); g.add(fill); g.add(edge);
+      var star = new THREE.Group();
+      var core = new THREE.Mesh(GEO.ball, mat({ color: 0xF6EEFF, opacity: 1 })); core.scale.setScalar(G.STAR_R);
+      var glow = new THREE.Mesh(GEO.ball, mat({ color: G.GLOW_COLOR, opacity: 0.5, blending: THREE.AdditiveBlending })); glow.scale.setScalar(G.STAR_R * 2.1);
+      var tail = new THREE.Mesh(GEO.meteorTail, mat({ color: G.GLOW_COLOR, opacity: 0.5, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+      tail.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), METEOR_DIR); tail.scale.set(G.STAR_R * 0.9, G.TAIL, G.STAR_R * 0.9);
+      star.add(tail); star.add(glow); star.add(core);
+      g.add(star);
+      g.position.set(e.x, 0, e.y);
+      g.userData = { mats: mats, fill: fill, edgeMat: edgeMat, star: star };
+      scene.add(g);
+      return g;
+    }
+    drop(s) { if (!s.vis) return; scene.remove(s.vis); s.vis.userData.mats.forEach(function (m) { m.dispose(); }); s.vis = null; }
+    render(s, t, nowMs) {
+      var e = s.e, G = StarfallView;
+      if (!s.vis) s.vis = this.make(e);
+      var ud = s.vis.userData, k = clamp((t - e.createdAt) / e.delay, 0, 1), lift = METEOR_TOP * (1 - k * k) + G.STAR_R;
+      ud.fill.scale.setScalar(Math.max(0.01, k) * e.r);
+      ud.edgeMat.opacity = 0.55 + 0.4 * Math.sin(nowMs / 60);
+      ud.star.visible = CAMERA_RIG.pix >= PIX_START;
+      ud.star.position.set(METEOR_DIR.x / METEOR_DIR.y * (lift - G.STAR_R), lift, METEOR_DIR.z / METEOR_DIR.y * (lift - G.STAR_R));
+    }
+  }
+  var STARFALL_VIEW = new StarfallView();
   class AimGuide {
     aimPart(geo) {
       var back = ARENA_VIEW.flatMesh(geo, aimBackMat), front = ARENA_VIEW.flatMesh(geo, aimMat);
@@ -8640,6 +8763,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     druid:   { file: "Druid", portraitPlant: true, right: "druid_staff" },
     giant:   { file: "Barbarian_Large", right: "Skeleton_Mace_Large", scale: 0.85, portraitFit: 1.1 },
     giantGolem: { file: "Skeleton_Golem", right: "Skeleton_Mace_Large", scale: 0.85 },
+    astrologer: { file: "Mage", left: "spellbook_open", leftTurn: Math.PI, hide: ["Mage_Hat"],
+                  halo: { on: "Mage_Head", color: 0xD9A8FF, r: 0.42, tube: 0.035, stars: 3, starSize: 0.075, rise: 0.14, tilt: 0.3 },
+                  recolor: [[1, 0, 2, "#2E2038", "#0A060F"], [1, 2, 1, "#C58BFF", "#6A2BC4"], [2, 1, 1, "#C58BFF", "#6A2BC4"], [0, 5, 1, "#C58BFF", "#6A2BC4"]],
+                  leftRecolor: [[1, 2, 1, "#C58BFF", "#6A2BC4"], [2, 1, 1, "#C58BFF", "#6A2BC4"]] },
     dummy:  { file: "Knight" },
     dummyAlly: { file: "Knight" }
   };
@@ -8866,6 +8993,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     stepFlightsAndFields(t, dt) {
       PROJECTILES.stepShots(t);
       FIELD_FX.stepBursts(t);
+      STARFALL.step(t);
       FIELD_FX.stepPools(t);
       STATUS.flushCC(t);
       FIELD_FX.stepHoles(t, dt);
