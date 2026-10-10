@@ -39,16 +39,16 @@ class CharacterMakerDialog {
   private readonly modal: HTMLDivElement;
   private readonly host: HTMLDivElement;
   private readonly note: HTMLDivElement;
-  private editor: ProfileEditor | null = null;
+  private editor: ProfileEditor | NickEditor | null = null;
   private loading: Promise<void> | null = null;
 
-  constructor(private readonly loadLibs: ThreeLibsLoader = ThreeLibsImporter.load) {
+  constructor(private readonly loadLibs: ThreeLibsLoader = ThreeLibsImporter.load, private readonly withLook = true) {
     this.modal = document.createElement("div");
     this.modal.className = "st-screen maker-modal";
     this.modal.hidden = true;
     this.modal.innerHTML =
       "<div class='st-wrap'><div class='st-card'>" +
-      "<div class='maker-head'><h2>캐릭터 만들기</h2><button type='button' class='st-btn sub maker-close'>닫기</button></div>" +
+      "<div class='maker-head'><h2>" + (withLook ? "캐릭터 만들기" : "닉네임 설정") + "</h2><button type='button' class='st-btn sub maker-close'>닫기</button></div>" +
       "<div class='maker-host'></div><div class='st-hint maker-note'></div></div></div>";
     document.body.appendChild(this.modal);
     this.host = this.modal.querySelector(".maker-host") as HTMLDivElement;
@@ -63,14 +63,14 @@ class CharacterMakerDialog {
   open(): void {
     this.modal.hidden = false;
     document.body.style.overflow = "hidden";
-    if (this.editor) this.editor.setActive(true);
-    else this.prepare();
+    if (this.editor instanceof ProfileEditor) this.editor.setActive(true);
+    else if (!this.editor) this.prepare();
   }
 
   close(): void {
     this.modal.hidden = true;
     document.body.style.overflow = "";
-    if (this.editor) this.editor.setActive(false);
+    if (this.editor instanceof ProfileEditor) this.editor.setActive(false);
     document.dispatchEvent(new CustomEvent(PlayerProfile.SETTLED_EVENT));
   }
 
@@ -96,7 +96,19 @@ class CharacterMakerDialog {
     });
   }
 
+  private buildNickOnly(): void {
+    const editor = new NickEditor(new PlayerProfile());
+    this.host.appendChild(editor.element);
+    this.editor = editor;
+    this.note.textContent = "바꾸면 이 기기에 자동으로 저장돼요. 모든 게임에서 같은 이름으로 쓰여요.";
+    if (!this.modal.hidden) editor.focus();
+  }
+
   private async build(): Promise<void> {
+    if (!this.withLook) {
+      this.buildNickOnly();
+      return;
+    }
     this.note.textContent = "캐릭터를 불러오는 중…";
     const libs = await this.loadLibs();
     const assets = new CharacterAssets(libs);

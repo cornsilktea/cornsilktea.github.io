@@ -388,7 +388,7 @@
   <div class="card" id="cardTeamStart" style="display:none">
     <div class="logo">👥 팀 대전</div>
     <label class="fieldLab">내 닉네임</label>
-    <div class="nickLine"><b id="teamNick"></b><button type="button" class="btn sub" data-maker-open>🎭 캐릭터 만들기</button></div>
+    <div class="nickLine"><b id="teamNick"></b><button type="button" class="btn sub" data-maker-open>✏️ 닉네임 설정</button></div>
     <button type="button" class="btn wideBtn" id="btnCreate">방 만들기</button>
     <label class="fieldLab" for="joinCode">방 코드로 입장</label>
     <div class="joinRow"><input id="joinCode" inputmode="numeric" maxlength="5" placeholder="방 코드 5자리" autocomplete="off"><button type="button" class="btn" id="btnJoin">입장</button></div>
@@ -410,7 +410,7 @@
 
   <div class="card wide" id="cardLobby" style="display:none">
     <div class="codeLine">방 코드<b id="lobbyCode">00000</b></div>
-    <div class="nickLine"><b id="lobbyNick"></b><button type="button" class="btn sub" data-maker-open>🎭 캐릭터 만들기</button></div>
+    <div class="nickLine"><b id="lobbyNick"></b><button type="button" class="btn sub" data-maker-open>✏️ 닉네임 설정</button></div>
     <div class="teams">
       <div class="team blue"><h3>블루팀</h3><div id="listBlue"></div><button type="button" class="btn sub" id="btnJoinBlue">블루팀으로</button></div>
       <div class="team red"><h3>레드팀</h3><div id="listRed"></div><button type="button" class="btn sub" id="btnJoinRed">레드팀으로</button></div>
@@ -456,7 +456,7 @@
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
 <script charset="utf-8" src="character-kit.js?v=20261010"></script>
 <script charset="utf-8" src="character-maker.js?v=20261010"></script>
-<script>new CharacterMakerDialog();</script>
+<script>new CharacterMakerDialog(undefined, false);</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>

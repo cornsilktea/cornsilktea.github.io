@@ -253,7 +253,7 @@
     </div>
     <div class="card">
       <label class="label">내 닉네임</label>
-      <div class="nickLine"><b id="startNick"></b><button type="button" class="btn" data-maker-open>🎭 캐릭터 만들기</button></div>
+      <div class="nickLine"><b id="startNick"></b><button type="button" class="btn" data-maker-open>✏️ 닉네임 설정</button></div>
       <button type="button" class="btn primary" id="btnCreate">방 만들기</button>
       <div class="gap"></div>
       <label class="label" for="joinCode">방 코드로 입장</label>
@@ -295,7 +295,7 @@
   <div class="wrap">
     <div class="card">
       <div class="codeBar"><span class="codeLab">방 코드</span><span class="codeNum" id="lobbyCode">-----</span></div>
-      <div class="nickLine"><b id="lobbyNick"></b><button type="button" class="btn" data-maker-open>🎭 캐릭터 만들기</button></div>
+      <div class="nickLine"><b id="lobbyNick"></b><button type="button" class="btn" data-maker-open>✏️ 닉네임 설정</button></div>
       <p class="sub" style="margin-top:10px">친구들에게 방 코드를 알려 주세요. (플레이어 5명 · 관전자 1명)</p>
     </div>
     <div class="card">
@@ -332,7 +332,7 @@
 
 <script charset="utf-8" src="character-kit.js?v=20261010"></script>
 <script charset="utf-8" src="character-maker.js?v=20261010"></script>
-<script>new CharacterMakerDialog();</script>
+<script>new CharacterMakerDialog(undefined, false);</script>
 <div id="loading">3D 학교를 준비하는 중입니다…</div>
 
 <script>

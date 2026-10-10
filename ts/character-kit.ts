@@ -229,7 +229,7 @@ class PlayerProfile {
   static readonly SETTLED_EVENT = "portal-profile-settled";
   static readonly MAX_NICK_LENGTH = 8;
   static readonly REAL_NAME_NOTICE = "닉네임은 본명으로 입력합니다";
-  static readonly NICK_REQUIRED_NOTICE = "캐릭터 만들기에서 닉네임(본명)을 먼저 정해 주세요.";
+  static readonly NICK_REQUIRED_NOTICE = "닉네임(본명)을 먼저 정해 주세요.";
 
   nick = "";
   look: CharacterLook = CharacterLooks.createDefault();
@@ -600,12 +600,50 @@ class CharacterPreview {
 }
 
 
+class NickEditor {
+  private readonly root: HTMLDivElement;
+  private readonly input: HTMLInputElement;
+  private onSettledListener: () => void = () => undefined;
+
+  constructor(private readonly profile: PlayerProfile) {
+    this.root = document.createElement("div");
+    this.root.className = "ce-nickbox";
+    this.root.innerHTML =
+      "<label class='st-label'>닉네임</label>" +
+      "<input type='text' class='ce-nick' maxlength='" + PlayerProfile.MAX_NICK_LENGTH + "' autocomplete='off' placeholder='닉네임 (최대 " + PlayerProfile.MAX_NICK_LENGTH + "글자)'>" +
+      "<div class='ce-notice'>" + PlayerProfile.REAL_NAME_NOTICE + "</div>";
+    this.input = this.root.querySelector(".ce-nick") as HTMLInputElement;
+    this.input.addEventListener("input", () => this.profile.setNick(this.input.value));
+    this.input.addEventListener("change", () => {
+      document.dispatchEvent(new CustomEvent(PlayerProfile.SETTLED_EVENT));
+      this.onSettledListener();
+    });
+    this.refresh();
+  }
+
+  get element(): HTMLDivElement {
+    return this.root;
+  }
+
+  onSettled(listener: () => void): void {
+    this.onSettledListener = listener;
+  }
+
+  refresh(): void {
+    if (document.activeElement !== this.input) this.input.value = this.profile.nick;
+  }
+
+  focus(): void {
+    this.input.focus();
+  }
+}
+
 class ProfileEditor {
   private static readonly CUSTOM_APPLY_DELAY_MS = 90;
 
   private readonly preview: CharacterPreview;
   private readonly root: HTMLDivElement;
-  private readonly nickInput: HTMLInputElement;
+  private readonly nickEditor: NickEditor;
   private readonly typeButtons: HTMLDivElement;
   private readonly paletteBox: HTMLDivElement;
   private readonly capeButton: HTMLButtonElement;
@@ -617,16 +655,16 @@ class ProfileEditor {
     this.root = document.createElement("div");
     this.root.className = "ce-editor";
     this.root.innerHTML =
-      "<label class='st-label'>닉네임</label>" +
-      "<input type='text' class='ce-nick' maxlength='" + PlayerProfile.MAX_NICK_LENGTH + "' autocomplete='off' placeholder='닉네임 (최대 " + PlayerProfile.MAX_NICK_LENGTH + "글자)'>" +
-      "<div class='ce-notice'>" + PlayerProfile.REAL_NAME_NOTICE + "</div>" +
+      "<div class='ce-nickslot'></div>" +
       "<canvas class='ce-preview'></canvas>" +
       "<div class='ce-hint'>끌어서 돌려 보기</div>" +
       "<label class='st-label'>캐릭터</label><div class='st-opts ce-types'></div>" +
       "<div class='ce-palettes'></div>" +
       "<div class='ce-toggles'><button type='button' class='ce-cape'></button><button type='button' class='ce-hat'></button>" +
       "<button type='button' class='ce-turn-left'>◀ 돌리기</button><button type='button' class='ce-turn-right'>돌리기 ▶</button></div>";
-    this.nickInput = this.root.querySelector(".ce-nick") as HTMLInputElement;
+    this.nickEditor = new NickEditor(profile);
+    this.nickEditor.onSettled(() => this.onLookChanged());
+    (this.root.querySelector(".ce-nickslot") as HTMLDivElement).appendChild(this.nickEditor.element);
     this.typeButtons = this.root.querySelector(".ce-types") as HTMLDivElement;
     this.paletteBox = this.root.querySelector(".ce-palettes") as HTMLDivElement;
     this.capeButton = this.root.querySelector(".ce-cape") as HTMLButtonElement;
@@ -641,7 +679,7 @@ class ProfileEditor {
   mount(container: HTMLElement): void {
     container.appendChild(this.root);
     this.preview.setLook(this.profile.look);
-    this.nickInput.value = this.profile.nick;
+    this.nickEditor.refresh();
     this.syncControls();
   }
 
@@ -650,7 +688,7 @@ class ProfileEditor {
   }
 
   focusNick(): void {
-    this.nickInput.focus();
+    this.nickEditor.focus();
   }
 
   onChange(listener: () => void): void {
@@ -658,7 +696,7 @@ class ProfileEditor {
   }
 
   refreshFromProfile(): void {
-    if (document.activeElement !== this.nickInput) this.nickInput.value = this.profile.nick;
+    this.nickEditor.refresh();
     this.preview.setLook(this.profile.look);
     this.syncControls();
   }
@@ -681,10 +719,6 @@ class ProfileEditor {
   }
 
   private bindEvents(): void {
-    this.nickInput.addEventListener("input", () => {
-      this.profile.setNick(this.nickInput.value);
-    });
-    this.nickInput.addEventListener("change", () => this.announceSettled());
     this.typeButtons.addEventListener("click", (event) => {
       const button = (event.target as HTMLElement).closest("button[data-type]") as HTMLButtonElement | null;
       if (!button) return;

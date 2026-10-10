@@ -354,7 +354,7 @@
         <input type="text" id="joinCode" inputmode="numeric" pattern="[0-9]*" maxlength="5" autocomplete="off" placeholder="방 코드 5자리">
         <button type="button" class="st-btn blue" id="btnJoin">참여하기</button>
       </div>
-      <div class="hello">내 닉네임: <b id="helloNick"></b> <button type="button" class="mini" data-maker-open>🎭 캐릭터 만들기</button></div>
+      <div class="hello">내 닉네임: <b id="helloNick"></b> <button type="button" class="mini" data-maker-open>✏️ 닉네임 설정</button></div>
       <div class="st-msg msg" id="bStartMsg"></div>
       <div id="loadNote"></div>
     </div>
@@ -399,7 +399,7 @@
       <div><span class="codeLab">방 코드</span><span class="codeNum" id="lobbyCode">-----</span></div>
       <button type="button" class="mini danger" id="btnLeaveLobby">방 나가기</button>
     </div>
-    <div class="hello left">내 닉네임: <b id="lobbyNick"></b> <button type="button" class="mini" data-maker-open>🎭 캐릭터 만들기</button></div>
+    <div class="hello left">내 닉네임: <b id="lobbyNick"></b> <button type="button" class="mini" data-maker-open>✏️ 닉네임 설정</button></div>
     <div class="sect">🗺️ 맵 <span id="mapHint" style="font-weight:700"></span></div>
     <div class="mapBtns" id="mapBtns"></div>
     <div class="sides">
@@ -472,7 +472,7 @@
 
 <script charset="utf-8" src="character-kit.js?v=20261010"></script>
 <script charset="utf-8" src="character-maker.js?v=20261010"></script>
-<script>new CharacterMakerDialog();</script>
+<script>new CharacterMakerDialog(undefined, false);</script>
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
 <script type="module">
 import * as THREE from "three";
