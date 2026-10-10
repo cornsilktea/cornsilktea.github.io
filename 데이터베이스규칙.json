@@ -62,7 +62,7 @@
           "red": { ".validate": "newData.isNumber() && newData.val() >= 0" },
           "blue": { ".validate": "newData.isNumber() && newData.val() >= 0" },
           "$char": {
-            ".validate": "$char.matches(/^(warrior|knight|ranger|mage|rogue|necro|sniper|thrower|lancer|blacksmith|priest|hitman|guardian|frost|dancer|duelist|stormbow|cleric|shaman)$/) && newData.hasChildren(['picks', 'wins', 'dmg', 'heal']) && newData.child('wins').val() <= newData.child('picks').val() && ((!data.exists() && newData.child('picks').val() <= ($mode === 'cup' ? 1 : 6)) || (data.exists() && newData.child('picks').val() >= data.child('picks').val() && newData.child('picks').val() <= data.child('picks').val() + ($mode === 'cup' ? 1 : 6)))",
+            ".validate": "$char.matches(/^(warrior|knight|ranger|mage|rogue|necro|sniper|thrower|lancer|blacksmith|priest|hitman|guardian|frost|dancer|duelist|stormbow|cleric|shaman|engineer|druid)$/) && newData.hasChildren(['picks', 'wins', 'dmg', 'heal']) && newData.child('wins').val() <= newData.child('picks').val() && ((!data.exists() && newData.child('picks').val() <= ($mode === 'cup' ? 1 : 6)) || (data.exists() && newData.child('picks').val() >= data.child('picks').val() && newData.child('picks').val() <= data.child('picks').val() + ($mode === 'cup' ? 1 : 6)))",
             "picks": { ".validate": "newData.isNumber() && newData.val() >= 0" },
             "wins": { ".validate": "newData.isNumber() && newData.val() >= 0" },
             "dmg": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5000" },

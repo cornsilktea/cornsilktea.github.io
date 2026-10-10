@@ -2851,7 +2851,7 @@ class ResultCollector {
 
   run(AIMG, "AI 역할: 기사·창술사·대장장이는 앞, 화염술사·주술사·궁수·뇌전사수·저격수는 뒤, 은신자·자객·결투가는 틈새를 노리는 역할인가", function (done) {
     var want = { knight: "front", lancer: "front", blacksmith: "front", guardian: "front", warrior: "front", mage: "back", shaman: "back", ranger: "back", stormbow: "back", sniper: "back", frost: "back", cleric: "back", necro: "back", thrower: "back",
-                 rogue: "flank", hitman: "flank", duelist: "flank", dancer: "back" }, bad = [];
+                 rogue: "flank", hitman: "flank", duelist: "flank", dancer: "back", engineer: "back", druid: "back" }, bad = [];
     Object.keys(want).forEach(function (c) { var got = api.CHAR_TYPES.of(c).botRole; if (got !== want[c]) bad.push(c + " " + got + " (기대 " + want[c] + ")"); });
     api.CHAR_LIST.forEach(function (c) { if (!want[c]) bad.push(c + " 역할이 정해지지 않음"); });
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : Object.keys(want).length + "명 역할이 맞음");
@@ -4387,8 +4387,172 @@ class ResultCollector {
     ["statsModal", "mapViewModal"].forEach(function (id) { document.getElementById(id).hidden = true; });
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "불러오기·집계 문구·표·모드 전환·실패·연결 없음·닫기·맵 보기");
   });
+  new EngineerDruidTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
   results.pending = Promise.resolve().then(function () { api.finish(api.currentMap()); }).then(drainAsync);
   return results;
+  }
+}
+
+class EngineerDruidTests {
+  static ENGINEER_GROUP = "공학자·포탑";
+  static DRUID_GROUP = "드루이드·부쉬";
+  constructor(api, kit) { this.api = api; this.kit = kit; }
+
+  lost(W, id) { var E = W.ent(id); return E.maxHp - E.hp; }
+  turretsAlive() { return this.api.FIELD.turrets.filter(function (s) { return !s.cut; }); }
+  shotsOf(W) { return W.log.filter(function (p) { return p.path === "effects" && p.v.type === "tshot"; }); }
+
+  freshWorld(list) {
+    this.api.MATCH.stateByKey = {};
+    return this.kit.world("forest", list);
+  }
+
+  engineerWorld(foes) {
+    var y = this.kit.OPEN_Y.forest;
+    return this.freshWorld([{ id: "eg", team: "blue", char: "engineer", x: 150, y: y, gauge: this.api.GAUGE_MAX }].concat(foes.map(function (f, i) {
+      return { id: f.id, team: "red", char: "guardian", x: f.x, y: y + (f.dy || 0), slot: i + 1 };
+    })));
+  }
+
+  register() {
+    var self = this, api = this.api, run = this.kit.run, FRAME = this.kit.FRAME, ULT = api.ULT, G = EngineerDruidTests.ENGINEER_GROUP, C = api.CHARS.engineer;
+    run(G, "공학자 기본 공격: 사거리 " + C.range + " 안의 적에게 렌치 " + C.dmg + "의 피해와 기본 게이지, 사거리 밖은 맞지 않는가", function (done) {
+      var bad = [], W = self.engineerWorld([{ id: "far", x: 150 + C.range + 80 }]), eg = W.ent("eg");
+      api.fireBasic(eg, 0); W.step(2500);
+      if (self.lost(W, "far") || eg.gauge !== api.GAUGE_MAX) bad.push("사거리 밖 적이 맞음 " + self.lost(W, "far"));
+      W = self.engineerWorld([{ id: "near", x: 150 + C.range - 60 }]); eg = W.ent("eg"); eg.gauge = 0;
+      api.fireBasic(eg, 0); W.step(2500);
+      if (self.lost(W, "near") !== C.dmg) bad.push("사거리 안 피해 " + self.lost(W, "near") + " (기대 " + C.dmg + ")");
+      if (eg.gauge !== api.roleGauge("engineer")) bad.push("게이지 " + eg.gauge + " (기대 " + api.roleGauge("engineer") + ")");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "사거리 안 " + C.dmg + "의 피해·게이지 " + api.roleGauge("engineer") + ", 사거리 밖은 맞지 않음");
+    });
+    run(G, "공학자 스킬: 자신의 자리에 포탑이 생기고 게이지가 0이 되며, 포탑은 최대 " + ULT.trMax + "개라 더 설치하면 가장 오래된 포탑이 사라지는가", function (done) {
+      var bad = [], W = self.engineerWorld([]), eg = W.ent("eg"), spots = [];
+      for (var i = 0; i < ULT.trMax + 1; i++) {
+        eg.gauge = api.GAUGE_MAX; eg.x = 150 + i * 120; eg.ultUntil = 0; spots.push(eg.x);
+        api.useUlt(eg, 0); W.frame(FRAME);
+        var live = self.turretsAlive();
+        if (i === 0 && (live.length !== 1 || live[0].e.x !== 150 || live[0].e.y !== eg.y)) bad.push("첫 포탑이 자신의 자리가 아님");
+        if (eg.gauge !== 0) bad.push("설치 뒤 게이지 " + eg.gauge);
+      }
+      var left = self.turretsAlive().map(function (s) { return s.e.x; }).sort();
+      if (left.length !== ULT.trMax) bad.push("포탑 " + left.length + "개 (기대 " + ULT.trMax + ")");
+      if (left.indexOf(spots[0]) >= 0) bad.push("가장 오래된 포탑이 남음");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "자신의 자리 설치·게이지 0·최대 " + ULT.trMax + "개(가장 오래된 것 제거)");
+    });
+    run(G, "포탑 사격: 사거리 안 적 1명만 쏘고 " + ULT.trHeavyEvery + "번째 포격은 " + ULT.trHeavyDmg + "의 피해와 기절, 맞힐 때마다 공학자 게이지 " + ULT.trGauge + " 회복인가", function (done) {
+      var bad = [], W = self.engineerWorld([{ id: "n1", x: 150 + 240 }, { id: "n2", x: 150 + 300, dy: 60 }]), eg = W.ent("eg");
+      api.useUlt(eg, 0); W.frame(FRAME);
+      W.step(ULT.trWarmMs + ULT.trCd * (ULT.trHeavyEvery - 1) + 60);
+      var shots = self.shotsOf(W);
+      if (shots.length !== ULT.trHeavyEvery) bad.push("사격 " + shots.length + "번 (기대 " + ULT.trHeavyEvery + ")");
+      if (shots.some(function (p) { return p.v.tgt !== "n1"; })) bad.push("가장 가까운 적 1명이 아닌 대상을 쏨");
+      if (shots.map(function (p) { return p.v.heavy; }).join() !== [0, 0, 1].join()) bad.push("강한 포격 순서 " + shots.map(function (p) { return p.v.heavy; }).join());
+      var want = ULT.trDmg * (ULT.trHeavyEvery - 1) + ULT.trHeavyDmg;
+      if (self.lost(W, "n1") !== want) bad.push("n1 피해 " + self.lost(W, "n1") + " (기대 " + want + ")");
+      if (self.lost(W, "n2")) bad.push("두 번째 적이 맞음 " + self.lost(W, "n2"));
+      if (!api.stunned(W.ent("n1"), W.t())) bad.push("강한 포격 뒤 기절하지 않음");
+      if (eg.gauge !== ULT.trGauge * ULT.trHeavyEvery) bad.push("게이지 " + eg.gauge + " (기대 " + ULT.trGauge * ULT.trHeavyEvery + ")");
+      W.step(ULT.trStunMs + 100);
+      if (api.stunned(W.ent("n1"), W.t())) bad.push("기절이 " + ULT.trStunMs + "ms 뒤에도 안 풀림");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "가까운 적 1명만 " + ULT.trHeavyEvery + "발(마지막 강한 포격 기절), 게이지 +" + eg.gauge);
+    });
+    run(G, "포탑 사거리·수명: 사거리 " + ULT.trR + " 밖 적은 쏘지 않고, 지속시간이 지나면 사라져 더 쏘지 않는가", function (done) {
+      var bad = [], W = self.engineerWorld([{ id: "out", x: 150 + ULT.trR + 120 }]), eg = W.ent("eg");
+      api.useUlt(eg, 0); W.step(ULT.trCd * 6);
+      if (self.shotsOf(W).length || self.lost(W, "out")) bad.push("사거리 밖 적을 쏨");
+      W.ent("out").x = 150 + 200; W.step(ULT.trDur + 600);
+      var shot = self.shotsOf(W).length;
+      if (!shot) bad.push("사거리 안으로 들어와도 쏘지 않음");
+      if (self.turretsAlive().length) bad.push("지속시간이 끝났는데 포탑이 남음");
+      W.step(ULT.trCd * 6);
+      if (self.shotsOf(W).length !== shot) bad.push("사라진 뒤에도 사격");
+      var expected = Math.floor((ULT.trDur - ULT.trCd * 6) / ULT.trCd), tolerance = 2;
+      if (Math.abs(shot - expected) > tolerance) bad.push("사격 수 " + shot + " (기대 약 " + expected + ")");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "사거리 밖 무사격, 지속시간 뒤 사라짐, 사격 " + shot + "번");
+    });
+    run(G, "공학자 패시브: 포탑 사거리 안에서만 이동속도 " + ULT.trSpeedBonus + "(게임 값) 증가하는가", function (done) {
+      var bad = [], W = self.engineerWorld([]), eg = W.ent("eg");
+      api.useUlt(eg, 0); W.frame(FRAME);
+      var inside = api.speedOf(eg), base = C.speed;
+      if (inside !== base + ULT.trSpeedBonus) bad.push("사거리 안 이동속도 " + inside + " (기대 " + (base + ULT.trSpeedBonus) + ")");
+      eg.x = 150 + ULT.trR + 40; W.frame(FRAME);
+      if (api.speedOf(eg) !== base) bad.push("사거리 밖 이동속도 " + api.speedOf(eg) + " (기대 " + base + ")");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "사거리 안 " + inside + ", 밖 " + base);
+    });
+    this.registerDruid();
+  }
+
+  druidWorld(extra) {
+    var y = this.kit.OPEN_Y.forest;
+    return this.freshWorld([{ id: "dr", team: "blue", char: "druid", x: 200, y: y }].concat(extra));
+  }
+
+  registerDruid() {
+    var self = this, api = this.api, run = this.kit.run, FRAME = this.kit.FRAME, ULT = api.ULT, G = EngineerDruidTests.DRUID_GROUP, C = api.CHARS.druid, y = this.kit.OPEN_Y.forest;
+    run(G, "드루이드 기본 공격: 덩굴 가시가 " + C.dmg + "의 피해를 주고 적을 둔화시키는가", function (done) {
+      var bad = [], W = self.druidWorld([{ id: "foe", team: "red", char: "guardian", x: 200 + 280, y: y }]), dr = W.ent("dr"), foe = W.ent("foe");
+      var before = api.speedOf(foe);
+      api.fireBasic(dr, 0);
+      for (var ms = 0; ms < 2500 && !self.lost(W, "foe"); ms += FRAME) W.frame(FRAME);
+      if (self.lost(W, "foe") !== C.dmg) bad.push("피해 " + self.lost(W, "foe") + " (기대 " + C.dmg + ")");
+      var slowed = api.speedOf(foe), want = Math.round(before * C.fx.slowMul);
+      if (foe.slowUntil <= W.t()) bad.push("둔화가 걸리지 않음");
+      else if (Math.abs(slowed - want) > 1) bad.push("둔화 뒤 속도 " + slowed + " (기대 " + want + ")");
+      W.step(C.fx.slowMs + 100);
+      if (api.speedOf(foe) !== before) bad.push("둔화가 풀리지 않음 " + api.speedOf(foe));
+      if (dr.gauge !== api.roleGauge("druid")) bad.push("게이지 " + dr.gauge + " (기대 " + api.roleGauge("druid") + ")");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "피해 " + C.dmg + "·둔화·게이지 " + dr.gauge);
+    });
+    run(G, "드루이드 스킬: 지정한 곳에 부쉬가 생겨 안의 아군만 1초당 " + ULT.drHeal + " 회복하고, 지속시간이 끝나면 사라지는가", function (done) {
+      var bad = [], W = self.druidWorld([
+        { id: "in", team: "blue", char: "guardian", x: 200 + 200 + 40, y: y },
+        { id: "out", team: "blue", char: "guardian", x: 200 + 200 + ULT.drR + 90, y: y },
+        { id: "foe", team: "red", char: "guardian", x: 200 + 200, y: y + 60 }
+      ]), dr = W.ent("dr"), a = W.ent("in"), b = W.ent("out"), foe = W.ent("foe");
+      dr.gauge = api.GAUGE_MAX; a.hp = 300; b.hp = 300; foe.hp = foe.maxHp - 200;
+      api.useUlt(dr, 0, 200); W.frame(FRAME);
+      var groves = api.FIELD.groves;
+      if (groves.length !== 1 || groves[0].e.x !== 400) bad.push("부쉬가 지정한 곳에 생기지 않음");
+      if (dr.gauge !== 0) bad.push("스킬 뒤 게이지 " + dr.gauge);
+      if (a.hp !== 300 + ULT.drHeal) bad.push("첫 회복 " + a.hp + " (기대 " + (300 + ULT.drHeal) + ")");
+      W.step(ULT.drTick + 60);
+      if (a.hp !== 300 + ULT.drHeal * 2) bad.push("두 번째 회복 " + a.hp + " (기대 " + (300 + ULT.drHeal * 2) + ")");
+      if (b.hp !== 300) bad.push("부쉬 밖 아군이 회복됨 " + b.hp);
+      if (foe.hp !== foe.maxHp - 200) bad.push("적이 회복됨");
+      W.step(ULT.drDur + 200);
+      var healed = a.hp;
+      if (api.FIELD.groves.length) bad.push("지속시간이 끝났는데 부쉬가 남음");
+      W.step(ULT.drTick * 2);
+      if (a.hp !== healed) bad.push("사라진 뒤에도 회복됨");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "안의 아군만 " + ULT.drHeal + "씩 회복, 적·밖 아군 제외, 지속시간 뒤 사라짐");
+    });
+    run(G, "드루이드 패시브: 자신의 부쉬 안에서 1초마다 최대 체력의 " + Math.round(ULT.drSelfRate * 100) + "% 회복하고 게이지가 1 차오르며, 밖에서는 아무 일도 없는가", function (done) {
+      var bad = [], W = self.druidWorld([]), dr = W.ent("dr"), tick = api.TIMESCALE.regenTickMs, self10 = Math.round(dr.maxHp * ULT.drSelfRate);
+      dr.gauge = api.GAUGE_MAX; api.useUlt(dr, 0); W.frame(FRAME);
+      if (api.FIELD.groves.length !== 1) bad.push("부쉬가 자신의 자리에 안 생김");
+      dr.hp = dr.maxHp - 90; var hp0 = dr.hp;
+      W.step(tick * 3 + 100);
+      var gain = dr.hp - hp0, wantGain = 3 * self10 + 3 * ULT.drHeal;
+      if (dr.gauge !== 3 * ULT.drSelfGauge) bad.push("게이지 " + dr.gauge + " (기대 " + 3 * ULT.drSelfGauge + ")");
+      if (gain !== Math.min(90, wantGain)) bad.push("회복 " + gain + " (기대 " + Math.min(90, wantGain) + ", 패시브 " + self10 + "×3 + 부쉬 " + ULT.drHeal + "×3)");
+      dr.x = 200 + ULT.drR + 80; dr.hp = dr.maxHp - 40; var g1 = dr.gauge, h1 = dr.hp;
+      W.step(tick * 3 + 100);
+      if (dr.hp !== h1 || dr.gauge !== g1) bad.push("부쉬 밖에서도 회복·게이지가 오름");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "안: 초당 " + self10 + "+부쉬 " + ULT.drHeal + " 회복·게이지 +1, 밖: 변화 없음");
+    });
+    run(G, "드루이드 패시브: 맵의 부쉬(풀숲) 안에서도 1초마다 체력 회복·게이지 +1 이 되는가", function (done) {
+      var bad = [], tiles = api.bushTiles(), spot = tiles.length ? tiles[0][0] : null;
+      if (!spot) { done("info", "이 맵에 풀숲이 없어 확인하지 못함"); return; }
+      var W = self.druidWorld([]), dr = W.ent("dr"), tick = api.TIMESCALE.regenTickMs;
+      dr.x = spot.x; dr.y = spot.y; dr.hp = dr.maxHp - 60; var hp0 = dr.hp;
+      if (!api.inBush(dr.x, dr.y)) bad.push("시험 준비 실패: 풀숲이 아님");
+      W.step(tick * 2 + 100);
+      var self10 = Math.round(dr.maxHp * ULT.drSelfRate);
+      if (dr.hp - hp0 !== 2 * self10) bad.push("회복 " + (dr.hp - hp0) + " (기대 " + 2 * self10 + ")");
+      if (dr.gauge !== 2 * ULT.drSelfGauge) bad.push("게이지 " + dr.gauge + " (기대 " + 2 * ULT.drSelfGauge + ")");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "풀숲 안 초당 " + self10 + " 회복·게이지 +1");
+    });
   }
 }
 
