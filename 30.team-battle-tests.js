@@ -4163,31 +4163,29 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "비율·밴픽·K/D/A·" + L.length + "줄+직업군 제목·맵 그림 주소");
   });
 
-  run(NICKG, "닉네임 창: 필수면 취소 버튼이 없고, 공백을 정리해 최대 글자 수로 자르며 저장하고, 비면 안내하고, 취소는 필수가 아닐 때만 되는가", function (done) {
-    var bad = [], input = document.getElementById("nickInput"), modal = document.getElementById("nickModal"), cancel = document.getElementById("btnNickCancel"), msg = document.getElementById("nickMsg");
-    var oldNick = api.setNick(""), stored = null;
-    try { stored = localStorage.getItem("tba_nickname"); } catch (e) {}
+  run(NICKG, "닉네임 창: 닉네임 설정 버튼이 공용 창(닉네임만, 캐릭터 꾸미기 없음)을 열고, 입력이 공용 프로필에 저장되어 화면에 반영되는가", function (done) {
+    var bad = [], modal = document.querySelector(".maker-modal");
+    var oldNick = api.setNick(""), oldGuard = null;
     try {
-      api.openNick(true);
-      if (modal.hidden || !cancel.hidden || input.value !== "") bad.push("필수 열기");
-      cancel.click(); if (modal.hidden) bad.push("필수인데 취소로 닫힘");
-      input.value = "   "; document.getElementById("btnNickSave").click();
-      if (msg.textContent.indexOf("닉네임을 입력") < 0 || modal.hidden) bad.push("빈 닉네임 안내 '" + msg.textContent + "'");
-      input.value = "  가   나다라마  "; document.getElementById("btnNickSave").click();
-      var expected = "가 나".slice(0, api.NICK_MAX);
-      if (api.nickNow() !== expected || !modal.hidden || document.getElementById("helloNick").textContent !== expected || document.getElementById("lobbyNick").textContent !== expected) bad.push("저장 결과 '" + api.nickNow() + "'");
-      if (localStorage.getItem("tba_nickname") !== expected) bad.push("기기에 저장");
-      document.getElementById("btnNickEdit").click();
-      if (modal.hidden || cancel.hidden || input.value !== expected) bad.push("수정 열기");
-      cancel.click(); if (!modal.hidden) bad.push("취소로 안 닫힘");
-      document.getElementById("btnNickEdit2").click(); input.value = "엔터"; input.onkeydown({ key: "Enter" });
-      if (api.nickNow() !== "엔터".slice(0, api.NICK_MAX)) bad.push("엔터로 저장");
+      document.getElementById("btnNickEdit") && bad.push("옛 닉네임 버튼이 남음");
+      if (!modal) { done("fail", "공용 닉네임 창이 없음"); return; }
+      modal.hidden = true;
+      document.querySelector("#cardLobby [data-maker-open], [data-maker-open]").click();
+      var input = modal.querySelector(".ce-nick");
+      if (modal.hidden || !input) bad.push("버튼으로 창이 안 열림");
+      else {
+        if (modal.querySelector(".ce-types, canvas")) bad.push("캐릭터 꾸미기가 나옴");
+        if (modal.textContent.indexOf("본명") < 0) bad.push("본명 안내 없음");
+        input.value = "가나다라마바사아자차"; input.dispatchEvent(new Event("input", { bubbles: true })); input.dispatchEvent(new Event("change", { bubbles: true }));
+        var expected = "가나다라마바사아자차".slice(0, api.NICK_MAX);
+        if (api.nickNow() !== expected || document.getElementById("helloNick").textContent !== expected || document.getElementById("lobbyNick").textContent !== expected) bad.push("저장 결과 '" + api.nickNow() + "'");
+        if (JSON.parse(localStorage.getItem("portal_profile_v1")).nick !== expected) bad.push("공용 프로필에 저장 안 됨");
+      }
     } finally {
-      api.setNick(oldNick); modal.hidden = true; input.value = "";
-      try { if (stored === null) localStorage.removeItem("tba_nickname"); else localStorage.setItem("tba_nickname", stored); } catch (e) {}
+      api.setNick(oldNick); if (modal) modal.hidden = true; document.body.style.overflow = "";
       api.refreshNick();
     }
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "필수·빈 값·공백 정리·글자 수·저장·수정·취소·엔터");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "공용 창 열림·닉네임만·본명 안내·글자 수·공용 프로필 저장");
   });
 
   var LAUNCHG = "경기 시작", PRACG = "연습모드";

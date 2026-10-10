@@ -607,7 +607,7 @@
     <div class="card">
       <h1 class="titleMain"><span class="tb">3v3</span> 팀 배틀 <span class="tr">아레나</span></h1>
       <p class="sub">1분 30초 동안 상대를 더 많이 쓰러뜨린 팀이 승리!<br>쓰러지면 3초 뒤 처음 자리에서 부활하고, 부활 후 2.5초 동안은 피해를 받지 않아요. 킬 스코어가 같으면 무승부.</p>
-      <div class="hello">안녕하세요, <b id="helloNick"></b>님 👋 <button id="btnNickEdit" class="mini" type="button">✏️ 변경</button></div>
+      <div class="hello">안녕하세요, <b id="helloNick"></b>님 👋 <button class="mini" type="button" data-maker-open>✏️ 닉네임 설정</button></div>
       <button id="btnCreate" class="big primary" type="button">방 만들기</button>
       <div id="joinBox">
         <div class="row">
@@ -635,7 +635,7 @@
         <button id="btnLeaveLobby" class="mini danger" type="button">방 나가기</button>
       </div>
       <div class="lobbyTop">
-        <div class="hello">내 닉네임: <b id="lobbyNick"></b> <button id="btnNickEdit2" class="mini" type="button">✏️ 변경</button></div>
+        <div class="hello">내 닉네임: <b id="lobbyNick"></b> <button class="mini" type="button" data-maker-open>✏️ 닉네임 설정</button></div>
         <div class="optRows">
           <div class="optRow"><span class="optLab">게임모드</span><span id="modeBtns" class="modeBtns"></span></div>
           <div class="optRow"><span class="optLab">맵</span><span id="mapBtns" class="modeBtns"></span></div>
@@ -787,18 +787,9 @@
   </div>
 </div>
 
-<div id="nickModal" class="modal" hidden>
-  <div class="modalBox">
-    <h3>닉네임을 입력해 주세요</h3>
-    <div class="row">
-      <input id="nickInput" maxlength="3" placeholder="최대 3자" autocomplete="off">
-      <button id="btnNickSave" class="primary" type="button">저장</button>
-    </div>
-    <div id="nickMsg" class="msg"></div>
-    <button id="btnNickCancel" class="mini cancel" type="button">취소</button>
-  </div>
-</div>
-
+<script charset="utf-8" src="character-kit.js?v=20261010"></script>
+<script charset="utf-8" src="character-maker.js?v=20261010"></script>
+<script>new CharacterMakerDialog(undefined, false);</script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -1166,38 +1157,29 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var SOUND = new SoundBox();
   var SEMITONE = Math.pow(2, 1 / 12);
 
-  var NICK_MAX = 3;
+  var NICK_MAX = PlayerProfile.MAX_NICK_LENGTH;
   class NickDialog {
-    constructor() {
-      this.name = "";
-      try { this.name = (localStorage.getItem("tba_nickname") || "").slice(0, NICK_MAX); } catch (e) { this.name = ""; }
-      this.required = false;
+    get name() { return PlayerProfile.storedNick(); }
+    replaceStored(text) {
+      var before = this.name;
+      new PlayerProfile().setNick(text);
+      return before;
     }
-    openNick(required) {
-      NICK.required = required;
-      $("nickInput").value = NICK.name || "";
-      setText($("nickMsg"), "");
-      show($("btnNickCancel"), !required);
-      show($("nickModal"), true);
-      setTimeout(function () { try { $("nickInput").focus(); } catch (e) {} }, 50);
+    openNick() { CharacterMakerDialog.requestOpen(); }
+    askFirst() {
+      if (this.name) return true;
+      LOBBY.startMsg(PlayerProfile.NICK_REQUIRED_NOTICE);
+      this.openNick();
+      return false;
     }
-    saveNick() {
-      var v = $("nickInput").value.replace(/\s+/g, " ").trim().slice(0, NICK_MAX);
-      if (!v) { setText($("nickMsg"), "닉네임을 입력해 주세요."); return; }
-      NICK.name = v;
-      try { localStorage.setItem("tba_nickname", v); } catch (e) {}
-      show($("nickModal"), false);
-      NICK.refreshNick();
-      if (SESSION.room && SESSION.players[SESSION.myId]) SESSION.room.ref.child("players/" + SESSION.myId + "/nickname").set(NICK.name);
+    refreshNick() { setText($("helloNick"), this.name); setText($("lobbyNick"), this.name); }
+    pushToRoom() {
+      if (this.name && SESSION.room && SESSION.players[SESSION.myId]) SESSION.room.ref.child("players/" + SESSION.myId + "/nickname").set(this.name);
     }
-    refreshNick() { setText($("helloNick"), NICK.name); setText($("lobbyNick"), NICK.name); }
   }
   var NICK = new NickDialog();
-  $("btnNickSave").onclick = function () { NICK.saveNick(); };
-  $("nickInput").onkeydown = function (e) { if (e.key === "Enter") NICK.saveNick(); };
-  $("btnNickCancel").onclick = function () { if (!NICK.required) show($("nickModal"), false); };
-  $("btnNickEdit").onclick = function () { NICK.openNick(false); };
-  $("btnNickEdit2").onclick = function () { NICK.openNick(false); };
+  document.addEventListener(PlayerProfile.CHANGE_EVENT, function () { NICK.refreshNick(); });
+  document.addEventListener(PlayerProfile.SETTLED_EVENT, function () { NICK.refreshNick(); NICK.pushToRoom(); });
 
   class Backend {
     constructor() {
@@ -2154,9 +2136,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   $("btnLeaveLobby").onclick = SESSION.leaveRoom.bind(SESSION);
   $("btnLeaveGame").onclick = function () { if (confirm("방을 나갈까요?")) SESSION.leaveRoom(); };
   $("btnLeaveEnd").onclick = SESSION.leaveRoom.bind(SESSION);
-  $("btnCreate").onclick = function () { SOUND.audio(); SESSION.createRoom(); };
-  $("btnJoin").onclick = function () { SOUND.audio(); SESSION.joinRoom(); };
-  $("joinCode").onkeydown = function (e) { if (e.key === "Enter") SESSION.joinRoom(); };
+  $("btnCreate").onclick = function () { SOUND.audio(); if (NICK.askFirst()) SESSION.createRoom(); };
+  $("btnJoin").onclick = function () { SOUND.audio(); if (NICK.askFirst()) SESSION.joinRoom(); };
+  $("joinCode").onkeydown = function (e) { if (e.key === "Enter" && NICK.askFirst()) SESSION.joinRoom(); };
   $("btnStart").onclick = function () { LAUNCHER.startGame(); };
 
   var PRACTICE_BOTS = [
@@ -8543,7 +8525,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       createRoom: SESSION.createRoom.bind(SESSION), joinRoom: SESSION.joinRoom.bind(SESSION), enterRoom: SESSION.enterRoom.bind(SESSION), leaveRoom: SESSION.leaveRoom.bind(SESSION), exitToStart: SESSION.exitToStart.bind(SESSION), nextHost: SESSION.nextHost.bind(SESSION), checkHost: SESSION.checkHost.bind(SESSION),
       tryResume: SESSION.tryResume.bind(SESSION), saveResume: SESSION.saveResume.bind(SESSION), readResume: SESSION.readResume.bind(SESSION), clearResume: SESSION.clearResume.bind(SESSION), resumeTeam: SESSION.resumeTeam.bind(SESSION), RESUME_KEY: RESUME_KEY, RESUME_MS: RESUME_MS,
       room: function () { return SESSION.room; }, players: function () { return SESSION.players; }, screen: function () { return SCREENS.now; },
-      setConf: function (conf) { var before = BACKEND.conf; BACKEND.conf = conf; return before; }, setNick: function (n) { var before = NICK.name; NICK.name = n; return before; },
+      setConf: function (conf) { var before = BACKEND.conf; BACKEND.conf = conf; return before; }, setNick: function (n) { return NICK.replaceStored(n); },
       capOf: ROSTER.capOf.bind(ROSTER), countIn: ROSTER.countIn.bind(ROSTER), isPlayingTeam: ROSTER.isPlayingTeam.bind(ROSTER), takenInMatch: ROSTER.takenInMatch.bind(ROSTER), freeCharOn: ROSTER.freeCharOn.bind(ROSTER), onlyOneMsg: ROSTER.onlyOneMsg.bind(ROSTER), canMoveTo: ROSTER.canMoveTo.bind(ROSTER),
       pickTeam: ROSTER.pickTeam.bind(ROSTER), pickChar: ROSTER.pickChar.bind(ROSTER), setMode: ROSTER.setMode.bind(ROSTER), setMapChoice: ROSTER.setMapChoice.bind(ROSTER), addAi: ROSTER.addAi.bind(ROSTER), removeAi: ROSTER.removeAi.bind(ROSTER), mapChoices: LOBBY.mapChoices.bind(LOBBY), resolveArena: ARENA_MAP.resolveArena.bind(ARENA_MAP), modeName: LOBBY.modeName.bind(LOBBY),
       renderLobby: LOBBY.renderLobby.bind(LOBBY), flashHint: LOBBY.flashHint.bind(LOBBY), clearHint: function () { LOBBY.hintUntil = 0; LOBBY.hintText = ""; }, practiceMode: SESSION.practiceMode.bind(SESSION), TEAM_MAX: TEAM_MAX, SPEC_MAX: SPEC_MAX, FALLBACK_CHAR: FALLBACK_CHAR, MODES: MODES,
@@ -8554,7 +8536,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       startGame: LAUNCHER.startGame.bind(LAUNCHER), launchMatch: LAUNCHER.launchMatch.bind(LAUNCHER), practiceSpots: LAUNCHER.practiceSpots.bind(LAUNCHER), PRACTICE_BOTS: PRACTICE_BOTS, leavePractice: PRACTICE.leavePractice.bind(PRACTICE), fillPracticeGauge: PRACTICE.fillPracticeGauge.bind(PRACTICE),
       openPracticeChars: PRACTICE.openPracticeChars.bind(PRACTICE), changePracticeChar: PRACTICE.changePracticeChar.bind(PRACTICE), renderPracticeModal: PRACTICE.renderPracticeModal.bind(PRACTICE), showScreen: SCREENS.showScreen.bind(SCREENS),
       statsPct: STATS_VIEW.statsPct.bind(STATS_VIEW), statsRateCell: STATS_VIEW.statsRateCell.bind(STATS_VIEW), banPickCell: STATS_VIEW.banPickCell.bind(STATS_VIEW), kdaText: STATS_VIEW.kdaText.bind(STATS_VIEW), statsRowsHtml: STATS_VIEW.statsRowsHtml.bind(STATS_VIEW), loadStats: STATS_VIEW.loadStats.bind(STATS_VIEW), mapShotSrc: ARENA_MAP.shotSrc.bind(ARENA_MAP), statsModeNow: function () { return STATS_VIEW.mode; },
-      sfx: SOUND.sfx.bind(SOUND), killSound: SOUND.killSound.bind(SOUND), audio: SOUND.audio.bind(SOUND), openNick: NICK.openNick.bind(NICK), saveNick: NICK.saveNick.bind(NICK), refreshNick: NICK.refreshNick.bind(NICK), nickNow: function () { return NICK.name; }, NICK_MAX: NICK_MAX,
+      sfx: SOUND.sfx.bind(SOUND), killSound: SOUND.killSound.bind(SOUND), audio: SOUND.audio.bind(SOUND), openNick: NICK.openNick.bind(NICK), refreshNick: NICK.refreshNick.bind(NICK), nickNow: function () { return NICK.name; }, NICK_MAX: NICK_MAX,
       playable: CATALOG.playable.bind(CATALOG), pickable: CATALOG.pickable.bind(CATALOG), roleOf: CATALOG.roleOf.bind(CATALOG), roParticle: roParticle, josa: josa, charsInRole: CATALOG.charsInRole.bind(CATALOG), isMelee: CATALOG.isMelee.bind(CATALOG), charImgSrc: CATALOG.charImgSrc.bind(CATALOG),
       ultDesc: SKILLTEXT.ultDesc.bind(SKILLTEXT), passiveDesc: SKILLTEXT.passiveDesc.bind(SKILLTEXT), basicDesc: SKILLTEXT.basicDesc.bind(SKILLTEXT), skillBlocks: SKILLTEXT.skillBlocks.bind(SKILLTEXT), statTable: SKILLTEXT.statTable.bind(SKILLTEXT), roleGaugeText: SKILLTEXT.roleGaugeText.bind(SKILLTEXT), num: SKILLTEXT.num.bind(SKILLTEXT), secs: SKILLTEXT.secs.bind(SKILLTEXT), shownSpeed: SKILLTEXT.shownSpeed.bind(SKILLTEXT),
       attackText: SKILLTEXT.attackText.bind(SKILLTEXT), pctOf: SKILLTEXT.pctOf.bind(SKILLTEXT), slowPct: SKILLTEXT.slowPct.bind(SKILLTEXT), healCutPct: SKILLTEXT.healCutPct.bind(SKILLTEXT), ultSpeedUpText: SKILLTEXT.ultSpeedUpText.bind(SKILLTEXT), teamHitColor: teamHitColor,
@@ -8571,7 +8553,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   NICK.refreshNick();
   SCREENS.showScreen("start");
   if (!BACKEND.db) LOBBY.startMsg("온라인 연결을 준비하지 못했어요. 인터넷 연결을 확인해 주세요.");
-  if (!NICK.name) NICK.openNick(true);
+  if (!NICK.name) NICK.openNick();
   if (!/[?&](test|sim)(&|$)/.test(location.search)) SESSION.tryResume();
   if (!SILENT_RUN) new FullscreenKeeper(document).watch();
   LOOP.start();
