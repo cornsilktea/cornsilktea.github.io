@@ -3,7 +3,8 @@
   [int]$Seed = 5000,
   [int]$Shards = 4,
   [int]$Port = 8791,
-  [int]$TimeoutMinutes = 40
+  [int]$TimeoutMinutes = 40,
+  [string]$NoFighter = ''
 )
 # 30번 아레나 시뮬레이션을 크롬 창 여러 개(headless)에 나눠 돌린다. 판마다 시드가 정해져 있어 한 번에 돌린 결과와 같다.
 # 로컬 서버(.claude/serve.ps1, 포트 $Port)가 켜져 있어야 하고, 조각 결과는 sim-reports/ 에 저장된다.
@@ -18,7 +19,7 @@ $profiles = Join-Path $env:TEMP 'tb-sim-profiles'
 $procs = @()
 $started = Get-Date
 for ($i = 0; $i -lt $Shards; $i++) {
-  $url = "http://localhost:$Port/30.team-battle-arena.html?c=test&sim&shard=$i/$Shards&games=$Games&seed=$Seed&upload=1"
+  $url = "http://localhost:$Port/30.team-battle-arena.html?c=test&sim&shard=$i/$Shards&games=$Games&seed=$Seed&upload=1&nofighter=$NoFighter"
   $procs += Start-Process $chrome -PassThru -ArgumentList @('--headless=new', '--disable-gpu', '--no-first-run', '--mute-audio', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows', "--user-data-dir=$profiles\$i", $url)
 }
 $deadline = $started.AddMinutes($TimeoutMinutes)

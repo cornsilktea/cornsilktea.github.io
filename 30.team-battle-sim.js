@@ -52,9 +52,9 @@ export function createSim(api) {
   }
 
   function teamCode(chars) { return chars.map(function (c) { return SimSettings.ROLE_CODE[api.CHARS[c].role]; }).sort().join(""); }
-  function pickTeamsOnce(rnd) {
+  function pickTeamsOnce(rnd, excludedFromFighterPick) {
     var all = api.CHAR_LIST.slice();
-    var fighters = all.filter(function (c) { return api.CHARS[c].role === "fighter"; });
+    var fighters = all.filter(function (c) { return api.CHARS[c].role === "fighter" && (excludedFromFighterPick || []).indexOf(c) < 0; });
     function take(list) { return list.splice(Math.floor(rnd() * list.length), 1)[0]; }
     var blueFighter = take(fighters);
     var redFighter = take(fighters);
@@ -71,22 +71,22 @@ export function createSim(api) {
     var firstTeam = matchup[0].split("").map(take), secondTeam = matchup[1].split("").map(take);
     return swapSides ? { blue: secondTeam, red: firstTeam } : { blue: firstTeam, red: secondTeam };
   }
-  function pickTeams(rnd, avoid, matchup, swapSides) {
+  function pickTeams(rnd, avoid, matchup, swapSides, excludedFromFighterPick) {
     if (matchup) return pickMatchupTeams(rnd, matchup, swapSides);
-    var teams = pickTeamsOnce(rnd);
+    var teams = pickTeamsOnce(rnd, excludedFromFighterPick);
     if (!avoid || !avoid.length) return teams;
     for (var tries = 0; tries < SimSettings.AVOID_MAX_TRIES; tries++) {
       if (avoid.indexOf(teamCode(teams.blue)) < 0 && avoid.indexOf(teamCode(teams.red)) < 0) return teams;
-      teams = pickTeamsOnce(rnd);
+      teams = pickTeamsOnce(rnd, excludedFromFighterPick);
     }
     return teams;
   }
 
-  function playOne(mapId, seed, avoid, matchup) {
+  function playOne(mapId, seed, avoid, matchup, excludedFromFighterPick) {
     var rnd = new SeededRandom(seed).asFunction(), realRandom = Math.random;
     Math.random = rnd;
     try {
-      var teams = pickTeams(rnd, avoid, matchup, seed % 2 === 1), list = [];
+      var teams = pickTeams(rnd, avoid, matchup, seed % 2 === 1, excludedFromFighterPick), list = [];
       ["blue", "red"].forEach(function (team) {
         teams[team].forEach(function (c, i) { list.push({ id: team + (i + 1), team: team, char: c, slot: i + 1 }); });
       });
@@ -185,7 +185,7 @@ export function createSim(api) {
 
   function simOptions(games, seedBase, options) {
     var matchup = options && options.matchup ? options.matchup.map(function (code) { return code.toUpperCase(); }) : null;
-    return { games: games, seedBase: seedBase || 5000, avoid: matchup ? [] : (options && options.avoid ? options.avoid : SimSettings.DEFAULT_AVOID.slice()), matchup: matchup };
+    return { games: games, seedBase: seedBase || 5000, avoid: matchup ? [] : (options && options.avoid ? options.avoid : SimSettings.DEFAULT_AVOID.slice()), matchup: matchup, fighterPickExclude: options && options.fighterPickExclude || [] };
   }
   var sim = { results: [], done: false, error: null, startedAt: 0, options: {} };
   sim.run = function (games, seedBase, options) {
@@ -197,7 +197,7 @@ export function createSim(api) {
     function next() {
       try {
         var sliceEnd = Date.now() + 200;
-        while (i < last && Date.now() < sliceEnd) { sim.results.push(playOne(api.MAP_IDS[i % api.MAP_IDS.length], sim.options.seedBase + i, sim.options.avoid, sim.options.matchup)); i++; }
+        while (i < last && Date.now() < sliceEnd) { sim.results.push(playOne(api.MAP_IDS[i % api.MAP_IDS.length], sim.options.seedBase + i, sim.options.avoid, sim.options.matchup, sim.options.fighterPickExclude)); i++; }
       } catch (err) { sim.error = String(err && err.stack || err); return; }
       if (i < last) channel.port2.postMessage(0);
       else { sim.done = true; sim.finishedAt = Date.now(); api.finish(api.MAP_IDS[0]); if (options && options.onDone) options.onDone(sim.results); }
@@ -296,7 +296,7 @@ export class SimLauncher {
   start() {
     var shard = (this.query.get("shard") || "").split("/");
     if (shard.length !== 2) return false;
-    this.sim.runShard(+shard[0], +shard[1], +this.query.get("games") || 5000, +this.query.get("seed") || 5000, { upload: this.query.get("upload") === "1" });
+    this.sim.runShard(+shard[0], +shard[1], +this.query.get("games") || 5000, +this.query.get("seed") || 5000, { upload: this.query.get("upload") === "1", fighterPickExclude: (this.query.get("nofighter") || "").split(",").filter(Boolean) });
     return true;
   }
 }
@@ -397,7 +397,7 @@ class ReportRenderer {
     var avoid = D.options.avoid || [];
     var optCard = D.options.matchup
       ? "<div class=\"card\"><b>" + D.options.matchup.map(comboName).join(" vs ") + "</b><span>고정 대결(판마다 진영 바꿈)</span></div>"
-      : "<div class=\"card\"><b>" + (avoid.length ? avoid.map(comboName).join(" ") : "없음") + "</b><span>AI가 피한 조합</span></div>";
+      : "<div class=\"card\"><b>" + (avoid.length ? avoid.map(comboName).join(" ") : "없음") + "</b><span>AI가 피한 조합" + (D.options.fighterPickExclude && D.options.fighterPickExclude.length ? " · 팀 전사 고르기에서 제외: " + D.options.fighterPickExclude.join(", ") : "") + "</span></div>";
     var comboRows = D.combos.map(function (c) {
       var tint = this.winTint(c.win);
       return "<tr><td>" + comboName(c.code) + "</td><td>" + c.n + "</td><td class=\"win" + tint + "\">" + fixed(c.win * 100, 1) + "%</td></tr>";
