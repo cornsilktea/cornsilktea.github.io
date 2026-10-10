@@ -217,7 +217,8 @@ class ResultCollector {
       { id: "far", team: "red", char: "guardian", x: 200 + c.dashRange + 120, y: y }
     ]);
     var du = W.ent("du"), near = W.ent("near"), far = W.ent("far");
-    du.hp = 200;
+    var hpBefore = du.maxHp - 50;
+    du.hp = hpBefore;
     api.fireBasic(du, 0);
     W.step(c.dashMs - 50);
     var early = near.hp < near.maxHp || far.hp < far.maxHp;
@@ -226,7 +227,7 @@ class ResultCollector {
     if (early) bad.push("도착 전에 찌름");
     if (near.hp !== near.maxHp - c.dmg) bad.push("가까운 적 피해 " + (near.maxHp - near.hp));
     if (far.hp !== far.maxHp) bad.push("먼 적도 맞음");
-    if (du.hp !== 200 + c.selfHeal) bad.push("회복 후 체력 " + du.hp);
+    if (du.hp !== hpBefore + c.selfHeal) bad.push("회복 후 체력 " + du.hp);
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "가까운 적만 " + c.dmg + " 피해, 체력 " + c.selfHeal + " 회복");
   });
 
