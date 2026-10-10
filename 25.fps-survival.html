@@ -263,6 +263,9 @@
   #overlay.st-screen .card .btn:disabled { box-shadow: none; }
   #overlay.st-screen .card .wideBtn, #overlay.st-screen #btnTeamBack { display: block; width: 100%; margin-top: 10px; }
   #overlay.st-screen .card .btns { justify-content: flex-start; }
+  #overlay.st-screen .nickLine { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  #overlay.st-screen .nickLine b { flex: 1; min-width: 0; font-size: 20px; color: #FFB08C; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #overlay.st-screen .nickLine .btn { flex: 0 0 auto; margin: 0; }
   #overlay.st-screen .joinRow { justify-content: flex-start; flex-wrap: nowrap; margin-top: 0; }
   #overlay.st-screen .joinRow input { flex: 1; min-width: 0; width: auto; height: 54px; background: rgba(255, 255, 255, .06); border: 2px solid rgba(255, 255, 255, .3); border-radius: 6px; color: #fff; text-align: left; }
   #overlay.st-screen .joinRow input#joinCode { text-align: center; letter-spacing: 4px; }
@@ -384,8 +387,8 @@
 
   <div class="card" id="cardTeamStart" style="display:none">
     <div class="logo">👥 팀 대전</div>
-    <label class="fieldLab" for="nickInput">닉네임</label>
-    <div class="joinRow"><input id="nickInput" maxlength="6" placeholder="최대 6글자" autocomplete="off"></div>
+    <label class="fieldLab">내 닉네임</label>
+    <div class="nickLine"><b id="teamNick"></b><button type="button" class="btn sub" data-maker-open>🎭 캐릭터 만들기</button></div>
     <button type="button" class="btn wideBtn" id="btnCreate">방 만들기</button>
     <label class="fieldLab" for="joinCode">방 코드로 입장</label>
     <div class="joinRow"><input id="joinCode" inputmode="numeric" maxlength="5" placeholder="방 코드 5자리" autocomplete="off"><button type="button" class="btn" id="btnJoin">입장</button></div>
@@ -407,6 +410,7 @@
 
   <div class="card wide" id="cardLobby" style="display:none">
     <div class="codeLine">방 코드<b id="lobbyCode">00000</b></div>
+    <div class="nickLine"><b id="lobbyNick"></b><button type="button" class="btn sub" data-maker-open>🎭 캐릭터 만들기</button></div>
     <div class="teams">
       <div class="team blue"><h3>블루팀</h3><div id="listBlue"></div><button type="button" class="btn sub" id="btnJoinBlue">블루팀으로</button></div>
       <div class="team red"><h3>레드팀</h3><div id="listRed"></div><button type="button" class="btn sub" id="btnJoinRed">레드팀으로</button></div>
@@ -449,6 +453,10 @@
 <canvas id="miniMap" hidden></canvas>
 <button type="button" id="btnGameLeave" hidden>나가기</button>
 
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
+<script charset="utf-8" src="character-kit.js?v=20261010"></script>
+<script charset="utf-8" src="character-maker.js?v=20261010"></script>
+<script>new CharacterMakerDialog();</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
@@ -2235,7 +2243,6 @@ function update(dt) {
 }
 const TEAM = { max: 2, specMax: 1, netMs: 143, matchMs: 120000, countMs: 3000, respawnMs: 3000, protectMs: 3000, lerpMs: 160, root: "fpsbattle/rooms" };
 const FIREBASE_SDK = ["https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js", "https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"];
-const NICK_KEY = "fpsbattle_nick";
 const TEAM_NAME = { blue: "블루", red: "레드" };
 const TEAM_ITEM_PAIRS = [ [[-27, 0], [27, 0]], [[-12, -12], [12, -12]], [[-12, 12], [12, 12]], [[0, -6], [0, 6]], [[-20, 0], [20, 0]] ];
 const TEAM_ITEM_WAVES = (() => {
@@ -2247,12 +2254,11 @@ const NET_FLAG = { alive: 1, pistol: 2, protect: 4, moving: 8 };
 const netDebug = /netdebug/.test(location.hash);
 const T = {
   db: null, ref: null, code: "", myId: "p" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4),
-  nick: "", serverOffset: 0, players: {}, status: null, host: null, hostLoaded: false, startAt: 0, botFill: true, itemWave: 0,
+  serverOffset: 0, players: {}, status: null, host: null, hostLoaded: false, startAt: 0, botFill: true, itemWave: 0,
   subs: [], botSubs: [], leaving: false, screen: "", spec: false, match: null, me: null, pov: null,
   ents: {}, bots: {}, raw: {}, kills: {}, dmg: {}, items: {}, bullets: [], sent: {}, lastNet: 0, forceNet: false, statusSent: "",
   lobbyQueued: false, textCache: {}, net: { up: 0, down: 0, t: 0 },
 };
-try { T.nick = localStorage.getItem(NICK_KEY) || ""; } catch (e) {}
 const tnow = () => Date.now() + T.serverOffset;
 const okeys = o => o ? Object.keys(o) : [];
 const byJoin = ps => (a, b) => ((ps[a] && ps[a].joinedAt) || 0) - ((ps[b] && ps[b].joinedAt) || 0);
@@ -2288,7 +2294,7 @@ function enterTeamMode() {
   clearSoloWorld();
   state = "team"; useMap("team");
   for (const k in keys) keys[k] = false;
-  $("nickInput").value = T.nick;
+  refreshTeamNick();
   teamStartMsg("");
   teamScreen("start");
 }
@@ -2319,14 +2325,22 @@ function teamScreen(name) {
   if (name === "lobby") renderLobby();
 }
 function teamStartMsg(t) { $("teamStartMsg").textContent = t || ""; }
-function saveNickFromInput() {
-  const v = $("nickInput").value.replace(/\s+/g, " ").trim().slice(0, 6);
-  if (!v) return false;
-  T.nick = v;
-  try { localStorage.setItem(NICK_KEY, v); } catch (e) {}
-  return true;
+function refreshTeamNick() {
+  const nick = PlayerProfile.storedNick();
+  $("teamNick").textContent = nick || "(닉네임 없음)";
+  $("lobbyNick").textContent = nick;
 }
-function newPlayer(team, t) { return { nickname: T.nick, team, isAI: false, joinedAt: t }; }
+function pushNickToRoom() {
+  const nick = PlayerProfile.storedNick();
+  if (nick && T.ref && T.players[T.myId]) T.ref.child("players/" + T.myId + "/nickname").set(nick);
+}
+function nickReady() {
+  if (PlayerProfile.storedNick()) return true;
+  teamStartMsg(PlayerProfile.NICK_REQUIRED_NOTICE);
+  CharacterMakerDialog.requestOpen();
+  return false;
+}
+function newPlayer(team, t) { return { nickname: PlayerProfile.storedNick(), team, isAI: false, joinedAt: t }; }
 
 function roomCodes() {
   const base = String((window.PORTAL_CONFIG || {}).DB_URL || "").replace(/\/+$/, "");
@@ -2349,7 +2363,7 @@ function sweepRooms() {
   }).catch(() => {});
 }
 async function createRoom() {
-  if (!saveNickFromInput()) { teamStartMsg("닉네임을 먼저 입력해 주세요."); return; }
+  if (!nickReady()) return;
   $("btnCreate").disabled = true; teamStartMsg("연결하는 중…");
   try {
     await connectDb();
@@ -2365,7 +2379,7 @@ async function createRoom() {
   finally { $("btnCreate").disabled = false; }
 }
 async function joinRoom() {
-  if (!saveNickFromInput()) { teamStartMsg("닉네임을 먼저 입력해 주세요."); return; }
+  if (!nickReady()) return;
   const code = $("joinCode").value.replace(/\D/g, "");
   if (code.length !== 5) { teamStartMsg("방 코드 5자리를 입력해 주세요."); return; }
   $("btnJoin").disabled = true; teamStartMsg("연결하는 중…");
@@ -3285,7 +3299,8 @@ function drawSpectator(t, nowMs) {
 $("btnCreate").onclick = e => { e.currentTarget.blur(); createRoom(); };
 $("btnJoin").onclick = e => { e.currentTarget.blur(); joinRoom(); };
 $("joinCode").addEventListener("keydown", e => { if (e.key === "Enter") joinRoom(); });
-$("nickInput").addEventListener("keydown", e => { if (e.key === "Enter") createRoom(); });
+document.addEventListener(PlayerProfile.CHANGE_EVENT, refreshTeamNick);
+document.addEventListener(PlayerProfile.SETTLED_EVENT, () => { refreshTeamNick(); pushNickToRoom(); });
 $("btnTeamBack").onclick = e => { e.currentTarget.blur(); exitTeamMode(); };
 $("btnJoinBlue").onclick = () => pickTeam("blue");
 $("btnJoinRed").onclick = () => pickTeam("red");

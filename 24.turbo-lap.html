@@ -138,11 +138,6 @@
   #overlay.st-screen .slot.mine { box-shadow: inset 0 0 0 2px #FFB08C; }
   #overlay.st-screen .slot small, #overlay.st-screen .specBox .none { color: #A9AFC2; }
   #overlay.st-screen #btnBStart { background: #D97B4F; border-color: #D97B4F; }
-  #nickModal.modal { background: rgba(8, 10, 18, .7); }
-  #nickModal .modalBox { background: #161826; border: 1px solid rgba(255, 255, 255, .18); border-radius: 8px; color: #EEF0F4; }
-  #nickModal .modalBox .btn { box-shadow: none; border-radius: 6px; background: #D97B4F; border-color: #D97B4F; color: #fff; }
-  #nickModal .modalBox .joinRow input { background: rgba(255, 255, 255, .06); border: 2px solid rgba(255, 255, 255, .3); border-radius: 6px; color: #fff; }
-  #nickModal .modalBox .mini { background: rgba(255, 255, 255, .08); border-color: rgba(255, 255, 255, .24); color: #DDE1EA; }
   .card { width: min(480px, 100%); background: var(--sg-panel); border: 3px solid var(--sg-line-strong); border-radius: 14px; padding: 22px 22px 18px; box-shadow: 0 10px 0 rgba(27,43,32,.3), 0 20px 40px rgba(0,0,0,.2); text-align: center; }
   .logo { font-size: clamp(44px, 9vw, 64px); font-weight: 800; line-height: 1.05; color: #D97B4F; -webkit-text-stroke: 2px var(--sg-ink); text-shadow: 4px 5px 0 var(--sg-ink); letter-spacing: -1px; margin-bottom: 4px; }
   .logo small { display: block; font-size: 15px; -webkit-text-stroke: 0; text-shadow: none; color: var(--sg-ink-soft); letter-spacing: 0; margin-top: 8px; font-weight: 700; }
@@ -359,7 +354,7 @@
         <input type="text" id="joinCode" inputmode="numeric" pattern="[0-9]*" maxlength="5" autocomplete="off" placeholder="방 코드 5자리">
         <button type="button" class="st-btn blue" id="btnJoin">참여하기</button>
       </div>
-      <div class="hello">대전 닉네임: <b id="helloNick"></b> <button type="button" class="mini" id="btnNickEdit">✏️ 변경</button></div>
+      <div class="hello">내 닉네임: <b id="helloNick"></b> <button type="button" class="mini" data-maker-open>🎭 캐릭터 만들기</button></div>
       <div class="st-msg msg" id="bStartMsg"></div>
       <div id="loadNote"></div>
     </div>
@@ -404,7 +399,7 @@
       <div><span class="codeLab">방 코드</span><span class="codeNum" id="lobbyCode">-----</span></div>
       <button type="button" class="mini danger" id="btnLeaveLobby">방 나가기</button>
     </div>
-    <div class="hello left">내 닉네임: <b id="lobbyNick"></b> <button type="button" class="mini" id="btnNickEdit2">✏️ 변경</button></div>
+    <div class="hello left">내 닉네임: <b id="lobbyNick"></b> <button type="button" class="mini" data-maker-open>🎭 캐릭터 만들기</button></div>
     <div class="sect">🗺️ 맵 <span id="mapHint" style="font-weight:700"></span></div>
     <div class="mapBtns" id="mapBtns"></div>
     <div class="sides">
@@ -475,15 +470,9 @@
 <div id="rankBox" hidden><div class="hud-box" id="rkTime">0:00.00</div><div id="rkList"></div></div>
 <div id="viewBtns" hidden></div>
 
-<div class="modal" id="nickModal" hidden>
-  <div class="modalBox">
-    <h3>닉네임을 입력해 주세요</h3>
-    <div class="joinRow"><input id="nickInput" maxlength="6" placeholder="최대 6자" autocomplete="off"><button type="button" class="btn" id="btnNickSave">저장</button></div>
-    <div class="msg" id="nickMsg"></div>
-    <button type="button" class="mini" id="btnNickCancel">취소</button>
-  </div>
-</div>
-
+<script charset="utf-8" src="character-kit.js?v=20261010"></script>
+<script charset="utf-8" src="character-maker.js?v=20261010"></script>
+<script>new CharacterMakerDialog();</script>
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
 <script type="module">
 import * as THREE from "three";
@@ -4186,17 +4175,17 @@ const BATTLE = {
   root: "turbolap/rooms", specMax: 1, netMs: 100, countMs: 3600, countLagMaxMs: 1500,dnfMs: 30000, rankRowH: 48,
   sdk: ["https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js", "https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"]
 };
-const NICK_KEY = "turbolap_nick_v1";
+
 const SIDES = ["left", "right"];
 const SIDE_NAME = { left: "왼쪽", right: "오른쪽", spec: "관전" };
 const SIDE_COLOR = { left: "#24402F", right: "#D97B4F" };
 const BT = {
   db: null, ref: null, code: "", myId: "p" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4),
-  nick: "", nickRequired: false, players: {}, status: "", host: null, hostLoaded: false, course: "seoul", startAt: 0, result: null,
+  players: {}, status: "", host: null, hostLoaded: false, course: "seoul", startAt: 0, result: null,
   subs: [], leaving: false, spec: false, match: null, ents: {}, raw: {}, sent: "", lastNet: 0, forceNet: false, statusSent: "",
   viewId: null, viewKey: "", serverOffset: 0, hitSeq: 0, rankRows: {}, rankNums: 0, lobbyCarSig: "", queued: false
 };
-try { BT.nick = localStorage.getItem(NICK_KEY) || ""; } catch (e) {}
+
 refreshNick();
 const BOT = { max: 1, topRatio: 0.9, grip: 0.86, brake: 24, lookSamples: 45, leadEaseM: 60, leadEase: 0.88, laneRatio: 0.35, latRate: 1.8, latPerSpeed: 0.25, dodgeAheadM: 14, dodgeGap: 2.4, edgeGap: 1.6 };
 const BOTS = {};
@@ -4233,27 +4222,17 @@ function connectDb() {
   return dbReady;
 }
 
-function refreshNick() { $("helloNick").textContent = BT.nick || "(닉네임 없음)"; $("lobbyNick").textContent = BT.nick; }
-function openNick(required) {
-  BT.nickRequired = required;
-  $("nickInput").value = BT.nick; $("nickMsg").textContent = "";
-  $("nickModal").hidden = false;
-  setTimeout(() => { try { $("nickInput").focus(); } catch (e) {} }, 50);
+function refreshNick() { const nick = PlayerProfile.storedNick(); $("helloNick").textContent = nick || "(닉네임 없음)"; $("lobbyNick").textContent = nick; }
+function pushNickToRoom() {
+  const nick = PlayerProfile.storedNick();
+  if (nick && BT.ref && BT.players[BT.myId]) BT.ref.child("players/" + BT.myId + "/nickname").set(nick);
 }
-function saveNick() {
-  const v = $("nickInput").value.replace(/\s+/g, " ").trim().slice(0, 6);
-  if (!v) { $("nickMsg").textContent = "닉네임을 입력해 주세요."; return; }
-  BT.nick = v;
-  try { localStorage.setItem(NICK_KEY, v); } catch (e) {}
-  $("nickModal").hidden = true; refreshNick();
-  if (BT.ref && BT.players[BT.myId]) BT.ref.child("players/" + BT.myId + "/nickname").set(v);
-}
-function cancelNick() {
-  $("nickModal").hidden = true;
-  if (BT.nickRequired && !BT.nick) showCard("start");
+function askNickFirst() {
+  bMsg(PlayerProfile.NICK_REQUIRED_NOTICE);
+  CharacterMakerDialog.requestOpen();
 }
 function bMsg(t) { $("bStartMsg").textContent = t || ""; }
-function newPlayer(team, t) { return { nickname: BT.nick, team, car: carKey, joinedAt: t }; }
+function newPlayer(team, t) { return { nickname: PlayerProfile.storedNick(), team, car: carKey, joinedAt: t }; }
 
 function roomCodes() {
   const base = String((window.PORTAL_CONFIG || {}).DB_URL || "").replace(/\/+$/, "");
@@ -4276,7 +4255,7 @@ function sweepRooms() {
   }).catch(() => {});
 }
 async function createRoom() {
-  if (!BT.nick) { openNick(true); return; }
+  if (!PlayerProfile.storedNick()) { askNickFirst(); return; }
   $("btnCreate").disabled = true; bMsg("연결하는 중…");
   try {
     await connectDb();
@@ -4292,7 +4271,7 @@ async function createRoom() {
   finally { $("btnCreate").disabled = false; }
 }
 async function joinRoom() {
-  if (!BT.nick) { openNick(true); return; }
+  if (!PlayerProfile.storedNick()) { askNickFirst(); return; }
   const code = $("joinCode").value.replace(/\D/g, "");
   if (code.length !== 5) { bMsg("방 코드 5자리를 입력해 주세요."); return; }
   $("btnJoin").disabled = true; bMsg("연결하는 중…");
@@ -5072,11 +5051,8 @@ function battleFrame(dt) {
   if (BT.match && state !== "menu") { botsTick(dt); hostTick(); renderBattleHud(); }
 }
 
-$("btnNickSave").onclick = saveNick;
-$("nickInput").onkeydown = e => { if (e.key === "Enter") saveNick(); };
-$("btnNickCancel").onclick = cancelNick;
-$("btnNickEdit").onclick = e => { e.currentTarget.blur(); openNick(false); };
-$("btnNickEdit2").onclick = e => { e.currentTarget.blur(); openNick(false); };
+document.addEventListener(PlayerProfile.CHANGE_EVENT, refreshNick);
+document.addEventListener(PlayerProfile.SETTLED_EVENT, () => { refreshNick(); pushNickToRoom(); });
 $("btnCreate").onclick = e => { e.currentTarget.blur(); audioInit(); createRoom(); };
 $("btnJoin").onclick = e => { e.currentTarget.blur(); audioInit(); joinRoom(); };
 $("joinCode").onkeydown = e => { if (e.key === "Enter") joinRoom(); };

@@ -61,6 +61,9 @@
   .btn { display: block; width: 100%; height: 54px; font-size: 18px; font-weight: 800; border-radius: 6px; border: 2px solid var(--sg-line-strong); background: var(--sg-panel); color: var(--sg-ink); margin-top: 10px; }
   .btn.primary { background: var(--sg-primary); color: var(--sg-primary-ink); border-color: var(--sg-primary); }
   .btn:disabled { opacity: .45; cursor: default; }
+  .nickLine { display: flex; align-items: center; gap: 10px; margin: 10px 0 12px; }
+  .nickLine b { flex: 1; min-width: 0; font-size: 20px; color: #9FD08A; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nickLine .btn { width: auto; flex: 0 0 auto; margin-top: 0; padding: 0 18px; min-height: 48px; }
   .field { display: flex; gap: 8px; }
   .field input { flex: 1; min-width: 0; height: 54px; font: inherit; font-size: 18px; font-weight: 700; padding: 0 14px; border: 2px solid var(--sg-line-strong); border-radius: 6px; background: #fff; color: var(--sg-ink); }
   .field input.codeIn { font-size: 24px; letter-spacing: 6px; text-align: center; }
@@ -249,8 +252,8 @@
       <p class="sub">불 꺼진 학교에 무언가 돌아다닙니다. 달빛만 비치는 교실과 복도에서 3분 동안 살아남으세요.</p>
     </div>
     <div class="card">
-      <label class="label" for="nickInput">닉네임</label>
-      <div class="field"><input id="nickInput" maxlength="8" placeholder="닉네임을 입력해 주세요" autocomplete="off"></div>
+      <label class="label">내 닉네임</label>
+      <div class="nickLine"><b id="startNick"></b><button type="button" class="btn" data-maker-open>🎭 캐릭터 만들기</button></div>
       <button type="button" class="btn primary" id="btnCreate">방 만들기</button>
       <div class="gap"></div>
       <label class="label" for="joinCode">방 코드로 입장</label>
@@ -292,6 +295,7 @@
   <div class="wrap">
     <div class="card">
       <div class="codeBar"><span class="codeLab">방 코드</span><span class="codeNum" id="lobbyCode">-----</span></div>
+      <div class="nickLine"><b id="lobbyNick"></b><button type="button" class="btn" data-maker-open>🎭 캐릭터 만들기</button></div>
       <p class="sub" style="margin-top:10px">친구들에게 방 코드를 알려 주세요. (플레이어 5명 · 관전자 1명)</p>
     </div>
     <div class="card">
@@ -326,6 +330,9 @@
   </div>
 </section>
 
+<script charset="utf-8" src="character-kit.js?v=20261010"></script>
+<script charset="utf-8" src="character-maker.js?v=20261010"></script>
+<script>new CharacterMakerDialog();</script>
 <div id="loading">3D 학교를 준비하는 중입니다…</div>
 
 <script>
@@ -352,7 +359,6 @@ const TURN_SPEED = Math.PI, PITCH_SPEED = 1.75, TURN_RAMP_SEC = 0.25, TURN_RAMP_
 const NET_MS = 100, BOT_NET_MS = 143, REMOTE_LERP_MS = 150;
 const MAX_PLAYERS = 5, MIN_PLAYERS = 2, MAX_SPECTATORS = 1;
 const ROOM_ROOT = "zombieoutbreak/rooms";
-const NICK_KEY = "zombieoutbreak_nick";
 const MODEL_DIR = "img/zombie/";
 const FLOOR_H = 4, PLAYER_RADIUS = 0.35, STEP_UP = 0.55, BODY_H = 1.75, GRAVITY = 22;
 const SPAWN = { x: 0, z: -9 }, HOLD_RADIUS = 6;
@@ -2441,16 +2447,24 @@ if (db) db.ref(".info/serverTimeOffset").on("value", s => { serverOffset = s.val
 function serverNow() { return Date.now() + serverOffset; }
 const myId = "p" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 
-let nickname = "";
-try { nickname = localStorage.getItem(NICK_KEY) || ""; } catch (e) {}
-$("nickInput").value = nickname;
-function readNickname() {
-  const v = $("nickInput").value.replace(/\s+/g, " ").trim().slice(0, 8);
-  if (!v) return false;
-  nickname = v;
-  try { localStorage.setItem(NICK_KEY, v); } catch (e) {}
-  return true;
+function refreshNick() {
+  const nick = PlayerProfile.storedNick();
+  $("startNick").textContent = nick || "(닉네임 없음)";
+  $("lobbyNick").textContent = nick;
 }
+refreshNick();
+function nickReady() {
+  if (PlayerProfile.storedNick()) return true;
+  startMsg(PlayerProfile.NICK_REQUIRED_NOTICE);
+  CharacterMakerDialog.requestOpen();
+  return false;
+}
+function pushNickToRoom() {
+  const nick = PlayerProfile.storedNick();
+  if (nick && room.ref && room.players[myId]) room.ref.child("players/" + myId + "/nickname").set(nick);
+}
+document.addEventListener(PlayerProfile.CHANGE_EVENT, refreshNick);
+document.addEventListener(PlayerProfile.SETTLED_EVENT, () => { refreshNick(); pushNickToRoom(); });
 
 const room = {
   code: null, ref: null, subs: [], leaving: false,
@@ -2472,7 +2486,7 @@ function countSlots(ps) {
   const spectators = ids.filter(id => ps[id].spec).length;
   return { players: ids.length - spectators, spectators };
 }
-function newPlayer(t, spec) { return { nickname, joinedAt: t, role: "human", infected: false, inRound: false, spec: !!spec }; }
+function newPlayer(t, spec) { return { nickname: PlayerProfile.storedNick(), joinedAt: t, role: "human", infected: false, inRound: false, spec: !!spec }; }
 function startMsg(t) { setText($("startMsg"), t || ""); }
 
 function roomCodes() {
@@ -2497,7 +2511,7 @@ function sweepRooms() {
 }
 async function createRoom() {
   audioInit();
-  if (!readNickname()) { startMsg("닉네임을 먼저 입력해 주세요."); return; }
+  if (!nickReady()) return;
   if (!db) { startMsg("온라인 연결을 할 수 없습니다. (인터넷 연결을 확인해 주세요)"); return; }
   $("btnCreate").disabled = true; startMsg("");
   try {
@@ -2514,7 +2528,7 @@ async function createRoom() {
 }
 async function joinRoom(asSpectator) {
   audioInit();
-  if (!readNickname()) { startMsg("닉네임을 먼저 입력해 주세요."); return; }
+  if (!nickReady()) return;
   const code = $("joinCode").value.replace(/\D/g, "");
   if (code.length !== 5) { startMsg("방 코드 5자리를 입력해 주세요."); return; }
   if (!db) { startMsg("온라인 연결을 할 수 없습니다."); return; }
@@ -3860,7 +3874,6 @@ $("btnJoin").onclick = blurAfter(() => joinRoom(false));
 $("btnJoinSpec").onclick = blurAfter(() => joinRoom(true));
 $("joinCode").addEventListener("keydown", e => { if (e.key === "Enter") joinRoom(false); });
 $("btnSpecToggle").onclick = blurAfter(toggleSpectator);
-$("nickInput").addEventListener("keydown", e => { if (e.key === "Enter") e.currentTarget.blur(); });
 $("btnStart").onclick = blurAfter(hostStart);
 $("btnBots").onclick = blurAfter(toggleBots);
 $("btnLobbyLeave").onclick = blurAfter(leaveRoom);

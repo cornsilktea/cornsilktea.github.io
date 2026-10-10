@@ -3,9 +3,11 @@ type PaintedPartKey = Exclude<PartKey, "skin">;
 type TextureCell = [row: number, column: number];
 type PartCells = Partial<Record<PaintedPartKey, Record<string, TextureCell[]>>>;
 
+type ColorChoice = number | string;
+
 interface CharacterLook {
   c: number;
-  p: Record<PartKey, number>;
+  p: Record<PartKey, ColorChoice>;
   cape: 0 | 1;
   hat: 0 | 1;
 }
@@ -21,6 +23,12 @@ interface CharacterTypeInfo {
   file: string;
   prefix: string;
   name: string;
+  rules: PartCells;
+  hatMeshes: readonly string[];
+  capeMeshes: readonly string[];
+  skinCell: TextureCell;
+  skinSet: readonly string[];
+  labels: Partial<Record<PartKey | "capeToggle" | "hatToggle", string>>;
 }
 
 interface ColorPartInfo {
@@ -37,27 +45,90 @@ interface AnimationOptions {
 class CharacterCatalog {
   static readonly COLOR_SET: readonly string[] = ["#D94B4B", "#F08A3E", "#F2C93B", "#5DBB63", "#3FB6B0", "#4A86E8", "#7B5CD6", "#D965A8", "#F2F2EE", "#3B3F4A"];
   static readonly SKIN_SET: readonly string[] = ["#FFE0C8", "#F6C09C", "#F2D2B5", "#E2A981", "#C98A62", "#A86A48", "#7E4B33", "#5A3524"];
+  static readonly BONE_SET: readonly string[] = ["#F2EBD8", "#E3D9BC", "#CFC6AA", "#B5AE9A", "#F2F2EE", "#E8D08A", "#8FD9C7", "#C94A4A"];
   static readonly HAIR_SET: readonly string[] = ["#1B191B", "#4A3222", "#7A4A2E", "#B0703A", "#E2C36A", "#F2E8C8", "#C94A4A", "#4A86E8", "#7B5CD6", "#9AA0A6"];
+  static readonly CUSTOM_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
+  static readonly NEUTRAL_CUSTOM_COLOR = "#888888";
+  static readonly RANDOM_TYPE_COUNT = 6;
+
+  private static readonly ADVENTURER = { skinCell: [0, 0] as TextureCell, skinSet: CharacterCatalog.SKIN_SET, capeMeshes: ["Cape"] as readonly string[] };
+  private static readonly SKELETON = { skinCell: [1, 1] as TextureCell, skinSet: CharacterCatalog.BONE_SET, capeMeshes: [] as readonly string[] };
 
   static readonly TYPES: readonly CharacterTypeInfo[] = [
-    { file: "Knight", prefix: "Knight", name: "기사" },
-    { file: "Barbarian", prefix: "Barbarian", name: "바바리안" },
-    { file: "Mage", prefix: "Mage", name: "마법사" },
-    { file: "Ranger", prefix: "Ranger", name: "레인저" },
-    { file: "Rogue", prefix: "Rogue", name: "도적" },
-    { file: "Rogue_Hooded", prefix: "RogueHooded", name: "후드 도적" }
+    {
+      file: "Knight", prefix: "Knight", name: "기사", ...CharacterCatalog.ADVENTURER, labels: {},
+      hatMeshes: ["Helmet", "HelmetVisor"],
+      rules: { top: { Body: [[0, 3]] }, arm: { ArmLeft: [[0, 3]], ArmRight: [[0, 3]] }, pants: { LegLeft: [[0, 3]], LegRight: [[0, 3]] }, cape: { Cape: [[1, 0]] }, hat: { Helmet: [[0, 3]], HelmetVisor: [[0, 3]] }, hair: { Head: [[0, 1]] } }
+    },
+    {
+      file: "Barbarian", prefix: "Barbarian", name: "바바리안", ...CharacterCatalog.ADVENTURER, labels: {},
+      hatMeshes: ["BearHat"], capeMeshes: [],
+      rules: { top: { Body: [[0, 7]] }, arm: { ArmLeft: [[0, 6]], ArmRight: [[0, 6]] }, pants: { LegLeft: [[2, 3]], LegRight: [[2, 3]] }, hat: { BearHat: [[0, 7]] }, hair: { Head: [[0, 1]] } }
+    },
+    {
+      file: "Mage", prefix: "Mage", name: "마법사", ...CharacterCatalog.ADVENTURER, labels: {},
+      hatMeshes: ["Hat"],
+      rules: { top: { Body: [[1, 0]] }, arm: { ArmLeft: [[1, 0]], ArmRight: [[1, 0]] }, pants: { LegLeft: [[2, 3]], LegRight: [[2, 3]] }, cape: { Cape: [[1, 2]] }, hat: { Hat: [[1, 1]] }, hair: { Head: [[0, 1]] } }
+    },
+    {
+      file: "Ranger", prefix: "Ranger", name: "레인저", ...CharacterCatalog.ADVENTURER, labels: {},
+      hatMeshes: [],
+      rules: { top: { Body: [[0, 5], [0, 6]] }, arm: { ArmLeft: [[0, 6]], ArmRight: [[0, 6]] }, pants: { LegLeft: [[2, 3]], LegRight: [[2, 3]] }, cape: { Cape: [[1, 0]] }, hair: { Head: [[0, 1]] } }
+    },
+    {
+      file: "Rogue", prefix: "Rogue", name: "도적", ...CharacterCatalog.ADVENTURER, labels: {},
+      hatMeshes: [],
+      rules: { top: { Body: [[1, 0]] }, arm: { ArmLeft: [[1, 0]], ArmRight: [[1, 0]] }, pants: { LegLeft: [[2, 3]], LegRight: [[2, 3]] }, cape: { Cape: [[1, 1]] }, hair: { Head: [[0, 1]] } }
+    },
+    {
+      file: "Rogue_Hooded", prefix: "RogueHooded", name: "후드 도적", ...CharacterCatalog.ADVENTURER, labels: { hat: "후드" },
+      hatMeshes: [],
+      rules: { top: { Body: [[1, 0]] }, arm: { ArmLeft: [[1, 0]], ArmRight: [[1, 0]] }, pants: { LegLeft: [[2, 3]], LegRight: [[2, 3]] }, cape: { Cape: [[1, 1]] }, hat: { Head: [[1, 1]], Body: [[1, 1]] }, hair: { Head: [[0, 1]] } }
+    },
+    {
+      file: "Druid", prefix: "Druid", name: "드루이드", ...CharacterCatalog.ADVENTURER,
+      labels: { cape: "배낭", capeToggle: "배낭", hair: "후드" },
+      hatMeshes: [], capeMeshes: ["Backpack"],
+      rules: { top: { Body: [[2, 1], [1, 0]] }, arm: { ArmLeft: [[1, 0]], ArmRight: [[1, 0]] }, pants: { LegLeft: [[1, 7]], LegRight: [[1, 7]] }, cape: { Backpack: [[0, 5]] }, hair: { Head: [[1, 0]] } }
+    },
+    {
+      file: "Engineer", prefix: "Engineer", name: "공학자", ...CharacterCatalog.ADVENTURER,
+      labels: { cape: "배낭", capeToggle: "배낭", hat: "고글", hatToggle: "고글" },
+      hatMeshes: ["Goggles"], capeMeshes: ["Backpack"],
+      rules: { top: { Body: [[1, 7]] }, arm: { ArmLeft: [[0, 7]], ArmRight: [[0, 7]] }, pants: { LegLeft: [[1, 7]], LegRight: [[1, 7]] }, cape: { Backpack: [[0, 6]] }, hat: { Goggles: [[0, 7]] }, hair: { Head: [[0, 1]] } }
+    },
+    {
+      file: "Necromancer", prefix: "Necromancer", name: "네크로맨서", skinCell: [0, 1], skinSet: CharacterCatalog.BONE_SET, capeMeshes: [],
+      labels: { skin: "두개골", hat: "왕관", hatToggle: "왕관" },
+      hatMeshes: ["Crown"],
+      rules: { top: { Body: [[2, 2]] }, arm: { ArmLeft: [[2, 2]], ArmRight: [[2, 2]] }, pants: { LegLeft: [[1, 3]], LegRight: [[1, 3]] }, hat: { Crown: [[1, 1]] } }
+    },
+    {
+      file: "Skeleton_Warrior", prefix: "Skeleton_Warrior", name: "해골 전사", ...CharacterCatalog.SKELETON,
+      labels: { skin: "뼈 색", top: "갑옷", cape: "천", capeToggle: "천", hat: "투구", hatToggle: "투구" },
+      hatMeshes: ["Helmet"], capeMeshes: ["Cloak"],
+      rules: { top: { Body: [[0, 3]] }, arm: { ArmLeft: [[0, 3]], ArmRight: [[0, 3]] }, pants: { LegLeft: [[0, 3]], LegRight: [[0, 3]] }, cape: { Cloak: [[2, 2]] }, hat: { Helmet: [[0, 4]] } }
+    },
+    {
+      file: "Skeleton_Rogue", prefix: "Skeleton_Rogue", name: "해골 도적", ...CharacterCatalog.SKELETON,
+      labels: { skin: "뼈 색", capeToggle: "망토", hat: "후드", hatToggle: "후드" },
+      hatMeshes: ["Hood"], capeMeshes: ["Cape"],
+      rules: { top: { Body: [[0, 7]] }, arm: { ArmLeft: [[0, 3]], ArmRight: [[0, 3]] }, pants: { LegLeft: [[0, 3]], LegRight: [[0, 3]] }, cape: { Cape: [[2, 2]] }, hat: { Hood: [[2, 2]] } }
+    },
+    {
+      file: "Skeleton_Mage", prefix: "Skeleton_Mage", name: "해골 마법사", ...CharacterCatalog.SKELETON,
+      labels: { skin: "뼈 색", hat: "모자", hatToggle: "모자" },
+      hatMeshes: ["Hat"],
+      rules: { top: { Body: [[2, 2]] }, arm: { ArmLeft: [[0, 7]], ArmRight: [[0, 7]] }, pants: { LegLeft: [[0, 7]], LegRight: [[0, 7]] }, hat: { Hat: [[2, 2]] } }
+    },
+    {
+      file: "Skeleton_Minion", prefix: "Skeleton_Minion", name: "해골 미니언", ...CharacterCatalog.SKELETON,
+      labels: { skin: "뼈 색", cape: "천", capeToggle: "천" },
+      hatMeshes: [], capeMeshes: ["Cloak"],
+      rules: { top: { Body: [[0, 7], [0, 6]] }, pants: { LegLeft: [[0, 7], [0, 6]], LegRight: [[0, 7], [0, 6]] }, cape: { Cloak: [[0, 5]] } }
+    }
   ];
 
-  static readonly PART_RULES: readonly PartCells[] = [
-    { top: { Body: [[0, 3]] }, arm: { ArmLeft: [[0, 3]], ArmRight: [[0, 3]] }, pants: { LegLeft: [[0, 3]], LegRight: [[0, 3]] }, cape: { Cape: [[1, 0]] }, hat: { Helmet: [[0, 3]], HelmetVisor: [[0, 3]] }, hair: { Head: [[0, 1]] } },
-    { top: { Body: [[0, 7]] }, arm: { ArmLeft: [[0, 6]], ArmRight: [[0, 6]] }, pants: { LegLeft: [[2, 3]], LegRight: [[2, 3]] }, hat: { BearHat: [[0, 7]] }, hair: { Head: [[0, 1]] } },
-    { top: { Body: [[1, 0]] }, arm: { ArmLeft: [[1, 0]], ArmRight: [[1, 0]] }, pants: { LegLeft: [[2, 3]], LegRight: [[2, 3]] }, cape: { Cape: [[1, 2]] }, hat: { Hat: [[1, 1]] }, hair: { Head: [[0, 1]] } },
-    { top: { Body: [[0, 5], [0, 6]] }, arm: { ArmLeft: [[0, 6]], ArmRight: [[0, 6]] }, pants: { LegLeft: [[2, 3]], LegRight: [[2, 3]] }, cape: { Cape: [[1, 0]] }, hair: { Head: [[0, 1]] } },
-    { top: { Body: [[1, 0]] }, arm: { ArmLeft: [[1, 0]], ArmRight: [[1, 0]] }, pants: { LegLeft: [[2, 3]], LegRight: [[2, 3]] }, cape: { Cape: [[1, 1]] }, hair: { Head: [[0, 1]] } },
-    { top: { Body: [[1, 0]] }, arm: { ArmLeft: [[1, 0]], ArmRight: [[1, 0]] }, pants: { LegLeft: [[2, 3]], LegRight: [[2, 3]] }, cape: { Cape: [[1, 1]] }, hat: { Head: [[1, 1]], Body: [[1, 1]] }, hair: { Head: [[0, 1]] } }
-  ];
-
-  static readonly HAT_MESHES: readonly (readonly string[])[] = [["Helmet", "HelmetVisor"], ["BearHat"], ["Hat"], [], [], []];
   static readonly HIDDEN_MESHES: readonly string[] = ["Mask"];
   static readonly PAINTED_PARTS: readonly PaintedPartKey[] = ["top", "arm", "pants", "cape", "hat", "hair"];
 
@@ -75,21 +146,43 @@ class CharacterCatalog {
     return CharacterCatalog.COLOR_PARTS.filter((part) => part.key === key)[0];
   }
 
+  static type(typeIndex: number): CharacterTypeInfo {
+    return CharacterCatalog.TYPES[typeIndex];
+  }
+
+  static setOf(typeIndex: number, key: PartKey): readonly string[] {
+    return key === "skin" ? CharacterCatalog.type(typeIndex).skinSet : CharacterCatalog.colorPart(key).set;
+  }
+
+  static labelOf(typeIndex: number, key: PartKey): string {
+    return CharacterCatalog.type(typeIndex).labels[key] || CharacterCatalog.colorPart(key).label;
+  }
+
+  static isCustomColor(choice: ColorChoice): choice is string {
+    return typeof choice === "string" && CharacterCatalog.CUSTOM_COLOR_PATTERN.test(choice);
+  }
+
   static colorOf(look: CharacterLook, key: PartKey): string | null {
-    const index = look.p[key];
-    return index ? CharacterCatalog.colorPart(key).set[index - 1] : null;
+    const choice = look.p[key];
+    if (CharacterCatalog.isCustomColor(choice)) return choice;
+    return typeof choice === "number" && choice ? CharacterCatalog.setOf(look.c, key)[choice - 1] : null;
   }
 
   static hasCape(typeIndex: number): boolean {
-    return !!CharacterCatalog.PART_RULES[typeIndex].cape;
+    return CharacterCatalog.type(typeIndex).capeMeshes.length > 0;
   }
 
   static hasHat(typeIndex: number): boolean {
-    return CharacterCatalog.HAT_MESHES[typeIndex].length > 0;
+    return CharacterCatalog.type(typeIndex).hatMeshes.length > 0;
+  }
+
+  static toggleLabel(typeIndex: number, which: "cape" | "hat"): string {
+    const labels = CharacterCatalog.type(typeIndex).labels;
+    return (which === "cape" ? labels.capeToggle : labels.hatToggle) || (which === "cape" ? "망토" : "모자");
   }
 
   static isPartAvailable(typeIndex: number, key: PartKey): boolean {
-    return key === "skin" || !!CharacterCatalog.PART_RULES[typeIndex][key as PaintedPartKey];
+    return key === "skin" || !!CharacterCatalog.type(typeIndex).rules[key as PaintedPartKey];
   }
 }
 
@@ -104,8 +197,7 @@ class CharacterLooks {
     const source = raw as RawCharacterLook;
     look.c = CharacterLooks.clamp(Math.floor(Number(source.c) || 0), 0, CharacterCatalog.TYPES.length - 1);
     CharacterCatalog.COLOR_PARTS.forEach((part) => {
-      const index = Math.floor(Number(source.p ? source.p[part.key] : 0) || 0);
-      look.p[part.key] = CharacterLooks.clamp(index, 0, part.set.length);
+      look.p[part.key] = CharacterLooks.cleanChoice(source.p ? source.p[part.key] : 0, part.set.length);
     });
     look.cape = source.cape === 0 ? 0 : 1;
     look.hat = source.hat === 0 ? 0 : 1;
@@ -114,11 +206,16 @@ class CharacterLooks {
 
   static random(): CharacterLook {
     const look = CharacterLooks.createDefault();
-    look.c = Math.floor(Math.random() * CharacterCatalog.TYPES.length);
+    look.c = Math.floor(Math.random() * CharacterCatalog.RANDOM_TYPE_COUNT);
     CharacterCatalog.COLOR_PARTS.forEach((part) => {
       look.p[part.key] = Math.random() < 0.15 ? 0 : 1 + Math.floor(Math.random() * part.set.length);
     });
     return look;
+  }
+
+  private static cleanChoice(raw: unknown, paletteSize: number): ColorChoice {
+    if (CharacterCatalog.isCustomColor(raw as ColorChoice)) return (raw as string).toLowerCase();
+    return CharacterLooks.clamp(Math.floor(Number(raw) || 0), 0, paletteSize);
   }
 
   private static clamp(value: number, low: number, high: number): number {
@@ -128,24 +225,44 @@ class CharacterLooks {
 
 class PlayerProfile {
   static readonly STORAGE_KEY = "portal_profile_v1";
-  static readonly LEGACY_NICK_KEY = "lasttile_nick_v1";
-  static readonly LEGACY_LOOK_KEY = "lasttile_look_v1";
+  static readonly CHANGE_EVENT = "portal-profile-changed";
+  static readonly SETTLED_EVENT = "portal-profile-settled";
   static readonly MAX_NICK_LENGTH = 8;
+  static readonly REAL_NAME_NOTICE = "닉네임은 본명으로 입력합니다";
+  static readonly NICK_REQUIRED_NOTICE = "캐릭터 만들기에서 닉네임(본명)을 먼저 정해 주세요.";
 
   nick = "";
   look: CharacterLook = CharacterLooks.createDefault();
+  private fallbackNick = "";
+  private broadcasting = false;
   private readonly listeners: Array<() => void> = [];
 
   constructor() {
     this.load();
+    document.addEventListener(PlayerProfile.CHANGE_EVENT, () => {
+      if (this.broadcasting) return;
+      this.load();
+      this.notify();
+    });
   }
 
   static cleanNick(text: string): string {
     return String(text || "").replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, PlayerProfile.MAX_NICK_LENGTH);
   }
 
+  static storedNick(): string {
+    try {
+      const stored = localStorage.getItem(PlayerProfile.STORAGE_KEY);
+      return stored ? PlayerProfile.cleanNick((JSON.parse(stored) as { nick?: string }).nick || "") : "";
+    } catch (error) {
+      return "";
+    }
+  }
+
   nickOrDefault(): string {
-    return this.nick || "학생" + (10 + Math.floor(Math.random() * 90));
+    if (this.nick) return this.nick;
+    if (!this.fallbackNick) this.fallbackNick = "학생" + (10 + Math.floor(Math.random() * 90));
+    return this.fallbackNick;
   }
 
   setNick(text: string): void {
@@ -171,15 +288,9 @@ class PlayerProfile {
   private load(): void {
     try {
       const stored = localStorage.getItem(PlayerProfile.STORAGE_KEY);
-      if (stored) {
-        const data = JSON.parse(stored) as { nick?: string; look?: unknown };
-        this.nick = PlayerProfile.cleanNick(data.nick || "");
-        this.look = CharacterLooks.clean(data.look);
-        return;
-      }
-      this.nick = PlayerProfile.cleanNick(localStorage.getItem(PlayerProfile.LEGACY_NICK_KEY) || "");
-      const legacyLook = localStorage.getItem(PlayerProfile.LEGACY_LOOK_KEY);
-      if (legacyLook) this.look = CharacterLooks.clean(JSON.parse(legacyLook));
+      const data = stored ? JSON.parse(stored) as { nick?: string; look?: unknown } : {};
+      this.nick = PlayerProfile.cleanNick(data.nick || "");
+      this.look = CharacterLooks.clean(data.look);
     } catch (error) {
       this.nick = "";
       this.look = CharacterLooks.createDefault();
@@ -192,6 +303,9 @@ class PlayerProfile {
     } catch (error) {
       return;
     }
+    this.broadcasting = true;
+    document.dispatchEvent(new CustomEvent(PlayerProfile.CHANGE_EVENT));
+    this.broadcasting = false;
   }
 }
 
@@ -235,6 +349,7 @@ class CharacterModelFactory {
   private static readonly TEXTURE_SIZE = 256;
   private static readonly TEXTURE_COLUMNS = 8;
   private static readonly TEXTURE_ROWS = 4;
+  private static readonly TEXTURE_CACHE_LIMIT = 400;
 
   private readonly textureCache = new Map<string, Three<"CanvasTexture">>();
 
@@ -242,11 +357,10 @@ class CharacterModelFactory {
 
   build(look: CharacterLook): Three<"Object3D"> {
     const typeIndex = look.c;
-    const type = CharacterCatalog.TYPES[typeIndex];
+    const type = CharacterCatalog.type(typeIndex);
     const template = this.assets.template(type.file);
     const model = this.libs.SkeletonUtils.clone(template);
     const sourceImage = this.sourceImageOf(template);
-    const hatMeshes = CharacterCatalog.HAT_MESHES[typeIndex];
     model.traverse((node) => {
       const mesh = node as Three<"Mesh">;
       if (!mesh.isMesh) return;
@@ -254,8 +368,8 @@ class CharacterModelFactory {
       mesh.material = new this.libs.THREE.MeshLambertMaterial({ map: this.textureFor(typeIndex, suffix, look, sourceImage) });
       mesh.frustumCulled = false;
       if (CharacterCatalog.HIDDEN_MESHES.indexOf(suffix) >= 0) mesh.visible = false;
-      if (suffix === "Cape" && !look.cape) mesh.visible = false;
-      if (hatMeshes.indexOf(suffix) >= 0 && !look.hat) mesh.visible = false;
+      if (type.capeMeshes.indexOf(suffix) >= 0 && !look.cape) mesh.visible = false;
+      if (type.hatMeshes.indexOf(suffix) >= 0 && !look.hat) mesh.visible = false;
     });
     model.scale.setScalar(CharacterModelFactory.SCALE);
     return model;
@@ -285,15 +399,15 @@ class CharacterModelFactory {
   }
 
   private paintListFor(typeIndex: number, suffix: string, look: CharacterLook): Array<[number, number, string]> {
-    const rules = CharacterCatalog.PART_RULES[typeIndex];
+    const type = CharacterCatalog.type(typeIndex);
     const paint: Array<[number, number, string]> = [];
     CharacterCatalog.PAINTED_PARTS.forEach((part) => {
-      const cells = rules[part] ? rules[part]![suffix] : undefined;
+      const cells = type.rules[part] ? type.rules[part]![suffix] : undefined;
       const color = CharacterCatalog.colorOf(look, part);
       if (cells && color) cells.forEach((cell) => paint.push([cell[0], cell[1], color]));
     });
     const skin = CharacterCatalog.colorOf(look, "skin");
-    if (skin) paint.push([0, 0, skin]);
+    if (skin) paint.push([type.skinCell[0], type.skinCell[1], skin]);
     return paint;
   }
 
@@ -323,8 +437,16 @@ class CharacterModelFactory {
     texture.generateMipmaps = false;
     texture.minFilter = THREE.LinearFilter;
     texture.magFilter = THREE.LinearFilter;
-    this.textureCache.set(key, texture);
+    this.rememberTexture(key, texture);
     return texture;
+  }
+
+  private rememberTexture(key: string, texture: Three<"CanvasTexture">): void {
+    this.textureCache.set(key, texture);
+    if (this.textureCache.size <= CharacterModelFactory.TEXTURE_CACHE_LIMIT) return;
+    const oldest = this.textureCache.keys().next().value as string;
+    (this.textureCache.get(oldest) as Three<"CanvasTexture">).dispose();
+    this.textureCache.delete(oldest);
   }
 }
 
@@ -477,7 +599,10 @@ class CharacterPreview {
   }
 }
 
+
 class ProfileEditor {
+  private static readonly CUSTOM_APPLY_DELAY_MS = 90;
+
   private readonly preview: CharacterPreview;
   private readonly root: HTMLDivElement;
   private readonly nickInput: HTMLInputElement;
@@ -486,6 +611,7 @@ class ProfileEditor {
   private readonly capeButton: HTMLButtonElement;
   private readonly hatButton: HTMLButtonElement;
   private onLookChanged: () => void = () => undefined;
+  private customTimer = 0;
 
   constructor(libs: ThreeLibs, factory: CharacterModelFactory, assets: CharacterAssets, private readonly profile: PlayerProfile) {
     this.root = document.createElement("div");
@@ -493,6 +619,7 @@ class ProfileEditor {
     this.root.innerHTML =
       "<label class='st-label'>닉네임</label>" +
       "<input type='text' class='ce-nick' maxlength='" + PlayerProfile.MAX_NICK_LENGTH + "' autocomplete='off' placeholder='닉네임 (최대 " + PlayerProfile.MAX_NICK_LENGTH + "글자)'>" +
+      "<div class='ce-notice'>" + PlayerProfile.REAL_NAME_NOTICE + "</div>" +
       "<canvas class='ce-preview'></canvas>" +
       "<div class='ce-hint'>끌어서 돌려 보기</div>" +
       "<label class='st-label'>캐릭터</label><div class='st-opts ce-types'></div>" +
@@ -515,10 +642,15 @@ class ProfileEditor {
     container.appendChild(this.root);
     this.preview.setLook(this.profile.look);
     this.nickInput.value = this.profile.nick;
+    this.syncControls();
   }
 
   setActive(active: boolean): void {
     this.preview.setActive(active);
+  }
+
+  focusNick(): void {
+    this.nickInput.focus();
   }
 
   onChange(listener: () => void): void {
@@ -541,9 +673,10 @@ class ProfileEditor {
     this.paletteBox.innerHTML = CharacterCatalog.COLOR_PARTS.map((part) => {
       const defaultSwatch = "<button type='button' class='ce-sw ce-sw-default' data-part='" + part.key + "' data-index='0' title='기본'></button>";
       const swatches = part.set.map((color, index) =>
-        "<button type='button' class='ce-sw' style='background:" + color + "' data-part='" + part.key + "' data-index='" + (index + 1) + "'></button>"
+        "<button type='button' class='ce-sw' data-part='" + part.key + "' data-index='" + (index + 1) + "'></button>"
       ).join("");
-      return "<div class='ce-row' data-row='" + part.key + "'><span>" + part.label + "</span><div>" + defaultSwatch + swatches + "</div></div>";
+      const custom = "<label class='ce-sw ce-custom' title='직접 고르기'><input type='color' data-custom='" + part.key + "' value='" + CharacterCatalog.NEUTRAL_CUSTOM_COLOR + "'></label>";
+      return "<div class='ce-row' data-row='" + part.key + "'><span></span><div>" + defaultSwatch + swatches + custom + "</div></div>";
     }).join("");
   }
 
@@ -551,7 +684,7 @@ class ProfileEditor {
     this.nickInput.addEventListener("input", () => {
       this.profile.setNick(this.nickInput.value);
     });
-    this.nickInput.addEventListener("change", () => this.onLookChanged());
+    this.nickInput.addEventListener("change", () => this.announceSettled());
     this.typeButtons.addEventListener("click", (event) => {
       const button = (event.target as HTMLElement).closest("button[data-type]") as HTMLButtonElement | null;
       if (!button) return;
@@ -562,38 +695,71 @@ class ProfileEditor {
       if (!button) return;
       this.changeLook((look) => { look.p[button.dataset.part as PartKey] = Number(button.dataset.index); });
     });
+    this.paletteBox.addEventListener("input", (event) => {
+      const input = event.target as HTMLInputElement;
+      if (!input.dataset.custom) return;
+      this.applyCustomColorSoon(input.dataset.custom as PartKey, input.value);
+    });
     this.capeButton.addEventListener("click", () => this.changeLook((look) => { look.cape = look.cape ? 0 : 1; }));
     this.hatButton.addEventListener("click", () => this.changeLook((look) => { look.hat = look.hat ? 0 : 1; }));
     (this.root.querySelector(".ce-turn-left") as HTMLButtonElement).addEventListener("click", () => this.preview.turn(-0.8));
     (this.root.querySelector(".ce-turn-right") as HTMLButtonElement).addEventListener("click", () => this.preview.turn(0.8));
   }
 
-  private changeLook(edit: (look: CharacterLook) => void): void {
+  private announceSettled(): void {
+    document.dispatchEvent(new CustomEvent(PlayerProfile.SETTLED_EVENT));
+    this.onLookChanged();
+  }
+
+  private applyCustomColorSoon(part: PartKey, hex: string): void {
+    window.clearTimeout(this.customTimer);
+    this.customTimer = window.setTimeout(() => {
+      this.changeLook((look) => { look.p[part] = hex.toLowerCase(); }, part);
+    }, ProfileEditor.CUSTOM_APPLY_DELAY_MS);
+  }
+
+  private changeLook(edit: (look: CharacterLook) => void, keepPickerOpenFor?: PartKey): void {
     const look = CharacterLooks.clean(this.profile.look);
     edit(look);
     this.profile.setLook(look);
     this.preview.setLook(this.profile.look);
-    this.syncControls();
-    this.onLookChanged();
+    this.syncControls(keepPickerOpenFor);
+    this.announceSettled();
   }
 
-  private syncControls(): void {
+  private syncControls(editingPart?: PartKey): void {
     const look = this.profile.look;
     Array.prototype.forEach.call(this.typeButtons.children, (button: HTMLButtonElement) => {
       button.classList.toggle("on", Number(button.dataset.type) === look.c);
     });
-    CharacterCatalog.COLOR_PARTS.forEach((part) => {
-      const row = this.paletteBox.querySelector("[data-row='" + part.key + "']") as HTMLDivElement;
-      row.hidden = !CharacterCatalog.isPartAvailable(look.c, part.key);
-      Array.prototype.forEach.call(row.querySelectorAll("button"), (button: HTMLButtonElement) => {
-        button.classList.toggle("on", Number(button.dataset.index) === look.p[part.key]);
-      });
+    CharacterCatalog.COLOR_PARTS.forEach((part) => this.syncRow(part, look, editingPart));
+    this.syncToggle(this.capeButton, "cape", CharacterCatalog.hasCape(look.c), !!look.cape);
+    this.syncToggle(this.hatButton, "hat", CharacterCatalog.hasHat(look.c), !!look.hat);
+  }
+
+  private syncRow(part: ColorPartInfo, look: CharacterLook, editingPart?: PartKey): void {
+    const row = this.paletteBox.querySelector("[data-row='" + part.key + "']") as HTMLDivElement;
+    row.hidden = !CharacterCatalog.isPartAvailable(look.c, part.key);
+    (row.firstChild as HTMLSpanElement).textContent = CharacterCatalog.labelOf(look.c, part.key);
+    const choice = look.p[part.key];
+    const colors = CharacterCatalog.setOf(look.c, part.key);
+    Array.prototype.forEach.call(row.querySelectorAll("button"), (button: HTMLButtonElement) => {
+      const index = Number(button.dataset.index);
+      if (index) button.style.background = colors[index - 1];
+      button.classList.toggle("on", index === choice);
     });
-    this.capeButton.hidden = !CharacterCatalog.hasCape(look.c);
-    this.hatButton.hidden = !CharacterCatalog.hasHat(look.c);
-    this.capeButton.classList.toggle("on", !!look.cape);
-    this.hatButton.classList.toggle("on", !!look.hat);
-    this.capeButton.textContent = look.cape ? "망토 켜짐" : "망토 꺼짐";
-    this.hatButton.textContent = look.hat ? "모자 켜짐" : "모자 꺼짐";
+    const custom = row.querySelector(".ce-custom") as HTMLLabelElement;
+    const picker = custom.querySelector("input") as HTMLInputElement;
+    const isCustom = CharacterCatalog.isCustomColor(choice);
+    custom.classList.toggle("on", isCustom);
+    custom.style.background = isCustom ? (choice as string) : "";
+    if (part.key !== editingPart) picker.value = CharacterCatalog.colorOf(look, part.key) || CharacterCatalog.NEUTRAL_CUSTOM_COLOR;
+  }
+
+  private syncToggle(button: HTMLButtonElement, which: "cape" | "hat", available: boolean, enabled: boolean): void {
+    const name = CharacterCatalog.toggleLabel(this.profile.look.c, which);
+    button.hidden = !available;
+    button.classList.toggle("on", enabled);
+    button.textContent = name + (enabled ? " 켜짐" : " 꺼짐");
   }
 }

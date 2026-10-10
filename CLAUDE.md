@@ -29,6 +29,7 @@
   three 타입은 `@types/three`(개발 의존성)이고 `tsconfig.json` 은 `moduleResolution: bundler`·`skipLibCheck` 를 쓴다. 3D 자료는 HTML 의 `<script type="module">` 에서 three 를 가져와 `new 게임클래스({THREE, GLTFLoader, SkeletonUtils})` 로 넘긴다(`ThreeLibs`, 33번 참고).
 - **공용 캐릭터 만들기는 `ts/character-kit.ts`**(2026-10-02 선생님 요청, 33번이 첫 사용). 닉네임·외형(`PlayerProfile`, 기기 저장 `portal_profile_v1`)과 6종 캐릭터 꾸미기 화면(`ProfileEditor`)·3D 모델 만들기(`CharacterModelFactory`)를 클래스로 묶었다.
   **캐릭터 만들기는 학급 화면(`index.html?c=…`)의 QR 위 `캐릭터 만들기` 버튼이 같은 화면 위 창으로 띄운다**(2026-10-03 선생님 요청, `ts/character-maker.ts` 의 `CharacterMakerPage`, three 는 버튼을 누를 때 늦게 불러옴).
+  **캐릭터 만들기 확장(2026-10-10)**: Medium 캐릭터 13종(`CharacterCatalog.TYPES`, 타입별 색칸 규칙·라벨·모자/망토 메시), 색은 팔레트 + 직접 고르기(`look.p[부위]` 는 번호 또는 `#rrggbb`), 닉네임 입력칸 아래 "닉네임은 본명으로 입력합니다". **닉네임은 `portal_profile_v1` 한 곳에만 저장**하고 게임별 닉네임 저장은 없앴다(24·25·31 포함). 창은 `ts/character-maker.ts` 의 `CharacterMakerDialog`(버튼에 `data-maker-open`, 코드로는 `CharacterMakerDialog.requestOpen()`)가 어느 화면 위에서든 띄운다. 닉네임이 필요한 곳은 `PlayerProfile.storedNick()` 을 읽고, 바뀐 것은 `PlayerProfile.CHANGE_EVENT`(입력 중)·`SETTLED_EVENT`(확정) 로 받는다. 새 게임 대기방도 같은 방식으로 붙인다. RTS(37)는 멀티 모드를 만들 때 연결한다.
   게임(32·33)의 캐릭터 만들기 카드는 접힌 한 줄(`.st-fold`, `ts/fold-card.ts` 의 `FoldCard`)이고 오른쪽 삼각형으로 펼친다. 32번 종목 규칙 카드도 같은 접이식. 새 게임도 같은 방식으로 둔다. 닉네임·외형은 기기 `localStorage`(`portal_profile_v1`)에 남는다. 새 3D 게임은 이 모듈로 캐릭터를 만든다. 사용법·클래스 표는 `33.castle-spy-notes.md` 2절.
 
 # 수업 자료 저장소 작업 지침

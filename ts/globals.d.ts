@@ -87,6 +87,7 @@ interface PortalClass {
 }
 
 interface Window {
+  importShim?: (specifier: string) => Promise<unknown>;
   PORTAL_CONFIG?: PortalConfig;
   PORTAL_CLASS?: PortalClass | null;
   firebase?: {
