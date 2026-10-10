@@ -3115,7 +3115,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     ultDesc() {
       return "자신을 중심으로 " + SKILLTEXT.secs(ULT.dmGrowMs) + "간 반경 " + ULT.dmR + "까지 커진 뒤 " + SKILLTEXT.secs(ULT.dmDur - ULT.dmGrowMs) + "간 유지되는 영역 생성. 커지는 동안 닿은 적은 " + SKILLTEXT.secs(ULT.dmStunMs) +
-      "간 기절하고 풀릴 때 " + ULT.dmBoltDmg + "의 피해. 영역 안에서 기본 공격은 가장 가까운 적 1명에게 최대 체력의 " + SKILLTEXT.pctOf(ULT.dmStrikeMaxHpRate) + "%의 피해를 입히고 " + SKILLTEXT.secs(ULT.dmStrikeStunMs) + "간 기절";
+      " 기절 후 " + ULT.dmBoltDmg + "의 피해. 영역 안 기본 공격은 가장 가까운 적 1명에게 최대 체력의 " + SKILLTEXT.pctOf(ULT.dmStrikeMaxHpRate) + "%의 피해와 " + SKILLTEXT.secs(ULT.dmStrikeStunMs) + " 기절";
     }
     passiveDesc() {
       return "공격이 적중할 때마다 대상에게 저주 1회 부여. 저주가 " + ULT.cuStacks + "회 중첩되면 폭발하여 " + ULT.cuBoomDmg + "의 피해. " + SKILLTEXT.secs(ULT.cuExpireMs) + " 이상 갱신되지 않으면 저주 소멸";
