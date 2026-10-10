@@ -71,7 +71,7 @@
   #hudAmmo.empty, #hudAmmo.empty .lab, #hudAmmo.empty #ammoMax { color: #FF8A98; animation: blink .5s steps(2) infinite; }
   #hudTime.hurry { color: #FF8A98; }
   @keyframes blink { 50% { opacity: .55; } }
-  #hudBest { top: calc(env(safe-area-inset-top,0px) + 10px); right: 12px; text-align: right; }
+  #hudBest { top: calc(env(safe-area-inset-top,0px) + 10px); right: 92px; text-align: right; }
   .hrec { display: flex; align-items: center; justify-content: flex-end; gap: 7px; min-width: 0; }
   .hrec + .hrec { margin-top: 6px; }
   .recIcon { flex: none; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
@@ -221,8 +221,7 @@
   body.touch #hudAmmo { right: 212px; bottom: 26px; }
   body.touch #hudAmmo::before { display: none; }
   body.touch #miniMap { bottom: auto; top: calc(env(safe-area-inset-top,0px) + 132px); width: min(200px, 28vw); }
-  body.touch #btnGameLeave { left: auto; right: 12px; bottom: auto; top: calc(env(safe-area-inset-top,0px) + 10px); }
-  #btnGameLeave { position: fixed; left: 12px; bottom: 12px; z-index: 6; font: inherit; font-size: 14px; font-weight: 800; padding: 6px 14px; border-radius: 10px; border: 2px solid var(--sg-line-strong); background: rgba(255,255,255,.92); color: var(--sg-ink); cursor: pointer; }
+  #btnGameLeave { position: fixed; right: 12px; top: calc(env(safe-area-inset-top,0px) + 10px); z-index: 6; font: inherit; font-size: 14px; font-weight: 800; padding: 6px 14px; border-radius: 10px; border: 2px solid var(--sg-line-strong); background: rgba(255,255,255,.92); color: var(--sg-ink); cursor: pointer; }
   @media (max-width: 520px) { #povBar { top: calc(env(safe-area-inset-top,0px) + 46px); max-width: calc(100vw - 24px); } .teams { flex-direction: column; } #hudTeam { left: auto; right: 12px; transform: none; gap: 12px; } #hudTeam > div { min-width: 48px; font-size: 22px; } #countBig { font-size: 90px; } }
   @media (max-height: 620px) {
     #hudHp { top: calc(env(safe-area-inset-top,0px) + 44px); }
@@ -263,9 +262,9 @@
   #overlay.st-screen .card .btn:disabled { box-shadow: none; }
   #overlay.st-screen .card .wideBtn, #overlay.st-screen #btnTeamBack { display: block; width: 100%; margin-top: 10px; }
   #overlay.st-screen .card .btns { justify-content: flex-start; }
-  #overlay.st-screen .nickLine { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-  #overlay.st-screen .nickLine b { flex: 1; min-width: 0; font-size: 20px; color: #FFB08C; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #overlay.st-screen .nickLine .btn { flex: 0 0 auto; margin: 0; }
+  #overlay.st-screen .hello { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 18px; font-weight: 700; margin: 0 0 14px; color: #EEF0F4; }
+  #overlay.st-screen .hello b { color: #FFB08C; }
+  #overlay.st-screen .mini { font: inherit; font-size: 13px; font-weight: 800; height: 32px; padding: 0 12px; border-radius: 8px; border: 2px solid rgba(255, 255, 255, .24); background: rgba(255, 255, 255, .08); color: #DDE1EA; cursor: pointer; }
   #overlay.st-screen .joinRow { justify-content: flex-start; flex-wrap: nowrap; margin-top: 0; }
   #overlay.st-screen .joinRow input { flex: 1; min-width: 0; width: auto; height: 54px; background: rgba(255, 255, 255, .06); border: 2px solid rgba(255, 255, 255, .3); border-radius: 6px; color: #fff; text-align: left; }
   #overlay.st-screen .joinRow input#joinCode { text-align: center; letter-spacing: 4px; }
@@ -387,8 +386,7 @@
 
   <div class="card" id="cardTeamStart" style="display:none">
     <div class="logo">👥 팀 대전</div>
-    <label class="fieldLab">내 닉네임</label>
-    <div class="nickLine"><b id="teamNick"></b><button type="button" class="btn sub" data-maker-open>✏️ 닉네임 설정</button></div>
+    <div class="hello">내 닉네임: <b id="teamNick"></b> <button type="button" class="mini" data-maker-open>✏️ 닉네임 설정</button></div>
     <button type="button" class="btn wideBtn" id="btnCreate">방 만들기</button>
     <label class="fieldLab" for="joinCode">방 코드로 입장</label>
     <div class="joinRow"><input id="joinCode" inputmode="numeric" maxlength="5" placeholder="방 코드 5자리" autocomplete="off"><button type="button" class="btn" id="btnJoin">입장</button></div>
@@ -410,7 +408,7 @@
 
   <div class="card wide" id="cardLobby" style="display:none">
     <div class="codeLine">방 코드<b id="lobbyCode">00000</b></div>
-    <div class="nickLine"><b id="lobbyNick"></b><button type="button" class="btn sub" data-maker-open>✏️ 닉네임 설정</button></div>
+    <div class="hello">내 닉네임: <b id="lobbyNick"></b> <button type="button" class="mini" data-maker-open>✏️ 닉네임 설정</button></div>
     <div class="teams">
       <div class="team blue"><h3>블루팀</h3><div id="listBlue"></div><button type="button" class="btn sub" id="btnJoinBlue">블루팀으로</button></div>
       <div class="team red"><h3>레드팀</h3><div id="listRed"></div><button type="button" class="btn sub" id="btnJoinRed">레드팀으로</button></div>
@@ -2002,6 +2000,14 @@ function startGame() {
   $("overlay").style.display = "none";
   ["hudHp", "hudAmmo", "hudBest"].forEach(id => $(id).style.display = "block");
   $("hudTop").style.display = "flex"; $("cross").style.display = "block";
+  $("btnGameLeave").hidden = false;
+}
+function leaveSoloGame() {
+  state = "menu";
+  clearSoloWorld();
+  for (const k in keys) keys[k] = false;
+  $("btnGameLeave").hidden = true;
+  showCard("start"); renderRecords();
 }
 function showCard(which) {
   const cardId = { start: "cardStart", over: "cardOver" }[which] || which;
@@ -2011,6 +2017,7 @@ function showCard(which) {
   document.querySelectorAll("#overlay > .card, #cardStart").forEach(c => { c.style.display = visibleCards.includes(c.id) ? "block" : "none"; });
   ["hudHp", "hudAmmo", "hudBest", "hudTop", "hudTeam"].forEach(id => $(id).style.display = "none");
   $("cross").style.display = "none";
+  $("btnGameLeave").hidden = true;
 }
 function damagePlayer(n, fromX, fromZ) {
   if (state !== "play") return;
@@ -3310,7 +3317,11 @@ $("btnTeamStart").onclick = e => { e.currentTarget.blur(); hostStart(); };
 $("btnLobbyLeave").onclick = e => { e.currentTarget.blur(); leaveRoom(); teamScreen("start"); };
 $("btnBackLobby").onclick = e => { e.currentTarget.blur(); hostBackToLobby(); };
 $("btnOverLeave").onclick = e => { e.currentTarget.blur(); leaveRoom(); teamScreen("start"); };
-$("btnGameLeave").onclick = e => { e.currentTarget.blur(); if (confirm("방을 나갈까요?")) { leaveRoom(); teamScreen("start"); } };
+$("btnGameLeave").onclick = e => {
+  e.currentTarget.blur();
+  if (state === "play") { if (confirm("처음 화면으로 나갈까요? (이번 기록은 저장되지 않아요)")) leaveSoloGame(); return; }
+  if (confirm("방을 나갈까요?")) { leaveRoom(); teamScreen("start"); }
+};
 
 const QG = QualityGovernor({
   isPlaying: () => state === "play" || (state === "team" && T.screen === "game"),

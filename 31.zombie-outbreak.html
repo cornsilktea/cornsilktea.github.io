@@ -61,9 +61,9 @@
   .btn { display: block; width: 100%; height: 54px; font-size: 18px; font-weight: 800; border-radius: 6px; border: 2px solid var(--sg-line-strong); background: var(--sg-panel); color: var(--sg-ink); margin-top: 10px; }
   .btn.primary { background: var(--sg-primary); color: var(--sg-primary-ink); border-color: var(--sg-primary); }
   .btn:disabled { opacity: .45; cursor: default; }
-  .nickLine { display: flex; align-items: center; gap: 10px; margin: 10px 0 12px; }
-  .nickLine b { flex: 1; min-width: 0; font-size: 20px; color: #9FD08A; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .nickLine .btn { width: auto; flex: 0 0 auto; margin-top: 0; padding: 0 18px; min-height: 48px; }
+  .hello { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 18px; font-weight: 700; margin: 0 0 14px; color: #EEF0F4; }
+  .hello b { color: #FFB08C; }
+  .mini { font: inherit; font-size: 13px; font-weight: 800; height: 32px; padding: 0 12px; border-radius: 8px; border: 2px solid rgba(255, 255, 255, .24); background: rgba(255, 255, 255, .08); color: #DDE1EA; cursor: pointer; }
   .field { display: flex; gap: 8px; }
   .field input { flex: 1; min-width: 0; height: 54px; font: inherit; font-size: 18px; font-weight: 700; padding: 0 14px; border: 2px solid var(--sg-line-strong); border-radius: 6px; background: #fff; color: var(--sg-ink); }
   .field input.codeIn { font-size: 24px; letter-spacing: 6px; text-align: center; }
@@ -252,8 +252,7 @@
       <p class="sub">불 꺼진 학교에 무언가 돌아다닙니다. 달빛만 비치는 교실과 복도에서 3분 동안 살아남으세요.</p>
     </div>
     <div class="card">
-      <label class="label">내 닉네임</label>
-      <div class="nickLine"><b id="startNick"></b><button type="button" class="btn" data-maker-open>✏️ 닉네임 설정</button></div>
+      <div class="hello">내 닉네임: <b id="startNick"></b> <button type="button" class="mini" data-maker-open>✏️ 닉네임 설정</button></div>
       <button type="button" class="btn primary" id="btnCreate">방 만들기</button>
       <div class="gap"></div>
       <label class="label" for="joinCode">방 코드로 입장</label>
@@ -295,7 +294,7 @@
   <div class="wrap">
     <div class="card">
       <div class="codeBar"><span class="codeLab">방 코드</span><span class="codeNum" id="lobbyCode">-----</span></div>
-      <div class="nickLine"><b id="lobbyNick"></b><button type="button" class="btn" data-maker-open>✏️ 닉네임 설정</button></div>
+      <div class="hello">내 닉네임: <b id="lobbyNick"></b> <button type="button" class="mini" data-maker-open>✏️ 닉네임 설정</button></div>
       <p class="sub" style="margin-top:10px">친구들에게 방 코드를 알려 주세요. (플레이어 5명 · 관전자 1명)</p>
     </div>
     <div class="card">
