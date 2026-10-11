@@ -298,7 +298,7 @@ export function createSim(api) {
     api.ROLE_LIST.forEach(function (k) { roles[k] = { name: api.ROLES[k].name, icon: api.ROLES[k].icon }; });
     return { title: title || "팀 배틀 아레나 시뮬레이션", note: note || "", createdAt: new Date().toISOString(), options: sim.options,
              seconds: Math.round(((sim.finishedAt || Date.now()) - sim.startedAt) / 1000), roleOrder: api.ROLE_LIST, roles: roles,
-             totals: gameTotals(r), rows: statRows(r), combos: comboRates(r), mapOrder: api.MAP_IDS, maps: byMap };
+             totals: gameTotals(r), rows: statRows(r), combos: comboRates(r), insights: sim.insights(), mapOrder: api.MAP_IDS, maps: byMap };
   };
   sim.insights = function () {
     var r = sim.results, mapRows = {}, mapNames = {};
@@ -456,6 +456,52 @@ class ReportRenderer {
   }
   comboName(code) { return code.split("").map(function (ch) { return this.icon[ch]; }, this).join(""); }
 
+  edgeTable(title, list, vsMark) {
+    var head = "<tr><th>" + (vsMark ? "상성" : "조합") + "</th><th>판</th><th>승률</th><th>기대</th><th>z</th></tr>";
+    var body = list.map(function (x) {
+      var sure = Math.abs(x.z) >= 3;
+      return "<tr><td>" + x.a + (vsMark ? " → " : " + ") + x.b + "</td><td>" + x.n + "</td><td class=\"win\">" + ReportRenderer.fixed(x.win, 1) + "%</td><td>" + ReportRenderer.fixed(x.expected, 1) + "%</td><td" + (sure ? " style=\"color:#D97B4F;font-weight:700\"" : "") + ">" + ReportRenderer.fixed(x.z, 1) + "</td></tr>";
+    }).join("");
+    return "<div><h2>" + title + "</h2><div class=\"wrap\"><table>" + head + body + "</table></div></div>";
+  }
+
+  mapWinTable(byMap) {
+    var head = "<tr><th>직업명</th><th>전체</th>" + byMap.maps.map(function (m) { return "<th>" + m + "</th>"; }).join("") + "</tr>";
+    var body = byMap.rows.map(function (r) {
+      var cells = r.slice(2).map(function (c) {
+        if (!c) return "<td>-</td>";
+        var tint = c[0] >= 60 ? " hi" : (c[0] < 40 ? " lo" : ""), thin = c[1] < 150 ? " muted" : "";
+        return "<td class=\"win" + tint + thin + "\" title=\"" + c[1] + "판\">" + ReportRenderer.fixed(c[0], 1) + "%</td>";
+      }).join("");
+      return "<tr><td>" + r[0] + "</td><td class=\"win" + this.winTint(r[1] / 100) + "\">" + ReportRenderer.fixed(r[1], 1) + "%</td>" + cells + "</tr>";
+    }, this).join("");
+    return "<div class=\"wrap\"><table>" + head + body + "</table></div>";
+  }
+
+  matrixTable(m) {
+    var self = this;
+    var head = "<tr><th>행 → 열</th>" + m.codes.map(function (c) { return "<th>" + self.comboName(c) + " " + c + "</th>"; }).join("") + "</tr>";
+    var body = m.codes.map(function (row, i) {
+      return "<tr><td>" + self.comboName(row) + " " + row + "</td>" + m.cells[i].map(function (c, j) {
+        if (i === j || !c) return "<td class=\"muted\">-</td>";
+        var tint = c[1] >= 60 ? " hi" : (c[1] < 40 ? " lo" : ""), thin = c[0] < 40 ? " muted" : "";
+        return "<td class=\"win" + tint + thin + "\" title=\"" + c[0] + "판\">" + ReportRenderer.fixed(c[1], 1) + "% (" + c[0] + ")</td>";
+      }).join("") + "</tr>";
+    }).join("");
+    return "<div class=\"wrap\"><table>" + head + body + "</table></div>";
+  }
+
+  insightsTab(I) {
+    return "<h2>맵별 승률</h2>" + this.mapWinTable(I.byMap) +
+      "<p class=\"note\">맵마다 판 수가 전체의 4분의 1이라 오차가 더 큽니다. 회색 칸은 150판 미만이라 참고만 하세요. 60% 이상 초록, 40% 미만 빨강.</p>" +
+      "<div class=\"grid2\">" + this.edgeTable("잘 맞는 같은 팀 조합", I.pairs.best, false) + this.edgeTable("안 맞는 같은 팀 조합", I.pairs.worst, false) + "</div>" +
+      "<p class=\"note\">같은 팀에 둘이 함께 있을 때 승률을 두 캐릭터 승률의 평균(기대)과 비교했습니다. z 3 이상(주황)이면 우연일 가능성이 낮고, 나머지는 참고용입니다. 조합이 200개 넘어 우연히 큰 값이 몇 개는 나옵니다.</p>" +
+      this.edgeTable("상성 (왼쪽이 오른쪽이 있는 상대 팀에게 유독 강함)", I.matchups.best, true) +
+      "<p class=\"note\">두 캐릭터의 전체 승률 차이로 예상한 값(기대)과 비교했습니다. 상대 팀의 나머지 두 명은 섞여 있습니다.</p>" +
+      "<h2>팀 구성 대결표</h2>" + this.matrixTable(I.comboMatrix) +
+      "<p class=\"note\">행 구성이 열 구성을 상대로 이긴 비율(판 수). 40판 미만 칸은 회색입니다.</p>";
+  }
+
   render() {
     var D = this.data, app = this.app, tables = this.tables, fixed = ReportRenderer.fixed;
     var comboName = this.comboName.bind(this);
@@ -482,8 +528,8 @@ class ReportRenderer {
     var when = new Date(D.createdAt);
     app.innerHTML ="<h1>" + D.title + "</h1><div class=\"sub\">" + when.toLocaleString("ko-KR") + " · " + D.totals.games.toLocaleString() + "판 · 시드 " + D.options.seedBase +
     " · 약 " + Math.round(D.seconds / 60) + "분" + (D.note ? " · " + D.note : "") + "</div>" +
-    "<div class=\"tabs\"><button data-tab=\"0\" class=\"on\">1. 전체 통계</button><button data-tab=\"1\">2. 직업군별</button><button data-tab=\"2\">3. 맵별</button></div>" +
-    "<section>" + tab1 + "</section><section hidden>" + tab2 + "</section><section hidden>" + tab3 + "</section>";
+    "<div class=\"tabs\"><button data-tab=\"0\" class=\"on\">1. 전체 통계</button><button data-tab=\"1\">2. 직업군별</button><button data-tab=\"2\">3. 맵별</button><button data-tab=\"3\">4. 조합·상성</button></div>" +
+    "<section>" + tab1 + "</section><section hidden>" + tab2 + "</section><section hidden>" + tab3 + "</section><section hidden>" + this.insightsTab(D.insights) + "</section>";
     tables.forEach(function (T, i) { this.drawTable(i); }, this);
     app.addEventListener("click", this.onClick.bind(this));
   }
