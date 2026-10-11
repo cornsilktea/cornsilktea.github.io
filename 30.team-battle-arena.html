@@ -821,7 +821,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     necro:   { name: "네크로", role: "caster", icon: "💀", hp: 120, lastStandHp: 50, lastStandHideMs: gameMs(1.5), speed: gameSpeed(170), cd: gameMs(1.4), dmg: 10, range: 350, pSpeed: 1000, pr: 9, ultName: "해골 소환", blocks: true },
     sniper:  { name: "저격수", role: "shooter", icon: "🎯", hp: 100, speed: gameSpeed(130), cd: gameMs(1), dmg: 37, range: 650, pSpeed: 1000, pr: 12, farDist: 500, farBonus: 0.5, ultName: "거대 화살", ultAim: true },
     thrower: { name: "투척병", role: "shooter", icon: "🧪", hp: 120, speed: gameSpeed(145), cd: gameMs(1.4), dmg: 15, ticks: 3, range: KEY * 4 + 120, minRange: KEY * 1, healCut: true, ultName: "독안개", ultAim: true, heals: true },
-    lancer:  { name: "창술사", role: "fighter", icon: "🔱", hp: 390, speed: gameSpeed(150), cd: gameMs(1.5), dmg: 35, range: 200, width: 50, respawnShield: true, ultName: "꿰뚫기", ultAim: true },
+    lancer:  { name: "창술사", role: "fighter", icon: "🔱", hp: 390, speed: gameSpeed(150), cd: gameMs(1.5), dmg: 32, range: 200, width: 50, respawnShield: true, ultName: "꿰뚫기", ultAim: true },
     blacksmith: { name: "대장장이", role: "fighter", icon: "🔨", hp: 445, speed: gameSpeed(150), cd: gameMs(1.8), dmg: 30, range: 180, width: 150, windup: gameMs(0.5), fx: { stunMs: gameMs(0.7) }, ultName: "내려찍기", ultAim: true },
     priest:  { name: "사제", role: "caster", icon: "📖", hp: 120, speed: 240, cd: 1000, dmg: 10, heal: 10, range: 320, width: 200, ultName: "블랙홀", ultKind: "blackhole", ultAim: true, heals: true, retired: true },
     shaman:  { name: "주술사", role: "shooter", icon: "👊", hp: 115, speed: gameSpeed(160), cd: gameMs(1.3), dmg: 5, range: 400, width: 100, ultName: "영역전개" },
@@ -906,7 +906,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               drR: 150, drDur: 3600000, drTick: gameMs(1), drHeal: 20, drCast: 450, drMin: 60, drSelfRate: 0.1, drSelfGauge: 1, drRiseMs: 350, drCastMs: 500,
               gaCast: 350, gaMin: 60, gaTransformMs: gameMs(1.2), gaDur: gameMs(6), gaR: 350, gaPull: 260, gaGap: 70, gaBoomDmg: 30,
               sfMin: 60, sfDelay: gameMs(0.6), sfR: 70, sfStunEvery: 3, sfStunMs: gameMs(1),
-              agCast: 400, agMin: 60, agDur: gameMs(3), agR: 350, agPull: 260, agGap: 70, agBoomDmg: 30,
+              agCast: 400, agMin: 60, agDur: gameMs(3), agR: 350, agPull: 260, agGap: 70, agBoomDmg: 25,
               gjCast: 300, gjMin: 60, gjTransformMs: gameMs(1.2), gjDur: gameMs(6), gjDef: 0.8, gjR: 150, gjTick: gameMs(1), gjTickDmg: 20, gjMaceRange: 150 };
   var ASSIST_MS = 5000;
   var SNIPER_KEEP = KEY * 5;
