@@ -2445,7 +2445,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     get clips() { return KIT.clips; }
     get altModelKey() { return null; }
     usesAltModel(E, t) { return false; }
-    get headY() { return HEAD_Y; }
+    get headY() { return CameraRig.HEAD_Y; }
     onLeapLand(E, t) { return false; }
     cannotAttack(E, t) { return false; }
     cast(E, ang, reach, t) {
@@ -4491,12 +4491,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var core = new THREE.Mesh(GEO.ball, MODELS.glowMat(e.heavy ? "shell-heavy" : "shell-light", e.heavy ? 0xFF7A2A : 0xFFD866, 0.95)); core.scale.setScalar(r); g.add(core);
       var tail = new THREE.Mesh(GEO.trail, MODELS.glowMat("trail-shell", 0xFFC46A, 0.4)); tail.position.x = -r * 2.4; tail.scale.set(r * 4, r * 0.5, r * 0.5); g.add(tail);
       g.rotation.y = -Math.atan2(e.ty - e.y, e.tx - e.x);
-      scene.add(g);
+      STAGE.scene.add(g);
       return g;
     }
     dropShellVis(s) {
       if (!s.vis) return;
-      scene.remove(s.vis); s.vis = null;
+      STAGE.scene.remove(s.vis); s.vis = null;
     }
     renderShell(s, t) {
       if (!s.shown) return;
@@ -4536,12 +4536,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       g.add(model);
       g.position.set(e.x, 0, e.y);
       g.userData = { mats: mats, model: model, rangeMat: rangeMat, baseMat: baseMat, timer: timer, yaw: 0 };
-      scene.add(g);
+      STAGE.scene.add(g);
       return g;
     }
     dropVis(s) {
       if (!s.vis) return;
-      scene.remove(s.vis); s.vis.userData.mats.forEach(function (m) { m.dispose(); }); s.vis.userData.timer.dispose(); s.vis = null;
+      STAGE.scene.remove(s.vis); s.vis.userData.mats.forEach(function (m) { m.dispose(); }); s.vis.userData.timer.dispose(); s.vis = null;
     }
     render(s, t, nowMs) {
       var e = s.e;
@@ -4608,12 +4608,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       g.add(hedge);
       g.position.set(e.x, 0, e.y);
       g.userData = { mats: mats, bushMats: bushMats, hedge: hedge, fade: 1 };
-      scene.add(g);
+      STAGE.scene.add(g);
       return g;
     }
     dropVis(s) {
       if (!s.vis) return;
-      scene.remove(s.vis); s.vis.userData.mats.forEach(function (m) { m.dispose(); }); s.vis = null;
+      STAGE.scene.remove(s.vis); s.vis.userData.mats.forEach(function (m) { m.dispose(); }); s.vis = null;
     }
     render(s, t, nowMs) {
       var e = s.e;
@@ -5317,7 +5317,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       E.buffUntil = 0; E.slamAt = 0; E.leap = null; E.dash = null; E.shove = null; E.stealthUntil = 0; E.ultUntil = 0; E.skillUntil = 0; E.regenUntil = 0; E.slowUntil = 0; E.slows = null; E.stunUntil = 0; E.lance = null; E.windUntil = 0;
       E.frostStacks = 0; E.frostStackAt = 0; E.revealUntil = 0; E.lastStandUsed = false; E.hasteUntil = 0; E.hasteStacks = 0;
       E.burnUntil = 0; E.burnNext = 0; E.rallyUsed = false; E.regenNext = 0; E.shield = !!CHARS[E.char].respawnShield;
-      if (E === MATCH.me) CAM.snap = true;
+      if (E === MATCH.me) CAMERA_RIG.view.snap = true;
       MATCH.game.forceNet = true;
     }
   }
@@ -6217,7 +6217,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       ARENA_MAP.bushes.forEach(function (b, i) {
         var built = makeGroup(b, i);
         built.mesh.renderOrder = 2;
-        arenaGroup.add(built.mesh);
+        STAGE.arenaGroup.add(built.mesh);
         ARENA_VIEW.bushVis[i] = { mats: [built.mat], full: built.full, fade: 1 };
       });
     }
@@ -6226,7 +6226,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return { mesh: ARENA_VIEW.boxField(b.tiles, 60, mat), mat: mat, full: 0.55 };
     }
     buildSimpleArena(th) {
-      arenaGroup.add(ARENA_VIEW.boxField(ARENA_VIEW.tilesOf(ROCK_TILES), 54, wallMat));
+      STAGE.arenaGroup.add(ARENA_VIEW.boxField(ARENA_VIEW.tilesOf(ROCK_TILES), 54, wallMat));
       ARENA_VIEW.hideVolumes(th, th.dungeon ? ARENA_VIEW.shadowVolume.bind(ARENA_VIEW) : function (b) {
         var mat = new THREE.MeshLambertMaterial({ color: 0x3E8E41, transparent: true, opacity: 0.8, depthWrite: false });
         return { mesh: ARENA_VIEW.boxField(b.tiles, 40, mat), mat: mat, full: 0.8 };
@@ -6249,12 +6249,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           for (var k = 0; k <= 3; k++) posts.push({ x: x, z: s.y - len / 2 + len * k / 3, w: 10, h: 22, d: 10 });
         });
       });
-      arenaGroup.add(ARENA_VIEW.boxList(rails, railMat));
-      arenaGroup.add(ARENA_VIEW.boxList(posts, postMat));
+      STAGE.arenaGroup.add(ARENA_VIEW.boxList(rails, railMat));
+      STAGE.arenaGroup.add(ARENA_VIEW.boxList(posts, postMat));
     }
     clearArena() {
-      arenaGroup.traverse(function (o) { if (o.isInstancedMesh) o.dispose(); });
-      arenaGroup.clear();
+      STAGE.arenaGroup.traverse(function (o) { if (o.isInstancedMesh) o.dispose(); });
+      STAGE.arenaGroup.clear();
       ARENA_VIEW.bushVis.forEach(function (bv) { bv.mats.forEach(function (m) { m.dispose(); }); });
       ARENA_VIEW.bushVis = [];
       PROPS.millBlades = []; SCENERY.group = null;
@@ -6262,11 +6262,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     buildArena() {
       ARENA_VIEW.clearArena();
       var th = THEMES[ARENA_MAP.id];
-      scene.background.setHex(th.sky); scene.fog.color.setHex(th.sky);
-      outerGround.material.color.setHex(th.outer);
-      ambient.intensity = th.ambient; sun.color.setHex(th.sun); sun.intensity = th.sunI;
-      if (groundMat.map) groundMat.map.dispose();
-      groundMat.map = ARENA_VIEW.paintFloor(th); groundMat.needsUpdate = true;
+      STAGE.scene.background.setHex(th.sky); STAGE.scene.fog.color.setHex(th.sky);
+      STAGE.outerGround.material.color.setHex(th.outer);
+      STAGE.ambient.intensity = th.ambient; STAGE.sun.color.setHex(th.sun); STAGE.sun.intensity = th.sunI;
+      if (STAGE.groundMat.map) STAGE.groundMat.map.dispose();
+      STAGE.groundMat.map = ARENA_VIEW.paintFloor(th); STAGE.groundMat.needsUpdate = true;
       PROPS.seed = 20260926;
       ARENA_VIEW.ground.visible = !(KIT.propsReady && th.dungeon);
       if (KIT.propsReady) PROPS.buildArenaProps(th); else ARENA_VIEW.buildSimpleArena(th);
@@ -6278,7 +6278,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (ARENA_VIEW.builtArena === id + (KIT.propsReady ? ":kit" : "")) return;
       ARENA_MAP.load(id);
       ARENA_VIEW.buildArena();
-      if (TOUR) TOUR.dirty = true;
+      if (TOUR_VIEW) TOUR_VIEW.state.dirty = true;
     }
     syncArena() {
       if (!SESSION.room) return;
@@ -6590,7 +6590,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     buildOutdoorProps(th) {
       if (th.windy) { PROPS.buildWindhillProps(th); return; }
-      var P3 = KIT.props, g = arenaGroup, blocks = [[], []];
+      var P3 = KIT.props, g = STAGE.arenaGroup, blocks = [[], []];
       function rockTile(c, r, hMin, hRange) {
         blocks[PROPS.seeded() < 0.5 ? 0 : 1].push({ w: TILE * 1.08, h: hMin + PROPS.seeded() * hRange, d: TILE * 1.08, x: ARENA_MAP.tileX(c), z: ARENA_MAP.tileY(r), yaw: PROPS.quarterTurn() });
       }
@@ -6629,14 +6629,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           tufts.push({ w: sz, h: sz * 0.8, d: sz, x: ARENA_MAP.tileX(c) + (PROPS.seeded() - 0.5) * TILE * 0.7, z: ARENA_MAP.tileY(r) + (PROPS.seeded() - 0.5) * TILE * 0.7, yaw: PROPS.seeded() * 6.28 });
         }
       });
-      if (tufts.length) arenaGroup.add(PROPS.instancedProp(KIT.props.tuft, tufts));
+      if (tufts.length) STAGE.arenaGroup.add(PROPS.instancedProp(KIT.props.tuft, tufts));
     }
     wallPiece(c, r) {
       var alongY = ARENA_VIEW.tileAt(c, r - 1) === "#" || ARENA_VIEW.tileAt(c, r + 1) === "#";
       var yaw = (alongY ? Math.PI / 2 : 0) + (PROPS.seeded() - 0.5) * 0.3;
       return { w: TILE * 0.98, h: 26 + PROPS.seeded() * 16, d: TILE * 0.62, x: ARENA_MAP.tileX(c), z: ARENA_MAP.tileY(r), yaw: yaw };
     }
-    sceneryWanted() { return !TOUR_LOW_END && !SCENERY.droppedForFps; }
+    sceneryWanted() { return !TOUR_VIEW.lowEnd && !SCENERY.droppedForFps; }
     dropSceneryForFps() {
       if (!SCENERY.group || SCENERY.droppedForFps) return false;
       SCENERY.droppedForFps = true; SCENERY.group.visible = false; PROPS.millBlades = [];
@@ -6648,7 +6648,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return PROPS.fitProp(tpl, size.x * k, h, size.z * k, x, z, yaw);
     }
     buildWindhillProps(th) {
-      var P3 = KIT.props, g = arenaGroup, blocks = [[], []];
+      var P3 = KIT.props, g = STAGE.arenaGroup, blocks = [[], []];
       ARENA_VIEW.tilesOf("#").forEach(function (tl) { blocks[PROPS.seeded() < 0.5 ? 0 : 1].push(PROPS.wallPiece(tl[0], tl[1])); });
       ARENA_VIEW.borderTiles().forEach(function (tl) {
         blocks[PROPS.seeded() < 0.5 ? 0 : 1].push({ w: TILE * 1.04, h: 20 + PROPS.seeded() * 14, d: TILE * 1.04, x: ARENA_MAP.tileX(tl[0]), z: ARENA_MAP.tileY(tl[1]), yaw: PROPS.quarterTurn() });
@@ -6659,7 +6659,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       // TODO: 들꽃 에셋이 생기면 교체 — 지금은 풀 덤불(tuft)을 더 촘촘히 뿌리고 바닥에 꽃 색 점을 찍어 대신함
       PROPS.tuftProps(0.6);
       if (!PROPS.sceneryWanted()) return;
-      g = SCENERY.group = new THREE.Group(); arenaGroup.add(g);
+      g = SCENERY.group = new THREE.Group(); STAGE.arenaGroup.add(g);
       var turf = [];
       for (var z = -150; z <= MH + 150; z += 100) {
         [-60, -160, MW + 60, MW + 160].forEach(function (x) {
@@ -6692,7 +6692,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       });
     }
     buildDungeonProps() {
-      var P3 = KIT.props, g = arenaGroup, floors = [[], []], blocks = [], boxes = [], barrels = [];
+      var P3 = KIT.props, g = STAGE.arenaGroup, floors = [[], []], blocks = [], boxes = [], barrels = [];
       ARENA_MAP.rows.forEach(function (row, r) {
         for (var c = 0; c < ARENA_MAP.cols; c++) {
           var ch = row.charAt(c), zone = ARENA_VIEW.zoneOfRow(r);
@@ -6803,7 +6803,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       v.mats.push(ringMat); v.ring = ring;
       if (E.id === SESSION.myId) { var meRing = ARENA_VIEW.flatMesh(GEO.meRing, meRingMat); meRing.position.y = 1.4; meRing.scale.setScalar(footK); root.add(meRing); v.meRing = meRing; }
       CHAR_TYPES.of(E.char).addMarkers(v, root, body);
-      (parent || scene).add(root);
+      (parent || STAGE.scene).add(root);
       return v;
     }
     makeForm(E, key, v) {
@@ -6956,10 +6956,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         g.userData.from = new THREE.Vector3(shooter.root.position.x + tmpV.x - d.x, tmpV.y - PROJ_Y, shooter.root.position.z + tmpV.z - d.y);
       }
       g.rotation.y = -Math.atan2(p.dy, p.dx);
-      scene.add(g);
+      STAGE.scene.add(g);
       return g;
     }
-    dropProjVis(id) { var g = PRV[id]; if (!g) return; scene.remove(g); delete PRV[id]; }
+    dropProjVis(id) { var g = PRV[id]; if (!g) return; STAGE.scene.remove(g); delete PRV[id]; }
     makeStabVis(d) {
       var g = new THREE.Group();
       var coreM = new THREE.MeshBasicMaterial({ color: 0xFF2A2A, transparent: true, opacity: 0.95, depthTest: false, depthWrite: false });
@@ -6970,7 +6970,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       g.add(glow); g.add(core);
       g.visible = false;
       g.userData = { fill: glowM, edge: coreM, stab: true, core: core, glow: glow };
-      scene.add(g);
+      STAGE.scene.add(g);
       return g;
     }
     placeStabLine(g, d, f) {
@@ -7054,7 +7054,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       fill.position.y = 2; edge.position.y = 24;
       g.add(fill); g.add(edge); g.position.set(d.x, 0, d.y); g.rotation.y = -d.angle;
       g.userData = { fill: fillM, edge: edgeM, edgeMesh: edge, fillMesh: fill, line: d.len ? d.len + BODY_R : 0, puffs: puffs };
-      scene.add(g);
+      STAGE.scene.add(g);
       return g;
     }
     makeLungeVis(d) {
@@ -7062,11 +7062,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       m.scale.set(d.len + BODY_R, d.width, 1);
       var g = new THREE.Group(); g.add(m); g.position.set(d.x, 2.6, d.y); g.rotation.y = -d.angle;
       g.userData.mat = m.material;
-      scene.add(g);
+      STAGE.scene.add(g);
       return g;
     }
-    dropLungeVis(l) { if (!l.vis) return; scene.remove(l.vis); l.vis.userData.mat.dispose(); l.vis = null; }
-    dropMelee(k) { var g = MLV[k]; if (!g) return; scene.remove(g); g.userData.fill.dispose(); g.userData.edge.dispose(); delete MLV[k]; }
+    dropLungeVis(l) { if (!l.vis) return; STAGE.scene.remove(l.vis); l.vis.userData.mat.dispose(); l.vis = null; }
+    dropMelee(k) { var g = MLV[k]; if (!g) return; STAGE.scene.remove(g); g.userData.fill.dispose(); g.userData.edge.dispose(); delete MLV[k]; }
     placeMeteor(vis, k, nowMs) {
       vis.userData.meteor.visible = CAMERA_RIG.pix >= PIX_START;
       if (!vis.userData.meteor.visible) return;
@@ -7094,12 +7094,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       g.add(meteor);
       g.position.set(e.x, 0, e.y);
       g.userData = { fill: fill, edge: edge, meteor: meteor, rock: rock, mats: [baseMat, fillMat, edgeMat, rockMat, fireMat, tailMat] };
-      scene.add(g);
+      STAGE.scene.add(g);
       return g;
     }
     dropBurstVis(b) {
       if (!b.vis) return;
-      scene.remove(b.vis); b.vis.userData.mats.forEach(function (m) { m.dispose(); }); b.vis = null;
+      STAGE.scene.remove(b.vis); b.vis.userData.mats.forEach(function (m) { m.dispose(); }); b.vis = null;
     }
     makePoolVis(e) {
       var g = new THREE.Group(), seed = e.x * 7 + e.y * 13 + e.createdAt % 997;
@@ -7120,7 +7120,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }
       g.position.set(e.x, 0, e.y);
       g.userData = { mats: mats, bubbles: bubbles, edge: edge };
-      scene.add(g);
+      STAGE.scene.add(g);
       return g;
     }
     makeHoleVis(e) {
@@ -7132,10 +7132,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var ring = ARENA_VIEW.flatMesh(GEO.ringFx, ringMat); ring.scale.setScalar(e.r); ring.position.y = 2; g.add(ring);
       g.position.set(e.x, 0, e.y);
       g.userData = { mats: [fillMat, ringMat], ring: ring, fill: fill, r: e.r };
-      scene.add(g);
+      STAGE.scene.add(g);
       return g;
     }
-    dropHoleVis(h) { if (!h.vis) return; scene.remove(h.vis); h.vis.userData.mats.forEach(function (m) { m.dispose(); }); h.vis = null; }
+    dropHoleVis(h) { if (!h.vis) return; STAGE.scene.remove(h.vis); h.vis.userData.mats.forEach(function (m) { m.dispose(); }); h.vis = null; }
     renderHole(h, t, nowMs) {
       var e = h.e, start = e.createdAt + e.delay;
       if (t < start) return;
@@ -7184,10 +7184,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }
       g.add(flakes);
       g.userData = { mats: [floorMat, flakeMat], floor: floorMat, flakeMat: flakeMat, flakes: flakes, flakeList: flakeList };
-      scene.add(g);
+      STAGE.scene.add(g);
       return g;
     }
-    dropStormVis(s) { if (!s.vis) return; scene.remove(s.vis); s.vis.userData.mats.forEach(function (m) { m.dispose(); }); s.vis = null; }
+    dropStormVis(s) { if (!s.vis) return; STAGE.scene.remove(s.vis); s.vis.userData.mats.forEach(function (m) { m.dispose(); }); s.vis = null; }
     renderStorm(s, t, dt) {
       var e = s.e, start = e.createdAt + e.delay, end = start + e.dur;
       if (t < start || t >= end) return;
@@ -7213,10 +7213,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var inner = new THREE.Mesh(GEO.skyBeam, core); inner.scale.set(9, SKY_BEAM_H, 9); g.add(inner);
       var pad = ARENA_VIEW.flatMesh(GEO.disc, padMat); pad.scale.setScalar(34); pad.position.y = 1.5; g.add(pad);
       g.userData = { mats: [mat, core, padMat], outer: outer, inner: inner, pad: pad };
-      scene.add(g);
+      STAGE.scene.add(g);
       return g;
     }
-    dropSkyBeam(b) { scene.remove(b); b.userData.mats.forEach(function (m) { m.dispose(); }); }
+    dropSkyBeam(b) { STAGE.scene.remove(b); b.userData.mats.forEach(function (m) { m.dispose(); }); }
     dropRevVis(r) { if (!r.vis) return; keys(r.vis).forEach(function (id) { EFFECT_VIEW.dropSkyBeam(r.vis[id]); }); r.vis = null; }
     placeSkyBeam(b, x, y, drop, fade, nowMs) {
       var ud = b.userData, len = SKY_BEAM_H * drop;
@@ -7265,10 +7265,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var floor = ARENA_VIEW.flatMesh(GEO.disc, floorMat); floor.position.y = 1.2 / 400; g.add(floor);
       var rim = ARENA_VIEW.flatMesh(GEO.domainRim, rimMat); rim.position.y = 1.6 / 400; g.add(rim);
       g.userData = { mats: [domeMat, shardMat, floorMat, rimMat], base: [0.42, 0.45, 0.38, 0.85], shards: shards };
-      scene.add(g);
+      STAGE.scene.add(g);
       return g;
     }
-    dropDomainVis(dm) { if (!dm.vis) return; scene.remove(dm.vis); dm.vis.userData.mats.forEach(function (m) { m.dispose(); }); dm.vis = null; }
+    dropDomainVis(dm) { if (!dm.vis) return; STAGE.scene.remove(dm.vis); dm.vis.userData.mats.forEach(function (m) { m.dispose(); }); dm.vis = null; }
     renderDomain(dm, t, nowMs) {
       var e = dm.e;
       if (!FIELD_FX.domainActive(e, t)) return;
@@ -7288,13 +7288,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var neck = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.4, 6, 8), MODELS.basicMat("potionNeck", 0x9BE88A, 0.85)); neck.position.y = 8; g.add(neck);
         var cork = new THREE.Mesh(new THREE.CylinderGeometry(2.8, 2.6, 3, 8), MODELS.basicMat("potionCork", 0x9A6B3E, 1)); cork.position.y = 12; g.add(cork);
       }
-      scene.add(g);
+      STAGE.scene.add(g);
       return g;
     }
     dropPoolVis(pl) {
-      if (pl.bottle) { scene.remove(pl.bottle); pl.bottle = null; }
+      if (pl.bottle) { STAGE.scene.remove(pl.bottle); pl.bottle = null; }
       if (!pl.vis) return;
-      scene.remove(pl.vis);
+      STAGE.scene.remove(pl.vis);
       var mats = pl.vis.userData.mats; keys(mats).forEach(function (k) { mats[k].dispose(); });
       pl.vis = null;
     }
@@ -7307,7 +7307,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         pl.bottle.rotation.set(k * 9, 0, k * 6);
         return;
       }
-      if (pl.bottle) { scene.remove(pl.bottle); pl.bottle = null; FX_VIEW.spark(e.x, e.y, "#8CFF5A", e.u ? 2.4 : 1.4); }
+      if (pl.bottle) { STAGE.scene.remove(pl.bottle); pl.bottle = null; FX_VIEW.spark(e.x, e.y, "#8CFF5A", e.u ? 2.4 : 1.4); }
       if (!pl.vis) pl.vis = EFFECT_VIEW.makePoolVis(e);
       var ud = pl.vis.userData, grow = clamp((t - start) / 160, 0, 1), fade = clamp((end - t) / ULT.plFade, 0, 1);
       pl.vis.scale.set(0.55 + 0.45 * grow, 1, 0.55 + 0.45 * grow);
@@ -7413,7 +7413,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var haloMat = mat({ map: tx.halo, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
       var halo = new THREE.Mesh(GEO.disc, haloMat); halo.scale.setScalar(GargantuaView.HALO_SCALE); g.add(halo);
       g.userData = { mats: mats, vortex: vortex, edgeMat: edgeMat, tilt: tilt, disc: disc, disc2: disc2, black: black, halo: halo, haloMat: haloMat };
-      scene.add(g);
+      STAGE.scene.add(g);
       return g;
     }
     makeBurst(f) {
@@ -7428,7 +7428,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       [ring1, ring2, flash, dome, disc].forEach(function (m) { g.add(m); });
       g.position.set(f.x, 0, f.y);
       g.userData = { mats: mats, r: f.r, ring1: ring1, ring2: ring2, flash: flash, dome: dome, disc: disc };
-      scene.add(g);
+      STAGE.scene.add(g);
       return g;
     }
     stepBurst(g, k) {
@@ -7449,10 +7449,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       ud.edgeMat.opacity = 0.55 + 0.25 * Math.sin(nowMs / (140 - 90 * charge));
       ud.disc.rotation.z = -spin * 2.6; ud.disc2.rotation.z = spin * 1.7;
       ud.tilt.rotation.z = Math.sin(spin * 0.5) * 0.05;
-      camera.getWorldDirection(this.facing);
+      STAGE.camera.getWorldDirection(this.facing);
       var norm = Math.hypot(this.facing.x, this.facing.z) || 1, ox = this.facing.x / norm * G.BEHIND, oz = this.facing.z / norm * G.BEHIND;
       ud.black.position.set(ox, G.BODY_Y, oz); ud.halo.position.set(ox * 0.8, G.BODY_Y, oz * 0.8);
-      ud.black.quaternion.copy(camera.quaternion); ud.halo.quaternion.copy(camera.quaternion);
+      ud.black.quaternion.copy(STAGE.camera.quaternion); ud.halo.quaternion.copy(STAGE.camera.quaternion);
       ud.haloMat.opacity = 0.85 + 0.15 * Math.sin(nowMs / 90);
     }
   }
@@ -7512,10 +7512,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         return ring;
       });
       g.userData = { mats: mats, floor: floor, edgeMat: edgeMat, rings: rings };
-      scene.add(g);
+      STAGE.scene.add(g);
       return g;
     }
-    drop(h) { if (!h.vis) return; scene.remove(h.vis); h.vis.userData.mats.forEach(function (m) { m.dispose(); }); h.vis = null; }
+    drop(h) { if (!h.vis) return; STAGE.scene.remove(h.vis); h.vis.userData.mats.forEach(function (m) { m.dispose(); }); h.vis = null; }
     render(h, t, nowMs) {
       var e = h.e, G = GolemGaleView, end = e.createdAt + e.dur;
       if (!h.vis) h.vis = this.make(e);
@@ -7554,10 +7554,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       g.add(star);
       g.position.set(e.x, 0, e.y);
       g.userData = { mats: mats, fill: fill, edgeMat: edgeMat, star: star };
-      scene.add(g);
+      STAGE.scene.add(g);
       return g;
     }
-    drop(s) { if (!s.vis) return; scene.remove(s.vis); s.vis.userData.mats.forEach(function (m) { m.dispose(); }); s.vis = null; }
+    drop(s) { if (!s.vis) return; STAGE.scene.remove(s.vis); s.vis.userData.mats.forEach(function (m) { m.dispose(); }); s.vis = null; }
     render(s, t, nowMs) {
       var e = s.e, G = StarfallView;
       if (!s.vis) s.vis = this.make(e);
@@ -7673,7 +7673,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       g.position.set(f.x, 0, f.y);
       g.userData.mats = [glow, core];
       g.userData.flashMat = flashMat;
-      scene.add(g);
+      STAGE.scene.add(g);
       return g;
     }
     chainFx(pts, over) {
@@ -7704,7 +7704,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         FX_VIEW.zigzagPath(g, a, b, f.segs || CHAIN_SEGS, CHAIN_JITTER, [[glow, 12], [core, 3.4]]);
       }
       g.userData.mats = [glow, core];
-      scene.add(g);
+      STAGE.scene.add(g);
       return g;
     }
     makeStormAura() {
@@ -7751,7 +7751,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     dropFxMesh(f) {
       if (!f.mesh) return;
-      scene.remove(f.mesh);
+      STAGE.scene.remove(f.mesh);
       (f.mesh.userData.mats || [f.mesh.material]).forEach(function (m) { m.dispose(); });
       if (f.mesh.userData.flashMat) f.mesh.userData.flashMat.dispose();
       f.mesh = null;
@@ -7769,7 +7769,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       part(GEO.poolEdge, 0xFFFFFF, 0.95, 2.4);
       g.position.set(f.x, 0, f.y);
       g.userData.mats = mats;
-      scene.add(g);
+      STAGE.scene.add(g);
       return g;
     }
     fxMesh(f) {
@@ -7781,7 +7781,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (f.k === "spark") { m = new THREE.Mesh(GEO.ringFx, mat); m.position.set(f.x, 36, f.y); }
       else if (f.k === "smoke") { m = new THREE.Mesh(GEO.ball, mat); m.position.set(f.x, 30, f.y); }
       else { m = ARENA_VIEW.flatMesh(GEO.ringFx, mat); m.position.set(f.x, 3, f.y); }
-      scene.add(m);
+      STAGE.scene.add(m);
       return m;
     }
     stepFx(nowMs) {
@@ -7808,7 +7808,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           return;
         }
         m.material.opacity = 1 - k;
-        if (f.k === "spark") { m.scale.setScalar((8 + k * 22) * f.s); m.quaternion.copy(camera.quaternion); }
+        if (f.k === "spark") { m.scale.setScalar((8 + k * 22) * f.s); m.quaternion.copy(STAGE.camera.quaternion); }
         else if (f.k === "smoke") { m.scale.setScalar(35 + 45 * Math.sin(Math.min(1, k * 1.4) * Math.PI / 2)); m.material.opacity = k < 0.6 ? 0.9 : 0.9 * (1 - (k - 0.6) / 0.4); }
         else if (f.k === "boom") m.scale.setScalar(f.r * (0.4 + 0.7 * k));
       });
@@ -7818,31 +7818,44 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       keys(MVIS).forEach(function (id) { FIGHTER_VIEW.dropMinionVis(id, false); });
       MATCH.fx.forEach(FX_VIEW.dropFxMesh.bind(FX_VIEW));
       FIELD.dropAllVis(); clericRange.visible = false;
-      aimGrp.visible = false; CAM.snap = true;
+      aimGrp.visible = false; CAMERA_RIG.view.snap = true;
     }
   }
   var FX_VIEW = new FxView();
   class CameraRig {
-    constructor() { this.w = 0; this.h = 0; this.dpr = 1; this.pix = PIX_START; this.renderer = null; }
+    static FOV = 40;
+    static SCOPE_FIT_OUT = 0.82;
+    static SCOPE_FIT_IN = 0.65;
+    static SCOPE_ZOOM_MAX = 2.2;
+    static VIEW_AHEAD = 570;
+    static VIEW_BEHIND = 290;
+    static VIEW_HALF_W = 280;
+    static VIEW_NEAR_PAD = 110;
+    static VIEW_TOP_SAFE_NDC = 0.55;
+    static HEAD_Y = 110;
+    constructor() {
+      this.w = 0; this.h = 0; this.dpr = 1; this.pix = PIX_START; this.renderer = null;
+      this.view = { pitchPlay: 0.92, pitchSpec: 1.12, dist: 1400, look: new THREE.Vector3(MW / 2, 0, MH / 2), fitKey: "", snap: true, halfW: 0, scopeX: 0, scopeZ: 0, zoom: 1, zoomGoal: 1 };
+    }
     resize() {
       CAMERA_RIG.dpr = Math.min(2, window.devicePixelRatio || 1);
       CAMERA_RIG.w = window.innerWidth; CAMERA_RIG.h = window.innerHeight;
       ov.width = Math.round(CAMERA_RIG.w * CAMERA_RIG.dpr); ov.height = Math.round(CAMERA_RIG.h * CAMERA_RIG.dpr);
       if (CAMERA_RIG.renderer) { CAMERA_RIG.renderer.setPixelRatio(CAMERA_RIG.pix); CAMERA_RIG.renderer.setSize(CAMERA_RIG.w, CAMERA_RIG.h, false); }
-      camera.aspect = CAMERA_RIG.w / Math.max(1, CAMERA_RIG.h); camera.updateProjectionMatrix();
-      CAM.fitKey = "";
+      STAGE.camera.aspect = CAMERA_RIG.w / Math.max(1, CAMERA_RIG.h); STAGE.camera.updateProjectionMatrix();
+      CAMERA_RIG.view.fitKey = "";
     }
     camBasis(fl) { return fl ? { fx: 0, fz: 1 } : { fx: 0, fz: -1 }; }
     placeCamera(lx, lz, dist, pitch, b) {
       var h = Math.cos(pitch) * dist;
-      camera.position.set(lx - b.fx * h, Math.sin(pitch) * dist, lz - b.fz * h);
-      camera.lookAt(lx, 0, lz);
-      camera.updateMatrixWorld();
+      STAGE.camera.position.set(lx - b.fx * h, Math.sin(pitch) * dist, lz - b.fz * h);
+      STAGE.camera.lookAt(lx, 0, lz);
+      STAGE.camera.updateMatrixWorld();
     }
     fitsView(pts, lx, lz, dist, pitch, xMax) {
       CAMERA_RIG.placeCamera(lx, lz, dist, pitch, CAMERA_RIG.camBasis(false));
       for (var i = 0; i < pts.length; i++) {
-        tmpV.set(pts[i][0], pts[i][1], pts[i][2]).project(camera);
+        tmpV.set(pts[i][0], pts[i][1], pts[i][2]).project(STAGE.camera);
         if (tmpV.z > 1 || Math.abs(tmpV.x) > xMax || Math.abs(tmpV.y) > 0.97) return false;
       }
       return true;
@@ -7854,71 +7867,96 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     groundReach(ndcY, height) {
       height = height || 0;
-      CAMERA_RIG.placeCamera(0, 0, CAM.dist, CAM.pitchPlay, CAMERA_RIG.camBasis(false));
-      tmpV.set(0, ndcY, 0.5).unproject(camera).sub(camera.position);
+      CAMERA_RIG.placeCamera(0, 0, CAMERA_RIG.view.dist, CAMERA_RIG.view.pitchPlay, CAMERA_RIG.camBasis(false));
+      tmpV.set(0, ndcY, 0.5).unproject(STAGE.camera).sub(STAGE.camera.position);
       if (tmpV.y >= -1e-6) return ndcY < 0 ? 9999 : -9999;
-      var k = (height - camera.position.y) / tmpV.y;
-      return camera.position.z + tmpV.z * k;
+      var k = (height - STAGE.camera.position.y) / tmpV.y;
+      return STAGE.camera.position.z + tmpV.z * k;
     }
     updateCamera(dt) {
       var spec = !MATCH.me, fl = !spec && INPUT.flip(), b = CAMERA_RIG.camBasis(fl);
       var key = CAMERA_RIG.w + "x" + CAMERA_RIG.h + (spec ? "s" + HUD.specPanelW() : "p") + (fl ? "f" : "");
-      if (CAM.fitKey !== key) {
-        CAM.fitKey = key; CAM.snap = true;
+      if (CAMERA_RIG.view.fitKey !== key) {
+        CAMERA_RIG.view.fitKey = key; CAMERA_RIG.view.snap = true;
         if (spec) {
           var xMax = Math.max(0.3, 1 - 2 * (HUD.specPanelW() + 16) / Math.max(1, CAMERA_RIG.w));
-          CAM.dist = CAMERA_RIG.fitDist([[0, 0, MH], [MW, 0, MH], [0, HEAD_Y, 0], [MW, HEAD_Y, 0]], MW / 2, MH / 2, CAM.pitchSpec, xMax);
+          CAMERA_RIG.view.dist = CAMERA_RIG.fitDist([[0, 0, MH], [MW, 0, MH], [0, CameraRig.HEAD_Y, 0], [MW, CameraRig.HEAD_Y, 0]], MW / 2, MH / 2, CAMERA_RIG.view.pitchSpec, xMax);
         } else {
-          var half = (VIEW_AHEAD - VIEW_BEHIND) / 2;
-          CAM.dist = CAMERA_RIG.fitDist([[-VIEW_HALF_W, 0, -VIEW_AHEAD], [VIEW_HALF_W, 0, -VIEW_AHEAD], [-VIEW_HALF_W, 0, VIEW_BEHIND], [VIEW_HALF_W, 0, VIEW_BEHIND]],
-                             0, -half, CAM.pitchPlay, 1);
-          CAM.halfW = CAM.dist * Math.tan(CAM_FOV * Math.PI / 360) * camera.aspect;
-          CAM.nearReach = CAMERA_RIG.groundReach(-1); CAM.farReach = Math.min(-CAMERA_RIG.groundReach(1) - 40, -CAMERA_RIG.groundReach(VIEW_TOP_SAFE_NDC, HEAD_Y));
+          var half = (CameraRig.VIEW_AHEAD - CameraRig.VIEW_BEHIND) / 2;
+          CAMERA_RIG.view.dist = CAMERA_RIG.fitDist([[-CameraRig.VIEW_HALF_W, 0, -CameraRig.VIEW_AHEAD], [CameraRig.VIEW_HALF_W, 0, -CameraRig.VIEW_AHEAD], [-CameraRig.VIEW_HALF_W, 0, CameraRig.VIEW_BEHIND], [CameraRig.VIEW_HALF_W, 0, CameraRig.VIEW_BEHIND]],
+                             0, -half, CAMERA_RIG.view.pitchPlay, 1);
+          CAMERA_RIG.view.halfW = CAMERA_RIG.view.dist * Math.tan(CameraRig.FOV * Math.PI / 360) * STAGE.camera.aspect;
+          CAMERA_RIG.view.nearReach = CAMERA_RIG.groundReach(-1); CAMERA_RIG.view.farReach = Math.min(-CAMERA_RIG.groundReach(1) - 40, -CAMERA_RIG.groundReach(CameraRig.VIEW_TOP_SAFE_NDC, CameraRig.HEAD_Y));
         }
       }
-      var lx = MW / 2, lz = MH / 2, pitch = CAM.pitchSpec;
+      var lx = MW / 2, lz = MH / 2, pitch = CAMERA_RIG.view.pitchSpec;
       if (!spec) {
         var focus = MATCH.me;
         if (!MATCH.me.alive) TARGETS.participants().forEach(function (id) { var o = TARGETS.ent(id); if (o && o.alive && o.team === MATCH.me.team && focus === MATCH.me) focus = o; });
-        var ahead = (VIEW_AHEAD - VIEW_BEHIND) / 2;
-        var zLo = fl ? CAM.nearReach - VIEW_NEAR_PAD : CAM.farReach, zHi = fl ? MH - CAM.farReach : MH + VIEW_NEAR_PAD - CAM.nearReach;
-        lx = CAM.halfW * 2 >= MW + 40 ? MW / 2 : clamp(focus.x + b.fx * ahead, CAM.halfW - 20, MW - CAM.halfW + 20);
+        var ahead = (CameraRig.VIEW_AHEAD - CameraRig.VIEW_BEHIND) / 2;
+        var zLo = fl ? CAMERA_RIG.view.nearReach - CameraRig.VIEW_NEAR_PAD : CAMERA_RIG.view.farReach, zHi = fl ? MH - CAMERA_RIG.view.farReach : MH + CameraRig.VIEW_NEAR_PAD - CAMERA_RIG.view.nearReach;
+        lx = CAMERA_RIG.view.halfW * 2 >= MW + 40 ? MW / 2 : clamp(focus.x + b.fx * ahead, CAMERA_RIG.view.halfW - 20, MW - CAMERA_RIG.view.halfW + 20);
         lz = zLo > zHi ? MH / 2 : clamp(focus.y + b.fz * ahead, zLo, zHi);
-        pitch = CAM.pitchPlay;
+        pitch = CAMERA_RIG.view.pitchPlay;
       }
-      if (CAM.snap) { CAM.look.set(lx, 0, lz); CAM.snap = false; }
-      else { var k = 1 - Math.exp(-dt * 7); CAM.look.x += (lx - CAM.look.x) * k; CAM.look.z += (lz - CAM.look.z) * k; }
+      if (CAMERA_RIG.view.snap) { CAMERA_RIG.view.look.set(lx, 0, lz); CAMERA_RIG.view.snap = false; }
+      else { var k = 1 - Math.exp(-dt * 7); CAMERA_RIG.view.look.x += (lx - CAMERA_RIG.view.look.x) * k; CAMERA_RIG.view.look.z += (lz - CAMERA_RIG.view.look.z) * k; }
       var scoping = !spec && MATCH.me.alive && CHAR_TYPES.of(MATCH.me.char).scopesWhileAiming && INPUT.aim.id !== null && INPUT.aim.drag && !INPUT.aim.cancel;
       var sk = 1 - Math.exp(-dt * 6), aimX = 0, aimZ = 0, endX = 0, endZ = 0;
       if (scoping) {
         var wx = Math.cos(MATCH.me.angle), wz = Math.sin(MATCH.me.angle), len = PHYSICS.rayCast(MATCH.me.x + wx * 20, MATCH.me.y + wz * 20, wx, wz, CHARS[MATCH.me.char].range, 6) + 20;
         endX = MATCH.me.x + wx * len; endZ = MATCH.me.y + wz * len;
-        aimX = (MATCH.me.x + endX) / 2 - CAM.look.x; aimZ = (MATCH.me.y + endZ) / 2 - CAM.look.z;
-        CAMERA_RIG.placeCamera(CAM.look.x + aimX, CAM.look.z + aimZ, CAM.dist * CAM.zoomGoal, pitch, b);
-        var edge = Math.max(CAMERA_RIG.ndcReach(MATCH.me.x, HEAD_Y, MATCH.me.y), CAMERA_RIG.ndcReach(endX, 0, endZ));
-        CAM.zoomGoal = clamp(CAM.zoomGoal * (edge > SCOPE_FIT_OUT ? 1 + dt * 3 : (edge < SCOPE_FIT_IN ? 1 - dt : 1)), 1, SCOPE_ZOOM_MAX);
-      } else CAM.zoomGoal = 1;
-      CAM.scopeX += (aimX - CAM.scopeX) * sk;
-      CAM.scopeZ += (aimZ - CAM.scopeZ) * sk;
-      CAM.zoom += (CAM.zoomGoal - CAM.zoom) * sk;
-      CAMERA_RIG.placeCamera(CAM.look.x + CAM.scopeX, CAM.look.z + CAM.scopeZ, CAM.dist * CAM.zoom, pitch, b);
+        aimX = (MATCH.me.x + endX) / 2 - CAMERA_RIG.view.look.x; aimZ = (MATCH.me.y + endZ) / 2 - CAMERA_RIG.view.look.z;
+        CAMERA_RIG.placeCamera(CAMERA_RIG.view.look.x + aimX, CAMERA_RIG.view.look.z + aimZ, CAMERA_RIG.view.dist * CAMERA_RIG.view.zoomGoal, pitch, b);
+        var edge = Math.max(CAMERA_RIG.ndcReach(MATCH.me.x, CameraRig.HEAD_Y, MATCH.me.y), CAMERA_RIG.ndcReach(endX, 0, endZ));
+        CAMERA_RIG.view.zoomGoal = clamp(CAMERA_RIG.view.zoomGoal * (edge > CameraRig.SCOPE_FIT_OUT ? 1 + dt * 3 : (edge < CameraRig.SCOPE_FIT_IN ? 1 - dt : 1)), 1, CameraRig.SCOPE_ZOOM_MAX);
+      } else CAMERA_RIG.view.zoomGoal = 1;
+      CAMERA_RIG.view.scopeX += (aimX - CAMERA_RIG.view.scopeX) * sk;
+      CAMERA_RIG.view.scopeZ += (aimZ - CAMERA_RIG.view.scopeZ) * sk;
+      CAMERA_RIG.view.zoom += (CAMERA_RIG.view.zoomGoal - CAMERA_RIG.view.zoom) * sk;
+      CAMERA_RIG.placeCamera(CAMERA_RIG.view.look.x + CAMERA_RIG.view.scopeX, CAMERA_RIG.view.look.z + CAMERA_RIG.view.scopeZ, CAMERA_RIG.view.dist * CAMERA_RIG.view.zoom, pitch, b);
     }
     ndcReach(x, h, z) {
-      tmpV.set(x, h, z).project(camera);
+      tmpV.set(x, h, z).project(STAGE.camera);
       return tmpV.z > 1 ? 9 : Math.max(Math.abs(tmpV.x), Math.abs(tmpV.y));
     }
   }
   var CAMERA_RIG = new CameraRig();
   class TourView {
+    static SPOTS = [["warrior", "blue", 330, 585], ["ranger", "blue", 450, 555], ["mage", "blue", 570, 585],
+                    ["knight", "red", 330, 765], ["rogue", "red", 450, 795], ["sniper", "red", 570, 765]];
+    static SHOTS = [
+      { name: "아레나 전경", orbit: true, center: [450, 0, 675], radius: 1350, height: 850, arc: [1.1, 1.95] },
+      { name: "중앙 대치", from: [110, 100, 930], to: [790, 100, 930], lookFrom: [380, 60, 675], lookTo: [520, 60, 675] },
+      { name: "블루 팀", from: [660, 140, 730], to: [560, 115, 710], lookFrom: [450, 55, 575], lookTo: [450, 50, 575] },
+      { name: "레드 팀", from: [240, 140, 620], to: [340, 115, 640], lookFrom: [450, 55, 775], lookTo: [450, 50, 775] },
+      { name: "풀숲", bush: true, from: [420, 170, 530], to: [360, 130, 600], lookFrom: [200, 30, 675], lookTo: [200, 30, 675] },
+      { name: "하늘에서 본 아레나", orbit: true, center: [450, 0, 675], radius: 300, height: 1750, arc: [0.2, 0.9] }
+    ];
+    static STILL_SHOT = { name: "아레나 전경", orbit: true, center: [450, 0, 675], radius: 1350, height: 850, arc: [1.5, 1.5] };
+    static STILL_REDRAW_MS = 1000;
+    static SHOT_MS = 7000;
+    static FADE_MS = 600;
+    constructor() {
+      this.state = { on: false, index: 0, start: 0, caption: "", dirty: true, drawnAt: 0 };
+      this.showcase = [];
+      this.group = null;
+      this.look = new THREE.Vector3();
+      this.lowEnd = TOUCH || (navigator.hardwareConcurrency > 0 && navigator.hardwareConcurrency <= 4);
+    }
+    attachTo(stageScene) {
+      this.group = new THREE.Group(); this.group.visible = false; stageScene.add(this.group);
+      window.addEventListener("resize", function () { TOUR_VIEW.state.dirty = true; });
+    }
     buildShowcase() {
-      SHOWCASE_SPOTS.forEach(function (s, i) {
+      TourView.SPOTS.forEach(function (s, i) {
         var E = Object.assign(new Unit(), { id: "tour" + i, team: s[1], char: s[0], x: s[2], y: s[3], angle: s[1] === "blue" ? Math.PI / 2 : -Math.PI / 2,
                   atkAt: 0, ultUntil: 0, buffUntil: 0, stealthUntil: 0, alive: true, mv: false, nextAtk: 1200 + i * 700 + Math.random() * 1500 });
-        var v = FIGHTER_VIEW.makeVis(E, tourGroup);
-        v.root.position.set(E.x, 0, E.y); v.body.rotation.y = -E.angle;      SHOWCASE.push({ E: E, v: v });
+        var v = FIGHTER_VIEW.makeVis(E, TOUR_VIEW.group);
+        v.root.position.set(E.x, 0, E.y); v.body.rotation.y = -E.angle;      TOUR_VIEW.showcase.push({ E: E, v: v });
       });
     }
-    tourStill() { return TOUR_LOW_END || CAMERA_RIG.pix < PIX_START; }
+    tourStill() { return TOUR_VIEW.lowEnd || CAMERA_RIG.pix < PIX_START; }
     bushShot(shot) {
       var ideal = shot.lookFrom, best = null, bestD = Infinity;
       ARENA_MAP.bushes.forEach(function (b) { var d = hyp(b.x - ideal[0], b.y - ideal[2]); if (d < bestD) { bestD = d; best = b; } });
@@ -7929,56 +7967,56 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     lerp3(a, b, k) { return [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k]; }
     startTour(nowMs) {
-      TOUR.on = true; TOUR.start = nowMs; TOUR.dirty = true;
+      TOUR_VIEW.state.on = true; TOUR_VIEW.state.start = nowMs; TOUR_VIEW.state.dirty = true;
       FX_VIEW.clear3d();
       octx.setTransform(1, 0, 0, 1, 0, 0); octx.clearRect(0, 0, ov.width, ov.height);
-      tourGroup.visible = true;
+      TOUR_VIEW.group.visible = true;
       show($("tourFade"), true); show($("tourCaption"), true);
     }
     endTour() {
-      TOUR.on = false; tourGroup.visible = false;
+      TOUR_VIEW.state.on = false; TOUR_VIEW.group.visible = false;
       show($("tourFade"), false); show($("tourCaption"), false);
-      CAM.snap = true; CAM.fitKey = "";
+      CAMERA_RIG.view.snap = true; CAMERA_RIG.view.fitKey = "";
     }
     renderTour(nowMs, dt) {
       if (!CAMERA_RIG.renderer) return;
-      if (!TOUR.on) TOUR_VIEW.startTour(nowMs);
+      if (!TOUR_VIEW.state.on) TOUR_VIEW.startTour(nowMs);
       var still = TOUR_VIEW.tourStill();
-      if (TOUR.mapShown !== ARENA_MAP.id) {
-        if (TOUR.mapShown) { TOUR.index = 0; TOUR.start = nowMs; }
-        TOUR.mapShown = ARENA_MAP.id; TOUR.dirty = true;
+      if (TOUR_VIEW.state.mapShown !== ARENA_MAP.id) {
+        if (TOUR_VIEW.state.mapShown) { TOUR_VIEW.state.index = 0; TOUR_VIEW.state.start = nowMs; }
+        TOUR_VIEW.state.mapShown = ARENA_MAP.id; TOUR_VIEW.state.dirty = true;
       }
       if (still) {
-        if (!TOUR.dirty && nowMs - TOUR.drawnAt < TOUR_STILL_REDRAW_MS) return;
+        if (!TOUR_VIEW.state.dirty && nowMs - TOUR_VIEW.state.drawnAt < TourView.STILL_REDRAW_MS) return;
         dt = Math.min(dt, 0.05);
       }
-      TOUR.dirty = false; TOUR.drawnAt = nowMs;
-      var elapsed = nowMs - TOUR.start;
-      if (elapsed > TOUR_MS) { TOUR.index = (TOUR.index + 1) % TOUR_SHOTS.length; TOUR.start = nowMs; elapsed = 0; }
-      var shot = still ? TOUR_STILL_SHOT : TOUR_SHOTS[TOUR.index], k = elapsed / TOUR_MS, e = k * k * (3 - 2 * k) * 0.6 + k * 0.4;
+      TOUR_VIEW.state.dirty = false; TOUR_VIEW.state.drawnAt = nowMs;
+      var elapsed = nowMs - TOUR_VIEW.state.start;
+      if (elapsed > TourView.SHOT_MS) { TOUR_VIEW.state.index = (TOUR_VIEW.state.index + 1) % TourView.SHOTS.length; TOUR_VIEW.state.start = nowMs; elapsed = 0; }
+      var shot = still ? TOUR_STILL_SHOT : TourView.SHOTS[TOUR_VIEW.state.index], k = elapsed / TourView.SHOT_MS, e = k * k * (3 - 2 * k) * 0.6 + k * 0.4;
       if (shot.bush) shot = TOUR_VIEW.bushShot(shot);
       if (shot.orbit) {
         var a = shot.arc[0] + (shot.arc[1] - shot.arc[0]) * e;
-        camera.position.set(shot.center[0] + Math.cos(a) * shot.radius, shot.height, shot.center[2] + Math.sin(a) * shot.radius);
-        tourLook.fromArray(shot.center);
+        STAGE.camera.position.set(shot.center[0] + Math.cos(a) * shot.radius, shot.height, shot.center[2] + Math.sin(a) * shot.radius);
+        TOUR_VIEW.look.fromArray(shot.center);
       } else {
-        camera.position.fromArray(TOUR_VIEW.lerp3(shot.from, shot.to, e));
-        tourLook.fromArray(TOUR_VIEW.lerp3(shot.lookFrom, shot.lookTo, e));
+        STAGE.camera.position.fromArray(TOUR_VIEW.lerp3(shot.from, shot.to, e));
+        TOUR_VIEW.look.fromArray(TOUR_VIEW.lerp3(shot.lookFrom, shot.lookTo, e));
       }
-      camera.lookAt(tourLook);
-      camera.updateMatrixWorld();
-      $("tourFade").style.opacity = still ? "0" : Math.max(0, 1 - Math.min(elapsed, TOUR_MS - elapsed) / TOUR_FADE).toFixed(3);
-      var camNo = still ? 1 : TOUR.index + 1;
+      STAGE.camera.lookAt(TOUR_VIEW.look);
+      STAGE.camera.updateMatrixWorld();
+      $("tourFade").style.opacity = still ? "0" : Math.max(0, 1 - Math.min(elapsed, TourView.SHOT_MS - elapsed) / TourView.FADE_MS).toFixed(3);
+      var camNo = still ? 1 : TOUR_VIEW.state.index + 1;
       var cap = "CAM " + (camNo < 10 ? "0" : "") + camNo + " · " + MAPS[ARENA_MAP.id].name + " · " + shot.name;
-      if (cap !== TOUR.caption) { TOUR.caption = cap; setText($("tourCam"), cap); }
+      if (cap !== TOUR_VIEW.state.caption) { TOUR_VIEW.state.caption = cap; setText($("tourCam"), cap); }
       var t = now();
-      SHOWCASE.forEach(function (s) {
+      TOUR_VIEW.showcase.forEach(function (s) {
         if (!s.E.nextAtk || s.E.nextAtk < 100000) s.E.nextAtk = t + s.E.nextAtk;
         if (t >= s.E.nextAtk) { s.E.atkAt = t; s.E.nextAtk = t + 1800 + Math.random() * 2600; }
         FIGHTER_VIEW.animate(s.v, s.E, t, dt, false);
       });
       ARENA_VIEW.bushVis.forEach(function (bv) { bv.mats.forEach(function (m) { m.opacity = bv.full; }); });
-      CAMERA_RIG.renderer.render(scene, camera);
+      CAMERA_RIG.renderer.render(STAGE.scene, STAGE.camera);
     }
   }
   var TOUR_VIEW = new TourView();
@@ -8007,10 +8045,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     render(t, dt) {
       if (!CAMERA_RIG.renderer) return;
-      if (TOUR.on) TOUR_VIEW.endTour();
+      if (TOUR_VIEW.state.on) TOUR_VIEW.endTour();
       var me = MATCH.me, spec = !me, nowMs = Date.now(), shown = {}, bushSeen = {};
       CAMERA_RIG.updateCamera(dt);
-      LABELS.length = 0;
+      HUD.labels.length = 0;
       TARGETS.participants().forEach(function (id) {
         var E = TARGETS.ent(id); if (!E) return;
         shown[id] = 1;
@@ -8066,7 +8104,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         v.ring.visible = E.alive;
         if (v.meRing) { v.meRing.visible = E.alive; v.meRing.scale.setScalar(1 + 0.07 * Math.sin(nowMs / 160)); }
         if (v.hulls) { var outlined = E.alive && alpha > 0.99; v.hulls.forEach(function (h) { h.visible = outlined; }); }
-        if (E.alive) LABELS.push({ e: E, alpha: alpha, ally: ally });
+        if (E.alive) HUD.labels.push({ e: E, alpha: alpha, ally: ally });
       });
       keys(VIS).forEach(function (id) { if (!shown[id]) FIGHTER_VIEW.dropVis(id); });
       MINIONS.allMinions().forEach(function (M) {
@@ -8097,7 +8135,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         v.ring.visible = M.alive;
         v.durRing.update((t - M.born) / ULT.smDur, nowMs);
         v.durRing.setVisible(M.alive && t >= M.rise);
-        if (M.alive && t >= M.rise) LABELS.push({ e: M, alpha: alpha, ally: ally, minion: true });
+        if (M.alive && t >= M.rise) HUD.labels.push({ e: M, alpha: alpha, ally: ally, minion: true });
       });
       keys(MVIS).forEach(function (id) { if (!shown[id]) FIGHTER_VIEW.dropMinionVis(id, true); });
       ARENA_VIEW.bushVis.forEach(function (bv, i) {
@@ -8164,15 +8202,20 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
       FX_VIEW.stepFx(nowMs);
       AIM_GUIDE.updateAimGuide();
-      CAMERA_RIG.renderer.render(scene, camera);
+      CAMERA_RIG.renderer.render(STAGE.scene, STAGE.camera);
       HUD.drawOverlay(nowMs);
     }
   }
   var FRAME_RENDERER = new FrameRenderer();
   class Hud2D {
-    constructor() { this.lastCountSec = 0; }
+    static STALL_MS = 250;
+    static MVP_STUN_PER_SEC = 60;
+    static MVP_SLOW_PER_SEC = 40;
+    static MVP_ASSIST = 50;
+    static FINAL_COUNT_MS = 10000;
+    constructor() { this.lastCountSec = 0; this.labels = []; this.quality = { acc: 0, frames: 0, slow: 0 }; }
     toScreen(x, h, y) {
-      tmpV.set(x, h, y).project(camera);
+      tmpV.set(x, h, y).project(STAGE.camera);
       return tmpV.z > 1 ? null : { x: (tmpV.x + 1) / 2 * CAMERA_RIG.w, y: (1 - tmpV.y) / 2 * CAMERA_RIG.h };
     }
     pill(x, y, w, h, r) {
@@ -8181,7 +8224,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       octx.arcTo(x, y + h, x, y, r); octx.arcTo(x, y, x + w, y, r); octx.closePath();
     }
     drawMinionBar(M, alpha, ally) {
-      var p = HUD.toScreen(M.x, HEAD_Y * 0.85, M.y); if (!p) return;
+      var p = HUD.toScreen(M.x, CameraRig.HEAD_Y * 0.85, M.y); if (!p) return;
       var bw = 38, bh = 5, x0 = p.x - bw / 2, top = p.y, ratio = clamp(M.hp / M.maxHp, 0, 1);
       octx.save(); octx.globalAlpha = alpha;
       octx.fillStyle = "rgba(10,14,12,.85)"; HUD.pill(x0 - 2, top - 2, bw + 4, bh + 4, 3); octx.fill();
@@ -8249,10 +8292,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     drawOverlay(nowMs) {
       octx.setTransform(CAMERA_RIG.dpr, 0, 0, CAMERA_RIG.dpr, 0, 0);
       octx.clearRect(0, 0, CAMERA_RIG.w, CAMERA_RIG.h);
-      LABELS.forEach(function (L) { if (L.minion) HUD.drawMinionBar(L.e, L.alpha, L.ally); else HUD.drawBars(L.e, L.alpha, L.ally); });
+      HUD.labels.forEach(function (L) { if (L.minion) HUD.drawMinionBar(L.e, L.alpha, L.ally); else HUD.drawBars(L.e, L.alpha, L.ally); });
       MATCH.fx.forEach(function (f) {
         if (f.k !== "txt") return;
-        var k = (nowMs - f.t) / f.life, p = HUD.toScreen(f.x, HEAD_Y, f.y); if (!p) return;
+        var k = (nowMs - f.t) / f.life, p = HUD.toScreen(f.x, CameraRig.HEAD_Y, f.y); if (!p) return;
         var y = p.y - 34 - k * 30;
         octx.save(); octx.globalAlpha = 1 - k;
         octx.font = "800 20px " + FONT; octx.textAlign = "center";
@@ -8263,15 +8306,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       HUD.drawJoystick();
     }
     adaptQuality(frameMs) {
-      if (!CAMERA_RIG.renderer || frameMs > QA_STALL_MS) return;
-      QA.acc += frameMs; QA.frames++;
-      if (QA.acc < 1000) return;
-      var fps = QA.frames * 1000 / QA.acc;
-      QA.acc = 0; QA.frames = 0;
-      QA.slow = fps < 45 ? QA.slow + 1 : 0;
-      if (QA.slow >= 3 && PROPS.dropSceneryForFps()) { QA.slow = 0; return; }
-      if (QA.slow >= 3 && CAMERA_RIG.pix > PIX_MIN) {
-        QA.slow = 0; CAMERA_RIG.pix = Math.max(PIX_MIN, CAMERA_RIG.pix - 0.25);
+      if (!CAMERA_RIG.renderer || frameMs > Hud2D.STALL_MS) return;
+      HUD.quality.acc += frameMs; HUD.quality.frames++;
+      if (HUD.quality.acc < 1000) return;
+      var fps = HUD.quality.frames * 1000 / HUD.quality.acc;
+      HUD.quality.acc = 0; HUD.quality.frames = 0;
+      HUD.quality.slow = fps < 45 ? HUD.quality.slow + 1 : 0;
+      if (HUD.quality.slow >= 3 && PROPS.dropSceneryForFps()) { HUD.quality.slow = 0; return; }
+      if (HUD.quality.slow >= 3 && CAMERA_RIG.pix > PIX_MIN) {
+        HUD.quality.slow = 0; CAMERA_RIG.pix = Math.max(PIX_MIN, CAMERA_RIG.pix - 0.25);
         CAMERA_RIG.renderer.setPixelRatio(CAMERA_RIG.pix); CAMERA_RIG.renderer.setSize(CAMERA_RIG.w, CAMERA_RIG.h, false);
       }
     }
@@ -8318,8 +8361,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     secText(v) { return v > 0 ? NETSTATE.oneDecimal(v) + "초" : "-"; }
     mvpScore(E) {
-      return E.kills * 100 + (E.assists || 0) * MVP_ASSIST + Math.round(E.dmg) + Math.round(E.heal || 0) + Math.round(E.blocked || 0)
-        + Math.round(NETSTATE.oneDecimal(E.stunDealt) * MVP_STUN_PER_SEC) + Math.round(NETSTATE.twoDecimals(E.slowWeight) * MVP_SLOW_PER_SEC) - E.deaths * 100;
+      return E.kills * 100 + (E.assists || 0) * Hud2D.MVP_ASSIST + Math.round(E.dmg) + Math.round(E.heal || 0) + Math.round(E.blocked || 0)
+        + Math.round(NETSTATE.oneDecimal(E.stunDealt) * Hud2D.MVP_STUN_PER_SEC) + Math.round(NETSTATE.twoDecimals(E.slowWeight) * Hud2D.MVP_SLOW_PER_SEC) - E.deaths * 100;
     }
     mvpHtml() {
       var best = [];
@@ -8338,13 +8381,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     scoreHelpHtml() {
       var items = [
-        ["처치 1번", "+100"], ["어시스트 1번", "+" + MVP_ASSIST], ["입힌 피해 1", "+1"], ["회복 1", "+1"], ["막은 피해 1", "+1"],
-        ["기절 1초", "+" + MVP_STUN_PER_SEC], ["둔화 1초 × 둔화율", "+" + MVP_SLOW_PER_SEC], ["쓰러짐 1번", "−100"]
+        ["처치 1번", "+100"], ["어시스트 1번", "+" + Hud2D.MVP_ASSIST], ["입힌 피해 1", "+1"], ["회복 1", "+1"], ["막은 피해 1", "+1"],
+        ["기절 1초", "+" + Hud2D.MVP_STUN_PER_SEC], ["둔화 1초 × 둔화율", "+" + Hud2D.MVP_SLOW_PER_SEC], ["쓰러짐 1번", "−100"]
       ];
       return "<table>" + items.map(function (item) {
         return "<tr><td>" + item[0] + '</td><td class="' + (item[1].charAt(0) === "−" ? "minus" : "") + '">' + item[1] + "</td></tr>";
       }).join("") + "</table><ul>" +
-        "<li>둔화는 둔화율을 곱합니다. 예) 50% 둔화 2초 = 2 × 0.5 × " + MVP_SLOW_PER_SEC + " = " + MVP_SLOW_PER_SEC + "점</li>" +
+        "<li>둔화는 둔화율을 곱합니다. 예) 50% 둔화 2초 = 2 × 0.5 × " + Hud2D.MVP_SLOW_PER_SEC + " = " + Hud2D.MVP_SLOW_PER_SEC + "점</li>" +
         "<li>기절·둔화는 이미 걸린 효과와 겹치지 않고 새로 늘어난 시간만 셉니다</li>" +
         "<li>블랙홀에 끌려간 시간은 " + Math.round(ULT.bhCcRate * 100) + "% 둔화로 셉니다</li>" +
         "<li>MVP는 환산점수가 가장 높은 사람이고, 처치·어시스트가 하나도 없으면 MVP에서 제외합니다</li></ul>";
@@ -8362,7 +8405,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (dmg !== MATCH.hudShown.dmg) { setText($("hudMeDmg"), String(dmg)); MATCH.hudShown.dmg = dmg; }
     }
     finalCountdown(el, left) {
-      var sec = left > 0 && left <= FINAL_COUNT_MS ? Math.ceil(left / 1000) : 0;
+      var sec = left > 0 && left <= Hud2D.FINAL_COUNT_MS ? Math.ceil(left / 1000) : 0;
       if (!sec) { HUD.lastCountSec = 0; el.className = ""; return; }
       if (sec === HUD.lastCountSec) return;
       HUD.lastCountSec = sec;
@@ -8448,27 +8491,25 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var HUD = new Hud2D();
 
   try { CAMERA_RIG.renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: !TOUCH, powerPreference: "high-performance" }); } catch (e) { CAMERA_RIG.renderer = null; }
-  var CAM_FOV = 40;
-  var CAM = { pitchPlay: 0.92, pitchSpec: 1.12, dist: 1400, look: new THREE.Vector3(MW / 2, 0, MH / 2), fitKey: "", snap: true, halfW: 0, scopeX: 0, scopeZ: 0, zoom: 1, zoomGoal: 1 };
-  var SCOPE_FIT_OUT = 0.82, SCOPE_FIT_IN = 0.65, SCOPE_ZOOM_MAX = 2.2;
-  var VIEW_AHEAD = 570, VIEW_BEHIND = 290, VIEW_HALF_W = 280, VIEW_NEAR_PAD = 110, VIEW_TOP_SAFE_NDC = 0.55;
-  var HEAD_Y = 110;
   var C_TEAM = { blue: 0x2F6FD6, red: 0xD6453D }, C_FX = { blue: 0x5FA2FF, red: 0xFF6A5F };
-  var scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x2A2F2B);
-  var camera = new THREE.PerspectiveCamera(CAM_FOV, 1, 20, 9000);
-
+  class ArenaStage {
+    constructor() {
+      this.scene = new THREE.Scene();
+      this.camera = new THREE.PerspectiveCamera(CameraRig.FOV, 1, 20, 9000);
+      this.scene.fog = new THREE.Fog(0x33443A, 3200, 7500);
+      this.scene.background = new THREE.Color(0x33443A);
+      this.ambient = new THREE.AmbientLight(0xffffff, 1.5); this.scene.add(this.ambient);
+      this.sun = new THREE.DirectionalLight(0xffffff, 2.0);
+      this.sun.position.set(MW / 2 - 400, 900, MH / 2 + 300); this.sun.target.position.set(MW / 2, 0, MH / 2);
+      this.scene.add(this.sun); this.scene.add(this.sun.target);
+      this.outerGround = ARENA_VIEW.flatMesh(new THREE.PlaneGeometry(MW * 14, MH * 14), new THREE.MeshLambertMaterial({ color: 0x4E6B43 }));
+      this.outerGround.position.set(MW / 2, -3, MH / 2); this.scene.add(this.outerGround);
+      this.groundMat = new THREE.MeshLambertMaterial();
+      this.arenaGroup = new THREE.Group();
+    }
+  }
+  var STAGE = new ArenaStage();
   window.addEventListener("resize", CAMERA_RIG.resize.bind(CAMERA_RIG));
-
-  scene.fog = new THREE.Fog(0x33443A, 3200, 7500);
-  scene.background = new THREE.Color(0x33443A);
-  var ambient = new THREE.AmbientLight(0xffffff, 1.5); scene.add(ambient);
-  var sun = new THREE.DirectionalLight(0xffffff, 2.0);
-  sun.position.set(MW / 2 - 400, 900, MH / 2 + 300); sun.target.position.set(MW / 2, 0, MH / 2);
-  scene.add(sun); scene.add(sun.target);
-
-  var outerGround = ARENA_VIEW.flatMesh(new THREE.PlaneGeometry(MW * 14, MH * 14), new THREE.MeshLambertMaterial({ color: 0x4E6B43 }));
-  outerGround.position.set(MW / 2, -3, MH / 2); scene.add(outerGround);
   var GRASS_LOOK = { sky: 0x33443A, outer: 0x4E6B43, ambient: 1.5, sun: 0xffffff, sunI: 2.0,
                      floor: ["#81B853", "#8CC25B"], wallFloor: "#6F7A5A", hideFloor: "#5E9640",
                      fleck: ["rgba(255,255,230,.10)", "rgba(30,60,20,.10)"], line: "rgba(40,70,30,.10)" };
@@ -8486,11 +8527,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   };
   var ZONE_FLOOR = { blue: ["#92B4D6", "#9DBEDF"], red: ["#DCA293", "#E5AE9F"] };
   var FLOOR_TEX_SCALE = 1.2;
-  var groundMat = new THREE.MeshLambertMaterial();
-  ARENA_VIEW.ground = ARENA_VIEW.flatMesh(new THREE.PlaneGeometry(MW, MH), groundMat);
-  ARENA_VIEW.ground.position.set(MW / 2, 0, MH / 2); scene.add(ARENA_VIEW.ground);
+  ARENA_VIEW.ground = ARENA_VIEW.flatMesh(new THREE.PlaneGeometry(MW, MH), STAGE.groundMat);
+  ARENA_VIEW.ground.position.set(MW / 2, 0, MH / 2); STAGE.scene.add(ARENA_VIEW.ground);
 
-  var arenaGroup = new THREE.Group(); scene.add(arenaGroup);
+  STAGE.scene.add(STAGE.arenaGroup);
   var wallMat = new THREE.MeshLambertMaterial({ color: 0x9A9A92 });
   var UNIT_BOX = new THREE.BoxGeometry(1, 1, 1); UNIT_BOX.translate(0, 0.5, 0);
   var railMat = new THREE.MeshLambertMaterial({ color: 0x8A5A34 }), postMat = new THREE.MeshLambertMaterial({ color: 0x5E3B22 });
@@ -8640,7 +8680,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var edge = ARENA_VIEW.flatMesh(new THREE.RingGeometry(0.985, 1, 72), clericRangeEdgeMat); edge.position.y = 1.3; g.add(edge);
     g.scale.set(CHARS.cleric.range, 1, CHARS.cleric.range);
     g.visible = false;
-    scene.add(g);
+    STAGE.scene.add(g);
     return g;
   })();
 
@@ -8720,7 +8760,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   GEO.domainShards = new THREE.IcosahedronGeometry(1, 2);
   GEO.domainRim = new THREE.RingGeometry(0.975, 1, 72);
 
-  var aimGrp = new THREE.Group(); aimGrp.visible = false; scene.add(aimGrp);
+  var aimGrp = new THREE.Group(); aimGrp.visible = false; STAGE.scene.add(aimGrp);
   var AIM_Y = 8, AIM_BACK_PAD = 5;
   var aimMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5, depthWrite: false, depthTest: false });
   var aimBackMat = new THREE.MeshBasicMaterial({ color: 0x0B1410, transparent: true, opacity: 0.3, depthWrite: false, depthTest: false });
@@ -8738,39 +8778,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
   var tmpV = new THREE.Vector3(), Y_UP = new THREE.Vector3(0, 1, 0);
 
-  var tourGroup = new THREE.Group(); tourGroup.visible = false; scene.add(tourGroup);
-  var SHOWCASE = [];
-  var SHOWCASE_SPOTS = [["warrior", "blue", 330, 585], ["ranger", "blue", 450, 555], ["mage", "blue", 570, 585],
-                        ["knight", "red", 330, 765], ["rogue", "red", 450, 795], ["sniper", "red", 570, 765]];
-  var TOUR_SHOTS = [
-    { name: "아레나 전경", orbit: true, center: [450, 0, 675], radius: 1350, height: 850, arc: [1.1, 1.95] },
-    { name: "중앙 대치", from: [110, 100, 930], to: [790, 100, 930], lookFrom: [380, 60, 675], lookTo: [520, 60, 675] },
-    { name: "블루 팀", from: [660, 140, 730], to: [560, 115, 710], lookFrom: [450, 55, 575], lookTo: [450, 50, 575] },
-    { name: "레드 팀", from: [240, 140, 620], to: [340, 115, 640], lookFrom: [450, 55, 775], lookTo: [450, 50, 775] },
-    { name: "풀숲", bush: true, from: [420, 170, 530], to: [360, 130, 600], lookFrom: [200, 30, 675], lookTo: [200, 30, 675] },
-    { name: "하늘에서 본 아레나", orbit: true, center: [450, 0, 675], radius: 300, height: 1750, arc: [0.2, 0.9] }
-  ];
-  var TOUR_STILL_SHOT = { name: "아레나 전경", orbit: true, center: [450, 0, 675], radius: 1350, height: 850, arc: [1.5, 1.5] };
-  var TOUR_STILL_REDRAW_MS = 1000;
-  var TOUR_LOW_END = TOUCH || (navigator.hardwareConcurrency > 0 && navigator.hardwareConcurrency <= 4);
-  var TOUR = { on: false, index: 0, start: 0, caption: "", dirty: true, drawnAt: 0 }, TOUR_MS = 7000, TOUR_FADE = 600;
-  window.addEventListener("resize", function () { TOUR.dirty = true; });
-  var tourLook = new THREE.Vector3();
-
-  var LABELS = [];
-
-
-  var QA = { acc: 0, frames: 0, slow: 0 }, QA_STALL_MS = 250;
+  TOUR_VIEW.attachTo(STAGE.scene);
   CAMERA_RIG.resize();
   ARENA_VIEW.buildArena();
   if (CAMERA_RIG.renderer) MODELS.loadKit();
 
 
-  var MVP_STUN_PER_SEC = 60, MVP_SLOW_PER_SEC = 40, MVP_ASSIST = 50;
   $("btnScoreHelp").onclick = function () { setHtml($("scoreHelpBody"), HUD.scoreHelpHtml()); show($("scoreHelpModal"), true); };
   $("btnScoreHelpClose").onclick = function () { show($("scoreHelpModal"), false); };
   $("scoreHelpModal").onclick = function (e) { if (e.target === $("scoreHelpModal")) show($("scoreHelpModal"), false); };
-  var FINAL_COUNT_MS = 10000;
 
   class GameLoop {
     constructor() { this.lastFrame = Date.now(); }
@@ -8872,13 +8888,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (!CAMERA_RIG.renderer || !KIT.propsReady) return null;
         ARENA_VIEW.useArena(id);
         CAMERA_RIG.renderer.setPixelRatio(1); CAMERA_RIG.renderer.setSize(pxW, pxH, false);
-        camera.aspect = pxW / pxH; camera.updateProjectionMatrix();
-        camera.up.set(0, 0, -1);
-        camera.position.set(MW / 2, MH * 0.5 / Math.tan(CAM_FOV * Math.PI / 360) * 1.02, MH / 2);
-        camera.lookAt(MW / 2, 0, MH / 2); camera.up.set(0, 1, 0);
-        camera.updateMatrixWorld();
+        STAGE.camera.aspect = pxW / pxH; STAGE.camera.updateProjectionMatrix();
+        STAGE.camera.up.set(0, 0, -1);
+        STAGE.camera.position.set(MW / 2, MH * 0.5 / Math.tan(CameraRig.FOV * Math.PI / 360) * 1.02, MH / 2);
+        STAGE.camera.lookAt(MW / 2, 0, MH / 2); STAGE.camera.up.set(0, 1, 0);
+        STAGE.camera.updateMatrixWorld();
         ARENA_VIEW.bushVis.forEach(function (bv) { bv.mats.forEach(function (m) { m.opacity = bv.full; }); });
-        CAMERA_RIG.renderer.render(scene, camera);
+        CAMERA_RIG.renderer.render(STAGE.scene, STAGE.camera);
         return CAMERA_RIG.renderer.domElement.toDataURL("image/png");
       },
       loadMapData: ARENA_MAP.load.bind(ARENA_MAP), makeEnt: FLOW.makeEnt.bind(FLOW), resolve: PHYSICS.resolve.bind(PHYSICS), stepWorld: WORLD.stepWorld.bind(WORLD),
@@ -8898,7 +8914,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       bindRoom: function (fakeRoom, players) { SESSION.room = fakeRoom; SESSION.players = players; },
       unbindRoom: function () { SESSION.room = null; SESSION.players = {}; },
       setMyId: function (id) { var before = SESSION.myId; SESSION.myId = id; return before; },
-      HUD: HUD, SOUND: SOUND, BACKEND: BACKEND, TIMESCALE: TIMESCALE, THREE: THREE, CAMERA_RIG: CAMERA_RIG, ARENA_VIEW: ARENA_VIEW, PROPS: PROPS, camera: camera, overlay: ov, QA: QA, PIX_MIN: PIX_MIN, PIX_START: PIX_START, SCENERY: SCENERY,
+      HUD: HUD, SOUND: SOUND, BACKEND: BACKEND, TIMESCALE: TIMESCALE, THREE: THREE, CAMERA_RIG: CAMERA_RIG, ARENA_VIEW: ARENA_VIEW, PROPS: PROPS, camera: STAGE.camera, overlay: ov, QA: HUD.quality, PIX_MIN: PIX_MIN, PIX_START: PIX_START, SCENERY: SCENERY,
       setDb: function (fake) { var before = BACKEND.db; BACKEND.db = fake; return before; },
       setTestLink: function (flag) { var before = BACKEND.isTestLink; BACKEND.isTestLink = flag; return before; },
       CHAR_TYPES: CHAR_TYPES, AUTO_AIM: AUTO_AIM, AUTO_AIM_ERR: AUTO_AIM_ERR, AUTO_AIM_LEAD: AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: DRAFT_AI,
