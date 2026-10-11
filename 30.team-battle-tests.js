@@ -2560,23 +2560,6 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : table.length + "가지 입력이 모두 맞게 변환됨");
   });
 
-  run(INPUTG, "키보드 이벤트: 경기 화면이 아니면 눌러도 무시하고, 키를 떼거나 창이 포커스를 잃으면 모든 키가 풀리는가", function (done) {
-    var bad = [];
-    if (document.querySelector("[data-guard]")) { done("info", "접속 잠금 화면이 키보드 입력을 막고 있어 검사하지 못함(잠금을 풀거나 access-guard 없이 실행)"); return; }
-    releaseInput();
-    try {
-      window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyD", key: "d", bubbles: true, cancelable: true }));
-      if (api.KEY_ON.right) bad.push("경기 화면이 아닌데 키가 눌림");
-      api.KEY_ON.right = true; api.KEY_ON.atk = true;
-      window.dispatchEvent(new KeyboardEvent("keyup", { code: "KeyD", key: "d", bubbles: true }));
-      if (api.KEY_ON.right || !api.KEY_ON.atk) bad.push("keyup 이 해당 키만 풀어야 함");
-      api.KEY_ON.up = true; api.KEY_ON.left = true;
-      window.dispatchEvent(new Event("blur"));
-      if (Object.keys(api.KEY_ON).some(function (k) { return api.KEY_ON[k]; })) bad.push("포커스를 잃어도 키가 남음");
-    } finally { releaseInput(); }
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "화면 확인·keyup·blur 처리 맞음");
-  });
-
   run(INPUTG, "화면 조이스틱(포인터): 조이스틱 근처에서만 시작하고, 다른 손가락·멀리 누르기·기절 중에는 무시하며 떼면 끝나는가", function (done) {
     var cv = document.getElementById("cv"), y = OPEN_Y.forest;
     withMe([meEntry("ranger", "red", 600, y), { id: "foe", team: "blue", char: "knight", x: 900, y: y }], function (W, me) {

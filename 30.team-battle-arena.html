@@ -1117,14 +1117,17 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.openNick();
       return false;
     }
+    bindProfileEvents() {
+      document.addEventListener(PlayerProfile.CHANGE_EVENT, function () { NICK.refreshNick(); });
+      document.addEventListener(PlayerProfile.SETTLED_EVENT, function () { NICK.refreshNick(); NICK.pushToRoom(); });
+    }
     refreshNick() { setText($("helloNick"), this.name); setText($("lobbyNick"), this.name); }
     pushToRoom() {
       if (this.name && SESSION.room && SESSION.players[SESSION.myId]) SESSION.room.ref.child("players/" + SESSION.myId + "/nickname").set(this.name);
     }
   }
   var NICK = new NickDialog();
-  document.addEventListener(PlayerProfile.CHANGE_EVENT, function () { NICK.refreshNick(); });
-  document.addEventListener(PlayerProfile.SETTLED_EVENT, function () { NICK.refreshNick(); NICK.pushToRoom(); });
+  NICK.bindProfileEvents();
 
   class Backend {
     constructor() {
@@ -1423,6 +1426,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       SESSION.room = null; SESSION.resetLocal(); SCREENS.showScreen("start"); LOBBY.startMsg(msg || "");
     }
     resetLocal() { FX_VIEW.clear3d(); SESSION.players = {}; MATCH.leave(); INPUT.reset(); FLOW.specHeld = false; setText($("btnAgain"), "다시하기"); }
+    bindLifecycle() {
+      window.addEventListener("pagehide", function () { SESSION.saveResume(); if (SESSION.room) { try { SESSION.room.ref.child("players/" + SESSION.myId).remove(); } catch (e) {} } });
+      document.addEventListener("visibilitychange", function () { if (document.hidden) SESSION.saveResume(); });
+      setInterval(function () { SESSION.saveResume(); }, RESUME_SAVE_MS);
+    }
     saveResume() {
       if (!SESSION.room || SESSION.leaving || !SESSION.players[SESSION.myId]) return;
       try { sessionStorage.setItem(RESUME_KEY, JSON.stringify({ code: SESSION.room.code, id: SESSION.myId, me: SESSION.players[SESSION.myId], at: Date.now() })); } catch (e) {}
@@ -1573,11 +1581,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
   var HOST_ORDER = { blue: 0, red: 1, spec: 2 };
 
-  window.addEventListener("pagehide", function () { SESSION.saveResume(); if (SESSION.room) { try { SESSION.room.ref.child("players/" + SESSION.myId).remove(); } catch (e) {} } });
-  document.addEventListener("visibilitychange", function () { if (document.hidden) SESSION.saveResume(); });
-
   var RESUME_KEY = "tba_resume_v1", RESUME_MS = 180000, RESUME_SAVE_MS = 20000;
-  setInterval(function () { SESSION.saveResume(); }, RESUME_SAVE_MS);
+  SESSION.bindLifecycle();
 
   class ScreenRouter {
     constructor() { this.now = "start"; }
@@ -1788,6 +1793,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }
       ROSTER.pickChar(c);
     }
+    bindResize() {
+      window.addEventListener("resize", function () { CARDS.fitCardHeight(); });
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { CARDS.cardHeightFor = null; CARDS.fitCardHeight(); });
+      window.addEventListener("resize", function () { CARDS.fitCharCols(); });
+    }
     flipAll() {
       var backCount = CHAR_LIST.filter(function (k) { return CARDS.flipped[k]; }).length;
       var showBack = backCount <= CHAR_LIST.length - backCount;
@@ -1799,9 +1809,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   var CARDS = new CharCardView();
-  window.addEventListener("resize", function () { CARDS.fitCardHeight(); });
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { CARDS.cardHeightFor = null; CARDS.fitCardHeight(); });
-  window.addEventListener("resize", function () { CARDS.fitCharCols(); });
+  CARDS.bindResize();
   class SkillText {
     num(v) { return String(Math.round(v * 10) / 10); }
     secs(ms) { return (Math.round(ms / CLOCK.scale / 10) / 100) + "초"; }
@@ -1841,13 +1849,18 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var LITE_MOTION = !!(window.matchMedia && matchMedia("(pointer: coarse)").matches);
   if (LITE_MOTION) document.documentElement.classList.add("liteMotion");
   $("btnZoomChars").onclick = function () { CARDS.setCharZoom(!$("charCardBox").classList.contains("zoomed")); };
-  window.addEventListener("keydown", function (e) {
-    if (e.key !== "Escape") return;
-    if (!$("pcModal").hidden) show($("pcModal"), false);
-    else if (!$("statsModal").hidden) show($("statsModal"), false);
-    else if (!$("mapViewModal").hidden) show($("mapViewModal"), false);
-    else if ($("charCardBox").classList.contains("zoomed")) CARDS.setCharZoom(false);
-  });
+  class EscapeKey {
+    bind() {
+      window.addEventListener("keydown", function (e) {
+        if (e.key !== "Escape") return;
+        if (!$("pcModal").hidden) show($("pcModal"), false);
+        else if (!$("statsModal").hidden) show($("statsModal"), false);
+        else if (!$("mapViewModal").hidden) show($("mapViewModal"), false);
+        else if ($("charCardBox").classList.contains("zoomed")) CARDS.setCharZoom(false);
+      });
+    }
+  }
+  new EscapeKey().bind();
   class StatsView {
     constructor() { this.mode = "pvp"; this.loadSeq = 0; }
     statsPct(a, b) { return b ? (a / b * 100).toFixed(1) + "%" : "-"; }
@@ -2562,7 +2575,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     skillSpeed(E, t) { return E.buffUntil > t ? this.data.ultSpeed : null; }
     statSkillDamage(c) { return Math.round(c.dmg * ULT.bzDmgMul); }
     statAltCooldown(c) { return c.cd * ULT.bzCdMul; }
-    addMarkers(v, root, body) { v.aura = new THREE.Mesh(GEO.aura, auraMat); v.aura.visible = false; root.add(v.aura); }
+    addMarkers(v, root, body) { v.aura = new THREE.Mesh(GEO.aura, MATLIB.auraMat); v.aura.visible = false; root.add(v.aura); }
     skillGlow(E, t) { return E.buffUntil > t ? 0x772200 : 0; }
     cast(E, ang, reach, t) {
       E.buffUntil = t + ULT.bzDur;
@@ -2586,7 +2599,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     statAltCooldown(c) { return 1000 / ULT.rmRate; }
     botUltRange() { return this.data.dashRange + this.data.range; }
     addMarkers(v, root, body) {
-      v.aura = new THREE.Mesh(GEO.aura, riposteAuraMat); v.aura.visible = false; root.add(v.aura);
+      v.aura = new THREE.Mesh(GEO.aura, MATLIB.riposteAuraMat); v.aura.visible = false; root.add(v.aura);
       if (v.kit) v.stabHand = body.getObjectByName("handslotr");
     }
     cast(E, ang, reach, t) {
@@ -6226,7 +6239,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return { mesh: ARENA_VIEW.boxField(b.tiles, 60, mat), mat: mat, full: 0.55 };
     }
     buildSimpleArena(th) {
-      STAGE.arenaGroup.add(ARENA_VIEW.boxField(ARENA_VIEW.tilesOf(ROCK_TILES), 54, wallMat));
+      STAGE.arenaGroup.add(ARENA_VIEW.boxField(ARENA_VIEW.tilesOf(ROCK_TILES), 54, MATLIB.wallMat));
       ARENA_VIEW.hideVolumes(th, th.dungeon ? ARENA_VIEW.shadowVolume.bind(ARENA_VIEW) : function (b) {
         var mat = new THREE.MeshLambertMaterial({ color: 0x3E8E41, transparent: true, opacity: 0.8, depthWrite: false });
         return { mesh: ARENA_VIEW.boxField(b.tiles, 40, mat), mat: mat, full: 0.8 };
@@ -6249,8 +6262,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           for (var k = 0; k <= 3; k++) posts.push({ x: x, z: s.y - len / 2 + len * k / 3, w: 10, h: 22, d: 10 });
         });
       });
-      STAGE.arenaGroup.add(ARENA_VIEW.boxList(rails, railMat));
-      STAGE.arenaGroup.add(ARENA_VIEW.boxList(posts, postMat));
+      STAGE.arenaGroup.add(ARENA_VIEW.boxList(rails, MATLIB.railMat));
+      STAGE.arenaGroup.add(ARENA_VIEW.boxList(posts, MATLIB.postMat));
     }
     clearArena() {
       STAGE.arenaGroup.traverse(function (o) { if (o.isInstancedMesh) o.dispose(); });
@@ -6723,18 +6736,18 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static MINION_TIMER_R = 28;
     makeShieldAura() {
       var g = new THREE.Group();
-      var dome = new THREE.Mesh(GEO.shieldDome, shieldDomeMat); dome.scale.y = 2.1; g.add(dome);
-      var edge = new THREE.Mesh(GEO.shieldEdge, shieldEdgeMat); edge.scale.y = 2.15; g.add(edge);
-      var ring = ARENA_VIEW.flatMesh(GEO.shieldRing, shieldRingMat); ring.position.y = 2; g.add(ring);
+      var dome = new THREE.Mesh(GEO.shieldDome, MATLIB.shieldDomeMat); dome.scale.y = 2.1; g.add(dome);
+      var edge = new THREE.Mesh(GEO.shieldEdge, MATLIB.shieldEdgeMat); edge.scale.y = 2.15; g.add(edge);
+      var ring = ARENA_VIEW.flatMesh(GEO.shieldRing, MATLIB.shieldRingMat); ring.position.y = 2; g.add(ring);
       g.userData.edge = edge; g.userData.ring = ring;
       g.visible = false;
       return g;
     }
     makeBladeRing() {
       var g = new THREE.Group(), spin = new THREE.Group();
-      var fill = ARENA_VIEW.flatMesh(GEO.disc, bladeRingFillMat); fill.scale.setScalar(ULT.bwR); fill.position.y = 1.6; g.add(fill);
-      var edge = ARENA_VIEW.flatMesh(GEO.poolEdge, bladeRingEdgeMat); edge.scale.setScalar(ULT.bwR); edge.position.y = 1.8; g.add(edge);
-      for (var i = 0; i < 3; i++) { var slice = ARENA_VIEW.flatMesh(GEO.bladeSlice, bladeRingSliceMat); slice.rotation.z = i * Math.PI * 2 / 3; slice.scale.setScalar(ULT.bwR); spin.add(slice); }
+      var fill = ARENA_VIEW.flatMesh(GEO.disc, MATLIB.bladeRingFillMat); fill.scale.setScalar(ULT.bwR); fill.position.y = 1.6; g.add(fill);
+      var edge = ARENA_VIEW.flatMesh(GEO.poolEdge, MATLIB.bladeRingEdgeMat); edge.scale.setScalar(ULT.bwR); edge.position.y = 1.8; g.add(edge);
+      for (var i = 0; i < 3; i++) { var slice = ARENA_VIEW.flatMesh(GEO.bladeSlice, MATLIB.bladeRingSliceMat); slice.rotation.z = i * Math.PI * 2 / 3; slice.scale.setScalar(ULT.bwR); spin.add(slice); }
       spin.position.y = 2; g.add(spin);
       g.userData.spin = spin;
       g.visible = false;
@@ -6742,15 +6755,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     makeClericHalo(v, body) {
       var g = new THREE.Group();
-      var shell = new THREE.Mesh(GEO.clericHalo, clericHaloMat); g.add(shell);
-      var ring = ARENA_VIEW.flatMesh(GEO.poolEdge, clericRingMat); ring.scale.setScalar(46); ring.position.y = 2; g.add(ring);
+      var shell = new THREE.Mesh(GEO.clericHalo, MATLIB.clericHaloMat); g.add(shell);
+      var ring = ARENA_VIEW.flatMesh(GEO.poolEdge, MATLIB.clericRingMat); ring.scale.setScalar(46); ring.position.y = 2; g.add(ring);
       var book = new THREE.Group(), handBook = v.kit ? body.getObjectByName("offhand") : null;
       if (handBook) {
         var copy = handBook.clone();
         copy.position.set(0, 0, 0); copy.rotation.set(-0.5, 0, 0); copy.scale.setScalar(MODEL_SCALE * 1.4);
         book.add(copy);
       }
-      var glow = new THREE.Mesh(GEO.ball, clericBookGlowMat); glow.scale.setScalar(16); book.add(glow);
+      var glow = new THREE.Mesh(GEO.ball, MATLIB.clericBookGlowMat); glow.scale.setScalar(16); book.add(glow);
       book.visible = false;
       body.add(book);
       g.userData = { shell: shell, ring: ring, book: book, handBook: handBook };
@@ -6796,12 +6809,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }
       root.add(body);
       var footK = E.hitR / BODY_R;
-      var shadow = ARENA_VIEW.flatMesh(GEO.shadow, shadowMat); shadow.position.y = 0.6; shadow.scale.setScalar(footK); root.add(shadow);
-      var disc = new THREE.Mesh(GEO.teamDisc, teamDiscMats[E.team] || teamDiscMats.blue);
+      var shadow = ARENA_VIEW.flatMesh(GEO.shadow, MATLIB.shadowMat); shadow.position.y = 0.6; shadow.scale.setScalar(footK); root.add(shadow);
+      var disc = new THREE.Mesh(GEO.teamDisc, MATLIB.teamDiscMats[E.team] || MATLIB.teamDiscMats.blue);
       var ringMat = new THREE.MeshBasicMaterial({ color: C_TEAM[E.team], transparent: true, depthWrite: false });
       var ring = ARENA_VIEW.flatMesh(GEO.ring, ringMat); ring.position.y = 1.2; ring.scale.setScalar(footK); ring.add(disc); disc.position.set(0, 0, -0.1); root.add(ring);
       v.mats.push(ringMat); v.ring = ring;
-      if (E.id === SESSION.myId) { var meRing = ARENA_VIEW.flatMesh(GEO.meRing, meRingMat); meRing.position.y = 1.4; meRing.scale.setScalar(footK); root.add(meRing); v.meRing = meRing; }
+      if (E.id === SESSION.myId) { var meRing = ARENA_VIEW.flatMesh(GEO.meRing, MATLIB.meRingMat); meRing.position.y = 1.4; meRing.scale.setScalar(footK); root.add(meRing); v.meRing = meRing; }
       CHAR_TYPES.of(E.char).addMarkers(v, root, body);
       (parent || STAGE.scene).add(root);
       return v;
@@ -7058,7 +7071,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return g;
     }
     makeLungeVis(d) {
-      var m = ARENA_VIEW.flatMesh(GEO.strip, lungeMat.clone());
+      var m = ARENA_VIEW.flatMesh(GEO.strip, MATLIB.lungeMat.clone());
       m.scale.set(d.len + BODY_R, d.width, 1);
       var g = new THREE.Group(); g.add(m); g.position.set(d.x, 2.6, d.y); g.rotation.y = -d.angle;
       g.userData.mat = m.material;
@@ -7571,7 +7584,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var STARFALL_VIEW = new StarfallView();
   class AimGuide {
     aimPart(geo) {
-      var back = ARENA_VIEW.flatMesh(geo, aimBackMat), front = ARENA_VIEW.flatMesh(geo, aimMat);
+      var back = ARENA_VIEW.flatMesh(geo, MATLIB.aimBackMat), front = ARENA_VIEW.flatMesh(geo, MATLIB.aimMat);
       back.position.y = front.position.y = AIM_Y; back.renderOrder = 8; front.renderOrder = 9;
       aimGrp.add(back); aimGrp.add(front);
       return { front: front, back: back };
@@ -7597,7 +7610,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (!on) return;
       var ult = INPUT.aim.btn === "ult", c = CHARS[MATCH.me.char];
       aimGrp.position.set(MATCH.me.x, 0, MATCH.me.y); aimGrp.rotation.y = -MATCH.me.angle;
-      aimMat.color.set(ult ? 0xFF503C : 0xffffff);
+      MATLIB.aimMat.color.set(ult ? 0xFF503C : 0xffffff);
       [aimStrip, aimSector, aimCircle].forEach(function (p) { p.front.visible = p.back.visible = false; });
       var aimType = CHAR_TYPES.of(MATCH.me.char);
       if (aimType.showAimGuide(MATCH.me, ult, c)) {
@@ -7845,6 +7858,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       STAGE.camera.aspect = CAMERA_RIG.w / Math.max(1, CAMERA_RIG.h); STAGE.camera.updateProjectionMatrix();
       CAMERA_RIG.view.fitKey = "";
     }
+    bindResize() { window.addEventListener("resize", function () { CAMERA_RIG.resize(); }); }
     camBasis(fl) { return fl ? { fx: 0, fz: 1 } : { fx: 0, fz: -1 }; }
     placeCamera(lx, lz, dist, pitch, b) {
       var h = Math.cos(pitch) * dist;
@@ -8509,7 +8523,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   var STAGE = new ArenaStage();
-  window.addEventListener("resize", CAMERA_RIG.resize.bind(CAMERA_RIG));
+  CAMERA_RIG.bindResize();
   var GRASS_LOOK = { sky: 0x33443A, outer: 0x4E6B43, ambient: 1.5, sun: 0xffffff, sunI: 2.0,
                      floor: ["#81B853", "#8CC25B"], wallFloor: "#6F7A5A", hideFloor: "#5E9640",
                      fleck: ["rgba(255,255,230,.10)", "rgba(30,60,20,.10)"], line: "rgba(40,70,30,.10)" };
@@ -8531,9 +8545,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   ARENA_VIEW.ground.position.set(MW / 2, 0, MH / 2); STAGE.scene.add(ARENA_VIEW.ground);
 
   STAGE.scene.add(STAGE.arenaGroup);
-  var wallMat = new THREE.MeshLambertMaterial({ color: 0x9A9A92 });
   var UNIT_BOX = new THREE.BoxGeometry(1, 1, 1); UNIT_BOX.translate(0, 0.5, 0);
-  var railMat = new THREE.MeshLambertMaterial({ color: 0x8A5A34 }), postMat = new THREE.MeshLambertMaterial({ color: 0x5E3B22 });
 
   var GEO = {
     body: new THREE.CapsuleGeometry(17, 34, 4, 12),
@@ -8554,13 +8566,37 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   GEO.head.rotateZ(-Math.PI / 2); GEO.head.translate(18, 0, 0);
   GEO.trail.translate(-0.5, 0, 0);
   GEO.strip.translate(0.5, 0, 0);
-  var shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.22, depthWrite: false });
   var ME_COLOR = 0xFFD23F, ME_CSS = "#FFD23F", ME_OUTLINE_K = 0.045, ME_RIM_POWER = 2.0, ME_RIM_MIX = 0.6;
-  var meRingMat = new THREE.MeshBasicMaterial({ color: ME_COLOR, transparent: true, opacity: 0.95, depthWrite: false });
-  var teamDiscMats = {
-    blue: new THREE.MeshBasicMaterial({ color: C_TEAM.blue, transparent: true, opacity: 0.3, depthWrite: false }),
-    red: new THREE.MeshBasicMaterial({ color: C_TEAM.red, transparent: true, opacity: 0.3, depthWrite: false })
-  };
+  class MaterialLibrary {
+    constructor() {
+      this.wallMat = new THREE.MeshLambertMaterial({ color: 0x9A9A92 });
+      this.railMat = new THREE.MeshLambertMaterial({ color: 0x8A5A34 });
+      this.postMat = new THREE.MeshLambertMaterial({ color: 0x5E3B22 });
+      this.shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.22, depthWrite: false });
+      this.meRingMat = new THREE.MeshBasicMaterial({ color: ME_COLOR, transparent: true, opacity: 0.95, depthWrite: false });
+      this.teamDiscMats = {
+        blue: new THREE.MeshBasicMaterial({ color: C_TEAM.blue, transparent: true, opacity: 0.3, depthWrite: false }),
+        red: new THREE.MeshBasicMaterial({ color: C_TEAM.red, transparent: true, opacity: 0.3, depthWrite: false })
+      };
+      this.auraMat = new THREE.MeshBasicMaterial({ color: 0xFF3B1F, transparent: true, opacity: 0.3, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+      this.riposteAuraMat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.28, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+      this.shieldDomeMat = new THREE.MeshBasicMaterial({ color: 0x3D8CFF, transparent: true, opacity: 0.32, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+      this.shieldEdgeMat = new THREE.MeshBasicMaterial({ color: 0x8CCBFF, transparent: true, opacity: 0.5, wireframe: true, depthWrite: false, blending: THREE.AdditiveBlending });
+      this.shieldRingMat = new THREE.MeshBasicMaterial({ color: 0xFFD54A, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide });
+      this.bladeRingFillMat = new THREE.MeshBasicMaterial({ color: 0xB0272C, transparent: true, opacity: 0.12, depthWrite: false });
+      this.bladeRingEdgeMat = new THREE.MeshBasicMaterial({ color: 0xF2F2F2, transparent: true, opacity: 0.55, depthWrite: false });
+      this.bladeRingSliceMat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide });
+      this.clericHaloMat = new THREE.MeshBasicMaterial({ color: 0xFFD84A, transparent: true, opacity: 0.32, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+      this.clericRingMat = new THREE.MeshBasicMaterial({ color: 0xFFE9A0, transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+      this.clericBookGlowMat = new THREE.MeshBasicMaterial({ color: 0xFFF1B0, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending });
+      this.clericRangeFillMat = new THREE.MeshBasicMaterial({ color: 0xFFF3C4, transparent: true, opacity: 0.05, depthWrite: false });
+      this.clericRangeEdgeMat = new THREE.MeshBasicMaterial({ color: 0xFFF3C4, transparent: true, opacity: 0.35, depthWrite: false });
+      this.lungeMat = new THREE.MeshBasicMaterial({ color: 0xFF2A1F, transparent: true, opacity: 0.8, depthWrite: false });
+      this.aimMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5, depthWrite: false, depthTest: false });
+      this.aimBackMat = new THREE.MeshBasicMaterial({ color: 0x0B1410, transparent: true, opacity: 0.3, depthWrite: false, depthTest: false });
+    }
+  }
+  var MATLIB = new MaterialLibrary();
   var ME_RIM_GLSL = "float meRim = pow(1.0 - clamp(abs(dot(normal, normalize(vViewPosition))), 0.0, 1.0), " + ME_RIM_POWER.toFixed(2) + ");\n" +
     "outgoingLight = mix(outgoingLight, vec3(1.0, 0.82, 0.25), meRim * " + ME_RIM_MIX.toFixed(2) + ");\n#include <opaque_fragment>";
   var SECTOR = {}, CRESCENT = {};
@@ -8651,33 +8687,20 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var PLANT_OUTWARD = 0.25, PLANT_FORWARD = 0.18;
 
   var VIS = {}, PRV = {}, MLV = {}, MVIS = {};
-  var auraMat = new THREE.MeshBasicMaterial({ color: 0xFF3B1F, transparent: true, opacity: 0.3, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
-  var riposteAuraMat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.28, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
   GEO.aura = new THREE.CylinderGeometry(30, 22, 84, 18, 1, true);
   GEO.aura.translate(0, 42, 0);
   GEO.stormRing = new THREE.TorusGeometry(1, 0.045, 5, 36);
-  var shieldDomeMat = new THREE.MeshBasicMaterial({ color: 0x3D8CFF, transparent: true, opacity: 0.32, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
-  var shieldEdgeMat = new THREE.MeshBasicMaterial({ color: 0x8CCBFF, transparent: true, opacity: 0.5, wireframe: true, depthWrite: false, blending: THREE.AdditiveBlending });
-  var shieldRingMat = new THREE.MeshBasicMaterial({ color: 0xFFD54A, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide });
   GEO.shieldDome = new THREE.SphereGeometry(46, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
   GEO.shieldEdge = new THREE.IcosahedronGeometry(47, 1);
   GEO.shieldRing = new THREE.RingGeometry(44, 50, 6);
-  var bladeRingFillMat = new THREE.MeshBasicMaterial({ color: 0xB0272C, transparent: true, opacity: 0.12, depthWrite: false });
-  var bladeRingEdgeMat = new THREE.MeshBasicMaterial({ color: 0xF2F2F2, transparent: true, opacity: 0.55, depthWrite: false });
-  var bladeRingSliceMat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide });
   GEO.bladeSlice = new THREE.RingGeometry(0.55, 0.95, 16, 1, 0, Math.PI * 0.35);
-  var clericHaloMat = new THREE.MeshBasicMaterial({ color: 0xFFD84A, transparent: true, opacity: 0.32, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
-  var clericRingMat = new THREE.MeshBasicMaterial({ color: 0xFFE9A0, transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
-  var clericBookGlowMat = new THREE.MeshBasicMaterial({ color: 0xFFF1B0, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending });
   GEO.clericHalo = new THREE.CylinderGeometry(40, 32, 130, 20, 1, true);
   GEO.clericHalo.translate(0, 65, 0);
   var CLERIC_BOOK_FROM = 45, CLERIC_BOOK_Y = 84, CLERIC_BOOK_AHEAD = 30, CLERIC_BOOK_RISE_MS = 350;
-  var clericRangeFillMat = new THREE.MeshBasicMaterial({ color: 0xFFF3C4, transparent: true, opacity: 0.05, depthWrite: false });
-  var clericRangeEdgeMat = new THREE.MeshBasicMaterial({ color: 0xFFF3C4, transparent: true, opacity: 0.35, depthWrite: false });
   var clericRange = (function () {
     var g = new THREE.Group();
-    var fill = ARENA_VIEW.flatMesh(GEO.disc, clericRangeFillMat); fill.position.y = 1.1; g.add(fill);
-    var edge = ARENA_VIEW.flatMesh(new THREE.RingGeometry(0.985, 1, 72), clericRangeEdgeMat); edge.position.y = 1.3; g.add(edge);
+    var fill = ARENA_VIEW.flatMesh(GEO.disc, MATLIB.clericRangeFillMat); fill.position.y = 1.1; g.add(fill);
+    var edge = ARENA_VIEW.flatMesh(new THREE.RingGeometry(0.985, 1, 72), MATLIB.clericRangeEdgeMat); edge.position.y = 1.3; g.add(edge);
     g.scale.set(CHARS.cleric.range, 1, CHARS.cleric.range);
     g.visible = false;
     STAGE.scene.add(g);
@@ -8696,7 +8719,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var stabFrom = new THREE.Vector3(), stabTo = new THREE.Vector3(), stabDir = new THREE.Vector3(), STAB_AXIS = new THREE.Vector3(1, 0, 0);
   var CURSE_BALL_Y = [30, 46, 62], CURSE_SIDE_X = 36, CURSE_BLAST_MS = 260, CURSE_CORE_R = 52, CURSE_BLAST_R = 78, CURSE_CENTER_Y = 46;
   var CLOUD_PUFFS = 16, CLOUD_LANES = [-1, 0.4, -0.4, 1, 0];
-  var lungeMat = new THREE.MeshBasicMaterial({ color: 0xFF2A1F, transparent: true, opacity: 0.8, depthWrite: false });
 
   var METEOR_TOP = 460, METEOR_R = 44, METEOR_TAIL = 230, METEOR_DIR = new THREE.Vector3(0.35, 1, -0.15).normalize();
   GEO.meteorRock = new THREE.IcosahedronGeometry(1, 0);
@@ -8762,8 +8784,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
   var aimGrp = new THREE.Group(); aimGrp.visible = false; STAGE.scene.add(aimGrp);
   var AIM_Y = 8, AIM_BACK_PAD = 5;
-  var aimMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5, depthWrite: false, depthTest: false });
-  var aimBackMat = new THREE.MeshBasicMaterial({ color: 0x0B1410, transparent: true, opacity: 0.3, depthWrite: false, depthTest: false });
   var aimStrip = AIM_GUIDE.aimPart(GEO.strip), aimSector = AIM_GUIDE.aimPart(MODELS.sectorGeo(100, 1)), aimCircle = AIM_GUIDE.aimPart(GEO.disc);
 
   var NECRO_SMOKE_COLOR = 0x8A2A48;
@@ -8880,7 +8900,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   var WORLD = new WorldStepper();
 
-  function testHooks() {
+  class TestBridge {
+    start() {
+      if (/[?&]test(&|$)/.test(location.search)) import("./30.team-battle-tests.js?t=" + Date.now()).then(function (m) { m.runTeamBattleTests(TEST_BRIDGE.hooks()); });
+      if (/[?&]sim(&|$)/.test(location.search)) import("./30.team-battle-sim.js?t=" + Date.now()).then(function (m) {
+        window.TB_SIM = m.createSim(TEST_BRIDGE.hooks()); window.TB_SIM.mapTopShot = TEST_BRIDGE.hooks().mapTopShot; new m.SimLauncher(window.TB_SIM, location.search).start();
+      });
+    }
+    markReady() { window.TEAM_BATTLE_READY = true; }
+    hooks() {
     return {
       CHARS: CHARS, CHAR_LIST: CHAR_LIST, ULT: ULT, ROLES: ROLES, ROLE_LIST: ROLE_LIST, MAPS: MAPS, roleGauge: function (c) { return CATALOG.gaugeOnHitOf(c); }, spawnOf: ARENA_MAP.spawnOf.bind(ARENA_MAP), BODY_R: BODY_R, GAUGE_MAX: GAUGE_MAX, BOUND: BOUND, MAP_IDS: MAP_IDS, RESPAWN_MS: TIMESCALE.respawnMs, RESPAWN_PROTECT_MS: TIMESCALE.respawnProtectMs, myId: SESSION.myId,
       obstacles: function () { return { walls: ARENA_MAP.obstacles, water: ARENA_MAP.water }; },
@@ -8949,9 +8977,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       currentMap: function () { return ARENA_MAP.id; },
       finish: function (mapId) { CLOCK.testTime = null; SESSION.room = null; SESSION.resetLocal(); ARENA_MAP.load(mapId); }
     };
+    }
   }
-  if (/[?&]test(&|$)/.test(location.search)) import("./30.team-battle-tests.js?t=" + Date.now()).then(function (m) { m.runTeamBattleTests(testHooks()); });
-  if (/[?&]sim(&|$)/.test(location.search)) import("./30.team-battle-sim.js?t=" + Date.now()).then(function (m) { window.TB_SIM = m.createSim(testHooks()); window.TB_SIM.mapTopShot = testHooks().mapTopShot; new m.SimLauncher(window.TB_SIM, location.search).start(); });
+  var TEST_BRIDGE = new TestBridge();
+  TEST_BRIDGE.start();
 
   NICK.refreshNick();
   SCREENS.showScreen("start");
@@ -8960,22 +8989,27 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   if (!/[?&](test|sim)(&|$)/.test(location.search)) SESSION.tryResume();
   if (!SILENT_RUN) new FullscreenKeeper(document).watch();
   LOOP.start();
-  window.TEAM_BATTLE_READY = true;
+  TEST_BRIDGE.markReady();
 })();
 </script>
 <script>
-window.addEventListener("load", function () {
-  setTimeout(function () {
-    if (window.TEAM_BATTLE_READY) return;
-    var chromeVersion = (navigator.userAgent.match(/Chrome\/(\d+)/) || [])[1];
-    var notice = document.createElement("div");
-    notice.style.cssText = "position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:9999;width:calc(100% - 32px);max-width:520px;padding:22px 24px;border-radius:14px;background:rgba(16,24,19,.94);border:1px solid rgba(255,255,255,.16);border-top:3px solid #D97B4F;color:#EEF2EE;font:700 17px/1.6 var(--sg-font);text-align:center";
-    notice.innerHTML = "이 기기의 인터넷 앱이 오래되어 게임을 열 수 없어요.<br>크롬(Chrome) 앱으로 열어 주세요." +
-      "<div style=\"margin-top:10px;font-size:13px;font-weight:400;color:#A3B0A6\">" +
-      (chromeVersion ? "브라우저 엔진 " + chromeVersion + " · 80 이상 필요" : navigator.userAgent.replace(/[<>&]/g, "")) + "</div>";
-    document.body.appendChild(notice);
-  }, 8000);
-});
+class OldBrowserNotice {
+  watch() {
+    window.addEventListener("load", function () {
+      setTimeout(function () {
+        if (window.TEAM_BATTLE_READY) return;
+        var chromeVersion = (navigator.userAgent.match(/Chrome\/(\d+)/) || [])[1];
+        var notice = document.createElement("div");
+        notice.style.cssText = "position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:9999;width:calc(100% - 32px);max-width:520px;padding:22px 24px;border-radius:14px;background:rgba(16,24,19,.94);border:1px solid rgba(255,255,255,.16);border-top:3px solid #D97B4F;color:#EEF2EE;font:700 17px/1.6 var(--sg-font);text-align:center";
+        notice.innerHTML = "이 기기의 인터넷 앱이 오래되어 게임을 열 수 없어요.<br>크롬(Chrome) 앱으로 열어 주세요." +
+          "<div style=\"margin-top:10px;font-size:13px;font-weight:400;color:#A3B0A6\">" +
+          (chromeVersion ? "브라우저 엔진 " + chromeVersion + " · 80 이상 필요" : navigator.userAgent.replace(/[<>&]/g, "")) + "</div>";
+        document.body.appendChild(notice);
+      }, 8000);
+    });
+  }
+}
+new OldBrowserNotice().watch();
 </script>
 </body>
 </html>
