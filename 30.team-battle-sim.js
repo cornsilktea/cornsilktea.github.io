@@ -378,7 +378,7 @@ class SimReportPage {
     "h2{font-size:17px;margin:22px 0 8px}.wrap{overflow-x:auto;background:#fff;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.08)}",
     "table{border-collapse:collapse;width:100%;font-size:13px;white-space:nowrap}",
     "th,td{padding:7px 9px;text-align:right;border-bottom:1px solid #E6E1D3}th{background:#EEF2EC;cursor:pointer;user-select:none;position:sticky;top:0}",
-    "th:first-child,td:first-child{text-align:left}th.sorted{color:#D97B4F}td.win{font-weight:700}",
+    "th:first-child,td:first-child{text-align:left}th.sorted{color:#D97B4F}th[data-dir=desc]::after{content:\" ▼\"}th[data-dir=asc]::after{content:\" ▲\"}td.win{font-weight:700}",
     ".hi{background:#DDF1E2}.lo{background:#F8DDD3}.muted{color:#9AA59F}",
     ".grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(560px,1fr));gap:0 18px}",
     ".note{font-size:12px;color:#5B6B62;margin-top:8px;line-height:1.6}",
@@ -434,8 +434,8 @@ class ReportRenderer {
     var D = this.data, COLS = this.columns;
     var T = this.tables[id], el = document.querySelector("table[data-t=\"" + id + "\"]");
     T.rows.sort(function (a, b) { return T.key === "name" ? a.name.localeCompare(b.name, "ko") * (T.desc ? -1 : 1) : (T.desc ? b[T.key] - a[T.key] : a[T.key] - b[T.key]); });
-    var head = "<tr><th data-k=\"name\"" + (T.key === "name" ? " class=\"sorted\"" : "") + ">직업명</th>" +
-      COLS.map(function (c) { return "<th data-k=\"" + c[0] + "\"" + (T.key === c[0] ? " class=\"sorted\"" : "") + ">" + c[1] + "</th>"; }).join("") + "</tr>";
+    var head = "<tr><th data-k=\"name\"" + (T.key === "name" ? " class=\"sorted\" data-dir=\"" + (T.desc ? "desc" : "asc") + "\"" : "") + ">직업명</th>" +
+      COLS.map(function (c) { return "<th data-k=\"" + c[0] + "\"" + (T.key === c[0] ? " class=\"sorted\" data-dir=\"" + (T.desc ? "desc" : "asc") + "\"" : "") + ">" + c[1] + "</th>"; }).join("") + "</tr>";
     el.innerHTML = "<thead>" + head + "</thead><tbody>" + T.rows.map(function (r) {
       var tint = this.winTint(r.win);
       return "<tr><td>" + D.roles[r.role].icon + " " + r.name + "</td>" + COLS.map(function (c) {
@@ -542,10 +542,33 @@ class ReportRenderer {
       [].forEach.call(app.querySelectorAll("section"), function (s, i) { s.hidden = String(i) !== tab.getAttribute("data-tab"); });
       return;
     }
-    var th = e.target.closest("th[data-k]"), table = th && th.closest("table[data-t]");
-    if (!table) return;
-    var T = this.tables[+table.getAttribute("data-t")], key = th.getAttribute("data-k");
-    T.desc = T.key === key ? !T.desc : key !== "name"; T.key = key;
+    var anyTh = e.target.closest("th"), plain = anyTh && anyTh.closest("table");
+    if (!plain) return;
+    if (!plain.hasAttribute("data-t")) { this.sortPlainTable(plain, anyTh); return; }
+    var th = anyTh, table = plain, T = this.tables[+table.getAttribute("data-t")], key = th.getAttribute("data-k");
+    var firstDesc = key !== "name";
+    if (T.key !== key) { T.key = key; T.desc = firstDesc; }
+    else if (T.desc === firstDesc) T.desc = !firstDesc;
+    else { T.key = "win"; T.desc = true; }
     this.drawTable(+table.getAttribute("data-t"));
+  }
+
+  sortPlainTable(table, th) {
+    var col = th.cellIndex, rows = [].slice.call(table.rows), head = rows.shift(), first = col === 0 ? "asc" : "desc";
+    rows.forEach(function (r, i) { if (!r.hasAttribute("data-o")) r.setAttribute("data-o", i); });
+    var sameCol = table.getAttribute("data-col") === String(col), dir = sameCol ? table.getAttribute("data-dir") : "";
+    var next = !sameCol ? first : (dir === first ? (first === "asc" ? "desc" : "asc") : "");
+    function value(r) { var v = parseFloat(r.cells[col].textContent); return isNaN(v) ? null : v; }
+    rows.sort(function (a, b) {
+      if (!next) return a.getAttribute("data-o") - b.getAttribute("data-o");
+      var x = value(a), y = value(b), sign = next === "asc" ? 1 : -1;
+      if (x === null || y === null) return a.cells[col].textContent.localeCompare(b.cells[col].textContent, "ko") * sign;
+      return (x - y) * sign;
+    });
+    var body = rows[0] && rows[0].parentNode;
+    rows.forEach(function (r) { body.appendChild(r); });
+    table.setAttribute("data-col", col); table.setAttribute("data-dir", next);
+    [].forEach.call(head.cells, function (c) { c.removeAttribute("data-dir"); });
+    if (next) th.setAttribute("data-dir", next);
   }
 }
