@@ -866,10 +866,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   var CATALOG = new CharCatalog();
-  var FALLBACK_CHAR = "ranger";
   var CHAR_LIST = Object.keys(CHARS).filter(function (c) { return CATALOG.pickable(c); }).sort(function (a, b) {
     return ROLE_LIST.indexOf(CHARS[a].role) - ROLE_LIST.indexOf(CHARS[b].role) || CHARS[a].name.localeCompare(CHARS[b].name, "ko");
   });
+  var FALLBACK_CHAR = CHAR_LIST[0];
   function roParticle(word) {
     var code = word.charCodeAt(word.length - 1) - 0xAC00;
     if (code < 0 || code > 11171) return "(으)로";
@@ -1577,7 +1577,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           }
           var p = SESSION.players[id];
           h += '<div class="slot' + (id === SESSION.myId ? " mine" : "") + (p.isAI ? " ai" : "") + '">' + (SESSION.room.host === id ? '<span class="host">👑</span>' : "") + (p.isAI ? "🤖 " : "") + esc(p.nickname) +
-               (id === SESSION.myId ? ' <span class="me">나</span>' : "") + (SESSION.room.mode === "cup" ? "" : '<span class="ch">' + esc((CHARS[p.characterType] || CHARS.ranger).name) + "</span>") +
+               (id === SESSION.myId ? ' <span class="me">나</span>' : "") + (SESSION.room.mode === "cup" ? "" : '<span class="ch">' + esc((CHARS[p.characterType] || CHARS[FALLBACK_CHAR]).name) + "</span>") +
                (p.isAI && hostCanFill ? '<button type="button" class="aiDel" data-ai-del="' + id + '" aria-label="AI 빼기">빼기</button>' : "") + "</div>";
         }
         return h;
@@ -2615,6 +2615,22 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (e.type === "rev") { if (t < e.createdAt + e.dur) this.revs.push({ e: e, vis: null, ticked: {} }); return true; }
       if (e.type === "domain") { if (t < e.createdAt + e.dur) this.domains.push({ e: e, vis: null, touched: {} }); return true; }
       return false;
+    }
+    dropOwnedBy(ownerId) {
+      var field = this, owned = function (item) { return (item.e || item.d).owner === ownerId; };
+      [["bursts", EFFECT_VIEW, "dropBurstVis"], ["pools", EFFECT_VIEW, "dropPoolVis"], ["lunges", EFFECT_VIEW, "dropLungeVis"], ["holes", EFFECT_VIEW, "dropHoleVis"],
+       ["storms", EFFECT_VIEW, "dropStormVis"], ["revs", EFFECT_VIEW, "dropRevVis"], ["graces", EFFECT_VIEW, "dropGraceVis"], ["domains", EFFECT_VIEW, "dropDomainVis"],
+       ["turrets", TURRETS, "dropVis"], ["groves", GROVES, "dropVis"], ["shells", TURRETS, "dropShellVis"], ["gales", GALE_VIEW, "drop"], ["stars", STARFALL_VIEW, "drop"]
+      ].forEach(function (row) {
+        field[row[0]] = field[row[0]].filter(function (item) {
+          if (!owned(item)) return true;
+          row[1][row[2]](item);
+          return false;
+        });
+      });
+      this.waves = this.waves.filter(function (w) { return !owned(w); });
+      this.bladeSpins = this.bladeSpins.filter(function (s) { return !owned(s); });
+      this.curses = {};
     }
     dropAllVis() {
       this.bursts.forEach(EFFECT_VIEW.dropBurstVis.bind(EFFECT_VIEW)); this.pools.forEach(EFFECT_VIEW.dropPoolVis.bind(EFFECT_VIEW)); this.lunges.forEach(EFFECT_VIEW.dropLungeVis.bind(EFFECT_VIEW)); this.holes.forEach(EFFECT_VIEW.dropHoleVis.bind(EFFECT_VIEW));
@@ -5121,7 +5137,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     projHit(id, p, T) {
       var d = p.d;
-      p.dead = true;
+      p.dead = true; p.gone = true;
       if (d.laneHit) d.laneHit[T.id] = 1;
       var immune = T.isProtected(), fx = d.fx, seen = !MATCH.me || MATCH.me.team === T.team || VISION.visibleTo(T, MATCH.me);
       var ownerType = CHAR_TYPES.of(d.ownerCharacterType);
@@ -6168,6 +6184,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       PRACTICE.renderPracticeModal();
       show($("pcModal"), true);
     }
+    clearSkillsOf(ownerId) {
+      FIELD.dropOwnedBy(ownerId);
+      MATCH.shots = MATCH.shots.filter(function (s) { return s.ev.o !== ownerId; });
+      [MATCH.remoteShots, MATCH.melee].forEach(function (list) {
+        keys(list).forEach(function (k) { if (list[k].d.owner === ownerId) delete list[k]; });
+      });
+    }
     changePracticeChar(c) {
       if (!SESSION.practiceMode() || !MATCH.me || !MATCH.game || !CATALOG.pickable(c)) return;
       var old = MATCH.me, d = Object.assign({}, SESSION.players[SESSION.myId], { characterType: c });
@@ -6178,9 +6201,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var E = FLOW.makeEnt(SESSION.myId, d);
       Object.assign(E, { x: old.x, y: old.y, angle: old.angle, alive: true, diedAt: 0, gauge: 0, minions: [], protectUntil: 0,
                          stealthUntil: 0, skillUntil: 0, skillDur: 0, stunUntil: 0, slowUntil: 0, slowMul: 1, revealUntil: 0, burnUntil: 0,
-                         frostStacks: 0, frostStackAt: 0, lastStandUsed: false, rallyUsed: false, shield: !!CHARS[c].respawnShield,
-                         dmg: old.dmg, kills: old.kills, deaths: old.deaths, assists: old.assists, heal: old.heal });
+                         frostStacks: 0, frostStackAt: 0, lastStandUsed: false, rallyUsed: false, shield: !!CHARS[c].respawnShield });
       E.maxHp = CHARS[E.char].hp; E.hp = E.maxHp;
+      PRACTICE.clearSkillsOf(old.id);
       MATCH.me = E; MATCH.lastHp[SESSION.myId] = E.hp;
       INPUT.aim.id = null;
       MATCH.game.forceNet = true;
@@ -6206,7 +6229,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.keyMap = { KeyW: "up", KeyS: "down", KeyA: "left", KeyD: "right", KeyK: "atk",
                       ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right" };
       this.joy = { id: null, ox: 0, oy: 0, x: 0, y: 0 };
-      this.aim = { id: null, btn: null, ox: 0, oy: 0, dx: 0, dy: 0, drag: false };
+      this.aim = { id: null, btn: null, ox: 0, oy: 0, dx: 0, dy: 0, drag: false, cancel: false };
       this.joyR = 60; this.dragMin = 14;
       this.moveX = 0; this.moveY = 0;
     }
@@ -6282,19 +6305,22 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
             var ua = AUTO_AIM.angle(MATCH.me); MATCH.me.angle = ua; ATTACK.useUlt(MATCH.me, ua); return;
           }
         }
-        INPUT.aim.id = e.pointerId; INPUT.aim.btn = which; INPUT.aim.ox = e.clientX; INPUT.aim.oy = e.clientY; INPUT.aim.dx = 0; INPUT.aim.dy = 0; INPUT.aim.drag = false;
+        INPUT.aim.id = e.pointerId; INPUT.aim.btn = which; INPUT.aim.ox = e.clientX; INPUT.aim.oy = e.clientY; INPUT.aim.dx = 0; INPUT.aim.dy = 0; INPUT.aim.drag = false; INPUT.aim.cancel = false;
         try { el.setPointerCapture(e.pointerId); } catch (er) {}
       });
       el.addEventListener("pointermove", function (e) {
         if (e.pointerId !== INPUT.aim.id) return;
         INPUT.aim.dx = e.clientX - INPUT.aim.ox; INPUT.aim.dy = e.clientY - INPUT.aim.oy;
         if (hyp(INPUT.aim.dx, INPUT.aim.dy) > INPUT.dragMin) { INPUT.aim.drag = true; if (MATCH.me) MATCH.me.angle = INPUT.screenToWorldAngle(Math.atan2(INPUT.aim.dy, INPUT.aim.dx)); }
+        var box = el.getBoundingClientRect();
+        INPUT.aim.cancel = INPUT.aim.drag && e.clientX >= box.left && e.clientX <= box.right && e.clientY >= box.top && e.clientY <= box.bottom;
       });
       function up(e) {
         if (e.pointerId !== INPUT.aim.id) return;
         var btn = INPUT.aim.btn, drag = INPUT.aim.drag && hyp(INPUT.aim.dx, INPUT.aim.dy) > INPUT.dragMin, reach = drag && MATCH.me ? INPUT.aimReach(MATCH.me, btn) : null;
-        INPUT.aim.id = null;
-        if (!INPUT.canAct() || e.type === "pointercancel") return;
+        var cancelled = INPUT.aim.cancel;
+        INPUT.aim.id = null; INPUT.aim.cancel = false;
+        if (cancelled || !INPUT.canAct() || e.type === "pointercancel") return;
         var ang = drag ? INPUT.screenToWorldAngle(Math.atan2(INPUT.aim.dy, INPUT.aim.dx)) : AUTO_AIM.angle(MATCH.me);
         MATCH.me.angle = ang;
         if (btn === "atk") ATTACK.tryFire(MATCH.me, ang, reach);
@@ -7252,7 +7278,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     makeLungeVis(d) {
       var m = ARENA_VIEW.flatMesh(GEO.strip, lungeMat.clone());
-      m.scale.set(d.len + BODY_R, d.zone ? d.width : 9, 1);
+      m.scale.set(d.len + BODY_R, d.width, 1);
       var g = new THREE.Group(); g.add(m); g.position.set(d.x, 2.6, d.y); g.rotation.y = -d.angle;
       g.userData.mat = m.material;
       scene.add(g);
@@ -7785,7 +7811,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       aimCircle.front.scale.setScalar(radius); aimCircle.back.scale.setScalar(radius + AIM_BACK_PAD);
     }
     updateAimGuide() {
-      var on = INPUT.aim.id !== null && INPUT.aim.drag && MATCH.me && MATCH.me.alive;
+      var on = INPUT.aim.id !== null && INPUT.aim.drag && !INPUT.aim.cancel && MATCH.me && MATCH.me.alive;
       aimGrp.visible = !!on;
       if (!on) return;
       var ult = INPUT.aim.btn === "ult", c = CHARS[MATCH.me.char];
@@ -8081,7 +8107,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }
       if (CAM.snap) { CAM.look.set(lx, 0, lz); CAM.snap = false; }
       else { var k = 1 - Math.exp(-dt * 7); CAM.look.x += (lx - CAM.look.x) * k; CAM.look.z += (lz - CAM.look.z) * k; }
-      var scoping = !spec && MATCH.me.alive && CHAR_TYPES.of(MATCH.me.char).scopesWhileAiming && INPUT.aim.id !== null && INPUT.aim.drag;
+      var scoping = !spec && MATCH.me.alive && CHAR_TYPES.of(MATCH.me.char).scopesWhileAiming && INPUT.aim.id !== null && INPUT.aim.drag && !INPUT.aim.cancel;
       var sk = 1 - Math.exp(-dt * 6), aimX = 0, aimZ = 0, endX = 0, endZ = 0;
       if (scoping) {
         var wx = Math.cos(MATCH.me.angle), wz = Math.sin(MATCH.me.angle), len = PHYSICS.rayCast(MATCH.me.x + wx * 20, MATCH.me.y + wz * 20, wx, wz, CHARS[MATCH.me.char].range, 6) + 20;
@@ -8301,7 +8327,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       keys(MATCH.remoteShots).forEach(function (id) {
         var p = MATCH.remoteShots[id], g = PRV[id], e = t - p.d.createdAt;
         PROJECTILES.projVisualHit(p, t);
-        if (e > p.life && !p.sparked && p.dist < (p.d.range || 500) - 1) {
+        if (e > p.life && !p.sparked && !p.gone && p.dist < (p.d.range || 500) - 1) {
           p.sparked = true; var q = PROJECTILES.projAt(p, p.life);
           var orbShot = CHAR_TYPES.of(p.d.ownerCharacterType).isOrbShooter;
           FX_VIEW.spark(q.x, q.y, orbShot ? FX_VIEW.hitColor(p.d) : "#FFFFFF", orbShot ? 1.8 : 1);
@@ -8340,7 +8366,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       });
       FIELD.lunges.forEach(function (l) {
         if (!l.vis) l.vis = EFFECT_VIEW.makeLungeVis(l.d);
-        l.vis.userData.mat.opacity = (l.d.zone ? 0.3 : 0.75) + 0.2 * Math.sin(nowMs / 45);
+        l.vis.userData.mat.opacity = 0.3 + 0.2 * Math.sin(nowMs / 45);
       });
       keys(MLV).forEach(function (k) { if (!MATCH.melee[k]) EFFECT_VIEW.dropMelee(k); });
 

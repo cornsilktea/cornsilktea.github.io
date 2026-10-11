@@ -4311,7 +4311,7 @@ class ResultCollector {
     });
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "게이지 채우기 조건 4가지·나가기 조건");
   });
-  runAsync(PRACG, "연습모드 캐릭터 창·바꾸기: 창에 모든 캐릭터 카드가 뜨고, 고르면 위치·통계는 이어 가며 체력 가득·게이지 0 의 새 캐릭터가 되고 방 기록도 바뀌는가", async function (done) {
+  runAsync(PRACG, "연습모드 캐릭터 창·바꾸기: 창에 모든 캐릭터 카드가 뜨고, 고르면 위치는 이어 가고 킬·데스·어시스트·피해량은 0 으로 초기화된 체력 가득·게이지 0 의 새 캐릭터가 되고 방 기록도 바뀌는가", async function (done) {
     var bad = [], L = HUMAN_CHARS;
     await withNet({}, async function (fake) {
       var base = await practiceRoom(fake, "17171"), old = api.MATCH.me;
@@ -4322,7 +4322,7 @@ class ResultCollector {
       Object.assign(old, { x: 321, y: 654, angle: 1.2, dmg: 77, kills: 2, deaths: 1, assists: 3, heal: 9, gauge: 5, hp: 1 });
       document.querySelector('#pcChars .dfCard[data-c="' + L[3] + '"]').click(); await sleep(10);
       var E = api.MATCH.me;
-      if (E === old || E.char !== L[3] || E.hp !== api.CHARS[L[3]].hp || E.maxHp !== E.hp || E.gauge !== 0 || E.x !== 321 || E.y !== 654 || E.dmg !== 77 || E.kills !== 2 || E.deaths !== 1 || E.assists !== 3 || E.heal !== 9 || !E.alive) bad.push("새 캐릭터 " + JSON.stringify([E.char, E.hp, E.gauge, E.x, E.dmg]));
+      if (E === old || E.char !== L[3] || E.hp !== api.CHARS[L[3]].hp || E.maxHp !== E.hp || E.gauge !== 0 || E.x !== 321 || E.y !== 654 || E.dmg !== 0 || E.kills !== 0 || E.deaths !== 0 || E.assists !== 0 || E.heal !== 0 || !E.alive) bad.push("새 캐릭터 " + JSON.stringify([E.char, E.hp, E.gauge, E.x, E.dmg]));
       if (fake.get(base + "players/" + me() + "/characterType") !== L[3] || fake.get(base + "roster/" + me() + "/c") !== L[3]) bad.push("방 기록");
       if (api.players()[me()].characterType !== L[3]) bad.push("내 참가자 기록");
       if (document.querySelector("#pcChars .dfCard.on").getAttribute("data-c") !== L[3]) bad.push("창이 새 캐릭터로 갱신 안 됨");
@@ -4332,7 +4332,7 @@ class ResultCollector {
       document.getElementById("btnPcClose").click(); if (!modal.hidden) bad.push("닫기 버튼");
       modal.hidden = false; modal.dispatchEvent(new MouseEvent("click", { bubbles: true })); if (!modal.hidden) bad.push("바깥을 누르면 닫혀야 함");
     });
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "카드 " + L.length + "장·캐릭터 교체(위치·통계 유지)·방 기록·잘못된 요청 무시·닫기");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "카드 " + L.length + "장·캐릭터 교체(위치 유지·통계 초기화)·방 기록·잘못된 요청 무시·닫기");
   });
 
   runAsync(STATSG, "저장 규칙에 draws 칸이 아직 없어 거부되면 draws 없이 다시 저장하는가", async function (done) {
