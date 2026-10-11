@@ -815,7 +815,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     duelist: { name: "결투가", role: "assassin", icon: "🤺", hp: 145, speed: gameSpeed(175), cd: gameMs(1), dmg: 40, range: 100,
                dashRange: 250, dashMs: gameMs(0.5), stab: true, selfHeal: 15, ultName: "르미즈", heals: true },
     knight:  { name: "기사", role: "fighter", icon: "🛡️", hp: 375, speed: gameSpeed(150), cd: gameMs(1.5), dmg: 25, range: 110, arc: Math.PI * 0.7, armor: 2, ultName: "방어태세", blocks: true },
-    ranger:  { name: "궁수", role: "shooter", icon: "🏹", hp: 100, speed: gameSpeed(130), haste: { add: 10, ms: gameMs(4), max: 40 }, cd: gameMs(0.8), dmg: 15, range: 450, pSpeed: 532, pr: 12, shots: 2, gap: 70, ultName: "난사", ultAim: true },
+    ranger:  { name: "궁수", role: "shooter", icon: "🏹", hp: 100, speed: gameSpeed(130), haste: { add: 10, ms: gameMs(4), max: 40 }, cd: gameMs(0.8), dmg: 15, range: 450, pSpeed: 532, pr: 12, shots: 2, gap: 70, gaugeOnHit: 1, ultName: "난사", ultAim: true },
     mage:    { name: "화염술사", role: "caster", icon: "🔥", hp: 115, speed: gameSpeed(170), cd: gameMs(1.4), dmg: 5, range: 350, pSpeed: 700, pr: 9, burn: { ms: gameMs(6), maxHpRate: 0.025 }, ultName: "메테오", ultAim: true },
     rogue:   { name: "은신자", role: "assassin", icon: "🗡️", hp: 150, speed: gameSpeed(175), ultSpeed: gameSpeed(280), cd: gameMs(1.1), dmg: 32, range: 110, arc: Math.PI * 0.6, hits: 2, hitGap: 160, ambushDmg: 45, throwDmg: 25, throwRange: 350, pSpeed: 1080, pr: 8, ultName: "은신" },
     necro:   { name: "네크로", role: "caster", icon: "💀", hp: 120, lastStandHp: 50, lastStandHideMs: gameMs(1.5), speed: gameSpeed(170), cd: gameMs(1.4), dmg: 10, range: 350, pSpeed: 1000, pr: 9, ultName: "해골 소환", blocks: true },
@@ -856,6 +856,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     playable(c) { return !!(CHARS[c] && !CHARS[c].retired); }
     pickable(c) { return CATALOG.playable(c) && !CHARS[c].practiceBot; }
     roleOf(c) { return ROLES[CHARS[c].role]; }
+    gaugeOnHitOf(c) { return CHARS[c].gaugeOnHit != null ? CHARS[c].gaugeOnHit : ROLES[CHARS[c].role].gaugeOnHit; }
     charsInRole(r) { return CHAR_LIST.filter(function (c) { return CHARS[c].role === r; }); }
     isMelee(c) { return !!(CHARS[c].arc || CHARS[c].width || CHARS[c].dashWidth || CHARS[c].stab); }
     charImgSrc(c) {
@@ -1892,7 +1893,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
              "<tr><th>이동속도</th><td>" + pair(SKILLTEXT.shownSpeed(c.speed), c.ultSpeed == null ? null : SKILLTEXT.shownSpeed(c.ultSpeed)) + "</td></tr>" +
              "<tr><th>사거리</th><td>" + pair(Math.round(c.dashRange || c.range), c.throwRange) + "</td></tr><tr><th>스킬</th><td>" + c.ultName + "</td></tr></table>";
     }
-    roleGaugeText(role) { return "기본 공격 적중 시 게이지 +" + role.gaugeOnHit + (role.gaugeOnHurt ? ", 피격 시 +" + role.gaugeOnHurt : ""); }
+    roleGaugeText(role, gaugeOnHit) { return "기본 공격 적중 시 게이지 +" + (gaugeOnHit != null ? gaugeOnHit : role.gaugeOnHit) + (role.gaugeOnHurt ? ", 피격 시 +" + role.gaugeOnHurt : ""); }
+    gaugeTextOf(k) { return SKILLTEXT.roleGaugeText(CATALOG.roleOf(k), CATALOG.gaugeOnHitOf(k)); }
     basicDesc(k) { return CHAR_TYPES.of(k).basicDesc(); }
     ultSpeedUpText(c) { return "이동속도 " + SKILLTEXT.shownSpeed(c.ultSpeed - c.speed) + " 증가"; }
   }
@@ -2076,7 +2078,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       '<div class="vpNav"><button type="button" class="mini" data-vp="' + CHAR_LIST[(i + CHAR_LIST.length - 1) % CHAR_LIST.length] + '">◀ 이전</button>' +
       '<button type="button" class="mini" data-vp="' + CHAR_LIST[(i + 1) % CHAR_LIST.length] + '">다음 ▶</button></div></div>' +
       '<div class="vpTop">' +
-        '<div class="vpBox"><h4>상세 스펙</h4>' + SKILLTEXT.statTable(k) + '<div class="vpGauge">' + ROLES[c.role].name + " · " + SKILLTEXT.roleGaugeText(ROLES[c.role]) + "</div></div>" +
+        '<div class="vpBox"><h4>상세 스펙</h4>' + SKILLTEXT.statTable(k) + '<div class="vpGauge">' + ROLES[c.role].name + " · " + SKILLTEXT.gaugeTextOf(k) + "</div></div>" +
         '<div class="vpBox"><h4>초상화</h4><div class="vpPic"><img alt="" src="' + CATALOG.charImgSrc(k) + '"></div></div>' +
         '<div class="vpBox"><h4>인게임 모습</h4><div class="vpPic">' + (shot ? '<img class="fill" alt="" src="' + shot + '">' : "<span>캐릭터 모델을 불러오는 중이에요</span>") + "</div></div>" +
       "</div>" +
@@ -2491,7 +2493,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var pickBtn = !canPick ? "" : banTurn ? '<button type="button" class="big danger" data-pick="' + v + '">🚫 ' + CHARS[v].name + " 밴</button>" :
         '<button type="button" class="big primary" data-pick="' + v + '">✔ ' + CHARS[v].name + roParticle(CHARS[v].name) + " 결정</button>";
       setHtml($("dfDetail"), v ? '<div class="dfName">' + CHARS[v].icon + " " + CHARS[v].name + '<small>' + CATALOG.roleOf(v).icon + " " + CATALOG.roleOf(v).name + "</small></div>" +
-        '<div class="dfRole">' + SKILLTEXT.roleGaugeText(CATALOG.roleOf(v)) + "</div>" + SKILLTEXT.statTable(v) + SKILLTEXT.skillBlocks(v) + pickBtn : "");
+        '<div class="dfRole">' + SKILLTEXT.gaugeTextOf(v) + "</div>" + SKILLTEXT.statTable(v) + SKILLTEXT.skillBlocks(v) + pickBtn : "");
     }
   }
   var DRAFT = new Draft();
@@ -4986,7 +4988,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         CHAR_TYPES.of(owner.char).onHitLate(owner, h);
         var sameSwing = h.s && owner.gaugeSwing === h.s;
         if (h.s) owner.gaugeSwing = h.s;
-        if (h.b && !sameSwing && !owner.isGaugeLocked()) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + (h.g != null ? h.g : CATALOG.roleOf(owner.char).gaugeOnHit));
+        if (h.b && !sameSwing && !owner.isGaugeLocked()) owner.gauge = Math.min(GAUGE_MAX, owner.gauge + (h.g != null ? h.g : CATALOG.gaugeOnHitOf(owner.char)));
         if (h.b && !sameSwing && owner.alive && CHARS[owner.char].selfHeal) {
           var stabHeal = STATUS.healAmount(owner, CHARS[owner.char].selfHeal, now());
           owner.hp += stabHeal; owner.heal += stabHeal;
@@ -6155,7 +6157,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     practiceInfoHtml() {
       var k = MATCH.me.char;
       return '<div class="dfName">' + CHARS[k].icon + " " + CHARS[k].name + '<small>' + CATALOG.roleOf(k).icon + " " + CATALOG.roleOf(k).name + "</small></div>" +
-        '<div class="dfRole">' + SKILLTEXT.roleGaugeText(CATALOG.roleOf(k)) + "</div>" + SKILLTEXT.statTable(k) + SKILLTEXT.skillBlocks(k);
+        '<div class="dfRole">' + SKILLTEXT.gaugeTextOf(k) + "</div>" + SKILLTEXT.statTable(k) + SKILLTEXT.skillBlocks(k);
     }
     renderPracticeModal() {
       setHtmlKeepScroll($("pcChars"), PRACTICE.practiceCharsHtml());
@@ -9057,7 +9059,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
   function testHooks() {
     return {
-      CHARS: CHARS, CHAR_LIST: CHAR_LIST, ULT: ULT, ROLES: ROLES, ROLE_LIST: ROLE_LIST, MAPS: MAPS, roleGauge: function (c) { return CATALOG.roleOf(c).gaugeOnHit; }, spawnOf: ARENA_MAP.spawnOf.bind(ARENA_MAP), BODY_R: BODY_R, GAUGE_MAX: GAUGE_MAX, BOUND: BOUND, MAP_IDS: MAP_IDS, RESPAWN_MS: TIMESCALE.respawnMs, RESPAWN_PROTECT_MS: TIMESCALE.respawnProtectMs, myId: SESSION.myId,
+      CHARS: CHARS, CHAR_LIST: CHAR_LIST, ULT: ULT, ROLES: ROLES, ROLE_LIST: ROLE_LIST, MAPS: MAPS, roleGauge: function (c) { return CATALOG.gaugeOnHitOf(c); }, spawnOf: ARENA_MAP.spawnOf.bind(ARENA_MAP), BODY_R: BODY_R, GAUGE_MAX: GAUGE_MAX, BOUND: BOUND, MAP_IDS: MAP_IDS, RESPAWN_MS: TIMESCALE.respawnMs, RESPAWN_PROTECT_MS: TIMESCALE.respawnProtectMs, myId: SESSION.myId,
       obstacles: function () { return { walls: ARENA_MAP.obstacles, water: ARENA_MAP.water }; },
       mapTopShot: function (id, pxW, pxH) {
         if (!CAMERA_RIG.renderer || !KIT.propsReady) return null;
@@ -9116,7 +9118,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       statsPct: STATS_VIEW.statsPct.bind(STATS_VIEW), statsRateCell: STATS_VIEW.statsRateCell.bind(STATS_VIEW), banPickCell: STATS_VIEW.banPickCell.bind(STATS_VIEW), kdaText: STATS_VIEW.kdaText.bind(STATS_VIEW), statsRowsHtml: STATS_VIEW.statsRowsHtml.bind(STATS_VIEW), loadStats: STATS_VIEW.loadStats.bind(STATS_VIEW), mapShotSrc: ARENA_MAP.shotSrc.bind(ARENA_MAP), statsModeNow: function () { return STATS_VIEW.mode; },
       sfx: SOUND.sfx.bind(SOUND), killSound: SOUND.killSound.bind(SOUND), audio: SOUND.audio.bind(SOUND), openNick: NICK.openNick.bind(NICK), refreshNick: NICK.refreshNick.bind(NICK), nickNow: function () { return NICK.name; }, NICK_MAX: NICK_MAX,
       playable: CATALOG.playable.bind(CATALOG), pickable: CATALOG.pickable.bind(CATALOG), roleOf: CATALOG.roleOf.bind(CATALOG), roParticle: roParticle, josa: josa, charsInRole: CATALOG.charsInRole.bind(CATALOG), isMelee: CATALOG.isMelee.bind(CATALOG), charImgSrc: CATALOG.charImgSrc.bind(CATALOG),
-      ultDesc: SKILLTEXT.ultDesc.bind(SKILLTEXT), passiveDesc: SKILLTEXT.passiveDesc.bind(SKILLTEXT), basicDesc: SKILLTEXT.basicDesc.bind(SKILLTEXT), skillBlocks: SKILLTEXT.skillBlocks.bind(SKILLTEXT), statTable: SKILLTEXT.statTable.bind(SKILLTEXT), roleGaugeText: SKILLTEXT.roleGaugeText.bind(SKILLTEXT), num: SKILLTEXT.num.bind(SKILLTEXT), secs: SKILLTEXT.secs.bind(SKILLTEXT), shownSpeed: SKILLTEXT.shownSpeed.bind(SKILLTEXT),
+      ultDesc: SKILLTEXT.ultDesc.bind(SKILLTEXT), passiveDesc: SKILLTEXT.passiveDesc.bind(SKILLTEXT), basicDesc: SKILLTEXT.basicDesc.bind(SKILLTEXT), skillBlocks: SKILLTEXT.skillBlocks.bind(SKILLTEXT), statTable: SKILLTEXT.statTable.bind(SKILLTEXT), roleGaugeText: SKILLTEXT.roleGaugeText.bind(SKILLTEXT), gaugeTextOf: SKILLTEXT.gaugeTextOf.bind(SKILLTEXT), num: SKILLTEXT.num.bind(SKILLTEXT), secs: SKILLTEXT.secs.bind(SKILLTEXT), shownSpeed: SKILLTEXT.shownSpeed.bind(SKILLTEXT),
       attackText: SKILLTEXT.attackText.bind(SKILLTEXT), pctOf: SKILLTEXT.pctOf.bind(SKILLTEXT), slowPct: SKILLTEXT.slowPct.bind(SKILLTEXT), healCutPct: SKILLTEXT.healCutPct.bind(SKILLTEXT), ultSpeedUpText: SKILLTEXT.ultSpeedUpText.bind(SKILLTEXT), teamHitColor: teamHitColor,
       onKillFeed: KILLFEED.onKillFeed.bind(KILLFEED), multiKillTag: KILLFEED.multiKillTag.bind(KILLFEED), KILL_FEED_MAX: KILL_FEED_MAX, KILL_FEED_MS: KILL_FEED_MS,
       mvpScore: HUD.mvpScore.bind(HUD),

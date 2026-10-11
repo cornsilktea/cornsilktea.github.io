@@ -4392,6 +4392,7 @@ class ResultCollector {
   new SkillResetTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
   new AstrologerTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
   new MinionSkillTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
+  new RangerGaugeTests(api, { world: world, run: run, OPEN_Y: OPEN_Y }).register();
   results.pending = Promise.resolve().then(function () { api.finish(api.currentMap()); }).then(drainAsync);
   return results;
   }
@@ -5142,5 +5143,29 @@ class MinionSkillTests {
       var html = api.statTable("duelist"), want = "<th>사거리</th><td>" + api.CHARS.duelist.dashRange + "</td>";
       done(html.indexOf(want) < 0 ? "fail" : "pass", html.indexOf(want) < 0 ? "표에 " + want + " 없음" : "사거리 " + api.CHARS.duelist.dashRange);
     });
+  }
+}
+
+class RangerGaugeTests {
+  static GROUP = "궁수 게이지";
+  constructor(api, kit) { this.api = api; this.kit = kit; }
+
+  register() {
+    var api = this.api, run = this.kit.run, y = this.kit.OPEN_Y.forest, C = api.CHARS.ranger;
+    run(RangerGaugeTests.GROUP, "궁수 기본 공격: 화살 1발이 맞을 때마다 게이지 +" + C.gaugeOnHit + ", 2발이 다 맞으면 +" + (C.gaugeOnHit * C.shots) + "이고 카드에도 같은 숫자가 적히는가", function (done) {
+      api.MATCH.stateByKey = {};
+      var W = this.kit.world("forest", [
+        { id: "rg", team: "blue", char: "ranger", x: 150, y: y },
+        { id: "foe", team: "red", char: "knight", x: 350, y: y }
+      ]);
+      var rg = W.ent("rg"), bad = [];
+      api.fireBasic(rg, 0);
+      W.step(C.cd + 300);
+      if (rg.gauge !== C.gaugeOnHit * C.shots) bad.push("2발 적중 게이지 " + rg.gauge + " (기대 " + C.gaugeOnHit * C.shots + ")");
+      if (api.roleGauge("ranger") !== C.gaugeOnHit) bad.push("1발당 게이지 " + api.roleGauge("ranger") + " (기대 " + C.gaugeOnHit + ")");
+      if (api.gaugeTextOf("ranger").indexOf("+" + C.gaugeOnHit) < 0) bad.push("카드 문구 " + api.gaugeTextOf("ranger"));
+      if (api.roleGauge("sniper") !== api.ROLES.shooter.gaugeOnHit) bad.push("다른 원거리 딜러 게이지가 바뀜 " + api.roleGauge("sniper"));
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "화살 1발당 +" + C.gaugeOnHit + ", 2발 적중 +" + rg.gauge + ", 카드 '" + api.gaugeTextOf("ranger") + "'");
+    }.bind(this));
   }
 }
