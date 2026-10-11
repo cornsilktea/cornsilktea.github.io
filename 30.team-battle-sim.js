@@ -24,6 +24,65 @@ class HtmlText {
   static escape(s) { return String(s).replace(/[&<>"]/g, function (ch) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[ch]; }); }
 }
 
+class SimInsights {
+  static MIN_PAIR_GAMES = 40;
+  static MIN_MATCHUP_GAMES = 40;
+  static LIST_SIZE = 6;
+  static SURE_Z = 3;
+  constructor(results, rows, mapIds, mapRows, mapNames) {
+    this.results = results; this.mapIds = mapIds; this.mapRows = mapRows; this.mapNames = mapNames;
+    this.base = {}; this.names = {};
+    rows.forEach((r) => { this.base[r.id] = r.win; this.names[r.id] = r.name; });
+  }
+  static percent(v) { return Math.round(v * 1000) / 10; }
+  static zScore(wins, games, expected) { return (wins - games * expected) / Math.sqrt(games * expected * (1 - expected)); }
+  static bump(table, key, win) { var a = table[key] || (table[key] = { n: 0, w: 0 }); a.n++; a.w += win; }
+  tally() {
+    var pair = {}, versus = {}, combo = {};
+    this.results.forEach((g) => {
+      if (g.winner === "draw") return;
+      var teams = { blue: [], red: [] };
+      g.chars.forEach((c) => teams[c.team].push(c.char));
+      [["blue", "red", g.blueCode, g.redCode], ["red", "blue", g.redCode, g.blueCode]].forEach((side) => {
+        var mine = teams[side[0]], other = teams[side[1]], win = g.winner === side[0] ? 1 : 0;
+        for (var i = 0; i < mine.length; i++) for (var j = i + 1; j < mine.length; j++) SimInsights.bump(pair, [mine[i], mine[j]].sort().join("|"), win);
+        mine.forEach((a) => other.forEach((b) => SimInsights.bump(versus, a + "|" + b, win)));
+        SimInsights.bump(combo, side[2] + "|" + side[3], win);
+      });
+    });
+    return { pair: pair, versus: versus, combo: combo };
+  }
+  scored(table, minGames, expectedOf) {
+    return Object.keys(table).filter((k) => table[k].n >= minGames).map((k) => {
+      var ids = k.split("|"), o = table[k], e = expectedOf(ids[0], ids[1]);
+      return { a: this.names[ids[0]], b: this.names[ids[1]], n: o.n, win: SimInsights.percent(o.w / o.n), expected: SimInsights.percent(e), z: Math.round(SimInsights.zScore(o.w, o.n, e) * 10) / 10 };
+    });
+  }
+  edges(list) {
+    var size = SimInsights.LIST_SIZE, byZ = list.slice().sort((x, y) => y.z - x.z);
+    return { best: byZ.slice(0, size), worst: byZ.slice(-size).reverse() };
+  }
+  pairs(table) {
+    return this.edges(this.scored(table, SimInsights.MIN_PAIR_GAMES, (a, b) => (this.base[a] + this.base[b]) / 2));
+  }
+  matchups(table) {
+    var list = this.scored(table, SimInsights.MIN_MATCHUP_GAMES, (a, b) => Math.min(0.95, Math.max(0.05, this.base[a] - this.base[b] + 0.5)));
+    return { best: this.edges(list.filter((x) => x.z > 0)).best };
+  }
+  comboMatrix(table, codes) {
+    return { codes: codes, cells: codes.map((a) => codes.map((b) => { var o = table[a + "|" + b]; return o ? [o.n, SimInsights.percent(o.w / o.n)] : null; })) };
+  }
+  byMap() {
+    return { maps: this.mapIds.map((m) => this.mapNames[m]), rows: Object.keys(this.base).map((id) => [this.names[id], SimInsights.percent(this.base[id])].concat(this.mapIds.map((m) => {
+      var row = this.mapRows[m].find((x) => x.id === id); return row ? [SimInsights.percent(row.win), row.n] : null;
+    }))).sort((x, y) => y[1] - x[1]) };
+  }
+  report(comboCodes) {
+    var t = this.tally();
+    return { games: this.results.length, pairs: this.pairs(t.pair), matchups: this.matchups(t.versus), comboMatrix: this.comboMatrix(t.combo, comboCodes), byMap: this.byMap() };
+  }
+}
+
 export function createSim(api) {
   function fakeRoom(mapId, log) {
     var n = 0;
@@ -240,6 +299,12 @@ export function createSim(api) {
     return { title: title || "팀 배틀 아레나 시뮬레이션", note: note || "", createdAt: new Date().toISOString(), options: sim.options,
              seconds: Math.round(((sim.finishedAt || Date.now()) - sim.startedAt) / 1000), roleOrder: api.ROLE_LIST, roles: roles,
              totals: gameTotals(r), rows: statRows(r), combos: comboRates(r), mapOrder: api.MAP_IDS, maps: byMap };
+  };
+  sim.insights = function () {
+    var r = sim.results, mapRows = {}, mapNames = {};
+    api.MAP_IDS.forEach(function (m) { mapRows[m] = statRows(r, m); mapNames[m] = api.MAPS[m].name; });
+    var codes = comboRates(r).map(function (c) { return c.code; });
+    return new SimInsights(r, statRows(r), api.MAP_IDS, mapRows, mapNames).report(codes);
   };
   sim.reportHtml = function (title, note) {
     return SimReportPage.build(sim.summary(title, note));

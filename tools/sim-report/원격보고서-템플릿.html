@@ -1,0 +1,219 @@
+<title>팀 배틀 밸런스 5000판</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700;800&display=swap">
+<style>
+/* layout: 요약 카드 → 메모 → 캐릭터 표 → 맵별 승률 → 팀 구성 → 특기 조합·상성 → 구성 대결표. 표는 가로로만 스크롤 */
+:root {
+  --bg: #F6F5F0;
+  --panel: #FFFFFF;
+  --fg: #23262B;
+  --muted: #6B7078;
+  --line: #E1DFD6;
+  --accent: #D97B4F;
+  --good: #1F7A45;
+  --good-bg: #DDF1E3;
+  --bad: #B3362B;
+  --bad-bg: #F9E0DC;
+  --focus: #FFF3D6;
+  --font: "Nanum Gothic", "Malgun Gothic", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1C1E22; --panel: #25282D; --fg: #E9E8E3; --muted: #9AA0A8; --line: #373B42;
+    --accent: #E88D62; --good: #7FD39B; --good-bg: #20382A; --bad: #F08F84; --bad-bg: #432522; --focus: #3A3220;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #1C1E22; --panel: #25282D; --fg: #E9E8E3; --muted: #9AA0A8; --line: #373B42;
+  --accent: #E88D62; --good: #7FD39B; --good-bg: #20382A; --bad: #F08F84; --bad-bg: #432522; --focus: #3A3220;
+  color-scheme: dark;
+}
+body { background: var(--bg); color: var(--fg); font-family: var(--font); padding-inline: 16px; padding-block: 20px 40px; line-height: 1.5; }
+main { max-width: 1080px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; }
+h1 { font-size: 1.5rem; margin: 0; text-wrap: balance; }
+h2 { font-size: 1.05rem; margin: 0 0 8px; }
+.sub { color: var(--muted); margin: 4px 0 0; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; min-width: 0; }
+.card b { display: block; font-size: 1.3rem; font-variant-numeric: tabular-nums; }
+.card span { color: var(--muted); font-size: 0.8rem; }
+.notes { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px 16px; display: flex; flex-direction: column; gap: 6px; }
+.notes p { margin: 0; }
+.scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
+.pair-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.pair-grid > div { min-width: 0; }
+.pair-grid h3 { font-size: 0.92rem; margin: 0 0 6px; }
+table { border-collapse: collapse; width: 100%; font-size: 0.86rem; font-variant-numeric: tabular-nums; }
+th, td { padding: 7px 10px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
+th { position: sticky; top: 0; background: var(--panel); color: var(--muted); font-weight: 700; cursor: pointer; user-select: none; }
+th.plain { cursor: default; }
+th:hover { color: var(--accent); }
+th.plain:hover { color: var(--muted); }
+th.on { color: var(--accent); }
+th:first-child, td:first-child { text-align: left; position: sticky; left: 0; background: var(--panel); }
+tr.focus td { background: var(--focus); }
+tr:last-child td { border-bottom: 0; }
+td.win { font-weight: 800; }
+td.hi { color: var(--good); background: var(--good-bg); }
+td.lo { color: var(--bad); background: var(--bad-bg); }
+td.thin { font-style: italic; opacity: 0.75; }
+td.self { color: var(--muted); }
+.name { font-weight: 700; }
+.sure { color: var(--accent); font-weight: 800; }
+.fine { color: var(--muted); font-size: 0.8rem; margin: 6px 0 0; }
+</style>
+<main>
+  <header>
+    <h1>팀 배틀 밸런스 5000판</h1>
+    <p class="sub" id="sub"></p>
+  </header>
+  <section class="cards" id="cards"></section>
+  <section class="notes" id="notes-main"></section>
+  <section>
+    <h2>캐릭터별</h2>
+    <div class="scroll"><table id="chars"></table></div>
+    <p class="fine">열 제목을 누르면 정렬됩니다. 승률은 무승부를 뺀 값이고, 55% 이상은 초록, 40% 미만은 빨강입니다. 피해·스킬·회복·막은 피해는 경기당 평균입니다.</p>
+  </section>
+  <section>
+    <h2>맵별 승률</h2>
+    <div class="scroll"><table id="maps"></table></div>
+    <p class="fine">맵마다 판 수가 전체의 4분의 1이라 오차가 더 큽니다(전사 600판 ±4%p, 마법사·원거리 300판 ±6%p). 기울임꼴은 150판 미만(암살자는 맵당 100판 안팎, ±10%p)이라 참고만 하세요. 60% 이상 초록, 40% 미만 빨강.</p>
+  </section>
+  <section>
+    <h2>팀 구성별</h2>
+    <div class="scroll"><table id="combos"></table></div>
+    <p class="fine">F 전사 · C 마법사 · S 원거리 딜러 · A 암살자. 전사+마법사+암살자, 전사+암살자 2, 전사 2+암살자 구성은 피하도록 돌렸습니다.</p>
+  </section>
+  <section class="notes" id="notes-insight"></section>
+  <section>
+    <h2>특기할 같은 팀 조합</h2>
+    <div class="pair-grid" id="pairs"></div>
+    <p class="fine">같은 팀에 둘이 함께 있을 때 승률을, 두 캐릭터 승률의 평균(기대)과 비교했습니다. 차이 점수(z)가 3 이상이면 우연일 가능성이 낮아 주황으로 표시합니다. 그 아래는 참고용입니다. 조합 수가 200개 넘으니 우연히 큰 값이 몇 개는 나옵니다.</p>
+  </section>
+  <section>
+    <h2>상성 (왼쪽이 오른쪽 상대로 유독 강함)</h2>
+    <div class="scroll"><table id="matchups"></table></div>
+    <p class="fine">왼쪽 캐릭터가 오른쪽 캐릭터가 있는 상대 팀과 붙었을 때 승률을, 두 캐릭터의 전체 승률 차이로 예상한 값(기대)과 비교했습니다. 상대 팀의 나머지 두 명은 섞여 있습니다.</p>
+  </section>
+  <section>
+    <h2>팀 구성 대결표</h2>
+    <div class="scroll"><table id="matrix"></table></div>
+    <p class="fine">행 구성이 열 구성을 상대로 이긴 비율(판 수). 40판 미만 칸은 기울임꼴입니다.</p>
+  </section>
+</main>
+<script>
+class SimReportData {
+  static ROLES = { fighter: "⚔️ 전사", caster: "✨ 마법사", shooter: "🏹 원거리", assassin: "🗡️ 암살자" };
+  static COLUMNS = ["캐릭터", "승률", "판", "피해", "스킬", "회복", "막은 피해", "기절(초)", "둔화(초)", "처치", "죽음", "어시스트", "MVP"];
+  static FOCUS = [];
+  static DATA = __DATA__;
+}
+
+class SortableTable {
+  constructor(element, columns, rows, formatRow, firstSort) {
+    this.element = element; this.columns = columns; this.rows = rows; this.formatRow = formatRow;
+    this.sortColumn = firstSort == null ? 1 : firstSort; this.descending = true;
+  }
+  sorted() {
+    var col = this.sortColumn, dir = this.descending ? -1 : 1;
+    return this.rows.slice().sort(function (a, b) { return a[col] === b[col] ? 0 : (a[col] > b[col] ? 1 : -1) * dir; });
+  }
+  render() {
+    var self = this;
+    var head = "<tr>" + this.columns.map(function (c, i) { return '<th data-col="' + i + '" class="' + (i === self.sortColumn ? "on" : "") + '">' + c + (i === self.sortColumn ? (self.descending ? " ▼" : " ▲") : "") + "</th>"; }).join("") + "</tr>";
+    this.element.innerHTML = head + this.sorted().map(this.formatRow).join("");
+    this.element.querySelectorAll("th").forEach(function (th) { th.addEventListener("click", function () { self.sortBy(+th.dataset.col); }); });
+  }
+  sortBy(col) {
+    this.descending = col === this.sortColumn ? !this.descending : true;
+    this.sortColumn = col;
+    this.render();
+  }
+}
+
+class ReportPage {
+  static winClass(win) { return win >= 55 ? "hi" : win < 40 ? "lo" : ""; }
+  static mapClass(win) { return win >= 60 ? "hi" : win < 40 ? "lo" : ""; }
+  static ROLE_ICON = { F: "⚔️", C: "✨", S: "🏹", A: "🗡️" };
+  static THIN_MAP_GAMES = 150;
+  static THIN_MATRIX_GAMES = 40;
+  static SURE_Z = 3;
+  get data() { return SimReportData.DATA; }
+  renderHeader() {
+    document.getElementById("sub").textContent = this.data.sub;
+    document.getElementById("notes-main").innerHTML = this.data.notesMain.map(function (p) { return "<p>" + p + "</p>"; }).join("");
+    document.getElementById("notes-insight").innerHTML = this.data.notesInsight.map(function (p) { return "<p>" + p + "</p>"; }).join("");
+  }
+  renderCards() {
+    var t = this.data.totals, decided = t.games - t.draws;
+    var items = [[t.games, "경기"], [t.draws, "무승부"], [(t.blue / decided * 100).toFixed(1) + "%", "블루 승률"], [(t.red / decided * 100).toFixed(1) + "%", "레드 승률"], [(t.kills / t.games).toFixed(1), "경기당 처치"]];
+    document.getElementById("cards").innerHTML = items.map(function (c) { return '<div class="card"><b>' + c[0] + "</b><span>" + c[1] + "</span></div>"; }).join("");
+  }
+  renderCharacters() {
+    var rows = this.data.rows.map(function (r) { return [r[1], r[4], r[3], r[5], r[6], r[7], r[8], r[9], r[10], r[11], r[12], r[13], r[14], r[0], r[2]]; });
+    new SortableTable(document.getElementById("chars"), SimReportData.COLUMNS, rows, function (r) {
+      var role = SimReportData.ROLES[r[14]].split(" ")[0];
+      return '<tr class="' + (SimReportData.FOCUS.indexOf(r[13]) >= 0 ? "focus" : "") + '"><td class="name">' + role + " " + r[0] + '</td><td class="win ' + ReportPage.winClass(r[1]) + '">' + r[1].toFixed(1) + "%</td><td>" + r.slice(2, 13).join("</td><td>") + "</td></tr>";
+    }).render();
+  }
+  renderMaps() {
+    var maps = this.data.insights.byMap, roleOf = {};
+    this.data.rows.forEach(function (r) { roleOf[r[1]] = SimReportData.ROLES[r[2]].split(" ")[0]; });
+    var rows = maps.rows.map(function (r) { return [r[0], r[1]].concat(r.slice(2).map(function (c) { return c ? c[0] : 0; })).concat([r.slice(2)]); });
+    var last = rows[0].length - 1;
+    new SortableTable(document.getElementById("maps"), ["캐릭터", "전체"].concat(maps.maps), rows, function (r) {
+      var cells = r[last].map(function (c) {
+        if (!c) return "<td>-</td>";
+        var thin = c[1] < ReportPage.THIN_MAP_GAMES;
+        return '<td class="win ' + ReportPage.mapClass(c[0]) + (thin ? " thin" : "") + '" title="' + c[1] + '판">' + c[0].toFixed(1) + "%</td>";
+      }).join("");
+      return '<tr><td class="name">' + roleOf[r[0]] + " " + r[0] + '</td><td class="win ' + ReportPage.winClass(r[1]) + '">' + r[1].toFixed(1) + "%</td>" + cells + "</tr>";
+    }).render();
+  }
+  renderCombos() {
+    var names = ReportPage.ROLE_ICON;
+    var rows = this.data.combos.map(function (c) { return [c[0], c[2], c[1]]; });
+    new SortableTable(document.getElementById("combos"), ["구성", "승률", "팀 수"], rows, function (r) {
+      return '<tr><td class="name">' + r[0].split("").map(function (ch) { return names[ch]; }).join("") + " " + r[0] + '</td><td class="win ' + ReportPage.winClass(r[1]) + '">' + r[1].toFixed(1) + "%</td><td>" + r[2] + "</td></tr>";
+    }).render();
+  }
+  edgeTable(title, list, withZ) {
+    var head = "<tr><th class='plain'>조합</th><th class='plain'>판</th><th class='plain'>승률</th><th class='plain'>기대</th><th class='plain'>z</th></tr>";
+    var body = list.map(function (x) {
+      var sure = Math.abs(x.z) >= ReportPage.SURE_Z;
+      return "<tr><td class='name'>" + x.a + " + " + x.b + "</td><td>" + x.n + "</td><td class='win'>" + x.win.toFixed(1) + "%</td><td>" + x.expected.toFixed(1) + "%</td><td class='" + (sure ? "sure" : "") + "'>" + x.z.toFixed(1) + "</td></tr>";
+    }).join("");
+    return "<div><h3>" + title + '</h3><div class="scroll"><table>' + head + body + "</table></div></div>";
+  }
+  renderPairs() {
+    var p = this.data.insights.pairs;
+    document.getElementById("pairs").innerHTML = this.edgeTable("잘 맞는 조합", p.best) + this.edgeTable("안 맞는 조합", p.worst);
+  }
+  renderMatchups() {
+    var list = this.data.insights.matchups.best;
+    var head = "<tr><th class='plain'>상성</th><th class='plain'>판</th><th class='plain'>승률</th><th class='plain'>기대</th><th class='plain'>z</th></tr>";
+    document.getElementById("matchups").innerHTML = head + list.map(function (x) {
+      var sure = x.z >= ReportPage.SURE_Z;
+      return "<tr><td class='name'>" + x.a + " → " + x.b + "</td><td>" + x.n + "</td><td class='win'>" + x.win.toFixed(1) + "%</td><td>" + x.expected.toFixed(1) + "%</td><td class='" + (sure ? "sure" : "") + "'>" + x.z.toFixed(1) + "</td></tr>";
+    }).join("");
+  }
+  renderMatrix() {
+    var m = this.data.insights.comboMatrix, icons = ReportPage.ROLE_ICON;
+    function label(code) { return code.split("").map(function (ch) { return icons[ch]; }).join("") + " " + code; }
+    var head = "<tr><th class='plain'>행 → 열</th>" + m.codes.map(function (c) { return "<th class='plain'>" + label(c) + "</th>"; }).join("") + "</tr>";
+    var body = m.codes.map(function (row, i) {
+      return "<tr><td class='name'>" + label(row) + "</td>" + m.cells[i].map(function (c, j) {
+        if (i === j || !c) return "<td class='self'>-</td>";
+        var thin = c[0] < ReportPage.THIN_MATRIX_GAMES;
+        return "<td class='win " + ReportPage.mapClass(c[1]) + (thin ? " thin" : "") + "' title='" + c[0] + "판'>" + c[1].toFixed(1) + "% <span class='fine'>(" + c[0] + ")</span></td>";
+      }).join("") + "</tr>";
+    }).join("");
+    document.getElementById("matrix").innerHTML = head + body;
+  }
+  render() {
+    this.renderHeader(); this.renderCards(); this.renderCharacters(); this.renderMaps(); this.renderCombos();
+    this.renderPairs(); this.renderMatchups(); this.renderMatrix();
+  }
+}
+new ReportPage().render();
+</script>
