@@ -837,7 +837,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     engineer: { name: "공학자", role: "shooter", icon: "🔧", hp: 105, speed: gameSpeed(140), cd: gameMs(1.1), dmg: 10, range: 350, pSpeed: 760, pr: 9, ultName: "포탑 설치" },
     druid:   { name: "드루이드", role: "caster", icon: "🌿", hp: 110, speed: gameSpeed(165), cd: gameMs(1.4), dmg: 14, range: 350, pSpeed: 728, pr: 12, lanes: 2, fx: { slowMs: gameMs(1.5), slowMul: 0.7 },
                ultName: "덩굴 부쉬", ultAim: true, heals: true },
-    giant:   { name: "거신", role: "fighter", icon: "🗿", hp: 500, speed: gameSpeed(135), cd: gameMs(1.6), dmg: 20, range: 120, arc: Math.PI * 0.6, bodyR: 36, ultName: "골렘 강림", ultAim: true, blocks: true },
+    giant:   { name: "거신", role: "fighter", icon: "🗿", hp: 500, speed: gameSpeed(135), cd: gameMs(1.6), dmg: 23, range: 120, arc: Math.PI * 0.6, bodyR: 36, ultName: "골렘 강림", ultAim: true, blocks: true },
     gargantua: { name: "가르강튀아", role: "caster", icon: "🌀", hp: 300, speed: gameSpeed(150), cd: gameMs(1.4), dmg: 10, range: 120, arc: Math.PI * 0.6, ultName: "가르강튀아", ultAim: true, retired: true },
     astrologer: { name: "점성술사", role: "caster", icon: "🌠", hp: 115, speed: gameSpeed(170), cd: gameMs(1.4), dmg: 13, range: 380, ultName: "가르강튀아", ultAim: true },
     dummy:  { name: "연습 봇", role: "fighter", icon: "🎯", hp: 99999, speed: 200, cd: 1000, dmg: 0, range: 0, ultName: "없음", practiceBot: true },
@@ -881,7 +881,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     if (code < 0 || code > 11171) return noFinal + "(" + withFinal + ")";
     return code % 28 === 0 ? noFinal : withFinal;
   }
-  var ULT = { mkCount: 10, mkGap: 115, mkDmg: 36, mkRefund: 1, mkSpeed: 805, mkRange: KEY * 8, mkPr: 8,
+  var ULT = { mkCount: 10, mkGap: 115, mkDmg: 40, mkRefund: 1, mkSpeed: 805, mkRange: KEY * 8, mkPr: 8,
               bzDur: gameMs(6), bzDmgMul: 1.5, bzCdMul: 1 / 1.5, bzHeal: 20, tkDur: gameMs(6), tkDef: 0.35, tkStunR: 120, tkStunMs: gameMs(1.5),
               mbDelay: gameMs(1.5), mbR: 250, mbDmg: 100, mbDmgMin: 65, mbCast: 550, mbMin: 60, mbStunMs: gameMs(1.7), mbStunMin: gameMs(0.9), mbSteps: 5,
               asSmokeMs: 400, asDur: gameMs(21),
@@ -894,7 +894,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               bsLeapMinMs: gameMs(0.3), bsLeapMaxMs: gameMs(1.5), bsR: 200, bsDmg: 45, bsStunMs: gameMs(1.5), bsCast: 450, bsMin: 60, bsHop: 45,
               bhR: 200, bhDur: 3000, bhDelay: 500, bhPull: 220, bhCast: 380, bhMin: 60, bhCcRate: 0.8,
               exRange: 600, exSpeed: 1300, exPr: 4, exDmg: 35, exStunMs: gameMs(1.5),
-              gdR: 200, gdKb: 150, gdKbMs: 500, gdDmg: 30, gdSlowMul: 0.8, gdSlowMs: gameMs(1.5),
+              gdR: 200, gdKb: 150, gdKbMs: 500, gdDmg: 40, gdSlowMul: 0.8, gdSlowMs: gameMs(1.5),
               frSlowMs: gameMs(1.5), frSlowMul: 0.8, frSlowStep: 0.2, frFreezeMs: gameMs(1), frFreezeMaxHpRate: 0.06,
               frBzHides: true, frBzR: 400, frBzDur: gameMs(9), frBzDmg: 4, frBzTick: gameMs(1), frBzDelay: 400,
               bwR: 150, bwDur: gameMs(4), bwTick: gameMs(0.3), bwHurtGaugeEvery: 4, bwDmg: 18, bwKillGauge: 5, bdR: 70, bdDmg: 10, bdDelay: gameMs(0.4),
@@ -904,11 +904,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
               rvDur: gameMs(4), rvTick: gameMs(1), rvHeal: 20, rvDmg: 20, rvCastMs: 600, grLife: 650,
               trDur: gameMs(10), trR: 340, trCd: gameMs(0.5), trScanMs: 120, trWarmMs: 300, trDmg: 10, trHeavyEvery: 3, trHeavyDmg: 34, trStunMs: gameMs(0.8), trMax: 2, trGauge: 1,
               trSpeedBonus: gameSpeed(30), trShellSpeed: gameSpeed(1000), trHitR: 38, trCastMs: 450,
-              drR: 150, drDur: 3600000, drTick: gameMs(1), drHeal: 20, drCast: 450, drMin: 60, drSelfRate: 0.1, drSelfGauge: 1, drRiseMs: 350, drCastMs: 500,
+              drR: 150, drDur: 3600000, drTick: gameMs(1), drHeal: 20, drCast: 450, drMin: 60, drSelfHeal: 20, drSelfGauge: 1, drRiseMs: 350, drCastMs: 500,
               gaCast: 350, gaMin: 60, gaTransformMs: gameMs(1.2), gaDur: gameMs(6), gaR: 350, gaPull: 260, gaGap: 70, gaBoomDmg: 30,
               sfMin: 60, sfDelay: gameMs(0.6), sfR: 70, sfStunEvery: 3, sfStunMs: gameMs(1),
               agCast: 400, agMin: 60, agDur: gameMs(3), agR: 350, agPull: 260, agGap: 70, agBoomDmg: 25,
-              gjCast: 300, gjMin: 60, gjTransformMs: gameMs(1.2), gjDur: gameMs(6), gjDef: 0.8, gjR: 150, gjTick: gameMs(1), gjTickDmg: 20, gjMaceRange: 150 };
+              gjCast: 300, gjMin: 60, gjTransformMs: gameMs(1.2), gjDur: gameMs(6), gjDef: 0.8, gjR: 150, gjTick: gameMs(1), gjTickDmg: 20, gjMaceRange: 150, gjMaceDmg: 23 };
   var ASSIST_MS = 5000;
   var SNIPER_KEEP = KEY * 5;
   var SHIELD_SPARK = "#FFD27A", HEAL_CUT_MUL = 0.5;
@@ -3462,17 +3462,17 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (!T.groveNext) T.groveNext = t + TIMESCALE.regenTickMs;
       if (t < T.groveNext) return;
       T.groveNext += TIMESCALE.regenTickMs;
-      var selfHeal = Math.round(T.maxHp * ULT.drSelfRate), healed = STATUS.healAmount(T, GROVES.shelters(T, t) ? Math.max(selfHeal, ULT.drHeal) : selfHeal, t);
+      var healed = STATUS.healAmount(T, ULT.drSelfHeal, t);
       if (healed > 0) { T.hp += healed; T.heal = (T.heal || 0) + healed; }
       if (!T.isGaugeLocked(t)) T.gauge = Math.min(GAUGE_MAX, T.gauge + ULT.drSelfGauge);
       MATCH.game.forceNet = true;
     }
     ultDesc() {
-      return "지정한 곳에 게임이 끝날 때까지 유지되는 " + GroveSystem.TILES_PER_SIDE + "×" + GroveSystem.TILES_PER_SIDE + "칸 부쉬 생성(풀숲처럼 안에서 모습이 숨겨짐). 안에 있는 아군은 1초당 체력 " + ULT.drHeal + " 회복(드루이드 자신 제외)";
+      return "지정한 곳에 게임이 끝날 때까지 유지되는 " + GroveSystem.TILES_PER_SIDE + "×" + GroveSystem.TILES_PER_SIDE + "칸 부쉬 생성(풀숲처럼 안에서 모습이 숨겨짐). 안에 있는 아군은 1초당 체력 " + ULT.drHeal + " 회복";
     }
     passiveDesc() {
       var c = this.data;
-      return "기본 공격에 맞은 적은 " + SKILLTEXT.secs(c.fx.slowMs) + "간 " + SKILLTEXT.slowPct(c.fx.slowMul) + ". 자신이 부쉬 안에 있으면 1초당 최대 체력의 " + SKILLTEXT.pctOf(ULT.drSelfRate) + "% 회복(자신이 만든 부쉬 안에서는 " + ULT.drHeal + " 회복), 게이지 " + ULT.drSelfGauge + " 회복";
+      return "기본 공격에 맞은 적은 " + SKILLTEXT.secs(c.fx.slowMs) + "간 " + SKILLTEXT.slowPct(c.fx.slowMul) + ". 자신이 부쉬 안에 있으면 1초당 체력 " + ULT.drSelfHeal + " 회복, 게이지 " + ULT.drSelfGauge + " 회복";
     }
     basicDesc() {
       var c = this.data;
@@ -3598,7 +3598,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     ultDesc() {
       return "지정한 곳(최대 " + ULT.gjCast + ")으로 점프해 " + SKILLTEXT.secs(ULT.gjDur) + "간 골렘으로 변신. 자신을 중심으로 반경 " + ULT.gjR + "에 하늘빛 폭풍이 일어 적은 1초당 " + ULT.gjTickDmg +
-             "의 피해. 변신 중 기본 공격은 반경 " + ULT.gjMaceRange + " 안의 가장 가까운 적 1명을 철퇴로 쳐 " + this.data.dmg + "의 피해";
+             "의 피해. 변신 중 기본 공격은 반경 " + ULT.gjMaceRange + " 안의 가장 가까운 적 1명을 철퇴로 쳐 " + ULT.gjMaceDmg + "의 피해";
     }
     passiveDesc() {
       return "골렘 변신 중 받는 피해 " + SKILLTEXT.pctOf(1 - ULT.gjDef) + "% 감소";
@@ -4462,10 +4462,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (t < e.createdAt || SESSION.room.status !== "playing") return true;
         var tick = FIELD_FX.revTickIndex(e, t);
         TARGETS.localTargets().forEach(function (T) {
-          if (T.id === e.owner || r.ticked[T.id] >= tick) return;
+          if (T.minion || T.id === e.owner || r.ticked[T.id] >= tick) return;
           r.ticked[T.id] = tick;
           if (!T.alive || T.isProtected(t)) return;
-          if (T.team === e.team) { if (!T.minion) FIELD_FX.healByCleric(T, e.owner, e.heal, t); }
+          if (T.team === e.team) FIELD_FX.healByCleric(T, e.owner, e.heal, t);
           else DAMAGE.damage(T, e.dmg, e.owner, false, "revelation");
         });
         return true;
@@ -4761,9 +4761,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     constructor() { this.rangeRing = null; this.nextId = GroveSystem.ID_BASE; }
     isActive(s, t) { return !s.cut && t >= s.e.createdAt && t < s.e.createdAt + s.e.dur; }
     covers(s, x, y) { return Math.max(Math.abs(x - s.e.x), Math.abs(y - s.e.y)) <= s.e.r; }
-    shelters(T, t) {
-      return FIELD.groves.some(function (s) { return s.e.owner === T.id && GROVES.isActive(s, t) && GROVES.covers(s, T.x, T.y); });
-    }
     snapToTiles(spot) {
       return { x: MAP_X0 + Math.round((spot.x - MAP_X0) / TILE) * TILE, y: MAP_Y0 + Math.round((spot.y - MAP_Y0) / TILE) * TILE };
     }
@@ -5501,7 +5498,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       MATCH.game.forceNet = true;
       if (TARGETS.hear(E)) SOUND.sfx("swing");
       SESSION.room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: E.angle, stab: 1, mace: 1, tgt: T.id, radius: ULT.gjMaceRange, arc: Math.PI * 2,
-                                        dmg: CHARS[E.char].dmg, u: 1, slam: 1, createdAt: t });
+                                        dmg: ULT.gjMaceDmg, u: 1, slam: 1, createdAt: t });
     }
   }
   var GIANT = new GiantSystem();

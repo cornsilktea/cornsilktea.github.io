@@ -1029,7 +1029,7 @@ class ResultCollector {
         for (var i = logStart; i < W.log.length; i++) { var p = W.log[i]; if (p.v.tp) teleported[p.path.split("/")[1]] = 1; }
         list.forEach(function (e) {
           var E = W.ent(e.id), P0 = prev[e.id];
-          prev[e.id] = { x: E.x, y: E.y, alive: E.alive, leap: !!E.leap, dash: !!E.dash, stunned: api.stunned(E, t - ms), stunUntil: E.stunUntil };
+          prev[e.id] = { x: E.x, y: E.y, alive: E.alive, leap: !!E.leap, dash: !!E.dash, shove: !!E.shove, stunned: api.stunned(E, t - ms), stunUntil: E.stunUntil };
           if (!isFinite(E.x) || !isFinite(E.y) || !isFinite(E.hp) || !isFinite(E.gauge)) { flag("숫자 아님(NaN)", E, t); return; }
           if (E.hp < 0 || E.hp > E.maxHp) flag("체력 범위 이탈", E, t, "hp " + E.hp);
           if (E.gauge < 0 || E.gauge > api.GAUGE_MAX) flag("게이지 범위 이탈", E, t, "gauge " + E.gauge);
@@ -1042,7 +1042,7 @@ class ResultCollector {
           if (!P0 || !P0.alive) return;
           var jump = hyp(E.x - P0.x, E.y - P0.y);
           if (!E.leap && !P0.leap && !teleported[e.id] && jump > 0.5 && segmentCrossesWall(P0.x, P0.y, E.x, E.y)) flag("벽 통과", E, t, Math.round(jump) + "만큼 이동");
-          if (P0.stunned && P0.stunUntil >= t && api.stunned(E, t) && jump > 0.5 && !E.shove && !E.dash && !P0.dash && !E.leap && !P0.leap && !teleported[e.id] && !holeActive(t)) flag("기절 중 이동", E, t, Math.round(jump) + "만큼");
+          if (P0.stunned && P0.stunUntil >= t && api.stunned(E, t) && jump > 0.5 && !E.shove && !P0.shove && !E.dash && !P0.dash && !E.leap && !P0.leap && !teleported[e.id] && !holeActive(t)) flag("기절 중 이동", E, t, Math.round(jump) + "만큼");
         });
       }
       var ults = W.log.filter(function (p) { return (p.path === "meleeHits" && p.v.u) || (p.path === "effects" && p.v.u !== 0 && p.v.type !== "pool" && p.v.type !== "grace") || (p.path === "shots" && p.v.s); }).length;
@@ -4585,19 +4585,19 @@ class EngineerDruidTests {
       if (g.dur < 600000) bad.push("지속시간이 게임 끝까지가 아님");
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "정사각형 한 변 " + h * 2);
     });
-    run(G, "드루이드 패시브: 자신의 부쉬 안에서 1초마다 최대 체력의 " + Math.round(ULT.drSelfRate * 100) + "% 회복하고 게이지가 1 차오르며, 밖에서는 아무 일도 없는가", function (done) {
-      var bad = [], W = self.druidWorld([]), dr = W.ent("dr"), tick = api.TIMESCALE.regenTickMs, self10 = Math.round(dr.maxHp * ULT.drSelfRate);
+    run(G, "드루이드 패시브: 자신의 부쉬 안에서 1초마다 체력 " + ULT.drSelfHeal + " 회복하고 게이지가 " + ULT.drSelfGauge + " 차오르며, 밖에서는 아무 일도 없는가", function (done) {
+      var bad = [], W = self.druidWorld([]), dr = W.ent("dr"), tick = api.TIMESCALE.regenTickMs;
       dr.gauge = api.GAUGE_MAX; api.useUlt(dr, 0); W.frame(FRAME);
       if (api.FIELD.groves.length !== 1) bad.push("부쉬가 자신의 자리에 안 생김");
       dr.hp = dr.maxHp - 90; var hp0 = dr.hp;
       W.step(tick * 3 + 100);
-      var gain = dr.hp - hp0, wantGain = 3 * Math.max(self10, ULT.drHeal);
+      var gain = dr.hp - hp0, wantGain = 3 * ULT.drSelfHeal;
       if (dr.gauge !== 3 * ULT.drSelfGauge) bad.push("게이지 " + dr.gauge + " (기대 " + 3 * ULT.drSelfGauge + ")");
-      if (gain !== Math.min(90, wantGain)) bad.push("회복 " + gain + " (기대 " + Math.min(90, wantGain) + ", 자신의 부쉬 안에서는 패시브 " + self10 + "와 부쉬 " + ULT.drHeal + " 중 큰 쪽 ×3, 겹쳐 받지 않음)");
+      if (gain !== Math.min(90, wantGain)) bad.push("회복 " + gain + " (기대 " + Math.min(90, wantGain) + ", 부쉬 스킬 회복과 겹쳐 받지 않고 패시브 " + ULT.drSelfHeal + " 한 번)");
       dr.x = 200 + ULT.drR + 80; dr.hp = dr.maxHp - 40; var g1 = dr.gauge, h1 = dr.hp;
       W.step(tick * 3 + 100);
       if (dr.hp !== h1 || dr.gauge !== g1) bad.push("부쉬 밖에서도 회복·게이지가 오름");
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "자신의 부쉬 안: 초당 " + Math.max(self10, ULT.drHeal) + "(겹치지 않고 큰 쪽) 회복·게이지 +1, 밖: 변화 없음");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "자신의 부쉬 안: 초당 " + ULT.drSelfHeal + " 회복·게이지 +" + ULT.drSelfGauge + ", 밖: 변화 없음");
     });
     run(G, "드루이드 패시브: 맵의 부쉬(풀숲) 안에서도 1초마다 체력 회복·게이지 +1 이 되는가", function (done) {
       var bad = [], tiles = api.bushTiles(), spot = tiles.length ? tiles[0][0] : null;
@@ -4606,7 +4606,7 @@ class EngineerDruidTests {
       dr.x = spot.x; dr.y = spot.y; dr.hp = dr.maxHp - 60; var hp0 = dr.hp;
       if (!api.inBush(dr.x, dr.y)) bad.push("시험 준비 실패: 풀숲이 아님");
       W.step(tick * 2 + 100);
-      var self10 = Math.round(dr.maxHp * ULT.drSelfRate);
+      var self10 = ULT.drSelfHeal;
       if (dr.hp - hp0 !== 2 * self10) bad.push("회복 " + (dr.hp - hp0) + " (기대 " + 2 * self10 + ")");
       if (dr.gauge !== 2 * ULT.drSelfGauge) bad.push("게이지 " + dr.gauge + " (기대 " + 2 * ULT.drSelfGauge + ")");
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "풀숲 안 초당 " + self10 + " 회복·게이지 +1");
@@ -4709,22 +4709,22 @@ class GiantTests {
       if (self.lost(W, "in") > ULT.gjTickDmg * Math.ceil(ULT.gjDur / tick)) bad.push("폭풍 틱이 너무 많음 " + self.lost(W, "in"));
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "틱마다 " + ULT.gjTickDmg + ", 밖 0, 따라다님");
     });
-    run(G, "거신 철퇴: 변신 중 기본 공격이 반경 " + ULT.gjMaceRange + " 안의 가장 가까운 적 1명에게만 " + C.dmg + "의 피해를 주고 기절은 없는가", function (done) {
+    run(G, "거신 철퇴: 변신 중 기본 공격이 반경 " + ULT.gjMaceRange + " 안의 가장 가까운 적 1명에게만 " + ULT.gjMaceDmg + "의 피해를 주고 기절은 없는가", function (done) {
       var bad = [], W = self.giantWorld([{ id: "n1", x: 700 }, { id: "n2", x: 740, dy: 20 }, { id: "far", x: 760, dy: 60 }]), gi = W.ent("gi"), n1 = W.ent("n1"), n2 = W.ent("n2"), far = W.ent("far");
       self.jump(W, 0, 250);
       W.step(ULT.gjTransformMs);
       api.FIELD.gales.length = 0;
       n1.x = gi.x + 80; n1.y = gi.y; n2.x = gi.x + 130; n2.y = gi.y + 10; far.x = gi.x + ULT.gjMaceRange + 40; far.y = gi.y + 5;
       gi.cdUntil = 0; api.fireBasic(gi, 0); W.frame(FRAME);
-      if (self.lost(W, "n1") !== C.dmg) bad.push("가장 가까운 적 피해 " + self.lost(W, "n1") + " (기대 " + C.dmg + ")");
+      if (self.lost(W, "n1") !== ULT.gjMaceDmg) bad.push("가장 가까운 적 피해 " + self.lost(W, "n1") + " (기대 " + ULT.gjMaceDmg + ")");
       if (api.stunned(n1, W.t())) bad.push("철퇴에 기절이 걸림");
       if (self.lost(W, "n2") || self.lost(W, "far")) bad.push("다른 적이 같이 맞음");
       gi.cdUntil = 0; api.fireBasic(gi, 0); W.frame(FRAME);
-      if (self.lost(W, "n1") !== C.dmg * 2) bad.push("두 번째 휘두름도 가장 가까운 적 " + self.lost(W, "n1") + " (기대 " + C.dmg * 2 + ")");
+      if (self.lost(W, "n1") !== ULT.gjMaceDmg * 2) bad.push("두 번째 휘두름도 가장 가까운 적 " + self.lost(W, "n1") + " (기대 " + ULT.gjMaceDmg * 2 + ")");
       n1.x = gi.x + 400;
       gi.cdUntil = 0; api.fireBasic(gi, 0); W.frame(FRAME);
-      if (self.lost(W, "n2") !== C.dmg) bad.push("가까운 적이 바뀌면 그 적: " + self.lost(W, "n2") + " (기대 " + C.dmg + ")");
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "가장 가까운 1명만 " + C.dmg + "·기절 없음, 대상이 바뀌면 다음 적");
+      if (self.lost(W, "n2") !== ULT.gjMaceDmg) bad.push("가까운 적이 바뀌면 그 적: " + self.lost(W, "n2") + " (기대 " + ULT.gjMaceDmg + ")");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "가장 가까운 1명만 " + ULT.gjMaceDmg + "·기절 없음, 대상이 바뀌면 다음 적");
     });
     run(G, "거신 패시브: 변신 중에만 받는 피해가 " + Math.round((1 - ULT.gjDef) * 100) + "% 줄고 막은 피해로 쌓이는가", function (done) {
       var bad = [], W = self.giantWorld([{ id: "foe", x: 200 + 600 }]), gi = W.ent("gi");
@@ -5117,7 +5117,7 @@ class MinionSkillTests {
       if (!hp.every(function (h) { return h === ULT.smHp - ULT.agBoomDmg; })) bad.push("폭발 피해 " + hp.join("·") + " (기대 " + (ULT.smHp - ULT.agBoomDmg) + ")");
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "끌려옴(중심까지 " + Math.round(dp) + " < " + Math.round(dc) + "), 폭발로 체력 " + ULT.smHp + " → " + (ULT.smHp - ULT.agBoomDmg));
     });
-    run(G, "클레릭 요한계시록: 적 해골 병사는 피해를 받고, 아군 해골 병사는 회복되지 않는가", function (done) {
+    run(G, "클레릭 요한계시록: 적 해골 병사는 피해를 받지 않고, 아군 해골 병사도 회복되지 않는가", function (done) {
       api.MATCH.stateByKey = {};
       var W = self.kit.world("forest", [
         { id: "cl", team: "blue", char: "cleric", x: 200, y: y, gauge: api.GAUGE_MAX },
@@ -5134,10 +5134,10 @@ class MinionSkillTests {
       cl.gauge = api.GAUGE_MAX;
       api.useUlt(cl, 0);
       W.frame(1);
-      if (enemy.hp !== enemyBefore - ULT.rvDmg) bad.push("적 해골 체력 " + enemyBefore + " → " + enemy.hp + " (기대 " + ULT.rvDmg + " 감소)");
+      if (enemy.hp !== enemyBefore) bad.push("적 해골 체력이 바뀜 " + enemyBefore + " → " + enemy.hp);
       W.step(ULT.rvDur + 500);
       if (ally.hp !== allyBefore) bad.push("아군 해골 체력이 바뀜 " + allyBefore + " → " + ally.hp);
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "적 해골 -" + ULT.rvDmg + "(틱마다), 아군 해골 회복 없음");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "적 해골 피해 없음, 아군 해골 회복 없음");
     });
     run(G, "결투가 능력치 표: 사거리에 돌진 거리 " + api.CHARS.duelist.dashRange + " 가 적히는가", function (done) {
       var html = api.statTable("duelist"), want = "<th>사거리</th><td>" + api.CHARS.duelist.dashRange + "</td>";
