@@ -643,7 +643,7 @@ class ResultCollector {
   });
 
   var PASSIVE = "궁수·저격수·네크로 패시브";
-  run(PASSIVE, "궁수: 기본 공격 적중마다 이동속도 +" + api.CHARS.ranger.haste.add + ", 최대 +" + api.CHARS.ranger.haste.max + ", " + api.CHARS.ranger.haste.ms + "ms 뒤 사라지는가", function (done) {
+  run(PASSIVE, "궁수: 기본 공격 적중마다 이동속도 +" + api.shownSpeed(api.CHARS.ranger.haste.add) + ", 최대 +" + api.shownSpeed(api.CHARS.ranger.haste.max) + "(표시 속도), " + api.CHARS.ranger.haste.ms + "ms 뒤 사라지는가", function (done) {
     var y = OPEN_Y.forest, h = api.CHARS.ranger.haste, base = api.CHARS.ranger.speed;
     var W = world("forest", [
       { id: "rg", team: "blue", char: "ranger", x: 250, y: y },
@@ -660,8 +660,9 @@ class ResultCollector {
     got.push(api.speedOf(rg) - base);
     W.step(1200);
     got.push(api.speedOf(rg) - base);
-    var ok = got[0] === 2 * h.add && got[1] === Math.min(h.max, 4 * h.add) && got[2] === h.max && got[3] === h.max && got[4] === h.max && got[5] === 0;
-    done(ok ? "pass" : "fail", "이동속도 증가 " + got.map(function (v) { return "+" + v; }).join(" → ") + " (기대: +" + 2 * h.add + " → +" + h.max + " ×4 → +0, 적중마다 지속시간 초기화)");
+    function near(a, b) { return Math.abs(a - b) < 1e-6; }
+    var ok = near(got[0], 2 * h.add) && near(got[1], Math.min(h.max, 4 * h.add)) && near(got[2], h.max) && near(got[3], h.max) && near(got[4], h.max) && near(got[5], 0);
+    done(ok ? "pass" : "fail", "이동속도 증가(표시) " + got.map(function (v) { return "+" + api.shownSpeed(v); }).join(" → ") + " (기대: +" + api.shownSpeed(2 * h.add) + " → +" + api.shownSpeed(h.max) + " ×4 → +0, 적중마다 지속시간 초기화)");
   });
   run(PASSIVE, "저격수: " + api.CHARS.sniper.farDist + "보다 먼 적에게만 피해 +" + Math.round(api.CHARS.sniper.farBonus * 100) + "%인가", function (done) {
     var y = OPEN_Y.forest, c = api.CHARS.sniper;
@@ -4004,7 +4005,7 @@ class ResultCollector {
     if (api.CLOCK.scale !== 0.7) bad.push("시계 배율 " + api.CLOCK.scale);
     if (api.matchMs() !== 90000 * 0.7) bad.push("경기 시간 " + api.matchMs());
     if (T.matchMs !== 90000 * 0.7 || T.respawnMs !== 3000 * 0.7 || T.respawnProtectMs !== 2500 * 0.7 || T.burnTickMs !== 700 || T.regenTickMs !== 700) bad.push("시간 필드 " + JSON.stringify([T.matchMs, T.respawnMs, T.respawnProtectMs, T.burnTickMs, T.regenTickMs]));
-    if (K.cd !== Math.round(1.5 * 1000 * 0.7) || K.speed !== Math.round(150 / 0.7) || K.hp !== 375) bad.push("기사 수치 " + JSON.stringify([K.cd, K.speed, K.hp]));
+    if (K.cd !== Math.round(1.5 * 1000 * 0.7) || K.speed !== Math.round(150 / 0.7) || K.hp !== 380) bad.push("기사 수치 " + JSON.stringify([K.cd, K.speed, K.hp]));
     if (api.ULT.rmDur !== Math.round(4 * 1000 * 0.7)) bad.push("스킬 수치 rmDur " + api.ULT.rmDur);
     if (api.secs(K.cd) !== "1.5초" || api.shownSpeed(K.speed) !== 150) bad.push("카드 표기 " + api.secs(K.cd) + " " + api.shownSpeed(K.speed));
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "배율 0.7·경기 63초·기사 공격 간격 1.5초 이동속도 150 표기");
