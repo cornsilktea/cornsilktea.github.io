@@ -815,7 +815,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     duelist: { name: "결투가", role: "assassin", icon: "🤺", hp: 145, speed: gameSpeed(175), cd: gameMs(1), dmg: 40, range: 100,
                dashRange: 250, dashMs: gameMs(0.5), stab: true, selfHeal: 15, ultName: "르미즈", heals: true },
     knight:  { name: "기사", role: "fighter", icon: "🛡️", hp: 380, speed: gameSpeed(150), cd: gameMs(1.5), dmg: 25, range: 110, arc: Math.PI * 0.7, armor: 2, ultName: "방어태세", blocks: true },
-    ranger:  { name: "궁수", role: "shooter", icon: "🏹", hp: 100, speed: gameSpeed(130), haste: { add: 10 / GAME_SPEED, ms: gameMs(6), max: 50 / GAME_SPEED }, cd: gameMs(0.8), dmg: 20, range: 450, pSpeed: 532, pr: 12, shots: 2, gap: 70, gaugeOnHit: 1, ultName: "난사", ultAim: true },
+    ranger:  { name: "궁수", role: "shooter", icon: "🏹", hp: 100, speed: gameSpeed(130), haste: { add: 10 / GAME_SPEED, ms: gameMs(6), max: 50 / GAME_SPEED }, cd: gameMs(0.8), dmg: 20, range: 500, pSpeed: 650, pr: 12, shots: 2, gap: 70, ultName: "난사", ultAim: true },
     mage:    { name: "화염술사", role: "caster", icon: "🔥", hp: 115, speed: gameSpeed(170), cd: gameMs(1.4), dmg: 5, range: 350, pSpeed: 700, pr: 9, burn: { ms: gameMs(6), maxHpRate: 0.025 }, ultName: "메테오", ultAim: true },
     rogue:   { name: "은신자", role: "assassin", icon: "🗡️", hp: 150, speed: gameSpeed(175), ultSpeed: gameSpeed(280), cd: gameMs(1.1), dmg: 32, range: 110, arc: Math.PI * 0.6, hits: 2, hitGap: 160, ambushDmg: 45, throwDmg: 25, throwRange: 350, pSpeed: 1080, pr: 8, ultName: "은신" },
     necro:   { name: "네크로", role: "caster", icon: "💀", hp: 120, lastStandHp: 50, lastStandHideMs: gameMs(1.5), speed: gameSpeed(170), cd: gameMs(1.4), dmg: 10, range: 350, pSpeed: 1000, pr: 9, ultName: "해골 소환", blocks: true },
@@ -2667,6 +2667,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     onHitLate(owner, h) {}
     projectileEffect(d, T, immune, fx) { return fx; }
     get isBladeThrower() { return false; }
+    basicHitMark(d) { return !d.isSkill; }
     afterProjectileHit(d, T, immune) {}
     skillGuard(T, amount, t) { return amount; }
     tallyBlocked(T, unguarded, amount) {}
@@ -2838,6 +2839,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   class RangerType extends CharacterType {
     get idleClip() { return "Ranged_Bow_Idle"; }
+    basicHitMark(d) { return d.isSkill ? false : d.swingAt; }
     onHitLate(owner, h) { if (h.u === "volley") owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.mkRefund); }
     ultLeadSeconds(dist) { return dist / ULT.mkSpeed; }
     launchHandOf(model) { return model.getObjectByName("handslotl"); }
@@ -2857,7 +2859,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     basicDesc() {
       var c = this.data;
-      return "사거리 " + c.range + "의 화살 " + c.shots + "발을 연달아 발사. 한 발마다 " + c.dmg + "의 피해";
+      return "사거리 " + c.range + "의 화살 " + c.shots + "발을 연달아 발사. 한 발마다 " + c.dmg + "의 피해. 두 발이 다 맞아도 게이지는 한 번만 오름";
     }
     attackClip(v, E, t) {
       return ["Ranged_Bow_Release", 3];
@@ -3306,6 +3308,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       else owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.bwKillGauge);
     }
     get isBladeThrower() { return true; }
+    basicHitMark(d) { return d.createdAt; }
     get shotSound() { return "star"; }
     botUltRange() { return ULT.bwR * 2; }
     projectileMesh(g, d) {
@@ -5091,7 +5094,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       for (var lane = 0; lane < lanes; lane++) {
         var side = (lane - (lanes - 1) / 2) * 2 * laneStep;
         PROJECTILES.addProj(v.key + "_" + i + (lanes > 1 ? "_" + lane : ""), { team: v.team, owner: v.ev.o, ownerCharacterType: v.char, x: ox + dx * 20 - dy * side, y: oy + dy * 20 + dx * side,
-          vx: dx * sp, vy: dy * sp, isSkill: v.skill, countsAsSkill: !!v.ev.sk, dmg: sv.dmg, ultKey: sv.ultKey, fx: sv.fx, laneHit: laneHit,
+          vx: dx * sp, vy: dy * sp, isSkill: v.skill, countsAsSkill: !!v.ev.sk, swingAt: v.ev.t, dmg: sv.dmg, ultKey: sv.ultKey, fx: sv.fx, laneHit: laneHit,
           pr: sv.pr, range: sv.range + (!v.skill && E && E.isOvercharged(v.ev.t) ? ULT.ocRangeBonus : 0), createdAt: v.ev.t + i * v.gap });
       }
       var shooterType = CHAR_TYPES.of(v.char);
@@ -5124,7 +5127,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var ownerType = CHAR_TYPES.of(d.ownerCharacterType);
       fx = ownerType.projectileEffect(d, T, immune, fx);
       var dancer = ownerType.isBladeThrower;
-      DAMAGE.damage(T, Math.round(d.dmg * (1 + PROJECTILES.damageBonusSum(d, T))), d.owner, dancer ? d.createdAt : !d.isSkill, d.isSkill ? d.ultKey : (d.countsAsSkill ? "skill" : null), fx);
+      DAMAGE.damage(T, Math.round(d.dmg * (1 + PROJECTILES.damageBonusSum(d, T))), d.owner, ownerType.basicHitMark(d), d.isSkill ? d.ultKey : (d.countsAsSkill ? "skill" : null), fx);
       if (dancer) PROJECTILES.bladeSpin(p, T.x, T.y);
       if (d.ultKey === "execute" && !immune) { SESSION.room.ref.child("hits/" + d.owner).push({ d: 0, b: 0, t: now(), tp: { x: r1(T.x), y: r1(T.y) } }); FX_VIEW.executeFx(T.x, T.y); }
       ownerType.afterProjectileHit(d, T, immune);

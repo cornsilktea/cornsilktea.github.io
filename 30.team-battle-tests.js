@@ -5152,21 +5152,31 @@ class RangerGaugeTests {
   constructor(api, kit) { this.api = api; this.kit = kit; }
 
   register() {
-    var api = this.api, run = this.kit.run, y = this.kit.OPEN_Y.forest, C = api.CHARS.ranger;
-    run(RangerGaugeTests.GROUP, "궁수 기본 공격: 화살 1발이 맞을 때마다 게이지 +" + C.gaugeOnHit + ", 2발이 다 맞으면 +" + (C.gaugeOnHit * C.shots) + "이고 카드에도 같은 숫자가 적히는가", function (done) {
+    var api = this.api, run = this.kit.run, y = this.kit.OPEN_Y.forest, C = api.CHARS.ranger, want = api.ROLES.shooter.gaugeOnHit;
+    run(RangerGaugeTests.GROUP, "궁수 기본 공격: 화살이 1발만 맞아도 게이지 +" + want + ", 2발이 다 맞아도 +" + want + "(한 번에 한 번만)이고 카드에도 적히는가", function (done) {
       api.MATCH.stateByKey = {};
       var W = this.kit.world("forest", [
         { id: "rg", team: "blue", char: "ranger", x: 150, y: y },
         { id: "foe", team: "red", char: "knight", x: 350, y: y }
       ]);
-      var rg = W.ent("rg"), bad = [];
+      var rg = W.ent("rg"), foe = W.ent("foe"), bad = [];
       api.fireBasic(rg, 0);
       W.step(C.cd + 300);
-      if (rg.gauge !== C.gaugeOnHit * C.shots) bad.push("2발 적중 게이지 " + rg.gauge + " (기대 " + C.gaugeOnHit * C.shots + ")");
-      if (api.roleGauge("ranger") !== C.gaugeOnHit) bad.push("1발당 게이지 " + api.roleGauge("ranger") + " (기대 " + C.gaugeOnHit + ")");
-      if (api.gaugeTextOf("ranger").indexOf("+" + C.gaugeOnHit) < 0) bad.push("카드 문구 " + api.gaugeTextOf("ranger"));
-      if (api.roleGauge("sniper") !== api.ROLES.shooter.gaugeOnHit) bad.push("다른 원거리 딜러 게이지가 바뀜 " + api.roleGauge("sniper"));
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "화살 1발당 +" + C.gaugeOnHit + ", 2발 적중 +" + rg.gauge + ", 카드 '" + api.gaugeTextOf("ranger") + "'");
-    }.bind(this));
-  }
+      if (rg.gauge !== want) bad.push("2발 적중 게이지 " + rg.gauge + " (기대 " + want + ")");
+      var W2 = this.kit.world("forest", [
+        { id: "rg", team: "blue", char: "ranger", x: 150, y: y },
+        { id: "foe", team: "red", char: "knight", x: 350, y: y }
+      ]);
+      var rg2 = W2.ent("rg"), foe2 = W2.ent("foe");
+      api.fireBasic(rg2, 0);
+      for (var i = 0; i < 60 && foe2.hp === foe2.maxHp; i++) W2.step(10);
+      var hitOnce = foe2.hp < foe2.maxHp;
+      foe2.y += 400;
+      W2.step(C.cd + 300);
+      if (!hitOnce) bad.push("시험 준비 실패: 첫 화살이 맞지 않음");
+      else if (rg2.gauge !== want) bad.push("1발 적중 게이지 " + rg2.gauge + " (기대 " + want + ")");
+      if (api.roleGauge("ranger") !== want) bad.push("1회당 게이지 " + api.roleGauge("ranger") + " (기대 " + want + ")");
+      if (api.gaugeTextOf("ranger").indexOf("+" + want) < 0) bad.push("카드 문구 " + api.gaugeTextOf("ranger"));
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "1발 적중 +" + rg2.gauge + ", 2발 적중 +" + rg.gauge + ", 카드 '" + api.gaugeTextOf("ranger") + "'");
+    }.bind(this));  }
 }
