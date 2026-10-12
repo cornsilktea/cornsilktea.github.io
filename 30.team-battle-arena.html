@@ -6583,7 +6583,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static SKY_BEAM_DROP_MS = 300;
     static REV_ALLY_COLOR = 0xFFD84A;
     static REV_FOE_COLOR = 0x8C8A86;
-    constructor() { this.stabFrom = new THREE.Vector3(); this.stabTo = new THREE.Vector3(); this.stabDir = new THREE.Vector3(); this.stabAxis = new THREE.Vector3(1, 0, 0); this.tmpV = new THREE.Vector3(); this.yUp = new THREE.Vector3(0, 1, 0); this.skyBeamFade = (function () {     var cv = document.createElement("canvas"); cv.width = 4; cv.height = 64;     var g = cv.getContext("2d"), grad = g.createLinearGradient(0, 0, 0, 64);     grad.addColorStop(0, "rgba(255,255,255,0)"); grad.addColorStop(0.55, "rgba(255,255,255,0.75)"); grad.addColorStop(1, "rgba(255,255,255,1)");     g.fillStyle = grad; g.fillRect(0, 0, 4, 64);     return new THREE.CanvasTexture(cv); })(); this.stormMask = { tex: null, arena: "" }; this.projectiles = {}; this.melees = {}; }
+    constructor() { this.stabFrom = new THREE.Vector3(); this.stabTo = new THREE.Vector3(); this.stabDir = new THREE.Vector3(); this.stabAxis = new THREE.Vector3(1, 0, 0); this.tmpV = new THREE.Vector3(); this.yUp = new THREE.Vector3(0, 1, 0); this.skyBeamFade = (function () {     var cv = document.createElement("canvas"); cv.width = 4; cv.height = 64;     var g = cv.getContext("2d"), grad = g.createLinearGradient(0, 0, 0, 64);     grad.addColorStop(0, "rgba(255,255,255,0)"); grad.addColorStop(0.55, "rgba(255,255,255,0.75)"); grad.addColorStop(1, "rgba(255,255,255,1)");     g.fillStyle = grad; g.fillRect(0, 0, 4, 64);     return new THREE.CanvasTexture(cv); })(); this.stormMaskCache = { tex: null, arena: "" }; this.projectiles = {}; this.melees = {}; }
     makeProjVis(p) {
       var d = p.d, g = new THREE.Group();
       CHAR_TYPES.of(d.ownerCharacterType).projectileMesh(g, d);
@@ -6706,7 +6706,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       STAGE.scene.remove(b.vis); b.vis.userData.mats.forEach(function (m) { m.dispose(); }); b.vis = null;
     }
     stormMask() {
-      if (EFFECT_VIEW.stormMask.arena === ARENA_MAP.id && EFFECT_VIEW.stormMask.tex) return EFFECT_VIEW.stormMask.tex;
+      if (EFFECT_VIEW.stormMaskCache.arena === ARENA_MAP.id && EFFECT_VIEW.stormMaskCache.tex) return EFFECT_VIEW.stormMaskCache.tex;
       var px = 8, cv = document.createElement("canvas");
       cv.width = ARENA_MAP.cols * px; cv.height = ARENA_MAP.rowCount * px;
       var g2 = cv.getContext("2d");
@@ -6716,10 +6716,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var ch = ARENA_MAP.rows[r].charAt(c);
         if (ch === "~" || ch === "=") g2.fillRect(c * px, r * px, px, px);
       }
-      if (EFFECT_VIEW.stormMask.tex) EFFECT_VIEW.stormMask.tex.dispose();
+      if (EFFECT_VIEW.stormMaskCache.tex) EFFECT_VIEW.stormMaskCache.tex.dispose();
       var tex = new THREE.CanvasTexture(cv);
       tex.flipY = false;
-      EFFECT_VIEW.stormMask.tex = tex; EFFECT_VIEW.stormMask.arena = ARENA_MAP.id;
+      EFFECT_VIEW.stormMaskCache.tex = tex; EFFECT_VIEW.stormMaskCache.arena = ARENA_MAP.id;
       return tex;
     }
   }
