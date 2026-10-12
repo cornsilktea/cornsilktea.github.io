@@ -1775,7 +1775,7 @@ class ResultCollector {
 
   run(DRAFTG, "진행 순서: 밴 2단계 뒤 픽 4단계(블루 1 → 레드 1·2 → 블루 2·3 → 레드 3), 단계 이름이 맞는가", function (done) {
     var kinds = STEPS.map(function (s) { return s.ban ? "밴" : "픽"; }).join(","), sides = STEPS.map(function (s, i) { return DR.stepSide(i); }).join("");
-    var labels = STEPS.map(function (s, i) { return DR.draftStepLabel(i); }).join(" / ");
+    var labels = STEPS.map(function (s, i) { return api.DRAFT_VIEW.draftStepLabel(i); }).join(" / ");
     var ok = kinds === "밴,밴,픽,픽,픽,픽" && sides === "brbrbr" && labels === "블루 밴 / 레드 밴 / 블루 1 / 레드 1·2 / 블루 2·3 / 레드 3";
     done(ok ? "pass" : "fail", kinds + " · 진영 " + sides + " · " + labels);
   });
@@ -1936,9 +1936,9 @@ class ResultCollector {
       if (d.trade || !d.denied || d.denied.to !== "pb2") bad.push("거절 기록이 없음");
       if (JSON.stringify(d.picks) !== JSON.stringify(before)) bad.push("거절했는데 캐릭터가 바뀜");
       S.as("b2");
-      if (DR.draftTradeBoxHtml(d).indexOf("거절") < 0) bad.push("거절 안내가 안 보임");
+      if (api.DRAFT_VIEW.draftTradeBoxHtml(d).indexOf("거절") < 0) bad.push("거절 안내가 안 보임");
       api.setClock(T0 + api.DRAFT_STEP_MS * 3);
-      if (DR.draftTradeBoxHtml(d) !== "") bad.push("거절 안내가 안 사라짐");
+      if (api.DRAFT_VIEW.draftTradeBoxHtml(d) !== "") bad.push("거절 안내가 안 사라짐");
       api.setClock(T0);
       DR.draftTradeAsk("pb3");
       S.as("b3"); DR.draftTradeAnswer(true);

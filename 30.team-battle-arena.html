@@ -835,7 +835,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       SESSION.sub(ref.child("final"), "value", function (s) { SESSION.room.final = s.val(); });
       SESSION.sub(ref.child("roster"), "value", function (s) { SESSION.room.roster = s.val(); });
       SESSION.sub(ref.child("statsNote"), "value", function (s) { SESSION.room.statsNote = s.val(); });
-      SESSION.sub(ref.child("draft"), "value", function (s) { SESSION.room.draft = s.val(); DRAFT.renderDraft(); });
+      SESSION.sub(ref.child("draft"), "value", function (s) { SESSION.room.draft = s.val(); DRAFT_VIEW.renderDraft(); });
       SESSION.sub(ref.child("status"), "value", function (s) {
         var st = s.val();
         if (st === null) { if (!SESSION.leaving) SESSION.exitToStart("방이 종료되었어요."); return; }
@@ -843,7 +843,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var keepSpecResult = st === "lobby" && prev === "ended" && SCREENS.now === "game" && FLOW.isSpec();
         if (!keepSpecResult) FLOW.releaseSpecResult();
         if (st === "lobby") { MATCH.game = null; MATCH.me = null; MATCH.bots = {}; if (keepSpecResult) FLOW.holdSpecResult(); else SCREENS.showScreen("lobby"); LOBBY.playersChanged(); }
-        else if (st === "draft") { MATCH.game = null; MATCH.me = null; MATCH.bots = {}; if (prev !== "draft") DRAFT.view = null; SCREENS.showScreen("draft"); DRAFT.renderDraft(); }
+        else if (st === "draft") { MATCH.game = null; MATCH.me = null; MATCH.bots = {}; if (prev !== "draft") DRAFT.view = null; SCREENS.showScreen("draft"); DRAFT_VIEW.renderDraft(); }
         else SCREENS.showScreen("game");
         if (st === "countdown" && prev !== "countdown") CLOCK.burst();
         if (st === "ended" && prev !== "ended") FLOW.onEnded();
@@ -1657,6 +1657,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         return DRAFT.draftSettle(cur, now());
       }).then(function () { DRAFT.busy = false; }, function () { DRAFT.busy = false; });
     }
+  }
+  class DraftView {
     draftTeamName(team) { return team === "blue" ? "블루팀" : "레드팀"; }
     draftStepLabel(step) {
       var S = Draft.STEPS[step], side = DRAFT.stepSide(step) === "b" ? "블루 " : "레드 ";
@@ -1701,14 +1703,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (done) turn = mySide ? (ready[SESSION.myId] ? "준비 완료! 다른 선수를 기다리는 중…" : "선택 완료! 준비가 되면 준비 완료를 눌러 주세요.") : "선수들이 준비하는 중…";
       else if (myTurn) turn = banTurn ? "내 차례예요! 밴할 캐릭터를 골라 주세요." : "내 차례예요! 캐릭터를 골라 주세요.";
       else if (!banTurn && picks[SESSION.myId] && DRAFT.draftStepIds(d, d.step).indexOf(SESSION.myId) >= 0) turn = "선택 완료 — 다른 선수를 기다리는 중…";
-      else turn = DRAFT.draftTeamName(DRAFT.stepSide(d.step) === "b" ? "blue" : "red") + " " + Draft.STEPS[d.step].keys.map(function (k) { return k.charAt(1); }).join("·") + "번 선수가 " + doing + " 중…";
+      else turn = DRAFT_VIEW.draftTeamName(DRAFT.stepSide(d.step) === "b" ? "blue" : "red") + " " + Draft.STEPS[d.step].keys.map(function (k) { return k.charAt(1); }).join("·") + "번 선수가 " + doing + " 중…";
       setText($("dfTurn"), turn);
       $("dfTurn").className = "dfTurn" + (myTurn ? " mine" : "");
       var charCol = document.querySelector(".dfCharCol");
       charCol.classList.toggle("myTurn", myTurn && left >= 5000);
       charCol.classList.toggle("myTurnLow", myTurn && left < 5000);
       setHtml($("dfSteps"), Draft.STEPS.map(function (S, i) {
-        return '<span class="' + (DRAFT.stepSide(i) === "b" ? "b" : "r") + (S.ban ? " ban" : "") + (i === d.step ? " now" : (i < d.step ? " done" : "")) + '">' + (i + 1) + ". " + DRAFT.draftStepLabel(i) + "</span>";
+        return '<span class="' + (DRAFT.stepSide(i) === "b" ? "b" : "r") + (S.ban ? " ban" : "") + (i === d.step ? " now" : (i < d.step ? " done" : "")) + '">' + (i + 1) + ". " + DRAFT_VIEW.draftStepLabel(i) + "</span>";
       }).join(""));
 
       function slots(team) {
@@ -1745,7 +1747,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         setText(btn, ready[SESSION.myId] ? "✔ 준비 완료 (누르면 취소)" : "준비 완료");
         setText($("dfReadyHint"), ready[SESSION.myId] ? "모두 준비 완료를 누르면 게임이 시작돼요." : "같은 팀의 초상화를 누르면 캐릭터 교환을 신청할 수 있어요.");
       }
-      var tradeHtml = DRAFT.draftTradeBoxHtml(d), tradeBox = $("dfTradeBox");
+      var tradeHtml = DRAFT_VIEW.draftTradeBoxHtml(d), tradeBox = $("dfTradeBox");
       show(tradeBox, !!tradeHtml);
       if (tradeBox.getAttribute("data-html") !== tradeHtml) { tradeBox.setAttribute("data-html", tradeHtml); setHtml(tradeBox, tradeHtml); }
 
@@ -1767,10 +1769,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         '<div class="dfRole">' + SKILLTEXT.gaugeTextOf(v) + "</div>" + SKILLTEXT.statTable(v) + SKILLTEXT.skillBlocks(v) + pickBtn : "");
     }
   }
+  var DRAFT_VIEW = new DraftView();
   var DRAFT = new Draft();
   setInterval(function () {
     if (!SESSION.room || SESSION.room.status !== "draft") return;
-    DRAFT.renderDraft();
+    DRAFT_VIEW.renderDraft();
     if (SESSION.isHost()) DRAFT.hostDraftTick();
   }, 200);
   $("dfChars").onclick = function (e) {
@@ -1779,7 +1782,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     var c = b.getAttribute("data-c");
     DRAFT.view = c;
     if (DRAFT.draftLeft(SESSION.room.draft).indexOf(c) >= 0) DRAFT.draftHover(c);
-    DRAFT.renderDraft();
+    DRAFT_VIEW.renderDraft();
     var detail = $("dfDetail");
     if (detail.scrollIntoView) detail.scrollIntoView({ block: "nearest", behavior: "smooth" });
   };
@@ -8486,7 +8489,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       setDb: function (fake) { var before = BACKEND.db; BACKEND.db = fake; return before; },
       setTestLink: function (flag) { var before = BACKEND.isTestLink; BACKEND.isTestLink = flag; return before; },
       CHAR_TYPES: CHAR_TYPES, AUTO_AIM: AUTO_AIM, AUTO_AIM_ERR: AutoAim.AUTO_AIM_ERR, AUTO_AIM_LEAD: AutoAim.AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: DRAFT_AI,
-      DRAFT: DRAFT, DRAFT_STEPS: Draft.STEPS, DRAFT_STEP_MS: Draft.STEP_MS, DRAFT_AI_MS: Draft.AI_MS, DRAFT_AI_TRADE_MS: Draft.AI_TRADE_MS, NO_BAN: Draft.NO_BAN,
+      DRAFT: DRAFT, DRAFT_VIEW: DRAFT_VIEW, DRAFT_STEPS: Draft.STEPS, DRAFT_STEP_MS: Draft.STEP_MS, DRAFT_AI_MS: Draft.AI_MS, DRAFT_AI_TRADE_MS: Draft.AI_TRADE_MS, NO_BAN: Draft.NO_BAN,
       STATS: STATS, STATS_PATH: MatchStats.PATH, STATS_PENDING: MatchStats.PENDING, STATS_SETTLE_MS: MatchStats.SETTLE_MS, STATS_HOLD_MAX_MS: MatchStats.HOLD_MAX_MS,
       CLOCK: CLOCK, GameClock: GameClock, CLOCK_KEEP: GameClock.KEEP, CLOCK_PINGS: GameClock.PINGS,
       MATCH: MATCH, FIELD: FIELD, resetLocal: SESSION.resetLocal.bind(SESSION), backToLobby: FLOW.backToLobby.bind(FLOW), stKey: NETSTATE.stKey.bind(NETSTATE),
