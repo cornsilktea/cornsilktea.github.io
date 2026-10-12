@@ -200,7 +200,7 @@
     <div class="st-card">
       <h2>규칙</h2>
       <ul class="st-rules">
-        <li>한 편에 돌 <b>6개</b>로 시작하고, 번갈아 한 번씩 튕깁니다.</li>
+        <li>돌은 백 <b>6개</b>, 흑 <b>5개</b>(선공 불이익)로 시작하고, 번갈아 한 번씩 튕깁니다.</li>
         <li>판 밖으로 나간 돌은 사라집니다.</li>
         <li>상대 돌을 <b>모두 떨어뜨리면</b> 승리!</li>
       </ul>
@@ -239,7 +239,7 @@
 
 const W = 600, H = 600;
 const R = 21;
-const PER_SIDE = 6;
+const STONES_PER_SIDE = [5, 6];
 const DT = 1 / 120;
 const DAMP = 0.984;
 const REST = 0.82;
@@ -292,8 +292,9 @@ function newGame() {
   }
   for (const x of front) {
     stones.push(mkStone(x, 158,     WHITE));
-    stones.push(mkStone(x, H - 158, BLACK));
+    if (x !== 300) stones.push(mkStone(x, H - 158, BLACK));
   }
+  stones.push(mkStone(300, 158, WHITE));
   turn = BLACK;
   phase = 'aim';
   selected = null;
@@ -789,7 +790,7 @@ requestAnimationFrame(loop);
 function buildDots() {
   for (const side of [BLACK, WHITE]) {
     dotsEl[side].innerHTML = '';
-    for (let i = 0; i < PER_SIDE; i++) {
+    for (let i = 0; i < STONES_PER_SIDE[side]; i++) {
       const d = document.createElement('span');
       d.className = side === BLACK ? 'b' : 'w';
       dotsEl[side].appendChild(d);
