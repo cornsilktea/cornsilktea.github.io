@@ -206,7 +206,7 @@
       <ul class="st-rules">
         <li>돌은 백 <b>6개</b>, 흑 <b>5개</b>(선공 불이익)로 시작하고, 번갈아 한 번씩 튕깁니다.</li>
         <li>판 밖으로 나간 돌은 사라집니다.</li>
-        <li>상대 돌을 <b>모두 떨어뜨리면</b> 승리!</li>
+        <li>상대 돌을 <b>모두 떨어뜨리면</b> 승리! 양쪽 돌이 동시에 모두 떨어지면 <b>튕긴 쪽이 패배</b>합니다.</li>
       </ul>
     </div>
   </div>
@@ -411,14 +411,19 @@ function finish(winner) {
   const title = resultTitleEl;
   const text  = resultTextEl;
   const left  = countAlive(stones, winner);
+  const bothWiped = left === 0;
   if (mode === 'ai') {
     title.textContent = winner === BLACK ? '이겼습니다!' : '졌습니다';
-    text.textContent = winner === BLACK
-      ? '내 돌 ' + left + '개를 남기고 이겼습니다.'
-      : '내 돌이 모두 판을 벗어났습니다.';
+    text.textContent = bothWiped
+      ? '돌이 동시에 모두 떨어졌습니다. 먼저 튕긴 쪽이 져서 ' + (winner === BLACK ? '내가 이겼습니다.' : 'AI가 이겼습니다.')
+      : winner === BLACK
+        ? '내 돌 ' + left + '개를 남기고 이겼습니다.'
+        : '내 돌이 모두 판을 벗어났습니다.';
   } else {
     title.textContent = SIDE_NAME[winner] + ' 승리!';
-    text.textContent = SIDE_NAME[winner] + ' 돌 ' + left + '개가 판에 남았습니다.';
+    text.textContent = bothWiped
+      ? '돌이 동시에 모두 떨어졌습니다. 먼저 튕긴 쪽이 져서 ' + SIDE_NAME[winner] + '이 이겼습니다.'
+      : SIDE_NAME[winner] + ' 돌 ' + left + '개가 판에 남았습니다.';
   }
   crownEl.textContent =
     (mode === 'ai' && winner === WHITE) ? '🤖' : '🏆';
