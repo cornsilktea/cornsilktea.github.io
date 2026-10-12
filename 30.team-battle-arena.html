@@ -2413,14 +2413,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   class ShamanType extends CharacterType {
     get hasDarkWave() { return true; }
     overrideBasic(E, ang, reach, t) {
-      var struck = FIELD_FX.domainStrikeTarget(E, t);
+      var struck = DOMAIN_FX.domainStrikeTarget(E, t);
       if (!struck) return false;
-      FIELD_FX.domainStrike(E, struck, t);
+      DOMAIN_FX.domainStrike(E, struck, t);
       return true;
     }
-    afterStrike(T, d) { FIELD_FX.applyCurse(T, d.owner, now()); }
+    afterStrike(T, d) { DOMAIN_FX.applyCurse(T, d.owner, now()); }
     botUltRange() { return ULT.dmR * 0.7; }
-    wantsBasicNow(B, t) { return t >= B.cdUntil && !!FIELD_FX.domainStrikeTarget(B, t); }
+    wantsBasicNow(B, t) { return t >= B.cdUntil && !!DOMAIN_FX.domainStrikeTarget(B, t); }
     get hasSkillClip() { return true; }
     playSkillClip(v, E, t) { FIGHTER_VIEW.playOnce(v, "Ranged_Magic_Summon", MODELS.kit.clips.Ranged_Magic_Summon.duration * 1000 / 900, t); }
     cast(E, ang, reach, t) {
@@ -3586,7 +3586,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       MATCH.handled[s.key] = 1;
       if (FIELD.addLingering(e, now())) return;
       if (e.type === "grace") { FIELD_FX.onGrace(e); return; }
-      if (e.type === "strike") { FIELD_FX.onDomainStrike(e); return; }
+      if (e.type === "strike") { DOMAIN_FX.onDomainStrike(e); return; }
       if (e.type === "zap") { FIELD_FX.onZap(e); return; }
       if (e.type === "tshot") { TURRETS.onShot(e); return; }
       if (e.type === "curse") { FIELD.curses[e.tgt] = { n: e.n, at: e.createdAt }; return; }
@@ -3774,95 +3774,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         return true;
       });
     }
-    domainRadius(e, t) { return e.r * clamp((t - e.createdAt) / e.grow, 0, 1); }
-    domainActive(e, t) { return t >= e.createdAt && t < e.createdAt + e.dur; }
-    domainCenter(dm) {
-      var A = TARGETS.ent(dm.e.owner);
-      if (A && A.alive) { dm.cx = A.x; dm.cy = A.y; }
-      else if (dm.cx == null) { dm.cx = dm.e.x; dm.cy = dm.e.y; }
-      return { x: dm.cx, y: dm.cy };
-    }
-    domainOwnerFell(dm) {
-      var A = TARGETS.ent(dm.e.owner);
-      if (A && !A.alive) dm.ownerFell = true;
-      return !!dm.ownerFell;
-    }
-    stepDomains(t) {
-      FIELD.domains = FIELD.domains.filter(function (dm) {
-        var e = dm.e;
-        if (t >= e.createdAt + e.dur || FIELD_FX.domainOwnerFell(dm)) { EFFECT_VIEW.dropDomainVis(dm); return false; }
-        var c = FIELD_FX.domainCenter(dm);
-        if (t < e.createdAt || SESSION.room.status !== "playing" || t > e.createdAt + e.grow + ULT.dmStunGraceMs) return true;
-        var reach = FIELD_FX.domainRadius(e, t);
-        TARGETS.localTargets().forEach(function (T) {
-          if (T.minion || !T.alive || T.team === e.team || dm.touched[T.id] || T.isProtected(t)) return;
-          if (hyp(T.x - c.x, T.y - c.y) > reach + T.hitR * 0.5) return;
-          dm.touched[T.id] = 1;
-          STATUS.afflict(T, { stunMs: e.stun }, e.owner);
-          T.domainBolt = { owner: e.owner, at: t + e.stun, dmg: e.bolt };
-        });
-        return true;
-      });
-    }
-    applyCurse(T, owner, t) {
-      if (T.minion || !T.alive || T.curseBoom) return;
-      T.curse = (T.curse || 0) + 1; T.curseAt = t;
-      if (T.curse >= ULT.cuStacks) T.curseBoom = { at: t + ULT.cuBoomMs, owner: owner };
-      SESSION.room.ref.child("effects").push({ type: "curse", tgt: T.id, owner: owner, n: T.curse, createdAt: t });
-    }
-    stepCurse(T, t) {
-      var B = T.curseBoom;
-      if (!B && T.curse && t - T.curseAt >= ULT.cuExpireMs) {
-        T.curse = 0;
-        SESSION.room.ref.child("effects").push({ type: "curse", tgt: T.id, owner: T.id, n: 0, createdAt: t });
-        return;
-      }
-      if (!B || t < B.at) return;
-      T.curse = 0; T.curseBoom = null;
-      if (!T.alive || T.isProtected(t)) return;
-      DAMAGE.damage(T, ULT.cuBoomDmg, B.owner, false, "curse");
-    }
-    stepDomainBolt(T, t) {
-      var B = T.domainBolt;
-      if (!B || t < B.at || T.isStunned(t)) return;
-      T.domainBolt = null;
-      if (!T.alive || T.isProtected(t)) return;
-      SESSION.room.ref.child("effects").push({ type: "strike", owner: B.owner, tgt: T.id, createdAt: t });
-      DAMAGE.damage(T, B.dmg, B.owner, false, "domainbolt");
-      FIELD_FX.applyCurse(T, B.owner, t);
-    }
-    domainStrikeTarget(E, t) {
-      var zone = null;
-      FIELD.domains.forEach(function (dm) { if (dm.e.owner === E.id && FIELD_FX.domainActive(dm.e, t) && !FIELD_FX.domainOwnerFell(dm)) zone = dm; });
-      if (!zone) return null;
-      var c = FIELD_FX.domainCenter(zone), reach = FIELD_FX.domainRadius(zone.e, t) + BODY_R * 0.5, best = null, bd = Infinity;
-      TARGETS.everyone(t).forEach(function (o) {
-        if (!o || !o.alive || o.team === E.team || o.isProtected(t) || hyp(o.x - c.x, o.y - c.y) > reach || (!o.minion && !VISION.visibleTo(o, E, t))) return;
-        var d = hyp(o.x - E.x, o.y - E.y);
-        if (d < bd) { bd = d; best = o; }
-      });
-      return best;
-    }
-    domainStrike(E, T, t) {
-      E.atkAt = t;
-      E.angle = Math.atan2(T.y - E.y, T.x - E.x);
-      VISION.revealBriefly(E.id, t);
-      MATCH.game.forceNet = true;
-      SESSION.room.ref.child("effects").push({ type: "strike", team: E.team, owner: E.id, tgt: T.id, dmg: Math.round(T.maxHp * ULT.dmStrikeMaxHpRate), stun: ULT.dmStrikeStunMs, createdAt: t });
-    }
-    onDomainStrike(e) {
-      var t = now();
-      if (t - e.createdAt > 1500) return;
-      var V = FIGHTER_VIEW.fighters[e.tgt] || FIGHTER_VIEW.minions[e.tgt], A = TARGETS.ent(e.tgt) || MINIONS.allMinions().filter(function (m) { return m.id === e.tgt; })[0];
-      if (A && (!MATCH.me || MATCH.me.team === A.team || VISION.visibleTo(A, MATCH.me, t))) { FX_VIEW.bloodBolt(V ? V.root.position.x : A.x, V ? V.root.position.z : A.y); FX_VIEW.spark(A.x, A.y, "#FF2A36", 1.6); }
-      if (A && (!MATCH.me || hyp(A.x - MATCH.me.x, A.y - MATCH.me.y) < 700)) SOUND.sfx("boom");
-      if (!e.dmg || SESSION.room.status !== "playing") return;
-      TARGETS.localTargets().forEach(function (T) {
-        if (T.id !== e.tgt || !T.alive || T.team === e.team) return;
-        DAMAGE.damage(T, e.dmg, e.owner, e.createdAt, "skill", e.stun ? { stunMs: e.stun } : null);
-        FIELD_FX.applyCurse(T, e.owner, now());
-      });
-    }
     potionFlightMs(dist) {
       var c = CHARS.thrower, far = Math.min(1, Math.max(0, (dist - c.minRange) / (c.range - c.minRange)));
       return Math.round(ULT.plFlightMin + (ULT.plFlight - ULT.plFlightMin) * far);
@@ -3898,6 +3809,98 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   var FIELD_FX = new FieldEffects();
+  class DomainEffects {
+    domainRadius(e, t) { return e.r * clamp((t - e.createdAt) / e.grow, 0, 1); }
+    domainActive(e, t) { return t >= e.createdAt && t < e.createdAt + e.dur; }
+    domainCenter(dm) {
+      var A = TARGETS.ent(dm.e.owner);
+      if (A && A.alive) { dm.cx = A.x; dm.cy = A.y; }
+      else if (dm.cx == null) { dm.cx = dm.e.x; dm.cy = dm.e.y; }
+      return { x: dm.cx, y: dm.cy };
+    }
+    domainOwnerFell(dm) {
+      var A = TARGETS.ent(dm.e.owner);
+      if (A && !A.alive) dm.ownerFell = true;
+      return !!dm.ownerFell;
+    }
+    stepDomains(t) {
+      FIELD.domains = FIELD.domains.filter(function (dm) {
+        var e = dm.e;
+        if (t >= e.createdAt + e.dur || DOMAIN_FX.domainOwnerFell(dm)) { EFFECT_VIEW.dropDomainVis(dm); return false; }
+        var c = DOMAIN_FX.domainCenter(dm);
+        if (t < e.createdAt || SESSION.room.status !== "playing" || t > e.createdAt + e.grow + ULT.dmStunGraceMs) return true;
+        var reach = DOMAIN_FX.domainRadius(e, t);
+        TARGETS.localTargets().forEach(function (T) {
+          if (T.minion || !T.alive || T.team === e.team || dm.touched[T.id] || T.isProtected(t)) return;
+          if (hyp(T.x - c.x, T.y - c.y) > reach + T.hitR * 0.5) return;
+          dm.touched[T.id] = 1;
+          STATUS.afflict(T, { stunMs: e.stun }, e.owner);
+          T.domainBolt = { owner: e.owner, at: t + e.stun, dmg: e.bolt };
+        });
+        return true;
+      });
+    }
+    applyCurse(T, owner, t) {
+      if (T.minion || !T.alive || T.curseBoom) return;
+      T.curse = (T.curse || 0) + 1; T.curseAt = t;
+      if (T.curse >= ULT.cuStacks) T.curseBoom = { at: t + ULT.cuBoomMs, owner: owner };
+      SESSION.room.ref.child("effects").push({ type: "curse", tgt: T.id, owner: owner, n: T.curse, createdAt: t });
+    }
+    stepCurse(T, t) {
+      var B = T.curseBoom;
+      if (!B && T.curse && t - T.curseAt >= ULT.cuExpireMs) {
+        T.curse = 0;
+        SESSION.room.ref.child("effects").push({ type: "curse", tgt: T.id, owner: T.id, n: 0, createdAt: t });
+        return;
+      }
+      if (!B || t < B.at) return;
+      T.curse = 0; T.curseBoom = null;
+      if (!T.alive || T.isProtected(t)) return;
+      DAMAGE.damage(T, ULT.cuBoomDmg, B.owner, false, "curse");
+    }
+    stepDomainBolt(T, t) {
+      var B = T.domainBolt;
+      if (!B || t < B.at || T.isStunned(t)) return;
+      T.domainBolt = null;
+      if (!T.alive || T.isProtected(t)) return;
+      SESSION.room.ref.child("effects").push({ type: "strike", owner: B.owner, tgt: T.id, createdAt: t });
+      DAMAGE.damage(T, B.dmg, B.owner, false, "domainbolt");
+      DOMAIN_FX.applyCurse(T, B.owner, t);
+    }
+    domainStrikeTarget(E, t) {
+      var zone = null;
+      FIELD.domains.forEach(function (dm) { if (dm.e.owner === E.id && DOMAIN_FX.domainActive(dm.e, t) && !DOMAIN_FX.domainOwnerFell(dm)) zone = dm; });
+      if (!zone) return null;
+      var c = DOMAIN_FX.domainCenter(zone), reach = DOMAIN_FX.domainRadius(zone.e, t) + BODY_R * 0.5, best = null, bd = Infinity;
+      TARGETS.everyone(t).forEach(function (o) {
+        if (!o || !o.alive || o.team === E.team || o.isProtected(t) || hyp(o.x - c.x, o.y - c.y) > reach || (!o.minion && !VISION.visibleTo(o, E, t))) return;
+        var d = hyp(o.x - E.x, o.y - E.y);
+        if (d < bd) { bd = d; best = o; }
+      });
+      return best;
+    }
+    domainStrike(E, T, t) {
+      E.atkAt = t;
+      E.angle = Math.atan2(T.y - E.y, T.x - E.x);
+      VISION.revealBriefly(E.id, t);
+      MATCH.game.forceNet = true;
+      SESSION.room.ref.child("effects").push({ type: "strike", team: E.team, owner: E.id, tgt: T.id, dmg: Math.round(T.maxHp * ULT.dmStrikeMaxHpRate), stun: ULT.dmStrikeStunMs, createdAt: t });
+    }
+    onDomainStrike(e) {
+      var t = now();
+      if (t - e.createdAt > 1500) return;
+      var V = FIGHTER_VIEW.fighters[e.tgt] || FIGHTER_VIEW.minions[e.tgt], A = TARGETS.ent(e.tgt) || MINIONS.allMinions().filter(function (m) { return m.id === e.tgt; })[0];
+      if (A && (!MATCH.me || MATCH.me.team === A.team || VISION.visibleTo(A, MATCH.me, t))) { FX_VIEW.bloodBolt(V ? V.root.position.x : A.x, V ? V.root.position.z : A.y); FX_VIEW.spark(A.x, A.y, "#FF2A36", 1.6); }
+      if (A && (!MATCH.me || hyp(A.x - MATCH.me.x, A.y - MATCH.me.y) < 700)) SOUND.sfx("boom");
+      if (!e.dmg || SESSION.room.status !== "playing") return;
+      TARGETS.localTargets().forEach(function (T) {
+        if (T.id !== e.tgt || !T.alive || T.team === e.team) return;
+        DAMAGE.damage(T, e.dmg, e.owner, e.createdAt, "skill", e.stun ? { stunMs: e.stun } : null);
+        DOMAIN_FX.applyCurse(T, e.owner, now());
+      });
+    }
+  }
+  var DOMAIN_FX = new DomainEffects();
   class DurationRing {
     static INNER = 0.8;
     static SEGMENTS = 72;
@@ -6887,10 +6890,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     dropDomainVis(dm) { if (!dm.vis) return; STAGE.scene.remove(dm.vis); dm.vis.userData.mats.forEach(function (m) { m.dispose(); }); dm.vis = null; }
     renderDomain(dm, t, nowMs) {
       var e = dm.e;
-      if (!FIELD_FX.domainActive(e, t)) return;
+      if (!DOMAIN_FX.domainActive(e, t)) return;
       if (!dm.vis) dm.vis = EFFECT_VIEW.makeDomainVis();
-      var ud = dm.vis.userData, r = Math.max(1, FIELD_FX.domainRadius(e, t)), fade = clamp((e.createdAt + e.dur - t) / 400, 0, 1);
-      var c = FIELD_FX.domainCenter(dm);
+      var ud = dm.vis.userData, r = Math.max(1, DOMAIN_FX.domainRadius(e, t)), fade = clamp((e.createdAt + e.dur - t) / 400, 0, 1);
+      var c = DOMAIN_FX.domainCenter(dm);
       dm.vis.position.set(c.x, 0, c.y);
       dm.vis.scale.setScalar(r);
       ud.shards.rotation.y = nowMs / 4000;
@@ -8398,7 +8401,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       FIELD_FX.stepStorms(t);
       FIELD_FX.stepGales(t);
       FIELD_FX.stepRevs(t);
-      FIELD_FX.stepDomains(t);
+      DOMAIN_FX.stepDomains(t);
       TURRETS.step(t);
       GROVES.step(t);
       MELEE.stepLunges(t);
@@ -8441,7 +8444,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       DAMAGE.payKillGaugeOwed(E, t);
     }
     stepStatusTicks(t) {
-      TARGETS.localTargets().forEach(function (T) { STATUS.stepShove(T, t); if (!T.minion) { STATUS.stepBurn(T, t); STATUS.stepRally(T, t); FIELD_FX.stepDomainBolt(T, t); FIELD_FX.stepCurse(T, t); T.type.stepPassive(T, t); } });
+      TARGETS.localTargets().forEach(function (T) { STATUS.stepShove(T, t); if (!T.minion) { STATUS.stepBurn(T, t); STATUS.stepRally(T, t); DOMAIN_FX.stepDomainBolt(T, t); DOMAIN_FX.stepCurse(T, t); T.type.stepPassive(T, t); } });
     }
   }
   var WORLD = new WorldStepper();
