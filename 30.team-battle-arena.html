@@ -2638,7 +2638,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     speedBonus(E, t) { return this.isOvercharged(E, t) ? ULT.ocSpeedBonus : 0; }
     get idleClip() { return "Ranged_Bow_Idle"; }
     statAltCooldown(c) { return c.cd / ULT.ocRate; }
-    onHitEarly(owner, h) { if (h.zap) FIELD_FX.stormZap(owner, h.zap, h.t); }
+    onHitEarly(owner, h) { if (h.zap) STORM_FX.stormZap(owner, h.zap, h.t); }
     afterProjectileHit(d, T, immune) {
       if (!immune) SESSION.room.ref.child("hits/" + d.owner).push({ d: 0, b: 0, t: now(), zap: { v: T.id, x: r1(T.x), y: r1(T.y) } });
     }
@@ -3297,7 +3297,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static STEALTH_REVEAL_DIST = 100;
     static REVEAL_BREAK_MS = 500;
     inBush(x, y) { return VISION.bushIndexAt(x, y) >= 0; }
-    hiddenFrom(E, t) { return VISION.inBush(E.x, E.y) || E.isStealthed(t) || FIELD_FX.inFriendlyStorm(E, t); }
+    hiddenFrom(E, t) { return VISION.inBush(E.x, E.y) || E.isStealthed(t) || STORM_FX.inFriendlyStorm(E, t); }
     bushIndexAt(x, y) {
       var c = Math.floor((x - MAP_X0) / TILE), r = Math.floor((y - MAP_Y0) / TILE);
       if (c < 0 || r < 0 || c >= ARENA_MAP.cols || r >= ARENA_MAP.rowCount) return -1;
@@ -3309,7 +3309,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (E.revealUntil > (t || now())) return true;
       var bush = VISION.bushIndexAt(E.x, E.y);
       if (bush >= 0 && VISION.bushIndexAt(viewer.x, viewer.y) !== bush) return false;
-      if ((E.isStealthed(t) || FIELD_FX.inFriendlyStorm(E, t)) && hyp(E.x - viewer.x, E.y - viewer.y) > VisionRules.STEALTH_REVEAL_DIST) return false;
+      if ((E.isStealthed(t) || STORM_FX.inFriendlyStorm(E, t)) && hyp(E.x - viewer.x, E.y - viewer.y) > VisionRules.STEALTH_REVEAL_DIST) return false;
       return true;
     }
     visibleTo(E, viewer, t) { return !VISION.hiddenFrom(E, t) || VISION.revealedTo(E, viewer, t); }
@@ -3533,61 +3533,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   var STATUS = new StatusEffects();
   class FieldEffects {
-    constructor() { this.bladeStormTick = {}; }
-    stepBladeStorms(t) {
-      TARGETS.participants().forEach(function (id) {
-        var E = TARGETS.ent(id);
-        if (!E || !E.alive || !E.isBladeStorming(t)) { delete FIELD_FX.bladeStormTick[id]; return; }
-        var tick = FIELD_FX.bladeStormTick[id];
-        if (!tick || tick.until !== E.buffUntil) tick = FIELD_FX.bladeStormTick[id] = { until: E.buffUntil, next: E.buffUntil - ULT.bwDur };
-        if (t < tick.next) return;
-        tick.next = Math.max(tick.next + ULT.bwTick, t + ULT.bwTick / 2);
-        VISION.revealBriefly(E.id, t);
-        var tickIndex = Math.floor((t - (E.buffUntil - ULT.bwDur)) / ULT.bwTick);
-        var hurtGaugeGroup = Math.floor(tickIndex / ULT.bwHurtGaugeEvery);
-        var givesHurtGauge = hurtGaugeGroup !== tick.hurtGaugeGroup;
-        tick.hurtGaugeGroup = hurtGaugeGroup;
-        TARGETS.localTargets().forEach(function (T) {
-          if (!T.alive || T.team === E.team || hyp(T.x - E.x, T.y - E.y) > ULT.bwR + T.hitR * 0.5) return;
-          DAMAGE.damage(T, ULT.bwDmg, E.id, false, "bladestorm", null, null, !givesHurtGauge);
-        });
-      });
-    }
-    stormZap(E, hit, t) {
-      var chain = CHARS.stormbow.chain, over = E.isOvercharged(t);
-      if (!over) {
-        E.zapHits = (E.zapHits || 0) + 1;
-        if (E.zapHits < chain.every) return;
-        E.zapHits = 0;
-      }
-      var links = FIELD_FX.chainTargets(E, hit, now()), pts = [[hit.x, hit.y]];
-      links.forEach(function (o) { pts.push([r1(o.x), r1(o.y)]); });
-      SESSION.room.ref.child("effects").push({ type: "zap", team: E.team, owner: E.id, pts: pts, tgt: [hit.v].concat(links.map(function (o) { return o.id; })), dmg: chain.dmg, over: over ? 1 : 0, createdAt: now() });
-    }
-    chainTargets(E, hit, t) {
-      var chain = CHARS.stormbow.chain;
-      return TARGETS.everyone(t).filter(function (o) {
-        return o && o.alive && o.team !== E.team && o.id !== hit.v && !o.isProtected(t) && !VISION.hiddenFrom(o, t) && hyp(o.x - hit.x, o.y - hit.y) <= chain.r;
-      }).sort(function (a, b) { return hyp(a.x - hit.x, a.y - hit.y) - hyp(b.x - hit.x, b.y - hit.y); }).slice(0, chain.count);
-    }
-    onZap(e) {
-      var t = now();
-      if (t - e.createdAt > 1500) return;
-      FX_VIEW.chainFx(e.pts, e.over);
-      if (MATCH.me && hyp(e.pts[0][0] - MATCH.me.x, e.pts[0][1] - MATCH.me.y) < 700) SOUND.sfx("zap");
-      if (!e.tgt || SESSION.room.status !== "playing") return;
-      TARGETS.localTargets().forEach(function (T) {
-        if (e.tgt.indexOf(T.id) < 0 || !T.alive || T.team === e.team) return;
-        DAMAGE.damage(T, e.dmg, e.owner, true, e.over ? "overcharge" : null, null, T.minion ? 0 : undefined);
-      });
-    }
     onEffect(s) {
       var e = s.val(); if (!e || !MATCH.game || MATCH.handled[s.key]) return;
       MATCH.handled[s.key] = 1;
       if (FIELD.addLingering(e, now())) return;
       if (e.type === "grace") { FIELD_FX.onGrace(e); return; }
       if (e.type === "strike") { DOMAIN_FX.onDomainStrike(e); return; }
-      if (e.type === "zap") { FIELD_FX.onZap(e); return; }
+      if (e.type === "zap") { STORM_FX.onZap(e); return; }
       if (e.type === "tshot") { TURRETS.onShot(e); return; }
       if (e.type === "curse") { FIELD.curses[e.tgt] = { n: e.n, at: e.createdAt }; return; }
       if (e.type === "revCut") { FIELD.revs.forEach(function (r) { if (r.e.owner === e.owner && r.e.createdAt <= e.createdAt) r.cut = true; }); return; }
@@ -3673,48 +3625,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         TARGETS.localTargets().forEach(function (T) {
           if (!T.alive || T.team === e.team || T.isProtected(t) || hyp(T.x - center.x, T.y - center.y) > e.r + T.hitR * 0.5) return;
           DAMAGE.damage(T, e.dmg, e.owner, false, "gale");
-        });
-        return true;
-      });
-    }
-    stormCenter(s) {
-      var A = TARGETS.ent(s.e.owner);
-      if (A && A.alive) { s.lastX = A.x; s.lastY = A.y; }
-      else if (s.lastX == null) { s.lastX = s.e.x; s.lastY = s.e.y; }
-      return { x: s.lastX, y: s.lastY };
-    }
-    stormOwnerFell(s) {
-      var A = TARGETS.ent(s.e.owner);
-      if (A && !A.alive) s.ownerFell = true;
-      return !!s.ownerFell;
-    }
-    stormActive(s, t) { return !s.ownerFell && t >= s.e.createdAt + s.e.delay && t < s.e.createdAt + s.e.delay + s.e.dur; }
-    inFriendlyStorm(E, t) {
-      if (!ULT.frBzHides) return false;
-      t = t || now();
-      for (var i = 0; i < FIELD.storms.length; i++) {
-        var s = FIELD.storms[i];
-        if (s.e.team !== E.team || !FIELD_FX.stormActive(s, t)) continue;
-        var c = FIELD_FX.stormCenter(s);
-        if (hyp(E.x - c.x, E.y - c.y) <= s.e.r) return true;
-      }
-      return false;
-    }
-    stepStorms(t) {
-      FIELD.storms = FIELD.storms.filter(function (s) {
-        var e = s.e;
-        if (t >= e.createdAt + e.delay + e.dur || FIELD_FX.stormOwnerFell(s)) { EFFECT_VIEW.dropStormVis(s); return false; }
-        if (t < e.createdAt + e.delay) return true;
-        var c = FIELD_FX.stormCenter(s);
-        if (!s.landed) { s.landed = true; if (!MATCH.me || hyp(c.x - MATCH.me.x, c.y - MATCH.me.y) < 700) SOUND.sfx("orb"); }
-        if (SESSION.room.status !== "playing") return true;
-        var foesInside = TARGETS.localTargets().filter(function (T) { return T.alive && T.team !== e.team && hyp(T.x - c.x, T.y - c.y) <= e.r; });
-        TARGETS.localTargets().forEach(function (T) { if (!T.minion && T.alive && T.team === e.team && hyp(T.x - c.x, T.y - c.y) <= e.r) DAMAGE.noteHelp(T, e.owner, t); });
-        if (s.nextTick && t < s.nextTick) return true;
-        s.nextTick = (s.nextTick || t) + ULT.frBzTick;
-        foesInside.forEach(function (T) {
-          var stack = !T.minion && !T.isProtected(t) && !T.isFrostFrozen(t) ? STATUS.frostStackFx(T) : null;
-          DAMAGE.damage(T, ULT.frBzDmg, e.owner, false, "blizzard", stack);
         });
         return true;
       });
@@ -3809,6 +3719,99 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   var FIELD_FX = new FieldEffects();
+  class StormEffects {
+    constructor() { this.bladeStormTick = {}; }
+    stepBladeStorms(t) {
+      TARGETS.participants().forEach(function (id) {
+        var E = TARGETS.ent(id);
+        if (!E || !E.alive || !E.isBladeStorming(t)) { delete STORM_FX.bladeStormTick[id]; return; }
+        var tick = STORM_FX.bladeStormTick[id];
+        if (!tick || tick.until !== E.buffUntil) tick = STORM_FX.bladeStormTick[id] = { until: E.buffUntil, next: E.buffUntil - ULT.bwDur };
+        if (t < tick.next) return;
+        tick.next = Math.max(tick.next + ULT.bwTick, t + ULT.bwTick / 2);
+        VISION.revealBriefly(E.id, t);
+        var tickIndex = Math.floor((t - (E.buffUntil - ULT.bwDur)) / ULT.bwTick);
+        var hurtGaugeGroup = Math.floor(tickIndex / ULT.bwHurtGaugeEvery);
+        var givesHurtGauge = hurtGaugeGroup !== tick.hurtGaugeGroup;
+        tick.hurtGaugeGroup = hurtGaugeGroup;
+        TARGETS.localTargets().forEach(function (T) {
+          if (!T.alive || T.team === E.team || hyp(T.x - E.x, T.y - E.y) > ULT.bwR + T.hitR * 0.5) return;
+          DAMAGE.damage(T, ULT.bwDmg, E.id, false, "bladestorm", null, null, !givesHurtGauge);
+        });
+      });
+    }
+    stormZap(E, hit, t) {
+      var chain = CHARS.stormbow.chain, over = E.isOvercharged(t);
+      if (!over) {
+        E.zapHits = (E.zapHits || 0) + 1;
+        if (E.zapHits < chain.every) return;
+        E.zapHits = 0;
+      }
+      var links = STORM_FX.chainTargets(E, hit, now()), pts = [[hit.x, hit.y]];
+      links.forEach(function (o) { pts.push([r1(o.x), r1(o.y)]); });
+      SESSION.room.ref.child("effects").push({ type: "zap", team: E.team, owner: E.id, pts: pts, tgt: [hit.v].concat(links.map(function (o) { return o.id; })), dmg: chain.dmg, over: over ? 1 : 0, createdAt: now() });
+    }
+    chainTargets(E, hit, t) {
+      var chain = CHARS.stormbow.chain;
+      return TARGETS.everyone(t).filter(function (o) {
+        return o && o.alive && o.team !== E.team && o.id !== hit.v && !o.isProtected(t) && !VISION.hiddenFrom(o, t) && hyp(o.x - hit.x, o.y - hit.y) <= chain.r;
+      }).sort(function (a, b) { return hyp(a.x - hit.x, a.y - hit.y) - hyp(b.x - hit.x, b.y - hit.y); }).slice(0, chain.count);
+    }
+    onZap(e) {
+      var t = now();
+      if (t - e.createdAt > 1500) return;
+      FX_VIEW.chainFx(e.pts, e.over);
+      if (MATCH.me && hyp(e.pts[0][0] - MATCH.me.x, e.pts[0][1] - MATCH.me.y) < 700) SOUND.sfx("zap");
+      if (!e.tgt || SESSION.room.status !== "playing") return;
+      TARGETS.localTargets().forEach(function (T) {
+        if (e.tgt.indexOf(T.id) < 0 || !T.alive || T.team === e.team) return;
+        DAMAGE.damage(T, e.dmg, e.owner, true, e.over ? "overcharge" : null, null, T.minion ? 0 : undefined);
+      });
+    }
+    stormCenter(s) {
+      var A = TARGETS.ent(s.e.owner);
+      if (A && A.alive) { s.lastX = A.x; s.lastY = A.y; }
+      else if (s.lastX == null) { s.lastX = s.e.x; s.lastY = s.e.y; }
+      return { x: s.lastX, y: s.lastY };
+    }
+    stormOwnerFell(s) {
+      var A = TARGETS.ent(s.e.owner);
+      if (A && !A.alive) s.ownerFell = true;
+      return !!s.ownerFell;
+    }
+    stormActive(s, t) { return !s.ownerFell && t >= s.e.createdAt + s.e.delay && t < s.e.createdAt + s.e.delay + s.e.dur; }
+    inFriendlyStorm(E, t) {
+      if (!ULT.frBzHides) return false;
+      t = t || now();
+      for (var i = 0; i < FIELD.storms.length; i++) {
+        var s = FIELD.storms[i];
+        if (s.e.team !== E.team || !STORM_FX.stormActive(s, t)) continue;
+        var c = STORM_FX.stormCenter(s);
+        if (hyp(E.x - c.x, E.y - c.y) <= s.e.r) return true;
+      }
+      return false;
+    }
+    stepStorms(t) {
+      FIELD.storms = FIELD.storms.filter(function (s) {
+        var e = s.e;
+        if (t >= e.createdAt + e.delay + e.dur || STORM_FX.stormOwnerFell(s)) { EFFECT_VIEW.dropStormVis(s); return false; }
+        if (t < e.createdAt + e.delay) return true;
+        var c = STORM_FX.stormCenter(s);
+        if (!s.landed) { s.landed = true; if (!MATCH.me || hyp(c.x - MATCH.me.x, c.y - MATCH.me.y) < 700) SOUND.sfx("orb"); }
+        if (SESSION.room.status !== "playing") return true;
+        var foesInside = TARGETS.localTargets().filter(function (T) { return T.alive && T.team !== e.team && hyp(T.x - c.x, T.y - c.y) <= e.r; });
+        TARGETS.localTargets().forEach(function (T) { if (!T.minion && T.alive && T.team === e.team && hyp(T.x - c.x, T.y - c.y) <= e.r) DAMAGE.noteHelp(T, e.owner, t); });
+        if (s.nextTick && t < s.nextTick) return true;
+        s.nextTick = (s.nextTick || t) + ULT.frBzTick;
+        foesInside.forEach(function (T) {
+          var stack = !T.minion && !T.isProtected(t) && !T.isFrostFrozen(t) ? STATUS.frostStackFx(T) : null;
+          DAMAGE.damage(T, ULT.frBzDmg, e.owner, false, "blizzard", stack);
+        });
+        return true;
+      });
+    }
+  }
+  var STORM_FX = new StormEffects();
   class DomainEffects {
     domainRadius(e, t) { return e.r * clamp((t - e.createdAt) / e.grow, 0, 1); }
     domainActive(e, t) { return t >= e.createdAt && t < e.createdAt + e.dur; }
@@ -6814,7 +6817,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var e = s.e, start = e.createdAt + e.delay, end = start + e.dur;
       if (t < start || t >= end) return;
       if (!s.vis) s.vis = EFFECT_VIEW.makeStormVis(e);
-      var ud = s.vis.userData, c = FIELD_FX.stormCenter(s), grow = clamp((t - start) / 300, 0, 1);
+      var ud = s.vis.userData, c = STORM_FX.stormCenter(s), grow = clamp((t - start) / 300, 0, 1);
       var fade = Math.max(0.01, grow) * clamp((end - t) / 400, 0, 1);
       s.vis.position.set(c.x, 0, c.y);
       ud.floor.uniforms.center.value.set(c.x, c.y);
@@ -8401,7 +8404,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       FIELD_FX.stepPools(t);
       STATUS.flushCC(t);
       FIELD_FX.stepHoles(t, dt);
-      FIELD_FX.stepStorms(t);
+      STORM_FX.stepStorms(t);
       FIELD_FX.stepGales(t);
       FIELD_FX.stepRevs(t);
       DOMAIN_FX.stepDomains(t);
@@ -8420,7 +8423,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       PROJECTILES.checkProjectiles(t);
       PROJECTILES.stepBladeDaggers(t);
       PROJECTILES.stepBladeSpins(t);
-      FIELD_FX.stepBladeStorms(t);
+      STORM_FX.stepBladeStorms(t);
     }
     stepRespawns(t) {
       if (MATCH.me) RESPAWN.respawnIfReady(MATCH.me, t);
@@ -8481,7 +8484,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       useUlt: ATTACK.useUlt.bind(ATTACK), fireBasic: ATTACK.fireBasic.bind(ATTACK), damage: DAMAGE.damage.bind(DAMAGE), healCut: STATUS.healCut.bind(STATUS), healAmount: STATUS.healAmount.bind(STATUS), respawnIfReady: RESPAWN.respawnIfReady.bind(RESPAWN), afflict: STATUS.afflict.bind(STATUS), speedOf: function (E) { return E.speed(); }, stunned: function (E, t) { return E.isStunned(t); },
       onShot: PROJECTILES.onShot.bind(PROJECTILES), onMelee: MELEE.onMelee.bind(MELEE), potionFlightMs: FIELD_FX.potionFlightMs.bind(FIELD_FX), meteorHitAt: FIELD_FX.meteorHitAt.bind(FIELD_FX), onEffect: FIELD_FX.onEffect.bind(FIELD_FX), onHit: DAMAGE.onHit.bind(DAMAGE),
       multiKillCount: KILLFEED.multiKillCount.bind(KILLFEED), MULTI_KILL_MS: KillFeed.MULTI_KILL_MS, ASSIST_MS: DamageResolver.ASSIST_MS, onKill: DAMAGE.creditHelpAssists.bind(DAMAGE),
-      hiddenFrom: VISION.hiddenFrom.bind(VISION), visibleTo: VISION.visibleTo.bind(VISION), storms: function () { return FIELD.storms; }, stormCenter: FIELD_FX.stormCenter.bind(FIELD_FX), revs: function () { return FIELD.revs; }, domains: function () { return FIELD.domains; }, graceTarget: FIELD_FX.graceTarget.bind(FIELD_FX),
+      hiddenFrom: VISION.hiddenFrom.bind(VISION), visibleTo: VISION.visibleTo.bind(VISION), storms: function () { return FIELD.storms; }, stormCenter: STORM_FX.stormCenter.bind(FIELD_FX), revs: function () { return FIELD.revs; }, domains: function () { return FIELD.domains; }, graceTarget: FIELD_FX.graceTarget.bind(FIELD_FX),
       bushTiles: function () { return ARENA_MAP.bushes.map(function (b) { return b.tiles.map(function (tl) { return { x: ARENA_MAP.tileX(tl[0]), y: ARENA_MAP.tileY(tl[1]) }; }); }); },
       isIdle: function () { return !SESSION.room; },
       timeScale: function () { return CLOCK.scale; },
