@@ -702,9 +702,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static ROOT = "teambattle/rooms";
     static REJOIN_TRIES = 3;
     static HOST_ORDER = { blue: 0, red: 1, spec: 2 };
-    static RESUME_KEY = "tba_resume_v1";
-    static RESUME_MS = 180000;
-    static RESUME_SAVE_MS = 20000;
     constructor() {
       this.myId = "p" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
       this.room = null; this.players = {}; this.subs = []; this.leaving = false;
@@ -816,8 +813,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       SESSION.sub(ref.child("pong/" + SESSION.myId), "value", function (x) { CLOCK.onPong(x); });
 
       var pref = ref.child("players");
-      SESSION.sub(pref, "child_added", function (s) { SESSION.players[s.key] = s.val(); if (s.key === SESSION.myId) SESSION.saveResume(); LOBBY.playersChanged(); });
-      SESSION.sub(pref, "child_changed", function (s) { SESSION.players[s.key] = s.val(); if (s.key === SESSION.myId) SESSION.saveResume(); if (!MATCH.game || SESSION.room.status === "lobby") LOBBY.playersChanged(); });
+      SESSION.sub(pref, "child_added", function (s) { SESSION.players[s.key] = s.val(); if (s.key === SESSION.myId) RESUME.saveResume(); LOBBY.playersChanged(); });
+      SESSION.sub(pref, "child_changed", function (s) { SESSION.players[s.key] = s.val(); if (s.key === SESSION.myId) RESUME.saveResume(); if (!MATCH.game || SESSION.room.status === "lobby") LOBBY.playersChanged(); });
       SESSION.sub(pref, "child_removed", function (s) {
         if (s.key === SESSION.myId && !SESSION.leaving) { SESSION.rejoinAfterDrop(s.val() || SESSION.players[SESSION.myId]); return; }
         delete SESSION.players[s.key]; delete MATCH.remotes[s.key]; delete MATCH.bots[s.key];
@@ -894,29 +891,36 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           if (!hid || !ps[hid] || ps[hid].isAI) return r.ref.update({ hostPlayerId: nx });
         });
       }).catch(function () {});
-      SESSION.clearResume();
+      RESUME.clearResume();
       SESSION.room = null; SESSION.resetLocal(); SCREENS.showScreen("start"); LOBBY.startMsg("");
     }
     exitToStart(msg) {
-      SESSION.clearResume();
+      RESUME.clearResume();
       if (SESSION.room) { SESSION.leaving = true; SESSION.unsubAll(); try { SESSION.room.ref.child("players/" + SESSION.myId).onDisconnect().cancel(); } catch (e) {} }
       SESSION.room = null; SESSION.resetLocal(); SCREENS.showScreen("start"); LOBBY.startMsg(msg || "");
     }
     resetLocal() { FX_VIEW.clear3d(); SESSION.players = {}; MATCH.leave(); INPUT.reset(); FLOW.specHeld = false; setText($("btnAgain"), "다시하기"); }
     bindLifecycle() {
-      window.addEventListener("pagehide", function () { SESSION.saveResume(); if (SESSION.room) { try { SESSION.room.ref.child("players/" + SESSION.myId).remove(); } catch (e) {} } });
-      document.addEventListener("visibilitychange", function () { if (document.hidden) SESSION.saveResume(); });
-      setInterval(function () { SESSION.saveResume(); }, RoomSession.RESUME_SAVE_MS);
+      window.addEventListener("pagehide", function () { RESUME.saveResume(); if (SESSION.room) { try { SESSION.room.ref.child("players/" + SESSION.myId).remove(); } catch (e) {} } });
+      document.addEventListener("visibilitychange", function () { if (document.hidden) RESUME.saveResume(); });
+      setInterval(function () { RESUME.saveResume(); }, RoomResume.RESUME_SAVE_MS);
     }
+    practiceMode() { return !!SESSION.room && SESSION.room.mode === "practice"; }
+  }
+  var SESSION = new RoomSession();
+  class RoomResume {
+    static RESUME_KEY = "tba_resume_v1";
+    static RESUME_MS = 180000;
+    static RESUME_SAVE_MS = 20000;
     saveResume() {
       if (!SESSION.room || SESSION.leaving || !SESSION.players[SESSION.myId]) return;
-      try { sessionStorage.setItem(RoomSession.RESUME_KEY, JSON.stringify({ code: SESSION.room.code, id: SESSION.myId, me: SESSION.players[SESSION.myId], at: Date.now() })); } catch (e) {}
+      try { sessionStorage.setItem(RoomResume.RESUME_KEY, JSON.stringify({ code: SESSION.room.code, id: SESSION.myId, me: SESSION.players[SESSION.myId], at: Date.now() })); } catch (e) {}
     }
-    clearResume() { try { sessionStorage.removeItem(RoomSession.RESUME_KEY); } catch (e) {} }
+    clearResume() { try { sessionStorage.removeItem(RoomResume.RESUME_KEY); } catch (e) {} }
     readResume() {
       var s = null;
-      try { s = JSON.parse(sessionStorage.getItem(RoomSession.RESUME_KEY) || "null"); } catch (e) { s = null; }
-      return s && s.code && s.id && s.me && Date.now() - s.at < RoomSession.RESUME_MS ? s : null;
+      try { s = JSON.parse(sessionStorage.getItem(RoomResume.RESUME_KEY) || "null"); } catch (e) { s = null; }
+      return s && s.code && s.id && s.me && Date.now() - s.at < RoomResume.RESUME_MS ? s : null;
     }
     resumeTeam(me, ps, status) {
       if (status !== "lobby" || me.team === "spec") return me.team;
@@ -924,25 +928,24 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return ROSTER.countIn(ps, "spec", SESSION.myId) < SPEC_MAX ? "spec" : null;
     }
     tryResume() {
-      var s = SESSION.readResume();
-      if (!s || !BACKEND.db) { SESSION.clearResume(); return; }
+      var s = RESUME.readResume();
+      if (!s || !BACKEND.db) { RESUME.clearResume(); return; }
       var ref = BACKEND.db.ref(RoomSession.ROOT + "/" + s.code);
       LOBBY.startMsg("이전 방(" + s.code + ")으로 다시 들어가는 중…");
       Promise.all(["status", "players"].map(function (k) { return ref.child(k).once("value"); })).then(function (a) {
         var status = a[0].val(), ps = a[1].val() || {};
         if (SESSION.room) return;
-        if (status === null) { SESSION.clearResume(); LOBBY.startMsg(""); return; }
+        if (status === null) { RESUME.clearResume(); LOBBY.startMsg(""); return; }
         SESSION.myId = s.id;
         var me = ps[SESSION.myId] || Object.assign({}, s.me, { nickname: NICK.name || s.me.nickname });
-        var team = SESSION.resumeTeam(me, ps, status);
-        if (!team) { SESSION.clearResume(); LOBBY.startMsg("이전 방이 가득 차서 다시 들어가지 못했어요."); return; }
+        var team = RESUME.resumeTeam(me, ps, status);
+        if (!team) { RESUME.clearResume(); LOBBY.startMsg("이전 방이 가득 차서 다시 들어가지 못했어요."); return; }
         me.team = team;
         return ref.child("players/" + SESSION.myId).set(me).then(function () { LOBBY.startMsg(""); SESSION.enterRoom(s.code); });
-      }).catch(function () { SESSION.clearResume(); LOBBY.startMsg(""); });
+      }).catch(function () { RESUME.clearResume(); LOBBY.startMsg(""); });
     }
-    practiceMode() { return !!SESSION.room && SESSION.room.mode === "practice"; }
   }
-  var SESSION = new RoomSession();
+  var RESUME = new RoomResume();
 
 
 
@@ -8497,7 +8500,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       localTargets: TARGETS.localTargets.bind(TARGETS), hear: TARGETS.hear.bind(TARGETS), pruneLocal: WORLD.pruneLocal.bind(WORLD), revealedTo: VISION.revealedTo.bind(VISION), inBush: VISION.inBush.bind(VISION), STEALTH_REVEAL_DIST: VisionRules.STEALTH_REVEAL_DIST,
       rayRect: PHYSICS.rayRect.bind(PHYSICS), rayObst: PHYSICS.rayObst.bind(PHYSICS), rayCast: PHYSICS.rayCast.bind(PHYSICS), losClear: PHYSICS.losClear.bind(PHYSICS), segHit: PROJECTILES.segHit.bind(PROJECTILES),
       createRoom: SESSION.createRoom.bind(SESSION), joinRoom: SESSION.joinRoom.bind(SESSION), enterRoom: SESSION.enterRoom.bind(SESSION), leaveRoom: SESSION.leaveRoom.bind(SESSION), exitToStart: SESSION.exitToStart.bind(SESSION), nextHost: SESSION.nextHost.bind(SESSION), checkHost: SESSION.checkHost.bind(SESSION),
-      tryResume: SESSION.tryResume.bind(SESSION), saveResume: SESSION.saveResume.bind(SESSION), readResume: SESSION.readResume.bind(SESSION), clearResume: SESSION.clearResume.bind(SESSION), resumeTeam: SESSION.resumeTeam.bind(SESSION), RESUME_KEY: RoomSession.RESUME_KEY, RESUME_MS: RoomSession.RESUME_MS,
+      tryResume: RESUME.tryResume.bind(RESUME), saveResume: RESUME.saveResume.bind(RESUME), readResume: RESUME.readResume.bind(RESUME), clearResume: RESUME.clearResume.bind(RESUME), resumeTeam: RESUME.resumeTeam.bind(RESUME), RESUME_KEY: RoomResume.RESUME_KEY, RESUME_MS: RoomResume.RESUME_MS,
       room: function () { return SESSION.room; }, players: function () { return SESSION.players; }, screen: function () { return SCREENS.now; },
       setConf: function (conf) { var before = BACKEND.conf; BACKEND.conf = conf; return before; }, setNick: function (n) { return NICK.replaceStored(n); },
       capOf: ROSTER.capOf.bind(ROSTER), countIn: ROSTER.countIn.bind(ROSTER), isPlayingTeam: ROSTER.isPlayingTeam.bind(ROSTER), takenInMatch: ROSTER.takenInMatch.bind(ROSTER), freeCharOn: ROSTER.freeCharOn.bind(ROSTER), onlyOneMsg: ROSTER.onlyOneMsg.bind(ROSTER), canMoveTo: ROSTER.canMoveTo.bind(ROSTER),
@@ -8529,7 +8532,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   SCREENS.showScreen("start");
   if (!BACKEND.db) LOBBY.startMsg("온라인 연결을 준비하지 못했어요. 인터넷 연결을 확인해 주세요.");
   if (!NICK.name) NICK.openNick();
-  if (!/[?&](test|sim)(&|$)/.test(location.search)) SESSION.tryResume();
+  if (!/[?&](test|sim)(&|$)/.test(location.search)) RESUME.tryResume();
   if (!SILENT_RUN) new FullscreenKeeper(document).watch();
   LOOP.start();
   TEST_BRIDGE.markReady();
