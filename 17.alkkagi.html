@@ -298,7 +298,6 @@ function newGame() {
     stones.push(mkStone(x, 158,     WHITE));
     if (x !== 300) stones.push(mkStone(x, H - 158, BLACK));
   }
-  stones.push(mkStone(300, 158, WHITE));
   turn = BLACK;
   boardTurner.follow(turn);
   phase = 'aim';
