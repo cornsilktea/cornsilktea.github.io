@@ -1381,7 +1381,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       setHtml($("statsBody"), "");
       if (!BACKEND.db) { setText($("statsMsg"), "온라인 연결을 준비하지 못해 통계를 불러올 수 없어요."); return; }
       setText($("statsMsg"), "불러오는 중…");
-      BACKEND.db.ref(STATS_PATH + STATS_VIEW.mode).once("value").then(function (snap) {
+      BACKEND.db.ref(MatchStats.PATH + STATS_VIEW.mode).once("value").then(function (snap) {
         if (seq !== STATS_VIEW.loadSeq) return;
         var s = snap.val() || {}, matches = +s.matches || 0, red = +s.red || 0, blue = +s.blue || 0, draws = Math.max(0, matches - red - blue);
         setText($("statsMsg"), "집계된 경기 " + matches + "판 · 진영 승률(무승부 제외): 블루 " + STATS_VIEW.statsPct(blue, matches - draws) + " · 레드 " + STATS_VIEW.statsPct(red, matches - draws) +
@@ -3093,7 +3093,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var skipReason = quitTeam ? "상대팀이 모두 나가서 통계에서 제외됐어요" : STATS.skipReason(SESSION.room.mode, SESSION.room.roster, SESSION.players);
       var ended = { status: "ended", winner: winner, endedAt: t,
         final: { blue: s.blueKills, red: s.redKills, reason: quitTeam ? "상대팀이 모두 나가서 승리" : "시간 종료 — 킬 스코어로 판정" } };
-      if (recordsStats) ended.statsNote = skipReason || STATS_PENDING;
+      if (recordsStats) ended.statsNote = skipReason || MatchStats.PENDING;
       SESSION.room.ref.update(ended);
       if (!skipReason) STATS.watchDone(t);
     }
@@ -5324,10 +5324,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
 
 
-  var STATS_PATH = "teambattle/modestats/";
-  var STATS_SETTLE_MS = 8000, STATS_HOLD_MAX_MS = 11000;
-  var STATS_PENDING = "통계를 저장하는 중이에요";
   class MatchStats {
+    static PATH = "teambattle/modestats/";
+    static SETTLE_MS = 8000;
+    static HOLD_MAX_MS = 11000;
+    static PENDING = "통계를 저장하는 중이에요";
     skipReason(mode, roster, ps) {
       if (mode !== "pvp" && mode !== "cup") return "이 모드는 통계를 모으지 않아요";
       if (!roster) return "참가자 정보를 못 받아서 통계에서 제외됐어요";
@@ -5356,7 +5357,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       function onDone(s) { settle(s.val() || {}, false); }
       function failed() { if (settled) return; settled = true; clearTimeout(timer); ref.off("value", onDone); STATS.setNote(r, "통계 확인에 실패해서 저장하지 못했어요"); }
       ref.on("value", onDone, failed);
-      timer = setTimeout(function () { ref.once("value").then(function (s) { settle(s.val() || {}, true); }).catch(failed); }, STATS_SETTLE_MS);
+      timer = setTimeout(function () { ref.once("value").then(function (s) { settle(s.val() || {}, true); }).catch(failed); }, MatchStats.SETTLE_MS);
     }
     record(r, endedAt, stayed) {
       var ps = SESSION.players;
@@ -5365,7 +5366,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (!STATS.isFullStudentMatch(r.mode, r.roster, ps)) { STATS.setNote(r, "참가자 정보가 맞지 않아 통계에서 제외됐어요"); return; }
       STATS.save(r, ps);
     }
-    holdActive() { return !!SESSION.room && SESSION.room.status === "ended" && SESSION.room.statsNote === STATS_PENDING && now() - (SESSION.room.endedAt || 0) < STATS_HOLD_MAX_MS; }
+    holdActive() { return !!SESSION.room && SESSION.room.status === "ended" && SESSION.room.statsNote === MatchStats.PENDING && now() - (SESSION.room.endedAt || 0) < MatchStats.HOLD_MAX_MS; }
     markStayed() {
       var r = SESSION.room;
       if (!r || !SESSION.players[SESSION.myId] || !r.roster || !r.roster[SESSION.myId]) return;
@@ -5383,7 +5384,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       });
       var banned = (r.bans || []).filter(function (c) { return CHARS[c]; });
       function addStats(countSelectableGames, countDraws) {
-        return BACKEND.db.ref(STATS_PATH + r.mode).transaction(function (cur) {
+        return BACKEND.db.ref(MatchStats.PATH + r.mode).transaction(function (cur) {
           cur = cur || {};
           var matchesBefore = +cur.matches || 0;
           cur.matches = matchesBefore + 1;
@@ -8429,7 +8430,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       setTestLink: function (flag) { var before = BACKEND.isTestLink; BACKEND.isTestLink = flag; return before; },
       CHAR_TYPES: CHAR_TYPES, AUTO_AIM: AUTO_AIM, AUTO_AIM_ERR: AUTO_AIM_ERR, AUTO_AIM_LEAD: AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: DRAFT_AI,
       DRAFT: DRAFT, DRAFT_STEPS: DRAFT_STEPS, DRAFT_STEP_MS: DRAFT_STEP_MS, DRAFT_AI_MS: DRAFT_AI_MS, DRAFT_AI_TRADE_MS: DRAFT_AI_TRADE_MS, NO_BAN: NO_BAN,
-      STATS: STATS, STATS_PATH: STATS_PATH, STATS_PENDING: STATS_PENDING, STATS_SETTLE_MS: STATS_SETTLE_MS, STATS_HOLD_MAX_MS: STATS_HOLD_MAX_MS,
+      STATS: STATS, STATS_PATH: MatchStats.PATH, STATS_PENDING: MatchStats.PENDING, STATS_SETTLE_MS: MatchStats.SETTLE_MS, STATS_HOLD_MAX_MS: MatchStats.HOLD_MAX_MS,
       CLOCK: CLOCK, GameClock: GameClock, CLOCK_KEEP: CLOCK_KEEP, CLOCK_PINGS: CLOCK_PINGS,
       MATCH: MATCH, FIELD: FIELD, resetLocal: SESSION.resetLocal.bind(SESSION), backToLobby: FLOW.backToLobby.bind(FLOW), stKey: NETSTATE.stKey.bind(NETSTATE),
       KEY_ON: INPUT.keys, joy: INPUT.joy, aim: INPUT.aim, keyName: INPUT.keyName.bind(INPUT), joyBase: INPUT.joyBase.bind(INPUT), joyRadius: function () { return INPUT.joyR; }, DRAG_MIN: INPUT.dragMin, canAct: INPUT.canAct.bind(INPUT), flip: INPUT.flip.bind(INPUT),
