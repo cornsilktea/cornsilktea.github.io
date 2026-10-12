@@ -2106,7 +2106,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return "앞으로 " + c.dashRange + " 돌진한 뒤 반경 " + c.range + " 안의 가장 가까운 적 1명을 찔러 " + c.dmg + "의 피해";
     }
     attackClip(v, E, t) {
-      return ["Running_A", MODELS.kit.clips.Running_A.duration * 1000 / MELEE.lungeDashMs(E, E.atkAt)];
+      return ["Running_A", MODELS.kit.clips.Running_A.duration * 1000 / DASH_MOVES.lungeDashMs(E, E.atkAt)];
     }
   }
   class KnightType extends ArcMeleeType {
@@ -2367,14 +2367,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     aimRange(btn) { return [ULT.bsMin, ULT.bsCast]; }
     botUltRange() { return ULT.bsCast; }
-    botUltSpot(B, target, td, t) { return BRAIN.leadSpot(target, MELEE.hammerLeapMs(td) / 1000, t); }
+    botUltSpot(B, target, td, t) { return BRAIN.leadSpot(target, DASH_MOVES.hammerLeapMs(td) / 1000, t); }
     get hasSkillClip() { return true; }
     playSkillClip(v, E, t) { FIGHTER_VIEW.playOnce(v, "Melee_1H_Attack_Jump_Chop", JUMP_CHOP_LAND_SEC * 1000 / Math.max(1, E.ultUntil - (E.leapAt || t)), t); }
     cast(E, ang, reach, t) {
       var landing = ATTACK.burstSpot(E, ang, reach, ULT.bsCast, ULT.bsMin);
       PHYSICS.resolve(landing);
       E.angle = Math.atan2(landing.y - E.y, landing.x - E.x);
-      var leapMs = MELEE.hammerLeapMs(hyp(landing.x - E.x, landing.y - E.y));
+      var leapMs = DASH_MOVES.hammerLeapMs(hyp(landing.x - E.x, landing.y - E.y));
       E.leapAt = t;
       E.ultUntil = t + leapMs;
       E.cdUntil = Math.max(E.cdUntil, t + leapMs + 250);
@@ -2485,11 +2485,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (ult) {
         var ex = Math.cos(E.angle), ey = Math.sin(E.angle), el = PHYSICS.rayCast(E.x + ex * 20, E.y + ey * 20, ex, ey, ULT.exRange, ULT.exPr) + 20;
         AIM_GUIDE.showAimStrip(18, Math.max(1, el - 18), 18);
-      } else AIM_GUIDE.showAimStrip(0, MELEE.dashReach(E, E.angle, c.dashRange) + BODY_R, c.dashWidth);
+      } else AIM_GUIDE.showAimStrip(0, DASH_MOVES.dashReach(E, E.angle, c.dashRange) + BODY_R, c.dashWidth);
       return true;
     }
     skillShotSpec() { return { count: 1, gap: 0, sp: ULT.exSpeed, dmg: ULT.exDmg, pr: ULT.exPr, range: ULT.exRange, ultKey: "execute", fx: { stunMs: ULT.exStunMs } }; }
-    overrideBasic(E, ang, reach, t) { MELEE.dashStrike(E, ang); return true; }
+    overrideBasic(E, ang, reach, t) { DASH_MOVES.dashStrike(E, ang); return true; }
     onHitLate(owner, h) {
       if (h.tp && owner.alive) { owner.x = h.tp.x; owner.y = h.tp.y; owner.dash = null; PHYSICS.resolve(owner); }
     }
@@ -2789,12 +2789,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return true;
     }
     botUltRange() { return ULT.gaCast; }
-    botUltSpot(B, target, td, t) { return BRAIN.leadSpot(target, MELEE.hammerLeapMs(td) / 1000, t); }
+    botUltSpot(B, target, td, t) { return BRAIN.leadSpot(target, DASH_MOVES.hammerLeapMs(td) / 1000, t); }
     cast(E, ang, reach, t) {
       var landing = ATTACK.burstSpot(E, ang, reach, ULT.gaCast, ULT.gaMin);
       PHYSICS.resolve(landing);
       E.angle = Math.atan2(landing.y - E.y, landing.x - E.x);
-      var leapMs = MELEE.hammerLeapMs(hyp(landing.x - E.x, landing.y - E.y));
+      var leapMs = DASH_MOVES.hammerLeapMs(hyp(landing.x - E.x, landing.y - E.y));
       E.leapAt = t;
       E.ultUntil = t + leapMs;
       E.cdUntil = Math.max(E.cdUntil, t + leapMs + 250);
@@ -2867,7 +2867,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return true;
     }
     botUltRange() { return ULT.gjCast; }
-    botUltSpot(B, target, td, t) { return BRAIN.leadSpot(target, MELEE.hammerLeapMs(td) / 1000, t); }
+    botUltSpot(B, target, td, t) { return BRAIN.leadSpot(target, DASH_MOVES.hammerLeapMs(td) / 1000, t); }
     overrideBasic(E, ang, reach, t) {
       if (!this.isGolem(E, t)) return false;
       var T = GIANT.maceTarget(E, t);
@@ -2879,7 +2879,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var landing = ATTACK.burstSpot(E, ang, reach, ULT.gjCast, ULT.gjMin);
       PHYSICS.resolve(landing);
       E.angle = Math.atan2(landing.y - E.y, landing.x - E.x);
-      var leapMs = MELEE.hammerLeapMs(hyp(landing.x - E.x, landing.y - E.y));
+      var leapMs = DASH_MOVES.hammerLeapMs(hyp(landing.x - E.x, landing.y - E.y));
       E.leapAt = t;
       E.ultUntil = t + leapMs;
       E.cdUntil = Math.max(E.cdUntil, t + leapMs + 250);
@@ -4610,6 +4610,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       SESSION.room.ref.child("meleeHits").push(d);
       if (TARGETS.hear(E)) SOUND.sfx("swing");
     }
+  }
+  var MELEE = new MeleeSystem();
+  class DashMoves {
     dashReach(E, ang, len) {
       var dx = Math.cos(ang), dy = Math.sin(ang), pad = BODY_R - 1, best = PHYSICS.rayObst(E.x, E.y, dx, dy, pad);
       for (var i = 0; i < ARENA_MAP.water.length; i++) best = Math.min(best, PHYSICS.rayRect(E.x, E.y, dx, dy, ARENA_MAP.water[i], pad));
@@ -4620,7 +4623,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return clamp(Math.min(len, best), 0, len);
     }
     dashStrike(E, ang) {
-      var c = CHARS[E.char], t = now(), reach = MELEE.dashReach(E, ang, c.dashRange);
+      var c = CHARS[E.char], t = now(), reach = DASH_MOVES.dashReach(E, ang, c.dashRange);
       var tx = clamp(E.x + Math.cos(ang) * reach, BOUND.l + BODY_R, BOUND.r - BODY_R), ty = clamp(E.y + Math.sin(ang) * reach, BOUND.t + BODY_R, BOUND.b - BODY_R);
       reach = hyp(tx - E.x, ty - E.y);
       SESSION.room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(ang), len: Math.max(1, Math.round(reach)), width: c.dashWidth, dmg: c.dashDmg, createdAt: t });
@@ -4633,11 +4636,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     lungeDashMs(E, t) { return E.isRiposting(t) ? ULT.rmDashMs : CHARS[E.char].dashMs; }
     lungeRange(E, t) { return E.isRiposting(t) ? ULT.rmDashRange : CHARS[E.char].dashRange; }
     lunge(E, ang) {
-      var t = now(), full = MELEE.lungeRange(E, t), reach = MELEE.dashReach(E, ang, full);
+      var t = now(), full = DASH_MOVES.lungeRange(E, t), reach = DASH_MOVES.dashReach(E, ang, full);
       var tx = clamp(E.x + Math.cos(ang) * reach, BOUND.l + BODY_R, BOUND.r - BODY_R), ty = clamp(E.y + Math.sin(ang) * reach, BOUND.t + BODY_R, BOUND.b - BODY_R);
       reach = hyp(tx - E.x, ty - E.y);
       VISION.revealBriefly(E.id, t);
-      E.dash = { sx: E.x, sy: E.y, tx: tx, ty: ty, at: t, ang: ang, ms: Math.max(1, Math.round(MELEE.lungeDashMs(E, t) * reach / full)) };
+      E.dash = { sx: E.x, sy: E.y, tx: tx, ty: ty, at: t, ang: ang, ms: Math.max(1, Math.round(DASH_MOVES.lungeDashMs(E, t) * reach / full)) };
       E.atkAt = t;
       MATCH.game.forceNet = true;
     }
@@ -4651,7 +4654,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return best;
     }
     stabNearest(E, t) {
-      var c = CHARS[E.char], T = MELEE.stabTarget(E, t);
+      var c = CHARS[E.char], T = DASH_MOVES.stabTarget(E, t);
       E.stabAt = t;
       VISION.revealBriefly(E.id, t);
       MATCH.game.forceNet = true;
@@ -4678,7 +4681,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (E.isStunned(t)) { E.dash = null; return; }
       if (t < D.at + dashMs + (c.finishDelay || 0)) return;
       E.dash = null;
-      if (c.stab) { MELEE.stabNearest(E, t); return; }
+      if (c.stab) { DASH_MOVES.stabNearest(E, t); return; }
       E.atkAt = t;
       if (TARGETS.hear(E)) SOUND.sfx("swing");
       SESSION.room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: r1(E.x), y: r1(E.y), angle: r1(D.ang), radius: c.range, arc: Math.PI * 2, dmg: c.dmg, createdAt: D.swingId });
@@ -4704,7 +4707,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     stepHammerLeap(E) {
       var L = E.leap; if (!L) return;
       if (!E.alive) { E.leap = null; return; }
-      var t = now(), k = MELEE.leapProgress(t, L.at, L.until), ease = k * k * (3 - 2 * k);
+      var t = now(), k = DASH_MOVES.leapProgress(t, L.at, L.until), ease = k * k * (3 - 2 * k);
       E.x = L.sx + (L.tx - L.sx) * ease; E.y = L.sy + (L.ty - L.sy) * ease;
       E.mv = false;
       if (k < 1) return;
@@ -4717,7 +4720,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       MATCH.game.forceNet = true;
     }
   }
-  var MELEE = new MeleeSystem();
+  var DASH_MOVES = new DashMoves();
   class GargantuaSystem {
     land(E, t) {
       E.buffUntil = t + ULT.gaDur;
@@ -4834,7 +4837,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       E.cdDur = E.isRiposting(t) ? 1000 / ULT.rmRate : c.cd * (rage ? ULT.bzCdMul : 1) / (E.isOvercharged(t) ? ULT.ocRate : 1); E.cdUntil = t + E.cdDur; E.angle = ang;
       var type = CHAR_TYPES.of(E.char);
       if (type.overrideBasic(E, ang, reach, t)) return;
-      if (c.stab) { MELEE.lunge(E, ang); return; }
+      if (c.stab) { DASH_MOVES.lunge(E, ang); return; }
       var ambushDmg = type.ambush(E, t);
       if (CATALOG.isMelee(E.char) && (!c.throwRange || MELEE.enemyInMelee(E))) {
         MELEE.swing(E, ang, rage, ambushDmg);
@@ -5289,7 +5292,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (botType.wantsBasicNow(B, t)) { ATTACK.fireBasic(B, B.angle); return; }
       if (aimAt && t >= B.cdUntil && t - k.seenAt > BotThought.BOT_REACT_MS) {
         var ad = hyp(aimAt.x - B.x, aimAt.y - B.y);
-        var rng = c.stab ? MELEE.lungeRange(B, t) + c.range : c.throwRange || c.dashRange || (melee ? c.range + BODY_R - 4 : c.range + (B.isOvercharged(t) ? ULT.ocRangeBonus : 0));
+        var rng = c.stab ? DASH_MOVES.lungeRange(B, t) + c.range : c.throwRange || c.dashRange || (melee ? c.range + BODY_R - 4 : c.range + (B.isOvercharged(t) ? ULT.ocRangeBonus : 0));
         if (ad <= rng && PHYSICS.losClear(B.x, B.y, aimAt.x, aimAt.y)) {
           var shotAim = c.pSpeed && !melee ? BRAIN.leadSpot(aimAt, ad / c.pSpeed, t) : aimAt;
           ATTACK.fireBasic(B, Math.atan2(shotAim.y - B.y, shotAim.x - B.x) + (Math.random() - 0.5) * 2 * BotThought.BOT_AIM_ERR);
@@ -6413,7 +6416,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     leapHeight(E, t) {
       if (!E.alive || !E.isHammerLeaping(t)) return 0;
-      var k = MELEE.leapProgress(t, E.leapAt, E.ultUntil);
+      var k = DASH_MOVES.leapProgress(t, E.leapAt, E.ultUntil);
       return 4 * ULT.bsHop * k * (1 - k);
     }
     attackClip(v, E, t) {
@@ -7224,7 +7227,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var aimType = CHAR_TYPES.of(MATCH.me.char);
       if (aimType.showAimGuide(MATCH.me, ult, c)) {
       } else if (c.stab && !ult) {
-        var lungeLen = MELEE.dashReach(MATCH.me, MATCH.me.angle, MELEE.lungeRange(MATCH.me, now()));
+        var lungeLen = DASH_MOVES.dashReach(MATCH.me, MATCH.me.angle, DASH_MOVES.lungeRange(MATCH.me, now()));
         AIM_GUIDE.showAimStrip(0, lungeLen, BODY_R * 2);
         AIM_GUIDE.showAimCircle(lungeLen, c.range + BODY_R);
       } else if (c.width) {
@@ -8436,10 +8439,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       } else if (MATCH.me) MATCH.me.mv = false;
     }
     stepSkillMotion(E, t, dt) {
-      MELEE.stepKnightSlam(E);
-      MELEE.stepHammerLeap(E);
+      DASH_MOVES.stepKnightSlam(E);
+      DASH_MOVES.stepHammerLeap(E);
       MELEE.stepLance(E);
-      MELEE.stepDash(E);
+      DASH_MOVES.stepDash(E);
       MINIONS.stepMinions(E, dt, t);
       DAMAGE.payKillGaugeOwed(E, t);
     }
