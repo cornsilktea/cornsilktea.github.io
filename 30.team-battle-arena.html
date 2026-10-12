@@ -2526,7 +2526,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     get hasDarkWave() { return false; }
     get hidesBasicEdge() { return false; }
     get heavyStrikeSpark() { return false; }
-    get scopesWhileAiming() { return false; }
     get showsHealRange() { return false; }
     showAimGuide(E, ult, c) {
       if (!ult || this.data.ultKind !== "blackhole") return false;
@@ -2781,7 +2780,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   class SniperType extends CharacterType {
     get idleClip() { return "Ranged_2H_Aiming"; }
-    get scopesWhileAiming() { return true; }
     ultAimShot() { return { len: ULT.pnRange, halfWidth: 22 }; }
     skillShotSpec() { return { count: 1, gap: 0, sp: ULT.pnSpeed, dmg: ULT.pnDmg, pr: ULT.pnPr, range: ULT.pnRange, ultKey: "giant" }; }
     onHitLate(owner, h) { if (h.u === "giant") owner.gauge = Math.min(GAUGE_MAX, owner.gauge + ULT.pnRefund); }
@@ -7837,9 +7835,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var FX_VIEW = new FxView();
   class CameraRig {
     static FOV = 40;
-    static SCOPE_FIT_OUT = 0.82;
-    static SCOPE_FIT_IN = 0.65;
-    static SCOPE_ZOOM_MAX = 2.2;
     static VIEW_AHEAD = 570;
     static VIEW_BEHIND = 290;
     static VIEW_HALF_W = 280;
@@ -7848,7 +7843,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static HEAD_Y = 110;
     constructor() {
       this.w = 0; this.h = 0; this.dpr = 1; this.pix = PIX_START; this.renderer = null;
-      this.view = { pitchPlay: 0.92, pitchSpec: 1.12, dist: 1400, look: new THREE.Vector3(MW / 2, 0, MH / 2), fitKey: "", snap: true, halfW: 0, scopeX: 0, scopeZ: 0, zoom: 1, zoomGoal: 1 };
+      this.view = { pitchPlay: 0.92, pitchSpec: 1.12, dist: 1400, look: new THREE.Vector3(MW / 2, 0, MH / 2), fitKey: "", snap: true, halfW: 0 };
     }
     resize() {
       CAMERA_RIG.dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -7915,24 +7910,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }
       if (CAMERA_RIG.view.snap) { CAMERA_RIG.view.look.set(lx, 0, lz); CAMERA_RIG.view.snap = false; }
       else { var k = 1 - Math.exp(-dt * 7); CAMERA_RIG.view.look.x += (lx - CAMERA_RIG.view.look.x) * k; CAMERA_RIG.view.look.z += (lz - CAMERA_RIG.view.look.z) * k; }
-      var scoping = !spec && MATCH.me.alive && CHAR_TYPES.of(MATCH.me.char).scopesWhileAiming && INPUT.aim.id !== null && INPUT.aim.drag && !INPUT.aim.cancel;
-      var sk = 1 - Math.exp(-dt * 6), aimX = 0, aimZ = 0, endX = 0, endZ = 0;
-      if (scoping) {
-        var wx = Math.cos(MATCH.me.angle), wz = Math.sin(MATCH.me.angle), len = PHYSICS.rayCast(MATCH.me.x + wx * 20, MATCH.me.y + wz * 20, wx, wz, CHARS[MATCH.me.char].range, 6) + 20;
-        endX = MATCH.me.x + wx * len; endZ = MATCH.me.y + wz * len;
-        aimX = (MATCH.me.x + endX) / 2 - CAMERA_RIG.view.look.x; aimZ = (MATCH.me.y + endZ) / 2 - CAMERA_RIG.view.look.z;
-        CAMERA_RIG.placeCamera(CAMERA_RIG.view.look.x + aimX, CAMERA_RIG.view.look.z + aimZ, CAMERA_RIG.view.dist * CAMERA_RIG.view.zoomGoal, pitch, b);
-        var edge = Math.max(CAMERA_RIG.ndcReach(MATCH.me.x, CameraRig.HEAD_Y, MATCH.me.y), CAMERA_RIG.ndcReach(endX, 0, endZ));
-        CAMERA_RIG.view.zoomGoal = clamp(CAMERA_RIG.view.zoomGoal * (edge > CameraRig.SCOPE_FIT_OUT ? 1 + dt * 3 : (edge < CameraRig.SCOPE_FIT_IN ? 1 - dt : 1)), 1, CameraRig.SCOPE_ZOOM_MAX);
-      } else CAMERA_RIG.view.zoomGoal = 1;
-      CAMERA_RIG.view.scopeX += (aimX - CAMERA_RIG.view.scopeX) * sk;
-      CAMERA_RIG.view.scopeZ += (aimZ - CAMERA_RIG.view.scopeZ) * sk;
-      CAMERA_RIG.view.zoom += (CAMERA_RIG.view.zoomGoal - CAMERA_RIG.view.zoom) * sk;
-      CAMERA_RIG.placeCamera(CAMERA_RIG.view.look.x + CAMERA_RIG.view.scopeX, CAMERA_RIG.view.look.z + CAMERA_RIG.view.scopeZ, CAMERA_RIG.view.dist * CAMERA_RIG.view.zoom, pitch, b);
-    }
-    ndcReach(x, h, z) {
-      tmpV.set(x, h, z).project(STAGE.camera);
-      return tmpV.z > 1 ? 9 : Math.max(Math.abs(tmpV.x), Math.abs(tmpV.y));
+      CAMERA_RIG.placeCamera(CAMERA_RIG.view.look.x, CAMERA_RIG.view.look.z, CAMERA_RIG.view.dist, pitch, b);
     }
   }
   var CAMERA_RIG = new CameraRig();
