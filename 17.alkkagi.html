@@ -128,6 +128,9 @@
     align-items: center; justify-content: center; padding: 10px;
     min-height: 0;
   }
+  canvas.turned { transform: rotate(180deg); }
+  .turn-option { display:flex; align-items:center; gap:8px; margin-top:10px; font-size:15px; cursor:pointer; }
+  .turn-option input { width:20px; height:20px; }
   canvas {
     touch-action: none; display: block; border-radius:var(--sg-radius);
     border: 2px solid var(--sg-line-strong); box-shadow: 0 6px 18px rgba(27,43,32,.12);
@@ -186,6 +189,7 @@
         <button class="st-btn primary" data-mode="ai" data-level="3">상</button>
       </div>
       <button class="st-btn" data-mode="duo">👥 2인 대전 시작 <small>한 화면을 마주 보고 번갈아 튕기기</small></button>
+      <label class="turn-option"><input type="checkbox" id="turnBoardOption"> 180도 회전 <small>(전자칠판용: 차례마다 판이 돌아 내 돌이 항상 아래에 옵니다)</small></label>
     </div>
 
     <div class="st-card">
@@ -296,6 +300,7 @@ function newGame() {
   }
   stones.push(mkStone(300, 158, WHITE));
   turn = BLACK;
+  boardTurner.follow(turn);
   phase = 'aim';
   selected = null;
   dragging = false;
@@ -386,6 +391,7 @@ function endTurn() {
     return;
   }
   turn = 1 - turn;
+  boardTurner.follow(turn);
   phase = 'aim';
   updateHud();
   if (mode === 'ai' && turn === WHITE) {
@@ -479,13 +485,25 @@ function edgeDist(s) {
   return Math.min(s.x, W - s.x, s.y, H - s.y);
 }
 
-function toBoard(ev) {
-  const r = cv.getBoundingClientRect();
-  return {
-    x: (ev.clientX - r.left) / r.width * W,
-    y: (ev.clientY - r.top) / r.height * H
-  };
+class BoardTurner {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.enabled = false;
+    this.turned = false;
+  }
+  follow(side) {
+    this.turned = this.enabled && side === WHITE;
+    this.canvas.classList.toggle('turned', this.turned);
+  }
+  toBoard(ev) {
+    const r = this.canvas.getBoundingClientRect();
+    const x = (ev.clientX - r.left) / r.width * W;
+    const y = (ev.clientY - r.top) / r.height * H;
+    return this.turned ? { x: W - x, y: H - y } : { x, y };
+  }
 }
+const boardTurner = new BoardTurner(cv);
+function toBoard(ev) { return boardTurner.toBoard(ev); }
 function myTurnNow() {
   if (phase !== 'aim') return false;
   if (mode === 'ai' && turn === WHITE) return false;
@@ -831,6 +849,7 @@ function showStart() {
 document.querySelectorAll('[data-mode]').forEach(btn => {
   btn.addEventListener('click', () => {
     mode = btn.dataset.mode;
+    boardTurner.enabled = mode === 'duo' && document.getElementById('turnBoardOption').checked;
     aiLevel = parseInt(btn.dataset.level || '2', 10);
     showGame();
   });
