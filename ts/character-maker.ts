@@ -48,7 +48,7 @@ class CharacterMakerDialog {
     this.modal.hidden = true;
     this.modal.innerHTML =
       "<div class='st-wrap'><div class='st-card'>" +
-      "<div class='maker-head'><h2>" + (withLook ? "캐릭터 만들기" : "닉네임 설정") + "</h2><button type='button' class='st-btn sub maker-close'>닫기</button></div>" +
+      "<div class='maker-head'><h2>" + (withLook ? "캐릭터 만들기" : "닉네임 설정") + "</h2><button type='button' class='st-btn maker-save'>저장</button></div>" +
       "<div class='maker-host'></div><div class='st-hint maker-note'></div></div></div>";
     document.body.appendChild(this.modal);
     this.host = this.modal.querySelector(".maker-host") as HTMLDivElement;
@@ -75,7 +75,7 @@ class CharacterMakerDialog {
   }
 
   private bindEvents(): void {
-    (this.modal.querySelector(".maker-close") as HTMLButtonElement).addEventListener("click", () => this.close());
+    (this.modal.querySelector(".maker-save") as HTMLButtonElement).addEventListener("click", () => this.close());
     document.addEventListener(CharacterMakerDialog.OPEN_EVENT, () => this.open());
     document.addEventListener("click", (event) => {
       const trigger = (event.target as HTMLElement).closest(CharacterMakerDialog.TRIGGER_SELECTOR);

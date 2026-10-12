@@ -208,6 +208,8 @@
 .maker-modal .maker-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
 .maker-modal .maker-head h2{margin:0;}
 .maker-modal .maker-head .st-btn{width:auto;min-height:44px;margin:0;font-size:16px;}
+.maker-modal .maker-head .st-btn.maker-save{background:#D32F2F;border-color:#EF5350;color:#fff;font-weight:800;}
+.maker-modal .maker-head .st-btn.maker-save:active{background:#B71C1C;}
 .maker-modal[hidden]{display:none !important;}
 .ce-toggles{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
 .ce-toggles button{flex:1 1 40%;min-height:42px;font:inherit;font-size:15px;font-weight:800;border-radius:6px;cursor:pointer;
