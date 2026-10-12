@@ -1491,9 +1491,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   var LAUNCHER = new MatchLauncher();
 
-  var DRAFT_STEPS = [{ keys: ["b1"], ban: true }, { keys: ["r1"], ban: true }, { keys: ["b1"] }, { keys: ["r1", "r2"] }, { keys: ["b2", "b3"] }, { keys: ["r3"] }];
-  var DRAFT_SHOWN_MS = 15000, DRAFT_STEP_MS = 16000, DRAFT_AI_MS = 2500, DRAFT_AI_TRADE_MS = 1200, TRADE_DENIED_SHOW_MS = 2000, NO_BAN = "-";
-  var DRAFT_AI_FIGHTER_FIRST = 0.5;
   class DraftAiPicker {
     sideIds(d, side) {
       return keys(d.seq || {}).filter(function (k) { return k.charAt(0) === side; }).map(function (k) { return d.seq[k]; }).filter(function (id) { return SESSION.players[id]; });
@@ -1509,19 +1506,27 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     choose(d, id, left) {
       var side = DRAFT.draftSideOf(d, id), fighters = left.filter(function (c) { return CHARS[c].role === "fighter"; });
       if (!side || !fighters.length || DRAFT_AI.sideHasFighter(d, side)) return pick(left);
-      if (!DRAFT_AI.otherAiWaiting(d, side, id) || Math.random() < DRAFT_AI_FIGHTER_FIRST) return pick(fighters);
+      if (!DRAFT_AI.otherAiWaiting(d, side, id) || Math.random() < Draft.AI_FIGHTER_FIRST) return pick(fighters);
       return pick(left);
     }
   }
   var DRAFT_AI = new DraftAiPicker();
   class Draft {
+    static STEPS = [{ keys: ["b1"], ban: true }, { keys: ["r1"], ban: true }, { keys: ["b1"] }, { keys: ["r1", "r2"] }, { keys: ["b2", "b3"] }, { keys: ["r3"] }];
+    static SHOWN_MS = 15000;
+    static STEP_MS = 16000;
+    static AI_MS = 2500;
+    static AI_TRADE_MS = 1200;
+    static DENIED_SHOW_MS = 2000;
+    static NO_BAN = "-";
+    static AI_FIGHTER_FIRST = 0.5;
     constructor() { this.view = null; this.busy = false; this.launched = 0; }
-    stepSide(step) { return DRAFT_STEPS[step].keys[0].charAt(0); }
+    stepSide(step) { return Draft.STEPS[step].keys[0].charAt(0); }
     draftStepIds(d, step) {
-      return ((DRAFT_STEPS[step] || {}).keys || []).map(function (k) { return d.seq && d.seq[k]; }).filter(function (id) { return !!id; });
+      return ((Draft.STEPS[step] || {}).keys || []).map(function (k) { return d.seq && d.seq[k]; }).filter(function (id) { return !!id; });
     }
     draftWaiting(d, step) {
-      var S = DRAFT_STEPS[step];
+      var S = Draft.STEPS[step];
       if (!S) return [];
       if (S.ban) return d.bans && d.bans[DRAFT.stepSide(step)] ? [] : DRAFT.draftStepIds(d, step).filter(function (id) { return SESSION.players[id]; });
       var picks = d.picks || {};
@@ -1529,7 +1534,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     draftBanned(d) {
       var bans = d.bans || {};
-      return ["b", "r"].map(function (k) { return bans[k]; }).filter(function (c) { return c && c !== NO_BAN; });
+      return ["b", "r"].map(function (k) { return bans[k]; }).filter(function (c) { return c && c !== Draft.NO_BAN; });
     }
     draftTaken(d) {
       var picks = d.picks || {};
@@ -1539,7 +1544,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var gone = DRAFT.draftTaken(d).concat(DRAFT.draftBanned(d));
       return CHAR_LIST.filter(function (c) { return gone.indexOf(c) < 0; });
     }
-    draftDone(d) { return d.step >= DRAFT_STEPS.length; }
+    draftDone(d) { return d.step >= Draft.STEPS.length; }
     draftSideOf(d, id) {
       var k = keys(d.seq || {}).filter(function (s) { return d.seq[s] === id; })[0];
       return k ? k.charAt(0) : null;
@@ -1557,7 +1562,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         DRAFT.draftSideOf(d, id) && DRAFT.draftSideOf(d, id) === DRAFT.draftSideOf(d, SESSION.myId) && !!picks[id] && !!picks[SESSION.myId];
     }
     draftSettle(d, t) {
-      while (d.step < DRAFT_STEPS.length && !DRAFT.draftWaiting(d, d.step).length) { d.step++; d.stepAt = t; }
+      while (d.step < Draft.STEPS.length && !DRAFT.draftWaiting(d, d.step).length) { d.step++; d.stepAt = t; }
       return d;
     }
     startDraft() {
@@ -1570,7 +1575,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
                         shots: null, meleeHits: null, hits: null, effects: null, kills: null, projectiles: null });
     }
     applyDraftChoice(cur, id, c) {
-      if (DRAFT_STEPS[cur.step].ban) { cur.bans = cur.bans || {}; cur.bans[DRAFT.stepSide(cur.step)] = c; }
+      if (Draft.STEPS[cur.step].ban) { cur.bans = cur.bans || {}; cur.bans[DRAFT.stepSide(cur.step)] = c; }
       else { cur.picks = cur.picks || {}; cur.picks[id] = c; }
       if (cur.hover) delete cur.hover[id];
     }
@@ -1630,7 +1635,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     hostDraftFinish(d, t) {
       var tr = d.trade, ready = d.ready || {};
       var tradeGone = tr && (!SESSION.players[tr.from] || !SESSION.players[tr.to] || ready[tr.from] || ready[tr.to]);
-      var aiAccepts = tr && !tradeGone && SESSION.players[tr.to].isAI && t >= tr.at + DRAFT_AI_TRADE_MS;
+      var aiAccepts = tr && !tradeGone && SESSION.players[tr.to].isAI && t >= tr.at + Draft.AI_TRADE_MS;
       if (tradeGone || aiAccepts) {
         DRAFT.busy = true;
         SESSION.room.ref.child("draft").transaction(function (cur) {
@@ -1649,7 +1654,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var d = SESSION.room.draft, t = now();
       if (!d || DRAFT.busy) return;
       if (DRAFT.draftDone(d)) { DRAFT.hostDraftFinish(d, t); return; }
-      var step = d.step, banStep = DRAFT_STEPS[step].ban, timeUp = t >= d.stepAt + DRAFT_STEP_MS, aiDue = t >= d.stepAt + DRAFT_AI_MS;
+      var step = d.step, banStep = Draft.STEPS[step].ban, timeUp = t >= d.stepAt + Draft.STEP_MS, aiDue = t >= d.stepAt + Draft.AI_MS;
       var waiting = DRAFT.draftWaiting(d, step);
       var auto = waiting.filter(function (id) { return timeUp || (aiDue && SESSION.players[id].isAI); });
       if (waiting.length && !auto.length) return;
@@ -1659,7 +1664,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         auto.forEach(function (id) {
           if (DRAFT.draftWaiting(cur, step).indexOf(id) < 0) return;
           var left = DRAFT.draftLeft(cur), hover = cur.hover && cur.hover[id], chosen = left.indexOf(hover) >= 0 ? hover : null;
-          if (banStep) DRAFT.applyDraftChoice(cur, id, chosen || (SESSION.players[id].isAI && left.length ? pick(left) : NO_BAN));
+          if (banStep) DRAFT.applyDraftChoice(cur, id, chosen || (SESSION.players[id].isAI && left.length ? pick(left) : Draft.NO_BAN));
           else if (left.length) DRAFT.applyDraftChoice(cur, id, chosen || (SESSION.players[id].isAI ? DRAFT_AI.choose(cur, id, left) : pick(left)));
         });
         return DRAFT.draftSettle(cur, now());
@@ -1667,7 +1672,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     draftTeamName(team) { return team === "blue" ? "블루팀" : "레드팀"; }
     draftStepLabel(step) {
-      var S = DRAFT_STEPS[step], side = DRAFT.stepSide(step) === "b" ? "블루 " : "레드 ";
+      var S = Draft.STEPS[step], side = DRAFT.stepSide(step) === "b" ? "블루 " : "레드 ";
       return side + (S.ban ? "밴" : S.keys.map(function (k) { return k.charAt(1); }).join("·"));
     }
     draftTradeBoxHtml(d) {
@@ -1680,16 +1685,16 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         return "<b>교환 신청. (" + CHARS[picks[tr.from]].name + ")</b><small>" + esc(SESSION.players[tr.from].nickname) + "의 " + CHARS[picks[tr.from]].name + josa(CHARS[picks[tr.from]].name, "와", "과") + " 내 " + CHARS[picks[SESSION.myId]].name + josa(CHARS[picks[SESSION.myId]].name, "를", "을") + " 바꿔요</small>" +
           '<div class="row"><button type="button" class="ok" data-trade-act="yes">수락</button><button type="button" class="no" data-trade-act="no">거절</button></div>';
       }
-      if (d.denied && d.denied.to === SESSION.myId && t < d.denied.at + TRADE_DENIED_SHOW_MS) return "<b>교환 신청이 거절되었습니다.</b>";
+      if (d.denied && d.denied.to === SESSION.myId && t < d.denied.at + Draft.DENIED_SHOW_MS) return "<b>교환 신청이 거절되었습니다.</b>";
       return "";
     }
     renderDraft() {
       if (!SESSION.room || SCREENS.now !== "draft") return;
       var d = SESSION.room.draft; if (!d) return;
       var t = now(), done = DRAFT.draftDone(d), picks = d.picks || {}, hover = d.hover || {}, ready = d.ready || {}, bans = d.bans || {};
-      var waiting = done ? [] : DRAFT.draftWaiting(d, d.step), myTurn = waiting.indexOf(SESSION.myId) >= 0, banTurn = !done && DRAFT_STEPS[d.step].ban;
+      var waiting = done ? [] : DRAFT.draftWaiting(d, d.step), myTurn = waiting.indexOf(SESSION.myId) >= 0, banTurn = !done && Draft.STEPS[d.step].ban;
       var me = SESSION.players[SESSION.myId], myTeam = me ? me.team : null, mySide = DRAFT.draftSideOf(d, SESSION.myId);
-      var left = Math.max(0, d.stepAt + DRAFT_SHOWN_MS - t), humans = DRAFT.draftHumans(d).length, readyN = DRAFT.draftReadyCount(d);
+      var left = Math.max(0, d.stepAt + Draft.SHOWN_MS - t), humans = DRAFT.draftHumans(d).length, readyN = DRAFT.draftReadyCount(d);
       var arena = MAPS[SESSION.room.arena] || MAPS[ARENA_MAP.id];
       setHtml($("dfMap"), arena ? "🗺️ " + esc(arena.name) + "<small>맵</small>" : "");
       var arenaId = MAPS[SESSION.room.arena] ? SESSION.room.arena : ARENA_MAP.id, mapImg = $("dfMapImg");
@@ -1703,28 +1708,28 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       } else {
         setHtml(timer, String(Math.ceil(left / 1000)) + "<small>남은 시간</small>");
         timer.className = "dfTimer" + (left < 5000 ? " low" : "");
-        $("dfBarFill").style.width = Math.round(left / DRAFT_SHOWN_MS * 100) + "%";
+        $("dfBarFill").style.width = Math.round(left / Draft.SHOWN_MS * 100) + "%";
       }
       var turn = "", doing = banTurn ? "밴하는" : "고르는";
       if (done) turn = mySide ? (ready[SESSION.myId] ? "준비 완료! 다른 선수를 기다리는 중…" : "선택 완료! 준비가 되면 준비 완료를 눌러 주세요.") : "선수들이 준비하는 중…";
       else if (myTurn) turn = banTurn ? "내 차례예요! 밴할 캐릭터를 골라 주세요." : "내 차례예요! 캐릭터를 골라 주세요.";
       else if (!banTurn && picks[SESSION.myId] && DRAFT.draftStepIds(d, d.step).indexOf(SESSION.myId) >= 0) turn = "선택 완료 — 다른 선수를 기다리는 중…";
-      else turn = DRAFT.draftTeamName(DRAFT.stepSide(d.step) === "b" ? "blue" : "red") + " " + DRAFT_STEPS[d.step].keys.map(function (k) { return k.charAt(1); }).join("·") + "번 선수가 " + doing + " 중…";
+      else turn = DRAFT.draftTeamName(DRAFT.stepSide(d.step) === "b" ? "blue" : "red") + " " + Draft.STEPS[d.step].keys.map(function (k) { return k.charAt(1); }).join("·") + "번 선수가 " + doing + " 중…";
       setText($("dfTurn"), turn);
       $("dfTurn").className = "dfTurn" + (myTurn ? " mine" : "");
       var charCol = document.querySelector(".dfCharCol");
       charCol.classList.toggle("myTurn", myTurn && left >= 5000);
       charCol.classList.toggle("myTurnLow", myTurn && left < 5000);
-      setHtml($("dfSteps"), DRAFT_STEPS.map(function (S, i) {
+      setHtml($("dfSteps"), Draft.STEPS.map(function (S, i) {
         return '<span class="' + (DRAFT.stepSide(i) === "b" ? "b" : "r") + (S.ban ? " ban" : "") + (i === d.step ? " now" : (i < d.step ? " done" : "")) + '">' + (i + 1) + ". " + DRAFT.draftStepLabel(i) + "</span>";
       }).join(""));
 
       function slots(team) {
         var pre = team === "blue" ? "b" : "r", ban = bans[pre], banStepNow = banTurn && DRAFT.stepSide(d.step) === pre;
         var h = "";
-        if (ban && ban !== NO_BAN && CHARS[ban]) h = '<span class="dfBan"><span class="banX"><svg viewBox="0 0 10 10"><path d="M2.2 2.2L7.8 7.8M7.8 2.2L2.2 7.8" stroke="#FF4A3D" stroke-width="1.6" stroke-linecap="round"/></svg></span>' +
+        if (ban && ban !== Draft.NO_BAN && CHARS[ban]) h = '<span class="dfBan"><span class="banX"><svg viewBox="0 0 10 10"><path d="M2.2 2.2L7.8 7.8M7.8 2.2L2.2 7.8" stroke="#FF4A3D" stroke-width="1.6" stroke-linecap="round"/></svg></span>' +
           '<span class="pface" style="background-image:url(\'' + CATALOG.faceImgSrc(ban) + '\')"></span>' + CHARS[ban].name + "</span>";
-        else h = '<span class="dfBan ' + (banStepNow ? "now" : "wait") + '">' + (ban === NO_BAN ? "밴 없음" : (banStepNow ? "밴 고르는 중…" : "밴 대기")) + "</span>";
+        else h = '<span class="dfBan ' + (banStepNow ? "now" : "wait") + '">' + (ban === Draft.NO_BAN ? "밴 없음" : (banStepNow ? "밴 고르는 중…" : "밴 대기")) + "</span>";
         setHtml($(team === "blue" ? "dfBanB" : "dfBanR"), h);
         h = "";
         for (var i = 1; i <= 3; i++) {
@@ -8429,7 +8434,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       setDb: function (fake) { var before = BACKEND.db; BACKEND.db = fake; return before; },
       setTestLink: function (flag) { var before = BACKEND.isTestLink; BACKEND.isTestLink = flag; return before; },
       CHAR_TYPES: CHAR_TYPES, AUTO_AIM: AUTO_AIM, AUTO_AIM_ERR: AUTO_AIM_ERR, AUTO_AIM_LEAD: AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: DRAFT_AI,
-      DRAFT: DRAFT, DRAFT_STEPS: DRAFT_STEPS, DRAFT_STEP_MS: DRAFT_STEP_MS, DRAFT_AI_MS: DRAFT_AI_MS, DRAFT_AI_TRADE_MS: DRAFT_AI_TRADE_MS, NO_BAN: NO_BAN,
+      DRAFT: DRAFT, DRAFT_STEPS: Draft.STEPS, DRAFT_STEP_MS: Draft.STEP_MS, DRAFT_AI_MS: Draft.AI_MS, DRAFT_AI_TRADE_MS: Draft.AI_TRADE_MS, NO_BAN: Draft.NO_BAN,
       STATS: STATS, STATS_PATH: MatchStats.PATH, STATS_PENDING: MatchStats.PENDING, STATS_SETTLE_MS: MatchStats.SETTLE_MS, STATS_HOLD_MAX_MS: MatchStats.HOLD_MAX_MS,
       CLOCK: CLOCK, GameClock: GameClock, CLOCK_KEEP: CLOCK_KEEP, CLOCK_PINGS: CLOCK_PINGS,
       MATCH: MATCH, FIELD: FIELD, resetLocal: SESSION.resetLocal.bind(SESSION), backToLobby: FLOW.backToLobby.bind(FLOW), stKey: NETSTATE.stKey.bind(NETSTATE),
