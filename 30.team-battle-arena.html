@@ -8199,13 +8199,27 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   var FRAME_RENDERER = new FrameRenderer();
+  class ResultRoster {
+    constructor() { this.entries = {}; }
+    clear() { this.entries = {}; }
+    remember() {
+      var entries = this.entries;
+      TARGETS.participants().forEach(function (id) {
+        var E = TARGETS.ent(id);
+        if (E) entries[id] = { player: SESSION.players[id], ent: E };
+      });
+    }
+    ids() { return keys(this.entries); }
+    player(id) { return this.entries[id].player; }
+    ent(id) { return this.entries[id].ent; }
+  }
   class Hud2D {
     static STALL_MS = 250;
     static MVP_STUN_PER_SEC = 60;
     static MVP_SLOW_PER_SEC = 40;
     static MVP_ASSIST = 50;
     static FINAL_COUNT_MS = 10000;
-    constructor() { this.lastCountSec = 0; this.labels = []; this.quality = { acc: 0, frames: 0, slow: 0 }; }
+    constructor() { this.lastCountSec = 0; this.labels = []; this.quality = { acc: 0, frames: 0, slow: 0 }; this.roster = new ResultRoster(); }
     toScreen(x, h, y) {
       tmpV.set(x, h, y).project(STAGE.camera);
       return tmpV.z > 1 ? null : { x: (tmpV.x + 1) / 2 * CAMERA_RIG.w, y: (1 - tmpV.y) / 2 * CAMERA_RIG.h };
@@ -8332,12 +8346,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return h;
     }
     boardRows() {
-      var rows = "", redStarted = false;
+      var rows = "", redStarted = false, roster = HUD.roster;
       ["blue", "red"].forEach(function (team) {
-        TARGETS.participants().filter(function (id) { return SESSION.players[id].team === team; })
-          .sort(function (a, b) { return (SESSION.players[a].slot || 0) - (SESSION.players[b].slot || 0); })
+        roster.ids().filter(function (id) { return roster.player(id).team === team; })
+          .sort(function (a, b) { return (roster.player(a).slot || 0) - (roster.player(b).slot || 0); })
           .forEach(function (id) {
-            var E = TARGETS.ent(id), d = SESSION.players[id]; if (!E) return;
+            var E = roster.ent(id), d = roster.player(id);
             var rowClass = (id === SESSION.myId ? "mine" : "") + (team === "red" && !redStarted ? " teamSplit" : "");
             if (team === "red") redStarted = true;
             rows += '<tr class="' + rowClass + '"><td><span class="dot" style="background:' + (team === "blue" ? "#2F6FD6" : "#D6453D") + '"></span></td>' +
@@ -8358,15 +8372,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     mvpHtml() {
       var best = [];
-      TARGETS.participants().forEach(function (id) {
-        var E = TARGETS.ent(id); if (!E || E.kills + (E.assists || 0) <= 0) return;
+      HUD.roster.ids().forEach(function (id) {
+        var E = HUD.roster.ent(id); if (E.kills + (E.assists || 0) <= 0) return;
         var row = { id: id, E: E, score: HUD.mvpScore(E), dmg: Math.round(E.dmg) };
         if (!best.length || row.score > best[0].score || (row.score === best[0].score && row.dmg > best[0].dmg)) best = [row];
         else if (row.score === best[0].score && row.dmg === best[0].dmg) best.push(row);
       });
       if (!best.length) return '<div class="mvpLab">MVP</div><div class="mvpNone">MVP 없음</div>';
       return '<div class="mvpLab">🏆 MVP' + (best.length > 1 ? " (공동)" : "") + "</div>" + best.map(function (b) {
-        var d = SESSION.players[b.id] || {};
+        var d = HUD.roster.player(b.id) || {};
         return '<div class="mvpName"><span class="' + (b.E.team === "blue" ? "b" : "r") + '">' + (d.isAI ? "🤖 " : "") + esc(d.nickname || b.E.nickname) + "</span><small>" +
                CHARS[b.E.char].name + " · " + b.score + "점</small></div>";
       }).join("");
@@ -8409,6 +8423,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     fmtTime(ms) { ms = Math.max(0, ms); var s = Math.ceil(ms / 1000); return Math.floor(s / 60) + ":" + (s % 60 < 10 ? "0" : "") + (s % 60); }
     updateHud(t) {
       var st = SESSION.room.status;
+      if (st === "countdown" || st === "playing" || st === "ended") HUD.roster.remember(); else HUD.roster.clear();
       var left = st === "countdown" || t < SESSION.room.startAt ? TIMESCALE.matchMs : SESSION.room.startAt + TIMESCALE.matchMs - t;
       if (st === "ended") left = Math.max(0, Math.min(TIMESCALE.matchMs, SESSION.room.startAt + TIMESCALE.matchMs - (SESSION.room.endedAt || t)));
       left /= CLOCK.scale;
