@@ -651,8 +651,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   var MATCH = new MatchState();
-  var CLOCK_PINGS = 5, CLOCK_GAP_MS = 500, CLOCK_KEEP = 10;
   class GameClock {
+    static PINGS = 5;
+    static GAP_MS = 500;
+    static KEEP = 10;
     constructor(link) {
       this.link = link;
       this.serverOffset = 0;
@@ -672,13 +674,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     burst() {
       var clock = this, link = this.link;
       this.stopBurst();
-      var left = CLOCK_PINGS;
+      var left = GameClock.PINGS;
       function ping() {
         if (!link.room() || link.isHost() || left-- <= 0) { clock.stopBurst(); return; }
         link.room().ref.child("ping/" + link.myId()).set({ a: Date.now() });
       }
       ping();
-      this.timer = setInterval(ping, CLOCK_GAP_MS);
+      this.timer = setInterval(ping, GameClock.GAP_MS);
     }
     onPing(s) {
       var v = s.val(), room = this.link.room();
@@ -691,7 +693,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var rtt = got - v.a;
       if (rtt < 0 || rtt > 5000) return;
       this.samples.push({ rtt: rtt, off: v.t - (v.a + got) / 2 });
-      if (this.samples.length > CLOCK_KEEP) this.samples.shift();
+      if (this.samples.length > GameClock.KEEP) this.samples.shift();
       var best = this.samples[0];
       this.samples.forEach(function (x) { if (x.rtt < best.rtt) best = x; });
       this.off = best.off;
@@ -1181,8 +1183,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     { id: "cup", name: "대회모드" }
   ];
   var STATS_MODES = MODES.filter(function (m) { return m.id !== "practice"; });
-  var PRACTICE_BOT_RETURN_MS = 2500, PRACTICE_BOT_GAP = 340, PRACTICE_BOT_MIN_GAP = 220, PRACTICE_ALLY_AHEAD = 200;
-  var PRACTICE_ALLY_LOW = 0.3, PRACTICE_ALLY_RESET_MS = 3000;
 
   function pick(list) { return list[Math.floor(Math.random() * list.length)]; }
 
@@ -1429,11 +1429,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   $("joinCode").onkeydown = function (e) { if (e.key === "Enter" && NICK.askFirst()) SESSION.joinRoom(); };
   $("btnStart").onclick = function () { LAUNCHER.startGame(); };
 
-  var PRACTICE_BOTS = [
-    { id: "aiPracticeBot", c: "dummy", foe: true, slot: 1, dx: -PRACTICE_BOT_GAP / 2, dy: 0 },
-    { id: "aiPracticeBot2", c: "dummy", foe: true, slot: 2, dx: PRACTICE_BOT_GAP / 2, dy: 0 },
-    { id: "aiPracticeAlly", c: "dummyAlly", foe: false, slot: 2, dx: 0, dy: -PRACTICE_ALLY_AHEAD }
-  ];
+
   class MatchLauncher {
     practiceSpots(arena, playerTeam) {
       var toward = playerTeam === "blue" ? 1 : -1, taken = [];
@@ -1443,11 +1439,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         for (var dr = -1; dr <= 1 && clear; dr++) for (var dc = -1; dc <= 1; dc++) if (map[r + dr].charAt(c + dc) !== ".") { clear = false; break; }
         if (clear) open.push({ x: ARENA_MAP.tileX(c), y: ARENA_MAP.tileY(r) });
       }
-      return PRACTICE_BOTS.map(function (b) {
+      return PracticeMode.BOTS.map(function (b) {
         var want = { x: MW / 2 + b.dx, y: MH / 2 + b.dy * toward }, best = null, bestD = Infinity;
         if (MAPS[arena].practice) best = want;
         else open.forEach(function (o) {
-          if (taken.some(function (q) { return hyp(q.x - o.x, q.y - o.y) < PRACTICE_BOT_MIN_GAP; })) return;
+          if (taken.some(function (q) { return hyp(q.x - o.x, q.y - o.y) < PracticeMode.BOT_MIN_GAP; })) return;
           var d = hyp(o.x - want.x, o.y - want.y) + (o.y - MH / 2) * toward * 0.05;
           if (d < bestD) { bestD = d; best = o; }
         });
@@ -1475,9 +1471,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       });
       if (SESSION.practiceMode() && SESSION.players[SESSION.myId]) {
         var myTeam = SESSION.players[SESSION.myId].team, spots = LAUNCHER.practiceSpots(arena, myTeam), mine = ARENA_MAP.spawnOf(myTeam, 1, arena);
-        PRACTICE_BOTS.forEach(function (b, i) {
+        PracticeMode.BOTS.forEach(function (b, i) {
           var team = b.foe ? SWAPPED_TEAM[myTeam] : myTeam, spot = spots[i], C = CHARS[b.c];
-          var hp = b.foe ? C.hp : Math.round(C.hp * PRACTICE_ALLY_LOW);
+          var hp = b.foe ? C.hp : Math.round(C.hp * PracticeMode.ALLY_LOW);
           u["players/" + b.id] = { nickname: C.name, isAI: true, practiceBot: true, team: team, characterType: b.c, joinedAt: now(), slot: b.slot, homeX: Math.round(spot.x), homeY: Math.round(spot.y) };
           st[NETSTATE.stKey(team, b.slot)] = NETSTATE.packState({ x: spot.x, y: spot.y, angle: Math.atan2(mine.y - spot.y, mine.x - spot.x), mv: false, hp: hp, alive: true });
           roster[b.id] = { team: team, c: b.c, ai: true };
@@ -3124,7 +3120,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     backToLobby() {
       var u = { status: "lobby", winner: null, final: null, statsNote: null, startAt: null, endedAt: null, roster: null, draft: null, bans: null,
                 st: null, done: null, shots: null, meleeHits: null, hits: null, effects: null, kills: null, projectiles: null };
-      PRACTICE_BOTS.forEach(function (b) { if (SESSION.players[b.id]) u["players/" + b.id] = null; });
+      PracticeMode.BOTS.forEach(function (b) { if (SESSION.players[b.id]) u["players/" + b.id] = null; });
       SESSION.room.ref.update(u);
     }
     holdSpecResult() { FLOW.specHeld = true; setText($("btnAgain"), "대기실로"); }
@@ -5158,14 +5154,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         B.x = B.home.x; B.y = B.home.y;
       }
       if (!B.alive) return;
-      if (B.hpSeen !== undefined && B.hp < B.hpSeen) B.backAt = t + PRACTICE_BOT_RETURN_MS;
+      if (B.hpSeen !== undefined && B.hp < B.hpSeen) B.backAt = t + PracticeMode.BOT_RETURN_MS;
       if (B.hpSeen !== undefined && B.hp > B.hpSeen) B.healedAt = t;
       B.hpSeen = B.hp;
-      var low = Math.round(B.maxHp * PRACTICE_ALLY_LOW);
-      if (B.char === "dummyAlly" && B.hp > low && t - (B.healedAt || 0) > PRACTICE_ALLY_RESET_MS) { B.hp = B.hpSeen = low; MATCH.lastHp[B.id] = low; MATCH.game.forceNet = true; }
+      var low = Math.round(B.maxHp * PracticeMode.ALLY_LOW);
+      if (B.char === "dummyAlly" && B.hp > low && t - (B.healedAt || 0) > PracticeMode.ALLY_RESET_MS) { B.hp = B.hpSeen = low; MATCH.lastHp[B.id] = low; MATCH.game.forceNet = true; }
       var dx = B.home.x - B.x, dy = B.home.y - B.y, away = hyp(dx, dy);
       if (away < 6) { B.backAt = 0; if (foe && foe.alive) B.angle = Math.atan2(foe.y - B.y, foe.x - B.x); return; }
-      if (!B.backAt) B.backAt = t + PRACTICE_BOT_RETURN_MS;
+      if (!B.backAt) B.backAt = t + PracticeMode.BOT_RETURN_MS;
       if (t < B.backAt || B.isStunned(t)) return;
       var ox = B.x, oy = B.y;
       PHYSICS.moveEnt(B, dx / away * Math.min(1, away / 40), dy / away * Math.min(1, away / 40), dt);
@@ -5438,6 +5434,17 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   var STATS = new MatchStats();
   class PracticeMode {
+    static BOT_RETURN_MS = 2500;
+    static BOT_GAP = 340;
+    static BOT_MIN_GAP = 220;
+    static ALLY_AHEAD = 200;
+    static ALLY_LOW = 0.3;
+    static ALLY_RESET_MS = 3000;
+    static BOTS = [
+      { id: "aiPracticeBot", c: "dummy", foe: true, slot: 1, dx: -PracticeMode.BOT_GAP / 2, dy: 0 },
+      { id: "aiPracticeBot2", c: "dummy", foe: true, slot: 2, dx: PracticeMode.BOT_GAP / 2, dy: 0 },
+      { id: "aiPracticeAlly", c: "dummyAlly", foe: false, slot: 2, dx: 0, dy: -PracticeMode.ALLY_AHEAD }
+    ];
     constructor() { this.infoShown = null; }
     leavePractice() {
       if (!SESSION.room || !SESSION.practiceMode() || !SESSION.isHost() || SESSION.room.status === "lobby") return;
@@ -8436,7 +8443,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       CHAR_TYPES: CHAR_TYPES, AUTO_AIM: AUTO_AIM, AUTO_AIM_ERR: AUTO_AIM_ERR, AUTO_AIM_LEAD: AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: DRAFT_AI,
       DRAFT: DRAFT, DRAFT_STEPS: Draft.STEPS, DRAFT_STEP_MS: Draft.STEP_MS, DRAFT_AI_MS: Draft.AI_MS, DRAFT_AI_TRADE_MS: Draft.AI_TRADE_MS, NO_BAN: Draft.NO_BAN,
       STATS: STATS, STATS_PATH: MatchStats.PATH, STATS_PENDING: MatchStats.PENDING, STATS_SETTLE_MS: MatchStats.SETTLE_MS, STATS_HOLD_MAX_MS: MatchStats.HOLD_MAX_MS,
-      CLOCK: CLOCK, GameClock: GameClock, CLOCK_KEEP: CLOCK_KEEP, CLOCK_PINGS: CLOCK_PINGS,
+      CLOCK: CLOCK, GameClock: GameClock, CLOCK_KEEP: GameClock.KEEP, CLOCK_PINGS: GameClock.PINGS,
       MATCH: MATCH, FIELD: FIELD, resetLocal: SESSION.resetLocal.bind(SESSION), backToLobby: FLOW.backToLobby.bind(FLOW), stKey: NETSTATE.stKey.bind(NETSTATE),
       KEY_ON: INPUT.keys, joy: INPUT.joy, aim: INPUT.aim, keyName: INPUT.keyName.bind(INPUT), joyBase: INPUT.joyBase.bind(INPUT), joyRadius: function () { return INPUT.joyR; }, DRAG_MIN: INPUT.dragMin, canAct: INPUT.canAct.bind(INPUT), flip: INPUT.flip.bind(INPUT),
       localTargets: TARGETS.localTargets.bind(TARGETS), hear: TARGETS.hear.bind(TARGETS), pruneLocal: WORLD.pruneLocal.bind(WORLD), revealedTo: VISION.revealedTo.bind(VISION), inBush: VISION.inBush.bind(VISION), STEALTH_REVEAL_DIST: STEALTH_REVEAL_DIST,
@@ -8452,7 +8459,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       packState: NETSTATE.packState.bind(NETSTATE), stateOf: NETSTATE.stateOf.bind(NETSTATE), packMinions: NETSTATE.packMinions.bind(NETSTATE), unpackMinions: NETSTATE.unpackMinions.bind(NETSTATE), relTime: NETSTATE.relTime.bind(NETSTATE), absTime: NETSTATE.absTime.bind(NETSTATE), angDeg: NETSTATE.angDeg.bind(NETSTATE), netWrite: NETSTATE.netWrite.bind(NETSTATE), NET_MS: NET_MS, STATE_TIMES: STATE_TIMES,
       teamTotals: FLOW.teamTotals.bind(FLOW), teamAllQuit: FLOW.teamAllQuit.bind(FLOW), hostJudge: FLOW.hostJudge.bind(FLOW), hostCleanup: FLOW.hostCleanup.bind(FLOW), onEnded: FLOW.onEnded.bind(FLOW), restart: FLOW.restart.bind(FLOW), holdSpecResult: FLOW.holdSpecResult.bind(FLOW), releaseSpecResult: FLOW.releaseSpecResult.bind(FLOW),
       againOrBackToLobby: FLOW.againOrBackToLobby.bind(FLOW), initGame: FLOW.initGame.bind(FLOW), isSpec: FLOW.isSpec.bind(FLOW), syncRemote: FLOW.syncRemote.bind(FLOW), specResultHeld: function () { return FLOW.specHeld; }, matchMs: function () { return TIMESCALE.matchMs; },
-      startGame: LAUNCHER.startGame.bind(LAUNCHER), launchMatch: LAUNCHER.launchMatch.bind(LAUNCHER), practiceSpots: LAUNCHER.practiceSpots.bind(LAUNCHER), PRACTICE_BOTS: PRACTICE_BOTS, leavePractice: PRACTICE.leavePractice.bind(PRACTICE), fillPracticeGauge: PRACTICE.fillPracticeGauge.bind(PRACTICE),
+      startGame: LAUNCHER.startGame.bind(LAUNCHER), launchMatch: LAUNCHER.launchMatch.bind(LAUNCHER), practiceSpots: LAUNCHER.practiceSpots.bind(LAUNCHER), PRACTICE_BOTS: PracticeMode.BOTS, leavePractice: PRACTICE.leavePractice.bind(PRACTICE), fillPracticeGauge: PRACTICE.fillPracticeGauge.bind(PRACTICE),
       openPracticeChars: PRACTICE.openPracticeChars.bind(PRACTICE), changePracticeChar: PRACTICE.changePracticeChar.bind(PRACTICE), renderPracticeModal: PRACTICE.renderPracticeModal.bind(PRACTICE), showScreen: SCREENS.showScreen.bind(SCREENS),
       statsPct: STATS_VIEW.statsPct.bind(STATS_VIEW), statsRateCell: STATS_VIEW.statsRateCell.bind(STATS_VIEW), banPickCell: STATS_VIEW.banPickCell.bind(STATS_VIEW), kdaText: STATS_VIEW.kdaText.bind(STATS_VIEW), statsRowsHtml: STATS_VIEW.statsRowsHtml.bind(STATS_VIEW), loadStats: STATS_VIEW.loadStats.bind(STATS_VIEW), mapShotSrc: ARENA_MAP.shotSrc.bind(ARENA_MAP), statsModeNow: function () { return STATS_VIEW.mode; },
       sfx: SOUND.sfx.bind(SOUND), killSound: SOUND.killSound.bind(SOUND), audio: SOUND.audio.bind(SOUND), openNick: NICK.openNick.bind(NICK), refreshNick: NICK.refreshNick.bind(NICK), nickNow: function () { return NICK.name; }, NICK_MAX: NICK_MAX,
