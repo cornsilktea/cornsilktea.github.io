@@ -1877,7 +1877,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var matches = +s.matches || 0, lastRole = null, h = "";
       CHAR_LIST.forEach(function (k) {
         var c = CHARS[k], d = s[k] || {}, selectableGames = d.games != null ? +d.games : (s[k] ? matches : 0), picks = +d.picks || 0, drawPicks = +d.draws || 0, wins = +d.wins || 0, ccPicks = +d.ccPicks || 0, asPicks = +d.asPicks || 0, kdPicks = +d.kdPicks || 0, bans = +d.bans || 0;
-        if (c.role !== lastRole) { lastRole = c.role; h += '<tr class="grp"><td colspan="8">' + ROLES[c.role].icon + " " + ROLES[c.role].name + "</td></tr>"; }
+        if (c.role !== lastRole) { lastRole = c.role; h += '<tr class="grp"><td colspan="9">' + ROLES[c.role].icon + " " + ROLES[c.role].name + "</td></tr>"; }
         h += '<tr><td class="nm">' + c.icon + " " + esc(c.name) + "</td>" + STATS_VIEW.banPickCell(bans, picks, selectableGames) + STATS_VIEW.statsRateCell(wins, Math.max(0, picks - drawPicks)) +
           "<td>" + STATS_VIEW.kdaText(d, kdPicks, asPicks) + "</td>" +
           "<td>" + (picks ? Math.round(+d.dmg || 0) : "-") + "</td>" +
