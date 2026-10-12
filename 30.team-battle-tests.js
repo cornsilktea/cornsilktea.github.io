@@ -4089,9 +4089,9 @@ class ResultCollector {
       P.seed = 20260926; var again = [P.seeded(), P.seeded(), P.seeded()];
       if (JSON.stringify(again) !== JSON.stringify(got)) bad.push("같은 씨앗인데 다른 수열");
       var blade = { rotation: { z: 1 } };
-      P.millBlades = [blade]; P.spinMillBlades(0.5);
+      P.millBlades = [blade]; api.PROP_THEMES.spinMillBlades(0.5);
       if (Math.abs(blade.rotation.z - 1.35) > 1e-9) bad.push("날개 회전 " + blade.rotation.z);
-      P.millBlades = []; P.spinMillBlades(1);
+      P.millBlades = []; api.PROP_THEMES.spinMillBlades(1);
       if (!A.ground || A.ground.position.x !== 450 || A.ground.position.z !== 675 || !Array.isArray(A.bushVis) || typeof A.builtArena !== "string") bad.push("바닥·풀 상태 " + (A.ground ? A.ground.position.x + "," + A.ground.position.z : "없음"));
     } finally { P.seed = savedSeed; P.millBlades = savedBlades; }
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "씨앗 수열 재현, 날개 회전, 바닥 위치·풀 목록 확인");

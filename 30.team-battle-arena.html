@@ -2180,7 +2180,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       g.userData.pulse = orb;
     }
     skillGlow(E, t) { return E.ultUntil > t ? 0x661000 : 0; }
-    playSkillClip(v, E, t) { FIGHTER_VIEW.playOnce(v, "Ranged_Magic_Spellcasting_Long", 2.6, t); }
+    playSkillClip(v, E, t) { FIGHTER_MOTION.playOnce(v, "Ranged_Magic_Spellcasting_Long", 2.6, t); }
     get shotName() { return "불꽃 구슬"; }
     get startsSkillTimer() { return false; }
     cast(E, ang, reach, t) {
@@ -2245,7 +2245,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       g.userData.pulse = sphere;
     }
     get hasSkillClip() { return true; }
-    playSkillClip(v, E, t) { FIGHTER_VIEW.playOnce(v, "Ranged_Magic_Summon", 3.2, t); }
+    playSkillClip(v, E, t) { FIGHTER_MOTION.playOnce(v, "Ranged_Magic_Summon", 3.2, t); }
     get shotName() { return "에너지 구"; }
     get startsSkillTimer() { return false; }
     attackClip(v, E, t) {
@@ -2297,7 +2297,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return "거리가 " + c.farDist + "보다 먼 적에게 주는 피해 " + Math.round(c.farBonus * 100) + "% 증가";
     }
     attackClip(v, E, t) {
-      return FIGHTER_VIEW.sniperShotClip(E);
+      return FIGHTER_MOTION.sniperShotClip(E);
     }
   }
   class ThrowerType extends CharacterType {
@@ -2369,7 +2369,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     botUltRange() { return ULT.bsCast; }
     botUltSpot(B, target, td, t) { return BRAIN.leadSpot(target, DASH_MOVES.hammerLeapMs(td) / 1000, t); }
     get hasSkillClip() { return true; }
-    playSkillClip(v, E, t) { FIGHTER_VIEW.playOnce(v, "Melee_1H_Attack_Jump_Chop", JUMP_CHOP_LAND_SEC * 1000 / Math.max(1, E.ultUntil - (E.leapAt || t)), t); }
+    playSkillClip(v, E, t) { FIGHTER_MOTION.playOnce(v, "Melee_1H_Attack_Jump_Chop", JUMP_CHOP_LAND_SEC * 1000 / Math.max(1, E.ultUntil - (E.leapAt || t)), t); }
     cast(E, ang, reach, t) {
       var landing = ATTACK.burstSpot(E, ang, reach, ULT.bsCast, ULT.bsMin);
       PHYSICS.resolve(landing);
@@ -2398,7 +2398,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   class PriestType extends CharacterType {
     get hasSkillClip() { return true; }
-    playSkillClip(v, E, t) { FIGHTER_VIEW.playOnce(v, "Ranged_Magic_Spellcasting_Long", 2.6, t); }
+    playSkillClip(v, E, t) { FIGHTER_MOTION.playOnce(v, "Ranged_Magic_Spellcasting_Long", 2.6, t); }
     ultDesc() {
       return "지정한 곳에 " + SKILLTEXT.secs(ULT.bhDelay) + " 뒤 " + SKILLTEXT.secs(ULT.bhDur) + "간 유지되는 반경 " + ULT.bhR + "의 블랙홀 생성. 적은 중심으로 끌려감";
     }
@@ -2422,7 +2422,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     botUltRange() { return ULT.dmR * 0.7; }
     wantsBasicNow(B, t) { return t >= B.cdUntil && !!DOMAIN_FX.domainStrikeTarget(B, t); }
     get hasSkillClip() { return true; }
-    playSkillClip(v, E, t) { FIGHTER_VIEW.playOnce(v, "Ranged_Magic_Summon", MODELS.kit.clips.Ranged_Magic_Summon.duration * 1000 / 900, t); }
+    playSkillClip(v, E, t) { FIGHTER_MOTION.playOnce(v, "Ranged_Magic_Summon", MODELS.kit.clips.Ranged_Magic_Summon.duration * 1000 / 900, t); }
     cast(E, ang, reach, t) {
       E.ultUntil = t + 600;
       E.skillDur = ULT.dmDur;
@@ -2454,7 +2454,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     botAct(B, target, enemies, t) { BRAIN.botCleric(B, enemies, t); return true; }
     get hasSkillClip() { return true; }
     addMarkers(v, root, body) { v.halo = FIGHTER_AURAS.makeClericHalo(v, body); root.add(v.halo); }
-    playSkillClip(v, E, t) { FIGHTER_VIEW.playOnce(v, "Ranged_Magic_Raise", MODELS.kit.clips.Ranged_Magic_Raise.duration * 1000 / ULT.rvCastMs, t); }
+    playSkillClip(v, E, t) { FIGHTER_MOTION.playOnce(v, "Ranged_Magic_Raise", MODELS.kit.clips.Ranged_Magic_Raise.duration * 1000 / ULT.rvCastMs, t); }
     cast(E, ang, reach, t) {
       E.ultUntil = t + ULT.rvCastMs;
       E.buffUntil = t + ULT.rvDur;
@@ -2572,7 +2572,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     get hasSkillClip() { return true; }
     playSkillClip(v, E, t) {
-      FIGHTER_VIEW.playOnce(v, "Ranged_Magic_Spellcasting", MODELS.kit.clips.Ranged_Magic_Spellcasting.duration * 1000 / ULT.frBzDelay, t);
+      FIGHTER_MOTION.playOnce(v, "Ranged_Magic_Spellcasting", MODELS.kit.clips.Ranged_Magic_Spellcasting.duration * 1000 / ULT.frBzDelay, t);
       v.once.next = ["Ranged_Magic_Raise", 1.8];
     }
     get shotName() { return "얼음 구슬"; }
@@ -2701,7 +2701,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var streak = new THREE.Mesh(GEO.trail, MODELS.glowMat("trail-engineer", 0xFFC46A, 0.35)); streak.position.x = -10; streak.scale.set(40, 1.3, 1.3); g.add(streak);
     }
     get hasSkillClip() { return true; }
-    playSkillClip(v, E, t) { FIGHTER_VIEW.playOnce(v, "Melee_1H_Attack_Chop", 2.2, t); }
+    playSkillClip(v, E, t) { FIGHTER_MOTION.playOnce(v, "Melee_1H_Attack_Chop", 2.2, t); }
     skillGlow(E, t) { return E.ultUntil > t ? 0x5A3A08 : 0; }
     cast(E, ang, reach, t) {
       E.ultUntil = t + ULT.trCastMs;
@@ -2743,7 +2743,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     botUltRange() { return ULT.drCast; }
     botUltSpot(B, target, td, t) { return { x: B.x, y: B.y }; }
     get hasSkillClip() { return true; }
-    playSkillClip(v, E, t) { FIGHTER_VIEW.playOnce(v, "Ranged_Magic_Summon", 2.4, t); }
+    playSkillClip(v, E, t) { FIGHTER_MOTION.playOnce(v, "Ranged_Magic_Summon", 2.4, t); }
     skillGlow(E, t) { return E.ultUntil > t ? 0x1E4A12 : 0; }
     cast(E, ang, reach, t) {
       var spot = reach == null ? { x: E.x, y: E.y } : ATTACK.burstSpot(E, ang, reach, ULT.drCast, ULT.drMin);
@@ -2804,7 +2804,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     onLeapLand(E, t) { GARGANTUA_SYS.land(E, t); return true; }
     get hasSkillClip() { return true; }
     playSkillClip(v, E, t) {
-      if (!this.isSurging(E, t)) FIGHTER_VIEW.playOnce(v, "Melee_1H_Attack_Jump_Chop", JUMP_CHOP_LAND_SEC * 1000 / Math.max(1, E.ultUntil - (E.leapAt || t)), t);
+      if (!this.isSurging(E, t)) FIGHTER_MOTION.playOnce(v, "Melee_1H_Attack_Jump_Chop", JUMP_CHOP_LAND_SEC * 1000 / Math.max(1, E.ultUntil - (E.leapAt || t)), t);
     }
     ultDesc() {
       return "지정한 곳(최대 " + ULT.gaCast + ")으로 점프해 " + SKILLTEXT.secs(ULT.gaDur) + "간 블랙홀 생성. 그동안 움직이거나 기본 공격을 할 수 없고, 반경 " + ULT.gaR +
@@ -2832,7 +2832,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       GARGANTUA_SYS.summon(E, spot, t);
     }
     skillGlow(E, t) { return E.ultUntil > t ? 0x2A1060 : 0; }
-    playSkillClip(v, E, t) { FIGHTER_VIEW.playOnce(v, "Ranged_Magic_Spellcasting_Long", 2.6, t); }
+    playSkillClip(v, E, t) { FIGHTER_MOTION.playOnce(v, "Ranged_Magic_Spellcasting_Long", 2.6, t); }
     attackClip(v, E, t) { return ["Ranged_Magic_Shoot", 1.8]; }
     passiveDesc() { return ULT.sfStunEvery + "번째 기본 공격마다 별똥별에 맞은 적을 " + SKILLTEXT.secs(ULT.sfStunMs) + " 기절"; }
     basicDesc() {
@@ -2889,9 +2889,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     onLeapLand(E, t) { GIANT.land(E, t); return true; }
     get hasSkillClip() { return true; }
     playSkillClip(v, E, t) {
-      if (this.isGolem(E, t)) { FIGHTER_VIEW.playOnce(v, "EXPERIMENTAL_Large_Transform", v.clips.EXPERIMENTAL_Large_Transform.duration * 1000 / ULT.gjTransformMs, t); return; }
+      if (this.isGolem(E, t)) { FIGHTER_MOTION.playOnce(v, "EXPERIMENTAL_Large_Transform", v.clips.EXPERIMENTAL_Large_Transform.duration * 1000 / ULT.gjTransformMs, t); return; }
       var leapMs = Math.max(1, E.ultUntil - E.leapAt);
-      FIGHTER_VIEW.playOnce(v, "Melee_2H_Slam", clamp(GiantType.SLAM_IMPACT_SEC * 1000 / leapMs, 1, 4.5), t);
+      FIGHTER_MOTION.playOnce(v, "Melee_2H_Slam", clamp(GiantType.SLAM_IMPACT_SEC * 1000 / leapMs, 1, 4.5), t);
     }
     ultDesc() {
       return "지정한 곳(최대 " + ULT.gjCast + ")으로 점프해 " + SKILLTEXT.secs(ULT.gjDur) + "간 골렘으로 변신. 자신을 중심으로 반경 " + ULT.gjR + "에 하늘빛 폭풍이 일어 적은 1초당 " + ULT.gjTickDmg +
@@ -4313,42 +4313,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   var DAMAGE = new DamageResolver();
   class ProjectileSystem {
     static LANE_FILL = 0.9;
-    bladeSpin(p, x, y) {
-      if (p.spun) return;
-      p.spun = true;
-      FIELD.bladeSpins.push({ d: p.d, x: x, y: y, at: now() + ULT.bdDelay });
-      MATCH.fx.push({ k: "bladeZone", x: x, y: y, r: ULT.bdR, t: Date.now(), delay: ULT.bdDelay / CLOCK.scale, life: (ULT.bdDelay + 260) / CLOCK.scale });
-    }
-    stepBladeSpins(t) {
-      FIELD.bladeSpins = FIELD.bladeSpins.filter(function (s) {
-        if (t < s.at) return true;
-        var d = s.d;
-        MATCH.fx.push({ k: "boom", x: s.x, y: s.y, r: ULT.bdR / 1.1, c: 0xDCE3EC, t: Date.now(), life: 260 });
-        FX_VIEW.spark(s.x, s.y, "#FFFFFF", 1.4);
-        TARGETS.localTargets().forEach(function (T) {
-          if (!T.alive || T.team === d.team || T.id === d.owner || hyp(T.x - s.x, T.y - s.y) > ULT.bdR + T.hitR * 0.5) return;
-          DAMAGE.damage(T, ULT.bdDmg, d.owner, d.createdAt, null);
-        });
-        return false;
-      });
-    }
-    stepBladeDaggers(t) {
-      var foes = null;
-      keys(MATCH.remoteShots).forEach(function (id) {
-        var p = MATCH.remoteShots[id], d = p.d;
-        if (!CHAR_TYPES.of(d.ownerCharacterType).isBladeThrower || p.spun) return;
-        var e = clamp(t - d.createdAt, 0, p.life), pe = p.se === undefined ? 0 : p.se;
-        p.se = e;
-        var a = PROJECTILES.projAt(p, pe), b = PROJECTILES.projAt(p, e);
-        foes = foes || TARGETS.everyone(t);
-        for (var i = 0; i < foes.length; i++) {
-          var T = foes[i];
-          if (!T || !T.alive || T.id === d.owner || T.team === d.team) continue;
-          if (PROJECTILES.segHit(a.x, a.y, b.x, b.y, T.x, T.y, T.hitR + (d.pr || 6))) { p.gone = true; PROJECTILES.bladeSpin(p, T.x, T.y); return; }
-        }
-        if (e >= p.life) { p.dead = true; PROJECTILES.bladeSpin(p, b.x, b.y); }
-      });
-    }
     addProj(id, d) {
       if (!d) return;
       var sp = hyp(d.vx, d.vy) || 1, dx = d.vx / sp, dy = d.vy / sp;
@@ -4435,7 +4399,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       fx = ownerType.projectileEffect(d, T, immune, fx);
       var dancer = ownerType.isBladeThrower;
       DAMAGE.damage(T, Math.round(d.dmg * (1 + PROJECTILES.damageBonusSum(d, T))), d.owner, ownerType.basicHitMark(d), d.isSkill ? d.ultKey : (d.countsAsSkill ? "skill" : null), fx);
-      if (dancer) PROJECTILES.bladeSpin(p, T.x, T.y);
+      if (dancer) BLADE_SPINS.bladeSpin(p, T.x, T.y);
       if (d.ultKey === "execute" && !immune) { SESSION.room.ref.child("hits/" + d.owner).push({ d: 0, b: 0, t: now(), tp: { x: r1(T.x), y: r1(T.y) } }); FX_VIEW.executeFx(T.x, T.y); }
       ownerType.afterProjectileHit(d, T, immune);
       if (seen) FX_VIEW.spark(T.x, T.y, FX_VIEW.orbHitColor(d), d.ultKey === "giant" ? 2.2 : 1);
@@ -4467,6 +4431,45 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   var PROJECTILES = new ProjectileSystem();
+  class BladeSpins {
+    bladeSpin(p, x, y) {
+      if (p.spun) return;
+      p.spun = true;
+      FIELD.bladeSpins.push({ d: p.d, x: x, y: y, at: now() + ULT.bdDelay });
+      MATCH.fx.push({ k: "bladeZone", x: x, y: y, r: ULT.bdR, t: Date.now(), delay: ULT.bdDelay / CLOCK.scale, life: (ULT.bdDelay + 260) / CLOCK.scale });
+    }
+    stepBladeSpins(t) {
+      FIELD.bladeSpins = FIELD.bladeSpins.filter(function (s) {
+        if (t < s.at) return true;
+        var d = s.d;
+        MATCH.fx.push({ k: "boom", x: s.x, y: s.y, r: ULT.bdR / 1.1, c: 0xDCE3EC, t: Date.now(), life: 260 });
+        FX_VIEW.spark(s.x, s.y, "#FFFFFF", 1.4);
+        TARGETS.localTargets().forEach(function (T) {
+          if (!T.alive || T.team === d.team || T.id === d.owner || hyp(T.x - s.x, T.y - s.y) > ULT.bdR + T.hitR * 0.5) return;
+          DAMAGE.damage(T, ULT.bdDmg, d.owner, d.createdAt, null);
+        });
+        return false;
+      });
+    }
+    stepBladeDaggers(t) {
+      var foes = null;
+      keys(MATCH.remoteShots).forEach(function (id) {
+        var p = MATCH.remoteShots[id], d = p.d;
+        if (!CHAR_TYPES.of(d.ownerCharacterType).isBladeThrower || p.spun) return;
+        var e = clamp(t - d.createdAt, 0, p.life), pe = p.se === undefined ? 0 : p.se;
+        p.se = e;
+        var a = PROJECTILES.projAt(p, pe), b = PROJECTILES.projAt(p, e);
+        foes = foes || TARGETS.everyone(t);
+        for (var i = 0; i < foes.length; i++) {
+          var T = foes[i];
+          if (!T || !T.alive || T.id === d.owner || T.team === d.team) continue;
+          if (PROJECTILES.segHit(a.x, a.y, b.x, b.y, T.x, T.y, T.hitR + (d.pr || 6))) { p.gone = true; BLADE_SPINS.bladeSpin(p, T.x, T.y); return; }
+        }
+        if (e >= p.life) { p.dead = true; BLADE_SPINS.bladeSpin(p, b.x, b.y); }
+      });
+    }
+  }
+  var BLADE_SPINS = new BladeSpins();
 
 
 
@@ -5668,6 +5671,73 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     flatMesh(geo, mat) { var m = new THREE.Mesh(geo, mat); m.rotation.x = -Math.PI / 2; return m; }
     zoneOfRow(r) { return MAPS[ARENA_MAP.id].practice ? "" : r < ArenaBuilder.SPAWN_ROWS ? "blue" : (r >= ARENA_MAP.rowCount - ArenaBuilder.SPAWN_ROWS ? "red" : ""); }
     tileAt(c, r) { return c < 0 || r < 0 || c >= ARENA_MAP.cols || r >= ARENA_MAP.rowCount ? "#" : ARENA_MAP.rows[r].charAt(c); }
+    tilesOf(kinds) {
+      var list = [];
+      ARENA_MAP.rows.forEach(function (row, r) { for (var c = 0; c < ARENA_MAP.cols; c++) if (kinds.indexOf(row.charAt(c)) >= 0) list.push([c, r]); });
+      return list;
+    }
+    borderTiles() {
+      var list = [];
+      if (MAPS[ARENA_MAP.id].practice) return list;
+      for (var c = -1; c <= ARENA_MAP.cols; c++) { list.push([c, -1]); list.push([c, ARENA_MAP.rowCount]); }
+      for (var r = 0; r < ARENA_MAP.rowCount; r++) { list.push([-1, r]); list.push([ARENA_MAP.cols, r]); }
+      return list;
+    }
+    boxField(tiles, h, mat) {
+      var im = new THREE.InstancedMesh(GEO.unitBox, mat, tiles.length), m4 = new THREE.Matrix4();
+      tiles.forEach(function (tl, i) { im.setMatrixAt(i, m4.makeScale(TILE, h, TILE).setPosition(ARENA_MAP.tileX(tl[0]), 0, ARENA_MAP.tileY(tl[1]))); });
+      im.computeBoundingSphere();
+      return im;
+    }
+    buildSimpleArena(th) {
+      STAGE.arenaGroup.add(ARENA_VIEW.boxField(ARENA_VIEW.tilesOf(ROCK_TILES), 54, MATLIB.wallMat));
+      ARENA_PAINT.hideVolumes(th, th.dungeon ? ARENA_PAINT.shadowVolume.bind(ARENA_VIEW) : function (b) {
+        var mat = new THREE.MeshLambertMaterial({ color: 0x3E8E41, transparent: true, opacity: 0.8, depthWrite: false });
+        return { mesh: ARENA_VIEW.boxField(b.tiles, 40, mat), mat: mat, full: 0.8 };
+      });
+    }
+    boxList(list, mat) {
+      var im = new THREE.InstancedMesh(GEO.unitBox, mat, list.length), m4 = new THREE.Matrix4();
+      list.forEach(function (b, i) { im.setMatrixAt(i, m4.makeScale(b.w, b.h, b.d).setPosition(b.x, b.y || 0, b.z)); });
+      im.computeBoundingSphere();
+      return im;
+    }
+    clearArena() {
+      STAGE.arenaGroup.traverse(function (o) { if (o.isInstancedMesh) o.dispose(); });
+      STAGE.arenaGroup.clear();
+      ARENA_VIEW.bushVis.forEach(function (bv) { bv.mats.forEach(function (m) { m.dispose(); }); });
+      ARENA_VIEW.bushVis = [];
+      PROPS.millBlades = []; ARENA_VIEW.scenery.group = null;
+    }
+    buildArena() {
+      ARENA_VIEW.clearArena();
+      var th = THEMES[ARENA_MAP.id];
+      STAGE.scene.background.setHex(th.sky); STAGE.scene.fog.color.setHex(th.sky);
+      STAGE.outerGround.material.color.setHex(th.outer);
+      STAGE.ambient.intensity = th.ambient; STAGE.sun.color.setHex(th.sun); STAGE.sun.intensity = th.sunI;
+      if (STAGE.groundMat.map) STAGE.groundMat.map.dispose();
+      STAGE.groundMat.map = ARENA_PAINT.paintFloor(th); STAGE.groundMat.needsUpdate = true;
+      PROPS.seed = 20260926;
+      ARENA_VIEW.ground.visible = !(MODELS.kit.propsReady && th.dungeon);
+      if (MODELS.kit.propsReady) PROPS.buildArenaProps(th); else ARENA_VIEW.buildSimpleArena(th);
+      ARENA_PAINT.buildBridgeRails();
+      ARENA_VIEW.builtArena = ARENA_MAP.id + (MODELS.kit.propsReady ? ":kit" : "");
+    }
+    useArena(id) {
+      if (!MAPS[id]) id = "forest";
+      if (ARENA_VIEW.builtArena === id + (MODELS.kit.propsReady ? ":kit" : "")) return;
+      ARENA_MAP.load(id);
+      ARENA_VIEW.buildArena();
+      if (TOUR_VIEW) TOUR_VIEW.state.dirty = true;
+    }
+    syncArena() {
+      if (!SESSION.room) return;
+      if (SESSION.room.status === "lobby") { if (MAPS[SESSION.room.map]) ARENA_VIEW.useArena(SESSION.room.map); return; }
+      if (SESSION.room.status && SESSION.room.arena) ARENA_VIEW.useArena(SESSION.room.arena);
+    }
+  }
+  var ARENA_VIEW = new ArenaBuilder();
+  class ArenaPaint {
     paintFloor(th) {
       var c2 = document.createElement("canvas"), S = ArenaBuilder.FLOOR_TEX_SCALE;
       c2.width = Math.round(MW * S); c2.height = Math.round(MH * S);
@@ -5709,7 +5779,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           }
         }
       }
-      if (th.rockShade) ARENA_VIEW.paintRockShade(g2, th.rockShade);
+      if (th.rockShade) ARENA_PAINT.paintRockShade(g2, th.rockShade);
       var practice = !!MAPS[ARENA_MAP.id].practice;
       g2.strokeStyle = th.line; g2.lineWidth = 1;
       if (!practice) {
@@ -5742,24 +5812,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         g2.fillRect(cx - rad, cy - rad, rad * 2, rad * 2);
       }
     }
-    tilesOf(kinds) {
-      var list = [];
-      ARENA_MAP.rows.forEach(function (row, r) { for (var c = 0; c < ARENA_MAP.cols; c++) if (kinds.indexOf(row.charAt(c)) >= 0) list.push([c, r]); });
-      return list;
-    }
-    borderTiles() {
-      var list = [];
-      if (MAPS[ARENA_MAP.id].practice) return list;
-      for (var c = -1; c <= ARENA_MAP.cols; c++) { list.push([c, -1]); list.push([c, ARENA_MAP.rowCount]); }
-      for (var r = 0; r < ARENA_MAP.rowCount; r++) { list.push([-1, r]); list.push([ARENA_MAP.cols, r]); }
-      return list;
-    }
-    boxField(tiles, h, mat) {
-      var im = new THREE.InstancedMesh(GEO.unitBox, mat, tiles.length), m4 = new THREE.Matrix4();
-      tiles.forEach(function (tl, i) { im.setMatrixAt(i, m4.makeScale(TILE, h, TILE).setPosition(ARENA_MAP.tileX(tl[0]), 0, ARENA_MAP.tileY(tl[1]))); });
-      im.computeBoundingSphere();
-      return im;
-    }
     hideVolumes(th, makeGroup) {
       ARENA_MAP.bushes.forEach(function (b, i) {
         var built = makeGroup(b, i);
@@ -5771,19 +5823,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     shadowVolume(b) {
       var mat = new THREE.MeshBasicMaterial({ color: 0x241634, transparent: true, opacity: 0.55, depthWrite: false });
       return { mesh: ARENA_VIEW.boxField(b.tiles, 60, mat), mat: mat, full: 0.55 };
-    }
-    buildSimpleArena(th) {
-      STAGE.arenaGroup.add(ARENA_VIEW.boxField(ARENA_VIEW.tilesOf(ROCK_TILES), 54, MATLIB.wallMat));
-      ARENA_VIEW.hideVolumes(th, th.dungeon ? ARENA_VIEW.shadowVolume.bind(ARENA_VIEW) : function (b) {
-        var mat = new THREE.MeshLambertMaterial({ color: 0x3E8E41, transparent: true, opacity: 0.8, depthWrite: false });
-        return { mesh: ARENA_VIEW.boxField(b.tiles, 40, mat), mat: mat, full: 0.8 };
-      });
-    }
-    boxList(list, mat) {
-      var im = new THREE.InstancedMesh(GEO.unitBox, mat, list.length), m4 = new THREE.Matrix4();
-      list.forEach(function (b, i) { im.setMatrixAt(i, m4.makeScale(b.w, b.h, b.d).setPosition(b.x, b.y || 0, b.z)); });
-      im.computeBoundingSphere();
-      return im;
     }
     buildBridgeRails() {
       if (!ARENA_MAP.bridges.length) return;
@@ -5799,41 +5838,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       STAGE.arenaGroup.add(ARENA_VIEW.boxList(rails, MATLIB.railMat));
       STAGE.arenaGroup.add(ARENA_VIEW.boxList(posts, MATLIB.postMat));
     }
-    clearArena() {
-      STAGE.arenaGroup.traverse(function (o) { if (o.isInstancedMesh) o.dispose(); });
-      STAGE.arenaGroup.clear();
-      ARENA_VIEW.bushVis.forEach(function (bv) { bv.mats.forEach(function (m) { m.dispose(); }); });
-      ARENA_VIEW.bushVis = [];
-      PROPS.millBlades = []; ARENA_VIEW.scenery.group = null;
-    }
-    buildArena() {
-      ARENA_VIEW.clearArena();
-      var th = THEMES[ARENA_MAP.id];
-      STAGE.scene.background.setHex(th.sky); STAGE.scene.fog.color.setHex(th.sky);
-      STAGE.outerGround.material.color.setHex(th.outer);
-      STAGE.ambient.intensity = th.ambient; STAGE.sun.color.setHex(th.sun); STAGE.sun.intensity = th.sunI;
-      if (STAGE.groundMat.map) STAGE.groundMat.map.dispose();
-      STAGE.groundMat.map = ARENA_VIEW.paintFloor(th); STAGE.groundMat.needsUpdate = true;
-      PROPS.seed = 20260926;
-      ARENA_VIEW.ground.visible = !(MODELS.kit.propsReady && th.dungeon);
-      if (MODELS.kit.propsReady) PROPS.buildArenaProps(th); else ARENA_VIEW.buildSimpleArena(th);
-      ARENA_VIEW.buildBridgeRails();
-      ARENA_VIEW.builtArena = ARENA_MAP.id + (MODELS.kit.propsReady ? ":kit" : "");
-    }
-    useArena(id) {
-      if (!MAPS[id]) id = "forest";
-      if (ARENA_VIEW.builtArena === id + (MODELS.kit.propsReady ? ":kit" : "")) return;
-      ARENA_MAP.load(id);
-      ARENA_VIEW.buildArena();
-      if (TOUR_VIEW) TOUR_VIEW.state.dirty = true;
-    }
-    syncArena() {
-      if (!SESSION.room) return;
-      if (SESSION.room.status === "lobby") { if (MAPS[SESSION.room.map]) ARENA_VIEW.useArena(SESSION.room.map); return; }
-      if (SESSION.room.status && SESSION.room.arena) ARENA_VIEW.useArena(SESSION.room.arena);
-    }
   }
-  var ARENA_VIEW = new ArenaBuilder();
+  var ARENA_PAINT = new ArenaPaint();
   class PortraitShot {
     static FACE_FRAME_K = 1.25;
     constructor(w, h) {
@@ -6146,10 +6152,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     quarterTurn() { return Math.floor(PROPS.seeded() * 4) * Math.PI / 2; }
     buildArenaProps(th) {
-      if (th.dungeon) PROPS.buildDungeonProps(); else PROPS.buildOutdoorProps(th);
+      if (th.dungeon) PROP_THEMES.buildDungeonProps(); else PROPS.buildOutdoorProps(th);
     }
     buildOutdoorProps(th) {
-      if (th.windy) { PROPS.buildWindhillProps(th); return; }
+      if (th.windy) { PROP_THEMES.buildWindhillProps(th); return; }
       var P3 = MODELS.kit.props, g = STAGE.arenaGroup, blocks = [[], []];
       function rockTile(c, r, hMin, hRange) {
         blocks[PROPS.seeded() < 0.5 ? 0 : 1].push({ w: TILE * 1.08, h: hMin + PROPS.seeded() * hRange, d: TILE * 1.08, x: ARENA_MAP.tileX(c), z: ARENA_MAP.tileY(r), yaw: PROPS.quarterTurn() });
@@ -6170,7 +6176,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     bushProps(th) {
       var P3 = MODELS.kit.props;
-      ARENA_VIEW.hideVolumes(th, function (b) {
+      ARENA_PAINT.hideVolumes(th, function (b) {
         var mat = P3.bushBig.getObjectByProperty("isMesh", true).material.clone();
         mat.transparent = true;
         var list = b.tiles.map(function (tl) {
@@ -6202,6 +6208,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       ARENA_VIEW.scenery.droppedForFps = true; ARENA_VIEW.scenery.group.visible = false; PROPS.millBlades = [];
       return true;
     }
+  }
+  var PROPS = new PropBuilder();
+  class PropThemes {
     spinMillBlades(dt) { PROPS.millBlades.forEach(function (b) { b.rotation.z += dt * PropBuilder.MILL_SPIN; }); }
     uniformProp(tpl, h, x, z, yaw) {
       var size = PROPS.propSize(tpl).getSize(new THREE.Vector3()), k = h / size.y;
@@ -6229,13 +6238,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }
       g.add(PROPS.instancedProp(P3.forestTile, turf));
       [[-300, 380, Math.PI / 2], [MW + 300, MH - 380, -Math.PI / 2]].forEach(function (spot) {
-        var mill = PROPS.uniformProp(P3.mill, 300, spot[0], spot[1], spot[2]);
+        var mill = PROP_THEMES.uniformProp(P3.mill, 300, spot[0], spot[1], spot[2]);
         var blades = mill.getObjectByName("mill_blades");
         if (blades) { blades.rotation.z = PROPS.seeded() * 6.28; PROPS.millBlades.push(blades); }
         g.add(mill);
         var side = spot[0] < 0 ? -1 : 1;
         [[-190, 20], [-60, 150], [150, -10]].forEach(function (off) {
-          g.add(PROPS.uniformProp(P3.farmPlot, 28, spot[0] + side * (40 + PROPS.seeded() * 30), spot[1] + off[0] + off[1], PROPS.quarterTurn()));
+          g.add(PROP_THEMES.uniformProp(P3.farmPlot, 28, spot[0] + side * (40 + PROPS.seeded() * 30), spot[1] + off[0] + off[1], PROPS.quarterTurn()));
         });
       });
       for (var hz = -500; hz <= MH + 500; hz += 330) {
@@ -6268,7 +6277,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       g.add(PROPS.instancedProp(P3.dgBlock, blocks));
       if (boxes.length) g.add(PROPS.instancedProp(P3.dgBox, boxes.map(function (o) { return { w: 46, h: 46, d: 46, x: o.x, z: o.z, yaw: o.yaw }; })));
       if (barrels.length) g.add(PROPS.instancedProp(P3.dgBarrel, barrels.map(function (o) { return { w: 44, h: 50, d: 44, x: o.x, z: o.z, yaw: o.yaw }; })));
-      ARENA_VIEW.hideVolumes(THEMES.dungeon, ARENA_VIEW.shadowVolume.bind(ARENA_VIEW));
+      ARENA_PAINT.hideVolumes(THEMES.dungeon, ARENA_PAINT.shadowVolume.bind(ARENA_VIEW));
       var torches = [];
       for (var r = 2; r < ARENA_MAP.rowCount; r += 5) [-1, ARENA_MAP.cols].forEach(function (c) { torches.push({ w: 16, h: 34, d: 16, x: ARENA_MAP.tileX(c), z: ARENA_MAP.tileY(r), yaw: 0 }); });
       var torchMesh = PROPS.instancedProp(P3.dgTorch, torches); torchMesh.position.y = 78; g.add(torchMesh);
@@ -6278,7 +6287,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       });
     }
   }
-  var PROPS = new PropBuilder();
+  var PROP_THEMES = new PropThemes();
   class FighterView {
     static CLERIC_BOOK_FROM = 45;
     static CLERIC_BOOK_Y = 84;
@@ -6343,11 +6352,27 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       FIGHTER_VIEW.adoptForm(v, next);
       v.once = null;
     }
+    dropMinionVis(id, vanish) {
+      var v = FIGHTER_VIEW.minions[id]; if (!v) return;
+      if (vanish && v.alive && v.root.visible) FX_VIEW.smoke(v.x, v.y);
+      v.durRing.dispose(); v.root.parent.remove(v.root); v.mats.forEach(function (m) { m.dispose(); }); delete FIGHTER_VIEW.minions[id];
+      delete MATCH.lastHp[id];
+    }
+    makeMinionVis(M) {
+      var v = FIGHTER_VIEW.makeVis(Object.assign(new Unit(), { id: M.key, team: M.team, char: "minion", angle: M.angle, atkAt: M.atkAt, ultUntil: 0, alive: true, x: M.x, y: M.y }));
+      v.body.scale.setScalar(MINION_MODEL.scale); v.ring.scale.setScalar(0.8);
+      v.durRing = new DurationRing(v.root, C_FX[M.team], FighterView.MINION_TIMER_R);
+      return v;
+    }
+    dropVis(id) { var v = FIGHTER_VIEW.fighters[id]; if (!v) return; v.root.parent.remove(v.root); v.mats.forEach(function (m) { m.dispose(); }); if (v.curse) v.curse.userData.mats.forEach(function (m) { m.dispose(); }); delete FIGHTER_VIEW.fighters[id]; }
+  }
+  var FIGHTER_VIEW = new FighterView();
+  class FighterMotion {
     clipAction(v, name) {
       return v.actions[name] || (v.actions[name] = v.mixer.clipAction((v.clips || MODELS.kit.clips)[name]));
     }
     showClip(v, name, ts, loop, restart, from) {
-      var a = FIGHTER_VIEW.clipAction(v, name);
+      var a = FIGHTER_MOTION.clipAction(v, name);
       a.timeScale = ts;
       if (name === v.curName && !restart) return;
       a.reset();
@@ -6382,13 +6407,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (E.atkAt !== v.atkSeen) {
         v.atkSeen = E.atkAt;
         if (E.alive && t - E.atkAt < 600) {
-          var ac = FIGHTER_VIEW.attackClip(v, E, t);
-          FIGHTER_VIEW.playOnce(v, ac[0], ac[1], t, ac[2], ac[3]);
+          var ac = FIGHTER_MOTION.attackClip(v, E, t);
+          FIGHTER_MOTION.playOnce(v, ac[0], ac[1], t, ac[2], ac[3]);
        }
       }
       if (E.stabAt !== v.stabSeen) {
         v.stabSeen = E.stabAt;
-        if (E.alive && t - E.stabAt < 600) FIGHTER_VIEW.playOnce(v, "Melee_1H_Attack_Stab", MODELS.kit.clips.Melee_1H_Attack_Stab.duration * 1000 / (E.isRiposting(E.stabAt) ? 320 : 520), t);
+        if (E.alive && t - E.stabAt < 600) FIGHTER_MOTION.playOnce(v, "Melee_1H_Attack_Stab", MODELS.kit.clips.Melee_1H_Attack_Stab.duration * 1000 / (E.isRiposting(E.stabAt) ? 320 : 520), t);
       }
       var type = CHAR_TYPES.of(E.char);
       if (type.hasSkillClip && E.ultUntil !== v.ultSeen) {
@@ -6398,61 +6423,48 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           v.once.soft = true;
         }
       }
-     if (hurt && E.alive && (!v.once || v.once.name === "Hit_A")) FIGHTER_VIEW.playOnce(v, "Hit_A", 1.6, t);
+     if (hurt && E.alive && (!v.once || v.once.name === "Hit_A")) FIGHTER_MOTION.playOnce(v, "Hit_A", 1.6, t);
       v.wasStealth = E.isStealthed(t);
       var gameDt = dt * CLOCK.scale;
       var moved = hyp(E.x - v.px, E.y - v.py) / Math.max(gameDt, 0.001);
       v.px = E.x; v.py = E.y;
       v.speed += (moved - v.speed) * Math.min(1, dt * 10);
-      if (v.once && v.once.next && t > v.once.until && E.alive) { FIGHTER_VIEW.playOnce(v, v.once.next[0], v.once.next[1], t); v.once.soft = true; }
+      if (v.once && v.once.next && t > v.once.until && E.alive) { FIGHTER_MOTION.playOnce(v, v.once.next[0], v.once.next[1], t); v.once.soft = true; }
       if (v.once && (t > v.once.until || !E.alive || (v.once.soft && E.mv && v.speed > 15))) v.once = null;
       if (!E.alive) {
-        if (!v.dead) { v.dead = true; FIGHTER_VIEW.showClip(v, "Death_A", 1, false); }
-        else if (!v.curName) FIGHTER_VIEW.showClip(v, "Death_A_Pose", 1, false);
+        if (!v.dead) { v.dead = true; FIGHTER_MOTION.showClip(v, "Death_A", 1, false); }
+        else if (!v.curName) FIGHTER_MOTION.showClip(v, "Death_A_Pose", 1, false);
       } else {
         v.dead = false;
         var earlyPose = type.earlyPose(E, t), latePose = type.latePose(E, t);
-        if (earlyPose) FIGHTER_VIEW.showClip(v, earlyPose[0], earlyPose[1], true);
-        else if (E.isBladeStorming(t)) FIGHTER_VIEW.showClip(v, "Melee_2H_Attack_Spinning", 1.2, true);
-        else if (v.once) { FIGHTER_VIEW.showClip(v, v.once.name, v.once.ts, false, v.once.fresh, v.once.from); v.once.fresh = false; }
-        else if (E.isRevealing(t)) FIGHTER_VIEW.showClip(v, "Ranged_Magic_Spellcasting", 1, true);
-        else if (latePose) FIGHTER_VIEW.showClip(v, latePose[0], latePose[1], true);
-        else if (E.mv && v.speed > 150) FIGHTER_VIEW.showClip(v, "Running_A", clamp(v.speed / 260, 0.7, 1.6), true);
-        else if (E.mv && v.speed > 15) FIGHTER_VIEW.showClip(v, "Walking_A", clamp(v.speed / 110, 0.6, 1.4), true);
-        else FIGHTER_VIEW.showClip(v, CHAR_TYPES.of(E.char).idleClip, 1, true);
+        if (earlyPose) FIGHTER_MOTION.showClip(v, earlyPose[0], earlyPose[1], true);
+        else if (E.isBladeStorming(t)) FIGHTER_MOTION.showClip(v, "Melee_2H_Attack_Spinning", 1.2, true);
+        else if (v.once) { FIGHTER_MOTION.showClip(v, v.once.name, v.once.ts, false, v.once.fresh, v.once.from); v.once.fresh = false; }
+        else if (E.isRevealing(t)) FIGHTER_MOTION.showClip(v, "Ranged_Magic_Spellcasting", 1, true);
+        else if (latePose) FIGHTER_MOTION.showClip(v, latePose[0], latePose[1], true);
+        else if (E.mv && v.speed > 150) FIGHTER_MOTION.showClip(v, "Running_A", clamp(v.speed / 260, 0.7, 1.6), true);
+        else if (E.mv && v.speed > 15) FIGHTER_MOTION.showClip(v, "Walking_A", clamp(v.speed / 110, 0.6, 1.4), true);
+        else FIGHTER_MOTION.showClip(v, CHAR_TYPES.of(E.char).idleClip, 1, true);
       }
       v.mixer.update(E.alive && E.isFrostFrozen(t) ? 0 : gameDt);
     }
     animateMinion(v, M, t, dt) {
       if (!v.kit) return;
       if (!M.alive) {
-        if (!v.dead) { v.dead = true; FIGHTER_VIEW.showClip(v, "Skeletons_Death", 1.5, false); }
+        if (!v.dead) { v.dead = true; FIGHTER_MOTION.showClip(v, "Skeletons_Death", 1.5, false); }
       } else if (t < M.rise) {
-        FIGHTER_VIEW.showClip(v, "Skeletons_Awaken_Floor", MODELS.kit.clips.Skeletons_Awaken_Floor.duration * 1000 / ULT.smRiseMs, false);
+        FIGHTER_MOTION.showClip(v, "Skeletons_Awaken_Floor", MODELS.kit.clips.Skeletons_Awaken_Floor.duration * 1000 / ULT.smRiseMs, false);
       } else {
-        if (M.atkAt !== v.atkSeen) { v.atkSeen = M.atkAt; if (t - M.atkAt < 600) FIGHTER_VIEW.playOnce(v, "Melee_1H_Attack_Chop", 1.7, t); }
+        if (M.atkAt !== v.atkSeen) { v.atkSeen = M.atkAt; if (t - M.atkAt < 600) FIGHTER_MOTION.playOnce(v, "Melee_1H_Attack_Chop", 1.7, t); }
         if (v.once && t > v.once.until) v.once = null;
-        if (v.once) { FIGHTER_VIEW.showClip(v, v.once.name, v.once.ts, false, v.once.fresh); v.once.fresh = false; }
-        else if (M.mv) FIGHTER_VIEW.showClip(v, "Skeletons_Walking", 1.4, true);
-        else FIGHTER_VIEW.showClip(v, "Skeletons_Idle", 1, true);
+        if (v.once) { FIGHTER_MOTION.showClip(v, v.once.name, v.once.ts, false, v.once.fresh); v.once.fresh = false; }
+        else if (M.mv) FIGHTER_MOTION.showClip(v, "Skeletons_Walking", 1.4, true);
+        else FIGHTER_MOTION.showClip(v, "Skeletons_Idle", 1, true);
       }
       v.mixer.update(dt * CLOCK.scale);
     }
-    dropMinionVis(id, vanish) {
-      var v = FIGHTER_VIEW.minions[id]; if (!v) return;
-      if (vanish && v.alive && v.root.visible) FX_VIEW.smoke(v.x, v.y);
-      v.durRing.dispose(); v.root.parent.remove(v.root); v.mats.forEach(function (m) { m.dispose(); }); delete FIGHTER_VIEW.minions[id];
-      delete MATCH.lastHp[id];
-    }
-    makeMinionVis(M) {
-      var v = FIGHTER_VIEW.makeVis(Object.assign(new Unit(), { id: M.key, team: M.team, char: "minion", angle: M.angle, atkAt: M.atkAt, ultUntil: 0, alive: true, x: M.x, y: M.y }));
-      v.body.scale.setScalar(MINION_MODEL.scale); v.ring.scale.setScalar(0.8);
-      v.durRing = new DurationRing(v.root, C_FX[M.team], FighterView.MINION_TIMER_R);
-      return v;
-    }
-    dropVis(id) { var v = FIGHTER_VIEW.fighters[id]; if (!v) return; v.root.parent.remove(v.root); v.mats.forEach(function (m) { m.dispose(); }); if (v.curse) v.curse.userData.mats.forEach(function (m) { m.dispose(); }); delete FIGHTER_VIEW.fighters[id]; }
   }
-  var FIGHTER_VIEW = new FighterView();
+  var FIGHTER_MOTION = new FighterMotion();
   class FighterAuras {
     makeShieldAura() {
       var g = new THREE.Group();
@@ -7662,7 +7674,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       TOUR_VIEW.showcase.forEach(function (s) {
         if (!s.E.nextAtk || s.E.nextAtk < 100000) s.E.nextAtk = t + s.E.nextAtk;
         if (t >= s.E.nextAtk) { s.E.atkAt = t; s.E.nextAtk = t + 1800 + Math.random() * 2600; }
-        FIGHTER_VIEW.animate(s.v, s.E, t, dt, false);
+        FIGHTER_MOTION.animate(s.v, s.E, t, dt, false);
       });
       ARENA_VIEW.bushVis.forEach(function (bv) { bv.mats.forEach(function (m) { m.opacity = bv.full; }); });
       CAMERA_RIG.renderer.render(STAGE.scene, STAGE.camera);
@@ -7728,11 +7740,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           v.frostSeen = E.frostStackAt;
         }
         v.root.position.set(E.x, 0, E.y);
-        v.body.position.y = FIGHTER_VIEW.leapHeight(E, t);
+        v.body.position.y = FIGHTER_MOTION.leapHeight(E, t);
         v.yaw += angDiff(-FRAME_RENDERER.faceAngle(E, t), v.yaw) * Math.min(1, dt * 14);
         if (v.kit) v.body.rotation.y = v.yaw;
         else { v.body.rotation.set(0, v.yaw, E.alive ? 0 : Math.PI / 2); v.body.position.y = E.alive ? 0 : 17; }
-        FIGHTER_VIEW.animate(v, E, t, dt, hurt);
+        FIGHTER_MOTION.animate(v, E, t, dt, hurt);
         v.mats.forEach(function (m) { m.opacity = alpha; });
         var glow = FRAME_RENDERER.glowOf(E, t);
         v.glowMats.forEach(function (m) { m.emissive.setHex(glow); });
@@ -7779,7 +7791,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         v.yaw += angDiff(-M.angle, v.yaw) * Math.min(1, dt * 12);
         if (v.kit) v.body.rotation.y = v.yaw;
         else { v.body.rotation.set(0, v.yaw, M.alive ? 0 : Math.PI / 2); v.body.position.y = M.alive ? 0 : 17; }
-        FIGHTER_VIEW.animateMinion(v, M, t, dt);
+        FIGHTER_MOTION.animateMinion(v, M, t, dt);
         v.mats.forEach(function (m) { m.opacity = alpha; });
         var glow = M.flashUntil > nowMs ? 0x999999 : (t < M.rise ? 0x2A1044 : 0x000000);
         v.glowMats.forEach(function (m) { m.emissive.setHex(glow); });
@@ -8393,7 +8405,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     frame() {
       requestAnimationFrame(function () { LOOP.frame(); });
       var nowMs = Date.now(), frameMs = nowMs - LOOP.lastFrame, dt = Math.min(0.05, frameMs / 1000); LOOP.lastFrame = nowMs;
-      PROPS.spinMillBlades(dt);
+      PROP_THEMES.spinMillBlades(dt);
       if (!SESSION.room || SCREENS.now !== "game") { TOUR_VIEW.renderTour(nowMs, dt); HUD.adaptQuality(frameMs); return; }
       var st = SESSION.room.status;
       if ((st === "countdown" || st === "playing" || st === "ended") && SESSION.room.startAt && (!MATCH.game || MATCH.game.startAt !== SESSION.room.startAt)) {
@@ -8445,8 +8457,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (MATCH.me) WORLD.stepSkillMotion(MATCH.me, t, dt);
       WORLD.stepStatusTicks(t);
       PROJECTILES.checkProjectiles(t);
-      PROJECTILES.stepBladeDaggers(t);
-      PROJECTILES.stepBladeSpins(t);
+      BLADE_SPINS.stepBladeDaggers(t);
+      BLADE_SPINS.stepBladeSpins(t);
       STORM_FX.stepBladeStorms(t);
     }
     stepRespawns(t) {
@@ -8521,7 +8533,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       bindRoom: function (fakeRoom, players) { SESSION.room = fakeRoom; SESSION.players = players; },
       unbindRoom: function () { SESSION.room = null; SESSION.players = {}; },
       setMyId: function (id) { var before = SESSION.myId; SESSION.myId = id; return before; },
-      HUD: HUD, SOUND: SOUND, BACKEND: BACKEND, TIMESCALE: TIMESCALE, THREE: THREE, CAMERA_RIG: CAMERA_RIG, ARENA_VIEW: ARENA_VIEW, PROPS: PROPS, camera: STAGE.camera, overlay: ov, QA: HUD.quality, PIX_MIN: PIX_MIN, PIX_START: PIX_START, SCENERY: ARENA_VIEW.scenery,
+      HUD: HUD, SOUND: SOUND, BACKEND: BACKEND, TIMESCALE: TIMESCALE, THREE: THREE, CAMERA_RIG: CAMERA_RIG, ARENA_VIEW: ARENA_VIEW, PROPS: PROPS, PROP_THEMES: PROP_THEMES, camera: STAGE.camera, overlay: ov, QA: HUD.quality, PIX_MIN: PIX_MIN, PIX_START: PIX_START, SCENERY: ARENA_VIEW.scenery,
       setDb: function (fake) { var before = BACKEND.db; BACKEND.db = fake; return before; },
       setTestLink: function (flag) { var before = BACKEND.isTestLink; BACKEND.isTestLink = flag; return before; },
       CHAR_TYPES: CHAR_TYPES, AUTO_AIM: AUTO_AIM, AUTO_AIM_ERR: AutoAim.AUTO_AIM_ERR, AUTO_AIM_LEAD: AutoAim.AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: DRAFT_AI,
