@@ -349,8 +349,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   var CATALOG = new CharCatalog();
-  var MAPS = {
-    forest: { name: "숲속 공터", blueHalf: [
+  class ForestMap {
+    static DATA = { name: "숲속 공터", blueHalf: [
       "................",
       "................",
       "................",
@@ -364,8 +364,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       "................",
       '..""...##...""..',
       '..""........""..'
-    ] },
-    river: { name: "강 건너기", blueHalf: [
+    ] };
+  }
+  class RiverMap {
+    static DATA = { name: "강 건너기", blueHalf: [
       "................",
       "................",
       "................",
@@ -379,8 +381,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       "................",
       "~==~~~~==~~~~==~",
       "~==~~~~==~~~~==~"
-    ] },
-    dungeon: { name: "던전 회랑", blueHalf: [
+    ] };
+  }
+  class DungeonMap {
+    static DATA = { name: "던전 회랑", blueHalf: [
       "................",
       "................",
       "................",
@@ -394,8 +398,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       '###...""""...###',
       "......x..x......",
       "..##........##.."
-    ] },
-    windhill: { name: "바람의 언덕", blueHalf: [
+    ] };
+  }
+  class WindhillMap {
+    static DATA = { name: "바람의 언덕", blueHalf: [
       "................",
       "................",
       "................",
@@ -409,8 +415,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       '""............""',
       '""...##.......""',
       "................"
-    ] },
-    practice: { name: "연습장", practice: true, spawnY: { blue: 375, red: ArenaSize.MH - 375 }, blueHalf: [
+    ] };
+  }
+  class PracticeMap {
+    static DATA = { name: "연습장", practice: true, spawnY: { blue: 375, red: ArenaSize.MH - 375 }, blueHalf: [
       "oooooooooooooooo",
       "oooooooooooooooo",
       "oooooooooooooooo",
@@ -424,9 +432,18 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       "#..............#",
       "#..............#",
       "#..............#"
-    ] }
-  };
-  var MAP_IDS = ["forest", "river", "dungeon", "windhill"];
+    ] };
+  }
+  class MapCatalog {
+    static KINDS = { forest: ForestMap, river: RiverMap, dungeon: DungeonMap, windhill: WindhillMap, practice: PracticeMap };
+    static IDS = ["forest", "river", "dungeon", "windhill"];
+    static of(id) { return Object.prototype.hasOwnProperty.call(MapCatalog.KINDS, id) ? MapCatalog.KINDS[id].DATA : undefined; }
+    static table() {
+      var table = {};
+      Object.keys(MapCatalog.KINDS).forEach(function (id) { table[id] = MapCatalog.KINDS[id].DATA; });
+      return table;
+    }
+  }
   class RectGrid {
     constructor(reach) { this.reach = reach; this.cols = 1; this.rows = 1; this.cells = [[]]; }
     cellOf(x, y) {
@@ -496,8 +513,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       });
     }
     load(id) {
-      ARENA_MAP.id = MAPS[id] ? id : "forest";
-      ARENA_MAP.rows = ARENA_MAP.fullMap(MAPS[ARENA_MAP.id].blueHalf);
+      ARENA_MAP.id = MapCatalog.of(id) ? id : "forest";
+      ARENA_MAP.rows = ARENA_MAP.fullMap(MapCatalog.of(ARENA_MAP.id).blueHalf);
       ARENA_MAP.cols = ARENA_MAP.rows[0].length; ARENA_MAP.rowCount = ARENA_MAP.rows.length;
       ARENA_MAP.obstacles = ARENA_MAP.tileRects(TileKinds.BLOCK_TILES);
       ARENA_MAP.water = ARENA_MAP.tileRects(TileKinds.WATER_TILES);
@@ -508,10 +525,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     shotSrc(id, wide) { return "img/teambattle/maps/" + id + (wide ? "-wide" : "") + ".webp"; }
     resolveArena(choice) {
-      return MAPS[choice] ? choice : MAP_IDS[Math.floor(Math.random() * MAP_IDS.length)];
+      return MapCatalog.of(choice) ? choice : MapCatalog.IDS[Math.floor(Math.random() * MapCatalog.IDS.length)];
     }
     spawnOf(team, slot, arena) {
-      var x = ArenaMap.SPAWN_X[slot - 1], map = MAPS[arena || ARENA_MAP.id], sy = (map && map.spawnY) || ArenaMap.SPAWN_Y;
+      var x = ArenaMap.SPAWN_X[slot - 1], map = MapCatalog.of(arena || ARENA_MAP.id), sy = (map && map.spawnY) || ArenaMap.SPAWN_Y;
       return { x: team === "blue" ? ArenaSize.MW - x : x, y: sy[team], angle: team === "blue" ? Math.PI / 2 : -Math.PI / 2 };
     }
   }
@@ -963,11 +980,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     flashHint(t) { LOBBY.hintText = t; LOBBY.hintUntil = Date.now() + 2500; LOBBY.renderLobby(); setTimeout(function () { LOBBY.renderLobby(); }, 2600); }
     mapChoices(mode) {
-      return MAP_IDS.map(function (id) { return { id: id, name: MAPS[id].name }; })
-        .concat([mode === "practice" ? { id: "practice", name: MAPS.practice.name } : { id: "random", name: "랜덤" }]);
+      return MapCatalog.IDS.map(function (id) { return { id: id, name: MapCatalog.of(id).name }; })
+        .concat([mode === "practice" ? { id: "practice", name: MapCatalog.of("practice").name } : { id: "random", name: "랜덤" }]);
     }
     nameIn(list, id, fallback) { for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i].name; return fallback; }
-    modeName(id) { return LOBBY.nameIn(MODES, id, "모드 선택 중"); }
+    modeName(id) { return LOBBY.nameIn(GameModes.LIST, id, "모드 선택 중"); }
     choiceButtons(list, current, cls) {
       return list.map(function (m) {
         return '<button type="button" class="mini modeBtn ' + cls + (m.id === current ? " on" : "") + '" data-id="' + m.id + '"' + (SESSION.isHost() ? "" : " disabled") + ">" + m.name + "</button>";
@@ -978,8 +995,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var me = SESSION.players[SESSION.myId]; if (!me) return;
       var mode = SESSION.room.mode;
       var practice = mode === "practice", maps = LOBBY.mapChoices(mode);
-      Dom.setText(Dom.$("lobbyMode"), LOBBY.modeName(mode) + " · " + LOBBY.nameIn(maps, SESSION.room.map, MAPS.forest.name));
-      Dom.setHtml(Dom.$("modeBtns"), LOBBY.choiceButtons(MODES, mode, "modeOpt"));
+      Dom.setText(Dom.$("lobbyMode"), LOBBY.modeName(mode) + " · " + LOBBY.nameIn(maps, SESSION.room.map, MapCatalog.of("forest").name));
+      Dom.setHtml(Dom.$("modeBtns"), LOBBY.choiceButtons(GameModes.LIST, mode, "modeOpt"));
       Dom.setHtml(Dom.$("mapBtns"), LOBBY.choiceButtons(maps, SESSION.room.map || "forest", "mapOpt"));
 
       var hostCanFill = SESSION.isHost() && SESSION.room.status === "lobby" && !practice;
@@ -1161,11 +1178,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   var ROSTER = new RoomRoster();
 
-  var MODES = [
-    { id: "pvp", name: "일반모드" },
-    { id: "practice", name: "연습모드" },
-    { id: "cup", name: "대회모드" }
-  ];
+  class GameModes {
+    static LIST = [
+      { id: "pvp", name: "일반모드" },
+      { id: "practice", name: "연습모드" },
+      { id: "cup", name: "대회모드" }
+    
+    ];
+  }
 
 
   class CharCardView {
@@ -1332,7 +1352,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   new EscapeKey().bind();
   class StatsView {
-    static STATS_MODES = MODES.filter(function (m) { return m.id !== "practice"; });
+    static STATS_MODES = GameModes.LIST.filter(function (m) { return m.id !== "practice"; });
     constructor() { this.mode = "pvp"; this.loadSeq = 0; }
     statsPct(a, b) { return b ? (a / b * 100).toFixed(1) + "%" : "-"; }
     statsRateCell(a, b) { return "<td><b>" + STATS_VIEW.statsPct(a, b) + "</b><small>(" + a + " / " + b + ")</small></td>"; }
@@ -1383,8 +1403,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   Dom.$("btnStatsClose").onclick = function () { Dom.show(Dom.$("statsModal"), false); };
   Dom.$("btnMapView").onclick = function () {
     var current = SESSION.room && SESSION.room.map;
-    Dom.setHtml(Dom.$("mapViewGrid"), MAP_IDS.map(function (id) {
-      return '<figure class="' + (id === current ? "on" : "") + '"><figcaption>' + Dom.esc(MAPS[id].name) + '</figcaption><img alt="" src="' + ARENA_MAP.shotSrc(id) + '"></figure>';
+    Dom.setHtml(Dom.$("mapViewGrid"), MapCatalog.IDS.map(function (id) {
+      return '<figure class="' + (id === current ? "on" : "") + '"><figcaption>' + Dom.esc(MapCatalog.of(id).name) + '</figcaption><img alt="" src="' + ARENA_MAP.shotSrc(id) + '"></figure>';
     }).join(""));
     Dom.show(Dom.$("mapViewModal"), true);
   };
@@ -1418,7 +1438,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   class MatchLauncher {
     practiceSpots(arena, playerTeam) {
       var toward = playerTeam === "blue" ? 1 : -1, taken = [];
-      var map = ARENA_MAP.fullMap(MAPS[arena].blueHalf), open = [];
+      var map = ARENA_MAP.fullMap(MapCatalog.of(arena).blueHalf), open = [];
       for (var r = 1; r < map.length - 1; r++) for (var c = 1; c < map[0].length - 1; c++) {
         var clear = true;
         for (var dr = -1; dr <= 1 && clear; dr++) for (var dc = -1; dc <= 1; dc++) if (map[r + dr].charAt(c + dc) !== ".") { clear = false; break; }
@@ -1426,7 +1446,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }
       return PracticeMode.BOTS.map(function (b) {
         var want = { x: ArenaSize.MW / 2 + b.dx, y: ArenaSize.MH / 2 + b.dy * toward }, best = null, bestD = Infinity;
-        if (MAPS[arena].practice) best = want;
+        if (MapCatalog.of(arena).practice) best = want;
         else open.forEach(function (o) {
           if (taken.some(function (q) { return MathKit.hyp(q.x - o.x, q.y - o.y) < PracticeMode.BOT_MIN_GAP; })) return;
           var d = MathKit.hyp(o.x - want.x, o.y - want.y) + (o.y - ArenaSize.MH / 2) * toward * 0.05;
@@ -1678,9 +1698,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var waiting = done ? [] : DRAFT.draftWaiting(d, d.step), myTurn = waiting.indexOf(SESSION.myId) >= 0, banTurn = !done && Draft.STEPS[d.step].ban;
       var me = SESSION.players[SESSION.myId], myTeam = me ? me.team : null, mySide = DRAFT.draftSideOf(d, SESSION.myId);
       var left = Math.max(0, d.stepAt + Draft.SHOWN_MS - t), humans = DRAFT.draftHumans(d).length, readyN = DRAFT.draftReadyCount(d);
-      var arena = MAPS[SESSION.room.arena] || MAPS[ARENA_MAP.id];
+      var arena = MapCatalog.of(SESSION.room.arena) || MapCatalog.of(ARENA_MAP.id);
       Dom.setHtml(Dom.$("dfMap"), arena ? "🗺️ " + Dom.esc(arena.name) + "<small>맵</small>" : "");
-      var arenaId = MAPS[SESSION.room.arena] ? SESSION.room.arena : ARENA_MAP.id, mapImg = Dom.$("dfMapImg");
+      var arenaId = MapCatalog.of(SESSION.room.arena) ? SESSION.room.arena : ARENA_MAP.id, mapImg = Dom.$("dfMapImg");
       Dom.setText(Dom.$("dfMapName"), arena ? "🗺️ " + arena.name : "");
       if (mapImg.getAttribute("src") !== ARENA_MAP.shotSrc(arenaId, true)) mapImg.setAttribute("src", ARENA_MAP.shotSrc(arenaId, true));
       var timer = Dom.$("dfTimer");
@@ -2047,6 +2067,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class WarriorType extends ArcMeleeType {
+    static MODEL = { file: "Barbarian", right: "axe_1handed" };
     static ULT = {
       bzDur: GameTime.gameMs(6), bzDmgMul: 1.5, bzCdMul: 1 / 1.5, bzHeal: 20
     };
@@ -2075,6 +2096,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class DuelistType extends CharacterType {
+    static MODEL = { file: "Rogue", right: "sword_D",
+               recolor: [[1, 0, 1, "#FFFFFF", "#D6DAE2"], [1, 1, 1, "#FFFFFF", "#D6DAE2"], [0, 5, 1, "#D97B4F", "#9A4A28"], [0, 6, 1, "#F2F4F7", "#BFC5CE"],
+                         [2, 3, 1, "#2B2F36", "#15171B"], [1, 7, 1, "#F2F4F7", "#BFC5CE"], [2, 7, 1, "#F2F4F7", "#BFC5CE"]],
+               ponytail: { hair: "#9B5A45", tie: "#FFFFFF" } };
     static ULT = {
       rmDur: GameTime.gameMs(4), rmRate: 1000 / GameTime.gameMs(0.5), rmDashMs: GameTime.gameMs(0.4), rmDashRange: 100
     };
@@ -2111,6 +2136,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class KnightType extends ArcMeleeType {
+    static MODEL = { file: "Knight", right: "sword_1handed", left: "shield_badge_color" };
     static ULT = {
       tkDur: GameTime.gameMs(6), tkDef: 0.35, tkStunR: 120, tkStunMs: GameTime.gameMs(1.5)
     };
@@ -2138,6 +2164,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class RangerType extends CharacterType {
+    static MODEL = { file: "Ranger", left: "bow_withString", leftTurn: Math.PI };
     static ULT = {
       mkCount: 10, mkGap: 115, mkDmg: 40, mkRefund: 1, mkSpeed: 805, mkRange: ArenaSize.KEY * 8, mkPr: 8
     };
@@ -2170,6 +2197,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class MageType extends MagicShooterType {
+    static MODEL = { file: "Mage", portraitPlant: true, right: "staff", recolor: [[1, 0, 2, "#D8342E", "#6A0E10"], [1, 7, 1, "#4A1012", "#1E0507"], [1, 2, 1, "#FF9A3A", "#C8401A"], [2, 1, 1, "#FF9A3A", "#C8401A"]],
+               rightRecolor: [[2, 6, 1, "#FFD27A", "#E0341E"]] };
     static ULT = {
       mbDelay: GameTime.gameMs(1.5), mbR: 250, mbDmg: 100, mbDmgMin: 65, mbCast: 550, mbMin: 60, mbStunMs: GameTime.gameMs(1.7),
       mbStunMin: GameTime.gameMs(0.9), mbSteps: 5
@@ -2215,6 +2244,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class RogueType extends CharacterType {
+    static MODEL = { file: "Rogue_Hooded", right: "dagger", left: "dagger",
+               recolor: [[1, 0, 1, "#3B2A55", "#150D22"], [1, 1, 1, "#241A38", "#0C0814"], [2, 1, 1, "#241A38", "#0C0814"], [2, 2, 1, "#6A3FA0", "#2A1250"]] };
     static ULT = {
       asSmokeMs: 400, asDur: GameTime.gameMs(21)
     };
@@ -2252,6 +2283,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class NecroType extends MagicShooterType {
+    static MODEL = { file: "Necromancer", portraitPlant: true, plantTurn: Math.PI / 2, right: "Skeleton_Scythe" };
     static ULT = {
       smCount: 2, smAhead: ArenaSize.KEY * 1, smSide: 38, smHp: 75, smSpeed: GameTime.gameSpeed(180), smGauge: 0.5, smDmg: 12, smCd: 800, smRange: 80,
       smArc: Math.PI * 0.6, smDur: GameTime.gameMs(10), smMax: 4, smFollow: ArenaSize.KEY * 1.5, smRiseMs: 1100, smCorpseMs: 1400
@@ -2288,6 +2320,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class SniperType extends CharacterType {
+    static MODEL = { file: "Rogue_Hooded", portraitPlant: true, plantTilt: -Math.PI / 2, right: "crossbow_2handed", rightTurn: Math.PI / 2, muzzle: [0, 0.12, 1.12] };
     static ULT = {
       pnDmg: 90, pnSpeed: 735, pnRange: 900, pnPr: 16, pnRefund: 4, pnScale: 3
     };
@@ -2328,6 +2361,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class ThrowerType extends CharacterType {
+    static MODEL = { file: "Skeleton_Rogue", right: "Potion_1", rightScale: 2.2 };
     static ULT = {
       plFlight: 700, plFlightMin: 100, plR: 60, plDur: GameTime.gameMs(2.5), plTick: GameTime.gameMs(1), plMax: 4, plFade: 500, plLob: 90, plGauge: 1,
       fgR: 150, fgDur: GameTime.gameMs(6), fgDmg: 15, fgHeal: 5, fgSlowMul: 0.6, fgSlowMs: 400, fgCast: ArenaSize.KEY * 4 + 100, fgRefund: 1
@@ -2360,6 +2394,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class LancerType extends CharacterType {
+    static MODEL = { file: "Barbarian", portraitPlant: true, right: "spear_A", rightScale: 1.35, hide: ["Barbarian_BearHat"], wear: { from: "knight", part: "Knight_Helmet" },
+               recolor: [[0, 1, 1, "#8A5A38", "#4A2C1A"], [0, 7, 1, "#5B7FB0", "#2E4468"]] };
     static ULT = {
       lnWind: GameTime.gameMs(0.5), lnLen: 350, lnW: 108, lnDmg: 75, lnStunMs: GameTime.gameMs(1.7)
     };
@@ -2393,6 +2429,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class BlacksmithType extends CharacterType {
+    static MODEL = { file: "Engineer", right: "hammer_A", hide: ["Engineer_Backpack"],
+                  recolor: [[0, 1, 1, "#3A2416", "#17100A"], [1, 0, 1, "#7A4E2D", "#3E2412"], [1, 3, 1, "#5A5F66", "#2E3136"], [0, 5, 1, "#F08A3A", "#9A3E14"],
+                            [1, 7, 1, "#4B413A", "#231D19"], [0, 7, 1, "#5C4636", "#2B2018"], [2, 1, 1, "#E8742A", "#8F3A0E"], [2, 7, 1, "#E8742A", "#8F3A0E"], [3, 0, 1, "#E8742A", "#8F3A0E"]] };
     static ULT = {
       bsLeapMinMs: GameTime.gameMs(0.3), bsLeapMaxMs: GameTime.gameMs(1.5), bsR: 200, bsDmg: 45, bsStunMs: GameTime.gameMs(1.5), bsCast: 450, bsMin: 60,
       bsHop: 45
@@ -2438,10 +2477,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class PriestType extends CharacterType {
+    static MODEL = { file: "Mage", right: "wand", left: "spellbook_open", leftTurn: Math.PI, hide: ["Mage_Hat"],
+               recolor: [[1, 0, 2, "#FFFFFF", "#CFC8BA"], [1, 2, 1, "#9CCBF2", "#3E6BA6"], [0, 1, 1, "#F2D38A", "#A87A3A"]] };
     static ULT = {
       bhR: 200, bhDur: 3000, bhDelay: 500, bhPull: 220, bhCast: 380, bhMin: 60, bhCcRate: 0.8
     };
     static STATS = { name: "사제", role: "caster", icon: "📖", hp: 120, speed: 240, cd: 1000, dmg: 10, heal: 10, range: 320, width: 200, ultName: "블랙홀", ultKind: "blackhole", ultAim: true, heals: true, retired: true };
+    static WAVE = { life: 703, travel: 543 };
     get hasSkillClip() { return true; }
     playSkillClip(v, E, t) { FIGHTER_MOTION.playOnce(v, "Ranged_Magic_Spellcasting_Long", 2.6, t); }
     ultDesc() {
@@ -2456,11 +2498,18 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class ShamanType extends CharacterType {
+    static MODEL = { file: "Knight", right: "fistweapon_A", left: "fistweapon_A", rightScale: 1.35, leftScale: 1.35, hide: ["Knight_Helmet", "Knight_HelmetVisor", "Knight_Cape"],
+               recolor: [[0, 1, 1, "#2E2C34", "#101014"], [0, 3, 1, "#3C3548", "#16121C"], [0, 4, 1, "#2A2532", "#0C0A10"], [0, 7, 1, "#3C3548", "#16121C"], [1, 2, 2, "#3C3548", "#141019"],
+                         [1, 7, 1, "#26222C", "#0B0A0E"], [0, 5, 2, "#D0303A", "#6A0E14"], [1, 5, 1, "#D0303A", "#6A0E14"], [2, 3, 1, "#D0303A", "#6A0E14"], [1, 6, 1, "#2A2630", "#121016"],
+                         [1, 1, 1, "#B01E28", "#5A0A10"], [2, 0, 1, "#B01E28", "#5A0A10"]],
+               rightRecolor: [[1, 5, 1, "#4A4258", "#141019"], [1, 6, 1, "#3A3446", "#0E0C12"], [0, 2, 1, "#4A4258", "#141019"], [0, 3, 1, "#3A3446", "#0E0C12"], [0, 4, 1, "#D0303A", "#6A0E14"]],
+               leftRecolor: [[1, 5, 1, "#4A4258", "#141019"], [1, 6, 1, "#3A3446", "#0E0C12"], [0, 2, 1, "#4A4258", "#141019"], [0, 3, 1, "#3A3446", "#0E0C12"], [0, 4, 1, "#D0303A", "#6A0E14"]] };
     static ULT = {
       dmR: 400, dmGrowMs: GameTime.gameMs(2), dmDur: GameTime.gameMs(8), dmStunMs: GameTime.gameMs(1), dmBoltDmg: 20, dmStrikeMaxHpRate: 0.2,
       dmStrikeStunMs: GameTime.gameMs(0.7), dmStunGraceMs: 40, cuStacks: 3, cuBoomDmg: 30, cuBoomMs: 500, cuExpireMs: GameTime.gameMs(4)
     };
     static STATS = { name: "주술사", role: "shooter", icon: "👊", hp: 115, speed: GameTime.gameSpeed(160), cd: GameTime.gameMs(1.3), dmg: 5, range: 400, width: 100, ultName: "영역전개" };
+    static WAVE = { life: 724, travel: 564 };
     get hasDarkWave() { return true; }
     overrideBasic(E, ang, reach, t) {
       var struck = DOMAIN_FX.domainStrikeTarget(E, t);
@@ -2497,6 +2546,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class ClericType extends CharacterType {
+    static MODEL = { file: "Rogue_Hooded", portraitPlant: true, right: "staff", left: "spellbook_closed", hide: ["RogueHooded_Mask"],
+               recolor: [[1, 1, 1, "#FFFFFF", "#D8D0BE"], [2, 1, 1, "#FFFFFF", "#D8D0BE"], [1, 0, 1, "#FFE58A", "#E0B040"], [0, 5, 2, "#E0B24A", "#8F6A22"],
+                         [1, 5, 2, "#E0B24A", "#8F6A22"], [2, 3, 1, "#E0B24A", "#8F6A22"], [2, 4, 2, "#E0B24A", "#8F6A22"], [2, 7, 1, "#E0B24A", "#8F6A22"]],
+               rightRecolor: [[2, 6, 1, "#FFFBD6", "#F5CE4E"], [0, 6, 1, "#FFFFFF", "#D8D0BE"], [1, 5, 1, "#FFFFFF", "#D8D0BE"], [0, 3, 2, "#F7DC7A", "#C0902E"],
+                              [1, 3, 1, "#F7DC7A", "#C0902E"], [1, 4, 1, "#F7DC7A", "#C0902E"]],
+               leftRecolor: [[1, 2, 1, "#F2CF6A", "#A87A26"], [2, 1, 1, "#F2CF6A", "#A87A26"], [0, 3, 2, "#FFF3C4", "#E0B24A"], [1, 3, 1, "#FFF3C4", "#E0B24A"],
+                             [1, 4, 1, "#FFF3C4", "#E0B24A"]] };
     static ULT = {
       rvDur: GameTime.gameMs(4), rvTick: GameTime.gameMs(1), rvHeal: 20, rvDmg: 20, rvCastMs: 600, grLife: 650
     };
@@ -2535,11 +2591,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class HitmanType extends CharacterType {
+    static MODEL = { file: "Rogue_Hooded", right: "dagger_A", left: "dagger_A",
+               recolor: [[1, 0, 1, "#3A3D46", "#16181D"], [1, 1, 1, "#9A2230", "#4A0E16"], [2, 1, 1, "#9A2230", "#4A0E16"]] };
     static ULT = {
       exRange: 600, exSpeed: 1300, exPr: 4, exDmg: 35, exStunMs: GameTime.gameMs(1.5)
     };
     static STATS = { name: "자객", role: "assassin", icon: "🔪", hp: 145, speed: GameTime.gameSpeed(175), cd: GameTime.gameMs(1.3), dmg: 40, range: 100,
                dashRange: 200, dashWidth: 150, dashDmg: 40, dashMs: 300, finishDelay: 125, ultName: "처형", ultAim: true };
+    static WAVE = { life: HitmanType.STATS.dashMs + 160, travel: HitmanType.STATS.dashMs };
     showAimGuide(E, ult, c) {
       if (ult) {
         var ex = Math.cos(E.angle), ey = Math.sin(E.angle), el = PHYSICS.rayCast(E.x + ex * 20, E.y + ey * 20, ex, ey, HitmanType.ULT.exRange, HitmanType.ULT.exPr) + 20;
@@ -2555,7 +2614,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     skillShotFx(ox, oy, dx, dy) { FX_VIEW.spark(ox + dx * 30, oy + dy * 30, "#FF3A4A", 2); }
     botUltRange() { return HitmanType.ULT.exRange; }
     projectileMesh(g, d) {
-      var bladeProp = MODELS.kit.weapons[MODEL.hitman.right], execBlade = d.isSkill;
+      var bladeProp = MODELS.kit.weapons[HitmanType.MODEL.right], execBlade = d.isSkill;
       if (bladeProp) {
         var blade = bladeProp.clone(); blade.rotation.z = -Math.PI / 2; blade.scale.setScalar(ModelTuning.MODEL_SCALE * (execBlade ? 3 : 1.2)); blade.position.x = execBlade ? -24 : -10;
         var spinner = new THREE.Group(); spinner.add(blade); g.add(spinner);
@@ -2599,6 +2658,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class GuardianType extends ArcMeleeType {
+    static MODEL = { file: "Knight", portraitPlant: true, right: "halberd", rightScale: 1.2, rightTilt: Math.PI / 2, left: "Skeleton_Shield_Large_A", leftScale: 0.8, leftRot: [-0.266, 0, -1.588],
+                recolor: [[0, 3, 1, "#1F4A2E", "#0E2417"], [1, 0, 1, "#1F4A2E", "#0E2417"], [2, 2, 1, "#1F4A2E", "#0E2417"], [1, 1, 1, "#E4EAEF", "#9AA4AC"], [1, 2, 2, "#C7D1D9", "#6E7880"]] };
     static ULT = {
       gdR: 200, gdKb: 150, gdKbMs: 500, gdDmg: 32, gdSlowMul: 0.8, gdSlowMs: GameTime.gameMs(1.5)
     };
@@ -2624,6 +2685,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class FrostType extends MagicShooterType {
+    static MODEL = { file: "Mage", portraitPlant: true, right: "staff_A", left: "spellbook_closed",
+               recolor: [[1, 0, 1, "#F2F6FA", "#C9D6E2"], [1, 1, 1, "#8FD8F0", "#4FA9D9"], [1, 2, 1, "#8FD8F0", "#4FA9D9"], [2, 1, 1, "#8FD8F0", "#4FA9D9"], [0, 5, 1, "#F2F6FA", "#C9D6E2"]] };
     static ULT = {
       frSlowMs: GameTime.gameMs(1.5), frSlowMul: 0.8, frSlowStep: 0.2, frFreezeMs: GameTime.gameMs(1), frFreezeMaxHpRate: 0.06, frBzHides: true, frBzR: 400,
       frBzDur: GameTime.gameMs(9), frBzDmg: 4, frBzTick: GameTime.gameMs(1), frBzDelay: 400
@@ -2661,6 +2724,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class DancerType extends CharacterType {
+    static MODEL = { file: "Mage", right: "sword_C", left: "sword_C", rightScale: 0.6, leftScale: 0.6, hide: ["Mage_Hat"],
+               recolor: [[1, 0, 2, "#FFB7CC", "#E0708F"], [1, 2, 1, "#FFE9F0", "#F2A9BE"], [2, 1, 1, "#C8303A", "#8A1820"], [0, 5, 1, "#C8303A", "#8A1820"], [2, 0, 1, "#FFFFFF", "#F2D6DE"]],
+               ponytail: { hair: "#1E1A22", tie: "#D97B4F" } };
     static ULT = {
       bwR: 150, bwDur: GameTime.gameMs(4), bwTick: GameTime.gameMs(0.3), bwHurtGaugeEvery: 4, bwDmg: 18, bwKillGauge: 5, bdR: 70, bdDmg: 10,
       bdDelay: GameTime.gameMs(0.4)
@@ -2680,10 +2746,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     get shotSound() { return "star"; }
     botUltRange() { return DancerType.ULT.bwR * 2; }
     projectileMesh(g, d) {
-      var curved = MODELS.kit.weapons[MODEL.dancer.right];
+      var curved = MODELS.kit.weapons[DancerType.MODEL.right];
       if (curved) {
         var whirl = new THREE.Group(), dancerBlade = curved.clone();
-        dancerBlade.rotation.z = -Math.PI / 2; dancerBlade.scale.setScalar(ModelTuning.MODEL_SCALE * MODEL.dancer.rightScale); dancerBlade.position.x = -24;
+        dancerBlade.rotation.z = -Math.PI / 2; dancerBlade.scale.setScalar(ModelTuning.MODEL_SCALE * DancerType.MODEL.rightScale); dancerBlade.position.x = -24;
         whirl.add(dancerBlade); g.add(whirl);
         g.userData.whirl = whirl;
       } else g.add(new THREE.Mesh(GEO.shaft, MODELS.basicMat("blade", 0xDCE3EC, 1)));
@@ -2708,6 +2774,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class StormbowType extends CharacterType {
+    static MODEL = { file: "Ranger", left: "bow_B_withString", leftTurn: -Math.PI / 2,
+                recolor: [[0, 5, 2, "#4A82F0", "#1E44B0"], [1, 0, 1, "#FFE45C", "#E8A317"], [0, 3, 1, "#26304E", "#10152A"], [0, 7, 1, "#2A3A7A", "#141C40"],
+                          [0, 1, 1, "#FFF3B0", "#E6BE4E"], [2, 7, 1, "#FFD23F", "#C98A10"], [2, 3, 1, "#1C2448", "#0B0F22"], [1, 7, 1, "#27336A", "#111733"], [1, 1, 1, "#27336A", "#111733"]],
+                leftRecolor: [[1, 6, 1, "#FFE45C", "#E0A01A"], [2, 4, 1, "#2A3A7A", "#141C40"], [3, 0, 1, "#8FE8FF", "#2A7BFF"], [2, 5, 3, "#26304E", "#10152A"]] };
     static ULT = {
       ocDur: GameTime.gameMs(7), ocRate: 1.5, ocSpeedBonus: 50, ocRangeBonus: 30, ocR: 200, ocDmg: 30, ocStunMs: GameTime.gameMs(1.5), ocRingPts: 10
     };
@@ -2761,6 +2831,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class EngineerType extends CharacterType {
+    static MODEL = { file: "Engineer", right: "engineer_Wrench" };
     static ULT = {
       trDur: GameTime.gameMs(10), trR: 340, trCd: GameTime.gameMs(0.5), trScanMs: 120, trWarmMs: 300, trDmg: 10, trHeavyEvery: 3, trHeavyDmg: 34,
       trStunMs: GameTime.gameMs(0.8), trMax: 2, trGauge: 1, trSpeedBonus: GameTime.gameSpeed(30), trShellSpeed: GameTime.gameSpeed(1000), trHitR: 38,
@@ -2775,7 +2846,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     launchHandOf(model) { return model.getObjectByName("muzzle") || model.getObjectByName("handslotr"); }
     botUltRange() { return this.data.range; }
     projectileMesh(g, d) {
-      var whirl = new THREE.Group(), tpl = MODELS.kit.weapons[MODEL.engineer.right];
+      var whirl = new THREE.Group(), tpl = MODELS.kit.weapons[EngineerType.MODEL.right];
       if (tpl) {
         var wrench = tpl.clone(), box = new THREE.Box3().setFromObject(wrench), mid = box.getCenter(new THREE.Vector3());
         wrench.position.sub(mid); wrench.position.multiplyScalar(ModelTuning.MODEL_SCALE * EngineerType.WRENCH_SCALE);
@@ -2810,6 +2881,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class DruidType extends MagicShooterType {
+    static MODEL = { file: "Druid", portraitPlant: true, right: "druid_staff" };
     static ULT = {
       drR: 150, drDur: 3600000, drTick: GameTime.gameMs(1), drHeal: 20, drCast: 450, drMin: 60, drSelfHeal: 20, drSelfGauge: 1, drRiseMs: 350, drCastMs: 500
     };
@@ -2906,6 +2978,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class AstrologerType extends GargantuaType {
+    static MODEL = { file: "Mage", left: "spellbook_open", leftTurn: Math.PI, hide: ["Mage_Hat"],
+                  halo: { on: "Mage_Head", color: 0xD9A8FF, r: 0.42, tube: 0.035, stars: 3, starSize: 0.075, rise: 0.14, tilt: 0.3 },
+                  recolor: [[1, 0, 2, "#2E2038", "#0A060F"], [1, 2, 1, "#C58BFF", "#6A2BC4"], [2, 1, 1, "#C58BFF", "#6A2BC4"], [0, 5, 1, "#C58BFF", "#6A2BC4"]],
+                  leftRecolor: [[1, 2, 1, "#C58BFF", "#6A2BC4"], [2, 1, 1, "#C58BFF", "#6A2BC4"]] };
     static ULT = {
       sfMin: 60, sfDelay: GameTime.gameMs(0.6), sfR: 70, sfStunEvery: 3, sfStunMs: GameTime.gameMs(1), agCast: 400, agMin: 60, agDur: GameTime.gameMs(3),
       agR: 350, agPull: 260, agGap: 70, agBoomDmg: 25
@@ -2942,6 +3018,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class GiantType extends ArcMeleeType {
+    static FORM_MODELS = { giantGolem: { file: "Skeleton_Golem", right: "Skeleton_Mace_Large", scale: 0.85 } };
+    static MODEL = { file: "Barbarian_Large", right: "Skeleton_Mace_Large", scale: 0.85, portraitFit: 1.1 };
     static ULT = {
       gjCast: 300, gjMin: 60, gjTransformMs: GameTime.gameMs(1.2), gjDur: GameTime.gameMs(6), gjDef: 0.8, gjR: 150, gjTick: GameTime.gameMs(1),
       gjTickDmg: 20, gjMaceRange: 150, gjMaceDmg: 23
@@ -3010,9 +3088,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class DummyType extends CharacterType {
+    static MODEL = { file: "Knight" };
     static STATS = { name: "연습 봇", role: "fighter", icon: "🎯", hp: 99999, speed: 200, cd: 1000, dmg: 0, range: 0, ultName: "없음", practiceBot: true };
   }
   class DummyAllyType extends CharacterType {
+    static MODEL = { file: "Knight" };
     static STATS = { name: "아군 봇", role: "fighter", icon: "💚", hp: 500, speed: 200, cd: 1000, dmg: 0, range: 0, ultName: "없음", practiceBot: true };
   }
   class CharacterRegistry {
@@ -3056,6 +3136,17 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       });
       return table;
     }
+    modelOf(id) {
+      var type = this.byId[id];
+      if (type) return type.constructor.MODEL;
+      var found;
+      Object.keys(this.byId).forEach(function (k) {
+        var forms = CHAR_TYPES.byId[k].constructor.FORM_MODELS;
+        if (forms && forms[id]) found = forms[id];
+      });
+      return found;
+    }
+    waveOf(id) { var type = this.byId[id]; return type ? type.constructor.WAVE : undefined; }
     statsOf(id) { var type = this.byId[id]; return type ? type.constructor.STATS : undefined; }
     statsTable() {
       var table = {};
@@ -4700,7 +4791,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     meleeStrike(key, d) {
       var who = SESSION.players[d.owner] ? SESSION.players[d.owner].characterType : "";
-      if (WAVE[who] && d.len) {
+      if (CHAR_TYPES.waveOf(who) && d.len) {
         MATCH.melee[key] = { d: d, at: Date.now() - Math.max(0, GameTime.now() - d.createdAt) / CLOCK.scale };
         FIELD.waves.push({ d: d, who: who, sparked: [], struck: [] });
         return;
@@ -4717,7 +4808,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     reachedBy(T, d, front) { return T && (T.x - d.x) * Math.cos(d.angle) + (T.y - d.y) * Math.sin(d.angle) <= front; }
     stepWaves(t) {
       FIELD.waves = FIELD.waves.filter(function (w) {
-        var d = w.d, travelMs = WAVE[w.who].travel, front = MELEE.waveFront(d, t, travelMs);
+        var d = w.d, travelMs = CHAR_TYPES.waveOf(w.who).travel, front = MELEE.waveFront(d, t, travelMs);
         TARGETS.fightersAndMinions().forEach(function (T) {
           if (!MELEE.reachedBy(T, d, front) || w.sparked.indexOf(T) >= 0) return;
           w.sparked.push(T); MELEE.strikeSpark(T, d, w.who);
@@ -5805,7 +5896,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static FLOOR_TEX_SCALE = 1.2;
     constructor() { this.scenery = { group: null, droppedForFps: false }; this.ground = null; this.bushVis = []; this.builtArena = ""; }
     flatMesh(geo, mat) { var m = new THREE.Mesh(geo, mat); m.rotation.x = -Math.PI / 2; return m; }
-    zoneOfRow(r) { return MAPS[ARENA_MAP.id].practice ? "" : r < ArenaBuilder.SPAWN_ROWS ? "blue" : (r >= ARENA_MAP.rowCount - ArenaBuilder.SPAWN_ROWS ? "red" : ""); }
+    zoneOfRow(r) { return MapCatalog.of(ARENA_MAP.id).practice ? "" : r < ArenaBuilder.SPAWN_ROWS ? "blue" : (r >= ARENA_MAP.rowCount - ArenaBuilder.SPAWN_ROWS ? "red" : ""); }
     tileAt(c, r) { return c < 0 || r < 0 || c >= ARENA_MAP.cols || r >= ARENA_MAP.rowCount ? "#" : ARENA_MAP.rows[r].charAt(c); }
     tilesOf(kinds) {
       var list = [];
@@ -5814,7 +5905,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     borderTiles() {
       var list = [];
-      if (MAPS[ARENA_MAP.id].practice) return list;
+      if (MapCatalog.of(ARENA_MAP.id).practice) return list;
       for (var c = -1; c <= ARENA_MAP.cols; c++) { list.push([c, -1]); list.push([c, ARENA_MAP.rowCount]); }
       for (var r = 0; r < ARENA_MAP.rowCount; r++) { list.push([-1, r]); list.push([ARENA_MAP.cols, r]); }
       return list;
@@ -5860,7 +5951,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       ARENA_VIEW.builtArena = ARENA_MAP.id + (MODELS.kit.propsReady ? ":kit" : "");
     }
     useArena(id) {
-      if (!MAPS[id]) id = "forest";
+      if (!MapCatalog.of(id)) id = "forest";
       if (ARENA_VIEW.builtArena === id + (MODELS.kit.propsReady ? ":kit" : "")) return;
       ARENA_MAP.load(id);
       ARENA_VIEW.buildArena();
@@ -5868,7 +5959,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     syncArena() {
       if (!SESSION.room) return;
-      if (SESSION.room.status === "lobby") { if (MAPS[SESSION.room.map]) ARENA_VIEW.useArena(SESSION.room.map); return; }
+      if (SESSION.room.status === "lobby") { if (MapCatalog.of(SESSION.room.map)) ARENA_VIEW.useArena(SESSION.room.map); return; }
       if (SESSION.room.status && SESSION.room.arena) ARENA_VIEW.useArena(SESSION.room.arena);
     }
   }
@@ -5916,7 +6007,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         }
       }
       if (th.rockShade) ARENA_PAINT.paintRockShade(g2, th.rockShade);
-      var practice = !!MAPS[ARENA_MAP.id].practice;
+      var practice = !!MapCatalog.of(ARENA_MAP.id).practice;
       g2.strokeStyle = th.line; g2.lineWidth = 1;
       if (!practice) {
         for (var gx = 0; gx <= ARENA_MAP.cols; gx++) { g2.beginPath(); g2.moveTo(ArenaSize.MAP_X0 + gx * ArenaSize.TILE, ArenaSize.MAP_Y0); g2.lineTo(ArenaSize.MAP_X0 + gx * ArenaSize.TILE, ArenaSize.BOUND.b); g2.stroke(); }
@@ -6002,6 +6093,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     dispose() { this.target.dispose(); }
   }
   class ModelKit {
+    static MINION_MODEL = { file: "Skeleton_Minion", right: "Skeleton_Blade", scale: 0.9 };
+    static PROP_FILES = { bushBig: "props/Bush_1_D_Color1.gltf",
+      blockA: "props/Rock_2_C_Color1.gltf", blockB: "props/Rock_2_D_Color1.gltf", treeA: "props/Tree_1_A_Color1.gltf", treeB: "props/Tree_2_B_Color1.gltf",
+      treeC: "props/Tree_3_A_Color1.gltf", treeD: "props/Tree_4_B_Color1.gltf", tuft: "props/Grass_1_B_Color1.gltf", vineBlade: "props/Grass_2_A_Color1.gltf",
+      dgBlock: "dungeon/floor_foundation_allsides.gltf", dgFloor: "dungeon/floor_tile_small.gltf", dgFloorWeeds: "dungeon/floor_tile_small_weeds_A.gltf",
+      dgBox: "dungeon/box_large.gltf", dgBarrel: "dungeon/barrel_large.gltf", dgTorch: "dungeon/torch_lit.gltf",
+      dgBannerBlue: "dungeon/banner_patternA_blue.gltf", dgBannerRed: "dungeon/banner_patternA_red.gltf",
+      mill: "medieval/objects/mill.glb", farmPlot: "medieval/objects/farm_plot.glb", hill: "medieval/objects/detail_hill.glb",
+      forestTile: "medieval/tiles/square_forest.glb", turret: "props/turret_base.gltf" };
     static KIT_DIR = "assets/kaykit/";
     static MODEL_CHARS = CHAR_TYPES.list.concat(["giantGolem", "dummy", "dummyAlly"]);
     static SKIN_COLS = 8;
@@ -6069,16 +6169,16 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var loader = new GLTFLoader();
       function load(url) { return new Promise(function (ok, no) { loader.load(url, ok, undefined, no); }); }
       var weaponNames = [];
-      ModelKit.MODEL_CHARS.forEach(function (c) { [MODEL[c].right, MODEL[c].left].forEach(function (w) { if (w && weaponNames.indexOf(w) < 0) weaponNames.push(w); }); });
-      weaponNames.push("arrow_bow", "arrow_crossbow", MINION_MODEL.right);
+      ModelKit.MODEL_CHARS.forEach(function (c) { [CHAR_TYPES.modelOf(c).right, CHAR_TYPES.modelOf(c).left].forEach(function (w) { if (w && weaponNames.indexOf(w) < 0) weaponNames.push(w); }); });
+      weaponNames.push("arrow_bow", "arrow_crossbow", ModelKit.MINION_MODEL.right);
       var jobs = [load(ModelKit.KIT_DIR + "animations/teambattle_anims.glb?v=crossbow").then(function (g) { g.animations.forEach(function (clip) { MODELS.kit.clips[clip.name] = clip; }); }),
                   load(ModelKit.KIT_DIR + "animations/teambattle_large.glb?v=giant").then(function (g) { g.animations.forEach(function (clip) { MODELS.kit.largeClips[clip.name] = clip; }); })];
-      weaponNames.forEach(function (w) { jobs.push(load(ModelKit.KIT_DIR + "props/" + w + ".gltf").then(function (g) { MODELS.kit.weapons[w] = MODEL_STYLE.lambertize(g.scene, w === MODEL.thrower.right); })); });
-      ModelKit.MODEL_CHARS.forEach(function (c) { jobs.push(load(ModelKit.KIT_DIR + "characters/" + MODEL[c].file + ".glb").then(function (g) { MODELS.kit.chars[c] = MODEL_STYLE.lambertize(g.scene); })); });
-      jobs.push(load(ModelKit.KIT_DIR + "characters/" + MINION_MODEL.file + ".glb").then(function (g) { MODELS.kit.chars.minion = MODEL_STYLE.lambertize(g.scene); }));
+      weaponNames.forEach(function (w) { jobs.push(load(ModelKit.KIT_DIR + "props/" + w + ".gltf").then(function (g) { MODELS.kit.weapons[w] = MODEL_STYLE.lambertize(g.scene, w === ThrowerType.MODEL.right); })); });
+      ModelKit.MODEL_CHARS.forEach(function (c) { jobs.push(load(ModelKit.KIT_DIR + "characters/" + CHAR_TYPES.modelOf(c).file + ".glb").then(function (g) { MODELS.kit.chars[c] = MODEL_STYLE.lambertize(g.scene); })); });
+      jobs.push(load(ModelKit.KIT_DIR + "characters/" + ModelKit.MINION_MODEL.file + ".glb").then(function (g) { MODELS.kit.chars.minion = MODEL_STYLE.lambertize(g.scene); }));
       Promise.all(jobs).then(function () {
         ModelKit.MODEL_CHARS.concat(["minion"]).forEach(function (c) {
-          var m = MODELS.kit.chars[c], spec = MODEL[c] || MINION_MODEL;
+          var m = MODELS.kit.chars[c], spec = CHAR_TYPES.modelOf(c) || ModelKit.MINION_MODEL;
           if (spec.recolor) MODEL_STYLE.recolorSkin(m, spec.recolor);
           if (spec.wear) MODEL_STYLE.wearPart(m, MODELS.kit.chars[spec.wear.from], spec.wear.part);
           if (spec.right) {
@@ -6091,13 +6191,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           if (spec.halo) MODEL_STYLE.attachHalo(m, spec.halo);
           (spec.hide || []).forEach(function (part) { var o = m.getObjectByName(part); if (o) o.visible = false; });
         });
-        CHAR_TYPES.list.forEach(function (c) { if (MODEL[c].muzzle) MODELS.kit.muzzle[c] = MODELS.aimedMuzzle(c); });
+        CHAR_TYPES.list.forEach(function (c) { if (CHAR_TYPES.modelOf(c).muzzle) MODELS.kit.muzzle[c] = MODELS.aimedMuzzle(c); });
         MODELS.kit.ready = true;
         MODELS.makePortraits();
         TOUR_VIEW.buildShowcase();
       }).catch(function () { MODELS.kit.failed = true; });
-      Promise.all(Object.keys(PROP_FILES || {}).map(function (k) {
-        return load(ModelKit.KIT_DIR + PROP_FILES[k]).then(function (g) { MODELS.kit.props[k] = MODEL_STYLE.lambertize(g.scene); });
+      Promise.all(Object.keys(ModelKit.PROP_FILES || {}).map(function (k) {
+        return load(ModelKit.KIT_DIR + ModelKit.PROP_FILES[k]).then(function (g) { MODELS.kit.props[k] = MODEL_STYLE.lambertize(g.scene); });
       })).then(function () { MODELS.kit.propsReady = true; ARENA_VIEW.useArena(ARENA_MAP.id); }).catch(function () {});
     }
     aimFaceCamera(camera, m) {
@@ -6156,13 +6256,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         m.rotation.y = -0.45;
         var mix = new THREE.AnimationMixer(m); mix.clipAction(CHAR_TYPES.of(c).clips.Idle_A).play(); mix.update(0.3);
         m.updateMatrixWorld(true);
-        if (MODEL[c].portraitPlant) { MODELS.plantHeldUpright(m, MODEL[c].plantTurn, MODEL[c].plantTilt); MODELS.shrinkTallHeld(m, MODEL[c].plantTurn, MODEL[c].plantTilt); }
+        if (CHAR_TYPES.modelOf(c).portraitPlant) { MODELS.plantHeldUpright(m, CHAR_TYPES.modelOf(c).plantTurn, CHAR_TYPES.modelOf(c).plantTilt); MODELS.shrinkTallHeld(m, CHAR_TYPES.modelOf(c).plantTurn, CHAR_TYPES.modelOf(c).plantTilt); }
         return { c: c, m: m, box: new THREE.Box3().setFromObject(m) };
       });
-      var tallest = posed.reduce(function (h, p) { return MODEL[p.c].portraitFit ? h : Math.max(h, p.box.max.y); }, 0);
+      var tallest = posed.reduce(function (h, p) { return CHAR_TYPES.modelOf(p.c).portraitFit ? h : Math.max(h, p.box.max.y); }, 0);
       posed.forEach(function (p) {
-        if (!MODEL[p.c].portraitFit) return;
-        p.m.scale.multiplyScalar(tallest * MODEL[p.c].portraitFit / p.box.max.y);
+        if (!CHAR_TYPES.modelOf(p.c).portraitFit) return;
+        p.m.scale.multiplyScalar(tallest * CHAR_TYPES.modelOf(p.c).portraitFit / p.box.max.y);
         p.m.updateMatrixWorld(true);
       });
       var frameH = tallest * 1.12, dist = frameH / 2 / Math.tan(15 * Math.PI / 180);
@@ -6465,7 +6565,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return v;
     }
     makeForm(E, key, v) {
-      var model = SkeletonUtils.clone(MODELS.kit.chars[key]), made = new Map(), spec = MODEL[key];
+      var model = SkeletonUtils.clone(MODELS.kit.chars[key]), made = new Map(), spec = CHAR_TYPES.modelOf(key);
       model.rotation.y = Math.PI / 2; model.scale.setScalar(ModelTuning.MODEL_SCALE * ((spec && spec.scale) || 1));
       model.traverse(function (o) {
         if (!o.isMesh) return;
@@ -6496,7 +6596,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     makeMinionVis(M) {
       var v = FIGHTER_VIEW.makeVis(Object.assign(new Unit(), { id: M.key, team: M.team, char: "minion", angle: M.angle, atkAt: M.atkAt, ultUntil: 0, alive: true, x: M.x, y: M.y }));
-      v.body.scale.setScalar(MINION_MODEL.scale); v.ring.scale.setScalar(0.8);
+      v.body.scale.setScalar(ModelKit.MINION_MODEL.scale); v.ring.scale.setScalar(0.8);
       v.durRing = new DurationRing(v.root, Palette.C_FX[M.team], FighterView.MINION_TIMER_R);
       return v;
     }
@@ -7804,7 +7904,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       STAGE.camera.updateMatrixWorld();
       Dom.$("tourFade").style.opacity = still ? "0" : Math.max(0, 1 - Math.min(elapsed, TourView.SHOT_MS - elapsed) / TourView.FADE_MS).toFixed(3);
       var camNo = still ? 1 : TOUR_VIEW.state.index + 1;
-      var cap = "CAM " + (camNo < 10 ? "0" : "") + camNo + " · " + MAPS[ARENA_MAP.id].name + " · " + shot.name;
+      var cap = "CAM " + (camNo < 10 ? "0" : "") + camNo + " · " + MapCatalog.of(ARENA_MAP.id).name + " · " + shot.name;
       if (cap !== TOUR_VIEW.state.caption) { TOUR_VIEW.state.caption = cap; Dom.setText(Dom.$("tourCam"), cap); }
       var t = GameTime.now();
       TOUR_VIEW.showcase.forEach(function (s) {
@@ -7963,7 +8063,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       Object.keys(EFFECT_VIEW.projectiles || {}).forEach(function (id) { if (!MATCH.remoteShots[id]) EFFECT_VIEW.dropProjVis(id); });
 
       Object.keys(MATCH.melee || {}).forEach(function (k) {
-        var m = MATCH.melee[k], age = (nowMs - m.at) * CLOCK.scale, g = EFFECT_VIEW.melees[k], wave = m.d.len && !m.d.stab ? WAVE[SESSION.players[m.d.owner] ? SESSION.players[m.d.owner].characterType : ""] : null, life = wave ? wave.life : m.d.stab ? FrameRenderer.STAB_VIS_MS : 240;
+        var m = MATCH.melee[k], age = (nowMs - m.at) * CLOCK.scale, g = EFFECT_VIEW.melees[k], wave = m.d.len && !m.d.stab ? CHAR_TYPES.waveOf(SESSION.players[m.d.owner] ? SESSION.players[m.d.owner].characterType : "") : null, life = wave ? wave.life : m.d.stab ? FrameRenderer.STAB_VIS_MS : 240;
         if (age > life) { if (g) EFFECT_VIEW.dropMelee(k); return; }
         if (!g) g = EFFECT_VIEW.melees[k] = EFFECT_VIEW.makeMeleeVis(m.d);
         var f = age / life;
@@ -8433,74 +8533,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   var MATLIB = new MaterialLibrary();
 
-  var MODEL = {
-    warrior: { file: "Barbarian", right: "axe_1handed" },
-    knight:  { file: "Knight", right: "sword_1handed", left: "shield_badge_color" },
-    ranger:  { file: "Ranger", left: "bow_withString", leftTurn: Math.PI },
-    mage:    { file: "Mage", portraitPlant: true, right: "staff", recolor: [[1, 0, 2, "#D8342E", "#6A0E10"], [1, 7, 1, "#4A1012", "#1E0507"], [1, 2, 1, "#FF9A3A", "#C8401A"], [2, 1, 1, "#FF9A3A", "#C8401A"]],
-               rightRecolor: [[2, 6, 1, "#FFD27A", "#E0341E"]] },
-    rogue:   { file: "Rogue_Hooded", right: "dagger", left: "dagger",
-               recolor: [[1, 0, 1, "#3B2A55", "#150D22"], [1, 1, 1, "#241A38", "#0C0814"], [2, 1, 1, "#241A38", "#0C0814"], [2, 2, 1, "#6A3FA0", "#2A1250"]] },
-    necro:   { file: "Necromancer", portraitPlant: true, plantTurn: Math.PI / 2, right: "Skeleton_Scythe" },
-    sniper:  { file: "Rogue_Hooded", portraitPlant: true, plantTilt: -Math.PI / 2, right: "crossbow_2handed", rightTurn: Math.PI / 2, muzzle: [0, 0.12, 1.12] },
-    thrower: { file: "Skeleton_Rogue", right: "Potion_1", rightScale: 2.2 },
-    lancer:  { file: "Barbarian", portraitPlant: true, right: "spear_A", rightScale: 1.35, hide: ["Barbarian_BearHat"], wear: { from: "knight", part: "Knight_Helmet" },
-               recolor: [[0, 1, 1, "#8A5A38", "#4A2C1A"], [0, 7, 1, "#5B7FB0", "#2E4468"]] },
-    blacksmith: { file: "Engineer", right: "hammer_A", hide: ["Engineer_Backpack"],
-                  recolor: [[0, 1, 1, "#3A2416", "#17100A"], [1, 0, 1, "#7A4E2D", "#3E2412"], [1, 3, 1, "#5A5F66", "#2E3136"], [0, 5, 1, "#F08A3A", "#9A3E14"],
-                            [1, 7, 1, "#4B413A", "#231D19"], [0, 7, 1, "#5C4636", "#2B2018"], [2, 1, 1, "#E8742A", "#8F3A0E"], [2, 7, 1, "#E8742A", "#8F3A0E"], [3, 0, 1, "#E8742A", "#8F3A0E"]] },
-    priest:  { file: "Mage", right: "wand", left: "spellbook_open", leftTurn: Math.PI, hide: ["Mage_Hat"],
-               recolor: [[1, 0, 2, "#FFFFFF", "#CFC8BA"], [1, 2, 1, "#9CCBF2", "#3E6BA6"], [0, 1, 1, "#F2D38A", "#A87A3A"]] },
-    shaman:  { file: "Knight", right: "fistweapon_A", left: "fistweapon_A", rightScale: 1.35, leftScale: 1.35, hide: ["Knight_Helmet", "Knight_HelmetVisor", "Knight_Cape"],
-               recolor: [[0, 1, 1, "#2E2C34", "#101014"], [0, 3, 1, "#3C3548", "#16121C"], [0, 4, 1, "#2A2532", "#0C0A10"], [0, 7, 1, "#3C3548", "#16121C"], [1, 2, 2, "#3C3548", "#141019"],
-                         [1, 7, 1, "#26222C", "#0B0A0E"], [0, 5, 2, "#D0303A", "#6A0E14"], [1, 5, 1, "#D0303A", "#6A0E14"], [2, 3, 1, "#D0303A", "#6A0E14"], [1, 6, 1, "#2A2630", "#121016"],
-                         [1, 1, 1, "#B01E28", "#5A0A10"], [2, 0, 1, "#B01E28", "#5A0A10"]],
-               rightRecolor: [[1, 5, 1, "#4A4258", "#141019"], [1, 6, 1, "#3A3446", "#0E0C12"], [0, 2, 1, "#4A4258", "#141019"], [0, 3, 1, "#3A3446", "#0E0C12"], [0, 4, 1, "#D0303A", "#6A0E14"]],
-               leftRecolor: [[1, 5, 1, "#4A4258", "#141019"], [1, 6, 1, "#3A3446", "#0E0C12"], [0, 2, 1, "#4A4258", "#141019"], [0, 3, 1, "#3A3446", "#0E0C12"], [0, 4, 1, "#D0303A", "#6A0E14"]] },
-    cleric:  { file: "Rogue_Hooded", portraitPlant: true, right: "staff", left: "spellbook_closed", hide: ["RogueHooded_Mask"],
-               recolor: [[1, 1, 1, "#FFFFFF", "#D8D0BE"], [2, 1, 1, "#FFFFFF", "#D8D0BE"], [1, 0, 1, "#FFE58A", "#E0B040"], [0, 5, 2, "#E0B24A", "#8F6A22"],
-                         [1, 5, 2, "#E0B24A", "#8F6A22"], [2, 3, 1, "#E0B24A", "#8F6A22"], [2, 4, 2, "#E0B24A", "#8F6A22"], [2, 7, 1, "#E0B24A", "#8F6A22"]],
-               rightRecolor: [[2, 6, 1, "#FFFBD6", "#F5CE4E"], [0, 6, 1, "#FFFFFF", "#D8D0BE"], [1, 5, 1, "#FFFFFF", "#D8D0BE"], [0, 3, 2, "#F7DC7A", "#C0902E"],
-                              [1, 3, 1, "#F7DC7A", "#C0902E"], [1, 4, 1, "#F7DC7A", "#C0902E"]],
-               leftRecolor: [[1, 2, 1, "#F2CF6A", "#A87A26"], [2, 1, 1, "#F2CF6A", "#A87A26"], [0, 3, 2, "#FFF3C4", "#E0B24A"], [1, 3, 1, "#FFF3C4", "#E0B24A"],
-                             [1, 4, 1, "#FFF3C4", "#E0B24A"]] },
-    hitman:  { file: "Rogue_Hooded", right: "dagger_A", left: "dagger_A",
-               recolor: [[1, 0, 1, "#3A3D46", "#16181D"], [1, 1, 1, "#9A2230", "#4A0E16"], [2, 1, 1, "#9A2230", "#4A0E16"]] },
-    guardian: { file: "Knight", portraitPlant: true, right: "halberd", rightScale: 1.2, rightTilt: Math.PI / 2, left: "Skeleton_Shield_Large_A", leftScale: 0.8, leftRot: [-0.266, 0, -1.588],
-                recolor: [[0, 3, 1, "#1F4A2E", "#0E2417"], [1, 0, 1, "#1F4A2E", "#0E2417"], [2, 2, 1, "#1F4A2E", "#0E2417"], [1, 1, 1, "#E4EAEF", "#9AA4AC"], [1, 2, 2, "#C7D1D9", "#6E7880"]] },
-    frost:   { file: "Mage", portraitPlant: true, right: "staff_A", left: "spellbook_closed",
-               recolor: [[1, 0, 1, "#F2F6FA", "#C9D6E2"], [1, 1, 1, "#8FD8F0", "#4FA9D9"], [1, 2, 1, "#8FD8F0", "#4FA9D9"], [2, 1, 1, "#8FD8F0", "#4FA9D9"], [0, 5, 1, "#F2F6FA", "#C9D6E2"]] },
-    dancer:  { file: "Mage", right: "sword_C", left: "sword_C", rightScale: 0.6, leftScale: 0.6, hide: ["Mage_Hat"],
-               recolor: [[1, 0, 2, "#FFB7CC", "#E0708F"], [1, 2, 1, "#FFE9F0", "#F2A9BE"], [2, 1, 1, "#C8303A", "#8A1820"], [0, 5, 1, "#C8303A", "#8A1820"], [2, 0, 1, "#FFFFFF", "#F2D6DE"]],
-               ponytail: { hair: "#1E1A22", tie: "#D97B4F" } },
-    duelist: { file: "Rogue", right: "sword_D",
-               recolor: [[1, 0, 1, "#FFFFFF", "#D6DAE2"], [1, 1, 1, "#FFFFFF", "#D6DAE2"], [0, 5, 1, "#D97B4F", "#9A4A28"], [0, 6, 1, "#F2F4F7", "#BFC5CE"],
-                         [2, 3, 1, "#2B2F36", "#15171B"], [1, 7, 1, "#F2F4F7", "#BFC5CE"], [2, 7, 1, "#F2F4F7", "#BFC5CE"]],
-               ponytail: { hair: "#9B5A45", tie: "#FFFFFF" } },
-    stormbow: { file: "Ranger", left: "bow_B_withString", leftTurn: -Math.PI / 2,
-                recolor: [[0, 5, 2, "#4A82F0", "#1E44B0"], [1, 0, 1, "#FFE45C", "#E8A317"], [0, 3, 1, "#26304E", "#10152A"], [0, 7, 1, "#2A3A7A", "#141C40"],
-                          [0, 1, 1, "#FFF3B0", "#E6BE4E"], [2, 7, 1, "#FFD23F", "#C98A10"], [2, 3, 1, "#1C2448", "#0B0F22"], [1, 7, 1, "#27336A", "#111733"], [1, 1, 1, "#27336A", "#111733"]],
-                leftRecolor: [[1, 6, 1, "#FFE45C", "#E0A01A"], [2, 4, 1, "#2A3A7A", "#141C40"], [3, 0, 1, "#8FE8FF", "#2A7BFF"], [2, 5, 3, "#26304E", "#10152A"]] },
-    engineer: { file: "Engineer", right: "engineer_Wrench" },
-    druid:   { file: "Druid", portraitPlant: true, right: "druid_staff" },
-    giant:   { file: "Barbarian_Large", right: "Skeleton_Mace_Large", scale: 0.85, portraitFit: 1.1 },
-    giantGolem: { file: "Skeleton_Golem", right: "Skeleton_Mace_Large", scale: 0.85 },
-    astrologer: { file: "Mage", left: "spellbook_open", leftTurn: Math.PI, hide: ["Mage_Hat"],
-                  halo: { on: "Mage_Head", color: 0xD9A8FF, r: 0.42, tube: 0.035, stars: 3, starSize: 0.075, rise: 0.14, tilt: 0.3 },
-                  recolor: [[1, 0, 2, "#2E2038", "#0A060F"], [1, 2, 1, "#C58BFF", "#6A2BC4"], [2, 1, 1, "#C58BFF", "#6A2BC4"], [0, 5, 1, "#C58BFF", "#6A2BC4"]],
-                  leftRecolor: [[1, 2, 1, "#C58BFF", "#6A2BC4"], [2, 1, 1, "#C58BFF", "#6A2BC4"]] },
-    dummy:  { file: "Knight" },
-    dummyAlly: { file: "Knight" }
-  };
-  var MINION_MODEL = { file: "Skeleton_Minion", right: "Skeleton_Blade", scale: 0.9 };
-  var PROP_FILES = { bushBig: "props/Bush_1_D_Color1.gltf",
-                     blockA: "props/Rock_2_C_Color1.gltf", blockB: "props/Rock_2_D_Color1.gltf", treeA: "props/Tree_1_A_Color1.gltf", treeB: "props/Tree_2_B_Color1.gltf",
-                     treeC: "props/Tree_3_A_Color1.gltf", treeD: "props/Tree_4_B_Color1.gltf", tuft: "props/Grass_1_B_Color1.gltf", vineBlade: "props/Grass_2_A_Color1.gltf",
-                     dgBlock: "dungeon/floor_foundation_allsides.gltf", dgFloor: "dungeon/floor_tile_small.gltf", dgFloorWeeds: "dungeon/floor_tile_small_weeds_A.gltf",
-                     dgBox: "dungeon/box_large.gltf", dgBarrel: "dungeon/barrel_large.gltf", dgTorch: "dungeon/torch_lit.gltf",
-                     dgBannerBlue: "dungeon/banner_patternA_blue.gltf", dgBannerRed: "dungeon/banner_patternA_red.gltf",
-                     mill: "medieval/objects/mill.glb", farmPlot: "medieval/objects/farm_plot.glb", hill: "medieval/objects/detail_hill.glb",
-                     forestTile: "medieval/tiles/square_forest.glb", turret: "props/turret_base.gltf" };
 
   // TODO: 돌담 에셋으로 교체 — 지금은 Rock_2_C/D 를 낮고 넓게 눌러 무너진 돌담처럼 보이게 한 대체재
 
@@ -8509,7 +8541,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   FIGHTER_AURAS.buildClericRange();
 
 
-  var WAVE = { priest: { life: 703, travel: 543 }, shaman: { life: 724, travel: 564 }, hitman: { life: HitmanType.STATS.dashMs + 160, travel: HitmanType.STATS.dashMs } };
 
 
   AIM_GUIDE.build();
@@ -8628,7 +8659,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     markReady() { window.TEAM_BATTLE_READY = true; }
     hooks() {
     return {
-      CHARS: CHAR_TYPES.statsTable(), CHAR_LIST: CHAR_TYPES.list, ULT: CHAR_TYPES.skillTable(), ROLES: RoleKinds.TABLE, ROLE_LIST: RoleKinds.LIST, MAPS: MAPS, roleGauge: function (c) { return CATALOG.gaugeOnHitOf(c); }, spawnOf: ARENA_MAP.spawnOf.bind(ARENA_MAP), BODY_R: ArenaSize.BODY_R, GAUGE_MAX: MatchRules.GAUGE_MAX, BOUND: ArenaSize.BOUND, MAP_IDS: MAP_IDS, RESPAWN_MS: TIMESCALE.respawnMs, RESPAWN_PROTECT_MS: TIMESCALE.respawnProtectMs, myId: SESSION.myId,
+      CHARS: CHAR_TYPES.statsTable(), CHAR_LIST: CHAR_TYPES.list, ULT: CHAR_TYPES.skillTable(), ROLES: RoleKinds.TABLE, ROLE_LIST: RoleKinds.LIST, MAPS: MapCatalog.table(), roleGauge: function (c) { return CATALOG.gaugeOnHitOf(c); }, spawnOf: ARENA_MAP.spawnOf.bind(ARENA_MAP), BODY_R: ArenaSize.BODY_R, GAUGE_MAX: MatchRules.GAUGE_MAX, BOUND: ArenaSize.BOUND, MAP_IDS: MapCatalog.IDS, RESPAWN_MS: TIMESCALE.respawnMs, RESPAWN_PROTECT_MS: TIMESCALE.respawnProtectMs, myId: SESSION.myId,
       obstacles: function () { return { walls: ARENA_MAP.obstacles, water: ARENA_MAP.water }; },
       mapTopShot: function (id, pxW, pxH) {
         if (!CAMERA_RIG.renderer || !MODELS.kit.propsReady) return null;
@@ -8677,7 +8708,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       setConf: function (conf) { var before = BACKEND.conf; BACKEND.conf = conf; return before; }, setNick: function (n) { return NICK.replaceStored(n); },
       capOf: ROSTER.capOf.bind(ROSTER), countIn: ROSTER.countIn.bind(ROSTER), isPlayingTeam: ROSTER.isPlayingTeam.bind(ROSTER), takenInMatch: ROSTER.takenInMatch.bind(ROSTER), freeCharOn: ROSTER.freeCharOn.bind(ROSTER), onlyOneMsg: ROSTER.onlyOneMsg.bind(ROSTER), canMoveTo: ROSTER.canMoveTo.bind(ROSTER),
       pickTeam: ROSTER.pickTeam.bind(ROSTER), pickChar: ROSTER.pickChar.bind(ROSTER), setMode: ROSTER.setMode.bind(ROSTER), setMapChoice: ROSTER.setMapChoice.bind(ROSTER), addAi: ROSTER.addAi.bind(ROSTER), removeAi: ROSTER.removeAi.bind(ROSTER), mapChoices: LOBBY.mapChoices.bind(LOBBY), resolveArena: ARENA_MAP.resolveArena.bind(ARENA_MAP), modeName: LOBBY.modeName.bind(LOBBY),
-      renderLobby: LOBBY.renderLobby.bind(LOBBY), flashHint: LOBBY.flashHint.bind(LOBBY), clearHint: function () { LOBBY.hintUntil = 0; LOBBY.hintText = ""; }, practiceMode: SESSION.practiceMode.bind(SESSION), TEAM_MAX: MatchRules.TEAM_MAX, SPEC_MAX: MatchRules.SPEC_MAX, FALLBACK_CHAR: CHAR_TYPES.fallbackId, MODES: MODES,
+      renderLobby: LOBBY.renderLobby.bind(LOBBY), flashHint: LOBBY.flashHint.bind(LOBBY), clearHint: function () { LOBBY.hintUntil = 0; LOBBY.hintText = ""; }, practiceMode: SESSION.practiceMode.bind(SESSION), TEAM_MAX: MatchRules.TEAM_MAX, SPEC_MAX: MatchRules.SPEC_MAX, FALLBACK_CHAR: CHAR_TYPES.fallbackId, MODES: GameModes.LIST,
       tileX: ARENA_MAP.tileX.bind(ARENA_MAP), tileY: ARENA_MAP.tileY.bind(ARENA_MAP), fullMap: ARENA_MAP.fullMap.bind(ARENA_MAP), mapRows: function () { return ARENA_MAP.rows; }, bushIds: function () { return ARENA_MAP.bushId; }, bridges: function () { return ARENA_MAP.bridges; }, MW: ArenaSize.MW, MH: ArenaSize.MH, TILE: ArenaSize.TILE, SPAWN_X: ArenaMap.SPAWN_X,
       packState: NETSTATE.packState.bind(NETSTATE), stateOf: NETSTATE.stateOf.bind(NETSTATE), packMinions: NETSTATE.packMinions.bind(NETSTATE), unpackMinions: NETSTATE.unpackMinions.bind(NETSTATE), relTime: NETSTATE.relTime.bind(NETSTATE), absTime: NETSTATE.absTime.bind(NETSTATE), angDeg: NETSTATE.angDeg.bind(NETSTATE), netWrite: NETSTATE.netWrite.bind(NETSTATE), NET_MS: NetState.NET_MS, STATE_TIMES: NetState.STATE_TIMES,
       teamTotals: FLOW.teamTotals.bind(FLOW), teamAllQuit: FLOW.teamAllQuit.bind(FLOW), hostJudge: FLOW.hostJudge.bind(FLOW), hostCleanup: FLOW.hostCleanup.bind(FLOW), onEnded: FLOW.onEnded.bind(FLOW), restart: FLOW.restart.bind(FLOW), holdSpecResult: FLOW.holdSpecResult.bind(FLOW), releaseSpecResult: FLOW.releaseSpecResult.bind(FLOW),
