@@ -1948,16 +1948,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     get headY() { return CameraRig.HEAD_Y; }
     onLeapLand(E, t) { return false; }
     cannotAttack(E, t) { return false; }
-    cast(E, ang, reach, t) {
-      if (this.data.ultKind !== "blackhole") return;
-      var holeSpot = Services.attack.burstSpot(E, ang, reach, PriestType.ULT.bhCast, PriestType.ULT.bhMin);
-      E.angle = Math.atan2(holeSpot.y - E.y, holeSpot.x - E.x);
-      E.ultUntil = t + 450;
-      E.skillDur = PriestType.ULT.bhDelay + PriestType.ULT.bhDur;
-      Services.session.room.ref.child("effects").push({ type: "hole", team: E.team, owner: E.id, x: Math.round(holeSpot.x), y: Math.round(holeSpot.y),
-                                       r: PriestType.ULT.bhR, dur: PriestType.ULT.bhDur, delay: PriestType.ULT.bhDelay, createdAt: t });
-      Services.vision.revealBriefly(E.id, t);
-    }
+    get keepsLowHp() { return false; }
+    get meleeColor() { return Object.prototype.hasOwnProperty.call(this.constructor, "MELEE") ? this.constructor.MELEE.color : undefined; }
+    get meleeSpark() { return Object.prototype.hasOwnProperty.call(this.constructor, "MELEE") ? this.constructor.MELEE.spark : undefined; }
+    cast(E, ang, reach, t) {}
     overrideBasic(E, ang, reach, t) { return false; }
     ambush(E, t) { return null; }
     onHitEarly(owner, h) {}
@@ -1978,7 +1972,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     get isOrbShooter() { return false; }
     hitColor(d) { return CharacterType.teamHitColor(d.team); }
     aimRange(btn) {
-      if (this.data.ultKind === "blackhole") return [PriestType.ULT.bhMin, PriestType.ULT.bhCast];
       return [MageType.ULT.mbMin, MageType.ULT.mbCast];
     }
     ultLeadSeconds(dist) { return 0; }
@@ -1986,7 +1979,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     get holdsFullRange() { return false; }
     get botRole() { return CharacterType.BOT_ROLE_OF_CLASS[this.data.role] || "front"; }
     botAct(B, target, enemies, t) { return false; }
-    botUltRange() { return this.data.ultKind === "blackhole" ? PriestType.ULT.bhCast : Infinity; }
+    botUltRange() { return Infinity; }
     botUltSpot(B, target, td, t) { return Services.brain.ultAimSpot(B, target, td, t); }
     wantsBasicNow(B, t) { return false; }
     projectileMesh(g, d) {
@@ -2014,11 +2007,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     get hidesBasicEdge() { return false; }
     get heavyStrikeSpark() { return false; }
     get showsHealRange() { return false; }
-    showAimGuide(E, ult, c) {
-      if (!ult || this.data.ultKind !== "blackhole") return false;
-      Services.aimGuide.showAimCircle(Services.input.aimReach(E, "ult"), PriestType.ULT.bhR);
-      return true;
-    }
+    showAimGuide(E, ult, c) { return false; }
     ultAimShot() { return { len: RangerType.ULT.mkRange, halfWidth: 12 }; }
     skillShotSpec() { return { count: RangerType.ULT.mkCount, gap: RangerType.ULT.mkGap, sp: RangerType.ULT.mkSpeed, dmg: RangerType.ULT.mkDmg, pr: RangerType.ULT.mkPr, range: RangerType.ULT.mkRange, ultKey: "volley" }; }
     statDamageText(c) { return null; }
@@ -2057,6 +2046,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class WarriorType extends ArcMeleeType {
+    static MELEE = { color: 0xFF9A3C, spark: "#FF9A3C" };
     static MODEL = { file: "Barbarian", right: "axe_1handed" };
     static ULT = {
       bzDur: GameTime.gameMs(6), bzDmgMul: 1.5, bzCdMul: 1 / 1.5, bzHeal: 20
@@ -2086,6 +2076,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class DuelistType extends CharacterType {
+    static MELEE = { color: 0xFFFFFF, spark: "#FF3B3B" };
     static MODEL = { file: "Rogue", right: "sword_D",
                recolor: [[1, 0, 1, "#FFFFFF", "#D6DAE2"], [1, 1, 1, "#FFFFFF", "#D6DAE2"], [0, 5, 1, "#D97B4F", "#9A4A28"], [0, 6, 1, "#F2F4F7", "#BFC5CE"],
                          [2, 3, 1, "#2B2F36", "#15171B"], [1, 7, 1, "#F2F4F7", "#BFC5CE"], [2, 7, 1, "#F2F4F7", "#BFC5CE"]],
@@ -2126,6 +2117,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class KnightType extends ArcMeleeType {
+    static MELEE = { color: 0xFFFFFF, spark: "#FFFFFF" };
     static MODEL = { file: "Knight", right: "sword_1handed", left: "shield_badge_color" };
     static ULT = {
       tkDur: GameTime.gameMs(6), tkDef: 0.35, tkStunR: 120, tkStunMs: GameTime.gameMs(1.5)
@@ -2234,6 +2226,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class RogueType extends CharacterType {
+    static MELEE = { color: 0xC9D6E6, spark: "#DCE3EC" };
     static MODEL = { file: "Rogue_Hooded", right: "dagger", left: "dagger",
                recolor: [[1, 0, 1, "#3B2A55", "#150D22"], [1, 1, 1, "#241A38", "#0C0814"], [2, 1, 1, "#241A38", "#0C0814"], [2, 2, 1, "#6A3FA0", "#2A1250"]] };
     static ULT = {
@@ -2273,6 +2266,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class NecroType extends MagicShooterType {
+    static MELEE = { color: 0xB07CFF, spark: "#C9A6FF" };
     static MODEL = { file: "Necromancer", portraitPlant: true, plantTurn: Math.PI / 2, right: "Skeleton_Scythe" };
     static ULT = {
       smCount: 2, smAhead: ArenaSize.KEY * 1, smSide: 38, smHp: 75, smSpeed: GameTime.gameSpeed(180), smGauge: 0.5, smDmg: 12, smCd: 800, smRange: 80,
@@ -2384,6 +2378,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class LancerType extends CharacterType {
+    static MELEE = { color: 0xFFD27A, spark: "#FFD27A" };
     static MODEL = { file: "Barbarian", portraitPlant: true, right: "spear_A", rightScale: 1.35, hide: ["Barbarian_BearHat"], wear: { from: "knight", part: "Knight_Helmet" },
                recolor: [[0, 1, 1, "#8A5A38", "#4A2C1A"], [0, 7, 1, "#5B7FB0", "#2E4468"]] };
     static ULT = {
@@ -2419,6 +2414,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class BlacksmithType extends CharacterType {
+    static MELEE = { color: 0xFFB45A, spark: "#FFB45A" };
     static MODEL = { file: "Engineer", right: "hammer_A", hide: ["Engineer_Backpack"],
                   recolor: [[0, 1, 1, "#3A2416", "#17100A"], [1, 0, 1, "#7A4E2D", "#3E2412"], [1, 3, 1, "#5A5F66", "#2E3136"], [0, 5, 1, "#F08A3A", "#9A3E14"],
                             [1, 7, 1, "#4B413A", "#231D19"], [0, 7, 1, "#5C4636", "#2B2018"], [2, 1, 1, "#E8742A", "#8F3A0E"], [2, 7, 1, "#E8742A", "#8F3A0E"], [3, 0, 1, "#E8742A", "#8F3A0E"]] };
@@ -2467,15 +2463,32 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class PriestType extends CharacterType {
+    static MELEE = { color: 0x7CFFB2, spark: "#C9A6FF" };
     static MODEL = { file: "Mage", right: "wand", left: "spellbook_open", leftTurn: Math.PI, hide: ["Mage_Hat"],
                recolor: [[1, 0, 2, "#FFFFFF", "#CFC8BA"], [1, 2, 1, "#9CCBF2", "#3E6BA6"], [0, 1, 1, "#F2D38A", "#A87A3A"]] };
     static ULT = {
       bhR: 200, bhDur: 3000, bhDelay: 500, bhPull: 220, bhCast: 380, bhMin: 60, bhCcRate: 0.8
     };
-    static STATS = { name: "사제", role: "caster", icon: "📖", hp: 120, speed: 240, cd: 1000, dmg: 10, heal: 10, range: 320, width: 200, ultName: "블랙홀", ultKind: "blackhole", ultAim: true, heals: true, retired: true };
+    static STATS = { name: "사제", role: "caster", icon: "📖", hp: 120, speed: 240, cd: 1000, dmg: 10, heal: 10, range: 320, width: 200, ultName: "블랙홀", ultAim: true, heals: true, retired: true };
     static WAVE = { life: 703, travel: 543 };
     get hasSkillClip() { return true; }
     playSkillClip(v, E, t) { Services.fighterMotion.playOnce(v, "Ranged_Magic_Spellcasting_Long", 2.6, t); }
+    cast(E, ang, reach, t) {
+      var holeSpot = Services.attack.burstSpot(E, ang, reach, PriestType.ULT.bhCast, PriestType.ULT.bhMin);
+      E.angle = Math.atan2(holeSpot.y - E.y, holeSpot.x - E.x);
+      E.ultUntil = t + 450;
+      E.skillDur = PriestType.ULT.bhDelay + PriestType.ULT.bhDur;
+      Services.session.room.ref.child("effects").push({ type: "hole", team: E.team, owner: E.id, x: Math.round(holeSpot.x), y: Math.round(holeSpot.y),
+                                       r: PriestType.ULT.bhR, dur: PriestType.ULT.bhDur, delay: PriestType.ULT.bhDelay, createdAt: t });
+      Services.vision.revealBriefly(E.id, t);
+    }
+    aimRange(btn) { return [PriestType.ULT.bhMin, PriestType.ULT.bhCast]; }
+    botUltRange() { return PriestType.ULT.bhCast; }
+    showAimGuide(E, ult, c) {
+      if (!ult) return false;
+      Services.aimGuide.showAimCircle(Services.input.aimReach(E, "ult"), PriestType.ULT.bhR);
+      return true;
+    }
     ultDesc() {
       return "지정한 곳에 " + Services.skilltext.secs(PriestType.ULT.bhDelay) + " 뒤 " + Services.skilltext.secs(PriestType.ULT.bhDur) + "간 유지되는 반경 " + PriestType.ULT.bhR + "의 블랙홀 생성. 적은 중심으로 끌려감";
     }
@@ -2488,6 +2501,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class ShamanType extends CharacterType {
+    static MELEE = { color: 0x241C2E, spark: "#8A1420" };
     static MODEL = { file: "Knight", right: "fistweapon_A", left: "fistweapon_A", rightScale: 1.35, leftScale: 1.35, hide: ["Knight_Helmet", "Knight_HelmetVisor", "Knight_Cape"],
                recolor: [[0, 1, 1, "#2E2C34", "#101014"], [0, 3, 1, "#3C3548", "#16121C"], [0, 4, 1, "#2A2532", "#0C0A10"], [0, 7, 1, "#3C3548", "#16121C"], [1, 2, 2, "#3C3548", "#141019"],
                          [1, 7, 1, "#26222C", "#0B0A0E"], [0, 5, 2, "#D0303A", "#6A0E14"], [1, 5, 1, "#D0303A", "#6A0E14"], [2, 3, 1, "#D0303A", "#6A0E14"], [1, 6, 1, "#2A2630", "#121016"],
@@ -2581,6 +2595,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class HitmanType extends CharacterType {
+    static MELEE = { color: 0xFF4A5A, spark: "#FF4A5A" };
     static MODEL = { file: "Rogue_Hooded", right: "dagger_A", left: "dagger_A",
                recolor: [[1, 0, 1, "#3A3D46", "#16181D"], [1, 1, 1, "#9A2230", "#4A0E16"], [2, 1, 1, "#9A2230", "#4A0E16"]] };
     static ULT = {
@@ -2648,6 +2663,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class GuardianType extends ArcMeleeType {
+    static MELEE = { color: 0x8FD9A8, spark: "#8FD9A8" };
     static MODEL = { file: "Knight", portraitPlant: true, right: "halberd", rightScale: 1.2, rightTilt: Math.PI / 2, left: "Skeleton_Shield_Large_A", leftScale: 0.8, leftRot: [-0.266, 0, -1.588],
                 recolor: [[0, 3, 1, "#1F4A2E", "#0E2417"], [1, 0, 1, "#1F4A2E", "#0E2417"], [2, 2, 1, "#1F4A2E", "#0E2417"], [1, 1, 1, "#E4EAEF", "#9AA4AC"], [1, 2, 2, "#C7D1D9", "#6E7880"]] };
     static ULT = {
@@ -2764,6 +2780,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class StormbowType extends CharacterType {
+    static MELEE = { spark: "#FFE45C" };
     static MODEL = { file: "Ranger", left: "bow_B_withString", leftTurn: -Math.PI / 2,
                 recolor: [[0, 5, 2, "#4A82F0", "#1E44B0"], [1, 0, 1, "#FFE45C", "#E8A317"], [0, 3, 1, "#26304E", "#10152A"], [0, 7, 1, "#2A3A7A", "#141C40"],
                           [0, 1, 1, "#FFF3B0", "#E6BE4E"], [2, 7, 1, "#FFD23F", "#C98A10"], [2, 3, 1, "#1C2448", "#0B0F22"], [1, 7, 1, "#27336A", "#111733"], [1, 1, 1, "#27336A", "#111733"]],
@@ -3082,6 +3099,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static STATS = { name: "연습 봇", role: "fighter", icon: "🎯", hp: 99999, speed: 200, cd: 1000, dmg: 0, range: 0, ultName: "없음", practiceBot: true };
   }
   class DummyAllyType extends CharacterType {
+    get keepsLowHp() { return true; }
     static MODEL = { file: "Knight" };
     static STATS = { name: "아군 봇", role: "fighter", icon: "💚", hp: 500, speed: 200, cd: 1000, dmg: 0, range: 0, ultName: "없음", practiceBot: true };
   }
@@ -4674,7 +4692,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
 
   class MeleeSystem {
-    static MELEE_SPARK = { warrior: "#FF9A3C", knight: "#FFFFFF", duelist: "#FF3B3B", rogue: "#DCE3EC", necro: "#C9A6FF", lancer: "#FFD27A", blacksmith: "#FFB45A", priest: "#C9A6FF", shaman: "#8A1420", hitman: "#FF4A5A", guardian: "#8FD9A8", stormbow: "#FFE45C" };
     static LANCE_SLIP = 3;
     static LANCE_VIS_SLIP = 60;
     enemyInMelee(E) {
@@ -4737,7 +4754,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var ally = T.team === d.team;
       if (ally && (!d.heal || T.minion || T.id === d.owner)) return;
       if (!ally && d.kb && !T.minion) T.knockedAt = Date.now();
-      if (!Services.match.me || Services.match.me.team === T.team || Services.vision.visibleTo(T, Services.match.me)) Services.fxView.spark(T.x, T.y, ally ? Palette.HEAL_SPARK : (MeleeSystem.MELEE_SPARK[who] || "#FFFFFF"), Services.charTypes.of(who).heavyStrikeSpark || d.u ? 1.5 : 1);
+      if (!Services.match.me || Services.match.me.team === T.team || Services.vision.visibleTo(T, Services.match.me)) Services.fxView.spark(T.x, T.y, ally ? Palette.HEAL_SPARK : (Services.charTypes.of(who).meleeSpark || "#FFFFFF"), Services.charTypes.of(who).heavyStrikeSpark || d.u ? 1.5 : 1);
     }
     strikeHit(T, d) {
       if (T.team === d.team || !T.alive || !Services.melee.inStrike(T, d)) return;
@@ -5383,7 +5400,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (B.hpSeen !== undefined && B.hp > B.hpSeen) B.healedAt = t;
       B.hpSeen = B.hp;
       var low = Math.round(B.maxHp * PracticeMode.ALLY_LOW);
-      if (B.char === "dummyAlly" && B.hp > low && t - (B.healedAt || 0) > PracticeMode.ALLY_RESET_MS) { B.hp = B.hpSeen = low; Services.match.lastHp[B.id] = low; Services.match.game.forceNet = true; }
+      if (Services.charTypes.of(B.char).keepsLowHp && B.hp > low && t - (B.healedAt || 0) > PracticeMode.ALLY_RESET_MS) { B.hp = B.hpSeen = low; Services.match.lastHp[B.id] = low; Services.match.game.forceNet = true; }
       var dx = B.home.x - B.x, dy = B.home.y - B.y, away = MathKit.hyp(dx, dy);
       if (away < 6) { B.backAt = 0; if (foe && foe.alive) B.angle = Math.atan2(foe.y - B.y, foe.x - B.x); return; }
       if (!B.backAt) B.backAt = t + PracticeMode.BOT_RETURN_MS;
@@ -6741,7 +6758,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       "  alpha *= smoothstep(0.0, 0.25, r + 0.2) * fade;",
       "  gl_FragColor = vec4(col, alpha);",
       "}"].join("\n");
-    static MELEE_COLOR = { warrior: 0xFF9A3C, knight: 0xFFFFFF, rogue: 0xC9D6E6, necro: 0xB07CFF, lancer: 0xFFD27A, blacksmith: 0xFFB45A, priest: 0x7CFFB2, shaman: 0x241C2E, hitman: 0xFF4A5A, guardian: 0x8FD9A8, duelist: 0xFFFFFF };
     static STAB_CHEST_Y = 40;
     static CURSE_BALL_Y = [30, 46, 62];
     static CURSE_SIDE_X = 36;
@@ -6806,7 +6822,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     makeMeleeVis(d) {
       if (d.stab && !d.mace) return Services.effectView.makeStabVis(d);
-      var g = new THREE.Group(), who = Services.session.players[d.owner] ? Services.session.players[d.owner].characterType : "", col = d.zap ? Palette.ZAP_GLOW : d.u ? 0xFF6A3D : (EffectView.MELEE_COLOR[who] || 0xFFFFFF);
+      var g = new THREE.Group(), who = Services.session.players[d.owner] ? Services.session.players[d.owner].characterType : "", col = d.zap ? Palette.ZAP_GLOW : d.u ? 0xFF6A3D : (Services.charTypes.of(who).meleeColor || 0xFFFFFF);
       var fillM = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.2, depthWrite: false });
       var darkWave = Services.charTypes.of(who).hasDarkWave && !d.u;
       if (darkWave) fillM.opacity = 0.35;
