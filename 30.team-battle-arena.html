@@ -533,7 +533,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   var ARENA_MAP = new ArenaMap();
-  ARENA_MAP.load("forest");
 
 
 
@@ -609,7 +608,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   var NICK = new NickDialog();
-  NICK.bindProfileEvents();
 
   class Backend {
     constructor() {
@@ -627,7 +625,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   var BACKEND = new Backend();
-  BACKEND.connect();
   class MatchState {
     constructor() { this.reset(); }
     reset() {
@@ -702,7 +699,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   var CLOCK = new GameClock({ isHost: function () { return SESSION.isHost(); }, room: function () { return SESSION.room; }, myId: function () { return SESSION.myId; } });
-  if (BACKEND.db) BACKEND.db.ref(".info/serverTimeOffset").on("value", function (s) { CLOCK.serverOffset = s.val() || 0; });
   class TimeScaler {
     constructor() { this.matchMs = 90000 * MatchRules.GAME_SPEED; this.respawnMs = 3000 * MatchRules.GAME_SPEED; this.respawnProtectMs = 2500 * MatchRules.GAME_SPEED; this.burnTickMs = this.regenTickMs = Math.round(1000 * MatchRules.GAME_SPEED); }
   }
@@ -1070,7 +1066,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
 
 
-  SESSION.bindLifecycle();
 
   class ScreenRouter {
     constructor() { this.now = "start"; }
@@ -1300,7 +1295,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   var CARDS = new CharCardView();
-  CARDS.bindResize();
   class SkillText {
     num(v) { return String(Math.round(v * 10) / 10); }
     secs(ms) { return (Math.round(ms / CLOCK.scale / 10) / 100) + "초"; }
@@ -1335,10 +1329,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     ultSpeedUpText(c) { return "이동속도 " + SKILLTEXT.shownSpeed(c.ultSpeed - c.speed) + " 증가"; }
   }
   var SKILLTEXT = new SkillText();
-  Dom.$("chars").onclick = function (e) { CARDS.onCardClick(e); };
-  Dom.$("btnFlipAll").onclick = function () { CARDS.flipAll(); };
-  if (Environment.LITE_MOTION) document.documentElement.classList.add("liteMotion");
-  Dom.$("btnZoomChars").onclick = function () { CARDS.setCharZoom(!Dom.$("charCardBox").classList.contains("zoomed")); };
   class EscapeKey {
     bind() {
       window.addEventListener("keydown", function (e) {
@@ -1350,7 +1340,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       });
     }
   }
-  new EscapeKey().bind();
   class StatsView {
     static STATS_MODES = GameModes.LIST.filter(function (m) { return m.id !== "practice"; });
     constructor() { this.mode = "pvp"; this.loadSeq = 0; }
@@ -1399,40 +1388,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   var STATS_VIEW = new StatsView();
-  Dom.$("btnStats").onclick = function () { Dom.show(Dom.$("statsModal"), true); Dom.$("statsModal").querySelector(".statsBox").scrollTop = 0; STATS_VIEW.loadStats(); };
-  Dom.$("btnStatsClose").onclick = function () { Dom.show(Dom.$("statsModal"), false); };
-  Dom.$("btnMapView").onclick = function () {
-    var current = SESSION.room && SESSION.room.map;
-    Dom.setHtml(Dom.$("mapViewGrid"), MapCatalog.IDS.map(function (id) {
-      return '<figure class="' + (id === current ? "on" : "") + '"><figcaption>' + Dom.esc(MapCatalog.of(id).name) + '</figcaption><img alt="" src="' + ARENA_MAP.shotSrc(id) + '"></figure>';
-    }).join(""));
-    Dom.show(Dom.$("mapViewModal"), true);
-  };
-  Dom.$("btnMapViewClose").onclick = function () { Dom.show(Dom.$("mapViewModal"), false); };
-  Dom.$("mapViewModal").addEventListener("click", function (e) { if (e.target === Dom.$("mapViewModal")) Dom.show(Dom.$("mapViewModal"), false); });
-  Dom.$("statsModal").addEventListener("click", function (e) { if (e.target === Dom.$("statsModal")) Dom.show(Dom.$("statsModal"), false); });
-  Dom.$("statsModes").onclick = function (e) {
-    var b = e.target.closest ? e.target.closest(".modeBtn") : null;
-    if (b && b.getAttribute("data-id") !== STATS_VIEW.mode) { STATS_VIEW.mode = b.getAttribute("data-id"); STATS_VIEW.loadStats(); }
-  };
-  Dom.$("teamCard").addEventListener("click", function (e) {
-    var add = e.target.closest ? e.target.closest("[data-ai-add]") : null, del = e.target.closest ? e.target.closest("[data-ai-del]") : null;
-    if (del) ROSTER.removeAi(del.getAttribute("data-ai-del"));
-    else if (add) ROSTER.addAi(add.getAttribute("data-ai-add"));
-  });
-  Dom.$("btnJoinBlue").onclick = function () { ROSTER.pickTeam("blue"); };
-  Dom.$("btnJoinRed").onclick = function () { ROSTER.pickTeam("red"); };
-  Dom.$("btnSpec").onclick = function () { ROSTER.pickTeam("spec"); };
-  Dom.$("btnSwapTeams").onclick = function () { ROSTER.swapTeams(); };
-  Dom.$("modeBtns").onclick = LOBBY.choiceClick(ROSTER.setMode.bind(ROSTER));
-  Dom.$("mapBtns").onclick = LOBBY.choiceClick(ROSTER.setMapChoice.bind(ROSTER));
-  Dom.$("btnLeaveLobby").onclick = SESSION.leaveRoom.bind(SESSION);
-  Dom.$("btnLeaveGame").onclick = function () { if (confirm("방을 나갈까요?")) SESSION.leaveRoom(); };
-  Dom.$("btnLeaveEnd").onclick = SESSION.leaveRoom.bind(SESSION);
-  Dom.$("btnCreate").onclick = function () { SOUND.audio(); if (NICK.askFirst()) SESSION.createRoom(); };
-  Dom.$("btnJoin").onclick = function () { SOUND.audio(); if (NICK.askFirst()) SESSION.joinRoom(); };
-  Dom.$("joinCode").onkeydown = function (e) { if (e.key === "Enter" && NICK.askFirst()) SESSION.joinRoom(); };
-  Dom.$("btnStart").onclick = function () { LAUNCHER.startGame(); };
 
 
   class MatchLauncher {
@@ -1785,37 +1740,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   var DRAFT_VIEW = new DraftView();
   var DRAFT = new Draft();
-  setInterval(function () {
-    if (!SESSION.room || SESSION.room.status !== "draft") return;
-    DRAFT_VIEW.renderDraft();
-    if (SESSION.isHost()) DRAFT.hostDraftTick();
-  }, 200);
-  Dom.$("dfChars").onclick = function (e) {
-    var b = e.target.closest ? e.target.closest(".dfCard") : null;
-    if (!b || !SESSION.room || !SESSION.room.draft) return;
-    var c = b.getAttribute("data-c");
-    DRAFT.view = c;
-    if (DRAFT.draftLeft(SESSION.room.draft).indexOf(c) >= 0) DRAFT.draftHover(c);
-    DRAFT_VIEW.renderDraft();
-    var detail = Dom.$("dfDetail");
-    if (detail.scrollIntoView) detail.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  };
-  Dom.$("dfDetail").onclick = function (e) {
-    var b = e.target.closest ? e.target.closest("[data-pick]") : null;
-    if (b) DRAFT.draftPick(b.getAttribute("data-pick"));
-  };
-  Dom.$("dfBlue").onclick = Dom.$("dfRed").onclick = function (e) {
-    var f = e.target.closest ? e.target.closest("[data-trade]") : null;
-    if (f) DRAFT.draftTradeAsk(f.getAttribute("data-trade"));
-  };
-  Dom.$("btnDraftReady").onclick = function () { DRAFT.draftReady(); };
-  Dom.$("dfTradeBox").onclick = function (e) {
-    var b = e.target.closest ? e.target.closest("[data-trade-act]") : null;
-    if (!b) return;
-    var act = b.getAttribute("data-trade-act");
-    if (act === "cancel") DRAFT.draftTradeCancel(); else DRAFT.draftTradeAnswer(act === "yes");
-  };
-  Dom.$("btnLeaveDraft").onclick = function () { if (confirm("방을 나갈까요?")) SESSION.leaveRoom(); };
 
   class NetState {
     static NET_MS = 143;
@@ -5765,16 +5689,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   var PRACTICE = new PracticeMode();
-  Dom.$("btnPracChar").onclick = function () { PRACTICE.openPracticeChars(); };
-  Dom.$("btnPracGauge").onclick = function () { PRACTICE.fillPracticeGauge(); };
-  Dom.$("btnPracExit").onclick = function () { PRACTICE.leavePractice(); };
-  Dom.$("btnPcClose").onclick = function () { Dom.show(Dom.$("pcModal"), false); };
-  Dom.$("pcModal").addEventListener("click", function (e) { if (e.target === Dom.$("pcModal")) Dom.show(Dom.$("pcModal"), false); });
-  Dom.$("pcChars").onclick = function (e) {
-    var b = e.target.closest ? e.target.closest(".dfCard") : null;
-    if (b) PRACTICE.changePracticeChar(b.getAttribute("data-c"));
-  };
-  Dom.$("btnAgain").onclick = function () { FLOW.againOrBackToLobby(); };
   class Canvases {
     static three = Dom.$("cv");
     static overlay = Dom.$("ov");
@@ -5888,7 +5802,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   var INPUT = new InputController();
-  INPUT.bind(Canvases.three, Dom.$("btnAtk"), Dom.$("btnUlt"));
 
   class ArenaBuilder {
     static SPAWN_ROWS = 3;
@@ -8412,7 +8325,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   var HUD_BARS = new HudBars();
 
-  try { CAMERA_RIG.renderer = new THREE.WebGLRenderer({ canvas: Canvases.three, antialias: !Environment.TOUCH, powerPreference: "high-performance" }); } catch (e) { CAMERA_RIG.renderer = null; }
   class ArenaStage {
     constructor() {
       this.scene = new THREE.Scene();
@@ -8430,7 +8342,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   var STAGE = new ArenaStage();
-  CAMERA_RIG.bindResize();
   class MapThemes {
     static GRASS_LOOK = { sky: 0x33443A, outer: 0x4E6B43, ambient: 1.5, sun: 0xffffff, sunI: 2.0,
                      floor: ["#81B853", "#8CC25B"], wallFloor: "#6F7A5A", hideFloor: "#5E9640",
@@ -8448,10 +8359,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     practice: Object.assign({}, MapThemes.GRASS_LOOK, { noCenterMark: true })
   };
   }
-  ARENA_VIEW.ground = ARENA_VIEW.flatMesh(new THREE.PlaneGeometry(ArenaSize.MW, ArenaSize.MH), STAGE.groundMat);
-  ARENA_VIEW.ground.position.set(ArenaSize.MW / 2, 0, ArenaSize.MH / 2); STAGE.scene.add(ARENA_VIEW.ground);
+   
 
-  STAGE.scene.add(STAGE.arenaGroup);
 
   class GeometryLibrary {
     constructor() {
@@ -8538,24 +8447,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
 
 
-  FIGHTER_AURAS.buildClericRange();
 
 
 
 
-  AIM_GUIDE.build();
 
 
 
-  TOUR_VIEW.attachTo(STAGE.scene);
-  CAMERA_RIG.resize();
-  ARENA_VIEW.buildArena();
-  if (CAMERA_RIG.renderer) MODELS.loadKit();
 
 
-  Dom.$("btnScoreHelp").onclick = function () { Dom.setHtml(Dom.$("scoreHelpBody"), RESULT_BOARD.scoreHelpHtml()); Dom.show(Dom.$("scoreHelpModal"), true); };
-  Dom.$("btnScoreHelpClose").onclick = function () { Dom.show(Dom.$("scoreHelpModal"), false); };
-  Dom.$("scoreHelpModal").onclick = function (e) { if (e.target === Dom.$("scoreHelpModal")) Dom.show(Dom.$("scoreHelpModal"), false); };
 
   class GameLoop {
     constructor() { this.lastFrame = Date.now(); }
@@ -8729,16 +8629,158 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   var TEST_BRIDGE = new TestBridge();
-  TEST_BRIDGE.start();
+  class ServiceBoot {
+    connect() {
+    ARENA_MAP.load("forest");
+    NICK.bindProfileEvents();
+    BACKEND.connect();
+    if (BACKEND.db) BACKEND.db.ref(".info/serverTimeOffset").on("value", function (s) { CLOCK.serverOffset = s.val() || 0; });
+    SESSION.bindLifecycle();
+    CARDS.bindResize();
+    if (Environment.LITE_MOTION) document.documentElement.classList.add("liteMotion");
+    new EscapeKey().bind();
+    }
+  }
+  class CardEvents {
+    bind() {
+    Dom.$("chars").onclick = function (e) { CARDS.onCardClick(e); };
+    Dom.$("btnFlipAll").onclick = function () { CARDS.flipAll(); };
+    Dom.$("btnZoomChars").onclick = function () { CARDS.setCharZoom(!Dom.$("charCardBox").classList.contains("zoomed")); };
+    }
+  }
+  class LobbyEvents {
+    bind() {
+    Dom.$("btnStats").onclick = function () { Dom.show(Dom.$("statsModal"), true); Dom.$("statsModal").querySelector(".statsBox").scrollTop = 0; STATS_VIEW.loadStats(); };
+    Dom.$("btnStatsClose").onclick = function () { Dom.show(Dom.$("statsModal"), false); };
+    Dom.$("btnMapView").onclick = function () {
+      var current = SESSION.room && SESSION.room.map;
+      Dom.setHtml(Dom.$("mapViewGrid"), MapCatalog.IDS.map(function (id) {
+        return '<figure class="' + (id === current ? "on" : "") + '"><figcaption>' + Dom.esc(MapCatalog.of(id).name) + '</figcaption><img alt="" src="' + ARENA_MAP.shotSrc(id) + '"></figure>';
+      }).join(""));
+      Dom.show(Dom.$("mapViewModal"), true);
+    };
+    Dom.$("btnMapViewClose").onclick = function () { Dom.show(Dom.$("mapViewModal"), false); };
+    Dom.$("mapViewModal").addEventListener("click", function (e) { if (e.target === Dom.$("mapViewModal")) Dom.show(Dom.$("mapViewModal"), false); });
+    Dom.$("statsModal").addEventListener("click", function (e) { if (e.target === Dom.$("statsModal")) Dom.show(Dom.$("statsModal"), false); });
+    Dom.$("statsModes").onclick = function (e) {
+      var b = e.target.closest ? e.target.closest(".modeBtn") : null;
+      if (b && b.getAttribute("data-id") !== STATS_VIEW.mode) { STATS_VIEW.mode = b.getAttribute("data-id"); STATS_VIEW.loadStats(); }
+    };
+    Dom.$("teamCard").addEventListener("click", function (e) {
+      var add = e.target.closest ? e.target.closest("[data-ai-add]") : null, del = e.target.closest ? e.target.closest("[data-ai-del]") : null;
+      if (del) ROSTER.removeAi(del.getAttribute("data-ai-del"));
+      else if (add) ROSTER.addAi(add.getAttribute("data-ai-add"));
+    });
+    Dom.$("btnJoinBlue").onclick = function () { ROSTER.pickTeam("blue"); };
+    Dom.$("btnJoinRed").onclick = function () { ROSTER.pickTeam("red"); };
+    Dom.$("btnSpec").onclick = function () { ROSTER.pickTeam("spec"); };
+    Dom.$("btnSwapTeams").onclick = function () { ROSTER.swapTeams(); };
+    Dom.$("modeBtns").onclick = LOBBY.choiceClick(ROSTER.setMode.bind(ROSTER));
+    Dom.$("mapBtns").onclick = LOBBY.choiceClick(ROSTER.setMapChoice.bind(ROSTER));
+    Dom.$("btnLeaveLobby").onclick = SESSION.leaveRoom.bind(SESSION);
+    Dom.$("btnLeaveGame").onclick = function () { if (confirm("방을 나갈까요?")) SESSION.leaveRoom(); };
+    Dom.$("btnLeaveEnd").onclick = SESSION.leaveRoom.bind(SESSION);
+    Dom.$("btnCreate").onclick = function () { SOUND.audio(); if (NICK.askFirst()) SESSION.createRoom(); };
+    Dom.$("btnJoin").onclick = function () { SOUND.audio(); if (NICK.askFirst()) SESSION.joinRoom(); };
+    Dom.$("joinCode").onkeydown = function (e) { if (e.key === "Enter" && NICK.askFirst()) SESSION.joinRoom(); };
+    Dom.$("btnStart").onclick = function () { LAUNCHER.startGame(); };
+    }
+  }
+  class DraftEvents {
+    bind() {
+    setInterval(function () {
+      if (!SESSION.room || SESSION.room.status !== "draft") return;
+      DRAFT_VIEW.renderDraft();
+      if (SESSION.isHost()) DRAFT.hostDraftTick();
+    }, 200);
+    Dom.$("dfChars").onclick = function (e) {
+      var b = e.target.closest ? e.target.closest(".dfCard") : null;
+      if (!b || !SESSION.room || !SESSION.room.draft) return;
+      var c = b.getAttribute("data-c");
+      DRAFT.view = c;
+      if (DRAFT.draftLeft(SESSION.room.draft).indexOf(c) >= 0) DRAFT.draftHover(c);
+      DRAFT_VIEW.renderDraft();
+      var detail = Dom.$("dfDetail");
+      if (detail.scrollIntoView) detail.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    };
+    Dom.$("dfDetail").onclick = function (e) {
+      var b = e.target.closest ? e.target.closest("[data-pick]") : null;
+      if (b) DRAFT.draftPick(b.getAttribute("data-pick"));
+    };
+    Dom.$("dfBlue").onclick = Dom.$("dfRed").onclick = function (e) {
+      var f = e.target.closest ? e.target.closest("[data-trade]") : null;
+      if (f) DRAFT.draftTradeAsk(f.getAttribute("data-trade"));
+    };
+    Dom.$("btnDraftReady").onclick = function () { DRAFT.draftReady(); };
+    Dom.$("dfTradeBox").onclick = function (e) {
+      var b = e.target.closest ? e.target.closest("[data-trade-act]") : null;
+      if (!b) return;
+      var act = b.getAttribute("data-trade-act");
+      if (act === "cancel") DRAFT.draftTradeCancel(); else DRAFT.draftTradeAnswer(act === "yes");
+    };
+    Dom.$("btnLeaveDraft").onclick = function () { if (confirm("방을 나갈까요?")) SESSION.leaveRoom(); };
+    }
+  }
+  class GameEvents {
+    bind() {
+    Dom.$("btnPracChar").onclick = function () { PRACTICE.openPracticeChars(); };
+    Dom.$("btnPracGauge").onclick = function () { PRACTICE.fillPracticeGauge(); };
+    Dom.$("btnPracExit").onclick = function () { PRACTICE.leavePractice(); };
+    Dom.$("btnPcClose").onclick = function () { Dom.show(Dom.$("pcModal"), false); };
+    Dom.$("pcModal").addEventListener("click", function (e) { if (e.target === Dom.$("pcModal")) Dom.show(Dom.$("pcModal"), false); });
+    Dom.$("pcChars").onclick = function (e) {
+      var b = e.target.closest ? e.target.closest(".dfCard") : null;
+      if (b) PRACTICE.changePracticeChar(b.getAttribute("data-c"));
+    };
+    Dom.$("btnAgain").onclick = function () { FLOW.againOrBackToLobby(); };
+    INPUT.bind(Canvases.three, Dom.$("btnAtk"), Dom.$("btnUlt"));
+    Dom.$("btnScoreHelp").onclick = function () { Dom.setHtml(Dom.$("scoreHelpBody"), RESULT_BOARD.scoreHelpHtml()); Dom.show(Dom.$("scoreHelpModal"), true); };
+    Dom.$("btnScoreHelpClose").onclick = function () { Dom.show(Dom.$("scoreHelpModal"), false); };
+    Dom.$("scoreHelpModal").onclick = function (e) { if (e.target === Dom.$("scoreHelpModal")) Dom.show(Dom.$("scoreHelpModal"), false); };
+    }
+  }
+  class SceneBoot {
+    build() {
+    try { CAMERA_RIG.renderer = new THREE.WebGLRenderer({ canvas: Canvases.three, antialias: !Environment.TOUCH, powerPreference: "high-performance" }); } catch (e) { CAMERA_RIG.renderer = null; }
+    CAMERA_RIG.bindResize();
+    ARENA_VIEW.ground = ARENA_VIEW.flatMesh(new THREE.PlaneGeometry(ArenaSize.MW, ArenaSize.MH), STAGE.groundMat);
+    ARENA_VIEW.ground.position.set(ArenaSize.MW / 2, 0, ArenaSize.MH / 2);
+    STAGE.scene.add(ARENA_VIEW.ground);
+    STAGE.scene.add(STAGE.arenaGroup);
+    FIGHTER_AURAS.buildClericRange();
+    AIM_GUIDE.build();
+    TOUR_VIEW.attachTo(STAGE.scene);
+    CAMERA_RIG.resize();
+    ARENA_VIEW.buildArena();
+    if (CAMERA_RIG.renderer) MODELS.loadKit();
+    }
+  }
+  class AppLauncher {
+    launch() {
+    TEST_BRIDGE.start();
+    NICK.refreshNick();
+    SCREENS.showScreen("start");
+    if (!BACKEND.db) LOBBY.startMsg("온라인 연결을 준비하지 못했어요. 인터넷 연결을 확인해 주세요.");
+    if (!NICK.name) NICK.openNick();
+    if (!/[?&](test|sim)(&|$)/.test(location.search)) RESUME.tryResume();
+    if (!Environment.SILENT_RUN) new FullscreenKeeper(document).watch();
+    LOOP.start();
+    TEST_BRIDGE.markReady();
+    }
+  }
+  class App {
+    start() {
+      new ServiceBoot().connect();
+      new CardEvents().bind();
+      new LobbyEvents().bind();
+      new DraftEvents().bind();
+      new GameEvents().bind();
+      new SceneBoot().build();
+      new AppLauncher().launch();
+    }
+  }
+  new App().start();
 
-  NICK.refreshNick();
-  SCREENS.showScreen("start");
-  if (!BACKEND.db) LOBBY.startMsg("온라인 연결을 준비하지 못했어요. 인터넷 연결을 확인해 주세요.");
-  if (!NICK.name) NICK.openNick();
-  if (!/[?&](test|sim)(&|$)/.test(location.search)) RESUME.tryResume();
-  if (!Environment.SILENT_RUN) new FullscreenKeeper(document).watch();
-  LOOP.start();
-  TEST_BRIDGE.markReady();
 })();
 </script>
 <script>
