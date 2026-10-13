@@ -8031,9 +8031,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class ResultRoster {
-    constructor() { this.entries = {}; }
-    clear() { this.entries = {}; }
+    constructor() { this.entries = {}; this.startAt = null; }
+    clear() { this.entries = {}; this.startAt = null; }
     remember() {
+      if (this.startAt !== Services.session.room.startAt) { this.entries = {}; this.startAt = Services.session.room.startAt; }
       var entries = this.entries;
       Services.targets.participants().forEach(function (id) {
         var E = Services.targets.ent(id);
