@@ -2693,7 +2693,7 @@ function setupEscalatorLanes() {
 }
 function buildMidLevelsEscalator(G, M, zone) {
   if (!zone) return;
-  const [a, b, ramp] = zone, lim = i => S[i].lim, roofY = 6.4, step = Math.max(1, Math.round(3.2 / SEG)), rods = [], posts = [], sign = new THREE.MeshBasicMaterial({ map: escalatorSignTexture() });
+  const [a, b, ramp] = zone, lim = i => S[i].lim, roofY = 6.4, step = Math.max(1, Math.round(3.2 / SEG)), rods = [], posts = [], sign = new THREE.MeshBasicMaterial({ map: HQM.escalatorSign || (HQM.escalatorSign = escalatorSignTexture()) });
   const landing = Math.max(2, Math.round(3 / SEG)), treadY = i => 0.05 + 0.06 * THREE.MathUtils.smoothstep(Math.min(i - a, b - i) / landing, 0, 1);
   const deck = (mat, vRepeat, from, to) => { ribbon(G, i => [edgeAt(i, lim(i) + 0.2, treadY(i)), edgeAt(i, -lim(i) - 0.2, treadY(i))], vRepeat, mat, from, to).receiveShadow = true; };
   deck(M.escTread, Math.round((b - a - 2 * landing) * SEG / 0.42), a + landing, b - landing);
