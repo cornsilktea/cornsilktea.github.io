@@ -652,8 +652,14 @@ function makeGhostCar(ck) {
   });
   return g;
 }
+function releaseGhostCar() {
+  if (!ghostCar) return;
+  scene.remove(ghostCar);
+  ghostCar.traverse(o => { if (o.isMesh) [].concat(o.material).forEach(m => m.dispose()); });
+  ghostCar = null;
+}
 function setupGhost() {
-  if (ghostCar) { scene.remove(ghostCar); ghostCar = null; }
+  releaseGhostCar();
   ghostPlay = null; ghostLabel = ""; ghostShort = ""; ghostIdx = 0;
   let src = null, gcar = carKey;
   if (ghostPick === "mine") { const m = loadMyGhost(course); if (m) { src = m.data; gcar = m.car || carKey; ghostShort = "나의 최고 기록"; ghostLabel = ghostShort + " " + fmtTime(m.ms); } }
@@ -1009,13 +1015,21 @@ function ribbon(group, edgeFn, vRepeat, mat, from, to) {
   g.setIndex(idx); g.computeVertexNormals();
   const m = new THREE.Mesh(g, mat); group.add(m); return m;
 }
+function disposeMaterialWithTextures(material) {
+  Object.keys(material).forEach(key => {
+    const value = material[key];
+    if (value && value.isTexture && !SHARED_TEX.has(value)) value.dispose();
+  });
+  material.dispose();
+}
 function buildTrack(def) {
   if (trackGroup) {
     scene.remove(trackGroup);
     trackGroup.traverse(o => {
-      if (!o.isMesh) return;
+      if (!o.geometry) return;
       o.geometry.dispose();
-      [].concat(o.material).forEach(m => { if (m.map && !SHARED_TEX.has(m.map)) m.map.dispose(); m.dispose(); });
+      if (o.isInstancedMesh) o.dispose();
+      [].concat(o.material).forEach(m => { disposeMaterialWithTextures(m); });
     });
   }
   const G = trackGroup = new THREE.Group(); scene.add(G);
@@ -1042,6 +1056,7 @@ function buildTrack(def) {
     const pad = 22, sc = Math.min((300 - pad * 2) / (B.maxX - B.minX), (300 - pad * 2) / (B.maxZ - B.minZ));
     const ox = 150 - (B.minX + B.maxX) / 2 * sc, oz = 150 - (B.minZ + B.maxZ) / 2 * sc;
     MM = { sc, mx: x => ox + x * sc, mz: z => oz + z * sc };
+    minimapTrackLayer.invalidate();
   }
 }
 function railPoints(off, sg, step) {
@@ -3473,33 +3488,57 @@ document.querySelectorAll(".carPick").forEach(box => {
     '<canvas class="carStage" width="' + PREVIEW_W + '" height="' + PREVIEW_H + '"></canvas>' +
     '<div class="carName"></div>';
 });
-const carStages = [];
-const carSpin = { key: "", m: null, ang: 0.6 };
-let previewRenderer = null, previewScene = null, previewCam = null;
-try {
-  previewRenderer = makeRenderer({ alpha: true, antialias: true });
-  previewRenderer.setPixelRatio(1); previewRenderer.setSize(PREVIEW_W, PREVIEW_H, false);
-  previewScene = new THREE.Scene();
-  previewScene.add(new THREE.HemisphereLight(0xE6F4FF, 0x8FB37A, 0.6));
-  const dl = new THREE.DirectionalLight(0xFFFFFF, 2.2); dl.position.set(3, 6, 4); previewScene.add(dl);
-  const applyEnv = hdr => { previewScene.environment = envFromHdr(previewRenderer, hdr); };
-  if (HQENV.hdr) applyEnv(HQENV.hdr); else HQENV.ready.push(applyEnv);
-  previewCam = new THREE.PerspectiveCamera(24, PREVIEW_W / PREVIEW_H, 0.1, 50); previewCam.position.set(0, 2.7, 9.2); previewCam.lookAt(0, 0.5, 0);
-} catch (e) { previewRenderer = null; }
-document.querySelectorAll(".carStage").forEach(cv => {
-  const ctx = previewRenderer && cv.getContext("2d");
-  if (!ctx) { cv.style.display = "none"; return; }
-  carStages.push({ cv, ctx });
-});
-function renderCarPreviews(dt) {
-  if (!previewRenderer || state !== "menu" || overlay.style.display === "none") return;
-  const stage = carStages.find(s => s.cv.offsetParent);
-  if (!stage) return;
-  if (carSpin.key !== carKey || !carSpin.m) { carSpin.key = carKey; carSpin.m = makeCar(carKey); }
-  carSpin.ang += dt * 0.9; carSpin.m.rotation.y = carSpin.ang;
-  previewScene.add(carSpin.m); previewRenderer.render(previewScene, previewCam); previewScene.remove(carSpin.m);
-  stage.ctx.clearRect(0, 0, PREVIEW_W, PREVIEW_H); stage.ctx.drawImage(previewRenderer.domElement, 0, 0);
+class CarPreview {
+  constructor() {
+    this.stages = [];
+    this.spinKey = "";
+    this.spinModel = null;
+    this.spinAngle = 0.6;
+    this.renderer = null;
+    this.scene = null;
+    this.camera = null;
+    this.failed = false;
+    document.querySelectorAll(".carStage").forEach(cv => this.stages.push({ cv, ctx: cv.getContext("2d") }));
+  }
+  forgetModel() { this.spinModel = null; }
+  open() {
+    if (this.renderer || this.failed) return !this.failed;
+    try {
+      const renderer = makeRenderer({ alpha: true, antialias: false });
+      renderer.setPixelRatio(1); renderer.setSize(PREVIEW_W, PREVIEW_H, false);
+      const scene = new THREE.Scene();
+      scene.add(new THREE.HemisphereLight(0xE6F4FF, 0x8FB37A, 0.6));
+      const light = new THREE.DirectionalLight(0xFFFFFF, 2.2); light.position.set(3, 6, 4); scene.add(light);
+      const camera = new THREE.PerspectiveCamera(24, PREVIEW_W / PREVIEW_H, 0.1, 50); camera.position.set(0, 2.7, 9.2); camera.lookAt(0, 0.5, 0);
+      this.renderer = renderer; this.scene = scene; this.camera = camera;
+      const applyEnv = hdr => { if (this.renderer === renderer) scene.environment = envFromHdr(renderer, hdr); };
+      if (HQENV.hdr) applyEnv(HQENV.hdr); else HQENV.ready.push(applyEnv);
+      return true;
+    } catch (e) {
+      this.failed = true; this.renderer = null;
+      this.stages.forEach(s => { s.cv.style.display = "none"; });
+      return false;
+    }
+  }
+  close() {
+    if (!this.renderer) return;
+    if (this.scene.environment) this.scene.environment.dispose();
+    this.renderer.dispose(); this.renderer.forceContextLoss();
+    this.renderer = this.scene = this.camera = null;
+  }
+  render(dt) {
+    if (this.failed) return;
+    if (state !== "menu" || overlay.style.display === "none") { this.close(); return; }
+    const stage = this.stages.find(s => s.cv.offsetParent);
+    if (!stage) { this.close(); return; }
+    if (!this.open()) return;
+    if (this.spinKey !== carKey || !this.spinModel) { this.spinKey = carKey; this.spinModel = makeCar(carKey); }
+    this.spinAngle += dt * 0.9; this.spinModel.rotation.y = this.spinAngle;
+    this.scene.add(this.spinModel); this.renderer.render(this.scene, this.camera); this.scene.remove(this.spinModel);
+    stage.ctx.clearRect(0, 0, PREVIEW_W, PREVIEW_H); stage.ctx.drawImage(this.renderer.domElement, 0, 0);
+  }
 }
+const carPreview = new CarPreview();
 function swapCar(old, id) {
   const next = id === ghostCarKey && old === ghostCar ? makeGhostCar(id) : makeCar(id);
   next.position.copy(old.position); next.rotation.copy(old.rotation); next.visible = old.visible;
@@ -3513,7 +3552,7 @@ function refreshCars() {
     const e = BT.ents[id], p = BT.players[id];
     if (e.car.userData.waitingModel && p) e.car = swapCar(e.car, p.car);
   });
-  carSpin.m = null; GFX.rear = null;
+  carPreview.forgetModel(); GFX.rear = null;
 }
 renderLoadGate();
 
@@ -3556,7 +3595,7 @@ function showCard(which) {
   Object.keys(CARDS).forEach(k => { $(CARDS[k]).style.display = which === k ? "" : "none"; });
 }
 function showCourse(k) {
-  if (ghostCar) { scene.remove(ghostCar); ghostCar = null; }
+  releaseGhostCar();
   course = k; buildTrack(TRACKS[k]); resetCar(); updateCar(0);
 }
 function pickCourse(k) {
@@ -3804,18 +3843,36 @@ function drawSpeedLines(ratio, surge = 0, flash = 0) {
     fctx.fillStyle = glow; fctx.fillRect(0, 0, w, h);
   }
 }
+class MinimapTrackLayer {
+  constructor() {
+    this.canvas = document.createElement("canvas");
+    this.canvas.width = this.canvas.height = 300;
+    this.stale = true;
+  }
+  invalidate() { this.stale = true; }
+  draw() {
+    if (!this.stale) return this.canvas;
+    this.stale = false;
+    const c = this.canvas.getContext("2d");
+    c.clearRect(0, 0, 300, 300);
+    c.lineCap = c.lineJoin = "round";
+    c.beginPath();
+    const last = OPEN ? N - 1 : N;
+    for (let i = 0; i <= last; i += (i + 4 > last && i < last ? last - i : 4)) { const s = S[i % N]; if (i === 0) c.moveTo(MM.mx(s.p.x), MM.mz(s.p.z)); else c.lineTo(MM.mx(s.p.x), MM.mz(s.p.z)); }
+    if (!OPEN) c.closePath();
+    c.strokeStyle = "#1B2B20"; c.lineWidth = W * MM.sc + 6; c.stroke();
+    c.strokeStyle = "#7A7E8C"; c.lineWidth = W * MM.sc; c.stroke();
+    const f = S[OPEN ? FINISH_I : 2];
+    c.strokeStyle = "#FFFFFF"; c.lineWidth = 4;
+    c.beginPath(); c.moveTo(MM.mx(f.p.x + f.n.x * W / 2), MM.mz(f.p.z + f.n.z * W / 2)); c.lineTo(MM.mx(f.p.x - f.n.x * W / 2), MM.mz(f.p.z - f.n.z * W / 2)); c.stroke();
+    return this.canvas;
+  }
+}
+const minimapTrackLayer = new MinimapTrackLayer();
 function drawMinimap() {
   mctx.clearRect(0, 0, 300, 300);
   mctx.lineCap = mctx.lineJoin = "round";
-  mctx.beginPath();
-  const last = OPEN ? N - 1 : N;
-  for (let i = 0; i <= last; i += (i + 4 > last && i < last ? last - i : 4)) { const s = S[i % N]; if (i === 0) mctx.moveTo(MM.mx(s.p.x), MM.mz(s.p.z)); else mctx.lineTo(MM.mx(s.p.x), MM.mz(s.p.z)); }
-  if (!OPEN) mctx.closePath();
-  mctx.strokeStyle = "#1B2B20"; mctx.lineWidth = W * MM.sc + 6; mctx.stroke();
-  mctx.strokeStyle = "#7A7E8C"; mctx.lineWidth = W * MM.sc; mctx.stroke();
-  const f = S[OPEN ? FINISH_I : 2];
-  mctx.strokeStyle = "#FFFFFF"; mctx.lineWidth = 4;
-  mctx.beginPath(); mctx.moveTo(MM.mx(f.p.x + f.n.x * W / 2), MM.mz(f.p.z + f.n.z * W / 2)); mctx.lineTo(MM.mx(f.p.x - f.n.x * W / 2), MM.mz(f.p.z - f.n.z * W / 2)); mctx.stroke();
+  mctx.drawImage(minimapTrackLayer.draw(), 0, 0);
   mctx.strokeStyle = "#1B2B20"; mctx.lineWidth = 3;
   if (playMode === "battle") Object.keys(BT.ents).forEach(id => {
     const e = BT.ents[id]; if (!e.seen || id === BT.myId) return;
@@ -4016,7 +4073,7 @@ function tick(now) {
   if (battle) battleFrame(dt);
   updateCamera(dt);
   updateGroundFx(dt);
-  renderCarPreviews(dt);
+  carPreview.render(dt);
   const V = viewTarget();
   engineUpdate(Math.min(1, Math.abs(V.v) / CFG.maxSpeed), state === "race" || state === "countdown" || (spectating && state === "done"));
 
@@ -4487,7 +4544,7 @@ function startMatchLocal() {
   const me = BT.players[BT.myId];
   BT.spec = !me || me.team === "spec";
   if (BT.course !== course) showCourse(BT.course);
-  if (ghostCar) { scene.remove(ghostCar); ghostCar = null; }
+  releaseGhostCar();
   ghostPlay = null; ghostLabel = "";
   scene.remove(car); car = makeCar(carKey); scene.add(car); car.visible = !BT.spec;
   resetCar(); P.lap = 0; P.expected = 0; lapTimes = []; lapStartMs = 0; raceBest = 0; renderHudBest();
@@ -4614,6 +4671,12 @@ function racerState(id) {
   return e && e.seen ? { prog: e.prog, fin: e.fin } : { prog: -1, fin: 0 };
 }
 function standings() { return racerIds().map(id => Object.assign({ id }, racerState(id))).sort(rankCmp); }
+class FrameStandings {
+  constructor() { this.cached = null; }
+  nextFrame() { this.cached = null; }
+  get() { return this.cached || (this.cached = standings()); }
+}
+const frameStandings = new FrameStandings();
 function progText(prog) {
   if (OPEN) return Math.max(0, Math.min(100, Math.round(prog * 100))) + "%";
   return Math.min(LAPS, Math.max(0, Math.floor(prog)) + 1) + "/" + LAPS + "바퀴";
@@ -4957,7 +5020,7 @@ function hostTick() {
   const t = tnow();
   if (BT.status === "countdown" && msToGo() <= 0 && BT.statusSent !== "playing") { BT.statusSent = "playing"; BT.ref.update({ status: "playing" }); }
   if (BT.status !== "playing" && BT.status !== "countdown") return;
-  const st = standings(), quitSide = sideAllQuit();
+  const st = frameStandings.get(), quitSide = sideAllQuit();
   const over = !st.length || st.every(r => r.fin) || (BT.match.firstFinAt && t - BT.match.firstFinAt > BATTLE.dnfMs) || !!quitSide;
   if (!over || BT.statusSent === "ended") return;
   BT.statusSent = "ended";
@@ -5034,7 +5097,7 @@ function renderViewBtns() {
   }).join("");
 }
 function renderBattleHud() {
-  const st = standings(), t = tnow();
+  const st = frameStandings.get(), t = tnow();
   if (st.some(r => r.fin) && !BT.match.firstFinAt) BT.match.firstFinAt = t;
   if (BT.spec) {
     specDirector.update(st, state === "race" || state === "done" ? elapsed : 0, performance.now());
@@ -5051,6 +5114,7 @@ function renderBattleHud() {
 }
 function battleFrame(dt) {
   if (!BT.ref) return;
+  frameStandings.nextFrame();
   updateEnts(dt);
   netTick();
   if (BT.match && state !== "menu") { botsTick(dt); hostTick(); renderBattleHud(); }
