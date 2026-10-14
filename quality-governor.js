@@ -12,7 +12,8 @@
        isPlaying: () => state === "race",  // 이 때만 프레임을 센다(생략하면 항상)
        slowSec: 0.022, slowLimit: 90        // 한 프레임이 slowSec 보다 느린 횟수가 slowLimit 을 넘으면 한 단계 내림
      });
-     QG.restore(최소횟수?)   // 저장된 횟수만큼(또는 최소횟수만큼) 미리 내려 두고 시작 — 장면이 만들어진 뒤에 부른다
+     relaxOnRestore: 1                    // restore 때 저장된 횟수에서 이만큼 덜 내려 시작(일시적 렉으로 화질이 영영 고정되는 것을 막음, 기본 0)
+     QG.restore(최소횟수?)  // 저장된 횟수만큼(또는 최소횟수만큼) 미리 내려 두고 시작 — 장면이 만들어진 뒤에 부른다
      QG.update(프레임초)      // 매 프레임 호출
      QG.lower()              // 즉시 한 단계 내림(내렸으면 true)
 
@@ -36,6 +37,7 @@
     var isPlaying = options.isPlaying || function () { return true; };
     var slowSec = options.slowSec;
     var slowLimit = options.slowLimit;
+    var relaxOnRestore = options.relaxOnRestore || 0;
     var slowFrames = 0;
     var stepsTaken = 0;
 
@@ -61,8 +63,9 @@
     }
 
     function restore(minimumSteps) {
-      var target = Math.max(savedSteps(), minimumSteps || 0);
+      var target = Math.max(savedSteps() - relaxOnRestore, minimumSteps || 0);
       for (var k = 0; k < target && lower(); k++);
+      if (relaxOnRestore > 0) saveSteps();
     }
 
     function update(frameSec) {

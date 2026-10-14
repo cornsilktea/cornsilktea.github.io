@@ -3700,7 +3700,7 @@ const once = QualityGovernor.times.bind(null, 1);
 const QG = QualityGovernor({
   storageKey: QUALITY_KEY,
   isPlaying: () => screenNow === "game",
-  slowSec: 1 / 45, slowLimit: 149,
+  slowSec: 1 / 45, slowLimit: 149, relaxOnRestore: 1,
   steps: [
     once(() => { fogClipIndoors = true; }),
     QualityGovernor.times(2, () => {

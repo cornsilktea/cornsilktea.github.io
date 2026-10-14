@@ -3972,7 +3972,7 @@ const ADAPT = { bloomOn: !IS_TOUCH };
 const QG = QualityGovernor({
   storageKey: "turbolap_quality_v1",
   isPlaying: () => state === "race",
-  slowSec: 0.022, slowLimit: 45,
+  slowSec: 0.022, slowLimit: 45, relaxOnRestore: 1,
   steps: [
     () => { if (!GFX.on) return false; setGroundFx(false); return true; },
     () => {
