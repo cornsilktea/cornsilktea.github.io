@@ -800,9 +800,10 @@ function makeRenderer(opts) {
   r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = HQ_EXPOSURE;
   return r;
 }
-const renderer = makeRenderer({ antialias: true, powerPreference: "high-performance" });
 const IS_TOUCH = (navigator.maxTouchPoints || 0) > 0 || "ontouchstart" in window;
-const MIN_PIXEL_RATIO = 1.0;
+const renderer = makeRenderer({ antialias: !IS_TOUCH, powerPreference: "high-performance" });
+const MIN_PIXEL_RATIO = 0.75;
+const SHADOW_MAP_SIZE = IS_TOUCH ? 1024 : 2048;
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, IS_TOUCH ? 1.25 : 2));
 renderer.domElement.id = "gl";
 document.body.insertBefore(renderer.domElement, document.body.firstChild);
@@ -834,7 +835,7 @@ function nightSkyTexture() {
 }
 function setupNight() {
   const size = new THREE.Vector2(); renderer.getSize(size);
-  const target = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: 4 });
+  const target = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: IS_TOUCH ? 0 : 4 });
   NIGHT.composer = new EffectComposer(renderer, target);
   NIGHT.composer.addPass(new RenderPass(scene, camera));
   NIGHT.bloom = new UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.55, 0.4, 0.92);
@@ -948,12 +949,12 @@ function horizonColor(img) {
 }
 function envFromHdr(r, hdr) { const pm = new THREE.PMREMGenerator(r); const t = pm.fromEquirectangular(hdr).texture; pm.dispose(); return t; }
 function setupWorld() {
-  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = IS_TOUCH ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
   scene.background = new THREE.Color(0xA9C6E2);
   scene.fog = new THREE.Fog(0xC9D9E8, 280, 1600);
   WORLD.hemi = new THREE.HemisphereLight(0xD8E8FF, 0x55703F, 0.45); scene.add(WORLD.hemi);
   sun = new THREE.DirectionalLight(0xFFF2DF, 3.0);
-  sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+  sun.castShadow = true; sun.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
   Object.assign(sun.shadow.camera, { left: -SUN_BOX, right: SUN_BOX, top: SUN_BOX, bottom: -SUN_BOX, near: 1, far: 320 });
   sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.04;
   scene.add(sun); scene.add(sun.target);
@@ -972,7 +973,7 @@ function setupWorld() {
     if (!NIGHT.on) { scene.background = t; scene.fog.color.copy(WORLD.dayFog); }
   }, undefined, () => console.warn("[turbolap] 하늘 배경을 못 불러옴"));
 }
-const SUN_BOX = 36, SUN_TEXEL = SUN_BOX * 2 / 2048;
+const SUN_BOX = 36, SUN_TEXEL = SUN_BOX * 2 / SHADOW_MAP_SIZE;
 const SUN_RIGHT = new THREE.Vector3(), SUN_UP = new THREE.Vector3(), SUN_AT = new THREE.Vector3(), WORLD_UP = new THREE.Vector3(0, 1, 0);
 function followSun() {
   SUN_RIGHT.crossVectors(WORLD_UP, SUN_DIR).normalize(); SUN_UP.crossVectors(SUN_DIR, SUN_RIGHT);
@@ -3970,22 +3971,22 @@ const ADAPT = { bloomOn: !IS_TOUCH };
 const QG = QualityGovernor({
   storageKey: "turbolap_quality_v1",
   isPlaying: () => state === "race",
-  slowSec: 0.022, slowLimit: 90,
+  slowSec: 0.022, slowLimit: 45,
   steps: [
     () => { if (!GFX.on) return false; setGroundFx(false); return true; },
+    () => {
+      if (!renderer.shadowMap.enabled) return false;
+      renderer.shadowMap.enabled = false;
+      scene.traverse(o => { if (o.material) [].concat(o.material).forEach(m => { m.needsUpdate = true; }); });
+      return true;
+    },
     () => {
       const pr = renderer.getPixelRatio();
       if (pr <= MIN_PIXEL_RATIO) return false;
       renderer.setPixelRatio(Math.max(MIN_PIXEL_RATIO, pr - 0.25)); resize();
       return true;
     },
-    () => { if (!ADAPT.bloomOn) return false; ADAPT.bloomOn = false; return true; },
-    () => {
-      if (!renderer.shadowMap.enabled) return false;
-      renderer.shadowMap.enabled = false;
-      scene.traverse(o => { if (o.material) [].concat(o.material).forEach(m => { m.needsUpdate = true; }); });
-      return true;
-    }
+    () => { if (!ADAPT.bloomOn) return false; ADAPT.bloomOn = false; return true; }
   ]
 });
 function frame(now) { requestAnimationFrame(frame); syncTouchPad(); QG.update((now - last) / 1000); tick(now); }
