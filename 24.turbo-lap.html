@@ -757,7 +757,7 @@ function canvasTex(w, h, draw, repeat) {
   draw(cv.getContext("2d"), w, h);
   const t = new THREE.CanvasTexture(cv);
   if (repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(repeat[0], repeat[1]); }
-  t.anisotropy = 4;
+  t.anisotropy = Math.min(4, TEXTURE_ANISOTROPY);
   return t;
 }
 function rnd(a, b) { return a + Math.random() * (b - a); }
@@ -804,6 +804,7 @@ const IS_TOUCH = (navigator.maxTouchPoints || 0) > 0 || "ontouchstart" in window
 const renderer = makeRenderer({ antialias: !IS_TOUCH, powerPreference: "high-performance" });
 const MIN_PIXEL_RATIO = 0.75;
 const SHADOW_MAP_SIZE = IS_TOUCH ? 1024 : 2048;
+const TEXTURE_ANISOTROPY = IS_TOUCH ? 2 : 8;
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, IS_TOUCH ? 1.25 : 2));
 renderer.domElement.id = "gl";
 document.body.insertBefore(renderer.domElement, document.body.firstChild);
@@ -858,7 +859,7 @@ function setNight(on) {
   scene.environmentIntensity = on ? 0.12 : 0.9;
   renderer.toneMappingExposure = on ? 0.9 : HQ_EXPOSURE;
   if (NIGHT.headlight) NIGHT.headlight.visible = on;
-  if (NIGHT.carLight) NIGHT.carLight.visible = on;
+  if (NIGHT.carLight) NIGHT.carLight.visible = on && !IS_TOUCH;
   applyCarNightLook();
 }
 function applyAtmosphere(def) {
@@ -889,12 +890,12 @@ function hqTex(name, srgb, fallbackColor, dir) {
     const c = cv.getContext("2d"); c.fillStyle = fallbackColor || "#8080FF"; c.fillRect(0, 0, 2, 2);
     t.image = cv; t.needsUpdate = true;
   });
-  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = Math.min(TEXTURE_ANISOTROPY, renderer.capabilities.getMaxAnisotropy());
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
   SHARED_TEX.add(t);
   return t;
 }
-function srgbCanvasTex(w, h, draw, repeat) { const t = canvasTex(w, h, draw, repeat); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; SHARED_TEX.add(t); return t; }
+function srgbCanvasTex(w, h, draw, repeat) { const t = canvasTex(w, h, draw, repeat); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = TEXTURE_ANISOTROPY; SHARED_TEX.add(t); return t; }
 function initMaterialsHQ() {
   const asphaltNormal = hqTex("asphalt_normal.jpg");
   HQM.grass = worldUvMaterial({ map: hqTex("grass_color.jpg", true, "#5E8C3A"), normalMap: hqTex("grass_normal.jpg"), roughness: 0.95, color: 0xE8F0DC }, 3.4, true);
@@ -1315,7 +1316,7 @@ function sampleRanges(pred) {
 function seoulTex(w, h, draw, linear) {
   const t = canvasTex(w, h, draw, [1, 1]);
   if (!linear) t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 8; SHARED_TEX.add(t);
+  t.anisotropy = TEXTURE_ANISOTROPY; SHARED_TEX.add(t);
   return t;
 }
 function heightNormalTex(w, h, heightAt, strength) {
@@ -1328,7 +1329,7 @@ function heightNormalTex(w, h, heightAt, strength) {
     img.data[o] = (-dx / l * 0.5 + 0.5) * 255; img.data[o + 1] = (dy / l * 0.5 + 0.5) * 255; img.data[o + 2] = (1 / l * 0.5 + 0.5) * 255; img.data[o + 3] = 255;
   }
   c.putImageData(img, 0, 0);
-  const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; SHARED_TEX.add(t);
+  const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = TEXTURE_ANISOTROPY; SHARED_TEX.add(t);
   return t;
 }
 function facadeMaterial(p, tileU, roofHex, tileV) {
