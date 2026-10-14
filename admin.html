@@ -153,13 +153,14 @@
     max-height: 92vh; overflow: auto; cursor: default; box-shadow: var(--sg-shadow-lg);
   }
   .stats-box h3 { margin: 0 0 var(--sg-s2); font-size: var(--sg-fs-xl); font-weight: 800; line-height: var(--sg-lh-tight); }
-  .stats-box table { width: 100%; border-collapse: collapse; margin: var(--sg-s4) 0; font-size: var(--sg-fs-md); font-variant-numeric: tabular-nums; }
+  .stats-box table { width: 100%; border-collapse: separate; border-spacing: 0; margin: var(--sg-s4) 0; font-size: var(--sg-fs-md); font-variant-numeric: tabular-nums; }
   .stats-box th, .stats-box td { padding: var(--sg-s2) var(--sg-s3); border-bottom: 1px solid var(--sg-line); text-align: right; white-space: nowrap; }
   .stats-box th:first-child, .stats-box td:first-child { text-align: left; }
   .stats-box th {
-    position: sticky; top: 0; background: var(--sg-panel);
+    position: sticky; top: 0; z-index: 1; background: var(--sg-panel); white-space: normal; vertical-align: bottom; line-height: 1.3;
     font-size: var(--sg-fs-xs); color: var(--sg-ink-soft); font-weight: 700; border-bottom: 2px solid var(--sg-line-mid);
   }
+  .stats-box th small { display: block; margin-top: 2px; font-size: 11px; font-weight: 400; }
   .stats-box tr:hover td { background: var(--sg-bg); }
   .stats-box td:first-child { font-weight: 700; }
   .stats-box td b { font-size: var(--sg-fs-lg); }
@@ -170,7 +171,7 @@
   /* 캐릭터 이름 칸: 글씨를 키우고 옅은 바탕·오른쪽 굵은 선으로 통계 숫자 칸과 나눈다 */
   .stats-box tr:not(.stats-group) td:first-child { font-size: var(--sg-fs-lg); padding-left: var(--sg-s5); background: var(--sg-bg); border-right: 2px solid var(--sg-line-mid); }
   .stats-box th:first-child { border-right: 2px solid var(--sg-line-mid); }
-  .stats-box td small { margin-left: var(--sg-s1); font-size: var(--sg-fs-xs); color: var(--sg-ink-soft); }
+  .stats-box td small { display: block; margin-top: 2px; font-size: var(--sg-fs-xs); color: var(--sg-ink-soft); }
   .stats-box .actions { margin-top: var(--sg-s2); }
   .stats-box .actions.stats-modes { margin: 0 0 var(--sg-s3); }
   .stats-modes button[aria-pressed="true"] {
@@ -1124,7 +1125,11 @@ async function showStats(g) {
     }
     const table = el("table");
     const head = el("tr");
-    ["직업", "밴픽률 ((밴 + 픽) / 고를 수 있던 게임 수)", "승률 (승리 수 / (픽 수 - 무승부))", "KDA (평균 킬 / 데스 / 어시스트)", "평균 피해량", "평균 회복량", "평균 막은 피해", "평균 기절", "평균 둔화"].forEach((t) => head.appendChild(el("th", null, t)));
+    [["직업"], ["밴픽률", "(밴 + 픽) / 고를 수 있던 게임 수"], ["승률", "승리 수 / (픽 수 - 무승부)"], ["KDA", "평균 킬 / 데스 / 어시스트"], ["평균 피해량"], ["평균 회복량"], ["평균 막은 피해"], ["평균 기절"], ["평균 둔화"]].forEach((col) => {
+      const th = el("th", null, col[0]);
+      if (col[1]) th.appendChild(el("small", null, col[1]));
+      head.appendChild(th);
+    });
     table.appendChild(head);
     /* 직업군 순서 → 이름 가나다순(게임 캐릭터 선택창과 같은 순서). 직업군이 바뀔 때마다 구분 줄을 넣는다 */
     const groups = meta.groups || [];
@@ -1137,7 +1142,7 @@ async function showStats(g) {
         const gr = groups[groupAt(role)];
         const gtr = el("tr", "stats-group");
         const gtd = el("td", null, gr ? gr.icon + " " + gr.name : "기타");
-        gtd.colSpan = 8;
+        gtd.colSpan = head.children.length;
         gtr.appendChild(gtd);
         table.appendChild(gtr);
       }
