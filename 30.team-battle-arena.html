@@ -305,6 +305,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     geo;
     matlib;
     loop;
+    shaderWarmup;
     world;
     testBridge;
   }
@@ -3262,6 +3263,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.match.startRound();
       services.match.lastHp = {};
       services.killfeed.clear();
+      services.shaderWarmup.warmMinionIfNeeded();
       Dom.show(Dom.$("endOv"), false);
     }
     isSpec() { var services = this.services; return !!services.session.players[services.session.myId] && services.session.players[services.session.myId].team === "spec"; }
@@ -8619,6 +8621,20 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
 
 
+  class ShaderWarmup {
+    static PROBE_SPOT = -9000;
+    constructor(services) { this.services = services; this.minionWarmed = false; }
+    warmMinionIfNeeded() { var services = this.services;
+      if (this.minionWarmed || !services.cameraRig.renderer || !services.models.kit.ready) return;
+      var necroInMatch = Object.keys(services.session.players).some(function (id) { return services.session.players[id].characterType === "necro"; });
+      if (!necroInMatch) return;
+      this.minionWarmed = true;
+      var probe = services.fighterView.makeMinionVis({ key: "shaderWarmup", team: "blue", angle: 0, atkAt: 0, x: ShaderWarmup.PROBE_SPOT, y: ShaderWarmup.PROBE_SPOT });
+      probe.root.position.set(ShaderWarmup.PROBE_SPOT, 0, ShaderWarmup.PROBE_SPOT);
+      services.cameraRig.renderer.render(services.stage.scene, services.stage.camera);
+      probe.durRing.dispose(); probe.root.parent.remove(probe.root); probe.mats.forEach(function (m) { m.dispose(); });
+    }
+  }
   class GameLoop {
     constructor(services) { this.services = services; this.lastFrame = Date.now(); }
     start() { var services = this.services; requestAnimationFrame(function () { services.loop.frame(); }); }
@@ -8876,6 +8892,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.stage = new ArenaStage(services);
       services.geo = new GeometryLibrary();
       services.matlib = new MaterialLibrary();
+      services.shaderWarmup = new ShaderWarmup(services);
       services.loop = new GameLoop(services);
       services.world = new WorldStepper(services);
       services.testBridge = new TestBridge(services);
