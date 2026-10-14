@@ -251,6 +251,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     physics;
     status;
     fieldFx;
+    effectIntake;
     stormFx;
     domainFx;
     turrets;
@@ -623,6 +624,25 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
   class SoundBox {
     static SEMITONE = Math.pow(2, 1 / 12);
+    static SFX = {
+      shoot: [{ f: 880, d: 0.07, type: "square", vol: 0.05, slide: 0.5 }],
+      orb: [{ f: 620, d: 0.12, type: "sine", vol: 0.08, slide: 1.6 }],
+      hit: [{ f: 180, d: 0.12, type: "sawtooth", vol: 0.09, slide: 0.5 }],
+      confirm: [{ f: 1320, d: 0.05, type: "triangle", vol: 0.06 }],
+      boom: [{ f: 130, d: 0.4, type: "sawtooth", vol: 0.1, slide: 0.35 }],
+      heal: [{ f: 760, d: 0.12, type: "sine", vol: 0.07, slide: 1.3 }, { f: 1140, d: 0.14, type: "sine", vol: 0.06, at: 70 }],
+      ult: [{ f: 300, d: 0.35, type: "sawtooth", vol: 0.08, slide: 3 }],
+      swing: [{ f: 240, d: 0.12, type: "triangle", vol: 0.1, slide: 0.4 }],
+      splash: [{ f: 420, d: 0.22, type: "sine", vol: 0.08, slide: 0.35 }],
+      star: [{ f: 1500, d: 0.05, type: "triangle", vol: 0.05, slide: 0.6 }],
+      zap: [{ f: 1900, d: 0.06, type: "square", vol: 0.04, slide: 0.3 }, { f: 1300, d: 0.09, type: "sawtooth", vol: 0.04, slide: 0.4, at: 40 }],
+      beep: [{ f: 660, d: 0.12, type: "square", vol: 0.07 }],
+      go: [{ f: 990, d: 0.3, type: "square", vol: 0.08 }],
+      count: [{ f: 880, d: 0.09, type: "sine", vol: 0.04 }],
+      down: [{ f: 400, d: 0.5, type: "sawtooth", vol: 0.08, slide: 0.25 }],
+      win: [{ f: 523, d: 0.18, type: "triangle", vol: 0.09, at: 0 }, { f: 659, d: 0.18, type: "triangle", vol: 0.09, at: 120 }, { f: 784, d: 0.18, type: "triangle", vol: 0.09, at: 240 }, { f: 1047, d: 0.18, type: "triangle", vol: 0.09, at: 360 }],
+      lose: [{ f: 392, d: 0.25, type: "triangle", vol: 0.08, at: 0 }, { f: 330, d: 0.25, type: "triangle", vol: 0.08, at: 160 }, { f: 262, d: 0.25, type: "triangle", vol: 0.08, at: 320 }]
+    };
     constructor(services) { this.services = services; this.ac = null; this.lastPlayed = {}; }
     audio() { var services = this.services;
       if (Environment.SILENT_RUN) return null;
@@ -648,23 +668,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     sfx(k) { var services = this.services;
       var t = Date.now(); if (services.sound.lastPlayed[k] && t - services.sound.lastPlayed[k] < 40) return; services.sound.lastPlayed[k] = t;
-      if (k === "shoot") services.sound.tone(880, 0.07, "square", 0.05, 0.5);
-      else if (k === "orb") services.sound.tone(620, 0.12, "sine", 0.08, 1.6);
-      else if (k === "hit") services.sound.tone(180, 0.12, "sawtooth", 0.09, 0.5);
-      else if (k === "confirm") services.sound.tone(1320, 0.05, "triangle", 0.06);
-      else if (k === "boom") services.sound.tone(130, 0.4, "sawtooth", 0.1, 0.35);
-      else if (k === "heal") { services.sound.tone(760, 0.12, "sine", 0.07, 1.3); setTimeout(function () { services.sound.tone(1140, 0.14, "sine", 0.06); }, 70); }
-      else if (k === "ult") { services.sound.tone(300, 0.35, "sawtooth", 0.08, 3); }
-      else if (k === "swing") services.sound.tone(240, 0.12, "triangle", 0.1, 0.4);
-      else if (k === "splash") services.sound.tone(420, 0.22, "sine", 0.08, 0.35);
-      else if (k === "star") services.sound.tone(1500, 0.05, "triangle", 0.05, 0.6);
-      else if (k === "zap") { services.sound.tone(1900, 0.06, "square", 0.04, 0.3); setTimeout(function () { services.sound.tone(1300, 0.09, "sawtooth", 0.04, 0.4); }, 40); }
-      else if (k === "beep") services.sound.tone(660, 0.12, "square", 0.07);
-      else if (k === "go") services.sound.tone(990, 0.3, "square", 0.08);
-      else if (k === "count") services.sound.tone(880, 0.09, "sine", 0.04);
-      else if (k === "down") services.sound.tone(400, 0.5, "sawtooth", 0.08, 0.25);
-      else if (k === "win") { [523, 659, 784, 1047].forEach(function (f, i) { setTimeout(function () { services.sound.tone(f, 0.18, "triangle", 0.09); }, i * 120); }); }
-      else if (k === "lose") { [392, 330, 262].forEach(function (f, i) { setTimeout(function () { services.sound.tone(f, 0.25, "triangle", 0.08); }, i * 160); }); }
+      var steps = SoundBox.SFX[k]; if (!steps) return;
+      steps.forEach(function (step) {
+        var play = function () { services.sound.tone(step.f, step.d, step.type, step.vol, step.slide); };
+        if (step.at === undefined) play(); else setTimeout(play, step.at);
+      });
     }
   }
 
@@ -1891,18 +1899,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.bursts = []; this.pools = []; this.poolHit = {}; this.lunges = []; this.waves = [];
       this.holes = []; this.storms = []; this.revs = []; this.graces = []; this.domains = [];
       this.curses = {}; this.bladeSpins = []; this.turrets = []; this.groves = []; this.shells = []; this.gales = []; this.stars = [];
-    }
-    addLingering(e, t) { var services = this.services;
-      if (e.type === "turret") { services.turrets.add(e, t); return true; }
-      if (e.type === "grove") { services.groves.add(e, t); return true; }
-      if (e.type === "gale") { if (t < e.createdAt + e.dur) this.gales.push({ e: e, vis: null }); return true; }
-      if (e.type === "star") { services.starfall.add(e, t); return true; }
-      if (e.type === "pool") { if (t < e.createdAt + e.delay + e.dur) this.pools.push({ e: e, vis: null, bottle: null }); return true; }
-      if (e.type === "hole") { if (t < e.createdAt + e.delay + e.dur) this.holes.push({ e: e, vis: null }); return true; }
-      if (e.type === "storm") { if (t < e.createdAt + e.delay + e.dur) this.storms.push({ e: e, vis: null }); return true; }
-      if (e.type === "rev") { if (t < e.createdAt + e.dur) this.revs.push({ e: e, vis: null, ticked: {} }); return true; }
-      if (e.type === "domain") { if (t < e.createdAt + e.dur) this.domains.push({ e: e, vis: null, touched: {} }); return true; }
-      return false;
     }
     dropOwnedBy(ownerId) { var services = this.services;
       var field = this, owned = function (item) { return (item.e || item.d).owner === ownerId; };
@@ -3773,20 +3769,118 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (k >= 1) E.shove = null;
     }
   }
+  class EffectHandler {
+    constructor(services) { this.services = services; }
+    handle(e, now) {}
+  }
+
+  class ListedEffect extends EffectHandler {
+    get listName() { return ""; }
+    endsAt(e) { return e.createdAt + e.dur; }
+    entry(e) { return { e: e, vis: null }; }
+    handle(e, now) { var services = this.services;
+      if (now < this.endsAt(e)) services.field[this.listName].push(this.entry(e));
+    }
+  }
+
+  class DelayedListedEffect extends ListedEffect {
+    endsAt(e) { return e.createdAt + e.delay + e.dur; }
+  }
+
+  class GaleEffect extends ListedEffect {
+    get listName() { return "gales"; }
+  }
+
+  class PoolEffect extends DelayedListedEffect {
+    get listName() { return "pools"; }
+    entry(e) { return { e: e, vis: null, bottle: null }; }
+  }
+
+  class HoleEffect extends DelayedListedEffect {
+    get listName() { return "holes"; }
+  }
+
+  class StormEffect extends DelayedListedEffect {
+    get listName() { return "storms"; }
+  }
+
+  class RevEffect extends ListedEffect {
+    get listName() { return "revs"; }
+    entry(e) { return { e: e, vis: null, ticked: {} }; }
+  }
+
+  class DomainEffect extends ListedEffect {
+    get listName() { return "domains"; }
+    entry(e) { return { e: e, vis: null, touched: {} }; }
+  }
+
+  class TurretEffect extends EffectHandler {
+    handle(e, now) { this.services.turrets.add(e, now); }
+  }
+
+  class GroveEffect extends EffectHandler {
+    handle(e, now) { this.services.groves.add(e, now); }
+  }
+
+  class StarEffect extends EffectHandler {
+    handle(e, now) { this.services.starfall.add(e, now); }
+  }
+
+  class GraceEffect extends EffectHandler {
+    handle(e, now) { this.services.fieldFx.onGrace(e); }
+  }
+
+  class StrikeEffect extends EffectHandler {
+    handle(e, now) { this.services.domainFx.onDomainStrike(e); }
+  }
+
+  class ZapEffect extends EffectHandler {
+    handle(e, now) { this.services.stormFx.onZap(e); }
+  }
+
+  class TurretShotEffect extends EffectHandler {
+    handle(e, now) { this.services.turrets.onShot(e); }
+  }
+
+  class CurseEffect extends EffectHandler {
+    handle(e, now) { this.services.field.curses[e.tgt] = { n: e.n, at: e.createdAt }; }
+  }
+
+  class RevCutEffect extends EffectHandler {
+    handle(e, now) { var services = this.services;
+      services.field.revs.forEach(function (r) { if (r.e.owner === e.owner && r.e.createdAt <= e.createdAt) r.cut = true; });
+    }
+  }
+
+  class BurstEffect extends EffectHandler {
+    static LATE_MS = 1500;
+    handle(e, now) { var services = this.services;
+      if (now > e.createdAt + e.delay + BurstEffect.LATE_MS) return;
+      services.field.bursts.push({ e: e, vis: null });
+    }
+  }
+
+  class EffectIntake {
+    constructor(services) {
+      this.handlers = new Map([
+        ["turret", new TurretEffect(services)], ["grove", new GroveEffect(services)], ["gale", new GaleEffect(services)], ["star", new StarEffect(services)],
+        ["pool", new PoolEffect(services)], ["hole", new HoleEffect(services)], ["storm", new StormEffect(services)], ["rev", new RevEffect(services)],
+        ["domain", new DomainEffect(services)], ["grace", new GraceEffect(services)], ["strike", new StrikeEffect(services)], ["zap", new ZapEffect(services)],
+        ["tshot", new TurretShotEffect(services)], ["curse", new CurseEffect(services)], ["revCut", new RevCutEffect(services)], ["burst", new BurstEffect(services)]
+      ]);
+    }
+    take(e, now) {
+      var handler = this.handlers.get(e.type);
+      if (handler) handler.handle(e, now);
+    }
+  }
+
   class FieldEffects {
     constructor(services) { this.services = services; }
     onEffect(s) { var services = this.services;
       var e = s.val(); if (!e || !services.match.game || services.match.handled[s.key]) return;
       services.match.handled[s.key] = 1;
-      if (services.field.addLingering(e, services.clock.now())) return;
-      if (e.type === "grace") { services.fieldFx.onGrace(e); return; }
-      if (e.type === "strike") { services.domainFx.onDomainStrike(e); return; }
-      if (e.type === "zap") { services.stormFx.onZap(e); return; }
-      if (e.type === "tshot") { services.turrets.onShot(e); return; }
-      if (e.type === "curse") { services.field.curses[e.tgt] = { n: e.n, at: e.createdAt }; return; }
-      if (e.type === "revCut") { services.field.revs.forEach(function (r) { if (r.e.owner === e.owner && r.e.createdAt <= e.createdAt) r.cut = true; }); return; }
-      if (e.type !== "burst" || services.clock.now() > e.createdAt + e.delay + 1500) return;
-      services.field.bursts.push({ e: e, vis: null });
+      services.effectIntake.take(e, services.clock.now());
     }
     poolStart(e) { return e.createdAt + e.delay; }
     healInFog(T, e, t) { var services = this.services;
@@ -8729,6 +8823,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.physics = new ArenaPhysics(services);
       services.status = new StatusEffects(services);
       services.fieldFx = new FieldEffects(services);
+      services.effectIntake = new EffectIntake(services);
       services.stormFx = new StormEffects(services);
       services.domainFx = new DomainEffects(services);
       services.turrets = new TurretSystem(services);
