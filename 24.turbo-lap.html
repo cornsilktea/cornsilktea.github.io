@@ -329,6 +329,7 @@
   <div id="hudBtns">
     <button type="button" id="btnReset">↻ 처음부터 (R)</button>
     <button type="button" id="btnRecover">🚗 트랙 복귀 (T)</button>
+    <button type="button" id="btnToMenu">🗺 맵 선택</button>
   </div>
 </div>
 <div id="touchPad" hidden>
@@ -4166,6 +4167,7 @@ $("btnRetry").onclick = e => { e.currentTarget.blur(); startRace(); };
 $("btnMenu").onclick = e => { e.currentTarget.blur(); showMenu(); };
 $("btnReset").onclick = e => { e.currentTarget.blur(); startRace(); };
 $("btnRecover").onclick = e => { e.currentTarget.blur(); recover(); };
+$("btnToMenu").onclick = e => { e.currentTarget.blur(); if (confirm("맵 선택 화면으로 나갈까요? 지금 기록은 저장되지 않습니다.")) showMenu(); };
 
 const CAR_HIT = { impact: 0.1, radius: 0.82, offset: 1.08, restitution: 0.45, push: 0.55, spinGain: 0.55, spinMax: 0.8, spinFriction: 3.2, slideFriction: 2.6, inertia: 1.45 };
 const HIT_NOTICE = { minGapMs: 250, dedupeMs: 300, staleMs: 1000 };
@@ -4463,6 +4465,7 @@ function setBattleHud(on) {
   const spec = on && BT.spec;
   $("hudPosBox").hidden = !on || spec; hud.classList.toggle("battle", on);
   $("btnReset").style.display = on ? "none" : "";
+  $("btnToMenu").style.display = on ? "none" : "";
   $("btnMatchLeave").hidden = !on;
   $("rankBox").hidden = !spec; $("viewBtns").hidden = !spec;
   $("battleNote").hidden = true;
