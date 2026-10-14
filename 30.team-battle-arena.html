@@ -2566,6 +2566,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     };
     static STATS = { name: "클레릭", role: "caster", icon: "✝️", hp: 110, speed: GameTime.gameSpeed(170), cd: GameTime.gameMs(1.4), dmg: 0, graceHeal: 18, range: 400, noAim: true, healGauge: 400, ultName: "요한계시록", heals: true };
     isRevealing(E, t) { return E.buffUntil > t; }
+    latePose(E, t) { return this.isRevealing(E, t) ? ["Ranged_Magic_Spellcasting", 1] : null; }
     isRooted(E, t) { return this.isRevealing(E, t); }
     get showsHealRange() { return true; }
     overrideBasic(E, ang, reach, t) { var services = this.services; services.fieldFx.graceStrike(E, t); return true; }
@@ -2744,6 +2745,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static STATS = { name: "검무희", role: "assassin", icon: "🌸", hp: 150, speed: GameTime.gameSpeed(175), ultSpeed: GameTime.gameSpeed(210), cd: GameTime.gameMs(1.2), dmg: 20, range: 350, pSpeed: 900, pr: 8, ultName: "칼날 폭풍" };
     get botRole() { return "back"; }
     isBladeStorming(E, t) { return E.buffUntil > t; }
+    earlyPose(E, t) { return this.isBladeStorming(E, t) ? ["Melee_2H_Attack_Spinning", 1.2] : null; }
     skillSpeed(E, t) { return E.buffUntil > t ? this.data.ultSpeed : null; }
     statDamageText(c) { var services = this.services; return services.skilltext.num(c.dmg) + "+" + services.skilltext.num(DancerType.ULT.bdDmg); }
     onHitEarly(owner, h) {
@@ -6761,9 +6763,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         v.dead = false;
         var earlyPose = type.earlyPose(E, t), latePose = type.latePose(E, t);
         if (earlyPose) services.fighterMotion.showClip(v, earlyPose[0], earlyPose[1], true);
-        else if (E.isBladeStorming(t)) services.fighterMotion.showClip(v, "Melee_2H_Attack_Spinning", 1.2, true);
         else if (v.once) { services.fighterMotion.showClip(v, v.once.name, v.once.ts, false, v.once.fresh, v.once.from); v.once.fresh = false; }
-        else if (E.isRevealing(t)) services.fighterMotion.showClip(v, "Ranged_Magic_Spellcasting", 1, true);
         else if (latePose) services.fighterMotion.showClip(v, latePose[0], latePose[1], true);
         else if (E.mv && v.speed > 150) services.fighterMotion.showClip(v, "Running_A", MathKit.clamp(v.speed / 260, 0.7, 1.6), true);
         else if (E.mv && v.speed > 15) services.fighterMotion.showClip(v, "Walking_A", MathKit.clamp(v.speed / 110, 0.6, 1.4), true);
