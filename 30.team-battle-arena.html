@@ -625,53 +625,90 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
   class SoundBox {
     static SEMITONE = Math.pow(2, 1 / 12);
+    static TONE_CUTOFF = 3200;
+    static FADE_IN = 0.008;
+    static PITCH_VARIATION = 0.06;
+    static MASTER_VOLUME = 0.85;
+    static NOISE_SECONDS = 0.6;
+    static MIN_GAP_MS = 60;
+    static VARIED = ["shoot", "orb", "hit", "swing", "splash", "star", "zap"];
     static SFX = {
-      shoot: [{ f: 880, d: 0.07, type: "square", vol: 0.05, slide: 0.5 }],
-      orb: [{ f: 620, d: 0.12, type: "sine", vol: 0.08, slide: 1.6 }],
-      hit: [{ f: 180, d: 0.12, type: "sawtooth", vol: 0.09, slide: 0.5 }],
-      confirm: [{ f: 1320, d: 0.05, type: "triangle", vol: 0.06 }],
-      boom: [{ f: 130, d: 0.4, type: "sawtooth", vol: 0.1, slide: 0.35 }],
-      heal: [{ f: 760, d: 0.12, type: "sine", vol: 0.07, slide: 1.3 }, { f: 1140, d: 0.14, type: "sine", vol: 0.06, at: 70 }],
-      ult: [{ f: 300, d: 0.35, type: "sawtooth", vol: 0.08, slide: 3 }],
-      swing: [{ f: 240, d: 0.12, type: "triangle", vol: 0.1, slide: 0.4 }],
-      splash: [{ f: 420, d: 0.22, type: "sine", vol: 0.08, slide: 0.35 }],
-      star: [{ f: 1500, d: 0.05, type: "triangle", vol: 0.05, slide: 0.6 }],
-      zap: [{ f: 1900, d: 0.06, type: "square", vol: 0.04, slide: 0.3 }, { f: 1300, d: 0.09, type: "sawtooth", vol: 0.04, slide: 0.4, at: 40 }],
-      beep: [{ f: 660, d: 0.12, type: "square", vol: 0.07 }],
-      go: [{ f: 990, d: 0.3, type: "square", vol: 0.08 }],
-      count: [{ f: 880, d: 0.09, type: "sine", vol: 0.04 }],
-      down: [{ f: 400, d: 0.5, type: "sawtooth", vol: 0.08, slide: 0.25 }],
-      win: [{ f: 523, d: 0.18, type: "triangle", vol: 0.09, at: 0 }, { f: 659, d: 0.18, type: "triangle", vol: 0.09, at: 120 }, { f: 784, d: 0.18, type: "triangle", vol: 0.09, at: 240 }, { f: 1047, d: 0.18, type: "triangle", vol: 0.09, at: 360 }],
-      lose: [{ f: 392, d: 0.25, type: "triangle", vol: 0.08, at: 0 }, { f: 330, d: 0.25, type: "triangle", vol: 0.08, at: 160 }, { f: 262, d: 0.25, type: "triangle", vol: 0.08, at: 320 }]
+      shoot: [{ f: 520, d: 0.09, type: "triangle", vol: 0.06, slide: 0.7 }, { noise: 2200, d: 0.05, vol: 0.025 }],
+      orb: [{ f: 480, d: 0.14, type: "sine", vol: 0.08, slide: 1.25 }],
+      hit: [{ noise: 1400, d: 0.1, vol: 0.09 }, { f: 150, d: 0.1, type: "sine", vol: 0.09, slide: 0.6 }],
+      confirm: [{ f: 880, d: 0.06, type: "sine", vol: 0.06 }],
+      boom: [{ f: 90, d: 0.45, type: "sine", vol: 0.14, slide: 0.4 }, { noise: 700, d: 0.4, vol: 0.09 }],
+      heal: [{ f: 523, d: 0.16, type: "sine", vol: 0.07, slide: 1.1 }, { f: 784, d: 0.2, type: "sine", vol: 0.06, at: 80 }],
+      ult: [{ f: 220, d: 0.4, type: "triangle", vol: 0.08, slide: 2 }, { noise: 1200, d: 0.35, vol: 0.03 }],
+      swing: [{ noise: 1800, d: 0.12, vol: 0.07 }, { f: 200, d: 0.1, type: "triangle", vol: 0.05, slide: 0.6 }],
+      splash: [{ noise: 1000, d: 0.25, vol: 0.07 }, { f: 330, d: 0.2, type: "sine", vol: 0.05, slide: 0.5 }],
+      star: [{ f: 1100, d: 0.07, type: "sine", vol: 0.045, slide: 0.8 }],
+      zap: [{ f: 900, d: 0.08, type: "triangle", vol: 0.04, slide: 0.5 }, { noise: 3000, d: 0.06, vol: 0.03 }],
+      beep: [{ f: 587, d: 0.12, type: "sine", vol: 0.07 }],
+      go: [{ f: 784, d: 0.3, type: "triangle", vol: 0.08 }],
+      count: [{ f: 698, d: 0.09, type: "sine", vol: 0.05 }],
+      down: [{ f: 300, d: 0.55, type: "triangle", vol: 0.08, slide: 0.4 }, { noise: 600, d: 0.3, vol: 0.04 }],
+      win: [{ f: 523, d: 0.3, type: "triangle", vol: 0.09, at: 0 }, { f: 659, d: 0.3, type: "triangle", vol: 0.09, at: 120 }, { f: 784, d: 0.3, type: "triangle", vol: 0.09, at: 240 }, { f: 1047, d: 0.4, type: "triangle", vol: 0.09, at: 360 }],
+      lose: [{ f: 392, d: 0.3, type: "sine", vol: 0.09, at: 0 }, { f: 330, d: 0.3, type: "sine", vol: 0.09, at: 160 }, { f: 262, d: 0.4, type: "sine", vol: 0.09, at: 320 }]
     };
-    constructor(services) { this.services = services; this.ac = null; this.lastPlayed = {}; }
+    constructor(services) { this.services = services; this.ac = null; this.lastPlayed = {}; this.master = null; this.noiseBuffer = null; }
     audio() { var services = this.services;
       if (Environment.SILENT_RUN) return null;
-      if (!services.sound.ac) { try { services.sound.ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { services.sound.ac = null; } }
+      if (!services.sound.ac) { try { services.sound.ac = new (window.AudioContext || window.webkitAudioContext)(); services.sound.buildMaster(services.sound.ac); } catch (e) { services.sound.ac = null; services.sound.master = null; } }
       if (services.sound.ac && services.sound.ac.state === "suspended") { try { services.sound.ac.resume(); } catch (e) {} }
       return services.sound.ac;
     }
-    tone(freq, dur, type, vol, slide) { var services = this.services;
-      var ac = services.sound.audio(); if (!ac) return;
+    buildMaster(ac) {
+      var volume = ac.createGain(), compressor = ac.createDynamicsCompressor();
+      volume.gain.value = SoundBox.MASTER_VOLUME;
+      volume.connect(compressor); compressor.connect(ac.destination);
+      this.master = volume;
+      var length = Math.floor(ac.sampleRate * SoundBox.NOISE_SECONDS), buffer = ac.createBuffer(1, length, ac.sampleRate), data = buffer.getChannelData(0);
+      for (var i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
+      this.noiseBuffer = buffer;
+    }
+    envelope(ac, t, dur, vol) {
+      var g = ac.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(vol || 0.08, t + SoundBox.FADE_IN);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + Math.max(dur, SoundBox.FADE_IN * 2));
+      return g;
+    }
+    tone(freq, dur, type, vol, slide, variation) { var services = this.services;
+      var ac = services.sound.audio(); if (!ac || !services.sound.master) return;
       try {
-        var t = ac.currentTime, o = ac.createOscillator(), g = ac.createGain();
-        o.type = type || "square"; o.frequency.setValueAtTime(freq, t);
-        if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(40, freq * slide), t + dur);
-        g.gain.setValueAtTime(vol || 0.08, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-        o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t + dur + 0.02);
+        var t = ac.currentTime, o = ac.createOscillator(), g = services.sound.envelope(ac, t, dur, vol), lp = ac.createBiquadFilter();
+        var f = freq * (variation ? 1 + (Math.random() * 2 - 1) * SoundBox.PITCH_VARIATION : 1);
+        o.type = type || "sine"; o.frequency.setValueAtTime(f, t);
+        if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(40, f * slide), t + dur);
+        lp.type = "lowpass"; lp.frequency.value = SoundBox.TONE_CUTOFF;
+        o.connect(lp); lp.connect(g); g.connect(services.sound.master); o.start(t); o.stop(t + dur + 0.02);
+      } catch (e) {}
+    }
+    noise(cutoff, dur, vol, variation) { var services = this.services;
+      var ac = services.sound.audio(); if (!ac || !services.sound.master || !services.sound.noiseBuffer) return;
+      try {
+        var t = ac.currentTime, src = ac.createBufferSource(), g = services.sound.envelope(ac, t, dur, vol), lp = ac.createBiquadFilter();
+        src.buffer = services.sound.noiseBuffer;
+        lp.type = "lowpass"; lp.frequency.value = cutoff * (variation ? 1 + (Math.random() * 2 - 1) * SoundBox.PITCH_VARIATION : 1);
+        src.connect(lp); lp.connect(g); g.connect(services.sound.master); src.start(t, Math.random() * 0.2); src.stop(t + dur + 0.02);
       } catch (e) {}
     }
     killSound(streak) { var services = this.services;
       var pitch = Math.pow(SoundBox.SEMITONE, Math.min(streak - 1, 4) * 2);
       services.sound.tone(110, 0.28, "sine", 0.16, 0.5);
-      setTimeout(function () { services.sound.tone(1320 * pitch, 0.16, "triangle", 0.08); }, 60);
-      setTimeout(function () { services.sound.tone(1760 * pitch, 0.22, "triangle", 0.06); }, 130);
+      setTimeout(function () { services.sound.tone(990 * pitch, 0.2, "triangle", 0.08); }, 60);
+      setTimeout(function () { services.sound.tone(1320 * pitch, 0.26, "triangle", 0.06); }, 130);
     }
     sfx(k) { var services = this.services;
-      var t = Date.now(); if (services.sound.lastPlayed[k] && t - services.sound.lastPlayed[k] < 40) return; services.sound.lastPlayed[k] = t;
+      var t = Date.now(); if (services.sound.lastPlayed[k] && t - services.sound.lastPlayed[k] < SoundBox.MIN_GAP_MS) return; services.sound.lastPlayed[k] = t;
       var steps = SoundBox.SFX[k]; if (!steps) return;
+      var varied = SoundBox.VARIED.indexOf(k) >= 0;
       steps.forEach(function (step) {
-        var play = function () { services.sound.tone(step.f, step.d, step.type, step.vol, step.slide); };
+        var play = function () {
+          if (step.noise) services.sound.noise(step.noise, step.d, step.vol, varied);
+          else services.sound.tone(step.f, step.d, step.type, step.vol, step.slide, varied);
+        };
         if (step.at === undefined) play(); else setTimeout(play, step.at);
       });
     }
