@@ -89,7 +89,11 @@ class RkSeatPlan {
         return ids;
     }
     freeSeat(players) {
-        return this.humanSeats(players).indexOf(null);
+        const seats = this.humanSeats(players);
+        if (!this.rules.seatOrder)
+            return seats.indexOf(null);
+        const open = this.rules.seatOrder.find((slot) => seats[slot] === null);
+        return open === undefined ? -1 : open;
     }
     swapUpdates(players, first, second) {
         const seats = this.humanSeats(players);
@@ -316,7 +320,7 @@ class RkDirectory {
         const lobby = statusSnapshot.val() === "lobby";
         const spectate = asSpectator || !lobby || seat < 0;
         if (spectate) {
-            if (this.seats.spectators(map).length > 0)
+            if (this.seats.spectators(map).length >= (this.rules.spectatorLimit || 1))
                 return { ok: false, message: "관전 자리가 이미 찼어요. 다음 판에 들어와 주세요." };
             await room.child("players/" + myId).set(Object.assign({}, record, { slot: this.rules.spectatorSlot, spectator: true }));
             const reason = asSpectator ? "" : lobby ? "선수 자리가 가득 차서 관전으로 들어왔어요." : "경기 중이라 관전으로 들어왔어요.";

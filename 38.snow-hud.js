@@ -176,6 +176,7 @@ class SnAimButton {
 }
 SnAimButton.DRAG_MIN = 14;
 class SnLocalControls {
+    setShotCounter(counter) { this.shotCounter = counter; }
     constructor(shotCounter) {
         this.shotCounter = shotCounter;
         this.keyboard = new SnKeyboard();

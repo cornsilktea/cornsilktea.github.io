@@ -177,7 +177,9 @@ class SnLocalControls {
   private shotsAtPress = -1;
   private readonly mapListeners: Array<() => void> = [];
 
-  constructor(private readonly shotCounter: () => number) {
+  setShotCounter(counter: () => number): void { this.shotCounter = counter; }
+
+  constructor(private shotCounter: () => number) {
     this.joystick = new SnJoystick(SnDom.el("touchZone"));
     this.throwButton = new SnAimButton(SnDom.el("btnThrow"), "throw", {
       press: () => { this.throwPressedAt = performance.now(); this.shotsAtPress = this.shotCounter(); },

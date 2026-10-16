@@ -175,6 +175,7 @@ class SnPlayer {
   downAt = -1; killedBy = -1;
   lastHitAt = -1; lastHitFromX = 0; lastHitFromZ = 0;
   landAt = -1; spotX = 0; spotZ = 0; skyX = 0; skyZ = 0;
+  external = false;
   constructor(readonly num: number, readonly id: string, readonly nick: string, readonly team: number, readonly bot: boolean) {}
 
   get maxHp(): number { return SnBalance.MAX_HP + SnGearRules.suitHp(this.gear[1]); }
@@ -961,8 +962,24 @@ class SnEngine {
         p.yaw = Math.atan2(mz, mx);
       }
     }
+    if (p.external && p.knockLeft <= 0) return;
     p.vx = (p.x - ox) / dt; p.vz = (p.z - oz) / dt;
     if (Math.hypot(p.vx, p.vz) > 0.1) p.movedAt = this.time;
+  }
+
+  placeExternal(num: number, x: number, z: number, yaw: number, elapsed: number): boolean {
+    const p = this.players[num];
+    if (!p || p.life !== "alive" || p.knockLeft > 0 || p.building(this.time)) return false;
+    const jump = Math.hypot(x - p.x, z - p.z);
+    if (jump > p.speed * Math.max(0.1, elapsed) * 1.6 + 0.6) return false;
+    const old = { x: p.x, z: p.z };
+    p.x = x; p.z = z;
+    if (!this.mover.canStand(p, x, z, false) && this.mover.blocked(p, x, z)) { p.x = old.x; p.z = old.z; return false; }
+    p.yaw = yaw;
+    const span = Math.max(0.05, elapsed);
+    p.vx = (x - old.x) / span; p.vz = (z - old.z) / span;
+    if (jump > 0.05) p.movedAt = this.time;
+    return true;
   }
 
   private actPlayer(p: SnPlayer, dt: number): void {
@@ -1056,8 +1073,55 @@ class SnSnapshotCodec {
     };
   }
 
-  static encodeTeams(teams: readonly SnTeam[]): string { return teams.map((t) => t.snow + ":" + t.outTick).join(","); }
-  static decodeTeams(s: string): Array<{ snow: number; outTick: number }> {
-    return s.split(",").map((part) => { const [a, b] = part.split(":").map(Number); return { snow: a, outTick: b }; });
+  static encodeTeams(teams: readonly SnTeam[]): string {
+    return teams.map((t) => [t.snow, t.outTick, Math.round(t.dropAt * 10), Math.round(t.dropX * 10), Math.round(t.dropZ * 10)].join(":")).join(",");
   }
+  static decodeTeams(s: string): Array<{ snow: number; outTick: number; dropAt: number; dropX: number; dropZ: number }> {
+    return s.split(",").map((part) => { const v = part.split(":").map(Number); return { snow: v[0], outTick: v[1], dropAt: v[2] / 10, dropX: v[3] / 10, dropZ: v[4] / 10 }; });
+  }
+
+  static encodeWalls(walls: readonly SnWall[]): string {
+    return walls.map((w) => [w.id, w.team, w.owner, Math.round(w.x * 100), Math.round(w.z * 100), Math.round(w.facing * 1000), w.level, Math.round(w.hp), Math.round(w.createdAt * 10), Math.round(w.readyAt * 10)].join(",")).join(";");
+  }
+  static decodeWalls(s: string): SnWall[] {
+    if (!s) return [];
+    return s.split(";").map((part) => {
+      const v = part.split(",").map(Number);
+      const w = new SnWall(v[0], v[1], v[2], v[3] / 100, v[4] / 100, v[5] / 1000, v[6], v[8] / 10, v[9] / 10);
+      w.hp = v[7];
+      return w;
+    });
+  }
+
+  static encodeLoot(crates: readonly SnCrate[], piles: readonly SnPile[]): string {
+    return crates.map((c) => (c.taken ? "2" : c.opened ? "1" : "0")).join("") + "|" + piles.map((p) => (p.taken ? "1" : "0")).join("");
+  }
+  static applyLoot(s: string, crates: readonly SnCrate[], piles: readonly SnPile[]): void {
+    const [c, p] = s.split("|");
+    crates.forEach((crate, k) => { crate.opened = c[k] !== "0"; crate.taken = c[k] === "2"; });
+    piles.forEach((pile, k) => { pile.taken = (p || "")[k] === "1"; });
+  }
+
+  static encodeSnow(amount: Uint8Array): string {
+    let text = "";
+    for (let k = 0; k < amount.length; k += 6) {
+      let bits = 0;
+      for (let b = 0; b < 6; b++) if (k + b < amount.length && amount[k + b] > 0) bits |= 1 << b;
+      text += SnSnapshotCodec.ALPHABET[bits];
+    }
+    return text;
+  }
+  static applySnow(s: string, amount: Uint8Array): number[] {
+    const cleared: number[] = [];
+    for (let k = 0; k < s.length; k++) {
+      const bits = SnSnapshotCodec.ALPHABET.indexOf(s[k]);
+      for (let b = 0; b < 6; b++) {
+        const idx = k * 6 + b;
+        if (idx >= amount.length) break;
+        if (!(bits & (1 << b)) && amount[idx] > 0) { amount[idx] = 0; cleared.push(idx); }
+      }
+    }
+    return cleared;
+  }
+  static readonly ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 }

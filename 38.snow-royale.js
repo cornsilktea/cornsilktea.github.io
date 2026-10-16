@@ -6,12 +6,23 @@ class SnPlayOptions {
         this.mode = params.get("mode") === "solo" ? "solo" : "duos";
         this.seed = Number(params.get("seed")) || Math.floor(Math.random() * 1e9);
         this.watchOnly = params.has("watch");
+        this.offline = params.has("offline") || this.watchOnly;
+        this.showNet = params.has("net");
     }
 }
 class SnTimeText {
     static clock(seconds) {
         const s = Math.max(0, Math.floor(seconds));
         return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+    }
+}
+class SnBotLooks {
+    static make(seed) {
+        const random = new SnSeededRandom(seed);
+        const look = CharacterLooks.createDefault();
+        look.c = random.int(CharacterCatalog.RANDOM_TYPE_COUNT);
+        CharacterCatalog.COLOR_PARTS.forEach((part) => { look.p[part.key] = random.next() < 0.15 ? 0 : 1 + random.int(part.set.length); });
+        return look;
     }
 }
 class SnSpectatorState {
@@ -51,156 +62,223 @@ class SnSpectatorState {
         this.switchAt = -1;
     }
     startFrom(engine, me) {
+        if (!me) {
+            const first = engine.players.find((m) => m.life !== "out");
+            this.pick(first ? first.num : 0);
+            return;
+        }
         const mate = engine.teams[me.team].members.find((m) => m !== me && (m.life === "alive" || m.life === "down"));
         const killer = me.killedBy >= 0 ? engine.players[me.killedBy] : null;
         const target = mate || (killer && killer.life !== "out" ? killer : null) || engine.players.find((m) => m.life === "alive");
         this.pick(target ? target.num : me.num);
     }
 }
-class SnGame {
-    constructor(libs) {
-        this.libs = libs;
-        this.options = new SnPlayOptions(location.search);
-        this.hud = new SnHud();
-        this.toast = new SnToast(SnDom.el("toast"));
-        this.results = new SnResultBoard();
-        this.spectator = new SnSpectatorState();
-        this.specPanel = new SnSpectatorPanel();
-        this.controls = null;
-        this.scene = null;
-        this.miniMap = null;
-        this.bigMap = null;
-        this.numbers = null;
-        this.engine = null;
-        this.profile = null;
-        this.myNum = -1;
-        this.spectating = false;
+class SnMatchDriver {
+    constructor() {
+        this.online = false;
+    }
+    dispose() { return; }
+}
+class SnOfflineDriver extends SnMatchDriver {
+    constructor(mode, seed, me, controls, speed) {
+        super();
+        this.speed = speed;
         this.carry = 0;
-        this.lastMs = 0;
-        this.shots = 0;
-        this.resultShown = false;
-        this.seed = this.options.seed;
-        this.start().catch((error) => { SnDom.text(SnDom.el("loading"), "불러오기 실패: " + error); });
-    }
-    async start() {
-        const assets = new CharacterAssets(this.libs);
-        await assets.load();
-        const library = new SnModelLibrary(this.libs);
-        await library.load(assets.clips);
-        const factory = new CharacterModelFactory(this.libs, assets);
-        const canvas = SnDom.el("view");
-        const touch = matchMedia("(pointer: coarse)").matches;
-        const map = SnMap.shared();
-        this.scene = new SnSceneView(this.libs, canvas, touch, library, factory, map);
-        const painter = new SnMapPainter(map);
-        this.bigMap = new SnBigMap(painter);
-        this.miniMap = new SnMiniMap(painter, () => this.toggleMap());
-        this.numbers = new SnDamageNumbers(SnDom.el("numLayer"));
-        this.profile = new PlayerProfile();
-        this.controls = new SnLocalControls(() => this.shots);
-        this.controls.onMapKey(() => this.toggleMap());
-        this.controls.keyboard.onPress((code) => this.onSpectatorKey(code));
-        canvas.addEventListener("pointerdown", (e) => this.pickActor(e.clientX, e.clientY));
-        this.specPanel.onPick((num) => this.spectator.pick(num));
-        this.specPanel.onOverview(() => this.spectator.toggleOverview());
-        SnDom.el("btnAgain").addEventListener("click", () => { this.seed++; this.newMatch(); });
-        document.body.classList.toggle("touch", touch);
-        SnDom.show(SnDom.el("loading"), false);
-        this.newMatch();
-        this.lastMs = performance.now();
-        requestAnimationFrame((ms) => this.frame(ms));
-    }
-    newMatch() {
-        const scene = this.scene, profile = this.profile, controls = this.controls;
-        const humans = this.options.watchOnly ? [] : [{ id: "me", nick: profile.nickOrDefault(), team: 0 }];
-        const teams = this.options.watchOnly ? SnRosterPlanner.allBots(this.options.mode) : SnRosterPlanner.fill(this.options.mode, humans);
-        const engine = new SnEngine({ seed: this.seed, mode: this.options.mode, teams });
-        this.myNum = -1;
-        engine.players.forEach((p) => {
+        const teams = me ? SnRosterPlanner.fill(mode, [me]) : SnRosterPlanner.allBots(mode);
+        this.engine = new SnEngine({ seed, mode, teams });
+        let mine = -1;
+        this.engine.players.forEach((p) => {
             if (p.bot)
-                engine.attach(p.num, new SnBotBrain(this.seed * 31 + p.num * 7919 + 1));
+                this.engine.attach(p.num, new SnBotBrain(seed * 31 + p.num * 7919 + 1));
             else {
-                engine.attach(p.num, new SnLocalPilot(controls));
-                this.myNum = p.num;
+                this.engine.attach(p.num, new SnLocalPilot(controls));
+                mine = p.num;
             }
         });
-        this.engine = engine;
-        this.spectating = this.myNum < 0;
-        this.spectator.pick(Math.max(0, this.myNum));
+        this.myNum = mine;
+    }
+    get source() { return this.engine; }
+    tick(dt) {
+        const events = [];
+        this.carry += dt * this.speed;
+        let steps = 0;
+        while (this.carry >= SnGame.STEP && steps < 40) {
+            this.carry -= SnGame.STEP;
+            steps++;
+            this.engine.update(SnGame.STEP).forEach((e) => events.push(e));
+        }
+        return events;
+    }
+}
+class SnHostDriver extends SnMatchDriver {
+    constructor(match, session, controls, meter, speed) {
+        super();
+        this.speed = speed;
+        this.online = true;
+        this.carry = 0;
+        this.engine = new SnEngine({ seed: match.seed, mode: match.mode, teams: match.teams });
+        this.director = new SnHostDirector(this.engine, session, match, meter);
+        let mine = -1;
+        this.engine.players.forEach((p) => {
+            if (p.bot)
+                this.engine.attach(p.num, new SnBotBrain(match.seed * 31 + p.num * 7919 + 1));
+            else if (p.id === session.myId) {
+                this.engine.attach(p.num, new SnLocalPilot(controls));
+                mine = p.num;
+            }
+            else {
+                const pilot = new SnRemotePilot();
+                this.engine.attach(p.num, pilot);
+                this.director.remote.set(p.num, pilot);
+                p.external = true;
+            }
+        });
+        this.myNum = mine;
+    }
+    get source() { return this.engine; }
+    receiveState(id, raw, nowMs) {
+        const p = this.engine.players.find((x) => x.id === id);
+        if (p)
+            this.director.receiveState(p.num, raw, nowMs);
+    }
+    playerLeft(id) {
+        const p = this.engine.players.find((x) => x.id === id);
+        if (p && !p.bot)
+            this.engine.disconnect(p.num);
+    }
+    tick(dt, nowMs) {
+        const events = [];
+        this.carry += dt * this.speed;
+        let steps = 0;
+        while (this.carry >= SnGame.STEP && steps < 40) {
+            this.carry -= SnGame.STEP;
+            steps++;
+            this.engine.update(SnGame.STEP).forEach((e) => events.push(e));
+        }
+        this.director.collect(events);
+        this.director.publish(nowMs);
+        return events;
+    }
+}
+class SnClientDriver extends SnMatchDriver {
+    constructor(match, session, controls, meter) {
+        super();
+        this.match = match;
+        this.session = session;
+        this.controls = controls;
+        this.online = true;
+        const teams = match.teams.flatMap((t) => t.members);
+        this.myNum = teams.findIndex((m) => m.id === session.myId);
+        this.mirror = new SnMirror(match, this.myNum);
+        this.body = this.myNum >= 0 ? new SnLocalBody(this.mirror, this.myNum, session, meter) : null;
+    }
+    get engine() { return this.mirror.engine; }
+    get source() { return this.mirror; }
+    tick(dt, nowMs) {
+        const m = this.mirror, s = this.session;
+        m.applySnap(s.value("snap"), nowMs, true);
+        m.applyWalls(s.value("wall"));
+        m.applyLoot(s.value("loot"));
+        const cleared = m.applySnowMap(s.value("snowmap"));
+        const events = m.takeEvents(s.value("ev"));
+        if (cleared.length)
+            events.push({ t: "snow", tiles: cleared });
+        m.applyEnd(s.value("end"));
+        m.advance(nowMs, dt);
+        if (this.body) {
+            const me = m.engine.players[this.myNum];
+            const intent = this.controls.intent(true);
+            this.body.step(intent, Math.min(0.1, dt));
+            if (me)
+                this.body.send(nowMs);
+        }
+        return events;
+    }
+}
+class SnMatchView {
+    constructor(ui, driver, looks) {
+        this.ui = ui;
+        this.driver = driver;
+        this.spectator = new SnSpectatorState();
+        this.spectating = false;
+        this.shots = 0;
         this.resultShown = false;
-        this.results.hide();
-        controls.reset();
-        const looks = new Map();
-        if (this.myNum >= 0)
-            looks.set(this.myNum, profile.look);
-        scene.beginMatch(engine, looks, engine.snow.amount);
+        const scene = ui.scene, engine = driver.engine;
+        this.spectating = driver.myNum < 0;
+        this.spectator.pick(Math.max(0, driver.myNum));
+        ui.results.hide();
+        ui.controls.reset();
+        ui.controls.setShotCounter(() => this.shots);
+        scene.beginMatch(driver.source, looks, engine.snow.amount);
         scene.world.rig.snap();
         scene.world.playing = true;
-        const leader = this.myNum >= 0 && engine.teams[engine.players[this.myNum].team].leader.num === this.myNum;
-        this.bigMap.setPicking(leader, leader ? "낙하 지점을 누르세요" : "전체 지도", leader ? (x, z) => controls.queueDrop(x, z) : null);
-        this.bigMap.setOpen(leader);
-        if (this.myNum >= 0)
-            this.toast.show(leader ? "지도를 눌러 낙하 지점을 고르세요 (20초)" : "팀장이 낙하 지점을 고르는 중이에요", 4, performance.now(), true);
+        const me = driver.myNum >= 0 ? engine.players[driver.myNum] : null;
+        const leader = !!me && engine.teams[me.team].leader === me;
+        ui.bigMap.setPicking(leader, leader ? "낙하 지점을 누르세요" : "전체 지도", leader ? (x, z) => ui.controls.queueDrop(x, z) : null);
+        ui.bigMap.setOpen(leader);
+        if (me)
+            ui.toast.show(leader ? "지도를 눌러 낙하 지점을 고르세요 (20초)" : "팀장이 낙하 지점을 고르는 중이에요", 4, performance.now(), true);
     }
+    get me() { return this.driver.myNum >= 0 ? this.driver.engine.players[this.driver.myNum] : null; }
+    get isSpectating() { return this.spectating; }
     toggleMap() {
-        const big = this.bigMap, engine = this.engine;
-        if (!engine)
-            return;
-        const me = this.myNum >= 0 ? engine.players[this.myNum] : null;
+        const big = this.ui.bigMap, engine = this.driver.engine, me = this.me;
         const picking = !!me && me.life === "sky" && engine.teams[me.team].dropAt < 0 && engine.teams[me.team].leader === me;
         if (picking)
             return;
         big.setPicking(false, "전체 지도", null);
         big.setOpen(!big.open);
     }
-    onSpectatorKey(code) {
-        if (!this.spectating || !this.engine)
+    spectatorKey(code) {
+        if (!this.spectating)
             return;
         if (code === "ArrowRight" || code === "KeyD")
-            this.spectator.step(this.engine, 1);
+            this.spectator.step(this.driver.engine, 1);
         if (code === "ArrowLeft" || code === "KeyA")
-            this.spectator.step(this.engine, -1);
+            this.spectator.step(this.driver.engine, -1);
     }
     pickActor(x, y) {
-        if (!this.spectating || !this.scene)
+        if (!this.spectating)
             return;
-        const num = this.scene.pickActor(x, y);
+        const num = this.ui.scene.pickActor(x, y);
         if (num >= 0)
             this.spectator.pick(num);
     }
+    pickCard(num) { this.spectator.pick(num); }
+    toggleOverview() { this.spectator.toggleOverview(); }
     onEvents(events, nowMs) {
-        const engine = this.engine, numbers = this.numbers, watched = this.spectator.watched;
+        const engine = this.driver.engine, ui = this.ui, myNum = this.driver.myNum, watched = this.spectator.watched;
         for (const ev of events) {
-            if (ev.t === "shot" && ev.by === this.myNum)
+            if (ev.t === "shot" && ev.by === myNum)
                 this.shots++;
-            else if (ev.t === "noSnow" && ev.id === this.myNum)
-                this.toast.show("눈이 부족해요 — 눈 칸을 밟아 모으세요", 1.4, nowMs);
-            else if (ev.t === "noWall" && ev.id === this.myNum)
-                this.toast.show("여기에는 벽을 세울 수 없어요", 1.4, nowMs);
+            else if (ev.t === "noSnow" && ev.id === myNum)
+                ui.toast.show("눈이 부족해요 — 눈 칸을 밟아 모으세요", 1.4, nowMs);
+            else if (ev.t === "noWall" && ev.id === myNum)
+                ui.toast.show("여기에는 벽을 세울 수 없어요", 1.4, nowMs);
             else if (ev.t === "storm")
-                this.toast.show(ev.what === "warn" ? "곧 " + ev.stage + "단계 눈보라가 줄어듭니다" : ev.what === "full" ? "눈보라가 섬을 덮었습니다" : ev.stage + "단계 눈보라가 줄어듭니다", 3, nowMs, true);
+                ui.toast.show(ev.what === "warn" ? "곧 " + ev.stage + "단계 눈보라가 줄어듭니다" : ev.what === "full" ? "눈보라가 섬을 덮었습니다" : ev.stage + "단계 눈보라가 줄어듭니다", 3, nowMs, true);
             else if (ev.t === "hit") {
                 const to = engine.players[ev.to];
-                const kind = ev.storm ? "storm" : ev.by === watched ? "mine" : ev.to === watched ? "hurt" : "other";
-                if (ev.storm && ev.to !== watched)
+                if (!to || (ev.storm && ev.to !== watched))
                     continue;
-                numbers.add("-" + Math.round(ev.v), kind, to.x, engine.map.heightAt(to.x, to.z) + 2.1, to.z, nowMs);
+                const kind = ev.storm ? "storm" : ev.by === watched ? "mine" : ev.to === watched ? "hurt" : "other";
+                ui.numbers.add("-" + Math.round(ev.v), kind, to.x, engine.map.heightAt(to.x, to.z) + 2.1, to.z, nowMs);
             }
-            else if (ev.t === "down" && ev.by === this.myNum && ev.by >= 0)
-                this.toast.show(engine.players[ev.id].nick + " 처치!", 2, nowMs, true);
-            else if (ev.t === "down" && ev.id === this.myNum)
-                this.toast.show(engine.mode === "duos" && engine.players[ev.id].canBeRevived() ? "얼어붙었어요! 아군이 부활시킬 수 있어요" : "얼어붙었어요!", 3, nowMs, true);
-            else if (ev.t === "revive" && (ev.id === this.myNum || ev.by === this.myNum))
-                this.toast.show(ev.id === this.myNum ? "부활했어요!" : engine.players[ev.id].nick + " 부활!", 2, nowMs, true);
-            else if (ev.t === "crate" && ev.by === this.myNum && ev.taken)
-                this.toast.show(this.itemText(engine.crates[ev.i].item), 1.8, nowMs);
-            else if (ev.t === "crate" && ev.by === this.myNum && !ev.taken)
-                this.toast.show("이미 같거나 더 좋은 것을 갖고 있어요 — 아군이 가져갈 수 있게 남겨 둡니다", 2, nowMs);
-            else if (ev.t === "pile" && ev.by === this.myNum)
-                this.toast.show("눈 더미 +" + SnBalance.SNOW.pile, 1.2, nowMs);
-            else if (ev.t === "drop" && this.myNum >= 0 && ev.team === engine.players[this.myNum].team) {
-                this.bigMap.setOpen(false);
-                this.bigMap.setPicking(false, "전체 지도", null);
+            else if (ev.t === "down" && ev.by === myNum && ev.by >= 0)
+                ui.toast.show(engine.players[ev.id].nick + " 처치!", 2, nowMs, true);
+            else if (ev.t === "down" && ev.id === myNum)
+                ui.toast.show(engine.mode === "duos" && engine.players[ev.id].revivesUsed < SnBalance.REVIVE.max ? "얼어붙었어요! 아군이 부활시킬 수 있어요" : "얼어붙었어요!", 3, nowMs, true);
+            else if (ev.t === "revive" && (ev.id === myNum || ev.by === myNum))
+                ui.toast.show(ev.id === myNum ? "부활했어요!" : engine.players[ev.id].nick + " 부활!", 2, nowMs, true);
+            else if (ev.t === "crate" && ev.by === myNum && ev.taken)
+                ui.toast.show(this.itemText(engine.crates[ev.i].item), 1.8, nowMs);
+            else if (ev.t === "crate" && ev.by === myNum && !ev.taken)
+                ui.toast.show("이미 같거나 더 좋은 것을 갖고 있어요 — 아군이 가져갈 수 있게 남겨 둡니다", 2, nowMs);
+            else if (ev.t === "pile" && ev.by === myNum)
+                ui.toast.show("눈 더미 +" + SnBalance.SNOW.pile, 1.2, nowMs);
+            else if (ev.t === "drop" && this.me && ev.team === this.me.team) {
+                ui.bigMap.setOpen(false);
+                ui.bigMap.setPicking(false, "전체 지도", null);
             }
         }
     }
@@ -212,29 +290,19 @@ class SnGame {
         return SnHud.ICONS[SnGearRules.slotIndex(item.slot)] + " " + SnBalance.GRADE_NAMES[item.grade] + " " + SnHud.SLOT_NAMES[SnGearRules.slotIndex(item.slot)] + " 장착!";
     }
     marks(engine, viewerTeam) {
+        const pointer = this.spectating ? this.spectator.watched : this.driver.myNum;
         const people = engine.players.filter((p) => (p.life !== "sky" || p.landAt >= 0) && p.life !== "out" && (viewerTeam < 0 || p.team === viewerTeam)).map((p) => ({
-            x: p.x, z: p.z, yaw: p.yaw, color: SnPalette.teamColor(engine.mode, p.team), me: p.num === (this.spectating ? this.spectator.watched : this.myNum), down: p.life === "down",
+            x: p.x, z: p.z, yaw: p.yaw, color: SnPalette.teamColor(engine.mode, p.team), me: p.num === pointer, down: p.life === "down",
         }));
         const pins = engine.teams.filter((t) => t.dropAt >= 0 && engine.time < SnBalance.DROP.pickLimit + SnBalance.DROP.time && (viewerTeam < 0 || t.num === viewerTeam)).map((t) => ({ x: t.dropX, z: t.dropZ, color: SnPalette.teamColor(engine.mode, t.num) }));
         return { storm: engine.stormNow(), crates: engine.crates, people, pins };
     }
-    frame(ms) {
-        requestAnimationFrame((next) => this.frame(next));
-        const scene = this.scene, engine = this.engine, controls = this.controls;
-        if (!scene || !engine || !controls)
-            return;
-        const dt = Math.min(0.1, (ms - this.lastMs) / 1000);
-        this.lastMs = ms;
-        this.carry += dt * this.options.speed;
-        let steps = 0;
-        while (this.carry >= SnGame.STEP && steps < 40) {
-            this.carry -= SnGame.STEP;
-            steps++;
-            const events = engine.update(SnGame.STEP);
-            scene.applyEvents(events, ms);
-            this.onEvents(events, ms);
-        }
-        const me = this.myNum >= 0 ? engine.players[this.myNum] : null;
+    frame(dt, ms) {
+        const ui = this.ui, scene = ui.scene, controls = ui.controls, driver = this.driver, engine = driver.engine;
+        const events = driver.tick(dt, ms);
+        scene.applyEvents(events, ms);
+        this.onEvents(events, ms);
+        const me = this.me;
         if (me && !this.spectating && (me.life === "out" || engine.ended)) {
             this.spectating = true;
             this.spectator.startFrom(engine, me);
@@ -242,65 +310,420 @@ class SnGame {
         controls.enabled = !!me && me.life === "alive" && !this.spectating;
         if (this.spectating)
             this.spectator.follow(engine, ms);
-        const watchedNum = this.spectating ? this.spectator.watched : this.myNum;
+        const watchedNum = this.spectating ? this.spectator.watched : driver.myNum;
         const watched = engine.players[watchedNum] || null;
         const overview = this.spectating && this.spectator.overview;
         scene.showSilhouettesFor(overview ? -1 : watched ? watched.team : -1);
-        scene.sync(engine, dt, ms);
+        scene.sync(driver.source, dt, ms);
         if (overview)
             scene.followEveryone(dt);
         else
             scene.followActor(watchedNum, dt);
-        const dist = Math.hypot(scene.world.rig.camera.position.x - scene.world.rig.focusX, scene.world.rig.camera.position.z - scene.world.rig.focusZ, scene.world.rig.camera.position.y - scene.world.rig.focusY);
+        const rig = scene.world.rig;
+        const dist = Math.hypot(rig.camera.position.x - rig.focusX, rig.camera.position.z - rig.focusZ, rig.camera.position.y - rig.focusY);
         scene.setFog(Math.max(75, dist * 1.4), Math.max(180, dist * 2.6));
         if (watched && !overview)
             scene.hideTreesAround(watched.x, watched.z, dt);
         else
             scene.props.fadePines(false, dt);
-        this.updateAim(scene, me);
+        this.updateAim(me);
         const storm = engine.stormNow();
         const edge = watched && watched.life === "alive" && !overview ? Math.hypot(watched.x - storm.x, watched.z - storm.z) - storm.r : -99;
-        this.hud.showFrost(edge > 0 ? 0.75 + Math.sin(ms / 180) * 0.1 : edge > -3 ? 0.25 : 0);
+        ui.hud.showFrost(edge > 0 ? 0.75 + Math.sin(ms / 180) * 0.1 : edge > -3 ? 0.25 : 0);
         scene.render(dt, edge > 0);
         this.drawHud(engine, watched, overview, me, ms);
     }
-    updateAim(scene, me) {
-        const controls = this.controls;
-        const angle = controls.aimWorldAngle();
-        if (!me || !controls.enabled || angle === null) {
-            scene.aimGuide.hide();
+    updateAim(me) {
+        const ui = this.ui, angle = ui.controls.aimWorldAngle();
+        if (!me || !ui.controls.enabled || angle === null) {
+            ui.scene.aimGuide.hide();
             return;
         }
-        const y = scene.map.heightAt(me.x, me.z);
-        const length = me.bigBall ? SnBalance.BIG.distance * 0.5 : SnBalance.SHOT.range;
-        scene.aimGuide.show(controls.aimKind, me.x, y, me.z, angle, length);
+        const y = ui.scene.map.heightAt(me.x, me.z);
+        ui.scene.aimGuide.show(ui.controls.aimKind, me.x, y, me.z, angle, me.bigBall ? SnBalance.BIG.distance * 0.5 : SnBalance.SHOT.range);
     }
     drawHud(engine, watched, overview, me, ms) {
-        const viewerTeam = this.spectating ? -1 : me ? me.team : -1;
-        const marks = this.marks(engine, viewerTeam);
-        this.hud.showTop(engine);
-        this.hud.showPlayer(engine, overview ? null : watched, this.spectating);
-        this.hud.showButtons(engine, me, !this.spectating && !!me && (me.life === "alive" || me.life === "sky"));
+        const ui = this.ui;
+        const marks = this.marks(engine, this.spectating ? -1 : me ? me.team : -1);
+        ui.hud.showTop(engine);
+        ui.hud.showPlayer(engine, overview ? null : watched, this.spectating);
+        ui.hud.showButtons(engine, me, !this.spectating && !!me && (me.life === "alive" || me.life === "sky"));
         SnDom.show(SnDom.el("touchZone"), !this.spectating);
         document.body.classList.toggle("spectating", this.spectating);
         const center = watched && !overview ? watched : null;
-        this.miniMap.draw(center ? center.x : this.scene.world.rig.focusX, center ? center.z : this.scene.world.rig.focusZ, marks);
-        this.bigMap.draw(marks);
-        this.specPanel.show(this.spectating);
+        ui.miniMap.draw(center ? center.x : ui.scene.world.rig.focusX, center ? center.z : ui.scene.world.rig.focusZ, marks);
+        ui.bigMap.draw(marks);
+        ui.specPanel.show(this.spectating);
         if (this.spectating)
-            this.specPanel.render(engine, this.spectator.watched, overview);
-        const big = this.bigMap;
+            ui.specPanel.render(engine, this.spectator.watched, overview);
         if (me && me.life === "sky" && engine.teams[me.team].dropAt < 0 && engine.teams[me.team].leader === me) {
             SnDom.text(SnDom.el("bigMapTitle"), "낙하 지점을 누르세요 · " + Math.max(0, Math.ceil(SnBalance.DROP.pickLimit - engine.time)) + "초");
-            if (!big.open)
-                big.setOpen(true);
+            if (!ui.bigMap.open)
+                ui.bigMap.setOpen(true);
         }
-        this.toast.update(ms);
-        this.numbers.update(this.scene.world, ms);
-        if (engine.ended && !this.resultShown && ms > 0) {
+        ui.toast.update(ms);
+        ui.numbers.update(ui.scene.world, ms);
+        const endReady = engine.ended && (!this.driver.online || engine.endAt > 0 || this.driver instanceof SnHostDriver);
+        if (endReady && !this.resultShown) {
             this.resultShown = true;
-            this.results.show(engine, this.myNum);
+            ui.results.show(engine, this.driver.myNum);
         }
+    }
+    dispose() {
+        this.driver.dispose();
+        this.ui.scene.clearMatch();
+        this.ui.results.hide();
+        this.ui.specPanel.show(false);
+        this.ui.bigMap.setOpen(false);
+        this.ui.scene.aimGuide.hide();
+        SnDom.show(SnDom.el("controls"), false);
+        SnDom.show(SnDom.el("hudMine"), false);
+        document.body.classList.remove("spectating");
+    }
+}
+class SnGameUi {
+    constructor(scene, onMapToggle) {
+        this.scene = scene;
+        this.hud = new SnHud();
+        this.toast = new SnToast(SnDom.el("toast"));
+        this.results = new SnResultBoard();
+        this.specPanel = new SnSpectatorPanel();
+        this.numbers = new SnDamageNumbers(SnDom.el("numLayer"));
+        const painter = new SnMapPainter(scene.map);
+        this.bigMap = new SnBigMap(painter);
+        this.miniMap = new SnMiniMap(painter, onMapToggle);
+        this.controls = new SnLocalControls(() => 0);
+    }
+}
+class SnLobbyView {
+    constructor() {
+        this.onSeatClick = () => undefined;
+        SnDom.el("lobbySeats").addEventListener("click", (e) => {
+            const seat = e.target.closest("[data-slot]");
+            if (seat)
+                this.onSeatClick(Number(seat.dataset.slot));
+        });
+    }
+    render(session, plan) {
+        const mode = (session.value("mode") === "solo" ? "solo" : "duos");
+        SnDom.text(SnDom.el("lobbyCode"), session.code);
+        SnDom.text(SnDom.el("lobbyMode"), mode === "duos" ? "2대2대2" : "개인전");
+        const seats = plan.humanSeats(session.players);
+        let html = "";
+        for (let slot = 0; slot < SnRoomRules.SEATS; slot++) {
+            const team = SnRoomRules.teamOfSlot(mode, slot), color = SnPalette.teamColor(mode, team);
+            const id = seats[slot], record = id ? session.players.get(id) : null;
+            const head = mode === "duos" && slot % 2 === 0 ? '<div class="seatTeam" style="background:' + color + '">' + SnBalance.TEAM_NAMES_DUOS[team] + "팀</div>" : "";
+            html += head + '<div class="seat' + (record ? " taken" : "") + (id === session.myId ? " mine" : "") + '" data-slot="' + slot + '" style="border-color:' + color + '">' +
+                (record ? SnDom.esc(record.nick) + (id === session.hostId ? " 👑" : "") : '<span class="empty">빈자리 · AI</span>') + "</div>";
+        }
+        SnDom.html(SnDom.el("lobbySeats"), html);
+        const watchers = plan.spectators(session.players).map((id) => SnDom.esc(session.players.get(id).nick));
+        SnDom.html(SnDom.el("lobbySpectators"), watchers.length ? watchers.join(", ") : '<span class="empty">없음</span>');
+        const humans = seats.filter((x) => x).length;
+        const host = session.isHost();
+        SnDom.show(SnDom.el("btnStart"), host);
+        SnDom.show(SnDom.el("btnModeToggle"), host);
+        SnDom.el("btnStart").disabled = humans < 1;
+        SnDom.text(SnDom.el("btnSeatMode"), session.isSpectator() ? "선수로 참가" : "관전자로 보기");
+        const fill = SnRosterPlanner.fill(mode, seats.map((id, slot) => id ? { id, nick: "", team: SnRoomRules.teamOfSlot(mode, slot) } : null).filter((x) => !!x));
+        const bots = fill.reduce((a, t) => a + t.members.filter((m) => m.bot).length, 0);
+        SnDom.text(SnDom.el("lobbyHint"), host ? "사람 " + humans + "명 + AI " + bots + "명으로 시작해요." : "방장이 시작하길 기다려요…");
+    }
+}
+class SnGame {
+    constructor(libs) {
+        this.libs = libs;
+        this.options = new SnPlayOptions(location.search);
+        this.backend = new RkBackend();
+        this.directory = new RkDirectory(this.backend, SnRoomRules.RULES);
+        this.seatPlan = new RkSeatPlan(SnRoomRules.RULES);
+        this.lobby = new SnLobbyView();
+        this.meter = new SnNetMeter();
+        this.myId = "p" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+        this.touch = matchMedia("(pointer: coarse)").matches;
+        this.ui = null;
+        this.profile = null;
+        this.session = null;
+        this.view = null;
+        this.matchId = 0;
+        this.lastMs = 0;
+        this.seed = this.options.seed;
+        this.start().catch((error) => { SnDom.text(SnDom.el("loading"), "불러오기 실패: " + error); });
+    }
+    async start() {
+        const assets = new CharacterAssets(this.libs);
+        await assets.load();
+        const library = new SnModelLibrary(this.libs);
+        await library.load(assets.clips);
+        const factory = new CharacterModelFactory(this.libs, assets);
+        const canvas = SnDom.el("view");
+        const scene = new SnSceneView(this.libs, canvas, this.touch, library, factory, SnMap.shared());
+        const ui = new SnGameUi(scene, () => { if (this.view)
+            this.view.toggleMap(); });
+        this.ui = ui;
+        this.profile = new PlayerProfile();
+        ui.controls.onMapKey(() => { if (this.view)
+            this.view.toggleMap(); });
+        ui.controls.keyboard.onPress((code) => { if (this.view)
+            this.view.spectatorKey(code); });
+        canvas.addEventListener("pointerdown", (e) => { if (this.view)
+            this.view.pickActor(e.clientX, e.clientY); });
+        ui.specPanel.onPick((num) => { if (this.view)
+            this.view.pickCard(num); });
+        ui.specPanel.onOverview(() => { if (this.view)
+            this.view.toggleOverview(); });
+        document.body.classList.toggle("touch", this.touch);
+        this.bindMenus();
+        SnDom.show(SnDom.el("loading"), false);
+        window.addEventListener("pagehide", () => { if (this.session)
+            this.session.removeMineOnUnload(); });
+        if (this.options.offline)
+            this.startOffline();
+        else {
+            this.showScreen("start");
+            this.updateStartButtons();
+        }
+        this.lastMs = performance.now();
+        requestAnimationFrame((ms) => this.frame(ms));
+        window.setInterval(() => { const now = performance.now(); if (now - this.lastMs > SnGame.STALL_MS)
+            this.step(now); }, SnGame.WATCHDOG_MS);
+    }
+    bindMenus() {
+        SnDom.el("btnCreateDuos").addEventListener("click", () => this.createRoom("duos"));
+        SnDom.el("btnCreateSolo").addEventListener("click", () => this.createRoom("solo"));
+        SnDom.el("btnJoin").addEventListener("click", () => this.joinRoom(false));
+        SnDom.el("btnWatch").addEventListener("click", () => this.joinRoom(true));
+        SnDom.el("joinCode").addEventListener("keydown", (e) => { if (e.key === "Enter")
+            this.joinRoom(false); });
+        SnDom.el("btnStart").addEventListener("click", () => this.startMatch());
+        SnDom.el("btnLeave").addEventListener("click", () => this.leaveRoom(""));
+        SnDom.el("btnSeatMode").addEventListener("click", () => this.toggleSeatMode());
+        SnDom.el("btnModeToggle").addEventListener("click", () => this.toggleMode());
+        SnDom.el("btnAgain").addEventListener("click", () => this.afterResult());
+        SnDom.el("btnResultLeave").addEventListener("click", () => this.leaveRoom(""));
+        this.lobby.onSeatClick = (slot) => this.clickSeat(slot);
+    }
+    showScreen(name) {
+        SnDom.show(SnDom.el("startScreen"), name === "start");
+        SnDom.show(SnDom.el("lobbyScreen"), name === "lobby");
+        SnDom.show(SnDom.el("hudTop"), name === "game");
+        SnDom.show(SnDom.el("mapDock"), name === "game");
+        if (name !== "game") {
+            SnDom.show(SnDom.el("controls"), false);
+            SnDom.show(SnDom.el("hudMine"), false);
+            SnDom.show(SnDom.el("touchZone"), false);
+        }
+    }
+    updateStartButtons() {
+        const ok = !!this.backend.database;
+        ["btnCreateDuos", "btnCreateSolo", "btnJoin", "btnWatch"].forEach((id) => { SnDom.el(id).disabled = !ok; });
+        if (!ok)
+            this.startMessage("온라인 연결을 할 수 없어요. (firebase-config.js·인터넷 확인)");
+    }
+    startMessage(text) { SnDom.text(SnDom.el("startMsg"), text); }
+    myRecord() {
+        const profile = this.profile;
+        return { nick: profile.nickOrDefault(), isBot: false, joinedAt: this.backend.now(), slot: 0, look: profile.look, spectator: false };
+    }
+    async createRoom(mode) {
+        if (!this.backend.database)
+            return;
+        this.startMessage("");
+        try {
+            const code = await this.directory.create(this.myId, this.myRecord());
+            if (!code) {
+                this.startMessage("방을 만들지 못했어요. 다시 눌러 주세요.");
+                return;
+            }
+            this.enterRoom(code, true);
+            this.session.writeValue("mode", mode);
+        }
+        catch (error) {
+            this.startMessage("방을 만들지 못했어요. (데이터베이스 규칙을 확인해 주세요)");
+        }
+    }
+    async joinRoom(asSpectator) {
+        if (!this.backend.database)
+            return;
+        const code = SnDom.el("joinCode").value.replace(/\D/g, "");
+        if (code.length !== 5) {
+            this.startMessage("방 코드 5자리를 입력해 주세요.");
+            return;
+        }
+        this.startMessage("");
+        try {
+            const outcome = await this.directory.join(code, this.myId, this.myRecord(), asSpectator);
+            if (outcome.ok) {
+                this.enterRoom(code, false);
+                SnDom.text(SnDom.el("lobbyNotice"), outcome.message);
+            }
+            else
+                this.startMessage(outcome.message);
+        }
+        catch (error) {
+            this.startMessage("방을 불러오지 못했어요.");
+        }
+    }
+    enterRoom(code, hosting) {
+        const session = new RkSession(this.backend, SnRoomRules.RULES, code, this.myId, hosting, SnRoomRules.VALUES);
+        this.session = session;
+        session.onChange = (kind) => this.onSessionChange(kind);
+        session.onRemoteState = (id, raw) => { if (this.view && this.view.driver instanceof SnHostDriver)
+            this.view.driver.receiveState(id, raw, performance.now()); };
+        session.onPlayerRemoved = (id) => { if (this.view && this.view.driver instanceof SnHostDriver)
+            this.view.driver.playerLeft(id); };
+        session.onClosed = (message) => this.exitToStart(message);
+        session.connect();
+        this.showScreen("lobby");
+        this.lobby.render(session, this.seatPlan);
+    }
+    onSessionChange(kind) {
+        const session = this.session;
+        if (!session)
+            return;
+        if (!this.view && (kind === "players" || kind === "host" || kind === "status" || kind === "mode"))
+            this.lobby.render(session, this.seatPlan);
+        if (kind === "status" || kind === "match" || kind === "players")
+            this.syncPhase();
+    }
+    syncPhase() {
+        const session = this.session, ui = this.ui;
+        if (!session || !ui)
+            return;
+        const match = session.value("match");
+        if (session.status === "lobby") {
+            if (this.view) {
+                this.view.dispose();
+                this.view = null;
+            }
+            this.showScreen("lobby");
+            this.lobby.render(session, this.seatPlan);
+            return;
+        }
+        if ((session.status === "playing" || session.status === "ended") && match && match.id !== this.matchId && session.me()) {
+            if (this.view)
+                this.view.dispose();
+            this.matchId = match.id;
+            const looks = new Map();
+            match.teams.flatMap((t) => t.members).forEach((m, num) => {
+                const record = session.players.get(m.id);
+                looks.set(num, record && !m.bot ? record.look : SnBotLooks.make(match.seed + num * 97));
+            });
+            const driver = session.isHost() ? new SnHostDriver(match, session, ui.controls, this.meter, this.options.speed) : new SnClientDriver(match, session, ui.controls, this.meter);
+            this.view = new SnMatchView(ui, driver, looks);
+            this.showScreen("game");
+            SnDom.show(SnDom.el("btnAgain"), session.isHost());
+            SnDom.text(SnDom.el("btnAgain"), "대기실로");
+            SnDom.show(SnDom.el("btnResultLeave"), true);
+        }
+    }
+    startMatch() {
+        const session = this.session;
+        if (!session || !session.isHost() || session.status !== "lobby")
+            return;
+        const mode = (session.value("mode") === "solo" ? "solo" : "duos");
+        const seats = this.seatPlan.humanSeats(session.players);
+        const humans = [];
+        seats.forEach((id, slot) => { if (id)
+            humans.push({ id, nick: session.players.get(id).nick, team: SnRoomRules.teamOfSlot(mode, slot) }); });
+        if (!humans.length)
+            return;
+        const match = { id: 1 + Math.floor(Math.random() * 1e9), seed: Math.floor(Math.random() * 1e9), mode, teams: SnRosterPlanner.fill(mode, humans), startAt: this.backend.now() };
+        session.ref.update({ match, status: "playing", st: null, snap: null, wall: null, loot: null, snowmap: null, ev: null, end: null });
+    }
+    afterResult() {
+        if (this.options.offline) {
+            this.seed++;
+            this.startOffline();
+            return;
+        }
+        const session = this.session;
+        if (!session || !session.isHost())
+            return;
+        session.ref.update({ status: "lobby", match: null, st: null, snap: null, wall: null, loot: null, snowmap: null, ev: null, end: null });
+    }
+    toggleSeatMode() {
+        const session = this.session;
+        if (!session || session.status !== "lobby")
+            return;
+        if (session.isSpectator()) {
+            const seat = this.seatPlan.freeSeat(session.players);
+            if (seat >= 0)
+                session.ref.child("players/" + session.myId).update({ slot: seat, spectator: false });
+        }
+        else
+            session.ref.child("players/" + session.myId).update({ slot: SnRoomRules.SPECTATOR_SLOT, spectator: true });
+    }
+    toggleMode() {
+        const session = this.session;
+        if (!session || !session.isHost() || session.status !== "lobby")
+            return;
+        session.writeValue("mode", session.value("mode") === "solo" ? "duos" : "solo");
+    }
+    clickSeat(slot) {
+        const session = this.session;
+        if (!session || session.status !== "lobby")
+            return;
+        if (this.seatPlan.humanSeats(session.players)[slot])
+            return;
+        session.ref.child("players/" + session.myId).update({ slot, spectator: false });
+    }
+    leaveRoom(message) {
+        if (this.options.offline) {
+            location.search = "";
+            return;
+        }
+        if (this.session)
+            this.session.leave();
+        this.exitToStart(message);
+    }
+    exitToStart(message) {
+        if (this.session)
+            this.session.silentClose();
+        this.session = null;
+        if (this.view) {
+            this.view.dispose();
+            this.view = null;
+        }
+        this.matchId = 0;
+        this.showScreen("start");
+        this.startMessage(message);
+    }
+    startOffline() {
+        const ui = this.ui, profile = this.profile;
+        if (this.view)
+            this.view.dispose();
+        const me = this.options.watchOnly ? null : { id: "me", nick: profile.nickOrDefault(), team: 0 };
+        const driver = new SnOfflineDriver(this.options.mode, this.seed, me, ui.controls, this.options.speed);
+        const looks = new Map();
+        driver.engine.players.forEach((p) => looks.set(p.num, p.bot ? SnBotLooks.make(this.seed + p.num * 97) : profile.look));
+        this.view = new SnMatchView(ui, driver, looks);
+        this.showScreen("game");
+        SnDom.text(SnDom.el("btnAgain"), "다시 하기");
+        SnDom.show(SnDom.el("btnAgain"), true);
+    }
+    frame(ms) {
+        requestAnimationFrame((next) => this.frame(next));
+        this.step(ms);
+    }
+    step(ms) {
+        const dt = Math.min(0.1, Math.max(0, (ms - this.lastMs) / 1000));
+        this.lastMs = ms;
+        const ui = this.ui;
+        if (!ui)
+            return;
+        if (this.view)
+            this.view.frame(dt, ms);
+        else {
+            ui.scene.world.rig.orbit(60, 45, ms / 20000, 0, 0, 0);
+            ui.scene.render(dt, false);
+        }
+        this.meter.tick(ms);
+        if (this.options.showNet)
+            SnDom.text(SnDom.el("netMeter"), (this.meter.rate / 1024).toFixed(1) + " KB/s");
     }
 }
 SnGame.STEP = 1 / 30;
+SnGame.STALL_MS = 250;
+SnGame.WATCHDOG_MS = 100;

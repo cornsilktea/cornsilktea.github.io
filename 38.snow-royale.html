@@ -9,6 +9,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>눈싸움 배틀로얄</title>
 <link rel="stylesheet" href="theme.css">
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1.10.1/dist/es-module-shims.js"></script>
 <script type="importmap">
 { "imports": {
@@ -105,6 +107,20 @@
   #resultBox tr.me td { background: rgba(217,123,79,.3); }
   #resultBox .tc { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; }
   #btnAgain { margin-top: 14px; width: 100%; min-height: 48px; font: inherit; font-size: 18px; font-weight: 800; border-radius: 8px; border: none; background: #D97B4F; color: #fff; cursor: pointer; }
+  .st-screen { --st-bg: 14, 22, 36; --st-panel: rgba(18, 28, 46, .88); --st-accent: #8FD3FF; --st-accent-ink: #10203A; --st-title2: #D97B4F; --st-glow: rgba(143, 211, 255, .5); overflow-y: auto; z-index: 20; }
+  .st-screen input[type=text] { width: 100%; min-height: 48px; padding: 6px 12px; font-size: 18px; font-weight: 800; border-radius: 6px; border: 2px solid rgba(255,255,255,.3); background: rgba(255,255,255,.06); color: #fff; outline: 0; -webkit-user-select: text; user-select: text; margin-top: 12px; }
+  .st-screen input[type=text]:focus { border-color: #D97B4F; }
+  .st-msg { margin-top: 8px; color: #FFB27A; font-weight: 800; min-height: 1em; }
+  .codeBig { font-size: 34px; letter-spacing: 4px; color: #8FD3FF; margin-left: 8px; }
+  #lobbySeats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+  .seatTeam { grid-column: 1 / -1; border-radius: 6px; padding: 4px 10px; font-weight: 800; margin-top: 4px; }
+  .seat { border: 2px solid; border-radius: 8px; padding: 10px; min-height: 46px; font-weight: 800; background: rgba(255,255,255,.05); cursor: pointer; }
+  .seat.mine { box-shadow: 0 0 0 3px #D97B4F; }
+  .seat .empty, #lobbySpectators .empty { opacity: .55; font-weight: 400; }
+  #lobbySpectators { margin-top: 10px; font-size: 15px; }
+  #lobbyNotice { margin-top: 8px; color: #FFB27A; font-weight: 800; }
+  #netMeter { position: fixed; right: 10px; bottom: 6px; z-index: 30; font-size: 12px; color: #24364A; font-weight: 800; }
+  #btnResultLeave { margin-top: 8px; width: 100%; min-height: 44px; font: inherit; font-size: 16px; font-weight: 800; border-radius: 8px; border: 2px solid rgba(255,255,255,.5); background: transparent; color: #fff; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -118,20 +134,47 @@
   <div id="btnWall" class="actBtn"><span>벽</span><small>J</small></div>
   <div id="btnThrow" class="actBtn"><span>던지기</span><small>K</small></div>
 </div>
-<div id="hudTop"><div class="hud-box" id="hudStorm"></div><div class="hud-box" id="hudTeams"></div></div>
+<div id="hudTop" hidden><div class="hud-box" id="hudStorm"></div><div class="hud-box" id="hudTeams"></div></div>
 <div id="hudMine" class="hud-box" hidden>
   <div id="hudWatch" hidden></div>
   <div class="hpBar"><i id="hudHpFill"></i><span id="hudHpText"></span></div>
   <div class="hudRow"><span id="hudSnow"></span><span id="hudKills"></span></div>
   <div class="hudRow"><div id="hudGear"></div></div>
 </div>
-<div id="mapDock"><canvas id="miniMap"></canvas><button type="button" id="btnOverview" hidden><span>전체 보기</span></button></div>
+<div id="mapDock" hidden><canvas id="miniMap"></canvas><button type="button" id="btnOverview" hidden><span>전체 보기</span></button></div>
 <div id="specPanel" hidden></div>
 <div id="toast" class="hud-box" hidden></div>
 <div id="bigMap" hidden><div id="bigMapTitle" class="hud-box">전체 지도</div><canvas id="bigMapCanvas"></canvas><button type="button" id="bigMapClose">✕</button></div>
 <div id="resultBox" hidden><div class="card"><div id="resultTitle"></div>
   <table><thead><tr><th>순위</th><th>이름</th><th>생존</th><th>처치</th><th>준 피해</th><th>모은 눈</th></tr></thead><tbody id="resultRows"></tbody></table>
-  <button type="button" id="btnAgain">다시 하기</button></div></div>
+  <button type="button" id="btnAgain">다시 하기</button><button type="button" id="btnResultLeave">방 나가기</button></div></div>
+<div id="startScreen" class="st-screen" hidden>
+  <div class="st-wrap">
+    <div class="st-hero"><h1 class="st-title">눈싸움<span>배틀로얄</span></h1></div>
+    <div class="st-card">
+      <div class="st-row"><button type="button" class="st-btn primary" id="btnCreateDuos">방 만들기<small>2대2대2</small></button><button type="button" class="st-btn primary" id="btnCreateSolo">방 만들기<small>개인전</small></button></div>
+      <input type="text" id="joinCode" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="방 코드 5자리">
+      <div class="st-row"><button type="button" class="st-btn" id="btnJoin">참여하기</button><button type="button" class="st-btn" id="btnWatch">관전하기</button></div>
+      <div class="st-msg" id="startMsg"></div>
+    </div>
+  </div>
+</div>
+<div id="lobbyScreen" class="st-screen" hidden>
+  <div class="st-wrap">
+    <div class="st-hero"><h1 class="st-title">눈싸움<span>배틀로얄</span></h1></div>
+    <div class="st-card">
+      <h2>대기실 <span class="codeBig" id="lobbyCode">00000</span></h2>
+      <div class="st-row"><div style="font-weight:800;padding-top:6px">모드: <span id="lobbyMode"></span></div><button type="button" class="st-btn" id="btnModeToggle" style="max-width:180px">모드 바꾸기</button></div>
+      <div id="lobbySeats"></div>
+      <div id="lobbySpectators"></div>
+      <div id="lobbyNotice"></div>
+      <button type="button" class="st-btn primary" id="btnStart" style="margin-top:14px">게임 시작</button>
+      <div class="st-hint" id="lobbyHint"></div>
+      <div class="st-row" style="margin-top:10px"><button type="button" class="st-btn" id="btnSeatMode">관전자로 보기</button><button type="button" class="st-btn" id="btnLeave">방 나가기</button></div>
+    </div>
+  </div>
+</div>
+<div id="netMeter"></div>
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="room-kit.js"></script>
 <script charset="utf-8" src="38.snow-map.js"></script>
@@ -139,6 +182,7 @@
 <script charset="utf-8" src="38.snow-bot.js"></script>
 <script charset="utf-8" src="38.snow-views.js"></script>
 <script charset="utf-8" src="38.snow-hud.js"></script>
+<script charset="utf-8" src="38.snow-net.js"></script>
 <script charset="utf-8" src="38.snow-royale.js"></script>
 <script type="module">
 import * as THREE from "three";
