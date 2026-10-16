@@ -220,6 +220,7 @@ class SnGame {
     const watchedNum = this.spectating ? this.spectator.watched : this.myNum;
     const watched = engine.players[watchedNum] || null;
     const overview = this.spectating && this.spectator.overview;
+    scene.showSilhouettesFor(overview ? -1 : watched ? watched.team : -1);
     scene.sync(engine, dt, ms);
     if (overview) scene.followEveryone(dt); else scene.followActor(watchedNum, dt);
     const dist = Math.hypot(scene.world.rig.camera.position.x - scene.world.rig.focusX, scene.world.rig.camera.position.z - scene.world.rig.focusZ, scene.world.rig.camera.position.y - scene.world.rig.focusY);

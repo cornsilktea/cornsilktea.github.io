@@ -245,6 +245,7 @@ class SnGame {
         const watchedNum = this.spectating ? this.spectator.watched : this.myNum;
         const watched = engine.players[watchedNum] || null;
         const overview = this.spectating && this.spectator.overview;
+        scene.showSilhouettesFor(overview ? -1 : watched ? watched.team : -1);
         scene.sync(engine, dt, ms);
         if (overview)
             scene.followEveryone(dt);

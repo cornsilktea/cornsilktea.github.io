@@ -385,13 +385,14 @@ class SnPropsView {
     const target = wanted ? 0.38 : 1;
     this.pineFade += (target - this.pineFade) * Math.min(1, dt * 6);
     this.pineMaterial.opacity = this.pineFade;
+    this.pineMaterial.transparent = this.pineFade < 0.99;
     this.pineMaterial.depthWrite = this.pineFade > 0.95;
   }
 
   private buildPines(): void {
     const THREE = this.libs.THREE;
     const geometry = SnPineGeometry.build(this.libs);
-    const material = new THREE.MeshLambertMaterial({ vertexColors: true, transparent: true, opacity: 1 });
+    const material = new THREE.MeshLambertMaterial({ vertexColors: true, transparent: false, opacity: 1 });
     this.pineMaterial = material;
     const buckets = new Map<number, SnObstacle[]>();
     for (const o of this.map.obstacles) {
@@ -608,6 +609,7 @@ class SnWallView {
       mesh.scale.set(1, Math.max(0.08, build) * (0.35 + 0.65 * melt), 1);
       const material = mesh.material as Three<"MeshLambertMaterial">;
       material.opacity = build < 1 ? 0.55 + build * 0.45 : 0.4 + 0.6 * melt;
+      material.transparent = material.opacity < 0.99;
       material.color.set(SnPalette.WALL).lerp(new this.libs.THREE.Color(SnPalette.WALL_HURT), 1 - Math.max(0, w.hp) / SnBalance.WALL.hp);
     }
     this.meshes.forEach((mesh, id) => {
@@ -756,7 +758,37 @@ class SnParachute {
   }
 }
 
+class SnSilhouette {
+  static readonly ORDER = 1;
+  static readonly BODY_ORDER = 2;
+  private readonly meshes: Three<"SkinnedMesh">[] = [];
+
+  constructor(libs: ThreeLibs, body: Three<"Object3D">, color: string) {
+    const THREE = libs.THREE;
+    const material = new THREE.MeshBasicMaterial({ color, depthFunc: THREE.GreaterDepth, depthWrite: false });
+    const sources: Three<"SkinnedMesh">[] = [];
+    body.traverse((node) => { const mesh = node as Three<"SkinnedMesh">; if (mesh.isSkinnedMesh) sources.push(mesh); });
+    for (const source of sources) {
+      const ghost = new THREE.SkinnedMesh(source.geometry, material);
+      ghost.bind(source.skeleton, source.bindMatrix);
+      ghost.position.copy(source.position); ghost.quaternion.copy(source.quaternion); ghost.scale.copy(source.scale);
+      ghost.frustumCulled = false;
+      ghost.renderOrder = SnSilhouette.ORDER;
+      ghost.userData.source = source;
+      ghost.visible = false;
+      (source.parent as Three<"Object3D">).add(ghost);
+      this.meshes.push(ghost);
+    }
+  }
+
+  setShown(shown: boolean): void {
+    for (const ghost of this.meshes) ghost.visible = shown && (ghost.userData.source as Three<"Object3D">).visible;
+  }
+}
+
 class SnPlayerActor {
+  private readonly silhouette: SnSilhouette;
+  showSilhouette = false;
   static readonly SKY_HEIGHT = 34;
   readonly root: Three<"Group">;
   private readonly body: Three<"Object3D">;
@@ -775,7 +807,8 @@ class SnPlayerActor {
     const THREE = libs.THREE;
     this.root = new THREE.Group();
     this.body = factory.build(look);
-    this.body.traverse((node) => { const mesh = node as Three<"Mesh">; if (mesh.isMesh) mesh.castShadow = true; });
+    this.body.traverse((node) => { const mesh = node as Three<"Mesh">; if (mesh.isMesh) { mesh.castShadow = true; mesh.renderOrder = SnSilhouette.BODY_ORDER; } });
+    this.silhouette = new SnSilhouette(libs, this.body, color);
     this.animator = new CharacterAnimator(libs, this.body, library.clips);
     this.animator.play("Idle_A");
     this.root.add(this.body);
@@ -847,6 +880,7 @@ class SnPlayerActor {
     this.wearGear(s.gear);
     const down = life === "down" || life === "out";
     this.body.visible = !down;
+    this.silhouette.setShown(this.showSilhouette && !down && life !== "sky");
     this.snowman.visible = down;
     this.snowman.rotation.y = Math.PI / 2 - this.yaw;
     this.ring.visible = !down && life !== "sky";
@@ -927,7 +961,7 @@ class SnGearLook {
 }
 
 class SnCameraRig {
-  static readonly PITCH = (52 * Math.PI) / 180;
+  static readonly PITCH = (60 * Math.PI) / 180;
   static readonly DISTANCE = 21;
   readonly camera: Three<"PerspectiveCamera">;
   focusX = 0; focusY = 0; focusZ = 0;
@@ -1164,6 +1198,10 @@ class SnSceneView {
     const bx = x, bz = z + 2.5;
     const near = this.map.obstaclesAround(bx, bz, 5).some((o) => o.model === "pine" && Math.hypot(o.x - bx, o.z - bz) < 4.6);
     this.props.fadePines(near, dt);
+  }
+
+  showSilhouettesFor(team: number): void {
+    this.actors.forEach((a) => { a.showSilhouette = a.source.team === team; });
   }
 
   followEveryone(dt: number): void {
