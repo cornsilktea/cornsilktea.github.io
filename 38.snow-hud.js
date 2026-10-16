@@ -190,6 +190,8 @@ class SnLocalControls {
         this.throwPressedAt = -1;
         this.shotsAtPress = -1;
         this.mapListeners = [];
+        this.headingOf = () => -Math.PI / 2;
+        this.latched = null;
         this.joystick = new SnJoystick(SnDom.el("touchZone"));
         this.throwButton = new SnAimButton(SnDom.el("btnThrow"), "throw", {
             press: () => { this.throwPressedAt = performance.now(); this.shotsAtPress = this.shotCounter(); },
@@ -237,6 +239,11 @@ class SnLocalControls {
             }
         });
     }
+    useHeading(provider) { this.headingOf = provider; }
+    toWorld(screenAngle) {
+        return SnAngle.wrap((this.latched === null ? this.headingOf() : this.latched) + Math.PI / 2 + screenAngle);
+    }
+    aimWorldAngle() { return this.aimAngle === null ? null : this.toWorld(this.aimAngle); }
     onMapKey(listener) { this.mapListeners.push(listener); }
     queueDrop(x, z) { this.pendingDrop = { x, z }; }
     holdingK() {
@@ -254,17 +261,25 @@ class SnLocalControls {
             return intent;
         }
         const stick = this.joystick.vector() || this.keyboard.vector();
-        intent.moveX = stick.x;
-        intent.moveZ = stick.z;
+        const m = Math.hypot(stick.x, stick.z);
+        if (m > 0.05) {
+            if (this.latched === null)
+                this.latched = this.headingOf();
+            const world = this.toWorld(Math.atan2(stick.z, stick.x));
+            intent.moveX = Math.cos(world) * m;
+            intent.moveZ = Math.sin(world) * m;
+        }
+        else
+            this.latched = null;
         intent.holdK = this.holdingK();
         if (this.pendingAttack && canThrow) {
             intent.attack = true;
-            intent.attackAngle = this.pendingAttackAngle;
+            intent.attackAngle = this.pendingAttackAngle === null ? null : this.toWorld(this.pendingAttackAngle);
             this.pendingAttack = false;
         }
         if (this.pendingWall) {
             intent.wall = true;
-            intent.wallAngle = this.pendingWallAngle;
+            intent.wallAngle = this.pendingWallAngle === null ? null : this.toWorld(this.pendingWallAngle);
             this.pendingWall = false;
         }
         return intent;
@@ -275,6 +290,7 @@ class SnLocalControls {
         this.pendingAttack = this.pendingWall = false;
         this.pendingDrop = null;
         this.aimAngle = null;
+        this.latched = null;
     }
 }
 SnLocalControls.HOLD_MS = 250;

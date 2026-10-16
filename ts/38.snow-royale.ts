@@ -99,6 +99,7 @@ class SnGame {
     this.profile = new PlayerProfile();
     this.controls = new SnLocalControls(() => this.shots);
     this.controls.onMapKey(() => this.toggleMap());
+    this.controls.useHeading(() => (this.scene as SnSceneView).world.rig.heading);
     this.controls.keyboard.onPress((code) => this.onSpectatorKey(code));
     canvas.addEventListener("pointerdown", (e) => this.pickActor(e.clientX, e.clientY));
     this.specPanel.onPick((num) => this.spectator.pick(num));
@@ -131,6 +132,7 @@ class SnGame {
     if (this.myNum >= 0) looks.set(this.myNum, profile.look);
     scene.beginMatch(engine, looks, engine.snow.amount);
     scene.world.rig.snap();
+    scene.world.rig.resetHeading(-Math.PI / 2);
     scene.world.playing = true;
     const leader = this.myNum >= 0 && engine.teams[engine.players[this.myNum].team].leader.num === this.myNum;
     (this.bigMap as SnBigMap).setPicking(leader, leader ? "낙하 지점을 누르세요" : "전체 지도", leader ? (x, z) => controls.queueDrop(x, z) : null);
@@ -221,7 +223,9 @@ class SnGame {
     const watched = engine.players[watchedNum] || null;
     const overview = this.spectating && this.spectator.overview;
     scene.sync(engine, dt, ms);
-    if (overview) scene.followEveryone(dt); else scene.followActor(watchedNum, dt);
+    const moving = !!watched && Math.hypot(watched.vx, watched.vz) > 0.3;
+    const turn = moving && !!watched && Math.abs(SnAngle.wrap(watched.yaw - scene.world.rig.heading)) < SnCameraRig.CHASE_BACK_LIMIT;
+    if (overview) scene.followEveryone(dt); else scene.followActor(watchedNum, dt, turn);
     const dist = Math.hypot(scene.world.rig.camera.position.x - scene.world.rig.focusX, scene.world.rig.camera.position.z - scene.world.rig.focusZ, scene.world.rig.camera.position.y - scene.world.rig.focusY);
     scene.setFog(Math.max(45, dist * 1.4), Math.max(110, dist * 2.6));
     if (watched && !overview) scene.hideTreesAround(watched.x, watched.z, dt); else scene.props.fadePines(false, dt);
@@ -235,10 +239,11 @@ class SnGame {
 
   private updateAim(scene: SnSceneView, me: SnPlayer | null): void {
     const controls = this.controls as SnLocalControls;
-    if (!me || !controls.enabled || controls.aimAngle === null) { scene.aimGuide.hide(); return; }
+    const angle = controls.aimWorldAngle();
+    if (!me || !controls.enabled || angle === null) { scene.aimGuide.hide(); return; }
     const y = scene.map.heightAt(me.x, me.z);
     const length = me.bigBall ? SnBalance.BIG.distance * 0.5 : SnBalance.SHOT.range;
-    scene.aimGuide.show(controls.aimKind, me.x, y, me.z, controls.aimAngle, length);
+    scene.aimGuide.show(controls.aimKind, me.x, y, me.z, angle, length);
   }
 
   private drawHud(engine: SnEngine, watched: SnPlayer | null, overview: boolean, me: SnPlayer | null, ms: number): void {

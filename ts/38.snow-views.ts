@@ -944,9 +944,10 @@ class SnCameraRig {
     this.camera.updateProjectionMatrix();
   }
 
-  snap(): void { this.ready = false; }
+  snap(): void { this.ready = false; this.chaseReady = false; }
 
   follow(x: number, y: number, z: number, distance: number, dt: number): void {
+    this.chaseReady = false;
     if (!this.ready) { this.focusX = x; this.focusY = y; this.focusZ = z; this.distance = distance; this.ready = true; }
     const k = Math.min(1, dt * 5);
     this.focusX += (x - this.focusX) * k; this.focusY += (y - this.focusY) * k; this.focusZ += (z - this.focusZ) * k;
@@ -956,6 +957,35 @@ class SnCameraRig {
     this.camera.position.set(this.focusX, this.focusY + up, this.focusZ + back);
     this.camera.lookAt(this.focusX, this.focusY, this.focusZ);
   }
+
+  static readonly CHASE_PITCH = (34 * Math.PI) / 180;
+  static readonly CHASE_DISTANCE = 11;
+  static readonly CHASE_LEAD = 2.5;
+  static readonly CHASE_TURN = 1.4;
+  static readonly CHASE_BACK_LIMIT = (120 * Math.PI) / 180;
+  heading = -Math.PI / 2;
+  private chaseReady = false;
+
+  resetHeading(yaw: number): void { this.heading = yaw; this.chaseReady = false; }
+
+  chase(x: number, y: number, z: number, targetYaw: number, turn: boolean, distance: number, dt: number): void {
+    if (turn) {
+      const diff = SnAngle.wrap(targetYaw - this.heading), step = SnCameraRig.CHASE_TURN * dt;
+      this.heading = SnAngle.wrap(this.heading + Math.max(-step, Math.min(step, diff)));
+    }
+    const fx = Math.cos(this.heading), fz = Math.sin(this.heading);
+    const lookX = x + fx * SnCameraRig.CHASE_LEAD, lookZ = z + fz * SnCameraRig.CHASE_LEAD, lookY = y + 1.2;
+    if (!this.chaseReady) { this.focusX = lookX; this.focusY = lookY; this.focusZ = lookZ; this.distance = distance; this.chaseReady = true; this.ready = true; }
+    const k = Math.min(1, dt * 8);
+    this.focusX += (lookX - this.focusX) * k; this.focusY += (lookY - this.focusY) * k; this.focusZ += (lookZ - this.focusZ) * k;
+    this.distance += (distance - this.distance) * Math.min(1, dt * 2);
+    const scale = this.camera.aspect < 1 ? 1.25 : 1;
+    const up = Math.sin(SnCameraRig.CHASE_PITCH) * this.distance * scale, back = Math.cos(SnCameraRig.CHASE_PITCH) * this.distance * scale;
+    this.camera.position.set(this.focusX - fx * back, this.focusY + up, this.focusZ - fz * back);
+    this.camera.lookAt(this.focusX, this.focusY, this.focusZ);
+  }
+
+  screenToWorld(screenAngle: number): number { return SnAngle.wrap(this.heading + Math.PI / 2 + screenAngle); }
 
   orbit(radius: number, height: number, angle: number, lookX: number, lookY: number, lookZ: number): void {
     this.camera.position.set(lookX + Math.sin(angle) * radius, lookY + height, lookZ + Math.cos(angle) * radius);
@@ -1153,15 +1183,16 @@ class SnSceneView {
     this.terrain.flush();
   }
 
-  followActor(num: number, dt: number, distance: number = SnCameraRig.DISTANCE): void {
+  followActor(num: number, dt: number, turn: boolean): void {
     const a = this.actors.get(num);
     if (!a) return;
     const sky = a.source.life === "sky";
-    this.world.rig.follow(a.worldX, sky ? a.worldY * 0.6 : a.worldY, a.worldZ, sky ? Math.max(26, distance) : distance, dt);
+    this.world.rig.chase(a.worldX, a.worldY, a.worldZ, a.source.yaw, turn, sky ? 20 : SnCameraRig.CHASE_DISTANCE, dt);
   }
 
   hideTreesAround(x: number, z: number, dt: number): void {
-    const near = this.map.obstaclesAround(x, z, 4).some((o) => o.model === "pine" && Math.hypot(o.x - x, o.z - z - 1.5) < 4.2);
+    const h = this.world.rig.heading, bx = x - Math.cos(h) * 3, bz = z - Math.sin(h) * 3;
+    const near = this.map.obstaclesAround(bx, bz, 5).some((o) => o.model === "pine" && Math.hypot(o.x - bx, o.z - bz) < 4.6);
     this.props.fadePines(near, dt);
   }
 
