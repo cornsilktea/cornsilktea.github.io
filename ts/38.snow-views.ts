@@ -940,7 +940,7 @@ class SnCameraRig {
 
   resize(aspect: number): void {
     this.camera.aspect = aspect;
-    this.camera.fov = aspect < 1 ? 62 : 46;
+    this.camera.fov = aspect < 1 ? 68 : 55;
     this.camera.updateProjectionMatrix();
   }
 
@@ -958,9 +958,9 @@ class SnCameraRig {
     this.camera.lookAt(this.focusX, this.focusY, this.focusZ);
   }
 
-  static readonly CHASE_PITCH = (34 * Math.PI) / 180;
-  static readonly CHASE_DISTANCE = 11;
-  static readonly CHASE_LEAD = 2.5;
+  static readonly CHASE_PITCH = (27 * Math.PI) / 180;
+  static readonly CHASE_DISTANCE = 15;
+  static readonly CHASE_LEAD = 6;
   static readonly CHASE_TURN = 1.4;
   static readonly CHASE_BACK_LIMIT = (120 * Math.PI) / 180;
   heading = -Math.PI / 2;
@@ -996,7 +996,7 @@ class SnCameraRig {
 
 class SnSunShadow {
   static readonly OFFSET = { x: -10, y: 26, z: 14 };
-  static readonly HALF_SPAN = 26;
+  static readonly HALF_SPAN = 34;
   private readonly light: Three<"DirectionalLight">;
 
   constructor(libs: ThreeLibs, scene: Three<"Scene">, mapSize: number) {
@@ -1048,7 +1048,7 @@ class SnWorldView {
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(SnPalette.SKY);
-    this.scene.fog = new THREE.Fog(SnPalette.SKY, 45, 110);
+    this.scene.fog = new THREE.Fog(SnPalette.SKY, 75, 180);
     this.scene.add(new THREE.HemisphereLight(0xE6F0FF, 0x8A93A0, 1.45));
     this.sun = new SnSunShadow(libs, this.scene, 1024);
     this.rig = new SnCameraRig(libs);

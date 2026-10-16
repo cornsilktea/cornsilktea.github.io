@@ -255,7 +255,7 @@ class SnGame {
         else
             scene.followActor(watchedNum, dt, turn);
         const dist = Math.hypot(scene.world.rig.camera.position.x - scene.world.rig.focusX, scene.world.rig.camera.position.z - scene.world.rig.focusZ, scene.world.rig.camera.position.y - scene.world.rig.focusY);
-        scene.setFog(Math.max(45, dist * 1.4), Math.max(110, dist * 2.6));
+        scene.setFog(Math.max(75, dist * 1.4), Math.max(180, dist * 2.6));
         if (watched && !overview)
             scene.hideTreesAround(watched.x, watched.z, dt);
         else

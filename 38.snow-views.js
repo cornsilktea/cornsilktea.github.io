@@ -958,7 +958,7 @@ class SnCameraRig {
     }
     resize(aspect) {
         this.camera.aspect = aspect;
-        this.camera.fov = aspect < 1 ? 62 : 46;
+        this.camera.fov = aspect < 1 ? 68 : 55;
         this.camera.updateProjectionMatrix();
     }
     snap() { this.ready = false; this.chaseReady = false; }
@@ -1018,9 +1018,9 @@ class SnCameraRig {
 }
 SnCameraRig.PITCH = (52 * Math.PI) / 180;
 SnCameraRig.DISTANCE = 17;
-SnCameraRig.CHASE_PITCH = (34 * Math.PI) / 180;
-SnCameraRig.CHASE_DISTANCE = 11;
-SnCameraRig.CHASE_LEAD = 2.5;
+SnCameraRig.CHASE_PITCH = (27 * Math.PI) / 180;
+SnCameraRig.CHASE_DISTANCE = 15;
+SnCameraRig.CHASE_LEAD = 6;
 SnCameraRig.CHASE_TURN = 1.4;
 SnCameraRig.CHASE_BACK_LIMIT = (120 * Math.PI) / 180;
 class SnSunShadow {
@@ -1053,7 +1053,7 @@ class SnSunShadow {
     }
 }
 SnSunShadow.OFFSET = { x: -10, y: 26, z: 14 };
-SnSunShadow.HALF_SPAN = 26;
+SnSunShadow.HALF_SPAN = 34;
 class SnWorldView {
     constructor(libs, canvas, touchDevice) {
         this.libs = libs;
@@ -1069,7 +1069,7 @@ class SnWorldView {
         this.renderer.shadowMap.type = THREE.PCFShadowMap;
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(SnPalette.SKY);
-        this.scene.fog = new THREE.Fog(SnPalette.SKY, 45, 110);
+        this.scene.fog = new THREE.Fog(SnPalette.SKY, 75, 180);
         this.scene.add(new THREE.HemisphereLight(0xE6F0FF, 0x8A93A0, 1.45));
         this.sun = new SnSunShadow(libs, this.scene, 1024);
         this.rig = new SnCameraRig(libs);
