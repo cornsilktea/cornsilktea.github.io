@@ -128,6 +128,13 @@ class SnHeightRules {
 }
 
 class SnRosterPlanner {
+  static allBots(mode: SnMode): SnRosterTeam[] {
+    const bot = (k: number): SnRosterMember => ({ id: "bot" + k, nick: "AI " + k, bot: true });
+    return mode === "solo"
+      ? [1, 2, 3, 4, 5, 6].map((k) => ({ members: [bot(k)] }))
+      : [0, 1, 2].map((t) => ({ members: [bot(t * 2 + 1), bot(t * 2 + 2)] }));
+  }
+
   static fill(mode: SnMode, humans: readonly SnHumanSeat[]): SnRosterTeam[] {
     let botCount = 0;
     const bot = (): SnRosterMember => { botCount++; return { id: "bot" + botCount, nick: "AI " + botCount, bot: true }; };

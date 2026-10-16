@@ -339,6 +339,8 @@ class SnPropsView {
         this.libs = libs;
         this.library = library;
         this.map = map;
+        this.pineMaterial = null;
+        this.pineFade = 1;
         this.group = new libs.THREE.Group();
         this.buildPines();
         this.buildModels();
@@ -348,10 +350,19 @@ class SnPropsView {
         const i = Math.min(s - 1, Math.max(0, Math.floor((x + SnGridMath.HALF) / size))), j = Math.min(s - 1, Math.max(0, Math.floor((z + SnGridMath.HALF) / size)));
         return j * s + i;
     }
+    fadePines(wanted, dt) {
+        if (!this.pineMaterial)
+            return;
+        const target = wanted ? 0.38 : 1;
+        this.pineFade += (target - this.pineFade) * Math.min(1, dt * 6);
+        this.pineMaterial.opacity = this.pineFade;
+        this.pineMaterial.depthWrite = this.pineFade > 0.95;
+    }
     buildPines() {
         const THREE = this.libs.THREE;
         const geometry = SnPineGeometry.build(this.libs);
-        const material = new THREE.MeshLambertMaterial({ vertexColors: true });
+        const material = new THREE.MeshLambertMaterial({ vertexColors: true, transparent: true, opacity: 1 });
+        this.pineMaterial = material;
         const buckets = new Map();
         for (const o of this.map.obstacles) {
             if (o.model !== "pine")
@@ -757,6 +768,9 @@ class SnPlayerActor {
         this.y = 0;
         this.yaw = 0;
         this.placed = false;
+        this.gearKey = "";
+        this.hat = null;
+        this.scarf = null;
         const THREE = libs.THREE;
         this.root = new THREE.Group();
         this.body = factory.build(look);
@@ -786,6 +800,34 @@ class SnPlayerActor {
         this.label.position.y = 2.25;
         this.root.add(this.label);
         parent.add(this.root);
+    }
+    wearGear(gear) {
+        const key = gear.join(",");
+        if (key === this.gearKey)
+            return;
+        this.gearKey = key;
+        const head = this.body.getObjectByName("head");
+        if (!head)
+            return;
+        if (this.hat) {
+            head.remove(this.hat);
+            this.hat = null;
+        }
+        if (this.scarf) {
+            head.remove(this.scarf);
+            this.scarf = null;
+        }
+        if (gear[0] >= 0) {
+            this.hat = SnGearLook.hat(this.libs, gear[0]);
+            this.hat.position.set(0, 0.85, 0);
+            this.hat.scale.setScalar(1.15);
+            head.add(this.hat);
+        }
+        if (gear[1] >= 0) {
+            this.scarf = SnGearLook.scarf(this.libs, gear[1]);
+            this.scarf.position.set(0, 0.02, 0);
+            head.add(this.scarf);
+        }
     }
     get worldX() { return this.x; }
     get worldY() { return this.y; }
@@ -820,6 +862,7 @@ class SnPlayerActor {
         this.yaw += turn * Math.min(1, dt * 12);
         this.root.position.set(this.x, this.y, this.z);
         this.body.rotation.y = Math.PI / 2 - this.yaw;
+        this.wearGear(s.gear);
         const down = life === "down" || life === "out";
         this.body.visible = !down;
         this.snowman.visible = down;
@@ -852,6 +895,56 @@ class SnPlayerActor {
     dispose(parent) { parent.remove(this.root); }
 }
 SnPlayerActor.SKY_HEIGHT = 34;
+class SnAimGuide {
+    constructor(libs) {
+        const THREE = libs.THREE;
+        this.group = new THREE.Group();
+        const strip = new THREE.PlaneGeometry(1, 0.32);
+        strip.rotateX(-Math.PI / 2);
+        strip.translate(0.5, 0, 0);
+        this.arrow = new THREE.Mesh(strip, new THREE.MeshBasicMaterial({ color: "#D97B4F", transparent: true, opacity: 0.75, depthWrite: false }));
+        this.arrow.renderOrder = 6;
+        this.ghost = new THREE.Mesh(new THREE.BoxGeometry(SnBalance.WALL.halfLength * 2, SnBalance.WALL.height, SnBalance.WALL.halfDepth * 2), new THREE.MeshBasicMaterial({ color: "#8FD3FF", transparent: true, opacity: 0.4, depthWrite: false }));
+        this.group.add(this.arrow, this.ghost);
+        this.group.visible = false;
+    }
+    hide() { this.group.visible = false; }
+    show(kind, x, y, z, angle, length) {
+        this.group.visible = true;
+        this.arrow.visible = kind === "throw";
+        this.ghost.visible = kind === "wall";
+        if (kind === "throw") {
+            this.arrow.position.set(x, y + 0.12, z);
+            this.arrow.rotation.y = -angle;
+            this.arrow.scale.set(length, 1, 1);
+        }
+        else {
+            const d = SnBalance.WALL.distance;
+            this.ghost.position.set(x + Math.cos(angle) * d, y + SnBalance.WALL.height / 2, z + Math.sin(angle) * d);
+            this.ghost.rotation.y = Math.atan2(Math.cos(angle), Math.sin(angle));
+        }
+    }
+}
+class SnGearLook {
+    static hat(libs, grade) {
+        const THREE = libs.THREE, group = new THREE.Group();
+        const color = SnBalance.GRADE_COLORS[grade];
+        const cone = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.62, 12), new THREE.MeshLambertMaterial({ color }));
+        cone.position.y = 0.31;
+        const brim = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.09, 6, 14), new THREE.MeshLambertMaterial({ color: "#FFFFFF" }));
+        brim.rotation.x = Math.PI / 2;
+        const bobble = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 6), new THREE.MeshLambertMaterial({ color: "#FFFFFF" }));
+        bobble.position.y = 0.66;
+        group.add(cone, brim, bobble);
+        return group;
+    }
+    static scarf(libs, grade) {
+        const THREE = libs.THREE;
+        const scarf = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.1, 6, 16), new THREE.MeshLambertMaterial({ color: SnBalance.GRADE_COLORS[grade] }));
+        scarf.rotation.x = Math.PI / 2;
+        return scarf;
+    }
+}
 class SnCameraRig {
     constructor(libs) {
         this.focusX = 0;
@@ -1005,12 +1098,22 @@ class SnSceneView {
         outside.position.y = -0.06;
         outside.receiveShadow = true;
         this.world.scene.add(outside);
-        this.world.scene.add(new SnPropsView(libs, library, map).group);
+        this.props = new SnPropsView(libs, library, map);
+        this.world.scene.add(this.props.group);
         this.storm = new SnStormView(libs, map);
         this.world.scene.add(this.storm.group);
         this.matchGroup = new THREE.Group();
         this.world.scene.add(this.matchGroup);
         this.labels = new RkLabelFactory(libs);
+        this.aimGuide = new SnAimGuide(libs);
+        this.world.scene.add(this.aimGuide.group);
+    }
+    setFog(near, far) {
+        const fog = this.world.scene.fog;
+        if (fog) {
+            fog.near = near;
+            fog.far = far;
+        }
     }
     beginMatch(source, looks, snow) {
         this.clearMatch();
@@ -1081,6 +1184,27 @@ class SnSceneView {
         const sky = a.source.life === "sky";
         this.world.rig.follow(a.worldX, sky ? a.worldY * 0.6 : a.worldY, a.worldZ, sky ? Math.max(26, distance) : distance, dt);
     }
+    hideTreesAround(x, z, dt) {
+        const near = this.map.obstaclesAround(x, z, 4).some((o) => o.model === "pine" && Math.hypot(o.x - x, o.z - z - 1.5) < 4.2);
+        this.props.fadePines(near, dt);
+    }
+    followEveryone(dt) {
+        const points = [];
+        this.actors.forEach((a) => { if (a.source.life === "alive" || (a.source.life === "sky" && a.source.landAt >= 0))
+            points.push({ x: a.worldX, z: a.worldZ }); });
+        if (!points.length)
+            this.actors.forEach((a) => { if (a.root.visible)
+                points.push({ x: a.worldX, z: a.worldZ }); });
+        if (!points.length)
+            return;
+        let cx = 0, cz = 0;
+        points.forEach((p) => { cx += p.x; cz += p.z; });
+        cx /= points.length;
+        cz /= points.length;
+        let spread = 0;
+        points.forEach((p) => { spread = Math.max(spread, Math.hypot(p.x - cx, p.z - cz)); });
+        this.world.rig.follow(cx, 0, cz, Math.min(SnSceneView.OVERVIEW_MAX, Math.max(SnSceneView.OVERVIEW_MIN, 14 + spread * 1.35)), dt);
+    }
     pickActor(clientX, clientY) {
         let best = -1, bd = 46;
         this.actors.forEach((a, num) => {
@@ -1102,3 +1226,5 @@ class SnSceneView {
         this.world.render(dt);
     }
 }
+SnSceneView.OVERVIEW_MIN = 30;
+SnSceneView.OVERVIEW_MAX = 110;
