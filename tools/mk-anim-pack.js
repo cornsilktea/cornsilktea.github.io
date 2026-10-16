@@ -40,6 +40,11 @@ const PACKS = {
     { file: "Rig_Medium_Special.glb", clips: ["Skeletons_Spawn_Ground", "Skeletons_Awaken_Standing"] },
     { file: "Rig_Medium_General.glb", clips: ["Hit_B", "Spawn_Ground"] },
     { file: "Rig_Medium_Simulation.glb", clips: ["Cheering"] }
+  ],
+  snow: [
+    { file: "Rig_Medium_General.glb", clips: ["Interact", "Spawn_Air"] },
+    { file: "Rig_Medium_Tools.glb", clips: ["Working_A"] },
+    { file: "Rig_Medium_Simulation.glb", clips: ["Cheering"] }
   ]
 };
 const WANTED = PACKS[process.argv[4] || "soccer"];

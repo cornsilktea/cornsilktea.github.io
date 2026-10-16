@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<script charset="utf-8" src="firebase-config.js"></script>
+<script charset="utf-8" src="access-guard.js" data-game="snowroyale"></script>
+<script charset="utf-8" src="fullscreen-keeper.js" data-watch></script>
+<script charset="utf-8" src="quality-governor.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>눈싸움 배틀로얄</title>
+<link rel="stylesheet" href="theme.css">
+<script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1.10.1/dist/es-module-shims.js"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #C9D8E6; font-family: var(--sg-font); }
+  #view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #previewInfo { position: fixed; left: 12px; top: 54px; white-space: pre; color: #fff; font-size: 14px; line-height: 1.6;
+    background: rgba(16, 24, 38, .72); border-left: 3px solid #D97B4F; border-radius: 4px; padding: 8px 12px; pointer-events: none; }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div id="previewInfo">불러오는 중…</div>
+<script charset="utf-8" src="character-kit.js?v=20261011"></script>
+<script charset="utf-8" src="room-kit.js"></script>
+<script charset="utf-8" src="38.snow-map.js"></script>
+<script charset="utf-8" src="38.snow-rules.js"></script>
+<script charset="utf-8" src="38.snow-bot.js"></script>
+<script charset="utf-8" src="38.snow-views.js"></script>
+<script charset="utf-8" src="38.snow-royale.js"></script>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
+new SnGame({ THREE, GLTFLoader, SkeletonUtils });
+</script>
+</body>
+</html>
