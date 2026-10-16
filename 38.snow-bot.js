@@ -28,31 +28,46 @@ class SnPathGraph {
         if (this.fields.size >= SnPathGraph.CACHE_LIMIT)
             this.fields.clear();
         const dist = new Int16Array(SnGridMath.COUNT).fill(-1);
-        const queue = [goal];
+        const buckets = [[goal]];
         dist[goal] = 0;
-        for (let head = 0; head < queue.length; head++) {
-            const a = queue[head], i = SnGridMath.colOf(a), j = SnGridMath.rowOf(a);
-            for (let dj = -1; dj <= 1; dj++)
-                for (let di = -1; di <= 1; di++) {
-                    if ((!di && !dj) || !SnGridMath.inside(i + di, j + dj))
-                        continue;
-                    const b = SnGridMath.index(i + di, j + dj);
-                    if (dist[b] >= 0 || !this.open[b] || !this.map.connected(b, a))
-                        continue;
-                    dist[b] = dist[a] + 1;
-                    queue.push(b);
-                }
+        for (let d = 0; d < buckets.length; d++) {
+            const bucket = buckets[d];
+            if (!bucket)
+                continue;
+            for (let head = 0; head < bucket.length; head++) {
+                const a = bucket[head];
+                if (dist[a] !== d)
+                    continue;
+                const i = SnGridMath.colOf(a), j = SnGridMath.rowOf(a);
+                for (let dj = -1; dj <= 1; dj++)
+                    for (let di = -1; di <= 1; di++) {
+                        if ((!di && !dj) || !SnGridMath.inside(i + di, j + dj))
+                            continue;
+                        const b = SnGridMath.index(i + di, j + dj);
+                        if (!this.open[b] || !this.map.connected(b, a))
+                            continue;
+                        const nd = d + this.stepCost(b);
+                        if (dist[b] >= 0 && dist[b] <= nd)
+                            continue;
+                        dist[b] = nd;
+                        (buckets[nd] ?? (buckets[nd] = [])).push(b);
+                    }
+            }
         }
         this.fields.set(goal, dist);
         return dist;
     }
+    stepCost(idx) { return this.map.isIce(idx) ? SnPathGraph.ICE_COST : 1; }
     straight(x0, z0, x1, z1) {
         const d = Math.hypot(x1 - x0, z1 - z0), n = Math.max(1, Math.ceil(d / 0.5));
         let prev = SnGridMath.indexAt(x0, z0);
+        const fromIce = this.map.isIce(prev);
         for (let k = 1; k <= n; k++) {
             const x = x0 + (x1 - x0) * k / n, z = z0 + (z1 - z0) * k / n;
             const idx = SnGridMath.indexAt(x, z);
             if (idx < 0 || !this.map.walkable(idx))
+                return false;
+            if (!fromIce && this.map.isIce(idx))
                 return false;
             if (idx !== prev && prev >= 0 && !this.map.connected(prev, idx))
                 return false;
@@ -85,7 +100,7 @@ class SnPathGraph {
                     if ((!di && !dj) || !SnGridMath.inside(i + di, j + dj))
                         continue;
                     const b = SnGridMath.index(i + di, j + dj);
-                    if (dist[b] === dist[cur] - 1 && this.map.connected(cur, b) && (next < 0 || (di && dj)))
+                    if (dist[b] >= 0 && dist[b] < dist[cur] && this.map.connected(cur, b) && (next < 0 || dist[b] < dist[next] || (dist[b] === dist[next] && di && dj)))
                         next = b;
                 }
             if (next < 0)
@@ -102,6 +117,7 @@ class SnPathGraph {
 }
 SnPathGraph.CACHE_LIMIT = 256;
 SnPathGraph.LOOKAHEAD = 10;
+SnPathGraph.ICE_COST = 2;
 SnPathGraph.built = null;
 class SnBotTuning {
 }

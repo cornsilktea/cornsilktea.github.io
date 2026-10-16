@@ -2,7 +2,8 @@
 class SnBalance {
 }
 SnBalance.MAX_HP = 100;
-SnBalance.SPEED = 2;
+SnBalance.SPEED = 4;
+SnBalance.ICE_PACE = 0.5;
 SnBalance.RADIUS = 0.4;
 SnBalance.SHOT = { damage: 12, cost: 2, interval: 0.45, speed: 22, range: 14, radius: 0.25, spawn: 0.5 };
 SnBalance.WALL = { cost: 30, hp: 150, halfLength: 1.5, halfDepth: 0.3, height: 2.2, buildTime: 1, interval: 1.2, perTeam: 6, life: 75, distance: 1.3 };
@@ -236,7 +237,7 @@ class SnSnowField {
         this.amount = new Uint8Array(SnGridMath.COUNT);
         this.changed = [];
         for (let idx = 0; idx < SnGridMath.COUNT; idx++)
-            if (map.walkable(idx))
+            if (map.snowy(idx))
                 this.amount[idx] = SnBalance.SNOW.perTile;
     }
     take(idx, room) {
@@ -313,6 +314,11 @@ class SnStormPlan {
 class SnMover {
     constructor(engine) {
         this.engine = engine;
+    }
+    paceAt(x, z) { return this.engine.map.onIce(x, z) ? SnBalance.ICE_PACE : 1; }
+    walk(p, dirX, dirZ, dt) {
+        const v = p.speed * this.paceAt(p.x, p.z);
+        this.move(p, dirX * v, dirZ * v, dt, false);
     }
     move(p, vx, vz, dt, allowDrop) {
         const dist = Math.hypot(vx, vz) * dt;
@@ -1158,7 +1164,7 @@ class SnEngine {
                 mz /= m;
             }
             if (m > 0.05) {
-                this.mover.move(p, mx * p.speed, mz * p.speed, dt, false);
+                this.mover.walk(p, mx, mz, dt);
                 p.yaw = Math.atan2(mz, mx);
             }
         }

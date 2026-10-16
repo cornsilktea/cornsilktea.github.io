@@ -13,6 +13,13 @@ class SnTile {
   static readonly RAMP_LENGTH = 3;
 }
 
+class SnSurface {
+  static readonly SNOW = 0;
+  static readonly ICE = 1;
+  static readonly BRIDGE = 2;
+  static readonly DECK = 0.1;
+}
+
 class SnGridMath {
   static readonly SIZE = 80;
   static readonly CELL = 2;
@@ -128,14 +135,53 @@ class SnMapLayout {
     { x: -63, z: -62, r: 15, p: 0.4 }, { x: 62, z: -63, r: 16, p: 1.7 },
     { x: -62, z: 64, r: 15, p: 2.9 }, { x: 63, z: 62, r: 14, p: 4.1 },
   ];
-  static readonly RAMPS: ReadonlyArray<{ x0: number; x1: number; z0: number; z1: number; dir: number; level: number }> = [
-    { x0: -26, x1: -20, z0: 0, z1: 4, dir: 0, level: 0 },
-    { x0: 20, x1: 26, z0: 0, z1: 4, dir: 1, level: 0 },
-    { x0: -2, x1: 2, z0: 18, z1: 24, dir: 3, level: 0 },
-    { x0: -2, x1: 2, z0: -10, z1: -4, dir: 3, level: 1 },
-    { x0: -30, x1: -26, z0: 38, z1: 44, dir: 2, level: 0 },
-    { x0: 26, x1: 30, z0: 38, z1: 44, dir: 2, level: 0 },
+  static readonly PLATEAUS: ReadonlyArray<{ x0: number; x1: number; z0: number; z1: number; level: number }> = [
+    { x0: -62, x1: -46, z0: -32, z1: -18, level: 1 },
+    { x0: 46, x1: 64, z0: 4, z1: 20, level: 1 },
+    { x0: -28, x1: -14, z0: -54, z1: -42, level: 1 },
+    { x0: 16, x1: 36, z0: -56, z1: -40, level: 1 },
+    { x0: 22, x1: 30, z0: -56, z1: -50, level: 2 },
+    { x0: -30, x1: -14, z0: 24, z1: 34, level: 1 },
+    { x0: 14, x1: 30, z0: 24, z1: 34, level: 1 },
   ];
+  static readonly RAMPS: ReadonlyArray<{ x0: number; x1: number; z0: number; z1: number; dir: number; level: number }> = [
+    { x0: -26, x1: -20, z0: -2, z1: 6, dir: 0, level: 0 },
+    { x0: 20, x1: 26, z0: -2, z1: 6, dir: 1, level: 0 },
+    { x0: -4, x1: 4, z0: 18, z1: 24, dir: 3, level: 0 },
+    { x0: -18, x1: -10, z0: -28, z1: -22, dir: 2, level: 0 },
+    { x0: 10, x1: 18, z0: -28, z1: -22, dir: 2, level: 0 },
+    { x0: -4, x1: 4, z0: -10, z1: -4, dir: 3, level: 1 },
+    { x0: -14, x1: -8, z0: -20, z1: -12, dir: 0, level: 1 },
+    { x0: 8, x1: 14, z0: -20, z1: -12, dir: 1, level: 1 },
+    { x0: -32, x1: -24, z0: 38, z1: 44, dir: 2, level: 0 },
+    { x0: 24, x1: 32, z0: 38, z1: 44, dir: 2, level: 0 },
+    { x0: -4, x1: 4, z0: 38, z1: 44, dir: 2, level: 0 },
+    { x0: -4, x1: 4, z0: 50, z1: 56, dir: 3, level: 0 },
+    { x0: -46, x1: -40, z0: -30, z1: -22, dir: 1, level: 0 },
+    { x0: -58, x1: -50, z0: -18, z1: -12, dir: 3, level: 0 },
+    { x0: 50, x1: 58, z0: -2, z1: 4, dir: 2, level: 0 },
+    { x0: 50, x1: 58, z0: 20, z1: 26, dir: 3, level: 0 },
+    { x0: -26, x1: -18, z0: -42, z1: -36, dir: 3, level: 0 },
+    { x0: -14, x1: -8, z0: -52, z1: -44, dir: 1, level: 0 },
+    { x0: 26, x1: 34, z0: -40, z1: -34, dir: 3, level: 0 },
+    { x0: 10, x1: 16, z0: -52, z1: -44, dir: 0, level: 0 },
+    { x0: 22, x1: 30, z0: -50, z1: -44, dir: 3, level: 1 },
+    { x0: -26, x1: -18, z0: 18, z1: 24, dir: 2, level: 0 },
+    { x0: -14, x1: -8, z0: 26, z1: 34, dir: 1, level: 0 },
+    { x0: 18, x1: 26, z0: 18, z1: 24, dir: 2, level: 0 },
+    { x0: 8, x1: 14, z0: 26, z1: 34, dir: 0, level: 0 },
+  ];
+  static readonly RIVERS: ReadonlyArray<ReadonlyArray<SnPoint>> = [
+    [{ x: -40, z: -82 }, { x: -38, z: -60 }, { x: -34, z: -44 }, { x: -40, z: -28 }, { x: -37, z: -12 }, { x: -38, z: 0 }, { x: -35, z: 14 }, { x: -44, z: 30 }, { x: -58, z: 40 }, { x: -82, z: 44 }],
+    [{ x: 82, z: -38 }, { x: 62, z: -34 }, { x: 46, z: -22 }, { x: 39, z: -6 }, { x: 40, z: 10 }, { x: 38, z: 26 }, { x: 40, z: 38 }, { x: 50, z: 40 }, { x: 82, z: 34 }],
+  ];
+  static readonly RIVER_HALF = 3.2;
+  static readonly BRIDGES: ReadonlyArray<{ x: number; z: number; across: "x" | "z" }> = [
+    { x: -39, z: -68, across: "x" }, { x: -38, z: -18, across: "x" }, { x: -36, z: 8, across: "x" }, { x: -70, z: 42, across: "z" },
+    { x: 72, z: -36, across: "z" }, { x: 40, z: 2, across: "x" }, { x: 39, z: 20, across: "x" }, { x: 64, z: 38, across: "z" },
+  ];
+  static readonly BRIDGE_HALF_WIDTH = 2;
+  static readonly BRIDGE_REACH = 8;
   static readonly BUILDINGS: ReadonlyArray<{ model: SnObstacleModel; x: number; z: number; hx: number; hz: number; yaw: number }> = [
     { model: "house", x: -13, z: -6, hx: 3, hz: 3, yaw: 0 },
     { model: "house", x: 13, z: -6, hx: 3, hz: 3, yaw: Math.PI },
@@ -146,21 +192,21 @@ class SnMapLayout {
     { model: "well", x: 0, z: 3, r: 1.0, hx: 0, hz: 0, yaw: 0 },
     { model: "woodpile", x: -5, z: 13, r: 0, hx: 1.3, hz: 0.8, yaw: 0 },
     { model: "woodpile", x: 6, z: -2, r: 0, hx: 1.3, hz: 0.8, yaw: Math.PI / 2 },
-    { model: "tent", x: -15, z: -17, r: 1.3, hx: 0, hz: 0, yaw: 0 },
-    { model: "tent", x: 15, z: -17, r: 1.3, hx: 0, hz: 0, yaw: 0 },
+    { model: "tent", x: -17, z: -15, r: 1.3, hx: 0, hz: 0, yaw: 0 },
+    { model: "tent", x: 17, z: -15, r: 1.3, hx: 0, hz: 0, yaw: 0 },
     { model: "fence", x: -7, z: -1, r: 0, hx: 2, hz: 0.25, yaw: 0 },
     { model: "fence", x: 7, z: 6, r: 0, hx: 2, hz: 0.25, yaw: 0 },
-    { model: "fence", x: -17, z: 2, r: 0, hx: 2, hz: 0.25, yaw: Math.PI / 2 },
+    { model: "fence", x: -17, z: 14, r: 0, hx: 2, hz: 0.25, yaw: Math.PI / 2 },
     { model: "fence", x: 17, z: 13, r: 0, hx: 2, hz: 0.25, yaw: Math.PI / 2 },
     { model: "log", x: 5, z: -15, r: 0, hx: 0.7, hz: 0.4, yaw: 0.6 },
     { model: "log", x: -5, z: 6, r: 0, hx: 0.7, hz: 0.4, yaw: -0.4 },
-    { model: "woodpile", x: -38, z: 20, r: 0, hx: 1.3, hz: 0.8, yaw: 0.3 },
+    { model: "woodpile", x: -27, z: 12, r: 0, hx: 1.3, hz: 0.8, yaw: 0.3 },
     { model: "woodpile", x: 38, z: -22, r: 0, hx: 1.3, hz: 0.8, yaw: -0.5 },
-    { model: "fence", x: -40, z: -18, r: 0, hx: 2, hz: 0.25, yaw: 0.2 },
-    { model: "fence", x: 42, z: 22, r: 0, hx: 2, hz: 0.25, yaw: -0.3 },
+    { model: "fence", x: -46, z: -6, r: 0, hx: 2, hz: 0.25, yaw: 0.2 },
+    { model: "fence", x: 44, z: 30, r: 0, hx: 2, hz: 0.25, yaw: -0.3 },
     { model: "log", x: 0, z: 34, r: 0, hx: 0.7, hz: 0.4, yaw: 0.2 },
-    { model: "log", x: -14, z: 32, r: 0, hx: 0.7, hz: 0.4, yaw: 1.2 },
-    { model: "log", x: 14, z: 30, r: 0, hx: 0.7, hz: 0.4, yaw: -1.0 },
+    { model: "log", x: -20, z: 30, r: 0, hx: 0.7, hz: 0.4, yaw: 1.2 },
+    { model: "log", x: 20, z: 30, r: 0, hx: 0.7, hz: 0.4, yaw: -1.0 },
     { model: "log", x: 0, z: 62, r: 0, hx: 0.7, hz: 0.4, yaw: 0.4 },
     { model: "log", x: -30, z: 62, r: 0, hx: 0.7, hz: 0.4, yaw: -0.2 },
     { model: "log", x: 30, z: 64, r: 0, hx: 0.7, hz: 0.4, yaw: 0.9 },
@@ -171,8 +217,8 @@ class SnMapLayout {
     { x: 0, z: -56, r: 15, count: 24 },
   ];
   static readonly ROCK_CLUSTERS: ReadonlyArray<{ x: number; z: number; count: number }> = [
-    { x: -32, z: -36, count: 6 }, { x: 33, z: -37, count: 6 },
-    { x: -34, z: 27, count: 5 }, { x: 35, z: 28, count: 5 },
+    { x: -32, z: -36, count: 6 }, { x: 40, z: -46, count: 6 },
+    { x: -34, z: 27, count: 5 }, { x: 46, z: 30, count: 5 },
   ];
   static readonly ITEM_VILLAGE = 12;
   static readonly ITEM_LOOKOUT = 4;
@@ -190,6 +236,8 @@ class SnMap {
   readonly rampDir = new Int8Array(SnGridMath.COUNT).fill(-1);
   readonly rampStep = new Uint8Array(SnGridMath.COUNT);
   readonly zone: SnZoneName[] = new Array<SnZoneName>(SnGridMath.COUNT).fill("outer");
+  readonly surface = new Uint8Array(SnGridMath.COUNT);
+  readonly bridges: Array<{ x0: number; x1: number; z0: number; z1: number; across: "x" | "z" }> = [];
   readonly obstacles: SnObstacle[] = [];
   readonly buckets: number[][] = [];
   readonly itemSpots: SnPoint[] = [];
@@ -211,6 +259,9 @@ class SnMap {
   isRamp(idx: number): boolean { return idx >= 0 && this.kind[idx] === SnTile.RAMP; }
   solidTile(idx: number): boolean { return idx < 0 || this.kind[idx] === SnTile.MOUNTAIN || this.kind[idx] === SnTile.BLOCK; }
   levelAt(x: number, z: number): number { const idx = SnGridMath.indexAt(x, z); return idx < 0 ? 0 : this.level[idx]; }
+  isIce(idx: number): boolean { return idx >= 0 && this.surface[idx] === SnSurface.ICE; }
+  onIce(x: number, z: number): boolean { return this.isIce(SnGridMath.indexAt(x, z)); }
+  snowy(idx: number): boolean { return this.walkable(idx) && this.surface[idx] === SnSurface.SNOW; }
 
   corners(idx: number): [number, number, number, number] {
     const base = this.level[idx] * SnTile.LEVEL_HEIGHT;
@@ -229,6 +280,7 @@ class SnMap {
     const idx = SnGridMath.indexAt(x, z);
     if (idx < 0) return 0;
     if (this.kind[idx] === SnTile.MOUNTAIN) return SnTile.LEVEL_HEIGHT * 3;
+    if (this.surface[idx] === SnSurface.BRIDGE) return SnSurface.DECK;
     const c = this.corners(idx);
     const u = Math.min(1, Math.max(0, (x - SnGridMath.minX(idx)) / SnGridMath.CELL));
     const v = Math.min(1, Math.max(0, (z - SnGridMath.minZ(idx)) / SnGridMath.CELL));
@@ -361,6 +413,7 @@ class SnMapBuilder {
       if (this.inRect(x, z, SnMapLayout.VILLAGE)) { m.level[idx] = 1; m.zone[idx] = "village"; }
       if (this.inRect(x, z, SnMapLayout.LOOKOUT)) { m.level[idx] = 2; m.zone[idx] = "lookout"; }
       if (this.inRect(x, z, SnMapLayout.BERM)) { m.level[idx] = 1; m.zone[idx] = "berm"; }
+      for (const p of SnMapLayout.PLATEAUS) if (this.inRect(x, z, p)) m.level[idx] = Math.max(m.level[idx], p.level);
     });
     for (const ramp of SnMapLayout.RAMPS) {
       this.eachTile((idx, x, z) => {
@@ -374,6 +427,40 @@ class SnMapBuilder {
         m.rampDir[idx] = ramp.dir;
         m.rampStep[idx] = ramp.dir === 0 || ramp.dir === 2 ? along : steps - 1 - along;
       });
+    }
+    this.carveRivers();
+    this.layBridges();
+  }
+
+  private static segmentDistance(x: number, z: number, a: SnPoint, b: SnPoint): number {
+    const dx = b.x - a.x, dz = b.z - a.z, len = dx * dx + dz * dz;
+    const t = len ? Math.max(0, Math.min(1, ((x - a.x) * dx + (z - a.z) * dz) / len)) : 0;
+    return Math.hypot(x - a.x - dx * t, z - a.z - dz * t);
+  }
+
+  private carveRivers(): void {
+    const m = this.map;
+    this.eachTile((idx, x, z) => {
+      if (m.kind[idx] !== SnTile.FLAT || m.level[idx] !== 0) return;
+      for (const river of SnMapLayout.RIVERS) for (let k = 1; k < river.length; k++) {
+        if (SnMapBuilder.segmentDistance(x, z, river[k - 1], river[k]) < SnMapLayout.RIVER_HALF) m.surface[idx] = SnSurface.ICE;
+      }
+    });
+  }
+
+  private layBridges(): void {
+    const m = this.map, half = SnMapLayout.BRIDGE_HALF_WIDTH, reach = SnMapLayout.BRIDGE_REACH;
+    for (const b of SnMapLayout.BRIDGES) {
+      let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+      this.eachTile((idx, x, z) => {
+        if (m.surface[idx] !== SnSurface.ICE) return;
+        const along = b.across === "x" ? x - b.x : z - b.z, side = b.across === "x" ? z - b.z : x - b.x;
+        if (Math.abs(side) >= half || Math.abs(along) >= reach) return;
+        m.surface[idx] = SnSurface.BRIDGE;
+        x0 = Math.min(x0, SnGridMath.minX(idx)); x1 = Math.max(x1, SnGridMath.minX(idx) + SnGridMath.CELL);
+        z0 = Math.min(z0, SnGridMath.minZ(idx)); z1 = Math.max(z1, SnGridMath.minZ(idx) + SnGridMath.CELL);
+      });
+      if (x0 < x1) m.bridges.push({ x0, x1, z0, z1, across: b.across });
     }
   }
 
@@ -404,7 +491,7 @@ class SnMapBuilder {
 
   private freeFor(x: number, z: number, gap: number): boolean {
     const m = this.map, idx = SnGridMath.indexAt(x, z);
-    if (idx < 0 || m.kind[idx] !== SnTile.FLAT) return false;
+    if (idx < 0 || m.kind[idx] !== SnTile.FLAT || !m.snowy(idx)) return false;
     for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
       const i = SnGridMath.colOf(idx) + di, j = SnGridMath.rowOf(idx) + dj;
       if (!SnGridMath.inside(i, j)) return false;
@@ -473,10 +560,12 @@ class SnMapBuilder {
   private fillCover(): void {
     let holes = SnMapBuilder.uncoveredTiles(this.map, this.coverTiles());
     for (let round = 0; round < 200 && holes.length; round++) {
-      const idx = holes[Math.floor(holes.length / 2)];
-      const hx = SnGridMath.centerX(idx), hz = SnGridMath.centerZ(idx);
-      holes = holes.filter((k) => Math.hypot(SnGridMath.centerX(k) - hx, SnGridMath.centerZ(k) - hz) > SnMapLayout.COVER_RANGE);
+      const hole = holes[Math.floor(holes.length / 2)];
+      const idx = this.map.surface[hole] === SnSurface.BRIDGE
+        ? this.map.nearestWalkable(SnGridMath.centerX(hole), SnGridMath.centerZ(hole), (k) => !this.map.snowy(k) || this.map.kind[k] !== SnTile.FLAT)
+        : hole;
       const x = SnGridMath.centerX(idx), z = SnGridMath.centerZ(idx);
+      holes = holes.filter((k) => Math.hypot(SnGridMath.centerX(k) - x, SnGridMath.centerZ(k) - z) > SnMapLayout.COVER_RANGE);
       const model: SnObstacleModel = round % 3 === 0 ? "log" : round % 3 === 1 ? "rock" : "pine";
       if (model === "log") this.map.addObstacle("log", x, z, 0, 0.7, 0.4, this.random.range(0, Math.PI), 1);
       else if (model === "rock") { const r = this.random.range(0.9, 1.3); this.map.addObstacle("rock", x, z, r, 0, 0, this.random.range(0, 6.28), r); }
@@ -487,7 +576,7 @@ class SnMapBuilder {
   private spotCandidates(filter: (idx: number) => boolean): number[] {
     const m = this.map, list: number[] = [];
     for (let idx = 0; idx < SnGridMath.COUNT; idx++) {
-      if (m.kind[idx] !== SnTile.FLAT || !filter(idx)) continue;
+      if (m.kind[idx] !== SnTile.FLAT || !m.snowy(idx) || !filter(idx)) continue;
       const x = SnGridMath.centerX(idx), z = SnGridMath.centerZ(idx);
       if (m.obstacleAt(x, z, 1.4)) continue;
       if (Math.abs(x) > 74 || Math.abs(z) > 74) continue;

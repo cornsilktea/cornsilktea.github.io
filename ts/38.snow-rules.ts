@@ -47,7 +47,8 @@ type SnEvent =
 
 class SnBalance {
   static readonly MAX_HP = 100;
-  static readonly SPEED = 2;
+  static readonly SPEED = 4;
+  static readonly ICE_PACE = 0.5;
   static readonly RADIUS = 0.4;
   static readonly SHOT = { damage: 12, cost: 2, interval: 0.45, speed: 22, range: 14, radius: 0.25, spawn: 0.5 };
   static readonly WALL = { cost: 30, hp: 150, halfLength: 1.5, halfDepth: 0.3, height: 2.2, buildTime: 1, interval: 1.2, perTeam: 6, life: 75, distance: 1.3 };
@@ -234,7 +235,7 @@ class SnSnowField {
   readonly amount = new Uint8Array(SnGridMath.COUNT);
   readonly changed: number[] = [];
   constructor(map: SnMap) {
-    for (let idx = 0; idx < SnGridMath.COUNT; idx++) if (map.walkable(idx)) this.amount[idx] = SnBalance.SNOW.perTile;
+    for (let idx = 0; idx < SnGridMath.COUNT; idx++) if (map.snowy(idx)) this.amount[idx] = SnBalance.SNOW.perTile;
   }
   take(idx: number, room: number): number {
     if (idx < 0 || room <= 0 || !this.amount[idx]) return 0;
@@ -305,6 +306,13 @@ class SnStormPlan {
 
 class SnMover {
   constructor(private readonly engine: SnEngine) {}
+
+  paceAt(x: number, z: number): number { return this.engine.map.onIce(x, z) ? SnBalance.ICE_PACE : 1; }
+
+  walk(p: SnPlayer, dirX: number, dirZ: number, dt: number): void {
+    const v = p.speed * this.paceAt(p.x, p.z);
+    this.move(p, dirX * v, dirZ * v, dt, false);
+  }
 
   move(p: SnPlayer, vx: number, vz: number, dt: number, allowDrop: boolean): void {
     const dist = Math.hypot(vx, vz) * dt;
@@ -958,7 +966,7 @@ class SnEngine {
       const m = Math.hypot(mx, mz);
       if (m > 1) { mx /= m; mz /= m; }
       if (m > 0.05) {
-        this.mover.move(p, mx * p.speed, mz * p.speed, dt, false);
+        this.mover.walk(p, mx, mz, dt);
         p.yaw = Math.atan2(mz, mx);
       }
     }

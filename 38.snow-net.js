@@ -389,7 +389,7 @@ class SnLocalBody {
             mz /= m;
         }
         if (m > 0.05) {
-            engine.mover.move(me, mx * me.speed, mz * me.speed, dt, false);
+            engine.mover.walk(me, mx, mz, dt);
             me.yaw = Math.atan2(mz, mx);
         }
         me.vx = (me.x - ox) / Math.max(1e-3, dt);

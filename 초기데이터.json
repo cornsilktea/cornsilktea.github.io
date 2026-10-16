@@ -350,6 +350,15 @@
         "units": [],
         "unitsSet": false,
         "url": "37.space-war.html"
+      },
+      "snowroyale": {
+        "memo": "방 코드로 모여 2대2대2(3팀) 또는 개인전(최대 6명)으로 겨루는 3D 눈싸움 배틀로얄 / 낙하산으로 내려가 눈을 모으고 눈덩이·눈 벽으로 싸움 / 모자·한벌옷·신발·코코아·대형 눈덩이 아이템, 얼어붙은 강과 다리, 좁혀 오는 눈보라 / 쓰러진 아군 부활 / 사람이 모자라면 AI가 채우고 관전도 가능, 혼자 연습 모드",
+        "open": false,
+        "order": 37,
+        "title": "눈싸움 배틀로얄",
+        "units": [],
+        "unitsSet": false,
+        "url": "38.snow-royale.html"
       }
     }
   }

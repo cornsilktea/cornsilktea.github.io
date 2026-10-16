@@ -16,6 +16,10 @@ SnPalette.WALL_HURT = "#AFC3D2";
 SnPalette.PINE = "#2E5845";
 SnPalette.PINE_DARK = "#24473A";
 SnPalette.TRUNK = "#5A4232";
+SnPalette.ICE = "#A9D3E8";
+SnPalette.ICE_LIGHT = "#CFE8F3";
+SnPalette.PLANK = "#8A6A4E";
+SnPalette.PLANK_DARK = "#5E4634";
 class SnModelLibrary {
     constructor(libs) {
         this.libs = libs;
@@ -273,6 +277,10 @@ class SnTerrainView {
     }
     toneColor(idx, snow) {
         const tone = this.snowTone[idx];
+        if (this.map.surface[idx] !== SnSurface.SNOW) {
+            const streak = 0.5 + 0.5 * Math.sin(SnGridMath.colOf(idx) * 0.9 + SnGridMath.rowOf(idx) * 0.55);
+            return new this.libs.THREE.Color(SnPalette.ICE).lerp(new this.libs.THREE.Color(SnPalette.ICE_LIGHT), streak * 0.55 + (tone - 0.965) * 8);
+        }
         return (snow ? this.snowColor : this.bareColor).clone().multiplyScalar(snow ? tone : 0.9 + (tone - 0.965) * 4);
     }
     setSnow(idx, hasSnow) {
@@ -429,6 +437,60 @@ class SnPropsView {
     }
 }
 SnPropsView.SECTORS = 4;
+class SnBridgeView {
+    constructor(libs, map) {
+        this.libs = libs;
+        const THREE = libs.THREE;
+        this.group = new THREE.Group();
+        const decks = [];
+        const planks = [];
+        const rails = [];
+        const posts = [];
+        for (const b of map.bridges) {
+            const alongX = b.across === "x", o = SnBridgeView.OVERHANG;
+            const x0 = b.x0 - (alongX ? o : 0), x1 = b.x1 + (alongX ? o : 0), z0 = b.z0 - (alongX ? 0 : o), z1 = b.z1 + (alongX ? 0 : o);
+            const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, w = x1 - x0, d = z1 - z0;
+            decks.push({ x: cx, z: cz, w, d });
+            const length = alongX ? w : d, count = Math.floor(length / 0.5);
+            for (let k = 1; k < count; k += 2) {
+                const t = -length / 2 + k * (length / count);
+                planks.push(alongX ? { x: cx + t, z: cz, w: 0.08, d: d + 0.02 } : { x: cx, z: cz + t, w: w + 0.02, d: 0.08 });
+            }
+            for (const side of [-1, 1]) {
+                const sx = alongX ? cx : cx + side * (w / 2 - 0.12), sz = alongX ? cz + side * (d / 2 - 0.12) : cz;
+                rails.push(alongX ? { x: sx, z: sz, w, d: 0.12 } : { x: sx, z: sz, w: 0.12, d });
+                const n = Math.max(2, Math.round(length / SnBridgeView.POST_GAP) + 1);
+                for (let k = 0; k < n; k++) {
+                    const t = -length / 2 + 0.15 + k * (length - 0.3) / (n - 1);
+                    posts.push(alongX ? { x: cx + t, z: sz } : { x: sx, z: cz + t });
+                }
+            }
+        }
+        const top = SnBridgeView.DECK_TOP, thick = SnBridgeView.DECK_THICK, rail = SnBridgeView.RAIL_HEIGHT;
+        this.boxes(decks, top - thick / 2, thick, SnPalette.PLANK, true);
+        this.boxes(planks, top + 0.005, 0.02, SnPalette.PLANK_DARK, false);
+        this.boxes(rails, top + rail, 0.12, SnPalette.PLANK, true);
+        this.boxes(posts.map((p) => ({ x: p.x, z: p.z, w: 0.16, d: 0.16 })), top + rail / 2, rail, SnPalette.PLANK_DARK, true);
+    }
+    boxes(list, y, height, color, shadow) {
+        if (!list.length)
+            return;
+        const THREE = this.libs.THREE;
+        const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ color }), list.length);
+        const matrix = new THREE.Matrix4();
+        list.forEach((b, k) => { matrix.makeScale(b.w, height, b.d); matrix.setPosition(b.x, y, b.z); mesh.setMatrixAt(k, matrix); });
+        mesh.instanceMatrix.needsUpdate = true;
+        mesh.computeBoundingSphere();
+        mesh.castShadow = shadow;
+        mesh.receiveShadow = true;
+        this.group.add(mesh);
+    }
+}
+SnBridgeView.DECK_TOP = SnSurface.DECK;
+SnBridgeView.DECK_THICK = 0.35;
+SnBridgeView.OVERHANG = 0.8;
+SnBridgeView.RAIL_HEIGHT = 0.75;
+SnBridgeView.POST_GAP = 2;
 class SnStormView {
     constructor(libs, map) {
         this.libs = libs;
@@ -1136,6 +1198,7 @@ class SnSceneView {
         this.world.scene.add(outside);
         this.props = new SnPropsView(libs, library, map);
         this.world.scene.add(this.props.group);
+        this.world.scene.add(new SnBridgeView(libs, map).group);
         this.storm = new SnStormView(libs, map);
         this.world.scene.add(this.storm.group);
         this.matchGroup = new THREE.Group();

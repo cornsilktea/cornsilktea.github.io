@@ -295,7 +295,7 @@ class SnLocalBody {
     let mx = intent.moveX, mz = intent.moveZ;
     const m = Math.hypot(mx, mz);
     if (m > 1) { mx /= m; mz /= m; }
-    if (m > 0.05) { engine.mover.move(me, mx * me.speed, mz * me.speed, dt, false); me.yaw = Math.atan2(mz, mx); }
+    if (m > 0.05) { engine.mover.walk(me, mx, mz, dt); me.yaw = Math.atan2(mz, mx); }
     me.vx = (me.x - ox) / Math.max(1e-3, dt); me.vz = (me.z - oz) / Math.max(1e-3, dt);
   }
 
