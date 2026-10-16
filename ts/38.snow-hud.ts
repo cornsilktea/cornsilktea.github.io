@@ -206,17 +206,7 @@ class SnLocalControls {
     });
   }
 
-  private headingOf: () => number = () => -Math.PI / 2;
-  private latched: number | null = null;
-
-  useHeading(provider: () => number): void { this.headingOf = provider; }
-
-  private toWorld(screenAngle: number): number {
-    return SnAngle.wrap((this.latched === null ? this.headingOf() : this.latched) + Math.PI / 2 + screenAngle);
-  }
-
-  aimWorldAngle(): number | null { return this.aimAngle === null ? null : this.toWorld(this.aimAngle); }
-
+  aimWorldAngle(): number | null { return this.aimAngle; }
   onMapKey(listener: () => void): void { this.mapListeners.push(listener); }
   queueDrop(x: number, z: number): void { this.pendingDrop = { x, z }; }
 
@@ -230,22 +220,16 @@ class SnLocalControls {
     if (this.pendingDrop) { intent.dropPick = this.pendingDrop; this.pendingDrop = null; }
     if (!this.enabled) { this.pendingAttack = this.pendingWall = false; return intent; }
     const stick = this.joystick.vector() || this.keyboard.vector();
-    const m = Math.hypot(stick.x, stick.z);
-    if (m > 0.05) {
-      if (this.latched === null) this.latched = this.headingOf();
-      const world = this.toWorld(Math.atan2(stick.z, stick.x));
-      intent.moveX = Math.cos(world) * m; intent.moveZ = Math.sin(world) * m;
-    } else this.latched = null;
+    intent.moveX = stick.x; intent.moveZ = stick.z;
     intent.holdK = this.holdingK();
-    if (this.pendingAttack && canThrow) { intent.attack = true; intent.attackAngle = this.pendingAttackAngle === null ? null : this.toWorld(this.pendingAttackAngle); this.pendingAttack = false; }
-    if (this.pendingWall) { intent.wall = true; intent.wallAngle = this.pendingWallAngle === null ? null : this.toWorld(this.pendingWallAngle); this.pendingWall = false; }
+    if (this.pendingAttack && canThrow) { intent.attack = true; intent.attackAngle = this.pendingAttackAngle; this.pendingAttack = false; }
+    if (this.pendingWall) { intent.wall = true; intent.wallAngle = this.pendingWallAngle; this.pendingWall = false; }
     return intent;
   }
 
   reset(): void {
     this.keyboard.release(); this.joystick.reset();
     this.pendingAttack = this.pendingWall = false; this.pendingDrop = null; this.aimAngle = null;
-    this.latched = null;
   }
 }
 

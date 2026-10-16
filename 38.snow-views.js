@@ -952,18 +952,15 @@ class SnCameraRig {
         this.focusZ = 0;
         this.distance = SnCameraRig.DISTANCE;
         this.ready = false;
-        this.heading = -Math.PI / 2;
-        this.chaseReady = false;
         this.camera = new libs.THREE.PerspectiveCamera(46, 1, 0.5, 320);
     }
     resize(aspect) {
         this.camera.aspect = aspect;
-        this.camera.fov = aspect < 1 ? 68 : 55;
+        this.camera.fov = aspect < 1 ? 62 : 50;
         this.camera.updateProjectionMatrix();
     }
-    snap() { this.ready = false; this.chaseReady = false; }
+    snap() { this.ready = false; }
     follow(x, y, z, distance, dt) {
-        this.chaseReady = false;
         if (!this.ready) {
             this.focusX = x;
             this.focusY = y;
@@ -981,33 +978,6 @@ class SnCameraRig {
         this.camera.position.set(this.focusX, this.focusY + up, this.focusZ + back);
         this.camera.lookAt(this.focusX, this.focusY, this.focusZ);
     }
-    resetHeading(yaw) { this.heading = yaw; this.chaseReady = false; }
-    chase(x, y, z, targetYaw, turn, distance, dt) {
-        if (turn) {
-            const diff = SnAngle.wrap(targetYaw - this.heading), step = SnCameraRig.CHASE_TURN * dt;
-            this.heading = SnAngle.wrap(this.heading + Math.max(-step, Math.min(step, diff)));
-        }
-        const fx = Math.cos(this.heading), fz = Math.sin(this.heading);
-        const lookX = x + fx * SnCameraRig.CHASE_LEAD, lookZ = z + fz * SnCameraRig.CHASE_LEAD, lookY = y + 1.2;
-        if (!this.chaseReady) {
-            this.focusX = lookX;
-            this.focusY = lookY;
-            this.focusZ = lookZ;
-            this.distance = distance;
-            this.chaseReady = true;
-            this.ready = true;
-        }
-        const k = Math.min(1, dt * 8);
-        this.focusX += (lookX - this.focusX) * k;
-        this.focusY += (lookY - this.focusY) * k;
-        this.focusZ += (lookZ - this.focusZ) * k;
-        this.distance += (distance - this.distance) * Math.min(1, dt * 2);
-        const scale = this.camera.aspect < 1 ? 1.25 : 1;
-        const up = Math.sin(SnCameraRig.CHASE_PITCH) * this.distance * scale, back = Math.cos(SnCameraRig.CHASE_PITCH) * this.distance * scale;
-        this.camera.position.set(this.focusX - fx * back, this.focusY + up, this.focusZ - fz * back);
-        this.camera.lookAt(this.focusX, this.focusY, this.focusZ);
-    }
-    screenToWorld(screenAngle) { return SnAngle.wrap(this.heading + Math.PI / 2 + screenAngle); }
     orbit(radius, height, angle, lookX, lookY, lookZ) {
         this.camera.position.set(lookX + Math.sin(angle) * radius, lookY + height, lookZ + Math.cos(angle) * radius);
         this.camera.lookAt(lookX, lookY, lookZ);
@@ -1017,12 +987,7 @@ class SnCameraRig {
     }
 }
 SnCameraRig.PITCH = (52 * Math.PI) / 180;
-SnCameraRig.DISTANCE = 17;
-SnCameraRig.CHASE_PITCH = (27 * Math.PI) / 180;
-SnCameraRig.CHASE_DISTANCE = 15;
-SnCameraRig.CHASE_LEAD = 6;
-SnCameraRig.CHASE_TURN = 1.4;
-SnCameraRig.CHASE_BACK_LIMIT = (120 * Math.PI) / 180;
+SnCameraRig.DISTANCE = 21;
 class SnSunShadow {
     constructor(libs, scene, mapSize) {
         this.light = new libs.THREE.DirectionalLight(0xFFF2E0, 1.25);
@@ -1212,15 +1177,15 @@ class SnSceneView {
         this.actors.forEach((a) => a.sync(source.time, dt, nowMs));
         this.terrain.flush();
     }
-    followActor(num, dt, turn) {
+    followActor(num, dt) {
         const a = this.actors.get(num);
         if (!a)
             return;
         const sky = a.source.life === "sky";
-        this.world.rig.chase(a.worldX, a.worldY, a.worldZ, a.source.yaw, turn, sky ? 20 : SnCameraRig.CHASE_DISTANCE, dt);
+        this.world.rig.follow(a.worldX, sky ? a.worldY * 0.6 : a.worldY, a.worldZ, sky ? 30 : SnCameraRig.DISTANCE, dt);
     }
     hideTreesAround(x, z, dt) {
-        const h = this.world.rig.heading, bx = x - Math.cos(h) * 3, bz = z - Math.sin(h) * 3;
+        const bx = x, bz = z + 2.5;
         const near = this.map.obstaclesAround(bx, bz, 5).some((o) => o.model === "pine" && Math.hypot(o.x - bx, o.z - bz) < 4.6);
         this.props.fadePines(near, dt);
     }

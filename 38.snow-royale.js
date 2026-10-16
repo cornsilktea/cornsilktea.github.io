@@ -99,7 +99,6 @@ class SnGame {
         this.profile = new PlayerProfile();
         this.controls = new SnLocalControls(() => this.shots);
         this.controls.onMapKey(() => this.toggleMap());
-        this.controls.useHeading(() => this.scene.world.rig.heading);
         this.controls.keyboard.onPress((code) => this.onSpectatorKey(code));
         canvas.addEventListener("pointerdown", (e) => this.pickActor(e.clientX, e.clientY));
         this.specPanel.onPick((num) => this.spectator.pick(num));
@@ -136,7 +135,6 @@ class SnGame {
             looks.set(this.myNum, profile.look);
         scene.beginMatch(engine, looks, engine.snow.amount);
         scene.world.rig.snap();
-        scene.world.rig.resetHeading(-Math.PI / 2);
         scene.world.playing = true;
         const leader = this.myNum >= 0 && engine.teams[engine.players[this.myNum].team].leader.num === this.myNum;
         this.bigMap.setPicking(leader, leader ? "낙하 지점을 누르세요" : "전체 지도", leader ? (x, z) => controls.queueDrop(x, z) : null);
@@ -248,12 +246,10 @@ class SnGame {
         const watched = engine.players[watchedNum] || null;
         const overview = this.spectating && this.spectator.overview;
         scene.sync(engine, dt, ms);
-        const moving = !!watched && Math.hypot(watched.vx, watched.vz) > 0.3;
-        const turn = moving && !!watched && Math.abs(SnAngle.wrap(watched.yaw - scene.world.rig.heading)) < SnCameraRig.CHASE_BACK_LIMIT;
         if (overview)
             scene.followEveryone(dt);
         else
-            scene.followActor(watchedNum, dt, turn);
+            scene.followActor(watchedNum, dt);
         const dist = Math.hypot(scene.world.rig.camera.position.x - scene.world.rig.focusX, scene.world.rig.camera.position.z - scene.world.rig.focusZ, scene.world.rig.camera.position.y - scene.world.rig.focusY);
         scene.setFog(Math.max(75, dist * 1.4), Math.max(180, dist * 2.6));
         if (watched && !overview)
