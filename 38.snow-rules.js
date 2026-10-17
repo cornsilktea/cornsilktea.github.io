@@ -6,7 +6,7 @@ SnBalance.SPEED = 4;
 SnBalance.ICE_PACE = 0.5;
 SnBalance.RADIUS = 0.4;
 SnBalance.SHOT = { damage: 12, cost: 2, interval: 0.45, speed: 22, range: 14, radius: 0.25, spawn: 0.5 };
-SnBalance.WALL = { cost: 30, hp: 150, halfLength: 1.5, halfDepth: 0.3, height: 2.2, buildTime: 1, interval: 1.2, perTeam: 10, life: 75, distance: 1.3, snap: 3.2, minLength: 0.8, maxLength: 3.6, joinOverlap: 0.3, joinFree: 0.9 };
+SnBalance.WALL = { cost: 30, hp: 150, halfLength: 1.5, halfDepth: 0.3, height: 2.2, buildTime: 1, interval: 1.2, perTeam: 10, life: 75, distance: 1.3, snap: 3.2, minLength: 0.8, maxLength: 3.6, joinOverlap: 0.3, joinFree: 0.9, cliffReach: 1.6, cliffLengths: [1.5, 1.1, 0.7] };
 SnBalance.COCOA_RATIO = 0.3;
 SnBalance.BIG = { damage: 40, wallDamage: 200, radius: 1.2, speed: 12, distance: 30, knock: 4, knockTime: 0.3 };
 SnBalance.REVIVE = { time: 10, hp: 50, guard: 3, max: 2, reach: 2.5 };
@@ -790,11 +790,51 @@ class SnWallWorks {
         for (const option of options)
             if (this.behind(p, option.wall) && this.fits(p, option.wall, option.joined))
                 return option;
+        for (const wall of this.alongCliff(p, facing))
+            if (this.behind(p, wall, 0) && this.fits(p, wall))
+                return { wall, joined: [] };
         return null;
     }
-    behind(p, w) {
+    alongCliff(p, facing) {
+        const e = this.engine, map = e.map, home = SnGridMath.indexAt(p.x, p.z);
+        if (home < 0)
+            return [];
+        const fx = Math.cos(facing), fz = Math.sin(facing), reach = SnBalance.WALL.distance + SnBalance.WALL.halfDepth + SnBalance.WALL.cliffReach;
+        let last = home, hitX = 0, hitZ = 0, next = -1, found = false;
+        for (let t = 0.2; t <= reach && !found; t += 0.1) {
+            const x = p.x + fx * t, z = p.z + fz * t, idx = SnGridMath.indexAt(x, z);
+            if (idx === last)
+                continue;
+            if (idx < 0 || !map.walkable(idx) || map.isRamp(idx) || map.level[idx] !== map.level[home]) {
+                next = idx;
+                hitX = x;
+                hitZ = z;
+                found = true;
+            }
+            else
+                last = idx;
+        }
+        if (!found)
+            return [];
+        const lastCol = SnGridMath.colOf(last), lastRow = SnGridMath.rowOf(last);
+        const nextCol = next >= 0 ? SnGridMath.colOf(next) : SnGridMath.col(hitX), nextRow = next >= 0 ? SnGridMath.rowOf(next) : SnGridMath.row(hitZ);
+        const walls = [];
+        const level = map.levelAt(p.x, p.z), gap = SnBalance.WALL.halfDepth + 0.05;
+        if (nextCol !== lastCol) {
+            const sx = Math.sign(nextCol - lastCol), edgeX = Math.max(nextCol, lastCol) * SnGridMath.CELL - SnGridMath.HALF;
+            for (const half of SnBalance.WALL.cliffLengths)
+                walls.push(new SnWall(-1, p.team, p.num, edgeX - sx * gap, hitZ, sx > 0 ? 0 : Math.PI, level, e.time, e.time + SnBalance.WALL.buildTime, half));
+        }
+        if (nextRow !== lastRow) {
+            const sz = Math.sign(nextRow - lastRow), edgeZ = Math.max(nextRow, lastRow) * SnGridMath.CELL - SnGridMath.HALF;
+            for (const half of SnBalance.WALL.cliffLengths)
+                walls.push(new SnWall(-1, p.team, p.num, hitX, edgeZ - sz * gap, sz > 0 ? Math.PI / 2 : -Math.PI / 2, level, e.time, e.time + SnBalance.WALL.buildTime, half));
+        }
+        return walls;
+    }
+    behind(p, w, margin = w.halfZ) {
         const ahead = (p.x - w.x) * Math.cos(w.facing) + (p.z - w.z) * Math.sin(w.facing);
-        return ahead <= -w.halfZ;
+        return ahead <= -margin;
     }
     nearestEnd(point, skip) {
         let best = null, bd = SnBalance.WALL.snap;
