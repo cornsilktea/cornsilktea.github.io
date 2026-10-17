@@ -38,7 +38,7 @@ class SnPalette {
   static readonly PINE_DARK = "#24473A";
   static readonly TRUNK = "#5A4232";
   static readonly ICE = "#A9D3E8";
-  static readonly EDGE = "#4A5868";
+  static readonly EDGE = "#3B4756";
   static readonly RAMP = "#D9C9A6";
   static readonly HIGH_SNOW = "#DCE7F5";
   static readonly ICE_LIGHT = "#CFE8F3";
@@ -197,7 +197,7 @@ class SnTerrainView {
   static readonly MOUNTAIN_SLOPE = 2.3;
   static readonly MOUNTAIN_PEAK = 17;
   static readonly SNOWLINE = 7;
-  static readonly EDGE_WIDTH = 0.32;
+  static readonly EDGE_WIDTH = 0.55;
   static readonly ROCK_STEPS = 5;
   static readonly ROCK_BUMP = 0.3;
   static readonly CORNICE = 0.28;
