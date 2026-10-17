@@ -168,6 +168,8 @@ SnMapLayout.RIVERS = [
     [{ x: 82, z: -38 }, { x: 62, z: -34 }, { x: 46, z: -22 }, { x: 39, z: -6 }, { x: 40, z: 10 }, { x: 38, z: 26 }, { x: 40, z: 38 }, { x: 50, z: 40 }, { x: 82, z: 34 }],
 ];
 SnMapLayout.RIVER_HALF = 3.2;
+SnMapLayout.BORDER_MIN = 1;
+SnMapLayout.BORDER_MAX = 3;
 SnMapLayout.BRIDGES = [
     { x: -39, z: -68, across: "x" }, { x: -38, z: -18, across: "x" }, { x: -36, z: 8, across: "x" }, { x: -70, z: 42, across: "z" },
     { x: 72, z: -36, across: "z" }, { x: 40, z: 2, across: "x" }, { x: 39, z: 20, across: "x" }, { x: 64, z: 38, across: "z" },
@@ -415,6 +417,8 @@ class SnMapBuilder {
                 if (Math.hypot(x - mt.x, z - mt.z) < r)
                     m.kind[idx] = SnTile.MOUNTAIN;
             }
+            if (this.inBorder(idx))
+                m.kind[idx] = SnTile.MOUNTAIN;
             if (m.kind[idx] === SnTile.MOUNTAIN)
                 return;
             if (this.inRect(x, z, SnMapLayout.VILLAGE)) {
@@ -449,6 +453,19 @@ class SnMapBuilder {
         }
         this.carveRivers();
         this.layBridges();
+    }
+    inBorder(idx) {
+        const i = SnGridMath.colOf(idx), j = SnGridMath.rowOf(idx), last = SnGridMath.SIZE - 1;
+        const sides = [
+            { depth: i, along: j, phase: 0.4 }, { depth: last - i, along: j, phase: 2.1 }, { depth: j, along: i, phase: 3.7 }, { depth: last - j, along: i, phase: 5.2 },
+        ];
+        for (const side of sides) {
+            const wave = 1.6 + 0.9 * Math.sin(side.along * 0.37 + side.phase) + 0.6 * Math.sin(side.along * 0.91 + side.phase * 2.3);
+            const width = Math.max(SnMapLayout.BORDER_MIN, Math.min(SnMapLayout.BORDER_MAX, Math.round(wave)));
+            if (side.depth < width)
+                return true;
+        }
+        return false;
     }
     static segmentDistance(x, z, a, b) {
         const dx = b.x - a.x, dz = b.z - a.z, len = dx * dx + dz * dz;

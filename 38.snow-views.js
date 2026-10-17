@@ -272,12 +272,58 @@ class SnTerrainView {
                 if (h1 <= g1 + 0.01 && h2 <= g2 + 0.01)
                     continue;
                 const e = side.edge(x0, z0);
+                if (!mountain) {
+                    this.rockFace(builder, e, h1, h2, Math.min(h1, g1), Math.min(h2, g2), side.di, side.dj, cliffLow, cliffTop);
+                    continue;
+                }
                 const top1 = mountain ? this.mountainColor(h1) : cliffTop, top2 = mountain ? this.mountainColor(h2) : cliffTop;
                 const a = builder.vertex(e[0], Math.min(h1, g1), e[1], cliffLow), b = builder.vertex(e[2], Math.min(h2, g2), e[3], cliffLow);
                 const t1 = builder.vertex(e[0], h1, e[1], top1), t2 = builder.vertex(e[2], h2, e[3], top2);
                 builder.indices.push(a, t1, b, b, t1, t2);
             }
         }
+    }
+    static rockNoise(x, y, z) {
+        return Math.sin(x * 1.9 + y * 2.7) * 0.5 + Math.sin(z * 2.3 - y * 1.7 + x * 0.6) * 0.35 + Math.sin((x + z) * 4.1 + y * 3.3) * 0.15;
+    }
+    rockFace(builder, e, h1, h2, b1, b2, ox, oz, low, high) {
+        const along = SnTerrainView.ROCK_STEPS, tall = Math.max(h1 - b1, h2 - b2);
+        const rows = Math.max(1, Math.min(6, Math.ceil(tall / 0.8)));
+        const strength = SnTerrainView.ROCK_BUMP * Math.min(1, tall / 1.2);
+        const grid = [], tops = [];
+        for (let k = 0; k <= along; k++) {
+            const u = k / along, column = [];
+            const bx = e[0] + (e[2] - e[0]) * u, bz = e[1] + (e[3] - e[1]) * u;
+            const bottom = b1 + (b2 - b1) * u, top = h1 + (h2 - h1) * u;
+            for (let m = 0; m <= rows; m++) {
+                const v = m / rows, y = bottom + (top - bottom) * v;
+                const n = SnTerrainView.rockNoise(bx, y, bz);
+                const push = strength * (0.55 + 0.45 * n) * Math.sin(Math.PI * u) * Math.sin(Math.PI * Math.min(1, v * 1.15));
+                const shade = 0.82 + 0.3 * (0.5 + 0.5 * SnTerrainView.rockNoise(bz * 1.3, y * 1.7, bx * 1.1));
+                const color = low.clone().lerp(high, v).multiplyScalar(shade);
+                column.push(builder.vertex(bx + ox * push, y, bz + oz * push, color));
+                if (m === rows)
+                    tops.push({ x: bx, y, z: bz });
+            }
+            grid.push(column);
+        }
+        for (let k = 0; k < along; k++)
+            for (let m = 0; m < rows; m++) {
+                const bl = grid[k][m], br = grid[k + 1][m], tl = grid[k][m + 1], tr = grid[k + 1][m + 1];
+                builder.indices.push(bl, tl, br, br, tl, tr);
+            }
+        if (tall < 0.8)
+            return;
+        const snow = this.snowColor.clone().multiplyScalar(0.97);
+        const lips = [], rims = [];
+        tops.forEach((t, k) => {
+            const u = k / along, n = SnTerrainView.rockNoise(t.x * 0.7, t.y, t.z * 0.7);
+            const reach = SnTerrainView.CORNICE * (0.6 + 0.4 * n) * (0.35 + 0.65 * Math.sin(Math.PI * u));
+            rims.push(builder.vertex(t.x, t.y + 0.04, t.z, snow));
+            lips.push(builder.vertex(t.x + ox * reach, t.y - 0.18 - 0.22 * (0.5 + 0.5 * n), t.z + oz * reach, snow));
+        });
+        for (let k = 0; k < along; k++)
+            builder.indices.push(lips[k], rims[k], lips[k + 1], lips[k + 1], rims[k], rims[k + 1]);
     }
     buildEdges(builder) {
         const THREE = this.libs.THREE, map = this.map, cell = SnGridMath.CELL, width = SnTerrainView.EDGE_WIDTH, lift = 0.03;
@@ -378,6 +424,9 @@ SnTerrainView.MOUNTAIN_SLOPE = 2.3;
 SnTerrainView.MOUNTAIN_PEAK = 17;
 SnTerrainView.SNOWLINE = 7;
 SnTerrainView.EDGE_WIDTH = 0.32;
+SnTerrainView.ROCK_STEPS = 5;
+SnTerrainView.ROCK_BUMP = 0.3;
+SnTerrainView.CORNICE = 0.28;
 class SnPineGeometry {
     static build(libs) {
         const THREE = libs.THREE;
