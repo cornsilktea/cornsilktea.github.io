@@ -374,7 +374,7 @@ class SnTerrainView {
                     nx = 0;
                     nz = 1;
                 }
-                const h = (x, z) => map.heightAt(x - nx * 0.01, z - nz * 0.01 + 0) + lift;
+                const h = (x, z) => this.tileHeight(idx, x, z) + lift;
                 const a = builder.vertex(ax, h(ax + nx * 0.02, az + nz * 0.02), az, color);
                 const b = builder.vertex(bx, h(bx + nx * 0.02, bz + nz * 0.02), bz, color);
                 const c = builder.vertex(ax + nx * width, h(ax + nx * width, az + nz * width), az + nz * width, color);
@@ -382,6 +382,12 @@ class SnTerrainView {
                 builder.indices.push(a, c, b, b, c, d);
             }
         }
+    }
+    tileHeight(idx, x, z) {
+        const c = this.map.corners(idx);
+        const u = Math.min(1, Math.max(0, (x - SnGridMath.minX(idx)) / SnGridMath.CELL));
+        const v = Math.min(1, Math.max(0, (z - SnGridMath.minZ(idx)) / SnGridMath.CELL));
+        return (c[0] * (1 - u) + c[1] * u) * (1 - v) + (c[2] * (1 - u) + c[3] * u) * v;
     }
     toneColor(idx, snow) {
         const tone = this.snowTone[idx];
