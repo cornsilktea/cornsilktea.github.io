@@ -257,7 +257,7 @@ class SnMatchView {
   private marks(engine: SnEngine, viewerTeam: number): SnMapMarks {
     const pointer = this.spectating ? this.spectator.watched : this.driver.myNum;
     const people = engine.players.filter((p) => (p.life !== "sky" || p.landAt >= 0) && p.life !== "out" && (viewerTeam < 0 || p.team === viewerTeam)).map((p) => ({
-      x: p.x, z: p.z, yaw: p.yaw, color: SnPalette.teamColor(engine.mode, p.team), me: p.num === pointer, down: p.life === "down",
+      x: p.x, z: p.z, yaw: p.yaw, color: SnPalette.teamColor(engine.mode, p.team), me: p.num === pointer, down: p.life === "down", nick: p.nick,
     }));
     const pins = engine.teams.filter((t) => t.dropAt >= 0 && engine.time < SnBalance.DROP.pickLimit + SnBalance.DROP.time && (viewerTeam < 0 || t.num === viewerTeam)).map((t) => ({ x: t.dropX, z: t.dropZ, color: SnPalette.teamColor(engine.mode, t.num) }));
     return { storm: engine.stormNow(), crates: engine.crates, people, pins };
@@ -270,7 +270,7 @@ class SnMatchView {
     this.onEvents(events, ms);
     const me = this.me;
     if (me && !this.spectating && (me.life === "out" || engine.ended)) { this.spectating = true; this.spectator.startFrom(engine, me); }
-    controls.enabled = !!me && me.life === "alive" && !this.spectating;
+    controls.enabled = !!me && (me.life === "alive" || (me.life === "sky" && me.landAt >= 0)) && !this.spectating;
     if (this.spectating) this.spectator.follow(engine, ms);
     const watchedNum = this.spectating ? this.spectator.watched : driver.myNum;
     const watched = engine.players[watchedNum] || null;
@@ -294,6 +294,12 @@ class SnMatchView {
     const ui = this.ui, angle = ui.controls.aimWorldAngle();
     if (!me || !ui.controls.enabled || angle === null) { ui.scene.aimGuide.hide(); return; }
     const y = ui.scene.map.heightAt(me.x, me.z);
+    if (ui.controls.aimKind === "wall") {
+      const engine = this.driver.engine, plan = engine.wallWorks.plan(me, angle);
+      const w = plan ? plan.wall : engine.wallWorks.footprint(me, angle);
+      ui.scene.aimGuide.showWall(w.x, y, w.z, w.yaw, w.halfX, !!plan);
+      return;
+    }
     ui.scene.aimGuide.show(ui.controls.aimKind, me.x, y, me.z, angle, me.bigBall ? SnBalance.BIG.distance * 0.5 : SnBalance.SHOT.range);
   }
 
@@ -308,6 +314,9 @@ class SnMatchView {
     const center = watched && !overview ? watched : null;
     ui.miniMap.draw(center ? center.x : ui.scene.world.rig.focusX, center ? center.z : ui.scene.world.rig.focusZ, marks);
     ui.bigMap.draw(marks);
+    const allyViewer = overview ? null : watched;
+    ui.allyPanel.render(engine, allyViewer);
+    ui.allyPointers.render(engine, allyViewer, ui.scene.world);
     ui.specPanel.show(this.spectating);
     if (this.spectating) ui.specPanel.render(engine, this.spectator.watched, overview);
     if (me && me.life === "sky" && engine.teams[me.team].dropAt < 0 && engine.teams[me.team].leader === me) {
@@ -327,6 +336,8 @@ class SnMatchView {
     this.ui.toast.hide();
     this.ui.results.hide();
     this.ui.specPanel.show(false);
+    this.ui.allyPanel.hide();
+    this.ui.allyPointers.hide();
     this.ui.bigMap.setOpen(false);
     this.ui.scene.aimGuide.hide();
     SnDom.show(SnDom.el("controls"), false);
@@ -343,6 +354,8 @@ class SnGameUi {
   readonly bigMap: SnBigMap;
   readonly miniMap: SnMiniMap;
   readonly numbers = new SnDamageNumbers(SnDom.el("numLayer"));
+  readonly allyPanel = new SnAllyPanel();
+  readonly allyPointers = new SnAllyPointers();
   readonly controls: SnLocalControls;
   constructor(readonly scene: SnSceneView, onMapToggle: () => void) {
     const painter = new SnMapPainter(scene.map);
@@ -364,7 +377,7 @@ class SnLobbyView {
   render(session: RkSession<SnPlayerRecord>, plan: RkSeatPlan): void {
     const mode = (session.value<string>("mode") === "solo" ? "solo" : "duos") as SnMode;
     SnDom.text(SnDom.el("lobbyCode"), session.code);
-    SnDom.text(SnDom.el("lobbyMode"), mode === "duos" ? "2대2대2" : "개인전");
+    SnDom.text(SnDom.el("lobbyMode"), mode === "duos" ? "팀전" : "개인전");
     const seats = plan.humanSeats(session.players);
     let html = "";
     for (let slot = 0; slot < SnRoomRules.SEATS; slot++) {
@@ -538,10 +551,32 @@ class SnGame {
     SnDom.el("btnModeToggle").addEventListener("click", () => this.toggleMode());
     SnDom.el("btnAgain").addEventListener("click", () => this.afterResult());
     SnDom.el("btnResultLeave").addEventListener("click", () => this.leaveRoom(""));
+    SnDom.el("btnGameLeave").addEventListener("click", () => this.askLeave());
     this.lobby.onSeatClick = (slot) => this.clickSeat(slot);
   }
 
+  static readonly LEAVE_CONFIRM_MS = 3000;
+  private leaveAskedAt = -1;
+
+  private askLeave(): void {
+    const button = SnDom.el("btnGameLeave"), now = performance.now();
+    if (this.leaveAskedAt >= 0 && now - this.leaveAskedAt < SnGame.LEAVE_CONFIRM_MS) { this.resetLeave(); this.leaveRoom(""); return; }
+    this.leaveAskedAt = now;
+    button.classList.add("confirm");
+    SnDom.text(button, "한 번 더 누르면 나가요");
+    window.setTimeout(() => { if (performance.now() - this.leaveAskedAt >= SnGame.LEAVE_CONFIRM_MS - 50) this.resetLeave(); }, SnGame.LEAVE_CONFIRM_MS);
+  }
+
+  private resetLeave(): void {
+    this.leaveAskedAt = -1;
+    const button = SnDom.el("btnGameLeave");
+    button.classList.remove("confirm");
+    SnDom.text(button, this.practice || this.options.offline ? "나가기" : "방 나가기");
+  }
+
   private showScreen(name: SnScreenName): void {
+    SnDom.show(SnDom.el("btnGameLeave"), name === "game");
+    this.resetLeave();
     SnDom.show(SnDom.el("startScreen"), name === "start");
     SnDom.show(SnDom.el("lobbyScreen"), name === "lobby");
     SnDom.show(SnDom.el("hudTop"), name === "game");
@@ -688,7 +723,7 @@ class SnGame {
   }
 
   private leaveRoom(message: string): void {
-    if (this.options.offline) { location.search = ""; return; }
+    if (this.options.offline) { const cls = new URLSearchParams(location.search).get("c"); location.href = location.pathname + (cls ? "?c=" + encodeURIComponent(cls) : ""); return; }
     if (this.practice) {
       this.practice = false;
       if (this.view) { this.view.dispose(); this.view = null; }

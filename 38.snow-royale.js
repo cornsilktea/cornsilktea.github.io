@@ -292,7 +292,7 @@ class SnMatchView {
     marks(engine, viewerTeam) {
         const pointer = this.spectating ? this.spectator.watched : this.driver.myNum;
         const people = engine.players.filter((p) => (p.life !== "sky" || p.landAt >= 0) && p.life !== "out" && (viewerTeam < 0 || p.team === viewerTeam)).map((p) => ({
-            x: p.x, z: p.z, yaw: p.yaw, color: SnPalette.teamColor(engine.mode, p.team), me: p.num === pointer, down: p.life === "down",
+            x: p.x, z: p.z, yaw: p.yaw, color: SnPalette.teamColor(engine.mode, p.team), me: p.num === pointer, down: p.life === "down", nick: p.nick,
         }));
         const pins = engine.teams.filter((t) => t.dropAt >= 0 && engine.time < SnBalance.DROP.pickLimit + SnBalance.DROP.time && (viewerTeam < 0 || t.num === viewerTeam)).map((t) => ({ x: t.dropX, z: t.dropZ, color: SnPalette.teamColor(engine.mode, t.num) }));
         return { storm: engine.stormNow(), crates: engine.crates, people, pins };
@@ -307,7 +307,7 @@ class SnMatchView {
             this.spectating = true;
             this.spectator.startFrom(engine, me);
         }
-        controls.enabled = !!me && me.life === "alive" && !this.spectating;
+        controls.enabled = !!me && (me.life === "alive" || (me.life === "sky" && me.landAt >= 0)) && !this.spectating;
         if (this.spectating)
             this.spectator.follow(engine, ms);
         const watchedNum = this.spectating ? this.spectator.watched : driver.myNum;
@@ -340,6 +340,12 @@ class SnMatchView {
             return;
         }
         const y = ui.scene.map.heightAt(me.x, me.z);
+        if (ui.controls.aimKind === "wall") {
+            const engine = this.driver.engine, plan = engine.wallWorks.plan(me, angle);
+            const w = plan ? plan.wall : engine.wallWorks.footprint(me, angle);
+            ui.scene.aimGuide.showWall(w.x, y, w.z, w.yaw, w.halfX, !!plan);
+            return;
+        }
         ui.scene.aimGuide.show(ui.controls.aimKind, me.x, y, me.z, angle, me.bigBall ? SnBalance.BIG.distance * 0.5 : SnBalance.SHOT.range);
     }
     drawHud(engine, watched, overview, me, ms) {
@@ -353,6 +359,9 @@ class SnMatchView {
         const center = watched && !overview ? watched : null;
         ui.miniMap.draw(center ? center.x : ui.scene.world.rig.focusX, center ? center.z : ui.scene.world.rig.focusZ, marks);
         ui.bigMap.draw(marks);
+        const allyViewer = overview ? null : watched;
+        ui.allyPanel.render(engine, allyViewer);
+        ui.allyPointers.render(engine, allyViewer, ui.scene.world);
         ui.specPanel.show(this.spectating);
         if (this.spectating)
             ui.specPanel.render(engine, this.spectator.watched, overview);
@@ -376,6 +385,8 @@ class SnMatchView {
         this.ui.toast.hide();
         this.ui.results.hide();
         this.ui.specPanel.show(false);
+        this.ui.allyPanel.hide();
+        this.ui.allyPointers.hide();
         this.ui.bigMap.setOpen(false);
         this.ui.scene.aimGuide.hide();
         SnDom.show(SnDom.el("controls"), false);
@@ -391,6 +402,8 @@ class SnGameUi {
         this.results = new SnResultBoard();
         this.specPanel = new SnSpectatorPanel();
         this.numbers = new SnDamageNumbers(SnDom.el("numLayer"));
+        this.allyPanel = new SnAllyPanel();
+        this.allyPointers = new SnAllyPointers();
         const painter = new SnMapPainter(scene.map);
         this.bigMap = new SnBigMap(painter);
         this.miniMap = new SnMiniMap(painter, onMapToggle);
@@ -409,7 +422,7 @@ class SnLobbyView {
     render(session, plan) {
         const mode = (session.value("mode") === "solo" ? "solo" : "duos");
         SnDom.text(SnDom.el("lobbyCode"), session.code);
-        SnDom.text(SnDom.el("lobbyMode"), mode === "duos" ? "2대2대2" : "개인전");
+        SnDom.text(SnDom.el("lobbyMode"), mode === "duos" ? "팀전" : "개인전");
         const seats = plan.humanSeats(session.players);
         let html = "";
         for (let slot = 0; slot < SnRoomRules.SEATS; slot++) {
@@ -547,6 +560,7 @@ class SnGame {
         this.view = null;
         this.matchId = 0;
         this.lastMs = 0;
+        this.leaveAskedAt = -1;
         this.seed = this.options.seed;
         this.start().catch((error) => { SnDom.text(SnDom.el("loading"), "불러오기 실패: " + error); });
     }
@@ -606,9 +620,31 @@ class SnGame {
         SnDom.el("btnModeToggle").addEventListener("click", () => this.toggleMode());
         SnDom.el("btnAgain").addEventListener("click", () => this.afterResult());
         SnDom.el("btnResultLeave").addEventListener("click", () => this.leaveRoom(""));
+        SnDom.el("btnGameLeave").addEventListener("click", () => this.askLeave());
         this.lobby.onSeatClick = (slot) => this.clickSeat(slot);
     }
+    askLeave() {
+        const button = SnDom.el("btnGameLeave"), now = performance.now();
+        if (this.leaveAskedAt >= 0 && now - this.leaveAskedAt < SnGame.LEAVE_CONFIRM_MS) {
+            this.resetLeave();
+            this.leaveRoom("");
+            return;
+        }
+        this.leaveAskedAt = now;
+        button.classList.add("confirm");
+        SnDom.text(button, "한 번 더 누르면 나가요");
+        window.setTimeout(() => { if (performance.now() - this.leaveAskedAt >= SnGame.LEAVE_CONFIRM_MS - 50)
+            this.resetLeave(); }, SnGame.LEAVE_CONFIRM_MS);
+    }
+    resetLeave() {
+        this.leaveAskedAt = -1;
+        const button = SnDom.el("btnGameLeave");
+        button.classList.remove("confirm");
+        SnDom.text(button, this.practice || this.options.offline ? "나가기" : "방 나가기");
+    }
     showScreen(name) {
+        SnDom.show(SnDom.el("btnGameLeave"), name === "game");
+        this.resetLeave();
         SnDom.show(SnDom.el("startScreen"), name === "start");
         SnDom.show(SnDom.el("lobbyScreen"), name === "lobby");
         SnDom.show(SnDom.el("hudTop"), name === "game");
@@ -791,7 +827,8 @@ class SnGame {
     }
     leaveRoom(message) {
         if (this.options.offline) {
-            location.search = "";
+            const cls = new URLSearchParams(location.search).get("c");
+            location.href = location.pathname + (cls ? "?c=" + encodeURIComponent(cls) : "");
             return;
         }
         if (this.practice) {
@@ -858,3 +895,4 @@ class SnGame {
 SnGame.STEP = 1 / 30;
 SnGame.STALL_MS = 250;
 SnGame.WATCHDOG_MS = 100;
+SnGame.LEAVE_CONFIRM_MS = 3000;

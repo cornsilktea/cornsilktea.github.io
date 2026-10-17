@@ -51,11 +51,11 @@ class SnBalance {
   static readonly ICE_PACE = 0.5;
   static readonly RADIUS = 0.4;
   static readonly SHOT = { damage: 12, cost: 2, interval: 0.45, speed: 22, range: 14, radius: 0.25, spawn: 0.5 };
-  static readonly WALL = { cost: 30, hp: 150, halfLength: 1.5, halfDepth: 0.3, height: 2.2, buildTime: 1, interval: 1.2, perTeam: 6, life: 75, distance: 1.3 };
+  static readonly WALL = { cost: 30, hp: 150, halfLength: 1.5, halfDepth: 0.3, height: 2.2, buildTime: 1, interval: 1.2, perTeam: 6, life: 75, distance: 1.3, snap: 1.8, minLength: 0.8, maxLength: 3.6, joinInset: 0.35 };
   static readonly COCOA_RATIO = 0.3;
   static readonly BIG = { damage: 40, wallDamage: 200, radius: 1.2, speed: 12, distance: 30, knock: 4, knockTime: 0.3 };
   static readonly REVIVE = { time: 10, hp: 50, guard: 3, max: 2, reach: 2.5 };
-  static readonly DROP = { time: 8, pickLimit: 20, spread: 6, gap: 2, steer: 1.2, steerMax: 6, botPickMin: 2, botPickMax: 6, keyWeight: 3 };
+  static readonly DROP = { time: 8, pickLimit: 20, spread: 6, gap: 2, steer: 3.5, steerMax: 22, botPickMin: 2, botPickMax: 6, keyWeight: 3 };
   static readonly SNOW = { perTile: 5, start: 30, cap: 300, pile: 10, pileReach: 1.0 };
   static readonly HEIGHT = { defense: 0.12, rangeUp: 0.15, rangeDown: 0.10 };
   static readonly AIM = { reach: 20, lead: 0.6, err: 0.08, moveMemory: 0.4 };
@@ -172,7 +172,7 @@ class SnPlayer {
   buildingWall = -1;
   knockX = 0; knockZ = 0; knockLeft = 0;
   reviveTarget = -1; reviveProgress = 0;
-  kills = 0; dealt = 0; collected = 0;
+  kills = 0; dealt = 0; collected = 0; walls = 0;
   downAt = -1; killedBy = -1;
   lastHitAt = -1; lastHitFromX = 0; lastHitFromZ = 0;
   landAt = -1; spotX = 0; spotZ = 0; skyX = 0; skyZ = 0;
@@ -201,21 +201,27 @@ class SnTeam {
 }
 
 class SnWall {
-  readonly halfX = SnBalance.WALL.halfLength;
   readonly halfZ = SnBalance.WALL.halfDepth;
   readonly yaw: number;
   hp = SnBalance.WALL.hp;
   expireAt: number;
-  constructor(readonly id: number, readonly team: number, readonly owner: number, readonly x: number, readonly z: number, readonly facing: number, readonly level: number, readonly createdAt: number, readonly readyAt: number) {
+  constructor(readonly id: number, readonly team: number, readonly owner: number, readonly x: number, readonly z: number, readonly facing: number, readonly level: number, readonly createdAt: number, readonly readyAt: number, readonly halfX: number = SnBalance.WALL.halfLength) {
     this.yaw = Math.atan2(Math.cos(facing), Math.sin(facing));
     this.expireAt = readyAt + SnBalance.WALL.life;
+  }
+  get axisX(): number { return Math.cos(this.yaw); }
+  get axisZ(): number { return -Math.sin(this.yaw); }
+  ends(): [SnPoint, SnPoint] {
+    const ax = this.axisX * this.halfX, az = this.axisZ * this.halfX;
+    return [{ x: this.x - ax, z: this.z - az }, { x: this.x + ax, z: this.z + az }];
   }
   solid(time: number): boolean { return time >= this.readyAt; }
   distanceTo(x: number, z: number): number { return SnBoxMath.distance(this.x, this.z, this.halfX, this.halfZ, this.yaw, x, z); }
   pushOut(x: number, z: number, pad: number): SnPoint | null { return SnBoxMath.pushOut(this.x, this.z, this.halfX, this.halfZ, this.yaw, x, z, pad); }
-  samplePoints(): SnPoint[] {
-    const pts: SnPoint[] = [], c = Math.cos(this.yaw), s = Math.sin(this.yaw);
-    for (let a = -this.halfX; a <= this.halfX + 1e-6; a += 0.5) for (const b of [-this.halfZ, this.halfZ]) pts.push({ x: this.x + a * c + b * s, z: this.z - a * s + b * c });
+  samplePoints(inset: number = 0): SnPoint[] {
+    const pts: SnPoint[] = [], c = Math.cos(this.yaw), s = Math.sin(this.yaw), reach = this.halfX - inset;
+    const n = Math.max(1, Math.ceil(reach * 2 / 0.5));
+    for (let k = 0; k <= n; k++) { const a = -reach + reach * 2 * k / n; for (const b of [-this.halfZ, this.halfZ]) pts.push({ x: this.x + a * c + b * s, z: this.z - a * s + b * c }); }
     return pts;
   }
 }
@@ -590,7 +596,7 @@ class SnWallWorks {
     return new SnWall(-1, p.team, p.num, x, z, facing, e.map.levelAt(p.x, p.z), e.time, e.time + SnBalance.WALL.buildTime);
   }
 
-  fits(p: SnPlayer, w: SnWall): boolean {
+  fits(p: SnPlayer, w: SnWall, joined: readonly SnWall[] = []): boolean {
     const e = this.engine, map = e.map;
     const home = SnGridMath.indexAt(p.x, p.z);
     if (home < 0 || map.isRamp(home)) return false;
@@ -599,7 +605,11 @@ class SnWallWorks {
       const idx = SnGridMath.indexAt(pt.x, pt.z);
       if (idx < 0 || !map.walkable(idx) || map.isRamp(idx) || map.level[idx] !== level) return false;
       if (map.obstacleAt(pt.x, pt.z, 0)) return false;
-      for (const other of e.walls) if (other.distanceTo(pt.x, pt.z) < 0.05) return false;
+    }
+    const inner = w.samplePoints(SnBalance.WALL.joinInset);
+    for (const other of e.walls) {
+      const points = joined.indexOf(other) >= 0 ? inner : w.samplePoints();
+      for (const pt of points) if (other.distanceTo(pt.x, pt.z) < 0.05) return false;
     }
     for (const q of e.players) {
       if (q.life !== "alive" && q.life !== "down") continue;
@@ -614,10 +624,12 @@ class SnWallWorks {
     const team = e.teams[p.team];
     if (team.snow < SnBalance.WALL.cost) { e.emit({ t: "noSnow", id: p.num }); return false; }
     const facing = angle === null ? p.yaw : angle;
-    const draft = this.footprint(p, facing);
-    if (!this.fits(p, draft)) { e.emit({ t: "noWall", id: p.num }); return false; }
-    const w = new SnWall(e.nextId(), p.team, p.num, draft.x, draft.z, facing, draft.level, e.time, e.time + SnBalance.WALL.buildTime);
+    const plan = this.plan(p, facing);
+    if (!plan) { e.emit({ t: "noWall", id: p.num }); return false; }
+    const draft = plan.wall;
+    const w = new SnWall(e.nextId(), p.team, p.num, draft.x, draft.z, draft.facing, draft.level, e.time, e.time + SnBalance.WALL.buildTime, draft.halfX);
     team.snow -= SnBalance.WALL.cost;
+    p.walls++;
     p.yaw = facing;
     p.buildUntil = w.readyAt;
     p.buildingWall = w.id;
@@ -627,6 +639,51 @@ class SnWallWorks {
     e.walls.push(w);
     e.emit({ t: "wall", id: w.id });
     return true;
+  }
+
+  plan(p: SnPlayer, facing: number): { wall: SnWall; joined: SnWall[] } | null {
+    const draft = this.footprint(p, facing);
+    const options: Array<{ wall: SnWall; joined: SnWall[] }> = [];
+    const [a, b] = draft.ends();
+    const nearA = this.nearestEnd(a, null), nearB = this.nearestEnd(b, nearA ? nearA.wall : null);
+    if (nearA && nearB) {
+      const bridge = this.between(p, draft, nearA.point, nearB.point);
+      if (bridge) options.push({ wall: bridge, joined: [nearA.wall, nearB.wall] });
+    }
+    for (const near of [nearA, nearB]) {
+      if (!near) continue;
+      const from = near === nearA ? a : b;
+      const moved = this.shifted(p, draft, near.point.x - from.x, near.point.z - from.z);
+      options.push({ wall: moved, joined: [near.wall] });
+    }
+    options.push({ wall: draft, joined: [] });
+    for (const option of options) if (this.fits(p, option.wall, option.joined)) return option;
+    return null;
+  }
+
+  private nearestEnd(point: SnPoint, skip: SnWall | null): { wall: SnWall; point: SnPoint } | null {
+    let best: { wall: SnWall; point: SnPoint } | null = null, bd = SnBalance.WALL.snap;
+    for (const w of this.engine.walls) {
+      if (w === skip) continue;
+      for (const end of w.ends()) {
+        const d = Math.hypot(end.x - point.x, end.z - point.z);
+        if (d < bd) { bd = d; best = { wall: w, point: end }; }
+      }
+    }
+    return best;
+  }
+
+  private between(p: SnPlayer, draft: SnWall, from: SnPoint, to: SnPoint): SnWall | null {
+    const length = Math.hypot(to.x - from.x, to.z - from.z);
+    if (length < SnBalance.WALL.minLength || length > SnBalance.WALL.maxLength) return null;
+    const along = Math.atan2(to.z - from.z, to.x - from.x);
+    let facing = along + Math.PI / 2;
+    if (Math.cos(facing - draft.facing) < 0) facing += Math.PI;
+    return new SnWall(-1, p.team, p.num, (from.x + to.x) / 2, (from.z + to.z) / 2, SnAngle.wrap(facing), draft.level, draft.createdAt, draft.readyAt, length / 2);
+  }
+
+  private shifted(p: SnPlayer, draft: SnWall, dx: number, dz: number): SnWall {
+    return new SnWall(-1, p.team, p.num, draft.x + dx, draft.z + dz, draft.facing, draft.level, draft.createdAt, draft.readyAt, draft.halfX);
   }
 
   step(): void {
@@ -819,6 +876,8 @@ class SnDropRules {
         const len = Math.hypot(p.skyX, p.skyZ);
         if (len > SnBalance.DROP.steerMax) { p.skyX *= SnBalance.DROP.steerMax / len; p.skyZ *= SnBalance.DROP.steerMax / len; }
       }
+      const edge = SnGridMath.HALF - 3;
+      p.skyX = Math.max(-edge - p.spotX, Math.min(edge - p.spotX, p.skyX)); p.skyZ = Math.max(-edge - p.spotZ, Math.min(edge - p.spotZ, p.skyZ));
       p.x = p.spotX + p.skyX; p.z = p.spotZ + p.skyZ;
       if (e.time >= p.landAt) this.land(p);
     }
@@ -1089,13 +1148,13 @@ class SnSnapshotCodec {
   }
 
   static encodeWalls(walls: readonly SnWall[]): string {
-    return walls.map((w) => [w.id, w.team, w.owner, Math.round(w.x * 100), Math.round(w.z * 100), Math.round(w.facing * 1000), w.level, Math.round(w.hp), Math.round(w.createdAt * 10), Math.round(w.readyAt * 10)].join(",")).join(";");
+    return walls.map((w) => [w.id, w.team, w.owner, Math.round(w.x * 100), Math.round(w.z * 100), Math.round(w.facing * 1000), w.level, Math.round(w.hp), Math.round(w.createdAt * 10), Math.round(w.readyAt * 10), Math.round(w.halfX * 100)].join(",")).join(";");
   }
   static decodeWalls(s: string): SnWall[] {
     if (!s) return [];
     return s.split(";").map((part) => {
       const v = part.split(",").map(Number);
-      const w = new SnWall(v[0], v[1], v[2], v[3] / 100, v[4] / 100, v[5] / 1000, v[6], v[8] / 10, v[9] / 10);
+      const w = new SnWall(v[0], v[1], v[2], v[3] / 100, v[4] / 100, v[5] / 1000, v[6], v[8] / 10, v[9] / 10, v[10] > 0 ? v[10] / 100 : SnBalance.WALL.halfLength);
       w.hp = v[7];
       return w;
     });

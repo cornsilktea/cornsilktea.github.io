@@ -42,7 +42,8 @@ const PACKS = {
     { file: "Rig_Medium_Simulation.glb", clips: ["Cheering"] }
   ],
   snow: [
-    { file: "Rig_Medium_General.glb", clips: ["Interact", "Spawn_Air"] },
+    { file: "Rig_Medium_General.glb", clips: ["Interact", "Spawn_Air", "Hit_B"] },
+    { file: "Rig_Medium_MovementBasic.glb", clips: ["Jump_Idle", "Jump_Land"] },
     { file: "Rig_Medium_Tools.glb", clips: ["Working_A"] },
     { file: "Rig_Medium_Simulation.glb", clips: ["Cheering"] }
   ]

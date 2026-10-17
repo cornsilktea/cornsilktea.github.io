@@ -363,7 +363,7 @@ class SnMapCanvas {
         }
         return { w, h, dpr };
     }
-    draw(cx, cz, span, marks) {
+    draw(cx, cz, span, marks, labels = false) {
         const { w, h, dpr } = this.fit();
         if (!w || !h)
             return;
@@ -428,44 +428,78 @@ class SnMapCanvas {
             ctx.fill();
             ctx.stroke();
         }
-        for (const p of marks.people) {
-            const x = toX(p.x), y = toY(p.z);
-            ctx.save();
-            ctx.translate(x, y);
-            if (p.down) {
-                ctx.fillStyle = "#FFFFFF";
-                ctx.strokeStyle = p.color;
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.arc(0, 0, 4.5, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.stroke();
-            }
-            else if (p.me) {
-                ctx.rotate(p.yaw);
-                ctx.fillStyle = "#D97B4F";
-                ctx.strokeStyle = "#fff";
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.moveTo(9, 0);
-                ctx.lineTo(-6, 6);
-                ctx.lineTo(-3, 0);
-                ctx.lineTo(-6, -6);
-                ctx.closePath();
-                ctx.fill();
-                ctx.stroke();
-            }
-            else {
-                ctx.fillStyle = p.color;
-                ctx.strokeStyle = "#fff";
-                ctx.lineWidth = 1.6;
-                ctx.beginPath();
-                ctx.arc(0, 0, 5, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.stroke();
-            }
-            ctx.restore();
+        const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 220);
+        const ordered = marks.people.slice().sort((a, b) => Number(a.me) - Number(b.me));
+        for (const p of ordered)
+            this.person(ctx, toX(p.x), toY(p.z), p, pulse, labels);
+    }
+    person(ctx, x, y, p, pulse, labels) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.globalAlpha = 0.35 + 0.35 * pulse;
+        ctx.fillStyle = p.me ? "#D97B4F" : p.color;
+        ctx.beginPath();
+        ctx.arc(0, 0, (p.me ? 15 : 12) + pulse * 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        if (p.down) {
+            ctx.fillStyle = "#FFFFFF";
+            ctx.strokeStyle = p.color;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(0, 0, 7, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = p.color;
+            ctx.font = "800 10px \"Nanum Gothic\", \"Malgun Gothic\", sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText("✕", 0, 0.5);
         }
+        else if (p.me) {
+            ctx.rotate(p.yaw);
+            ctx.fillStyle = "#D97B4F";
+            ctx.strokeStyle = "#1A2230";
+            ctx.lineWidth = 4.5;
+            ctx.lineJoin = "round";
+            ctx.beginPath();
+            ctx.moveTo(14, 0);
+            ctx.lineTo(-9, 9.5);
+            ctx.lineTo(-4, 0);
+            ctx.lineTo(-9, -9.5);
+            ctx.closePath();
+            ctx.stroke();
+            ctx.strokeStyle = "#FFFFFF";
+            ctx.lineWidth = 2.2;
+            ctx.fill();
+            ctx.stroke();
+        }
+        else {
+            ctx.fillStyle = p.color;
+            ctx.strokeStyle = "#1A2230";
+            ctx.lineWidth = 5;
+            ctx.beginPath();
+            ctx.arc(0, 0, 8, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.strokeStyle = "#FFFFFF";
+            ctx.lineWidth = 2.6;
+            ctx.fill();
+            ctx.stroke();
+        }
+        ctx.restore();
+        if (!labels)
+            return;
+        ctx.save();
+        ctx.font = "800 13px \"Nanum Gothic\", \"Malgun Gothic\", sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "bottom";
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = "#1A2230";
+        ctx.fillStyle = "#FFFFFF";
+        const text = p.me ? "나" : p.nick;
+        ctx.strokeText(text, x, y - 16);
+        ctx.fillText(text, x, y - 16);
+        ctx.restore();
     }
     worldAt(clientX, clientY, cx, cz, span) {
         const box = this.canvas.getBoundingClientRect(), size = Math.min(box.width, box.height), scale = size / span;
@@ -529,6 +563,7 @@ class SnHud {
         this.hp = SnDom.el("hudHpFill");
         this.hpText = SnDom.el("hudHpText");
         this.snow = SnDom.el("hudSnow");
+        this.snowFill = SnDom.el("hudSnowFill");
         this.gear = SnDom.el("hudGear");
         this.storm = SnDom.el("hudStorm");
         this.teams = SnDom.el("hudTeams");
@@ -558,7 +593,9 @@ class SnHud {
         this.hp.style.width = (ratio * 100).toFixed(1) + "%";
         this.hp.classList.toggle("low", ratio < 0.3);
         SnDom.text(this.hpText, p.life === "down" || p.life === "out" ? "얼어붙음 ⛄" : "체온 " + Math.ceil(Math.max(0, p.hp)) + " / " + p.maxHp);
-        SnDom.text(this.snow, "❄ " + engine.teams[p.team].snow + " / " + SnBalance.SNOW.cap);
+        const snow = engine.teams[p.team].snow;
+        SnDom.text(this.snow, "❄ " + snow + " / " + SnBalance.SNOW.cap);
+        this.snowFill.style.width = (snow / SnBalance.SNOW.cap * 100).toFixed(1) + "%";
         SnDom.html(this.gear, p.gear.map((g, k) => '<span class="slot' + (g < 0 ? " empty" : "") + '" style="' + (g < 0 ? "" : "border-color:" + SnBalance.GRADE_COLORS[g]) + '" title="' + SnHud.SLOT_NAMES[k] + '">' + SnHud.ICONS[k] + (g < 0 ? "" : "<b style=\"background:" + SnBalance.GRADE_COLORS[g] + '"></b>') + "</span>").join("") + (p.bigBall ? '<span class="slot big" title="대형 눈덩이">⚪</span>' : ""));
         SnDom.text(this.kills, "처치 " + p.kills);
         SnDom.show(this.watchTag, watching);
@@ -614,7 +651,9 @@ class SnSpectatorPanel {
             team.members.forEach((p) => {
                 const ratio = Math.max(0, Math.min(1, p.hp / p.maxHp));
                 const status = p.life === "sky" ? "낙하 중" : p.life === "down" ? (p.canBeRevived() ? "⛄ 부활 대기" : "⛄ 얼어붙음") : p.life === "out" ? "탈락" : "체온 " + Math.ceil(p.hp) + " / " + p.maxHp;
-                const dots = p.gear.map((g) => '<i class="gd" style="background:' + (g < 0 ? "rgba(255,255,255,.18)" : SnBalance.GRADE_COLORS[g]) + '"></i>').join("");
+                const snow = engine.teams[team.num].snow;
+                const dots = p.gear.map((g) => '<i class="gd" style="background:' + (g < 0 ? "rgba(255,255,255,.18)" : SnBalance.GRADE_COLORS[g]) + '"></i>').join("") +
+                    '<div class="spSnow"><i style="width:' + Math.round(snow / SnBalance.SNOW.cap * 100) + '%"></i><span>❄ ' + snow + "</span></div>";
                 html += '<div class="spCard' + (p.life === "out" ? " dead" : p.life === "down" ? " down" : "") + (p.num === watched && !overview ? " watched" : "") + '" data-num="' + p.num + '" style="border-color:' + color + '">' +
                     '<div class="spName">' + (p.bot ? "🤖 " : "") + SnDom.esc(p.nick) + '<span class="spK">' + p.kills + "처치</span>" + (p.bigBall ? '<span class="spBig">⚪</span>' : "") + "</div>" +
                     '<div class="spBar hp' + (ratio < 0.3 ? " low" : "") + '"><i style="width:' + Math.round((p.life === "alive" || p.life === "sky" ? ratio : 0) * 100) + '%"></i><span>' + status + "</span></div>" +
@@ -624,6 +663,75 @@ class SnSpectatorPanel {
         SnDom.html(this.panel, html);
     }
 }
+class SnAllyPanel {
+    constructor() {
+        this.panel = SnDom.el("allyPanel");
+    }
+    render(engine, viewer) {
+        const mates = viewer ? engine.teams[viewer.team].members.filter((m) => m !== viewer) : [];
+        SnDom.show(this.panel, mates.length > 0);
+        if (!mates.length)
+            return;
+        const color = SnPalette.teamColor(engine.mode, viewer.team), snow = engine.teams[viewer.team].snow;
+        SnDom.html(this.panel, mates.map((p) => {
+            const ratio = Math.max(0, Math.min(1, p.hp / p.maxHp));
+            const status = p.life === "sky" ? "낙하 중" : p.life === "down" ? "⛄ 얼어붙음" : p.life === "out" ? "탈락" : "체온 " + Math.ceil(p.hp) + " / " + p.maxHp;
+            const gear = p.gear.map((g, k) => '<span class="gs' + (g < 0 ? " empty" : "") + '" style="' + (g < 0 ? "" : "border-color:" + SnBalance.GRADE_COLORS[g]) + '">' + SnHud.ICONS[k] + "</span>").join("") + (p.bigBall ? '<span class="gs">⚪</span>' : "");
+            return '<div class="allyCard' + (p.life === "down" ? " down" : p.life === "out" ? " out" : "") + '" style="border-left-color:' + color + '">' +
+                '<div class="allyName">' + (p.bot ? "🤖 " : "") + SnDom.esc(p.nick) + "</div>" +
+                '<div class="spBar' + (ratio < 0.3 ? " low" : "") + '"><i style="width:' + Math.round((p.life === "alive" || p.life === "sky" ? ratio : 0) * 100) + '%"></i><span>' + status + "</span></div>" +
+                '<div class="allyRow">' + gear + '<div class="snowGauge"><i style="width:' + Math.round(snow / SnBalance.SNOW.cap * 100) + '%"></i><span>❄ ' + snow + "</span></div></div></div>";
+        }).join(""));
+    }
+    hide() { SnDom.show(this.panel, false); }
+}
+class SnAllyPointers {
+    constructor() {
+        this.layer = SnDom.el("allyPointers");
+        this.pool = [];
+    }
+    render(engine, viewer, world) {
+        const mates = viewer && viewer.life !== "out" ? engine.teams[viewer.team].members.filter((m) => m !== viewer && (m.life === "alive" || m.life === "down" || (m.life === "sky" && m.landAt >= 0))) : [];
+        let used = 0;
+        const w = window.innerWidth, h = window.innerHeight, m = SnAllyPointers.MARGIN;
+        for (const p of mates) {
+            const y = engine.map.heightAt(p.x, p.z) + 1;
+            const s = world.project(p.x, y, p.z);
+            const inside = s.visible && s.x > m && s.x < w - m && s.y > m && s.y < h - m;
+            if (inside)
+                continue;
+            let dx = s.x - w / 2, dy = s.y - h / 2;
+            if (!s.visible) {
+                dx = -dx;
+                dy = -dy;
+            }
+            const angle = Math.atan2(dy, dx), cos = Math.cos(angle), sin = Math.sin(angle);
+            const reach = Math.min(Math.abs(cos) > 1e-6 ? (w / 2 - m) / Math.abs(cos) : Infinity, Math.abs(sin) > 1e-6 ? (h / 2 - m) / Math.abs(sin) : Infinity);
+            const el = this.pointer(used++);
+            el.style.transform = "translate(" + Math.round(w / 2 + cos * reach) + "px," + Math.round(h / 2 + sin * reach) + "px)";
+            const arrow = el.firstChild, label = el.lastChild;
+            arrow.style.transform = "rotate(" + angle.toFixed(3) + "rad)";
+            arrow.style.background = SnPalette.teamColor(engine.mode, p.team);
+            SnDom.text(label, (p.life === "down" ? "⛄ " : "") + p.nick + " " + Math.round(Math.hypot(p.x - viewer.x, p.z - viewer.z)) + "m");
+            label.style.top = sin < -0.5 ? "16px" : "-32px";
+            el.style.display = "block";
+        }
+        for (let k = used; k < this.pool.length; k++)
+            this.pool[k].style.display = "none";
+    }
+    pointer(k) {
+        if (!this.pool[k]) {
+            const el = document.createElement("div");
+            el.className = "allyPtr";
+            el.innerHTML = "<i></i><b></b>";
+            this.layer.appendChild(el);
+            this.pool[k] = el;
+        }
+        return this.pool[k];
+    }
+    hide() { this.pool.forEach((el) => { el.style.display = "none"; }); }
+}
+SnAllyPointers.MARGIN = 30;
 class SnBigMap {
     constructor(painter) {
         this.box = SnDom.el("bigMap");
@@ -653,7 +761,7 @@ class SnBigMap {
     }
     draw(marks) {
         if (this.open)
-            this.canvas.draw(0, 0, SnGridMath.HALF * 2 + 8, marks);
+            this.canvas.draw(0, 0, SnGridMath.HALF * 2 + 8, marks, true);
     }
 }
 class SnMiniMap {
@@ -675,7 +783,7 @@ class SnResultBoard {
         let rows = "";
         for (const { t, rank } of order)
             for (const p of t.members) {
-                rows += "<tr" + (p.num === myNum ? ' class="me"' : "") + "><td>" + rank + "위</td><td><i class=\"tc\" style=\"background:" + SnPalette.teamColor(engine.mode, t.num) + '"></i>' + (p.bot ? "🤖 " : "") + SnDom.esc(p.nick) + "</td><td>" + SnTimeText.clock(engine.survival(p)) + "</td><td>" + p.kills + "</td><td>" + p.dealt + "</td><td>" + p.collected + "</td></tr>";
+                rows += "<tr" + (p.num === myNum ? ' class="me"' : "") + "><td>" + rank + "위</td><td><i class=\"tc\" style=\"background:" + SnPalette.teamColor(engine.mode, t.num) + '"></i>' + (p.bot ? "🤖 " : "") + SnDom.esc(p.nick) + "</td><td>" + SnTimeText.clock(engine.survival(p)) + "</td><td>" + p.kills + "</td><td>" + p.dealt + "</td><td>" + p.collected + "</td><td>" + p.walls + "</td></tr>";
             }
         const mine = myNum >= 0 ? ranks[engine.players[myNum].team] : 0;
         SnDom.text(SnDom.el("resultTitle"), myNum < 0 ? "경기 끝" : mine === 1 ? "우승! 🏆" : mine + "위");

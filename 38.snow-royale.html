@@ -48,8 +48,36 @@
   #hudGear .slot.big { border-color: #FFFFFF; background: rgba(143,211,255,.35); }
   #hudTop { position: fixed; top: 8px; left: 50%; transform: translateX(-50%); z-index: 5; display: flex; gap: 8px; pointer-events: none; white-space: nowrap; font-size: 15px; font-weight: 800; }
   #hudTop .hud-box { padding: 6px 12px; }
-  #mapDock { position: fixed; right: 12px; top: 50%; transform: translateY(-50%); z-index: 6; display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
-  #miniMap { width: 150px; height: 150px; border-radius: 8px; border: 2px solid rgba(255,255,255,.8); box-shadow: 0 4px 12px rgba(0,0,0,.3); cursor: pointer; display: block; }
+  :root { --map-size: clamp(150px, calc(50vh - 193px), 40vw); }
+  #mapDock { position: fixed; right: 12px; top: calc(50% - 75px); z-index: 6; display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
+  #miniMap { width: var(--map-size); height: var(--map-size); border-radius: 8px; border: 2px solid rgba(255,255,255,.8); box-shadow: 0 4px 12px rgba(0,0,0,.3); cursor: pointer; display: block; }
+  .snowGauge { position: relative; flex: 1; height: 22px; border-radius: 5px; background: rgba(255,255,255,.14); overflow: hidden; align-self: center; }
+  .snowGauge i { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, #6FB7F0, #CFEAFF); transition: width .15s; }
+  .snowGauge span { position: relative; display: block; text-align: center; font-size: 13px; font-weight: 800; line-height: 22px; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.85); white-space: nowrap; }
+  .hudRow.small { font-size: 13px; color: #FFD37A; margin-top: 4px; }
+  .lobbyModeText { font-size: 22px; font-weight: 800; padding-top: 4px; white-space: nowrap; }
+  .lobbyModeText b { color: #8FD3FF; }
+  #btnGameLeave { position: fixed; right: 12px; top: 8px; z-index: 7; font: inherit; font-size: 15px; font-weight: 800; color: #fff; cursor: pointer; border-top: 0; border-right: 0; border-bottom: 0; padding: 7px 14px; }
+  #btnGameLeave.confirm { background: #D97B4F; border-left-color: #fff; }
+  #allyPanel { position: fixed; right: 12px; bottom: calc(50% + 75px + 8px); width: var(--map-size); min-width: 170px; z-index: 6; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+  .allyCard { background: rgba(16,24,38,.82); border-radius: 8px; border-left: 4px solid; padding: 5px 8px; }
+  .allyCard.down { opacity: .85; }
+  .allyCard.out { opacity: .45; filter: grayscale(1); }
+  .allyName { font-size: 13px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
+  .allyRow { display: flex; gap: 4px; align-items: center; margin-top: 3px; }
+  .allyRow .gs { width: 20px; height: 20px; border-radius: 4px; border: 2px solid rgba(255,255,255,.35); font-size: 11px; display: flex; align-items: center; justify-content: center; flex: none; }
+  .allyRow .gs.empty { border-style: dashed; opacity: .5; }
+  .allyRow .snowGauge { height: 18px; }
+  .allyRow .snowGauge span { font-size: 11px; line-height: 18px; }
+  .allyCard .spBar { height: 15px; }
+  .allyCard .spBar span { font-size: 11px; line-height: 15px; }
+  #allyPointers { position: fixed; inset: 0; z-index: 5; pointer-events: none; overflow: hidden; }
+  .allyPtr { position: absolute; left: 0; top: 0; width: 0; height: 0; }
+  .allyPtr i { position: absolute; left: -13px; top: -13px; width: 26px; height: 26px; clip-path: polygon(100% 50%, 0 0, 22% 50%, 0 100%); filter: drop-shadow(0 0 2px #fff); }
+  .allyPtr b { position: absolute; left: 0; top: 16px; transform: translateX(-50%); font-size: 12px; font-weight: 800; white-space: nowrap; text-shadow: 0 0 3px #10182A, 0 1px 2px #10182A; }
+  .spSnow { position: relative; flex: 1; height: 14px; border-radius: 4px; background: rgba(255,255,255,.12); overflow: hidden; margin-left: 4px; }
+  .spSnow i { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, #6FB7F0, #CFEAFF); }
+  .spSnow span { position: relative; display: block; text-align: center; font-size: 11px; font-weight: 800; line-height: 14px; text-shadow: 0 1px 2px rgba(0,0,0,.85); }
   #btnOverview { font: inherit; font-size: 15px; font-weight: 800; color: #fff; background: rgba(16,24,38,.82); border: 2px solid #D97B4F; border-radius: 8px; padding: 9px 6px; cursor: pointer; }
   #btnOverview.on { background: #D97B4F; }
   #controls { position: fixed; inset: 0; z-index: 4; pointer-events: none; }
@@ -92,12 +120,11 @@
   .spBar i { position: absolute; left: 0; top: 0; bottom: 0; background: #F08A3E; }
   .spBar.low i { background: #5B9BFF; }
   .spBar span { position: relative; display: block; text-align: center; font-size: 12px; font-weight: 800; line-height: 17px; text-shadow: 0 1px 2px rgba(0,0,0,.75); }
-  .spGear { display: flex; gap: 4px; margin-top: 4px; }
+  .spGear { display: flex; gap: 4px; margin-top: 4px; align-items: center; }
   .spGear .gd { width: 12px; height: 12px; border-radius: 3px; display: block; }
   @media (max-width: 900px) {
     #specPanel { width: 160px; }
     .spTime b { font-size: 22px; } .spName { font-size: 13px; } .spHead { font-size: 13px; }
-    #miniMap { width: 120px; height: 120px; }
   }
   #bigMap { position: fixed; inset: 0; z-index: 9; background: rgba(10,16,26,.82); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 50px 12px 12px; }
   #bigMapTitle { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); font-size: 18px; font-weight: 800; padding: 6px 14px; }
@@ -145,25 +172,28 @@
 <div id="hudMine" class="hud-box" hidden>
   <div id="hudWatch" hidden></div>
   <div class="hpBar"><i id="hudHpFill"></i><span id="hudHpText"></span></div>
-  <div class="hudRow"><span id="hudSnow"></span><span id="hudKills"></span></div>
-  <div class="hudRow"><div id="hudGear"></div></div>
+  <div class="hudRow"><div id="hudGear"></div><div class="snowGauge"><i id="hudSnowFill"></i><span id="hudSnow"></span></div></div>
+  <div class="hudRow small"><span id="hudKills"></span></div>
 </div>
+<div id="allyPanel" hidden></div>
+<div id="allyPointers"></div>
+<button type="button" id="btnGameLeave" class="hud-box" hidden>방 나가기</button>
 <div id="mapDock" hidden><canvas id="miniMap"></canvas><button type="button" id="btnOverview" hidden><span>전체 보기</span></button></div>
 <div id="specPanel" hidden></div>
 <div id="toast" class="hud-box" hidden></div>
 <div id="bigMap" hidden><div id="bigMapTitle" class="hud-box">전체 지도</div><canvas id="bigMapCanvas"></canvas><button type="button" id="bigMapClose">✕</button></div>
 <div id="resultBox" hidden><div class="card"><div id="resultTitle"></div>
-  <table><thead><tr><th>순위</th><th>이름</th><th>생존</th><th>처치</th><th>준 피해</th><th>모은 눈</th></tr></thead><tbody id="resultRows"></tbody></table>
+  <table><thead><tr><th>순위</th><th>이름</th><th>생존</th><th>처치</th><th>준 피해</th><th>모은 눈</th><th>만든 벽</th></tr></thead><tbody id="resultRows"></tbody></table>
   <button type="button" id="btnAgain">다시 하기</button><button type="button" id="btnResultLeave">방 나가기</button></div></div>
 <div id="startScreen" class="st-screen" hidden>
   <div class="st-wrap">
     <div class="st-hero"><h1 class="st-title">눈싸움<span>배틀로얄</span></h1></div>
     <div class="st-card">
-      <div class="st-row"><button type="button" class="st-btn primary" id="btnCreateDuos">방 만들기<small>2대2대2</small></button><button type="button" class="st-btn primary" id="btnCreateSolo">방 만들기<small>개인전</small></button></div>
+      <div class="st-row"><button type="button" class="st-btn primary" id="btnCreateDuos">방 만들기<small>팀전</small></button><button type="button" class="st-btn primary" id="btnCreateSolo">방 만들기<small>개인전</small></button></div>
       <input type="text" id="joinCode" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="방 코드 5자리">
       <div class="st-row"><button type="button" class="st-btn" id="btnJoin">참여하기</button><button type="button" class="st-btn" id="btnWatch">관전하기</button></div>
       <div class="st-msg" id="startMsg"></div>
-      <button type="button" class="st-btn" id="btnPractice" style="margin-top:10px">혼자 연습<small>AI와 2대2대2</small></button>
+      <button type="button" class="st-btn" id="btnPractice" style="margin-top:10px">혼자 연습<small>AI와 팀전</small></button>
     </div>
     <div class="st-card st-fold">
       <h2>캐릭터 만들기</h2>
@@ -183,7 +213,7 @@
     <div class="st-card">
       <h2>규칙</h2>
       <ul class="st-rules">
-        <li><b>마지막까지 살아남는 팀이 우승</b>해요. 2대2대2(3팀) 또는 개인전(최대 6명). 사람이 모자라면 AI가 채워요.</li>
+        <li><b>마지막까지 살아남는 팀이 우승</b>해요. <b>팀전</b>(2명씩 3팀) 또는 <b>개인전</b>(최대 6명). 사람이 모자라면 AI가 채워요.</li>
         <li>시작하면 큰 지도에서 <b>낙하 지점</b>을 골라 낙하산으로 내려가요. 팀장이 고르면 팀 전체가 내려가요.</li>
         <li>눈 위를 걸으면 <b>눈을 모아요</b>(팀이 함께 씀). 눈덩이 한 개에 눈 2, 눈 벽에 눈 30이 들어요. 벽은 모든 눈덩이를 막아요.</li>
         <li>상자에서 <b>모자</b>(받는 피해 감소)·<b>한벌옷</b>(체온 추가)·<b>신발</b>(빨라짐), 코코아(회복)·대형 눈덩이를 얻어요. 높은 곳에 있으면 덜 맞고 더 멀리 던져요.</li>
@@ -199,7 +229,7 @@
     <div class="st-hero"><h1 class="st-title">눈싸움<span>배틀로얄</span></h1></div>
     <div class="st-card">
       <h2>대기실 <span class="codeBig" id="lobbyCode">00000</span></h2>
-      <div class="st-row"><div style="font-weight:800;padding-top:6px">모드: <span id="lobbyMode"></span></div><button type="button" class="st-btn" id="btnModeToggle" style="max-width:180px">모드 바꾸기</button></div>
+      <div class="st-row"><div class="lobbyModeText">모드: <b id="lobbyMode"></b></div><button type="button" class="st-btn" id="btnModeToggle" style="max-width:180px">모드 바꾸기</button></div>
       <div id="lobbySeats"></div>
       <div id="lobbySpectators"></div>
       <div id="lobbyNotice"></div>

@@ -129,7 +129,7 @@ SnModelLibrary.FILES = {
     well: "building_well_blue.gltf", tent: "tent.gltf", fence: "fence.gltf", fenceBroken: "fence_broken.gltf", log: "Wood_Log_A.gltf", logStack: "Wood_Log_Stack.gltf",
 };
 SnModelLibrary.SNOW_ROOFED = ["homeA", "homeB", "tavern", "mill", "well", "tent"];
-SnModelLibrary.ANIMATION_FILE = "assets/kaykit/animations/snow_anims.glb";
+SnModelLibrary.ANIMATION_FILE = "assets/kaykit/animations/snow_anims.glb?v=2";
 class SnMeshBuilder {
     constructor() {
         this.positions = [];
@@ -496,15 +496,43 @@ class SnStormView {
         this.libs = libs;
         this.map = map;
         this.nextKey = "";
+        this.hazeTime = 0;
         const THREE = libs.THREE;
         this.group = new THREE.Group();
         this.texture = this.streakTexture();
         const geometry = new THREE.CylinderGeometry(1, 1, SnStormView.HEIGHT, 96, 1, true);
         geometry.translate(0, SnStormView.HEIGHT / 2 - 2, 0);
-        this.wall = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ map: this.texture, color: "#FFFFFF", transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }));
+        this.wall = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ map: this.texture, color: "#FFFFFF", transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false }));
         this.wall.renderOrder = 5;
         this.nextLine = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: "#FFFFFF", transparent: true, opacity: 0.9 }));
-        this.group.add(this.wall, this.nextLine);
+        this.haze = this.buildHaze();
+        this.group.add(this.wall, this.nextLine, this.haze);
+    }
+    buildHaze() {
+        const THREE = this.libs.THREE;
+        const geometry = new THREE.PlaneGeometry(SnStormView.HAZE_SIZE, SnStormView.HAZE_SIZE, 1, 1);
+        geometry.rotateX(-Math.PI / 2);
+        const material = new THREE.ShaderMaterial({
+            transparent: true, depthWrite: false,
+            uniforms: { center: { value: new THREE.Vector2() }, radius: { value: 0 }, focus: { value: new THREE.Vector2() }, hole: { value: SnStormView.HOLE }, time: { value: 0 }, strength: { value: SnStormView.HAZE_ALPHA } },
+            vertexShader: "varying vec2 vWorld; void main() { vec4 w = modelMatrix * vec4(position, 1.0); vWorld = w.xz; gl_Position = projectionMatrix * viewMatrix * w; }",
+            fragmentShader: [
+                "uniform vec2 center; uniform float radius; uniform vec2 focus; uniform float hole; uniform float time; uniform float strength; varying vec2 vWorld;",
+                "void main() {",
+                "  float d = distance(vWorld, center);",
+                "  float a = smoothstep(radius, radius + 6.0, d);",
+                "  float wave = 0.88 + 0.12 * sin(vWorld.x * 0.21 + time * 1.7) * sin(vWorld.y * 0.17 - time * 1.3);",
+                "  a *= strength * wave;",
+                "  a *= smoothstep(hole * 0.45, hole, distance(vWorld, focus));",
+                "  gl_FragColor = vec4(0.93, 0.96, 1.0, a);",
+                "}",
+            ].join("\n"),
+        });
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.y = SnStormView.HAZE_HEIGHT;
+        mesh.renderOrder = 6;
+        mesh.frustumCulled = false;
+        return mesh;
     }
     streakTexture() {
         const THREE = this.libs.THREE;
@@ -537,7 +565,16 @@ class SnStormView {
         }
         return points;
     }
-    update(state, dt) {
+    update(state, dt, focusX, focusZ) {
+        this.hazeTime += dt;
+        const uniforms = this.haze.material.uniforms;
+        uniforms.center.value.set(state.x, state.z);
+        uniforms.radius.value = state.r;
+        uniforms.focus.value.set(focusX, focusZ);
+        uniforms.time.value = this.hazeTime;
+        this.haze.position.x = focusX;
+        this.haze.position.z = focusZ;
+        this.haze.visible = state.phase !== "prep" || state.r < 112;
         const visible = state.r > 0.3;
         this.wall.visible = visible;
         if (visible) {
@@ -561,6 +598,10 @@ class SnStormView {
     }
 }
 SnStormView.HEIGHT = 36;
+SnStormView.HAZE_SIZE = 600;
+SnStormView.HAZE_HEIGHT = 7.5;
+SnStormView.HAZE_ALPHA = 0.86;
+SnStormView.HOLE = 7;
 class SnSnowfall {
     constructor(libs) {
         this.libs = libs;
@@ -650,7 +691,7 @@ class SnWallView {
             }
             const build = Math.min(1, Math.max(0, 1 - (w.readyAt - time) / SnBalance.WALL.buildTime));
             const melt = Math.min(1, Math.max(0, (w.expireAt - time) / 3));
-            mesh.scale.set(1, Math.max(0.08, build) * (0.35 + 0.65 * melt), 1);
+            mesh.scale.set(w.halfX / SnBalance.WALL.halfLength, Math.max(0.08, build) * (0.35 + 0.65 * melt), 1);
             const material = mesh.material;
             material.opacity = build < 1 ? 0.55 + build * 0.45 : 0.4 + 0.6 * melt;
             material.transparent = material.opacity < 0.99;
@@ -855,6 +896,10 @@ class SnPlayerActor {
         this.color = color;
         this.map = map;
         this.showSilhouette = false;
+        this.chuteFold = 0;
+        this.skyTime = 0;
+        this.tiltX = 0;
+        this.tiltZ = 0;
         this.actionUntil = 0;
         this.landed = false;
         this.x = 0;
@@ -875,6 +920,7 @@ class SnPlayerActor {
         this.silhouette = new SnSilhouette(libs, this.body, color);
         this.animator = new CharacterAnimator(libs, this.body, library.clips);
         this.animator.play("Idle_A");
+        this.skyClip = library.clips.has("Jump_Idle") ? "Jump_Idle" : "Idle_A";
         this.root.add(this.body);
         this.snowman = library.clone("snowman");
         this.snowman.scale.setScalar(0.62);
@@ -893,6 +939,11 @@ class SnPlayerActor {
         this.chute = SnParachute.build(libs, color);
         this.chute.visible = false;
         this.root.add(this.chute);
+        this.landMark = new THREE.Mesh(new THREE.RingGeometry(0.7, 1.0, 28), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, depthWrite: false }));
+        this.landMark.rotation.x = -Math.PI / 2;
+        this.landMark.renderOrder = 3;
+        this.landMark.visible = false;
+        parent.add(this.landMark);
         this.label = labels.create(source.nick, color);
         this.label.position.y = 2.25;
         this.root.add(this.label);
@@ -942,8 +993,9 @@ class SnPlayerActor {
             return;
         const ground = this.map.heightAt(s.x, s.z);
         let targetY = ground;
+        const left = Math.max(0, Math.min(1, (s.landAt - time) / SnBalance.DROP.time));
         if (life === "sky")
-            targetY = ground + SnPlayerActor.SKY_HEIGHT * Math.max(0, Math.min(1, (s.landAt - time) / SnBalance.DROP.time));
+            targetY = ground + SnPlayerActor.SKY_HEIGHT * Math.pow(left, 1.6);
         if (!this.placed) {
             this.x = s.x;
             this.z = s.z;
@@ -952,9 +1004,11 @@ class SnPlayerActor {
             this.placed = true;
         }
         const follow = Math.min(1, dt * 14);
-        this.x += (s.x - this.x) * follow;
-        this.z += (s.z - this.z) * follow;
+        const stepX = (s.x - this.x) * follow, stepZ = (s.z - this.z) * follow;
+        this.x += stepX;
+        this.z += stepZ;
         this.y += (targetY - this.y) * Math.min(1, dt * 18);
+        this.swing(life === "sky", stepX, stepZ, ground, dt);
         const turn = SnAngle.wrap(s.yaw - this.yaw);
         this.yaw += turn * Math.min(1, dt * 12);
         this.root.position.set(this.x, this.y, this.z);
@@ -969,11 +1023,11 @@ class SnPlayerActor {
         this.reviveRing.visible = life === "down" && s.revivesUsed < SnBalance.REVIVE.max;
         if (this.reviveRing.visible)
             this.reviveRing.scale.setScalar(1 + Math.sin(nowMs / 260) * 0.06);
-        this.chute.visible = life === "sky";
+        this.chute.visible = life === "sky" || this.chuteFold > 0;
         this.label.position.y = down ? 1.9 : 2.25;
         if (life === "sky") {
             this.landed = false;
-            this.animator.play("Idle_A");
+            this.animator.play(this.skyClip);
         }
         else if (!down && !this.landed) {
             this.landed = true;
@@ -990,9 +1044,94 @@ class SnPlayerActor {
         }
         this.animator.update(dt);
     }
-    dispose(parent) { parent.remove(this.root); }
+    swing(sky, stepX, stepZ, ground, dt) {
+        if (sky) {
+            this.skyTime += dt;
+            this.chuteFold = SnPlayerActor.CHUTE_FOLD;
+            const open = Math.min(1, this.skyTime / 0.6);
+            this.chute.scale.set(0.3 + 0.7 * open, 0.3 + 0.7 * open, 0.3 + 0.7 * open);
+            const speed = dt > 0 ? 1 / dt : 0;
+            const wantX = Math.max(-0.35, Math.min(0.35, stepZ * speed * 0.09)) + Math.sin(this.skyTime * 1.7) * 0.07;
+            const wantZ = Math.max(-0.35, Math.min(0.35, -stepX * speed * 0.09)) + Math.cos(this.skyTime * 1.3) * 0.07;
+            this.tiltX += (wantX - this.tiltX) * Math.min(1, dt * 3);
+            this.tiltZ += (wantZ - this.tiltZ) * Math.min(1, dt * 3);
+            this.landMark.visible = true;
+            this.landMark.position.set(this.x, ground + 0.08, this.z);
+            const pulse = 1 + Math.sin(this.skyTime * 5) * 0.12;
+            this.landMark.scale.set(pulse, pulse, pulse);
+        }
+        else {
+            this.skyTime = 0;
+            this.landMark.visible = false;
+            this.tiltX *= Math.max(0, 1 - dt * 8);
+            this.tiltZ *= Math.max(0, 1 - dt * 8);
+            if (this.chuteFold > 0) {
+                this.chuteFold = Math.max(0, this.chuteFold - dt);
+                const k = this.chuteFold / SnPlayerActor.CHUTE_FOLD;
+                this.chute.scale.set(1 + (1 - k) * 0.4, k, 1 + (1 - k) * 0.4);
+                this.chute.position.y = -(1 - k) * 2.2;
+            }
+            else
+                this.chute.position.y = 0;
+        }
+        this.root.rotation.set(this.tiltX, 0, this.tiltZ);
+    }
+    dispose(parent) { parent.remove(this.root); parent.remove(this.landMark); }
 }
 SnPlayerActor.SKY_HEIGHT = 34;
+SnPlayerActor.CHUTE_FOLD = 0.7;
+class SnHitPuffs {
+    constructor(libs) {
+        this.puffs = [];
+        this.next = 0;
+        const THREE = libs.THREE;
+        this.group = new THREE.Group();
+        const geometry = new THREE.IcosahedronGeometry(0.13, 0);
+        const random = new SnSeededRandom(77);
+        for (let k = 0; k < SnHitPuffs.POOL; k++) {
+            const holder = new THREE.Group(), material = new THREE.MeshLambertMaterial({ color: "#FFFFFF", transparent: true, opacity: 1, depthWrite: false });
+            const dirs = [];
+            for (let b = 0; b < SnHitPuffs.BITS; b++) {
+                holder.add(new THREE.Mesh(geometry, material));
+                const a = random.range(0, Math.PI * 2), up = random.range(0.2, 1);
+                dirs.push([Math.cos(a), up, Math.sin(a)]);
+            }
+            holder.visible = false;
+            this.group.add(holder);
+            this.puffs.push({ holder, material, age: SnHitPuffs.LIFE, size: 1, dirs });
+        }
+    }
+    burst(x, y, z, size) {
+        const puff = this.puffs[this.next];
+        this.next = (this.next + 1) % SnHitPuffs.POOL;
+        puff.age = 0;
+        puff.size = size;
+        puff.holder.position.set(x, y, z);
+        puff.holder.visible = true;
+    }
+    update(dt) {
+        for (const puff of this.puffs) {
+            if (!puff.holder.visible)
+                continue;
+            puff.age += dt;
+            const k = puff.age / SnHitPuffs.LIFE;
+            if (k >= 1) {
+                puff.holder.visible = false;
+                continue;
+            }
+            const reach = (0.25 + k * 0.9) * puff.size;
+            puff.holder.children.forEach((bit, b) => {
+                const d = puff.dirs[b];
+                bit.position.set(d[0] * reach, d[1] * reach - k * k * 0.6, d[2] * reach);
+                bit.scale.setScalar((1.4 - k) * puff.size);
+            });
+            puff.material.opacity = 1 - k;
+        }
+    }
+}
+SnHitPuffs.POOL = 6;
+SnHitPuffs.BITS = 7;
+SnHitPuffs.LIFE = 0.45;
 class SnAimGuide {
     constructor(libs) {
         const THREE = libs.THREE;
@@ -1007,6 +1146,15 @@ class SnAimGuide {
         this.group.visible = false;
     }
     hide() { this.group.visible = false; }
+    showWall(x, y, z, yaw, halfX, ok) {
+        this.group.visible = true;
+        this.arrow.visible = false;
+        this.ghost.visible = true;
+        this.ghost.position.set(x, y + SnBalance.WALL.height / 2, z);
+        this.ghost.rotation.y = yaw;
+        this.ghost.scale.set(halfX / SnBalance.WALL.halfLength, 1, 1);
+        this.ghost.material.color.set(ok ? "#8FD3FF" : "#FF7A7A");
+    }
     show(kind, x, y, z, angle, length) {
         this.group.visible = true;
         this.arrow.visible = kind === "throw";
@@ -1206,6 +1354,8 @@ class SnSceneView {
         this.labels = new RkLabelFactory(libs);
         this.aimGuide = new SnAimGuide(libs);
         this.world.scene.add(this.aimGuide.group);
+        this.puffs = new SnHitPuffs(libs);
+        this.world.scene.add(this.puffs.group);
     }
     setFog(near, far) {
         const fog = this.world.scene.fog;
@@ -1252,8 +1402,11 @@ class SnSceneView {
             }
             else if (ev.t === "hit") {
                 const a = this.actors.get(ev.to);
-                if (a && !ev.storm)
-                    a.play("Hit_A", 0.5, nowMs, 1.6);
+                if (!a || ev.storm)
+                    continue;
+                const heavy = ev.v >= SnBalance.BIG.damage * 0.9;
+                a.play(heavy ? "Hit_B" : "Hit_A", heavy ? 0.87 : 0.67, nowMs, heavy ? 1.1 : 1.3);
+                this.puffs.burst(a.worldX, a.worldY + 1.2, a.worldZ, heavy ? 1.8 : 1);
             }
         }
     }
@@ -1264,7 +1417,7 @@ class SnSceneView {
     sync(source, dt, nowMs) {
         this.pendingWalls = source.walls;
         const storm = source.stormNow();
-        this.storm.update(storm, dt);
+        this.storm.update(storm, dt, this.world.rig.focusX, this.world.rig.focusZ);
         if (this.walls)
             this.walls.sync(source.walls, source.time);
         if (this.crates)
@@ -1274,6 +1427,7 @@ class SnSceneView {
         if (this.shots)
             this.shots.sync(source.shots, dt);
         this.actors.forEach((a) => a.sync(source.time, dt, nowMs));
+        this.puffs.update(dt);
         this.terrain.flush();
     }
     followActor(num, dt) {
