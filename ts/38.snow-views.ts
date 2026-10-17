@@ -882,7 +882,12 @@ class SnPileView {
 }
 
 class SnShotView {
+  static readonly CARRY = 1.2;
+  static readonly ARC = 0.55;
+  static readonly LOOK_AHEAD = 2.5;
+  static readonly FOLLOW = 12;
   private readonly balls = new Map<number, Three<"Mesh">>();
+  private readonly heights = new Map<number, number>();
   private readonly small: TileGeometry;
   private readonly large: TileGeometry;
   private readonly material: Three<"MeshLambertMaterial">;
@@ -911,14 +916,20 @@ class SnShotView {
         ball.rotation.z -= s.dirX * dt * SnBalance.BIG.speed / SnBalance.BIG.radius;
       } else {
         const t = Math.min(1, s.traveled / SnBalance.SHOT.range);
-        const base = s.level * SnTile.LEVEL_HEIGHT + 1.3;
-        ball.position.set(s.x, base + Math.sin(t * Math.PI) * 0.9 - t * 0.5, s.z);
+        const ahead = SnShotView.LOOK_AHEAD;
+        const ground = Math.max(this.map.heightAt(s.x, s.z), this.map.heightAt(s.x + s.dirX * ahead, s.z + s.dirZ * ahead));
+        const want = ground + SnShotView.CARRY + Math.sin(t * Math.PI) * SnShotView.ARC;
+        const now = this.heights.get(s.id);
+        const y = now === undefined ? s.level * SnTile.LEVEL_HEIGHT + SnShotView.CARRY : now + (want - now) * Math.min(1, dt * SnShotView.FOLLOW);
+        this.heights.set(s.id, y);
+        ball.position.set(s.x, y, s.z);
       }
     }
     this.balls.forEach((ball, id) => {
       if (seen.has(id)) return;
       this.parent.remove(ball);
       this.balls.delete(id);
+      this.heights.delete(id);
     });
   }
 }

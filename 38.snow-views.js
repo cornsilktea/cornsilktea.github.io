@@ -922,6 +922,7 @@ class SnShotView {
         this.parent = parent;
         this.map = map;
         this.balls = new Map();
+        this.heights = new Map();
         const THREE = libs.THREE;
         this.small = new THREE.IcosahedronGeometry(0.17, 1);
         this.large = new THREE.IcosahedronGeometry(SnBalance.BIG.radius, 2);
@@ -945,8 +946,13 @@ class SnShotView {
             }
             else {
                 const t = Math.min(1, s.traveled / SnBalance.SHOT.range);
-                const base = s.level * SnTile.LEVEL_HEIGHT + 1.3;
-                ball.position.set(s.x, base + Math.sin(t * Math.PI) * 0.9 - t * 0.5, s.z);
+                const ahead = SnShotView.LOOK_AHEAD;
+                const ground = Math.max(this.map.heightAt(s.x, s.z), this.map.heightAt(s.x + s.dirX * ahead, s.z + s.dirZ * ahead));
+                const want = ground + SnShotView.CARRY + Math.sin(t * Math.PI) * SnShotView.ARC;
+                const now = this.heights.get(s.id);
+                const y = now === undefined ? s.level * SnTile.LEVEL_HEIGHT + SnShotView.CARRY : now + (want - now) * Math.min(1, dt * SnShotView.FOLLOW);
+                this.heights.set(s.id, y);
+                ball.position.set(s.x, y, s.z);
             }
         }
         this.balls.forEach((ball, id) => {
@@ -954,9 +960,14 @@ class SnShotView {
                 return;
             this.parent.remove(ball);
             this.balls.delete(id);
+            this.heights.delete(id);
         });
     }
 }
+SnShotView.CARRY = 1.2;
+SnShotView.ARC = 0.55;
+SnShotView.LOOK_AHEAD = 2.5;
+SnShotView.FOLLOW = 12;
 class SnParachute {
     static build(libs, color) {
         const THREE = libs.THREE, group = new THREE.Group();
