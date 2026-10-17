@@ -197,7 +197,7 @@ class SnTerrainView {
   static readonly MOUNTAIN_SLOPE = 2.3;
   static readonly MOUNTAIN_PEAK = 17;
   static readonly SNOWLINE = 7;
-  static readonly EDGE_WIDTH = 0.55;
+  static readonly EDGE_WIDTH = 0.3;
   static readonly ROCK_STEPS = 5;
   static readonly ROCK_BUMP = 0.3;
   static readonly CORNICE = 0.28;
@@ -289,7 +289,7 @@ class SnTerrainView {
 
   private buildSides(builder: SnMeshBuilder): void {
     const THREE = this.libs.THREE, cell = SnGridMath.CELL;
-    const cliffTop = new THREE.Color(SnPalette.CLIFF).multiplyScalar(0.95), cliffLow = new THREE.Color(SnPalette.CLIFF).multiplyScalar(0.5);
+    const cliffTop = new THREE.Color(SnPalette.CLIFF).multiplyScalar(1.12), cliffLow = new THREE.Color(SnPalette.CLIFF).multiplyScalar(0.8);
     const sides: Array<{ di: number; dj: number; mine: [number, number]; theirs: [number, number]; edge: (x0: number, z0: number) => [number, number, number, number] }> = [
       { di: 1, dj: 0, mine: [1, 3], theirs: [0, 2], edge: (x0, z0) => [x0 + cell, z0, x0 + cell, z0 + cell] },
       { di: -1, dj: 0, mine: [2, 0], theirs: [3, 1], edge: (x0, z0) => [x0, z0 + cell, x0, z0] },

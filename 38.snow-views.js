@@ -254,7 +254,7 @@ class SnTerrainView {
     }
     buildSides(builder) {
         const THREE = this.libs.THREE, cell = SnGridMath.CELL;
-        const cliffTop = new THREE.Color(SnPalette.CLIFF).multiplyScalar(0.95), cliffLow = new THREE.Color(SnPalette.CLIFF).multiplyScalar(0.5);
+        const cliffTop = new THREE.Color(SnPalette.CLIFF).multiplyScalar(1.12), cliffLow = new THREE.Color(SnPalette.CLIFF).multiplyScalar(0.8);
         const sides = [
             { di: 1, dj: 0, mine: [1, 3], theirs: [0, 2], edge: (x0, z0) => [x0 + cell, z0, x0 + cell, z0 + cell] },
             { di: -1, dj: 0, mine: [2, 0], theirs: [3, 1], edge: (x0, z0) => [x0, z0 + cell, x0, z0] },
@@ -429,7 +429,7 @@ SnTerrainView.MOUNTAIN_BASE = 2.4;
 SnTerrainView.MOUNTAIN_SLOPE = 2.3;
 SnTerrainView.MOUNTAIN_PEAK = 17;
 SnTerrainView.SNOWLINE = 7;
-SnTerrainView.EDGE_WIDTH = 0.55;
+SnTerrainView.EDGE_WIDTH = 0.3;
 SnTerrainView.ROCK_STEPS = 5;
 SnTerrainView.ROCK_BUMP = 0.3;
 SnTerrainView.CORNICE = 0.28;

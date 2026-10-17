@@ -645,6 +645,14 @@ class SnWallWorks {
     return true;
   }
 
+  private pushBack(w: SnWall, q: SnPlayer): SnPoint | null {
+    if (w.distanceTo(q.x, q.z) >= SnBalance.RADIUS) return null;
+    const fx = Math.cos(w.facing), fz = Math.sin(w.facing);
+    const ahead = (q.x - w.x) * fx + (q.z - w.z) * fz, need = -(w.halfZ + SnBalance.RADIUS + 0.02);
+    if (ahead <= need) return null;
+    return { x: q.x + fx * (need - ahead), z: q.z + fz * (need - ahead) };
+  }
+
   plan(p: SnPlayer, facing: number): { wall: SnWall; joined: SnWall[] } | null {
     const draft = this.footprint(p, facing);
     const options: Array<{ wall: SnWall; joined: SnWall[] }> = [];
@@ -663,8 +671,13 @@ class SnWallWorks {
       if (nearTail) options.push({ wall: this.attached(p, draft, tail, lead, nearTail.point), joined: [nearTail.wall] });
     }
     options.push({ wall: draft, joined: [] });
-    for (const option of options) if (this.fits(p, option.wall, option.joined)) return option;
+    for (const option of options) if (this.behind(p, option.wall) && this.fits(p, option.wall, option.joined)) return option;
     return null;
+  }
+
+  behind(p: SnPlayer, w: SnWall): boolean {
+    const ahead = (p.x - w.x) * Math.cos(w.facing) + (p.z - w.z) * Math.sin(w.facing);
+    return ahead <= -w.halfZ;
   }
 
   private nearestEnd(point: SnPoint, skip: SnWall | null): { wall: SnWall; point: SnPoint; gap: number } | null {
@@ -703,7 +716,7 @@ class SnWallWorks {
       if (w.solid(e.time) && e.time - e.lastDt < w.readyAt) {
         for (const q of e.players) {
           if (q.life !== "alive") continue;
-          const out = w.pushOut(q.x, q.z, SnBalance.RADIUS);
+          const out = q.num === w.owner ? this.pushBack(w, q) : w.pushOut(q.x, q.z, SnBalance.RADIUS);
           if (out) { q.x = out.x; q.z = out.z; e.mover.placeFree(q); }
         }
       }
