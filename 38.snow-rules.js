@@ -6,7 +6,7 @@ SnBalance.SPEED = 4;
 SnBalance.ICE_PACE = 0.5;
 SnBalance.RADIUS = 0.4;
 SnBalance.SHOT = { damage: 12, cost: 2, interval: 0.45, speed: 22, range: 14, radius: 0.25, spawn: 0.5 };
-SnBalance.WALL = { cost: 30, hp: 150, halfLength: 1.5, halfDepth: 0.3, height: 2.2, buildTime: 1, interval: 1.2, perTeam: 10, life: 75, distance: 1.3, snap: 3.2, minLength: 0.8, maxLength: 3.6, joinInset: 0.35 };
+SnBalance.WALL = { cost: 30, hp: 150, halfLength: 1.5, halfDepth: 0.3, height: 2.2, buildTime: 1, interval: 1.2, perTeam: 10, life: 75, distance: 1.3, snap: 3.2, minLength: 0.8, maxLength: 3.6, joinOverlap: 0.3, joinFree: 0.9 };
 SnBalance.COCOA_RATIO = 0.3;
 SnBalance.BIG = { damage: 40, wallDamage: 200, radius: 1.2, speed: 12, distance: 30, knock: 4, knockTime: 0.3 };
 SnBalance.REVIVE = { time: 10, hp: 50, guard: 3, max: 2, reach: 2.5 };
@@ -211,6 +211,12 @@ class SnWall {
     solid(time) { return time >= this.readyAt; }
     distanceTo(x, z) { return SnBoxMath.distance(this.x, this.z, this.halfX, this.halfZ, this.yaw, x, z); }
     pushOut(x, z, pad) { return SnBoxMath.pushOut(this.x, this.z, this.halfX, this.halfZ, this.yaw, x, z, pad); }
+    spine(inset) {
+        const reach = this.halfX - inset, pts = [{ x: this.x, z: this.z }];
+        for (let a = 0.25; a <= reach; a += 0.25)
+            pts.push({ x: this.x + this.axisX * a, z: this.z + this.axisZ * a }, { x: this.x - this.axisX * a, z: this.z - this.axisZ * a });
+        return pts;
+    }
     samplePoints(inset = 0) {
         const pts = [], c = Math.cos(this.yaw), s = Math.sin(this.yaw), reach = this.halfX - inset;
         const n = Math.max(1, Math.ceil(reach * 2 / 0.5));
@@ -704,10 +710,13 @@ class SnWallWorks {
             if (map.obstacleAt(pt.x, pt.z, 0))
                 return false;
         }
-        const inner = w.samplePoints(SnBalance.WALL.joinInset);
         for (const other of e.walls) {
-            const points = joined.indexOf(other) >= 0 ? inner : w.samplePoints();
-            for (const pt of points)
+            if (joined.indexOf(other) >= 0) {
+                if (w.spine(SnBalance.WALL.joinFree).some((pt) => other.distanceTo(pt.x, pt.z) < 0.02))
+                    return false;
+                continue;
+            }
+            for (const pt of w.samplePoints())
                 if (other.distanceTo(pt.x, pt.z) < 0.05)
                     return false;
         }
@@ -764,9 +773,9 @@ class SnWallWorks {
                 if (bridge)
                     options.push({ wall: bridge, joined: [nearLead.wall, nearTail.wall] });
             }
-            options.push({ wall: this.shifted(p, draft, nearLead.point.x - lead.x, nearLead.point.z - lead.z), joined: [nearLead.wall] });
+            options.push({ wall: this.attached(p, draft, lead, tail, nearLead.point), joined: [nearLead.wall] });
             if (nearTail)
-                options.push({ wall: this.shifted(p, draft, nearTail.point.x - tail.x, nearTail.point.z - tail.z), joined: [nearTail.wall] });
+                options.push({ wall: this.attached(p, draft, tail, lead, nearTail.point), joined: [nearTail.wall] });
         }
         options.push({ wall: draft, joined: [] });
         for (const option of options)
@@ -797,9 +806,13 @@ class SnWallWorks {
         let facing = along + Math.PI / 2;
         if (Math.cos(facing - draft.facing) < 0)
             facing += Math.PI;
-        return new SnWall(-1, p.team, p.num, (from.x + to.x) / 2, (from.z + to.z) / 2, SnAngle.wrap(facing), draft.level, draft.createdAt, draft.readyAt, length / 2);
+        const half = length / 2 + SnBalance.WALL.joinOverlap;
+        return new SnWall(-1, p.team, p.num, (from.x + to.x) / 2, (from.z + to.z) / 2, SnAngle.wrap(facing), draft.level, draft.createdAt, draft.readyAt, half);
     }
-    shifted(p, draft, dx, dz) {
+    attached(p, draft, end, other, joint) {
+        const len = Math.hypot(end.x - other.x, end.z - other.z) || 1;
+        const ux = (end.x - other.x) / len, uz = (end.z - other.z) / len, over = SnBalance.WALL.joinOverlap;
+        const dx = joint.x + ux * over - end.x, dz = joint.z + uz * over - end.z;
         return new SnWall(-1, p.team, p.num, draft.x + dx, draft.z + dz, draft.facing, draft.level, draft.createdAt, draft.readyAt, draft.halfX);
     }
     step() {
