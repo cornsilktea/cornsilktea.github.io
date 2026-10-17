@@ -51,7 +51,7 @@ class SnBalance {
   static readonly ICE_PACE = 0.5;
   static readonly RADIUS = 0.4;
   static readonly SHOT = { damage: 12, cost: 2, interval: 0.45, speed: 22, range: 14, radius: 0.25, spawn: 0.5 };
-  static readonly WALL = { cost: 30, hp: 150, halfLength: 1.5, halfDepth: 0.3, height: 2.2, buildTime: 1, interval: 1.2, perTeam: 6, life: 75, distance: 1.3, snap: 1.8, minLength: 0.8, maxLength: 3.6, joinInset: 0.35 };
+  static readonly WALL = { cost: 30, hp: 150, halfLength: 1.5, halfDepth: 0.3, height: 2.2, buildTime: 1, interval: 1.2, perTeam: 10, life: 75, distance: 1.3, snap: 3.2, minLength: 0.8, maxLength: 3.6, joinInset: 0.35 };
   static readonly COCOA_RATIO = 0.3;
   static readonly BIG = { damage: 40, wallDamage: 200, radius: 1.2, speed: 12, distance: 30, knock: 4, knockTime: 0.3 };
   static readonly REVIVE = { time: 10, hp: 50, guard: 3, max: 2, reach: 2.5 };
@@ -612,7 +612,7 @@ class SnWallWorks {
       for (const pt of points) if (other.distanceTo(pt.x, pt.z) < 0.05) return false;
     }
     for (const q of e.players) {
-      if (q.life !== "alive" && q.life !== "down") continue;
+      if (q === p || (q.life !== "alive" && q.life !== "down")) continue;
       if (w.distanceTo(q.x, q.z) < SnBalance.RADIUS) return false;
     }
     return true;
@@ -644,30 +644,32 @@ class SnWallWorks {
   plan(p: SnPlayer, facing: number): { wall: SnWall; joined: SnWall[] } | null {
     const draft = this.footprint(p, facing);
     const options: Array<{ wall: SnWall; joined: SnWall[] }> = [];
-    const [a, b] = draft.ends();
-    const nearA = this.nearestEnd(a, null), nearB = this.nearestEnd(b, nearA ? nearA.wall : null);
-    if (nearA && nearB) {
-      const bridge = this.between(p, draft, nearA.point, nearB.point);
-      if (bridge) options.push({ wall: bridge, joined: [nearA.wall, nearB.wall] });
-    }
-    for (const near of [nearA, nearB]) {
-      if (!near) continue;
-      const from = near === nearA ? a : b;
-      const moved = this.shifted(p, draft, near.point.x - from.x, near.point.z - from.z);
-      options.push({ wall: moved, joined: [near.wall] });
+    const ends = draft.ends();
+    const firstA = this.nearestEnd(ends[0], null), firstB = this.nearestEnd(ends[1], null);
+    const aFirst = !!firstA && (!firstB || firstA.gap <= firstB.gap);
+    const lead = aFirst ? ends[0] : ends[1], tail = aFirst ? ends[1] : ends[0];
+    const nearLead = aFirst ? firstA : firstB;
+    if (nearLead) {
+      const nearTail = this.nearestEnd(tail, nearLead.wall);
+      if (nearTail) {
+        const bridge = this.between(p, draft, nearLead.point, nearTail.point);
+        if (bridge) options.push({ wall: bridge, joined: [nearLead.wall, nearTail.wall] });
+      }
+      options.push({ wall: this.shifted(p, draft, nearLead.point.x - lead.x, nearLead.point.z - lead.z), joined: [nearLead.wall] });
+      if (nearTail) options.push({ wall: this.shifted(p, draft, nearTail.point.x - tail.x, nearTail.point.z - tail.z), joined: [nearTail.wall] });
     }
     options.push({ wall: draft, joined: [] });
     for (const option of options) if (this.fits(p, option.wall, option.joined)) return option;
     return null;
   }
 
-  private nearestEnd(point: SnPoint, skip: SnWall | null): { wall: SnWall; point: SnPoint } | null {
-    let best: { wall: SnWall; point: SnPoint } | null = null, bd = SnBalance.WALL.snap;
+  private nearestEnd(point: SnPoint, skip: SnWall | null): { wall: SnWall; point: SnPoint; gap: number } | null {
+    let best: { wall: SnWall; point: SnPoint; gap: number } | null = null, bd = SnBalance.WALL.snap;
     for (const w of this.engine.walls) {
       if (w === skip) continue;
       for (const end of w.ends()) {
         const d = Math.hypot(end.x - point.x, end.z - point.z);
-        if (d < bd) { bd = d; best = { wall: w, point: end }; }
+        if (d < bd) { bd = d; best = { wall: w, point: end, gap: d }; }
       }
     }
     return best;

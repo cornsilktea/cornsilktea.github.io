@@ -449,97 +449,41 @@ class SnLobbyView {
 class SnMenuBackdrop {
     constructor(scene) {
         this.scene = scene;
-        this.engine = null;
-        this.seed = Math.floor(Math.random() * 1e6);
-        this.carry = 0;
+        this.active = false;
         this.angle = 0;
-        this.focus = -1;
-        this.focusUntil = 0;
-        this.x = 0;
-        this.y = 0;
-        this.z = 0;
-    }
-    begin() {
-        this.seed++;
-        const teams = SnRosterPlanner.allBots("duos");
-        const engine = new SnEngine({ seed: this.seed, mode: "duos", teams });
-        engine.players.forEach((p) => engine.attach(p.num, new SnBotBrain(this.seed * 31 + p.num * 7919 + 1)));
-        const looks = new Map();
-        engine.players.forEach((p) => looks.set(p.num, SnBotLooks.make(this.seed + p.num * 97)));
-        this.scene.beginMatch(engine, looks, engine.snow.amount);
-        this.scene.world.playing = false;
-        this.engine = engine;
-        this.focus = -1;
-        this.carry = 0;
+        this.stop = 0;
+        this.holdLeft = SnMenuBackdrop.HOLD;
         this.x = 0;
         this.y = 2.4;
-        this.z = 0;
-        return engine;
+        this.z = -4;
     }
-    stop() {
-        if (!this.engine)
-            return;
-        this.engine = null;
-        this.scene.clearMatch();
-    }
-    pickFocus(engine) {
-        let best = -1, bestGap = Infinity;
-        for (const p of engine.players) {
-            if (p.life !== "alive")
-                continue;
-            for (const q of engine.players) {
-                if (q.team === p.team || q.life !== "alive")
-                    continue;
-                const gap = Math.hypot(p.x - q.x, p.z - q.z);
-                if (gap < bestGap) {
-                    bestGap = gap;
-                    best = p.num;
-                }
-            }
+    stopTour() { this.active = false; }
+    frame(dt) {
+        if (!this.active) {
+            this.scene.showMenuWorld();
+            this.active = true;
         }
-        if (best < 0) {
-            const any = engine.players.find((p) => p.life === "alive");
-            best = any ? any.num : -1;
+        this.holdLeft -= dt;
+        if (this.holdLeft <= 0) {
+            this.holdLeft = SnMenuBackdrop.HOLD;
+            this.stop = (this.stop + 1) % SnMenuBackdrop.STOPS.length;
         }
-        this.focus = best;
-        this.focusUntil = engine.time + SnMenuBackdrop.FOCUS_HOLD;
-    }
-    frame(dt, nowMs) {
-        let engine = this.engine || this.begin();
-        if (engine.ended || engine.time > SnMenuBackdrop.RESTART_AT)
-            engine = this.begin();
-        this.carry += dt * (engine.time < SnMenuBackdrop.FAST_UNTIL ? SnMenuBackdrop.FAST_SPEED : 1);
-        let steps = 0;
-        while (this.carry >= SnGame.STEP && steps < 12) {
-            this.carry -= SnGame.STEP;
-            steps++;
-            this.scene.applyEvents(engine.update(SnGame.STEP), nowMs);
-        }
-        this.scene.sync(engine, dt, nowMs);
-        const watched = this.focus >= 0 ? engine.players[this.focus] : null;
-        if (!watched || watched.life !== "alive" || engine.time >= this.focusUntil)
-            this.pickFocus(engine);
-        const target = this.focus >= 0 ? engine.players[this.focus] : null;
-        const landed = !!target && target.life === "alive";
-        const k = Math.min(1, dt * 1.5);
-        if (landed) {
-            this.x += (target.x - this.x) * k;
-            this.z += (target.z - this.z) * k;
-            this.y += (engine.map.heightAt(target.x, target.z) - this.y) * k;
-        }
+        const target = SnMenuBackdrop.STOPS[this.stop], k = Math.min(1, dt * 0.45);
+        this.x += (target.x - this.x) * k;
+        this.z += (target.z - this.z) * k;
+        this.y += (this.scene.map.heightAt(target.x, target.z) - this.y) * k;
         this.angle += dt * SnMenuBackdrop.SPIN;
-        const radius = landed ? SnMenuBackdrop.RADIUS : 70, height = landed ? SnMenuBackdrop.HEIGHT : 48;
-        this.scene.world.rig.orbit(radius, height, this.angle, this.x, this.y, this.z);
+        this.scene.world.rig.orbit(SnMenuBackdrop.RADIUS, SnMenuBackdrop.HEIGHT, this.angle, this.x, this.y, this.z);
         this.scene.render(dt, false);
     }
 }
-SnMenuBackdrop.FAST_UNTIL = 15;
-SnMenuBackdrop.FAST_SPEED = 3;
-SnMenuBackdrop.RESTART_AT = 200;
-SnMenuBackdrop.FOCUS_HOLD = 9;
-SnMenuBackdrop.RADIUS = 24;
-SnMenuBackdrop.HEIGHT = 16;
-SnMenuBackdrop.SPIN = 0.07;
+SnMenuBackdrop.STOPS = [
+    { x: 0, z: -4 }, { x: -37, z: 6 }, { x: -52, z: -26 }, { x: -20, z: -46 }, { x: 26, z: -50 }, { x: 54, z: 12 }, { x: 40, z: 18 }, { x: 0, z: 46 }, { x: -22, z: 28 },
+];
+SnMenuBackdrop.HOLD = 9;
+SnMenuBackdrop.RADIUS = 30;
+SnMenuBackdrop.HEIGHT = 20;
+SnMenuBackdrop.SPIN = 0.06;
 class SnGame {
     constructor(libs) {
         this.libs = libs;
@@ -766,7 +710,7 @@ class SnGame {
             });
             const driver = session.isHost() ? new SnHostDriver(match, session, ui.controls, this.meter, this.options.speed) : new SnClientDriver(match, session, ui.controls, this.meter);
             if (this.backdrop)
-                this.backdrop.stop();
+                this.backdrop.stopTour();
             this.view = new SnMatchView(ui, driver, looks);
             this.showScreen("game");
             SnDom.show(SnDom.el("btnAgain"), session.isHost());
@@ -865,7 +809,7 @@ class SnGame {
         const looks = new Map();
         driver.engine.players.forEach((p) => looks.set(p.num, p.bot ? SnBotLooks.make(this.seed + p.num * 97) : profile.look));
         if (this.backdrop)
-            this.backdrop.stop();
+            this.backdrop.stopTour();
         this.view = new SnMatchView(ui, driver, looks);
         this.showScreen("game");
         SnDom.text(SnDom.el("btnAgain"), "다시 하기");
@@ -886,7 +830,7 @@ class SnGame {
         if (this.view)
             this.view.frame(dt, ms);
         else
-            backdrop.frame(dt, ms);
+            backdrop.frame(dt);
         this.meter.tick(ms);
         if (this.options.showNet)
             SnDom.text(SnDom.el("netMeter"), (this.meter.rate / 1024).toFixed(1) + " KB/s");

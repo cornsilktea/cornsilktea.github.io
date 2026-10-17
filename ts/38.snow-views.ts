@@ -38,6 +38,9 @@ class SnPalette {
   static readonly PINE_DARK = "#24473A";
   static readonly TRUNK = "#5A4232";
   static readonly ICE = "#A9D3E8";
+  static readonly EDGE = "#4A5868";
+  static readonly RAMP = "#D9C9A6";
+  static readonly HIGH_SNOW = "#DCE7F5";
   static readonly ICE_LIGHT = "#CFE8F3";
   static readonly PLANK = "#8A6A4E";
   static readonly PLANK_DARK = "#5E4634";
@@ -194,6 +197,7 @@ class SnTerrainView {
   static readonly MOUNTAIN_SLOPE = 2.3;
   static readonly MOUNTAIN_PEAK = 17;
   static readonly SNOWLINE = 7;
+  static readonly EDGE_WIDTH = 0.32;
 
   readonly mesh: Three<"Mesh">;
   private readonly tileVertex = new Int32Array(SnGridMath.COUNT).fill(-1);
@@ -213,6 +217,7 @@ class SnTerrainView {
     const builder = new SnMeshBuilder();
     this.buildTops(builder);
     this.buildSides(builder);
+    this.buildEdges(builder);
     const geometry = builder.geometry(libs);
     this.colorAttribute = geometry.getAttribute("color") as Three<"BufferAttribute">;
     this.mesh = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ vertexColors: true }));
@@ -281,7 +286,7 @@ class SnTerrainView {
 
   private buildSides(builder: SnMeshBuilder): void {
     const THREE = this.libs.THREE, cell = SnGridMath.CELL;
-    const cliffTop = new THREE.Color(SnPalette.SNOW).multiplyScalar(0.9), cliffLow = new THREE.Color(SnPalette.CLIFF).multiplyScalar(0.62);
+    const cliffTop = new THREE.Color(SnPalette.CLIFF).multiplyScalar(0.95), cliffLow = new THREE.Color(SnPalette.CLIFF).multiplyScalar(0.5);
     const sides: Array<{ di: number; dj: number; mine: [number, number]; theirs: [number, number]; edge: (x0: number, z0: number) => [number, number, number, number] }> = [
       { di: 1, dj: 0, mine: [1, 3], theirs: [0, 2], edge: (x0, z0) => [x0 + cell, z0, x0 + cell, z0 + cell] },
       { di: -1, dj: 0, mine: [2, 0], theirs: [3, 1], edge: (x0, z0) => [x0, z0 + cell, x0, z0] },
@@ -306,8 +311,37 @@ class SnTerrainView {
     }
   }
 
+  private buildEdges(builder: SnMeshBuilder): void {
+    const THREE = this.libs.THREE, map = this.map, cell = SnGridMath.CELL, width = SnTerrainView.EDGE_WIDTH, lift = 0.03;
+    const color = new THREE.Color(SnPalette.EDGE);
+    const sides: Array<{ di: number; dj: number }> = [{ di: 1, dj: 0 }, { di: -1, dj: 0 }, { di: 0, dj: 1 }, { di: 0, dj: -1 }];
+    for (let idx = 0; idx < SnGridMath.COUNT; idx++) {
+      if (!map.walkable(idx)) continue;
+      const i = SnGridMath.colOf(idx), j = SnGridMath.rowOf(idx), x0 = SnGridMath.minX(idx), z0 = SnGridMath.minZ(idx);
+      for (const side of sides) {
+        if (!SnGridMath.inside(i + side.di, j + side.dj)) continue;
+        const other = SnGridMath.index(i + side.di, j + side.dj);
+        if (!map.walkable(other) || map.connected(idx, other)) continue;
+        if (Math.max(...map.corners(idx)) < Math.max(...map.corners(other))) continue;
+        let ax: number, az: number, bx: number, bz: number, nx: number, nz: number;
+        if (side.di === 1) { ax = x0 + cell; az = z0; bx = x0 + cell; bz = z0 + cell; nx = -1; nz = 0; }
+        else if (side.di === -1) { ax = x0; az = z0 + cell; bx = x0; bz = z0; nx = 1; nz = 0; }
+        else if (side.dj === 1) { ax = x0 + cell; az = z0 + cell; bx = x0; bz = z0 + cell; nx = 0; nz = -1; }
+        else { ax = x0; az = z0; bx = x0 + cell; bz = z0; nx = 0; nz = 1; }
+        const h = (x: number, z: number) => map.heightAt(x - nx * 0.01, z - nz * 0.01 + 0) + lift;
+        const a = builder.vertex(ax, h(ax + nx * 0.02, az + nz * 0.02), az, color);
+        const b = builder.vertex(bx, h(bx + nx * 0.02, bz + nz * 0.02), bz, color);
+        const c = builder.vertex(ax + nx * width, h(ax + nx * width, az + nz * width), az + nz * width, color);
+        const d = builder.vertex(bx + nx * width, h(bx + nx * width, bz + nz * width), bz + nz * width, color);
+        builder.indices.push(a, c, b, b, c, d);
+      }
+    }
+  }
+
   private toneColor(idx: number, snow: boolean): Three<"Color"> {
     const tone = this.snowTone[idx];
+    if (snow && this.map.isRamp(idx)) return new this.libs.THREE.Color(SnPalette.RAMP).multiplyScalar(0.98 + (tone - 0.965));
+    if (snow && this.map.level[idx] > 0) return this.snowColor.clone().lerp(new this.libs.THREE.Color(SnPalette.HIGH_SNOW), this.map.level[idx] * 0.5).multiplyScalar(tone);
     if (this.map.surface[idx] !== SnSurface.SNOW) {
       const streak = 0.5 + 0.5 * Math.sin(SnGridMath.colOf(idx) * 0.9 + SnGridMath.rowOf(idx) * 0.55);
       return new this.libs.THREE.Color(SnPalette.ICE).lerp(new this.libs.THREE.Color(SnPalette.ICE_LIGHT), streak * 0.55 + (tone - 0.965) * 8);
@@ -1357,8 +1391,18 @@ class SnSceneView {
     if (fog) { fog.near = near; fog.far = far; }
   }
 
+  showMenuWorld(): void {
+    this.clearMatch();
+    this.terrain.syncAll(new SnSnowField(this.map).amount);
+    this.terrain.flush();
+    this.storm.group.visible = false;
+    this.props.fadePines(false, 1);
+    this.setFog(75, 180);
+  }
+
   beginMatch(source: SnSceneSource, looks: ReadonlyMap<number, CharacterLook>, snow: Uint8Array | readonly number[]): void {
     this.clearMatch();
+    this.storm.group.visible = true;
     this.terrain.syncAll(snow);
     this.walls = new SnWallView(this.libs, this.matchGroup, this.map, source.mode);
     this.crates = new SnCrateView(this.libs, this.library, this.matchGroup, this.map, source.crates);

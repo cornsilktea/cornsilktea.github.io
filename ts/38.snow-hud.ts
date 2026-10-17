@@ -257,7 +257,7 @@ class SnMapPainter {
     const levels = ["#DCE6EE", "#C4D3DF", "#A9BDCD"];
     for (let idx = 0; idx < SnGridMath.COUNT; idx++) {
       const kind = map.kind[idx];
-      ctx.fillStyle = kind === SnTile.MOUNTAIN ? "#7E848C" : kind === SnTile.BLOCK ? "#8C6A55" : kind === SnTile.RAMP ? "#B9C9D6" : map.surface[idx] === SnSurface.ICE ? "#8FC3DD" : map.surface[idx] === SnSurface.BRIDGE ? "#9A7656" : levels[map.level[idx]];
+      ctx.fillStyle = kind === SnTile.MOUNTAIN ? "#7E848C" : kind === SnTile.BLOCK ? "#8C6A55" : kind === SnTile.RAMP ? "#D9C9A6" : map.surface[idx] === SnSurface.ICE ? "#8FC3DD" : map.surface[idx] === SnSurface.BRIDGE ? "#9A7656" : levels[map.level[idx]];
       ctx.fillRect(SnGridMath.colOf(idx) * cell, SnGridMath.rowOf(idx) * cell, cell + 0.5, cell + 0.5);
     }
     ctx.strokeStyle = "rgba(60,70,84,.75)";

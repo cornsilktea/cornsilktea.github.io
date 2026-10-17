@@ -403,82 +403,35 @@ class SnLobbyView {
 }
 
 class SnMenuBackdrop {
-  static readonly FAST_UNTIL = 15;
-  static readonly FAST_SPEED = 3;
-  static readonly RESTART_AT = 200;
-  static readonly FOCUS_HOLD = 9;
-  static readonly RADIUS = 24;
-  static readonly HEIGHT = 16;
-  static readonly SPIN = 0.07;
-  private engine: SnEngine | null = null;
-  private seed = Math.floor(Math.random() * 1e6);
-  private carry = 0;
+  static readonly STOPS: readonly SnPoint[] = [
+    { x: 0, z: -4 }, { x: -37, z: 6 }, { x: -52, z: -26 }, { x: -20, z: -46 }, { x: 26, z: -50 }, { x: 54, z: 12 }, { x: 40, z: 18 }, { x: 0, z: 46 }, { x: -22, z: 28 },
+  ];
+  static readonly HOLD = 9;
+  static readonly RADIUS = 30;
+  static readonly HEIGHT = 20;
+  static readonly SPIN = 0.06;
+  private active = false;
   private angle = 0;
-  private focus = -1;
-  private focusUntil = 0;
-  private x = 0; private y = 0; private z = 0;
+  private stop = 0;
+  private holdLeft = SnMenuBackdrop.HOLD;
+  private x = 0; private y = 2.4; private z = -4;
 
   constructor(private readonly scene: SnSceneView) {}
 
-  private begin(): SnEngine {
-    this.seed++;
-    const teams = SnRosterPlanner.allBots("duos");
-    const engine = new SnEngine({ seed: this.seed, mode: "duos", teams });
-    engine.players.forEach((p) => engine.attach(p.num, new SnBotBrain(this.seed * 31 + p.num * 7919 + 1)));
-    const looks = new Map<number, CharacterLook>();
-    engine.players.forEach((p) => looks.set(p.num, SnBotLooks.make(this.seed + p.num * 97)));
-    this.scene.beginMatch(engine, looks, engine.snow.amount);
-    this.scene.world.playing = false;
-    this.engine = engine;
-    this.focus = -1; this.carry = 0;
-    this.x = 0; this.y = 2.4; this.z = 0;
-    return engine;
-  }
+  stopTour(): void { this.active = false; }
 
-  stop(): void {
-    if (!this.engine) return;
-    this.engine = null;
-    this.scene.clearMatch();
-  }
-
-  private pickFocus(engine: SnEngine): void {
-    let best = -1, bestGap = Infinity;
-    for (const p of engine.players) {
-      if (p.life !== "alive") continue;
-      for (const q of engine.players) {
-        if (q.team === p.team || q.life !== "alive") continue;
-        const gap = Math.hypot(p.x - q.x, p.z - q.z);
-        if (gap < bestGap) { bestGap = gap; best = p.num; }
-      }
-    }
-    if (best < 0) { const any = engine.players.find((p) => p.life === "alive"); best = any ? any.num : -1; }
-    this.focus = best;
-    this.focusUntil = engine.time + SnMenuBackdrop.FOCUS_HOLD;
-  }
-
-  frame(dt: number, nowMs: number): void {
-    let engine = this.engine || this.begin();
-    if (engine.ended || engine.time > SnMenuBackdrop.RESTART_AT) engine = this.begin();
-    this.carry += dt * (engine.time < SnMenuBackdrop.FAST_UNTIL ? SnMenuBackdrop.FAST_SPEED : 1);
-    let steps = 0;
-    while (this.carry >= SnGame.STEP && steps < 12) {
-      this.carry -= SnGame.STEP; steps++;
-      this.scene.applyEvents(engine.update(SnGame.STEP), nowMs);
-    }
-    this.scene.sync(engine, dt, nowMs);
-    const watched = this.focus >= 0 ? engine.players[this.focus] : null;
-    if (!watched || watched.life !== "alive" || engine.time >= this.focusUntil) this.pickFocus(engine);
-    const target = this.focus >= 0 ? engine.players[this.focus] : null;
-    const landed = !!target && target.life === "alive";
-    const k = Math.min(1, dt * 1.5);
-    if (landed) { this.x += (target.x - this.x) * k; this.z += (target.z - this.z) * k; this.y += (engine.map.heightAt(target.x, target.z) - this.y) * k; }
+  frame(dt: number): void {
+    if (!this.active) { this.scene.showMenuWorld(); this.active = true; }
+    this.holdLeft -= dt;
+    if (this.holdLeft <= 0) { this.holdLeft = SnMenuBackdrop.HOLD; this.stop = (this.stop + 1) % SnMenuBackdrop.STOPS.length; }
+    const target = SnMenuBackdrop.STOPS[this.stop], k = Math.min(1, dt * 0.45);
+    this.x += (target.x - this.x) * k; this.z += (target.z - this.z) * k;
+    this.y += (this.scene.map.heightAt(target.x, target.z) - this.y) * k;
     this.angle += dt * SnMenuBackdrop.SPIN;
-    const radius = landed ? SnMenuBackdrop.RADIUS : 70, height = landed ? SnMenuBackdrop.HEIGHT : 48;
-    this.scene.world.rig.orbit(radius, height, this.angle, this.x, this.y, this.z);
+    this.scene.world.rig.orbit(SnMenuBackdrop.RADIUS, SnMenuBackdrop.HEIGHT, this.angle, this.x, this.y, this.z);
     this.scene.render(dt, false);
   }
 }
-
 class SnGame {
   static readonly STEP = 1 / 30;
   static readonly STALL_MS = 250;
@@ -672,7 +625,7 @@ class SnGame {
         looks.set(num, record && !m.bot ? record.look : SnBotLooks.make(match.seed + num * 97));
       });
       const driver = session.isHost() ? new SnHostDriver(match, session, ui.controls, this.meter, this.options.speed) : new SnClientDriver(match, session, ui.controls, this.meter);
-      if (this.backdrop) this.backdrop.stop();
+      if (this.backdrop) this.backdrop.stopTour();
     this.view = new SnMatchView(ui, driver, looks);
       this.showScreen("game");
       SnDom.show(SnDom.el("btnAgain"), session.isHost());
@@ -750,7 +703,7 @@ class SnGame {
     const driver = new SnOfflineDriver(this.options.mode, this.seed, me, ui.controls, this.options.speed);
     const looks = new Map<number, CharacterLook>();
     driver.engine.players.forEach((p) => looks.set(p.num, p.bot ? SnBotLooks.make(this.seed + p.num * 97) : profile.look));
-    if (this.backdrop) this.backdrop.stop();
+    if (this.backdrop) this.backdrop.stopTour();
     this.view = new SnMatchView(ui, driver, looks);
     this.showScreen("game");
     SnDom.text(SnDom.el("btnAgain"), "다시 하기");
@@ -770,7 +723,7 @@ class SnGame {
     if (!ui) return;
     const backdrop = this.backdrop as SnMenuBackdrop;
     if (this.view) this.view.frame(dt, ms);
-    else backdrop.frame(dt, ms);
+    else backdrop.frame(dt);
     this.meter.tick(ms);
     if (this.options.showNet) SnDom.text(SnDom.el("netMeter"), (this.meter.rate / 1024).toFixed(1) + " KB/s");
   }
