@@ -325,21 +325,23 @@ class SnTerrainView {
         for (let k = 0; k < along; k++)
             builder.indices.push(lips[k], rims[k], lips[k + 1], lips[k + 1], rims[k], rims[k + 1]);
     }
+    stripOn(idx, di, dj) {
+        const map = this.map, i = SnGridMath.colOf(idx) + di, j = SnGridMath.rowOf(idx) + dj;
+        if (!map.walkable(idx) || !SnGridMath.inside(i, j))
+            return false;
+        const other = SnGridMath.index(i, j);
+        if (!map.walkable(other) || map.connected(idx, other))
+            return false;
+        return Math.max(...map.corners(idx)) >= Math.max(...map.corners(other));
+    }
     buildEdges(builder) {
-        const THREE = this.libs.THREE, map = this.map, cell = SnGridMath.CELL, width = SnTerrainView.EDGE_WIDTH, lift = 0.03;
+        const THREE = this.libs.THREE, map = this.map, cell = SnGridMath.CELL, width = SnTerrainView.EDGE_WIDTH;
         const color = new THREE.Color(SnPalette.EDGE);
         const sides = [{ di: 1, dj: 0 }, { di: -1, dj: 0 }, { di: 0, dj: 1 }, { di: 0, dj: -1 }];
         for (let idx = 0; idx < SnGridMath.COUNT; idx++) {
-            if (!map.walkable(idx))
-                continue;
             const i = SnGridMath.colOf(idx), j = SnGridMath.rowOf(idx), x0 = SnGridMath.minX(idx), z0 = SnGridMath.minZ(idx);
             for (const side of sides) {
-                if (!SnGridMath.inside(i + side.di, j + side.dj))
-                    continue;
-                const other = SnGridMath.index(i + side.di, j + side.dj);
-                if (!map.walkable(other) || map.connected(idx, other))
-                    continue;
-                if (Math.max(...map.corners(idx)) < Math.max(...map.corners(other)))
+                if (!this.stripOn(idx, side.di, side.dj))
                     continue;
                 let ax, az, bx, bz, nx, nz;
                 if (side.di === 1) {
@@ -374,14 +376,32 @@ class SnTerrainView {
                     nx = 0;
                     nz = 1;
                 }
-                const h = (x, z) => this.tileHeight(idx, x, z) + lift;
-                const a = builder.vertex(ax, h(ax + nx * 0.02, az + nz * 0.02), az, color);
-                const b = builder.vertex(bx, h(bx + nx * 0.02, bz + nz * 0.02), bz, color);
-                const c = builder.vertex(ax + nx * width, h(ax + nx * width, az + nz * width), az + nz * width, color);
-                const d = builder.vertex(bx + nx * width, h(bx + nx * width, bz + nz * width), bz + nz * width, color);
-                builder.indices.push(a, c, b, b, c, d);
+                this.edgeQuad(builder, idx, ax, az, bx, bz, nx, nz, width, color);
+                const tx = Math.sign(bx - ax), tz = Math.sign(bz - az);
+                for (const [ex, ez, dx, dz] of [[bx, bz, tx, tz], [ax, az, -tx, -tz]]) {
+                    const ni = i + dx, nj = j + dz;
+                    if (!SnGridMath.inside(ni, nj))
+                        continue;
+                    const next = SnGridMath.index(ni, nj);
+                    if (!map.walkable(next) || !map.connected(idx, next) || this.stripOn(next, side.di, side.dj))
+                        continue;
+                    this.edgeQuad(builder, next, ex, ez, ex + dx * width, ez + dz * width, nx, nz, width, color);
+                }
             }
         }
+    }
+    edgeQuad(builder, idx, ax, az, bx, bz, nx, nz, width, color) {
+        const lift = SnTerrainView.EDGE_LIFT;
+        const h = (x, z) => this.tileHeight(idx, x, z) + lift;
+        const a = builder.vertex(ax, h(ax + nx * 0.02, az + nz * 0.02), az, color);
+        const b = builder.vertex(bx, h(bx + nx * 0.02, bz + nz * 0.02), bz, color);
+        const c = builder.vertex(ax + nx * width, h(ax + nx * width, az + nz * width), az + nz * width, color);
+        const d = builder.vertex(bx + nx * width, h(bx + nx * width, bz + nz * width), bz + nz * width, color);
+        const cross = (bx - ax) * nz - (bz - az) * nx;
+        if (cross > 0)
+            builder.indices.push(a, c, b, b, c, d);
+        else
+            builder.indices.push(a, b, c, b, d, c);
     }
     tileHeight(idx, x, z) {
         const c = this.map.corners(idx);
@@ -430,6 +450,7 @@ SnTerrainView.MOUNTAIN_SLOPE = 2.3;
 SnTerrainView.MOUNTAIN_PEAK = 17;
 SnTerrainView.SNOWLINE = 7;
 SnTerrainView.EDGE_WIDTH = 0.3;
+SnTerrainView.EDGE_LIFT = 0.03;
 SnTerrainView.ROCK_STEPS = 5;
 SnTerrainView.ROCK_BUMP = 0.3;
 SnTerrainView.CORNICE = 0.28;
