@@ -51,7 +51,7 @@ class SnBalance {
   static readonly ICE_PACE = 0.5;
   static readonly RADIUS = 0.4;
   static readonly SHOT = { damage: 12, cost: 2, interval: 0.45, speed: 22, range: 14, radius: 0.25, spawn: 0.5 };
-  static readonly WALL = { cost: 30, hp: 150, halfLength: 1.5, halfDepth: 0.3, height: 2.2, buildTime: 1, interval: 1.2, perTeam: 10, life: 75, distance: 1.3, snap: 3.2, minLength: 0.8, maxLength: 3.6, joinOverlap: 0.3, joinFree: 0.9, cliffReach: 1.6, cliffLengths: [1.5, 1.1, 0.7] as readonly number[] };
+  static readonly WALL = { cost: 30, hp: 150, halfLength: 1.5, halfDepth: 0.3, height: 2.2, buildTime: 1, interval: 1.2, perTeam: 10, life: 75, distance: 1.3, snap: 3.2, minLength: 0.8, maxLength: 3.6, joinOverlap: 0.3, joinFree: 0.9, cliffReach: 1.6, cliffLengths: [1.5, 1.1, 0.7] as readonly number[], slideStep: 0.25, slideMax: 1.5 };
   static readonly COCOA_RATIO = 0.3;
   static readonly BIG = { damage: 40, wallDamage: 200, radius: 1.2, speed: 12, distance: 30, knock: 4, knockTime: 0.3 };
   static readonly REVIVE = { time: 10, hp: 50, guard: 3, max: 2, reach: 2.5 };
@@ -673,7 +673,26 @@ class SnWallWorks {
     options.push({ wall: draft, joined: [] });
     for (const option of options) if (this.behind(p, option.wall) && this.fits(p, option.wall, option.joined)) return option;
     for (const wall of this.alongCliff(p, facing)) if (this.behind(p, wall, 0) && this.fits(p, wall)) return { wall, joined: [] };
+    if (!this.onGround(p, draft)) for (const wall of this.slid(p, draft)) if (this.fits(p, wall)) return { wall, joined: [] };
     return null;
+  }
+
+  private onGround(p: SnPlayer, w: SnWall): boolean {
+    const map = this.engine.map, home = SnGridMath.indexAt(p.x, p.z);
+    return w.samplePoints().every((pt) => { const idx = SnGridMath.indexAt(pt.x, pt.z); return idx >= 0 && map.walkable(idx) && !map.isRamp(idx) && map.level[idx] === map.level[home]; });
+  }
+
+  private slid(p: SnPlayer, draft: SnWall): SnWall[] {
+    const walls: SnWall[] = [], step = SnBalance.WALL.slideStep;
+    for (const half of SnBalance.WALL.cliffLengths) {
+      for (let shift = 0; shift <= SnBalance.WALL.slideMax + 1e-9; shift += step) {
+        for (const sign of shift ? [1, -1] : [1]) {
+          const d = shift * sign;
+          walls.push(new SnWall(-1, p.team, p.num, draft.x + draft.axisX * d, draft.z + draft.axisZ * d, draft.facing, draft.level, draft.createdAt, draft.readyAt, half));
+        }
+      }
+    }
+    return walls;
   }
 
   private alongCliff(p: SnPlayer, facing: number): SnWall[] {
