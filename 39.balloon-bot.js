@@ -6,6 +6,7 @@ WbBotTuning.LEVELS = {
     normal: { think: 0.20, missChain: 0.04, aim: 1, needleDelay: 0.8, reaction: 0.15 },
     hard: { think: 0.12, missChain: 0, aim: 2, needleDelay: 0.2, reaction: 0.05 },
 };
+WbBotTuning.LABELS = { easy: "쉬움", normal: "보통", hard: "어려움" };
 WbBotTuning.FINISH_STEPS = 3;
 WbBotTuning.RESCUE_STEPS = 5;
 WbBotTuning.ITEM_STEPS = 6;

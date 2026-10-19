@@ -495,6 +495,55 @@ function gridWorld(grid) { return { blocked: (i, j) => grid.blocked(i, j), ballo
   check("0.3칸 미만으로 걸치면 안 주움", g.floor.has(WbGrid.index(5, 6)));
 }
 
+{
+  const { WbStateCodec, WbMirror } = W;
+  const { e, pilots } = arena();
+  const [a] = e.players;
+  a.external = true; put(a, 2, 0);
+  check("밖에서 받은 위치: 한 틱 걸음은 받음", e.placeExternal(0, 2.6, 0.5, WbDir.RIGHT, WbDir.RIGHT, 0.1) && near(a.x, 2.6));
+  check("밖에서 받은 위치: 너무 멀리 튀면 무시", !e.placeExternal(0, 6.5, 0.5, WbDir.RIGHT, WbDir.RIGHT, 0.1) && near(a.x, 2.6));
+  check("밖에서 받은 위치: 기둥 안이면 무시", !e.placeExternal(0, 3.5, 1.3, WbDir.DOWN, WbDir.DOWN, 0.5) && near(a.z, 0.5));
+  run(e, 1);
+  check("밖에서 움직인 사람은 걷는 중으로 보임", a.moving === true);
+  run(e, 8);
+  check("밖에서 움직임이 끊기면 멈춤으로 보임", a.moving === false);
+  put(a, 4, 0); pilots[0].kPress = 1; run(e, 1);
+  check("밖에서 움직이는 사람도 K 누름 번호로 풍선을 놓음", e.balloons.length === 1 && e.balloons[0].i === 4);
+  const raw = WbStateCodec.encode({ x: 3.25, z: 0.5, face: 1, move: 1, alt: -1, kPress: 4, match: 77 });
+  const back = WbStateCodec.decode(raw);
+  check("손님 입력 왕복", back && near(back.x, 3.25) && back.kPress === 4 && back.alt === -1 && back.match === 77);
+}
+{
+  const { WbMirror } = W;
+  const teams = WbRosterPlanner.allBots("solo", 6);
+  const match = { id: 5, seed: 31337, mode: "solo", map: "classroom", teams, startAt: 0 };
+  const host = new WbEngine({ seed: match.seed, lootSeed: 777, mode: "solo", teams });
+  host.players.forEach((p) => host.attach(p.index, new WbBotBrain(p.index, "normal", match.seed)));
+  const mirror = new WbMirror(match, -1);
+  check("거울 엔진: 상자 자리는 방장과 같고 상자 속은 없음", mirror.engine.grid.cells.join("") === host.grid.cells.join("") && mirror.engine.hidden.size === 0);
+  let seq = 0;
+  const batches = [];
+  let pending = [];
+  for (let k = 0; k < 30 * 70; k++) {
+    host.update(1 / 30, (list, tick) => { for (const ev of list) pending.push([tick, ev]); });
+    if (k % 3 === 2 && pending.length) { batches.push([++seq, pending]); pending = []; }
+  }
+  if (pending.length) batches.push([++seq, pending]);
+  for (let at = 0; at < batches.length; at += 2) mirror.takeEvents(JSON.stringify({ s: batches[Math.min(at + 1, batches.length - 1)][0], b: batches.slice(Math.max(0, at - 1), at + 2) }));
+  const sameCells = mirror.engine.grid.cells.join("") === host.grid.cells.join("");
+  const sameFloor = Array.from(mirror.engine.floor.keys()).sort().join() === Array.from(host.floor.keys()).sort().join();
+  const sameBalloons = mirror.engine.balloons.map((b) => b.id + ":" + b.cell).sort().join() === host.balloons.map((b) => b.id + ":" + b.cell).sort().join();
+  let wetSame = true;
+  for (let k = 0; k < WbGrid.COUNT; k++) if (host.wetUntil[k] > host.tick && mirror.engine.wetUntil[k] !== host.wetUntil[k]) wetSame = false;
+  check("거울 엔진: 70초 이벤트를 겹쳐 받아도 칸·바닥 아이템·풍선·젖은 칸이 방장과 같음", sameCells && sameFloor && sameBalloons && wetSame, { sameCells, sameFloor, sameBalloons, wetSame, batches: batches.length });
+  const snap = JSON.stringify({ t: host.tick, p: host.players.map((p) => WbSnapshotCodec.encodePlayer(p, host)) });
+  mirror.applySnap(snap, 0);
+  check("거울 엔진: 스냅샷으로 사람 상태가 같아짐", mirror.engine.players.every((p, k) => near(p.x, host.players[k].x, 0.01) && p.life === host.players[k].life && p.range === host.players[k].range));
+  const fresh = new WbMirror(match, -1);
+  fresh.applyBoard(WbSnapshotCodec.encodeBoard(host));
+  check("늦게 들어온 관전자: 판 상태(board)만으로 칸·아이템·풍선을 맞춤", fresh.engine.grid.cells.join("") === host.grid.cells.join("") && fresh.engine.floor.size === host.floor.size && fresh.engine.balloons.length === host.balloons.length);
+}
+
 console.log(failures.length ? failures.map((f) => "FAIL " + f).join("\n") : "");
 console.log((failures.length ? "UNIT CHECKS FAILED " : "ALL UNIT CHECKS PASSED ") + "(" + passed + " passed, " + failures.length + " failed)");
 process.exitCode = failures.length ? 1 : 0;

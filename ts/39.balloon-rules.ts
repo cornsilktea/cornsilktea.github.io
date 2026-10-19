@@ -77,6 +77,9 @@ class WbBalance {
   static readonly MAX_PLAYERS = 8;
   static readonly TEAM_COUNT = 4;
   static readonly TEAM_SIZE = 2;
+  static readonly EXTERNAL_SLACK = 1.6;
+  static readonly EXTERNAL_MARGIN = 0.35;
+  static readonly EXTERNAL_MOVE_TICKS = 6;
 
   static ticks(seconds: number): number { return Math.round(seconds * WbBalance.RATE); }
 }
@@ -239,6 +242,8 @@ class WbPlayer {
   outWhy: WbOutReason | null = null;
   disconnected = false;
   moving = false;
+  external = false;
+  externalMoveUntil = -1;
   spawn = 0;
   traps = 0;
   kills = 0;
@@ -658,12 +663,15 @@ class WbEngine implements WbMoveWorld {
     this.knockOut(p, -1, "left");
   }
 
-  update(dt: number): WbEvent[] {
+  update(dt: number, sink?: (events: readonly WbEvent[], tick: number) => void): WbEvent[] {
     this.carry += Math.min(dt, 0.25);
     const all: WbEvent[] = [];
     while (this.carry >= WbBalance.DT - 1e-9 && !this.ended) {
       this.carry -= WbBalance.DT;
-      all.push(...this.step());
+      const tick = this.tick;
+      const events = this.step();
+      if (sink && events.length) sink(events, tick);
+      all.push(...events);
     }
     return all;
   }
@@ -698,13 +706,46 @@ class WbEngine implements WbMoveWorld {
   private movePlayers(intents: WbIntent[]): void {
     for (const p of this.players) {
       if (p.life === "out") continue;
+      if (p.external) {
+        p.moving = this.tick < p.externalMoveUntil;
+        this.releasePassers(p);
+        continue;
+      }
       const intent = intents[p.index];
       const result = WbMover.advance(this, p.index, p, intent.move, intent.alt, p.speed() * WbBalance.DT);
       p.moving = result.moved > 0;
       if (intent.move >= 0) p.face = result.moved > 0 ? result.dir : intent.move;
       if (result.kick >= 0 && p.kick && p.life === "alive") this.startKick(p, result.kick);
-      for (const b of this.balloons) if (b.passers.has(p.index) && !WbMover.overlapsCell(p, b.i, b.j)) b.passers.delete(p.index);
+      this.releasePassers(p);
     }
+  }
+
+  private releasePassers(p: WbPlayer): void {
+    for (const b of this.balloons) if (b.passers.has(p.index) && !WbMover.overlapsCell(p, b.i, b.j)) b.passers.delete(p.index);
+  }
+
+  fits(who: number, x: number, z: number): boolean {
+    const R = WbBalance.BODY - WbMover.EPS;
+    if (x - R < 0 || z - R < 0 || x + R > WbGrid.W || z + R > WbGrid.H) return false;
+    for (let j = Math.floor(z - R); j <= Math.floor(z + R); j++) for (let i = Math.floor(x - R); i <= Math.floor(x + R); i++) if (this.blocked(i, j, who)) return false;
+    return true;
+  }
+
+  placeExternal(index: number, x: number, z: number, face: number, move: number, elapsed: number): boolean {
+    const p = this.players[index];
+    if (!p || p.life === "out" || this.ended || this.tick < 0) return false;
+    const step = Math.abs(x - p.x) + Math.abs(z - p.z);
+    const limit = p.speed() * Math.max(elapsed, WbBalance.DT) * WbBalance.EXTERNAL_SLACK + WbBalance.EXTERNAL_MARGIN;
+    if (step > limit || !this.fits(index, x, z)) return false;
+    p.x = x; p.z = z;
+    if (face >= 0 && face < 4) p.face = face;
+    if (step > 0.005) p.externalMoveUntil = this.tick + WbBalance.EXTERNAL_MOVE_TICKS;
+    this.releasePassers(p);
+    if (move >= 0 && p.kick && p.life === "alive") {
+      const probe = WbMover.probe(this, index, p, move);
+      if (probe.kick >= 0) this.startKick(p, probe.kick);
+    }
+    return true;
   }
 
   private startKick(p: WbPlayer, dir: number): void {

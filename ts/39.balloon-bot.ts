@@ -8,6 +8,7 @@ class WbBotTuning {
     normal: { think: 0.20, missChain: 0.04, aim: 1, needleDelay: 0.8, reaction: 0.15 },
     hard: { think: 0.12, missChain: 0, aim: 2, needleDelay: 0.2, reaction: 0.05 },
   };
+  static readonly LABELS: Readonly<Record<WbDifficulty, string>> = { easy: "쉬움", normal: "보통", hard: "어려움" };
   static readonly FINISH_STEPS = 3;
   static readonly RESCUE_STEPS = 5;
   static readonly ITEM_STEPS = 6;

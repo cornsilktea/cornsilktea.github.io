@@ -1,13 +1,17 @@
+type WbScreenName = "start" | "lobby" | "game";
+
 class WbPlayOptions {
   static readonly STORAGE_KEY = "waterballoon_solo_v1";
-  readonly seed: number;
-  readonly mapId: string;
-  readonly mode: WbMode;
-  readonly bots: number;
-  readonly level: WbDifficulty;
+  seed: number;
+  mapId: string;
+  mode: WbMode;
+  bots: number;
+  level: WbDifficulty;
   readonly speed: number;
   readonly skipTo: number;
   readonly watch: boolean;
+  readonly autoSolo: boolean;
+  readonly showNet: boolean;
 
   constructor(search: string) {
     const params = new URLSearchParams(search);
@@ -15,16 +19,22 @@ class WbPlayOptions {
     this.seed = Number(params.get("seed")) || Math.floor(Math.random() * 1e9);
     this.mapId = params.get("map") || saved.map || WbMapCatalog.RANDOM;
     this.mode = (params.get("mode") || saved.mode) === "team" ? "team" : "solo";
-    const botLimit = this.mode === "solo" ? WbBalance.MAX_PLAYERS - 1 : WbBalance.TEAM_COUNT - 1;
-    const defaultBots = this.mode === "solo" ? 3 : 1;
-    this.bots = Math.max(1, Math.min(botLimit, Number(params.get("bots")) || saved.bots || defaultBots));
-    const level = params.get("level") || saved.level;
-    this.level = level === "easy" || level === "hard" ? level : "normal";
+    this.bots = WbPlayOptions.clampBots(this.mode, Number(params.get("bots")) || saved.bots || 0);
+    this.level = WbPlayOptions.levelOf(params.get("level") || saved.level || "");
     this.speed = Math.max(0.25, Math.min(8, Number(params.get("speed")) || 1));
     this.skipTo = Math.max(0, Math.min(WbBalance.MATCH, Number(params.get("at")) || 0));
     this.watch = params.has("watch");
+    this.autoSolo = params.has("solo") || this.watch;
+    this.showNet = params.has("net");
     if (params.get("trap") === "hit") WbAvatarView.trapClip = "Hit_B";
   }
+
+  static clampBots(mode: WbMode, bots: number): number {
+    const limit = mode === "solo" ? WbBalance.MAX_PLAYERS - 1 : WbBalance.TEAM_COUNT - 1;
+    return Math.max(1, Math.min(limit, bots || (mode === "solo" ? 3 : 1)));
+  }
+
+  static levelOf(text: string): WbDifficulty { return text === "easy" || text === "hard" ? text : "normal"; }
 
   static load(): { map?: string; mode?: string; bots?: number; level?: string } {
     try {
@@ -114,13 +124,21 @@ abstract class WbMatchDriver {
   abstract readonly engine: WbEngine;
   abstract readonly myIndex: number;
   abstract readonly looks: CharacterLook[];
-  update(dt: number): WbEvent[] { return this.engine.update(dt); }
+  abstract readonly mapId: string;
+  readonly online: boolean = false;
+  get source(): WbSceneSource { return this.engine; }
+  lead(input: WbInput): WbLead | null {
+    const me = this.engine.players[this.myIndex];
+    return me ? new WbLocalLead(this.engine, me.index, input) : null;
+  }
+  update(dt: number, nowMs: number): WbEvent[] { return this.engine.update(dt); }
 }
 
 class WbSoloDriver extends WbMatchDriver {
   readonly engine: WbEngine;
   readonly myIndex: number;
   readonly looks: CharacterLook[];
+  readonly mapId: string;
 
   constructor(options: WbPlayOptions, seed: number, profile: PlayerProfile, input: WbInput) {
     super();
@@ -129,6 +147,7 @@ class WbSoloDriver extends WbMatchDriver {
     this.myIndex = this.engine.players.findIndex((p) => p.id === WbSoloRoster.MY_ID);
     this.engine.players.forEach((p) => this.engine.attach(p.index, p.bot ? new WbBotBrain(p.index, options.level, seed) : new WbLocalPilot(input)));
     this.looks = this.engine.players.map((p) => p.bot ? WbBotLooks.make(seed + p.index * 7919) : profile.look);
+    this.mapId = WbMapCatalog.resolve(options.mapId, new WbSeededRandom(seed ^ 0x3A9)).id;
   }
 }
 
@@ -137,12 +156,84 @@ class WbWatchDriver extends WbMatchDriver {
   readonly myIndex = -1;
   readonly looks: CharacterLook[];
 
-  constructor(options: WbPlayOptions, seed: number) {
+  constructor(mode: WbMode, count: number, level: WbDifficulty, seed: number, readonly mapId: string) {
     super();
-    const count = options.mode === "solo" ? options.bots + 1 : (options.bots + 1) * 2;
-    this.engine = new WbEngine({ seed, lootSeed: seed ^ 0x1007, mode: options.mode, teams: WbRosterPlanner.allBots(options.mode, count) });
-    this.engine.players.forEach((p) => this.engine.attach(p.index, new WbBotBrain(p.index, options.level, seed)));
+    this.engine = new WbEngine({ seed, lootSeed: seed ^ 0x1007, mode, teams: WbRosterPlanner.allBots(mode, count) });
+    this.engine.players.forEach((p) => this.engine.attach(p.index, new WbBotBrain(p.index, level, seed)));
     this.looks = this.engine.players.map((p) => WbBotLooks.make(seed + p.index * 7919));
+  }
+}
+
+class WbHostDriver extends WbMatchDriver {
+  readonly online = true;
+  readonly engine: WbEngine;
+  readonly myIndex: number;
+  readonly link: WbHostLink;
+  readonly mapId: string;
+
+  constructor(readonly match: WbMatchRecord, session: RkSession<WbPlayerRecord>, input: WbInput, meter: WbNetMeter, level: WbDifficulty, readonly looks: CharacterLook[]) {
+    super();
+    this.engine = new WbEngine({ seed: match.seed, lootSeed: Math.floor(Math.random() * 1e9), mode: match.mode, teams: match.teams });
+    this.link = new WbHostLink(this.engine, session, match, meter);
+    this.mapId = match.map;
+    let mine = -1;
+    this.engine.players.forEach((p) => {
+      if (p.bot) this.engine.attach(p.index, new WbBotBrain(p.index, level, match.seed));
+      else if (p.id === session.myId) { this.engine.attach(p.index, new WbLocalPilot(input)); mine = p.index; }
+      else { const pilot = new WbRemotePilot(); this.engine.attach(p.index, pilot); this.link.remote.set(p.index, pilot); p.external = true; }
+    });
+    this.myIndex = mine;
+  }
+
+  receiveState(id: string, raw: string, nowMs: number): void {
+    const p = this.engine.players.find((x) => x.id === id);
+    if (p) this.link.receive(p.index, raw, nowMs);
+  }
+
+  playerLeft(id: string): void {
+    const p = this.engine.players.find((x) => x.id === id);
+    if (p && !p.bot) this.engine.disconnect(p.index);
+  }
+
+  update(dt: number, nowMs: number): WbEvent[] {
+    const events = this.engine.update(dt, (list, tick) => this.link.collect(list, tick));
+    this.link.publish(nowMs);
+    return events;
+  }
+}
+
+class WbGuestDriver extends WbMatchDriver {
+  readonly online = true;
+  readonly mirror: WbMirror;
+  readonly myIndex: number;
+  readonly mapId: string;
+  private body: WbGuestBody | null = null;
+
+  constructor(readonly match: WbMatchRecord, private readonly session: RkSession<WbPlayerRecord>, private readonly input: WbInput, private readonly meter: WbNetMeter, readonly looks: CharacterLook[]) {
+    super();
+    this.myIndex = match.teams.flatMap((t) => t.members).findIndex((m) => m.id === session.myId);
+    this.mirror = new WbMirror(match, this.myIndex);
+    this.mapId = match.map;
+  }
+
+  get engine(): WbEngine { return this.mirror.engine; }
+  get source(): WbSceneSource { return this.mirror; }
+
+  lead(input: WbInput): WbLead | null {
+    if (this.myIndex < 0) return null;
+    this.body = new WbGuestBody(this.mirror, this.myIndex, input, this.session, this.meter);
+    return this.body;
+  }
+
+  update(dt: number, nowMs: number): WbEvent[] {
+    const m = this.mirror, s = this.session;
+    m.applySnap(s.value<string>("snap"), nowMs);
+    const events = m.takeEvents(s.value<string>("ev"));
+    m.applyBoard(s.value<string>("board"));
+    m.applyEnd(s.value<WbEndRecord>("end"));
+    m.advance(nowMs, dt);
+    if (this.body) this.body.step(Math.min(0.1, dt), nowMs);
+    return events;
   }
 }
 
@@ -156,7 +247,17 @@ class WbMatchView {
   private tenWarned = false;
   private lastCount = "";
 
-  constructor(readonly driver: WbMatchDriver, private readonly world: WbWorldView, private readonly ui: WbGameUi) {
+  constructor(readonly driver: WbMatchDriver, private readonly world: WbWorldView, private readonly ui: WbGameUi, input: WbInput) {
+    const theme = WbMapCatalog.find(driver.mapId);
+    const match = world.show(theme, driver.source, driver.looks);
+    match.lead = driver.lead(input);
+    const me = driver.engine.players[driver.myIndex];
+    input.reset();
+    input.body = () => me ? { x: me.x, z: me.z } : { x: 0, z: 0 };
+    world.playing = true;
+    ui.result.hide();
+    ui.banner.hide();
+    ui.hud.show(true);
     this.watched = Math.max(0, driver.myIndex);
     this.markWatched();
   }
@@ -172,9 +273,8 @@ class WbMatchView {
   }
 
   cycle(delta: number): void {
+    if (!this.spectating) return;
     const n = this.engine.players.length;
-    const me = this.engine.players[this.driver.myIndex];
-    if (me && me.life !== "out") return;
     for (let k = 1; k <= n; k++) {
       const next = (this.watched + delta * k + n * 4) % n;
       if (this.engine.players[next].life !== "out") { this.watched = next; break; }
@@ -183,7 +283,7 @@ class WbMatchView {
   }
 
   frame(dt: number, nowMs: number): void {
-    const events = this.driver.update(dt);
+    const events = this.driver.update(dt, nowMs);
     this.world.react(events, nowMs);
     this.reactUi(events, nowMs);
     this.world.render(dt, nowMs);
@@ -195,8 +295,19 @@ class WbMatchView {
     if (this.endedAt >= 0 && !this.resultShown && nowMs - this.endedAt > WbMatchView.RESULT_DELAY_MS) {
       this.resultShown = true;
       this.world.playing = false;
+      if (!this.engine.ranks.length) this.engine.ranks = WbScoreboard.ranks(this.engine);
       this.ui.result.show(this.engine, this.driver.myIndex);
     }
+  }
+
+  dispose(): void {
+    this.world.clear();
+    this.world.playing = false;
+    this.ui.result.hide();
+    this.ui.banner.hide();
+    this.ui.count.set("");
+    this.ui.hud.show(false);
+    WbDom.show(WbDom.el("controls"), false);
   }
 
   private updateButton(): void {
@@ -213,13 +324,13 @@ class WbMatchView {
   private updateCount(): void {
     const e = this.engine, s = e.seconds;
     let text = "";
-    if (e.tick < 0) text = String(Math.ceil(-s));
+    if (e.tick < 0) text = String(Math.max(1, Math.ceil(-s)));
     else if (s < WbMatchView.START_SHOW) text = "시작!";
-    else if (!e.ended && s >= WbBalance.MATCH - WbBalance.FINAL_COUNT) text = String(Math.ceil(WbBalance.MATCH - s));
+    else if (!e.ended && s >= WbBalance.MATCH - WbBalance.FINAL_COUNT) text = String(Math.max(1, Math.ceil(WbBalance.MATCH - s)));
     if (text && text !== this.lastCount) this.ui.sound.beep(text === "시작!");
     this.lastCount = text;
     this.ui.count.set(text);
-    if (!this.tenWarned && s >= WbBalance.MATCH - 10) { this.tenWarned = true; this.ui.banner.show("10초 남음", true); }
+    if (!this.tenWarned && s >= WbBalance.MATCH - 10 && !e.ended) { this.tenWarned = true; this.ui.banner.show("10초 남음", true); }
   }
 
   private headAt(index: number): { x: number; y: number } | null {
@@ -249,7 +360,7 @@ class WbMatchView {
       if (ev.t === "rescue") { ui.sound.rescue(); ui.banner.show(this.nick(ev.id) + (ev.needle ? " 님 바늘 탈출!" : " 님 구출!"), false, 1200); }
       if (ev.t === "out") {
         ui.sound.pop();
-        ui.banner.show(this.nick(ev.id) + " 님 탈락", ev.id === me, 1400);
+        ui.banner.show(this.nick(ev.id) + (ev.why === "left" ? " 님 연결 끊김" : " 님 탈락"), ev.id === me, 1400);
         if (ev.id === this.watched) window.setTimeout(() => this.cycle(1), 1200);
       }
       if (ev.t === "pick") {
@@ -286,19 +397,119 @@ class WbGameUi {
   }
 }
 
+class WbMenuBackdrop {
+  static readonly RADIUS = 34;
+  static readonly HEIGHT = 30;
+  static readonly SPIN = 0.05;
+  static readonly BOTS = 4;
+  private driver: WbWatchDriver | null = null;
+  private angle = 0;
+  private seed = Math.floor(Math.random() * 1e9);
+
+  constructor(private readonly world: WbWorldView) {}
+
+  stop(): void { if (this.driver) { this.world.clear(); this.driver = null; } }
+
+  frame(dt: number, nowMs: number): void {
+    if (!this.driver || this.driver.engine.ended) {
+      this.seed = (this.seed + 1) >>> 0;
+      this.driver = new WbWatchDriver("solo", WbMenuBackdrop.BOTS, "normal", this.seed, "classroom");
+      this.world.show(WbMapCatalog.find("classroom"), this.driver.engine, this.driver.looks);
+      this.world.playing = false;
+    }
+    this.world.react(this.driver.update(dt, nowMs), nowMs);
+    this.angle += dt * WbMenuBackdrop.SPIN;
+    this.world.render(dt, nowMs);
+    this.world.rig.orbit(this.angle, WbMenuBackdrop.RADIUS, WbMenuBackdrop.HEIGHT);
+  }
+}
+
+class WbLobbyView {
+  static readonly TEAM_NAMES: readonly string[] = ["빨강", "파랑", "노랑", "초록"];
+  onSeat: (slot: number) => void = () => undefined;
+  onBot: (slot: number) => void = () => undefined;
+
+  constructor() {
+    WbDom.el("lobbySeats").addEventListener("click", (e) => {
+      const target = e.target as HTMLElement;
+      const bot = target.closest("[data-bot]") as HTMLElement | null;
+      if (bot) { this.onBot(Number(bot.dataset.bot)); return; }
+      const seat = target.closest("[data-slot]") as HTMLElement | null;
+      if (seat) this.onSeat(Number(seat.dataset.slot));
+    });
+  }
+
+  static modeOf(session: RkSession<WbPlayerRecord>): WbMode { return session.value<string>("mode") === "team" ? "team" : "solo"; }
+  static botsOf(session: RkSession<WbPlayerRecord>): number[] { const list = session.value<number[]>("bots"); return Array.isArray(list) ? list.slice() : []; }
+
+  static humans(session: RkSession<WbPlayerRecord>, plan: RkSeatPlan): WbHumanSeat[] {
+    const list: WbHumanSeat[] = [];
+    plan.humanSeats(session.players).forEach((id, slot) => { if (id) list.push({ id, nick: (session.players.get(id) as WbPlayerRecord).nick, slot }); });
+    return list;
+  }
+
+  render(session: RkSession<WbPlayerRecord>, plan: RkSeatPlan): void {
+    const mode = WbLobbyView.modeOf(session), host = session.isHost(), bots = WbLobbyView.botsOf(session);
+    WbDom.text(WbDom.el("lobbyCode"), session.code);
+    WbDom.text(WbDom.el("lobbyMode"), mode === "team" ? "팀전 (2명씩)" : "개인전");
+    const seats = plan.humanSeats(session.players);
+    let html = "";
+    for (let slot = 0; slot < WbRoomRules.SEATS; slot++) {
+      const team = WbRoomRules.teamOfSlot(mode, slot), color = WbPalette.teamColor(mode, team);
+      const id = seats[slot], record = id ? session.players.get(id) : null;
+      const head = mode === "team" && slot % 2 === 0 ? "<div class=\"seatTeam\" style=\"background:" + color + "\">" + WbLobbyView.TEAM_NAMES[team] + "팀</div>" : "";
+      const botHere = bots.indexOf(mode === "team" ? team : slot) >= 0;
+      let inner = "<span class=\"empty\">빈자리</span>";
+      if (record) inner = WbDom.esc(record.nick) + (id === session.hostId ? " 👑" : "");
+      else if (botHere) inner = "봇" + (host ? " <button type=\"button\" class=\"seatBot\" data-bot=\"" + slot + "\">×</button>" : "");
+      else if (host) inner += " <button type=\"button\" class=\"seatBot\" data-bot=\"" + slot + "\">+봇</button>";
+      html += head + "<div class=\"seat" + (record ? " taken" : "") + (id === session.myId ? " mine" : "") + "\" data-slot=\"" + slot + "\" style=\"border-color:" + color + ";background:" + color + "33\">" + inner + "</div>";
+    }
+    WbDom.html(WbDom.el("lobbySeats"), html);
+    const watchers = plan.spectators(session.players).map((sid) => WbDom.esc((session.players.get(sid) as WbPlayerRecord).nick));
+    WbDom.html(WbDom.el("lobbySpectators"), "관전: " + (watchers.length ? watchers.join(", ") : "<span class=\"empty\">없음</span>"));
+    WbDom.show(WbDom.el("btnStart"), host);
+    WbDom.show(WbDom.el("lobbyHostRow"), host);
+    WbDom.show(WbDom.el("lobbyGuestRow"), !host);
+    const map = session.value<string>("map") || WbMapCatalog.RANDOM, level = WbPlayOptions.levelOf(session.value<string>("level") || "");
+    WbDom.el<HTMLSelectElement>("lobbyMap").value = map;
+    WbDom.el<HTMLSelectElement>("lobbyLevel").value = level;
+    WbDom.text(WbDom.el("lobbyGuestInfo"), "맵: " + (map === WbMapCatalog.RANDOM ? "무작위" : WbMapCatalog.find(map).title) + " · 봇: " + WbBotTuning.LABELS[level]);
+    WbDom.text(WbDom.el("btnSeatMode"), session.isSpectator() ? "선수로 참가" : "관전자로 보기");
+    const humans = WbLobbyView.humans(session, plan);
+    const roster = WbRosterPlanner.fill(mode, humans, bots);
+    const botCount = roster.reduce((a, t) => a + t.members.filter((m) => m.bot).length, 0);
+    WbDom.el<HTMLButtonElement>("btnStart").disabled = humans.length < 1;
+    WbDom.text(WbDom.el("lobbyHint"), host ? "사람 " + humans.length + "명 + 봇 " + botCount + "명으로 시작해요." : "방장이 시작하길 기다려요…");
+  }
+}
+
 class WbGame {
+  static readonly STALL_MS = 250;
+  static readonly WATCHDOG_MS = 100;
+  static readonly LEAVE_CONFIRM_MS = 3000;
   private readonly options = new WbPlayOptions(location.search);
   private readonly touch = matchMedia("(pointer: coarse)").matches;
+  private readonly backend = new RkBackend();
+  private readonly directory = new RkDirectory<WbPlayerRecord>(this.backend, WbRoomRules.RULES);
+  private readonly seatPlan = new RkSeatPlan(WbRoomRules.RULES);
+  private readonly meter = new WbNetMeter();
+  private readonly myId = "p" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+  private lobby: WbLobbyView | null = null;
   private world: WbWorldView | null = null;
   private ui: WbGameUi | null = null;
   private input: WbInput | null = null;
   private profile: PlayerProfile | null = null;
+  private editor: ProfileEditor | null = null;
+  private backdrop: WbMenuBackdrop | null = null;
+  private session: RkSession<WbPlayerRecord> | null = null;
   private view: WbMatchView | null = null;
-  private seed: number;
+  private practice = false;
+  private matchId = 0;
   private lastMs = 0;
+  private leaveAskedAt = -1;
 
   constructor(private readonly libs: ThreeLibs) {
-    this.seed = this.options.seed;
     this.start().catch((error) => { WbDom.text(WbDom.el("loading"), "불러오기 실패: " + error); });
   }
 
@@ -309,23 +520,75 @@ class WbGame {
     await library.load(assets.clips);
     const factory = new CharacterModelFactory(this.libs, assets);
     this.world = new WbWorldView(this.libs, WbDom.el<HTMLCanvasElement>("view"), this.touch, library, factory);
+    this.backdrop = new WbMenuBackdrop(this.world);
     this.profile = new PlayerProfile();
+    this.editor = new ProfileEditor(this.libs, factory, assets, this.profile);
+    this.editor.onChange(() => this.pushProfile());
+    FoldCard.bindAll(document);
     const ui = new WbGameUi(() => this.action());
     this.ui = ui;
     this.input = new WbInput(ui.joystick);
-    new WbKeyboard({
-      dir: (dir, down) => this.direction(dir, down),
-      action: () => this.action(),
-      other: (code) => this.otherKey(code),
-    });
-    WbDom.el("btnMute").addEventListener("click", () => this.toggleMute());
-    WbDom.el("btnAgain").addEventListener("click", () => this.again());
+    this.lobby = new WbLobbyView();
+    this.lobby.onSeat = (slot) => this.clickSeat(slot);
+    this.lobby.onBot = (slot) => this.toggleBot(slot);
+    new WbKeyboard({ dir: (dir, down) => this.direction(dir, down), action: () => this.action(), other: (code) => this.otherKey(code) });
+    this.bindMenus();
     document.body.classList.toggle("touch", this.touch);
     WbDom.show(WbDom.el("loading"), false);
-    this.options.save();
-    this.newMatch();
+    window.addEventListener("pagehide", () => { if (this.session) this.session.removeMineOnUnload(); });
+    this.fillSoloForm();
+    if (this.options.autoSolo) this.startSolo();
+    else { this.showScreen("start"); this.updateStartButtons(); }
     this.lastMs = performance.now();
     requestAnimationFrame((ms) => this.frame(ms));
+    window.setInterval(() => { const now = performance.now(); if (now - this.lastMs > WbGame.STALL_MS) this.step(now); }, WbGame.WATCHDOG_MS);
+  }
+
+  private bindMenus(): void {
+    const on = (id: string, fn: () => void): void => WbDom.el(id).addEventListener("click", fn);
+    on("btnSolo", () => { this.readSoloForm(); this.startSolo(); });
+    on("btnCreateSolo", () => this.createRoom("solo"));
+    on("btnCreateTeam", () => this.createRoom("team"));
+    on("btnJoin", () => this.joinRoom(false));
+    on("btnWatch", () => this.joinRoom(true));
+    WbDom.el("joinCode").addEventListener("keydown", (e) => { if ((e as KeyboardEvent).key === "Enter") this.joinRoom(false); });
+    on("btnStart", () => this.startMatch());
+    on("btnLeave", () => this.leaveRoom(""));
+    on("btnSeatMode", () => this.toggleSeatMode());
+    on("btnModeToggle", () => this.toggleMode());
+    on("btnAgain", () => this.afterResult());
+    on("btnResultLeave", () => this.leaveRoom(""));
+    on("btnGameLeave", () => this.askLeave());
+    on("btnMute", () => this.toggleMute());
+    WbDom.el("lobbyMap").addEventListener("change", () => this.writeHostValue("map", WbDom.el<HTMLSelectElement>("lobbyMap").value));
+    WbDom.el("lobbyLevel").addEventListener("change", () => this.writeHostValue("level", WbDom.el<HTMLSelectElement>("lobbyLevel").value));
+    WbDom.el("soloMode").addEventListener("change", () => this.refreshBotChoices());
+  }
+
+  private fillSoloForm(): void {
+    WbDom.el<HTMLSelectElement>("soloMode").value = this.options.mode;
+    this.refreshBotChoices();
+    WbDom.el<HTMLSelectElement>("soloBots").value = String(this.options.bots);
+    WbDom.el<HTMLSelectElement>("soloLevel").value = this.options.level;
+    WbDom.el<HTMLSelectElement>("soloMap").value = this.options.mapId;
+  }
+
+  private refreshBotChoices(): void {
+    const mode = WbDom.el<HTMLSelectElement>("soloMode").value === "team" ? "team" : "solo";
+    const select = WbDom.el<HTMLSelectElement>("soloBots"), keep = Number(select.value) || 0;
+    const limit = mode === "solo" ? WbBalance.MAX_PLAYERS - 1 : WbBalance.TEAM_COUNT - 1;
+    const unit = mode === "solo" ? "봇 " : "봇 팀 ";
+    select.innerHTML = Array.from({ length: limit }, (_, k) => "<option value=\"" + (k + 1) + "\">" + unit + (k + 1) + (mode === "solo" ? "명" : "팀") + "</option>").join("");
+    select.value = String(WbPlayOptions.clampBots(mode, keep));
+  }
+
+  private readSoloForm(): void {
+    const o = this.options;
+    o.mode = WbDom.el<HTMLSelectElement>("soloMode").value === "team" ? "team" : "solo";
+    o.bots = WbPlayOptions.clampBots(o.mode, Number(WbDom.el<HTMLSelectElement>("soloBots").value));
+    o.level = WbPlayOptions.levelOf(WbDom.el<HTMLSelectElement>("soloLevel").value);
+    o.mapId = WbDom.el<HTMLSelectElement>("soloMap").value || WbMapCatalog.RANDOM;
+    o.save();
   }
 
   private direction(dir: number, down: boolean): void {
@@ -335,47 +598,264 @@ class WbGame {
   }
 
   private action(): void {
-    if (this.view && this.view.finished) { this.again(); return; }
+    if (this.view && this.view.finished) { if (this.practice || !this.session || this.session.isHost()) this.afterResult(); return; }
     if (this.input) this.input.action();
   }
 
   private otherKey(code: string): void {
-    if (code === "KeyN") this.again();
+    if (code === "KeyN" && this.practice) this.afterResult();
   }
 
   private toggleMute(): void {
     if (!this.ui) return;
-    const muted = this.ui.sound.toggle();
-    WbDom.text(WbDom.el("btnMute"), muted ? "🔇" : "🔊");
+    WbDom.text(WbDom.el("btnMute"), this.ui.sound.toggle() ? "🔇" : "🔊");
   }
 
-  private again(): void {
-    this.seed = (this.seed + 1) >>> 0;
-    this.newMatch();
+  private askLeave(): void {
+    const button = WbDom.el("btnGameLeave"), now = performance.now();
+    if (this.leaveAskedAt >= 0 && now - this.leaveAskedAt < WbGame.LEAVE_CONFIRM_MS) { this.resetLeave(); this.leaveRoom(""); return; }
+    this.leaveAskedAt = now;
+    button.classList.add("confirm");
+    WbDom.text(button, "한 번 더 누르면 나가요");
+    window.setTimeout(() => { if (performance.now() - this.leaveAskedAt >= WbGame.LEAVE_CONFIRM_MS - 50) this.resetLeave(); }, WbGame.LEAVE_CONFIRM_MS);
   }
 
-  private newMatch(): void {
-    const world = this.world as WbWorldView, ui = this.ui as WbGameUi, input = this.input as WbInput;
-    input.reset();
-    ui.result.hide();
-    ui.banner.hide();
-    const driver: WbMatchDriver = this.options.watch ? new WbWatchDriver(this.options, this.seed) : new WbSoloDriver(this.options, this.seed, this.profile as PlayerProfile, input);
-    const engine = driver.engine;
-    while (!engine.ended && engine.seconds < this.options.skipTo) engine.step();
-    const theme = WbMapCatalog.resolve(this.options.mapId, new WbSeededRandom(this.seed ^ 0x3A9));
-    const match = world.show(theme, engine, driver.looks);
-    const me = engine.players[driver.myIndex];
-    input.body = () => me ? { x: me.x, z: me.z } : { x: 0, z: 0 };
-    match.lead = me ? new WbLocalLead(engine, me.index, input) : null;
-    world.playing = true;
-    this.view = new WbMatchView(driver, world, ui);
+  private resetLeave(): void {
+    this.leaveAskedAt = -1;
+    const button = WbDom.el("btnGameLeave");
+    button.classList.remove("confirm");
+    WbDom.text(button, this.practice ? "나가기" : "방 나가기");
+  }
+
+  private showScreen(name: WbScreenName): void {
+    WbDom.show(WbDom.el("btnGameLeave"), name === "game");
+    this.resetLeave();
+    WbDom.show(WbDom.el("startScreen"), name === "start");
+    WbDom.show(WbDom.el("lobbyScreen"), name === "lobby");
+    WbDom.show(WbDom.el("touchZone"), name === "game");
+    if (name !== "game") { WbDom.show(WbDom.el("controls"), false); if (this.ui) this.ui.hud.show(false); }
+    const editor = this.editor;
+    if (!editor) return;
+    if (name === "game") { editor.setActive(false); return; }
+    editor.mount(WbDom.el(name === "start" ? "profileHost" : "lobbyProfileHost"));
+    editor.setActive(true);
+  }
+
+  private pushProfile(): void {
+    const profile = this.profile;
+    if (this.session && profile) this.session.pushProfile({ nick: profile.nickOrDefault(), look: profile.look });
+  }
+
+  private updateStartButtons(): void {
+    const ok = !!this.backend.database;
+    ["btnCreateSolo", "btnCreateTeam", "btnJoin", "btnWatch"].forEach((id) => { WbDom.el<HTMLButtonElement>(id).disabled = !ok; });
+    if (!ok) this.startMessage("온라인 연결을 할 수 없어요. (firebase-config.js·인터넷 확인) 혼자 하기는 할 수 있어요.");
+  }
+
+  private startMessage(text: string): void { WbDom.text(WbDom.el("startMsg"), text); }
+
+  private myRecord(): WbPlayerRecord {
+    const profile = this.profile as PlayerProfile;
+    return { nick: profile.nickOrDefault(), isBot: false, joinedAt: this.backend.now(), slot: 0, look: profile.look, spectator: false };
+  }
+
+  private async createRoom(mode: WbMode): Promise<void> {
+    if (!this.backend.database) return;
+    this.startMessage("");
+    try {
+      const code = await this.directory.create(this.myId, this.myRecord());
+      if (!code) { this.startMessage("방을 만들지 못했어요. 다시 눌러 주세요."); return; }
+      this.enterRoom(code, true);
+      (this.session as RkSession<WbPlayerRecord>).ref.update({ mode, map: WbMapCatalog.RANDOM, level: "normal", bots: [] });
+    } catch (error) {
+      this.startMessage("방을 만들지 못했어요. (데이터베이스 규칙을 확인해 주세요)");
+    }
+  }
+
+  private async joinRoom(asSpectator: boolean): Promise<void> {
+    if (!this.backend.database) return;
+    const code = WbDom.el<HTMLInputElement>("joinCode").value.replace(/\D/g, "");
+    if (code.length !== 5) { this.startMessage("방 코드 5자리를 입력해 주세요."); return; }
+    this.startMessage("");
+    try {
+      const outcome = await this.directory.join(code, this.myId, this.myRecord(), asSpectator);
+      if (outcome.ok) { this.enterRoom(code, false); WbDom.text(WbDom.el("lobbyNotice"), outcome.message); }
+      else this.startMessage(outcome.message);
+    } catch (error) {
+      this.startMessage("방을 불러오지 못했어요.");
+    }
+  }
+
+  private enterRoom(code: string, hosting: boolean): void {
+    if (this.backdrop) this.backdrop.stop();
+    const session = new RkSession<WbPlayerRecord>(this.backend, WbRoomRules.RULES, code, this.myId, hosting, WbRoomRules.VALUES);
+    this.session = session;
+    this.practice = false;
+    session.onChange = (kind) => this.onSessionChange(kind);
+    session.onRemoteState = (id, raw) => { if (this.view && this.view.driver instanceof WbHostDriver) this.view.driver.receiveState(id, raw, performance.now()); };
+    session.onPlayerRemoved = (id) => this.playerRemoved(id);
+    session.onClosed = (message) => this.exitToStart(message);
+    session.connect();
+    this.showScreen("lobby");
+    (this.lobby as WbLobbyView).render(session, this.seatPlan);
+  }
+
+  private playerRemoved(id: string): void {
+    const session = this.session;
+    if (this.view && this.view.driver instanceof WbHostDriver) this.view.driver.playerLeft(id);
+    if (session && session.isHost() && session.status === "lobby") this.pruneBots();
+  }
+
+  private onSessionChange(kind: string): void {
+    const session = this.session;
+    if (!session) return;
+    if (!this.view && kind !== "snap" && kind !== "ev" && kind !== "board") (this.lobby as WbLobbyView).render(session, this.seatPlan);
+    if (kind === "status" || kind === "match" || kind === "players") this.syncPhase();
+  }
+
+  private syncPhase(): void {
+    const session = this.session, ui = this.ui, world = this.world, input = this.input;
+    if (!session || !ui || !world || !input) return;
+    const match = session.value<WbMatchRecord>("match");
+    if (session.status === "lobby") {
+      if (this.view) { this.view.dispose(); this.view = null; }
+      this.showScreen("lobby");
+      (this.lobby as WbLobbyView).render(session, this.seatPlan);
+      return;
+    }
+    if ((session.status === "playing" || session.status === "ended") && match && match.id !== this.matchId && session.me()) {
+      if (this.view) this.view.dispose();
+      if (this.backdrop) this.backdrop.stop();
+      this.matchId = match.id;
+      const looks = match.teams.flatMap((t) => t.members).map((m, k) => {
+        const record = session.players.get(m.id);
+        return record && !m.bot ? record.look : WbBotLooks.make(match.seed + k * 7919);
+      });
+      const level = WbPlayOptions.levelOf(session.value<string>("level") || "");
+      const driver: WbMatchDriver = session.isHost() ? new WbHostDriver(match, session, input, this.meter, level, looks) : new WbGuestDriver(match, session, input, this.meter, looks);
+      this.view = new WbMatchView(driver, world, ui, input);
+      this.showScreen("game");
+      ui.hud.show(true);
+      WbDom.show(WbDom.el("btnAgain"), session.isHost());
+      WbDom.text(WbDom.el("btnAgain"), "대기실로");
+      WbDom.text(WbDom.el("btnResultLeave"), "방 나가기");
+    }
+  }
+
+  private startMatch(): void {
+    const session = this.session;
+    if (!session || !session.isHost() || session.status !== "lobby") return;
+    const mode = WbLobbyView.modeOf(session);
+    const humans = WbLobbyView.humans(session, this.seatPlan);
+    if (!humans.length) return;
+    const seed = Math.floor(Math.random() * 1e9);
+    const map = WbMapCatalog.resolve(session.value<string>("map") || WbMapCatalog.RANDOM, new WbSeededRandom(seed ^ 0x3A9)).id;
+    const match: WbMatchRecord = { id: 1 + Math.floor(Math.random() * 1e9), seed, mode, map, teams: WbRosterPlanner.fill(mode, humans, WbLobbyView.botsOf(session)), startAt: this.backend.now() };
+    session.ref.update({ match, status: "playing", st: null, snap: null, ev: null, board: null, end: null });
+  }
+
+  private afterResult(): void {
+    if (this.practice) { this.options.seed = (this.options.seed + 1) >>> 0; this.startSolo(); return; }
+    const session = this.session;
+    if (!session || !session.isHost()) return;
+    session.ref.update({ status: "lobby", match: null, st: null, snap: null, ev: null, board: null, end: null });
+  }
+
+  private writeHostValue(name: string, value: string): void {
+    const session = this.session;
+    if (session && session.isHost() && session.status === "lobby") session.writeValue(name, value);
+  }
+
+  private toggleSeatMode(): void {
+    const session = this.session;
+    if (!session || session.status !== "lobby") return;
+    if (session.isSpectator()) {
+      const seat = this.seatPlan.freeSeat(session.players);
+      if (seat >= 0) session.ref.child("players/" + session.myId).update({ slot: seat, spectator: false });
+    } else session.ref.child("players/" + session.myId).update({ slot: WbRoomRules.SPECTATOR_SLOT, spectator: true });
+  }
+
+  private toggleMode(): void {
+    const session = this.session;
+    if (!session || !session.isHost() || session.status !== "lobby") return;
+    session.ref.update({ mode: WbLobbyView.modeOf(session) === "team" ? "solo" : "team", bots: [] });
+  }
+
+  private clickSeat(slot: number): void {
+    const session = this.session;
+    if (!session || session.status !== "lobby") return;
+    if (this.seatPlan.humanSeats(session.players)[slot]) return;
+    session.ref.child("players/" + session.myId).update({ slot, spectator: false });
+  }
+
+  private toggleBot(slot: number): void {
+    const session = this.session;
+    if (!session || !session.isHost() || session.status !== "lobby") return;
+    const mode = WbLobbyView.modeOf(session), key = WbRoomRules.teamOfSlot(mode, slot);
+    const bots = WbLobbyView.botsOf(session), at = bots.indexOf(key);
+    if (at >= 0) bots.splice(at, 1); else bots.push(key);
+    session.writeValue("bots", bots);
+  }
+
+  private pruneBots(): void {
+    const session = this.session;
+    if (!session) return;
+    const mode = WbLobbyView.modeOf(session), seats = this.seatPlan.humanSeats(session.players);
+    const bots = WbLobbyView.botsOf(session).filter((key) => mode === "team" || !seats[key]);
+    if (bots.length !== WbLobbyView.botsOf(session).length) session.writeValue("bots", bots);
+  }
+
+  private leaveRoom(message: string): void {
+    if (this.practice) {
+      this.practice = false;
+      if (this.view) { this.view.dispose(); this.view = null; }
+      this.showScreen("start");
+      this.updateStartButtons();
+      return;
+    }
+    if (this.session) this.session.leave();
+    this.exitToStart(message);
+  }
+
+  private exitToStart(message: string): void {
+    if (this.session) this.session.silentClose();
+    this.session = null;
+    if (this.view) { this.view.dispose(); this.view = null; }
+    this.matchId = 0;
+    this.showScreen("start");
+    this.updateStartButtons();
+    this.startMessage(message);
+  }
+
+  private startSolo(): void {
+    const ui = this.ui as WbGameUi, world = this.world as WbWorldView, input = this.input as WbInput;
+    if (this.view) this.view.dispose();
+    if (this.backdrop) this.backdrop.stop();
+    this.practice = true;
+    const o = this.options;
+    const driver: WbMatchDriver = o.watch
+      ? new WbWatchDriver(o.mode, o.mode === "solo" ? o.bots + 1 : (o.bots + 1) * 2, o.level, o.seed, WbMapCatalog.resolve(o.mapId, new WbSeededRandom(o.seed ^ 0x3A9)).id)
+      : new WbSoloDriver(o, o.seed, this.profile as PlayerProfile, input);
+    while (!driver.engine.ended && driver.engine.seconds < o.skipTo) driver.engine.step();
+    this.view = new WbMatchView(driver, world, ui, input);
+    this.showScreen("game");
     ui.hud.show(true);
+    WbDom.show(WbDom.el("btnAgain"), true);
+    WbDom.text(WbDom.el("btnAgain"), "다시 하기");
+    WbDom.text(WbDom.el("btnResultLeave"), "나가기");
   }
 
   private frame(ms: number): void {
-    const dt = Math.min(0.1, (ms - this.lastMs) / 1000);
-    this.lastMs = ms;
-    if (this.view) this.view.frame(dt * this.options.speed, ms);
     requestAnimationFrame((next) => this.frame(next));
+    this.step(ms);
+  }
+
+  private step(ms: number): void {
+    const dt = Math.min(0.1, Math.max(0, (ms - this.lastMs) / 1000));
+    this.lastMs = ms;
+    if (this.view) this.view.frame(dt * (this.practice ? this.options.speed : 1), ms);
+    else if (this.backdrop && this.world) this.backdrop.frame(dt, ms);
+    this.meter.tick(ms);
+    if (this.options.showNet) WbDom.text(WbDom.el("netMeter"), (this.meter.rate / 1024).toFixed(1) + " KB/s");
   }
 }
