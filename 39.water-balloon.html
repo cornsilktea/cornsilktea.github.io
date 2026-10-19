@@ -8,6 +8,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>물풍선 대작전</title>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="정보 수업용 링크 모음">
+<meta property="og:title" content="물풍선 대작전">
+<meta property="og:description" content="물풍선을 놓아 상자를 부수고 상대를 물방울에 가두는 3D 물풍선 대작전">
+<meta property="og:url" content="https://cornsilktea.github.io/39.water-balloon.html">
+<meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
+<meta name="twitter:card" content="summary">
 <link rel="stylesheet" href="theme.css">
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -80,6 +87,19 @@
   #resultBox tr.me td { background: rgba(217,123,79,.3); }
   #resultBox .tc { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; }
   #resultBox small { font-size: 11px; color: #9FB3C8; }
+  #specPanel { position: fixed; left: 12px; top: 50px; bottom: 16px; width: 230px; z-index: 6; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; }
+  .spCard { background: rgba(10,22,44,.86); border-radius: 8px; padding: 6px 9px; border-left: 5px solid; cursor: pointer; }
+  .spCard.watched { box-shadow: 0 0 0 3px #D97B4F; }
+  .spCard.trapped { background: rgba(40,90,140,.9); }
+  .spCard.dead { opacity: .45; filter: grayscale(1); }
+  .spName { font-size: 14px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; gap: 6px; align-items: center; }
+  .spName small { font-size: 10px; color: #9FB3C8; }
+  .spState { margin-left: auto; font-size: 12px; color: #FFD37A; }
+  .spStats { font-size: 13px; font-weight: 800; margin-top: 2px; display: flex; align-items: center; gap: 3px; }
+  .spStats .rangeIcon { width: 12px; height: 12px; background-size: 12px 4px, 4px 12px; }
+  body.spectating #hudMine { left: 50%; top: auto; bottom: 16px; transform: translateX(-50%); }
+  @media (max-width: 700px) { #specPanel { width: 150px; } .spStats { font-size: 11px; } .spName { font-size: 12px; } }
+  .seat { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.7); }
   #btnGameLeave { position: fixed; right: 12px; top: 54px; z-index: 7; font: inherit; font-size: 15px; font-weight: 800; color: #fff; cursor: pointer; border-top: 0; border-right: 0; border-bottom: 0; padding: 7px 14px; }
   #btnGameLeave.confirm { background: #D97B4F; border-left-color: #fff; }
   #btnResultLeave { margin-top: 8px; width: 100%; min-height: 44px; font: inherit; font-size: 16px; font-weight: 800; border-radius: 8px; border: 2px solid rgba(255,255,255,.5); background: transparent; color: #fff; cursor: pointer; }
@@ -122,6 +142,7 @@
 </div>
 <div id="hudTop" hidden><div class="hud-box" id="hudClock"></div><div class="hud-box" id="hudAlive"></div></div>
 <div id="hudMine" class="hud-box" hidden></div>
+<div id="specPanel" hidden></div>
 <button type="button" id="btnMute" class="hud-box">🔊</button>
 <div id="banner" class="hud-box" hidden></div>
 <div id="bigCount" hidden></div>
@@ -205,13 +226,13 @@
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="fold-card.js"></script>
 <script charset="utf-8" src="room-kit.js"></script>
-<script charset="utf-8" src="39.balloon-map.js?v=6"></script>
-<script charset="utf-8" src="39.balloon-rules.js?v=6"></script>
-<script charset="utf-8" src="39.balloon-bot.js?v=6"></script>
-<script charset="utf-8" src="39.balloon-views.js?v=6"></script>
-<script charset="utf-8" src="39.balloon-hud.js?v=6"></script>
-<script charset="utf-8" src="39.balloon-net.js?v=6"></script>
-<script charset="utf-8" src="39.water-balloon.js?v=6"></script>
+<script charset="utf-8" src="39.balloon-map.js?v=8"></script>
+<script charset="utf-8" src="39.balloon-rules.js?v=8"></script>
+<script charset="utf-8" src="39.balloon-bot.js?v=8"></script>
+<script charset="utf-8" src="39.balloon-views.js?v=8"></script>
+<script charset="utf-8" src="39.balloon-hud.js?v=8"></script>
+<script charset="utf-8" src="39.balloon-net.js?v=8"></script>
+<script charset="utf-8" src="39.water-balloon.js?v=8"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";

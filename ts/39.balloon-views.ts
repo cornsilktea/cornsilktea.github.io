@@ -843,6 +843,11 @@ class WbAvatarView {
 
   squash(nowMs: number): void { this.squashAt = nowMs; }
 
+  cheer(): void {
+    this.animator.play("Cheering");
+    this.actionUntil = Infinity;
+  }
+
   playOnce(clip: string, seconds: number, nowMs: number): void {
     this.animator.play(clip, { once: true });
     this.actionUntil = nowMs + seconds * 1000;
@@ -1150,6 +1155,10 @@ class WbMatchScene {
   }
 
   avatarAt(index: number): WbAvatarView | null { return this.avatars[index] || null; }
+
+  cheer(ranks: readonly number[]): void {
+    this.avatars.forEach((avatar, k) => { if (ranks[k] === 1 && avatar.source.life !== "out") avatar.cheer(); });
+  }
 }
 
 class WbWorldView {

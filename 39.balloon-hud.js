@@ -358,6 +358,30 @@ class WbVibration {
         }
     }
 }
+class WbSpectatorPanel {
+    constructor() {
+        this.box = WbDom.el("specPanel");
+        this.listener = () => undefined;
+        this.box.addEventListener("click", (e) => {
+            const card = e.target.closest("[data-watch]");
+            if (card)
+                this.listener(Number(card.dataset.watch));
+        });
+    }
+    onPick(listener) { this.listener = listener; }
+    show(on) { WbDom.show(this.box, on); }
+    render(engine, watched) {
+        const html = engine.players.map((p) => {
+            const color = WbPalette.teamColor(engine.mode, p.team);
+            const state = p.life === "out" ? (p.disconnected ? "연결 끊김" : "탈락") : p.life === "trapped" ? "갇힘 " + Math.max(0, Math.ceil((p.trapUntil - engine.tick) / WbBalance.RATE)) + "초" : engine.tick < p.shieldUntil ? "방패" : engine.tick < p.invulnUntil ? "무적" : "";
+            const cls = "spCard" + (p.index === watched ? " watched" : "") + (p.life === "out" ? " dead" : p.life === "trapped" ? " trapped" : "");
+            return "<div class=\"" + cls + "\" data-watch=\"" + p.index + "\" style=\"border-left-color:" + color + "\">" +
+                "<div class=\"spName\">" + WbDom.esc(p.nick) + (p.bot ? " <small>BOT</small>" : "") + (state ? "<span class=\"spState\">" + state + "</span>" : "") + "</div>" +
+                "<div class=\"spStats\">💧" + p.balloonsMax + " <i class=\"rangeIcon\"></i>" + p.range + " 👟" + p.shoe + (p.needles ? " 📌" + p.needles : "") + (p.kick ? " 킥" : "") + "</div></div>";
+        }).join("");
+        WbDom.html(this.box, html);
+    }
+}
 class WbResultBoard {
     constructor() {
         this.box = WbDom.el("resultBox");

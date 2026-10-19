@@ -234,6 +234,9 @@ class WbMatchView {
         ui.hud.show(true);
         this.watched = Math.max(0, driver.myIndex);
         this.markWatched();
+        const first = driver.engine.players[this.watched];
+        if (first && first.life === "out")
+            this.cycle(1);
     }
     get engine() { return this.driver.engine; }
     get mine() { return this.driver.myIndex >= 0 && this.watched === this.driver.myIndex; }
@@ -274,7 +277,21 @@ class WbMatchView {
             if (!this.engine.ranks.length)
                 this.engine.ranks = WbScoreboard.ranks(this.engine);
             this.ui.result.show(this.engine, this.driver.myIndex);
+            const match = this.world.current;
+            if (match)
+                match.cheer(this.engine.ranks);
         }
+        const panel = this.spectating && !this.resultShown;
+        this.ui.spectators.show(panel);
+        document.body.classList.toggle("spectating", panel);
+        if (panel)
+            this.ui.spectators.render(this.engine, this.watched);
+    }
+    pick(index) {
+        if (!this.spectating || !this.engine.players[index])
+            return;
+        this.watched = index;
+        this.markWatched();
     }
     dispose() {
         this.world.clear();
@@ -283,6 +300,8 @@ class WbMatchView {
         this.ui.banner.hide();
         this.ui.count.set("");
         this.ui.hud.show(false);
+        this.ui.spectators.show(false);
+        document.body.classList.remove("spectating");
         WbDom.show(WbDom.el("controls"), false);
     }
     updateButton() {
@@ -392,6 +411,7 @@ class WbGameUi {
         this.floats = new WbFloatText();
         this.sound = new WbSound();
         this.result = new WbResultBoard();
+        this.spectators = new WbSpectatorPanel();
         this.joystick = new WbJoystick(WbDom.el("touchZone"));
         this.button = new WbActionButton(onAction);
     }
@@ -466,7 +486,7 @@ class WbLobbyView {
                 inner = "봇" + (host ? " <button type=\"button\" class=\"seatBot\" data-bot=\"" + slot + "\">×</button>" : "");
             else if (host)
                 inner += " <button type=\"button\" class=\"seatBot\" data-bot=\"" + slot + "\">+봇</button>";
-            html += head + "<div class=\"seat" + (record ? " taken" : "") + (id === session.myId ? " mine" : "") + "\" data-slot=\"" + slot + "\" style=\"border-color:" + color + ";background:" + color + "33\">" + inner + "</div>";
+            html += head + "<div class=\"seat" + (record ? " taken" : "") + (id === session.myId ? " mine" : "") + "\" data-slot=\"" + slot + "\" style=\"border-color:" + color + ";background:" + (record || botHere ? color : color + "26") + "\">" + inner + "</div>";
         }
         WbDom.html(WbDom.el("lobbySeats"), html);
         const watchers = plan.spectators(session.players).map((sid) => WbDom.esc(session.players.get(sid).nick));
@@ -507,6 +527,7 @@ class WbGame {
         this.session = null;
         this.view = null;
         this.practice = false;
+        this.holding = false;
         this.matchId = 0;
         this.lastMs = 0;
         this.leaveAskedAt = -1;
@@ -526,6 +547,8 @@ class WbGame {
         FoldCard.bindAll(document);
         const ui = new WbGameUi(() => this.action());
         this.ui = ui;
+        ui.spectators.onPick((index) => { if (this.view)
+            this.view.pick(index); });
         this.input = new WbInput(ui.joystick);
         this.lobby = new WbLobbyView();
         this.lobby.onSeat = (slot) => this.clickSeat(slot);
@@ -580,8 +603,7 @@ class WbGame {
         const mode = WbDom.el("soloMode").value === "team" ? "team" : "solo";
         const select = WbDom.el("soloBots"), keep = Number(select.value) || 0;
         const limit = mode === "solo" ? WbBalance.MAX_PLAYERS - 1 : WbBalance.TEAM_COUNT - 1;
-        const unit = mode === "solo" ? "봇 " : "봇 팀 ";
-        select.innerHTML = Array.from({ length: limit }, (_, k) => "<option value=\"" + (k + 1) + "\">" + unit + (k + 1) + (mode === "solo" ? "명" : "팀") + "</option>").join("");
+        select.innerHTML = Array.from({ length: limit }, (_, k) => "<option value=\"" + (k + 1) + "\">봇 " + (k + 1) + (mode === "solo" ? "명" : "팀") + "</option>").join("");
         select.value = String(WbPlayOptions.clampBots(mode, keep));
     }
     readSoloForm() {
@@ -603,7 +625,7 @@ class WbGame {
     }
     action() {
         if (this.view && this.view.finished) {
-            if (this.practice || !this.session || this.session.isHost())
+            if (this.practice || this.holding || !this.session || this.session.isHost())
                 this.afterResult();
             return;
         }
@@ -751,6 +773,14 @@ class WbGame {
             return;
         const match = session.value("match");
         if (session.status === "lobby") {
+            if (this.view && this.view.finished && session.isSpectator() && !this.holding) {
+                this.holding = true;
+                WbDom.show(WbDom.el("btnAgain"), true);
+                WbDom.text(WbDom.el("btnAgain"), "대기실로");
+                return;
+            }
+            if (this.holding)
+                return;
             if (this.view) {
                 this.view.dispose();
                 this.view = null;
@@ -764,6 +794,7 @@ class WbGame {
                 this.view.dispose();
             if (this.backdrop)
                 this.backdrop.stop();
+            this.holding = false;
             this.matchId = match.id;
             const looks = match.teams.flatMap((t) => t.members).map((m, k) => {
                 const record = session.players.get(m.id);
@@ -796,6 +827,15 @@ class WbGame {
         if (this.practice) {
             this.options.seed = (this.options.seed + 1) >>> 0;
             this.startSolo();
+            return;
+        }
+        if (this.holding) {
+            this.holding = false;
+            if (this.view) {
+                this.view.dispose();
+                this.view = null;
+            }
+            this.syncPhase();
             return;
         }
         const session = this.session;
@@ -874,6 +914,7 @@ class WbGame {
         if (this.session)
             this.session.silentClose();
         this.session = null;
+        this.holding = false;
         if (this.view) {
             this.view.dispose();
             this.view = null;

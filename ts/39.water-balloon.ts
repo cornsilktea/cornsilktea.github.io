@@ -260,6 +260,8 @@ class WbMatchView {
     ui.hud.show(true);
     this.watched = Math.max(0, driver.myIndex);
     this.markWatched();
+    const first = driver.engine.players[this.watched];
+    if (first && first.life === "out") this.cycle(1);
   }
 
   get engine(): WbEngine { return this.driver.engine; }
@@ -297,7 +299,19 @@ class WbMatchView {
       this.world.playing = false;
       if (!this.engine.ranks.length) this.engine.ranks = WbScoreboard.ranks(this.engine);
       this.ui.result.show(this.engine, this.driver.myIndex);
+      const match = this.world.current;
+      if (match) match.cheer(this.engine.ranks);
     }
+    const panel = this.spectating && !this.resultShown;
+    this.ui.spectators.show(panel);
+    document.body.classList.toggle("spectating", panel);
+    if (panel) this.ui.spectators.render(this.engine, this.watched);
+  }
+
+  pick(index: number): void {
+    if (!this.spectating || !this.engine.players[index]) return;
+    this.watched = index;
+    this.markWatched();
   }
 
   dispose(): void {
@@ -307,6 +321,8 @@ class WbMatchView {
     this.ui.banner.hide();
     this.ui.count.set("");
     this.ui.hud.show(false);
+    this.ui.spectators.show(false);
+    document.body.classList.remove("spectating");
     WbDom.show(WbDom.el("controls"), false);
   }
 
@@ -388,6 +404,7 @@ class WbGameUi {
   readonly floats = new WbFloatText();
   readonly sound = new WbSound();
   readonly result = new WbResultBoard();
+  readonly spectators = new WbSpectatorPanel();
   readonly joystick: WbJoystick;
   readonly button: WbActionButton;
 
@@ -463,7 +480,7 @@ class WbLobbyView {
       if (record) inner = WbDom.esc(record.nick) + (id === session.hostId ? " 👑" : "");
       else if (botHere) inner = "봇" + (host ? " <button type=\"button\" class=\"seatBot\" data-bot=\"" + slot + "\">×</button>" : "");
       else if (host) inner += " <button type=\"button\" class=\"seatBot\" data-bot=\"" + slot + "\">+봇</button>";
-      html += head + "<div class=\"seat" + (record ? " taken" : "") + (id === session.myId ? " mine" : "") + "\" data-slot=\"" + slot + "\" style=\"border-color:" + color + ";background:" + color + "33\">" + inner + "</div>";
+      html += head + "<div class=\"seat" + (record ? " taken" : "") + (id === session.myId ? " mine" : "") + "\" data-slot=\"" + slot + "\" style=\"border-color:" + color + ";background:" + (record || botHere ? color : color + "26") + "\">" + inner + "</div>";
     }
     WbDom.html(WbDom.el("lobbySeats"), html);
     const watchers = plan.spectators(session.players).map((sid) => WbDom.esc((session.players.get(sid) as WbPlayerRecord).nick));
@@ -505,6 +522,7 @@ class WbGame {
   private session: RkSession<WbPlayerRecord> | null = null;
   private view: WbMatchView | null = null;
   private practice = false;
+  private holding = false;
   private matchId = 0;
   private lastMs = 0;
   private leaveAskedAt = -1;
@@ -527,6 +545,7 @@ class WbGame {
     FoldCard.bindAll(document);
     const ui = new WbGameUi(() => this.action());
     this.ui = ui;
+    ui.spectators.onPick((index) => { if (this.view) this.view.pick(index); });
     this.input = new WbInput(ui.joystick);
     this.lobby = new WbLobbyView();
     this.lobby.onSeat = (slot) => this.clickSeat(slot);
@@ -577,8 +596,7 @@ class WbGame {
     const mode = WbDom.el<HTMLSelectElement>("soloMode").value === "team" ? "team" : "solo";
     const select = WbDom.el<HTMLSelectElement>("soloBots"), keep = Number(select.value) || 0;
     const limit = mode === "solo" ? WbBalance.MAX_PLAYERS - 1 : WbBalance.TEAM_COUNT - 1;
-    const unit = mode === "solo" ? "봇 " : "봇 팀 ";
-    select.innerHTML = Array.from({ length: limit }, (_, k) => "<option value=\"" + (k + 1) + "\">" + unit + (k + 1) + (mode === "solo" ? "명" : "팀") + "</option>").join("");
+    select.innerHTML = Array.from({ length: limit }, (_, k) => "<option value=\"" + (k + 1) + "\">봇 " + (k + 1) + (mode === "solo" ? "명" : "팀") + "</option>").join("");
     select.value = String(WbPlayOptions.clampBots(mode, keep));
   }
 
@@ -598,7 +616,7 @@ class WbGame {
   }
 
   private action(): void {
-    if (this.view && this.view.finished) { if (this.practice || !this.session || this.session.isHost()) this.afterResult(); return; }
+    if (this.view && this.view.finished) { if (this.practice || this.holding || !this.session || this.session.isHost()) this.afterResult(); return; }
     if (this.input) this.input.action();
   }
 
@@ -718,6 +736,13 @@ class WbGame {
     if (!session || !ui || !world || !input) return;
     const match = session.value<WbMatchRecord>("match");
     if (session.status === "lobby") {
+      if (this.view && this.view.finished && session.isSpectator() && !this.holding) {
+        this.holding = true;
+        WbDom.show(WbDom.el("btnAgain"), true);
+        WbDom.text(WbDom.el("btnAgain"), "대기실로");
+        return;
+      }
+      if (this.holding) return;
       if (this.view) { this.view.dispose(); this.view = null; }
       this.showScreen("lobby");
       (this.lobby as WbLobbyView).render(session, this.seatPlan);
@@ -726,6 +751,7 @@ class WbGame {
     if ((session.status === "playing" || session.status === "ended") && match && match.id !== this.matchId && session.me()) {
       if (this.view) this.view.dispose();
       if (this.backdrop) this.backdrop.stop();
+      this.holding = false;
       this.matchId = match.id;
       const looks = match.teams.flatMap((t) => t.members).map((m, k) => {
         const record = session.players.get(m.id);
@@ -756,6 +782,12 @@ class WbGame {
 
   private afterResult(): void {
     if (this.practice) { this.options.seed = (this.options.seed + 1) >>> 0; this.startSolo(); return; }
+    if (this.holding) {
+      this.holding = false;
+      if (this.view) { this.view.dispose(); this.view = null; }
+      this.syncPhase();
+      return;
+    }
     const session = this.session;
     if (!session || !session.isHost()) return;
     session.ref.update({ status: "lobby", match: null, st: null, snap: null, ev: null, board: null, end: null });
@@ -820,6 +852,7 @@ class WbGame {
   private exitToStart(message: string): void {
     if (this.session) this.session.silentClose();
     this.session = null;
+    this.holding = false;
     if (this.view) { this.view.dispose(); this.view = null; }
     this.matchId = 0;
     this.showScreen("start");

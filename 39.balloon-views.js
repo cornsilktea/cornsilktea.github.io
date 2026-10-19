@@ -844,6 +844,10 @@ class WbAvatarView {
         parent.add(this.root);
     }
     squash(nowMs) { this.squashAt = nowMs; }
+    cheer() {
+        this.animator.play("Cheering");
+        this.actionUntil = Infinity;
+    }
     playOnce(clip, seconds, nowMs) {
         this.animator.play(clip, { once: true });
         this.actionUntil = nowMs + seconds * 1000;
@@ -1167,6 +1171,10 @@ class WbMatchScene {
         this.footprints.update(this.avatars, dt);
     }
     avatarAt(index) { return this.avatars[index] || null; }
+    cheer(ranks) {
+        this.avatars.forEach((avatar, k) => { if (ranks[k] === 1 && avatar.source.life !== "out")
+            avatar.cheer(); });
+    }
 }
 class WbWorldView {
     constructor(libs, canvas, touchDevice, library, factory) {
