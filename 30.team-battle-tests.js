@@ -3399,6 +3399,51 @@ class ResultCollector {
     });
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "복귀·없는 방·가득 참·연결 없음 4가지 처리");
   });
+  runAsync(CONNG, "경기 자리 되찾기(SeatReclaim): 경기 중 나간 학생이 코드로 들어오거나 새 탭을 열면 관전이 아니라 원래 팀·자리·캐릭터로 돌아가는가", async function (done) {
+    var bad = [], seatBefore = localStorage.getItem(api.SEAT_KEY);
+    function seat(team, c, slot, nick) { return { team: team, c: HUMAN_CHARS[c], ai: false, s: slot, n: nick }; }
+    function liveId() { var cur = api.setMyId(""); api.setMyId(cur); return cur; }
+    function playing(players, roster) { return roomTree("90011", players, { status: "playing", startAt: Date.now(), roster: roster }); }
+    var host = { H: person("방장", "blue", 1, 0) };
+    try {
+      localStorage.removeItem(api.SEAT_KEY);
+      await withNet(playing(host, { H: seat("blue", 0, 1, "방장"), gone: seat("red", 2, 2, "나") }), async function (fake) {
+        var firstId = liveId();
+        el("joinCode").value = "90011"; api.joinRoom();
+        await waitFor(function () { return api.room(); }, 500);
+        var rec = playersIn(fake, "90011").gone;
+        if (liveId() !== "gone" || !rec || rec.team !== "red" || rec.slot !== 2 || rec.characterType !== HUMAN_CHARS[2] || rec.isAI !== false || rec.nickname !== "나") bad.push("닉네임으로 되찾기 " + liveId() + " " + JSON.stringify(rec));
+        if (playersIn(fake, "90011")[firstId]) bad.push("새 아이디로도 들어감");
+        api.leaveRoom();
+      });
+      await withNet(playing(Object.assign({ gone: person("나", "red", 2, 2) }, host), { H: seat("blue", 0, 1, "방장"), gone: seat("red", 2, 2, "나") }), async function (fake) {
+        el("joinCode").value = "90011"; api.joinRoom();
+        await waitFor(function () { return api.room(); }, 500);
+        var rec = playersIn(fake, "90011")[liveId()];
+        if (liveId() === "gone" || !rec || rec.team !== "spec") bad.push("이미 있는 자리를 가져감 " + liveId());
+        api.leaveRoom();
+      });
+      await withNet(playing(host, { H: seat("blue", 0, 1, "방장"), oldMe: seat("blue", 1, 2, "옛이름") }), async function (fake) {
+        sessionStorage.removeItem(api.RESUME_KEY);
+        localStorage.setItem(api.SEAT_KEY, JSON.stringify({ code: "90011", id: "oldMe", at: Date.now() }));
+        api.tryResume();
+        await waitFor(function () { return api.room(); }, 500);
+        var rec = playersIn(fake, "90011").oldMe;
+        if (liveId() !== "oldMe" || !rec || rec.team !== "blue" || rec.slot !== 2 || rec.characterType !== HUMAN_CHARS[1]) bad.push("새 탭 되찾기 " + liveId() + " " + JSON.stringify(rec));
+        api.leaveRoom();
+        if (localStorage.getItem(api.SEAT_KEY)) bad.push("방 나가기 뒤 자리 기록이 남음");
+      });
+      await withNet(roomTree("90011", host, { status: "lobby", roster: { gone: seat("red", 2, 2, "나") } }), async function (fake) {
+        localStorage.setItem(api.SEAT_KEY, JSON.stringify({ code: "90011", id: "gone", at: Date.now() }));
+        api.tryResume();
+        await waitFor(function () { return !localStorage.getItem(api.SEAT_KEY); }, 500);
+        if (api.room() || localStorage.getItem(api.SEAT_KEY)) bad.push("경기 중이 아닌 방으로 되찾기");
+      });
+    } finally {
+      if (seatBefore === null) localStorage.removeItem(api.SEAT_KEY); else localStorage.setItem(api.SEAT_KEY, seatBefore);
+    }
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "닉네임·저장된 아이디로 되찾기, 남아 있는 자리·경기 밖 방은 거절");
+  });
 
   async function lobbyOf(fake, code, others, me0, over) {
     var players = Object.assign({}, others), mineKey = api.myId;

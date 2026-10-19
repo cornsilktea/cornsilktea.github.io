@@ -24,11 +24,12 @@
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
 } }
 </script>
-<link rel="stylesheet" href="30.team-battle-arena.css?v=20261012">
+<link rel="stylesheet" href="30.team-battle-arena.css?v=20261019">
 </head>
 <body>
 <canvas id="cv"></canvas>
 <canvas id="ov"></canvas>
+<div id="glLostNote" hidden>화면을 다시 그리지 못했어요. 새로고침하면 같은 캐릭터로 이어서 할 수 있어요.</div>
 <div id="tourFade" hidden></div>
 <div id="tourCaption" hidden><i></i><span id="tourCam"></span></div>
 
@@ -230,6 +231,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     timescale;
     session;
     resume;
+    seats;
+    gpuGuard;
     lobby;
     screens;
     roster;
@@ -898,11 +901,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (!services.backend.db) { services.lobby.startMsg("온라인 연결을 할 수 없어요."); return; }
       Dom.$("btnJoin").disabled = true; services.lobby.startMsg("");
       var ref = services.backend.db.ref(RoomSession.ROOT + "/" + code);
-      Promise.all(["players", "status", "mode"].map(function (k) { return ref.child(k).once("value"); })).then(function (a) {
+      Promise.all(["players", "status", "mode", "roster"].map(function (k) { return ref.child(k).once("value"); })).then(function (a) {
         Dom.$("btnJoin").disabled = false;
-        var r = { players: a[0].val(), status: a[1].val(), mode: a[2].val() };
+        var r = { players: a[0].val(), status: a[1].val(), mode: a[2].val(), roster: a[3].val() };
         if (!r.players || !services.session.humans(r.players).length) { services.lobby.startMsg("그런 방이 없어요. 코드를 확인해 주세요."); return; }
         if (r.mode === "practice") { services.lobby.startMsg("혼자 연습 중인 방이라 들어갈 수 없어요."); return; }
+        if (services.seats.claimIfOpen(ref, code, r)) return;
         var cnt = function (tm) { return Object.keys(r.players || {}).filter(function (id) { return r.players[id] && r.players[id].team === tm; }).length; };
         var team = null;
         if (r.status === "lobby") {
@@ -1024,7 +1028,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           if (!hid || !ps[hid] || ps[hid].isAI) return r.ref.update({ hostPlayerId: nx });
         });
       }).catch(function () {});
-      services.resume.clearResume();
+      services.resume.clearResume(); services.seats.forget();
       services.session.room = null; services.session.resetLocal(); services.screens.showScreen("start"); services.lobby.startMsg("");
     }
     exitToStart(msg) { var services = this.services;
@@ -1048,6 +1052,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     saveResume() { var services = this.services;
       if (!services.session.room || services.session.leaving || !services.session.players[services.session.myId]) return;
       try { sessionStorage.setItem(RoomResume.RESUME_KEY, JSON.stringify({ code: services.session.room.code, id: services.session.myId, me: services.session.players[services.session.myId], at: Date.now() })); } catch (e) {}
+      services.seats.remember();
     }
     clearResume() { try { sessionStorage.removeItem(RoomResume.RESUME_KEY); } catch (e) {} }
     readResume() {
@@ -1062,7 +1067,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     tryResume() { var services = this.services;
       var s = services.resume.readResume();
-      if (!s || !services.backend.db) { services.resume.clearResume(); return; }
+      if (!s || !services.backend.db) { services.resume.clearResume(); services.seats.reclaimSaved(); return; }
       var ref = services.backend.db.ref(RoomSession.ROOT + "/" + s.code);
       services.lobby.startMsg("이전 방(" + s.code + ")으로 다시 들어가는 중…");
       Promise.all(["status", "players"].map(function (k) { return ref.child(k).once("value"); })).then(function (a) {
@@ -1076,6 +1081,94 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         me.team = team;
         return ref.child("players/" + services.session.myId).set(me).then(function () { services.lobby.startMsg(""); services.session.enterRoom(s.code); });
       }).catch(function () { services.resume.clearResume(); services.lobby.startMsg(""); });
+    }
+  }
+  class SeatReclaim {
+    static SEAT_KEY = "tba_seat_v1";
+    static SEAT_MS = 900000;
+    static LIVE = { countdown: true, playing: true };
+    static SEAT_MODES = { pvp: true, cup: true };
+    constructor(services) { this.services = services; }
+    remember() { var services = this.services, r = services.session.room;
+      if (!r || !r.roster || !r.roster[services.session.myId] || !SeatReclaim.SEAT_MODES[r.mode]) return;
+      try { localStorage.setItem(SeatReclaim.SEAT_KEY, JSON.stringify({ code: r.code, id: services.session.myId, at: Date.now() })); } catch (e) {}
+    }
+    forget() { try { localStorage.removeItem(SeatReclaim.SEAT_KEY); } catch (e) {} }
+    saved() {
+      var s = null;
+      try { s = JSON.parse(localStorage.getItem(SeatReclaim.SEAT_KEY) || "null"); } catch (e) { s = null; }
+      return s && s.code && s.id && Date.now() - s.at < SeatReclaim.SEAT_MS ? s : null;
+    }
+    isLive(info) { return !!SeatReclaim.LIVE[info.status] && !!SeatReclaim.SEAT_MODES[info.mode]; }
+    isOpen(info, id) {
+      var r = info.roster && info.roster[id];
+      return !!r && !r.ai && !!r.s && (r.team === "blue" || r.team === "red") && !(info.players || {})[id];
+    }
+    seatFor(code, info, nick) { var seats = this;
+      if (!seats.isLive(info)) return null;
+      var s = seats.saved();
+      if (s && s.code === code && seats.isOpen(info, s.id)) return s.id;
+      return Object.keys(info.roster || {}).filter(function (id) { return seats.isOpen(info, id) && !!nick && info.roster[id].n === nick; })[0] || null;
+    }
+    seatRecord(r, nick) { var services = this.services;
+      return { nickname: nick || r.n || "", isAI: false, team: r.team, slot: r.s, characterType: r.c, joinedAt: services.clock.now() };
+    }
+    readRoom(ref) {
+      return Promise.all(["status", "mode", "players", "roster"].map(function (k) { return ref.child(k).once("value"); })).then(function (a) {
+        return { status: a[0].val(), mode: a[1].val(), players: a[2].val() || {}, roster: a[3].val() };
+      });
+    }
+    claim(ref, code, id, info) { var services = this.services;
+      services.session.myId = id;
+      return ref.child("players/" + id).set(services.seats.seatRecord(info.roster[id], services.nick.name)).then(function () { services.lobby.startMsg(""); services.session.enterRoom(code); });
+    }
+    claimIfOpen(ref, code, info) { var services = this.services;
+      var id = services.seats.seatFor(code, info, services.nick.name);
+      if (!id) return false;
+      services.lobby.startMsg("나갔던 경기 자리로 다시 들어가는 중…");
+      services.seats.claim(ref, code, id, info).catch(function () { services.lobby.startMsg("입장하지 못했어요."); });
+      return true;
+    }
+    reclaimSaved() { var services = this.services;
+      var s = services.seats.saved();
+      if (!s || !services.backend.db) { services.seats.forget(); return; }
+      var ref = services.backend.db.ref(RoomSession.ROOT + "/" + s.code);
+      services.seats.readRoom(ref).then(function (info) {
+        if (services.session.room) return;
+        if (!services.seats.isLive(info) || !services.seats.isOpen(info, s.id)) { services.seats.forget(); return; }
+        services.lobby.startMsg("이전 경기(" + s.code + ")로 다시 들어가는 중…");
+        return services.seats.claim(ref, s.code, s.id, info);
+      }).catch(function () { services.lobby.startMsg(""); });
+    }
+  }
+  class RenderContextGuard {
+    static RESTORE_WAIT_MS = 3000;
+    static RELOAD_KEY = "tba_gl_reload_v1";
+    static RELOAD_GAP_MS = 60000;
+    constructor(services) { this.services = services; this.lostAt = 0; this.timer = 0; }
+    watch(canvas) { var guard = this;
+      canvas.addEventListener("webglcontextlost", function (e) { e.preventDefault(); guard.onLost(); });
+      canvas.addEventListener("webglcontextrestored", function () { guard.onRestored(); });
+      document.addEventListener("visibilitychange", function () { if (!document.hidden && guard.lostAt) guard.waitForRestore(); });
+    }
+    onLost() { this.lostAt = Date.now(); this.waitForRestore(); }
+    onRestored() { var services = this.services;
+      this.lostAt = 0; clearTimeout(this.timer); this.timer = 0;
+      Dom.show(Dom.$("glLostNote"), false);
+      services.cameraRig.resize();
+    }
+    waitForRestore() { var guard = this;
+      clearTimeout(guard.timer);
+      guard.timer = setTimeout(function () { guard.timer = 0; if (guard.lostAt && !document.hidden) guard.reloadPage(); }, RenderContextGuard.RESTORE_WAIT_MS);
+    }
+    reloadedRecently() {
+      try { return Date.now() - (+sessionStorage.getItem(RenderContextGuard.RELOAD_KEY) || 0) < RenderContextGuard.RELOAD_GAP_MS; } catch (e) { return true; }
+    }
+    reloadPage() { var services = this.services;
+      if (this.reloadedRecently()) { Dom.show(Dom.$("glLostNote"), true); return; }
+      try { sessionStorage.setItem(RenderContextGuard.RELOAD_KEY, String(Date.now())); } catch (e) {}
+      services.resume.saveResume();
+      location.reload();
     }
   }
 
@@ -1549,7 +1642,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           var sp = services.arenaMap.spawnOf(team, i + 1, arena), base = "players/" + id + "/";
           u[base + "slot"] = i + 1; u[base + "characterType"] = c;
           st[services.netstate.stKey(team, i + 1)] = services.netstate.packState({ x: sp.x, y: sp.y, angle: sp.angle, mv: false, hp: services.charTypes.statsOf(c).hp, alive: true, shield: !!services.charTypes.statsOf(c).respawnShield });
-          roster[id] = { team: team, c: c, ai: !!p.isAI };
+          roster[id] = { team: team, c: c, ai: !!p.isAI, s: i + 1, n: p.nickname || "" };
         });
       });
       if (services.session.practiceMode() && services.session.players[services.session.myId]) {
@@ -8818,7 +8911,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       localTargets: services.targets.localTargets.bind(services.targets), hear: services.targets.hear.bind(services.targets), pruneLocal: services.world.pruneLocal.bind(services.world), revealedTo: services.vision.revealedTo.bind(services.vision), inBush: services.vision.inBush.bind(services.vision), STEALTH_REVEAL_DIST: VisionRules.STEALTH_REVEAL_DIST,
       rayRect: services.physics.rayRect.bind(services.physics), rayObst: services.physics.rayObst.bind(services.physics), rayCast: services.physics.rayCast.bind(services.physics), losClear: services.physics.losClear.bind(services.physics), segHit: services.projectiles.segHit.bind(services.projectiles),
       createRoom: services.session.createRoom.bind(services.session), joinRoom: services.session.joinRoom.bind(services.session), enterRoom: services.session.enterRoom.bind(services.session), leaveRoom: services.session.leaveRoom.bind(services.session), exitToStart: services.session.exitToStart.bind(services.session), nextHost: services.session.nextHost.bind(services.session), checkHost: services.session.checkHost.bind(services.session),
-      tryResume: services.resume.tryResume.bind(services.resume), saveResume: services.resume.saveResume.bind(services.resume), readResume: services.resume.readResume.bind(services.resume), clearResume: services.resume.clearResume.bind(services.resume), resumeTeam: services.resume.resumeTeam.bind(services.resume), RESUME_KEY: RoomResume.RESUME_KEY, RESUME_MS: RoomResume.RESUME_MS,
+      tryResume: services.resume.tryResume.bind(services.resume), saveResume: services.resume.saveResume.bind(services.resume), readResume: services.resume.readResume.bind(services.resume), clearResume: services.resume.clearResume.bind(services.resume), resumeTeam: services.resume.resumeTeam.bind(services.resume), RESUME_KEY: RoomResume.RESUME_KEY, RESUME_MS: RoomResume.RESUME_MS, SEATS: services.seats, SEAT_KEY: SeatReclaim.SEAT_KEY, GPU_GUARD: services.gpuGuard,
       room: function () { return services.session.room; }, players: function () { return services.session.players; }, screen: function () { return services.screens.now; },
       setConf: function (conf) { var before = services.backend.conf; services.backend.conf = conf; return before; }, setNick: function (n) { return services.nick.replaceStored(n); },
       capOf: services.roster.capOf.bind(services.roster), countIn: services.roster.countIn.bind(services.roster), isPlayingTeam: services.roster.isPlayingTeam.bind(services.roster), takenInMatch: services.roster.takenInMatch.bind(services.roster), freeCharOn: services.roster.freeCharOn.bind(services.roster), onlyOneMsg: services.roster.onlyOneMsg.bind(services.roster), canMoveTo: services.roster.canMoveTo.bind(services.roster),
@@ -8855,6 +8948,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.timescale = new TimeScaler();
       services.session = new RoomSession(services);
       services.resume = new RoomResume(services);
+      services.seats = new SeatReclaim(services);
+      services.gpuGuard = new RenderContextGuard(services);
       services.lobby = new LobbyView(services);
       services.screens = new ScreenRouter(services);
       services.roster = new RoomRoster(services);
@@ -9054,6 +9149,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     constructor(services) { this.services = services; }
     build() { var services = this.services;
     try { services.cameraRig.renderer = new THREE.WebGLRenderer({ canvas: Canvases.three, antialias: !Environment.TOUCH, powerPreference: "high-performance" }); } catch (e) { services.cameraRig.renderer = null; }
+    if (services.cameraRig.renderer) services.gpuGuard.watch(Canvases.three);
     services.cameraRig.bindResize();
     services.arenaView.ground = services.arenaView.flatMesh(new THREE.PlaneGeometry(ArenaSize.MW, ArenaSize.MH), services.stage.groundMat);
     services.arenaView.ground.position.set(ArenaSize.MW / 2, 0, ArenaSize.MH / 2);
