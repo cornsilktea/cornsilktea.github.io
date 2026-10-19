@@ -2071,7 +2071,7 @@ class ResultCollector {
     withStatsEnv(function () {
       var bad = [], base = STATS.skipReason("cup", statsFixture().roster, statsFixture().players);
       if (base !== "") bad.push("정상 6명 경기(cup)가 제외됨: " + base);
-      if (STATS.skipReason("pvp", statsFixture().roster, statsFixture().players) !== "") bad.push("정상 6명 경기(pvp)가 제외됨");
+      if (STATS.skipReason("pvp", statsFixture().roster, statsFixture().players).indexOf("이 모드는") !== 0) bad.push("일반모드(pvp) 경기는 통계에서 빠져야 함");
       if (!STATS.isFullStudentMatch("cup", statsFixture().roster, statsFixture().players)) bad.push("isFullStudentMatch 가 정상 경기를 거름");
       SKIP_CASES.forEach(function (c) {
         var F = statsFixture(), arg = { mode: "cup", roster: F.roster }, env = { testLink: false };
@@ -2113,13 +2113,13 @@ class ResultCollector {
       if (db.paths.length || note.u.statsNote.indexOf("참가자 정보가 맞지") < 0) bad.push("AI 가 있는데 저장되거나 사유가 안 남음");
       F.players.pb1.isAI = false;
       STATS.record(room, T0 + 5000, true);
-      if (db.paths.join() !== "teambattle/modestats/cup") bad.push("정상 경기가 저장 경로 teambattle/modestats/cup 에 안 들어감: " + db.paths.join());
+      if (db.paths.join() !== api.STATS_PATH || api.STATS_PATH !== api.STATS_PATCHES.current.path) bad.push("정상 경기가 현재 패치 저장 경로 " + api.STATS_PATH + " 에 안 들어감: " + db.paths.join());
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "조건이 어긋나면 저장하지 않고, 정상 경기만 " + db.paths[0] + " 에 저장함");
     });
   });
   run(STATSG, "통계 행 만들기와 평균 갱신: 두 경기를 저장하면 픽·승·피해·회복·막은 피해·기절·둔화·어시스트·킬·죽음이 평균으로 쌓이는가", function (done) {
     withStatsEnv(function () {
-      var bad = [], F = statsFixture(), L = api.CHAR_LIST, db = fakeDb(), key = "teambattle/modestats/cup";
+      var bad = [], F = statsFixture(), L = api.CHAR_LIST, db = fakeDb(), key = api.STATS_PATH;
       api.setDb(db);
       var room = endedRoom(F, { bans: [L[8], "없는캐릭터"] }); api.bindRoom(room, F.players);
       POSITIONS.forEach(function (k, i) { if (k !== "r3") api.MATCH.remotes["p" + k] = battleStats(i + 1); });
@@ -2148,7 +2148,7 @@ class ResultCollector {
   });
   run(STATSG, "옛 통계(games 칸 없음)는 지금까지 판수 + 1 로 이어 세고, 새 캐릭터는 1판째로 시작하는가", function (done) {
     withStatsEnv(function () {
-      var bad = [], F = statsFixture(), L = api.CHAR_LIST, key = "teambattle/modestats/cup";
+      var bad = [], F = statsFixture(), L = api.CHAR_LIST, key = api.STATS_PATH;
       var old = {}; old.matches = 4; old[L[0]] = { picks: 4, wins: 2, dmg: 50, heal: 0 };
       var db = fakeDb(); db.store[key] = old;
       api.setDb(db);
@@ -2163,7 +2163,7 @@ class ResultCollector {
   });
   run(STATSG, "무승부 경기는 고른 6명 모두 draws 가 1 오르고, 승패가 난 경기는 draws 칸을 만들지 않는가", function (done) {
     withStatsEnv(function () {
-      var bad = [], F = statsFixture(), L = api.CHAR_LIST, key = "teambattle/modestats/cup", db = fakeDb();
+      var bad = [], F = statsFixture(), L = api.CHAR_LIST, key = api.STATS_PATH, db = fakeDb();
       api.setDb(db);
       var room = endedRoom(F); api.bindRoom(room, F.players);
       room.winner = "draw"; STATS.save(room, F.players);
@@ -3887,7 +3887,10 @@ class ResultCollector {
     api.setClock(s.start + api.matchMs()); api.hostJudge(); api.hostJudge();
     var ended = updateWith(s.cap, "winner");
     if (ended.length !== 1 || ended[0].u.status !== "ended" || ended[0].u.winner !== "blue" || ended[0].u.final.blue !== 2 || ended[0].u.final.red !== 1 || ended[0].u.final.reason.indexOf("시간 종료") < 0 || ended[0].u.endedAt !== s.start + api.matchMs()) bad.push("시간 종료 판정 " + JSON.stringify(ended));
-    if (!ended[0] || !ended[0].u.statsNote) bad.push("일반모드는 통계 안내가 있어야 함");
+    if (!ended[0] || ended[0].u.statsNote !== undefined) bad.push("일반모드는 통계를 모으지 않아 통계 안내가 없어야 함");
+    var cup = setup("cup"); cup.W.room.status = "playing";
+    api.setClock(cup.start + api.matchMs()); api.hostJudge();
+    if (!updateWith(cup.cap, "winner")[0] || !updateWith(cup.cap, "winner")[0].u.statsNote) bad.push("대회모드는 통계 안내가 있어야 함");
     var d = setup(); d.W.room.status = "playing"; d.W.ent("a").deaths = 1; d.W.ent("b").deaths = 1;
     api.setClock(d.start + api.matchMs()); api.hostJudge();
     var draw = updateWith(d.cap, "winner")[0];
@@ -3906,7 +3909,7 @@ class ResultCollector {
   run(JUDGEG, "호스트 판정: 한 팀이 모두 나가면 시간이 남아도 상대 팀 승리로 끝내고 통계에서 제외하는가", function (done) {
     var y = OPEN_Y.forest, W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]), bad = [];
     var cap = recordRef(W), P = api.players();
-    P.a.isAI = false; P.b.isAI = false; W.room.mode = "pvp"; W.room.status = "playing";
+    P.a.isAI = false; P.b.isAI = false; W.room.mode = "cup"; W.room.status = "playing";
     W.room.roster = { a: { team: "blue", c: "knight", ai: false }, b: { team: "red", c: "knight", ai: false } };
     delete P.b;
     api.setClock(W.room.startAt + 5000); api.hostJudge();
@@ -4364,7 +4367,7 @@ class ResultCollector {
   });
 
   runAsync(STATSG, "저장 규칙에 draws 칸이 아직 없어 거부되면 draws 없이 다시 저장하는가", async function (done) {
-    var bad = [], F, L = api.CHAR_LIST, key = "teambattle/modestats/cup", strict = fakeDb();
+    var bad = [], F, L = api.CHAR_LIST, key = api.STATS_PATH, strict = fakeDb();
     strict.rejectDraws = true;
     await withStatsEnvAsync(async function () {
       F = statsFixture(); api.setDb(strict);
@@ -4377,31 +4380,43 @@ class ResultCollector {
     if (strict.paths.length !== 2) bad.push("저장 시도 " + strict.paths.length + "번 (기대 2: draws 포함 → draws 없이)");
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "draws 거부 → draws 없이 두 번째 시도로 저장");
   });
-  runAsync(STATSVG, "통계 창 불러오기: 모드별 통계를 받아 집계 문구와 표로 보여 주고, 모드 버튼으로 바꾸며, 연결이 없거나 실패하면 안내하는가", async function (done) {
-    var bad = [], L = HUMAN_CHARS, tree = { teambattle: { modestats: { pvp: { matches: 10, blue: 6, red: 3 }, cup: { matches: 4, blue: 1, red: 3 } } } };
-    tree.teambattle.modestats.pvp[L[0]] = { picks: 4, wins: 3, games: 8, bans: 1, dmg: 100 };
+  runAsync(STATSVG, "통계 창 불러오기: 열면 현재 패치 통계를 보여 주고, 오른쪽 위 패치 버튼으로 이전 패치를 고르며, 연결이 없거나 실패하면 안내하는가", async function (done) {
+    var bad = [], L = HUMAN_CHARS, P = api.STATS_PATCHES, now = P.current.id, old = P.LIST[0].id, tree = {};
+    function put(path, v) { var o = tree, parts = path.split("/"); parts.slice(0, -1).forEach(function (k) { o = o[k] = o[k] || {}; }); o[parts[parts.length - 1]] = v; }
+    put(P.current.path, { matches: 10, blue: 6, red: 3 });
+    put(P.of(old).path, { matches: 4, blue: 1, red: 3 });
+    put(P.current.path + "/" + L[0], { picks: 4, wins: 3, games: 8, bans: 1, dmg: 100 });
     await withNet(tree, async function (fake) {
+      var modal = document.getElementById("statsModal"), msg = document.getElementById("statsMsg"), body = document.getElementById("statsBody"), btn = document.getElementById("btnStatsPatch"), menu = document.getElementById("statsPatchMenu");
+      if (document.getElementById("statsModes")) bad.push("모드 버튼 칸이 남아 있음");
       document.getElementById("btnStats").click();
-      var modal = document.getElementById("statsModal"), msg = document.getElementById("statsMsg"), body = document.getElementById("statsBody");
       if (modal.hidden) bad.push("창이 안 열림");
-      await waitFor(function () { return msg.textContent.indexOf("집계된 경기") === 0; }, 400);
-      if (msg.textContent.indexOf("집계된 경기 10판") !== 0 || msg.textContent.indexOf("블루 66.7%") < 0 || msg.textContent.indexOf("레드 33.3%") < 0 || msg.textContent.indexOf("무승부 10.0%") < 0) bad.push("집계 문구 '" + msg.textContent + "'");
+      await waitFor(function () { return msg.textContent.indexOf("집계된 경기") >= 0; }, 400);
+      if (api.statsPatchNow() !== now || msg.textContent.indexOf("패치 " + now + " (현재)") !== 0 || msg.textContent.indexOf("집계된 경기 10판") < 0 || msg.textContent.indexOf("블루 66.7%") < 0 || msg.textContent.indexOf("레드 33.3%") < 0 || msg.textContent.indexOf("무승부 10.0%") < 0) bad.push("현재 패치 집계 문구 '" + msg.textContent + "'");
       if (body.querySelectorAll("tr").length < L.length || body.innerHTML.indexOf("75.0%") < 0) bad.push("표 " + body.querySelectorAll("tr").length);
-      var buttons = document.querySelectorAll("#statsModes .modeBtn");
-      if (buttons.length !== 2 || document.querySelector("#statsModes .on").getAttribute("data-id") !== "pvp") bad.push("모드 버튼 " + buttons.length);
-      document.querySelector('#statsModes [data-id="cup"]').click();
-      await waitFor(function () { return msg.textContent.indexOf("집계된 경기 4판") === 0; }, 400);
-      if (api.statsModeNow() !== "cup" || msg.textContent.indexOf("집계된 경기 4판") !== 0 || document.querySelector("#statsModes .on").getAttribute("data-id") !== "cup") bad.push("대회 통계 전환 '" + msg.textContent + "'");
+      if (btn.textContent.indexOf(now) < 0 || !menu.hidden) bad.push("패치 버튼 '" + btn.textContent + "'·메뉴 처음엔 닫힘");
+      btn.click();
+      if (menu.hidden || menu.querySelectorAll("[data-patch]").length !== P.LIST.length || menu.querySelector(".on").getAttribute("data-patch") !== now) bad.push("패치 메뉴 열기");
+      menu.querySelector('[data-patch="' + old + '"]').click();
+      await waitFor(function () { return msg.textContent.indexOf("집계된 경기 4판") >= 0; }, 400);
+      if (api.statsPatchNow() !== old || msg.textContent.indexOf("패치 " + old + " ·") !== 0 || !menu.hidden || btn.textContent.indexOf(old) < 0) bad.push("이전 패치 전환 '" + msg.textContent + "'");
       fake.failOnce = true;
-      document.querySelector('#statsModes [data-id="pvp"]').click();
+      btn.click(); menu.querySelector('[data-patch="' + now + '"]').click();
       await waitFor(function () { return msg.textContent.indexOf("불러오지 못했어요") >= 0; }, 400);
       if (msg.textContent.indexOf("통계를 불러오지 못했어요") < 0) bad.push("실패 안내 '" + msg.textContent + "'");
-      fake.delays["teambattle/modestats/cup"] = 60;
-      document.querySelector('#statsModes [data-id="cup"]').click();
-      document.querySelector('#statsModes [data-id="pvp"]').click();
+      fake.delays[P.of(old).path] = 60;
+      btn.click(); menu.querySelector('[data-patch="' + old + '"]').click();
+      btn.click(); menu.querySelector('[data-patch="' + now + '"]').click();
       await sleep(140);
-      if (api.statsModeNow() !== "pvp" || msg.textContent.indexOf("집계된 경기 10판") !== 0) bad.push("늦게 도착한 옛 요청이 화면을 덮어씀 '" + msg.textContent + "'");
+      if (api.statsPatchNow() !== now || msg.textContent.indexOf("집계된 경기 10판") < 0) bad.push("늦게 도착한 옛 요청이 화면을 덮어씀 '" + msg.textContent + "'");
       fake.delays = {};
+      btn.click(); modal.querySelector("h3").click();
+      if (!menu.hidden) bad.push("메뉴 바깥을 누르면 메뉴가 닫혀야 함");
+      btn.click(); menu.querySelector('[data-patch="' + old + '"]').click();
+      document.getElementById("btnStatsClose").click();
+      document.getElementById("btnStats").click();
+      if (api.statsPatchNow() !== now) bad.push("다시 열면 현재 패치로 돌아와야 함");
+      await waitFor(function () { return msg.textContent.indexOf("집계된 경기 10판") >= 0; }, 400);
       api.setDb(null); api.loadStats();
       if (msg.textContent.indexOf("온라인 연결을 준비하지 못해") < 0 || body.innerHTML !== "") bad.push("연결 없음 안내 '" + msg.textContent + "'");
       api.setDb(fake);
@@ -4413,7 +4428,7 @@ class ResultCollector {
       document.getElementById("btnMapViewClose").click();
     });
     ["statsModal", "mapViewModal"].forEach(function (id) { document.getElementById(id).hidden = true; });
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "불러오기·집계 문구·표·모드 전환·실패·연결 없음·닫기·맵 보기");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "현재 패치 기본·패치 메뉴 전환·실패·늦은 요청 무시·연결 없음·닫기·맵 보기");
   });
   new EngineerDruidTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
   new GiantTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
