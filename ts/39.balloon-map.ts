@@ -1,0 +1,477 @@
+type WbMode = "solo" | "team";
+
+interface WbSpot { i: number; j: number }
+interface WbSpawnGroup { spots: WbSpot[]; clear: WbSpot[] }
+interface WbHiddenLoot { grade: number; kind: string }
+
+class WbCell {
+  static readonly EMPTY = 0;
+  static readonly PILLAR = 1;
+  static readonly BOX = 2;
+  static readonly WALL = 3;
+}
+
+class WbGrid {
+  static readonly W = 15;
+  static readonly H = 13;
+  static readonly COUNT = 195;
+  readonly cells: Uint8Array;
+
+  constructor(cells?: Uint8Array) {
+    this.cells = cells ? new Uint8Array(cells) : new Uint8Array(WbGrid.COUNT);
+  }
+
+  static index(i: number, j: number): number { return j * WbGrid.W + i; }
+  static col(index: number): number { return index % WbGrid.W; }
+  static row(index: number): number { return Math.floor(index / WbGrid.W); }
+  static inside(i: number, j: number): boolean { return i >= 0 && j >= 0 && i < WbGrid.W && j < WbGrid.H; }
+  static isPillarSpot(i: number, j: number): boolean { return i % 2 === 1 && j % 2 === 1; }
+
+  static withPillars(): WbGrid {
+    const grid = new WbGrid();
+    for (let j = 0; j < WbGrid.H; j++) for (let i = 0; i < WbGrid.W; i++) if (WbGrid.isPillarSpot(i, j)) grid.set(i, j, WbCell.PILLAR);
+    return grid;
+  }
+
+  kind(i: number, j: number): number { return WbGrid.inside(i, j) ? this.cells[WbGrid.index(i, j)] : WbCell.PILLAR; }
+  set(i: number, j: number, kind: number): void { this.cells[WbGrid.index(i, j)] = kind; }
+  blocked(i: number, j: number): boolean { return this.kind(i, j) !== WbCell.EMPTY; }
+  solid(i: number, j: number): boolean { const k = this.kind(i, j); return k === WbCell.PILLAR || k === WbCell.WALL; }
+  clone(): WbGrid { return new WbGrid(this.cells); }
+  count(kind: number): number { let n = 0; for (const c of this.cells) if (c === kind) n++; return n; }
+}
+
+class WbSeededRandom {
+  private state: number;
+  constructor(seed: number) { this.state = seed >>> 0; }
+  next(): number {
+    this.state = (this.state + 0x6D2B79F5) >>> 0;
+    let m = this.state;
+    m = Math.imul(m ^ (m >>> 15), m | 1);
+    m ^= m + Math.imul(m ^ (m >>> 7), m | 61);
+    return ((m ^ (m >>> 14)) >>> 0) / 4294967296;
+  }
+  int(n: number): number { return Math.floor(this.next() * n); }
+  pick<T>(list: readonly T[]): T { return list[this.int(list.length)]; }
+  shuffle<T>(list: T[]): T[] {
+    for (let k = list.length - 1; k > 0; k--) { const r = this.int(k + 1); const t = list[k]; list[k] = list[r]; list[r] = t; }
+    return list;
+  }
+}
+
+class WbSpawnPlan {
+  static readonly CORNERS: readonly WbSpot[] = [{ i: 0, j: 0 }, { i: 14, j: 0 }, { i: 0, j: 12 }, { i: 14, j: 12 }];
+  static readonly DIAGONALS: readonly (readonly number[])[] = [[0, 3], [1, 2]];
+  static readonly SIDES: readonly WbSpot[] = [{ i: 7, j: 0 }, { i: 7, j: 12 }, { i: 0, j: 6 }, { i: 14, j: 6 }];
+  static readonly SIDE_PAIRS: readonly (readonly number[])[] = [[0, 1], [2, 3]];
+
+  static solo(count: number, rng: WbSeededRandom): WbSpawnGroup[] {
+    const corners = WbSpawnPlan.cornerSet(Math.min(count, 4), rng);
+    const groups = corners.map((c) => WbSpawnPlan.cornerGroup(WbSpawnPlan.CORNERS[c]));
+    for (const s of WbSpawnPlan.sideSet(Math.max(0, count - 4), rng)) groups.push(WbSpawnPlan.sideGroup(s, rng));
+    return groups;
+  }
+
+  static team(teamCount: number, rng: WbSeededRandom): WbSpawnGroup[] {
+    return WbSpawnPlan.cornerSet(teamCount, rng).map((c) => WbSpawnPlan.teamGroup(WbSpawnPlan.CORNERS[c]));
+  }
+
+  private static cornerSet(count: number, rng: WbSeededRandom): number[] {
+    if (count <= 2) return rng.pick(WbSpawnPlan.DIAGONALS).slice(0, count);
+    const all = [0, 1, 2, 3];
+    if (count === 3) all.splice(rng.int(4), 1);
+    return all;
+  }
+
+  private static sideSet(count: number, rng: WbSeededRandom): number[] {
+    if (count === 0) return [];
+    if (count === 1) return [rng.int(4)];
+    if (count === 2) return rng.pick(WbSpawnPlan.SIDE_PAIRS).slice();
+    const all = [0, 1, 2, 3];
+    if (count === 3) all.splice(rng.int(4), 1);
+    return all;
+  }
+
+  private static inward(v: number, max: number): number { return v === 0 ? 1 : v === max ? -1 : 0; }
+
+  private static cornerGroup(c: WbSpot): WbSpawnGroup {
+    const di = WbSpawnPlan.inward(c.i, WbGrid.W - 1), dj = WbSpawnPlan.inward(c.j, WbGrid.H - 1);
+    return { spots: [c], clear: [c, { i: c.i + di, j: c.j }, { i: c.i, j: c.j + dj }] };
+  }
+
+  private static sideGroup(side: number, rng: WbSeededRandom): WbSpawnGroup {
+    const s = WbSpawnPlan.SIDES[side];
+    if (s.j === 0 || s.j === WbGrid.H - 1) return { spots: [s], clear: [s, { i: s.i - 1, j: s.j }, { i: s.i + 1, j: s.j }] };
+    const di = WbSpawnPlan.inward(s.i, WbGrid.W - 1);
+    return { spots: [s], clear: [s, { i: s.i + di, j: s.j }, { i: s.i, j: s.j + (rng.next() < 0.5 ? -1 : 1) }] };
+  }
+
+  private static teamGroup(c: WbSpot): WbSpawnGroup {
+    const di = WbSpawnPlan.inward(c.i, WbGrid.W - 1), dj = WbSpawnPlan.inward(c.j, WbGrid.H - 1);
+    const second = { i: c.i + 2 * di, j: c.j };
+    return {
+      spots: [c, second],
+      clear: [c, { i: c.i + di, j: c.j }, second, { i: c.i + 3 * di, j: c.j }, { i: c.i, j: c.j + dj }, { i: second.i, j: c.j + dj }],
+    };
+  }
+}
+
+class WbWalkDistance {
+  static readonly FAR = 9999;
+
+  static fromSpots(grid: WbGrid, spots: readonly WbSpot[], passBoxes: boolean): Int16Array {
+    const dist = new Int16Array(WbGrid.COUNT).fill(WbWalkDistance.FAR);
+    const queue: number[] = [];
+    for (const s of spots) { const k = WbGrid.index(s.i, s.j); dist[k] = 0; queue.push(k); }
+    for (let head = 0; head < queue.length; head++) {
+      const k = queue[head], i = WbGrid.col(k), j = WbGrid.row(k);
+      for (let d = 0; d < 4; d++) {
+        const ni = i + WbDirStep.DX[d], nj = j + WbDirStep.DZ[d];
+        if (!WbGrid.inside(ni, nj)) continue;
+        const kind = grid.kind(ni, nj);
+        if (kind === WbCell.PILLAR || kind === WbCell.WALL || (!passBoxes && kind === WbCell.BOX)) continue;
+        const nk = WbGrid.index(ni, nj);
+        if (dist[nk] !== WbWalkDistance.FAR) continue;
+        dist[nk] = dist[k] + 1;
+        queue.push(nk);
+      }
+    }
+    return dist;
+  }
+}
+
+class WbDirStep {
+  static readonly DX: readonly number[] = [0, 1, 0, -1];
+  static readonly DZ: readonly number[] = [-1, 0, 1, 0];
+}
+
+class WbZoneMap {
+  readonly zoneOf: Int8Array;
+  readonly distances: Int16Array[];
+
+  constructor(grid: WbGrid, groups: readonly WbSpawnGroup[], rng: WbSeededRandom) {
+    this.distances = groups.map((g) => WbWalkDistance.fromSpots(grid, g.spots, true));
+    this.zoneOf = new Int8Array(WbGrid.COUNT).fill(-1);
+    groups.forEach((g, z) => { for (const s of g.spots) this.zoneOf[WbGrid.index(s.i, s.j)] = z; });
+    for (let grew = true; grew;) {
+      grew = false;
+      for (const z of rng.shuffle(groups.map((_, n) => n))) {
+        const cell = this.nextClaim(grid, z, rng);
+        if (cell >= 0) { this.zoneOf[cell] = z; grew = true; }
+      }
+    }
+  }
+
+  private nextClaim(grid: WbGrid, zone: number, rng: WbSeededRandom): number {
+    const dist = this.distances[zone];
+    let best = WbWalkDistance.FAR, ties: number[] = [];
+    for (let k = 0; k < WbGrid.COUNT; k++) {
+      if (this.zoneOf[k] !== -1 || grid.cells[k] === WbCell.PILLAR || !this.touches(k, zone)) continue;
+      if (dist[k] < best) { best = dist[k]; ties = [k]; } else if (dist[k] === best) ties.push(k);
+    }
+    return ties.length ? rng.pick(ties) : -1;
+  }
+
+  private touches(k: number, zone: number): boolean {
+    const i = WbGrid.col(k), j = WbGrid.row(k);
+    for (let d = 0; d < 4; d++) {
+      const ni = i + WbDirStep.DX[d], nj = j + WbDirStep.DZ[d];
+      if (WbGrid.inside(ni, nj) && this.zoneOf[WbGrid.index(ni, nj)] === zone) return true;
+    }
+    return false;
+  }
+
+  cells(zone: number): number[] {
+    const list: number[] = [];
+    for (let k = 0; k < WbGrid.COUNT; k++) if (this.zoneOf[k] === zone) list.push(k);
+    return list;
+  }
+}
+
+class WbFairReport {
+  tries = 0;
+  fixes = 0;
+  passed = false;
+  nearBoxes: number[] = [];
+  zoneBoxes: number[] = [];
+  zoneGrades: number[][] = [];
+  escapeOk: boolean[] = [];
+  score = 0;
+}
+
+class WbLootDeck {
+  static readonly GRADE_SHARE: readonly number[] = [0.5, 0.4, 0.1];
+
+  static gradeCounts(total: number): number[] {
+    const legend = Math.round(total * WbLootDeck.GRADE_SHARE[2]);
+    const rare = Math.round(total * WbLootDeck.GRADE_SHARE[1]);
+    return [total - legend - rare, rare, legend];
+  }
+
+  static kinds(count: number, kinds: readonly string[], rng: WbSeededRandom): string[] {
+    const order = rng.shuffle(kinds.slice());
+    const deck: string[] = [];
+    for (let k = 0; k < count; k++) deck.push(order[k % order.length]);
+    return deck;
+  }
+}
+
+interface WbLayoutResult { grid: WbGrid; loot: Map<number, WbHiddenLoot> | null; zones: WbZoneMap; report: WbFairReport }
+
+class WbFairBoxLayout {
+  static readonly BOX_CHANCE = 0.65;
+  static readonly LANE_CHANCE = 0.40;
+  static readonly LANE_COLS: readonly number[] = [6, 8];
+  static readonly LANE_ROWS: readonly number[] = [6];
+  static readonly MAX_TRIES = 200;
+  static readonly MAX_FIXES = 80;
+  static readonly NEAR_STEPS = 4;
+  static readonly NEAR_SPREAD = 1;
+  static readonly ZONE_SPREAD = 2;
+  static readonly ESCAPE_CELLS = 2;
+  static readonly ESCAPE_STEPS = 7;
+  static readonly LOOT_RATIO = 0.4;
+
+  private readonly clear = new Set<number>();
+  private readonly base = WbGrid.withPillars();
+
+  constructor(private readonly groups: readonly WbSpawnGroup[], private readonly rng: WbSeededRandom) {
+    for (const g of groups) for (const c of g.clear) this.clear.add(WbGrid.index(c.i, c.j));
+  }
+
+  static isLane(i: number, j: number): boolean {
+    return WbFairBoxLayout.LANE_COLS.indexOf(i) >= 0 || WbFairBoxLayout.LANE_ROWS.indexOf(j) >= 0;
+  }
+
+  build(kindsByGrade: readonly (readonly string[])[] | null, lootRng: WbSeededRandom | null): WbLayoutResult {
+    const zones = new WbZoneMap(this.base, this.groups, this.rng);
+    let best: { grid: WbGrid; report: WbFairReport } | null = null;
+    let attempts = 0;
+    for (let attempt = 1; attempt <= WbFairBoxLayout.MAX_TRIES; attempt++) {
+      const grid = this.scatter();
+      const fixes = this.balanceZones(grid, zones);
+      const report = this.inspect(grid, zones);
+      attempts = attempt;
+      report.fixes = fixes;
+      if (!best || report.score < best.report.score) best = { grid, report };
+      if (report.passed) break;
+    }
+    const chosen = best as { grid: WbGrid; report: WbFairReport };
+    chosen.report.tries = attempts;
+    const loot = kindsByGrade && lootRng ? this.hideLoot(chosen.grid, zones, kindsByGrade, lootRng, chosen.report) : null;
+    return { grid: chosen.grid, loot, zones, report: chosen.report };
+  }
+
+  private scatter(): WbGrid {
+    const grid = this.base.clone();
+    for (let j = 0; j < WbGrid.H; j++) for (let i = 0; i < WbGrid.W; i++) {
+      const k = WbGrid.index(i, j);
+      if (grid.cells[k] !== WbCell.EMPTY || this.clear.has(k)) continue;
+      const chance = WbFairBoxLayout.isLane(i, j) ? WbFairBoxLayout.LANE_CHANCE : WbFairBoxLayout.BOX_CHANCE;
+      if (this.rng.next() < chance) grid.cells[k] = WbCell.BOX;
+    }
+    return grid;
+  }
+
+  private zoneBoxCounts(grid: WbGrid, zones: WbZoneMap): number[] {
+    const counts = this.groups.map(() => 0);
+    for (let k = 0; k < WbGrid.COUNT; k++) if (grid.cells[k] === WbCell.BOX && zones.zoneOf[k] >= 0) counts[zones.zoneOf[k]]++;
+    return counts;
+  }
+
+  private nearCounts(grid: WbGrid, zones: WbZoneMap): number[] {
+    return zones.distances.map((dist) => {
+      let n = 0;
+      for (let k = 0; k < WbGrid.COUNT; k++) if (grid.cells[k] === WbCell.BOX && dist[k] <= WbFairBoxLayout.NEAR_STEPS) n++;
+      return n;
+    });
+  }
+
+  private extremes(counts: number[]): { hi: number; lo: number; from: number; to: number } {
+    const hi = Math.max(...counts), lo = Math.min(...counts);
+    const from = this.rng.pick(counts.map((c, z) => c === hi ? z : -1).filter((z) => z >= 0));
+    const to = this.rng.pick(counts.map((c, z) => c === lo ? z : -1).filter((z) => z >= 0));
+    return { hi, lo, from, to };
+  }
+
+  private moveBox(grid: WbGrid, boxes: number[], spaces: number[]): boolean {
+    if (!boxes.length || !spaces.length) return false;
+    grid.cells[this.rng.pick(boxes)] = WbCell.EMPTY;
+    grid.cells[this.rng.pick(spaces)] = WbCell.BOX;
+    return true;
+  }
+
+  private balanceZones(grid: WbGrid, zones: WbZoneMap): number {
+    let fixes = 0;
+    const near = (zone: number, k: number): boolean => zones.distances[zone][k] <= WbFairBoxLayout.NEAR_STEPS;
+    const movable = (k: number): boolean => !this.clear.has(k);
+    while (fixes < WbFairBoxLayout.MAX_FIXES) {
+      const trapped = this.groups.findIndex((g) => !this.hasEscape(grid, g));
+      if (trapped >= 0) {
+        const mouth = new Set<number>();
+        for (const c of this.groups[trapped].clear) for (let d = 0; d < 4; d++) {
+          const ni = c.i + WbDirStep.DX[d], nj = c.j + WbDirStep.DZ[d];
+          if (WbGrid.inside(ni, nj)) mouth.add(WbGrid.index(ni, nj));
+        }
+        const boxes = Array.from(mouth).filter((k) => grid.cells[k] === WbCell.BOX && movable(k));
+        const spaces = zones.cells(trapped).filter((k) => grid.cells[k] === WbCell.EMPTY && movable(k) && !mouth.has(k) && near(trapped, k));
+        if (!this.moveBox(grid, boxes, spaces)) break;
+        fixes++;
+        continue;
+      }
+      const n = this.extremes(this.nearCounts(grid, zones));
+      if (n.hi - n.lo > WbFairBoxLayout.NEAR_SPREAD) {
+        const boxes = zones.cells(n.from).filter((k) => grid.cells[k] === WbCell.BOX && near(n.from, k) && !near(n.to, k));
+        const spaces = zones.cells(n.to).filter((k) => grid.cells[k] === WbCell.EMPTY && movable(k) && near(n.to, k));
+        if (!this.moveBox(grid, boxes, spaces)) break;
+        fixes++;
+        continue;
+      }
+      const z = this.extremes(this.zoneBoxCounts(grid, zones));
+      if (z.hi - z.lo <= WbFairBoxLayout.ZONE_SPREAD) break;
+      const nearAny = (k: number): boolean => zones.distances.some((d) => d[k] <= WbFairBoxLayout.NEAR_STEPS);
+      const boxes = zones.cells(z.from).filter((k) => grid.cells[k] === WbCell.BOX && !nearAny(k));
+      const spaces = zones.cells(z.to).filter((k) => grid.cells[k] === WbCell.EMPTY && movable(k) && !nearAny(k));
+      if (!this.moveBox(grid, boxes, spaces)) break;
+      fixes++;
+    }
+    return fixes;
+  }
+
+  private inspect(grid: WbGrid, zones: WbZoneMap): WbFairReport {
+    const report = new WbFairReport();
+    report.nearBoxes = zones.distances.map((dist) => {
+      let n = 0;
+      for (let k = 0; k < WbGrid.COUNT; k++) if (grid.cells[k] === WbCell.BOX && dist[k] <= WbFairBoxLayout.NEAR_STEPS) n++;
+      return n;
+    });
+    report.zoneBoxes = this.zoneBoxCounts(grid, zones);
+    report.escapeOk = this.groups.map((g) => this.hasEscape(grid, g));
+    const nearOver = Math.max(0, Math.max(...report.nearBoxes) - Math.min(...report.nearBoxes) - WbFairBoxLayout.NEAR_SPREAD);
+    const zoneOver = Math.max(0, Math.max(...report.zoneBoxes) - Math.min(...report.zoneBoxes) - WbFairBoxLayout.ZONE_SPREAD);
+    const escapeMiss = report.escapeOk.filter((ok) => !ok).length;
+    report.score = nearOver + zoneOver + escapeMiss * 3;
+    report.passed = report.score === 0;
+    return report;
+  }
+
+  static wetCross(grid: WbGrid, i: number, j: number, range: number): Set<number> {
+    const wet = new Set<number>([WbGrid.index(i, j)]);
+    for (let d = 0; d < 4; d++) {
+      for (let s = 1; s <= range; s++) {
+        const ni = i + WbDirStep.DX[d] * s, nj = j + WbDirStep.DZ[d] * s;
+        if (!WbGrid.inside(ni, nj) || grid.solid(ni, nj)) break;
+        wet.add(WbGrid.index(ni, nj));
+        if (grid.kind(ni, nj) === WbCell.BOX) break;
+      }
+    }
+    return wet;
+  }
+
+  private hasEscape(grid: WbGrid, group: WbSpawnGroup): boolean {
+    for (const p of group.clear) {
+      const wet = WbFairBoxLayout.wetCross(grid, p.i, p.j, 1);
+      const dist = WbWalkDistance.fromSpots(grid, [p], false);
+      let safe = 0;
+      for (let k = 0; k < WbGrid.COUNT; k++) if (dist[k] > 0 && dist[k] <= WbFairBoxLayout.ESCAPE_STEPS && !wet.has(k)) safe++;
+      if (safe >= WbFairBoxLayout.ESCAPE_CELLS) return true;
+    }
+    return false;
+  }
+
+  private hideLoot(grid: WbGrid, zones: WbZoneMap, kindsByGrade: readonly (readonly string[])[], rng: WbSeededRandom, report: WbFairReport): Map<number, WbHiddenLoot> {
+    const zoneCount = this.groups.length;
+    const boxTotal = grid.count(WbCell.BOX);
+    const gradeCounts = WbLootDeck.gradeCounts(Math.round(boxTotal * WbFairBoxLayout.LOOT_RATIO));
+    const perZone: number[][] = [];
+    for (let z = 0; z < zoneCount; z++) perZone.push([0, 0, 0]);
+    const totals = (): number[] => perZone.map((g) => g[0] + g[1] + g[2]);
+    for (let g = 2; g >= 0; g--) {
+      const each = Math.floor(gradeCounts[g] / zoneCount);
+      for (let z = 0; z < zoneCount; z++) perZone[z][g] += each;
+      const leftover = gradeCounts[g] - each * zoneCount;
+      const order = rng.shuffle(perZone.map((_, z) => z));
+      order.sort((a, b) => totals()[a] - totals()[b]);
+      for (let r = 0; r < leftover; r++) perZone[order[r]][g]++;
+    }
+    report.zoneGrades = perZone.map((g) => g.slice());
+    const loot = new Map<number, WbHiddenLoot>();
+    const freeBoxes = zones.distances.map((_, z) => rng.shuffle(zones.cells(z).filter((k) => grid.cells[k] === WbCell.BOX)));
+    const spare = (): number => {
+      for (const list of freeBoxes) while (list.length) { const k = list.pop() as number; if (!loot.has(k)) return k; }
+      return -1;
+    };
+    for (let g = 0; g < 3; g++) {
+      const deck = WbLootDeck.kinds(gradeCounts[g], kindsByGrade[g], rng);
+      const slots: number[] = [];
+      const need = perZone.map((counts) => counts[g]);
+      const zoneOrder = rng.shuffle(perZone.map((_, z) => z));
+      while (slots.length < gradeCounts[g]) for (const z of zoneOrder) if (need[z] > 0) { need[z]--; slots.push(z); }
+      slots.forEach((z, n) => {
+        const list = freeBoxes[z];
+        let cell = -1;
+        while (list.length && cell < 0) { const k = list.pop() as number; if (!loot.has(k)) cell = k; }
+        if (cell < 0) cell = spare();
+        if (cell >= 0) loot.set(cell, { grade: g, kind: deck[n] });
+      });
+    }
+    return loot;
+  }
+}
+
+abstract class WbMapTheme {
+  abstract readonly id: string;
+  abstract readonly title: string;
+  abstract readonly floorA: number;
+  abstract readonly floorB: number;
+  abstract readonly sky: number;
+  abstract readonly sun: number;
+  abstract readonly hemiSky: number;
+  abstract readonly hemiGround: number;
+}
+
+class WbClassroomTheme extends WbMapTheme {
+  readonly id = "classroom";
+  readonly title = "교실";
+  readonly floorA = 0xC89A66;
+  readonly floorB = 0xBC8F5E;
+  readonly sky = 0xF4E7CF;
+  readonly sun = 0xFFF1D6;
+  readonly hemiSky = 0xFFF6E6;
+  readonly hemiGround = 0x8A6A4A;
+}
+
+class WbPlaygroundTheme extends WbMapTheme {
+  readonly id = "playground";
+  readonly title = "운동장";
+  readonly floorA = 0x8DBF5C;
+  readonly floorB = 0x84B456;
+  readonly sky = 0xAEDCF7;
+  readonly sun = 0xFFFFFF;
+  readonly hemiSky = 0xCFEBFF;
+  readonly hemiGround = 0x6E7F45;
+}
+
+class WbCafeteriaTheme extends WbMapTheme {
+  readonly id = "cafeteria";
+  readonly title = "급식실";
+  readonly floorA = 0xE8E2D4;
+  readonly floorB = 0xDAD3C4;
+  readonly sky = 0xF6DDBE;
+  readonly sun = 0xFFE2B8;
+  readonly hemiSky = 0xFFEBD2;
+  readonly hemiGround = 0x8C7B66;
+}
+
+class WbMapCatalog {
+  static readonly THEMES: readonly WbMapTheme[] = [new WbClassroomTheme(), new WbPlaygroundTheme(), new WbCafeteriaTheme()];
+  static readonly RANDOM = "random";
+
+  static find(id: string): WbMapTheme {
+    return WbMapCatalog.THEMES.find((t) => t.id === id) || WbMapCatalog.THEMES[0];
+  }
+
+  static resolve(id: string, rng: WbSeededRandom): WbMapTheme {
+    return id === WbMapCatalog.RANDOM ? rng.pick(WbMapCatalog.THEMES) : WbMapCatalog.find(id);
+  }
+}
