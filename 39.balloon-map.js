@@ -460,11 +460,21 @@ class WbClassroomTheme extends WbMapTheme {
         this.id = "classroom";
         this.title = "교실";
         this.floorA = 0xC89A66;
-        this.floorB = 0xBC8F5E;
+        this.floorB = 0xBA8C5B;
+        this.outside = 0x9C7A55;
         this.sky = 0xF4E7CF;
         this.sun = 0xFFF1D6;
         this.hemiSky = 0xFFF6E6;
         this.hemiGround = 0x8A6A4A;
+        this.block = 0x8E9AA6;
+        this.pillars = [
+            [{ model: "table_medium", width: 1.8, height: 1.05 }, { model: "chair_A_wood", width: 0.75, dz: 0.78, yaw: Math.PI }],
+        ];
+        this.boxes = [
+            [{ model: "box_small", width: 1.5, tint: 0xE2AC6E }, { model: "book_set", width: 1.0, lift: 1.5 }],
+            [{ model: "box_small", width: 1.5, yaw: Math.PI / 2, tint: 0xE2AC6E }, { model: "book_set", width: 1.0, lift: 1.5, yaw: 0.6 }],
+        ];
+        this.wall = [{ model: "cabinet_medium", width: 2.0, height: 1.5 }];
     }
 }
 class WbPlaygroundTheme extends WbMapTheme {
@@ -473,11 +483,22 @@ class WbPlaygroundTheme extends WbMapTheme {
         this.id = "playground";
         this.title = "운동장";
         this.floorA = 0x8DBF5C;
-        this.floorB = 0x84B456;
+        this.floorB = 0x83B353;
+        this.outside = 0xC9A878;
         this.sky = 0xAEDCF7;
         this.sun = 0xFFFFFF;
         this.hemiSky = 0xCFEBFF;
         this.hemiGround = 0x6E7F45;
+        this.block = 0x9AA3AB;
+        this.pillars = [
+            [{ model: "Tree_1_A_Color1", width: 2.1 }],
+            [{ shape: "pullupBar", width: 1.8 }],
+        ];
+        this.boxes = [
+            [{ model: "box_small", width: 1.5, tint: 0xE2AC6E }],
+            [{ model: "box_small", width: 1.5, yaw: Math.PI / 2, tint: 0xE2AC6E }, { model: "football", width: 0.62, lift: 1.5 }],
+        ];
+        this.wall = [{ model: "fence", width: 2.0, height: 1.1 }];
     }
 }
 class WbCafeteriaTheme extends WbMapTheme {
@@ -486,11 +507,21 @@ class WbCafeteriaTheme extends WbMapTheme {
         this.id = "cafeteria";
         this.title = "급식실";
         this.floorA = 0xE8E2D4;
-        this.floorB = 0xDAD3C4;
+        this.floorB = 0xD9D1C1;
+        this.outside = 0xB9AE9C;
         this.sky = 0xF6DDBE;
         this.sun = 0xFFE2B8;
         this.hemiSky = 0xFFEBD2;
         this.hemiGround = 0x8C7B66;
+        this.block = 0x9C9488;
+        this.pillars = [
+            [{ model: "kitchentable_A", width: 1.8, height: 1.0 }],
+        ];
+        this.boxes = [
+            [{ model: "box_small", width: 1.5, tint: 0xE2AC6E }, { model: "plate_stack", width: 0.95, lift: 1.5 }],
+            [{ model: "barrel_small", width: 1.4, height: 1.5 }],
+        ];
+        this.wall = [{ model: "kitchencounter_straight_A", width: 2.0, height: 1.2 }];
     }
 }
 class WbMapCatalog {

@@ -419,48 +419,98 @@ class WbFairBoxLayout {
   }
 }
 
+interface WbPropPart {
+  readonly model?: string;
+  readonly shape?: string;
+  readonly width: number;
+  readonly height?: number;
+  readonly lift?: number;
+  readonly dx?: number;
+  readonly dz?: number;
+  readonly yaw?: number;
+  readonly tint?: number;
+}
+
+type WbPropVariant = readonly WbPropPart[];
+
 abstract class WbMapTheme {
   abstract readonly id: string;
   abstract readonly title: string;
   abstract readonly floorA: number;
   abstract readonly floorB: number;
+  abstract readonly outside: number;
   abstract readonly sky: number;
   abstract readonly sun: number;
   abstract readonly hemiSky: number;
   abstract readonly hemiGround: number;
+  abstract readonly block: number;
+  abstract readonly pillars: readonly WbPropVariant[];
+  abstract readonly boxes: readonly WbPropVariant[];
+  abstract readonly wall: WbPropVariant;
 }
 
 class WbClassroomTheme extends WbMapTheme {
   readonly id = "classroom";
   readonly title = "교실";
   readonly floorA = 0xC89A66;
-  readonly floorB = 0xBC8F5E;
+  readonly floorB = 0xBA8C5B;
+  readonly outside = 0x9C7A55;
   readonly sky = 0xF4E7CF;
   readonly sun = 0xFFF1D6;
   readonly hemiSky = 0xFFF6E6;
   readonly hemiGround = 0x8A6A4A;
+  readonly block = 0x8E9AA6;
+  readonly pillars: readonly WbPropVariant[] = [
+    [{ model: "table_medium", width: 1.8, height: 1.05 }, { model: "chair_A_wood", width: 0.75, dz: 0.78, yaw: Math.PI }],
+  ];
+  readonly boxes: readonly WbPropVariant[] = [
+    [{ model: "box_small", width: 1.5, tint: 0xE2AC6E }, { model: "book_set", width: 1.0, lift: 1.5 }],
+    [{ model: "box_small", width: 1.5, yaw: Math.PI / 2, tint: 0xE2AC6E }, { model: "book_set", width: 1.0, lift: 1.5, yaw: 0.6 }],
+  ];
+  readonly wall: WbPropVariant = [{ model: "cabinet_medium", width: 2.0, height: 1.5 }];
 }
 
 class WbPlaygroundTheme extends WbMapTheme {
   readonly id = "playground";
   readonly title = "운동장";
   readonly floorA = 0x8DBF5C;
-  readonly floorB = 0x84B456;
+  readonly floorB = 0x83B353;
+  readonly outside = 0xC9A878;
   readonly sky = 0xAEDCF7;
   readonly sun = 0xFFFFFF;
   readonly hemiSky = 0xCFEBFF;
   readonly hemiGround = 0x6E7F45;
+  readonly block = 0x9AA3AB;
+  readonly pillars: readonly WbPropVariant[] = [
+    [{ model: "Tree_1_A_Color1", width: 2.1 }],
+    [{ shape: "pullupBar", width: 1.8 }],
+  ];
+  readonly boxes: readonly WbPropVariant[] = [
+    [{ model: "box_small", width: 1.5, tint: 0xE2AC6E }],
+    [{ model: "box_small", width: 1.5, yaw: Math.PI / 2, tint: 0xE2AC6E }, { model: "football", width: 0.62, lift: 1.5 }],
+  ];
+  readonly wall: WbPropVariant = [{ model: "fence", width: 2.0, height: 1.1 }];
 }
 
 class WbCafeteriaTheme extends WbMapTheme {
   readonly id = "cafeteria";
   readonly title = "급식실";
   readonly floorA = 0xE8E2D4;
-  readonly floorB = 0xDAD3C4;
+  readonly floorB = 0xD9D1C1;
+  readonly outside = 0xB9AE9C;
   readonly sky = 0xF6DDBE;
   readonly sun = 0xFFE2B8;
   readonly hemiSky = 0xFFEBD2;
   readonly hemiGround = 0x8C7B66;
+  readonly block = 0x9C9488;
+  readonly pillars: readonly WbPropVariant[] = [
+    [{ model: "kitchentable_A", width: 1.8, height: 1.0 }],
+  ];
+  readonly boxes: readonly WbPropVariant[] = [
+    [{ model: "box_small", width: 1.5, tint: 0xE2AC6E }, { model: "plate_stack", width: 0.95, lift: 1.5 }],
+    [{ model: "barrel_small", width: 1.4, height: 1.5 }],
+  ];
+  readonly wall: WbPropVariant = [{ model: "kitchencounter_straight_A", width: 2.0, height: 1.2 }];
 }
 
 class WbMapCatalog {

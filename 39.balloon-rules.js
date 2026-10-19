@@ -576,6 +576,7 @@ class WbEngine {
     }
     get phase() { return this.ended ? "ended" : this.tick < 0 ? "countdown" : "play"; }
     get seconds() { return this.tick / WbBalance.RATE; }
+    get tickTime() { return this.tick + this.carry * WbBalance.RATE; }
     get endTick() { return WbBalance.ticks(WbBalance.MATCH); }
     attach(index, pilot) { this.pilots.set(index, pilot); }
     emit(ev) { this.events.push(ev); }

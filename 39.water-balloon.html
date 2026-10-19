@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<script charset="utf-8" src="firebase-config.js"></script>
+<script charset="utf-8" src="access-guard.js" data-game="waterballoon"></script>
+<script charset="utf-8" src="fullscreen-keeper.js" data-watch></script>
+<script charset="utf-8" src="quality-governor.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>물풍선 대작전</title>
+<link rel="stylesheet" href="theme.css">
+<script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1.10.1/dist/es-module-shims.js"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  [hidden] { display: none !important; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0A162C; font-family: var(--sg-font); color: #fff; -webkit-user-select: none; user-select: none; }
+  #view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 800; color: #CFE8F7; }
+  .hud-box { background: rgba(16, 24, 38, .74); border-left: 3px solid #D97B4F; border-radius: 6px; padding: 8px 12px; }
+  #previewInfo { position: fixed; left: 50%; top: 46px; transform: translateX(-50%); z-index: 5; font-size: 14px; font-weight: 800; white-space: nowrap; max-width: 96vw; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+  #previewHint { position: fixed; left: 50%; bottom: 8px; transform: translateX(-50%); z-index: 5; font-size: 12px; font-weight: 800; white-space: nowrap; pointer-events: none; opacity: .85; }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div id="loading">불러오는 중…</div>
+<div id="previewInfo" class="hud-box"></div>
+<div id="previewHint" class="hud-box">미리보기(봇 판) · ←/→ 보는 사람 · M 맵 바꾸기 · N 새 판</div>
+<script charset="utf-8" src="character-kit.js?v=20261011"></script>
+<script charset="utf-8" src="room-kit.js"></script>
+<script charset="utf-8" src="39.balloon-map.js?v=3"></script>
+<script charset="utf-8" src="39.balloon-rules.js?v=3"></script>
+<script charset="utf-8" src="39.balloon-bot.js?v=3"></script>
+<script charset="utf-8" src="39.balloon-views.js?v=3"></script>
+<script charset="utf-8" src="39.water-balloon.js?v=3"></script>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
+new WbGame({ THREE, GLTFLoader, SkeletonUtils });
+</script>
+</body>
+</html>

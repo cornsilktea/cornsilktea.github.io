@@ -600,6 +600,7 @@ class WbEngine implements WbMoveWorld {
 
   get phase(): WbPhase { return this.ended ? "ended" : this.tick < 0 ? "countdown" : "play"; }
   get seconds(): number { return this.tick / WbBalance.RATE; }
+  get tickTime(): number { return this.tick + this.carry * WbBalance.RATE; }
   get endTick(): number { return WbBalance.ticks(WbBalance.MATCH); }
 
   attach(index: number, pilot: WbPilot): void { this.pilots.set(index, pilot); }
