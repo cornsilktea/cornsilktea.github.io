@@ -23,22 +23,92 @@
   #view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
   #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 800; color: #CFE8F7; }
   .hud-box { background: rgba(16, 24, 38, .74); border-left: 3px solid #D97B4F; border-radius: 6px; padding: 8px 12px; }
-  #previewInfo { position: fixed; left: 50%; top: 46px; transform: translateX(-50%); z-index: 5; font-size: 14px; font-weight: 800; white-space: nowrap; max-width: 96vw; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
-  #previewHint { position: fixed; left: 50%; bottom: 8px; transform: translateX(-50%); z-index: 5; font-size: 12px; font-weight: 800; white-space: nowrap; pointer-events: none; opacity: .85; }
+  #touchZone { position: fixed; inset: 0; z-index: 2; touch-action: none; }
+  #hudTop { position: fixed; top: 8px; left: 50%; transform: translateX(-50%); z-index: 5; display: flex; gap: 8px; pointer-events: none; white-space: nowrap; font-size: 16px; font-weight: 800; }
+  #hudTop .hud-box { padding: 6px 12px; display: flex; align-items: center; gap: 4px; }
+  #hudClock { font-variant-numeric: tabular-nums; min-width: 84px; justify-content: center; }
+  #hudClock.sudden { color: #FFB27A; border-left-color: #FF6B5A; }
+  .teamDot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-left: 4px; border: 1px solid rgba(255,255,255,.7); }
+  #hudMine { position: fixed; left: 12px; top: 54px; z-index: 5; pointer-events: none; font-size: 15px; font-weight: 800; }
+  .hudWho { font-size: 13px; color: #FFD7BF; margin-bottom: 4px; }
+  .statRow { display: flex; gap: 10px; align-items: center; }
+  .statRow + .statRow { margin-top: 5px; }
+  .stat { white-space: nowrap; display: inline-flex; align-items: center; gap: 2px; }
+  .stat.full { color: #FFD37A; }
+  .stat.kick { color: #F08A3E; }
+  .stat.out { color: #FF8A7A; }
+  .rangeIcon { display: inline-block; width: 15px; height: 15px; background: linear-gradient(#4FB4F5, #4FB4F5) center/15px 5px no-repeat, linear-gradient(#4FB4F5, #4FB4F5) center/5px 15px no-repeat; }
+  #btnMute { position: fixed; right: 12px; top: 8px; z-index: 7; font: inherit; font-size: 18px; color: #fff; cursor: pointer; border-top: 0; border-right: 0; border-bottom: 0; padding: 5px 11px; }
+  #banner { position: fixed; left: 50%; top: 96px; transform: translateX(-50%); z-index: 8; padding: 8px 16px; font-size: 17px; font-weight: 800; pointer-events: none; max-width: 90vw; text-align: center; white-space: nowrap; }
+  #banner.strong { font-size: 22px; background: rgba(217,123,79,.92); border-left-color: #fff; }
+  #bigCount { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); z-index: 8; font-size: 96px; font-weight: 800; pointer-events: none; color: #fff; text-shadow: 0 4px 0 #1A5C99, 0 0 24px rgba(79,180,245,.8); }
+  #bigCount.pop { animation: wbPop .45s ease-out; }
+  @keyframes wbPop { 0% { transform: translate(-50%, -50%) scale(1.6); opacity: 0; } 40% { opacity: 1; } 100% { transform: translate(-50%, -50%) scale(1); } }
+  #trapVeil { position: fixed; inset: 0; z-index: 3; pointer-events: none; background: radial-gradient(ellipse at center, rgba(79,180,245,0) 45%, rgba(79,180,245,.45) 80%, rgba(168,224,255,.85) 100%); }
+  #trapCenter { position: fixed; left: 50%; top: 58%; transform: translateX(-50%); z-index: 8; text-align: center; pointer-events: none; }
+  #trapBig { font-size: 56px; font-weight: 800; text-shadow: 0 3px 0 #1A5C99; font-variant-numeric: tabular-nums; }
+  #trapBig.blink { color: #FF8A7A; animation: wbBlink .25s steps(2) infinite; }
+  @keyframes wbBlink { 50% { opacity: .35; } }
+  #trapHint { font-size: 16px; font-weight: 800; margin-top: 2px; text-shadow: 0 1px 3px #10203A; }
+  #floatLayer { position: fixed; inset: 0; z-index: 6; pointer-events: none; overflow: hidden; }
+  .wb-float { position: absolute; transform: translate(-50%, -100%); font-size: 20px; font-weight: 800; white-space: nowrap; text-shadow: 0 0 3px #10203A, 0 2px 2px #10203A; animation: wbRise 1s ease-out forwards; }
+  .wb-float.grade1 { color: #8FC0FF; font-size: 23px; }
+  .wb-float.grade2 { color: #FFB27A; font-size: 24px; }
+  .wb-float.max { color: #FFD37A; }
+  @keyframes wbRise { from { margin-top: 0; opacity: 1; } to { margin-top: -46px; opacity: 0; } }
+  #controls { position: fixed; inset: 0; z-index: 4; pointer-events: none; }
+  #joyBase { position: absolute; left: 34px; bottom: 40px; width: 128px; height: 128px; border-radius: 50%; background: rgba(14,20,30,.3); border: 3px solid rgba(255,255,255,.5); display: none; }
+  #joyBase.on { background: rgba(14,20,30,.45); border-color: rgba(255,255,255,.85); }
+  body.touch #joyBase { display: block; }
+  #joyKnob { position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; margin: -27px 0 0 -27px; border-radius: 50%; background: rgba(255,255,255,.75); }
+  #btnBalloon { position: absolute; right: 26px; bottom: 44px; width: 112px; height: 112px; border-radius: 50%; pointer-events: auto; touch-action: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 800; border: 4px solid rgba(255,255,255,.88); box-shadow: 0 6px 18px rgba(0,0,0,.35); background: radial-gradient(circle at 50% 32%, rgba(91,170,255,.96), rgba(22,48,90,.96)); }
+  #btnBalloonIcon { font-size: 36px; line-height: 1; }
+  #btnBalloonCount { font-size: 18px; margin-top: 2px; }
+  #btnBalloon.needle { background: radial-gradient(circle at 50% 32%, rgba(255,210,140,.98), rgba(217,123,79,.96)); animation: wbBlink .4s steps(2) infinite; }
+  #btnBalloon.dim { opacity: .45; }
+  #btnBalloon.shake { animation: wbShake .25s; }
+  @keyframes wbShake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+  @media (max-width: 700px) { #btnBalloon { width: 96px; height: 96px; } }
+  #resultBox { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; background: rgba(10,22,44,.55); }
+  #resultBox .card { background: rgba(10,22,44,.92); border-radius: 12px; border: 2px solid rgba(110,200,255,.5); padding: 18px; width: min(600px, 94vw); max-height: 90vh; overflow: auto; }
+  #resultTitle { font-size: 30px; font-weight: 800; text-align: center; color: #FFD7BF; margin-bottom: 10px; }
+  #resultBox table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  #resultBox th, #resultBox td { padding: 5px 6px; text-align: center; border-bottom: 1px solid rgba(255,255,255,.12); white-space: nowrap; }
+  #resultBox td:nth-child(2) { text-align: left; }
+  #resultBox tr.me td { background: rgba(217,123,79,.3); }
+  #resultBox .tc { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; }
+  #resultBox small { font-size: 11px; color: #9FB3C8; }
+  @media (max-width: 560px) { #resultBox .card { padding: 12px 8px; } #resultBox table { font-size: 12px; } #resultBox th, #resultBox td { padding: 4px 3px; } #resultTitle { font-size: 26px; } }
+  #btnAgain { margin-top: 14px; width: 100%; min-height: 48px; font: inherit; font-size: 18px; font-weight: 800; border-radius: 8px; border: none; background: #D97B4F; color: #fff; cursor: pointer; }
 </style>
 </head>
 <body>
 <canvas id="view"></canvas>
 <div id="loading">불러오는 중…</div>
-<div id="previewInfo" class="hud-box"></div>
-<div id="previewHint" class="hud-box">미리보기(봇 판) · ←/→ 보는 사람 · M 맵 바꾸기 · N 새 판</div>
+<div id="trapVeil" hidden></div>
+<div id="touchZone"></div>
+<div id="floatLayer"></div>
+<div id="controls" hidden>
+  <div id="joyBase"><div id="joyKnob"></div></div>
+  <div id="btnBalloon"><span id="btnBalloonIcon">💧</span><span id="btnBalloonCount">1</span></div>
+</div>
+<div id="hudTop" hidden><div class="hud-box" id="hudClock"></div><div class="hud-box" id="hudAlive"></div></div>
+<div id="hudMine" class="hud-box" hidden></div>
+<button type="button" id="btnMute" class="hud-box">🔊</button>
+<div id="banner" class="hud-box" hidden></div>
+<div id="bigCount" hidden></div>
+<div id="trapCenter" hidden><div id="trapBig"></div><div id="trapHint"></div></div>
+<div id="resultBox" hidden><div class="card"><div id="resultTitle"></div>
+  <table><thead id="resultHead"></thead><tbody id="resultRows"></tbody></table>
+  <button type="button" id="btnAgain">다시 하기</button></div></div>
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="room-kit.js"></script>
-<script charset="utf-8" src="39.balloon-map.js?v=3"></script>
-<script charset="utf-8" src="39.balloon-rules.js?v=3"></script>
-<script charset="utf-8" src="39.balloon-bot.js?v=3"></script>
-<script charset="utf-8" src="39.balloon-views.js?v=3"></script>
-<script charset="utf-8" src="39.water-balloon.js?v=3"></script>
+<script charset="utf-8" src="39.balloon-map.js?v=5"></script>
+<script charset="utf-8" src="39.balloon-rules.js?v=5"></script>
+<script charset="utf-8" src="39.balloon-bot.js?v=5"></script>
+<script charset="utf-8" src="39.balloon-views.js?v=5"></script>
+<script charset="utf-8" src="39.balloon-hud.js?v=5"></script>
+<script charset="utf-8" src="39.water-balloon.js?v=5"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";

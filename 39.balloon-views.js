@@ -798,6 +798,7 @@ class WbAvatarView {
         this.actionUntil = 0;
         this.wasLife = "alive";
         this.watched = false;
+        this.squashAt = -1;
         const THREE = libs.THREE;
         this.root = new THREE.Group();
         this.lift = new THREE.Group();
@@ -842,6 +843,7 @@ class WbAvatarView {
         }
         parent.add(this.root);
     }
+    squash(nowMs) { this.squashAt = nowMs; }
     playOnce(clip, seconds, nowMs) {
         this.animator.play(clip, { once: true });
         this.actionUntil = nowMs + seconds * 1000;
@@ -855,7 +857,7 @@ class WbAvatarView {
             turn -= Math.PI * 2;
         while (turn < -Math.PI)
             turn += Math.PI * 2;
-        this.yaw += turn * Math.min(1, dt * 40);
+        this.yaw += turn * Math.min(1, dt * 55);
         this.body.rotation.y = this.yaw;
         const trapped = s.life === "trapped", out = s.life === "out";
         if (out && this.wasLife !== "out") {
@@ -870,6 +872,9 @@ class WbAvatarView {
         this.root.visible = !out || this.outFor < WbAvatarView.OUT_HIDE;
         const liftY = trapped ? WbAvatarView.TRAP_LIFT + Math.sin(seconds * 3.2) * 0.12 : 0;
         this.lift.position.y += (liftY - this.lift.position.y) * Math.min(1, dt * 10);
+        const squashT = (nowMs - this.squashAt) / (WbAvatarView.SQUASH * 1000);
+        const squash = this.squashAt >= 0 && squashT < 1 ? Math.sin(squashT * Math.PI) * 0.14 : 0;
+        this.lift.scale.set(1 + squash * 0.5, 1 - squash, 1 + squash * 0.5);
         const trapLeft = (s.trapUntil - tickTime) / WbBalance.RATE;
         const blink = trapped && trapLeft < WbBalance.TRAP_BLINK;
         this.bubble.visible = trapped;
@@ -905,7 +910,61 @@ WbAvatarView.FACE_YAW = [Math.PI, Math.PI / 2, 0, -Math.PI / 2];
 WbAvatarView.TRAP_LIFT = 0.45;
 WbAvatarView.OUT_HIDE = 1.3;
 WbAvatarView.BODY_SCALE = 1.15;
+WbAvatarView.SQUASH = 0.15;
 WbAvatarView.trapClip = "Jump_Idle";
+class WbFootprints {
+    constructor(libs) {
+        this.marks = [];
+        this.timers = new Map();
+        this.cursor = 0;
+        const THREE = libs.THREE;
+        this.matrix = new THREE.Matrix4();
+        const disc = new THREE.CircleGeometry(0.28, 12);
+        disc.rotateX(-Math.PI / 2);
+        this.mesh = new THREE.InstancedMesh(disc, new THREE.MeshBasicMaterial({ color: WbPalette.WATER, transparent: true, opacity: 0.55, depthWrite: false }), WbFootprints.POOL);
+        this.mesh.position.y = 0.02;
+        this.mesh.renderOrder = 2;
+        this.mesh.frustumCulled = false;
+        for (let k = 0; k < WbFootprints.POOL; k++)
+            this.marks.push({ x: 0, z: 0, age: WbFootprints.LIFE });
+    }
+    update(avatars, dt) {
+        for (const avatar of avatars) {
+            const s = avatar.source;
+            if (s.life !== "alive" || !s.moving || s.shoe < WbFootprints.MIN_SHOE) {
+                this.timers.delete(s.index);
+                continue;
+            }
+            const t = (this.timers.get(s.index) || 0) + dt;
+            if (t < WbFootprints.GAP) {
+                this.timers.set(s.index, t);
+                continue;
+            }
+            this.timers.set(s.index, 0);
+            const mark = this.marks[this.cursor];
+            this.cursor = (this.cursor + 1) % WbFootprints.POOL;
+            mark.x = avatar.root.position.x;
+            mark.z = avatar.root.position.z;
+            mark.age = 0;
+        }
+        this.marks.forEach((mark, k) => {
+            mark.age += dt;
+            const left = 1 - mark.age / WbFootprints.LIFE;
+            if (left <= 0)
+                this.matrix.makeScale(0, 0, 0);
+            else {
+                this.matrix.makeScale(0.4 + 0.6 * left, 1, 0.4 + 0.6 * left);
+                this.matrix.setPosition(mark.x, 0, mark.z);
+            }
+            this.mesh.setMatrixAt(k, this.matrix);
+        });
+        this.mesh.instanceMatrix.needsUpdate = true;
+    }
+}
+WbFootprints.POOL = 48;
+WbFootprints.LIFE = 0.7;
+WbFootprints.GAP = 0.13;
+WbFootprints.MIN_SHOE = 3;
 class WbCameraRig {
     constructor(libs) {
         this.libs = libs;
@@ -1075,6 +1134,7 @@ class WbMatchScene {
         this.theme = theme;
         this.source = source;
         this.avatars = [];
+        this.lead = null;
         this.trail = new WbTrail();
         this.group = new libs.THREE.Group();
         const floor = new WbFloorView(libs, theme);
@@ -1085,7 +1145,8 @@ class WbMatchScene {
         this.balloons = new WbBalloonView(libs);
         this.splash = new WbSplashView(libs);
         this.items = new WbItemView(libs);
-        this.group.add(this.board.group, this.blocks.group, this.balloons.group, this.splash.group, this.items.group);
+        this.footprints = new WbFootprints(libs);
+        this.group.add(this.board.group, this.blocks.group, this.balloons.group, this.splash.group, this.items.group, this.footprints.mesh);
         source.players.forEach((p, k) => {
             this.avatars.push(new WbAvatarView(libs, this.group, factory, library, labels, looks[k % looks.length], p, WbPalette.teamColor(source.mode, p.team)));
         });
@@ -1100,9 +1161,10 @@ class WbMatchScene {
         this.avatars.forEach((avatar) => {
             const p = avatar.source;
             this.trail.feed(p.index, p.x, p.z, s.tick);
-            const at = this.trail.at(p.index, tickTime);
+            const at = this.lead && this.lead.index === p.index ? this.lead.position(tickTime) : this.trail.at(p.index, tickTime);
             avatar.sync(at.x, at.z, tickTime, dt, nowMs);
         });
+        this.footprints.update(this.avatars, dt);
     }
     avatarAt(index) { return this.avatars[index] || null; }
 }
@@ -1180,6 +1242,11 @@ class WbWorldView {
                 const avatar = match.avatarAt(ev.id);
                 if (avatar)
                     this.bursts.burst(avatar.root.position.x, 1.2, avatar.root.position.z);
+            }
+            if (ev.t === "place") {
+                const avatar = match.avatarAt(ev.by);
+                if (avatar)
+                    avatar.squash(nowMs);
             }
             if (ev.t === "rescue") {
                 const avatar = match.avatarAt(ev.by);
