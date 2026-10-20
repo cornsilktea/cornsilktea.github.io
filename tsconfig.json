@@ -9,6 +9,7 @@
     "skipLibCheck": true,
     "rootDir": "ts",
     "outDir": ".",
+    "newLine": "crlf",
     "types": []
   },
   "include": ["ts/**/*.ts"],
