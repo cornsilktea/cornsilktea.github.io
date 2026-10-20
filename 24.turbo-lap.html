@@ -120,6 +120,7 @@
   #overlay.st-screen .laps b { color: #FFB08C; }
   #overlay.st-screen .carbtn, #overlay.st-screen .ghostbtn, #overlay.st-screen .mapBtn { background: rgba(255, 255, 255, .06); border: 2px solid rgba(255, 255, 255, .18); color: #F4F1E8; box-shadow: none; }
   #overlay.st-screen .carbtn.on, #overlay.st-screen .ghostbtn.on, #overlay.st-screen .mapBtn.on { background: rgba(217, 123, 79, .22); border-color: #D97B4F; outline: 0; }
+  #overlay.st-screen .rtab tr.on td { background: rgba(217, 123, 79, .14); }
   #overlay.st-screen .carbtn small, #overlay.st-screen .ghostbtn small, #overlay.st-screen .mapBtn small { color: #A9AFC2; }
   #overlay.st-screen .rec > div, #overlay.st-screen .specBox, #overlay.st-screen .courseTag { background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .14); color: #EEF0F4; }
   #overlay.st-screen .rec .lab, #overlay.st-screen .rec .who { color: #A9AFC2; }
@@ -375,23 +376,32 @@
     </div>
   </div>
 
-  <div class="card" id="cardCourse" style="display:none">
-    <div class="logo" style="font-size:36px">⏱ 타임어택<small>코스를 고르세요</small></div>
+  <div class="card wide" id="cardCourse" style="display:none">
+    <div class="logo" style="font-size:36px">⏱ 타임어택</div>
+    <div class="sect">🗺️ 코스</div>
+    <div class="mapBtns" id="taCourseBtns">
+      <button type="button" class="mapBtn" data-course="seoul" id="btnSeoul">서울<small>2바퀴</small></button>
+      <button type="button" class="mapBtn" data-course="singapore" id="btnSingapore">싱가포르<small>3바퀴</small></button>
+      <button type="button" class="mapBtn" data-course="hongkong" id="btnHongkong">홍콩<small>편도 코스</small></button>
+    </div>
     <table class="rtab">
       <thead><tr><th>코스</th><th>나의 최고 기록</th><th>🏆 세계신기록</th><th class="clsCol" hidden>🏫 우리 반</th></tr></thead>
       <tbody>
-        <tr><td>서울<small style="font-weight:400">2바퀴</small></td><td><em id="bestSeoul">—</em></td><td><em id="wrSeoul">—</em><small id="wrWhoSeoul"></small></td><td class="clsCol" hidden><em id="crSeoul">—</em><small id="crWhoSeoul"></small></td></tr>
-        <tr><td>싱가포르<small style="font-weight:400">3바퀴</small></td><td><em id="bestSingapore">—</em></td><td><em id="wrSingapore">—</em><small id="wrWhoSingapore"></small></td><td class="clsCol" hidden><em id="crSingapore">—</em><small id="crWhoSingapore"></small></td></tr>
-        <tr><td>홍콩<small style="font-weight:400">편도 코스</small></td><td><em id="bestHongkong">—</em></td><td><em id="wrHongkong">—</em><small id="wrWhoHongkong"></small></td><td class="clsCol" hidden><em id="crHongkong">—</em><small id="crWhoHongkong"></small></td></tr>
+        <tr data-course="seoul"><td>서울</td><td><em id="bestSeoul">—</em></td><td><em id="wrSeoul">—</em><small id="wrWhoSeoul"></small></td><td class="clsCol" hidden><em id="crSeoul">—</em><small id="crWhoSeoul"></small></td></tr>
+        <tr data-course="singapore"><td>싱가포르</td><td><em id="bestSingapore">—</em></td><td><em id="wrSingapore">—</em><small id="wrWhoSingapore"></small></td><td class="clsCol" hidden><em id="crSingapore">—</em><small id="crWhoSingapore"></small></td></tr>
+        <tr data-course="hongkong"><td>홍콩</td><td><em id="bestHongkong">—</em></td><td><em id="wrHongkong">—</em><small id="wrWhoHongkong"></small></td><td class="clsCol" hidden><em id="crHongkong">—</em><small id="crWhoHongkong"></small></td></tr>
       </tbody>
     </table>
-    <div class="btns">
-      <button type="button" class="btn hard" id="btnSeoul">서울<small>2바퀴</small></button>
-      <button type="button" class="btn mid" id="btnSingapore">싱가포르<small>3바퀴</small></button>
-      <button type="button" class="btn" id="btnHongkong">홍콩<small>편도 코스</small></button>
+    <div class="sect">🚗 차량 선택 <span style="font-weight:700">— 대전모드와 같은 차가 저장됩니다</span></div>
+    <div class="carPick"></div>
+    <div class="sect">👻 고스트 고르기 <span style="font-weight:700">— 지난 주행이 반투명 차로 같이 달립니다</span></div>
+    <div class="ghosts">
+      <button type="button" class="ghostbtn on" data-ghost="none">없음<small>&nbsp;</small></button>
+      <button type="button" class="ghostbtn" data-ghost="mine" id="ghostMine">나의 최고 기록<small>기록 없음</small></button>
+      <button type="button" class="ghostbtn" data-ghost="world" id="ghostWorld">세계신기록<small>확인 중…</small></button>
     </div>
-    <div class="hint">트랙을 벗어나면 느려지고, 울타리에 부딪히면 크게 감속합니다. R 키: 처음부터 다시</div>
-    <div class="btns" style="margin-top:12px"><button type="button" class="btn sub" id="btnCourseBack">← 처음 화면</button></div>
+    <div class="btns" style="margin-top:12px"><button type="button" class="btn sub" id="btnCourseBack">← 처음 화면</button><button type="button" class="btn" id="btnGo">시작하기</button></div>
+    <div class="hint">스페이스바: 시작하기 · 트랙을 벗어나면 느려지고, 울타리에 부딪히면 크게 감속합니다. R 키: 처음부터 다시</div>
     <div class="wipe"><button type="button" id="btnWipe">이 기기의 나의 최고 기록·고스트 지우기</button></div>
   </div>
 
@@ -426,19 +436,6 @@
       <button type="button" class="btn sub" id="btnLeaveEnd">방 나가기</button>
     </div>
     <div class="hint" id="bDoneHint"></div>
-  </div>
-
-  <div class="card" id="cardCar" style="display:none">
-    <div class="logo" style="font-size:36px">차량 선택<small id="carCourse">홍콩 코스</small></div>
-    <div class="carPick"></div>
-    <div class="sect">👻 고스트 고르기 <span style="font-weight:700">— 지난 주행이 반투명 차로 같이 달립니다</span></div>
-    <div class="ghosts">
-      <button type="button" class="ghostbtn on" data-ghost="none">없음<small>&nbsp;</small></button>
-      <button type="button" class="ghostbtn" data-ghost="mine" id="ghostMine">나의 최고 기록<small>기록 없음</small></button>
-      <button type="button" class="ghostbtn" data-ghost="world" id="ghostWorld">세계신기록<small>확인 중…</small></button>
-    </div>
-    <div class="btns" style="margin-top:12px"><button type="button" class="btn sub" id="btnCarBack">← 코스 다시 고르기</button><button type="button" class="btn" id="btnGo">시작하기</button></div>
-    <div class="hint">스페이스바: 시작하기</div>
   </div>
 
   <div class="card" id="cardDone" style="display:none">
@@ -589,8 +586,35 @@ function parseCar(id) {
 }
 function carLabel(id) { const c = parseCar(id); return CAR_MODELS[c.model].name + " · " + CAR_COLORS[c.color].name; }
 function carReady(id) { return !!CAR_MODELS[parseCar(id).model].tpl; }
-let carKey = carId("porsche", "blue");
-try { const saved = localStorage.getItem("turbolap_car_v1"); if (saved) { const c = parseCar(saved); carKey = carId(c.model, c.color); } } catch (e) {}
+class CarGarage {
+  static STORAGE_KEY = "turbolap_car_v1";
+  static DEFAULT = { model: "porsche", color: "blue" };
+  constructor() {
+    this.key = CarGarage.restore();
+    this.listeners = [];
+  }
+  static restore() {
+    try {
+      const saved = localStorage.getItem(CarGarage.STORAGE_KEY);
+      if (saved) { const c = parseCar(saved); return carId(c.model, c.color); }
+    } catch (e) {}
+    return carId(CarGarage.DEFAULT.model, CarGarage.DEFAULT.color);
+  }
+  get picked() { return parseCar(this.key); }
+  get ready() { return carReady(this.key); }
+  get label() { return carLabel(this.key); }
+  pickModel(model) { this.choose(model, this.picked.color); }
+  pickColor(color) { this.choose(this.picked.model, color); }
+  choose(model, color) {
+    const next = carId(model, color);
+    if (next === this.key) return;
+    this.key = next;
+    try { localStorage.setItem(CarGarage.STORAGE_KEY, next); } catch (e) {}
+    this.listeners.forEach(listener => listener(next));
+  }
+  onChange(listener) { this.listeners.push(listener); }
+}
+const garage = new CarGarage();
 let pendingCourse = "seoul"; try { if (TRACKS[localStorage.getItem("turbolap_course_v1")]) pendingCourse = localStorage.getItem("turbolap_course_v1"); } catch (e) {}
 
 const $ = id => document.getElementById(id);
@@ -607,7 +631,7 @@ let ghostPlay = null, ghostCar = null, ghostCarKey = null, ghostIdx = 0, ghostLa
 let recData = [], recLast = -Infinity;
 function ghostKey(k) { return "turbolap_ghost_" + recKey(k) + "_v1"; }
 function loadMyGhost(k) { try { const j = JSON.parse(localStorage.getItem(ghostKey(k)) || "null"); return (j && j.ms > 0 && typeof j.data === "string") ? j : null; } catch (e) { return null; } }
-function saveMyGhost(k, ms, data) { try { localStorage.setItem(ghostKey(k), JSON.stringify({ ms, data, car: carKey })); } catch (e) {} }
+function saveMyGhost(k, ms, data) { try { localStorage.setItem(ghostKey(k), JSON.stringify({ ms, data, car: garage.key })); } catch (e) {} }
 function ghostUrl(k) { const cfg = window.PORTAL_CONFIG; return (cfg && cfg.isReady && cfg.isReady()) ? cfg.DB_URL.replace(/\/+$/, "") + "/ghosts/turbolap/" + recKey(k) + ".json" : null; }
 function fetchWorldGhost(k) {
   const u = ghostUrl(k); if (!u) return Promise.resolve(null);
@@ -619,9 +643,9 @@ function fetchWorldGhost(k) {
 function uploadWorldGhost(k, rec, data, retry) {
   const u = ghostUrl(k), note = $("ghostUpNote"); if (!u) return Promise.resolve();
   note.textContent = "세계신기록 고스트 저장 중…";
-  return fetch(u, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(retry ? { score: rec.score, name: rec.name, data } : { score: rec.score, name: rec.name, data, car: carKey }) })
+  return fetch(u, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(retry ? { score: rec.score, name: rec.name, data } : { score: rec.score, name: rec.name, data, car: garage.key }) })
     .then(r => {
-      if (r.ok) { worldGhost[k] = { score: rec.score, name: rec.name, data, car: carKey }; worldGhost.tried[k] = true; renderGhostButtons(); note.textContent = "세계신기록 고스트 저장 완료 · 스페이스바: 다시 하기"; return; }
+      if (r.ok) { worldGhost[k] = { score: rec.score, name: rec.name, data, car: garage.key }; worldGhost.tried[k] = true; renderGhostButtons(); note.textContent = "세계신기록 고스트 저장 완료 · 스페이스바: 다시 하기"; return; }
       return r.text().then(t => { throw new Error(r.status + " " + t); });
     })
     .catch(err => {
@@ -642,7 +666,7 @@ function renderGhostButtons() {
   });
 }
 function makeGhostCar(ck) {
-  const g = makeCar(ck || carKey);
+  const g = makeCar(ck || garage.key);
   g.traverse(o => {
     if (!o.isMesh) return;
     const m = o.material.clone();
@@ -661,9 +685,9 @@ function releaseGhostCar() {
 function setupGhost() {
   releaseGhostCar();
   ghostPlay = null; ghostLabel = ""; ghostShort = ""; ghostIdx = 0;
-  let src = null, gcar = carKey;
-  if (ghostPick === "mine") { const m = loadMyGhost(course); if (m) { src = m.data; gcar = m.car || carKey; ghostShort = "나의 최고 기록"; ghostLabel = ghostShort + " " + fmtTime(m.ms); } }
-  else if (ghostPick === "world" && worldGhostValid(course)) { const wg = worldGhost[course]; src = wg.data; gcar = wg.car || carKey; ghostShort = "세계신기록"; ghostLabel = ghostShort + " " + fmtTime(WRS[course].value()); }
+  let src = null, gcar = garage.key;
+  if (ghostPick === "mine") { const m = loadMyGhost(course); if (m) { src = m.data; gcar = m.car || garage.key; ghostShort = "나의 최고 기록"; ghostLabel = ghostShort + " " + fmtTime(m.ms); } }
+  else if (ghostPick === "world" && worldGhostValid(course)) { const wg = worldGhost[course]; src = wg.data; gcar = wg.car || garage.key; ghostShort = "세계신기록"; ghostLabel = ghostShort + " " + fmtTime(WRS[course].value()); }
   if (!src) return;
   try { const arr = JSON.parse(src); if (Array.isArray(arr) && arr.length > 1) ghostPlay = arr; } catch (e) {}
   if (!ghostPlay) { ghostLabel = ""; return; }
@@ -785,10 +809,10 @@ function warmUpGpu() {
   })));
 }
 function renderLoadGate() {
-  const myModel = CAR_MODELS[parseCar(carKey).model], ok = HQ_LOAD.ready && !!myModel.tpl;
+  const myModel = CAR_MODELS[parseCar(garage.key).model], ok = HQ_LOAD.ready && !!myModel.tpl;
   ["btnModeTA", "btnCreate", "btnJoin", "btnHongkong", "btnSingapore", "btnSeoul"].forEach(id => { $(id).disabled = !ok; });
   $("btnGo").disabled = !ok;
-  markCarButtons();
+  carPicker.mark();
   const note = $("loadNote");
   if (!HQ_LOAD.ready) note.textContent = "그래픽 자료 불러오는 중… " + HQ_LOAD.loaded + " / " + (HQ_LOAD.total || "?") + (HQ_LOAD.slow ? " — 인터넷이 느리면 조금 더 기다려 주세요" : "");
   else if (myModel.state === "failed") note.textContent = "자동차 모델을 불러오지 못했습니다. 새로 고침(F5) 해 주세요.";
@@ -3478,16 +3502,41 @@ function loadCarModel(key, manager) {
   }, undefined, err => { carModel.state = "failed"; console.warn("[turbolap] 자동차 모델을 못 불러옴:", key, err); renderLoadGate(); });
 }
 
-loadCarModel(parseCar(carKey).model, HQ_MANAGER);
-let car = makeCar(carKey); scene.add(car);
+loadCarModel(parseCar(garage.key).model, HQ_MANAGER);
+let car = makeCar(garage.key); scene.add(car);
 const PREVIEW_W = 440, PREVIEW_H = 200;
-document.querySelectorAll(".carPick").forEach(box => {
-  box.innerHTML =
-    '<div class="carModels">' + CAR_MODEL_KEYS.map(k => '<button type="button" class="carbtn" data-model="' + k + '">' + CAR_MODELS[k].name + "</button>").join("") + "</div>" +
-    '<div class="carColors">' + CAR_COLOR_KEYS.map(k => '<button type="button" class="colorbtn" data-color="' + k + '" style="--car-color:#' + CAR_COLORS[k].hex.toString(16).padStart(6, "0") + '"><i></i>' + CAR_COLORS[k].name + "</button>").join("") + "</div>" +
-    '<canvas class="carStage" width="' + PREVIEW_W + '" height="' + PREVIEW_H + '"></canvas>' +
-    '<div class="carName"></div>';
-});
+class CarPicker {
+  constructor(garage) {
+    this.garage = garage;
+    this.boxes = [...document.querySelectorAll(".carPick")];
+    this.boxes.forEach(box => {
+      box.innerHTML = CarPicker.markup();
+      box.addEventListener("click", e => this.onClick(e));
+    });
+    garage.onChange(() => this.mark());
+  }
+  static markup() {
+    return '<div class="carModels">' + CAR_MODEL_KEYS.map(k => '<button type="button" class="carbtn" data-model="' + k + '">' + CAR_MODELS[k].name + "</button>").join("") + "</div>" +
+      '<div class="carColors">' + CAR_COLOR_KEYS.map(k => '<button type="button" class="colorbtn" data-color="' + k + '" style="--car-color:#' + CAR_COLORS[k].hex.toString(16).padStart(6, "0") + '"><i></i>' + CAR_COLORS[k].name + "</button>").join("") + "</div>" +
+      '<canvas class="carStage" width="' + PREVIEW_W + '" height="' + PREVIEW_H + '"></canvas>' +
+      '<div class="carName"></div>';
+  }
+  onClick(e) {
+    const b = e.target.closest("button"); if (!b) return;
+    b.blur();
+    if (b.dataset.model) this.garage.pickModel(b.dataset.model);
+    else if (b.dataset.color) this.garage.pickColor(b.dataset.color);
+  }
+  mark() {
+    const picked = this.garage.picked, label = this.garage.label + (this.garage.ready ? "" : " — 불러오는 중…");
+    this.boxes.forEach(box => {
+      box.querySelectorAll(".carbtn").forEach(x => x.classList.toggle("on", x.dataset.model === picked.model));
+      box.querySelectorAll(".colorbtn").forEach(x => x.classList.toggle("on", x.dataset.color === picked.color));
+      box.querySelectorAll(".carName").forEach(x => { x.textContent = label; });
+    });
+  }
+}
+const carPicker = new CarPicker(garage);
 class CarPreview {
   constructor() {
     this.stages = [];
@@ -3532,7 +3581,7 @@ class CarPreview {
     const stage = this.stages.find(s => s.cv.offsetParent);
     if (!stage) { this.close(); return; }
     if (!this.open()) return;
-    if (this.spinKey !== carKey || !this.spinModel) { this.spinKey = carKey; this.spinModel = makeCar(carKey); }
+    if (this.spinKey !== garage.key || !this.spinModel) { this.spinKey = garage.key; this.spinModel = makeCar(garage.key); }
     this.spinAngle += dt * 0.9; this.spinModel.rotation.y = this.spinAngle;
     this.scene.add(this.spinModel); this.renderer.render(this.scene, this.camera); this.scene.remove(this.spinModel);
     stage.ctx.clearRect(0, 0, PREVIEW_W, PREVIEW_H); stage.ctx.drawImage(this.renderer.domElement, 0, 0);
@@ -3546,7 +3595,7 @@ function swapCar(old, id) {
   return next;
 }
 function refreshCars() {
-  if (car.userData.waitingModel) car = swapCar(car, carKey);
+  if (car.userData.waitingModel) car = swapCar(car, garage.key);
   if (ghostCar && ghostCar.userData.waitingModel) ghostCar = swapCar(ghostCar, ghostCarKey);
   okeys(BT.ents).forEach(id => {
     const e = BT.ents[id], p = BT.players[id];
@@ -3561,7 +3610,7 @@ const P = { x: 0, z: 0, y: 0, h: 0, v: 0, ci: 0, prevCi: 0, lap: 0, expected: 0,
 let state = "menu", playMode = "ta";
 let cdTime = 0, cdShown = -1, goTimer = 0, t0 = 0, elapsed = 0, finalMs = 0, doneTimer = 0, shake = 0, menuAng = 0;
 const keys = { up: false, down: false, left: false, right: false };
-const hud = $("hud"), overlay = $("overlay"), cardStart = $("cardStart"), cardDone = $("cardDone"), cardCar = $("cardCar");
+const hud = $("hud"), overlay = $("overlay"), cardStart = $("cardStart"), cardDone = $("cardDone");
 const hudLap = $("hudLap"), hudTime = $("hudTime"), hudOff = $("hudOff"), speedBox = $("speed"), speedVal = $("speedVal"), chaseTag = $("chaseTag"), followTag = $("followTag");
 const countBox = $("count"), countNum = $("countNum"), mini = $("minimap"), mctx = mini.getContext("2d");
 const lapFill = $("lapFill");
@@ -3586,7 +3635,7 @@ function placeAt(i, lat) {
 function startLat() { return (playMode === "battle" && myTeam() === "right" ? -1 : 1) * gridLat(); }
 function resetCar() { placeAt(START_I, startLat()); clearGroundFx(); P.gfxT = newGroundTrack(); P.off = false; P.wallT = 0; P.steerVis = 0; P.rollVis = 0; P.fin = 0; resetBoost(P); }
 function resetBoost(r) { r.chase = 0; r.chaseKmh = 0; r.tailLostT = 0; r.surgeVis = 0; r.surgeFlash = 0; r.tailT = 0; r.offLine = false; r.boostOn = false; r.boostT = 0; r.boostCap = 0; r.boostGain = 0; r.boostCool = 0; }
-const CARDS = { start: "cardStart", course: "cardCourse", car: "cardCar", done: "cardDone", lobby: "cardLobby", bdone: "cardBDone" };
+const CARDS = { start: "cardStart", course: "cardCourse", done: "cardDone", lobby: "cardLobby", bdone: "cardBDone" };
 let cardNow = "start";
 function showCard(which) {
   cardNow = which;
@@ -3598,14 +3647,39 @@ function showCourse(k) {
   releaseGhostCar();
   course = k; buildTrack(TRACKS[k]); resetCar(); updateCar(0);
 }
-function pickCourse(k) {
-  pendingCourse = k; $("carCourse").textContent = TRACKS[k].name + " 코스";
-  try { localStorage.setItem("turbolap_course_v1", k); } catch (e) {}
-  if (k !== course) showCourse(k);
-  markCarButtons();
-  showCard("car");
-  renderGhostButtons(); if (!worldGhost.tried[k] || !worldGhostValid(k)) fetchWorldGhost(k);
+class TimeAttackSetup {
+  static COURSE_STORAGE_KEY = "turbolap_course_v1";
+  constructor() {
+    this.courseBox = $("taCourseBtns");
+    this.recordRows = [...$("cardCourse").querySelectorAll(".rtab tr[data-course]")];
+    this.courseBox.addEventListener("click", e => this.onCourseClick(e));
+  }
+  open() {
+    audioInit();
+    showCard("course");
+    this.chooseCourse(pendingCourse);
+    renderRecords();
+  }
+  onCourseClick(e) {
+    const b = e.target.closest(".mapBtn"); if (!b || b.disabled) return;
+    b.blur();
+    this.chooseCourse(b.dataset.course);
+  }
+  chooseCourse(k) {
+    pendingCourse = k;
+    try { localStorage.setItem(TimeAttackSetup.COURSE_STORAGE_KEY, k); } catch (e) {}
+    if (k !== course) showCourse(k);
+    this.markCourse();
+    carPicker.mark();
+    renderGhostButtons(); if (!worldGhost.tried[k] || !worldGhostValid(k)) fetchWorldGhost(k);
+  }
+  markCourse() {
+    this.courseBox.querySelectorAll(".mapBtn").forEach(b => b.classList.toggle("on", b.dataset.course === pendingCourse));
+    this.recordRows.forEach(tr => tr.classList.toggle("on", tr.dataset.course === pendingCourse));
+  }
+  canStart() { return cardNow === "course" && garage.ready && !$("btnGo").disabled; }
 }
+const timeAttackSetup = new TimeAttackSetup();
 function setHud(on) { hud.style.display = on ? "flex" : "none"; speedBox.style.display = on ? "block" : "none"; mini.style.display = on ? "block" : "none"; }
 function showLapToast(done, lt, isNew) {
   const left = LAPS - done;
@@ -3619,7 +3693,7 @@ function startRace(which) {
   audioInit();
   playMode = "ta"; setBattleHud(false);
   if (which && which !== course) { course = which; buildTrack(TRACKS[course]); }
-  scene.remove(car); car = makeCar(carKey); scene.add(car);
+  scene.remove(car); car = makeCar(garage.key); scene.add(car);
   resetCar(); P.lap = 0; P.expected = 0; lapTimes = []; lapStartMs = 0; raceBest = 0; renderHudBest();
   recData = []; recLast = -Infinity; setupGhost();
   $("hudGhost").style.display = ghostLabel ? "block" : "none"; $("hudGhost").textContent = "👻 " + ghostLabel;
@@ -3906,7 +3980,7 @@ const GFX = { on: true, rear: null, skidMax: 1600, puffMax: 260, skidWidth: 0.26
 const GFX_TINT = { rubber: new THREE.Color(0x141414), dirt: new THREE.Color(0x5A4630), smoke: new THREE.Color(0xD8D8D2), dust: new THREE.Color(0xB39A70), spark: new THREE.Color(0xFFC46A) };
 function rearWheelSpots() {
   if (GFX.rear) return GFX.rear;
-  const tpl = CAR_MODELS[parseCar(carKey).model].tpl, l = tpl && tpl.getObjectByName("pivotRearL"), r = tpl && tpl.getObjectByName("pivotRearR");
+  const tpl = CAR_MODELS[parseCar(garage.key).model].tpl, l = tpl && tpl.getObjectByName("pivotRearL"), r = tpl && tpl.getObjectByName("pivotRearR");
   if (!l || !r) return [[-0.62, 1.1], [0.62, 1.1]];
   return (GFX.rear = [l, r].map(o => [o.position.x * CFG.carScale, o.position.z * CFG.carScale]));
 }
@@ -4179,42 +4253,23 @@ function onKey(e, down) {
   else if (e.code === "Space") {
     e.preventDefault();
     if (state === "done") startRace();
-    else if (state === "menu" && cardNow === "car" && carReady(carKey)) startRace(pendingCourse);
+    else if (state === "menu" && timeAttackSetup.canStart()) startRace(pendingCourse);
   }
 }
 window.addEventListener("keydown", e => onKey(e, true));
 window.addEventListener("keyup", e => onKey(e, false));
 window.addEventListener("blur", () => { keys.up = keys.down = keys.left = keys.right = false; });
-$("btnHongkong").onclick = e => { e.currentTarget.blur(); pickCourse("hongkong"); };
-$("btnSingapore").onclick = e => { e.currentTarget.blur(); pickCourse("singapore"); };
-$("btnSeoul").onclick = e => { e.currentTarget.blur(); pickCourse("seoul"); };
-$("btnCarBack").onclick = e => { e.currentTarget.blur(); showCard("course"); };
-$("btnModeTA").onclick = e => { e.currentTarget.blur(); audioInit(); showCard("course"); renderRecords(); };
+$("btnModeTA").onclick = e => { e.currentTarget.blur(); timeAttackSetup.open(); };
 $("btnCourseBack").onclick = e => { e.currentTarget.blur(); showCard("start"); };
 document.querySelectorAll(".ghostbtn").forEach(b => b.onclick = e => {
   e.currentTarget.blur(); ghostPick = b.getAttribute("data-ghost");
   try { localStorage.setItem("turbolap_ghostpick_v1", ghostPick); } catch (err) {}
   renderGhostButtons();
 });
-function chooseCar(model, color) {
-  carKey = carId(model, color);
-  try { localStorage.setItem("turbolap_car_v1", carKey); } catch (err) {}
-  loadCarModel(model); renderLoadGate();
-  if (playMode === "battle" && BT.ref && BT.status === "lobby") { BT.ref.child("players/" + BT.myId + "/car").set(carKey); showLobbyCar(); }
-}
-document.querySelectorAll(".carPick").forEach(box => box.addEventListener("click", e => {
-  const b = e.target.closest("button"); if (!b) return;
-  b.blur();
-  const picked = parseCar(carKey);
-  if (b.dataset.model) chooseCar(b.dataset.model, picked.color);
-  else if (b.dataset.color) chooseCar(picked.model, b.dataset.color);
-}));
-function markCarButtons() {
-  const picked = parseCar(carKey), label = carLabel(carKey) + (carReady(carKey) ? "" : " — 불러오는 중…");
-  document.querySelectorAll(".carPick .carbtn").forEach(x => x.classList.toggle("on", x.dataset.model === picked.model));
-  document.querySelectorAll(".carPick .colorbtn").forEach(x => x.classList.toggle("on", x.dataset.color === picked.color));
-  document.querySelectorAll(".carPick .carName").forEach(x => { x.textContent = label; });
-}
+garage.onChange(key => { loadCarModel(parseCar(key).model); renderLoadGate(); });
+garage.onChange(key => {
+  if (playMode === "battle" && BT.ref && BT.status === "lobby") { BT.ref.child("players/" + BT.myId + "/car").set(key); showLobbyCar(); }
+});
 $("btnGo").onclick = e => { e.currentTarget.blur(); startRace(pendingCourse); };
 $("btnWipe").onclick = e => {
   e.currentTarget.blur();
@@ -4293,7 +4348,7 @@ function askNickFirst() {
   CharacterMakerDialog.requestOpen();
 }
 function bMsg(t) { $("bStartMsg").textContent = t || ""; }
-function newPlayer(team, t) { return { nickname: PlayerProfile.storedNick(), team, car: carKey, joinedAt: t }; }
+function newPlayer(team, t) { return { nickname: PlayerProfile.storedNick(), team, car: garage.key, joinedAt: t }; }
 
 function roomCodes() {
   const base = String((window.PORTAL_CONFIG || {}).DB_URL || "").replace(/\/+$/, "");
@@ -4431,7 +4486,7 @@ function closeRoomLocal(msg) {
   BT.ref = null; BT.players = {}; BT.raw = {}; BT.result = null;
   resetMatchLocal();
   playMode = "ta"; setBattleHud(false);
-  scene.remove(car); car = makeCar(carKey); scene.add(car); resetCar(); updateCar(0);
+  scene.remove(car); car = makeCar(garage.key); scene.add(car); resetCar(); updateCar(0);
   refreshNick(); showCard("start"); bMsg(msg);
 }
 window.addEventListener("pagehide", () => { if (BT.ref) { try { BT.ref.child("players/" + BT.myId).remove(); BT.ref.child("st/" + BT.myId).remove(); } catch (e) {} } });
@@ -4464,8 +4519,8 @@ function fixSeat() {
 }
 function showLobbyCar() {
   const me = BT.players[BT.myId];
-  BT.lobbyCarSig = carKey + ":" + myTeam() + ":" + course;
-  scene.remove(car); car = makeCar(carKey); scene.add(car);
+  BT.lobbyCarSig = garage.key + ":" + myTeam() + ":" + course;
+  scene.remove(car); car = makeCar(garage.key); scene.add(car);
   car.visible = !!me && me.team !== "spec";
   resetCar(); updateCar(0);
 }
@@ -4493,8 +4548,8 @@ function renderLobby() {
     " (" + specs.length + "/" + BATTLE.specMax + ")");
   $("btnJoinSpec").hidden = me.team === "spec"; $("btnJoinSpec").disabled = !canMoveTo("spec");
   $("lobbyCarBox").hidden = me.team === "spec";
-  markCarButtons();
-  if (BT.lobbyCarSig !== carKey + ":" + me.team + ":" + course) showLobbyCar();
+  carPicker.mark();
+  if (BT.lobbyCarSig !== garage.key + ":" + me.team + ":" + course) showLobbyCar();
   const ok = humanRacerReady(), full = !!racerOf("left") && !!racerOf("right");
   let hint = ok ? nickOf(racerOf("left")) + " vs " + nickOf(racerOf("right")) + " · " + TRACKS[BT.course].name
     : full ? "사람이 한 명은 왼쪽이나 오른쪽 자리에 있어야 시작할 수 있어요."
@@ -4546,7 +4601,7 @@ function startMatchLocal() {
   if (BT.course !== course) showCourse(BT.course);
   releaseGhostCar();
   ghostPlay = null; ghostLabel = "";
-  scene.remove(car); car = makeCar(carKey); scene.add(car); car.visible = !BT.spec;
+  scene.remove(car); car = makeCar(garage.key); scene.add(car); car.visible = !BT.spec;
   resetCar(); P.lap = 0; P.expected = 0; lapTimes = []; lapStartMs = 0; raceBest = 0; renderHudBest();
   BT.match = { startAt: BT.startAt, firstFinAt: 0, humansAtStart: { left: humansOnSide("left"), right: humansOnSide("right") } };
   BT.statusSent = ""; BT.sent = ""; BT.lastNet = 0; BT.forceNet = true;
