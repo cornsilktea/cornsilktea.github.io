@@ -416,34 +416,56 @@ class WbGameUi {
         this.button = new WbActionButton(onAction);
     }
 }
+class WbEmptyMapSource {
+    constructor(seed) {
+        this.tick = 0;
+        this.tickTime = 0;
+        this.mode = "solo";
+        this.players = [];
+        this.balloons = [];
+        this.floor = new Map();
+        const engine = new WbEngine({ seed, lootSeed: seed ^ 0x1007, mode: this.mode, teams: WbRosterPlanner.allBots(this.mode, WbEmptyMapSource.LAYOUT_PLAYERS) });
+        this.grid = engine.grid;
+        this.wetUntil = engine.wetUntil;
+        this.sudden = engine.sudden;
+    }
+}
+WbEmptyMapSource.LAYOUT_PLAYERS = 4;
 class WbMenuBackdrop {
     constructor(world) {
         this.world = world;
-        this.driver = null;
+        this.showing = false;
         this.angle = 0;
+        this.mapLeft = 0;
+        this.mapIndex = Math.floor(Math.random() * WbMapCatalog.THEMES.length);
         this.seed = Math.floor(Math.random() * 1e9);
     }
-    stop() { if (this.driver) {
+    stop() { if (this.showing) {
         this.world.clear();
-        this.driver = null;
+        this.showing = false;
     } }
     frame(dt, nowMs) {
-        if (!this.driver || this.driver.engine.ended) {
-            this.seed = (this.seed + 1) >>> 0;
-            this.driver = new WbWatchDriver("solo", WbMenuBackdrop.BOTS, "normal", this.seed, "classroom");
-            this.world.show(WbMapCatalog.find("classroom"), this.driver.engine, this.driver.looks);
-            this.world.playing = false;
-        }
-        this.world.react(this.driver.update(dt, nowMs), nowMs);
+        this.mapLeft -= dt;
+        if (!this.showing || this.mapLeft <= 0)
+            this.nextMap();
         this.angle += dt * WbMenuBackdrop.SPIN;
         this.world.render(dt, nowMs);
         this.world.rig.orbit(this.angle, WbMenuBackdrop.RADIUS, WbMenuBackdrop.HEIGHT);
+    }
+    nextMap() {
+        if (this.showing)
+            this.mapIndex = (this.mapIndex + 1) % WbMapCatalog.THEMES.length;
+        this.seed = (this.seed + 1) >>> 0;
+        this.world.show(WbMapCatalog.THEMES[this.mapIndex], new WbEmptyMapSource(this.seed), []);
+        this.world.playing = false;
+        this.showing = true;
+        this.mapLeft = WbMenuBackdrop.MAP_SECONDS;
     }
 }
 WbMenuBackdrop.RADIUS = 34;
 WbMenuBackdrop.HEIGHT = 30;
 WbMenuBackdrop.SPIN = 0.05;
-WbMenuBackdrop.BOTS = 4;
+WbMenuBackdrop.MAP_SECONDS = 24;
 class WbLobbyView {
     constructor() {
         this.onSeat = () => undefined;

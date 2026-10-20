@@ -414,30 +414,56 @@ class WbGameUi {
   }
 }
 
+class WbEmptyMapSource implements WbSceneSource {
+  static readonly LAYOUT_PLAYERS = 4;
+  readonly tick = 0;
+  readonly tickTime = 0;
+  readonly mode: WbMode = "solo";
+  readonly grid: WbGrid;
+  readonly players: readonly WbActorSource[] = [];
+  readonly balloons: readonly WbBalloonSource[] = [];
+  readonly floor: ReadonlyMap<number, WbFloorItem> = new Map();
+  readonly wetUntil: ArrayLike<number>;
+  readonly sudden: WbSuddenDeath;
+
+  constructor(seed: number) {
+    const engine = new WbEngine({ seed, lootSeed: seed ^ 0x1007, mode: this.mode, teams: WbRosterPlanner.allBots(this.mode, WbEmptyMapSource.LAYOUT_PLAYERS) });
+    this.grid = engine.grid;
+    this.wetUntil = engine.wetUntil;
+    this.sudden = engine.sudden;
+  }
+}
+
 class WbMenuBackdrop {
   static readonly RADIUS = 34;
   static readonly HEIGHT = 30;
   static readonly SPIN = 0.05;
-  static readonly BOTS = 4;
-  private driver: WbWatchDriver | null = null;
+  static readonly MAP_SECONDS = 24;
+  private showing = false;
   private angle = 0;
+  private mapLeft = 0;
+  private mapIndex = Math.floor(Math.random() * WbMapCatalog.THEMES.length);
   private seed = Math.floor(Math.random() * 1e9);
 
   constructor(private readonly world: WbWorldView) {}
 
-  stop(): void { if (this.driver) { this.world.clear(); this.driver = null; } }
+  stop(): void { if (this.showing) { this.world.clear(); this.showing = false; } }
 
   frame(dt: number, nowMs: number): void {
-    if (!this.driver || this.driver.engine.ended) {
-      this.seed = (this.seed + 1) >>> 0;
-      this.driver = new WbWatchDriver("solo", WbMenuBackdrop.BOTS, "normal", this.seed, "classroom");
-      this.world.show(WbMapCatalog.find("classroom"), this.driver.engine, this.driver.looks);
-      this.world.playing = false;
-    }
-    this.world.react(this.driver.update(dt, nowMs), nowMs);
+    this.mapLeft -= dt;
+    if (!this.showing || this.mapLeft <= 0) this.nextMap();
     this.angle += dt * WbMenuBackdrop.SPIN;
     this.world.render(dt, nowMs);
     this.world.rig.orbit(this.angle, WbMenuBackdrop.RADIUS, WbMenuBackdrop.HEIGHT);
+  }
+
+  private nextMap(): void {
+    if (this.showing) this.mapIndex = (this.mapIndex + 1) % WbMapCatalog.THEMES.length;
+    this.seed = (this.seed + 1) >>> 0;
+    this.world.show(WbMapCatalog.THEMES[this.mapIndex], new WbEmptyMapSource(this.seed), []);
+    this.world.playing = false;
+    this.showing = true;
+    this.mapLeft = WbMenuBackdrop.MAP_SECONDS;
   }
 }
 
