@@ -2996,6 +2996,23 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "40판 모두 3번 AI 가 전사, 사람 선택은 그대로");
   });
 
+  run(AIMG, "AI 드래프트: 남은 전사가 없으면 1번·3번 AI 도 남은 캐릭터 중 무작위로 고르는가", function (done) {
+    var bad = [], seen = {};
+    withDraft(POSITIONS, function (S) {
+      var d = startDraft(S);
+      var noFighters = DR.draftLeft(d).filter(function (c) { return api.CHARS[c].role !== "fighter"; });
+      for (var seed = 1; seed <= 40; seed++) withSeed(seed, function () {
+        ["b1", "b3"].forEach(function (k) {
+          var c = api.DRAFT_AI.choose(d, "p" + k, noFighters);
+          if (noFighters.indexOf(c) < 0) bad.push(k + " 가 남은 목록 밖의 " + c + " 를 고름");
+          seen[api.CHARS[c] && api.CHARS[c].role] = true;
+        });
+      });
+    });
+    if (Object.keys(seen).length < 3) bad.push("고른 직업군이 " + Object.keys(seen).join(","));
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "전사 없는 목록에서 " + Object.keys(seen).length + "개 직업군을 무작위로 고름");
+  });
+
   run(AIMG, "AI 드래프트 순서: 1번 픽은 전사, 2번 픽은 무작위, 3번 픽은 앞이 전사 2명이면 원거리 딜러·전사 1명이면 무작위인가", function (done) {
     var bad = [], second = {}, thirdMixed = {}, twoFighters = 0;
     function roleAt(d, k) { return api.CHARS[d.picks["p" + k]].role; }
