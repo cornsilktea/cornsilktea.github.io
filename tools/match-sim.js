@@ -55,7 +55,12 @@ class MockServer {
     this.listeners = this.listeners.filter((l) => l.client !== client);
     this.notify();
   }
-  database(client) { return { ref: (p) => new MockRef(this, client, Util.split(p).join("/")) }; }
+  database(client) {
+    return { ref: (p) => {
+      if (typeof p !== "string" || p === "") throw new Error("실제 Firebase 처럼 빈 경로는 거절");
+      return new MockRef(this, client, Util.split(p).join("/"));
+    } };
+  }
 }
 
 class MockRef {

@@ -425,7 +425,7 @@ class MkQueue {
         ref.onDisconnect().remove();
         await ref.set(entry);
         await party.markSearching(since);
-        this.watch(party.code);
+        this.watch(party);
     }
     // 내 항목을 실제로 뺐을 때만 true. 누가 묶어 가는 중(claim)이거나 이미 묶여 빠졌으면 false — 곧 표가 온다.
     async cancel(party) {
@@ -465,17 +465,28 @@ class MkQueue {
             this.listener = null;
         }
     }
-    watch(myCode) {
+    watch(party) {
+        const myCode = party.code;
         this.stop();
         this.active = true;
         this.listener = this.database.ref(this.paths.queue).on("value", (snapshot) => {
             this.entries = snapshot.val();
-            if (this.entries && !this.entries[myCode]) {
+            if (!this.entries || !this.entries[myCode]) {
                 this.stop();
+                this.recoverIfLost(party);
                 return;
             }
             this.consider(myCode);
         });
+    }
+    // 내 항목이 표 없이 사라지면(묶던 사람이 표를 못 나눠 줌·연결 끊김) "찾는 중"에 갇히지 않게 잠시 뒤 풀어 준다.
+    recoverIfLost(party) {
+        setTimeout(() => {
+            if (this.active || !party.searching() || party.ticket())
+                return;
+            party.markSearching(null).catch(() => undefined);
+            this.onError("매칭이 끊겼어요. 다시 매칭 시작을 눌러 주세요.");
+        }, MkQueue.LOST_GRACE_MS);
     }
     consider(myCode) {
         if (!this.active)
@@ -579,7 +590,16 @@ class MkQueue {
             updates[this.paths.party(group.code) + "/match"] = ticket;
             updates[this.paths.party(group.code) + "/search"] = null;
         });
-        await this.database.ref("").update(updates);
+        // 실제 Firebase 는 ref("") 를 잘못된 경로로 거절한다. 루트는 "/" 로 연다.
+        try {
+            await this.database.ref("/").update(updates);
+        }
+        catch (error) {
+            if (this.maker.discard)
+                await this.maker.discard(made).catch(() => undefined);
+            this.onError("상대에게 경기장을 알리지 못했어요. 다시 매칭해 주세요.");
+            return true;
+        }
         this.onBound(plan);
         return true;
     }
@@ -598,6 +618,7 @@ class MkQueue {
     }
 }
 MkQueue.RETRY_MS = 250;
+MkQueue.LOST_GRACE_MS = 4000;
 // 연승 표시 버튼. 누르면 이 팀 대기실의 모든 전적 창을 띄운다.
 class MkStreakButton {
     constructor(host, showRank) {
