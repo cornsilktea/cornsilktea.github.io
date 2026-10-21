@@ -4,6 +4,7 @@
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="teambattle"></script>
 <script charset="utf-8" src="fullscreen-keeper.js"></script>
+<script charset="utf-8" src="match-kit.js?v=20261021c"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>3v3 팀 배틀 아레나</title>
@@ -24,7 +25,7 @@
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
 } }
 </script>
-<link rel="stylesheet" href="30.team-battle-arena.css?v=20261019b">
+<link rel="stylesheet" href="30.team-battle-arena.css?v=20261021">
 </head>
 <body>
 <canvas id="cv"></canvas>
@@ -39,10 +40,11 @@
     <div class="card">
       <h1 class="titleMain"><span class="tb">3v3</span> 팀 배틀 <span class="tr">아레나</span></h1>
       <div class="hello startHello">내 닉네임: <b id="helloNick"></b> <button class="mini" type="button" data-maker-open>✏️ 닉네임 설정</button></div>
-      <button id="btnCreate" class="big primary" type="button">방 만들기</button>
+      <button id="btnCreate" class="big primary" type="button">게임 만들기</button>
+      <button id="btnRandom" class="big primary" type="button">랜덤 매칭 방 만들기</button>
       <div id="joinBox">
         <div class="row">
-          <input id="joinCode" inputmode="numeric" pattern="[0-9]*" maxlength="5" placeholder="방 코드 5자리" autocomplete="off">
+          <input id="joinCode" inputmode="numeric" pattern="[0-9]*" maxlength="5" placeholder="방·팀 코드 5자리" autocomplete="off">
           <button id="btnJoin" class="primary" type="button">입장하기</button>
         </div>
       </div>
@@ -89,6 +91,7 @@
     <div class="card">
       <div class="startRow"><button id="btnStart" class="big primary" type="button" hidden>게임 시작</button><button id="btnSwapTeams" class="big swapBtn" type="button" hidden>팀 전환</button></div>
       <div id="startHint" class="startHint"></div>
+      <div id="lobbyMatchNote" class="mk-notice">매칭됐어요! 모두 모이면 대회모드로 바로 시작해요.</div>
     </div>
 
     <div class="card lobbyKeys">
@@ -103,6 +106,25 @@
   <div id="charCardBox" class="card charCol">
     <div class="secTitle charHead"><span>캐릭터<span id="charHint" class="secHint">선택한 캐릭터를 한 번 더 누르면 자세한 설명이 나와요.</span></span><span class="charBtns"><button id="btnStats" class="mini" type="button">통계</button><button id="btnZoomChars" class="mini" type="button">확대</button><button id="btnFlipAll" class="mini" type="button">모든 카드 뒤집기</button></span></div>
     <div class="chars" id="chars"></div>
+  </div>
+  </div>
+</div>
+
+<div id="scrParty" class="screen" hidden>
+  <div id="partyCols" class="lobbyCols">
+  <div class="wrap">
+    <div class="card">
+      <div class="hello startHello">내 닉네임: <b id="partyNick"></b> <button class="mini" type="button" data-maker-open>✏️ 닉네임 설정</button></div>
+      <div id="partyMount"></div>
+    </div>
+    <div class="card lobbyKeys">
+      <div class="secTitle">조작 방법</div>
+      <div class="keys">
+        <span><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd></span><span>이동</span>
+        <span><kbd>J</kbd> <kbd>K</kbd></span><span><b>J</b> 스킬 · <b>K</b> 기본 공격 — 누르면 자동 조준</span>
+        <span><kbd>터치</kbd></span><span>조이스틱으로 수동 조준</span>
+      </div>
+    </div>
   </div>
   </div>
 </div>
@@ -163,6 +185,7 @@
       <div id="endTitle"></div>
       <div id="endReason" hidden></div>
       <div id="endStats" hidden></div>
+      <div id="endStreak" class="mk-notice"></div>
       <div class="scoreRow"><div class="sb">블루팀<b id="endBlue">0</b></div><div class="sr">레드팀<b id="endRed">0</b></div></div>
       <div class="boardWrap"><table class="board"><thead><tr><th>팀</th><th class="nm">닉네임</th><th class="nm">직업</th><th>처치</th><th>쓰러짐</th><th>어시스트</th><th>입힌 피해</th><th>회복</th><th>막은 피해</th><th>기절</th><th>둔화</th><th>환산점수<button id="btnScoreHelp" class="scoreHelp" type="button" aria-label="환산점수 계산식">?</button></th></tr></thead><tbody id="boardBody"></tbody></table></div>
       <div class="endBtns"><button id="btnAgain" class="primary" type="button">다시하기</button><button id="btnLeaveEnd" type="button">방 나가기</button></div>
@@ -734,9 +757,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     bindProfileEvents() { var services = this.services;
       document.addEventListener(PlayerProfile.CHANGE_EVENT, function () { services.nick.refreshNick(); });
-      document.addEventListener(PlayerProfile.SETTLED_EVENT, function () { services.nick.refreshNick(); services.nick.pushToRoom(); });
+      document.addEventListener(PlayerProfile.SETTLED_EVENT, function () { services.nick.refreshNick(); services.nick.pushToRoom(); services.randomMatch.updateMe(); });
     }
-    refreshNick() { Dom.setText(Dom.$("helloNick"), this.name); Dom.setText(Dom.$("lobbyNick"), this.name); }
+    refreshNick() { Dom.setText(Dom.$("helloNick"), this.name); Dom.setText(Dom.$("lobbyNick"), this.name); Dom.setText(Dom.$("partyNick"), this.name); }
     pushToRoom() { var services = this.services;
       if (this.name && services.session.room && services.session.players[services.session.myId]) services.session.room.ref.child("players/" + services.session.myId + "/nickname").set(this.name);
     }
@@ -881,6 +904,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.session.sweep().then(function () { tryCode(0); });
       function tryCode(n) {
         var code = String(10000 + Math.floor(Math.random() * 90000));
+        services.randomMatch.codeTaken(code).then(function (taken) { if (taken && n < 8) tryCode(n + 1); else claim(code, n); });
+      }
+      function claim(code, n) {
         var t = services.clock.now();
         var me = services.session.newPlayer("blue", t);
         var obj = { mode: "pvp", map: "forest", arena: "forest", status: "lobby", hostPlayerId: services.session.myId, createdAt: t, winner: null, players: {} };
@@ -1029,12 +1055,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         });
       }).catch(function () {});
       services.resume.clearResume(); services.seats.forget();
-      services.session.room = null; services.session.resetLocal(); services.screens.showScreen("start"); services.lobby.startMsg("");
+      services.session.room = null; services.session.resetLocal(); services.randomMatch.roomClosed("");
     }
     exitToStart(msg) { var services = this.services;
       services.resume.clearResume();
       if (services.session.room) { services.session.leaving = true; services.session.unsubAll(); try { services.session.room.ref.child("players/" + services.session.myId).onDisconnect().cancel(); } catch (e) {} }
-      services.session.room = null; services.session.resetLocal(); services.screens.showScreen("start"); services.lobby.startMsg(msg || "");
+      services.session.room = null; services.session.resetLocal(); services.randomMatch.roomClosed(msg || "");
     }
     resetLocal() { var services = this.services; services.fxView.clear3d(); services.session.players = {}; services.match.leave(); services.input.reset(); services.flow.specHeld = false; Dom.setText(Dom.$("btnAgain"), "다시하기"); }
     bindLifecycle() { var services = this.services;
@@ -1178,19 +1204,19 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     constructor(services) { this.services = services; this.queued = false; this.hintUntil = 0; this.hintText = ""; }
     startMsg(t) { Dom.setText(Dom.$("startMsg"), t || ""); }
     placeCharBox(k) { var services = this.services;
-      var cols = Dom.$(k === "start" ? "startCols" : "lobbyCols"), box = Dom.$("charCardBox");
+      var cols = Dom.$(k === "start" ? "startCols" : k === "party" ? "partyCols" : "lobbyCols"), box = Dom.$("charCardBox");
       if (box.parentNode !== cols) cols.appendChild(box);
-      if (k === "start") services.lobby.renderStartChars();
+      if (k === "start" || k === "party") services.lobby.renderStartChars();
     }
-    charsViewOnly() { var services = this.services; return services.screens.now === "start" || !!(services.session.room && services.session.room.mode === "cup"); }
+    charsViewOnly() { var services = this.services; return services.screens.now === "start" || services.screens.now === "party" || !!(services.session.room && services.session.room.mode === "cup"); }
     renderStartChars() { var services = this.services;
       Dom.show(Dom.$("charCardBox"), true);
-      Dom.setText(Dom.$("charHint"), "카드를 누르면 자세한 설명이 나와요.");
+      Dom.setText(Dom.$("charHint"), services.screens.now === "party" ? "대회모드에서는 게임 시작 후 캐릭터를 골라요. 카드를 누르면 자세한 설명이 나와요." : "카드를 누르면 자세한 설명이 나와요.");
       Dom.setHtmlKeepScroll(Dom.$("chars"), services.cards.cardsHtml({}, true)); services.cards.fitCardHeight(); services.cards.fitCharCol(Dom.$("charCardBox"));
     }
     playersChanged() { var services = this.services;
       if (services.lobby.queued) return; services.lobby.queued = true;
-      setTimeout(function () { services.lobby.queued = false; services.lobby.renderLobby(); }, 0);
+      setTimeout(function () { services.lobby.queued = false; services.lobby.renderLobby(); services.randomMatch.roomChanged(); }, 0);
     }
     flashHint(t) { var services = this.services; services.lobby.hintText = t; services.lobby.hintUntil = Date.now() + 2500; services.lobby.renderLobby(); setTimeout(function () { services.lobby.renderLobby(); }, 2600); }
     mapChoices(mode) {
@@ -1289,12 +1315,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     showScreen(k) { var services = this.services;
       var prev = services.screens.now;
       services.screens.now = k;
-      Dom.show(Dom.$("scrStart"), k === "start"); Dom.show(Dom.$("scrLobby"), k === "lobby"); Dom.show(Dom.$("scrDraft"), k === "draft"); Dom.show(Dom.$("scrGame"), k === "game");
+      Dom.show(Dom.$("scrStart"), k === "start"); Dom.show(Dom.$("scrLobby"), k === "lobby"); Dom.show(Dom.$("scrDraft"), k === "draft"); Dom.show(Dom.$("scrGame"), k === "game"); Dom.show(Dom.$("scrParty"), k === "party");
       var guardHome = document.querySelector("[data-guard-home]");
       if (guardHome) guardHome.style.display = k === "game" || k === "draft" ? "none" : "";
       if (k === "game") services.cameraRig.resize();
       if (k !== prev || (k !== "lobby" && k !== "start")) services.cards.setCharZoom(false);
-      if (k === "start" || k === "lobby") services.lobby.placeCharBox(k);
+      if (k === "start" || k === "lobby" || k === "party") services.lobby.placeCharBox(k);
       if (k !== "start" && k !== "lobby") { Dom.show(Dom.$("statsModal"), false); }
       if (k !== "lobby") Dom.show(Dom.$("mapViewModal"), false);
       if (k !== "game") Dom.show(Dom.$("pcModal"), false);
@@ -1481,7 +1507,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     onCardClick(e) { var services = this.services;
       var b = e.target.closest ? e.target.closest(".charCard") : null;
-      var onStart = services.screens.now === "start";
+      var onStart = services.screens.now === "start" || services.screens.now === "party";
       if (!b || b.disabled || (!onStart && (!services.session.room || services.session.room.status !== "lobby"))) return;
       var c = b.getAttribute("data-c");
       var me = onStart ? {} : services.session.players[services.session.myId]; if (!me) return;
@@ -3503,6 +3529,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (services.session.room.status === "ended" && services.session.room.endedAt && t - services.session.room.endedAt > 300000) services.session.room.ref.remove();
     }
     onEnded() { var services = this.services;
+      services.randomMatch.matchEnded();
       if (!services.match.game) return;
       services.match.game.forceNet = true;
       try { services.netstate.netWrite(true); } catch (e) {}
@@ -8966,6 +8993,107 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     };
     }
   }
+  class ArenaRandomMatch {
+    static PARTY_LIMIT = MatchRules.TEAM_MAX;
+    static SIDE_TEAMS = ["blue", "red"];
+    static RESULT_TRIES = 20;
+    static RESULT_RETRY_MS = 300;
+    constructor(services) { this.services = services; this.flow = null; this.quiet = false; }
+    ready() { var services = this.services;
+      if (this.flow || !services.backend.db) return this.flow;
+      var options = { gameRoot: "teambattle", queue: "teambattle", partyLimit: ArenaRandomMatch.PARTY_LIMIT, matcher: new MkVersusMatcher(ArenaRandomMatch.PARTY_LIMIT), allowBots: true,
+        intro: "팀을 짜고(빈 자리는 🤖 AI 추가) 매칭 시작을 누르면 아무 팀과 3대3 대회모드로 만나요. 맵은 무작위예요." };
+      var panel = new MkPartyPanel(Dom.$("scrParty"), Dom.$("partyMount"), options);
+      this.flow = new MkRandomFlow(services.backend.db, { now: function () { return services.clock.now(); } }, services.session.myId, options, this, panel);
+      return this.flow;
+    }
+    ticket() { return this.flow ? this.flow.ticket() : null; }
+    inParty() { return !!this.flow && this.flow.inParty(); }
+    open() { var services = this.services, flow = this.ready();
+      if (!flow) { services.lobby.startMsg("온라인 연결을 할 수 없어요. (firebase-config.js·인터넷 확인)"); return; }
+      Dom.$("btnRandom").disabled = true; services.lobby.startMsg("");
+      flow.create().then(function (msg) { services.lobby.startMsg(msg); }, function () { services.lobby.startMsg("랜덤 매칭 방을 만들지 못했어요. (데이터베이스 규칙을 확인해 주세요)"); })
+        .then(function () { Dom.$("btnRandom").disabled = false; });
+    }
+    joinByCode() { var services = this.services, flow = this.ready();
+      var code = Dom.$("joinCode").value.replace(/\D/g, "");
+      if (!flow || code.length !== 5) { services.session.joinRoom(); return; }
+      Dom.$("btnJoin").disabled = true;
+      flow.tryJoin(code).then(function (r) {
+        Dom.$("btnJoin").disabled = false;
+        if (r.handled) services.lobby.startMsg(r.message); else services.session.joinRoom();
+      }, function () { Dom.$("btnJoin").disabled = false; services.session.joinRoom(); });
+    }
+    codeTaken(code) { var flow = this.ready(); return flow ? flow.codeTaken(code).catch(function () { return false; }) : Promise.resolve(false); }
+    updateMe() { if (this.flow) this.flow.updateMe(); }
+    member() { var services = this.services; return { nick: services.nick.name || "학생", joinedAt: services.clock.now(), look: null }; }
+    create(plan) { var services = this.services, myId = services.session.myId;
+      var t = services.clock.now(), arena = MapCatalog.IDS[plan.seed % MapCatalog.IDS.length], assign = {}, players = {};
+      plan.groups.forEach(function (g) {
+        var team = ArenaRandomMatch.SIDE_TEAMS[g.side], people = MkSeatAssign.peopleOf(g).slice(0, ArenaRandomMatch.PARTY_LIMIT);
+        people.forEach(function (id) { assign[id] = team; });
+        if (people.indexOf(myId) >= 0) players[myId] = services.session.newPlayer(team, t, players);
+        for (var n = people.length; n < ArenaRandomMatch.PARTY_LIMIT; n++) {
+          var free = services.charTypes.list.filter(function (c) { return !services.roster.takenInMatch(players, team, c); });
+          players["ai" + Math.random().toString(36).slice(2, 10)] = { nickname: services.roster.freeAiName(players), isAI: true, team: team, characterType: MathKit.pick(free.length ? free : services.charTypes.list), joinedAt: t + n };
+        }
+      });
+      var obj = { mode: "cup", map: arena, arena: arena, status: "lobby", hostPlayerId: myId, createdAt: t, winner: null, players: players, assign: assign, matchId: plan.matchId };
+      var self = this;
+      return services.session.sweep().then(function () { return self.claimRoom(obj, 0); }).then(function (code) { return code ? { room: code, host: myId, map: MapCatalog.of(arena).name } : null; });
+    }
+    claimRoom(obj, n) { var services = this.services, self = this;
+      if (n >= 8) return Promise.resolve(null);
+      var code = String(10000 + Math.floor(Math.random() * 90000));
+      return this.flow.codeTaken(code).then(function (taken) {
+        if (taken) return self.claimRoom(obj, n + 1);
+        return services.backend.db.ref(RoomSession.ROOT + "/" + code).transaction(function (cur) { return cur === null ? obj : undefined; })
+          .then(function (res) { return res.committed ? code : self.claimRoom(obj, n + 1); });
+      });
+    }
+    discard(made) { return this.services.backend.db.ref(RoomSession.ROOT + "/" + made.room).remove(); }
+    enterRoom(ticket, hosting) { var services = this.services, myId = services.session.myId;
+      var ref = services.backend.db.ref(RoomSession.ROOT + "/" + ticket.room), self = this;
+      function enter() { document.body.classList.add("mkMatched"); services.session.enterRoom(ticket.room); return true; }
+      if (hosting) return Promise.resolve(enter());
+      return Promise.all(["players", "status", "assign/" + myId].map(function (k) { return ref.child(k).once("value"); })).then(function (a) {
+        var players = a[0].val(), team = a[2].val();
+        if (!players || a[1].val() !== "lobby" || !team) return false;
+        return ref.child("players/" + myId).set(services.session.newPlayer(team, services.clock.now(), players)).then(enter);
+      });
+    }
+    leaveRoom() { var services = this.services;
+      if (!services.session.room) return;
+      this.quiet = true;
+      try { services.session.leaveRoom(); } finally { this.quiet = false; }
+    }
+    roomClosed(msg) { var services = this.services;
+      document.body.classList.remove("mkMatched");
+      Dom.setText(Dom.$("endStreak"), "");
+      if (this.quiet) return;
+      if (this.inParty()) { this.flow.backToParty(msg); return; }
+      services.screens.showScreen("start"); services.lobby.startMsg(msg);
+    }
+    startMatch() { this.services.launcher.startGame(); }
+    showParty() { var services = this.services; services.screens.showScreen("party"); services.nick.refreshNick(); }
+    showStart(message) { var services = this.services; services.screens.showScreen("start"); services.lobby.startMsg(message); }
+    roomChanged() { var services = this.services;
+      if (!this.flow || !services.session.room) return;
+      var humans = services.session.humans(services.session.players).filter(function (id) { return services.roster.isPlayingTeam(services.session.players[id].team); }).length;
+      this.flow.roomChanged(humans, services.session.isHost(), services.session.room.status === "lobby");
+    }
+    matchEnded() { this.reportWhenDecided(ArenaRandomMatch.RESULT_TRIES); }
+    reportWhenDecided(triesLeft) { var services = this.services, self = this, ticket = this.ticket();
+      if (!ticket || !services.session.room || services.session.room.status !== "ended") return;
+      Dom.setText(Dom.$("btnLeaveEnd"), "팀 대기실로");
+      var winner = services.session.room.winner;
+      if (!winner) { if (triesLeft > 0) setTimeout(function () { self.reportWhenDecided(triesLeft - 1); }, ArenaRandomMatch.RESULT_RETRY_MS); return; }
+      var mine = ArenaRandomMatch.SIDE_TEAMS[ticket.side];
+      var showStreak = function () { Dom.setText(Dom.$("endStreak"), self.flow.endHint()); };
+      showStreak();
+      this.flow.matchEnded({ result: winner === "draw" ? "draw" : winner === mine ? "win" : "lose" }, showStreak);
+    }
+  }
   class ServiceBuilder {
     build() { var services = new Services();
       services.catalog = new CharCatalog(services);
@@ -9058,6 +9186,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.loop = new GameLoop(services);
       services.world = new WorldStepper(services);
       services.testBridge = new TestBridge(services);
+      services.randomMatch = new ArenaRandomMatch(services);
      return services; }
   }
   class ServiceBoot {
@@ -9117,10 +9246,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     Dom.$("mapBtns").onclick = services.lobby.choiceClick(services.roster.setMapChoice.bind(services.roster));
     Dom.$("btnLeaveLobby").onclick = services.session.leaveRoom.bind(services.session);
     Dom.$("btnLeaveGame").onclick = function () { if (confirm("방을 나갈까요?")) services.session.leaveRoom(); };
-    Dom.$("btnLeaveEnd").onclick = services.session.leaveRoom.bind(services.session);
+    Dom.$("btnLeaveEnd").onclick = function () { Dom.setText(Dom.$("btnLeaveEnd"), "방 나가기"); services.session.leaveRoom(); };
     Dom.$("btnCreate").onclick = function () { services.sound.audio(); if (services.nick.askFirst()) services.session.createRoom(); };
-    Dom.$("btnJoin").onclick = function () { services.sound.audio(); if (services.nick.askFirst()) services.session.joinRoom(); };
-    Dom.$("joinCode").onkeydown = function (e) { if (e.key === "Enter" && services.nick.askFirst()) services.session.joinRoom(); };
+    Dom.$("btnJoin").onclick = function () { services.sound.audio(); if (services.nick.askFirst()) services.randomMatch.joinByCode(); };
+    Dom.$("joinCode").onkeydown = function (e) { if (e.key === "Enter" && services.nick.askFirst()) services.randomMatch.joinByCode(); };
+    Dom.$("btnRandom").onclick = function () { services.sound.audio(); if (services.nick.askFirst()) services.randomMatch.open(); };
     Dom.$("btnStart").onclick = function () { services.launcher.startGame(); };
     }
   }

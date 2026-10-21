@@ -518,3 +518,9 @@
     .dfCard { flex-basis: 84px; }
     .dfChars .roleTag { flex-basis: 58px; }
   }
+  #scrParty { --st-accent: var(--sg-primary); --st-accent-ink: #fff; --st-title: #F4F1E8; --st-ink: var(--sg-ink); --st-ink-mid: var(--sg-ink-mid); --st-ink-soft: var(--sg-ink-soft); --st-bg: 16, 24, 19; --st-panel: var(--sg-panel); }
+  #scrParty .mk-head { font-size: 20px; font-weight: 800; margin: 0 0 6px; }
+  #lobbyMatchNote, #endStreak:empty { display: none; }
+  body.mkMatched #lobbyMatchNote { display: block; }
+  body.mkMatched #scrLobby .optRows, body.mkMatched #btnMapView, body.mkMatched #btnStart, body.mkMatched #btnSwapTeams, body.mkMatched #scrLobby .join, body.mkMatched #btnSpec,
+  body.mkMatched #scrLobby .addAi, body.mkMatched #scrLobby .aiDel, body.mkMatched #btnAgain { display: none !important; }
