@@ -2971,6 +2971,31 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "네 직업군 모두 뽑힘");
   });
 
+  run(AIMG, "AI 드래프트 순서: 1번 픽은 전사, 2번 픽은 무작위, 3번 픽은 앞이 전사 2명이면 원거리 딜러·전사 1명이면 무작위인가", function (done) {
+    var bad = [], second = {}, thirdMixed = {}, twoFighters = 0;
+    function roleAt(d, k) { return api.CHARS[d.picks["p" + k]].role; }
+    for (var seed = 1; seed <= 150 && bad.length < 3; seed++) {
+      withDraft(POSITIONS, function (S) {
+        withSeed(seed, function () {
+          startDraft(S); autoPlay(S);
+          var d = S.room.draft;
+          if (!DR.draftDone(d)) { bad.push("시드 " + seed + ": 끝나지 않음"); return; }
+          ["b", "r"].forEach(function (side) {
+            var r1 = roleAt(d, side + "1"), r2 = roleAt(d, side + "2"), r3 = roleAt(d, side + "3");
+            if (r1 !== "fighter") bad.push("시드 " + seed + ": " + side + "1 이 " + r1);
+            second[r2] = true;
+            if (r2 === "fighter") { twoFighters++; if (r3 !== "shooter") bad.push("시드 " + seed + ": " + side + " 앞 전사 2명인데 3번 픽 " + r3); }
+            else thirdMixed[r3] = true;
+          });
+        });
+      });
+    }
+    if (Object.keys(second).length < 3) bad.push("2번 픽 직업군이 " + Object.keys(second).join(","));
+    if (Object.keys(thirdMixed).length < 3) bad.push("전사+다른 직업 뒤 3번 픽 직업군이 " + Object.keys(thirdMixed).join(","));
+    if (!twoFighters) bad.push("앞 전사 2명 경우가 한 번도 안 나옴");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "1번 픽 모두 전사, 2번 픽 " + Object.keys(second).length + "개 직업군, 앞 전사 2명 " + twoFighters + "번 모두 원거리 딜러, 그 밖의 3번 픽 " + Object.keys(thirdMixed).length + "개 직업군");
+  });
+
   run(AIMG, "전체화면: 터치로 손을 뗄 때만 전체화면을 요청하고, 이미 전체화면이거나 실패가 거듭되면 그만 요청하는가", function (done) {
     var asked = 0, rejected = false, onFlag = false, bad = [];
     var doc = { documentElement: { requestFullscreen: function () { asked++; return rejected ? Promise.reject(new Error("no")) : Promise.resolve(); } }, get fullscreenElement() { return onFlag ? {} : null; } };

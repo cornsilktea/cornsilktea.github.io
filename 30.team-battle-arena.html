@@ -1718,23 +1718,34 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
 
   class DraftAiPicker {
+    static FIGHTER = "fighter";
+    static SHOOTER = "shooter";
     constructor(services) { this.services = services; }
-    sideIds(d, side) { var services = this.services;
-      return Object.keys(d.seq || {}).filter(function (k) { return k.charAt(0) === side; }).map(function (k) { return d.seq[k]; }).filter(function (id) { return services.session.players[id]; });
+    seatOf(d, id) {
+      return Object.keys(d.seq || {}).filter(function (k) { return d.seq[k] === id; })[0] || null;
     }
-    sideHasFighter(d, side) { var services = this.services;
-      var picks = d.picks || {};
-      return services.draftAi.sideIds(d, side).some(function (id) { return picks[id] && services.charTypes.statsOf(picks[id]) && services.charTypes.statsOf(picks[id]).role === "fighter"; });
+    roleOf(charId) {
+      var stats = this.services.charTypes.statsOf(charId);
+      return stats ? stats.role : null;
     }
-    otherAiWaiting(d, side, id) { var services = this.services;
-      var picks = d.picks || {};
-      return services.draftAi.sideIds(d, side).some(function (o) { return o !== id && !picks[o] && services.session.players[o].isAI; });
+    earlierTeamRoles(d, seat) { var self = this;
+      var picks = d.picks || {}, side = seat.charAt(0), order = Number(seat.charAt(1));
+      return Object.keys(d.seq || {}).filter(function (k) { return k.charAt(0) === side && Number(k.charAt(1)) < order; })
+        .map(function (k) { return picks[d.seq[k]]; }).filter(Boolean).map(function (c) { return self.roleOf(c); });
     }
-    choose(d, id, left) { var services = this.services;
-      var side = services.draft.draftSideOf(d, id), fighters = left.filter(function (c) { return services.charTypes.statsOf(c).role === "fighter"; });
-      if (!side || !fighters.length || services.draftAi.sideHasFighter(d, side)) return MathKit.pick(left);
-      if (!services.draftAi.otherAiWaiting(d, side, id) || Math.random() < Draft.AI_FIGHTER_FIRST) return MathKit.pick(fighters);
-      return MathKit.pick(left);
+    wantedRole(d, seat) {
+      var order = Number(seat.charAt(1));
+      if (order === 1) return DraftAiPicker.FIGHTER;
+      if (order === 2) return null;
+      var fighters = this.earlierTeamRoles(d, seat).filter(function (r) { return r === DraftAiPicker.FIGHTER; }).length;
+      if (fighters >= 2) return DraftAiPicker.SHOOTER;
+      if (fighters === 0) return DraftAiPicker.FIGHTER;
+      return null;
+    }
+    choose(d, id, left) { var self = this;
+      var seat = this.seatOf(d, id), wanted = seat ? this.wantedRole(d, seat) : null;
+      var pool = wanted ? left.filter(function (c) { return self.roleOf(c) === wanted; }) : [];
+      return MathKit.pick(pool.length ? pool : left);
     }
   }
   class Draft {
@@ -1745,7 +1756,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static AI_TRADE_MS = 1200;
     static DENIED_SHOW_MS = 2000;
     static NO_BAN = "-";
-    static AI_FIGHTER_FIRST = 0.5;
     constructor(services) { this.services = services; this.view = null; this.busy = false; this.launched = 0; }
     stepSide(step) { return Draft.STEPS[step].keys[0].charAt(0); }
     draftStepIds(d, step) {
