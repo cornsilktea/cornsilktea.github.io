@@ -723,6 +723,362 @@ class MkQueue {
   }
 }
 
+// ───── 게임에 붙이는 부분: 팀 대기실 화면(MkPartyPanel)과 흐름(MkRandomFlow) ─────
+// 게임마다 다른 것(방 만들기·표로 입장·경기 시작·화면 전환)은 MkGameHooks 로 받고, 나머지
+// (팀 대기실 만들기·들어가기, 매칭 시작/취소, 표 받기, 모이면 시작, 결과 반영, 팀 대기실로 돌아오기)는 여기 한 곳에 둔다.
+
+interface MkGameHooks extends MkRoomMaker {
+  member(): MkMember;
+  enterRoom(ticket: MkTicket, hosting: boolean): Promise<boolean>;
+  leaveRoom(): void;
+  startMatch(): void;
+  showParty(): void;
+  showStart(message: string): void;
+}
+
+interface MkFlowOptions {
+  gameRoot: string;
+  queue: string;
+  partyLimit: number;
+  matcher: MkMatcher;
+  intro: string;
+  showRank?: boolean;
+  solo?: boolean;
+  allowBots?: boolean;
+  startWaitMs?: number;
+}
+
+interface MkPartyLookup {
+  handled: boolean;
+  message: string;
+}
+
+// 편(side)마다 자리 번호를 정해 준다. 일반 방에 assign/<id> 로 넣어 두면 들어오는 사람이 그 자리에 앉는다.
+class MkSeatAssign {
+  static bySide(plan: MkMatchPlan, perSide: number): Record<string, number> {
+    const assign: Record<string, number> = {};
+    plan.groups.forEach((group) => {
+      MkSeatAssign.peopleOf(group).slice(0, perSide).forEach((id, index) => { assign[id] = group.side * perSide + index; });
+    });
+    return assign;
+  }
+
+  static peopleOf(group: MkPlannedEntry): string[] {
+    const people = group.entry.people || {};
+    return Object.keys(people).sort((a, b) => people[a].joinedAt - people[b].joinedAt || (a < b ? -1 : 1));
+  }
+
+  static sideOf(plan: MkMatchPlan, id: string): number {
+    const group = plan.groups.find((item) => !!(item.entry.people || {})[id]);
+    return group ? group.side : -1;
+  }
+}
+
+class MkPartyPanel {
+  onMatch: () => void = () => undefined;
+  onLeave: () => void = () => undefined;
+  onAddBot: () => void = () => undefined;
+  onRemoveBot: () => void = () => undefined;
+  private readonly code: HTMLSpanElement;
+  private readonly head: HTMLHeadingElement;
+  private readonly seats: HTMLDivElement;
+  private readonly notice: HTMLDivElement;
+  private readonly matchButton: HTMLButtonElement;
+  private readonly hint: HTMLDivElement;
+  private readonly streak: MkStreakButton;
+
+  constructor(screen: HTMLElement, mount: HTMLElement, private readonly options: MkFlowOptions) {
+    this.streak = new MkStreakButton(screen, !!options.showRank);
+    this.head = document.createElement("h2");
+    this.head.className = "mk-head";
+    this.code = document.createElement("span");
+    this.code.className = "mk-code";
+    if (options.solo) this.head.append("랜덤 매칭 ", this.streak.element);
+    else this.head.append("팀 코드 ", this.code, this.streak.element);
+    this.seats = document.createElement("div");
+    this.seats.className = "mk-team";
+    this.seats.addEventListener("click", (event) => {
+      const seat = (event.target as HTMLElement).closest("[data-mk-seat]") as HTMLButtonElement | null;
+      if (!seat || seat.disabled) return;
+      if (seat.dataset.mkSeat === "bot") this.onRemoveBot();
+      if (seat.dataset.mkSeat === "empty") this.onAddBot();
+    });
+    this.notice = document.createElement("div");
+    this.notice.className = "mk-notice";
+    this.matchButton = MkPartyPanel.button("st-btn primary mk-match", "매칭 시작", () => this.onMatch());
+    this.hint = document.createElement("div");
+    this.hint.className = "st-hint mk-hint";
+    const leave = MkPartyPanel.button("st-btn mk-leave", options.solo ? "나가기" : "팀 나가기", () => this.onLeave());
+    mount.textContent = "";
+    mount.append(this.head, this.seats, this.notice, this.matchButton, this.hint, leave);
+  }
+
+  setNotice(text: string): void {
+    if (this.notice.textContent !== text) this.notice.textContent = text;
+  }
+
+  setBusy(busy: boolean): void {
+    this.matchButton.disabled = busy;
+  }
+
+  render(party: MkParty): void {
+    const leader = party.isLeader();
+    const searching = !!party.searching();
+    const book = party.book();
+    this.code.textContent = party.code;
+    this.streak.render(book);
+    this.seats.textContent = "";
+    const title = document.createElement("h3");
+    title.textContent = this.options.solo ? "나" : "우리 팀";
+    this.seats.appendChild(title);
+    const leaderId = party.record ? party.record.leaderId : "";
+    party.members().forEach(([id, member]) => {
+      const tags = [id === leaderId && !this.options.solo ? "팀장" : "", id === party.myId ? "나" : ""].filter(Boolean).join(" ");
+      this.seats.appendChild(MkPartyPanel.seat("div", "mk-seat" + (id === party.myId ? " me" : ""), member.nick, tags, ""));
+    });
+    const editable = leader && !searching;
+    if (this.options.allowBots) {
+      for (let index = 0; index < party.bots(); index++) {
+        const seat = MkPartyPanel.seat("button", "mk-seat bot", "🤖 AI", editable ? "눌러서 빼기" : "아군 AI", "bot") as HTMLButtonElement;
+        seat.disabled = !editable;
+        this.seats.appendChild(seat);
+      }
+    }
+    for (let count = party.members().length + (this.options.allowBots ? party.bots() : 0); count < this.options.partyLimit; count++) {
+      if (this.options.allowBots && editable) this.seats.appendChild(MkPartyPanel.seat("button", "mk-seat empty", "🤖 AI 추가", "빈 자리 · 친구는 팀 코드로 들어와요", "empty"));
+      else this.seats.appendChild(MkPartyPanel.seat("div", "mk-seat empty", "빈 자리", this.options.allowBots ? "친구는 팀 코드로 들어와요" : "경기에서는 AI가 채워요", ""));
+    }
+    this.matchButton.textContent = searching ? "매칭 취소" : "매칭 시작";
+    this.matchButton.classList.toggle("primary", !searching);
+    this.matchButton.disabled = !leader;
+    const streakNote = book.streak() > 0 ? " · 지금 " + book.streak() + "연승 중" : "";
+    this.hint.textContent = searching
+      ? "상대를 찾는 중… " + party.searchSeconds() + "초" + streakNote
+      : (leader ? this.options.intro : "팀장이 매칭을 시작하길 기다리는 중이에요…") + streakNote;
+  }
+
+  private static button(className: string, text: string, onClick: () => void): HTMLButtonElement {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = className;
+    button.textContent = text;
+    button.addEventListener("click", () => { button.blur(); onClick(); });
+    return button;
+  }
+
+  private static seat(tag: "div" | "button", className: string, name: string, note: string, kind: string): HTMLElement {
+    const seat = document.createElement(tag);
+    seat.className = className;
+    if (tag === "button") (seat as HTMLButtonElement).type = "button";
+    if (kind) seat.dataset.mkSeat = kind;
+    const bold = document.createElement("b");
+    bold.textContent = name;
+    const small = document.createElement("small");
+    small.textContent = note;
+    seat.append(bold, small);
+    return seat;
+  }
+}
+
+class MkRandomFlow {
+  private static readonly START_WAIT_MS = 15000;
+
+  readonly paths: MkPaths;
+  private readonly directory: MkPartyDirectory;
+  private party: MkParty | null = null;
+  private queue: MkQueue | null = null;
+  private current: MkTicket | null = null;
+  private startTimer: ReturnType<typeof setTimeout> | null = null;
+  private secondsTimer: ReturnType<typeof setInterval> | null = null;
+  private startedFor = "";
+  private reported = false;
+  private onResult: () => void = () => undefined;
+
+  constructor(
+    private readonly database: FirebaseDatabase,
+    private readonly clock: MkClock,
+    private readonly myId: string,
+    private readonly options: MkFlowOptions,
+    private readonly hooks: MkGameHooks,
+    private readonly panel: MkPartyPanel
+  ) {
+    this.paths = MkPaths.forGame(options.gameRoot, options.queue);
+    this.directory = new MkPartyDirectory(database, clock, this.paths, options.partyLimit);
+    panel.onMatch = () => this.toggleSearch();
+    panel.onLeave = () => this.leaveParty();
+    panel.onAddBot = () => { if (this.party) this.party.setBots(this.party.bots() + 1); };
+    panel.onRemoveBot = () => { if (this.party) this.party.setBots(this.party.bots() - 1); };
+  }
+
+  inParty(): boolean {
+    return !!this.party;
+  }
+
+  ticket(): MkTicket | null {
+    return this.current;
+  }
+
+  hasTicket(): boolean {
+    return !!this.current;
+  }
+
+  async create(): Promise<string> {
+    const code = await this.directory.create(this.myId, this.hooks.member());
+    if (!code) return "랜덤 매칭 방을 만들지 못했어요. 다시 눌러 주세요.";
+    this.attach(code);
+    return "";
+  }
+
+  async tryJoin(code: string): Promise<MkPartyLookup> {
+    if (this.options.solo || !(await this.directory.exists(code))) return { handled: false, message: "" };
+    const outcome = await this.directory.join(code, this.myId, this.hooks.member());
+    if (outcome.ok) this.attach(code);
+    return { handled: true, message: outcome.message };
+  }
+
+  async codeTaken(code: string): Promise<boolean> {
+    return this.directory.exists(code);
+  }
+
+  updateMe(): void {
+    if (this.party) this.party.updateMe(this.hooks.member());
+  }
+
+  render(): void {
+    if (this.party) this.panel.render(this.party);
+  }
+
+  setNotice(text: string): void {
+    this.panel.setNotice(text);
+  }
+
+  // 방장 기기에서 일반 방 사람 수가 바뀔 때마다 부른다. 표에 적힌 사람이 다 모이면 바로 시작한다.
+  roomChanged(humans: number, hosting: boolean, inLobby: boolean): void {
+    if (this.current && hosting && inLobby && humans >= this.current.expect) this.startNow();
+  }
+
+  // 판이 끝났을 때 모두 부른다(전적에 쓰는 건 팀장만, 같은 판은 한 번만).
+  matchEnded(outcome: MkOutcome, onStreak: () => void = () => undefined): void {
+    const ticket = this.current;
+    if (!ticket || !this.party || this.reported) return;
+    this.reported = true;
+    this.onResult = onStreak;
+    this.party.report(ticket, outcome);
+  }
+
+  endHint(): string {
+    return this.party ? "지금 " + this.party.book().streakLabel().replace("🔥 ", "") : "";
+  }
+
+  backToParty(message: string): void {
+    const note = this.reported ? "" : message;
+    this.clearStartTimer();
+    this.current = null;
+    this.reported = false;
+    this.onResult = () => undefined;
+    this.hooks.leaveRoom();
+    if (this.party) {
+      this.hooks.showParty();
+      this.panel.setNotice(note);
+      this.render();
+    } else this.hooks.showStart(note);
+  }
+
+  private attach(code: string): void {
+    const party = new MkParty(this.database, this.clock, this.paths, code, this.myId, this.options.partyLimit);
+    this.party = party;
+    party.onChange = () => {
+      this.render();
+      this.tickSeconds(!!party.searching());
+      if (this.reported) this.onResult();
+    };
+    party.onTicket = (ticket) => this.receiveTicket(ticket);
+    party.onClosed = (message) => this.dropParty(message);
+    party.connect();
+    this.panel.setNotice("");
+    this.hooks.showParty();
+  }
+
+  private async toggleSearch(): Promise<void> {
+    const party = this.party;
+    if (!party || !party.isLeader()) return;
+    this.panel.setBusy(true);
+    try {
+      if (party.searching()) {
+        const cancelled = this.queue ? await this.queue.cancel(party) : (await party.markSearching(null), true);
+        if (!cancelled) this.panel.setNotice("상대를 찾았어요! 곧 경기장으로 가요.");
+      } else {
+        this.panel.setNotice("");
+        if (this.queue) this.queue.stop();
+        this.queue = new MkQueue(this.database, this.clock, this.paths, this.options.matcher, this.hooks);
+        this.queue.onError = (message) => this.panel.setNotice(message);
+        await this.queue.enter(party);
+      }
+    } catch (error) {
+      this.panel.setNotice("매칭 서버에 연결하지 못했어요. (인터넷·데이터베이스 규칙 확인)");
+    }
+    this.render();
+  }
+
+  private async receiveTicket(ticket: MkTicket): Promise<void> {
+    if (this.queue) this.queue.stop();
+    this.tickSeconds(false);
+    this.hooks.leaveRoom();
+    this.current = ticket;
+    this.reported = false;
+    const hosting = ticket.host === this.myId;
+    const entered = await this.hooks.enterRoom(ticket, hosting).catch(() => false);
+    if (!entered) {
+      this.current = null;
+      if (this.party) this.party.clearTicket(ticket.matchId);
+      this.hooks.showParty();
+      this.panel.setNotice("경기장에 들어가지 못했어요. 다시 매칭해 주세요.");
+      return;
+    }
+    if (hosting) {
+      this.clearStartTimer();
+      this.startTimer = setTimeout(() => this.startNow(), this.options.startWaitMs || MkRandomFlow.START_WAIT_MS);
+    }
+  }
+
+  private startNow(): void {
+    this.clearStartTimer();
+    if (!this.current || this.startedFor === this.current.matchId) return;
+    this.startedFor = this.current.matchId;
+    this.hooks.startMatch();
+  }
+
+  private clearStartTimer(): void {
+    if (this.startTimer) clearTimeout(this.startTimer);
+    this.startTimer = null;
+  }
+
+  private tickSeconds(on: boolean): void {
+    if (on && !this.secondsTimer) this.secondsTimer = setInterval(() => this.render(), 1000);
+    if (!on && this.secondsTimer) {
+      clearInterval(this.secondsTimer);
+      this.secondsTimer = null;
+    }
+  }
+
+  private async leaveParty(): Promise<void> {
+    const party = this.party;
+    if (!party) return;
+    if (this.queue) this.queue.stop();
+    this.tickSeconds(false);
+    this.party = null;
+    await party.leave().catch(() => undefined);
+    this.hooks.showStart("");
+  }
+
+  private dropParty(message: string): void {
+    if (this.queue) this.queue.stop();
+    this.tickSeconds(false);
+    this.party = null;
+    if (!this.current) this.hooks.showStart(message);
+  }
+}
+
 // 연승 표시 버튼. 누르면 이 팀 대기실의 모든 전적 창을 띄운다.
 class MkStreakButton {
   readonly element: HTMLButtonElement;

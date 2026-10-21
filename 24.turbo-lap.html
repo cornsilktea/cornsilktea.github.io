@@ -139,6 +139,9 @@
   #overlay.st-screen .slot.mine { box-shadow: inset 0 0 0 2px #FFB08C; }
   #overlay.st-screen .slot small, #overlay.st-screen .specBox .none { color: #A9AFC2; }
   #overlay.st-screen #btnBStart { background: #D97B4F; border-color: #D97B4F; }
+  #lobbyMatchNote { display: none; font-size: 16px; }
+  #cardLobby.matched #lobbyMatchNote { display: block; }
+  #cardLobby.matched #mapBtns, #cardLobby.matched .join, #cardLobby.matched #btnJoinSpec, #cardLobby.matched #btnBStart, #cardLobby.matched .botBtn, #cardLobby.matched #mapHint { display: none !important; }
   .card { width: min(480px, 100%); background: var(--sg-panel); border: 3px solid var(--sg-line-strong); border-radius: 14px; padding: 22px 22px 18px; box-shadow: 0 10px 0 rgba(27,43,32,.3), 0 20px 40px rgba(0,0,0,.2); text-align: center; }
   .logo { font-size: clamp(44px, 9vw, 64px); font-weight: 800; line-height: 1.05; color: #D97B4F; -webkit-text-stroke: 2px var(--sg-ink); text-shadow: 4px 5px 0 var(--sg-ink); letter-spacing: -1px; margin-bottom: 4px; }
   .logo small { display: block; font-size: 15px; -webkit-text-stroke: 0; text-shadow: none; color: var(--sg-ink-soft); letter-spacing: 0; margin-top: 8px; font-weight: 700; }
@@ -351,7 +354,8 @@
     </div>
     <div class="st-card">
       <button type="button" class="st-btn primary" id="btnModeTA">⏱ 타임어택<small>혼자 달려 완주 최단 시간 도전 · 고스트</small></button>
-      <button type="button" class="st-btn" id="btnCreate">⚔️ 대전모드 방 만들기<small>1대1 실시간 레이스</small></button>
+      <button type="button" class="st-btn" id="btnCreate">⚔️ 대전모드 게임 만들기<small>1대1 실시간 레이스 · 방 코드로 친구 초대</small></button>
+      <button type="button" class="st-btn" id="btnRandom">🎲 랜덤 매칭 방 만들기<small>아무 학생과 1대1 · 코스와 출발 자리는 무작위</small></button>
       <div class="st-joinrow">
         <input type="text" id="joinCode" inputmode="numeric" pattern="[0-9]*" maxlength="5" autocomplete="off" placeholder="방 코드 5자리">
         <button type="button" class="st-btn blue" id="btnJoin">참여하기</button>
@@ -405,6 +409,16 @@
     <div class="wipe"><button type="button" id="btnWipe">이 기기의 나의 최고 기록·고스트 지우기</button></div>
   </div>
 
+  <div class="st-wrap" id="cardParty" style="display:none">
+    <div class="st-hero"><h1 class="st-title">TURBO LAP</h1></div>
+    <div class="st-card" id="partyMount"></div>
+    <div class="st-card">
+      <div class="hello left">내 닉네임: <b id="partyNick"></b> <button type="button" class="mini" data-maker-open>✏️ 닉네임 설정</button></div>
+      <h2>🚗 차량 선택</h2>
+      <div class="carPick"></div>
+    </div>
+  </div>
+
   <div class="card wide" id="cardLobby" style="display:none">
     <div class="codeBar">
       <div><span class="codeLab">방 코드</span><span class="codeNum" id="lobbyCode">-----</span></div>
@@ -422,6 +436,7 @@
       <div class="sect">🚗 차량 선택</div>
       <div class="carPick"></div>
     </div>
+    <div class="mk-notice" id="lobbyMatchNote">매칭됐어요! 곧 출발해요.</div>
     <button type="button" class="btn" id="btnBStart" hidden>게임 시작</button>
     <div class="hint" id="lobbyHint"></div>
   </div>
@@ -470,6 +485,7 @@
 
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="character-maker.js?v=20261012"></script>
+<script charset="utf-8" src="match-kit.js?v=20261021c"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
 <script type="module">
@@ -810,7 +826,7 @@ function warmUpGpu() {
 }
 function renderLoadGate() {
   const myModel = CAR_MODELS[parseCar(garage.key).model], ok = HQ_LOAD.ready && !!myModel.tpl;
-  ["btnModeTA", "btnCreate", "btnJoin", "btnHongkong", "btnSingapore", "btnSeoul"].forEach(id => { $(id).disabled = !ok; });
+  ["btnModeTA", "btnCreate", "btnRandom", "btnJoin", "btnHongkong", "btnSingapore", "btnSeoul"].forEach(id => { $(id).disabled = !ok; });
   $("btnGo").disabled = !ok;
   carPicker.mark();
   const note = $("loadNote");
@@ -3635,7 +3651,7 @@ function placeAt(i, lat) {
 function startLat() { return (playMode === "battle" && myTeam() === "right" ? -1 : 1) * gridLat(); }
 function resetCar() { placeAt(START_I, startLat()); clearGroundFx(); P.gfxT = newGroundTrack(); P.off = false; P.wallT = 0; P.steerVis = 0; P.rollVis = 0; P.fin = 0; resetBoost(P); }
 function resetBoost(r) { r.chase = 0; r.chaseKmh = 0; r.tailLostT = 0; r.surgeVis = 0; r.surgeFlash = 0; r.tailT = 0; r.offLine = false; r.boostOn = false; r.boostT = 0; r.boostCap = 0; r.boostGain = 0; r.boostCool = 0; }
-const CARDS = { start: "cardStart", course: "cardCourse", done: "cardDone", lobby: "cardLobby", bdone: "cardBDone" };
+const CARDS = { start: "cardStart", course: "cardCourse", done: "cardDone", lobby: "cardLobby", bdone: "cardBDone", party: "cardParty" };
 let cardNow = "start";
 function showCard(which) {
   cardNow = which;
@@ -4338,7 +4354,7 @@ function connectDb() {
   return dbReady;
 }
 
-function refreshNick() { const nick = PlayerProfile.storedNick(); $("helloNick").textContent = nick || "(닉네임 없음)"; $("lobbyNick").textContent = nick; }
+function refreshNick() { const nick = PlayerProfile.storedNick(); $("helloNick").textContent = nick || "(닉네임 없음)"; $("lobbyNick").textContent = nick; $("partyNick").textContent = nick || "(닉네임 없음)"; }
 function pushNickToRoom() {
   const nick = PlayerProfile.storedNick();
   if (nick && BT.ref && BT.players[BT.myId]) BT.ref.child("players/" + BT.myId + "/nickname").set(nick);
@@ -4378,6 +4394,7 @@ async function createRoom() {
     await sweepRooms();
     for (let n = 0; n < 8; n++) {
       const code = String(10000 + Math.floor(Math.random() * 90000)), t = tnow();
+      if (await turboRandom.codeTaken(code)) continue;
       const obj = { status: "lobby", hostPlayerId: BT.myId, createdAt: t, course: pendingCourse, players: { [BT.myId]: newPlayer("left", t) } };
       const res = await BT.db.ref(BATTLE.root + "/" + code).transaction(cur => cur === null ? obj : undefined);
       if (res.committed) { bMsg(""); enterRoom(code); return; }
@@ -4487,14 +4504,14 @@ function closeRoomLocal(msg) {
   resetMatchLocal();
   playMode = "ta"; setBattleHud(false);
   scene.remove(car); car = makeCar(garage.key); scene.add(car); resetCar(); updateCar(0);
-  refreshNick(); showCard("start"); bMsg(msg);
+  refreshNick(); turboRandom.roomClosed(msg);
 }
 window.addEventListener("pagehide", () => { if (BT.ref) { try { BT.ref.child("players/" + BT.myId).remove(); BT.ref.child("st/" + BT.myId).remove(); } catch (e) {} } });
 
 function playersChanged() {
   if (BT.queued) return;
   BT.queued = true;
-  setTimeout(() => { BT.queued = false; fixSeat(); renderLobby(); if (cardNow === "bdone") renderResult(); }, 0);
+  setTimeout(() => { BT.queued = false; fixSeat(); renderLobby(); if (cardNow === "bdone") renderResult(); turboRandom.roomChanged(); }, 0);
 }
 function capOf(team) { return team === "spec" ? BATTLE.specMax : 1; }
 function canMoveTo(team) {
@@ -4755,6 +4772,7 @@ function renderResult() {
   const host = isHost();
   $("btnToLobby").disabled = !host;
   $("bDoneHint").textContent = host ? "대기실로 돌아가면 같은 방에서 맵·차량을 바꿔 다시 할 수 있어요." : "방장이 '대기실로'를 누르면 다시 할 수 있어요.";
+  turboRandom.decorateResult(rows, quitWinner);
 }
 
 function ensureEnt(id) {
@@ -5167,6 +5185,97 @@ function renderBattleHud() {
   else if (BT.match.firstFinAt) note = "⏱ 상대가 완주했어요! " + Math.max(0, Math.ceil((BATTLE.dnfMs - (t - BT.match.firstFinAt)) / 1000)) + "초 안에 들어오세요";
   setNote(note);
 }
+class TurboRandomMatch {
+  static START_TRIES = 12;
+  static START_RETRY_MS = 300;
+  constructor() { this.flow = null; this.quiet = false; this.botAsked = {}; }
+  async ready() {
+    if (this.flow) return this.flow;
+    const db = await connectDb();
+    if (this.flow) return this.flow;
+    const options = { gameRoot: "turbolap", queue: "turbolap", partyLimit: 1, matcher: new MkVersusMatcher(1), solo: true, allowBots: false,
+      intro: "매칭 시작을 누르면 아무 학생과 1대1로 달려요. 코스와 출발 자리는 무작위예요." };
+    const panel = new MkPartyPanel($("overlay"), $("partyMount"), options);
+    this.flow = new MkRandomFlow(db, { now: tnow }, BT.myId, options, this, panel);
+    return this.flow;
+  }
+  inParty() { return !!this.flow && this.flow.inParty(); }
+  ticket() { return this.flow ? this.flow.ticket() : null; }
+  async open() {
+    if (!PlayerProfile.storedNick()) { askNickFirst(); return; }
+    $("btnRandom").disabled = true; bMsg("연결하는 중…");
+    try { const flow = await this.ready(); bMsg(await flow.create()); }
+    catch (e) { bMsg("온라인 연결을 할 수 없어요. (인터넷·데이터베이스 규칙 확인)"); }
+    finally { $("btnRandom").disabled = false; }
+  }
+  async codeTaken(code) {
+    try { return await (await this.ready()).codeTaken(code); } catch (e) { return false; }
+  }
+  updateMe() { if (this.flow) this.flow.updateMe(); }
+  member() { return { nick: PlayerProfile.storedNick() || "학생", joinedAt: tnow(), look: null }; }
+  async create(plan) {
+    const course = COURSES[plan.seed % COURSES.length], assign = {};
+    plan.groups.forEach(g => MkSeatAssign.peopleOf(g).forEach(id => { assign[id] = SIDES[g.side]; }));
+    await sweepRooms();
+    for (let n = 0; n < 8; n++) {
+      const code = String(10000 + Math.floor(Math.random() * 90000)), t = tnow();
+      if (await this.flow.codeTaken(code)) continue;
+      const obj = { status: "lobby", hostPlayerId: BT.myId, createdAt: t, course, assign, matchId: plan.matchId, players: { [BT.myId]: newPlayer(assign[BT.myId] || "left", t) } };
+      const res = await BT.db.ref(BATTLE.root + "/" + code).transaction(cur => cur === null ? obj : undefined);
+      if (res.committed) return { room: code, host: BT.myId, map: TRACKS[course].name };
+    }
+    return null;
+  }
+  async discard(made) { await BT.db.ref(BATTLE.root + "/" + made.room).remove(); }
+  async enterRoom(ticket, hosting) {
+    const ref = BT.db.ref(BATTLE.root + "/" + ticket.room);
+    if (!hosting) {
+      const status = (await ref.child("status").once("value")).val();
+      const team = (await ref.child("assign/" + BT.myId).once("value")).val();
+      if (status !== "lobby" || !team) return false;
+      await ref.child("players/" + BT.myId).set(newPlayer(team, tnow()));
+    }
+    this.botAsked = {};
+    enterRoom(ticket.room);
+    $("cardLobby").classList.add("matched");
+    return true;
+  }
+  leaveRoom() {
+    if (!BT.ref) return;
+    this.quiet = true;
+    try { leaveRoom(); } finally { this.quiet = false; }
+  }
+  roomClosed(msg) {
+    $("cardLobby").classList.remove("matched");
+    if (this.quiet) return;
+    if (this.inParty()) { this.flow.backToParty(msg); return; }
+    showCard("start"); bMsg(msg);
+  }
+  startMatch() { this.tryStart(TurboRandomMatch.START_TRIES); }
+  tryStart(triesLeft) {
+    if (!isHost() || BT.status !== "lobby") return;
+    if (humanRacerReady()) { hostStart(); return; }
+    SIDES.forEach(side => { if (!racerOf(side) && !this.botAsked[side]) { this.botAsked[side] = true; addBot(side); } });
+    if (triesLeft > 0) setTimeout(() => this.tryStart(triesLeft - 1), TurboRandomMatch.START_RETRY_MS);
+  }
+  showParty() { showCard("party"); refreshNick(); carPicker.mark(); }
+  showStart(message) { showCard("start"); bMsg(message); }
+  roomChanged() {
+    if (this.flow && BT.ref) this.flow.roomChanged(racerIds().filter(id => !isBot(id)).length, isHost(), BT.status === "lobby");
+  }
+  decorateResult(rows, quitWinner) {
+    const ticket = this.ticket();
+    $("btnToLobby").hidden = !!ticket;
+    $("btnLeaveEnd").textContent = ticket ? "랜덤 매칭 대기실로" : "방 나가기";
+    if (!ticket) return;
+    $("bDoneHint").textContent = this.flow.endHint();
+    if (!rows.length || BT.status !== "ended") return;
+    const winner = quitWinner || (rows[0].fin ? rows[0] : null), mine = SIDES[ticket.side];
+    this.flow.matchEnded({ result: !winner ? "draw" : winner.team === mine ? "win" : "lose" }, () => { $("bDoneHint").textContent = this.flow.endHint(); });
+  }
+}
+const turboRandom = new TurboRandomMatch();
+
 function battleFrame(dt) {
   if (!BT.ref) return;
   frameStandings.nextFrame();
@@ -5176,9 +5285,10 @@ function battleFrame(dt) {
 }
 
 document.addEventListener(PlayerProfile.CHANGE_EVENT, refreshNick);
-document.addEventListener(PlayerProfile.SETTLED_EVENT, () => { refreshNick(); pushNickToRoom(); });
+document.addEventListener(PlayerProfile.SETTLED_EVENT, () => { refreshNick(); pushNickToRoom(); turboRandom.updateMe(); });
 $("btnCreate").onclick = e => { e.currentTarget.blur(); audioInit(); createRoom(); };
 $("btnJoin").onclick = e => { e.currentTarget.blur(); audioInit(); joinRoom(); };
+$("btnRandom").onclick = e => { e.currentTarget.blur(); audioInit(); turboRandom.open(); };
 $("joinCode").onkeydown = e => { if (e.key === "Enter") joinRoom(); };
 $("btnLeaveLobby").onclick = e => { e.currentTarget.blur(); leaveRoom(); };
 $("btnLeaveEnd").onclick = e => { e.currentTarget.blur(); leaveRoom(); };

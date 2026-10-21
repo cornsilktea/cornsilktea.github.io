@@ -203,6 +203,21 @@
 .mk-line.lose .mk-mark{background:#B4533A;}
 .mk-detail{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .mk-time{font-variant-numeric:tabular-nums;color:var(--st-ink-soft,#A3B0A6);}
+/* 랜덤 매칭 팀 대기실(MkPartyPanel). 게임 방 대기실처럼 보이게 하되 "우리 팀" 칸 하나만 둔다. */
+.mk-head{display:flex;flex-wrap:wrap;align-items:center;gap:10px;}
+.mk-code{font-size:34px;font-weight:800;letter-spacing:.18em;color:#FFB08C;font-variant-numeric:tabular-nums;}
+.mk-team{margin-top:10px;padding:10px;border-radius:8px;background:rgba(255,255,255,.05);border:2px solid var(--st-accent,#D97B4F);}
+.mk-team h3{margin:0 0 8px;font-size:16px;font-weight:800;color:var(--st-title,#F4F1E8);text-align:center;}
+.mk-seat{display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;min-height:56px;margin-top:6px;padding:6px 8px;
+  border-radius:6px;border:2px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:#fff;font:inherit;font-size:16px;font-weight:800;}
+.mk-seat small{font-size:12px;font-weight:700;color:var(--st-ink-soft,#A3B0A6);}
+.mk-seat.empty{border-style:dashed;color:var(--st-ink-soft,#A3B0A6);}
+.mk-seat.me{border-color:#D97B4F;box-shadow:inset 0 0 0 1px #D97B4F;}
+button.mk-seat{cursor:pointer;-webkit-tap-highlight-color:transparent;}
+button.mk-seat:disabled{cursor:default;}
+.mk-notice{margin-top:8px;font-size:14px;font-weight:700;color:#FFD2B8;text-align:center;}
+.mk-notice:empty{display:none;}
+.mk-match{margin-top:14px !important;}
 
 /* 캐릭터 만들기(character-kit.ts 의 ProfileEditor). 어두운 .st-screen 카드 안에서 쓴다. */
 .ce-nick{width:100%;min-height:48px;padding:6px 12px;font:inherit;font-size:18px;font-weight:800;border-radius:6px;

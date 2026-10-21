@@ -1651,7 +1651,7 @@ class VolleyballGame {
   private readonly endView = new VbEndView();
   private readonly editor: ProfileEditor;
   private readonly myId = "p" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
-  private readonly random: VbRandomFlow;
+  private readonly random: MkRandomFlow;
   private session: VbRoomSession | null = null;
   private match: VolleyballMatch | null = null;
   private assetsReady = false;
@@ -1663,11 +1663,11 @@ class VolleyballGame {
     this.textures = new VbCourtTextures(libs);
     this.court = new VbCourtView(libs, this.textures);
     this.editor = new ProfileEditor(libs, this.factory, this.assets, this.profile);
-    this.random = new VbRandomFlow(this.backend, this.directory, this.myId, {
+    this.random = VbRandomSetup.create(this.backend, this.directory, this.myId, {
       enterTicketRoom: (code, hosting) => this.enterTicketRoom(code, hosting),
       leaveRoomQuietly: () => this.leaveRoomQuietly(),
       startMatch: () => this.startMatch(),
-      showParty: (message) => this.showParty(message),
+      showParty: () => this.showParty(),
       showStart: (message) => this.showStart(message),
       myRecord: () => this.myRecord()
     });
@@ -1767,11 +1767,10 @@ class VolleyballGame {
     this.disposeMatch();
   }
 
-  private showParty(message: string): void {
+  private showParty(): void {
     this.screens.show("party");
     this.editor.mount(VbDom.byId("partyProfileHost"));
     this.editor.setActive(true);
-    VbDom.setText(VbDom.byId("partyNotice"), message);
     this.random.render();
   }
 
@@ -1845,7 +1844,7 @@ class VolleyballGame {
     const session = this.session;
     if (!session) return;
     if (this.screens.current === "lobby" && (kind === "players" || kind === "host" || kind === "status")) this.lobbyView.render(session);
-    if (kind === "players" || kind === "host" || kind === "status") this.random.roomChanged(session);
+    if (kind === "players" || kind === "host" || kind === "status") this.random.roomChanged(VbSeatPlan.humanSeats(session.players).filter((id) => !!id).length, session.isHost(), session.status === "lobby");
     if (kind === "status" || kind === "match" || kind === "end" || (kind === "players" && session.status === "play" && !this.match)) this.syncPhase();
     if (this.match) this.match.applyChange(kind);
   }
@@ -1869,7 +1868,8 @@ class VolleyballGame {
       VbDom.show(VbDom.byId("btnToLobby"), session.isHost() && !matched);
       VbDom.setText(VbDom.byId("btnEndLeave"), matched ? "팀 대기실로" : "방 나가기");
       VbDom.setText(VbDom.byId("endHint"), matched ? this.random.endHint() : session.isHost() ? "" : "방장이 대기실로 돌아가길 기다려요…");
-      if (matched) this.random.matchEnded(session.end);
+      const ticket = this.random.ticket();
+      if (ticket) this.random.matchEnded({ result: session.end.winner === ticket.side ? "win" : "lose" }, () => VbDom.setText(VbDom.byId("endHint"), this.random.endHint()));
     }
   }
 

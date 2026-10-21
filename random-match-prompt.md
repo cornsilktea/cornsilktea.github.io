@@ -150,7 +150,11 @@
 - 시간: 대기 3초(`MkMatcher.TIMING.settleMs`), 묶던 사람이 사라졌을 때 차지 풀림 10초(`claimExpireMs`).
 - 검사: `node tools/match-sim.js`(가짜 Firebase, 약 40초). 동시 입장·취소·끊김·방 만들기 실패·묶던 사람 끊김·
   정원 넘김·연승(승·무·패, 중복 반영, 팀장 교체·끊김, 다시 매칭) 143개. match-kit.ts 를 고치면 꼭 돌린다.
-- 게임에 붙이는 모양(34번이 기준): 게임별 파일 `ts/<번호>.<이름>-party.ts` 에 `…RandomFlow`(팀 대기실·대기열·표 받기·자동 시작·결과 반영),
+- **공용 흐름(2026-10-21)**: 팀 대기실 화면 `MkPartyPanel(.st-screen 요소, 넣을 칸, 옵션)` 과 흐름 `MkRandomFlow(db, clock, 내id, 옵션, 훅, 패널)` 이
+  match-kit 에 있다. 게임은 `MkGameHooks`(member·create(plan)·discard·enterRoom(표, 방장?)·leaveRoom·startMatch·showParty·showStart)만 만든다.
+  게임 쪽에서 부르는 것: `create()`·`tryJoin(코드)`·`codeTaken(코드)`·`roomChanged(사람 수, 방장?, 대기 중?)`·`matchEnded({result, rank?, of?}, 연승 갱신 콜백)`·
+  `endHint()`·`backToParty(메시지)`·`updateMe()`·`render()`·`ticket()`. 자리 배정은 `MkSeatAssign.bySide(plan, 편당 자리)`.
+- 게임에 붙이는 모양(34번이 기준, 공용 흐름으로 바꾼 뒤의 설명은 위): 게임별 파일 `ts/<번호>.<이름>-party.ts` 에 `…RandomFlow`(팀 대기실·대기열·표 받기·자동 시작·결과 반영),
   `…PartyView`(팀 대기실 화면), `…RandomRoomMaker`(MkRoomMaker: 편에 맞춰 `assign/<id>=자리` 를 넣은 일반 방 만들기)를 두고,
   기존 게임 클래스에는 훅 몇 개만 붙인다(방 만들기 `extra`·참여 `useAssigned`, 화면 `party`, 끝 화면 "팀 대기실로", 방이 닫히면 팀 대기실로).
   방장은 `expect` 명이 모이면 바로, 아니면 15초 뒤 시작하고 표 하나당 한 번만 시작한다. 시험은 `tools/fbmock.js` 를 넣은 `.claude/` 사본을 탭 여러 개로 연다.
@@ -168,6 +172,6 @@
 | 6 | 32 미니게임 모음 | 대기 |
 | 7 | 25 FPS 서바이벌 | 대기 |
 | 8 | 31 좀비 아웃브레이크 | 대기 |
-| 9 | 24 터보 랩 | 대기 |
+| 9 | 24 터보 랩 | 완료(2026-10-21, 선생님 요청으로 30번과 함께 먼저) — 인라인 클로저 안 `TurboRandomMatch`(MkGameHooks). 1대1 개인전(`solo`), 코스는 `plan.seed`, 좌우는 편으로 무작위. 가짜 Firebase 탭 2개로 매칭·출발·결과·연승·기존 방 코드 흐름 확인 |
 | 10 | 30 팀 배틀 아레나 | 대기 |
 | 11 | 데이터베이스규칙.json 정리·선생님 게시 안내 | 대기 |

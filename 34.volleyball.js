@@ -1566,11 +1566,11 @@ class VolleyballGame {
         this.textures = new VbCourtTextures(libs);
         this.court = new VbCourtView(libs, this.textures);
         this.editor = new ProfileEditor(libs, this.factory, this.assets, this.profile);
-        this.random = new VbRandomFlow(this.backend, this.directory, this.myId, {
+        this.random = VbRandomSetup.create(this.backend, this.directory, this.myId, {
             enterTicketRoom: (code, hosting) => this.enterTicketRoom(code, hosting),
             leaveRoomQuietly: () => this.leaveRoomQuietly(),
             startMatch: () => this.startMatch(),
-            showParty: (message) => this.showParty(message),
+            showParty: () => this.showParty(),
             showStart: (message) => this.showStart(message),
             myRecord: () => this.myRecord()
         });
@@ -1671,11 +1671,10 @@ class VolleyballGame {
         this.session = null;
         this.disposeMatch();
     }
-    showParty(message) {
+    showParty() {
         this.screens.show("party");
         this.editor.mount(VbDom.byId("partyProfileHost"));
         this.editor.setActive(true);
-        VbDom.setText(VbDom.byId("partyNotice"), message);
         this.random.render();
     }
     async createRoom() {
@@ -1758,7 +1757,7 @@ class VolleyballGame {
         if (this.screens.current === "lobby" && (kind === "players" || kind === "host" || kind === "status"))
             this.lobbyView.render(session);
         if (kind === "players" || kind === "host" || kind === "status")
-            this.random.roomChanged(session);
+            this.random.roomChanged(VbSeatPlan.humanSeats(session.players).filter((id) => !!id).length, session.isHost(), session.status === "lobby");
         if (kind === "status" || kind === "match" || kind === "end" || (kind === "players" && session.status === "play" && !this.match))
             this.syncPhase();
         if (this.match)
@@ -1789,8 +1788,9 @@ class VolleyballGame {
             VbDom.show(VbDom.byId("btnToLobby"), session.isHost() && !matched);
             VbDom.setText(VbDom.byId("btnEndLeave"), matched ? "팀 대기실로" : "방 나가기");
             VbDom.setText(VbDom.byId("endHint"), matched ? this.random.endHint() : session.isHost() ? "" : "방장이 대기실로 돌아가길 기다려요…");
-            if (matched)
-                this.random.matchEnded(session.end);
+            const ticket = this.random.ticket();
+            if (ticket)
+                this.random.matchEnded({ result: session.end.winner === ticket.side ? "win" : "lose" }, () => VbDom.setText(VbDom.byId("endHint"), this.random.endHint()));
         }
     }
     disposeMatch() {
