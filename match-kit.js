@@ -92,16 +92,18 @@ class MkVersusMatcher extends MkMatcher {
     }
 }
 // 여럿이 한 방에 모이는 게임(31·32·38·39): 먼저 온 순서로 정원까지 채우고, 넘치는 항목은 다음 묶음으로.
+// maxEntries: 한 방에 들어갈 수 있는 팀(항목) 수 상한(예: 38번 팀전은 3팀).
 class MkFreeForAllMatcher extends MkMatcher {
-    constructor(partyLimit, capacity, timing = MkMatcher.TIMING) {
+    constructor(partyLimit, capacity, timing = MkMatcher.TIMING, maxEntries = Infinity) {
         super(partyLimit, timing);
         this.capacity = capacity;
+        this.maxEntries = maxEntries;
     }
     pick(ready) {
         const picked = [];
         let people = 0;
         ready.forEach((item) => {
-            if (item[1].size <= this.partyLimit && people + item[1].size <= this.capacity) {
+            if (picked.length < this.maxEntries && item[1].size <= this.partyLimit && people + item[1].size <= this.capacity) {
                 picked.push(item);
                 people += item[1].size;
             }
@@ -707,7 +709,7 @@ class MkPartyPanel {
             if (this.options.allowBots && editable)
                 this.seats.appendChild(MkPartyPanel.seat("button", "mk-seat empty", "🤖 AI 추가", "빈 자리 · 친구는 팀 코드로 들어와요", "empty"));
             else
-                this.seats.appendChild(MkPartyPanel.seat("div", "mk-seat empty", "빈 자리", this.options.allowBots ? "친구는 팀 코드로 들어와요" : "경기에서는 AI가 채워요", ""));
+                this.seats.appendChild(MkPartyPanel.seat("div", "mk-seat empty", "빈 자리", this.options.allowBots ? "친구는 팀 코드로 들어와요" : "친구는 팀 코드로 들어와요 · 비면 AI가 채워요", ""));
         }
         this.matchButton.textContent = searching ? "매칭 취소" : "매칭 시작";
         this.matchButton.classList.toggle("primary", !searching);

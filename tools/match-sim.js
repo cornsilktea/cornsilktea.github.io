@@ -360,6 +360,10 @@ class Scenarios {
     const v = new Mk.MkVersusMatcher(2, SimWorld.TIMING);
     Report.check("1대1: 혼자면 기다림", v.plan({ a: e(0, 2) }, 100, Math.random) === null);
     Report.check("1대1: 팀 정원보다 큰 항목은 무시", v.plan({ a: e(0, 2), b: e(1, 3) }, 100, Math.random) === null);
+    const teams = new Mk.MkFreeForAllMatcher(2, 6, SimWorld.TIMING, 3);
+    const solos = { a: e(0, 1), b: e(1, 1), c: e(2, 1), d: e(3, 1) };
+    const teamPlan = teams.plan(solos, 100, () => 0.5);
+    Report.check("팀 수 상한: 6자리라도 3팀까지만", teamPlan && teamPlan.groups.map((g) => g.code).join() === "a,b,c", teamPlan && teamPlan.groups.map((g) => g.code));
     Report.check("기록장: 빈 전적", new Mk.MkRecordBook(null).summary() === "0전 0승 0무 0패" && new Mk.MkRecordBook(null).streak() === 0);
   }
 }

@@ -169,7 +169,7 @@
 | 1 | ts/match-kit.ts(연승 버튼·전적 창 포함) + tools/ 매칭 시뮬레이터 | 완료(2026-10-21) — `node tools/match-sim.js` 143개 통과, 연승 버튼·전적 창 브라우저 확인 |
 | 2 | 34 배구 | 완료(2026-10-21) — 가짜 Firebase 창 2~3개로 매칭·편 배정·자동 시작·결과·연승·전적 창·팀 코드 입장·팀장 교체·취소 확인. 규칙 게시 뒤 실제 Firebase(?c=test, 탭 2개)로 매칭·시작·결과·연승·정리까지 확인. 실제 Firebase 는 ref("") 를 거절하므로 루트는 ref("/") |
 | 3 | 35 축구 | 완료(2026-10-21) — room-kit 의 공용 연결 `RkRandomSetup`/`RkMatchHooks`(Rk 방 게임 공용) + `SocRandomSetup`. 가짜 Firebase 탭 2개로 매칭·경기 시작·결과·연승 확인 |
-| 4 | 38 눈싸움 배틀로얄 | 대기 |
+| 4 | 38 눈싸움 배틀로얄 | 완료(2026-10-21) — 대기열 `snowroyale_duos`(2명 팀, 한 방 최대 3팀: `MkFreeForAllMatcher` 의 `maxEntries`)·`snowroyale_solo`(6명). `SnRandomSetup`, 패널 칸이 모드마다 따로(`partyMountDuos`·`partyMountSolo`). 순위 `end.ranks[내 팀]` 1위만 승, 전적에 `n위/팀 수`. 가짜 Firebase 로 팀전·개인전 매칭·결과 확인 |
 | 5 | 39 물풍선 대작전 | 대기 |
 | 6 | 32 미니게임 모음 | 대기 |
 | 7 | 25 FPS 서바이벌 | 대기 |

@@ -503,6 +503,8 @@ class SnGame {
         this.session = null;
         this.view = null;
         this.matchId = 0;
+        this.randomMode = "duos";
+        this.randoms = new Map();
         this.lastMs = 0;
         this.leaveAskedAt = -1;
         this.seed = this.options.seed;
@@ -553,6 +555,8 @@ class SnGame {
     bindMenus() {
         SnDom.el("btnCreateDuos").addEventListener("click", () => this.createRoom("duos"));
         SnDom.el("btnCreateSolo").addEventListener("click", () => this.createRoom("solo"));
+        SnDom.el("btnRandomDuos").addEventListener("click", () => this.createParty("duos"));
+        SnDom.el("btnRandomSolo").addEventListener("click", () => this.createParty("solo"));
         SnDom.el("btnPractice").addEventListener("click", () => { this.practice = true; this.startOffline(); });
         SnDom.el("btnJoin").addEventListener("click", () => this.joinRoom(false));
         SnDom.el("btnWatch").addEventListener("click", () => this.joinRoom(true));
@@ -591,6 +595,9 @@ class SnGame {
         this.resetLeave();
         SnDom.show(SnDom.el("startScreen"), name === "start");
         SnDom.show(SnDom.el("lobbyScreen"), name === "lobby");
+        SnDom.show(SnDom.el("partyScreen"), name === "party");
+        SnDom.show(SnDom.el("partyMountSolo"), this.randomMode === "solo");
+        SnDom.show(SnDom.el("partyMountDuos"), this.randomMode === "duos");
         SnDom.show(SnDom.el("hudTop"), name === "game");
         SnDom.show(SnDom.el("mapDock"), name === "game");
         if (name !== "game") {
@@ -605,13 +612,88 @@ class SnGame {
             editor.setActive(false);
             return;
         }
-        editor.mount(SnDom.el(name === "start" ? "profileHost" : "lobbyProfileHost"));
+        editor.mount(SnDom.el(name === "start" ? "profileHost" : name === "party" ? "partyProfileHost" : "lobbyProfileHost"));
         editor.setActive(true);
     }
     pushProfile() {
         const profile = this.profile;
         if (this.session && profile)
             this.session.pushProfile({ nick: profile.nickOrDefault(), look: profile.look });
+        this.randoms.forEach((flow) => flow.updateMe());
+    }
+    randomFor(mode) {
+        const existing = this.randoms.get(mode);
+        if (existing)
+            return existing;
+        const flow = SnRandomSetup.create(mode, this.backend, this.directory, this.myId, {
+            myRecord: () => this.myRecord(),
+            enterTicketRoom: (code, hosting) => this.enterTicketRoom(mode, code, hosting),
+            leaveRoomQuietly: () => this.leaveRoomQuietly(),
+            startMatch: () => this.startMatch(),
+            showParty: () => { this.randomMode = mode; this.showScreen("party"); flow.render(); },
+            showStart: (message) => { this.showScreen("start"); this.startMessage(message); }
+        });
+        this.randoms.set(mode, flow);
+        return flow;
+    }
+    random() {
+        return this.randoms.get(this.randomMode) || null;
+    }
+    inParty() {
+        const flow = this.random();
+        return !!flow && flow.inParty();
+    }
+    async createParty(mode) {
+        if (!this.backend.database)
+            return;
+        this.startMessage("");
+        this.randomMode = mode;
+        try {
+            this.startMessage(await this.randomFor(mode).create());
+        }
+        catch (error) {
+            this.startMessage("랜덤 매칭 방을 만들지 못했어요. (데이터베이스 규칙을 확인해 주세요)");
+        }
+    }
+    async enterTicketRoom(mode, code, hosting) {
+        this.randomMode = mode;
+        if (!hosting) {
+            const outcome = await this.directory.join(code, this.myId, this.myRecord(), false, true).catch(() => null);
+            if (!outcome || !outcome.ok)
+                return false;
+        }
+        this.enterRoom(code, hosting);
+        if (hosting)
+            this.session.writeValue("mode", mode);
+        SnDom.text(SnDom.el("lobbyNotice"), "매칭됐어요! 곧 시작해요.");
+        SnDom.el("lobbyScreen").classList.add("matched");
+        return true;
+    }
+    leaveRoomQuietly() {
+        if (this.session)
+            this.session.leave();
+        if (this.session)
+            this.session.silentClose();
+        this.session = null;
+        if (this.view) {
+            this.view.dispose();
+            this.view = null;
+        }
+        this.matchId = 0;
+        SnDom.el("lobbyScreen").classList.remove("matched");
+    }
+    reportEnd(session) {
+        const flow = this.random(), match = session.value("match"), end = session.value("end");
+        const ticket = flow ? flow.ticket() : null;
+        if (!flow || !ticket || !match || !end || end.match !== match.id)
+            return;
+        const team = match.teams.findIndex((t) => t.members.some((m) => m.id === this.myId));
+        if (team < 0)
+            return;
+        const rank = end.ranks[team];
+        const showStreak = () => SnDom.text(SnDom.el("resultStreak"), flow.endHint());
+        showStreak();
+        flow.matchEnded({ result: rank === 1 ? "win" : "lose", rank, of: match.teams.length }, showStreak);
     }
     updateStartButtons() {
         const ok = !!this.backend.database;
@@ -629,7 +711,7 @@ class SnGame {
             return;
         this.startMessage("");
         try {
-            const code = await this.directory.create(this.myId, this.myRecord());
+            const code = await this.directory.create(this.myId, this.myRecord(), {}, (taken) => this.randomFor("duos").codeTaken(taken));
             if (!code) {
                 this.startMessage("방을 만들지 못했어요. 다시 눌러 주세요.");
                 return;
@@ -651,6 +733,12 @@ class SnGame {
         }
         this.startMessage("");
         try {
+            const party = await this.randomFor("duos").tryJoin(code);
+            if (party.handled) {
+                this.randomMode = "duos";
+                this.startMessage(party.message);
+                return;
+            }
             const outcome = await this.directory.join(code, this.myId, this.myRecord(), asSpectator);
             if (outcome.ok) {
                 this.enterRoom(code, false);
@@ -684,6 +772,11 @@ class SnGame {
             this.lobby.render(session, this.seatPlan);
         if (kind === "status" || kind === "match" || kind === "players")
             this.syncPhase();
+        const flow = this.random();
+        if (flow && (kind === "players" || kind === "host" || kind === "status"))
+            flow.roomChanged(this.seatPlan.humanSeats(session.players).filter((id) => !!id).length, session.isHost(), session.status === "lobby");
+        if (kind === "end" || kind === "status")
+            this.reportEnd(session);
     }
     syncPhase() {
         const session = this.session, ui = this.ui;
@@ -713,9 +806,12 @@ class SnGame {
                 this.backdrop.stopTour();
             this.view = new SnMatchView(ui, driver, looks);
             this.showScreen("game");
-            SnDom.show(SnDom.el("btnAgain"), session.isHost());
+            const flow = this.random(), matched = !!flow && flow.hasTicket();
+            SnDom.show(SnDom.el("btnAgain"), session.isHost() && !matched);
             SnDom.text(SnDom.el("btnAgain"), "대기실로");
             SnDom.show(SnDom.el("btnResultLeave"), true);
+            SnDom.text(SnDom.el("btnResultLeave"), matched ? (this.randomMode === "solo" ? "랜덤 매칭 대기실로" : "팀 대기실로") : "방 나가기");
+            SnDom.text(SnDom.el("resultStreak"), "");
         }
     }
     startMatch() {
@@ -784,6 +880,10 @@ class SnGame {
             this.showScreen("start");
             return;
         }
+        if (this.inParty()) {
+            this.random().backToParty(message);
+            return;
+        }
         if (this.session)
             this.session.leave();
         this.exitToStart(message);
@@ -797,6 +897,11 @@ class SnGame {
             this.view = null;
         }
         this.matchId = 0;
+        SnDom.el("lobbyScreen").classList.remove("matched");
+        if (this.inParty()) {
+            this.random().backToParty(message);
+            return;
+        }
         this.showScreen("start");
         this.startMessage(message);
     }
@@ -840,3 +945,26 @@ SnGame.STEP = 1 / 30;
 SnGame.STALL_MS = 250;
 SnGame.WATCHDOG_MS = 100;
 SnGame.LEAVE_CONFIRM_MS = 3000;
+class SnRandomSetup {
+    static create(mode, backend, directory, myId, port) {
+        const solo = mode === "solo", perTeam = solo ? 1 : 2;
+        return RkRandomSetup.create({
+            backend, directory, myId, port,
+            rules: SnRoomRules.RULES,
+            options: {
+                gameRoot: "snowroyale",
+                queue: "snowroyale_" + mode,
+                partyLimit: perTeam,
+                matcher: new MkFreeForAllMatcher(perTeam, SnRandomSetup.CAPACITY, MkMatcher.TIMING, solo ? SnRandomSetup.CAPACITY : SnRandomSetup.DUOS_TEAMS),
+                intro: solo ? "매칭 시작을 누르면 다른 학생들과 개인전으로 만나요. 모자란 자리는 AI가 채워요." : "매칭 시작을 누르면 다른 팀들과 팀전(2명씩 최대 3팀)으로 만나요. 모자란 자리는 AI가 채워요.",
+                showRank: true,
+                solo
+            },
+            assign: (plan) => MkSeatAssign.bySide(plan, perTeam),
+            screen: SnDom.el("partyScreen"),
+            mount: SnDom.el(solo ? "partyMountSolo" : "partyMountDuos")
+        });
+    }
+}
+SnRandomSetup.CAPACITY = 6;
+SnRandomSetup.DUOS_TEAMS = 3;

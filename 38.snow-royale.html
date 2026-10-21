@@ -153,6 +153,8 @@
   .seat .empty, #lobbySpectators .empty { opacity: .55; font-weight: 400; }
   #lobbySpectators { margin-top: 10px; font-size: 15px; }
   #lobbyNotice { margin-top: 8px; color: #FFB27A; font-weight: 800; }
+  #lobbyScreen.matched #btnStart, #lobbyScreen.matched #btnModeToggle, #lobbyScreen.matched #btnSeatMode { display: none; }
+  #lobbyScreen.matched [data-slot] { pointer-events: none; }
   #netMeter { position: fixed; right: 10px; bottom: 6px; z-index: 30; font-size: 12px; color: #24364A; font-weight: 800; }
   #btnResultLeave { margin-top: 8px; width: 100%; min-height: 44px; font: inherit; font-size: 16px; font-weight: 800; border-radius: 8px; border: 2px solid rgba(255,255,255,.5); background: transparent; color: #fff; cursor: pointer; }
 </style>
@@ -184,13 +186,15 @@
 <div id="bigMap" hidden><div id="bigMapTitle" class="hud-box">전체 지도</div><canvas id="bigMapCanvas"></canvas><button type="button" id="bigMapClose">✕</button></div>
 <div id="resultBox" hidden><div class="card"><div id="resultTitle"></div>
   <table><thead><tr><th>순위</th><th>이름</th><th>생존</th><th>처치</th><th>준 피해</th><th>모은 눈</th><th>만든 벽</th></tr></thead><tbody id="resultRows"></tbody></table>
+  <div id="resultStreak" class="mk-notice"></div>
   <button type="button" id="btnAgain">다시 하기</button><button type="button" id="btnResultLeave">방 나가기</button></div></div>
 <div id="startScreen" class="st-screen" hidden>
   <div class="st-wrap">
     <div class="st-hero"><h1 class="st-title">눈싸움<span>배틀로얄</span></h1></div>
     <div class="st-card">
-      <div class="st-row"><button type="button" class="st-btn primary" id="btnCreateDuos">방 만들기<small>팀전</small></button><button type="button" class="st-btn primary" id="btnCreateSolo">방 만들기<small>개인전</small></button></div>
-      <input type="text" id="joinCode" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="방 코드 5자리">
+      <div class="st-row"><button type="button" class="st-btn primary" id="btnCreateDuos">게임 만들기<small>팀전</small></button><button type="button" class="st-btn primary" id="btnCreateSolo">게임 만들기<small>개인전</small></button></div>
+      <div class="st-row"><button type="button" class="st-btn primary" id="btnRandomDuos">랜덤 매칭 방 만들기<small>팀전</small></button><button type="button" class="st-btn primary" id="btnRandomSolo">랜덤 매칭 방 만들기<small>개인전</small></button></div>
+      <input type="text" id="joinCode" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="방·팀 코드 5자리">
       <div class="st-row"><button type="button" class="st-btn" id="btnJoin">참여하기</button><button type="button" class="st-btn" id="btnWatch">관전하기</button></div>
       <div class="st-msg" id="startMsg"></div>
       <button type="button" class="st-btn" id="btnPractice" style="margin-top:10px">혼자 연습<small>AI와 팀전</small></button>
@@ -224,6 +228,17 @@
     </div>
   </div>
 </div>
+<div id="partyScreen" class="st-screen" hidden>
+  <div class="st-wrap">
+    <div class="st-hero"><h1 class="st-title">눈싸움<span>배틀로얄</span></h1></div>
+    <div class="st-card" id="partyMountDuos"></div>
+    <div class="st-card" id="partyMountSolo" hidden></div>
+    <div class="st-card st-fold">
+      <h2>캐릭터 만들기</h2>
+      <div id="partyProfileHost"></div>
+    </div>
+  </div>
+</div>
 <div id="lobbyScreen" class="st-screen" hidden>
   <div class="st-wrap">
     <div class="st-hero"><h1 class="st-title">눈싸움<span>배틀로얄</span></h1></div>
@@ -246,14 +261,15 @@
 <div id="netMeter"></div>
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="fold-card.js"></script>
-<script charset="utf-8" src="room-kit.js"></script>
-<script charset="utf-8" src="38.snow-map.js"></script>
-<script charset="utf-8" src="38.snow-rules.js"></script>
-<script charset="utf-8" src="38.snow-bot.js"></script>
-<script charset="utf-8" src="38.snow-views.js"></script>
-<script charset="utf-8" src="38.snow-hud.js"></script>
-<script charset="utf-8" src="38.snow-net.js"></script>
-<script charset="utf-8" src="38.snow-royale.js"></script>
+<script charset="utf-8" src="match-kit.js?v=20261021d"></script>
+<script charset="utf-8" src="room-kit.js?v=20261021d"></script>
+<script charset="utf-8" src="38.snow-map.js?v=20261021d"></script>
+<script charset="utf-8" src="38.snow-rules.js?v=20261021d"></script>
+<script charset="utf-8" src="38.snow-bot.js?v=20261021d"></script>
+<script charset="utf-8" src="38.snow-views.js?v=20261021d"></script>
+<script charset="utf-8" src="38.snow-hud.js?v=20261021d"></script>
+<script charset="utf-8" src="38.snow-net.js?v=20261021d"></script>
+<script charset="utf-8" src="38.snow-royale.js?v=20261021d"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
