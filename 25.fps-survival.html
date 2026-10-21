@@ -268,6 +268,9 @@
   #overlay.st-screen .joinRow { justify-content: flex-start; flex-wrap: nowrap; margin-top: 0; }
   #overlay.st-screen .joinRow input { flex: 1; min-width: 0; width: auto; height: 54px; background: rgba(255, 255, 255, .06); border: 2px solid rgba(255, 255, 255, .3); border-radius: 6px; color: #fff; text-align: left; }
   #overlay.st-screen .joinRow input#joinCode { text-align: center; letter-spacing: 4px; }
+  #lobbyMatchNote, #teamStreak:empty { display: none; }
+  #cardLobby.matched #lobbyMatchNote { display: block; }
+  #cardLobby.matched #btnJoinBlue, #cardLobby.matched #btnJoinRed, #cardLobby.matched #btnJoinSpec, #cardLobby.matched .botRow, #cardLobby.matched #btnTeamStart { display: none !important; }
   #overlay.st-screen .joinRow input::placeholder { color: #7F8C82; letter-spacing: 0; }
   #overlay.st-screen .card .hint, #overlay.st-screen .card .desc { color: #A3B0A6; text-align: left; }
   #overlay.st-screen .card .msg { text-align: left; }
@@ -387,9 +390,10 @@
   <div class="card" id="cardTeamStart" style="display:none">
     <div class="logo">👥 팀 대전</div>
     <div class="hello">내 닉네임: <b id="teamNick"></b> <button type="button" class="mini" data-maker-open>✏️ 닉네임 설정</button></div>
-    <button type="button" class="btn wideBtn" id="btnCreate">방 만들기</button>
-    <label class="fieldLab" for="joinCode">방 코드로 입장</label>
-    <div class="joinRow"><input id="joinCode" inputmode="numeric" maxlength="5" placeholder="방 코드 5자리" autocomplete="off"><button type="button" class="btn" id="btnJoin">입장</button></div>
+    <button type="button" class="btn wideBtn" id="btnCreate">게임 만들기</button>
+    <button type="button" class="btn wideBtn" id="btnRandom">랜덤 매칭 방 만들기</button>
+    <label class="fieldLab" for="joinCode">방·팀 코드로 입장</label>
+    <div class="joinRow"><input id="joinCode" inputmode="numeric" maxlength="5" placeholder="방·팀 코드 5자리" autocomplete="off"><button type="button" class="btn" id="btnJoin">입장</button></div>
     <div class="msg" id="teamStartMsg"></div>
     <button type="button" class="btn sub" id="btnTeamBack">← AI 대전으로</button>
   </div>
@@ -406,6 +410,12 @@
     </ul>
   </div>
 
+  <div class="card wide" id="cardParty" style="display:none">
+    <div class="logo">👥 팀 대전</div>
+    <div class="hello">내 닉네임: <b id="partyNick"></b> <button type="button" class="mini" data-maker-open>✏️ 닉네임 설정</button></div>
+    <div id="partyMount"></div>
+  </div>
+
   <div class="card wide" id="cardLobby" style="display:none">
     <div class="codeLine">방 코드<b id="lobbyCode">00000</b></div>
     <div class="hello">내 닉네임: <b id="lobbyNick"></b> <button type="button" class="mini" data-maker-open>✏️ 닉네임 설정</button></div>
@@ -415,6 +425,7 @@
     </div>
     <div class="specRow"><span>👀 관전자 <span id="listSpec"></span></span><button type="button" class="btn sub" id="btnJoinSpec">관전하기</button></div>
     <label class="botRow"><input type="checkbox" id="botFill">빈자리는 AI로 채우기</label>
+    <div class="mk-notice" id="lobbyMatchNote">매칭됐어요! 모두 모이면 바로 시작해요.</div>
     <div class="msg" id="lobbyHint"></div>
     <div class="btns"><button type="button" class="btn" id="btnTeamStart">시작하기</button><button type="button" class="btn sub" id="btnLobbyLeave">나가기</button></div>
   </div>
@@ -433,6 +444,7 @@
       <div><div class="lab">헤드샷 비율</div><div class="val" id="tStatHead">—</div></div>
     </div>
     <div class="msg" id="teamOverHint"></div>
+    <div class="mk-notice" id="teamStreak"></div>
     <div class="btns"><button type="button" class="btn" id="btnBackLobby">로비로 돌아가기</button><button type="button" class="btn sub" id="btnOverLeave">나가기</button></div>
   </div>
 </div>
@@ -454,6 +466,7 @@
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="character-maker.js?v=20261012"></script>
+<script charset="utf-8" src="match-kit.js?v=20261021e"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
@@ -2316,7 +2329,7 @@ function exitTeamMode() {
 function teamScreen(name) {
   T.screen = name;
   for (const k in keys) keys[k] = false;
-  const cards = { start: "cardTeamStart", lobby: "cardLobby", over: "cardTeamOver" };
+  const cards = { start: "cardTeamStart", lobby: "cardLobby", over: "cardTeamOver", party: "cardParty" };
   if (cards[name]) showCard(cards[name]); else $("overlay").style.display = "none";
   const inGame = name === "game", playing = inGame && !T.spec;
   ["hudHp", "hudAmmo"].forEach(id => $(id).style.display = playing ? "block" : "none");
@@ -2336,6 +2349,7 @@ function refreshTeamNick() {
   const nick = PlayerProfile.storedNick();
   $("teamNick").textContent = nick || "(닉네임 없음)";
   $("lobbyNick").textContent = nick;
+  $("partyNick").textContent = nick || "(닉네임 없음)";
 }
 function pushNickToRoom() {
   const nick = PlayerProfile.storedNick();
@@ -2377,6 +2391,7 @@ async function createRoom() {
     await sweepRooms();
     for (let n = 0; n < 8; n++) {
       const code = String(10000 + Math.floor(Math.random() * 90000)), t = tnow();
+      if (await fpsRandom.codeTaken(code)) continue;
       const obj = { status: "lobby", hostPlayerId: T.myId, createdAt: t, botFill: true, players: { [T.myId]: newPlayer("blue", t) } };
       const res = await T.db.ref(TEAM.root + "/" + code).transaction(cur => cur === null ? obj : undefined);
       if (res.committed) { teamStartMsg(""); enterRoom(code); return; }
@@ -2392,6 +2407,8 @@ async function joinRoom() {
   $("btnJoin").disabled = true; teamStartMsg("연결하는 중…");
   try {
     await connectDb();
+    const party = await fpsRandom.tryJoin(code);
+    if (party.handled) { teamStartMsg(party.message); return; }
     const ref = T.db.ref(TEAM.root + "/" + code);
     const st = (await ref.child("status").once("value")).val();
     const ps = (await ref.child("players").once("value")).val() || {};
@@ -2484,14 +2501,14 @@ function exitRoom(msg) {
   }
   T.ref = null; T.players = {}; T.raw = {}; T.kills = {}; T.dmg = {};
   resetMatchLocal(); clearTeamItems();
-  teamScreen("start"); teamStartMsg(msg);
+  fpsRandom.roomClosed(msg);
 }
 window.addEventListener("pagehide", () => { if (T.ref) { try { T.ref.child("players/" + T.myId).remove(); T.ref.child("st/" + T.myId).remove(); } catch (e) {} } });
 
 function playersChanged() {
   if (T.lobbyQueued) return;
   T.lobbyQueued = true;
-  setTimeout(() => { T.lobbyQueued = false; renderLobby(); }, 0);
+  setTimeout(() => { T.lobbyQueued = false; renderLobby(); fpsRandom.roomChanged(); }, 0);
 }
 function canMoveTo(team) {
   const me = T.players[T.myId];
@@ -2590,6 +2607,113 @@ function spawnMe(protect) {
   T.me.alive = true; T.me.protectUntil = protect ? tnow() + TEAM.protectMs : 0; T.forceNet = true;
   renderHud();
 }
+class FpsRandomMatch {
+  static PARTY_LIMIT = TEAM.max;
+  static SIDE_TEAMS = ["blue", "red"];
+  static START_TRIES = 12;
+  static START_RETRY_MS = 300;
+  static SETTLE_MS = 1000;
+  constructor() { this.flow = null; this.botAsked = {}; }
+  async ready() {
+    if (this.flow) return this.flow;
+    const db = await connectDb();
+    if (this.flow) return this.flow;
+    const options = { gameRoot: "fpsbattle", queue: "fpsbattle", partyLimit: FpsRandomMatch.PARTY_LIMIT, matcher: new MkVersusMatcher(FpsRandomMatch.PARTY_LIMIT),
+      intro: "매칭 시작을 누르면 아무 팀과 최대 2대2로 만나요. 빈자리는 AI가 채워요." };
+    const panel = new MkPartyPanel($("overlay"), $("partyMount"), options);
+    this.flow = new MkRandomFlow(db, { now: tnow }, T.myId, options, this, panel);
+    return this.flow;
+  }
+  inParty() { return !!this.flow && this.flow.inParty(); }
+  ticket() { return this.flow ? this.flow.ticket() : null; }
+  async open() {
+    if (!nickReady()) return;
+    $("btnRandom").disabled = true; teamStartMsg("연결하는 중…");
+    try { const flow = await this.ready(); teamStartMsg(await flow.create()); }
+    catch (e) { teamStartMsg("온라인 연결을 할 수 없어요. (인터넷·데이터베이스 규칙 확인)"); }
+    finally { $("btnRandom").disabled = false; }
+  }
+  async tryJoin(code) {
+    try { return await (await this.ready()).tryJoin(code); } catch (e) { return { handled: false, message: "" }; }
+  }
+  async codeTaken(code) {
+    try { return await (await this.ready()).codeTaken(code); } catch (e) { return false; }
+  }
+  updateMe() { if (this.flow) this.flow.updateMe(); }
+  member() { return { nick: PlayerProfile.storedNick() || "학생", joinedAt: tnow(), look: null }; }
+  async create(plan) {
+    const assign = {};
+    plan.groups.forEach(g => MkSeatAssign.peopleOf(g).slice(0, FpsRandomMatch.PARTY_LIMIT).forEach(id => { assign[id] = FpsRandomMatch.SIDE_TEAMS[g.side]; }));
+    await sweepRooms();
+    for (let n = 0; n < 8; n++) {
+      const code = String(10000 + Math.floor(Math.random() * 90000)), t = tnow();
+      if (await this.flow.codeTaken(code)) continue;
+      const obj = { status: "lobby", hostPlayerId: T.myId, createdAt: t, botFill: true, assign, matchId: plan.matchId, players: { [T.myId]: newPlayer(assign[T.myId] || "blue", t) } };
+      const res = await T.db.ref(TEAM.root + "/" + code).transaction(cur => cur === null ? obj : undefined);
+      if (res.committed) return { room: code, host: T.myId };
+    }
+    return null;
+  }
+  async discard(made) { await T.db.ref(TEAM.root + "/" + made.room).remove(); }
+  async enterRoom(ticket, hosting) {
+    const ref = T.db.ref(TEAM.root + "/" + ticket.room);
+    if (!hosting) {
+      const status = (await ref.child("status").once("value")).val();
+      const team = (await ref.child("assign/" + T.myId).once("value")).val();
+      if (status !== "lobby" || !team) return false;
+      await ref.child("players/" + T.myId).set(newPlayer(team, tnow()));
+    }
+    this.botAsked = {};
+    enterRoom(ticket.room);
+    $("cardLobby").classList.add("matched");
+    return true;
+  }
+  leaveRoom() { if (T.ref) leaveRoom(); $("cardLobby").classList.remove("matched"); }
+  afterLeave() {
+    $("cardLobby").classList.remove("matched");
+    if (this.inParty()) { this.flow.backToParty(""); return; }
+    teamScreen("start");
+  }
+  roomClosed(msg) {
+    $("cardLobby").classList.remove("matched");
+    if (this.inParty()) { this.flow.backToParty(msg); return; }
+    teamScreen("start"); teamStartMsg(msg);
+  }
+  startMatch() { this.tryStart(FpsRandomMatch.START_TRIES); }
+  tryStart(triesLeft) {
+    if (!isHost() || T.status !== "lobby") return;
+    if (teamIds("blue").length && teamIds("red").length) { hostStart(); return; }
+    FpsRandomMatch.SIDE_TEAMS.forEach(team => {
+      if (!teamIds(team).length && !this.botAsked[team]) { this.botAsked[team] = true; T.ref.child("players/bot" + team + "0").set({ nickname: "AI 1", team, isAI: true, joinedAt: tnow() + 1 }); }
+    });
+    if (triesLeft > 0) setTimeout(() => this.tryStart(triesLeft - 1), FpsRandomMatch.START_RETRY_MS);
+  }
+  showParty() { teamScreen("party"); refreshTeamNick(); }
+  showStart(message) { teamScreen("start"); teamStartMsg(message); }
+  roomChanged() {
+    if (!this.flow || !T.ref) return;
+    const humans = humanIds(T.players).filter(id => T.players[id].team === "blue" || T.players[id].team === "red").length;
+    this.flow.roomChanged(humans, isHost(), T.status === "lobby");
+  }
+  decorateResult() {
+    const ticket = this.ticket();
+    $("teamStreak").textContent = "";
+    $("btnOverLeave").textContent = ticket ? "팀 대기실로" : "나가기";
+    if (!ticket) return;
+    $("btnBackLobby").hidden = true;
+    $("teamOverHint").textContent = "";
+    const mine = FpsRandomMatch.SIDE_TEAMS[ticket.side];
+    const showStreak = () => { $("teamStreak").textContent = this.flow.endHint(); };
+    showStreak();
+    setTimeout(() => {
+      if (this.ticket() !== ticket) return;
+      const settled = renderTeamResultTitle();
+      this.flow.matchEnded({ result: !settled ? "draw" : settled === mine ? "win" : "lose" }, showStreak);
+    }, FpsRandomMatch.SETTLE_MS);
+  }
+}
+const fpsRandom = new FpsRandomMatch();
+
 function teamCanAct() {
   if (!T.me || !T.me.alive || !T.match || T.screen !== "game") return false;
   const t = tnow();
@@ -3054,6 +3178,7 @@ function showTeamResult() {
   $("tStatShots").textContent = STAT.shots + "발"; $("tStatAcc").textContent = pct(STAT.hits, STAT.shots); $("tStatHead").textContent = pct(STAT.heads, STAT.hits);
   $("btnBackLobby").hidden = !isHost();
   $("teamOverHint").textContent = isHost() ? "" : "방장이 로비로 돌아가면 함께 이동해요.";
+  fpsRandom.decorateResult();
   if (T.me) { if (winner && my === winner) SFX.killHead(); else if (winner) SFX.over(); }
   T.bullets.forEach(bl => scene.remove(bl.g)); T.bullets.length = 0;
   teamScreen("over");
@@ -3307,20 +3432,21 @@ $("btnCreate").onclick = e => { e.currentTarget.blur(); createRoom(); };
 $("btnJoin").onclick = e => { e.currentTarget.blur(); joinRoom(); };
 $("joinCode").addEventListener("keydown", e => { if (e.key === "Enter") joinRoom(); });
 document.addEventListener(PlayerProfile.CHANGE_EVENT, refreshTeamNick);
-document.addEventListener(PlayerProfile.SETTLED_EVENT, () => { refreshTeamNick(); pushNickToRoom(); });
+document.addEventListener(PlayerProfile.SETTLED_EVENT, () => { refreshTeamNick(); pushNickToRoom(); fpsRandom.updateMe(); });
+$("btnRandom").onclick = e => { e.currentTarget.blur(); fpsRandom.open(); };
 $("btnTeamBack").onclick = e => { e.currentTarget.blur(); exitTeamMode(); };
 $("btnJoinBlue").onclick = () => pickTeam("blue");
 $("btnJoinRed").onclick = () => pickTeam("red");
 $("btnJoinSpec").onclick = () => pickTeam("spec");
 $("botFill").onchange = e => { if (isHost()) T.ref.update({ botFill: e.currentTarget.checked }); else e.currentTarget.checked = T.botFill; };
 $("btnTeamStart").onclick = e => { e.currentTarget.blur(); hostStart(); };
-$("btnLobbyLeave").onclick = e => { e.currentTarget.blur(); leaveRoom(); teamScreen("start"); };
+$("btnLobbyLeave").onclick = e => { e.currentTarget.blur(); leaveRoom(); fpsRandom.afterLeave(); };
 $("btnBackLobby").onclick = e => { e.currentTarget.blur(); hostBackToLobby(); };
-$("btnOverLeave").onclick = e => { e.currentTarget.blur(); leaveRoom(); teamScreen("start"); };
+$("btnOverLeave").onclick = e => { e.currentTarget.blur(); leaveRoom(); fpsRandom.afterLeave(); };
 $("btnGameLeave").onclick = e => {
   e.currentTarget.blur();
   if (state === "play") { if (confirm("처음 화면으로 나갈까요? (이번 기록은 저장되지 않아요)")) leaveSoloGame(); return; }
-  if (confirm("방을 나갈까요?")) { leaveRoom(); teamScreen("start"); }
+  if (confirm("방을 나갈까요?")) { leaveRoom(); fpsRandom.afterLeave(); }
 };
 
 const QG = QualityGovernor({

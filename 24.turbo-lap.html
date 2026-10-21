@@ -5188,7 +5188,8 @@ function renderBattleHud() {
 class TurboRandomMatch {
   static START_TRIES = 12;
   static START_RETRY_MS = 300;
-  constructor() { this.flow = null; this.quiet = false; this.botAsked = {}; }
+  static SETTLE_MS = 1000;
+  constructor() { this.flow = null; this.quiet = false; this.botAsked = {}; this.settleFor = ""; this.settledFor = ""; }
   async ready() {
     if (this.flow) return this.flow;
     const db = await connectDb();
@@ -5270,6 +5271,12 @@ class TurboRandomMatch {
     if (!ticket) return;
     $("bDoneHint").textContent = this.flow.endHint();
     if (!rows.length || BT.status !== "ended") return;
+    if (this.settleFor !== ticket.matchId) {
+      this.settleFor = ticket.matchId;
+      setTimeout(() => { this.settledFor = ticket.matchId; if (cardNow === "bdone") renderResult(); }, TurboRandomMatch.SETTLE_MS);
+      return;
+    }
+    if (this.settledFor !== ticket.matchId) return;
     const winner = quitWinner || (rows[0].fin ? rows[0] : null), mine = SIDES[ticket.side];
     this.flow.matchEnded({ result: !winner ? "draw" : winner.team === mine ? "win" : "lose" }, () => { $("bDoneHint").textContent = this.flow.endHint(); });
   }
