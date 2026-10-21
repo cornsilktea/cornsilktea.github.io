@@ -61,6 +61,13 @@
   #spectatorLine { margin-top: 10px; font-size: 14px; font-weight: 700; color: #A9AFC2; text-align: center; }
   #lobbyNotice { margin-top: 8px; font-size: 14px; font-weight: 700; color: #FFD2B8; text-align: center; }
   #lobbyNotice:empty { display: none; }
+  #lobbyScreen.matched #btnStart, #lobbyScreen.matched #btnSeatMode { display: none; }
+  #lobbyScreen.matched .vbSeat { pointer-events: none; }
+  .partyHead { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .vbTeams.one { grid-template-columns: 1fr; }
+  .vbSeat:disabled { cursor: default; }
+  #partyNotice { margin-top: 8px; font-size: 14px; font-weight: 700; color: #FFD2B8; text-align: center; }
+  #partyNotice:empty { display: none; }
 
   .hud-box { background: linear-gradient(135deg, rgba(16, 18, 28, .82), rgba(38, 42, 58, .72)); border: 1.5px solid rgba(255, 255, 255, .22); border-top: 3px solid #D97B4F; border-radius: 10px; padding: 6px 12px; color: #fff; font-weight: 800; font-variant-numeric: tabular-nums; text-shadow: 0 1px 3px rgba(0, 0, 0, .6); box-shadow: 0 4px 14px rgba(0, 0, 0, .3); }
   #gameUi { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 20; pointer-events: none; }
@@ -110,9 +117,10 @@
   <div class="st-wrap">
     <div class="st-hero"><h1 class="st-title">2대2 3D 배구</h1></div>
     <div class="st-card">
-      <button type="button" class="st-btn primary" id="btnCreate">방 만들기</button>
+      <button type="button" class="st-btn primary" id="btnCreate">게임 만들기</button>
+      <button type="button" class="st-btn primary" id="btnRandom">랜덤 매칭 방 만들기</button>
       <div class="st-joinrow">
-        <input type="text" id="joinCode" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="방 코드 5자리">
+        <input type="text" id="joinCode" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="방·팀 코드 5자리">
         <button type="button" class="st-btn blue" id="btnJoin">참여하기</button>
         <button type="button" class="st-btn sub" id="btnWatch">관전하기</button>
       </div>
@@ -167,6 +175,24 @@
   </div>
 </div>
 
+<div id="partyScreen" class="st-screen" hidden>
+  <div class="st-wrap">
+    <div class="st-hero"><h1 class="st-title">2대2 3D 배구</h1></div>
+    <div class="st-card">
+      <h2 class="partyHead">팀 코드 <span class="codeBig" id="partyCode">00000</span><span id="partyStreakSlot"></span></h2>
+      <div class="vbTeams one" id="partySeats"></div>
+      <div id="partyNotice"></div>
+      <button type="button" class="st-btn primary" id="btnMatch" style="margin-top:14px">매칭 시작</button>
+      <div class="st-hint" id="partyHint"></div>
+      <button type="button" class="st-btn sub slim" id="btnPartyLeave" style="margin-top:10px">팀 나가기</button>
+    </div>
+    <div class="st-card st-fold">
+      <h2>캐릭터 만들기</h2>
+      <div id="partyProfileHost"></div>
+    </div>
+  </div>
+</div>
+
 <div id="endScreen" class="st-screen" hidden>
   <div class="st-wrap">
     <div class="st-hero"><h1 class="st-title" id="endTitle">결과</h1></div>
@@ -182,8 +208,10 @@
 
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="fold-card.js"></script>
-<script charset="utf-8" src="34.volleyball-rules.js"></script>
-<script charset="utf-8" src="34.volleyball.js"></script>
+<script charset="utf-8" src="match-kit.js?v=20261021"></script>
+<script charset="utf-8" src="34.volleyball-rules.js?v=20261021"></script>
+<script charset="utf-8" src="34.volleyball-party.js?v=20261021"></script>
+<script charset="utf-8" src="34.volleyball.js?v=20261021"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";

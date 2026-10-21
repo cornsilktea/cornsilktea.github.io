@@ -289,26 +289,33 @@ class VbRoomDirectory {
     constructor(backend) {
         this.backend = backend;
     }
-    async create(myId, record) {
+    async create(myId, record, extra = {}) {
         await this.sweep();
         const database = this.backend.database;
         for (let attempt = 0; attempt < 9; attempt++) {
             const code = String(10000 + Math.floor(Math.random() * 90000));
-            const room = { status: "lobby", hostPlayerId: myId, createdAt: this.backend.now(), players: { [myId]: record } };
+            if ((await database.ref(VbPartyPaths.PARTIES + "/" + code + "/members").once("value")).exists())
+                continue;
+            const room = Object.assign({}, extra, { status: "lobby", hostPlayerId: myId, createdAt: this.backend.now(), players: { [myId]: record } });
             const result = await database.ref(VbConfig.ROOT + "/" + code).transaction((current) => (current !== null ? undefined : room));
             if (result.committed)
                 return code;
         }
         return null;
     }
-    async join(code, myId, record, asSpectator) {
+    async join(code, myId, record, asSpectator, useAssigned = false) {
         const room = this.backend.database.ref(VbConfig.ROOT + "/" + code);
-        const [playersSnapshot, statusSnapshot] = await Promise.all([room.child("players").once("value"), room.child("status").once("value")]);
+        const [playersSnapshot, statusSnapshot, assignedSnapshot] = await Promise.all([
+            room.child("players").once("value"),
+            room.child("status").once("value"),
+            useAssigned ? room.child("assign/" + myId).once("value") : Promise.resolve(null)
+        ]);
         const players = playersSnapshot.val();
         if (!players || !Object.keys(players).some((id) => !players[id].isBot))
             return { ok: false, message: "그런 방이 없어요. 코드를 확인해 주세요." };
         const map = new Map(Object.keys(players).map((id) => [id, players[id]]));
-        const seat = VbSeatPlan.freeSeat(map);
+        const assigned = assignedSnapshot ? assignedSnapshot.val() : null;
+        const seat = assigned !== null && !VbSeatPlan.humanSeats(map)[assigned] ? assigned : VbSeatPlan.freeSeat(map);
         const lobby = statusSnapshot.val() === "lobby";
         const spectate = asSpectator || !lobby || seat < 0;
         if (spectate) {
@@ -1391,6 +1398,7 @@ class VbScreens {
         this.start = VbDom.byId("startScreen");
         this.lobby = VbDom.byId("lobbyScreen");
         this.end = VbDom.byId("endScreen");
+        this.party = VbDom.byId("partyScreen");
         this.gameUi = VbDom.byId("gameUi");
         this.joystickZone = VbDom.byId("joyZone");
         this.current = "start";
@@ -1400,6 +1408,7 @@ class VbScreens {
         VbDom.show(this.start, name === "start");
         VbDom.show(this.lobby, name === "lobby");
         VbDom.show(this.end, name === "end");
+        VbDom.show(this.party, name === "party");
         VbDom.show(this.gameUi, name === "game");
         VbDom.show(this.joystickZone, name === "game" && this.touchDevice && canControl);
         document.body.classList.toggle("in-game", name === "game");
@@ -1557,6 +1566,14 @@ class VolleyballGame {
         this.textures = new VbCourtTextures(libs);
         this.court = new VbCourtView(libs, this.textures);
         this.editor = new ProfileEditor(libs, this.factory, this.assets, this.profile);
+        this.random = new VbRandomFlow(this.backend, this.directory, this.myId, {
+            enterTicketRoom: (code, hosting) => this.enterTicketRoom(code, hosting),
+            leaveRoomQuietly: () => this.leaveRoomQuietly(),
+            startMatch: () => this.startMatch(),
+            showParty: (message) => this.showParty(message),
+            showStart: (message) => this.showStart(message),
+            myRecord: () => this.myRecord()
+        });
         FoldCard.bindAll(document);
         const input = new VolleyballInput(VbDom.byId("joyZone"), VbDom.byId("joyBase"), VbDom.byId("joyKnob"));
         input.onAct = () => { if (this.match)
@@ -1595,6 +1612,7 @@ class VolleyballGame {
     }
     bindMenus() {
         VbDom.byId("btnCreate").addEventListener("click", () => this.createRoom());
+        VbDom.byId("btnRandom").addEventListener("click", () => this.createParty());
         VbDom.byId("btnJoin").addEventListener("click", () => this.joinRoom(false));
         VbDom.byId("btnWatch").addEventListener("click", () => this.joinRoom(true));
         VbDom.byId("joinCode").addEventListener("keydown", (event) => { if (event.key === "Enter")
@@ -1609,7 +1627,7 @@ class VolleyballGame {
     }
     updateStartButtons() {
         const ok = !!this.backend.database && this.assetsReady;
-        ["btnCreate", "btnJoin", "btnWatch"].forEach((id) => { VbDom.byId(id).disabled = !ok; });
+        ["btnCreate", "btnRandom", "btnJoin", "btnWatch"].forEach((id) => { VbDom.byId(id).disabled = !ok; });
         if (!this.backend.database)
             this.showStartMessage("온라인 연결을 할 수 없어요. (firebase-config.js·인터넷 확인)");
     }
@@ -1622,6 +1640,43 @@ class VolleyballGame {
     pushProfile() {
         if (this.session)
             this.session.pushProfile({ nick: this.profile.nickOrDefault(), look: this.profile.look });
+        this.random.updateMe();
+    }
+    async createParty() {
+        if (!this.backend.database)
+            return;
+        this.showStartMessage("");
+        const button = VbDom.byId("btnRandom");
+        button.disabled = true;
+        try {
+            this.showStartMessage(await this.random.create());
+        }
+        catch (error) {
+            this.showStartMessage("팀 대기실을 만들지 못했어요. (데이터베이스 규칙을 확인해 주세요)");
+        }
+        button.disabled = false;
+    }
+    async enterTicketRoom(code, hosting) {
+        if (!hosting) {
+            const outcome = await this.directory.join(code, this.myId, this.myRecord(), false, true).catch(() => null);
+            if (!outcome || !outcome.ok)
+                return false;
+        }
+        this.enterRoom(code, hosting, "매칭됐어요! 곧 경기가 시작돼요.");
+        return true;
+    }
+    leaveRoomQuietly() {
+        if (this.session)
+            this.session.leave();
+        this.session = null;
+        this.disposeMatch();
+    }
+    showParty(message) {
+        this.screens.show("party");
+        this.editor.mount(VbDom.byId("partyProfileHost"));
+        this.editor.setActive(true);
+        VbDom.setText(VbDom.byId("partyNotice"), message);
+        this.random.render();
     }
     async createRoom() {
         if (!this.backend.database)
@@ -1651,6 +1706,11 @@ class VolleyballGame {
         }
         this.showStartMessage("");
         try {
+            const party = await this.random.tryJoin(code);
+            if (party.handled) {
+                this.showStartMessage(party.message);
+                return;
+            }
             const outcome = await this.directory.join(code, this.myId, this.myRecord(), asSpectator);
             if (outcome.ok)
                 this.enterRoom(code, false, outcome.message);
@@ -1679,6 +1739,7 @@ class VolleyballGame {
     }
     showLobby() {
         this.screens.show("lobby");
+        VbDom.byId("lobbyScreen").classList.toggle("matched", this.random.hasTicket());
         this.editor.mount(VbDom.byId("lobbyProfileHost"));
         this.editor.setActive(true);
         if (this.session)
@@ -1696,6 +1757,8 @@ class VolleyballGame {
             return;
         if (this.screens.current === "lobby" && (kind === "players" || kind === "host" || kind === "status"))
             this.lobbyView.render(session);
+        if (kind === "players" || kind === "host" || kind === "status")
+            this.random.roomChanged(session);
         if (kind === "status" || kind === "match" || kind === "end" || (kind === "players" && session.status === "play" && !this.match))
             this.syncPhase();
         if (this.match)
@@ -1722,8 +1785,12 @@ class VolleyballGame {
                 this.match.markEnded();
             this.endView.render(session, session.end);
             this.screens.show("end");
-            VbDom.show(VbDom.byId("btnToLobby"), session.isHost());
-            VbDom.setText(VbDom.byId("endHint"), session.isHost() ? "" : "방장이 대기실로 돌아가길 기다려요…");
+            const matched = this.random.hasTicket();
+            VbDom.show(VbDom.byId("btnToLobby"), session.isHost() && !matched);
+            VbDom.setText(VbDom.byId("btnEndLeave"), matched ? "팀 대기실로" : "방 나가기");
+            VbDom.setText(VbDom.byId("endHint"), matched ? this.random.endHint() : session.isHost() ? "" : "방장이 대기실로 돌아가길 기다려요…");
+            if (matched)
+                this.random.matchEnded(session.end);
         }
     }
     disposeMatch() {
@@ -1800,10 +1867,11 @@ class VolleyballGame {
         session.ref.update(updates);
     }
     leaveRoom() {
-        if (this.session)
-            this.session.leave();
-        this.session = null;
-        this.disposeMatch();
+        if (this.random.inParty()) {
+            this.random.backToParty("");
+            return;
+        }
+        this.leaveRoomQuietly();
         this.showStart("");
     }
     exitToStart(message) {
@@ -1811,7 +1879,10 @@ class VolleyballGame {
             this.session.silentClose();
         this.session = null;
         this.disposeMatch();
-        this.showStart(message);
+        if (this.random.inParty())
+            this.random.backToParty(message);
+        else
+            this.showStart(message);
     }
     step(timeMs) {
         const deltaSeconds = Math.min(0.1, Math.max(0, (timeMs - this.lastFrameMs) / 1000));

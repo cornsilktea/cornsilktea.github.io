@@ -437,6 +437,12 @@ class MkParty {
     return added;
   }
 
+  // 표를 받았는데 그 방에 못 들어갔을 때(방장이 사라짐 등) 팀장이 표를 지워 다시 매칭할 수 있게 한다.
+  clearTicket(matchId: string): void {
+    const match = this.ticket();
+    if (this.isLeader() && match && match.matchId === matchId) this.ref.child("match").set(null);
+  }
+
   async leave(): Promise<void> {
     this.leaving = true;
     this.stopListening();

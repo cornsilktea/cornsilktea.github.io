@@ -1,4 +1,4 @@
-type VbScreenName = "start" | "lobby" | "game" | "end";
+type VbScreenName = "start" | "lobby" | "game" | "end" | "party";
 type VbRoomStatus = "lobby" | "play" | "end";
 type VbChange = "players" | "host" | "status" | "match" | "ball" | "rally" | "end";
 
@@ -316,25 +316,31 @@ class VbRoomDirectory {
 
   constructor(private readonly backend: VbBackend) {}
 
-  async create(myId: string, record: VbPlayerRecord): Promise<string | null> {
+  async create(myId: string, record: VbPlayerRecord, extra: Record<string, unknown> = {}): Promise<string | null> {
     await this.sweep();
     const database = this.backend.database as FirebaseDatabase;
     for (let attempt = 0; attempt < 9; attempt++) {
       const code = String(10000 + Math.floor(Math.random() * 90000));
-      const room = { status: "lobby", hostPlayerId: myId, createdAt: this.backend.now(), players: { [myId]: record } };
+      if ((await database.ref(VbPartyPaths.PARTIES + "/" + code + "/members").once("value")).exists()) continue;
+      const room = Object.assign({}, extra, { status: "lobby", hostPlayerId: myId, createdAt: this.backend.now(), players: { [myId]: record } });
       const result = await database.ref(VbConfig.ROOT + "/" + code).transaction((current) => (current !== null ? undefined : room));
       if (result.committed) return code;
     }
     return null;
   }
 
-  async join(code: string, myId: string, record: VbPlayerRecord, asSpectator: boolean): Promise<VbJoinOutcome> {
+  async join(code: string, myId: string, record: VbPlayerRecord, asSpectator: boolean, useAssigned: boolean = false): Promise<VbJoinOutcome> {
     const room = (this.backend.database as FirebaseDatabase).ref(VbConfig.ROOT + "/" + code);
-    const [playersSnapshot, statusSnapshot] = await Promise.all([room.child("players").once("value"), room.child("status").once("value")]);
+    const [playersSnapshot, statusSnapshot, assignedSnapshot] = await Promise.all([
+      room.child("players").once("value"),
+      room.child("status").once("value"),
+      useAssigned ? room.child("assign/" + myId).once("value") : Promise.resolve(null)
+    ]);
     const players = playersSnapshot.val<Record<string, VbPlayerRecord>>();
     if (!players || !Object.keys(players).some((id) => !players[id].isBot)) return { ok: false, message: "그런 방이 없어요. 코드를 확인해 주세요." };
     const map = new Map<string, VbPlayerRecord>(Object.keys(players).map((id) => [id, players[id]] as [string, VbPlayerRecord]));
-    const seat = VbSeatPlan.freeSeat(map);
+    const assigned = assignedSnapshot ? assignedSnapshot.val<number>() : null;
+    const seat = assigned !== null && !VbSeatPlan.humanSeats(map)[assigned] ? assigned : VbSeatPlan.freeSeat(map);
     const lobby = statusSnapshot.val<string>() === "lobby";
     const spectate = asSpectator || !lobby || seat < 0;
     if (spectate) {
@@ -1476,6 +1482,7 @@ class VbScreens {
   private readonly start = VbDom.byId("startScreen");
   private readonly lobby = VbDom.byId("lobbyScreen");
   private readonly end = VbDom.byId("endScreen");
+  private readonly party = VbDom.byId("partyScreen");
   private readonly gameUi = VbDom.byId("gameUi");
   private readonly joystickZone = VbDom.byId("joyZone");
   current: VbScreenName = "start";
@@ -1487,6 +1494,7 @@ class VbScreens {
     VbDom.show(this.start, name === "start");
     VbDom.show(this.lobby, name === "lobby");
     VbDom.show(this.end, name === "end");
+    VbDom.show(this.party, name === "party");
     VbDom.show(this.gameUi, name === "game");
     VbDom.show(this.joystickZone, name === "game" && this.touchDevice && canControl);
     document.body.classList.toggle("in-game", name === "game");
@@ -1643,6 +1651,7 @@ class VolleyballGame {
   private readonly endView = new VbEndView();
   private readonly editor: ProfileEditor;
   private readonly myId = "p" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+  private readonly random: VbRandomFlow;
   private session: VbRoomSession | null = null;
   private match: VolleyballMatch | null = null;
   private assetsReady = false;
@@ -1654,6 +1663,14 @@ class VolleyballGame {
     this.textures = new VbCourtTextures(libs);
     this.court = new VbCourtView(libs, this.textures);
     this.editor = new ProfileEditor(libs, this.factory, this.assets, this.profile);
+    this.random = new VbRandomFlow(this.backend, this.directory, this.myId, {
+      enterTicketRoom: (code, hosting) => this.enterTicketRoom(code, hosting),
+      leaveRoomQuietly: () => this.leaveRoomQuietly(),
+      startMatch: () => this.startMatch(),
+      showParty: (message) => this.showParty(message),
+      showStart: (message) => this.showStart(message),
+      myRecord: () => this.myRecord()
+    });
     FoldCard.bindAll(document);
     const input = new VolleyballInput(VbDom.byId("joyZone"), VbDom.byId("joyBase"), VbDom.byId("joyKnob"));
     input.onAct = () => { if (this.match) this.match.pressAction(); };
@@ -1690,6 +1707,7 @@ class VolleyballGame {
 
   private bindMenus(): void {
     VbDom.byId("btnCreate").addEventListener("click", () => this.createRoom());
+    VbDom.byId("btnRandom").addEventListener("click", () => this.createParty());
     VbDom.byId("btnJoin").addEventListener("click", () => this.joinRoom(false));
     VbDom.byId("btnWatch").addEventListener("click", () => this.joinRoom(true));
     VbDom.byId("joinCode").addEventListener("keydown", (event) => { if ((event as KeyboardEvent).key === "Enter") this.joinRoom(false); });
@@ -1704,7 +1722,7 @@ class VolleyballGame {
 
   private updateStartButtons(): void {
     const ok = !!this.backend.database && this.assetsReady;
-    ["btnCreate", "btnJoin", "btnWatch"].forEach((id) => { VbDom.byId<HTMLButtonElement>(id).disabled = !ok; });
+    ["btnCreate", "btnRandom", "btnJoin", "btnWatch"].forEach((id) => { VbDom.byId<HTMLButtonElement>(id).disabled = !ok; });
     if (!this.backend.database) this.showStartMessage("온라인 연결을 할 수 없어요. (firebase-config.js·인터넷 확인)");
   }
 
@@ -1718,6 +1736,43 @@ class VolleyballGame {
 
   private pushProfile(): void {
     if (this.session) this.session.pushProfile({ nick: this.profile.nickOrDefault(), look: this.profile.look });
+    this.random.updateMe();
+  }
+
+  private async createParty(): Promise<void> {
+    if (!this.backend.database) return;
+    this.showStartMessage("");
+    const button = VbDom.byId<HTMLButtonElement>("btnRandom");
+    button.disabled = true;
+    try {
+      this.showStartMessage(await this.random.create());
+    } catch (error) {
+      this.showStartMessage("팀 대기실을 만들지 못했어요. (데이터베이스 규칙을 확인해 주세요)");
+    }
+    button.disabled = false;
+  }
+
+  private async enterTicketRoom(code: string, hosting: boolean): Promise<boolean> {
+    if (!hosting) {
+      const outcome = await this.directory.join(code, this.myId, this.myRecord(), false, true).catch(() => null);
+      if (!outcome || !outcome.ok) return false;
+    }
+    this.enterRoom(code, hosting, "매칭됐어요! 곧 경기가 시작돼요.");
+    return true;
+  }
+
+  private leaveRoomQuietly(): void {
+    if (this.session) this.session.leave();
+    this.session = null;
+    this.disposeMatch();
+  }
+
+  private showParty(message: string): void {
+    this.screens.show("party");
+    this.editor.mount(VbDom.byId("partyProfileHost"));
+    this.editor.setActive(true);
+    VbDom.setText(VbDom.byId("partyNotice"), message);
+    this.random.render();
   }
 
   private async createRoom(): Promise<void> {
@@ -1744,6 +1799,11 @@ class VolleyballGame {
     }
     this.showStartMessage("");
     try {
+      const party = await this.random.tryJoin(code);
+      if (party.handled) {
+        this.showStartMessage(party.message);
+        return;
+      }
       const outcome = await this.directory.join(code, this.myId, this.myRecord(), asSpectator);
       if (outcome.ok) this.enterRoom(code, false, outcome.message);
       else this.showStartMessage(outcome.message);
@@ -1768,6 +1828,7 @@ class VolleyballGame {
 
   private showLobby(): void {
     this.screens.show("lobby");
+    VbDom.byId("lobbyScreen").classList.toggle("matched", this.random.hasTicket());
     this.editor.mount(VbDom.byId("lobbyProfileHost"));
     this.editor.setActive(true);
     if (this.session) this.lobbyView.render(this.session);
@@ -1784,6 +1845,7 @@ class VolleyballGame {
     const session = this.session;
     if (!session) return;
     if (this.screens.current === "lobby" && (kind === "players" || kind === "host" || kind === "status")) this.lobbyView.render(session);
+    if (kind === "players" || kind === "host" || kind === "status") this.random.roomChanged(session);
     if (kind === "status" || kind === "match" || kind === "end" || (kind === "players" && session.status === "play" && !this.match)) this.syncPhase();
     if (this.match) this.match.applyChange(kind);
   }
@@ -1803,8 +1865,11 @@ class VolleyballGame {
       if (this.match) this.match.markEnded();
       this.endView.render(session, session.end);
       this.screens.show("end");
-      VbDom.show(VbDom.byId("btnToLobby"), session.isHost());
-      VbDom.setText(VbDom.byId("endHint"), session.isHost() ? "" : "방장이 대기실로 돌아가길 기다려요…");
+      const matched = this.random.hasTicket();
+      VbDom.show(VbDom.byId("btnToLobby"), session.isHost() && !matched);
+      VbDom.setText(VbDom.byId("btnEndLeave"), matched ? "팀 대기실로" : "방 나가기");
+      VbDom.setText(VbDom.byId("endHint"), matched ? this.random.endHint() : session.isHost() ? "" : "방장이 대기실로 돌아가길 기다려요…");
+      if (matched) this.random.matchEnded(session.end);
     }
   }
 
@@ -1875,9 +1940,11 @@ class VolleyballGame {
   }
 
   private leaveRoom(): void {
-    if (this.session) this.session.leave();
-    this.session = null;
-    this.disposeMatch();
+    if (this.random.inParty()) {
+      this.random.backToParty("");
+      return;
+    }
+    this.leaveRoomQuietly();
     this.showStart("");
   }
 
@@ -1885,7 +1952,8 @@ class VolleyballGame {
     if (this.session) this.session.silentClose();
     this.session = null;
     this.disposeMatch();
-    this.showStart(message);
+    if (this.random.inParty()) this.random.backToParty(message);
+    else this.showStart(message);
   }
 
   private readonly loop = (timeMs: number): void => {

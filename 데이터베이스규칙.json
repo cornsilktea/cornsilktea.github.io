@@ -18,6 +18,9 @@
       ".read": true,
       "rooms": {
         "$room": { ".write": "$room.matches(/^[0-9]{5}$/)" }
+      },
+      "parties": {
+        "$party": { ".write": "$party.matches(/^[0-9]{5}$/)" }
       }
     },
     "soccer": {
