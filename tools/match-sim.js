@@ -55,6 +55,11 @@ class MockServer {
     this.listeners = this.listeners.filter((l) => l.client !== client);
     this.notify();
   }
+  blip(client) {
+    (this.disconnects.get(client) || new Set()).forEach((p) => this.put(p, null));
+    this.disconnects.delete(client);
+    this.notify();
+  }
   database(client) {
     return { ref: (p) => {
       if (typeof p !== "string" || p === "") throw new Error("실제 Firebase 처럼 빈 경로는 거절");
@@ -345,6 +350,32 @@ class Scenarios {
     [a, b].forEach((t) => { t.queue.stop(); t.leader.silentClose(); });
   }
 
+  static async scenarioBlip() {
+    const world = new SimWorld(new Mk.MkVersusMatcher(1, SimWorld.TIMING), 3);
+    const solo = await world.team(1, 1), pair = await world.team(2, 2);
+    let closed = 0;
+    solo.leader.onClosed = () => { closed++; };
+    const ticket = { matchId: "b1", room: "10000", side: 0, host: "h", expect: 2, at: Date.now(), rivals: ["상대"] };
+    await solo.leader.report(ticket, { result: "win" });
+    await Util.wait(30);
+    world.server.blip(solo.leader.myId);
+    await Util.wait(80);
+    Report.check("잠깐 끊김: 혼자 팀 대기실 자리가 되살아남", closed === 0 && !!solo.leader.record && solo.leader.isLeader() && solo.leader.book().streak() === 1, [closed, solo.leader.record]);
+    world.server.blip(solo.leader.myId);
+    await Util.wait(80);
+    Report.check("잠깐 끊김 두 번: 다시 되살아남(onDisconnect 다시 걸림)", closed === 0 && !!(world.server.get(world.paths.party(solo.code)) || {}).members, world.server.get(world.paths.party(solo.code)));
+    const [first, second] = pair.parties;
+    world.server.blip(second.myId);
+    await Util.wait(80);
+    Report.check("잠깐 끊김: 둘 팀원 자리가 되살아남", Object.keys(first.record.members).length === 2 && !!second.record, first.record && first.record.members);
+    world.server.blip(first.myId);
+    await Util.wait(80);
+    Report.check("잠깐 끊김: 팀장도 되살아나고 팀장은 한 명", first.isLeader() !== second.isLeader() && Object.keys(second.record.members).length === 2 && Object.keys(first.record.members).length === 2, second.record);
+    await solo.leader.leave();
+    await Util.wait(40);
+    Report.check("잠깐 끊김 뒤 스스로 나가면 대기실이 사라짐", world.server.get(world.paths.party(solo.code)) === null);
+  }
+
   static async scenarioAiFallback() {
     const world = new SimWorld(new Mk.MkVersusMatcher(2, SimWorld.TIMING), 3);
     const lone = await world.team(2, 2);
@@ -400,6 +431,7 @@ class SimRunner {
     await Scenarios.scenarioBinderDies();
     await Scenarios.scenarioCancelWhileClaimed();
     await Scenarios.scenarioAiFallback();
+    await Scenarios.scenarioBlip();
     for (let round = 0; round < 4; round++) {
       await Scenarios.scenarioRandom("동시 입장 2대2 #" + round, new Mk.MkVersusMatcher(2, SimWorld.TIMING), 14, 2, { lag: 6, spread: 1, cancelRate: 0, killRate: 0, settle: 900, capacity: 4, versus: true });
     }

@@ -351,6 +351,8 @@ class MkParty {
   private listener: ((snapshot: FirebaseSnapshot) => void) | null = null;
   private leaving = false;
   private handingOff = false;
+  private restoring = false;
+  private lastMe: MkMember | null = null;
 
   constructor(
     private readonly database: FirebaseDatabase,
@@ -478,13 +480,17 @@ class MkParty {
   }
 
   private apply(record: MkPartyRecord | null): void {
-    if (this.leaving) return;
-    if (!MkPartyDirectory.isAlive(record) || !(record as MkPartyRecord).members![this.myId]) {
-      this.record = null;
-      this.stopListening();
-      this.onClosed("팀 대기실에서 나왔어요.");
+    if (this.leaving || this.restoring) return;
+    const mine = record && record.members ? record.members[this.myId] : undefined;
+    if (!mine && record && this.lastMe) {
+      this.restore(this.lastMe);
       return;
     }
+    if (!MkPartyDirectory.isAlive(record) || !mine) {
+      this.close();
+      return;
+    }
+    this.lastMe = mine;
     this.record = record;
     this.handOffIfLeaderGone();
     this.onChange();
@@ -510,6 +516,44 @@ class MkParty {
       party.search = null;
       return party;
     }).then(() => { this.handingOff = false; }, () => { this.handingOff = false; });
+  }
+
+  private close(): void {
+    this.record = null;
+    this.lastMe = null;
+    this.stopListening();
+    this.onClosed("팀 대기실에서 나왔어요.");
+  }
+
+  // 태블릿이 잠깐 잠들거나 와이파이가 끊기면 서버의 onDisconnect 가 내 자리를 지운다.
+  // 스스로 나간 게 아니고 대기실이 아직 남아 있으면 그 자리를 되살려 전적·연승을 지킨다.
+  private restore(me: MkMember): void {
+    this.restoring = true;
+    let back = false;
+    this.ref.transaction((current) => {
+      back = false;
+      const record = current as MkPartyRecord | null;
+      if (!record || !record.leaderId) return undefined;
+      const members = record.members || {};
+      if (members[this.myId]) {
+        back = true;
+        return undefined;
+      }
+      if (Object.keys(members).length >= this.limit) return undefined;
+      members[this.myId] = me;
+      record.members = members;
+      back = true;
+      return record;
+    }).then(() => back, () => false).then((ok) => {
+      this.restoring = false;
+      if (this.leaving) return;
+      if (!ok) {
+        this.close();
+        return;
+      }
+      this.ref.child("members/" + this.myId).onDisconnect().remove();
+      this.ref.once("value").then((snapshot) => this.apply(snapshot.val<MkPartyRecord>()), () => undefined);
+    });
   }
 
   private stopListening(): void {

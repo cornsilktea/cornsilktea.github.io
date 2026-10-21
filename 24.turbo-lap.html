@@ -40,8 +40,9 @@
   .chip .lab { grid-area: lab; letter-spacing: .02em !important; }
   .chip .chipIcon { grid-area: icon; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 15px; font-style: normal; text-shadow: none; box-shadow: 0 1px 4px rgba(0,0,0,.45), inset 0 0 0 2px rgba(255,255,255,.35); }
   .chipIcon.best { background: #D97B4F; }
-  .chipIcon.pos { background: #fff; }
-  #hudBest, #hudPos { grid-area: val; font-size: 22px; font-weight: 800; line-height: 1.15; font-variant-numeric: tabular-nums; }
+  .chipIcon.pos, .chipIcon.rival { background: #fff; }
+  #hudRival { max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #hudBest, #hudPos, #hudRival { grid-area: val; font-size: 22px; font-weight: 800; line-height: 1.15; font-variant-numeric: tabular-nums; }
   #hud #hudGhost { display: none; font-size: 13px; font-weight: 700; color: #DCE6D6; white-space: nowrap; max-width: 44vw; overflow: hidden; text-overflow: ellipsis; }
   #hudBtns { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 8px); right: 12px; display: flex; gap: 6px; pointer-events: auto; }
   #hud.battle #hudBtns { right: 110px; }
@@ -209,7 +210,7 @@
     #hud .lab { font-size: 10.5px; letter-spacing: .1em; }
     .chip { grid-template-columns: auto 24px; column-gap: 6px; }
     .chip .chipIcon { width: 24px; height: 24px; font-size: 12px; }
-    #hudBest, #hudPos { font-size: 17px; }
+    #hudBest, #hudPos, #hudRival { font-size: 17px; }
     #hudBtns { right: 8px; }
     #hudBtns button { font-size: 13px; padding: 0 9px; }
     #hud.battle #hudBtns { right: 100px; }
@@ -328,6 +329,7 @@
   <div class="hudRight">
     <div class="chip" id="hudPosBox" hidden><span class="lab">순위</span><span id="hudPos">1 / 2</span><i class="chipIcon pos">🏁</i></div>
     <div class="chip"><span class="lab">이번 경기 최고 랩</span><span id="hudBest">—</span><i class="chipIcon best">⏱</i></div>
+    <div class="chip" id="hudRivalBox" hidden><span class="lab">상대</span><span id="hudRival">—</span><i class="chipIcon rival">🚗</i></div>
     <div id="hudGhost"></div>
   </div>
   <div id="hudBtns">
@@ -485,7 +487,7 @@
 
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="character-maker.js?v=20261012"></script>
-<script charset="utf-8" src="match-kit.js?v=20261021g"></script>
+<script charset="utf-8" src="match-kit.js?v=20261021h"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
 <script type="module">
@@ -4430,15 +4432,14 @@ function enterRoom(code) {
   BT.players = {}; BT.status = "lobby"; BT.host = null; BT.hostLoaded = false; BT.raw = {}; BT.result = null; BT.lobbyCarSig = "";
   resetMatchLocal();
   const ref = BT.ref;
-  ref.child("players/" + BT.myId).onDisconnect().remove();
-  ref.child("st/" + BT.myId).onDisconnect().remove();
-  ref.child("hit/" + BT.myId).onDisconnect().remove();
+  roomPresence.arm(ref);
+  quitGrace.reset();
   const pref = ref.child("players");
   sub(pref, "child_added", s => { BT.players[s.key] = s.val(); playersChanged(); });
   sub(pref, "child_changed", s => { BT.players[s.key] = s.val(); playersChanged(); });
   sub(pref, "child_removed", s => {
     delete BT.players[s.key]; removeEnt(s.key); delete BT.raw[s.key];
-    if (s.key === BT.myId && !BT.leaving) { exitRoom("방에서 나가졌어요."); return; }
+    if (s.key === BT.myId && !BT.leaving) { roomPresence.rejoin(ref, s.val()); return; }
     checkHost(); playersChanged();
   });
   sub(ref.child("hostPlayerId"), "value", s => { BT.host = s.val(); BT.hostLoaded = true; checkHost(); playersChanged(); });
@@ -4450,6 +4451,7 @@ function enterRoom(code) {
   sub(ref.child("startAt"), "value", s => { BT.startAt = s.val() || 0; if (BT.match) BT.match.startAt = BT.startAt; });
   sub(ref.child("result"), "value", s => { BT.result = s.val(); if (cardNow === "bdone") renderResult(); });
   sub(ref.child("quitSide"), "value", s => { BT.quitSide = s.val(); if (cardNow === "bdone") renderResult(); });
+  sub(ref.child("bye"), "value", s => quitGrace.setByes(s.val()));
   sub(ref.child("status"), "value", s => onStatus(s.val()));
   const stRef = ref.child("st");
   sub(stRef, "child_added", s => onRemoteState(s.key, s.val()));
@@ -4479,8 +4481,9 @@ function checkHost() {
 function leaveRoom() {
   if (!BT.ref) return;
   const ref = BT.ref, me = BT.myId;
+  roomPresence.sayBye(ref);
   BT.leaving = true; unsubAll();
-  try { ref.child("players/" + me).onDisconnect().cancel(); ref.child("st/" + me).onDisconnect().cancel(); ref.child("hit/" + me).onDisconnect().cancel(); } catch (e) {}
+  roomPresence.disarm(ref);
   ref.child("st/" + me).remove().catch(() => {}); ref.child("hit/" + me).remove().catch(() => {});
   ref.child("players/" + me).remove().then(() => ref.child("players").once("value")).then(s => {
     const ps = s.val() || {};
@@ -4495,7 +4498,7 @@ function leaveRoom() {
 function exitRoom(msg) {
   if (BT.ref) {
     BT.leaving = true; unsubAll();
-    try { BT.ref.child("players/" + BT.myId).onDisconnect().cancel(); BT.ref.child("st/" + BT.myId).onDisconnect().cancel(); } catch (e) {}
+    roomPresence.disarm(BT.ref);
   }
   closeRoomLocal(msg);
 }
@@ -4511,7 +4514,7 @@ window.addEventListener("pagehide", () => { if (BT.ref) { try { BT.ref.child("pl
 function playersChanged() {
   if (BT.queued) return;
   BT.queued = true;
-  setTimeout(() => { BT.queued = false; fixSeat(); renderLobby(); if (cardNow === "bdone") renderResult(); turboRandom.roomChanged(); }, 0);
+  setTimeout(() => { BT.queued = false; fixSeat(); renderLobby(); rivalChip.render(); if (cardNow === "bdone") renderResult(); turboRandom.roomChanged(); }, 0);
 }
 function capOf(team) { return team === "spec" ? BATTLE.specMax : 1; }
 function canMoveTo(team) {
@@ -4578,11 +4581,11 @@ function renderLobby() {
 function hostStart() {
   if (!isHost() || BT.status !== "lobby" || !humanRacerReady()) return;
   audioInit();
-  BT.ref.update({ status: "countdown", startAt: tnow() + BATTLE.countMs, endedAt: null, st: null, result: null, quitSide: null });
+  BT.ref.update({ status: "countdown", startAt: tnow() + BATTLE.countMs, endedAt: null, st: null, result: null, quitSide: null, bye: null });
 }
 function hostBackToLobby() {
   if (!isHost()) return;
-  BT.ref.update({ status: "lobby", st: null, result: null, quitSide: null, startAt: null, endedAt: null });
+  BT.ref.update({ status: "lobby", st: null, result: null, quitSide: null, startAt: null, endedAt: null, bye: null });
 }
 
 function onStatus(st) {
@@ -4595,6 +4598,7 @@ function onStatus(st) {
 function setBattleHud(on) {
   const spec = on && BT.spec;
   $("hudPosBox").hidden = !on || spec; hud.classList.toggle("battle", on);
+  rivalChip.show(on && !spec);
   $("btnReset").style.display = on ? "none" : "";
   $("btnToMenu").style.display = on ? "none" : "";
   $("btnMatchLeave").hidden = !on;
@@ -4630,7 +4634,9 @@ function startMatchLocal() {
   showCard(null); setHud(!BT.spec); setBattleHud(true);
   $("hudGhost").style.display = "none";
   countBox.style.display = late ? "none" : "flex"; countNum.textContent = ""; countNum.className = ""; lapToast.className = "";
-  hudLap.parentElement.style.display = hudBest.parentElement.style.display = OPEN ? "none" : "";
+  hudLap.parentElement.style.display = OPEN ? "none" : "";
+  rivalChip.show(!BT.spec);
+  quitGrace.reset();
   hudLap.textContent = "1 / " + LAPS; hudTime.firstChild.nodeValue = fmtTime(0); hudOff.textContent = "";
   engineStart();
   okeys(BT.raw).forEach(id => onRemoteState(id, BT.raw[id]));
@@ -5093,6 +5099,7 @@ function hostTick() {
   const t = tnow();
   if (BT.status === "countdown" && msToGo() <= 0 && BT.statusSent !== "playing") { BT.statusSent = "playing"; BT.ref.update({ status: "playing" }); }
   if (BT.status !== "playing" && BT.status !== "countdown") return;
+  if (quitGrace.waiting(t)) return;
   const st = frameStandings.get(), quitSide = sideAllQuit();
   const over = !st.length || st.every(r => r.fin) || (BT.match.firstFinAt && t - BT.match.firstFinAt > BATTLE.dnfMs) || !!quitSide;
   if (!over || BT.statusSent === "ended") return;
@@ -5185,8 +5192,67 @@ function renderBattleHud() {
   else if (BT.match.firstFinAt) note = "⏱ 상대가 완주했어요! " + Math.max(0, Math.ceil((BATTLE.dnfMs - (t - BT.match.firstFinAt)) / 1000)) + "초 안에 들어오세요";
   setNote(note);
 }
+class RoomPresence {
+  static PATHS = ["players/", "st/", "hit/"];
+  arm(ref) { RoomPresence.PATHS.forEach(p => ref.child(p + BT.myId).onDisconnect().remove()); }
+  disarm(ref) { try { RoomPresence.PATHS.forEach(p => ref.child(p + BT.myId).onDisconnect().cancel()); } catch (e) {} }
+  sayBye(ref) {
+    const me = BT.players[BT.myId];
+    if (!BT.match || BT.spec || !me || (BT.status !== "countdown" && BT.status !== "playing")) return;
+    ref.child("bye/" + BT.myId).set(me.team).catch(() => {});
+  }
+  rejoin(ref, saved) {
+    const lost = msg => { if (BT.ref === ref && !BT.leaving) exitRoom(msg); };
+    if (!saved) { lost("방에서 나가졌어요."); return; }
+    ref.child("status").once("value").then(s => {
+      if (BT.ref !== ref || BT.leaving) return;
+      if (s.val() === null) { lost("방이 종료되었어요."); return; }
+      if (saved.team !== "spec" && sideIds(saved.team).some(id => id !== BT.myId)) { lost("방에서 나가졌어요."); return; }
+      this.arm(ref);
+      BT.sent = ""; BT.forceNet = true;
+      return ref.child("players/" + BT.myId).set(saved);
+    }).catch(() => lost("방에서 나가졌어요."));
+  }
+}
+const roomPresence = new RoomPresence();
+
+class QuitGrace {
+  static GRACE_MS = 8000;
+  constructor() { this.byes = {}; this.goneSince = {}; }
+  reset() { this.goneSince = {}; }
+  setByes(byes) { this.byes = byes || {}; }
+  saidBye(side) { return okeys(this.byes).some(id => this.byes[id] === side); }
+  waiting(now) {
+    const started = BT.match && BT.match.humansAtStart;
+    if (!started) return false;
+    return SIDES.some(side => {
+      if (!started[side] || humansOnSide(side) || this.saidBye(side)) { delete this.goneSince[side]; return false; }
+      if (!this.goneSince[side]) this.goneSince[side] = now;
+      return now - this.goneSince[side] < QuitGrace.GRACE_MS;
+    });
+  }
+}
+const quitGrace = new QuitGrace();
+
+class RivalChip {
+  constructor() { this.box = $("hudRivalBox"); this.name = $("hudRival"); this.on = false; }
+  show(on) {
+    this.on = on;
+    this.box.hidden = !on;
+    hudBest.parentElement.style.display = on || OPEN ? "none" : "";
+    this.render();
+  }
+  render() {
+    if (!this.on) return;
+    const rival = racerOf(myTeam() === "left" ? "right" : "left");
+    setText(this.name, rival ? nickOf(rival) : "—");
+  }
+}
+const rivalChip = new RivalChip();
+
 class TurboRandomMatch {
   static START_TRIES = 12;
+  static FORFEIT_PROGRESS = 0.5;
   static START_RETRY_MS = 300;
   static SETTLE_MS = 1000;
   static AI_FALLBACK_MS = 30000;
@@ -5265,6 +5331,23 @@ class TurboRandomMatch {
   roomChanged() {
     if (this.flow && BT.ref) this.flow.roomChanged(racerIds().filter(id => !isBot(id)).length, isHost(), BT.status === "lobby");
   }
+  raceProgress() {
+    if (!BT.match) return 0;
+    if (BT.match.firstFinAt) return 1;
+    return standings().reduce((most, r) => Math.max(most, r.fin ? 1 : OPEN ? r.prog : r.prog / LAPS), 0);
+  }
+  forfeits() {
+    return !!this.ticket() && !!BT.match && !BT.spec && BT.status !== "ended" && this.raceProgress() >= TurboRandomMatch.FORFEIT_PROGRESS;
+  }
+  leaveQuestion() {
+    return this.forfeits() ? "경기가 절반 넘게 진행됐어요. 지금 나가면 패배로 기록됩니다. 나갈까요?" : "방을 나갈까요? 경기 중이면 미완주로 처리됩니다.";
+  }
+  recordBeforeLeave() {
+    const ticket = this.ticket();
+    if (!ticket) return;
+    if (this.forfeits()) { this.flow.matchEnded({ result: "lose" }); return; }
+    if (BT.status === "ended" && cardNow === "bdone") { this.settleFor = this.settledFor = ticket.matchId; renderResult(); }
+  }
   decorateResult(rows, quitWinner) {
     const ticket = this.ticket();
     $("btnToLobby").hidden = !!ticket;
@@ -5299,8 +5382,8 @@ $("btnJoin").onclick = e => { e.currentTarget.blur(); audioInit(); joinRoom(); }
 $("btnRandom").onclick = e => { e.currentTarget.blur(); audioInit(); turboRandom.open(); };
 $("joinCode").onkeydown = e => { if (e.key === "Enter") joinRoom(); };
 $("btnLeaveLobby").onclick = e => { e.currentTarget.blur(); leaveRoom(); };
-$("btnLeaveEnd").onclick = e => { e.currentTarget.blur(); leaveRoom(); };
-$("btnMatchLeave").onclick = e => { e.currentTarget.blur(); if (confirm("방을 나갈까요? 경기 중이면 미완주로 처리됩니다.")) leaveRoom(); };
+$("btnLeaveEnd").onclick = e => { e.currentTarget.blur(); turboRandom.recordBeforeLeave(); leaveRoom(); };
+$("btnMatchLeave").onclick = e => { e.currentTarget.blur(); if (confirm(turboRandom.leaveQuestion())) { turboRandom.recordBeforeLeave(); leaveRoom(); } };
 $("btnToLobby").onclick = e => { e.currentTarget.blur(); hostBackToLobby(); };
 $("btnBStart").onclick = e => { e.currentTarget.blur(); hostStart(); };
 $("btnJoinLeft").onclick = e => { e.currentTarget.blur(); pickTeam("left"); };

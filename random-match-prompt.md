@@ -150,8 +150,12 @@
 - 시간: 대기 3초(`MkMatcher.TIMING.settleMs`), 묶던 사람이 사라졌을 때 차지 풀림 10초(`claimExpireMs`).
 - **AI 대체 매칭**(2026-10-21 선생님 요청, 24·30번만 켬): 흐름 옵션 `aiFallbackMs`(30000)를 주면 팀장이 그 시간 동안 상대를 못 찾을 때 `MkQueue.goSolo` 로
   우리 팀만 든 방을 만들어 바로 시작한다(상대 편은 게임이 AI 로 채움: 24번 AI 1대, 30번 AI 3명). 누가 우리를 묶어 가는 중이면 하지 않는다. 대기 문구에 "n초 뒤 AI와 시작해요", 전적은 "vs AI".
+- **잠깐 끊김 복구**(2026-10-21, 24번 "방이 나가진다" 보고): 태블릿이 잠들거나 와이파이가 끊기면 서버 onDisconnect 가 내 자리를 지운다.
+  `MkParty` 는 스스로 나간 게 아니고 대기실이 남아 있으면 내 자리를 되살리고 onDisconnect 를 다시 건다(모든 게임 공통).
+  24번은 방 자리도 되살리고(`RoomPresence`), 방장은 상대가 사라져도 8초 기다린 뒤 기권 처리(`QuitGrace`, 나가기 버튼으로 나가면 `bye/<id>` 로 바로).
+  24번 랜덤 매칭에서 경기가 절반 넘게 진행된 뒤(앞선 차 기준) 나가기를 누르면 나간 쪽 전적은 패. 대전 HUD 오른쪽 위는 최고 랩 대신 상대 닉네임.
 - 검사: `node tools/match-sim.js`(가짜 Firebase, 약 40초). 동시 입장·취소·끊김·방 만들기 실패·묶던 사람 끊김·
-  정원 넘김·연승(승·무·패, 중복 반영, 팀장 교체·끊김, 다시 매칭) 143개. match-kit.ts 를 고치면 꼭 돌린다.
+  정원 넘김·연승(승·무·패, 중복 반영, 팀장 교체·끊김, 다시 매칭)·잠깐 끊김 복구 152개. match-kit.ts 를 고치면 꼭 돌린다.
 - **공용 흐름(2026-10-21)**: 팀 대기실 화면 `MkPartyPanel(.st-screen 요소, 넣을 칸, 옵션)` 과 흐름 `MkRandomFlow(db, clock, 내id, 옵션, 훅, 패널)` 이
   match-kit 에 있다. 게임은 `MkGameHooks`(member·create(plan)·discard·enterRoom(표, 방장?)·leaveRoom·startMatch·showParty·showStart)만 만든다.
   게임 쪽에서 부르는 것: `create()`·`tryJoin(코드)`·`codeTaken(코드)`·`roomChanged(사람 수, 방장?, 대기 중?)`·`matchEnded({result, rank?, of?}, 연승 갱신 콜백)`·
