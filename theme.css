@@ -180,6 +180,30 @@
 .st-fold.open .st-fold-btn::before{content:"\25B2";}
 .st-fold-body[hidden]{display:none;}
 
+/* 랜덤 매칭(match-kit.ts): 연승 버튼과 전적 창. 창은 그 게임 .st-screen 안에 붙어 --st-* 색을 받는다.
+   승·무·패는 색만으로 구분하지 않고 글자를 같이 쓴다(색을 구분하기 어려운 학생). */
+.mk-streak{display:inline-flex;align-items:center;gap:4px;min-height:40px;padding:4px 14px;border-radius:999px;
+  border:2px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);color:var(--st-ink,#EEF2EE);
+  font:inherit;font-size:16px;font-weight:800;cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent;}
+.mk-streak.hot{border-color:#D97B4F;background:rgba(217,123,79,.22);color:#FFE3D3;}
+.mk-streak:active{filter:brightness(.9);}
+.mk-backdrop{position:fixed;top:0;right:0;bottom:0;left:0;z-index:80;display:flex;align-items:center;justify-content:center;
+  padding:16px;background:rgba(0,0,0,.55);}
+.mk-backdrop[hidden]{display:none;}
+.mk-dialog{width:100%;max-width:460px;max-height:min(80vh,620px);display:flex;flex-direction:column;margin:0;
+  background:rgba(var(--st-bg,6,12,9),.94);}
+.mk-summary{font-weight:800;color:var(--st-title,#F4F1E8) !important;}
+.mk-history{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;margin:0;padding:0;list-style:none;}
+.mk-line{display:grid;grid-template-columns:auto auto 1fr auto;gap:10px;align-items:center;padding:8px 6px;
+  border-bottom:1px solid rgba(255,255,255,.1);font-size:15px;color:var(--st-ink-mid,#CFD8D0);}
+.mk-n{font-variant-numeric:tabular-nums;color:var(--st-ink-soft,#A3B0A6);}
+.mk-mark{min-width:34px;padding:2px 8px;border-radius:4px;text-align:center;white-space:nowrap;color:#fff;}
+.mk-line.win .mk-mark{background:#3E8E5E;}
+.mk-line.draw .mk-mark{background:#6B7280;}
+.mk-line.lose .mk-mark{background:#B4533A;}
+.mk-detail{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mk-time{font-variant-numeric:tabular-nums;color:var(--st-ink-soft,#A3B0A6);}
+
 /* 캐릭터 만들기(character-kit.ts 의 ProfileEditor). 어두운 .st-screen 카드 안에서 쓴다. */
 .ce-nick{width:100%;min-height:48px;padding:6px 12px;font:inherit;font-size:18px;font-weight:800;border-radius:6px;
   border:2px solid rgba(255,255,255,.3);background:rgba(255,255,255,.06);color:#fff;outline:0;-webkit-user-select:text;user-select:text;}

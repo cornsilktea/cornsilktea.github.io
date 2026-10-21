@@ -128,10 +128,35 @@
 4. 각 게임의 기존 검사(30 &test·&sim, 34·35·38·39 sim/unit 등)가 모두 통과해야 한다.
 5. 마지막에 데이터베이스규칙.json 변경 내용을 선생님께 게시하라고 알린다.
 
+## 공용 모듈 사용법(1단계에서 만든 것, 2단계부터 이대로 붙인다)
+- 불러오기: HTML 에 `<script src="match-kit.js"></script>`(three·room-kit 과 무관, 인라인 게임도 같은 줄).
+  모양은 `theme.css` 의 `.mk-*`(연승 버튼·전적 창).
+- 경로: `MkPaths.forGame("<게임 루트>", "<대기열 이름>")` → 대기열 `matchQueue/<대기열 이름>`,
+  팀 대기실 `<게임 루트>/parties/<코드>`, 일반 방 `<게임 루트>/rooms/<코드>`(팀 코드는 방 코드와 안 겹치게 만든다).
+  38·39 는 개인전·팀전 대기열 이름을 나눈다(예: `snowroyale_solo`·`snowroyale_team`).
+- 클래스:
+  | 클래스 | 하는 일 |
+  |---|---|
+  | `MkPartyDirectory(db, clock, paths, 팀정원)` | `create(내id, 멤버)` → 팀 코드, `join(코드, 내id, 멤버)` → `{ok,message}`, `exists(코드)`(입장 칸에서 방/팀 구분) |
+  | `MkParty(db, clock, paths, 코드, 내id, 팀정원)` | `connect()` 후 `onChange`·`onTicket(표)`·`onClosed`. `members()`·`bots()`·`setBots(n)`·`isLeader()`·`searching()`·`searchSeconds()`·`book()`(전적)·`report(표, {result, rank?, of?})`(팀장만, 같은 판 한 번)·`leave()` |
+  | `MkQueue(db, clock, paths, matcher, roomMaker)` | 팀장 기기에서만. `enter(party)`·`cancel(party)`(이미 묶이는 중이면 false). 내 차례면 묶어서 `roomMaker.create(plan)` 으로 일반 방을 만들고 각 팀에 표(`parties/<코드>/match`)를 쓴다 |
+  | `MkVersusMatcher(팀정원)` / `MkFreeForAllMatcher(팀정원, 방정원)` | 묶는 규칙(2편 / 여럿이 한 방). 게임별로 더 다르면 이것을 이어 `pick`·`sides` 를 덮어쓴다 |
+  | `MkRoomMaker`(게임이 만드는 객체) | `create(plan)` → `{room, host, map?}`. plan.groups 마다 `code·entry(people·bots·size)·side`, `plan.seed` 로 맵·시작 위치를 고른다. 선택 `discard(made)`(방을 만들었는데 차지를 잃었을 때 지우기) |
+  | `MkRecordBook` | 전적 합계·연승(`streak()`·`streakLabel()`·`summary()`) — 연승은 전적 끝에서 센다 |
+  | `MkStreakButton(.st-screen 요소, 순위전?)` | `.element` 를 팀 코드 옆에 붙이고 `render(party.book())`. 누르면 `MkHistoryDialog` |
+- 표(`MkTicket`): `matchId·room·side·host·expect(사람 수)·rivals(상대 닉네임)·map`. 표를 받으면 `host === 내id` 면 이미 방장으로
+  방에 있고, 아니면 기존 "코드로 입장" 흐름으로 `room` 에 들어간다. 방장은 `expect` 명이 모이면(또는 잠깐 기다린 뒤) 바로 시작.
+  판이 끝나면 팀 대기실 화면으로 돌아오고 팀장이 `party.report(표, 결과)`.
+- 시간: 대기 3초(`MkMatcher.TIMING.settleMs`), 묶던 사람이 사라졌을 때 차지 풀림 10초(`claimExpireMs`).
+- 검사: `node tools/match-sim.js`(가짜 Firebase, 약 40초). 동시 입장·취소·끊김·방 만들기 실패·묶던 사람 끊김·
+  정원 넘김·연승(승·무·패, 중복 반영, 팀장 교체·끊김, 다시 매칭) 143개. match-kit.ts 를 고치면 꼭 돌린다.
+- DB 규칙: `matchQueue/$queue` 는 1단계에서 넣었다. 게임을 붙일 때마다 그 게임 루트에
+  `"parties": { "$party": { ".write": "$party.matches(/^[0-9]{5}$/)" } }` 를 넣는다(11단계에서 한꺼번에 게시 안내).
+
 ## 진행 상태
 | 단계 | 내용 | 상태 |
 |---|---|---|
-| 1 | ts/match-kit.ts(연승 버튼·전적 창 포함) + tools/ 매칭 시뮬레이터 | 대기 |
+| 1 | ts/match-kit.ts(연승 버튼·전적 창 포함) + tools/ 매칭 시뮬레이터 | 완료(2026-10-21) — `node tools/match-sim.js` 143개 통과, 연승 버튼·전적 창 브라우저 확인 |
 | 2 | 34 배구 | 대기 |
 | 3 | 35 축구 | 대기 |
 | 4 | 38 눈싸움 배틀로얄 | 대기 |
