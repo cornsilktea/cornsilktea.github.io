@@ -540,6 +540,43 @@ class MkQueue {
         }
         this.retryLater(myCode);
     }
+    // 오래 기다려도 상대가 없을 때(aiFallbackMs): 내 항목만 차지해 우리 팀만 든 방을 만든다(상대 편은 게임이 AI 로 채움).
+    // 그 사이 다른 팀장이 나를 묶어 가는 중(claim)이면 그만두고 사람끼리 매칭을 따른다.
+    async goSolo(myCode) {
+        if (this.binding)
+            return false;
+        this.binding = true;
+        let plan = null;
+        let delivered = false;
+        try {
+            const result = await this.database.ref(this.paths.queue).transaction((current) => {
+                plan = null;
+                const entries = current;
+                const now = this.clock.now();
+                const mine = entries ? entries[myCode] : null;
+                if (!entries || !mine || !this.matcher.isFree(mine, now))
+                    return undefined;
+                const solo = {
+                    matchId: myCode + "-ai-" + now.toString(36),
+                    seed: Math.floor(this.random() * 2147483647),
+                    binder: myCode,
+                    groups: [{ code: myCode, entry: mine, side: this.random() < 0.5 ? 0 : 1 }]
+                };
+                mine.claim = { by: myCode, at: now, id: solo.matchId };
+                plan = solo;
+                return entries;
+            });
+            const claimed = plan;
+            delivered = result.committed && !!claimed && (await this.deliver(claimed));
+        }
+        catch (error) {
+            delivered = false;
+        }
+        this.binding = false;
+        if (!delivered)
+            this.consider(myCode);
+        return delivered;
+    }
     // 묶기가 그만둬졌다는 건 내 기기가 본 대기열이 서버보다 늦다는 뜻이다. 바로 다시 하면
     // 같은 판단을 끝없이 되풀이하므로, 잠깐 쉬었다가(그 사이 새 대기열 값이 오면 그걸로) 다시 본다.
     retryLater(myCode) {
@@ -715,8 +752,10 @@ class MkPartyPanel {
         this.matchButton.classList.toggle("primary", !searching);
         this.matchButton.disabled = !leader;
         const streakNote = book.streak() > 0 ? " · 지금 " + book.streak() + "연승 중" : "";
+        const fallback = this.options.aiFallbackMs ? Math.ceil(this.options.aiFallbackMs / 1000) - party.searchSeconds() : 0;
+        const fallbackNote = !this.options.aiFallbackMs ? "" : fallback > 0 ? " · " + fallback + "초 뒤 AI와 시작해요" : " · AI와 시작하는 중…";
         this.hint.textContent = searching
-            ? "상대를 찾는 중… " + party.searchSeconds() + "초" + streakNote
+            ? "상대를 찾는 중… " + party.searchSeconds() + "초" + fallbackNote + streakNote
             : (leader ? this.options.intro : "팀장이 매칭을 시작하길 기다리는 중이에요…") + streakNote;
     }
     static button(className, text, onClick) {
@@ -757,6 +796,7 @@ class MkRandomFlow {
         this.secondsTimer = null;
         this.startedFor = "";
         this.reported = false;
+        this.fallbackFor = 0;
         this.onResult = () => undefined;
         this.paths = MkPaths.forGame(options.gameRoot, options.queue);
         this.directory = new MkPartyDirectory(database, clock, this.paths, options.partyLimit);
@@ -917,11 +957,21 @@ class MkRandomFlow {
     }
     tickSeconds(on) {
         if (on && !this.secondsTimer)
-            this.secondsTimer = setInterval(() => this.render(), 1000);
+            this.secondsTimer = setInterval(() => { this.render(); this.checkAiFallback(); }, 1000);
         if (!on && this.secondsTimer) {
             clearInterval(this.secondsTimer);
             this.secondsTimer = null;
         }
+    }
+    checkAiFallback() {
+        const party = this.party, wait = this.options.aiFallbackMs;
+        const search = party ? party.searching() : null;
+        if (!wait || !party || !search || !party.isLeader() || !this.queue || this.fallbackFor === search.since)
+            return;
+        if (this.clock.now() - search.since < wait)
+            return;
+        this.fallbackFor = search.since;
+        this.queue.goSolo(party.code);
     }
     async leaveParty() {
         const party = this.party;

@@ -345,6 +345,28 @@ class Scenarios {
     [a, b].forEach((t) => { t.queue.stop(); t.leader.silentClose(); });
   }
 
+  static async scenarioAiFallback() {
+    const world = new SimWorld(new Mk.MkVersusMatcher(2, SimWorld.TIMING), 3);
+    const lone = await world.team(2, 2);
+    await lone.queue.enter(lone.leader);
+    await Util.wait(60);
+    const solo = await lone.queue.goSolo(lone.code);
+    await Util.wait(80);
+    const ticket = lone.parties[0].tickets[0];
+    Report.check("AI 대체: 혼자면 우리 팀만 든 방으로 표를 받음", solo && !!ticket && !(ticket.rivals || []).length && ticket.expect === 2 && lone.parties[1].tickets.length === 1, [solo, ticket]);
+    Report.check("AI 대체: 대기열에서 빠지고 찾는 중이 풀림", !world.queueNow()[lone.code] && !lone.leader.searching());
+    const a = await world.team(1, 2), b = await world.team(1, 2);
+    let release;
+    world.makerHook = () => new Promise((resolve) => { release = resolve; });
+    await a.queue.enter(a.leader); await Util.wait(5); await b.queue.enter(b.leader);
+    await Util.wait(150);
+    const refused = await b.queue.goSolo(b.code);
+    release(true);
+    await Util.wait(120);
+    Report.check("AI 대체: 사람끼리 묶이는 중이면 하지 않음", refused === false && a.leader.tickets.length === 1 && b.leader.tickets.length === 1 && a.leader.tickets[0].room === b.leader.tickets[0].room, [refused, a.leader.tickets.length, b.leader.tickets.length]);
+    [lone, a, b].forEach((t) => { t.queue.stop(); t.parties.forEach((p) => p.silentClose()); });
+  }
+
   static unitMatcher() {
     const m = new Mk.MkFreeForAllMatcher(3, 6, SimWorld.TIMING);
     const e = (at, size, claim) => ({ leader: "x", people: {}, bots: 0, size, at, claim: claim || null });
@@ -377,6 +399,7 @@ class SimRunner {
     await Scenarios.scenarioMakerFails();
     await Scenarios.scenarioBinderDies();
     await Scenarios.scenarioCancelWhileClaimed();
+    await Scenarios.scenarioAiFallback();
     for (let round = 0; round < 4; round++) {
       await Scenarios.scenarioRandom("동시 입장 2대2 #" + round, new Mk.MkVersusMatcher(2, SimWorld.TIMING), 14, 2, { lag: 6, spread: 1, cancelRate: 0, killRate: 0, settle: 900, capacity: 4, versus: true });
     }

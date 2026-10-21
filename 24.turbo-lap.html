@@ -353,9 +353,9 @@
       <h1 class="st-title">TURBO LAP</h1>
     </div>
     <div class="st-card">
-      <button type="button" class="st-btn primary" id="btnModeTA">⏱ 타임어택<small>혼자 달려 완주 최단 시간 도전 · 고스트</small></button>
-      <button type="button" class="st-btn" id="btnCreate">⚔️ 대전모드 게임 만들기<small>1대1 실시간 레이스 · 방 코드로 친구 초대</small></button>
-      <button type="button" class="st-btn" id="btnRandom">🎲 랜덤 매칭 방 만들기<small>아무 학생과 1대1 · 코스와 출발 자리는 무작위</small></button>
+      <button type="button" class="st-btn primary" id="btnModeTA">⏱ 타임어택</button>
+      <button type="button" class="st-btn" id="btnCreate">⚔️ 대전모드 게임 만들기</button>
+      <button type="button" class="st-btn" id="btnRandom">🎲 랜덤 매칭 방 만들기</button>
       <div class="st-joinrow">
         <input type="text" id="joinCode" inputmode="numeric" pattern="[0-9]*" maxlength="5" autocomplete="off" placeholder="방 코드 5자리">
         <button type="button" class="st-btn blue" id="btnJoin">참여하기</button>
@@ -485,7 +485,7 @@
 
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="character-maker.js?v=20261012"></script>
-<script charset="utf-8" src="match-kit.js?v=20261021f"></script>
+<script charset="utf-8" src="match-kit.js?v=20261021g"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
 <script type="module">
@@ -5189,12 +5189,13 @@ class TurboRandomMatch {
   static START_TRIES = 12;
   static START_RETRY_MS = 300;
   static SETTLE_MS = 1000;
+  static AI_FALLBACK_MS = 30000;
   constructor() { this.flow = null; this.quiet = false; this.botAsked = {}; this.settleFor = ""; this.settledFor = ""; }
   async ready() {
     if (this.flow) return this.flow;
     const db = await connectDb();
     if (this.flow) return this.flow;
-    const options = { gameRoot: "turbolap", queue: "turbolap", partyLimit: 1, matcher: new MkVersusMatcher(1), solo: true, allowBots: false,
+    const options = { gameRoot: "turbolap", queue: "turbolap", partyLimit: 1, matcher: new MkVersusMatcher(1), solo: true, allowBots: false, aiFallbackMs: TurboRandomMatch.AI_FALLBACK_MS,
       intro: "매칭 시작을 누르면 아무 학생과 1대1로 달려요. 코스와 출발 자리는 무작위예요." };
     const panel = new MkPartyPanel($("overlay"), $("partyMount"), options);
     this.flow = new MkRandomFlow(db, { now: tnow }, BT.myId, options, this, panel);
