@@ -154,6 +154,8 @@
   match-kit 에 있다. 게임은 `MkGameHooks`(member·create(plan)·discard·enterRoom(표, 방장?)·leaveRoom·startMatch·showParty·showStart)만 만든다.
   게임 쪽에서 부르는 것: `create()`·`tryJoin(코드)`·`codeTaken(코드)`·`roomChanged(사람 수, 방장?, 대기 중?)`·`matchEnded({result, rank?, of?}, 연승 갱신 콜백)`·
   `endHint()`·`backToParty(메시지)`·`updateMe()`·`render()`·`ticket()`. 자리 배정은 `MkSeatAssign.bySide(plan, 편당 자리)`.
+- **Rk 방 게임(35·38·39)**: `room-kit.ts` 의 `RkRandomSetup.create({backend, directory, rules, myId, options, assign, port, screen, mount})` 한 줄로 흐름을 만든다.
+  `RkDirectory.create(내id, 기록, extra, 코드사용중?)`·`join(…, useAssigned)` 가 `assign/<id>` 자리를 쓴다. HTML 은 `#partyScreen > #partyMount`, `#lobbyScreen.matched`.
 - 게임에 붙이는 모양(34번이 기준, 공용 흐름으로 바꾼 뒤의 설명은 위): 게임별 파일 `ts/<번호>.<이름>-party.ts` 에 `…RandomFlow`(팀 대기실·대기열·표 받기·자동 시작·결과 반영),
   `…PartyView`(팀 대기실 화면), `…RandomRoomMaker`(MkRoomMaker: 편에 맞춰 `assign/<id>=자리` 를 넣은 일반 방 만들기)를 두고,
   기존 게임 클래스에는 훅 몇 개만 붙인다(방 만들기 `extra`·참여 `useAssigned`, 화면 `party`, 끝 화면 "팀 대기실로", 방이 닫히면 팀 대기실로).
@@ -166,7 +168,7 @@
 |---|---|---|
 | 1 | ts/match-kit.ts(연승 버튼·전적 창 포함) + tools/ 매칭 시뮬레이터 | 완료(2026-10-21) — `node tools/match-sim.js` 143개 통과, 연승 버튼·전적 창 브라우저 확인 |
 | 2 | 34 배구 | 완료(2026-10-21) — 가짜 Firebase 창 2~3개로 매칭·편 배정·자동 시작·결과·연승·전적 창·팀 코드 입장·팀장 교체·취소 확인. 규칙 게시 뒤 실제 Firebase(?c=test, 탭 2개)로 매칭·시작·결과·연승·정리까지 확인. 실제 Firebase 는 ref("") 를 거절하므로 루트는 ref("/") |
-| 3 | 35 축구 | 대기 |
+| 3 | 35 축구 | 완료(2026-10-21) — room-kit 의 공용 연결 `RkRandomSetup`/`RkMatchHooks`(Rk 방 게임 공용) + `SocRandomSetup`. 가짜 Firebase 탭 2개로 매칭·경기 시작·결과·연승 확인 |
 | 4 | 38 눈싸움 배틀로얄 | 대기 |
 | 5 | 39 물풍선 대작전 | 대기 |
 | 6 | 32 미니게임 모음 | 대기 |

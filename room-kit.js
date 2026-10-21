@@ -297,26 +297,33 @@ class RkDirectory {
         this.rules = rules;
         this.seats = new RkSeatPlan(rules);
     }
-    async create(myId, record) {
+    async create(myId, record, extra = {}, taken = async () => false) {
         await this.sweep();
         const database = this.backend.database;
         for (let attempt = 0; attempt < 9; attempt++) {
             const code = String(10000 + Math.floor(Math.random() * 90000));
-            const room = { status: "lobby", hostPlayerId: myId, createdAt: this.backend.now(), players: { [myId]: record } };
+            if (await taken(code))
+                continue;
+            const room = Object.assign({}, extra, { status: "lobby", hostPlayerId: myId, createdAt: this.backend.now(), players: { [myId]: record } });
             const result = await database.ref(this.rules.root + "/" + code).transaction((current) => (current !== null ? undefined : room));
             if (result.committed)
                 return code;
         }
         return null;
     }
-    async join(code, myId, record, asSpectator) {
+    async join(code, myId, record, asSpectator, useAssigned = false) {
         const room = this.backend.database.ref(this.rules.root + "/" + code);
-        const [playersSnapshot, statusSnapshot] = await Promise.all([room.child("players").once("value"), room.child("status").once("value")]);
+        const [playersSnapshot, statusSnapshot, assignedSnapshot] = await Promise.all([
+            room.child("players").once("value"),
+            room.child("status").once("value"),
+            useAssigned ? room.child("assign/" + myId).once("value") : Promise.resolve(null)
+        ]);
         const players = playersSnapshot.val();
         if (!players || !Object.keys(players).some((id) => !players[id].isBot))
             return { ok: false, message: "그런 방이 없어요. 코드를 확인해 주세요." };
         const map = new Map(Object.keys(players).map((id) => [id, players[id]]));
-        const seat = this.seats.freeSeat(map);
+        const assigned = assignedSnapshot ? assignedSnapshot.val() : null;
+        const seat = assigned !== null && !this.seats.humanSeats(map)[assigned] ? assigned : this.seats.freeSeat(map);
         const lobby = statusSnapshot.val() === "lobby";
         const spectate = asSpectator || !lobby || seat < 0;
         if (spectate) {
@@ -356,3 +363,47 @@ class RkDirectory {
 }
 RkDirectory.STALE_EMPTY_MS = 60000;
 RkDirectory.STALE_OLD_MS = 6 * 3600000;
+class RkMatchHooks {
+    constructor(plan) {
+        this.plan = plan;
+        this.codeTaken = async () => false;
+    }
+    member() {
+        const record = this.plan.port.myRecord();
+        return { nick: record.nick, joinedAt: record.joinedAt, look: record.look };
+    }
+    async create(match) {
+        const assign = this.plan.assign(match);
+        const record = this.plan.port.myRecord();
+        record.slot = assign[this.plan.myId] === undefined ? 0 : assign[this.plan.myId];
+        const code = await this.plan.directory.create(this.plan.myId, record, { assign, matchId: match.matchId }, this.codeTaken);
+        return code ? { room: code, host: this.plan.myId } : null;
+    }
+    async discard(made) {
+        await this.plan.backend.database.ref(this.plan.rules.root + "/" + made.room).remove();
+    }
+    enterRoom(ticket, hosting) {
+        return this.plan.port.enterTicketRoom(ticket.room, hosting);
+    }
+    leaveRoom() {
+        this.plan.port.leaveRoomQuietly();
+    }
+    startMatch() {
+        this.plan.port.startMatch();
+    }
+    showParty() {
+        this.plan.port.showParty();
+    }
+    showStart(message) {
+        this.plan.port.showStart(message);
+    }
+}
+class RkRandomSetup {
+    static create(plan) {
+        const hooks = new RkMatchHooks(plan);
+        const panel = new MkPartyPanel(plan.screen, plan.mount, plan.options);
+        const flow = new MkRandomFlow(plan.backend.database, plan.backend, plan.myId, plan.options, hooks, panel);
+        hooks.codeTaken = (code) => flow.codeTaken(code);
+        return flow;
+    }
+}

@@ -326,25 +326,31 @@ class RkDirectory<P extends RkPlayerRecord> {
     this.seats = new RkSeatPlan(rules);
   }
 
-  async create(myId: string, record: P): Promise<string | null> {
+  async create(myId: string, record: P, extra: Record<string, unknown> = {}, taken: (code: string) => Promise<boolean> = async () => false): Promise<string | null> {
     await this.sweep();
     const database = this.backend.database as FirebaseDatabase;
     for (let attempt = 0; attempt < 9; attempt++) {
       const code = String(10000 + Math.floor(Math.random() * 90000));
-      const room = { status: "lobby", hostPlayerId: myId, createdAt: this.backend.now(), players: { [myId]: record } };
+      if (await taken(code)) continue;
+      const room = Object.assign({}, extra, { status: "lobby", hostPlayerId: myId, createdAt: this.backend.now(), players: { [myId]: record } });
       const result = await database.ref(this.rules.root + "/" + code).transaction((current) => (current !== null ? undefined : room));
       if (result.committed) return code;
     }
     return null;
   }
 
-  async join(code: string, myId: string, record: P, asSpectator: boolean): Promise<RkJoinOutcome> {
+  async join(code: string, myId: string, record: P, asSpectator: boolean, useAssigned: boolean = false): Promise<RkJoinOutcome> {
     const room = (this.backend.database as FirebaseDatabase).ref(this.rules.root + "/" + code);
-    const [playersSnapshot, statusSnapshot] = await Promise.all([room.child("players").once("value"), room.child("status").once("value")]);
+    const [playersSnapshot, statusSnapshot, assignedSnapshot] = await Promise.all([
+      room.child("players").once("value"),
+      room.child("status").once("value"),
+      useAssigned ? room.child("assign/" + myId).once("value") : Promise.resolve(null)
+    ]);
     const players = playersSnapshot.val<Record<string, P>>();
     if (!players || !Object.keys(players).some((id) => !players[id].isBot)) return { ok: false, message: "그런 방이 없어요. 코드를 확인해 주세요." };
     const map = new Map<string, P>(Object.keys(players).map((id) => [id, players[id]] as [string, P]));
-    const seat = this.seats.freeSeat(map);
+    const assigned = assignedSnapshot ? assignedSnapshot.val<number>() : null;
+    const seat = assigned !== null && !this.seats.humanSeats(map)[assigned] ? assigned : this.seats.freeSeat(map);
     const lobby = statusSnapshot.val<string>() === "lobby";
     const spectate = asSpectator || !lobby || seat < 0;
     if (spectate) {
@@ -377,5 +383,79 @@ class RkDirectory<P extends RkPlayerRecord> {
     } catch (error) {
       return;
     }
+  }
+}
+
+interface RkMatchPort<P extends RkPlayerRecord> {
+  myRecord(): P;
+  enterTicketRoom(code: string, hosting: boolean): Promise<boolean>;
+  leaveRoomQuietly(): void;
+  startMatch(): void;
+  showParty(): void;
+  showStart(message: string): void;
+}
+
+interface RkRandomPlan<P extends RkPlayerRecord> {
+  backend: RkBackend;
+  directory: RkDirectory<P>;
+  rules: RkRoomRules;
+  myId: string;
+  options: MkFlowOptions;
+  assign: (plan: MkMatchPlan) => Record<string, number>;
+  port: RkMatchPort<P>;
+  screen: HTMLElement;
+  mount: HTMLElement;
+}
+
+class RkMatchHooks<P extends RkPlayerRecord> implements MkGameHooks {
+  codeTaken: (code: string) => Promise<boolean> = async () => false;
+
+  constructor(private readonly plan: RkRandomPlan<P>) {}
+
+  member(): MkMember {
+    const record = this.plan.port.myRecord();
+    return { nick: record.nick, joinedAt: record.joinedAt, look: record.look };
+  }
+
+  async create(match: MkMatchPlan): Promise<MkRoomMade | null> {
+    const assign = this.plan.assign(match);
+    const record = this.plan.port.myRecord();
+    record.slot = assign[this.plan.myId] === undefined ? 0 : assign[this.plan.myId];
+    const code = await this.plan.directory.create(this.plan.myId, record, { assign, matchId: match.matchId }, this.codeTaken);
+    return code ? { room: code, host: this.plan.myId } : null;
+  }
+
+  async discard(made: MkRoomMade): Promise<void> {
+    await (this.plan.backend.database as FirebaseDatabase).ref(this.plan.rules.root + "/" + made.room).remove();
+  }
+
+  enterRoom(ticket: MkTicket, hosting: boolean): Promise<boolean> {
+    return this.plan.port.enterTicketRoom(ticket.room, hosting);
+  }
+
+  leaveRoom(): void {
+    this.plan.port.leaveRoomQuietly();
+  }
+
+  startMatch(): void {
+    this.plan.port.startMatch();
+  }
+
+  showParty(): void {
+    this.plan.port.showParty();
+  }
+
+  showStart(message: string): void {
+    this.plan.port.showStart(message);
+  }
+}
+
+class RkRandomSetup {
+  static create<P extends RkPlayerRecord>(plan: RkRandomPlan<P>): MkRandomFlow {
+    const hooks = new RkMatchHooks<P>(plan);
+    const panel = new MkPartyPanel(plan.screen, plan.mount, plan.options);
+    const flow = new MkRandomFlow(plan.backend.database as FirebaseDatabase, plan.backend, plan.myId, plan.options, hooks, panel);
+    hooks.codeTaken = (code) => flow.codeTaken(code);
+    return flow;
   }
 }

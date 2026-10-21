@@ -1,4 +1,4 @@
-type SocScreenName = "start" | "lobby" | "game" | "end";
+type SocScreenName = "start" | "lobby" | "game" | "end" | "party";
 type SocButtonKey = "J" | "K";
 
 interface SocPlayerRecord extends RkPlayerRecord {}
@@ -830,6 +830,7 @@ class SocScreens {
   private readonly start = RkDom.byId("startScreen");
   private readonly lobby = RkDom.byId("lobbyScreen");
   private readonly end = RkDom.byId("endScreen");
+  private readonly party = RkDom.byId("partyScreen");
   private readonly gameUi = RkDom.byId("gameUi");
   private readonly joystickZone = RkDom.byId("joyZone");
   current: SocScreenName = "start";
@@ -841,6 +842,7 @@ class SocScreens {
     RkDom.show(this.start, name === "start");
     RkDom.show(this.lobby, name === "lobby");
     RkDom.show(this.end, name === "end");
+    RkDom.show(this.party, name === "party");
     RkDom.show(this.gameUi, name === "game");
     RkDom.show(this.joystickZone, name === "game" && this.touchDevice && canControl);
     document.body.classList.toggle("in-game", name === "game");
@@ -935,6 +937,7 @@ class SoccerGame {
   private readonly endView = new SocEndView();
   private readonly editor: ProfileEditor;
   private readonly myId = "p" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+  private readonly random: MkRandomFlow;
   private session: RkSession<SocPlayerRecord> | null = null;
   private match: SoccerMatch | null = null;
   private assetsReady = false;
@@ -946,6 +949,14 @@ class SoccerGame {
     this.textures = new SocCourtTextures(libs);
     this.court = new SocCourtView(libs, this.textures);
     this.editor = new ProfileEditor(libs, this.factory, this.assets, this.profile);
+    this.random = SocRandomSetup.create(this.backend, this.directory, this.myId, {
+      myRecord: () => this.myRecord(),
+      enterTicketRoom: (code, hosting) => this.enterTicketRoom(code, hosting),
+      leaveRoomQuietly: () => this.leaveRoomQuietly(),
+      startMatch: () => this.startMatch(),
+      showParty: () => this.showParty(),
+      showStart: (message) => this.showStart(message)
+    });
     FoldCard.bindAll(document);
     const input = new SocInput(RkDom.byId("joyZone"), RkDom.byId("joyBase"), RkDom.byId("joyKnob"));
     this.services = {
@@ -991,6 +1002,7 @@ class SoccerGame {
 
   private bindMenus(): void {
     RkDom.byId("btnCreate").addEventListener("click", () => this.createRoom());
+    RkDom.byId("btnRandom").addEventListener("click", () => this.createParty());
     RkDom.byId("btnJoin").addEventListener("click", () => this.joinRoom(false));
     RkDom.byId("btnWatch").addEventListener("click", () => this.joinRoom(true));
     RkDom.byId("joinCode").addEventListener("keydown", (event) => { if ((event as KeyboardEvent).key === "Enter") this.joinRoom(false); });
@@ -1005,7 +1017,7 @@ class SoccerGame {
 
   private updateStartButtons(): void {
     const ok = !!this.backend.database && this.assetsReady;
-    ["btnCreate", "btnJoin", "btnWatch"].forEach((id) => { RkDom.byId<HTMLButtonElement>(id).disabled = !ok; });
+    ["btnCreate", "btnRandom", "btnJoin", "btnWatch"].forEach((id) => { RkDom.byId<HTMLButtonElement>(id).disabled = !ok; });
     if (!this.backend.database) this.showStartMessage("온라인 연결을 할 수 없어요. (firebase-config.js·인터넷 확인)");
   }
 
@@ -1019,6 +1031,42 @@ class SoccerGame {
 
   private pushProfile(): void {
     if (this.session) this.session.pushProfile({ nick: this.profile.nickOrDefault(), look: this.profile.look });
+    this.random.updateMe();
+  }
+
+  private async createParty(): Promise<void> {
+    if (!this.backend.database) return;
+    this.showStartMessage("");
+    const button = RkDom.byId<HTMLButtonElement>("btnRandom");
+    button.disabled = true;
+    try {
+      this.showStartMessage(await this.random.create());
+    } catch (error) {
+      this.showStartMessage("랜덤 매칭 방을 만들지 못했어요. (데이터베이스 규칙을 확인해 주세요)");
+    }
+    button.disabled = false;
+  }
+
+  private async enterTicketRoom(code: string, hosting: boolean): Promise<boolean> {
+    if (!hosting) {
+      const outcome = await this.directory.join(code, this.myId, this.myRecord(), false, true).catch(() => null);
+      if (!outcome || !outcome.ok) return false;
+    }
+    this.enterRoom(code, hosting, "매칭됐어요! 곧 경기가 시작돼요.");
+    return true;
+  }
+
+  private leaveRoomQuietly(): void {
+    if (this.session) this.session.leave();
+    this.session = null;
+    this.disposeMatch();
+  }
+
+  private showParty(): void {
+    this.screens.show("party");
+    this.editor.mount(RkDom.byId("partyProfileHost"));
+    this.editor.setActive(true);
+    this.random.render();
   }
 
   private async createRoom(): Promise<void> {
@@ -1027,7 +1075,7 @@ class SoccerGame {
     const button = RkDom.byId<HTMLButtonElement>("btnCreate");
     button.disabled = true;
     try {
-      const code = await this.directory.create(this.myId, this.myRecord());
+      const code = await this.directory.create(this.myId, this.myRecord(), {}, (taken) => this.random.codeTaken(taken));
       if (code) this.enterRoom(code, true, "");
       else this.showStartMessage("방을 만들지 못했어요. 다시 눌러 주세요.");
     } catch (error) {
@@ -1045,6 +1093,11 @@ class SoccerGame {
     }
     this.showStartMessage("");
     try {
+      const party = await this.random.tryJoin(code);
+      if (party.handled) {
+        this.showStartMessage(party.message);
+        return;
+      }
       const outcome = await this.directory.join(code, this.myId, this.myRecord(), asSpectator);
       if (outcome.ok) this.enterRoom(code, false, outcome.message);
       else this.showStartMessage(outcome.message);
@@ -1072,6 +1125,7 @@ class SoccerGame {
 
   private showLobby(): void {
     this.screens.show("lobby");
+    RkDom.byId("lobbyScreen").classList.toggle("matched", this.random.hasTicket());
     this.editor.mount(RkDom.byId("lobbyProfileHost"));
     this.editor.setActive(true);
     if (this.session) this.lobbyView.render(this.session);
@@ -1088,6 +1142,7 @@ class SoccerGame {
     const session = this.session;
     if (!session) return;
     if (this.screens.current === "lobby" && (kind === "players" || kind === "host" || kind === "status")) this.lobbyView.render(session);
+    if (kind === "players" || kind === "host" || kind === "status") this.random.roomChanged(this.seatPlan.humanSeats(session.players).filter((id) => !!id).length, session.isHost(), session.status === "lobby");
     if (kind === "status" || kind === "match" || kind === "end" || (kind === "players" && session.status === "play" && !this.match)) this.syncPhase();
     if (this.match) this.match.applyChange(kind);
   }
@@ -1108,8 +1163,11 @@ class SoccerGame {
       if (this.match) this.match.markEnded();
       this.endView.render(session, end);
       this.screens.show("end");
-      RkDom.show(RkDom.byId("btnToLobby"), session.isHost());
-      RkDom.setText(RkDom.byId("endHint"), session.isHost() ? "" : "방장이 대기실로 돌아가길 기다려요…");
+      const ticket = this.random.ticket();
+      RkDom.show(RkDom.byId("btnToLobby"), session.isHost() && !ticket);
+      RkDom.setText(RkDom.byId("btnEndLeave"), ticket ? "팀 대기실로" : "방 나가기");
+      RkDom.setText(RkDom.byId("endHint"), ticket ? this.random.endHint() : session.isHost() ? "" : "방장이 대기실로 돌아가길 기다려요…");
+      if (ticket) this.random.matchEnded({ result: end.winner === ticket.side ? "win" : "lose" }, () => RkDom.setText(RkDom.byId("endHint"), this.random.endHint()));
     }
   }
 
@@ -1180,9 +1238,11 @@ class SoccerGame {
   }
 
   private leaveRoom(): void {
-    if (this.session) this.session.leave();
-    this.session = null;
-    this.disposeMatch();
+    if (this.random.inParty()) {
+      this.random.backToParty("");
+      return;
+    }
+    this.leaveRoomQuietly();
     this.showStart("");
   }
 
@@ -1190,7 +1250,8 @@ class SoccerGame {
     if (this.session) this.session.silentClose();
     this.session = null;
     this.disposeMatch();
-    this.showStart(message);
+    if (this.random.inParty()) this.random.backToParty(message);
+    else this.showStart(message);
   }
 
   private readonly loop = (timeMs: number): void => {
@@ -1208,5 +1269,27 @@ class SoccerGame {
       this.backdrop.show();
       this.backdrop.render(deltaSeconds);
     }
+  }
+}
+
+class SocRandomSetup {
+  static readonly PARTY_LIMIT = 2;
+
+  static create(backend: RkBackend, directory: RkDirectory<SocPlayerRecord>, myId: string, port: RkMatchPort<SocPlayerRecord>): MkRandomFlow {
+    return RkRandomSetup.create<SocPlayerRecord>({
+      backend, directory, myId, port,
+      rules: SocRoomRules.RULES,
+      options: {
+        gameRoot: "soccer",
+        queue: "soccer",
+        partyLimit: SocRandomSetup.PARTY_LIMIT,
+        matcher: new MkVersusMatcher(SocRandomSetup.PARTY_LIMIT),
+        intro: "매칭 시작을 누르면 아무 팀과 2대2로 만나요.",
+        allowBots: true
+      },
+      assign: (plan) => MkSeatAssign.bySide(plan, SocRandomSetup.PARTY_LIMIT),
+      screen: RkDom.byId("partyScreen"),
+      mount: RkDom.byId("partyMount")
+    });
   }
 }
