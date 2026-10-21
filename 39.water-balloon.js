@@ -553,6 +553,8 @@ class WbGame {
         this.matchId = 0;
         this.lastMs = 0;
         this.leaveAskedAt = -1;
+        this.randomMode = "team";
+        this.randoms = new Map();
         this.start().catch((error) => { WbDom.text(WbDom.el("loading"), "불러오기 실패: " + error); });
     }
     async start() {
@@ -598,6 +600,8 @@ class WbGame {
         on("btnSolo", () => { this.readSoloForm(); this.startSolo(); });
         on("btnCreateSolo", () => this.createRoom("solo"));
         on("btnCreateTeam", () => this.createRoom("team"));
+        on("btnRandomSolo", () => this.createParty("solo"));
+        on("btnRandomTeam", () => this.createParty("team"));
         on("btnJoin", () => this.joinRoom(false));
         on("btnWatch", () => this.joinRoom(true));
         WbDom.el("joinCode").addEventListener("keydown", (e) => { if (e.key === "Enter")
@@ -687,6 +691,9 @@ class WbGame {
         this.resetLeave();
         WbDom.show(WbDom.el("startScreen"), name === "start");
         WbDom.show(WbDom.el("lobbyScreen"), name === "lobby");
+        WbDom.show(WbDom.el("partyScreen"), name === "party");
+        WbDom.show(WbDom.el("partyMountSolo"), this.randomMode === "solo");
+        WbDom.show(WbDom.el("partyMountTeam"), this.randomMode === "team");
         WbDom.show(WbDom.el("touchZone"), name === "game");
         if (name !== "game") {
             WbDom.show(WbDom.el("controls"), false);
@@ -700,13 +707,88 @@ class WbGame {
             editor.setActive(false);
             return;
         }
-        editor.mount(WbDom.el(name === "start" ? "profileHost" : "lobbyProfileHost"));
+        editor.mount(WbDom.el(name === "start" ? "profileHost" : name === "party" ? "partyProfileHost" : "lobbyProfileHost"));
         editor.setActive(true);
     }
     pushProfile() {
         const profile = this.profile;
         if (this.session && profile)
             this.session.pushProfile({ nick: profile.nickOrDefault(), look: profile.look });
+        this.randoms.forEach((flow) => flow.updateMe());
+    }
+    randomFor(mode) {
+        const existing = this.randoms.get(mode);
+        if (existing)
+            return existing;
+        const flow = WbRandomSetup.create(mode, this.backend, this.directory, this.myId, {
+            myRecord: () => this.myRecord(),
+            enterTicketRoom: (code, hosting) => this.enterTicketRoom(mode, code, hosting),
+            leaveRoomQuietly: () => this.leaveRoomQuietly(),
+            startMatch: () => this.startMatch(),
+            showParty: () => { this.randomMode = mode; this.showScreen("party"); flow.render(); },
+            showStart: (message) => { this.showScreen("start"); this.updateStartButtons(); this.startMessage(message); }
+        });
+        this.randoms.set(mode, flow);
+        return flow;
+    }
+    random() {
+        return this.randoms.get(this.randomMode) || null;
+    }
+    inParty() {
+        const flow = this.random();
+        return !!flow && flow.inParty();
+    }
+    async createParty(mode) {
+        if (!this.backend.database)
+            return;
+        this.startMessage("");
+        this.randomMode = mode;
+        try {
+            this.startMessage(await this.randomFor(mode).create());
+        }
+        catch (error) {
+            this.startMessage("랜덤 매칭 방을 만들지 못했어요. (데이터베이스 규칙을 확인해 주세요)");
+        }
+    }
+    async enterTicketRoom(mode, code, hosting) {
+        this.randomMode = mode;
+        if (!hosting) {
+            const outcome = await this.directory.join(code, this.myId, this.myRecord(), false, true).catch(() => null);
+            if (!outcome || !outcome.ok)
+                return false;
+        }
+        this.enterRoom(code, hosting);
+        if (hosting)
+            this.session.ref.update({ mode, map: WbMapCatalog.RANDOM, level: "normal", bots: [] });
+        WbDom.text(WbDom.el("lobbyNotice"), "매칭됐어요! 곧 시작해요.");
+        WbDom.el("lobbyScreen").classList.add("matched");
+        return true;
+    }
+    leaveRoomQuietly() {
+        if (this.session)
+            this.session.leave();
+        this.session = null;
+        this.holding = false;
+        if (this.view) {
+            this.view.dispose();
+            this.view = null;
+        }
+        this.matchId = 0;
+        WbDom.el("lobbyScreen").classList.remove("matched");
+    }
+    reportEnd(session) {
+        const flow = this.random(), match = session.value("match"), end = session.value("end");
+        const ticket = flow ? flow.ticket() : null;
+        if (!flow || !ticket || !match || !end || end.match !== match.id)
+            return;
+        const index = match.teams.flatMap((t) => t.members).findIndex((m) => m.id === this.myId);
+        if (index < 0)
+            return;
+        const rank = end.ranks[index];
+        const of = match.mode === "solo" ? end.ranks.length : match.teams.length;
+        const showStreak = () => WbDom.text(WbDom.el("resultStreak"), flow.endHint());
+        showStreak();
+        flow.matchEnded({ result: rank === 1 ? "win" : "lose", rank, of }, showStreak);
     }
     updateStartButtons() {
         const ok = !!this.backend.database;
@@ -724,7 +806,7 @@ class WbGame {
             return;
         this.startMessage("");
         try {
-            const code = await this.directory.create(this.myId, this.myRecord());
+            const code = await this.directory.create(this.myId, this.myRecord(), {}, (taken) => this.randomFor("team").codeTaken(taken));
             if (!code) {
                 this.startMessage("방을 만들지 못했어요. 다시 눌러 주세요.");
                 return;
@@ -746,6 +828,12 @@ class WbGame {
         }
         this.startMessage("");
         try {
+            const party = await this.randomFor("team").tryJoin(code);
+            if (party.handled) {
+                this.randomMode = "team";
+                this.startMessage(party.message);
+                return;
+            }
             const outcome = await this.directory.join(code, this.myId, this.myRecord(), asSpectator);
             if (outcome.ok) {
                 this.enterRoom(code, false);
@@ -788,6 +876,11 @@ class WbGame {
             this.lobby.render(session, this.seatPlan);
         if (kind === "status" || kind === "match" || kind === "players")
             this.syncPhase();
+        const flow = this.random();
+        if (flow && (kind === "players" || kind === "host" || kind === "status"))
+            flow.roomChanged(this.seatPlan.humanSeats(session.players).filter((id) => !!id).length, session.isHost(), session.status === "lobby");
+        if (kind === "end" || kind === "status")
+            this.reportEnd(session);
     }
     syncPhase() {
         const session = this.session, ui = this.ui, world = this.world, input = this.input;
@@ -827,9 +920,11 @@ class WbGame {
             this.view = new WbMatchView(driver, world, ui, input);
             this.showScreen("game");
             ui.hud.show(true);
-            WbDom.show(WbDom.el("btnAgain"), session.isHost());
+            const flow = this.random(), matched = !!flow && flow.hasTicket();
+            WbDom.show(WbDom.el("btnAgain"), session.isHost() && !matched);
             WbDom.text(WbDom.el("btnAgain"), "대기실로");
-            WbDom.text(WbDom.el("btnResultLeave"), "방 나가기");
+            WbDom.text(WbDom.el("btnResultLeave"), matched ? (this.randomMode === "solo" ? "랜덤 매칭 대기실로" : "팀 대기실로") : "방 나가기");
+            WbDom.text(WbDom.el("resultStreak"), "");
         }
     }
     startMatch() {
@@ -928,6 +1023,10 @@ class WbGame {
             this.updateStartButtons();
             return;
         }
+        if (this.inParty()) {
+            this.random().backToParty(message);
+            return;
+        }
         if (this.session)
             this.session.leave();
         this.exitToStart(message);
@@ -942,6 +1041,11 @@ class WbGame {
             this.view = null;
         }
         this.matchId = 0;
+        WbDom.el("lobbyScreen").classList.remove("matched");
+        if (this.inParty()) {
+            this.random().backToParty(message);
+            return;
+        }
         this.showScreen("start");
         this.updateStartButtons();
         this.startMessage(message);
@@ -985,3 +1089,25 @@ class WbGame {
 WbGame.STALL_MS = 250;
 WbGame.WATCHDOG_MS = 100;
 WbGame.LEAVE_CONFIRM_MS = 3000;
+class WbRandomSetup {
+    static create(mode, backend, directory, myId, port) {
+        const solo = mode === "solo", perTeam = solo ? 1 : WbBalance.TEAM_SIZE;
+        return RkRandomSetup.create({
+            backend, directory, myId, port,
+            rules: WbRoomRules.RULES,
+            options: {
+                gameRoot: "waterballoon",
+                queue: "waterballoon_" + mode,
+                partyLimit: perTeam,
+                matcher: new MkFreeForAllMatcher(perTeam, WbRandomSetup.CAPACITY, MkMatcher.TIMING, solo ? WbRandomSetup.CAPACITY : WbBalance.TEAM_COUNT),
+                intro: solo ? "매칭 시작을 누르면 다른 학생들과 개인전으로 만나요. 모자란 자리는 봇이 채워요." : "매칭 시작을 누르면 다른 팀들과 팀전(2명씩 최대 4팀)으로 만나요. 모자란 자리는 봇이 채워요.",
+                showRank: true,
+                solo
+            },
+            assign: (plan) => MkSeatAssign.bySide(plan, perTeam),
+            screen: WbDom.el("partyScreen"),
+            mount: WbDom.el(solo ? "partyMountSolo" : "partyMountTeam")
+        });
+    }
+}
+WbRandomSetup.CAPACITY = 8;

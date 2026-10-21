@@ -123,6 +123,8 @@
   .seatBot { font: inherit; font-size: 13px; font-weight: 800; border-radius: 6px; border: 1px solid rgba(255,255,255,.6); background: rgba(10,22,44,.6); color: #fff; padding: 4px 8px; cursor: pointer; }
   #lobbySpectators { margin-top: 10px; font-size: 15px; }
   #lobbyNotice { margin-top: 8px; color: #FFB27A; font-weight: 800; }
+  #lobbyScreen.matched #lobbyHostRow, #lobbyScreen.matched #btnStart, #lobbyScreen.matched #btnSeatMode { display: none; }
+  #lobbyScreen.matched #lobbySeats { pointer-events: none; }
   .lobbyGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
   .lobbyGrid label { font-size: 13px; font-weight: 800; color: #B8D8F0; display: flex; flex-direction: column; gap: 3px; }
   #lobbyGuestInfo { margin-top: 10px; font-weight: 800; color: #B8D8F0; }
@@ -149,6 +151,7 @@
 <div id="trapCenter" hidden><div id="trapBig"></div><div id="trapHint"></div></div>
 <div id="resultBox" hidden><div class="card"><div id="resultTitle"></div>
   <table><thead id="resultHead"></thead><tbody id="resultRows"></tbody></table>
+  <div id="resultStreak" class="mk-notice"></div>
   <button type="button" id="btnAgain">다시 하기</button><button type="button" id="btnResultLeave">나가기</button></div></div>
 <button type="button" id="btnGameLeave" class="hud-box" hidden>나가기</button>
 <div id="startScreen" class="st-screen" hidden>
@@ -166,8 +169,9 @@
     </div>
     <div class="st-card">
       <h2>같이 하기</h2>
-      <div class="st-row"><button type="button" class="st-btn primary" id="btnCreateSolo">방 만들기<small>개인전</small></button><button type="button" class="st-btn primary" id="btnCreateTeam">방 만들기<small>팀전</small></button></div>
-      <input type="text" id="joinCode" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="방 코드 5자리">
+      <div class="st-row"><button type="button" class="st-btn primary" id="btnCreateSolo">게임 만들기<small>개인전</small></button><button type="button" class="st-btn primary" id="btnCreateTeam">게임 만들기<small>팀전</small></button></div>
+      <div class="st-row"><button type="button" class="st-btn primary" id="btnRandomSolo">랜덤 매칭 방 만들기<small>개인전</small></button><button type="button" class="st-btn primary" id="btnRandomTeam">랜덤 매칭 방 만들기<small>팀전</small></button></div>
+      <input type="text" id="joinCode" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="방·팀 코드 5자리">
       <div class="st-row"><button type="button" class="st-btn" id="btnJoin">참여하기</button><button type="button" class="st-btn" id="btnWatch">관전하기</button></div>
       <div class="st-msg" id="startMsg"></div>
     </div>
@@ -192,6 +196,17 @@
         <li>120초부터 <b>서든데스</b>: 바깥부터 블록이 떨어져요. 빨갛게 깜빡이는 칸에서 피하세요.</li>
         <li>마지막까지 남은 사람(팀)이 우승해요. 180초가 되면 남은 사람끼리 공동 우승(팀전은 남은 인원이 많은 팀).</li>
       </ul>
+    </div>
+  </div>
+</div>
+<div id="partyScreen" class="st-screen" hidden>
+  <div class="st-wrap">
+    <div class="st-hero"><h1 class="st-title">물풍선<span>대작전</span></h1></div>
+    <div class="st-card" id="partyMountTeam"></div>
+    <div class="st-card" id="partyMountSolo" hidden></div>
+    <div class="st-card st-fold">
+      <h2>캐릭터 만들기</h2>
+      <div id="partyProfileHost"></div>
     </div>
   </div>
 </div>
@@ -225,14 +240,15 @@
 <div id="netMeter"></div>
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="fold-card.js"></script>
-<script charset="utf-8" src="room-kit.js"></script>
-<script charset="utf-8" src="39.balloon-map.js?v=8"></script>
-<script charset="utf-8" src="39.balloon-rules.js?v=8"></script>
-<script charset="utf-8" src="39.balloon-bot.js?v=8"></script>
-<script charset="utf-8" src="39.balloon-views.js?v=8"></script>
-<script charset="utf-8" src="39.balloon-hud.js?v=8"></script>
-<script charset="utf-8" src="39.balloon-net.js?v=8"></script>
-<script charset="utf-8" src="39.water-balloon.js?v=9"></script>
+<script charset="utf-8" src="match-kit.js?v=20261021d"></script>
+<script charset="utf-8" src="room-kit.js?v=10"></script>
+<script charset="utf-8" src="39.balloon-map.js?v=10"></script>
+<script charset="utf-8" src="39.balloon-rules.js?v=10"></script>
+<script charset="utf-8" src="39.balloon-bot.js?v=10"></script>
+<script charset="utf-8" src="39.balloon-views.js?v=10"></script>
+<script charset="utf-8" src="39.balloon-hud.js?v=10"></script>
+<script charset="utf-8" src="39.balloon-net.js?v=10"></script>
+<script charset="utf-8" src="39.water-balloon.js?v=10"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
