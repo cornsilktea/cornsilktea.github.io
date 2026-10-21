@@ -173,7 +173,7 @@
 | 5 | 39 물풍선 대작전 | 완료(2026-10-21) — 대기열 `waterballoon_team`(2명 팀, 최대 4팀)·`waterballoon_solo`(8명). `WbRandomSetup`. 순위는 선수별 `end.ranks[내 번호]`. `balloon-unit` 113 통과·`balloon-sim` 200판 위반 0. 가짜 Firebase 로 팀전 매칭·결과 확인 |
 | 6 | 32 미니게임 모음 | 완료(2026-10-21) — `ts/32.minigames/45-random-match.ts`(`CollectionRandomMatch`), 팀 최대 3명·한 방 6명(`MkFreeForAllMatcher`), 모이면 바로 모음 시작(종목은 기존대로 무작위 5개), 최종 누적 1등이 팀원 중에 있으면 승(`memberIds`). `last-tile/` 폴더는 그대로. 가짜 Firebase 로 매칭·최종 결과·연승 확인 |
 | 7 | 25 FPS 서바이벌 | 완료(2026-10-21) — 인라인 `FpsRandomMatch`(MkGameHooks). 팀 대전 화면에 `랜덤 매칭 방 만들기`, 최대 2대2, 편 무작위, 빈자리는 AI(한쪽이 비면 AI 1명을 넣고 시작). 결과는 `quitTeam` 이 늦게 올 수 있어 1초 뒤 승자를 다시 읽어 기록(24번도 같은 방식으로 고침). 가짜 Firebase 로 매칭·결과·연승 확인 |
-| 8 | 31 좀비 아웃브레이크 | 대기 |
+| 8 | 31 좀비 아웃브레이크 | 완료(2026-10-21) — 인라인 `ZombieRandomMatch`. 팀 최대 3명·한 방 5명(`MkFreeForAllMatcher`), 좀비는 기존대로 시작 때 무작위, 모자란 자리는 AI. 팀원이 모두 이긴 쪽(인간 승리면 생존, 좀비 승리면 감염·숙주)일 때만 승. `winner` 가 `status` 보다 늦게 오므로 결과 화면을 다시 그릴 때 기록. 가짜 Firebase 로 확인 |
 | 9 | 24 터보 랩 | 완료(2026-10-21, 선생님 요청으로 30번과 함께 먼저) — 인라인 클로저 안 `TurboRandomMatch`(MkGameHooks). 1대1 개인전(`solo`), 코스는 `plan.seed`, 좌우는 편으로 무작위. 가짜 Firebase 탭 2개로 매칭·출발·결과·연승·기존 방 코드 흐름 확인 |
 | 10 | 30 팀 배틀 아레나 | 완료(2026-10-21, 선생님 요청으로 24번과 함께 먼저) — `ArenaRandomMatch`(services.randomMatch). 대회모드·랜덤 맵·편 무작위, 모자란 자리는 AI 로 3명까지, 모이면 바로 드래프트. `&test` 265·0·0, `&sim` 3373110270(길이 735673) 그대로. 가짜 Firebase 탭 2개로 매칭·드래프트·경기 시작·결과·연승·기존 흐름 확인 |
-| 11 | 데이터베이스규칙.json 정리·선생님 게시 안내 | 대기 |
+| 11 | 데이터베이스규칙.json 정리·선생님 게시 안내 | 완료(2026-10-21) — `matchQueue/$queue` 와 게임 9개의 `parties/$party`(volleyball·turbolap·teambattle·soccer·snowroyale·waterballoon·minigames·fpsbattle·zombieoutbreak). 모든 페이지의 `match-kit.js?v=20261021f` 로 통일. 선생님께 콘솔 게시 요청 |

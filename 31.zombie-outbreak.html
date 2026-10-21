@@ -197,6 +197,10 @@
     #keyHint { display: none; }
     .codeNum { font-size: 44px; }
   }
+  #scrParty { --st-accent: var(--sg-primary); --st-accent-ink: #fff; --st-title: #F4F1E8; --st-ink: var(--sg-ink); --st-ink-mid: var(--sg-ink-mid); --st-ink-soft: var(--sg-ink-soft); --st-bg: 12, 14, 20; --st-panel: var(--sg-panel); }
+  #lobbyMatchNote, #resStreak:empty { display: none; }
+  #scrLobby.matched #lobbyMatchNote { display: block; }
+  #scrLobby.matched #btnStart, #scrLobby.matched #btnBots, #scrLobby.matched #btnSpecToggle, #scrResult.matched #btnAgain { display: none !important; }
 </style>
 </head>
 <body>
@@ -253,9 +257,10 @@
     </div>
     <div class="card">
       <div class="hello">내 닉네임: <b id="startNick"></b> <button type="button" class="mini" data-maker-open>✏️ 닉네임 설정</button></div>
-      <button type="button" class="btn primary" id="btnCreate">방 만들기</button>
+      <button type="button" class="btn primary" id="btnCreate">게임 만들기</button>
+      <button type="button" class="btn primary" id="btnRandom">랜덤 매칭 방 만들기</button>
       <div class="gap"></div>
-      <label class="label" for="joinCode">방 코드로 입장</label>
+      <label class="label" for="joinCode">방·팀 코드로 입장</label>
       <div class="field">
         <input id="joinCode" class="codeIn" inputmode="numeric" maxlength="5" placeholder="12345" autocomplete="off">
         <button type="button" class="btn primary" id="btnJoin">입장</button>
@@ -303,8 +308,21 @@
       <button type="button" class="btn primary" id="btnStart">게임 시작</button>
       <button type="button" class="btn" id="btnBots">🤖 빈 자리 AI로 채우기: 켜짐</button>
       <div class="msg ok" id="lobbyMsg"></div>
+      <div class="mk-notice" id="lobbyMatchNote">매칭됐어요! 모두 모이면 바로 시작해요.</div>
       <button type="button" class="btn" id="btnSpecToggle">관전자로 바꾸기</button>
       <button type="button" class="btn" id="btnLobbyLeave">방 나가기</button>
+    </div>
+  </div>
+</section>
+
+<section id="scrParty" class="screen" hidden>
+  <div class="wrap">
+    <div class="card titleCard">
+      <h1 class="titleMain">미드나잇<span>좀비 아웃브레이크</span></h1>
+    </div>
+    <div class="card">
+      <div class="hello">내 닉네임: <b id="partyNick"></b> <button type="button" class="mini" data-maker-open>✏️ 닉네임 설정</button></div>
+      <div id="partyMount"></div>
     </div>
   </div>
 </section>
@@ -321,6 +339,7 @@
         <tbody id="resBody"></tbody>
       </table>
       <div class="myRec" id="resMine"></div>
+      <div class="mk-notice" id="resStreak"></div>
     </div>
     <div class="card">
       <button type="button" class="btn primary" id="btnAgain">다시하기 (Space)</button>
@@ -331,6 +350,7 @@
 
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="character-maker.js?v=20261012"></script>
+<script charset="utf-8" src="match-kit.js?v=20261021f"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <div id="loading">3D 학교를 준비하는 중입니다…</div>
 
@@ -2450,6 +2470,7 @@ function refreshNick() {
   const nick = PlayerProfile.storedNick();
   $("startNick").textContent = nick || "(닉네임 없음)";
   $("lobbyNick").textContent = nick;
+  $("partyNick").textContent = nick || "(닉네임 없음)";
 }
 refreshNick();
 function nickReady() {
@@ -2463,7 +2484,7 @@ function pushNickToRoom() {
   if (nick && room.ref && room.players[myId]) room.ref.child("players/" + myId + "/nickname").set(nick);
 }
 document.addEventListener(PlayerProfile.CHANGE_EVENT, refreshNick);
-document.addEventListener(PlayerProfile.SETTLED_EVENT, () => { refreshNick(); pushNickToRoom(); });
+document.addEventListener(PlayerProfile.SETTLED_EVENT, () => { refreshNick(); pushNickToRoom(); zombieRandom.updateMe(); });
 
 const room = {
   code: null, ref: null, subs: [], leaving: false,
@@ -2517,6 +2538,7 @@ async function createRoom() {
     await sweepRooms();
     for (let n = 0; n < 8; n++) {
       const code = String(10000 + Math.floor(Math.random() * 90000)), t = serverNow();
+      if (await zombieRandom.codeTaken(code)) continue;
       const obj = { status: "lobby", hostPlayerId: myId, createdAt: t, fillBots: true, players: { [myId]: newPlayer(t) } };
       const res = await db.ref(ROOM_ROOT + "/" + code).transaction(cur => cur === null ? obj : undefined);
       if (res.committed) { enterRoom(code); return; }
@@ -2533,6 +2555,8 @@ async function joinRoom(asSpectator) {
   if (!db) { startMsg("온라인 연결을 할 수 없습니다."); return; }
   $("btnJoin").disabled = true; $("btnJoinSpec").disabled = true; startMsg("");
   try {
+    const party = asSpectator ? { handled: false, message: "" } : await zombieRandom.tryJoin(code);
+    if (party.handled) { startMsg(party.message); return; }
     const ref = db.ref(ROOM_ROOT + "/" + code);
     const snap = await ref.once("value"), r = snap.val();
     if (!r || !humanIdsOf(r.players).length) { startMsg("그런 방이 없습니다. 방 코드를 확인해 주세요."); return; }
@@ -2595,7 +2619,7 @@ function leaveRoom() {
     });
   }).catch(() => {});
   resetRoomLocal();
-  showScreen("start"); startMsg("");
+  zombieRandom.roomClosed("");
 }
 function exitToStart(msg) {
   if (room.ref) {
@@ -2603,7 +2627,7 @@ function exitToStart(msg) {
     try { room.ref.child("players/" + myId).onDisconnect().cancel(); room.ref.child("st/" + myId).onDisconnect().cancel(); } catch (e) {}
   }
   resetRoomLocal();
-  showScreen("start"); startMsg(msg || "");
+  zombieRandom.roomClosed(msg || "");
 }
 function resetRoomLocal() {
   room.ref = null; room.code = null; room.players = {}; room.status = null; room.final = null;
@@ -2620,6 +2644,7 @@ function showScreen(name) {
   show($("scrStart"), name === "start");
   show($("scrLobby"), name === "lobby");
   show($("scrResult"), name === "result");
+  show($("scrParty"), name === "party");
   show($("hud"), name === "game");
   if (name !== "game") { $("vignette").className = ""; $("speedLines").style.opacity = "0"; }
   if (name === "lobby") renderLobby();
@@ -2649,6 +2674,7 @@ function playersChanged() {
     lobbyQueued = false;
     if (room.status === "playing" && screenNow === "lobby" && watchesRound()) { showScreen("game"); return; }
     if (screenNow === "lobby") renderLobby();
+    zombieRandom.roomChanged();
   }, 0);
 }
 function watchesRound() { const p = room.players[myId]; return !!(p && (p.inRound || p.spec)); }
@@ -3609,6 +3635,7 @@ function renderResult() {
     round.resultSaved = room.startAt;
     playEndSting(humansWon);
   }
+  zombieRandom.decorateResult(final);
   if (mine) setText($("resMine"), (mine.r === "origin" ? "이번 판에는 숙주 좀비였습니다." : "이번 생존 시간 " + mine.s + "초"));
   else setText($("resMine"), (isSpectator(myId) ? "이번 판은 관전했습니다." : "이번 판에는 참가하지 않았습니다."));
 }
@@ -3867,7 +3894,89 @@ function frame(nowMs) {
 requestAnimationFrame(frame);
 window.__zo = { THREE, scene, camera, renderer, round, tour, TOUR_SHOTS, curtainMeshes, updateCurtains, eerieSounds, flashLightning, playHeartbeat };
 
+class ZombieRandomMatch {
+  static PARTY_LIMIT = 3;
+  constructor() {
+    this.quiet = false;
+    this.flow = null;
+    if (!db) return;
+    const options = { gameRoot: "zombieoutbreak", queue: "zombieoutbreak", partyLimit: ZombieRandomMatch.PARTY_LIMIT, matcher: new MkFreeForAllMatcher(ZombieRandomMatch.PARTY_LIMIT, MAX_PLAYERS),
+      intro: "매칭 시작을 누르면 다른 학생들과 최대 " + MAX_PLAYERS + "명이 모여요. 좀비는 시작할 때 무작위로 정해지고, 모자란 자리는 AI가 채워요." };
+    this.flow = new MkRandomFlow(db, { now: serverNow }, myId, options, this, new MkPartyPanel($("scrParty"), $("partyMount"), options));
+  }
+  inParty() { return !!this.flow && this.flow.inParty(); }
+  ticket() { return this.flow ? this.flow.ticket() : null; }
+  async open() {
+    audioInit();
+    if (!nickReady()) return;
+    if (!this.flow) { startMsg("온라인 연결을 할 수 없습니다. (인터넷 연결을 확인해 주세요)"); return; }
+    $("btnRandom").disabled = true; startMsg("");
+    try { startMsg(await this.flow.create()); }
+    catch (e) { startMsg("랜덤 매칭 방을 만들지 못했습니다. (데이터베이스 규칙을 확인해 주세요)"); }
+    finally { $("btnRandom").disabled = false; }
+  }
+  async tryJoin(code) { return this.flow ? this.flow.tryJoin(code) : { handled: false, message: "" }; }
+  async codeTaken(code) { return this.flow ? this.flow.codeTaken(code).catch(() => false) : false; }
+  updateMe() { if (this.flow) this.flow.updateMe(); }
+  member() { return { nick: PlayerProfile.storedNick() || "학생", joinedAt: serverNow(), look: null }; }
+  async create(plan) {
+    await sweepRooms();
+    for (let n = 0; n < 8; n++) {
+      const code = String(10000 + Math.floor(Math.random() * 90000)), t = serverNow();
+      if (await this.flow.codeTaken(code)) continue;
+      const obj = { status: "lobby", hostPlayerId: myId, createdAt: t, fillBots: true, matchId: plan.matchId, players: { [myId]: newPlayer(t) } };
+      const res = await db.ref(ROOM_ROOT + "/" + code).transaction(cur => cur === null ? obj : undefined);
+      if (res.committed) return { room: code, host: myId };
+    }
+    return null;
+  }
+  async discard(made) { await db.ref(ROOM_ROOT + "/" + made.room).remove(); }
+  async enterRoom(ticket, hosting) {
+    if (!hosting) {
+      const ref = db.ref(ROOM_ROOT + "/" + ticket.room);
+      const status = (await ref.child("status").once("value")).val();
+      if (status !== "lobby") return false;
+      await ref.child("players/" + myId).set(newPlayer(serverNow(), false));
+    }
+    enterRoom(ticket.room);
+    $("scrLobby").classList.add("matched");
+    $("scrResult").classList.add("matched");
+    return true;
+  }
+  leaveRoom() {
+    if (!room.ref) return;
+    this.quiet = true;
+    try { leaveRoom(); } finally { this.quiet = false; }
+  }
+  roomClosed(msg) {
+    $("scrLobby").classList.remove("matched");
+    $("scrResult").classList.remove("matched");
+    setText($("btnResultLeave"), "방 나가기");
+    if (this.quiet) return;
+    if (this.inParty()) { this.flow.backToParty(msg); return; }
+    showScreen("start"); startMsg(msg);
+  }
+  startMatch() { hostStart(); }
+  showParty() { showScreen("party"); refreshNick(); }
+  showStart(message) { showScreen("start"); startMsg(message); }
+  roomChanged() { if (this.flow && room.ref) this.flow.roomChanged(participantCount(), isHost(), room.status === "lobby"); }
+  decorateResult(final) {
+    const ticket = this.ticket();
+    if (!ticket) return;
+    setText($("btnResultLeave"), "팀 대기실로");
+    const showStreak = () => setText($("resStreak"), this.flow.endHint());
+    showStreak();
+    const winner = room.winner;
+    const mine = this.flow.memberIds().filter(id => final[id]);
+    if (!winner || !mine.length) return;
+    const onWinningSide = id => winner === "human" ? final[id].r === "survived" : final[id].r !== "survived";
+    this.flow.matchEnded({ result: mine.every(onWinningSide) ? "win" : "lose" }, showStreak);
+  }
+}
+const zombieRandom = new ZombieRandomMatch();
+
 function blurAfter(fn) { return e => { e.currentTarget.blur(); fn(); }; }
+$("btnRandom").onclick = blurAfter(() => zombieRandom.open());
 $("btnCreate").onclick = blurAfter(createRoom);
 $("btnJoin").onclick = blurAfter(() => joinRoom(false));
 $("btnJoinSpec").onclick = blurAfter(() => joinRoom(true));

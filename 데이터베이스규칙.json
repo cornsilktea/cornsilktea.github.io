@@ -202,6 +202,9 @@
     },
     "zombieoutbreak": {
       ".read": true,
+      "parties": {
+        "$party": { ".write": "$party.matches(/^[0-9]{5}$/)" }
+      },
       "rooms": {
         "$room": {
           ".write": "$room.matches(/^[0-9]{5}$/)",
