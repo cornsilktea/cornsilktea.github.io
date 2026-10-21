@@ -122,8 +122,10 @@ interface CollectionServices extends CollectionSessionAccess {
   readonly startProfileHost: HTMLElement;
   readonly lobbyProfileHost: HTMLElement;
   readonly practiceProfileHost: HTMLElement;
+  readonly partyProfileHost: HTMLElement;
   readonly localId: string;
   readonly directory: ParticipantDirectory;
+  readonly matchedInfo: MatchedResultInfo;
 }
 
 abstract class CollectionPhase {
@@ -186,6 +188,12 @@ class LobbyScreenPhase extends MenuScreenPhase {
   refresh(): void {
     const session = this.services.session();
     if (session && this.services.screens.current === "lobby") this.services.lobbyView.render(session);
+  }
+}
+
+class PartyScreenPhase extends MenuScreenPhase {
+  enter(): void {
+    this.showMenu("party", this.services.partyProfileHost);
   }
 }
 
@@ -259,7 +267,7 @@ class ResultScreenPhase extends CollectionPhase {
     const scores = new TournamentScores(session.resultsRecord());
     if (final) view.renderFinal(scores, this.services.localId, this.services.directory);
     else view.renderRound(session.round, session.plan.length, scores, (session.resultsRecord() || {})[session.round.n] || {}, this.services.localId, this.services.directory);
-    view.showButtons(final, session.isHost());
+    view.showButtons(final, session.isHost(), this.services.matchedInfo);
   }
 
   private showCountdown(): void {
@@ -284,6 +292,11 @@ interface CollectionFlowServices {
   readonly startView: StartView;
   readonly practiceEntry: PracticeEntryView;
   readonly practiceMenu: PracticeMenuView;
+  readonly randomEntry: RandomEntryView;
+  readonly partyScreen: HTMLElement;
+  readonly partyMount: HTMLElement;
+  readonly partyPhase: CollectionPhase;
+  readonly screens: CollectionScreens;
   readonly lobbyView: CollectionLobbyView;
   readonly resultView: CollectionResultView;
   readonly runtime: GameRuntime;
@@ -302,8 +315,20 @@ class CollectionFlow implements CollectionListener, HostGate, CollectionSessionA
   private current: CollectionSession | null = null;
   private director: CollectionDirector | null = null;
   private readonly statusHandlers: Readonly<Record<CollectionStatus, () => void>>;
+  readonly random: CollectionRandomMatch;
 
   constructor(private readonly services: CollectionFlowServices) {
+    this.random = new CollectionRandomMatch(services.backend.database, services.backend.clock, services.localId, {
+      member: () => { const record = this.myRecord(0, false); return { nick: record.nick, joinedAt: record.joinedAt, look: record.look }; },
+      createMatchedRoom: (matchId) => services.directory.create(services.localId, this.myRecord(0, false), false, (code) => this.random.codeTaken(code), { matchId }),
+      discardRoom: (code) => services.backend.ref(CollectionRules.ROOM_ROOT + "/" + code).remove(),
+      enterTicketRoom: (code, hosting) => this.enterTicketRoom(code, hosting),
+      leaveRoomQuietly: () => this.leaveRoomQuietly(),
+      startCollection: () => { if (this.director) this.director.startCollection(); },
+      showParty: () => this.services.phases.goTo(this.services.partyPhase),
+      showStart: (message) => this.returnToStart(message)
+    }, services.partyScreen, services.partyMount);
+    services.randomEntry.onClick(() => this.createParty());
     this.statusHandlers = {
       lobby: () => this.openLobby(),
       play: () => this.openRound(),
@@ -344,18 +369,31 @@ class CollectionFlow implements CollectionListener, HostGate, CollectionSessionA
   }
 
   pushProfile(): void {
+    if (this.random.flow) this.random.flow.updateMe();
     const session = this.current;
     if (!session || !session.hasPlayer(session.myId)) return;
     session.pushProfile(this.services.profile.nick || session.player(session.myId).nick, this.services.profile.look);
   }
 
-  playersChanged(): void { this.services.lobbyPhase.refresh(); }
+  playersChanged(): void {
+    this.services.lobbyPhase.refresh();
+    const session = this.current;
+    if (session && this.random.flow) this.random.flow.roomChanged(session.playingHumanCount(), session.isHost(), session.status === "lobby");
+  }
   hostChanged(): void {
     this.services.lobbyPhase.refresh();
     this.settleDepartures();
   }
   winsChanged(): void { this.services.lobbyPhase.refresh(); }
-  statusChanged(): void { this.syncPhase(); }
+  statusChanged(): void {
+    this.syncPhase();
+    this.reportFinalToParty();
+  }
+
+  private reportFinalToParty(): void {
+    const session = this.current;
+    if (session && session.status === "final") this.random.reportFinal(new TournamentScores(session.resultsRecord()), () => this.services.resultPhase.refresh());
+  }
   roundChanged(): void { this.syncPhase(); }
   closed(message: string): void { this.exitToStart(message); }
 
@@ -366,6 +404,7 @@ class CollectionFlow implements CollectionListener, HostGate, CollectionSessionA
   resultsChanged(): void {
     const session = this.current;
     if (session && (session.status === "roundEnd" || session.status === "final")) this.services.resultPhase.refresh();
+    this.reportFinalToParty();
   }
 
   private settleDepartures(): void {
@@ -385,6 +424,39 @@ class CollectionFlow implements CollectionListener, HostGate, CollectionSessionA
   private setCreateBusy(busy: boolean): void {
     this.services.startView.setCreateEnabled(!busy);
     this.services.practiceEntry.setEnabled(!busy);
+    this.services.randomEntry.setEnabled(!busy);
+  }
+
+  private async createParty(): Promise<void> {
+    const flow = this.random.flow;
+    if (!flow) return;
+    this.setCreateBusy(true);
+    this.services.startView.showMessage("");
+    try {
+      this.services.startView.showMessage(await flow.create());
+    } catch (error) {
+      this.services.startView.showMessage("랜덤 매칭 방을 만들지 못했어요. (데이터베이스 규칙을 확인해 주세요)");
+    }
+    this.setCreateBusy(false);
+  }
+
+  private async enterTicketRoom(code: string, hosting: boolean): Promise<boolean> {
+    if (!hosting) {
+      const outcome = await this.services.directory.join(code, this.services.localId, (existing, spectator) => this.myRecord(spectator ? CollectionRules.SPECTATOR_SLOT : SlotAllocator.freeSlot(existing.values()), spectator)).catch(() => null);
+      if (!outcome || !outcome.ok) return false;
+    }
+    this.enterRoom(code, false);
+    this.services.screens.setMatched(true);
+    return true;
+  }
+
+  private leaveRoomQuietly(): void {
+    if (this.current) this.current.leave();
+    this.current = null;
+    this.director = null;
+    this.services.runtime.dispose();
+    this.services.hub.releaseAll();
+    this.services.screens.setMatched(false);
   }
 
   private async createRoom(practice: boolean): Promise<void> {
@@ -393,7 +465,7 @@ class CollectionFlow implements CollectionListener, HostGate, CollectionSessionA
     this.setCreateBusy(true);
     view.showMessage("");
     try {
-      const code = await this.services.directory.create(this.services.localId, this.myRecord(0, false), practice);
+      const code = await this.services.directory.create(this.services.localId, this.myRecord(0, false), practice, (taken) => this.random.codeTaken(taken));
       if (code) this.enterRoom(code, practice);
       else view.showMessage("방을 만들지 못했어요. 다시 눌러 주세요.");
     } catch (error) {
@@ -413,6 +485,12 @@ class CollectionFlow implements CollectionListener, HostGate, CollectionSessionA
     view.setJoinEnabled(false);
     view.showMessage("");
     try {
+      const party = this.random.flow ? await this.random.flow.tryJoin(code) : { handled: false, message: "" };
+      if (party.handled) {
+        view.setJoinEnabled(true);
+        view.showMessage(party.message);
+        return;
+      }
       const outcome = await this.services.directory.join(code, this.services.localId, (existing, spectator) => this.myRecord(spectator ? CollectionRules.SPECTATOR_SLOT : SlotAllocator.freeSlot(existing.values()), spectator));
       view.setJoinEnabled(true);
       if (outcome.ok) this.enterRoom(code, false);
@@ -434,12 +512,24 @@ class CollectionFlow implements CollectionListener, HostGate, CollectionSessionA
   }
 
   private leaveRoom(): void {
+    if (this.random.inParty() && this.random.flow) {
+      this.random.flow.backToParty("");
+      return;
+    }
     if (this.current) this.current.leave();
     this.returnToStart("");
   }
 
   private exitToStart(message: string): void {
     if (this.current) this.current.silentClose();
+    if (this.random.inParty() && this.random.flow) {
+      this.current = null;
+      this.director = null;
+      this.services.runtime.dispose();
+      this.services.screens.setMatched(false);
+      this.random.flow.backToParty(message);
+      return;
+    }
     this.returnToStart(message);
   }
 

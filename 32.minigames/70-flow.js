@@ -151,6 +151,11 @@ class LobbyScreenPhase extends MenuScreenPhase {
             this.services.lobbyView.render(session);
     }
 }
+class PartyScreenPhase extends MenuScreenPhase {
+    enter() {
+        this.showMenu("party", this.services.partyProfileHost);
+    }
+}
 class PracticeScreenPhase extends MenuScreenPhase {
     enter() {
         this.showMenu("practice", this.services.practiceProfileHost);
@@ -219,7 +224,7 @@ class ResultScreenPhase extends CollectionPhase {
             view.renderFinal(scores, this.services.localId, this.services.directory);
         else
             view.renderRound(session.round, session.plan.length, scores, (session.resultsRecord() || {})[session.round.n] || {}, this.services.localId, this.services.directory);
-        view.showButtons(final, session.isHost());
+        view.showButtons(final, session.isHost(), this.services.matchedInfo);
     }
     showCountdown() {
         const session = this.services.session();
@@ -239,6 +244,18 @@ class CollectionFlow {
         this.services = services;
         this.current = null;
         this.director = null;
+        this.random = new CollectionRandomMatch(services.backend.database, services.backend.clock, services.localId, {
+            member: () => { const record = this.myRecord(0, false); return { nick: record.nick, joinedAt: record.joinedAt, look: record.look }; },
+            createMatchedRoom: (matchId) => services.directory.create(services.localId, this.myRecord(0, false), false, (code) => this.random.codeTaken(code), { matchId }),
+            discardRoom: (code) => services.backend.ref(CollectionRules.ROOM_ROOT + "/" + code).remove(),
+            enterTicketRoom: (code, hosting) => this.enterTicketRoom(code, hosting),
+            leaveRoomQuietly: () => this.leaveRoomQuietly(),
+            startCollection: () => { if (this.director)
+                this.director.startCollection(); },
+            showParty: () => this.services.phases.goTo(this.services.partyPhase),
+            showStart: (message) => this.returnToStart(message)
+        }, services.partyScreen, services.partyMount);
+        services.randomEntry.onClick(() => this.createParty());
         this.statusHandlers = {
             lobby: () => this.openLobby(),
             play: () => this.openRound(),
@@ -281,18 +298,33 @@ class CollectionFlow {
             this.director.tick(this.services.runtime.game);
     }
     pushProfile() {
+        if (this.random.flow)
+            this.random.flow.updateMe();
         const session = this.current;
         if (!session || !session.hasPlayer(session.myId))
             return;
         session.pushProfile(this.services.profile.nick || session.player(session.myId).nick, this.services.profile.look);
     }
-    playersChanged() { this.services.lobbyPhase.refresh(); }
+    playersChanged() {
+        this.services.lobbyPhase.refresh();
+        const session = this.current;
+        if (session && this.random.flow)
+            this.random.flow.roomChanged(session.playingHumanCount(), session.isHost(), session.status === "lobby");
+    }
     hostChanged() {
         this.services.lobbyPhase.refresh();
         this.settleDepartures();
     }
     winsChanged() { this.services.lobbyPhase.refresh(); }
-    statusChanged() { this.syncPhase(); }
+    statusChanged() {
+        this.syncPhase();
+        this.reportFinalToParty();
+    }
+    reportFinalToParty() {
+        const session = this.current;
+        if (session && session.status === "final")
+            this.random.reportFinal(new TournamentScores(session.resultsRecord()), () => this.services.resultPhase.refresh());
+    }
     roundChanged() { this.syncPhase(); }
     closed(message) { this.exitToStart(message); }
     playerLeft(id) {
@@ -302,6 +334,7 @@ class CollectionFlow {
         const session = this.current;
         if (session && (session.status === "roundEnd" || session.status === "final"))
             this.services.resultPhase.refresh();
+        this.reportFinalToParty();
     }
     settleDepartures() {
         const session = this.current;
@@ -320,6 +353,40 @@ class CollectionFlow {
     setCreateBusy(busy) {
         this.services.startView.setCreateEnabled(!busy);
         this.services.practiceEntry.setEnabled(!busy);
+        this.services.randomEntry.setEnabled(!busy);
+    }
+    async createParty() {
+        const flow = this.random.flow;
+        if (!flow)
+            return;
+        this.setCreateBusy(true);
+        this.services.startView.showMessage("");
+        try {
+            this.services.startView.showMessage(await flow.create());
+        }
+        catch (error) {
+            this.services.startView.showMessage("랜덤 매칭 방을 만들지 못했어요. (데이터베이스 규칙을 확인해 주세요)");
+        }
+        this.setCreateBusy(false);
+    }
+    async enterTicketRoom(code, hosting) {
+        if (!hosting) {
+            const outcome = await this.services.directory.join(code, this.services.localId, (existing, spectator) => this.myRecord(spectator ? CollectionRules.SPECTATOR_SLOT : SlotAllocator.freeSlot(existing.values()), spectator)).catch(() => null);
+            if (!outcome || !outcome.ok)
+                return false;
+        }
+        this.enterRoom(code, false);
+        this.services.screens.setMatched(true);
+        return true;
+    }
+    leaveRoomQuietly() {
+        if (this.current)
+            this.current.leave();
+        this.current = null;
+        this.director = null;
+        this.services.runtime.dispose();
+        this.services.hub.releaseAll();
+        this.services.screens.setMatched(false);
     }
     async createRoom(practice) {
         const view = this.services.startView;
@@ -328,7 +395,7 @@ class CollectionFlow {
         this.setCreateBusy(true);
         view.showMessage("");
         try {
-            const code = await this.services.directory.create(this.services.localId, this.myRecord(0, false), practice);
+            const code = await this.services.directory.create(this.services.localId, this.myRecord(0, false), practice, (taken) => this.random.codeTaken(taken));
             if (code)
                 this.enterRoom(code, practice);
             else
@@ -351,6 +418,12 @@ class CollectionFlow {
         view.setJoinEnabled(false);
         view.showMessage("");
         try {
+            const party = this.random.flow ? await this.random.flow.tryJoin(code) : { handled: false, message: "" };
+            if (party.handled) {
+                view.setJoinEnabled(true);
+                view.showMessage(party.message);
+                return;
+            }
             const outcome = await this.services.directory.join(code, this.services.localId, (existing, spectator) => this.myRecord(spectator ? CollectionRules.SPECTATOR_SLOT : SlotAllocator.freeSlot(existing.values()), spectator));
             view.setJoinEnabled(true);
             if (outcome.ok)
@@ -373,6 +446,10 @@ class CollectionFlow {
         this.services.phases.goTo(practice ? this.services.practicePhase : this.services.lobbyPhase);
     }
     leaveRoom() {
+        if (this.random.inParty() && this.random.flow) {
+            this.random.flow.backToParty("");
+            return;
+        }
         if (this.current)
             this.current.leave();
         this.returnToStart("");
@@ -380,6 +457,14 @@ class CollectionFlow {
     exitToStart(message) {
         if (this.current)
             this.current.silentClose();
+        if (this.random.inParty() && this.random.flow) {
+            this.current = null;
+            this.director = null;
+            this.services.runtime.dispose();
+            this.services.screens.setMatched(false);
+            this.random.flow.backToParty(message);
+            return;
+        }
         this.returnToStart(message);
     }
     returnToStart(message) {

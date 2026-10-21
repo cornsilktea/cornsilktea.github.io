@@ -371,11 +371,12 @@ class CollectionDirectory {
 
   constructor(private readonly backend: RoomBackend, private readonly env: BrowserEnv, private readonly tokens: TokenSource) {}
 
-  async create(myId: string, record: CollectionPlayerRecord, practice: boolean): Promise<string | null> {
+  async create(myId: string, record: CollectionPlayerRecord, practice: boolean, taken: (code: string) => Promise<boolean> = async () => false, extra: Record<string, unknown> = {}): Promise<string | null> {
     await this.sweep();
     for (let attempt = 0; attempt < CollectionDirectory.CREATE_ATTEMPTS; attempt++) {
       const code = this.tokens.digits(CollectionRules.ROOM_CODE_LENGTH);
-      const room: Record<string, unknown> = { status: "lobby", hostPlayerId: myId, createdAt: this.backend.clock.now(), players: { [myId]: record } };
+      if (await taken(code)) continue;
+      const room: Record<string, unknown> = Object.assign({}, extra, { status: "lobby", hostPlayerId: myId, createdAt: this.backend.clock.now(), players: { [myId]: record } });
       if (practice) room.practice = true;
       const result = await this.backend.ref(CollectionRules.ROOM_ROOT + "/" + code).transaction((current) => (current !== null ? undefined : room));
       if (result.committed) return code;

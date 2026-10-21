@@ -318,11 +318,13 @@ class CollectionDirectory {
         this.env = env;
         this.tokens = tokens;
     }
-    async create(myId, record, practice) {
+    async create(myId, record, practice, taken = async () => false, extra = {}) {
         await this.sweep();
         for (let attempt = 0; attempt < CollectionDirectory.CREATE_ATTEMPTS; attempt++) {
             const code = this.tokens.digits(CollectionRules.ROOM_CODE_LENGTH);
-            const room = { status: "lobby", hostPlayerId: myId, createdAt: this.backend.clock.now(), players: { [myId]: record } };
+            if (await taken(code))
+                continue;
+            const room = Object.assign({}, extra, { status: "lobby", hostPlayerId: myId, createdAt: this.backend.clock.now(), players: { [myId]: record } });
             if (practice)
                 room.practice = true;
             const result = await this.backend.ref(CollectionRules.ROOM_ROOT + "/" + code).transaction((current) => (current !== null ? undefined : room));

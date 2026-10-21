@@ -10,16 +10,21 @@ class CollectionScreens {
         this.lobby = page.byId("lobbyScreen");
         this.practice = page.byId("practiceScreen");
         this.result = page.byId("resultScreen");
+        this.party = page.byId("partyScreen");
         this.hudList = page.byId("hudList");
         this.hudRight = page.byId("hudRight");
     }
     get current() { return this.shown; }
+    setMatched(matched) {
+        this.lobby.classList.toggle("matched", matched);
+    }
     show(name) {
         this.shown = name;
         this.page.show(this.start, name === "start");
         this.page.show(this.lobby, name === "lobby");
         this.page.show(this.practice, name === "practice");
         this.page.show(this.result, name === "result");
+        this.page.show(this.party, name === "party");
         const playing = name === "game";
         this.page.show(this.hudList, playing);
         this.page.show(this.hudRight, playing);
@@ -96,6 +101,13 @@ class CatalogView {
 class PracticeEntryView {
     constructor(page) {
         this.button = page.byId("btnPractice");
+    }
+    onClick(handler) { this.button.onclick = handler; }
+    setEnabled(enabled) { this.button.disabled = !enabled; }
+}
+class RandomEntryView {
+    constructor(page) {
+        this.button = page.byId("btnRandom");
     }
     onClick(handler) { this.button.onclick = handler; }
     setEnabled(enabled) { this.button.disabled = !enabled; }
@@ -253,10 +265,14 @@ class CollectionResultView {
         const winners = scores.topIds().map((id) => scores.nick(id));
         this.page.setText(this.nextIn, winners.length ? "🏆 최종 우승: " + winners.join(", ") : "");
     }
-    showButtons(final, host) {
-        this.page.show(this.toLobbyButton, final && host);
+    showButtons(final, host, matched) {
+        const fromMatch = matched.matched();
+        this.page.show(this.toLobbyButton, final && host && !fromMatch);
         this.page.show(this.leaveButton, final);
-        if (final && !host)
+        this.page.setText(this.leaveButton, fromMatch ? "팀 대기실로" : "방 나가기");
+        if (final && fromMatch)
+            this.page.setText(this.nextIn, matched.streakText());
+        else if (final && !host)
             this.page.setText(this.nextIn, (this.nextIn.textContent || "") + " · 방장이 대기실로 이동할 때까지 기다려 주세요");
     }
     showCountdown(text) {

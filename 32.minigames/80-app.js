@@ -11,6 +11,7 @@ class MiniGamesApp {
         this.localId = "p" + this.tokens.token(8) + new SystemClock().now().toString(36).slice(-4);
         this.startView = new StartView(this.page);
         this.practiceEntry = new PracticeEntryView(this.page);
+        this.randomEntry = new RandomEntryView(this.page);
         this.practiceMenu = new PracticeMenuView(this.page);
         this.phases = new CollectionPhaseMachine();
         this.lastFrameMs = 0;
@@ -64,12 +65,15 @@ class MiniGamesApp {
             clock: this.backend.clock, screens, runtime, hud: new CollectionHud(this.page), spectatorBar, messages, hub, render: this.render, backdrops: this.backdrops, catalog: this.catalog,
             lobbyView, resultView, profilePanel: this.profilePanel,
             startProfileHost: this.page.byId("profileHost"), lobbyProfileHost: this.page.byId("lobbyProfileHost"), practiceProfileHost: this.page.byId("practiceProfileHost"),
-            localId: this.localId, session: () => this.flow.session(), directory: { lookup: (id) => this.flow.lookup(id) }
+            partyProfileHost: this.page.byId("partyProfileHost"),
+            localId: this.localId, session: () => this.flow.session(), directory: { lookup: (id) => this.flow.lookup(id) },
+            matchedInfo: { matched: () => this.flow.random.matched(), streakText: () => this.flow.random.streakText() }
         };
         const startPhase = new StartScreenPhase(services);
         const flow = new CollectionFlow({
             env: this.env, backend: this.backend, directory: new CollectionDirectory(this.backend, this.env, this.tokens), catalog: this.catalog, profile: this.profile,
             startView: this.startView, practiceEntry: this.practiceEntry, practiceMenu: this.practiceMenu, lobbyView, resultView, runtime, hub, phases: this.phases,
+            randomEntry: this.randomEntry, partyScreen: this.page.byId("partyScreen"), partyMount: this.page.byId("partyMount"), partyPhase: new PartyScreenPhase(services), screens,
             startPhase, lobbyPhase: new LobbyScreenPhase(services), practicePhase: new PracticeScreenPhase(services), playPhase: new PlayScreenPhase(services), resultPhase: new ResultScreenPhase(services),
             random: new RandomRange(this.randomSource), localId: this.localId
         });
@@ -93,6 +97,7 @@ class MiniGamesApp {
         const ready = this.backend.isOnline() && this.assetsReady;
         this.startView.setOnlineReady(ready);
         this.practiceEntry.setEnabled(ready);
+        this.randomEntry.setEnabled(ready);
         if (!this.backend.isOnline())
             this.startView.showMessage("온라인 연결을 할 수 없어요. (firebase-config.js·인터넷 확인)");
     }

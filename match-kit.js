@@ -773,6 +773,10 @@ class MkRandomFlow {
     ticket() {
         return this.current;
     }
+    // 여럿이 한 방에 모이는 게임에서 "우리 팀 누군가 1등"을 판단할 때 쓴다.
+    memberIds() {
+        return this.party ? this.party.members().map(([id]) => id) : [];
+    }
     hasTicket() {
         return !!this.current;
     }
