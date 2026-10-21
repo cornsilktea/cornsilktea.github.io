@@ -262,6 +262,8 @@ class MkRecordBook {
 // 팀 대기실 만들기·들어가기. 코드는 일반 방 코드와 겹치지 않게 고른다.
 class MkPartyDirectory {
   private static readonly CODE_ATTEMPTS = 12;
+  // 사람이 없는 대기실은 대부분 연결이 잠깐 끊긴 것이라 곧 돌아온다(MkParty.restore). 오래된 것만 치운다.
+  private static readonly ABANDONED_MS = 3 * 3600000;
 
   constructor(
     private readonly database: FirebaseDatabase,
@@ -330,8 +332,10 @@ class MkPartyDirectory {
       const snapshot = await this.database.ref(this.paths.parties).once("value");
       const all = snapshot.val<Record<string, MkPartyRecord>>() || {};
       const updates: Record<string, null> = {};
+      const now = this.clock.now();
       Object.keys(all).forEach((code) => {
-        if (!MkPartyDirectory.isAlive(all[code])) updates[code] = null;
+        const record = all[code];
+        if (!MkPartyDirectory.isAlive(record) && !(now - ((record && record.createdAt) || 0) < MkPartyDirectory.ABANDONED_MS)) updates[code] = null;
       });
       if (Object.keys(updates).length) await this.database.ref(this.paths.parties).update(updates);
     } catch (error) {

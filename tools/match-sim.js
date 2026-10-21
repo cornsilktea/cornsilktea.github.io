@@ -371,6 +371,10 @@ class Scenarios {
     world.server.blip(first.myId);
     await Util.wait(80);
     Report.check("잠깐 끊김: 팀장도 되살아나고 팀장은 한 명", first.isLeader() !== second.isLeader() && Object.keys(second.record.members).length === 2 && Object.keys(first.record.members).length === 2, second.record);
+    world.server.put(world.paths.party("99999"), { leaderId: "gone", createdAt: Date.now(), history: { m1: { n: 1 } } });
+    world.server.put(world.paths.party("99998"), { leaderId: "gone", createdAt: Date.now() - 4 * 3600000 });
+    await world.team(1, 1);
+    Report.check("청소: 사람이 잠깐 빠진 대기실은 남기고 오래된 빈 대기실만 지움", !!world.server.get(world.paths.party("99999")) && world.server.get(world.paths.party("99998")) === null);
     await solo.leader.leave();
     await Util.wait(40);
     Report.check("잠깐 끊김 뒤 스스로 나가면 대기실이 사라짐", world.server.get(world.paths.party(solo.code)) === null);

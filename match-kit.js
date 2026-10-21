@@ -210,8 +210,10 @@ class MkPartyDirectory {
             const snapshot = await this.database.ref(this.paths.parties).once("value");
             const all = snapshot.val() || {};
             const updates = {};
+            const now = this.clock.now();
             Object.keys(all).forEach((code) => {
-                if (!MkPartyDirectory.isAlive(all[code]))
+                const record = all[code];
+                if (!MkPartyDirectory.isAlive(record) && !(now - ((record && record.createdAt) || 0) < MkPartyDirectory.ABANDONED_MS))
                     updates[code] = null;
             });
             if (Object.keys(updates).length)
@@ -223,6 +225,8 @@ class MkPartyDirectory {
     }
 }
 MkPartyDirectory.CODE_ATTEMPTS = 12;
+// 사람이 없는 대기실은 대부분 연결이 잠깐 끊긴 것이라 곧 돌아온다(MkParty.restore). 오래된 것만 치운다.
+MkPartyDirectory.ABANDONED_MS = 3 * 3600000;
 // 팀 대기실 하나에 붙어 있는 동안의 상태. 판 중에도 연결을 유지해서 끝나면 같은 대기실로 돌아온다.
 class MkParty {
     constructor(database, clock, paths, code, myId, limit) {

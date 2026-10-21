@@ -487,7 +487,7 @@
 
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="character-maker.js?v=20261012"></script>
-<script charset="utf-8" src="match-kit.js?v=20261021h"></script>
+<script charset="utf-8" src="match-kit.js?v=20261021i"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
 <script type="module">
@@ -4306,7 +4306,7 @@ const HIT_NOTICE = { minGapMs: 250, dedupeMs: 300, staleMs: 1000 };
 const CHASE = { gapSteps: [{ overM: 30, kmh: 25 }, { overM: 20, kmh: 15 }, { overM: 10, kmh: 10 }, { overM: 0, kmh: 5 }], tailM: 25, tailSideM: 2.5 * 2 * CAR_HIT.radius, tailSec: 3, boostKmh: 40, rampSec: 0.5, holdSec: 1, fadeSec: 1.5, cooldownSec: 6, startLockSec: 5, stickyM: 3, stickySideM: 0.4, tailGraceSec: 0.5, tagHoldSec: 0.6, surgeFromRatio: 0.85, surgeFullKmh: 20 };
 const TAG_HOLD = { chase: { text: "", t: 0 }, follow: { text: "", t: 0 } };
 const BATTLE = {
-  root: "turbolap/rooms", specMax: 1, netMs: 100, countMs: 3600, countLagMaxMs: 1500,dnfMs: 30000, rankRowH: 48,
+  root: "turbolap/rooms", specMax: 1, netMs: 100, countMs: 3600, dnfMs: 30000, rankRowH: 48,
   sdk: ["https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js", "https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"]
 };
 
@@ -4350,7 +4350,10 @@ function connectDb() {
     if (!window.firebase) { await loadScript(BATTLE.sdk[0]); await loadScript(BATTLE.sdk[1]); }
     if (!firebase.apps.length) firebase.initializeApp({ apiKey: CONF.API_KEY, authDomain: CONF.AUTH_DOMAIN, databaseURL: CONF.DB_URL.replace(/\/+$/, "") });
     BT.db = firebase.database();
-    BT.db.ref(".info/serverTimeOffset").on("value", s => { BT.serverOffset = s.val() || 0; });
+    await new Promise(ok => {
+      BT.db.ref(".info/serverTimeOffset").on("value", s => { BT.serverOffset = s.val() || 0; ok(); });
+      setTimeout(ok, 3000);
+    });
     return BT.db;
   })().catch(err => { dbReady = null; throw err; });
   return dbReady;
@@ -4382,8 +4385,8 @@ function sweepRooms() {
   return roomCodes().then(codes => Promise.all(codes.map(roomSummary))).then(rooms => {
     const t = tnow(), u = {};
     rooms.forEach(r => {
-      const age = t - r.createdAt;
-      if ((!humanIds(r.players).length && age > 60000) || (r.status === "ended" && t - r.endedAt > 300000) || age > 6 * 3600000) u[r.code] = null;
+      const age = t - r.createdAt, racing = r.status === "countdown" || r.status === "playing";
+      if ((!racing && !humanIds(r.players).length && age > 60000) || (r.status === "ended" && t - r.endedAt > 300000) || age > 6 * 3600000) u[r.code] = null;
     });
     if (okeys(u).length) return BT.db.ref(BATTLE.root).update(u);
   }).catch(() => {});
@@ -4429,7 +4432,7 @@ async function joinRoom() {
 function enterRoom(code) {
   playMode = "battle";
   BT.leaving = false; BT.code = code; BT.ref = BT.db.ref(BATTLE.root + "/" + code);
-  BT.players = {}; BT.status = "lobby"; BT.host = null; BT.hostLoaded = false; BT.raw = {}; BT.result = null; BT.lobbyCarSig = "";
+  BT.players = {}; BT.status = "lobby"; BT.startAt = 0; BT.host = null; BT.hostLoaded = false; BT.raw = {}; BT.result = null; BT.lobbyCarSig = "";
   resetMatchLocal();
   const ref = BT.ref;
   roomPresence.arm(ref);
@@ -4448,7 +4451,12 @@ function enterRoom(code) {
     if (!BT.match && BT.course !== course) { showCourse(BT.course); BT.lobbyCarSig = ""; }
     playersChanged();
   });
-  sub(ref.child("startAt"), "value", s => { BT.startAt = s.val() || 0; if (BT.match) BT.match.startAt = BT.startAt; });
+  sub(ref.child("startAt"), "value", s => {
+    BT.startAt = s.val() || 0;
+    if (!BT.match) return;
+    BT.match.startAt = BT.startAt;
+    if (state === "countdown" && BT.startAt > 0) BT.match.goPerf = performance.now() + goDelayMs();
+  });
   sub(ref.child("result"), "value", s => { BT.result = s.val(); if (cardNow === "bdone") renderResult(); });
   sub(ref.child("quitSide"), "value", s => { BT.quitSide = s.val(); if (cardNow === "bdone") renderResult(); });
   sub(ref.child("bye"), "value", s => quitGrace.setByes(s.val()));
@@ -4644,8 +4652,7 @@ function startMatchLocal() {
 }
 function goDelayMs() {
   const serverLeft = BT.startAt > 0 ? BT.startAt - tnow() : BATTLE.countMs;
-  if (BT.status !== "countdown") return serverLeft;
-  return Math.max(BATTLE.countMs - BATTLE.countLagMaxMs, Math.min(BATTLE.countMs, serverLeft));
+  return Math.min(BATTLE.countMs, serverLeft);
 }
 function msToGo() { return BT.match ? BT.match.goPerf - performance.now() : Infinity; }
 function endMatchLocal() {
