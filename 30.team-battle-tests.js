@@ -2971,6 +2971,31 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "네 직업군 모두 뽑힘");
   });
 
+  run(AIMG, "AI 드래프트: 앞의 사람 2명이 모두 전사가 아닌 캐릭터를 고르면 3번 AI 가 전사를 고르는가", function (done) {
+    var bad = [];
+    for (var seed = 1; seed <= 40 && bad.length < 3; seed++) {
+      withDraft(["b3", "r1", "r2", "r3"], function (S) {
+        withSeed(seed, function () {
+          startDraft(S);
+          S.as("b1"); DR.draftPick(DR.draftLeft(S.room.draft)[0]);
+          var clock = T0, guard = 0;
+          while (S.room.draft.step < 2 && guard++ < 8) { clock += api.DRAFT_AI_MS; api.setClock(clock); tick(); }
+          var first = DR.draftLeft(S.room.draft).filter(function (c) { return api.CHARS[c].role === "caster"; })[0];
+          S.as("b1"); DR.draftPick(first);
+          while (S.room.draft.step < 4 && guard++ < 16) { clock += api.DRAFT_AI_MS; api.setClock(clock); tick(); }
+          var second = DR.draftLeft(S.room.draft).filter(function (c) { return api.CHARS[c].role === "assassin"; })[0];
+          S.as("b2"); DR.draftPick(second);
+          while (!DR.draftDone(S.room.draft) && guard++ < 40) { clock += api.DRAFT_AI_MS; api.setClock(clock); tick(); }
+          var d = S.room.draft;
+          if (!DR.draftDone(d)) bad.push("시드 " + seed + ": 끝나지 않음");
+          else if (d.picks.pb1 !== first || d.picks.pb2 !== second) bad.push("시드 " + seed + ": 사람 선택이 바뀜");
+          else if (api.CHARS[d.picks.pb3].role !== "fighter") bad.push("시드 " + seed + ": 3번 AI 가 " + api.CHARS[d.picks.pb3].role);
+        });
+      });
+    }
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "40판 모두 3번 AI 가 전사, 사람 선택은 그대로");
+  });
+
   run(AIMG, "AI 드래프트 순서: 1번 픽은 전사, 2번 픽은 무작위, 3번 픽은 앞이 전사 2명이면 원거리 딜러·전사 1명이면 무작위인가", function (done) {
     var bad = [], second = {}, thirdMixed = {}, twoFighters = 0;
     function roleAt(d, k) { return api.CHARS[d.picks["p" + k]].role; }
