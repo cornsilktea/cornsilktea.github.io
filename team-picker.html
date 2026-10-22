@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script charset="utf-8" src="firebase-config.js"></script>
+<script charset="utf-8" src="access-guard.js"></script>
+<title>조 편성</title>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="정보 수업용 링크 모음">
+<meta property="og:title" content="조 편성">
+<meta property="og:description" content="정보 수업용 링크 모음">
+<meta property="og:url" content="https://cornsilktea.github.io/team-picker.html">
+<meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F4F6F1;
+  --panel:#FFFFFF;
+  --panel-alt:#EAF0E6;
+  --strong:#24402F;
+  --ink:#1B2B20;
+  --soft:#5B6B5E;
+  --primary:#24402F;
+  --primary-soft:#DCE6D6;
+  --accent:#D97B4F;
+  --font:"Nanum Gothic","NanumGothic","나눔고딕","Malgun Gothic","맑은 고딕",sans-serif;
+}
+*{box-sizing:border-box;}
+[hidden]{display:none !important;}
+html,body{margin:0;}
+body{
+  height:100vh;height:100dvh;overflow:hidden;
+  background:var(--bg);color:var(--ink);font-family:var(--font);
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+  touch-action:manipulation;
+}
+button{
+  font-family:inherit;min-height:48px;min-width:48px;padding:0 16px;
+  font-size:17px;font-weight:700;color:var(--primary);
+  background:var(--panel);border:2px solid var(--strong);border-radius:6px;cursor:pointer;
+}
+button:active{background:var(--primary-soft);}
+button.primary{background:var(--primary);color:#fff;}
+
+#app{display:flex;flex-direction:column;height:calc(100% + 46px);margin-top:-46px;padding:6px 12px 10px;gap:10px;}
+.controls{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;}
+.guard-gap{flex:none;width:96px;height:1px;}
+.size-label{font-size:16px;font-weight:800;color:var(--strong);}
+.size-choice{display:flex;gap:6px;}
+.size-button{min-width:64px;}
+.size-button.on{background:var(--accent);border-color:var(--accent);color:#fff;}
+.present-count{margin-left:auto;font-size:16px;font-weight:800;color:var(--soft);}
+
+.team-board{
+  flex:1 1 0;min-height:0;overflow-y:auto;width:100%;max-width:1500px;margin:0 auto;
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;align-content:start;
+  touch-action:pan-y;
+}
+.board-hint{grid-column:1 / -1;margin:auto;align-self:center;font-size:20px;font-weight:700;color:var(--soft);text-align:center;}
+.team-card{
+  background:var(--panel);border:3px solid var(--strong);border-radius:8px;overflow:hidden;
+  animation:pop .3s ease-out both;
+}
+.team-title{margin:0;padding:8px 12px;background:var(--primary);color:#fff;font-size:20px;font-weight:800;}
+.team-members{display:flex;flex-wrap:wrap;gap:8px;padding:12px;}
+.member-chip{
+  min-width:44px;padding:6px 8px;text-align:center;font-size:24px;font-weight:800;
+  background:var(--panel-alt);border:2px solid var(--primary-soft);border-radius:6px;
+}
+@keyframes pop{from{transform:scale(.7);opacity:0;}to{transform:scale(1);opacity:1;}}
+
+.number-picker{display:flex;flex-direction:column;gap:6px;}
+.number-row{display:flex;gap:6px;}
+.number-button{flex:1 1 0;min-width:0;padding:0;font-size:18px;}
+.number-button.off{
+  color:var(--soft);
+  background:
+    linear-gradient(to top right, transparent calc(50% - 1.5px), var(--strong) calc(50% - 1.5px), var(--strong) calc(50% + 1.5px), transparent calc(50% + 1.5px)),
+    linear-gradient(to bottom right, transparent calc(50% - 1.5px), var(--strong) calc(50% - 1.5px), var(--strong) calc(50% + 1.5px), transparent calc(50% + 1.5px)),
+    var(--panel-alt);
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="controls">
+    <span class="guard-gap"></span>
+    <span class="size-label">조원 수</span>
+    <div class="size-choice" id="sizeChoice"></div>
+    <button type="button" id="placeButton" class="primary">배치</button>
+    <span class="present-count" id="presentCount"></span>
+  </header>
+  <main class="team-board" id="teamBoard"></main>
+  <section class="number-picker" id="numberPicker" aria-label="출석 번호 고르기"></section>
+</div>
+<script src="team-picker.js"></script>
+</body>
+</html>
