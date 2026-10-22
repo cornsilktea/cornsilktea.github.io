@@ -154,8 +154,11 @@
   `MkParty` 는 스스로 나간 게 아니고 대기실이 남아 있으면 내 자리를 되살리고 onDisconnect 를 다시 건다(모든 게임 공통).
   24번은 방 자리도 되살리고(`RoomPresence`), 방장은 상대가 사라져도 8초 기다린 뒤 기권 처리(`QuitGrace`, 나가기 버튼으로 나가면 `bye/<id>` 로 바로).
   24번 랜덤 매칭에서 경기가 절반 넘게 진행된 뒤(앞선 차 기준) 나가기를 누르면 나간 쪽 전적은 패. 대전 HUD 오른쪽 위는 최고 랩 대신 상대 닉네임.
+- **취소 뒤 다시 매칭**(2026-10-22, 24번 "방이 두 번 잡힘" 보고): 실제 Firebase 는 취소 transaction 을 부르는 순간 내 구독에 "항목 없음"을 먼저 보여 줘서,
+  옛 `MkQueue` 가 "표 없이 사라짐" 복구 타이머를 걸고 4초 뒤 새 매칭의 '찾는 중'을 지웠다(대기열 항목은 남은 채 다시 매칭 → 표 두 번).
+  이제 취소 중에는 복구를 걸지 않고, 복구는 자기가 시작한 찾기(`since` 가 같을 때)만 푼다. 시뮬레이터 `localEcho` 로 이 동작을 흉내 낸다.
 - 검사: `node tools/match-sim.js`(가짜 Firebase, 약 40초). 동시 입장·취소·끊김·방 만들기 실패·묶던 사람 끊김·
-  정원 넘김·연승(승·무·패, 중복 반영, 팀장 교체·끊김, 다시 매칭)·잠깐 끊김 복구 152개. match-kit.ts 를 고치면 꼭 돌린다.
+  정원 넘김·연승(승·무·패, 중복 반영, 팀장 교체·끊김, 다시 매칭)·잠깐 끊김 복구·취소 뒤 다시 매칭 156개. match-kit.ts 를 고치면 꼭 돌린다.
 - **공용 흐름(2026-10-21)**: 팀 대기실 화면 `MkPartyPanel(.st-screen 요소, 넣을 칸, 옵션)` 과 흐름 `MkRandomFlow(db, clock, 내id, 옵션, 훅, 패널)` 이
   match-kit 에 있다. 게임은 `MkGameHooks`(member·create(plan)·discard·enterRoom(표, 방장?)·leaveRoom·startMatch·showParty·showStart)만 만든다.
   게임 쪽에서 부르는 것: `create()`·`tryJoin(코드)`·`codeTaken(코드)`·`roomChanged(사람 수, 방장?, 대기 중?)`·`matchEnded({result, rank?, of?}, 연승 갱신 콜백)`·

@@ -48,6 +48,15 @@ class MockServer {
       setTimeout(() => { if (listener.on && !this.dead.has(listener.client)) listener.fn(MockRef.snap(listener.path, JSON.parse(json))); }, Math.max(0, at - Date.now()));
     }
   }
+  echo(client, p, value) {
+    const saved = this.tree;
+    this.tree = Util.clone(saved) || {};
+    this.put(p, value);
+    this.writes--;
+    const seen = this.listeners.filter((l) => l.client === client && l.on && (p === l.path || p.startsWith(l.path + "/"))).map((l) => [l, this.get(l.path)]);
+    this.tree = saved;
+    seen.forEach(([l, v]) => l.fn(MockRef.snap(l.path, v)));
+  }
   kill(client) {
     this.dead.add(client);
     (this.disconnects.get(client) || new Set()).forEach((p) => this.put(p, null));
@@ -88,6 +97,7 @@ class MockRef {
     for (let attempt = 0; attempt < 50; attempt++) {
       const result = update(Util.clone(local));
       if (result === undefined) return { committed: false, snapshot: MockRef.snap(this.path, local) };
+      if (attempt === 0 && this.server.localEcho) this.server.echo(this.client, this.path, result);
       await Util.wait(this.server.lag());
       if (!this.alive()) throw new Error("disconnected");
       const server = this.server.get(this.path);
@@ -350,6 +360,30 @@ class Scenarios {
     [a, b].forEach((t) => { t.queue.stop(); t.leader.silentClose(); });
   }
 
+  static async scenarioCancelThenRematch() {
+    const world = new SimWorld(new Mk.MkVersusMatcher(1, SimWorld.TIMING), 3);
+    world.server.localEcho = true;
+    const a = await world.team(1, 1);
+    let errors = 0;
+    a.queue.onError = () => errors++;
+    await a.queue.enter(a.leader);
+    await Util.wait(20);
+    const cancelled = await a.queue.cancel(a.leader);
+    await Util.wait(20);
+    const again = new Mk.MkQueue(world.server.database(a.ids[0]), SimWorld.clock, world.paths, world.matcher, world.maker(a.ids[0]));
+    again.onError = () => errors++;
+    await again.enter(a.leader);
+    await Util.wait(4300);
+    Report.check("취소 뒤 다시 매칭: 취소 성공", cancelled === true);
+    Report.check("취소 뒤 다시 매칭: 옛 대기열이 새 '찾는 중'을 지우지 않음", !!a.leader.searching() && !!world.queueNow()[a.code] && errors === 0, [a.leader.searching(), errors]);
+    const b = await world.team(1, 1);
+    await b.queue.enter(b.leader);
+    await Util.wait(300);
+    Report.check("취소 뒤 다시 매칭: 표는 한 번만", a.leader.tickets.length === 1 && b.leader.tickets.length === 1 && a.leader.tickets[0].room === b.leader.tickets[0].room, [a.leader.tickets.length, b.leader.tickets.length]);
+    [a, b].forEach((t) => { t.queue.stop(); t.leader.silentClose(); });
+    again.stop();
+  }
+
   static async scenarioBlip() {
     const world = new SimWorld(new Mk.MkVersusMatcher(1, SimWorld.TIMING), 3);
     const solo = await world.team(1, 1), pair = await world.team(2, 2);
@@ -436,6 +470,7 @@ class SimRunner {
     await Scenarios.scenarioCancelWhileClaimed();
     await Scenarios.scenarioAiFallback();
     await Scenarios.scenarioBlip();
+    await Scenarios.scenarioCancelThenRematch();
     for (let round = 0; round < 4; round++) {
       await Scenarios.scenarioRandom("동시 입장 2대2 #" + round, new Mk.MkVersusMatcher(2, SimWorld.TIMING), 14, 2, { lag: 6, spread: 1, cancelRate: 0, killRate: 0, settle: 900, capacity: 4, versus: true });
     }

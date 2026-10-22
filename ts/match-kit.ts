@@ -577,6 +577,8 @@ class MkQueue {
   private binding = false;
   private restUntil = 0;
   private active = false;
+  private cancelling = false;
+  private since = 0;
   onBound: (plan: MkMatchPlan) => void = () => undefined;
   onError: (message: string) => void = () => undefined;
 
@@ -591,6 +593,7 @@ class MkQueue {
 
   async enter(party: MkParty): Promise<void> {
     const since = this.clock.now();
+    this.since = since;
     const people: Record<string, MkMember> = {};
     party.members().forEach(([id, member]) => { people[id] = { nick: member.nick, joinedAt: member.joinedAt, look: member.look || null }; });
     const entry: MkQueueEntry = { leader: party.myId, people, bots: party.bots(), size: party.size(), at: since, claim: null };
@@ -605,14 +608,23 @@ class MkQueue {
   async cancel(party: MkParty): Promise<boolean> {
     const ref = this.database.ref(this.paths.entry(party.code));
     let removed = false;
-    const result = await ref.transaction((current) => {
-      removed = false;
-      const entry = current as MkQueueEntry | null;
-      if (!entry) return null;
-      if (!this.matcher.isFree(entry, this.clock.now())) return undefined;
-      removed = true;
-      return null;
-    });
+    // 실제 Firebase 는 transaction 을 부르는 순간 내 기기 구독에 "항목 없음"을 먼저 보여 준다.
+    // 그걸 "표 없이 사라짐"으로 오해해 복구 타이머를 걸면, 4초 안에 다시 매칭했을 때 새 '찾는 중'을 지워
+    // 대기열에 항목이 남은 채 또 매칭하게 되고 표가 두 번 온다(24번 "방이 두 번 잡힘" 보고).
+    this.cancelling = true;
+    let result: FirebaseTransactionResult;
+    try {
+      result = await ref.transaction((current) => {
+        removed = false;
+        const entry = current as MkQueueEntry | null;
+        if (!entry) return null;
+        if (!this.matcher.isFree(entry, this.clock.now())) return undefined;
+        removed = true;
+        return null;
+      });
+    } finally {
+      this.cancelling = false;
+    }
     if (!result.committed) return false;
     this.stop();
     try { ref.onDisconnect().cancel(); } catch (error) { /* 이미 끊긴 연결 */ }
@@ -637,6 +649,7 @@ class MkQueue {
     this.listener = this.database.ref(this.paths.queue).on("value", (snapshot) => {
       this.entries = snapshot.val<MkQueueMap>();
       if (!this.entries || !this.entries[myCode]) {
+        if (this.cancelling) return;
         this.stop();
         this.recoverIfLost(party);
         return;
@@ -646,9 +659,12 @@ class MkQueue {
   }
 
   // 내 항목이 표 없이 사라지면(묶던 사람이 표를 못 나눠 줌·연결 끊김) "찾는 중"에 갇히지 않게 잠시 뒤 풀어 준다.
+  // 그 사이 다시 매칭을 눌렀으면(찾기 시작 시각이 다름) 새 매칭이므로 건드리지 않는다.
   private recoverIfLost(party: MkParty): void {
+    const since = this.since;
     setTimeout(() => {
-      if (this.active || !party.searching() || party.ticket()) return;
+      const search = party.searching();
+      if (this.active || !search || search.since !== since || party.ticket()) return;
       party.markSearching(null).catch(() => undefined);
       this.onError("매칭이 끊겼어요. 다시 매칭 시작을 눌러 주세요.");
     }, MkQueue.LOST_GRACE_MS);
