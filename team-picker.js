@@ -80,7 +80,7 @@ class TeamSizePicker {
     }
 }
 TeamSizePicker.SIZES = [2, 3, 4, 5, 6];
-TeamSizePicker.DEFAULT_SIZE = 4;
+TeamSizePicker.DEFAULT_SIZE = 3;
 class TeamNumberPicker {
     constructor(container) {
         this.excluded = new Set();

@@ -54,7 +54,7 @@ class TeamSplitter {
 
 class TeamSizePicker {
   static readonly SIZES: readonly number[] = [2, 3, 4, 5, 6];
-  private static readonly DEFAULT_SIZE = 4;
+  private static readonly DEFAULT_SIZE = 3;
 
   private current = TeamSizePicker.DEFAULT_SIZE;
   private readonly buttons = new Map<number, HTMLButtonElement>();
