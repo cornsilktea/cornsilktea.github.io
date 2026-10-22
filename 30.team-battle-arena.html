@@ -25,7 +25,7 @@
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
 } }
 </script>
-<link rel="stylesheet" href="30.team-battle-arena.css?v=20261022c">
+<link rel="stylesheet" href="30.team-battle-arena.css?v=20261022d">
 </head>
 <body>
 <canvas id="cv"></canvas>
@@ -202,7 +202,7 @@
     <ul class="statsNotes">
       <li>AI 없이 학생 6명이 3대3으로 끝까지 마친 대회모드 경기만 집계합니다.</li>
       <li>밸런스 패치마다 통계를 따로 모읍니다. 오른쪽 위 패치 버튼으로 이전 패치의 통계도 볼 수 있습니다.</li>
-      <li>시간이 끝났을 때 킬 수가 같으면 무승부이고, 무승부는 승리로 세지 않습니다.</li>
+      <li>시간이 끝났을 때 킬 수가 같으면 연장전을 하고, 연장전에서 먼저 처치한 팀이 이깁니다. 연장전이 생기기 전(2026-10-22)의 무승부 경기는 승리로 세지 않습니다.</li>
       <li>한 경기에서 같은 캐릭터는 1명만 고를 수 있으므로 밴픽률은 그 캐릭터가 밴되거나 나온 판의 비율입니다.</li>
       <li>막은 피해·기절·둔화·킬·데스·어시스트·밴은 이 항목이 추가된 뒤의 경기만으로 셉니다.</li>
       <li>어시스트: 내가 피해나 해로운 효과(기절·둔화·넉백·끌어당김)를 준 적이 5초 안에 쓰러지거나, 내가 회복·은신(눈보라)을 준 아군이 5초 안에 적을 처치하면 1회(처치한 사람은 제외, 한 처치에 1번만).</li>
@@ -271,6 +271,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     charTypes;
     flow;
     killfeed;
+    overtime;
     targets;
     minions;
     vision;
@@ -964,7 +965,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     enterRoom(code) { var services = this.services;
       services.session.leaving = false;
       var ref = services.backend.db.ref(RoomSession.ROOT + "/" + code);
-      services.session.room = { code: code, ref: ref, mode: null, map: "forest", status: "lobby", host: null, startAt: 0, winner: null, endedAt: 0, final: null, roster: null, draft: null, bans: null, statsNote: null };
+      services.session.room = { code: code, ref: ref, mode: null, map: "forest", status: "lobby", host: null, startAt: 0, winner: null, overtimeAt: null, endedAt: 0, final: null, roster: null, draft: null, bans: null, statsNote: null };
       services.fxView.clear3d();
       services.session.players = {}; services.match.leave();
       ref.child("players/" + services.session.myId).onDisconnect().remove();
@@ -990,6 +991,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.session.sub(ref.child("hostPlayerId"), "value", function (s) { services.session.room.host = s.val(); services.session.room.hostLoaded = true; services.clock.hostChanged(services.session.room.host); services.session.checkHost(); services.lobby.playersChanged(); });
       services.session.sub(ref.child("startAt"), "value", function (s) { services.session.room.startAt = s.val() || 0; });
       services.session.sub(ref.child("winner"), "value", function (s) { services.session.room.winner = s.val(); });
+      services.session.sub(ref.child("overtimeAt"), "value", function (s) { services.session.room.overtimeAt = s.val(); });
       services.session.sub(ref.child("bans"), "value", function (s) { services.session.room.bans = s.val(); });
       services.session.sub(ref.child("endedAt"), "value", function (s) { services.session.room.endedAt = s.val() || 0; });
       services.session.sub(ref.child("final"), "value", function (s) { services.session.room.final = s.val(); });
@@ -1711,7 +1713,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         });
       }
       u.roster = roster; u.st = st; u.arena = arena; u.draft = null; u.bans = bans && bans.length ? bans : null;
-      u.status = "countdown"; u.startAt = services.clock.real() + countMs; u.winner = null; u.final = null; u.statsNote = null; u.endedAt = null;
+      u.status = "countdown"; u.startAt = services.clock.real() + countMs; u.winner = null; u.overtimeAt = null; u.final = null; u.statsNote = null; u.endedAt = null;
       u.shots = null; u.meleeHits = null; u.hits = null; u.effects = null; u.kills = null; u.projectiles = null;
       services.session.room.ref.update(u);
     }
@@ -1807,7 +1809,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         services.session.teamIds(team).slice(0, 3).forEach(function (id, i) { seq[(team === "blue" ? "b" : "r") + (i + 1)] = id; });
       });
       var d = services.draft.draftSettle({ seq: seq, step: 0, stepAt: t }, t);
-      services.session.room.ref.update({ draft: d, arena: services.arenaMap.resolveArena(services.session.room.map), status: "draft", roster: null, st: null, winner: null, final: null, statsNote: null, endedAt: null, startAt: null,
+      services.session.room.ref.update({ draft: d, arena: services.arenaMap.resolveArena(services.session.room.map), status: "draft", roster: null, st: null, winner: null, overtimeAt: null, final: null, statsNote: null, endedAt: null, startAt: null,
                         shots: null, meleeHits: null, hits: null, effects: null, kills: null, projectiles: null });
     }
     applyDraftChoice(cur, id, c) { var services = this.services;
@@ -3522,6 +3524,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var s = services.flow.teamTotals();
       var quitTeam = services.flow.teamAllQuit();
       if (!quitTeam && t < services.session.room.startAt + services.timescale.matchMs) return;
+      if (!quitTeam && services.overtime.holdsTie(s, t)) return;
       var winner = quitTeam ? (quitTeam === "blue" ? "red" : "blue")
         : (s.blueKills > s.redKills ? "blue" : (s.redKills > s.blueKills ? "red" : "draw"));
       services.match.game.endSent = true;
@@ -3529,7 +3532,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var recordsStats = services.stats.recordsMode(services.session.room.mode);
       var skipReason = quitTeam ? "상대팀이 모두 나가서 통계에서 제외됐어요" : services.stats.skipReason(services.session.room.mode, services.session.room.roster, services.session.players);
       var ended = { status: "ended", winner: winner, endedAt: t,
-        final: { blue: s.blueKills, red: s.redKills, reason: quitTeam ? "상대팀이 모두 나가서 승리" : "시간 종료 — 킬 스코어로 판정" } };
+        final: { blue: s.blueKills, red: s.redKills, reason: quitTeam ? "상대팀이 모두 나가서 승리" : (services.overtime.active() ? CupOvertime.REASON : "시간 종료 — 킬 스코어로 판정") } };
       if (recordsStats) ended.statsNote = skipReason || MatchStats.PENDING;
       services.session.room.ref.update(ended);
       if (!skipReason) services.stats.watchDone(t);
@@ -3555,7 +3558,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.flow.backToLobby();
     }
     backToLobby() { var services = this.services;
-      var u = { status: "lobby", winner: null, final: null, statsNote: null, startAt: null, endedAt: null, roster: null, draft: null, bans: null,
+      var u = { status: "lobby", winner: null, overtimeAt: null, final: null, statsNote: null, startAt: null, endedAt: null, roster: null, draft: null, bans: null,
                 st: null, done: null, shots: null, meleeHits: null, hits: null, effects: null, kills: null, projectiles: null };
       PracticeMode.BOTS.forEach(function (b) { if (services.session.players[b.id]) u["players/" + b.id] = null; });
       services.session.room.ref.update(u);
@@ -3567,6 +3570,37 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (services.session.room && services.session.room.status === "lobby") { services.screens.showScreen("lobby"); services.lobby.playersChanged(); }
     }
     againOrBackToLobby() { var services = this.services; Dom.show(Dom.$("scoreHelpModal"), false); if (services.flow.specHeld) services.flow.releaseSpecResult(); else services.flow.restart(); }
+  }
+  class CupOvertime {
+    constructor(services) { this.services = services; this.announcedFor = 0; }
+    static REASON = "연장전 — 먼저 처치한 팀 승리";
+    applies(mode) { return mode === "cup"; }
+    active() { var room = this.services.session.room; return !!(room && room.overtimeAt); }
+    holdsTie(s, t) { var services = this.services, room = services.session.room;
+      if (!this.applies(room.mode) || s.blueKills !== s.redKills) return false;
+      if (!room.overtimeAt && !services.match.game.overtimeSent) {
+        services.match.game.overtimeSent = true;
+        room.overtimeAt = t;
+        room.ref.update({ overtimeAt: t });
+      }
+      return true;
+    }
+    paintHud(st, s) { var services = this.services, room = services.session.room;
+      var on = this.active() && (st === "playing" || st === "ended"), timer = Dom.$("hudTimer");
+      timer.classList.toggle("ot", on);
+      Dom.$("hudTop").classList.toggle("ot", on);
+      if (!on) return;
+      Dom.setText(timer, "연장전");
+      if (st === "playing") Dom.setHtml(Dom.$("hudCount"), '<span class="otHint">먼저 처치하면 승리</span>');
+      if (st === "playing" && this.announcedFor !== room.overtimeAt) { this.announcedFor = room.overtimeAt; this.announce(); }
+    }
+    announce() { var services = this.services, banner = Dom.$("killBanner");
+      Dom.setHtml(banner, '<span class="kbHead">연장전!</span>먼저 처치하는 팀이 승리해요');
+      banner.className = "";
+      void banner.offsetWidth;
+      banner.className = "show ot";
+      services.sound.sfx("go");
+    }
   }
   class KillFeed {
     constructor(services) { this.services = services; }
@@ -8568,15 +8602,16 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       left /= services.clock.scale;
       var practice = services.session.room.mode === "practice";
       Dom.setText(Dom.$("hudTimer"), practice ? services.hud.fmtTime(Math.floor(Math.max(0, t - services.session.room.startAt) / services.clock.scale / 1000) * 1000) : services.hud.fmtTime(left));
-      services.hud.finalCountdown(Dom.$("hudTimer"), st === "playing" && !practice ? left : 0);
+      services.hud.finalCountdown(Dom.$("hudTimer"), st === "playing" && !practice && !services.overtime.active() ? left : 0);
       Dom.$("scrGame").classList.toggle("practice", practice);
       Dom.show(Dom.$("practiceBar"), practice && !!services.match.me && st !== "ended");
       Dom.show(Dom.$("practiceInfo"), practice && !!services.match.me && st !== "ended");
       if (practice && services.match.me && services.practice.infoShown !== services.match.me.char) { services.practice.infoShown = services.match.me.char; Dom.setHtml(Dom.$("practiceInfo"), services.practice.practiceInfoHtml()); }
       Dom.show(Dom.$("btnLeaveGame"), !practice);
       var s = services.flow.teamTotals();
-      Dom.setHtml(Dom.$("hudCount"), '<span class="b">🔵 ' + s.blueAlive + '</span> vs <span class="r">🔴 ' + s.redAlive + "</span>");
+      if (!(services.overtime.active() && st === "playing")) Dom.setHtml(Dom.$("hudCount"), '<span class="b">🔵 ' + s.blueAlive + '</span> vs <span class="r">🔴 ' + s.redAlive + "</span>");
       Dom.setText(Dom.$("hudKillB"), String(s.blueKills)); Dom.setText(Dom.$("hudKillR"), String(s.redKills));
+      services.overtime.paintHud(st, s);
       var spec = !services.match.me;
       Dom.show(Dom.$("hudTop"), !spec); Dom.show(Dom.$("hudMe"), !spec); Dom.$("killFeed").classList.toggle("spec", spec);
       if (!spec) services.hud.updateMyHud(); Dom.show(Dom.$("specL"), spec); Dom.show(Dom.$("specR"), spec); Dom.show(Dom.$("specCode"), spec);
@@ -9135,6 +9170,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.charTypes = new CharacterRegistry(services);
       services.flow = new MatchFlow(services);
       services.killfeed = new KillFeed(services);
+      services.overtime = new CupOvertime(services);
       services.targets = new TargetQuery(services);
       services.minions = new MinionSystem(services);
       services.vision = new VisionRules(services);

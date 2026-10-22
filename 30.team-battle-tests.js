@@ -3955,7 +3955,7 @@ class ResultCollector {
     var ended = updateWith(s.cap, "winner");
     if (ended.length !== 1 || ended[0].u.status !== "ended" || ended[0].u.winner !== "blue" || ended[0].u.final.blue !== 2 || ended[0].u.final.red !== 1 || ended[0].u.final.reason.indexOf("시간 종료") < 0 || ended[0].u.endedAt !== s.start + api.matchMs()) bad.push("시간 종료 판정 " + JSON.stringify(ended));
     if (!ended[0] || ended[0].u.statsNote !== undefined) bad.push("일반모드는 통계를 모으지 않아 통계 안내가 없어야 함");
-    var cup = setup("cup"); cup.W.room.status = "playing";
+    var cup = setup("cup"); cup.W.room.status = "playing"; cup.W.ent("b").deaths = 1;
     api.setClock(cup.start + api.matchMs()); api.hostJudge();
     if (!updateWith(cup.cap, "winner")[0] || !updateWith(cup.cap, "winner")[0].u.statsNote) bad.push("대회모드는 통계 안내가 있어야 함");
     var d = setup(); d.W.room.status = "playing"; d.W.ent("a").deaths = 1; d.W.ent("b").deaths = 1;
@@ -3972,6 +3972,34 @@ class ResultCollector {
     api.setClock(normal.start + api.matchMs()); api.hostJudge();
     if (updateWith(normal.cap, "winner")[0].u.statsNote !== undefined) bad.push("통계 안 모으는 모드에 통계 안내가 붙음");
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "playing 전환 1번·시간 종료 판정 1번·무승부·레드 승·연습 제외·통계 안내");
+  });
+  run(JUDGEG, "대회모드 연장전: 시간이 끝났을 때 킬이 같으면 끝내지 않고 연장전을 한 번 열고, 연장 중 먼저 처치한 팀이 이기며, 일반모드는 그대로 무승부인가", function (done) {
+    var y = OPEN_Y.forest, bad = [];
+    function setup(mode) {
+      var W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]);
+      W.room.mode = mode; W.room.status = "playing"; W.room.overtimeAt = null; return { W: W, cap: recordRef(W), start: W.room.startAt };
+    }
+    var cup = setup("cup"); cup.W.ent("a").deaths = 1; cup.W.ent("b").deaths = 1;
+    var end = cup.start + api.matchMs();
+    api.setClock(end); api.hostJudge(); api.setClock(end + 500); api.hostJudge();
+    var ot = updateWith(cup.cap, "overtimeAt");
+    if (ot.length !== 1 || ot[0].u.overtimeAt !== end || cup.W.room.overtimeAt !== end) bad.push("연장 시작 " + JSON.stringify(ot));
+    if (updateWith(cup.cap, "winner").length) bad.push("동점인데 끝남");
+    api.setClock(end + 20000); api.hostJudge();
+    if (updateWith(cup.cap, "winner").length) bad.push("연장 중 킬이 없는데 끝남");
+    cup.W.ent("a").deaths = 2;
+    api.setClock(end + 21000); api.hostJudge(); api.hostJudge();
+    var won = updateWith(cup.cap, "winner");
+    if (won.length !== 1 || won[0].u.winner !== "red" || won[0].u.final.red !== 2 || won[0].u.final.blue !== 1 || won[0].u.final.reason.indexOf("연장전") < 0 || won[0].u.final.reason.indexOf("나가서") >= 0) bad.push("연장 중 레드 처치 → 레드 승 " + JSON.stringify(won));
+    var clear = setup("cup"); clear.W.ent("b").deaths = 1;
+    api.setClock(clear.start + api.matchMs()); api.hostJudge();
+    var cw = updateWith(clear.cap, "winner")[0];
+    if (!cw || cw.u.winner !== "blue" || updateWith(clear.cap, "overtimeAt").length || cw.u.final.reason.indexOf("시간 종료") < 0) bad.push("킬 차이가 있으면 연장 없이 끝 " + JSON.stringify(cw));
+    var pvp = setup("pvp"); pvp.W.ent("a").deaths = 1; pvp.W.ent("b").deaths = 1;
+    api.setClock(pvp.start + api.matchMs()); api.hostJudge();
+    var pw = updateWith(pvp.cap, "winner")[0];
+    if (!pw || pw.u.winner !== "draw" || updateWith(pvp.cap, "overtimeAt").length) bad.push("일반모드 무승부 " + JSON.stringify(pw));
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "동점 → 연장 1번·킬 없으면 계속·연장 중 처치 팀 승·킬 차이면 바로 끝·일반모드 무승부");
   });
   run(JUDGEG, "호스트 판정: 한 팀이 모두 나가면 시간이 남아도 상대 팀 승리로 끝내고 통계에서 제외하는가", function (done) {
     var y = OPEN_Y.forest, W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]), bad = [];

@@ -526,3 +526,10 @@
   body.mkMatched #scrLobby .addAi, body.mkMatched #scrLobby .aiDel, body.mkMatched #btnAgain { display: none !important; }
   .dfSlots .slot .dfNick { flex: none; padding: 1px 7px; border: 2px solid transparent; border-radius: 6px; }
   .dfSlots .slot .dfNick.myNick { border-color: var(--sg-primary); background: rgba(95,168,118,.12); }
+  #hudTimer.ot { font-size: 22px; color: #FFCF5A; text-shadow: 0 0 12px rgba(255,190,70,.75); animation: otPulse 1.4s ease-in-out infinite; }
+  #hudTop.ot { border-color: rgba(255,207,90,.55); box-shadow: 0 6px 18px rgba(0,0,0,.3), 0 0 18px rgba(255,190,70,.28); }
+  #hudCount .otHint { color: #FFCF5A; font-size: 12px; }
+  #killBanner.ot { font-size: 20px; border-color: rgba(255,207,90,.6); }
+  #killBanner.ot .kbHead { color: #FFCF5A; }
+  #killBanner.show.ot { animation-duration: 2.4s; }
+  @keyframes otPulse { 0%, 100% { opacity: 1; } 50% { opacity: .65; } }
