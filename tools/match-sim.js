@@ -394,7 +394,7 @@ class Scenarios {
     await Util.wait(30);
     const seenByA = a.queue.othersWaiting(a.code), seenByB = b.queue.othersWaiting(b.code);
     a.queue.stop();
-    Report.check("대기 인원: 혼자면 0명, 두 명 팀이 오면 2명, 상대는 1명", alone === 0 && seenByA === 2 && seenByB === 1, [alone, seenByA, seenByB]);
+    Report.check("대기 팀 수: 혼자면 0팀, 두 명 팀이 와도 1팀, 상대도 1팀", alone === 0 && seenByA === 1 && seenByB === 1, [alone, seenByA, seenByB]);
     Report.check("대기 인원: 찾는 중이 아니면 모름(null)", a.queue.othersWaiting(a.code) === null);
     [a, b].forEach((t) => { t.queue.stop(); t.parties.forEach((p) => p.silentClose()); });
   }

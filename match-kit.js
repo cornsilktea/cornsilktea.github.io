@@ -580,15 +580,14 @@ class MkQueue {
     hasCompany(myCode) {
         return this.matcher.hasCompany(this.entries, this.clock.now(), myCode);
     }
-    // 대기 화면의 "지금 기다리는 학생 n명". 이미 보고 있는 대기열 구독 값만 세므로 요청이 늘지 않는다.
+    // 대기 화면의 "지금 n개 팀이 기다리는 중"(개인전은 n명 — 항목 하나가 한 사람). 이미 보고 있는 대기열 구독 값만 세므로 요청이 늘지 않는다.
     // 누가 묶어 가는 중(차지된) 항목은 곧 빠지므로 세지 않는다. 대기열을 아직 못 받았으면 null.
     othersWaiting(myCode) {
         if (!this.active || !this.entries)
             return null;
         const entries = this.entries, now = this.clock.now();
         return Object.keys(entries)
-            .filter((code) => code !== myCode && !!entries[code] && entries[code].size > 0 && this.matcher.isFree(entries[code], now))
-            .reduce((sum, code) => sum + Object.keys(entries[code].people || {}).length, 0);
+            .filter((code) => code !== myCode && !!entries[code] && entries[code].size > 0 && this.matcher.isFree(entries[code], now)).length;
     }
     stop() {
         this.active = false;
@@ -944,7 +943,8 @@ class MkPartyPanel {
         this.matchButton.disabled = !leader;
         this.aiNowButton.hidden = !this.options.aiFallbackMs || !searching || !leader;
         this.aiNowButton.disabled = false;
-        const crowdText = !searching || waiting === null ? "" : waiting > 0 ? "👥 지금 다른 학생 " + waiting + "명이 기다리는 중" : "👥 지금 기다리는 다른 학생이 없어요";
+        const unit = this.options.solo ? { some: "명이", none: "학생이" } : { some: "개 팀이", none: "팀이" };
+        const crowdText = !searching || waiting === null ? "" : waiting > 0 ? "👥 지금 " + waiting + unit.some + " 기다리는 중" : "👥 지금 기다리는 " + unit.none + " 없어요";
         if (this.crowd.textContent !== crowdText)
             this.crowd.textContent = crowdText;
         this.crowd.classList.toggle("alone", searching && waiting === 0);
