@@ -181,6 +181,13 @@
 - 검사: `node tools/match-sim.js`(가짜 Firebase, 약 45초). 동시 입장·취소·끊김·방 만들기 실패·묶던 사람 끊김·
   정원 넘김·연승(승·무·패, 중복 반영, 팀장 교체·끊김, 다시 매칭)·잠깐 끊김 복구·취소 뒤 다시 매칭·같은 상대 피하기·AI 차례 돌리기·대기 인원·전적 보존·무승부 연승 유지 189개. match-kit.ts 를 고치면 꼭 돌린다.
   "섞어서 2대2/6인"(무작위 지연·끊김) 검사는 원래부터 10번에 1~2번꼴로 하나가 시간 안에 안 끝나 실패한다 — 다시 돌려 같은 항목이 계속 실패할 때만 문제로 본다.
+- **게임별 결과 → 전적 검사**(2026-10-22): `node tools/match-result-check.js` 가 9개 게임의 가짜 Firebase 사본 `.claude/mk-check-<파일>` 을 만든다
+  (진짜 Firebase SDK 줄은 빼고, 도구는 진짜에 연결돼 있으면 시작하지 않는다). `?c=test` 로 열고 콘솔에서
+  `__mkCheck.run("turbo", ["win","draw","win","lose"])` → `__mkCheck.done`·`__mkCheck.log`. 실제 매칭 버튼으로 대기실을 만들고 가짜 상대를 대기열에 넣어
+  진짜로 묶이게 한 뒤, 경기가 시작되면 그 게임의 실제 끝 상태(24 `result`, 25 `kills`, 30 `winner`, 31 `final`·`winner`, 32 `results`·`final`, 34·35 `end.winner`, 38·39 `end.ranks`)를 써서
+  게임 코드가 남긴 전적 줄(승·무·패·순위)·연승 표시를 읽는다. 이름: turbo·fps·arena·zombie·minigames·volley·soccer·snowSolo·snowDuos·balloonSolo·balloonTeam(31은 `zombieWin` 도).
+  30번은 밴픽 "준비 완료"를 도구가 누르고 판마다 몇 분 걸린다. 탭 여러 개로 게임마다 동시에 돌려도 된다.
+  2026-10-22 결과: 9개 게임(38·39 개인전·팀전 포함) 모두 승·패(24·25 는 무승부도)와 연승(무승부는 유지)이 맞음. 30번 랜덤 매칭 방은 `mode: "cup"` 이라 동점이면 연장전(무승부 없음, `&test` 연장전 항목 통과).
 - **공용 흐름(2026-10-21)**: 팀 대기실 화면 `MkPartyPanel(.st-screen 요소, 넣을 칸, 옵션)` 과 흐름 `MkRandomFlow(db, clock, 내id, 옵션, 훅, 패널)` 이
   match-kit 에 있다. 게임은 `MkGameHooks`(member·create(plan)·discard·enterRoom(표, 방장?)·leaveRoom·startMatch·showParty·showStart)만 만든다.
   게임 쪽에서 부르는 것: `create()`·`tryJoin(코드)`·`codeTaken(코드)`·`roomChanged(사람 수, 방장?, 대기 중?)`·`matchEnded({result, rank?, of?}, 연승 갱신 콜백)`·
