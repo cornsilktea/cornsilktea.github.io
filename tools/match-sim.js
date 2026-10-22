@@ -399,6 +399,49 @@ class Scenarios {
     [a, b].forEach((t) => { t.queue.stop(); t.parties.forEach((p) => p.silentClose()); });
   }
 
+  static async scenarioRecordKeeping() {
+    const world = new SimWorld(new Mk.MkVersusMatcher(1, SimWorld.TIMING), 3);
+    const solo = await world.team(1, 1);
+    const ticket = { matchId: "rk-1", room: "1", side: 0, host: "x", expect: 2, at: Date.now(), rivals: ["표에 적힌 학생"] };
+    await solo.leader.report(ticket, { result: "win", rivals: [] });
+    await Util.wait(20);
+    const line = solo.leader.book().lines[0];
+    Report.check("전적: 실제 상대가 AI 면 표의 학생 이름 대신 AI 로 남음", !!line && !(line.rivals && line.rivals.length), line);
+
+    world.server.blip(solo.ids[0]);
+    await Util.wait(5);
+    const realRandom = Math.random;
+    let calls = 0;
+    const fixed = (Number(solo.code) - 10000 + 0.5) / 90000;
+    Math.random = () => (calls++ < 3 ? fixed : realRandom());
+    const other = await new Mk.MkPartyDirectory(world.server.database("intruder"), SimWorld.clock, world.paths, 1).create("intruder", { nick: "다른 학생", joinedAt: Date.now() });
+    Math.random = realRandom;
+    await Util.wait(40);
+    const kept = world.server.get(world.paths.party(solo.code));
+    Report.check("전적: 잠깐 끊긴 학생의 대기실을 새 대기실이 덮어쓰지 않음", other !== solo.code && !!kept && !!kept.history && kept.leaderId === solo.ids[0], [other, kept && kept.leaderId]);
+
+    await solo.leader.leave(true);
+    const left = world.server.get(world.paths.party(solo.code));
+    Report.check("혼자 게임: 나가도 대기실·전적이 남음", !!left && !!left.history && !left.members && !!left.leftAt, left);
+    const directory = new Mk.MkPartyDirectory(world.server.database(solo.ids[0]), SimWorld.clock, world.paths, 1);
+    await world.server.database(solo.ids[0]).ref(world.paths.party(solo.code) + "/match").set(ticket);
+    const back = await directory.reclaim(solo.code, solo.ids[0], { nick: solo.ids[0], joinedAt: Date.now() });
+    const after = world.server.get(world.paths.party(solo.code));
+    Report.check("혼자 게임: 다시 들어오면 같은 전적을 이어 쓰고 지난 표는 지워짐", back && Object.keys(after.history).length === 1 && !after.match && !!after.members[solo.ids[0]], after);
+    const stranger = await new Mk.MkPartyDirectory(world.server.database("p-stranger"), SimWorld.clock, world.paths, 1).reclaim(solo.code, "p-stranger", { nick: "남", joinedAt: Date.now() });
+    Report.check("혼자 게임: 누가 들어 있으면 다른 사람이 가져가지 못함", stranger === false);
+    const reloaded = await new Mk.MkPartyDirectory(world.server.database("p-reload"), SimWorld.clock, world.paths, 1).reclaim(solo.code, "p-reload", { nick: solo.ids[0], joinedAt: Date.now() });
+    const afterReload = world.server.get(world.paths.party(solo.code));
+    Report.check("혼자 게임: 새로고침(아이디 바뀜, 같은 닉네임)이면 예전 자리를 이어받음", reloaded && Object.keys(afterReload.members).join() === "p-reload" && afterReload.leaderId === "p-reload" && Object.keys(afterReload.history).length === 1, afterReload);
+    const party = new Mk.MkParty(world.server.database("p-reload"), SimWorld.clock, world.paths, solo.code, "p-reload", 1);
+    party.connect();
+    await Util.wait(20);
+    await party.leave(false);
+    Report.check("팀 게임: 마지막 사람이 나가면 대기실이 사라짐(그대로)", world.server.get(world.paths.party(solo.code)) === null);
+    solo.queue.stop();
+    solo.leader.silentClose();
+  }
+
   static async scenarioBlip() {
     const world = new SimWorld(new Mk.MkVersusMatcher(1, SimWorld.TIMING), 3);
     const solo = await world.team(1, 1), pair = await world.team(2, 2);
@@ -559,6 +602,7 @@ class SimRunner {
     await Scenarios.scenarioBlip();
     await Scenarios.scenarioCancelThenRematch();
     await Scenarios.scenarioWaitingCount();
+    await Scenarios.scenarioRecordKeeping();
     for (let round = 0; round < 4; round++) {
       await Scenarios.scenarioRandom("동시 입장 2대2 #" + round, new Mk.MkVersusMatcher(2, SimWorld.TIMING), 14, 2, { lag: 6, spread: 1, cancelRate: 0, killRate: 0, settle: 900, capacity: 4, versus: true });
     }

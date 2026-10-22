@@ -64,6 +64,7 @@ interface MkPartyRecord {
   match?: MkTicket | null;
   history?: Record<string, MkHistoryLine>;
   last?: MkLastMatch | null;
+  leftAt?: number | null;
 }
 
 interface MkClaim {
@@ -116,6 +117,8 @@ interface MkOutcome {
   result: MkResult;
   rank?: number;
   of?: number;
+  // 실제로 함께 달린 상대(빈 배열이면 AI). 표의 상대가 끝내 안 와서 AI 와 했을 때 게임이 알려 준다.
+  rivals?: string[];
 }
 
 interface MkJoinOutcome {
@@ -351,10 +354,34 @@ class MkPartyDirectory {
       const room = await this.database.ref(this.paths.rooms + "/" + code + "/status").once("value");
       if (room.exists()) continue;
       const record: MkPartyRecord = { leaderId: myId, createdAt: this.clock.now(), members: { [myId]: member }, bots: 0 };
-      const result = await this.database.ref(this.paths.party(code)).transaction((current) => (MkPartyDirectory.isAlive(current as MkPartyRecord | null) ? undefined : record));
+      // 사람이 비어 있는 대기실도 건드리지 않는다. 잠깐 끊긴 학생이 곧 돌아올(MkParty.restore) 자리라,
+      // 덮어쓰면 그 학생의 전적이 사라지고 다른 학생 전적과 섞인다.
+      const result = await this.database.ref(this.paths.party(code)).transaction((current) => (current === null ? record : undefined));
       if (result.committed) return code;
     }
     return null;
+  }
+
+  // 혼자 하는 게임(solo)에서 이 기기가 쓰던 대기실로 돌아간다. 다른 사람이 들어 있으면 실패.
+  // 새로고침하면 아이디가 바뀌고 예전 페이지 자리는 onDisconnect 가 지울 때까지 잠깐 남으므로, 닉네임이 같은 자리는 내 것으로 본다.
+  // 전적(history)과 바로 전 상대(last)는 그대로 두고, 남아 있던 찾기·표는 지운다(지난 판 방으로 다시 들어가지 않게).
+  async reclaim(code: string, myId: string, member: MkMember): Promise<boolean> {
+    let reclaimed = false;
+    await this.database.ref(this.paths.party(code)).transaction((current) => {
+      reclaimed = false;
+      const record = current as MkPartyRecord | null;
+      if (record === null) return null;
+      const members = record.members || {};
+      if (!record.leaderId || Object.keys(members).some((id) => id !== myId && members[id].nick !== member.nick)) return undefined;
+      record.members = { [myId]: member };
+      record.leaderId = myId;
+      record.search = null;
+      record.match = null;
+      record.leftAt = null;
+      reclaimed = true;
+      return record;
+    }).catch(() => undefined);
+    return reclaimed;
   }
 
   async exists(code: string): Promise<boolean> {
@@ -407,7 +434,8 @@ class MkPartyDirectory {
       const now = this.clock.now();
       Object.keys(all).forEach((code) => {
         const record = all[code];
-        if (!MkPartyDirectory.isAlive(record) && !(now - ((record && record.createdAt) || 0) < MkPartyDirectory.ABANDONED_MS)) updates[code] = null;
+        const lastActive = Math.max((record && record.createdAt) || 0, (record && record.leftAt) || 0);
+        if (!MkPartyDirectory.isAlive(record) && !(now - lastActive < MkPartyDirectory.ABANDONED_MS)) updates[code] = null;
       });
       if (Object.keys(updates).length) await this.database.ref(this.paths.parties).update(updates);
     } catch (error) {
@@ -507,7 +535,7 @@ class MkParty {
       added = false;
       const history = (current as Record<string, MkHistoryLine> | null) || {};
       if (new MkRecordBook(history).has(ticket.matchId)) return undefined;
-      const line: MkHistoryLine = { n: Object.keys(history).length + 1, matchId: ticket.matchId, at, result: outcome.result, rivals: ticket.rivals || [] };
+      const line: MkHistoryLine = { n: Object.keys(history).length + 1, matchId: ticket.matchId, at, result: outcome.result, rivals: outcome.rivals || ticket.rivals || [] };
       if (ticket.map) line.map = ticket.map;
       if (outcome.rank !== undefined) line.rank = outcome.rank;
       if (outcome.of !== undefined) line.of = outcome.of;
@@ -526,16 +554,25 @@ class MkParty {
     if (this.isLeader() && match && match.matchId === matchId) this.ref.child("match").set(null);
   }
 
-  async leave(): Promise<void> {
+  // keepRecord: 혼자 하는 게임에서 나갈 때 대기실(전적)을 지우지 않고 남겨 둔다. 다시 들어오면 reclaim 으로 이어 쓰고,
+  // 안 오면 sweep 이 leftAt 기준으로 몇 시간 뒤에 치운다.
+  async leave(keepRecord: boolean = false): Promise<void> {
     this.leaving = true;
     this.stopListening();
     try { this.ref.child("members/" + this.myId).onDisconnect().cancel(); } catch (error) { /* 이미 끊긴 연결 */ }
     const wasLeader = this.isLeader();
+    const at = this.clock.now();
     await this.ref.transaction((current) => {
       const record = current as MkPartyRecord | null;
       if (!record || !record.members || !record.members[this.myId]) return record === null ? null : undefined;
       delete record.members[this.myId];
-      if (!Object.keys(record.members).length) return null;
+      if (!Object.keys(record.members).length) {
+        if (!keepRecord) return null;
+        record.search = null;
+        record.match = null;
+        record.leftAt = at;
+        return record;
+      }
       if (record.leaderId === this.myId) {
         record.leaderId = MkParty.firstMember(record.members);
         record.search = null;
@@ -1135,6 +1172,7 @@ class MkRandomFlow {
 
   readonly paths: MkPaths;
   private readonly directory: MkPartyDirectory;
+  private readonly memory: MkSoloPartyMemory | null;
   private readonly sign: MkBusySign;
   private party: MkParty | null = null;
   private queue: MkQueue | null = null;
@@ -1156,6 +1194,7 @@ class MkRandomFlow {
   ) {
     this.paths = MkPaths.forGame(options.gameRoot, options.queue);
     this.directory = new MkPartyDirectory(database, clock, this.paths, options.partyLimit);
+    this.memory = options.solo ? new MkSoloPartyMemory(options.queue) : null;
     this.sign = new MkBusySign(database, clock, this.paths);
     panel.onMatch = () => this.toggleSearch();
     panel.onLeave = () => this.leaveParty();
@@ -1182,8 +1221,15 @@ class MkRandomFlow {
   }
 
   async create(): Promise<string> {
-    const code = await this.directory.create(this.myId, this.hooks.member());
+    const member = this.hooks.member();
+    const kept = this.memory ? this.memory.recall(member.nick) : null;
+    if (kept && (await this.directory.reclaim(kept, this.myId, member))) {
+      this.attach(kept);
+      return "";
+    }
+    const code = await this.directory.create(this.myId, member);
     if (!code) return "랜덤 매칭 방을 만들지 못했어요. 다시 눌러 주세요.";
+    if (this.memory) this.memory.remember(code, member.nick);
     this.attach(code);
     return "";
   }
@@ -1234,6 +1280,7 @@ class MkRandomFlow {
   backToParty(message: string): void {
     const note = this.reported ? "" : message;
     this.clearStartTimer();
+    if (this.current && this.party) this.party.clearTicket(this.current.matchId);
     this.current = null;
     this.reported = false;
     this.onResult = () => undefined;
@@ -1354,7 +1401,7 @@ class MkRandomFlow {
     if (this.queue) this.queue.stop();
     this.tickSeconds(false);
     this.party = null;
-    await party.leave().catch(() => undefined);
+    await party.leave(!!this.memory).catch(() => undefined);
     this.hooks.showStart("");
   }
 
@@ -1363,6 +1410,30 @@ class MkRandomFlow {
     this.tickSeconds(false);
     this.party = null;
     if (!this.current) this.hooks.showStart(message);
+  }
+}
+
+// 혼자 하는 게임(24번 등)은 대기실이 곧 "나"라서, 나가기·새로고침을 해도 같은 대기실(전적·연승·바로 전 상대)을 이어 쓰게
+// 이 기기에 대기실 코드를 적어 둔다. 같은 태블릿을 다른 학생이 쓸 수 있으니 닉네임이 같을 때만 돌아가고,
+// 오래 안 쓴 대기실은 서버에서 치워지므로(MkPartyDirectory.sweep) 다음 날까지 이어지지는 않는다.
+class MkSoloPartyMemory {
+  private readonly key: string;
+
+  constructor(queueName: string) {
+    this.key = "mk_solo_party_" + queueName + "_v1";
+  }
+
+  recall(nick: string): string | null {
+    try {
+      const saved = JSON.parse(localStorage.getItem(this.key) || "null") as { code?: string; nick?: string } | null;
+      return saved && saved.code && saved.nick === nick ? saved.code : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  remember(code: string, nick: string): void {
+    try { localStorage.setItem(this.key, JSON.stringify({ code, nick })); } catch (error) { /* 저장 못 하는 기기 */ }
   }
 }
 
