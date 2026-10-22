@@ -4,7 +4,7 @@
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="teambattle"></script>
 <script charset="utf-8" src="fullscreen-keeper.js"></script>
-<script charset="utf-8" src="match-kit.js?v=20261022t"></script>
+<script charset="utf-8" src="match-kit.js?v=20261022u"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>3v3 팀 배틀 아레나</title>
@@ -9124,6 +9124,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     startMatch() { this.services.launcher.startGame(); }
     showParty() { var services = this.services; services.screens.showScreen("party"); services.nick.refreshNick(); }
     showStart(message) { var services = this.services; services.screens.showScreen("start"); services.lobby.startMsg(message); }
+    presentIds() { var services = this.services; return services.session.room ? services.session.humans(services.session.players) : []; }
     roomChanged() { var services = this.services;
       if (!this.flow || !services.session.room) return;
       var humans = services.session.humans(services.session.players).filter(function (id) { return services.roster.isPlayingTeam(services.session.players[id].team); }).length;

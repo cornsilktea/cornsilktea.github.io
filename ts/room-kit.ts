@@ -393,6 +393,7 @@ interface RkMatchPort<P extends RkPlayerRecord> {
   startMatch(): void;
   showParty(): void;
   showStart(message: string): void;
+  presentIds(): string[];
 }
 
 interface RkRandomPlan<P extends RkPlayerRecord> {
@@ -447,6 +448,14 @@ class RkMatchHooks<P extends RkPlayerRecord> implements MkGameHooks {
 
   showStart(message: string): void {
     this.plan.port.showStart(message);
+  }
+
+  presentIds(): string[] {
+    return this.plan.port.presentIds();
+  }
+
+  static humanIds(players: ReadonlyMap<string, RkPlayerRecord>): string[] {
+    return Array.from(players.keys()).filter((id) => !(players.get(id) as RkPlayerRecord).isBot);
   }
 }
 

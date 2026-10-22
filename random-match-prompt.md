@@ -177,6 +177,9 @@
     `sweep` 은 `createdAt`·`leftAt` 중 늦은 쪽에서 3시간 뒤에 치운다. 새로고침 직후 남은 예전 자리(같은 닉네임)는 내 것으로 본다. 팀 게임은 그대로(마지막 사람이 나가면 사라짐).
   - 판이 끝나 팀 대기실로 돌아오면 표(`match`)를 지운다(`backToParty` → `clearTicket`).
   - 전적의 상대는 게임이 실제로 함께한 상대를 `MkOutcome.rivals` 로 넘길 수 있다(24번: 결과표의 상대 차, AI 차면 "vs AI"). 표의 상대가 끝내 안 와서 AI 와 달린 판이 그 학생 이름으로 남던 문제.
+  - 팀 게임(25·30·31·32·34·35·38·39)은 공용으로 처리한다: 표에 `rivalIds`(상대 아이디→닉네임)를 싣고, 게임 훅 `presentIds()`(방 안의 사람 아이디, AI 제외)로
+    `roomChanged` 때마다·판이 끝날 때 방에 한 번이라도 들어온 상대를 모아(`MkRandomFlow.seenRivals`) 그 상대만 전적에 남긴다. 아무도 안 들어왔으면 "vs AI". 경기 중 나간 상대는 함께 한 것으로 본다.
+    Rk 게임은 `RkMatchPort.presentIds`(`RkMatchHooks.humanIds(session.players)`), 32 는 `session.humanIds()`, 34 는 앱의 `presentIds()`, 25·30·31 은 각 `…RandomMatch.presentIds()`.
   - 24번도 같은 `MkVersusMatcher` 라 "바로 전 상대 피하기"가 그대로 적용된다(가짜 Firebase 탭 3개로 A·B 판 뒤 C 가 들어오자 A–C 로 묶이고 B 는 기다림 확인).
 - 검사: `node tools/match-sim.js`(가짜 Firebase, 약 45초). 동시 입장·취소·끊김·방 만들기 실패·묶던 사람 끊김·
   정원 넘김·연승(승·무·패, 중복 반영, 팀장 교체·끊김, 다시 매칭)·잠깐 끊김 복구·취소 뒤 다시 매칭·같은 상대 피하기·AI 차례 돌리기·대기 인원·전적 보존·무승부 연승 유지 189개. match-kit.ts 를 고치면 꼭 돌린다.
@@ -187,7 +190,7 @@
   진짜로 묶이게 한 뒤, 경기가 시작되면 그 게임의 실제 끝 상태(24 `result`, 25 `kills`, 30 `winner`, 31 `final`·`winner`, 32 `results`·`final`, 34·35 `end.winner`, 38·39 `end.ranks`)를 써서
   게임 코드가 남긴 전적 줄(승·무·패·순위)·연승 표시를 읽는다. 이름: turbo·fps·arena·zombie·minigames·volley·soccer·snowSolo·snowDuos·balloonSolo·balloonTeam(31은 `zombieWin` 도).
   30번은 밴픽 "준비 완료"를 도구가 누르고 판마다 몇 분 걸린다. 탭 여러 개로 게임마다 동시에 돌려도 된다.
-  2026-10-22 결과: 9개 게임(38·39 개인전·팀전 포함) 모두 승·패(24·25 는 무승부도)와 연승(무승부는 유지)이 맞음. 30번 랜덤 매칭 방은 `mode: "cup"` 이라 동점이면 연장전(무승부 없음, `&test` 연장전 항목 통과).
+  2026-10-22 결과: 9개 게임(38·39 개인전·팀전 포함) 모두 승·패(24·25 는 무승부도)와 연승(무승부는 유지)이 맞음. 전적의 상대: 상대가 안 들어온 판은 모든 게임에서 "vs AI", 들어온 판(`winJoined`, 가짜 상대를 방 선수 목록에 넣음)은 25·30·31·32·34·35 에서 그 이름. 30번 랜덤 매칭 방은 `mode: "cup"` 이라 동점이면 연장전(무승부 없음, `&test` 연장전 항목 통과).
 - **공용 흐름(2026-10-21)**: 팀 대기실 화면 `MkPartyPanel(.st-screen 요소, 넣을 칸, 옵션)` 과 흐름 `MkRandomFlow(db, clock, 내id, 옵션, 훅, 패널)` 이
   match-kit 에 있다. 게임은 `MkGameHooks`(member·create(plan)·discard·enterRoom(표, 방장?)·leaveRoom·startMatch·showParty·showStart)만 만든다.
   게임 쪽에서 부르는 것: `create()`·`tryJoin(코드)`·`codeTaken(코드)`·`roomChanged(사람 수, 방장?, 대기 중?)`·`matchEnded({result, rank?, of?}, 연승 갱신 콜백)`·

@@ -726,7 +726,8 @@ class WbGame {
             leaveRoomQuietly: () => this.leaveRoomQuietly(),
             startMatch: () => this.startMatch(),
             showParty: () => { this.randomMode = mode; this.showScreen("party"); flow.render(); },
-            showStart: (message) => { this.showScreen("start"); this.updateStartButtons(); this.startMessage(message); }
+            showStart: (message) => { this.showScreen("start"); this.updateStartButtons(); this.startMessage(message); },
+            presentIds: () => (this.session ? RkMatchHooks.humanIds(this.session.players) : [])
         });
         this.randoms.set(mode, flow);
         return flow;

@@ -36,6 +36,8 @@ interface MkTicket {
   expect: number;
   at: number;
   rivals: string[];
+  // 상대 학생 아이디 → 닉네임. 판이 끝났을 때 실제로 경기장에 들어온 상대만 전적에 남기는 데 쓴다.
+  rivalIds?: Record<string, string>;
   map?: string;
 }
 
@@ -923,11 +925,12 @@ class MkQueue {
     const expect = plan.groups.reduce((sum, group) => sum + Object.keys(group.entry.people || {}).length, 0);
     const updates: Record<string, unknown> = {};
     plan.groups.forEach((group) => {
-      const rivals: string[] = [];
+      const rivals: string[] = [], rivalIds: Record<string, string> = {};
       plan.groups.forEach((other) => {
-        if (other !== group) Object.keys(other.entry.people || {}).forEach((id) => rivals.push(other.entry.people[id].nick));
+        if (other !== group) Object.keys(other.entry.people || {}).forEach((id) => { rivals.push(other.entry.people[id].nick); rivalIds[id] = other.entry.people[id].nick; });
       });
       const ticket: MkTicket = { matchId: plan.matchId, room: made.room, side: group.side, host: made.host, expect, at, rivals };
+      if (rivals.length) ticket.rivalIds = rivalIds;
       if (made.map) ticket.map = made.map;
       updates[this.paths.party(group.code) + "/match"] = ticket;
       updates[this.paths.party(group.code) + "/search"] = null;
@@ -993,6 +996,8 @@ interface MkGameHooks extends MkRoomMaker {
   startMatch(): void;
   showParty(): void;
   showStart(message: string): void;
+  // 지금 일반 방에 있는 사람(AI 제외) 아이디. 주면 전적의 상대를 "실제로 들어온 학생"으로 적는다(없으면 표의 상대 그대로).
+  presentIds?(): string[];
 }
 
 interface MkFlowOptions {
@@ -1185,6 +1190,7 @@ class MkRandomFlow {
   private startedFor = "";
   private reported = false;
   private fallbackFor = 0;
+  private readonly seenRivals = new Set<string>();
   private onResult: () => void = () => undefined;
 
   constructor(
@@ -1264,7 +1270,24 @@ class MkRandomFlow {
 
   // 방장 기기에서 일반 방 사람 수가 바뀔 때마다 부른다. 표에 적힌 사람이 다 모이면 바로 시작한다.
   roomChanged(humans: number, hosting: boolean, inLobby: boolean): void {
+    this.notePresentRivals();
     if (this.current && hosting && inLobby && humans >= this.current.expect) this.startNow();
+  }
+
+  // 매칭된 상대가 끝내 경기장에 안 들어오면 게임이 그 자리를 AI 로 채운다. 그 판 전적에 그 학생 이름이 남지 않게,
+  // 방에 한 번이라도 들어온 상대만 모아 둔다(경기 중에 나간 상대는 함께 한 것으로 본다).
+  private notePresentRivals(): void {
+    const ticket = this.current;
+    if (!ticket || !ticket.rivalIds || !this.hooks.presentIds) return;
+    const rivalIds = ticket.rivalIds;
+    this.hooks.presentIds().forEach((id) => { if (rivalIds[id] !== undefined) this.seenRivals.add(id); });
+  }
+
+  private actualRivals(ticket: MkTicket): string[] | undefined {
+    if (!ticket.rivalIds || !this.hooks.presentIds) return undefined;
+    this.notePresentRivals();
+    const rivalIds = ticket.rivalIds;
+    return Object.keys(rivalIds).filter((id) => this.seenRivals.has(id)).map((id) => rivalIds[id]);
   }
 
   // 판이 끝났을 때 모두 부른다(전적에 쓰는 건 팀장만, 같은 판은 한 번만).
@@ -1273,7 +1296,8 @@ class MkRandomFlow {
     if (!ticket || !this.party || this.reported) return;
     this.reported = true;
     this.onResult = onStreak;
-    this.party.report(ticket, outcome);
+    const rivals = outcome.rivals || this.actualRivals(ticket);
+    this.party.report(ticket, rivals ? { ...outcome, rivals } : outcome);
   }
 
   endHint(): string {
@@ -1339,6 +1363,7 @@ class MkRandomFlow {
     this.hooks.leaveRoom();
     this.current = ticket;
     this.reported = false;
+    this.seenRivals.clear();
     if (this.party) this.sign.put(this.party, this.options.matcher.busyMs, !(ticket.rivals || []).length);
     const hosting = ticket.host === this.myId;
     const entered = await this.hooks.enterRoom(ticket, hosting).catch(() => false);

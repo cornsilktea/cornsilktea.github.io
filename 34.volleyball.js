@@ -1572,7 +1572,8 @@ class VolleyballGame {
             startMatch: () => this.startMatch(),
             showParty: () => this.showParty(),
             showStart: (message) => this.showStart(message),
-            myRecord: () => this.myRecord()
+            myRecord: () => this.myRecord(),
+            presentIds: () => this.presentIds()
         });
         FoldCard.bindAll(document);
         const input = new VolleyballInput(VbDom.byId("joyZone"), VbDom.byId("joyBase"), VbDom.byId("joyKnob"));
@@ -1743,6 +1744,10 @@ class VolleyballGame {
         this.editor.setActive(true);
         if (this.session)
             this.lobbyView.render(this.session);
+    }
+    presentIds() {
+        const session = this.session;
+        return session ? Array.from(session.players.keys()).filter((id) => !session.players.get(id).isBot) : [];
     }
     showStart(message) {
         this.screens.show("start");

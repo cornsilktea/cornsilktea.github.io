@@ -27,13 +27,15 @@ class MkCheckDb {
 }
 
 class MkCheckGame {
-  constructor(root, openButton) { this.root = root; this.openButton = openButton; this.startWaitMs = 40000; }
+  constructor(root, openButton) { this.root = root; this.openButton = openButton; this.startWaitMs = 40000; this.joinAfterStart = false; }
   winSide(room, me) { return null; }
   // 판 결과를 방에 쓰는 내용. outcome: "win" | "draw" | "lose"
   endUpdate(room, me, outcome) { throw new Error("endUpdate"); }
   started(room) { return !!room && room.status && room.status !== "lobby"; }
   // 경기 시작을 기다리는 동안 사람이 눌러야 하는 버튼(30번 밴픽 "준비 완료" 등)을 누른다.
   poke() {}
+  // 가짜 상대가 실제로 경기장에 들어온 것처럼 방 선수 목록에 넣을 기록(내 기록을 본떠 편만 바꿈). 못 하는 게임은 null.
+  fakePlayer(room, me, fakeId, nick) { return null; }
   teamOf(room, me) { return room.players && room.players[me] ? room.players[me].team : null; }
   otherIds(room, me) { return Object.keys(room.players || {}).filter((id) => id !== me); }
 }
@@ -48,6 +50,10 @@ class TurboCheck extends MkCheckGame {
 }
 
 class FpsCheck extends MkCheckGame {
+  fakePlayer(room, me, fakeId, nick) {
+    const mine = room.players[me];
+    return Object.assign({}, mine, { nickname: nick, team: mine.team === "blue" ? "red" : "blue", joinedAt: Date.now() });
+  }
   endUpdate(room, me, outcome) {
     const mine = this.teamOf(room, me), other = mine === "blue" ? "red" : "blue";
     const kills = {};
@@ -60,7 +66,11 @@ class FpsCheck extends MkCheckGame {
 }
 
 class ArenaCheck extends MkCheckGame {
-  constructor(root, openButton) { super(root, openButton); this.startWaitMs = 300000; }
+  constructor(root, openButton) { super(root, openButton); this.startWaitMs = 300000; this.joinAfterStart = true; }
+  fakePlayer(room, me, fakeId, nick) {
+    const mine = room.players[me];
+    return Object.assign({}, mine, { nickname: nick, team: this.teamOf(room, me) === "blue" ? "red" : "blue", isAI: false, joinedAt: Date.now() });
+  }
   teamOf(room, me) { return (room.roster && room.roster[me] && room.roster[me].team) || super.teamOf(room, me); }
   started(room) { return !!room && (room.status === "playing" || room.status === "countdown"); }
   poke() { const ready = document.getElementById("btnDraftReady"); if (ready && ready.offsetParent !== null && !ready.disabled) ready.click(); }
@@ -74,6 +84,7 @@ class ArenaCheck extends MkCheckGame {
 // 31번은 감염되면 좀비 편이다. win = 인간 승리에 나는 생존, zombieWin = 전원 감염(좀비 승리, 나도 감염 → 승),
 // lose = 인간 승리인데 나는 감염(좀비 편이 짐).
 class ZombieCheck extends MkCheckGame {
+  fakePlayer(room, me, fakeId, nick) { return Object.assign({}, room.players[me], { nickname: nick, joinedAt: Date.now() }); }
   endUpdate(room, me, outcome) {
     const final = {}, humansWin = outcome !== "zombieWin";
     const others = Object.keys(room.players || {}).filter((id) => id !== me);
@@ -85,6 +96,7 @@ class ZombieCheck extends MkCheckGame {
 }
 
 class CollectionCheck extends MkCheckGame {
+  fakePlayer(room, me, fakeId, nick) { return Object.assign({}, room.players[me], { nick, joinedAt: Date.now() }); }
   endUpdate(room, me, outcome) {
     const others = this.otherIds(room, me);
     const ranks = { [me]: outcome === "win" ? 1 : 2 };
@@ -96,6 +108,10 @@ class CollectionCheck extends MkCheckGame {
 }
 
 class SideCheck extends MkCheckGame {
+  fakePlayer(room, me, fakeId, nick) {
+    const slot = room.assign && room.assign[fakeId];
+    return slot === undefined ? null : Object.assign({}, room.players[me], { nick, slot, joinedAt: Date.now() });
+  }
   constructor(root, openButton, extra) { super(root, openButton); this.extra = extra || {}; }
   started(room) { return !!room && room.status && room.status !== "lobby" && room.status !== "end"; }
   endUpdate(room, me, outcome, ticket) {
@@ -173,6 +189,7 @@ class MkCheckRunner {
   async addRival(queue) {
     const fakeCode = String(90000 + (Date.now() % 9000) + this.fakeSeq++), fakeId = "fk" + fakeCode;
     const person = { nick: "가짜상대" + this.fakeSeq, joinedAt: Date.now(), look: null };
+    this.fake = { id: fakeId, nick: person.nick };
     await MkCheckDb.ref(this.game.root + "/parties/" + fakeCode).set({ leaderId: fakeId, createdAt: Date.now(), members: { [fakeId]: person }, bots: 0 });
     await MkCheckDb.ref("matchQueue/" + queue + "/" + fakeCode).set({ leader: fakeId, people: { [fakeId]: person }, bots: 0, size: 1, at: Date.now() + 50, claim: null });
   }
@@ -185,10 +202,20 @@ class MkCheckRunner {
     await this.addRival(party.queue);
     const ticket = await this.until(() => { const p = MkCheckDb.at(this.game.root + "/parties/" + party.code); return p && p.match; }, 60000, "표");
     const roomPath = await this.until(() => MkCheckDb.findRoom(ticket.room), 8000, "방 " + ticket.room);
+    const joins = outcome === "winJoined";
+    const joinRival = async () => {
+      await this.until(() => { const r = MkCheckDb.at(roomPath); return r && r.players && r.players[party.me]; }, 8000, "내 선수 기록");
+      const record = this.game.fakePlayer(MkCheckDb.at(roomPath), party.me, this.fake.id, this.fake.nick);
+      if (!record) throw new Error("이 게임은 winJoined 를 지원하지 않음");
+      await MkCheckDb.ref(roomPath + "/players/" + this.fake.id).set(record);
+      await MkCheckRunner.wait(1000);
+    };
+    if (joins && !this.game.joinAfterStart) await joinRival();
     await this.until(() => { this.game.poke(); return this.game.started(MkCheckDb.at(roomPath)); }, this.game.startWaitMs, "게임 시작");
     await MkCheckRunner.wait(1500);
+    if (joins && this.game.joinAfterStart) await joinRival();
     const room = MkCheckDb.at(roomPath);
-    await MkCheckDb.ref(roomPath).update(this.game.endUpdate(room, party.me, outcome, ticket));
+    await MkCheckDb.ref(roomPath).update(this.game.endUpdate(room, party.me, joins ? "win" : outcome, ticket));
     const line = await this.until(() => {
       const history = (MkCheckDb.at(this.game.root + "/parties/" + party.code + "/history")) || {};
       const lines = Object.keys(history).map((k) => history[k]).sort((a, b) => a.n - b.n);
@@ -202,8 +229,9 @@ class MkCheckRunner {
     back.click();
     await this.until(() => this.visibleButton(/^매칭 시작$/), 10000, "대기실 복귀");
     const streak = (document.querySelector(".mk-streak") || {}).textContent || "";
-    const expect = outcome === "zombieWin" ? "win" : outcome;
-    this.note({ round: index + 1, case: outcome, want: expect, got: line.result, ok: expect === line.result, added: lines - before, rivals: line.rivals || [], rank: line.rank, of: line.of, streak });
+    const expect = outcome === "zombieWin" || joins ? "win" : outcome;
+    const rivals = line.rivals || [], rivalsOk = joins ? rivals.length === 1 && rivals[0] === this.fake.nick : rivals.length === 0;
+    this.note({ round: index + 1, case: outcome, want: expect, got: line.result, ok: expect === line.result && rivalsOk && lines - before === 1, added: lines - before, rivals, rivalsOk, rank: line.rank, of: line.of, streak });
   }
   async run(outcomes) {
     if (typeof window.__fbTree !== "function" || typeof firebase.SDK_VERSION === "string") {

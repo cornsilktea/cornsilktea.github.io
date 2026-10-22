@@ -253,7 +253,8 @@ class CollectionFlow {
             startCollection: () => { if (this.director)
                 this.director.startCollection(); },
             showParty: () => this.services.phases.goTo(this.services.partyPhase),
-            showStart: (message) => this.returnToStart(message)
+            showStart: (message) => this.returnToStart(message),
+            presentIds: () => (this.current ? this.current.humanIds() : [])
         }, services.partyScreen, services.partyMount);
         services.randomEntry.onClick(() => this.createParty());
         this.statusHandlers = {

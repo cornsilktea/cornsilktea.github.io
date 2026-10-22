@@ -39,6 +39,9 @@ class VbMatchHooks {
     showStart(message) {
         this.port.showStart(message);
     }
+    presentIds() {
+        return this.port.presentIds();
+    }
 }
 class VbRandomSetup {
     static create(backend, directory, myId, port) {

@@ -397,6 +397,12 @@ class RkMatchHooks {
     showStart(message) {
         this.plan.port.showStart(message);
     }
+    presentIds() {
+        return this.plan.port.presentIds();
+    }
+    static humanIds(players) {
+        return Array.from(players.keys()).filter((id) => !players.get(id).isBot);
+    }
 }
 class RkRandomSetup {
     static create(plan) {

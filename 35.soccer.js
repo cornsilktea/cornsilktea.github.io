@@ -914,7 +914,8 @@ class SoccerGame {
             leaveRoomQuietly: () => this.leaveRoomQuietly(),
             startMatch: () => this.startMatch(),
             showParty: () => this.showParty(),
-            showStart: (message) => this.showStart(message)
+            showStart: (message) => this.showStart(message),
+            presentIds: () => (this.session ? RkMatchHooks.humanIds(this.session.players) : [])
         });
         FoldCard.bindAll(document);
         const input = new SocInput(RkDom.byId("joyZone"), RkDom.byId("joyBase"), RkDom.byId("joyKnob"));

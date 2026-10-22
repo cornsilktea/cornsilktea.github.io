@@ -350,7 +350,7 @@
 
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="character-maker.js?v=20261012"></script>
-<script charset="utf-8" src="match-kit.js?v=20261022t"></script>
+<script charset="utf-8" src="match-kit.js?v=20261022u"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <div id="loading">3D 학교를 준비하는 중입니다…</div>
 
@@ -3959,6 +3959,7 @@ class ZombieRandomMatch {
   startMatch() { hostStart(); }
   showParty() { showScreen("party"); refreshNick(); }
   showStart(message) { showScreen("start"); startMsg(message); }
+  presentIds() { return room.ref ? humanIdsOf(room.players) : []; }
   roomChanged() { if (this.flow && room.ref) this.flow.roomChanged(participantCount(), isHost(), room.status === "lobby"); }
   decorateResult(final) {
     const ticket = this.ticket();

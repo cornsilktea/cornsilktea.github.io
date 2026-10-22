@@ -5,6 +5,7 @@ interface VbGamePort {
   showParty(): void;
   showStart(message: string): void;
   myRecord(): VbPlayerRecord;
+  presentIds(): string[];
 }
 
 class VbPartyPaths {
@@ -55,6 +56,10 @@ class VbMatchHooks implements MkGameHooks {
 
   showStart(message: string): void {
     this.port.showStart(message);
+  }
+
+  presentIds(): string[] {
+    return this.port.presentIds();
   }
 }
 

@@ -26,6 +26,9 @@ class CollectionMatchHooks {
     showParty() {
         this.port.showParty();
     }
+    presentIds() {
+        return this.port.presentIds();
+    }
     showStart(message) {
         this.port.showStart(message);
     }

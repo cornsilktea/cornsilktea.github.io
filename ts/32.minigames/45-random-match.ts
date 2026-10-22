@@ -7,6 +7,7 @@ interface CollectionRandomPort {
   startCollection(): void;
   showParty(): void;
   showStart(message: string): void;
+  presentIds(): string[];
 }
 
 interface MatchedResultInfo {
@@ -44,6 +45,10 @@ class CollectionMatchHooks implements MkGameHooks {
 
   showParty(): void {
     this.port.showParty();
+  }
+
+  presentIds(): string[] {
+    return this.port.presentIds();
   }
 
   showStart(message: string): void {
