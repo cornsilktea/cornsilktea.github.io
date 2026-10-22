@@ -131,7 +131,14 @@ class TeamBoardView {
     }
     showTeams(teams) {
         this.board.textContent = "";
+        this.fitGrid(teams.length);
         teams.forEach((members, index) => this.board.appendChild(this.buildCard(index + 1, members)));
+    }
+    fitGrid(teamCount) {
+        const aspect = this.board.clientWidth / Math.max(1, this.board.clientHeight);
+        const columns = Math.max(1, Math.min(teamCount, Math.round(Math.sqrt(teamCount * aspect / TeamBoardView.CARD_ASPECT))));
+        this.board.style.setProperty("--cols", String(columns));
+        this.board.style.setProperty("--rows", String(Math.ceil(teamCount / columns)));
     }
     buildCard(teamNumber, members) {
         const card = TeamDom.create("section", "team-card");
@@ -143,6 +150,7 @@ class TeamBoardView {
         return card;
     }
 }
+TeamBoardView.CARD_ASPECT = 1.3;
 class TeamPickerApp {
     constructor() {
         this.sizes = new TeamSizePicker(TeamDom.byId("sizeChoice"));

@@ -135,6 +135,8 @@ class TeamNumberPicker {
 }
 
 class TeamBoardView {
+  private static readonly CARD_ASPECT = 1.3;
+
   constructor(private readonly board: HTMLElement) {}
 
   showHint(text: string): void {
@@ -144,7 +146,15 @@ class TeamBoardView {
 
   showTeams(teams: readonly (readonly number[])[]): void {
     this.board.textContent = "";
+    this.fitGrid(teams.length);
     teams.forEach((members, index) => this.board.appendChild(this.buildCard(index + 1, members)));
+  }
+
+  private fitGrid(teamCount: number): void {
+    const aspect = this.board.clientWidth / Math.max(1, this.board.clientHeight);
+    const columns = Math.max(1, Math.min(teamCount, Math.round(Math.sqrt(teamCount * aspect / TeamBoardView.CARD_ASPECT))));
+    this.board.style.setProperty("--cols", String(columns));
+    this.board.style.setProperty("--rows", String(Math.ceil(teamCount / columns)));
   }
 
   private buildCard(teamNumber: number, members: readonly number[]): HTMLElement {
