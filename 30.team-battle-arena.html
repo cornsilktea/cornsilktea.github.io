@@ -4,7 +4,7 @@
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="teambattle"></script>
 <script charset="utf-8" src="fullscreen-keeper.js"></script>
-<script charset="utf-8" src="match-kit.js?v=20261022c"></script>
+<script charset="utf-8" src="match-kit.js?v=20261022p"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>3v3 팀 배틀 아레나</title>
@@ -25,7 +25,7 @@
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
 } }
 </script>
-<link rel="stylesheet" href="30.team-battle-arena.css?v=20261022d">
+<link rel="stylesheet" href="30.team-battle-arena.css?v=20261022e">
 </head>
 <body>
 <canvas id="cv"></canvas>
@@ -132,7 +132,8 @@
 <div id="scrDraft" class="screen" hidden>
   <div class="draftCols">
   <div class="wrap draftLeft">
-    <div class="card">
+    <div class="card dfTopCard">
+      <button id="btnLeaveDraft" class="mini danger" type="button">방 나가기</button>
       <div class="dfHead">
         <div><div class="dfTitle">🏆 대회모드 캐릭터 선택</div><div id="dfTurn" class="dfTurn"></div></div>
         <div id="dfMap" class="dfMap"></div>
@@ -148,7 +149,6 @@
       </div>
     </div>
     <div class="card dfMapCard"><div class="dfMapHead"><span id="dfMapName"></span><small><span class="b">◀ 블루 진영</span> · <span class="r">레드 진영 ▶</span></small></div><img id="dfMapImg" class="dfMapImg" alt=""></div>
-    <button id="btnLeaveDraft" class="mini danger" type="button">방 나가기</button>
     <div id="dfTradeBox" class="dfTradeBox" hidden></div>
   </div>
   <div class="card charCol dfCharCol">

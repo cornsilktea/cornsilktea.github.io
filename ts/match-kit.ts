@@ -1032,13 +1032,16 @@ class MkPartyPanel {
     this.crowd = document.createElement("div");
     this.crowd.className = "mk-crowd";
     this.matchButton = MkPartyPanel.button("st-btn primary mk-match", "매칭 시작", () => this.onMatch());
-    this.aiNowButton = MkPartyPanel.button("st-btn mk-ai-now", "🤖 AI와 바로 시작", () => this.onAiNow());
+    this.aiNowButton = MkPartyPanel.button("st-btn primary mk-ai-now", "🤖 AI와 바로 시작", () => this.onAiNow());
     this.aiNowButton.hidden = true;
     this.hint = document.createElement("div");
     this.hint.className = "st-hint mk-hint";
     const leave = MkPartyPanel.button("st-btn mk-leave", options.solo ? "나가기" : "팀 나가기", () => this.onLeave());
     mount.textContent = "";
-    mount.append(this.head, this.seats, this.notice, this.crowd, this.matchButton, this.aiNowButton, this.hint, leave);
+    const buttons = document.createElement("div");
+    buttons.className = "st-row mk-buttons";
+    buttons.append(this.aiNowButton, this.matchButton);
+    mount.append(this.head, this.seats, this.notice, this.crowd, buttons, this.hint, leave);
   }
 
   setNotice(text: string): void {
@@ -1070,7 +1073,7 @@ class MkPartyPanel {
     const editable = leader && !searching;
     if (this.options.allowBots) {
       for (let index = 0; index < party.bots(); index++) {
-        const seat = MkPartyPanel.seat("button", "mk-seat bot", "🤖 AI", editable ? "눌러서 빼기" : "아군 AI", "bot") as HTMLButtonElement;
+        const seat = MkPartyPanel.seat("button", "mk-seat bot", "🤖 AI", editable ? "눌러서 빼기" : "", "bot") as HTMLButtonElement;
         seat.disabled = !editable;
         this.seats.appendChild(seat);
       }
@@ -1081,6 +1084,7 @@ class MkPartyPanel {
     }
     this.matchButton.textContent = searching ? "매칭 취소" : "매칭 시작";
     this.matchButton.classList.toggle("primary", !searching);
+    this.matchButton.classList.toggle("cancel", searching);
     this.matchButton.disabled = !leader;
     this.aiNowButton.hidden = !this.options.aiFallbackMs || !searching || !leader;
     this.aiNowButton.disabled = false;

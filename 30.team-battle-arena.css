@@ -353,7 +353,9 @@
   .mvpBox .mvpName .r { color: #FF7A70; }
   .mvpBox .mvpNone { font-size: 20px; font-weight: 800; color: #A3B0A6; margin-top: 2px; }
 
-  #btnLeaveDraft { display: block; margin: 0 auto; }
+  .dfTopCard { position: relative; }
+  #btnLeaveDraft { position: absolute; top: 12px; right: 12px; margin: 0; }
+  .dfTopCard .dfHead { padding-top: 30px; align-items: flex-end; }
   .startRow { display: flex; gap: 10px; }
   .startRow .big { margin-bottom: 12px; }
   .startRow #btnStart { flex: 3 1 0; min-width: 0; }
