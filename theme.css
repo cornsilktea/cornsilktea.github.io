@@ -218,6 +218,12 @@ button.mk-seat:disabled{cursor:default;}
 .mk-notice{margin-top:8px;font-size:14px;font-weight:700;color:#FFD2B8;text-align:center;}
 .mk-notice:empty{display:none;}
 .mk-match{margin-top:14px !important;}
+/* 기다리는 동안: 대기열에 있는 다른 학생 수와, 기다리기 싫을 때 바로 AI 대전(24·30번처럼 aiFallbackMs 가 있는 게임만) */
+.mk-crowd{margin-top:10px;font-size:15px;font-weight:800;color:var(--st-title,#F4F1E8);text-align:center;}
+.mk-crowd:empty{display:none;}
+.mk-crowd.alone{color:#FFD2B8;}
+.mk-ai-now{margin-top:8px !important;}
+.mk-ai-now[hidden]{display:none !important;}
 
 /* 캐릭터 만들기(character-kit.ts 의 ProfileEditor). 어두운 .st-screen 카드 안에서 쓴다. */
 .ce-nick{width:100%;min-height:48px;padding:6px 12px;font:inherit;font-size:18px;font-weight:800;border-radius:6px;

@@ -384,6 +384,21 @@ class Scenarios {
     again.stop();
   }
 
+  static async scenarioWaitingCount() {
+    const world = new SimWorld(new Mk.MkVersusMatcher(2, { settleMs: 5000, claimExpireMs: 300 }), 3);
+    const a = await world.team(1, 2), b = await world.team(2, 2);
+    await a.queue.enter(a.leader);
+    await Util.wait(30);
+    const alone = a.queue.othersWaiting(a.code);
+    await b.queue.enter(b.leader);
+    await Util.wait(30);
+    const seenByA = a.queue.othersWaiting(a.code), seenByB = b.queue.othersWaiting(b.code);
+    a.queue.stop();
+    Report.check("대기 인원: 혼자면 0명, 두 명 팀이 오면 2명, 상대는 1명", alone === 0 && seenByA === 2 && seenByB === 1, [alone, seenByA, seenByB]);
+    Report.check("대기 인원: 찾는 중이 아니면 모름(null)", a.queue.othersWaiting(a.code) === null);
+    [a, b].forEach((t) => { t.queue.stop(); t.parties.forEach((p) => p.silentClose()); });
+  }
+
   static async scenarioBlip() {
     const world = new SimWorld(new Mk.MkVersusMatcher(1, SimWorld.TIMING), 3);
     const solo = await world.team(1, 1), pair = await world.team(2, 2);
@@ -543,6 +558,7 @@ class SimRunner {
     await Scenarios.scenarioAiFallback();
     await Scenarios.scenarioBlip();
     await Scenarios.scenarioCancelThenRematch();
+    await Scenarios.scenarioWaitingCount();
     for (let round = 0; round < 4; round++) {
       await Scenarios.scenarioRandom("동시 입장 2대2 #" + round, new Mk.MkVersusMatcher(2, SimWorld.TIMING), 14, 2, { lag: 6, spread: 1, cancelRate: 0, killRate: 0, settle: 900, capacity: 4, versus: true });
     }

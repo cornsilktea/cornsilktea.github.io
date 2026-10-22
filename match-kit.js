@@ -521,6 +521,7 @@ class MkQueue {
         this.since = 0;
         this.onBound = () => undefined;
         this.onError = () => undefined;
+        this.onEntries = () => undefined;
     }
     async enter(party) {
         const since = this.clock.now();
@@ -572,10 +573,22 @@ class MkQueue {
         catch (error) { /* 이미 끊긴 연결 */ }
         if (removed)
             await party.markSearching(null);
+        else
+            this.recoverIfLost(party);
         return removed;
     }
     hasCompany(myCode) {
         return this.matcher.hasCompany(this.entries, this.clock.now(), myCode);
+    }
+    // 대기 화면의 "지금 기다리는 학생 n명". 이미 보고 있는 대기열 구독 값만 세므로 요청이 늘지 않는다.
+    // 누가 묶어 가는 중(차지된) 항목은 곧 빠지므로 세지 않는다. 대기열을 아직 못 받았으면 null.
+    othersWaiting(myCode) {
+        if (!this.active || !this.entries)
+            return null;
+        const entries = this.entries, now = this.clock.now();
+        return Object.keys(entries)
+            .filter((code) => code !== myCode && !!entries[code] && entries[code].size > 0 && this.matcher.isFree(entries[code], now))
+            .reduce((sum, code) => sum + Object.keys(entries[code].people || {}).length, 0);
     }
     stop() {
         this.active = false;
@@ -601,9 +614,11 @@ class MkQueue {
                     return;
                 this.stop();
                 this.recoverIfLost(party);
+                this.onEntries();
                 return;
             }
             this.consider(myCode);
+            this.onEntries();
         });
     }
     // 내 항목이 표 없이 사라지면(묶던 사람이 표를 못 나눠 줌·연결 끊김) "찾는 중"에 갇히지 않게 잠시 뒤 풀어 준다.
@@ -842,6 +857,7 @@ class MkPartyPanel {
         this.onLeave = () => undefined;
         this.onAddBot = () => undefined;
         this.onRemoveBot = () => undefined;
+        this.onAiNow = () => undefined;
         this.streak = new MkStreakButton(screen, !!options.showRank);
         this.head = document.createElement("h2");
         this.head.className = "mk-head";
@@ -864,12 +880,16 @@ class MkPartyPanel {
         });
         this.notice = document.createElement("div");
         this.notice.className = "mk-notice";
+        this.crowd = document.createElement("div");
+        this.crowd.className = "mk-crowd";
         this.matchButton = MkPartyPanel.button("st-btn primary mk-match", "매칭 시작", () => this.onMatch());
+        this.aiNowButton = MkPartyPanel.button("st-btn mk-ai-now", "🤖 AI와 바로 시작", () => this.onAiNow());
+        this.aiNowButton.hidden = true;
         this.hint = document.createElement("div");
         this.hint.className = "st-hint mk-hint";
         const leave = MkPartyPanel.button("st-btn mk-leave", options.solo ? "나가기" : "팀 나가기", () => this.onLeave());
         mount.textContent = "";
-        mount.append(this.head, this.seats, this.notice, this.matchButton, this.hint, leave);
+        mount.append(this.head, this.seats, this.notice, this.crowd, this.matchButton, this.aiNowButton, this.hint, leave);
     }
     setNotice(text) {
         if (this.notice.textContent !== text)
@@ -877,9 +897,11 @@ class MkPartyPanel {
     }
     setBusy(busy) {
         this.matchButton.disabled = busy;
+        this.aiNowButton.disabled = busy;
     }
     // waitingForOthers: 대기열에 상대가 있는데 바로 전 판 상대라, 경기 중인 다른 팀이 돌아오길 잠깐 기다리는 중.
-    render(party, waitingForOthers = false) {
+    // waiting: 대기열에서 나 말고 기다리는 학생 수(찾는 중이 아니거나 아직 모르면 null).
+    render(party, waitingForOthers = false, waiting = null) {
         const leader = party.isLeader();
         const searching = !!party.searching();
         const book = party.book();
@@ -911,6 +933,12 @@ class MkPartyPanel {
         this.matchButton.textContent = searching ? "매칭 취소" : "매칭 시작";
         this.matchButton.classList.toggle("primary", !searching);
         this.matchButton.disabled = !leader;
+        this.aiNowButton.hidden = !this.options.aiFallbackMs || !searching || !leader;
+        this.aiNowButton.disabled = false;
+        const crowdText = !searching || waiting === null ? "" : waiting > 0 ? "👥 지금 다른 학생 " + waiting + "명이 기다리는 중" : "👥 지금 기다리는 다른 학생이 없어요";
+        if (this.crowd.textContent !== crowdText)
+            this.crowd.textContent = crowdText;
+        this.crowd.classList.toggle("alone", searching && waiting === 0);
         const streakNote = book.streak() > 0 ? " · 지금 " + book.streak() + "연승 중" : "";
         const fallback = this.options.aiFallbackMs ? Math.ceil(this.options.aiFallbackMs / 1000) - party.searchSeconds() : 0;
         const fallbackNote = waitingForOthers ? " · 다른 팀 경기가 끝나길 기다리는 중(같은 상대와 연달아 만나지 않게)"
@@ -968,6 +996,7 @@ class MkRandomFlow {
             this.party.setBots(this.party.bots() + 1); };
         panel.onRemoveBot = () => { if (this.party)
             this.party.setBots(this.party.bots() - 1); };
+        panel.onAiNow = () => this.startWithAiNow();
     }
     inParty() {
         return !!this.party;
@@ -1005,8 +1034,10 @@ class MkRandomFlow {
             this.party.updateMe(this.hooks.member());
     }
     render() {
-        if (this.party)
-            this.panel.render(this.party, !!this.queue && !!this.party.searching() && this.queue.hasCompany(this.party.code));
+        if (!this.party)
+            return;
+        const searching = !!this.queue && !!this.party.searching();
+        this.panel.render(this.party, searching && this.queue.hasCompany(this.party.code), this.queue ? this.queue.othersWaiting(this.party.code) : null);
     }
     setNotice(text) {
         this.panel.setNotice(text);
@@ -1077,6 +1108,7 @@ class MkRandomFlow {
                     this.queue.stop();
                 this.queue = new MkQueue(this.database, this.clock, this.paths, this.options.matcher, this.hooks);
                 this.queue.onError = (message) => this.panel.setNotice(message);
+                this.queue.onEntries = () => this.render();
                 await this.queue.enter(party);
             }
         }
@@ -1141,6 +1173,19 @@ class MkRandomFlow {
             return;
         this.fallbackFor = search.since;
         this.queue.goSolo(party.code);
+    }
+    // 기다리기 싫으면 aiFallbackMs 를 기다리지 않고 바로 AI 대전. 그 사이 사람과 묶이는 중이면 사람 매칭을 따른다.
+    async startWithAiNow() {
+        const party = this.party;
+        const search = party ? party.searching() : null;
+        if (!party || !search || !party.isLeader() || !this.queue)
+            return;
+        this.fallbackFor = search.since;
+        this.panel.setBusy(true);
+        const started = await this.queue.goSolo(party.code).catch(() => false);
+        if (!started && !party.ticket())
+            this.panel.setNotice("다른 학생과 연결되는 중이에요. 잠시만 기다려 주세요.");
+        this.render();
     }
     async leaveParty() {
         const party = this.party;

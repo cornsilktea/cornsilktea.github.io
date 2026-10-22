@@ -4,7 +4,7 @@
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="teambattle"></script>
 <script charset="utf-8" src="fullscreen-keeper.js"></script>
-<script charset="utf-8" src="match-kit.js?v=20261022b"></script>
+<script charset="utf-8" src="match-kit.js?v=20261022c"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>3v3 팀 배틀 아레나</title>
@@ -9066,7 +9066,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static SIDE_TEAMS = ["blue", "red"];
     static RESULT_TRIES = 20;
     static RESULT_RETRY_MS = 300;
-    static AI_FALLBACK_MS = 30000;
+    static AI_FALLBACK_MS = 45000;
     constructor(services) { this.services = services; this.flow = null; this.quiet = false; }
     ready() { var services = this.services;
       if (this.flow || !services.backend.db) return this.flow;
