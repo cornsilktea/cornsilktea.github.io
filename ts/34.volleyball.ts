@@ -1149,6 +1149,11 @@ class VolleyballMatch {
     this.session.ref.update({ ["players/" + botId]: record, ["match/seats/s" + slot]: botId });
   }
 
+  progress(): number {
+    const rally = this.rally;
+    return rally ? MkForfeit.clamp(Math.max(rally.sa, rally.sb) / VbConfig.WIN_SCORE) : 0;
+  }
+
   markEnded(): void {
     this.ended = true;
   }
@@ -1715,7 +1720,7 @@ class VolleyballGame {
     VbDom.byId("btnStart").addEventListener("click", () => this.startMatch());
     VbDom.byId("btnLeave").addEventListener("click", () => this.leaveRoom());
     VbDom.byId("btnEndLeave").addEventListener("click", () => this.leaveRoom());
-    VbDom.byId("btnGameLeave").addEventListener("click", () => this.leaveRoom());
+    VbDom.byId("btnGameLeave").addEventListener("click", () => this.leaveDuringMatch());
     VbDom.byId("btnToLobby").addEventListener("click", () => this.returnToLobby());
     VbDom.byId("btnSeatMode").addEventListener("click", () => this.toggleSeatMode());
     this.lobbyView.onSeatClick = (slot) => this.clickSeat(slot);
@@ -1943,6 +1948,13 @@ class VolleyballGame {
     const updates: Record<string, unknown> = { status: "lobby", match: null, ball: null, rally: null, end: null, st: null, in: null };
     session.players.forEach((record, id) => { if (record.isBot) updates["players/" + id] = null; });
     session.ref.update(updates);
+  }
+
+  private leaveDuringMatch(): void {
+    const progress = this.session && this.session.status === "play" && this.match ? this.match.progress() : 0;
+    if (this.random.forfeitApplies(progress) && !window.confirm(MkForfeit.QUESTION)) return;
+    this.random.forfeitIfLate(progress);
+    this.leaveRoom();
   }
 
   private leaveRoom(): void {

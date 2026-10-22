@@ -575,14 +575,31 @@ class SnGame {
         const button = SnDom.el("btnGameLeave"), now = performance.now();
         if (this.leaveAskedAt >= 0 && now - this.leaveAskedAt < SnGame.LEAVE_CONFIRM_MS) {
             this.resetLeave();
+            this.forfeitIfLate();
             this.leaveRoom("");
             return;
         }
         this.leaveAskedAt = now;
         button.classList.add("confirm");
-        SnDom.text(button, "한 번 더 누르면 나가요");
+        SnDom.text(button, this.forfeitApplies() ? MkForfeit.TAP_AGAIN : "한 번 더 누르면 나가요");
         window.setTimeout(() => { if (performance.now() - this.leaveAskedAt >= SnGame.LEAVE_CONFIRM_MS - 50)
             this.resetLeave(); }, SnGame.LEAVE_CONFIRM_MS);
+    }
+    matchProgress() {
+        if (!this.view || !this.session || this.session.status !== "playing")
+            return 0;
+        const engine = this.view.driver.engine, rows = SnBalance.STORM_ROWS;
+        const byOut = engine.teams.filter((t) => t.out).length / Math.max(1, engine.teams.length);
+        return MkForfeit.clamp(Math.max(byOut, engine.time / rows[rows.length - 1].start));
+    }
+    forfeitApplies() {
+        const flow = this.random();
+        return !!flow && flow.forfeitApplies(this.matchProgress());
+    }
+    forfeitIfLate() {
+        const flow = this.random();
+        if (flow)
+            flow.forfeitIfLate(this.matchProgress());
     }
     resetLeave() {
         this.leaveAskedAt = -1;

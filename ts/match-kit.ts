@@ -1302,6 +1302,18 @@ class MkRandomFlow {
     this.party.report(ticket, rivals ? { ...outcome, rivals } : outcome);
   }
 
+  // 랜덤 매칭 판에서 경기가 절반 넘게 진행된 뒤(progress 0~1, 게임마다 시간·점수·탈락 비율로 계산) 나가면 나간 쪽 전적은 패.
+  // 판이 이미 끝나 결과를 기록했으면 해당 없음.
+  forfeitApplies(progress: number): boolean {
+    return !!this.current && !!this.party && !this.reported && progress >= MkForfeit.AT;
+  }
+
+  forfeitIfLate(progress: number): boolean {
+    if (!this.forfeitApplies(progress)) return false;
+    this.matchEnded({ result: "lose" });
+    return true;
+  }
+
   endHint(): string {
     return this.party ? "지금 " + this.party.book().streakLabel().replace("🔥 ", "") : "";
   }
@@ -1446,6 +1458,17 @@ class MkRandomFlow {
 // 새로고침·나가기를 해도 같은 대기실(전적·연승·바로 전 상대)을 이어 쓰게 이 기기에 대기실 코드와 내 아이디를 적어 둔다
 // (24번에서 먼저 쓰다가 2026-10-22 모든 게임으로 넓힘). 같은 태블릿을 다른 학생이 쓸 수 있으니 닉네임이 같을 때만 돌아가고,
 // 오래 안 쓴 대기실은 서버에서 치워지므로(MkPartyDirectory.sweep) 다음 날까지 이어지지는 않는다.
+// 랜덤 매칭 중간 이탈 규칙(24번에서 먼저 쓰다가 2026-10-22 모든 게임으로). 확인 문구를 게임마다 같게 쓴다.
+class MkForfeit {
+  static readonly AT = 0.5;
+  static readonly QUESTION = "경기가 절반 넘게 진행됐어요. 지금 나가면 패배로 기록됩니다. 나갈까요?";
+  static readonly TAP_AGAIN = "한 번 더 누르면 패배로 나가요";
+
+  static clamp(progress: number): number {
+    return Number.isFinite(progress) ? Math.max(0, Math.min(1, progress)) : 0;
+  }
+}
+
 class MkPartyMemory {
   private readonly key: string;
   private readonly oldKey: string;

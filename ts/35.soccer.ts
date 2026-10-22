@@ -478,6 +478,14 @@ class SoccerMatch {
     this.session.ref.update({ ["players/" + botId]: record, ["match/seats/s" + slot]: botId });
   }
 
+  progress(): number {
+    const game = this.game;
+    if (!game) return 0;
+    if (game.overtime) return 1;
+    const left = game.phase === "play" ? game.leftMs - (this.services.backend.now() - game.at) : game.leftMs;
+    return MkForfeit.clamp(1 - left / SocConfig.MATCH_MS);
+  }
+
   markEnded(): void {
     this.ended = true;
   }
@@ -1010,7 +1018,7 @@ class SoccerGame {
     RkDom.byId("btnStart").addEventListener("click", () => this.startMatch());
     RkDom.byId("btnLeave").addEventListener("click", () => this.leaveRoom());
     RkDom.byId("btnEndLeave").addEventListener("click", () => this.leaveRoom());
-    RkDom.byId("btnGameLeave").addEventListener("click", () => this.leaveRoom());
+    RkDom.byId("btnGameLeave").addEventListener("click", () => this.leaveDuringMatch());
     RkDom.byId("btnToLobby").addEventListener("click", () => this.returnToLobby());
     RkDom.byId("btnSeatMode").addEventListener("click", () => this.toggleSeatMode());
     this.lobbyView.onSeatClick = (slot) => this.clickSeat(slot);
@@ -1236,6 +1244,13 @@ class SoccerGame {
     const updates: Record<string, unknown> = { status: "lobby", match: null, ball: null, game: null, end: null, st: null, in: null };
     session.players.forEach((record, id) => { if (record.isBot) updates["players/" + id] = null; });
     session.ref.update(updates);
+  }
+
+  private leaveDuringMatch(): void {
+    const progress = this.session && this.session.status === "play" && this.match ? this.match.progress() : 0;
+    if (this.random.forfeitApplies(progress) && !window.confirm(MkForfeit.QUESTION)) return;
+    this.random.forfeitIfLate(progress);
+    this.leaveRoom();
   }
 
   private leaveRoom(): void {

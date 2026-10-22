@@ -466,7 +466,7 @@
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="character-maker.js?v=20261012"></script>
-<script charset="utf-8" src="match-kit.js?v=20261022v"></script>
+<script charset="utf-8" src="match-kit.js?v=20261022w"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
@@ -2714,6 +2714,9 @@ class FpsRandomMatch {
     const ticket = this.ticket();
     if (ticket && T.status === "ended" && T.match && T.match.shownEnd) this.reportResult(ticket);
   }
+  progress() { return T.status === "playing" && T.startAt ? MkForfeit.clamp((tnow() - T.startAt) / TEAM.matchMs) : 0; }
+  forfeitApplies() { return !!this.flow && this.flow.forfeitApplies(this.progress()); }
+  forfeitIfLate() { if (this.flow) this.flow.forfeitIfLate(this.progress()); }
 }
 const fpsRandom = new FpsRandomMatch();
 
@@ -3449,7 +3452,7 @@ $("btnOverLeave").onclick = e => { e.currentTarget.blur(); fpsRandom.recordBefor
 $("btnGameLeave").onclick = e => {
   e.currentTarget.blur();
   if (state === "play") { if (confirm("처음 화면으로 나갈까요? (이번 기록은 저장되지 않아요)")) leaveSoloGame(); return; }
-  if (confirm("방을 나갈까요?")) { leaveRoom(); fpsRandom.afterLeave(); }
+  if (confirm(fpsRandom.forfeitApplies() ? MkForfeit.QUESTION : "방을 나갈까요?")) { fpsRandom.forfeitIfLate(); leaveRoom(); fpsRandom.afterLeave(); }
 };
 
 const QG = QualityGovernor({

@@ -350,7 +350,7 @@
 
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="character-maker.js?v=20261012"></script>
-<script charset="utf-8" src="match-kit.js?v=20261022v"></script>
+<script charset="utf-8" src="match-kit.js?v=20261022w"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <div id="loading">3D 학교를 준비하는 중입니다…</div>
 
@@ -3960,6 +3960,9 @@ class ZombieRandomMatch {
   showParty() { showScreen("party"); refreshNick(); }
   showStart(message) { showScreen("start"); startMsg(message); }
   presentIds() { return room.ref ? humanIdsOf(room.players) : []; }
+  progress() { return room.status === "playing" && room.startAt ? MkForfeit.clamp((serverNow() - room.startAt) / ROUND_MS) : 0; }
+  forfeitApplies() { return !!this.flow && this.flow.forfeitApplies(this.progress()); }
+  forfeitIfLate() { if (this.flow) this.flow.forfeitIfLate(this.progress()); }
   roomChanged() { if (this.flow && room.ref) this.flow.roomChanged(participantCount(), isHost(), room.status === "lobby"); }
   decorateResult(final) {
     const ticket = this.ticket();
@@ -3988,7 +3991,7 @@ $("btnBots").onclick = blurAfter(toggleBots);
 $("btnLobbyLeave").onclick = blurAfter(leaveRoom);
 $("btnAgain").onclick = blurAfter(playAgain);
 $("btnResultLeave").onclick = blurAfter(leaveRoom);
-$("btnGameLeave").onclick = blurAfter(() => { if (confirm("방을 나가시겠습니까?")) leaveRoom(); });
+$("btnGameLeave").onclick = blurAfter(() => { if (confirm(zombieRandom.forfeitApplies() ? MkForfeit.QUESTION : "방을 나가시겠습니까?")) { zombieRandom.forfeitIfLate(); leaveRoom(); } });
 if (!db) startMsg("온라인 연결 설정을 불러오지 못했습니다. (firebase-config.js·인터넷 연결 확인)");
 })();
 </script>

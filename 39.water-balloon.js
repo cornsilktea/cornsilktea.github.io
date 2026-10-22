@@ -671,14 +671,33 @@ class WbGame {
         const button = WbDom.el("btnGameLeave"), now = performance.now();
         if (this.leaveAskedAt >= 0 && now - this.leaveAskedAt < WbGame.LEAVE_CONFIRM_MS) {
             this.resetLeave();
+            this.forfeitIfLate();
             this.leaveRoom("");
             return;
         }
         this.leaveAskedAt = now;
         button.classList.add("confirm");
-        WbDom.text(button, "한 번 더 누르면 나가요");
+        WbDom.text(button, this.forfeitApplies() ? MkForfeit.TAP_AGAIN : "한 번 더 누르면 나가요");
         window.setTimeout(() => { if (performance.now() - this.leaveAskedAt >= WbGame.LEAVE_CONFIRM_MS - 50)
             this.resetLeave(); }, WbGame.LEAVE_CONFIRM_MS);
+    }
+    matchProgress() {
+        if (!this.view || !this.session || this.session.status !== "playing")
+            return 0;
+        const engine = this.view.driver.engine;
+        const units = engine.mode === "solo" ? engine.players.map((p) => [p]) : engine.teamColors().map((c) => engine.players.filter((p) => p.team === c));
+        const byOut = units.filter((members) => members.every((p) => p.life === "out")).length / Math.max(1, units.length);
+        const byTime = engine.tick / WbBalance.ticks(WbBalance.SUDDEN_START + WbBalance.SUDDEN_SPAN);
+        return MkForfeit.clamp(Math.max(byOut, byTime));
+    }
+    forfeitApplies() {
+        const flow = this.random();
+        return !!flow && flow.forfeitApplies(this.matchProgress());
+    }
+    forfeitIfLate() {
+        const flow = this.random();
+        if (flow)
+            flow.forfeitIfLate(this.matchProgress());
     }
     resetLeave() {
         this.leaveAskedAt = -1;

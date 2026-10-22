@@ -7,7 +7,9 @@ const fs = require("fs"), path = require("path");
 class MatchResultCopies {
   static FILES = ["24.turbo-lap.html", "25.fps-survival.html", "30.team-battle-arena.html", "31.zombie-outbreak.html", "32.minigames.html",
     "34.volleyball.html", "35.soccer.html", "38.snow-royale.html", "39.water-balloon.html"];
-  static HEAD = '<base href="../">\n<script src="tools/fbmock.js"></script>\n<script>firebase.apps = [];</script>\n';
+  // 브라우저 패널이 가려져 있으면 requestAnimationFrame 이 아예 돌지 않아 방장 게임 반복(25·34·35·38·39)이 멈춘다. 시험 사본에서만 타이머로 바꾼다.
+  static FRAME = "<script>window.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 16); window.cancelAnimationFrame = (id) => clearTimeout(id);</script>\n";
+  static HEAD = '<base href="../">\n<script src="tools/fbmock.js"></script>\n<script>firebase.apps = [];</script>\n' + MatchResultCopies.FRAME;
   static TAIL = '<script src="tools/match-result-harness.js"></script>\n</body>';
 
   static build(root) {

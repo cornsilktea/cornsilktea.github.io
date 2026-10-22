@@ -4,7 +4,7 @@
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="teambattle"></script>
 <script charset="utf-8" src="fullscreen-keeper.js"></script>
-<script charset="utf-8" src="match-kit.js?v=20261022v"></script>
+<script charset="utf-8" src="match-kit.js?v=20261022w"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>3v3 팀 배틀 아레나</title>
@@ -9125,6 +9125,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     showParty() { var services = this.services; services.screens.showScreen("party"); services.nick.refreshNick(); }
     showStart(message) { var services = this.services; services.screens.showScreen("start"); services.lobby.startMsg(message); }
     presentIds() { var services = this.services; return services.session.room ? services.session.humans(services.session.players) : []; }
+    progress() { var services = this.services, room = services.session.room;
+      if (!room || room.status !== "playing" || !room.startAt) return 0;
+      return services.overtime.active() ? 1 : MkForfeit.clamp((services.clock.now() - room.startAt) / services.timescale.matchMs);
+    }
+    forfeitApplies() { return !!this.flow && this.flow.forfeitApplies(this.progress()); }
+    forfeitIfLate() { if (this.flow) this.flow.forfeitIfLate(this.progress()); }
     roomChanged() { var services = this.services;
       if (!this.flow || !services.session.room) return;
       var humans = services.session.humans(services.session.players).filter(function (id) { return services.roster.isPlayingTeam(services.session.players[id].team); }).length;
@@ -9294,7 +9300,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     Dom.$("modeBtns").onclick = services.lobby.choiceClick(services.roster.setMode.bind(services.roster));
     Dom.$("mapBtns").onclick = services.lobby.choiceClick(services.roster.setMapChoice.bind(services.roster));
     Dom.$("btnLeaveLobby").onclick = services.session.leaveRoom.bind(services.session);
-    Dom.$("btnLeaveGame").onclick = function () { if (confirm("방을 나갈까요?")) services.session.leaveRoom(); };
+    Dom.$("btnLeaveGame").onclick = function () { if (confirm(services.randomMatch.forfeitApplies() ? MkForfeit.QUESTION : "방을 나갈까요?")) { services.randomMatch.forfeitIfLate(); services.session.leaveRoom(); } };
     Dom.$("btnLeaveEnd").onclick = function () { Dom.setText(Dom.$("btnLeaveEnd"), "방 나가기"); services.session.leaveRoom(); };
     Dom.$("btnCreate").onclick = function () { services.sound.audio(); if (services.nick.askFirst()) services.session.createRoom(); };
     Dom.$("btnJoin").onclick = function () { services.sound.audio(); if (services.nick.askFirst()) services.randomMatch.joinByCode(); };

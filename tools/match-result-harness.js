@@ -27,7 +27,10 @@ class MkCheckDb {
 }
 
 class MkCheckGame {
-  constructor(root, openButton) { this.root = root; this.openButton = openButton; this.startWaitMs = 40000; this.joinAfterStart = false; }
+  constructor(root, openButton) { this.root = root; this.openButton = openButton; this.enterButton = ""; this.startWaitMs = 40000; this.joinAfterStart = false; this.leaveId = "btnGameLeave"; this.doubleTap = false; this.lateTimeoutMs = 30000; }
+  // leaveLate: 경기를 절반 넘게 진행된 상태로 만드는 방 데이터(없으면 null)와, 실제로 그렇게 됐는지 보는 조건.
+  lateUpdate(room) { return null; }
+  lateReady(room, since) { return true; }
   winSide(room, me) { return null; }
   // 판 결과를 방에 쓰는 내용. outcome: "win" | "draw" | "lose"
   endUpdate(room, me, outcome) { throw new Error("endUpdate"); }
@@ -50,6 +53,8 @@ class TurboCheck extends MkCheckGame {
 }
 
 class FpsCheck extends MkCheckGame {
+  constructor(root, openButton) { super(root, openButton); this.lateTimeoutMs = 120000; this.enterButton = "btnTeam"; }
+  lateReady(room) { return room.status === "playing" && Date.now() - room.startAt >= 66000; }
   fakePlayer(room, me, fakeId, nick) {
     const mine = room.players[me];
     return Object.assign({}, mine, { nickname: nick, team: mine.team === "blue" ? "red" : "blue", joinedAt: Date.now() });
@@ -66,13 +71,15 @@ class FpsCheck extends MkCheckGame {
 }
 
 class ArenaCheck extends MkCheckGame {
-  constructor(root, openButton) { super(root, openButton); this.startWaitMs = 300000; this.joinAfterStart = true; }
+  constructor(root, openButton) { super(root, openButton); this.startWaitMs = 300000; this.joinAfterStart = true; this.leaveId = "btnLeaveGame"; }
   fakePlayer(room, me, fakeId, nick) {
     const mine = room.players[me];
     return Object.assign({}, mine, { nickname: nick, team: this.teamOf(room, me) === "blue" ? "red" : "blue", isAI: false, joinedAt: Date.now() });
   }
   teamOf(room, me) { return (room.roster && room.roster[me] && room.roster[me].team) || super.teamOf(room, me); }
   started(room) { return !!room && (room.status === "playing" || room.status === "countdown"); }
+  lateUpdate(room) { return { overtimeAt: Date.now() }; }
+  lateReady(room) { return room.status === "playing"; }
   poke() { const ready = document.getElementById("btnDraftReady"); if (ready && ready.offsetParent !== null && !ready.disabled) ready.click(); }
   endUpdate(room, me, outcome) {
     const mine = this.teamOf(room, me), other = mine === "blue" ? "red" : "blue";
@@ -84,6 +91,8 @@ class ArenaCheck extends MkCheckGame {
 // 31번은 감염되면 좀비 편이다. win = 인간 승리에 나는 생존, zombieWin = 전원 감염(좀비 승리, 나도 감염 → 승),
 // lose = 인간 승리인데 나는 감염(좀비 편이 짐).
 class ZombieCheck extends MkCheckGame {
+  lateUpdate(room) { return { startAt: Date.now() - 108000 }; }
+  lateReady(room) { return room.status === "playing"; }
   fakePlayer(room, me, fakeId, nick) { return Object.assign({}, room.players[me], { nickname: nick, joinedAt: Date.now() }); }
   endUpdate(room, me, outcome) {
     const final = {}, humansWin = outcome !== "zombieWin";
@@ -108,11 +117,15 @@ class CollectionCheck extends MkCheckGame {
 }
 
 class SideCheck extends MkCheckGame {
+  constructor(root, openButton, extra) { super(root, openButton); this.extra = extra || {}; this.lateTimeoutMs = 240000; }
+  lateReady(room) {
+    if (this.root === "volleyball") return !!room.rally && Math.max(room.rally.sa, room.rally.sb) >= 6;
+    return !!room.game && (room.game.overtime || 1 - (room.game.leftMs - (room.game.phase === "play" ? Date.now() - room.game.at : 0)) / 90000 >= 0.55);
+  }
   fakePlayer(room, me, fakeId, nick) {
     const slot = room.assign && room.assign[fakeId];
     return slot === undefined ? null : Object.assign({}, room.players[me], { nick, slot, joinedAt: Date.now() });
   }
-  constructor(root, openButton, extra) { super(root, openButton); this.extra = extra || {}; }
   started(room) { return !!room && room.status && room.status !== "lobby" && room.status !== "end"; }
   endUpdate(room, me, outcome, ticket) {
     const winner = outcome === "win" ? ticket.side : 1 - ticket.side;
@@ -121,7 +134,14 @@ class SideCheck extends MkCheckGame {
 }
 
 class RoyaleCheck extends MkCheckGame {
-  constructor(root, openButton, perPlayer) { super(root, openButton); this.perPlayer = perPlayer; }
+  constructor(root, openButton, perPlayer) { super(root, openButton); this.perPlayer = perPlayer; this.doubleTap = true; this.lateTimeoutMs = 900000; }
+  // 방장이 쓰는 snap 의 게임 안 시간으로 본다(38: 초, 눈보라 완전 수축 360초 / 39: 틱 30/초, 서든데스 끝 179초). 시험 탭 타이머가 느려 실제 시간과 다르다.
+  lateReady(room) {
+    let snap = null;
+    try { snap = JSON.parse(room.snap || "null"); } catch (error) { return false; }
+    if (!snap) return false;
+    return this.root === "snowroyale" ? snap.t >= 0.55 * 360 : snap.t / 30 >= 0.55 * 179;
+  }
   started(room) { return !!room && !!room.match && !!room.match.teams; }
   endUpdate(room, me, outcome) {
     const teams = room.match.teams;
@@ -214,6 +234,7 @@ class MkCheckRunner {
     await this.until(() => { this.game.poke(); return this.game.started(MkCheckDb.at(roomPath)); }, this.game.startWaitMs, "게임 시작");
     await MkCheckRunner.wait(1500);
     if (joins && this.game.joinAfterStart) await joinRival();
+    if (outcome === "leaveLate" || outcome === "leaveEarly") { await this.leaveMidMatch(outcome, index, party, roomPath, before); return; }
     const room = MkCheckDb.at(roomPath);
     const quick = outcome === "winQuick";
     await MkCheckDb.ref(roomPath).update(this.game.endUpdate(room, party.me, joins || quick ? "win" : outcome, ticket));
@@ -243,6 +264,30 @@ class MkCheckRunner {
     const rivals = line.rivals || [], rivalsOk = joins ? rivals.length === 1 && rivals[0] === this.fake.nick : rivals.length === 0;
     this.note({ round: index + 1, case: outcome, want: expect, got: line.result, ok: expect === line.result && rivalsOk && lines - before === 1, added: lines - before, rivals, rivalsOk, rank: line.rank, of: line.of, streak });
   }
+  // 경기 중 나가기 버튼(확인 창은 "예", 두 번 누르는 버튼은 두 번)으로 나간다. leaveLate 는 절반 넘게 진행된 뒤라 패가 남아야 하고,
+  // leaveEarly 는 절반 전이라 아무것도 남지 않아야 한다.
+  async leaveMidMatch(outcome, index, party, roomPath, before) {
+    const late = outcome === "leaveLate", since = Date.now(), asked = [];
+    if (late) {
+      const update = this.game.lateUpdate(MkCheckDb.at(roomPath));
+      if (update) await MkCheckDb.ref(roomPath).update(update);
+      await this.until(() => this.game.lateReady(MkCheckDb.at(roomPath) || {}, since), this.game.lateTimeoutMs, "절반 넘게 진행");
+      await MkCheckRunner.wait(1500);
+    }
+    window.confirm = (message) => { asked.push(message); return true; };
+    const button = await this.until(() => document.getElementById(this.game.leaveId), 5000, "경기 중 나가기 버튼");
+    button.click();
+    if (this.game.doubleTap) { await MkCheckRunner.wait(300); asked.push(button.textContent.trim()); button.click(); }
+    await this.until(() => this.visibleButton(/^매칭 시작$/), 10000, "대기실 복귀");
+    await MkCheckRunner.wait(2500);
+    const h = MkCheckDb.at(this.game.root + "/parties/" + party.code + "/history") || {};
+    const lines = Object.keys(h).map((k) => h[k]).sort((a, b) => a.n - b.n);
+    const added = lines.length - before, last = lines[lines.length - 1];
+    const warned = asked.some((m) => /패배/.test(m));
+    const ok = late ? added === 1 && last.result === "lose" && warned : added === 0 && !warned;
+    const streak = (document.querySelector(".mk-streak") || {}).textContent || "";
+    this.note({ round: index + 1, case: outcome, want: late ? "lose(경고 문구)" : "기록 없음", got: added ? last.result : "기록 없음", ok, added, asked, streak });
+  }
   async run(outcomes) {
     if (typeof window.__fbTree !== "function" || typeof firebase.SDK_VERSION === "string") {
       this.note("중단: 진짜 Firebase 에 연결돼 있어요(가짜 fbmock 이 아님). 실제 DB 에 쓰지 않도록 시작하지 않습니다.");
@@ -251,6 +296,7 @@ class MkCheckRunner {
     }
     try {
       await this.clearStaleQueue();
+      if (this.game.enterButton) { (await this.until(() => document.getElementById(this.game.enterButton), 10000, "모드 버튼")).click(); await MkCheckRunner.wait(800); }
       const open = await this.until(() => document.getElementById(this.game.openButton), 10000, "랜덤 매칭 버튼");
       open.click();
       await this.until(() => this.myParty(), 10000, "대기실");
