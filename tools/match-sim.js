@@ -1,7 +1,7 @@
 const fs = require("fs"), vm = require("vm"), path = require("path");
 
 class MatchKitLoader {
-  static NAMES = ["MkPaths", "MkMatcher", "MkVersusMatcher", "MkFreeForAllMatcher", "MkRecordBook", "MkPartyDirectory", "MkParty", "MkQueue"];
+  static NAMES = ["MkPaths", "MkMatcher", "MkVersusMatcher", "MkFreeForAllMatcher", "MkRecordBook", "MkPartyDirectory", "MkParty", "MkQueue", "MkBusySign"];
   static load() {
     const src = fs.readFileSync(path.join(__dirname, "..", "match-kit.js"), "utf8") + "\n;({" + MatchKitLoader.NAMES.join(",") + "})";
     return vm.runInNewContext(src, { console, Math, Date, JSON, Object, Array, String, Number, Set, Map, Promise, setTimeout, clearTimeout });
@@ -457,11 +457,83 @@ class Scenarios {
     Report.check("팀 수 상한: 6자리라도 3팀까지만", teamPlan && teamPlan.groups.map((g) => g.code).join() === "a,b,c", teamPlan && teamPlan.groups.map((g) => g.code));
     Report.check("기록장: 빈 전적", new Mk.MkRecordBook(null).summary() === "0전 0승 0무 0패" && new Mk.MkRecordBook(null).streak() === 0);
   }
+
+  static unitRotation() {
+    const timing = { settleMs: 40, claimExpireMs: 300, rematchWaitMs: 400, busyMs: 2000, returnGraceMs: 300 };
+    const v = new Mk.MkVersusMatcher(1, timing);
+    const e = (at, extra) => Object.assign({ leader: "x", people: {}, bots: 0, size: 1, at, claim: null }, extra || {});
+    const sign = (until) => ({ leader: "y", people: {}, bots: 0, size: 0, at: 0, claim: null, busyUntil: until });
+    const codes = (plan) => plan ? plan.groups.map((g) => g.code).sort().join() : null;
+    Report.check("재대결 피하기: 바로 전 상대 대신 다른 팀과 묶음", codes(v.plan({ a: e(0, { avoid: ["b"] }), b: e(1, { avoid: ["a"] }), c: e(2) }, 100, () => 0.5)) === "a,c");
+    Report.check("재대결 피하기: 상대 쪽 기록만 있어도 피함", codes(v.plan({ a: e(0), b: e(1, { avoid: ["a"] }), c: e(2) }, 100, () => 0.5)) === "a,c");
+    const rivals = { a: e(0, { avoid: ["b"] }), b: e(1, { avoid: ["a"] }), c: sign(5000) };
+    Report.check("재대결: 경기 중인 팀이 있으면 잠깐 기다림", v.plan(rivals, 100, () => 0.5) === null);
+    Report.check("재대결: 기다릴 시간이 지나면 다시 붙임", codes(v.plan(rivals, 40 + 400 + 1, () => 0.5)) === "a,b");
+    Report.check("재대결: 경기 중인 팀이 없으면 바로 다시 붙임", codes(v.plan({ a: rivals.a, b: rivals.b }, 100, () => 0.5)) === "a,b");
+    Report.check("재대결: 오래된 표지판은 무시", codes(v.plan({ a: rivals.a, b: rivals.b, c: sign(90) }, 100, () => 0.5)) === "a,b");
+    Report.check("표지판은 묶이지 않음", v.plan({ a: e(0), c: sign(5000) }, 100, () => 0.5) === null && v.anchor({ c: sign(5000) }, 100) === null);
+    Report.check("다음 확인 시각: 재대결 대기 끝·표지판 끝", v.nextCheck(rivals, 100) === 40 + 400 + 1 && v.nextCheck({ c: sign(250) }, 100) === 251, [v.nextCheck(rivals, 100), v.nextCheck({ c: sign(250) }, 100)]);
+    const owed = { a: e(0), b: e(1), c: e(5, { owed: true }) };
+    Report.check("AI 차례 돌리기: 지난 판 AI 와 한 팀이 먼저 묶임", v.anchor(owed, 100) === "c" && codes(v.plan(owed, 100, () => 0.5)) === "a,c");
+    Report.check("AI 대체 미루기: 다른 팀이 대기열에 있으면 동행 있음", v.hasCompany(rivals, 100, "a") && !v.hasCompany({ a: rivals.a, c: sign(5000) }, 100, "a"));
+    const owedSign = Object.assign(sign(5000), { owed: true });
+    Report.check("AI 차례 돌리기: AI 판 팀이 곧 오면 남은 두 팀은 잠깐 기다림", v.plan({ a: e(0), b: e(1), c: owedSign }, 100, () => 0.5) === null && codes(v.plan({ a: e(0), b: e(1), c: owedSign }, 40 + 400 + 1, () => 0.5)) === "a,b");
+    Report.check("AI 차례 돌리기: 네 팀이면 먼저 두 팀은 바로 묶음", codes(v.plan({ a: e(0), b: e(1), c: e(2), d: e(3), x: owedSign }, 100, () => 0.5)) === "a,b");
+    Report.check("AI 차례 돌리기: 막 들어온 AI 판 팀도 곧 올 팀으로 셈", v.plan({ a: e(0), b: e(1), c: e(90, { owed: true }) }, 100, () => 0.5) === null);
+  }
+
+  // 1인 팀 3개가 여러 판 계속 매칭할 때: 바로 전 상대와 연달아 붙지 않고, AI 와 하는 판이 한 팀에 연달아 몰리지 않는가.
+  // 게임 흐름(MkRandomFlow)을 줄여 흉내 낸다: 표를 받으면 경기 중 표지판 → 경기 → 결과 → 돌아옴 표지판 → 다시 매칭.
+  static async scenarioRotation(teamCount, rounds) {
+    const timing = { settleMs: 40, claimExpireMs: 300, rematchWaitMs: 450, busyMs: 3000, returnGraceMs: 400 };
+    const world = new SimWorld(new Mk.MkVersusMatcher(1, timing), 3);
+    const teams = [];
+    for (let i = 0; i < teamCount; i++) teams.push(await world.team(1, 1));
+    const codeOfNick = new Map(teams.map((t) => [t.ids[0], t.code]));
+    const FALLBACK = 250, PLAY = 300;
+    const runTeam = async (team) => {
+      const sign = new Mk.MkBusySign(world.server.database(team.ids[0]), SimWorld.clock, world.paths);
+      team.opponents = [];
+      for (let round = 0; round < rounds; round++) {
+        const before = team.leader.tickets.length;
+        await Util.wait(Math.floor(Math.random() * 30));
+        await team.queue.enter(team.leader);
+        const since = Date.now();
+        let triedSolo = false;
+        while (team.leader.tickets.length === before) {
+          await Util.wait(10);
+          const waited = Date.now() - since;
+          if (!triedSolo && waited >= FALLBACK && !(team.queue.hasCompany(team.code) && waited < FALLBACK + timing.rematchWaitMs + 150)) { triedSolo = true; await team.queue.goSolo(team.code); }
+          if (waited > 6000) throw new Error("표를 못 받음 " + team.code);
+        }
+        const ticket = team.leader.tickets[before];
+        team.opponents.push((ticket.rivals || []).length ? codeOfNick.get(ticket.rivals[0]) : "AI");
+        await sign.put(team.leader, timing.busyMs, !(ticket.rivals || []).length);
+        await Util.wait(PLAY);
+        await team.leader.report(ticket, { result: "win" });
+        await sign.put(team.leader, timing.returnGraceMs, !!team.leader.lastMatch().ai);
+      }
+      team.queue.stop();
+    };
+    await Promise.all(teams.map(runTeam));
+    const label = "팀 " + teamCount + "개 " + rounds + "판";
+    const repeats = teams.map((t) => t.opponents.filter((o, i) => i > 0 && o !== "AI" && o === t.opponents[i - 1]).length);
+    const aiTwice = teams.map((t) => t.opponents.filter((o, i) => i > 0 && o === "AI" && t.opponents[i - 1] === "AI").length);
+    console.log("  " + label + ": " + teams.map((t) => t.code.slice(-2) + "[" + t.opponents.map((o) => o === "AI" ? "AI" : o.slice(-2)).join(" ") + "]").join(" "));
+    Report.check(label + ": 바로 전 상대와 연달아 붙지 않음", repeats.every((n) => n === 0), repeats);
+    Report.check(label + ": AI 와 하는 판이 한 팀에 연달아 몰리지 않음", aiTwice.every((n) => n === 0), aiTwice);
+    if (teamCount % 2 === 1) {
+      const aiTeams = teams.filter((t) => t.opponents.indexOf("AI") >= 0).length;
+      Report.check(label + ": AI 와 하는 차례가 여러 팀에 돌아감", aiTeams >= 2, teams.map((t) => t.opponents));
+    }
+    teams.forEach((t) => t.parties.forEach((p) => p.silentClose()));
+  }
 }
 
 class SimRunner {
   static async run() {
     Scenarios.unitMatcher();
+    Scenarios.unitRotation();
     await Scenarios.scenarioJoinRules();
     await Scenarios.scenarioStreak();
     await Scenarios.scenarioRematch();
@@ -478,6 +550,9 @@ class SimRunner {
       await Scenarios.scenarioRandom("섞어서 2대2 #" + round, new Mk.MkVersusMatcher(2, SimWorld.TIMING), 30, 2, { lag: 8, spread: 600, cancelRate: 0.15, killRate: 0.08, settle: 1500, capacity: 4, versus: true });
       await Scenarios.scenarioRandom("섞어서 6인 #" + round, new Mk.MkFreeForAllMatcher(3, 6, SimWorld.TIMING), 30, 3, { lag: 8, spread: 600, cancelRate: 0.15, killRate: 0.08, settle: 1500, capacity: 6, versus: false });
     }
+    await Scenarios.scenarioRotation(3, 6);
+    await Scenarios.scenarioRotation(4, 5);
+    await Scenarios.scenarioRotation(5, 5);
     console.log("통과 " + Report.passed + "개, 실패 " + Report.failures.length + "개");
     Report.failures.forEach((f) => console.log("  ✗ " + f));
     process.exit(Report.failures.length ? 1 : 0);

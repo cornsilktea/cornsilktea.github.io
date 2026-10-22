@@ -50,6 +50,11 @@ interface MkHistoryLine {
   of?: number;
 }
 
+interface MkLastMatch {
+  rivals?: string[];
+  ai?: boolean;
+}
+
 interface MkPartyRecord {
   leaderId: string;
   createdAt: number;
@@ -58,6 +63,7 @@ interface MkPartyRecord {
   search?: MkSearch | null;
   match?: MkTicket | null;
   history?: Record<string, MkHistoryLine>;
+  last?: MkLastMatch | null;
 }
 
 interface MkClaim {
@@ -66,6 +72,8 @@ interface MkClaim {
   id: string;
 }
 
+// size 0 + busyUntil 인 항목은 "경기 중이라 곧 돌아올 팀" 표지판이다(MkBusySign). 묶이지는 않고,
+// 다른 팀이 같은 상대와 또 붙기 전에 잠깐 기다릴지 정하는 데만 쓴다.
 interface MkQueueEntry {
   leader: string;
   people: Record<string, MkMember>;
@@ -73,6 +81,9 @@ interface MkQueueEntry {
   size: number;
   at: number;
   claim?: MkClaim | null;
+  avoid?: string[];
+  owed?: boolean;
+  busyUntil?: number;
 }
 
 type MkQueueMap = Record<string, MkQueueEntry>;
@@ -115,6 +126,15 @@ interface MkJoinOutcome {
 interface MkTiming {
   settleMs: number;
   claimExpireMs: number;
+  rematchWaitMs?: number;
+  busyMs?: number;
+  returnGraceMs?: number;
+}
+
+interface MkPickContext {
+  now: number;
+  othersComing: boolean;
+  owedComing: boolean;
 }
 
 class MkPaths {
@@ -135,24 +155,64 @@ class MkPaths {
 
 // 묶기 규칙의 공통 부분: 누가 준비됐는지, 누가 묶을 차례인지, 다음에 언제 다시 볼지.
 // 어떤 항목을 몇 개 고르고 어느 편에 넣는지는 자식 클래스가 정한다.
+// 시간 값의 이유:
+//  - rematchWaitMs(40초): 방금 붙은 두 팀만 대기열에 있고 다른 팀이 경기 중이면, 그 팀이 돌아올 때까지 이만큼 기다렸다가
+//    그래도 없으면 다시 붙인다. AI 와 한 판 한 팀은 AI 대체(30초)만큼 늦게 끝나므로 그보다 길어야 섞인다.
+//  - busyMs(4분): 경기 중 표지판이 스스로 사라지는 시간(30번 드래프트+경기+결과가 3분 남짓).
+//  - returnGraceMs(25초): 판이 끝나 팀 대기실로 돌아온 팀이 "매칭 시작"을 다시 누를 때까지 기다려 주는 시간.
 abstract class MkMatcher {
-  static readonly TIMING: MkTiming = { settleMs: 3000, claimExpireMs: 10000 };
+  static readonly TIMING: MkTiming = { settleMs: 3000, claimExpireMs: 10000, rematchWaitMs: 40000, busyMs: 240000, returnGraceMs: 25000 };
 
   constructor(readonly partyLimit: number, protected readonly timing: MkTiming = MkMatcher.TIMING) {}
 
-  protected abstract pick(ready: Array<[string, MkQueueEntry]>): Array<[string, MkQueueEntry]> | null;
+  protected abstract pick(ready: Array<[string, MkQueueEntry]>, context: MkPickContext): Array<[string, MkQueueEntry]> | null;
 
   protected abstract sides(count: number, random: () => number): number[];
+
+  get rematchWaitMs(): number {
+    return this.timing.rematchWaitMs ?? (MkMatcher.TIMING.rematchWaitMs as number);
+  }
+
+  get busyMs(): number {
+    return this.timing.busyMs ?? (MkMatcher.TIMING.busyMs as number);
+  }
+
+  get returnGraceMs(): number {
+    return this.timing.returnGraceMs ?? (MkMatcher.TIMING.returnGraceMs as number);
+  }
+
+  static metRecently(a: [string, MkQueueEntry], b: [string, MkQueueEntry]): boolean {
+    return (a[1].avoid || []).indexOf(b[0]) >= 0 || (b[1].avoid || []).indexOf(a[0]) >= 0;
+  }
+
+  static isSign(entry: MkQueueEntry): boolean {
+    return !!entry && !(entry.size > 0) && !!entry.busyUntil;
+  }
 
   anchor(entries: MkQueueMap | null, now: number): string | null {
     const ready = this.ready(entries, now);
     return ready.length ? ready[0][0] : null;
   }
 
+  // 나 말고 지금 묶일 수 있는 팀이 대기열에 있는지. 있으면 AI 대체를 미룬다(사람끼리 붙는 게 먼저).
+  hasCompany(entries: MkQueueMap | null, now: number, myCode: string): boolean {
+    return this.ready(entries, now).some(([code]) => code !== myCode);
+  }
+
+  // 곧 묶일 수 있게 될 팀: 경기 중 표지판, 또는 막 들어와 아직 준비(settleMs) 중인 팀. onlyOwed 면 AI 와 한 판 한 팀만 센다.
+  othersComing(entries: MkQueueMap | null, now: number, onlyOwed: boolean): boolean {
+    return Object.keys(entries || {}).some((code) => {
+      const entry = (entries as MkQueueMap)[code];
+      if (!entry || (onlyOwed && !entry.owed)) return false;
+      if (MkMatcher.isSign(entry)) return (entry.busyUntil as number) > now;
+      return entry.size > 0 && entry.at + this.timing.settleMs > now;
+    });
+  }
+
   plan(entries: MkQueueMap | null, now: number, random: () => number): MkMatchPlan | null {
     const ready = this.ready(entries, now);
     if (!ready.length) return null;
-    const picked = this.pick(ready);
+    const picked = this.pick(ready, { now, othersComing: this.othersComing(entries, now, false), owedComing: this.othersComing(entries, now, true) });
     if (!picked || picked[0][0] !== ready[0][0]) return null;
     const sides = this.sides(picked.length, random);
     return {
@@ -171,7 +231,8 @@ abstract class MkMatcher {
     let next: number | null = null;
     Object.keys(entries || {}).forEach((code) => {
       const entry = (entries as MkQueueMap)[code];
-      const moments = [entry.at + this.timing.settleMs];
+      if (!entry) return;
+      const moments = MkMatcher.isSign(entry) ? [(entry.busyUntil as number) + 1] : [entry.at + this.timing.settleMs, entry.at + this.timing.settleMs + this.rematchWaitMs + 1];
       if (entry.claim) moments.push(entry.claim.at + this.timing.claimExpireMs + 1);
       moments.forEach((moment) => {
         if (moment > now && (next === null || moment < next)) next = moment;
@@ -180,20 +241,31 @@ abstract class MkMatcher {
     return next;
   }
 
+  // 지난 판을 AI 와 한 팀(owed)이 맨 앞 — 팀 수가 홀수일 때 AI 와 하는 차례가 한 팀에 몰리지 않고 돌아가게.
+  // 나머지는 먼저 온 순서.
   private ready(entries: MkQueueMap | null, now: number): Array<[string, MkQueueEntry]> {
     return Object.keys(entries || {})
       .map((code) => [code, (entries as MkQueueMap)[code]] as [string, MkQueueEntry])
       .filter(([, entry]) => entry && entry.size > 0 && entry.at + this.timing.settleMs <= now && this.isFree(entry, now))
-      .sort((a, b) => a[1].at - b[1].at || (a[0] < b[0] ? -1 : 1));
+      .sort((a, b) => (a[1].owed ? 0 : 1) - (b[1].owed ? 0 : 1) || a[1].at - b[1].at || (a[0] < b[0] ? -1 : 1));
   }
 }
 
-// 두 편이 맞붙는 게임(24·25·30·34·35): 가장 먼저 온 팀과 그다음 준비된 팀을 묶고 편은 무작위.
+// 두 편이 맞붙는 게임(24·25·30·34·35): 맨 앞 팀과 그다음 준비된 팀을 묶고 편은 무작위.
+// 바로 전 판 상대(avoid)는 건너뛰고, 그 상대밖에 없으면 경기 중인 다른 팀(표지판)이 있을 때만 rematchWaitMs 까지 기다린다.
+// AI 와 한 판 한 팀이 곧 돌아오는데 남은 팀이 딱 둘이면, 둘을 묶지 않고 잠깐 기다린다 — 그래야 그 팀이 또 혼자 남아
+// AI 를 연달아 만나지 않고, 대신 남은 둘 중 한 팀이 다음 AI 차례가 된다(팀 수가 홀수일 때 AI 차례 돌리기).
 class MkVersusMatcher extends MkMatcher {
-  protected pick(ready: Array<[string, MkQueueEntry]>): Array<[string, MkQueueEntry]> | null {
+  protected pick(ready: Array<[string, MkQueueEntry]>, context: MkPickContext): Array<[string, MkQueueEntry]> | null {
     const fitting = ready.filter(([, entry]) => entry.size <= this.partyLimit);
     if (fitting.length < 2 || fitting[0] !== ready[0]) return null;
-    return [fitting[0], fitting[1]];
+    const first = fitting[0];
+    const holding = context.now - (first[1].at + this.timing.settleMs) < this.rematchWaitMs;
+    if (holding && fitting.length === 2 && context.owedComing && !first[1].owed) return null;
+    const fresh = fitting.slice(1).find((other) => !MkMatcher.metRecently(first, other));
+    if (fresh) return [first, fresh];
+    if (holding && context.othersComing) return null;
+    return [first, fitting[1]];
   }
 
   protected sides(count: number, random: () => number): number[] {
@@ -208,7 +280,7 @@ class MkFreeForAllMatcher extends MkMatcher {
     super(partyLimit, timing);
   }
 
-  protected pick(ready: Array<[string, MkQueueEntry]>): Array<[string, MkQueueEntry]> | null {
+  protected pick(ready: Array<[string, MkQueueEntry]>, _context: MkPickContext): Array<[string, MkQueueEntry]> | null {
     const picked: Array<[string, MkQueueEntry]> = [];
     let people = 0;
     ready.forEach((item) => {
@@ -408,6 +480,10 @@ class MkParty {
     return new MkRecordBook(this.record && this.record.history);
   }
 
+  lastMatch(): MkLastMatch {
+    return (this.record && this.record.last) || {};
+  }
+
   setBots(count: number): void {
     if (!this.isLeader() || this.searching()) return;
     const allowed = Math.max(0, Math.min(count, this.limit - this.members().length));
@@ -455,7 +531,6 @@ class MkParty {
     this.stopListening();
     try { this.ref.child("members/" + this.myId).onDisconnect().cancel(); } catch (error) { /* 이미 끊긴 연결 */ }
     const wasLeader = this.isLeader();
-    const searching = !!this.searching();
     await this.ref.transaction((current) => {
       const record = current as MkPartyRecord | null;
       if (!record || !record.members || !record.members[this.myId]) return record === null ? null : undefined;
@@ -467,7 +542,7 @@ class MkParty {
       }
       return record;
     });
-    if (wasLeader && searching) await this.database.ref(this.paths.entry(this.code)).remove();
+    if (wasLeader) await this.database.ref(this.paths.entry(this.code)).remove();
   }
 
   silentClose(): void {
@@ -596,7 +671,10 @@ class MkQueue {
     this.since = since;
     const people: Record<string, MkMember> = {};
     party.members().forEach(([id, member]) => { people[id] = { nick: member.nick, joinedAt: member.joinedAt, look: member.look || null }; });
+    const last = party.lastMatch();
     const entry: MkQueueEntry = { leader: party.myId, people, bots: party.bots(), size: party.size(), at: since, claim: null };
+    if (last.rivals && last.rivals.length) entry.avoid = last.rivals.slice();
+    if (last.ai) entry.owed = true;
     const ref = this.database.ref(this.paths.entry(party.code));
     ref.onDisconnect().remove();
     await ref.set(entry);
@@ -630,6 +708,10 @@ class MkQueue {
     try { ref.onDisconnect().cancel(); } catch (error) { /* 이미 끊긴 연결 */ }
     if (removed) await party.markSearching(null);
     return removed;
+  }
+
+  hasCompany(myCode: string): boolean {
+    return this.matcher.hasCompany(this.entries, this.clock.now(), myCode);
   }
 
   stop(): void {
@@ -796,6 +878,7 @@ class MkQueue {
       if (made.map) ticket.map = made.map;
       updates[this.paths.party(group.code) + "/match"] = ticket;
       updates[this.paths.party(group.code) + "/search"] = null;
+      updates[this.paths.party(group.code) + "/last"] = { rivals: plan.groups.filter((other) => other !== group).map((other) => other.code), ai: plan.groups.length === 1 };
     });
     // 실제 Firebase 는 ref("") 를 잘못된 경로로 거절한다. 루트는 "/" 로 연다.
     try {
@@ -819,6 +902,30 @@ class MkQueue {
       });
       return entries;
     });
+  }
+}
+
+// 경기 중인 팀이 대기열 자기 자리에 세워 두는 표지판(size 0, busyUntil). 다른 팀이 "방금 붙은 상대와 또 붙을지,
+// 곧 돌아올 팀을 잠깐 기다릴지" 판단하는 데 쓴다. 팀장 기기만 세우고, 끊기면 onDisconnect 로 사라지며,
+// 시간이 지나면 스스로 무시된다. 진짜 대기 항목(매칭 시작)이 이미 있으면 덮어쓰지 않는다.
+class MkBusySign {
+  constructor(private readonly database: FirebaseDatabase, private readonly clock: MkClock, private readonly paths: MkPaths) {}
+
+  // owed: AI 와 하는 판이면 true. 돌아오는 이 팀이 또 혼자 남지 않게 다른 팀이 잠깐 기다려 준다.
+  async put(party: MkParty, forMs: number, owed: boolean): Promise<void> {
+    if (!party.isLeader()) return;
+    const ref = this.database.ref(this.paths.entry(party.code));
+    const now = this.clock.now();
+    const sign: MkQueueEntry = { leader: party.myId, people: {}, bots: 0, size: 0, at: now, claim: null, busyUntil: now + forMs };
+    if (owed) sign.owed = true;
+    try {
+      ref.onDisconnect().remove();
+      await ref.transaction((current) => {
+        const entry = current as MkQueueEntry | null;
+        if (entry && entry.size > 0) return undefined;
+        return sign;
+      });
+    } catch (error) { /* 표지판은 없어도 매칭은 된다 */ }
   }
 }
 
@@ -921,7 +1028,8 @@ class MkPartyPanel {
     this.matchButton.disabled = busy;
   }
 
-  render(party: MkParty): void {
+  // waitingForOthers: 대기열에 상대가 있는데 바로 전 판 상대라, 경기 중인 다른 팀이 돌아오길 잠깐 기다리는 중.
+  render(party: MkParty, waitingForOthers: boolean = false): void {
     const leader = party.isLeader();
     const searching = !!party.searching();
     const book = party.book();
@@ -953,7 +1061,8 @@ class MkPartyPanel {
     this.matchButton.disabled = !leader;
     const streakNote = book.streak() > 0 ? " · 지금 " + book.streak() + "연승 중" : "";
     const fallback = this.options.aiFallbackMs ? Math.ceil(this.options.aiFallbackMs / 1000) - party.searchSeconds() : 0;
-    const fallbackNote = !this.options.aiFallbackMs ? "" : fallback > 0 ? " · " + fallback + "초 뒤 AI와 시작해요" : " · AI와 시작하는 중…";
+    const fallbackNote = waitingForOthers ? " · 다른 팀 경기가 끝나길 기다리는 중(같은 상대와 연달아 만나지 않게)"
+      : !this.options.aiFallbackMs ? "" : fallback > 0 ? " · " + fallback + "초 뒤 AI와 시작해요" : " · AI와 시작하는 중…";
     this.hint.textContent = searching
       ? "상대를 찾는 중… " + party.searchSeconds() + "초" + fallbackNote + streakNote
       : (leader ? this.options.intro : "팀장이 매칭을 시작하길 기다리는 중이에요…") + streakNote;
@@ -984,9 +1093,12 @@ class MkPartyPanel {
 
 class MkRandomFlow {
   private static readonly START_WAIT_MS = 15000;
+  // 사람 상대가 대기열에 있어 AI 대체를 미뤄도, 묶는 팀장 기기가 잠들어 묶지 못할 수 있으니 이만큼 더 지나면 AI 와 시작한다.
+  private static readonly COMPANY_GRACE_MS = 15000;
 
   readonly paths: MkPaths;
   private readonly directory: MkPartyDirectory;
+  private readonly sign: MkBusySign;
   private party: MkParty | null = null;
   private queue: MkQueue | null = null;
   private current: MkTicket | null = null;
@@ -1007,6 +1119,7 @@ class MkRandomFlow {
   ) {
     this.paths = MkPaths.forGame(options.gameRoot, options.queue);
     this.directory = new MkPartyDirectory(database, clock, this.paths, options.partyLimit);
+    this.sign = new MkBusySign(database, clock, this.paths);
     panel.onMatch = () => this.toggleSearch();
     panel.onLeave = () => this.leaveParty();
     panel.onAddBot = () => { if (this.party) this.party.setBots(this.party.bots() + 1); };
@@ -1053,7 +1166,7 @@ class MkRandomFlow {
   }
 
   render(): void {
-    if (this.party) this.panel.render(this.party);
+    if (this.party) this.panel.render(this.party, !!this.queue && !!this.party.searching() && this.queue.hasCompany(this.party.code));
   }
 
   setNotice(text: string): void {
@@ -1086,6 +1199,7 @@ class MkRandomFlow {
     this.onResult = () => undefined;
     this.hooks.leaveRoom();
     if (this.party) {
+      if (!this.party.searching()) this.sign.put(this.party, this.options.matcher.returnGraceMs, !!this.party.lastMatch().ai);
       this.hooks.showParty();
       this.panel.setNotice(note);
       this.render();
@@ -1134,6 +1248,7 @@ class MkRandomFlow {
     this.hooks.leaveRoom();
     this.current = ticket;
     this.reported = false;
+    if (this.party) this.sign.put(this.party, this.options.matcher.busyMs, !(ticket.rivals || []).length);
     const hosting = ticket.host === this.myId;
     const entered = await this.hooks.enterRoom(ticket, hosting).catch(() => false);
     if (!entered) {
@@ -1173,7 +1288,9 @@ class MkRandomFlow {
     const party = this.party, wait = this.options.aiFallbackMs;
     const search = party ? party.searching() : null;
     if (!wait || !party || !search || !party.isLeader() || !this.queue || this.fallbackFor === search.since) return;
-    if (this.clock.now() - search.since < wait) return;
+    const waited = this.clock.now() - search.since;
+    if (waited < wait) return;
+    if (this.queue.hasCompany(party.code) && waited < wait + this.options.matcher.rematchWaitMs + MkRandomFlow.COMPANY_GRACE_MS) return;
     this.fallbackFor = search.since;
     this.queue.goSolo(party.code);
   }
