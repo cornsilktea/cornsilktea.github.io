@@ -176,10 +176,13 @@ class MkRecordBook {
     count(result) {
         return this.lines.filter((line) => line.result === result).length;
     }
+    // 무승부는 연승을 끊지도 늘리지도 않는다(2026-10-22 선생님 요청). 패배를 만나면 거기서 멈춘다.
     streak() {
         let wins = 0;
-        for (let index = this.lines.length - 1; index >= 0 && this.lines[index].result === "win"; index--)
-            wins++;
+        for (let index = this.lines.length - 1; index >= 0 && this.lines[index].result !== "lose"; index--) {
+            if (this.lines[index].result === "win")
+                wins++;
+        }
         return wins;
     }
     summary() {
