@@ -205,6 +205,11 @@
 .mk-time{font-variant-numeric:tabular-nums;color:var(--st-ink-soft,#A3B0A6);}
 /* 랜덤 매칭 팀 대기실(MkPartyPanel). 게임 방 대기실처럼 보이게 하되 "우리 팀" 칸 하나만 둔다. */
 .mk-head{display:flex;flex-wrap:wrap;align-items:center;gap:10px;}
+/* 팀 코드 줄 + 게임의 닉네임 줄(headExtra): 자리가 되면 한 줄, 모자라면 팀 코드가 위인 두 줄 */
+.mk-top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 18px;margin-bottom:4px;}
+.mk-top>.mk-head{margin:0 !important;flex-wrap:nowrap;white-space:nowrap;}
+.mk-top>.hello{margin:0 !important;justify-content:flex-start;flex-wrap:nowrap;white-space:nowrap;}
+.mk-hint:empty{display:none;}
 .mk-code{font-size:34px;font-weight:800;letter-spacing:.18em;color:#FFB08C;font-variant-numeric:tabular-nums;}
 .mk-team{margin-top:10px;padding:10px;border-radius:8px;background:rgba(255,255,255,.05);border:2px solid var(--st-accent,#D97B4F);}
 .mk-team h3{margin:0 0 8px;font-size:16px;font-weight:800;color:var(--st-title,#F4F1E8);text-align:center;}

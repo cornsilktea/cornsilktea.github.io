@@ -967,6 +967,8 @@ interface MkFlowOptions {
   allowBots?: boolean;
   startWaitMs?: number;
   aiFallbackMs?: number;
+  // 게임 쪽 "내 닉네임 · 닉네임 설정" 줄. 주면 팀 코드 줄 오른쪽으로 옮겨 자리가 되면 한 줄, 모자라면 팀 코드 아래 둘째 줄이 된다.
+  headExtra?: HTMLElement | null;
 }
 
 interface MkPartyLookup {
@@ -1038,10 +1040,14 @@ class MkPartyPanel {
     this.hint.className = "st-hint mk-hint";
     const leave = MkPartyPanel.button("st-btn mk-leave", options.solo ? "나가기" : "팀 나가기", () => this.onLeave());
     mount.textContent = "";
+    const top = document.createElement("div");
+    top.className = "mk-top";
+    top.append(this.head);
+    if (options.headExtra) top.append(options.headExtra);
     const buttons = document.createElement("div");
     buttons.className = "st-row mk-buttons";
     buttons.append(this.aiNowButton, this.matchButton);
-    mount.append(this.head, this.seats, this.notice, this.crowd, buttons, this.hint, leave);
+    mount.append(top, this.seats, this.notice, this.crowd, buttons, this.hint, leave);
   }
 
   setNotice(text: string): void {
@@ -1079,8 +1085,8 @@ class MkPartyPanel {
       }
     }
     for (let count = party.members().length + (this.options.allowBots ? party.bots() : 0); count < this.options.partyLimit; count++) {
-      if (this.options.allowBots && editable) this.seats.appendChild(MkPartyPanel.seat("button", "mk-seat empty", "🤖 AI 추가", "빈 자리 · 친구는 팀 코드로 들어와요", "empty"));
-      else this.seats.appendChild(MkPartyPanel.seat("div", "mk-seat empty", "빈 자리", this.options.allowBots ? "친구는 팀 코드로 들어와요" : "친구는 팀 코드로 들어와요 · 비면 AI가 채워요", ""));
+      if (this.options.allowBots && editable) this.seats.appendChild(MkPartyPanel.seat("button", "mk-seat empty", "🤖 AI 추가", "", "empty"));
+      else this.seats.appendChild(MkPartyPanel.seat("div", "mk-seat empty", "빈 자리", "", ""));
     }
     this.matchButton.textContent = searching ? "매칭 취소" : "매칭 시작";
     this.matchButton.classList.toggle("primary", !searching);
@@ -1095,9 +1101,8 @@ class MkPartyPanel {
     const fallback = this.options.aiFallbackMs ? Math.ceil(this.options.aiFallbackMs / 1000) - party.searchSeconds() : 0;
     const fallbackNote = waitingForOthers ? " · 다른 팀 경기가 끝나길 기다리는 중(같은 상대와 연달아 만나지 않게)"
       : !this.options.aiFallbackMs ? "" : fallback > 0 ? " · " + fallback + "초 뒤 AI와 시작해요" : " · AI와 시작하는 중…";
-    this.hint.textContent = searching
-      ? "상대를 찾는 중… " + party.searchSeconds() + "초" + fallbackNote + streakNote
-      : (leader ? this.options.intro : "팀장이 매칭을 시작하길 기다리는 중이에요…") + streakNote;
+    const hint = searching ? "상대를 찾는 중… " + party.searchSeconds() + "초" + fallbackNote + streakNote : leader ? "" : "팀장이 매칭을 시작하길 기다리는 중이에요…";
+    if (this.hint.textContent !== hint) this.hint.textContent = hint;
   }
 
   private static button(className: string, text: string, onClick: () => void): HTMLButtonElement {

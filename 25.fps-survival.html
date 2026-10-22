@@ -466,7 +466,7 @@
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="character-maker.js?v=20261012"></script>
-<script charset="utf-8" src="match-kit.js?v=20261022p"></script>
+<script charset="utf-8" src="match-kit.js?v=20261022q"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
@@ -2618,7 +2618,7 @@ class FpsRandomMatch {
     if (this.flow) return this.flow;
     const db = await connectDb();
     if (this.flow) return this.flow;
-    const options = { gameRoot: "fpsbattle", queue: "fpsbattle", partyLimit: FpsRandomMatch.PARTY_LIMIT, matcher: new MkVersusMatcher(FpsRandomMatch.PARTY_LIMIT),
+    const options = { gameRoot: "fpsbattle", queue: "fpsbattle", partyLimit: FpsRandomMatch.PARTY_LIMIT, matcher: new MkVersusMatcher(FpsRandomMatch.PARTY_LIMIT), headExtra: $("partyNick").parentNode,
       intro: "매칭 시작을 누르면 아무 팀과 최대 2대2로 만나요. 빈자리는 AI가 채워요." };
     const panel = new MkPartyPanel($("overlay"), $("partyMount"), options);
     this.flow = new MkRandomFlow(db, { now: tnow }, T.myId, options, this, panel);
