@@ -25,7 +25,7 @@
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
 } }
 </script>
-<link rel="stylesheet" href="30.team-battle-arena.css?v=20261022b">
+<link rel="stylesheet" href="30.team-battle-arena.css?v=20261022c">
 </head>
 <body>
 <canvas id="cv"></canvas>
@@ -184,7 +184,6 @@
     <div class="endBox">
       <div id="endTitle"></div>
       <div id="endReason" hidden></div>
-      <div id="endTiebreak" class="endTiebreak" hidden></div>
       <div id="endStats" hidden></div>
       <div id="endStreak" class="mk-notice"></div>
       <div class="scoreRow"><div class="sb">블루팀<b id="endBlue">0</b></div><div class="sr">레드팀<b id="endRed">0</b></div></div>
@@ -203,7 +202,7 @@
     <ul class="statsNotes">
       <li>AI 없이 학생 6명이 3대3으로 끝까지 마친 대회모드 경기만 집계합니다.</li>
       <li>밸런스 패치마다 통계를 따로 모읍니다. 오른쪽 위 패치 버튼으로 이전 패치의 통계도 볼 수 있습니다.</li>
-      <li>시간이 끝났을 때 킬 수가 같으면 첫 킬을 먼저 기록한 팀이 이깁니다. 이 규칙이 생기기 전(2026-10-22)의 무승부 경기는 승리로 세지 않습니다.</li>
+      <li>시간이 끝났을 때 킬 수가 같으면 무승부이고, 무승부는 승리로 세지 않습니다.</li>
       <li>한 경기에서 같은 캐릭터는 1명만 고를 수 있으므로 밴픽률은 그 캐릭터가 밴되거나 나온 판의 비율입니다.</li>
       <li>막은 피해·기절·둔화·킬·데스·어시스트·밴은 이 항목이 추가된 뒤의 경기만으로 셉니다.</li>
       <li>어시스트: 내가 피해나 해로운 효과(기절·둔화·넉백·끌어당김)를 준 적이 5초 안에 쓰러지거나, 내가 회복·은신(눈보라)을 준 아군이 5초 안에 적을 처치하면 1회(처치한 사람은 제외, 한 처치에 1번만).</li>
@@ -272,7 +271,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     charTypes;
     flow;
     killfeed;
-    tiebreak;
     targets;
     minions;
     vision;
@@ -3524,16 +3522,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var s = services.flow.teamTotals();
       var quitTeam = services.flow.teamAllQuit();
       if (!quitTeam && t < services.session.room.startAt + services.timescale.matchMs) return;
-      var tie = !quitTeam && s.blueKills === s.redKills && services.tiebreak.applies(services.session.room.mode) ? services.tiebreak.decide(s) : null;
       var winner = quitTeam ? (quitTeam === "blue" ? "red" : "blue")
-        : (tie ? tie.winner : (s.blueKills > s.redKills ? "blue" : (s.redKills > s.blueKills ? "red" : "draw")));
+        : (s.blueKills > s.redKills ? "blue" : (s.redKills > s.blueKills ? "red" : "draw"));
       services.match.game.endSent = true;
       services.netstate.netWrite(true);
       var recordsStats = services.stats.recordsMode(services.session.room.mode);
       var skipReason = quitTeam ? "상대팀이 모두 나가서 통계에서 제외됐어요" : services.stats.skipReason(services.session.room.mode, services.session.room.roster, services.session.players);
       var ended = { status: "ended", winner: winner, endedAt: t,
-        final: { blue: s.blueKills, red: s.redKills, reason: quitTeam ? "상대팀이 모두 나가서 승리" : (tie ? services.tiebreak.reasonOf(tie.by) : "시간 종료 — 킬 스코어로 판정") } };
-      if (tie) ended.final.tiebreak = tie.by;
+        final: { blue: s.blueKills, red: s.redKills, reason: quitTeam ? "상대팀이 모두 나가서 승리" : "시간 종료 — 킬 스코어로 판정" } };
       if (recordsStats) ended.statsNote = skipReason || MatchStats.PENDING;
       services.session.room.ref.update(ended);
       if (!skipReason) services.stats.watchDone(t);
@@ -3572,58 +3568,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     againOrBackToLobby() { var services = this.services; Dom.show(Dom.$("scoreHelpModal"), false); if (services.flow.specHeld) services.flow.releaseSpecResult(); else services.flow.restart(); }
   }
-  class CupTiebreak {
-    constructor(services) { this.services = services; }
-    static FIRST_KILL = "firstKill";
-    static DAMAGE = "damage";
-    static COIN = "coin";
-    static MARKS = { firstKill: "⚡ 첫 킬", damage: "💥 피해량", coin: "🎲 추첨" };
-    applies(mode) { return mode === "cup"; }
-    noteKill(k) { var services = this.services, game = services.match.game;
-      if (!game || !(k.t >= game.startAt)) return;
-      var victim = services.session.players[k.v] || ((services.session.room && services.session.room.roster) || {})[k.v];
-      var team = victim && victim.team === "blue" ? "red" : (victim && victim.team === "red" ? "blue" : null);
-      if (team && (!game.firstKill || k.t < game.firstKill.t)) game.firstKill = { t: k.t, team: team };
-    }
-    firstKillTeam() { var game = this.services.match.game; return game && game.firstKill ? game.firstKill.team : null; }
-    decide(s) {
-      var first = this.firstKillTeam();
-      if (first) return { winner: first, by: CupTiebreak.FIRST_KILL };
-      if (s.blue !== s.red) return { winner: s.blue > s.red ? "blue" : "red", by: CupTiebreak.DAMAGE };
-      return { winner: Math.random() < 0.5 ? "blue" : "red", by: CupTiebreak.COIN };
-    }
-    reasonOf(by) {
-      if (by === CupTiebreak.FIRST_KILL) return "킬 동점 — 첫 킬을 먼저 기록한 팀 승리";
-      if (by === CupTiebreak.DAMAGE) return "킬 동점·첫 킬 없음 — 피해량이 많은 팀 승리";
-      return "킬·피해량 모두 동점 — 추첨으로 승리";
-    }
-    explainHtml(by, winner, final) {
-      var team = '<b class="' + (winner === "blue" ? "b" : "r") + '">' + (winner === "blue" ? "블루팀" : "레드팀") + "</b>";
-      var score = "킬 <b>" + (+final.blue || 0) + " : " + (+final.red || 0) + "</b> 동점";
-      var how = by === CupTiebreak.FIRST_KILL ? team + "이 첫 킬을 먼저 기록했어요"
-        : (by === CupTiebreak.DAMAGE ? "첫 킬이 없어 피해를 더 많이 준 " + team + "이 이겼어요" : "피해량까지 같아 추첨으로 " + team + "이 이겼어요");
-      return '<span class="tbTag">동점 판정</span><span class="tbText">' + score + " · " + how + "</span>";
-    }
-    paintHud() { var services = this.services;
-      var team = services.session.room && this.applies(services.session.room.mode) ? this.firstKillTeam() : null;
-      [["hudKillB", "blue"], ["hudKillR", "red"]].forEach(function (pair) {
-        var side = Dom.$(pair[0]).parentNode, on = team === pair[1];
-        if (side.classList.contains("fk") === on) return;
-        side.classList.toggle("fk", on);
-        if (on) side.setAttribute("data-mark", CupTiebreak.MARKS[CupTiebreak.FIRST_KILL]); else side.removeAttribute("data-mark");
-      });
-    }
-    paintEnd(winner, final) {
-      var by = final && final.tiebreak, box = Dom.$("endTiebreak");
-      Dom.show(box, !!by);
-      [["endBlue", "blue"], ["endRed", "red"]].forEach(function (pair) {
-        var cell = Dom.$(pair[0]).parentNode, marked = !!by && winner === pair[1];
-        cell.classList.toggle("tbWin", marked);
-        if (marked) cell.setAttribute("data-mark", CupTiebreak.MARKS[by] || ""); else cell.removeAttribute("data-mark");
-      });
-      if (by) Dom.setHtml(box, this.explainHtml(by, winner, final));
-    }
-  }
   class KillFeed {
     constructor(services) { this.services = services; }
     static KILL_FEED_MS = 4000;
@@ -3649,7 +3593,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     onKillFeed(s) { var services = this.services;
       var k = s.val(); if (!k || !services.match.game || services.match.handled[s.key]) return;
       services.match.handled[s.key] = 1;
-      services.tiebreak.noteKill(k);
       services.damage.creditHelpAssists(k);
       var streak = services.killfeed.multiKillCount(services.match.game.killChains || (services.match.game.killChains = {}), k);
       if (!(k.t > services.clock.now() - KillFeed.KILL_FEED_MS)) return;
@@ -8633,7 +8576,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       Dom.show(Dom.$("btnLeaveGame"), !practice);
       var s = services.flow.teamTotals();
       Dom.setHtml(Dom.$("hudCount"), '<span class="b">🔵 ' + s.blueAlive + '</span> vs <span class="r">🔴 ' + s.redAlive + "</span>");
-      Dom.setText(Dom.$("hudKillB"), String(s.blueKills)); Dom.setText(Dom.$("hudKillR"), String(s.redKills)); services.tiebreak.paintHud();
+      Dom.setText(Dom.$("hudKillB"), String(s.blueKills)); Dom.setText(Dom.$("hudKillR"), String(s.redKills));
       var spec = !services.match.me;
       Dom.show(Dom.$("hudTop"), !spec); Dom.show(Dom.$("hudMe"), !spec); Dom.$("killFeed").classList.toggle("spec", spec);
       if (!spec) services.hud.updateMyHud(); Dom.show(Dom.$("specL"), spec); Dom.show(Dom.$("specR"), spec); Dom.show(Dom.$("specCode"), spec);
@@ -8686,7 +8629,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         Dom.$("btnLeaveEnd").disabled = holdForStats;
         Dom.setText(Dom.$("endBlue"), String(f.blue != null ? f.blue : s.blueKills));
         Dom.setText(Dom.$("endRed"), String(f.red != null ? f.red : s.redKills));
-        services.tiebreak.paintEnd(w, f);
         Dom.setHtml(Dom.$("boardBody"), services.resultBoard.boardRows());
         Dom.setHtml(Dom.$("endMvp"), services.resultBoard.mvpHtml());
       } else { Dom.show(Dom.$("endOv"), false); Dom.show(Dom.$("scoreHelpModal"), false); }
@@ -9044,7 +8986,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       renderLobby: services.lobby.renderLobby.bind(services.lobby), flashHint: services.lobby.flashHint.bind(services.lobby), clearHint: function () { services.lobby.hintUntil = 0; services.lobby.hintText = ""; }, practiceMode: services.session.practiceMode.bind(services.session), TEAM_MAX: MatchRules.TEAM_MAX, SPEC_MAX: MatchRules.SPEC_MAX, FALLBACK_CHAR: services.charTypes.fallbackId, MODES: GameModes.LIST,
       tileX: services.arenaMap.tileX.bind(services.arenaMap), tileY: services.arenaMap.tileY.bind(services.arenaMap), fullMap: services.arenaMap.fullMap.bind(services.arenaMap), mapRows: function () { return services.arenaMap.rows; }, bushIds: function () { return services.arenaMap.bushId; }, bridges: function () { return services.arenaMap.bridges; }, MW: ArenaSize.MW, MH: ArenaSize.MH, TILE: ArenaSize.TILE, SPAWN_X: ArenaMap.SPAWN_X,
       packState: services.netstate.packState.bind(services.netstate), stateOf: services.netstate.stateOf.bind(services.netstate), packMinions: services.netstate.packMinions.bind(services.netstate), unpackMinions: services.netstate.unpackMinions.bind(services.netstate), relTime: services.netstate.relTime.bind(services.netstate), absTime: services.netstate.absTime.bind(services.netstate), angDeg: services.netstate.angDeg.bind(services.netstate), netWrite: services.netstate.netWrite.bind(services.netstate), NET_MS: NetState.NET_MS, STATE_TIMES: NetState.STATE_TIMES,
-      teamTotals: services.flow.teamTotals.bind(services.flow), teamAllQuit: services.flow.teamAllQuit.bind(services.flow), hostJudge: services.flow.hostJudge.bind(services.flow), noteKill: services.tiebreak.noteKill.bind(services.tiebreak), hostCleanup: services.flow.hostCleanup.bind(services.flow), onEnded: services.flow.onEnded.bind(services.flow), restart: services.flow.restart.bind(services.flow), holdSpecResult: services.flow.holdSpecResult.bind(services.flow), releaseSpecResult: services.flow.releaseSpecResult.bind(services.flow),
+      teamTotals: services.flow.teamTotals.bind(services.flow), teamAllQuit: services.flow.teamAllQuit.bind(services.flow), hostJudge: services.flow.hostJudge.bind(services.flow), hostCleanup: services.flow.hostCleanup.bind(services.flow), onEnded: services.flow.onEnded.bind(services.flow), restart: services.flow.restart.bind(services.flow), holdSpecResult: services.flow.holdSpecResult.bind(services.flow), releaseSpecResult: services.flow.releaseSpecResult.bind(services.flow),
       againOrBackToLobby: services.flow.againOrBackToLobby.bind(services.flow), initGame: services.flow.initGame.bind(services.flow), isSpec: services.flow.isSpec.bind(services.flow), syncRemote: services.flow.syncRemote.bind(services.flow), specResultHeld: function () { return services.flow.specHeld; }, matchMs: function () { return services.timescale.matchMs; },
       startGame: services.launcher.startGame.bind(services.launcher), launchMatch: services.launcher.launchMatch.bind(services.launcher), practiceSpots: services.launcher.practiceSpots.bind(services.launcher), PRACTICE_BOTS: PracticeMode.BOTS, leavePractice: services.practice.leavePractice.bind(services.practice), fillPracticeGauge: services.practice.fillPracticeGauge.bind(services.practice),
       openPracticeChars: services.practice.openPracticeChars.bind(services.practice), changePracticeChar: services.practice.changePracticeChar.bind(services.practice), renderPracticeModal: services.practice.renderPracticeModal.bind(services.practice), showScreen: services.screens.showScreen.bind(services.screens),
@@ -9193,7 +9135,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.charTypes = new CharacterRegistry(services);
       services.flow = new MatchFlow(services);
       services.killfeed = new KillFeed(services);
-      services.tiebreak = new CupTiebreak(services);
       services.targets = new TargetQuery(services);
       services.minions = new MinionSystem(services);
       services.vision = new VisionRules(services);

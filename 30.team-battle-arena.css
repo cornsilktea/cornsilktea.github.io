@@ -526,17 +526,3 @@
   body.mkMatched #scrLobby .addAi, body.mkMatched #scrLobby .aiDel, body.mkMatched #btnAgain { display: none !important; }
   .dfSlots .slot .dfNick { flex: none; padding: 1px 7px; border: 2px solid transparent; border-radius: 6px; }
   .dfSlots .slot .dfNick.myNick { border-color: var(--sg-primary); background: rgba(95,168,118,.12); }
-  .hdSide { position: relative; }
-  .hdSide.fk::after { content: attr(data-mark); position: absolute; left: 50%; top: calc(100% + 6px); transform: translateX(-50%); padding: 2px 7px; border-radius: 999px; font-size: 11px; font-weight: 800; line-height: 1.3;
-                      white-space: nowrap; color: #2A1A08; background: #F2D06B; box-shadow: 0 2px 8px rgba(0,0,0,.35), 0 0 10px rgba(242,208,107,.45); animation: fkPop .45s cubic-bezier(.2,1.6,.4,1); }
-  @keyframes fkPop { 0% { transform: translateX(-50%) scale(.3); opacity: 0; } 100% { transform: translateX(-50%) scale(1); opacity: 1; } }
-  .endTiebreak { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px 10px; margin: -6px auto 14px; padding: 9px 14px; max-width: 560px; border-radius: 10px;
-                 background: rgba(242,208,107,.1); border: 1px solid rgba(242,208,107,.45); border-top: 3px solid #D97B4F; font-size: 15px; font-weight: 700; color: #F4F1E8; }
-  .endTiebreak .tbTag { padding: 2px 9px; border-radius: 999px; background: #D97B4F; color: #fff; font-size: 13px; font-weight: 800; }
-  .endTiebreak b { font-weight: 800; color: #F2D06B; }
-  .endTiebreak b.b { color: #8DB8FF; }
-  .endTiebreak b.r { color: #FF9A92; }
-  .scoreRow div { position: relative; }
-  .scoreRow div.tbWin { box-shadow: inset 0 0 0 2px #F2D06B, 0 0 16px rgba(242,208,107,.35); }
-  .scoreRow div.tbWin::after { content: attr(data-mark); position: absolute; top: -10px; left: 50%; transform: translateX(-50%); padding: 1px 9px; border-radius: 999px; font-size: 12px; font-weight: 800;
-                               white-space: nowrap; color: #2A1A08; background: #F2D06B; box-shadow: 0 2px 6px rgba(0,0,0,.35); }

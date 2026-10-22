@@ -3973,35 +3973,6 @@ class ResultCollector {
     if (updateWith(normal.cap, "winner")[0].u.statsNote !== undefined) bad.push("통계 안 모으는 모드에 통계 안내가 붙음");
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "playing 전환 1번·시간 종료 판정 1번·무승부·레드 승·연습 제외·통계 안내");
   });
-  run(JUDGEG, "대회모드 동점 판정: 킬이 같으면 첫 킬 팀, 킬이 없으면 피해량 많은 팀이 이기고 무승부가 없는가(일반모드는 그대로 무승부)", function (done) {
-    var y = OPEN_Y.forest, bad = [];
-    function setup(mode) {
-      var W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]);
-      W.room.mode = mode; W.room.status = "playing"; return { W: W, cap: recordRef(W), start: W.room.startAt };
-    }
-    function judge(s) { api.setClock(s.start + api.matchMs()); api.hostJudge(); return (updateWith(s.cap, "winner")[0] || {}).u || {}; }
-    var fk = setup("cup"); fk.W.ent("a").deaths = 1; fk.W.ent("b").deaths = 1;
-    api.noteKill({ k: "a", v: "b", t: fk.start + 9000 });
-    api.noteKill({ k: "b", v: "a", t: fk.start + 4000 });
-    api.noteKill({ k: "a", v: "b", t: fk.start - 500 });
-    var u = judge(fk);
-    if (u.winner !== "red" || !u.final || u.final.tiebreak !== "firstKill" || u.final.reason.indexOf("첫 킬") < 0 || u.final.reason.indexOf("나가서") >= 0) bad.push("첫 킬(레드가 먼저) " + JSON.stringify(u));
-    var dm = setup("cup"); dm.W.ent("a").dmg = 20; dm.W.ent("b").dmg = 55;
-    u = judge(dm);
-    if (u.winner !== "red" || u.final.tiebreak !== "damage") bad.push("킬 없음 → 피해량 " + JSON.stringify(u));
-    var coin = setup("cup");
-    u = judge(coin);
-    if ((u.winner !== "blue" && u.winner !== "red") || u.final.tiebreak !== "coin") bad.push("모두 같으면 추첨 " + JSON.stringify(u));
-    var clear = setup("cup"); clear.W.ent("a").deaths = 2; clear.W.ent("b").deaths = 1;
-    api.noteKill({ k: "a", v: "b", t: clear.start + 1000 });
-    u = judge(clear);
-    if (u.winner !== "red" || u.final.tiebreak !== undefined) bad.push("킬 차이가 있으면 동점 판정 없음 " + JSON.stringify(u));
-    var pvp = setup("pvp"); pvp.W.ent("a").deaths = 1; pvp.W.ent("b").deaths = 1;
-    api.noteKill({ k: "b", v: "a", t: pvp.start + 4000 });
-    u = judge(pvp);
-    if (u.winner !== "draw" || u.final.tiebreak !== undefined) bad.push("일반모드는 무승부 " + JSON.stringify(u));
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "첫 킬(늦게 온 기록·시작 전 기록 무시)·피해량·추첨·킬 차이·일반모드 무승부");
-  });
   run(JUDGEG, "호스트 판정: 한 팀이 모두 나가면 시간이 남아도 상대 팀 승리로 끝내고 통계에서 제외하는가", function (done) {
     var y = OPEN_Y.forest, W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]), bad = [];
     var cap = recordRef(W), P = api.players();
