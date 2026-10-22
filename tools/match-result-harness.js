@@ -215,21 +215,31 @@ class MkCheckRunner {
     await MkCheckRunner.wait(1500);
     if (joins && this.game.joinAfterStart) await joinRival();
     const room = MkCheckDb.at(roomPath);
-    await MkCheckDb.ref(roomPath).update(this.game.endUpdate(room, party.me, joins ? "win" : outcome, ticket));
-    const line = await this.until(() => {
-      const history = (MkCheckDb.at(this.game.root + "/parties/" + party.code + "/history")) || {};
-      const lines = Object.keys(history).map((k) => history[k]).sort((a, b) => a.n - b.n);
-      return lines.length > before ? lines[lines.length - 1] : null;
-    }, 10000, "전적 줄");
+    const quick = outcome === "winQuick";
+    await MkCheckDb.ref(roomPath).update(this.game.endUpdate(room, party.me, joins || quick ? "win" : outcome, ticket));
+    const findBack = () => this.visibleButton(/대기실로/) || [...document.querySelectorAll("button")].find((b) => /^(팀|랜덤 매칭) 대기실로$/.test(b.textContent.trim()) && !b.hidden && !b.disabled);
+    const historyNow = () => { const h = MkCheckDb.at(this.game.root + "/parties/" + party.code + "/history") || {}; return Object.keys(h).map((k) => h[k]).sort((a, b) => a.n - b.n); };
+    // winQuick: 결과 화면이 뜨자마자(전적을 쓰기 전에) 대기실로 돌아가도 전적이 남는지.
+    if (quick) {
+      await this.until(() => this.visibleButton(/대기실로/), 4000, "").catch(() => null);
+      const early = findBack();
+      if (!early) throw new Error("대기실로 버튼 없음");
+      early.click();
+    }
+    const line = await this.until(() => { const lines = historyNow(); return lines.length > before ? lines[lines.length - 1] : null; }, quick ? 6000 : 10000, "전적 줄").catch(() => null);
+    if (!line && !quick) throw new Error("시간 초과: 전적 줄");
     await MkCheckRunner.wait(1500);
-    const lines = Object.keys(MkCheckDb.at(this.game.root + "/parties/" + party.code + "/history") || {}).length;
-    await this.until(() => this.visibleButton(/대기실로/), 4000, "").catch(() => null);
-    const back = this.visibleButton(/대기실로/) || [...document.querySelectorAll("button")].find((b) => /^(팀|랜덤 매칭) 대기실로$/.test(b.textContent.trim()) && !b.hidden && !b.disabled);
-    if (!back) throw new Error("대기실로 버튼 없음");
-    back.click();
+    const lines = historyNow().length;
+    if (!quick) {
+      await this.until(() => this.visibleButton(/대기실로/), 4000, "").catch(() => null);
+      const back = findBack();
+      if (!back) throw new Error("대기실로 버튼 없음");
+      back.click();
+    }
     await this.until(() => this.visibleButton(/^매칭 시작$/), 10000, "대기실 복귀");
     const streak = (document.querySelector(".mk-streak") || {}).textContent || "";
-    const expect = outcome === "zombieWin" || joins ? "win" : outcome;
+    const expect = outcome === "zombieWin" || joins || quick ? "win" : outcome;
+    if (!line) { this.note({ round: index + 1, case: outcome, want: expect, got: "전적 없음", ok: false, added: lines - before, streak }); return; }
     const rivals = line.rivals || [], rivalsOk = joins ? rivals.length === 1 && rivals[0] === this.fake.nick : rivals.length === 0;
     this.note({ round: index + 1, case: outcome, want: expect, got: line.result, ok: expect === line.result && rivalsOk && lines - before === 1, added: lines - before, rivals, rivalsOk, rank: line.rank, of: line.of, streak });
   }

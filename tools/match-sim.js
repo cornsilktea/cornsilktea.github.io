@@ -434,14 +434,16 @@ class Scenarios {
     Report.check("혼자 게임: 다시 들어오면 같은 전적을 이어 쓰고 지난 표는 지워짐", back && Object.keys(after.history).length === 1 && !after.match && !!after.members[solo.ids[0]], after);
     const stranger = await new Mk.MkPartyDirectory(world.server.database("p-stranger"), SimWorld.clock, world.paths, 1).reclaim(solo.code, "p-stranger", { nick: "남", joinedAt: Date.now() });
     Report.check("혼자 게임: 누가 들어 있으면 다른 사람이 가져가지 못함", stranger === false);
-    const reloaded = await new Mk.MkPartyDirectory(world.server.database("p-reload"), SimWorld.clock, world.paths, 1).reclaim(solo.code, "p-reload", { nick: solo.ids[0], joinedAt: Date.now() });
+    const sameNick = await new Mk.MkPartyDirectory(world.server.database("p-twin"), SimWorld.clock, world.paths, 1).reclaim(solo.code, "p-twin", { nick: solo.ids[0], joinedAt: Date.now() }, "p-other");
+    Report.check("대기실 돌아가기: 이름이 같아도 직전 아이디가 아니면 남의 자리를 밀어내지 않음", sameNick === false && !!world.server.get(world.paths.party(solo.code)).members[solo.ids[0]]);
+    const reloaded = await new Mk.MkPartyDirectory(world.server.database("p-reload"), SimWorld.clock, world.paths, 1).reclaim(solo.code, "p-reload", { nick: solo.ids[0], joinedAt: Date.now() }, solo.ids[0]);
     const afterReload = world.server.get(world.paths.party(solo.code));
-    Report.check("혼자 게임: 새로고침(아이디 바뀜, 같은 닉네임)이면 예전 자리를 이어받음", reloaded && Object.keys(afterReload.members).join() === "p-reload" && afterReload.leaderId === "p-reload" && Object.keys(afterReload.history).length === 1, afterReload);
+    Report.check("대기실 돌아가기: 새로고침(아이디 바뀜, 이 기기의 직전 아이디)이면 예전 자리를 이어받음", reloaded && Object.keys(afterReload.members).join() === "p-reload" && afterReload.leaderId === "p-reload" && Object.keys(afterReload.history).length === 1, afterReload);
     const party = new Mk.MkParty(world.server.database("p-reload"), SimWorld.clock, world.paths, solo.code, "p-reload", 1);
     party.connect();
     await Util.wait(20);
     await party.leave(false);
-    Report.check("팀 게임: 마지막 사람이 나가면 대기실이 사라짐(그대로)", world.server.get(world.paths.party(solo.code)) === null);
+    Report.check("leave(false): 마지막 사람이 나가면 대기실이 사라짐", world.server.get(world.paths.party(solo.code)) === null);
     solo.queue.stop();
     solo.leader.silentClose();
   }

@@ -220,10 +220,11 @@ class MkPartyDirectory {
         }
         return null;
     }
-    // 혼자 하는 게임(solo)에서 이 기기가 쓰던 대기실로 돌아간다. 다른 사람이 들어 있으면 실패.
-    // 새로고침하면 아이디가 바뀌고 예전 페이지 자리는 onDisconnect 가 지울 때까지 잠깐 남으므로, 닉네임이 같은 자리는 내 것으로 본다.
+    // 이 기기가 쓰던 대기실로 돌아간다(MkPartyMemory). 다른 사람이 들어 있으면 실패 — 친구가 남아 있는 팀은 팀 코드로 다시 들어간다.
+    // 새로고침하면 아이디가 바뀌고 예전 페이지 자리는 onDisconnect 가 지울 때까지 잠깐 남으므로, 이 기기의 직전 아이디(previousId) 자리는 내 것으로 본다.
+    // (닉네임으로 보면 이름이 같은 친구를 밀어낼 수 있다.)
     // 전적(history)과 바로 전 상대(last)는 그대로 두고, 남아 있던 찾기·표는 지운다(지난 판 방으로 다시 들어가지 않게).
-    async reclaim(code, myId, member) {
+    async reclaim(code, myId, member, previousId = "") {
         let reclaimed = false;
         await this.database.ref(this.paths.party(code)).transaction((current) => {
             reclaimed = false;
@@ -231,7 +232,7 @@ class MkPartyDirectory {
             if (record === null)
                 return null;
             const members = record.members || {};
-            if (!record.leaderId || Object.keys(members).some((id) => id !== myId && members[id].nick !== member.nick))
+            if (!record.leaderId || Object.keys(members).some((id) => id !== myId && id !== previousId))
                 return undefined;
             record.members = { [myId]: member };
             record.leaderId = myId;
@@ -1039,7 +1040,7 @@ class MkRandomFlow {
         this.onResult = () => undefined;
         this.paths = MkPaths.forGame(options.gameRoot, options.queue);
         this.directory = new MkPartyDirectory(database, clock, this.paths, options.partyLimit);
-        this.memory = options.solo ? new MkSoloPartyMemory(options.queue) : null;
+        this.memory = new MkPartyMemory(options.queue);
         this.sign = new MkBusySign(database, clock, this.paths);
         panel.onMatch = () => this.toggleSearch();
         panel.onLeave = () => this.leaveParty();
@@ -1064,16 +1065,16 @@ class MkRandomFlow {
     }
     async create() {
         const member = this.hooks.member();
-        const kept = this.memory ? this.memory.recall(member.nick) : null;
-        if (kept && (await this.directory.reclaim(kept, this.myId, member))) {
-            this.attach(kept);
+        const kept = this.memory.recall(member.nick);
+        if (kept && (await this.directory.reclaim(kept.code, this.myId, member, kept.id))) {
+            this.memory.remember(kept.code, member.nick, this.myId);
+            this.attach(kept.code);
             return "";
         }
         const code = await this.directory.create(this.myId, member);
         if (!code)
             return "랜덤 매칭 방을 만들지 못했어요. 다시 눌러 주세요.";
-        if (this.memory)
-            this.memory.remember(code, member.nick);
+        this.memory.remember(code, member.nick, this.myId);
         this.attach(code);
         return "";
     }
@@ -1276,7 +1277,7 @@ class MkRandomFlow {
             this.queue.stop();
         this.tickSeconds(false);
         this.party = null;
-        await party.leave(!!this.memory).catch(() => undefined);
+        await party.leave(true).catch(() => undefined);
         this.hooks.showStart("");
     }
     dropParty(message) {
@@ -1291,27 +1292,31 @@ class MkRandomFlow {
 MkRandomFlow.START_WAIT_MS = 15000;
 // 사람 상대가 대기열에 있어 AI 대체를 미뤄도, 묶는 팀장 기기가 잠들어 묶지 못할 수 있으니 이만큼 더 지나면 AI 와 시작한다.
 MkRandomFlow.COMPANY_GRACE_MS = 15000;
-// 혼자 하는 게임(24번 등)은 대기실이 곧 "나"라서, 나가기·새로고침을 해도 같은 대기실(전적·연승·바로 전 상대)을 이어 쓰게
-// 이 기기에 대기실 코드를 적어 둔다. 같은 태블릿을 다른 학생이 쓸 수 있으니 닉네임이 같을 때만 돌아가고,
+// 새로고침·나가기를 해도 같은 대기실(전적·연승·바로 전 상대)을 이어 쓰게 이 기기에 대기실 코드와 내 아이디를 적어 둔다
+// (24번에서 먼저 쓰다가 2026-10-22 모든 게임으로 넓힘). 같은 태블릿을 다른 학생이 쓸 수 있으니 닉네임이 같을 때만 돌아가고,
 // 오래 안 쓴 대기실은 서버에서 치워지므로(MkPartyDirectory.sweep) 다음 날까지 이어지지는 않는다.
-class MkSoloPartyMemory {
+class MkPartyMemory {
     constructor(queueName) {
-        this.key = "mk_solo_party_" + queueName + "_v1";
+        this.key = "mk_party_" + queueName + "_v1";
+        this.oldKey = "mk_solo_party_" + queueName + "_v1";
     }
     recall(nick) {
+        const saved = this.read(this.key) || this.read(this.oldKey);
+        return saved && saved.code && saved.nick === nick ? { code: saved.code, id: saved.id || "" } : null;
+    }
+    remember(code, nick, id) {
         try {
-            const saved = JSON.parse(localStorage.getItem(this.key) || "null");
-            return saved && saved.code && saved.nick === nick ? saved.code : null;
+            localStorage.setItem(this.key, JSON.stringify({ code, nick, id }));
+        }
+        catch (error) { /* 저장 못 하는 기기 */ }
+    }
+    read(key) {
+        try {
+            return JSON.parse(localStorage.getItem(key) || "null");
         }
         catch (error) {
             return null;
         }
-    }
-    remember(code, nick) {
-        try {
-            localStorage.setItem(this.key, JSON.stringify({ code, nick }));
-        }
-        catch (error) { /* 저장 못 하는 기기 */ }
     }
 }
 // 연승 표시 버튼. 누르면 이 팀 대기실의 모든 전적 창을 띄운다.
