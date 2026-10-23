@@ -423,7 +423,7 @@
 
   <div class="st-wrap" id="cardFound" style="display:none">
     <div class="st-hero"><h1 class="st-title">TURBO LAP</h1></div>
-    <div class="st-card"><h2>🏁 상대를 찾았어요!</h2><div class="mk-notice" id="foundRival"></div><div class="hint">곧 출발해요. 잠시만 기다려 주세요.</div></div>
+    <div class="st-card"><h2>🏁 상대를 찾았어요!</h2><div class="mk-notice" id="foundRival"></div><div class="hint" id="foundHint">곧 출발해요. 잠시만 기다려 주세요.</div></div>
   </div>
 
   <div class="card wide" id="cardLobby" style="display:none">
@@ -815,30 +815,48 @@ function canvasTex(w, h, draw, repeat) {
 }
 function rnd(a, b) { return a + Math.random() * (b - a); }
 const HQ_DIR = "img/turbo/hq/";
-const HQ_LOAD = { ready: false, loaded: 0, total: 0, failed: [], slow: false };
+const HQ_LOAD = { ready: false, everReady: false, loaded: 0, total: 0, failed: [], slow: false };
 const HQ_MANAGER = new THREE.LoadingManager(
-  () => { HQ_LOAD.ready = true; warmUpGpu(); renderLoadGate(); },
+  () => { HQ_LOAD.ready = HQ_LOAD.everReady = true; courseWarmup.kick(); renderLoadGate(); realTextures.prefetchRestLater(); },
   (url, loaded, total) => { HQ_LOAD.loaded = loaded; HQ_LOAD.total = total; renderLoadGate(); },
   url => { HQ_LOAD.failed.push(String(url).split("/").pop()); renderLoadGate(); });
-function warmUpGpu() {
-  if (!HQ_LOAD.ready || !trackGroup) return;
-  const screenTarget = renderer.getRenderTarget();
-  renderer.compile(scene, camera);
-  if (NIGHT.on && NIGHT.composer) { renderer.setRenderTarget(NIGHT.composer.renderTarget1); renderer.compile(scene, camera); }
-  renderer.setRenderTarget(screenTarget);
-  const seen = new Set();
-  scene.traverse(o => [].concat(o.material || []).forEach(m => Object.values(m).forEach(v => {
-    if (v && v.isTexture && !seen.has(v)) { seen.add(v); renderer.initTexture(v); }
-  })));
+HQ_MANAGER.onStart = () => { HQ_LOAD.ready = false; if (HQ_LOAD.everReady) renderLoadGate(); };
+class CourseWarmup {
+  constructor() { this.builtKey = ""; this.warmKey = ""; this.seq = 0; }
+  trackBuilt(key) { this.builtKey = key; this.warmKey = ""; this.kick(); }
+  isWarm(key) { return HQ_LOAD.ready && this.warmKey === key && this.builtKey === key; }
+  async kick() {
+    if (!HQ_LOAD.ready || !trackGroup || !this.builtKey) return;
+    const seq = ++this.seq, key = this.builtKey;
+    await Promise.all(this.compileAllTargets()).catch(e => console.warn("[turbolap] 셰이더 미리 준비 실패:", e));
+    if (seq !== this.seq) return;
+    this.uploadTextures();
+    this.warmKey = key;
+    renderLoadGate(); battleLoadSync.refresh();
+  }
+  compileAllTargets() {
+    const screenTarget = renderer.getRenderTarget(), jobs = [renderer.compileAsync(scene, camera)];
+    if (NIGHT.on && NIGHT.composer) { renderer.setRenderTarget(NIGHT.composer.renderTarget1); jobs.push(renderer.compileAsync(scene, camera)); }
+    renderer.setRenderTarget(screenTarget);
+    return jobs;
+  }
+  uploadTextures() {
+    const seen = new Set();
+    scene.traverse(o => [].concat(o.material || []).forEach(m => Object.values(m).forEach(v => {
+      if (v && v.isTexture && !seen.has(v)) { seen.add(v); renderer.initTexture(v); }
+    })));
+  }
 }
+const courseWarmup = new CourseWarmup();
 function renderLoadGate() {
-  const myModel = CAR_MODELS[parseCar(garage.key).model], ok = HQ_LOAD.ready && !!myModel.tpl;
+  const myModel = CAR_MODELS[parseCar(garage.key).model], ok = HQ_LOAD.everReady && !!myModel.tpl, warm = courseWarmup.isWarm(course);
   ["btnModeTA", "btnCreate", "btnRandom", "btnJoin", "btnHongkong", "btnSingapore", "btnSeoul"].forEach(id => { $(id).disabled = !ok; });
-  $("btnGo").disabled = !ok;
+  $("btnGo").disabled = !ok || !warm;
   carPicker.mark();
   const note = $("loadNote");
   if (!HQ_LOAD.ready) note.textContent = "그래픽 자료 불러오는 중… " + HQ_LOAD.loaded + " / " + (HQ_LOAD.total || "?") + (HQ_LOAD.slow ? " — 인터넷이 느리면 조금 더 기다려 주세요" : "");
   else if (myModel.state === "failed") note.textContent = "자동차 모델을 불러오지 못했습니다. 새로 고침(F5) 해 주세요.";
+  else if (!warm) note.textContent = "코스 준비 중…";
   else if (!myModel.tpl) note.textContent = "자동차 모델 불러오는 중…";
   else if (HQ_LOAD.failed.length) note.textContent = "일부 그래픽 자료를 불러오지 못했습니다(" + HQ_LOAD.failed.join(", ") + "). 새로 고침(F5) 해 보세요.";
   else note.textContent = "";
@@ -974,13 +992,38 @@ function initMaterialsHQ() {
   leafMap.repeat.set(3, 3); leafNormal.repeat.set(3, 3);
   HQM.leaves = new THREE.MeshStandardMaterial({ map: leafMap, normalMap: leafNormal, roughness: 0.88 });
   HQM.palmLeaves = HQM.leaves.clone(); HQM.palmLeaves.side = THREE.DoubleSide;
-  const real = (n, srgb) => hqTex(n, srgb, srgb ? "#707070" : "#8080FF", REAL_DIR);
-  HQM.real = {};
-  ["facade_glass", "facade_mirror", "facade_office", "facade_concrete", "facade_brick", "night_blinds", "night_dense", "night_grid", "night_brown", "paving", "plaza", "concrete_light", "concrete", "brick", "stone_block"].forEach(k => { HQM.real[k] = real(k + "_color.jpg", true); });
-  ["boc", "ckc", "ifc", "vd", "mbs_glass", "mbs_rear"].forEach(k => { HQM.real["landmark_" + k] = real("landmark_" + k + ".jpg", true); });
-  ["facade_office", "facade_concrete", "facade_brick", "paving", "plaza", "concrete_light", "concrete", "brick", "stone_block"].forEach(k => { HQM.real[k + "N"] = real(k + "_normal.jpg", false); });
-  ["night_blinds", "night_dense", "night_grid", "night_brown"].forEach(k => { HQM.real[k + "E"] = real(k + "_emit.jpg", true); });
+  HQM.real = realTextures;
 }
+class RealTextureShelf {
+  static COLOR = ["facade_glass", "facade_mirror", "facade_office", "facade_concrete", "facade_brick", "night_blinds", "night_dense", "night_grid", "night_brown", "paving", "plaza", "concrete_light", "concrete", "brick", "stone_block"];
+  static LANDMARK = ["boc", "ckc", "ifc", "vd", "mbs_glass", "mbs_rear"];
+  static NORMAL = ["facade_office", "facade_concrete", "facade_brick", "paving", "plaza", "concrete_light", "concrete", "brick", "stone_block"];
+  static EMIT = ["night_blinds", "night_dense", "night_grid", "night_brown"];
+  static PREFETCH_DELAY_MS = 4000;
+  constructor() {
+    this.files = {};
+    RealTextureShelf.COLOR.forEach(k => { this.files[k] = { file: k + "_color.jpg", srgb: true }; });
+    RealTextureShelf.LANDMARK.forEach(k => { this.files["landmark_" + k] = { file: "landmark_" + k + ".jpg", srgb: true }; });
+    RealTextureShelf.NORMAL.forEach(k => { this.files[k + "N"] = { file: k + "_normal.jpg", srgb: false }; });
+    RealTextureShelf.EMIT.forEach(k => { this.files[k + "E"] = { file: k + "_emit.jpg", srgb: true }; });
+    this.loaded = {}; this.prefetchQueued = false;
+  }
+  get(key) {
+    if (!this.loaded[key]) { const f = this.files[key]; this.loaded[key] = hqTex(f.file, f.srgb, f.srgb ? "#707070" : "#8080FF", REAL_DIR); }
+    return this.loaded[key];
+  }
+  prefetchRestLater() {
+    if (this.prefetchQueued) return;
+    this.prefetchQueued = true;
+    setTimeout(() => this.prefetchRest(), RealTextureShelf.PREFETCH_DELAY_MS);
+  }
+  prefetchRest() {
+    Object.keys(this.files).filter(k => !this.loaded[k]).forEach(k => {
+      fetch(REAL_DIR + this.files[k].file, { priority: "low" }).catch(() => {});
+    });
+  }
+}
+const realTextures = new RealTextureShelf();
 function brightestDirection(tex) {
   const { data, width, height } = tex.image, half = data instanceof Uint16Array;
   let best = -1, bx = 0, by = 0;
@@ -1091,6 +1134,7 @@ function buildTrack(def) {
     const t = new THREE.Vector3(tg.x, 0, tg.z).normalize();
     S.push({ p, t, n: new THREE.Vector3(t.z, 0, -t.x) });
   }
+  TrackNeighborhood.rebuild();
   START_I = OPEN ? 7 : N - 14;
   FINISH_I = 0;
   if (OPEN) { let bd = Infinity; S.forEach((s, i) => { const d = Math.hypot(s.p.x - def.finish[0], s.p.z - def.finish[1]); if (d < bd) { bd = d; FINISH_I = i; } }); }
@@ -1098,7 +1142,7 @@ function buildTrack(def) {
   S.forEach(s => { B.minX = Math.min(B.minX, s.p.x); B.maxX = Math.max(B.maxX, s.p.x); B.minZ = Math.min(B.minZ, s.p.z); B.maxZ = Math.max(B.maxZ, s.p.z); });
   buildSceneryHQ(G, def, B);
   applyAtmosphere(def);
-  warmUpGpu();
+  courseWarmup.trackBuilt(def.key);
   {
     const pad = 22, sc = Math.min((300 - pad * 2) / (B.maxX - B.minX), (300 - pad * 2) / (B.maxZ - B.minZ));
     const ox = 150 - (B.minX + B.maxX) / 2 * sc, oz = 150 - (B.minZ + B.maxZ) / 2 * sc;
@@ -1280,7 +1324,7 @@ function buildRoadSurface(G, gap) {
     gantry(FINISH_I);
     [N - 1].forEach(i => {
       const e = S[i], yaw = Math.atan2(e.n.x, e.n.z);
-      HQM.endWall = HQM.endWall || new THREE.MeshStandardMaterial({ map: HQM.real.concrete_light, normalMap: HQM.real.concrete_lightN, roughness: 0.85 });
+      HQM.endWall = HQM.endWall || new THREE.MeshStandardMaterial({ map: HQM.real.get("concrete_light"), normalMap: HQM.real.get("concrete_lightN"), roughness: 0.85 });
       const wall = new THREE.Mesh(scaleBoxUv(new THREE.BoxGeometry(W + 2 * SH + 0.4, 1.05, 0.6), W + 2 * SH + 0.4, 1.05, 0.6, 4, 1.05), HQM.endWall);
       wall.position.set(e.p.x, e.p.y + 0.525, e.p.z); wall.rotation.y = yaw; wall.castShadow = true; wall.receiveShadow = true; G.add(wall);
     });
@@ -1361,10 +1405,56 @@ function seoulKeepOut(x, z, pad) {
   if (Math.hypot(x - gw.x, z - gw.z) < 34 + pad) return true;
   return SEOUL.decoBridges.some(bx => Math.abs(x - bx) < 16 + pad && z > R.z0 - 90 && z < R.z1 + 90);
 }
-function nearTrackXZ(x, z, dist) {
-  for (let i = 0; i < N; i += 2) { const s = S[i], dx = s.p.x - x, dz = s.p.z - z; if (dx * dx + dz * dz < dist * dist) return true; }
-  return false;
+class PlanarPointGrid {
+  constructor(points, cell) {
+    this.cell = cell; this.cells = new Map(); this.count = points.length;
+    points.forEach(p => {
+      const k = this.keyOf(Math.floor(p.x / cell), Math.floor(p.z / cell));
+      if (!this.cells.has(k)) this.cells.set(k, []);
+      this.cells.get(k).push(p);
+    });
+  }
+  keyOf(cx, cz) { return cx * 100003 + cz; }
+  someNear(x, z, r, test) {
+    const c = this.cell, x0 = Math.floor((x - r) / c), x1 = Math.floor((x + r) / c), z0 = Math.floor((z - r) / c), z1 = Math.floor((z + r) / c);
+    if ((x1 - x0 + 1) * (z1 - z0 + 1) > this.count) {
+      for (const list of this.cells.values()) if (list.some(test)) return true;
+      return false;
+    }
+    for (let cx = x0; cx <= x1; cx++) for (let cz = z0; cz <= z1; cz++) {
+      const list = this.cells.get(this.keyOf(cx, cz));
+      if (list && list.some(test)) return true;
+    }
+    return false;
+  }
+  anyWithin(x, z, dist) { const d2 = dist * dist; return this.someNear(x, z, dist, p => (p.x - x) ** 2 + (p.z - z) ** 2 < d2); }
+  nearestWithin(x, z, r) {
+    const c = this.cell, cx = Math.floor(x / c), cz = Math.floor(z / c), rings = Math.ceil(r / c) + 1;
+    let best = r * r, hit = null;
+    const scan = (gx, gz) => {
+      const list = this.cells.get(this.keyOf(gx, gz)); if (!list) return;
+      for (const p of list) { const d = (p.x - x) ** 2 + (p.z - z) ** 2; if (d < best) { best = d; hit = p; } }
+    };
+    for (let k = 0; k <= rings; k++) {
+      const closest = Math.max(0, k - 1) * c;
+      if (closest * closest >= best) break;
+      if (k === 0) { scan(cx, cz); continue; }
+      for (let a = -k; a <= k; a++) { scan(cx + a, cz - k); scan(cx + a, cz + k); }
+      for (let a = -k + 1; a < k; a++) { scan(cx - k, cz + a); scan(cx + k, cz + a); }
+    }
+    return hit ? { d2: best, p: hit } : null;
+  }
+  sumWithin(x, z, r, add) {
+    const r2 = r * r;
+    this.someNear(x, z, r, p => { const d = (p.x - x) ** 2 + (p.z - z) ** 2; if (d < r2) add(p, d); return false; });
+  }
 }
+class TrackNeighborhood {
+  static CELL = 40;
+  static grid = null;
+  static rebuild() { TrackNeighborhood.grid = new PlanarPointGrid(S.filter((s, i) => i % 2 === 0).map(s => s.p), TrackNeighborhood.CELL); }
+}
+function nearTrackXZ(x, z, dist) { return TrackNeighborhood.grid.anyWithin(x, z, dist); }
 function sampleRanges(pred) {
   const out = [];
   let start = -1;
@@ -1548,19 +1638,19 @@ function makeSeoulMaterials() {
   T.mast = seoulTex(8, 64, SEOUL_DRAW.mast); T.mast.repeat.set(1, 9);
   T.windowBand.repeat.set(12, 1);
   SEOUL_M = {
-    glass: facadeMaterial({ map: HQM.real.facade_glass, metalness: 0.5, roughness: 0.16 }, 24, 0x5E6266),
-    office: facadeMaterial({ map: HQM.real.facade_office, normalMap: HQM.real.facade_officeN, roughness: 0.8 }, 18, 0x6A6A68),
-    concreteFacade: facadeMaterial({ map: HQM.real.facade_concrete, normalMap: HQM.real.facade_concreteN, roughness: 0.75 }, 13, 0x707070),
+    glass: facadeMaterial({ map: HQM.real.get("facade_glass"), metalness: 0.5, roughness: 0.16 }, 24, 0x5E6266),
+    office: facadeMaterial({ map: HQM.real.get("facade_office"), normalMap: HQM.real.get("facade_officeN"), roughness: 0.8 }, 18, 0x6A6A68),
+    concreteFacade: facadeMaterial({ map: HQM.real.get("facade_concrete"), normalMap: HQM.real.get("facade_concreteN"), roughness: 0.75 }, 13, 0x707070),
     apartment: facadeMaterial({ map: T.apartment, roughness: 0.85 }, 14, 0x7A7C80),
     shops: T.shops.map(t => facadeMaterial({ map: t, roughness: 0.45, metalness: 0.1 }, 32, 0x55585C, 5)),
-    brickFacade: facadeMaterial({ map: HQM.real.facade_brick, normalMap: HQM.real.facade_brickN, roughness: 0.85 }, 14, 0x6E625A),
-    stone: facadeMaterial({ map: HQM.real.stone_block, normalMap: HQM.real.stone_blockN, color: 0xE6DED0, roughness: 0.92 }, 3.2, 0xB5AD9F),
+    brickFacade: facadeMaterial({ map: HQM.real.get("facade_brick"), normalMap: HQM.real.get("facade_brickN"), roughness: 0.85 }, 14, 0x6E625A),
+    stone: facadeMaterial({ map: HQM.real.get("stone_block"), normalMap: HQM.real.get("stone_blockN"), color: 0xE6DED0, roughness: 0.92 }, 3.2, 0xB5AD9F),
     stoneLight: std({ color: 0xD9D3C5, roughness: 0.85 }),
-    sidewalk: worldUvMaterial({ map: HQM.real.paving, normalMap: HQM.real.pavingN, roughness: 0.9 }, 3, false),
-    plaza: worldUvMaterial({ map: HQM.real.plaza, normalMap: HQM.real.plazaN, roughness: 0.85 }, 4, false),
+    sidewalk: worldUvMaterial({ map: HQM.real.get("paving"), normalMap: HQM.real.get("pavingN"), roughness: 0.9 }, 3, false),
+    plaza: worldUvMaterial({ map: HQM.real.get("plaza"), normalMap: HQM.real.get("plazaN"), roughness: 0.85 }, 4, false),
     pavement: worldUvMaterial({ map: HQM.asphalt.map, normalMap: HQM.asphalt.normalMap, roughness: 0.95, color: new THREE.Color(1.5, 1.5, 1.5) }, 5, false),
     concrete: std({ color: 0xB9B6AE, roughness: 0.85, side: THREE.DoubleSide }),
-    barrier: std({ map: HQM.real.concrete_light, normalMap: HQM.real.concrete_lightN, roughness: 0.85, side: THREE.DoubleSide }),
+    barrier: std({ map: HQM.real.get("concrete_light"), normalMap: HQM.real.get("concrete_lightN"), roughness: 0.85, side: THREE.DoubleSide }),
     deck: std({ color: 0x8E8C85, roughness: 0.9, side: THREE.DoubleSide }),
     steel: std({ color: 0x9AA3AC, metalness: 0.6, roughness: 0.4 }),
     arch: std({ color: 0xC4552F, metalness: 0.35, roughness: 0.38 }),
@@ -2333,8 +2423,8 @@ function makeHKMaterials() {
   ["grid", "hsbc", "jardine", "colonial", "ferryWin", "clock"].forEach(k => { L[k] = seoulTex(256, 256, HK_LIT[k]); });
   L.shop = seoulTex(1024, 144, HK_LIT.shop);
   const pool = seoulTex(128, 128, HK_LIT.pool), streak = seoulTex(64, 256, HK_LIT.streak);
-  const photo = (k, glow, p) => Object.assign({ map: HQM.real["landmark_" + k], emissiveMap: HQM.real["landmark_" + k], emissive: 0xFFFFFF, emissiveIntensity: glow }, p);
-  const nightPhoto = k => ({ map: HQM.real[k], emissiveMap: HQM.real[k + "E"], emissive: 0xFFFFFF, emissiveIntensity: 0.85, roughness: 0.8 });
+  const photo = (k, glow, p) => Object.assign({ map: HQM.real.get("landmark_" + k), emissiveMap: HQM.real.get("landmark_" + k), emissive: 0xFFFFFF, emissiveIntensity: glow }, p);
+  const nightPhoto = k => ({ map: HQM.real.get(k), emissiveMap: HQM.real.get(k + "E"), emissive: 0xFFFFFF, emissiveIntensity: 0.85, roughness: 0.8 });
   const lit = (p, map, k) => Object.assign(p, { emissiveMap: map, emissive: 0xFFFFFF, emissiveIntensity: (k || 1) * 0.55 });
   ["hsbc", "truss", "jardine", "grid", "colonial", "clock", "pinkTile", "domeTile", "ferryWin", "sail"].forEach(k => { T[k] = seoulTex(256, 256, HK_DRAW[k]); });
   T.shop = seoulTex(1024, 144, HK_DRAW.shop);
@@ -2367,7 +2457,7 @@ function makeHKMaterials() {
     jardine: facadeMaterial(lit({ map: T.jardine, normalMap: T.jardineN, metalness: 0.6, roughness: 0.3 }, L.jardine), 12, 0x8C9096),
     grid: facadeMaterial(lit({ map: T.grid, metalness: 0.6, roughness: 0.2 }, L.grid), 10, 0x4A5058),
     colonial: facadeMaterial(lit({ map: T.colonial, roughness: 0.8 }, L.colonial), 10, 0x4E6B55),
-    brick: facadeMaterial({ map: HQM.real.brick, normalMap: HQM.real.brickN, roughness: 0.9, emissive: 0x6A3420, emissiveIntensity: 0.55 }, 3, 0xB0B0A8),
+    brick: facadeMaterial({ map: HQM.real.get("brick"), normalMap: HQM.real.get("brickN"), roughness: 0.9, emissive: 0x6A3420, emissiveIntensity: 0.55 }, 3, 0xB0B0A8),
     clock: std(lit({ map: T.clock, roughness: 0.5 }, L.clock, 1.3)),
     lampHead: std({ color: 0xFFF1D0, emissive: 0xFFD9A0, emissiveIntensity: 3 }),
     lightPool: new THREE.MeshBasicMaterial({ map: pool, color: 0x5E4630, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }),
@@ -2437,16 +2527,18 @@ function fitHillsToTrack(hills) {
 }
 function buildHKTerrain(G, M) {
   const o = HK.slope, x0 = o.x0, x1 = o.x3, z0 = o.zEnd, z1 = -270, step = 6, isl = S.filter(s => s.p.z < -262), few = isl.filter((s, i) => i % 4 === 0);
-  const edge = W / 2 + SH + 2, s = THREE.MathUtils.smoothstep, lerp = THREE.MathUtils.lerp;
+  const edge = W / 2 + SH + 2, s = THREE.MathUtils.smoothstep, lerp = THREE.MathUtils.lerp, slopeFromM = 45, slopeOnlyM = 230, idwReachM = 220;
+  const islGrid = new PlanarPointGrid(isl.map(q => q.p), 40), fewGrid = new PlanarPointGrid(few.map(q => q.p), 60);
   const terrainAt = (x, z) => {
     if (z > z1) return 0;
-    let bd = Infinity, ty = 0, sw = 0, sy = 0;
-    for (const q of isl) { const d = (q.p.x - x) ** 2 + (q.p.z - z) ** 2; if (d < bd) { bd = d; ty = q.p.y; } }
-    for (const q of few) { const d = (q.p.x - x) ** 2 + (q.p.z - z) ** 2; if (d < 48400) { const w = 1 / (d + 100); sw += w; sy += w * q.p.y; } }
-    bd = Math.sqrt(bd);
+    const nearest = islGrid.nearestWithin(x, z, slopeOnlyM);
+    if (!nearest) return islandSlope(x, z);
+    const bd = Math.sqrt(nearest.d2), ty = nearest.p.y;
     if (bd < edge) return ty - 0.3;
+    let sw = 0, sy = 0;
+    fewGrid.sumWithin(x, z, idwReachM, (p, d) => { const w = 1 / (d + 100); sw += w; sy += w * p.y; });
     const idw = sw > 0 ? sy / sw : ty, near = lerp(ty - 0.3, idw, s(bd, edge, edge + 22));
-    return lerp(near, islandSlope(x, z), s(bd, 45, 230));
+    return lerp(near, islandSlope(x, z), s(bd, slopeFromM, slopeOnlyM));
   };
   const g = new THREE.PlaneGeometry(x1 - x0, z1 - z0, Math.round((x1 - x0) / step), Math.round((z1 - z0) / step)).rotateX(-Math.PI / 2);
   const p = g.attributes.position, col = [], green = new THREE.Color(0x2E5231), tmp = new THREE.Color(), cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
@@ -3146,11 +3238,11 @@ function makeSGMaterials() {
   const water = n => std({ color: 0x2E6070, roughness: 0.05, metalness: 0.25, normalMap: n, normalScale: new THREE.Vector2(0.35, 0.35) });
   SG_M = Object.assign({}, makeSeoulMaterials(), {
     mbs: std({ map: T.mbs, metalness: 0.55, roughness: 0.18 }),
-    sgGlass: facadeMaterial({ map: HQM.real.facade_mirror, color: 0xCFE8EC, metalness: 0.6, roughness: 0.12 }, 16, 0x6A7075),
+    sgGlass: facadeMaterial({ map: HQM.real.get("facade_mirror"), color: 0xCFE8EC, metalness: 0.6, roughness: 0.12 }, 16, 0x6A7075),
     hdb: facadeMaterial({ map: T.hdb, roughness: 0.85 }, 14, 0x8C8C88, 12),
     skypark: std({ color: 0xE9ECEE, metalness: 0.4, roughness: 0.4 }),
-    mbsGlass: std({ map: HQM.real.landmark_mbs_glass, color: 0xB4C0C8, metalness: 0.45, roughness: 0.18 }),
-    mbsRear: std({ map: HQM.real.landmark_mbs_rear, roughness: 0.7 }),
+    mbsGlass: std({ map: HQM.real.get("landmark_mbs_glass"), color: 0xB4C0C8, metalness: 0.45, roughness: 0.18 }),
+    mbsRear: std({ map: HQM.real.get("landmark_mbs_rear"), roughness: 0.7 }),
     mbsSide: std({ color: 0xE3E6E4, roughness: 0.6 }),
     pool: std({ color: 0x3FB6E0, roughness: 0.05, metalness: 0.1, emissive: 0x0E4A66, emissiveIntensity: 0.4 }),
     supertree: std({ map: T.supertree, roughness: 0.9, side: THREE.DoubleSide }),
@@ -3521,8 +3613,8 @@ function loadCarModel(key, manager) {
   new GLTFLoader(manager).setMeshoptDecoder(MeshoptDecoder).load("img/turbo/" + carModel.file, gltf => {
     try { carModel.tpl = prepareSupercar(gltf.scene, carModel); carModel.state = "ready"; refreshCars(); }
     catch (e) { carModel.tpl = null; carModel.state = "failed"; console.warn("[turbolap] 자동차 모델 준비 실패:", key, e); }
-    renderLoadGate();
-  }, undefined, err => { carModel.state = "failed"; console.warn("[turbolap] 자동차 모델을 못 불러옴:", key, err); renderLoadGate(); });
+    renderLoadGate(); battleLoadSync.refresh();
+  }, undefined, err => { carModel.state = "failed"; console.warn("[turbolap] 자동차 모델을 못 불러옴:", key, err); renderLoadGate(); battleLoadSync.refresh(); });
 }
 
 loadCarModel(parseCar(garage.key).model, HQ_MANAGER);
@@ -4326,6 +4418,43 @@ const BT = {
   viewId: null, viewKey: "", serverOffset: 0, hitSeq: 0, rankRows: {}, rankNums: 0, lobbyCarSig: "", queued: false
 };
 
+class BattleLoadSync {
+  static WAIT_CAP_MS = 60000;
+  constructor() { this.waitKey = ""; this.waitSince = 0; this.capTimer = 0; }
+  carsReady() {
+    return racerIds().every(id => {
+      const key = parseCar(BT.players[id].car).model, model = CAR_MODELS[key];
+      if (model.state === "idle") loadCarModel(key);
+      return !!model.tpl || model.state === "failed";
+    });
+  }
+  myLoadedCourse() { return course === BT.course && courseWarmup.isWarm(BT.course) && this.carsReady() ? BT.course : ""; }
+  refresh() {
+    const me = BT.ref && !BT.leaving ? BT.players[BT.myId] : null;
+    if (!me) return;
+    const want = this.myLoadedCourse();
+    if ((me.loaded || "") === want) return;
+    BT.ref.child("players/" + BT.myId).transaction(cur => cur ? Object.assign(cur, { loaded: want || null }) : undefined);
+  }
+  pendingIds() { return racerIds().filter(id => !isBot(id) && BT.players[id].loaded !== BT.course); }
+  blocksStart() {
+    const pending = this.pendingIds(), key = BT.code + ":" + BT.course + ":" + pending.join(",");
+    if (!pending.length || !humanRacerReady()) { this.waitKey = ""; return false; }
+    if (this.waitKey !== key) {
+      this.waitKey = key; this.waitSince = performance.now();
+      clearTimeout(this.capTimer); this.capTimer = setTimeout(playersChanged, BattleLoadSync.WAIT_CAP_MS + 50);
+    }
+    return performance.now() - this.waitSince < BattleLoadSync.WAIT_CAP_MS;
+  }
+  waitText() {
+    const pending = this.pendingIds();
+    if (!pending.length) return "";
+    if (pending.includes(BT.myId)) return "⏳ 내 화면에서 코스를 불러오는 중…";
+    return "⏳ " + pending.map(nickOf).join(", ") + " 님이 코스를 불러오는 중…";
+  }
+}
+const battleLoadSync = new BattleLoadSync();
+
 refreshNick();
 const BOT = { max: 1, topRatio: 0.9, grip: 0.86, brake: 24, lookSamples: 45, leadEaseM: 60, leadEase: 0.88, laneRatio: 0.35, latRate: 1.8, latPerSpeed: 0.25, dodgeAheadM: 14, dodgeGap: 2.4, edgeGap: 1.6 };
 const BOTS = {};
@@ -4528,7 +4657,7 @@ window.addEventListener("pagehide", () => { if (BT.ref) { try { BT.ref.child("pl
 function playersChanged() {
   if (BT.queued) return;
   BT.queued = true;
-  setTimeout(() => { BT.queued = false; fixSeat(); renderLobby(); rivalChip.render(); if (cardNow === "bdone") renderResult(); turboRandom.roomChanged(); }, 0);
+  setTimeout(() => { BT.queued = false; fixSeat(); battleLoadSync.refresh(); renderLobby(); rivalChip.render(); if (cardNow === "bdone") renderResult(); turboRandom.roomChanged(); }, 0);
 }
 function capOf(team) { return team === "spec" ? BATTLE.specMax : 1; }
 function canMoveTo(team) {
@@ -4588,12 +4717,14 @@ function renderLobby() {
   let hint = ok ? nickOf(racerOf("left")) + " vs " + nickOf(racerOf("right")) + " · " + TRACKS[BT.course].name
     : full ? "사람이 한 명은 왼쪽이나 오른쪽 자리에 있어야 시작할 수 있어요."
     : "왼쪽·오른쪽 자리에 한 명씩 있어야 시작할 수 있어요. 방 코드를 알려 주거나 방장이 🤖 AI를 추가하세요.";
-  if (!host) hint = (ok ? "방장이 시작하기를 기다리는 중… " : "") + hint;
+  const loading = ok && battleLoadSync.blocksStart(), loadWait = ok ? battleLoadSync.waitText() : "";
+  if (!host && !loadWait) hint = (ok ? "방장이 시작하기를 기다리는 중… " : "") + hint;
+  if (loadWait) hint = loadWait + " " + hint;
   $("lobbyHint").textContent = hint;
-  $("btnBStart").hidden = !host; $("btnBStart").disabled = !ok;
+  $("btnBStart").hidden = !host; $("btnBStart").disabled = !ok || loading;
 }
 function hostStart() {
-  if (!isHost() || BT.status !== "lobby" || !humanRacerReady()) return;
+  if (!isHost() || BT.status !== "lobby" || !humanRacerReady() || battleLoadSync.blocksStart()) return;
   audioInit();
   BT.ref.update({ status: "countdown", startAt: tnow() + BATTLE.countMs, endedAt: null, st: null, result: null, quitSide: null, bye: null });
 }
@@ -5269,7 +5400,8 @@ class TurboRandomMatch {
   static START_RETRY_MS = 300;
   static SETTLE_MS = 1000;
   static AI_FALLBACK_MS = 120000;
-  constructor() { this.flow = null; this.quiet = false; this.botAsked = {}; this.settleFor = ""; this.settledFor = ""; }
+  static FOUND_HINT = "곧 출발해요. 잠시만 기다려 주세요.";
+  constructor() { this.flow = null; this.quiet = false; this.botAsked = {}; this.awaitingLoad = false; this.settleFor = ""; this.settledFor = ""; }
   async ready() {
     if (this.flow) return this.flow;
     const db = await connectDb();
@@ -5321,7 +5453,7 @@ class TurboRandomMatch {
       if (status !== "lobby" || !team) return false;
       await ref.child("players/" + BT.myId).set(newPlayer(team, tnow()));
     }
-    this.botAsked = {};
+    this.botAsked = {}; this.awaitingLoad = false;
     this.showFound(ticket);
     enterRoom(ticket.room);
     $("cardLobby").classList.add("matched");
@@ -5341,13 +5473,15 @@ class TurboRandomMatch {
   startMatch() { this.tryStart(TurboRandomMatch.START_TRIES); }
   tryStart(triesLeft) {
     if (!isHost() || BT.status !== "lobby") return;
-    if (humanRacerReady()) { hostStart(); return; }
+    if (humanRacerReady()) { if (battleLoadSync.blocksStart()) this.awaitingLoad = true; else hostStart(); return; }
     SIDES.forEach(side => { if (!racerOf(side) && !this.botAsked[side]) { this.botAsked[side] = true; addBot(side); } });
     if (triesLeft > 0) setTimeout(() => this.tryStart(triesLeft - 1), TurboRandomMatch.START_RETRY_MS);
   }
   showParty() { showCard("party"); refreshNick(); carPicker.mark(); }
   showStart(message) { showCard("start"); bMsg(message); }
   roomChanged() {
+    $("foundHint").textContent = (BT.ref && battleLoadSync.waitText()) || TurboRandomMatch.FOUND_HINT;
+    if (this.awaitingLoad && isHost() && BT.status === "lobby" && humanRacerReady() && !battleLoadSync.blocksStart()) { this.awaitingLoad = false; hostStart(); }
     if (this.flow && BT.ref) this.flow.roomChanged(racerIds().filter(id => !isBot(id)).length, isHost(), BT.status === "lobby");
   }
   raceProgress() {
