@@ -276,7 +276,7 @@
   .modalBox .joinRow input { font-size: 22px; letter-spacing: 1px; }
   .modalBox .mini { margin-top: 10px; }
 
-  #battleNote { position: fixed; left: 50%; transform: translateX(-50%); top: 138px; z-index: 5; pointer-events: none; font-size: 16px; padding: 8px 16px; text-align: center; white-space: nowrap; border-left: 4px solid #D97B4F; }
+  #battleNote { position: fixed; left: 50%; transform: translateX(-50%); bottom: 16px; z-index: 5; pointer-events: none; font-size: 16px; padding: 8px 16px; text-align: center; white-space: nowrap; border-left: 4px solid #D97B4F; }
   #btnMatchLeave { position: fixed; top: 8px; right: 8px; z-index: 8; }
   #rankBox { position: fixed; top: 48px; left: 10px; z-index: 5; pointer-events: none; width: 260px; padding: 10px 10px 12px; border-radius: 12px; border-top: 3px solid #D97B4F; background: linear-gradient(to bottom, rgba(16,18,28,.72), rgba(16,18,28,.38)); box-shadow: 0 4px 14px rgba(0,0,0,.25); }
   #rankBox #rkTime { display: block; margin: 0 0 8px 2px; padding: 0; font-size: 26px; background: none; border: 0; box-shadow: none; }
@@ -296,7 +296,7 @@
     #rankBox { width: 210px; }
     #rankBox #rkTime { font-size: 22px; }
     .rkRow b { font-size: 15px; }
-    #battleNote { top: 150px; font-size: 14px; }
+    #battleNote { bottom: 12px; font-size: 14px; }
     #viewBtns { bottom: 12px; }
     #viewBtns button { font-size: 15px; padding: 8px 12px; }
   }
@@ -4176,7 +4176,8 @@ function tick(now) {
 
   if (spectating && state !== "menu") drawSpeedLines(Math.abs(V.v) / CFG.maxSpeed);
   else if (state !== "menu") {
-    hudTime.firstChild.nodeValue = fmtTime(state === "done" ? finalMs : elapsed);
+    if (battle && state === "done") elapsed = Math.max(0, -msToGo());
+    hudTime.firstChild.nodeValue = fmtTime(state === "done" && !battle ? finalMs : elapsed);
     if (!OPEN) setText(hudLap, Math.min(LAPS, P.lap + 1) + " / " + LAPS);
     if (!OPEN) { const lapFillWidth = (Math.max(0, Math.min(1, myProg() - P.lap)) * 100).toFixed(1) + "%"; if (lapFill.style.width !== lapFillWidth) lapFill.style.width = lapFillWidth; }
     setText(hudOff, P.off ? "오프로드 — 감속 중" : "");
