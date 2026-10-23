@@ -1105,23 +1105,34 @@ function ribbon(group, edgeFn, vRepeat, mat, from, to) {
   g.setIndex(idx); g.computeVertexNormals();
   const m = new THREE.Mesh(g, mat); group.add(m); return m;
 }
-function disposeMaterialWithTextures(material) {
-  Object.keys(material).forEach(key => {
-    const value = material[key];
-    if (value && value.isTexture && !SHARED_TEX.has(value)) value.dispose();
-  });
-  material.dispose();
-}
-function buildTrack(def) {
-  if (trackGroup) {
-    scene.remove(trackGroup);
-    trackGroup.traverse(o => {
-      if (!o.geometry) return;
-      o.geometry.dispose();
-      if (o.isInstancedMesh) o.dispose();
-      [].concat(o.material).forEach(m => { disposeMaterialWithTextures(m); });
-    });
+class CourseShelf {
+  constructor() { this.built = {}; this.shownKey = ""; }
+  show(def) {
+    if (this.shownKey === def.key && trackGroup) return;
+    if (trackGroup) scene.remove(trackGroup);
+    const kept = this.built[def.key];
+    if (kept) this.restore(kept); else { buildTrack(def); this.built[def.key] = this.capture(); }
+    scene.add(trackGroup);
+    this.shownKey = def.key;
+    applyAtmosphere(def);
+    courseWarmup.trackBuilt(def.key);
+    minimapTrackLayer.invalidate();
   }
+  capture() {
+    return {
+      group: trackGroup, S, N, W, SEG, TRACK_LEN, LAPS, OPEN, START_I, FINISH_I, MM,
+      cityWater: CITY_WATER, cityAnim: CITY_ANIM, treeCells: TREE_CELL_MESHES.slice(), shadowOnly: SHADOW_ONLY.slice(), neighborhood: TrackNeighborhood.grid
+    };
+  }
+  restore(c) {
+    trackGroup = c.group; S = c.S; N = c.N; W = c.W; SEG = c.SEG; TRACK_LEN = c.TRACK_LEN; LAPS = c.LAPS; OPEN = c.OPEN; START_I = c.START_I; FINISH_I = c.FINISH_I; MM = c.MM;
+    CITY_WATER = c.cityWater; CITY_ANIM = c.cityAnim; TrackNeighborhood.grid = c.neighborhood;
+    TREE_CELL_MESHES.splice(0, TREE_CELL_MESHES.length, ...c.treeCells);
+    SHADOW_ONLY.splice(0, SHADOW_ONLY.length, ...c.shadowOnly);
+  }
+}
+const courseShelf = new CourseShelf();
+function buildTrack(def) {
   const G = trackGroup = new THREE.Group(); scene.add(G);
   CITY_WATER = []; CITY_ANIM = []; TREE_CELL_MESHES.length = 0; SHADOW_ONLY.length = 0;
   W = def.width; OPEN = !!def.open;
@@ -1141,13 +1152,10 @@ function buildTrack(def) {
   const B = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity };
   S.forEach(s => { B.minX = Math.min(B.minX, s.p.x); B.maxX = Math.max(B.maxX, s.p.x); B.minZ = Math.min(B.minZ, s.p.z); B.maxZ = Math.max(B.maxZ, s.p.z); });
   buildSceneryHQ(G, def, B);
-  applyAtmosphere(def);
-  courseWarmup.trackBuilt(def.key);
   {
     const pad = 22, sc = Math.min((300 - pad * 2) / (B.maxX - B.minX), (300 - pad * 2) / (B.maxZ - B.minZ));
     const ox = 150 - (B.minX + B.maxX) / 2 * sc, oz = 150 - (B.minZ + B.maxZ) / 2 * sc;
     MM = { sc, mx: x => ox + x * sc, mz: z => oz + z * sc };
-    minimapTrackLayer.invalidate();
   }
 }
 function railPoints(off, sg, step) {
@@ -3760,7 +3768,7 @@ function showCard(which) {
 }
 function showCourse(k) {
   releaseGhostCar();
-  course = k; buildTrack(TRACKS[k]); resetCar(); updateCar(0);
+  course = k; courseShelf.show(TRACKS[k]); resetCar(); updateCar(0);
 }
 class TimeAttackSetup {
   static COURSE_STORAGE_KEY = "turbolap_course_v1";
@@ -3807,7 +3815,7 @@ function showLapToast(done, lt, isNew) {
 function startRace(which) {
   audioInit();
   playMode = "ta"; setBattleHud(false);
-  if (which && which !== course) { course = which; buildTrack(TRACKS[course]); }
+  if (which && which !== course) { course = which; courseShelf.show(TRACKS[course]); }
   scene.remove(car); car = makeCar(garage.key); scene.add(car);
   resetCar(); P.lap = 0; P.expected = 0; lapTimes = []; lapStartMs = 0; raceBest = 0; renderHudBest();
   recData = []; recLast = -Infinity; setupGhost();
@@ -5570,9 +5578,9 @@ $("viewBtns").onclick = e => {
   b.blur(); BT.viewId = b.getAttribute("data-id"); BT.viewKey = ""; specDirector.pickManually(standings()); renderViewBtns(); snapCamera();
 };
 
-window.TL = { keys, P, CFG, camera, scene, renderer, tick, makeCar, CAR_MODELS, BT, get S() { return S; }, setTrack: k => { course = k; buildTrack(TRACKS[k]); resetCar(); } };
+window.TL = { keys, P, CFG, camera, scene, renderer, tick, makeCar, CAR_MODELS, BT, get S() { return S; }, setTrack: k => { course = k; courseShelf.show(TRACKS[k]); resetCar(); } };
 COURSES.forEach(k => { if (WRS[k]) WRS[k].onChange(renderRecords); });
-buildTrack(TRACKS[course]); resetCar(); updateCar(0); showMenu();
+courseShelf.show(TRACKS[course]); resetCar(); updateCar(0); showMenu();
 requestAnimationFrame(frame);
 })();
 </script>
