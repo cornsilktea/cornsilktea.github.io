@@ -4829,8 +4829,10 @@ function gapToRival() {
   if (playMode !== "battle" || BT.spec || state !== "race" || P.fin) return noRival;
   const rivalId = racerIds().find(id => id !== BT.myId), e = rivalId && BT.ents[rivalId];
   if (!e || !e.seen || e.fin) return noRival;
-  const s = S[P.ci];
-  return { behind: (entProgNow(e) - myProg()) * courseLen(), side: Math.abs((P.x - e.x) * s.n.x + (P.z - e.z) * s.n.z) };
+  const s = S[P.ci], es = S[e.ci] || s;
+  const myLat = (P.x - s.p.x) * s.n.x + (P.z - s.p.z) * s.n.z;
+  const rivalLat = (e.x - es.p.x) * es.n.x + (e.z - es.p.z) * es.n.z;
+  return { behind: (entProgNow(e) - myProg()) * courseLen(), side: Math.abs(myLat - rivalLat) };
 }
 function boostLevel(t) {
   if (t < CHASE.rampSec) return t / CHASE.rampSec;
