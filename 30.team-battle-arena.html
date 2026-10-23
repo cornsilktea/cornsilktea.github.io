@@ -9043,7 +9043,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static SIDE_TEAMS = ["blue", "red"];
     static RESULT_TRIES = 20;
     static RESULT_RETRY_MS = 300;
-    static AI_FALLBACK_MS = 45000;
+    static AI_FALLBACK_MS = 120000;
     constructor(services) { this.services = services; this.flow = null; this.quiet = false; }
     ready() { var services = this.services;
       if (this.flow || !services.backend.db) return this.flow;

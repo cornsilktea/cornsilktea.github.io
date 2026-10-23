@@ -421,6 +421,11 @@
     </div>
   </div>
 
+  <div class="st-wrap" id="cardFound" style="display:none">
+    <div class="st-hero"><h1 class="st-title">TURBO LAP</h1></div>
+    <div class="st-card"><h2>🏁 상대를 찾았어요!</h2><div class="mk-notice" id="foundRival"></div><div class="hint">곧 출발해요. 잠시만 기다려 주세요.</div></div>
+  </div>
+
   <div class="card wide" id="cardLobby" style="display:none">
     <div class="codeBar">
       <div><span class="codeLab">방 코드</span><span class="codeNum" id="lobbyCode">-----</span></div>
@@ -3653,7 +3658,7 @@ function placeAt(i, lat) {
 function startLat() { return (playMode === "battle" && myTeam() === "right" ? -1 : 1) * gridLat(); }
 function resetCar() { placeAt(START_I, startLat()); clearGroundFx(); P.gfxT = newGroundTrack(); P.off = false; P.wallT = 0; P.steerVis = 0; P.rollVis = 0; P.fin = 0; resetBoost(P); }
 function resetBoost(r) { r.chase = 0; r.chaseKmh = 0; r.tailLostT = 0; r.surgeVis = 0; r.surgeFlash = 0; r.tailT = 0; r.offLine = false; r.boostOn = false; r.boostT = 0; r.boostCap = 0; r.boostGain = 0; r.boostCool = 0; }
-const CARDS = { start: "cardStart", course: "cardCourse", done: "cardDone", lobby: "cardLobby", bdone: "cardBDone", party: "cardParty" };
+const CARDS = { start: "cardStart", course: "cardCourse", done: "cardDone", lobby: "cardLobby", bdone: "cardBDone", party: "cardParty", found: "cardFound" };
 let cardNow = "start";
 function showCard(which) {
   cardNow = which;
@@ -4306,7 +4311,7 @@ const HIT_NOTICE = { minGapMs: 250, dedupeMs: 300, staleMs: 1000 };
 const CHASE = { gapSteps: [{ overM: 30, kmh: 25 }, { overM: 20, kmh: 15 }, { overM: 10, kmh: 10 }, { overM: 0, kmh: 5 }], tailM: 25, tailSideM: 2.5 * 2 * CAR_HIT.radius, tailSec: 3, boostKmh: 40, rampSec: 0.5, holdSec: 1, fadeSec: 1.5, cooldownSec: 6, startLockSec: 5, stickyM: 3, stickySideM: 0.4, tailGraceSec: 0.5, tagHoldSec: 0.6, surgeFromRatio: 0.85, surgeFullKmh: 20 };
 const TAG_HOLD = { chase: { text: "", t: 0 }, follow: { text: "", t: 0 } };
 const BATTLE = {
-  root: "turbolap/rooms", specMax: 1, netMs: 100, countMs: 3600, dnfMs: 30000, rankRowH: 48,
+  root: "turbolap/rooms", specMax: 1, netMs: 100, countMs: 3600, dnfMs: 10000, rankRowH: 48,
   sdk: ["https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js", "https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"]
 };
 
@@ -4471,7 +4476,7 @@ function enterRoom(code) {
   sub(hitRef, "child_changed", botHit);
   $("lobbyCode").textContent = code;
   refreshNick();
-  showCard("lobby");
+  showCard(turboRandom.roomCard());
 }
 const HOST_ORDER = { left: 0, right: 1, spec: 2 };
 function nextHost(ps) {
@@ -4599,7 +4604,7 @@ function hostBackToLobby() {
 function onStatus(st) {
   if (st === null) { if (!BT.leaving) exitRoom("방이 종료되었어요."); return; }
   BT.status = st;
-  if (st === "lobby") { resetMatchLocal(); BT.lobbyCarSig = ""; showCard("lobby"); playersChanged(); return; }
+  if (st === "lobby") { resetMatchLocal(); BT.lobbyCarSig = ""; showCard(turboRandom.roomCard()); playersChanged(); return; }
   if (!BT.match && (st === "countdown" || st === "playing")) startMatchLocal();
   if (st === "ended") endMatchLocal();
 }
@@ -5262,7 +5267,7 @@ class TurboRandomMatch {
   static FORFEIT_PROGRESS = 0.5;
   static START_RETRY_MS = 300;
   static SETTLE_MS = 1000;
-  static AI_FALLBACK_MS = 45000;
+  static AI_FALLBACK_MS = 120000;
   constructor() { this.flow = null; this.quiet = false; this.botAsked = {}; this.settleFor = ""; this.settledFor = ""; }
   async ready() {
     if (this.flow) return this.flow;
@@ -5275,6 +5280,11 @@ class TurboRandomMatch {
     return this.flow;
   }
   inParty() { return !!this.flow && this.flow.inParty(); }
+  roomCard() { return this.ticket() ? "found" : "lobby"; }
+  showFound(ticket) {
+    const rival = (ticket.rivals || [])[0];
+    $("foundRival").textContent = rival ? "상대: " + rival : "AI와 대결해요";
+  }
   ticket() { return this.flow ? this.flow.ticket() : null; }
   async open() {
     if (!PlayerProfile.storedNick()) { askNickFirst(); return; }
@@ -5311,6 +5321,7 @@ class TurboRandomMatch {
       await ref.child("players/" + BT.myId).set(newPlayer(team, tnow()));
     }
     this.botAsked = {};
+    this.showFound(ticket);
     enterRoom(ticket.room);
     $("cardLobby").classList.add("matched");
     return true;
