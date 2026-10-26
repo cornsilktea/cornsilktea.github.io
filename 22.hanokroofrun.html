@@ -199,6 +199,7 @@ const SAVE_KEY = 'hanokroofrun_best_v2';
 function loadBest() { try { return parseInt(localStorage.getItem(SAVE_KEY)) || 0; } catch (e) { return 0; } }
 function saveBest(v) { try { localStorage.setItem(SAVE_KEY, String(v)); } catch (e) {} }
 let best = loadBest();
+if (window.WorldRecord && WorldRecord.syncBest) WorldRecord.syncBest('hanokroofrun', { storageKey: SAVE_KEY, merge: WorldRecord.betterOf(raw => parseInt(raw, 10), false), onApply: () => { best = loadBest(); const el = document.getElementById('menuRecs'); if (el) el.innerHTML = menuRecordsHtml(); } });
 
 const Hall = window.WorldRecord ? WorldRecord('hanokroofrun', { format: v => v + '점' }) : null;
 function hallText() {

@@ -645,8 +645,9 @@ const $ = id => document.getElementById(id);
 function recKey(k) { return TRACKS[k].recKey || k; }
 function bestKey(k) { return "turbolap_best_" + recKey(k) + "_v1"; }
 function loadBest(k) { try { const v = parseInt(localStorage.getItem(bestKey(k)), 10); return v > 0 ? v : 0; } catch (e) { return 0; } }
-function saveBest(k, v) { try { localStorage.setItem(bestKey(k), String(v)); } catch (e) {} }
+function saveBest(k, v) { try { localStorage.setItem(bestKey(k), String(v)); } catch (e) {} if (window.WorldRecord && WorldRecord.pushBest) WorldRecord.pushBest("turbolap"); }
 const best = {}; COURSES.forEach(k => { best[k] = loadBest(k); });
+if (window.WorldRecord && WorldRecord.syncBest) COURSES.forEach(k => WorldRecord.syncBest("turbolap", { storageKey: bestKey(k), merge: WorldRecord.betterOf(raw => { const v = parseInt(raw, 10); return v > 0 ? v : null; }, true), onApply: () => { best[k] = loadBest(k); renderRecords(); } }));
 const GHOST_STEP = 100;
 let ghostPick = "none"; try { if (/^(none|mine|world)$/.test(localStorage.getItem("turbolap_ghostpick_v1") || "")) ghostPick = localStorage.getItem("turbolap_ghostpick_v1"); } catch (e) {}
 const worldGhost = { tried: {} }; COURSES.forEach(k => { worldGhost[k] = null; worldGhost.tried[k] = false; });

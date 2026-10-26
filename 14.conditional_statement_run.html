@@ -242,6 +242,7 @@
   };
 
   var WR = window.WorldRecord ? WorldRecord("conditionrun") : null;
+  if (window.WorldRecord && WorldRecord.syncBest) WorldRecord.syncBest("conditionrun", { storageKey: "runner_best_stage", merge: WorldRecord.betterOf(function (raw) { return parseInt(raw, 10); }, false), onApply: function () { bestStage = parseInt(localStorage.getItem("runner_best_stage") || "0", 10) || bestStage; elBest.textContent = bestStage; } });
   function renderWorld(){
     var E = recordEls;
     var has = WR && WR.rec;

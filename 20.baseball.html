@@ -808,6 +808,7 @@ window.addEventListener("resize", fitArena);
 applyImages();
 setBatter("ready"); setPitcher("idle");
 BEST.render($("startBest"), false);
+if (window.WorldRecord && WorldRecord.syncBest) WorldRecord.syncBest("baseball", { storageKey: BEST.KEY, merge: WorldRecord.betterOf(raw => { const b = JSON.parse(raw); return b && typeof b.score === "number" ? b.score : null; }, false), onApply: () => BEST.render($("startBest"), false) });
 renderWorld();
 </script>
 </body>

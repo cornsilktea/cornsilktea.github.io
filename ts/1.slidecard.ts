@@ -122,6 +122,16 @@ class BestRecordStore {
       localStorage.setItem(this.storageKey, JSON.stringify(record));
     } catch (e) {}
   }
+
+  syncWithAccount(game: string, onApply: () => void): { push(): void } | null {
+    const factory = window.WorldRecord;
+    if (!factory || !factory.syncBest || !factory.betterOf) return null;
+    const merge = factory.betterOf((raw) => {
+      const value = JSON.parse(raw);
+      return value && typeof value.time === "number" && typeof value.moves === "number" ? value.time : null;
+    }, true);
+    return factory.syncBest(game, { storageKey: this.storageKey, merge, onApply });
+  }
 }
 
 class BoardGeometry {
@@ -305,6 +315,7 @@ class SlideCardGame {
   private readonly cards: HTMLElement[] = [];
   private readonly dragController: CardDragController;
   private best: BestRecord | null = this.bestStore.load();
+  private readonly accountBest = this.bestStore.syncWithAccount("slidecard", () => this.reloadBest());
   private finished = false;
   private animationFrame = 0;
 
@@ -322,6 +333,11 @@ class SlideCardGame {
     window.addEventListener("resize", () => this.layout(false));
     window.addEventListener("load", () => this.layout(false));
     this.reset();
+  }
+
+  private reloadBest(): void {
+    this.best = this.bestStore.load();
+    this.recordPanel.renderBest(this.best);
   }
 
   private buildCards(): void {
@@ -401,6 +417,7 @@ class SlideCardGame {
     if (isNewBest) {
       this.best = { time: elapsed, moves };
       this.bestStore.save(this.best);
+      if (this.accountBest) this.accountBest.push();
       this.recordPanel.renderBest(this.best);
     }
     this.statusElement.textContent = `${isNewBest ? "완료 · 신기록! " : "완료 · 기록 "}${formatTime(elapsed)} / ${moves}회`;

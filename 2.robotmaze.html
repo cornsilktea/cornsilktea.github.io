@@ -381,6 +381,8 @@ h1{font-size:16px;margin:0 0 4px;letter-spacing:-0.01em;}
     }
   }
 
+  if(window.WorldRecord&&WorldRecord.syncBest){WorldRecord.syncBest('robotmaze',{storageKey:BEST_KEY,merge:WorldRecord.betterOf(function(raw){var v=JSON.parse(raw);return v&&typeof v.cmds==='number'&&typeof v.time==='number'?v.cmds*10000000+v.time:null;},true),onApply:function(){best=loadBest();renderBest();}});}
+
   function recordWin(cmds,time){
     if(!best || cmds<best.cmds || (cmds===best.cmds && time<best.time)){
       best={cmds:cmds,time:time};

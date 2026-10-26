@@ -202,6 +202,7 @@
   var WR = window.WorldRecord
     ? WorldRecord("timeguess", { lower: true, format: function (v) { return "오차 " + (v / 1000000).toFixed(6) + "초"; } })
     : null;
+  if (window.WorldRecord && WorldRecord.syncBest) WorldRecord.syncBest("timeguess", { storageKey: BEST_KEY, merge: WorldRecord.betterOf(function (raw) { var b = JSON.parse(raw); return b && typeof b.sec === "number" && typeof b.diff === "number" ? Math.abs(b.diff) : null; }, true), onApply: function () { try { var b = JSON.parse(localStorage.getItem(BEST_KEY)); if (b && typeof b.sec === "number") best = b; } catch (e) {} renderBest(false); } });
 
   function renderWorld() {
     renderClass();

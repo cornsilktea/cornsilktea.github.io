@@ -305,6 +305,7 @@ function saveJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } ca
 let prog = loadJSON(PROG_KEY); if (!prog || !(prog.cleared >= 0)) prog = { cleared: 0 };
 let best = loadJSON(BEST_KEY); if (best && !(best.stage >= 1 && best.speed >= 0)) best = null;
 const WR = window.WorldRecord ? WorldRecord("freekick", { format: fmtPacked }) : null;
+if (window.WorldRecord && WorldRecord.syncBest) WorldRecord.syncBest("freekick", { storageKey: BEST_KEY, merge: WorldRecord.betterOf(raw => { const b = JSON.parse(raw); return b && b.stage >= 1 && b.speed >= 0 ? packScore(b.stage, b.speed) : null; }, false), onApply: () => { best = loadJSON(BEST_KEY); renderRecords(); } });
 let wrTried = false;
 function wrInfo() {
   if (!WR) return { val: "—", who: "", none: true };
@@ -1016,7 +1017,7 @@ function showResult() {
   if (goal) {
     const packed = packScore(stage.n, shotStat.kmh), prevPacked = best ? packScore(best.stage, best.speed) : -1;
     newBest = packed > prevPacked;
-    if (newBest) { best = { stage: stage.n, speed: shotStat.kmh, date: new Date().toLocaleDateString("ko-KR") }; saveJSON(BEST_KEY, best); }
+    if (newBest) { best = { stage: stage.n, speed: shotStat.kmh, date: new Date().toLocaleDateString("ko-KR") }; saveJSON(BEST_KEY, best); if (window.WorldRecord && WorldRecord.pushBest) WorldRecord.pushBest("freekick"); }
     wrBeat = !!(WR && WR.beats(packed));
     crBeat = !!(WR && WR.beatsClass(packed));
     $("finalMsg").textContent = wrBeat ? "🏆 세계 신기록!" : crBeat ? "🏫 우리 반 신기록!" : newBest ? "🎉 개인 최고 기록 경신!" : "";

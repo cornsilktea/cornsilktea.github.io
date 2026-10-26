@@ -265,6 +265,7 @@ button:active { background: var(--sg-panel-alt); }
   function saveBest() {
     try { window.localStorage.setItem("brk_best", String(best)); } catch (e) {}
   }
+  if (window.WorldRecord && WorldRecord.syncBest) WorldRecord.syncBest("brickbreak", { storageKey: "brk_best", merge: WorldRecord.betterOf(function (raw) { return parseInt(raw, 10); }, false), onApply: function () { best = parseInt(window.localStorage.getItem("brk_best"), 10) || best; } });
 
   var worldLine = document.getElementById("worldLine");
   var classBox = document.getElementById("clsBox");

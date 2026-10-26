@@ -561,8 +561,9 @@ function fmtPacked(v) { return Math.floor(v / 10000) + "명 · " + fmtTime(v % 1
 
 const BEST_KEY = "fpssurvival_best_v2";
 function loadBest() { try { const j = JSON.parse(localStorage.getItem(BEST_KEY) || "null"); return (j && j.score >= 0 && j.time >= 0) ? j : null; } catch (e) { return null; } }
-function saveBest(b) { try { localStorage.setItem(BEST_KEY, JSON.stringify(b)); } catch (e) {} }
+function saveBest(b) { try { localStorage.setItem(BEST_KEY, JSON.stringify(b)); } catch (e) {} if (window.WorldRecord && WorldRecord.pushBest) WorldRecord.pushBest("fpssurvival"); }
 let best = loadBest();
+if (window.WorldRecord && WorldRecord.syncBest) WorldRecord.syncBest("fpssurvival", { storageKey: BEST_KEY, merge: WorldRecord.betterOf(raw => { const j = JSON.parse(raw); return j && j.score >= 0 && j.time >= 0 ? packScore(j.score, j.time) : null; }, false), onApply: () => { best = loadBest(); renderRecords(); } });
 const WR = window.WorldRecord ? WorldRecord("fpssurvival", { key: "twomin", format: fmtPacked }) : null;
 let wrTried = false;
 function wrInfo() {

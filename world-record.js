@@ -254,6 +254,7 @@
          다 채워 등록하기 전에는 닫히지 않는다(그 사이 누가 앞질러 거부되면 자동으로 닫힘).
          돌려주는 값은 세계 신기록으로 등록된 기록(반 신기록만 등록했거나 아니면 null). */
       prompt: function (v, title) {
+        PersonalBests.pushGame(game);
         if (blocked()) return Promise.resolve(null);
         /* 기기에 들고 있던 기록은 게임을 시작할 때 읽은 값이라, 그 사이 다른 학생이 더 높은 기록을 냈을 수 있다.
            창을 띄우기 전에 세계·반 신기록을 다시 읽어(onChange 도 다시 불림) 진짜 신기록일 때만 창을 띄운다.
@@ -506,6 +507,142 @@
     function emit() { listeners.forEach(function (fn) { try { fn(api); } catch (e) {} }); }
     return api;
   }
+
+  /* ---------- 개인 최고 기록을 계정에 저장(2026-10-26 선생님 결정) ----------
+     게임마다 이 기기의 최고 기록을 localStorage(<게임>_best… 키)에 두는데, 저장 모양이 게임마다 달라(숫자·객체·곡별 표)
+     원문 문자열 그대로 users/<uid>/personal/<게임>/<키> = { raw, at } 에 올려 두고, 다른 기기에서 로그인하면 내려받는다.
+       WorldRecord.syncBest(game, { storageKey, merge, onApply })
+         merge(이기기원문, 계정원문) → 둘을 합친 원문(더 좋은 쪽, 곡별 표면 칸마다 더 좋은 쪽). null 이면 아무것도 안 함.
+         onApply() → 합친 원문이 이 기기에 새로 써졌을 때 게임이 localStorage 를 다시 읽고 화면을 다시 그린다.
+       돌려주는 handle.push() → 게임이 끝나 이 기기 기록이 바뀌었을 때 부른다(그 게임의 WR.prompt 도 자동으로 부름).
+     요청: 게임마다 페이지를 열 때 계정 기록 읽기 1번(같은 게임의 키들을 한 번에), 합친 결과가 계정과 다를 때만 쓰기 1번.
+     로그인이 안 됐으면(배포용·옛 링크) 아무것도 하지 않는다. 로그인이 게임 스크립트보다 늦게 끝나면 그때 다시 맞춘다.
+     merge 도우미: WorldRecord.betterOf(scoreOf, lower) — 원문 → 점수(못 읽으면 null)로 비교해 더 좋은 원문을 고른다.
+                   WorldRecord.mergeTable(lower) — {칸: 숫자} 표를 칸마다 더 좋은 값으로 합친다(0·빈칸은 기록 없음). */
+  var PersonalBests = {
+    syncs: {},
+    cache: {},
+    cacheUid: "",
+    keyOf: function (storageKey) {
+      return String(storageKey).toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 40) || "all";
+    },
+    url: function (user, path, token) {
+      var cfg = window.PORTAL_CONFIG;
+      if (!cfg || !cfg.isReady || !cfg.isReady()) return null;
+      return cfg.DB_URL.replace(/\/+$/, "") + "/users/" + user.uid + "/personal/" + path + ".json?auth=" + encodeURIComponent(token);
+    },
+    readLocal: function (key) {
+      try { return localStorage.getItem(key); } catch (e) { return null; }
+    },
+    writeLocal: function (key, raw) {
+      try { localStorage.setItem(key, raw); return true; } catch (e) { return false; }
+    },
+    /* 같은 게임의 계정 기록은 페이지마다 한 번만 읽는다(키가 여러 개여도) */
+    load: function (user, game) {
+      if (PersonalBests.cacheUid !== user.uid) { PersonalBests.cache = {}; PersonalBests.cacheUid = user.uid; }
+      if (!PersonalBests.cache[game]) {
+        PersonalBests.cache[game] = user.getToken().then(function (token) {
+          var u = PersonalBests.url(user, game, token);
+          if (!u) return {};
+          return fetch(u, { cache: "no-store" }).then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); });
+        }).then(function (j) { return j || {}; }, function () { delete PersonalBests.cache[game]; return null; });
+      }
+      return PersonalBests.cache[game];
+    },
+    save: function (user, game, key, raw, table) {
+      return user.getToken().then(function (token) {
+        var u = PersonalBests.url(user, game + "/" + key, token);
+        if (!u) return;
+        return fetch(u, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ raw: raw, at: { ".sv": "timestamp" } }) })
+          .then(function (r) { if (r.ok) table[key] = { raw: raw, at: Date.now() }; });
+      }).catch(function () {});
+    },
+    run: function (game, sync) {
+      var user = window.PORTAL_USER;
+      if (!user) return;
+      /* 맞추는 중에 또 불리면(게임이 끝나 기록이 바뀜) 끝난 뒤 한 번 더 맞춘다 */
+      if (sync.running) { sync.again = true; return; }
+      sync.running = true;
+      sync.again = false;
+      PersonalBests.load(user, game).then(function (table) {
+        if (!table) return;
+        var key = PersonalBests.keyOf(sync.storageKey);
+        var local = PersonalBests.readLocal(sync.storageKey);
+        var account = table[key] && typeof table[key].raw === "string" ? table[key].raw : null;
+        var merged = null;
+        try { merged = sync.merge(local, account); } catch (e) { merged = null; }
+        if (typeof merged !== "string" || !merged) return;
+        if (merged !== local && PersonalBests.writeLocal(sync.storageKey, merged)) { try { sync.onApply(); } catch (e) {} }
+        if (merged !== account) return PersonalBests.save(user, game, key, merged, table);
+      }).then(PersonalBests.finisher(game, sync), PersonalBests.finisher(game, sync));
+    },
+    finisher: function (game, sync) {
+      return function () {
+        sync.running = false;
+        if (sync.again) PersonalBests.run(game, sync);
+      };
+    },
+    pushGame: function (game) {
+      (PersonalBests.syncs[game] || []).forEach(function (sync) { PersonalBests.run(game, sync); });
+    },
+    rerunAll: function () {
+      Object.keys(PersonalBests.syncs).forEach(PersonalBests.pushGame);
+    }
+  };
+  document.addEventListener("portal-user-changed", PersonalBests.rerunAll);
+
+  WorldRecord.syncBest = function (game, o) {
+    var sync = { storageKey: o.storageKey, merge: o.merge, onApply: o.onApply || function () {}, running: false };
+    (PersonalBests.syncs[game] = PersonalBests.syncs[game] || []).push(sync);
+    PersonalBests.run(game, sync);
+    return { push: function () { PersonalBests.run(game, sync); } };
+  };
+
+  /* 게임이 끝나 이 기기 기록이 바뀌었을 때(WR.prompt 를 신기록일 때만 부르는 게임용) 그 게임의 계정 기록을 다시 맞춘다 */
+  WorldRecord.pushBest = function (game) { PersonalBests.pushGame(game); };
+
+  WorldRecord.betterOf = function (scoreOf, lower) {
+    function score(raw) {
+      if (raw == null) return null;
+      var v = null;
+      try { v = scoreOf(raw); } catch (e) { v = null; }
+      return typeof v === "number" && isFinite(v) ? v : null;
+    }
+    return function (local, account) {
+      var a = score(local), b = score(account);
+      if (a === null) return b === null ? null : account;
+      if (b === null) return local;
+      return (lower ? b < a : b > a) ? account : local;
+    };
+  };
+
+  /* scoreOf(칸 값) → 점수. 생략하면 칸 값 자체가 숫자(예: 코스별 시간). 곡별 {score, …} 객체면 v => v.score */
+  WorldRecord.mergeTable = function (lower, scoreOf) {
+    var pick = scoreOf || function (v) { return v; };
+    function table(raw) {
+      if (!raw) return {};
+      try { var t = JSON.parse(raw); return t && typeof t === "object" ? t : {}; } catch (e) { return {}; }
+    }
+    function score(v) {
+      var s = null;
+      try { s = v == null ? null : Number(pick(v)); } catch (e) { s = null; }
+      return typeof s === "number" && isFinite(s) && s > 0 ? s : 0;
+    }
+    return function (local, account) {
+      var a = table(local), b = table(account), out = {};
+      Object.keys(a).concat(Object.keys(b)).forEach(function (k) {
+        var x = score(a[k]), y = score(b[k]);
+        if (!x && !y) return;
+        var useLocal = !y || (x && (lower ? x <= y : x >= y));
+        out[k] = useLocal ? a[k] : b[k];
+      });
+      if (!Object.keys(out).length) return null;
+      var merged = JSON.stringify(out);
+      if (merged === JSON.stringify(a)) return local;
+      if (merged === JSON.stringify(b)) return account;
+      return merged;
+    };
+  };
 
   window.WorldRecord = WorldRecord;
 })();

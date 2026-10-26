@@ -108,6 +108,16 @@ class BestRecordStore {
         }
         catch (e) { }
     }
+    syncWithAccount(game, onApply) {
+        const factory = window.WorldRecord;
+        if (!factory || !factory.syncBest || !factory.betterOf)
+            return null;
+        const merge = factory.betterOf((raw) => {
+            const value = JSON.parse(raw);
+            return value && typeof value.time === "number" && typeof value.moves === "number" ? value.time : null;
+        }, true);
+        return factory.syncBest(game, { storageKey: this.storageKey, merge, onApply });
+    }
 }
 class BoardGeometry {
     constructor(boardElement) {
@@ -271,6 +281,7 @@ class SlideCardGame {
         this.recordPanel = new RecordPanel(formatTime);
         this.cards = [];
         this.best = this.bestStore.load();
+        this.accountBest = this.bestStore.syncWithAccount("slidecard", () => this.reloadBest());
         this.finished = false;
         this.animationFrame = 0;
         this.buildCards();
@@ -280,6 +291,10 @@ class SlideCardGame {
         window.addEventListener("resize", () => this.layout(false));
         window.addEventListener("load", () => this.layout(false));
         this.reset();
+    }
+    reloadBest() {
+        this.best = this.bestStore.load();
+        this.recordPanel.renderBest(this.best);
     }
     buildCards() {
         this.board.innerHTML = "";
@@ -355,6 +370,8 @@ class SlideCardGame {
         if (isNewBest) {
             this.best = { time: elapsed, moves };
             this.bestStore.save(this.best);
+            if (this.accountBest)
+                this.accountBest.push();
             this.recordPanel.renderBest(this.best);
         }
         this.statusElement.textContent = `${isNewBest ? "완료 · 신기록! " : "완료 · 기록 "}${formatTime(elapsed)} / ${moves}회`;

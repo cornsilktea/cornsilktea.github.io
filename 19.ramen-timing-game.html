@@ -766,6 +766,7 @@ const BEST = {
   }
 };
 BEST.renderStart();
+if (window.WorldRecord && WorldRecord.syncBest) WorldRecord.syncBest("ramentiming", { storageKey: BEST.KEY, merge: WorldRecord.betterOf(raw => { const b = JSON.parse(raw); return b && typeof b.money === "number" ? b.money : null; }, false), onApply: () => BEST.renderStart() });
 
 const WR = window.WorldRecord ? WorldRecord("ramentiming", { format: v => fmt(v) + "원" }) : null;
 function renderWorld(){

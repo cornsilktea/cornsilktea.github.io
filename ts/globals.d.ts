@@ -22,8 +22,21 @@ interface WorldRecordHandle extends RecordSlot {
   submitParty?(value: number, party: WorldRecordParty): Promise<unknown>;
 }
 
+interface PersonalBestSyncOptions {
+  storageKey: string;
+  merge: (local: string | null, account: string | null) => string | null;
+  onApply?: () => void;
+}
+
+interface WorldRecordFactory {
+  (game: string, options: { lower: boolean; format: (ms: number) => string }): WorldRecordHandle;
+  syncBest?(game: string, options: PersonalBestSyncOptions): { push(): void };
+  pushBest?(game: string): void;
+  betterOf?(scoreOf: (raw: string) => number | null, lower: boolean): PersonalBestSyncOptions["merge"];
+}
+
 interface Window {
-  WorldRecord?: (game: string, options: { lower: boolean; format: (ms: number) => string }) => WorldRecordHandle;
+  WorldRecord?: WorldRecordFactory;
 }
 
 type ThreeModule = typeof import("three");

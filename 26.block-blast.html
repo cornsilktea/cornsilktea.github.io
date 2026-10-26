@@ -677,6 +677,7 @@ document.addEventListener("keydown", e => {
 $("infoPerfect").textContent = CONFIG.PERFECT_CLEAR_BONUS;
 $("infoCells").textContent = "+칸 수×" + CONFIG.CELL_POINT;
 BEST.render($("startBest"), false);
+if (window.WorldRecord && WorldRecord.syncBest) WorldRecord.syncBest("blockblast", { storageKey: BEST.KEY, merge: WorldRecord.betterOf(raw => { const b = JSON.parse(raw); return b && typeof b.score === "number" ? b.score : null; }, false), onApply: () => BEST.render($("startBest"), false) });
 G.board = newBoard();
 applyTheme(); renderBoard(); renderTray();
 </script>

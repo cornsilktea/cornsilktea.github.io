@@ -855,8 +855,9 @@ const Best = {
   KEY: "pianotiles_best_v1",
   all(){ try { return JSON.parse(localStorage.getItem(this.KEY) || "{}") || {}; } catch (e) { return {}; } },
   get(id){ const b = this.all()[id]; return (b && typeof b.score === "number") ? b : null; },
-  set(id, rec){ try { const a = this.all(); a[id] = rec; localStorage.setItem(this.KEY, JSON.stringify(a)); } catch (e) {} }
+  set(id, rec){ try { const a = this.all(); a[id] = rec; localStorage.setItem(this.KEY, JSON.stringify(a)); } catch (e) {} if (window.WorldRecord && WorldRecord.pushBest) WorldRecord.pushBest("pianotiles"); }
 };
+if (window.WorldRecord && WorldRecord.syncBest) WorldRecord.syncBest("pianotiles", { storageKey: Best.KEY, merge: WorldRecord.mergeTable(false, b => b.score), onApply: () => { if (typeof renderSongs === "function" && $("start").classList.contains("on")) renderSongs(); } });
 
 const Sound = {
   ctx: null,

@@ -499,6 +499,7 @@
 
   best = loadBest();
   bestEl.textContent = best;
+  if (window.WorldRecord && WorldRecord.syncBest) WorldRecord.syncBest('snakegame', { storageKey: BEST_KEY, merge: WorldRecord.betterOf(raw => parseInt(raw, 10), false), onApply: () => { best = loadBest(); bestEl.textContent = best; } });
   resetState();
   resizeCanvas();
 })();

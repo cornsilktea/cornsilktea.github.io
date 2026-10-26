@@ -239,6 +239,7 @@ function saveJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } ca
 let best = loadJSON(BEST_KEY); if (best && !(best.score >= 0)) best = null;
 const fmtScore = v => v + "점";
 const WR = window.WorldRecord ? WorldRecord("basketball", { format: fmtScore }) : null;
+if (window.WorldRecord && WorldRecord.syncBest) WorldRecord.syncBest("basketball", { storageKey: BEST_KEY, merge: WorldRecord.betterOf(raw => { const b = JSON.parse(raw); return b && b.score >= 0 ? b.score : null; }, false), onApply: () => { best = loadJSON(BEST_KEY); renderRecords(); } });
 let wrTried = false;
 function wrInfo() {
   if (!WR) return { val: "—", who: "", none: true };
@@ -372,7 +373,7 @@ function gameOver(cleared) {
   let newBest = false, wrBeat = false, crBeat = false;
   if (score > 0) {
     newBest = !best || score > best.score;
-    if (newBest) { best = { score, round, date: new Date().toLocaleDateString("ko-KR") }; saveJSON(BEST_KEY, best); }
+    if (newBest) { best = { score, round, date: new Date().toLocaleDateString("ko-KR") }; saveJSON(BEST_KEY, best); if (window.WorldRecord && WorldRecord.pushBest) WorldRecord.pushBest("basketball"); }
     wrBeat = !!(WR && WR.beats(score));
     crBeat = !!(WR && WR.beatsClass(score));
   }
