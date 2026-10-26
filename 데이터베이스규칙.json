@@ -125,7 +125,7 @@
           "red": { ".validate": "newData.isNumber() && newData.val() >= 0" },
           "blue": { ".validate": "newData.isNumber() && newData.val() >= 0" },
           "$char": {
-            ".validate": "$char.matches(/^(warrior|knight|ranger|mage|rogue|necro|sniper|thrower|lancer|blacksmith|priest|hitman|guardian|frost|dancer|duelist|stormbow|cleric|shaman|engineer|druid|giant|astrologer)$/) && newData.hasChildren(['picks', 'wins', 'dmg', 'heal']) && newData.child('wins').val() <= newData.child('picks').val() && ((!data.exists() && newData.child('picks').val() <= 1) || (data.exists() && newData.child('picks').val() >= data.child('picks').val() && newData.child('picks').val() <= data.child('picks').val() + 1))",
+            ".validate": "$char.matches(/^(warrior|knight|ranger|mage|rogue|necro|sniper|thrower|lancer|blacksmith|priest|hitman|guardian|frost|dancer|duelist|stormbow|cleric|shaman|engineer|druid|giant|astrologer)$/) && newData.hasChildren(['picks', 'wins', 'dmg', 'heal']) && newData.child('wins').val() <= newData.child('picks').val() && ((auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')) || (!data.exists() && newData.child('picks').val() <= 1) || (data.exists() && newData.child('picks').val() >= data.child('picks').val() && newData.child('picks').val() <= data.child('picks').val() + 1))",
             "picks": { ".validate": "newData.isNumber() && newData.val() >= 0" },
             "wins": { ".validate": "newData.isNumber() && newData.val() >= 0" },
             "dmg": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5000" },
