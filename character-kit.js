@@ -247,7 +247,6 @@ PlayerProfile.CHANGE_EVENT = "portal-profile-changed";
 PlayerProfile.SETTLED_EVENT = "portal-profile-settled";
 PlayerProfile.MAX_NICK_LENGTH = 4;
 PlayerProfile.REAL_NAME_NOTICE = "닉네임은 본명으로 입력합니다";
-PlayerProfile.ACCOUNT_NICK_NOTICE = "로그인한 계정 이름으로 정해져 있어요";
 PlayerProfile.NICK_REQUIRED_NOTICE = "닉네임(본명)을 먼저 정해 주세요.";
 class CharacterAssets {
     constructor(libs, directory = CharacterAssets.DEFAULT_DIRECTORY) {
@@ -540,7 +539,6 @@ class NickEditor {
                 "<input type='text' class='ce-nick' maxlength='" + PlayerProfile.MAX_NICK_LENGTH + "' autocomplete='off' placeholder='닉네임 (최대 " + PlayerProfile.MAX_NICK_LENGTH + "글자)'>" +
                 "<div class='ce-notice'>" + PlayerProfile.REAL_NAME_NOTICE + "</div>";
         this.input = this.root.querySelector(".ce-nick");
-        this.notice = this.root.querySelector(".ce-notice");
         this.input.addEventListener("input", () => this.profile.setNick(this.input.value));
         this.input.addEventListener("change", () => {
             document.dispatchEvent(new CustomEvent(PlayerProfile.SETTLED_EVENT));
@@ -558,8 +556,7 @@ class NickEditor {
         if (document.activeElement !== this.input)
             this.input.value = this.profile.nick;
         const locked = PlayerProfile.isNickLocked();
-        this.input.readOnly = locked;
-        this.notice.textContent = locked ? PlayerProfile.ACCOUNT_NICK_NOTICE : PlayerProfile.REAL_NAME_NOTICE;
+        this.root.hidden = locked;
     }
     focus() {
         this.input.focus();

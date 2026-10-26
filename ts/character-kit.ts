@@ -229,7 +229,6 @@ class PlayerProfile {
   static readonly SETTLED_EVENT = "portal-profile-settled";
   static readonly MAX_NICK_LENGTH = 4;
   static readonly REAL_NAME_NOTICE = "닉네임은 본명으로 입력합니다";
-  static readonly ACCOUNT_NICK_NOTICE = "로그인한 계정 이름으로 정해져 있어요";
   static readonly NICK_REQUIRED_NOTICE = "닉네임(본명)을 먼저 정해 주세요.";
 
   nick = "";
@@ -609,7 +608,6 @@ class CharacterPreview {
 class NickEditor {
   private readonly root: HTMLDivElement;
   private readonly input: HTMLInputElement;
-  private readonly notice: HTMLDivElement;
   private onSettledListener: () => void = () => undefined;
 
   constructor(private readonly profile: PlayerProfile) {
@@ -620,7 +618,6 @@ class NickEditor {
       "<input type='text' class='ce-nick' maxlength='" + PlayerProfile.MAX_NICK_LENGTH + "' autocomplete='off' placeholder='닉네임 (최대 " + PlayerProfile.MAX_NICK_LENGTH + "글자)'>" +
       "<div class='ce-notice'>" + PlayerProfile.REAL_NAME_NOTICE + "</div>";
     this.input = this.root.querySelector(".ce-nick") as HTMLInputElement;
-    this.notice = this.root.querySelector(".ce-notice") as HTMLDivElement;
     this.input.addEventListener("input", () => this.profile.setNick(this.input.value));
     this.input.addEventListener("change", () => {
       document.dispatchEvent(new CustomEvent(PlayerProfile.SETTLED_EVENT));
@@ -640,8 +637,7 @@ class NickEditor {
   refresh(): void {
     if (document.activeElement !== this.input) this.input.value = this.profile.nick;
     const locked = PlayerProfile.isNickLocked();
-    this.input.readOnly = locked;
-    this.notice.textContent = locked ? PlayerProfile.ACCOUNT_NICK_NOTICE : PlayerProfile.REAL_NAME_NOTICE;
+    this.root.hidden = locked;
   }
 
   focus(): void {
