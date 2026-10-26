@@ -1205,6 +1205,7 @@ async function showStats(g) {
     const acts = el("div", "actions");
     const reload = el("button", null, "새로고침"); reload.type = "button";
     const reset = el("button", null, "통계 초기화"); reset.type = "button";
+    const dropDraws = el("button", null, "무승부 판 제외"); dropDraws.type = "button";
     const close = el("button", null, "닫기"); close.type = "button";
     reload.addEventListener("click", draw);
     close.addEventListener("click", () => back.remove());
@@ -1213,7 +1214,17 @@ async function showStats(g) {
       try { await writeStats(path); draw(); }
       catch (e) { msg.textContent = e.message; }
     });
-    acts.append(reload, reset, close);
+    dropDraws.addEventListener("click", async () => {
+      try {
+        const cleaner = new DrawStatsCleaner(patch.id, s);
+        if (!cleaner.hasDraws()) { msg.textContent = "이 패치에는 제외할 무승부 판이 없습니다."; return; }
+        if (!confirm(cleaner.summary() + "\n\n백업 파일을 내려받은 뒤 이 패치의 무승부 판을 통계에서 제외합니다. 계속할까요?")) return;
+        cleaner.downloadBackup();
+        await cleaner.apply(path);
+        draw();
+      } catch (e) { msg.textContent = e.message; }
+    });
+    acts.append(reload, dropDraws, reset, close);
     box.appendChild(acts);
   }
   draw();
@@ -1231,6 +1242,47 @@ async function writeStats(path) {
       throw new Error("권한이 없습니다. 데이터베이스규칙.json 을 Firebase 콘솔 → 규칙 탭에 다시 게시했는지 확인해 주세요.");
     }
     throw new Error(explainDb(detail));
+  }
+}
+
+/* 이미 합쳐진 통계에서 무승부 판을 뺀다(선생님 계정만 규칙상 쓸 수 있음).
+   무승부 판 수 = 경기 수 - 레드 승 - 블루 승. 경기 수·직업별 선택 수(picks)·고를 수 있던 게임 수(games)는 정확히 줄이고,
+   평균 값(피해·회복·KDA 등)과 밴 수는 판별 기록이 없어 그대로 둔다. 한 번 하면 무승부 판 수가 0 이라 다시 눌러도 바뀌지 않는다. */
+class DrawStatsCleaner {
+  constructor(patchId, stats) { this.patchId = patchId; this.before = stats || {}; }
+  drawCount() { return Math.max(0, (this.before.matches || 0) - (this.before.red || 0) - (this.before.blue || 0)); }
+  hasDraws() { return this.drawCount() > 0; }
+  summary() {
+    return "패치 " + this.patchId + ": 집계 경기 " + (this.before.matches || 0) + "판 → " + ((this.before.red || 0) + (this.before.blue || 0)) +
+      "판 (무승부 " + this.drawCount() + "판 제외)";
+  }
+  cleaned() {
+    const draws = this.drawCount(), after = JSON.parse(JSON.stringify(this.before));
+    after.matches = (this.before.red || 0) + (this.before.blue || 0);
+    Object.keys(after).forEach((k) => {
+      const c = after[k];
+      if (!c || typeof c !== "object" || c.picks == null) return;
+      c.picks = Math.max(0, (c.picks || 0) - (c.draws || 0));
+      delete c.draws;
+      c.games = Math.max(0, (c.games != null ? c.games : this.before.matches || 0) - draws);
+    });
+    return after;
+  }
+  downloadBackup() {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(this.before, null, 1)], { type: "application/json" }));
+    a.download = "teambattle-stats-" + this.patchId + "-backup.json";
+    a.click();
+  }
+  async apply(path) {
+    if (!auth || !auth.currentUser) throw new Error("다시 로그인해 주세요.");
+    const idToken = await auth.currentUser.getIdToken();
+    const r = await fetch(statsUrl(path) + "?auth=" + encodeURIComponent(idToken), { method: "PUT", body: JSON.stringify(this.cleaned()) });
+    if (!r.ok) {
+      let detail = r.status;
+      try { const d = await r.json(); detail = d.error || detail; } catch (e) {}
+      throw new Error(explainDb(detail));
+    }
   }
 }
 
