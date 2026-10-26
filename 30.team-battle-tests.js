@@ -4281,12 +4281,12 @@ class ResultCollector {
     if (api.statsPct(1, 4) !== "25.0%" || api.statsPct(0, 0) !== "-" || api.statsPct(1, 3) !== "33.3%") bad.push("비율");
     if (api.statsRateCell(3, 12).indexOf("25.0%") < 0 || api.statsRateCell(3, 12).indexOf("(3 / 12)") < 0) bad.push("승률 칸");
     if (api.banPickCell(1, 2, 10).indexOf("30.0%") < 0 || api.banPickCell(1, 2, 10).indexOf("밴 1 + 픽 2 / 10") < 0) bad.push("밴픽 칸");
-    if (api.kdaText({}, 0, 0) !== "-" || api.kdaText({ kills: 3.25, deaths: 1, assist: 2 }, 4, 4) !== "3.3 / 1.0 / 2.0" || api.kdaText({ assist: 2 }, 0, 4) !== "- / - / 2.0" || api.kdaText({ kills: 1, deaths: 2 }, 3, 0) !== "1.0 / 2.0 / -") bad.push("K/D/A");
+    if (api.kdaCell({}, 0, 0) !== "<td>-</td>" || api.kdaCell({ kills: 3.25, deaths: 1, assist: 2 }, 4, 4).indexOf("<b>5.25</b>") < 0 || api.kdaCell({ kills: 3.25, deaths: 1, assist: 2 }, 4, 4).indexOf("(3.3 / 1.0 / 2.0)") < 0 || api.kdaCell({ kills: 1, deaths: 2 }, 3, 0).indexOf("(1.0 / 2.0 / -)") < 0 || api.kdaCell({ kills: 2, deaths: 0 }, 3, 0).indexOf("Perfect") < 0) bad.push("K/D/A");
     var empty = api.statsRowsHtml({}), rows = (empty.match(/<tr><td class="nm">/g) || []).length, groups = (empty.match(/class="grp"/g) || []).length;
     if (rows !== L.length || groups !== api.ROLE_LIST.length) bad.push("빈 통계 " + rows + "줄 " + groups + "제목");
     var s = { matches: 10 }; s[L[0]] = { picks: 4, wins: 3, games: 8, bans: 1, dmg: 123.6, heal: 5, block: 7, stun: 1.25, slow: 0.5, ccPicks: 4, asPicks: 4, kdPicks: 4, kills: 2, deaths: 1, assist: 3 };
     var one = api.statsRowsHtml(s);
-    if (one.indexOf("75.0%") < 0 || one.indexOf("124") < 0 || one.indexOf("1.3초") < 0 || one.indexOf("2.0 / 1.0 / 3.0") < 0 || one.indexOf("(밴 1 + 픽 4 / 8)") < 0) bad.push("한 캐릭터 줄");
+    if (one.indexOf("75.0%") < 0 || one.indexOf("124") < 0 || one.indexOf("1.3초") < 0 || one.indexOf("(2.0 / 1.0 / 3.0)") < 0 || one.indexOf("<b>5.00</b>") < 0 || one.indexOf("(밴 1 + 픽 4 / 8)") < 0) bad.push("한 캐릭터 줄");
     if (api.mapShotSrc("river") !== "img/teambattle/maps/river.webp" || api.mapShotSrc("river", true) !== "img/teambattle/maps/river-wide.webp") bad.push("맵 그림 주소");
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "비율·밴픽·K/D/A·" + L.length + "줄+직업군 제목·맵 그림 주소");
   });
@@ -4487,7 +4487,7 @@ class ResultCollector {
       document.getElementById("btnStats").click();
       if (modal.hidden) bad.push("창이 안 열림");
       await waitFor(function () { return msg.textContent.indexOf("집계된 경기") >= 0; }, 400);
-      if (api.statsPatchNow() !== now || msg.textContent.indexOf("패치 " + now + " (현재)") !== 0 || msg.textContent.indexOf("집계된 경기 10판") < 0 || msg.textContent.indexOf("블루 66.7%") < 0 || msg.textContent.indexOf("레드 33.3%") < 0 || msg.textContent.indexOf("무승부 10.0%") < 0) bad.push("현재 패치 집계 문구 '" + msg.textContent + "'");
+      if (api.statsPatchNow() !== now || msg.textContent.indexOf("패치 " + now + " (현재)") !== 0 || msg.textContent.indexOf("집계된 경기 10판") < 0 || msg.textContent.indexOf("블루 66.7%") < 0 || msg.textContent.indexOf("레드 33.3%") < 0 || msg.textContent.indexOf("무승부") >= 0) bad.push("현재 패치 집계 문구 '" + msg.textContent + "'");
       if (body.querySelectorAll("tr").length < L.length || body.innerHTML.indexOf("75.0%") < 0) bad.push("표 " + body.querySelectorAll("tr").length);
       if (btn.textContent.indexOf(now) < 0 || !menu.hidden) bad.push("패치 버튼 '" + btn.textContent + "'·메뉴 처음엔 닫힘");
       btn.click();

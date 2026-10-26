@@ -142,6 +142,8 @@
             "deaths": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100" },
             "kdPicks": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= newData.parent().child('picks').val()" },
             "draws": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= newData.parent().child('picks').val()" },
+            "mvp": { ".validate": "newData.isNumber() && newData.val() >= -20000 && newData.val() <= 20000" },
+            "mvpPicks": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= newData.parent().child('picks').val()" },
             "$other": { ".validate": false }
           }
         }

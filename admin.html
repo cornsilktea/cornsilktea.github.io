@@ -1264,7 +1264,7 @@ class DrawStatsCleaner {
       if (!c || typeof c !== "object" || c.picks == null) return;
       c.picks = Math.max(0, (c.picks || 0) - (c.draws || 0));
       delete c.draws;
-      ["asPicks", "ccPicks", "kdPicks"].forEach((f) => { if (c[f] != null) c[f] = Math.min(c[f], c.picks); });
+      ["asPicks", "ccPicks", "kdPicks", "mvpPicks"].forEach((f) => { if (c[f] != null) c[f] = Math.min(c[f], c.picks); });
       c.wins = Math.min(c.wins || 0, c.picks);
       c.games = Math.max(0, (c.games != null ? c.games : this.before.matches || 0) - draws);
     });

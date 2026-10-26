@@ -198,7 +198,7 @@
   <div class="modalBox statsBox">
     <div class="statsTop"><h3>캐릭터 통계</h3><div class="statsTopBtns"><button id="btnStatsRefresh" class="mini" type="button">새로고침</button><div class="patchPick"><button id="btnStatsPatch" class="mini" type="button">패치</button><div id="statsPatchMenu" class="patchMenu" hidden></div></div><button id="btnStatsClose" class="mini" type="button">닫기</button></div></div>
     <div id="statsMsg" class="statsMsg"></div>
-    <div class="boardWrap"><table class="board statsTable"><thead><tr><th class="nm">캐릭터</th><th>밴픽률<small>(밴 + 픽) / 고를 수 있던 게임 수</small></th><th>승률<small>승리 수 / (픽 수 - 무승부)</small></th><th>KDA<small>평균 킬 / 데스 / 어시스트</small></th><th>평균 피해량</th><th>평균 회복량</th><th>평균 막은 피해</th><th>평균 기절</th><th>평균 둔화</th></tr></thead><tbody id="statsBody"></tbody></table></div>
+    <div class="boardWrap"><table class="board statsTable"><thead><tr><th class="nm">캐릭터</th><th>밴픽률<small>(밴 + 픽) / 게임 수</small></th><th>승률<small>승리 수 / 픽 수</small></th><th>KDA<small>(킬 + 어시스트) / 데스</small></th><th>평균 피해량</th><th>평균 회복량</th><th>평균 막은 피해</th><th>평균 기절</th><th>평균 둔화</th><th>평균 MVP 점수</th></tr></thead><tbody id="statsBody"></tbody></table></div>
     <ul class="statsNotes">
       <li>AI 없이 학생 6명이 3대3으로 끝까지 마친 대회모드 경기만 집계합니다.</li>
       <li>밸런스 패치마다 통계를 따로 모읍니다. 오른쪽 위 패치 버튼으로 이전 패치의 통계도 볼 수 있습니다.</li>
@@ -1622,23 +1622,25 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     banPickCell(bans, picks, games) { var services = this.services;
       return "<td><b>" + services.statsView.statsPct(bans + picks, games) + "</b><small>(밴 " + bans + " + 픽 " + picks + " / " + games + ")</small></td>";
     }
-    kdaText(d, kdPicks, asPicks) {
-      if (!kdPicks && !asPicks) return "-";
-      var kd = kdPicks ? (+d.kills || 0).toFixed(1) + " / " + (+d.deaths || 0).toFixed(1) : "- / -";
-      return kd + " / " + (asPicks ? (+d.assist || 0).toFixed(1) : "-");
+    kdaCell(d, kdPicks, asPicks) {
+      if (!kdPicks) return "<td>-</td>";
+      var kills = +d.kills || 0, deaths = +d.deaths || 0, assist = asPicks ? +d.assist || 0 : 0;
+      var ratio = deaths > 0 ? ((kills + assist) / deaths).toFixed(2) : "Perfect";
+      return "<td><b>" + ratio + "</b><small>(" + kills.toFixed(1) + " / " + deaths.toFixed(1) + " / " + (asPicks ? assist.toFixed(1) : "-") + ")</small></td>";
     }
     statsRowsHtml(s) { var services = this.services;
       var matches = +s.matches || 0, lastRole = null, h = "";
       services.charTypes.list.forEach(function (k) {
-        var c = services.charTypes.statsOf(k), d = s[k] || {}, selectableGames = d.games != null ? +d.games : (s[k] ? matches : 0), picks = +d.picks || 0, drawPicks = +d.draws || 0, wins = +d.wins || 0, ccPicks = +d.ccPicks || 0, asPicks = +d.asPicks || 0, kdPicks = +d.kdPicks || 0, bans = +d.bans || 0;
-        if (c.role !== lastRole) { lastRole = c.role; h += '<tr class="grp"><td colspan="9">' + RoleKinds.TABLE[c.role].icon + " " + RoleKinds.TABLE[c.role].name + "</td></tr>"; }
+        var c = services.charTypes.statsOf(k), d = s[k] || {}, selectableGames = d.games != null ? +d.games : (s[k] ? matches : 0), picks = +d.picks || 0, drawPicks = +d.draws || 0, wins = +d.wins || 0, ccPicks = +d.ccPicks || 0, asPicks = +d.asPicks || 0, kdPicks = +d.kdPicks || 0, mvpPicks = +d.mvpPicks || 0, bans = +d.bans || 0;
+        if (c.role !== lastRole) { lastRole = c.role; h += '<tr class="grp"><td colspan="10">' + RoleKinds.TABLE[c.role].icon + " " + RoleKinds.TABLE[c.role].name + "</td></tr>"; }
         h += '<tr><td class="nm">' + c.icon + " " + Dom.esc(c.name) + "</td>" + services.statsView.banPickCell(bans, picks, selectableGames) + services.statsView.statsRateCell(wins, Math.max(0, picks - drawPicks)) +
-          "<td>" + services.statsView.kdaText(d, kdPicks, asPicks) + "</td>" +
+          services.statsView.kdaCell(d, kdPicks, asPicks) +
           "<td>" + (picks ? Math.round(+d.dmg || 0) : "-") + "</td>" +
           "<td>" + (picks && c.heals ? Math.round(+d.heal || 0) : "-") + "</td>" +
           "<td>" + (ccPicks && c.blocks ? Math.round(+d.block || 0) : "-") + "</td>" +
           "<td>" + (ccPicks ? (+d.stun || 0).toFixed(1) + "초" : "-") + "</td>" +
-          "<td>" + (ccPicks ? (+d.slow || 0).toFixed(1) + "초" : "-") + "</td></tr>";
+          "<td>" + (ccPicks ? (+d.slow || 0).toFixed(1) + "초" : "-") + "</td>" +
+          "<td>" + (mvpPicks ? Math.round(+d.mvp || 0) : "-") + "</td></tr>";
       });
       return h;
     }
@@ -1652,8 +1654,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.backend.db.ref(patch.path).once("value").then(function (snap) {
         if (seq !== services.statsView.loadSeq) return;
         var s = snap.val() || {}, matches = +s.matches || 0, red = +s.red || 0, blue = +s.blue || 0, draws = Math.max(0, matches - red - blue);
-        Dom.setText(Dom.$("statsMsg"), "패치 " + StatsPatches.labelOf(patch.id) + " · 집계된 경기 " + matches + "판 · 진영 승률(무승부 제외): 블루 " + services.statsView.statsPct(blue, matches - draws) + " · 레드 " + services.statsView.statsPct(red, matches - draws) +
-          " · 무승부 " + services.statsView.statsPct(draws, matches));
+        Dom.setText(Dom.$("statsMsg"), "패치 " + StatsPatches.labelOf(patch.id) + " · 집계된 경기 " + matches + "판 · 진영 승률: 블루 " + services.statsView.statsPct(blue, matches - draws) + " · 레드 " + services.statsView.statsPct(red, matches - draws));
         Dom.setHtml(Dom.$("statsBody"), services.statsView.statsRowsHtml(s));
       }).catch(function () {
         if (seq === services.statsView.loadSeq) Dom.setText(Dom.$("statsMsg"), "통계를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.");
@@ -5983,7 +5984,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var rows = Object.keys(r.roster || {}).map(function (id) {
         var e = services.targets.ent(id) || services.netstate.stateOf(ps[id]);
         return { c: r.roster[id].c, win: r.winner === r.roster[id].team, draw: r.winner === "draw", dmg: +e.dmg || 0, heal: +e.heal || 0,
-                 blocked: +e.blocked || 0, stun: +e.stunDealt || 0, slow: +e.slowDealt || 0, assists: +e.assists || 0, kills: +e.kills || 0, deaths: +e.deaths || 0 };
+                 blocked: +e.blocked || 0, stun: +e.stunDealt || 0, slow: +e.slowDealt || 0, assists: +e.assists || 0, kills: +e.kills || 0, deaths: +e.deaths || 0,
+                 mvp: services.resultBoard.mvpScore(e) };
       });
       var banned = (r.bans || []).filter(function (c) { return services.charTypes.statsOf(c); });
       function addStats(countSelectableGames, countDraws) {
@@ -6014,6 +6016,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
             st.kills = MathKit.r1(((+st.kills || 0) * kdN + w.kills) / (kdN + 1));
             st.deaths = MathKit.r1(((+st.deaths || 0) * kdN + w.deaths) / (kdN + 1));
             st.kdPicks = kdN + 1;
+            if (countDraws) {
+              var mvpN = +st.mvpPicks || 0;
+              st.mvp = MathKit.r1(((+st.mvp || 0) * mvpN + w.mvp) / (mvpN + 1));
+              st.mvpPicks = mvpN + 1;
+            }
             st.picks = n + 1;
             st.wins = (+st.wins || 0) + (w.win ? 1 : 0);
             if (countDraws && w.draw) st.draws = (+st.draws || 0) + 1;
@@ -9025,7 +9032,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       againOrBackToLobby: services.flow.againOrBackToLobby.bind(services.flow), initGame: services.flow.initGame.bind(services.flow), isSpec: services.flow.isSpec.bind(services.flow), syncRemote: services.flow.syncRemote.bind(services.flow), specResultHeld: function () { return services.flow.specHeld; }, matchMs: function () { return services.timescale.matchMs; },
       startGame: services.launcher.startGame.bind(services.launcher), launchMatch: services.launcher.launchMatch.bind(services.launcher), practiceSpots: services.launcher.practiceSpots.bind(services.launcher), PRACTICE_BOTS: PracticeMode.BOTS, leavePractice: services.practice.leavePractice.bind(services.practice), fillPracticeGauge: services.practice.fillPracticeGauge.bind(services.practice),
       openPracticeChars: services.practice.openPracticeChars.bind(services.practice), changePracticeChar: services.practice.changePracticeChar.bind(services.practice), renderPracticeModal: services.practice.renderPracticeModal.bind(services.practice), showScreen: services.screens.showScreen.bind(services.screens),
-      statsPct: services.statsView.statsPct.bind(services.statsView), statsRateCell: services.statsView.statsRateCell.bind(services.statsView), banPickCell: services.statsView.banPickCell.bind(services.statsView), kdaText: services.statsView.kdaText.bind(services.statsView), statsRowsHtml: services.statsView.statsRowsHtml.bind(services.statsView), loadStats: services.statsView.loadStats.bind(services.statsView), mapShotSrc: services.arenaMap.shotSrc.bind(services.arenaMap), statsPatchNow: function () { return services.statsView.patch; },
+      statsPct: services.statsView.statsPct.bind(services.statsView), statsRateCell: services.statsView.statsRateCell.bind(services.statsView), banPickCell: services.statsView.banPickCell.bind(services.statsView), kdaCell: services.statsView.kdaCell.bind(services.statsView), statsRowsHtml: services.statsView.statsRowsHtml.bind(services.statsView), loadStats: services.statsView.loadStats.bind(services.statsView), mapShotSrc: services.arenaMap.shotSrc.bind(services.arenaMap), statsPatchNow: function () { return services.statsView.patch; },
       sfx: services.sound.sfx.bind(services.sound), killSound: services.sound.killSound.bind(services.sound), audio: services.sound.audio.bind(services.sound), openNick: services.nick.openNick.bind(services.nick), refreshNick: services.nick.refreshNick.bind(services.nick), nickNow: function () { return services.nick.name; }, NICK_MAX: PlayerProfile.MAX_NICK_LENGTH,
       playable: services.catalog.playable.bind(services.catalog), pickable: services.catalog.pickable.bind(services.catalog), roleOf: services.catalog.roleOf.bind(services.catalog), roParticle: Korean.roParticle, josa: Korean.josa, charsInRole: services.catalog.charsInRole.bind(services.catalog), isMelee: services.catalog.isMelee.bind(services.catalog), charImgSrc: services.catalog.charImgSrc.bind(services.catalog),
       ultDesc: services.skilltext.ultDesc.bind(services.skilltext), passiveDesc: services.skilltext.passiveDesc.bind(services.skilltext), basicDesc: services.skilltext.basicDesc.bind(services.skilltext), skillBlocks: services.skilltext.skillBlocks.bind(services.skilltext), statTable: services.skilltext.statTable.bind(services.skilltext), roleGaugeText: services.skilltext.roleGaugeText.bind(services.skilltext), gaugeTextOf: services.skilltext.gaugeTextOf.bind(services.skilltext), num: services.skilltext.num.bind(services.skilltext), secs: services.skilltext.secs.bind(services.skilltext), shownSpeed: services.skilltext.shownSpeed.bind(services.skilltext),
