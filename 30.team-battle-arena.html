@@ -276,7 +276,8 @@
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="character-maker.js?v=20261026a"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
-<script charset="utf-8" src="account-stats.js?v=20261026a"></script>
+<script charset="utf-8" src="account-match-kit.js?v=20261026b"></script>
+<script charset="utf-8" src="account-stats.js?v=20261026b"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -8633,7 +8634,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     matchEnded() { var services = this.services, self = this;
       if (!this.loggedIn()) return;
       var snap = services.accountReport.snapshot();
-      if (!snap || snap.mode !== AccountMatchPlan.CUP_MODE) return;
+      if (!snap || snap.mode !== TeamBattlePlan.CUP_MODE) return;
       setTimeout(function () {
         var room = services.session.room;
         if (room && room.winner && !snap.winner) { snap.winner = room.winner; snap.final = room.final; }
@@ -8641,8 +8642,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }, AccountMatchRecorder.SETTLE_MS);
     }
     forfeitApplies() { var services = this.services, room = services.session.room;
-      return this.loggedIn() && !!room && room.mode === AccountMatchPlan.CUP_MODE && room.status === "playing" && !!room.roster && !!room.roster[services.session.myId]
-        && services.randomMatch.progress() >= AccountMatchPlan.FORFEIT_AT;
+      return this.loggedIn() && !!room && room.mode === TeamBattlePlan.CUP_MODE && room.status === "playing" && !!room.roster && !!room.roster[services.session.myId]
+        && services.randomMatch.progress() >= TeamBattlePlan.FORFEIT_AT;
     }
     leavingNow() { var services = this.services;
       if (!this.forfeitApplies()) return;
@@ -8658,9 +8659,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class MyStatsWindow {
-    static LOGIN_NEEDED = "로그인하면 내 통계를 볼 수 있어요.";
-    static NOT_READY = "로그인 정보를 준비하는 중이에요. 잠시 뒤 다시 열어 주세요.";
-    static FAILED = "내 통계를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.";
+    static LOGIN_NEEDED = AccountLoginNotice.STATS_LOGIN_NEEDED;
+    static NOT_READY = AccountLoginNotice.NOT_READY;
+    static FAILED = AccountLoginNotice.STATS_FAILED;
     constructor(services) { this.services = services; this.loadSeq = 0; }
     bind() { var self = this;
       Dom.$("btnMyStats").onclick = function () { self.open(); };
@@ -8690,10 +8691,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class RecentMatchWindow {
-    static LOGIN_NEEDED = "로그인하면 최근 매치를 볼 수 있어요.";
-    static NOT_READY = MyStatsWindow.NOT_READY;
+    static LOGIN_NEEDED = AccountLoginNotice.RECENT_LOGIN_NEEDED;
+    static NOT_READY = AccountLoginNotice.NOT_READY;
     static EMPTY = "아직 기록된 대회모드 경기가 없어요.";
-    static FAILED = "최근 매치를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.";
+    static FAILED = AccountLoginNotice.RECENT_FAILED;
     constructor(services) { this.services = services; this.loadSeq = 0; this.entries = []; }
     bind() { var self = this;
       Dom.$("btnRecent").onclick = function () { self.open(); };
@@ -8721,22 +8722,16 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     render(list) { var self = this;
       this.entries = list;
       Dom.setText(Dom.$("rmMsg"), list.length ? "최근 " + list.length + "경기 · 최신순 · 누르면 그 경기 결과표가 열려요" : RecentMatchWindow.EMPTY);
-      Dom.setHtml(Dom.$("rmList"), list.map(function (entry, i) { return self.itemHtml(entry, i); }).join(""));
+      Dom.setHtml(Dom.$("rmList"), RecentBlockList.html(list, function (entry) { return self.teamsHtml(entry); }));
     }
-    whenText(at) {
-      if (!at) return "";
-      var d = new Date(at), two = function (n) { return (n < 10 ? "0" : "") + n; };
-      return (d.getMonth() + 1) + "월 " + d.getDate() + "일 " + two(d.getHours()) + ":" + two(d.getMinutes());
-    }
+    whenText(at) { return RecentBlockList.whenText(at); }
     namesHtml(players, team) {
       return players.filter(function (p) { return p.team === team; }).map(function (p) { return (p.ai ? "🤖 " : "") + Dom.esc(p.name); }).join(" · ");
     }
-    itemHtml(entry, i) {
+    teamsHtml(entry) {
       var mine = entry.players[entry.myIndex].team;
-      return '<button type="button" class="rmItem ' + (entry.win ? "win" : "lose") + '" data-recent="' + i + '">' +
-        '<span class="rmHead"><b>' + (entry.win ? "승리" : "패배") + "</b><small>" + this.whenText(entry.at) + "</small></span>" +
-        '<span class="rmTeam"><i>우리 팀</i>' + this.namesHtml(entry.players, mine) + "</span>" +
-        '<span class="rmTeam"><i>상대 팀</i>' + this.namesHtml(entry.players, 1 - mine) + "</span></button>";
+      return '<span class="rmTeam"><i>우리 팀</i>' + this.namesHtml(entry.players, mine) + "</span>" +
+        '<span class="rmTeam"><i>상대 팀</i>' + this.namesHtml(entry.players, 1 - mine) + "</span>";
     }
     showResult(i) { var services = this.services, entry = this.entries[i];
       if (!entry) return;
@@ -9292,7 +9287,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       onKillFeed: services.killfeed.onKillFeed.bind(services.killfeed), multiKillTag: services.killfeed.multiKillTag.bind(services.killfeed), KILL_FEED_MAX: KillFeed.KILL_FEED_MAX, KILL_FEED_MS: KillFeed.KILL_FEED_MS,
       mvpScore: services.resultBoard.mvpScore.bind(services.resultBoard), boardRows: services.resultBoard.boardRows.bind(services.resultBoard), mvpHtml: services.resultBoard.mvpHtml.bind(services.resultBoard), RESULT_ROSTER: services.resultBoard.roster,
       ACCOUNT: { report: services.accountReport, recorder: services.accountRecorder, myStats: services.myStats, recent: services.recentMatches, myRowsHtml: services.statsView.myRowsHtml.bind(services.statsView),
-                 Plan: AccountMatchPlan, Judge: AccountMvpJudge, Codec: RecentMatchCodec, Ring: RecentMatchRing, Math: AccountStatsMath, Table: AccountStatsTable, Rates: AccountRates, ClassSummary: ClassStatsSummary, Key: AccountMatchKey, Store: AccountStatsStore },
+                 Plan: TeamBattlePlan, Judge: AccountMvpJudge, Codec: TeamBattleCodec, Ring: TeamBattleRing, Math: AccountStatsMath, Table: AccountStatsTable, Rates: TeamBattleRates, ClassSummary: ClassStatsSummary, Key: AccountMatchKey, Store: AccountStatsStore },
       setClock: function (ms) { services.clock.testTime = ms; },
       currentMap: function () { return services.arenaMap.id; },
       finish: function (mapId) { services.clock.testTime = null; services.session.room = null; services.session.resetLocal(); services.arenaMap.load(mapId); }

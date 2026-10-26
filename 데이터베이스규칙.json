@@ -320,6 +320,7 @@
           "$game": { ".validate": "$game === 'teambattle'" }
         },
         "recent": {
+         "teambattle": {
           "$slot": {
             ".validate": "$slot.matches(/^[0-9]$/) && newData.hasChildren(['v', 'id', 'at', 'r', 'ai', 'me', 's', 'p'])",
             "v": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 99" },
@@ -339,6 +340,8 @@
             },
             "$other": { ".validate": false }
           }
+         },
+         "$game": { ".validate": "$game === 'teambattle'" }
         },
         "best": {
           "$game": {

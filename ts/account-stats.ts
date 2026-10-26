@@ -1,24 +1,24 @@
 /* =====================================================================
-   30번 팀 배틀 계정별 통계 · 최근 매치 (공용 모듈, 로그인한 학생만)
+   30번 팀 배틀 계정별 통계 · 최근 매치 (공용 뼈대 account-match-kit.ts 를 이어 받은 30번 전용 부분)
 
    저장 위치(Realtime Database, 규칙은 데이터베이스규칙.json 의 users·classStats):
      users/<uid>/stats/teambattle   { g, w, l, bg, bw, rg, rw, m, ids/<matchKey>, c/<캐릭터> }
        g 유효한 판 수 · w 승 · l 패 · bg/bw 블루 판·승 · rg/rw 레드 판·승 · m MVP 수
        c/<캐릭터> = { n 판, w 승, bg, bw, rg, rw, m MVP 횟수, kn 킬·데스·어시스트 평균 분모,
                       k·d·a 평균 킬·데스·어시스트, dmg·hl·bl 평균 피해·회복·막은 피해, st·sl 평균 기절·둔화(초) }
-       ids = 최근에 올린 경기 열쇠(같은 판을 두 번 올리지 않게, 최근 IDS_KEEP 개만)
-     users/<uid>/recent/<0~9>       최근 매치 10칸(값 배열, RecentMatchCodec) — 칸이 10개뿐이라 규칙으로도 10판을 넘지 못한다
+       ids = 최근에 올린 경기 열쇠(같은 판을 두 번 올리지 않게, 최근 AccountKeyLedger.KEEP 개만)
+     users/<uid>/recent/teambattle/<0~9>  최근 매치 10칸(값 배열, TeamBattleCodec) — 칸이 10개뿐이라 규칙으로도 10판을 넘지 못한다
      classStats/<학년-반|none>/<uid> { n 이름, g, w, m }  교사 화면 반별 승률 순위용 요약(교사만 읽음)
 
    집계 규칙(2026-10-26 선생님 결정)
      - 누적 통계: 대회모드이고 AI 가 한 명도 없던 경기만. 경기 절반 뒤에 나가면 패배, 절반 전에 나가면 기록 없음.
      - 최근 매치: 대회모드 경기면 AI 가 있어도 기록(절반 전에 나간 판은 없음).
      - MVP: 환산점수 최고점, 동점이면 모두 인정, 나간 사람과 처치·어시스트가 하나도 없는 사람은 후보에서 뺀다.
-     - 승률·MVP율 같은 파생값은 저장하지 않고 화면에서 계산한다(AccountRates).
+     - 승률·MVP율 같은 파생값은 저장하지 않고 화면에서 계산한다(TeamBattleRates).
 
-   계산 클래스(AccountMatchPlan·AccountMvpJudge·RecentMatchCodec·RecentMatchRing·AccountStatsMath·AccountStatsTable·ClassStatsSummary)는
-   화면도 통신도 모르는 순수 클래스라 30번 &test 가 직접 검사한다. 읽고 쓰는 것은 AccountStatsStore 한 곳이며,
-   경기 하나당 쓰기 1번(읽기-수정-쓰기 + 여러 경로 PATCH 1번), 창을 열 때 읽기 1번만 한다.
+   계산 클래스(TeamBattlePlan·AccountMvpJudge·TeamBattleCodec·TeamBattleRing·AccountStatsMath·AccountStatsTable·ClassStatsSummary)는
+   화면도 통신도 모르는 순수 클래스라 30번 &test 가 직접 검사한다. 읽고 쓰는 것은 공용 AccountMatchStore 를 이어 받은
+   AccountStatsStore 한 곳이며, TeamBattleProfile 이 30번만의 모양(게임 키·집계 대상·합산·값 배열)을 정한다.
    AccountDatabase 는 personal-records.js(로그인하면 account-login.js 가 불러옴)에 있다.
    ===================================================================== */
 
@@ -52,21 +52,14 @@ interface AccountMatchReport {
 
 type StoredPlayerLine = Array<string | number>;
 
-interface StoredRecentMatch {
-  v: number;
-  id: string;
-  at: unknown;
-  r: number;
+interface StoredRecentMatch extends AccountRecentHead {
   ai: number;
   me: number;
   s: number[];
   p: StoredPlayerLine[];
 }
 
-interface RecentMatchEntry {
-  id: string;
-  at: number;
-  win: boolean;
+interface RecentMatchEntry extends AccountRecentHeadEntry {
   withAi: boolean;
   myIndex: number;
   score: number[];
@@ -112,49 +105,9 @@ interface AccountLegacyCharRow {
   dmg: number; heal: number; block: number; stun: number; slow: number;
 }
 
-class AccountNumbers {
-  static oneDecimal(value: unknown): number {
-    return Math.round((Number(value) || 0) * 10) / 10;
-  }
-
-  static twoDecimals(value: unknown): number {
-    return Math.round((Number(value) || 0) * 100) / 100;
-  }
-
-  static whole(value: unknown): number {
-    return Math.round(Number(value) || 0);
-  }
-
-  static count(value: unknown): number {
-    const number = Number(value);
-    return isFinite(number) && number > 0 ? Math.floor(number) : 0;
-  }
-
-  static runningAverage(average: number, samples: number, value: number): number {
-    return AccountNumbers.oneDecimal((average * samples + value) / (samples + 1));
-  }
-}
-
-class AccountRates {
-  static ratio(part: number, whole: number): number | null {
-    return whole > 0 ? part / whole : null;
-  }
-
-  static winRate(node: AccountStatsNode | null): number | null {
-    return node ? AccountRates.ratio(node.w, node.g) : null;
-  }
-
+class TeamBattleRates extends AccountRates {
   static mvpRate(node: AccountStatsNode | null): number | null {
     return node ? AccountRates.ratio(node.m, node.g) : null;
-  }
-}
-
-class AccountMatchKey {
-  private static readonly MAX_LENGTH = 60;
-
-  static of(matchId: unknown): string {
-    const key = String(matchId == null ? "" : matchId).replace(/[.#$\[\]\/\s]/g, "_").slice(0, AccountMatchKey.MAX_LENGTH);
-    return key || "match";
   }
 }
 
@@ -182,9 +135,9 @@ class AccountMvpJudge {
   }
 }
 
-class AccountMatchPlan {
+class TeamBattlePlan implements AccountMatchPlanBase {
   static readonly CUP_MODE = "cup";
-  static readonly FORFEIT_AT = 0.5;
+  static readonly FORFEIT_AT = AccountForfeit.AT;
 
   readonly recordsRecent: boolean;
   readonly countsStats: boolean;
@@ -194,36 +147,32 @@ class AccountMatchPlan {
 
   constructor(report: AccountMatchReport, judge: AccountMvpJudge) {
     const me = report.players[report.myIndex];
-    const leftEarly = report.iLeft && report.progress < AccountMatchPlan.FORFEIT_AT;
+    const leftEarly = AccountForfeit.leftEarly(report.iLeft, report.progress);
     this.withAi = report.players.some((line) => line.ai);
-    this.recordsRecent = report.mode === AccountMatchPlan.CUP_MODE && !!me && !leftEarly && (report.winnerTeam === 0 || report.winnerTeam === 1 || report.iLeft);
+    this.recordsRecent = report.mode === TeamBattlePlan.CUP_MODE && !!me && !leftEarly && (report.winnerTeam === 0 || report.winnerTeam === 1 || report.iLeft);
     this.countsStats = this.recordsRecent && !this.withAi;
     this.win = !!me && !report.iLeft && me.team === report.winnerTeam;
     this.mvp = !!me && !report.iLeft && judge.isMvp(report.players, report.myIndex);
   }
 }
 
-class RecentMatchCodec {
+class TeamBattleCodec {
   static readonly VERSION = 1;
   static readonly NAME_MAX = 20;
   private static readonly FIELDS = 14;
 
   static encode(report: AccountMatchReport, key: string, win: boolean): StoredRecentMatch {
-    return {
-      v: RecentMatchCodec.VERSION,
-      id: key,
-      at: { ".sv": "timestamp" },
-      r: win ? 1 : 0,
+    return Object.assign(AccountRecentHeadCodec.encode(TeamBattleCodec.VERSION, key, win), {
       ai: report.players.some((line) => line.ai) ? 1 : 0,
       me: report.myIndex,
       s: [AccountNumbers.count(report.score[0]), AccountNumbers.count(report.score[1])],
-      p: report.players.map((line) => RecentMatchCodec.encodeLine(line))
-    };
+      p: report.players.map((line) => TeamBattleCodec.encodeLine(line))
+    });
   }
 
   static encodeLine(line: AccountPlayerLine): StoredPlayerLine {
     return [
-      String(line.name || "").slice(0, RecentMatchCodec.NAME_MAX), line.team === 1 ? 1 : 0, line.char,
+      String(line.name || "").slice(0, TeamBattleCodec.NAME_MAX), line.team === 1 ? 1 : 0, line.char,
       AccountNumbers.count(line.kills), AccountNumbers.count(line.deaths), AccountNumbers.count(line.assists),
       Math.max(0, AccountNumbers.whole(line.dmg)), Math.max(0, AccountNumbers.whole(line.heal)), Math.max(0, AccountNumbers.whole(line.blocked)),
       Math.max(0, AccountNumbers.oneDecimal(line.stun)), Math.max(0, AccountNumbers.oneDecimal(line.slow)),
@@ -232,18 +181,19 @@ class RecentMatchCodec {
   }
 
   static decode(raw: unknown): RecentMatchEntry | null {
-    const stored = raw as StoredRecentMatch | null;
-    if (!stored || typeof stored !== "object" || stored.v !== RecentMatchCodec.VERSION) return null;
-    const lines = AccountShape.list(stored.p).map((item) => RecentMatchCodec.decodeLine(item));
+    const head = AccountRecentHeadCodec.decode(raw, TeamBattleCodec.VERSION);
+    if (!head) return null;
+    const stored = raw as StoredRecentMatch;
+    const lines = AccountShape.list(stored.p).map((item) => TeamBattleCodec.decodeLine(item));
     if (!lines.length || lines.some((line) => !line)) return null;
     const players = lines as AccountPlayerLine[];
     const myIndex = AccountNumbers.count(stored.me);
     if (myIndex >= players.length) return null;
     const score = AccountShape.list(stored.s).map((value) => AccountNumbers.count(value));
     return {
-      id: String(stored.id || ""),
-      at: typeof stored.at === "number" ? stored.at : 0,
-      win: stored.r === 1,
+      id: head.id,
+      at: head.at,
+      win: head.win,
       withAi: stored.ai === 1,
       myIndex,
       score: [score[0] || 0, score[1] || 0],
@@ -253,7 +203,7 @@ class RecentMatchCodec {
 
   static decodeLine(raw: unknown): AccountPlayerLine | null {
     const item = AccountShape.list(raw);
-    if (item.length < RecentMatchCodec.FIELDS - 1 || typeof item[2] !== "string") return null;
+    if (item.length < TeamBattleCodec.FIELDS - 1 || typeof item[2] !== "string") return null;
     const number = (index: number) => Number(item[index]) || 0;
     return {
       name: String(item[0] == null ? "" : item[0]), team: number(1) === 1 ? 1 : 0, char: String(item[2]),
@@ -263,58 +213,14 @@ class RecentMatchCodec {
   }
 }
 
-class AccountShape {
-  static list(value: unknown): unknown[] {
-    if (Array.isArray(value)) return value;
-    if (!value || typeof value !== "object") return [];
-    const record = value as Record<string, unknown>;
-    return Object.keys(record).filter((key) => /^[0-9]+$/.test(key)).sort((a, b) => Number(a) - Number(b)).map((key) => record[key]);
-  }
-
-  static slots(value: unknown): Record<string, unknown> {
-    if (!value || typeof value !== "object") return {};
-    const record = value as Record<string, unknown>;
-    const slots: Record<string, unknown> = {};
-    Object.keys(record).forEach((key) => { if (record[key] != null) slots[key] = record[key]; });
-    return slots;
-  }
-}
-
-class RecentMatchRing {
-  static readonly SLOTS = 10;
-
-  static chooseSlot(stored: unknown, key: string): number {
-    const slots = AccountShape.slots(stored);
-    let oldestSlot = -1;
-    let oldestAt = Infinity;
-    for (let slot = 0; slot < RecentMatchRing.SLOTS; slot++) {
-      const entry = slots[String(slot)] as StoredRecentMatch | undefined;
-      if (entry && entry.id === key) return -1;
-    }
-    for (let slot = 0; slot < RecentMatchRing.SLOTS; slot++) {
-      const entry = slots[String(slot)] as StoredRecentMatch | undefined;
-      if (!entry) return slot;
-      const at = typeof entry.at === "number" ? entry.at : 0;
-      if (at < oldestAt) {
-        oldestAt = at;
-        oldestSlot = slot;
-      }
-    }
-    return oldestSlot;
-  }
-
+class TeamBattleRing extends RecentMatchRing {
   static entries(stored: unknown): RecentMatchEntry[] {
-    const slots = AccountShape.slots(stored);
-    return Object.keys(slots)
-      .filter((key) => /^[0-9]$/.test(key))
-      .map((key) => RecentMatchCodec.decode(slots[key]))
-      .filter((entry): entry is RecentMatchEntry => !!entry)
-      .sort((a, b) => b.at - a.at);
+    return RecentMatchRing.decodeAll(stored, TeamBattleCodec.decode);
   }
 }
 
 class AccountStatsMath {
-  static readonly IDS_KEEP = 20;
+  static readonly IDS_KEEP = AccountKeyLedger.KEEP;
 
   static empty(): AccountStatsNode {
     return { g: 0, w: 0, l: 0, bg: 0, bw: 0, rg: 0, rw: 0, m: 0 };
@@ -363,7 +269,7 @@ class AccountStatsMath {
       c: Object.assign({}, before.c || {})
     };
     node.ids![outcome.key] = outcome.at;
-    const evictedKeys = AccountStatsMath.overflowKeys(node.ids!);
+    const evictedKeys = AccountKeyLedger.overflowKeys(node.ids!);
     evictedKeys.forEach((key) => { delete node.ids![key]; });
     node.c![line.char] = AccountStatsMath.applyChar(node.c![line.char] || AccountStatsMath.emptyChar(), line, outcome);
     return { node, charId: line.char, addedKey: outcome.key, evictedKeys };
@@ -391,11 +297,6 @@ class AccountStatsMath {
       st: AccountNumbers.runningAverage(before.st, n, Math.max(0, Number(line.stun) || 0)),
       sl: AccountNumbers.runningAverage(before.sl, n, Math.max(0, Number(line.slow) || 0))
     };
-  }
-
-  private static overflowKeys(ids: Record<string, number>): string[] {
-    const keys = Object.keys(ids).sort((a, b) => ids[a] - ids[b]);
-    return keys.slice(0, Math.max(0, keys.length - AccountStatsMath.IDS_KEEP));
   }
 }
 
@@ -429,73 +330,74 @@ class ClassStatsSummary {
   }
 }
 
-class AccountStatsStore {
-  static readonly STATS_PATH = "stats/teambattle";
-  static readonly RECENT_PATH = "recent";
+class TeamBattleProfile extends AccountGameProfile<AccountMatchReport, TeamBattlePlan, AccountStatsNode, RecentMatchEntry, AccountMvpJudge> {
   static readonly CLASS_PATH = "profile/cls";
   static readonly CLASS_STATS_ROOT = "classStats";
 
-  constructor(private readonly database: AccountDatabase, private readonly user: PortalUser) {}
+  readonly gameKey = "teambattle";
+
+  matchIdOf(report: AccountMatchReport): string {
+    return report.matchId;
+  }
+
+  planOf(report: AccountMatchReport, judge: AccountMvpJudge): TeamBattlePlan {
+    return new TeamBattlePlan(report, judge);
+  }
+
+  encodeRecent(report: AccountMatchReport, key: string, win: boolean): object {
+    return TeamBattleCodec.encode(report, key, win);
+  }
+
+  decodeRecent(raw: unknown): RecentMatchEntry | null {
+    return TeamBattleCodec.decode(raw);
+  }
+
+  normalizeStats(raw: unknown): AccountStatsNode {
+    return AccountStatsMath.normalize(raw);
+  }
+
+  applyStats(raw: unknown, report: AccountMatchReport, plan: TeamBattlePlan, key: string, at: number): AccountStatsChangeBase<AccountStatsNode> | null {
+    const me = report.players[report.myIndex];
+    const change = AccountStatsMath.apply(raw, me, { key, win: plan.win, side: me.team, mvp: plan.mvp, at });
+    return change ? { node: change.node, patch: this.statsPatch(change) } : null;
+  }
+
+  extraReadPath(): string | null {
+    return TeamBattleProfile.CLASS_PATH;
+  }
+
+  /* 선생님 계정은 반별 순위에 넣지 않는다. 반이 정해진 학생은 미분류(none) 칸의 옛 요약을 함께 지운다 */
+  extraPatch(user: PortalUser, cls: unknown, node: AccountStatsNode): Record<string, unknown> {
+    const values: Record<string, unknown> = {};
+    const admins = typeof AccountPolicy === "function" ? AccountPolicy.ADMIN_UIDS : [];
+    if (admins.indexOf(user.uid) >= 0) return values;
+    const classKey = ClassStatsSummary.classKey(cls);
+    const root = TeamBattleProfile.CLASS_STATS_ROOT + "/";
+    values[root + classKey + "/" + user.uid] = ClassStatsSummary.build(user.name, node);
+    if (classKey !== ClassStatsSummary.NONE) values[root + ClassStatsSummary.NONE + "/" + user.uid] = null;
+    return values;
+  }
+
+  private statsPatch(change: AccountStatsChange): Record<string, unknown> {
+    const values: Record<string, unknown> = {};
+    const node = change.node;
+    (["g", "w", "l", "bg", "bw", "rg", "rw", "m"] as const).forEach((key) => { values[key] = node[key]; });
+    values["c/" + change.charId] = node.c![change.charId];
+    values["ids/" + change.addedKey] = node.ids![change.addedKey];
+    change.evictedKeys.forEach((key) => { values["ids/" + key] = null; });
+    return values;
+  }
+}
+
+class AccountStatsStore extends AccountMatchStore<AccountMatchReport, TeamBattlePlan, AccountStatsNode, RecentMatchEntry, AccountMvpJudge> {
+  constructor(database: AccountDatabaseLike, user: PortalUser) {
+    super(database, user, new TeamBattleProfile());
+  }
 
   /* 로그인 전이거나 personal-records.js 가 아직 안 불렸으면 null — 화면은 안내 문구를 보인다 */
   static open(): AccountStatsStore | null {
     const user = window.PORTAL_USER;
     if (!user || typeof AccountDatabase !== "function") return null;
     return new AccountStatsStore(new AccountDatabase(user), user);
-  }
-
-  loadStats(): Promise<AccountStatsNode | null> {
-    return this.database.read<unknown>(AccountStatsStore.STATS_PATH).then((raw) => (raw ? AccountStatsMath.normalize(raw) : null));
-  }
-
-  loadRecent(): Promise<RecentMatchEntry[]> {
-    return this.database.read<unknown>(AccountStatsStore.RECENT_PATH).then((raw) => RecentMatchRing.entries(raw));
-  }
-
-  async record(report: AccountMatchReport, judge: AccountMvpJudge): Promise<string> {
-    const plan = new AccountMatchPlan(report, judge);
-    if (!plan.recordsRecent) return "skip";
-    const key = AccountMatchKey.of(report.matchId);
-    const [statsRaw, recentRaw, cls] = await Promise.all([
-      plan.countsStats ? this.database.read<unknown>(AccountStatsStore.STATS_PATH) : Promise.resolve(null),
-      this.database.read<unknown>(AccountStatsStore.RECENT_PATH),
-      plan.countsStats ? this.database.read<unknown>(AccountStatsStore.CLASS_PATH) : Promise.resolve(null)
-    ]);
-    const slot = RecentMatchRing.chooseSlot(recentRaw, key);
-    if (slot < 0) return "duplicate";
-    const userRoot = "users/" + this.user.uid + "/";
-    const values: Record<string, unknown> = {};
-    values[userRoot + AccountStatsStore.RECENT_PATH + "/" + slot] = RecentMatchCodec.encode(report, key, plan.win);
-    if (plan.countsStats) {
-      const me = report.players[report.myIndex];
-      const change = AccountStatsMath.apply(statsRaw, me, { key, win: plan.win, side: me.team, mvp: plan.mvp, at: Date.now() });
-      if (!change) return "duplicate";
-      Object.assign(values, this.statsPatch(userRoot + AccountStatsStore.STATS_PATH + "/", change));
-      Object.assign(values, this.classPatch(cls, change.node));
-    }
-    await this.database.updateRoot(values);
-    return plan.countsStats ? "stats" : "recent";
-  }
-
-  private statsPatch(prefix: string, change: AccountStatsChange): Record<string, unknown> {
-    const values: Record<string, unknown> = {};
-    const node = change.node;
-    (["g", "w", "l", "bg", "bw", "rg", "rw", "m"] as const).forEach((key) => { values[prefix + key] = node[key]; });
-    values[prefix + "c/" + change.charId] = node.c![change.charId];
-    values[prefix + "ids/" + change.addedKey] = node.ids![change.addedKey];
-    change.evictedKeys.forEach((key) => { values[prefix + "ids/" + key] = null; });
-    return values;
-  }
-
-  /* 선생님 계정은 반별 순위에 넣지 않는다. 반이 정해진 학생은 미분류(none) 칸의 옛 요약을 함께 지운다 */
-  private classPatch(cls: unknown, node: AccountStatsNode): Record<string, unknown> {
-    const values: Record<string, unknown> = {};
-    const admins = typeof AccountPolicy === "function" ? AccountPolicy.ADMIN_UIDS : [];
-    if (admins.indexOf(this.user.uid) >= 0) return values;
-    const classKey = ClassStatsSummary.classKey(cls);
-    const root = AccountStatsStore.CLASS_STATS_ROOT + "/";
-    values[root + classKey + "/" + this.user.uid] = ClassStatsSummary.build(this.user.name, node);
-    if (classKey !== ClassStatsSummary.NONE) values[root + ClassStatsSummary.NONE + "/" + this.user.uid] = null;
-    return values;
   }
 }

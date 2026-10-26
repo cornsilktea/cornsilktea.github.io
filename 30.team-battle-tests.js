@@ -5474,7 +5474,7 @@ class AccountStatsTests {
       return first.store.record(self.report(), judge).then(function (status) {
         var w = first.writes[0] || {};
         if (status !== "stats" || first.writes.length !== 1) bad.push("상태 " + status + " 쓰기 " + first.writes.length);
-        if (!w["users/u1/recent/0"] || w["users/u1/recent/0"].r !== 1) bad.push("최근 매치 칸");
+        if (!w["users/u1/recent/teambattle/0"] || w["users/u1/recent/teambattle/0"].r !== 1) bad.push("최근 매치 칸");
         if (w["users/u1/stats/teambattle/g"] !== 1 || w["users/u1/stats/teambattle/w"] !== 1 || w["users/u1/stats/teambattle/m"] !== 1) bad.push("요약 g·w·m");
         if (!w["users/u1/stats/teambattle/ids/room1_1000"]) bad.push("경기 열쇠");
         var cs = w["classStats/2-5/u1"];
@@ -5482,11 +5482,11 @@ class AccountStatsTests {
         var ai = self.fakeStore({});
         return ai.store.record(self.report({ players: self.players({ 0: { kills: 3 }, 5: { ai: true } }) }), judge).then(function (s2) {
           var keys = Object.keys(ai.writes[0] || {});
-          if (s2 !== "recent" || keys.length !== 1 || keys[0] !== "users/u1/recent/0") bad.push("AI 경기 " + s2 + " " + keys.join());
+          if (s2 !== "recent" || keys.length !== 1 || keys[0] !== "users/u1/recent/teambattle/0") bad.push("AI 경기 " + s2 + " " + keys.join());
           var none = self.fakeStore({});
           return none.store.record(self.report(), judge);
         }).then(function (s3) {
-          var dup = self.fakeStore({ recent: { 0: first.writes[0]["users/u1/recent/0"] } });
+          var dup = self.fakeStore({ "recent/teambattle": { 0: first.writes[0]["users/u1/recent/teambattle/0"] } });
           return dup.store.record(self.report(), judge).then(function (s4) {
             if (s4 !== "duplicate" || dup.writes.length) bad.push("중복 " + s4);
             var early = self.fakeStore({});
