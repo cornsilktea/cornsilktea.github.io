@@ -185,6 +185,7 @@ class AccountGate {
         this.chip = new AccountChip(() => this.requestSignOut());
         this.nickWriter = new AccountNickWriter();
         this.hideStyle = document.createElement("style");
+        this.nickSettingStyle = document.createElement("style");
         this.published = false;
     }
     start() {
@@ -218,6 +219,7 @@ class AccountGate {
         const name = AccountPolicy.displayName(user);
         window.PORTAL_USER = { uid: user.uid, email: user.email || "", name, getToken: () => user.getIdToken() };
         this.nickWriter.write(name);
+        this.hideNickSettingButtons();
         this.screen.hide();
         this.hideStyle.remove();
         this.chip.show(name);
@@ -225,6 +227,11 @@ class AccountGate {
             this.loadRecordsModule();
         this.published = true;
         document.dispatchEvent(new CustomEvent(AccountGate.USER_EVENT));
+    }
+    hideNickSettingButtons() {
+        this.nickSettingStyle.textContent = "[data-nick-setting]{display:none !important}";
+        if (!this.nickSettingStyle.isConnected)
+            document.head.appendChild(this.nickSettingStyle);
     }
     requestSignIn() {
         this.screen.disableButton();

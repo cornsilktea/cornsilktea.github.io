@@ -224,6 +224,7 @@ class AccountGate {
   private readonly chip = new AccountChip(() => this.requestSignOut());
   private readonly nickWriter = new AccountNickWriter();
   private readonly hideStyle = document.createElement("style");
+  private readonly nickSettingStyle = document.createElement("style");
   private published = false;
 
   start(): void {
@@ -259,12 +260,18 @@ class AccountGate {
     const name = AccountPolicy.displayName(user);
     window.PORTAL_USER = { uid: user.uid, email: user.email || "", name, getToken: () => user.getIdToken() };
     this.nickWriter.write(name);
+    this.hideNickSettingButtons();
     this.screen.hide();
     this.hideStyle.remove();
     this.chip.show(name);
     if (!this.published) this.loadRecordsModule();
     this.published = true;
     document.dispatchEvent(new CustomEvent(AccountGate.USER_EVENT));
+  }
+
+  private hideNickSettingButtons(): void {
+    this.nickSettingStyle.textContent = "[data-nick-setting]{display:none !important}";
+    if (!this.nickSettingStyle.isConnected) document.head.appendChild(this.nickSettingStyle);
   }
 
   private requestSignIn(): void {

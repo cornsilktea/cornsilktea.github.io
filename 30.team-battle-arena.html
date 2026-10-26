@@ -25,7 +25,7 @@
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
 } }
 </script>
-<link rel="stylesheet" href="30.team-battle-arena.css?v=20261022e">
+<link rel="stylesheet" href="30.team-battle-arena.css?v=20261026a">
 </head>
 <body>
 <canvas id="cv"></canvas>
@@ -39,7 +39,7 @@
   <div class="wrap">
     <div class="card">
       <h1 class="titleMain"><span class="tb">3v3</span> 팀 배틀 <span class="tr">아레나</span></h1>
-      <div class="hello startHello">내 닉네임: <b id="helloNick"></b> <button class="mini" type="button" data-maker-open>✏️ 닉네임 설정</button></div>
+      <div class="hello startHello">내 닉네임: <b id="helloNick"></b> <button class="mini" type="button" data-maker-open data-nick-setting>✏️ 닉네임 설정</button></div>
       <button id="btnCreate" class="big primary" type="button">게임 만들기</button>
       <button id="btnRandom" class="big primary" type="button">랜덤 매칭 방 만들기</button>
       <div id="joinBox">
@@ -68,7 +68,7 @@
         <button id="btnLeaveLobby" class="mini danger" type="button">방 나가기</button>
       </div>
       <div class="lobbyTop">
-        <div class="hello">내 닉네임: <b id="lobbyNick"></b> <button class="mini" type="button" data-maker-open>✏️ 닉네임 설정</button></div>
+        <div class="hello">내 닉네임: <b id="lobbyNick"></b> <button class="mini" type="button" data-maker-open data-nick-setting>✏️ 닉네임 설정</button></div>
         <div class="optRows">
           <div class="optRow"><span class="optLab">게임모드</span><span id="modeBtns" class="modeBtns"></span></div>
           <div class="optRow"><span class="optLab">맵</span><span id="mapBtns" class="modeBtns"></span></div>
@@ -114,9 +114,16 @@
   <div id="partyCols" class="lobbyCols">
   <div class="wrap">
     <div class="card">
-      <div class="hello startHello">내 닉네임: <b id="partyNick"></b> <button class="mini" type="button" data-maker-open>✏️ 닉네임 설정</button></div>
-      <div id="partyMount"></div>
+      <div class="codeBar">
+        <div class="codeBox"><span class="codeLab">팀 코드</span><span id="partyCode" class="codeNum">-----</span><span id="partyStreakMount"></span></div>
+        <button id="btnLeaveParty" class="mini danger" type="button">방 나가기</button>
+      </div>
+      <div class="lobbyTop">
+        <div class="hello">내 닉네임: <b id="partyNick"></b> <button class="mini" type="button" data-maker-open data-nick-setting>✏️ 닉네임 설정</button></div>
+      </div>
     </div>
+    <div class="card"><div id="partyMount"></div></div>
+    <div class="card"><div id="partyActions"></div></div>
     <div class="card lobbyKeys">
       <div class="secTitle">조작 방법</div>
       <div class="keys">
@@ -1807,7 +1814,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     startDraft() { var services = this.services;
       var seq = {}, t = services.clock.now();
       ["blue", "red"].forEach(function (team) {
-        services.session.teamIds(team).slice(0, 3).forEach(function (id, i) { seq[(team === "blue" ? "b" : "r") + (i + 1)] = id; });
+        var ids = services.session.teamIds(team);
+        if (services.randomMatch.ticket()) ids = ids.filter(function (id) { return !services.session.players[id].isAI; }).concat(ids.filter(function (id) { return services.session.players[id].isAI; }));
+        ids.slice(0, 3).forEach(function (id, i) { seq[(team === "blue" ? "b" : "r") + (i + 1)] = id; });
       });
       var d = services.draft.draftSettle({ seq: seq, step: 0, stepAt: t }, t);
       services.session.room.ref.update({ draft: d, arena: services.arenaMap.resolveArena(services.session.room.map), status: "draft", roster: null, st: null, winner: null, overtimeAt: null, final: null, statsNote: null, endedAt: null, startAt: null,
@@ -1903,7 +1912,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         auto.forEach(function (id) {
           if (services.draft.draftWaiting(cur, step).indexOf(id) < 0) return;
           var left = services.draft.draftLeft(cur), hover = cur.hover && cur.hover[id], chosen = left.indexOf(hover) >= 0 ? hover : null;
-          if (banStep) services.draft.applyDraftChoice(cur, id, chosen || (services.session.players[id].isAI && left.length ? MathKit.pick(left) : Draft.NO_BAN));
+          if (banStep) services.draft.applyDraftChoice(cur, id, chosen || (services.session.players[id].isAI && left.length && !services.randomMatch.ticket() ? MathKit.pick(left) : Draft.NO_BAN));
           else if (left.length) services.draft.applyDraftChoice(cur, id, chosen || (services.session.players[id].isAI ? services.draftAi.choose(cur, id, left) : MathKit.pick(left)));
         });
         return services.draft.draftSettle(cur, services.clock.now());
@@ -9045,6 +9054,50 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     };
     }
   }
+  class ArenaPartyPanel extends MkPartyPanel {
+    constructor(screen, mount, options) { super(screen, mount, options);
+      this.code = Dom.$("partyCode");
+      Dom.$("partyStreakMount").appendChild(this.streak.element);
+      Dom.$("btnLeaveParty").addEventListener("click", () => this.onLeave());
+      this.seats.className = "";
+      var box = document.createElement("div"); box.className = "team mine"; box.appendChild(this.seats);
+      var teams = document.createElement("div"); teams.className = "teams"; teams.appendChild(box);
+      mount.textContent = ""; mount.appendChild(teams);
+      this.matchButton.className = "big primary mk-match"; this.aiNowButton.className = "big primary mk-ai-now";
+      this.hint.className = "startHint"; this.notice.className = "mk-notice"; this.crowd.className = "mk-crowd";
+      options.actionsMount.textContent = "";
+      options.actionsMount.append(this.crowd, this.notice, this.aiNowButton, this.matchButton, this.hint);
+    }
+    slotRows(party, leaderId, editable) { var rows = "";
+      party.members().forEach(function (entry) { var id = entry[0], member = entry[1];
+        rows += '<div class="slot' + (id === party.myId ? " mine" : "") + '">' + (id === leaderId ? '<span class="host">👑</span>' : "") + Dom.esc(member.nick) + (id === party.myId ? ' <span class="me">나</span>' : "") + "</div>";
+      });
+      for (var n = 0; n < party.bots(); n++) rows += '<div class="slot ai">🤖 AI' + (editable ? '<button type="button" class="aiDel" data-mk-seat="bot" aria-label="AI 빼기">빼기</button>' : "") + "</div>";
+      for (var count = party.members().length + party.bots(); count < this.options.partyLimit; count++)
+        rows += editable ? '<button type="button" class="slot empty addAi" data-mk-seat="empty">빈 자리<span class="aiAdd">🤖 AI 추가</span></button>' : '<div class="slot empty">빈 자리</div>';
+      return rows;
+    }
+    render(party, waitingForOthers = false, waiting = null) {
+      var leader = party.isLeader(), searching = !!party.searching(), book = party.book();
+      this.code.textContent = party.code;
+      this.streak.render(book);
+      this.seats.innerHTML = "<h3>우리 팀</h3>" + this.slotRows(party, party.record ? party.record.leaderId : "", leader && !searching);
+      this.matchButton.textContent = searching ? "매칭 취소" : "매칭 시작";
+      this.matchButton.classList.toggle("primary", !searching);
+      this.matchButton.classList.toggle("cancel", searching);
+      this.matchButton.disabled = !leader;
+      this.aiNowButton.hidden = !this.options.aiFallbackMs || !searching || !leader;
+      this.aiNowButton.disabled = false;
+      var crowdText = !searching || waiting === null ? "" : waiting > 0 ? "👥 지금 " + waiting + "개 팀이 기다리는 중" : "👥 지금 기다리는 팀이 없어요";
+      if (this.crowd.textContent !== crowdText) this.crowd.textContent = crowdText;
+      this.crowd.classList.toggle("alone", searching && waiting === 0);
+      var streakNote = book.streak() > 0 ? " · 지금 " + book.streak() + "연승 중" : "";
+      var fallback = Math.ceil(this.options.aiFallbackMs / 1000) - party.searchSeconds();
+      var fallbackNote = waitingForOthers ? " · 다른 팀 경기가 끝나길 기다리는 중(같은 상대와 연달아 만나지 않게)" : fallback > 0 ? " · " + fallback + "초 뒤 AI와 시작해요" : " · AI와 시작하는 중…";
+      var hint = searching ? "상대를 찾는 중… " + party.searchSeconds() + "초" + fallbackNote + streakNote : leader ? "" : "팀장이 매칭을 시작하길 기다리는 중이에요…";
+      if (this.hint.textContent !== hint) this.hint.textContent = hint;
+    }
+  }
   class ArenaRandomMatch {
     static PARTY_LIMIT = MatchRules.TEAM_MAX;
     static SIDE_TEAMS = ["blue", "red"];
@@ -9054,9 +9107,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     constructor(services) { this.services = services; this.flow = null; this.quiet = false; }
     ready() { var services = this.services;
       if (this.flow || !services.backend.db) return this.flow;
-      var options = { gameRoot: "teambattle", queue: "teambattle", partyLimit: ArenaRandomMatch.PARTY_LIMIT, matcher: new MkVersusMatcher(ArenaRandomMatch.PARTY_LIMIT), allowBots: true, aiFallbackMs: ArenaRandomMatch.AI_FALLBACK_MS, headExtra: Dom.$("partyNick").parentNode,
+      var options = { gameRoot: "teambattle", queue: "teambattle", partyLimit: ArenaRandomMatch.PARTY_LIMIT, matcher: new MkVersusMatcher(ArenaRandomMatch.PARTY_LIMIT), allowBots: true, aiFallbackMs: ArenaRandomMatch.AI_FALLBACK_MS, actionsMount: Dom.$("partyActions"),
         intro: "팀을 짜고(빈 자리는 🤖 AI 추가) 매칭 시작을 누르면 아무 팀과 3대3 대회모드로 만나요. 맵은 무작위예요." };
-      var panel = new MkPartyPanel(Dom.$("scrParty"), Dom.$("partyMount"), options);
+      var panel = new ArenaPartyPanel(Dom.$("scrParty"), Dom.$("partyMount"), options);
       this.flow = new MkRandomFlow(services.backend.db, { now: function () { return services.clock.now(); } }, services.session.myId, options, this, panel);
       return this.flow;
     }
@@ -9087,7 +9140,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var team = ArenaRandomMatch.SIDE_TEAMS[side], people = g ? MkSeatAssign.peopleOf(g).slice(0, ArenaRandomMatch.PARTY_LIMIT) : [];
         people.forEach(function (id) { assign[id] = team; });
         if (people.indexOf(myId) >= 0) players[myId] = services.session.newPlayer(team, t, players);
-        for (var n = people.length; n < ArenaRandomMatch.PARTY_LIMIT; n++) {
+        var botCount = g ? Math.min(g.entry.bots || 0, ArenaRandomMatch.PARTY_LIMIT - people.length) : ArenaRandomMatch.PARTY_LIMIT;
+        for (var n = 0; n < botCount; n++) {
           var free = services.charTypes.list.filter(function (c) { return !services.roster.takenInMatch(players, team, c); });
           players["ai" + Math.random().toString(36).slice(2, 10)] = { nickname: services.roster.freeAiName(players), isAI: true, team: team, characterType: MathKit.pick(free.length ? free : services.charTypes.list), joinedAt: t + n };
         }

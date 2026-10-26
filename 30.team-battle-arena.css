@@ -521,7 +521,15 @@
     .dfChars .roleTag { flex-basis: 58px; }
   }
   #scrParty { --st-accent: var(--sg-primary); --st-accent-ink: #fff; --st-title: #F4F1E8; --st-ink: var(--sg-ink); --st-ink-mid: var(--sg-ink-mid); --st-ink-soft: var(--sg-ink-soft); --st-bg: 16, 24, 19; --st-panel: var(--sg-panel); }
-  #scrParty .mk-head { font-size: 20px; font-weight: 800; margin: 0 0 6px; }
+  .team.mine { border-color: var(--sg-primary); background: rgba(95,168,118,.10); }
+  .team.mine h3 { color: var(--sg-primary); }
+  #partyMount .slot .aiDel { margin-left: auto; }
+  #partyActions .big { margin-bottom: 10px; }
+  #partyActions .big.cancel { background: #B8352E; border-color: #D6453D; color: #fff; }
+  #partyActions .big:disabled { opacity: .55; cursor: default; }
+  #partyActions .mk-crowd { text-align: center; font-size: 14px; font-weight: 700; color: var(--sg-ink-soft); margin-bottom: 8px; }
+  #partyActions .mk-crowd:empty { display: none; }
+  #partyStreakMount { display: inline-flex; }
   #lobbyMatchNote, #endStreak:empty { display: none; }
   body.mkMatched #lobbyMatchNote { display: block; }
   body.mkMatched #scrLobby .optRows, body.mkMatched #btnMapView, body.mkMatched #btnStart, body.mkMatched #btnSwapTeams, body.mkMatched #scrLobby .join, body.mkMatched #btnSpec,
