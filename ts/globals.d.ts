@@ -90,6 +90,7 @@ interface PortalUser {
   uid: string;
   email: string;
   name: string;
+  nick?: string;
   getToken(): Promise<string>;
 }
 

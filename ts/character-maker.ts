@@ -35,6 +35,7 @@ class ThreeLibsImporter {
 class CharacterMakerDialog {
   static readonly OPEN_EVENT = "portal-maker-open";
   static readonly TRIGGER_SELECTOR = "[data-maker-open]";
+  static readonly ACCOUNT_EVENT = "portal-user-changed";
 
   private readonly modal: HTMLDivElement;
   private readonly host: HTMLDivElement;
@@ -61,6 +62,7 @@ class CharacterMakerDialog {
   }
 
   open(): void {
+    if (this.isNickOnlyLocked()) return;
     this.modal.hidden = false;
     document.body.style.overflow = "hidden";
     if (this.editor instanceof ProfileEditor) this.editor.setActive(true);
@@ -77,6 +79,9 @@ class CharacterMakerDialog {
   private bindEvents(): void {
     (this.modal.querySelector(".maker-save") as HTMLButtonElement).addEventListener("click", () => this.close());
     document.addEventListener(CharacterMakerDialog.OPEN_EVENT, () => this.open());
+    document.addEventListener(CharacterMakerDialog.ACCOUNT_EVENT, () => {
+      if (this.isNickOnlyLocked() && !this.modal.hidden) this.close();
+    });
     document.addEventListener("click", (event) => {
       const trigger = (event.target as HTMLElement).closest(CharacterMakerDialog.TRIGGER_SELECTOR);
       if (!trigger) return;
@@ -86,6 +91,10 @@ class CharacterMakerDialog {
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && !this.modal.hidden) this.close();
     });
+  }
+
+  private isNickOnlyLocked(): boolean {
+    return !this.withLook && PlayerProfile.isNickLocked();
   }
 
   private prepare(): void {

@@ -6,7 +6,8 @@
    access-guard.js 가 이 파일을 불러오고(index.html·contest.html 은 script 한 줄로 직접), 로그인이 끝나야 잠금 확인을 이어 간다.
 
    로그인하면
-     window.PORTAL_USER = { uid, email, name, getToken() }   (로그아웃 전·로그인 전에는 null/없음)
+     window.PORTAL_USER = { uid, email, name, nick, getToken() }   (로그아웃 전·로그인 전에는 null/없음)
+       name = 구글 계정 이름("20104 홍길동"), nick = 학번을 뗀 이름("홍길동", 닉네임·신기록 이름에 씀)
      document 에 "portal-user-changed" 이벤트
    를 가드가 PORTAL_CLASS 를 만들어 주는 것처럼 제공한다. getToken() 은 데이터베이스 REST 요청의 ?auth= 에 붙일 ID 토큰이다.
    로그인 정보는 SDK 가 기기에 보관하므로 한 번 로그인하면 다음부터는 화면이 바로 열린다.
@@ -55,6 +56,13 @@ class AccountPolicy {
   static displayName(user: AuthUserSnapshot): string {
     const raw = user.displayName || (user.email || "").split("@")[0] || "학생";
     return raw.replace(/[\u0000-\u001f<>]/g, "").trim() || "학생";
+  }
+
+  /* 학생 계정 이름은 "20104 홍길동"처럼 학번이 앞에 붙는다. 닉네임(최대 4자)·신기록 이름에는 학번을 떼고 이름만 쓴다.
+     학번만 있거나 숫자를 떼면 아무것도 안 남으면 원래 이름을 그대로 쓴다. 교사 화면 순위표처럼 학번이 필요한 곳은 name 을 쓴다. */
+  static personName(name: string): string {
+    const stripped = name.replace(/^\d+[\s._-]*/, "").trim();
+    return stripped || name;
   }
 }
 
@@ -258,8 +266,9 @@ class AccountGate {
 
   private publish(user: AuthUserSnapshot): void {
     const name = AccountPolicy.displayName(user);
-    window.PORTAL_USER = { uid: user.uid, email: user.email || "", name, getToken: () => user.getIdToken() };
-    this.nickWriter.write(name);
+    const nick = AccountPolicy.personName(name);
+    window.PORTAL_USER = { uid: user.uid, email: user.email || "", name, nick, getToken: () => user.getIdToken() };
+    this.nickWriter.write(nick);
     this.hideNickSettingButtons();
     this.screen.hide();
     this.hideStyle.remove();

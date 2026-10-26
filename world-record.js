@@ -255,10 +255,12 @@
     };
 
     /* 로그인한 학생(window.PORTAL_USER, account-login.js)은 이름을 계정 이름으로 채워 고치지 못하게 하고,
-       반 링크로 들어왔으면 학년·반 고르기도 생략한다(대회서버처럼 반을 모르면 학년·반은 그대로 고른다). */
+       반 링크로 들어왔으면 학년·반 고르기도 생략한다(대회서버처럼 반을 모르면 학년·반은 그대로 고른다).
+       계정 이름 앞의 학번("20104 홍길동")은 뗀 nick 을 쓴다(학년·반은 따로 적히므로). */
     function accountName(maxLength) {
       var u = window.PORTAL_USER;
-      return u && u.name ? String(u.name).slice(0, maxLength) : "";
+      var name = u ? (u.nick || u.name) : "";
+      return name ? String(name).slice(0, maxLength) : "";
     }
 
     function openDialog(v, title, isWorld, isClass) {

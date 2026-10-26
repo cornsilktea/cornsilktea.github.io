@@ -50,6 +50,8 @@ class CharacterMakerDialog {
         document.dispatchEvent(new CustomEvent(CharacterMakerDialog.OPEN_EVENT));
     }
     open() {
+        if (this.isNickOnlyLocked())
+            return;
         this.modal.hidden = false;
         document.body.style.overflow = "hidden";
         if (this.editor instanceof ProfileEditor)
@@ -67,6 +69,10 @@ class CharacterMakerDialog {
     bindEvents() {
         this.modal.querySelector(".maker-save").addEventListener("click", () => this.close());
         document.addEventListener(CharacterMakerDialog.OPEN_EVENT, () => this.open());
+        document.addEventListener(CharacterMakerDialog.ACCOUNT_EVENT, () => {
+            if (this.isNickOnlyLocked() && !this.modal.hidden)
+                this.close();
+        });
         document.addEventListener("click", (event) => {
             const trigger = event.target.closest(CharacterMakerDialog.TRIGGER_SELECTOR);
             if (!trigger)
@@ -78,6 +84,9 @@ class CharacterMakerDialog {
             if (event.key === "Escape" && !this.modal.hidden)
                 this.close();
         });
+    }
+    isNickOnlyLocked() {
+        return !this.withLook && PlayerProfile.isNickLocked();
     }
     prepare() {
         if (!this.loading)
@@ -118,3 +127,4 @@ class CharacterMakerDialog {
 }
 CharacterMakerDialog.OPEN_EVENT = "portal-maker-open";
 CharacterMakerDialog.TRIGGER_SELECTOR = "[data-maker-open]";
+CharacterMakerDialog.ACCOUNT_EVENT = "portal-user-changed";
