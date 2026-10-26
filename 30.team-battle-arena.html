@@ -198,7 +198,7 @@
   <div class="modalBox statsBox">
     <div class="statsTop"><h3>캐릭터 통계</h3><div class="statsTopBtns"><button id="btnStatsRefresh" class="mini" type="button">새로고침</button><div class="patchPick"><button id="btnStatsPatch" class="mini" type="button">패치</button><div id="statsPatchMenu" class="patchMenu" hidden></div></div><button id="btnStatsClose" class="mini" type="button">닫기</button></div></div>
     <div id="statsMsg" class="statsMsg"></div>
-    <div class="boardWrap"><table class="board statsTable"><thead><tr><th class="nm">캐릭터</th><th>밴픽률<small>(밴 + 픽) / 게임 수</small></th><th>승률<small>승리 수 / 픽 수</small></th><th>KDA<small>(킬 + 어시스트) / 데스</small></th><th>평균 피해량</th><th>평균 회복량</th><th>평균 막은 피해</th><th>평균 기절</th><th>평균 둔화</th><th>평균 MVP 점수</th></tr></thead><tbody id="statsBody"></tbody></table></div>
+    <div class="boardWrap"><table class="board statsTable"><thead><tr><th class="nm">캐릭터</th><th>승률<small>승리 수 / 픽 수</small></th><th>밴픽률<small>(밴 + 픽) / 게임 수</small></th><th>KDA<small>(킬 + 어시스트) / 데스</small></th><th>평균 피해량</th><th>평균 회복량</th><th>평균 막은 피해</th><th>평균 기절</th><th>평균 둔화</th><th>평균 MVP 점수</th></tr></thead><tbody id="statsBody"></tbody></table></div>
     <ul class="statsNotes">
       <li>AI 없이 학생 6명이 3대3으로 끝까지 마친 대회모드 경기만 집계합니다.</li>
       <li>밸런스 패치마다 통계를 따로 모읍니다. 오른쪽 위 패치 버튼으로 이전 패치의 통계도 볼 수 있습니다.</li>
@@ -1633,7 +1633,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.charTypes.list.forEach(function (k) {
         var c = services.charTypes.statsOf(k), d = s[k] || {}, selectableGames = d.games != null ? +d.games : (s[k] ? matches : 0), picks = +d.picks || 0, drawPicks = +d.draws || 0, wins = +d.wins || 0, ccPicks = +d.ccPicks || 0, asPicks = +d.asPicks || 0, kdPicks = +d.kdPicks || 0, mvpPicks = +d.mvpPicks || 0, bans = +d.bans || 0;
         if (c.role !== lastRole) { lastRole = c.role; h += '<tr class="grp"><td colspan="10">' + RoleKinds.TABLE[c.role].icon + " " + RoleKinds.TABLE[c.role].name + "</td></tr>"; }
-        h += '<tr><td class="nm">' + c.icon + " " + Dom.esc(c.name) + "</td>" + services.statsView.banPickCell(bans, picks, selectableGames) + services.statsView.statsRateCell(wins, Math.max(0, picks - drawPicks)) +
+        h += '<tr><td class="nm">' + c.icon + " " + Dom.esc(c.name) + "</td>" + services.statsView.statsRateCell(wins, Math.max(0, picks - drawPicks)) + services.statsView.banPickCell(bans, picks, selectableGames) +
           services.statsView.kdaCell(d, kdPicks, asPicks) +
           "<td>" + (picks ? Math.round(+d.dmg || 0) : "-") + "</td>" +
           "<td>" + (picks && c.heals ? Math.round(+d.heal || 0) : "-") + "</td>" +

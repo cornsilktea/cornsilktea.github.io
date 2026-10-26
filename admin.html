@@ -1132,8 +1132,8 @@ async function showStats(g) {
     msg.textContent = "패치 " + patchName(patch) + " · 집계된 경기(학생 3대3만) " + matches + "판 · 게임 수는 그 직업을 고를 수 있던 경기만 셈";
     /* 진영 유불리(대회모드는 블루가 먼저 고르는 드래프트). 무승부는 어느 쪽 승리에도 안 셈 */
     const draws = Math.max(0, matches - (s.red || 0) - (s.blue || 0));
-    box.appendChild(el("p", "msg", "진영 승률(무승부 제외): 레드 " + pct(s.red || 0, matches - draws) +
-      " · 블루 " + pct(s.blue || 0, matches - draws) + " · 무승부 " + pct(draws, matches) + " (" + matches + "경기)"));
+    box.appendChild(el("p", "msg", "진영 승률: 레드 " + pct(s.red || 0, matches - draws) +
+      " · 블루 " + pct(s.blue || 0, matches - draws) + " (" + matches + "경기)"));
 
     /* 비율 옆에 (분자 / 분모) 를 작게 붙여 표본이 적은 직업을 알아볼 수 있게 한다 */
     function rateCell(a, b) {
@@ -1144,7 +1144,7 @@ async function showStats(g) {
     }
     const table = el("table");
     const head = el("tr");
-    [["직업"], ["밴픽률", "(밴 + 픽) / 고를 수 있던 게임 수"], ["승률", "승리 수 / (픽 수 - 무승부)"], ["KDA", "평균 킬 / 데스 / 어시스트"], ["평균 피해량"], ["평균 회복량"], ["평균 막은 피해"], ["평균 기절"], ["평균 둔화"]].forEach((col) => {
+    [["직업"], ["승률", "승리 수 / 픽 수"], ["밴픽률", "(밴 + 픽) / 게임 수"], ["KDA", "(킬 + 어시스트) / 데스"], ["평균 피해량"], ["평균 회복량"], ["평균 막은 피해"], ["평균 기절"], ["평균 둔화"], ["평균 MVP 점수"]].forEach((col) => {
       const th = el("th", null, col[0]);
       if (col[1]) th.appendChild(el("small", null, col[1]));
       head.appendChild(th);
@@ -1174,12 +1174,17 @@ async function showStats(g) {
       const bp = el("td");
       bp.appendChild(el("b", null, pct(bans + picks, games)));
       bp.appendChild(el("small", null, "(밴 " + bans + " + 픽 " + picks + " / " + games + ")"));
-      tr.appendChild(bp);
       tr.appendChild(rateCell(wins, decidedPicks));
+      tr.appendChild(bp);
       /* KDA: 킬·데스는 2026-09-30부터(kdPicks), 어시스트는 그 전부터(asPicks) 따로 평균을 낸다 */
       const asPicks = d.asPicks || 0, kdPicks = d.kdPicks || 0;
-      const kd = kdPicks ? (d.kills || 0).toFixed(1) + " / " + (d.deaths || 0).toFixed(1) : "- / -";
-      tr.appendChild(el("td", null, kdPicks || asPicks ? kd + " / " + (asPicks ? (d.assist || 0).toFixed(1) : "-") : "-"));
+      const kdTd = el("td");
+      if (kdPicks) {
+        const kills = d.kills || 0, deaths = d.deaths || 0, assist = asPicks ? d.assist || 0 : 0;
+        kdTd.appendChild(el("b", null, deaths > 0 ? ((kills + assist) / deaths).toFixed(2) : "Perfect"));
+        kdTd.appendChild(el("small", null, "(" + kills.toFixed(1) + " / " + deaths.toFixed(1) + " / " + (asPicks ? assist.toFixed(1) : "-") + ")"));
+      } else kdTd.textContent = "-";
+      tr.appendChild(kdTd);
       /* 1판 평균. 회복 스킬이 있는 직업(heal: true)만 회복량을 보이고 나머지는 "-" */
       tr.appendChild(el("td", null, picks ? String(Math.round(d.dmg || 0)) : "-"));
       tr.appendChild(el("td", null, picks && role.heal ? String(Math.round(d.heal || 0)) : "-"));
@@ -1188,6 +1193,7 @@ async function showStats(g) {
       tr.appendChild(el("td", null, ccPicks && role.block ? String(Math.round(d.block || 0)) : "-"));
       tr.appendChild(el("td", null, ccPicks ? (d.stun || 0).toFixed(1) + "초" : "-"));
       tr.appendChild(el("td", null, ccPicks ? (d.slow || 0).toFixed(1) + "초" : "-"));
+      tr.appendChild(el("td", null, d.mvpPicks ? String(Math.round(d.mvp || 0)) : "-"));
       table.appendChild(tr);
     });
     box.appendChild(table);
@@ -1197,7 +1203,7 @@ async function showStats(g) {
      "시간 종료 때 킬 수가 같으면 무승부입니다(레드·블루 승리 어느 쪽에도 세지 않음).",
      "게임 수는 모든 직업이 같습니다(한 판마다 모든 직업 +1). 선택 수는 그 판에 고른 6명의 직업만 오릅니다.",
      "한 경기에서 같은 캐릭터는 1명만 고를 수 있으므로 밴픽률은 그 직업이 밴되거나 나온 판의 비율입니다.",
-     "승률만 무승부 판을 분모에서 뺍니다(승리 ÷ (픽 수 - 무승부 판)). 나머지 통계는 무승부 판도 모두 셉니다. 무승부 판 수(draws)는 이 항목이 추가된 뒤의 경기부터 쌓입니다.",
+     "평균 MVP 점수는 결과 화면의 환산 점수(처치 +100, 어시스트 +50, 입힌 피해·회복·막은 피해 1당 +1, 기절 1초 +60, 둔화 1초 × 둔화율 +40, 쓰러짐 −100)를 판마다 평균 낸 값이며 이 항목이 추가된 뒤의 경기만으로 셉니다.",
      "막은 피해·기절·둔화·킬·데스·어시스트·밴은 이 항목이 추가된 뒤의 경기만으로 셉니다.",
      "어시스트: 내가 피해나 해로운 효과(기절·둔화·넉백·끌어당김)를 준 적이 5초 안에 쓰러지거나, 내가 회복·은신(눈보라)을 준 아군이 5초 안에 적을 처치하면 1회(처치한 사람은 제외, 한 처치에 1번만)."].forEach((t) => notes.appendChild(el("li", null, t)));
     box.appendChild(notes);
