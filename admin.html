@@ -831,6 +831,8 @@ function recCard(r, msgId) {
     const rec = { score: m && m.lower ? REC_BASE - v : v, name, at: r.rec.at || { ".sv": "timestamp" } };
     if (grade) rec.grade = grade;
     if (cls) rec.cls = cls;
+    /* 학생 계정으로 세운 기록이면 누가 세웠는지(uid)를 그대로 남긴다(2026-10-26부터 신기록은 로그인 계정만 등록) */
+    if (r.rec.uid) rec.uid = r.rec.uid;
     saveBtn.disabled = true; msg.textContent = "저장 중…";
     try {
       await writeRecord(r.game, r.key, rec);

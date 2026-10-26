@@ -19,6 +19,10 @@
        그때 WR.cls / WR.klass 가 그 반으로 채워지므로 결과 화면에 반 신기록을 보여 줄 수 있다.
      · 배포용 링크(?c=test)로 들어오면 WR.noRecord 가 true: 기록은 보여 주지만 beats/beatsClass 는 항상 false,
        prompt 는 창을 띄우지 않고 null 을 돌려주므로 세계·반 신기록이 등록되지 않는다(WR.cls 도 null).
+     · 로그인한 계정(window.PORTAL_USER, account-login.js)만 등록한다(2026-10-26 선생님 결정). 로그인이 없는 링크(?c= 없는 옛 링크·학생배포용)도
+       WR.noRecord 가 true 가 된다(로그인이 늦게 끝날 수 있어 부를 때마다 다시 판정). 기록에는 계정 uid 를 함께 남기고 규칙이 uid·학교 계정을 확인한다.
+     · 반 링크로 로그인했으면 창 없이 바로 등록하고 화면 아래에 잠깐 알림만 띄운다(이름 = 학번 뗀 계정 이름, 학년·반 = 반 링크).
+       대회서버처럼 반을 모르면 학년·반만 고르는 창을 띄운다.
 
    우리 반 신기록
      · 반별 링크(?c=)로 들어오면 WorldRecord() 가 WR.cls 를 알아서 만든다(같은 모양: rec·loaded·text()·who()·beats()).
@@ -66,7 +70,11 @@
       "border:1px solid #24402F;background:#24402F;color:#FFFFFF;}" +
     ".wr-row button:disabled{opacity:.6;cursor:default;}" +
     ".wr-warn{font-size:12px;color:#B33951;font-weight:700;margin-top:10px;text-align:center;line-height:1.5;}" +
-    ".wr-msg{font-size:13px;color:#5B6B5E;min-height:18px;margin-top:6px;text-align:center;}";
+    ".wr-msg{font-size:13px;color:#5B6B5E;min-height:18px;margin-top:6px;text-align:center;}" +
+    ".wr-toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom, 0px));transform:translateX(-50%);z-index:2147483000;" +
+      "max-width:calc(100vw - 32px);box-sizing:border-box;padding:12px 18px;border-radius:8px;background:rgba(16,24,19,.92);color:#FFFFFF;" +
+      "border:2px solid #D97B4F;font-family:'Nanum Gothic','Malgun Gothic',sans-serif;font-size:15px;font-weight:800;text-align:center;" +
+      "pointer-events:none;box-shadow:0 8px 24px rgba(0,0,0,.3);}";
 
   var styleDone = false;
   function ensureStyle() {
@@ -152,15 +160,20 @@
         if (!s.rec) return v > 0;
         return lower ? v < LOWER_BASE - s.rec.score : v > s.rec.score;
       },
-      /* 규칙이 "기존보다 큰 score 만" 받으므로, 그 사이 누가 앞질렀으면 401 로 거부된다 */
+      /* 규칙이 "기존보다 큰 score 만" 받으므로, 그 사이 누가 앞질렀으면 401 로 거부된다.
+         로그인한 계정의 ID 토큰(?auth=)과 uid 를 함께 보낸다 — 규칙이 uid 가 그 계정인지 확인한다 */
       submit: function (v, name, grade, cls, party) {
-        var u = s.url();
+        var u = s.url(), user = window.PORTAL_USER;
         if (!u) return Promise.reject(new Error("no-db"));
+        if (!user) return Promise.reject(new Error("login"));
         /* at 은 서버 시각(.sv) — 학생 기기의 시계가 틀려도 규칙의 시각 검사에 걸리지 않게 */
-        var rec = { score: lower ? LOWER_BASE - v : v, name: name, grade: grade, cls: cls, at: { ".sv": "timestamp" } };
+        var rec = { score: lower ? LOWER_BASE - v : v, name: name, grade: grade, cls: cls, at: { ".sv": "timestamp" }, uid: user.uid };
         /* party 는 파티 기록일 때만 붙인다(없으면 예전과 똑같은 모양으로 저장) */
         if (party) rec.party = party;
-        return fetch(u, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(rec) })
+        return user.getToken()
+          .then(function (token) {
+            return fetch(u + "?auth=" + encodeURIComponent(token), { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(rec) });
+          })
           .then(function (r) {
             if (!r.ok) throw new Error(String(r.status));
             rec.at = Date.now(); s.rec = rec; return rec;
@@ -187,8 +200,10 @@
     var pc = window.PORTAL_CLASS || null;
     /* 배포용 링크(?c=test, access-guard.js 가 test:true 를 붙임)로 들어왔으면 기록은 보여 주되
        세계·반 신기록은 등록하지 않는다(beats·beatsClass 는 false, prompt 는 바로 null, submit 은 거부). */
-    var noRecord = !!(pc && pc.test);
-    if (noRecord) pc = null;
+    var testLink = !!(pc && pc.test);
+    if (testLink) pc = null;
+    /* 등록할 수 없는 경우: 배포용 링크이거나 로그인하지 않았을 때(로그인은 게임 스크립트보다 늦게 끝날 수 있어 부를 때마다 본다) */
+    function blocked() { return testLink || !window.PORTAL_USER; }
     /* 대회서버(?c=contest)는 여러 반이 섞여 있으므로 반 링크 없이 들어온 것처럼 세계 신기록만 둔다
        (세계 신기록을 세우면 입력 창에서 고른 학년·반의 반 신기록은 평소처럼 함께 등록된다). */
     if (pc && pc.contest) pc = null;
@@ -224,12 +239,12 @@
         });
       },
 
-      noRecord: noRecord,
-      beats: function (v) { return !noRecord && world.beats(v); },
-      beatsClass: function (v) { return !noRecord && !!(cls && cls.beats(v)); },
+      get noRecord() { return blocked(); },
+      beats: function (v) { return !blocked() && world.beats(v); },
+      beatsClass: function (v) { return !blocked() && !!(cls && cls.beats(v)); },
 
       submit: function (v, name, grade, cls_) {
-        if (noRecord) return Promise.reject(new Error("test-link"));
+        if (blocked()) return Promise.reject(new Error("no-record"));
         return world.submit(v, name, grade, cls_).then(function (rec) { emit(); return rec; });
       },
 
@@ -239,7 +254,7 @@
          다 채워 등록하기 전에는 닫히지 않는다(그 사이 누가 앞질러 거부되면 자동으로 닫힘).
          돌려주는 값은 세계 신기록으로 등록된 기록(반 신기록만 등록했거나 아니면 null). */
       prompt: function (v, title) {
-        if (noRecord) return Promise.resolve(null);
+        if (blocked()) return Promise.resolve(null);
         /* 기기에 들고 있던 기록은 게임을 시작할 때 읽은 값이라, 그 사이 다른 학생이 더 높은 기록을 냈을 수 있다.
            창을 띄우기 전에 세계·반 신기록을 다시 읽어(onChange 도 다시 불림) 진짜 신기록일 때만 창을 띄운다.
            다시 읽기에 실패하면(오프라인 등) 들고 있던 값으로 판정하고, 등록 때 규칙(401)이 한 번 더 거른다. */
@@ -249,6 +264,7 @@
           var isWorld = api.beats(v);
           var isClass = api.beatsClass(v);
           if (!isWorld && !isClass) return null;
+          if (pc && accountName(20)) return registerNow(v, title, isWorld);
           return openDialog(v, title, isWorld, isClass);
         });
       }
@@ -261,6 +277,37 @@
       var u = window.PORTAL_USER;
       var name = u ? (u.nick || u.name) : "";
       return name ? String(name).slice(0, maxLength) : "";
+    }
+
+    /* 반 링크 + 로그인: 이름·학년·반이 모두 정해져 있으므로 창 없이 바로 등록한다.
+       세계 신기록이면 우리 반 신기록도 함께(반 기록이 이미 더 좋으면 규칙이 거부하므로 결과와 상관없이 넘어간다). */
+    function registerNow(v, title, isWorld) {
+      var name = accountName(20), grade = pc.grade, cls_ = pc.cls;
+      var job = isWorld
+        ? world.submit(v, name, grade, cls_).then(function (rec) {
+            var classJob = cls.beats(v) || !cls.loaded ? cls.submit(v, name, grade, cls_) : null;
+            return Promise.resolve(classJob).then(function () { return rec; }, function () { return rec; });
+          })
+        : cls.submit(v, name, grade, cls_).then(function () { return null; });
+      return job.then(function (rec) {
+        emit();
+        toast((isWorld ? "🏆 " + (title || "세계 신기록 달성!") : "🏫 " + pc.label + " 신기록 달성!") + "  " + format(v) + " · " + name);
+        return rec;
+      }, function (err) {
+        var beaten = err.message === "401" || err.message === "400";
+        toast(beaten ? "그 사이 더 높은 기록이 등록되어 신기록 등록이 안 됐어요." : "네트워크 오류로 신기록을 등록하지 못했어요.");
+        return api.load().then(function () { return null; });
+      });
+    }
+
+    /* 바로 등록했을 때 보여 주는 짧은 알림(4초 뒤 사라짐, 화면 조작을 막지 않음) */
+    function toast(text) {
+      ensureStyle();
+      var box = document.createElement("div");
+      box.className = "wr-toast";
+      box.textContent = text;
+      document.body.appendChild(box);
+      setTimeout(function () { box.remove(); }, 4000);
     }
 
     function openDialog(v, title, isWorld, isClass) {
@@ -372,6 +419,8 @@
        기존 prompt/submit 의 동작과 저장 모양은 바뀌지 않는다(party 를 넘기지 않으면 예전과 같음). */
     api.askName = function (o) {
       o = o || {};
+      /* 로그인해서 이름이 정해져 있고 학년·반도 고를 필요가 없으면 창 없이 바로 그 이름을 쓴다 */
+      if (accountName(8) && !o.needClass) return Promise.resolve({ name: accountName(8), grade: pc ? pc.grade : 0, cls: pc ? pc.cls : 0 });
       ensureStyle();
       return new Promise(function (resolve) {
         var needClass = !!o.needClass;
@@ -432,7 +481,7 @@
     };
 
     api.submitParty = function (v, o) {
-      if (noRecord) return Promise.reject(new Error("test-link"));
+      if (blocked()) return Promise.reject(new Error("no-record"));
       var party = (o.party || []).map(function (n) { return String(n).slice(0, 8); });
       var name = party.join(" ").slice(0, 20) || "파티";
       var grade = o.grade, cls_ = o.cls;

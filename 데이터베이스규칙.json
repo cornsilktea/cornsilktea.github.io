@@ -247,13 +247,14 @@
       ".read": true,
       "$game": {
         "$key": {
-          ".write": "$game.matches(/^[a-z]+$/) && $key.matches(/^[a-z]+$/) && (!data.exists() || newData.child('score').val() > data.child('score').val() || (auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')))",
+          ".write": "$game.matches(/^[a-z]+$/) && $key.matches(/^[a-z]+$/) && auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || (auth.token.email_verified === true && auth.token.email.endsWith('@dongma.sen.ms.kr') && newData.child('uid').val() === auth.uid && (!data.exists() || newData.child('score').val() > data.child('score').val())))",
           ".validate": "newData.hasChildren(['score', 'name', 'at']) && newData.child('score').isNumber() && newData.child('score').val() >= 0 && ($game !== 'slidecard' || newData.child('score').val() <= 999997500) && ($game !== 'robotmaze' || newData.child('score').val() <= 999999500) && ($game !== 'brickbreak' || newData.child('score').val() <= 500) && ($game !== 'snakegame' || newData.child('score').val() <= 399) && ($game !== 'conditionrun' || newData.child('score').val() <= 100) && ($game !== 'ramentiming' || newData.child('score').val() <= 50000) && ($game !== 'baseball' || newData.child('score').val() <= 300000) && ($game !== 'hanokroofrun' || newData.child('score').val() <= 50000) && ($game !== 'pianotiles' || newData.child('score').val() <= 1000000) && ($game !== 'timeguess' || newData.child('score').val() <= 1000000000) && ($game !== 'turbolap' || newData.child('score').val() <= 999955000) && ($game !== 'fpssurvival' || newData.child('score').val() <= 99999999) && ($game !== 'blockblast' || newData.child('score').val() <= 1000000) && ($game !== 'freekick' || newData.child('score').val() <= 10999) && ($game !== 'basketball' || newData.child('score').val() <= 100000) && ($game !== 'powerarrow' || newData.child('score').val() <= 600) && ($game !== 'dungeonraid' || (newData.child('score').val() <= 999820000 && newData.hasChild('party')))",
           "score": { ".validate": "newData.isNumber()" },
           "name": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20" },
           "at": { ".validate": "newData.isNumber() && ((newData.val() > now - 600000 && newData.val() < now + 600000) || (auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')))" },
           "grade": { ".validate": "newData.isNumber() && (newData.val() === 1 || newData.val() === 2)" },
           "cls": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 5" },
+          "uid": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 128" },
           "party": {
             ".validate": "$game === 'dungeonraid' && newData.hasChildren(['0', '1', '2', '3', '4']) && !newData.hasChild('5')",
             "$i": { ".validate": "$i.matches(/^[0-4]$/) && newData.isString() && newData.val().length >= 1 && newData.val().length <= 8" }
