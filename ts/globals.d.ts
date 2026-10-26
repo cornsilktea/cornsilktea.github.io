@@ -86,10 +86,18 @@ interface PortalClass {
   label: string;
 }
 
+interface PortalUser {
+  uid: string;
+  email: string;
+  name: string;
+  getToken(): Promise<string>;
+}
+
 interface Window {
   importShim?: (specifier: string) => Promise<unknown>;
   PORTAL_CONFIG?: PortalConfig;
   PORTAL_CLASS?: PortalClass | null;
+  PORTAL_USER?: PortalUser | null;
   firebase?: {
     initializeApp(config: { apiKey: string; authDomain: string; databaseURL: string }): unknown;
     database(): FirebaseDatabase;

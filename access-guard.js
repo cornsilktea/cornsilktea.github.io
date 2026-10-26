@@ -122,6 +122,20 @@
     : klass.contest ? "contest.html"
     : "index.html?c=" + klass.id;
 
+  /* ---------- 구글 로그인 ----------
+     반별 링크와 대회서버는 학교 구글 계정으로 로그인해야 자료가 열립니다(배포용·학생배포용은 로그인 없음).
+     로그인 화면과 계정 정보(window.PORTAL_USER)는 account-login.js 가 맡고, 이 가드는 그 파일을 불러온 뒤
+     로그인이 끝날 때까지 잠금 확인을 미룹니다(로그인하면 "portal-user-changed" 이벤트로 이어 감).
+     file:// 미리보기는 account-login.js 가 알아서 건너뜁니다. */
+  var loginRequired = !!klass && !klass.test;
+  var loginScript = null;
+  if (loginRequired && script && script.src) {
+    loginScript = document.createElement("script");
+    loginScript.charset = "utf-8";
+    loginScript.src = script.src.replace("access-guard.js", "account-login.js");
+    (document.head || document.documentElement).appendChild(loginScript);
+  }
+
   /* 버튼이 화면 배경에서 튀지 않게, 뒤 배경이 밝으면 옅은 어두운 판·어두운 글씨,
      어두우면 옅은 밝은 판·밝은 글씨로 칠합니다. 배경을 못 알아내면 어두운 쪽으로 봅니다. */
   function pageBackgroundIsLight() {
@@ -358,6 +372,7 @@
   var gameId = null;          /* 실제로 등록된 자료 아이디(예전 아이디로 찾았으면 그 이름) */
 
   function check() {
+    if (loginRequired && !window.PORTAL_USER) return;
     if (!cfg.isReady || !cfg.isReady()) {
       lock("🔧", "설정이 아직 끝나지 않았어요",
            "firebase-config.js 에 주소와 키를 넣어야 수업 자료를 열 수 있습니다.");
@@ -423,6 +438,13 @@
              "인터넷 연결을 확인해 주세요. 연결되면 자동으로 열립니다.");
       });
   }
+
+  if (loginScript) {
+    loginScript.onerror = function () {
+      lock("📡", "로그인 도구를 불러오지 못했어요", "인터넷 연결을 확인하고 다시 열어 주세요.");
+    };
+  }
+  document.addEventListener("portal-user-changed", check);
 
   check();
   setInterval(check, POLL);

@@ -254,8 +254,17 @@
       }
     };
 
+    /* 로그인한 학생(window.PORTAL_USER, account-login.js)은 이름을 계정 이름으로 채워 고치지 못하게 하고,
+       반 링크로 들어왔으면 학년·반 고르기도 생략한다(대회서버처럼 반을 모르면 학년·반은 그대로 고른다). */
+    function accountName(maxLength) {
+      var u = window.PORTAL_USER;
+      return u && u.name ? String(u.name).slice(0, maxLength) : "";
+    }
+
     function openDialog(v, title, isWorld, isClass) {
         ensureStyle();
+        var fixedName = accountName(20);
+        var showPicks = isWorld && !(fixedName && pc);
         return new Promise(function (resolve) {
           var back = document.createElement("div");
           back.className = "wr-back";
@@ -265,7 +274,7 @@
                 ? "<h3>🏆 " + escapeHtml(title || "세계 신기록 달성!") + "</h3>"
                 : "<h3>🏫 " + escapeHtml(pc.label + " 신기록 달성!") + "</h3>") +
               '<div class="wr-val">기록 <b>' + escapeHtml(format(v)) + "</b></div>" +
-              (isWorld
+              (showPicks
                 ? '<div class="wr-lab">학년</div>' + pickRow(GRADES, "학년") +
                   '<div class="wr-lab">반</div>' + pickRow(CLASSES, "반")
                 : '<div class="wr-lab">' + escapeHtml(pc.label) + "</div>") +
@@ -289,7 +298,8 @@
               msg.textContent = "";
             });
           }
-          if (isWorld) {
+          if (fixedName) { input.value = fixedName; input.readOnly = true; }
+          if (showPicks) {
             wirePick(picks[0], function (n) { grade = n; });
             wirePick(picks[1], function (n) { cls_ = n; });
             /* 반별 링크로 들어왔으면 학년·반을 미리 골라 둔다 */
@@ -382,6 +392,8 @@
         var input = back.querySelector("input"), ok = back.querySelector(".wr-ok"), msg = back.querySelector(".wr-msg");
         var picks = back.querySelectorAll(".wr-pick");
         var grade = pc ? pc.grade : 0, cls_ = pc ? pc.cls : 0;
+        var fixedName = accountName(8);
+        if (fixedName) { input.value = fixedName; input.readOnly = true; }
         if (needClass) {
           [[picks[0], function (n) { grade = n; }, grade], [picks[1], function (n) { cls_ = n; }, cls_]].forEach(function (entry) {
             var row = entry[0], setter = entry[1];

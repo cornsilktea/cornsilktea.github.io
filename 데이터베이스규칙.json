@@ -262,6 +262,40 @@
         }
       }
     },
+    "users": {
+      ".read": "auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')",
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid && ((auth.token.email_verified === true && auth.token.email.endsWith('@dongma.sen.ms.kr')) || auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')",
+        "profile": {
+          ".validate": "newData.hasChildren(['name', 'email', 'at']) && newData.child('email').val() === auth.token.email",
+          "name": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 40" },
+          "email": { ".validate": "newData.isString()" },
+          "at": { ".validate": "newData.val() === now" },
+          "$other": { ".validate": false }
+        },
+        "best": {
+          "$game": {
+            "$key": {
+              ".validate": "$game.matches(/^[a-z]+$/) && $key.matches(/^[a-z0-9]{1,40}$/) && newData.hasChildren(['score', 'lower', 'at']) && newData.child('score').isNumber() && newData.child('score').val() >= 0 && newData.child('score').val() <= 1000000000000 && newData.child('lower').isBoolean() && newData.child('at').val() === now && (!data.exists() || (newData.child('lower').val() === data.child('lower').val() && (newData.child('lower').val() ? newData.child('score').val() < data.child('score').val() : newData.child('score').val() > data.child('score').val())))",
+              "score": { ".validate": "newData.isNumber()" },
+              "lower": { ".validate": "newData.isBoolean()" },
+              "at": { ".validate": "newData.isNumber()" },
+              "$other": { ".validate": false }
+            }
+          }
+        },
+        "localBests": {
+          "$k": {
+            ".validate": "$k.matches(/^[a-z0-9_]{3,40}$/) && !data.exists() && newData.hasChildren(['raw', 'at']) && newData.child('at').val() === now",
+            "raw": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 2000" },
+            "at": { ".validate": "newData.isNumber()" },
+            "$other": { ".validate": false }
+          }
+        },
+        "$other": { ".validate": false }
+      }
+    },
     "seatplans": {
       ".read": true,
       "$cls": {

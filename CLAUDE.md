@@ -66,6 +66,8 @@
    `ctx.font` 에 글꼴 이름을 넣을 땐 `"Nanum Gothic", "Malgun Gothic", sans-serif` 큰따옴표.
    "버튼이 안 눌린다"는 보고는 콘솔 SyntaxError 부터 의심.
 
+- **학생 구글 로그인(2026-10-26)**: 반별 링크·대회서버는 `ts/account-login.ts`(`AccountGate`)가 자료 실행 전에 로그인을 요구하고 `window.PORTAL_USER` 를 제공한다. 계정별 기록은 `ts/personal-records.ts`. 로그인하면 닉네임은 계정 이름으로 고정(수정 불가). 작업 전 `계정로그인.md` 를 읽는다. CSP 가 있는 자료(1~3번)는 Firebase Auth 주소가 허용돼 있어야 한다.
+
 ## 디자인·조작 규칙
 
 - **게임 파일(번호.html, court-cases.js)에는 주석을 달지 않고 변수·함수 이름으로 설명한다.** 공용 모듈(access-guard.js·world-record.js·firebase-config.js·data.js·sw.js·theme.css)과
