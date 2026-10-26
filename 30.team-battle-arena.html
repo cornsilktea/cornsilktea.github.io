@@ -196,7 +196,7 @@
 
 <div id="statsModal" class="modal" hidden>
   <div class="modalBox statsBox">
-    <div class="statsTop"><h3>캐릭터 통계</h3><div class="statsTopBtns"><div class="patchPick"><button id="btnStatsPatch" class="mini" type="button">패치</button><div id="statsPatchMenu" class="patchMenu" hidden></div></div><button id="btnStatsClose" class="mini" type="button">닫기</button></div></div>
+    <div class="statsTop"><h3>캐릭터 통계</h3><div class="statsTopBtns"><button id="btnStatsRefresh" class="mini" type="button">새로고침</button><div class="patchPick"><button id="btnStatsPatch" class="mini" type="button">패치</button><div id="statsPatchMenu" class="patchMenu" hidden></div></div><button id="btnStatsClose" class="mini" type="button">닫기</button></div></div>
     <div id="statsMsg" class="statsMsg"></div>
     <div class="boardWrap"><table class="board statsTable"><thead><tr><th class="nm">캐릭터</th><th>밴픽률<small>(밴 + 픽) / 고를 수 있던 게임 수</small></th><th>승률<small>승리 수 / (픽 수 - 무승부)</small></th><th>KDA<small>평균 킬 / 데스 / 어시스트</small></th><th>평균 피해량</th><th>평균 회복량</th><th>평균 막은 피해</th><th>평균 기절</th><th>평균 둔화</th></tr></thead><tbody id="statsBody"></tbody></table></div>
     <ul class="statsNotes">
@@ -9280,6 +9280,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     Dom.$("btnMapViewClose").onclick = function () { Dom.show(Dom.$("mapViewModal"), false); };
     Dom.$("mapViewModal").addEventListener("click", function (e) { if (e.target === Dom.$("mapViewModal")) Dom.show(Dom.$("mapViewModal"), false); });
     Dom.$("statsModal").addEventListener("click", function (e) { if (e.target === Dom.$("statsModal")) Dom.show(Dom.$("statsModal"), false); });
+    Dom.$("btnStatsRefresh").onclick = function () { services.statsView.loadStats(); };
     Dom.$("btnStatsPatch").onclick = function () { services.statsView.togglePatchMenu(); };
     Dom.$("statsPatchMenu").onclick = function (e) {
       var b = e.target.closest ? e.target.closest("[data-patch]") : null;
