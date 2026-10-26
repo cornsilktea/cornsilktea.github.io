@@ -268,11 +268,76 @@
         ".read": "auth != null && auth.uid === $uid",
         ".write": "auth != null && auth.uid === $uid && ((auth.token.email_verified === true && auth.token.email.endsWith('@dongma.sen.ms.kr')) || auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')",
         "profile": {
-          ".validate": "newData.hasChildren(['name', 'email', 'at']) && newData.child('email').val() === auth.token.email",
+          ".validate": "newData.hasChildren(['name', 'email', 'at']) && (newData.child('email').val() === auth.token.email || ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') && newData.child('email').val() === data.child('email').val()))",
           "name": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 40" },
           "email": { ".validate": "newData.isString()" },
-          "at": { ".validate": "newData.val() === now" },
+          "at": { ".validate": "newData.val() === now || ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') && newData.val() === data.val())" },
+          "cls": {
+            ".write": "auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')",
+            ".validate": "newData.isString() && newData.val().matches(/^[12]-[1-5]$/) && (!data.exists() || newData.val() === data.val() || auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+          },
           "$other": { ".validate": false }
+        },
+        "stats": {
+          "teambattle": {
+            ".validate": "newData.hasChildren(['g', 'w', 'l', 'bg', 'bw', 'rg', 'rw', 'm']) && ((!data.exists() && newData.child('g').val() === 1) || (data.exists() && newData.child('g').val() === data.child('g').val() + 1 && newData.child('w').val() >= data.child('w').val() && newData.child('l').val() >= data.child('l').val() && newData.child('m').val() >= data.child('m').val() && newData.child('m').val() <= data.child('m').val() + 1 && newData.child('bg').val() >= data.child('bg').val() && newData.child('rg').val() >= data.child('rg').val())) && newData.child('w').val() + newData.child('l').val() === newData.child('g').val() && newData.child('m').val() <= newData.child('g').val() && newData.child('bg').val() + newData.child('rg').val() === newData.child('g').val() && newData.child('bw').val() <= newData.child('bg').val() && newData.child('rw').val() <= newData.child('rg').val() && newData.child('bw').val() + newData.child('rw').val() === newData.child('w').val()",
+            "g": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+            "w": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+            "l": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+            "bg": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+            "bw": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+            "rg": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+            "rw": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+            "m": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+            "ids": {
+              "$id": { ".validate": "$id.length >= 1 && $id.length <= 60 && newData.isNumber() && !data.exists()" }
+            },
+            "c": {
+              "$char": {
+                ".validate": "$char.matches(/^(warrior|knight|ranger|mage|rogue|necro|sniper|thrower|lancer|blacksmith|priest|hitman|guardian|frost|dancer|duelist|stormbow|cleric|shaman|engineer|druid|giant|astrologer)$/) && newData.hasChildren(['n', 'w', 'bg', 'bw', 'rg', 'rw', 'm', 'kn', 'k', 'd', 'a', 'dmg', 'hl', 'bl', 'st', 'sl']) && ((!data.exists() && newData.child('n').val() === 1) || (data.exists() && newData.child('n').val() === data.child('n').val() + 1)) && newData.child('w').val() <= newData.child('n').val() && newData.child('m').val() <= newData.child('n').val() && newData.child('kn').val() <= newData.child('n').val() && newData.child('bg').val() + newData.child('rg').val() === newData.child('n').val() && newData.child('bw').val() <= newData.child('bg').val() && newData.child('rw').val() <= newData.child('rg').val()",
+                "n": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+                "w": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+                "bg": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+                "bw": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+                "rg": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+                "rw": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+                "m": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+                "kn": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+                "k": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100" },
+                "d": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100" },
+                "a": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100" },
+                "dmg": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5000" },
+                "hl": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5000" },
+                "bl": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5000" },
+                "st": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 600" },
+                "sl": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 600" },
+                "$other": { ".validate": false }
+              }
+            },
+            "$other": { ".validate": false }
+          },
+          "$game": { ".validate": "$game === 'teambattle'" }
+        },
+        "recent": {
+          "$slot": {
+            ".validate": "$slot.matches(/^[0-9]$/) && newData.hasChildren(['v', 'id', 'at', 'r', 'ai', 'me', 's', 'p'])",
+            "v": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 99" },
+            "id": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60" },
+            "at": { ".validate": "newData.val() === now" },
+            "r": { ".validate": "newData.val() === 0 || newData.val() === 1" },
+            "ai": { ".validate": "newData.val() === 0 || newData.val() === 1" },
+            "me": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5" },
+            "s": {
+              "$i": { ".validate": "$i.matches(/^[01]$/) && newData.isNumber() && newData.val() >= 0 && newData.val() <= 999" }
+            },
+            "p": {
+              "$i": {
+                ".validate": "$i.matches(/^[0-5]$/)",
+                "$j": { ".validate": "$j.matches(/^([0-9]|1[0-3])$/) && ((($j === '0' || $j === '2') && newData.isString() && newData.val().length <= 20) || ($j !== '0' && $j !== '2' && newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000))" }
+              }
+            },
+            "$other": { ".validate": false }
+          }
         },
         "best": {
           "$game": {
@@ -294,6 +359,20 @@
           }
         },
         "$other": { ".validate": false }
+      }
+    },
+    "classStats": {
+      ".read": "auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')",
+      "$cls": {
+        "$uid": {
+          ".write": "auth != null && ((auth.uid === $uid && auth.token.email_verified === true && auth.token.email.endsWith('@dongma.sen.ms.kr')) || auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')",
+          ".validate": "$cls.matches(/^([12]-[1-5]|none)$/) && newData.hasChildren(['n', 'g', 'w', 'm']) && newData.child('w').val() <= newData.child('g').val() && newData.child('m').val() <= newData.child('g').val() && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3' || (newData.child('g').val() === newData.parent().parent().parent().child('users').child($uid).child('stats').child('teambattle').child('g').val() && newData.child('w').val() === newData.parent().parent().parent().child('users').child($uid).child('stats').child('teambattle').child('w').val() && newData.child('m').val() === newData.parent().parent().parent().child('users').child($uid).child('stats').child('teambattle').child('m').val()))",
+          "n": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 40" },
+          "g": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+          "w": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+          "m": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+          "$other": { ".validate": false }
+        }
       }
     },
     "seatplans": {

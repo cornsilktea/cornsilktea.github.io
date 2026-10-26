@@ -3,7 +3,8 @@
    계정별 개인 기록 (공용 모듈, 로그인한 학생만)
 
    저장 위치(Realtime Database, 본인만 읽고 쓴다 — 데이터베이스규칙.json 의 users):
-     users/<uid>/profile                     { name, email, at }
+     users/<uid>/profile                     { name, email, at, cls? }  cls 는 반 링크로 처음 로그인할 때 한 번만("2-5")
+     users/<uid>/stats/teambattle · recent   30번 팀 배틀 계정 통계·최근 매치(account-stats.ts)
      users/<uid>/best/<게임>/<key>           { score, lower, at }  게임별 개인 최고 기록 (더 좋을 때만 덮어씀)
      users/<uid>/localBests/<기기 저장 키>    { raw, at }  이 기기에 있던 localStorage 최고 기록을 처음 로그인할 때 한 번 옮겨 둔 것
 
@@ -26,8 +27,19 @@ class AccountDatabase {
         return (await response.json());
     }
     async write(path, value) {
-        const response = await fetch(await this.address(path), {
-            method: "PUT",
+        await this.send("PUT", await this.address(path), value);
+    }
+    /* 부분 수정(PATCH): 적은 필드만 바뀌고 나머지(예: profile.cls)는 그대로 남는다 */
+    async update(path, value) {
+        await this.send("PATCH", await this.address(path), value);
+    }
+    /* 여러 가지(users/<uid>/… 와 classStats/… 처럼 users 밖 경로 포함)를 한 번의 요청으로 함께 쓴다. 키는 루트 기준 경로 */
+    async updateRoot(values) {
+        await this.send("PATCH", await this.rootAddress(), values);
+    }
+    async send(method, url, value) {
+        const response = await fetch(url, {
+            method,
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(value)
         });
@@ -35,12 +47,18 @@ class AccountDatabase {
             throw new Error(String(response.status));
     }
     async address(path) {
+        return this.urlOf("/users/" + this.user.uid + "/" + path);
+    }
+    async rootAddress() {
+        return this.urlOf("/");
+    }
+    async urlOf(path) {
         const config = window.PORTAL_CONFIG;
         if (!config || !config.isReady())
             throw new Error("no-db");
         const token = await this.user.getToken();
         const base = config.DB_URL.replace(/\/+$/, "");
-        return base + "/users/" + this.user.uid + "/" + path + ".json?auth=" + encodeURIComponent(token);
+        return base + path + ".json?auth=" + encodeURIComponent(token);
     }
 }
 class PersonalBest {
@@ -132,16 +150,66 @@ class LocalBestMigrator {
 LocalBestMigrator.KEY_PATTERN = /^[a-z0-9]+_best(?:_v[0-9]+)?$/;
 LocalBestMigrator.MAX_RAW_LENGTH = 2000;
 LocalBestMigrator.DONE_PREFIX = "account_migrated_";
+/* 학생의 반(profile.cls, "2-5" 형식)은 반 링크(?c=1-1 … 2-5)로 처음 로그인할 때 한 번만 적는다.
+   대회서버·배포용 링크는 반을 알 수 없어 적지 않는다(미분류). 규칙이 한 번 적힌 반은 선생님 계정만 고치게 막으므로,
+   다른 반 링크로 들어와 거부되면 cls 없이 다시 쓰고, 이 기기에는 "이미 처리함" 표시를 남겨 다음 로그인부터는 시도하지 않는다
+   (그래서 보통은 로그인 한 번당 요청 1회 그대로). 선생님 계정은 칠판에서 반 링크로 로그인하므로 적지 않는다. */
+class AccountClassClaim {
+    constructor(user) {
+        this.user = user;
+    }
+    pending() {
+        const klass = window.PORTAL_CLASS;
+        if (!klass || !AccountClassClaim.CLASS_PATTERN.test(klass.id))
+            return null;
+        if (AccountPolicy.ADMIN_UIDS.indexOf(this.user.uid) >= 0)
+            return null;
+        return this.readDone() === klass.id ? null : klass.id;
+    }
+    markDone(cls) {
+        try {
+            localStorage.setItem(AccountClassClaim.DONE_PREFIX + this.user.uid, cls);
+        }
+        catch (error) {
+            return;
+        }
+    }
+    readDone() {
+        try {
+            return localStorage.getItem(AccountClassClaim.DONE_PREFIX + this.user.uid) || "";
+        }
+        catch (error) {
+            return "";
+        }
+    }
+}
+AccountClassClaim.CLASS_PATTERN = /^[12]-[1-5]$/;
+AccountClassClaim.DONE_PREFIX = "account_cls_";
 class AccountRecordsStarter {
     start() {
         const user = window.PORTAL_USER;
         if (!user)
             return;
         const database = new AccountDatabase(user);
-        const profile = { name: user.name, email: user.email, at: { ".sv": "timestamp" } };
-        database.write("profile", profile)
+        this.writeProfile(user, database)
             .then(() => new LocalBestMigrator(user, database).migrateOnce())
             .catch(() => undefined);
+    }
+    async writeProfile(user, database) {
+        const profile = { name: user.name, email: user.email, at: { ".sv": "timestamp" } };
+        const claim = new AccountClassClaim(user);
+        const cls = claim.pending();
+        if (!cls) {
+            await database.update("profile", profile);
+            return;
+        }
+        try {
+            await database.update("profile", Object.assign({ cls }, profile));
+        }
+        catch (error) {
+            await database.update("profile", profile);
+        }
+        claim.markDone(cls);
     }
 }
 new AccountRecordsStarter().start();

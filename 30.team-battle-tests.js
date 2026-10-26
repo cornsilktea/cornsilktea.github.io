@@ -4532,6 +4532,7 @@ class ResultCollector {
   new AstrologerTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
   new MinionSkillTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
   new RangerGaugeTests(api, { world: world, run: run, OPEN_Y: OPEN_Y }).register();
+  new AccountStatsTests(api, { run: run, runAsync: runAsync }).register();
   results.pending = Promise.resolve().then(function () { api.finish(api.currentMap()); }).then(drainAsync);
   return results;
   }
@@ -5317,4 +5318,208 @@ class RangerGaugeTests {
       if (api.gaugeTextOf("ranger").indexOf("+" + want) < 0) bad.push("카드 문구 " + api.gaugeTextOf("ranger"));
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "1발 적중 +" + rg2.gauge + ", 2발 적중 +" + rg.gauge + ", 카드 '" + api.gaugeTextOf("ranger") + "'");
     }.bind(this));  }
+}
+
+class AccountStatsTests {
+  static GROUP = "계정 통계·최근 매치";
+  constructor(api, kit) { this.api = api; this.kit = kit; this.A = api.ACCOUNT; }
+
+  line(name, team, char, extra) {
+    return Object.assign({ name: name, team: team, char: char, kills: 0, deaths: 0, assists: 0, dmg: 0, heal: 0, blocked: 0, stun: 0, slow: 0, slowWeight: 0, left: false, ai: false }, extra || {});
+  }
+
+  players(extra) {
+    var L = this.api.CHAR_LIST, self = this, names = ["가", "나", "다", "라", "마", "바"];
+    return names.map(function (n, i) { return self.line(n, i < 3 ? 0 : 1, L[i], (extra || {})[i]); });
+  }
+
+  report(extra) {
+    return Object.assign({ matchId: "room1_1000", mode: "cup", winnerTeam: 0, myIndex: 0, players: this.players({ 0: { kills: 3, dmg: 900 }, 1: { kills: 1, dmg: 300 } }), score: [4, 1], progress: 1, iLeft: false }, extra || {});
+  }
+
+  judge() { return this.A.report.judge(); }
+
+  plan(report) { return new this.A.Plan(report, this.judge()); }
+
+  fakeStore(data) {
+    var writes = [];
+    var database = { read: function (path) { return Promise.resolve(data[path] === undefined ? null : JSON.parse(JSON.stringify(data[path]))); }, updateRoot: function (values) { writes.push(values); return Promise.resolve(); } };
+    var store = new this.A.Store(database, { uid: "u1", name: "홍길동", email: "a@b", getToken: function () { return Promise.resolve(""); } });
+    return { store: store, writes: writes };
+  }
+
+  liveEntries() {
+    var L = this.api.CHAR_LIST, entries = {};
+    var specs = [
+      ["me", "blue", 1, "나", L[0], { kills: 3, deaths: 1, assists: 2, dmg: 1234.6, heal: 45.4, blocked: 210.5, stunDealt: 1.26, slowDealt: 0.84, slowWeight: 0.4567 }],
+      ["b2", "blue", 2, "둘", L[1], { kills: 1, deaths: 2, assists: 4, dmg: 640.2, heal: 300.7, blocked: 0, stunDealt: 0, slowDealt: 3.33, slowWeight: 1.111 }],
+      ["b3", "blue", 3, "셋", L[2], { kills: 0, deaths: 3, assists: 1, dmg: 410, heal: 0, blocked: 12.2, stunDealt: 2.05, slowDealt: 0, slowWeight: 0 }],
+      ["r1", "red", 1, "AI 봇", L[3], { kills: 2, deaths: 2, assists: 0, dmg: 980.5, heal: 0, blocked: 0, stunDealt: 0, slowDealt: 0, slowWeight: 0 }, true],
+      ["r2", "red", 2, "넷", L[4], { kills: 2, deaths: 1, assists: 1, dmg: 777.7, heal: 10.1, blocked: 0, stunDealt: 0.5, slowDealt: 1.5, slowWeight: 0.75 }],
+      ["r3", "red", 3, "다섯", L[5], { kills: 0, deaths: 0, assists: 0, dmg: 5.5, heal: 0, blocked: 0, stunDealt: 0, slowDealt: 0, slowWeight: 0 }]
+    ];
+    specs.forEach(function (s) {
+      entries[s[0]] = { player: { team: s[1], slot: s[2], nickname: s[3], isAI: !!s[6] }, ent: Object.assign({ char: s[4], team: s[1], nickname: s[3] }, s[5]) };
+    });
+    return entries;
+  }
+
+  register() {
+    var self = this, api = this.api, A = this.A, run = this.kit.run, runAsync = this.kit.runAsync, G = AccountStatsTests.GROUP;
+
+    run(G, "MVP: 환산점수가 같으면 모두 MVP, 나간 사람과 처치·어시스트가 없는 사람은 후보에서 빠지는가", function (done) {
+      var bad = [], judge = self.judge();
+      var tie = self.players({ 0: { kills: 2, dmg: 100 }, 3: { kills: 2, dmg: 100 }, 1: { kills: 1 } });
+      if (JSON.stringify(judge.winners(tie)) !== "[0,3]") bad.push("동점 " + JSON.stringify(judge.winners(tie)));
+      var left = self.players({ 0: { kills: 9, dmg: 2000, left: true }, 2: { kills: 1, dmg: 50 } });
+      if (JSON.stringify(judge.winners(left)) !== "[2]") bad.push("나간 사람 제외 " + JSON.stringify(judge.winners(left)));
+      var idle = self.players({ 0: { dmg: 3000 }, 4: { assists: 1 } });
+      if (JSON.stringify(judge.winners(idle)) !== "[4]") bad.push("처치·어시스트 없음 제외 " + JSON.stringify(judge.winners(idle)));
+      var r = self.report({ players: tie, myIndex: 3, winnerTeam: 0 });
+      if (!self.plan(r).mvp || self.plan(r).win) bad.push("진 팀이어도 동점 MVP 인정");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "동점 2명 모두 MVP, 나간 사람·기여 없는 사람 제외");
+    });
+
+    run(G, "집계 대상: AI 포함 경기는 누적 통계에서 빠지고 최근 매치에만, 일반·연습모드는 둘 다 기록하지 않는가", function (done) {
+      var bad = [];
+      var withAi = self.report({ players: self.players({ 4: { ai: true } }) });
+      var p = self.plan(withAi);
+      if (!p.recordsRecent || p.countsStats || !p.withAi) bad.push("AI 포함 " + JSON.stringify(p));
+      var pure = self.plan(self.report());
+      if (!pure.recordsRecent || !pure.countsStats || !pure.win) bad.push("AI 없음 " + JSON.stringify(pure));
+      ["pvp", "practice"].forEach(function (mode) { if (self.plan(self.report({ mode: mode })).recordsRecent) bad.push(mode + " 기록됨"); });
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "AI 포함 → 최근 매치만, AI 없음 → 둘 다, 일반·연습 → 없음");
+    });
+
+    run(G, "나가기: 경기 절반 뒤에 나가면 패배로 세고, 절반 전에 나가면 아무 기록도 남지 않는가", function (done) {
+      var bad = [], half = A.Plan.FORFEIT_AT;
+      var late = self.plan(self.report({ iLeft: true, progress: half, winnerTeam: -1, players: self.players({ 0: { left: true, kills: 9, dmg: 3000 } }) }));
+      if (!late.recordsRecent || !late.countsStats || late.win || late.mvp) bad.push("절반 뒤 " + JSON.stringify(late));
+      var lateWinning = self.plan(self.report({ iLeft: true, progress: 0.9, winnerTeam: 0 }));
+      if (lateWinning.win) bad.push("이기던 팀이어도 나가면 패배");
+      var early = self.plan(self.report({ iLeft: true, progress: half - 0.01 }));
+      if (early.recordsRecent || early.countsStats) bad.push("절반 전 " + JSON.stringify(early));
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "진행 " + half * 100 + "% 이상 → 패배 기록, 미만 → 기록 없음");
+    });
+
+    run(G, "누적 통계: 판·승·진영·MVP 합산과 캐릭터 평균(통계 표와 같은 방식), 같은 경기 열쇠는 두 번 올라가지 않는가", function (done) {
+      var bad = [], M = A.Math, ch = api.CHAR_LIST[0];
+      var l1 = self.line("나", 0, ch, { kills: 3, deaths: 1, assists: 2, dmg: 1000, heal: 0, blocked: 10, stun: 1.2, slow: 0.4 });
+      var l2 = self.line("나", 1, ch, { kills: 1, deaths: 3, assists: 0, dmg: 501, heal: 0, blocked: 0, stun: 0, slow: 1 });
+      var c1 = M.apply(null, l1, { key: "k1", win: true, side: 0, mvp: true, at: 1 });
+      var c2 = M.apply(JSON.parse(JSON.stringify(c1.node)), l2, { key: "k2", win: false, side: 1, mvp: false, at: 2 });
+      var n = c2.node, c = n.c[ch];
+      if (n.g !== 2 || n.w !== 1 || n.l !== 1 || n.bg !== 1 || n.bw !== 1 || n.rg !== 1 || n.rw !== 0 || n.m !== 1) bad.push("요약 " + JSON.stringify(n));
+      if (c.n !== 2 || c.kn !== 2 || c.k !== 2 || c.d !== 2 || c.a !== 1 || c.dmg !== 750.5 || c.bl !== 5 || c.st !== 0.6 || c.sl !== 0.7 || c.m !== 1 || c.w !== 1) bad.push("캐릭터 " + JSON.stringify(c));
+      if (M.apply(n, l2, { key: "k1", win: true, side: 0, mvp: true, at: 3 }) !== null) bad.push("같은 열쇠 다시 반영됨");
+      var big = { g: 0, w: 0, l: 0, bg: 0, bw: 0, rg: 0, rw: 0, m: 0, ids: {} };
+      for (var i = 0; i < M.IDS_KEEP; i++) big.ids["old" + i] = 100 + i;
+      var c3 = M.apply(big, l1, { key: "new", win: true, side: 0, mvp: false, at: 999 });
+      if (c3.evictedKeys.join() !== "old0" || Object.keys(c3.node.ids).length !== M.IDS_KEEP || c3.node.ids.new !== 999) bad.push("열쇠 보관 " + c3.evictedKeys.join());
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "2판 합산·평균(피해 750.5·기절 0.6초)·중복 무시·열쇠 " + M.IDS_KEEP + "개 보관");
+    });
+
+    run(G, "MVP율·승률: 분모가 유효한 판 수이고, 내 통계 표는 밴픽률 대신 MVP 횟수 칸을 쓰는가", function (done) {
+      var bad = [], R = A.Rates, ch = api.CHAR_LIST[0];
+      var node = { g: 8, w: 5, l: 3, bg: 4, bw: 3, rg: 4, rw: 2, m: 2, c: {} };
+      node.c[ch] = { n: 8, w: 5, bg: 4, bw: 3, rg: 4, rw: 2, m: 2, kn: 8, k: 2, d: 1, a: 3, dmg: 500, hl: 0, bl: 0, st: 1, sl: 0 };
+      if (R.mvpRate(node) !== 0.25 || R.winRate(node) !== 0.625 || R.mvpRate({ g: 0, m: 0 }) !== null) bad.push("비율 " + R.mvpRate(node) + "·" + R.winRate(node));
+      var html = A.myRowsHtml(A.Table.legacyRows(node));
+      var rows = (html.match(/<tr><td class="nm">/g) || []).length;
+      if (rows !== api.CHAR_LIST.length || html.indexOf("62.5%") < 0 || html.indexOf("(2 / 8판)") < 0 || html.indexOf("(5 / 8)") < 0 || html.indexOf("밴") >= 0) bad.push("표 " + rows + "줄");
+      if (html.indexOf('colspan="9"') < 0) bad.push("직업군 제목 칸 수");
+      var text = A.myStats.summaryText(node);
+      if (text.indexOf("유효한 경기 8판") < 0 || text.indexOf("MVP율 25.0%") < 0 || text.indexOf("블루 75.0%") < 0 || text.indexOf("레드 50.0%") < 0) bad.push("요약 '" + text + "'");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "MVP율 2/8=25%, 승률 5/8, 표 " + rows + "줄·MVP 횟수 칸");
+    });
+
+    run(G, "최근 매치 10칸: 빈 칸부터 쓰고, 11번째 판은 가장 오래된 판 자리에 들어가며, 같은 경기는 무시하는가", function (done) {
+      var bad = [], Ring = A.Ring, Codec = A.Codec, stored = {};
+      for (var i = 0; i < Ring.SLOTS; i++) {
+        var slot = Ring.chooseSlot(stored, "m" + i);
+        if (slot !== i) bad.push(i + "번째 → " + slot);
+        var e = Codec.encode(self.report(), "m" + i, true); e.at = 1000 + (i === 4 ? -500 : i);
+        stored[slot] = e;
+      }
+      var eleventh = Ring.chooseSlot(stored, "m10");
+      if (eleventh !== 4) bad.push("11번째 판 자리 " + eleventh + " (기대 4: 가장 오래된 판)");
+      if (Ring.chooseSlot(stored, "m7") !== -1) bad.push("같은 경기 다시 들어감");
+      var list = Ring.entries(Object.assign({}, stored, { 9: { v: 99, id: "x", at: 5 } }));
+      if (list.length !== Ring.SLOTS - 1 || list[0].at !== 1008) bad.push("모르는 버전 건너뛰기·최신순 " + list.length);
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "10칸 채움 → 11번째는 가장 오래된 칸, 중복 무시, 모르는 버전 건너뜀");
+    });
+
+    run(G, "값 배열 왕복: 결과표를 값 배열로 저장했다가 되살리면 결과표·MVP 표시가 원래와 똑같은가", function (done) {
+      var bad = [], entries = self.liveEntries(), present = {};
+      Object.keys(entries).forEach(function (id) { present[id] = entries[id].player; });
+      var snap = { entries: entries, present: present, roster: { r1: { ai: true } }, myId: "me", mode: "cup", winner: "blue", final: { blue: 4, red: 6 }, matchId: "12345_99" };
+      var report = A.report.build(snap, false, 1);
+      var liveRows = api.RESULT_ROSTER.rows(entries);
+      var stored = JSON.parse(JSON.stringify(A.Codec.encode(report, A.Key.of(report.matchId), true)));
+      stored.at = 1700000000000;
+      var size = JSON.stringify(stored).length;
+      var back = A.Codec.decode(stored), rows = A.report.rowsOf(back.players);
+      var before = api.boardRows(liveRows, "me"), after = api.boardRows(rows, "p" + back.myIndex);
+      if (before !== after) bad.push("결과표가 다름");
+      if (api.mvpHtml(liveRows) !== api.mvpHtml(rows)) bad.push("MVP 표시가 다름");
+      if (back.score.join() !== "4,6" || !back.win || !back.withAi || back.myIndex !== 0 || back.players[3].ai !== true) bad.push("점수·승패·AI " + JSON.stringify([back.score, back.win, back.withAi, back.myIndex]));
+      if (size > 400) bad.push("한 판 " + size + "바이트");
+      if (A.Codec.decode(Object.assign({}, stored, { v: 2 })) !== null) bad.push("모르는 버전도 읽음");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "6명 결과표·MVP 같음, 한 판 " + size + "바이트");
+    });
+
+    runAsync(G, "저장: 한 번의 PATCH 에 최근 매치·누적 통계·반 요약이 함께 들어가고, AI 경기·중복·절반 전 나감은 알맞게 거르는가", function (done) {
+      var bad = [], judge = self.judge();
+      var first = self.fakeStore({ "profile/cls": "2-5" });
+      return first.store.record(self.report(), judge).then(function (status) {
+        var w = first.writes[0] || {};
+        if (status !== "stats" || first.writes.length !== 1) bad.push("상태 " + status + " 쓰기 " + first.writes.length);
+        if (!w["users/u1/recent/0"] || w["users/u1/recent/0"].r !== 1) bad.push("최근 매치 칸");
+        if (w["users/u1/stats/teambattle/g"] !== 1 || w["users/u1/stats/teambattle/w"] !== 1 || w["users/u1/stats/teambattle/m"] !== 1) bad.push("요약 g·w·m");
+        if (!w["users/u1/stats/teambattle/ids/room1_1000"]) bad.push("경기 열쇠");
+        var cs = w["classStats/2-5/u1"];
+        if (!cs || cs.n !== "홍길동" || cs.g !== 1 || cs.w !== 1 || cs.m !== 1 || w["classStats/none/u1"] !== null) bad.push("반 요약 " + JSON.stringify(cs));
+        var ai = self.fakeStore({});
+        return ai.store.record(self.report({ players: self.players({ 0: { kills: 3 }, 5: { ai: true } }) }), judge).then(function (s2) {
+          var keys = Object.keys(ai.writes[0] || {});
+          if (s2 !== "recent" || keys.length !== 1 || keys[0] !== "users/u1/recent/0") bad.push("AI 경기 " + s2 + " " + keys.join());
+          var none = self.fakeStore({});
+          return none.store.record(self.report(), judge);
+        }).then(function (s3) {
+          var dup = self.fakeStore({ recent: { 0: first.writes[0]["users/u1/recent/0"] } });
+          return dup.store.record(self.report(), judge).then(function (s4) {
+            if (s4 !== "duplicate" || dup.writes.length) bad.push("중복 " + s4);
+            var early = self.fakeStore({});
+            return early.store.record(self.report({ iLeft: true, progress: 0.3 }), judge).then(function (s5) {
+              if (s5 !== "skip" || early.writes.length) bad.push("절반 전 나감 " + s5);
+              done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "쓰기 1번(최근 매치+통계+반 요약), AI → 최근 매치만, 중복·절반 전 → 쓰기 없음 (반 없음 → " + s3 + ")");
+            });
+          });
+        });
+      });
+    });
+
+    run(G, "학생 화면: 캐릭터 칸 버튼이 최근 매치·내 통계·전체 통계·확대·모든 카드 뒤집기 순이고, 로그인 전에는 안내만 뜨는가", function (done) {
+      var bad = [], userBefore = window.PORTAL_USER;
+      var ids = Array.prototype.map.call(document.querySelectorAll(".charBtns button"), function (b) { return b.id + ":" + b.textContent; });
+      if (ids.join() !== "btnRecent:최근 매치,btnMyStats:내 통계,btnStats:전체 통계,btnZoomChars:확대,btnFlipAll:모든 카드 뒤집기") bad.push("버튼 " + ids.join());
+      try {
+        window.PORTAL_USER = null;
+        document.getElementById("btnMyStats").click();
+        if (document.getElementById("myStatsModal").hidden || document.getElementById("myStatsMsg").textContent !== "로그인하면 내 통계를 볼 수 있어요." || document.getElementById("myStatsBody").innerHTML !== "") bad.push("내 통계 안내");
+        document.getElementById("btnMyStatsClose").click();
+        document.getElementById("btnRecent").click();
+        if (document.getElementById("recentModal").hidden || document.getElementById("rmMsg").textContent !== "로그인하면 최근 매치를 볼 수 있어요.") bad.push("최근 매치 안내");
+        A.recent.render([A.Codec.decode(Object.assign(JSON.parse(JSON.stringify(A.Codec.encode(self.report({ players: self.players({ 0: { kills: 2 }, 4: { ai: true } }) }), "k", false))), { at: 1700000000000 }))]);
+        var item = document.querySelector("#rmList .rmItem");
+        if (!item || !item.classList.contains("lose") || item.textContent.indexOf("🤖 마") < 0 || item.textContent.indexOf("패배") < 0) bad.push("최근 매치 블록");
+        item && item.click();
+        if (document.getElementById("recentResultModal").hidden || document.querySelectorAll("#rmBoardBody tr").length !== 6 || document.getElementById("rmTitle").textContent !== "레드팀 승리!") bad.push("결과 창");
+      } finally {
+        window.PORTAL_USER = userBefore;
+        ["myStatsModal", "recentModal", "recentResultModal"].forEach(function (id) { document.getElementById(id).hidden = true; });
+      }
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "버튼 5개 순서·로그인 안내 2곳·최근 매치 블록(패배 빨강)·결과 창 6줄");
+    });
+  }
 }

@@ -25,7 +25,7 @@
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
 } }
 </script>
-<link rel="stylesheet" href="30.team-battle-arena.css?v=20261026a">
+<link rel="stylesheet" href="30.team-battle-arena.css?v=20261026b">
 </head>
 <body>
 <canvas id="cv"></canvas>
@@ -104,7 +104,7 @@
     </div>
   </div>
   <div id="charCardBox" class="card charCol">
-    <div class="secTitle charHead"><span>캐릭터<span id="charHint" class="secHint">선택한 캐릭터를 한 번 더 누르면 자세한 설명이 나와요.</span></span><span class="charBtns"><button id="btnStats" class="mini" type="button">통계</button><button id="btnZoomChars" class="mini" type="button">확대</button><button id="btnFlipAll" class="mini" type="button">모든 카드 뒤집기</button></span></div>
+    <div class="secTitle charHead"><span>캐릭터<span id="charHint" class="secHint">선택한 캐릭터를 한 번 더 누르면 자세한 설명이 나와요.</span></span><span class="charBtns"><button id="btnRecent" class="mini" type="button">최근 매치</button><button id="btnMyStats" class="mini" type="button">내 통계</button><button id="btnStats" class="mini" type="button">전체 통계</button><button id="btnZoomChars" class="mini" type="button">확대</button><button id="btnFlipAll" class="mini" type="button">모든 카드 뒤집기</button></span></div>
     <div class="chars" id="chars"></div>
   </div>
   </div>
@@ -217,6 +217,39 @@
   </div>
 </div>
 
+<div id="myStatsModal" class="modal" hidden>
+  <div class="modalBox statsBox">
+    <div class="statsTop"><h3>내 통계</h3><div class="statsTopBtns"><button id="btnMyStatsRefresh" class="mini" type="button">새로고침</button><button id="btnMyStatsClose" class="mini" type="button">닫기</button></div></div>
+    <div id="myStatsMsg" class="statsMsg"></div>
+    <div class="boardWrap"><table class="board statsTable"><thead><tr><th class="nm">캐릭터</th><th>승률<small>승리 수 / 판 수</small></th><th>MVP<small>MVP 횟수 / 판 수</small></th><th>KDA<small>(킬 + 어시스트) / 데스</small></th><th>평균 피해량</th><th>평균 회복량</th><th>평균 막은 피해</th><th>평균 기절</th><th>평균 둔화</th></tr></thead><tbody id="myStatsBody"></tbody></table></div>
+    <ul class="statsNotes">
+      <li>내 계정으로 AI 없이 치른 대회모드 경기만 집계합니다(랜덤 매칭 포함).</li>
+      <li>경기가 절반 넘게 진행된 뒤 나가면 패배로 세고, 절반 전에 나간 경기는 세지 않습니다.</li>
+      <li>MVP는 결과 화면의 환산점수가 가장 높은 사람이고, 점수가 같으면 모두 MVP로 셉니다. 중간에 나간 사람은 MVP가 될 수 없습니다.</li>
+    </ul>
+  </div>
+</div>
+
+<div id="recentModal" class="modal" hidden>
+  <div class="modalBox statsBox">
+    <div class="statsTop"><h3>최근 매치</h3><button id="btnRecentClose" class="mini" type="button">닫기</button></div>
+    <div id="rmMsg" class="statsMsg"></div>
+    <div id="rmList" class="rmList"></div>
+    <ul class="statsNotes"><li>최근 대회모드 10경기가 남습니다(AI가 함께한 경기 포함). 절반 전에 나간 경기는 남지 않습니다.</li></ul>
+  </div>
+</div>
+
+<div id="recentResultModal" class="modal" hidden>
+  <div id="rmResultBox" class="endBox rmResult">
+    <div id="rmTitle" class="rmTitle"></div>
+    <div id="rmWhen" class="rmWhen"></div>
+    <div class="scoreRow"><div class="sb">블루팀<b id="rmBlue">0</b></div><div class="sr">레드팀<b id="rmRed">0</b></div></div>
+    <div class="boardWrap"><table class="board"><thead><tr><th>팀</th><th class="nm">닉네임</th><th class="nm">직업</th><th>처치</th><th>쓰러짐</th><th>어시스트</th><th>입힌 피해</th><th>회복</th><th>막은 피해</th><th>기절</th><th>둔화</th><th>환산점수</th></tr></thead><tbody id="rmBoardBody"></tbody></table></div>
+    <div class="endBtns"><button id="btnRmResultClose" type="button">닫기</button></div>
+    <div id="rmMvp" class="mvpBox"></div>
+  </div>
+</div>
+
 <div id="mapViewModal" class="modal" hidden>
   <div class="modalBox mapViewBox">
     <div class="statsTop"><h3>맵 보기</h3><button id="btnMapViewClose" class="mini" type="button">닫기</button></div>
@@ -243,6 +276,7 @@
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="character-maker.js?v=20261012"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
+<script charset="utf-8" src="account-stats.js?v=20261026a"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -342,6 +376,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     shaderWarmup;
     world;
     testBridge;
+    accountReport;
+    accountRecorder;
+    myStats;
+    recentMatches;
   }
   class ArenaSize {
     static KEY = 70;
@@ -1330,7 +1368,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (k === "game") services.cameraRig.resize();
       if (k !== prev || (k !== "lobby" && k !== "start")) services.cards.setCharZoom(false);
       if (k === "start" || k === "lobby" || k === "party") services.lobby.placeCharBox(k);
-      if (k !== "start" && k !== "lobby") { Dom.show(Dom.$("statsModal"), false); }
+      if (k !== "start" && k !== "lobby") { Dom.show(Dom.$("statsModal"), false); AccountWindows.closeAll(); }
       if (k !== "lobby") Dom.show(Dom.$("mapViewModal"), false);
       if (k !== "game") Dom.show(Dom.$("pcModal"), false);
     }
@@ -1585,6 +1623,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       window.addEventListener("keydown", function (e) {
         if (e.key !== "Escape") return;
         if (!Dom.$("pcModal").hidden) Dom.show(Dom.$("pcModal"), false);
+        else if (AccountWindows.closeTop()) return;
         else if (!Dom.$("statsModal").hidden) Dom.show(Dom.$("statsModal"), false);
         else if (!Dom.$("mapViewModal").hidden) Dom.show(Dom.$("mapViewModal"), false);
         else if (Dom.$("charCardBox").classList.contains("zoomed")) services.cards.setCharZoom(false);
@@ -1635,21 +1674,41 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var ratio = deaths > 0 ? ((kills + assist) / deaths).toFixed(2) : "Perfect";
       return "<td><b>" + ratio + "</b><small>(" + kills.toFixed(1) + " / " + deaths.toFixed(1) + " / " + (asPicks ? assist.toFixed(1) : "-") + ")</small></td>";
     }
-    statsRowsHtml(s) { var services = this.services;
-      var matches = +s.matches || 0, lastRole = null, h = "";
+    static TOTAL_COLUMNS = 10;
+    static MINE_COLUMNS = 9;
+    averageCells(d, c) {
+      var picks = +d.picks || 0, ccPicks = +d.ccPicks || 0;
+      return "<td>" + (picks ? Math.round(+d.dmg || 0) : "-") + "</td>" +
+        "<td>" + (picks && c.heals ? Math.round(+d.heal || 0) : "-") + "</td>" +
+        "<td>" + (ccPicks && c.blocks ? Math.round(+d.block || 0) : "-") + "</td>" +
+        "<td>" + (ccPicks ? (+d.stun || 0).toFixed(1) + "초" : "-") + "</td>" +
+        "<td>" + (ccPicks ? (+d.slow || 0).toFixed(1) + "초" : "-") + "</td>";
+    }
+    charRowsHtml(s, columns, cellsOf) { var services = this.services;
+      var lastRole = null, h = "";
       services.charTypes.list.forEach(function (k) {
-        var c = services.charTypes.statsOf(k), d = s[k] || {}, selectableGames = d.games != null ? +d.games : (s[k] ? matches : 0), picks = +d.picks || 0, drawPicks = +d.draws || 0, wins = +d.wins || 0, ccPicks = +d.ccPicks || 0, asPicks = +d.asPicks || 0, kdPicks = +d.kdPicks || 0, mvpPicks = +d.mvpPicks || 0, bans = +d.bans || 0;
-        if (c.role !== lastRole) { lastRole = c.role; h += '<tr class="grp"><td colspan="10">' + RoleKinds.TABLE[c.role].icon + " " + RoleKinds.TABLE[c.role].name + "</td></tr>"; }
-        h += '<tr><td class="nm">' + c.icon + " " + Dom.esc(c.name) + "</td>" + services.statsView.statsRateCell(wins, Math.max(0, picks - drawPicks)) + services.statsView.banPickCell(bans, picks, selectableGames) +
-          services.statsView.kdaCell(d, kdPicks, asPicks) +
-          "<td>" + (picks ? Math.round(+d.dmg || 0) : "-") + "</td>" +
-          "<td>" + (picks && c.heals ? Math.round(+d.heal || 0) : "-") + "</td>" +
-          "<td>" + (ccPicks && c.blocks ? Math.round(+d.block || 0) : "-") + "</td>" +
-          "<td>" + (ccPicks ? (+d.stun || 0).toFixed(1) + "초" : "-") + "</td>" +
-          "<td>" + (ccPicks ? (+d.slow || 0).toFixed(1) + "초" : "-") + "</td>" +
-          "<td>" + (mvpPicks ? Math.round(+d.mvp || 0) : "-") + "</td></tr>";
+        var c = services.charTypes.statsOf(k);
+        if (c.role !== lastRole) { lastRole = c.role; h += '<tr class="grp"><td colspan="' + columns + '">' + RoleKinds.TABLE[c.role].icon + " " + RoleKinds.TABLE[c.role].name + "</td></tr>"; }
+        h += '<tr><td class="nm">' + c.icon + " " + Dom.esc(c.name) + "</td>" + cellsOf(s[k] || {}, c, k) + "</tr>";
       });
       return h;
+    }
+    statsRowsHtml(s) { var services = this.services;
+      var matches = +s.matches || 0;
+      return this.charRowsHtml(s, StatsView.TOTAL_COLUMNS, function (d, c, k) {
+        var selectableGames = d.games != null ? +d.games : (s[k] ? matches : 0), picks = +d.picks || 0, drawPicks = +d.draws || 0, wins = +d.wins || 0, asPicks = +d.asPicks || 0, kdPicks = +d.kdPicks || 0, mvpPicks = +d.mvpPicks || 0, bans = +d.bans || 0;
+        return services.statsView.statsRateCell(wins, Math.max(0, picks - drawPicks)) + services.statsView.banPickCell(bans, picks, selectableGames) +
+          services.statsView.kdaCell(d, kdPicks, asPicks) + services.statsView.averageCells(d, c) +
+          "<td>" + (mvpPicks ? Math.round(+d.mvp || 0) : "-") + "</td>";
+      });
+    }
+    myRowsHtml(rows) { var services = this.services;
+      return this.charRowsHtml(rows, StatsView.MINE_COLUMNS, function (d, c) {
+        var picks = +d.picks || 0;
+        return services.statsView.statsRateCell(+d.wins || 0, picks) +
+          (picks ? "<td><b>" + (+d.mvpCount || 0) + "</b><small>(" + (+d.mvpCount || 0) + " / " + picks + "판)</small></td>" : "<td>-</td>") +
+          services.statsView.kdaCell(d, +d.kdPicks || 0, +d.asPicks || 0) + services.statsView.averageCells(d, c);
+      });
     }
     loadStats() { var services = this.services;
       var seq = ++services.statsView.loadSeq;
@@ -3553,6 +3612,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     onEnded() { var services = this.services;
       services.randomMatch.matchEnded();
+      services.accountRecorder.matchEnded();
       if (!services.match.game) return;
       services.match.game.forceNet = true;
       try { services.netstate.netWrite(true); } catch (e) {}
@@ -8448,29 +8508,34 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     ids() { return Object.keys(this.entries || {}); }
     player(id) { return this.entries[id].player; }
     ent(id) { return this.entries[id].ent; }
+    rows(entries) {
+      var source = entries || this.entries || {}, list = [];
+      ["blue", "red"].forEach(function (team) {
+        Object.keys(source).filter(function (id) { return source[id].player.team === team; })
+          .sort(function (a, b) { return (source[a].player.slot || 0) - (source[b].player.slot || 0); })
+          .forEach(function (id) { list.push({ id: id, player: source[id].player, ent: source[id].ent }); });
+      });
+      return list;
+    }
   }
   class ResultBoard {
     static MVP_STUN_PER_SEC = 60;
     static MVP_SLOW_PER_SEC = 40;
     static MVP_ASSIST = 50;
     constructor(services) { this.services = services; this.roster = new ResultRoster(services); }
-    boardRows() { var services = this.services;
-      var rows = "", redStarted = false, roster = services.resultBoard.roster;
-      ["blue", "red"].forEach(function (team) {
-        roster.ids().filter(function (id) { return roster.player(id).team === team; })
-          .sort(function (a, b) { return (roster.player(a).slot || 0) - (roster.player(b).slot || 0); })
-          .forEach(function (id) {
-            var E = roster.ent(id), d = roster.player(id);
-            var rowClass = (id === services.session.myId ? "mine" : "") + (team === "red" && !redStarted ? " teamSplit" : "");
-            if (team === "red") redStarted = true;
-            rows += '<tr class="' + rowClass + '"><td><span class="dot" style="background:' + (team === "blue" ? "#2F6FD6" : "#D6453D") + '"></span></td>' +
-              '<td class="nm">' + (d.isAI ? "🤖 " : "") + Dom.esc(d.nickname) + '</td><td class="job">' + services.charTypes.statsOf(E.char).name + "</td>" +
-              "<td>" + E.kills + "</td><td>" + E.deaths + "</td><td>" + (E.assists || 0) + "</td><td>" + Math.round(E.dmg) + "</td>" +
-              "<td>" + (services.charTypes.statsOf(E.char).heals ? Math.round(E.heal) : "-") + "</td>" +
-              "<td>" + (services.charTypes.statsOf(E.char).blocks ? Math.round(E.blocked || 0) : "-") + "</td>" +
-              "<td>" + services.resultBoard.secText(E.stunDealt) + "</td><td>" + services.resultBoard.secText(E.slowDealt) + "</td>" +
-              '<td class="sc">' + services.resultBoard.mvpScore(E) + "</td></tr>";
-          });
+    boardRows(list, myId) { var services = this.services;
+      var rows = "", redStarted = false, mine = list ? myId : services.session.myId;
+      (list || this.roster.rows()).forEach(function (row) {
+        var id = row.id, E = row.ent, d = row.player, team = d.team;
+        var rowClass = (id === mine ? "mine" : "") + (team === "red" && !redStarted ? " teamSplit" : "");
+        if (team === "red") redStarted = true;
+        rows += '<tr class="' + rowClass + '"><td><span class="dot" style="background:' + (team === "blue" ? "#2F6FD6" : "#D6453D") + '"></span></td>' +
+          '<td class="nm">' + (d.isAI ? "🤖 " : "") + Dom.esc(d.nickname) + '</td><td class="job">' + services.charTypes.statsOf(E.char).name + "</td>" +
+          "<td>" + E.kills + "</td><td>" + E.deaths + "</td><td>" + (E.assists || 0) + "</td><td>" + Math.round(E.dmg) + "</td>" +
+          "<td>" + (services.charTypes.statsOf(E.char).heals ? Math.round(E.heal) : "-") + "</td>" +
+          "<td>" + (services.charTypes.statsOf(E.char).blocks ? Math.round(E.blocked || 0) : "-") + "</td>" +
+          "<td>" + services.resultBoard.secText(E.stunDealt) + "</td><td>" + services.resultBoard.secText(E.slowDealt) + "</td>" +
+          '<td class="sc">' + services.resultBoard.mvpScore(E) + "</td></tr>";
       });
       return rows;
     }
@@ -8479,17 +8544,17 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return E.kills * 100 + (E.assists || 0) * ResultBoard.MVP_ASSIST + Math.round(E.dmg) + Math.round(E.heal || 0) + Math.round(E.blocked || 0)
         + Math.round(services.netstate.oneDecimal(E.stunDealt) * ResultBoard.MVP_STUN_PER_SEC) + Math.round(services.netstate.twoDecimals(E.slowWeight) * ResultBoard.MVP_SLOW_PER_SEC) - E.deaths * 100;
     }
-    mvpHtml() { var services = this.services;
+    mvpHtml(list) { var services = this.services;
       var best = [];
-      services.resultBoard.roster.ids().forEach(function (id) {
-        var E = services.resultBoard.roster.ent(id); if (E.kills + (E.assists || 0) <= 0) return;
-        var row = { id: id, E: E, score: services.resultBoard.mvpScore(E), dmg: Math.round(E.dmg) };
+      (list || this.roster.rows()).forEach(function (entry) {
+        var E = entry.ent; if (E.kills + (E.assists || 0) <= 0) return;
+        var row = { player: entry.player, E: E, score: services.resultBoard.mvpScore(E), dmg: Math.round(E.dmg) };
         if (!best.length || row.score > best[0].score || (row.score === best[0].score && row.dmg > best[0].dmg)) best = [row];
         else if (row.score === best[0].score && row.dmg === best[0].dmg) best.push(row);
       });
       if (!best.length) return '<div class="mvpLab">MVP</div><div class="mvpNone">MVP 없음</div>';
       return '<div class="mvpLab">🏆 MVP' + (best.length > 1 ? " (공동)" : "") + "</div>" + best.map(function (b) {
-        var d = services.resultBoard.roster.player(b.id) || {};
+        var d = b.player || {};
         return '<div class="mvpName"><span class="' + (b.E.team === "blue" ? "b" : "r") + '">' + (d.isAI ? "🤖 " : "") + Dom.esc(d.nickname || b.E.nickname) + "</span><small>" +
                services.charTypes.statsOf(b.E.char).name + " · " + b.score + "점</small></div>";
       }).join("");
@@ -8506,6 +8571,184 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         "<li>기절·둔화는 이미 걸린 효과와 겹치지 않고 새로 늘어난 시간만 셉니다</li>" +
         "<li>블랙홀에 끌려간 시간은 " + Math.round(PriestType.ULT.bhCcRate * 100) + "% 둔화로 셉니다</li>" +
         "<li>MVP는 환산점수가 가장 높은 사람이고, 처치·어시스트가 하나도 없으면 MVP에서 제외합니다</li></ul>";
+    }
+  }
+  class AccountWindows {
+    static IDS = ["recentResultModal", "recentModal", "myStatsModal"];
+    static closeAll() { AccountWindows.IDS.forEach(function (id) { Dom.show(Dom.$(id), false); }); }
+    static closeTop() {
+      var open = AccountWindows.IDS.filter(function (id) { return !Dom.$(id).hidden; })[0];
+      if (!open) return false;
+      Dom.show(Dom.$(open), false);
+      return true;
+    }
+    static bindClose(modalId, buttonId) {
+      Dom.$(buttonId).onclick = function () { Dom.show(Dom.$(modalId), false); };
+      Dom.$(modalId).addEventListener("click", function (e) { if (e.target === Dom.$(modalId)) Dom.show(Dom.$(modalId), false); });
+    }
+  }
+  class AccountReportBuilder {
+    static TEAMS = ["blue", "red"];
+    constructor(services) { this.services = services; }
+    lineOf(row, left, rosterAi) {
+      var E = row.ent, d = row.player || {};
+      return { name: String(d.nickname || E.nickname || ""), team: d.team === "red" ? 1 : 0, char: E.char,
+        kills: +E.kills || 0, deaths: +E.deaths || 0, assists: +E.assists || 0, dmg: +E.dmg || 0, heal: +E.heal || 0, blocked: +E.blocked || 0,
+        stun: +E.stunDealt || 0, slow: +E.slowDealt || 0, slowWeight: +E.slowWeight || 0, left: !!left, ai: !!d.isAI || !!rosterAi };
+    }
+    entOf(line) {
+      return { char: line.char, team: AccountReportBuilder.TEAMS[line.team], nickname: line.name, kills: line.kills, deaths: line.deaths, assists: line.assists,
+        dmg: line.dmg, heal: line.heal, blocked: line.blocked, stunDealt: line.stun, slowDealt: line.slow, slowWeight: line.slowWeight };
+    }
+    rowsOf(players) { var self = this, slots = [0, 0];
+      return players.map(function (line, i) {
+        slots[line.team]++;
+        return { id: "p" + i, player: { team: AccountReportBuilder.TEAMS[line.team], slot: slots[line.team], isAI: line.ai, nickname: line.name }, ent: self.entOf(line) };
+      });
+    }
+    scoreOf(line) { return this.services.resultBoard.mvpScore(this.entOf(line)); }
+    judge() { var self = this; return new AccountMvpJudge(function (line) { return self.scoreOf(line); }); }
+    matchIdOf(room) { var ticket = this.services.randomMatch.ticket();
+      return room.matchId || (ticket && ticket.matchId) || (room.code + "_" + room.startAt);
+    }
+    snapshot() { var services = this.services, room = services.session.room, myId = services.session.myId;
+      if (!room || !room.roster || !room.roster[myId]) return null;
+      return { entries: services.resultBoard.roster.entries, present: Object.assign({}, services.session.players), roster: Object.assign({}, room.roster), myId: myId,
+               mode: room.mode, winner: room.winner, final: room.final, matchId: this.matchIdOf(room) };
+    }
+    build(snap, iLeft, progress, liveScore) { var self = this;
+      var myIndex = -1, rows = this.services.resultBoard.roster.rows(snap.entries), f = snap.final || liveScore || {};
+      var players = rows.map(function (row, i) {
+        if (row.id === snap.myId) myIndex = i;
+        return self.lineOf(row, row.id === snap.myId ? iLeft : !snap.present[row.id], snap.roster[row.id] && snap.roster[row.id].ai);
+      });
+      return { matchId: snap.matchId, mode: snap.mode, winnerTeam: AccountReportBuilder.TEAMS.indexOf(snap.winner), myIndex: myIndex, players: players,
+               score: [+f.blue || 0, +f.red || 0], progress: progress, iLeft: iLeft };
+    }
+  }
+  class AccountMatchRecorder {
+    static SETTLE_MS = 2500;
+    constructor(services) { this.services = services; this.sentKey = ""; }
+    loggedIn() { return !Environment.SILENT_RUN && !!window.PORTAL_USER; }
+    matchEnded() { var services = this.services, self = this;
+      if (!this.loggedIn()) return;
+      var snap = services.accountReport.snapshot();
+      if (!snap || snap.mode !== AccountMatchPlan.CUP_MODE) return;
+      setTimeout(function () {
+        var room = services.session.room;
+        if (room && room.winner && !snap.winner) { snap.winner = room.winner; snap.final = room.final; }
+        self.send(services.accountReport.build(snap, false, 1));
+      }, AccountMatchRecorder.SETTLE_MS);
+    }
+    forfeitApplies() { var services = this.services, room = services.session.room;
+      return this.loggedIn() && !!room && room.mode === AccountMatchPlan.CUP_MODE && room.status === "playing" && !!room.roster && !!room.roster[services.session.myId]
+        && services.randomMatch.progress() >= AccountMatchPlan.FORFEIT_AT;
+    }
+    leavingNow() { var services = this.services;
+      if (!this.forfeitApplies()) return;
+      var snap = services.accountReport.snapshot(), s = services.flow.teamTotals();
+      if (snap) this.send(services.accountReport.build(snap, true, services.randomMatch.progress(), { blue: s.blueKills, red: s.redKills }));
+    }
+    send(report) {
+      if (!report || report.myIndex < 0) return;
+      var key = AccountMatchKey.of(report.matchId), store = AccountStatsStore.open();
+      if (key === this.sentKey || !store) return;
+      this.sentKey = key;
+      store.record(report, this.services.accountReport.judge()).catch(function () {});
+    }
+  }
+  class MyStatsWindow {
+    static LOGIN_NEEDED = "로그인하면 내 통계를 볼 수 있어요.";
+    static NOT_READY = "로그인 정보를 준비하는 중이에요. 잠시 뒤 다시 열어 주세요.";
+    static FAILED = "내 통계를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.";
+    constructor(services) { this.services = services; this.loadSeq = 0; }
+    bind() { var self = this;
+      Dom.$("btnMyStats").onclick = function () { self.open(); };
+      Dom.$("btnMyStatsRefresh").onclick = function () { self.load(); };
+      AccountWindows.bindClose("myStatsModal", "btnMyStatsClose");
+    }
+    open() {
+      Dom.show(Dom.$("myStatsModal"), true);
+      Dom.$("myStatsModal").querySelector(".statsBox").scrollTop = 0;
+      this.load();
+    }
+    load() { var self = this, seq = ++this.loadSeq, store = AccountStatsStore.open();
+      Dom.setHtml(Dom.$("myStatsBody"), "");
+      if (!window.PORTAL_USER) { Dom.setText(Dom.$("myStatsMsg"), MyStatsWindow.LOGIN_NEEDED); return; }
+      if (!store) { Dom.setText(Dom.$("myStatsMsg"), MyStatsWindow.NOT_READY); return; }
+      Dom.setText(Dom.$("myStatsMsg"), "불러오는 중…");
+      store.loadStats().then(function (node) { if (seq === self.loadSeq) self.render(node); })
+        .catch(function () { if (seq === self.loadSeq) Dom.setText(Dom.$("myStatsMsg"), MyStatsWindow.FAILED); });
+    }
+    summaryText(node) { var view = this.services.statsView;
+      node = node || AccountStatsMath.empty();
+      return "유효한 경기 " + node.g + "판 · " + node.w + "승 " + node.l + "패 · 진영 승률: 블루 " + view.statsPct(node.bw, node.bg) + " · 레드 " + view.statsPct(node.rw, node.rg) + " · MVP율 " + view.statsPct(node.m, node.g);
+    }
+    render(node) {
+      Dom.setText(Dom.$("myStatsMsg"), this.summaryText(node));
+      Dom.setHtml(Dom.$("myStatsBody"), this.services.statsView.myRowsHtml(AccountStatsTable.legacyRows(node)));
+    }
+  }
+  class RecentMatchWindow {
+    static LOGIN_NEEDED = "로그인하면 최근 매치를 볼 수 있어요.";
+    static NOT_READY = MyStatsWindow.NOT_READY;
+    static EMPTY = "아직 기록된 대회모드 경기가 없어요.";
+    static FAILED = "최근 매치를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.";
+    constructor(services) { this.services = services; this.loadSeq = 0; this.entries = []; }
+    bind() { var self = this;
+      Dom.$("btnRecent").onclick = function () { self.open(); };
+      Dom.$("rmList").onclick = function (e) {
+        var b = e.target.closest ? e.target.closest("[data-recent]") : null;
+        if (b) self.showResult(+b.getAttribute("data-recent"));
+      };
+      AccountWindows.bindClose("recentModal", "btnRecentClose");
+      AccountWindows.bindClose("recentResultModal", "btnRmResultClose");
+    }
+    open() {
+      Dom.show(Dom.$("recentModal"), true);
+      Dom.$("recentModal").querySelector(".statsBox").scrollTop = 0;
+      this.load();
+    }
+    load() { var self = this, seq = ++this.loadSeq, store = AccountStatsStore.open();
+      this.entries = [];
+      Dom.setHtml(Dom.$("rmList"), "");
+      if (!window.PORTAL_USER) { Dom.setText(Dom.$("rmMsg"), RecentMatchWindow.LOGIN_NEEDED); return; }
+      if (!store) { Dom.setText(Dom.$("rmMsg"), RecentMatchWindow.NOT_READY); return; }
+      Dom.setText(Dom.$("rmMsg"), "불러오는 중…");
+      store.loadRecent().then(function (list) { if (seq === self.loadSeq) self.render(list); })
+        .catch(function () { if (seq === self.loadSeq) Dom.setText(Dom.$("rmMsg"), RecentMatchWindow.FAILED); });
+    }
+    render(list) { var self = this;
+      this.entries = list;
+      Dom.setText(Dom.$("rmMsg"), list.length ? "최근 " + list.length + "경기 · 최신순 · 누르면 그 경기 결과표가 열려요" : RecentMatchWindow.EMPTY);
+      Dom.setHtml(Dom.$("rmList"), list.map(function (entry, i) { return self.itemHtml(entry, i); }).join(""));
+    }
+    whenText(at) {
+      if (!at) return "";
+      var d = new Date(at), two = function (n) { return (n < 10 ? "0" : "") + n; };
+      return (d.getMonth() + 1) + "월 " + d.getDate() + "일 " + two(d.getHours()) + ":" + two(d.getMinutes());
+    }
+    namesHtml(players, team) {
+      return players.filter(function (p) { return p.team === team; }).map(function (p) { return (p.ai ? "🤖 " : "") + Dom.esc(p.name); }).join(" · ");
+    }
+    itemHtml(entry, i) {
+      var mine = entry.players[entry.myIndex].team;
+      return '<button type="button" class="rmItem ' + (entry.win ? "win" : "lose") + '" data-recent="' + i + '">' +
+        '<span class="rmHead"><b>' + (entry.win ? "승리" : "패배") + "</b><small>" + this.whenText(entry.at) + "</small></span>" +
+        '<span class="rmTeam"><i>우리 팀</i>' + this.namesHtml(entry.players, mine) + "</span>" +
+        '<span class="rmTeam"><i>상대 팀</i>' + this.namesHtml(entry.players, 1 - mine) + "</span></button>";
+    }
+    showResult(i) { var services = this.services, entry = this.entries[i];
+      if (!entry) return;
+      var rows = services.accountReport.rowsOf(entry.players), mine = entry.players[entry.myIndex].team, winner = entry.win ? mine : 1 - mine;
+      Dom.$("rmResultBox").className = "endBox rmResult " + AccountReportBuilder.TEAMS[winner];
+      Dom.setText(Dom.$("rmTitle"), winner === 0 ? "블루팀 승리!" : "레드팀 승리!");
+      Dom.$("rmTitle").style.color = winner === 0 ? "#6FA8FF" : "#FF7A70";
+      Dom.setText(Dom.$("rmWhen"), (entry.win ? "내 결과: 승리" : "내 결과: 패배") + " · " + this.whenText(entry.at) + (entry.withAi ? " · AI 포함 경기(내 통계에는 안 들어감)" : ""));
+      Dom.setText(Dom.$("rmBlue"), String(entry.score[0])); Dom.setText(Dom.$("rmRed"), String(entry.score[1]));
+      Dom.setHtml(Dom.$("rmBoardBody"), services.resultBoard.boardRows(rows, "p" + entry.myIndex));
+      Dom.setHtml(Dom.$("rmMvp"), services.resultBoard.mvpHtml(rows));
+      Dom.show(Dom.$("recentResultModal"), true);
     }
   }
   class Hud2D {
@@ -9047,7 +9290,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       ultDesc: services.skilltext.ultDesc.bind(services.skilltext), passiveDesc: services.skilltext.passiveDesc.bind(services.skilltext), basicDesc: services.skilltext.basicDesc.bind(services.skilltext), skillBlocks: services.skilltext.skillBlocks.bind(services.skilltext), statTable: services.skilltext.statTable.bind(services.skilltext), roleGaugeText: services.skilltext.roleGaugeText.bind(services.skilltext), gaugeTextOf: services.skilltext.gaugeTextOf.bind(services.skilltext), num: services.skilltext.num.bind(services.skilltext), secs: services.skilltext.secs.bind(services.skilltext), shownSpeed: services.skilltext.shownSpeed.bind(services.skilltext),
       attackText: services.skilltext.attackText.bind(services.skilltext), pctOf: services.skilltext.pctOf.bind(services.skilltext), slowPct: services.skilltext.slowPct.bind(services.skilltext), healCutPct: services.skilltext.healCutPct.bind(services.skilltext), ultSpeedUpText: services.skilltext.ultSpeedUpText.bind(services.skilltext), teamHitColor: CharacterType.teamHitColor,
       onKillFeed: services.killfeed.onKillFeed.bind(services.killfeed), multiKillTag: services.killfeed.multiKillTag.bind(services.killfeed), KILL_FEED_MAX: KillFeed.KILL_FEED_MAX, KILL_FEED_MS: KillFeed.KILL_FEED_MS,
-      mvpScore: services.resultBoard.mvpScore.bind(services.resultBoard),
+      mvpScore: services.resultBoard.mvpScore.bind(services.resultBoard), boardRows: services.resultBoard.boardRows.bind(services.resultBoard), mvpHtml: services.resultBoard.mvpHtml.bind(services.resultBoard), RESULT_ROSTER: services.resultBoard.roster,
+      ACCOUNT: { report: services.accountReport, recorder: services.accountRecorder, myStats: services.myStats, recent: services.recentMatches, myRowsHtml: services.statsView.myRowsHtml.bind(services.statsView),
+                 Plan: AccountMatchPlan, Judge: AccountMvpJudge, Codec: RecentMatchCodec, Ring: RecentMatchRing, Math: AccountStatsMath, Table: AccountStatsTable, Rates: AccountRates, ClassSummary: ClassStatsSummary, Key: AccountMatchKey, Store: AccountStatsStore },
       setClock: function (ms) { services.clock.testTime = ms; },
       currentMap: function () { return services.arenaMap.id; },
       finish: function (mapId) { services.clock.testTime = null; services.session.room = null; services.session.resetLocal(); services.arenaMap.load(mapId); }
@@ -9303,6 +9548,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.world = new WorldStepper(services);
       services.testBridge = new TestBridge(services);
       services.randomMatch = new ArenaRandomMatch(services);
+      services.accountReport = new AccountReportBuilder(services);
+      services.accountRecorder = new AccountMatchRecorder(services);
+      services.myStats = new MyStatsWindow(services);
+      services.recentMatches = new RecentMatchWindow(services);
      return services; }
   }
   class ServiceBoot {
@@ -9330,6 +9579,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     constructor(services) { this.services = services; }
     bind() { var services = this.services;
     Dom.$("btnStats").onclick = function () { services.statsView.open(); };
+    services.myStats.bind();
+    services.recentMatches.bind();
     Dom.$("btnStatsClose").onclick = function () { Dom.show(Dom.$("statsModal"), false); };
     Dom.$("btnMapView").onclick = function () {
       var current = services.session.room && services.session.room.map;
@@ -9362,7 +9613,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     Dom.$("modeBtns").onclick = services.lobby.choiceClick(services.roster.setMode.bind(services.roster));
     Dom.$("mapBtns").onclick = services.lobby.choiceClick(services.roster.setMapChoice.bind(services.roster));
     Dom.$("btnLeaveLobby").onclick = services.session.leaveRoom.bind(services.session);
-    Dom.$("btnLeaveGame").onclick = function () { if (confirm(services.randomMatch.forfeitApplies() ? MkForfeit.QUESTION : "방을 나갈까요?")) { services.randomMatch.forfeitIfLate(); services.session.leaveRoom(); } };
+    Dom.$("btnLeaveGame").onclick = function () { if (confirm(services.randomMatch.forfeitApplies() || services.accountRecorder.forfeitApplies() ? MkForfeit.QUESTION : "방을 나갈까요?")) { services.randomMatch.forfeitIfLate(); services.accountRecorder.leavingNow(); services.session.leaveRoom(); } };
     Dom.$("btnLeaveEnd").onclick = function () { Dom.setText(Dom.$("btnLeaveEnd"), "방 나가기"); services.session.leaveRoom(); };
     Dom.$("btnCreate").onclick = function () { services.sound.audio(); if (services.nick.askFirst()) services.session.createRoom(); };
     Dom.$("btnJoin").onclick = function () { services.sound.audio(); if (services.nick.askFirst()) services.randomMatch.joinByCode(); };

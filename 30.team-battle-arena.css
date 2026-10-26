@@ -543,3 +543,21 @@
   #killBanner.ot .kbHead { color: #FFCF5A; }
   #killBanner.show.ot { animation-duration: 2.4s; }
   @keyframes otPulse { 0%, 100% { opacity: 1; } 50% { opacity: .65; } }
+  .charBtns { flex-wrap: wrap; justify-content: flex-end; }
+  .rmList { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+  .rmItem { display: grid; grid-template-columns: 112px 1fr 1fr; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border-radius: 8px; text-align: left; color: #EEF2EE; font: inherit; cursor: pointer; border: 2px solid transparent; }
+  .rmItem.win { background: rgba(47,111,214,.22); border-color: rgba(111,168,255,.55); }
+  .rmItem.lose { background: rgba(214,69,61,.2); border-color: rgba(255,122,112,.5); }
+  .rmItem:hover { filter: brightness(1.15); }
+  .rmHead b { display: block; font-size: 18px; font-weight: 800; }
+  .rmItem.win .rmHead b { color: #8DB8FF; }
+  .rmItem.lose .rmHead b { color: #FF9A92; }
+  .rmHead small { font-size: 12px; color: #A3B0A6; }
+  .rmTeam { font-size: 14px; font-weight: 700; line-height: 1.45; word-break: keep-all; }
+  .rmTeam i { display: block; font-style: normal; font-size: 11px; color: #A3B0A6; }
+  #recentResultModal { z-index: 51; }
+  .rmResult.blue { border-color: rgba(111,168,255,.7); }
+  .rmResult.red { border-color: rgba(255,122,112,.7); }
+  .rmTitle { font-size: 34px; font-weight: 800; margin-bottom: 4px; }
+  .rmWhen { font-size: 14px; color: #A3B0A6; margin-bottom: 14px; }
+  @media (max-width: 640px) { .rmItem { grid-template-columns: 1fr; gap: 4px; } }
