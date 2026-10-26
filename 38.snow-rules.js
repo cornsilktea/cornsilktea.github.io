@@ -2,6 +2,7 @@
 class SnBalance {
 }
 SnBalance.MAX_HP = 100;
+SnBalance.ASSIST_WINDOW = 5;
 SnBalance.SPEED = 4;
 SnBalance.ICE_PACE = 0.5;
 SnBalance.RADIUS = 0.4;
@@ -150,6 +151,8 @@ class SnPlayer {
         this.dealt = 0;
         this.collected = 0;
         this.walls = 0;
+        this.assists = 0;
+        this.hurtBy = new Map();
         this.downAt = -1;
         this.killedBy = -1;
         this.lastHitAt = -1;
@@ -638,6 +641,8 @@ class SnCombat {
             attacker.dealt += v;
             target.lastHitFromX = attacker.x;
             target.lastHitFromZ = attacker.z;
+            if (attacker.team !== target.team)
+                target.hurtBy.set(attacker.num, e.time);
         }
         e.emit({ t: "hit", to: target.num, by: attacker ? attacker.num : -1, v, storm: !attacker });
         if (target.hp <= 0)
@@ -1382,6 +1387,7 @@ class SnEngine {
         p.reviveProgress = 0;
         if (by && by.team !== p.team)
             by.kills++;
+        this.creditAssists(p, by);
         if (p.building(this.time)) {
             const w = this.walls.find((x) => x.id === p.buildingWall);
             if (w)
@@ -1396,6 +1402,13 @@ class SnEngine {
                 q.reviveProgress = 0;
             }
         this.checkTeam(this.teams[p.team]);
+    }
+    creditAssists(p, by) {
+        if (by && by.team !== p.team) {
+            p.hurtBy.forEach((at, num) => { if (num !== by.num && this.time - at <= SnBalance.ASSIST_WINDOW)
+                this.players[num].assists++; });
+        }
+        p.hurtBy.clear();
     }
     disconnect(num) {
         const p = this.players[num];

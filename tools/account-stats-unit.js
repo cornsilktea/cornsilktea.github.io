@@ -1,10 +1,13 @@
 const fs = require("fs"), vm = require("vm"), path = require("path");
 const root = path.join(__dirname, "..");
-const files = ["account-match-kit.js", "account-stats.js"];
+const files = ["account-match-kit.js", "account-stats.js", "24.turbo-lap-stats.js", "25.fps-survival-stats.js", "31.zombie-outbreak-stats.js", "38.snow-account.js", "39.balloon-account.js"];
 const names = ["AccountNumbers", "AccountRates", "AccountMatchKey", "AccountKeyLedger", "AccountForfeit", "AccountShape", "AccountRecentHeadCodec", "RecentMatchRing", "AccountLoginNotice", "RecentBlockList", "AccountGameProfile", "AccountMatchStore",
-  "TeamBattleRates", "AccountMvpJudge", "TeamBattlePlan", "TeamBattleCodec", "TeamBattleRing", "AccountStatsMath", "AccountStatsTable", "ClassStatsSummary", "TeamBattleProfile", "AccountStatsStore"];
+  "TeamBattleRates", "AccountMvpJudge", "TeamBattlePlan", "TeamBattleCodec", "TeamBattleRing", "AccountStatsMath", "AccountStatsTable", "ClassStatsSummary", "TeamBattleProfile", "AccountStatsStore",
+  "TurboLapPlan", "TurboLapCodec", "TurboLapStatsMath", "TurboLapProfile", "TurboLapStatsView", "FpsPlan", "FpsCodec", "FpsStatsMath", "FpsProfile", "FpsStatsView",
+  "ZombiePlan", "ZombieCodec", "ZombieStatsMath", "ZombieProfile", "ZombieStatsView", "SnAccountPlan", "SnAccountCodec", "SnAccountMath", "SnAccountProfile", "SnAccountView", "SnReportBuilder",
+  "WbAccountPlan", "WbAccountCodec", "WbAccountMath", "WbAccountProfile", "WbAccountView", "WbReportBuilder"];
 const src = files.map((f) => fs.readFileSync(path.join(root, f), "utf8")).join("\n") + "\n;({" + names.join(",") + "})";
-const K = vm.runInNewContext(src, { console, Math, Set, Map, Array, Object, Number, String, JSON, isFinite, Date, Promise, window: {} });
+const K = vm.runInNewContext(src, { console, Math, Set, Map, Array, Object, Number, String, JSON, isFinite, Date, Promise, window: {}, WbBalance: { RATE: 30 } });
 
 let passed = 0;
 const failures = [];
@@ -145,7 +148,184 @@ const done = (async () => {
   check("읽기: 최근 매치 불러오기", recent.length === 1 && recent[0].win === true && recent[0].players.length === 6);
 })();
 
-done.then(() => {
+
+const RULES = JSON.parse(fs.readFileSync(path.join(root, "데이터베이스규칙.json"), "utf8")).rules.users.$uid;
+String.prototype.matches = function (re) { return re.test(String(this)); };
+const RULE_NOW = 1700000000000;
+
+class RuleNode {
+  constructor(v) { this.v = v === null ? undefined : v; }
+  val() { return this.v && this.v[".sv"] ? RULE_NOW : this.v === undefined ? null : this.v; }
+  exists() { return this.v !== undefined; }
+  child(name) { return new RuleNode(this.v && typeof this.v === "object" ? this.v[name] : undefined); }
+  hasChildren(list) { return !!this.v && typeof this.v === "object" && list.every((k) => this.v[k] !== undefined && this.v[k] !== null); }
+  isNumber() { return typeof this.v === "number"; }
+  isString() { return typeof this.v === "string"; }
+  isBoolean() { return typeof this.v === "boolean"; }
+}
+
+class RuleChecker {
+  static evaluate(expr, nv, ov, vars) {
+    const names = Object.keys(vars);
+    return !!new Function("newData", "data", "now", ...names, "return (" + expr + ");")(new RuleNode(nv), new RuleNode(ov), RULE_NOW, ...names.map((n) => vars[n]));
+  }
+  static validate(rule, nv, ov, vars, label, errors) {
+    if (typeof rule[".validate"] === "string" && !RuleChecker.evaluate(rule[".validate"], nv, ov, vars)) errors.push(label + " :: " + rule[".validate"].slice(0, 90));
+    if (!nv || typeof nv !== "object" || nv[".sv"]) return;
+    Object.keys(nv).forEach((key) => {
+      const exact = rule[key], wild = Object.keys(rule).find((k) => k[0] === "$");
+      const childRule = exact && typeof exact === "object" ? exact : wild ? rule[wild] : null;
+      if (!childRule) return;
+      const old = ov && typeof ov === "object" ? ov[key] : undefined;
+      if (old !== undefined && JSON.stringify(old) === JSON.stringify(nv[key])) return;
+      RuleChecker.validate(childRule, nv[key], old, Object.assign({}, vars, !exact && wild ? { [wild]: key } : {}), label + "/" + key, errors);
+    });
+  }
+  static after(base, writes, prefix) {
+    const out = JSON.parse(JSON.stringify(base === undefined ? {} : base));
+    Object.keys(writes).filter((k) => k.indexOf(prefix) === 0).forEach((k) => {
+      const parts = k.slice(prefix.length).split("/");
+      let node = out;
+      parts.slice(0, -1).forEach((part) => { node = node[part] = node[part] || {}; });
+      if (writes[k] === null) delete node[parts[parts.length - 1]]; else node[parts[parts.length - 1]] = JSON.parse(JSON.stringify(writes[k]));
+    });
+    return out;
+  }
+  static check(key, writes, baseStats, baseRecent) {
+    const errors = [];
+    const stats = RuleChecker.after(baseStats, writes, "users/u1/stats/" + key + "/");
+    if (Object.keys(writes).some((k) => k.indexOf("users/u1/stats/" + key + "/") === 0)) RuleChecker.validate(RULES.stats[key], stats, baseStats, {}, "stats/" + key, errors);
+    const slots = {};
+    Object.keys(writes).filter((k) => k.indexOf("users/u1/recent/" + key + "/") === 0).forEach((k) => { slots[k.split("/").pop()] = JSON.parse(JSON.stringify(writes[k])); });
+    RuleChecker.validate(RULES.recent[key], slots, baseRecent || {}, {}, "recent/" + key, errors);
+    return { errors, stats, slots };
+  }
+}
+class GameCase {
+  constructor(name, profile, codec, key) { this.name = name; this.profile = profile; this.codec = codec; this.key = key; }
+  roundTrip(report, win) {
+    const stored = JSON.parse(JSON.stringify(this.codec.encode(report, "k1", win)));
+    stored.at = 1700000000000;
+    return { stored, back: this.codec.decode(stored), size: JSON.stringify(stored).length };
+  }
+  store(data) {
+    const writes = [];
+    const database = { read: (p) => Promise.resolve(data[p] === undefined ? null : JSON.parse(JSON.stringify(data[p]))), updateRoot: (v) => { writes.push(v); return Promise.resolve(); } };
+    return { store: new K.AccountMatchStore(database, { uid: "u1", name: "홍", email: "a@b", getToken: () => Promise.resolve("") }, this.profile), writes };
+  }
+  async verifyStore(report, ctx) {
+    const first = this.store({});
+    const status = await first.store.record(report, null);
+    const w = first.writes[0] || {};
+    check(this.name + " 저장: 쓰기 1번·경로 recent/" + this.key + "/0 · stats/" + this.key, status === "stats" && first.writes.length === 1 && !!w["users/u1/recent/" + this.key + "/0"] && Object.keys(w).some((k) => k.indexOf("users/u1/stats/" + this.key + "/g") === 0), Object.keys(w));
+    const dup = this.store({ ["recent/" + this.key]: { 0: w["users/u1/recent/" + this.key + "/0"] } });
+    check(this.name + " 저장: 같은 경기는 쓰기 없음", (await dup.store.record(report, null)) === "duplicate" && dup.writes.length === 0);
+    const loaded = await this.store({ ["recent/" + this.key]: { 3: Object.assign(JSON.parse(JSON.stringify(w["users/u1/recent/" + this.key + "/0"])), { at: 5 }) } }).store.loadRecent();
+    check(this.name + " 읽기: 최근 매치 불러오기", loaded.length === 1);
+    const ruled = RuleChecker.check(this.key, w, undefined, undefined);
+    check(this.name + " 규칙: 첫 판 쓰기가 데이터베이스규칙.json 을 통과", ruled.errors.length === 0, ruled.errors);
+    const second = this.store({ ["stats/" + this.key]: ruled.stats, ["recent/" + this.key]: ruled.slots });
+    await second.store.record(Object.assign({}, report, { matchId: "second" }), null);
+    const w2 = second.writes[0] || {};
+    const ruled2 = RuleChecker.check(this.key, w2, ruled.stats, ruled.slots);
+    check(this.name + " 규칙: 둘째 판 쓰기도 통과(판 수 +1)", second.writes.length === 1 && ruled2.errors.length === 0 && ruled2.stats.g === 2, ruled2.errors);
+    const cheat = JSON.parse(JSON.stringify(w2));
+    cheat["users/u1/stats/" + this.key + "/g"] = 5;
+    check(this.name + " 규칙: 판 수를 한 번에 3 올리면 거부", RuleChecker.check(this.key, cheat, ruled.stats, ruled.slots).errors.length > 0);
+  }}
+
+const turbo = new GameCase("24번", new K.TurboLapProfile(), K.TurboLapCodec, "turbolap");
+const turboReport = (extra) => Object.assign({ matchId: "m24", course: "seoul", result: "win", myIndex: 0,
+  rows: [{ nick: "가".repeat(25), side: 0, fin: 65432, prog: 1, car: "porsche:blue", bot: false }, { nick: "나", side: 1, fin: 0, prog: 0.4217, car: "audi:red", bot: false }] }, extra || {});
+{
+  check("24번 판정: 사람끼리 승리는 최근·누적 모두", (() => { const p = new K.TurboLapPlan(turboReport()); return p.recordsRecent && p.countsStats && p.win; })());
+  check("24번 판정: 무승부는 기록 없음", !new K.TurboLapPlan(turboReport({ result: "draw" })).recordsRecent);
+  const withBot = turboReport(); withBot.rows[1].bot = true;
+  check("24번 판정: AI 상대는 최근 매치만", (() => { const p = new K.TurboLapPlan(withBot); return p.recordsRecent && !p.countsStats && p.withAi; })());
+  const r = turbo.roundTrip(turboReport(), true);
+  check("24번 값 배열: 왕복(이름 20자·진행률 ‰·차량·완주 기록)", r.back.course === "seoul" && r.back.rows[0].nick.length === 20 && r.back.rows[0].fin === 65432 && Math.abs(r.back.rows[1].prog - 0.422) < 1e-9 && r.back.rows[0].car === "porsche:blue" && r.back.win && r.size < 500, r.size);
+  const a = K.TurboLapStatsMath.apply(null, turboReport(), true, "k1", 1);
+  const b = K.TurboLapStatsMath.apply(JSON.parse(JSON.stringify(a.node)), turboReport({ myIndex: 1, matchId: "m2" }), false, "k2", 2);
+  check("24번 누적: 판·승·패·완주·코스별 시간 합계", b.node.g === 2 && b.node.w === 1 && b.node.l === 1 && b.node.f === 1 && b.node.c.seoul.g === 2 && b.node.c.seoul.tm === 65432, b.node);
+  check("24번 누적: 같은 열쇠는 무시", K.TurboLapStatsMath.apply(b.node, turboReport(), true, "k1", 3) === null);
+}
+
+const fps = new GameCase("25번", new K.FpsProfile(), K.FpsCodec, "fpsbattle");
+const fpsReport = (extra) => Object.assign({ matchId: "m25", myIndex: 0, winnerTeam: 0, score: [9, 5], progress: 1, iLeft: false,
+  players: [{ name: "가", team: 0, kills: 5, deaths: 2, dmg: 910.4, left: false, ai: false }, { name: "나", team: 0, kills: 4, deaths: 3, dmg: 700, left: false, ai: false },
+    { name: "다", team: 1, kills: 3, deaths: 5, dmg: 400, left: false, ai: false }, { name: "라", team: 1, kills: 2, deaths: 4, dmg: 300, left: false, ai: false }] }, extra || {});
+{
+  check("25번 판정: 사람끼리 팀 승리", (() => { const p = new K.FpsPlan(fpsReport()); return p.recordsRecent && p.countsStats && p.win; })());
+  check("25번 판정: 무승부는 기록 없음, 절반 전 나가기도 없음, 절반 뒤 나가기는 패배",
+    !new K.FpsPlan(fpsReport({ winnerTeam: -1 })).recordsRecent && !new K.FpsPlan(fpsReport({ iLeft: true, progress: 0.3, winnerTeam: -1 })).recordsRecent
+    && (() => { const p = new K.FpsPlan(fpsReport({ iLeft: true, progress: 0.6, winnerTeam: -1 })); return p.recordsRecent && p.countsStats && !p.win; })());
+  const ai = fpsReport(); ai.players[3].ai = true;
+  check("25번 판정: AI 포함은 최근 매치만", (() => { const p = new K.FpsPlan(ai); return p.recordsRecent && !p.countsStats; })());
+  const r = fps.roundTrip(fpsReport(), true);
+  check("25번 값 배열: 왕복", r.back.players.length === 4 && r.back.players[0].dmg === 910 && r.back.players[0].kills === 5 && r.back.score.join() === "9,5" && r.size < 500, r.size);
+  const a = K.FpsStatsMath.apply(null, fpsReport().players[0], true, "k1", 1);
+  const b = K.FpsStatsMath.apply(JSON.parse(JSON.stringify(a.node)), fpsReport().players[1], false, "k2", 2);
+  check("25번 누적: 처치·쓰러짐·피해 합계와 KDA", b.node.g === 2 && b.node.k === 9 && b.node.d === 5 && b.node.dm === 1610 && K.FpsStatsMath.kda(9, 5) === "1.80" && K.FpsStatsMath.kda(4, 0) === "Perfect" && K.FpsStatsMath.kda(0, 0) === "—", b.node);
+}
+
+const zombie = new GameCase("31번", new K.ZombieProfile(), K.ZombieCodec, "zombieoutbreak");
+const zombieRows = () => [{ name: "숙주", role: 0, secs: 0, infects: 3, left: false, ai: false }, { name: "나", role: 2, secs: 180, infects: 0, left: false, ai: false },
+  { name: "감염", role: 1, secs: 61, infects: 1, left: false, ai: false }, { name: "봇", role: 1, secs: 20, infects: 0, left: false, ai: true }];
+const zombieReport = (extra) => Object.assign({ matchId: "m31", myIndex: 1, rows: zombieRows(), winner: 0, progress: 1, iLeft: false }, extra || {});
+{
+  check("31번 판정: 인간 승리 때 끝까지 생존한 사람이 승", new K.ZombiePlan(zombieReport()).win && !new K.ZombiePlan(zombieReport({ myIndex: 2 })).win && new K.ZombiePlan(zombieReport({ winner: 1, myIndex: 2 })).win && new K.ZombiePlan(zombieReport({ winner: 1, myIndex: 0 })).win);
+  check("31번 판정: 봇이 있으면 최근 매치만, 절반 전 나가기는 기록 없음", (() => { const p = new K.ZombiePlan(zombieReport()); return p.recordsRecent && !p.countsStats; })() && !new K.ZombiePlan(zombieReport({ iLeft: true, progress: 0.2, winner: -1 })).recordsRecent);
+  const r = zombie.roundTrip(zombieReport(), true);
+  check("31번 값 배열: 왕복(역할·생존 초·감염 수)", r.back.rows.length === 4 && r.back.rows[0].role === 0 && r.back.rows[0].infects === 3 && r.back.rows[1].secs === 180 && r.back.winner === 0 && r.back.rows[3].ai && r.size < 500, r.size);
+  const clean = zombieReport({ rows: zombieRows().slice(0, 3) });
+  const human = K.ZombieStatsMath.apply(null, clean, true, "k1", 1).node;
+  check("31번 누적: 끝까지 생존한 인간 판", human.g === 1 && human.w === 1 && human.hg === 1 && human.hw === 1 && human.zg === 0 && human.sv === 1 && human.hs === 180 && human.ls === 180, human);
+  const origin = K.ZombieStatsMath.apply(JSON.parse(JSON.stringify(human)), zombieReport({ rows: zombieRows().slice(0, 3), myIndex: 0, winner: 1, matchId: "m2" }), true, "k2", 2).node;
+  check("31번 누적: 숙주 좀비 판(좀비 편 승리, 감염 수·최다)", origin.og === 1 && origin.zg === 1 && origin.zw === 1 && origin.hg === 1 && origin.ik === 3 && origin.mi === 3 && origin.w === 2, origin);
+  const infected = K.ZombieStatsMath.apply(JSON.parse(JSON.stringify(origin)), zombieReport({ rows: zombieRows().slice(0, 3), myIndex: 2, winner: 0, matchId: "m3" }), false, "k3", 3).node;
+  check("31번 누적: 감염된 판은 인간·좀비 양쪽 판 수에 들고 생존 시간은 감염 때까지", infected.hg === 2 && infected.zg === 2 && infected.hw === 2 && infected.zw === 1 && infected.hs === 241 && infected.l === 1, infected);
+}
+
+const snow = new GameCase("38번", new K.SnAccountProfile(), K.SnAccountCodec, "snowroyale");
+const snowMatch = { id: 1, seed: 2, mode: "duos", startAt: 0, teams: [{ members: [{ id: "a", nick: "A", bot: false }, { id: "b", nick: "B", bot: false }] }, { members: [{ id: "c", nick: "C", bot: false }, { id: "d", nick: "D", bot: true }] }] };
+const snowEnd = { match: 1, ranks: [1, 2], at: 1, stats: [[3, 120.6, 5, 200.46, 2, 1], [1, 40, 2, 150, 0, 2], [2, 90, 3, 80, 1, 0], [0, 10, 0, 60, 0, 0]] };
+{
+  const report = K.SnReportBuilder.fromEnd("m38", snowMatch, snowEnd, "a");
+  check("38번 보고서: 끝 기록에서 선수 줄·순위·어시스트·AI 읽기", report.players.length === 4 && report.myIndex === 0 && report.players[0].rank === 1 && report.players[2].rank === 2 && report.players[0].assists === 1 && report.players[3].ai && report.players[0].secs === 200.46, report.players[0]);
+  check("38번 판정: 1위만 승, AI 포함이면 최근 매치만", (() => { const p = new K.SnAccountPlan(report); const lose = new K.SnAccountPlan(K.SnReportBuilder.fromEnd("m", snowMatch, snowEnd, "c")); return p.win && p.recordsRecent && !p.countsStats && !lose.win; })());
+  const clean = JSON.parse(JSON.stringify(report)); clean.players[3].ai = false;
+  const r = snow.roundTrip(clean, true);
+  check("38번 값 배열: 왕복(생존 초 0.1 단위·어시스트)", r.back.players[0].secs === 200.5 && r.back.players[0].assists === 1 && r.back.players[0].dealt === 121 && r.back.mode === "duos" && r.size < 600, r.size);
+  const a = K.SnAccountMath.apply(null, clean, true, "k1", 1);
+  const b = K.SnAccountMath.apply(JSON.parse(JSON.stringify(a.node)), K.SnReportBuilder.fromEnd("m2", snowMatch, snowEnd, "c"), false, "k2", 2);
+  check("38번 누적: 킬·어시·피해·벽·생존·순위 합계", b.node.g === 2 && b.node.w === 1 && b.node.k === 5 && b.node.a === 1 && b.node.dm === 211 && b.node.wl === 3 && b.node.sv === 280 && b.node.rk === 3 && b.node.t3 === 2 && b.node.mk === 3 && b.node.gd === 2, b.node);
+  const forfeit = K.SnReportBuilder.fromEnd("m3", snowMatch, snowEnd, "a"); forfeit.iLeft = true; forfeit.progress = 0.3;
+  check("38번 판정: 절반 전 나가기는 기록 없음", !new K.SnAccountPlan(forfeit).recordsRecent);
+}
+
+const balloon = new GameCase("39번", new K.WbAccountProfile(), K.WbAccountCodec, "waterballoon");
+const wbMatch = { id: 1, seed: 2, mode: "team", map: "classroom", startAt: 0, teams: [{ color: 0, members: [{ id: "a", nick: "A", bot: false }, { id: "b", nick: "B", bot: false }] }, { color: 1, members: [{ id: "c", nick: "C", bot: false }, { id: "d", nick: "D", bot: false }] }] };
+const wbEnd = { match: 1, ranks: [1, 1, 2, 2], outTicks: [-1, 600, 300, 450], at: 1, stats: [[2, 3, 1, 4, 0], [0, 1, 0, 2, 1], [1, 1, 0, 0, 0], [0, 0, 1, 1, 0]], endTick: 900 };
+{
+  const report = K.WbReportBuilder.fromEnd("m39", wbMatch, wbEnd, "a");
+  check("39번 보고서: 끝 기록에서 순위·생존 초·항목 읽기(끝까지 남은 사람은 끝 시각)", report.players.length === 4 && report.players[0].secs === 30 && report.players[1].secs === 20 && report.players[0].traps === 3 && report.players[0].rescues === 1 && report.players[2].rank === 2 && report.players[2].team === 1, report.players);
+  check("39번 판정: 1위 편이 승", new K.WbAccountPlan(report).win && new K.WbAccountPlan(report).countsStats && !new K.WbAccountPlan(K.WbReportBuilder.fromEnd("m", wbMatch, wbEnd, "c")).win);
+  const r = balloon.roundTrip(report, true);
+  check("39번 값 배열: 왕복", r.back.players[0].traps === 3 && r.back.players[0].boxes === 4 && r.back.mode === "team" && r.back.players[1].secs === 20 && r.size < 600, r.size);
+  const a = K.WbAccountMath.apply(null, report, true, "k1", 1);
+  const b = K.WbAccountMath.apply(JSON.parse(JSON.stringify(a.node)), K.WbReportBuilder.fromEnd("m2", wbMatch, wbEnd, "c"), false, "k2", 2);
+  check("39번 누적: 가둔 수·처치·구출·상자·생존·순위 합계", b.node.g === 2 && b.node.tp === 4 && b.node.kl === 3 && b.node.rs === 1 && b.node.bx === 4 && b.node.sv === 40 && b.node.rk === 3 && b.node.gt === 2 && b.node.mk === 2, b.node);
+}
+
+const gameChecks = (async () => {
+  await turbo.verifyStore(turboReport());
+  await fps.verifyStore(fpsReport());
+  await zombie.verifyStore(zombieReport({ rows: zombieRows().slice(0, 3) }));
+  const cleanSnow = K.SnReportBuilder.fromEnd("m38", snowMatch, snowEnd, "a"); cleanSnow.players[3].ai = false;
+  await snow.verifyStore(cleanSnow);
+  await balloon.verifyStore(K.WbReportBuilder.fromEnd("m39", wbMatch, wbEnd, "a"));
+})();
+Promise.all([done, gameChecks]).then(() => {
   if (failures.length) { console.log("실패 " + failures.length + "개\n" + failures.join("\n")); process.exit(1); }
   console.log("통과 " + passed + " · 문제 0");
 }).catch((e) => { console.log("오류", e); process.exit(1); });

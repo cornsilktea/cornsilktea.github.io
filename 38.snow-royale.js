@@ -500,6 +500,7 @@ class SnGame {
         this.editor = null;
         this.backdrop = null;
         this.practice = false;
+        this.account = new SnAccount();
         this.session = null;
         this.view = null;
         this.matchId = 0;
@@ -569,6 +570,7 @@ class SnGame {
         SnDom.el("btnAgain").addEventListener("click", () => this.afterResult());
         SnDom.el("btnResultLeave").addEventListener("click", () => this.leaveRoom(""));
         SnDom.el("btnGameLeave").addEventListener("click", () => this.askLeave());
+        this.account.bind();
         this.lobby.onSeatClick = (slot) => this.clickSeat(slot);
     }
     askLeave() {
@@ -594,9 +596,25 @@ class SnGame {
     }
     forfeitApplies() {
         const flow = this.random();
-        return !!flow && flow.forfeitApplies(this.matchProgress());
+        return (!!flow && flow.forfeitApplies(this.matchProgress())) || this.onlineForfeitApplies();
+    }
+    onlineForfeitApplies() {
+        const view = this.view;
+        return !!this.session && !!view && this.session.status === "playing" && view.driver.myNum >= 0 && this.matchProgress() >= AccountForfeit.AT;
+    }
+    matchKey(session, match) {
+        const flow = this.random(), ticket = flow ? flow.ticket() : null;
+        return ticket ? ticket.matchId : session.code + "_" + match.id + "_" + match.seed;
+    }
+    recordForfeit() {
+        const session = this.session, view = this.view;
+        const match = session ? session.value("match") : null;
+        if (!session || !view || !match || !this.onlineForfeitApplies())
+            return;
+        this.account.record(SnReportBuilder.fromEngine(this.matchKey(session, match), view.driver.engine, view.driver.myNum, this.matchProgress()));
     }
     forfeitIfLate() {
+        this.recordForfeit();
         const flow = this.random();
         if (flow)
             flow.forfeitIfLate(this.matchProgress());
@@ -702,6 +720,8 @@ class SnGame {
     }
     reportEnd(session) {
         const flow = this.random(), match = session.value("match"), end = session.value("end");
+        if (match && end && end.match === match.id)
+            this.account.record(SnReportBuilder.fromEnd(this.matchKey(session, match), match, end, this.myId));
         const ticket = flow ? flow.ticket() : null;
         if (!flow || !ticket || !match || !end || end.match !== match.id)
             return;

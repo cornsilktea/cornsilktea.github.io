@@ -264,6 +264,7 @@
   #overlay.st-screen .card .btns { justify-content: flex-start; }
   #overlay.st-screen .hello { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 18px; font-weight: 700; margin: 0 0 14px; color: #EEF0F4; }
   #overlay.st-screen .hello b { color: #FFB08C; }
+  #overlay.st-screen .hello .acct { margin-left: auto; }
   #overlay.st-screen .mini { font: inherit; font-size: 13px; font-weight: 800; height: 32px; padding: 0 12px; border-radius: 8px; border: 2px solid rgba(255, 255, 255, .24); background: rgba(255, 255, 255, .08); color: #DDE1EA; cursor: pointer; }
   #overlay.st-screen .joinRow { justify-content: flex-start; flex-wrap: nowrap; margin-top: 0; }
   #overlay.st-screen .joinRow input { flex: 1; min-width: 0; width: auto; height: 54px; background: rgba(255, 255, 255, .06); border: 2px solid rgba(255, 255, 255, .3); border-radius: 6px; color: #fff; text-align: left; }
@@ -389,7 +390,7 @@
 
   <div class="card" id="cardTeamStart" style="display:none">
     <div class="logo">👥 팀 대전</div>
-    <div class="hello">내 닉네임: <b id="teamNick"></b> <button type="button" class="mini" data-maker-open data-nick-setting>✏️ 닉네임 설정</button></div>
+    <div class="hello">내 닉네임: <b id="teamNick"></b> <button type="button" class="mini" data-maker-open data-nick-setting>✏️ 닉네임 설정</button> <button type="button" class="mini acct" data-account-open="stats">📊 통계 · 최근 10매치</button></div>
     <button type="button" class="btn wideBtn" id="btnCreate">게임 만들기</button>
     <button type="button" class="btn wideBtn" id="btnRandom">랜덤 매칭 방 만들기</button>
     <label class="fieldLab" for="joinCode">방·팀 코드로 입장</label>
@@ -412,13 +413,13 @@
 
   <div class="card wide" id="cardParty" style="display:none">
     <div class="logo">👥 팀 대전</div>
-    <div class="hello">내 닉네임: <b id="partyNick"></b> <button type="button" class="mini" data-maker-open data-nick-setting>✏️ 닉네임 설정</button></div>
+    <div class="hello">내 닉네임: <b id="partyNick"></b> <button type="button" class="mini" data-maker-open data-nick-setting>✏️ 닉네임 설정</button> <button type="button" class="mini acct" data-account-open="stats">📊 통계 · 최근 10매치</button></div>
     <div id="partyMount"></div>
   </div>
 
   <div class="card wide" id="cardLobby" style="display:none">
     <div class="codeLine">방 코드<b id="lobbyCode">00000</b></div>
-    <div class="hello">내 닉네임: <b id="lobbyNick"></b> <button type="button" class="mini" data-maker-open data-nick-setting>✏️ 닉네임 설정</button></div>
+    <div class="hello">내 닉네임: <b id="lobbyNick"></b> <button type="button" class="mini" data-maker-open data-nick-setting>✏️ 닉네임 설정</button> <button type="button" class="mini acct" data-account-open="stats">📊 통계 · 최근 10매치</button></div>
     <div class="teams">
       <div class="team blue"><h3>블루팀</h3><div id="listBlue"></div><button type="button" class="btn sub" id="btnJoinBlue">블루팀으로</button></div>
       <div class="team red"><h3>레드팀</h3><div id="listRed"></div><button type="button" class="btn sub" id="btnJoinRed">레드팀으로</button></div>
@@ -467,6 +468,8 @@
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="character-maker.js?v=20261026a"></script>
 <script charset="utf-8" src="match-kit.js?v=20261022w"></script>
+<script charset="utf-8" src="account-match-kit.js?v=20261026c"></script>
+<script charset="utf-8" src="25.fps-survival-stats.js?v=20261026b"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
@@ -2721,6 +2724,28 @@ class FpsRandomMatch {
 }
 const fpsRandom = new FpsRandomMatch();
 
+class FpsMatchReporter {
+  static SETTLE_MS = 1000;
+  constructor() { this.account = new FpsAccount(); this.account.bind(); }
+  matchId() { const ticket = fpsRandom.ticket(); return ticket ? ticket.matchId : T.code + "_" + T.startAt; }
+  playerLine(id, iLeft) {
+    const p = T.players[id]; let k = 0, d = 0;
+    for (const key in T.kills) { const v = T.kills[key]; if (!killCounts(v)) continue; if (v.k === id) k++; if (v.v === id) d++; }
+    return { name: p.nickname, team: p.team === "red" ? 1 : 0, kills: k, deaths: d, dmg: damageDealtBy(id), left: iLeft && id === T.myId, ai: !!p.isAI };
+  }
+  report(iLeft) {
+    const ids = ["blue", "red"].flatMap(team => teamIds(team)), b = teamScore("blue"), r = teamScore("red");
+    const quitWinner = T.quitTeam === "blue" ? "red" : T.quitTeam === "red" ? "blue" : null, winner = quitWinner || (b === r ? null : b > r ? "blue" : "red");
+    return { matchId: this.matchId(), myIndex: ids.indexOf(T.myId), players: ids.map(id => this.playerLine(id, iLeft)), score: [b, r],
+      winnerTeam: winner === "blue" ? 0 : winner === "red" ? 1 : -1, progress: iLeft ? fpsRandom.progress() : 1, iLeft };
+  }
+  ended(match) { setTimeout(() => { if (T.match === match) this.recordEnded(); }, FpsMatchReporter.SETTLE_MS); }
+  recordEnded() { if (T.ref && T.me && !T.spec && T.match && T.match.shownEnd) this.account.record(this.report(false)); }
+  forfeitApplies() { return !!T.ref && !!T.me && !T.spec && T.status === "playing" && fpsRandom.progress() >= AccountForfeit.AT; }
+  leaving() { if (this.forfeitApplies()) this.account.record(this.report(true)); }
+}
+const fpsReporter = new FpsMatchReporter();
+
 function teamCanAct() {
   if (!T.me || !T.me.alive || !T.match || T.screen !== "game") return false;
   const t = tnow();
@@ -3186,6 +3211,7 @@ function showTeamResult() {
   $("btnBackLobby").hidden = !isHost();
   $("teamOverHint").textContent = isHost() ? "" : "방장이 로비로 돌아가면 함께 이동해요.";
   fpsRandom.decorateResult();
+  fpsReporter.ended(T.match);
   if (T.me) { if (winner && my === winner) SFX.killHead(); else if (winner) SFX.over(); }
   T.bullets.forEach(bl => scene.remove(bl.g)); T.bullets.length = 0;
   teamScreen("over");
@@ -3449,11 +3475,11 @@ $("botFill").onchange = e => { if (isHost()) T.ref.update({ botFill: e.currentTa
 $("btnTeamStart").onclick = e => { e.currentTarget.blur(); hostStart(); };
 $("btnLobbyLeave").onclick = e => { e.currentTarget.blur(); leaveRoom(); fpsRandom.afterLeave(); };
 $("btnBackLobby").onclick = e => { e.currentTarget.blur(); hostBackToLobby(); };
-$("btnOverLeave").onclick = e => { e.currentTarget.blur(); fpsRandom.recordBeforeLeave(); leaveRoom(); fpsRandom.afterLeave(); };
+$("btnOverLeave").onclick = e => { e.currentTarget.blur(); fpsRandom.recordBeforeLeave(); fpsReporter.recordEnded(); leaveRoom(); fpsRandom.afterLeave(); };
 $("btnGameLeave").onclick = e => {
   e.currentTarget.blur();
   if (state === "play") { if (confirm("처음 화면으로 나갈까요? (이번 기록은 저장되지 않아요)")) leaveSoloGame(); return; }
-  if (confirm(fpsRandom.forfeitApplies() ? MkForfeit.QUESTION : "방을 나갈까요?")) { fpsRandom.forfeitIfLate(); leaveRoom(); fpsRandom.afterLeave(); }
+  if (confirm(fpsRandom.forfeitApplies() || fpsReporter.forfeitApplies() ? MkForfeit.QUESTION : "방을 나갈까요?")) { fpsRandom.forfeitIfLate(); fpsReporter.leaving(); leaveRoom(); fpsRandom.afterLeave(); }
 };
 
 const QG = QualityGovernor({

@@ -449,6 +449,7 @@ class SnGame {
   private editor: ProfileEditor | null = null;
   private backdrop: SnMenuBackdrop | null = null;
   private practice = false;
+  private readonly account = new SnAccount();
   private session: RkSession<SnPlayerRecord> | null = null;
   private view: SnMatchView | null = null;
   private matchId = 0;
@@ -509,6 +510,7 @@ class SnGame {
     SnDom.el("btnAgain").addEventListener("click", () => this.afterResult());
     SnDom.el("btnResultLeave").addEventListener("click", () => this.leaveRoom(""));
     SnDom.el("btnGameLeave").addEventListener("click", () => this.askLeave());
+    this.account.bind();
     this.lobby.onSeatClick = (slot) => this.clickSeat(slot);
   }
 
@@ -533,10 +535,28 @@ class SnGame {
 
   private forfeitApplies(): boolean {
     const flow = this.random();
-    return !!flow && flow.forfeitApplies(this.matchProgress());
+    return (!!flow && flow.forfeitApplies(this.matchProgress())) || this.onlineForfeitApplies();
+  }
+
+  private onlineForfeitApplies(): boolean {
+    const view = this.view;
+    return !!this.session && !!view && this.session.status === "playing" && view.driver.myNum >= 0 && this.matchProgress() >= AccountForfeit.AT;
+  }
+
+  private matchKey(session: RkSession<SnPlayerRecord>, match: SnMatchRecord): string {
+    const flow = this.random(), ticket = flow ? flow.ticket() : null;
+    return ticket ? ticket.matchId : session.code + "_" + match.id + "_" + match.seed;
+  }
+
+  private recordForfeit(): void {
+    const session = this.session, view = this.view;
+    const match = session ? session.value<SnMatchRecord>("match") : null;
+    if (!session || !view || !match || !this.onlineForfeitApplies()) return;
+    this.account.record(SnReportBuilder.fromEngine(this.matchKey(session, match), view.driver.engine, view.driver.myNum, this.matchProgress()));
   }
 
   private forfeitIfLate(): void {
+    this.recordForfeit();
     const flow = this.random();
     if (flow) flow.forfeitIfLate(this.matchProgress());
   }
@@ -632,6 +652,7 @@ class SnGame {
 
   private reportEnd(session: RkSession<SnPlayerRecord>): void {
     const flow = this.random(), match = session.value<SnMatchRecord>("match"), end = session.value<SnEndRecord>("end");
+    if (match && end && end.match === match.id) this.account.record(SnReportBuilder.fromEnd(this.matchKey(session, match), match, end, this.myId));
     const ticket = flow ? flow.ticket() : null;
     if (!flow || !ticket || !match || !end || end.match !== match.id) return;
     const team = match.teams.findIndex((t) => t.members.some((m) => m.id === this.myId));

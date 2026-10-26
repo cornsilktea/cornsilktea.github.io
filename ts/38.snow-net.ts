@@ -124,7 +124,7 @@ class SnHostDirector {
   private writeEnd(): void {
     this.endWritten = true;
     const e = this.engine;
-    const end: SnEndRecord = { match: this.match.id, ranks: e.ranks(), stats: e.players.map((p) => [p.kills, p.dealt, p.collected, Math.round(e.survival(p) * 10) / 10, p.walls]), at: Date.now() };
+    const end: SnEndRecord = { match: this.match.id, ranks: e.ranks(), stats: e.players.map((p) => [p.kills, p.dealt, p.collected, Math.round(e.survival(p) * 10) / 10, p.walls, p.assists]), at: Date.now() };
     this.session.ref.update({ end, status: "ended" });
   }
 
@@ -266,7 +266,7 @@ class SnMirror implements SnSceneSource {
     end.stats.forEach((s, num) => {
       const p = this.engine.players[num];
       if (!p) return;
-      p.kills = s[0]; p.dealt = s[1]; p.collected = s[2]; p.downAt = s[3]; p.walls = s[4] || 0;
+      p.kills = s[0]; p.dealt = s[1]; p.collected = s[2]; p.downAt = s[3]; p.walls = s[4] || 0; p.assists = s[5] || 0;
     });
     this.engine.endAt = Math.max(...end.stats.map((s) => s[3]));
   }

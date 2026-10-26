@@ -317,7 +317,101 @@
             },
             "$other": { ".validate": false }
           },
-          "$game": { ".validate": "$game === 'teambattle'" }
+          "turbolap": {
+            ".validate": "newData.hasChildren(['g', 'w', 'l', 'f']) && ((!data.exists() && newData.child('g').val() === 1 && newData.child('w').val() <= 1 && newData.child('l').val() <= 1 && newData.child('f').val() <= 1) || (data.exists() && newData.child('g').val() === data.child('g').val() + 1 && newData.child('w').val() >= data.child('w').val() && newData.child('l').val() >= data.child('l').val() && newData.child('f').val() >= data.child('f').val() && newData.child('f').val() <= data.child('f').val() + 1)) && newData.child('w').val() + newData.child('l').val() === newData.child('g').val() && newData.child('f').val() <= newData.child('g').val()",
+            "g": { ".validate": "newData.isNumber() && newData.val() === (data.exists() ? data.val() : 0) + 1" },
+            "w": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1" },
+            "l": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1" },
+            "f": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1" },
+            "ids": {
+              "$id": { ".validate": "$id.length >= 1 && $id.length <= 60 && newData.isNumber() && !data.exists()" }
+            },
+            "c": {
+              "$course": {
+                ".validate": "$course.matches(/^(seoul|singapore|hongkong)$/) && newData.hasChildren(['g', 'w', 'f', 'tm']) && ((!data.exists() && newData.child('g').val() === 1 && newData.child('tm').val() <= 1800000) || (data.exists() && newData.child('g').val() === data.child('g').val() + 1 && newData.child('w').val() >= data.child('w').val() && newData.child('w').val() <= data.child('w').val() + 1 && newData.child('f').val() >= data.child('f').val() && newData.child('f').val() <= data.child('f').val() + 1 && newData.child('tm').val() >= data.child('tm').val() && newData.child('tm').val() <= data.child('tm').val() + 1800000)) && newData.child('w').val() <= newData.child('g').val() && newData.child('f').val() <= newData.child('g').val()",
+                "g": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000" },
+                "w": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000" },
+                "f": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000" },
+                "tm": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000000000" },
+                "$other": { ".validate": false }
+              }
+            },
+            "$other": { ".validate": false }
+          },
+          "fpsbattle": {
+            ".validate": "newData.hasChildren(['g', 'w', 'l', 'k', 'd', 'dm']) && ((!data.exists() && newData.child('g').val() === 1 && newData.child('w').val() <= 1 && newData.child('l').val() <= 1 && newData.child('k').val() <= 99 && newData.child('d').val() <= 99 && newData.child('dm').val() <= 100000) || (data.exists() && newData.child('g').val() === data.child('g').val() + 1 && newData.child('w').val() >= data.child('w').val() && newData.child('l').val() >= data.child('l').val() && newData.child('k').val() >= data.child('k').val() && newData.child('k').val() <= data.child('k').val() + 99 && newData.child('d').val() >= data.child('d').val() && newData.child('d').val() <= data.child('d').val() + 99 && newData.child('dm').val() >= data.child('dm').val() && newData.child('dm').val() <= data.child('dm').val() + 100000)) && newData.child('w').val() + newData.child('l').val() === newData.child('g').val()",
+            "g": { ".validate": "newData.isNumber() && newData.val() === (data.exists() ? data.val() : 0) + 1" },
+            "w": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1" },
+            "l": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1" },
+            "k": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 99" },
+            "d": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 99" },
+            "dm": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 100000" },
+            "ids": {
+              "$id": { ".validate": "$id.length >= 1 && $id.length <= 60 && newData.isNumber() && !data.exists()" }
+            },
+            "$other": { ".validate": false }
+          },
+          "zombieoutbreak": {
+            ".validate": "newData.hasChildren(['g', 'w', 'l', 'hg', 'hw', 'zg', 'zw', 'og', 'sv', 'ik', 'hs', 'mi', 'ls']) && ((!data.exists() && newData.child('g').val() === 1 && newData.child('w').val() <= 1 && newData.child('l').val() <= 1 && newData.child('hg').val() <= 1 && newData.child('hw').val() <= 1 && newData.child('zg').val() <= 1 && newData.child('zw').val() <= 1 && newData.child('og').val() <= 1 && newData.child('sv').val() <= 1 && newData.child('ik').val() <= 9 && newData.child('hs').val() <= 180 && newData.child('mi').val() <= 9 && newData.child('ls').val() <= 180) || (data.exists() && newData.child('g').val() === data.child('g').val() + 1 && newData.child('w').val() >= data.child('w').val() && newData.child('l').val() >= data.child('l').val() && newData.child('hg').val() >= data.child('hg').val() && newData.child('hg').val() <= data.child('hg').val() + 1 && newData.child('hw').val() >= data.child('hw').val() && newData.child('hw').val() <= data.child('hw').val() + 1 && newData.child('zg').val() >= data.child('zg').val() && newData.child('zg').val() <= data.child('zg').val() + 1 && newData.child('zw').val() >= data.child('zw').val() && newData.child('zw').val() <= data.child('zw').val() + 1 && newData.child('og').val() >= data.child('og').val() && newData.child('og').val() <= data.child('og').val() + 1 && newData.child('sv').val() >= data.child('sv').val() && newData.child('sv').val() <= data.child('sv').val() + 1 && newData.child('ik').val() >= data.child('ik').val() && newData.child('ik').val() <= data.child('ik').val() + 9 && newData.child('hs').val() >= data.child('hs').val() && newData.child('hs').val() <= data.child('hs').val() + 180 && newData.child('mi').val() >= data.child('mi').val() && newData.child('mi').val() <= 9 && newData.child('ls').val() >= data.child('ls').val() && newData.child('ls').val() <= 180)) && newData.child('w').val() + newData.child('l').val() === newData.child('g').val() && newData.child('hw').val() <= newData.child('hg').val() && newData.child('zw').val() <= newData.child('zg').val() && newData.child('hg').val() <= newData.child('g').val() && newData.child('zg').val() <= newData.child('g').val() && newData.child('og').val() + newData.child('sv').val() <= newData.child('g').val()",
+            "g": { ".validate": "newData.isNumber() && newData.val() === (data.exists() ? data.val() : 0) + 1" },
+            "w": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1" },
+            "l": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1" },
+            "hg": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1" },
+            "hw": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1" },
+            "zg": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1" },
+            "zw": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1" },
+            "og": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1" },
+            "sv": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1" },
+            "ik": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 9" },
+            "hs": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 180" },
+            "mi": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= 9" },
+            "ls": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= 180" },
+            "ids": {
+              "$id": { ".validate": "$id.length >= 1 && $id.length <= 60 && newData.isNumber() && !data.exists()" }
+            },
+            "$other": { ".validate": false }
+          },
+          "snowroyale": {
+            ".validate": "newData.hasChildren(['g', 'w', 'l', 'gd', 'gs', 'k', 'a', 'dm', 'wl', 'sv', 'rk', 't3', 'mk']) && ((!data.exists() && newData.child('g').val() === 1 && newData.child('w').val() <= 1 && newData.child('l').val() <= 1 && newData.child('gd').val() <= 1 && newData.child('gs').val() <= 1 && newData.child('k').val() <= 99 && newData.child('a').val() <= 99 && newData.child('dm').val() <= 100000 && newData.child('wl').val() <= 200 && newData.child('sv').val() <= 3600 && newData.child('rk').val() <= 6 && newData.child('t3').val() <= 1 && newData.child('mk').val() <= 99) || (data.exists() && newData.child('g').val() === data.child('g').val() + 1 && newData.child('w').val() >= data.child('w').val() && newData.child('l').val() >= data.child('l').val() && newData.child('gd').val() >= data.child('gd').val() && newData.child('gd').val() <= data.child('gd').val() + 1 && newData.child('gs').val() >= data.child('gs').val() && newData.child('gs').val() <= data.child('gs').val() + 1 && newData.child('k').val() >= data.child('k').val() && newData.child('k').val() <= data.child('k').val() + 99 && newData.child('a').val() >= data.child('a').val() && newData.child('a').val() <= data.child('a').val() + 99 && newData.child('dm').val() >= data.child('dm').val() && newData.child('dm').val() <= data.child('dm').val() + 100000 && newData.child('wl').val() >= data.child('wl').val() && newData.child('wl').val() <= data.child('wl').val() + 200 && newData.child('sv').val() >= data.child('sv').val() && newData.child('sv').val() <= data.child('sv').val() + 3600 && newData.child('rk').val() >= data.child('rk').val() && newData.child('rk').val() <= data.child('rk').val() + 6 && newData.child('t3').val() >= data.child('t3').val() && newData.child('t3').val() <= data.child('t3').val() + 1 && newData.child('mk').val() >= data.child('mk').val() && newData.child('mk').val() <= 99)) && newData.child('w').val() + newData.child('l').val() === newData.child('g').val() && newData.child('gd').val() + newData.child('gs').val() === newData.child('g').val() && newData.child('t3').val() <= newData.child('g').val() && newData.child('rk').val() >= newData.child('g').val()",
+            "g": { ".validate": "newData.isNumber() && newData.val() === (data.exists() ? data.val() : 0) + 1" },
+            "w": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1" },
+            "l": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1" },
+            "gd": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1" },
+            "gs": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1" },
+            "k": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 99" },
+            "a": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 99" },
+            "dm": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 100000" },
+            "wl": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 200" },
+            "sv": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 3600" },
+            "rk": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 6" },
+            "t3": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1" },
+            "mk": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= 99" },
+            "ids": {
+              "$id": { ".validate": "$id.length >= 1 && $id.length <= 60 && newData.isNumber() && !data.exists()" }
+            },
+            "$other": { ".validate": false }
+          },
+          "waterballoon": {
+            ".validate": "newData.hasChildren(['g', 'w', 'l', 'gs', 'gt', 'kl', 'tp', 'rs', 'bx', 'sk', 'sv', 'rk', 'mk']) && ((!data.exists() && newData.child('g').val() === 1 && newData.child('w').val() <= 1 && newData.child('l').val() <= 1 && newData.child('gs').val() <= 1 && newData.child('gt').val() <= 1 && newData.child('kl').val() <= 20 && newData.child('tp').val() <= 30 && newData.child('rs').val() <= 30 && newData.child('bx').val() <= 100 && newData.child('sk').val() <= 10 && newData.child('sv').val() <= 3600 && newData.child('rk').val() <= 10 && newData.child('mk').val() <= 20) || (data.exists() && newData.child('g').val() === data.child('g').val() + 1 && newData.child('w').val() >= data.child('w').val() && newData.child('l').val() >= data.child('l').val() && newData.child('gs').val() >= data.child('gs').val() && newData.child('gs').val() <= data.child('gs').val() + 1 && newData.child('gt').val() >= data.child('gt').val() && newData.child('gt').val() <= data.child('gt').val() + 1 && newData.child('kl').val() >= data.child('kl').val() && newData.child('kl').val() <= data.child('kl').val() + 20 && newData.child('tp').val() >= data.child('tp').val() && newData.child('tp').val() <= data.child('tp').val() + 30 && newData.child('rs').val() >= data.child('rs').val() && newData.child('rs').val() <= data.child('rs').val() + 30 && newData.child('bx').val() >= data.child('bx').val() && newData.child('bx').val() <= data.child('bx').val() + 100 && newData.child('sk').val() >= data.child('sk').val() && newData.child('sk').val() <= data.child('sk').val() + 10 && newData.child('sv').val() >= data.child('sv').val() && newData.child('sv').val() <= data.child('sv').val() + 3600 && newData.child('rk').val() >= data.child('rk').val() && newData.child('rk').val() <= data.child('rk').val() + 10 && newData.child('mk').val() >= data.child('mk').val() && newData.child('mk').val() <= 20)) && newData.child('w').val() + newData.child('l').val() === newData.child('g').val() && newData.child('gs').val() + newData.child('gt').val() === newData.child('g').val() && newData.child('rk').val() >= newData.child('g').val()",
+            "g": { ".validate": "newData.isNumber() && newData.val() === (data.exists() ? data.val() : 0) + 1" },
+            "w": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1" },
+            "l": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1" },
+            "gs": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1" },
+            "gt": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1" },
+            "kl": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 20" },
+            "tp": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 30" },
+            "rs": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 30" },
+            "bx": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 100" },
+            "sk": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 10" },
+            "sv": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 3600" },
+            "rk": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 10" },
+            "mk": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= 20" },
+            "ids": {
+              "$id": { ".validate": "$id.length >= 1 && $id.length <= 60 && newData.isNumber() && !data.exists()" }
+            },
+            "$other": { ".validate": false }
+          },
+          "$game": { ".validate": "$game.matches(/^(teambattle|turbolap|fpsbattle|zombieoutbreak|snowroyale|waterballoon)$/)" }
         },
         "recent": {
          "teambattle": {
@@ -341,7 +435,104 @@
             "$other": { ".validate": false }
           }
          },
-         "$game": { ".validate": "$game === 'teambattle'" }
+         "turbolap": {
+           "$slot": {
+             ".validate": "$slot.matches(/^[0-9]$/) && newData.hasChildren(['v', 'id', 'at', 'r', 'ai', 'co', 'me'])",
+             "v": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 99" },
+             "id": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60" },
+             "at": { ".validate": "newData.val() === now" },
+             "r": { ".validate": "newData.val() === 0 || newData.val() === 1" },
+             "ai": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1" },
+             "co": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 2" },
+             "me": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1" },
+             "p": {
+               "$i": {
+                 ".validate": "$i.matches(/^[0-1]$/)",
+                 "$j": { ".validate": "$j.matches(/^([0-9]|1[0-3])$/) && newData.isString() === ($j === '0' || $j === '4') && (newData.isString() ? newData.val().length <= 30 : (newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000000))" }
+               }
+             },
+             "$other": { ".validate": false }
+           }
+         },
+         "fpsbattle": {
+           "$slot": {
+             ".validate": "$slot.matches(/^[0-9]$/) && newData.hasChildren(['v', 'id', 'at', 'r', 'ai', 'me'])",
+             "v": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 99" },
+             "id": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60" },
+             "at": { ".validate": "newData.val() === now" },
+             "r": { ".validate": "newData.val() === 0 || newData.val() === 1" },
+             "ai": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1" },
+             "me": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5" },
+             "s": {
+               "$i": { ".validate": "$i.matches(/^[01]$/) && newData.isNumber() && newData.val() >= 0 && newData.val() <= 999" }
+             },
+             "p": {
+               "$i": {
+                 ".validate": "$i.matches(/^[0-5]$/)",
+                 "$j": { ".validate": "$j.matches(/^([0-9]|1[0-3])$/) && newData.isString() === ($j === '0') && (newData.isString() ? newData.val().length <= 30 : (newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000000))" }
+               }
+             },
+             "$other": { ".validate": false }
+           }
+         },
+         "zombieoutbreak": {
+           "$slot": {
+             ".validate": "$slot.matches(/^[0-9]$/) && newData.hasChildren(['v', 'id', 'at', 'r', 'ai', 'me', 'w'])",
+             "v": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 99" },
+             "id": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60" },
+             "at": { ".validate": "newData.val() === now" },
+             "r": { ".validate": "newData.val() === 0 || newData.val() === 1" },
+             "ai": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1" },
+             "me": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5" },
+             "w": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1" },
+             "p": {
+               "$i": {
+                 ".validate": "$i.matches(/^[0-5]$/)",
+                 "$j": { ".validate": "$j.matches(/^([0-9]|1[0-3])$/) && newData.isString() === ($j === '0') && (newData.isString() ? newData.val().length <= 30 : (newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000000))" }
+               }
+             },
+             "$other": { ".validate": false }
+           }
+         },
+         "snowroyale": {
+           "$slot": {
+             ".validate": "$slot.matches(/^[0-9]$/) && newData.hasChildren(['v', 'id', 'at', 'r', 'ai', 'md', 'me'])",
+             "v": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 99" },
+             "id": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60" },
+             "at": { ".validate": "newData.val() === now" },
+             "r": { ".validate": "newData.val() === 0 || newData.val() === 1" },
+             "ai": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1" },
+             "md": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1" },
+             "me": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5" },
+             "p": {
+               "$i": {
+                 ".validate": "$i.matches(/^[0-5]$/)",
+                 "$j": { ".validate": "$j.matches(/^([0-9]|1[0-3])$/) && newData.isString() === ($j === '0') && (newData.isString() ? newData.val().length <= 30 : (newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000000))" }
+               }
+             },
+             "$other": { ".validate": false }
+           }
+         },
+         "waterballoon": {
+           "$slot": {
+             ".validate": "$slot.matches(/^[0-9]$/) && newData.hasChildren(['v', 'id', 'at', 'r', 'ai', 'md', 'me'])",
+             "v": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 99" },
+             "id": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60" },
+             "at": { ".validate": "newData.val() === now" },
+             "r": { ".validate": "newData.val() === 0 || newData.val() === 1" },
+             "ai": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1" },
+             "md": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1" },
+             "me": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 9" },
+             "p": {
+               "$i": {
+                 ".validate": "$i.matches(/^[0-9]$/)",
+                 "$j": { ".validate": "$j.matches(/^([0-9]|1[0-3])$/) && newData.isString() === ($j === '0') && (newData.isString() ? newData.val().length <= 30 : (newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000000))" }
+               }
+             },
+             "$other": { ".validate": false }
+           }
+         },
+         "$game": { ".validate": "$game.matches(/^(teambattle|turbolap|fpsbattle|zombieoutbreak|snowroyale|waterballoon)$/)" }
         },
         "best": {
           "$game": {

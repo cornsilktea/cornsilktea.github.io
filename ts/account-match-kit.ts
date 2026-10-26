@@ -223,6 +223,12 @@ class AccountMatchStore<R, P extends AccountMatchPlanBase, N, E extends AccountR
     private readonly profile: AccountGameProfile<R, P, N, E, C>
   ) {}
 
+  static forProfile<R, P extends AccountMatchPlanBase, N, E extends AccountRecentHeadEntry, C>(profile: AccountGameProfile<R, P, N, E, C>): AccountMatchStore<R, P, N, E, C> | null {
+    const user = window.PORTAL_USER;
+    if (!user || typeof AccountDatabase !== "function") return null;
+    return new AccountMatchStore<R, P, N, E, C>(new AccountDatabase(user), user, profile);
+  }
+
   loadStats(): Promise<N | null> {
     return this.database.read<unknown>(this.profile.statsPath).then((raw) => (raw ? this.profile.normalizeStats(raw) : null));
   }
@@ -256,5 +262,200 @@ class AccountMatchStore<R, P extends AccountMatchPlanBase, N, E extends AccountR
     }
     await this.database.updateRoot(values);
     return plan.countsStats ? "stats" : "recent";
+  }
+}
+
+class AccountHtml {
+  static esc(value: unknown): string {
+    return String(value == null ? "" : value).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" } as Record<string, string>)[ch]);
+  }
+
+  static percent(part: number, whole: number): string {
+    const ratio = AccountRates.ratio(part, whole);
+    return ratio == null ? "—" : (ratio * 100).toFixed(1) + "%";
+  }
+
+  static average(sum: number, count: number, digits: number): string {
+    return count > 0 ? (sum / count).toFixed(digits) : "—";
+  }
+
+  static record(games: number, wins: number, losses: number): string {
+    return '<div class="asd-record"><b>' + wins + '</b>승 <b>' + losses + '</b>패<small> · ' + games + '판 · 승률 ' + AccountHtml.percent(wins, games) + "</small></div>";
+  }
+
+  static grid(cells: Array<[string, string]>): string {
+    return '<div class="asd-grid">' + cells.map((cell) => "<div><small>" + AccountHtml.esc(cell[0]) + "</small><b>" + cell[1] + "</b></div>").join("") + "</div>";
+  }
+
+  static table(head: string[], rows: string[][]): string {
+    return '<table class="asd-table"><thead><tr>' + head.map((cell) => "<th>" + cell + "</th>").join("") + "</tr></thead><tbody>"
+      + rows.map((row) => "<tr>" + row.map((cell) => "<td>" + cell + "</td>").join("") + "</tr>").join("") + "</tbody></table>";
+  }
+
+  static minutes(seconds: number): string {
+    const whole = Math.max(0, Math.round(seconds));
+    const rest = whole % 60;
+    return Math.floor(whole / 60) + ":" + (rest < 10 ? "0" : "") + rest;
+  }
+
+  static clock(ms: number): string {
+    const whole = Math.max(0, Math.round(ms));
+    const minutes = Math.floor(whole / 60000);
+    const seconds = Math.floor(whole % 60000 / 1000);
+    const hundredths = Math.floor(whole % 1000 / 10);
+    return minutes + ":" + (seconds < 10 ? "0" : "") + seconds + "." + (hundredths < 10 ? "0" : "") + hundredths;
+  }
+}
+
+interface AccountStatsReader<N, E> {
+  loadStats(): Promise<N | null>;
+  loadRecent(): Promise<E[]>;
+}
+
+interface AccountDialogView<N, E extends AccountRecentHeadEntry> {
+  readonly title: string;
+  readonly emptyRecent: string;
+  statsHtml(node: N | null): string;
+  blockBodyHtml(entry: E): string;
+  resultTitle(entry: E): string;
+  resultHtml(entry: E): string;
+}
+
+class AccountStatsDialog<N, E extends AccountRecentHeadEntry> {
+  private static readonly STYLE_ID = "asdStyle";
+  private static readonly STYLE = [
+    ".asd-back{position:fixed;inset:0;z-index:99990;display:flex;align-items:center;justify-content:center;padding:12px;background:rgba(0,0,0,.62);}",
+    ".asd-back[hidden]{display:none;}",
+    ".asd-box{width:100%;max-width:580px;max-height:90vh;overflow:auto;padding:16px;border-radius:10px;border:1px solid rgba(255,255,255,.18);background:rgba(var(--asd-bg),.97);color:#EEF2EE;font-family:var(--sg-font,'Nanum Gothic','Malgun Gothic',sans-serif);line-height:1.5;box-sizing:border-box;}",
+    ".asd-head{display:flex;align-items:center;gap:8px;margin-bottom:10px;}",
+    ".asd-head h2{flex:1;margin:0;font-size:20px;font-weight:800;color:#F4F1E8;}",
+    ".asd-box button{font:inherit;color:inherit;cursor:pointer;}",
+    ".asd-x,.asd-back-btn{min-height:40px;padding:4px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);font-weight:800;}",
+    ".asd-tabs{display:flex;gap:6px;margin-bottom:10px;}",
+    ".asd-tabs button{flex:1;min-height:44px;border-radius:6px;border:2px solid rgba(255,255,255,.25);background:rgba(255,255,255,.05);font-size:16px;font-weight:800;}",
+    ".asd-tabs button.on{background:var(--asd-accent,#D97B4F);border-color:var(--asd-accent,#D97B4F);color:#fff;}",
+    ".asd-msg{min-height:22px;margin:0 0 8px;font-size:14px;color:#CFD8D0;}",
+    ".asd-record{font-size:20px;margin:4px 0 10px;}",
+    ".asd-record b{font-size:40px;color:#F4F1E8;}.asd-record small{font-size:14px;color:#A3B0A6;}",
+    ".asd-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin:0 0 10px;}",
+    ".asd-grid div{padding:8px 10px;border-radius:6px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);}",
+    ".asd-grid small{display:block;font-size:12px;color:#A3B0A6;}.asd-grid b{font-size:19px;color:#F4F1E8;}",
+    ".asd-table{width:100%;border-collapse:collapse;font-size:14px;margin:0 0 10px;}",
+    ".asd-table th,.asd-table td{padding:6px 8px;text-align:left;border-bottom:1px solid rgba(255,255,255,.12);}",
+    ".asd-table th{font-size:12px;color:#A3B0A6;font-weight:700;}",
+    ".asd-sec{margin:12px 0 6px;font-size:15px;font-weight:800;color:#CFD8D0;}",
+    ".asd-list{display:flex;flex-direction:column;gap:8px;}",
+    ".asd-item{display:block;width:100%;text-align:left;padding:10px 12px;border-radius:8px;border:2px solid;color:#fff;}",
+    ".asd-item.win{background:rgba(52,110,200,.34);border-color:#5C93E8;}",
+    ".asd-item.lose{background:rgba(200,70,60,.32);border-color:#E8756A;}",
+    ".asd-item .asd-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:17px;}",
+    ".asd-item .asd-top small{font-size:12px;color:rgba(255,255,255,.75);font-weight:400;}",
+    ".asd-item .asd-body{display:block;margin-top:2px;font-size:14px;color:rgba(255,255,255,.92);}",
+    ".asd-result-mine td{background:rgba(255,255,255,.1);font-weight:800;}"
+  ].join("\n");
+
+  private back: HTMLElement | null = null;
+  private tab: "stats" | "recent" = "stats";
+  private seq = 0;
+  private entries: E[] = [];
+
+  constructor(private readonly open_: () => AccountStatsReader<N, E> | null, private readonly view: AccountDialogView<N, E>) {}
+
+  bindButtons(root: ParentNode = document): void {
+    root.querySelectorAll<HTMLElement>("[data-account-open]").forEach((button) => {
+      button.addEventListener("click", () => this.open(button.getAttribute("data-account-open") === "recent" ? "recent" : "stats"));
+    });
+  }
+
+  open(tab: "stats" | "recent"): void {
+    this.tab = tab;
+    this.ensureDom().hidden = false;
+    this.load();
+  }
+
+  close(): void {
+    if (this.back) this.back.hidden = true;
+  }
+
+  private ensureDom(): HTMLElement {
+    if (this.back) return this.back;
+    if (!document.getElementById(AccountStatsDialog.STYLE_ID)) {
+      const style = document.createElement("style");
+      style.id = AccountStatsDialog.STYLE_ID;
+      style.textContent = AccountStatsDialog.STYLE;
+      document.head.appendChild(style);
+    }
+    const screen = document.querySelector(".st-screen");
+    const computed = screen ? getComputedStyle(screen) : null;
+    const back = document.createElement("div");
+    back.className = "asd-back";
+    back.hidden = true;
+    back.style.setProperty("--asd-bg", (computed && computed.getPropertyValue("--st-bg").trim()) || "14,20,17");
+    back.style.setProperty("--asd-accent", (computed && computed.getPropertyValue("--st-accent").trim()) || "#D97B4F");
+    back.innerHTML = '<div class="asd-box" role="dialog" aria-modal="true"><div class="asd-head"><h2></h2><button type="button" class="asd-x">닫기</button></div>'
+      + '<div class="asd-tabs"><button type="button" data-tab="stats">내 통계</button><button type="button" data-tab="recent">최근 10매치</button></div>'
+      + '<p class="asd-msg"></p><div class="asd-body"></div></div>';
+    (back.querySelector("h2") as HTMLElement).textContent = this.view.title;
+    back.addEventListener("click", (event) => {
+      const target = event.target as HTMLElement;
+      if (target === back || target.closest(".asd-x")) { this.close(); return; }
+      const tabButton = target.closest("[data-tab]");
+      if (tabButton) { this.tab = tabButton.getAttribute("data-tab") === "recent" ? "recent" : "stats"; this.load(); return; }
+      const item = target.closest("[data-recent]");
+      if (item) { this.showResult(Number(item.getAttribute("data-recent"))); return; }
+      if (target.closest(".asd-back-btn")) this.renderRecent();
+    });
+    document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !back.hidden) this.close(); });
+    document.body.appendChild(back);
+    this.back = back;
+    return back;
+  }
+
+  private part(selector: string): HTMLElement {
+    return (this.back as HTMLElement).querySelector(selector) as HTMLElement;
+  }
+
+  private load(): void {
+    const seq = ++this.seq;
+    this.part(".asd-tabs").style.display = "";
+    this.part("h2").textContent = this.view.title;
+    this.part(".asd-body").innerHTML = "";
+    this.part("[data-tab=stats]").classList.toggle("on", this.tab === "stats");
+    this.part("[data-tab=recent]").classList.toggle("on", this.tab === "recent");
+    const stats = this.tab === "stats";
+    if (!window.PORTAL_USER) { this.setMessage(stats ? AccountLoginNotice.STATS_LOGIN_NEEDED : AccountLoginNotice.RECENT_LOGIN_NEEDED); return; }
+    const reader = this.open_();
+    if (!reader) { this.setMessage(AccountLoginNotice.NOT_READY); return; }
+    this.setMessage(AccountLoginNotice.LOADING);
+    if (stats) {
+      reader.loadStats().then((node) => { if (seq === this.seq) { this.setMessage(""); this.part(".asd-body").innerHTML = this.view.statsHtml(node); } })
+        .catch(() => { if (seq === this.seq) this.setMessage(AccountLoginNotice.STATS_FAILED); });
+    } else {
+      reader.loadRecent().then((list) => { if (seq === this.seq) { this.entries = list; this.renderRecent(); } })
+        .catch(() => { if (seq === this.seq) this.setMessage(AccountLoginNotice.RECENT_FAILED); });
+    }
+  }
+
+  private setMessage(text: string): void {
+    this.part(".asd-msg").textContent = text;
+  }
+
+  private renderRecent(): void {
+    this.part(".asd-tabs").style.display = "";
+    this.part("h2").textContent = this.view.title;
+    this.setMessage(this.entries.length ? "최근 " + this.entries.length + "경기 · 최신순 · 누르면 그 경기 결과가 열려요" : this.view.emptyRecent);
+    const list = RecentBlockList.html(this.entries, (entry) => '<span class="asd-body">' + this.view.blockBodyHtml(entry) + "</span>")
+      .replace(/class="rmItem (win|lose)"/g, 'class="asd-item $1"')
+      .replace(/<span class="rmHead">/g, '<span class="asd-top">');
+    this.part(".asd-body").innerHTML = '<div class="asd-list">' + list + "</div>";
+  }
+
+  private showResult(index: number): void {
+    const entry = this.entries[index];
+    if (!entry) return;
+    this.part(".asd-tabs").style.display = "none";
+    this.part("h2").textContent = this.view.resultTitle(entry);
+    this.setMessage((entry.win ? "내 결과: 승리" : "내 결과: 패배") + " · " + RecentBlockList.whenText(entry.at));
+    this.part(".asd-body").innerHTML = this.view.resultHtml(entry) + '<button type="button" class="asd-back-btn">← 최근 매치 목록</button>';
   }
 }

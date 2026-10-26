@@ -101,7 +101,7 @@ class WbHostLink {
     writeEnd() {
         this.endWritten = true;
         const e = this.engine;
-        const end = { match: this.match.id, ranks: e.ranks.slice(), outTicks: e.players.map((p) => p.outTick), at: Date.now() };
+        const end = { match: this.match.id, ranks: e.ranks.slice(), outTicks: e.players.map((p) => p.outTick), at: Date.now(), stats: e.players.map((p) => [p.kills, p.traps, p.rescues, p.boxes, p.selfKills]), endTick: e.tick };
         this.session.ref.update({ end, status: "ended" });
     }
     write(name, text) {
@@ -333,6 +333,13 @@ class WbMirror {
         e.ranks = end.ranks.slice();
         end.outTicks.forEach((t, k) => { const p = e.players[k]; if (p)
             p.outTick = t; });
+        (end.stats || []).forEach((s, k) => { const p = e.players[k]; if (p) {
+            p.kills = s[0];
+            p.traps = s[1];
+            p.rescues = s[2];
+            p.boxes = s[3];
+            p.selfKills = s[4];
+        } });
     }
 }
 WbMirror.GHOST_MS = 400;

@@ -107,6 +107,7 @@
   .st-joinrow { display: flex; gap: 10px; margin-top: 10px; }
   .st-joinrow input { flex: 1 1 auto; min-width: 0; text-align: center; letter-spacing: .3em; }
   .st-joinrow .st-btn { flex: 0 0 34%; margin: 0; }
+  .st-joinrow.account .st-btn { flex: 1 1 0; font-size: 17px; }
   .st-btn.blue { background: #4C8DFF; border-color: #4C8DFF; color: #fff; }
   #overlay.st-screen .st-msg { color: #FFB08C; min-height: 20px; margin: 6px 0 0; font-weight: 800; }
   #overlay.st-screen .card .btn:active { transform: none; filter: brightness(.9); }
@@ -362,6 +363,10 @@
         <input type="text" id="joinCode" inputmode="numeric" pattern="[0-9]*" maxlength="5" autocomplete="off" placeholder="방 코드 5자리">
         <button type="button" class="st-btn blue" id="btnJoin">참여하기</button>
       </div>
+      <div class="st-joinrow account">
+        <button type="button" class="st-btn" data-account-open="recent">📋 최근 10매치</button>
+        <button type="button" class="st-btn" data-account-open="stats">📊 내 통계</button>
+      </div>
       <div class="hello">내 닉네임: <b id="helloNick"></b> <button type="button" class="mini" data-maker-open data-nick-setting>✏️ 닉네임 설정</button></div>
       <div class="st-msg msg" id="bStartMsg"></div>
       <div id="loadNote"></div>
@@ -493,6 +498,8 @@
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="character-maker.js?v=20261026a"></script>
 <script charset="utf-8" src="match-kit.js?v=20261022w"></script>
+<script charset="utf-8" src="account-match-kit.js?v=20261026c"></script>
+<script charset="utf-8" src="24.turbo-lap-stats.js?v=20261026b"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
 <script type="module">
@@ -5509,7 +5516,7 @@ class TurboRandomMatch {
   recordBeforeLeave() {
     const ticket = this.ticket();
     if (!ticket) return;
-    if (this.forfeits()) { this.flow.matchEnded({ result: "lose", rivals: this.racingRivals() }); return; }
+    if (this.forfeits()) { turboAccount.record(this.accountReport(ticket, standings().map(r => Object.assign({ nick: nickOf(r.id), team: (BT.players[r.id] || {}).team }, r)), "lose")); this.flow.matchEnded({ result: "lose", rivals: this.racingRivals() }); return; }
     if (BT.status === "ended" && cardNow === "bdone") { this.settleFor = this.settledFor = ticket.matchId; renderResult(); }
   }
   decorateResult(rows, quitWinner) {
@@ -5525,8 +5532,14 @@ class TurboRandomMatch {
       return;
     }
     if (this.settledFor !== ticket.matchId) return;
-    const winner = quitWinner || (rows[0].fin ? rows[0] : null), mine = SIDES[ticket.side];
-    this.flow.matchEnded({ result: !winner ? "draw" : winner.team === mine ? "win" : "lose", rivals: this.resultRivals(rows, mine) }, () => { $("bDoneHint").textContent = this.flow.endHint(); });
+    const winner = quitWinner || (rows[0].fin ? rows[0] : null), mine = SIDES[ticket.side], result = !winner ? "draw" : winner.team === mine ? "win" : "lose";
+    turboAccount.record(this.accountReport(ticket, rows, result));
+    this.flow.matchEnded({ result, rivals: this.resultRivals(rows, mine) }, () => { $("bDoneHint").textContent = this.flow.endHint(); });
+  }
+  accountReport(ticket, rows, result) {
+    const players = BT.players;
+    return { matchId: ticket.matchId, course: BT.course, result, myIndex: rows.findIndex(x => x.id === BT.myId),
+      rows: rows.map(x => ({ nick: x.nick, side: SIDES.indexOf(x.team), fin: x.fin || 0, prog: +x.prog || 0, car: (players[x.id] || {}).car || "", bot: isBot(x.id) })) };
   }
   static rivalsOf(id, nick) { return !id ? undefined : id.indexOf("bot") === 0 ? [] : [nick]; }
   resultRivals(rows, mine) {
@@ -5539,6 +5552,8 @@ class TurboRandomMatch {
   }
 }
 const turboRandom = new TurboRandomMatch();
+const turboAccount = new TurboLapAccount(carLabel);
+turboAccount.bind();
 
 function battleFrame(dt) {
   if (!BT.ref) return;

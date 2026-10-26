@@ -549,6 +549,7 @@ class WbGame {
         this.session = null;
         this.view = null;
         this.practice = false;
+        this.account = new WbAccount();
         this.holding = false;
         this.matchId = 0;
         this.lastMs = 0;
@@ -598,6 +599,7 @@ class WbGame {
     bindMenus() {
         const on = (id, fn) => WbDom.el(id).addEventListener("click", fn);
         on("btnSolo", () => { this.readSoloForm(); this.startSolo(); });
+        this.account.bind();
         on("btnCreateSolo", () => this.createRoom("solo"));
         on("btnCreateTeam", () => this.createRoom("team"));
         on("btnRandomSolo", () => this.createParty("solo"));
@@ -692,9 +694,25 @@ class WbGame {
     }
     forfeitApplies() {
         const flow = this.random();
-        return !!flow && flow.forfeitApplies(this.matchProgress());
+        return (!!flow && flow.forfeitApplies(this.matchProgress())) || this.onlineForfeitApplies();
+    }
+    onlineForfeitApplies() {
+        const view = this.view;
+        return !!this.session && !!view && this.session.status === "playing" && view.driver.myIndex >= 0 && this.matchProgress() >= AccountForfeit.AT;
+    }
+    matchKey(session, match) {
+        const flow = this.random(), ticket = flow ? flow.ticket() : null;
+        return ticket ? ticket.matchId : session.code + "_" + match.id + "_" + match.seed;
+    }
+    recordForfeit() {
+        const session = this.session, view = this.view;
+        const match = session ? session.value("match") : null;
+        if (!session || !view || !match || !this.onlineForfeitApplies())
+            return;
+        this.account.record(WbReportBuilder.fromEngine(this.matchKey(session, match), view.driver.engine, view.driver.myIndex, this.matchProgress()));
     }
     forfeitIfLate() {
+        this.recordForfeit();
         const flow = this.random();
         if (flow)
             flow.forfeitIfLate(this.matchProgress());
@@ -798,6 +816,8 @@ class WbGame {
     }
     reportEnd(session) {
         const flow = this.random(), match = session.value("match"), end = session.value("end");
+        if (match && end && end.match === match.id)
+            this.account.record(WbReportBuilder.fromEnd(this.matchKey(session, match), match, end, this.myId));
         const ticket = flow ? flow.ticket() : null;
         if (!flow || !ticket || !match || !end || end.match !== match.id)
             return;

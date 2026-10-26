@@ -47,6 +47,7 @@ type SnEvent =
 
 class SnBalance {
   static readonly MAX_HP = 100;
+  static readonly ASSIST_WINDOW = 5;
   static readonly SPEED = 4;
   static readonly ICE_PACE = 0.5;
   static readonly RADIUS = 0.4;
@@ -172,7 +173,8 @@ class SnPlayer {
   buildingWall = -1;
   knockX = 0; knockZ = 0; knockLeft = 0;
   reviveTarget = -1; reviveProgress = 0;
-  kills = 0; dealt = 0; collected = 0; walls = 0;
+  kills = 0; dealt = 0; collected = 0; walls = 0; assists = 0;
+  readonly hurtBy = new Map<number, number>();
   downAt = -1; killedBy = -1;
   lastHitAt = -1; lastHitFromX = 0; lastHitFromZ = 0;
   landAt = -1; spotX = 0; spotZ = 0; skyX = 0; skyZ = 0;
@@ -553,7 +555,7 @@ class SnCombat {
     target.hp -= v;
     target.lastHitAt = e.time;
     target.reviveTarget = -1; target.reviveProgress = 0;
-    if (attacker) { attacker.dealt += v; target.lastHitFromX = attacker.x; target.lastHitFromZ = attacker.z; }
+    if (attacker) { attacker.dealt += v; target.lastHitFromX = attacker.x; target.lastHitFromZ = attacker.z; if (attacker.team !== target.team) target.hurtBy.set(attacker.num, e.time); }
     e.emit({ t: "hit", to: target.num, by: attacker ? attacker.num : -1, v, storm: !attacker });
     if (target.hp <= 0) e.knockDown(target, attacker);
     return v;
@@ -1136,6 +1138,7 @@ class SnEngine {
     p.knockLeft = 0;
     p.reviveTarget = -1; p.reviveProgress = 0;
     if (by && by.team !== p.team) by.kills++;
+    this.creditAssists(p, by);
     if (p.building(this.time)) {
       const w = this.walls.find((x) => x.id === p.buildingWall);
       if (w) this.removeWall(w, false);
@@ -1145,6 +1148,13 @@ class SnEngine {
     this.emit({ t: "down", id: p.num, by: p.killedBy });
     for (const q of this.players) if (q.reviveTarget === p.num) { q.reviveTarget = -1; q.reviveProgress = 0; }
     this.checkTeam(this.teams[p.team]);
+  }
+
+  private creditAssists(p: SnPlayer, by: SnPlayer | null): void {
+    if (by && by.team !== p.team) {
+      p.hurtBy.forEach((at, num) => { if (num !== by.num && this.time - at <= SnBalance.ASSIST_WINDOW) this.players[num].assists++; });
+    }
+    p.hurtBy.clear();
   }
 
   disconnect(num: number): void {

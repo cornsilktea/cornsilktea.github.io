@@ -548,6 +548,7 @@ class WbGame {
   private session: RkSession<WbPlayerRecord> | null = null;
   private view: WbMatchView | null = null;
   private practice = false;
+  private readonly account = new WbAccount();
   private holding = false;
   private matchId = 0;
   private lastMs = 0;
@@ -594,6 +595,7 @@ class WbGame {
   private bindMenus(): void {
     const on = (id: string, fn: () => void): void => WbDom.el(id).addEventListener("click", fn);
     on("btnSolo", () => { this.readSoloForm(); this.startSolo(); });
+    this.account.bind();
     on("btnCreateSolo", () => this.createRoom("solo"));
     on("btnCreateTeam", () => this.createRoom("team"));
     on("btnRandomSolo", () => this.createParty("solo"));
@@ -679,10 +681,28 @@ class WbGame {
 
   private forfeitApplies(): boolean {
     const flow = this.random();
-    return !!flow && flow.forfeitApplies(this.matchProgress());
+    return (!!flow && flow.forfeitApplies(this.matchProgress())) || this.onlineForfeitApplies();
+  }
+
+  private onlineForfeitApplies(): boolean {
+    const view = this.view;
+    return !!this.session && !!view && this.session.status === "playing" && view.driver.myIndex >= 0 && this.matchProgress() >= AccountForfeit.AT;
+  }
+
+  private matchKey(session: RkSession<WbPlayerRecord>, match: WbMatchRecord): string {
+    const flow = this.random(), ticket = flow ? flow.ticket() : null;
+    return ticket ? ticket.matchId : session.code + "_" + match.id + "_" + match.seed;
+  }
+
+  private recordForfeit(): void {
+    const session = this.session, view = this.view;
+    const match = session ? session.value<WbMatchRecord>("match") : null;
+    if (!session || !view || !match || !this.onlineForfeitApplies()) return;
+    this.account.record(WbReportBuilder.fromEngine(this.matchKey(session, match), view.driver.engine, view.driver.myIndex, this.matchProgress()));
   }
 
   private forfeitIfLate(): void {
+    this.recordForfeit();
     const flow = this.random();
     if (flow) flow.forfeitIfLate(this.matchProgress());
   }
@@ -777,6 +797,7 @@ class WbGame {
 
   private reportEnd(session: RkSession<WbPlayerRecord>): void {
     const flow = this.random(), match = session.value<WbMatchRecord>("match"), end = session.value<WbEndRecord>("end");
+    if (match && end && end.match === match.id) this.account.record(WbReportBuilder.fromEnd(this.matchKey(session, match), match, end, this.myId));
     const ticket = flow ? flow.ticket() : null;
     if (!flow || !ticket || !match || !end || end.match !== match.id) return;
     const index = match.teams.flatMap((t) => t.members).findIndex((m) => m.id === this.myId);

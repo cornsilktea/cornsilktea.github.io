@@ -1,6 +1,6 @@
 interface WbPlayerRecord extends RkPlayerRecord {}
 interface WbMatchRecord { id: number; seed: number; mode: WbMode; map: string; teams: WbRosterTeam[]; startAt: number }
-interface WbEndRecord { match: number; ranks: number[]; outTicks: number[]; at: number }
+interface WbEndRecord { match: number; ranks: number[]; outTicks: number[]; at: number; stats?: number[][]; endTick?: number }
 interface WbRemoteState { x: number; z: number; face: number; move: number; alt: number; kPress: number; match: number }
 type WbStampedEvent = [number, WbEvent];
 interface WbEventBatch { s: number; b: Array<[number, WbStampedEvent[]]> }
@@ -97,7 +97,7 @@ class WbHostLink {
   private writeEnd(): void {
     this.endWritten = true;
     const e = this.engine;
-    const end: WbEndRecord = { match: this.match.id, ranks: e.ranks.slice(), outTicks: e.players.map((p) => p.outTick), at: Date.now() };
+    const end: WbEndRecord = { match: this.match.id, ranks: e.ranks.slice(), outTicks: e.players.map((p) => p.outTick), at: Date.now(), stats: e.players.map((p) => [p.kills, p.traps, p.rescues, p.boxes, p.selfKills]), endTick: e.tick };
     this.session.ref.update({ end, status: "ended" });
   }
 
@@ -269,6 +269,7 @@ class WbMirror implements WbSceneSource {
     e.ended = true;
     e.ranks = end.ranks.slice();
     end.outTicks.forEach((t, k) => { const p = e.players[k]; if (p) p.outTick = t; });
+    (end.stats || []).forEach((s, k) => { const p = e.players[k]; if (p) { p.kills = s[0]; p.traps = s[1]; p.rescues = s[2]; p.boxes = s[3]; p.selfKills = s[4]; } });
   }
 }
 
