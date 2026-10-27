@@ -152,6 +152,9 @@
     background: var(--sg-panel); border-radius: var(--sg-radius); padding: var(--sg-s6); width: 100%; max-width: 1040px;
     max-height: 92vh; overflow: auto; cursor: default; box-shadow: var(--sg-shadow-lg);
   }
+  /* 제어판 안의 표(반별 순위·렉 진단)는 창 높이에 갇히지 않고 끝까지 펼친다 — 페이지 스크롤과 표 스크롤이 겹치지 않게(2026-10-27 선생님 요청) */
+  .rank-divider { margin: var(--sg-s4) 0; border: 0; border-top: 1px solid var(--sg-line-mid); }
+  .panel .stats-box { max-height: none; overflow-x: auto; overflow-y: visible; }
   .stats-box h3 { margin: 0 0 var(--sg-s2); font-size: var(--sg-fs-xl); font-weight: 800; line-height: var(--sg-lh-tight); }
   .stats-box table { width: 100%; border-collapse: separate; border-spacing: 0; margin: var(--sg-s4) 0; font-size: var(--sg-fs-md); font-variant-numeric: tabular-nums; }
   .stats-box th, .stats-box td { padding: var(--sg-s2) var(--sg-s3); border-bottom: 1px solid var(--sg-line); text-align: right; white-space: nowrap; }
@@ -421,24 +424,20 @@
       </div>
     </div>
 
-    <!-- 게임별 반별 순위(2026-10-27, 예전 "팀 배틀 반별 승률"을 넓힘): 학생 기기가 경기 끝에 자기 요약 한 줄을 씁니다
+    <!-- 반 별 통계(2026-10-27 이름 바꿈, 예전 "게임별 반별 순위", 예전 "팀 배틀 반별 승률"을 넓힘): 학생 기기가 경기 끝에 자기 요약 한 줄을 씁니다
          (팀 배틀은 classStats/<반>/<uid>, 다른 게임은 gameRanks/<게임>/<반>/<uid>, 로그인한 학생만).
          게임과 반 버튼을 누를 때 그 한 곳만 한 번 읽습니다(폴링 없음).
          반은 학생이 반 링크로 처음 로그인할 때 profile.cls 에 한 번 적히고, 반 링크로 들어온 적이 없으면 '미분류'입니다. -->
     <div class="panel" id="rankPanel">
-      <h2>게임별 반별 순위</h2>
+      <h2>반 별 통계</h2>
       <div class="actions" style="margin-top:0">
         <button id="rankToggle" type="button" aria-expanded="false">펼치기</button>
       </div>
       <div id="rankBody" hidden>
-        <p class="hint">
-          학생 계정(구글 로그인)으로 치른 경기만 셉니다. 랜덤 매칭은 경기 중에 나가면 패배, 상대가 나가서 이긴 판은 승리입니다.
-          최소 판 수 기준은 없으니 <b>판 수</b> 열을 보고 걸러 주세요. 열 제목을 누르면 정렬이 바뀝니다.
-          학생의 반이 틀렸으면 <b>반 바꾸기</b>로 고칩니다(모든 게임의 반별 요약이 함께 옮겨집니다).
-        </p>
         <div class="class-grid" id="rankGames"></div>
-        <p class="hint" id="rankNote"></p>
+        <hr class="rank-divider">
         <div class="class-grid" id="rankGrid"></div>
+        <div class="actions"><button id="rankRefresh" type="button" disabled>🔄 새로고침</button></div>
         <p class="msg" id="rankMsg"></p>
         <div id="rankTable" class="stats-box"></div>
       </div>
@@ -954,7 +953,7 @@ function el(tag, cls, text) {
   return n;
 }
 
-/* ---------------- 게임별 반별 순위 ----------------
+/* ---------------- 반 별 통계(예전 이름: 게임별 반별 순위) ----------------
    학생 기기가 경기 끝에 자기 요약 한 줄을 쓰고(로그인한 학생만, 교사 계정만 읽기), 게임과 반을 고를 때 그 한 곳만 한 번 읽는다(폴링 없음).
    - 팀 배틀(30): classStats/<반|none>/<uid> = { n, g, w, m }  — 예전부터 쓰던 곳(MVP 포함)
    - 그 밖의 게임: gameRanks/<게임키>/<반|none>/<uid> = { n, g, w, x }  — x 의 뜻은 게임마다 다르다(RankGame.extra, 2026-10-27)
@@ -992,9 +991,9 @@ class TeamBattleRankGame extends RankGame {
 class ClassRankPanel {
   static NONE = "none";
   static GAMES = [
-    new TeamBattleRankGame("teambattle", "팀 배틀(30)", { label: "MVP 수", rate: "MVP율" }, "AI 없이 치른 대회모드 경기(랜덤 매칭 포함)만 셉니다."),
     new RankGame("turbolap", "터보 랩(24)", { label: "완주 수" }, "랜덤 매칭 1대1, 상대가 사람이었던 판만 셉니다."),
     new RankGame("fpsbattle", "서바이벌(25)", { label: "처치 합계" }, "팀 대전(방 만들기·코드 입장·랜덤 매칭) 중 AI 없는 판만 셉니다."),
+    new TeamBattleRankGame("teambattle", "팀 배틀(30)", { label: "MVP 수", rate: "MVP율" }, "AI 없이 치른 대회모드 경기(랜덤 매칭 포함)만 셉니다."),
     new RankGame("zombieoutbreak", "좀비(31)", { label: "감염시킨 수" }, "온라인 방(랜덤 매칭 포함) 중 AI 없는 판만 셉니다. 승 = 내 편이 이긴 판."),
     new RankGame("minigames", "미니게임(32)", { label: "3위 안" }, "랜덤 매칭에서 사람과 함께한 판만 셉니다. 승 = 우리 팀이 최종 1등."),
     new RankGame("volleyball", "배구(34)", null, "랜덤 매칭에서 사람 상대와 한 판만 셉니다."),
@@ -1030,12 +1029,13 @@ class ClassRankPanel {
       $("rankToggle").setAttribute("aria-expanded", open ? "true" : "false");
       if (open) this.renderPickers();
     });
+    $("rankRefresh").addEventListener("click", () => { if (this.cls) this.load(this.cls); });
   }
 
   renderPickers() {
     this.fillGrid($("rankGames"), ClassRankPanel.GAMES.map((g) => ({ id: g.key, label: g.title })), (id) => this.pickGame(id), this.game.key);
     this.fillGrid($("rankGrid"), ClassRankPanel.classes(), (id) => this.load(id), this.cls);
-    $("rankNote").textContent = this.game.note;
+    $("rankRefresh").disabled = !this.cls;
   }
 
   fillGrid(grid, items, onPick, selected) {
@@ -2072,7 +2072,7 @@ $("recToggle").addEventListener("click", () => {
   if (open && records.length === 0) loadRecords();
 });
 
-/* 게임별 반별 순위도 접어 두고, 펼친 뒤 게임·반 버튼을 눌러야 그 한 곳만 읽습니다 */
+/* 반 별 통계도 접어 두고, 펼친 뒤 게임·반 버튼을 눌러야 그 한 곳만 읽습니다 */
 new ClassRankPanel().bind();
 
 window.__portalBooted = true;

@@ -10,7 +10,7 @@
 //    일반 방을 실제로 만드는 일은 게임마다 다르므로 게임이 MkRoomMaker 를 넘긴다.
 //  - 대기열은 on('value') 구독으로만 본다(폴링 없음). 3초 대기는 기기 안 타이머로 다시 계산만 한다.
 // 이 파일은 화면과 무관한 부분(Node 시뮬레이터 tools/match-sim.js 가 그대로 불러 검사)과
-// 계정별 연승(MkPersonalStreak)·연승 표시(MkStreakButton)로 나뉜다. 모양은 theme.css 의 .mk-* .
+// 계정별 연승(MkPersonalStreak)·연승 표시(MkStreakBadge)로 나뉜다. 모양은 theme.css 의 .mk-* .
 
 type MkResult = "win" | "draw" | "lose";
 
@@ -22,6 +22,13 @@ interface MkMember {
   nick: string;
   joinedAt: number;
   look?: CharacterLook | null;
+  // 계정 누적 승패(사람과 한 랜덤 매칭). 승률 구간 매칭(MkWinBandVersusMatcher)을 쓰는 게임만 넣는다.
+  rate?: MkWinRate | null;
+}
+
+interface MkWinRate {
+  g: number;
+  w: number;
 }
 
 interface MkSearch {
@@ -199,6 +206,11 @@ abstract class MkMatcher {
 
   protected abstract sides(count: number, random: () => number): number[];
 
+  // 두 항목이 서로 만나도 되는지. 기본은 누구와도 만난다(승률 구간 매칭이 덮어씀).
+  canMeet(_a: MkQueueEntry, _b: MkQueueEntry): boolean {
+    return true;
+  }
+
   get rematchWaitMs(): number {
     return this.timing.rematchWaitMs ?? (MkMatcher.TIMING.rematchWaitMs as number);
   }
@@ -273,7 +285,7 @@ abstract class MkMatcher {
 
   // 지난 판을 AI 와 한 팀(owed)이 맨 앞 — 팀 수가 홀수일 때 AI 와 하는 차례가 한 팀에 몰리지 않고 돌아가게.
   // 나머지는 먼저 온 순서.
-  private ready(entries: MkQueueMap | null, now: number): Array<[string, MkQueueEntry]> {
+  protected ready(entries: MkQueueMap | null, now: number): Array<[string, MkQueueEntry]> {
     return Object.keys(entries || {})
       .map((code) => [code, (entries as MkQueueMap)[code]] as [string, MkQueueEntry])
       .filter(([, entry]) => entry && entry.size > 0 && entry.at + this.timing.settleMs <= now && this.isFree(entry, now))
@@ -300,6 +312,72 @@ class MkVersusMatcher extends MkMatcher {
 
   protected sides(count: number, random: () => number): number[] {
     return random() < 0.5 ? [0, 1] : [1, 0];
+  }
+}
+
+// 승률이 크게 다른 학생끼리 만나지 않게 한다(2026-10-27 선생님 요청, 24번):
+// 승률 30% 미만은 승률 50% 미만인 상대만, 70% 이상은 50% 이상인 상대만 기다린다(양쪽 모두 만족해야 묶임).
+// 판 수가 적으면 승률이 한두 판에 크게 흔들리므로 MIN_GAMES 판부터 적용하고, 기록이 없는 쪽(로그인 안 함·새 학생)은 누구와도 만난다.
+// 끝내 맞는 상대가 없으면 기존 AI 대체(aiFallbackMs)가 받아 준다. 팀 항목은 팀원 승패를 합쳐 본다.
+class MkWinBand {
+  static readonly LOW = 0.3;
+  static readonly HIGH = 0.7;
+  static readonly MID = 0.5;
+  static readonly MIN_GAMES = 5;
+
+  static rateOf(entry: MkQueueEntry): number | null {
+    let games = 0, wins = 0;
+    Object.keys(entry.people || {}).forEach((id) => {
+      const rate = entry.people[id].rate;
+      if (!rate) return;
+      games += Number(rate.g) || 0;
+      wins += Number(rate.w) || 0;
+    });
+    return games >= MkWinBand.MIN_GAMES ? wins / games : null;
+  }
+
+  static accepts(own: number | null, other: number | null): boolean {
+    if (own === null || other === null) return true;
+    if (own < MkWinBand.LOW) return other < MkWinBand.MID;
+    if (own >= MkWinBand.HIGH) return other >= MkWinBand.MID;
+    return true;
+  }
+
+  static fits(a: MkQueueEntry, b: MkQueueEntry): boolean {
+    const rateA = MkWinBand.rateOf(a), rateB = MkWinBand.rateOf(b);
+    return MkWinBand.accepts(rateA, rateB) && MkWinBand.accepts(rateB, rateA);
+  }
+
+  // Firebase 는 undefined 를 못 쓰므로 없는 값은 null 로, 숫자는 0 이상 정수로.
+  static clean(rate: MkWinRate | null | undefined): MkWinRate | null {
+    if (!rate) return null;
+    const g = Math.max(0, Math.floor(Number(rate.g) || 0));
+    return { g, w: Math.min(g, Math.max(0, Math.floor(Number(rate.w) || 0))) };
+  }
+}
+
+// 1대1·팀 대 팀 묶기에 승률 구간을 더한 것. 맞는 상대가 하나도 없는 항목은 "준비된 항목"에서 빼서
+// 그 항목이 맨 앞에 있어도 다른 학생들끼리의 묶기를 막지 않게 한다(묶는 사람은 준비된 항목 중 맨 앞).
+class MkWinBandVersusMatcher extends MkVersusMatcher {
+  canMeet(a: MkQueueEntry, b: MkQueueEntry): boolean {
+    return MkWinBand.fits(a, b);
+  }
+
+  hasCompany(entries: MkQueueMap | null, now: number, myCode: string): boolean {
+    const mine = entries ? entries[myCode] : null;
+    if (!mine) return super.hasCompany(entries, now, myCode);
+    return this.ready(entries, now).some(([code, entry]) => code !== myCode && this.canMeet(mine, entry));
+  }
+
+  protected ready(entries: MkQueueMap | null, now: number): Array<[string, MkQueueEntry]> {
+    const all = super.ready(entries, now);
+    return all.filter((item) => all.some((other) => other !== item && this.canMeet(item[1], other[1])));
+  }
+
+  protected pick(ready: Array<[string, MkQueueEntry]>, context: MkPickContext): Array<[string, MkQueueEntry]> | null {
+    if (!ready.length) return null;
+    const first = ready[0];
+    return super.pick([first].concat(ready.slice(1).filter((other) => this.canMeet(first[1], other[1]))), context);
   }
 }
 
@@ -549,8 +627,8 @@ class MkParty {
     this.ref.child("bots").set(allowed);
   }
 
-  updateMe(member: Pick<MkMember, "nick" | "look">): void {
-    if (this.record && this.record.members && this.record.members[this.myId]) this.ref.child("members/" + this.myId).update({ nick: member.nick, look: member.look || null });
+  updateMe(member: Pick<MkMember, "nick" | "look" | "rate">): void {
+    if (this.record && this.record.members && this.record.members[this.myId]) this.ref.child("members/" + this.myId).update({ nick: member.nick, look: member.look || null, rate: MkWinBand.clean(member.rate) });
   }
 
   markSearching(since: number | null): Promise<void> {
@@ -735,11 +813,16 @@ class MkQueue {
     private readonly random: () => number = Math.random
   ) {}
 
-  async enter(party: MkParty): Promise<void> {
+  // me: 내 기기가 지금 아는 내 정보(승률처럼 팀 대기실 기록보다 새로울 수 있는 값)를 내 자리에 덮어쓴다.
+  async enter(party: MkParty, me: MkMember | null = null): Promise<void> {
     const since = this.clock.now();
     this.since = since;
     const people: Record<string, MkMember> = {};
-    party.members().forEach(([id, member]) => { people[id] = { nick: member.nick, joinedAt: member.joinedAt, look: member.look || null }; });
+    party.members().forEach(([id, member]) => {
+      people[id] = { nick: member.nick, joinedAt: member.joinedAt, look: member.look || null };
+      const rate = MkWinBand.clean(id === party.myId && me && me.rate !== undefined ? me.rate : member.rate);
+      if (rate) people[id].rate = rate;
+    });
     const last = party.lastMatch();
     const entry: MkQueueEntry = { leader: party.myId, people, bots: party.bots(), size: party.size(), at: since, claim: null };
     if (last.rivals && last.rivals.length) entry.avoid = last.rivals.slice();
@@ -788,9 +871,9 @@ class MkQueue {
   // 누가 묶어 가는 중(차지된) 항목은 곧 빠지므로 세지 않는다. 대기열을 아직 못 받았으면 null.
   othersWaiting(myCode: string): number | null {
     if (!this.active || !this.entries) return null;
-    const entries = this.entries, now = this.clock.now();
+    const entries = this.entries, now = this.clock.now(), mine = entries[myCode];
     return Object.keys(entries)
-      .filter((code) => code !== myCode && !!entries[code] && entries[code].size > 0 && this.matcher.isFree(entries[code], now)).length;
+      .filter((code) => code !== myCode && !!entries[code] && entries[code].size > 0 && this.matcher.isFree(entries[code], now) && (!mine || this.matcher.canMeet(mine, entries[code]))).length;
   }
 
   stop(): void {
@@ -1082,13 +1165,13 @@ class MkPartyPanel {
   private readonly notice: HTMLDivElement;
   private readonly matchButton: HTMLButtonElement;
   private readonly hint: HTMLDivElement;
-  private readonly streak: MkStreakButton;
+  private readonly streak: MkStreakBadge;
   private readonly statsButton: HTMLButtonElement;
   private streakCount = 0;
 
   constructor(screen: HTMLElement, mount: HTMLElement, private readonly options: MkFlowOptions) {
     const openStats = () => { if (options.stats) options.stats.open(); };
-    this.streak = new MkStreakButton(openStats);
+    this.streak = new MkStreakBadge();
     this.statsButton = MkPartyPanel.button("mk-stats", "📊 내 통계", openStats);
     this.statsButton.hidden = !options.stats || !!(options.headExtra && options.headExtra.querySelector("[data-account-open]"));
     this.head = document.createElement("h2");
@@ -1114,8 +1197,10 @@ class MkPartyPanel {
     this.aiNowButton.hidden = true;
     this.hint = document.createElement("div");
     this.hint.className = "st-hint mk-hint";
-    const leave = MkPartyPanel.button("st-btn mk-leave", options.solo ? "나가기" : "팀 나가기", () => this.onLeave());
+    // 30번 대기실처럼 나가기는 카드 오른쪽 위 작은 빨간 버튼(2026-10-27 선생님 요청, 모든 랜덤 매칭 대기실 공통).
+    const leave = MkPartyPanel.button("mk-leave", options.solo ? "나가기" : "팀 나가기", () => this.onLeave());
     mount.textContent = "";
+    mount.classList.add("mk-panel");
     const top = document.createElement("div");
     top.className = "mk-top";
     top.append(this.head);
@@ -1123,7 +1208,7 @@ class MkPartyPanel {
     const buttons = document.createElement("div");
     buttons.className = "st-row mk-buttons";
     buttons.append(this.aiNowButton, this.matchButton);
-    mount.append(top, this.seats, this.notice, this.crowd, buttons, this.hint, leave);
+    mount.append(leave, top, this.seats, this.notice, this.crowd, buttons, this.hint);
   }
 
   setNotice(text: string): void {
@@ -1152,12 +1237,14 @@ class MkPartyPanel {
     this.code.textContent = party.code;
     this.streak.render(this.streakCount);
     this.seats.textContent = "";
-    const title = document.createElement("h3");
-    title.textContent = this.options.solo ? "나" : "우리 팀";
-    this.seats.appendChild(title);
+    if (!this.options.solo) {
+      const title = document.createElement("h3");
+      title.textContent = "우리 팀";
+      this.seats.appendChild(title);
+    }
     const leaderId = party.record ? party.record.leaderId : "";
     party.members().forEach(([id, member]) => {
-      const tags = [id === leaderId && !this.options.solo ? "팀장" : "", id === party.myId ? "나" : ""].filter(Boolean).join(" ");
+      const tags = id === leaderId && !this.options.solo ? "팀장" : "";
       this.seats.appendChild(MkPartyPanel.seat("div", "mk-seat" + (id === party.myId ? " me" : ""), member.nick, tags, ""));
     });
     const editable = leader && !searching;
@@ -1443,7 +1530,7 @@ class MkRandomFlow {
         this.queue = new MkQueue(this.database, this.clock, this.paths, this.options.matcher, this.hooks);
         this.queue.onError = (message) => this.panel.setNotice(message);
         this.queue.onEntries = () => this.render();
-        await this.queue.enter(party);
+        await this.queue.enter(party, this.hooks.member());
       }
     } catch (error) {
       this.panel.setNotice("매칭 서버에 연결하지 못했어요. (인터넷·데이터베이스 규칙 확인)");
@@ -1578,14 +1665,13 @@ class MkPartyMemory {
 }
 
 // 연승 표시 버튼(🔥 n연승 / 연승 없음). 누르면 게임의 계정 통계 창을 연다.
-class MkStreakButton {
-  readonly element: HTMLButtonElement;
+// 내 계정의 랜덤 매칭 연승(MkPersonalStreak, 팀 대기실 전적이 아님)을 보여 주기만 한다. 누르는 기능은 없앴다(2026-10-27 선생님 요청).
+class MkStreakBadge {
+  readonly element: HTMLSpanElement;
 
-  constructor(onClick: () => void) {
-    this.element = document.createElement("button");
-    this.element.type = "button";
+  constructor() {
+    this.element = document.createElement("span");
     this.element.className = "mk-streak";
-    this.element.addEventListener("click", () => { this.element.blur(); onClick(); });
     this.render(0);
   }
 

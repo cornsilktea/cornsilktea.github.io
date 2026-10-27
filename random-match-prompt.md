@@ -143,7 +143,7 @@
   | `MkVersusMatcher(팀정원)` / `MkFreeForAllMatcher(팀정원, 방정원)` | 묶는 규칙(2편 / 여럿이 한 방). 게임별로 더 다르면 이것을 이어 `pick`·`sides` 를 덮어쓴다 |
   | `MkRoomMaker`(게임이 만드는 객체) | `create(plan)` → `{room, host, map?}`. plan.groups 마다 `code·entry(people·bots·size)·side`, `plan.seed` 로 맵·시작 위치를 고른다. 선택 `discard(made)`(방을 만들었는데 차지를 잃었을 때 지우기) |
   | `MkRecordBook` | 전적 합계·연승(`streak()`·`streakLabel()`·`summary()`) — 연승은 전적 끝에서 센다 |
-  | `MkStreakButton(.st-screen 요소, 순위전?)` | `.element` 를 팀 코드 옆에 붙이고 `render(party.book())`. 누르면 `MkHistoryDialog` |
+  | `MkStreakBadge()` | `.element`(누를 수 없는 표시, 2026-10-27)를 팀 코드 옆에 붙이고 `render(내 계정 연승)` |
 - 표(`MkTicket`): `matchId·room·side·host·expect(사람 수)·rivals(상대 닉네임)·map`. 표를 받으면 `host === 내id` 면 이미 방장으로
   방에 있고, 아니면 기존 "코드로 입장" 흐름으로 `room` 에 들어간다. 방장은 `expect` 명이 모이면(또는 잠깐 기다린 뒤) 바로 시작.
   판이 끝나면 팀 대기실 화면으로 돌아오고 팀장이 `party.report(표, 결과)`.
@@ -265,3 +265,16 @@
 - **요청 수**: 판마다 읽기 1번 + 쓰기 1번(미리 적기)과 연승 쓰기 1번이 늘었다. 쓰기는 `print=silent` 라 응답 크기가 거의 없다.
 - 검사: `node tools/account-stats-unit.js` 의 "미리 적기·정상 종료·사라진 판·취소된 판·연승 미리 적기" 항목(24·30·축구 사례, 규칙 통과 포함).
 - **선생님 할 일**: `데이터베이스규칙.json` 을 다시 게시(`pending` 추가, `streak` 에 `p`). 게시 전에는 미리 적기가 거부되어 예전처럼 동작한다.
+
+## 2026-10-27 추가: 24번 나가기 승패·승률 구간 매칭·대기실 모양
+
+- **24번 상대가 나간 판**: 방장이 결과(`result`)를 쓸 때 나간 학생 줄이 빠져 결과가 1줄이 되고, 계정 통계는 "2명 이상"인 판만 세서 남은 학생의 승리가 통계에 안 잡혔다.
+  이제 `RaceRoster` 가 경기 중 모든 기기에서 마지막으로 본 선수 상태를 들고 있다가, `quitSide` 로 끝난 판이면 나간 학생 줄(`quit: 1`, 결과표 "나감 · 패배", 맨 아래)을 결과에 넣는다.
+  남은 학생 = 승(누적 통계·최근 매치·반 별 통계·연승), 나간 학생 = 패(나가기 버튼 → `forfeitReport`, ← 목록으로·탭 닫기 → 미리 적어 둔 패배). 헤드리스 크롬 두 탭(가짜 Firebase)으로 확인.
+- **승률 구간 매칭**(24번만, `MkWinBandVersusMatcher`·`MkWinBand`): 승률 30% 미만은 50% 미만인 상대만, 70% 이상은 50% 이상인 상대만 기다린다(양쪽 모두 만족해야 묶임).
+  승률은 계정 누적 통계(`stats/turbolap` 의 g·w, 사람과 한 판만)이고 **5판(`MkWinBand.MIN_GAMES`)부터** 적용, 기록이 없으면(로그인 안 함·새 학생) 누구와도 만난다. 못 만나면 기존 AI 대체(2분).
+  맞는 상대가 없는 항목은 "준비된 항목"에서 빠져 맨 앞에 있어도 다른 학생들끼리의 묶기를 막지 않는다. 대기 인원·AI 대체 미루기도 맞는 상대만 센다(`MkMatcher.canMeet`, 기본은 누구와도 true).
+  승률은 대기실에 들어갈 때 읽기 1번(`TurboLapRates.load`), 판이 끝나면 기기 안에서 더한다. 대기열 항목 `people/<id>/rate = {g, w}`. 검사: `match-sim` 의 "승률 구간" 항목.
+- **24번 대결 화면**(`TurboLapVersusView`): 상대를 찾으면 왼쪽 자리 학생은 왼쪽, 오른쪽 자리 학생은 오른쪽에 이름·차·전체 승률·그 코스 승률(경기장 자리 `players/<id>/rate`)과 VS 움직임. 방장은 모인 뒤 4초(`TurboRandomMatch.VERSUS_MS`) 보여 준 뒤 출발.
+- **모든 랜덤 매칭 대기실**: 나가기는 카드 오른쪽 위 작은 빨간 버튼(`.mk-leave`, 30번은 원래 그 모양). 연승 표시는 누를 수 없는 표시(`MkStreakBadge`, 내 계정 연승), 내 통계 버튼과 14px 띄움. 개인전의 "나" 제목·"나" 표시는 없앴다.
+- **24번 AI 주행**: `BotRacingLine` 이 코스 곡률로 인-아웃 경로(진입 바깥 → 정점 안쪽 → 탈출 바깥)를 미리 계산하고 1초 앞 지점을 따라간다(출발 45m 는 원래 차선). 옆 이동 속도 `BOT.latRate` 6.

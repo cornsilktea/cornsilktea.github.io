@@ -741,6 +741,7 @@ class AccountStatsOpener {
    자식은 자기 profile·view 만 넘긴다. 30번은 맥락(MVP 판정)이 있어 AccountMatchSender 를 직접 쓴다 */
 class AccountGameAccount {
     constructor(profile, view) {
+        this.profile = profile;
         this.dialog = new AccountStatsDialog(() => AccountMatchStore.forProfile(profile), view);
         this.sender = new AccountMatchSender(() => AccountMatchStore.forProfile(profile));
     }
@@ -749,6 +750,11 @@ class AccountGameAccount {
     }
     openStats() {
         this.dialog.open("stats");
+    }
+    /* 화면에 승률을 보여 주거나 매칭에 쓰려고 내 누적 통계를 한 번 읽는다(로그인 전이면 null) */
+    loadStats() {
+        const store = AccountMatchStore.forProfile(this.profile);
+        return store ? store.loadStats() : Promise.resolve(null);
     }
     record(report) {
         this.sender.record(report, null);

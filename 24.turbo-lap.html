@@ -109,7 +109,43 @@
   .st-joinrow { display: flex; gap: 10px; margin-top: 10px; }
   .st-joinrow input { flex: 1 1 auto; min-width: 0; text-align: center; letter-spacing: .3em; }
   .st-joinrow .st-btn { flex: 0 0 34%; margin: 0; }
-  .st-joinrow.account .st-btn { flex: 1 1 0; font-size: 17px; }
+  .tv { margin: 10px 0 6px; }
+  .tv-course { margin-bottom: 8px; text-align: center; font-size: 16px; font-weight: 800; color: #FFB08C; }
+  .tv-arena { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; align-items: stretch; }
+  .tv-side { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 12px 10px; border-radius: 8px; border: 2px solid; }
+  .tv-side.left { border-color: #4C8DFF; background: rgba(76, 141, 255, .16); text-align: left; animation: tvRevL 1.6s ease-in-out infinite; }
+  .tv-side.right { border-color: #D97B4F; background: rgba(217, 123, 79, .16); text-align: right; animation: tvRevR 1.6s ease-in-out infinite; }
+  .tv-side.me { box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .45); }
+  .tv-side small { font-size: 12px; font-weight: 800; }
+  .tv-side.left small { color: #8DB8FF; }
+  .tv-side.right small { color: #FFB08C; }
+  .tv-side b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 21px; color: #F4F1E8; }
+  .tv-side.waiting b { animation: tvBlink 1s ease-in-out infinite; }
+  .tv-car-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: #C9CEDA; }
+  .tv-rate { font-size: 14px; color: #EEF0F4; }
+  .tv-rate em { font-style: normal; font-weight: 800; color: #FFE3D3; }
+  .tv-rate small { font-weight: 700; color: #A9AFC2; }
+  .tv-vs { position: relative; display: flex; align-items: center; justify-content: center; width: 54px; }
+  .tv-vs b { position: relative; font-size: 30px; font-style: italic; font-weight: 900; color: #fff; text-shadow: 0 0 14px #D97B4F, 0 3px 0 rgba(0, 0, 0, .5); animation: tvPulse 1s ease-in-out infinite; }
+  .tv-spark { position: absolute; left: 50%; top: 50%; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%; background: radial-gradient(circle, rgba(255, 214, 160, .85), rgba(217, 123, 79, 0) 70%); animation: tvSpark 1s ease-out infinite; }
+  .tv-road { position: relative; height: 8px; margin-top: 10px; border-radius: 4px; background: rgba(255, 255, 255, .06); overflow: hidden; }
+  .tv-dash { position: absolute; top: 0; width: 34%; height: 100%; border-radius: 4px; }
+  .tv-dash.left { left: -34%; background: linear-gradient(90deg, rgba(76, 141, 255, 0), #4C8DFF); animation: tvDashL 1s ease-in infinite; }
+  .tv-dash.right { right: -34%; background: linear-gradient(270deg, rgba(217, 123, 79, 0), #D97B4F); animation: tvDashR 1s ease-in infinite; }
+  .tv.tv-enter .tv-side.left { animation: tvFromL .6s cubic-bezier(.2, .9, .3, 1.25) both, tvRevL 1.6s .6s ease-in-out infinite; }
+  .tv.tv-enter .tv-side.right { animation: tvFromR .6s cubic-bezier(.2, .9, .3, 1.25) both, tvRevR 1.6s .6s ease-in-out infinite; }
+  .tv.tv-enter .tv-vs b { animation: tvSlam .45s .45s both, tvPulse 1s .9s ease-in-out infinite; }
+  @keyframes tvFromL { from { transform: translateX(-120%); opacity: 0; } to { transform: none; opacity: 1; } }
+  @keyframes tvFromR { from { transform: translateX(120%); opacity: 0; } to { transform: none; opacity: 1; } }
+  @keyframes tvSlam { from { transform: scale(3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  @keyframes tvPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.14); } }
+  @keyframes tvSpark { from { transform: scale(.4); opacity: .9; } to { transform: scale(1.5); opacity: 0; } }
+  @keyframes tvRevL { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(4px); } }
+  @keyframes tvRevR { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(-4px); } }
+  @keyframes tvDashL { from { left: -34%; } to { left: 50%; } }
+  @keyframes tvDashR { from { right: -34%; } to { right: 50%; } }
+  @keyframes tvBlink { 0%, 100% { opacity: .45; } 50% { opacity: .9; } }
+  @media (prefers-reduced-motion: reduce) { .tv *, .tv.tv-enter * { animation: none !important; } }
   .st-btn.blue { background: #4C8DFF; border-color: #4C8DFF; color: #fff; }
   #overlay.st-screen .st-msg { color: #FFB08C; min-height: 20px; margin: 6px 0 0; font-weight: 800; }
   #overlay.st-screen .card .btn:active { transform: none; filter: brightness(.9); }
@@ -358,17 +394,14 @@
       <h1 class="st-title">TURBO LAP</h1>
     </div>
     <div class="st-card">
-      <button type="button" class="st-btn primary" id="btnModeTA">⏱ 타임어택</button>
+      <button type="button" class="st-btn" id="btnModeTA">⏱ 타임어택</button>
       <button type="button" class="st-btn" id="btnCreate">⚔️ 대전모드 게임 만들기</button>
       <button type="button" class="st-btn" id="btnRandom">🎲 랜덤 매칭 방 만들기</button>
       <div class="st-joinrow">
         <input type="text" id="joinCode" inputmode="numeric" pattern="[0-9]*" maxlength="5" autocomplete="off" placeholder="방 코드 5자리">
         <button type="button" class="st-btn blue" id="btnJoin">참여하기</button>
       </div>
-      <div class="st-joinrow account">
-        <button type="button" class="st-btn" data-account-open="recent">📋 최근 20매치</button>
-        <button type="button" class="st-btn" data-account-open="stats">📊 내 통계</button>
-      </div>
+      <button type="button" class="st-btn" data-account-open="stats">📊 내 통계 · 최근 20매치</button>
       <div class="hello">내 닉네임: <b id="helloNick"></b> <button type="button" class="mini" data-maker-open data-nick-setting>✏️ 닉네임 설정</button></div>
       <div class="st-msg msg" id="bStartMsg"></div>
       <div id="loadNote"></div>
@@ -431,7 +464,7 @@
 
   <div class="st-wrap" id="cardFound" style="display:none">
     <div class="st-hero"><h1 class="st-title">TURBO LAP</h1></div>
-    <div class="st-card"><h2>🏁 상대를 찾았어요!</h2><div class="mk-notice" id="foundRival"></div><div class="hint" id="foundHint">곧 출발해요. 잠시만 기다려 주세요.</div></div>
+    <div class="st-card"><h2>🏁 상대를 찾았어요!</h2><div class="tv" id="foundVersus"></div><div class="hint" id="foundHint">곧 출발해요. 잠시만 기다려 주세요.</div></div>
   </div>
 
   <div class="card wide" id="cardLobby" style="display:none">
@@ -500,9 +533,9 @@
 
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="character-maker.js?v=20261026a"></script>
-<script charset="utf-8" src="match-kit.js?v=20261027b"></script>
-<script charset="utf-8" src="account-match-kit.js?v=20261027b"></script>
-<script charset="utf-8" src="24.turbo-lap-stats.js?v=20261027b"></script>
+<script charset="utf-8" src="match-kit.js?v=20261027c"></script>
+<script charset="utf-8" src="account-match-kit.js?v=20261027c"></script>
+<script charset="utf-8" src="24.turbo-lap-stats.js?v=20261027c"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
 <script type="module">
@@ -4520,7 +4553,7 @@ class BattleLoadSync {
 const battleLoadSync = new BattleLoadSync();
 
 refreshNick();
-const BOT = { max: 1, topRatio: 0.9, grip: 0.86, brake: 24, lookSamples: 45, leadEaseM: 60, leadEase: 0.88, laneRatio: 0.35, latRate: 1.8, latPerSpeed: 0.25, dodgeAheadM: 14, dodgeGap: 2.4, edgeGap: 1.6 };
+const BOT = { max: 1, topRatio: 0.9, grip: 0.86, brake: 24, lookSamples: 45, leadEaseM: 60, leadEase: 0.88, laneRatio: 0.35, latRate: 6, latPerSpeed: 0.3, laneHoldM: 45, lineLeadS: 1.0, dodgeAheadM: 14, dodgeGap: 2.4, edgeGap: 1.6 };
 const BOTS = {};
 let botCornerV = null, botCornerFor = null;
 const tnow = () => Date.now() + BT.serverOffset;
@@ -4835,6 +4868,7 @@ function startMatchLocal() {
   scene.remove(car); car = makeCar(garage.key); scene.add(car); car.visible = !BT.spec;
   resetCar(); P.lap = 0; P.expected = 0; lapTimes = []; lapStartMs = 0; raceBest = 0; renderHudBest();
   BT.match = { startAt: BT.startAt, firstFinAt: 0, humansAtStart: { left: humansOnSide("left"), right: humansOnSide("right") } };
+  raceRoster.reset();
   BT.statusSent = ""; BT.sent = ""; BT.lastNet = 0; BT.forceNet = true;
   BT.viewId = racerOf("left") || racerOf("right");
   specDirector.reset();
@@ -4972,11 +5006,11 @@ function progText(prog) {
 }
 function renderResult() {
   const r = BT.result || {};
-  const rows = okeys(r).map(id => Object.assign({ id }, r[id])).sort(rankCmp);
+  const rows = okeys(r).map(id => Object.assign({ id }, r[id])).sort((a, b) => (a.quit ? 1 : 0) - (b.quit ? 1 : 0) || rankCmp(a, b));
   $("bDoneCourse").textContent = TRACKS[BT.course].name;
   setHtml($("bDoneRows"), rows.length ? rows.map((x, i) => '<tr><td>' + (i + 1) + "위</td><td>" +
     '<span class="sideDot" style="background:' + (SIDE_COLOR[x.team] || "#8A978C") + '"></span>' + escHtml(x.nick) + (x.id === BT.myId ? " (나)" : "") + "</td><td>" +
-    (x.fin ? "<em>" + fmtTime(x.fin) + "</em>" : '<em class="none">미완주 · ' + progText(x.prog) + "</em>") + "</td></tr>").join("")
+    (x.quit ? '<em class="none">나감 · 패배</em>' : x.fin ? "<em>" + fmtTime(x.fin) + "</em>" : '<em class="none">미완주 · ' + progText(x.prog) + "</em>") + "</td></tr>").join("")
     : '<tr><td colspan="3">결과를 불러오는 중…</td></tr>');
   const mine = rows.findIndex(x => x.id === BT.myId);
   let msg = "";
@@ -5196,6 +5230,31 @@ function botCornerSpeeds() {
   botCornerFor = S;
   return botCornerV;
 }
+class BotRacingLine {
+  static NEAR_M = 8;
+  static AHEAD_FROM_M = 16;
+  static AHEAD_TO_M = 55;
+  static SMOOTH_M = 12;
+  static USE = 0.9;
+  constructor() { this.forS = null; this.lat = []; }
+  at(i) {
+    if (this.forS !== S) this.build();
+    return this.lat[wrapI(i)] || 0;
+  }
+  build() {
+    const span = m => Math.max(1, Math.round(m / SEG));
+    const curv = S.map((s, i) => { const a = S[wrapI(i + 2)].t, b = S[wrapI(i - 2)].t; return ((a.x - b.x) * s.n.x + (a.z - b.z) * s.n.z) / (4 * SEG); });
+    const avg = (arr, i, from, to) => { let sum = 0; for (let k = from; k <= to; k++) sum += arr[wrapI(i + k)]; return sum / (to - from + 1); };
+    const near = span(BotRacingLine.NEAR_M), a0 = span(BotRacingLine.AHEAD_FROM_M), a1 = span(BotRacingLine.AHEAD_TO_M);
+    const raw = curv.map((_, i) => 2 * avg(curv, i, -near, near) - avg(curv, i, a0, a1) - avg(curv, i, -a1, -a0));
+    const sorted = raw.map(Math.abs).sort((a, b) => a - b), peak = sorted[Math.floor(sorted.length * 0.9)] || 0;
+    const shaped = raw.map(v => peak > 0 ? Math.max(-1, Math.min(1, v / (peak * 0.5))) : 0);
+    const sm = span(BotRacingLine.SMOOTH_M);
+    this.lat = shaped.map((_, i) => avg(shaped, i, -sm, sm) * botLatLimit(i) * BotRacingLine.USE);
+    this.forS = S;
+  }
+}
+const botLine = new BotRacingLine();
 function botMaxDist() { return OPEN ? N - 1 - START_I : Infinity; }
 function botProg(b) { return OPEN ? b.dist / Math.max(1, FINISH_I - START_I) : (START_I - N + b.dist) / N; }
 function botPose(b) {
@@ -5248,7 +5307,7 @@ function botStep(b, dt) {
   else if (b.v < want) b.v = Math.min(want, b.v + CFG.accel * Math.max(0.15, 1 - (b.v / CFG.maxSpeed) ** 2) * dt);
   else b.v = Math.max(want, b.v - (b.fin ? CFG.brake * 0.4 : CFG.brake) * dt);
 
-  let target = b.lane;
+  let target = b.dist * SEG < BOT.laneHoldM ? b.lane : botLine.at(b.ci + Math.round(b.v * BOT.lineLeadS / SEG));
   const chasingTail = chaseGap.behind > BOT.dodgeAheadM && chaseGap.behind <= CHASE.tailM && !b.boostCool && !b.boostOn;
   if (chasingTail) target = chaseGap.lat;
   rivals.forEach(r => { if (r.aheadM > 0 && r.aheadM < BOT.dodgeAheadM && Math.abs(r.lat - b.lat) < BOT.dodgeGap) target = r.lat + (b.lat >= r.lat ? 1 : -1) * BOT.dodgeGap * 1.3; });
@@ -5316,9 +5375,24 @@ function hostTick() {
   if (!over || BT.statusSent === "ended") return;
   BT.statusSent = "ended";
   const result = {};
-  st.forEach(r => { const p = BT.players[r.id] || {}; result[r.id] = { nick: p.nickname || "?", team: p.team || "left", fin: r.fin || 0, prog: +(+r.prog).toFixed(4) }; });
+  st.forEach(r => { const p = BT.players[r.id] || {}; result[r.id] = { nick: p.nickname || "?", team: p.team || "left", car: p.car || "", fin: r.fin || 0, prog: +(+r.prog).toFixed(4) }; });
+  raceRoster.leavers(st, quitSide).forEach(r => { result[r.id] = { nick: r.nick, team: r.team, car: r.car, fin: 0, prog: r.prog, quit: 1 }; });
   BT.ref.update({ status: "ended", endedAt: t, result, quitSide: quitSide || null });
 }
+class RaceRoster {
+  constructor() { this.seen = {}; }
+  reset() { this.seen = {}; }
+  note(st) {
+    st.forEach(r => { const p = BT.players[r.id]; if (p) this.seen[r.id] = { nick: p.nickname || "?", team: p.team || "left", car: p.car || "", prog: Math.max(0, +(+r.prog).toFixed(4)) }; });
+  }
+  leavers(st, quitSide) {
+    if (!quitSide) return [];
+    const here = {};
+    st.forEach(r => { here[r.id] = true; });
+    return okeys(this.seen).filter(id => !here[id] && this.seen[id].team === quitSide).map(id => Object.assign({ id }, this.seen[id]));
+  }
+}
+const raceRoster = new RaceRoster();
 function humansOnSide(side) { return sideIds(side).filter(id => !isBot(id)).length; }
 function sideAllQuit() {
   const started = BT.match && BT.match.humansAtStart;
@@ -5465,15 +5539,16 @@ class TurboRandomMatch {
   static START_TRIES = 12;
   static START_RETRY_MS = 300;
   static SETTLE_MS = 1000;
+  static VERSUS_MS = 4000;
   static AI_FALLBACK_MS = 120000;
   static MATCHER_TIMING = Object.assign({}, MkMatcher.TIMING, { rematchWaitMs: TurboRandomMatch.AI_FALLBACK_MS + 30000, busyMs: 300000 });
   static FOUND_HINT = "곧 출발해요. 잠시만 기다려 주세요.";
-  constructor() { this.flow = null; this.quiet = false; this.botAsked = {}; this.awaitingLoad = false; this.settleFor = ""; this.settledFor = ""; }
+  constructor(account) { this.flow = null; this.quiet = false; this.botAsked = {}; this.awaitingLoad = false; this.settleFor = ""; this.settledFor = ""; this.versusUntil = 0; this.versusTimer = 0; this.account = account; this.rates = new TurboLapRates(account); this.versus = new TurboLapVersusView($("foundVersus"), carLabel); }
   async ready() {
     if (this.flow) return this.flow;
     const db = await connectDb();
     if (this.flow) return this.flow;
-    const options = { gameRoot: "turbolap", queue: "turbolap", partyLimit: 1, matcher: new MkVersusMatcher(1, TurboRandomMatch.MATCHER_TIMING), solo: true, allowBots: false, aiFallbackMs: TurboRandomMatch.AI_FALLBACK_MS, stats: new AccountStatsOpener(() => turboAccount.openStats(), turboAccount.pendingGuard(ticket => this.forfeitReport(ticket))),
+    const options = { gameRoot: "turbolap", queue: "turbolap", partyLimit: 1, matcher: new MkWinBandVersusMatcher(1, TurboRandomMatch.MATCHER_TIMING), solo: true, allowBots: false, aiFallbackMs: TurboRandomMatch.AI_FALLBACK_MS, stats: new AccountStatsOpener(() => this.account.openStats(), this.account.pendingGuard(ticket => this.forfeitReport(ticket))),
       intro: "매칭 시작을 누르면 아무 학생과 1대1로 달려요. 코스와 출발 자리는 무작위예요." };
     const panel = new MkPartyPanel($("overlay"), $("partyMount"), options);
     this.flow = new MkRandomFlow(db, { now: tnow }, BT.myId, options, this, panel);
@@ -5481,15 +5556,25 @@ class TurboRandomMatch {
   }
   inParty() { return !!this.flow && this.flow.inParty(); }
   roomCard() { return this.ticket() ? "found" : "lobby"; }
-  showFound(ticket) {
-    const rival = (ticket.rivals || [])[0];
-    $("foundRival").textContent = rival ? "상대: " + rival : "AI와 대결해요";
+  renderVersus() {
+    const ticket = this.ticket();
+    if (!ticket || !BT.ref) return;
+    const racer = side => {
+      const id = racerOf(side), p = id ? BT.players[id] : null;
+      return p ? { nick: p.nickname || "?", car: p.car || "", bot: isBot(id), me: id === BT.myId, rate: TurboLapRates.cardOf(p.rate) } : null;
+    };
+    this.versus.render(BT.course, racer("left"), racer("right"), (ticket.rivals || [])[0] || "🤖 AI");
+  }
+  player(team, t) {
+    const player = newPlayer(team, t), rate = this.rates.forRoom();
+    if (rate) player.rate = rate;
+    return player;
   }
   ticket() { return this.flow ? this.flow.ticket() : null; }
   async open() {
     if (!PlayerProfile.storedNick()) { askNickFirst(); return; }
     $("btnRandom").disabled = true; bMsg("연결하는 중…");
-    try { const flow = await this.ready(); bMsg(await flow.create()); }
+    try { const flow = await this.ready(); await this.rates.load(); bMsg(await flow.create()); }
     catch (e) { bMsg("온라인 연결을 할 수 없어요. (인터넷·데이터베이스 규칙 확인)"); }
     finally { $("btnRandom").disabled = false; }
   }
@@ -5497,7 +5582,7 @@ class TurboRandomMatch {
     try { return await (await this.ready()).codeTaken(code); } catch (e) { return false; }
   }
   updateMe() { if (this.flow) this.flow.updateMe(); }
-  member() { return { nick: PlayerProfile.storedNick() || "학생", joinedAt: tnow(), look: null }; }
+  member() { return { nick: PlayerProfile.storedNick() || "학생", joinedAt: tnow(), look: null, rate: this.rates.forMatching() }; }
   async create(plan) {
     const course = COURSES[plan.seed % COURSES.length], assign = {};
     plan.groups.forEach(g => MkSeatAssign.peopleOf(g).forEach(id => { assign[id] = SIDES[g.side]; }));
@@ -5505,7 +5590,7 @@ class TurboRandomMatch {
     for (let n = 0; n < 8; n++) {
       const code = String(10000 + Math.floor(Math.random() * 90000)), t = tnow();
       if (await this.flow.codeTaken(code)) continue;
-      const obj = { status: "lobby", hostPlayerId: BT.myId, createdAt: t, course, assign, matchId: plan.matchId, players: { [BT.myId]: newPlayer(assign[BT.myId] || "left", t) } };
+      const obj = { status: "lobby", hostPlayerId: BT.myId, createdAt: t, course, assign, matchId: plan.matchId, players: { [BT.myId]: this.player(assign[BT.myId] || "left", t) } };
       const res = await BT.db.ref(BATTLE.root + "/" + code).transaction(cur => cur === null ? obj : undefined);
       if (res.committed) return { room: code, host: BT.myId, map: TRACKS[course].name };
     }
@@ -5518,11 +5603,12 @@ class TurboRandomMatch {
       const status = (await ref.child("status").once("value")).val();
       const team = (await ref.child("assign/" + BT.myId).once("value")).val();
       if (status !== "lobby" || !team) return false;
-      await ref.child("players/" + BT.myId).set(newPlayer(team, tnow()));
+      await ref.child("players/" + BT.myId).set(this.player(team, tnow()));
     }
     this.botAsked = {}; this.awaitingLoad = false;
-    this.showFound(ticket);
+    this.versus.reset();
     enterRoom(ticket.room);
+    this.renderVersus();
     $("cardLobby").classList.add("matched");
     return true;
   }
@@ -5537,10 +5623,15 @@ class TurboRandomMatch {
     if (this.inParty()) { this.flow.backToParty(msg); return; }
     showCard("start"); bMsg(msg);
   }
-  startMatch() { this.tryStart(TurboRandomMatch.START_TRIES); }
+  startMatch() { this.versusUntil = performance.now() + TurboRandomMatch.VERSUS_MS; this.tryStart(TurboRandomMatch.START_TRIES); }
   tryStart(triesLeft) {
     if (!isHost() || BT.status !== "lobby") return;
-    if (humanRacerReady()) { if (battleLoadSync.blocksStart()) this.awaitingLoad = true; else hostStart(); return; }
+    if (humanRacerReady()) {
+      const wait = this.versusUntil - performance.now();
+      if (wait > 0) { clearTimeout(this.versusTimer); this.versusTimer = setTimeout(() => this.tryStart(triesLeft), wait); return; }
+      if (battleLoadSync.blocksStart()) this.awaitingLoad = true; else hostStart();
+      return;
+    }
     SIDES.forEach(side => { if (!racerOf(side) && !this.botAsked[side]) { this.botAsked[side] = true; addBot(side); } });
     if (triesLeft > 0) setTimeout(() => this.tryStart(triesLeft - 1), TurboRandomMatch.START_RETRY_MS);
   }
@@ -5550,6 +5641,7 @@ class TurboRandomMatch {
     $("foundHint").textContent = (BT.ref && battleLoadSync.waitText()) || TurboRandomMatch.FOUND_HINT;
     if (this.awaitingLoad && isHost() && BT.status === "lobby" && humanRacerReady() && !battleLoadSync.blocksStart()) { this.awaitingLoad = false; hostStart(); }
     if (this.flow && BT.ref) this.flow.roomChanged(racerIds().filter(id => !isBot(id)).length, isHost(), BT.status === "lobby");
+    if (cardNow === "found") this.renderVersus();
   }
   raceProgress() {
     if (!BT.match) return 0;
@@ -5566,7 +5658,7 @@ class TurboRandomMatch {
   recordBeforeLeave() {
     const ticket = this.ticket();
     if (!ticket) return;
-    if (this.forfeits()) { turboAccount.record(this.forfeitReport(ticket)); this.flow.matchEnded({ result: "lose", rivals: this.racingRivals() }); return; }
+    if (this.forfeits()) { this.record(this.forfeitReport(ticket)); this.flow.matchEnded({ result: "lose", rivals: this.racingRivals() }); return; }
     if (BT.status === "ended" && cardNow === "bdone") { this.settleFor = this.settledFor = ticket.matchId; renderResult(); }
   }
   forfeitReport(ticket) {
@@ -5587,13 +5679,17 @@ class TurboRandomMatch {
     }
     if (this.settledFor !== ticket.matchId) return;
     const winner = quitWinner || (rows[0].fin ? rows[0] : null), mine = SIDES[ticket.side], result = !winner ? "draw" : winner.team === mine ? "win" : "lose";
-    turboAccount.record(this.accountReport(ticket, rows, result));
+    this.record(this.accountReport(ticket, rows, result));
     this.flow.matchEnded({ result, rivals: this.resultRivals(rows, mine) }, () => { $("bDoneHint").textContent = this.flow.endHint(); });
+  }
+  record(report) {
+    this.account.record(report);
+    this.rates.note(report);
   }
   accountReport(ticket, rows, result) {
     const players = BT.players;
     return { matchId: ticket.matchId, course: BT.course, result, myIndex: rows.findIndex(x => x.id === BT.myId),
-      rows: rows.map(x => ({ nick: x.nick, side: SIDES.indexOf(x.team), fin: x.fin || 0, prog: +x.prog || 0, car: (players[x.id] || {}).car || "", bot: isBot(x.id) })) };
+      rows: rows.map(x => ({ nick: x.nick, side: SIDES.indexOf(x.team), fin: x.fin || 0, prog: Math.max(0, +x.prog || 0), car: x.car || (players[x.id] || {}).car || "", bot: isBot(x.id) })) };
   }
   static rivalsOf(id, nick) { return !id ? undefined : id.indexOf("bot") === 0 ? [] : [nick]; }
   resultRivals(rows, mine) {
@@ -5605,8 +5701,8 @@ class TurboRandomMatch {
     return TurboRandomMatch.rivalsOf(rivalId, nickOf(rivalId));
   }
 }
-const turboRandom = new TurboRandomMatch();
 const turboAccount = new TurboLapAccount(carLabel);
+const turboRandom = new TurboRandomMatch(turboAccount);
 turboAccount.bind();
 
 function battleFrame(dt) {
@@ -5614,7 +5710,7 @@ function battleFrame(dt) {
   frameStandings.nextFrame();
   updateEnts(dt);
   netTick();
-  if (BT.match && state !== "menu") { botsTick(dt); hostTick(); renderBattleHud(); }
+  if (BT.match && state !== "menu") { botsTick(dt); raceRoster.note(frameStandings.get()); hostTick(); renderBattleHud(); }
 }
 
 document.addEventListener(PlayerProfile.CHANGE_EVENT, refreshNick);

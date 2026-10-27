@@ -869,7 +869,7 @@ class AccountGameAccount<R, P extends AccountMatchPlanBase, N, E extends Account
   private readonly dialog: AccountStatsDialog<N, E>;
   private readonly sender: AccountMatchSender<R, P, N, E, null>;
 
-  constructor(profile: AccountGameProfile<R, P, N, E, null>, view: AccountDialogView<N, E>) {
+  constructor(private readonly profile: AccountGameProfile<R, P, N, E, null>, view: AccountDialogView<N, E>) {
     this.dialog = new AccountStatsDialog<N, E>(() => AccountMatchStore.forProfile(profile), view);
     this.sender = new AccountMatchSender<R, P, N, E, null>(() => AccountMatchStore.forProfile(profile));
   }
@@ -880,6 +880,12 @@ class AccountGameAccount<R, P extends AccountMatchPlanBase, N, E extends Account
 
   openStats(): void {
     this.dialog.open("stats");
+  }
+
+  /* 화면에 승률을 보여 주거나 매칭에 쓰려고 내 누적 통계를 한 번 읽는다(로그인 전이면 null) */
+  loadStats(): Promise<N | null> {
+    const store = AccountMatchStore.forProfile(this.profile);
+    return store ? store.loadStats() : Promise.resolve(null);
   }
 
   record(report: R): void {

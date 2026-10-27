@@ -1,7 +1,7 @@
 const fs = require("fs"), vm = require("vm"), path = require("path");
 
 class MatchKitLoader {
-  static NAMES = ["MkPaths", "MkMatcher", "MkVersusMatcher", "MkFreeForAllMatcher", "MkRecordBook", "MkPartyDirectory", "MkParty", "MkQueue", "MkBusySign", "MkStreakMath", "MkPersonalStreak"];
+  static NAMES = ["MkPaths", "MkMatcher", "MkVersusMatcher", "MkWinBandVersusMatcher", "MkWinBand", "MkFreeForAllMatcher", "MkRecordBook", "MkPartyDirectory", "MkParty", "MkQueue", "MkBusySign", "MkStreakMath", "MkPersonalStreak"];
   static load() {
     const src = fs.readFileSync(path.join(__dirname, "..", "match-kit.js"), "utf8") + "\n;({" + MatchKitLoader.NAMES.join(",") + "})";
     return vm.runInNewContext(src, { console, Math, Date, JSON, Object, Array, String, Number, Set, Map, Promise, setTimeout, clearTimeout });
@@ -530,6 +530,40 @@ class Scenarios {
     Report.check("아이디 연승: 저장 값 다듬기", S.normalize({ n: "3", b: 1, id: 5 }).n === 3 && S.normalize({ n: 3, b: 1 }).b === 3 && S.normalize(null).n === 0 && S.key("a.b/c").indexOf(".") < 0);
   }
 
+  static unitWinBand() {
+    const m = new Mk.MkWinBandVersusMatcher(1, SimWorld.TIMING);
+    const e = (at, g, w) => ({ leader: "x", people: { ["u" + at]: Object.assign({ nick: "u" + at, joinedAt: at }, g === null ? {} : { rate: { g, w } }) }, bots: 0, size: 1, at, claim: null });
+    const codes = (plan) => plan ? plan.groups.map((g) => g.code).sort().join() : null;
+    Report.check("승률 구간: 30% 미만 + 70% 이상은 묶지 않음", m.plan({ low: e(0, 10, 2), high: e(1, 10, 8) }, 100, Math.random) === null);
+    Report.check("승률 구간: 30% 미만은 50% 미만과 묶음", codes(m.plan({ low: e(0, 10, 2), mid: e(1, 10, 4) }, 100, Math.random)) === "low,mid");
+    Report.check("승률 구간: 30% 미만은 50%와 안 묶음", m.plan({ low: e(0, 10, 2), half: e(1, 10, 5) }, 100, Math.random) === null);
+    Report.check("승률 구간: 70% 이상은 50% 이상과 묶음", codes(m.plan({ high: e(0, 10, 7), half: e(1, 10, 5) }, 100, Math.random)) === "half,high");
+    Report.check("승률 구간: 70% 이상은 50% 미만과 안 묶음", m.plan({ high: e(0, 10, 7), mid: e(1, 10, 4) }, 100, Math.random) === null);
+    Report.check("승률 구간: 중간(30~70%)끼리는 자유", codes(m.plan({ a: e(0, 10, 3), b: e(1, 10, 6) }, 100, Math.random)) === "a,b");
+    Report.check("승률 구간: 판 수가 적거나 기록 없으면 누구와도", codes(m.plan({ low: e(0, 4, 0), high: e(1, 10, 9) }, 100, Math.random)) === "high,low" && codes(m.plan({ none: e(0, null), high: e(1, 10, 9) }, 100, Math.random)) === "high,none");
+    const stuck = { low: e(0, 10, 1), high: e(1, 10, 9), half: e(2, 10, 5) };
+    Report.check("승률 구간: 맨 앞 학생이 맞는 상대가 없어도 다른 학생끼리는 묶임", m.anchor(stuck, 100) === "high" && codes(m.plan(stuck, 100, Math.random)) === "half,high");
+    Report.check("승률 구간: 맞는 상대만 '함께 기다리는 학생'으로 봄(AI 대체를 막지 않음)", !m.hasCompany({ low: e(0, 10, 1), high: e(1, 10, 9) }, 100, "low") && m.hasCompany(stuck, 100, "half"));
+    Report.check("승률 구간: 기본 매처는 누구와도 만남", new Mk.MkVersusMatcher(1, SimWorld.TIMING).canMeet(e(0, 10, 1), e(1, 10, 9)) === true);
+    Report.check("승률 값 다듬기", JSON.stringify(Mk.MkWinBand.clean({ g: "7", w: 9 })) === JSON.stringify({ g: 7, w: 7 }) && Mk.MkWinBand.clean(null) === null);
+  }
+
+  static async scenarioWinBand() {
+    const world = new SimWorld(new Mk.MkWinBandVersusMatcher(1, SimWorld.TIMING), 3);
+    const low = await world.team(1, 1), high = await world.team(1, 1), half = await world.team(1, 1);
+    await low.queue.enter(low.leader, { nick: "low", joinedAt: 0, rate: { g: 10, w: 1 } });
+    await Util.wait(5);
+    await high.queue.enter(high.leader, { nick: "high", joinedAt: 0, rate: { g: 10, w: 9 } });
+    await Util.wait(150);
+    Report.check("승률 구간(대기열): 맞지 않는 둘은 계속 기다림", !low.leader.tickets.length && !high.leader.tickets.length && low.queue.othersWaiting(low.code) === 0);
+    await half.queue.enter(half.leader, { nick: "half", joinedAt: 0, rate: { g: 10, w: 5 } });
+    await Util.wait(200);
+    Report.check("승률 구간(대기열): 맞는 학생이 오면 그 둘이 묶이고 30% 미만은 남음", high.leader.tickets.length === 1 && half.leader.tickets.length === 1 && !low.leader.tickets.length && !!world.queueNow()[low.code], [low.leader.tickets.length, high.leader.tickets.length, half.leader.tickets.length]);
+    const entry = world.server.get(world.paths.entry(low.code));
+    Report.check("승률 구간(대기열): 항목에 승패가 실림", entry && entry.people[low.ids[0]].rate && entry.people[low.ids[0]].rate.g === 10);
+    [low, high, half].forEach((t) => { t.queue.stop(); t.leader.silentClose(); });
+  }
+
   static unitRotation() {
     const timing = { settleMs: 40, claimExpireMs: 300, rematchWaitMs: 400, busyMs: 2000, returnGraceMs: 300 };
     const v = new Mk.MkVersusMatcher(1, timing);
@@ -606,6 +640,8 @@ class SimRunner {
   static async run() {
     Scenarios.unitMatcher();
     Scenarios.unitRotation();
+    Scenarios.unitWinBand();
+    await Scenarios.scenarioWinBand();
     await Scenarios.scenarioJoinRules();
     await Scenarios.scenarioStreak();
     await Scenarios.scenarioRematch();

@@ -184,9 +184,10 @@
    승·무·패는 색만으로 구분하지 않고 글자를 같이 쓴다(색을 구분하기 어려운 학생). */
 .mk-streak{display:inline-flex;align-items:center;gap:4px;min-height:40px;padding:4px 14px;border-radius:999px;
   border:2px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);color:var(--st-ink,#EEF2EE);
-  font:inherit;font-size:16px;font-weight:800;cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent;}
+  font:inherit;font-size:16px;font-weight:800;white-space:nowrap;box-sizing:border-box;}
 .mk-streak.hot{border-color:#D97B4F;background:rgba(217,123,79,.22);color:#FFE3D3;}
-.mk-streak:active{filter:brightness(.9);}
+/* 연승 표시와 내 통계 버튼 사이를 조금 띄운다(30번 팀 코드 줄 포함, 2026-10-27) */
+.mk-streak+.mk-stats{margin-left:14px;}
 /* 팀 대기실의 "📊 내 통계" 버튼(2026-10-27): 연승 옆에 같은 높이로. 누르면 그 게임의 계정 통계 창 */
 .mk-stats{display:inline-flex;align-items:center;min-height:40px;padding:4px 14px;border-radius:999px;
   border:2px solid var(--st-accent,#D97B4F);background:rgba(255,255,255,.06);color:var(--st-ink,#EEF2EE);
@@ -238,6 +239,13 @@ button.mk-seat:disabled{cursor:default;}
 .mk-crowd:empty{display:none;}
 .mk-crowd.alone{color:#FFD2B8;}
 .mk-ai-now[hidden]{display:none !important;}
+/* 대기실 나가기: 30번 방 대기실처럼 카드 오른쪽 위 작은 빨간 버튼(2026-10-27). 팀 코드 줄은 버튼 자리만큼 오른쪽을 비운다 */
+.mk-panel{position:relative;}
+.mk-panel>.mk-top{padding-right:96px;}
+.mk-leave{position:absolute;top:12px;right:12px;z-index:1;height:34px;padding:0 12px;border-radius:8px;
+  border:2px solid #FF7A7A;background:rgba(211,47,47,.16);color:#FF9A9A;font:inherit;font-size:14px;font-weight:800;
+  white-space:nowrap;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.mk-leave:active{filter:brightness(.9);}
 
 /* 캐릭터 만들기(character-kit.ts 의 ProfileEditor). 어두운 .st-screen 카드 안에서 쓴다. */
 .ce-nick{width:100%;min-height:48px;padding:6px 12px;font:inherit;font-size:18px;font-weight:800;border-radius:6px;

@@ -12,6 +12,11 @@
    저장:
      users/<uid>/stats/turbolap   { g, w, l, f 완주 수, c/<코스> = { g, w, f, tm 완주 시간 합계(ms) }, ids/<경기열쇠> }
      users/<uid>/recent/turbolap/<0~19>  { v, id, at, r, ai, co 코스 번호, me 내 줄, p [[닉네임, 쪽 0왼/1오, 기록ms(0=미완주), 진행‰, 차량, AI 0/1]] }
+
+   승률 표시·승률 구간 매칭(2026-10-27 선생님 요청)
+     - 랜덤 매칭 대기실에 들어갈 때 내 누적 통계를 한 번 읽어(TurboLapRates) 대기열 항목(MkMember.rate)과 경기장 내 자리(players/<id>/rate)에 싣는다.
+       판이 끝나면 다시 읽지 않고 기록한 결과를 기기 안에서 더한다(요청을 늘리지 않음).
+     - 상대를 찾았을 때 대결 화면(TurboLapVersusView): 왼쪽 자리는 왼쪽, 오른쪽 자리는 오른쪽에 이름·차·전체 승률·그 코스 승률.
    ===================================================================== */
 class TurboLapCourses {
     static nameOf(key) {
@@ -176,5 +181,88 @@ class TurboLapStatsView {
 class TurboLapAccount extends AccountGameAccount {
     constructor(carLabel) {
         super(new TurboLapProfile(), new TurboLapStatsView(carLabel));
+    }
+}
+class TurboLapRates {
+    constructor(account) {
+        this.account = account;
+        this.node = null;
+    }
+    load() {
+        return this.account.loadStats().then((node) => { this.node = node; }).catch(() => undefined);
+    }
+    static cardOf(raw) {
+        if (!raw || typeof raw !== "object")
+            return null;
+        const source = raw, courses = AccountShape.slots(source.c), card = { g: AccountNumbers.count(source.g), w: AccountNumbers.count(source.w), c: {} };
+        Object.keys(courses).forEach((key) => {
+            const item = (courses[key] && typeof courses[key] === "object" ? courses[key] : {});
+            card.c[key] = { g: AccountNumbers.count(item.g), w: AccountNumbers.count(item.w) };
+        });
+        return card;
+    }
+    forMatching() {
+        return this.node && this.node.g > 0 ? { g: this.node.g, w: this.node.w } : null;
+    }
+    forRoom() {
+        if (!this.node)
+            return null;
+        const node = this.node, courses = {};
+        TurboLapCourses.KEYS.forEach((key) => { if (node.c[key])
+            courses[key] = { g: node.c[key].g, w: node.c[key].w }; });
+        return { g: node.g, w: node.w, c: courses };
+    }
+    note(report) {
+        const plan = new TurboLapPlan(report);
+        if (!window.PORTAL_USER || !plan.countsStats)
+            return;
+        const change = TurboLapStatsMath.apply(this.node, report, plan.win, AccountMatchKey.of(report.matchId), Date.now());
+        if (change)
+            this.node = change.node;
+    }
+}
+class TurboLapVersusView {
+    constructor(root, carLabel) {
+        this.root = root;
+        this.carLabel = carLabel;
+        this.shownKey = "";
+        this.course = "";
+    }
+    reset() {
+        this.shownKey = "";
+        this.root.textContent = "";
+    }
+    render(course, left, right, rivalHint) {
+        const key = JSON.stringify([course, left, right, rivalHint]);
+        if (key === this.shownKey)
+            return;
+        const animate = !this.shownKey;
+        this.shownKey = key;
+        this.course = course;
+        this.root.classList.toggle("tv-enter", animate);
+        this.root.innerHTML = '<div class="tv-course">🗺️ ' + AccountHtml.esc(TurboLapCourses.nameOf(course)) + "</div>"
+            + '<div class="tv-arena">' + this.sideHtml("left", left, rivalHint)
+            + '<div class="tv-vs"><span class="tv-spark"></span><b>VS</b></div>'
+            + this.sideHtml("right", right, rivalHint) + "</div>"
+            + '<div class="tv-road"><span class="tv-dash left"></span><span class="tv-dash right"></span></div>';
+        if (animate)
+            window.setTimeout(() => this.root.classList.remove("tv-enter"), 1200);
+    }
+    sideHtml(side, racer, rivalHint) {
+        const label = side === "left" ? "왼쪽 자리" : "오른쪽 자리";
+        if (!racer) {
+            return '<div class="tv-side ' + side + ' waiting"><small>' + label + '</small><b>' + AccountHtml.esc(rivalHint || "상대") + '</b><span class="tv-car-name">입장하는 중…</span>'
+                + '<span class="tv-rate">&nbsp;</span><span class="tv-rate">&nbsp;</span></div>';
+        }
+        const lines = racer.bot ? ["🤖 컴퓨터가 운전해요", "&nbsp;"] : [this.rateLine("전체 승률", racer.rate), this.rateLine(TurboLapCourses.nameOf(this.course) + " 승률", racer.rate ? racer.rate.c[this.course] || { g: 0, w: 0 } : null)];
+        return '<div class="tv-side ' + side + (racer.me ? " me" : "") + '"><small>' + label + (racer.me ? " · 나" : "") + "</small>"
+            + "<b>" + (racer.bot ? "🤖 " : "") + AccountHtml.esc(racer.nick) + "</b>"
+            + '<span class="tv-car-name">🚗 ' + AccountHtml.esc(this.carLabel(racer.car)) + "</span>"
+            + lines.map((line) => '<span class="tv-rate">' + line + "</span>").join("") + "</div>";
+    }
+    rateLine(label, pair) {
+        if (!pair || !pair.g)
+            return AccountHtml.esc(label) + " <em>기록 없음</em>";
+        return AccountHtml.esc(label) + " <em>" + Math.round(pair.w / pair.g * 100) + "%</em> <small>" + pair.w + "승 " + (pair.g - pair.w) + "패</small>";
     }
 }
