@@ -620,10 +620,19 @@
         },
         "streak": {
           "$game": {
-            ".validate": "$game.matches(/^[a-z]{1,30}$/) && newData.hasChildren(['n', 'b', 'id']) && newData.child('id').val() !== data.child('id').val() && newData.child('n').val() <= (data.exists() ? data.child('n').val() : 0) + 1 && newData.child('b').val() >= newData.child('n').val() && newData.child('b').val() >= (data.exists() ? data.child('b').val() : 0) && newData.child('b').val() <= (data.exists() ? data.child('b').val() : 0) + 1",
+            ".validate": "$game.matches(/^[a-z]{1,30}$/) && newData.hasChildren(['n', 'b', 'id']) && newData.child('b').val() >= newData.child('n').val() && ((newData.child('id').val() !== data.child('id').val() && newData.child('n').val() <= (data.exists() ? data.child('n').val() : 0) + 1 && newData.child('b').val() >= (data.exists() ? data.child('b').val() : 0) && newData.child('b').val() <= (data.exists() ? data.child('b').val() : 0) + 1) || (data.exists() && newData.child('id').val() === data.child('id').val() && newData.child('n').val() === data.child('n').val() && newData.child('b').val() === data.child('b').val()))",
             "n": { ".validate": "newData.isNumber() && newData.val() >= 0" },
             "b": { ".validate": "newData.isNumber() && newData.val() >= 0" },
             "id": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60" },
+            "p": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60" },
+            "$other": { ".validate": false }
+          }
+        },
+        "pending": {
+          "$game": {
+            ".validate": "$game.matches(/^(teambattle|turbolap|fpsbattle|zombieoutbreak|snowroyale|waterballoon|minigames|volleyball|soccer)$/) && newData.hasChildren(['id', 'rep'])",
+            "id": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60" },
+            "rep": { ".validate": "newData.isString() && newData.val().length >= 2 && newData.val().length <= 6000" },
             "$other": { ".validate": false }
           }
         },

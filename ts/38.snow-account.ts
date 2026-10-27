@@ -234,24 +234,8 @@ class SnReportBuilder {
   }
 }
 
-class SnAccount {
-  private readonly profile = new SnAccountProfile();
-  private readonly dialog = new AccountStatsDialog<SnAccountStatsNode, SnAccountRecentEntry>(() => AccountMatchStore.forProfile(this.profile), new SnAccountView());
-  private sentKey = "";
-
-  bind(): void {
-    this.dialog.bindButtons();
-  }
-
-  openStats(): void {
-    this.dialog.open("stats");
-  }
-
-  record(report: SnAccountReport): void {
-    const key = AccountMatchKey.of(report.matchId);
-    const store = AccountMatchStore.forProfile(this.profile);
-    if (!window.PORTAL_USER || !store || key === this.sentKey) return;
-    this.sentKey = key;
-    store.record(report, null).catch(() => {});
+class SnAccount extends AccountGameAccount<SnAccountReport, SnAccountPlan, SnAccountStatsNode, SnAccountRecentEntry> {
+  constructor() {
+    super(new SnAccountProfile(), new SnAccountView());
   }
 }

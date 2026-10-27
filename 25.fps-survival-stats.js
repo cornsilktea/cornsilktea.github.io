@@ -147,24 +147,8 @@ class FpsStatsView {
         return head + AccountHtml.table(["팀", "닉네임", "처치", "쓰러짐", "입힌 피해"], rows);
     }
 }
-class FpsAccount {
+class FpsAccount extends AccountGameAccount {
     constructor() {
-        this.profile = new FpsProfile();
-        this.dialog = new AccountStatsDialog(() => AccountMatchStore.forProfile(this.profile), new FpsStatsView());
-        this.sentKey = "";
-    }
-    bind() {
-        this.dialog.bindButtons();
-    }
-    openStats() {
-        this.dialog.open("stats");
-    }
-    record(report) {
-        const key = AccountMatchKey.of(report.matchId);
-        const store = AccountMatchStore.forProfile(this.profile);
-        if (!window.PORTAL_USER || !store || key === this.sentKey)
-            return;
-        this.sentKey = key;
-        store.record(report, null).catch(() => { });
+        super(new FpsProfile(), new FpsStatsView());
     }
 }

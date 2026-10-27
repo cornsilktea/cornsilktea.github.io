@@ -185,24 +185,8 @@ class SnReportBuilder {
         return { matchId, mode: engine.mode, myIndex: myNum, players, progress, iLeft: true };
     }
 }
-class SnAccount {
+class SnAccount extends AccountGameAccount {
     constructor() {
-        this.profile = new SnAccountProfile();
-        this.dialog = new AccountStatsDialog(() => AccountMatchStore.forProfile(this.profile), new SnAccountView());
-        this.sentKey = "";
-    }
-    bind() {
-        this.dialog.bindButtons();
-    }
-    openStats() {
-        this.dialog.open("stats");
-    }
-    record(report) {
-        const key = AccountMatchKey.of(report.matchId);
-        const store = AccountMatchStore.forProfile(this.profile);
-        if (!window.PORTAL_USER || !store || key === this.sentKey)
-            return;
-        this.sentKey = key;
-        store.record(report, null).catch(() => { });
+        super(new SnAccountProfile(), new SnAccountView());
     }
 }

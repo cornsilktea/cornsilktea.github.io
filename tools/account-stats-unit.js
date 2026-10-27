@@ -1,12 +1,13 @@
 const fs = require("fs"), vm = require("vm"), path = require("path");
 const root = path.join(__dirname, "..");
-const files = ["account-match-kit.js", "account-stats.js", "24.turbo-lap-stats.js", "25.fps-survival-stats.js", "31.zombie-outbreak-stats.js", "38.snow-account.js", "39.balloon-account.js"];
+const files = ["match-kit.js", "account-match-kit.js", "account-stats.js", "24.turbo-lap-stats.js", "25.fps-survival-stats.js", "31.zombie-outbreak-stats.js", "38.snow-account.js", "39.balloon-account.js"];
 const names = ["AccountNumbers", "AccountRates", "AccountMatchKey", "AccountKeyLedger", "AccountForfeit", "AccountShape", "AccountRecentHeadCodec", "RecentMatchRing", "AccountLoginNotice", "RecentBlockList", "AccountGameProfile", "AccountMatchStore",
   "TeamBattleRates", "AccountMvpJudge", "TeamBattlePlan", "TeamBattleCodec", "TeamBattleRing", "AccountStatsMath", "AccountStatsTable", "ClassStatsSummary", "TeamBattleProfile", "AccountStatsStore",
   "TurboLapPlan", "TurboLapCodec", "TurboLapStatsMath", "TurboLapProfile", "TurboLapStatsView", "FpsPlan", "FpsCodec", "FpsStatsMath", "FpsProfile", "FpsStatsView",
   "ZombiePlan", "ZombieCodec", "ZombieStatsMath", "ZombieProfile", "ZombieStatsView", "SnAccountPlan", "SnAccountCodec", "SnAccountMath", "SnAccountProfile", "SnAccountView", "SnReportBuilder",
   "WbAccountPlan", "WbAccountCodec", "WbAccountMath", "WbAccountProfile", "WbAccountView", "WbReportBuilder",
-  "AccountClassRank", "RandomMatchPlan", "RandomMatchCodec", "RandomMatchMath", "RandomMatchProfile", "RandomMatchView"];
+  "AccountClassRank", "RandomMatchPlan", "RandomMatchCodec", "RandomMatchMath", "RandomMatchProfile", "RandomMatchView",
+  "AccountPendingCodec", "AccountMatchSender", "AccountPendingGuard", "MkStreakMath"];
 const src = files.map((f) => fs.readFileSync(path.join(root, f), "utf8")).join("\n") + "\n;({" + names.join(",") + "})";
 const K = vm.runInNewContext(src, { console, Math, Set, Map, Array, Object, Number, String, JSON, isFinite, Date, Promise, window: {}, WbBalance: { RATE: 30 } });
 
@@ -355,6 +356,89 @@ const randomReport = (extra) => Object.assign({ matchId: "rm1", result: "win", r
   const rankPatch = K.AccountClassRank.patch("soccer", user, "2-5", { g: 3, w: 2, x: 0 });
   check("반별 순위 요약: 반 칸에 쓰고 미분류 칸은 지움", rankPatch["gameRanks/soccer/2-5/u1"].g === 3 && rankPatch["gameRanks/soccer/none/u1"] === null && K.AccountClassRank.classKey("3-1") === "none");
 }
+/* 미리 적어 둔 패배(2026-10-27): 쓰기를 실제로 반영하는 가짜 데이터베이스로 판 시작 → 정상 종료 / 결과 없이 사라짐 → 정산을 흉내 낸다 */
+class LiveDb {
+  constructor(seed) { this.tree = { users: { u1: JSON.parse(JSON.stringify(seed || {})) } }; this.writes = []; }
+  read(p) { return Promise.resolve(this.at("users/u1/" + p)); }
+  at(p) { let node = this.tree; for (const part of p.split("/")) { node = node && typeof node === "object" ? node[part] : undefined; } return node === undefined ? null : JSON.parse(JSON.stringify(node)); }
+  updateRoot(values) {
+    this.writes.push(values);
+    Object.keys(values).forEach((k) => {
+      const parts = k.split("/"); let node = this.tree;
+      parts.slice(0, -1).forEach((part) => { node = node[part] = node[part] && typeof node[part] === "object" ? node[part] : {}; });
+      const v = values[k];
+      if (v === null) delete node[parts[parts.length - 1]]; else node[parts[parts.length - 1]] = JSON.parse(JSON.stringify(v, (key, value) => (value && value[".sv"] ? RULE_NOW : value)));
+    });
+    return Promise.resolve();
+  }
+}
+const pendingUser = { uid: "u1", name: "홍", email: "a@b", getToken: () => Promise.resolve("") };
+async function pendingCase(name, key, makeStore, lossReport, winReport, context) {
+  const db = new LiveDb();
+  const store = makeStore(db);
+  await store.arm(lossReport);
+  const armed = db.at("users/u1/pending/" + key);
+  const pendErrors = [];
+  RuleChecker.validate(RULES.pending.$game, armed, undefined, { $game: key }, "pending/" + key, pendErrors);
+  check(name + " 미리 적기: pending 에 보고 1개, 통계는 아직 그대로, 규칙 통과", !!armed && armed.id === store.keyOf(lossReport) && !db.at("users/u1/stats/" + key) && pendErrors.length === 0, pendErrors);
+  await store.record(winReport, context);
+  const recent = db.at("users/u1/recent/" + key) || {};
+  check(name + " 정상 종료: 진짜 결과로 기록하고 pending 지움", !db.at("users/u1/pending/" + key) && Object.keys(recent).length === 1 && recent[0].r === 1, recent);
+
+  const gone = new LiveDb();
+  await makeStore(gone).arm(lossReport);
+  const later = makeStore(gone);
+  await later.settlePending();
+  const lost = gone.at("users/u1/recent/" + key) || {};
+  const stats = gone.at("users/u1/stats/" + key);
+  check(name + " 사라진 판: 다음에 정산하면 패배 1판, pending 지움", !gone.at("users/u1/pending/" + key) && lost[0] && lost[0].r === 0 && stats && stats.g === 1 && stats.w === 0, [lost, stats]);
+  const settleRule = RuleChecker.check(key, gone.writes[gone.writes.length - 1], undefined, undefined);
+  check(name + " 사라진 판: 정산 쓰기가 규칙 통과", settleRule.errors.length === 0, settleRule.errors);
+
+  const twice = new LiveDb();
+  const s2 = makeStore(twice);
+  await s2.arm(lossReport);
+  const next = Object.assign(JSON.parse(JSON.stringify(winReport)), { matchId: "next_match" });
+  await s2.record(next, context);
+  const rows = Object.values(twice.at("users/u1/recent/" + key) || {});
+  check(name + " 사라진 판 뒤 다음 판: 먼저 패배 정산, 다음 판 승리, 판 수 2", rows.length === 2 && rows.filter((r) => r.r === 0).length === 1 && twice.at("users/u1/stats/" + key).g === 2 && !twice.at("users/u1/pending/" + key), rows);
+
+  const quiet = new LiveDb();
+  const s3 = makeStore(quiet);
+  await s3.arm(lossReport);
+  await s3.disarm(s3.keyOf(lossReport));
+  check(name + " 취소된 판: disarm 하면 아무것도 안 남음", !quiet.at("users/u1/pending/" + key) && !quiet.at("users/u1/recent/" + key));
+}
+const pendingChecks = (async () => {
+  await pendingCase("24번", "turbolap", (db) => new K.AccountMatchStore(db, pendingUser, new K.TurboLapProfile()), turboReport({ result: "lose" }), turboReport(), null);
+  await pendingCase("랜덤 승패(축구)", "soccer", (db) => new K.AccountMatchStore(db, pendingUser, new K.RandomMatchProfile("soccer")), randomReport({ result: "lose" }), randomReport(), null);
+  const leftReport = report({ iLeft: true, progress: 1, players: players({ 0: { left: true } }) });
+  await pendingCase("30번", "teambattle", (db) => new K.AccountStatsStore(db, pendingUser), leftReport, report(), judge);
+  check("보고 묶음: 너무 긴 보고는 미리 적지 않음", K.AccountPendingCodec.encode("k", { x: "가".repeat(7000) }) === null && K.AccountPendingCodec.decode({ id: "k", rep: "{bad" }).report === null);
+
+  const order = new LiveDb();
+  const sender = new K.AccountMatchSender(() => new K.AccountMatchStore(order, pendingUser, new K.TurboLapProfile()));
+  sender.arm(turboReport({ result: "lose" }));
+  sender.record(turboReport(), null);
+  sender.arm(turboReport({ result: "lose" }));
+  await new Promise((r) => setTimeout(r, 20));
+  check("기록 창구: 미리 적기 직후 진짜 결과 — 순서대로 보내 pending 이 남지 않고, 같은 판 다시 미리 적기는 무시", !order.at("users/u1/pending/turbolap") && order.at("users/u1/stats/turbolap").w === 1, order.writes.map((w) => Object.keys(w).length));
+
+  const S = K.MkStreakMath, rule = RULES.streak.$game;
+  const legal = (before, after) => { const errors = []; RuleChecker.validate(rule, after, before.id ? before : undefined, { $game: "soccer" }, "streak", errors); return errors.length === 0; };
+  const three = { n: 3, b: 5, id: "m3" };
+  const armed = S.arm(three, "m4");
+  check("연승 미리 적기: 연승은 그대로, p 에 이번 판", armed.n === 3 && armed.p === "m4" && legal(three, armed), armed);
+  const won = S.next(armed, "m4", "win");
+  check("연승 미리 적기 → 승리: 4연승, p 지움, 규칙 통과", won.n === 4 && !won.p && won.id === "m4" && legal(armed, won), won);
+  const settled = S.settle(armed);
+  check("연승 사라진 판: 정산하면 0연승(최고 5 유지), 규칙 통과", settled.n === 0 && settled.b === 5 && settled.id === "m4" && legal(armed, settled), settled);
+  const rearm = S.arm(armed, "m5");
+  check("연승 사라진 판 뒤 다음 판 미리 적기: 정산과 함께 한 번에", rearm.n === 0 && rearm.id === "m4" && rearm.p === "m5" && legal(armed, rearm), rearm);
+  const undone = S.disarm(armed, "m4");
+  check("연승 취소된 판: p 만 지움, 규칙 통과", undone.n === 3 && !undone.p && legal(armed, undone) && S.disarm(three, "m4") === null, undone);
+  check("연승 규칙: 같은 판 표시로 연승을 올리면 거부", !legal(three, { n: 9, b: 9, id: "m3", p: "x" }) && S.arm(armed, "m4") === null && S.normalize({ n: 1, b: 1, id: "a", p: "a" }).p === undefined);
+})();
 const gameChecks = (async () => {
   await turbo.verifyStore(turboReport());
   await fps.verifyStore(fpsReport());
@@ -364,7 +448,7 @@ const gameChecks = (async () => {
   await balloon.verifyStore(K.WbReportBuilder.fromEnd("m39", wbMatch, wbEnd, "a"));
   for (const key of ["minigames", "volleyball", "soccer"]) await new GameCase(key, new K.RandomMatchProfile(key), K.RandomMatchCodec, key).verifyStore(randomReport());
 })();
-Promise.all([done, gameChecks]).then(() => {
+Promise.all([done, gameChecks, pendingChecks]).then(() => {
   if (failures.length) { console.log("실패 " + failures.length + "개\n" + failures.join("\n")); process.exit(1); }
   console.log("통과 " + passed + " · 문제 0");
 }).catch((e) => { console.log("오류", e); process.exit(1); });

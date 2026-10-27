@@ -1047,6 +1047,8 @@ class MkRandomFlow {
         this.startedFor = "";
         this.reported = false;
         this.fallbackFor = 0;
+        this.streakArmedFor = "";
+        this.statsArmedFor = "";
         this.seenRivals = new Set();
         this.paths = MkPaths.forGame(options.gameRoot, options.queue);
         this.directory = new MkPartyDirectory(database, clock, this.paths, options.partyLimit);
@@ -1116,8 +1118,34 @@ class MkRandomFlow {
     // 방장 기기에서 일반 방 사람 수가 바뀔 때마다 부른다. 표에 적힌 사람이 다 모이면 바로 시작한다.
     roomChanged(humans, hosting, inLobby) {
         this.notePresentRivals();
+        this.armMatch();
         if (this.current && hosting && inLobby && humans >= this.current.expect)
             this.startNow();
+    }
+    // 경기장에 들어온 판은 결과가 나기 전에 사라져도(← 목록으로·탭 닫기) 패배로 남게 미리 적어 둔다.
+    // 경기 화면을 따로 알리는 게임은 판이 시작될 때 이것도 부른다(같은 판은 한 번만 적힌다).
+    armMatch() {
+        const ticket = this.current;
+        if (!ticket || !this.party || this.reported)
+            return;
+        if (this.streakArmedFor !== ticket.matchId) {
+            this.streakArmedFor = ticket.matchId;
+            this.streak.arm(ticket.matchId);
+        }
+        const guard = this.guard();
+        if (guard && this.statsArmedFor !== ticket.matchId && guard.arm(ticket))
+            this.statsArmedFor = ticket.matchId;
+    }
+    disarmMatch(ticket) {
+        if (this.streakArmedFor === ticket.matchId)
+            this.streak.disarm(ticket.matchId);
+        const guard = this.guard();
+        if (guard && this.statsArmedFor === ticket.matchId)
+            guard.disarm(ticket);
+        this.streakArmedFor = this.statsArmedFor = "";
+    }
+    guard() {
+        return (this.options.stats && this.options.stats.guard) || null;
     }
     // 매칭된 상대가 끝내 경기장에 안 들어오면 게임이 그 자리를 AI 로 채운다. 그 판 전적에 그 학생 이름이 남지 않게,
     // 방에 한 번이라도 들어온 상대만 모아 둔다(경기 중에 나간 상대는 함께 한 것으로 본다).
@@ -1149,6 +1177,10 @@ class MkRandomFlow {
         this.party.report(ticket, final);
         if (this.options.stats && this.options.stats.recordOutcome)
             this.options.stats.recordOutcome(ticket, final);
+        // 진 판이 아니면 미리 적은 패배를 치운다. 게임이 결과를 계정에 남기지 못하고 화면을 떠나도 거짓 패배가 되지 않게.
+        const guard = this.guard();
+        if (guard && final.result !== "lose" && this.statsArmedFor === ticket.matchId)
+            guard.disarm(ticket);
         this.streak.apply(ticket.matchId, final.result).then(() => {
             this.panel.setStreak(this.streak.current());
             onStreak();
@@ -1171,6 +1203,8 @@ class MkRandomFlow {
     backToParty(message) {
         const note = this.reported ? "" : message;
         this.clearStartTimer();
+        if (this.current && !this.reported)
+            this.disarmMatch(this.current);
         if (this.current && this.party)
             this.party.clearTicket(this.current.matchId);
         this.current = null;
@@ -1199,6 +1233,9 @@ class MkRandomFlow {
         this.panel.setNotice("");
         this.panel.setStreak(this.streak.current());
         this.streak.load().then(() => { this.panel.setStreak(this.streak.current()); this.render(); });
+        const guard = this.guard();
+        if (guard)
+            guard.settle();
         this.hooks.showParty();
     }
     async toggleSearch() {
@@ -1247,6 +1284,7 @@ class MkRandomFlow {
             this.panel.setNotice("경기장에 들어가지 못했어요. 다시 매칭해 주세요.");
             return;
         }
+        this.armMatch();
         if (hosting) {
             this.clearStartTimer();
             this.startTimer = setTimeout(() => this.startNow(), this.options.startWaitMs || MkRandomFlow.START_WAIT_MS);
@@ -1378,14 +1416,34 @@ class MkStreakMath {
     static normalize(raw) {
         const value = (raw && typeof raw === "object" ? raw : {});
         const n = MkStreakMath.count(value.n);
-        return { n, b: Math.max(n, MkStreakMath.count(value.b)), id: typeof value.id === "string" ? value.id : "" };
+        const record = { n, b: Math.max(n, MkStreakMath.count(value.b)), id: typeof value.id === "string" ? value.id : "" };
+        if (typeof value.p === "string" && value.p && value.p !== record.id)
+            record.p = value.p;
+        return record;
+    }
+    // 결과 없이 사라진 판(p)을 진 것으로 정리한다. 남은 판이 없으면 그대로.
+    static settle(before) {
+        return before.p ? { n: 0, b: before.b, id: before.p } : { n: before.n, b: before.b, id: before.id };
+    }
+    static arm(before, matchId) {
+        const id = MkStreakMath.key(matchId);
+        if (!id || before.id === id || before.p === id)
+            return null;
+        return { ...MkStreakMath.settle(before), p: id };
+    }
+    static disarm(before, matchId) {
+        const id = MkStreakMath.key(matchId);
+        return id && before.p === id ? { n: before.n, b: before.b, id: before.id } : null;
     }
     static next(before, matchId, result) {
         const id = MkStreakMath.key(matchId);
         if (!id || before.id === id)
             return null;
-        const n = result === "win" ? before.n + 1 : result === "lose" ? 0 : before.n;
-        return { n, b: Math.max(before.b, n), id };
+        const base = before.p === id ? MkStreakMath.disarm(before, matchId) : MkStreakMath.settle(before);
+        if (base.id === id)
+            return null;
+        const n = result === "win" ? base.n + 1 : result === "lose" ? 0 : base.n;
+        return { n, b: Math.max(base.b, n), id };
     }
     static key(matchId) {
         return String(matchId || "").replace(/[.#$\[\]\/\s]/g, "_").slice(0, MkStreakMath.KEY_MAX);
@@ -1402,7 +1460,7 @@ MkStreakMath.EMPTY = { n: 0, b: 0, id: "" };
 MkStreakMath.KEY_MAX = 60;
 // 연승은 팀 대기실이 아니라 아이디(로그인 계정)마다 센다(2026-10-27 선생님 요청).
 // 로그인했으면 users/<uid>/streak/<게임 루트> = {n 지금 연승, b 최고 연승, id 마지막 판}, 로그인 전(배포용 링크)은 이 기기 localStorage.
-// 요청: 대기실에 들어갈 때 읽기 1번, 판이 끝날 때 쓰기 1번(자기 계정에만). 폴링 없음.
+// 요청: 대기실에 들어갈 때 읽기 1번, 판을 시작할 때 미리 패배 적기 1번, 판이 끝날 때 쓰기 1번(자기 계정에만). 폴링 없음.
 class MkPersonalStreak {
     constructor(game) {
         this.game = game;
@@ -1415,13 +1473,27 @@ class MkPersonalStreak {
     label() {
         return MkStreakMath.label(this.value.n);
     }
+    // 읽었을 때 결과 없는 판이 남아 있으면 그 판은 이 화면에서 진행 중이 아니니(새로 연 화면) 패배로 정산해 둔다.
     load() {
-        this.pending = this.pending.then(() => this.read()).then((raw) => { this.value = MkStreakMath.normalize(raw); }, () => undefined);
+        this.pending = this.pending.then(() => this.read()).then((raw) => {
+            const stored = MkStreakMath.normalize(raw);
+            this.value = MkStreakMath.settle(stored);
+            return stored.p ? this.save(this.value).catch(() => undefined) : undefined;
+        }, () => undefined);
         return this.pending;
     }
+    arm(matchId) {
+        return this.change((before) => MkStreakMath.arm(before, matchId));
+    }
+    disarm(matchId) {
+        return this.change((before) => MkStreakMath.disarm(before, matchId));
+    }
     apply(matchId, result) {
+        return this.change((before) => MkStreakMath.next(before, matchId, result));
+    }
+    change(step) {
         this.pending = this.pending.then(() => {
-            const next = MkStreakMath.next(this.value, matchId, result);
+            const next = step(this.value);
             if (!next)
                 return undefined;
             this.value = next;

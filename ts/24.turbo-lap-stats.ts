@@ -218,28 +218,8 @@ class TurboLapStatsView implements AccountDialogView<TurboLapStatsNode, TurboLap
   }
 }
 
-class TurboLapAccount {
-  private readonly profile = new TurboLapProfile();
-  private readonly dialog: AccountStatsDialog<TurboLapStatsNode, TurboLapRecentEntry>;
-  private sentKey = "";
-
+class TurboLapAccount extends AccountGameAccount<TurboLapReport, TurboLapPlan, TurboLapStatsNode, TurboLapRecentEntry> {
   constructor(carLabel: (id: string) => string) {
-    this.dialog = new AccountStatsDialog<TurboLapStatsNode, TurboLapRecentEntry>(() => AccountMatchStore.forProfile(this.profile), new TurboLapStatsView(carLabel));
-  }
-
-  bind(): void {
-    this.dialog.bindButtons();
-  }
-
-  openStats(): void {
-    this.dialog.open("stats");
-  }
-
-  record(report: TurboLapReport): void {
-    const key = AccountMatchKey.of(report.matchId);
-    const store = AccountMatchStore.forProfile(this.profile);
-    if (!window.PORTAL_USER || !store || key === this.sentKey) return;
-    this.sentKey = key;
-    store.record(report, null).catch(() => {});
+    super(new TurboLapProfile(), new TurboLapStatsView(carLabel));
   }
 }

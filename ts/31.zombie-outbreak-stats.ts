@@ -212,24 +212,8 @@ class ZombieStatsView implements AccountDialogView<ZombieStatsNode, ZombieRecent
   }
 }
 
-class ZombieAccount {
-  private readonly profile = new ZombieProfile();
-  private readonly dialog = new AccountStatsDialog<ZombieStatsNode, ZombieRecentEntry>(() => AccountMatchStore.forProfile(this.profile), new ZombieStatsView());
-  private sentKey = "";
-
-  bind(): void {
-    this.dialog.bindButtons();
-  }
-
-  openStats(): void {
-    this.dialog.open("stats");
-  }
-
-  record(report: ZombieReport): void {
-    const key = AccountMatchKey.of(report.matchId);
-    const store = AccountMatchStore.forProfile(this.profile);
-    if (!window.PORTAL_USER || !store || key === this.sentKey) return;
-    this.sentKey = key;
-    store.record(report, null).catch(() => {});
+class ZombieAccount extends AccountGameAccount<ZombieReport, ZombiePlan, ZombieStatsNode, ZombieRecentEntry> {
+  constructor() {
+    super(new ZombieProfile(), new ZombieStatsView());
   }
 }

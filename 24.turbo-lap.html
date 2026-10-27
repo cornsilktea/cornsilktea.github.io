@@ -500,9 +500,9 @@
 
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="character-maker.js?v=20261026a"></script>
-<script charset="utf-8" src="match-kit.js?v=20261027a"></script>
-<script charset="utf-8" src="account-match-kit.js?v=20261027a"></script>
-<script charset="utf-8" src="24.turbo-lap-stats.js?v=20261027a"></script>
+<script charset="utf-8" src="match-kit.js?v=20261027b"></script>
+<script charset="utf-8" src="account-match-kit.js?v=20261027b"></script>
+<script charset="utf-8" src="24.turbo-lap-stats.js?v=20261027b"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
 <script type="module">
@@ -4803,6 +4803,7 @@ function onStatus(st) {
   if (st === "lobby") { resetMatchLocal(); BT.lobbyCarSig = ""; showCard(turboRandom.roomCard()); playersChanged(); return; }
   if (!BT.match && (st === "countdown" || st === "playing")) startMatchLocal();
   if (st === "ended") endMatchLocal();
+  turboRandom.armMatch();
 }
 function setBattleHud(on) {
   const spec = on && BT.spec;
@@ -5472,7 +5473,7 @@ class TurboRandomMatch {
     if (this.flow) return this.flow;
     const db = await connectDb();
     if (this.flow) return this.flow;
-    const options = { gameRoot: "turbolap", queue: "turbolap", partyLimit: 1, matcher: new MkVersusMatcher(1, TurboRandomMatch.MATCHER_TIMING), solo: true, allowBots: false, aiFallbackMs: TurboRandomMatch.AI_FALLBACK_MS, stats: new AccountStatsOpener(() => turboAccount.openStats()),
+    const options = { gameRoot: "turbolap", queue: "turbolap", partyLimit: 1, matcher: new MkVersusMatcher(1, TurboRandomMatch.MATCHER_TIMING), solo: true, allowBots: false, aiFallbackMs: TurboRandomMatch.AI_FALLBACK_MS, stats: new AccountStatsOpener(() => turboAccount.openStats(), turboAccount.pendingGuard(ticket => this.forfeitReport(ticket))),
       intro: "매칭 시작을 누르면 아무 학생과 1대1로 달려요. 코스와 출발 자리는 무작위예요." };
     const panel = new MkPartyPanel($("overlay"), $("partyMount"), options);
     this.flow = new MkRandomFlow(db, { now: tnow }, BT.myId, options, this, panel);
@@ -5555,6 +5556,7 @@ class TurboRandomMatch {
     if (BT.match.firstFinAt) return 1;
     return standings().reduce((most, r) => Math.max(most, r.fin ? 1 : OPEN ? r.prog : r.prog / LAPS), 0);
   }
+  armMatch() { if (this.flow) this.flow.armMatch(); }
   forfeits() {
     return !!this.flow && !!BT.match && !BT.spec && BT.status !== "ended" && this.flow.forfeitApplies(this.raceProgress());
   }
@@ -5564,8 +5566,12 @@ class TurboRandomMatch {
   recordBeforeLeave() {
     const ticket = this.ticket();
     if (!ticket) return;
-    if (this.forfeits()) { turboAccount.record(this.accountReport(ticket, standings().map(r => Object.assign({ nick: nickOf(r.id), team: (BT.players[r.id] || {}).team }, r)), "lose")); this.flow.matchEnded({ result: "lose", rivals: this.racingRivals() }); return; }
+    if (this.forfeits()) { turboAccount.record(this.forfeitReport(ticket)); this.flow.matchEnded({ result: "lose", rivals: this.racingRivals() }); return; }
     if (BT.status === "ended" && cardNow === "bdone") { this.settleFor = this.settledFor = ticket.matchId; renderResult(); }
+  }
+  forfeitReport(ticket) {
+    if (!this.forfeits()) return null;
+    return this.accountReport(ticket, standings().map(r => Object.assign({ nick: nickOf(r.id), team: (BT.players[r.id] || {}).team }, r)), "lose");
   }
   decorateResult(rows, quitWinner) {
     const ticket = this.ticket();

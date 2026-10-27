@@ -188,24 +188,8 @@ class WbReportBuilder {
         return { matchId, mode: engine.mode, myIndex, players, progress, iLeft: true };
     }
 }
-class WbAccount {
+class WbAccount extends AccountGameAccount {
     constructor() {
-        this.profile = new WbAccountProfile();
-        this.dialog = new AccountStatsDialog(() => AccountMatchStore.forProfile(this.profile), new WbAccountView());
-        this.sentKey = "";
-    }
-    bind() {
-        this.dialog.bindButtons();
-    }
-    openStats() {
-        this.dialog.open("stats");
-    }
-    record(report) {
-        const key = AccountMatchKey.of(report.matchId);
-        const store = AccountMatchStore.forProfile(this.profile);
-        if (!window.PORTAL_USER || !store || key === this.sentKey)
-            return;
-        this.sentKey = key;
-        store.record(report, null).catch(() => { });
+        super(new WbAccountProfile(), new WbAccountView());
     }
 }

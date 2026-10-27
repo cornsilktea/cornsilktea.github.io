@@ -237,24 +237,8 @@ class WbReportBuilder {
   }
 }
 
-class WbAccount {
-  private readonly profile = new WbAccountProfile();
-  private readonly dialog = new AccountStatsDialog<WbAccountStatsNode, WbAccountRecentEntry>(() => AccountMatchStore.forProfile(this.profile), new WbAccountView());
-  private sentKey = "";
-
-  bind(): void {
-    this.dialog.bindButtons();
-  }
-
-  openStats(): void {
-    this.dialog.open("stats");
-  }
-
-  record(report: WbAccountReport): void {
-    const key = AccountMatchKey.of(report.matchId);
-    const store = AccountMatchStore.forProfile(this.profile);
-    if (!window.PORTAL_USER || !store || key === this.sentKey) return;
-    this.sentKey = key;
-    store.record(report, null).catch(() => {});
+class WbAccount extends AccountGameAccount<WbAccountReport, WbAccountPlan, WbAccountStatsNode, WbAccountRecentEntry> {
+  constructor() {
+    super(new WbAccountProfile(), new WbAccountView());
   }
 }

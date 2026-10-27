@@ -350,9 +350,9 @@
 
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="character-maker.js?v=20261026a"></script>
-<script charset="utf-8" src="match-kit.js?v=20261027a"></script>
-<script charset="utf-8" src="account-match-kit.js?v=20261027a"></script>
-<script charset="utf-8" src="31.zombie-outbreak-stats.js?v=20261027a"></script>
+<script charset="utf-8" src="match-kit.js?v=20261027b"></script>
+<script charset="utf-8" src="account-match-kit.js?v=20261027b"></script>
+<script charset="utf-8" src="31.zombie-outbreak-stats.js?v=20261027b"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <div id="loading">3D 학교를 준비하는 중입니다…</div>
 
@@ -2666,6 +2666,7 @@ function onStatus(st) {
   } else if (st === "ended") {
     if (screenNow === "game" || screenNow === "lobby") showScreen("result");
   }
+  zombieRandom.armMatch();
 }
 
 let lobbyQueued = false;
@@ -3903,7 +3904,7 @@ class ZombieRandomMatch {
     this.quiet = false;
     this.flow = null;
     if (!db) return;
-    const options = { gameRoot: "zombieoutbreak", queue: "zombieoutbreak", partyLimit: ZombieRandomMatch.PARTY_LIMIT, matcher: new MkFreeForAllMatcher(ZombieRandomMatch.PARTY_LIMIT, MAX_PLAYERS), solo: true, stats: new AccountStatsOpener(() => zombieReporter.account.openStats()),
+    const options = { gameRoot: "zombieoutbreak", queue: "zombieoutbreak", partyLimit: ZombieRandomMatch.PARTY_LIMIT, matcher: new MkFreeForAllMatcher(ZombieRandomMatch.PARTY_LIMIT, MAX_PLAYERS), solo: true, stats: new AccountStatsOpener(() => zombieReporter.account.openStats(), new AccountLazyGuard(() => zombieReporter.guard)),
       intro: "매칭 시작을 누르면 다른 학생들과 최대 " + MAX_PLAYERS + "명이 모여요. 좀비는 시작할 때 무작위로 정해지고, 모자란 자리는 AI가 채워요." };
     this.flow = new MkRandomFlow(db, { now: serverNow }, myId, options, this, new MkPartyPanel($("scrParty"), $("partyMount"), options));
   }
@@ -3966,6 +3967,7 @@ class ZombieRandomMatch {
   progress() { return room.status === "playing" && room.startAt ? MkForfeit.clamp((serverNow() - room.startAt) / ROUND_MS) : 0; }
   forfeitApplies() { return !!this.flow && this.flow.forfeitApplies(this.progress()); }
   forfeitIfLate() { if (this.flow) this.flow.forfeitIfLate(this.progress()); }
+  armMatch() { if (this.flow) this.flow.armMatch(); }
   roomChanged() { if (this.flow && room.ref) this.flow.roomChanged(participantCount(), isHost(), room.status === "lobby"); }
   decorateResult(final) {
     const ticket = this.ticket();
@@ -3983,7 +3985,7 @@ class ZombieRandomMatch {
 const zombieRandom = new ZombieRandomMatch();
 
 class ZombieMatchReporter {
-  constructor() { this.account = new ZombieAccount(); this.account.bind(); }
+  constructor() { this.account = new ZombieAccount(); this.account.bind(); this.guard = this.account.pendingGuard(() => this.forfeitReport()); }
   matchId() { const ticket = zombieRandom.ticket(); return ticket ? ticket.matchId : room.code + "_" + room.startAt; }
   infectsBy(id) { return okeys(room.players).filter(other => room.players[other] && room.players[other].infectedBy === id).length; }
   rowOf(id, name, result, secs) { return { name, role: ZombieRoles.fromResult(result), secs, infects: this.infectsBy(id), left: !room.players[id], ai: isBot(id) }; }
@@ -4002,6 +4004,7 @@ class ZombieMatchReporter {
   ended() { if (room.ref && room.final && room.final[myId] && room.winner) this.account.record(this.finishedReport()); }
   forfeitApplies() { return !!room.ref && room.status === "playing" && roundIds().indexOf(myId) >= 0 && (!!zombieRandom.ticket() || zombieRandom.progress() >= AccountForfeit.AT); }
   leaving() { if (this.forfeitApplies()) this.account.record(this.roundReport()); }
+  forfeitReport() { return this.forfeitApplies() && zombieRandom.ticket() ? this.roundReport() : null; }
 }
 const zombieReporter = new ZombieMatchReporter();
 

@@ -13,7 +13,9 @@
    최근 매치 한 판은 공통 머리 {v, id, at(서버 시각), r(1승/0패)} + 게임별 몸통이다.
    랜덤 매칭만 있고 게임별 통계가 없는 게임(32·34·35)은 RandomMatchAccount 가 승패만 같은 구조로 남긴다.
 
-   요청 빈도: 경기 끝 쓰기 1번(읽기-수정-쓰기 + 여러 경로 PATCH 1번), 창을 열 때 읽기 1번. 그 외 요청은 만들지 않는다.
+     users/<uid>/pending/<게임키>       랜덤 매칭 판을 시작할 때 미리 적어 두는 패배 보고 {id, rep}(AccountPendingCodec 설명 참고)
+   요청 빈도: 랜덤 매칭 판 시작 때 읽기 1번 + 쓰기 1번(미리 적기), 경기 끝 쓰기 1번(읽기-수정-쓰기 + 여러 경로 PATCH 1번, 미리 적은 보고도 같은 PATCH 에서 지움),
+   창을 열 때 읽기 1번. 그 외 요청은 만들지 않는다.
    이 파일의 계산 클래스는 화면도 통신도 몰라서 tools/account-stats-unit.js 가 node 에서 직접 검사한다.
    ===================================================================== */
 class AccountNumbers {
@@ -181,6 +183,9 @@ class AccountGameProfile {
     get recentPath() {
         return "recent/" + this.gameKey;
     }
+    get pendingPath() {
+        return "pending/" + this.gameKey;
+    }
     /* 교사 화면 반별 순위에 보일 판·승·게임별 숫자 하나(x). 자식이 정하지 않으면 순위 요약을 쓰지 않는다 */
     rankFields(node) {
         return null;
@@ -192,7 +197,34 @@ class AccountGameProfile {
         const fields = this.rankFields(node);
         return fields ? AccountClassRank.patch(this.gameKey, user, extraRaw, fields) : {};
     }
+    /* 미리 적어 둔 패배를 나중에 정산할 때 쓰는 기록 맥락. 나간 판이라 맥락이 결과를 바꾸지 않는 게임은 null 로 충분하다 */
+    abandonedContext() {
+        return null;
+    }
 }
+/* 랜덤 매칭 판을 시작할 때 "이 판을 나가면 남을 패배 보고"를 users/<uid>/pending/<게임키> 에 미리 적어 둔다(2026-10-27 선생님 요청).
+   판이 정상으로 끝나면 진짜 결과를 기록하는 같은 PATCH 에서 지우고, ← 목록으로·탭 닫기·기기 꺼짐처럼 결과를 못 남기고 사라지면
+   다음에 그 게임을 기록할 때(다음 판 시작·끝, 랜덤 매칭 대기실 입장) 그 보고를 패배로 정산한다.
+   통계 칸에 바로 패배를 더했다가 고치는 대신 이렇게 하는 까닭: 규칙이 판 수·승·패를 줄이는 쓰기를 막아(점수 조작 방지) 패배를 승리로 바꿀 수 없다.
+   보고는 JSON 글자 하나로 저장한다 — 빈 배열·null 이 데이터베이스에서 사라져 모양이 바뀌지 않게. */
+class AccountPendingCodec {
+    static encode(key, report) {
+        const rep = JSON.stringify(report);
+        return rep && rep.length <= AccountPendingCodec.REPORT_MAX ? { id: key, rep } : null;
+    }
+    static decode(raw) {
+        const stored = raw;
+        if (!stored || typeof stored !== "object" || typeof stored.id !== "string" || !stored.id)
+            return null;
+        try {
+            return { id: stored.id, report: typeof stored.rep === "string" ? JSON.parse(stored.rep) : null };
+        }
+        catch (error) {
+            return { id: stored.id, report: null };
+        }
+    }
+}
+AccountPendingCodec.REPORT_MAX = 6000;
 class AccountMatchStore {
     constructor(database, user, profile) {
         this.database = database;
@@ -211,11 +243,63 @@ class AccountMatchStore {
     loadRecent() {
         return this.database.read(this.profile.recentPath).then((raw) => RecentMatchRing.decodeAll(raw, (item) => this.profile.decodeRecent(item)));
     }
+    keyOf(report) {
+        return AccountMatchKey.of(this.profile.matchIdOf(report));
+    }
     async record(report, context) {
+        const key = this.keyOf(report);
+        const pending = await this.settleOtherThan(key);
+        return this.write(report, context, !!pending && pending.id === key);
+    }
+    async arm(report) {
+        const key = this.keyOf(report);
+        const pending = await this.settleOtherThan(key);
+        if (pending && pending.id === key)
+            return "armed";
+        const stored = AccountPendingCodec.encode(key, report);
+        if (!stored)
+            return "skip";
+        await this.database.updateRoot({ [this.pendingAddress()]: stored });
+        return "armed";
+    }
+    async disarm(key) {
+        const pending = await this.readPending();
+        if (pending && pending.id === key)
+            await this.database.updateRoot({ [this.pendingAddress()]: null });
+    }
+    async settlePending() {
+        await this.settleOtherThan("");
+    }
+    readPending() {
+        return this.database.read(this.profile.pendingPath).then((raw) => AccountPendingCodec.decode(raw));
+    }
+    pendingAddress() {
+        return "users/" + this.user.uid + "/" + this.profile.pendingPath;
+    }
+    /* 다른 판의 패배 보고가 남아 있으면 먼저 패배로 기록하고 지운다. 지금 판의 보고면 그대로 돌려준다 */
+    async settleOtherThan(key) {
+        const pending = await this.readPending();
+        if (!pending || pending.id === key)
+            return pending;
+        if (pending.report)
+            await this.write(pending.report, this.profile.abandonedContext(), true);
+        else
+            await this.database.updateRoot({ [this.pendingAddress()]: null });
+        return null;
+    }
+    async write(report, context, clearPending) {
         const profile = this.profile;
         const plan = profile.planOf(report, context);
+        const values = {};
+        if (clearPending)
+            values[this.pendingAddress()] = null;
+        const finish = async (result) => {
+            if (Object.keys(values).length)
+                await this.database.updateRoot(values);
+            return result;
+        };
         if (!plan.recordsRecent)
-            return "skip";
+            return finish("skip");
         const key = AccountMatchKey.of(profile.matchIdOf(report));
         const extraPath = profile.extraReadPath();
         const [statsRaw, recentRaw, extraRaw] = await Promise.all([
@@ -225,20 +309,87 @@ class AccountMatchStore {
         ]);
         const slot = RecentMatchRing.chooseSlot(recentRaw, key);
         if (slot < 0)
-            return "duplicate";
+            return finish("duplicate");
         const userRoot = "users/" + this.user.uid + "/";
-        const values = {};
-        values[userRoot + profile.recentPath + "/" + slot] = profile.encodeRecent(report, key, plan.win);
+        const recent = {};
+        recent[userRoot + profile.recentPath + "/" + slot] = profile.encodeRecent(report, key, plan.win);
         if (plan.countsStats) {
             const change = profile.applyStats(statsRaw, report, plan, key, Date.now());
             if (!change)
-                return "duplicate";
+                return finish("duplicate");
             const statsRoot = userRoot + profile.statsPath + "/";
-            Object.keys(change.patch).forEach((path) => { values[statsRoot + path] = change.patch[path]; });
-            Object.assign(values, profile.extraPatch(this.user, extraRaw, change.node));
+            Object.keys(change.patch).forEach((path) => { recent[statsRoot + path] = change.patch[path]; });
+            Object.assign(recent, profile.extraPatch(this.user, extraRaw, change.node));
         }
-        await this.database.updateRoot(values);
-        return plan.countsStats ? "stats" : "recent";
+        Object.assign(values, recent);
+        return finish(plan.countsStats ? "stats" : "recent");
+    }
+}
+/* 한 게임 화면이 쓰는 계정 기록 창구. 미리 적기·지우기·진짜 기록을 차례대로 보내(앞 요청이 끝난 뒤 다음 요청)
+   "진짜 결과를 쓴 뒤에 늦게 도착한 미리 적기"가 남아 거짓 패배가 되는 일을 막고, 같은 판을 두 번 보내지 않는다 */
+class AccountMatchSender {
+    constructor(storeOf) {
+        this.storeOf = storeOf;
+        this.sentKey = "";
+        this.armedKey = "";
+        this.queue = Promise.resolve();
+    }
+    record(report, context) {
+        const store = this.storeOf();
+        if (!store)
+            return;
+        const key = store.keyOf(report);
+        if (key === this.sentKey)
+            return;
+        this.sentKey = key;
+        this.armedKey = "";
+        this.enqueue(() => store.record(report, context));
+    }
+    arm(report) {
+        const store = this.storeOf();
+        if (!store)
+            return;
+        const key = store.keyOf(report);
+        if (key === this.sentKey || key === this.armedKey)
+            return;
+        this.armedKey = key;
+        this.enqueue(() => store.arm(report));
+    }
+    disarm(matchId) {
+        const store = this.storeOf();
+        const key = AccountMatchKey.of(matchId);
+        if (!store || key !== this.armedKey)
+            return;
+        this.armedKey = "";
+        this.enqueue(() => store.disarm(key));
+    }
+    settle() {
+        const store = this.storeOf();
+        if (store)
+            this.enqueue(() => store.settlePending());
+    }
+    enqueue(task) {
+        this.queue = this.queue.then(task).catch(() => undefined);
+    }
+}
+/* 랜덤 매칭 판의 패배 보고를 만들 줄 아는 게임 쪽 연결. buildForfeit 가 null 이면 아직 경기 전이라 다음 기회에 다시 시도한다 */
+class AccountPendingGuard {
+    constructor(sender, buildForfeit) {
+        this.sender = sender;
+        this.buildForfeit = buildForfeit;
+    }
+    arm(ticket) {
+        const report = this.buildForfeit(ticket);
+        if (!report)
+            return false;
+        this.sender.arm(report);
+        return true;
+    }
+    disarm(ticket) {
+        this.sender.disarm(ticket.matchId);
+    }
+    settle() {
+        this.sender.settle();
     }
 }
 class AccountHtml {
@@ -566,22 +717,64 @@ class RandomMatchAccount {
     constructor(gameKey, title, ranked) {
         this.profile = new RandomMatchProfile(gameKey);
         this.dialog = new AccountStatsDialog(() => AccountMatchStore.forProfile(this.profile), new RandomMatchView(title, ranked));
+        this.sender = new AccountMatchSender(() => AccountMatchStore.forProfile(this.profile));
+        this.guard = new AccountPendingGuard(this.sender, (ticket) => RandomMatchCodec.fromOutcome(ticket, { result: "lose" }));
     }
     open() {
         this.dialog.open("stats");
     }
     recordOutcome(ticket, outcome) {
-        const store = AccountMatchStore.forProfile(this.profile);
-        if (store)
-            store.record(RandomMatchCodec.fromOutcome(ticket, outcome), null).catch(() => undefined);
+        this.sender.record(RandomMatchCodec.fromOutcome(ticket, outcome), null);
     }
 }
-/* 게임별 통계 창이 이미 있는 게임(24·25·30·31·38·39)은 팀 대기실 버튼이 그 창을 열기만 한다 */
+/* 게임별 통계 창이 이미 있는 게임(24·25·30·31·38·39)은 팀 대기실 버튼이 그 창을 열고, 미리 적는 패배는 게임이 넘긴 guard 가 맡는다 */
 class AccountStatsOpener {
-    constructor(opener) {
+    constructor(opener, guard) {
         this.opener = opener;
+        this.guard = guard;
     }
     open() {
         this.opener();
+    }
+}
+/* 게임별 통계 창이 있는 게임(24·25·31·38·39)의 계정 쪽 묶음: 통계 창 + 기록 창구 + 미리 적는 패배 연결.
+   자식은 자기 profile·view 만 넘긴다. 30번은 맥락(MVP 판정)이 있어 AccountMatchSender 를 직접 쓴다 */
+class AccountGameAccount {
+    constructor(profile, view) {
+        this.dialog = new AccountStatsDialog(() => AccountMatchStore.forProfile(profile), view);
+        this.sender = new AccountMatchSender(() => AccountMatchStore.forProfile(profile));
+    }
+    bind() {
+        this.dialog.bindButtons();
+    }
+    openStats() {
+        this.dialog.open("stats");
+    }
+    record(report) {
+        this.sender.record(report, null);
+    }
+    pendingGuard(buildForfeit) {
+        return new AccountPendingGuard(this.sender, buildForfeit);
+    }
+}
+/* 랜덤 매칭 설정을 만들 때 아직 기록 쪽 객체가 없는 게임(31번 등)이 나중에 guard 를 넘기게 한다 */
+class AccountLazyGuard {
+    constructor(make) {
+        this.make = make;
+        this.target = null;
+    }
+    arm(ticket) {
+        return this.guard().arm(ticket);
+    }
+    disarm(ticket) {
+        this.guard().disarm(ticket);
+    }
+    settle() {
+        this.guard().settle();
+    }
+    guard() {
+        if (!this.target)
+            this.target = this.make();
+        return this.target;
     }
 }

@@ -239,6 +239,10 @@ class TeamBattleProfile extends AccountGameProfile {
     planOf(report, judge) {
         return new TeamBattlePlan(report, judge);
     }
+    /* 미리 적어 둔 패배는 나간 판(iLeft)이라 MVP 가 될 수 없어 점수 계산이 필요 없다 */
+    abandonedContext() {
+        return new AccountMvpJudge(() => 0);
+    }
     encodeRecent(report, key, win) {
         return TeamBattleCodec.encode(report, key, win);
     }

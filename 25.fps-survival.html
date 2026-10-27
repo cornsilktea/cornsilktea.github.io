@@ -467,9 +467,9 @@
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="character-maker.js?v=20261026a"></script>
-<script charset="utf-8" src="match-kit.js?v=20261027a"></script>
-<script charset="utf-8" src="account-match-kit.js?v=20261027a"></script>
-<script charset="utf-8" src="25.fps-survival-stats.js?v=20261027a"></script>
+<script charset="utf-8" src="match-kit.js?v=20261027b"></script>
+<script charset="utf-8" src="account-match-kit.js?v=20261027b"></script>
+<script charset="utf-8" src="25.fps-survival-stats.js?v=20261027b"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
@@ -2578,6 +2578,7 @@ function onStatus(st) {
   if (st === "lobby") { if (T.match) resetMatchLocal(); teamScreen("lobby"); return; }
   if (!T.match && (st === "countdown" || st === "playing" || (st === "ended" && prev !== "lobby"))) startMatchLocal();
   if (st === "ended") showTeamResult();
+  fpsRandom.armMatch();
 }
 function resetMatchLocal() {
   okeys(T.ents).forEach(removeEnt);
@@ -2622,7 +2623,7 @@ class FpsRandomMatch {
     if (this.flow) return this.flow;
     const db = await connectDb();
     if (this.flow) return this.flow;
-    const options = { gameRoot: "fpsbattle", queue: "fpsbattle", partyLimit: FpsRandomMatch.PARTY_LIMIT, matcher: new MkVersusMatcher(FpsRandomMatch.PARTY_LIMIT), headExtra: $("partyNick").parentNode, stats: new AccountStatsOpener(() => fpsReporter.account.openStats()),
+    const options = { gameRoot: "fpsbattle", queue: "fpsbattle", partyLimit: FpsRandomMatch.PARTY_LIMIT, matcher: new MkVersusMatcher(FpsRandomMatch.PARTY_LIMIT), headExtra: $("partyNick").parentNode, stats: new AccountStatsOpener(() => fpsReporter.account.openStats(), fpsReporter.guard),
       intro: "매칭 시작을 누르면 아무 팀과 최대 2대2로 만나요. 빈자리는 AI가 채워요." };
     const panel = new MkPartyPanel($("overlay"), $("partyMount"), options);
     this.flow = new MkRandomFlow(db, { now: tnow }, T.myId, options, this, panel);
@@ -2721,12 +2722,13 @@ class FpsRandomMatch {
   progress() { return T.status === "playing" && T.startAt ? MkForfeit.clamp((tnow() - T.startAt) / TEAM.matchMs) : 0; }
   forfeitApplies() { return !!this.flow && this.flow.forfeitApplies(this.progress()); }
   forfeitIfLate() { if (this.flow) this.flow.forfeitIfLate(this.progress()); }
+  armMatch() { if (this.flow) this.flow.armMatch(); }
 }
 const fpsRandom = new FpsRandomMatch();
 
 class FpsMatchReporter {
   static SETTLE_MS = 1000;
-  constructor() { this.account = new FpsAccount(); this.account.bind(); }
+  constructor() { this.account = new FpsAccount(); this.account.bind(); this.guard = this.account.pendingGuard(() => this.forfeitReport()); }
   matchId() { const ticket = fpsRandom.ticket(); return ticket ? ticket.matchId : T.code + "_" + T.startAt; }
   playerLine(id, iLeft) {
     const p = T.players[id]; let k = 0, d = 0;
@@ -2743,6 +2745,7 @@ class FpsMatchReporter {
   recordEnded() { if (T.ref && T.me && !T.spec && T.match && T.match.shownEnd) this.account.record(this.report(false)); }
   forfeitApplies() { return !!T.ref && !!T.me && !T.spec && T.status === "playing" && (!!fpsRandom.ticket() || fpsRandom.progress() >= AccountForfeit.AT); }
   leaving() { if (this.forfeitApplies()) this.account.record(this.report(true)); }
+  forfeitReport() { return this.forfeitApplies() && fpsRandom.ticket() ? this.report(true) : null; }
 }
 const fpsReporter = new FpsMatchReporter();
 

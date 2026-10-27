@@ -173,24 +173,8 @@ class TurboLapStatsView {
         return b.prog - a.prog;
     }
 }
-class TurboLapAccount {
+class TurboLapAccount extends AccountGameAccount {
     constructor(carLabel) {
-        this.profile = new TurboLapProfile();
-        this.sentKey = "";
-        this.dialog = new AccountStatsDialog(() => AccountMatchStore.forProfile(this.profile), new TurboLapStatsView(carLabel));
-    }
-    bind() {
-        this.dialog.bindButtons();
-    }
-    openStats() {
-        this.dialog.open("stats");
-    }
-    record(report) {
-        const key = AccountMatchKey.of(report.matchId);
-        const store = AccountMatchStore.forProfile(this.profile);
-        if (!window.PORTAL_USER || !store || key === this.sentKey)
-            return;
-        this.sentKey = key;
-        store.record(report, null).catch(() => { });
+        super(new TurboLapProfile(), new TurboLapStatsView(carLabel));
     }
 }

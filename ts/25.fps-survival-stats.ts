@@ -188,24 +188,8 @@ class FpsStatsView implements AccountDialogView<FpsStatsNode, FpsRecentEntry> {
   }
 }
 
-class FpsAccount {
-  private readonly profile = new FpsProfile();
-  private readonly dialog = new AccountStatsDialog<FpsStatsNode, FpsRecentEntry>(() => AccountMatchStore.forProfile(this.profile), new FpsStatsView());
-  private sentKey = "";
-
-  bind(): void {
-    this.dialog.bindButtons();
-  }
-
-  openStats(): void {
-    this.dialog.open("stats");
-  }
-
-  record(report: FpsReport): void {
-    const key = AccountMatchKey.of(report.matchId);
-    const store = AccountMatchStore.forProfile(this.profile);
-    if (!window.PORTAL_USER || !store || key === this.sentKey) return;
-    this.sentKey = key;
-    store.record(report, null).catch(() => {});
+class FpsAccount extends AccountGameAccount<FpsReport, FpsPlan, FpsStatsNode, FpsRecentEntry> {
+  constructor() {
+    super(new FpsProfile(), new FpsStatsView());
   }
 }

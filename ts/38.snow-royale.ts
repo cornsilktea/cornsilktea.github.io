@@ -554,10 +554,19 @@ class SnGame {
   }
 
   private recordForfeit(): void {
+    const report = this.leaveReport();
+    if (report) this.account.record(report);
+  }
+
+  private leaveReport(): SnAccountReport | null {
     const session = this.session, view = this.view;
     const match = session ? session.value<SnMatchRecord>("match") : null;
-    if (!session || !view || !match || !this.onlineForfeitApplies()) return;
-    this.account.record(SnReportBuilder.fromEngine(this.matchKey(session, match), view.driver.engine, view.driver.myNum, AccountForfeit.progressOnLeave(this.inRandomMatch(), this.matchProgress())));
+    if (!session || !view || !match || !this.onlineForfeitApplies()) return null;
+    return SnReportBuilder.fromEngine(this.matchKey(session, match), view.driver.engine, view.driver.myNum, AccountForfeit.progressOnLeave(this.inRandomMatch(), this.matchProgress()));
+  }
+
+  private forfeitReport(): SnAccountReport | null {
+    return this.inRandomMatch() ? this.leaveReport() : null;
   }
 
   private forfeitIfLate(): void {
@@ -600,7 +609,7 @@ class SnGame {
   private randomFor(mode: SnMode): MkRandomFlow {
     const existing = this.randoms.get(mode);
     if (existing) return existing;
-    const flow = SnRandomSetup.create(mode, this.backend, this.directory, this.myId, new AccountStatsOpener(() => this.account.openStats()), {
+    const flow = SnRandomSetup.create(mode, this.backend, this.directory, this.myId, new AccountStatsOpener(() => this.account.openStats(), this.account.pendingGuard(() => this.forfeitReport())), {
       myRecord: () => this.myRecord(),
       enterTicketRoom: (code, hosting) => this.enterTicketRoom(mode, code, hosting),
       leaveRoomQuietly: () => this.leaveRoomQuietly(),
@@ -733,6 +742,7 @@ class SnGame {
     if (kind === "status" || kind === "match" || kind === "players") this.syncPhase();
     const flow = this.random();
     if (flow && (kind === "players" || kind === "host" || kind === "status")) flow.roomChanged(this.seatPlan.humanSeats(session.players).filter((id) => !!id).length, session.isHost(), session.status === "lobby");
+    if (flow && kind === "match") flow.armMatch();
     if (kind === "end" || kind === "status") this.reportEnd(session);
   }
 

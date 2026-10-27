@@ -5,7 +5,7 @@
 <script charset="utf-8" src="access-guard.js" data-game="teambattle"></script>
 <script charset="utf-8" src="quality-governor.js"></script>
 <script charset="utf-8" src="fullscreen-keeper.js"></script>
-<script charset="utf-8" src="match-kit.js?v=20261027a"></script>
+<script charset="utf-8" src="match-kit.js?v=20261027b"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>3v3 팀 배틀 아레나</title>
@@ -278,8 +278,8 @@
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="character-maker.js?v=20261026a"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
-<script charset="utf-8" src="account-match-kit.js?v=20261027a"></script>
-<script charset="utf-8" src="account-stats.js?v=20261027a"></script>
+<script charset="utf-8" src="account-match-kit.js?v=20261027b"></script>
+<script charset="utf-8" src="account-stats.js?v=20261027b"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -1083,6 +1083,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         else services.screens.showScreen("game");
         if (st === "countdown" && prev !== "countdown") services.clock.burst();
         if (st === "ended" && prev !== "ended") services.flow.onEnded();
+        services.randomMatch.armMatch();
       });
       var stRef = ref.child("st");
       var stateIn = function (s) {
@@ -8699,7 +8700,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   class AccountMatchRecorder {
     static SETTLE_MS = 2500;
-    constructor(services) { this.services = services; this.sentKey = ""; }
+    constructor(services) { var self = this; this.services = services; this.sender = new AccountMatchSender(function () { return AccountStatsStore.open(); }); this.guard = new AccountPendingGuard(this.sender, function () { return self.forfeitReport(); }); }
     loggedIn() { return !Environment.SILENT_RUN && !!window.PORTAL_USER; }
     matchEnded() { var services = this.services, self = this;
       if (!this.loggedIn()) return;
@@ -8715,17 +8716,18 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return this.loggedIn() && !!room && room.mode === TeamBattlePlan.CUP_MODE && room.status === "playing" && !!room.roster && !!room.roster[services.session.myId]
         && (!!services.randomMatch.ticket() || services.randomMatch.progress() >= TeamBattlePlan.FORFEIT_AT);
     }
-    leavingNow() { var services = this.services;
-      if (!this.forfeitApplies()) return;
+    leavingNow() { this.send(this.leaveReport()); }
+    leaveReport() { var services = this.services;
+      if (!this.forfeitApplies()) return null;
       var snap = services.accountReport.snapshot(), s = services.flow.teamTotals();
-      if (snap) this.send(services.accountReport.build(snap, true, AccountForfeit.progressOnLeave(!!services.randomMatch.ticket(), services.randomMatch.progress()), { blue: s.blueKills, red: s.redKills }));
+      return snap ? services.accountReport.build(snap, true, AccountForfeit.progressOnLeave(!!services.randomMatch.ticket(), services.randomMatch.progress()), { blue: s.blueKills, red: s.redKills }) : null;
+    }
+    forfeitReport() { var report = this.services.randomMatch.ticket() ? this.leaveReport() : null;
+      return report && report.myIndex >= 0 ? report : null;
     }
     send(report) {
       if (!report || report.myIndex < 0) return;
-      var key = AccountMatchKey.of(report.matchId), store = AccountStatsStore.open();
-      if (key === this.sentKey || !store) return;
-      this.sentKey = key;
-      store.record(report, this.services.accountReport.judge()).catch(function () {});
+      this.sender.record(report, this.services.accountReport.judge());
     }
   }
   class ResultTitle {
@@ -9783,7 +9785,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     constructor(services) { this.services = services; this.flow = null; this.quiet = false; }
     ready() { var services = this.services;
       if (this.flow || !services.backend.db) return this.flow;
-      var options = { gameRoot: "teambattle", queue: "teambattle", partyLimit: ArenaRandomMatch.PARTY_LIMIT, matcher: new MkVersusMatcher(ArenaRandomMatch.PARTY_LIMIT, ArenaRandomMatch.MATCHER_TIMING), allowBots: true, aiFallbackMs: ArenaRandomMatch.AI_FALLBACK_MS, actionsMount: Dom.$("partyActions"), stats: new AccountStatsOpener(function () { services.myStats.open(); }),
+      var options = { gameRoot: "teambattle", queue: "teambattle", partyLimit: ArenaRandomMatch.PARTY_LIMIT, matcher: new MkVersusMatcher(ArenaRandomMatch.PARTY_LIMIT, ArenaRandomMatch.MATCHER_TIMING), allowBots: true, aiFallbackMs: ArenaRandomMatch.AI_FALLBACK_MS, actionsMount: Dom.$("partyActions"), stats: new AccountStatsOpener(function () { services.myStats.open(); }, new AccountLazyGuard(function () { return services.accountRecorder.guard; })),
         intro: "팀을 짜고(빈 자리는 🤖 AI 추가) 매칭 시작을 누르면 아무 팀과 3대3 대회모드로 만나요. 맵은 무작위예요." };
       var panel = new ArenaPartyPanel(Dom.$("scrParty"), Dom.$("partyMount"), options);
       this.flow = new MkRandomFlow(services.backend.db, { now: function () { return services.clock.now(); } }, services.session.myId, options, this, panel);
@@ -9868,6 +9870,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     forfeitApplies() { return !!this.flow && this.flow.forfeitApplies(this.progress()); }
     forfeitIfLate() { if (this.flow) this.flow.forfeitIfLate(this.progress()); }
+    armMatch() { if (this.flow) this.flow.armMatch(); }
     roomChanged() { var services = this.services;
       if (!this.flow || !services.session.room) return;
       var humans = services.session.humans(services.session.players).filter(function (id) { return services.roster.isPlayingTeam(services.session.players[id].team); }).length;

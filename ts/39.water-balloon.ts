@@ -700,10 +700,19 @@ class WbGame {
   }
 
   private recordForfeit(): void {
+    const report = this.leaveReport();
+    if (report) this.account.record(report);
+  }
+
+  private leaveReport(): WbAccountReport | null {
     const session = this.session, view = this.view;
     const match = session ? session.value<WbMatchRecord>("match") : null;
-    if (!session || !view || !match || !this.onlineForfeitApplies()) return;
-    this.account.record(WbReportBuilder.fromEngine(this.matchKey(session, match), view.driver.engine, view.driver.myIndex, AccountForfeit.progressOnLeave(this.inRandomMatch(), this.matchProgress())));
+    if (!session || !view || !match || !this.onlineForfeitApplies()) return null;
+    return WbReportBuilder.fromEngine(this.matchKey(session, match), view.driver.engine, view.driver.myIndex, AccountForfeit.progressOnLeave(this.inRandomMatch(), this.matchProgress()));
+  }
+
+  private forfeitReport(): WbAccountReport | null {
+    return this.inRandomMatch() ? this.leaveReport() : null;
   }
 
   private forfeitIfLate(): void {
@@ -745,7 +754,7 @@ class WbGame {
   private randomFor(mode: WbMode): MkRandomFlow {
     const existing = this.randoms.get(mode);
     if (existing) return existing;
-    const flow = WbRandomSetup.create(mode, this.backend, this.directory, this.myId, new AccountStatsOpener(() => this.account.openStats()), {
+    const flow = WbRandomSetup.create(mode, this.backend, this.directory, this.myId, new AccountStatsOpener(() => this.account.openStats(), this.account.pendingGuard(() => this.forfeitReport())), {
       myRecord: () => this.myRecord(),
       enterTicketRoom: (code, hosting) => this.enterTicketRoom(mode, code, hosting),
       leaveRoomQuietly: () => this.leaveRoomQuietly(),
@@ -887,6 +896,7 @@ class WbGame {
     if (kind === "status" || kind === "match" || kind === "players") this.syncPhase();
     const flow = this.random();
     if (flow && (kind === "players" || kind === "host" || kind === "status")) flow.roomChanged(this.seatPlan.humanSeats(session.players).filter((id) => !!id).length, session.isHost(), session.status === "lobby");
+    if (flow && kind === "match") flow.armMatch();
     if (kind === "end" || kind === "status") this.reportEnd(session);
   }
 
