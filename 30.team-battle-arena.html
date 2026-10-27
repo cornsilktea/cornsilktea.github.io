@@ -377,6 +377,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     shaderWarmup;
     perf;
     netDiag;
+    remoteMotion;
+    netJitter;
     world;
     testBridge;
     accountReport;
@@ -1060,9 +1062,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (st === "ended" && prev !== "ended") services.flow.onEnded();
       });
       var stRef = ref.child("st");
-      services.session.sub(stRef, "child_added", function (s) { services.match.stateByKey[s.key] = s.val(); services.perf.noteState(s.key, s.val()); });
-      services.session.sub(stRef, "child_changed", function (s) { services.match.stateByKey[s.key] = s.val(); services.perf.noteState(s.key, s.val()); });
-      services.session.sub(stRef, "child_removed", function (s) { delete services.match.stateByKey[s.key]; });
+      var stateIn = function (s) {
+        var key = s.key, value = s.val();
+        services.netJitter.deliver(function () { services.match.stateByKey[key] = value; services.remoteMotion.push(key, value, performance.now()); services.perf.noteState(key, value); });
+      };
+      services.session.sub(stRef, "child_added", stateIn);
+      services.session.sub(stRef, "child_changed", stateIn);
+      services.session.sub(stRef, "child_removed", function (s) { var key = s.key; services.netJitter.deliver(function () { delete services.match.stateByKey[key]; services.remoteMotion.drop(key); }); });
       services.session.sub(ref.child("shots"), "child_added", services.projectiles.onShot.bind(services.projectiles));
       services.session.sub(ref.child("meleeHits"), "child_added", function (s) { services.melee.onMelee(s.key, s.val()); });
       services.damage.listenHits(services.session.myId);
@@ -3532,6 +3538,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.match.me = services.flow.isSpec() ? null : services.flow.makeEnt(services.session.myId, services.session.players[services.session.myId]);
       services.match.startRound();
       services.match.lastHp = {};
+      services.remoteMotion.clear();
       services.killfeed.clear();
       services.shaderWarmup.warmMinionIfNeeded();
       Dom.show(Dom.$("endOv"), false);
@@ -3550,11 +3557,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (!r) { r = services.match.remotes[id] = services.flow.makeEnt(id, d); }
         var k = Math.min(1, dt * 12), pos = services.netstate.stateOf(d);
         var tx = pos.x, ty = pos.y, revived = pos.full && !r.alive && pos.alive;
-        if (pos.mv && MathKit.hyp(tx - r.x, ty - r.y) > 3) { r.moveAng = Math.atan2(ty - r.y, tx - r.x); r.moveAt = services.clock.now(); }
-        if (revived || MathKit.hyp(tx - r.x, ty - r.y) > 250) { if (!revived && !fresh) services.perf.noteSnap(); r.x = tx; r.y = ty; } else { r.x += (tx - r.x) * k; r.y += (ty - r.y) * k; }
-        r.angle = MathKit.lerpAng(r.angle, pos.angle, Math.min(1, dt * 15));
+        var stKey = services.netstate.stKey(d.team, d.slot), smooth = services.remoteMotion.sample(stKey, performance.now());
+        if (smooth && !revived && MathKit.hyp(smooth.x - r.x, smooth.y - r.y) <= 250) services.flow.followSmooth(r, smooth);
+        else {
+          if (pos.mv && MathKit.hyp(tx - r.x, ty - r.y) > 3) { r.moveAng = Math.atan2(ty - r.y, tx - r.x); r.moveAt = services.clock.now(); }
+          if (revived || MathKit.hyp(tx - r.x, ty - r.y) > 250) { if (!revived && !fresh) services.perf.noteSnap(); r.x = tx; r.y = ty; services.remoteMotion.restart(stKey); } else { r.x += (tx - r.x) * k; r.y += (ty - r.y) * k; }
+          r.angle = MathKit.lerpAng(r.angle, pos.angle, Math.min(1, dt * 15));
+        }
         r.team = d.team; r.char = services.catalog.playable(d.characterType) ? d.characterType : services.charTypes.fallbackId; r.maxHp = services.charTypes.statsOf(r.char).hp;
-        r.mv = pos.mv; r.nickname = d.nickname; r.isAI = !!d.isAI;
+        r.mv = smooth ? smooth.mv : pos.mv; r.nickname = d.nickname; r.isAI = !!d.isAI;
         if (!pos.full) return;
         r.deaths = pos.deaths; r.diedAt = pos.diedAt; r.kills = pos.kills; r.assists = pos.assists; r.heal = pos.heal; r.protectUntil = pos.protectUntil;
         r.stunDealt = pos.stunDealt; r.slowDealt = pos.slowDealt; r.slowWeight = pos.slowWeight; r.blocked = pos.blocked;
@@ -3569,6 +3580,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         r.burnUntil = pos.burnUntil; r.shield = pos.shield;
         services.minions.adoptMinions(r, pos.minions, k);
       });
+    }
+    followSmooth(r, smooth) { var services = this.services;
+      var dx = smooth.x - r.x, dy = smooth.y - r.y;
+      if (smooth.mv && MathKit.hyp(dx, dy) > 0.2) { r.moveAng = Math.atan2(dy, dx); r.moveAt = services.clock.now(); }
+      r.x = smooth.x; r.y = smooth.y; r.angle = smooth.angle;
     }
     teamTotals() { var services = this.services;
       var s = { blue: 0, red: 0, blueAlive: 0, redAlive: 0, blueN: 0, redN: 0, blueKills: 0, redKills: 0 };
@@ -9176,7 +9192,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class PerfProbe {
-    static BUILD = "lag1";
+    static BUILD = "lag2";
     static PATH = "perfDiag/teambattle/";
     static RTT_KEEP = 50;
     static RECORDS = !Environment.SILENT_RUN;
@@ -9225,6 +9241,66 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (!PerfProbe.RECORDS || this.sentFor === this.startAt || !this.frames.times.count()) return;
       this.sentFor = this.startAt;
       new PerfRecordSender().send(PerfProbe.PATH + this.dayKey(), this.record());
+    }
+  }
+  class RemoteSnapshotBuffer {
+    static KEEP = 8;
+    static MAX_SPAN_MS = 250;
+    constructor() { this.snaps = []; }
+    push(snap) { this.snaps.push(snap); if (this.snaps.length > RemoteSnapshotBuffer.KEEP) this.snaps.shift(); }
+    latest() { return this.snaps[this.snaps.length - 1] || null; }
+    restartFrom(snap) { this.snaps = [snap]; }
+    still(snap, moving) { return { x: snap.x, y: snap.y, angle: snap.angle, mv: !!moving }; }
+    between(a, b, at) {
+      var start = Math.max(a.at, b.at - RemoteSnapshotBuffer.MAX_SPAN_MS);
+      var k = at <= start ? 0 : (at - start) / (b.at - start);
+      return { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k, angle: MathKit.lerpAng(a.angle, b.angle, k), mv: a.mv || b.mv };
+    }
+    ahead(at) {
+      var last = this.latest(), prev = this.snaps[this.snaps.length - 2];
+      if (!prev || !last.mv) return this.still(last, false);
+      var gap = Math.min(RemoteSnapshotBuffer.MAX_SPAN_MS, last.at - prev.at);
+      if (gap <= 0) return this.still(last, false);
+      var over = Math.min(at - last.at, gap), k = over / gap;
+      return { x: last.x + (last.x - prev.x) * k, y: last.y + (last.y - prev.y) * k, angle: last.angle, mv: at - last.at < gap };
+    }
+    sample(at) {
+      var s = this.snaps, n = s.length;
+      if (!n) return null;
+      if (at >= s[n - 1].at) return this.ahead(at);
+      for (var i = n - 1; i > 0; i--) if (s[i - 1].at <= at) return this.between(s[i - 1], s[i], at);
+      return this.still(s[0], s[0].mv);
+    }
+  }
+  class RemoteMotion {
+    static DELAY_MS = 180;
+    static JUMP = 250;
+    static MIN_GAP_MS = NetState.NET_MS * 0.6;
+    static MAX_LEAD_MS = RemoteMotion.DELAY_MS / 2;
+    constructor() { this.buffers = {}; }
+    spreadTime(last, arrived) {
+      if (!last) return arrived;
+      return Math.max(arrived, Math.min(last.at + RemoteMotion.MIN_GAP_MS, arrived + RemoteMotion.MAX_LEAD_MS));
+    }
+    push(key, value, arrived) {
+      if (typeof value !== "string") return;
+      var buffer = this.buffers[key] = this.buffers[key] || new RemoteSnapshotBuffer(), last = buffer.latest();
+      var f = value.split(",", 4), snap = { at: this.spreadTime(last, arrived), x: +f[0] || 0, y: +f[1] || 0, angle: (+f[2] || 0) * Math.PI / 180, mv: f[3] === "1" };
+      if (last && MathKit.hyp(snap.x - last.x, snap.y - last.y) > RemoteMotion.JUMP) { snap.at = arrived; buffer.restartFrom(snap); } else buffer.push(snap);
+    }
+    drop(key) { delete this.buffers[key]; }
+    clear() { this.buffers = {}; }
+    restart(key) { var buffer = this.buffers[key], last = buffer && buffer.latest(); if (last) buffer.restartFrom(last); }
+    sample(key, now) { var buffer = this.buffers[key]; return buffer ? buffer.sample(now - RemoteMotion.DELAY_MS) : null; }
+  }
+  class NetJitterSim {
+    static MAX_MS = Math.max(0, +((location.search.match(/[?&]jitter=(\d+)/) || [])[1] || 0));
+    constructor() { this.readyAt = 0; }
+    deliver(apply) {
+      if (!NetJitterSim.MAX_MS) { apply(); return; }
+      var now = performance.now(), at = Math.max(this.readyAt, now + Math.random() * NetJitterSim.MAX_MS);
+      this.readyAt = at;
+      setTimeout(apply, at - now);
     }
   }
   class NetDiagOverlay {
@@ -9687,6 +9763,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.shaderWarmup = new ShaderWarmup(services);
       services.perf = new PerfProbe(services);
       services.netDiag = new NetDiagOverlay(services);
+      services.remoteMotion = new RemoteMotion();
+      services.netJitter = new NetJitterSim();
       services.loop = new GameLoop(services);
       services.world = new WorldStepper(services);
       services.testBridge = new TestBridge(services);
