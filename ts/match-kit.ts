@@ -10,7 +10,7 @@
 //    일반 방을 실제로 만드는 일은 게임마다 다르므로 게임이 MkRoomMaker 를 넘긴다.
 //  - 대기열은 on('value') 구독으로만 본다(폴링 없음). 3초 대기는 기기 안 타이머로 다시 계산만 한다.
 // 이 파일은 화면과 무관한 부분(Node 시뮬레이터 tools/match-sim.js 가 그대로 불러 검사)과
-// 연승 버튼·전적 창(MkStreakButton·MkHistoryDialog)으로 나뉜다. 모양은 theme.css 의 .mk-* .
+// 계정별 연승(MkPersonalStreak)·연승 표시(MkStreakButton)로 나뉜다. 모양은 theme.css 의 .mk-* .
 
 type MkResult = "win" | "draw" | "lose";
 
@@ -121,6 +121,19 @@ interface MkOutcome {
   of?: number;
   // 실제로 함께 달린 상대(빈 배열이면 AI). 표의 상대가 끝내 안 와서 AI 와 했을 때 게임이 알려 준다.
   rivals?: string[];
+}
+
+// 게임의 계정 통계 창과 이어 주는 고리. 팀 대기실의 "📊 내 통계" 버튼이 open 을 부르고,
+// 계정 통계가 따로 없는 게임(32·34·35)은 recordOutcome 으로 판 결과를 계정에 남긴다(account-match-kit.ts 의 RandomMatchAccount).
+interface MkStatsLink {
+  open(): void;
+  recordOutcome?(ticket: MkTicket, outcome: MkOutcome): void;
+}
+
+interface MkStreakRecord {
+  n: number;
+  b: number;
+  id: string;
 }
 
 interface MkJoinOutcome {
@@ -1012,6 +1025,7 @@ interface MkFlowOptions {
   allowBots?: boolean;
   startWaitMs?: number;
   aiFallbackMs?: number;
+  stats?: MkStatsLink;
   // 게임 쪽 "내 닉네임 · 닉네임 설정" 줄. 주면 팀 코드 줄 오른쪽으로 옮겨 자리가 되면 한 줄, 모자라면 팀 코드 아래 둘째 줄이 된다.
   headExtra?: HTMLElement | null;
 }
@@ -1057,15 +1071,20 @@ class MkPartyPanel {
   private readonly matchButton: HTMLButtonElement;
   private readonly hint: HTMLDivElement;
   private readonly streak: MkStreakButton;
+  private readonly statsButton: HTMLButtonElement;
+  private streakCount = 0;
 
   constructor(screen: HTMLElement, mount: HTMLElement, private readonly options: MkFlowOptions) {
-    this.streak = new MkStreakButton(screen, !!options.showRank);
+    const openStats = () => { if (options.stats) options.stats.open(); };
+    this.streak = new MkStreakButton(openStats);
+    this.statsButton = MkPartyPanel.button("mk-stats", "📊 내 통계", openStats);
+    this.statsButton.hidden = !options.stats || !!(options.headExtra && options.headExtra.querySelector("[data-account-open]"));
     this.head = document.createElement("h2");
     this.head.className = "mk-head";
     this.code = document.createElement("span");
     this.code.className = "mk-code";
-    if (options.solo) this.head.append("랜덤 매칭 ", this.streak.element);
-    else this.head.append("팀 코드 ", this.code, this.streak.element);
+    if (options.solo) this.head.append("랜덤 매칭 ", this.streak.element, this.statsButton);
+    else this.head.append("팀 코드 ", this.code, this.streak.element, this.statsButton);
     this.seats = document.createElement("div");
     this.seats.className = "mk-team";
     this.seats.addEventListener("click", (event) => {
@@ -1099,6 +1118,15 @@ class MkPartyPanel {
     if (this.notice.textContent !== text) this.notice.textContent = text;
   }
 
+  setStreak(count: number): void {
+    this.streakCount = count;
+    this.streak.render(count);
+  }
+
+  streakNote(): string {
+    return this.streakCount > 0 ? " · 지금 " + this.streakCount + "연승 중" : "";
+  }
+
   setBusy(busy: boolean): void {
     this.matchButton.disabled = busy;
     this.aiNowButton.disabled = busy;
@@ -1109,9 +1137,8 @@ class MkPartyPanel {
   render(party: MkParty, waitingForOthers: boolean = false, waiting: number | null = null): void {
     const leader = party.isLeader();
     const searching = !!party.searching();
-    const book = party.book();
     this.code.textContent = party.code;
-    this.streak.render(book);
+    this.streak.render(this.streakCount);
     this.seats.textContent = "";
     const title = document.createElement("h3");
     title.textContent = this.options.solo ? "나" : "우리 팀";
@@ -1143,7 +1170,7 @@ class MkPartyPanel {
     const crowdText = !searching || waiting === null ? "" : waiting > 0 ? "👥 지금 " + waiting + unit.some + " 기다리는 중" : "👥 지금 기다리는 " + unit.none + " 없어요";
     if (this.crowd.textContent !== crowdText) this.crowd.textContent = crowdText;
     this.crowd.classList.toggle("alone", searching && waiting === 0);
-    const streakNote = book.streak() > 0 ? " · 지금 " + book.streak() + "연승 중" : "";
+    const streakNote = this.streakNote();
     const fallback = this.options.aiFallbackMs ? Math.ceil(this.options.aiFallbackMs / 1000) - party.searchSeconds() : 0;
     const fallbackNote = waitingForOthers ? " · 다른 팀 경기가 끝나길 기다리는 중(같은 상대와 연달아 만나지 않게)"
       : !this.options.aiFallbackMs ? "" : fallback > 0 ? " · " + fallback + "초 뒤 AI와 시작해요" : " · AI와 시작하는 중…";
@@ -1192,7 +1219,7 @@ class MkRandomFlow {
   private reported = false;
   private fallbackFor = 0;
   private readonly seenRivals = new Set<string>();
-  private onResult: () => void = () => undefined;
+  private readonly streak: MkPersonalStreak;
 
   constructor(
     private readonly database: FirebaseDatabase,
@@ -1206,6 +1233,7 @@ class MkRandomFlow {
     this.directory = new MkPartyDirectory(database, clock, this.paths, options.partyLimit);
     this.memory = new MkPartyMemory(options.queue);
     this.sign = new MkBusySign(database, clock, this.paths);
+    this.streak = new MkPersonalStreak(options.gameRoot);
     panel.onMatch = () => this.toggleSearch();
     panel.onLeave = () => this.leaveParty();
     panel.onAddBot = () => { if (this.party) this.party.setBots(this.party.bots() + 1); };
@@ -1292,30 +1320,37 @@ class MkRandomFlow {
     return Object.keys(rivalIds).filter((id) => this.seenRivals.has(id)).map((id) => rivalIds[id]);
   }
 
-  // 판이 끝났을 때 모두 부른다(전적에 쓰는 건 팀장만, 같은 판은 한 번만).
+  // 판이 끝났을 때 팀원 모두가 부른다. 연승은 각자 자기 계정에 남긴다(같은 판은 한 번만).
+  // 화면의 연승은 2026-10-27 선생님 결정으로 팀 대기실 전적이 아니라 아이디 단위다. 팀 대기실 전적(MkParty.report, 팀장만)은
+  // 화면에 보이지 않지만 "이미 끝난 판의 표로 다시 들어가지 않기"(MkParty 의 book().has)에 쓰여서 그대로 남긴다.
   matchEnded(outcome: MkOutcome, onStreak: () => void = () => undefined): void {
     const ticket = this.current;
     if (!ticket || !this.party || this.reported) return;
     this.reported = true;
-    this.onResult = onStreak;
     const rivals = outcome.rivals || this.actualRivals(ticket);
-    this.party.report(ticket, rivals ? { ...outcome, rivals } : outcome);
+    const final = rivals ? { ...outcome, rivals } : outcome;
+    this.party.report(ticket, final);
+    if (this.options.stats && this.options.stats.recordOutcome) this.options.stats.recordOutcome(ticket, final);
+    this.streak.apply(ticket.matchId, final.result).then(() => {
+      this.panel.setStreak(this.streak.current());
+      onStreak();
+    });
   }
 
-  // 랜덤 매칭 판에서 경기가 절반 넘게 진행된 뒤(progress 0~1, 게임마다 시간·점수·탈락 비율로 계산) 나가면 나간 쪽 전적은 패.
-  // 판이 이미 끝나 결과를 기록했으면 해당 없음.
-  forfeitApplies(progress: number): boolean {
-    return !!this.current && !!this.party && !this.reported && progress >= MkForfeit.AT;
+  // 랜덤 매칭 판에서는 경기 중 언제 나가도 나간 쪽은 패(2026-10-27 선생님 요청, 예전에는 절반 뒤에만).
+  // progress 는 예전 호출 모양을 지키려고 받기만 한다. 판이 이미 끝나 결과를 기록했으면 해당 없음.
+  forfeitApplies(progress: number = 0): boolean {
+    return !!this.current && !!this.party && !this.reported && progress >= 0;
   }
 
-  forfeitIfLate(progress: number): boolean {
+  forfeitIfLate(progress: number = 0): boolean {
     if (!this.forfeitApplies(progress)) return false;
     this.matchEnded({ result: "lose" });
     return true;
   }
 
   endHint(): string {
-    return this.party ? "지금 " + this.party.book().streakLabel().replace("🔥 ", "") : "";
+    return this.party ? "지금 " + this.streak.label().replace("🔥 ", "") : "";
   }
 
   backToParty(message: string): void {
@@ -1324,7 +1359,6 @@ class MkRandomFlow {
     if (this.current && this.party) this.party.clearTicket(this.current.matchId);
     this.current = null;
     this.reported = false;
-    this.onResult = () => undefined;
     this.hooks.leaveRoom();
     if (this.party) {
       if (!this.party.searching()) this.sign.put(this.party, this.options.matcher.returnGraceMs, !!this.party.lastMatch().ai);
@@ -1340,12 +1374,13 @@ class MkRandomFlow {
     party.onChange = () => {
       this.render();
       this.tickSeconds(!!party.searching());
-      if (this.reported) this.onResult();
     };
     party.onTicket = (ticket) => this.receiveTicket(ticket);
     party.onClosed = (message) => this.dropParty(message);
     party.connect();
     this.panel.setNotice("");
+    this.panel.setStreak(this.streak.current());
+    this.streak.load().then(() => { this.panel.setStreak(this.streak.current()); this.render(); });
     this.hooks.showParty();
   }
 
@@ -1461,7 +1496,7 @@ class MkRandomFlow {
 // 랜덤 매칭 중간 이탈 규칙(24번에서 먼저 쓰다가 2026-10-22 모든 게임으로). 확인 문구를 게임마다 같게 쓴다.
 class MkForfeit {
   static readonly AT = 0.5;
-  static readonly QUESTION = "경기가 절반 넘게 진행됐어요. 지금 나가면 패배로 기록됩니다. 나갈까요?";
+  static readonly QUESTION = "지금 나가면 패배로 기록됩니다. 나갈까요?";
   static readonly TAP_AGAIN = "한 번 더 누르면 패배로 나가요";
 
   static clamp(progress: number): number {
@@ -1496,97 +1531,116 @@ class MkPartyMemory {
   }
 }
 
-// 연승 표시 버튼. 누르면 이 팀 대기실의 모든 전적 창을 띄운다.
+// 연승 표시 버튼(🔥 n연승 / 연승 없음). 누르면 게임의 계정 통계 창을 연다.
 class MkStreakButton {
   readonly element: HTMLButtonElement;
-  private book = new MkRecordBook(null);
-  private readonly dialog: MkHistoryDialog;
 
-  constructor(host: HTMLElement, private readonly showRank: boolean) {
+  constructor(onClick: () => void) {
     this.element = document.createElement("button");
     this.element.type = "button";
     this.element.className = "mk-streak";
-    this.element.addEventListener("click", () => this.dialog.show(this.book, this.showRank));
-    this.dialog = new MkHistoryDialog(host);
-    this.render(this.book);
+    this.element.addEventListener("click", () => { this.element.blur(); onClick(); });
+    this.render(0);
   }
 
-  render(book: MkRecordBook): void {
-    this.book = book;
-    const label = book.streakLabel();
+  render(count: number): void {
+    const label = MkStreakMath.label(count);
     if (this.element.textContent !== label) this.element.textContent = label;
-    this.element.classList.toggle("hot", book.streak() > 0);
+    this.element.classList.toggle("hot", count > 0);
   }
 }
 
-// 전적 창. 그 게임 .st-screen 안에 붙어서 --st-* 색을 그대로 받는다.
-class MkHistoryDialog {
-  private static readonly MARKS: Record<MkResult, string> = { win: "승", draw: "무", lose: "패" };
-  private readonly backdrop: HTMLDivElement;
-  private readonly summary: HTMLParagraphElement;
-  private readonly list: HTMLOListElement;
-  private readonly onKey = (event: KeyboardEvent) => { if (event.key === "Escape") this.hide(); };
+// 연승 계산(화면·통신 없음, tools/match-sim.js 가 검사). 이기면 +1, 지면 0, 비기면 그대로. 상한 없음(2026-10-27 선생님 요청).
+class MkStreakMath {
+  static readonly EMPTY: MkStreakRecord = { n: 0, b: 0, id: "" };
+  static readonly KEY_MAX = 60;
 
-  constructor(host: HTMLElement) {
-    this.backdrop = document.createElement("div");
-    this.backdrop.className = "mk-backdrop";
-    this.backdrop.hidden = true;
-    const card = document.createElement("div");
-    card.className = "st-card mk-dialog";
-    card.setAttribute("role", "dialog");
-    const title = document.createElement("h2");
-    title.textContent = "우리 팀 전적";
-    this.summary = document.createElement("p");
-    this.summary.className = "mk-summary";
-    this.list = document.createElement("ol");
-    this.list.className = "mk-history";
-    const close = document.createElement("button");
-    close.type = "button";
-    close.className = "st-btn";
-    close.textContent = "닫기";
-    close.addEventListener("click", () => this.hide());
-    card.append(title, this.summary, this.list, close);
-    this.backdrop.appendChild(card);
-    this.backdrop.addEventListener("click", (event) => { if (event.target === this.backdrop) this.hide(); });
-    host.appendChild(this.backdrop);
+  static normalize(raw: unknown): MkStreakRecord {
+    const value = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+    const n = MkStreakMath.count(value.n);
+    return { n, b: Math.max(n, MkStreakMath.count(value.b)), id: typeof value.id === "string" ? value.id : "" };
   }
 
-  show(book: MkRecordBook, showRank: boolean): void {
-    this.summary.textContent = book.lines.length ? book.summary() + " · 지금 " + (book.streak() > 0 ? book.streak() + "연승" : "연승 없음") : "아직 경기가 없어요";
-    this.list.textContent = "";
-    book.lines.forEach((line) => this.list.appendChild(this.row(line, showRank)));
-    this.backdrop.hidden = false;
-    document.addEventListener("keydown", this.onKey);
+  static next(before: MkStreakRecord, matchId: string, result: MkResult): MkStreakRecord | null {
+    const id = MkStreakMath.key(matchId);
+    if (!id || before.id === id) return null;
+    const n = result === "win" ? before.n + 1 : result === "lose" ? 0 : before.n;
+    return { n, b: Math.max(before.b, n), id };
   }
 
-  hide(): void {
-    this.backdrop.hidden = true;
-    document.removeEventListener("keydown", this.onKey);
+  static key(matchId: string): string {
+    return String(matchId || "").replace(/[.#$\[\]\/\s]/g, "_").slice(0, MkStreakMath.KEY_MAX);
   }
 
-  private row(line: MkHistoryLine, showRank: boolean): HTMLLIElement {
-    const item = document.createElement("li");
-    item.className = "mk-line " + line.result;
-    const order = document.createElement("span");
-    order.className = "mk-n";
-    order.textContent = line.n + "판";
-    const mark = document.createElement("b");
-    mark.className = "mk-mark";
-    mark.textContent = MkHistoryDialog.MARKS[line.result] + (showRank && line.rank ? " " + line.rank + "위/" + (line.of || "?") : "");
-    const detail = document.createElement("span");
-    detail.className = "mk-detail";
-    const parts = [line.rivals && line.rivals.length ? "vs " + line.rivals.join(", ") : "vs AI"];
-    if (line.map) parts.push(line.map);
-    detail.textContent = parts.join(" · ");
-    const time = document.createElement("span");
-    time.className = "mk-time";
-    time.textContent = MkHistoryDialog.clock(line.at);
-    item.append(order, mark, detail, time);
-    return item;
+  static label(count: number): string {
+    return count > 0 ? "🔥 " + count + "연승" : "연승 없음";
   }
 
-  private static clock(at: number): string {
-    const date = new Date(at);
-    return String(date.getHours()).padStart(2, "0") + ":" + String(date.getMinutes()).padStart(2, "0");
+  private static count(value: unknown): number {
+    const number = Number(value);
+    return isFinite(number) && number > 0 ? Math.floor(number) : 0;
+  }
+}
+
+// 연승은 팀 대기실이 아니라 아이디(로그인 계정)마다 센다(2026-10-27 선생님 요청).
+// 로그인했으면 users/<uid>/streak/<게임 루트> = {n 지금 연승, b 최고 연승, id 마지막 판}, 로그인 전(배포용 링크)은 이 기기 localStorage.
+// 요청: 대기실에 들어갈 때 읽기 1번, 판이 끝날 때 쓰기 1번(자기 계정에만). 폴링 없음.
+class MkPersonalStreak {
+  private value: MkStreakRecord = MkStreakMath.EMPTY;
+  private pending: Promise<void> = Promise.resolve();
+
+  constructor(private readonly game: string) {}
+
+  current(): number {
+    return this.value.n;
+  }
+
+  label(): string {
+    return MkStreakMath.label(this.value.n);
+  }
+
+  load(): Promise<void> {
+    this.pending = this.pending.then(() => this.read()).then((raw) => { this.value = MkStreakMath.normalize(raw); }, () => undefined);
+    return this.pending;
+  }
+
+  apply(matchId: string, result: MkResult): Promise<void> {
+    this.pending = this.pending.then(() => {
+      const next = MkStreakMath.next(this.value, matchId, result);
+      if (!next) return undefined;
+      this.value = next;
+      return this.save(next).catch(() => undefined);
+    });
+    return this.pending;
+  }
+
+  private account(): AccountDatabase | null {
+    if (typeof window === "undefined" || !window.PORTAL_USER || typeof AccountDatabase !== "function") return null;
+    return new AccountDatabase(window.PORTAL_USER);
+  }
+
+  private path(): string {
+    return "streak/" + this.game;
+  }
+
+  private localKey(): string {
+    return "mk_streak_" + this.game + "_v1";
+  }
+
+  private read(): Promise<unknown> {
+    const database = this.account();
+    if (database) return database.read<unknown>(this.path());
+    try {
+      return Promise.resolve(typeof localStorage === "undefined" ? null : JSON.parse(localStorage.getItem(this.localKey()) || "null"));
+    } catch (error) {
+      return Promise.resolve(null);
+    }
+  }
+
+  private save(record: MkStreakRecord): Promise<void> {
+    const database = this.account();
+    if (database) return database.write(this.path(), record);
+    try { if (typeof localStorage !== "undefined") localStorage.setItem(this.localKey(), JSON.stringify(record)); } catch (error) { /* 저장 못 하는 기기 */ }
+    return Promise.resolve();
   }
 }

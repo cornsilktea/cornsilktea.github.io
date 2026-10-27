@@ -540,7 +540,12 @@ class SnGame {
 
   private onlineForfeitApplies(): boolean {
     const view = this.view;
-    return !!this.session && !!view && this.session.status === "playing" && view.driver.myNum >= 0 && this.matchProgress() >= AccountForfeit.AT;
+    return !!this.session && !!view && this.session.status === "playing" && view.driver.myNum >= 0 && (this.inRandomMatch() || this.matchProgress() >= AccountForfeit.AT);
+  }
+
+  private inRandomMatch(): boolean {
+    const flow = this.random();
+    return !!flow && !!flow.ticket();
   }
 
   private matchKey(session: RkSession<SnPlayerRecord>, match: SnMatchRecord): string {
@@ -552,7 +557,7 @@ class SnGame {
     const session = this.session, view = this.view;
     const match = session ? session.value<SnMatchRecord>("match") : null;
     if (!session || !view || !match || !this.onlineForfeitApplies()) return;
-    this.account.record(SnReportBuilder.fromEngine(this.matchKey(session, match), view.driver.engine, view.driver.myNum, this.matchProgress()));
+    this.account.record(SnReportBuilder.fromEngine(this.matchKey(session, match), view.driver.engine, view.driver.myNum, AccountForfeit.progressOnLeave(this.inRandomMatch(), this.matchProgress())));
   }
 
   private forfeitIfLate(): void {
@@ -595,7 +600,7 @@ class SnGame {
   private randomFor(mode: SnMode): MkRandomFlow {
     const existing = this.randoms.get(mode);
     if (existing) return existing;
-    const flow = SnRandomSetup.create(mode, this.backend, this.directory, this.myId, {
+    const flow = SnRandomSetup.create(mode, this.backend, this.directory, this.myId, new AccountStatsOpener(() => this.account.openStats()), {
       myRecord: () => this.myRecord(),
       enterTicketRoom: (code, hosting) => this.enterTicketRoom(mode, code, hosting),
       leaveRoomQuietly: () => this.leaveRoomQuietly(),
@@ -864,7 +869,7 @@ class SnRandomSetup {
   static readonly CAPACITY = 6;
   static readonly DUOS_TEAMS = 3;
 
-  static create(mode: SnMode, backend: RkBackend, directory: RkDirectory<SnPlayerRecord>, myId: string, port: RkMatchPort<SnPlayerRecord>): MkRandomFlow {
+  static create(mode: SnMode, backend: RkBackend, directory: RkDirectory<SnPlayerRecord>, myId: string, stats: MkStatsLink, port: RkMatchPort<SnPlayerRecord>): MkRandomFlow {
     const solo = mode === "solo", perTeam = solo ? 1 : 2;
     return RkRandomSetup.create<SnPlayerRecord>({
       backend, directory, myId, port,
@@ -876,6 +881,7 @@ class SnRandomSetup {
         matcher: new MkFreeForAllMatcher(perTeam, SnRandomSetup.CAPACITY, MkMatcher.TIMING, solo ? SnRandomSetup.CAPACITY : SnRandomSetup.DUOS_TEAMS),
         intro: solo ? "매칭 시작을 누르면 다른 학생들과 개인전으로 만나요. 모자란 자리는 AI가 채워요." : "매칭 시작을 누르면 다른 팀들과 팀전(2명씩 최대 3팀)으로 만나요. 모자란 자리는 AI가 채워요.",
         showRank: true,
+        stats,
         solo
       },
       assign: (plan) => MkSeatAssign.bySide(plan, perTeam),

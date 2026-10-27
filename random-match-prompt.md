@@ -227,3 +227,24 @@
 | 9 | 24 터보 랩 | 완료(2026-10-21, 선생님 요청으로 30번과 함께 먼저) — 인라인 클로저 안 `TurboRandomMatch`(MkGameHooks). 1대1 개인전(`solo`), 코스는 `plan.seed`, 좌우는 편으로 무작위. 가짜 Firebase 탭 2개로 매칭·출발·결과·연승·기존 방 코드 흐름 확인 |
 | 10 | 30 팀 배틀 아레나 | 완료(2026-10-21, 선생님 요청으로 24번과 함께 먼저) — `ArenaRandomMatch`(services.randomMatch). 대회모드·랜덤 맵·편 무작위, 모자란 자리는 AI 로 3명까지, 모이면 바로 드래프트. `&test` 265·0·0, `&sim` 3373110270(길이 735673) 그대로. 가짜 Firebase 탭 2개로 매칭·드래프트·경기 시작·결과·연승·기존 흐름 확인 |
 | 11 | 데이터베이스규칙.json 정리·선생님 게시 안내 | 완료(2026-10-21) — `matchQueue/$queue` 와 게임 9개의 `parties/$party`(volleyball·turbolap·teambattle·soccer·snowroyale·waterballoon·minigames·fpsbattle·zombieoutbreak). 모든 페이지의 `match-kit.js?v=20261021f` 로 통일. 선생님께 콘솔 게시 요청 |
+
+## 2026-10-27 선생님 요청으로 바뀐 것(로그아웃·반별 순위·랜덤 매칭 패배·아이디 연승·최근 20매치)
+
+- **로그아웃 버튼은 초기화면에서만**: `account-login.ts` 의 `AccountChipPlacement`. 목록 화면(index·contest 의 script 에 `data-account-chip="always"`)은 늘 보이고,
+  게임은 시작 화면 요소에 `data-account-home` 을 단 곳이 보일 때만 보인다(대기실·경기·결과에서는 숨김). 표시가 없는 자료(퀴즈 등)는 안 보인다 — 로그아웃은 목록 화면에서.
+  새 게임은 시작 화면 요소에 `data-account-home` 을 단다. 화면이 보이는지는 기기 안에서 0.4초마다 확인한다(네트워크 아님). 30번의 예전 숨김 코드는 지웠다.
+- **최근 매치 20칸**: `RecentMatchRing.SLOTS = 20`, 경로 `users/<uid>/recent/<게임키>/<0~19>`, 규칙 `$slot` 은 `^([0-9]|1[0-9])$`. 버튼·탭 이름도 "최근 20매치".
+- **랜덤 매칭은 언제 나가도 패배**: `MkRandomFlow.forfeitApplies` 가 진행도를 보지 않는다(문구 `MkForfeit.QUESTION` = "지금 나가면 패배로 기록됩니다. 나갈까요?").
+  계정 통계도 같은 판단: 게임이 나갈 때 보고서의 진행도를 `AccountForfeit.progressOnLeave(랜덤 매칭?, 진행도)` 로 넘긴다(랜덤 매칭이면 1 → 절반 규칙에 안 걸림).
+  방 만들기·코드 입장 방은 예전처럼 절반 규칙. 상대가 나가서 끝난 판은 각 게임의 기존 판정대로 남은 쪽 승리로 기록된다. "← 목록으로"·탭 닫기는 여전히 세지 않는다.
+- **연승은 아이디 단위, 상한 없음**: `match-kit.ts` 의 `MkPersonalStreak`·`MkStreakMath`. 로그인하면 `users/<uid>/streak/<게임 루트>` = `{n 지금 연승, b 최고 연승, id 마지막 판}`,
+  로그인 전(배포용)은 기기 `mk_streak_<게임>_v1`. 대기실에 들어갈 때 읽기 1번, 판이 끝날 때 각자 자기 계정에 쓰기 1번. 이기면 +1, 지면 0, 비기면 그대로.
+  팀 대기실 전적 창(MkHistoryDialog)은 없앴다. 팀 대기실 전적(`MkParty.report`, 팀장만)은 화면에 안 보이지만 "끝난 판의 표로 다시 들어가지 않기"에 쓰여 그대로 둔다.
+- **팀 대기실 `📊 내 통계` 버튼**: `MkFlowOptions.stats`(`MkStatsLink`). 연승 버튼을 눌러도 같은 창. 24·25·30·31·38·39 는 `AccountStatsOpener(() => 게임 통계 창 열기)`,
+  통계가 없던 32·34·35 는 `RandomMatchAccount(게임키, 제목, 순위전?)` 가 랜덤 매칭 판의 승패를 `stats/<게임키>`(g·w·l·t 3위 안)·`recent/<게임키>` 에 남기고 창도 보여 준다.
+  25번처럼 닉네임 줄(`headExtra`)에 이미 통계 버튼이 있으면 `📊 내 통계` 는 숨긴다. 31번은 닉네임 줄의 버튼을 빼고 이 버튼을 쓴다.
+- **교사 화면 "게임별 반별 순위"**(admin.html `ClassRankPanel`, 예전 "팀 배틀 반별 승률"을 넓힘): 게임 버튼 → 반 버튼. 30번은 `classStats/<반>`(MVP), 나머지는 `gameRanks/<게임키>/<반>/<uid>` = `{n, g, w, x}`.
+  x: 24 완주 수 · 25 처치 합계 · 31 감염시킨 수 · 32 3위 안 · 38 처치 합계 · 39 처치 합계(34·35 는 없음). 학생 기기가 누적 통계와 같은 PATCH 에서 쓴다(`AccountGameProfile.rankFields` → `AccountClassRank.patch`).
+  반 바꾸기는 모든 게임의 요약을 한 번의 PATCH 로 옮긴다(게임마다 옛 칸 읽기 1번). 규칙은 g·w 가 그 학생의 `stats/<게임키>` 와 같아야 통과.
+- 검사: `node tools/account-stats-unit.js`(20칸·반별 요약·32/34/35 승패·규칙 통과), `node tools/match-sim.js`(아이디 연승 150연승·중복·무승부 포함).
+- **선생님 할 일**: `데이터베이스규칙.json` 을 Firebase 콘솔에 다시 게시(`recent` 20칸·`streak`·`gameRanks`·32/34/35 `stats`·`recent`). 게시 전에는 이 새 저장이 거부된다(게임은 그대로).

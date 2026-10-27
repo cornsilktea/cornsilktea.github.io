@@ -74,7 +74,8 @@ class VbRandomSetup {
       partyLimit: VbRandomSetup.PARTY_LIMIT,
       matcher: new MkVersusMatcher(VbRandomSetup.PARTY_LIMIT),
       intro: "매칭 시작을 누르면 아무 팀과 2대2로 만나요.",
-      allowBots: true
+      allowBots: true,
+      stats: new RandomMatchAccount(VbPartyPaths.GAME_ROOT, "배구 랜덤 매칭 통계", false)
     };
     const panel = new MkPartyPanel(VbDom.byId("partyScreen"), VbDom.byId("partyMount"), options);
     return new MkRandomFlow(database, backend, myId, options, new VbMatchHooks(directory, database, myId, port), panel);

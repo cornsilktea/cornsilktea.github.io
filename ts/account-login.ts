@@ -201,6 +201,51 @@ class AccountChip {
     this.chip.textContent = name + " · 로그아웃";
     if (!this.chip.isConnected) document.body.appendChild(this.chip);
   }
+
+  setVisible(visible: boolean): void {
+    const display = visible ? "" : "none";
+    if (this.chip.style.display !== display) this.chip.style.display = display;
+  }
+}
+
+/* 로그아웃 버튼은 "초기화면"에서만 보인다(2026-10-27 선생님 요청 — 게임에 들어간 뒤에는 어디에서도 안 보이게).
+   - 목록 화면(index.html·contest.html): script 태그에 data-account-chip="always" → 늘 보임.
+   - 게임: 시작 화면 요소에 data-account-home 을 달아 두면 그 요소가 화면에 보일 때만 보인다(대기실·경기·결과에서는 숨김).
+   - 표시가 없는 자료(퀴즈 등): 보이지 않는다. 로그아웃은 목록 화면에서 한다.
+   화면 전환 방식이 게임마다 달라(hidden·display·클래스) 기기 안에서 0.4초마다 보이는지만 확인한다(네트워크 요청 아님). */
+class AccountChipPlacement {
+  private static readonly CHECK_MS = 400;
+  private static readonly ALWAYS_SELECTOR = "script[data-account-chip='always']";
+  private static readonly HOME_SELECTOR = "[data-account-home]";
+  private timer: ReturnType<typeof setInterval> | null = null;
+
+  constructor(private readonly chip: AccountChip) {}
+
+  start(): void {
+    if (this.timer) return;
+    this.apply();
+    if (document.querySelector(AccountChipPlacement.ALWAYS_SELECTOR)) return;
+    this.timer = setInterval(() => this.apply(), AccountChipPlacement.CHECK_MS);
+  }
+
+  private apply(): void {
+    this.chip.setVisible(this.onHomeScreen());
+  }
+
+  private onHomeScreen(): boolean {
+    if (document.querySelector(AccountChipPlacement.ALWAYS_SELECTOR)) return true;
+    const homes = document.querySelectorAll<HTMLElement>(AccountChipPlacement.HOME_SELECTOR);
+    for (let index = 0; index < homes.length; index++) {
+      if (AccountChipPlacement.isShown(homes[index])) return true;
+    }
+    return false;
+  }
+
+  private static isShown(element: HTMLElement): boolean {
+    if (element.hidden || !element.getClientRects().length) return false;
+    const style = getComputedStyle(element);
+    return style.visibility !== "hidden" && style.display !== "none" && Number(style.opacity || "1") > 0.05;
+  }
 }
 
 class AccountNickWriter {
@@ -230,6 +275,7 @@ class AccountGate {
   private readonly client = new AccountAuthClient();
   private readonly screen = new AccountLoginScreen(() => this.requestSignIn());
   private readonly chip = new AccountChip(() => this.requestSignOut());
+  private readonly chipPlacement = new AccountChipPlacement(this.chip);
   private readonly nickWriter = new AccountNickWriter();
   private readonly hideStyle = document.createElement("style");
   private readonly nickSettingStyle = document.createElement("style");
@@ -273,6 +319,7 @@ class AccountGate {
     this.screen.hide();
     this.hideStyle.remove();
     this.chip.show(name);
+    this.chipPlacement.start();
     if (!this.published) this.loadRecordsModule();
     this.published = true;
     document.dispatchEvent(new CustomEvent(AccountGate.USER_EVENT));

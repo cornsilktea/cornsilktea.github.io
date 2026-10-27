@@ -1,7 +1,7 @@
 const fs = require("fs"), vm = require("vm"), path = require("path");
 
 class MatchKitLoader {
-  static NAMES = ["MkPaths", "MkMatcher", "MkVersusMatcher", "MkFreeForAllMatcher", "MkRecordBook", "MkPartyDirectory", "MkParty", "MkQueue", "MkBusySign"];
+  static NAMES = ["MkPaths", "MkMatcher", "MkVersusMatcher", "MkFreeForAllMatcher", "MkRecordBook", "MkPartyDirectory", "MkParty", "MkQueue", "MkBusySign", "MkStreakMath", "MkPersonalStreak"];
   static load() {
     const src = fs.readFileSync(path.join(__dirname, "..", "match-kit.js"), "utf8") + "\n;({" + MatchKitLoader.NAMES.join(",") + "})";
     return vm.runInNewContext(src, { console, Math, Date, JSON, Object, Array, String, Number, Set, Map, Promise, setTimeout, clearTimeout });
@@ -520,6 +520,14 @@ class Scenarios {
     const teamPlan = teams.plan(solos, 100, () => 0.5);
     Report.check("팀 수 상한: 6자리라도 3팀까지만", teamPlan && teamPlan.groups.map((g) => g.code).join() === "a,b,c", teamPlan && teamPlan.groups.map((g) => g.code));
     Report.check("기록장: 빈 전적", new Mk.MkRecordBook(null).summary() === "0전 0승 0무 0패" && new Mk.MkRecordBook(null).streak() === 0);
+    const S = Mk.MkStreakMath;
+    let rec = S.EMPTY;
+    for (let n = 0; n < 150; n++) rec = S.next(rec, "m" + n, "win");
+    Report.check("아이디 연승: 상한 없이 150연승", rec.n === 150 && rec.b === 150 && S.label(rec.n) === "🔥 150연승", rec);
+    Report.check("아이디 연승: 같은 판은 두 번 안 셈", S.next(rec, "m149", "win") === null);
+    const drew = S.next(rec, "d1", "draw"), lost = S.next(drew, "l1", "lose");
+    Report.check("아이디 연승: 비기면 그대로, 지면 0(최고 기록은 남음)", drew.n === 150 && lost.n === 0 && lost.b === 150 && S.label(0) === "연승 없음");
+    Report.check("아이디 연승: 저장 값 다듬기", S.normalize({ n: "3", b: 1, id: 5 }).n === 3 && S.normalize({ n: 3, b: 1 }).b === 3 && S.normalize(null).n === 0 && S.key("a.b/c").indexOf(".") < 0);
   }
 
   static unitRotation() {

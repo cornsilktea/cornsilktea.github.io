@@ -78,7 +78,8 @@ class CollectionRandomMatch implements MatchedResultInfo {
       partyLimit: CollectionRandomMatch.PARTY_LIMIT,
       matcher: new MkFreeForAllMatcher(CollectionRandomMatch.PARTY_LIMIT, CollectionRules.MAX_PLAYERS),
       intro: "매칭 시작을 누르면 다른 학생들과 최대 " + CollectionRules.MAX_PLAYERS + "명이 모여 미니게임 모음을 해요. 모자란 자리는 AI가 채워요.",
-      showRank: true
+      showRank: true,
+      stats: new RandomMatchAccount("minigames", "미니게임 랜덤 매칭 통계", true)
     };
     this.flow = new MkRandomFlow(database, clock, myId, options, new CollectionMatchHooks(port, myId), new MkPartyPanel(screen, mount, options));
   }

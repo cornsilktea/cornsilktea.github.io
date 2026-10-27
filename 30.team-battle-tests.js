@@ -5477,7 +5477,7 @@ class AccountStatsTests {
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "MVP율 2/8=25%, 승률 5/8, 표 " + rows + "줄·MVP 횟수 칸");
     });
 
-    run(G, "최근 매치 10칸: 빈 칸부터 쓰고, 11번째 판은 가장 오래된 판 자리에 들어가며, 같은 경기는 무시하는가", function (done) {
+    run(G, "최근 매치 " + A.Ring.SLOTS + "칸: 빈 칸부터 쓰고, " + (A.Ring.SLOTS + 1) + "번째 판은 가장 오래된 판 자리에 들어가며, 같은 경기는 무시하는가", function (done) {
       var bad = [], Ring = A.Ring, Codec = A.Codec, stored = {};
       for (var i = 0; i < Ring.SLOTS; i++) {
         var slot = Ring.chooseSlot(stored, "m" + i);
@@ -5485,12 +5485,12 @@ class AccountStatsTests {
         var e = Codec.encode(self.report(), "m" + i, true); e.at = 1000 + (i === 4 ? -500 : i);
         stored[slot] = e;
       }
-      var eleventh = Ring.chooseSlot(stored, "m10");
-      if (eleventh !== 4) bad.push("11번째 판 자리 " + eleventh + " (기대 4: 가장 오래된 판)");
+      var eleventh = Ring.chooseSlot(stored, "m" + Ring.SLOTS);
+      if (eleventh !== 4) bad.push((Ring.SLOTS + 1) + "번째 판 자리 " + eleventh + " (기대 4: 가장 오래된 판)");
       if (Ring.chooseSlot(stored, "m7") !== -1) bad.push("같은 경기 다시 들어감");
       var list = Ring.entries(Object.assign({}, stored, { 9: { v: 99, id: "x", at: 5 } }));
-      if (list.length !== Ring.SLOTS - 1 || list[0].at !== 1008) bad.push("모르는 버전 건너뛰기·최신순 " + list.length);
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "10칸 채움 → 11번째는 가장 오래된 칸, 중복 무시, 모르는 버전 건너뜀");
+      if (list.length !== Ring.SLOTS - 1 || list[0].at !== 1000 + Ring.SLOTS - 1) bad.push("모르는 버전 건너뛰기·최신순 " + list.length);
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : Ring.SLOTS + "칸 채움 → " + (Ring.SLOTS + 1) + "번째는 가장 오래된 칸, 중복 무시, 모르는 버전 건너뜀");
     });
 
     run(G, "값 배열 왕복: 결과표를 값 배열로 저장했다가 되살리면 결과표·MVP 표시가 원래와 똑같은가", function (done) {

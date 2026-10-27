@@ -1,5 +1,5 @@
 /* =====================================================================
-   39번 물풍선 대작전 계정 통계 · 최근 10매치 (공용 뼈대 account-match-kit.ts 의 자식, 게임 키 waterballoon)
+   39번 물풍선 대작전 계정 통계 · 최근 20매치 (공용 뼈대 account-match-kit.ts 의 자식, 게임 키 waterballoon)
 
    집계 규칙(2026-10-26, 선생님 요청 · 항목은 규칙 엔진이 세는 값에서 골랐다)
      - 대상: 온라인 방(방 만들기·코드 입장·랜덤 매칭). 혼자 하기(봇)·관전은 기록하지 않는다.
@@ -12,7 +12,7 @@
 
    저장:
      users/<uid>/stats/waterballoon  { g, w, l, gs 개인전 판, gt 팀전 판, kl 처치, tp 가둔 수, rs 구출, bx 상자, sk 자폭, sv 생존 초 합, rk 순위 합, mk 한 판 최다 처치, ids }
-     users/<uid>/recent/waterballoon/<0~9>  { v, id, at, r, ai, md 0개인전/1팀전, me, p [[이름, 편, 순위, 생존 초, 처치, 가둔 수, 구출, 상자, 자폭, 나감 0/1, AI 0/1]] }
+     users/<uid>/recent/waterballoon/<0~19>  { v, id, at, r, ai, md 0개인전/1팀전, me, p [[이름, 편, 순위, 생존 초, 처치, 가둔 수, 구출, 상자, 자폭, 나감 0/1, AI 0/1]] }
    ===================================================================== */
 
 interface WbAccountLine {
@@ -149,6 +149,7 @@ class WbAccountProfile extends AccountGameProfile<WbAccountReport, WbAccountPlan
   readonly gameKey = "waterballoon";
 
   matchIdOf(report: WbAccountReport): string { return report.matchId; }
+  rankFields(node: WbAccountStatsNode): AccountRankFields { return { g: node.g, w: node.w, x: node.kl }; }
   planOf(report: WbAccountReport): WbAccountPlan { return new WbAccountPlan(report); }
   encodeRecent(report: WbAccountReport, key: string, win: boolean): object { return WbAccountCodec.encode(report, key, win); }
   decodeRecent(raw: unknown): WbAccountRecentEntry | null { return WbAccountCodec.decode(raw); }
@@ -243,6 +244,10 @@ class WbAccount {
 
   bind(): void {
     this.dialog.bindButtons();
+  }
+
+  openStats(): void {
+    this.dialog.open("stats");
   }
 
   record(report: WbAccountReport): void {

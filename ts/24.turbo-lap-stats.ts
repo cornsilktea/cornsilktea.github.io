@@ -1,5 +1,5 @@
 /* =====================================================================
-   24번 터보 랩 계정 통계 · 최근 10매치 (공용 뼈대 account-match-kit.ts 의 자식, 게임 키 turbolap)
+   24번 터보 랩 계정 통계 · 최근 20매치 (공용 뼈대 account-match-kit.ts 의 자식, 게임 키 turbolap)
 
    집계 규칙(2026-10-26, 선생님 요청 · 승 정의는 코드 기준으로 정함)
      - 대상: 랜덤 매칭 1대1 경기만. 방 코드로 만든 대전·타임어택은 기록하지 않는다.
@@ -10,7 +10,7 @@
 
    저장:
      users/<uid>/stats/turbolap   { g, w, l, f 완주 수, c/<코스> = { g, w, f, tm 완주 시간 합계(ms) }, ids/<경기열쇠> }
-     users/<uid>/recent/turbolap/<0~9>  { v, id, at, r, ai, co 코스 번호, me 내 줄, p [[닉네임, 쪽 0왼/1오, 기록ms(0=미완주), 진행‰, 차량, AI 0/1]] }
+     users/<uid>/recent/turbolap/<0~19>  { v, id, at, r, ai, co 코스 번호, me 내 줄, p [[닉네임, 쪽 0왼/1오, 기록ms(0=미완주), 진행‰, 차량, AI 0/1]] }
    ===================================================================== */
 
 interface TurboLapRow {
@@ -146,6 +146,7 @@ class TurboLapProfile extends AccountGameProfile<TurboLapReport, TurboLapPlan, T
   readonly gameKey = "turbolap";
 
   matchIdOf(report: TurboLapReport): string { return report.matchId; }
+  rankFields(node: TurboLapStatsNode): AccountRankFields { return { g: node.g, w: node.w, x: node.f }; }
   planOf(report: TurboLapReport): TurboLapPlan { return new TurboLapPlan(report); }
   encodeRecent(report: TurboLapReport, key: string, win: boolean): object { return TurboLapCodec.encode(report, key, win); }
   decodeRecent(raw: unknown): TurboLapRecentEntry | null { return TurboLapCodec.decode(raw); }
@@ -228,6 +229,10 @@ class TurboLapAccount {
 
   bind(): void {
     this.dialog.bindButtons();
+  }
+
+  openStats(): void {
+    this.dialog.open("stats");
   }
 
   record(report: TurboLapReport): void {

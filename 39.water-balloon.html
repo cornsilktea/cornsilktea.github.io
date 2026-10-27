@@ -154,7 +154,7 @@
   <div id="resultStreak" class="mk-notice"></div>
   <button type="button" id="btnAgain">다시 하기</button><button type="button" id="btnResultLeave">나가기</button></div></div>
 <button type="button" id="btnGameLeave" class="hud-box" hidden>나가기</button>
-<div id="startScreen" class="st-screen" hidden>
+<div id="startScreen" data-account-home class="st-screen" hidden>
   <div class="st-wrap">
     <div class="st-hero"><h1 class="st-title">물풍선<span>대작전</span></h1></div>
     <div class="st-card">
@@ -173,7 +173,7 @@
       <div class="st-row"><button type="button" class="st-btn primary" id="btnRandomSolo">랜덤 매칭 방 만들기<small>개인전</small></button><button type="button" class="st-btn primary" id="btnRandomTeam">랜덤 매칭 방 만들기<small>팀전</small></button></div>
       <input type="text" id="joinCode" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="방·팀 코드 5자리">
       <div class="st-row"><button type="button" class="st-btn" id="btnJoin">참여하기</button><button type="button" class="st-btn" id="btnWatch">관전하기</button></div>
-      <div class="st-row"><button type="button" class="st-btn" data-account-open="recent">📋 최근 10매치</button><button type="button" class="st-btn" data-account-open="stats">📊 내 통계</button></div>
+      <div class="st-row"><button type="button" class="st-btn" data-account-open="recent">📋 최근 20매치</button><button type="button" class="st-btn" data-account-open="stats">📊 내 통계</button></div>
       <div class="st-msg" id="startMsg"></div>
     </div>
     <div class="st-card st-fold">
@@ -241,17 +241,17 @@
 <div id="netMeter"></div>
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="fold-card.js"></script>
-<script charset="utf-8" src="match-kit.js?v=20261022w"></script>
+<script charset="utf-8" src="match-kit.js?v=20261027a"></script>
 <script charset="utf-8" src="room-kit.js?v=11"></script>
-<script charset="utf-8" src="account-match-kit.js?v=20261026c"></script>
+<script charset="utf-8" src="account-match-kit.js?v=20261027a"></script>
 <script charset="utf-8" src="39.balloon-map.js?v=11"></script>
 <script charset="utf-8" src="39.balloon-rules.js?v=11"></script>
 <script charset="utf-8" src="39.balloon-bot.js?v=11"></script>
 <script charset="utf-8" src="39.balloon-views.js?v=11"></script>
 <script charset="utf-8" src="39.balloon-hud.js?v=11"></script>
 <script charset="utf-8" src="39.balloon-net.js?v=20261026b"></script>
-<script charset="utf-8" src="39.balloon-account.js?v=20261026b"></script>
-<script charset="utf-8" src="39.water-balloon.js?v=20261026b"></script>
+<script charset="utf-8" src="39.balloon-account.js?v=20261027a"></script>
+<script charset="utf-8" src="39.water-balloon.js?v=20261027a"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";

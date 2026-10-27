@@ -1,5 +1,5 @@
 /* =====================================================================
-   25번 서바이벌 팀 대전 계정 통계 · 최근 10매치 (공용 뼈대 account-match-kit.ts 의 자식, 게임 키 fpsbattle)
+   25번 서바이벌 팀 대전 계정 통계 · 최근 20매치 (공용 뼈대 account-match-kit.ts 의 자식, 게임 키 fpsbattle)
 
    집계 규칙(2026-10-26, 선생님 요청)
      - 대상: 팀 대전 방(방 만들기·코드 입장·랜덤 매칭). AI 대전(혼자)은 기록하지 않는다.
@@ -11,7 +11,7 @@
 
    저장:
      users/<uid>/stats/fpsbattle  { g, w, l, k 처치 합, d 쓰러짐 합, dm 입힌 피해 합, ids/<경기열쇠> }
-     users/<uid>/recent/fpsbattle/<0~9>  { v, id, at, r, ai, me 내 줄, s [블루 점수, 레드 점수], p [[닉네임, 팀 0블루/1레드, 처치, 쓰러짐, 피해, 나감 0/1, AI 0/1]] }
+     users/<uid>/recent/fpsbattle/<0~19>  { v, id, at, r, ai, me 내 줄, s [블루 점수, 레드 점수], p [[닉네임, 팀 0블루/1레드, 처치, 쓰러짐, 피해, 나감 0/1, AI 0/1]] }
    ===================================================================== */
 
 interface FpsPlayerLine {
@@ -134,6 +134,7 @@ class FpsProfile extends AccountGameProfile<FpsReport, FpsPlan, FpsStatsNode, Fp
   readonly gameKey = "fpsbattle";
 
   matchIdOf(report: FpsReport): string { return report.matchId; }
+  rankFields(node: FpsStatsNode): AccountRankFields { return { g: node.g, w: node.w, x: node.k }; }
   planOf(report: FpsReport): FpsPlan { return new FpsPlan(report); }
   encodeRecent(report: FpsReport, key: string, win: boolean): object { return FpsCodec.encode(report, key, win); }
   decodeRecent(raw: unknown): FpsRecentEntry | null { return FpsCodec.decode(raw); }
@@ -194,6 +195,10 @@ class FpsAccount {
 
   bind(): void {
     this.dialog.bindButtons();
+  }
+
+  openStats(): void {
+    this.dialog.open("stats");
   }
 
   record(report: FpsReport): void {

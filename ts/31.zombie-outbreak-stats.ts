@@ -1,5 +1,5 @@
 /* =====================================================================
-   31번 좀비 아웃브레이크 계정 통계 · 최근 10매치 (공용 뼈대 account-match-kit.ts 의 자식, 게임 키 zombieoutbreak)
+   31번 좀비 아웃브레이크 계정 통계 · 최근 20매치 (공용 뼈대 account-match-kit.ts 의 자식, 게임 키 zombieoutbreak)
 
    집계 규칙(2026-10-26, 선생님 요청 · 정의는 코드 기준으로 정함)
      - 대상: 온라인 방(방 만들기·코드 입장·랜덤 매칭). 관전자는 기록하지 않는다.
@@ -12,7 +12,7 @@
 
    저장:
      users/<uid>/stats/zombieoutbreak  { g, w, l, hg, hw, zg, zw, og 숙주 횟수, sv 끝까지 생존 횟수, ik 감염 합, mi 한 판 최다 감염, hs 인간 생존 초 합, ls 최장 생존 초, ids }
-     users/<uid>/recent/zombieoutbreak/<0~9>  { v, id, at, r, ai, me, w 0인간/1좀비, p [[닉네임, 0숙주/1감염/2생존, 생존 초, 감염 수, 나감 0/1, AI 0/1]] }
+     users/<uid>/recent/zombieoutbreak/<0~19>  { v, id, at, r, ai, me, w 0인간/1좀비, p [[닉네임, 0숙주/1감염/2생존, 생존 초, 감염 수, 나감 0/1, AI 0/1]] }
    ===================================================================== */
 
 interface ZombieRow {
@@ -153,6 +153,7 @@ class ZombieProfile extends AccountGameProfile<ZombieReport, ZombiePlan, ZombieS
   readonly gameKey = "zombieoutbreak";
 
   matchIdOf(report: ZombieReport): string { return report.matchId; }
+  rankFields(node: ZombieStatsNode): AccountRankFields { return { g: node.g, w: node.w, x: node.ik }; }
   planOf(report: ZombieReport): ZombiePlan { return new ZombiePlan(report); }
   encodeRecent(report: ZombieReport, key: string, win: boolean): object { return ZombieCodec.encode(report, key, win); }
   decodeRecent(raw: unknown): ZombieRecentEntry | null { return ZombieCodec.decode(raw); }
@@ -218,6 +219,10 @@ class ZombieAccount {
 
   bind(): void {
     this.dialog.bindButtons();
+  }
+
+  openStats(): void {
+    this.dialog.open("stats");
   }
 
   record(report: ZombieReport): void {

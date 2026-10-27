@@ -353,7 +353,7 @@
 <div id="count"><span id="countNum">3</span></div>
 
 <div id="overlay" class="st-screen">
-  <div class="st-wrap" id="cardStart">
+  <div class="st-wrap" id="cardStart" data-account-home>
     <div class="st-hero">
       <h1 class="st-title">TURBO LAP</h1>
     </div>
@@ -366,7 +366,7 @@
         <button type="button" class="st-btn blue" id="btnJoin">참여하기</button>
       </div>
       <div class="st-joinrow account">
-        <button type="button" class="st-btn" data-account-open="recent">📋 최근 10매치</button>
+        <button type="button" class="st-btn" data-account-open="recent">📋 최근 20매치</button>
         <button type="button" class="st-btn" data-account-open="stats">📊 내 통계</button>
       </div>
       <div class="hello">내 닉네임: <b id="helloNick"></b> <button type="button" class="mini" data-maker-open data-nick-setting>✏️ 닉네임 설정</button></div>
@@ -500,9 +500,9 @@
 
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="character-maker.js?v=20261026a"></script>
-<script charset="utf-8" src="match-kit.js?v=20261022w"></script>
-<script charset="utf-8" src="account-match-kit.js?v=20261026c"></script>
-<script charset="utf-8" src="24.turbo-lap-stats.js?v=20261026b"></script>
+<script charset="utf-8" src="match-kit.js?v=20261027a"></script>
+<script charset="utf-8" src="account-match-kit.js?v=20261027a"></script>
+<script charset="utf-8" src="24.turbo-lap-stats.js?v=20261027a"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
 <script type="module">
@@ -5452,7 +5452,6 @@ const rivalChip = new RivalChip();
 
 class TurboRandomMatch {
   static START_TRIES = 12;
-  static FORFEIT_PROGRESS = 0.5;
   static START_RETRY_MS = 300;
   static SETTLE_MS = 1000;
   static AI_FALLBACK_MS = 120000;
@@ -5463,7 +5462,7 @@ class TurboRandomMatch {
     if (this.flow) return this.flow;
     const db = await connectDb();
     if (this.flow) return this.flow;
-    const options = { gameRoot: "turbolap", queue: "turbolap", partyLimit: 1, matcher: new MkVersusMatcher(1, TurboRandomMatch.MATCHER_TIMING), solo: true, allowBots: false, aiFallbackMs: TurboRandomMatch.AI_FALLBACK_MS,
+    const options = { gameRoot: "turbolap", queue: "turbolap", partyLimit: 1, matcher: new MkVersusMatcher(1, TurboRandomMatch.MATCHER_TIMING), solo: true, allowBots: false, aiFallbackMs: TurboRandomMatch.AI_FALLBACK_MS, stats: new AccountStatsOpener(() => turboAccount.openStats()),
       intro: "매칭 시작을 누르면 아무 학생과 1대1로 달려요. 코스와 출발 자리는 무작위예요." };
     const panel = new MkPartyPanel($("overlay"), $("partyMount"), options);
     this.flow = new MkRandomFlow(db, { now: tnow }, BT.myId, options, this, panel);
@@ -5547,10 +5546,10 @@ class TurboRandomMatch {
     return standings().reduce((most, r) => Math.max(most, r.fin ? 1 : OPEN ? r.prog : r.prog / LAPS), 0);
   }
   forfeits() {
-    return !!this.ticket() && !!BT.match && !BT.spec && BT.status !== "ended" && this.raceProgress() >= TurboRandomMatch.FORFEIT_PROGRESS;
+    return !!this.flow && !!BT.match && !BT.spec && BT.status !== "ended" && this.flow.forfeitApplies(this.raceProgress());
   }
   leaveQuestion() {
-    return this.forfeits() ? "경기가 절반 넘게 진행됐어요. 지금 나가면 패배로 기록됩니다. 나갈까요?" : "방을 나갈까요? 경기 중이면 미완주로 처리됩니다.";
+    return this.forfeits() ? MkForfeit.QUESTION : "방을 나갈까요? 경기 중이면 미완주로 처리됩니다.";
   }
   recordBeforeLeave() {
     const ticket = this.ticket();

@@ -5,7 +5,8 @@ const names = ["AccountNumbers", "AccountRates", "AccountMatchKey", "AccountKeyL
   "TeamBattleRates", "AccountMvpJudge", "TeamBattlePlan", "TeamBattleCodec", "TeamBattleRing", "AccountStatsMath", "AccountStatsTable", "ClassStatsSummary", "TeamBattleProfile", "AccountStatsStore",
   "TurboLapPlan", "TurboLapCodec", "TurboLapStatsMath", "TurboLapProfile", "TurboLapStatsView", "FpsPlan", "FpsCodec", "FpsStatsMath", "FpsProfile", "FpsStatsView",
   "ZombiePlan", "ZombieCodec", "ZombieStatsMath", "ZombieProfile", "ZombieStatsView", "SnAccountPlan", "SnAccountCodec", "SnAccountMath", "SnAccountProfile", "SnAccountView", "SnReportBuilder",
-  "WbAccountPlan", "WbAccountCodec", "WbAccountMath", "WbAccountProfile", "WbAccountView", "WbReportBuilder"];
+  "WbAccountPlan", "WbAccountCodec", "WbAccountMath", "WbAccountProfile", "WbAccountView", "WbReportBuilder",
+  "AccountClassRank", "RandomMatchPlan", "RandomMatchCodec", "RandomMatchMath", "RandomMatchProfile", "RandomMatchView"];
 const src = files.map((f) => fs.readFileSync(path.join(root, f), "utf8")).join("\n") + "\n;({" + names.join(",") + "})";
 const K = vm.runInNewContext(src, { console, Math, Set, Map, Array, Object, Number, String, JSON, isFinite, Date, Promise, window: {}, WbBalance: { RATE: 30 } });
 
@@ -51,14 +52,16 @@ check("절반 규칙: 절반 전에 나가면 기록 없음, 절반부터는 기
     if (slot !== i) ok = false;
     stored[slot] = Object.assign(K.AccountRecentHeadCodec.encode(1, "m" + i, true), { at: 1000 + (i === 4 ? -500 : i) });
   }
-  check("10칸 링: 빈 칸부터 채움", ok);
-  check("10칸 링: 11번째는 가장 오래된 칸", K.RecentMatchRing.chooseSlot(stored, "m10") === 4);
-  check("10칸 링: 같은 열쇠는 무시", K.RecentMatchRing.chooseSlot(stored, "m7") === -1);
+  check("20칸 링: 칸 수 20", K.RecentMatchRing.SLOTS === 20);
+  check("20칸 링: 빈 칸부터 채움", ok);
+  check("20칸 링: 21번째는 가장 오래된 칸", K.RecentMatchRing.chooseSlot(stored, "m20") === 4);
+  check("20칸 링: 같은 열쇠는 무시", K.RecentMatchRing.chooseSlot(stored, "m7") === -1);
   const full = {};
-  for (let i = 0; i < 10; i++) full[i] = Object.assign(JSON.parse(JSON.stringify(K.TeamBattleCodec.encode(report(), "m" + i, true))), { at: 1000 + i });
+  for (let i = 0; i < 20; i++) full[i] = Object.assign(JSON.parse(JSON.stringify(K.TeamBattleCodec.encode(report(), "m" + i, true))), { at: 1000 + i });
   full[9] = { v: 99, id: "x", at: 5 };
+  full[20] = Object.assign(JSON.parse(JSON.stringify(full[0])), { at: 9999 });
   const list = K.TeamBattleRing.entries(full);
-  check("10칸 링: 모르는 버전은 건너뛰고 최신순", list.length === 9 && list[0].at === 1008 && list[8].at === 1000, list.map((e) => e.at));
+  check("20칸 링: 모르는 버전·20번 넘는 칸은 건너뛰고 최신순", list.length === 19 && list[0].at === 1019 && list[18].at === 1000, list.map((e) => e.at));
 }
 
 {
@@ -152,6 +155,7 @@ const done = (async () => {
 const RULES = JSON.parse(fs.readFileSync(path.join(root, "데이터베이스규칙.json"), "utf8")).rules.users.$uid;
 String.prototype.matches = function (re) { return re.test(String(this)); };
 const RULE_NOW = 1700000000000;
+const RANK_RULES = JSON.parse(fs.readFileSync(path.join(root, "데이터베이스규칙.json"), "utf8")).rules.gameRanks;
 
 class RuleNode {
   constructor(v) { this.v = v === null ? undefined : v; }
@@ -181,6 +185,18 @@ class RuleChecker {
       RuleChecker.validate(childRule, nv[key], old, Object.assign({}, vars, !exact && wild ? { [wild]: key } : {}), label + "/" + key, errors);
     });
   }
+  static checkRanks(key, writes, errors) {
+    const rule = RANK_RULES.$game.$cls.$uid;
+    Object.keys(writes).filter((k) => k.indexOf("gameRanks/") === 0 && writes[k] !== null).forEach((k) => {
+      const [, game, cls, uid] = k.split("/");
+      const stats = RuleChecker.after({}, writes, "users/u1/stats/" + key + "/");
+      const parentChain = { parent: () => ({ parent: () => ({ parent: () => ({ parent: () => ({ child: (n) => new RuleNode(n === "users" ? { u1: { stats: { [key]: stats } } } : undefined) }) }) }) }) };
+      const node = new RuleNode(writes[k]);
+      node.parent = parentChain.parent;
+      const ok = new Function("newData", "auth", "$game", "$cls", "$uid", "return (" + rule[".validate"] + ");")(node, { uid: "u1" }, game, cls, uid);
+      if (!ok) errors.push("gameRanks/" + game + "/" + cls + " :: 순위 요약이 누적 통계와 다름");
+    });
+  }
   static after(base, writes, prefix) {
     const out = JSON.parse(JSON.stringify(base === undefined ? {} : base));
     Object.keys(writes).filter((k) => k.indexOf(prefix) === 0).forEach((k) => {
@@ -193,6 +209,7 @@ class RuleChecker {
   }
   static check(key, writes, baseStats, baseRecent) {
     const errors = [];
+    RuleChecker.checkRanks(key, writes, errors);
     const stats = RuleChecker.after(baseStats, writes, "users/u1/stats/" + key + "/");
     if (Object.keys(writes).some((k) => k.indexOf("users/u1/stats/" + key + "/") === 0)) RuleChecker.validate(RULES.stats[key], stats, baseStats, {}, "stats/" + key, errors);
     const slots = {};
@@ -218,6 +235,8 @@ class GameCase {
     const status = await first.store.record(report, null);
     const w = first.writes[0] || {};
     check(this.name + " 저장: 쓰기 1번·경로 recent/" + this.key + "/0 · stats/" + this.key, status === "stats" && first.writes.length === 1 && !!w["users/u1/recent/" + this.key + "/0"] && Object.keys(w).some((k) => k.indexOf("users/u1/stats/" + this.key + "/g") === 0), Object.keys(w));
+    const rank = w["gameRanks/" + this.key + "/none/u1"];
+    check(this.name + " 저장: 같은 PATCH 에 반별 순위 요약(gameRanks/" + this.key + "/none)", !!rank && rank.g === 1 && rank.n === "홍" && typeof rank.x === "number", rank);
     const dup = this.store({ ["recent/" + this.key]: { 0: w["users/u1/recent/" + this.key + "/0"] } });
     check(this.name + " 저장: 같은 경기는 쓰기 없음", (await dup.store.record(report, null)) === "duplicate" && dup.writes.length === 0);
     const loaded = await this.store({ ["recent/" + this.key]: { 3: Object.assign(JSON.parse(JSON.stringify(w["users/u1/recent/" + this.key + "/0"])), { at: 5 }) } }).store.loadRecent();
@@ -317,6 +336,25 @@ const wbEnd = { match: 1, ranks: [1, 1, 2, 2], outTicks: [-1, 600, 300, 450], at
   check("39번 누적: 가둔 수·처치·구출·상자·생존·순위 합계", b.node.g === 2 && b.node.tp === 4 && b.node.kl === 3 && b.node.rs === 1 && b.node.bx === 4 && b.node.sv === 40 && b.node.rk === 3 && b.node.gt === 2 && b.node.mk === 2, b.node);
 }
 
+const randomReport = (extra) => Object.assign({ matchId: "rm1", result: "win", rank: 2, of: 6, map: "맵".repeat(25), rivals: ["가".repeat(25), "나"] }, extra || {});
+{
+  const p = (extra) => new K.RandomMatchPlan(randomReport(extra));
+  check("랜덤 매칭 승패: 승리는 최근·누적 모두", p().recordsRecent && p().countsStats && p().win);
+  check("랜덤 매칭 승패: 무승부는 기록 없음, 상대가 모두 AI 면 최근 매치만", !p({ result: "draw" }).recordsRecent && p({ rivals: [] }).recordsRecent && !p({ rivals: [] }).countsStats);
+  const stored = JSON.parse(JSON.stringify(K.RandomMatchCodec.encode(randomReport(), "k1", true))); stored.at = 1700000000000;
+  const back = K.RandomMatchCodec.decode(stored);
+  check("랜덤 매칭 승패: 값 배열 왕복(이름·맵 20자, 순위)", back.rank === 2 && back.of === 6 && back.map.length === 20 && back.rivals[0].length === 20 && back.rivals[1] === "나" && back.win && !back.withAi, back);
+  const a = K.RandomMatchMath.apply(null, randomReport(), true, "k1", 1), b = K.RandomMatchMath.apply(a.node, randomReport({ rank: 5 }), false, "k2", 2);
+  check("랜덤 매칭 승패: 누적 판·승·패·3위 안", b.node.g === 2 && b.node.w === 1 && b.node.l === 1 && b.node.t === 1 && K.RandomMatchMath.apply(b.node, randomReport(), true, "k1", 3) === null, b.node);
+  const ticket = { matchId: "t1", room: "12345", side: 0, host: "h", expect: 2, rivals: ["표상대"], map: "해변" };
+  const fromTicket = K.RandomMatchCodec.fromOutcome(ticket, { result: "lose", rank: 3, of: 4 });
+  check("랜덤 매칭 승패: 표·결과에서 보고서 만들기(상대 없으면 표의 상대)", fromTicket.matchId === "t1" && fromTicket.rivals[0] === "표상대" && fromTicket.map === "해변" && fromTicket.rank === 3, fromTicket);
+  const view = new K.RandomMatchView("제목", true);
+  check("랜덤 매칭 승패: 통계 창 글자(승패·3위 안)", view.statsHtml(b.node).indexOf("3위 안") >= 0 && view.blockBodyHtml(back).indexOf("vs ") === 0);
+  const user = { uid: "u1", name: "20104 홍길동", email: "a@b" };
+  const rankPatch = K.AccountClassRank.patch("soccer", user, "2-5", { g: 3, w: 2, x: 0 });
+  check("반별 순위 요약: 반 칸에 쓰고 미분류 칸은 지움", rankPatch["gameRanks/soccer/2-5/u1"].g === 3 && rankPatch["gameRanks/soccer/none/u1"] === null && K.AccountClassRank.classKey("3-1") === "none");
+}
 const gameChecks = (async () => {
   await turbo.verifyStore(turboReport());
   await fps.verifyStore(fpsReport());
@@ -324,6 +362,7 @@ const gameChecks = (async () => {
   const cleanSnow = K.SnReportBuilder.fromEnd("m38", snowMatch, snowEnd, "a"); cleanSnow.players[3].ai = false;
   await snow.verifyStore(cleanSnow);
   await balloon.verifyStore(K.WbReportBuilder.fromEnd("m39", wbMatch, wbEnd, "a"));
+  for (const key of ["minigames", "volleyball", "soccer"]) await new GameCase(key, new K.RandomMatchProfile(key), K.RandomMatchCodec, key).verifyStore(randomReport());
 })();
 Promise.all([done, gameChecks]).then(() => {
   if (failures.length) { console.log("실패 " + failures.length + "개\n" + failures.join("\n")); process.exit(1); }

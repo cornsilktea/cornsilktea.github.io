@@ -1278,7 +1278,8 @@ class SocRandomSetup {
                 partyLimit: SocRandomSetup.PARTY_LIMIT,
                 matcher: new MkVersusMatcher(SocRandomSetup.PARTY_LIMIT),
                 intro: "매칭 시작을 누르면 아무 팀과 2대2로 만나요.",
-                allowBots: true
+                allowBots: true,
+                stats: new RandomMatchAccount("soccer", "축구 랜덤 매칭 통계", false)
             },
             assign: (plan) => MkSeatAssign.bySide(plan, SocRandomSetup.PARTY_LIMIT),
             screen: RkDom.byId("partyScreen"),

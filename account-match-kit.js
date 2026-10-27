@@ -1,14 +1,17 @@
 "use strict";
 /* =====================================================================
-   계정별 통계 · 최근 10매치 공용 뼈대 (게임을 모르는 부분, 로그인한 학생만)
+   계정별 통계 · 최근 20매치 공용 뼈대 (게임을 모르는 부분, 로그인한 학생만)
 
    게임마다 복사하지 않고 이 파일을 함께 쓴다. 게임별 모양은 AccountGameProfile 을 이어 받은
    자식 클래스(30번 TeamBattleProfile 등)가 정하고, 읽고 쓰는 일은 AccountMatchStore 한 곳이 한다.
 
-   저장 위치(Realtime Database, 규칙은 데이터베이스규칙.json 의 users/$uid):
+   저장 위치(Realtime Database, 규칙은 데이터베이스규칙.json 의 users/$uid · gameRanks):
      users/<uid>/stats/<게임키>          누적 통계(게임별 모양, ids/<경기열쇠> 로 중복 방지)
-     users/<uid>/recent/<게임키>/<0~9>   최근 매치 10칸. 칸이 10개뿐이라 규칙으로도 10판을 넘지 못한다.
+     users/<uid>/recent/<게임키>/<0~19>  최근 매치 20칸(2026-10-27 선생님 요청으로 10칸에서 늘림). 칸 이름 규칙으로도 20판을 넘지 못한다.
+     gameRanks/<게임키>/<학년-반|none>/<uid> { n 이름, g 판, w 승, x 게임별 숫자 하나 }  교사 화면 반별 순위용 요약(교사만 읽음).
+       누적 통계와 같은 PATCH 에서 쓴다. 30번은 예전부터 쓰던 classStats(MVP 포함)를 그대로 쓴다.
    최근 매치 한 판은 공통 머리 {v, id, at(서버 시각), r(1승/0패)} + 게임별 몸통이다.
+   랜덤 매칭만 있고 게임별 통계가 없는 게임(32·34·35)은 RandomMatchAccount 가 승패만 같은 구조로 남긴다.
 
    요청 빈도: 경기 끝 쓰기 1번(읽기-수정-쓰기 + 여러 경로 PATCH 1번), 창을 열 때 읽기 1번. 그 외 요청은 만들지 않는다.
    이 파일의 계산 클래스는 화면도 통신도 몰라서 tools/account-stats-unit.js 가 node 에서 직접 검사한다.
@@ -56,6 +59,10 @@ AccountKeyLedger.KEEP = 20;
 class AccountForfeit {
     static leftEarly(iLeft, progress) {
         return iLeft && progress < AccountForfeit.AT;
+    }
+    /* 랜덤 매칭 판은 언제 나가도 패배로 남긴다(2026-10-27 선생님 요청). 방 만들기·코드 입장 방은 절반 규칙 그대로 */
+    static progressOnLeave(randomMatch, progress) {
+        return randomMatch ? 1 : progress;
     }
 }
 AccountForfeit.AT = 0.5;
@@ -114,13 +121,13 @@ class RecentMatchRing {
     static decodeAll(stored, decode) {
         const slots = AccountShape.slots(stored);
         return Object.keys(slots)
-            .filter((key) => /^[0-9]$/.test(key))
+            .filter((key) => /^[0-9]{1,2}$/.test(key) && Number(key) < RecentMatchRing.SLOTS)
             .map((key) => decode(slots[key]))
             .filter((entry) => !!entry)
             .sort((a, b) => b.at - a.at);
     }
 }
-RecentMatchRing.SLOTS = 10;
+RecentMatchRing.SLOTS = 20;
 class AccountLoginNotice {
 }
 AccountLoginNotice.STATS_LOGIN_NEEDED = "로그인하면 내 통계를 볼 수 있어요.";
@@ -143,6 +150,30 @@ class RecentBlockList {
             bodyOf(entry, index) + "</button>").join("");
     }
 }
+/* 교사 화면 반별 순위 요약(gameRanks). 반은 학생이 반 링크로 처음 로그인할 때 profile/cls 에 적힌다(없으면 none = 미분류).
+   선생님 계정은 순위에 넣지 않고, 반이 정해진 학생은 미분류 칸의 옛 요약을 함께 지운다(30번 classStats 와 같은 방식). */
+class AccountClassRank {
+    static classKey(cls) {
+        return typeof cls === "string" && AccountClassRank.CLASS_PATTERN.test(cls) ? cls : AccountClassRank.NONE;
+    }
+    static patch(gameKey, user, cls, fields) {
+        const values = {};
+        const admins = typeof AccountPolicy === "function" ? AccountPolicy.ADMIN_UIDS : [];
+        if (admins.indexOf(user.uid) >= 0)
+            return values;
+        const classKey = AccountClassRank.classKey(cls);
+        const root = AccountClassRank.ROOT + "/" + gameKey + "/";
+        values[root + classKey + "/" + user.uid] = { n: String(user.name || "학생").slice(0, AccountClassRank.NAME_MAX) || "학생", g: fields.g, w: fields.w, x: AccountNumbers.count(fields.x) };
+        if (classKey !== AccountClassRank.NONE)
+            values[root + AccountClassRank.NONE + "/" + user.uid] = null;
+        return values;
+    }
+}
+AccountClassRank.ROOT = "gameRanks";
+AccountClassRank.CLASS_PATH = "profile/cls";
+AccountClassRank.NONE = "none";
+AccountClassRank.CLASS_PATTERN = /^[12]-[1-5]$/;
+AccountClassRank.NAME_MAX = 40;
 class AccountGameProfile {
     get statsPath() {
         return "stats/" + this.gameKey;
@@ -150,11 +181,16 @@ class AccountGameProfile {
     get recentPath() {
         return "recent/" + this.gameKey;
     }
-    extraReadPath() {
+    /* 교사 화면 반별 순위에 보일 판·승·게임별 숫자 하나(x). 자식이 정하지 않으면 순위 요약을 쓰지 않는다 */
+    rankFields(node) {
         return null;
     }
+    extraReadPath() {
+        return AccountClassRank.CLASS_PATH;
+    }
     extraPatch(user, extraRaw, node) {
-        return {};
+        const fields = this.rankFields(node);
+        return fields ? AccountClassRank.patch(this.gameKey, user, extraRaw, fields) : {};
     }
 }
 class AccountMatchStore {
@@ -279,7 +315,7 @@ class AccountStatsDialog {
         back.style.setProperty("--asd-bg", (computed && computed.getPropertyValue("--st-bg").trim()) || "14,20,17");
         back.style.setProperty("--asd-accent", (computed && computed.getPropertyValue("--st-accent").trim()) || "#D97B4F");
         back.innerHTML = '<div class="asd-box" role="dialog" aria-modal="true"><div class="asd-head"><h2></h2><button type="button" class="asd-x">닫기</button></div>'
-            + '<div class="asd-tabs"><button type="button" data-tab="stats">내 통계</button><button type="button" data-tab="recent">최근 10매치</button></div>'
+            + '<div class="asd-tabs"><button type="button" data-tab="stats">내 통계</button><button type="button" data-tab="recent">최근 20매치</button></div>'
             + '<p class="asd-msg"></p><div class="asd-body"></div></div>';
         back.querySelector("h2").textContent = this.view.title;
         back.addEventListener("click", (event) => {
@@ -399,3 +435,153 @@ AccountStatsDialog.STYLE = [
     ".asd-item .asd-body{display:block;margin-top:2px;font-size:14px;color:rgba(255,255,255,.92);}",
     ".asd-result-mine td{background:rgba(255,255,255,.1);font-weight:800;}"
 ].join("\n");
+class RandomMatchPlan {
+    constructor(report) {
+        this.recordsRecent = report.result === "win" || report.result === "lose";
+        this.countsStats = this.recordsRecent && report.rivals.length > 0;
+        this.win = report.result === "win";
+    }
+}
+class RandomMatchCodec {
+    static fromOutcome(ticket, outcome) {
+        return {
+            matchId: ticket.matchId, result: outcome.result, rank: AccountNumbers.count(outcome.rank), of: AccountNumbers.count(outcome.of),
+            map: String(ticket.map || ""), rivals: (outcome.rivals || ticket.rivals || []).map((name) => String(name))
+        };
+    }
+    static encode(report, key, win) {
+        return Object.assign(AccountRecentHeadCodec.encode(RandomMatchCodec.VERSION, key, win), {
+            ai: report.rivals.length ? 0 : 1, rk: Math.min(RandomMatchCodec.NUMBER_MAX, report.rank), of: Math.min(RandomMatchCodec.NUMBER_MAX, report.of),
+            mp: report.map.slice(0, RandomMatchCodec.NAME_MAX),
+            rv: report.rivals.slice(0, RandomMatchCodec.RIVALS_MAX).map((name) => name.slice(0, RandomMatchCodec.NAME_MAX) || "학생")
+        });
+    }
+    static decode(raw) {
+        const head = AccountRecentHeadCodec.decode(raw, RandomMatchCodec.VERSION);
+        if (!head)
+            return null;
+        const stored = raw;
+        return {
+            id: head.id, at: head.at, win: head.win, withAi: stored.ai === 1, rank: AccountNumbers.count(stored.rk), of: AccountNumbers.count(stored.of),
+            map: typeof stored.mp === "string" ? stored.mp : "", rivals: AccountShape.list(stored.rv).map((name) => String(name))
+        };
+    }
+}
+RandomMatchCodec.VERSION = 1;
+RandomMatchCodec.NAME_MAX = 20;
+RandomMatchCodec.RIVALS_MAX = 10;
+RandomMatchCodec.NUMBER_MAX = 99;
+class RandomMatchMath {
+    static empty() {
+        return { g: 0, w: 0, l: 0, t: 0, ids: {} };
+    }
+    static normalize(raw) {
+        const node = RandomMatchMath.empty();
+        if (!raw || typeof raw !== "object")
+            return node;
+        const source = raw;
+        ["g", "w", "l", "t"].forEach((key) => { node[key] = AccountNumbers.count(source[key]); });
+        const ids = AccountShape.slots(source.ids);
+        Object.keys(ids).forEach((key) => { node.ids[key] = Number(ids[key]) || 0; });
+        return node;
+    }
+    static apply(raw, report, win, key, at) {
+        const before = RandomMatchMath.normalize(raw);
+        if (before.ids[key] != null)
+            return null;
+        const top = report.rank > 0 && report.rank <= RandomMatchMath.TOP;
+        const node = {
+            g: before.g + 1, w: before.w + (win ? 1 : 0), l: before.l + (win ? 0 : 1), t: before.t + (top ? 1 : 0), ids: Object.assign({}, before.ids)
+        };
+        node.ids[key] = at;
+        const evicted = AccountKeyLedger.overflowKeys(node.ids);
+        evicted.forEach((id) => { delete node.ids[id]; });
+        return { node, evicted };
+    }
+}
+RandomMatchMath.TOP = 3;
+class RandomMatchProfile extends AccountGameProfile {
+    constructor(gameKey) {
+        super();
+        this.gameKey = gameKey;
+    }
+    matchIdOf(report) { return report.matchId; }
+    planOf(report) { return new RandomMatchPlan(report); }
+    encodeRecent(report, key, win) { return RandomMatchCodec.encode(report, key, win); }
+    decodeRecent(raw) { return RandomMatchCodec.decode(raw); }
+    normalizeStats(raw) { return RandomMatchMath.normalize(raw); }
+    applyStats(raw, report, plan, key, at) {
+        const change = RandomMatchMath.apply(raw, report, plan.win, key, at);
+        if (!change)
+            return null;
+        const patch = { g: change.node.g, w: change.node.w, l: change.node.l, t: change.node.t };
+        patch["ids/" + key] = at;
+        change.evicted.forEach((id) => { patch["ids/" + id] = null; });
+        return { node: change.node, patch };
+    }
+    rankFields(node) {
+        return { g: node.g, w: node.w, x: node.t };
+    }
+}
+class RandomMatchView {
+    constructor(title, ranked) {
+        this.title = title;
+        this.ranked = ranked;
+        this.emptyRecent = "아직 랜덤 매칭 기록이 없어요. 랜덤 매칭으로 경기를 끝내면 여기에 남아요.";
+    }
+    statsHtml(node) {
+        if (!node || !node.g)
+            return '<p class="asd-msg">아직 기록이 없어요. 사람과 함께한 랜덤 매칭 경기가 끝나면 쌓여요.</p>';
+        const cells = [["판 수", String(node.g)], ["승률", AccountHtml.percent(node.w, node.g)]];
+        if (this.ranked)
+            cells.push(["3위 안", node.t + "번"]);
+        return AccountHtml.record(node.g, node.w, node.l) + AccountHtml.grid(cells)
+            + '<p class="asd-msg">랜덤 매칭 경기만 셉니다. 경기 중에 나가면 패배, 상대가 나가서 이긴 판은 승리예요. 상대가 모두 AI였던 판은 최근 매치에만 남아요.</p>';
+    }
+    blockBodyHtml(entry) {
+        return AccountHtml.esc(this.parts(entry).join(" · "));
+    }
+    resultTitle(entry) {
+        return entry.win ? "승리" : "패배";
+    }
+    resultHtml(entry) {
+        const cells = [["상대", AccountHtml.esc(entry.rivals.length ? entry.rivals.join(", ") : "AI")]];
+        if (entry.rank)
+            cells.push(["순위", entry.rank + "위" + (entry.of ? " / " + entry.of : "")]);
+        if (entry.map)
+            cells.push(["맵", AccountHtml.esc(entry.map)]);
+        return AccountHtml.grid(cells) + (entry.withAi ? '<p class="asd-msg">AI와 한 경기라 내 통계에는 들어가지 않아요.</p>' : "");
+    }
+    parts(entry) {
+        const parts = [entry.rivals.length ? "vs " + entry.rivals.join(", ") : "vs AI"];
+        if (entry.rank)
+            parts.push(entry.rank + "위" + (entry.of ? "/" + entry.of : ""));
+        if (entry.map)
+            parts.push(entry.map);
+        return parts;
+    }
+}
+/* match-kit 의 MkStatsLink: 팀 대기실 "📊 내 통계" 버튼이 open, 판이 끝나면 MkRandomFlow 가 recordOutcome 을 부른다 */
+class RandomMatchAccount {
+    constructor(gameKey, title, ranked) {
+        this.profile = new RandomMatchProfile(gameKey);
+        this.dialog = new AccountStatsDialog(() => AccountMatchStore.forProfile(this.profile), new RandomMatchView(title, ranked));
+    }
+    open() {
+        this.dialog.open("stats");
+    }
+    recordOutcome(ticket, outcome) {
+        const store = AccountMatchStore.forProfile(this.profile);
+        if (store)
+            store.record(RandomMatchCodec.fromOutcome(ticket, outcome), null).catch(() => undefined);
+    }
+}
+/* 게임별 통계 창이 이미 있는 게임(24·25·30·31·38·39)은 팀 대기실 버튼이 그 창을 열기만 한다 */
+class AccountStatsOpener {
+    constructor(opener) {
+        this.opener = opener;
+    }
+    open() {
+        this.opener();
+    }
+}

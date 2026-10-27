@@ -421,20 +421,23 @@
       </div>
     </div>
 
-    <!-- 팀 배틀 반별 승률: 학생 기기가 경기 끝에 classStats/<반>/<uid> = {n 이름, g 유효한 판, w 승, m MVP 수} 를 씁니다
-         (로그인한 학생, AI 없는 대회모드 경기만). 반 버튼을 누를 때 그 반 한 곳만 한 번 읽습니다(폴링 없음).
+    <!-- 게임별 반별 순위(2026-10-27, 예전 "팀 배틀 반별 승률"을 넓힘): 학생 기기가 경기 끝에 자기 요약 한 줄을 씁니다
+         (팀 배틀은 classStats/<반>/<uid>, 다른 게임은 gameRanks/<게임>/<반>/<uid>, 로그인한 학생만).
+         게임과 반 버튼을 누를 때 그 한 곳만 한 번 읽습니다(폴링 없음).
          반은 학생이 반 링크로 처음 로그인할 때 profile.cls 에 한 번 적히고, 반 링크로 들어온 적이 없으면 '미분류'입니다. -->
     <div class="panel" id="rankPanel">
-      <h2>팀 배틀 반별 승률</h2>
+      <h2>게임별 반별 순위</h2>
       <div class="actions" style="margin-top:0">
         <button id="rankToggle" type="button" aria-expanded="false">펼치기</button>
       </div>
       <div id="rankBody" hidden>
         <p class="hint">
-          학생 계정(구글 로그인)으로 AI 없이 치른 대회모드 경기만 셉니다. 경기 절반 뒤에 나가면 패배, 절반 전에 나간 경기는 세지 않습니다.
+          학생 계정(구글 로그인)으로 치른 경기만 셉니다. 랜덤 매칭은 경기 중에 나가면 패배, 상대가 나가서 이긴 판은 승리입니다.
           최소 판 수 기준은 없으니 <b>판 수</b> 열을 보고 걸러 주세요. 열 제목을 누르면 정렬이 바뀝니다.
-          학생의 반이 틀렸으면 <b>반 바꾸기</b>로 고칩니다(학생 기록과 이 표의 요약이 함께 옮겨집니다).
+          학생의 반이 틀렸으면 <b>반 바꾸기</b>로 고칩니다(모든 게임의 반별 요약이 함께 옮겨집니다).
         </p>
+        <div class="class-grid" id="rankGames"></div>
+        <p class="hint" id="rankNote"></p>
         <div class="class-grid" id="rankGrid"></div>
         <p class="msg" id="rankMsg"></p>
         <div id="rankTable" class="stats-box"></div>
@@ -951,128 +954,212 @@ function el(tag, cls, text) {
   return n;
 }
 
-/* ---------------- 팀 배틀 반별 승률 ----------------
-   classStats/<반|none>/<uid> = { n, g, w, m } (교사 계정만 읽기). 반을 고를 때 그 반 한 곳만 한 번 읽는다.
-   승률 = w / g, MVP율 = m / g. 기본 정렬은 승률 내림차순, 같으면 판 수가 많은 학생이 위(최소 판 수 기준 없음, 선생님 결정). */
-const RANK_NONE = "none";
-const RANK_CLASSES = () => D.ALL_CLASSES.filter((c) => /^[12]-[1-5]$/.test(c.id)).concat([{ id: RANK_NONE, label: "미분류" }]);
-let rankClass = null;
-let rankRows = [];
-let rankSort = { key: "rate", dir: -1 };
-
-const rankRate = (a, b) => (b > 0 ? a / b : -1);
-const rankPct = (a, b) => (b > 0 ? (a / b * 100).toFixed(1) + "%" : "-");
-
+/* ---------------- 게임별 반별 순위 ----------------
+   학생 기기가 경기 끝에 자기 요약 한 줄을 쓰고(로그인한 학생만, 교사 계정만 읽기), 게임과 반을 고를 때 그 한 곳만 한 번 읽는다(폴링 없음).
+   - 팀 배틀(30): classStats/<반|none>/<uid> = { n, g, w, m }  — 예전부터 쓰던 곳(MVP 포함)
+   - 그 밖의 게임: gameRanks/<게임키>/<반|none>/<uid> = { n, g, w, x }  — x 의 뜻은 게임마다 다르다(RankGame.extra, 2026-10-27)
+   승률 = w / g. 기본 정렬은 승률 내림차순, 같으면 판 수가 많은 학생이 위(최소 판 수 기준 없음, 선생님 결정). */
 async function authedUrl(path) {
   if (!auth || !auth.currentUser) throw new Error("다시 로그인해 주세요.");
   const idToken = await auth.currentUser.getIdToken();
   return cfg.DB_URL.replace(/\/+$/, "") + "/" + path + ".json?auth=" + encodeURIComponent(idToken);
 }
 
-function renderRankGrid() {
-  const grid = $("rankGrid");
-  if (!grid.children.length) {
-    RANK_CLASSES().forEach((c) => {
-      const b = el("button", null);
-      b.type = "button";
-      b.dataset.rank = c.id;
-      b.append(el("span", null, c.label));
-      b.addEventListener("click", () => loadRank(c.id));
-      grid.appendChild(b);
+class RankGame {
+  constructor(key, title, extra, note) {
+    this.key = key;
+    this.title = title;
+    this.extra = extra;
+    this.note = note;
+  }
+
+  path(cls) { return "gameRanks/" + this.key + "/" + cls; }
+
+  rowOf(uid, v) { return { uid, n: String(v.n || "?"), g: +v.g || 0, w: +v.w || 0, x: +v.x || 0 }; }
+
+  stored(row) { return { n: row.n, g: row.g, w: row.w, x: row.x }; }
+}
+
+/* 30번만 classStats 에 MVP 수(m)를 둔다. 화면에서는 다른 게임의 x 칸처럼 보이고 MVP율 열이 하나 더 붙는다 */
+class TeamBattleRankGame extends RankGame {
+  path(cls) { return "classStats/" + cls; }
+
+  rowOf(uid, v) { return { uid, n: String(v.n || "?"), g: +v.g || 0, w: +v.w || 0, x: +v.m || 0 }; }
+
+  stored(row) { return { n: row.n, g: row.g, w: row.w, m: row.x }; }
+}
+
+class ClassRankPanel {
+  static NONE = "none";
+  static GAMES = [
+    new TeamBattleRankGame("teambattle", "팀 배틀(30)", { label: "MVP 수", rate: "MVP율" }, "AI 없이 치른 대회모드 경기(랜덤 매칭 포함)만 셉니다."),
+    new RankGame("turbolap", "터보 랩(24)", { label: "완주 수" }, "랜덤 매칭 1대1, 상대가 사람이었던 판만 셉니다."),
+    new RankGame("fpsbattle", "서바이벌(25)", { label: "처치 합계" }, "팀 대전(방 만들기·코드 입장·랜덤 매칭) 중 AI 없는 판만 셉니다."),
+    new RankGame("zombieoutbreak", "좀비(31)", { label: "감염시킨 수" }, "온라인 방(랜덤 매칭 포함) 중 AI 없는 판만 셉니다. 승 = 내 편이 이긴 판."),
+    new RankGame("minigames", "미니게임(32)", { label: "3위 안" }, "랜덤 매칭에서 사람과 함께한 판만 셉니다. 승 = 우리 팀이 최종 1등."),
+    new RankGame("volleyball", "배구(34)", null, "랜덤 매칭에서 사람 상대와 한 판만 셉니다."),
+    new RankGame("soccer", "축구(35)", null, "랜덤 매칭에서 사람 상대와 한 판만 셉니다. 비긴 판은 세지 않습니다."),
+    new RankGame("snowroyale", "눈싸움(38)", { label: "처치 합계" }, "온라인 방(랜덤 매칭 포함) 중 AI 없는 판만 셉니다. 승 = 1위."),
+    new RankGame("waterballoon", "물풍선(39)", { label: "처치 합계" }, "온라인 방(랜덤 매칭 포함) 중 AI 없는 판만 셉니다. 승 = 1위.")
+  ];
+
+  constructor() {
+    this.game = ClassRankPanel.GAMES[0];
+    this.cls = null;
+    this.rows = [];
+    this.sort = { key: "rate", dir: -1 };
+  }
+
+  static classes() {
+    return D.ALL_CLASSES.filter((c) => /^[12]-[1-5]$/.test(c.id)).concat([{ id: ClassRankPanel.NONE, label: "미분류" }]);
+  }
+
+  static labelOf(cls) {
+    return (ClassRankPanel.classes().find((c) => c.id === cls) || {}).label || cls;
+  }
+
+  static rate(a, b) { return b > 0 ? a / b : -1; }
+
+  static pct(a, b) { return b > 0 ? (a / b * 100).toFixed(1) + "%" : "-"; }
+
+  bind() {
+    $("rankToggle").addEventListener("click", () => {
+      const open = $("rankBody").hidden;
+      $("rankBody").hidden = !open;
+      $("rankToggle").textContent = open ? "접기" : "펼치기";
+      $("rankToggle").setAttribute("aria-expanded", open ? "true" : "false");
+      if (open) this.renderPickers();
     });
   }
-  Array.from(grid.children).forEach((b) => b.setAttribute("aria-pressed", b.dataset.rank === rankClass ? "true" : "false"));
-}
 
-async function loadRank(cls) {
-  rankClass = cls;
-  renderRankGrid();
-  $("rankTable").textContent = "";
-  say("rankMsg", "불러오는 중…");
-  try {
-    const r = await fetch(await authedUrl("classStats/" + cls), { cache: "no-store" });
-    if (!r.ok) throw new Error(r.status === 401 || r.status === 403 ? "읽기 권한이 없습니다. 데이터베이스 규칙(classStats)을 콘솔에 게시했는지 확인해 주세요." : "불러오지 못했습니다 (" + r.status + ")");
-    const data = (await r.json()) || {};
-    if (rankClass !== cls) return;
-    rankRows = Object.keys(data).map((uid) => {
-      const v = data[uid] || {};
-      return { uid, n: String(v.n || "?"), g: +v.g || 0, w: +v.w || 0, m: +v.m || 0 };
-    });
-    renderRank();
-  } catch (e) {
-    if (rankClass === cls) say("rankMsg", e.message);
+  renderPickers() {
+    this.fillGrid($("rankGames"), ClassRankPanel.GAMES.map((g) => ({ id: g.key, label: g.title })), (id) => this.pickGame(id), this.game.key);
+    this.fillGrid($("rankGrid"), ClassRankPanel.classes(), (id) => this.load(id), this.cls);
+    $("rankNote").textContent = this.game.note;
   }
-}
 
-function rankCompare(a, b) {
-  const k = rankSort.key, d = rankSort.dir;
-  const value = (r) => k === "rate" ? rankRate(r.w, r.g) : k === "mvp" ? rankRate(r.m, r.g) : k === "loss" ? r.g - r.w : r[k];
-  if (k === "n") return d * a.n.localeCompare(b.n, "ko");
-  return d * (value(a) - value(b)) || b.g - a.g || a.n.localeCompare(b.n, "ko");
-}
-
-function renderRank() {
-  const label = (RANK_CLASSES().find((c) => c.id === rankClass) || {}).label || rankClass;
-  say("rankMsg", label + " · " + rankRows.length + "명" + (rankRows.length ? "" : " — 아직 기록이 없습니다."));
-  const box = $("rankTable");
-  box.textContent = "";
-  if (!rankRows.length) return;
-  const table = el("table");
-  const head = el("tr");
-  [["#", null], ["이름", "n"], ["승률", "rate"], ["승/패", "w"], ["유효한 판 수", "g"], ["MVP 수", "m"], ["MVP율", "mvp"], ["반 바꾸기", null]].forEach(([text, key]) => {
-    const th = el("th", null, text + (key && rankSort.key === key ? (rankSort.dir < 0 ? " ▼" : " ▲") : ""));
-    if (key) {
-      th.style.cursor = "pointer";
-      th.addEventListener("click", () => {
-        rankSort = rankSort.key === key ? { key, dir: -rankSort.dir } : { key, dir: key === "n" ? 1 : -1 };
-        renderRank();
+  fillGrid(grid, items, onPick, selected) {
+    if (!grid.children.length) {
+      items.forEach((item) => {
+        const b = el("button", null);
+        b.type = "button";
+        b.dataset.rank = item.id;
+        b.append(el("span", null, item.label));
+        b.addEventListener("click", () => onPick(item.id));
+        grid.appendChild(b);
       });
     }
-    head.appendChild(th);
-  });
-  table.appendChild(head);
-  rankRows.slice().sort(rankCompare).forEach((r, i) => {
-    const tr = el("tr");
-    tr.appendChild(el("td", null, String(i + 1)));
-    tr.appendChild(el("td", null, r.n));
-    tr.appendChild(el("td", null, rankPct(r.w, r.g)));
-    tr.appendChild(el("td", null, r.w + " / " + (r.g - r.w)));
-    tr.appendChild(el("td", null, String(r.g)));
-    tr.appendChild(el("td", null, String(r.m)));
-    tr.appendChild(el("td", null, rankPct(r.m, r.g)));
+    Array.from(grid.children).forEach((b) => b.setAttribute("aria-pressed", b.dataset.rank === selected ? "true" : "false"));
+  }
+
+  pickGame(key) {
+    this.game = ClassRankPanel.GAMES.find((g) => g.key === key) || this.game;
+    this.rows = [];
+    $("rankTable").textContent = "";
+    this.renderPickers();
+    if (this.cls) this.load(this.cls); else say("rankMsg", "반을 고르세요.");
+  }
+
+  async load(cls) {
+    this.cls = cls;
+    const game = this.game;
+    this.renderPickers();
+    $("rankTable").textContent = "";
+    say("rankMsg", "불러오는 중…");
+    try {
+      const r = await fetch(await authedUrl(game.path(cls)), { cache: "no-store" });
+      if (!r.ok) throw new Error(r.status === 401 || r.status === 403 ? "읽기 권한이 없습니다. 데이터베이스 규칙(classStats·gameRanks)을 콘솔에 게시했는지 확인해 주세요." : "불러오지 못했습니다 (" + r.status + ")");
+      const data = (await r.json()) || {};
+      if (this.cls !== cls || this.game !== game) return;
+      this.rows = Object.keys(data).map((uid) => game.rowOf(uid, data[uid] || {}));
+      this.render();
+    } catch (e) {
+      if (this.cls === cls && this.game === game) say("rankMsg", e.message);
+    }
+  }
+
+  compare(a, b) {
+    const k = this.sort.key, d = this.sort.dir;
+    const value = (r) => k === "rate" ? ClassRankPanel.rate(r.w, r.g) : k === "xrate" ? ClassRankPanel.rate(r.x, r.g) : k === "loss" ? r.g - r.w : r[k];
+    if (k === "n") return d * a.n.localeCompare(b.n, "ko");
+    return d * (value(a) - value(b)) || b.g - a.g || a.n.localeCompare(b.n, "ko");
+  }
+
+  columns() {
+    const extra = this.game.extra;
+    const cols = [["#", null, (r, i) => String(i + 1)], ["이름", "n", (r) => r.n], ["승률", "rate", (r) => ClassRankPanel.pct(r.w, r.g)],
+      ["승/패", "w", (r) => r.w + " / " + (r.g - r.w)], ["판 수", "g", (r) => String(r.g)]];
+    if (extra) cols.push([extra.label, "x", (r) => String(r.x)]);
+    if (extra && extra.rate) cols.push([extra.rate, "xrate", (r) => ClassRankPanel.pct(r.x, r.g)]);
+    return cols;
+  }
+
+  render() {
+    say("rankMsg", this.game.title + " · " + ClassRankPanel.labelOf(this.cls) + " · " + this.rows.length + "명" + (this.rows.length ? "" : " — 아직 기록이 없습니다."));
+    const box = $("rankTable");
+    box.textContent = "";
+    if (!this.rows.length) return;
+    const table = el("table");
+    const head = el("tr");
+    const cols = this.columns();
+    cols.concat([["반 바꾸기", null, null]]).forEach(([text, key]) => {
+      const th = el("th", null, text + (key && this.sort.key === key ? (this.sort.dir < 0 ? " ▼" : " ▲") : ""));
+      if (key) {
+        th.style.cursor = "pointer";
+        th.addEventListener("click", () => {
+          this.sort = this.sort.key === key ? { key, dir: -this.sort.dir } : { key, dir: key === "n" ? 1 : -1 };
+          this.render();
+        });
+      }
+      head.appendChild(th);
+    });
+    table.appendChild(head);
+    this.rows.slice().sort((a, b) => this.compare(a, b)).forEach((r, i) => {
+      const tr = el("tr");
+      cols.forEach(([, , cell]) => tr.appendChild(el("td", null, cell(r, i))));
+      tr.appendChild(this.moveCell(r));
+      table.appendChild(tr);
+    });
+    box.appendChild(table);
+  }
+
+  moveCell(row) {
     const move = el("td");
     const pick = el("select");
     const none = el("option", null, "반 선택"); none.value = ""; pick.appendChild(none);
-    RANK_CLASSES().filter((c) => c.id !== RANK_NONE).forEach((c) => {
+    ClassRankPanel.classes().filter((c) => c.id !== ClassRankPanel.NONE).forEach((c) => {
       const o = el("option", null, c.label); o.value = c.id; pick.appendChild(o);
     });
-    pick.value = rankClass === RANK_NONE ? "" : rankClass;
-    pick.addEventListener("change", () => moveRankStudent(r, pick.value));
+    pick.value = this.cls === ClassRankPanel.NONE ? "" : this.cls;
+    pick.addEventListener("change", () => this.moveStudent(row, pick.value));
     move.appendChild(pick);
-    tr.appendChild(move);
-    table.appendChild(tr);
-  });
-  box.appendChild(table);
-}
+    return move;
+  }
 
-/* 반 바꾸기: 학생 profile.cls 와 이 표의 요약을 한 번의 요청으로 함께 옮긴다(규칙상 교사 계정만 다른 학생의 반을 고칠 수 있음) */
-async function moveRankStudent(row, to) {
-  if (!to || to === rankClass) return;
-  const toLabel = (RANK_CLASSES().find((c) => c.id === to) || {}).label || to;
-  if (!confirm(row.n + " 학생의 반을 " + toLabel + "(으)로 바꿀까요?")) { renderRank(); return; }
-  const values = {};
-  values["users/" + row.uid + "/profile/cls"] = to;
-  values["classStats/" + to + "/" + row.uid] = { n: row.n, g: row.g, w: row.w, m: row.m };
-  values["classStats/" + rankClass + "/" + row.uid] = null;
-  try {
-    const r = await fetch(await authedUrl(""), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) });
-    if (!r.ok) throw new Error(r.status === 401 || r.status === 403 ? "고치지 못했습니다. 데이터베이스 규칙을 콘솔에 게시했는지 확인해 주세요." : "고치지 못했습니다 (" + r.status + ")");
-    rankRows = rankRows.filter((x) => x.uid !== row.uid);
-    renderRank();
-    say("rankMsg", row.n + " 학생을 " + toLabel + "(으)로 옮겼습니다.");
-  } catch (e) {
-    say("rankMsg", e.message);
-    renderRank();
+  /* 반 바꾸기: 학생 profile.cls 와 모든 게임의 반별 요약을 한 번의 PATCH 로 함께 옮긴다(게임마다 옛 반 칸을 한 번씩 읽음, 규칙상 교사 계정만 가능) */
+  async moveStudent(row, to) {
+    const from = this.cls;
+    if (!to || to === from) return;
+    if (!confirm(row.n + " 학생의 반을 " + ClassRankPanel.labelOf(to) + "(으)로 바꿀까요? (모든 게임의 반별 순위가 함께 옮겨집니다)")) { this.render(); return; }
+    try {
+      const values = {};
+      values["users/" + row.uid + "/profile/cls"] = to;
+      await Promise.all(ClassRankPanel.GAMES.map(async (game) => {
+        const r = await fetch(await authedUrl(game.path(from) + "/" + row.uid), { cache: "no-store" });
+        const v = r.ok ? await r.json() : null;
+        if (!v) return;
+        values[game.path(to) + "/" + row.uid] = game.stored(game.rowOf(row.uid, v));
+        values[game.path(from) + "/" + row.uid] = null;
+      }));
+      const r = await fetch(await authedUrl(""), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) });
+      if (!r.ok) throw new Error(r.status === 401 || r.status === 403 ? "고치지 못했습니다. 데이터베이스 규칙을 콘솔에 게시했는지 확인해 주세요." : "고치지 못했습니다 (" + r.status + ")");
+      this.rows = this.rows.filter((x) => x.uid !== row.uid);
+      this.render();
+      say("rankMsg", row.n + " 학생을 " + ClassRankPanel.labelOf(to) + "(으)로 옮겼습니다.");
+    } catch (e) {
+      say("rankMsg", e.message);
+      this.render();
+    }
   }
 }
 
@@ -1985,14 +2072,8 @@ $("recToggle").addEventListener("click", () => {
   if (open && records.length === 0) loadRecords();
 });
 
-/* 팀 배틀 반별 승률도 접어 두고, 펼친 뒤 반 버튼을 눌러야 그 반 한 곳만 읽습니다 */
-$("rankToggle").addEventListener("click", () => {
-  const open = $("rankBody").hidden;
-  $("rankBody").hidden = !open;
-  $("rankToggle").textContent = open ? "접기" : "펼치기";
-  $("rankToggle").setAttribute("aria-expanded", open ? "true" : "false");
-  if (open) renderRankGrid();
-});
+/* 게임별 반별 순위도 접어 두고, 펼친 뒤 게임·반 버튼을 눌러야 그 한 곳만 읽습니다 */
+new ClassRankPanel().bind();
 
 window.__portalBooted = true;
 if (!cfg.isAdminReady()) {

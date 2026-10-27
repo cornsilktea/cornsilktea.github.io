@@ -5,7 +5,7 @@
 <script charset="utf-8" src="access-guard.js" data-game="teambattle"></script>
 <script charset="utf-8" src="quality-governor.js"></script>
 <script charset="utf-8" src="fullscreen-keeper.js"></script>
-<script charset="utf-8" src="match-kit.js?v=20261022w"></script>
+<script charset="utf-8" src="match-kit.js?v=20261027a"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>3v3 팀 배틀 아레나</title>
@@ -36,7 +36,7 @@
 <div id="tourFade" hidden></div>
 <div id="tourCaption" hidden><i></i><span id="tourCam"></span></div>
 
-<div id="scrStart" class="screen">
+<div id="scrStart" data-account-home class="screen">
   <div id="startCols" class="lobbyCols">
   <div class="wrap">
     <div class="card">
@@ -237,7 +237,7 @@
     <div class="statsTop"><h3>최근 매치</h3><button id="btnRecentClose" class="mini" type="button">닫기</button></div>
     <div id="rmMsg" class="statsMsg"></div>
     <div id="rmList" class="rmList"></div>
-    <ul class="statsNotes"><li>최근 대회모드 10경기가 남습니다(AI가 함께한 경기 포함). 절반 전에 나간 경기는 남지 않습니다.</li></ul>
+    <ul class="statsNotes"><li>최근 대회모드 20경기가 남습니다(AI가 함께한 경기 포함). 랜덤 매칭은 언제 나가도 패배, 다른 방은 절반 전에 나간 경기는 남지 않습니다.</li></ul>
   </div>
 </div>
 
@@ -278,8 +278,8 @@
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="character-maker.js?v=20261026a"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
-<script charset="utf-8" src="account-match-kit.js?v=20261026c"></script>
-<script charset="utf-8" src="account-stats.js?v=20261026b"></script>
+<script charset="utf-8" src="account-match-kit.js?v=20261027a"></script>
+<script charset="utf-8" src="account-stats.js?v=20261027a"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -1398,8 +1398,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       Dom.show(Dom.$("scrStart"), k === "start"); Dom.show(Dom.$("scrLobby"), k === "lobby"); Dom.show(Dom.$("scrDraft"), k === "draft"); Dom.show(Dom.$("scrGame"), k === "game"); Dom.show(Dom.$("scrParty"), k === "party");
       var guardHome = document.querySelector("[data-guard-home]");
       if (guardHome) guardHome.style.display = k === "game" || k === "draft" ? "none" : "";
-      var accountChip = document.querySelector("[data-account-chip]");
-      if (accountChip) accountChip.style.display = k === "game" || k === "draft" ? "none" : "";
       if (k === "game") services.cameraRig.resize();
       if (k !== prev || (k !== "lobby" && k !== "start")) services.cards.setCharZoom(false);
       if (k === "start" || k === "lobby" || k === "party") services.lobby.placeCharBox(k);
@@ -8715,12 +8713,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     forfeitApplies() { var services = this.services, room = services.session.room;
       return this.loggedIn() && !!room && room.mode === TeamBattlePlan.CUP_MODE && room.status === "playing" && !!room.roster && !!room.roster[services.session.myId]
-        && services.randomMatch.progress() >= TeamBattlePlan.FORFEIT_AT;
+        && (!!services.randomMatch.ticket() || services.randomMatch.progress() >= TeamBattlePlan.FORFEIT_AT);
     }
     leavingNow() { var services = this.services;
       if (!this.forfeitApplies()) return;
       var snap = services.accountReport.snapshot(), s = services.flow.teamTotals();
-      if (snap) this.send(services.accountReport.build(snap, true, services.randomMatch.progress(), { blue: s.blueKills, red: s.redKills }));
+      if (snap) this.send(services.accountReport.build(snap, true, AccountForfeit.progressOnLeave(!!services.randomMatch.ticket(), services.randomMatch.progress()), { blue: s.blueKills, red: s.redKills }));
     }
     send(report) {
       if (!report || report.myIndex < 0) return;
@@ -9735,7 +9733,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   class ArenaPartyPanel extends MkPartyPanel {
     constructor(screen, mount, options) { super(screen, mount, options);
       this.code = Dom.$("partyCode");
-      Dom.$("partyStreakMount").appendChild(this.streak.element);
+      Dom.$("partyStreakMount").append(this.streak.element, this.statsButton);
       Dom.$("btnLeaveParty").addEventListener("click", () => this.onLeave());
       this.seats.className = "";
       var box = document.createElement("div"); box.className = "team mine"; box.appendChild(this.seats);
@@ -9756,9 +9754,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return rows;
     }
     render(party, waitingForOthers = false, waiting = null) {
-      var leader = party.isLeader(), searching = !!party.searching(), book = party.book();
+      var leader = party.isLeader(), searching = !!party.searching();
       this.code.textContent = party.code;
-      this.streak.render(book);
       this.seats.innerHTML = "<h3>우리 팀</h3>" + this.slotRows(party, party.record ? party.record.leaderId : "", leader && !searching);
       this.matchButton.textContent = searching ? "매칭 취소" : "매칭 시작";
       this.matchButton.classList.toggle("primary", !searching);
@@ -9769,7 +9766,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var crowdText = !searching || waiting === null ? "" : waiting > 0 ? "👥 지금 " + waiting + "개 팀이 기다리는 중" : "👥 지금 기다리는 팀이 없어요";
       if (this.crowd.textContent !== crowdText) this.crowd.textContent = crowdText;
       this.crowd.classList.toggle("alone", searching && waiting === 0);
-      var streakNote = book.streak() > 0 ? " · 지금 " + book.streak() + "연승 중" : "";
+      var streakNote = this.streakNote();
       var fallback = Math.ceil(this.options.aiFallbackMs / 1000) - party.searchSeconds();
       var fallbackNote = waitingForOthers ? " · 다른 팀 경기가 끝나길 기다리는 중(같은 상대와 연달아 만나지 않게)" : fallback > 0 ? " · " + fallback + "초 뒤 AI와 시작해요" : " · AI와 시작하는 중…";
       var hint = searching ? "상대를 찾는 중… " + party.searchSeconds() + "초" + fallbackNote + streakNote : leader ? "" : "팀장이 매칭을 시작하길 기다리는 중이에요…";
@@ -9786,7 +9783,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     constructor(services) { this.services = services; this.flow = null; this.quiet = false; }
     ready() { var services = this.services;
       if (this.flow || !services.backend.db) return this.flow;
-      var options = { gameRoot: "teambattle", queue: "teambattle", partyLimit: ArenaRandomMatch.PARTY_LIMIT, matcher: new MkVersusMatcher(ArenaRandomMatch.PARTY_LIMIT, ArenaRandomMatch.MATCHER_TIMING), allowBots: true, aiFallbackMs: ArenaRandomMatch.AI_FALLBACK_MS, actionsMount: Dom.$("partyActions"),
+      var options = { gameRoot: "teambattle", queue: "teambattle", partyLimit: ArenaRandomMatch.PARTY_LIMIT, matcher: new MkVersusMatcher(ArenaRandomMatch.PARTY_LIMIT, ArenaRandomMatch.MATCHER_TIMING), allowBots: true, aiFallbackMs: ArenaRandomMatch.AI_FALLBACK_MS, actionsMount: Dom.$("partyActions"), stats: new AccountStatsOpener(function () { services.myStats.open(); }),
         intro: "팀을 짜고(빈 자리는 🤖 AI 추가) 매칭 시작을 누르면 아무 팀과 3대3 대회모드로 만나요. 맵은 무작위예요." };
       var panel = new ArenaPartyPanel(Dom.$("scrParty"), Dom.$("partyMount"), options);
       this.flow = new MkRandomFlow(services.backend.db, { now: function () { return services.clock.now(); } }, services.session.myId, options, this, panel);

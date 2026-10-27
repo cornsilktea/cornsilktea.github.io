@@ -1,5 +1,5 @@
 /* =====================================================================
-   38번 눈싸움 배틀로얄 계정 통계 · 최근 10매치 (공용 뼈대 account-match-kit.ts 의 자식, 게임 키 snowroyale)
+   38번 눈싸움 배틀로얄 계정 통계 · 최근 20매치 (공용 뼈대 account-match-kit.ts 의 자식, 게임 키 snowroyale)
 
    집계 규칙(2026-10-26, 선생님 요청 · 정의는 규칙 엔진 기준으로 정함)
      - 대상: 온라인 방(방 만들기·코드 입장·랜덤 매칭). 혼자 연습(AI)·관전은 기록하지 않는다.
@@ -12,7 +12,7 @@
 
    저장:
      users/<uid>/stats/snowroyale  { g, w, l, gd 팀전 판, gs 개인전 판, k 처치, a 어시스트, dm 준 피해, wl 만든 벽, sv 생존 초 합, rk 순위 합, t3 3위 안 횟수, mk 한 판 최다 처치, ids }
-     users/<uid>/recent/snowroyale/<0~9>  { v, id, at, r, ai, md 0팀전/1개인전, me, p [[닉네임, 팀, 순위, 생존 초, 처치, 어시스트, 준 피해, 모은 눈, 만든 벽, 나감 0/1, AI 0/1]] }
+     users/<uid>/recent/snowroyale/<0~19>  { v, id, at, r, ai, md 0팀전/1개인전, me, p [[닉네임, 팀, 순위, 생존 초, 처치, 어시스트, 준 피해, 모은 눈, 만든 벽, 나감 0/1, AI 0/1]] }
    ===================================================================== */
 
 interface SnAccountLine {
@@ -150,6 +150,7 @@ class SnAccountProfile extends AccountGameProfile<SnAccountReport, SnAccountPlan
   readonly gameKey = "snowroyale";
 
   matchIdOf(report: SnAccountReport): string { return report.matchId; }
+  rankFields(node: SnAccountStatsNode): AccountRankFields { return { g: node.g, w: node.w, x: node.k }; }
   planOf(report: SnAccountReport): SnAccountPlan { return new SnAccountPlan(report); }
   encodeRecent(report: SnAccountReport, key: string, win: boolean): object { return SnAccountCodec.encode(report, key, win); }
   decodeRecent(raw: unknown): SnAccountRecentEntry | null { return SnAccountCodec.decode(raw); }
@@ -240,6 +241,10 @@ class SnAccount {
 
   bind(): void {
     this.dialog.bindButtons();
+  }
+
+  openStats(): void {
+    this.dialog.open("stats");
   }
 
   record(report: SnAccountReport): void {

@@ -249,14 +249,14 @@
   <button type="button" id="btnGameLeave">나가기</button>
 </div>
 
-<section id="scrStart" class="screen">
+<section id="scrStart" data-account-home class="screen">
   <div class="wrap">
     <div class="card titleCard">
       <h1 class="titleMain">미드나잇<span>좀비 아웃브레이크</span></h1>
       <p class="sub">불 꺼진 학교에 무언가 돌아다닙니다. 달빛만 비치는 교실과 복도에서 3분 동안 살아남으세요.</p>
     </div>
     <div class="card">
-      <div class="hello">내 닉네임: <b id="startNick"></b> <button type="button" class="mini" data-maker-open data-nick-setting>✏️ 닉네임 설정</button> <button type="button" class="mini" style="margin-left:auto" data-account-open="stats">📊 통계 · 최근 10매치</button></div>
+      <div class="hello">내 닉네임: <b id="startNick"></b> <button type="button" class="mini" data-maker-open data-nick-setting>✏️ 닉네임 설정</button> <button type="button" class="mini" style="margin-left:auto" data-account-open="stats">📊 통계 · 최근 20매치</button></div>
       <button type="button" class="btn primary" id="btnCreate">게임 만들기</button>
       <button type="button" class="btn primary" id="btnRandom">랜덤 매칭 방 만들기</button>
       <div class="gap"></div>
@@ -299,7 +299,7 @@
   <div class="wrap">
     <div class="card">
       <div class="codeBar"><span class="codeLab">방 코드</span><span class="codeNum" id="lobbyCode">-----</span></div>
-      <div class="hello">내 닉네임: <b id="lobbyNick"></b> <button type="button" class="mini" data-maker-open data-nick-setting>✏️ 닉네임 설정</button> <button type="button" class="mini" style="margin-left:auto" data-account-open="stats">📊 통계 · 최근 10매치</button></div>
+      <div class="hello">내 닉네임: <b id="lobbyNick"></b> <button type="button" class="mini" data-maker-open data-nick-setting>✏️ 닉네임 설정</button> <button type="button" class="mini" style="margin-left:auto" data-account-open="stats">📊 통계 · 최근 20매치</button></div>
       <p class="sub" style="margin-top:10px">친구들에게 방 코드를 알려 주세요. (플레이어 5명 · 관전자 1명)</p>
     </div>
     <div class="card">
@@ -321,7 +321,7 @@
       <h1 class="titleMain">미드나잇<span>좀비 아웃브레이크</span></h1>
     </div>
     <div class="card">
-      <div class="hello">내 닉네임: <b id="partyNick"></b> <button type="button" class="mini" data-maker-open data-nick-setting>✏️ 닉네임 설정</button> <button type="button" class="mini" style="margin-left:auto" data-account-open="stats">📊 통계 · 최근 10매치</button></div>
+      <div class="hello">내 닉네임: <b id="partyNick"></b> <button type="button" class="mini" data-maker-open data-nick-setting>✏️ 닉네임 설정</button></div>
       <div id="partyMount"></div>
     </div>
   </div>
@@ -350,9 +350,9 @@
 
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="character-maker.js?v=20261026a"></script>
-<script charset="utf-8" src="match-kit.js?v=20261022w"></script>
-<script charset="utf-8" src="account-match-kit.js?v=20261026c"></script>
-<script charset="utf-8" src="31.zombie-outbreak-stats.js?v=20261026b"></script>
+<script charset="utf-8" src="match-kit.js?v=20261027a"></script>
+<script charset="utf-8" src="account-match-kit.js?v=20261027a"></script>
+<script charset="utf-8" src="31.zombie-outbreak-stats.js?v=20261027a"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <div id="loading">3D 학교를 준비하는 중입니다…</div>
 
@@ -3903,7 +3903,7 @@ class ZombieRandomMatch {
     this.quiet = false;
     this.flow = null;
     if (!db) return;
-    const options = { gameRoot: "zombieoutbreak", queue: "zombieoutbreak", partyLimit: ZombieRandomMatch.PARTY_LIMIT, matcher: new MkFreeForAllMatcher(ZombieRandomMatch.PARTY_LIMIT, MAX_PLAYERS), solo: true,
+    const options = { gameRoot: "zombieoutbreak", queue: "zombieoutbreak", partyLimit: ZombieRandomMatch.PARTY_LIMIT, matcher: new MkFreeForAllMatcher(ZombieRandomMatch.PARTY_LIMIT, MAX_PLAYERS), solo: true, stats: new AccountStatsOpener(() => zombieReporter.account.openStats()),
       intro: "매칭 시작을 누르면 다른 학생들과 최대 " + MAX_PLAYERS + "명이 모여요. 좀비는 시작할 때 무작위로 정해지고, 모자란 자리는 AI가 채워요." };
     this.flow = new MkRandomFlow(db, { now: serverNow }, myId, options, this, new MkPartyPanel($("scrParty"), $("partyMount"), options));
   }
@@ -3997,10 +3997,10 @@ class ZombieMatchReporter {
     const state = id => { const p = room.players[id]; return id === room.originZombieId ? "origin" : (p.infected || p.role === "zombie") ? "infected" : "survived"; };
     const secsOf = id => { const p = room.players[id], at = state(id) === "infected" ? (p.infectedAt || t) : t; return clamp(Math.floor((at - room.startAt) / 1000), 0, ROUND_MS / 1000); };
     return { matchId: this.matchId(), myIndex: ids.indexOf(myId), rows: ids.map(id => this.rowOf(id, room.players[id].nickname || "이름 없음", state(id), state(id) === "origin" ? 0 : secsOf(id))),
-      winner: -1, progress: zombieRandom.progress(), iLeft: true };
+      winner: -1, progress: AccountForfeit.progressOnLeave(!!zombieRandom.ticket(), zombieRandom.progress()), iLeft: true };
   }
   ended() { if (room.ref && room.final && room.final[myId] && room.winner) this.account.record(this.finishedReport()); }
-  forfeitApplies() { return !!room.ref && room.status === "playing" && roundIds().indexOf(myId) >= 0 && zombieRandom.progress() >= AccountForfeit.AT; }
+  forfeitApplies() { return !!room.ref && room.status === "playing" && roundIds().indexOf(myId) >= 0 && (!!zombieRandom.ticket() || zombieRandom.progress() >= AccountForfeit.AT); }
   leaving() { if (this.forfeitApplies()) this.account.record(this.roundReport()); }
 }
 const zombieReporter = new ZombieMatchReporter();
