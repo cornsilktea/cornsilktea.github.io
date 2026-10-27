@@ -4199,28 +4199,29 @@ class ResultCollector {
     }
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "창 4가지 크기(세로 0·배율 3·배율 0 포함)에서 값·그림판·카메라·장치 크기 일치");
   });
-  run(RENDERG, "화질 자동 조절(adaptQuality): 느린 프레임이 3초 이어지면 0.25씩 최저 0.75 까지 내리고, 빠르거나 멈춘 프레임은 세지 않는가", function (done) {
-    var R = api.CAMERA_RIG, Q = api.QA, H = api.HUD, bad = [], saved = { pix: R.pix, qa: JSON.stringify(Q), dropped: api.SCENERY.droppedForFps };
-    function frames(ms, count) { for (var i = 0; i < count; i++) H.adaptQuality(ms); }
+  run(RENDERG, "화질 자동 조절(ArenaQuality·QualityGovernor): 느린 프레임이 쌓이면 3D 배율을 0.25씩 0.75 까지, 그다음 2D 배율을 1 까지 내리고, 빠른 프레임은 느림 수를 줄이며 멈춘 프레임은 세지 않는가", function (done) {
+    var R = api.CAMERA_RIG, Q = api.QA, bad = [], limit = Q.constructor.SLOW_LIMIT, saved = { pix: R.pix, cap: R.overlayCap, dropped: api.SCENERY.droppedForFps };
+    function frames(ms, count) { for (var i = 0; i < count; i++) Q.count(ms); }
     try {
       api.SCENERY.droppedForFps = true;
-      R.pix = 1.5; Q.acc = 0; Q.frames = 0; Q.slow = 0;
-      frames(100, 20);
-      if (R.pix !== 1.5 || Q.slow !== 2) bad.push("2초째 pix " + R.pix + " slow " + Q.slow);
-      frames(16, 130);
-      if (R.pix !== 1.5 || Q.slow !== 0) bad.push("빠른 프레임이면 느림 횟수 초기화 pix " + R.pix + " slow " + Q.slow);
-      Q.acc = 0; Q.frames = 0;
-      frames(300, 20);
-      if (R.pix !== 1.5 || Q.acc !== 0) bad.push("멈춘 프레임(250ms 초과)은 무시 pix " + R.pix + " acc " + Q.acc);
-      frames(100, 30);
-      if (R.pix !== 1.25 || Q.slow !== 0) bad.push("3초 느림 → 1.25 pix " + R.pix + " slow " + Q.slow);
+      R.pix = 1.5; R.overlayCap = 2; R.resize(); Q.reset();
+      var dpr0 = R.dpr;
+      frames(100, limit);
+      if (R.pix !== 1.5) bad.push("한도 전 pix " + R.pix);
+      frames(16, limit); frames(100, 1);
+      if (R.pix !== 1.5) bad.push("빠른 프레임이 느림 수를 줄이지 않음 pix " + R.pix);
+      Q.reset(); frames(300, limit * 2);
+      if (R.pix !== 1.5) bad.push("멈춘 프레임(250ms 초과)은 무시 pix " + R.pix);
+      frames(100, limit + 1);
+      if (R.pix !== 1.25) bad.push("느림 쌓임 → 1.25 pix " + R.pix);
       if (R.renderer && R.renderer.getPixelRatio() !== 1.25) bad.push("장치 배율 " + R.renderer.getPixelRatio());
-      frames(100, 30 * 6);
+      frames(100, (limit + 1) * 2);
       if (R.pix !== api.PIX_MIN) bad.push("최저 배율 " + R.pix);
-      frames(100, 60);
+      frames(100, (limit + 1) * 8);
       if (R.pix !== api.PIX_MIN) bad.push("최저 아래로 내려감 " + R.pix);
-    } finally { R.pix = saved.pix; Object.assign(Q, JSON.parse(saved.qa)); api.SCENERY.droppedForFps = saved.dropped; if (R.renderer) R.renderer.setPixelRatio(R.pix); }
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "느림 3초마다 0.25 하향, 0.75 에서 멈춤, 빠른·멈춘 프레임 무시");
+      if (R.dpr !== Math.min(dpr0, 1)) bad.push("2D 배율 " + dpr0 + " → " + R.dpr);
+    } finally { R.pix = saved.pix; R.overlayCap = saved.cap; R.resize(); Q.reset(); api.SCENERY.droppedForFps = saved.dropped; if (R.renderer) R.renderer.setPixelRatio(R.pix); }
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "느림 쌓이면 0.25씩 하향, 3D 0.75·2D 1 에서 멈춤, 빠른 프레임은 느림 수 감소, 멈춘 프레임 무시");
   });
   run(RENDERG, "장면 상태(ARENA_VIEW·PROPS): 소품 난수가 씨앗대로 같은 수열을 내고, 풍차 날개가 돌며, 바닥 판이 장면에 있는가", function (done) {
     var P = api.PROPS, A = api.ARENA_VIEW, bad = [], savedSeed = P.seed, savedBlades = P.millBlades;

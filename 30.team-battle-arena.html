@@ -3,6 +3,7 @@
 <head>
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="access-guard.js" data-game="teambattle"></script>
+<script charset="utf-8" src="quality-governor.js"></script>
 <script charset="utf-8" src="fullscreen-keeper.js"></script>
 <script charset="utf-8" src="match-kit.js?v=20261022w"></script>
 <meta charset="UTF-8">
@@ -376,6 +377,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     loop;
     shaderWarmup;
     fxMats;
+    quality;
     perf;
     netDiag;
     remoteMotion;
@@ -3542,6 +3544,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.remoteMotion.clear();
       services.killfeed.clear();
       services.shaderWarmup.matchStarting();
+      services.quality.restoreOnce();
       Dom.show(Dom.$("endOv"), false);
     }
     isSpec() { var services = this.services; return !!services.session.players[services.session.myId] && services.session.players[services.session.myId].team === "spec"; }
@@ -8160,13 +8163,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static VIEW_NEAR_PAD = 110;
     static VIEW_TOP_SAFE_NDC = 0.55;
     static HEAD_Y = 110;
+    static OVERLAY_START = Environment.TOUCH ? 1.5 : 2;
+    static OVERLAY_MIN = 1;
     constructor(services) { this.services = services;
       this.tmpV = new THREE.Vector3();
-      this.w = 0; this.h = 0; this.dpr = 1; this.pix = Environment.PIX_START; this.renderer = null;
+      this.w = 0; this.h = 0; this.dpr = 1; this.pix = Environment.PIX_START; this.overlayCap = CameraRig.OVERLAY_START; this.renderer = null;
       this.view = { pitchPlay: 0.92, pitchSpec: 1.12, dist: 1400, look: new THREE.Vector3(ArenaSize.MW / 2, 0, ArenaSize.MH / 2), fitKey: "", snap: true, halfW: 0 };
     }
     resize() { var services = this.services;
-      services.cameraRig.dpr = Math.min(2, window.devicePixelRatio || 1);
+      services.cameraRig.dpr = Math.min(services.cameraRig.overlayCap, window.devicePixelRatio || 1);
       services.cameraRig.w = window.innerWidth; services.cameraRig.h = window.innerHeight;
       Canvases.overlay.width = Math.round(services.cameraRig.w * services.cameraRig.dpr); Canvases.overlay.height = Math.round(services.cameraRig.h * services.cameraRig.dpr);
       if (services.cameraRig.renderer) { services.cameraRig.renderer.setPixelRatio(services.cameraRig.pix); services.cameraRig.renderer.setSize(services.cameraRig.w, services.cameraRig.h, false); }
@@ -8774,7 +8779,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static FONT = '"Nanum Gothic", "Malgun Gothic", sans-serif';
     static STALL_MS = 250;
     static FINAL_COUNT_MS = 10000;
-    constructor(services) { this.services = services; this.tmpV = new THREE.Vector3(); this.lastCountSec = 0; this.labels = []; this.quality = { acc: 0, frames: 0, slow: 0 }; }
+    constructor(services) { this.services = services; this.tmpV = new THREE.Vector3(); this.lastCountSec = 0; this.labels = []; }
     toScreen(x, h, y) { var services = this.services;
       services.hud.tmpV.set(x, h, y).project(services.stage.camera);
       return services.hud.tmpV.z > 1 ? null : { x: (services.hud.tmpV.x + 1) / 2 * services.cameraRig.w, y: (1 - services.hud.tmpV.y) / 2 * services.cameraRig.h };
@@ -8814,19 +8819,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         Canvases.overlayCtx.restore();
       });
       services.hud.drawJoystick();
-    }
-    adaptQuality(frameMs) { var services = this.services;
-      if (!services.cameraRig.renderer || frameMs > Hud2D.STALL_MS) return;
-      services.hud.quality.acc += frameMs; services.hud.quality.frames++;
-      if (services.hud.quality.acc < 1000) return;
-      var fps = services.hud.quality.frames * 1000 / services.hud.quality.acc;
-      services.hud.quality.acc = 0; services.hud.quality.frames = 0;
-      services.hud.quality.slow = fps < 45 ? services.hud.quality.slow + 1 : 0;
-      if (services.hud.quality.slow >= 3 && services.props.dropSceneryForFps()) { services.hud.quality.slow = 0; return; }
-      if (services.hud.quality.slow >= 3 && services.cameraRig.pix > Environment.PIX_MIN) {
-        services.hud.quality.slow = 0; services.cameraRig.pix = Math.max(Environment.PIX_MIN, services.cameraRig.pix - 0.25);
-        services.cameraRig.renderer.setPixelRatio(services.cameraRig.pix); services.cameraRig.renderer.setSize(services.cameraRig.w, services.cameraRig.h, false);
-      }
     }
     specPanelW() { var services = this.services; return services.cameraRig.w > 900 ? 300 : 150; }
     specPanel(team, s) { var services = this.services;
@@ -9196,7 +9188,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class PerfProbe {
-    static BUILD = "lag3";
+    static BUILD = "lag4";
     static PATH = "perfDiag/teambattle/";
     static RTT_KEEP = 50;
     static RECORDS = !Environment.SILENT_RUN;
@@ -9331,6 +9323,36 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         "\n순간이동 " + probe.snaps + " · 멈춤 " + probe.frames.stall + " · 배율 " + services.cameraRig.pix;
     }
   }
+  class ArenaQuality {
+    static STORAGE_KEY = "teambattle_quality_v1";
+    static SLOW_SEC = 1 / 45;
+    static SLOW_LIMIT = 120;
+    static PIX_STEP = 0.25;
+    constructor(services) { this.services = services; this.restored = false; this.reset(); }
+    reset() { var quality = this;
+      this.governor = window.QualityGovernor ? window.QualityGovernor({
+        storageKey: Environment.SILENT_RUN ? null : ArenaQuality.STORAGE_KEY, relaxOnRestore: 1,
+        slowSec: ArenaQuality.SLOW_SEC, slowLimit: ArenaQuality.SLOW_LIMIT,
+        steps: [function () { return quality.services.props.dropSceneryForFps(); }, function () { return quality.lowerPixels(); }, function () { return quality.lowerOverlay(); }]
+      }) : null;
+    }
+    inMatch() { var services = this.services; return services.screens.now === "game" && !!services.session.room && services.session.room.status === "playing" && !!services.match.game; }
+    update(frameMs) { if (this.inMatch()) this.count(frameMs); }
+    count(frameMs) { if (this.governor && frameMs <= Hud2D.STALL_MS) this.governor.update(frameMs / 1000); }
+    restoreOnce() { if (this.restored || !this.governor || !this.services.cameraRig.renderer) return; this.restored = true; this.governor.restore(); }
+    lowerPixels() { var rig = this.services.cameraRig;
+      if (!rig.renderer || rig.pix <= Environment.PIX_MIN) return false;
+      rig.pix = Math.max(Environment.PIX_MIN, rig.pix - ArenaQuality.PIX_STEP);
+      rig.renderer.setPixelRatio(rig.pix); rig.renderer.setSize(rig.w, rig.h, false);
+      return true;
+    }
+    lowerOverlay() { var rig = this.services.cameraRig;
+      if (rig.dpr <= CameraRig.OVERLAY_MIN) return false;
+      rig.overlayCap = Math.max(CameraRig.OVERLAY_MIN, rig.dpr - ArenaQuality.PIX_STEP);
+      rig.resize();
+      return true;
+    }
+  }
   class EffectMaterialPool {
     constructor() { this.free = {}; this.made = 0; }
     keyOf(kind, params) {
@@ -9445,7 +9467,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.perf.frame(frameMs);
       services.netDiag.frame(frameMs);
       services.propThemes.spinMillBlades(dt);
-      if (!services.session.room || services.screens.now !== "game") { services.tourView.renderTour(nowMs, dt); services.hud.adaptQuality(frameMs); return; }
+      if (!services.session.room || services.screens.now !== "game") { services.tourView.renderTour(nowMs, dt); return; }
       var st = services.session.room.status;
       if ((st === "countdown" || st === "playing" || st === "ended") && services.session.room.startAt && (!services.match.game || services.match.game.startAt !== services.session.room.startAt)) {
         if (services.session.players[services.session.myId] && (services.session.players[services.session.myId].slot || services.flow.isSpec())) services.flow.initGame(); else return;
@@ -9458,7 +9480,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.frameRenderer.render(t, dt);
       services.shaderWarmup.warmHiddenForms();
       services.hud.updateHud(t);
-      services.hud.adaptQuality(frameMs);
+      services.quality.update(frameMs);
     }
   }
   class WorldStepper {
@@ -9573,7 +9595,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       bindRoom: function (fakeRoom, players) { services.session.room = fakeRoom; services.session.players = players; },
       unbindRoom: function () { services.session.room = null; services.session.players = {}; },
       setMyId: function (id) { var before = services.session.myId; services.session.myId = id; return before; },
-      HUD: services.hud, SOUND: services.sound, BACKEND: services.backend, TIMESCALE: services.timescale, THREE: THREE, CAMERA_RIG: services.cameraRig, ARENA_VIEW: services.arenaView, PROPS: services.props, PROP_THEMES: services.propThemes, camera: services.stage.camera, overlay: Canvases.overlay, QA: services.hud.quality, PIX_MIN: Environment.PIX_MIN, PIX_START: Environment.PIX_START, SCENERY: services.arenaView.scenery,
+      HUD: services.hud, SOUND: services.sound, BACKEND: services.backend, TIMESCALE: services.timescale, THREE: THREE, CAMERA_RIG: services.cameraRig, ARENA_VIEW: services.arenaView, PROPS: services.props, PROP_THEMES: services.propThemes, camera: services.stage.camera, overlay: Canvases.overlay, QA: services.quality, PIX_MIN: Environment.PIX_MIN, PIX_START: Environment.PIX_START, SCENERY: services.arenaView.scenery,
       setDb: function (fake) { var before = services.backend.db; services.backend.db = fake; return before; },
       setTestLink: function (flag) { var before = services.backend.isTestLink; services.backend.isTestLink = flag; return before; },
       CHAR_TYPES: services.charTypes, AUTO_AIM: services.autoAim, AUTO_AIM_ERR: AutoAim.AUTO_AIM_ERR, AUTO_AIM_LEAD: AutoAim.AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: services.draftAi,
@@ -9858,6 +9880,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.matlib = new MaterialLibrary();
       services.fxMats = new EffectMaterialPool();
       services.shaderWarmup = new ShaderWarmup(services);
+      services.quality = new ArenaQuality(services);
       services.perf = new PerfProbe(services);
       services.netDiag = new NetDiagOverlay(services);
       services.remoteMotion = new RemoteMotion();
