@@ -37,8 +37,9 @@ class AccountDatabase {
     async updateRoot(values) {
         await this.send("PATCH", await this.rootAddress(), values);
     }
+    /* print=silent: 서버가 방금 쓴 내용을 응답으로 되돌려 보내지 않게 해 다운로드 사용량을 줄인다(2026-10-27 선생님 결정, 요청 횟수는 그대로) */
     async send(method, url, value) {
-        const response = await fetch(url, {
+        const response = await fetch(url + "&print=silent", {
             method,
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(value)
