@@ -5558,7 +5558,7 @@ class AccountStatsTests {
         var item = document.querySelector("#rmList .rmItem");
         if (!item || !item.classList.contains("lose") || item.textContent.indexOf("🤖 마") < 0 || item.textContent.indexOf("패배") < 0) bad.push("최근 매치 블록");
         item && item.click();
-        if (document.getElementById("recentResultModal").hidden || document.querySelectorAll("#rmBoardBody tr").length !== 6 || document.getElementById("rmTitle").textContent !== "레드팀 승리!") bad.push("결과 창");
+        if (document.getElementById("recentResultModal").hidden || document.querySelectorAll("#rmBoardBody tr").length !== 6 || document.getElementById("rmTitle").textContent !== "패배") bad.push("결과 창");
       } finally {
         window.PORTAL_USER = userBefore;
         ["myStatsModal", "recentModal", "recentResultModal"].forEach(function (id) { document.getElementById(id).hidden = true; });

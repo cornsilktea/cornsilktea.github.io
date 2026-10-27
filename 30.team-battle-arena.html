@@ -1398,6 +1398,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       Dom.show(Dom.$("scrStart"), k === "start"); Dom.show(Dom.$("scrLobby"), k === "lobby"); Dom.show(Dom.$("scrDraft"), k === "draft"); Dom.show(Dom.$("scrGame"), k === "game"); Dom.show(Dom.$("scrParty"), k === "party");
       var guardHome = document.querySelector("[data-guard-home]");
       if (guardHome) guardHome.style.display = k === "game" || k === "draft" ? "none" : "";
+      var accountChip = document.querySelector("[data-account-chip]");
+      if (accountChip) accountChip.style.display = k === "game" || k === "draft" ? "none" : "";
       if (k === "game") services.cameraRig.resize();
       if (k !== prev || (k !== "lobby" && k !== "start")) services.cards.setCharZoom(false);
       if (k === "start" || k === "lobby" || k === "party") services.lobby.placeCharBox(k);
@@ -8728,6 +8730,20 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       store.record(report, this.services.accountReport.judge()).catch(function () {});
     }
   }
+  class ResultTitle {
+    static WIN_COLOR = "#FFD66B";
+    static LOSE_COLOR = "#9AA3A0";
+    static TEAM_TEXT = { blue: "블루팀 승리!", red: "레드팀 승리!" };
+    static TEAM_COLOR = { blue: "#6FA8FF", red: "#FF7A70" };
+    static paint(el, winner, mine) {
+      if (winner === "draw") { Dom.setText(el, "무승부"); el.style.color = "#EEF2EE"; return; }
+      if (!ResultTitle.TEAM_TEXT[winner]) { Dom.setText(el, "게임 종료"); el.style.color = "#EEF2EE"; return; }
+      if (!mine) { Dom.setText(el, ResultTitle.TEAM_TEXT[winner]); el.style.color = ResultTitle.TEAM_COLOR[winner]; return; }
+      var won = winner === mine;
+      Dom.setText(el, won ? "승리" : "패배");
+      el.style.color = won ? ResultTitle.WIN_COLOR : ResultTitle.LOSE_COLOR;
+    }
+  }
   class MyStatsWindow {
     static LOGIN_NEEDED = AccountLoginNotice.STATS_LOGIN_NEEDED;
     static NOT_READY = AccountLoginNotice.NOT_READY;
@@ -8807,8 +8823,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (!entry) return;
       var rows = services.accountReport.rowsOf(entry.players), mine = entry.players[entry.myIndex].team, winner = entry.win ? mine : 1 - mine;
       Dom.$("rmResultBox").className = "endBox rmResult " + AccountReportBuilder.TEAMS[winner];
-      Dom.setText(Dom.$("rmTitle"), winner === 0 ? "블루팀 승리!" : "레드팀 승리!");
-      Dom.$("rmTitle").style.color = winner === 0 ? "#6FA8FF" : "#FF7A70";
+      ResultTitle.paint(Dom.$("rmTitle"), AccountReportBuilder.TEAMS[winner], AccountReportBuilder.TEAMS[mine]);
       Dom.setText(Dom.$("rmWhen"), (entry.win ? "내 결과: 승리" : "내 결과: 패배") + " · " + this.whenText(entry.at) + (entry.withAi ? " · AI 포함 경기(내 통계에는 안 들어감)" : ""));
       Dom.setText(Dom.$("rmBlue"), String(entry.score[0])); Dom.setText(Dom.$("rmRed"), String(entry.score[1]));
       Dom.setHtml(Dom.$("rmBoardBody"), services.resultBoard.boardRows(rows, "p" + entry.myIndex));
@@ -8963,8 +8978,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var w = services.session.room.winner, f = services.session.room.final || {};
         Dom.show(Dom.$("endOv"), true);
         Dom.$("endOv").className = w === "blue" ? "blue" : (w === "red" ? "red" : "draw");
-        Dom.setText(Dom.$("endTitle"), w === "draw" ? "무승부" : (w === "blue" ? "블루팀 승리!" : (w === "red" ? "레드팀 승리!" : "게임 종료")));
-        Dom.$("endTitle").style.color = w === "blue" ? "#6FA8FF" : (w === "red" ? "#FF7A70" : "#EEF2EE");
+        ResultTitle.paint(Dom.$("endTitle"), w, services.match.me ? services.match.me.team : null);
         var quitWin = !!f.reason && f.reason.indexOf("나가서") >= 0;
         Dom.show(Dom.$("endReason"), quitWin);
         if (quitWin) Dom.setText(Dom.$("endReason"), "상대팀이 모두 나가서 " + (w === "blue" ? "블루팀" : "레드팀") + "이 승리했어요.");
