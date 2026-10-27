@@ -375,6 +375,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     matlib;
     loop;
     shaderWarmup;
+    perf;
+    netDiag;
     world;
     testBridge;
     accountReport;
@@ -887,6 +889,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (!room || !v || v.h !== room.host || this.link.isHost()) return;
       var rtt = got - v.a;
       if (rtt < 0 || rtt > 5000) return;
+      if (this.link.rtt) this.link.rtt(rtt);
       this.samples.push({ rtt: rtt, off: v.t - (v.a + got) / 2 });
       if (this.samples.length > GameClock.KEEP) this.samples.shift();
       var best = this.samples[0];
@@ -1057,8 +1060,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (st === "ended" && prev !== "ended") services.flow.onEnded();
       });
       var stRef = ref.child("st");
-      services.session.sub(stRef, "child_added", function (s) { services.match.stateByKey[s.key] = s.val(); });
-      services.session.sub(stRef, "child_changed", function (s) { services.match.stateByKey[s.key] = s.val(); });
+      services.session.sub(stRef, "child_added", function (s) { services.match.stateByKey[s.key] = s.val(); services.perf.noteState(s.key, s.val()); });
+      services.session.sub(stRef, "child_changed", function (s) { services.match.stateByKey[s.key] = s.val(); services.perf.noteState(s.key, s.val()); });
       services.session.sub(stRef, "child_removed", function (s) { delete services.match.stateByKey[s.key]; });
       services.session.sub(ref.child("shots"), "child_added", services.projectiles.onShot.bind(services.projectiles));
       services.session.sub(ref.child("meleeHits"), "child_added", function (s) { services.melee.onMelee(s.key, s.val()); });
@@ -3543,12 +3546,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           if (!services.match.bots[id]) { services.match.bots[id] = services.flow.makeEnt(id, d); services.match.bots[id].bot = { seed: Math.random() * 10, seenAt: 0, target: null, stuck: 0, detour: 0, detourDir: 1 }; delete services.match.remotes[id]; services.damage.listenHits(id); }
           return;
         }
-        var r = services.match.remotes[id];
+        var r = services.match.remotes[id], fresh = !r;
         if (!r) { r = services.match.remotes[id] = services.flow.makeEnt(id, d); }
         var k = Math.min(1, dt * 12), pos = services.netstate.stateOf(d);
         var tx = pos.x, ty = pos.y, revived = pos.full && !r.alive && pos.alive;
         if (pos.mv && MathKit.hyp(tx - r.x, ty - r.y) > 3) { r.moveAng = Math.atan2(ty - r.y, tx - r.x); r.moveAt = services.clock.now(); }
-        if (revived || MathKit.hyp(tx - r.x, ty - r.y) > 250) { r.x = tx; r.y = ty; } else { r.x += (tx - r.x) * k; r.y += (ty - r.y) * k; }
+        if (revived || MathKit.hyp(tx - r.x, ty - r.y) > 250) { if (!revived && !fresh) services.perf.noteSnap(); r.x = tx; r.y = ty; } else { r.x += (tx - r.x) * k; r.y += (ty - r.y) * k; }
         r.angle = MathKit.lerpAng(r.angle, pos.angle, Math.min(1, dt * 15));
         r.team = d.team; r.char = services.catalog.playable(d.characterType) ? d.characterType : services.charTypes.fallbackId; r.maxHp = services.charTypes.statsOf(r.char).hp;
         r.mv = pos.mv; r.nickname = d.nickname; r.isAI = !!d.isAI;
@@ -3615,6 +3618,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.randomMatch.matchEnded();
       services.accountRecorder.matchEnded();
       if (!services.match.game) return;
+      services.perf.matchEnded();
       services.match.game.forceNet = true;
       try { services.netstate.netWrite(true); } catch (e) {}
       services.stats.markStayed();
@@ -6127,6 +6131,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     leavePractice() { var services = this.services;
       if (!services.session.room || !services.session.practiceMode() || !services.session.isHost() || services.session.room.status === "lobby") return;
       Dom.show(Dom.$("pcModal"), false);
+      services.perf.matchEnded();
       services.flow.backToLobby();
     }
     fillPracticeGauge() { var services = this.services;
@@ -9107,6 +9112,145 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
 
 
+  class SampleTally {
+    constructor() { this.reset(); }
+    reset() { this.values = []; }
+    add(v) { this.values.push(v); }
+    count() { return this.values.length; }
+    keepLast(n) { if (this.values.length > n) this.values.splice(0, this.values.length - n); }
+    quantile(q) {
+      if (!this.values.length) return 0;
+      var sorted = this.values.slice().sort(function (a, b) { return a - b; });
+      return sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))];
+    }
+    max() { return this.values.reduce(function (m, v) { return v > m ? v : m; }, 0); }
+  }
+  class FrameTally {
+    static JANK_MS = 50;
+    static STALL_MS = 200;
+    static AWAY_MS = 3000;
+    constructor() { this.times = new SampleTally(); this.reset(); }
+    reset() { this.times.reset(); this.totalMs = 0; this.jank = 0; this.stall = 0; }
+    add(ms) {
+      if (!(ms > 0) || ms > FrameTally.AWAY_MS) return;
+      this.times.add(ms); this.totalMs += ms;
+      if (ms > FrameTally.JANK_MS) this.jank++;
+      if (ms > FrameTally.STALL_MS) this.stall++;
+    }
+    fps() { return this.totalMs ? this.times.count() * 1000 / this.totalMs : 0; }
+    lowFps() { var slowest = this.times.quantile(0.95); return slowest ? 1000 / slowest : 0; }
+    worstFps() { var worst = this.times.max(); return worst ? 1000 / worst : 0; }
+  }
+  class ArrivalTally {
+    constructor() { this.all = new SampleTally(); this.reset(); }
+    reset() { this.all.reset(); this.lastAt = {}; this.wasMoving = {}; this.byKey = {}; }
+    note(key, moving, at) {
+      if (this.wasMoving[key] && this.lastAt[key]) {
+        var gap = at - this.lastAt[key];
+        this.all.add(gap);
+        (this.byKey[key] = this.byKey[key] || new SampleTally()).add(gap);
+      }
+      this.lastAt[key] = at; this.wasMoving[key] = moving;
+    }
+    keyCount() { return Object.keys(this.lastAt).length; }
+    worstQuantile(q) { var tally = this; return Object.keys(this.byKey).reduce(function (m, k) { return Math.max(m, tally.byKey[k].quantile(q)); }, 0); }
+  }
+  class DeviceInfo {
+    static model() {
+      var ua = navigator.userAgent || "";
+      var m = ua.match(/\b(SM-[A-Z0-9]+)\b/) || ua.match(/\b(iPad|iPhone|CrOS|Android|Windows|Macintosh|Linux)\b/);
+      return m ? m[1].slice(0, 32) : "other";
+    }
+    static summary() {
+      return { dev: DeviceInfo.model(), dpr: MathKit.r1(window.devicePixelRatio || 1), sw: Math.round(screen.width || 0), sh: Math.round(screen.height || 0), touch: Environment.TOUCH ? 1 : 0 };
+    }
+  }
+  class PerfRecordSender {
+    send(path, record) {
+      var user = window.PORTAL_USER, config = window.PORTAL_CONFIG;
+      if (!user || !user.getToken || !config || !config.isReady || !config.isReady()) return;
+      user.getToken().then(function (token) {
+        return fetch(config.DB_URL.replace(/\/+$/, "") + "/" + path + ".json?auth=" + encodeURIComponent(token),
+          { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(record) });
+      }).catch(function () {});
+    }
+  }
+  class PerfProbe {
+    static BUILD = "lag1";
+    static PATH = "perfDiag/teambattle/";
+    static RTT_KEEP = 50;
+    static RECORDS = !Environment.SILENT_RUN;
+    constructor(services) { this.services = services; this.frames = new FrameTally(); this.arrivals = new ArrivalTally(); this.rtts = new SampleTally(); this.snaps = 0; this.startAt = 0; this.sentFor = 0; }
+    playing() { var room = this.services.session.room; return !!(room && room.status === "playing" && this.services.match.game); }
+    followMatch() {
+      var room = this.services.session.room;
+      if (!room || !room.startAt || room.startAt === this.startAt) return;
+      this.startAt = room.startAt; this.frames.reset(); this.arrivals.reset(); this.snaps = 0;
+    }
+    frame(frameMs) { this.followMatch(); if (this.playing() && !document.hidden) this.frames.add(frameMs); }
+    isLocalKey(key) { var services = this.services;
+      var keyOf = function (id) { var d = services.session.players[id]; return d && d.slot ? services.netstate.stKey(d.team, d.slot) : null; };
+      if (keyOf(services.session.myId) === key) return true;
+      return services.session.isHost() && Object.keys(services.match.bots || {}).some(function (id) { return keyOf(id) === key; });
+    }
+    noteState(key, value) {
+      if (!this.playing() || this.isLocalKey(key)) return;
+      this.arrivals.note(key, typeof value === "string" && value.split(",", 4)[3] === "1", performance.now());
+    }
+    noteSnap() { if (this.playing()) this.snaps++; }
+    noteRtt(ms) { if (Environment.SILENT_RUN) return; this.rtts.add(ms); this.rtts.keepLast(PerfProbe.RTT_KEEP); }
+    dayKey() {
+      var d = new Date(this.services.clock.real());
+      return String(d.getFullYear()) + String(d.getMonth() + 1).padStart(2, "0") + String(d.getDate()).padStart(2, "0");
+    }
+    cap(v, max) { return Math.max(0, Math.min(max, Math.round(+v || 0))); }
+    record() { var services = this.services, room = services.session.room, host = services.session.isHost(), probe = this;
+      var humans = services.targets.participants().filter(function (id) { return !services.session.players[id].isAI; }).length;
+      return Object.assign({
+        v: PerfProbe.BUILD, at: { ".sv": "timestamp" },
+        mode: String(room.mode || "").slice(0, 12), map: String(room.arena || room.map || "").slice(0, 20),
+        cls: window.PORTAL_CLASS && window.PORTAL_CLASS.id ? String(window.PORTAL_CLASS.id).slice(0, 12) : "",
+        host: host ? 1 : 0, sp: services.flow.isSpec() ? 1 : 0, ai: host ? Object.keys(services.match.bots || {}).length : 0, hu: humans,
+        dur: MathKit.r1(Math.min(3600, this.frames.totalMs / 1000)), fps: MathKit.r1(Math.min(300, this.frames.fps())), fps5: MathKit.r1(Math.min(300, this.frames.lowFps())),
+        j50: probe.cap(this.frames.jank, 100000), j200: probe.cap(this.frames.stall, 100000),
+        pix: services.cameraRig.pix, scen: services.arenaView.scenery.droppedForFps ? 1 : 0,
+        rn: probe.cap(this.arrivals.keyCount(), 12), stN: probe.cap(this.arrivals.all.count(), 100000),
+        st50: probe.cap(this.arrivals.all.quantile(0.5), 60000), st95: probe.cap(this.arrivals.all.quantile(0.95), 60000),
+        stMax: probe.cap(this.arrivals.all.max(), 600000), st95w: probe.cap(this.arrivals.worstQuantile(0.95), 60000),
+        snap: probe.cap(this.snaps, 10000), rttN: probe.cap(this.rtts.count(), 1000), rtt50: probe.cap(this.rtts.quantile(0.5), 10000), rttMax: probe.cap(this.rtts.max(), 10000)
+      }, DeviceInfo.summary());
+    }
+    matchEnded() {
+      this.followMatch();
+      if (!PerfProbe.RECORDS || this.sentFor === this.startAt || !this.frames.times.count()) return;
+      this.sentFor = this.startAt;
+      new PerfRecordSender().send(PerfProbe.PATH + this.dayKey(), this.record());
+    }
+  }
+  class NetDiagOverlay {
+    static ON = /[?&]net(&|$)/.test(location.search) && !Environment.SILENT_RUN;
+    static EVERY_MS = 500;
+    constructor(services) { this.services = services; this.window = new FrameTally(); this.shownAt = 0; this.box = null; }
+    frame(frameMs) {
+      if (!NetDiagOverlay.ON) return;
+      this.window.add(frameMs);
+      var now = performance.now();
+      if (now - this.shownAt < NetDiagOverlay.EVERY_MS) return;
+      this.shownAt = now; this.show(); this.window.reset();
+    }
+    makeBox() {
+      var box = document.createElement("div");
+      box.style.cssText = "position:fixed;top:50px;right:8px;z-index:2147482000;padding:4px 8px;border-radius:4px;background:rgba(0,0,0,.72);color:#fff;font:600 12px/1.5 monospace;white-space:pre;text-align:right;pointer-events:none";
+      document.body.appendChild(box);
+      return box;
+    }
+    show() { var services = this.services, probe = services.perf;
+      if (!this.box) this.box = this.makeBox();
+      this.box.textContent = "FPS " + Math.round(this.window.fps()) + " · 최저 " + Math.round(this.window.worstFps()) +
+        "\nRTT " + (probe.rtts.count() ? Math.round(probe.rtts.quantile(0.5)) + "ms" : "-") + " · st95 " + Math.round(probe.arrivals.all.quantile(0.95)) + "ms" +
+        "\n순간이동 " + probe.snaps + " · 멈춤 " + probe.frames.stall + " · 배율 " + services.cameraRig.pix;
+    }
+  }
   class ShaderWarmup {
     static PROBE_SPOT = -9000;
     constructor(services) { this.services = services; this.minionWarmed = false; }
@@ -9127,6 +9271,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     frame() { var services = this.services;
       requestAnimationFrame(function () { services.loop.frame(); });
       var nowMs = Date.now(), frameMs = nowMs - services.loop.lastFrame, dt = Math.min(0.05, frameMs / 1000); services.loop.lastFrame = nowMs;
+      services.perf.frame(frameMs);
+      services.netDiag.frame(frameMs);
       services.propThemes.spinMillBlades(dt);
       if (!services.session.room || services.screens.now !== "game") { services.tourView.renderTour(nowMs, dt); services.hud.adaptQuality(frameMs); return; }
       var st = services.session.room.status;
@@ -9457,7 +9603,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.nick = new NickDialog(services);
       services.backend = new Backend(services);
       services.match = new MatchState(services);
-      services.clock = new GameClock({ isHost: function () { return services.session.isHost(); }, room: function () { return services.session.room; }, myId: function () { return services.session.myId; } });
+      services.clock = new GameClock({ isHost: function () { return services.session.isHost(); }, room: function () { return services.session.room; }, myId: function () { return services.session.myId; }, rtt: function (ms) { services.perf.noteRtt(ms); } });
       services.timescale = new TimeScaler();
       services.session = new RoomSession(services);
       services.resume = new RoomResume(services);
@@ -9539,6 +9685,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.geo = new GeometryLibrary();
       services.matlib = new MaterialLibrary();
       services.shaderWarmup = new ShaderWarmup(services);
+      services.perf = new PerfProbe(services);
+      services.netDiag = new NetDiagOverlay(services);
       services.loop = new GameLoop(services);
       services.world = new WorldStepper(services);
       services.testBridge = new TestBridge(services);

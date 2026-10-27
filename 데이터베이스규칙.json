@@ -580,6 +580,50 @@
         }
       }
     },
+    "perfDiag": {
+      ".read": "auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')",
+      ".write": "auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')",
+      "teambattle": {
+        "$day": {
+          "$id": {
+            ".write": "auth != null && !data.exists()",
+            ".validate": "$day.matches(/^20[0-9]{6}$/) && newData.hasChildren(['v', 'at', 'mode', 'fps', 'dev'])",
+            "v": { ".validate": "newData.isString() && newData.val().length <= 16" },
+            "at": { ".validate": "newData.val() === now" },
+            "mode": { ".validate": "newData.isString() && newData.val().length <= 12" },
+            "map": { ".validate": "newData.isString() && newData.val().length <= 20" },
+            "cls": { ".validate": "newData.isString() && newData.val().length <= 12" },
+            "dev": { ".validate": "newData.isString() && newData.val().length <= 32" },
+            "host": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1" },
+            "sp": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1" },
+            "touch": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1" },
+            "scen": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1" },
+            "ai": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 12" },
+            "hu": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 12" },
+            "rn": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 12" },
+            "dur": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 3600" },
+            "fps": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 300" },
+            "fps5": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 300" },
+            "j50": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000" },
+            "j200": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000" },
+            "pix": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 4" },
+            "stN": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000" },
+            "st50": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 60000" },
+            "st95": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 60000" },
+            "st95w": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 60000" },
+            "stMax": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 600000" },
+            "snap": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000" },
+            "rttN": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000" },
+            "rtt50": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000" },
+            "rttMax": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000" },
+            "dpr": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 8" },
+            "sw": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000" },
+            "sh": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000" },
+            "$other": { ".validate": false }
+          }
+        }
+      }
+    },
     "seatplans": {
       ".read": true,
       "$cls": {

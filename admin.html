@@ -441,6 +441,30 @@
       </div>
     </div>
 
+    <!-- 30번 렉 진단: 학생 기기가 경기 끝에 perfDiag/teambattle/<YYYYMMDD>/<push 키> 에 진단 요약 한 줄을 씁니다
+         (로그인한 기기만, 연습모드 포함, 닉네임·uid 없음). 날짜를 고르고 불러오기를 누를 때 그날 기록을 한 번만 읽습니다(폴링 없음).
+         필드 뜻과 보는 법은 30.team-battle-notes.md 의 "렉 진단 기록" 절. -->
+    <div class="panel" id="lagPanel">
+      <h2>30번 렉 진단</h2>
+      <div class="actions" style="margin-top:0">
+        <button id="lagToggle" type="button" aria-expanded="false">펼치기</button>
+      </div>
+      <div id="lagBody" hidden>
+        <p class="hint">
+          팀 배틀 경기가 끝날 때 기기마다 한 줄씩 남은 진단 기록을 <b>기기 모델·반·빌드</b>별로 묶어 평균을 냅니다.
+          <b>빌드</b>는 렉 개선 단계마다 올리는 표시라, 같은 기기·반에서 빌드끼리 비교하면 전후 차이를 볼 수 있습니다.
+          FPS 는 높을수록, 나머지(멈춤·도착 간격·순간이동·RTT)는 낮을수록 좋습니다.
+        </p>
+        <div class="actions">
+          <input id="lagDate" type="date">
+          <button id="lagLoad" type="button">불러오기</button>
+          <label><input id="lagByMode" type="checkbox"> 모드별로 나누기</label>
+        </div>
+        <p class="msg" id="lagMsg"></p>
+        <div id="lagTable" class="stats-box"></div>
+      </div>
+    </div>
+
   </div>
 
 </div>
@@ -1051,6 +1075,112 @@ async function moveRankStudent(row, to) {
     renderRank();
   }
 }
+
+/* ---------------- 30번 렉 진단 ----------------
+   perfDiag/teambattle/<YYYYMMDD>/<push 키> = 기기 하나가 경기 하나에서 잰 요약(교사 계정만 읽기). 날짜마다 한 번 읽는다.
+   묶음(기기 모델·반·빌드, 고르면 모드까지)마다 단순 평균을 내고, 멈춤·순간이동은 경기 길이로 나눠 1분당 횟수로 보인다. */
+class LagDiagPanel {
+  static COLUMNS = [
+    ["묶음", (g) => g.label],
+    ["기록", (g) => String(g.rows.length)],
+    ["방장", (g) => LagDiagPanel.pct(g.sum("host"), g.rows.length)],
+    ["평균 FPS", (g) => g.avg("fps").toFixed(1)],
+    ["하위 5% FPS", (g) => g.avg("fps5").toFixed(1)],
+    ["50ms 끊김/분", (g) => g.perMinute("j50")],
+    ["200ms 멈춤/분", (g) => g.perMinute("j200")],
+    ["st 간격 중앙", (g) => LagDiagPanel.ms(g.avg("st50"))],
+    ["st 간격 95%", (g) => LagDiagPanel.ms(g.avg("st95"))],
+    ["가장 늦은 캐릭터 95%", (g) => LagDiagPanel.ms(g.avg("st95w"))],
+    ["st 최대", (g) => LagDiagPanel.ms(g.max("stMax"))],
+    ["순간이동/분", (g) => g.perMinute("snap")],
+    ["RTT 중앙", (g) => g.has("rttN") ? LagDiagPanel.ms(g.avgWhere("rtt50", "rttN")) : "-"],
+    ["RTT 최대", (g) => g.has("rttN") ? LagDiagPanel.ms(g.max("rttMax")) : "-"],
+    ["화질 배율", (g) => g.avg("pix").toFixed(2)],
+    ["평균 경기(초)", (g) => g.avg("dur").toFixed(0)]
+  ];
+  static pct(a, b) { return b ? Math.round(a / b * 100) + "%" : "-"; }
+  static ms(v) { return Math.round(v) + "ms"; }
+  static today() {
+    const d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+
+  constructor() { this.loadedDay = null; this.rows = []; }
+
+  bind() {
+    $("lagDate").value = LagDiagPanel.today();
+    $("lagToggle").addEventListener("click", () => {
+      const open = $("lagBody").hidden;
+      $("lagBody").hidden = !open;
+      $("lagToggle").textContent = open ? "접기" : "펼치기";
+      $("lagToggle").setAttribute("aria-expanded", open ? "true" : "false");
+    });
+    $("lagLoad").addEventListener("click", () => this.load($("lagDate").value.replace(/-/g, "")));
+    $("lagByMode").addEventListener("change", () => this.render());
+  }
+
+  async load(day) {
+    if (!/^20[0-9]{6}$/.test(day)) { say("lagMsg", "날짜를 골라 주세요."); return; }
+    this.loadedDay = day;
+    $("lagTable").textContent = "";
+    say("lagMsg", "불러오는 중…");
+    try {
+      const r = await fetch(await authedUrl("perfDiag/teambattle/" + day), { cache: "no-store" });
+      if (!r.ok) throw new Error(r.status === 401 || r.status === 403 ? "읽기 권한이 없습니다. 데이터베이스 규칙(perfDiag)을 콘솔에 게시했는지 확인해 주세요." : "불러오지 못했습니다 (" + r.status + ")");
+      const data = (await r.json()) || {};
+      if (this.loadedDay !== day) return;
+      this.rows = Object.keys(data).map((k) => data[k] || {});
+      this.render();
+    } catch (e) {
+      if (this.loadedDay === day) say("lagMsg", e.message);
+    }
+  }
+
+  groups() {
+    const byMode = $("lagByMode").checked, map = new Map();
+    this.rows.forEach((row) => {
+      const label = [row.dev || "?", row.cls || "반 없음", row.v || "?"].concat(byMode ? [row.mode || "?"] : []).join(" · ");
+      if (!map.has(label)) map.set(label, new LagDiagGroup(label));
+      map.get(label).rows.push(row);
+    });
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label, "ko"));
+  }
+
+  render() {
+    const box = $("lagTable");
+    box.textContent = "";
+    say("lagMsg", this.rows.length + "개 기록" + (this.rows.length ? "" : " — 이 날짜에는 기록이 없습니다."));
+    if (!this.rows.length) return;
+    const table = el("table"), head = el("tr");
+    LagDiagPanel.COLUMNS.forEach(([title]) => head.appendChild(el("th", null, title)));
+    table.appendChild(head);
+    this.groups().forEach((g) => {
+      const tr = el("tr");
+      LagDiagPanel.COLUMNS.forEach(([, cell]) => tr.appendChild(el("td", null, cell(g))));
+      table.appendChild(tr);
+    });
+    box.appendChild(table);
+  }
+}
+
+class LagDiagGroup {
+  constructor(label) { this.label = label; this.rows = []; }
+  num(row, key) { return +row[key] || 0; }
+  sum(key) { return this.rows.reduce((s, r) => s + this.num(r, key), 0); }
+  avg(key) { return this.rows.length ? this.sum(key) / this.rows.length : 0; }
+  max(key) { return this.rows.reduce((m, r) => Math.max(m, this.num(r, key)), 0); }
+  has(countKey) { return this.rows.some((r) => this.num(r, countKey) > 0); }
+  avgWhere(key, countKey) {
+    const picked = this.rows.filter((r) => this.num(r, countKey) > 0);
+    return picked.length ? picked.reduce((s, r) => s + this.num(r, key), 0) / picked.length : 0;
+  }
+  perMinute(key) {
+    const minutes = this.sum("dur") / 60;
+    return minutes > 0 ? (this.sum(key) / minutes).toFixed(1) : "-";
+  }
+}
+
+new LagDiagPanel().bind();
 
 /* ---------------- 단원 고르기 ----------------
    목록 화면의 구조도와 똑같은 폴더 탐색 방식입니다.
