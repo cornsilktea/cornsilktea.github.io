@@ -3803,10 +3803,13 @@ function placeAt(i, lat) {
 function startLat() { return (playMode === "battle" && myTeam() === "right" ? -1 : 1) * gridLat(); }
 function resetCar() { placeAt(START_I, startLat()); clearGroundFx(); P.gfxT = newGroundTrack(); P.off = false; P.wallT = 0; P.steerVis = 0; P.rollVis = 0; P.fin = 0; resetBoost(P); }
 function resetBoost(r) { r.chase = 0; r.chaseKmh = 0; r.tailLostT = 0; r.surgeVis = 0; r.surgeFlash = 0; r.tailT = 0; r.offLine = false; r.boostOn = false; r.boostT = 0; r.boostCap = 0; r.boostGain = 0; r.boostCool = 0; }
-class AccountChipVisibility {
+class MenuCornerButtons {
+  static SELECTORS = ["[data-guard-home]", "[data-account-chip]"];
   static follow(onMenu) {
-    const chip = document.querySelector("[data-account-chip]");
-    if (chip) chip.style.display = onMenu ? "" : "none";
+    MenuCornerButtons.SELECTORS.forEach(selector => {
+      const button = document.querySelector(selector);
+      if (button) button.style.display = onMenu ? "" : "none";
+    });
   }
 }
 const CARDS = { start: "cardStart", course: "cardCourse", done: "cardDone", lobby: "cardLobby", bdone: "cardBDone", party: "cardParty", found: "cardFound" };
@@ -3816,7 +3819,7 @@ function showCard(which) {
   overlay.style.display = which ? "block" : "none";
   overlay.scrollTop = 0;
   Object.keys(CARDS).forEach(k => { $(CARDS[k]).style.display = which === k ? "" : "none"; });
-  AccountChipVisibility.follow(!!which);
+  MenuCornerButtons.follow(!!which);
 }
 function showCourse(k) {
   releaseGhostCar();
