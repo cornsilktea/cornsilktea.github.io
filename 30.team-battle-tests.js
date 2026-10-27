@@ -2324,6 +2324,32 @@ class ResultCollector {
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "A 유지 → B 로 바뀌면 초기화하고 ping 1번 → 없음·내가 호스트는 ping 없음");
     });
   });
+  run(CLOCKG, "경기 중 시계 다시 맞추기: 참가자만 10초마다 ping 1번, 그 표본은 1초에 20ms 씩만 따라가고(첫 표본은 바로), 방장·대기실에서는 보내지 않는가", function (done) {
+    withDateNow(0, function (box) {
+      var bad = [], room = recordingRoom({ host: "H" }), c = new api.GameClock(clockLink(false, room)), wasOn = api.GameClock.KEEP_SYNC_ON;
+      api.GameClock.KEEP_SYNC_ON = true;
+      try {
+        room.status = "playing"; c.resetSync("H");
+        var pings = function () { return room.sets.filter(function (x) { return x.path === "ping/me"; }).length; };
+        box.t = 5000; c.keepInSync();
+        if (pings() !== 0) bad.push("10초 전에 ping");
+        box.t = 10000; c.keepInSync();
+        if (pings() !== 1) bad.push("10초에 ping " + pings() + "번");
+        box.t = 10100; c.onPong(pong(room, 10000, 10550));
+        if (c.off !== 500) bad.push("첫 표본은 바로 " + c.off);
+        box.t = 20000; c.keepInSync(); box.t = 20020; c.onPong(pong(room, 20000, 20310));
+        if (c.target !== 300 || c.real() !== 20020 + 500) bad.push("더 좋은 표본이 바로 적용됨 off " + c.off + " target " + c.target);
+        box.t = 21020; var oneSec = c.real() - 21020;
+        if (oneSec !== 480) bad.push("1초 뒤 " + oneSec + " (기대 480)");
+        box.t = 40000; c.real();
+        if (c.off !== 300) bad.push("다 따라가지 못함 " + c.off);
+        var host = new api.GameClock(clockLink(true, room)); host.resetSync("H"); box.t = 60000; host.keepInSync();
+        room.status = "lobby"; c.keepInSync();
+        if (pings() !== 2) bad.push("방장·대기실에서 ping " + (pings() - 2) + "번");
+      } finally { api.GameClock.KEEP_SYNC_ON = wasOn; }
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "10초마다 ping, 500 → 1초 뒤 480 → 300, 방장·대기실 ping 없음");
+    });
+  });
   run(CLOCKG, "느린 모드(배율 0.7): 경기 시작 전엔 실제 시각 그대로, 시작 뒤에만 0.7배로 흐르고 검사용 시계가 우선하는가", function (done) {
     withDateNow(0, function (box) {
       var bad = [], S = 1e12, room = recordingRoom({ host: "H", startAt: S }), c = new api.GameClock(clockLink(false, room));

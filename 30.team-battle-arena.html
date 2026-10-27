@@ -857,6 +857,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static PINGS = 5;
     static GAP_MS = 500;
     static KEEP = 10;
+    static KEEP_SYNC_MS = 10000;
+    static SLEW_PER_MS = 0.02;
+    static KEEP_SYNC_ON = !Environment.SILENT_RUN;
     constructor(link) {
       this.link = link;
       this.serverOffset = 0;
@@ -865,8 +868,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.timer = null;
       this.resetSync(null);
     }
-    resetSync(host) { this.host = host; this.samples = []; this.off = null; }
-    real() { return Date.now() + (this.off === null || this.link.isHost() ? this.serverOffset : this.off); }
+    resetSync(host) { this.host = host; this.samples = []; this.off = null; this.target = null; this.gentle = false; this.syncPingAt = Date.now(); }
+    follow() {
+      if (this.target === null || this.off === null || this.off === this.target) return;
+      var now = Date.now(), step = Math.max(0, now - this.slewAt) * GameClock.SLEW_PER_MS, gap = this.target - this.off;
+      this.slewAt = now;
+      this.off = Math.abs(gap) <= step ? this.target : this.off + (gap > 0 ? step : -step);
+    }
+    real() { this.follow(); return Date.now() + (this.off === null || this.link.isHost() ? this.serverOffset : this.off); }
     now() {
       if (this.testTime !== null) return this.testTime;
       var real = this.real(), room = this.link.room();
@@ -877,12 +886,20 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var clock = this, link = this.link;
       this.stopBurst();
       var left = GameClock.PINGS;
+      this.gentle = false; this.target = null; this.syncPingAt = Date.now();
       function ping() {
         if (!link.room() || link.isHost() || left-- <= 0) { clock.stopBurst(); return; }
         link.room().ref.child("ping/" + link.myId()).set({ a: Date.now() });
       }
       ping();
       this.timer = setInterval(ping, GameClock.GAP_MS);
+    }
+    keepInSync() {
+      var room = this.link.room();
+      if (!GameClock.KEEP_SYNC_ON || !room || !room.ref || this.link.isHost() || (room.status !== "countdown" && room.status !== "playing")) return;
+      if (Date.now() - this.syncPingAt < GameClock.KEEP_SYNC_MS) return;
+      this.syncPingAt = Date.now(); this.gentle = true;
+      room.ref.child("ping/" + this.link.myId()).set({ a: Date.now() });
     }
     onPing(s) {
       var v = s.val(), room = this.link.room();
@@ -899,7 +916,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (this.samples.length > GameClock.KEEP) this.samples.shift();
       var best = this.samples[0];
       this.samples.forEach(function (x) { if (x.rtt < best.rtt) best = x; });
-      this.off = best.off;
+      if (this.gentle && this.off !== null) { this.follow(); this.target = best.off; this.slewAt = Date.now(); }
+      else { this.off = best.off; this.target = null; }
     }
     hostChanged(host) {
       if (host === this.host) return;
@@ -9188,7 +9206,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class PerfProbe {
-    static BUILD = "lag4";
+    static BUILD = "lag5";
     static PATH = "perfDiag/teambattle/";
     static RTT_KEEP = 50;
     static RECORDS = !Environment.SILENT_RUN;
@@ -9475,7 +9493,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (!services.match.game) return;
       var t = services.clock.now();
       services.world.stepWorld(t, dt * services.clock.scale, true, dt);
-      if (st === "countdown" || st === "playing") services.netstate.netWrite(false);
+      if (st === "countdown" || st === "playing") { services.netstate.netWrite(false); services.clock.keepInSync(); }
       if (services.session.isHost()) { services.flow.hostJudge(); services.flow.hostCleanup(); }
       services.frameRenderer.render(t, dt);
       services.shaderWarmup.warmHiddenForms();
