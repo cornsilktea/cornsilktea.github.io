@@ -5418,13 +5418,14 @@ class TurboRandomMatch {
   static START_RETRY_MS = 300;
   static SETTLE_MS = 1000;
   static AI_FALLBACK_MS = 120000;
+  static MATCHER_TIMING = Object.assign({}, MkMatcher.TIMING, { rematchWaitMs: TurboRandomMatch.AI_FALLBACK_MS + 30000, busyMs: 300000 });
   static FOUND_HINT = "곧 출발해요. 잠시만 기다려 주세요.";
   constructor() { this.flow = null; this.quiet = false; this.botAsked = {}; this.awaitingLoad = false; this.settleFor = ""; this.settledFor = ""; }
   async ready() {
     if (this.flow) return this.flow;
     const db = await connectDb();
     if (this.flow) return this.flow;
-    const options = { gameRoot: "turbolap", queue: "turbolap", partyLimit: 1, matcher: new MkVersusMatcher(1), solo: true, allowBots: false, aiFallbackMs: TurboRandomMatch.AI_FALLBACK_MS,
+    const options = { gameRoot: "turbolap", queue: "turbolap", partyLimit: 1, matcher: new MkVersusMatcher(1, TurboRandomMatch.MATCHER_TIMING), solo: true, allowBots: false, aiFallbackMs: TurboRandomMatch.AI_FALLBACK_MS,
       intro: "매칭 시작을 누르면 아무 학생과 1대1로 달려요. 코스와 출발 자리는 무작위예요." };
     const panel = new MkPartyPanel($("overlay"), $("partyMount"), options);
     this.flow = new MkRandomFlow(db, { now: tnow }, BT.myId, options, this, panel);
