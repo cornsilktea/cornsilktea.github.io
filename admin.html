@@ -153,6 +153,7 @@
     max-height: 92vh; overflow: auto; cursor: default; box-shadow: var(--sg-shadow-lg);
   }
   /* 제어판 안의 표(반별 순위·렉 진단)는 창 높이에 갇히지 않고 끝까지 펼친다 — 페이지 스크롤과 표 스크롤이 겹치지 않게(2026-10-27 선생님 요청) */
+  #rankBody { margin-top: var(--sg-s4); }
   .rank-divider { margin: var(--sg-s4) 0; border: 0; border-top: 1px solid var(--sg-line-mid); }
   .panel .stats-box { max-height: none; overflow-x: auto; overflow-y: visible; }
   .stats-box h3 { margin: 0 0 var(--sg-s2); font-size: var(--sg-fs-xl); font-weight: 800; line-height: var(--sg-lh-tight); }
@@ -972,7 +973,9 @@ class RankGame {
     this.note = note;
   }
 
-  path(cls) { return "gameRanks/" + this.key + "/" + cls; }
+  root() { return "gameRanks/" + this.key; }
+
+  path(cls) { return this.root() + "/" + cls; }
 
   rowOf(uid, v) { return { uid, n: String(v.n || "?"), g: +v.g || 0, w: +v.w || 0, x: +v.x || 0 }; }
 
@@ -981,15 +984,17 @@ class RankGame {
 
 /* 30번만 classStats 에 MVP 수(m)를 둔다. 화면에서는 다른 게임의 x 칸처럼 보이고 MVP율 열이 하나 더 붙는다 */
 class TeamBattleRankGame extends RankGame {
-  path(cls) { return "classStats/" + cls; }
+  root() { return "classStats"; }
 
   rowOf(uid, v) { return { uid, n: String(v.n || "?"), g: +v.g || 0, w: +v.w || 0, x: +v.m || 0 }; }
 
   stored(row) { return { n: row.n, g: row.g, w: row.w, m: row.x }; }
 }
 
+/* <전체>: 그 게임의 반별 요약 전체(gameRanks/<게임> 또는 classStats)를 한 번 읽어 모든 반 학생을 한 표에 보인다(2026-10-27 선생님 요청). 줄마다 반 열이 붙는다 */
 class ClassRankPanel {
   static NONE = "none";
+  static ALL = "all";
   static GAMES = [
     new RankGame("turbolap", "터보 랩(24)", { label: "완주 수" }, "랜덤 매칭 1대1, 상대가 사람이었던 판만 셉니다."),
     new RankGame("fpsbattle", "서바이벌(25)", { label: "처치 합계" }, "팀 대전(방 만들기·코드 입장·랜덤 매칭) 중 AI 없는 판만 셉니다."),
@@ -1013,8 +1018,12 @@ class ClassRankPanel {
     return D.ALL_CLASSES.filter((c) => /^[12]-[1-5]$/.test(c.id)).concat([{ id: ClassRankPanel.NONE, label: "미분류" }]);
   }
 
+  static pickable() {
+    return ClassRankPanel.classes().concat([{ id: ClassRankPanel.ALL, label: "전체" }]);
+  }
+
   static labelOf(cls) {
-    return (ClassRankPanel.classes().find((c) => c.id === cls) || {}).label || cls;
+    return (ClassRankPanel.pickable().find((c) => c.id === cls) || {}).label || cls;
   }
 
   static rate(a, b) { return b > 0 ? a / b : -1; }
@@ -1034,7 +1043,7 @@ class ClassRankPanel {
 
   renderPickers() {
     this.fillGrid($("rankGames"), ClassRankPanel.GAMES.map((g) => ({ id: g.key, label: g.title })), (id) => this.pickGame(id), this.game.key);
-    this.fillGrid($("rankGrid"), ClassRankPanel.classes(), (id) => this.load(id), this.cls);
+    this.fillGrid($("rankGrid"), ClassRankPanel.pickable(), (id) => this.load(id), this.cls);
     $("rankRefresh").disabled = !this.cls;
   }
 
@@ -1067,21 +1076,32 @@ class ClassRankPanel {
     $("rankTable").textContent = "";
     say("rankMsg", "불러오는 중…");
     try {
-      const r = await fetch(await authedUrl(game.path(cls)), { cache: "no-store" });
+      const all = cls === ClassRankPanel.ALL;
+      const r = await fetch(await authedUrl(all ? game.root() : game.path(cls)), { cache: "no-store" });
       if (!r.ok) throw new Error(r.status === 401 || r.status === 403 ? "읽기 권한이 없습니다. 데이터베이스 규칙(classStats·gameRanks)을 콘솔에 게시했는지 확인해 주세요." : "불러오지 못했습니다 (" + r.status + ")");
       const data = (await r.json()) || {};
       if (this.cls !== cls || this.game !== game) return;
-      this.rows = Object.keys(data).map((uid) => game.rowOf(uid, data[uid] || {}));
+      this.rows = all ? ClassRankPanel.flatten(game, data) : Object.keys(data).map((uid) => Object.assign(game.rowOf(uid, data[uid] || {}), { cls }));
       this.render();
     } catch (e) {
       if (this.cls === cls && this.game === game) say("rankMsg", e.message);
     }
   }
 
+  static flatten(game, data) {
+    const rows = [];
+    Object.keys(data).forEach((cls) => {
+      const group = data[cls] || {};
+      Object.keys(group).forEach((uid) => rows.push(Object.assign(game.rowOf(uid, group[uid] || {}), { cls })));
+    });
+    return rows;
+  }
+
   compare(a, b) {
     const k = this.sort.key, d = this.sort.dir;
     const value = (r) => k === "rate" ? ClassRankPanel.rate(r.w, r.g) : k === "xrate" ? ClassRankPanel.rate(r.x, r.g) : k === "loss" ? r.g - r.w : r[k];
     if (k === "n") return d * a.n.localeCompare(b.n, "ko");
+    if (k === "cls") return d * ClassRankPanel.labelOf(a.cls).localeCompare(ClassRankPanel.labelOf(b.cls), "ko", { numeric: true }) || b.g - a.g;
     return d * (value(a) - value(b)) || b.g - a.g || a.n.localeCompare(b.n, "ko");
   }
 
@@ -1089,6 +1109,7 @@ class ClassRankPanel {
     const extra = this.game.extra;
     const cols = [["#", null, (r, i) => String(i + 1)], ["이름", "n", (r) => r.n], ["승률", "rate", (r) => ClassRankPanel.pct(r.w, r.g)],
       ["승/패", "w", (r) => r.w + " / " + (r.g - r.w)], ["판 수", "g", (r) => String(r.g)]];
+    if (this.cls === ClassRankPanel.ALL) cols.splice(2, 0, ["반", "cls", (r) => ClassRankPanel.labelOf(r.cls)]);
     if (extra) cols.push([extra.label, "x", (r) => String(r.x)]);
     if (extra && extra.rate) cols.push([extra.rate, "xrate", (r) => ClassRankPanel.pct(r.x, r.g)]);
     return cols;
@@ -1107,7 +1128,7 @@ class ClassRankPanel {
       if (key) {
         th.style.cursor = "pointer";
         th.addEventListener("click", () => {
-          this.sort = this.sort.key === key ? { key, dir: -this.sort.dir } : { key, dir: key === "n" ? 1 : -1 };
+          this.sort = this.sort.key === key ? { key, dir: -this.sort.dir } : { key, dir: key === "n" || key === "cls" ? 1 : -1 };
           this.render();
         });
       }
@@ -1138,7 +1159,7 @@ class ClassRankPanel {
 
   /* 반 바꾸기: 학생 profile.cls 와 모든 게임의 반별 요약을 한 번의 PATCH 로 함께 옮긴다(게임마다 옛 반 칸을 한 번씩 읽음, 규칙상 교사 계정만 가능) */
   async moveStudent(row, to) {
-    const from = this.cls;
+    const from = row.cls;
     if (!to || to === from) return;
     if (!confirm(row.n + " 학생의 반을 " + ClassRankPanel.labelOf(to) + "(으)로 바꿀까요? (모든 게임의 반별 순위가 함께 옮겨집니다)")) { this.render(); return; }
     try {
@@ -1153,7 +1174,8 @@ class ClassRankPanel {
       }));
       const r = await fetch(await authedUrl(""), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) });
       if (!r.ok) throw new Error(r.status === 401 || r.status === 403 ? "고치지 못했습니다. 데이터베이스 규칙을 콘솔에 게시했는지 확인해 주세요." : "고치지 못했습니다 (" + r.status + ")");
-      this.rows = this.rows.filter((x) => x.uid !== row.uid);
+      if (this.cls === ClassRankPanel.ALL) row.cls = to;
+      else this.rows = this.rows.filter((x) => x.uid !== row.uid);
       this.render();
       say("rankMsg", row.n + " 학생을 " + ClassRankPanel.labelOf(to) + "(으)로 옮겼습니다.");
     } catch (e) {
