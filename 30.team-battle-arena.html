@@ -375,6 +375,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     matlib;
     loop;
     shaderWarmup;
+    fxMats;
     perf;
     netDiag;
     remoteMotion;
@@ -3540,7 +3541,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.match.lastHp = {};
       services.remoteMotion.clear();
       services.killfeed.clear();
-      services.shaderWarmup.warmMinionIfNeeded();
+      services.shaderWarmup.matchStarting();
       Dom.show(Dom.$("endOv"), false);
     }
     isSpec() { var services = this.services; return !!services.session.players[services.session.myId] && services.session.players[services.session.myId].team === "spec"; }
@@ -6617,6 +6618,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         services.models.kit.ready = true;
         services.models.makePortraits();
         services.tourView.buildShowcase();
+        services.shaderWarmup.warmEffects();
       }).catch(function () { services.models.kit.failed = true; });
       Promise.all(Object.keys(ModelKit.PROP_FILES || {}).map(function (k) {
         return load(ModelKit.KIT_DIR + ModelKit.PROP_FILES[k]).then(function (g) { services.models.kit.props[k] = services.modelStyle.lambertize(g.scene); });
@@ -7257,8 +7259,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     dropProjVis(id) { var services = this.services; var g = services.effectView.projectiles[id]; if (!g) return; services.stage.scene.remove(g); delete services.effectView.projectiles[id]; }
     makeStabVis(d) { var services = this.services;
       var g = new THREE.Group();
-      var coreM = new THREE.MeshBasicMaterial({ color: 0xFF2A2A, transparent: true, opacity: 0.95, depthTest: false, depthWrite: false });
-      var glowM = new THREE.MeshBasicMaterial({ color: 0xFF3B3B, transparent: true, opacity: 0.35, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending });
+      var coreM = services.fxMats.acquire("basic", { color: 0xFF2A2A, transparent: true, opacity: 0.95, depthTest: false, depthWrite: false });
+      var glowM = services.fxMats.acquire("basic", { color: 0xFF3B3B, transparent: true, opacity: 0.35, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending });
       var core = new THREE.Mesh(services.geo.stabLine, coreM), glow = new THREE.Mesh(services.geo.stabLine, glowM);
       core.scale.set(1, 3, 3); glow.scale.set(1, 9, 9);
       core.renderOrder = glow.renderOrder = 5;
@@ -7285,10 +7287,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     makeMeleeVis(d) { var services = this.services;
       if (d.stab && !d.mace) return services.effectView.makeStabVis(d);
       var g = new THREE.Group(), who = services.session.players[d.owner] ? services.session.players[d.owner].characterType : "", col = d.zap ? Palette.ZAP_GLOW : d.u ? 0xFF6A3D : (services.charTypes.of(who).meleeColor || 0xFFFFFF);
-      var fillM = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.2, depthWrite: false });
+      var fillM = services.fxMats.acquire("basic", { color: col, transparent: true, opacity: 0.2, depthWrite: false });
       var darkWave = services.charTypes.of(who).hasDarkWave && !d.u;
       if (darkWave) fillM.opacity = 0.35;
-      var edgeM = new THREE.MeshBasicMaterial({ color: darkWave ? 0x0E0A14 : col, transparent: true, opacity: 0.9, depthWrite: false, blending: darkWave ? THREE.NormalBlending : THREE.AdditiveBlending });
+      var edgeM = services.fxMats.acquire("basic", { color: darkWave ? 0x0E0A14 : col, transparent: true, opacity: 0.9, depthWrite: false, blending: darkWave ? THREE.NormalBlending : THREE.AdditiveBlending });
       var fill, edge, puffs = [];
       if (d.len) {
         fill = services.arenaView.flatMesh(services.geo.strip, fillM); fill.scale.set(d.len + ArenaSize.BODY_R, d.width, 1);
@@ -7314,15 +7316,16 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return g;
     }
     makeLungeVis(d) { var services = this.services;
-      var m = services.arenaView.flatMesh(services.geo.strip, services.matlib.lungeMat.clone());
+      var m = services.arenaView.flatMesh(services.geo.strip, services.fxMats.acquire("basic", MaterialLibrary.LUNGE));
       m.scale.set(d.len + ArenaSize.BODY_R, d.width, 1);
       var g = new THREE.Group(); g.add(m); g.position.set(d.x, 2.6, d.y); g.rotation.y = -d.angle;
       g.userData.mat = m.material;
       services.stage.scene.add(g);
       return g;
     }
-    dropLungeVis(l) { var services = this.services; if (!l.vis) return; services.stage.scene.remove(l.vis); l.vis.userData.mat.dispose(); l.vis = null; }
-    dropMelee(k) { var services = this.services; var g = services.effectView.melees[k]; if (!g) return; services.stage.scene.remove(g); g.userData.fill.dispose(); g.userData.edge.dispose(); delete services.effectView.melees[k]; }
+    dropLungeVis(l) { var services = this.services; if (!l.vis) return; services.stage.scene.remove(l.vis); services.fxMats.release(l.vis.userData.mat); l.vis = null; }
+    releaseMeleeVis(g) { var services = this.services; services.stage.scene.remove(g); services.fxMats.release(g.userData.fill); services.fxMats.release(g.userData.edge); }
+    dropMelee(k) { var services = this.services; var g = services.effectView.melees[k]; if (!g) return; services.effectView.releaseMeleeVis(g); delete services.effectView.melees[k]; }
     placeMeteor(vis, k, nowMs) { var services = this.services;
       vis.userData.meteor.visible = services.cameraRig.pix >= Environment.PIX_START;
       if (!vis.userData.meteor.visible) return;
@@ -7332,16 +7335,16 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     makeBurstVis(e) { var services = this.services;
       var g = new THREE.Group(), col = 0xE8300E;
-      var baseMat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.18, depthWrite: false });
-      var fillMat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.35, depthWrite: false });
-      var edgeMat = new THREE.MeshBasicMaterial({ color: Palette.C_FX[e.team], transparent: true, opacity: 0.8, depthWrite: false });
+      var baseMat = services.fxMats.acquire("basic", { color: col, transparent: true, opacity: 0.18, depthWrite: false });
+      var fillMat = services.fxMats.acquire("basic", { color: col, transparent: true, opacity: 0.35, depthWrite: false });
+      var edgeMat = services.fxMats.acquire("basic", { color: Palette.C_FX[e.team], transparent: true, opacity: 0.8, depthWrite: false });
       var base = services.arenaView.flatMesh(services.geo.disc, baseMat); base.scale.setScalar(e.r); base.position.y = 2;
       var fill = services.arenaView.flatMesh(services.geo.disc, fillMat); fill.scale.setScalar(0.01); fill.position.y = 2.2;
       var edge = services.arenaView.flatMesh(services.geo.ringFx, edgeMat); edge.scale.setScalar(e.r); edge.position.y = 2.4;
       g.add(base); g.add(fill); g.add(edge);
-      var rockMat = new THREE.MeshLambertMaterial({ color: 0x3A2A22, emissive: 0x2A0A02, flatShading: true });
-      var fireMat = new THREE.MeshBasicMaterial({ color: 0xFF5A14, transparent: true, opacity: 0.45, depthWrite: false, side: THREE.BackSide });
-      var tailMat = new THREE.MeshBasicMaterial({ color: 0xFF7A2A, transparent: true, opacity: 0.45, depthWrite: false });
+      var rockMat = services.fxMats.acquire("lambert", { color: 0x3A2A22, emissive: 0x2A0A02, flatShading: true });
+      var fireMat = services.fxMats.acquire("basic", { color: 0xFF5A14, transparent: true, opacity: 0.45, depthWrite: false, side: THREE.BackSide });
+      var tailMat = services.fxMats.acquire("basic", { color: 0xFF7A2A, transparent: true, opacity: 0.45, depthWrite: false });
       var meteor = new THREE.Group();
       var rock = new THREE.Mesh(services.geo.meteorRock, rockMat); rock.scale.setScalar(MeteorLook.R);
       var fire = new THREE.Mesh(services.geo.ball, fireMat); fire.scale.setScalar(MeteorLook.R * 1.25); fire.position.copy(MeteorLook.DIR).multiplyScalar(MeteorLook.R * 0.45);
@@ -7355,7 +7358,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     dropBurstVis(b) { var services = this.services;
       if (!b.vis) return;
-      services.stage.scene.remove(b.vis); b.vis.userData.mats.forEach(function (m) { m.dispose(); }); b.vis = null;
+      services.stage.scene.remove(b.vis); b.vis.userData.mats.forEach(function (m) { services.fxMats.release(m); }); b.vis = null;
     }
     stormMask() { var services = this.services;
       if (services.effectView.stormMaskCache.arena === services.arenaMap.id && services.effectView.stormMaskCache.tex) return services.effectView.stormMaskCache.tex;
@@ -8012,8 +8015,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     dropFxMesh(f) { var services = this.services;
       if (!f.mesh) return;
       services.stage.scene.remove(f.mesh);
-      (f.mesh.userData.mats || [f.mesh.material]).forEach(function (m) { m.dispose(); });
-      if (f.mesh.userData.flashMat) f.mesh.userData.flashMat.dispose();
+      (f.mesh.userData.mats || [f.mesh.material]).forEach(function (m) { services.fxMats.release(m); });
+      if (f.mesh.userData.flashMat) services.fxMats.release(f.mesh.userData.flashMat);
       f.mesh = null;
     }
     bladeZoneMesh(f) { var services = this.services;
@@ -8037,7 +8040,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (f.k === "chain") return services.boltFx.chainMesh(f);
       if (f.k === "bladeZone") return services.fxView.bladeZoneMesh(f);
       if (f.k === "holeBurst") return services.gargantua.makeBurst(f);
-      var mat = new THREE.MeshBasicMaterial({ color: f.c, transparent: true, depthWrite: false, side: THREE.DoubleSide }), m;
+      var mat = services.fxMats.acquire("basic", { color: f.c, transparent: true, depthWrite: false, side: THREE.DoubleSide }), m;
       if (f.k === "spark") { m = new THREE.Mesh(services.geo.ringFx, mat); m.position.set(f.x, 36, f.y); }
       else if (f.k === "smoke") { m = new THREE.Mesh(services.geo.ball, mat); m.position.set(f.x, 30, f.y); }
       else { m = services.arenaView.flatMesh(services.geo.ringFx, mat); m.position.set(f.x, 3, f.y); }
@@ -8100,8 +8103,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     boltMesh(f) { var services = this.services;
       var g = new THREE.Group();
-      var glow = new THREE.MeshBasicMaterial({ color: f.glow || 0x8FC8FF, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
-      var core = new THREE.MeshBasicMaterial({ color: f.core || 0xFFFFFF, transparent: true, depthWrite: false });
+      var glow = services.fxMats.acquire("basic", { color: f.glow || 0x8FC8FF, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+      var core = services.fxMats.acquire("basic", { color: f.core || 0xFFFFFF, transparent: true, depthWrite: false });
       var prev = new THREE.Vector3(0, FxView.BOLT_TOP, 0);
       for (var i = 1; i <= FxView.BOLT_SEGS; i++) {
         var ground = i === FxView.BOLT_SEGS, ny = FxView.BOLT_TOP * (1 - i / FxView.BOLT_SEGS);
@@ -8109,7 +8112,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         services.boltFx.addBoltSeg(g, prev, next, [[glow, 7], [core, 2.2]]);
         prev = next;
       }
-      var flashMat = new THREE.MeshBasicMaterial({ color: f.glow || 0x8FC8FF, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+      var flashMat = services.fxMats.acquire("basic", { color: f.glow || 0x8FC8FF, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
       var flash = services.arenaView.flatMesh(services.geo.disc, flashMat); flash.scale.setScalar(f.flash || BlacksmithType.ULT.bsR * 0.55); flash.position.y = 2.6; g.add(flash);
       g.position.set(f.x, 0, f.y);
       g.userData.mats = [glow, core];
@@ -8138,8 +8141,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     chainMesh(f) { var services = this.services;
       var g = new THREE.Group();
-      var glow = new THREE.MeshBasicMaterial({ color: f.over ? Palette.ZAP_OVER_GLOW : Palette.ZAP_GLOW, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
-      var core = new THREE.MeshBasicMaterial({ color: Palette.ZAP_CORE, transparent: true, depthWrite: false });
+      var glow = services.fxMats.acquire("basic", { color: f.over ? Palette.ZAP_OVER_GLOW : Palette.ZAP_GLOW, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+      var core = services.fxMats.acquire("basic", { color: Palette.ZAP_CORE, transparent: true, depthWrite: false });
       for (var i = 1; i < f.pts.length; i++) {
         var a = new THREE.Vector3(f.pts[i - 1][0], FxView.CHAIN_Y, f.pts[i - 1][1]), b = new THREE.Vector3(f.pts[i][0], FxView.CHAIN_Y, f.pts[i][1]);
         services.boltFx.zigzagPath(g, a, b, f.segs || FxView.CHAIN_SEGS, FxView.CHAIN_JITTER, [[glow, 12], [core, 3.4]]);
@@ -9081,6 +9084,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class MaterialLibrary {
+    static LUNGE = { color: 0xFF2A1F, transparent: true, opacity: 0.8, depthWrite: false };
     constructor() {
       this.sector = {};
       this.crescent = {};
@@ -9107,7 +9111,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.clericBookGlowMat = new THREE.MeshBasicMaterial({ color: 0xFFF1B0, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending });
       this.clericRangeFillMat = new THREE.MeshBasicMaterial({ color: 0xFFF3C4, transparent: true, opacity: 0.05, depthWrite: false });
       this.clericRangeEdgeMat = new THREE.MeshBasicMaterial({ color: 0xFFF3C4, transparent: true, opacity: 0.35, depthWrite: false });
-      this.lungeMat = new THREE.MeshBasicMaterial({ color: 0xFF2A1F, transparent: true, opacity: 0.8, depthWrite: false });
+      this.lungeMat = new THREE.MeshBasicMaterial(MaterialLibrary.LUNGE);
       this.aimMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5, depthWrite: false, depthTest: false });
       this.aimBackMat = new THREE.MeshBasicMaterial({ color: 0x0B1410, transparent: true, opacity: 0.3, depthWrite: false, depthTest: false });
     }
@@ -9192,7 +9196,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class PerfProbe {
-    static BUILD = "lag2";
+    static BUILD = "lag3";
     static PATH = "perfDiag/teambattle/";
     static RTT_KEEP = 50;
     static RECORDS = !Environment.SILENT_RUN;
@@ -9327,9 +9331,100 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         "\n순간이동 " + probe.snaps + " · 멈춤 " + probe.frames.stall + " · 배율 " + services.cameraRig.pix;
     }
   }
+  class EffectMaterialPool {
+    constructor() { this.free = {}; this.made = 0; }
+    keyOf(kind, params) {
+      var shape = Object.assign({}, params); delete shape.opacity;
+      return kind + JSON.stringify(shape, Object.keys(shape).sort());
+    }
+    create(kind, params, key) {
+      var mat = kind === "lambert" ? new THREE.MeshLambertMaterial(params) : new THREE.MeshBasicMaterial(params);
+      mat.userData.poolKey = key; this.made++;
+      return mat;
+    }
+    acquire(kind, params) {
+      var key = this.keyOf(kind, params), spare = this.free[key];
+      var mat = spare && spare.length ? spare.pop() : this.create(kind, params, key);
+      mat.opacity = params.opacity == null ? 1 : params.opacity;
+      return mat;
+    }
+    release(mat) {
+      if (!mat) return;
+      var key = mat.userData.poolKey;
+      if (!key) { mat.dispose(); return; }
+      (this.free[key] = this.free[key] || []).push(mat);
+    }
+    spareCount() { var pool = this; return Object.keys(this.free).reduce(function (n, k) { return n + pool.free[k].length; }, 0); }
+  }
   class ShaderWarmup {
     static PROBE_SPOT = -9000;
-    constructor(services) { this.services = services; this.minionWarmed = false; }
+    constructor(services) { this.services = services; this.minionWarmed = false; this.effectsWarmed = false; }
+    sampleShots() { var services = this.services, P = ShaderWarmup.PROBE_SPOT;
+      return services.charTypes.list.map(function (c) {
+        var g = new THREE.Group();
+        try { services.charTypes.of(c).projectileMesh(g, { x: P, y: P, team: "blue", owner: "", ownerCharacterType: c, r: 8, createdAt: 0 }); } catch (e) {}
+        g.position.set(P, ModelTuning.PROJ_Y, P);
+        services.stage.scene.add(g);
+        return g;
+      });
+    }
+    sampleViews() { var services = this.services, P = ShaderWarmup.PROBE_SPOT, e = { x: P, y: P, r: 60, team: "blue", createdAt: 0, u: 1, owner: "", ga: false };
+      var makers = [
+        function () { return services.fxView.fxMesh({ k: "spark", x: P, y: P, c: "#FFFFFF", s: 1 }); },
+        function () { return services.fxView.fxMesh({ k: "smoke", x: P, y: P, c: 0xC8C8CD }); },
+        function () { return services.fxView.fxMesh({ k: "boom", x: P, y: P, r: 60, c: 0xFFFFFF }); },
+        function () { return services.fxView.fxMesh({ k: "bolt", x: P, y: P }); },
+        function () { return services.fxView.fxMesh({ k: "chain", pts: [[P, P], [P + 60, P]], over: 0 }); },
+        function () { return services.fxView.fxMesh({ k: "bladeZone", x: P, y: P, r: 60 }); },
+        function () { return services.effectView.makeMeleeVis({ x: P, y: P, angle: 0, radius: 60, arc: 1.5, owner: "" }); },
+        function () { return services.effectView.makeMeleeVis({ x: P, y: P, angle: 0, len: 120, width: 40, owner: "", u: 1 }); },
+        function () { var g = services.effectView.makeStabVis({}); g.visible = true; return g; },
+        function () { return services.effectView.makeLungeVis({ x: P, y: P, angle: 0, len: 120, width: 40 }); },
+        function () { return services.effectView.makeBurstVis(e); },
+        function () { return services.poolView.makePoolVis(e); },
+        function () { return services.poolView.makeHoleVis(e); },
+        function () { return services.poolView.makeBottleVis(); },
+        function () { return services.domainView.makeCurseVis(); },
+        function () { return services.domainView.makeDomainVis(); },
+        function () { return services.revGraceView.makeSkyBeam(EffectView.REV_ALLY_COLOR, false); },
+        function () { return services.revGraceView.makeSkyBeam(EffectView.REV_FOE_COLOR, true); },
+        function () { return services.stormView.makeStormVis(e); },
+        function () { return services.gargantua.make(Object.assign({}, e, { ga: true })); },
+        function () { return services.galeView.make(e); },
+        function () { return services.starfallView.make(e); },
+        function () { return services.starfallView.make(Object.assign({}, e, { stun: true })); }
+      ];
+      return makers.map(function (make) {
+        try {
+          var obj = make();
+          if (!obj || !obj.isObject3D) return null;
+          if (!obj.parent) services.stage.scene.add(obj);
+          obj.position.set(P, obj.position.y, P);
+          return obj;
+        } catch (err) { return null; }
+      }).filter(Boolean);
+    }
+    warmEffects() { var services = this.services;
+      if (this.effectsWarmed || !services.cameraRig.renderer) return;
+      this.effectsWarmed = true;
+      var keep = this.kept = this.sampleViews().concat(this.sampleShots());
+      var cleanUp = function () { keep.forEach(function (obj) { if (obj.parent) obj.parent.remove(obj); }); };
+      var renderer = services.cameraRig.renderer;
+      if (renderer.compileAsync) renderer.compileAsync(services.stage.scene, services.stage.camera).then(cleanUp, cleanUp);
+      else { renderer.compile(services.stage.scene, services.stage.camera); cleanUp(); }
+    }
+    warmHiddenForms() { var services = this.services;
+      if (!this.formsPending || !services.cameraRig.renderer) return;
+      var views = Object.keys(services.fighterView.fighters || {}).map(function (id) { return services.fighterView.fighters[id]; });
+      if (!views.length) return;
+      this.formsPending = false;
+      var shown = [];
+      views.forEach(function (v) { Object.keys(v.forms || {}).forEach(function (k) { var m = v.forms[k].model; if (!m.visible) { m.visible = true; shown.push(m); } }); });
+      if (!shown.length) return;
+      services.cameraRig.renderer.compile(services.stage.scene, services.stage.camera);
+      shown.forEach(function (m) { m.visible = false; });
+    }
+    matchStarting() { this.formsPending = true; this.warmMinionIfNeeded(); }
     warmMinionIfNeeded() { var services = this.services;
       if (this.minionWarmed || !services.cameraRig.renderer || !services.models.kit.ready) return;
       var necroInMatch = Object.keys(services.session.players).some(function (id) { return services.session.players[id].characterType === "necro"; });
@@ -9338,7 +9433,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var probe = services.fighterView.makeMinionVis({ key: "shaderWarmup", team: "blue", angle: 0, atkAt: 0, x: ShaderWarmup.PROBE_SPOT, y: ShaderWarmup.PROBE_SPOT });
       probe.root.position.set(ShaderWarmup.PROBE_SPOT, 0, ShaderWarmup.PROBE_SPOT);
       services.cameraRig.renderer.render(services.stage.scene, services.stage.camera);
-      probe.durRing.dispose(); probe.root.parent.remove(probe.root); probe.mats.forEach(function (m) { m.dispose(); });
+      probe.root.parent.remove(probe.root); this.minionProbe = probe;
     }
   }
   class GameLoop {
@@ -9361,6 +9456,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (st === "countdown" || st === "playing") services.netstate.netWrite(false);
       if (services.session.isHost()) { services.flow.hostJudge(); services.flow.hostCleanup(); }
       services.frameRenderer.render(t, dt);
+      services.shaderWarmup.warmHiddenForms();
       services.hud.updateHud(t);
       services.hud.adaptQuality(frameMs);
     }
@@ -9760,6 +9856,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.stage = new ArenaStage(services);
       services.geo = new GeometryLibrary();
       services.matlib = new MaterialLibrary();
+      services.fxMats = new EffectMaterialPool();
       services.shaderWarmup = new ShaderWarmup(services);
       services.perf = new PerfProbe(services);
       services.netDiag = new NetDiagOverlay(services);
