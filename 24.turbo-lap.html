@@ -90,6 +90,8 @@
   #overlay.st-screen .st-title { font-style: italic; letter-spacing: -.5px; }
   #cardStart #loadNote { color: #A9AFC2; text-align: center; margin-top: 10px; }
   #cardStart #loadNote:empty { display: none; }
+  #cardStart #btnLoadRetry { display: block; margin: 8px auto 0; }
+  #cardStart #btnLoadRetry[hidden] { display: none; }
   #cardStart .credits { color: #7F8698; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, .1); }
   #cardStart .credits a { color: #A9AFC2; }
 
@@ -370,6 +372,7 @@
       <div class="hello">내 닉네임: <b id="helloNick"></b> <button type="button" class="mini" data-maker-open data-nick-setting>✏️ 닉네임 설정</button></div>
       <div class="st-msg msg" id="bStartMsg"></div>
       <div id="loadNote"></div>
+      <button id="btnLoadRetry" type="button" class="mini" hidden>다시 불러오기</button>
     </div>
     <div class="st-card">
       <h2>조작 방법</h2>
@@ -823,11 +826,11 @@ function canvasTex(w, h, draw, repeat) {
 }
 function rnd(a, b) { return a + Math.random() * (b - a); }
 const HQ_DIR = "img/turbo/hq/";
-const HQ_LOAD = { ready: false, everReady: false, loaded: 0, total: 0, failed: [], slow: false };
+const HQ_LOAD = { ready: false, everReady: false, loaded: 0, total: 0, slow: false };
 const HQ_MANAGER = new THREE.LoadingManager(
   () => { HQ_LOAD.ready = HQ_LOAD.everReady = true; courseWarmup.kick(); renderLoadGate(); realTextures.prefetchRestLater(); },
   (url, loaded, total) => { HQ_LOAD.loaded = loaded; HQ_LOAD.total = total; renderLoadGate(); },
-  url => { HQ_LOAD.failed.push(String(url).split("/").pop()); renderLoadGate(); });
+  () => renderLoadGate());
 HQ_MANAGER.onStart = () => { HQ_LOAD.ready = false; if (HQ_LOAD.everReady) renderLoadGate(); };
 class CourseWarmup {
   constructor() { this.builtKey = ""; this.warmKey = ""; this.seq = 0; }
@@ -856,6 +859,31 @@ class CourseWarmup {
   }
 }
 const courseWarmup = new CourseWarmup();
+class LoadRetry {
+  static WAIT_MS = [1500, 4000];
+  static gaveUp = [];
+  static run(name, manager, attempt, onGiveUp) {
+    const tryAt = n => attempt(() => {
+      if (n < LoadRetry.WAIT_MS.length) {
+        const hold = "retry:" + name + ":" + n;
+        if (manager) manager.itemStart(hold);
+        setTimeout(() => { tryAt(n + 1); if (manager) manager.itemEnd(hold); }, LoadRetry.WAIT_MS[n]);
+        return;
+      }
+      LoadRetry.gaveUp.push({ name, again: () => tryAt(0) });
+      if (onGiveUp) onGiveUp();
+      renderLoadGate();
+    });
+    tryAt(0);
+  }
+  static names() { return LoadRetry.gaveUp.map(g => g.name.split("?")[0]); }
+  static retryAll() {
+    const list = LoadRetry.gaveUp;
+    LoadRetry.gaveUp = [];
+    list.forEach(g => g.again());
+    renderLoadGate();
+  }
+}
 function renderLoadGate() {
   const myModel = CAR_MODELS[parseCar(garage.key).model], ok = HQ_LOAD.everReady && !!myModel.tpl, warm = courseWarmup.isWarm(course);
   ["btnModeTA", "btnCreate", "btnRandom", "btnJoin", "btnHongkong", "btnSingapore", "btnSeoul"].forEach(id => { $(id).disabled = !ok; });
@@ -863,11 +891,12 @@ function renderLoadGate() {
   carPicker.mark();
   const note = $("loadNote");
   if (!HQ_LOAD.ready) note.textContent = "그래픽 자료 불러오는 중… " + HQ_LOAD.loaded + " / " + (HQ_LOAD.total || "?") + (HQ_LOAD.slow ? " — 인터넷이 느리면 조금 더 기다려 주세요" : "");
-  else if (myModel.state === "failed") note.textContent = "자동차 모델을 불러오지 못했습니다. 새로 고침(F5) 해 주세요.";
+  else if (myModel.state === "failed") note.textContent = "자동차 모델을 불러오지 못했습니다. 아래 다시 불러오기를 눌러 주세요.";
   else if (!warm) note.textContent = "코스 준비 중…";
   else if (!myModel.tpl) note.textContent = "자동차 모델 불러오는 중…";
-  else if (HQ_LOAD.failed.length) note.textContent = "일부 그래픽 자료를 불러오지 못했습니다(" + HQ_LOAD.failed.join(", ") + "). 새로 고침(F5) 해 보세요.";
+  else if (LoadRetry.gaveUp.length) note.textContent = "일부 그래픽 자료를 불러오지 못했습니다(" + LoadRetry.names().join(", ") + "). 그대로 탈 수 있고, 다시 불러오기를 눌러 볼 수 있어요.";
   else note.textContent = "";
+  $("btnLoadRetry").hidden = !HQ_LOAD.ready || !LoadRetry.gaveUp.length;
 }
 setTimeout(() => { HQ_LOAD.slow = true; renderLoadGate(); }, 15000);
 const HQ_EXPOSURE = 0.95;
@@ -963,8 +992,13 @@ function worldUvMaterial(params, tile, macro) {
 }
 const REAL_DIR = "img/turbo/real/";
 function hqTex(name, srgb, fallbackColor, dir) {
-  const t = new THREE.TextureLoader(HQ_MANAGER).load((dir || HQ_DIR) + name, undefined, undefined, () => {
-    console.warn("[turbolap] 고화질 텍스처를 못 불러옴:", name);
+  let t = null;
+  LoadRetry.run(name, HQ_MANAGER, fail => {
+    const loaded = new THREE.TextureLoader(HQ_MANAGER).load((dir || HQ_DIR) + name, got => {
+      if (got !== t) { t.image = got.image; t.needsUpdate = true; }
+    }, undefined, () => { console.warn("[turbolap] 고화질 텍스처를 못 불러옴:", name); fail(); });
+    if (!t) t = loaded;
+  }, () => {
     const cv = document.createElement("canvas"); cv.width = cv.height = 2;
     const c = cv.getContext("2d"); c.fillStyle = fallbackColor || "#8080FF"; c.fillRect(0, 0, 2, 2);
     t.image = cv; t.needsUpdate = true;
@@ -1066,17 +1100,17 @@ function setupWorld() {
   initMaterialsHQ();
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(9000, 9000), HQM.grass);
   ground.rotation.x = -Math.PI / 2; ground.position.y = -0.05; ground.receiveShadow = true; scene.add(ground); WORLD.ground = ground;
-  new RGBELoader(HQ_MANAGER).load(HQ_DIR + "sky_1k.hdr", hdr => {
+  LoadRetry.run("sky_1k.hdr", HQ_MANAGER, fail => new RGBELoader(HQ_MANAGER).load(HQ_DIR + "sky_1k.hdr", hdr => {
     hdr.mapping = THREE.EquirectangularReflectionMapping;
     SUN_DIR.copy(brightestDirection(hdr));
     HQENV.hdr = hdr; scene.environment = envFromHdr(renderer, hdr); scene.environmentIntensity = NIGHT.on ? 0.12 : 0.9;
     HQENV.ready.forEach(f => f(hdr)); HQENV.ready = [];
-  }, undefined, err => console.warn("[turbolap] 하늘 HDRI를 못 불러옴:", err));
-  new THREE.TextureLoader(HQ_MANAGER).load(HQ_DIR + "sky.jpg?v=2", t => {
+  }, undefined, err => { console.warn("[turbolap] 하늘 HDRI를 못 불러옴:", err); fail(); }));
+  LoadRetry.run("sky.jpg?v=2", HQ_MANAGER, fail => new THREE.TextureLoader(HQ_MANAGER).load(HQ_DIR + "sky.jpg?v=2", t => {
     t.mapping = THREE.EquirectangularReflectionMapping; t.colorSpace = THREE.SRGBColorSpace;
     WORLD.daySky = t; WORLD.dayFog = horizonColor(t.image);
     if (!NIGHT.on) { scene.background = t; scene.fog.color.copy(WORLD.dayFog); }
-  }, undefined, () => console.warn("[turbolap] 하늘 배경을 못 불러옴"));
+  }, undefined, () => { console.warn("[turbolap] 하늘 배경을 못 불러옴"); fail(); }));
 }
 const SUN_BOX = 36, SUN_TEXEL = SUN_BOX * 2 / SHADOW_MAP_SIZE;
 const SUN_RIGHT = new THREE.Vector3(), SUN_UP = new THREE.Vector3(), SUN_AT = new THREE.Vector3(), WORLD_UP = new THREE.Vector3(0, 1, 0);
@@ -3626,11 +3660,14 @@ function loadCarModel(key, manager) {
   const carModel = CAR_MODELS[key];
   if (carModel.state !== "idle") return;
   carModel.state = "loading";
-  new GLTFLoader(manager).setMeshoptDecoder(MeshoptDecoder).load("img/turbo/" + carModel.file, gltf => {
-    try { carModel.tpl = prepareSupercar(gltf.scene, carModel); carModel.state = "ready"; refreshCars(); }
-    catch (e) { carModel.tpl = null; carModel.state = "failed"; console.warn("[turbolap] 자동차 모델 준비 실패:", key, e); }
-    renderLoadGate(); battleLoadSync.refresh();
-  }, undefined, err => { carModel.state = "failed"; console.warn("[turbolap] 자동차 모델을 못 불러옴:", key, err); renderLoadGate(); battleLoadSync.refresh(); });
+  LoadRetry.run(carModel.file, manager, fail => {
+    carModel.state = "loading";
+    new GLTFLoader(manager).setMeshoptDecoder(MeshoptDecoder).load("img/turbo/" + carModel.file, gltf => {
+      try { carModel.tpl = prepareSupercar(gltf.scene, carModel); carModel.state = "ready"; refreshCars(); }
+      catch (e) { carModel.tpl = null; carModel.state = "failed"; console.warn("[turbolap] 자동차 모델 준비 실패:", key, e); }
+      renderLoadGate(); battleLoadSync.refresh();
+    }, undefined, err => { console.warn("[turbolap] 자동차 모델을 못 불러옴:", key, err); fail(); });
+  }, () => { carModel.state = "failed"; renderLoadGate(); battleLoadSync.refresh(); });
 }
 
 loadCarModel(parseCar(garage.key).model, HQ_MANAGER);
@@ -4392,6 +4429,7 @@ window.addEventListener("keydown", e => onKey(e, true));
 window.addEventListener("keyup", e => onKey(e, false));
 window.addEventListener("blur", () => { keys.up = keys.down = keys.left = keys.right = false; });
 $("btnModeTA").onclick = e => { e.currentTarget.blur(); timeAttackSetup.open(); };
+$("btnLoadRetry").onclick = e => { e.currentTarget.blur(); LoadRetry.retryAll(); };
 $("btnCourseBack").onclick = e => { e.currentTarget.blur(); showCard("start"); };
 document.querySelectorAll(".ghostbtn").forEach(b => b.onclick = e => {
   e.currentTarget.blur(); ghostPick = b.getAttribute("data-ghost");

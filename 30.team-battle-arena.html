@@ -26,11 +26,12 @@
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
 } }
 </script>
-<link rel="stylesheet" href="30.team-battle-arena.css?v=20261026b">
+<link rel="stylesheet" href="30.team-battle-arena.css?v=20261027a">
 </head>
 <body>
 <canvas id="cv"></canvas>
 <canvas id="ov"></canvas>
+<div id="kitNote" hidden><span id="kitNoteText"></span><button id="btnKitRetry" class="mini" type="button" hidden>다시 불러오기</button></div>
 <div id="glLostNote" hidden>화면을 다시 그리지 못했어요. 새로고침하면 같은 캐릭터로 이어서 할 수 있어요.</div>
 <div id="tourFade" hidden></div>
 <div id="tourCaption" hidden><i></i><span id="tourCam"></span></div>
@@ -376,6 +377,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     matlib;
     loop;
     shaderWarmup;
+    kitNote;
     fxMats;
     quality;
     perf;
@@ -1402,6 +1404,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (k !== "start" && k !== "lobby") { Dom.show(Dom.$("statsModal"), false); AccountWindows.closeAll(); }
       if (k !== "lobby") Dom.show(Dom.$("mapViewModal"), false);
       if (k !== "game") Dom.show(Dom.$("pcModal"), false);
+      services.kitNote.render();
     }
   }
 
@@ -6620,8 +6623,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return at;
     }
     loadKit() { var services = this.services;
-      var loader = new GLTFLoader();
-      function load(url) { return new Promise(function (ok, no) { loader.load(url, ok, undefined, no); }); }
+      if (services.kitNote.busy()) return;
+      var files = new KitFileLoader(function () { services.kitNote.render(); });
+      if (!this.kit.ready) this.loadFighters(files);
+      if (!this.kit.propsReady) this.loadProps(files);
+      services.kitNote.track(files);
+    }
+    loadFighters(files) { var services = this.services;
+      function load(url) { return files.load(url); }
       var weaponNames = [];
       ModelKit.modelChars(services).forEach(function (c) { [services.charTypes.modelOf(c).right, services.charTypes.modelOf(c).left].forEach(function (w) { if (w && weaponNames.indexOf(w) < 0) weaponNames.push(w); }); });
       weaponNames.push("arrow_bow", "arrow_crossbow", ModelKit.MINION_MODEL.right);
@@ -6646,14 +6655,18 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           (spec.hide || []).forEach(function (part) { var o = m.getObjectByName(part); if (o) o.visible = false; });
         });
         services.charTypes.list.forEach(function (c) { if (services.charTypes.modelOf(c).muzzle) services.models.kit.muzzle[c] = services.models.aimedMuzzle(c); });
-        services.models.kit.ready = true;
+        services.models.kit.ready = true; services.models.kit.failed = false;
         services.models.makePortraits();
         services.tourView.buildShowcase();
         services.shaderWarmup.warmEffects();
-      }).catch(function () { services.models.kit.failed = true; });
+        services.kitNote.render();
+      }).catch(function () { services.models.kit.failed = true; services.kitNote.render(); });
+    }
+    loadProps(files) { var services = this.services;
+      function load(url) { return files.load(url); }
       Promise.all(Object.keys(ModelKit.PROP_FILES || {}).map(function (k) {
         return load(ModelKit.KIT_DIR + ModelKit.PROP_FILES[k]).then(function (g) { services.models.kit.props[k] = services.modelStyle.lambertize(g.scene); });
-      })).then(function () { services.models.kit.propsReady = true; services.arenaView.useArena(services.arenaMap.id); }).catch(function () {});
+      })).then(function () { services.models.kit.propsReady = true; services.arenaView.useArena(services.arenaMap.id); services.kitNote.render(); }).catch(function () { services.kitNote.render(); });
     }
     aimFaceCamera(camera, m) { var services = this.services;
       var head = new THREE.Box3(), found = false;
@@ -9406,6 +9419,49 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     spareCount() { var pool = this; return Object.keys(this.free).reduce(function (n, k) { return n + pool.free[k].length; }, 0); }
   }
+  class KitFileLoader {
+    static RETRY_WAIT_MS = [1500, 4000];
+    constructor(onChange) { this.loader = new GLTFLoader(); this.onChange = onChange; this.total = 0; this.done = 0; this.failed = []; this.startedAt = performance.now(); }
+    pending() { return this.total - this.done - this.failed.length; }
+    load(url) { var self = this;
+      self.total++;
+      return new Promise(function (ok, no) {
+        function attempt(n) {
+          self.loader.load(url, function (g) { self.done++; self.onChange(); ok(g); }, undefined, function (err) {
+            if (n < KitFileLoader.RETRY_WAIT_MS.length) { setTimeout(function () { attempt(n + 1); }, KitFileLoader.RETRY_WAIT_MS[n]); return; }
+            self.failed.push(url.split("/").pop().split("?")[0]); self.onChange(); no(err);
+          });
+        }
+        attempt(0);
+      });
+    }
+  }
+  class KitLoadNote {
+    static SLOW_MS = 15000;
+    constructor(services) { this.services = services; this.files = null; this.slowTimer = 0; }
+    bind() { var services = this.services;
+      Dom.$("btnKitRetry").onclick = function () { services.models.loadKit(); };
+    }
+    track(files) { var note = this;
+      this.files = files;
+      clearTimeout(this.slowTimer); this.slowTimer = setTimeout(function () { note.render(); }, KitLoadNote.SLOW_MS + 50);
+      this.render();
+    }
+    busy() { return !!this.files && this.files.pending() > 0; }
+    allReady() { var kit = this.services.models.kit; return kit.ready && kit.propsReady; }
+    message() { var files = this.files, kit = this.services.models.kit;
+      if (files.pending() > 0) return "그래픽 자료 불러오는 중… " + files.done + " / " + files.total + (performance.now() - files.startedAt > KitLoadNote.SLOW_MS ? " — 인터넷이 느리면 조금 더 기다려 주세요" : "");
+      if (!kit.ready) return "캐릭터 그림을 불러오지 못해 단순한 모양으로 보여요. 경기는 그대로 할 수 있어요.";
+      return "맵 장식을 불러오지 못해 단순한 바닥으로 보여요. 경기는 그대로 할 수 있어요.";
+    }
+    render() { var services = this.services;
+      var on = !!this.files && !Environment.SILENT_RUN && !this.allReady() && services.screens.now !== "game";
+      Dom.show(Dom.$("kitNote"), on);
+      if (!on) return;
+      Dom.setText(Dom.$("kitNoteText"), this.message());
+      Dom.show(Dom.$("btnKitRetry"), !this.busy());
+    }
+  }
   class ShaderWarmup {
     static PROBE_SPOT = -9000;
     constructor(services) { this.services = services; this.minionWarmed = false; this.effectsWarmed = false; }
@@ -9909,6 +9965,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.matlib = new MaterialLibrary();
       services.fxMats = new EffectMaterialPool();
       services.shaderWarmup = new ShaderWarmup(services);
+      services.kitNote = new KitLoadNote(services);
       services.quality = new ArenaQuality(services);
       services.perf = new PerfProbe(services);
       services.netDiag = new NetDiagOverlay(services);
@@ -10062,6 +10119,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     services.tourView.attachTo(services.stage.scene);
     services.cameraRig.resize();
     services.arenaView.buildArena();
+    services.kitNote.bind();
     if (services.cameraRig.renderer) services.models.loadKit();
     }
   }

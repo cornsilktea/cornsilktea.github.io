@@ -218,6 +218,9 @@
   #scrGame { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 5; pointer-events: none; }
   #btnLeaveGame, .actBtn, #endOv { pointer-events: auto; }
   #cv, #ov { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #kitNote { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 55; display: flex; align-items: center; gap: 10px; width: max-content; max-width: calc(100% - 32px); padding: 8px 14px; border-radius: 10px; background: rgba(16,24,19,.9); border-left: 3px solid #D97B4F; color: #fff; font-size: 14px; font-weight: 700; line-height: 1.4; }
+  #kitNote[hidden], #btnKitRetry[hidden] { display: none; }
+  #btnKitRetry { flex: none; }
   #glLostNote { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 60; width: calc(100% - 32px); max-width: 460px; padding: 18px 20px; border-radius: 12px; background: rgba(16,24,19,.92); border-top: 3px solid #D97B4F; color: #fff; font-weight: 700; line-height: 1.6; text-align: center; }
   #ov { pointer-events: none; }
   #hudTop { position: absolute; top: 0; left: 50%; transform: translateX(-50%); display: flex; align-items: stretch; pointer-events: none; white-space: nowrap;
