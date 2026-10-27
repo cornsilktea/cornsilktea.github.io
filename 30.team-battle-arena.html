@@ -3932,11 +3932,21 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         E.y = MathKit.clamp(E.y, ArenaSize.BOUND.t + ArenaSize.BODY_R, ArenaSize.BOUND.b - ArenaSize.BODY_R);
       }
     }
+    static WALL_SLIDE_BOOST = 2;
     moveEnt(E, vx, vy, dt) { var services = this.services;
       var m = MathKit.hyp(vx, vy); if (m > 1) { vx /= m; vy /= m; }
-      var sp = E.speed();
-      E.x += vx * sp * dt; E.y += vy * sp * dt;
+      var step = E.speed() * dt, ox = E.x, oy = E.y;
+      E.x += vx * step; E.y += vy * step;
       services.physics.resolve(E);
+      this.keepWallSlideSpeed(E, ox, oy, MathKit.hyp(vx, vy) * step);
+    }
+    keepWallSlideSpeed(E, ox, oy, wanted) {
+      var gotX = E.x - ox, gotY = E.y - oy, got = MathKit.hyp(gotX, gotY);
+      if (wanted < 1e-6 || got < 1e-3 || got >= wanted * 0.98) return;
+      var slideShare = got / wanted, extra = wanted * Math.min(1, slideShare * ArenaPhysics.WALL_SLIDE_BOOST) - got;
+      if (extra <= 0) return;
+      E.x += gotX / got * extra; E.y += gotY / got * extra;
+      this.resolve(E);
     }
     rayRect(x, y, dx, dy, o, pad) {
       var x0 = o.x - o.w / 2 - pad, x1 = o.x + o.w / 2 + pad, y0 = o.y - o.h / 2 - pad, y1 = o.y + o.h / 2 + pad;
@@ -9702,10 +9712,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static RESULT_TRIES = 20;
     static RESULT_RETRY_MS = 300;
     static AI_FALLBACK_MS = 120000;
+    static MATCHER_TIMING = Object.assign({}, MkMatcher.TIMING, { rematchWaitMs: ArenaRandomMatch.AI_FALLBACK_MS + 30000, busyMs: 300000 });
     constructor(services) { this.services = services; this.flow = null; this.quiet = false; }
     ready() { var services = this.services;
       if (this.flow || !services.backend.db) return this.flow;
-      var options = { gameRoot: "teambattle", queue: "teambattle", partyLimit: ArenaRandomMatch.PARTY_LIMIT, matcher: new MkVersusMatcher(ArenaRandomMatch.PARTY_LIMIT), allowBots: true, aiFallbackMs: ArenaRandomMatch.AI_FALLBACK_MS, actionsMount: Dom.$("partyActions"),
+      var options = { gameRoot: "teambattle", queue: "teambattle", partyLimit: ArenaRandomMatch.PARTY_LIMIT, matcher: new MkVersusMatcher(ArenaRandomMatch.PARTY_LIMIT, ArenaRandomMatch.MATCHER_TIMING), allowBots: true, aiFallbackMs: ArenaRandomMatch.AI_FALLBACK_MS, actionsMount: Dom.$("partyActions"),
         intro: "팀을 짜고(빈 자리는 🤖 AI 추가) 매칭 시작을 누르면 아무 팀과 3대3 대회모드로 만나요. 맵은 무작위예요." };
       var panel = new ArenaPartyPanel(Dom.$("scrParty"), Dom.$("partyMount"), options);
       this.flow = new MkRandomFlow(services.backend.db, { now: function () { return services.clock.now(); } }, services.session.myId, options, this, panel);

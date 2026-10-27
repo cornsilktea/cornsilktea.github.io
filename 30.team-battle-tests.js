@@ -2560,6 +2560,23 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "벽 앞에서 멈춤, 기절·쓰러짐 중 이동 불가");
   });
 
+  run(INPUTG, "벽에 비스듬히 밀면 벽을 따라 충분히 빠르게 미끄러지고(멈춘 것처럼 보이지 않고), 정면으로 밀면 멈추는가", function (done) {
+    var q = singleRowWall(), bad = [], speed = api.CHARS.ranger.speed, R = api.joyRadius(), ms = 200, notes = [];
+    var x0 = q.x - q.w / 2 + api.BODY_R, y0 = q.y + q.h / 2 + api.BODY_R + 0.5;
+    [["정면", 0, 0, 0.02], ["20도", 20, 0.6, 0.75], ["45도", 45, 0.95, 1.02]].forEach(function (c) {
+      withMe([meEntry("ranger", "red", x0, y0)], function (W, me) {
+        var joy = api.joy, a = c[1] * Math.PI / 180;
+        joy.id = 1; joy.ox = 100; joy.oy = 100; joy.x = 100 + Math.sin(a) * R * 2; joy.y = 100 - Math.cos(a) * R * 2;
+        var m = moveOf(W, me, ms), share = m.dx / (speed * ms / 1000), why = blockedAt(me.x, me.y);
+        notes.push(c[0] + " " + share.toFixed(2));
+        if (why || me.y < y0 - 1) bad.push(c[0] + ": 벽을 파고듦 " + (why || "y=" + Math.round(me.y)));
+        if (share < c[2] || share > c[3]) bad.push(c[0] + ": 미끄러진 비율 " + share.toFixed(2) + " (기대 " + c[2] + "~" + c[3] + ")");
+        if (c[2] > 0 && !me.mv) bad.push(c[0] + ": 움직이는데 멈춘 상태로 표시");
+      });
+    });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "최고 속도 대비 " + notes.join(", "));
+  });
+
   run(INPUTG, "공격 키(K): 가장 가까운 적을 자동 조준해 쿨타임마다 한 번씩만 쏘는가", function (done) {
     withMe([meEntry("ranger", "red", 200, OPEN_Y.forest), { id: "foe", team: "blue", char: "knight", x: 500, y: OPEN_Y.forest }, { id: "far", team: "blue", char: "knight", x: 900, y: OPEN_Y.forest }], function (W, me) {
       var bad = [], cd = api.CHARS.ranger.cd;
