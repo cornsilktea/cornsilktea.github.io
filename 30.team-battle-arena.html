@@ -225,11 +225,12 @@
   <div class="modalBox statsBox">
     <div class="statsTop"><h3>내 통계</h3><div class="statsTopBtns"><button id="btnMyStatsRecent" class="mini" type="button">최근 20매치 보기</button><button id="btnMyStatsRefresh" class="mini" type="button">새로고침</button><button id="btnMyStatsClose" class="mini" type="button">닫기</button></div></div>
     <div id="myStatsMsg" class="statsMsg"></div>
-    <div class="boardWrap"><table class="board statsTable"><thead><tr><th class="nm">캐릭터</th><th>승률<small>승리 수 / 판 수</small></th><th>MVP<small>MVP 횟수 / 판 수</small></th><th>KDA<small>(킬 + 어시스트) / 데스</small></th><th>평균 피해량</th><th>평균 회복량</th><th>평균 막은 피해</th><th>평균 기절</th><th>평균 둔화</th></tr></thead><tbody id="myStatsBody"></tbody></table></div>
+    <div class="boardWrap"><table class="board statsTable"><thead><tr><th class="nm">캐릭터</th><th>승률<small>승리 수 / 판 수</small></th><th>MVP<small>MVP 횟수 / 판 수</small></th><th>KDA<small>(킬 + 어시스트) / 데스</small></th><th>평균 피해량</th><th>평균 회복량</th><th>평균 막은 피해</th><th>평균 기절</th><th>평균 둔화</th><th>평균 MVP 점수</th></tr></thead><tbody id="myStatsBody"></tbody></table></div>
     <ul class="statsNotes">
       <li>내 계정으로 AI 없이 치른 대회모드 경기만 집계합니다(랜덤 매칭 포함).</li>
       <li>경기가 절반 넘게 진행된 뒤 나가면 패배로 세고, 절반 전에 나간 경기는 세지 않습니다.</li>
       <li>MVP는 결과 화면의 환산점수가 가장 높은 사람이고, 점수가 같으면 모두 MVP로 셉니다. 중간에 나간 사람은 MVP가 될 수 없습니다.</li>
+      <li>평균 MVP 점수는 결과 화면 환산점수의 평균이며, 2026년 10월 28일 이후 경기부터 셉니다.</li>
     </ul>
   </div>
 </div>
@@ -281,7 +282,7 @@
 <script charset="utf-8" src="character-maker.js?v=20261026a"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <script charset="utf-8" src="account-match-kit.js?v=20261028d"></script>
-<script charset="utf-8" src="account-stats.js?v=20261028d"></script>
+<script charset="utf-8" src="account-stats.js?v=20261028e"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -1742,7 +1743,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return "<td><b>" + ratio + "</b><small>(" + kills.toFixed(1) + " / " + deaths.toFixed(1) + " / " + (asPicks ? assist.toFixed(1) : "-") + ")</small></td>";
     }
     static TOTAL_COLUMNS = 10;
-    static MINE_COLUMNS = 9;
+    static MINE_COLUMNS = 10;
     averageCells(d, c) {
       var picks = +d.picks || 0, ccPicks = +d.ccPicks || 0;
       return "<td>" + (picks ? Math.round(+d.dmg || 0) : "-") + "</td>" +
@@ -1774,7 +1775,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var picks = +d.picks || 0;
         return services.statsView.statsRateCell(+d.wins || 0, picks) +
           (picks ? "<td><b>" + (+d.mvpCount || 0) + "</b><small>(" + (+d.mvpCount || 0) + " / " + picks + "판)</small></td>" : "<td>-</td>") +
-          services.statsView.kdaCell(d, +d.kdPicks || 0, +d.asPicks || 0) + services.statsView.averageCells(d, c);
+          services.statsView.kdaCell(d, +d.kdPicks || 0, +d.asPicks || 0) + services.statsView.averageCells(d, c) +
+          "<td>" + (+d.scPicks ? Math.round(+d.mvpScore || 0) : "-") + "</td>";
       });
     }
     loadStats() { var services = this.services;

@@ -515,7 +515,7 @@
      30번은 StudentStatsWindow(account-stats.js), 나머지는 각 게임 통계 모듈의 Profile·View + AccountStatsDialog(StudentAccountWindow).
      통계가 있는 새 게임을 만들면 그 게임의 통계 .js 를 여기 한 줄 더하고 ClassRankPanel.GAMES 에 account 를 넘긴다. -->
 <script charset="utf-8" src="account-match-kit.js?v=20261028d"></script>
-<script charset="utf-8" src="account-stats.js?v=20261028d"></script>
+<script charset="utf-8" src="account-stats.js?v=20261028e"></script>
 <script charset="utf-8" src="24.turbo-lap-stats.js?v=20261028d"></script>
 <script charset="utf-8" src="25.fps-survival-stats.js?v=20261028c"></script>
 <script charset="utf-8" src="31.zombie-outbreak-stats.js?v=20261028c"></script>
@@ -1338,7 +1338,7 @@ class StudentStatsWindow {
     if (!ids.length) { this.box.appendChild(el("p", "msg", "아직 집계된 경기가 없습니다.")); this.closeRow(); return; }
     const table = el("table");
     const head = el("tr");
-    [["캐릭터"], ["승률", "승리 수 / 판 수"], ["MVP", "MVP 횟수 / 판 수"], ["KDA", "(킬 + 어시스트) / 데스"], ["평균 피해량"], ["평균 회복량"], ["평균 막은 피해"], ["평균 기절"], ["평균 둔화"]].forEach((col) => {
+    [["캐릭터"], ["승률", "승리 수 / 판 수"], ["MVP", "MVP 횟수 / 판 수"], ["KDA", "(킬 + 어시스트) / 데스"], ["평균 피해량"], ["평균 회복량"], ["평균 막은 피해"], ["평균 기절"], ["평균 둔화"], ["평균 MVP 점수", "결과 화면 환산점수 평균 · 10/28부터"]].forEach((col) => {
       const th = el("th", null, col[0]);
       if (col[1]) th.appendChild(el("small", null, col[1]));
       head.appendChild(th);
@@ -1358,6 +1358,7 @@ class StudentStatsWindow {
       tr.appendChild(el("td", null, role.block ? String(Math.round(d.block)) : "-"));
       tr.appendChild(el("td", null, d.stun.toFixed(1) + "초"));
       tr.appendChild(el("td", null, d.slow.toFixed(1) + "초"));
+      tr.appendChild(el("td", null, d.scPicks ? String(Math.round(d.mvpScore)) : "-"));
       table.appendChild(tr);
     });
     this.box.appendChild(table);

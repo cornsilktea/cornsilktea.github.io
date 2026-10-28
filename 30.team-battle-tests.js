@@ -5538,23 +5538,29 @@ class AccountStatsTests {
       var n = c2.node, c = n.c[ch];
       if (n.g !== 2 || n.w !== 1 || n.l !== 1 || n.bg !== 1 || n.bw !== 1 || n.rg !== 1 || n.rw !== 0 || n.m !== 1) bad.push("요약 " + JSON.stringify(n));
       if (c.n !== 2 || c.kn !== 2 || c.k !== 2 || c.d !== 2 || c.a !== 1 || c.dmg !== 750.5 || c.bl !== 5 || c.st !== 0.6 || c.sl !== 0.7 || c.m !== 1 || c.w !== 1) bad.push("캐릭터 " + JSON.stringify(c));
+      var wantSc = Math.round((TeamBattleScore.of(l1) + TeamBattleScore.of(l2)) / 2 * 10) / 10;
+      if (c.scn !== 2 || c.sc !== wantSc) bad.push("평균 환산점수 " + c.scn + "판 " + c.sc + " (기대 " + wantSc + ")");
+      var old = JSON.parse(JSON.stringify(c2.node)); delete old.c[ch].scn; delete old.c[ch].sc;
+      var c4 = M.apply(old, l1, { key: "k4", win: true, side: 0, mvp: false, at: 4 }).node.c[ch];
+      if (c4.n !== 3 || c4.scn !== 1 || c4.sc !== TeamBattleScore.of(l1)) bad.push("옛 기록에 이어 쓰기 " + JSON.stringify([c4.n, c4.scn, c4.sc]));
       if (M.apply(n, l2, { key: "k1", win: true, side: 0, mvp: true, at: 3 }) !== null) bad.push("같은 열쇠 다시 반영됨");
       var big = { g: 0, w: 0, l: 0, bg: 0, bw: 0, rg: 0, rw: 0, m: 0, ids: {} };
       for (var i = 0; i < M.IDS_KEEP; i++) big.ids["old" + i] = 100 + i;
       var c3 = M.apply(big, l1, { key: "new", win: true, side: 0, mvp: false, at: 999 });
       if (c3.evictedKeys.join() !== "old0" || Object.keys(c3.node.ids).length !== M.IDS_KEEP || c3.node.ids.new !== 999) bad.push("열쇠 보관 " + c3.evictedKeys.join());
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "2판 합산·평균(피해 750.5·기절 0.6초)·중복 무시·열쇠 " + M.IDS_KEEP + "개 보관");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "2판 합산·평균(피해 750.5·기절 0.6초·환산점수 " + c.sc + ")·옛 기록은 환산점수만 새로 셈·중복 무시·열쇠 " + M.IDS_KEEP + "개 보관");
     });
 
     run(G, "MVP율·승률: 분모가 유효한 판 수이고, 내 통계 표는 밴픽률 대신 MVP 횟수 칸을 쓰는가", function (done) {
       var bad = [], R = A.Rates, ch = api.CHAR_LIST[0];
       var node = { g: 8, w: 5, l: 3, bg: 4, bw: 3, rg: 4, rw: 2, m: 2, c: {} };
-      node.c[ch] = { n: 8, w: 5, bg: 4, bw: 3, rg: 4, rw: 2, m: 2, kn: 8, k: 2, d: 1, a: 3, dmg: 500, hl: 0, bl: 0, st: 1, sl: 0 };
+      node.c[ch] = { n: 8, w: 5, bg: 4, bw: 3, rg: 4, rw: 2, m: 2, kn: 8, k: 2, d: 1, a: 3, dmg: 500, hl: 0, bl: 0, st: 1, sl: 0, scn: 3, sc: 1234.4 };
       if (R.mvpRate(node) !== 0.25 || R.winRate(node) !== 0.625 || R.mvpRate({ g: 0, m: 0 }) !== null) bad.push("비율 " + R.mvpRate(node) + "·" + R.winRate(node));
       var html = A.myRowsHtml(A.Table.legacyRows(node));
       var rows = (html.match(/<tr><td class="nm">/g) || []).length;
       if (rows !== api.CHAR_LIST.length || html.indexOf("62.5%") < 0 || html.indexOf("(2 / 8판)") < 0 || html.indexOf("(5 / 8)") < 0 || html.indexOf("밴") >= 0) bad.push("표 " + rows + "줄");
-      if (html.indexOf('colspan="9"') < 0) bad.push("직업군 제목 칸 수");
+      if (html.indexOf('colspan="10"') < 0) bad.push("직업군 제목 칸 수");
+      if (html.indexOf("<td>1234</td>") < 0) bad.push("평균 MVP 점수 칸");
       var text = A.myStats.summaryText(node);
       if (text.indexOf("유효한 경기 8판") < 0 || text.indexOf("MVP율 25.0%") < 0 || text.indexOf("블루 75.0%") < 0 || text.indexOf("레드 50.0%") < 0) bad.push("요약 '" + text + "'");
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "MVP율 2/8=25%, 승률 5/8, 표 " + rows + "줄·MVP 횟수 칸");

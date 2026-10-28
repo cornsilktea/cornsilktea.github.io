@@ -6,7 +6,8 @@
      users/<uid>/stats/teambattle   { g, w, l, bg, bw, rg, rw, m, ids/<matchKey>, c/<캐릭터> }
        g 유효한 판 수 · w 승 · l 패 · bg/bw 블루 판·승 · rg/rw 레드 판·승 · m MVP 수
        c/<캐릭터> = { n 판, w 승, bg, bw, rg, rw, m MVP 횟수, kn 킬·데스·어시스트 평균 분모,
-                      k·d·a 평균 킬·데스·어시스트, dmg·hl·bl 평균 피해·회복·막은 피해, st·sl 평균 기절·둔화(초) }
+                      k·d·a 평균 킬·데스·어시스트, dmg·hl·bl 평균 피해·회복·막은 피해, st·sl 평균 기절·둔화(초),
+                      scn·sc 평균 환산점수의 판 수·평균(2026-10-28 추가 — 그 전 판은 없어서 n 과 따로 센다) }
        ids = 최근에 올린 경기 열쇠(같은 판을 두 번 올리지 않게, 최근 AccountKeyLedger.KEEP 개만)
      users/<uid>/recent/teambattle/<0~19>  최근 매치 20칸(값 배열, TeamBattleCodec) — 칸 이름 규칙으로도 20판을 넘지 못한다
      classStats/<학년-반|none>/<uid> { n 이름, g, w, m }  교사 화면 반별 승률 순위용 요약(교사만 읽음)
@@ -131,7 +132,7 @@ class AccountStatsMath {
         return { g: 0, w: 0, l: 0, bg: 0, bw: 0, rg: 0, rw: 0, m: 0 };
     }
     static emptyChar() {
-        return { n: 0, w: 0, bg: 0, bw: 0, rg: 0, rw: 0, m: 0, kn: 0, k: 0, d: 0, a: 0, dmg: 0, hl: 0, bl: 0, st: 0, sl: 0 };
+        return { n: 0, w: 0, bg: 0, bw: 0, rg: 0, rw: 0, m: 0, kn: 0, k: 0, d: 0, a: 0, dmg: 0, hl: 0, bl: 0, st: 0, sl: 0, scn: 0, sc: 0 };
     }
     static normalize(raw) {
         const node = AccountStatsMath.empty();
@@ -197,7 +198,9 @@ class AccountStatsMath {
             hl: AccountNumbers.runningAverage(before.hl, n, Math.max(0, Number(line.heal) || 0)),
             bl: AccountNumbers.runningAverage(before.bl, n, Math.max(0, Number(line.blocked) || 0)),
             st: AccountNumbers.runningAverage(before.st, n, Math.max(0, Number(line.stun) || 0)),
-            sl: AccountNumbers.runningAverage(before.sl, n, Math.max(0, Number(line.slow) || 0))
+            sl: AccountNumbers.runningAverage(before.sl, n, Math.max(0, Number(line.slow) || 0)),
+            scn: before.scn + 1,
+            sc: AccountNumbers.runningAverage(before.sc, before.scn, TeamBattleScore.of(line))
         };
     }
 }
@@ -209,7 +212,7 @@ class AccountStatsTable {
         Object.keys(chars).forEach((id) => {
             const c = chars[id];
             rows[id] = {
-                picks: c.n, wins: c.w, draws: 0, mvpCount: c.m,
+                picks: c.n, wins: c.w, draws: 0, mvpCount: c.m, scPicks: c.scn, mvpScore: c.sc,
                 kills: c.k, deaths: c.d, assist: c.a, kdPicks: c.kn, asPicks: c.kn, ccPicks: c.n,
                 dmg: c.dmg, heal: c.hl, block: c.bl, stun: c.st, slow: c.sl
             };
