@@ -439,6 +439,17 @@ const pendingChecks = (async () => {
   check("연승 취소된 판: p 만 지움, 규칙 통과", undone.n === 3 && !undone.p && legal(armed, undone) && S.disarm(three, "m4") === null, undone);
   check("연승 규칙: 같은 판 표시로 연승을 올리면 거부", !legal(three, { n: 9, b: 9, id: "m3", p: "x" }) && S.arm(armed, "m4") === null && S.normalize({ n: 1, b: 1, id: "a", p: "a" }).p === undefined);
 })();
+(() => {
+  const rule = RULES.stats.teambattle.c.$char;
+  const ok = (before, after) => { const errors = []; RuleChecker.validate(rule, after, before, { $char: "knight" }, "c/knight", errors); return errors.length === 0; };
+  const old = { n: 4, w: 2, bg: 2, bw: 1, rg: 2, rw: 1, m: 1, kn: 4, k: 2, d: 1, a: 3, dmg: 500, hl: 0, bl: 0, st: 1, sl: 0 };
+  const next = Object.assign({}, old, { n: 5, bg: 3 });
+  check("평균 환산점수 규칙: 옛 기록에 처음 쓰면 scn 1 로 시작", ok(old, Object.assign({}, next, { scn: 1, sc: 1234.5 })));
+  check("평균 환산점수 규칙: 옛 화면(점수 없이 쓰기)도 받음", ok(old, next));
+  check("평균 환산점수 규칙: 이어 쓰면 scn +1, 음수 점수도 받음", ok(Object.assign({}, next, { scn: 1, sc: 900 }), Object.assign({}, next, { n: 6, bg: 4, scn: 2, sc: -150 })));
+  check("평균 환산점수 규칙: scn 을 2 올리거나 판 수보다 크게 하면 거부", !ok(Object.assign({}, next, { scn: 1, sc: 900 }), Object.assign({}, next, { n: 6, bg: 4, scn: 3, sc: 900 })) && !ok(undefined, { n: 1, w: 0, bg: 1, bw: 0, rg: 0, rw: 0, m: 0, kn: 1, k: 0, d: 0, a: 0, dmg: 0, hl: 0, bl: 0, st: 0, sl: 0, scn: 2, sc: 1 }));
+  check("평균 환산점수 규칙: sc 만 있거나 범위 밖이면 거부", !ok(old, Object.assign({}, next, { sc: 50 })) && !ok(old, Object.assign({}, next, { scn: 1, sc: 200000 })));
+})();
 const gameChecks = (async () => {
   await turbo.verifyStore(turboReport());
   await fps.verifyStore(fpsReport());
