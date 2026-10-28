@@ -146,8 +146,8 @@ class RecentBlockList {
         const two = (n) => (n < 10 ? "0" : "") + n;
         return (date.getMonth() + 1) + "월 " + date.getDate() + "일 " + two(date.getHours()) + ":" + two(date.getMinutes());
     }
-    static html(entries, bodyOf) {
-        return entries.map((entry, index) => '<button type="button" class="rmItem ' + (entry.win ? "win" : "lose") + '" data-recent="' + index + '">' +
+    static html(entries, bodyOf, extraClass = "") {
+        return entries.map((entry, index) => '<button type="button" class="rmItem ' + (entry.win ? "win" : "lose") + (extraClass ? " " + extraClass : "") + '" data-recent="' + index + '">' +
             '<span class="rmHead"><b>' + (entry.win ? "승리" : "패배") + "</b><small>" + RecentBlockList.whenText(entry.at) + "</small></span>" +
             bodyOf(entry, index) + "</button>").join("");
     }
@@ -445,7 +445,7 @@ class AccountStatsDialog {
         this.heading = text;
     }
     titleText() {
-        return this.heading || this.titleText();
+        return this.heading || this.view.title;
     }
     bindButtons(root = document) {
         root.querySelectorAll("[data-account-open]").forEach((button) => {

@@ -5626,6 +5626,30 @@ class AccountStatsTests {
       });
     });
 
+    run(G, "최근 매치·교사 화면의 환산점수(TeamBattleScore)가 저장했다 되살린 줄로도 결과 창 환산점수·MVP 표시와 같고, 블록에 점수·순위·요약이 나오는가", function (done) {
+      var bad = [], live = self.liveEntries(), lines = [];
+      Object.keys(live).forEach(function (id) {
+        var line = A.Codec.decodeLine(JSON.parse(JSON.stringify(A.Codec.encodeLine(A.report.lineOf(live[id], false, live[id].player.isAI)))));
+        lines.push(line);
+        var want = api.mvpScore(live[id].ent), got = TeamBattleScore.of(line);
+        if (want !== got) bad.push(id + " 결과 창 " + want + " / 다시 계산 " + got);
+      });
+      var tie = self.players({ 0: { kills: 2, dmg: 300 }, 3: { kills: 2, dmg: 300 }, 4: { kills: 1, assists: 2, dmg: 900 } });
+      [lines, tie, self.players({ 1: { kills: 2, deaths: 2 } }), self.players()].forEach(function (players, n) {
+        var html = api.mvpHtml(A.report.rowsOf(players)), shown = TeamBattleScore.shownMvp(players);
+        var names = shown.map(function (i) { return players[i].name; });
+        var ok = shown.length ? names.every(function (nm) { return html.indexOf(">" + nm + "<") >= 0; }) && (shown.length > 1) === (html.indexOf("(공동)") >= 0) : html.indexOf("MVP 없음") >= 0;
+        if (!ok) bad.push("MVP 표시 " + n + ": " + names.join() + " / " + html.replace(/<[^>]+>/g, " "));
+      });
+      var entry = A.Codec.decode(Object.assign(JSON.parse(JSON.stringify(A.Codec.encode(self.report(), "k", true))), { at: 1700000000000 }));
+      var summary = new TeamBattleMatchSummary(entry);
+      if (summary.score !== TeamBattleScore.of(entry.players[0]) || summary.rank !== 1 || !summary.mvp || summary.ours !== 4 || summary.theirs !== 1) bad.push("요약 " + JSON.stringify({ s: summary.score, r: summary.rank, m: summary.mvp, o: summary.ours, t: summary.theirs }));
+      if (TeamBattleRecentDigest.text([entry]) !== "1승 0패 · MVP 1번 · 평균 환산점수 " + summary.score) bad.push("요약 줄 " + TeamBattleRecentDigest.text([entry]));
+      var html = TeamBattleRecentBlock.listHtml([entry], function (id) { return { name: "직업" + id, heals: false, blocks: false }; });
+      if (html.indexOf("tbr-item") < 0 || html.indexOf("🏆 MVP") < 0 || html.indexOf("6명 중 1위") < 0 || html.indexOf(">" + summary.score + "<") < 0) bad.push("블록 내용");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "6명 환산점수 일치, MVP 표시 4가지(공동·피해량 가르기·없음) 일치, 블록에 점수·순위·MVP·요약 줄");
+    });
+
     run(G, "학생 화면: 캐릭터 칸 버튼이 전체 통계·확대·모든 카드 뒤집기 순이고, 시작 화면 방 코드 아래 내 통계 · 최근 20매치 버튼 창에서 서로 오가며, 로그인 전에는 안내만 뜨는가", function (done) {
       var bad = [], userBefore = window.PORTAL_USER;
       var ids = Array.prototype.map.call(document.querySelectorAll(".charBtns button"), function (b) { return b.id + ":" + b.textContent; });

@@ -280,8 +280,8 @@
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="character-maker.js?v=20261026a"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
-<script charset="utf-8" src="account-match-kit.js?v=20261028c"></script>
-<script charset="utf-8" src="account-stats.js?v=20261027b"></script>
+<script charset="utf-8" src="account-match-kit.js?v=20261028d"></script>
+<script charset="utf-8" src="account-stats.js?v=20261028d"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -8859,20 +8859,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       store.loadRecent().then(function (list) { if (seq === self.loadSeq) self.render(list); })
         .catch(function () { if (seq === self.loadSeq) Dom.setText(Dom.$("rmMsg"), RecentMatchWindow.FAILED); });
     }
-    render(list) { var self = this;
+    render(list) { var services = this.services;
       this.entries = list;
-      Dom.setText(Dom.$("rmMsg"), list.length ? "최근 " + list.length + "경기 · 최신순 · 누르면 그 경기 결과표가 열려요" : RecentMatchWindow.EMPTY);
-      Dom.setHtml(Dom.$("rmList"), RecentBlockList.html(list, function (entry) { return self.teamsHtml(entry); }));
+      Dom.setText(Dom.$("rmMsg"), list.length ? "최근 " + list.length + "경기 · " + TeamBattleRecentDigest.text(list) + " · 누르면 그 경기 결과표가 열려요" : RecentMatchWindow.EMPTY);
+      Dom.setHtml(Dom.$("rmList"), TeamBattleRecentBlock.listHtml(list, function (id) {
+        var stats = services.charTypes.statsOf(id);
+        return { name: stats.name, heals: !!stats.heals, blocks: !!stats.blocks };
+      }));
     }
     whenText(at) { return RecentBlockList.whenText(at); }
-    namesHtml(players, team) {
-      return players.filter(function (p) { return p.team === team; }).map(function (p) { return (p.ai ? "🤖 " : "") + Dom.esc(p.name); }).join(" · ");
-    }
-    teamsHtml(entry) {
-      var mine = entry.players[entry.myIndex].team;
-      return '<span class="rmTeam"><i>우리 팀</i>' + this.namesHtml(entry.players, mine) + "</span>" +
-        '<span class="rmTeam"><i>상대 팀</i>' + this.namesHtml(entry.players, 1 - mine) + "</span>";
-    }
     showResult(i) { var services = this.services, entry = this.entries[i];
       if (!entry) return;
       var rows = services.accountReport.rowsOf(entry.players), mine = entry.players[entry.myIndex].team, winner = entry.win ? mine : 1 - mine;

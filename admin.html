@@ -161,12 +161,38 @@
   .student-stats .student-tabs { justify-content: flex-start; margin: 0 0 var(--sg-s2); }
   .student-stats .student-tabs button[aria-pressed="true"] { border-color: #D97B4F; box-shadow: inset 0 0 0 1px #D97B4F; }
   .student-recent { display: flex; flex-direction: column; gap: var(--sg-s2); margin: var(--sg-s3) 0; }
-  .student-match { display: flex; gap: var(--sg-s3); align-items: center; width: 100%; padding: var(--sg-s2) var(--sg-s3); border-radius: var(--sg-radius);
-    border: 1px solid var(--sg-line); border-left: 6px solid #4C8DFF; background: var(--sg-bg); color: var(--sg-ink); font: inherit; text-align: left; cursor: pointer; }
-  .student-match.lose { border-left-color: #E0474C; }
-  .student-match b { min-width: 3em; }
-  .student-board { margin: 0 0 var(--sg-s3) !important; }
-  .student-board tr.mine td { background: rgba(217, 123, 79, 0.14); font-weight: 800; }
+  /* 펼친 경기 결과표: 30번 게임 결과 창(.endBox)과 같은 어두운 판·색. 팀 칸은 팀 색 바탕(2026-10-28 선생님 요청) */
+  .tb-result { padding: 18px 16px; border-radius: 12px; border: 2px solid rgba(255,255,255,.2); background: rgba(16,24,19,.96); color: #F4F1E8; text-align: center; }
+  .tb-result.blue { border-color: rgba(111,168,255,.7); }
+  .tb-result.red { border-color: rgba(255,122,112,.7); }
+  .tb-title { font-size: 34px; font-weight: 800; line-height: 1.2; }
+  .tb-title.win { color: #FFD66B; }
+  .tb-title.lose { color: #9AA3A0; }
+  .tb-when { margin: 2px 0 12px; font-size: 14px; color: #A3B0A6; }
+  .tb-scores { display: flex; gap: 10px; margin-bottom: 12px; }
+  .tb-scores div { flex: 1 1 0; padding: 8px 6px; border-radius: 8px; font-size: 15px; font-weight: 800; }
+  .tb-scores b { display: block; font-size: 30px; }
+  .tb-scores .sb { background: rgba(47,111,214,.22); color: #8DB8FF; }
+  .tb-scores .sr { background: rgba(214,69,61,.22); color: #FF9A92; }
+  .tb-board-wrap { overflow-x: auto; }
+  .stats-box table.tb-board { margin: 0; font-size: 15px; }
+  .stats-box .tb-board th { position: static; background: transparent; color: #A3B0A6; font-size: 12px; text-align: center; border-bottom: 2px solid rgba(255,255,255,.16); }
+  .stats-box .tb-board td { padding: 7px 6px; font-weight: 800; color: #EEF2EE; text-align: center; border-bottom: 1px solid rgba(255,255,255,.08); }
+  .stats-box .tb-board td.nm, .stats-box .tb-board td.job { text-align: left; }
+  .stats-box .tb-board td.job { font-size: 12px; color: #A3B0A6; }
+  .stats-box .tb-board td.sc { color: #F2D06B; }
+  .stats-box .tb-board td.team { color: #fff; font-weight: 800; }
+  .stats-box .tb-board td.team.blue { background: #2F6FD6; }
+  .stats-box .tb-board td.team.red { background: #C93A33; }
+  .stats-box .tb-board tr.split td { border-top: 3px solid rgba(255,255,255,.75); }
+  .stats-box .tb-board tr.mine td:not(.team) { background: rgba(242,208,107,.16); }
+  .tb-mvp { margin-top: 12px; padding: 10px; border-radius: 8px; border: 2px solid rgba(242,208,107,.5); background: rgba(242,208,107,.1); }
+  .tb-mvp .lab { font-size: 14px; font-weight: 800; color: #F2D06B; letter-spacing: .08em; }
+  .tb-mvp .name { font-size: 22px; font-weight: 800; }
+  .tb-mvp .name small { margin-left: 4px; font-size: 14px; color: #A3B0A6; }
+  .tb-mvp .name .b { color: #6FA8FF; }
+  .tb-mvp .name .r { color: #FF7A70; }
+  .tb-mvp .none { font-size: 20px; font-weight: 800; color: #A3B0A6; }
   .stats-box h3 { margin: 0 0 var(--sg-s2); font-size: var(--sg-fs-xl); font-weight: 800; line-height: var(--sg-lh-tight); }
   .stats-box table { width: 100%; border-collapse: separate; border-spacing: 0; margin: var(--sg-s4) 0; font-size: var(--sg-fs-md); font-variant-numeric: tabular-nums; }
   .stats-box th, .stats-box td { padding: var(--sg-s2) var(--sg-s3); border-bottom: 1px solid var(--sg-line); text-align: right; white-space: nowrap; }
@@ -488,8 +514,8 @@
 <!-- 반 별 통계에서 학생 이름을 누르면 여는 개인 통계 창이 게임과 같은 계산·되살리기·표 클래스를 쓰려고 불러온다.
      30번은 StudentStatsWindow(account-stats.js), 나머지는 각 게임 통계 모듈의 Profile·View + AccountStatsDialog(StudentAccountWindow).
      통계가 있는 새 게임을 만들면 그 게임의 통계 .js 를 여기 한 줄 더하고 ClassRankPanel.GAMES 에 account 를 넘긴다. -->
-<script charset="utf-8" src="account-match-kit.js?v=20261028c"></script>
-<script charset="utf-8" src="account-stats.js?v=20261028c"></script>
+<script charset="utf-8" src="account-match-kit.js?v=20261028d"></script>
+<script charset="utf-8" src="account-stats.js?v=20261028d"></script>
 <script charset="utf-8" src="24.turbo-lap-stats.js?v=20261028d"></script>
 <script charset="utf-8" src="25.fps-survival-stats.js?v=20261028c"></script>
 <script charset="utf-8" src="31.zombie-outbreak-stats.js?v=20261028c"></script>
@@ -1339,38 +1365,68 @@ class StudentStatsWindow {
     this.closeRow();
   }
 
+  /* 최근 20매치: 블록은 게임 창과 같은 TeamBattleRecentBlock(account-stats.js), 누르면 그 아래에 게임 결과 창과 같은 결과표가 펼쳐진다 */
   showRecent() {
     this.frame("recent");
-    this.msg.textContent = this.entries.length ? "최근 " + this.entries.length + "경기 · 최신순 · 줄을 누르면 그 경기 결과표" : "아직 기록된 대회모드 경기가 없습니다.";
+    this.msg.textContent = this.entries.length ? "최근 " + this.entries.length + "경기 · " + TeamBattleRecentDigest.text(this.entries) + " · 블록을 누르면 그 경기 결과표" : "아직 기록된 대회모드 경기가 없습니다.";
     const list = el("div", "student-recent");
-    this.entries.forEach((entry) => {
-      const me = entry.players[entry.myIndex];
-      const item = el("button", "student-match " + (entry.win ? "win" : "lose"));
-      item.type = "button";
-      item.append(el("b", null, entry.win ? "승리" : "패배"),
-        el("span", null, RecentBlockList.whenText(entry.at) + " · " + entry.score[0] + " : " + entry.score[1] + " · " + StudentStatsWindow.roleOf(me.char).name + " · " + me.kills + "/" + me.deaths + "/" + me.assists + (entry.withAi ? " · AI 포함(통계 제외)" : "")));
-      const board = this.boardOf(entry);
+    list.innerHTML = TeamBattleRecentBlock.listHtml(this.entries, (id) => {
+      const role = StudentStatsWindow.roleOf(id);
+      return { name: role.name, heals: !!role.heal, blocks: !!role.block };
+    });
+    list.querySelectorAll("[data-recent]").forEach((item) => {
+      const board = this.boardOf(this.entries[+item.getAttribute("data-recent")]);
       board.hidden = true;
+      item.after(board);
       item.addEventListener("click", () => { board.hidden = !board.hidden; });
-      list.append(item, board);
     });
     this.box.appendChild(list);
     this.closeRow();
   }
 
+  /* 게임이 끝나면 나오는 결과 창과 같은 구성: 승패 제목 → 팀 처치 → 결과표(환산점수 포함) → MVP. 팀 칸은 팀 색 바탕 */
   boardOf(entry) {
-    const table = el("table", "student-board");
+    const me = entry.players[entry.myIndex];
+    const winner = entry.win ? me.team : 1 - me.team;
+    const card = el("div", "tb-result " + (winner === 0 ? "blue" : "red"));
+    card.appendChild(el("div", "tb-title " + (entry.win ? "win" : "lose"), entry.win ? "승리" : "패배"));
+    card.appendChild(el("div", "tb-when", (entry.win ? "내 결과: 승리" : "내 결과: 패배") + " · " + RecentBlockList.whenText(entry.at) + (entry.withAi ? " · AI 포함 경기(내 통계에는 안 들어감)" : "")));
+    const scores = el("div", "tb-scores");
+    const blue = el("div", "sb", "블루팀"); blue.appendChild(el("b", null, String(entry.score[0])));
+    const red = el("div", "sr", "레드팀"); red.appendChild(el("b", null, String(entry.score[1])));
+    scores.append(blue, red);
+    card.appendChild(scores);
+    const wrap = el("div", "tb-board-wrap");
+    const table = el("table", "tb-board");
     const head = el("tr");
-    ["팀", "닉네임", "직업", "처치", "쓰러짐", "어시스트", "입힌 피해", "회복", "막은 피해", "기절", "둔화"].forEach((t) => head.appendChild(el("th", null, t)));
+    ["팀", "닉네임", "직업", "처치", "쓰러짐", "어시스트", "입힌 피해", "회복", "막은 피해", "기절", "둔화", "환산점수"].forEach((t) => head.appendChild(el("th", null, t)));
     table.appendChild(head);
+    const sec = (v) => (+v > 0 ? (+v).toFixed(1) + "초" : "-");
     entry.players.forEach((p, i) => {
-      const tr = el("tr", i === entry.myIndex ? "mine" : null);
-      [StudentStatsWindow.TEAMS[p.team] || "-", (p.ai ? "🤖 " : "") + p.name + (p.left ? " (나감)" : ""), StudentStatsWindow.roleOf(p.char).name,
-        p.kills, p.deaths, p.assists, Math.round(p.dmg), Math.round(p.heal), Math.round(p.blocked), (+p.stun).toFixed(1) + "초", (+p.slow).toFixed(1) + "초"]
+      const role = StudentStatsWindow.roleOf(p.char);
+      const tr = el("tr", (i === entry.myIndex ? "mine" : "") + (p.team === 1 && (i === 0 || entry.players[i - 1].team === 0) ? " split" : ""));
+      tr.appendChild(el("td", "team " + (p.team === 0 ? "blue" : "red"), StudentStatsWindow.TEAMS[p.team] || "-"));
+      tr.appendChild(el("td", "nm", (p.ai ? "🤖 " : "") + p.name + (p.left ? " (나감)" : "")));
+      tr.appendChild(el("td", "job", role.name));
+      [p.kills, p.deaths, p.assists, Math.round(p.dmg), role.heal ? Math.round(p.heal) : "-", role.block ? Math.round(p.blocked) : "-", sec(p.stun), sec(p.slow)]
         .forEach((v) => tr.appendChild(el("td", null, String(v))));
+      tr.appendChild(el("td", "sc", String(TeamBattleScore.of(p))));
       table.appendChild(tr);
     });
-    return table;
+    wrap.appendChild(table);
+    card.appendChild(wrap);
+    const mvp = el("div", "tb-mvp");
+    const best = TeamBattleScore.shownMvp(entry.players);
+    mvp.appendChild(el("div", "lab", best.length ? "🏆 MVP" + (best.length > 1 ? " (공동)" : "") : "MVP"));
+    if (!best.length) mvp.appendChild(el("div", "none", "MVP 없음"));
+    best.forEach((i) => {
+      const p = entry.players[i];
+      const line = el("div", "name");
+      line.append(el("span", p.team === 0 ? "b" : "r", (p.ai ? "🤖 " : "") + p.name), el("small", null, StudentStatsWindow.roleOf(p.char).name + " · " + TeamBattleScore.of(p) + "점"));
+      mvp.appendChild(line);
+    });
+    card.appendChild(mvp);
+    return card;
   }
 }
 

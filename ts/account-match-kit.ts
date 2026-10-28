@@ -190,9 +190,9 @@ class RecentBlockList {
     return (date.getMonth() + 1) + "월 " + date.getDate() + "일 " + two(date.getHours()) + ":" + two(date.getMinutes());
   }
 
-  static html<E extends AccountRecentHeadEntry>(entries: E[], bodyOf: (entry: E, index: number) => string): string {
+  static html<E extends AccountRecentHeadEntry>(entries: E[], bodyOf: (entry: E, index: number) => string, extraClass: string = ""): string {
     return entries.map((entry, index) =>
-      '<button type="button" class="rmItem ' + (entry.win ? "win" : "lose") + '" data-recent="' + index + '">' +
+      '<button type="button" class="rmItem ' + (entry.win ? "win" : "lose") + (extraClass ? " " + extraClass : "") + '" data-recent="' + index + '">' +
       '<span class="rmHead"><b>' + (entry.win ? "승리" : "패배") + "</b><small>" + RecentBlockList.whenText(entry.at) + "</small></span>" +
       bodyOf(entry, index) + "</button>"
     ).join("");
@@ -579,7 +579,7 @@ class AccountStatsDialog<N, E extends AccountRecentHeadEntry> {
   }
 
   private titleText(): string {
-    return this.heading || this.titleText();
+    return this.heading || this.view.title;
   }
 
   bindButtons(root: ParentNode = document): void {

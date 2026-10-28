@@ -297,3 +297,127 @@ class AccountStatsStore extends AccountMatchStore {
         return new AccountStatsStore(new AccountDatabase(user), user);
     }
 }
+/* 결과 창 환산점수 식(30번 ResultBoard.mvpScore 와 같은 식 — &test 가 둘이 같은 값을 내는지 본다).
+   최근 매치 목록·교사 화면은 저장된 줄로 다시 계산한다(점수는 저장하지 않음, 5-2b) */
+class TeamBattleScore {
+    static of(line) {
+        return line.kills * TeamBattleScore.KILL + (line.assists || 0) * TeamBattleScore.ASSIST
+            + Math.round(line.dmg) + Math.round(line.heal || 0) + Math.round(line.blocked || 0)
+            + Math.round(AccountNumbers.oneDecimal(line.stun) * TeamBattleScore.STUN_PER_SEC)
+            + Math.round(AccountNumbers.twoDecimals(line.slowWeight) * TeamBattleScore.SLOW_PER_SEC)
+            - line.deaths * TeamBattleScore.DEATH;
+    }
+    /* 결과 창의 MVP 표시와 같은 규칙: 처치·어시스트가 있는 사람 중 점수 최고, 같으면 피해량이 큰 사람, 그래도 같으면 공동 */
+    static shownMvp(players) {
+        let best = [];
+        let bestScore = 0;
+        let bestDmg = 0;
+        players.forEach((line, index) => {
+            if (line.kills + (line.assists || 0) <= 0)
+                return;
+            const score = TeamBattleScore.of(line);
+            const dmg = Math.round(line.dmg);
+            if (!best.length || score > bestScore || (score === bestScore && dmg > bestDmg)) {
+                best = [index];
+                bestScore = score;
+                bestDmg = dmg;
+            }
+            else if (score === bestScore && dmg === bestDmg) {
+                best.push(index);
+            }
+        });
+        return best;
+    }
+}
+TeamBattleScore.KILL = 100;
+TeamBattleScore.ASSIST = 50;
+TeamBattleScore.DEATH = 100;
+TeamBattleScore.STUN_PER_SEC = 60;
+TeamBattleScore.SLOW_PER_SEC = 40;
+/* 최근 매치 한 판에서 내 쪽 요약: 환산점수와 그 판 전체 순위, MVP(계정 통계와 같은 AccountMvpJudge), 우리·상대 팀 처치 */
+class TeamBattleMatchSummary {
+    constructor(entry) {
+        this.entry = entry;
+        this.me = entry.players[entry.myIndex];
+        this.score = TeamBattleScore.of(this.me);
+        this.rank = 1 + entry.players.filter((line) => TeamBattleScore.of(line) > this.score).length;
+        this.mvp = !this.me.left && new AccountMvpJudge((line) => TeamBattleScore.of(line)).isMvp(entry.players, entry.myIndex);
+        this.ours = entry.score[this.me.team] || 0;
+        this.theirs = entry.score[1 - this.me.team] || 0;
+    }
+}
+/* 최근 매치 목록 위 한 줄 요약: "9승 5패 · MVP 3번 · 평균 환산점수 812" */
+class TeamBattleRecentDigest {
+    static text(entries) {
+        if (!entries.length)
+            return "";
+        const summaries = entries.map((entry) => new TeamBattleMatchSummary(entry));
+        const wins = entries.filter((entry) => entry.win).length;
+        const mvps = summaries.filter((summary) => summary.mvp).length;
+        const average = Math.round(summaries.reduce((sum, summary) => sum + summary.score, 0) / summaries.length);
+        return wins + "승 " + (entries.length - wins) + "패 · MVP " + mvps + "번 · 평균 환산점수 " + average;
+    }
+}
+/* 최근 20매치 블록(30번 게임 창과 교사 제어판이 같이 쓴다, 2026-10-28 선생님 요청). 승패를 크게, 내 캐릭터·K/D/A,
+   환산점수와 그 판 순위·MVP, 우리:상대 처치, 두 팀 명단을 한 블록에. 모양은 처음 그릴 때 <style id="tbrStyle"> 로 한 번 넣는다 */
+class TeamBattleRecentBlock {
+    static listHtml(entries, labelOf) {
+        TeamBattleRecentBlock.ensureStyle();
+        return RecentBlockList.html(entries, (entry) => TeamBattleRecentBlock.bodyHtml(entry, labelOf), TeamBattleRecentBlock.CLASS);
+    }
+    static bodyHtml(entry, labelOf) {
+        const summary = new TeamBattleMatchSummary(entry);
+        const me = summary.me;
+        const ourClass = me.team === 0 ? "b" : "r";
+        const theirClass = me.team === 0 ? "r" : "b";
+        return '<span class="tbr-col tbr-me"><i>내 캐릭터</i><b>' + AccountHtml.esc(labelOf(me.char).name) + "</b>"
+            + "<em>" + me.kills + " / " + me.deaths + " / " + me.assists + " <small>처치·쓰러짐·어시스트</small></em></span>"
+            + '<span class="tbr-col tbr-score"><i>환산점수</i><b>' + summary.score + "</b>" + (summary.mvp ? '<span class="tbr-mvp">🏆 MVP</span>' : "")
+            + "<em>" + entry.players.length + "명 중 " + summary.rank + "위" + (me.left ? " · 나감" : "") + "</em></span>"
+            + '<span class="tbr-col tbr-kills"><i>팀 처치</i><b><span class="' + ourClass + '">' + summary.ours + '</span> : <span class="' + theirClass + '">' + summary.theirs + "</span></b>"
+            + "<em>우리 " + (me.team === 0 ? "블루" : "레드") + "팀 : 상대</em></span>"
+            + '<span class="tbr-teams"><span><i>우리 팀</i>' + TeamBattleRecentBlock.namesHtml(entry, me.team) + "</span>"
+            + "<span><i>상대 팀</i>" + TeamBattleRecentBlock.namesHtml(entry, 1 - me.team) + "</span>"
+            + (entry.withAi ? '<span class="ai">🤖 AI 포함 · 내 통계 제외</span>' : "") + "</span>";
+    }
+    static namesHtml(entry, team) {
+        return entry.players.map((line, index) => ({ line, index })).filter((item) => item.line.team === team).map((item) => {
+            const text = (item.line.ai ? "🤖 " : "") + AccountHtml.esc(item.line.name) + (item.line.left ? "(나감)" : "");
+            return item.index === entry.myIndex ? '<span class="mine">' + text + "</span>" : text;
+        }).join(" · ");
+    }
+    static ensureStyle() {
+        if (typeof document === "undefined" || document.getElementById(TeamBattleRecentBlock.STYLE_ID))
+            return;
+        const style = document.createElement("style");
+        style.id = TeamBattleRecentBlock.STYLE_ID;
+        style.textContent = TeamBattleRecentBlock.STYLE;
+        document.head.appendChild(style);
+    }
+}
+TeamBattleRecentBlock.CLASS = "tbr-item";
+TeamBattleRecentBlock.STYLE_ID = "tbrStyle";
+TeamBattleRecentBlock.STYLE = [
+    ".rmItem.tbr-item{display:grid;grid-template-columns:104px minmax(0,1.15fr) minmax(0,1fr) minmax(0,1fr);grid-template-areas:'head me score kills' 'head teams teams teams';align-items:center;gap:6px 14px;width:100%;padding:12px 14px;border-radius:10px;border:2px solid transparent;text-align:left;color:#EEF2EE;font:inherit;cursor:pointer;box-sizing:border-box;}",
+    ".rmItem.tbr-item.win{background:rgba(47,111,214,.24);border-color:rgba(111,168,255,.6);}",
+    ".rmItem.tbr-item.lose{background:rgba(214,69,61,.22);border-color:rgba(255,122,112,.55);}",
+    ".rmItem.tbr-item:hover{filter:brightness(1.15);}",
+    ".rmItem.tbr-item .rmHead{grid-area:head;}",
+    ".rmItem.tbr-item .rmHead b{display:block;font-size:28px;font-weight:800;line-height:1.15;}",
+    ".rmItem.tbr-item.win .rmHead b{color:#8DB8FF;}",
+    ".rmItem.tbr-item.lose .rmHead b{color:#FF9A92;}",
+    ".rmItem.tbr-item .rmHead small{display:block;font-size:12px;color:#C3CCC5;}",
+    ".tbr-col{display:block;min-width:0;}",
+    ".tbr-me{grid-area:me;}.tbr-score{grid-area:score;}.tbr-kills{grid-area:kills;}",
+    ".tbr-col i{display:block;font-style:normal;font-size:11px;font-weight:700;color:#A3B0A6;}",
+    ".tbr-col b{font-size:21px;font-weight:800;color:#F4F1E8;white-space:nowrap;}",
+    ".tbr-col em{display:block;font-style:normal;font-size:14px;font-weight:800;color:#DCE3DD;}",
+    ".tbr-col em small{font-size:11px;font-weight:700;color:#A3B0A6;}",
+    ".tbr-score b{color:#F2D06B;}",
+    ".tbr-mvp{display:inline-block;margin-left:6px;padding:1px 8px;border-radius:999px;background:#F2D06B;color:#3A2A00;font-size:12px;font-weight:800;vertical-align:3px;}",
+    ".tbr-kills .b{color:#8DB8FF;}.tbr-kills .r{color:#FF9A92;}",
+    ".tbr-teams{grid-area:teams;display:flex;flex-wrap:wrap;gap:2px 18px;font-size:13px;font-weight:700;color:#DCE3DD;word-break:keep-all;}",
+    ".tbr-teams i{font-style:normal;font-size:11px;color:#A3B0A6;margin-right:6px;}",
+    ".tbr-teams .mine{color:#F2D06B;}.tbr-teams .ai{color:#FFCF5A;}",
+    "@media (max-width:640px){.rmItem.tbr-item{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-areas:'head head head' 'me score kills' 'teams teams teams';}.rmItem.tbr-item .rmHead b{display:inline;margin-right:8px;}.rmItem.tbr-item .rmHead small{display:inline;}}"
+].join("\n");
