@@ -295,7 +295,7 @@
             },
             "c": {
               "$char": {
-                ".validate": "$char.matches(/^(warrior|knight|ranger|mage|rogue|necro|sniper|thrower|lancer|blacksmith|priest|hitman|guardian|frost|dancer|duelist|stormbow|cleric|shaman|engineer|druid|giant|astrologer)$/) && newData.hasChildren(['n', 'w', 'bg', 'bw', 'rg', 'rw', 'm', 'kn', 'k', 'd', 'a', 'dmg', 'hl', 'bl', 'st', 'sl']) && ((!data.exists() && newData.child('n').val() === 1) || (data.exists() && newData.child('n').val() === data.child('n').val() + 1)) && newData.child('w').val() <= newData.child('n').val() && newData.child('m').val() <= newData.child('n').val() && newData.child('kn').val() <= newData.child('n').val() && newData.child('bg').val() + newData.child('rg').val() === newData.child('n').val() && newData.child('bw').val() <= newData.child('bg').val() && newData.child('rw').val() <= newData.child('rg').val()",
+                ".validate": "$char.matches(/^(warrior|knight|ranger|mage|rogue|necro|sniper|thrower|lancer|blacksmith|priest|hitman|guardian|frost|dancer|duelist|stormbow|cleric|shaman|engineer|druid|giant|astrologer)$/) && newData.hasChildren(['n', 'w', 'bg', 'bw', 'rg', 'rw', 'm', 'kn', 'k', 'd', 'a', 'dmg', 'hl', 'bl', 'st', 'sl']) && ((!data.exists() && newData.child('n').val() === 1) || (data.exists() && newData.child('n').val() === data.child('n').val() + 1)) && newData.child('w').val() <= newData.child('n').val() && newData.child('m').val() <= newData.child('n').val() && newData.child('kn').val() <= newData.child('n').val() && newData.child('bg').val() + newData.child('rg').val() === newData.child('n').val() && newData.child('bw').val() <= newData.child('bg').val() && newData.child('rw').val() <= newData.child('rg').val() && newData.child('sc').exists() === newData.child('scn').exists() && (!newData.child('scn').exists() || newData.child('scn').val() <= newData.child('n').val())",
                 "n": { ".validate": "newData.isNumber() && newData.val() >= 0" },
                 "w": { ".validate": "newData.isNumber() && newData.val() >= 0" },
                 "bg": { ".validate": "newData.isNumber() && newData.val() >= 0" },
@@ -312,6 +312,8 @@
                 "bl": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5000" },
                 "st": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 600" },
                 "sl": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 600" },
+                "scn": { ".validate": "newData.isNumber() && newData.val() === (data.exists() ? data.val() : 0) + 1" },
+                "sc": { ".validate": "newData.isNumber() && newData.val() >= -10000 && newData.val() <= 100000" },
                 "$other": { ".validate": false }
               }
             },
