@@ -1832,15 +1832,15 @@ class ResultCollector {
     });
   });
 
-  run(DRAFTG, "나간 선수의 차례(혼자 맡은 단계, 둘 다 나간 단계)는 건너뛰는가", function (done) {
+  run(DRAFTG, "직접 나간(방 나가기) 선수의 차례(혼자 맡은 단계, 둘 다 나간 단계)는 건너뛰는가", function (done) {
     withDraft([], function (S) {
       startDraft(S);
-      delete S.players.pr1;
+      delete S.players.pr1; S.room.draft.gone = { pr1: true };
       S.as("b1"); DR.draftPick(api.CHAR_LIST[0]);
       var afterBan = S.room.draft.step, skippedBan = !S.room.draft.bans.r;
       S.as("b1"); DR.draftPick(api.CHAR_LIST[1]);
       var afterBluePick = S.room.draft.step;
-      delete S.players.pr2;
+      delete S.players.pr2; S.room.draft.gone.pr2 = true;
       DR.draftSettle(S.room.draft, T0 + 1);
       var ok = afterBan === 2 && skippedBan && afterBluePick === 3 && S.room.draft.step === 4;
       done(ok ? "pass" : "fail", "레드 1이 나간 뒤 블루 밴 끝나고 단계 " + afterBan + "(기대 2), 블루 픽 뒤 " + afterBluePick + "(기대 3), 레드 2도 나가면 " + S.room.draft.step + "(기대 4)");
@@ -2005,6 +2005,89 @@ class ResultCollector {
       if (!(u.startAt > 0)) bad.push("시작 시각이 없음");
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "사람 " + humans.length + "명 모두 준비 후 한 번만 시작, 로스터 6명·밴 " + banned.length + "개, 상태 " + u.status);
     });
+  });
+
+  run(DRAFTG, "연결이 끊긴 선수: 차례를 바로 건너뛰지 않고 제한 시간까지 기다렸다 고민 중이던 캐릭터·밴 없음으로 정하고, 돌아오면 직접 고를 수 있는가", function (done) {
+    withDraft([], function (S) {
+      var bad = [], L = api.CHAR_LIST;
+      startDraft(S);
+      if (!S.room.draft.names || S.room.draft.names.pr1 !== "선수r1") bad.push("드래프트에 이름이 안 적힘");
+      var saved = S.players.pr1;
+      delete S.players.pr1;
+      S.as("b1"); DR.draftPick(L[0]);
+      if (S.room.draft.step !== 1) bad.push("끊긴 레드 1의 밴 차례를 바로 건너뜀(단계 " + S.room.draft.step + ")");
+      api.setClock(T0 + api.DRAFT_STEP_MS - 1); tick();
+      if (S.room.draft.step !== 1) bad.push("시간이 남았는데 넘어감");
+      api.setClock(T0 + api.DRAFT_STEP_MS + 1); tick();
+      if (S.room.draft.step !== 2 || S.room.draft.bans.r !== api.NO_BAN) bad.push("시간 초과 뒤 밴 없음으로 안 넘어감");
+      S.as("b1"); DR.draftPick(L[1]);
+      S.players.pr1 = saved;
+      S.as("r1"); DR.draftPick(L[2]);
+      if (!S.room.draft.picks || S.room.draft.picks.pr1 !== L[2]) bad.push("돌아온 선수가 직접 못 고름");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "끊긴 동안 16초 기다림 → 밴 없음, 돌아온 뒤 직접 픽");
+    });
+  });
+
+  run(DRAFTG, "준비 완료 단계에서 끊긴 선수: 20초 기다리고, 그래도 없으면 그 선수도 명단(roster)·시작 상태에 넣어 시작하며 자리 정보(players)는 만들지 않는가", function (done) {
+    tradeScenario([], function (S) {
+      var bad = [], picks = JSON.parse(JSON.stringify(S.room.draft.picks)), t = api.CLOCK.now();
+      delete S.players.pb2;
+      POSITIONS.filter(function (k) { return k !== "b2"; }).forEach(function (k) { S.as(k); DR.draftReady(); });
+      S.as("b1");
+      finish(S);
+      if (S.room.draft.waitFrom !== t) bad.push("기다리기 시작 시각이 안 적힘");
+      finish(S);
+      if (launchUpdate(S)) bad.push("20초 전에 시작함");
+      api.setClock(t + api.DRAFT_ABSENT_WAIT_MS - 1); finish(S);
+      if (launchUpdate(S)) bad.push("20초가 안 됐는데 시작함");
+      api.setClock(t + api.DRAFT_ABSENT_WAIT_MS); finish(S);
+      var launched = launchUpdate(S);
+      if (!launched) { done("fail", "20초 뒤에도 시작 안 함 / " + bad.join(" / ")); return; }
+      var u = launched.u, r = u.roster.pb2;
+      if (!r || r.team !== "blue" || r.c !== picks.pb2 || r.ai || !r.s || r.n !== "선수b2") bad.push("끊긴 선수 로스터가 틀림: " + JSON.stringify(r));
+      if (Object.keys(u).some(function (k) { return k.indexOf("players/pb2") === 0; })) bad.push("끊긴 선수의 players 를 만듦");
+      var slots = ["pb1", "pb2", "pb3"].map(function (id) { return u.roster[id] && u.roster[id].s; }).sort().join(",");
+      if (slots !== "1,2,3") bad.push("블루 자리 번호 " + slots);
+      if (Object.keys(u.st).length !== 6) bad.push("시작 상태 " + Object.keys(u.st).length + "개");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "20초 기다린 뒤 시작, 끊긴 선수 로스터 자리 " + r.s + "·캐릭터 " + r.c + "(players 없음)");
+    });
+  });
+
+  run(DRAFTG, "준비 완료 단계에서 끊겼다 돌아오면 기다림이 풀리고, 돌아온 선수까지 준비해야 시작하는가", function (done) {
+    tradeScenario([], function (S) {
+      var bad = [], saved = S.players.pr3;
+      delete S.players.pr3;
+      POSITIONS.filter(function (k) { return k !== "r3"; }).forEach(function (k) { S.as(k); DR.draftReady(); });
+      S.as("b1"); finish(S);
+      if (!S.room.draft.waitFrom) bad.push("기다리기가 시작 안 됨");
+      S.players.pr3 = saved;
+      finish(S);
+      if (S.room.draft.waitFrom) bad.push("돌아왔는데 기다리기가 안 풀림");
+      api.setClock(api.CLOCK.now() + api.DRAFT_ABSENT_WAIT_MS + 1); finish(S);
+      if (launchUpdate(S)) bad.push("돌아온 선수가 준비 안 했는데 시작함");
+      S.as("r3"); DR.draftReady(); S.as("b1"); finish(S);
+      if (!launchUpdate(S)) bad.push("모두 준비했는데 시작 안 함");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "기다림 풀림 → 돌아온 선수 준비 후 시작");
+    });
+  });
+
+  run(DRAFTG, "다시 들어오기: 경기 중이면 로스터 자리·캐릭터로, 로스터에 없으면 관전자로, 밴픽 중 방 코드로 들어오면 닉네임으로 밴픽 자리를 되찾는가", function (done) {
+    var SE = api.SEATS, bad = [];
+    var last = { nickname: "가", team: "blue", slot: 3, characterType: "mage", isAI: false };
+    var live = { status: "playing", mode: "cup", roster: { me: { team: "red", c: "knight", s: 2, ai: false, n: "가" } } };
+    var a = SE.returnRecord(live, "me", last);
+    if (a.team !== "red" || a.slot !== 2 || a.characterType !== "knight") bad.push("경기 중 로스터 자리로 안 돌아감: " + JSON.stringify(a));
+    var b = SE.returnRecord({ status: "countdown", mode: "cup", roster: {} }, "me", last);
+    if (b.team !== "spec" || b.slot) bad.push("로스터에 없는데 관전자가 아님: " + JSON.stringify(b));
+    var c = SE.returnRecord({ status: "draft", mode: "cup", roster: null }, "me", last);
+    if (c !== last) bad.push("밴픽 중인데 기록을 바꿈");
+    var draftInfo = { status: "draft", mode: "cup", players: { other: {} }, roster: null, draft: { seq: { b1: "other", b2: "old" }, names: { other: "나", old: "가" } } };
+    if (!SE.isLive(draftInfo) || !SE.isOpen(draftInfo, "old") || SE.isOpen(draftInfo, "other")) bad.push("밴픽 자리 열림 판정이 틀림");
+    if (SE.nickOf(draftInfo, "old") !== "가") bad.push("밴픽 자리 닉네임을 못 읽음");
+    var rec = SE.draftRecord(draftInfo, "old", "가");
+    if (rec.team !== "blue" || rec.isAI || rec.nickname !== "가") bad.push("밴픽 자리 기록이 틀림: " + JSON.stringify(rec));
+    if (SE.isLive({ status: "draft", mode: "pvp", draft: null })) bad.push("드래프트 없는 방을 되찾기 대상으로 봄");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "경기 중 → 로스터 자리, 없으면 관전, 밴픽 중 코드 입장 → 닉네임으로 자리");
   });
 
   var STATS = api.STATS;

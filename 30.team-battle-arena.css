@@ -417,6 +417,8 @@
   .dfCard.banned { border-color: rgba(216,69,59,.7); }
   .dfCard .tag.ban { background: #B8322A; }
   .dfReadyBar { margin: 12px 0 0; text-align: center; }
+  .dfRoomCode { display: inline-block; margin-left: 10px; padding: 1px 8px; border-radius: 999px; background: rgba(0,0,0,.42); color: rgba(255,255,255,.86); font-size: 11px; font-weight: 700; letter-spacing: .06em; line-height: 1.5; vertical-align: middle; white-space: nowrap; }
+  .dfRoomCode:empty { display: none; }
   /* 캐릭터 칸이 화면보다 길어도 준비 완료 버튼은 칸 아래쪽에 붙어 늘 보이게 한다(2026-10-28 선생님 요청) */
   .dfCharCol .dfReadyBar { position: sticky; bottom: -22px; z-index: 3; margin: 12px -20px -22px; padding: 10px 20px 14px; background: linear-gradient(to bottom, rgba(16,24,19,0), rgba(16,24,19,.97) 12px); }
   .dfReadyBtn { display: block; width: 100%; height: 60px; border: 0; border-radius: 10px; background: #2FA35A; color: #fff; font: inherit; font-size: 22px; font-weight: 800; cursor: pointer; box-shadow: 0 4px 14px rgba(47,163,90,.35); }
