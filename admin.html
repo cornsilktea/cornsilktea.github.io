@@ -490,7 +490,7 @@
      통계가 있는 새 게임을 만들면 그 게임의 통계 .js 를 여기 한 줄 더하고 ClassRankPanel.GAMES 에 account 를 넘긴다. -->
 <script charset="utf-8" src="account-match-kit.js?v=20261028c"></script>
 <script charset="utf-8" src="account-stats.js?v=20261028c"></script>
-<script charset="utf-8" src="24.turbo-lap-stats.js?v=20261028c"></script>
+<script charset="utf-8" src="24.turbo-lap-stats.js?v=20261028d"></script>
 <script charset="utf-8" src="25.fps-survival-stats.js?v=20261028c"></script>
 <script charset="utf-8" src="31.zombie-outbreak-stats.js?v=20261028c"></script>
 <script charset="utf-8" src="38.snow-account.js?v=20261028c"></script>
@@ -1028,7 +1028,7 @@ class ClassRankPanel {
   static ALL = "all";
   static GAMES = [
     new RankGame("turbolap", "터보 랩(24)", { label: "완주 수" }, "랜덤 매칭 1대1, 상대가 사람이었던 판만 셉니다.",
-      () => ({ profile: new TurboLapProfile(), view: new TurboLapStatsView((id) => String(id || "").split(/[-_]/).join(" · ")) })),
+      () => ({ profile: new TurboLapProfile(), view: new TurboLapStatsView((id) => TurboLapCarNames.label(id)) })),
     new RankGame("fpsbattle", "서바이벌(25)", { label: "처치 합계" }, "팀 대전(방 만들기·코드 입장·랜덤 매칭) 중 AI 없는 판만 셉니다.",
       () => ({ profile: new FpsProfile(), view: new FpsStatsView() })),
     new TeamBattleRankGame("teambattle", "팀 배틀(30)", { label: "MVP 수", rate: "MVP율" }, "AI 없이 치른 대회모드 경기(랜덤 매칭 포함)만 셉니다."),

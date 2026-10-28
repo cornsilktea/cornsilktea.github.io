@@ -557,7 +557,7 @@
 <script charset="utf-8" src="character-maker.js?v=20261026a"></script>
 <script charset="utf-8" src="match-kit.js?v=20261028c"></script>
 <script charset="utf-8" src="account-match-kit.js?v=20261028c"></script>
-<script charset="utf-8" src="24.turbo-lap-stats.js?v=20261027c"></script>
+<script charset="utf-8" src="24.turbo-lap-stats.js?v=20261028d"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
 <script type="module">
@@ -651,28 +651,24 @@ const COURSES = ["seoul", "singapore", "hongkong"];
 function capKey(k) { return k[0].toUpperCase() + k.slice(1); }
 let LAPS = CFG.laps;
 const CAR_MODELS = {
-  porsche:  { name: "포르쉐 911 GT3", file: "porsche911gt3.glb" },
-  valkyrie: { name: "애스턴마틴 발키리", file: "astonvalkyrie.glb" },
-  chiron:   { name: "부가티 시론", file: "bugattichiron.glb" }
+  porsche:  { name: TurboLapCarNames.MODELS.porsche, file: "porsche911gt3.glb" },
+  valkyrie: { name: TurboLapCarNames.MODELS.valkyrie, file: "astonvalkyrie.glb" },
+  chiron:   { name: TurboLapCarNames.MODELS.chiron, file: "bugattichiron.glb" }
 };
 const CAR_MODEL_KEYS = Object.keys(CAR_MODELS);
 CAR_MODEL_KEYS.forEach(k => Object.assign(CAR_MODELS[k], { tpl: null, state: "idle", paintBase: null, paint: {}, lamps: {}, wheelR: 0.4 }));
 const CAR_COLORS = {
-  black:  { name: "검정", hex: 0x2A2E35 },
-  white:  { name: "흰색", hex: 0xE6E9EC },
-  yellow: { name: "노랑", hex: 0xFFC23D },
-  green:  { name: "초록", hex: 0x2E9B63 },
-  blue:   { name: "파랑", hex: 0x3D8BFF },
-  red:    { name: "빨강", hex: 0xFF5A4E }
+  black:  { name: TurboLapCarNames.COLORS.black, hex: 0x2A2E35 },
+  white:  { name: TurboLapCarNames.COLORS.white, hex: 0xE6E9EC },
+  yellow: { name: TurboLapCarNames.COLORS.yellow, hex: 0xFFC23D },
+  green:  { name: TurboLapCarNames.COLORS.green, hex: 0x2E9B63 },
+  blue:   { name: TurboLapCarNames.COLORS.blue, hex: 0x3D8BFF },
+  red:    { name: TurboLapCarNames.COLORS.red, hex: 0xFF5A4E }
 };
 const CAR_COLOR_KEYS = Object.keys(CAR_COLORS);
 function carId(model, color) { return model + color; }
-function parseCar(id) {
-  id = String(id || "");
-  const model = CAR_MODEL_KEYS.find(k => id.startsWith(k)), color = model ? id.slice(model.length) : id;
-  return { model: model || "porsche", color: CAR_COLORS[color] ? color : "blue" };
-}
-function carLabel(id) { const c = parseCar(id); return CAR_MODELS[c.model].name + " · " + CAR_COLORS[c.color].name; }
+function parseCar(id) { return TurboLapCarNames.parse(id); }
+function carLabel(id) { return TurboLapCarNames.label(id); }
 function carReady(id) { return !!CAR_MODELS[parseCar(id).model].tpl; }
 class CarGarage {
   static STORAGE_KEY = "turbolap_car_v1";

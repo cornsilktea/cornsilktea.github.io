@@ -52,6 +52,26 @@ interface TurboLapRecentEntry extends AccountRecentHeadEntry {
   rows: TurboLapRow[];
 }
 
+/* 차량 이름(게임 차고·결과표·교사 화면이 같이 쓰는 한 곳). 차 아이디는 모델 키 + 색 키(예: porscheblue) */
+class TurboLapCarNames {
+  static readonly MODELS: Record<string, string> = { porsche: "포르쉐 911 GT3", valkyrie: "애스턴마틴 발키리", chiron: "부가티 시론" };
+  static readonly COLORS: Record<string, string> = { black: "검정", white: "흰색", yellow: "노랑", green: "초록", blue: "파랑", red: "빨강" };
+  static readonly DEFAULT_MODEL = "porsche";
+  static readonly DEFAULT_COLOR = "blue";
+
+  static parse(id: unknown): { model: string; color: string } {
+    const text = String(id || "");
+    const model = Object.keys(TurboLapCarNames.MODELS).find((key) => text.startsWith(key));
+    const color = model ? text.slice(model.length) : text;
+    return { model: model || TurboLapCarNames.DEFAULT_MODEL, color: TurboLapCarNames.COLORS[color] ? color : TurboLapCarNames.DEFAULT_COLOR };
+  }
+
+  static label(id: unknown): string {
+    const car = TurboLapCarNames.parse(id);
+    return TurboLapCarNames.MODELS[car.model] + " · " + TurboLapCarNames.COLORS[car.color];
+  }
+}
+
 class TurboLapCourses {
   static readonly KEYS = ["seoul", "singapore", "hongkong"];
   static readonly NAMES: Record<string, string> = { seoul: "서울", singapore: "싱가포르", hongkong: "홍콩" };
