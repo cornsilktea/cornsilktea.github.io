@@ -361,6 +361,8 @@
   .dfTopCard .dfHead { padding-top: 30px; align-items: flex-end; }
   .startRow { display: flex; gap: 10px; }
   .startRow .big { margin-bottom: 12px; }
+  #scrStart .card > .big, #joinBox { margin: 0 0 10px; }
+  #joinBox .row { gap: 10px; }
   .startRow #btnStart { flex: 3 1 0; min-width: 0; }
   .startRow .swapBtn { flex: 1 1 0; min-width: 0; background: #B8352E; border-color: #D6453D; color: #fff; }
   .startRow .swapBtn:hover { background: #C9433B; }
