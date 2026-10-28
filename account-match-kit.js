@@ -426,6 +426,9 @@ class AccountHtml {
         return minutes + ":" + (seconds < 10 ? "0" : "") + seconds + "." + (hundredths < 10 ? "0" : "") + hundredths;
     }
 }
+/* 모든 게임의 통계 입구는 버튼 하나다(2026-10-28 선생님 요청, 24번 터보 랩 모양이 기준).
+   시작 화면 실행 버튼 아래에 <button class="st-btn" data-account-open="stats">📊 내 통계 · 최근 20매치</button> 를 두면
+   그 게임의 AccountStatsDialog 가 열고, 창 안 탭으로 내 통계 ↔ 최근 20매치를 오간다. 한 버튼은 한 창에만 묶인다 */
 class AccountStatsDialog {
     constructor(open_, view) {
         this.open_ = open_;
@@ -437,6 +440,9 @@ class AccountStatsDialog {
     }
     bindButtons(root = document) {
         root.querySelectorAll("[data-account-open]").forEach((button) => {
+            if (button.hasAttribute(AccountStatsDialog.BOUND_ATTR))
+                return;
+            button.setAttribute(AccountStatsDialog.BOUND_ATTR, "");
             button.addEventListener("click", () => this.open(button.getAttribute("data-account-open") === "recent" ? "recent" : "stats"));
         });
     }
@@ -555,6 +561,7 @@ class AccountStatsDialog {
         this.part(".asd-body").innerHTML = this.view.resultHtml(entry) + '<button type="button" class="asd-back-btn">← 최근 매치 목록</button>';
     }
 }
+AccountStatsDialog.BOUND_ATTR = "data-account-bound";
 AccountStatsDialog.STYLE_ID = "asdStyle";
 AccountStatsDialog.STYLE = [
     ".asd-back{position:fixed;inset:0;z-index:99990;display:flex;align-items:center;justify-content:center;padding:12px;background:rgba(0,0,0,.62);}",
@@ -719,6 +726,7 @@ class RandomMatchAccount {
         this.dialog = new AccountStatsDialog(() => AccountMatchStore.forProfile(this.profile), new RandomMatchView(title, ranked));
         this.sender = new AccountMatchSender(() => AccountMatchStore.forProfile(this.profile));
         this.guard = new AccountPendingGuard(this.sender, (ticket) => RandomMatchCodec.fromOutcome(ticket, { result: "lose" }));
+        this.dialog.bindButtons();
     }
     open() {
         this.dialog.open("stats");

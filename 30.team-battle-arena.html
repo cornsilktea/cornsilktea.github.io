@@ -5,7 +5,7 @@
 <script charset="utf-8" src="access-guard.js" data-game="teambattle"></script>
 <script charset="utf-8" src="quality-governor.js"></script>
 <script charset="utf-8" src="fullscreen-keeper.js"></script>
-<script charset="utf-8" src="match-kit.js?v=20261027c"></script>
+<script charset="utf-8" src="match-kit.js?v=20261028a"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>3v3 팀 배틀 아레나</title>
@@ -106,7 +106,7 @@
     </div>
   </div>
   <div id="charCardBox" class="card charCol">
-    <div class="secTitle charHead"><span>캐릭터<span id="charHint" class="secHint">선택한 캐릭터를 한 번 더 누르면 자세한 설명이 나와요.</span></span><span class="charBtns"><button id="btnRecent" class="mini" type="button">최근 매치</button><button id="btnMyStats" class="mini" type="button">내 통계</button><button id="btnStats" class="mini" type="button">전체 통계</button><button id="btnZoomChars" class="mini" type="button">확대</button><button id="btnFlipAll" class="mini" type="button">모든 카드 뒤집기</button></span></div>
+    <div class="secTitle charHead"><span>캐릭터<span id="charHint" class="secHint">선택한 캐릭터를 한 번 더 누르면 자세한 설명이 나와요.</span></span><span class="charBtns"><button id="btnMyStats" class="mini" type="button">📊 내 통계 · 최근 20매치</button><button id="btnStats" class="mini" type="button">전체 통계</button><button id="btnZoomChars" class="mini" type="button">확대</button><button id="btnFlipAll" class="mini" type="button">모든 카드 뒤집기</button></span></div>
     <div class="chars" id="chars"></div>
   </div>
   </div>
@@ -221,7 +221,7 @@
 
 <div id="myStatsModal" class="modal" hidden>
   <div class="modalBox statsBox">
-    <div class="statsTop"><h3>내 통계</h3><div class="statsTopBtns"><button id="btnMyStatsRefresh" class="mini" type="button">새로고침</button><button id="btnMyStatsClose" class="mini" type="button">닫기</button></div></div>
+    <div class="statsTop"><h3>내 통계</h3><div class="statsTopBtns"><button id="btnMyStatsRecent" class="mini" type="button">최근 20매치 보기</button><button id="btnMyStatsRefresh" class="mini" type="button">새로고침</button><button id="btnMyStatsClose" class="mini" type="button">닫기</button></div></div>
     <div id="myStatsMsg" class="statsMsg"></div>
     <div class="boardWrap"><table class="board statsTable"><thead><tr><th class="nm">캐릭터</th><th>승률<small>승리 수 / 판 수</small></th><th>MVP<small>MVP 횟수 / 판 수</small></th><th>KDA<small>(킬 + 어시스트) / 데스</small></th><th>평균 피해량</th><th>평균 회복량</th><th>평균 막은 피해</th><th>평균 기절</th><th>평균 둔화</th></tr></thead><tbody id="myStatsBody"></tbody></table></div>
     <ul class="statsNotes">
@@ -234,7 +234,7 @@
 
 <div id="recentModal" class="modal" hidden>
   <div class="modalBox statsBox">
-    <div class="statsTop"><h3>최근 매치</h3><button id="btnRecentClose" class="mini" type="button">닫기</button></div>
+    <div class="statsTop"><h3>최근 20매치</h3><div class="statsTopBtns"><button id="btnRecentStats" class="mini" type="button">내 통계 보기</button><button id="btnRecentClose" class="mini" type="button">닫기</button></div></div>
     <div id="rmMsg" class="statsMsg"></div>
     <div id="rmList" class="rmList"></div>
     <ul class="statsNotes"><li>최근 대회모드 20경기가 남습니다(AI가 함께한 경기 포함). 랜덤 매칭은 언제 나가도 패배, 다른 방은 절반 전에 나간 경기는 남지 않습니다.</li></ul>
@@ -278,7 +278,7 @@
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="character-maker.js?v=20261026a"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
-<script charset="utf-8" src="account-match-kit.js?v=20261027c"></script>
+<script charset="utf-8" src="account-match-kit.js?v=20261028a"></script>
 <script charset="utf-8" src="account-stats.js?v=20261027b"></script>
 <script type="module">
 import * as THREE from "three";
@@ -8751,6 +8751,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     constructor(services) { this.services = services; this.loadSeq = 0; }
     bind() { var self = this;
       Dom.$("btnMyStats").onclick = function () { self.open(); };
+      Dom.$("btnRecentStats").onclick = function () { Dom.show(Dom.$("recentModal"), false); self.open(); };
       Dom.$("btnMyStatsRefresh").onclick = function () { self.load(); };
       AccountWindows.bindClose("myStatsModal", "btnMyStatsClose");
     }
@@ -8783,7 +8784,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static FAILED = AccountLoginNotice.RECENT_FAILED;
     constructor(services) { this.services = services; this.loadSeq = 0; this.entries = []; }
     bind() { var self = this;
-      Dom.$("btnRecent").onclick = function () { self.open(); };
+      Dom.$("btnMyStatsRecent").onclick = function () { Dom.show(Dom.$("myStatsModal"), false); self.open(); };
       Dom.$("rmList").onclick = function (e) {
         var b = e.target.closest ? e.target.closest("[data-recent]") : null;
         if (b) self.showResult(+b.getAttribute("data-recent"));

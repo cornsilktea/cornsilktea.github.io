@@ -976,7 +976,7 @@ class MkPartyPanel {
         const openStats = () => { if (options.stats)
             options.stats.open(); };
         this.streak = new MkStreakBadge();
-        this.statsButton = MkPartyPanel.button("mk-stats", "📊 내 통계", openStats);
+        this.statsButton = MkPartyPanel.button("mk-stats", "📊 내 통계 · 최근 20매치", openStats);
         this.statsButton.hidden = !options.stats || !!(options.headExtra && options.headExtra.querySelector("[data-account-open]"));
         this.head = document.createElement("h2");
         this.head.className = "mk-head";

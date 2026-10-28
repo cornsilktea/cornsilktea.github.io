@@ -7,6 +7,39 @@
 > 선생님 요청(2026-10-26) 원문의 "32. 좀비게임"은 **31번 좀비 아웃브레이크(`31.zombie-outbreak.html`)** 를 말한다.
 > 32번(미니게임 모음)은 이번 작업 대상이 아니다.
 
+## ★ 새 게임을 만들 때: 통계 저장까지 처음부터 함께 만든다 (2026-10-28 선생님 결정, 기준은 24번 터보 랩)
+
+대전(방 만들기·코드 입장·랜덤 매칭)이 있는 새 게임은 **게임을 처음 만드는 커밋에 계정 통계까지 넣는다.** 나중에 따로 붙이지 않는다.
+개인전(혼자 기록 경쟁) 게임은 기존 규칙대로 최고 기록·세계 신기록(`world-record.js`)·`WorldRecord.syncBest` 를 쓴다.
+
+**입구는 버튼 하나**: 시작 화면의 실행 버튼(만들기·랜덤 매칭·참여) 바로 아래에 넓은 버튼 한 개를 둔다.
+```html
+<button type="button" class="st-btn" data-account-open="stats">📊 내 통계 · 최근 20매치</button>
+```
+- 이 버튼은 그 게임의 `AccountStatsDialog` 가 연다(`bindButtons()`). 창 안 탭 두 개(내 통계 / 최근 20매치)로 오가고, 최근 매치 블록을 누르면 그 판 결과가 열린다.
+- "최근 매치"·"내 통계" 버튼을 따로 두지 않는다. 다른 화면(대기실 닉네임 줄 등)에 더 둘 때도 글자는 똑같이 `📊 내 통계 · 최근 20매치`.
+- 랜덤 매칭 팀 대기실에는 `MkPartyPanel` 이 같은 이름의 버튼을 저절로 붙인다(`MkFlowOptions.stats`).
+- 2026-10-28 현재 24·25·30·31·32·34·35·38·39번 모두 이 모양(30번은 캐릭터 칸 버튼 하나 + 창 위 `최근 20매치 보기`/`내 통계 보기` 전환).
+
+**두 가지 방법 중 고른다**
+1. **승패만 남기면 되는 게임**(32·34·35 방식): 랜덤 매칭 설정에 `stats: new RandomMatchAccount("<게임키>", "<제목> 랜덤 매칭 통계", 순위전?)` 한 줄.
+   판 수·승·패·(순위전이면 3위 안)·최근 20매치·교사 반 별 통계가 다 된다. 시작 화면 버튼도 이 객체가 묶는다(페이지에서 한 번만 만든다).
+2. **게임만의 통계가 필요한 게임**(24·25·31·38·39 방식, 기본으로 이쪽을 권함): `ts/<번호>.<영문이름>-stats.ts` 를 새로 만든다.
+   - `AccountGameProfile` 자식(게임 키, 집계 대상 판정 `planOf`, 누적 합산 `applyStats`, 최근 매치 인코딩·디코딩, 교사 화면용 `rankFields` 의 `x` 한 칸).
+   - `AccountDialogView` 구현(`statsHtml` 맨 위에 `AccountHtml.record(판, 승, 패)`, `blockBodyHtml`, `resultHtml` — 경기 끝 결과표와 같은 항목).
+   - 게임 쪽은 `new AccountGameAccount(profile, view)` → 시작할 때 `bind()`, 판이 끝나면 `record(보고서)`, 랜덤 매칭에는 `stats: new AccountStatsOpener(() => account.openStats(), account.pendingGuard(패배 보고 만들기))`.
+   - 무엇을 셀지는 게임 규칙 엔진(`ts/<번호>.*-rules.ts`)에서 센다. 화면 코드에서 세지 않는다. 고른 항목과 "승"의 정의는 노트에 적고 선생님께 보고한다.
+
+**게임 키를 넣어야 하는 곳(빠뜨리면 저장이 거부된다)**
+- `데이터베이스규칙.json`: `users/$uid/stats/<게임키>`(판 수 +1 만·승 ≤ 판 수·항목별 상한·`$other` 거부·`ids/$id` 새로만), `recent/<게임키>/$slot`(0~19),
+  그리고 `pending`·`streak`·`gameRanks` 의 `$game` 목록 정규식에 게임 키 추가. 바꾸면 선생님께 콘솔 재게시를 알린다.
+- `admin.html` `RankGame.GAMES` 에 `new RankGame("<게임키>", "<이름>(<번호>)", { label: "x 칸 이름" } 또는 null, "무엇을 세는지")` — 번호 순서 자리에.
+- `tools/account-stats-unit.js` 에 그 게임의 `GameCase`(저장 → 되살리기 왕복·집계 판정·규칙 통과)와 미리 적기(`pendingCase`) 한 줄씩.
+- HTML 에 `match-kit.js`·`account-match-kit.js`·`<번호>.<이름>-stats.js` 를 `?v=` 와 함께 불러오고, 시작 화면 요소에 `data-account-home`.
+
+**공통 규칙은 이 파일 위의 "모든 게임 공통 규칙"을 그대로 따른다**(로그인한 학생만, 판 끝 쓰기 1번·창 열 때 읽기 1번, 사람끼리 판만 누적, 랜덤 매칭은 언제 나가도 패배, 미리 적는 패배, 파생값 저장 안 함).
+끝나면 `npx tsc -p .` → `node tools/account-stats-unit.js` → `node tools/match-sim.js` → `?c=test` 화면에서 버튼·로그인 안내 확인 → 커밋·푸시.
+
 ## 시작 전에 읽을 것
 - CLAUDE.md 전체(특히 객체지향·TypeScript 규칙, 시작 화면·대기화면 규칙, 커밋·푸시 규칙, 요청 빈도 규칙)
 - `계정로그인.md` — 로그인(`window.PORTAL_USER`)·`users/<uid>` 저장 구조·교사 화면

@@ -5543,17 +5543,19 @@ class AccountStatsTests {
       });
     });
 
-    run(G, "학생 화면: 캐릭터 칸 버튼이 최근 매치·내 통계·전체 통계·확대·모든 카드 뒤집기 순이고, 로그인 전에는 안내만 뜨는가", function (done) {
+    run(G, "학생 화면: 캐릭터 칸 버튼이 내 통계 · 최근 20매치(하나로 합침)·전체 통계·확대·모든 카드 뒤집기 순이고, 창 안에서 서로 오가며, 로그인 전에는 안내만 뜨는가", function (done) {
       var bad = [], userBefore = window.PORTAL_USER;
       var ids = Array.prototype.map.call(document.querySelectorAll(".charBtns button"), function (b) { return b.id + ":" + b.textContent; });
-      if (ids.join() !== "btnRecent:최근 매치,btnMyStats:내 통계,btnStats:전체 통계,btnZoomChars:확대,btnFlipAll:모든 카드 뒤집기") bad.push("버튼 " + ids.join());
+      if (ids.join() !== "btnMyStats:📊 내 통계 · 최근 20매치,btnStats:전체 통계,btnZoomChars:확대,btnFlipAll:모든 카드 뒤집기") bad.push("버튼 " + ids.join());
       try {
         window.PORTAL_USER = null;
         document.getElementById("btnMyStats").click();
         if (document.getElementById("myStatsModal").hidden || document.getElementById("myStatsMsg").textContent !== "로그인하면 내 통계를 볼 수 있어요." || document.getElementById("myStatsBody").innerHTML !== "") bad.push("내 통계 안내");
-        document.getElementById("btnMyStatsClose").click();
-        document.getElementById("btnRecent").click();
-        if (document.getElementById("recentModal").hidden || document.getElementById("rmMsg").textContent !== "로그인하면 최근 매치를 볼 수 있어요.") bad.push("최근 매치 안내");
+        document.getElementById("btnMyStatsRecent").click();
+        if (!document.getElementById("myStatsModal").hidden || document.getElementById("recentModal").hidden || document.getElementById("rmMsg").textContent !== "로그인하면 최근 매치를 볼 수 있어요.") bad.push("최근 매치 안내");
+        document.getElementById("btnRecentStats").click();
+        if (document.getElementById("myStatsModal").hidden || !document.getElementById("recentModal").hidden) bad.push("내 통계로 돌아가기");
+        document.getElementById("btnMyStatsRecent").click();
         A.recent.render([A.Codec.decode(Object.assign(JSON.parse(JSON.stringify(A.Codec.encode(self.report({ players: self.players({ 0: { kills: 2 }, 4: { ai: true } }) }), "k", false))), { at: 1700000000000 }))]);
         var item = document.querySelector("#rmList .rmItem");
         if (!item || !item.classList.contains("lose") || item.textContent.indexOf("🤖 마") < 0 || item.textContent.indexOf("패배") < 0) bad.push("최근 매치 블록");
@@ -5563,7 +5565,7 @@ class AccountStatsTests {
         window.PORTAL_USER = userBefore;
         ["myStatsModal", "recentModal", "recentResultModal"].forEach(function (id) { document.getElementById(id).hidden = true; });
       }
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "버튼 5개 순서·로그인 안내 2곳·최근 매치 블록(패배 빨강)·결과 창 6줄");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "버튼 4개 순서·통계↔최근 매치 전환·로그인 안내 2곳·최근 매치 블록(패배 빨강)·결과 창 6줄");
     });
   }
 }

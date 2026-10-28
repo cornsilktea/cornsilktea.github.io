@@ -339,6 +339,7 @@
         <button type="button" class="st-btn primary" id="btnStart">🤖 AI 대전<small>솔로 · Space</small></button>
         <button type="button" class="st-btn" id="btnTeam">👥 팀 대전<small>2대2 · 방 코드</small></button>
       </div>
+      <button type="button" class="st-btn" data-account-open="stats">📊 내 통계 · 최근 20매치</button>
       <div class="rec">
         <div><div class="lab">개인 최고 기록</div><div class="val" id="bestStart">—</div><div class="who" id="bestStartDate"></div></div>
         <div><div class="lab">🏆 세계 신기록</div><div class="val" id="wrStart">—</div><div class="who" id="wrWhoStart"></div></div>
@@ -390,7 +391,7 @@
 
   <div class="card" id="cardTeamStart" style="display:none">
     <div class="logo">👥 팀 대전</div>
-    <div class="hello">내 닉네임: <b id="teamNick"></b> <button type="button" class="mini" data-maker-open data-nick-setting>✏️ 닉네임 설정</button> <button type="button" class="mini acct" data-account-open="stats">📊 통계 · 최근 20매치</button></div>
+    <div class="hello">내 닉네임: <b id="teamNick"></b> <button type="button" class="mini" data-maker-open data-nick-setting>✏️ 닉네임 설정</button> <button type="button" class="mini acct" data-account-open="stats">📊 내 통계 · 최근 20매치</button></div>
     <button type="button" class="btn wideBtn" id="btnCreate">게임 만들기</button>
     <button type="button" class="btn wideBtn" id="btnRandom">랜덤 매칭 방 만들기</button>
     <label class="fieldLab" for="joinCode">방·팀 코드로 입장</label>
@@ -413,13 +414,13 @@
 
   <div class="card wide" id="cardParty" style="display:none">
     <div class="logo">👥 팀 대전</div>
-    <div class="hello">내 닉네임: <b id="partyNick"></b> <button type="button" class="mini" data-maker-open data-nick-setting>✏️ 닉네임 설정</button> <button type="button" class="mini acct" data-account-open="stats">📊 통계 · 최근 20매치</button></div>
+    <div class="hello">내 닉네임: <b id="partyNick"></b> <button type="button" class="mini" data-maker-open data-nick-setting>✏️ 닉네임 설정</button> <button type="button" class="mini acct" data-account-open="stats">📊 내 통계 · 최근 20매치</button></div>
     <div id="partyMount"></div>
   </div>
 
   <div class="card wide" id="cardLobby" style="display:none">
     <div class="codeLine">방 코드<b id="lobbyCode">00000</b></div>
-    <div class="hello">내 닉네임: <b id="lobbyNick"></b> <button type="button" class="mini" data-maker-open data-nick-setting>✏️ 닉네임 설정</button> <button type="button" class="mini acct" data-account-open="stats">📊 통계 · 최근 20매치</button></div>
+    <div class="hello">내 닉네임: <b id="lobbyNick"></b> <button type="button" class="mini" data-maker-open data-nick-setting>✏️ 닉네임 설정</button> <button type="button" class="mini acct" data-account-open="stats">📊 내 통계 · 최근 20매치</button></div>
     <div class="teams">
       <div class="team blue"><h3>블루팀</h3><div id="listBlue"></div><button type="button" class="btn sub" id="btnJoinBlue">블루팀으로</button></div>
       <div class="team red"><h3>레드팀</h3><div id="listRed"></div><button type="button" class="btn sub" id="btnJoinRed">레드팀으로</button></div>
@@ -467,8 +468,8 @@
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="character-maker.js?v=20261026a"></script>
-<script charset="utf-8" src="match-kit.js?v=20261027c"></script>
-<script charset="utf-8" src="account-match-kit.js?v=20261027c"></script>
+<script charset="utf-8" src="match-kit.js?v=20261028a"></script>
+<script charset="utf-8" src="account-match-kit.js?v=20261028a"></script>
 <script charset="utf-8" src="25.fps-survival-stats.js?v=20261027b"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
