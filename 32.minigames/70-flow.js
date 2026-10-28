@@ -447,6 +447,9 @@ class CollectionFlow {
         const roomCodeTag = document.getElementById("hudRoomCode");
         if (roomCodeTag)
             roomCodeTag.textContent = practice ? "" : "방 코드 " + code;
+        const joinInput = document.getElementById("joinCode");
+        if (joinInput && !practice)
+            joinInput.value = code;
         this.services.phases.goTo(practice ? this.services.practicePhase : this.services.lobbyPhase);
     }
     leaveRoom() {

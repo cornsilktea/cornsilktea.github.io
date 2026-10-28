@@ -511,6 +511,8 @@ class CollectionFlow implements CollectionListener, HostGate, CollectionSessionA
     this.services.lobbyView.showCode(code);
     const roomCodeTag = document.getElementById("hudRoomCode");
     if (roomCodeTag) roomCodeTag.textContent = practice ? "" : "방 코드 " + code;
+    const joinInput = document.getElementById("joinCode") as HTMLInputElement | null;
+    if (joinInput && !practice) joinInput.value = code;
     this.services.phases.goTo(practice ? this.services.practicePhase : this.services.lobbyPhase);
   }
 

@@ -34,6 +34,7 @@
 - `데이터베이스규칙.json`: `users/$uid/stats/<게임키>`(판 수 +1 만·승 ≤ 판 수·항목별 상한·`$other` 거부·`ids/$id` 새로만), `recent/<게임키>/$slot`(0~19),
   그리고 `pending`·`streak`·`gameRanks` 의 `$game` 목록 정규식에 게임 키 추가. 바꾸면 선생님께 콘솔 재게시를 알린다.
 - `admin.html` `RankGame.GAMES` 에 `new RankGame("<게임키>", "<이름>(<번호>)", { label: "x 칸 이름" } 또는 null, "무엇을 세는지")` — 번호 순서 자리에.
+- `admin.html`: 그 게임 통계 `.js` 를 `<script>` 로 불러오고(30번 줄 아래), `RankGame` 다섯째 인자로 `() => ({ profile: new 게임Profile(), view: new 게임View() })` 를 넘긴다 → 반 별 통계에서 학생 이름을 누르면 학생이 보는 것과 같은 개인 통계 창(`StudentAccountWindow` = `AccountStatsDialog` + `AccountTeacherReader`)이 열린다(2026-10-28 선생님 요청). 승패만 남기는 게임은 `RandomMatchProfile`·`RandomMatchView`.
 - `tools/account-stats-unit.js` 에 그 게임의 `GameCase`(저장 → 되살리기 왕복·집계 판정·규칙 통과)와 미리 적기(`pendingCase`) 한 줄씩.
 - HTML 에 `match-kit.js`·`account-match-kit.js`·`<번호>.<이름>-stats.js` 를 `?v=` 와 함께 불러오고, 시작 화면 요소에 `data-account-home`.
 

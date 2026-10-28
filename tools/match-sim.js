@@ -1,7 +1,7 @@
 const fs = require("fs"), vm = require("vm"), path = require("path");
 
 class MatchKitLoader {
-  static NAMES = ["MkPaths", "MkMatcher", "MkVersusMatcher", "MkWinBandVersusMatcher", "MkWinBand", "MkFreeForAllMatcher", "MkRecordBook", "MkPartyDirectory", "MkParty", "MkQueue", "MkBusySign", "MkStreakMath", "MkPersonalStreak"];
+  static NAMES = ["MkPaths", "MkMatcher", "MkVersusMatcher", "MkWinBandVersusMatcher", "MkWinBand", "MkRecentMaps", "MkFreeForAllMatcher", "MkRecordBook", "MkPartyDirectory", "MkParty", "MkQueue", "MkBusySign", "MkStreakMath", "MkPersonalStreak"];
   static load() {
     const src = fs.readFileSync(path.join(__dirname, "..", "match-kit.js"), "utf8") + "\n;({" + MatchKitLoader.NAMES.join(",") + "})";
     return vm.runInNewContext(src, { console, Math, Date, JSON, Object, Array, String, Number, Set, Map, Promise, setTimeout, clearTimeout });
@@ -530,6 +530,18 @@ class Scenarios {
     Report.check("아이디 연승: 저장 값 다듬기", S.normalize({ n: "3", b: 1, id: 5 }).n === 3 && S.normalize({ n: 3, b: 1 }).b === 3 && S.normalize(null).n === 0 && S.key("a.b/c").indexOf(".") < 0);
   }
 
+  static unitRecentMaps() {
+    const maps = ["seoul", "singapore", "hongkong"];
+    const plan = (seed, ...recents) => ({ seed, groups: recents.map((r, i) => ({ code: "c" + i, side: i, entry: { people: { ["u" + i]: { nick: "u" + i, joinedAt: i, recentMaps: r } } } })) });
+    const picks = [0, 1, 2, 3, 4, 5].map((seed) => Mk.MkRecentMaps.pick(maps, plan(seed, ["seoul", "hongkong"], ["singapore"])));
+    Report.check("맵 고르기: 두 사람의 바로 전 맵(서울·싱가포르)은 피함", picks.every((m) => m === "hongkong"));
+    const one = [0, 1, 2, 3].map((seed) => Mk.MkRecentMaps.pick(maps, plan(seed, ["seoul"], null)));
+    Report.check("맵 고르기: 한 사람만 기록 있으면 그 맵만 빼고 고름", one.every((m) => m !== "seoul") && new Set(one).size === 2);
+    Report.check("맵 고르기: 기록이 없으면 전체에서 고름", new Set([0, 1, 2].map((seed) => Mk.MkRecentMaps.pick(maps, plan(seed, null, null)))).size === 3);
+    Report.check("맵 고르기: 다 빠지면 전체에서", maps.indexOf(Mk.MkRecentMaps.pick(["seoul"], plan(7, ["seoul"]))) === 0);
+    Report.check("맵 기록: 앞에 넣고 2개까지, 겹치면 앞으로", JSON.stringify(Mk.MkRecentMaps.noted(["a", "b"], "b")) === JSON.stringify(["b", "a"]) && JSON.stringify(Mk.MkRecentMaps.noted(["a", "b"], "c")) === JSON.stringify(["c", "a"]) && Mk.MkRecentMaps.clean("x") === null);
+  }
+
   static unitWinBand() {
     const m = new Mk.MkWinBandVersusMatcher(1, SimWorld.TIMING);
     const e = (at, g, w) => ({ leader: "x", people: { ["u" + at]: Object.assign({ nick: "u" + at, joinedAt: at }, g === null ? {} : { rate: { g, w } }) }, bots: 0, size: 1, at, claim: null });
@@ -641,6 +653,7 @@ class SimRunner {
     Scenarios.unitMatcher();
     Scenarios.unitRotation();
     Scenarios.unitWinBand();
+    Scenarios.unitRecentMaps();
     await Scenarios.scenarioWinBand();
     await Scenarios.scenarioJoinRules();
     await Scenarios.scenarioStreak();

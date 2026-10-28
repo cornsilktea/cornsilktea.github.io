@@ -2808,6 +2808,7 @@ class CastleSpyGame {
 
   private enterRoom(code: string): void {
     Dom.byId("hudRoomCode").textContent = "방 코드 " + code;
+    Dom.byId<HTMLInputElement>("joinCode").value = code;
     const session = new RoomSession(this.backend, code, this.myId);
     this.session = session;
     session.onChange = (kind) => this.onSessionChange(kind);

@@ -802,6 +802,7 @@ class SnGame {
     }
     enterRoom(code, hosting) {
         SnDom.text(SnDom.el("hudRoomCode"), "방 코드 " + code);
+        SnDom.el("joinCode").value = code;
         const session = new RkSession(this.backend, SnRoomRules.RULES, code, this.myId, hosting, SnRoomRules.VALUES);
         this.session = session;
         session.onChange = (kind) => this.onSessionChange(kind);

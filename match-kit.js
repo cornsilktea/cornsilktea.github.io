@@ -12,6 +12,35 @@
 //  - 대기열은 on('value') 구독으로만 본다(폴링 없음). 3초 대기는 기기 안 타이머로 다시 계산만 한다.
 // 이 파일은 화면과 무관한 부분(Node 시뮬레이터 tools/match-sim.js 가 그대로 불러 검사)과
 // 계정별 연승(MkPersonalStreak)·연승 표시(MkStreakBadge)로 나뉜다. 모양은 theme.css 의 .mk-* .
+// 랜덤 매칭 맵 고르기(2026-10-28 선생님 요청: 24번 맵이 계속 비슷하게 나온다).
+// 매칭된 모든 사람의 바로 전 맵을 빼고 남은 맵 중에서 plan.seed 로 고른다. 다 빠지면 전체에서 고른다.
+class MkRecentMaps {
+    static clean(list) {
+        if (!Array.isArray(list))
+            return null;
+        const maps = list.filter((item) => typeof item === "string" && item.length > 0 && item.length <= 40).slice(0, MkRecentMaps.KEEP);
+        return maps.length ? maps : null;
+    }
+    static noted(list, map) {
+        return [map].concat((MkRecentMaps.clean(list) || []).filter((item) => item !== map)).slice(0, MkRecentMaps.KEEP);
+    }
+    static avoidOf(plan) {
+        const avoid = [];
+        plan.groups.forEach((group) => Object.keys(group.entry.people || {}).forEach((id) => {
+            (MkRecentMaps.clean(group.entry.people[id].recentMaps) || []).slice(0, MkRecentMaps.AVOID_LAST).forEach((map) => { if (avoid.indexOf(map) < 0)
+                avoid.push(map); });
+        }));
+        return avoid;
+    }
+    static pick(maps, plan) {
+        const avoid = MkRecentMaps.avoidOf(plan);
+        const fresh = maps.filter((map) => avoid.indexOf(map) < 0);
+        const pool = fresh.length ? fresh : maps;
+        return pool[Math.abs(plan.seed) % pool.length];
+    }
+}
+MkRecentMaps.KEEP = 2;
+MkRecentMaps.AVOID_LAST = 1;
 class MkPaths {
     constructor(queue, parties, rooms) {
         this.queue = queue;
@@ -438,7 +467,7 @@ class MkParty {
     }
     updateMe(member) {
         if (this.record && this.record.members && this.record.members[this.myId])
-            this.ref.child("members/" + this.myId).update({ nick: member.nick, look: member.look || null, rate: MkWinBand.clean(member.rate) });
+            this.ref.child("members/" + this.myId).update({ nick: member.nick, look: member.look || null, rate: MkWinBand.clean(member.rate), recentMaps: MkRecentMaps.clean(member.recentMaps) });
     }
     markSearching(since) {
         return this.ref.child("search").set(since === null ? null : { since });
@@ -640,6 +669,9 @@ class MkQueue {
             const rate = MkWinBand.clean(id === party.myId && me && me.rate !== undefined ? me.rate : member.rate);
             if (rate)
                 people[id].rate = rate;
+            const recentMaps = MkRecentMaps.clean(id === party.myId && me && me.recentMaps !== undefined ? me.recentMaps : member.recentMaps);
+            if (recentMaps)
+                people[id].recentMaps = recentMaps;
         });
         const last = party.lastMatch();
         const entry = { leader: party.myId, people, bots: party.bots(), size: party.size(), at: since, claim: null };

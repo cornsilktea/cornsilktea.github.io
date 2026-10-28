@@ -899,6 +899,7 @@ class WbGame {
     }
     enterRoom(code, hosting) {
         WbDom.text(WbDom.el("hudRoomCode"), "방 코드 " + code);
+        WbDom.el("joinCode").value = code;
         if (this.backdrop)
             this.backdrop.stop();
         const session = new RkSession(this.backend, WbRoomRules.RULES, code, this.myId, hosting, WbRoomRules.VALUES);

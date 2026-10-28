@@ -1081,6 +1081,7 @@ class SoccerGame {
     }
     enterRoom(code, hosting, notice) {
         RkDom.byId("hudRoomCode").textContent = "방 코드 " + code;
+        RkDom.byId("joinCode").value = code;
         const session = new RkSession(this.backend, SocRoomRules.RULES, code, this.myId, hosting, SocRoomRules.VALUES);
         this.session = session;
         session.onChange = (kind) => this.onSessionChange(kind);

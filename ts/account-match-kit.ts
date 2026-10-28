@@ -569,7 +569,18 @@ class AccountStatsDialog<N, E extends AccountRecentHeadEntry> {
   private seq = 0;
   private entries: E[] = [];
 
-  constructor(private readonly open_: () => AccountStatsReader<N, E> | null, private readonly view: AccountDialogView<N, E>) {}
+  private heading = "";
+
+  // requireLogin 이 false 면(교사 화면) 로그인 확인 없이 읽는 쪽(reader)에 맡긴다
+  constructor(private readonly open_: () => AccountStatsReader<N, E> | null, private readonly view: AccountDialogView<N, E>, private readonly requireLogin: boolean = true) {}
+
+  setHeading(text: string): void {
+    this.heading = text;
+  }
+
+  private titleText(): string {
+    return this.heading || this.titleText();
+  }
 
   bindButtons(root: ParentNode = document): void {
     root.querySelectorAll<HTMLElement>("[data-account-open]").forEach((button) => {
@@ -607,7 +618,7 @@ class AccountStatsDialog<N, E extends AccountRecentHeadEntry> {
     back.innerHTML = '<div class="asd-box" role="dialog" aria-modal="true"><div class="asd-head"><h2></h2><button type="button" class="asd-x">닫기</button></div>'
       + '<div class="asd-tabs"><button type="button" data-tab="stats">내 통계</button><button type="button" data-tab="recent">최근 20매치</button></div>'
       + '<p class="asd-msg"></p><div class="asd-body"></div></div>';
-    (back.querySelector("h2") as HTMLElement).textContent = this.view.title;
+    (back.querySelector("h2") as HTMLElement).textContent = this.titleText();
     back.addEventListener("click", (event) => {
       const target = event.target as HTMLElement;
       if (target === back || target.closest(".asd-x")) { this.close(); return; }
@@ -630,12 +641,12 @@ class AccountStatsDialog<N, E extends AccountRecentHeadEntry> {
   private load(): void {
     const seq = ++this.seq;
     this.part(".asd-tabs").style.display = "";
-    this.part("h2").textContent = this.view.title;
+    this.part("h2").textContent = this.titleText();
     this.part(".asd-body").innerHTML = "";
     this.part("[data-tab=stats]").classList.toggle("on", this.tab === "stats");
     this.part("[data-tab=recent]").classList.toggle("on", this.tab === "recent");
     const stats = this.tab === "stats";
-    if (!window.PORTAL_USER) { this.setMessage(stats ? AccountLoginNotice.STATS_LOGIN_NEEDED : AccountLoginNotice.RECENT_LOGIN_NEEDED); return; }
+    if (this.requireLogin && !window.PORTAL_USER) { this.setMessage(stats ? AccountLoginNotice.STATS_LOGIN_NEEDED : AccountLoginNotice.RECENT_LOGIN_NEEDED); return; }
     const reader = this.open_();
     if (!reader) { this.setMessage(AccountLoginNotice.NOT_READY); return; }
     this.setMessage(AccountLoginNotice.LOADING);
@@ -654,7 +665,7 @@ class AccountStatsDialog<N, E extends AccountRecentHeadEntry> {
 
   private renderRecent(): void {
     this.part(".asd-tabs").style.display = "";
-    this.part("h2").textContent = this.view.title;
+    this.part("h2").textContent = this.titleText();
     this.setMessage(this.entries.length ? "최근 " + this.entries.length + "경기 · 최신순 · 누르면 그 경기 결과가 열려요" : this.view.emptyRecent);
     const list = RecentBlockList.html(this.entries, (entry) => '<span class="asd-body">' + this.view.blockBodyHtml(entry) + "</span>")
       .replace(/class="rmItem (win|lose)"/g, 'class="asd-item $1"')
@@ -834,6 +845,24 @@ class RandomMatchView implements AccountDialogView<RandomMatchStatsNode, RandomM
     if (entry.rank) parts.push(entry.rank + "위" + (entry.of ? "/" + entry.of : ""));
     if (entry.map) parts.push(entry.map);
     return parts;
+  }
+}
+
+/* 교사 화면(admin.html 반 별 통계에서 학생 이름 누르기, 2026-10-28 선생님 요청)이 그 학생의 통계를 학생 화면과 같은 해석으로 읽는다.
+   readPath 는 교사 화면이 넘기는 읽기 함수(교사 인증 토큰으로 경로 → JSON). 저장은 하지 않는다 */
+class AccountTeacherReader<R, P extends AccountMatchPlanBase, N, E extends AccountRecentHeadEntry, C> implements AccountStatsReader<N, E> {
+  constructor(private readonly readPath: (path: string) => Promise<unknown>, private readonly uid: string, private readonly profile: AccountGameProfile<R, P, N, E, C>) {}
+
+  private path(part: string): string {
+    return "users/" + this.uid + "/" + part;
+  }
+
+  loadStats(): Promise<N | null> {
+    return this.readPath(this.path(this.profile.statsPath)).then((raw) => (raw ? this.profile.normalizeStats(raw) : null));
+  }
+
+  loadRecent(): Promise<E[]> {
+    return this.readPath(this.path(this.profile.recentPath)).then((raw) => RecentMatchRing.decodeAll(raw, (item) => this.profile.decodeRecent(item)));
   }
 }
 

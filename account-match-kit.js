@@ -430,13 +430,22 @@ class AccountHtml {
    시작 화면 실행 버튼 아래에 <button class="st-btn" data-account-open="stats">📊 내 통계 · 최근 20매치</button> 를 두면
    그 게임의 AccountStatsDialog 가 열고, 창 안 탭으로 내 통계 ↔ 최근 20매치를 오간다. 한 버튼은 한 창에만 묶인다 */
 class AccountStatsDialog {
-    constructor(open_, view) {
+    // requireLogin 이 false 면(교사 화면) 로그인 확인 없이 읽는 쪽(reader)에 맡긴다
+    constructor(open_, view, requireLogin = true) {
         this.open_ = open_;
         this.view = view;
+        this.requireLogin = requireLogin;
         this.back = null;
         this.tab = "stats";
         this.seq = 0;
         this.entries = [];
+        this.heading = "";
+    }
+    setHeading(text) {
+        this.heading = text;
+    }
+    titleText() {
+        return this.heading || this.titleText();
     }
     bindButtons(root = document) {
         root.querySelectorAll("[data-account-open]").forEach((button) => {
@@ -474,7 +483,7 @@ class AccountStatsDialog {
         back.innerHTML = '<div class="asd-box" role="dialog" aria-modal="true"><div class="asd-head"><h2></h2><button type="button" class="asd-x">닫기</button></div>'
             + '<div class="asd-tabs"><button type="button" data-tab="stats">내 통계</button><button type="button" data-tab="recent">최근 20매치</button></div>'
             + '<p class="asd-msg"></p><div class="asd-body"></div></div>';
-        back.querySelector("h2").textContent = this.view.title;
+        back.querySelector("h2").textContent = this.titleText();
         back.addEventListener("click", (event) => {
             const target = event.target;
             if (target === back || target.closest(".asd-x")) {
@@ -507,12 +516,12 @@ class AccountStatsDialog {
     load() {
         const seq = ++this.seq;
         this.part(".asd-tabs").style.display = "";
-        this.part("h2").textContent = this.view.title;
+        this.part("h2").textContent = this.titleText();
         this.part(".asd-body").innerHTML = "";
         this.part("[data-tab=stats]").classList.toggle("on", this.tab === "stats");
         this.part("[data-tab=recent]").classList.toggle("on", this.tab === "recent");
         const stats = this.tab === "stats";
-        if (!window.PORTAL_USER) {
+        if (this.requireLogin && !window.PORTAL_USER) {
             this.setMessage(stats ? AccountLoginNotice.STATS_LOGIN_NEEDED : AccountLoginNotice.RECENT_LOGIN_NEEDED);
             return;
         }
@@ -544,7 +553,7 @@ class AccountStatsDialog {
     }
     renderRecent() {
         this.part(".asd-tabs").style.display = "";
-        this.part("h2").textContent = this.view.title;
+        this.part("h2").textContent = this.titleText();
         this.setMessage(this.entries.length ? "최근 " + this.entries.length + "경기 · 최신순 · 누르면 그 경기 결과가 열려요" : this.view.emptyRecent);
         const list = RecentBlockList.html(this.entries, (entry) => '<span class="asd-body">' + this.view.blockBodyHtml(entry) + "</span>")
             .replace(/class="rmItem (win|lose)"/g, 'class="asd-item $1"')
@@ -717,6 +726,24 @@ class RandomMatchView {
         if (entry.map)
             parts.push(entry.map);
         return parts;
+    }
+}
+/* 교사 화면(admin.html 반 별 통계에서 학생 이름 누르기, 2026-10-28 선생님 요청)이 그 학생의 통계를 학생 화면과 같은 해석으로 읽는다.
+   readPath 는 교사 화면이 넘기는 읽기 함수(교사 인증 토큰으로 경로 → JSON). 저장은 하지 않는다 */
+class AccountTeacherReader {
+    constructor(readPath, uid, profile) {
+        this.readPath = readPath;
+        this.uid = uid;
+        this.profile = profile;
+    }
+    path(part) {
+        return "users/" + this.uid + "/" + part;
+    }
+    loadStats() {
+        return this.readPath(this.path(this.profile.statsPath)).then((raw) => (raw ? this.profile.normalizeStats(raw) : null));
+    }
+    loadRecent() {
+        return this.readPath(this.path(this.profile.recentPath)).then((raw) => RecentMatchRing.decodeAll(raw, (item) => this.profile.decodeRecent(item)));
     }
 }
 /* match-kit 의 MkStatsLink: 팀 대기실 "📊 내 통계" 버튼이 open, 판이 끝나면 MkRandomFlow 가 recordOutcome 을 부른다 */

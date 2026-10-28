@@ -870,6 +870,7 @@ class WbGame {
 
   private enterRoom(code: string, hosting: boolean): void {
     WbDom.text(WbDom.el("hudRoomCode"), "방 코드 " + code);
+    WbDom.el<HTMLInputElement>("joinCode").value = code;
     if (this.backdrop) this.backdrop.stop();
     const session = new RkSession<WbPlayerRecord>(this.backend, WbRoomRules.RULES, code, this.myId, hosting, WbRoomRules.VALUES);
     this.session = session;

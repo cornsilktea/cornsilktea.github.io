@@ -485,9 +485,16 @@
 
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="data.js"></script>
-<!-- 30번 학생 개인 통계 창(StudentStatsWindow)이 게임과 같은 계산·되살리기 클래스(AccountStatsMath·TeamBattleRing 등)를 쓰려고 불러온다 -->
-<script charset="utf-8" src="account-match-kit.js?v=20261028b"></script>
-<script charset="utf-8" src="account-stats.js?v=20261028b"></script>
+<!-- 반 별 통계에서 학생 이름을 누르면 여는 개인 통계 창이 게임과 같은 계산·되살리기·표 클래스를 쓰려고 불러온다.
+     30번은 StudentStatsWindow(account-stats.js), 나머지는 각 게임 통계 모듈의 Profile·View + AccountStatsDialog(StudentAccountWindow).
+     통계가 있는 새 게임을 만들면 그 게임의 통계 .js 를 여기 한 줄 더하고 ClassRankPanel.GAMES 에 account 를 넘긴다. -->
+<script charset="utf-8" src="account-match-kit.js?v=20261028c"></script>
+<script charset="utf-8" src="account-stats.js?v=20261028c"></script>
+<script charset="utf-8" src="24.turbo-lap-stats.js?v=20261028c"></script>
+<script charset="utf-8" src="25.fps-survival-stats.js?v=20261028c"></script>
+<script charset="utf-8" src="31.zombie-outbreak-stats.js?v=20261028c"></script>
+<script charset="utf-8" src="38.snow-account.js?v=20261028c"></script>
+<script charset="utf-8" src="39.balloon-account.js?v=20261028c"></script>
 <script>
 /* 밝기 전환 버튼: <html data-theme> 를 바꾸고 localStorage('portal_theme')에 남긴다(index.html 과 같은 키).
    주소창 색(theme-color)도 배경색에 맞춘다. */
@@ -979,15 +986,19 @@ async function authedUrl(path) {
   return cfg.DB_URL.replace(/\/+$/, "") + "/" + path + ".json?auth=" + encodeURIComponent(idToken);
 }
 
+/* account: 그 게임의 계정 통계 { profile, view } 를 만드는 함수(게임 통계 모듈의 클래스). 있으면 이름을 눌러 학생 개인 통계 창을 연다 */
 class RankGame {
-  get opensStudent() { return false; }
+  get opensStudent() { return !!this.account; }
 
-  constructor(key, title, extra, note) {
+  constructor(key, title, extra, note, account) {
     this.key = key;
     this.title = title;
     this.extra = extra;
     this.note = note;
+    this.account = account || null;
   }
+
+  openStudent(uid, name) { StudentAccountWindow.open(this, uid, name); }
 
   root() { return "gameRanks/" + this.key; }
 
@@ -1002,6 +1013,8 @@ class RankGame {
 class TeamBattleRankGame extends RankGame {
   get opensStudent() { return true; }
 
+  openStudent(uid, name) { StudentStatsWindow.open(uid, name); }
+
   root() { return "classStats"; }
 
   rowOf(uid, v) { return { uid, n: String(v.n || "?"), g: +v.g || 0, w: +v.w || 0, x: +v.m || 0 }; }
@@ -1014,15 +1027,23 @@ class ClassRankPanel {
   static NONE = "none";
   static ALL = "all";
   static GAMES = [
-    new RankGame("turbolap", "터보 랩(24)", { label: "완주 수" }, "랜덤 매칭 1대1, 상대가 사람이었던 판만 셉니다."),
-    new RankGame("fpsbattle", "서바이벌(25)", { label: "처치 합계" }, "팀 대전(방 만들기·코드 입장·랜덤 매칭) 중 AI 없는 판만 셉니다."),
+    new RankGame("turbolap", "터보 랩(24)", { label: "완주 수" }, "랜덤 매칭 1대1, 상대가 사람이었던 판만 셉니다.",
+      () => ({ profile: new TurboLapProfile(), view: new TurboLapStatsView((id) => String(id || "").split(/[-_]/).join(" · ")) })),
+    new RankGame("fpsbattle", "서바이벌(25)", { label: "처치 합계" }, "팀 대전(방 만들기·코드 입장·랜덤 매칭) 중 AI 없는 판만 셉니다.",
+      () => ({ profile: new FpsProfile(), view: new FpsStatsView() })),
     new TeamBattleRankGame("teambattle", "팀 배틀(30)", { label: "MVP 수", rate: "MVP율" }, "AI 없이 치른 대회모드 경기(랜덤 매칭 포함)만 셉니다."),
-    new RankGame("zombieoutbreak", "좀비(31)", { label: "감염시킨 수" }, "온라인 방(랜덤 매칭 포함) 중 AI 없는 판만 셉니다. 승 = 내 편이 이긴 판."),
-    new RankGame("minigames", "미니게임(32)", { label: "3위 안" }, "랜덤 매칭에서 사람과 함께한 판만 셉니다. 승 = 우리 팀이 최종 1등."),
-    new RankGame("volleyball", "배구(34)", null, "랜덤 매칭에서 사람 상대와 한 판만 셉니다."),
-    new RankGame("soccer", "축구(35)", null, "랜덤 매칭에서 사람 상대와 한 판만 셉니다. 비긴 판은 세지 않습니다."),
-    new RankGame("snowroyale", "눈싸움(38)", { label: "처치 합계" }, "온라인 방(랜덤 매칭 포함) 중 AI 없는 판만 셉니다. 승 = 1위."),
-    new RankGame("waterballoon", "물풍선(39)", { label: "처치 합계" }, "온라인 방(랜덤 매칭 포함) 중 AI 없는 판만 셉니다. 승 = 1위.")
+    new RankGame("zombieoutbreak", "좀비(31)", { label: "감염시킨 수" }, "온라인 방(랜덤 매칭 포함) 중 AI 없는 판만 셉니다. 승 = 내 편이 이긴 판.",
+      () => ({ profile: new ZombieProfile(), view: new ZombieStatsView() })),
+    new RankGame("minigames", "미니게임(32)", { label: "3위 안" }, "랜덤 매칭에서 사람과 함께한 판만 셉니다. 승 = 우리 팀이 최종 1등.",
+      () => ({ profile: new RandomMatchProfile("minigames"), view: new RandomMatchView("미니게임 랜덤 매칭 통계", true) })),
+    new RankGame("volleyball", "배구(34)", null, "랜덤 매칭에서 사람 상대와 한 판만 셉니다.",
+      () => ({ profile: new RandomMatchProfile("volleyball"), view: new RandomMatchView("배구 랜덤 매칭 통계", false) })),
+    new RankGame("soccer", "축구(35)", null, "랜덤 매칭에서 사람 상대와 한 판만 셉니다. 비긴 판은 세지 않습니다.",
+      () => ({ profile: new RandomMatchProfile("soccer"), view: new RandomMatchView("축구 랜덤 매칭 통계", false) })),
+    new RankGame("snowroyale", "눈싸움(38)", { label: "처치 합계" }, "온라인 방(랜덤 매칭 포함) 중 AI 없는 판만 셉니다. 승 = 1위.",
+      () => ({ profile: new SnAccountProfile(), view: new SnAccountView() })),
+    new RankGame("waterballoon", "물풍선(39)", { label: "처치 합계" }, "온라인 방(랜덤 매칭 포함) 중 AI 없는 판만 셉니다. 승 = 1위.",
+      () => ({ profile: new WbAccountProfile(), view: new WbAccountView() }))
   ];
 
   constructor() {
@@ -1160,7 +1181,7 @@ class ClassRankPanel {
         if (key === "n" && this.game.opensStudent) {
           td.className = "rank-name";
           td.title = "누르면 이 학생의 개인 통계";
-          td.addEventListener("click", () => StudentStatsWindow.open(r.uid, r.n));
+          td.addEventListener("click", () => this.game.openStudent(r.uid, r.n));
         }
         tr.appendChild(td);
       });
@@ -1350,6 +1371,31 @@ class StudentStatsWindow {
       table.appendChild(tr);
     });
     return table;
+  }
+}
+
+/* 30번 밖의 게임 학생 개인 통계 창(2026-10-28 선생님 요청): 학생이 게임에서 여는 "📊 내 통계 · 최근 20매치" 창(AccountStatsDialog)을
+   그대로 쓰고, 읽는 쪽만 교사 토큰으로 그 학생의 users/<uid>/stats·recent 를 읽는 AccountTeacherReader 로 바꾼다. 창을 열 때 읽기 2번. */
+class StudentAccountWindow {
+  static games = new Map();
+
+  static async readJson(path) {
+    const r = await fetch(await authedUrl(path), { cache: "no-store" });
+    if (!r.ok) throw new Error(r.status === 401 || r.status === 403 ? "읽기 권한이 없습니다." : "불러오지 못했습니다 (" + r.status + ")");
+    return r.json();
+  }
+
+  static open(game, uid, name) {
+    let entry = StudentAccountWindow.games.get(game.key);
+    if (!entry) {
+      const made = game.account();
+      const holder = { reader: null };
+      entry = { profile: made.profile, holder, dialog: new AccountStatsDialog(() => holder.reader, made.view, false) };
+      StudentAccountWindow.games.set(game.key, entry);
+    }
+    entry.holder.reader = new AccountTeacherReader(StudentAccountWindow.readJson, uid, entry.profile);
+    entry.dialog.setHeading(name + " — " + game.title + " 개인 통계");
+    entry.dialog.open("stats");
   }
 }
 

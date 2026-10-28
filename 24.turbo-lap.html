@@ -110,6 +110,25 @@
   .st-joinrow input { flex: 1 1 auto; min-width: 0; text-align: center; letter-spacing: .3em; }
   .st-joinrow .st-btn { flex: 0 0 34%; margin: 0; }
   .tv { margin: 10px 0 6px; }
+  .tv-curtain { position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; padding: calc(env(safe-area-inset-top, 0px) + 54px) 4vw 24px;
+    background: radial-gradient(ellipse at center, rgba(34, 40, 64, .93), rgba(10, 12, 20, .97)); color: #EEF0F4; font-family: var(--sg-font); transition: opacity .35s ease; }
+  .tv-curtain[hidden] { display: none; }
+  .tv-curtain.out { opacity: 0; }
+  .tv-curtain-in { width: min(1100px, 100%); }
+  .tv-curtain-head { text-align: center; font-size: clamp(22px, 3.4vw, 40px); font-weight: 900; color: #F4F1E8; text-shadow: 0 0 18px rgba(217, 123, 79, .55); }
+  .tv-curtain .hint { margin-top: 14px; text-align: center; font-size: clamp(14px, 1.8vw, 20px); color: #C9CEDA; }
+  .tv-curtain .tv { margin: 3vh 0 0; }
+  .tv-curtain .tv-course { margin-bottom: 2.4vh; font-size: clamp(18px, 2.6vw, 30px); }
+  .tv-curtain .tv-arena { gap: 2vw; }
+  .tv-curtain .tv-side { gap: 1vh; padding: 3.4vh 2.6vw; border-width: 3px; border-radius: 14px; }
+  .tv-curtain .tv-side small { font-size: clamp(13px, 1.6vw, 18px); }
+  .tv-curtain .tv-side b { font-size: clamp(26px, 4.6vw, 58px); }
+  .tv-curtain .tv-car-name { font-size: clamp(14px, 1.8vw, 22px); }
+  .tv-curtain .tv-rate { font-size: clamp(16px, 2.2vw, 28px); }
+  .tv-curtain .tv-vs { width: clamp(60px, 9vw, 120px); }
+  .tv-curtain .tv-vs b { font-size: clamp(36px, 6vw, 80px); }
+  .tv-curtain .tv-spark { width: 12vw; height: 12vw; margin: -6vw 0 0 -6vw; }
+  .tv-curtain .tv-road { height: 12px; margin-top: 3vh; }
   .tv-course { margin-bottom: 8px; text-align: center; font-size: 16px; font-weight: 800; color: #FFB08C; }
   .tv-arena { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; align-items: stretch; }
   .tv-side { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 12px 10px; border-radius: 8px; border: 2px solid; }
@@ -360,6 +379,13 @@
 </style>
 </head>
 <body>
+<div id="versusCurtain" class="tv-curtain" hidden>
+  <div class="tv-curtain-in" id="cardFound">
+    <div class="tv-curtain-head">🏁 상대를 찾았어요!</div>
+    <div class="tv" id="foundVersus"></div>
+    <div class="hint" id="foundHint">곧 출발해요. 잠시만 기다려 주세요.</div>
+  </div>
+</div>
 <div id="hud">
   <div class="hudLeft">
     <div class="lapBlock"><span class="lab">LAP · 바퀴</span><span id="hudLap">1 / 3</span><div class="lapBar"><i id="lapFill"></i></div></div>
@@ -462,10 +488,6 @@
     </div>
   </div>
 
-  <div class="st-wrap" id="cardFound" style="display:none">
-    <div class="st-hero"><h1 class="st-title">TURBO LAP</h1></div>
-    <div class="st-card"><h2>🏁 상대를 찾았어요!</h2><div class="tv" id="foundVersus"></div><div class="hint" id="foundHint">곧 출발해요. 잠시만 기다려 주세요.</div></div>
-  </div>
 
   <div class="card wide" id="cardLobby" style="display:none">
     <div class="codeBar">
@@ -533,8 +555,8 @@
 
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="character-maker.js?v=20261026a"></script>
-<script charset="utf-8" src="match-kit.js?v=20261028a"></script>
-<script charset="utf-8" src="account-match-kit.js?v=20261028a"></script>
+<script charset="utf-8" src="match-kit.js?v=20261028c"></script>
+<script charset="utf-8" src="account-match-kit.js?v=20261028c"></script>
 <script charset="utf-8" src="24.turbo-lap-stats.js?v=20261027c"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
@@ -3845,9 +3867,33 @@ class MenuCornerButtons {
     });
   }
 }
-const CARDS = { start: "cardStart", course: "cardCourse", done: "cardDone", lobby: "cardLobby", bdone: "cardBDone", party: "cardParty", found: "cardFound" };
+class VersusCurtain {
+  static MIN_MS = 2000;
+  static FADE_MS = 350;
+  static instance = null;
+  static get main() { return VersusCurtain.instance || (VersusCurtain.instance = new VersusCurtain(document.getElementById("versusCurtain"))); }
+  constructor(root) { this.root = root; this.shownAt = 0; this.timer = 0; }
+  follow(card) {
+    clearTimeout(this.timer);
+    if (card === "found") { this.show(); return; }
+    if (this.root.hidden) return;
+    if (card) { this.hide(); return; }
+    const goIn = BT.startAt ? BT.startAt - tnow() : Infinity, left = Math.min(this.shownAt + VersusCurtain.MIN_MS - performance.now(), goIn);
+    if (left > 0) this.timer = setTimeout(() => this.hide(), left); else this.hide();
+  }
+  show() {
+    if (this.root.hidden || this.root.classList.contains("out")) this.shownAt = performance.now();
+    this.root.classList.remove("out"); this.root.hidden = false;
+  }
+  hide() {
+    this.root.classList.add("out");
+    this.timer = setTimeout(() => { this.root.hidden = true; this.root.classList.remove("out"); }, VersusCurtain.FADE_MS);
+  }
+}
+const CARDS = { start: "cardStart", course: "cardCourse", done: "cardDone", lobby: "cardLobby", bdone: "cardBDone", party: "cardParty" };
 let cardNow = "start";
 function showCard(which) {
+  VersusCurtain.main.follow(which);
   cardNow = which;
   overlay.style.display = which ? "block" : "none";
   overlay.scrollTop = 0;
@@ -4664,6 +4710,7 @@ async function joinRoom() {
 function enterRoom(code) {
   playMode = "battle";
   $("hudRoomCode").textContent = "방 코드 " + code;
+  $("joinCode").value = code;
   BT.leaving = false; BT.code = code; BT.ref = BT.db.ref(BATTLE.root + "/" + code);
   BT.players = {}; BT.status = "lobby"; BT.startAt = 0; BT.host = null; BT.hostLoaded = false; BT.raw = {}; BT.result = null; BT.lobbyCarSig = "";
   resetMatchLocal();
@@ -5537,6 +5584,11 @@ class RivalChip {
 }
 const rivalChip = new RivalChip();
 
+class TurboRecentCourses {
+  static KEY = "turbolap_recent_courses_v1";
+  static read() { try { return MkRecentMaps.clean(JSON.parse(localStorage.getItem(TurboRecentCourses.KEY) || "null")) || []; } catch (e) { return []; } }
+  static note(course) { if (!course) return; try { localStorage.setItem(TurboRecentCourses.KEY, JSON.stringify(MkRecentMaps.noted(TurboRecentCourses.read(), course))); } catch (e) {} }
+}
 class TurboRandomMatch {
   static START_TRIES = 12;
   static START_RETRY_MS = 300;
@@ -5545,7 +5597,7 @@ class TurboRandomMatch {
   static AI_FALLBACK_MS = 120000;
   static MATCHER_TIMING = Object.assign({}, MkMatcher.TIMING, { rematchWaitMs: TurboRandomMatch.AI_FALLBACK_MS + 30000, busyMs: 300000 });
   static FOUND_HINT = "곧 출발해요. 잠시만 기다려 주세요.";
-  constructor(account) { this.flow = null; this.quiet = false; this.botAsked = {}; this.awaitingLoad = false; this.settleFor = ""; this.settledFor = ""; this.versusUntil = 0; this.versusTimer = 0; this.account = account; this.rates = new TurboLapRates(account); this.versus = new TurboLapVersusView($("foundVersus"), carLabel); }
+  constructor(account) { this.flow = null; this.quiet = false; this.botAsked = {}; this.wantStart = false; this.settleFor = ""; this.settledFor = ""; this.versusUntil = 0; this.versusTimer = 0; this.account = account; this.rates = new TurboLapRates(account); this.versus = new TurboLapVersusView($("foundVersus"), carLabel); }
   async ready() {
     if (this.flow) return this.flow;
     const db = await connectDb();
@@ -5584,9 +5636,9 @@ class TurboRandomMatch {
     try { return await (await this.ready()).codeTaken(code); } catch (e) { return false; }
   }
   updateMe() { if (this.flow) this.flow.updateMe(); }
-  member() { return { nick: PlayerProfile.storedNick() || "학생", joinedAt: tnow(), look: null, rate: this.rates.forMatching() }; }
+  member() { return { nick: PlayerProfile.storedNick() || "학생", joinedAt: tnow(), look: null, rate: this.rates.forMatching(), recentMaps: TurboRecentCourses.read() }; }
   async create(plan) {
-    const course = COURSES[plan.seed % COURSES.length], assign = {};
+    const course = MkRecentMaps.pick(COURSES, plan), assign = {};
     plan.groups.forEach(g => MkSeatAssign.peopleOf(g).forEach(id => { assign[id] = SIDES[g.side]; }));
     await sweepRooms();
     for (let n = 0; n < 8; n++) {
@@ -5607,7 +5659,7 @@ class TurboRandomMatch {
       if (status !== "lobby" || !team) return false;
       await ref.child("players/" + BT.myId).set(this.player(team, tnow()));
     }
-    this.botAsked = {}; this.awaitingLoad = false;
+    this.botAsked = {}; this.wantStart = false;
     this.versus.reset();
     enterRoom(ticket.room);
     this.renderVersus();
@@ -5625,13 +5677,13 @@ class TurboRandomMatch {
     if (this.inParty()) { this.flow.backToParty(msg); return; }
     showCard("start"); bMsg(msg);
   }
-  startMatch() { this.versusUntil = performance.now() + TurboRandomMatch.VERSUS_MS; this.tryStart(TurboRandomMatch.START_TRIES); }
+  startMatch() { this.versusUntil = performance.now() + TurboRandomMatch.VERSUS_MS; this.wantStart = true; this.tryStart(TurboRandomMatch.START_TRIES); }
   tryStart(triesLeft) {
     if (!isHost() || BT.status !== "lobby") return;
     if (humanRacerReady()) {
       const wait = this.versusUntil - performance.now();
       if (wait > 0) { clearTimeout(this.versusTimer); this.versusTimer = setTimeout(() => this.tryStart(triesLeft), wait); return; }
-      if (battleLoadSync.blocksStart()) this.awaitingLoad = true; else hostStart();
+      if (!battleLoadSync.blocksStart()) { this.wantStart = false; hostStart(); }
       return;
     }
     SIDES.forEach(side => { if (!racerOf(side) && !this.botAsked[side]) { this.botAsked[side] = true; addBot(side); } });
@@ -5641,7 +5693,8 @@ class TurboRandomMatch {
   showStart(message) { showCard("start"); bMsg(message); }
   roomChanged() {
     $("foundHint").textContent = (BT.ref && battleLoadSync.waitText()) || TurboRandomMatch.FOUND_HINT;
-    if (this.awaitingLoad && isHost() && BT.status === "lobby" && humanRacerReady() && !battleLoadSync.blocksStart()) { this.awaitingLoad = false; hostStart(); }
+    if (BT.status && BT.status !== "lobby") this.wantStart = false;
+    if (this.wantStart && isHost() && BT.status === "lobby" && humanRacerReady()) this.tryStart(0);
     if (this.flow && BT.ref) this.flow.roomChanged(racerIds().filter(id => !isBot(id)).length, isHost(), BT.status === "lobby");
     if (cardNow === "found") this.renderVersus();
   }
@@ -5685,6 +5738,7 @@ class TurboRandomMatch {
     this.flow.matchEnded({ result, rivals: this.resultRivals(rows, mine) }, () => { $("bDoneHint").textContent = this.flow.endHint(); });
   }
   record(report) {
+    TurboRecentCourses.note(report.course);
     this.account.record(report);
     this.rates.note(report);
   }

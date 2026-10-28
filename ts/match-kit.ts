@@ -24,6 +24,40 @@ interface MkMember {
   look?: CharacterLook | null;
   // 계정 누적 승패(사람과 한 랜덤 매칭). 승률 구간 매칭(MkWinBandVersusMatcher)을 쓰는 게임만 넣는다.
   rate?: MkWinRate | null;
+  // 이 학생이 최근에 한 맵(가장 최근이 앞). 맵을 고르는 게임이 같은 맵이 이어 나오지 않게 쓴다(MkRecentMaps).
+  recentMaps?: string[] | null;
+}
+
+// 랜덤 매칭 맵 고르기(2026-10-28 선생님 요청: 24번 맵이 계속 비슷하게 나온다).
+// 매칭된 모든 사람의 바로 전 맵을 빼고 남은 맵 중에서 plan.seed 로 고른다. 다 빠지면 전체에서 고른다.
+class MkRecentMaps {
+  static readonly KEEP = 2;
+  static readonly AVOID_LAST = 1;
+
+  static clean(list: unknown): string[] | null {
+    if (!Array.isArray(list)) return null;
+    const maps = list.filter((item) => typeof item === "string" && item.length > 0 && item.length <= 40).slice(0, MkRecentMaps.KEEP) as string[];
+    return maps.length ? maps : null;
+  }
+
+  static noted(list: unknown, map: string): string[] {
+    return [map].concat((MkRecentMaps.clean(list) || []).filter((item) => item !== map)).slice(0, MkRecentMaps.KEEP);
+  }
+
+  static avoidOf(plan: MkMatchPlan): string[] {
+    const avoid: string[] = [];
+    plan.groups.forEach((group) => Object.keys(group.entry.people || {}).forEach((id) => {
+      (MkRecentMaps.clean(group.entry.people[id].recentMaps) || []).slice(0, MkRecentMaps.AVOID_LAST).forEach((map) => { if (avoid.indexOf(map) < 0) avoid.push(map); });
+    }));
+    return avoid;
+  }
+
+  static pick(maps: string[], plan: MkMatchPlan): string {
+    const avoid = MkRecentMaps.avoidOf(plan);
+    const fresh = maps.filter((map) => avoid.indexOf(map) < 0);
+    const pool = fresh.length ? fresh : maps;
+    return pool[Math.abs(plan.seed) % pool.length];
+  }
 }
 
 interface MkWinRate {
@@ -627,8 +661,8 @@ class MkParty {
     this.ref.child("bots").set(allowed);
   }
 
-  updateMe(member: Pick<MkMember, "nick" | "look" | "rate">): void {
-    if (this.record && this.record.members && this.record.members[this.myId]) this.ref.child("members/" + this.myId).update({ nick: member.nick, look: member.look || null, rate: MkWinBand.clean(member.rate) });
+  updateMe(member: Pick<MkMember, "nick" | "look" | "rate" | "recentMaps">): void {
+    if (this.record && this.record.members && this.record.members[this.myId]) this.ref.child("members/" + this.myId).update({ nick: member.nick, look: member.look || null, rate: MkWinBand.clean(member.rate), recentMaps: MkRecentMaps.clean(member.recentMaps) });
   }
 
   markSearching(since: number | null): Promise<void> {
@@ -822,6 +856,8 @@ class MkQueue {
       people[id] = { nick: member.nick, joinedAt: member.joinedAt, look: member.look || null };
       const rate = MkWinBand.clean(id === party.myId && me && me.rate !== undefined ? me.rate : member.rate);
       if (rate) people[id].rate = rate;
+      const recentMaps = MkRecentMaps.clean(id === party.myId && me && me.recentMaps !== undefined ? me.recentMaps : member.recentMaps);
+      if (recentMaps) people[id].recentMaps = recentMaps;
     });
     const last = party.lastMatch();
     const entry: MkQueueEntry = { leader: party.myId, people, bots: party.bots(), size: party.size(), at: since, claim: null };

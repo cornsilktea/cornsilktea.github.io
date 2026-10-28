@@ -469,8 +469,8 @@
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="character-maker.js?v=20261026a"></script>
-<script charset="utf-8" src="match-kit.js?v=20261028a"></script>
-<script charset="utf-8" src="account-match-kit.js?v=20261028a"></script>
+<script charset="utf-8" src="match-kit.js?v=20261028c"></script>
+<script charset="utf-8" src="account-match-kit.js?v=20261028c"></script>
 <script charset="utf-8" src="25.fps-survival-stats.js?v=20261027b"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -2432,6 +2432,7 @@ async function joinRoom() {
 }
 function enterRoom(code) {
   $("hudRoomCode").textContent = code;
+  $("joinCode").value = code;
   T.leaving = false; T.code = code; T.ref = T.db.ref(TEAM.root + "/" + code);
   T.players = {}; T.status = "lobby"; T.host = null; T.hostLoaded = false; T.raw = {}; T.kills = {}; T.dmg = {};
   resetMatchLocal(); clearTeamItems();

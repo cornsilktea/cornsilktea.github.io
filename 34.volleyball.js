@@ -1726,6 +1726,7 @@ class VolleyballGame {
     }
     enterRoom(code, hosting, notice) {
         VbDom.byId("hudRoomCode").textContent = "방 코드 " + code;
+        VbDom.byId("joinCode").value = code;
         const session = new VbRoomSession(this.backend, code, this.myId, hosting);
         this.session = session;
         session.onChange = (kind) => this.onSessionChange(kind);
