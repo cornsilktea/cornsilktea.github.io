@@ -604,10 +604,9 @@ class WbGame {
         on("btnCreateTeam", () => this.createRoom("team"));
         on("btnRandomSolo", () => this.createParty("solo"));
         on("btnRandomTeam", () => this.createParty("team"));
-        on("btnJoin", () => this.joinRoom(false));
-        on("btnWatch", () => this.joinRoom(true));
+        on("btnJoin", () => this.joinRoom());
         WbDom.el("joinCode").addEventListener("keydown", (e) => { if (e.key === "Enter")
-            this.joinRoom(false); });
+            this.joinRoom(); });
         on("btnStart", () => this.startMatch());
         on("btnLeave", () => this.leaveRoom(""));
         on("btnSeatMode", () => this.toggleSeatMode());
@@ -844,7 +843,7 @@ class WbGame {
     }
     updateStartButtons() {
         const ok = !!this.backend.database;
-        ["btnCreateSolo", "btnCreateTeam", "btnJoin", "btnWatch"].forEach((id) => { WbDom.el(id).disabled = !ok; });
+        ["btnCreateSolo", "btnCreateTeam", "btnJoin"].forEach((id) => { WbDom.el(id).disabled = !ok; });
         if (!ok)
             this.startMessage("온라인 연결을 할 수 없어요. (firebase-config.js·인터넷 확인) 혼자 하기는 할 수 있어요.");
     }
@@ -870,7 +869,7 @@ class WbGame {
             this.startMessage("방을 만들지 못했어요. (데이터베이스 규칙을 확인해 주세요)");
         }
     }
-    async joinRoom(asSpectator) {
+    async joinRoom() {
         if (!this.backend.database)
             return;
         const code = WbDom.el("joinCode").value.replace(/\D/g, "");
@@ -886,7 +885,7 @@ class WbGame {
                 this.startMessage(party.message);
                 return;
             }
-            const outcome = await this.directory.join(code, this.myId, this.myRecord(), asSpectator);
+            const outcome = await this.directory.join(code, this.myId, this.myRecord(), false);
             if (outcome.ok) {
                 this.enterRoom(code, false);
                 WbDom.text(WbDom.el("lobbyNotice"), outcome.message);
@@ -899,6 +898,7 @@ class WbGame {
         }
     }
     enterRoom(code, hosting) {
+        WbDom.text(WbDom.el("hudRoomCode"), "방 코드 " + code);
         if (this.backdrop)
             this.backdrop.stop();
         const session = new RkSession(this.backend, WbRoomRules.RULES, code, this.myId, hosting, WbRoomRules.VALUES);
@@ -1105,6 +1105,7 @@ class WbGame {
         this.startMessage(message);
     }
     startSolo() {
+        WbDom.text(WbDom.el("hudRoomCode"), "");
         const ui = this.ui, world = this.world, input = this.input;
         if (this.view)
             this.view.dispose();

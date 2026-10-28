@@ -444,6 +444,9 @@ class CollectionFlow {
         this.director = new CollectionDirector(session, this.services.catalog, this.services.random);
         session.connect();
         this.services.lobbyView.showCode(code);
+        const roomCodeTag = document.getElementById("hudRoomCode");
+        if (roomCodeTag)
+            roomCodeTag.textContent = practice ? "" : "방 코드 " + code;
         this.services.phases.goTo(practice ? this.services.practicePhase : this.services.lobbyPhase);
     }
     leaveRoom() {

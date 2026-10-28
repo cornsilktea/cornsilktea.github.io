@@ -126,6 +126,10 @@
 - **38번(눈싸움 배틀로얄) 작업은 시작 전에 `38.snow-royale-notes.md`(명세서·진행 상태)와 사양 `38.snow-royale-proposal.md` 를 읽는다.** 규칙 엔진(`ts/38.snow-rules.ts`)은 화면을 몰라서 `node .claude/snow-unit.js`·`node .claude/snow-sim.js` 로 검사한다. 여러 명 접속은 `.claude/snow-multi.html`(가짜 Firebase) 로 본다.
 - **39번(물풍선 대작전) 작업은 시작 전에 `39.water-balloon-notes.md` 와 사양 `39.water-balloon-proposal.md` 를 읽는다.** 노트 맨 위 "이어 하기"와 진행 상태 표에서 다음 단계를 확인한다. 규칙 엔진(`ts/39.balloon-rules.ts`)은 화면을 몰라서 `node tools/balloon-unit.js`·`node tools/balloon-sim.js` 로 검사한다(다른 컴퓨터에서도 쓰도록 검사 도구는 `tools/` 에 커밋).
 - **랜덤 매칭(24·25·30·31·32·34·35·38·39번) 작업은 시작 전에 `random-match-prompt.md` 를 읽는다**(2026-10-20 선생님 요청). "랜덤 매칭 관련 추가 진행해줘" 라고 하면 그 파일의 지시대로, 맨 아래 진행 상태 표의 안 끝난 첫 단계부터 이어 하고 단계마다 표를 고쳐 커밋·푸시한다.
+- **방(방 코드)이 있는 게임 공통 규칙**(2026-10-28 선생님 요청, 앞으로 만드는 게임 모두):
+  - 시작 화면에 `관전하기`·`관전자로 입장` 버튼을 따로 두지 않는다. `입장` 하나로 들어가고, 이미 진행 중이거나 선수 자리가 찬 방이면 남은 관전 자리로 자동 입장한다(`room-kit.ts` 의 `RkRoomDirectory.join` 이 그렇게 동작). 방 안에서 선수↔관전 바꾸기 버튼은 둘 수 있다.
+  - 경기 화면 위쪽 HUD 에 작은 방 코드를 띄운다: 위쪽 가운데 HUD 상자 안에 `<div class="room-code-tag" id="hudRoomCode"></div>`(상자 바로 아래에 붙음) 또는 HUD 상자 안 한 줄이면 `class="room-code-tag in-flow"`(theme.css). 방에 들어갈 때 `"방 코드 " + code`, 혼자 하기·연습이면 빈 글자(빈 글자면 숨는다). 다른 HUD·버튼에 가리지 않는지 좁은 화면(640px)까지 확인한다.
+  - 랜덤 매칭 팀 대기실의 오른쪽 위 나가기 버튼과 머리 줄 버튼이 겹치지 않게 한다(theme.css `.mk-panel` 머리 줄은 넘치면 다음 줄로 내려감).
 - **대전이 있는 새 게임은 계정 통계(내 통계·최근 20매치·교사 반 별 통계) 저장까지 처음부터 함께 만든다**(2026-10-28 선생님 요청, 24번 터보 랩이 기준). 시작 화면 실행 버튼 아래에 넓은 버튼 하나 `📊 내 통계 · 최근 20매치`(`data-account-open="stats"`)만 두고, 내 통계·최근 매치 버튼을 따로 만들지 않는다. 만드는 순서·게임 키를 넣을 곳(DB 규칙·admin `RankGame.GAMES`·`tools/account-stats-unit.js`)은 `account-stats-prompt.md` 맨 위 "★ 새 게임을 만들 때" 절.
 - **개인 통계·최근 10매치(24·25·31·38·39번) 작업은 시작 전에 `account-stats-prompt.md` 를 읽는다**(2026-10-26 선생님 요청). "개인 통계 추가 진행해줘" 라고 하면 그 파일의 진행 상태 표의 안 끝난 첫 단계부터 이어 하고 단계마다 표를 고쳐 커밋·푸시한다. 기준은 30번 계정 통계(`30.team-battle-notes.md` 5-2b).
 - **32번(미니게임 모음) 작업은 시작 전에 `32.minigames-notes.md` 를 읽는다.** `32.minigames/last-tile/`(옛 마지막 발판 규칙 코드, 설명은 `32.minigames-last-tile-notes.md`)도 같은 모음 안의 코드다. 종목 추가 방법·클래스 지도·Firebase 구조·검사 방법이 거기 있다.

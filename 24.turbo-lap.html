@@ -363,7 +363,7 @@
 <div id="hud">
   <div class="hudLeft">
     <div class="lapBlock"><span class="lab">LAP · 바퀴</span><span id="hudLap">1 / 3</span><div class="lapBar"><i id="lapFill"></i></div></div>
-    <div class="timeBlock"><span class="lab">TIME · 기록</span><div id="hudTime">0:00.00<span class="off" id="hudOff"></span></div></div>
+    <div class="timeBlock"><span class="lab">TIME · 기록</span><div id="hudTime">0:00.00<span class="off" id="hudOff"></span></div><div class="room-code-tag in-flow" id="hudRoomCode" style="margin-left:0"></div></div>
   </div>
   <div class="hudRight">
     <div class="chip" id="hudPosBox" hidden><span class="lab">순위</span><span id="hudPos">1 / 2</span><i class="chipIcon pos">🏁</i></div>
@@ -4663,6 +4663,7 @@ async function joinRoom() {
 }
 function enterRoom(code) {
   playMode = "battle";
+  $("hudRoomCode").textContent = "방 코드 " + code;
   BT.leaving = false; BT.code = code; BT.ref = BT.db.ref(BATTLE.root + "/" + code);
   BT.players = {}; BT.status = "lobby"; BT.startAt = 0; BT.host = null; BT.hostLoaded = false; BT.raw = {}; BT.result = null; BT.lobbyCarSig = "";
   resetMatchLocal();
@@ -4743,6 +4744,7 @@ function exitRoom(msg) {
   closeRoomLocal(msg);
 }
 function closeRoomLocal(msg) {
+  $("hudRoomCode").textContent = "";
   BT.ref = null; BT.players = {}; BT.raw = {}; BT.result = null;
   resetMatchLocal();
   playMode = "ta"; setBattleHud(false);

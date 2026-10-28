@@ -1012,9 +1012,8 @@ class SoccerGame {
   private bindMenus(): void {
     RkDom.byId("btnCreate").addEventListener("click", () => this.createRoom());
     RkDom.byId("btnRandom").addEventListener("click", () => this.createParty());
-    RkDom.byId("btnJoin").addEventListener("click", () => this.joinRoom(false));
-    RkDom.byId("btnWatch").addEventListener("click", () => this.joinRoom(true));
-    RkDom.byId("joinCode").addEventListener("keydown", (event) => { if ((event as KeyboardEvent).key === "Enter") this.joinRoom(false); });
+    RkDom.byId("btnJoin").addEventListener("click", () => this.joinRoom());
+    RkDom.byId("joinCode").addEventListener("keydown", (event) => { if ((event as KeyboardEvent).key === "Enter") this.joinRoom(); });
     RkDom.byId("btnStart").addEventListener("click", () => this.startMatch());
     RkDom.byId("btnLeave").addEventListener("click", () => this.leaveRoom());
     RkDom.byId("btnEndLeave").addEventListener("click", () => this.leaveRoom());
@@ -1026,7 +1025,7 @@ class SoccerGame {
 
   private updateStartButtons(): void {
     const ok = !!this.backend.database && this.assetsReady;
-    ["btnCreate", "btnRandom", "btnJoin", "btnWatch"].forEach((id) => { RkDom.byId<HTMLButtonElement>(id).disabled = !ok; });
+    ["btnCreate", "btnRandom", "btnJoin"].forEach((id) => { RkDom.byId<HTMLButtonElement>(id).disabled = !ok; });
     if (!this.backend.database) this.showStartMessage("온라인 연결을 할 수 없어요. (firebase-config.js·인터넷 확인)");
   }
 
@@ -1093,7 +1092,7 @@ class SoccerGame {
     button.disabled = false;
   }
 
-  private async joinRoom(asSpectator: boolean): Promise<void> {
+  private async joinRoom(): Promise<void> {
     if (!this.backend.database) return;
     const code = RkDom.byId<HTMLInputElement>("joinCode").value.replace(/\D/g, "");
     if (code.length !== 5) {
@@ -1107,7 +1106,7 @@ class SoccerGame {
         this.showStartMessage(party.message);
         return;
       }
-      const outcome = await this.directory.join(code, this.myId, this.myRecord(), asSpectator);
+      const outcome = await this.directory.join(code, this.myId, this.myRecord(), false);
       if (outcome.ok) this.enterRoom(code, false, outcome.message);
       else this.showStartMessage(outcome.message);
     } catch (error) {
@@ -1116,6 +1115,7 @@ class SoccerGame {
   }
 
   private enterRoom(code: string, hosting: boolean, notice: string): void {
+    RkDom.byId("hudRoomCode").textContent = "방 코드 " + code;
     const session = new RkSession<SocPlayerRecord>(this.backend, SocRoomRules.RULES, code, this.myId, hosting, SocRoomRules.VALUES);
     this.session = session;
     session.onChange = (kind) => this.onSessionChange(kind);

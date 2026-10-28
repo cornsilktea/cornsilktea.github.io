@@ -191,7 +191,7 @@
 
 <div id="gameUi" hidden>
   <div id="hudTeam" class="hud-box"></div>
-  <div id="hudTop" class="hud-box"><div id="hudFloor"></div><div id="hudTime"></div><div id="hudWave"></div></div>
+  <div id="hudTop" class="hud-box"><div id="hudFloor"></div><div id="hudTime"></div><div id="hudWave"></div><div class="room-code-tag in-flow" id="hudRoomCode"></div></div>
   <div id="hudBoss" class="hud-box" hidden><div class="rd-boss-head"><span id="hudBossName"></span><span id="hudBossTag" hidden></span></div><div class="rd-boss-bar"><div id="hudBossFill"></div></div></div>
   <div id="hudMech" class="hud-box" hidden></div>
   <div id="hudCount" hidden></div>
@@ -221,7 +221,6 @@
       <div class="st-joinrow">
         <input type="text" id="joinCode" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="방 코드 5자리">
         <button type="button" class="st-btn blue" id="btnJoin">참여하기</button>
-        <button type="button" class="st-btn sub" id="btnWatch">관전하기</button>
       </div>
       <div class="st-msg" id="startMsg"></div>
       <div class="st-hint" id="loadNote">캐릭터를 불러오는 중…</div>
@@ -308,7 +307,7 @@
 <script charset="utf-8" src="room-kit.js"></script>
 <script charset="utf-8" src="36.raid-rules.js"></script>
 <script charset="utf-8" src="36.raid-views.js"></script>
-<script charset="utf-8" src="36.dungeon-raid.js"></script>
+<script charset="utf-8" src="36.dungeon-raid.js?v=20261028a"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";

@@ -313,6 +313,7 @@
   <div id="hudTop">
     <div><span class="lab">처치</span><span id="hudScore">0</span></div>
     <div><span class="lab">남은 시간</span><span id="hudTime">2:00</span></div>
+    <div><span class="lab">방 코드</span><span id="hudRoomCode"></span></div>
   </div>
 </div>
 <div class="hud hud-text" id="hudAmmo"><span class="lab" id="ammoLab">소총 탄약</span><span id="ammoNum">30</span><span id="ammoMax">/ 30</span></div>
@@ -2430,6 +2431,7 @@ async function joinRoom() {
   finally { $("btnJoin").disabled = false; }
 }
 function enterRoom(code) {
+  $("hudRoomCode").textContent = code;
   T.leaving = false; T.code = code; T.ref = T.db.ref(TEAM.root + "/" + code);
   T.players = {}; T.status = "lobby"; T.host = null; T.hostLoaded = false; T.raw = {}; T.kills = {}; T.dmg = {};
   resetMatchLocal(); clearTeamItems();

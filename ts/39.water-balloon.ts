@@ -600,9 +600,8 @@ class WbGame {
     on("btnCreateTeam", () => this.createRoom("team"));
     on("btnRandomSolo", () => this.createParty("solo"));
     on("btnRandomTeam", () => this.createParty("team"));
-    on("btnJoin", () => this.joinRoom(false));
-    on("btnWatch", () => this.joinRoom(true));
-    WbDom.el("joinCode").addEventListener("keydown", (e) => { if ((e as KeyboardEvent).key === "Enter") this.joinRoom(false); });
+    on("btnJoin", () => this.joinRoom());
+    WbDom.el("joinCode").addEventListener("keydown", (e) => { if ((e as KeyboardEvent).key === "Enter") this.joinRoom(); });
     on("btnStart", () => this.startMatch());
     on("btnLeave", () => this.leaveRoom(""));
     on("btnSeatMode", () => this.toggleSeatMode());
@@ -825,7 +824,7 @@ class WbGame {
 
   private updateStartButtons(): void {
     const ok = !!this.backend.database;
-    ["btnCreateSolo", "btnCreateTeam", "btnJoin", "btnWatch"].forEach((id) => { WbDom.el<HTMLButtonElement>(id).disabled = !ok; });
+    ["btnCreateSolo", "btnCreateTeam", "btnJoin"].forEach((id) => { WbDom.el<HTMLButtonElement>(id).disabled = !ok; });
     if (!ok) this.startMessage("온라인 연결을 할 수 없어요. (firebase-config.js·인터넷 확인) 혼자 하기는 할 수 있어요.");
   }
 
@@ -849,7 +848,7 @@ class WbGame {
     }
   }
 
-  private async joinRoom(asSpectator: boolean): Promise<void> {
+  private async joinRoom(): Promise<void> {
     if (!this.backend.database) return;
     const code = WbDom.el<HTMLInputElement>("joinCode").value.replace(/\D/g, "");
     if (code.length !== 5) { this.startMessage("방 코드 5자리를 입력해 주세요."); return; }
@@ -861,7 +860,7 @@ class WbGame {
         this.startMessage(party.message);
         return;
       }
-      const outcome = await this.directory.join(code, this.myId, this.myRecord(), asSpectator);
+      const outcome = await this.directory.join(code, this.myId, this.myRecord(), false);
       if (outcome.ok) { this.enterRoom(code, false); WbDom.text(WbDom.el("lobbyNotice"), outcome.message); }
       else this.startMessage(outcome.message);
     } catch (error) {
@@ -870,6 +869,7 @@ class WbGame {
   }
 
   private enterRoom(code: string, hosting: boolean): void {
+    WbDom.text(WbDom.el("hudRoomCode"), "방 코드 " + code);
     if (this.backdrop) this.backdrop.stop();
     const session = new RkSession<WbPlayerRecord>(this.backend, WbRoomRules.RULES, code, this.myId, hosting, WbRoomRules.VALUES);
     this.session = session;
@@ -1035,6 +1035,7 @@ class WbGame {
   }
 
   private startSolo(): void {
+    WbDom.text(WbDom.el("hudRoomCode"), "");
     const ui = this.ui as WbGameUi, world = this.world as WbWorldView, input = this.input as WbInput;
     if (this.view) this.view.dispose();
     if (this.backdrop) this.backdrop.stop();

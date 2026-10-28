@@ -156,6 +156,17 @@
   #rankBody { margin-top: var(--sg-s4); }
   .rank-divider { margin: var(--sg-s4) 0; border: 0; border-top: 1px solid var(--sg-line-mid); }
   .panel .stats-box { max-height: none; overflow-x: auto; overflow-y: visible; }
+  /* 반 별 통계 표의 이름 칸(30번): 누르면 학생 개인 통계 창(StudentStatsWindow) */
+  #rankTable td.rank-name { cursor: pointer; color: #D97B4F; text-decoration: underline; text-underline-offset: 3px; }
+  .student-stats .student-tabs { justify-content: flex-start; margin: 0 0 var(--sg-s2); }
+  .student-stats .student-tabs button[aria-pressed="true"] { border-color: #D97B4F; box-shadow: inset 0 0 0 1px #D97B4F; }
+  .student-recent { display: flex; flex-direction: column; gap: var(--sg-s2); margin: var(--sg-s3) 0; }
+  .student-match { display: flex; gap: var(--sg-s3); align-items: center; width: 100%; padding: var(--sg-s2) var(--sg-s3); border-radius: var(--sg-radius);
+    border: 1px solid var(--sg-line); border-left: 6px solid #4C8DFF; background: var(--sg-bg); color: var(--sg-ink); font: inherit; text-align: left; cursor: pointer; }
+  .student-match.lose { border-left-color: #E0474C; }
+  .student-match b { min-width: 3em; }
+  .student-board { margin: 0 0 var(--sg-s3) !important; }
+  .student-board tr.mine td { background: rgba(217, 123, 79, 0.14); font-weight: 800; }
   .stats-box h3 { margin: 0 0 var(--sg-s2); font-size: var(--sg-fs-xl); font-weight: 800; line-height: var(--sg-lh-tight); }
   .stats-box table { width: 100%; border-collapse: separate; border-spacing: 0; margin: var(--sg-s4) 0; font-size: var(--sg-fs-md); font-variant-numeric: tabular-nums; }
   .stats-box th, .stats-box td { padding: var(--sg-s2) var(--sg-s3); border-bottom: 1px solid var(--sg-line); text-align: right; white-space: nowrap; }
@@ -474,6 +485,9 @@
 
 <script charset="utf-8" src="firebase-config.js"></script>
 <script charset="utf-8" src="data.js"></script>
+<!-- 30번 학생 개인 통계 창(StudentStatsWindow)이 게임과 같은 계산·되살리기 클래스(AccountStatsMath·TeamBattleRing 등)를 쓰려고 불러온다 -->
+<script charset="utf-8" src="account-match-kit.js?v=20261028b"></script>
+<script charset="utf-8" src="account-stats.js?v=20261028b"></script>
 <script>
 /* 밝기 전환 버튼: <html data-theme> 를 바꾸고 localStorage('portal_theme')에 남긴다(index.html 과 같은 키).
    주소창 색(theme-color)도 배경색에 맞춘다. */
@@ -966,6 +980,8 @@ async function authedUrl(path) {
 }
 
 class RankGame {
+  get opensStudent() { return false; }
+
   constructor(key, title, extra, note) {
     this.key = key;
     this.title = title;
@@ -984,6 +1000,8 @@ class RankGame {
 
 /* 30번만 classStats 에 MVP 수(m)를 둔다. 화면에서는 다른 게임의 x 칸처럼 보이고 MVP율 열이 하나 더 붙는다 */
 class TeamBattleRankGame extends RankGame {
+  get opensStudent() { return true; }
+
   root() { return "classStats"; }
 
   rowOf(uid, v) { return { uid, n: String(v.n || "?"), g: +v.g || 0, w: +v.w || 0, x: +v.m || 0 }; }
@@ -1137,7 +1155,15 @@ class ClassRankPanel {
     table.appendChild(head);
     this.rows.slice().sort((a, b) => this.compare(a, b)).forEach((r, i) => {
       const tr = el("tr");
-      cols.forEach(([, , cell]) => tr.appendChild(el("td", null, cell(r, i))));
+      cols.forEach(([, key, cell]) => {
+        const td = el("td", null, cell(r, i));
+        if (key === "n" && this.game.opensStudent) {
+          td.className = "rank-name";
+          td.title = "누르면 이 학생의 개인 통계";
+          td.addEventListener("click", () => StudentStatsWindow.open(r.uid, r.n));
+        }
+        tr.appendChild(td);
+      });
       tr.appendChild(this.moveCell(r));
       table.appendChild(tr);
     });
@@ -1182,6 +1208,148 @@ class ClassRankPanel {
       say("rankMsg", e.message);
       this.render();
     }
+  }
+}
+
+/* 30번 학생 개인 통계 창(2026-10-28 선생님 요청): 반 별 통계 표에서 이름을 누르면 그 학생이 로그인해서 보는 "내 통계 · 최근 20매치"와 같은 내용을 보인다.
+   users/<uid>/stats/teambattle 과 users/<uid>/recent/teambattle 을 창을 열 때 한 번씩 읽는다(교사 계정은 규칙상 users 전체 읽기 가능).
+   값 해석은 게임과 같은 클래스(account-stats.js 의 AccountStatsMath·AccountStatsTable·TeamBattleRing)를 써서 학생 화면과 어긋나지 않게 한다. */
+class StudentStatsWindow {
+  static GAME = "teambattle";
+  static TEAMS = ["블루", "레드"];
+
+  static async open(uid, name) {
+    const back = el("div", "lightbox");
+    const box = el("div", "stats-box student-stats");
+    back.appendChild(box);
+    back.addEventListener("click", (e) => { if (e.target === back) back.remove(); });
+    document.body.appendChild(back);
+    const view = new StudentStatsWindow(box, name);
+    view.message("불러오는 중…");
+    try {
+      const [stats, recent] = await Promise.all(["stats", "recent"].map(async (part) => {
+        const r = await fetch(await authedUrl("users/" + uid + "/" + part + "/" + StudentStatsWindow.GAME), { cache: "no-store" });
+        if (!r.ok) throw new Error(r.status === 401 || r.status === 403 ? "읽기 권한이 없습니다. 데이터베이스 규칙을 콘솔에 게시했는지 확인해 주세요." : "불러오지 못했습니다 (" + r.status + ")");
+        return r.json();
+      }));
+      view.stats = AccountStatsMath.normalize(stats);
+      view.entries = TeamBattleRing.entries(recent);
+      view.showStats();
+    } catch (e) {
+      view.message(e.message);
+    }
+  }
+
+  constructor(box, name) {
+    this.box = box;
+    this.name = name;
+    this.stats = null;
+    this.entries = [];
+    this.msg = null;
+  }
+
+  static roleOf(id) {
+    return STATS_GAMES.teambattle.roles.find((r) => r.id === id) || { id, name: id, group: "" };
+  }
+
+  frame(tab) {
+    this.box.innerHTML = "";
+    const top = el("div", "stats-top");
+    top.appendChild(el("h3", null, this.name + " — 팀 배틀(30) 개인 통계"));
+    this.box.appendChild(top);
+    const tabs = el("div", "actions student-tabs");
+    [["stats", "내 통계"], ["recent", "최근 20매치"]].forEach(([id, label]) => {
+      const b = el("button", null, label); b.type = "button";
+      b.setAttribute("aria-pressed", id === tab ? "true" : "false");
+      b.addEventListener("click", () => { if (this.stats) (id === "stats" ? this.showStats() : this.showRecent()); });
+      tabs.appendChild(b);
+    });
+    this.box.appendChild(tabs);
+    this.msg = el("p", "msg");
+    this.box.appendChild(this.msg);
+  }
+
+  message(text) {
+    if (!this.msg) this.frame("stats");
+    this.msg.textContent = text;
+  }
+
+  closeRow() {
+    const acts = el("div", "actions");
+    const close = el("button", null, "닫기"); close.type = "button";
+    close.addEventListener("click", () => this.box.parentNode.remove());
+    acts.appendChild(close);
+    this.box.appendChild(acts);
+  }
+
+  showStats() {
+    this.frame("stats");
+    const n = this.stats;
+    this.msg.textContent = "유효한 경기 " + n.g + "판 · " + n.w + "승 " + n.l + "패 · 진영 승률: 블루 " + pct(n.bw, n.bg) + " · 레드 " + pct(n.rw, n.rg) + " · MVP율 " + pct(n.m, n.g);
+    const rows = AccountStatsTable.legacyRows(n);
+    const ids = Object.keys(rows).sort((a, b) => rows[b].picks - rows[a].picks);
+    if (!ids.length) { this.box.appendChild(el("p", "msg", "아직 집계된 경기가 없습니다.")); this.closeRow(); return; }
+    const table = el("table");
+    const head = el("tr");
+    [["캐릭터"], ["승률", "승리 수 / 판 수"], ["MVP", "MVP 횟수 / 판 수"], ["KDA", "(킬 + 어시스트) / 데스"], ["평균 피해량"], ["평균 회복량"], ["평균 막은 피해"], ["평균 기절"], ["평균 둔화"]].forEach((col) => {
+      const th = el("th", null, col[0]);
+      if (col[1]) th.appendChild(el("small", null, col[1]));
+      head.appendChild(th);
+    });
+    table.appendChild(head);
+    ids.forEach((id) => {
+      const d = rows[id], role = StudentStatsWindow.roleOf(id), tr = el("tr");
+      tr.appendChild(el("td", null, role.name));
+      const rate = el("td"); rate.append(el("b", null, pct(d.wins, d.picks)), el("small", null, "(" + d.wins + " / " + d.picks + ")")); tr.appendChild(rate);
+      const mvp = el("td"); mvp.append(el("b", null, String(d.mvpCount)), el("small", null, "(" + d.mvpCount + " / " + d.picks + "판)")); tr.appendChild(mvp);
+      const kda = el("td");
+      if (d.kdPicks) kda.append(el("b", null, d.deaths > 0 ? ((d.kills + d.assist) / d.deaths).toFixed(2) : "Perfect"), el("small", null, "(" + d.kills.toFixed(1) + " / " + d.deaths.toFixed(1) + " / " + d.assist.toFixed(1) + ")"));
+      else kda.textContent = "-";
+      tr.appendChild(kda);
+      tr.appendChild(el("td", null, String(Math.round(d.dmg))));
+      tr.appendChild(el("td", null, role.heal ? String(Math.round(d.heal)) : "-"));
+      tr.appendChild(el("td", null, role.block ? String(Math.round(d.block)) : "-"));
+      tr.appendChild(el("td", null, d.stun.toFixed(1) + "초"));
+      tr.appendChild(el("td", null, d.slow.toFixed(1) + "초"));
+      table.appendChild(tr);
+    });
+    this.box.appendChild(table);
+    this.box.appendChild(el("p", "hint", "AI 없이 치른 대회모드 경기(랜덤 매칭 포함)만 셉니다. 학생이 게임에서 보는 내 통계와 같은 값입니다."));
+    this.closeRow();
+  }
+
+  showRecent() {
+    this.frame("recent");
+    this.msg.textContent = this.entries.length ? "최근 " + this.entries.length + "경기 · 최신순 · 줄을 누르면 그 경기 결과표" : "아직 기록된 대회모드 경기가 없습니다.";
+    const list = el("div", "student-recent");
+    this.entries.forEach((entry) => {
+      const me = entry.players[entry.myIndex];
+      const item = el("button", "student-match " + (entry.win ? "win" : "lose"));
+      item.type = "button";
+      item.append(el("b", null, entry.win ? "승리" : "패배"),
+        el("span", null, RecentBlockList.whenText(entry.at) + " · " + entry.score[0] + " : " + entry.score[1] + " · " + StudentStatsWindow.roleOf(me.char).name + " · " + me.kills + "/" + me.deaths + "/" + me.assists + (entry.withAi ? " · AI 포함(통계 제외)" : "")));
+      const board = this.boardOf(entry);
+      board.hidden = true;
+      item.addEventListener("click", () => { board.hidden = !board.hidden; });
+      list.append(item, board);
+    });
+    this.box.appendChild(list);
+    this.closeRow();
+  }
+
+  boardOf(entry) {
+    const table = el("table", "student-board");
+    const head = el("tr");
+    ["팀", "닉네임", "직업", "처치", "쓰러짐", "어시스트", "입힌 피해", "회복", "막은 피해", "기절", "둔화"].forEach((t) => head.appendChild(el("th", null, t)));
+    table.appendChild(head);
+    entry.players.forEach((p, i) => {
+      const tr = el("tr", i === entry.myIndex ? "mine" : null);
+      [StudentStatsWindow.TEAMS[p.team] || "-", (p.ai ? "🤖 " : "") + p.name + (p.left ? " (나감)" : ""), StudentStatsWindow.roleOf(p.char).name,
+        p.kills, p.deaths, p.assists, Math.round(p.dmg), Math.round(p.heal), Math.round(p.blocked), (+p.stun).toFixed(1) + "초", (+p.slow).toFixed(1) + "초"]
+        .forEach((v) => tr.appendChild(el("td", null, String(v))));
+      table.appendChild(tr);
+    });
+    return table;
   }
 }
 
@@ -1596,88 +1764,13 @@ async function showStats(g) {
 
     const acts = el("div", "actions");
     const reload = el("button", null, "새로고침"); reload.type = "button";
-    const reset = el("button", null, "통계 초기화"); reset.type = "button";
-    const dropDraws = el("button", null, "무승부 판 제외"); dropDraws.type = "button";
     const close = el("button", null, "닫기"); close.type = "button";
     reload.addEventListener("click", draw);
     close.addEventListener("click", () => back.remove());
-    reset.addEventListener("click", async () => {
-      if (!confirm(g.title + " 패치 " + patch.id + " 통계를 모두 지울까요? 되돌릴 수 없습니다.")) return;
-      try { await writeStats(path); draw(); }
-      catch (e) { msg.textContent = e.message; }
-    });
-    dropDraws.addEventListener("click", async () => {
-      try {
-        const cleaner = new DrawStatsCleaner(patch.id, s);
-        if (!cleaner.hasDraws()) { msg.textContent = "이 패치에는 제외할 무승부 판이 없습니다."; return; }
-        if (!confirm(cleaner.summary() + "\n\n백업 파일을 내려받은 뒤 이 패치의 무승부 판을 통계에서 제외합니다. 계속할까요?")) return;
-        cleaner.downloadBackup();
-        await cleaner.apply(path);
-        draw();
-      } catch (e) { msg.textContent = e.message; }
-    });
-    acts.append(reload, dropDraws, reset, close);
+    acts.append(reload, close);
     box.appendChild(acts);
   }
   draw();
-}
-
-/* 통계 초기화(선생님 계정만 규칙상 지울 수 있음) */
-async function writeStats(path) {
-  if (!auth || !auth.currentUser) throw new Error("다시 로그인해 주세요.");
-  const idToken = await auth.currentUser.getIdToken();
-  const r = await fetch(statsUrl(path) + "?auth=" + encodeURIComponent(idToken), { method: "DELETE" });
-  if (!r.ok) {
-    let detail = r.status;
-    try { const d = await r.json(); detail = d.error || detail; } catch (e) {}
-    if (detail === "Permission denied" || detail === 401) {
-      throw new Error("권한이 없습니다. 데이터베이스규칙.json 을 Firebase 콘솔 → 규칙 탭에 다시 게시했는지 확인해 주세요.");
-    }
-    throw new Error(explainDb(detail));
-  }
-}
-
-/* 이미 합쳐진 통계에서 무승부 판을 뺀다(선생님 계정만 규칙상 쓸 수 있음).
-   무승부 판 수 = 경기 수 - 레드 승 - 블루 승. 경기 수·직업별 선택 수(picks)·고를 수 있던 게임 수(games)는 정확히 줄이고,
-   평균 값(피해·회복·KDA 등)과 밴 수는 판별 기록이 없어 그대로 둔다. 한 번 하면 무승부 판 수가 0 이라 다시 눌러도 바뀌지 않는다. */
-class DrawStatsCleaner {
-  constructor(patchId, stats) { this.patchId = patchId; this.before = stats || {}; }
-  drawCount() { return Math.max(0, (this.before.matches || 0) - (this.before.red || 0) - (this.before.blue || 0)); }
-  hasDraws() { return this.drawCount() > 0; }
-  summary() {
-    return "패치 " + this.patchId + ": 집계 경기 " + (this.before.matches || 0) + "판 → " + ((this.before.red || 0) + (this.before.blue || 0)) +
-      "판 (무승부 " + this.drawCount() + "판 제외)";
-  }
-  cleaned() {
-    const draws = this.drawCount(), after = JSON.parse(JSON.stringify(this.before));
-    after.matches = (this.before.red || 0) + (this.before.blue || 0);
-    Object.keys(after).forEach((k) => {
-      const c = after[k];
-      if (!c || typeof c !== "object" || c.picks == null) return;
-      c.picks = Math.max(0, (c.picks || 0) - (c.draws || 0));
-      delete c.draws;
-      ["asPicks", "ccPicks", "kdPicks", "mvpPicks"].forEach((f) => { if (c[f] != null) c[f] = Math.min(c[f], c.picks); });
-      c.wins = Math.min(c.wins || 0, c.picks);
-      c.games = Math.max(0, (c.games != null ? c.games : this.before.matches || 0) - draws);
-    });
-    return after;
-  }
-  downloadBackup() {
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(this.before, null, 1)], { type: "application/json" }));
-    a.download = "teambattle-stats-" + this.patchId + "-backup.json";
-    a.click();
-  }
-  async apply(path) {
-    if (!auth || !auth.currentUser) throw new Error("다시 로그인해 주세요.");
-    const idToken = await auth.currentUser.getIdToken();
-    const r = await fetch(statsUrl(path) + "?auth=" + encodeURIComponent(idToken), { method: "PUT", body: JSON.stringify(this.cleaned()) });
-    if (!r.ok) {
-      let detail = r.status;
-      try { const d = await r.json(); detail = d.error || detail; } catch (e) {}
-      throw new Error(explainDb(detail));
-    }
-  }
 }
 
 function renderList() {

@@ -105,6 +105,7 @@
     <div class="socTeam" id="hudTeam0" style="--team:#E5484D"><i></i><span class="name">빨강 팀</span><b id="hudScore0">0</b></div>
     <span id="hudTime">1:30</span>
     <div class="socTeam" id="hudTeam1" style="--team:#3E8EF0"><b id="hudScore1">0</b><span class="name">파랑 팀</span><i></i></div>
+    <div class="room-code-tag" id="hudRoomCode"></div>
   </div>
   <div id="hudOvertime" class="hud-box" hidden>연장 골든골</div>
   <div id="banner" hidden><div class="hud-box" id="bannerBox"></div></div>
@@ -126,7 +127,6 @@
       <div class="st-joinrow">
         <input type="text" id="joinCode" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="방·팀 코드 5자리">
         <button type="button" class="st-btn blue" id="btnJoin">참여하기</button>
-        <button type="button" class="st-btn sub" id="btnWatch">관전하기</button>
       </div>
       <button type="button" class="st-btn" data-account-open="stats">📊 내 통계 · 최근 20매치</button>
       <div class="st-msg" id="startMsg"></div>
@@ -214,7 +214,7 @@
 <script charset="utf-8" src="room-kit.js?v=20261022"></script>
 <script charset="utf-8" src="35.soccer-rules.js?v=20261021d"></script>
 <script charset="utf-8" src="35.soccer-views.js?v=20261021d"></script>
-<script charset="utf-8" src="35.soccer.js?v=20261027a"></script>
+<script charset="utf-8" src="35.soccer.js?v=20261028a"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";

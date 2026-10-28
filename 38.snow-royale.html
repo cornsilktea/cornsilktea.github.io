@@ -170,7 +170,7 @@
   <div id="btnWall" class="actBtn"><span>벽</span><small>J</small></div>
   <div id="btnThrow" class="actBtn"><span>던지기</span><small>K</small></div>
 </div>
-<div id="hudTop" hidden><div class="hud-box" id="hudStorm"></div><div class="hud-box" id="hudTeams"></div></div>
+<div id="hudTop" hidden><div class="hud-box" id="hudStorm"></div><div class="hud-box" id="hudTeams"></div><div class="room-code-tag" id="hudRoomCode"></div></div>
 <div id="hudMine" class="hud-box" hidden>
   <div id="hudWatch" hidden></div>
   <div class="hpBar"><i id="hudHpFill"></i><span id="hudHpText"></span></div>
@@ -195,7 +195,7 @@
       <div class="st-row"><button type="button" class="st-btn primary" id="btnCreateDuos">게임 만들기<small>팀전</small></button><button type="button" class="st-btn primary" id="btnCreateSolo">게임 만들기<small>개인전</small></button></div>
       <div class="st-row"><button type="button" class="st-btn primary" id="btnRandomDuos">랜덤 매칭 방 만들기<small>팀전</small></button><button type="button" class="st-btn primary" id="btnRandomSolo">랜덤 매칭 방 만들기<small>개인전</small></button></div>
       <input type="text" id="joinCode" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="방·팀 코드 5자리">
-      <div class="st-row"><button type="button" class="st-btn" id="btnJoin">참여하기</button><button type="button" class="st-btn" id="btnWatch">관전하기</button></div>
+      <button type="button" class="st-btn" id="btnJoin">참여하기</button>
       <button type="button" class="st-btn" data-account-open="stats">📊 내 통계 · 최근 20매치</button>
       <div class="st-msg" id="startMsg"></div>
       <button type="button" class="st-btn" id="btnPractice" style="margin-top:10px">혼자 연습<small>AI와 팀전</small></button>
@@ -272,7 +272,7 @@
 <script charset="utf-8" src="38.snow-hud.js?v=20261021d"></script>
 <script charset="utf-8" src="38.snow-net.js?v=20261026b"></script>
 <script charset="utf-8" src="38.snow-account.js?v=20261027b"></script>
-<script charset="utf-8" src="38.snow-royale.js?v=20261027b"></script>
+<script charset="utf-8" src="38.snow-royale.js?v=20261028a"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";

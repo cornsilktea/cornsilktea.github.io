@@ -5543,10 +5543,11 @@ class AccountStatsTests {
       });
     });
 
-    run(G, "학생 화면: 캐릭터 칸 버튼이 내 통계 · 최근 20매치(하나로 합침)·전체 통계·확대·모든 카드 뒤집기 순이고, 창 안에서 서로 오가며, 로그인 전에는 안내만 뜨는가", function (done) {
+    run(G, "학생 화면: 캐릭터 칸 버튼이 전체 통계·확대·모든 카드 뒤집기 순이고, 시작 화면 방 코드 아래 내 통계 · 최근 20매치 버튼 창에서 서로 오가며, 로그인 전에는 안내만 뜨는가", function (done) {
       var bad = [], userBefore = window.PORTAL_USER;
       var ids = Array.prototype.map.call(document.querySelectorAll(".charBtns button"), function (b) { return b.id + ":" + b.textContent; });
-      if (ids.join() !== "btnMyStats:📊 내 통계 · 최근 20매치,btnStats:전체 통계,btnZoomChars:확대,btnFlipAll:모든 카드 뒤집기") bad.push("버튼 " + ids.join());
+      if (ids.join() !== "btnStats:전체 통계,btnZoomChars:확대,btnFlipAll:모든 카드 뒤집기") bad.push("버튼 " + ids.join());
+      if (!document.querySelector("#joinBox + #btnMyStats")) bad.push("내 통계 버튼 위치");
       try {
         window.PORTAL_USER = null;
         document.getElementById("btnMyStats").click();
@@ -5565,7 +5566,7 @@ class AccountStatsTests {
         window.PORTAL_USER = userBefore;
         ["myStatsModal", "recentModal", "recentResultModal"].forEach(function (id) { document.getElementById(id).hidden = true; });
       }
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "버튼 4개 순서·통계↔최근 매치 전환·로그인 안내 2곳·최근 매치 블록(패배 빨강)·결과 창 6줄");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "캐릭터 칸 버튼 3개 순서·방 코드 아래 내 통계 버튼·통계↔최근 매치 전환·로그인 안내 2곳·최근 매치 블록(패배 빨강)·결과 창 6줄");
     });
   }
 }

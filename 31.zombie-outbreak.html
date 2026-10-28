@@ -236,6 +236,7 @@
     <div class="hudLab">남은 시간</div>
     <div id="timer">3:00</div>
     <div id="aliveLine"></div>
+    <div class="room-code-tag in-flow" id="hudRoomCode"></div>
   </div>
   <div id="centerMsg"></div>
   <div id="feed"></div>
@@ -265,7 +266,6 @@
         <input id="joinCode" class="codeIn" inputmode="numeric" maxlength="5" placeholder="12345" autocomplete="off">
         <button type="button" class="btn primary" id="btnJoin">입장</button>
       </div>
-      <button type="button" class="btn" id="btnJoinSpec">👀 관전자로 입장 (방마다 1명)</button>
       <button type="button" class="btn" data-account-open="stats">📊 내 통계 · 최근 20매치</button>
       <div class="msg" id="startMsg"></div>
     </div>
@@ -2550,28 +2550,29 @@ async function createRoom() {
   } catch (e) { startMsg("방을 만들지 못했습니다. (데이터베이스 규칙을 확인해 주세요)"); }
   finally { $("btnCreate").disabled = false; }
 }
-async function joinRoom(asSpectator) {
+async function joinRoom() {
   audioInit();
   if (!nickReady()) return;
   const code = $("joinCode").value.replace(/\D/g, "");
   if (code.length !== 5) { startMsg("방 코드 5자리를 입력해 주세요."); return; }
   if (!db) { startMsg("온라인 연결을 할 수 없습니다."); return; }
-  $("btnJoin").disabled = true; $("btnJoinSpec").disabled = true; startMsg("");
+  $("btnJoin").disabled = true; startMsg("");
   try {
-    const party = asSpectator ? { handled: false, message: "" } : await zombieRandom.tryJoin(code);
+    const party = await zombieRandom.tryJoin(code);
     if (party.handled) { startMsg(party.message); return; }
     const ref = db.ref(ROOM_ROOT + "/" + code);
     const snap = await ref.once("value"), r = snap.val();
     if (!r || !humanIdsOf(r.players).length) { startMsg("그런 방이 없습니다. 방 코드를 확인해 주세요."); return; }
     const slots = countSlots(r.players);
-    if (asSpectator && slots.spectators >= MAX_SPECTATORS) { startMsg("이 방에는 이미 관전자가 있습니다. (관전자 " + MAX_SPECTATORS + "명)"); return; }
-    if (!asSpectator && slots.players >= MAX_PLAYERS) { startMsg("플레이어 자리가 가득 찼습니다. (최대 " + MAX_PLAYERS + "명)"); return; }
+    const asSpectator = r.status !== "lobby" || slots.players >= MAX_PLAYERS;
+    if (asSpectator && slots.spectators >= MAX_SPECTATORS) { startMsg(r.status !== "lobby" ? "경기 중인 방이고 관전 자리도 찼습니다. 다음 판에 들어와 주세요." : "플레이어·관전 자리가 모두 찼습니다."); return; }
     await ref.child("players/" + myId).set(newPlayer(serverNow(), asSpectator));
     enterRoom(code);
   } catch (e) { startMsg("입장하지 못했습니다. (인터넷 연결을 확인해 주세요)"); }
-  finally { $("btnJoin").disabled = false; $("btnJoinSpec").disabled = false; }
+  finally { $("btnJoin").disabled = false; }
 }
 function enterRoom(code) {
+  $("hudRoomCode").textContent = "방 코드 " + code;
   room.code = code; room.ref = db.ref(ROOM_ROOT + "/" + code); room.leaving = false;
   room.players = {}; room.status = null; room.host = null; room.hostLoaded = false; room.startAt = 0; room.final = null;
   const ref = room.ref;
@@ -4012,9 +4013,8 @@ const zombieReporter = new ZombieMatchReporter();
 function blurAfter(fn) { return e => { e.currentTarget.blur(); fn(); }; }
 $("btnRandom").onclick = blurAfter(() => zombieRandom.open());
 $("btnCreate").onclick = blurAfter(createRoom);
-$("btnJoin").onclick = blurAfter(() => joinRoom(false));
-$("btnJoinSpec").onclick = blurAfter(() => joinRoom(true));
-$("joinCode").addEventListener("keydown", e => { if (e.key === "Enter") joinRoom(false); });
+$("btnJoin").onclick = blurAfter(() => joinRoom());
+$("joinCode").addEventListener("keydown", e => { if (e.key === "Enter") joinRoom(); });
 $("btnSpecToggle").onclick = blurAfter(toggleSpectator);
 $("btnStart").onclick = blurAfter(hostStart);
 $("btnBots").onclick = blurAfter(toggleBots);

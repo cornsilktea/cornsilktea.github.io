@@ -26,7 +26,7 @@
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
 } }
 </script>
-<link rel="stylesheet" href="30.team-battle-arena.css?v=20261027a">
+<link rel="stylesheet" href="30.team-battle-arena.css?v=20261028a">
 </head>
 <body>
 <canvas id="cv"></canvas>
@@ -50,6 +50,7 @@
           <button id="btnJoin" class="primary" type="button">입장하기</button>
         </div>
       </div>
+      <button id="btnMyStats" class="big" type="button">📊 내 통계 · 최근 20매치</button>
       <div id="startMsg" class="msg"></div>
       <div class="keys quickKeys">
         <span><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd></span><span>이동</span>
@@ -106,7 +107,7 @@
     </div>
   </div>
   <div id="charCardBox" class="card charCol">
-    <div class="secTitle charHead"><span>캐릭터<span id="charHint" class="secHint">선택한 캐릭터를 한 번 더 누르면 자세한 설명이 나와요.</span></span><span class="charBtns"><button id="btnMyStats" class="mini" type="button">📊 내 통계 · 최근 20매치</button><button id="btnStats" class="mini" type="button">전체 통계</button><button id="btnZoomChars" class="mini" type="button">확대</button><button id="btnFlipAll" class="mini" type="button">모든 카드 뒤집기</button></span></div>
+    <div class="secTitle charHead"><span>캐릭터<span id="charHint" class="secHint">선택한 캐릭터를 한 번 더 누르면 자세한 설명이 나와요.</span></span><span class="charBtns"><button id="btnStats" class="mini" type="button">전체 통계</button><button id="btnZoomChars" class="mini" type="button">확대</button><button id="btnFlipAll" class="mini" type="button">모든 카드 뒤집기</button></span></div>
     <div class="chars" id="chars"></div>
   </div>
   </div>
@@ -174,6 +175,7 @@
     <div class="hdSide b"><span>블루 킬</span><b id="hudKillB">0</b></div>
     <div id="hudMid"><div id="hudTimer">1:30</div><div id="hudCount"></div></div>
     <div class="hdSide r"><span>레드 킬</span><b id="hudKillR">0</b></div>
+    <div class="room-code-tag" id="hudRoomCode"></div>
   </div>
   <div id="killFeed"></div>
   <div id="killBanner"></div>
@@ -1037,6 +1039,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }).catch(function () { if (services.session.room === r && !services.session.leaving) setTimeout(function () { services.session.rejoinAfterDrop(last, tries + 1); }, 1000); });
     }
     enterRoom(code) { var services = this.services;
+      Dom.setText(Dom.$("hudRoomCode"), "방 코드 " + code);
       services.session.leaving = false;
       var ref = services.backend.db.ref(RoomSession.ROOT + "/" + code);
       services.session.room = { code: code, ref: ref, mode: null, map: "forest", status: "lobby", host: null, startAt: 0, winner: null, overtimeAt: null, endedAt: 0, final: null, roster: null, draft: null, bans: null, statsNote: null };
@@ -2122,7 +2125,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var pickBtn = !canPick ? "" : banTurn ? '<button type="button" class="big danger" data-pick="' + v + '">🚫 ' + services.charTypes.statsOf(v).name + " 밴</button>" :
         '<button type="button" class="big primary" data-pick="' + v + '">✔ ' + services.charTypes.statsOf(v).name + Korean.roParticle(services.charTypes.statsOf(v).name) + " 결정</button>";
       Dom.setHtml(Dom.$("dfDetail"), v ? '<div class="dfName">' + services.charTypes.statsOf(v).icon + " " + services.charTypes.statsOf(v).name + '<small>' + services.catalog.roleOf(v).icon + " " + services.catalog.roleOf(v).name + "</small></div>" +
-        '<div class="dfRole">' + services.skilltext.gaugeTextOf(v) + "</div>" + services.skilltext.statTable(v) + services.skilltext.skillBlocks(v) + pickBtn : "");
+        services.skilltext.statTable(v) + services.skilltext.skillBlocks(v) + pickBtn : "");
     }
   }
 
@@ -6198,7 +6201,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     practiceInfoHtml() { var services = this.services;
       var k = services.match.me.char;
       return '<div class="dfName">' + services.charTypes.statsOf(k).icon + " " + services.charTypes.statsOf(k).name + '<small>' + services.catalog.roleOf(k).icon + " " + services.catalog.roleOf(k).name + "</small></div>" +
-        '<div class="dfRole">' + services.skilltext.gaugeTextOf(k) + "</div>" + services.skilltext.statTable(k) + services.skilltext.skillBlocks(k);
+        services.skilltext.statTable(k) + services.skilltext.skillBlocks(k);
     }
     renderPracticeModal() { var services = this.services;
       Dom.setHtmlKeepScroll(Dom.$("pcChars"), services.practice.practiceCharsHtml());

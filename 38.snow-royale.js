@@ -559,10 +559,9 @@ class SnGame {
         SnDom.el("btnRandomDuos").addEventListener("click", () => this.createParty("duos"));
         SnDom.el("btnRandomSolo").addEventListener("click", () => this.createParty("solo"));
         SnDom.el("btnPractice").addEventListener("click", () => { this.practice = true; this.startOffline(); });
-        SnDom.el("btnJoin").addEventListener("click", () => this.joinRoom(false));
-        SnDom.el("btnWatch").addEventListener("click", () => this.joinRoom(true));
+        SnDom.el("btnJoin").addEventListener("click", () => this.joinRoom());
         SnDom.el("joinCode").addEventListener("keydown", (e) => { if (e.key === "Enter")
-            this.joinRoom(false); });
+            this.joinRoom(); });
         SnDom.el("btnStart").addEventListener("click", () => this.startMatch());
         SnDom.el("btnLeave").addEventListener("click", () => this.leaveRoom(""));
         SnDom.el("btnSeatMode").addEventListener("click", () => this.toggleSeatMode());
@@ -747,7 +746,7 @@ class SnGame {
     }
     updateStartButtons() {
         const ok = !!this.backend.database;
-        ["btnCreateDuos", "btnCreateSolo", "btnJoin", "btnWatch"].forEach((id) => { SnDom.el(id).disabled = !ok; });
+        ["btnCreateDuos", "btnCreateSolo", "btnJoin"].forEach((id) => { SnDom.el(id).disabled = !ok; });
         if (!ok)
             this.startMessage("온라인 연결을 할 수 없어요. (firebase-config.js·인터넷 확인)");
     }
@@ -773,7 +772,7 @@ class SnGame {
             this.startMessage("방을 만들지 못했어요. (데이터베이스 규칙을 확인해 주세요)");
         }
     }
-    async joinRoom(asSpectator) {
+    async joinRoom() {
         if (!this.backend.database)
             return;
         const code = SnDom.el("joinCode").value.replace(/\D/g, "");
@@ -789,7 +788,7 @@ class SnGame {
                 this.startMessage(party.message);
                 return;
             }
-            const outcome = await this.directory.join(code, this.myId, this.myRecord(), asSpectator);
+            const outcome = await this.directory.join(code, this.myId, this.myRecord(), false);
             if (outcome.ok) {
                 this.enterRoom(code, false);
                 SnDom.text(SnDom.el("lobbyNotice"), outcome.message);
@@ -802,6 +801,7 @@ class SnGame {
         }
     }
     enterRoom(code, hosting) {
+        SnDom.text(SnDom.el("hudRoomCode"), "방 코드 " + code);
         const session = new RkSession(this.backend, SnRoomRules.RULES, code, this.myId, hosting, SnRoomRules.VALUES);
         this.session = session;
         session.onChange = (kind) => this.onSessionChange(kind);
@@ -958,6 +958,7 @@ class SnGame {
         this.startMessage(message);
     }
     startOffline() {
+        SnDom.text(SnDom.el("hudRoomCode"), "");
         const ui = this.ui, profile = this.profile;
         if (this.view)
             this.view.dispose();

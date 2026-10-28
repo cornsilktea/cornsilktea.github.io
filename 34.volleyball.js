@@ -1618,10 +1618,9 @@ class VolleyballGame {
     bindMenus() {
         VbDom.byId("btnCreate").addEventListener("click", () => this.createRoom());
         VbDom.byId("btnRandom").addEventListener("click", () => this.createParty());
-        VbDom.byId("btnJoin").addEventListener("click", () => this.joinRoom(false));
-        VbDom.byId("btnWatch").addEventListener("click", () => this.joinRoom(true));
+        VbDom.byId("btnJoin").addEventListener("click", () => this.joinRoom());
         VbDom.byId("joinCode").addEventListener("keydown", (event) => { if (event.key === "Enter")
-            this.joinRoom(false); });
+            this.joinRoom(); });
         VbDom.byId("btnStart").addEventListener("click", () => this.startMatch());
         VbDom.byId("btnLeave").addEventListener("click", () => this.leaveRoom());
         VbDom.byId("btnEndLeave").addEventListener("click", () => this.leaveRoom());
@@ -1632,7 +1631,7 @@ class VolleyballGame {
     }
     updateStartButtons() {
         const ok = !!this.backend.database && this.assetsReady;
-        ["btnCreate", "btnRandom", "btnJoin", "btnWatch"].forEach((id) => { VbDom.byId(id).disabled = !ok; });
+        ["btnCreate", "btnRandom", "btnJoin"].forEach((id) => { VbDom.byId(id).disabled = !ok; });
         if (!this.backend.database)
             this.showStartMessage("온라인 연결을 할 수 없어요. (firebase-config.js·인터넷 확인)");
     }
@@ -1700,7 +1699,7 @@ class VolleyballGame {
         }
         button.disabled = false;
     }
-    async joinRoom(asSpectator) {
+    async joinRoom() {
         if (!this.backend.database)
             return;
         const code = VbDom.byId("joinCode").value.replace(/\D/g, "");
@@ -1715,7 +1714,7 @@ class VolleyballGame {
                 this.showStartMessage(party.message);
                 return;
             }
-            const outcome = await this.directory.join(code, this.myId, this.myRecord(), asSpectator);
+            const outcome = await this.directory.join(code, this.myId, this.myRecord(), false);
             if (outcome.ok)
                 this.enterRoom(code, false, outcome.message);
             else
@@ -1726,6 +1725,7 @@ class VolleyballGame {
         }
     }
     enterRoom(code, hosting, notice) {
+        VbDom.byId("hudRoomCode").textContent = "방 코드 " + code;
         const session = new VbRoomSession(this.backend, code, this.myId, hosting);
         this.session = session;
         session.onChange = (kind) => this.onSessionChange(kind);

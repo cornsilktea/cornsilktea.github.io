@@ -242,6 +242,9 @@ button.mk-seat:disabled{cursor:default;}
 /* 대기실 나가기: 30번 방 대기실처럼 카드 오른쪽 위 작은 빨간 버튼(2026-10-27). 팀 코드 줄은 버튼 자리만큼 오른쪽을 비운다 */
 .mk-panel{position:relative;}
 .mk-panel>.mk-top{padding-right:96px;}
+/* 팀 코드·연승·내 통계가 한 줄에 다 안 들어가면 내 통계를 다음 줄로 내린다. 한 줄로 고정하면 오른쪽 위 나가기 버튼과 겹친다(2026-10-28) */
+.mk-panel>.mk-top>.mk-head{flex-wrap:wrap;white-space:normal;min-width:0;}
+.mk-panel>.mk-top>.mk-head>.mk-code{white-space:nowrap;}
 .mk-leave{position:absolute;top:12px;right:12px;z-index:1;height:34px;padding:0 12px;border-radius:8px;
   border:2px solid #FF7A7A;background:rgba(211,47,47,.16);color:#FF9A9A;font:inherit;font-size:14px;font-weight:800;
   white-space:nowrap;cursor:pointer;-webkit-tap-highlight-color:transparent;}
@@ -282,3 +285,12 @@ button.mk-seat:disabled{cursor:default;}
 .ce-toggles button{flex:1 1 40%;min-height:42px;font:inherit;font-size:15px;font-weight:800;border-radius:6px;cursor:pointer;
   border:2px solid rgba(255,255,255,.22);background:rgba(255,255,255,.05);color:var(--st-ink-mid);}
 .ce-toggles button.on{border-color:var(--st-accent);background:rgba(217,123,79,.22);color:#fff;}
+
+/* 경기 화면 위쪽의 작은 방 코드(2026-10-28 선생님 요청, 모든 방·매칭 게임 공통). 관전하려면 진행 중인 방 코드를 입장 칸에 넣으므로
+   경기 중에도 코드가 보여야 한다. 기본은 그 게임의 위쪽 가운데 HUD 상자 바로 아래에 붙는다(그 상자 안에 넣는다).
+   .in-flow 는 HUD 상자 안의 한 줄로 둔다. 글자가 없으면(혼자 하기·연습) 숨는다. */
+.room-code-tag{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:4px;padding:1px 8px;border-radius:999px;
+  background:rgba(0,0,0,.42);color:rgba(255,255,255,.86);font-family:var(--sg-font,"Nanum Gothic","Malgun Gothic",sans-serif);
+  font-size:11px;font-weight:700;letter-spacing:.06em;line-height:1.5;white-space:nowrap;pointer-events:none;text-shadow:none;}
+.room-code-tag:empty{display:none !important;}
+.room-code-tag.in-flow{position:static;transform:none;display:block;width:max-content;max-width:100%;margin:4px auto 0;padding:0;background:none;color:rgba(255,255,255,.72);}

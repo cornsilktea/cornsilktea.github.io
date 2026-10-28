@@ -1499,10 +1499,9 @@ class RdGame {
     }
     bindMenus() {
         RkDom.byId("btnCreate").addEventListener("click", () => this.createRoom());
-        RkDom.byId("btnJoin").addEventListener("click", () => this.joinRoom(false));
-        RkDom.byId("btnWatch").addEventListener("click", () => this.joinRoom(true));
+        RkDom.byId("btnJoin").addEventListener("click", () => this.joinRoom());
         RkDom.byId("joinCode").addEventListener("keydown", (event) => { if (event.key === "Enter")
-            this.joinRoom(false); });
+            this.joinRoom(); });
         RkDom.byId("btnStart").addEventListener("click", () => this.startMatch());
         RkDom.byId("btnLeave").addEventListener("click", () => this.leaveRoom());
         RkDom.byId("btnEndLeave").addEventListener("click", () => this.leaveRoom());
@@ -1526,7 +1525,7 @@ class RdGame {
     }
     updateStartButtons() {
         const ok = !!this.backend.database && this.assetsReady;
-        ["btnCreate", "btnJoin", "btnWatch"].forEach((id) => { RkDom.byId(id).disabled = !ok; });
+        ["btnCreate", "btnJoin"].forEach((id) => { RkDom.byId(id).disabled = !ok; });
         if (!this.backend.database)
             this.showStartMessage("온라인 연결을 할 수 없어요. (firebase-config.js·인터넷 확인)");
     }
@@ -1558,7 +1557,7 @@ class RdGame {
         }
         button.disabled = false;
     }
-    async joinRoom(asSpectator) {
+    async joinRoom() {
         if (!this.backend.database)
             return;
         const code = RkDom.byId("joinCode").value.replace(/\D/g, "");
@@ -1568,7 +1567,7 @@ class RdGame {
         }
         this.showStartMessage("");
         try {
-            const outcome = await this.directory.join(code, this.myId, this.myRecord(), asSpectator);
+            const outcome = await this.directory.join(code, this.myId, this.myRecord(), false);
             if (outcome.ok)
                 this.enterRoom(code, false, outcome.message);
             else
@@ -1579,6 +1578,7 @@ class RdGame {
         }
     }
     enterRoom(code, hosting, notice) {
+        RkDom.byId("hudRoomCode").textContent = "방 코드 " + code;
         const session = new RkSession(this.backend, RdRoomRules.RULES, code, this.myId, hosting, RdRoomRules.VALUES);
         this.session = session;
         session.onChange = (kind) => this.onSessionChange(kind);

@@ -973,10 +973,9 @@ class SoccerGame {
     bindMenus() {
         RkDom.byId("btnCreate").addEventListener("click", () => this.createRoom());
         RkDom.byId("btnRandom").addEventListener("click", () => this.createParty());
-        RkDom.byId("btnJoin").addEventListener("click", () => this.joinRoom(false));
-        RkDom.byId("btnWatch").addEventListener("click", () => this.joinRoom(true));
+        RkDom.byId("btnJoin").addEventListener("click", () => this.joinRoom());
         RkDom.byId("joinCode").addEventListener("keydown", (event) => { if (event.key === "Enter")
-            this.joinRoom(false); });
+            this.joinRoom(); });
         RkDom.byId("btnStart").addEventListener("click", () => this.startMatch());
         RkDom.byId("btnLeave").addEventListener("click", () => this.leaveRoom());
         RkDom.byId("btnEndLeave").addEventListener("click", () => this.leaveRoom());
@@ -987,7 +986,7 @@ class SoccerGame {
     }
     updateStartButtons() {
         const ok = !!this.backend.database && this.assetsReady;
-        ["btnCreate", "btnRandom", "btnJoin", "btnWatch"].forEach((id) => { RkDom.byId(id).disabled = !ok; });
+        ["btnCreate", "btnRandom", "btnJoin"].forEach((id) => { RkDom.byId(id).disabled = !ok; });
         if (!this.backend.database)
             this.showStartMessage("온라인 연결을 할 수 없어요. (firebase-config.js·인터넷 확인)");
     }
@@ -1055,7 +1054,7 @@ class SoccerGame {
         }
         button.disabled = false;
     }
-    async joinRoom(asSpectator) {
+    async joinRoom() {
         if (!this.backend.database)
             return;
         const code = RkDom.byId("joinCode").value.replace(/\D/g, "");
@@ -1070,7 +1069,7 @@ class SoccerGame {
                 this.showStartMessage(party.message);
                 return;
             }
-            const outcome = await this.directory.join(code, this.myId, this.myRecord(), asSpectator);
+            const outcome = await this.directory.join(code, this.myId, this.myRecord(), false);
             if (outcome.ok)
                 this.enterRoom(code, false, outcome.message);
             else
@@ -1081,6 +1080,7 @@ class SoccerGame {
         }
     }
     enterRoom(code, hosting, notice) {
+        RkDom.byId("hudRoomCode").textContent = "방 코드 " + code;
         const session = new RkSession(this.backend, SocRoomRules.RULES, code, this.myId, hosting, SocRoomRules.VALUES);
         this.session = session;
         session.onChange = (kind) => this.onSessionChange(kind);
