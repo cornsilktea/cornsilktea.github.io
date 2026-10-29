@@ -74,7 +74,6 @@
   #allOff { color: var(--sg-danger); border-color: var(--sg-danger); }
   #allOff:hover { background: var(--sg-danger-soft); }
   /* 새 학년도 시작: 맨 아래 위험 칸과 확인 창 */
-  .year-panel { border-color: var(--sg-danger); }
   #yearOpen, #yearGo { color: var(--sg-danger); border-color: var(--sg-danger); }
   #yearOpen:hover, #yearGo:not(:disabled):hover { background: var(--sg-danger-soft); }
   .year-dialog {
@@ -450,7 +449,7 @@
       </p>
     </div>
 
-    <!-- 관리 도구 5가지(2026-10-29 선생님 요청): 예전에는 카드 5장이 따로 펼치기 버튼을 가졌는데, 한 카드에 서류철 탭처럼 모았다.
+    <!-- 관리 도구 6가지(2026-10-29 선생님 요청): 예전에는 카드 5장이 따로 펼치기 버튼을 가졌는데, 한 카드에 서류철 탭처럼 모았다.
          탭을 누르면 그 기능만 펼쳐지고, 고른 탭과 펼친 칸이 함께 조금 밝아져 하나로 이어져 보인다. 같은 탭을 다시 누르면 접힌다.
          각 기능의 '처음 펼칠 때만 읽기'는 예전 펼치기 버튼(숨김, *Toggle)이 그대로 맡고, ToolTabs 는 그 버튼을 눌러 줄 뿐이다. -->
     <div class="tool-box" id="toolBox">
@@ -460,6 +459,7 @@
         <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="rank">반 별 통계</button>
         <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="patchNote">패치노트</button>
         <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="lag">30번 렉 진단</button>
+        <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="year">새 학년도 시작</button>
       </div>
       <div hidden>
         <button id="recToggle" type="button" aria-expanded="false">펼치기</button>
@@ -467,6 +467,7 @@
         <button id="rankToggle" type="button" aria-expanded="false">펼치기</button>
         <button id="patchNoteToggle" type="button" aria-expanded="false">펼치기</button>
         <button id="lagToggle" type="button" aria-expanded="false">펼치기</button>
+        <button id="yearToggle" type="button" aria-expanded="false">펼치기</button>
       </div>
       <div class="tool-sheet" id="toolSheet" hidden>
         <!-- 세계 신기록 관리: records/<게임>/<항목> 을 읽어 보여 주고, 선생님 계정으로 고치거나 지웁니다.
@@ -544,20 +545,14 @@
           <p class="msg" id="lagMsg"></p>
           <div id="lagTable" class="stats-box"></div>
         </div>
-      </div>
-    </div>
 
-    <!-- 새 학년도 시작(2026-10-29 선생님 요청): 일 년에 한 번만 쓰고 되돌리기 어려워서 제어판 맨 아래에 두고, 확인 창에서 문구를 쳐야 시작한다.
-         하는 일은 스크립트의 SchoolYearReset 주석. -->
-    <div class="panel year-panel" id="yearPanel">
-      <h2>새 학년도 시작</h2>
-      <p class="hint">
-        진급해서 학년·반이 바뀌었을 때 <b>새 학기 첫 수업 전에 한 번</b> 누릅니다.
-        모든 학생의 반을 비우면 학생이 <b>새 반 링크로 처음 로그인할 때 새 반이 다시 적힙니다.</b>
-        지난해 반 별 통계는 보관한 뒤 비우고, 학생의 개인 통계·최근 매치·신기록은 그대로 둡니다.
-      </p>
-      <div class="actions"><button id="yearOpen" type="button">새 학년도 시작…</button></div>
-      <p class="msg" id="yearMsg"></p>
+        <!-- 새 학년도 시작(2026-10-29 선생님 요청): 일 년에 한 번만 쓰고 되돌리기 어려워서 관리 도구 맨 끝 탭에 두고, 확인 창에서 문구를 쳐야 시작한다.
+             하는 일은 스크립트의 SchoolYearReset 주석. -->
+        <div id="yearBody" hidden>
+          <div class="actions"><button id="yearOpen" type="button">새 학년도 시작…</button></div>
+          <p class="msg" id="yearMsg"></p>
+        </div>
+      </div>
     </div>
 
     <dialog class="year-dialog" id="yearDialog">
@@ -2482,13 +2477,19 @@ class SchoolYearReset {
   }
 }
 
-/* 제어판 맨 아래 새 학년도 칸: 실수로 누르지 않게 확인 창에서 문구를 그대로 쳐야 시작 버튼이 켜진다 */
+/* 관리 도구 맨 끝 새 학년도 탭: 실수로 누르지 않게 확인 창에서 문구를 그대로 쳐야 시작 버튼이 켜진다 */
 class SchoolYearPanel {
   static CONFIRM_TEXT = "새 학년도 시작";
 
   constructor(reset) { this.reset = reset; this.busy = false; }
 
   bind() {
+    $("yearToggle").addEventListener("click", () => {
+      const open = $("yearBody").hidden;
+      $("yearBody").hidden = !open;
+      $("yearToggle").textContent = open ? "접기" : "펼치기";
+      $("yearToggle").setAttribute("aria-expanded", open ? "true" : "false");
+    });
     $("yearOpen").addEventListener("click", () => this.open());
     $("yearTyped").addEventListener("input", () => { $("yearGo").disabled = $("yearTyped").value.trim() !== SchoolYearPanel.CONFIRM_TEXT; });
     $("yearCancel").addEventListener("click", () => $("yearDialog").close());
